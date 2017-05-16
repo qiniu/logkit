@@ -1,0 +1,208 @@
+package reader
+
+import (
+	"errors"
+	"strings"
+
+	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/conf"
+)
+
+// Reader 是一个通用的行读取reader接口
+type Reader interface {
+	Name() string
+	Source() string
+	ReadLine() (string, error)
+	Close() error
+	SyncMeta()
+}
+
+// FileReader reader 接口方法
+type FileReader interface {
+	Name() string
+	Source() string
+	Read(p []byte) (n int, err error)
+	Close() error
+	SyncMeta() error
+}
+
+// FileReader's conf keys
+const (
+	KeyLogPath  = "log_path"
+	KeyMetaPath = "meta_path"
+	KeyFileDone = "file_done"
+	KeyMode     = "mode"
+	KeyBufSize  = "reader_buf_size"
+	KeyWhence   = "read_from"
+	KeyEncoding = "encoding"
+
+	// 忽略隐藏文件
+	KeyIgnoreHiddenFile = "ignore_hidden"
+	KeyIgnoreFileSuffix = "ignore_file_suffix"
+	KeyValidFilePattern = "valid_file_pattern"
+
+	KeyMysqlOffsetKey   = "mysql_offset_key"
+	KeyMysqlReadBatch   = "mysql_limit_batch"
+	KeyMysqlDataSource  = "mysql_datasource"
+	KeyMysqlDataBase    = "mysql_database"
+	KeyMysqlSQL         = "mysql_sql"
+	KeyMysqlCron        = "mysql_cron"
+	KeyMysqlExecOnStart = "mysql_exec_onstart"
+
+	KeyMssqlOffsetKey   = "mssql_offset_key"
+	KeyMssqlReadBatch   = "mssql_limit_batch"
+	KeyMssqlDataSource  = "mssql_datasource"
+	KeyMssqlDataBase    = "mssql_database"
+	KeyMssqlSQL         = "mssql_sql"
+	KeyMssqlCron        = "mssql_cron"
+	KeyMssqlExecOnStart = "mssql_exec_onstart"
+
+	KeyESReadBatch = "es_limit_batch"
+	KeyESIndex     = "es_index"
+	KeyESType      = "es_type"
+	KeyESHost      = "es_host"
+	KeyESKeepAlive = "es_keepalive"
+
+	KeyMongoHost        = "mongo_host"
+	KeyMongoDatabase    = "mongo_database"
+	KeyMongoCollection  = "mongo_collection"
+	KeyMongoOffsetKey   = "mongo_offset_key"
+	KeyMongoReadBatch   = "mongo_limit_batch"
+	KeyMongoCron        = "mongo_cron"
+	KeyMongoExecOnstart = "mongo_exec_onstart"
+	KeyMongoFilters     = "mongo_filters"
+	KeyMongoCert        = "mongo_cacert"
+)
+
+var defaultIgnoreFileSuffix = []string{
+	".pid", ".swap", ".go", ".conf", ".tar.gz", ".tar", ".zip",
+	".a", ".o", ".so"}
+
+// FileReader's modes
+const (
+	ModeDir     = "dir"
+	ModeFile    = "file"
+	ModeMysql   = "mysql"
+	ModeMssql   = "mssql"
+	ModeElastic = "elastic"
+	ModeMongo   = "mongo"
+)
+
+// KeyWhence 的可选项
+const (
+	WhenceOldest = "oldest"
+	WhenceNewest = "newest"
+)
+
+// NewFileReader 创建FileReader
+func NewFileBufReader(conf conf.MapConf) (reader Reader, err error) {
+	meta, err := NewMetaWithConf(conf)
+	if err != nil {
+		log.Warn(err)
+		return
+	}
+	return NewFileBufReaderWithMeta(conf, meta)
+}
+
+func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta) (reader Reader, err error) {
+	mode, _ := conf.GetStringOr(KeyMode, ModeDir)
+	logpath, err := conf.GetString(KeyLogPath)
+	if err != nil && (mode == ModeFile || mode == ModeDir) {
+		return
+	}
+	bufSize, _ := conf.GetIntOr(KeyBufSize, defaultBufSize)
+	whence, _ := conf.GetStringOr(KeyWhence, WhenceOldest)
+	decoder, _ := conf.GetStringOr(KeyEncoding, "")
+	if decoder != "" {
+		meta.SetEncodingWay(strings.ToLower(decoder))
+	}
+	var fr FileReader
+	switch mode {
+	case ModeDir:
+		// 默认不读取隐藏文件
+		ignoreHidden, _ := conf.GetBoolOr(KeyIgnoreHiddenFile, true)
+		ignoreFileSuffix, _ := conf.GetStringListOr(KeyIgnoreFileSuffix, defaultIgnoreFileSuffix)
+		validFilesRegex, _ := conf.GetStringOr(KeyValidFilePattern, "*")
+		fr, err = NewSeqFile(meta, logpath, ignoreHidden, ignoreFileSuffix, validFilesRegex, whence)
+		if err != nil {
+			return
+		}
+		return NewReaderSize(fr, meta, bufSize)
+	case ModeFile:
+		fr, err = NewSingleFile(meta, logpath, whence)
+		if err != nil {
+			return
+		}
+		return NewReaderSize(fr, meta, bufSize)
+	case ModeMysql: // Mysql 模式是启动mysql reader,读取mysql数据表
+		readBatch, _ := conf.GetIntOr(KeyMysqlReadBatch, 100)
+		offsetKey, _ := conf.GetStringOr(KeyMysqlOffsetKey, "")
+		dataSource, err := conf.GetString(KeyMysqlDataSource)
+		if err != nil {
+			dataSource = logpath
+		}
+		database, err := conf.GetString(KeyMysqlDataBase)
+		if err != nil {
+			return nil, err
+		}
+		rawSqls, err := conf.GetString(KeyMysqlSQL)
+		if err != nil {
+			return nil, err
+		}
+		cronSchedule, _ := conf.GetStringOr(KeyMysqlCron, "")
+		execOnStart, _ := conf.GetBoolOr(KeyMysqlExecOnStart, true)
+		return NewSQLReader(meta, readBatch, ModeMysql, dataSource, database, rawSqls, cronSchedule, offsetKey, execOnStart)
+	case ModeMssql: // Mssql 模式是启动mssql reader，读取mssql数据表
+		readBatch, _ := conf.GetIntOr(KeyMssqlReadBatch, 100)
+		offsetKey, _ := conf.GetStringOr(KeyMssqlOffsetKey, "")
+		dataSource, err := conf.GetString(KeyMssqlDataSource)
+		if err != nil {
+			dataSource = logpath
+		}
+		database, err := conf.GetString(KeyMssqlDataBase)
+		if err != nil {
+			return nil, err
+		}
+		rawSqls, err := conf.GetString(KeyMssqlSQL)
+		if err != nil {
+			return nil, err
+		}
+		cronSchedule, _ := conf.GetStringOr(KeyMssqlCron, "")
+		execOnStart, _ := conf.GetBoolOr(KeyMssqlExecOnStart, true)
+		return NewSQLReader(meta, readBatch, ModeMssql, dataSource, database, rawSqls, cronSchedule, offsetKey, execOnStart)
+	case ModeElastic:
+		readBatch, _ := conf.GetIntOr(KeyESReadBatch, 100)
+		estype, err := conf.GetString(KeyESType)
+		if err != nil {
+			return nil, err
+		}
+		esindex, err := conf.GetString(KeyESIndex)
+		if err != nil {
+			return nil, err
+		}
+		eshost, _ := conf.GetStringOr(KeyESHost, "http://localhost:9200")
+		if !strings.HasPrefix(eshost, "http://") && !strings.HasPrefix(eshost, "https://") {
+			eshost = "http://" + eshost
+		}
+		keepAlive, _ := conf.GetStringOr(KeyESKeepAlive, "6h")
+		return NewESReader(meta, readBatch, estype, esindex, eshost, keepAlive)
+	case ModeMongo:
+		readBatch, _ := conf.GetIntOr(KeyMongoReadBatch, 100)
+		database, err := conf.GetString(KeyMongoDatabase)
+		if err != nil {
+			return nil, err
+		}
+		coll, err := conf.GetString(KeyMongoCollection)
+		if err != nil {
+			return nil, err
+		}
+		mongohost, _ := conf.GetStringOr(KeyMongoHost, "localhost:9200")
+		offsetKey, _ := conf.GetStringOr(KeyMongoOffsetKey, MongoDefaultOffsetKey)
+		cronSchedule, _ := conf.GetStringOr(KeyMongoCron, "")
+		execOnStart, _ := conf.GetBoolOr(KeyMongoExecOnstart, true)
+		filters, _ := conf.GetStringOr(KeyMongoFilters, "")
+		certfile, _ := conf.GetStringOr(KeyMongoCert, "")
+		return NewMongoReader(meta, readBatch, mongohost, database, coll, offsetKey, cronSchedule, filters, certfile, execOnStart)
+	}
+	return nil, errors.New("mode not supported, please set it to dir, file or mysql, mssql")
+}

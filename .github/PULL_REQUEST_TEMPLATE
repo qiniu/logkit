@@ -1,0 +1,20 @@
+## Fixes [PDR-XXX](pdr-link-address)
+
+## Changes
+   
+  - [ ] feature1
+  - [ ] feature2 
+  - [ ] fixbug1
+  - [ ] fixbug2
+ 
+## Reviewers
+
+  - [ ] @[someone] please review
+  - [ ] @[someotherone] please review
+    
+## Checklist
+   
+   - [ ] Rebased/mergable
+   - [ ] Tests pass
+   - [ ] CHANGELOG.md updated
+   - [ ] Jira issue/task done

@@ -1,0 +1,92 @@
+#`logkit grok pattern` 其格式符合 `%{<捕获语法>[:<字段名>][:<字段类型>]}`，其中中括号的内容可以省略
+#    - logkit的grok pattern是logstash grok pattern的增强版，除了完全兼容[logstash grok pattern规则](https://www.elastic.co/guide/en/logstash/current/plugins-filters-grok.html#_grok_basics)以外，还增加了类型，与[telegraf的grok pattern规则](https://github.com/influxdata/telegraf/tree/master/plugins/inputs/logparser#grok-parser)一致，但是使用的类型是logkit自身定义的。你可以在[logstash grok文档](https://www.elastic.co/guide/en/logstash/current/plugins-filters-grok.html)中找到详细的grok介绍.
+#    - `捕获语法` 是一个正则表达式的名字，比如内置了`USERNAME [a-zA-Z0-9._-]+`,那么此时`USERNAME`就是一个捕获语法。所以，在使用自定义的正则表达式之前，你需要先为你的正则命名，然后把这个名字当作`捕获语法`填写`patterns`中，当然，不推荐自己写正则，建议首选内置的捕获语法。
+#    - `字段名` 按照捕获语法对应的正则表达式解析出的字段，其字段名称以此命名，该项可以不填，但是没有字段名的grok pattern不解析，无法被logkit sender使用，但可以作为一个中间`捕获语法`与别的`捕获语法`共同组合一个新的`捕获语法`。
+#    - `字段类型` 可以不填，默认为string。logkit支持以下类型。
+#       * `string` 默认的类型
+#       * `long` 整型
+#       * `float` 浮点型
+#       * `date` 时间类型，包括以下格式
+#       	 - "2006/01/02 15:04:05",
+#		 - "2006-01-02 15:04:05 -0700 MST",
+#		 - "2006-01-02 15:04:05 -0700",
+#		 - "2006-01-02 15:04:05",
+#		 - "2006/01/02 15:04:05 -0700 MST",
+#		 - "2006/01/02 15:04:05 -0700",
+#		 - "2006-01-02 -0700 MST",
+#		 - "2006-01-02 -0700",
+#		 - "2006-01-02",
+#		 - "2006/01/02 -0700 MST",
+#		 - "2006/01/02 -0700",
+#		 - "2006/01/02",
+#		 - "Mon Jan _2 15:04:05 2006" ANSIC,
+#		 - "Mon Jan _2 15:04:05 MST 2006" UnixDate,
+#		 - "Mon Jan 02 15:04:05 -0700 2006" RubyDate,
+#		 - "02 Jan 06 15:04 MST" RFC822,
+#		 - "02 Jan 06 15:04 -0700" RFC822Z,
+#		 - "Monday, 02-Jan-06 15:04:05 MST" RFC850,
+#		 - "Mon, 02 Jan 2006 15:04:05 MST" RFC1123,
+#		 - "Mon, 02 Jan 2006 15:04:05 -0700" RFC1123Z,
+#		 - "2006-01-02T15:04:05Z07:00" RFC3339,
+#		 - "2006-01-02T15:04:05.999999999Z07:00" RFC3339Nano,
+#		 - "3:04PM" Kitchen,
+#		 - "Jan _2 15:04:05" Stamp,
+#		 - "Jan _2 15:04:05.000" StampMilli,
+#		 - "Jan _2 15:04:05.000000" StampMicro,
+#		 - "Jan _2 15:04:05.000000000" StampNano,
+
+# 更多关于grok的内容可以参见logstash的文档:
+#   https://www.elastic.co/guide/en/logstash/current/plugins-filters-grok.html
+# 所有logstash的基础pattern都是兼容的，参见:
+#   https://github.com/logstash-plugins/logstash-patterns-core/blob/master/patterns/grok-patterns
+
+
+# 下面我们以一个示例的解析为例，简单介绍一下自定义logkit grok pattern的方式
+# 假设一条基本的log类似如下：
+#   2017/03/28 15:41:06 [abc123reqid][INFO] bdc.go:573: deleted: 67608
+# 首先解析第一个时间，利用年月日时分秒的基础内置grok pattern: `DATESTAMP`
+# 然后是request id，符合`WORD`这个内置类型
+# 接下来是loglevel，同样符合`WORD`
+# 再然后是原始日志符合 `DATA`这个类型
+# 最后我们需要把他们拼接起来
+
+LOGDATE %{DATESTAMP:logdate:date}
+REQID %{WORD:reqid}
+LOGLEVEL %{WORD:loglevel}
+LOGDATA %{%DATA:log}
+LOGKIT_LOG %{LOGDATE} \[%{REQID}\] \[%{LOGLEVEL}\] %{LOGDATA}
+
+# 可见，合理的将grok pattern作为中间结果为我们利用，可以逐渐构筑复杂的grok pattern
+# 但是使用grok pattern依旧建议使用社区成熟的grok pattern为主，不建议大量自定义grok pattern
+
+DURATION %{NUMBER}[nuµm]?s
+RESPONSE_CODE %{NUMBER:response_code:string}
+RESPONSE_TIME %{DURATION:response_time_ns:string}
+EXAMPLE_LOG \[%{HTTPDATE:ts:date}\] %{NUMBER:myfloat:float} %{RESPONSE_CODE} %{IPORHOST:clientip} %{RESPONSE_TIME}
+
+# Wider-ranging username matching vs. logstash built-in %{USER}
+NGUSERNAME [a-zA-Z0-9\.\@\-\+_%]+
+NGUSER %{NGUSERNAME}
+# Wider-ranging client IP matching
+CLIENT (?:%{IPORHOST}|%{HOSTPORT}|::1)
+
+##
+## 常见日志匹配方式
+##
+
+# apache & nginx logs, this is also known as the "common log format"
+#   see https://en.wikipedia.org/wiki/Common_Log_Format
+COMMON_LOG_FORMAT %{CLIENT:client_ip} %{NOTSPACE:ident} %{NOTSPACE:auth} \[%{HTTPDATE:ts:date}\] "(?:%{WORD:verb} %{NOTSPACE:request}(?: HTTP/%{NUMBER:http_version:float})?|%{DATA})" %{NUMBER:resp_code} (?:%{NUMBER:resp_bytes:long}|-)
+NGINX_LOG %{IPORHOST:client_ip} %{USER:ident} %{USER:auth} \[%{HTTPDATE:ts:date}\] "(?:%{WORD:verb} %{NOTSPACE:request}(?: HTTP/%{NUMBER:http_version:float})?|%{DATA})" %{NUMBER:resp_code} (?:%{NUMBER:resp_bytes:long}|-)
+
+PANDORA_NGINX %{NOTSPACE:client_ip} %{USER:ident} %{USER:auth} \[%{HTTPDATE:ts:date}\] "(?:%{WORD:verb} %{NOTSPACE:request}(?: HTTP/%{NUMBER:http_version:float})?|%{DATA})" %{NUMBER:resp_code} (?:%{NUMBER:resp_bytes:long}|-) (?:%{NUMBER:resp_body_bytes:long}|-) "(?:%{NOTSPACE:referrer}|-)" %{QUOTEDSTRING:agent} %{QUOTEDSTRING:forward_for} %{NOTSPACE:upstream_addr} (%{HOSTNAME:host}|-) (%{NOTSPACE:reqid}) %{NUMBER:resp_time:float}
+
+# Combined log format is the same as the common log format but with the addition
+# of two quoted strings at the end for "referrer" and "agent"
+#   See Examples at http://httpd.apache.org/docs/current/mod/mod_log_config.html
+COMBINED_LOG_FORMAT %{COMMON_LOG_FORMAT} %{QS:referrer} %{QS:agent}
+
+# HTTPD log formats
+HTTPD20_ERRORLOG \[%{HTTPDERROR_DATE:timestamp}\] \[%{LOGLEVEL:loglevel}\] (?:\[client %{IPORHOST:clientip}\] ){0,1}%{GREEDYDATA:errormsg}
+HTTPD24_ERRORLOG \[%{HTTPDERROR_DATE:timestamp}\] \[%{WORD:module}:%{LOGLEVEL:loglevel}\] \[pid %{POSINT:pid:long}:tid %{NUMBER:tid:long}\]( \(%{POSINT:proxy_errorcode:long}\)%{DATA:proxy_errormessage}:)?( \[client %{IPORHOST:client}:%{POSINT:clientport}\])? %{DATA:errorcode}: %{GREEDYDATA:message}
+HTTPD_ERRORLOG %{HTTPD20_ERRORLOG}|%{HTTPD24_ERRORLOG}
