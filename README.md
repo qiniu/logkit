@@ -1,8 +1,7 @@
+[![Build Status](https://api.travis-ci.org/qiniu/logkit.svg)](http://travis-ci.org/qiniu/logkit)
+
 logkit
 ======
-
-# Production
-![Coverage]()
 
 Table of Contents
 =================
@@ -43,7 +42,9 @@ Table of Contents
 简介
 ------
 
-logkit是一个通用的日志收集、解析、汇聚、发送的工具，带有容错、并发、监控、删除等功能。
+logkit是七牛推出的开源数据收集、解析、汇聚、发送的工具，带有容错、并发、监控、删除等功能。
+
+文档站： [Pandora Logkit](https://pandora-docs.qiniu.com)
 
 服务配置
 ------
