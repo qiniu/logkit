@@ -129,7 +129,7 @@ func GetLogFiles(doneFilePath string) (files []File) {
 			continue
 		}
 		if err != nil {
-			log.Errorf("read file %v error %v", dfi.Name(), err)
+			log.Errorf("read file %v error %v", df, err)
 			continue
 		}
 		files = append(files, File{
