@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"log"
 	"os"
 	"regexp"
 	"strconv"
@@ -16,6 +15,7 @@ import (
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
 
+	"github.com/qiniu/log"
 	"github.com/vjeantet/grok"
 )
 
@@ -25,6 +25,8 @@ const (
 	KeyGrokPatterns           = "grok_patterns"          // grok 模式串名
 	KeyGrokCustomPatternFiles = "grok_custom_pattern_files"
 	KeyGrokCustomPatterns     = "grok_custom_patterns"
+
+	KeyTimeZoneOffset = "timezone_offset"
 )
 
 const (
@@ -96,6 +98,8 @@ type GrokParser struct {
 	headPattern string
 	buffer      *bytes.Buffer
 
+	timeZoneOffset int
+
 	schemaErr *schemaErr
 
 	Patterns []string // 正式的pattern名称
@@ -127,6 +131,28 @@ type GrokParser struct {
 	g        *grok.Grok
 }
 
+func parseTimeZoneOffset(zoneoffset string) (ret int) {
+	zoneoffset = strings.TrimSpace(zoneoffset)
+	if zoneoffset == "" {
+		return
+	}
+	mi := false
+	if strings.HasPrefix(zoneoffset, "-") {
+		mi = true
+	}
+	zoneoffset = strings.Trim(zoneoffset, "+-")
+	i, err := strconv.ParseInt(zoneoffset, 10, 64)
+	if err != nil {
+		log.Errorf("parse %v error %v, ignore zoneoffset...", zoneoffset, err)
+		return
+	}
+	ret = int(i)
+	if mi {
+		ret = 0 - ret
+	}
+	return
+}
+
 func NewGrokParser(c conf.MapConf) (LogParser, error) {
 	name, _ := c.GetStringOr(KeyParserName, "")
 	patterns, err := c.GetStringList(KeyGrokPatterns)
@@ -138,6 +164,8 @@ func NewGrokParser(c conf.MapConf) (LogParser, error) {
 	headPattern, _ := c.GetStringOr(KeyGrokHeadPattern, "")
 
 	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
+	timeZoneOffsetRaw, _ := c.GetStringOr(KeyTimeZoneOffset, "")
+	timeZoneOffset := parseTimeZoneOffset(timeZoneOffsetRaw)
 	nameMap := make(map[string]struct{})
 	labels := getLabels(labelList, nameMap)
 
@@ -153,6 +181,7 @@ func NewGrokParser(c conf.MapConf) (LogParser, error) {
 		Patterns:           patterns,
 		CustomPatterns:     customPatterns,
 		CustomPatternFiles: customPatternFiles,
+		timeZoneOffset:     timeZoneOffset,
 		schemaErr: &schemaErr{
 			number: 0,
 			last:   time.Now(),
@@ -231,6 +260,7 @@ func (gp *GrokParser) Parse(lines []string) ([]sender.Data, error) {
 		if len(data) < 1 { //数据不为空的时候发送
 			continue
 		}
+		log.Debugf("D! parse result(%v)", data)
 		datas = append(datas, data)
 		se.AddSuccess()
 	}
@@ -241,18 +271,23 @@ func (p *GrokParser) parseLine(line string) (sender.Data, error) {
 
 	var multiLine string
 	if p.mode == "multi" { //
+		line = strings.TrimSuffix(line, "\n")
 		if ok, _ := regexp.MatchString(p.headPattern, line); ok { //行首匹配成功，解析之前的多行
 			multiLine = p.buffer.String()
+			log.Debugf("D! line head regexp matched, start to parse multiLine:(%v)", multiLine)
 			p.buffer.Reset()
-			p.buffer.WriteString(line)
+			p.buffer.WriteString(line + " ")
 			if p.buffer.Len() > MaxGrokMultiLineBuffer {
 				err := fmt.Errorf("max grok buffer exceeded(%v)", MaxGrokMultiLineBuffer)
+				log.Debugf("E! %v", err)
 				return nil, err
 			}
 		} else { //行首匹配失败，添加当前行到buffer中
-			p.buffer.WriteString(line)
+			p.buffer.WriteString(line + " ")
+			log.Debugf("D! add line(%v) to buffer", line)
 			if p.buffer.Len() > MaxGrokMultiLineBuffer {
 				err := fmt.Errorf("max grok buffer exceeded(%v)", MaxGrokMultiLineBuffer)
+				log.Debugf("E! %v", err)
 				return nil, err
 			}
 			return sender.Data{}, nil
@@ -266,6 +301,7 @@ func (p *GrokParser) parseLine(line string) (sender.Data, error) {
 	var patternName string
 	for _, pattern := range p.namedPatterns {
 		if values, err = p.g.Parse(pattern, multiLine); err != nil {
+			log.Debugf("E! %v", err)
 			return nil, err
 		}
 		if len(values) != 0 {
@@ -312,6 +348,7 @@ func (p *GrokParser) parseLine(line string) (sender.Data, error) {
 		case DATE:
 			ts, err := times.StrToTime(v)
 			if err == nil {
+				ts = ts.Add(time.Duration(p.timeZoneOffset) * time.Hour)
 				rfctime := ts.Format(time.RFC3339Nano)
 				data[k] = rfctime
 			} else {

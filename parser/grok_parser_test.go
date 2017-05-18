@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/qiniu/logkit/sender"
-	"github.com/qiniu/logkit/utils"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/qiniu/logkit/sender"
+	"github.com/qiniu/logkit/utils"
 )
 
 var grokBench sender.Data
@@ -54,6 +54,46 @@ func Benchmark_GrokParseLine_Common(b *testing.B) {
 	grokBench = m
 }
 
+func TestParseTimeZoneOffset(t *testing.T) {
+	tests := []struct {
+		s   string
+		exp int
+	}{
+		{
+			s:   "+08",
+			exp: 8,
+		},
+		{
+			s:   "+8",
+			exp: 8,
+		},
+		{
+			s:   "8",
+			exp: 8,
+		},
+		{
+			s:   "-8",
+			exp: -8,
+		},
+		{
+			s:   "-08",
+			exp: -8,
+		},
+		{
+			s:   "-1",
+			exp: -1,
+		},
+		{
+			s:   "0",
+			exp: 0,
+		},
+	}
+	for _, ti := range tests {
+		got := parseTimeZoneOffset(ti.s)
+		assert.Equal(t, ti.exp, got)
+	}
+}
+
 // Test a very simple parse pattern.
 func TestSimpleParse(t *testing.T) {
 	p := &GrokParser{
@@ -83,10 +123,34 @@ func TestNginxTimeParse(t *testing.T) {
 	}
 	assert.NoError(t, p.compile())
 
-	m, err := p.parseLine(`10.4.3.2 - - [05/Apr/2017:17:25:06 +0800] "POST /v2/repos/testrepo/data HTTP/1.1" 200 497 2 "-" "Go 1.1 package http" "-" 192.168.160.1:80 pipeline.qiniu.com KBkAAD7W6-UfdrIU 0.139`)
+	m, err := p.parseLine(`192.168.45.53 - - [05/Apr/2017:17:25:06 +0800] "POST /v2/repos/kodo_z0_app_pfdstg/data HTTP/1.1" 200 497 2 "-" "Go 1.1 package http" "-" 192.168.160.1:80 pipeline.qiniu.io KBkAAD7W6-UfdrIU 0.139`)
 	assert.NoError(t, err)
 	require.NotNil(t, m)
 	assert.Equal(t, "2017-04-05T17:25:06+08:00", m["ts"])
+}
+
+func TestTimeZoneOffsetParse(t *testing.T) {
+	p := &GrokParser{
+		Patterns:       []string{"%{NGINX_LOG}"},
+		timeZoneOffset: -3,
+	}
+	assert.NoError(t, p.compile())
+
+	m, err := p.parseLine(`192.168.45.53 - - [05/Apr/2017:17:25:06 +0800] "POST /v2/repos/kodo_z0_app_pfdstg/data HTTP/1.1" 200 497 2 "-" "Go 1.1 package http" "-" 192.168.160.1:80 pipeline.qiniu.io KBkAAD7W6-UfdrIU 0.139`)
+	assert.NoError(t, err)
+	require.NotNil(t, m)
+	assert.Equal(t, "2017-04-05T14:25:06+08:00", m["ts"])
+
+	p = &GrokParser{
+		Patterns:       []string{"%{NGINX_LOG}"},
+		timeZoneOffset: 8,
+	}
+	assert.NoError(t, p.compile())
+
+	m, err = p.parseLine(`192.168.45.53 - - [05/Apr/2017:10:25:06 +0800] "POST /v2/repos/kodo_z0_app_pfdstg/data HTTP/1.1" 200 497 2 "-" "Go 1.1 package http" "-" 192.168.160.1:80 pipeline.qiniu.io KBkAAD7W6-UfdrIU 0.139`)
+	assert.NoError(t, err)
+	require.NotNil(t, m)
+	assert.Equal(t, "2017-04-05T18:25:06+08:00", m["ts"])
 }
 
 // Verify that patterns with a regex lookahead fail at compile time.
@@ -563,7 +627,7 @@ func TestParseMultiLine(t *testing.T) {
 			sender.Data{
 				"timestamp": "05-May-2017 13:44:39",
 				"type":      "pool",
-				"message":   "pid 4109script_filename = /data/html/log.ushengsheng.com/index.php[0x00007fec119d1720] curl_exec() /data/html/xyframework/base/XySoaClient.php:357[0x00007fec119d1590] request_post() /data/html/xyframework/base/XySoaClient.php:284[0x00007fff39d538b0] __call() unknown:0[0x00007fec119d13a8] add() /data/html/log.ushengsheng.com/1/interface/ErrorLogInterface.php:70[0x00007fec119d1298] log() /data/html/log.ushengsheng.com/1/interface/ErrorLogInterface.php:30[0x00007fec119d1160] android() /data/html/xyframework/core/x.php:215[0x00007fec119d0ff8] +++ dump failed",
+				"message":   "pid 4109 script_filename = /data/html/log.ushengsheng.com/index.php [0x00007fec119d1720] curl_exec() /data/html/xyframework/base/XySoaClient.php:357 [0x00007fec119d1590] request_post() /data/html/xyframework/base/XySoaClient.php:284 [0x00007fff39d538b0] __call() unknown:0 [0x00007fec119d13a8] add() /data/html/log.ushengsheng.com/1/interface/ErrorLogInterface.php:70 [0x00007fec119d1298] log() /data/html/log.ushengsheng.com/1/interface/ErrorLogInterface.php:30 [0x00007fec119d1160] android() /data/html/xyframework/core/x.php:215 [0x00007fec119d0ff8] +++ dump failed ",
 			},
 		}, data)
 }

@@ -504,6 +504,7 @@ Grok Parser 典型配置如下
         "grok_patterns":"%{QINIU_LOG_FORMAT}",
         "grok_custom_pattern_files":"/etc/logkit/pattern1,/etc/logkit/pattern2",
         "grok_custom_patterns":"",
+        "timezone_offset":"+08",
         "labels":"machine nb110,team pandora"
     },
 ```
@@ -519,6 +520,7 @@ Grok Parser 典型配置如下
 * `grok_custom_patterns` 用户自定义的grok pattern内容，需符合logkit自定义pattern的写法，**按行分隔**，参见**自定义pattern的写法和用法说明**
 * `grok_custom_pattern_files` 用户自定义的一些grok pattern文件，当自定义pattern太长太多，建议用文件功能。
 * `Grok Parser中解析出的字段` 就是grok表达式中命名的字段，还包括labels中定义的标签名，可以在sender中选择需要发送的字段和标签。
+* `timezone_offset` 解析出的时区信息默认为`UTC`时区，使用`timezone_offset`可以修改时区偏移量，默认偏移量为0,写法为"+08"、"08"、"8" 均表示比读取时间加8小时，"-08"，"-8",表示比读取的时间减8小时。若实际为东八区时间，读取为UTC时间，则实际多读取了8小时，需要写"-8"，修正回CST中国北京时间。
 * `logkit grok pattern` 其格式符合 `%{<捕获语法>[:<字段名>][:<字段类型>]}`，其中中括号的内容可以省略
     - logkit的grok pattern是logstash grok pattern的增强版，除了完全兼容[logstash grok pattern规则](https://www.elastic.co/guide/en/logstash/current/plugins-filters-grok.html#_grok_basics)以外，还增加了类型，与[telegraf的grok pattern规则](https://github.com/influxdata/telegraf/tree/master/plugins/inputs/logparser#grok-parser)一致，但是使用的类型是logkit自身定义的。你可以在[logstash grok文档](https://www.elastic.co/guide/en/logstash/current/plugins-filters-grok.html)中找到详细的grok介绍.
     - `捕获语法` 是一个正则表达式的名字，比如内置了`USERNAME [a-zA-Z0-9._-]+`,那么此时`USERNAME`就是一个捕获语法。所以，在使用自定义的正则表达式之前，你需要先为你的正则命名，然后把这个名字当作`捕获语法`填写`patterns`中，当然，不推荐自己写正则，建议首选内置的捕获语法。
