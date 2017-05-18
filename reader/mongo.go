@@ -256,3 +256,7 @@ func (mr *MongoReader) SyncMeta() {
 	}
 	return
 }
+
+func (mr *MongoReader) SetMode(mode string, v interface{}) error {
+	return errors.New("MongoReader not support readmode")
+}

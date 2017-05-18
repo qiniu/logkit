@@ -1,8 +1,8 @@
 package parser
 
 import (
-	"bytes"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/qiniu/logkit/sender"
-	"github.com/qiniu/logkit/utils"
 )
 
 var grokBench sender.Data
@@ -585,10 +584,8 @@ func TestParseMultiLine(t *testing.T) {
 	assert.Equal(t, false, matched)
 
 	p := &GrokParser{
-		Patterns:    []string{"%{PHP_FPM_SLOW_LOG}"},
-		mode:        "multi",
-		headPattern: pattern,
-		buffer:      bytes.NewBuffer([]byte{}),
+		Patterns: []string{"%{PHP_FPM_SLOW_LOG}"},
+		mode:     "multi",
 		CustomPatterns: `
 			PHPLOGTIMESTAMP (%{MONTHDAY}-%{MONTH}-%{YEAR}|%{YEAR}-%{MONTHNUM}-%{MONTHDAY}) %{HOUR}:%{MINUTE}:%{SECOND}
 			PHPTZ (%{WORD}\/%{WORD})
@@ -614,20 +611,15 @@ func TestParseMultiLine(t *testing.T) {
 		`[0x00007fec119d1298] log() /data/html/log.ushengsheng.com/1/interface/ErrorLogInterface.php:30`,
 		`[0x00007fec119d1160] android() /data/html/xyframework/core/x.php:215`,
 		`[0x00007fec119d0ff8] +++ dump failed`,
-		`[05-May-2017 13:45:39]  [pool log] pid 4108`,
 	}
-	data, err := p.Parse(lines)
-	serr, _ := err.(*utils.StatsError)
-	if serr.Errors > 0 {
-		t.Error(serr)
-	}
+
+	data, err := p.parseLine(strings.Join(lines, "\n"))
+	assert.NoError(t, err)
 	t.Log(data)
 	assert.Equal(t,
-		[]sender.Data{
-			sender.Data{
-				"timestamp": "05-May-2017 13:44:39",
-				"type":      "pool",
-				"message":   "pid 4109 script_filename = /data/html/log.ushengsheng.com/index.php [0x00007fec119d1720] curl_exec() /data/html/xyframework/base/XySoaClient.php:357 [0x00007fec119d1590] request_post() /data/html/xyframework/base/XySoaClient.php:284 [0x00007fff39d538b0] __call() unknown:0 [0x00007fec119d13a8] add() /data/html/log.ushengsheng.com/1/interface/ErrorLogInterface.php:70 [0x00007fec119d1298] log() /data/html/log.ushengsheng.com/1/interface/ErrorLogInterface.php:30 [0x00007fec119d1160] android() /data/html/xyframework/core/x.php:215 [0x00007fec119d0ff8] +++ dump failed ",
-			},
+		sender.Data{
+			"timestamp": "05-May-2017 13:44:39",
+			"type":      "pool",
+			"message":   "pid 4109 script_filename = /data/html/log.ushengsheng.com/index.php [0x00007fec119d1720] curl_exec() /data/html/xyframework/base/XySoaClient.php:357 [0x00007fec119d1590] request_post() /data/html/xyframework/base/XySoaClient.php:284 [0x00007fff39d538b0] __call() unknown:0 [0x00007fec119d13a8] add() /data/html/log.ushengsheng.com/1/interface/ErrorLogInterface.php:70 [0x00007fec119d1298] log() /data/html/log.ushengsheng.com/1/interface/ErrorLogInterface.php:30 [0x00007fec119d1160] android() /data/html/xyframework/core/x.php:215 [0x00007fec119d0ff8] +++ dump failed",
 		}, data)
 }

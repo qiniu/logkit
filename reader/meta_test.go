@@ -168,6 +168,7 @@ func Test_getdonefiles(t *testing.T) {
 	c[KeyMetaPath] = donefiles
 	c[KeyLogPath] = "logpath"
 	c[KeyMode] = ModeDir
+	c[KeyDataSourceTag] = "tag1path"
 	meta, err := NewMetaWithConf(c)
 	if err != nil {
 		t.Error(err)
@@ -184,5 +185,11 @@ func Test_getdonefiles(t *testing.T) {
 	}
 	if !reflect.DeepEqual(exps, gots) {
 		t.Errorf("Test_getdonefiles error got %v exp %v", gots, exps)
+	}
+	if meta.GetDataSourceTag() != "tag1path" {
+		t.Error("GetDataSourceTag error")
+	}
+	if meta.GetMode() != ModeDir {
+		t.Error("get mode error")
 	}
 }

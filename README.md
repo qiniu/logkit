@@ -100,6 +100,7 @@ Runner配置
     "batch_size": 2097152,
     "batch_interval": 300, 
     "batch_try_times": 3,
+    "mutiline":false,
     "reader":{
         "log_path":"/home/user/app/log/dir/",
         "meta_path":"./metapath",
@@ -138,10 +139,10 @@ Runner配置
 配置字段说明：
 
 1. `name` 用来标识runner的名字。用来记录日志。
-2. `batch_len` 可选，每读取多少行作为一个batch，进行解析和发送。默认无限制
-3. `batch_size` 可选，每读取多少数据作为一个batch，单位为byte。默认2097152（2MB:`2*1024*1024`）
-4. `batch_interval` 可选，每读取多长时间作为一个batch，无论batch达到多少都直接进行解析和发送。默认60秒
-5. `batch_try_times` 可选，每个batch最多尝试发送多少次，如果仍然发送失败，则抛弃该数据。默认永远不抛弃数据始终重试
+1. `batch_len` 可选，每读取多少行作为一个batch，进行解析和发送。默认无限制
+1. `batch_size` 可选，每读取多少数据作为一个batch，单位为byte。默认2097152（2MB:`2*1024*1024`）
+1. `batch_interval` 可选，每读取多长时间作为一个batch，无论batch达到多少都直接进行解析和发送。默认60秒
+1. `batch_try_times` 可选，每个batch最多尝试发送多少次，如果仍然发送失败，则抛弃该数据。默认永远不抛弃数据始终重试
 
 **注意**
 
@@ -178,22 +179,23 @@ file reader 的典型配置如下
 ```
 
 1. `log_path` 必填项，需要收集的日志的文件（夹）路径
-1. `meta_path` 是reader的读取offset的记录路径，必须是一个文件夹，在这个文件夹下，会记录本次reader的读取位置
+1. `meta_path` 可选项，是reader的读取offset的记录路径，必须是一个文件夹，在这个文件夹下，会记录本次reader的读取位置。默认会根据runner名称结合`log_path`的hash值自动生成。
 1. `file_done` 可选项，是reader完成后标志读取完成的文件放置位置，如果不填，默认放在`meta_path`下。singleFile模式下，若文件被rotate，则只匹配当前日志文件夹下，前缀相同的文件，inode相同作为rotate后的文件记录到`file_done`文件中，该策略只是把移动后的第一个文件放到`meta`的`file_done`文件里面。
 1. `mode` 必填项，读取方式，有 `dir` 、 `file` 和 `tail` 三种读取模式。
-    * 当选项为`dir`的时候，`log_path` 必须是精确的文件夹路径，例如 `/home/qiniu/path/`, logkit会在启动时根据文件夹下文件时间顺序依次读取文件，当读到时间最新的文件时会不断读取追加的数据，直到该文件夹下出现新的文件。
-    * 当选项为`file`的时候，`log_path` 必须是精确的文件路径，例如 `/home/qiniu/path/server.log` , logkit会不断读取该文件追加的数据。
-    * 当选项为`tailx`的时候，`logpath` 是一个匹配路径的模式串，例如 `/home/*/path/*/logdir/*.log*`, 此时会展开并匹配所有符合该表达式的文件，并持续读取所有有数据追加的文件。每隔`stat_interval`的时间，重新刷新一遍`logpath`模式串，添加新增的文件。
-1. `read_from` 可选项，针对`dir`和`file`两个读取模式，在创建reader的时候，如果meta信息，即历史读取记录不存在，将从文件的哪一端开始读取。可以设置为`oldest`最旧的部分或者`newest`最新的部分开始读取。如果字段不填，默认从最老的开始消费。(`tailx`读取模式固定以`oldest`模式读取文件)
-1. `expire` 可选项，针对`tailx`读取模式读取的日志, 单位为"小时", 默认的`expire`时间是`24`小时,当达到`expire`时间的日志，就放弃追踪。放弃追踪的文件会被记录到`file_done`中，认为已经读取完毕。*注意：若放弃追踪的文件有更新，则会从头开始读取该文件所有数据。请谨慎设置文件追踪的过期时间。*
+    * 当选项为`dir`的时候，`log_path` 必须是精确的文件夹路径，例如 `/home/qiniu/path/`, logkit会在启动时根据文件夹下文件时间顺序依次读取文件，当读到时间最新的文件时会不断读取追加的数据，直到该文件夹下出现新的文件。使用`dir`模式的经典日志存储方式为整个文件夹下存储业务日志，文件夹下的日志使用统一前缀，后缀为时间戳，根据日志的大小rotate到新的文件。
+    * 当选项为`file`的时候，`log_path` 必须是精确的文件路径，例如 `/home/qiniu/path/server.log` , logkit会不断读取该文件追加的数据。使用`file`模式的经典日志存储方式类似于nginx的日志rotate方式，日志名称为固定的名称，如`access.log`,rotate时直接move成新的文件如`access.log.1`，新的数据仍然写入到`access.log`。
+    * 当选项为`tailx`的时候，`logpath` 是一个匹配路径的模式串，例如 `/home/*/path/*/logdir/*.log*`, 此时会展开并匹配所有符合该表达式的文件，并持续读取所有有数据追加的文件。每隔`stat_interval`的时间，重新刷新一遍`logpath`模式串，添加新增的文件。`tailx`模式比较灵活，几乎可以读取所有日志更新，需要注意的是，使用`tailx`模式容易导致文件句柄打开过多。`tailx`模式的文件重复判断标准为文件的`inode`编号，即`rename`文件名不会导致数据重复读取。
+1. `read_from` 可选项，在创建新文件或meta信息损坏的时候(即历史读取记录不存在)，将从文件的哪个位置开始读取。可以设置为`oldest`，从文件开始的部分全量读取，也可以设置为`newest`从文件最新的部分开始读取。如果字段不填，默认从最老的开始消费。`tailx`读取模式下，设置为`oldest`模式可能会导致数据重复读取(如rotate的方式是copy一份数据)，设置为`newest`则有可能在感知的时间周期内丢失一部分数据。
+1. `expire` 可选项，针对`tailx`读取模式读取的日志, 写法为数字加单位符号组成的字符串`duration`写法，支持时`h`、分`m`、秒`s`为单位,类似`3h`(3小时),`10m`(10分钟),`5s`(5秒), 默认的`expire`时间是`24h`, 当达到`expire`时间的日志，就放弃追踪。放弃追踪的文件会被记录到`file_done`中，认为已经读取完毕。
 1. `max_open_files` 可选项，针对`tailx`读取模式读取的日志，最大能追踪的文件数，默认为256。同时追踪的文件过多会导致打开的文件句柄超过系统限制，请谨慎配置该项。超过限制后，不再追踪新添加的日志文件，直到部分追踪文件达到`expire`时间。
-1. `stat_interval` 可选项，针对`tailx`读取模式读取的日志，刷新`logpath`模式串，感知新增日志的定时检查时间，单位为`秒`，默认`180`秒，即3分钟。
+1. `stat_interval` 可选项，针对`tailx`读取模式读取的日志，刷新过期的跟踪日志文件, 刷新`logpath`模式串，感知新增日志的定时检查时间, 写法为数字加单位符号组成的字符串`duration`写法，支持时`h`、分`m`、秒`s`为单位,类似`3h`(3小时),`10m`(10分钟),`5s`(5秒),默认`3m`(3分钟)。
 1. `datasource_tag` 可选项，表示把读取日志的路径名称也作为标签，记录到解析出来的数据结果中，默认不添加，若`datasource_tag`不为空，则以该字段名称作为标签名称。例如 "datasource_tag":"mydatasource"; 则最终解析的日志中会增加一个字段`mydatasource`记录读取到日志的路径。可用于区分`tailx`模式下的日志数据是从哪个日志路径下读取的问题。
 1. `ignore_hidden` 可选项，读取的过程中是否忽略隐藏文件，默认忽略
-1. `ignore_file_suffix` 可选项，读取的过程中忽略哪些文件后缀名，默认不忽略
-1. `donefile_retention` 可选项，日志读取完毕后donefile的保留时间，默认7天，当然，如果donefile里面的文件一直因为别的runner不能删除，donefile也不会删除。
+1. `ignore_file_suffix` 可选项，针对`dir`读取模式需要解析的日志文件，可以设置读取的过程中忽略哪些文件后缀名，默认忽略的后缀包括`".pid", ".swap", ".go", ".conf", ".tar.gz", ".tar", ".zip",".a", ".o", ".so"`
+1. `donefile_retention` 可选项，日志读取完毕后donefile的保留时间，默认7天。如果donefile里面的文件一直因为别的runner不能删除，donefile也不会删除。
 1. `valid_file_pattern` 可选项，针对`dir`读取模式需要解析的日志文件，可以设置匹配文件名的模式串，匹配方式为glob展开模式，默认为`*`，即匹配文件夹下全部文件。
 1. `encoding` 可选项，读取日志文件的编码方式，默认为`utf-8`，即按照`utf-8`的编码方式读取文件。支持读取文件的编码格式包括：`UTF-16`,`GB18030`,`GBK`,`cp51932`,`windows-51932`,`EUC-JP`,`EUC-KR`,`ISO-2022-JP`,`Shift_JIS`,`TCVN3`及其相关国际化通用别名。
+1. `head_pattern` 可选项，默认不填，reader每次读取一行，若要读取多行，则填写`head_pattern`表示匹配多行的第一行使用的正则表达式。`tailx`模式在多行匹配时，若一条日志的多行被截断到多个文件，那么此时无法匹配多行。`dir`、`file`模式下会自动处理文件截断的拼接。`head_pattern`最多缓存`20MB`的日志文件进行匹配。使用多行匹配情况的一个经典场景就是使用grok parser解析应用日志，此时需要在`head_pattern`中指定行首的正则表达式，每当匹配到符合行首正则表达式的时候，就将之前的多行一起返回，交由grok parser解析。如果配置的`parser`只能解析单行,如目前提供的`csv_parser`,`json_parser`，那么此处的`head_pattern`必须为空，否则会导致解析错误。
 
 
 ElasticSearch Reader
@@ -412,10 +414,11 @@ cleaner的典型配置如下
     },
 ```
 
+1. 目前只有reader模式(`mode`)为`dir`或者`file`时才支持Cleaner
 1. `delete_enable` 该选项表示是否启用cleaner，cleaner是删除控制功能，默认不开启，当delete_enable为true时开启。开启后，当reader已经读取完毕的数据，cleaner会负责通知mgr删除。
-2. `delete_interval` cleaner执行周期，会在每个周期检查是否符合删除的条件，单位为秒(s)，到了删除周期，且检测发现符合删除条件的数据会被删除，reader读取完毕后会生成file.done文件，当整个file.done文件里的日志都被发送至mgr删除时，文件名会变为file.deleted。
-3. `reserve_file_number` 最大保留的已读取文件数，当超过这个数量时就会把多出的文件删除，默认为保留10个.
-4. `reserve_file_size` 最大保留已读文件总大小，当已读文件的总大小超过这个值时，会把最老的那部分删掉，默认保留10GB，单位为MB.
+1. `delete_interval` cleaner执行周期，会在每个周期检查是否符合删除的条件，单位为秒(s)，到了删除周期，且检测发现符合删除条件的数据会被删除，reader读取完毕后会生成file.done文件，当整个file.done文件里的日志都被发送至mgr删除时，文件名会变为file.deleted。
+1. `reserve_file_number` 最大保留的已读取文件数，当超过这个数量时就会把多出的文件删除，默认为保留10个.
+1. `reserve_file_size` 最大保留已读文件总大小，当已读文件的总大小超过这个值时，会把最老的那部分删掉，默认保留10GB，单位为MB.
 
 *注意*
 
@@ -506,7 +509,6 @@ Grok Parser 典型配置如下
         "name":"nginx_parser",
         "type":"grok",
         "grok_mode":"",#默认为空
-        "grok_line_head_pattern":"",#默认为空
         "grok_patterns":"%{QINIU_LOG_FORMAT}",
         "grok_custom_pattern_files":"/etc/logkit/pattern1,/etc/logkit/pattern2",
         "grok_custom_patterns":"",
@@ -517,8 +519,7 @@ Grok Parser 典型配置如下
 
 * `grok_patterns` 是按照逗号分隔的字符串，每个部分格式按照`字段名 字段类型`构成，字段类型现在支持`string`, `long`, `jsonmap`, `float`。
 * `labels` 填一些额外的标签信息，同样逗号分隔，每个部分由空格隔开，左边是标签的key，右边是value。
-* `grok_mode`用来指定解析的方式，留空表示只针对单行进行解析；`multi`表示针对多行就行解析，注意当`grok_mode`为`multi`的时候需要配合`grok_line_head_pattern`使用，读取多行时，最多读取2MB的数据。
-* `grok_line_head_pattern`用来在`grok_mode`为多行解析的时候，指定行首的正则表达式，每当匹配到符合行首正则表达式的时候，就将之前的多行一起解析。
+* `grok_mode` 指定`grok_mode`为`multi` 可以针对多行日志解析,。grok和普通正则一样，默认是不支持匹配回车换行,只针对单行进行解析。注意：指定为`multi`以后，**grok会把日志中的换行符替换为空格解析**。同时若grok parser希望解析多行，则需要在`reader`模块填写 `head_pattern` 行首正则表达式。
 * `patterns` 填写解析日志的grok pattern名称，包括一些[logkit自身内置的patterns](https://github.com/qbox/logkit/blob/develop/grok_patterns/logkit-patterns)以及自定义的pattern名称，以及社区的常见grok pattern，如[logstash的内置pattern](https://github.com/logstash-plugins/logstash-patterns-core/blob/master/patterns/grok-patterns)以及常见的[grok库pattern](https://github.com/vjeantet/grok/tree/master/patterns)
     - 填写方式是`%{QINIU_LOG_FORMAT},%{COMMON_LOG_FORMAT}`，以百分号和花括号包裹pattern名称，多个pattern名称以逗号分隔。
     - 实际匹配过程中会按顺序依次去parse文本内容，以第一个匹配的pattern解析文本内容。

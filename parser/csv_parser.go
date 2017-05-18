@@ -361,11 +361,12 @@ func (p *CsvParser) parse(line string) (sender.Data, error) {
 func (p *CsvParser) Parse(lines []string) ([]sender.Data, error) {
 	datas := []sender.Data{}
 	se := &utils.StatsError{}
-	for _, line := range lines {
+	for idx, line := range lines {
 		d, err := p.parse(line)
 		if err != nil {
 			p.schemaErr.Output(err)
 			se.AddErrors()
+			se.ErrorIndex = append(se.ErrorIndex, idx)
 			continue
 		}
 		datas = append(datas, d)

@@ -2,6 +2,7 @@ package reader
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -388,4 +389,8 @@ func (mr *SqlReader) SyncMeta() {
 		log.Errorf("%v SyncMeta error %v", mr.Name(), err)
 	}
 	return
+}
+
+func (mr *SqlReader) SetMode(mode string, v interface{}) error {
+	return errors.New("SqlReader not support readmode")
 }

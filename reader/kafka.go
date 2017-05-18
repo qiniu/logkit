@@ -2,6 +2,7 @@ package reader
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -151,4 +152,8 @@ func (kr *KafkaReader) run() {
 			kr.curMsg = msg
 		}
 	}
+}
+
+func (kr *KafkaReader) SetMode(mode string, v interface{}) error {
+	return errors.New("KafkaReader not support readmode")
 }

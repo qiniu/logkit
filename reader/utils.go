@@ -2,8 +2,10 @@ package reader
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
+	"regexp"
 	"syscall"
 	"time"
 )
@@ -98,4 +100,31 @@ func notCondition(f1 func(os.FileInfo) bool) func(os.FileInfo) bool {
 // modTimeLater 按最后修改时间进行比较
 func modTimeLater(f1, f2 os.FileInfo) bool {
 	return f1.ModTime().Unix() >= f2.ModTime().Unix()
+}
+
+func HeadPatternMode(mode string, v interface{}) (reg *regexp.Regexp, err error) {
+	switch mode {
+	case ReadModeHeadPatternString:
+		pattern, ok := v.(string)
+		if !ok {
+			err = fmt.Errorf(" %v is not pattern string", v)
+			return
+		}
+		reg, err = regexp.Compile(pattern)
+		if err != nil {
+			err = fmt.Errorf("pattern %v compile error %v ", v, err)
+			return
+		}
+		return
+	case ReadModeHeadPatternRegexp:
+		reg1, ok := v.(*regexp.Regexp)
+		if !ok {
+			err = fmt.Errorf(" %v is not *regexp.Regexp type value", v)
+		}
+		reg = reg1
+		return
+	default:
+		err = fmt.Errorf("unknown HeadPatternMode %v", mode)
+		return
+	}
 }

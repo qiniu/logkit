@@ -226,6 +226,7 @@ func isMatch(pattern *regexp.Regexp, raw string) bool {
 	return pattern.MatchString(raw)
 }
 
+//TODO qiniuparser这边需要去掉多行的cache，改成reader读取多行
 func (p *QiniulogParser) isNew(line string) bool {
 	if len(p.prefix) > 0 {
 		return strings.HasPrefix(line, p.prefix)
@@ -294,12 +295,13 @@ func (p *QiniulogParser) parse() (d sender.Data, err error) {
 func (p *QiniulogParser) Parse(lines []string) ([]sender.Data, error) {
 	datas := []sender.Data{}
 	se := &utils.StatsError{}
-	for _, line := range lines {
+	for idx, line := range lines {
 		if !p.isNew(line) && p.Count < p.maxline {
 			if len(p.lastline) < 1 {
 				err := fmt.Errorf("QiniulogParser can not parse [%v] as newline", line)
 				se.ErrorDetail = err
 				se.AddErrors()
+				se.ErrorIndex = append(se.ErrorIndex, idx)
 				return datas, se
 			}
 			p.lastline += line

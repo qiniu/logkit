@@ -245,6 +245,7 @@ func (r *LogExportRunner) Run() {
 		go r.cleaner.Run()
 	}
 	defer close(r.exitChan)
+	datasourceTag := r.meta.GetDataSourceTag()
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
 			log.Debugf("runner %v exited from run", r.RunnerName)
@@ -252,7 +253,7 @@ func (r *LogExportRunner) Run() {
 			return
 		}
 		// read data
-		var lines []string
+		var lines, froms []string
 		for !r.batchFullOrTimeout() {
 			line, err := r.reader.ReadLine()
 			if err != nil && err != io.EOF {
@@ -269,6 +270,9 @@ func (r *LogExportRunner) Run() {
 				continue
 			}
 			lines = append(lines, line)
+			if datasourceTag != "" {
+				froms = append(froms, r.reader.Source())
+			}
 			r.batchLen++
 			r.batchSize += len(line)
 		}
@@ -282,7 +286,8 @@ func (r *LogExportRunner) Run() {
 		}
 		// parse data
 		datas, err := r.parser.Parse(lines)
-		if se, ok := err.(*utils.StatsError); ok {
+		se, ok := err.(*utils.StatsError)
+		if ok {
 			err = se.ErrorDetail
 			r.rs.ParserStats.Errors += se.Errors
 			r.rs.ParserStats.Success += se.Success
@@ -298,6 +303,28 @@ func (r *LogExportRunner) Run() {
 		if len(datas) <= 0 {
 			log.Debug("runner received parsed data length = 0")
 			continue
+		}
+		//把datasourcetag加到data里，前提是认为[]line变成[]data以后是一一对应的，一旦错位就不加
+
+		if datasourceTag != "" {
+			if len(datas)+len(se.ErrorIndex) == len(froms) {
+				var j int = 0
+				for i, v := range froms {
+					if se.ErrorIndexIn(i) {
+						continue
+					}
+					if j >= len(datas) {
+						continue
+					}
+					if dt, ok := datas[j][datasourceTag]; ok {
+						log.Debugf("%v datasource tag already has data %v, ignore %v", r.Name(), dt, v)
+					} else {
+						datas[j][datasourceTag] = v
+					}
+				}
+			} else {
+				log.Errorf("%v datasourcetag add error, datas %v not match with froms %v", r.Name(), datas, froms)
+			}
 		}
 		success := true
 		for _, s := range r.senders {

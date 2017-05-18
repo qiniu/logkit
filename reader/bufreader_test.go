@@ -9,6 +9,7 @@ import (
 	"github.com/qiniu/logkit/conf"
 
 	"github.com/qiniu/log"
+	"github.com/stretchr/testify/assert"
 )
 
 var lines = "123456789\n123456789\n123456789\n123456789\n"
@@ -65,9 +66,7 @@ func Test_BuffReader(t *testing.T) {
 	if len(rest) != 12 {
 		t.Errorf("rest should be 12, but got %v", len(rest))
 	}
-
 	r.Close()
-
 }
 
 func Test_BuffReaderBufSizeLarge(t *testing.T) {
@@ -132,5 +131,62 @@ func Test_GBKEncoding(t *testing.T) {
 			t.Fatalf("should exp %v but got %v", exp, line)
 		}
 	}
+	r.Close()
+}
+
+func Test_BuffReaderMultiLine(t *testing.T) {
+	body := "test123\n12\n34\n56\ntest\nxtestx\n123\n"
+	createSeqFile(1000, body)
+	defer destroySeqFile()
+	c := conf.MapConf{
+		"log_path":        dir,
+		"meta_path":       metaDir,
+		"mode":            DirMode,
+		"sync_every":      "1",
+		"ignore_hidden":   "true",
+		"reader_buf_size": "1024",
+		"read_from":       "oldest",
+		"head_pattern":    "^test*",
+	}
+	r, err := NewFileBufReader(c)
+	if err != nil {
+		t.Error(err)
+	}
+	rest := make(map[string]int)
+	num := 0
+	for {
+		line, err := r.ReadLine()
+		rest[line]++
+		num++
+
+		r.SyncMeta()
+		if num > 3 {
+			break
+		}
+		r.SyncMeta()
+		assert.NoError(t, err)
+	}
+	r.Close()
+	r, err = NewFileBufReader(c)
+	if err != nil {
+		t.Error(err)
+	}
+	for {
+		line, err := r.ReadLine()
+		rest[line]++
+		num++
+
+		r.SyncMeta()
+		if num >= 6 {
+			break
+		}
+		r.SyncMeta()
+		assert.NoError(t, err)
+	}
+	exp := map[string]int{
+		"test123\n12\n34\n56\n": 3,
+		"test\nxtestx\n123\n":   3,
+	}
+	assert.Equal(t, exp, rest)
 	r.Close()
 }

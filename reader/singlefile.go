@@ -22,6 +22,9 @@ type SingleFile struct {
 	offset  int64       // 当前处理文件offset
 	stopped int32
 
+	lastSyncPath   string
+	lastSyncOffset int64
+
 	meta      *Meta // 记录offset的元数据
 	syncEvery int   // 每读取多少次同步一次meta
 	count     int   // 调用Read了多少次
@@ -76,6 +79,8 @@ func NewSingleFile(meta *Meta, path, whence string) (sf *SingleFile, err error) 
 		if err != nil {
 			return nil, err
 		}
+	} else {
+		log.Debugf("%v restore meta success", sf.Name())
 	}
 	sf.offset = offset
 	f.Seek(offset, os.SEEK_SET)
@@ -201,7 +206,6 @@ func (sf *SingleFile) Reopen() (err error) {
 	sf.pfi = pfi
 	sf.f = f
 	sf.offset = 0
-
 	return
 }
 
@@ -210,16 +214,31 @@ func (sf *SingleFile) Read(p []byte) (n int, err error) {
 		return 0, errors.New("reader " + sf.Name() + " has been exited")
 	}
 	n, err = sf.f.Read(p)
+	sf.offset += int64(n)
 	if err == io.EOF {
+		//读到了，如果n大于0，先把EOF抹去，返回
+		if n > 0 {
+			err = nil
+			return
+		}
 		err = sf.Reopen()
 		if err != nil {
 			return
 		}
-		return sf.f.Read(p)
+		n, err = sf.f.Read(p)
+		sf.offset += int64(n)
+		return
 	}
 	return
 }
 
 func (sf *SingleFile) SyncMeta() error {
+	if sf.lastSyncOffset == sf.offset && sf.lastSyncPath == sf.path {
+		log.Debugf("%v was just syncd %v %v ignore it...", sf.Name(), sf.lastSyncPath, sf.lastSyncOffset)
+		return nil
+	}
+	log.Debugf("%v Sync file success: %v", sf.Name(), sf.offset)
+	sf.lastSyncOffset = sf.offset
+	sf.lastSyncPath = sf.path
 	return sf.meta.WriteOffset(sf.path, sf.offset)
 }
