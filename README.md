@@ -18,6 +18,7 @@ Table of Contents
     * [Mssql Reader](#mssql-reader)
     * [ElasticSearch Reader](#elasticSearch-reader)
     * [MongoDB Reader](#mongoDB-reader)
+    * [Kafka Reader](#kafka-reader)
   * [Cleaner](#cleaner)
   * [Parser](#parser)
     * [CSV Parser 配置](#csv-parser-配置)
@@ -367,6 +368,29 @@ reader 的典型配置如下
     - @(m):  分钟
     - @(ss): 秒，补齐两位
     - @(s): 秒
+
+Kafka Reader
+-----
+
+Kafka reader 的典型配置如下
+
+```
+    "reader":{
+        "mode": "kafka",
+        "kafka_groupid":"mac1",
+        "kafka_topic":"test_topic1，test_topic2",
+        "kafka_zookeeper":"localhost:2181, localhost:2181, localhost:2181",
+        "read_from":"oldest"
+    },
+```
+
+* `Kafka reader` 输出的是raw data，可根据具体情况自定义parser进行解析。
+* `mode` 是读取方式，使用Kafka Reader必须填写`kafka`。
+* `kafka_topic` kafka的topic名称列表
+* `kafka_groupid` kafka的consumer group名称。
+* `kafka_zookeeper` zookeeper地址列表
+* `read_from` 可选，oldest：从partition最开始的位置，newest：从partition最新的位置。默认从oldest位置开始消费。
+
 
 Cleaner
 ======

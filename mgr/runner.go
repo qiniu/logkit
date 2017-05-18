@@ -280,7 +280,6 @@ func (r *LogExportRunner) Run() {
 			log.Debug("runner fetched 0 lines")
 			continue
 		}
-
 		// parse data
 		datas, err := r.parser.Parse(lines)
 		if se, ok := err.(*utils.StatsError); ok {

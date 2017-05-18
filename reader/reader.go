@@ -72,6 +72,10 @@ const (
 	KeyMongoExecOnstart = "mongo_exec_onstart"
 	KeyMongoFilters     = "mongo_filters"
 	KeyMongoCert        = "mongo_cacert"
+
+	KeyKafkaGroupID   = "kafka_groupid"
+	KeyKafkaTopic     = "kafka_topic"
+	KeyKafkaZookeeper = "kafka_zookeeper"
 )
 
 var defaultIgnoreFileSuffix = []string{
@@ -86,6 +90,7 @@ const (
 	ModeMssql   = "mssql"
 	ModeElastic = "elastic"
 	ModeMongo   = "mongo"
+	ModeKafka   = "kafka"
 )
 
 // KeyWhence 的可选项
@@ -203,6 +208,18 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta) (reader Reader, err
 		filters, _ := conf.GetStringOr(KeyMongoFilters, "")
 		certfile, _ := conf.GetStringOr(KeyMongoCert, "")
 		return NewMongoReader(meta, readBatch, mongohost, database, coll, offsetKey, cronSchedule, filters, certfile, execOnStart)
+	case ModeKafka:
+		consumerGroup, err := conf.GetString(KeyKafkaGroupID)
+		if err != nil {
+			return nil, err
+		}
+		topics, err := conf.GetStringList(KeyKafkaTopic)
+		if err != nil {
+			return nil, err
+		}
+		zookeepers, err := conf.GetStringList(KeyKafkaZookeeper)
+		return NewKafkaReader(meta, consumerGroup, topics, zookeepers, whence)
 	}
+
 	return nil, errors.New("mode not supported, please set it to dir, file or mysql, mssql")
 }
