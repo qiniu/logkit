@@ -1,6 +1,5 @@
-[![Build Status](https://api.travis-ci.org/qiniu/logkit.svg)](http://travis-ci.org/qiniu/logkit)
 
-logkit
+logkit [![Build Status](https://api.travis-ci.org/qiniu/logkit.svg)](http://travis-ci.org/qiniu/logkit)
 ======
 
 Table of Contents
@@ -178,16 +177,23 @@ file reader 的典型配置如下
     },
 ```
 
-1. `log_path` 需要收集的日志的文件（夹）路径
-2. `meta_path` 是reader的读取offset的记录路径，必须是一个文件夹，在这个文件夹下，会记录本次reader的读取位置
-3. `file_done` 是reader完成后标志读取完成的文件放置位置，如果不填，默认放在meta_path下。singleFile模式下，若文件被rotate，则只匹配当前日志文件夹下，前缀相同的文件，inode相同作为rotate后的文件记录到file_done文件中，该策略只是把移动后的第一个文件放到meta的file_done文件里面。
-4. `mode` 是读取方式，支持`dir`和`file`两种。当选项为dir的时候，`log_path`必须是文件夹路径，同时会在这个文件夹下根据时间顺序依次读取文件。当选项为`file`的时候，`log_path`必须是文件路径，同时文件会不断的读取最终数据。
-5. `read_from` 可选，在创建reader的时候，如果meta信息，即历史读取记录不存在，将从文件的哪一端开始读取。可以设置为`oldest`最旧的部分或者`newest`最新的部分开始读取。如果字段不填，默认从最老的开始消费。
-6. `ignore_hidden` 读取的过程中是否忽略隐藏文件，默认忽略
-7. `ignore_file_suffix` 读取的过程中忽略哪些文件后缀名，默认不忽略
-8. `donefile_retention` 日志读取完毕后donefile的保留时间，默认7天，当然，如果donefile里面的文件一直因为别的runner不能删除，donefile也不会删除。
-9. `valid_file_pattern` 需要解析的日志文件名字，方式为glob，默认为全部，即：`*`
-10. `encoding` 日志文件的编码方式，默认为`utf-8`，即按照`utf-8`的编码方式读取文件。支持读取文件的编码格式包括：`UTF-16`,`GB18030`,`GBK`,`cp51932`,`windows-51932`,`EUC-JP`,`EUC-KR`,`ISO-2022-JP`,`Shift_JIS`,`TCVN3`及其相关国际化通用别名。
+1. `log_path` 必填项，需要收集的日志的文件（夹）路径
+1. `meta_path` 是reader的读取offset的记录路径，必须是一个文件夹，在这个文件夹下，会记录本次reader的读取位置
+1. `file_done` 可选项，是reader完成后标志读取完成的文件放置位置，如果不填，默认放在`meta_path`下。singleFile模式下，若文件被rotate，则只匹配当前日志文件夹下，前缀相同的文件，inode相同作为rotate后的文件记录到`file_done`文件中，该策略只是把移动后的第一个文件放到`meta`的`file_done`文件里面。
+1. `mode` 必填项，读取方式，有 `dir` 、 `file` 和 `tail` 三种读取模式。
+    * 当选项为`dir`的时候，`log_path` 必须是精确的文件夹路径，例如 `/home/qiniu/path/`, logkit会在启动时根据文件夹下文件时间顺序依次读取文件，当读到时间最新的文件时会不断读取追加的数据，直到该文件夹下出现新的文件。
+    * 当选项为`file`的时候，`log_path` 必须是精确的文件路径，例如 `/home/qiniu/path/server.log` , logkit会不断读取该文件追加的数据。
+    * 当选项为`tailx`的时候，`logpath` 是一个匹配路径的模式串，例如 `/home/*/path/*/logdir/*.log*`, 此时会展开并匹配所有符合该表达式的文件，并持续读取所有有数据追加的文件。每隔`stat_interval`的时间，重新刷新一遍`logpath`模式串，添加新增的文件。
+1. `read_from` 可选项，针对`dir`和`file`两个读取模式，在创建reader的时候，如果meta信息，即历史读取记录不存在，将从文件的哪一端开始读取。可以设置为`oldest`最旧的部分或者`newest`最新的部分开始读取。如果字段不填，默认从最老的开始消费。(`tailx`读取模式固定以`oldest`模式读取文件)
+1. `expire` 可选项，针对`tailx`读取模式读取的日志, 单位为"小时", 默认的`expire`时间是`24`小时,当达到`expire`时间的日志，就放弃追踪。放弃追踪的文件会被记录到`file_done`中，认为已经读取完毕。*注意：若放弃追踪的文件有更新，则会从头开始读取该文件所有数据。请谨慎设置文件追踪的过期时间。*
+1. `max_open_files` 可选项，针对`tailx`读取模式读取的日志，最大能追踪的文件数，默认为256。同时追踪的文件过多会导致打开的文件句柄超过系统限制，请谨慎配置该项。超过限制后，不再追踪新添加的日志文件，直到部分追踪文件达到`expire`时间。
+1. `stat_interval` 可选项，针对`tailx`读取模式读取的日志，刷新`logpath`模式串，感知新增日志的定时检查时间，单位为`秒`，默认`180`秒，即3分钟。
+1. `datasource_tag` 可选项，表示把读取日志的路径名称也作为标签，记录到解析出来的数据结果中，默认不添加，若`datasource_tag`不为空，则以该字段名称作为标签名称。例如 "datasource_tag":"mydatasource"; 则最终解析的日志中会增加一个字段`mydatasource`记录读取到日志的路径。可用于区分`tailx`模式下的日志数据是从哪个日志路径下读取的问题。
+1. `ignore_hidden` 可选项，读取的过程中是否忽略隐藏文件，默认忽略
+1. `ignore_file_suffix` 可选项，读取的过程中忽略哪些文件后缀名，默认不忽略
+1. `donefile_retention` 可选项，日志读取完毕后donefile的保留时间，默认7天，当然，如果donefile里面的文件一直因为别的runner不能删除，donefile也不会删除。
+1. `valid_file_pattern` 可选项，针对`dir`读取模式需要解析的日志文件，可以设置匹配文件名的模式串，匹配方式为glob展开模式，默认为`*`，即匹配文件夹下全部文件。
+1. `encoding` 可选项，读取日志文件的编码方式，默认为`utf-8`，即按照`utf-8`的编码方式读取文件。支持读取文件的编码格式包括：`UTF-16`,`GB18030`,`GBK`,`cp51932`,`windows-51932`,`EUC-JP`,`EUC-KR`,`ISO-2022-JP`,`Shift_JIS`,`TCVN3`及其相关国际化通用别名。
 
 
 ElasticSearch Reader
