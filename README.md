@@ -181,7 +181,7 @@ file reader 的典型配置如下
 1. `log_path` 必填项，需要收集的日志的文件（夹）路径
 1. `meta_path` 可选项，是reader的读取offset的记录路径，必须是一个文件夹，在这个文件夹下，会记录本次reader的读取位置。默认会根据runner名称结合`log_path`的hash值自动生成。
 1. `file_done` 可选项，是reader完成后标志读取完成的文件放置位置，如果不填，默认放在`meta_path`下。singleFile模式下，若文件被rotate，则只匹配当前日志文件夹下，前缀相同的文件，inode相同作为rotate后的文件记录到`file_done`文件中，该策略只是把移动后的第一个文件放到`meta`的`file_done`文件里面。
-1. `mode` 必填项，读取方式，有 `dir` 、 `file` 和 `tail` 三种读取模式。
+1. `mode` 必填项，读取方式，有 `dir` 、 `file` 和 `tailx` 三种读取模式。
     * 当选项为`dir`的时候，`log_path` 必须是精确的文件夹路径，例如 `/home/qiniu/path/`, logkit会在启动时根据文件夹下文件时间顺序依次读取文件，当读到时间最新的文件时会不断读取追加的数据，直到该文件夹下出现新的文件。使用`dir`模式的经典日志存储方式为整个文件夹下存储业务日志，文件夹下的日志使用统一前缀，后缀为时间戳，根据日志的大小rotate到新的文件。
     * 当选项为`file`的时候，`log_path` 必须是精确的文件路径，例如 `/home/qiniu/path/server.log` , logkit会不断读取该文件追加的数据。使用`file`模式的经典日志存储方式类似于nginx的日志rotate方式，日志名称为固定的名称，如`access.log`,rotate时直接move成新的文件如`access.log.1`，新的数据仍然写入到`access.log`。
     * 当选项为`tailx`的时候，`logpath` 是一个匹配路径的模式串，例如 `/home/*/path/*/logdir/*.log*`, 此时会展开并匹配所有符合该表达式的文件，并持续读取所有有数据追加的文件。每隔`stat_interval`的时间，重新刷新一遍`logpath`模式串，添加新增的文件。`tailx`模式比较灵活，几乎可以读取所有日志更新，需要注意的是，使用`tailx`模式容易导致文件句柄打开过多。`tailx`模式的文件重复判断标准为文件的`inode`编号，即`rename`文件名不会导致数据重复读取。
