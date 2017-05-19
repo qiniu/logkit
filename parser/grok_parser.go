@@ -2,7 +2,6 @@ package parser
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"os"
 	"regexp"
@@ -20,13 +19,16 @@ import (
 )
 
 const (
-	KeyGrokMode               = "grok_mode"              //单行还是多行
-	KeyGrokHeadPattern        = "grok_line_head_pattern" //行首正则表达式，只在mode为多行的时候有效
-	KeyGrokPatterns           = "grok_patterns"          // grok 模式串名
+	KeyGrokMode               = "grok_mode"     //是否替换\n以匹配多行
+	KeyGrokPatterns           = "grok_patterns" // grok 模式串名
 	KeyGrokCustomPatternFiles = "grok_custom_pattern_files"
 	KeyGrokCustomPatterns     = "grok_custom_patterns"
 
 	KeyTimeZoneOffset = "timezone_offset"
+)
+
+const (
+	ModeMulti = "multi"
 )
 
 const (
@@ -92,11 +94,9 @@ var (
 )
 
 type GrokParser struct {
-	name        string
-	labels      []label
-	mode        string
-	headPattern string
-	buffer      *bytes.Buffer
+	name   string
+	labels []label
+	mode   string
 
 	timeZoneOffset int
 
@@ -159,10 +159,7 @@ func NewGrokParser(c conf.MapConf) (LogParser, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse key %v error %v", KeyGrokPatterns, err)
 	}
-
 	mode, _ := c.GetStringOr(KeyGrokMode, "")
-	headPattern, _ := c.GetStringOr(KeyGrokHeadPattern, "")
-
 	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
 	timeZoneOffsetRaw, _ := c.GetStringOr(KeyTimeZoneOffset, "")
 	timeZoneOffset := parseTimeZoneOffset(timeZoneOffsetRaw)
@@ -176,8 +173,6 @@ func NewGrokParser(c conf.MapConf) (LogParser, error) {
 		name:               name,
 		labels:             labels,
 		mode:               mode,
-		headPattern:        headPattern,
-		buffer:             bytes.NewBuffer([]byte{}),
 		Patterns:           patterns,
 		CustomPatterns:     customPatterns,
 		CustomPatternFiles: customPatternFiles,
@@ -202,15 +197,6 @@ func (p *GrokParser) compile() error {
 		return err
 	}
 	p.g = gk
-
-	//校验行首正则表达式的合法性
-	if p.mode == "multi" {
-		_, err := regexp.Compile(p.headPattern)
-		if err != nil {
-			return err
-		}
-		p.headPattern = "^" + p.headPattern
-	}
 
 	// Give Patterns fake names so that they can be treated as named
 	// "custom patterns"
@@ -250,11 +236,12 @@ func (gp *GrokParser) Name() string {
 func (gp *GrokParser) Parse(lines []string) ([]sender.Data, error) {
 	datas := []sender.Data{}
 	se := &utils.StatsError{}
-	for _, line := range lines {
+	for idx, line := range lines {
 		data, err := gp.parseLine(line)
 		if err != nil {
 			gp.schemaErr.Output(err)
 			se.AddErrors()
+			se.ErrorIndex = append(se.ErrorIndex, idx)
 			continue
 		}
 		if len(data) < 1 { //数据不为空的时候发送
@@ -268,39 +255,14 @@ func (gp *GrokParser) Parse(lines []string) ([]sender.Data, error) {
 }
 
 func (p *GrokParser) parseLine(line string) (sender.Data, error) {
-
-	var multiLine string
-	if p.mode == "multi" { //
-		line = strings.TrimSuffix(line, "\n")
-		if ok, _ := regexp.MatchString(p.headPattern, line); ok { //行首匹配成功，解析之前的多行
-			multiLine = p.buffer.String()
-			log.Debugf("D! line head regexp matched, start to parse multiLine:(%v)", multiLine)
-			p.buffer.Reset()
-			p.buffer.WriteString(line + " ")
-			if p.buffer.Len() > MaxGrokMultiLineBuffer {
-				err := fmt.Errorf("max grok buffer exceeded(%v)", MaxGrokMultiLineBuffer)
-				log.Debugf("E! %v", err)
-				return nil, err
-			}
-		} else { //行首匹配失败，添加当前行到buffer中
-			p.buffer.WriteString(line + " ")
-			log.Debugf("D! add line(%v) to buffer", line)
-			if p.buffer.Len() > MaxGrokMultiLineBuffer {
-				err := fmt.Errorf("max grok buffer exceeded(%v)", MaxGrokMultiLineBuffer)
-				log.Debugf("E! %v", err)
-				return nil, err
-			}
-			return sender.Data{}, nil
-		}
-	} else {
-		multiLine = line
+	if p.mode == ModeMulti {
+		line = strings.Replace(line, "\n", " ", -1)
 	}
-
 	var err error
 	var values map[string]string
 	var patternName string
 	for _, pattern := range p.namedPatterns {
-		if values, err = p.g.Parse(pattern, multiLine); err != nil {
+		if values, err = p.g.Parse(pattern, line); err != nil {
 			log.Debugf("E! %v", err)
 			return nil, err
 		}

@@ -3,6 +3,7 @@ package reader
 import (
 	"fmt"
 	"hash/fnv"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -22,6 +23,7 @@ const (
 	deletedFileName   = "file.deleted"
 	bufMetaFilePath   = "buf.meta"
 	bufFilePath       = "buf.dat"
+	lineCacheFilePath = "cache.dat"
 	doneFileRetention = "donefile_retention"
 )
 
@@ -38,9 +40,11 @@ type Meta struct {
 	doneFilePath      string // 记录扫描过文件记录的文件
 	bufMetaFilePath   string // 记录buf的offset数据
 	bufFilePath       string // 记录buf数据
+	lineCacheFile     string //记录多行的缓存line
 	donefileretention int    // done.file保留时间，单位为天
 	encodingWay       string //文件编码格式，默认为utf-8
 	logpath           string
+	dataSourceTag     string //记录文件路径的标签名称
 }
 
 func getValidDir(dir string) (realPath string, err error) {
@@ -80,6 +84,7 @@ func NewMeta(metadir, filedonedir, logpath, mode string, donefileRetention int) 
 		doneFilePath:      filedonedir,
 		bufFilePath:       filepath.Join(metadir, bufFilePath),
 		bufMetaFilePath:   filepath.Join(metadir, bufMetaFilePath),
+		lineCacheFile:     filepath.Join(metadir, lineCacheFilePath),
 		donefileretention: donefileRetention,
 		logpath:           logpath,
 		mode:              mode,
@@ -114,7 +119,7 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 		metapath = "meta/" + runnerName + "_" + hash(base)
 		log.Debugf("Using %s as default metaPath", metapath)
 	}
-
+	datasourceTag, _ := conf.GetStringOr(KeyDataSourceTag, "")
 	filedonepath, _ := conf.GetStringOr(KeyFileDone, metapath)
 	donefileRetention, _ := conf.GetIntOr(doneFileRetention, defautFileRetention)
 	meta, err = NewMeta(metapath, filedonepath, logPath, mode, donefileRetention)
@@ -122,6 +127,7 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 		log.Warnf("%s - newMeta failed, err:%v", metapath, err)
 		return
 	}
+	meta.dataSourceTag = datasourceTag
 	return
 }
 
@@ -158,6 +164,18 @@ func (m *Meta) Clear() error {
 		return err
 	}
 	return os.MkdirAll(m.dir, defaultDirPerm)
+}
+
+func (m *Meta) CacheLineFile() string {
+	return m.lineCacheFile
+}
+
+func (m *Meta) ReadCacheLine() ([]byte, error) {
+	return ioutil.ReadFile(m.CacheLineFile())
+}
+
+func (m *Meta) WriteCacheLine(lines string) error {
+	return ioutil.WriteFile(m.CacheLineFile(), []byte(lines), defaultFilePerm)
 }
 
 func (m *Meta) ReadBufMeta() (r, w, bufsize int, err error) {
@@ -391,4 +409,12 @@ func (m *Meta) SetEncodingWay(e string) {
 //GetEncodingWay 获取文件编码方式
 func (m *Meta) GetEncodingWay() (e string) {
 	return m.encodingWay
+}
+
+func (m *Meta) GetMode() string {
+	return m.mode
+}
+
+func (m *Meta) GetDataSourceTag() string {
+	return m.dataSourceTag
 }

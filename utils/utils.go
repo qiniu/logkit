@@ -144,6 +144,7 @@ type StatsError struct {
 	StatsInfo
 	ErrorDetail error `json:"error"`
 	Ft          bool  `json:"-"`
+	ErrorIndex  []int
 }
 
 type StatsInfo struct {
@@ -171,6 +172,15 @@ func (se *StatsError) Error() string {
 		return ""
 	}
 	return fmt.Sprintf("success %v errors %v errordetail %v", se.Success, se.Errors, se.ErrorDetail)
+}
+
+func (se *StatsError) ErrorIndexIn(idx int) bool {
+	for _, v := range se.ErrorIndex {
+		if v == idx {
+			return true
+		}
+	}
+	return false
 }
 
 // parse ${ENV} to ENV

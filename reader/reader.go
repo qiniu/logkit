@@ -1,8 +1,9 @@
 package reader
 
 import (
-	"errors"
 	"strings"
+
+	"fmt"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
@@ -10,9 +11,12 @@ import (
 
 // Reader 是一个通用的行读取reader接口
 type Reader interface {
+	//Name reader名称
 	Name() string
+	//Source 读取的数据源
 	Source() string
 	ReadLine() (string, error)
+	SetMode(mode string, v interface{}) error
 	Close() error
 	SyncMeta()
 }
@@ -28,18 +32,24 @@ type FileReader interface {
 
 // FileReader's conf keys
 const (
-	KeyLogPath  = "log_path"
-	KeyMetaPath = "meta_path"
-	KeyFileDone = "file_done"
-	KeyMode     = "mode"
-	KeyBufSize  = "reader_buf_size"
-	KeyWhence   = "read_from"
-	KeyEncoding = "encoding"
+	KeyLogPath       = "log_path"
+	KeyMetaPath      = "meta_path"
+	KeyFileDone      = "file_done"
+	KeyMode          = "mode"
+	KeyBufSize       = "reader_buf_size"
+	KeyWhence        = "read_from"
+	KeyEncoding      = "encoding"
+	KeyDataSourceTag = "datasource_tag"
+	KeyHeadPattern   = "head_pattern"
 
 	// 忽略隐藏文件
 	KeyIgnoreHiddenFile = "ignore_hidden"
 	KeyIgnoreFileSuffix = "ignore_file_suffix"
 	KeyValidFilePattern = "valid_file_pattern"
+
+	KeyExpire       = "expire"
+	KeyMaxOpenFiles = "max_open_files"
+	KeyStatInterval = "stat_interval"
 
 	KeyMysqlOffsetKey   = "mysql_offset_key"
 	KeyMysqlReadBatch   = "mysql_limit_batch"
@@ -86,11 +96,17 @@ var defaultIgnoreFileSuffix = []string{
 const (
 	ModeDir     = "dir"
 	ModeFile    = "file"
+	ModeTailx   = "tailx"
 	ModeMysql   = "mysql"
 	ModeMssql   = "mssql"
 	ModeElastic = "elastic"
 	ModeMongo   = "mongo"
 	ModeKafka   = "kafka"
+)
+
+const (
+	ReadModeHeadPatternString = "mode_head_pattern_string"
+	ReadModeHeadPatternRegexp = "mode_head_pattern_regexp"
 )
 
 // KeyWhence 的可选项
@@ -112,7 +128,7 @@ func NewFileBufReader(conf conf.MapConf) (reader Reader, err error) {
 func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta) (reader Reader, err error) {
 	mode, _ := conf.GetStringOr(KeyMode, ModeDir)
 	logpath, err := conf.GetString(KeyLogPath)
-	if err != nil && (mode == ModeFile || mode == ModeDir) {
+	if err != nil && (mode == ModeFile || mode == ModeDir || mode == ModeTailx) {
 		return
 	}
 	bufSize, _ := conf.GetIntOr(KeyBufSize, defaultBufSize)
@@ -121,6 +137,7 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta) (reader Reader, err
 	if decoder != "" {
 		meta.SetEncodingWay(strings.ToLower(decoder))
 	}
+	headPattern, _ := conf.GetStringOr(KeyHeadPattern, "")
 	var fr FileReader
 	switch mode {
 	case ModeDir:
@@ -132,13 +149,19 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta) (reader Reader, err
 		if err != nil {
 			return
 		}
-		return NewReaderSize(fr, meta, bufSize)
+		reader, err = NewReaderSize(fr, meta, bufSize)
+
 	case ModeFile:
 		fr, err = NewSingleFile(meta, logpath, whence)
 		if err != nil {
 			return
 		}
-		return NewReaderSize(fr, meta, bufSize)
+		reader, err = NewReaderSize(fr, meta, bufSize)
+	case ModeTailx:
+		expireDur, _ := conf.GetStringOr(KeyExpire, "24h")
+		stateIntervalDur, _ := conf.GetStringOr(KeyStatInterval, "3m")
+		maxOpenFiles, _ := conf.GetIntOr(KeyMaxOpenFiles, 256)
+		reader, err = NewMultiReader(meta, logpath, whence, expireDur, stateIntervalDur, maxOpenFiles)
 	case ModeMysql: // Mysql 模式是启动mysql reader,读取mysql数据表
 		readBatch, _ := conf.GetIntOr(KeyMysqlReadBatch, 100)
 		offsetKey, _ := conf.GetStringOr(KeyMysqlOffsetKey, "")
@@ -156,7 +179,7 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta) (reader Reader, err
 		}
 		cronSchedule, _ := conf.GetStringOr(KeyMysqlCron, "")
 		execOnStart, _ := conf.GetBoolOr(KeyMysqlExecOnStart, true)
-		return NewSQLReader(meta, readBatch, ModeMysql, dataSource, database, rawSqls, cronSchedule, offsetKey, execOnStart)
+		reader, err = NewSQLReader(meta, readBatch, ModeMysql, dataSource, database, rawSqls, cronSchedule, offsetKey, execOnStart)
 	case ModeMssql: // Mssql 模式是启动mssql reader，读取mssql数据表
 		readBatch, _ := conf.GetIntOr(KeyMssqlReadBatch, 100)
 		offsetKey, _ := conf.GetStringOr(KeyMssqlOffsetKey, "")
@@ -174,7 +197,7 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta) (reader Reader, err
 		}
 		cronSchedule, _ := conf.GetStringOr(KeyMssqlCron, "")
 		execOnStart, _ := conf.GetBoolOr(KeyMssqlExecOnStart, true)
-		return NewSQLReader(meta, readBatch, ModeMssql, dataSource, database, rawSqls, cronSchedule, offsetKey, execOnStart)
+		reader, err = NewSQLReader(meta, readBatch, ModeMssql, dataSource, database, rawSqls, cronSchedule, offsetKey, execOnStart)
 	case ModeElastic:
 		readBatch, _ := conf.GetIntOr(KeyESReadBatch, 100)
 		estype, err := conf.GetString(KeyESType)
@@ -190,7 +213,7 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta) (reader Reader, err
 			eshost = "http://" + eshost
 		}
 		keepAlive, _ := conf.GetStringOr(KeyESKeepAlive, "6h")
-		return NewESReader(meta, readBatch, estype, esindex, eshost, keepAlive)
+		reader, err = NewESReader(meta, readBatch, estype, esindex, eshost, keepAlive)
 	case ModeMongo:
 		readBatch, _ := conf.GetIntOr(KeyMongoReadBatch, 100)
 		database, err := conf.GetString(KeyMongoDatabase)
@@ -207,7 +230,7 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta) (reader Reader, err
 		execOnStart, _ := conf.GetBoolOr(KeyMongoExecOnstart, true)
 		filters, _ := conf.GetStringOr(KeyMongoFilters, "")
 		certfile, _ := conf.GetStringOr(KeyMongoCert, "")
-		return NewMongoReader(meta, readBatch, mongohost, database, coll, offsetKey, cronSchedule, filters, certfile, execOnStart)
+		reader, err = NewMongoReader(meta, readBatch, mongohost, database, coll, offsetKey, cronSchedule, filters, certfile, execOnStart)
 	case ModeKafka:
 		consumerGroup, err := conf.GetString(KeyKafkaGroupID)
 		if err != nil {
@@ -218,8 +241,15 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta) (reader Reader, err
 			return nil, err
 		}
 		zookeepers, err := conf.GetStringList(KeyKafkaZookeeper)
-		return NewKafkaReader(meta, consumerGroup, topics, zookeepers, whence)
+		reader, err = NewKafkaReader(meta, consumerGroup, topics, zookeepers, whence)
+	default:
+		err = fmt.Errorf("mode %v not supported now", mode)
 	}
-
-	return nil, errors.New("mode not supported, please set it to dir, file or mysql, mssql")
+	if err != nil {
+		return
+	}
+	if headPattern != "" {
+		err = reader.SetMode(ReadModeHeadPatternString, headPattern)
+	}
+	return
 }

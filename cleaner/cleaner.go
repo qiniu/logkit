@@ -50,6 +50,10 @@ func NewCleaner(conf conf.MapConf, meta *reader.Meta, cleanChan chan<- CleanSign
 	if !enable {
 		return
 	}
+	if meta.GetMode() != reader.ModeDir && meta.GetMode() != reader.ModeFile {
+		log.Errorf("cleaner only support reader mode in dir or file, now mode is %v, cleaner disabled", meta.GetMode())
+		return
+	}
 	interval, _ := conf.GetIntOr(clean_interval, 0) //单位，秒
 	if interval <= 0 {
 		interval = default_delete_interval

@@ -36,6 +36,9 @@ type SeqFile struct {
 	ignoreFileSuffix []string // 忽略文件后缀
 	validFilePattern string   // 合法的文件名正则表达式
 	stopped          int32    // 停止标志位
+
+	lastSyncPath   string
+	lastSyncOffset int64
 }
 
 func getStartFile(path, whence string, meta *Meta, sf *SeqFile) (f *os.File, dir, currFile string, offset int64, err error) {
@@ -68,6 +71,8 @@ func getStartFile(path, whence string, meta *Meta, sf *SeqFile) (f *os.File, dir
 			err = fmt.Errorf("%s -cannot open oldest file err:%v", dir, err)
 			return
 		}
+	} else {
+		log.Debugf("%v restore meta success", dir)
 	}
 	f, err = os.Open(currFile)
 	if err != nil {
@@ -225,9 +230,11 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 				if err2 != nil {
 					return n, err2
 				}
+				//已经获得了下一个文件，没有EOF
+				err = nil
 			} else {
 				time.Sleep(time.Millisecond * 500)
-				continue
+				return 0, io.EOF
 			}
 		}
 	}
@@ -358,5 +365,11 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 }
 
 func (sf *SeqFile) SyncMeta() (err error) {
+	if sf.lastSyncOffset == sf.offset && sf.lastSyncPath == sf.currFile {
+		log.Debugf("%v was just syncd %v %v ignore it...", sf.Name(), sf.lastSyncPath, sf.lastSyncOffset)
+		return nil
+	}
+	sf.lastSyncOffset = sf.offset
+	sf.lastSyncPath = sf.currFile
 	return sf.meta.WriteOffset(sf.currFile, sf.offset)
 }

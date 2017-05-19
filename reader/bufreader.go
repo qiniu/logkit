@@ -10,16 +10,19 @@ package reader
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"os"
-
-	"github.com/qiniu/log"
+	"regexp"
+	"sync"
 
 	"github.com/axgle/mahonia"
+	"github.com/qiniu/log"
 )
 
 const (
-	defaultBufSize = 4096
+	defaultBufSize           = 4096
+	MaxHeadPatternBufferSize = 20 * 1024 * 1024
 )
 
 var (
@@ -31,18 +34,28 @@ var (
 
 // buffered input.
 
+type LastSync struct {
+	cache string
+	buf   string
+	r, w  int
+}
+
 // BufReader implements buffering for an FileReader object.
 type BufReader struct {
 	buf          []byte
+	lineCache    string
 	rd           FileReader // reader provided by the client
 	r, w         int        // buf read and write positions
 	err          error
 	lastByte     int
 	lastRuneSize int
+	lastSync     LastSync
 
+	mux     sync.Mutex
 	decoder mahonia.Decoder
 
-	meta *Meta // 存放offset的元信息
+	meta            *Meta // 存放offset的元信息
+	multiLineRegexp *regexp.Regexp
 }
 
 const minReadBufferSize = 16
@@ -68,10 +81,21 @@ func NewReaderSize(rd FileReader, meta *Meta, size int) (*BufReader, error) {
 			log.Errorf("%s cannot read buf meta info %v", rd.Name(), err)
 			return nil, err
 		}
+	} else {
+		log.Debugf("%v restore meta success %v %v %v", meta.LogPath(), readPos, writePos, lastSize)
 	}
 	if size < lastSize {
 		size = lastSize
 	}
+	linesbytes, err := meta.ReadCacheLine()
+	if err != nil {
+		log.Errorf("ReadCacheLine from file error %v", err)
+		err = nil
+		linesbytes = []byte("")
+	} else {
+		log.Debugf("%v restore line cache success: [%v]", meta.LogPath(), string(linesbytes))
+	}
+
 	r := new(BufReader)
 	r.reset(make([]byte, size), rd)
 	r.meta = meta
@@ -86,10 +110,22 @@ func NewReaderSize(rd FileReader, meta *Meta, size int) (*BufReader, error) {
 			_, err = meta.ReadBuf(r.buf)
 			if err != nil {
 				return nil, err
+			} else {
+				log.Debugf("%v restore buf success [%v]", meta.LogPath(), string(r.buf))
 			}
 		}
 	}
+	r.lineCache = string(linesbytes)
 	return r, nil
+}
+
+func (b *BufReader) SetMode(mode string, v interface{}) (err error) {
+	b.multiLineRegexp, err = HeadPatternMode(mode, v)
+	if err != nil {
+		err = fmt.Errorf("%v set mode error %v ", b.Name(), err)
+		return
+	}
+	return
 }
 
 func (b *BufReader) reset(buf []byte, r FileReader) {
@@ -98,6 +134,9 @@ func (b *BufReader) reset(buf []byte, r FileReader) {
 		rd:           r,
 		lastByte:     -1,
 		lastRuneSize: -1,
+		lineCache:    "",
+		lastSync:     LastSync{},
+		mux:          sync.Mutex{},
 	}
 }
 
@@ -154,6 +193,8 @@ func (b *BufReader) buffered() int { return b.w - b.r }
 // readBytes or ReadString instead.
 // readSlice returns err != nil if and only if line does not end in delim.
 func (b *BufReader) readSlice(delim byte) (line []byte, err error) {
+	b.mux.Lock()
+	defer b.mux.Unlock()
 	for {
 
 		// Search buffer.
@@ -253,9 +294,52 @@ func (b *BufReader) ReadString(delim byte) (ret string, err error) {
 	return
 }
 
+//ReadPattern读取日志直到匹配行首模式串
+func (b *BufReader) ReadPattern() (string, error) {
+	var maxTimes int = 0
+	for {
+		line, err := b.ReadString('\n')
+		//读取到line的情况
+		if len(line) > 0 {
+			if len(b.lineCache) <= 0 {
+				b.lineCache = line
+				continue
+			}
+			//匹配行首，成功则返回之前的cache，否则加入到cache，返回空串
+			if b.multiLineRegexp.Match([]byte(line)) {
+				line, b.lineCache = b.lineCache, line
+				return line, err
+			}
+			b.lineCache += line
+			maxTimes = 0
+		} else { //读取不到日志
+			if err != nil {
+				line = b.lineCache
+				b.lineCache = ""
+				return line, err
+			}
+			maxTimes++
+			//对于又没有错误，也读取不到日志的情况，最多允许10次重试
+			if maxTimes > 10 {
+				log.Debugf("%v read empty line 10 times return empty", b.Name())
+				return "", nil
+			}
+		}
+		//对于读取到了Cache的情况，继续循环，直到超过最大限制
+		if len(b.lineCache) > MaxHeadPatternBufferSize {
+			line = b.lineCache
+			b.lineCache = ""
+			return line, err
+		}
+	}
+}
+
 //ReadLine returns a string line as a normal Reader
-func (b *BufReader) ReadLine() (string, error) {
-	return b.ReadString('\n')
+func (b *BufReader) ReadLine() (ret string, err error) {
+	if b.multiLineRegexp == nil {
+		return b.ReadString('\n')
+	}
+	return b.ReadPattern()
 }
 
 var errNegativeWrite = errors.New("bufio: writer returned negative count from Write")
@@ -283,12 +367,30 @@ func (b *BufReader) Close() error {
 }
 
 func (b *BufReader) SyncMeta() {
-	err := b.meta.WriteBuf(b.buf, b.r, b.w, len(b.buf))
-	if err != nil {
-		log.Errorf("%s cannot write buf, err :%v", b.Name(), err)
-		return
+	b.mux.Lock()
+	defer b.mux.Unlock()
+	//把linecache也缓存
+	if b.lastSync.cache != b.lineCache || b.lastSync.buf != string(b.buf) || b.r != b.lastSync.r || b.w != b.lastSync.w {
+		log.Printf("%v sync meta started, linecache [%v] buf [%v] （%v %v）", b.Name(), b.lineCache, string(b.buf), b.r, b.w)
+		err := b.meta.WriteBuf(b.buf, b.r, b.w, len(b.buf))
+		if err != nil {
+			log.Errorf("%s cannot write buf, err :%v", b.Name(), err)
+			return
+		}
+		err = b.meta.WriteCacheLine(b.lineCache)
+		if err != nil {
+			log.Errorf("%s cannot write linecache, err :%v", b.Name(), err)
+			return
+		}
+		b.lastSync.cache = b.lineCache
+		b.lastSync.buf = string(b.buf)
+		b.lastSync.r = b.r
+		b.lastSync.w = b.w
+		log.Printf("%v sync meta succeed, linecache [%v] buf [%v] （%v %v）", b.Name(), b.lineCache, string(b.buf), b.r, b.w)
+	} else {
+		log.Debugf("%v meta data was just syncd, cache %v, buf %v, r,w =(%v,%v), ignore this sync...", b.Name(), b.lineCache, string(b.buf), b.r, b.w)
 	}
-	err = b.rd.SyncMeta()
+	err := b.rd.SyncMeta()
 	if err != nil {
 		log.Errorf("%s cannot write reader %v's meta info, err %v", b.Name(), b.rd.Name(), err)
 		return

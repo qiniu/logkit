@@ -1,7 +1,9 @@
 package reader
 
 import (
+	"errors"
 	"os"
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -38,4 +40,38 @@ func TestCondition(t *testing.T) {
 	assert.False(t, falseCondition(fi))
 	assert.True(t, orCondition(trueCondition, falseCondition)(fi))
 	assert.False(t, andCondition(trueCondition, falseCondition)(fi))
+}
+
+func TestHeadPatternMode(t *testing.T) {
+	headreg, err := regexp.Compile("^xx$")
+	if err != nil {
+		t.Error(err)
+	}
+	tests := []struct {
+		mode   string
+		value  interface{}
+		experr error
+	}{
+		{
+			mode:   "hahah",
+			experr: errors.New("unknown HeadPatternMode hahah"),
+		},
+		{
+			mode:  ReadModeHeadPatternRegexp,
+			value: headreg,
+		},
+		{
+			mode:  ReadModeHeadPatternString,
+			value: "^xx$",
+		},
+	}
+	for _, ti := range tests {
+		reg, err := HeadPatternMode(ti.mode, ti.value)
+		if ti.experr != nil {
+			assert.EqualError(t, err, ti.experr.Error())
+			continue
+		}
+		assert.NoError(t, err)
+		assert.Equal(t, headreg, reg)
+	}
 }

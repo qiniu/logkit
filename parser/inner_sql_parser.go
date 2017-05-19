@@ -85,11 +85,12 @@ func (im *InternalSQLParser) Name() string {
 func (im *InternalSQLParser) Parse(lines []string) ([]sender.Data, error) {
 	datas := []sender.Data{}
 	se := &utils.StatsError{}
-	for _, line := range lines {
+	for idx, line := range lines {
 		data, err := im.parseLine(line)
 		if err != nil {
 			im.schemaErr.Output(err)
 			se.AddErrors()
+			se.ErrorIndex = append(se.ErrorIndex, idx)
 			continue
 		}
 		datas = append(datas, data)

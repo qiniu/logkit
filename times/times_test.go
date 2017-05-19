@@ -1,6 +1,7 @@
 package times
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -83,4 +84,12 @@ func TestStrToTime2(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	testcase = "2017/05/18 16:10:10.000000"
+	tm, err := StrToTime(testcase)
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println(tm.String())
+	nt := tm.Format(time.RFC3339)
+	fmt.Println(nt)
 }

@@ -2,6 +2,7 @@ package reader
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -163,4 +164,8 @@ func (er *ElasticReader) SyncMeta() {
 		log.Errorf("%v SyncMeta error %v", er.Name(), err)
 	}
 	return
+}
+
+func (er *ElasticReader) SetMode(mode string, v interface{}) error {
+	return errors.New("ElasticReader not support readmode")
 }
