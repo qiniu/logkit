@@ -135,7 +135,11 @@ func NewMultiReader(meta *Meta, logPathPattern, whence, expireDur, statIntervalD
 	}
 	_, _, bufsize, err := meta.ReadBufMeta()
 	if err != nil {
-		log.Warnf("%v recover from meta error %v, ignore...", logPathPattern, err)
+		if os.IsNotExist(err) {
+			log.Debugf("%v recover from meta error %v, ignore...", logPathPattern, err)
+		} else {
+			log.Warnf("%v recover from meta error %v, ignore...", logPathPattern, err)
+		}
 		bufsize = 0
 		err = nil
 	}
@@ -159,7 +163,11 @@ func NewMultiReader(meta *Meta, logPathPattern, whence, expireDur, statIntervalD
 	if bufsize > 0 {
 		_, err = meta.ReadBuf(buf)
 		if err != nil {
-			log.Warnf("%v read buf error %v, ignore...", mr.Name(), err)
+			if os.IsNotExist(err) {
+				log.Debugf("%v read buf error %v, ignore...", mr.Name(), err)
+			} else {
+				log.Warnf("%v read buf error %v, ignore...", mr.Name(), err)
+			}
 		} else {
 			err = json.Unmarshal(buf, &mr.cacheMap)
 			if err != nil {
@@ -316,7 +324,14 @@ func (mr *MultiReader) Name() string {
 }
 
 func (mr *MultiReader) Source() string {
-	return mr.fileReaders[mr.curDataLogInode].logpath
+	if mr.curDataLogInode == 0 {
+		return ""
+	}
+	if ar, ok := mr.fileReaders[mr.curDataLogInode]; ok {
+		return ar.logpath
+	}
+	log.Errorf("%v not exist in tailx multireader", mr.curDataLogInode)
+	return ""
 }
 
 func (mr *MultiReader) Close() (err error) {

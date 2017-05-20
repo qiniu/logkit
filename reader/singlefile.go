@@ -58,11 +58,15 @@ func NewSingleFile(meta *Meta, path, whence string) (sf *SingleFile, err error) 
 	omitMeta := false
 	file, offset, err := meta.ReadOffset()
 	if err != nil {
-		log.Errorf("%v -meta data is corrupted err:%v, omit meta data", meta.MetaFile(), err)
+		if os.IsNotExist(err) {
+			log.Debugf("%v -meta data is corrupted err:%v, omit meta data", meta.MetaFile(), err)
+		} else {
+			log.Warnf("%v -meta data is corrupted err:%v, omit meta data", meta.MetaFile(), err)
+		}
 		omitMeta = true
 	}
 	if file != path {
-		log.Errorf("%v -meta file is not current file %v != %v， omit meta data", meta.MetaFile(), file, path)
+		log.Warnf("%v -meta file is not current file %v != %v， omit meta data", meta.MetaFile(), file, path)
 		omitMeta = true
 	}
 

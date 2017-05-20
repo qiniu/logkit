@@ -75,10 +75,10 @@ func NewReaderSize(rd FileReader, meta *Meta, size int) (*BufReader, error) {
 	readPos, writePos, lastSize, err := meta.ReadBufMeta()
 	if err != nil {
 		if os.IsNotExist(err) {
-			log.Warnf("%s cannot find out buf meta file, start from zero", rd.Name())
+			log.Debugf("%s cannot find out buf meta file, start from zero", rd.Name())
 			bufFromFile = false
 		} else {
-			log.Errorf("%s cannot read buf meta info %v", rd.Name(), err)
+			log.Warnf("%s cannot read buf meta info %v", rd.Name(), err)
 			return nil, err
 		}
 	} else {
@@ -89,7 +89,11 @@ func NewReaderSize(rd FileReader, meta *Meta, size int) (*BufReader, error) {
 	}
 	linesbytes, err := meta.ReadCacheLine()
 	if err != nil {
-		log.Errorf("ReadCacheLine from file error %v", err)
+		if os.IsNotExist(err) {
+			log.Debugf("ReadCacheLine from file error %v", err)
+		} else {
+			log.Warnf("ReadCacheLine from file error %v", err)
+		}
 		err = nil
 		linesbytes = []byte("")
 	} else {
@@ -371,7 +375,7 @@ func (b *BufReader) SyncMeta() {
 	defer b.mux.Unlock()
 	//把linecache也缓存
 	if b.lastSync.cache != b.lineCache || b.lastSync.buf != string(b.buf) || b.r != b.lastSync.r || b.w != b.lastSync.w {
-		log.Printf("%v sync meta started, linecache [%v] buf [%v] （%v %v）", b.Name(), b.lineCache, string(b.buf), b.r, b.w)
+		log.Debugf("%v sync meta started, linecache [%v] buf [%v] （%v %v）", b.Name(), b.lineCache, string(b.buf), b.r, b.w)
 		err := b.meta.WriteBuf(b.buf, b.r, b.w, len(b.buf))
 		if err != nil {
 			log.Errorf("%s cannot write buf, err :%v", b.Name(), err)
@@ -386,7 +390,7 @@ func (b *BufReader) SyncMeta() {
 		b.lastSync.buf = string(b.buf)
 		b.lastSync.r = b.r
 		b.lastSync.w = b.w
-		log.Printf("%v sync meta succeed, linecache [%v] buf [%v] （%v %v）", b.Name(), b.lineCache, string(b.buf), b.r, b.w)
+		log.Debugf("%v sync meta succeed, linecache [%v] buf [%v] （%v %v）", b.Name(), b.lineCache, string(b.buf), b.r, b.w)
 	} else {
 		log.Debugf("%v meta data was just syncd, cache %v, buf %v, r,w =(%v,%v), ignore this sync...", b.Name(), b.lineCache, string(b.buf), b.r, b.w)
 	}
