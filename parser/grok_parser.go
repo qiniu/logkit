@@ -296,14 +296,14 @@ func (p *GrokParser) parseLine(line string) (sender.Data, error) {
 		case LONG:
 			iv, err := strconv.ParseInt(v, 10, 64)
 			if err != nil {
-				log.Printf("E! Error parsing %s to long: %s", v, err)
+				log.Debugf("E! Error parsing %s to long: %s", v, err)
 			} else {
 				data[k] = iv
 			}
 		case FLOAT:
 			fv, err := strconv.ParseFloat(v, 64)
 			if err != nil {
-				log.Printf("E! Error parsing %s to float: %s", v, err)
+				log.Debugf("E! Error parsing %s to float: %s", v, err)
 			} else {
 				data[k] = fv
 			}
@@ -314,7 +314,7 @@ func (p *GrokParser) parseLine(line string) (sender.Data, error) {
 				rfctime := ts.Format(time.RFC3339Nano)
 				data[k] = rfctime
 			} else {
-				log.Printf("E! Error parsing %s to time layout [%s]: %s", v, t, err)
+				log.Debugf("E! Error parsing %s to time layout [%s]: %s", v, t, err)
 			}
 
 		case DROP:
