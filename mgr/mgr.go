@@ -274,9 +274,16 @@ func (m *Manager) doClean(sig cleaner.CleanSignal) {
 	}
 	count := q.filecount[file] + 1
 	if count >= q.cleanerCount {
-		err := os.Remove(filepath.Join(dir, file))
-		if err != nil && !os.IsNotExist(err) {
-			log.Error(err)
+		catdir := filepath.Join(dir, file)
+		err := os.Remove(catdir)
+		if err != nil {
+			if os.IsNotExist(err) {
+				log.Warnf("clean %v failed as logfile is not exist: %v", catdir, err)
+			} else {
+				log.Errorf("clean %v failed: %v", catdir, err)
+			}
+		} else {
+			log.Infof("log <%v> was successfully cleaned by cleaner", catdir)
 		}
 		delete(q.filecount, file)
 	} else {
