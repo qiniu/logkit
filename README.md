@@ -61,18 +61,20 @@ go build -o logkit logkit.go
 logkit.conf 配置如下。
 
 1. `max_procs` go的runtime.GOMAXPROCS
-2. `debug_level` 日志输出级别，0为debug，数字越高级别越高
-3. `confs_path` 监听Runner配置文件夹，是一个列表，列表中的每一项都是一个监听的配置文件文件夹，如果每一项中文件夹下配置发生增加、减少或者变更，会根据配置创建相应的runner，每个conf文件是一个runner，可以使用表达式来监听文件夹。当符合表达式的文件夹增加或减少时，每隔十秒能检测出变动。
-4. `confs_path` 中最大能监听的文件数取决于系统的`fs.inotify.max_user_instances`，请谨慎添加，目前qiniu的服务器默认限制数在128.
-5. `clean_self_log` 是否清理logkit本身产生的日志，默认删除 `./run/*.log-*` 匹配命中的日志文件，保留文件名时间戳最新的5个文件。
-6. `clean_self_dir` logkit本身日志的路径，默认为 `./run`
-7. `clean_self_pattern` logkit本身日志的模式，默认为 `*.log-*`
-8. `clean_self_cnt` 保留logkit日志文件个数，默认为 5
+1. `debug_level` 日志输出级别，0为debug，数字越高级别越高
+1. `port` 可选项，绑定端口地址，默认不填则随机选择一个4000及以上的可用端口。
+1. `confs_path` 监听Runner配置文件夹，是一个列表，列表中的每一项都是一个监听的配置文件文件夹，如果每一项中文件夹下配置发生增加、减少或者变更，会根据配置创建相应的runner，每个conf文件是一个runner，可以使用表达式来监听文件夹。当符合表达式的文件夹增加或减少时，每隔十秒能检测出变动。
+1. `confs_path` 中最大能监听的文件数取决于系统的`fs.inotify.max_user_instances`，请谨慎添加，目前qiniu的服务器默认限制数在128.
+1. `clean_self_log` 是否清理logkit本身产生的日志，默认删除 `./run/*.log-*` 匹配命中的日志文件，保留文件名时间戳最新的5个文件。
+1. `clean_self_dir` logkit本身日志的路径，默认为 `./run`
+1. `clean_self_pattern` logkit本身日志的模式，默认为 `*.log-*`
+1. `clean_self_cnt` 保留logkit日志文件个数，默认为 5
 
 ```
 {
     "max_procs": 8,
     "debug_level": 1,
+    "port":4000,
     "clean_self_log":true,           # 选填，默认false
     "clean_self_dir":"./run",        # 选填，clean_self_log 为true时候生效，默认 "./run" 
     "clean_self_pattern":"*.log-*",  # 选填，clean_self_log 为true时候生效，默认 "*.log-*"
@@ -767,20 +769,24 @@ Pandora 典型配置
         "pandora_host":"https://pipeline.qiniu.com",
         "pandora_repo_name":"repo_req_io",
         "pandora_region":"nb",
+        "request_rate_limit":"100",
+        "flow_rate_limit":"1024",
         "pandora_schema":"field1 pandora_field1,field2,field3 pandora_field3,...",
         "pandora_auto_create":"pandora_field1 *s,field2 l,pandora_field3 d,field4 f",
         "pandora_schema_update_interval":"300"
 }
 ```
 
-1. `pandora_ak` qiniu账号的ak.可以直接填写ak，也可使用`"${YOUR\_ENV\_AK\_NAME}"`从系统环境变量`YOUR_ENV_AK_NAME`中读取ak
-1. `pandora_sk` qiniu账号的sk.可以直接填写sk，也可使用`"${YOUR\_ENV\_SK\_NAME}"`从系统环境变量`YOUR_ENV_SK_NAME`中读取sk
-1. `pandora_host` pandora 服务地址
-1. `pandora_repo_name` pandora 的repo名字
-1. `pandora_region` pandora 服务的地域
-1. `pandora_schema` 是可选字段，提供了schema的选项和别名功能，如果不填，则认为所有parser出来的field只要符合pandora schema就发送；如果填，可以只选择填了的字段打向pandora，根据逗号分隔，如果要以别名的方式打向pandora，加上空格跟上别名即可。若最后以逗号省略号",..."结尾则表示其他字段也以pandora的schema为准发送。
+1. `pandora_ak` 必填，qiniu账号的ak.可以直接填写ak，也可使用`"${YOUR\_ENV\_AK\_NAME}"`从系统环境变量`YOUR_ENV_AK_NAME`中读取ak
+1. `pandora_sk` 必填，qiniu账号的sk.可以直接填写sk，也可使用`"${YOUR\_ENV\_SK\_NAME}"`从系统环境变量`YOUR_ENV_SK_NAME`中读取sk
+1. `pandora_host` 必填，pandora 服务地址
+1. `pandora_repo_name` 必填， pandora 的repo名字
+1. `pandora_region` 必填，pandora 服务的地域
+1. `pandora_schema` 可选字段，提供了schema的选项和别名功能，如果不填，则认为所有parser出来的field只要符合pandora schema就发送；如果填，可以只选择填了的字段打向pandora，根据逗号分隔，如果要以别名的方式打向pandora，加上空格跟上别名即可。若最后以逗号省略号",..."结尾则表示其他字段也以pandora的schema为准发送。
 1. Pandora Sender会在runner启动时获取repo的schema，若用户缺少一些必填的schema，会帮助填上默认值。
-1. `pandora_schema_update_interval` 是自动更新pandora schema的周期时间，单位为秒，默认300s
+1. `pandora_schema_update_interval` 可选字段，自动更新pandora schema的周期时间，单位为秒，默认300s
+1. `request_rate_limit` 可选字段，每秒请求数限制，默认不限速，注意填写的为数字字符串，如`"500"`,表示每秒限制最多500个请求。注意，限速并发准确值，会有数值上的偏差，偏差范围在每秒`20`个请求以内。
+1. `flow_rate_limit` 可选字段, 每秒的流量限制，单位为`KB`,默认不限速，注意填写的为数字字符串，如`"1024"`，表示限速每秒`1024KB`，注意，限速并发准确值，会有数值上的偏差，偏差范围在`1KB`以内。**警告：若单个点的大小超过了流量限速的最大限制，logkit将发送不出任何点，请根据单条日志大小谨慎配置。**
 1. `pandora_auto_create` 该字段表示字段创建，默认为空，不自动创建。若填写该字段，则表示自动创建。repo的DSL创建规则为`<字段名称> <类型>`,字段名称和类型用空格符隔开，不同自动用逗号隔开。若字段必填，则在类型前加`*`号表示。
     * pandora date类型：`date`,`DATE`,`d`,`D`
     * pandora long类型：`long`,`LONG`,`l`,`L`

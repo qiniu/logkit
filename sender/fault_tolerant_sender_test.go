@@ -17,7 +17,7 @@ const (
 
 func TestFtSender(t *testing.T) {
 	_, pt := NewMockPandoraWithPrefix("v2")
-	s, err := newPandoraSender("p", "TestFtSender", "nb", "http://127.0.0.1:"+pt, "ak", "sk", "ab", "ab *s", time.Second)
+	s, err := newPandoraSender("p", "TestFtSender", "nb", "http://127.0.0.1:"+pt, "ak", "sk", "ab", "ab *s", time.Second, 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
