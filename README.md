@@ -62,7 +62,7 @@ logkit.conf 配置如下。
 
 1. `max_procs` go的runtime.GOMAXPROCS
 1. `debug_level` 日志输出级别，0为debug，数字越高级别越高
-1. `port` 可选项，绑定端口地址，默认不填则随机选择一个4000及以上的可用端口。
+1. `bind_host` 可选项，监听的host及端口地址，默认不填则随机选择一个4000及以上的可用端口。
 1. `confs_path` 监听Runner配置文件夹，是一个列表，列表中的每一项都是一个监听的配置文件文件夹，如果每一项中文件夹下配置发生增加、减少或者变更，会根据配置创建相应的runner，每个conf文件是一个runner，可以使用表达式来监听文件夹。当符合表达式的文件夹增加或减少时，每隔十秒能检测出变动。
 1. `confs_path` 中最大能监听的文件数取决于系统的`fs.inotify.max_user_instances`，请谨慎添加，目前qiniu的服务器默认限制数在128.
 1. `clean_self_log` 是否清理logkit本身产生的日志，默认删除 `./run/*.log-*` 匹配命中的日志文件，保留文件名时间戳最新的5个文件。
@@ -74,7 +74,7 @@ logkit.conf 配置如下。
 {
     "max_procs": 8,
     "debug_level": 1,
-    "port":4000,
+    "bind_host":"127.0.0.1:4000",
     "clean_self_log":true,           # 选填，默认false
     "clean_self_dir":"./run",        # 选填，clean_self_log 为true时候生效，默认 "./run" 
     "clean_self_pattern":"*.log-*",  # 选填，clean_self_log 为true时候生效，默认 "*.log-*"

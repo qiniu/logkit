@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
-	"strconv"
 	"time"
 
 	config "github.com/qiniu/logkit/conf"
@@ -21,7 +20,7 @@ import (
 type Config struct {
 	MaxProcs         int      `json:"max_procs"`
 	DebugLevel       int      `json:"debug_level"`
-	Port             int      `json:"port"`
+	BindHost         string   `json:"bind_host"`
 	ConfsPath        []string `json:"confs_path"`
 	CleanSelfLog     bool     `json:"clean_self_log"`
 	CleanSelfDir     string   `json:"clean_self_dir"`
@@ -126,8 +125,8 @@ func main() {
 	if conf.CleanSelfLog {
 		go loopCleanLogkitLog(conf.CleanSelfDir, conf.CleanSelfPattern, conf.CleanSelfLogCnt, stopClean)
 	}
-	if conf.Port > 0 {
-		m.BindHost = ":" + strconv.Itoa(conf.Port)
+	if len(conf.BindHost) > 0 {
+		m.BindHost = conf.BindHost
 	}
 	// start rest service
 	rs := mgr.NewRestService(m)

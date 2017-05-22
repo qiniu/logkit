@@ -413,25 +413,25 @@ func (r *LogExportRunner) LagStats() (rl RunnerLag, err error) {
 
 	bd, err := ioutil.ReadFile(mf)
 	if err != nil {
-		log.Errorf("Read meta File err %v", err)
+		log.Warnf("Read meta File err %v, can't get stats", err)
 		return
 	}
 	ss := strings.Split(strings.TrimSpace(string(bd)), "\t")
 	if len(ss) != 2 {
-		err = fmt.Errorf("metafile format err %v", ss)
-		log.Error(err)
+		err = fmt.Errorf("metafile format err %v, can't get stats", ss)
+		log.Warn(err)
 		return
 	}
 	logreading, logsize := ss[0], ss[1]
 	size, err := strconv.ParseInt(logsize, 10, 64)
 	if err != nil {
-		log.Errorf("parse log meta error %v", err)
+		log.Errorf("parse log meta error %v, can't get stats", err)
 		return
 	}
 
 	logs, err := utils.ReadDirByTime(r.meta.LogPath())
 	if err != nil {
-		log.Errorf("ReadDirByTime err %v", err)
+		log.Warn("ReadDirByTime err %v, can't get stats", err)
 		return
 	}
 	logreading = filepath.Base(logreading)
