@@ -106,7 +106,7 @@ func NewRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleane
 }
 
 func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.LogParser, senders []sender.Sender, meta *reader.Meta) (runner *LogExportRunner, err error) {
-	if info.MaxBatchLen <= 0 && info.MaxBatchSize <= 0 {
+	if info.MaxBatchSize <= 0 {
 		info.MaxBatchSize = defaultMaxBatchSize
 	}
 	if info.MaxBatchInteval <= 0 {

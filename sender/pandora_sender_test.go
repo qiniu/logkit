@@ -153,7 +153,7 @@ func (s *mock_pandora) LetGetRepoError(f bool) {
 func TestPandoraSender(t *testing.T) {
 	pandora, pt := NewMockPandoraWithPrefix("v2")
 	pandora.LetGetRepoError(true)
-	s, err := newPandoraSender("p", "TestPandoraSender", "nb", "http://127.0.0.1:"+pt, "ak", "sk", "ab, abc a1,d", "ab *s,a1 f*,ac *long,d DATE*", time.Second)
+	s, err := newPandoraSender("p", "TestPandoraSender", "nb", "http://127.0.0.1:"+pt, "ak", "sk", "ab, abc a1,d", "ab *s,a1 f*,ac *long,d DATE*", time.Second, 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +281,7 @@ func TestPandoraSender(t *testing.T) {
 
 func TestNestPandoraSender(t *testing.T) {
 	pandora, pt := NewMockPandoraWithPrefix("v2")
-	s, err := newPandoraSender("p_TestNestPandoraSender", "TestNestPandoraSender", "nb", "http://127.0.0.1:"+pt, "ak", "sk", "", "x1 *s,x2 f,x3 l,x4 a(f),x5 {x6 l, x7{x8 a(s),x9 b}}", time.Second)
+	s, err := newPandoraSender("p_TestNestPandoraSender", "TestNestPandoraSender", "nb", "http://127.0.0.1:"+pt, "ak", "sk", "", "x1 *s,x2 f,x3 l,x4 a(f),x5 {x6 l, x7{x8 a(s),x9 b}}", time.Second, 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -50,6 +50,8 @@ const (
 	KeyPandoraSchema               = "pandora_schema"
 	KeyPandoraSchemaUpdateInterval = "pandora_schema_update_interval"
 	KeyPandoraAutoCreate           = "pandora_auto_create"
+	KeyRequestRateLimit            = "request_rate_limit"
+	KeyFlowRateLimit               = "flow_rate_limit"
 )
 
 var PandoraMaxBatchSize = 2 * 1024 * 1024
@@ -89,7 +91,9 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("pandoraSender:(%v,repo:%v,region:%v)", host, repoName, region))
 	updateInterval, _ := conf.GetInt64Or(KeyPandoraSchemaUpdateInterval, 300)
 	autoCreateSchema, _ := conf.GetStringOr(KeyPandoraAutoCreate, "")
-	return newPandoraSender(name, repoName, region, host, akFromEnv, skFromEnv, schema, autoCreateSchema, time.Duration(updateInterval)*time.Second)
+	reqRateLimit, _ := conf.GetInt64Or(KeyRequestRateLimit, 0)
+	flowRateLimit, _ := conf.GetInt64Or(KeyFlowRateLimit, 0)
+	return newPandoraSender(name, repoName, region, host, akFromEnv, skFromEnv, schema, autoCreateSchema, time.Duration(updateInterval)*time.Second, reqRateLimit, flowRateLimit)
 }
 
 func createPandoraRepo(autoCreateSchema, repoName, region string, client pipeline.PipelineAPI) (err error) {
@@ -104,17 +108,25 @@ func createPandoraRepo(autoCreateSchema, repoName, region string, client pipelin
 	})
 }
 
-func newPandoraSender(name, repoName, region, endpoint, ak, sk, schema, autoCreate string, updateInterval time.Duration) (s *PandoraSender, err error) {
+func newPandoraSender(name, repoName, region, endpoint, ak, sk, schema, autoCreate string, updateInterval time.Duration, reqRateLimit, flowRateLimit int64) (s *PandoraSender, err error) {
 	logger := pipelinebase.NewDefaultLogger()
 	config := pipeline.NewConfig().
 		WithEndpoint(endpoint).
 		WithAccessKeySecretKey(ak, sk).
 		WithLogger(logger).
-		WithLoggerLevel(pipelinebase.LogInfo)
+		WithLoggerLevel(pipelinebase.LogInfo).
+		WithRequestRateLimit(reqRateLimit).
+		WithFlowRateLimit(flowRateLimit)
 	client, err := pipeline.New(config)
 	if err != nil {
 		err = fmt.Errorf("Cannot init pipelineClient %v", err)
 		return
+	}
+	if reqRateLimit > 0 {
+		log.Warnf("you have limited %v pandora sender within %v requests/s", name, reqRateLimit)
+	}
+	if flowRateLimit > 0 {
+		log.Warnf("you have limited %v pandora sender within %v KB/s", name, flowRateLimit)
 	}
 	userSchema := parseUserSchema(repoName, schema)
 	s = &PandoraSender{
@@ -376,7 +388,6 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 			}
 			failDatas = append(failDatas, pContext.datas...)
 			lastErr = err
-			log.Error(datas[0], reqErr)
 		}
 	}
 	if len(failDatas) > 0 {
@@ -441,5 +452,5 @@ func (s *PandoraSender) Name() string {
 }
 
 func (s *PandoraSender) Close() error {
-	return nil
+	return s.client.Close()
 }

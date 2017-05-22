@@ -53,9 +53,11 @@ func NewRestService(mgr *Manager) *RestService {
 		}
 		listener, err = httpserve(address, mux)
 		if err != nil {
-			log.Errorf("bind address %v for RestService error %v", address, err)
+			err = fmt.Errorf("bind address %v for RestService error %v", address, err)
 			if mgr.BindHost != "" {
 				log.Fatal(err)
+			} else {
+				log.Warnf("%v, try next port", err)
 			}
 			port++
 			continue
