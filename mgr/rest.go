@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/qiniu/log"
@@ -74,7 +75,10 @@ func NewRestService(mgr *Manager) *RestService {
 }
 
 func generateStatsShell(address, prefix string) (err error) {
-	sh := fmt.Sprintf("#!/bin/bash\ncurl 127.0.0.1%v%v/status", address, prefix)
+	if strings.HasPrefix(address, ":") {
+		address = fmt.Sprintf("127.0.0.1%v", address)
+	}
+	sh := fmt.Sprintf("#!/bin/bash\ncurl %v%v/status", address, prefix)
 	err = ioutil.WriteFile(StatsShell, []byte(sh), 0666)
 	if err != nil {
 		err = fmt.Errorf("writefile error %v, address: 127.0.0.1%v%v/status", err, address, prefix)
