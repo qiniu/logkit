@@ -182,6 +182,7 @@ func NewMultiReader(meta *Meta, logPathPattern, whence, expireDur, statIntervalD
 //Expire函数关闭过期的文件，先要remove SelectCase，再close
 func (mr *MultiReader) Expire() {
 	var removes []uint64
+	mr.mux.Lock()
 	for inode, ar := range mr.fileReaders {
 		fi, err := os.Stat(ar.logpath)
 		if err != nil {
@@ -196,7 +197,12 @@ func (mr *MultiReader) Expire() {
 			removes = append(removes, inode)
 		}
 	}
+	mr.mux.Unlock()
+
+	//下面的removeSelectCase是有锁的，注意
 	mr.removeSelectCase(removes)
+
+	mr.mux.Lock()
 	for _, inode := range removes {
 		ar, ok := mr.fileReaders[inode]
 		if ok {
@@ -205,6 +211,7 @@ func (mr *MultiReader) Expire() {
 		delete(mr.fileReaders, inode)
 		delete(mr.cacheMap, strconv.FormatUint(inode, 10))
 	}
+	mr.mux.Unlock()
 }
 
 func (mr *MultiReader) SetMode(mode string, value interface{}) (err error) {
@@ -238,11 +245,16 @@ func (mr *MultiReader) StatLogPath() {
 			continue
 		}
 		inode := getInode(fi)
-		if _, ok := mr.fileReaders[inode]; ok {
+		mr.mux.Lock()
+		_, ok := mr.fileReaders[inode]
+		mr.mux.Unlock()
+		if ok {
 			log.Debugf("%v %vis exist,ignore...", inode, m)
 			continue
 		}
+		mr.mux.Lock()
 		cacheline := mr.cacheMap[strconv.FormatUint(inode, 10)]
+		mr.mux.Unlock()
 		//过期的文件不追踪，除非之前追踪的并且有日志没读完
 		if cacheline == "" && fi.ModTime().Add(mr.expire).Before(time.Now()) {
 			continue
@@ -262,7 +274,9 @@ func (mr *MultiReader) StatLogPath() {
 			}
 		}
 		go ar.Run()
+		mr.mux.Lock()
 		mr.fileReaders[inode] = ar
+		mr.mux.Unlock()
 	}
 	if len(newaddsInode) > 0 {
 		log.Debugf("StatLogPath find new logpath: %v; %v", strings.Join(newaddsPath, ", "), newaddsInode)
@@ -327,6 +341,8 @@ func (mr *MultiReader) Source() string {
 	if mr.curDataLogInode == 0 {
 		return ""
 	}
+	mr.mux.Lock()
+	defer mr.mux.Unlock()
 	if ar, ok := mr.fileReaders[mr.curDataLogInode]; ok {
 		return ar.logpath
 	}
@@ -335,7 +351,13 @@ func (mr *MultiReader) Source() string {
 }
 
 func (mr *MultiReader) Close() (err error) {
+	var ars []*ActiveReader
+	mr.mux.Lock()
 	for _, ar := range mr.fileReaders {
+		ars = append(ars, ar)
+	}
+	mr.mux.Unlock()
+	for _, ar := range ars {
 		err = ar.Close()
 		if err != nil {
 			log.Errorf("Close ActiveReader %v error %v", ar.logpath, err)
@@ -391,10 +413,12 @@ func (mr *MultiReader) ReadLine() (data string, err error) {
 
 //SyncMeta 从队列取数据时同步队列，作用在于保证数据不重复。
 func (mr *MultiReader) SyncMeta() {
+	mr.mux.Lock()
 	for inode, ar := range mr.fileReaders {
 		ar.SyncMeta()
 		mr.cacheMap[strconv.FormatUint(inode, 10)] = ar.readcache
 	}
+	mr.mux.Unlock()
 	buf, err := json.Marshal(mr.cacheMap)
 	if err != nil {
 		log.Errorf("%v sync meta error %v, cacheMap %v", mr.Name(), err, mr.cacheMap)
