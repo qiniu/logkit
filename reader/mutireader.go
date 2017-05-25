@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -19,15 +18,17 @@ import (
 )
 
 type MultiReader struct {
-	started         bool
-	status          int32
-	fileReaders     map[uint64]*ActiveReader
-	scs             []reflect.SelectCase //在updateSelectCase中更新
-	scs2Inode       []uint64             //在updateSelectCase中更新
-	mux             sync.Mutex
-	curDataLogInode uint64
-	headRegexp      *regexp.Regexp
-	cacheMap        map[string]string
+	started     bool
+	status      int32
+	fileReaders map[string]*ActiveReader
+	scs         []reflect.SelectCase //在updateSelectCase中更新
+	scs2File    []string             //在updateSelectCase中更新
+	armapmux    sync.Mutex
+	scsmux      sync.Mutex
+	startmux    sync.Mutex
+	curFile     string
+	headRegexp  *regexp.Regexp
+	cacheMap    map[string]string
 
 	//以下为传入参数
 	meta           *Meta
@@ -124,6 +125,20 @@ func (ar *ActiveReader) SyncMeta() {
 	ar.br.SyncMeta()
 }
 
+func (ar *ActiveReader) expired(expireDur time.Duration) bool {
+	fi, err := os.Stat(ar.logpath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return true
+		}
+		log.Errorf("stat log %v error %v", ar.logpath, err)
+	}
+	if fi.ModTime().Add(expireDur).Before(time.Now()) && ar.inactive {
+		return true
+	}
+	return false
+}
+
 func NewMultiReader(meta *Meta, logPathPattern, whence, expireDur, statIntervalDur string, maxOpenFiles int) (mr *MultiReader, err error) {
 	expire, err := time.ParseDuration(expireDur)
 	if err != nil {
@@ -153,11 +168,14 @@ func NewMultiReader(meta *Meta, logPathPattern, whence, expireDur, statIntervalD
 		maxOpenFiles:   maxOpenFiles,
 		started:        false,
 		status:         StatusInit,
-		fileReaders:    make(map[uint64]*ActiveReader),
+		fileReaders:    make(map[string]*ActiveReader),
 		scs:            make([]reflect.SelectCase, 0),
-		scs2Inode:      make([]uint64, 0),
-		mux:            sync.Mutex{},
-		cacheMap:       make(map[string]string),
+		scs2File:       make([]string, 0),
+		armapmux:       sync.Mutex{},
+		scsmux:         sync.Mutex{},
+		startmux:       sync.Mutex{},
+
+		cacheMap: make(map[string]string),
 	}
 	buf := make([]byte, bufsize)
 	if bufsize > 0 {
@@ -179,39 +197,24 @@ func NewMultiReader(meta *Meta, logPathPattern, whence, expireDur, statIntervalD
 	return
 }
 
-//Expire函数关闭过期的文件，先要remove SelectCase，再close
+//Expire 函数关闭过期的文件，再更新
 func (mr *MultiReader) Expire() {
-	var removes []uint64
-	mr.mux.Lock()
-	for inode, ar := range mr.fileReaders {
-		fi, err := os.Stat(ar.logpath)
-		if err != nil {
-			if os.IsNotExist(err) {
-				removes = append(removes, inode)
-			} else {
-				log.Errorf("stat log %v error %v", ar.logpath, err)
-			}
-			continue
-		}
-		if fi.ModTime().Add(mr.expire).Before(time.Now()) && ar.inactive {
-			removes = append(removes, inode)
+	var paths []string
+	mr.armapmux.Lock()
+	for path, ar := range mr.fileReaders {
+		if ar.expired(mr.expire) {
+			go ar.Close()
+			delete(mr.fileReaders, path)
+			delete(mr.cacheMap, path)
+			paths = append(paths, path)
 		}
 	}
-	mr.mux.Unlock()
+	mr.armapmux.Unlock()
 
-	//下面的removeSelectCase是有锁的，注意
-	mr.removeSelectCase(removes)
-
-	mr.mux.Lock()
-	for _, inode := range removes {
-		ar, ok := mr.fileReaders[inode]
-		if ok {
-			ar.Close()
-		}
-		delete(mr.fileReaders, inode)
-		delete(mr.cacheMap, strconv.FormatUint(inode, 10))
+	if len(paths) > 0 {
+		log.Infof("Expire reader find expired logpath: %v", strings.Join(paths, ", "))
+		mr.updateSelectCase()
 	}
-	mr.mux.Unlock()
 }
 
 func (mr *MultiReader) SetMode(mode string, value interface{}) (err error) {
@@ -237,100 +240,75 @@ func (mr *MultiReader) StatLogPath() {
 		return
 	}
 	var newaddsPath []string
-	var newaddsInode []uint64
-	for _, m := range matches {
-		m, fi, err := utils.GetRealPath(m)
+	for _, mc := range matches {
+		rp, fi, err := utils.GetRealPath(mc)
 		if err != nil {
-			log.Errorf("file pattern %v match %v stat error %v, ignore this match...", mr.logPathPattern, m, err)
+			log.Errorf("file pattern %v match %v stat error %v, ignore this match...", mr.logPathPattern, mc, err)
 			continue
 		}
-		inode := getInode(fi)
-		mr.mux.Lock()
-		_, ok := mr.fileReaders[inode]
-		mr.mux.Unlock()
+		mr.armapmux.Lock()
+		_, ok := mr.fileReaders[rp]
+		mr.armapmux.Unlock()
 		if ok {
-			log.Debugf("%v %vis exist,ignore...", inode, m)
+			log.Debugf("<%v> is collecting, ignore...", rp)
 			continue
 		}
-		mr.mux.Lock()
-		cacheline := mr.cacheMap[strconv.FormatUint(inode, 10)]
-		mr.mux.Unlock()
+		mr.armapmux.Lock()
+		cacheline := mr.cacheMap[rp]
+		mr.armapmux.Unlock()
 		//过期的文件不追踪，除非之前追踪的并且有日志没读完
 		if cacheline == "" && fi.ModTime().Add(mr.expire).Before(time.Now()) {
 			continue
 		}
-		ar, err := NewActiveReader(m, mr.whence, mr.meta)
+		ar, err := NewActiveReader(rp, mr.whence, mr.meta)
 		if err != nil {
-			log.Errorf("NewActiveReader for matches %v error %v, ignore this match...", m, err)
+			log.Errorf("NewActiveReader for matches %v error %v, ignore this match...", rp, err)
 			continue
 		}
 		ar.readcache = cacheline
-		newaddsPath = append(newaddsPath, m)
-		newaddsInode = append(newaddsInode, inode)
 		if mr.headRegexp != nil {
 			err = ar.br.SetMode(ReadModeHeadPatternRegexp, mr.headRegexp)
 			if err != nil {
-				log.Errorf("NewActiveReader for matches %v SetMode error %v", m, err)
+				log.Errorf("NewActiveReader for matches %v SetMode error %v", rp, err)
 			}
 		}
+		newaddsPath = append(newaddsPath, rp)
 		go ar.Run()
-		mr.mux.Lock()
-		mr.fileReaders[inode] = ar
-		mr.mux.Unlock()
+		mr.armapmux.Lock()
+		mr.fileReaders[rp] = ar
+		mr.armapmux.Unlock()
 	}
-	if len(newaddsInode) > 0 {
-		log.Debugf("StatLogPath find new logpath: %v; %v", strings.Join(newaddsPath, ", "), newaddsInode)
-		mr.addSelectCase(newaddsInode)
+	if len(newaddsPath) > 0 {
+		log.Infof("StatLogPath find new logpath: %v", strings.Join(newaddsPath, ", "))
+		mr.updateSelectCase()
 	}
 }
 
-func (mr *MultiReader) addSelectCase(updates []uint64) {
-	mr.mux.Lock()
-	defer mr.mux.Unlock()
-	for _, inode := range updates {
-		ar, ok := mr.fileReaders[inode]
-		if !ok {
-			log.Errorf("addSelectCase inode %v, but not found in fileReaders map", inode)
-			continue
-		}
-		mr.scs = append(mr.scs, reflect.SelectCase{
+func (mr *MultiReader) getActiveReaders() []*ActiveReader {
+	mr.armapmux.Lock()
+	defer mr.armapmux.Unlock()
+	var ars []*ActiveReader
+	for _, ar := range mr.fileReaders {
+		ars = append(ars, ar)
+	}
+	return ars
+}
+
+func (mr *MultiReader) updateSelectCase() {
+	ars := mr.getActiveReaders()
+	var newScs []reflect.SelectCase
+	var newScs2files []string
+	for _, ar := range ars {
+		newScs = append(newScs, reflect.SelectCase{
 			Dir:  reflect.SelectRecv,
 			Chan: reflect.ValueOf(ar.msgchan),
 		})
-		mr.scs2Inode = append(mr.scs2Inode, inode)
+		newScs2files = append(newScs2files, ar.logpath)
 	}
-}
-
-func (mr *MultiReader) removeSelectCase(updates []uint64) {
-	checkIn := func(cs []uint64, c uint64) bool {
-		for _, x := range cs {
-			if c == x {
-				return true
-			}
-		}
-		return false
-	}
-	var reservedIdx []int
-	for i, ix := range mr.scs2Inode {
-		if !checkIn(updates, ix) {
-			reservedIdx = append(reservedIdx, i)
-		}
-	}
-
-	newScs := make([]reflect.SelectCase, 0)
-	newScs2Inode := make([]uint64, 0)
-	for _, i := range reservedIdx {
-		if i >= len(mr.scs) {
-			log.Errorf("removeSelectCase but found index %v is out of range %v ", i, len(mr.scs))
-			continue
-		}
-		newScs = append(newScs, mr.scs[i])
-		newScs2Inode = append(newScs2Inode, mr.scs2Inode[i])
-	}
-	mr.mux.Lock()
-	defer mr.mux.Unlock()
+	mr.scsmux.Lock()
 	mr.scs = newScs
-	mr.scs2Inode = newScs2Inode
+	mr.scs2File = newScs2files
+	mr.scsmux.Unlock()
 }
 
 func (mr *MultiReader) Name() string {
@@ -338,25 +316,11 @@ func (mr *MultiReader) Name() string {
 }
 
 func (mr *MultiReader) Source() string {
-	if mr.curDataLogInode == 0 {
-		return ""
-	}
-	mr.mux.Lock()
-	defer mr.mux.Unlock()
-	if ar, ok := mr.fileReaders[mr.curDataLogInode]; ok {
-		return ar.logpath
-	}
-	log.Errorf("%v not exist in tailx multireader", mr.curDataLogInode)
-	return ""
+	return mr.curFile
 }
 
 func (mr *MultiReader) Close() (err error) {
-	var ars []*ActiveReader
-	mr.mux.Lock()
-	for _, ar := range mr.fileReaders {
-		ars = append(ars, ar)
-	}
-	mr.mux.Unlock()
+	ars := mr.getActiveReaders()
 	for _, ar := range ars {
 		err = ar.Close()
 		if err != nil {
@@ -371,8 +335,8 @@ func (mr *MultiReader) Close() (err error) {
 	处理StatIntervel以及Expire两大循环任务
 */
 func (mr *MultiReader) Start() {
-	mr.mux.Lock()
-	defer mr.mux.Unlock()
+	mr.startmux.Lock()
+	defer mr.startmux.Unlock()
 	if mr.started {
 		return
 	}
@@ -398,14 +362,18 @@ func (mr *MultiReader) ReadLine() (data string, err error) {
 		mr.Start()
 	}
 	if len(mr.scs) <= 0 {
-		time.Sleep(time.Second)
 		return
 	}
-
+	mr.scsmux.Lock()
+	defer mr.scsmux.Unlock()
+	//double check
+	if len(mr.scs) <= 0 {
+		return
+	}
 	//reflect.Select blocks until at least one of the cases can proceed
 	chosen, value, ok := reflect.Select(mr.scs)
 	if ok {
-		mr.curDataLogInode = mr.scs2Inode[chosen]
+		mr.curFile = mr.scs2File[chosen]
 		data = value.String()
 	}
 	return
@@ -413,12 +381,11 @@ func (mr *MultiReader) ReadLine() (data string, err error) {
 
 //SyncMeta 从队列取数据时同步队列，作用在于保证数据不重复。
 func (mr *MultiReader) SyncMeta() {
-	mr.mux.Lock()
-	for inode, ar := range mr.fileReaders {
+	ars := mr.getActiveReaders()
+	for _, ar := range ars {
 		ar.SyncMeta()
-		mr.cacheMap[strconv.FormatUint(inode, 10)] = ar.readcache
+		mr.cacheMap[ar.logpath] = ar.readcache
 	}
-	mr.mux.Unlock()
 	buf, err := json.Marshal(mr.cacheMap)
 	if err != nil {
 		log.Errorf("%v sync meta error %v, cacheMap %v", mr.Name(), err, mr.cacheMap)

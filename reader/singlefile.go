@@ -25,9 +25,7 @@ type SingleFile struct {
 	lastSyncPath   string
 	lastSyncOffset int64
 
-	meta      *Meta // 记录offset的元数据
-	syncEvery int   // 每读取多少次同步一次meta
-	count     int   // 调用Read了多少次
+	meta *Meta // 记录offset的元数据
 }
 
 func NewSingleFile(meta *Meta, path, whence string) (sf *SingleFile, err error) {
