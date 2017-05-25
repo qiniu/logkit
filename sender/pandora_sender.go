@@ -52,6 +52,7 @@ const (
 	KeyPandoraAutoCreate           = "pandora_auto_create"
 	KeyRequestRateLimit            = "request_rate_limit"
 	KeyFlowRateLimit               = "flow_rate_limit"
+	KeyPandoraGzip                 = "pandora_gzip"
 )
 
 var PandoraMaxBatchSize = 2 * 1024 * 1024
@@ -93,7 +94,8 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	autoCreateSchema, _ := conf.GetStringOr(KeyPandoraAutoCreate, "")
 	reqRateLimit, _ := conf.GetInt64Or(KeyRequestRateLimit, 0)
 	flowRateLimit, _ := conf.GetInt64Or(KeyFlowRateLimit, 0)
-	return newPandoraSender(name, repoName, region, host, akFromEnv, skFromEnv, schema, autoCreateSchema, time.Duration(updateInterval)*time.Second, reqRateLimit, flowRateLimit)
+	gzip, _ := conf.GetBoolOr(KeyPandoraGzip, false)
+	return newPandoraSender(name, repoName, region, host, akFromEnv, skFromEnv, schema, autoCreateSchema, time.Duration(updateInterval)*time.Second, reqRateLimit, flowRateLimit, gzip)
 }
 
 func createPandoraRepo(autoCreateSchema, repoName, region string, client pipeline.PipelineAPI) (err error) {
@@ -108,7 +110,7 @@ func createPandoraRepo(autoCreateSchema, repoName, region string, client pipelin
 	})
 }
 
-func newPandoraSender(name, repoName, region, endpoint, ak, sk, schema, autoCreate string, updateInterval time.Duration, reqRateLimit, flowRateLimit int64) (s *PandoraSender, err error) {
+func newPandoraSender(name, repoName, region, endpoint, ak, sk, schema, autoCreate string, updateInterval time.Duration, reqRateLimit, flowRateLimit int64, gzip bool) (s *PandoraSender, err error) {
 	logger := pipelinebase.NewDefaultLogger()
 	config := pipeline.NewConfig().
 		WithEndpoint(endpoint).
@@ -116,7 +118,9 @@ func newPandoraSender(name, repoName, region, endpoint, ak, sk, schema, autoCrea
 		WithLogger(logger).
 		WithLoggerLevel(pipelinebase.LogInfo).
 		WithRequestRateLimit(reqRateLimit).
-		WithFlowRateLimit(flowRateLimit)
+		WithFlowRateLimit(flowRateLimit).
+		WithGzipData(gzip)
+
 	client, err := pipeline.New(config)
 	if err != nil {
 		err = fmt.Errorf("Cannot init pipelineClient %v", err)

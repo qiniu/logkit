@@ -1,7 +1,9 @@
 package sender
 
 import (
+	"bufio"
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -104,15 +106,35 @@ func (s *mock_pandora) PostRepos_(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (s *mock_pandora) PostRepos_Data(rw http.ResponseWriter, req *http.Request) {
-	bytes, err := ioutil.ReadAll(req.Body)
+	var bytesx []byte
+	var r *bufio.Reader
+	log.Println("post data!!!")
+
+	if req.Header.Get("Content-Encoding") == "gzip" {
+		reqBody, err := gzip.NewReader(req.Body)
+		if err != nil {
+			rw.WriteHeader(500)
+			rw.Write([]byte(`{"error":"gzip reader error"}`))
+			rw.Header().Set("Content-Type", "application/json")
+			return
+		}
+		reqBody.Close()
+		r = bufio.NewReader(reqBody)
+		log.Println("gzip got")
+	} else {
+		r = bufio.NewReader(req.Body)
+	}
+	bytesx, err := ioutil.ReadAll(r)
 	if err != nil {
 		rw.WriteHeader(500)
+		log.Println("post repo readall error")
 		return
 	}
-	s.Body = string(bytes)
+	s.Body = string(bytesx)
 	sep := strings.Fields(s.Body)
 	sort.Strings(sep)
 	s.Body = strings.Join(sep, " ")
+	log.Println("get datas: ", s.Body)
 	if strings.Contains(s.Body, "E18111") {
 		rw.WriteHeader(404)
 		rw.Write([]byte(`{"error":"E18111 mock_pandora error"}`))
@@ -153,7 +175,7 @@ func (s *mock_pandora) LetGetRepoError(f bool) {
 func TestPandoraSender(t *testing.T) {
 	pandora, pt := NewMockPandoraWithPrefix("v2")
 	pandora.LetGetRepoError(true)
-	s, err := newPandoraSender("p", "TestPandoraSender", "nb", "http://127.0.0.1:"+pt, "ak", "sk", "ab, abc a1,d", "ab *s,a1 f*,ac *long,d DATE*", time.Second, 0, 0)
+	s, err := newPandoraSender("p", "TestPandoraSender", "nb", "http://127.0.0.1:"+pt, "ak", "sk", "ab, abc a1,d", "ab *s,a1 f*,ac *long,d DATE*", time.Second, 0, 0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +303,7 @@ func TestPandoraSender(t *testing.T) {
 
 func TestNestPandoraSender(t *testing.T) {
 	pandora, pt := NewMockPandoraWithPrefix("v2")
-	s, err := newPandoraSender("p_TestNestPandoraSender", "TestNestPandoraSender", "nb", "http://127.0.0.1:"+pt, "ak", "sk", "", "x1 *s,x2 f,x3 l,x4 a(f),x5 {x6 l, x7{x8 a(s),x9 b}}", time.Second, 0, 0)
+	s, err := newPandoraSender("p_TestNestPandoraSender", "TestNestPandoraSender", "nb", "http://127.0.0.1:"+pt, "ak", "sk", "", "x1 *s,x2 f,x3 l,x4 a(f),x5 {x6 l, x7{x8 a(s),x9 b}}", time.Second, 0, 0, false)
 	if err != nil {
 		t.Fatal(err)
 	}
