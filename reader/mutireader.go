@@ -167,15 +167,14 @@ func NewMultiReader(meta *Meta, logPathPattern, whence, expireDur, statIntervalD
 		statInterval:   statInterval,
 		maxOpenFiles:   maxOpenFiles,
 		started:        false,
-		status:         StatusInit,
-		fileReaders:    make(map[string]*ActiveReader),
-		scs:            make([]reflect.SelectCase, 0),
-		scs2File:       make([]string, 0),
-		armapmux:       sync.Mutex{},
-		scsmux:         sync.Mutex{},
 		startmux:       sync.Mutex{},
-
-		cacheMap: make(map[string]string),
+		status:         StatusInit,
+		fileReaders:    make(map[string]*ActiveReader), //armapmux
+		cacheMap:       make(map[string]string),        //armapmux
+		armapmux:       sync.Mutex{},
+		scs:            make([]reflect.SelectCase, 0), //scsmux
+		scs2File:       make([]string, 0),             //scsmux
+		scsmux:         sync.Mutex{},
 	}
 	buf := make([]byte, bufsize)
 	if bufsize > 0 {
@@ -384,9 +383,13 @@ func (mr *MultiReader) SyncMeta() {
 	ars := mr.getActiveReaders()
 	for _, ar := range ars {
 		ar.SyncMeta()
+		mr.armapmux.Lock()
 		mr.cacheMap[ar.logpath] = ar.readcache
+		mr.armapmux.Unlock()
 	}
+	mr.armapmux.Lock()
 	buf, err := json.Marshal(mr.cacheMap)
+	mr.armapmux.Unlock()
 	if err != nil {
 		log.Errorf("%v sync meta error %v, cacheMap %v", mr.Name(), err, mr.cacheMap)
 		return
