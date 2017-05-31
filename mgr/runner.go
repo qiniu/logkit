@@ -85,6 +85,7 @@ type LogExportRunner struct {
 
 const defaultSendIntervalSeconds = 60
 const defaultMaxBatchSize = 2 * 1024 * 1024
+const qiniulogHeadPatthern = "[1-9]\\d{3}/[0-1]\\d/[0-3]\\d [0-2]\\d:[0-6]\\d:[0-6]\\d(\\.\\d{6})?"
 
 // NewRunner 创建Runner
 func NewRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal) (runner Runner, err error) {
@@ -155,7 +156,8 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, p
 	}
 
 	rc.ReaderConfig[utils.GlobalKeyName] = rc.RunnerName
-
+	//配置文件适配
+	rc = Compatible(rc)
 	var (
 		rd reader.Reader
 		cl *cleaner.Cleaner
@@ -330,6 +332,7 @@ func (r *LogExportRunner) Run() {
 		for _, s := range r.senders {
 			if !r.trySend(s, datas, r.MaxBatchTryTimes) {
 				success = false
+				log.Println(datas)
 				break
 			}
 		}
@@ -462,4 +465,32 @@ func (r *LogExportRunner) Status() RunnerStatus {
 	//r.rs.ParserStats = r.rs.ParserStats
 	//r.rs.SenderStats = r.rs.SenderStats
 	return r.rs
+}
+
+//Compatible 用于新老配置的兼容
+func Compatible(rc RunnerConfig) RunnerConfig {
+	//兼容qiniulog与reader多行的配置
+	if rc.ParserConf == nil {
+		return rc
+	}
+	if rc.ReaderConfig == nil {
+		return rc
+	}
+	parserType, err := rc.ParserConf.GetString(parser.KeyParserType)
+	if err != nil {
+		return rc
+	}
+	pattern, _ := rc.ReaderConfig.GetStringOr(reader.KeyHeadPattern, "")
+	if parserType == parser.TypeLogv1 && pattern == "" {
+		prefix, _ := rc.ParserConf.GetStringOr(parser.KeyQiniulogPrefix, "")
+		prefix = strings.TrimSpace(prefix)
+		var readpattern string
+		if len(prefix) > 0 {
+			readpattern = "^" + prefix + " " + qiniulogHeadPatthern
+		} else {
+			readpattern = "^" + qiniulogHeadPatthern
+		}
+		rc.ReaderConfig[reader.KeyHeadPattern] = readpattern
+	}
+	return rc
 }

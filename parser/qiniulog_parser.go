@@ -50,14 +50,11 @@ func init() {
 }
 
 type QiniulogParser struct {
-	name     string
-	prefix   string
-	headers  []string
-	labels   []label
-	lastline string //用于多行合并
-	maxline  int
-	Count    int
-	se       schemaErr
+	name    string
+	prefix  string
+	headers []string
+	labels  []label
+	se      schemaErr
 }
 
 func getAllLogv1Heads() map[string]bool {
@@ -82,7 +79,6 @@ func isExist(source []string, item string) bool {
 func NewQiniulogParser(c conf.MapConf) (LogParser, error) {
 	name, _ := c.GetStringOr(KeyParserName, "")
 	prefix, _ := c.GetStringOr(KeyQiniulogPrefix, "")
-	maxline, _ := c.GetIntOr(KeyLogMaxLine, 1000)
 	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
 	logHeaders, _ := c.GetStringListOr(KeyLogHeaders, defaultLogHeads)
 
@@ -93,13 +89,10 @@ func NewQiniulogParser(c conf.MapConf) (LogParser, error) {
 	labels := getLabels(labelList, nameMap)
 
 	return &QiniulogParser{
-		name:     name,
-		labels:   labels,
-		prefix:   prefix,
-		headers:  logHeaders,
-		maxline:  maxline,
-		lastline: "",
-		Count:    0,
+		name:    name,
+		labels:  labels,
+		prefix:  prefix,
+		headers: logHeaders,
 		se: schemaErr{
 			number: 0,
 			last:   time.Now(),
@@ -226,20 +219,6 @@ func isMatch(pattern *regexp.Regexp, raw string) bool {
 	return pattern.MatchString(raw)
 }
 
-//TODO qiniuparser这边需要去掉多行的cache，改成reader读取多行
-func (p *QiniulogParser) isNew(line string) bool {
-	if len(p.prefix) > 0 {
-		return strings.HasPrefix(line, p.prefix)
-	}
-	fields := strings.Fields(line)
-	for i, v := range []string{LogHeadDate, LogHeadTime} {
-		if len(fields) < i+1 || !isMatch(CompliedPatterns[v], fields[i]) {
-			return false
-		}
-	}
-	return true
-}
-
 func errorNothingParse(s string, d string) error {
 	return fmt.Errorf("there is no left log to parse %v, have parsed %v", s, d)
 }
@@ -247,9 +226,8 @@ func errorCanNotParse(s string, line string, err error) error {
 	return fmt.Errorf("can not parse %v from %v %v", s, line, err)
 }
 
-func (p *QiniulogParser) parse() (d sender.Data, err error) {
+func (p *QiniulogParser) parse(line string) (d sender.Data, err error) {
 	d = sender.Data{}
-	line := p.lastline
 	line = strings.Replace(line, "\n", " ", -1)
 	line = strings.Replace(line, "\t", "\\t", -1)
 	var result, logdate string
@@ -259,7 +237,7 @@ func (p *QiniulogParser) parse() (d sender.Data, err error) {
 			continue
 		}
 		if len(line) < 1 {
-			return nil, errorNothingParse(head, p.lastline)
+			return nil, errorNothingParse(head, line)
 		}
 		// LogHeadLog不需要使用解析器，最后剩下的就是
 		if line == LogHeadLog {
@@ -295,26 +273,8 @@ func (p *QiniulogParser) parse() (d sender.Data, err error) {
 func (p *QiniulogParser) Parse(lines []string) ([]sender.Data, error) {
 	datas := []sender.Data{}
 	se := &utils.StatsError{}
-	for idx, line := range lines {
-		if !p.isNew(line) && p.Count < p.maxline {
-			if len(p.lastline) < 1 {
-				err := fmt.Errorf("QiniulogParser can not parse [%v] as newline", line)
-				se.ErrorDetail = err
-				se.AddErrors()
-				se.ErrorIndex = append(se.ErrorIndex, idx)
-				return datas, se
-			}
-			p.lastline += line
-			p.Count++
-			continue
-		}
-		p.Count = 1
-		if len(p.lastline) < 1 {
-			p.lastline = line
-			continue
-		}
-		d, err := p.parse()
-		p.lastline = line
+	for _, line := range lines {
+		d, err := p.parse(line)
 		if err != nil {
 			p.se.Output(err)
 			se.AddErrors()
