@@ -162,3 +162,202 @@ func Test_Run(t *testing.T) {
 		assert.Equal(t, absLogpath, dt["testtag"])
 	}
 }
+
+func Test_Compatible(t *testing.T) {
+	rc := RunnerConfig{
+		ReaderConfig: conf.MapConf{
+			"log_path":       "/path1",
+			"meta_path":      "meta",
+			"mode":           "dir",
+			"read_from":      "oldest",
+			"datasource_tag": "testtag",
+		},
+		ParserConf: conf.MapConf{
+			"type": "qiniulog",
+		},
+	}
+	exprc := RunnerConfig{
+		ReaderConfig: conf.MapConf{
+			"log_path":       "/path1",
+			"meta_path":      "meta",
+			"mode":           "dir",
+			"read_from":      "oldest",
+			"datasource_tag": "testtag",
+			"head_pattern":   "^" + qiniulogHeadPatthern,
+		},
+		ParserConf: conf.MapConf{
+			"type": "qiniulog",
+		},
+	}
+	rc = Compatible(rc)
+	assert.Equal(t, exprc, rc)
+	rc2 := RunnerConfig{
+		ReaderConfig: conf.MapConf{
+			"log_path":       "/path1",
+			"meta_path":      "meta",
+			"mode":           "dir",
+			"read_from":      "oldest",
+			"datasource_tag": "testtag",
+		},
+		ParserConf: conf.MapConf{
+			"type":            "qiniulog",
+			"qiniulog_prefix": "PREX",
+		},
+	}
+	exprc2 := RunnerConfig{
+		ReaderConfig: conf.MapConf{
+			"log_path":       "/path1",
+			"meta_path":      "meta",
+			"mode":           "dir",
+			"read_from":      "oldest",
+			"datasource_tag": "testtag",
+			"head_pattern":   "^PREX " + qiniulogHeadPatthern,
+		},
+		ParserConf: conf.MapConf{
+			"type":            "qiniulog",
+			"qiniulog_prefix": "PREX",
+		},
+	}
+	rc2 = Compatible(rc2)
+	assert.Equal(t, exprc2, rc2)
+}
+
+func Test_QiniulogRun(t *testing.T) {
+	dir := "Test_QiniulogRun"
+	if err := os.Mkdir(dir, 0755); err != nil {
+		log.Fatalf("Test_Run error mkdir %v %v", dir, err)
+	}
+	defer os.RemoveAll(dir)
+	logpath := dir + "/logdir"
+	logpathLink := dir + "/logdirlink"
+	metapath := dir + "/meta_mock_csv"
+	if err := os.Mkdir(logpath, 0755); err != nil {
+		log.Fatalf("Test_Run error mkdir %v %v", logpath, err)
+	}
+	absLogpath, err := filepath.Abs(logpath)
+	if err != nil {
+		t.Fatalf("filepath.Abs %v, %v", logpath, err)
+	}
+	absLogpathLink, err := filepath.Abs(logpathLink)
+	if err != nil {
+		t.Fatalf("filepath.Abs %v, %v", logpathLink, err)
+	}
+	if err := os.Symlink(absLogpath, absLogpathLink); err != nil {
+		log.Fatalf("Test_Run error symbol link %v to %v: %v", absLogpathLink, logpath, err)
+	}
+	if err := os.Mkdir(metapath, 0755); err != nil {
+		log.Fatalf("Test_Run error mkdir %v %v", metapath, err)
+	}
+	log1 := `2017/01/22 11:16:08.885550 [X-ZsU][INFO] disk.go:123: [REQ_END] 200 0.010k 3.792ms
+		[WARN][SLdoIrCDZj7pmZsU] disk.go <job.freezeDeamon> pop() failed: not found
+2017/01/22 11:15:54.947217 [2pyKMukqvwSd-ZsU][INFO] disk.go:124: Service: POST 10.200.20.25:9100/user/info, Code: 200, Xlog: AC, Time: 1ms
+`
+	log2 := `2016/10/20 17:20:30.642666 [ERROR] disk.go:125: github.com/qiniu/logkit/queue/disk.go:241
+	1234 3243xsaxs
+2016/10/20 17:20:30.642662 [123][WARN] disk.go:241: github.com/qiniu/logkit/queue/disk.go 1
+`
+	log3 := `2016/10/20 17:20:30.642662 [124][WARN] disk.go xxxxxx`
+	expfiles := []string{`[REQ_END] 200 0.010k 3.792ms \t\t[WARN][SLdoIrCDZj7pmZsU] disk.go <job.freezeDeamon> pop() failed: not found`,
+		`Service: POST 10.200.20.25:9100/user/info, Code: 200, Xlog: AC, Time: 1ms`,
+		`github.com/qiniu/logkit/queue/disk.go:241 \t1234 3243xsaxs`, `github.com/qiniu/logkit/queue/disk.go 1`}
+	expreqid := []string{"X-ZsU", "2pyKMukqvwSd-ZsU", "", "123"}
+	if err := ioutil.WriteFile(filepath.Join(logpath, "log1"), []byte(log1), 0666); err != nil {
+		log.Fatalf("write log1 fail %v", err)
+	}
+	time.Sleep(time.Second)
+	if err := ioutil.WriteFile(filepath.Join(logpath, "log2"), []byte(log2), 0666); err != nil {
+		log.Fatalf("write log2 fail %v", err)
+	}
+	rinfo := RunnerInfo{
+		RunnerName:   "test_runner",
+		MaxBatchLen:  1,
+		MaxBatchSize: 2048,
+	}
+
+	readerConfig := conf.MapConf{
+		"log_path":       logpathLink,
+		"meta_path":      metapath,
+		"mode":           "dir",
+		"read_from":      "oldest",
+		"datasource_tag": "testtag",
+	}
+	parseConf := conf.MapConf{
+		"name": "qiniu",
+		"type": "qiniulog",
+	}
+	senderConfigs := []conf.MapConf{
+		conf.MapConf{
+			"name":        "mock_sender",
+			"sender_type": "mock",
+		},
+	}
+
+	rc := RunnerConfig{
+		RunnerInfo:   rinfo,
+		ReaderConfig: readerConfig,
+		ParserConf:   parseConf,
+		SenderConfig: senderConfigs,
+	}
+	rc = Compatible(rc)
+	meta, err := reader.NewMetaWithConf(rc.ReaderConfig)
+	if err != nil {
+		t.Error(err)
+	}
+	reader, err := reader.NewFileBufReader(rc.ReaderConfig)
+	if err != nil {
+		t.Error(err)
+	}
+	ps := parser.NewParserRegistry()
+	pparser, err := ps.NewLogParser(parseConf)
+	if err != nil {
+		t.Error(err)
+	}
+
+	var senders []sender.Sender
+	raws, err := sender.NewMockSender(senderConfigs[0])
+	s, succ := raws.(*sender.MockSender)
+	if !succ {
+		t.Error("sender should be mock sender")
+	}
+	if err != nil {
+		t.Error(err)
+	}
+	senders = append(senders, s)
+
+	r, err := NewLogExportRunnerWithService(rinfo, reader, nil, pparser, senders, meta)
+	if err != nil {
+		t.Error(err)
+	}
+
+	go r.Run()
+	time.Sleep(time.Second)
+	if err := ioutil.WriteFile(filepath.Join(logpath, "log3"), []byte(log3), 0666); err != nil {
+		log.Fatalf("write log3 fail %v", err)
+	}
+	timer := time.NewTimer(20 * time.Second).C
+	for {
+		if s.SendCount() >= 4 {
+			break
+		}
+		select {
+		case <-timer:
+			t.Error("runner didn't stop within ticker time")
+			return
+		default:
+			time.Sleep(time.Second)
+		}
+	}
+	var dts []sender.Data
+	rawData := r.senders[0].Name()[len("mock_sender "):]
+	err = json.Unmarshal([]byte(rawData), &dts)
+	if err != nil {
+		t.Error(err)
+	}
+	if len(dts) != 4 {
+		t.Errorf("got sender data not match error,expect 4 but %v", len(dts))
+	}
+	for idx, dt := range dts {
+		assert.Equal(t, expfiles[idx], dt["log"], "equl log test")
+		assert.Equal(t, expreqid[idx], dt["reqid"], "equal reqid test")
+	}
+}
