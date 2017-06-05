@@ -9,6 +9,7 @@ import (
 
 	config "github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/mgr"
+	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
 
 	_ "net/http/pprof"
@@ -25,6 +26,7 @@ type Config struct {
 	CleanSelfLog     bool     `json:"clean_self_log"`
 	CleanSelfDir     string   `json:"clean_self_dir"`
 	CleanSelfPattern string   `json:"clean_self_pattern"`
+	TimeLayouts      []string `json:"timeformat_layouts"`
 	CleanSelfLogCnt  int      `json:"clean_self_cnt"`
 	mgr.ManagerConfig
 }
@@ -103,7 +105,9 @@ func main() {
 		log.Fatal("config.Load failed:", err)
 	}
 	log.Printf("Config: %#v", conf)
-
+	if conf.TimeLayouts != nil {
+		times.AddLayout(conf.TimeLayouts)
+	}
 	if conf.MaxProcs == 0 {
 		conf.MaxProcs = runtime.NumCPU()
 	}
