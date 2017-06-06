@@ -1,6 +1,7 @@
 package times
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -92,4 +93,24 @@ func TestStrToTime2(t *testing.T) {
 	fmt.Println(tm.String())
 	nt := tm.Format(time.RFC3339)
 	fmt.Println(nt)
+	testcase = "2017-06-05T21:00:18+08:00"
+	tm, err = StrToTime(testcase)
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println(tm.String())
+	fmt.Println(time.Now().Format(time.RFC3339))
+}
+
+func TestAddLayout(t *testing.T) {
+	tm, err := StrToTime("[02/Jan/2017:15:04:05 -0700]")
+	if err == nil {
+		t.Error(errors.New("should have error without layouts"))
+	}
+	AddLayout([]string{"[02/Jan/2006:15:04:05 -0700]"})
+	tm, err = StrToTime("[02/Jan/2017:15:04:05 -0700]")
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println(tm.String())
 }

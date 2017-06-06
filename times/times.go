@@ -7,6 +7,44 @@ import (
 	"time"
 )
 
+var layouts = []string{
+	"02/Jan/2006:15:04:05 -0700",
+	"2006/01/02 15:04:05",
+	"2006-01-02 15:04:05 -0700 MST",
+	"2006-01-02 15:04:05 -0700",
+	"2006-01-02 15:04:05",
+	"2006/01/02 15:04:05 -0700 MST",
+	"2006/01/02 15:04:05 -0700",
+	"2006-01-02 -0700 MST",
+	"2006-01-02 -0700",
+	"2006-01-02",
+	"2006/01/02 -0700 MST",
+	"2006/01/02 -0700",
+	"2006/01/02",
+	"02/01/2006--15:04:05",
+	"02 Jan 06 15:04",
+	time.ANSIC,
+	time.UnixDate,
+	time.RubyDate,
+	time.RFC822,
+	time.RFC822Z,
+	time.RFC850,
+	time.RFC1123,
+	time.RFC1123Z,
+	time.RFC3339,
+	time.RFC3339Nano,
+	time.Kitchen,
+	time.Stamp,
+	time.StampMilli,
+	time.StampMicro,
+	time.StampNano,
+}
+
+// AddLayout 可以增加用户自定义的时间类型
+func AddLayout(udfLayouts []string) {
+	layouts = append(udfLayouts, layouts...)
+}
+
 // Format 跟 PHP 中 date 类似的使用方式，如果 ts 没传递，则使用当前时间
 func Format(format string, ts ...time.Time) string {
 	patterns := []string{
@@ -64,38 +102,6 @@ func GetTimeZone() (zoneName, zoneValue string) {
 func StrToTime(value string) (time.Time, error) {
 	if value == "" {
 		return time.Now(), errors.New("empty time string")
-	}
-	layouts := []string{
-		"02/Jan/2006:15:04:05 -0700",
-		"2006/01/02 15:04:05",
-		"2006-01-02 15:04:05 -0700 MST",
-		"2006-01-02 15:04:05 -0700",
-		"2006-01-02 15:04:05",
-		"2006/01/02 15:04:05 -0700 MST",
-		"2006/01/02 15:04:05 -0700",
-		"2006-01-02 -0700 MST",
-		"2006-01-02 -0700",
-		"2006-01-02",
-		"2006/01/02 -0700 MST",
-		"2006/01/02 -0700",
-		"2006/01/02",
-		"02/01/2006--15:04:05",
-		"02 Jan 06 15:04",
-		time.ANSIC,
-		time.UnixDate,
-		time.RubyDate,
-		time.RFC822,
-		time.RFC822Z,
-		time.RFC850,
-		time.RFC1123,
-		time.RFC1123Z,
-		time.RFC3339,
-		time.RFC3339Nano,
-		time.Kitchen,
-		time.Stamp,
-		time.StampMilli,
-		time.StampMicro,
-		time.StampNano,
 	}
 
 	var t time.Time

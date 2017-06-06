@@ -28,14 +28,22 @@ logkit本身支持多种数据源，并且可以同时发送多个数据源的�
 
 1. 下载&解压logkit工具
 
+**Linux 版本**
+
 ```
-wget http://op26gaeek.bkt.clouddn.com/logkit.tar.gz && tar xvf logkit.tar.gz
+wget http://op26gaeek.bkt.clouddn.com/logkit.tar.gz && tar xvf logkit.tar.gz && cd _package_linux64/
+```
+
+**MacOS 版本**
+
+```
+wget http://op26gaeek.bkt.clouddn.com/logkit_mac.tar.gz && tar xvf logkit_mac.tar.gz && cd _package_mac/
 ```
 
 2. 修改runner的配置
 
 ```
-打开 _package/confs/default.conf
+打开 confs/default.conf
 ```
 
 按照图示进行修改
@@ -44,7 +52,7 @@ wget http://op26gaeek.bkt.clouddn.com/logkit.tar.gz && tar xvf logkit.tar.gz
 3. 启动logkit工具
 
 ```
-cd _package && ./logkit -f logkit.conf
+./logkit -f logkit.conf
 ```
 
 logkit.conf是logkit工具本身的配置文件，主要用于指定logkit运行时需要的资源和各个runner配置文件的具体路径。
