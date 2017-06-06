@@ -126,6 +126,7 @@ func main() {
 		log.Fatalf("watch path error %v", err)
 	}
 	stopClean := make(chan struct{}, 0)
+	defer close(stopClean)
 	if conf.CleanSelfLog {
 		go loopCleanLogkitLog(conf.CleanSelfDir, conf.CleanSelfPattern, conf.CleanSelfLogCnt, stopClean)
 	}
@@ -137,7 +138,9 @@ func main() {
 
 	utils.WaitForInterrupt(func() {
 		rs.Stop()
-		stopClean <- struct{}{}
+		if conf.CleanSelfLog {
+			stopClean <- struct{}{}
+		}
 		m.Stop()
 	})
 }
