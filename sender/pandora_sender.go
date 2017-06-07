@@ -18,6 +18,8 @@ import (
 	pipelinebase "github.com/qiniu/pandora-go-sdk/base"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
+
+	gouuid "github.com/satori/go.uuid"
 )
 
 // 可选参数 当sender_type 为pandora 的时候，需要必填的字段
@@ -33,6 +35,9 @@ const (
 	KeyRequestRateLimit            = "request_rate_limit"
 	KeyFlowRateLimit               = "flow_rate_limit"
 	KeyPandoraGzip                 = "pandora_gzip"
+	KeyPandoraUUID                 = "pandora_uuid"
+
+	PandoraUUID = "Pandora_UUID"
 )
 
 // PandoraSender pandora sender
@@ -47,6 +52,7 @@ type PandoraSender struct {
 	updateInterval time.Duration
 	UserSchema     UserSchema
 	alias2key      map[string]string // map[alias]name
+	uuid           bool
 }
 
 // UserSchema was parsed pandora schema from user's raw schema
@@ -69,6 +75,7 @@ type PandoraOption struct {
 	reqRateLimit   int64
 	flowRateLimit  int64
 	gzip           bool
+	uuid           bool
 }
 
 //PandoraMaxBatchSize 发送到Pandora的batch限制
@@ -112,6 +119,7 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	reqRateLimit, _ := conf.GetInt64Or(KeyRequestRateLimit, 0)
 	flowRateLimit, _ := conf.GetInt64Or(KeyFlowRateLimit, 0)
 	gzip, _ := conf.GetBoolOr(KeyPandoraGzip, false)
+	uuid, _ := conf.GetBoolOr(KeyPandoraUUID, false)
 	opt := &PandoraOption{
 		name:           name,
 		repoName:       repoName,
@@ -125,6 +133,7 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 		reqRateLimit:   reqRateLimit,
 		flowRateLimit:  flowRateLimit,
 		gzip:           gzip,
+		uuid:           uuid,
 	}
 	return newPandoraSender(opt)
 }
@@ -171,6 +180,7 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 		alias2key:      make(map[string]string),
 		updateInterval: opt.updateInterval,
 		UserSchema:     userSchema,
+		uuid:           opt.uuid,
 		schemas:        make(map[string]pipeline.RepoSchemaEntry),
 	}
 	if createErr := createPandoraRepo(opt.autoCreate, opt.repoName, opt.region, client); createErr != nil {
@@ -388,6 +398,13 @@ func (s *PandoraSender) generatePoint(data Data) (point pipeline.Point) {
 		point.Fields = append(point.Fields, pipeline.PointField{
 			Key:   k,
 			Value: value,
+		})
+	}
+	if s.uuid {
+		uuid := gouuid.NewV4()
+		point.Fields = append(point.Fields, pipeline.PointField{
+			Key:   PandoraUUID,
+			Value: uuid.String(),
 		})
 	}
 	//data中剩余的值，但是在schema中不存在的，默认认为是用户不需要的。

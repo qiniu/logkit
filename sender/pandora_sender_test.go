@@ -214,7 +214,7 @@ func TestPandoraSender(t *testing.T) {
 	}
 	_, offset := time.Now().Zone()
 	value := offset / 3600
-	var timestr string = ""
+	var timestr string
 	if value > 0 {
 		timestr = fmt.Sprintf("+%02d:00", value)
 	} else if value < 0 {
@@ -357,6 +357,42 @@ func TestNestPandoraSender(t *testing.T) {
 	if pandora.Body != exp {
 		t.Errorf("send data error exp %v but %v", exp, pandora.Body)
 	}
+}
+
+func TestUUIDPandoraSender(t *testing.T) {
+	pandora, pt := NewMockPandoraWithPrefix("v2")
+	opt := &PandoraOption{
+		name:           "TestUUIDPandoraSender",
+		repoName:       "TestUUIDPandoraSender",
+		region:         "nb",
+		endpoint:       "http://127.0.0.1:" + pt,
+		ak:             "ak",
+		sk:             "sk",
+		schema:         "",
+		autoCreate:     "x1 s",
+		updateInterval: time.Second,
+		reqRateLimit:   0,
+		flowRateLimit:  0,
+		gzip:           false,
+		uuid:           true,
+	}
+	s, err := newPandoraSender(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := Data{}
+	d["x1"] = "hh"
+	err = s.Send([]Data{d})
+	if err != nil {
+		t.Error(err)
+	}
+	if !strings.Contains(pandora.Body, "x1=hh") {
+		t.Error("not x1 find error")
+	}
+	if !strings.Contains(pandora.Body, PandoraUUID) {
+		t.Error("no uuid found")
+	}
+	fmt.Println(pandora.Body)
 }
 
 func TestConvertDate(t *testing.T) {
