@@ -31,6 +31,7 @@ type mock_pandora struct {
 	GetRepoErr bool
 }
 
+//NewMockPandoraWithPrefix 测试的mock pandora server
 func NewMockPandoraWithPrefix(prefix string) (*mock_pandora, string) {
 	pandora := &mock_pandora{Prefix: prefix}
 
@@ -175,7 +176,21 @@ func (s *mock_pandora) LetGetRepoError(f bool) {
 func TestPandoraSender(t *testing.T) {
 	pandora, pt := NewMockPandoraWithPrefix("v2")
 	pandora.LetGetRepoError(true)
-	s, err := newPandoraSender("p", "TestPandoraSender", "nb", "http://127.0.0.1:"+pt, "ak", "sk", "ab, abc a1,d", "ab *s,a1 f*,ac *long,d DATE*", time.Second, 0, 0, true)
+	opt := &PandoraOption{
+		name:           "p",
+		repoName:       "TestPandoraSender",
+		region:         "nb",
+		endpoint:       "http://127.0.0.1:" + pt,
+		ak:             "ak",
+		sk:             "sk",
+		schema:         "ab, abc a1,d",
+		autoCreate:     "ab *s,a1 f*,ac *long,d DATE*",
+		updateInterval: time.Second,
+		reqRateLimit:   0,
+		flowRateLimit:  0,
+		gzip:           true,
+	}
+	s, err := newPandoraSender(opt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,7 +214,7 @@ func TestPandoraSender(t *testing.T) {
 	}
 	_, offset := time.Now().Zone()
 	value := offset / 3600
-	var timestr string = ""
+	var timestr string
 	if value > 0 {
 		timestr = fmt.Sprintf("+%02d:00", value)
 	} else if value < 0 {
@@ -303,7 +318,21 @@ func TestPandoraSender(t *testing.T) {
 
 func TestNestPandoraSender(t *testing.T) {
 	pandora, pt := NewMockPandoraWithPrefix("v2")
-	s, err := newPandoraSender("p_TestNestPandoraSender", "TestNestPandoraSender", "nb", "http://127.0.0.1:"+pt, "ak", "sk", "", "x1 *s,x2 f,x3 l,x4 a(f),x5 {x6 l, x7{x8 a(s),x9 b}}", time.Second, 0, 0, false)
+	opt := &PandoraOption{
+		name:           "p_TestNestPandoraSender",
+		repoName:       "TestNestPandoraSender",
+		region:         "nb",
+		endpoint:       "http://127.0.0.1:" + pt,
+		ak:             "ak",
+		sk:             "sk",
+		schema:         "",
+		autoCreate:     "x1 *s,x2 f,x3 l,x4 a(f),x5 {x6 l, x7{x8 a(s),x9 b}}",
+		updateInterval: time.Second,
+		reqRateLimit:   0,
+		flowRateLimit:  0,
+		gzip:           false,
+	}
+	s, err := newPandoraSender(opt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -328,6 +357,42 @@ func TestNestPandoraSender(t *testing.T) {
 	if pandora.Body != exp {
 		t.Errorf("send data error exp %v but %v", exp, pandora.Body)
 	}
+}
+
+func TestUUIDPandoraSender(t *testing.T) {
+	pandora, pt := NewMockPandoraWithPrefix("v2")
+	opt := &PandoraOption{
+		name:           "TestUUIDPandoraSender",
+		repoName:       "TestUUIDPandoraSender",
+		region:         "nb",
+		endpoint:       "http://127.0.0.1:" + pt,
+		ak:             "ak",
+		sk:             "sk",
+		schema:         "",
+		autoCreate:     "x1 s",
+		updateInterval: time.Second,
+		reqRateLimit:   0,
+		flowRateLimit:  0,
+		gzip:           false,
+		uuid:           true,
+	}
+	s, err := newPandoraSender(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := Data{}
+	d["x1"] = "hh"
+	err = s.Send([]Data{d})
+	if err != nil {
+		t.Error(err)
+	}
+	if !strings.Contains(pandora.Body, "x1=hh") {
+		t.Error("not x1 find error")
+	}
+	if !strings.Contains(pandora.Body, PandoraUUID) {
+		t.Error("no uuid found")
+	}
+	fmt.Println(pandora.Body)
 }
 
 func TestConvertDate(t *testing.T) {

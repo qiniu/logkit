@@ -50,3 +50,4 @@ vendor/*/
 .cache
 .vscode
 logkit
+stats
