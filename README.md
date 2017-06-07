@@ -117,4 +117,15 @@ go build -o logkit logkit.go
 ./logkit -f logkit.conf
 ```
 
+## 使用logkit的docker镜像启动
+
+```
+docker pull wonderflow/logkit:v1.0-pre
+docker run -d -p 3000:3000 -v /local/logkit/dataconf:/app/confs -v /local/log/path:/logs/path logkit
+```
+
+镜像中，logkit读取`/app/confs`下的配置文件，所以可以通过挂载目录的形式，将本地的logkit配置目录`/local/logkit/dataconf`挂载到镜像里面。
+
+需要注意的是，镜像中的logkit收集 `/logs`目录下的日志，需要把本地的日志目录也挂载到镜像里面去才能启动，比如本地的日志目录为`/local/log/path`, 挂载到镜像中的`/logs/path`目录，那么`/local/logkit/dataconf`目录下的配置文件填写的日志路径必须是`/logs/path`。
+
 Enjoy it！
