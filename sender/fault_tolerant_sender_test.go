@@ -17,7 +17,21 @@ const (
 
 func TestFtSender(t *testing.T) {
 	_, pt := NewMockPandoraWithPrefix("v2")
-	s, err := newPandoraSender("p", "TestFtSender", "nb", "http://127.0.0.1:"+pt, "ak", "sk", "ab", "ab *s", time.Second, 0, 0, false)
+	opt := &PandoraOption{
+		name:           "p",
+		repoName:       "TestFtSender",
+		region:         "nb",
+		endpoint:       "http://127.0.0.1:" + pt,
+		ak:             "ak",
+		sk:             "sk",
+		schema:         "ab",
+		autoCreate:     "ab *s",
+		updateInterval: time.Second,
+		reqRateLimit:   0,
+		flowRateLimit:  0,
+		gzip:           false,
+	}
+	s, err := newPandoraSender(opt)
 	if err != nil {
 		t.Fatal(err)
 	}

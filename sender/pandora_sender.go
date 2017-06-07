@@ -20,6 +20,21 @@ import (
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 )
 
+// 可选参数 当sender_type 为pandora 的时候，需要必填的字段
+const (
+	KeyPandoraAk                   = "pandora_ak"
+	KeyPandoraSk                   = "pandora_sk"
+	KeyPandoraHost                 = "pandora_host"
+	KeyPandoraRepoName             = "pandora_repo_name"
+	KeyPandoraRegion               = "pandora_region"
+	KeyPandoraSchema               = "pandora_schema"
+	KeyPandoraSchemaUpdateInterval = "pandora_schema_update_interval"
+	KeyPandoraAutoCreate           = "pandora_auto_create"
+	KeyRequestRateLimit            = "request_rate_limit"
+	KeyFlowRateLimit               = "flow_rate_limit"
+	KeyPandoraGzip                 = "pandora_gzip"
+)
+
 // PandoraSender pandora sender
 type PandoraSender struct {
 	name           string
@@ -40,21 +55,23 @@ type UserSchema struct {
 	Fields     map[string]string
 }
 
-// 可选参数 当sender_type 为pandora 的时候，需要必填的字段
-const (
-	KeyPandoraAk                   = "pandora_ak"
-	KeyPandoraSk                   = "pandora_sk"
-	KeyPandoraHost                 = "pandora_host"
-	KeyPandoraRepoName             = "pandora_repo_name"
-	KeyPandoraRegion               = "pandora_region"
-	KeyPandoraSchema               = "pandora_schema"
-	KeyPandoraSchemaUpdateInterval = "pandora_schema_update_interval"
-	KeyPandoraAutoCreate           = "pandora_auto_create"
-	KeyRequestRateLimit            = "request_rate_limit"
-	KeyFlowRateLimit               = "flow_rate_limit"
-	KeyPandoraGzip                 = "pandora_gzip"
-)
+// PandoraOption 创建Pandora Sender的选项
+type PandoraOption struct {
+	name           string
+	repoName       string
+	region         string
+	endpoint       string
+	ak             string
+	sk             string
+	schema         string
+	autoCreate     string
+	updateInterval time.Duration
+	reqRateLimit   int64
+	flowRateLimit  int64
+	gzip           bool
+}
 
+//PandoraMaxBatchSize 发送到Pandora的batch限制
 var PandoraMaxBatchSize = 2 * 1024 * 1024
 
 // NewPandoraSender pandora sender constructor
@@ -95,7 +112,21 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	reqRateLimit, _ := conf.GetInt64Or(KeyRequestRateLimit, 0)
 	flowRateLimit, _ := conf.GetInt64Or(KeyFlowRateLimit, 0)
 	gzip, _ := conf.GetBoolOr(KeyPandoraGzip, false)
-	return newPandoraSender(name, repoName, region, host, akFromEnv, skFromEnv, schema, autoCreateSchema, time.Duration(updateInterval)*time.Second, reqRateLimit, flowRateLimit, gzip)
+	opt := &PandoraOption{
+		name:           name,
+		repoName:       repoName,
+		region:         region,
+		endpoint:       host,
+		ak:             akFromEnv,
+		sk:             skFromEnv,
+		schema:         schema,
+		autoCreate:     autoCreateSchema,
+		updateInterval: time.Duration(updateInterval) * time.Second,
+		reqRateLimit:   reqRateLimit,
+		flowRateLimit:  flowRateLimit,
+		gzip:           gzip,
+	}
+	return newPandoraSender(opt)
 }
 
 func createPandoraRepo(autoCreateSchema, repoName, region string, client pipeline.PipelineAPI) (err error) {
@@ -110,39 +141,39 @@ func createPandoraRepo(autoCreateSchema, repoName, region string, client pipelin
 	})
 }
 
-func newPandoraSender(name, repoName, region, endpoint, ak, sk, schema, autoCreate string, updateInterval time.Duration, reqRateLimit, flowRateLimit int64, gzip bool) (s *PandoraSender, err error) {
+func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 	logger := pipelinebase.NewDefaultLogger()
 	config := pipeline.NewConfig().
-		WithEndpoint(endpoint).
-		WithAccessKeySecretKey(ak, sk).
+		WithEndpoint(opt.endpoint).
+		WithAccessKeySecretKey(opt.ak, opt.sk).
 		WithLogger(logger).
 		WithLoggerLevel(pipelinebase.LogInfo).
-		WithRequestRateLimit(reqRateLimit).
-		WithFlowRateLimit(flowRateLimit).
-		WithGzipData(gzip)
+		WithRequestRateLimit(opt.reqRateLimit).
+		WithFlowRateLimit(opt.flowRateLimit).
+		WithGzipData(opt.gzip)
 
 	client, err := pipeline.New(config)
 	if err != nil {
 		err = fmt.Errorf("Cannot init pipelineClient %v", err)
 		return
 	}
-	if reqRateLimit > 0 {
-		log.Warnf("you have limited %v pandora sender within %v requests/s", name, reqRateLimit)
+	if opt.reqRateLimit > 0 {
+		log.Warnf("you have limited %v pandora sender within %v requests/s", opt.name, opt.reqRateLimit)
 	}
-	if flowRateLimit > 0 {
-		log.Warnf("you have limited %v pandora sender within %v KB/s", name, flowRateLimit)
+	if opt.flowRateLimit > 0 {
+		log.Warnf("you have limited %v pandora sender within %v KB/s", opt.name, opt.flowRateLimit)
 	}
-	userSchema := parseUserSchema(repoName, schema)
+	userSchema := parseUserSchema(opt.repoName, opt.schema)
 	s = &PandoraSender{
-		name:           name,
-		repoName:       repoName,
+		name:           opt.name,
+		repoName:       opt.repoName,
 		client:         client,
 		alias2key:      make(map[string]string),
-		updateInterval: updateInterval,
+		updateInterval: opt.updateInterval,
 		UserSchema:     userSchema,
 		schemas:        make(map[string]pipeline.RepoSchemaEntry),
 	}
-	if createErr := createPandoraRepo(autoCreate, repoName, region, client); createErr != nil {
+	if createErr := createPandoraRepo(opt.autoCreate, opt.repoName, opt.region, client); createErr != nil {
 		if !strings.Contains(createErr.Error(), "E18101") {
 			log.Errorf("auto create pandora repo error: %v, you can create on pandora portal, ignored...", createErr)
 		}
