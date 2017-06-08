@@ -38,6 +38,7 @@ func NewMockPandoraWithPrefix(prefix string) (*mock_pandora, string) {
 	mux := rest.NewServeMux()
 	mux.HandleFunc("GET/"+prefix+"/ping", pandora.GetPing)
 	mux.HandleFunc("POST/"+prefix+"/repos/*", pandora.PostRepos_)
+	mux.HandleFunc("PUT/"+prefix+"/repos/*", pandora.PutRepos_)
 	mux.HandleFunc("POST/"+prefix+"/repos/*/data", pandora.PostRepos_Data)
 	mux.HandleFunc("GET/"+prefix+"/repos/*", pandora.GetRepos_)
 
@@ -92,7 +93,7 @@ type PostReposReq struct {
 }
 
 func (s *mock_pandora) PostRepos_(rw http.ResponseWriter, req *http.Request) {
-
+	log.Println("PostRepos_ request")
 	var data []byte
 	var err error
 	if data, err = ioutil.ReadAll(req.Body); err != nil {
@@ -163,6 +164,20 @@ func (s *mock_pandora) GetRepos_(rw http.ResponseWriter, req *http.Request) {
 	by, _ := json.Marshal(ret)
 	rw.Write(by)
 	return
+}
+
+func (s *mock_pandora) PutRepos_(rw http.ResponseWriter, req *http.Request) {
+	log.Println("PutRepos_ request")
+	var data []byte
+	var err error
+	if data, err = ioutil.ReadAll(req.Body); err != nil {
+		return
+	}
+	var req1 PostReposReq
+	if err = json.Unmarshal(data, &req1); err != nil {
+		return
+	}
+	s.Schemas = req1.Schema
 }
 
 func (s *mock_pandora) ChangeSchema(Schema []pipeline.RepoSchemaEntry) {
@@ -622,4 +637,168 @@ func TestParseUserSchema(t *testing.T) {
 			t.Errorf("TestParseUserSchema error exp %v but got %v", ti.exp, us)
 		}
 	}
+}
+
+func TestGetPandoraKeyValueType(t *testing.T) {
+	var data map[string]interface{}
+	dc := json.NewDecoder(strings.NewReader("{\"a\":123,\"b\":123.1,\"c\":\"123\"}"))
+	dc.UseNumber()
+	err := dc.Decode(&data)
+	exp := map[string]string{
+		"a": PandoraTypeLong,
+		"b": PandoraTypeFloat,
+		"c": PandoraTypeString,
+	}
+	assert.NoError(t, err)
+	vt := getPandoraKeyValueType(data)
+	assert.Equal(t, exp, vt)
+	data = map[string]interface{}{
+		"a": 1,
+		"b": time.Now().Format(time.RFC3339Nano),
+		"c": time.Now().Format(time.RFC3339),
+		"d": 1.0,
+		"e": int64(32),
+		"f": "123",
+	}
+	exp = map[string]string{
+		"a": PandoraTypeLong,
+		"b": PandoraTypeDate,
+		"c": PandoraTypeDate,
+		"d": PandoraTypeFloat,
+		"e": PandoraTypeLong,
+		"f": PandoraTypeString,
+	}
+	vt = getPandoraKeyValueType(data)
+	assert.Equal(t, exp, vt)
+}
+
+func TestUpdatePandoraSchema(t *testing.T) {
+	pandora, pt := NewMockPandoraWithPrefix("v2")
+	opt := &PandoraOption{
+		name:           "p_TestUpdatePandoraSchema",
+		repoName:       "TestUpdatePandoraSchema",
+		region:         "nb",
+		endpoint:       "http://127.0.0.1:" + pt,
+		ak:             "ak",
+		sk:             "sk",
+		schema:         "x3 x3change,x4,...",
+		schemaFree:     true,
+		updateInterval: time.Second,
+	}
+	s, err := newPandoraSender(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := Data{}
+	d["x1"] = "hh"
+	err = s.Send([]Data{d})
+	if err != nil {
+		t.Error(err)
+	}
+	exp := "x1=hh"
+	if pandora.Body != exp {
+		t.Errorf("send data error exp %v but %v", exp, pandora.Body)
+	}
+	d["x2"] = 2
+	err = s.Send([]Data{d})
+	if err != nil {
+		t.Error(err)
+	}
+	exp = "x1=hh x2=2"
+	if pandora.Body != exp {
+		t.Errorf("send data error exp %v but %v", exp, pandora.Body)
+	}
+	expschema := []pipeline.RepoSchemaEntry{
+		pipeline.RepoSchemaEntry{
+			Key:       "x1",
+			ValueType: PandoraTypeString,
+		},
+		pipeline.RepoSchemaEntry{
+			Key:       "x2",
+			ValueType: PandoraTypeLong,
+		},
+	}
+	assert.Equal(t, expschema, pandora.Schemas)
+	d["x1"] = "hh"
+	d["x2"] = 2
+	d["x3"] = 2.1
+	err = s.Send([]Data{d})
+	if err != nil {
+		t.Error(err)
+	}
+	exp = "x1=hh x2=2 x3change=2.1"
+	assert.Equal(t, exp, pandora.Body)
+
+	expschema = []pipeline.RepoSchemaEntry{
+		pipeline.RepoSchemaEntry{
+			Key:       "x1",
+			ValueType: PandoraTypeString,
+		},
+		pipeline.RepoSchemaEntry{
+			Key:       "x2",
+			ValueType: PandoraTypeLong,
+		},
+		pipeline.RepoSchemaEntry{
+			Key:       "x3change",
+			ValueType: PandoraTypeFloat,
+		},
+	}
+	assert.Equal(t, expschema, pandora.Schemas)
+	log.Println("\n\n ===========second =======")
+	pandora.Body = ""
+	pandora.Schemas = nil
+	//第二轮测试
+	opt = &PandoraOption{
+		name:           "p_TestUpdatePandoraSchema",
+		repoName:       "TestUpdatePandoraSchema",
+		region:         "nb",
+		endpoint:       "http://127.0.0.1:" + pt,
+		ak:             "ak",
+		sk:             "sk",
+		schema:         "x3 x3change,x4",
+		schemaFree:     true,
+		updateInterval: time.Second,
+	}
+	s, err = newPandoraSender(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d["x1"] = "hh"
+	tm := time.Now().Format(time.RFC3339)
+	d["x3"] = tm
+	err = s.Send([]Data{d})
+	if err != nil {
+		t.Error(err)
+	}
+	exp = "x3change=" + tm
+	assert.Equal(t, exp, pandora.Body)
+
+	expschema = []pipeline.RepoSchemaEntry{
+		pipeline.RepoSchemaEntry{
+			Key:       "x3change",
+			ValueType: PandoraTypeDate,
+		},
+	}
+	assert.Equal(t, expschema, pandora.Schemas)
+
+	d["x3"] = tm
+	d["x4"] = 1
+	err = s.Send([]Data{d})
+	if err != nil {
+		t.Error(err)
+	}
+	exp = "x3change=" + tm + " x4=1"
+	assert.Equal(t, exp, pandora.Body)
+
+	expschema = []pipeline.RepoSchemaEntry{
+		pipeline.RepoSchemaEntry{
+			Key:       "x3change",
+			ValueType: PandoraTypeDate,
+		},
+		pipeline.RepoSchemaEntry{
+			Key:       "x4",
+			ValueType: PandoraTypeLong,
+		},
+	}
+	assert.Equal(t, expschema, pandora.Schemas)
 }
