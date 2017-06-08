@@ -18,27 +18,9 @@ import (
 	pipelinebase "github.com/qiniu/pandora-go-sdk/base"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
+
+	gouuid "github.com/satori/go.uuid"
 )
-
-// PandoraSender pandora sender
-type PandoraSender struct {
-	name           string
-	repoName       string
-	client         pipeline.PipelineAPI
-	schemas        map[string]pipeline.RepoSchemaEntry
-	schemasMux     sync.RWMutex
-	lastUpdate     time.Time
-	updateMux      sync.Mutex
-	updateInterval time.Duration
-	UserSchema     UserSchema
-	alias2key      map[string]string // map[alias]name
-}
-
-// UserSchema was parsed pandora schema from user's raw schema
-type UserSchema struct {
-	DefaultAll bool
-	Fields     map[string]string
-}
 
 // 可选参数 当sender_type 为pandora 的时候，需要必填的字段
 const (
@@ -50,11 +32,57 @@ const (
 	KeyPandoraSchema               = "pandora_schema"
 	KeyPandoraSchemaUpdateInterval = "pandora_schema_update_interval"
 	KeyPandoraAutoCreate           = "pandora_auto_create"
+	KeyPandoraSchemaFree           = "pandora_schema_free"
 	KeyRequestRateLimit            = "request_rate_limit"
 	KeyFlowRateLimit               = "flow_rate_limit"
 	KeyPandoraGzip                 = "pandora_gzip"
+	KeyPandoraUUID                 = "pandora_uuid"
+
+	PandoraUUID = "Pandora_UUID"
 )
 
+// PandoraSender pandora sender
+type PandoraSender struct {
+	name           string
+	repoName       string
+	region         string
+	client         pipeline.PipelineAPI
+	schemas        map[string]pipeline.RepoSchemaEntry
+	schemasMux     sync.RWMutex
+	lastUpdate     time.Time
+	updateMux      sync.Mutex
+	updateInterval time.Duration
+	UserSchema     UserSchema
+	schemaFree     bool
+	alias2key      map[string]string // map[alias]name
+	uuid           bool
+}
+
+// UserSchema was parsed pandora schema from user's raw schema
+type UserSchema struct {
+	DefaultAll bool
+	Fields     map[string]string
+}
+
+// PandoraOption 创建Pandora Sender的选项
+type PandoraOption struct {
+	name           string
+	repoName       string
+	region         string
+	endpoint       string
+	ak             string
+	sk             string
+	schema         string
+	schemaFree     bool   // schemaFree在用户数据有新字段时就更新repo添加字段，如果repo不存在，创建repo。schemaFree功能包含autoCreate
+	autoCreate     string // 自动创建用户的repo，dsl语言填写schema
+	updateInterval time.Duration
+	reqRateLimit   int64
+	flowRateLimit  int64
+	gzip           bool
+	uuid           bool
+}
+
+//PandoraMaxBatchSize 发送到Pandora的batch限制
 var PandoraMaxBatchSize = 2 * 1024 * 1024
 
 // NewPandoraSender pandora sender constructor
@@ -91,11 +119,29 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	schema, _ := conf.GetStringOr(KeyPandoraSchema, "")
 	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("pandoraSender:(%v,repo:%v,region:%v)", host, repoName, region))
 	updateInterval, _ := conf.GetInt64Or(KeyPandoraSchemaUpdateInterval, 300)
+	schemaFree, _ := conf.GetBoolOr(KeyPandoraSchemaFree, false)
 	autoCreateSchema, _ := conf.GetStringOr(KeyPandoraAutoCreate, "")
 	reqRateLimit, _ := conf.GetInt64Or(KeyRequestRateLimit, 0)
 	flowRateLimit, _ := conf.GetInt64Or(KeyFlowRateLimit, 0)
 	gzip, _ := conf.GetBoolOr(KeyPandoraGzip, false)
-	return newPandoraSender(name, repoName, region, host, akFromEnv, skFromEnv, schema, autoCreateSchema, time.Duration(updateInterval)*time.Second, reqRateLimit, flowRateLimit, gzip)
+	uuid, _ := conf.GetBoolOr(KeyPandoraUUID, false)
+	opt := &PandoraOption{
+		name:           name,
+		repoName:       repoName,
+		region:         region,
+		endpoint:       host,
+		ak:             akFromEnv,
+		sk:             skFromEnv,
+		schema:         schema,
+		autoCreate:     autoCreateSchema,
+		schemaFree:     schemaFree,
+		updateInterval: time.Duration(updateInterval) * time.Second,
+		reqRateLimit:   reqRateLimit,
+		flowRateLimit:  flowRateLimit,
+		gzip:           gzip,
+		uuid:           uuid,
+	}
+	return newPandoraSender(opt)
 }
 
 func createPandoraRepo(autoCreateSchema, repoName, region string, client pipeline.PipelineAPI) (err error) {
@@ -110,46 +156,112 @@ func createPandoraRepo(autoCreateSchema, repoName, region string, client pipelin
 	})
 }
 
-func newPandoraSender(name, repoName, region, endpoint, ak, sk, schema, autoCreate string, updateInterval time.Duration, reqRateLimit, flowRateLimit int64, gzip bool) (s *PandoraSender, err error) {
+func (s *PandoraSender) addPandoraRepoSchemas(addSchemas map[string]string) (err error) {
+	repo, err := s.client.GetRepo(&pipeline.GetRepoInput{
+		RepoName: s.repoName,
+	})
+	var schemas []pipeline.RepoSchemaEntry
+	var createInsteadOfUpdate bool
+	if err != nil {
+		reqErr, ok := err.(*reqerr.RequestError)
+		if !ok {
+			return
+		}
+		switch reqErr.ErrorType {
+		case reqerr.NoSuchRepoError:
+			createInsteadOfUpdate = true
+			schemas = make([]pipeline.RepoSchemaEntry, 0)
+		default:
+			return
+		}
+	} else {
+		schemas = repo.Schema
+	}
+
+	for k, v := range addSchemas {
+		aliasKey, ok := s.UserSchema.Fields[k]
+		if !ok {
+			aliasKey = k
+		}
+		schemas = append(schemas, pipeline.RepoSchemaEntry{
+			Key:       aliasKey,
+			ValueType: v,
+		})
+	}
+	if createInsteadOfUpdate {
+		err = s.client.CreateRepo(&pipeline.CreateRepoInput{
+			RepoName: s.repoName,
+			Region:   s.region,
+			Schema:   schemas,
+		})
+	} else {
+		err = s.client.UpdateRepo(&pipeline.UpdateRepoInput{
+			RepoName: s.repoName,
+			Schema:   schemas,
+		})
+	}
+	if err != nil {
+		reqErr, ok := err.(*reqerr.RequestError)
+		if !ok {
+			return
+		}
+		if reqErr.ErrorType != reqerr.RepoAlreadyExistsError {
+			return
+		}
+	}
+	err = nil
+	mpschemas := make(map[string]pipeline.RepoSchemaEntry)
+	for _, sc := range schemas {
+		mpschemas[sc.Key] = sc
+	}
+
+	s.updateSchemas(mpschemas)
+	return
+}
+
+func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 	logger := pipelinebase.NewDefaultLogger()
 	config := pipeline.NewConfig().
-		WithEndpoint(endpoint).
-		WithAccessKeySecretKey(ak, sk).
+		WithEndpoint(opt.endpoint).
+		WithAccessKeySecretKey(opt.ak, opt.sk).
 		WithLogger(logger).
 		WithLoggerLevel(pipelinebase.LogInfo).
-		WithRequestRateLimit(reqRateLimit).
-		WithFlowRateLimit(flowRateLimit).
-		WithGzipData(gzip)
+		WithRequestRateLimit(opt.reqRateLimit).
+		WithFlowRateLimit(opt.flowRateLimit).
+		WithGzipData(opt.gzip)
 
 	client, err := pipeline.New(config)
 	if err != nil {
 		err = fmt.Errorf("Cannot init pipelineClient %v", err)
 		return
 	}
-	if reqRateLimit > 0 {
-		log.Warnf("you have limited %v pandora sender within %v requests/s", name, reqRateLimit)
+	if opt.reqRateLimit > 0 {
+		log.Warnf("you have limited %v pandora sender within %v requests/s", opt.name, opt.reqRateLimit)
 	}
-	if flowRateLimit > 0 {
-		log.Warnf("you have limited %v pandora sender within %v KB/s", name, flowRateLimit)
+	if opt.flowRateLimit > 0 {
+		log.Warnf("you have limited %v pandora sender within %v KB/s", opt.name, opt.flowRateLimit)
 	}
-	userSchema := parseUserSchema(repoName, schema)
+	userSchema := parseUserSchema(opt.repoName, opt.schema)
 	s = &PandoraSender{
-		name:           name,
-		repoName:       repoName,
+		name:           opt.name,
+		repoName:       opt.repoName,
+		region:         opt.region,
 		client:         client,
 		alias2key:      make(map[string]string),
-		updateInterval: updateInterval,
+		updateInterval: opt.updateInterval,
 		UserSchema:     userSchema,
+		uuid:           opt.uuid,
+		schemaFree:     opt.schemaFree,
 		schemas:        make(map[string]pipeline.RepoSchemaEntry),
 	}
-	if createErr := createPandoraRepo(autoCreate, repoName, region, client); createErr != nil {
+	if createErr := createPandoraRepo(opt.autoCreate, opt.repoName, opt.region, client); createErr != nil {
 		if !strings.Contains(createErr.Error(), "E18101") {
 			log.Errorf("auto create pandora repo error: %v, you can create on pandora portal, ignored...", createErr)
 		}
 	}
 	// 如果updateSchemas更新schema失败，不会报错，可以正常启动runner，但是在sender时会检查schema是否获取
 	// sender时会尝试不断获取pandora schema，若还是获取失败则返回发送错误。
-	s.updateSchemas()
+	s.UpdateSchemas()
 	return
 }
 
@@ -189,7 +301,7 @@ func parseUserSchema(repoName, schema string) (us UserSchema) {
 	return
 }
 
-func (s *PandoraSender) updateSchemas() {
+func (s *PandoraSender) UpdateSchemas() {
 	repo, err := s.client.GetRepo(&pipeline.GetRepoInput{
 		RepoName: s.repoName,
 	})
@@ -202,7 +314,6 @@ func (s *PandoraSender) updateSchemas() {
 	for _, sc := range repo.Schema {
 		schemas[sc.Key] = sc
 	}
-	alias2Key := fillAlias2Keys(s.repoName, schemas, s.UserSchema)
 	s.updateMux.Lock()
 	defer s.updateMux.Unlock()
 	//double check
@@ -211,6 +322,11 @@ func (s *PandoraSender) updateSchemas() {
 	}
 	s.lastUpdate = time.Now()
 
+	s.updateSchemas(schemas)
+}
+
+func (s *PandoraSender) updateSchemas(schemas map[string]pipeline.RepoSchemaEntry) {
+	alias2Key := fillAlias2Keys(s.repoName, schemas, s.UserSchema)
 	s.schemasMux.Lock()
 	s.schemas = schemas
 	s.alias2key = alias2Key
@@ -228,7 +344,6 @@ func fillAlias2Keys(repoName string, schemas map[string]pipeline.RepoSchemaEntry
 	}
 	for name, alias := range us.Fields {
 		if _, ok := schemas[alias]; !ok {
-			log.Errorf("Repo-%s:select schema or alias <%v> for key <%v> was not found in pandora schema, ignore this key...", repoName, alias, name)
 			continue
 		}
 		alias2key[alias] = name
@@ -236,17 +351,27 @@ func fillAlias2Keys(repoName string, schemas map[string]pipeline.RepoSchemaEntry
 	return
 }
 
+const (
+	PandoraTypeLong   = "long"
+	PandoraTypeFloat  = "float"
+	PandoraTypeString = "string"
+	PandoraTypeDate   = "date"
+	PandoraTypeBool   = "boolean"
+	PandoraTypeArray  = "array"
+	PandoraTypeMap    = "map"
+)
+
 func getDefault(t pipeline.RepoSchemaEntry) (result interface{}) {
 	switch t.ValueType {
-	case "long":
+	case PandoraTypeLong:
 		result = 0
-	case "float":
+	case PandoraTypeFloat:
 		result = 0.0
-	case "string":
+	case PandoraTypeString:
 		result = ""
-	case "date":
+	case PandoraTypeDate:
 		result = time.Now().Format(time.RFC3339Nano)
-	case "boolean":
+	case PandoraTypeBool:
 		result = false
 	}
 	return
@@ -299,19 +424,19 @@ func convertDate(v interface{}) (interface{}, error) {
 func validSchema(valueType string, value interface{}) bool {
 	v := fmt.Sprintf("%v", value)
 	switch valueType {
-	case "long":
+	case PandoraTypeLong:
 		if _, err := strconv.ParseInt(v, 10, 64); err != nil {
 			return false
 		}
-	case "float":
+	case PandoraTypeFloat:
 		if _, err := strconv.ParseFloat(v, 64); err != nil {
 			return false
 		}
-	case "string":
-	case "date":
-	case "array":
-	case "map":
-	case "boolean":
+	case PandoraTypeString:
+	case PandoraTypeDate:
+	case PandoraTypeArray:
+	case PandoraTypeMap:
+	case PandoraTypeBool:
 	}
 	return true
 }
@@ -327,7 +452,7 @@ func (s *PandoraSender) generatePoint(data Data) (point pipeline.Point) {
 	schemas, alias2key := s.getSchemasAlias()
 	for k, v := range schemas {
 		name, ok := alias2key[k]
-		if !ok {
+		if !s.UserSchema.DefaultAll && !ok {
 			continue // 表示这个值未被选中
 		}
 		value, ok := data[name]
@@ -339,8 +464,11 @@ func (s *PandoraSender) generatePoint(data Data) (point pipeline.Point) {
 				continue
 			}
 		}
-
-		if v.ValueType == "date" {
+		//对于没有autoupdate的情况就不delete了，节省CPU
+		if s.schemaFree {
+			delete(data, name)
+		}
+		if v.ValueType == PandoraTypeDate {
 			formatTime, err := convertDate(value)
 			if err != nil {
 				log.Error(err)
@@ -359,7 +487,71 @@ func (s *PandoraSender) generatePoint(data Data) (point pipeline.Point) {
 			Value: value,
 		})
 	}
-	//data中剩余的值，但是在schema中不存在的，默认认为是用户不需要的。
+	if s.uuid {
+		uuid := gouuid.NewV4()
+		point.Fields = append(point.Fields, pipeline.PointField{
+			Key:   PandoraUUID,
+			Value: uuid.String(),
+		})
+	}
+	/*
+		data中剩余的值，但是在schema中不存在的，根据defaultAll和schemaFree判断是否增加。
+	*/
+	if s.schemaFree && len(data) > 0 {
+		//defaultAll 为false，时，过滤一批不要的
+		if !s.UserSchema.DefaultAll {
+			for k := range data {
+				if _, ok := s.UserSchema.Fields[k]; !ok {
+					delete(data, k)
+				}
+			}
+		}
+		valueType := getPandoraKeyValueType(data)
+		if err := s.addPandoraRepoSchemas(valueType); err != nil {
+			log.Errorf("updatePandora Repo error %v", err)
+		}
+		for k, v := range data {
+			name, ok := s.UserSchema.Fields[k]
+			if !ok {
+				name = k
+			}
+			point.Fields = append(point.Fields, pipeline.PointField{
+				Key:   name,
+				Value: v,
+			})
+		}
+	}
+	return
+}
+
+func getPandoraKeyValueType(data Data) (valueType map[string]string) {
+	valueType = make(map[string]string)
+	for k, v := range data {
+		switch nv := v.(type) {
+		case int, int8, int16, int32, int64:
+			valueType[k] = PandoraTypeLong
+		case float32, float64:
+			valueType[k] = PandoraTypeFloat
+		case bool:
+			valueType[k] = PandoraTypeBool
+		case json.Number:
+			_, err := nv.Int64()
+			if err == nil {
+				valueType[k] = PandoraTypeLong
+			} else {
+				valueType[k] = PandoraTypeFloat
+			}
+		case string:
+			_, err := time.Parse(time.RFC3339, nv)
+			if err == nil {
+				valueType[k] = PandoraTypeDate
+			} else {
+				valueType[k] = PandoraTypeString
+			}
+		default:
+			valueType[k] = PandoraTypeString
+		}
+	}
 	return
 }
 
@@ -367,12 +559,12 @@ func (s *PandoraSender) checkSchemaUpdate() {
 	if s.lastUpdate.Add(s.updateInterval).After(time.Now()) {
 		return
 	}
-	s.updateSchemas()
+	s.UpdateSchemas()
 }
 
 func (s *PandoraSender) Send(datas []Data) (se error) {
 	s.checkSchemaUpdate()
-	if len(s.schemas) <= 0 || len(s.alias2key) <= 0 {
+	if !s.schemaFree && (len(s.schemas) <= 0 || len(s.alias2key) <= 0) {
 		se = NewSendError("Get pandora schema error, faild to send data", datas, TypeDefault)
 		return
 	}
