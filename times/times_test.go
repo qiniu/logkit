@@ -114,3 +114,46 @@ func TestAddLayout(t *testing.T) {
 	}
 	fmt.Println(tm.String())
 }
+
+func a1() map[string]interface{} {
+	x := map[string]interface{}{
+		"a": 1,
+		"b": "2",
+		"c": 1,
+		"d": "xx",
+	}
+	for k := range x {
+		if k == "b" || k == "a" || k == "c" {
+			delete(x, k)
+		}
+	}
+	return x
+}
+
+func a2() map[string]interface{} {
+	x := map[string]interface{}{
+		"a": 1,
+		"b": "2",
+		"c": 1,
+		"d": "xx",
+	}
+	x2 := make(map[string]interface{})
+	for k, v := range x {
+		if k != "b" && k != "a" && k != "c" {
+			x2[k] = v
+		}
+	}
+	return x2
+}
+
+func BenchmarkTest1(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		a1()
+	}
+}
+
+func BenchmarkTest2(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		a2()
+	}
+}
