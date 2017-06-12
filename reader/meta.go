@@ -112,6 +112,7 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 	if err != nil && (mode == ModeDir || mode == ModeFile) {
 		return
 	}
+	err = nil
 	metapath, err := conf.GetString(KeyMetaPath)
 	if err != nil {
 		runnerName, _ := conf.GetString(utils.GlobalKeyName)
