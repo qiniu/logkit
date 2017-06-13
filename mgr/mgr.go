@@ -318,12 +318,11 @@ func (m *Manager) addWatchers(confsPath []string) (err error) {
 			continue
 		}
 		for _, path := range paths {
-			fi, err := os.Stat(path)
+			inode, err := utils.GetIdentifyIDByPath(path)
 			if err != nil {
-				log.Errorf("os.Stat(%v) error %v", path, err)
+				log.Errorf("GetIdentifyID(%v) error %v", path, err)
 				continue
 			}
-			inode := utils.GetInode(fi)
 			_, exist := m.watchers[inode]
 			if exist {
 				// 如果文件已经被监听，则不再重复监听
