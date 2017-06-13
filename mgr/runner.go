@@ -60,10 +60,11 @@ type RunnerConfig struct {
 
 type RunnerInfo struct {
 	RunnerName       string `json:"name"`
-	MaxBatchLen      int    `json:"batch_len"`       // 每个read batch的行数
-	MaxBatchSize     int    `json:"batch_size"`      // 每个read batch的字节数
-	MaxBatchInteval  int    `json:"batch_interval"`  // 最大发送时间间隔
-	MaxBatchTryTimes int    `json:"batch_try_times"` // 最大发送次数，小于等于0代表无限重试
+	CollectInterval  string `json:"collect_interval"` // metric runner收集的频率
+	MaxBatchLen      int    `json:"batch_len"`        // 每个read batch的行数
+	MaxBatchSize     int    `json:"batch_size"`       // 每个read batch的字节数
+	MaxBatchInteval  int    `json:"batch_interval"`   // 最大发送时间间隔
+	MaxBatchTryTimes int    `json:"batch_try_times"`  // 最大发送次数，小于等于0代表无限重试
 }
 
 type LogExportRunner struct {
@@ -232,7 +233,6 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []sender.Data, times in
 			info.Success++
 		}
 		if err != nil {
-			log.Error(err)
 			time.Sleep(time.Second)
 			if times <= 0 || cnt < times {
 				cnt++

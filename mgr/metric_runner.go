@@ -1,10 +1,10 @@
 package mgr
 
 import (
+	"errors"
+	"fmt"
 	"sync/atomic"
 	"time"
-
-	"fmt"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/metric"
@@ -13,8 +13,11 @@ import (
 )
 
 const (
-	KeyCollectInteval = "collect_interval" // 最大发送时间间隔
-	KeyMetricType     = "type"
+	KeyMetricType = "type"
+)
+
+const (
+	defaultCollectInterval = "3s"
 )
 
 type MetricRunner struct {
@@ -23,20 +26,28 @@ type MetricRunner struct {
 	collectors []metric.Collector
 	senders    []sender.Sender
 
-	rs       RunnerStatus
-	lastSend time.Time
-	stopped  int32
-	exitChan chan struct{}
+	collectInterval time.Duration
+	rs              RunnerStatus
+	lastSend        time.Time
+	stopped         int32
+	exitChan        chan struct{}
 }
 
 func NewMetric(tp string) (metric.Collector, error) {
 	if c, ok := metric.Collectors[tp]; ok {
 		return c(), nil
 	}
-	return nil, fmt.Errorf("Metric %v is not support now", tp)
+	return nil, fmt.Errorf("Metric <%v> is not support now", tp)
 }
 
 func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *MetricRunner, err error) {
+	if rc.CollectInterval == "" {
+		rc.CollectInterval = defaultCollectInterval
+	}
+	interval, err := time.ParseDuration(rc.CollectInterval)
+	if err != nil {
+		return
+	}
 	collectors := make([]metric.Collector, 0)
 	for _, c := range rc.Metric {
 		tp, err := c.GetString(KeyMetricType)
@@ -45,9 +56,15 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 		}
 		c, err := NewMetric(tp)
 		if err != nil {
-			return nil, err
+			log.Errorf("%v ignore it...", err)
+			err = nil
+			continue
 		}
 		collectors = append(collectors, c)
+	}
+	if len(collectors) < 1 {
+		err = errors.New("no collectors were added")
+		return
 	}
 	senders := make([]sender.Sender, 0)
 	for _, c := range rc.SenderConfig {
@@ -58,10 +75,13 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 		senders = append(senders, s)
 	}
 	runner = &MetricRunner{
-		RunnerName: rc.RunnerName,
-		exitChan:   make(chan struct{}),
-		lastSend:   time.Now(), // 上一次发送时间
-		rs:         RunnerStatus{SenderStats: make(map[string]utils.StatsInfo)},
+		RunnerName:      rc.RunnerName,
+		exitChan:        make(chan struct{}),
+		lastSend:        time.Now(), // 上一次发送时间
+		rs:              RunnerStatus{SenderStats: make(map[string]utils.StatsInfo)},
+		collectInterval: interval,
+		collectors:      collectors,
+		senders:         senders,
 	}
 	return
 }
@@ -78,25 +98,42 @@ func (r *MetricRunner) Run() {
 			r.exitChan <- struct{}{}
 			return
 		}
-		var data sender.Data
+		datas := make([]sender.Data, 0)
 		// collect data
 		for _, c := range r.collectors {
-
+			tmpdatas, err := c.Collect()
+			if err != nil {
+				log.Errorf("collecter <%v> collect data error: %v", c.Name(), err)
+				continue
+			}
+			for i := range tmpdatas {
+				newdata := sender.Data{}
+				for k, v := range tmpdatas[i] {
+					newdata[c.Name()+"_"+k] = v
+				}
+				if len(newdata) > 0 {
+					datas = append(datas, newdata)
+				}
+			}
+			if len(tmpdatas) < 1 {
+				log.Debugf("MetricRunner %v collect No data", c.Name())
+			}
 		}
 
 		r.lastSend = time.Now()
 
-		if len(data) <= 0 {
+		if len(datas) <= 0 {
 			log.Debug("MetricRunner collect No data")
 			continue
 		}
 
 		for _, s := range r.senders {
-			if !r.trySend(s, []sender.Data{data}, 3) {
-				log.Errorf("failed to send metricData: << %v >>", data)
+			if !r.trySend(s, datas, 3) {
+				log.Errorf("failed to send metricData: << %v >>", datas)
 				break
 			}
 		}
+		time.Sleep(r.collectInterval)
 	}
 }
 

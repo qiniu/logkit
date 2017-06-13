@@ -11,6 +11,8 @@ import (
 	"github.com/qiniu/logkit/mgr"
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
+	_ "github.com/qiniu/logkit/metric/all"
+
 
 	_ "net/http/pprof"
 

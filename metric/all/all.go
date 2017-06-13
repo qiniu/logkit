@@ -1,5 +1,5 @@
 package all
 
 import (
-	_ "github.com/qiniu/logkit/metrices/system"
+	_ "github.com/qiniu/logkit/metric/system"
 )
