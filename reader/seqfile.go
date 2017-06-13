@@ -98,16 +98,15 @@ func NewSeqFile(meta *Meta, path string, ignoreHidden bool, suffixes []string, v
 		return
 	}
 	if f != nil {
-		fi, err := f.Stat()
-		if err != nil {
-			return nil, err
-		}
 		_, err = f.Seek(offset, os.SEEK_SET)
 		if err != nil {
 			f.Close()
 			return nil, err
 		}
-		sf.inode = utils.GetInode(fi)
+		sf.inode, err = utils.GetIdentifyIDByPath(currFile)
+		if err != nil {
+			return nil, err
+		}
 		sf.f = f
 		sf.offset = offset
 	} else {
@@ -264,17 +263,21 @@ func (sf *SeqFile) nextFile() (fi os.FileInfo, err error) {
 		log.Debugf("getMinFile error %v", err)
 		return nil, err
 	}
-	if sf.isNewFile(fi) {
+	if sf.isNewFile(fi, filepath.Join(sf.dir, fi.Name())) {
 		return fi, nil
 	}
 	return nil, nil
 }
 
-func (sf *SeqFile) isNewFile(newFileInfo os.FileInfo) bool {
+func (sf *SeqFile) isNewFile(newFileInfo os.FileInfo, filePath string) bool {
 	if newFileInfo == nil {
 		return false
 	}
-	newInode := utils.GetInode(newFileInfo)
+	newInode, err := utils.GetIdentifyIDByPath(filePath)
+	if err != nil {
+		log.Error(err)
+		return false
+	}
 	newName := newFileInfo.Name()
 	newFsize := newFileInfo.Size()
 	if newInode != 0 && sf.inode != 0 && newInode == sf.inode {
@@ -318,7 +321,10 @@ func (sf *SeqFile) newOpen() (err error) {
 	}
 	sf.f = f
 	sf.offset = 0
-	sf.inode = utils.GetInode(fi)
+	sf.inode, err = utils.GetIdentifyIDByPath(sf.currFile)
+	if err != nil {
+		return
+	}
 	return
 }
 
@@ -348,7 +354,10 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 		}
 		sf.f = f
 		sf.offset = 0
-		sf.inode = utils.GetInode(fi)
+		sf.inode, err = utils.GetIdentifyIDByPath(sf.currFile)
+		if err != nil {
+			return err
+		}
 		log.Infof("%s - start tail new file: %s", sf.dir, fname)
 		break
 	}

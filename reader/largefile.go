@@ -86,17 +86,21 @@ func (l *LFReader) nextFile() (fi os.FileInfo, err error) {
 	if err != nil {
 		return nil, err
 	}
-	if l.isNewFile(fi) {
+	if l.isNewFile(fi, filepath.Join(l.dir, fi.Name())) {
 		return fi, nil
 	}
 	return nil, nil
 }
 
-func (l *LFReader) isNewFile(newFileInfo os.FileInfo) bool {
+func (l *LFReader) isNewFile(newFileInfo os.FileInfo, filepath string) bool {
 	if newFileInfo == nil {
 		return false
 	}
-	newInode := utils.GetInode(newFileInfo)
+	newInode, err := utils.GetIdentifyIDByPath(filepath)
+	if err != nil {
+		log.Error(err)
+		return false
+	}
 	newName := newFileInfo.Name()
 	newFsize := newFileInfo.Size()
 	if newInode != 0 && l.inode != 0 && newInode == l.inode {
@@ -141,7 +145,10 @@ func (l *LFReader) open(fi os.FileInfo) (err error) {
 		}
 		l.f = f
 		l.offset = 0
-		l.inode = utils.GetInode(fi)
+		l.inode, err = utils.GetIdentifyIDByPath(filepath.Join(l.dir, fi.Name()))
+		if err != nil {
+			log.Error(err)
+		}
 		log.Infof("%s - start tail new file: %s", l.dir, l.fname)
 		break
 	}
@@ -197,15 +204,14 @@ func NewLFReader(path string, mode string, stopped *int32) (lfr *LFReader, err e
 			break
 		}
 	}
-	fi, err := f.Stat()
-	if err != nil {
-		return nil, err
-	}
 	offset, err := f.Seek(0, 2)
 	if err != nil {
 		return nil, err
 	}
-	inode := utils.GetInode(fi)
+	inode, err := utils.GetIdentifyIDByPath(filepath.Join(dir, fname))
+	if err != nil {
+		return nil, err
+	}
 
 	log.Infof("%s - NewLFReader with: %s, inode: %d, offset: %d", dir, fname, inode, offset)
 	lfr = &LFReader{

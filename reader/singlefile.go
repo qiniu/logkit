@@ -173,7 +173,12 @@ func (sf *SingleFile) detectMovedName(inode uint64) (name string) {
 		if fi.IsDir() || !strings.HasPrefix(fi.Name(), sf.pfi.Name()) {
 			continue
 		}
-		if utils.GetInode(fi) == inode {
+		newInode, err := utils.GetIdentifyIDByPath(filepath.Join(dir, fi.Name()))
+		if err != nil {
+			log.Error(err)
+			continue
+		}
+		if newInode == inode {
 			name = filepath.Join(dir, fi.Name())
 			return
 		}
@@ -182,12 +187,14 @@ func (sf *SingleFile) detectMovedName(inode uint64) (name string) {
 }
 
 func (sf *SingleFile) Reopen() (err error) {
-	pfi, err := sf.statFile(sf.path)
+	newInode, err := utils.GetIdentifyIDByPath(sf.path)
 	if err != nil {
 		return
 	}
-	newInode := utils.GetInode(pfi)
-	oldInode := utils.GetInode(sf.pfi)
+	oldInode, err := utils.GetIdentifyIDByFile(sf.f)
+	if err != nil {
+		return
+	}
 
 	if newInode == oldInode {
 		return

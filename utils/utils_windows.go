@@ -2,13 +2,32 @@
 package utils
 
 import (
+	"encoding/binary"
+	"fmt"
 	"os"
-
-	"github.com/qiniu/log"
+	"syscall"
 )
 
-// GetInode 获得文件inode
-func GetInode(f os.FileInfo) uint64 {
-	log.Errorf("!!Error: get inode is not supported in windows, %v", f.Name())
-	return 0
+func GetIdentifyIDByPath(path string) (uint64, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return 0, err
+	}
+	defer f.Close()
+	return GetIdentifyIDByFile(f)
+}
+
+func GetIdentifyIDByFile(f *os.File) (uint64, error) {
+	var d syscall.ByHandleFileInformation
+
+	if err := syscall.GetFileInformationByHandle(syscall.Handle(f.Fd()), &d); err != nil {
+		err = fmt.Errorf(" syscall.GetFileInformationByHandle error %v", err)
+		return 0, err
+	}
+	be := binary.BigEndian
+	be.PutUint32()
+	inode := uint64(d.FileIndexHigh)
+	inode <<= 32
+	inode += uint64(d.FileIndexLow)
+	return inode, nil
 }
