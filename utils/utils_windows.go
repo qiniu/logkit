@@ -2,7 +2,6 @@
 package utils
 
 import (
-	"encoding/binary"
 	"fmt"
 	"os"
 	"syscall"
@@ -24,8 +23,6 @@ func GetIdentifyIDByFile(f *os.File) (uint64, error) {
 		err = fmt.Errorf(" syscall.GetFileInformationByHandle error %v", err)
 		return 0, err
 	}
-	be := binary.BigEndian
-	be.PutUint32()
 	inode := uint64(d.FileIndexHigh)
 	inode <<= 32
 	inode += uint64(d.FileIndexLow)
