@@ -51,6 +51,7 @@ type RunnerLag struct {
 // RunnerConfig 从多数据源读取，经过解析后，发往多个数据目的地
 type RunnerConfig struct {
 	RunnerInfo
+	Metric        []conf.MapConf `json:"metric"`
 	ReaderConfig  conf.MapConf   `json:"reader"`
 	CleanerConfig conf.MapConf   `json:"cleaner"`
 	ParserConf    conf.MapConf   `json:"parser"`
@@ -59,10 +60,11 @@ type RunnerConfig struct {
 
 type RunnerInfo struct {
 	RunnerName       string `json:"name"`
-	MaxBatchLen      int    `json:"batch_len"`       // 每个read batch的行数
-	MaxBatchSize     int    `json:"batch_size"`      // 每个read batch的字节数
-	MaxBatchInteval  int    `json:"batch_interval"`  // 最大发送时间间隔
-	MaxBatchTryTimes int    `json:"batch_try_times"` // 最大发送次数，小于等于0代表无限重试
+	CollectInterval  string `json:"collect_interval"` // metric runner收集的频率
+	MaxBatchLen      int    `json:"batch_len"`        // 每个read batch的行数
+	MaxBatchSize     int    `json:"batch_size"`       // 每个read batch的字节数
+	MaxBatchInteval  int    `json:"batch_interval"`   // 最大发送时间间隔
+	MaxBatchTryTimes int    `json:"batch_try_times"`  // 最大发送次数，小于等于0代表无限重试
 }
 
 type LogExportRunner struct {
@@ -98,6 +100,9 @@ func NewCustomRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, ps *
 	}
 	if sr == nil {
 		sr = sender.NewSenderRegistry()
+	}
+	if rc.Metric != nil {
+		return NewMetricRunner(rc, sender.NewSenderRegistry())
 	}
 	return NewLogExportRunner(rc, cleanChan, ps, sr)
 }
@@ -228,7 +233,6 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []sender.Data, times in
 			info.Success++
 		}
 		if err != nil {
-			log.Error(err)
 			time.Sleep(time.Second)
 			if times <= 0 || cnt < times {
 				cnt++
@@ -332,7 +336,7 @@ func (r *LogExportRunner) Run() {
 		for _, s := range r.senders {
 			if !r.trySend(s, datas, r.MaxBatchTryTimes) {
 				success = false
-				log.Println(datas)
+				log.Errorf("failed to send data: << %v >>", datas)
 				break
 			}
 		}
