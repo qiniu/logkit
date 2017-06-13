@@ -96,7 +96,7 @@ func (l *LFReader) isNewFile(newFileInfo os.FileInfo) bool {
 	if newFileInfo == nil {
 		return false
 	}
-	newInode := getInode(newFileInfo)
+	newInode := utils.GetInode(newFileInfo)
 	newName := newFileInfo.Name()
 	newFsize := newFileInfo.Size()
 	if newInode != 0 && l.inode != 0 && newInode == l.inode {
@@ -141,7 +141,7 @@ func (l *LFReader) open(fi os.FileInfo) (err error) {
 		}
 		l.f = f
 		l.offset = 0
-		l.inode = getInode(fi)
+		l.inode = utils.GetInode(fi)
 		log.Infof("%s - start tail new file: %s", l.dir, l.fname)
 		break
 	}
@@ -205,7 +205,7 @@ func NewLFReader(path string, mode string, stopped *int32) (lfr *LFReader, err e
 	if err != nil {
 		return nil, err
 	}
-	inode := getInode(fi)
+	inode := utils.GetInode(fi)
 
 	log.Infof("%s - NewLFReader with: %s, inode: %d, offset: %d", dir, fname, inode, offset)
 	lfr = &LFReader{

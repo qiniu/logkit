@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"os"
 	"regexp"
-	"syscall"
 	"time"
 )
 
@@ -17,20 +16,6 @@ var ErrFileNotRegular = errors.New("file is not regular")
 var ErrFileNotDir = errors.New("file is not directory")
 
 var WaitNoSuchFile = time.Second
-
-// getInode 获得文件inode
-func getInode(f os.FileInfo) uint64 {
-	s := f.Sys()
-	if s == nil {
-		return 0
-	}
-	switch s := s.(type) {
-	case *syscall.Stat_t:
-		return s.Ino
-	default:
-		return 0
-	}
-}
 
 // getLatestFile 获得当前文件夹下最新的文件
 func getLatestFile(logdir string) (os.FileInfo, error) {

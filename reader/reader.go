@@ -131,6 +131,7 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta) (reader Reader, err
 	if err != nil && (mode == ModeFile || mode == ModeDir || mode == ModeTailx) {
 		return
 	}
+	err = nil
 	bufSize, _ := conf.GetIntOr(KeyBufSize, defaultBufSize)
 	whence, _ := conf.GetStringOr(KeyWhence, WhenceOldest)
 	decoder, _ := conf.GetStringOr(KeyEncoding, "")
