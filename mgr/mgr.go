@@ -38,7 +38,7 @@ type Manager struct {
 	cleanChan   chan cleaner.CleanSignal
 	cleanQueues map[string]*cleanQueue
 	runners     map[string]Runner
-	watchers    map[uint64]*fsnotify.Watcher // inode到watcher的映射表
+	watchers    map[string]*fsnotify.Watcher // inode到watcher的映射表
 	pregistry   *parser.ParserRegistry
 	sregistry   *sender.SenderRegistry
 }
@@ -55,7 +55,7 @@ func NewCustomManager(conf ManagerConfig, pr *parser.ParserRegistry, sr *sender.
 		cleanChan:     make(chan cleaner.CleanSignal),
 		cleanQueues:   make(map[string]*cleanQueue),
 		runners:       make(map[string]Runner),
-		watchers:      make(map[uint64]*fsnotify.Watcher),
+		watchers:      make(map[string]*fsnotify.Watcher),
 		pregistry:     pr,
 		sregistry:     sr,
 	}
@@ -221,7 +221,7 @@ func (m *Manager) isRunning(confPath string) bool {
 // 重命名会触发 rename和create事件
 // 删除会触发 delete事件
 // 修改会触发 delete事件、create事件、modify事件以及modify|ATTRIB事件
-func (m *Manager) handle(inode uint64, path string, watcher *fsnotify.Watcher) {
+func (m *Manager) handle(path string, watcher *fsnotify.Watcher) {
 	for {
 		select {
 		case ev, ok := <-watcher.Event:
@@ -234,9 +234,9 @@ func (m *Manager) handle(inode uint64, path string, watcher *fsnotify.Watcher) {
 				_, err := os.Stat(path)
 				if os.IsNotExist(err) {
 					// 如果当前监听文件被删除，则不再监听，退出
-					log.Warnf("close file watcher path %v inode %v", path, inode)
+					log.Warnf("close file watcher path %v", path)
 					watcher.Close()
-					delete(m.watchers, inode)
+					delete(m.watchers, path)
 					return
 				}
 				m.Remove(ev.Name)
@@ -318,12 +318,7 @@ func (m *Manager) addWatchers(confsPath []string) (err error) {
 			continue
 		}
 		for _, path := range paths {
-			inode, err := utils.GetIdentifyIDByPath(path)
-			if err != nil {
-				log.Errorf("GetIdentifyID(%v) error %v", path, err)
-				continue
-			}
-			_, exist := m.watchers[inode]
+			_, exist := m.watchers[path]
 			if exist {
 				// 如果文件已经被监听，则不再重复监听
 				continue
@@ -346,8 +341,8 @@ func (m *Manager) addWatchers(confsPath []string) (err error) {
 				log.Errorf("fsnotify.NewWatcher: %v", err)
 				continue
 			}
-			m.watchers[inode] = watcher
-			go m.handle(inode, path, watcher)
+			m.watchers[path] = watcher
+			go m.handle(path, watcher)
 			if err = watcher.Watch(path); err != nil {
 				log.Errorf("watch %v error %v", path, err)
 			}
