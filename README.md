@@ -22,6 +22,9 @@ logkit本身支持多种数据源，并且可以同时发送多个数据源的�
 
 ![logkit 工作原理图](https://qiniu.github.io/pandora-docs/_media/logkit.png)
 
+## 下载
+
+请移步至[Download页面](https://github.com/qiniu/logkit/wiki/Download)
 
 ## 安装与使用
 
@@ -39,6 +42,10 @@ wget http://op26gaeek.bkt.clouddn.com/logkit.tar.gz && tar xvf logkit.tar.gz && 
 ```
 wget http://op26gaeek.bkt.clouddn.com/logkit_mac.tar.gz && tar xvf logkit_mac.tar.gz && cd _package_mac/
 ```
+
+**Windows 版本**
+
+请下载 http://op26gaeek.bkt.clouddn.com/logkit_windows.zip 并解压缩，进入目录
 
 2. 修改runner的配置
 
