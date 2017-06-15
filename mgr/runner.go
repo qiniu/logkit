@@ -263,7 +263,8 @@ func (r *LogExportRunner) Run() {
 		for !r.batchFullOrTimeout() {
 			line, err := r.reader.ReadLine()
 			if err != nil && err != io.EOF {
-				log.Warnf("runner %s, reader %s - error: %v", r.Name(), r.reader.Name(), err)
+				log.Errorf("runner %s, reader %s - error: %v, sleep 1 second...", r.Name(), r.reader.Name(), err)
+				time.Sleep(time.Second)
 				break
 			}
 			if len(line) <= 0 {

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/rateio"
 	"github.com/qiniu/logkit/utils"
 )
 
@@ -30,6 +31,7 @@ type SeqFile struct {
 	dir              string   // 文件目录
 	currFile         string   // 当前处理文件名
 	f                *os.File // 当前处理文件
+	ratereader       io.ReadCloser
 	inode            uint64   // 当前文件inode
 	offset           int64    // 当前处理文件offset
 	ignoreHidden     bool     // 忽略隐藏文件
@@ -108,6 +110,7 @@ func NewSeqFile(meta *Meta, path string, ignoreHidden bool, suffixes []string, v
 			return nil, err
 		}
 		sf.f = f
+		sf.ratereader = rateio.NewRateReader(f, meta.readlimit)
 		sf.offset = offset
 	} else {
 		sf.inode = 0
@@ -179,6 +182,9 @@ func (sf *SeqFile) Source() string {
 
 func (sf *SeqFile) Close() (err error) {
 	atomic.AddInt32(&sf.stopped, 1)
+	if sf.ratereader != nil {
+		sf.ratereader.Close()
+	}
 	if sf.f == nil {
 		return
 	}
@@ -201,7 +207,7 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 				continue
 			}
 		}
-		n1, err = sf.f.Read(p[n:])
+		n1, err = sf.ratereader.Read(p[n:])
 		sf.offset += int64(n1)
 		n += n1
 		if err != nil {
@@ -319,6 +325,10 @@ func (sf *SeqFile) newOpen() (err error) {
 	if err != nil {
 		return fmt.Errorf("os.Open %s: %v", fname, err)
 	}
+	if sf.ratereader != nil {
+		sf.ratereader.Close()
+	}
+	sf.ratereader = rateio.NewRateReader(f, sf.meta.readlimit)
 	sf.f = f
 	sf.offset = 0
 	sf.inode, err = utils.GetIdentifyIDByPath(sf.currFile)
@@ -353,6 +363,11 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 			return err
 		}
 		sf.f = f
+		//开新的之前关掉老的
+		if sf.ratereader != nil {
+			sf.ratereader.Close()
+		}
+		sf.ratereader = rateio.NewRateReader(f, sf.meta.readlimit)
 		sf.offset = 0
 		sf.inode, err = utils.GetIdentifyIDByPath(sf.currFile)
 		if err != nil {

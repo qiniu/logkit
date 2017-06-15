@@ -55,6 +55,7 @@ func NewActiveReader(logPath, whence string, meta *Meta) (ar *ActiveReader, err 
 	if err != nil {
 		return nil, err
 	}
+	subMeta.readlimit = meta.readlimit
 	fr, err := NewSingleFile(subMeta, logPath, whence)
 	if err != nil {
 		return
