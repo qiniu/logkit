@@ -1,7 +1,6 @@
 package sender
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -16,7 +15,6 @@ import (
 	"github.com/qiniu/logkit/utils"
 
 	pipelinebase "github.com/qiniu/pandora-go-sdk/base"
-	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 
 	gouuid "github.com/satori/go.uuid"
@@ -156,69 +154,6 @@ func createPandoraRepo(autoCreateSchema, repoName, region string, client pipelin
 	})
 }
 
-func (s *PandoraSender) addPandoraRepoSchemas(addSchemas map[string]string) (err error) {
-	repo, err := s.client.GetRepo(&pipeline.GetRepoInput{
-		RepoName: s.repoName,
-	})
-	var schemas []pipeline.RepoSchemaEntry
-	var createInsteadOfUpdate bool
-	if err != nil {
-		reqErr, ok := err.(*reqerr.RequestError)
-		if !ok {
-			return
-		}
-		switch reqErr.ErrorType {
-		case reqerr.NoSuchRepoError:
-			createInsteadOfUpdate = true
-			schemas = make([]pipeline.RepoSchemaEntry, 0)
-		default:
-			return
-		}
-	} else {
-		schemas = repo.Schema
-	}
-
-	for k, v := range addSchemas {
-		aliasKey, ok := s.UserSchema.Fields[k]
-		if !ok {
-			aliasKey = k
-		}
-		schemas = append(schemas, pipeline.RepoSchemaEntry{
-			Key:       aliasKey,
-			ValueType: v,
-		})
-	}
-	if createInsteadOfUpdate {
-		err = s.client.CreateRepo(&pipeline.CreateRepoInput{
-			RepoName: s.repoName,
-			Region:   s.region,
-			Schema:   schemas,
-		})
-	} else {
-		err = s.client.UpdateRepo(&pipeline.UpdateRepoInput{
-			RepoName: s.repoName,
-			Schema:   schemas,
-		})
-	}
-	if err != nil {
-		reqErr, ok := err.(*reqerr.RequestError)
-		if !ok {
-			return
-		}
-		if reqErr.ErrorType != reqerr.RepoAlreadyExistsError {
-			return
-		}
-	}
-	err = nil
-	mpschemas := make(map[string]pipeline.RepoSchemaEntry)
-	for _, sc := range schemas {
-		mpschemas[sc.Key] = sc
-	}
-
-	s.updateSchemas(mpschemas)
-	return
-}
-
 func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 	logger := pipelinebase.NewDefaultLogger()
 	config := pipeline.NewConfig().
@@ -302,17 +237,10 @@ func parseUserSchema(repoName, schema string) (us UserSchema) {
 }
 
 func (s *PandoraSender) UpdateSchemas() {
-	repo, err := s.client.GetRepo(&pipeline.GetRepoInput{
-		RepoName: s.repoName,
-	})
-
+	schemas, err := s.client.GetUpdateSchemas(s.repoName)
 	if err != nil {
 		log.Errorf("sender <%v> update pandora repo <%v> schema error %v", s.name, s.repoName, err)
 		return
-	}
-	schemas := make(map[string]pipeline.RepoSchemaEntry)
-	for _, sc := range repo.Schema {
-		schemas[sc.Key] = sc
 	}
 	s.updateMux.Lock()
 	defer s.updateMux.Unlock()
@@ -331,7 +259,6 @@ func (s *PandoraSender) updateSchemas(schemas map[string]pipeline.RepoSchemaEntr
 	s.schemas = schemas
 	s.alias2key = alias2Key
 	s.schemasMux.Unlock()
-
 	return
 }
 
@@ -360,22 +287,6 @@ const (
 	PandoraTypeArray  = "array"
 	PandoraTypeMap    = "map"
 )
-
-func getDefault(t pipeline.RepoSchemaEntry) (result interface{}) {
-	switch t.ValueType {
-	case PandoraTypeLong:
-		result = 0
-	case PandoraTypeFloat:
-		result = 0.0
-	case PandoraTypeString:
-		result = ""
-	case PandoraTypeDate:
-		result = time.Now().Format(time.RFC3339Nano)
-	case PandoraTypeBool:
-		result = false
-	}
-	return
-}
 
 //临时方案，转换时间，目前sender这边拿到的都是string，很难确定是什么格式的string
 func convertDate(v interface{}) (interface{}, error) {
@@ -447,8 +358,8 @@ func (s *PandoraSender) getSchemasAlias() (map[string]pipeline.RepoSchemaEntry, 
 	return s.schemas, s.alias2key
 }
 
-func (s *PandoraSender) generatePoint(data Data) (point pipeline.Point) {
-	point = pipeline.Point{}
+func (s *PandoraSender) generatePoint(data Data) (point Data) {
+	point = Data{}
 	schemas, alias2key := s.getSchemasAlias()
 	for k, v := range schemas {
 		name, ok := alias2key[k]
@@ -459,7 +370,7 @@ func (s *PandoraSender) generatePoint(data Data) (point pipeline.Point) {
 		if !ok {
 			//不存在，但是必填，需要加上默认值
 			if v.Required {
-				value = getDefault(v)
+				value = s.client.GetDefault(v)
 			} else {
 				continue
 			}
@@ -481,75 +392,23 @@ func (s *PandoraSender) generatePoint(data Data) (point pipeline.Point) {
 			log.Errorf("%v not match type %v, from data < %v >, ignored this field", value, v.ValueType, data)
 			continue
 		}
-
-		point.Fields = append(point.Fields, pipeline.PointField{
-			Key:   k,
-			Value: value,
-		})
+		point[k] = value
 	}
 	if s.uuid {
-		uuid := gouuid.NewV4()
-		point.Fields = append(point.Fields, pipeline.PointField{
-			Key:   PandoraUUID,
-			Value: uuid.String(),
-		})
+		point[PandoraUUID] = gouuid.NewV4().String()
 	}
 	/*
 		data中剩余的值，但是在schema中不存在的，根据defaultAll和schemaFree判断是否增加。
 	*/
 	if s.schemaFree && len(data) > 0 {
-		//defaultAll 为false，时，过滤一批不要的
-		if !s.UserSchema.DefaultAll {
-			for k := range data {
-				if _, ok := s.UserSchema.Fields[k]; !ok {
-					delete(data, k)
-				}
-			}
-		}
-		valueType := getPandoraKeyValueType(data)
-		if err := s.addPandoraRepoSchemas(valueType); err != nil {
-			log.Errorf("updatePandora Repo error %v", err)
-		}
 		for k, v := range data {
 			name, ok := s.UserSchema.Fields[k]
 			if !ok {
 				name = k
 			}
-			point.Fields = append(point.Fields, pipeline.PointField{
-				Key:   name,
-				Value: v,
-			})
-		}
-	}
-	return
-}
-
-func getPandoraKeyValueType(data Data) (valueType map[string]string) {
-	valueType = make(map[string]string)
-	for k, v := range data {
-		switch nv := v.(type) {
-		case int, int8, int16, int32, int64:
-			valueType[k] = PandoraTypeLong
-		case float32, float64:
-			valueType[k] = PandoraTypeFloat
-		case bool:
-			valueType[k] = PandoraTypeBool
-		case json.Number:
-			_, err := nv.Int64()
-			if err == nil {
-				valueType[k] = PandoraTypeLong
-			} else {
-				valueType[k] = PandoraTypeFloat
+			if s.UserSchema.DefaultAll || ok {
+				point[name] = v
 			}
-		case string:
-			_, err := time.Parse(time.RFC3339, nv)
-			if err == nil {
-				valueType[k] = PandoraTypeDate
-			} else {
-				valueType[k] = PandoraTypeString
-			}
-		default:
-			valueType[k] = PandoraTypeString
 		}
 	}
 	return
@@ -568,76 +427,20 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 		se = NewSendError("Get pandora schema error, faild to send data", datas, TypeDefault)
 		return
 	}
-	var lastErr error
-	contexts := s.unpack(datas)
-	var failDatas = []Data{}
-	errType := TypeDefault
-	for _, pContext := range contexts {
-		err := s.client.PostDataFromBytes(pContext.inputs)
-		if err != nil {
-			reqErr, ok := err.(*reqerr.RequestError)
-			if ok {
-				switch reqErr.ErrorType {
-				case reqerr.InvalidDataSchemaError, reqerr.EntityTooLargeError:
-					errType = TypeBinaryUnpack
-				}
-			}
-			failDatas = append(failDatas, pContext.datas...)
-			lastErr = err
-		}
-	}
-	if len(failDatas) > 0 {
-		se = NewSendError("Cannot send data to pandora, "+lastErr.Error(), failDatas, errType)
-	}
-	return
-}
-
-type pointContext struct {
-	datas  []Data
-	inputs *pipeline.PostDataFromBytesInput
-}
-
-func (s *PandoraSender) unpack(datas []Data) (packages []pointContext) {
-	packages = []pointContext{}
-	var buf bytes.Buffer
-	var start = 0
-	for i, d := range datas {
+	var points pipeline.Datas
+	for _, d := range datas {
 		point := s.generatePoint(d)
-		pointString := pointToString(point)
-		// 当buf中有数据，并且加入该条数据后就超过了最大的限制，则提交这个input
-		if start < i && buf.Len() > 0 && buf.Len()+len(pointString) >= PandoraMaxBatchSize {
-			packages = append(packages, pointContext{
-				datas: datas[start:i],
-				inputs: &pipeline.PostDataFromBytesInput{
-					RepoName: s.repoName,
-					Buffer:   buf.Bytes(),
-				},
-			})
-			buf.Reset()
-			start = i
-		}
-		buf.WriteString(pointString)
+		points = append(points, pipeline.Data(map[string]interface{}(point)))
 	}
-	packages = append(packages, pointContext{
-		datas: datas[start:],
-		inputs: &pipeline.PostDataFromBytesInput{
-			RepoName: s.repoName,
-			Buffer:   buf.Bytes(),
-		},
+	schemas, se := s.client.PostDataSchemaFree(&pipeline.SchemaFreeInput{
+		RepoName: s.repoName,
+		NoUpdate: !s.schemaFree,
+		Datas:    points,
 	})
+	if schemas != nil {
+		s.updateSchemas(schemas)
+	}
 	return
-}
-
-func pointToString(point pipeline.Point) (bs string) {
-	var buf bytes.Buffer
-	for _, field := range point.Fields {
-		buf.WriteString(field.String())
-	}
-	if len(point.Fields) > 0 {
-		buf.Truncate(buf.Len() - 1)
-	}
-	buf.WriteByte('\n')
-	return buf.String()
 }
 
 func (s *PandoraSender) Name() string {
