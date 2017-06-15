@@ -39,6 +39,7 @@ const (
 	KeyBufSize       = "reader_buf_size"
 	KeyWhence        = "read_from"
 	KeyEncoding      = "encoding"
+	KeyReadIOLimit   = "readio_limit"
 	KeyDataSourceTag = "datasource_tag"
 	KeyHeadPattern   = "head_pattern"
 

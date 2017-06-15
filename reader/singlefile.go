@@ -10,17 +10,19 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/qiniu/logkit/rateio"
 	"github.com/qiniu/logkit/utils"
 
 	"github.com/qiniu/log"
 )
 
 type SingleFile struct {
-	path    string      // 处理文件路径
-	pfi     os.FileInfo // path 的文件信息
-	f       *os.File    // 当前处理文件
-	offset  int64       // 当前处理文件offset
-	stopped int32
+	path       string      // 处理文件路径
+	pfi        os.FileInfo // path 的文件信息
+	f          *os.File    // 当前处理文件
+	ratereader io.ReadCloser
+	offset     int64 // 当前处理文件offset
+	stopped    int32
 
 	lastSyncPath   string
 	lastSyncOffset int64
@@ -69,10 +71,11 @@ func NewSingleFile(meta *Meta, path, whence string) (sf *SingleFile, err error) 
 	}
 
 	sf = &SingleFile{
-		meta: meta,
-		path: path,
-		pfi:  pfi,
-		f:    f,
+		meta:       meta,
+		path:       path,
+		pfi:        pfi,
+		f:          f,
+		ratereader: rateio.NewRateReader(f, meta.readlimit),
 	}
 
 	// 如果meta初始信息损坏
@@ -158,6 +161,9 @@ func (sf *SingleFile) Source() string {
 
 func (sf *SingleFile) Close() (err error) {
 	atomic.AddInt32(&sf.stopped, 1)
+	if sf.ratereader != nil {
+		sf.ratereader.Close()
+	}
 	return sf.f.Close()
 }
 
@@ -214,6 +220,10 @@ func (sf *SingleFile) Reopen() (err error) {
 	}
 	sf.pfi = pfi
 	sf.f = f
+	if sf.ratereader != nil {
+		sf.ratereader.Close()
+	}
+	sf.ratereader = rateio.NewRateReader(f, sf.meta.readlimit)
 	sf.offset = 0
 	return
 }
@@ -222,7 +232,7 @@ func (sf *SingleFile) Read(p []byte) (n int, err error) {
 	if atomic.LoadInt32(&sf.stopped) > 0 {
 		return 0, errors.New("reader " + sf.Name() + " has been exited")
 	}
-	n, err = sf.f.Read(p)
+	n, err = sf.ratereader.Read(p)
 	sf.offset += int64(n)
 	if err == io.EOF {
 		//读到了，如果n大于0，先把EOF抹去，返回
@@ -234,7 +244,7 @@ func (sf *SingleFile) Read(p []byte) (n int, err error) {
 		if err != nil {
 			return
 		}
-		n, err = sf.f.Read(p)
+		n, err = sf.ratereader.Read(p)
 		sf.offset += int64(n)
 		return
 	}

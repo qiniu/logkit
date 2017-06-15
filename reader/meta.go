@@ -27,11 +27,14 @@ const (
 	doneFileRetention = "donefile_retention"
 )
 
-const defaultDirPerm = 0755
-const defaultFilePerm = 0600
-const defautFileRetention = 7
-const metaFormat = "%s\t%d\n"
-const bufMetaFormat = "read:%d\nwrite:%d\nbufsize:%d\n"
+const (
+	defaultDirPerm      = 0755
+	defaultFilePerm     = 0600
+	defautFileRetention = 7
+	metaFormat          = "%s\t%d\n"
+	bufMetaFormat       = "read:%d\nwrite:%d\nbufsize:%d\n"
+	defaultIOLimit      = 20 //默认读取速度为20MB/s
+)
 
 type Meta struct {
 	mode              string //reader mode
@@ -45,6 +48,7 @@ type Meta struct {
 	encodingWay       string //文件编码格式，默认为utf-8
 	logpath           string
 	dataSourceTag     string //记录文件路径的标签名称
+	readlimit         int    //读取磁盘限速单位 MB/s
 }
 
 func getValidDir(dir string) (realPath string, err error) {
@@ -88,6 +92,7 @@ func NewMeta(metadir, filedonedir, logpath, mode string, donefileRetention int) 
 		donefileretention: donefileRetention,
 		logpath:           logpath,
 		mode:              mode,
+		readlimit:         defaultIOLimit * 1024 * 1024,
 	}, nil
 }
 
@@ -123,12 +128,14 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 	datasourceTag, _ := conf.GetStringOr(KeyDataSourceTag, "")
 	filedonepath, _ := conf.GetStringOr(KeyFileDone, metapath)
 	donefileRetention, _ := conf.GetIntOr(doneFileRetention, defautFileRetention)
+	readlimit, _ := conf.GetIntOr(KeyReadIOLimit, defaultIOLimit)
 	meta, err = NewMeta(metapath, filedonepath, logPath, mode, donefileRetention)
 	if err != nil {
 		log.Warnf("%s - newMeta failed, err:%v", metapath, err)
 		return
 	}
 	meta.dataSourceTag = datasourceTag
+	meta.readlimit = readlimit * 1024 * 1024 //readlimit*MB
 	return
 }
 
