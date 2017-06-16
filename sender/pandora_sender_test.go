@@ -319,16 +319,17 @@ func TestPandoraSender(t *testing.T) {
 	d["ac"] = 0
 	d["d"] = 1477373632504888
 	d["ax"] = "b"
+	s.updateInterval = 0
 	err = s.Send([]Data{d})
 	if err != nil {
 		t.Error(err)
 	}
+
 	timeVal = int64(1477373632504888)
 	timeexp = time.Unix(0, timeVal*int64(time.Microsecond)).Format(time.RFC3339Nano)
 	exp = "a1=1.1 ab=a ac=0 ax=b d=" + timeexp
-	if pandora.Body != exp {
-		t.Errorf("send data error exp %v but %v", exp, pandora.Body)
-	}
+	assert.Equal(t, exp, pandora.Body)
+
 }
 
 func TestNestPandoraSender(t *testing.T) {
@@ -390,6 +391,7 @@ func TestUUIDPandoraSender(t *testing.T) {
 		flowRateLimit:  0,
 		gzip:           false,
 		uuid:           true,
+		schemaFree:     true,
 	}
 	s, err := newPandoraSender(opt)
 	if err != nil {
@@ -479,59 +481,6 @@ func TestSuppurtedTimeFormat(t *testing.T) {
 			t.Errorf("TestSuppurtedTimeFormat error exp %v but got %v", ti.exp, got)
 		}
 	}
-}
-
-func TestUnpack(t *testing.T) {
-	s := &PandoraSender{
-		repoName:  "test",
-		schemas:   map[string]pipeline.RepoSchemaEntry{},
-		alias2key: map[string]string{},
-	}
-	s.schemas["abcd"] = pipeline.RepoSchemaEntry{
-		Key:       "abcd",
-		ValueType: "string",
-	}
-	s.alias2key["abcd"] = "abcd"
-	d := Data{}
-	// 一个点有10个byte: "abcd=efgh\n"
-	d["abcd"] = "efgh"
-
-	// 在最坏的情况下（每条数据都超过最大限制），则要求每个point都只包含一条数据
-	PandoraMaxBatchSize = 0
-	datas := []Data{}
-	for i := 0; i < 3; i++ {
-		datas = append(datas, d)
-	}
-	contexts := s.unpack(datas)
-	assert.Equal(t, len(contexts), 3)
-	for _, c := range contexts {
-		assert.Equal(t, len(c.inputs.Buffer), 10)
-	}
-
-	// Pandora的2MB限制
-	PandoraMaxBatchSize = 2 * 1024 * 1024
-	datas = []Data{}
-	for i := 0; i < 2*1024*102; i++ {
-		datas = append(datas, d)
-	}
-	contexts = s.unpack(datas)
-	assert.Equal(t, len(contexts), 1)
-	assert.Equal(t, len(contexts[0].inputs.Buffer), 2*1024*1020)
-
-	// Pandora的2MB限制
-	PandoraMaxBatchSize = 2 * 1024 * 1024
-	datas = []Data{}
-	for i := 0; i < 2*1024*103; i++ {
-		datas = append(datas, d)
-	}
-	contexts = s.unpack(datas)
-	assert.Equal(t, len(contexts), 2)
-	assert.Equal(t, len(contexts[0].datas), 2*1024*1024/10)
-	assert.Equal(t, len(contexts[1].datas), 2*1024*103-2*1024*1024/10)
-	// 第一个包是最大限制以内的最大整十数
-	assert.Equal(t, len(contexts[0].inputs.Buffer), 2*1024*1024/10*10)
-	// 第二个包是总bytes 减去第一个包的数量
-	assert.Equal(t, len(contexts[1].inputs.Buffer), 2*1024*103*10-2*1024*1024/10*10)
 }
 
 func TestValidSchema(t *testing.T) {
@@ -637,39 +586,6 @@ func TestParseUserSchema(t *testing.T) {
 			t.Errorf("TestParseUserSchema error exp %v but got %v", ti.exp, us)
 		}
 	}
-}
-
-func TestGetPandoraKeyValueType(t *testing.T) {
-	var data map[string]interface{}
-	dc := json.NewDecoder(strings.NewReader("{\"a\":123,\"b\":123.1,\"c\":\"123\"}"))
-	dc.UseNumber()
-	err := dc.Decode(&data)
-	exp := map[string]string{
-		"a": PandoraTypeLong,
-		"b": PandoraTypeFloat,
-		"c": PandoraTypeString,
-	}
-	assert.NoError(t, err)
-	vt := getPandoraKeyValueType(data)
-	assert.Equal(t, exp, vt)
-	data = map[string]interface{}{
-		"a": 1,
-		"b": time.Now().Format(time.RFC3339Nano),
-		"c": time.Now().Format(time.RFC3339),
-		"d": 1.0,
-		"e": int64(32),
-		"f": "123",
-	}
-	exp = map[string]string{
-		"a": PandoraTypeLong,
-		"b": PandoraTypeDate,
-		"c": PandoraTypeDate,
-		"d": PandoraTypeFloat,
-		"e": PandoraTypeLong,
-		"f": PandoraTypeString,
-	}
-	vt = getPandoraKeyValueType(data)
-	assert.Equal(t, exp, vt)
 }
 
 func TestUpdatePandoraSchema(t *testing.T) {
