@@ -364,6 +364,7 @@ func (s *PandoraSender) generatePoint(data Data) (point Data) {
 	for k, v := range schemas {
 		name, ok := alias2key[k]
 		if !s.UserSchema.DefaultAll && !ok {
+			delete(data, name)
 			continue // 表示这个值未被选中
 		}
 		value, ok := data[name]
@@ -375,10 +376,7 @@ func (s *PandoraSender) generatePoint(data Data) (point Data) {
 				continue
 			}
 		}
-		//对于没有autoupdate的情况就不delete了，节省CPU
-		if s.schemaFree {
-			delete(data, name)
-		}
+		delete(data, name)
 		if v.ValueType == PandoraTypeDate {
 			formatTime, err := convertDate(value)
 			if err != nil {
@@ -400,15 +398,13 @@ func (s *PandoraSender) generatePoint(data Data) (point Data) {
 	/*
 		data中剩余的值，但是在schema中不存在的，根据defaultAll和schemaFree判断是否增加。
 	*/
-	if s.schemaFree && len(data) > 0 {
-		for k, v := range data {
-			name, ok := s.UserSchema.Fields[k]
-			if !ok {
-				name = k
-			}
-			if s.UserSchema.DefaultAll || ok {
-				point[name] = v
-			}
+	for k, v := range data {
+		name, ok := s.UserSchema.Fields[k]
+		if !ok {
+			name = k
+		}
+		if s.UserSchema.DefaultAll || ok {
+			point[name] = v
 		}
 	}
 	return

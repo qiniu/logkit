@@ -91,38 +91,38 @@
 		{
 			"checksumSHA1": "BV7Dv4SQ2mhpGqlmuDo0Evit410=",
 			"path": "github.com/qiniu/pandora-go-sdk/base",
-			"revision": "7aa3e0a1d2aba5e430fd4262b8a32057e0f5c3ae",
-			"revisionTime": "2017-06-16T10:44:37Z"
+			"revision": "48e9f45d86df0034a71bf63ea434071e3d7c9dc5",
+			"revisionTime": "2017-06-17T13:21:06Z"
 		},
 		{
 			"checksumSHA1": "2eR9tUVg71UUdjjfO9ntJF1bp/c=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/config",
-			"revision": "7aa3e0a1d2aba5e430fd4262b8a32057e0f5c3ae",
-			"revisionTime": "2017-06-16T10:44:37Z"
+			"revision": "48e9f45d86df0034a71bf63ea434071e3d7c9dc5",
+			"revisionTime": "2017-06-17T13:21:06Z"
 		},
 		{
 			"checksumSHA1": "gmWdZ+75y1U5KEL6uW9RI/xRUTU=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/ratelimit",
-			"revision": "7aa3e0a1d2aba5e430fd4262b8a32057e0f5c3ae",
-			"revisionTime": "2017-06-16T10:44:37Z"
+			"revision": "48e9f45d86df0034a71bf63ea434071e3d7c9dc5",
+			"revisionTime": "2017-06-17T13:21:06Z"
 		},
 		{
-			"checksumSHA1": "lM3JaDH+V3YiPSS+dyo6PwIRNBA=",
+			"checksumSHA1": "80AUzmIfkt58GfDMSAjChnHDkb0=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/reqerr",
-			"revision": "7aa3e0a1d2aba5e430fd4262b8a32057e0f5c3ae",
-			"revisionTime": "2017-06-16T10:44:37Z"
+			"revision": "48e9f45d86df0034a71bf63ea434071e3d7c9dc5",
+			"revisionTime": "2017-06-17T13:21:06Z"
 		},
 		{
 			"checksumSHA1": "WBDapF35xL+xobLwW0LOwhCQcbs=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/request",
-			"revision": "7aa3e0a1d2aba5e430fd4262b8a32057e0f5c3ae",
-			"revisionTime": "2017-06-16T10:44:37Z"
+			"revision": "48e9f45d86df0034a71bf63ea434071e3d7c9dc5",
+			"revisionTime": "2017-06-17T13:21:06Z"
 		},
 		{
-			"checksumSHA1": "pxnZv/dX2zk5oEH+KNj1IXX134U=",
+			"checksumSHA1": "Ixy9UYeE/6Q+hd3XwtwoApH/ZAY=",
 			"path": "github.com/qiniu/pandora-go-sdk/pipeline",
-			"revision": "7aa3e0a1d2aba5e430fd4262b8a32057e0f5c3ae",
-			"revisionTime": "2017-06-16T10:44:37Z"
+			"revision": "48e9f45d86df0034a71bf63ea434071e3d7c9dc5",
+			"revisionTime": "2017-06-17T13:21:06Z"
 		},
 		{
 			"checksumSHA1": "KAzbLjI9MzW2tjfcAsK75lVRp6I=",
