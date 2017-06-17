@@ -10,6 +10,7 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/queue"
 	"github.com/qiniu/logkit/utils"
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 )
 
 const (
@@ -189,6 +190,14 @@ func (ft *FtSender) trySendBytes(dat []byte, failSleep int) (err error) {
 	return ft.trySendDatas(datas, failSleep)
 }
 
+func convertDatas(ins []map[string]interface{}) []Data {
+	var datas []Data
+	for _, v := range ins {
+		datas = append(datas, Data(v))
+	}
+	return datas
+}
+
 // trySendDatas 尝试发送数据，如果失败，将失败数据加入backup queue，并睡眠指定时间。返回结果为是否正常发送
 func (ft *FtSender) trySendDatas(datas []Data, failSleep int) (err error) {
 	err = ft.innerSender.Send(datas)
@@ -199,14 +208,14 @@ func (ft *FtSender) trySendDatas(datas []Data, failSleep int) (err error) {
 		log.Errorf("%s cannot write points + %v", ft.innerSender.Name(), err)
 		failCtx := new(datasContext)
 		var binaryUnpack bool
-		se, succ := err.(*SendError)
+		se, succ := err.(*reqerr.SendError)
 		if !succ {
 			// 如果不是SendError 默认所有的数据都发送失败
 			log.Infof("error type is not *SendError! reSend all datas by default")
 			failCtx.Datas = datas
 		} else {
-			failCtx.Datas = se.failDatas
-			if se.ErrorType == TypeBinaryUnpack {
+			failCtx.Datas = convertDatas(se.GetFailDatas())
+			if se.ErrorType == reqerr.TypeBinaryUnpack {
 				binaryUnpack = true
 			}
 		}
