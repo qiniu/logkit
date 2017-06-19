@@ -196,14 +196,14 @@ func (m *Manager) Add(confPath string) {
 			return
 		}
 		m.addCleanQueue(runner.Cleaner())
-		log.Infof("%s added: %#v", conf.RunnerName, confPath)
+		log.Infof("Runner[%v] added: %#v", conf.RunnerName, confPath)
 		go runner.Run()
 		m.runners[confPath] = runner
-		log.Infof("new runner %s is added, total %d", conf.RunnerName, len(m.runners))
+		log.Infof("new Runner[%v] is added, total %d", conf.RunnerName, len(m.runners))
 		return
 	}
 
-	log.Infof("Start to try add: %#v", conf.RunnerName)
+	log.Infof("Start to try add: %v", conf.RunnerName)
 	go forkRunner(confPath)
 
 	return

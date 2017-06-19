@@ -46,12 +46,13 @@ func NewMongoReader(meta *Meta, readBatch int, host, database, collection, offse
 
 	keyOrObj, offset, err := meta.ReadOffset()
 	if err != nil {
-		log.Errorf("%v -meta data is corrupted err:%v, omit meta data", meta.MetaFile(), err)
+		log.Errorf("Runner[%v] %v -meta data is corrupted err: %v, omit meta data...", meta.RunnerName, meta.MetaFile(), err)
 	}
 	if keyOrObj != offsetkey {
 		offset = 0
 	}
 	if certfile != "" {
+		log.Warnf("Runner[%v] MongoDB reader does not support certfile Now", meta.RunnerName)
 		//TODO mongo鉴权暂时不支持
 	}
 	mr = &MongoReader{
@@ -91,7 +92,7 @@ func NewMongoReader(meta *Meta, readBatch int, host, database, collection, offse
 		if err != nil {
 			return
 		}
-		log.Infof("%v Cron added with schedule <%v>", mr.Name(), cronSched)
+		log.Infof("Runner[%v] %v Cron added with schedule <%v>", mr.meta.RunnerName, mr.Name(), cronSched)
 	}
 
 	return mr, nil
@@ -111,7 +112,7 @@ func (mr *MongoReader) Close() (err error) {
 		mr.session.Close()
 	}
 	if atomic.CompareAndSwapInt32(&mr.status, StatusRunning, StatusStoping) {
-		log.Infof("%v stopping", mr.Name())
+		log.Infof("Runner[%v] %v stopping", mr.meta.RunnerName, mr.Name())
 	} else {
 		close(mr.readChan)
 	}
@@ -130,7 +131,7 @@ func (mr *MongoReader) Start() {
 		mr.Cron.Start()
 	}
 	mr.started = true
-	log.Printf("%v pull data deamon started", mr.Name())
+	log.Infof("Runner[%v] %v pull data daemon started", mr.meta.RunnerName, mr.Name())
 }
 
 func (mr *MongoReader) ReadLine() (data string, err error) {
@@ -162,18 +163,18 @@ func (mr *MongoReader) run() {
 		if atomic.CompareAndSwapInt32(&mr.status, StatusStoping, StatusStopped) {
 			close(mr.readChan)
 		}
-		log.Infof("%v successfully finnished", mr.Name())
+		log.Infof("Runner[%v] %v successfully finished", mr.meta.RunnerName, mr.Name())
 	}()
 
 	// 开始work逻辑
 	for {
 		if atomic.LoadInt32(&mr.status) == StatusStoping {
-			log.Warnf("%v stopped from running", mr.Name())
+			log.Warnf("Runner[%v] %v stopped from running", mr.meta.RunnerName, mr.Name())
 			return
 		}
 		err := mr.exec()
 		if err == nil {
-			log.Infof("%v successfully exec", mr.Name())
+			log.Infof("Runner[%v] %v successfully exec", mr.meta.RunnerName, mr.Name())
 			return
 		}
 		log.Error(err)
@@ -216,7 +217,7 @@ func (mr *MongoReader) exec() (err error) {
 	var result bson.M
 	for iter.Next(&result) {
 		if atomic.LoadInt32(&mr.status) == StatusStoping {
-			log.Warnf("%v stopped from running", mr.Name())
+			log.Warnf("Runner[%v] %v stopped from running", mr.meta.RunnerName, mr.Name())
 			return nil
 		}
 		if id, ok := result[mr.offsetkey]; ok {
@@ -224,7 +225,7 @@ func (mr *MongoReader) exec() (err error) {
 		}
 		bytes, ierr := json.Marshal(result)
 		if ierr != nil {
-			log.Errorf("%v json marshal inner error %v", result, ierr)
+			log.Errorf("Runner[%v] %v json marshal inner error %v", mr.meta.RunnerName, result, ierr)
 		}
 		mr.readChan <- bytes
 		result = bson.M{}
@@ -252,11 +253,11 @@ func (mr *MongoReader) SyncMeta() {
 		}
 	}
 	if err := mr.meta.WriteOffset(key, offset); err != nil {
-		log.Errorf("%v SyncMeta error %v", mr.Name(), err)
+		log.Errorf("Runner[%v] %v SyncMeta error %v", mr.meta.RunnerName, mr.Name(), err)
 	}
 	return
 }
 
 func (mr *MongoReader) SetMode(mode string, v interface{}) error {
-	return errors.New("MongoReader not support readmode")
+	return errors.New("MongoDB Reader not support read mode")
 }

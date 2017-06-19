@@ -54,7 +54,10 @@ const (
 	KeySenderType    = "sender_type"
 	KeyFaultTolerant = "fault_tolerant"
 	KeyName          = "name"
+	KeyRunnerName    = "runner_name"
 )
+
+const UnderfinedRunnerName = "UnderfinedRunnerName"
 
 // SenderType 发送类型
 const (

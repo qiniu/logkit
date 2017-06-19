@@ -37,18 +37,18 @@ func NewSingleFile(meta *Meta, path, whence string) (sf *SingleFile, err error) 
 	for {
 		path, pfi, err = utils.GetRealPath(path)
 		if err != nil || pfi == nil {
-			log.Warnf("%s - utils.GetRealPath failed, err:%v", path, err)
+			log.Warnf("Runner[%v] %s - utils.GetRealPath failed, err:%v", meta.RunnerName, path, err)
 			time.Sleep(time.Minute)
 			continue
 		}
 		if !pfi.Mode().IsRegular() {
-			log.Warnf("%s - file failed, err: file is not regular", path)
+			log.Warnf("Runner[%v] %s - file failed, err: file is not regular", meta.RunnerName, path)
 			time.Sleep(time.Minute)
 			continue
 		}
 		f, err = os.Open(path)
 		if err != nil {
-			log.Warnf("%s - open file err:%v", path, err)
+			log.Warnf("Runner[%v] %s - open file err:%v", meta.RunnerName, path, err)
 			time.Sleep(time.Minute)
 			continue
 		}
@@ -59,14 +59,14 @@ func NewSingleFile(meta *Meta, path, whence string) (sf *SingleFile, err error) 
 	metafile, offset, err := meta.ReadOffset()
 	if err != nil {
 		if os.IsNotExist(err) {
-			log.Debugf("%v -meta data is corrupted err:%v, omit meta data", meta.MetaFile(), err)
+			log.Debugf("Runner[%v] %v -meta data is corrupted err:%v, omit meta data", meta.RunnerName, meta.MetaFile(), err)
 		} else {
-			log.Warnf("%v -meta data is corrupted err:%v, omit meta data", meta.MetaFile(), err)
+			log.Warnf("Runner[%v] %v -meta data is corrupted err:%v, omit meta data", meta.RunnerName, meta.MetaFile(), err)
 		}
 		omitMeta = true
 	}
 	if metafile != path {
-		log.Warnf("%v -meta file <%v> is not current file <%v>， omit meta data", meta.MetaFile(), metafile, path)
+		log.Warnf("Runner[%v] %v -meta file <%v> is not current file <%v>， omit meta data", meta.RunnerName, meta.MetaFile(), metafile, path)
 		omitMeta = true
 	}
 
@@ -85,7 +85,7 @@ func NewSingleFile(meta *Meta, path, whence string) (sf *SingleFile, err error) 
 			return nil, err
 		}
 	} else {
-		log.Debugf("%v restore meta success", sf.Name())
+		log.Debugf("Runner[%v] %v restore meta success", sf.meta.RunnerName, sf.Name())
 	}
 	sf.offset = offset
 	f.Seek(offset, os.SEEK_SET)
@@ -101,7 +101,7 @@ func (sf *SingleFile) statFile(path string) (pfi os.FileInfo, err error) {
 		}
 		path, pfi, err = utils.GetRealPath(path)
 		if err != nil || pfi == nil {
-			log.Warnf("%s - utils.GetRealPath failed, err:%v", path, err)
+			log.Warnf("Runner[%v] %s - utils.GetRealPath failed, err:%v", sf.meta.RunnerName, path, err)
 			time.Sleep(time.Minute)
 			continue
 		}
@@ -120,18 +120,18 @@ func (sf *SingleFile) openSingleFile(path string) (pfi os.FileInfo, f *os.File, 
 
 		path, pfi, err = utils.GetRealPath(path)
 		if err != nil || pfi == nil {
-			log.Warnf("%s - utils.GetRealPath failed, err:%v", path, err)
+			log.Warnf("Runner[%v] %s - utils.GetRealPath failed, err:%v", sf.meta.RunnerName, path, err)
 			time.Sleep(time.Minute)
 			continue
 		}
 		if !pfi.Mode().IsRegular() {
-			log.Warnf("%s - file failed, err: file is not regular", path)
+			log.Warnf("Runner[%v] %s - file failed, err: file is not regular", sf.meta.RunnerName, path)
 			time.Sleep(time.Minute)
 			continue
 		}
 		f, err = os.Open(path)
 		if err != nil {
-			log.Warnf("%s - open file err:%v", path, err)
+			log.Warnf("Runner[%v] %s - open file err:%v", sf.meta.RunnerName, path, err)
 			time.Sleep(time.Minute)
 			continue
 		}
@@ -171,7 +171,7 @@ func (sf *SingleFile) detectMovedName(inode uint64) (name string) {
 	dir := filepath.Dir(sf.path)
 	fis, err := ioutil.ReadDir(dir)
 	if err != nil {
-		log.Errorf("read SingleFile path %v err %v", dir, err)
+		log.Errorf("Runner[%v] read SingleFile path %v err %v", sf.meta.RunnerName, dir, err)
 		return
 	}
 	for _, fi := range fis {
@@ -208,12 +208,11 @@ func (sf *SingleFile) Reopen() (err error) {
 	sf.f.Close()
 	detectStr := sf.detectMovedName(oldInode)
 	if detectStr != "" {
-		derr := sf.meta.AppendDoneFile(detectStr)
-		if derr != nil {
-			log.Errorf("AppendDoneFile %v error %v", detectStr, derr)
+		if derr := sf.meta.AppendDoneFile(detectStr); derr != nil {
+			log.Errorf("Runner[%v] AppendDoneFile %v error %v", sf.meta.RunnerName, detectStr, derr)
 		}
 	}
-	log.Infof("rotate %s successfully , rotated file is <%v>", sf.path, detectStr)
+	log.Infof("Runner[%v] rotate %s successfully , rotated file is <%v>", sf.meta.RunnerName, sf.path, detectStr)
 	pfi, f, err := sf.openSingleFile(sf.path)
 	if err != nil {
 		return
@@ -228,11 +227,43 @@ func (sf *SingleFile) Reopen() (err error) {
 	return
 }
 
+func (sf *SingleFile) reopenForESTALE() (err error) {
+	f, err := os.Open(sf.path)
+	if err != nil {
+		return
+	}
+	pfi, err := f.Stat()
+	if err != nil {
+		f.Close()
+		return
+	}
+	_, err = f.Seek(sf.offset, os.SEEK_SET)
+	if err != nil {
+		f.Close()
+		return
+	}
+	sf.f.Close()
+	sf.pfi = pfi
+	sf.f = f
+	if sf.ratereader != nil {
+		sf.ratereader.Close()
+	}
+	sf.ratereader = rateio.NewRateReader(f, sf.meta.readlimit)
+	return
+}
+
 func (sf *SingleFile) Read(p []byte) (n int, err error) {
 	if atomic.LoadInt32(&sf.stopped) > 0 {
 		return 0, errors.New("reader " + sf.Name() + " has been exited")
 	}
 	n, err = sf.ratereader.Read(p)
+	if err != nil && strings.Contains(err.Error(), "stale NFS file handle") {
+		nerr := sf.reopenForESTALE()
+		if nerr != nil {
+			log.Errorf("Runner[%v] %v meet eror %v reopen error %v", sf.meta.RunnerName, sf.path, err, nerr)
+		}
+		return
+	}
 	sf.offset += int64(n)
 	if err == io.EOF {
 		//读到了，如果n大于0，先把EOF抹去，返回
@@ -253,10 +284,10 @@ func (sf *SingleFile) Read(p []byte) (n int, err error) {
 
 func (sf *SingleFile) SyncMeta() error {
 	if sf.lastSyncOffset == sf.offset && sf.lastSyncPath == sf.path {
-		log.Debugf("%v was just syncd %v %v ignore it...", sf.Name(), sf.lastSyncPath, sf.lastSyncOffset)
+		log.Debugf("Runner[%v] %v was just syncd %v %v ignore it...", sf.meta.RunnerName, sf.Name(), sf.lastSyncPath, sf.lastSyncOffset)
 		return nil
 	}
-	log.Debugf("%v Sync file success: %v", sf.Name(), sf.offset)
+	log.Debugf("Runner[%v] %v Sync file success: %v", sf.meta.RunnerName, sf.Name(), sf.offset)
 	sf.lastSyncOffset = sf.offset
 	sf.lastSyncPath = sf.path
 	return sf.meta.WriteOffset(sf.path, sf.offset)

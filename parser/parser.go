@@ -19,6 +19,7 @@ type LogParser interface {
 const (
 	KeyParserName = utils.GlobalKeyName
 	KeyParserType = "type"
+	KeyRunnerName = "runner_name"
 	KeyLabels     = "labels" // 额外增加的标签信息，比如机器信息等
 )
 

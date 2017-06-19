@@ -1,7 +1,6 @@
 package cleaner
 
 import (
-	"fmt"
 	"path/filepath"
 	"time"
 
@@ -68,7 +67,7 @@ func NewCleaner(conf conf.MapConf, meta *reader.Meta, cleanChan chan<- CleanSign
 	reserveSize = reserveSize * MB
 	logdir, _, err = utils.GetRealPath(logdir)
 	if err != nil {
-		err = fmt.Errorf("GetRealPath for %v error %v", logdir, err)
+		log.Errorf("GetRealPath for %v error %v", logdir, err)
 		return
 	}
 	c = &Cleaner{
