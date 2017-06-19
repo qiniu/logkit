@@ -41,6 +41,7 @@ const (
 
 // PandoraSender pandora sender
 type PandoraSender struct {
+	runnerName     string
 	name           string
 	repoName       string
 	region         string
@@ -64,6 +65,7 @@ type UserSchema struct {
 
 // PandoraOption 创建Pandora Sender的选项
 type PandoraOption struct {
+	runnerName     string
 	name           string
 	repoName       string
 	region         string
@@ -123,7 +125,10 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	flowRateLimit, _ := conf.GetInt64Or(KeyFlowRateLimit, 0)
 	gzip, _ := conf.GetBoolOr(KeyPandoraGzip, false)
 	uuid, _ := conf.GetBoolOr(KeyPandoraUUID, false)
+	runnerName, _ := conf.GetStringOr(KeyRunnerName, UnderfinedRunnerName)
+
 	opt := &PandoraOption{
+		runnerName:     runnerName,
 		name:           name,
 		repoName:       repoName,
 		region:         region,
@@ -171,13 +176,14 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 		return
 	}
 	if opt.reqRateLimit > 0 {
-		log.Warnf("you have limited %v pandora sender within %v requests/s", opt.name, opt.reqRateLimit)
+		log.Warnf("Runner[%v] Sender[%v]: you have limited send speed within %v requests/s", opt.runnerName, opt.name, opt.reqRateLimit)
 	}
 	if opt.flowRateLimit > 0 {
-		log.Warnf("you have limited %v pandora sender within %v KB/s", opt.name, opt.flowRateLimit)
+		log.Warnf("Runner[%v] Sender[%v]: you have limited send speed within %v KB/s", opt.runnerName, opt.name, opt.flowRateLimit)
 	}
 	userSchema := parseUserSchema(opt.repoName, opt.schema)
 	s = &PandoraSender{
+		runnerName:     opt.runnerName,
 		name:           opt.name,
 		repoName:       opt.repoName,
 		region:         opt.region,
@@ -191,7 +197,7 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 	}
 	if createErr := createPandoraRepo(opt.autoCreate, opt.repoName, opt.region, client); createErr != nil {
 		if !strings.Contains(createErr.Error(), "E18101") {
-			log.Errorf("auto create pandora repo error: %v, you can create on pandora portal, ignored...", createErr)
+			log.Errorf("Runner[%v] Sender[%v]: auto create pandora repo error: %v, you can create on pandora portal, ignored...", opt.runnerName, opt.name, createErr)
 		}
 	}
 	// 如果updateSchemas更新schema失败，不会报错，可以正常启动runner，但是在sender时会检查schema是否获取
@@ -239,7 +245,7 @@ func parseUserSchema(repoName, schema string) (us UserSchema) {
 func (s *PandoraSender) UpdateSchemas() {
 	schemas, err := s.client.GetUpdateSchemas(s.repoName)
 	if err != nil {
-		log.Errorf("sender <%v> update pandora repo <%v> schema error %v", s.name, s.repoName, err)
+		log.Errorf("Runner[%v] Sender[%v]: update pandora repo <%v> schema error %v", s.runnerName, s.name, s.repoName, err)
 		return
 	}
 	s.updateMux.Lock()
@@ -387,7 +393,7 @@ func (s *PandoraSender) generatePoint(data Data) (point Data) {
 		}
 
 		if !validSchema(v.ValueType, value) {
-			log.Errorf("%v not match type %v, from data < %v >, ignored this field", value, v.ValueType, data)
+			log.Errorf("Runner[%v] Sender[%v]: %v not match type %v, from data < %v >, ignored this field", s.runnerName, s.name, value, v.ValueType, data)
 			continue
 		}
 		point[k] = value

@@ -42,6 +42,7 @@ const (
 	KeyReadIOLimit   = "readio_limit"
 	KeyDataSourceTag = "datasource_tag"
 	KeyHeadPattern   = "head_pattern"
+	KeyRunnerName    = "runner_name"
 
 	// 忽略隐藏文件
 	KeyIgnoreHiddenFile = "ignore_hidden"

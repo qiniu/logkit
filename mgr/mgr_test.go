@@ -429,7 +429,7 @@ func Test_Watch_LogDir(t *testing.T) {
 		t.Error(err)
 	}
 
-	time.Sleep(time.Duration(DIR_NOT_EXIST_SLEEP_TIME) * time.Second)
+	time.Sleep(time.Duration(DIR_NOT_EXIST_SLEEP_TIME+5) * time.Second)
 
 	if _, ok := m.runners[confPathAbs]; !ok {
 		t.Fatal("runner of \"./tests2/confs1/test5.conf\" exp  after add test5.conf but not")

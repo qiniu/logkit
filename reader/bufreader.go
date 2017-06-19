@@ -71,18 +71,20 @@ func NewReaderSize(rd FileReader, meta *Meta, size int) (*BufReader, error) {
 	}
 
 	bufFromFile := true
-
+	if meta == nil {
+		return nil, errors.New("meta is nil pointer error")
+	}
 	readPos, writePos, lastSize, err := meta.ReadBufMeta()
 	if err != nil {
 		if os.IsNotExist(err) {
-			log.Debugf("%s cannot find out buf meta file, start from zero", rd.Name())
+			log.Debugf("Runner[%v] %s cannot find out buf meta file, start from zero", meta.RunnerName, rd.Name())
 			bufFromFile = false
 		} else {
-			log.Warnf("%s cannot read buf meta info %v", rd.Name(), err)
+			log.Warnf("Runner[%v] %s cannot read buf meta info %v", meta.RunnerName, rd.Name(), err)
 			return nil, err
 		}
 	} else {
-		log.Debugf("%v restore meta success %v %v %v", meta.LogPath(), readPos, writePos, lastSize)
+		log.Debugf("Runner[%v] %v restore meta success %v %v %v", meta.RunnerName, meta.LogPath(), readPos, writePos, lastSize)
 	}
 	if size < lastSize {
 		size = lastSize
@@ -90,18 +92,19 @@ func NewReaderSize(rd FileReader, meta *Meta, size int) (*BufReader, error) {
 	linesbytes, err := meta.ReadCacheLine()
 	if err != nil {
 		if os.IsNotExist(err) {
-			log.Debugf("ReadCacheLine from file error %v", err)
+			log.Debugf("Runner[%v] ReadCacheLine from file error %v", meta.RunnerName, err)
 		} else {
-			log.Warnf("ReadCacheLine from file error %v", err)
+			log.Warnf("Runner[%v] ReadCacheLine from file error %v", meta.RunnerName, err)
 		}
 		err = nil
 		linesbytes = []byte("")
 	} else {
-		log.Debugf("%v restore line cache success: [%v]", meta.LogPath(), string(linesbytes))
+		log.Debugf("Runner[%v] %v restore line cache success: [%v]", meta.RunnerName, meta.LogPath(), string(linesbytes))
 	}
 
 	r := new(BufReader)
 	r.reset(make([]byte, size), rd)
+
 	r.meta = meta
 	if r.meta.GetEncodingWay() != "" {
 		r.decoder = mahonia.NewDecoder(r.meta.GetEncodingWay())
@@ -115,7 +118,7 @@ func NewReaderSize(rd FileReader, meta *Meta, size int) (*BufReader, error) {
 			if err != nil {
 				return nil, err
 			} else {
-				log.Debugf("%v restore buf success [%v]", meta.LogPath(), string(r.buf))
+				log.Debugf("Runner[%v] %v restore buf success [%v]", meta.RunnerName, meta.LogPath(), string(r.buf))
 			}
 		}
 	}
@@ -156,7 +159,7 @@ func (b *BufReader) fill() {
 	}
 
 	if b.w >= len(b.buf) {
-		panic("bufio: tried to fill full buffer")
+		panic(fmt.Sprintf("Runner[%v] bufio: tried to fill full buffer", b.meta.RunnerName))
 	}
 
 	// Read new data: try a limited number of times.
@@ -325,7 +328,7 @@ func (b *BufReader) ReadPattern() (string, error) {
 			maxTimes++
 			//对于又没有错误，也读取不到日志的情况，最多允许10次重试
 			if maxTimes > 10 {
-				log.Debugf("%v read empty line 10 times return empty", b.Name())
+				log.Debugf("Runner[%v] %v read empty line 10 times return empty", b.meta.RunnerName, b.Name())
 				return "", nil
 			}
 		}
@@ -375,28 +378,28 @@ func (b *BufReader) SyncMeta() {
 	defer b.mux.Unlock()
 	//把linecache也缓存
 	if b.lastSync.cache != b.lineCache || b.lastSync.buf != string(b.buf) || b.r != b.lastSync.r || b.w != b.lastSync.w {
-		log.Debugf("%v sync meta started, linecache [%v] buf [%v] （%v %v）", b.Name(), b.lineCache, string(b.buf), b.r, b.w)
+		log.Debugf("Runner[%v] %v sync meta started, linecache [%v] buf [%v] （%v %v）", b.meta.RunnerName, b.Name(), b.lineCache, string(b.buf), b.r, b.w)
 		err := b.meta.WriteBuf(b.buf, b.r, b.w, len(b.buf))
 		if err != nil {
-			log.Errorf("%s cannot write buf, err :%v", b.Name(), err)
+			log.Errorf("Runner[%v] %s cannot write buf, err :%v", b.meta.RunnerName, b.Name(), err)
 			return
 		}
 		err = b.meta.WriteCacheLine(b.lineCache)
 		if err != nil {
-			log.Errorf("%s cannot write linecache, err :%v", b.Name(), err)
+			log.Errorf("Runner[%v] %s cannot write linecache, err :%v", b.meta.RunnerName, b.Name(), err)
 			return
 		}
 		b.lastSync.cache = b.lineCache
 		b.lastSync.buf = string(b.buf)
 		b.lastSync.r = b.r
 		b.lastSync.w = b.w
-		log.Debugf("%v sync meta succeed, linecache [%v] buf [%v] （%v %v）", b.Name(), b.lineCache, string(b.buf), b.r, b.w)
+		log.Debugf("Runner[%v] %v sync meta succeed, linecache [%v] buf [%v] （%v %v）", b.meta.RunnerName, b.Name(), b.lineCache, string(b.buf), b.r, b.w)
 	} else {
-		log.Debugf("%v meta data was just syncd, cache %v, buf %v, r,w =(%v,%v), ignore this sync...", b.Name(), b.lineCache, string(b.buf), b.r, b.w)
+		log.Debugf("Runner[%v] %v meta data was just syncd, cache %v, buf %v, r,w =(%v,%v), ignore this sync...", b.meta.RunnerName, b.Name(), b.lineCache, string(b.buf), b.r, b.w)
 	}
 	err := b.rd.SyncMeta()
 	if err != nil {
-		log.Errorf("%s cannot write reader %v's meta info, err %v", b.Name(), b.rd.Name(), err)
+		log.Errorf("Runner[%v] %s cannot write reader %v's meta info, err %v", b.meta.RunnerName, b.Name(), b.rd.Name(), err)
 		return
 	}
 }

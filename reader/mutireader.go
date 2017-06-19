@@ -40,12 +40,13 @@ type MultiReader struct {
 }
 
 type ActiveReader struct {
-	br        *BufReader
-	logpath   string
-	readcache string
-	msgchan   chan string
-	status    int32
-	inactive  bool //当inactive为true时才会被expire回收
+	br         *BufReader
+	logpath    string
+	readcache  string
+	msgchan    chan string
+	status     int32
+	inactive   bool //当inactive为true时才会被expire回收
+	runnerName string
 }
 
 func NewActiveReader(logPath, whence string, meta *Meta) (ar *ActiveReader, err error) {
@@ -65,10 +66,11 @@ func NewActiveReader(logPath, whence string, meta *Meta) (ar *ActiveReader, err 
 		return
 	}
 	ar = &ActiveReader{
-		br:       bf,
-		logpath:  logPath,
-		msgchan:  make(chan string),
-		inactive: false,
+		br:         bf,
+		logpath:    logPath,
+		msgchan:    make(chan string),
+		inactive:   false,
+		runnerName: meta.RunnerName,
 	}
 	return
 }
@@ -84,19 +86,19 @@ func (ar *ActiveReader) Run() {
 		if ar.readcache == "" {
 			ar.readcache, err = ar.br.ReadLine()
 			if err != nil && err != io.EOF {
-				log.Warnf("ActiveReader %s read error: %v", ar.logpath, err)
+				log.Warnf("Runner[%v] ActiveReader %s read error: %v", ar.runnerName, ar.logpath, err)
 				time.Sleep(3 * time.Second)
 				continue
 			}
 			//文件EOF，同时没有任何内容，代表不是第一次EOF，休息时间设置长一些
 			if ar.readcache == "" && err == io.EOF {
 				ar.inactive = true
-				log.Debugf("%v ActiveReader was inactive, sleep 10 seconds", ar.logpath)
+				log.Debugf("Runner[%v] %v ActiveReader was inactive, sleep 10 seconds", ar.runnerName, ar.logpath)
 				time.Sleep(10 * time.Second)
 				continue
 			}
 		}
-		log.Debugf(">>>>>>readcache <%v> linecache <%v>", ar.readcache, ar.br.lineCache)
+		log.Debugf("Runner[%v] >>>>>>readcache <%v> linecache <%v>", ar.runnerName, ar.readcache, ar.br.lineCache)
 		for {
 			if ar.readcache == "" {
 				break
@@ -104,7 +106,7 @@ func (ar *ActiveReader) Run() {
 			ar.inactive = false
 			//做这一层结构为了快速结束
 			if atomic.LoadInt32(&ar.status) == StatusStopped {
-				log.Debugf("%v ActiveReader was exited when waiting to send data", ar.logpath)
+				log.Debugf("Runner[%v] %v ActiveReader was exited when waiting to send data", ar.runnerName, ar.logpath)
 				return
 			}
 			select {
@@ -132,7 +134,7 @@ func (ar *ActiveReader) expired(expireDur time.Duration) bool {
 		if os.IsNotExist(err) {
 			return true
 		}
-		log.Errorf("stat log %v error %v", ar.logpath, err)
+		log.Errorf("Runner[%v] stat log %v error %v", ar.runnerName, ar.logpath, err)
 	}
 	if fi.ModTime().Add(expireDur).Before(time.Now()) && ar.inactive {
 		return true
@@ -152,9 +154,9 @@ func NewMultiReader(meta *Meta, logPathPattern, whence, expireDur, statIntervalD
 	_, _, bufsize, err := meta.ReadBufMeta()
 	if err != nil {
 		if os.IsNotExist(err) {
-			log.Debugf("%v recover from meta error %v, ignore...", logPathPattern, err)
+			log.Debugf("Runner[%v] %v recover from meta error %v, ignore...", meta.RunnerName, logPathPattern, err)
 		} else {
-			log.Warnf("%v recover from meta error %v, ignore...", logPathPattern, err)
+			log.Warnf("Runner[%v] %v recover from meta error %v, ignore...", meta.RunnerName, logPathPattern, err)
 		}
 		bufsize = 0
 		err = nil
@@ -182,14 +184,14 @@ func NewMultiReader(meta *Meta, logPathPattern, whence, expireDur, statIntervalD
 		_, err = meta.ReadBuf(buf)
 		if err != nil {
 			if os.IsNotExist(err) {
-				log.Debugf("%v read buf error %v, ignore...", mr.Name(), err)
+				log.Debugf("Runner[%v] %v read buf error %v, ignore...", mr.meta.RunnerName, mr.Name(), err)
 			} else {
-				log.Warnf("%v read buf error %v, ignore...", mr.Name(), err)
+				log.Warnf("Runner[%v] %v read buf error %v, ignore...", mr.meta.RunnerName, mr.Name(), err)
 			}
 		} else {
 			err = json.Unmarshal(buf, &mr.cacheMap)
 			if err != nil {
-				log.Warnf("%v Unmarshal read buf error %v, ignore...", mr.Name(), err)
+				log.Warnf("Runner[%v] %v Unmarshal read buf error %v, ignore...", mr.meta.RunnerName, mr.Name(), err)
 			}
 		}
 		err = nil
@@ -212,7 +214,7 @@ func (mr *MultiReader) Expire() {
 	mr.armapmux.Unlock()
 
 	if len(paths) > 0 {
-		log.Infof("Expire reader find expired logpath: %v", strings.Join(paths, ", "))
+		log.Infof("Runner[%v] Expire reader find expired logpath: %v", mr.meta.RunnerName, strings.Join(paths, ", "))
 		mr.updateSelectCase()
 	}
 }
@@ -231,26 +233,26 @@ func (mr *MultiReader) SetMode(mode string, value interface{}) (err error) {
 func (mr *MultiReader) StatLogPath() {
 	//达到最大打开文件数，不再追踪
 	if len(mr.fileReaders) >= mr.maxOpenFiles {
-		log.Warnf("%v meet maxOpenFiles limit %v, ignore Stat new log...", mr.Name(), mr.maxOpenFiles)
+		log.Warnf("Runner[%v] %v meet maxOpenFiles limit %v, ignore Stat new log...", mr.meta.RunnerName, mr.Name(), mr.maxOpenFiles)
 		return
 	}
 	matches, err := filepath.Glob(mr.logPathPattern)
 	if err != nil {
-		log.Errorf("stat logPathPattern error %v", err)
+		log.Errorf("Runner[%v] stat logPathPattern error %v", mr.meta.RunnerName, err)
 		return
 	}
 	var newaddsPath []string
 	for _, mc := range matches {
 		rp, fi, err := utils.GetRealPath(mc)
 		if err != nil {
-			log.Errorf("file pattern %v match %v stat error %v, ignore this match...", mr.logPathPattern, mc, err)
+			log.Errorf("Runner[%v] file pattern %v match %v stat error %v, ignore this match...", mr.meta.RunnerName, mr.logPathPattern, mc, err)
 			continue
 		}
 		mr.armapmux.Lock()
 		_, ok := mr.fileReaders[rp]
 		mr.armapmux.Unlock()
 		if ok {
-			log.Debugf("<%v> is collecting, ignore...", rp)
+			log.Debugf("Runner[%v] <%v> is collecting, ignore...", mr.meta.RunnerName, rp)
 			continue
 		}
 		mr.armapmux.Lock()
@@ -262,14 +264,14 @@ func (mr *MultiReader) StatLogPath() {
 		}
 		ar, err := NewActiveReader(rp, mr.whence, mr.meta)
 		if err != nil {
-			log.Errorf("NewActiveReader for matches %v error %v, ignore this match...", rp, err)
+			log.Errorf("Runner[%v] NewActiveReader for matches %v error %v, ignore this match...", mr.meta.RunnerName, rp, err)
 			continue
 		}
 		ar.readcache = cacheline
 		if mr.headRegexp != nil {
 			err = ar.br.SetMode(ReadModeHeadPatternRegexp, mr.headRegexp)
 			if err != nil {
-				log.Errorf("NewActiveReader for matches %v SetMode error %v", rp, err)
+				log.Errorf("Runner[%v] NewActiveReader for matches %v SetMode error %v", mr.meta.RunnerName, rp, err)
 			}
 		}
 		newaddsPath = append(newaddsPath, rp)
@@ -279,7 +281,7 @@ func (mr *MultiReader) StatLogPath() {
 		mr.armapmux.Unlock()
 	}
 	if len(newaddsPath) > 0 {
-		log.Infof("StatLogPath find new logpath: %v", strings.Join(newaddsPath, ", "))
+		log.Infof("Runner[%v] StatLogPath find new logpath: %v", mr.meta.RunnerName, strings.Join(newaddsPath, ", "))
 		mr.updateSelectCase()
 	}
 }
@@ -324,7 +326,7 @@ func (mr *MultiReader) Close() (err error) {
 	for _, ar := range ars {
 		err = ar.Close()
 		if err != nil {
-			log.Errorf("Close ActiveReader %v error %v", ar.logpath, err)
+			log.Errorf("Runner[%v] Close ActiveReader %v error %v", mr.meta.RunnerName, ar.logpath, err)
 		}
 	}
 	return

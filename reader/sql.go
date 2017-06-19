@@ -87,7 +87,7 @@ func NewSQLReader(meta *Meta, readBatch int, dbtype, dataSource, database, rawSq
 		if err != nil {
 			return
 		}
-		log.Infof("%v Cron job added with schedule <%v>", mr.Name(), cronSchedule)
+		log.Infof("Runner[%v] %v Cron job added with schedule <%v>", mr.meta.RunnerName, mr.Name(), cronSchedule)
 	}
 	return mr, nil
 }
@@ -98,12 +98,12 @@ func restoreMeta(meta *Meta, rawSqls string) (offsets []int64, sqls []string, om
 	omitMeta = true
 	sqlAndOffsets, length, err := meta.ReadOffset()
 	if err != nil {
-		log.Errorf("%v -meta data is corrupted err:%v, omit meta data", meta.MetaFile(), err)
+		log.Errorf("Runner[%v] %v -meta data is corrupted err:%v, omit meta data", meta.RunnerName, meta.MetaFile(), err)
 		return
 	}
 	tmps := strings.Split(sqlAndOffsets, sqlOffsetConnector)
 	if int64(len(tmps)) != 2*length || int64(len(sqls)) != length {
-		log.Errorf("%v -meta file is not invalid sql meta file %v， omit meta data", meta.MetaFile(), sqlAndOffsets)
+		log.Errorf("Runner[%v] %v -meta file is not invalid sql meta file %v， omit meta data", meta.RunnerName, meta.MetaFile(), sqlAndOffsets)
 		return
 	}
 	omitMeta = false
@@ -112,7 +112,7 @@ func restoreMeta(meta *Meta, rawSqls string) (offsets []int64, sqls []string, om
 		syncSQL := strings.Replace(tmps[idx], "@", " ", -1)
 		offset, err := strconv.ParseInt(tmps[idx+int(length)], 10, 64)
 		if err != nil || sql != syncSQL {
-			log.Errorf("%v -meta file sql is out of date %v or parse offset err %v， omit this offset", meta.MetaFile(), syncSQL, err)
+			log.Errorf("Runner[%v] %v -meta file sql is out of date %v or parse offset err %v， omit this offset", meta.RunnerName, meta.MetaFile(), syncSQL, err)
 		}
 		offsets[idx] = offset
 	}
@@ -187,7 +187,7 @@ func (mr *SqlReader) Source() string {
 func (mr *SqlReader) Close() (err error) {
 	mr.Cron.Stop()
 	if atomic.CompareAndSwapInt32(&mr.status, StatusRunning, StatusStoping) {
-		log.Infof("%v stopping", mr.Name())
+		log.Infof("Runner[%v] %v stopping", mr.meta.RunnerName, mr.Name())
 	} else {
 		close(mr.readChan)
 	}
@@ -206,7 +206,7 @@ func (mr *SqlReader) Start() {
 		go mr.run()
 	}
 	mr.started = true
-	log.Printf("%v pull data deamon started", mr.Name())
+	log.Infof("Runner[%v] %v pull data deamon started", mr.meta.RunnerName, mr.Name())
 }
 
 func (mr *SqlReader) ReadLine() (data string, err error) {
@@ -267,7 +267,7 @@ func (mr *SqlReader) run() {
 		if atomic.CompareAndSwapInt32(&mr.status, StatusStoping, StatusStopped) {
 			close(mr.readChan)
 		}
-		log.Infof("%v successfully finnished", mr.Name())
+		log.Infof("Runner[%v] %v successfully finished", mr.meta.RunnerName, mr.Name())
 	}()
 
 	var connectStr string
@@ -280,12 +280,12 @@ func (mr *SqlReader) run() {
 	// 开始work逻辑
 	for {
 		if atomic.LoadInt32(&mr.status) == StatusStoping {
-			log.Warnf("%v stopped from running", mr.Name())
+			log.Warnf("Runner[%v] %v stopped from running", mr.meta.RunnerName, mr.Name())
 			return
 		}
 		err := mr.exec(connectStr)
 		if err == nil {
-			log.Infof("%v successfully exec", mr.Name())
+			log.Infof("Runner[%v] %v successfully exec", mr.meta.RunnerName, mr.Name())
 			return
 		}
 		log.Error(err)
@@ -307,7 +307,7 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 	sqls := updateSqls(mr.rawsqls, now)
 	mr.updateOffsets(sqls)
 	mr.syncSQLs = sqls
-	log.Infof("%v start to work, sqls %v offsets %v", mr.Name(), mr.syncSQLs, mr.offsets)
+	log.Infof("Runner[%v] %v start to work, sqls %v offsets %v", mr.meta.RunnerName, mr.Name(), mr.syncSQLs, mr.offsets)
 
 	for idx, rawSQL := range mr.syncSQLs {
 		//分sql执行
@@ -318,28 +318,23 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 			isRawSQL = false
 			execSQL, err := mr.getSQL(idx)
 			if err != nil {
-				log.Errorf("get SQL error %v, use raw SQL", err)
+				log.Errorf("Runner[%v] get SQL error %v, use raw SQL", mr.meta.RunnerName, err)
 				execSQL = rawSQL
 				isRawSQL = true
 			}
-			log.Infof("reader <%v> exec sql <%v>", mr.Name(), execSQL)
+			log.Infof("Runner[%v] reader <%v> exec sql <%v>", mr.meta.RunnerName, mr.Name(), execSQL)
 			rows, err := db.Query(execSQL)
 			if err != nil {
-				log.Errorf("%v prepare %v <%v> query error %v", mr.Name(), mr.dbtype, execSQL, err)
+				log.Errorf("Runner[%v] %v prepare %v <%v> query error %v", mr.meta.RunnerName, mr.Name(), mr.dbtype, execSQL, err)
 				continue
 			}
 			// Get column names
 			columns, err := rows.Columns()
 			if err != nil {
-				log.Errorf("%v prepare %v <%v> columns error %v", mr.Name(), mr.dbtype, execSQL, err)
+				log.Errorf("Runner[%v] %v prepare %v <%v> columns error %v", mr.meta.RunnerName, mr.Name(), mr.dbtype, execSQL, err)
 				continue
 			}
-			columnsTypes, err := rows.ColumnTypes()
-			if err != nil {
-				log.Errorf("%v prepare %v <%v> ColumnTypes error %v", mr.Name(), mr.dbtype, execSQL, err)
-				continue
-			}
-			log.Infof("SQL ：<%v>, schemas: <%v>", execSQL, strings.Join(columns, ", "))
+			log.Infof("Runner[%v] SQL ：<%v>, schemas: <%v>", mr.meta.RunnerName, execSQL, strings.Join(columns, ", "))
 			scanArgs := make([]interface{}, len(columns))
 			for i := range scanArgs {
 				scanArgs[i] = new(interface{})
@@ -357,7 +352,7 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 				// get RawBytes from data
 				err = rows.Scan(scanArgs...)
 				if err != nil {
-					log.Errorf("%v scan rows error %v", mr.Name(), err)
+					log.Errorf("Runner[%v] %v scan rows error %v", mr.meta.RunnerName, mr.Name(), err)
 					continue
 				}
 				data := make(map[string]interface{})
@@ -366,24 +361,20 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 				}
 				ret, err := json.Marshal(data)
 				if err != nil {
-					log.Errorf("%v unmarshal sql data error %v", mr.Name(), err)
+					log.Errorf("Runner[%v] %v unmarshal sql data error %v", mr.meta.RunnerName, mr.Name(), err)
 					continue
 				}
 				if atomic.LoadInt32(&mr.status) == StatusStoping {
-					log.Warnf("%v stopped from running", mr.Name())
+					log.Warnf("Runner[%v] %v stopped from running", mr.meta.RunnerName, mr.Name())
 					return nil
 				}
 				mr.readChan <- ret
 
 				if offsetKeyIndex >= 0 {
-					if offsetKeyIndex >= len(columnsTypes) {
-						log.Errorf("columnsTypes length %v less than offsetKeyIndex %v", len(columnsTypes), offsetKeyIndex)
-					} else {
-						mr.offsets[idx], err = convertInt(scanArgs[offsetKeyIndex], columnsTypes[offsetKeyIndex].ScanType())
-						if err != nil {
-							log.Errorf("%v offset key value parse error %v, offset was not recorded, columTypes: %v", mr.Name(), err, columnsTypes[offsetKeyIndex].ScanType())
-							err = nil
-						}
+					mr.offsets[idx], err = convertInt(scanArgs[offsetKeyIndex])
+					if err != nil {
+						log.Errorf("Runner[%v] %v offset key value parse error %v, offset was not recorded", mr.meta.RunnerName, mr.Name(), err)
+						err = nil
 					}
 				}
 				mr.offsets[idx]++
@@ -402,7 +393,7 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 	return nil
 }
 
-func convertInt(v interface{}, tp reflect.Type) (int64, error) {
+func convertInt(v interface{}) (int64, error) {
 	dpv := reflect.ValueOf(v)
 	if dpv.Kind() != reflect.Ptr {
 		return 0, errors.New("scanArgs not a pointer")
@@ -420,30 +411,38 @@ func convertInt(v interface{}, tp reflect.Type) (int64, error) {
 		return strconv.ParseInt(dv.String(), 10, 64)
 	case reflect.Interface:
 		idv := dv.Interface()
-		switch tp.Kind() {
-		case reflect.Int64:
-			return idv.(int64), nil
-		case reflect.Int:
-			return int64(idv.(int)), nil
-		case reflect.Int8:
-			return int64(idv.(int8)), nil
-		case reflect.Int16:
-			return int64(idv.(int16)), nil
-		case reflect.Int32:
-			return int64(idv.(int32)), nil
-		case reflect.Uint:
-			return int64(idv.(uint)), nil
-		case reflect.Uint8:
-			return int64(idv.(uint8)), nil
-		case reflect.Uint16:
-			return int64(idv.(uint16)), nil
-		case reflect.Uint32:
-			return int64(idv.(uint32)), nil
-		case reflect.Uint64:
-			return int64(idv.(uint64)), nil
-		case reflect.String:
-			sdv := idv.(string)
-			return strconv.ParseInt(sdv, 10, 64)
+		if ret, ok := idv.(int64); ok {
+			return ret, nil
+		}
+		if ret, ok := idv.(int); ok {
+			return int64(ret), nil
+		}
+		if ret, ok := idv.(uint); ok {
+			return int64(ret), nil
+		}
+		if ret, ok := idv.(uint64); ok {
+			return int64(ret), nil
+		}
+		if ret, ok := idv.(string); ok {
+			return strconv.ParseInt(ret, 10, 64)
+		}
+		if ret, ok := idv.(int8); ok {
+			return int64(ret), nil
+		}
+		if ret, ok := idv.(int16); ok {
+			return int64(ret), nil
+		}
+		if ret, ok := idv.(int32); ok {
+			return int64(ret), nil
+		}
+		if ret, ok := idv.(uint8); ok {
+			return int64(ret), nil
+		}
+		if ret, ok := idv.(uint16); ok {
+			return int64(ret), nil
+		}
+		if ret, ok := idv.(uint32); ok {
+			return int64(ret), nil
 		}
 	}
 	return 0, fmt.Errorf("%v type can not convert to int", dv.Kind())
@@ -512,7 +511,7 @@ func (mr *SqlReader) SyncMeta() {
 	}
 	all := strings.Join(encodeSQLs, sqlOffsetConnector)
 	if err := mr.meta.WriteOffset(all, int64(len(mr.syncSQLs))); err != nil {
-		log.Errorf("%v SyncMeta error %v", mr.Name(), err)
+		log.Errorf("Runner[%v] %v SyncMeta error %v", mr.meta.RunnerName, mr.Name(), err)
 	}
 	return
 }

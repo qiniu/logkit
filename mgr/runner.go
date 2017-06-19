@@ -161,6 +161,11 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, p
 	}
 
 	rc.ReaderConfig[utils.GlobalKeyName] = rc.RunnerName
+	rc.ReaderConfig[reader.KeyRunnerName] = rc.RunnerName
+	for i := range rc.SenderConfig {
+		rc.SenderConfig[i][sender.KeyRunnerName] = rc.RunnerName
+	}
+	rc.ParserConf[parser.KeyRunnerName] = rc.RunnerName
 	//配置文件适配
 	rc = Compatible(rc)
 	var (
@@ -238,7 +243,7 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []sender.Data, times in
 				cnt++
 				continue
 			}
-			log.Errorf("retry send %v times, but still error %v, discard datas %v ... total %v lines", cnt, err, datas[0], len(datas))
+			log.Errorf("Runner[%v] retry send %v times, but still error %v, discard datas %v ... total %v lines", r.RunnerName, cnt, err, datas[0], len(datas))
 		}
 		break
 	}
@@ -254,7 +259,7 @@ func (r *LogExportRunner) Run() {
 	datasourceTag := r.meta.GetDataSourceTag()
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
-			log.Debugf("runner %v exited from run", r.RunnerName)
+			log.Debugf("Runner[%v] exited from run", r.Name())
 			r.exitChan <- struct{}{}
 			return
 		}
@@ -263,17 +268,17 @@ func (r *LogExportRunner) Run() {
 		for !r.batchFullOrTimeout() {
 			line, err := r.reader.ReadLine()
 			if err != nil && err != io.EOF {
-				log.Errorf("runner %s, reader %s - error: %v, sleep 1 second...", r.Name(), r.reader.Name(), err)
+				log.Errorf("Runner[%v] reader %s - error: %v, sleep 1 second...", r.Name(), r.reader.Name(), err)
 				time.Sleep(time.Second)
 				break
 			}
 			if len(line) <= 0 {
-				log.Debugf("runner %s, reader %s cannot get any content", r.Name(), r.reader.Name())
+				log.Debugf("Runner[%v] reader %s cannot get any content", r.Name(), r.reader.Name())
 				time.Sleep(2 * time.Second)
 				continue
 			}
 			if len(line) >= r.MaxBatchSize {
-				log.Errorf("runner %s, reader %s read lines larger than MaxBatchSize %v, content is %s", r.Name(), r.reader.Name(), r.MaxBatchSize, line)
+				log.Errorf("Runner[%v] reader %s read lines larger than MaxBatchSize %v, content is %s", r.Name(), r.reader.Name(), r.MaxBatchSize, line)
 				continue
 			}
 			lines = append(lines, line)
@@ -288,7 +293,7 @@ func (r *LogExportRunner) Run() {
 		r.lastSend = time.Now()
 
 		if len(lines) <= 0 {
-			log.Debug("runner fetched 0 lines")
+			log.Debugf("Runner[%v] fetched 0 lines", r.Name())
 			continue
 		}
 		// parse data
@@ -304,11 +309,11 @@ func (r *LogExportRunner) Run() {
 			r.rs.ParserStats.Success++
 		}
 		if err != nil {
-			log.Errorf("runner %s, parser %s error : %v ", r.Name(), r.parser.Name(), err.Error())
+			log.Errorf("Runner[%v] parser %s error : %v ", r.Name(), r.parser.Name(), err.Error())
 		}
 		// send data
 		if len(datas) <= 0 {
-			log.Debug("runner received parsed data length = 0")
+			log.Debugf("Runner[%v] received parsed data length = 0", r.Name())
 			continue
 		}
 		//把datasourcetag加到data里，前提是认为[]line变成[]data以后是一一对应的，一旦错位就不加
@@ -324,20 +329,20 @@ func (r *LogExportRunner) Run() {
 						continue
 					}
 					if dt, ok := datas[j][datasourceTag]; ok {
-						log.Debugf("%v datasource tag already has data %v, ignore %v", r.Name(), dt, v)
+						log.Debugf("Runner[%v] datasource tag already has data %v, ignore %v", r.Name(), dt, v)
 					} else {
 						datas[j][datasourceTag] = v
 					}
 				}
 			} else {
-				log.Errorf("%v datasourcetag add error, datas %v not match with froms %v", r.Name(), datas, froms)
+				log.Errorf("Runner[%v] datasourcetag add error, datas %v not match with froms %v", r.Name(), datas, froms)
 			}
 		}
 		success := true
 		for _, s := range r.senders {
 			if !r.trySend(s, datas, r.MaxBatchTryTimes) {
 				success = false
-				log.Errorf("failed to send data: << %v >>", datas)
+				log.Errorf("Runner[%v] failed to send data: << %v >>", datas, r.Name())
 				break
 			}
 		}
@@ -350,7 +355,7 @@ func (r *LogExportRunner) Run() {
 func (r *LogExportRunner) Stop() {
 	atomic.AddInt32(&r.stopped, 1)
 
-	log.Warnf("wait for runner " + r.Name() + " stopped")
+	log.Warnf("Runner[%v] waiting for stopped signal", r.Name())
 	timer := time.NewTimer(time.Second * 10)
 	select {
 	case <-r.exitChan:
@@ -358,20 +363,20 @@ func (r *LogExportRunner) Stop() {
 	case <-timer.C:
 		log.Warnf("runner " + r.Name() + " exited timeout ")
 	}
-	log.Warnf("wait for reader " + r.reader.Name() + " stopped")
+	log.Warnf("Runner[%v] wait for reader %v stopped", r.Name(), r.reader.Name())
 	// 清理所有使用到的资源
 	err := r.reader.Close()
 	if err != nil {
-		log.Errorf("cannot close reader name: %s, err: %v", r.reader.Name(), err)
+		log.Errorf("Runner[%v] cannot close reader name: %s, err: %v", r.Name(), r.reader.Name(), err)
 	} else {
-		log.Warnf("reader %v of runner %v closed", r.reader.Name(), r.Name())
+		log.Warnf("Runner[%v] reader %v of runner %v closed", r.Name(), r.reader.Name(), r.Name())
 	}
 	for _, s := range r.senders {
 		err := s.Close()
 		if err != nil {
-			log.Errorf("cannot close sender name: %s, err: %v", s.Name(), err)
+			log.Errorf("Runner[%v] cannot close sender name: %s, err: %v", r.Name(), s.Name(), err)
 		} else {
-			log.Warnf("sender %v of runner %v closed", s.Name(), r.Name())
+			log.Warnf("Runner[%v] sender %v closed", r.Name(), s.Name())
 		}
 	}
 	if r.cleaner != nil {
@@ -394,22 +399,22 @@ func (r *LogExportRunner) Cleaner() CleanInfo {
 func (r *LogExportRunner) batchFullOrTimeout() bool {
 	// 达到最大行数
 	if r.MaxBatchLen > 0 && r.batchLen >= r.MaxBatchLen {
-		log.Debugf("runner %v meet the max batch length %v", r.RunnerName, r.MaxBatchLen)
+		log.Debugf("Runner[%v] meet the max batch length %v", r.RunnerName, r.MaxBatchLen)
 		return true
 	}
 	// 达到最大字节数
 	if r.MaxBatchSize > 0 && r.batchSize >= r.MaxBatchSize {
-		log.Debugf("runner %v meet the max batch size %v", r.RunnerName, r.MaxBatchSize)
+		log.Debugf("Runner[%v] meet the max batch size %v", r.RunnerName, r.MaxBatchSize)
 		return true
 	}
 	// 超过最长的发送间隔
 	if time.Now().Sub(r.lastSend).Seconds() >= float64(r.MaxBatchInteval) {
-		log.Debugf("runner %v meet the max batch send interval %v", r.RunnerName, r.MaxBatchInteval)
+		log.Debugf("Runner[%v] meet the max batch send interval %v", r.RunnerName, r.MaxBatchInteval)
 		return true
 	}
 	// 如果任务已经停止
 	if atomic.LoadInt32(&r.stopped) > 0 {
-		log.Warnf("runner %v meet the stopped signal", r.RunnerName)
+		log.Warnf("Runner[%v] meet the stopped signal", r.RunnerName)
 		return true
 	}
 
@@ -421,25 +426,25 @@ func (r *LogExportRunner) LagStats() (rl RunnerLag, err error) {
 
 	bd, err := ioutil.ReadFile(mf)
 	if err != nil {
-		log.Warnf("Read meta File err %v, can't get stats", err)
+		log.Warnf("Runner[%v] Read meta File err %v, can't get stats", r.Name(), err)
 		return
 	}
 	ss := strings.Split(strings.TrimSpace(string(bd)), "\t")
 	if len(ss) != 2 {
-		err = fmt.Errorf("metafile format err %v, can't get stats", ss)
+		err = fmt.Errorf("Runner[%v] metafile format err %v, can't get stats", r.Name(), ss)
 		log.Warn(err)
 		return
 	}
 	logreading, logsize := ss[0], ss[1]
 	size, err := strconv.ParseInt(logsize, 10, 64)
 	if err != nil {
-		log.Errorf("parse log meta error %v, can't get stats", err)
+		log.Errorf("Runner[%v] parse log meta error %v, can't get stats", r.Name(), err)
 		return
 	}
 
 	logs, err := utils.ReadDirByTime(r.meta.LogPath())
 	if err != nil {
-		log.Warn("ReadDirByTime err %v, can't get stats", err)
+		log.Warnf("Runner[%v] ReadDirByTime err %v, can't get stats", r.Name(), err)
 		return
 	}
 	logreading = filepath.Base(logreading)

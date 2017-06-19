@@ -49,6 +49,7 @@ type Meta struct {
 	logpath           string
 	dataSourceTag     string //记录文件路径的标签名称
 	readlimit         int    //读取磁盘限速单位 MB/s
+	RunnerName        string
 }
 
 func getValidDir(dir string) (realPath string, err error) {
@@ -63,7 +64,6 @@ func getValidDir(dir string) (realPath string, err error) {
 		return
 	}
 	if !fi.Mode().IsDir() {
-		log.Errorf("%v is not directory", fi.Name())
 		err = ErrFileNotDir
 	}
 	return
@@ -72,13 +72,13 @@ func getValidDir(dir string) (realPath string, err error) {
 func NewMeta(metadir, filedonedir, logpath, mode string, donefileRetention int) (m *Meta, err error) {
 	metadir, err = getValidDir(metadir)
 	if err != nil {
-		log.Error(err)
+		err = fmt.Errorf("check dir %v error %v", metadir, err)
 		return
 	}
 	if filedonedir != metadir {
 		filedonedir, err = getValidDir(filedonedir)
 		if err != nil {
-			log.Error(err)
+			err = fmt.Errorf("check dir %v error %v", filedonedir, err)
 			return
 		}
 	}
@@ -112,6 +112,7 @@ func getLogPathAbs(conf conf.MapConf) (logpath string, err error) {
 }
 
 func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
+	runnerName, _ := conf.GetStringOr(KeyRunnerName, "UndefinedRunnerName")
 	mode, _ := conf.GetStringOr(KeyMode, ModeDir)
 	logPath, err := getLogPathAbs(conf)
 	if err != nil && (mode == ModeDir || mode == ModeFile) {
@@ -123,7 +124,7 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 		runnerName, _ := conf.GetString(utils.GlobalKeyName)
 		base := filepath.Base(logPath)
 		metapath = "meta/" + runnerName + "_" + hash(base)
-		log.Debugf("Using %s as default metaPath", metapath)
+		log.Debugf("Runner[%v] Using %s as default metaPath", runnerName, metapath)
 	}
 	datasourceTag, _ := conf.GetStringOr(KeyDataSourceTag, "")
 	filedonepath, _ := conf.GetStringOr(KeyFileDone, metapath)
@@ -131,11 +132,12 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 	readlimit, _ := conf.GetIntOr(KeyReadIOLimit, defaultIOLimit)
 	meta, err = NewMeta(metapath, filedonepath, logPath, mode, donefileRetention)
 	if err != nil {
-		log.Warnf("%s - newMeta failed, err:%v", metapath, err)
+		log.Warnf("Runner[%v] %s - newMeta failed, err:%v", runnerName, metapath, err)
 		return
 	}
 	meta.dataSourceTag = datasourceTag
 	meta.readlimit = readlimit * 1024 * 1024 //readlimit*MB
+	meta.RunnerName = runnerName
 	return
 }
 
@@ -168,7 +170,7 @@ func (m *Meta) IsNotValid() bool {
 func (m *Meta) Clear() error {
 	err := os.RemoveAll(m.dir)
 	if err != nil {
-		log.Errorf("remove %v err %v", m.dir, err)
+		log.Errorf("Runner[%v] remove %v err %v", m.RunnerName, m.dir, err)
 		return err
 	}
 	return os.MkdirAll(m.dir, defaultDirPerm)
@@ -262,14 +264,14 @@ func (m *Meta) ReadOffset() (currFile string, offset int64, err error) {
 
 	_, err = fmt.Fscanf(f, metaFormat, &currFile, &offset)
 	if err != nil {
-		log.Errorf("meta file format err %v", err)
+		err = fmt.Errorf("meta file format err %v", err)
 		return
 	}
 	if m.mode == ModeDir || m.mode == ModeFile {
 		_, err = os.Stat(currFile)
 		if err != nil {
 			if os.IsNotExist(err) {
-				log.Errorf("meta content outdated, the file %v has been deleted", currFile)
+				err = fmt.Errorf("meta content outdated, the file %v has been deleted", currFile)
 			}
 			return
 		}
@@ -393,7 +395,7 @@ func (m *Meta) GetDoneFiles() (doneFiles []utils.File, err error) {
 	}
 	for _, f := range files {
 		if f.IsDir() {
-			log.Warnf("search file done skipped dir %v", f.Name())
+			log.Warnf("Runner[%v] search file done skipped dir %v", m.RunnerName, f.Name())
 			continue
 		}
 		fname := f.Name()

@@ -47,7 +47,7 @@ func getStartFile(path, whence string, meta *Meta, sf *SeqFile) (f *os.File, dir
 	var pfi os.FileInfo
 	dir, pfi, err = utils.GetRealPath(path)
 	if err != nil || pfi == nil {
-		log.Errorf("%s - utils.GetRealPath failed, err:%v", path, err)
+		err = fmt.Errorf("%s - utils.GetRealPath failed, err:%v", path, err)
 		return
 	}
 	if !pfi.IsDir() {
@@ -138,7 +138,7 @@ func (sf *SeqFile) getIgnoreCondition() func(os.FileInfo) bool {
 		}
 		match, err := filepath.Match(sf.validFilePattern, fi.Name())
 		if err != nil {
-			log.Errorf("when read dir %s, get not valid file pattern. Error->%v", sf.dir, err)
+			log.Errorf("Runner[%v] when read dir %s, get not valid file pattern. Error->%v", sf.meta.RunnerName, sf.dir, err)
 			return false
 		}
 
@@ -202,7 +202,7 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 			}
 			err = sf.newOpen()
 			if err != nil {
-				log.Warnf("%v new open error %v, sleep 3s and retry", sf.dir, err)
+				log.Warnf("Runner[%v] %v new open error %v, sleep 3s and retry", sf.meta.RunnerName, sf.dir, err)
 				time.Sleep(3 * time.Second)
 				continue
 			}
@@ -220,17 +220,17 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 					return n, io.EOF
 				}
 				// dir removed or file rotated
-				log.Debugf("%s - nextFile: %v", sf.dir, err1)
+				log.Debugf("Runner[%v] %s - nextFile: %v", sf.meta.RunnerName, sf.dir, err1)
 				time.Sleep(WaitNoSuchFile)
 				nextFileRetry++
 				continue
 			}
 			if err1 != nil {
-				log.Debugf("%s - nextFile(file exist) but: %v", sf.dir, err1)
+				log.Debugf("Runner[%v] %s - nextFile(file exist) but: %v", sf.meta.RunnerName, sf.dir, err1)
 				return n, err1
 			}
 			if fi != nil {
-				log.Infof("%s - nextFile: %s", sf.dir, fi.Name())
+				log.Infof("Runner[%v] %s - nextFile: %s", sf.meta.RunnerName, sf.dir, fi.Name())
 				err2 := sf.open(fi)
 				if err2 != nil {
 					return n, err2
@@ -252,11 +252,11 @@ func (sf *SeqFile) nextFile() (fi os.FileInfo, err error) {
 	if err != nil {
 		if !os.IsNotExist(err) {
 			// 日志读取错误
-			log.Errorf("stat current file error %v, need retry", err)
+			log.Errorf("Runner[%v] stat current file error %v, need retry", sf.meta.RunnerName, err)
 			return
 		}
 		// 当前读取的文件已经被删除
-		log.Warnf("stat current file error %v, start to find the oldest file", err)
+		log.Warnf("Runner[%v] stat current file error %v, start to find the oldest file", sf.meta.RunnerName, err)
 		condition = sf.getIgnoreCondition()
 	} else {
 		newerThanCurrFile := func(f os.FileInfo) bool {
@@ -266,7 +266,7 @@ func (sf *SeqFile) nextFile() (fi os.FileInfo, err error) {
 	}
 	fi, err = getMinFile(sf.dir, condition, modTimeLater)
 	if err != nil {
-		log.Debugf("getMinFile error %v", err)
+		log.Debugf("Runner[%v] getMinFile error %v", sf.meta.RunnerName, err)
 		return nil, err
 	}
 	if sf.isNewFile(fi, filepath.Join(sf.dir, fi.Name())) {
@@ -290,16 +290,16 @@ func (sf *SeqFile) isNewFile(newFileInfo os.FileInfo, filePath string) bool {
 		return false
 	}
 	if newInode != sf.inode {
-		log.Debugf("%s - newInode: %d, l.inode: %d", sf.dir, newInode, sf.inode)
+		log.Debugf("Runner[%v] %s - newInode: %d, l.inode: %d", sf.meta.RunnerName, sf.dir, newInode, sf.inode)
 		return true
 	}
 	if newFsize < sf.offset {
-		log.Debugf("%s - newFsize: %d, l.offset: %d", sf.dir, newFsize, sf.offset)
+		log.Debugf("Runner[%v] %s - newFsize: %d, l.offset: %d", sf.meta.RunnerName, sf.dir, newFsize, sf.offset)
 		return true
 	}
 	fname := filepath.Base(sf.currFile)
 	if newName != fname {
-		log.Debugf("%s - newName: %d, l.fname: %d", sf.dir, newName, fname)
+		log.Debugf("Runner[%v] %s - newName: %d, l.fname: %d", sf.meta.RunnerName, sf.dir, newName, fname)
 		return true
 	}
 	return false
@@ -344,7 +344,7 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 	}
 	err = sf.f.Close()
 	if err != nil && err != syscall.EINVAL {
-		log.Warnf("%s - %s f.Close: %v", sf.dir, sf.currFile)
+		log.Warnf("Runner[%v] %s - %s f.Close: %v", sf.meta.RunnerName, sf.dir, sf.currFile)
 		return
 	}
 
@@ -354,12 +354,12 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 	for {
 		f, err := os.Open(sf.currFile)
 		if os.IsNotExist(err) {
-			log.Debugf("os.Open %s: %v", fname, err)
+			log.Debugf("Runner[%v] os.Open %s: %v", sf.meta.RunnerName, fname, err)
 			time.Sleep(WaitNoSuchFile)
 			continue
 		}
 		if err != nil {
-			log.Warnf("os.Open %s: %v", fname, err)
+			log.Warnf("Runner[%v] os.Open %s: %v", sf.meta.RunnerName, fname, err)
 			return err
 		}
 		sf.f = f
@@ -373,13 +373,13 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 		if err != nil {
 			return err
 		}
-		log.Infof("%s - start tail new file: %s", sf.dir, fname)
+		log.Infof("Runner[%v] %s - start tail new file: %s", sf.meta.RunnerName, sf.dir, fname)
 		break
 	}
 	for {
 		err = sf.meta.AppendDoneFile(doneFile)
 		if err != nil {
-			log.Errorf("cannot write done file %s, err:%v", doneFile, err)
+			log.Errorf("Runner[%v] cannot write done file %s, err:%v", sf.meta.RunnerName, doneFile, err)
 			time.Sleep(3 * time.Second)
 			continue
 		}
@@ -390,7 +390,7 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 
 func (sf *SeqFile) SyncMeta() (err error) {
 	if sf.lastSyncOffset == sf.offset && sf.lastSyncPath == sf.currFile {
-		log.Debugf("%v was just syncd %v %v ignore it...", sf.Name(), sf.lastSyncPath, sf.lastSyncOffset)
+		log.Debugf("Runner[%v] %v was just syncd %v %v ignore it...", sf.meta.RunnerName, sf.Name(), sf.lastSyncPath, sf.lastSyncOffset)
 		return nil
 	}
 	sf.lastSyncOffset = sf.offset
