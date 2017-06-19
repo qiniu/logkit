@@ -47,11 +47,11 @@ func getStartFile(path, whence string, meta *Meta, sf *SeqFile) (f *os.File, dir
 	var pfi os.FileInfo
 	dir, pfi, err = utils.GetRealPath(path)
 	if err != nil || pfi == nil {
-		err = fmt.Errorf("%s - utils.GetRealPath failed, err:%v", path, err)
+		log.Errorf("%s - utils.GetRealPath failed, err:%v", path, err)
 		return
 	}
 	if !pfi.IsDir() {
-		err = fmt.Errorf("%s -the path is not directory", dir)
+		log.Errorf("%s -the path is not directory", dir)
 		return
 	}
 	currFile, offset, err = meta.ReadOffset()
@@ -191,6 +191,35 @@ func (sf *SeqFile) Close() (err error) {
 	return sf.f.Close()
 }
 
+// 这个函数目前只针对stale NFS file handle的情况，重新打开文件
+func (sf *SeqFile) reopenForESTALE() error {
+	f, err := os.Open(sf.currFile)
+	if err != nil {
+		return fmt.Errorf("%s -cannot reopen currfile file err:%v", sf.currFile, err)
+	}
+
+	_, err = f.Seek(sf.offset, os.SEEK_SET)
+	if err != nil {
+		f.Close()
+		return err
+	}
+	sf.f.Close()
+	sf.f = f
+	if sf.ratereader != nil {
+		sf.ratereader.Close()
+	}
+	sf.ratereader = rateio.NewRateReader(f, sf.meta.readlimit)
+	ninode, err := utils.GetIdentifyIDByFile(f)
+	if err != nil {
+		//为了不影响程序运行
+		log.Errorf("Runner[%v] %v getinode error %v, use old inode", sf.meta.RunnerName, sf.dir, err)
+		err = nil
+	} else {
+		sf.inode = ninode
+	}
+	return nil
+}
+
 func (sf *SeqFile) Read(p []byte) (n int, err error) {
 	var nextFileRetry int
 	n = 0
@@ -208,6 +237,14 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 			}
 		}
 		n1, err = sf.ratereader.Read(p[n:])
+		if err != nil && strings.Contains(err.Error(), "stale NFS file handle") {
+			nerr := sf.reopenForESTALE()
+			if nerr != nil {
+				log.Errorf("Runner[%v] %v meet eror %v reopen error %v", sf.meta.RunnerName, sf.dir, err, nerr)
+				time.Sleep(time.Second)
+			}
+			continue
+		}
 		sf.offset += int64(n1)
 		n += n1
 		if err != nil {

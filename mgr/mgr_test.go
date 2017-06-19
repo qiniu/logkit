@@ -387,6 +387,7 @@ func Test_Watch(t *testing.T) {
 	}
 	m.Stop()
 }
+
 func Test_Watch_LogDir(t *testing.T) {
 	logfile2 := "./tests2/logdir2/log1"
 	logdir2 := "./tests2/logdir2"
@@ -429,10 +430,10 @@ func Test_Watch_LogDir(t *testing.T) {
 		t.Error(err)
 	}
 
-	time.Sleep(time.Duration(DIR_NOT_EXIST_SLEEP_TIME+5) * time.Second)
+	time.Sleep(time.Duration(DIR_NOT_EXIST_SLEEP_TIME) * time.Second)
 
 	if _, ok := m.runners[confPathAbs]; !ok {
-		t.Fatal("runner of \"./tests2/confs1/test5.conf\" exp  after add test5.conf but not")
+		t.Fatal("runner of \"./tests2/confs1/test5.conf\" exp  after add test5.conf but not", m.runners, confPathAbs, time.Now().Format(time.RFC3339Nano))
 	}
 	m.Stop()
 }

@@ -227,11 +227,43 @@ func (sf *SingleFile) Reopen() (err error) {
 	return
 }
 
+func (sf *SingleFile) reopenForESTALE() (err error) {
+	f, err := os.Open(sf.path)
+	if err != nil {
+		return
+	}
+	pfi, err := f.Stat()
+	if err != nil {
+		f.Close()
+		return
+	}
+	_, err = f.Seek(sf.offset, os.SEEK_SET)
+	if err != nil {
+		f.Close()
+		return
+	}
+	sf.f.Close()
+	sf.pfi = pfi
+	sf.f = f
+	if sf.ratereader != nil {
+		sf.ratereader.Close()
+	}
+	sf.ratereader = rateio.NewRateReader(f, sf.meta.readlimit)
+	return
+}
+
 func (sf *SingleFile) Read(p []byte) (n int, err error) {
 	if atomic.LoadInt32(&sf.stopped) > 0 {
 		return 0, errors.New("reader " + sf.Name() + " has been exited")
 	}
 	n, err = sf.ratereader.Read(p)
+	if err != nil && strings.Contains(err.Error(), "stale NFS file handle") {
+		nerr := sf.reopenForESTALE()
+		if nerr != nil {
+			log.Errorf("Runner[%v] %v meet eror %v reopen error %v", sf.meta.RunnerName, sf.path, err, nerr)
+		}
+		return
+	}
 	sf.offset += int64(n)
 	if err == io.EOF {
 		//读到了，如果n大于0，先把EOF抹去，返回

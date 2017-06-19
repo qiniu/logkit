@@ -111,14 +111,13 @@ func LoadEx(conf interface{}, confName string) (err error) {
 
 	data, err := ioutil.ReadFile(confName)
 	if err != nil {
-		log.Error("Load conf failed:", err)
 		return
 	}
 	data = trimComments(data)
 
 	err = json.Unmarshal(data, conf)
 	if err != nil {
-		log.Error("Parse conf failed:", err)
+		log.Errorf("Parse conf %v failed: %v", string(data), err)
 	}
 	return
 }

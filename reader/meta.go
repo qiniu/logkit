@@ -56,7 +56,7 @@ func getValidDir(dir string) (realPath string, err error) {
 	realPath, fi, err := utils.GetRealPath(dir)
 	if os.IsNotExist(err) {
 		if err = os.MkdirAll(realPath, defaultDirPerm); err != nil {
-			err = fmt.Errorf("fail to newMeta cannot create %v, err:%v", realPath, err)
+			log.Errorf("fail to newMeta cannot create %v, err:%v", realPath, err)
 		}
 		return
 	}
@@ -72,13 +72,13 @@ func getValidDir(dir string) (realPath string, err error) {
 func NewMeta(metadir, filedonedir, logpath, mode string, donefileRetention int) (m *Meta, err error) {
 	metadir, err = getValidDir(metadir)
 	if err != nil {
-		err = fmt.Errorf("check dir %v error %v", metadir, err)
+		log.Errorf("check dir %v error %v", metadir, err)
 		return
 	}
 	if filedonedir != metadir {
 		filedonedir, err = getValidDir(filedonedir)
 		if err != nil {
-			err = fmt.Errorf("check dir %v error %v", filedonedir, err)
+			log.Errorf("check dir %v error %v", filedonedir, err)
 			return
 		}
 	}
@@ -264,14 +264,14 @@ func (m *Meta) ReadOffset() (currFile string, offset int64, err error) {
 
 	_, err = fmt.Fscanf(f, metaFormat, &currFile, &offset)
 	if err != nil {
-		err = fmt.Errorf("meta file format err %v", err)
+		log.Errorf("meta file format err %v", err)
 		return
 	}
 	if m.mode == ModeDir || m.mode == ModeFile {
 		_, err = os.Stat(currFile)
 		if err != nil {
 			if os.IsNotExist(err) {
-				err = fmt.Errorf("meta content outdated, the file %v has been deleted", currFile)
+				log.Errorf("meta content outdated, the file %v has been deleted", currFile)
 			}
 			return
 		}
