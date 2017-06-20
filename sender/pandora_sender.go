@@ -244,8 +244,11 @@ func parseUserSchema(repoName, schema string) (us UserSchema) {
 
 func (s *PandoraSender) UpdateSchemas() {
 	schemas, err := s.client.GetUpdateSchemas(s.repoName)
-	if err != nil {
+	if err != nil && !s.schemaFree {
 		log.Errorf("Runner[%v] Sender[%v]: update pandora repo <%v> schema error %v", s.runnerName, s.name, s.repoName, err)
+		return
+	}
+	if schemas == nil {
 		return
 	}
 	s.updateMux.Lock()

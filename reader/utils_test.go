@@ -74,4 +74,9 @@ func TestHeadPatternMode(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, headreg, reg)
 	}
+	headreg, err = regexp.Compile("^{\n$")
+	assert.NoError(t, err)
+	ret := headreg.Match([]byte(`{
+`))
+	assert.Equal(t, true, ret)
 }

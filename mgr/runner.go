@@ -243,7 +243,7 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []sender.Data, times in
 				cnt++
 				continue
 			}
-			log.Errorf("Runner[%v] retry send %v times, but still error %v, discard datas %v ... total %v lines", r.RunnerName, cnt, err, datas[0], len(datas))
+			log.Errorf("Runner[%v] retry send %v times, but still error %v, discard datas %v ... total %v lines", r.RunnerName, cnt, err, datas, len(datas))
 		}
 		break
 	}
