@@ -56,6 +56,7 @@ func getValidDir(dir string) (realPath string, err error) {
 	realPath, fi, err := utils.GetRealPath(dir)
 	if os.IsNotExist(err) {
 		if err = os.MkdirAll(realPath, defaultDirPerm); err != nil {
+			//此处的error需要直接返回，后面会根据error类型是否为path error做判断
 			log.Errorf("fail to newMeta cannot create %v, err:%v", realPath, err)
 		}
 		return
@@ -72,12 +73,14 @@ func getValidDir(dir string) (realPath string, err error) {
 func NewMeta(metadir, filedonedir, logpath, mode string, donefileRetention int) (m *Meta, err error) {
 	metadir, err = getValidDir(metadir)
 	if err != nil {
+		//此处的error需要直接返回，后面会根据error类型是否为path error做判断
 		log.Errorf("check dir %v error %v", metadir, err)
 		return
 	}
 	if filedonedir != metadir {
 		filedonedir, err = getValidDir(filedonedir)
 		if err != nil {
+			//此处的error需要直接返回，后面会根据error类型是否为path error做判断
 			log.Errorf("check dir %v error %v", filedonedir, err)
 			return
 		}
@@ -264,7 +267,7 @@ func (m *Meta) ReadOffset() (currFile string, offset int64, err error) {
 
 	_, err = fmt.Fscanf(f, metaFormat, &currFile, &offset)
 	if err != nil {
-		log.Errorf("meta file format err %v", err)
+		log.Debugf("meta file format err %v", err)
 		return
 	}
 	if m.mode == ModeDir || m.mode == ModeFile {
