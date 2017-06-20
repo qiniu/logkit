@@ -19,6 +19,7 @@ type LogParser interface {
 const (
 	KeyParserName = utils.GlobalKeyName
 	KeyParserType = "type"
+	KeyRunnerName = "runner_name"
 	KeyLabels     = "labels" // 额外增加的标签信息，比如机器信息等
 )
 
@@ -54,8 +55,8 @@ func NewParserRegistry() *ParserRegistry {
 	ps.RegisterParser(TypeKafkaRest, NewKafaRestlogParser)
 	ps.RegisterParser(TypeEmpty, NewEmptyParser)
 	ps.RegisterParser(TypeGrok, NewGrokParser)
-	ps.RegisterParser(TypeInnerSQL, NewInternalSQLParser)
-	ps.RegisterParser(TypeInnerMysql, NewInternalSQLParser) //兼容
+	ps.RegisterParser(TypeInnerSQL, NewJsonParser)   //兼容
+	ps.RegisterParser(TypeInnerMysql, NewJsonParser) //兼容
 	ps.RegisterParser(TypeJson, NewJsonParser)
 	return ps
 }

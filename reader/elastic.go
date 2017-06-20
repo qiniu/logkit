@@ -34,7 +34,7 @@ func NewESReader(meta *Meta, readBatch int, estype, esindex, eshost, keepAlive s
 
 	offset, _, err := meta.ReadOffset()
 	if err != nil {
-		log.Errorf("%v -meta data is corrupted err:%v, omit meta data", meta.MetaFile(), err)
+		log.Errorf("Runner[%v] %v -meta data is corrupted err:%v, omit meta data", meta.RunnerName, meta.MetaFile(), err)
 	}
 	er = &ElasticReader{
 		esindex:   esindex,
@@ -63,7 +63,7 @@ func (er *ElasticReader) Source() string {
 
 func (er *ElasticReader) Close() (err error) {
 	if atomic.CompareAndSwapInt32(&er.status, StatusRunning, StatusStoping) {
-		log.Infof("%v stopping", er.Name())
+		log.Infof("Runner[%v] %v stopping", er.meta.RunnerName, er.Name())
 	} else {
 		close(er.readChan)
 	}
@@ -79,7 +79,7 @@ func (er *ElasticReader) Start() {
 	}
 	go er.run()
 	er.started = true
-	log.Printf("%v pull data deamon started", er.Name())
+	log.Infof("Runner[%v] %v pull data deamon started", er.meta.RunnerName, er.Name())
 }
 
 func (er *ElasticReader) ReadLine() (data string, err error) {
@@ -111,7 +111,7 @@ func (er *ElasticReader) run() {
 		if atomic.CompareAndSwapInt32(&er.status, StatusStoping, StatusStopped) {
 			close(er.readChan)
 		}
-		log.Infof("%v successfully finnished", er.Name())
+		log.Infof("Runner[%v] %v successfully finished", er.meta.RunnerName, er.Name())
 	}()
 
 	// 开始work逻辑
@@ -152,7 +152,7 @@ func (er *ElasticReader) exec() (err error) {
 		}
 		er.offset = results.ScrollId
 		if atomic.LoadInt32(&er.status) == StatusStoping {
-			log.Warnf("%v stopped from running", er.Name())
+			log.Warnf("Runner[%v] %v stopped from running", er.meta.RunnerName, er.Name())
 			return nil
 		}
 	}
@@ -161,11 +161,11 @@ func (er *ElasticReader) exec() (err error) {
 //SyncMeta 从队列取数据时同步队列，作用在于保证数据不重复。
 func (er *ElasticReader) SyncMeta() {
 	if err := er.meta.WriteOffset(er.offset, 0); err != nil {
-		log.Errorf("%v SyncMeta error %v", er.Name(), err)
+		log.Errorf("Runner[%v] %v SyncMeta error %v", er.meta.RunnerName, er.Name(), err)
 	}
 	return
 }
 
 func (er *ElasticReader) SetMode(mode string, v interface{}) error {
-	return errors.New("ElasticReader not support readmode")
+	return errors.New("ElasticReader not support read mode")
 }

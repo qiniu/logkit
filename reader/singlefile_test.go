@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/qiniu/logkit/utils"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,7 +35,8 @@ func Test_singleFileRotate(t *testing.T) {
 	absPath, err := filepath.Abs(fileName)
 	assert.NoError(t, err)
 	assert.Equal(t, absPath, sf.Source())
-	oldInode := getInode(sf.pfi)
+	oldInode, err := utils.GetIdentifyIDByPath(absPath)
+	assert.NoError(t, err)
 
 	//rotate file(rename old file + create new file)
 	renameTestFile(fileName, fileNameRotated)
@@ -54,7 +57,8 @@ func Test_singleFileRotate(t *testing.T) {
 		t.Error(err)
 	}
 
-	newInode := getInode(sf.pfi)
+	newInode, err := utils.GetIdentifyIDByPath(fileName)
+	assert.NoError(t, err)
 	assert.NotEqual(t, newInode, oldInode)
 
 	assert.Equal(t, 5, n)
@@ -83,7 +87,8 @@ func Test_singleFileNotRotate(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	oldInode := getInode(sf.pfi)
+	oldInode, err := utils.GetIdentifyIDByFile(sf.f)
+	assert.NoError(t, err)
 
 	//read file 正常读
 	p := make([]byte, 5)
@@ -98,7 +103,8 @@ func Test_singleFileNotRotate(t *testing.T) {
 	n, err = sf.Read(p)
 	assert.Equal(t, io.EOF, err)
 
-	newInode := getInode(sf.pfi)
+	newInode, err := utils.GetIdentifyIDByFile(sf.f)
+	assert.NoError(t, err)
 	assert.Equal(t, newInode, oldInode)
 
 	//append文件

@@ -39,8 +39,10 @@ const (
 	KeyBufSize       = "reader_buf_size"
 	KeyWhence        = "read_from"
 	KeyEncoding      = "encoding"
+	KeyReadIOLimit   = "readio_limit"
 	KeyDataSourceTag = "datasource_tag"
 	KeyHeadPattern   = "head_pattern"
+	KeyRunnerName    = "runner_name"
 
 	// 忽略隐藏文件
 	KeyIgnoreHiddenFile = "ignore_hidden"
@@ -131,6 +133,7 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta) (reader Reader, err
 	if err != nil && (mode == ModeFile || mode == ModeDir || mode == ModeTailx) {
 		return
 	}
+	err = nil
 	bufSize, _ := conf.GetIntOr(KeyBufSize, defaultBufSize)
 	whence, _ := conf.GetStringOr(KeyWhence, WhenceOldest)
 	decoder, _ := conf.GetStringOr(KeyEncoding, "")

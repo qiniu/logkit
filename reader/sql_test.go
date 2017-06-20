@@ -159,10 +159,12 @@ func TestSQLReader(t *testing.T) {
 	mr.syncSQLs = testsqls
 
 	//测试getSQL
-	gotSQL := mr.getSQL(2)
+	gotSQL, err := mr.getSQL(2)
+	assert.NoError(t, err)
 	assert.EqualValues(t, testsqls[2]+" WHERE id >= 0 AND id < 100;", gotSQL)
 	mr.offsetKey = ""
-	gotSQL = mr.getSQL(0)
+	gotSQL, err = mr.getSQL(0)
+	assert.NoError(t, err)
 	assert.EqualValues(t, testsqls[0]+" LIMIT 123,223;", gotSQL)
 }
 

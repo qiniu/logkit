@@ -72,7 +72,7 @@ func (kr *KafkaReader) ReadLine() (data string, err error) {
 }
 func (kr *KafkaReader) Close() (err error) {
 	if atomic.CompareAndSwapInt32(&kr.status, StatusRunning, StatusStoping) {
-		log.Infof("%v stopping", kr.Name())
+		log.Infof("Runner[%v] %v stopping", kr.meta.RunnerName, kr.Name())
 	} else {
 		close(kr.readChan)
 	}
@@ -95,8 +95,7 @@ func (kr *KafkaReader) Start() {
 	case "newest":
 		config.Offsets.Initial = sarama.OffsetNewest
 	default:
-		log.Printf("I! WARNING: Kafka consumer invalid offset '%s', using 'oldest'\n",
-			kr.Whence)
+		log.Warnf("Runner[%v] WARNING: Kafka consumer invalid offset '%s', using 'oldest'\n", kr.meta.RunnerName, kr.Whence)
 		config.Offsets.Initial = sarama.OffsetNewest
 	}
 	if kr.Consumer == nil {
@@ -115,7 +114,7 @@ func (kr *KafkaReader) Start() {
 	}
 	go kr.run()
 	kr.started = true
-	log.Printf("%v pull data deamon started", kr.Name())
+	log.Infof("Runner[%v] %v pull data daemon started", kr.meta.RunnerName, kr.Name())
 }
 
 func (kr *KafkaReader) run() {
@@ -134,18 +133,18 @@ func (kr *KafkaReader) run() {
 		if atomic.CompareAndSwapInt32(&kr.status, StatusStoping, StatusStopped) {
 			close(kr.readChan)
 		}
-		log.Infof("%v successfully finnished", kr.Name())
+		log.Infof("Runner[%v] %v successfully finished", kr.meta.RunnerName, kr.Name())
 	}()
 	// 开始work逻辑
 	for {
 		if atomic.LoadInt32(&kr.status) == StatusStoping {
-			log.Warnf("%v stopped from running", kr.Name())
+			log.Warnf("Runner[%v] %v stopped from running", kr.meta.RunnerName, kr.Name())
 			return
 		}
 		select {
 		case err := <-kr.errs:
 			if err != nil {
-				log.Errorf("Consumer Error: %s\n", err)
+				log.Errorf("Runner[%v] Consumer Error: %s\n", kr.meta.RunnerName, err)
 			}
 		case msg := <-kr.in:
 			kr.readChan <- msg.Value
@@ -155,5 +154,5 @@ func (kr *KafkaReader) run() {
 }
 
 func (kr *KafkaReader) SetMode(mode string, v interface{}) error {
-	return errors.New("KafkaReader not support readmode")
+	return errors.New("KafkaReader not support read mode")
 }

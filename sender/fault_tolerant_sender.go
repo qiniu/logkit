@@ -10,6 +10,7 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/queue"
 	"github.com/qiniu/logkit/utils"
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 )
 
 const (
@@ -48,6 +49,7 @@ type FtSender struct {
 	backupOnly  bool // 是否只使用backup queue
 	procs       int  //发送并发数
 	se          *utils.StatsError
+	runnerName  string
 }
 
 type datasContext struct {
@@ -64,10 +66,11 @@ func NewFtSender(sender Sender, conf conf.MapConf) (*FtSender, error) {
 	writeLimit, _ := conf.GetIntOr(KeyFtWriteLimit, defaultWriteLimit)
 	strategy, _ := conf.GetStringOr(KeyFtStrategy, KeyFtStrategyAlwaysSave)
 	procs, _ := conf.GetIntOr(KeyFtProcs, defaultMaxProcs)
-	return newFtSender(sender, logpath, int64(syncEvery), writeLimit, strategy == KeyFtStrategyBackupOnly, procs)
+	runnerName, _ := conf.GetStringOr(KeyRunnerName, UnderfinedRunnerName)
+	return newFtSender(sender, logpath, int64(syncEvery), writeLimit, strategy == KeyFtStrategyBackupOnly, procs, runnerName)
 }
 
-func newFtSender(innerSender Sender, saveLogPath string, syncEvery int64, writeLimit int, backupOnly bool, procs int) (*FtSender, error) {
+func newFtSender(innerSender Sender, saveLogPath string, syncEvery int64, writeLimit int, backupOnly bool, procs int, runnerName string) (*FtSender, error) {
 	err := utils.CreateDirIfNotExist(saveLogPath)
 	if err != nil {
 		return nil, err
@@ -84,6 +87,7 @@ func newFtSender(innerSender Sender, saveLogPath string, syncEvery int64, writeL
 		backupOnly:  backupOnly,
 		procs:       procs,
 		se:          &utils.StatsError{Ft: true},
+		runnerName:  runnerName,
 	}
 	go ftSender.asyncSendLogFromDiskQueue()
 	return &ftSender, nil
@@ -98,7 +102,7 @@ func (ft *FtSender) Send(datas []Data) error {
 		// 尝试直接发送数据，当数据失败的时候会加入到本地重试队列。外部不需要重试
 		err := ft.trySendDatas(datas, 1)
 		if err != nil {
-			log.Warn(ft.innerSender.Name() + " trySendDatas err" + err.Error())
+			log.Warnf("Runner[%v] Sender[%v] try Send Datas err: %v", ft.runnerName, ft.innerSender.Name(), err)
 			ft.se.AddErrors()
 		} else {
 			ft.se.AddSuccess()
@@ -119,7 +123,7 @@ func (ft *FtSender) Send(datas []Data) error {
 
 func (ft *FtSender) Close() error {
 	atomic.AddInt32(&ft.stopped, 1)
-	log.Warn("wait for sender " + ft.Name() + " completely exit")
+	log.Warnf("Runner[%v] wait for Sender[%v] to completely exit", ft.runnerName, ft.Name())
 	// 等待错误恢复流程退出
 	<-ft.exitChan
 	// 等待正常发送流程退出
@@ -127,7 +131,7 @@ func (ft *FtSender) Close() error {
 		<-ft.exitChan
 	}
 
-	log.Warn(ft.Name() + " has been completely exited")
+	log.Warnf("Runner[%v] Sender[%v] has been completely exited", ft.runnerName, ft.Name())
 
 	// persist queue's meta data
 	ft.logQueue.Close()
@@ -189,6 +193,14 @@ func (ft *FtSender) trySendBytes(dat []byte, failSleep int) (err error) {
 	return ft.trySendDatas(datas, failSleep)
 }
 
+func convertDatas(ins []map[string]interface{}) []Data {
+	var datas []Data
+	for _, v := range ins {
+		datas = append(datas, Data(v))
+	}
+	return datas
+}
+
 // trySendDatas 尝试发送数据，如果失败，将失败数据加入backup queue，并睡眠指定时间。返回结果为是否正常发送
 func (ft *FtSender) trySendDatas(datas []Data, failSleep int) (err error) {
 	err = ft.innerSender.Send(datas)
@@ -196,17 +208,17 @@ func (ft *FtSender) trySendDatas(datas []Data, failSleep int) (err error) {
 		err = c.ErrorDetail
 	}
 	if err != nil {
-		log.Errorf("%s cannot write points + %v", ft.innerSender.Name(), err)
+		log.Errorf("Runner[%v] Sender[%v] cannot write points + %v", ft.runnerName, ft.innerSender.Name(), err)
 		failCtx := new(datasContext)
 		var binaryUnpack bool
-		se, succ := err.(*SendError)
+		se, succ := err.(*reqerr.SendError)
 		if !succ {
 			// 如果不是SendError 默认所有的数据都发送失败
-			log.Infof("error type is not *SendError! reSend all datas by default")
+			log.Infof("Runner[%v] Sender[%v] error type is not *SendError! reSend all datas by default", ft.runnerName, ft.innerSender.Name())
 			failCtx.Datas = datas
 		} else {
-			failCtx.Datas = se.failDatas
-			if se.ErrorType == TypeBinaryUnpack {
+			failCtx.Datas = convertDatas(se.GetFailDatas())
+			if se.ErrorType == reqerr.TypeBinaryUnpack {
 				binaryUnpack = true
 			}
 		}
@@ -239,7 +251,7 @@ func (ft *FtSender) sendFromStreamQueue() {
 		case dat := <-readChan:
 			err := ft.trySendBytes(dat, 1)
 			if err != nil {
-				log.Errorf("%s cannot send points from queue %v, error %v", ft.innerSender.Name(), ft.logQueue.Name(), err)
+				log.Errorf("Runner[%v] Sender[%v] cannot send points from queue %v, error %v", ft.runnerName, ft.innerSender.Name(), ft.logQueue.Name(), err)
 				ft.se.AddErrors()
 			} else {
 				ft.se.AddSuccess()
@@ -266,7 +278,7 @@ func (ft *FtSender) retryFromBackupQueue() {
 				waitCnt = 1
 				ft.se.AddSuccess()
 			} else {
-				log.Errorf("%s cannot send points from queue %v, error is %v", ft.innerSender.Name(), ft.backupQueue.Name(), err)
+				log.Errorf("Runner[%v] Sender[%v] cannot send points from queue %v, error is %v", ft.runnerName, ft.innerSender.Name(), ft.backupQueue.Name(), err)
 				ft.se.AddErrors()
 				waitCnt++
 				if waitCnt > 10 {

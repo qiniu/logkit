@@ -11,7 +11,6 @@ import (
 	"sort"
 	"strings"
 	"sync/atomic"
-	"syscall"
 
 	"github.com/qiniu/log"
 )
@@ -95,20 +94,6 @@ func GetRealPath(path string) (newPath string, fi os.FileInfo, err error) {
 		return
 	}
 	return
-}
-
-// getInode 获得文件inode
-func GetInode(f os.FileInfo) uint64 {
-	s := f.Sys()
-	if s == nil {
-		return 0
-	}
-	switch s := s.(type) {
-	case *syscall.Stat_t:
-		return s.Ino
-	default:
-		return 0
-	}
 }
 
 func GetLogFiles(doneFilePath string) (files []File) {
