@@ -91,38 +91,38 @@
 		{
 			"checksumSHA1": "BV7Dv4SQ2mhpGqlmuDo0Evit410=",
 			"path": "github.com/qiniu/pandora-go-sdk/base",
-			"revision": "48e9f45d86df0034a71bf63ea434071e3d7c9dc5",
-			"revisionTime": "2017-06-17T13:21:06Z"
+			"revision": "37b1f9a6c47fb89bfcf921b86e6f606cdcdf0702",
+			"revisionTime": "2017-06-21T07:13:10Z"
 		},
 		{
 			"checksumSHA1": "2eR9tUVg71UUdjjfO9ntJF1bp/c=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/config",
-			"revision": "48e9f45d86df0034a71bf63ea434071e3d7c9dc5",
-			"revisionTime": "2017-06-17T13:21:06Z"
+			"revision": "37b1f9a6c47fb89bfcf921b86e6f606cdcdf0702",
+			"revisionTime": "2017-06-21T07:13:10Z"
 		},
 		{
 			"checksumSHA1": "gmWdZ+75y1U5KEL6uW9RI/xRUTU=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/ratelimit",
-			"revision": "48e9f45d86df0034a71bf63ea434071e3d7c9dc5",
-			"revisionTime": "2017-06-17T13:21:06Z"
+			"revision": "37b1f9a6c47fb89bfcf921b86e6f606cdcdf0702",
+			"revisionTime": "2017-06-21T07:13:10Z"
 		},
 		{
 			"checksumSHA1": "80AUzmIfkt58GfDMSAjChnHDkb0=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/reqerr",
-			"revision": "48e9f45d86df0034a71bf63ea434071e3d7c9dc5",
-			"revisionTime": "2017-06-17T13:21:06Z"
+			"revision": "37b1f9a6c47fb89bfcf921b86e6f606cdcdf0702",
+			"revisionTime": "2017-06-21T07:13:10Z"
 		},
 		{
 			"checksumSHA1": "WBDapF35xL+xobLwW0LOwhCQcbs=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/request",
-			"revision": "48e9f45d86df0034a71bf63ea434071e3d7c9dc5",
-			"revisionTime": "2017-06-17T13:21:06Z"
+			"revision": "37b1f9a6c47fb89bfcf921b86e6f606cdcdf0702",
+			"revisionTime": "2017-06-21T07:13:10Z"
 		},
 		{
-			"checksumSHA1": "Ixy9UYeE/6Q+hd3XwtwoApH/ZAY=",
+			"checksumSHA1": "llGE9DTFXeidv5GH4faDGS+/zzM=",
 			"path": "github.com/qiniu/pandora-go-sdk/pipeline",
-			"revision": "48e9f45d86df0034a71bf63ea434071e3d7c9dc5",
-			"revisionTime": "2017-06-17T13:21:06Z"
+			"revision": "37b1f9a6c47fb89bfcf921b86e6f606cdcdf0702",
+			"revisionTime": "2017-06-21T07:13:10Z"
 		},
 		{
 			"checksumSHA1": "KAzbLjI9MzW2tjfcAsK75lVRp6I=",
