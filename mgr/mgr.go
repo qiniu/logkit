@@ -317,6 +317,9 @@ func (m *Manager) addWatchers(confsPath []string) (err error) {
 			log.Errorf("filepath.Glob(%s): %v, err:%v", dir, paths, err)
 			continue
 		}
+		if len(paths) <= 0 {
+			log.Warnf("confPath Config %v can not find any real conf dir", dir)
+		}
 		for _, path := range paths {
 			_, exist := m.watchers[path]
 			if exist {
