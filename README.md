@@ -120,6 +120,7 @@ logkit.conf是logkit工具本身的配置文件，主要用于指定logkit运行
 ```
 go get -u github.com/kardianos/govendor
 govendor sync
+go get ./...
 go build -o logkit logkit.go
 ./logkit -f logkit.conf
 ```
