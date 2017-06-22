@@ -8,6 +8,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/utils"
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
 	"github.com/qiniu/log"
 	mgo "gopkg.in/mgo.v2"
@@ -140,7 +141,7 @@ func (s *MongoAccSender) Send(datas []Data) (se error) {
 		}
 	}
 	if len(failure) > 0 && lastErr != nil {
-		ss.ErrorDetail = NewSendError("Write failure, last err is: "+lastErr.Error(), failure, TypeDefault)
+		ss.ErrorDetail = reqerr.NewSendError("Write failure, last err is: "+lastErr.Error(), convertDatasBack(failure), reqerr.TypeDefault)
 	}
 	return ss
 }

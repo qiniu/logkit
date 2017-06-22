@@ -146,7 +146,7 @@ func (ft *FtSender) marshalData(datas []Data) (bs []byte, err error) {
 	ctx.Datas = datas
 	bs, err = json.Marshal(ctx)
 	if err != nil {
-		err = NewSendError("Cannot marshal data :"+err.Error(), datas, TypeDefault)
+		err = reqerr.NewSendError("Cannot marshal data :"+err.Error(), convertDatasBack(datas), reqerr.TypeDefault)
 		return
 	}
 	return
@@ -172,7 +172,7 @@ func (ft *FtSender) saveToFile(datas []Data) error {
 	}
 	err = ft.logQueue.Put(bs)
 	if err != nil {
-		return NewSendError(ft.innerSender.Name()+" Cannot put data into diskqueue :"+err.Error(), datas, TypeDefault)
+		return reqerr.NewSendError(ft.innerSender.Name()+" Cannot put data into diskqueue :"+err.Error(), convertDatasBack(datas), reqerr.TypeDefault)
 	}
 	return nil
 }
@@ -197,6 +197,13 @@ func convertDatas(ins []map[string]interface{}) []Data {
 	var datas []Data
 	for _, v := range ins {
 		datas = append(datas, Data(v))
+	}
+	return datas
+}
+func convertDatasBack(ins []Data) []map[string]interface{} {
+	var datas []map[string]interface{}
+	for _, v := range ins {
+		datas = append(datas, map[string]interface{}(v))
 	}
 	return datas
 }

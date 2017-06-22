@@ -89,40 +89,40 @@
 			"revisionTime": "2014-07-28T01:09:19Z"
 		},
 		{
-			"checksumSHA1": "BV7Dv4SQ2mhpGqlmuDo0Evit410=",
+			"checksumSHA1": "Lw565VsqZR8sXIMTcjqmVYHzrvI=",
 			"path": "github.com/qiniu/pandora-go-sdk/base",
-			"revision": "37b1f9a6c47fb89bfcf921b86e6f606cdcdf0702",
-			"revisionTime": "2017-06-21T07:13:10Z"
+			"revision": "1a0cb50c76ad4d1a2f60ab971f0b8253ff26a7cf",
+			"revisionTime": "2017-06-22T10:32:14Z"
 		},
 		{
 			"checksumSHA1": "2eR9tUVg71UUdjjfO9ntJF1bp/c=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/config",
-			"revision": "37b1f9a6c47fb89bfcf921b86e6f606cdcdf0702",
-			"revisionTime": "2017-06-21T07:13:10Z"
+			"revision": "1a0cb50c76ad4d1a2f60ab971f0b8253ff26a7cf",
+			"revisionTime": "2017-06-22T10:32:14Z"
 		},
 		{
 			"checksumSHA1": "gmWdZ+75y1U5KEL6uW9RI/xRUTU=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/ratelimit",
-			"revision": "37b1f9a6c47fb89bfcf921b86e6f606cdcdf0702",
-			"revisionTime": "2017-06-21T07:13:10Z"
+			"revision": "1a0cb50c76ad4d1a2f60ab971f0b8253ff26a7cf",
+			"revisionTime": "2017-06-22T10:32:14Z"
 		},
 		{
 			"checksumSHA1": "80AUzmIfkt58GfDMSAjChnHDkb0=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/reqerr",
-			"revision": "37b1f9a6c47fb89bfcf921b86e6f606cdcdf0702",
-			"revisionTime": "2017-06-21T07:13:10Z"
+			"revision": "1a0cb50c76ad4d1a2f60ab971f0b8253ff26a7cf",
+			"revisionTime": "2017-06-22T10:32:14Z"
 		},
 		{
 			"checksumSHA1": "WBDapF35xL+xobLwW0LOwhCQcbs=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/request",
-			"revision": "37b1f9a6c47fb89bfcf921b86e6f606cdcdf0702",
-			"revisionTime": "2017-06-21T07:13:10Z"
+			"revision": "1a0cb50c76ad4d1a2f60ab971f0b8253ff26a7cf",
+			"revisionTime": "2017-06-22T10:32:14Z"
 		},
 		{
-			"checksumSHA1": "llGE9DTFXeidv5GH4faDGS+/zzM=",
+			"checksumSHA1": "ya01OF0uaMZQzfWJ+CSbrAw4AR8=",
 			"path": "github.com/qiniu/pandora-go-sdk/pipeline",
-			"revision": "37b1f9a6c47fb89bfcf921b86e6f606cdcdf0702",
-			"revisionTime": "2017-06-21T07:13:10Z"
+			"revision": "1a0cb50c76ad4d1a2f60ab971f0b8253ff26a7cf",
+			"revisionTime": "2017-06-22T10:32:14Z"
 		},
 		{
 			"checksumSHA1": "KAzbLjI9MzW2tjfcAsK75lVRp6I=",
