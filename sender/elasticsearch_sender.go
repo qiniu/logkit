@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"strings"
 
+	"gopkg.in/olivere/elastic.v3"
+
 	"github.com/qiniu/logkit/conf"
 
 	"github.com/qiniu/log"
-	"gopkg.in/olivere/elastic.v3"
 )
 
 type ElasticsearchSender struct {

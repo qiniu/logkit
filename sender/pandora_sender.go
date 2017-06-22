@@ -15,6 +15,7 @@ import (
 	"github.com/qiniu/logkit/utils"
 
 	pipelinebase "github.com/qiniu/pandora-go-sdk/base"
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 
 	gouuid "github.com/satori/go.uuid"
@@ -429,7 +430,7 @@ func (s *PandoraSender) checkSchemaUpdate() {
 func (s *PandoraSender) Send(datas []Data) (se error) {
 	s.checkSchemaUpdate()
 	if !s.schemaFree && (len(s.schemas) <= 0 || len(s.alias2key) <= 0) {
-		se = NewSendError("Get pandora schema error, faild to send data", datas, TypeDefault)
+		se = reqerr.NewSendError("Get pandora schema error, faild to send data", convertDatasBack(datas), reqerr.TypeDefault)
 		return
 	}
 	var points pipeline.Datas

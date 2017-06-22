@@ -19,6 +19,7 @@ import (
 	"github.com/qiniu/logkit/times"
 
 	"github.com/qiniu/log"
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 	"github.com/stretchr/testify/assert"
 )
@@ -218,12 +219,12 @@ func TestPandoraSender(t *testing.T) {
 	if err == nil {
 		t.Error(fmt.Errorf("should get as send LetGetRepoError error but nil"))
 	}
-	se, ok := err.(*SendError)
+	se, ok := err.(*reqerr.SendError)
 	if !ok {
 		t.Error("should pasred as Send Error")
 	}
 	pandora.LetGetRepoError(false)
-	err = s.Send(se.failDatas)
+	err = s.Send(convertDatas(se.GetFailDatas()))
 	if err != nil {
 		t.Error(err)
 	}
