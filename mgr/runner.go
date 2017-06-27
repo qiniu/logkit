@@ -344,7 +344,7 @@ func (r *LogExportRunner) Run() {
 		for _, s := range r.senders {
 			if !r.trySend(s, datas, r.MaxBatchTryTimes) {
 				success = false
-				log.Errorf("Runner[%v] failed to send data: << %v >>", datas, r.Name())
+				log.Errorf("Runner[%v] failed to send data: << %v >>", r.Name(), datas)
 				break
 			}
 		}

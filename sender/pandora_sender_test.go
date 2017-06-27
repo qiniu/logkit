@@ -320,7 +320,7 @@ func TestPandoraSender(t *testing.T) {
 	d["ac"] = 0
 	d["d"] = 1477373632504888
 	d["ax"] = "b"
-	s.updateInterval = 0
+	s.opt.updateInterval = 0
 	err = s.Send([]Data{d})
 	if err != nil {
 		t.Error(err)
