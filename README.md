@@ -12,8 +12,8 @@ logkit是[七牛Pandora](https://pandora-docs.qiniu.com)开发的一个通用的
 
 1. 文件(包括csv格式的文件，kafka-rest日志文件，nginx日志文件等,并支持以[grok](https://www.elastic.co/blog/do-you-grok-grok)的方式解析日志)
 1. MySQL
-1. Microsoft SQL Server(MSSQL)
-1. ElasticSearch
+1. Microsoft SQL Server(MS SQL)
+1. Elasticsearch
 1. MongoDB
 
 ## 工作方式
