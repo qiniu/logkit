@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"os"
+
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/cleaner"
 	"github.com/qiniu/logkit/conf"
@@ -243,7 +245,7 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []sender.Data, times in
 				cnt++
 				continue
 			}
-			log.Errorf("Runner[%v] retry send %v times, but still error %v, discard datas %v ... total %v lines", r.RunnerName, cnt, err, datas[0], len(datas))
+			log.Errorf("Runner[%v] retry send %v times, but still error %v, discard datas %v ... total %v lines", r.RunnerName, cnt, err, datas, len(datas))
 		}
 		break
 	}
@@ -342,7 +344,7 @@ func (r *LogExportRunner) Run() {
 		for _, s := range r.senders {
 			if !r.trySend(s, datas, r.MaxBatchTryTimes) {
 				success = false
-				log.Errorf("Runner[%v] failed to send data: << %v >>", datas, r.Name())
+				log.Errorf("Runner[%v] failed to send data: << %v >>", r.Name(), datas)
 				break
 			}
 		}
@@ -441,23 +443,36 @@ func (r *LogExportRunner) LagStats() (rl RunnerLag, err error) {
 		log.Errorf("Runner[%v] parse log meta error %v, can't get stats", r.Name(), err)
 		return
 	}
-
-	logs, err := utils.ReadDirByTime(r.meta.LogPath())
-	if err != nil {
-		log.Warnf("Runner[%v] ReadDirByTime err %v, can't get stats", r.Name(), err)
-		return
-	}
-	logreading = filepath.Base(logreading)
 	rl = RunnerLag{Files: 0, Size: -size}
-	for _, l := range logs {
-		if l.IsDir() {
-			continue
+	logpath := r.meta.LogPath()
+	switch r.meta.GetMode() {
+	case reader.DirMode:
+		logs, serr := utils.ReadDirByTime(logpath)
+		if serr != nil {
+			log.Warnf("Runner[%v] ReadDirByTime err %v, can't get stats", r.Name(), serr)
+			err = serr
+			return
 		}
-		rl.Size += l.Size()
-		if l.Name() == logreading {
-			break
+		logreading = filepath.Base(logreading)
+		for _, l := range logs {
+			if l.IsDir() {
+				continue
+			}
+			rl.Size += l.Size()
+			if l.Name() == logreading {
+				break
+			}
+			rl.Files++
 		}
-		rl.Files++
+	case reader.FileMode:
+		fi, serr := os.Stat(logpath)
+		if serr != nil {
+			err = serr
+			return
+		}
+		rl.Size += fi.Size()
+	default:
+		err = fmt.Errorf("Runner[%v] readmode %v not support LagStats, can't get stats", r.Name(), r.meta.GetMode())
 	}
 	return
 }
@@ -471,9 +486,6 @@ func (r *LogExportRunner) Status() RunnerStatus {
 		return r.rs
 	}
 	r.rs.Lag = rl
-	//self assign
-	//r.rs.ParserStats = r.rs.ParserStats
-	//r.rs.SenderStats = r.rs.SenderStats
 	return r.rs
 }
 

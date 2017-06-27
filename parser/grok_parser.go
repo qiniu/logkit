@@ -296,14 +296,14 @@ func (p *GrokParser) parseLine(line string) (sender.Data, error) {
 		case LONG:
 			iv, err := strconv.ParseInt(v, 10, 64)
 			if err != nil {
-				log.Debugf("E! Error parsing %s to long: %s", v, err)
+				log.Warnf("E! Error parsing %s to long: %s, ignore this field...", v, err)
 			} else {
 				data[k] = iv
 			}
 		case FLOAT:
 			fv, err := strconv.ParseFloat(v, 64)
 			if err != nil {
-				log.Debugf("E! Error parsing %s to float: %s", v, err)
+				log.Warnf("E! Error parsing %s to float: %s, ignore this field...", v, err)
 			} else {
 				data[k] = fv
 			}
@@ -314,7 +314,7 @@ func (p *GrokParser) parseLine(line string) (sender.Data, error) {
 				rfctime := ts.Format(time.RFC3339Nano)
 				data[k] = rfctime
 			} else {
-				log.Debugf("E! Error parsing %s to time layout [%s]: %s", v, t, err)
+				log.Warnf("E! Error parsing %s to time layout [%s]: %s, ignore this field...", v, t, err)
 			}
 
 		case DROP:
@@ -323,6 +323,11 @@ func (p *GrokParser) parseLine(line string) (sender.Data, error) {
 			data[k] = strings.Trim(v, `"`)
 		}
 	}
+
+	if len(data) <= 0 {
+		return data, fmt.Errorf("all data was ignored in this line? Check WARN log and fix your grok pattern")
+	}
+
 	for _, l := range p.labels {
 		data[l.name] = l.dataValue
 	}

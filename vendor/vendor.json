@@ -11,6 +11,12 @@
 			"versionExact": "v1.12.0"
 		},
 		{
+			"checksumSHA1": "qtjd74+bErubh+qyv3s+lWmn9wc=",
+			"path": "github.com/StackExchange/wmi",
+			"revision": "ea383cf3ba6ec950874b8486cd72356d007c768f",
+			"revisionTime": "2017-04-10T19:29:09Z"
+		},
+		{
 			"checksumSHA1": "ucu0eJ90b2Jlj+KPt0YJzGfwm7s=",
 			"path": "github.com/axgle/mahonia",
 			"revision": "c528b747d92d41ca581a7acf3e604c396fc7c034",
@@ -45,6 +51,18 @@
 			"path": "github.com/eapache/queue",
 			"revision": "44cc805cf13205b55f69e14bcb69867d1ae92f98",
 			"revisionTime": "2016-08-05T00:47:13Z"
+		},
+		{
+			"checksumSHA1": "oyULO1B/l2OLy2xereo+2w3hYk4=",
+			"path": "github.com/go-ole/go-ole",
+			"revision": "02d3668a0cf01f58411cc85cd37c174c257ec7c2",
+			"revisionTime": "2017-06-01T13:56:11Z"
+		},
+		{
+			"checksumSHA1": "Q0ZOcJW0fqOefDzEdn+PJHOeSgI=",
+			"path": "github.com/go-ole/go-ole/oleutil",
+			"revision": "02d3668a0cf01f58411cc85cd37c174c257ec7c2",
+			"revisionTime": "2017-06-01T13:56:11Z"
 		},
 		{
 			"checksumSHA1": "/A5P2s8crcwfDyqHKCh16Yt9jd4=",
@@ -89,40 +107,52 @@
 			"revisionTime": "2014-07-28T01:09:19Z"
 		},
 		{
-			"checksumSHA1": "BV7Dv4SQ2mhpGqlmuDo0Evit410=",
+			"checksumSHA1": "7ALaVB5DVdcd8wV6n3FdKZQe6TQ=",
 			"path": "github.com/qiniu/pandora-go-sdk/base",
-			"revision": "48e9f45d86df0034a71bf63ea434071e3d7c9dc5",
-			"revisionTime": "2017-06-17T13:21:06Z"
+			"revision": "64dcdb49aa8ed38ab4d410eb8d55199b4abce123",
+			"revisionTime": "2017-06-27T08:09:28Z"
 		},
 		{
-			"checksumSHA1": "2eR9tUVg71UUdjjfO9ntJF1bp/c=",
+			"checksumSHA1": "waI4DN/ZpYqQxY8svhZoX3SWF2s=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/config",
-			"revision": "48e9f45d86df0034a71bf63ea434071e3d7c9dc5",
-			"revisionTime": "2017-06-17T13:21:06Z"
+			"revision": "64dcdb49aa8ed38ab4d410eb8d55199b4abce123",
+			"revisionTime": "2017-06-27T08:09:28Z"
 		},
 		{
 			"checksumSHA1": "gmWdZ+75y1U5KEL6uW9RI/xRUTU=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/ratelimit",
-			"revision": "48e9f45d86df0034a71bf63ea434071e3d7c9dc5",
-			"revisionTime": "2017-06-17T13:21:06Z"
+			"revision": "64dcdb49aa8ed38ab4d410eb8d55199b4abce123",
+			"revisionTime": "2017-06-27T08:09:28Z"
 		},
 		{
-			"checksumSHA1": "80AUzmIfkt58GfDMSAjChnHDkb0=",
+			"checksumSHA1": "Xk+PNxhDZXaERID2JAJJ6PTuUO8=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/reqerr",
-			"revision": "48e9f45d86df0034a71bf63ea434071e3d7c9dc5",
-			"revisionTime": "2017-06-17T13:21:06Z"
+			"revision": "64dcdb49aa8ed38ab4d410eb8d55199b4abce123",
+			"revisionTime": "2017-06-27T08:09:28Z"
 		},
 		{
-			"checksumSHA1": "WBDapF35xL+xobLwW0LOwhCQcbs=",
+			"checksumSHA1": "Gz8EZ+iKVzR4y4UMRZUuDSnwEuw=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/request",
-			"revision": "48e9f45d86df0034a71bf63ea434071e3d7c9dc5",
-			"revisionTime": "2017-06-17T13:21:06Z"
+			"revision": "64dcdb49aa8ed38ab4d410eb8d55199b4abce123",
+			"revisionTime": "2017-06-27T08:09:28Z"
 		},
 		{
-			"checksumSHA1": "Ixy9UYeE/6Q+hd3XwtwoApH/ZAY=",
+			"checksumSHA1": "gVTJC7ZHB3cg+pwDyHiTOhVRQaY=",
+			"path": "github.com/qiniu/pandora-go-sdk/logdb",
+			"revision": "64dcdb49aa8ed38ab4d410eb8d55199b4abce123",
+			"revisionTime": "2017-06-27T08:09:28Z"
+		},
+		{
+			"checksumSHA1": "jY2YdggkGkB6g817MzKDGdu1vxg=",
 			"path": "github.com/qiniu/pandora-go-sdk/pipeline",
-			"revision": "48e9f45d86df0034a71bf63ea434071e3d7c9dc5",
-			"revisionTime": "2017-06-17T13:21:06Z"
+			"revision": "64dcdb49aa8ed38ab4d410eb8d55199b4abce123",
+			"revisionTime": "2017-06-27T08:09:28Z"
+		},
+		{
+			"checksumSHA1": "ZnP4LI39Cwl2D5FKPfQJXH8gSEE=",
+			"path": "github.com/qiniu/pandora-go-sdk/tsdb",
+			"revision": "64dcdb49aa8ed38ab4d410eb8d55199b4abce123",
+			"revisionTime": "2017-06-27T08:09:28Z"
 		},
 		{
 			"checksumSHA1": "KAzbLjI9MzW2tjfcAsK75lVRp6I=",
@@ -203,6 +233,12 @@
 			"revisionTime": "2016-09-30T07:24:34Z"
 		},
 		{
+			"checksumSHA1": "MCeXr2RNeiG1XG6V+er1OR0qyeo=",
+			"path": "golang.org/x/crypto/md4",
+			"revision": "9477e0b78b9ac3d0b03822fd95422e2fe07627cd",
+			"revisionTime": "2016-10-31T15:37:30Z"
+		},
+		{
 			"checksumSHA1": "Y+HGqEkYM15ir+J93MEaHdyFy0c=",
 			"path": "golang.org/x/net/context",
 			"revision": "34057069f4ab13dc4433c68d368737ebeafcccdc",
@@ -213,6 +249,18 @@
 			"path": "golang.org/x/net/context/ctxhttp",
 			"revision": "34057069f4ab13dc4433c68d368737ebeafcccdc",
 			"revisionTime": "2017-05-09T19:22:37Z"
+		},
+		{
+			"checksumSHA1": "Tkb1hBdBWeO7SGjixS2Hm48F6+s=",
+			"path": "golang.org/x/sys/unix",
+			"revision": "0b25a408a50076fbbcae6b7ac0ea5fbb0b085e79",
+			"revisionTime": "2017-06-08T11:43:49Z"
+		},
+		{
+			"checksumSHA1": "2Coyr3Bq1dPkFg+ZYHEq1+/Rn58=",
+			"path": "golang.org/x/sys/windows",
+			"revision": "0b25a408a50076fbbcae6b7ac0ea5fbb0b085e79",
+			"revisionTime": "2017-06-08T11:43:49Z"
 		},
 		{
 			"checksumSHA1": "1D8GzeoFGUs5FZOoyC2DpQg8c5Y=",

@@ -14,6 +14,7 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 )
 
 // InfluxdbSender write datas into influxdb
@@ -98,7 +99,7 @@ func (s *InfluxdbSender) Send(datas []Data) error {
 	}
 	err := s.sendPoints(ps)
 	if err != nil {
-		return NewSendError(s.Name()+" Cannot write data into influxdb, error is "+err.Error(), datas, TypeDefault)
+		return reqerr.NewSendError(s.Name()+" Cannot write data into influxdb, error is "+err.Error(), convertDatasBack(datas), reqerr.TypeDefault)
 	}
 	return nil
 }

@@ -8,11 +8,10 @@ import (
 	"time"
 
 	config "github.com/qiniu/logkit/conf"
+	_ "github.com/qiniu/logkit/metric/all"
 	"github.com/qiniu/logkit/mgr"
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
-	_ "github.com/qiniu/logkit/metric/all"
-
 
 	_ "net/http/pprof"
 
@@ -35,9 +34,12 @@ type Config struct {
 
 var conf Config
 
-const defaultReserveCnt = 5
-const defaultLogDir = "./run"
-const defaultLogPattern = "*.log-*"
+const (
+	Version           = "v1.1.0"
+	defaultReserveCnt = 5
+	defaultLogDir     = "./run"
+	defaultLogPattern = "*.log-*"
+)
 
 func getValidPath(confPaths []string) (paths []string) {
 	paths = make([]string, 0)
@@ -106,7 +108,7 @@ func main() {
 	if err := config.Load(&conf); err != nil {
 		log.Fatal("config.Load failed:", err)
 	}
-	log.Printf("Config: %#v", conf)
+	log.Printf("Welcome to use Logkit, Version: %v \n\nConfig: %#v", Version, conf)
 	if conf.TimeLayouts != nil {
 		times.AddLayout(conf.TimeLayouts)
 	}

@@ -15,6 +15,7 @@ import (
 	"github.com/qiniu/logkit/utils"
 
 	pipelinebase "github.com/qiniu/pandora-go-sdk/base"
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 
 	gouuid "github.com/satori/go.uuid"
@@ -31,6 +32,9 @@ const (
 	KeyPandoraSchemaUpdateInterval = "pandora_schema_update_interval"
 	KeyPandoraAutoCreate           = "pandora_auto_create"
 	KeyPandoraSchemaFree           = "pandora_schema_free"
+	KeyPandoraEnableLogDB          = "pandora_enable_logdb"
+	KeyPandoraLogDBName            = "pandora_logdb_name"
+	KeyPandoraLogDBHost            = "pandora_logdb_host"
 	KeyRequestRateLimit            = "request_rate_limit"
 	KeyFlowRateLimit               = "flow_rate_limit"
 	KeyPandoraGzip                 = "pandora_gzip"
@@ -41,20 +45,14 @@ const (
 
 // PandoraSender pandora sender
 type PandoraSender struct {
-	runnerName     string
-	name           string
-	repoName       string
-	region         string
-	client         pipeline.PipelineAPI
-	schemas        map[string]pipeline.RepoSchemaEntry
-	schemasMux     sync.RWMutex
-	lastUpdate     time.Time
-	updateMux      sync.Mutex
-	updateInterval time.Duration
-	UserSchema     UserSchema
-	schemaFree     bool
-	alias2key      map[string]string // map[alias]name
-	uuid           bool
+	client     pipeline.PipelineAPI
+	schemas    map[string]pipeline.RepoSchemaEntry
+	schemasMux sync.RWMutex
+	lastUpdate time.Time
+	updateMux  sync.Mutex
+	UserSchema UserSchema
+	alias2key  map[string]string // map[alias]name
+	opt        PandoraOption
 }
 
 // UserSchema was parsed pandora schema from user's raw schema
@@ -80,6 +78,9 @@ type PandoraOption struct {
 	flowRateLimit  int64
 	gzip           bool
 	uuid           bool
+	enableLogdb    bool
+	logdbReponame  string
+	logdbendpoint  string
 }
 
 //PandoraMaxBatchSize 发送到Pandora的batch限制
@@ -126,7 +127,9 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	gzip, _ := conf.GetBoolOr(KeyPandoraGzip, false)
 	uuid, _ := conf.GetBoolOr(KeyPandoraUUID, false)
 	runnerName, _ := conf.GetStringOr(KeyRunnerName, UnderfinedRunnerName)
-
+	enableLogdb, _ := conf.GetBoolOr(KeyPandoraEnableLogDB, false)
+	logdbreponame, _ := conf.GetStringOr(KeyPandoraLogDBName, repoName)
+	logdbhost, _ := conf.GetStringOr(KeyPandoraLogDBHost, "")
 	opt := &PandoraOption{
 		runnerName:     runnerName,
 		name:           name,
@@ -143,6 +146,9 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 		flowRateLimit:  flowRateLimit,
 		gzip:           gzip,
 		uuid:           uuid,
+		enableLogdb:    enableLogdb,
+		logdbReponame:  logdbreponame,
+		logdbendpoint:  logdbhost,
 	}
 	return newPandoraSender(opt)
 }
@@ -162,14 +168,16 @@ func createPandoraRepo(autoCreateSchema, repoName, region string, client pipelin
 func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 	logger := pipelinebase.NewDefaultLogger()
 	config := pipeline.NewConfig().
-		WithEndpoint(opt.endpoint).
+		WithPipelineEndpoint(opt.endpoint).
 		WithAccessKeySecretKey(opt.ak, opt.sk).
 		WithLogger(logger).
 		WithLoggerLevel(pipelinebase.LogInfo).
 		WithRequestRateLimit(opt.reqRateLimit).
 		WithFlowRateLimit(opt.flowRateLimit).
 		WithGzipData(opt.gzip)
-
+	if opt.logdbendpoint != "" {
+		config = config.WithLogDBEndpoint(opt.logdbendpoint)
+	}
 	client, err := pipeline.New(config)
 	if err != nil {
 		err = fmt.Errorf("Cannot init pipelineClient %v", err)
@@ -183,17 +191,11 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 	}
 	userSchema := parseUserSchema(opt.repoName, opt.schema)
 	s = &PandoraSender{
-		runnerName:     opt.runnerName,
-		name:           opt.name,
-		repoName:       opt.repoName,
-		region:         opt.region,
-		client:         client,
-		alias2key:      make(map[string]string),
-		updateInterval: opt.updateInterval,
-		UserSchema:     userSchema,
-		uuid:           opt.uuid,
-		schemaFree:     opt.schemaFree,
-		schemas:        make(map[string]pipeline.RepoSchemaEntry),
+		opt:        *opt,
+		client:     client,
+		alias2key:  make(map[string]string),
+		UserSchema: userSchema,
+		schemas:    make(map[string]pipeline.RepoSchemaEntry),
 	}
 	if createErr := createPandoraRepo(opt.autoCreate, opt.repoName, opt.region, client); createErr != nil {
 		if !strings.Contains(createErr.Error(), "E18101") {
@@ -203,6 +205,16 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 	// 如果updateSchemas更新schema失败，不会报错，可以正常启动runner，但是在sender时会检查schema是否获取
 	// sender时会尝试不断获取pandora schema，若还是获取失败则返回发送错误。
 	s.UpdateSchemas()
+	if s.opt.enableLogdb && len(s.schemas) > 0 {
+		log.Printf("Runner[%v] Sender[%v]: auto create export to logdb (%v)", opt.runnerName, opt.name, opt.logdbReponame)
+		err = s.client.AutoExportToLogDB(&pipeline.AutoExportToLogDBInput{
+			RepoName:    s.opt.repoName,
+			LogRepoName: s.opt.logdbReponame,
+		})
+		if err != nil {
+			log.Warnf("Runner[%v] Sender[%v]: AutoExportToLogDB %v error %v", s.opt.runnerName, s.opt.name, s.opt.logdbReponame, err)
+		}
+	}
 	return
 }
 
@@ -243,15 +255,18 @@ func parseUserSchema(repoName, schema string) (us UserSchema) {
 }
 
 func (s *PandoraSender) UpdateSchemas() {
-	schemas, err := s.client.GetUpdateSchemas(s.repoName)
-	if err != nil {
-		log.Errorf("Runner[%v] Sender[%v]: update pandora repo <%v> schema error %v", s.runnerName, s.name, s.repoName, err)
+	schemas, err := s.client.GetUpdateSchemas(s.opt.repoName)
+	if err != nil && (!s.opt.schemaFree || !reqerr.IsNoSuchResourceError(err)) {
+		log.Warnf("Runner[%v] Sender[%v]: update pandora repo <%v> schema error %v", s.opt.runnerName, s.opt.name, s.opt.repoName, err)
+		return
+	}
+	if schemas == nil {
 		return
 	}
 	s.updateMux.Lock()
 	defer s.updateMux.Unlock()
 	//double check
-	if s.lastUpdate.Add(s.updateInterval).After(time.Now()) {
+	if s.lastUpdate.Add(s.opt.updateInterval).After(time.Now()) {
 		return
 	}
 	s.lastUpdate = time.Now()
@@ -260,7 +275,7 @@ func (s *PandoraSender) UpdateSchemas() {
 }
 
 func (s *PandoraSender) updateSchemas(schemas map[string]pipeline.RepoSchemaEntry) {
-	alias2Key := fillAlias2Keys(s.repoName, schemas, s.UserSchema)
+	alias2Key := fillAlias2Keys(s.opt.repoName, schemas, s.UserSchema)
 	s.schemasMux.Lock()
 	s.schemas = schemas
 	s.alias2key = alias2Key
@@ -393,12 +408,12 @@ func (s *PandoraSender) generatePoint(data Data) (point Data) {
 		}
 
 		if !validSchema(v.ValueType, value) {
-			log.Errorf("Runner[%v] Sender[%v]: %v not match type %v, from data < %v >, ignored this field", s.runnerName, s.name, value, v.ValueType, data)
+			log.Errorf("Runner[%v] Sender[%v]: %v not match type %v, from data < %v >, ignored this field", s.opt.runnerName, s.opt.name, value, v.ValueType, data)
 			continue
 		}
 		point[k] = value
 	}
-	if s.uuid {
+	if s.opt.uuid {
 		point[PandoraUUID] = gouuid.NewV4().String()
 	}
 	/*
@@ -417,7 +432,7 @@ func (s *PandoraSender) generatePoint(data Data) (point Data) {
 }
 
 func (s *PandoraSender) checkSchemaUpdate() {
-	if s.lastUpdate.Add(s.updateInterval).After(time.Now()) {
+	if s.lastUpdate.Add(s.opt.updateInterval).After(time.Now()) {
 		return
 	}
 	s.UpdateSchemas()
@@ -425,8 +440,8 @@ func (s *PandoraSender) checkSchemaUpdate() {
 
 func (s *PandoraSender) Send(datas []Data) (se error) {
 	s.checkSchemaUpdate()
-	if !s.schemaFree && (len(s.schemas) <= 0 || len(s.alias2key) <= 0) {
-		se = NewSendError("Get pandora schema error, faild to send data", datas, TypeDefault)
+	if !s.opt.schemaFree && (len(s.schemas) <= 0 || len(s.alias2key) <= 0) {
+		se = reqerr.NewSendError("Get pandora schema error, faild to send data", convertDatasBack(datas), reqerr.TypeDefault)
 		return
 	}
 	var points pipeline.Datas
@@ -435,9 +450,13 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 		points = append(points, pipeline.Data(map[string]interface{}(point)))
 	}
 	schemas, se := s.client.PostDataSchemaFree(&pipeline.SchemaFreeInput{
-		RepoName: s.repoName,
-		NoUpdate: !s.schemaFree,
+		RepoName: s.opt.repoName,
+		NoUpdate: !s.opt.schemaFree,
 		Datas:    points,
+		Option: &pipeline.SchemaFreeOption{
+			ToLogDB:       s.opt.enableLogdb,
+			LogDBRepoName: s.opt.logdbReponame,
+		},
 	})
 	if schemas != nil {
 		s.updateSchemas(schemas)
@@ -446,10 +465,10 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 }
 
 func (s *PandoraSender) Name() string {
-	if len(s.name) <= 0 {
-		return "panodra:" + s.repoName
+	if len(s.opt.name) <= 0 {
+		return "panodra:" + s.opt.repoName
 	}
-	return s.name
+	return s.opt.name
 }
 
 func (s *PandoraSender) Close() error {
