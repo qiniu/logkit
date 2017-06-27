@@ -15,6 +15,7 @@ logkit是[七牛Pandora](https://pandora-docs.qiniu.com)开发的一个通用的
 1. Microsoft SQL Server(MS SQL)
 1. Elasticsearch
 1. MongoDB
+1. Kafka
 
 ## 工作方式
 
