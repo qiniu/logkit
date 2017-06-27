@@ -323,6 +323,11 @@ func (p *GrokParser) parseLine(line string) (sender.Data, error) {
 			data[k] = strings.Trim(v, `"`)
 		}
 	}
+
+	if len(data) <= 0 {
+		return data, fmt.Errorf("all data was ignored in this line? Check WARN log and fix your grok pattern")
+	}
+
 	for _, l := range p.labels {
 		data[l.name] = l.dataValue
 	}
