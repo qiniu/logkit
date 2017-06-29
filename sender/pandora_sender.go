@@ -3,6 +3,7 @@ package sender
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"reflect"
 	"strconv"
 	"strings"
@@ -39,20 +40,22 @@ const (
 	KeyFlowRateLimit               = "flow_rate_limit"
 	KeyPandoraGzip                 = "pandora_gzip"
 	KeyPandoraUUID                 = "pandora_uuid"
+	KeyForceMicrosecond            = "force_microsecond"
 
 	PandoraUUID = "Pandora_UUID"
 )
 
 // PandoraSender pandora sender
 type PandoraSender struct {
-	client     pipeline.PipelineAPI
-	schemas    map[string]pipeline.RepoSchemaEntry
-	schemasMux sync.RWMutex
-	lastUpdate time.Time
-	updateMux  sync.Mutex
-	UserSchema UserSchema
-	alias2key  map[string]string // map[alias]name
-	opt        PandoraOption
+	client             pipeline.PipelineAPI
+	schemas            map[string]pipeline.RepoSchemaEntry
+	schemasMux         sync.RWMutex
+	lastUpdate         time.Time
+	updateMux          sync.Mutex
+	UserSchema         UserSchema
+	alias2key          map[string]string // map[alias]name
+	opt                PandoraOption
+	microsecondCounter int64
 }
 
 // UserSchema was parsed pandora schema from user's raw schema
@@ -63,24 +66,25 @@ type UserSchema struct {
 
 // PandoraOption 创建Pandora Sender的选项
 type PandoraOption struct {
-	runnerName     string
-	name           string
-	repoName       string
-	region         string
-	endpoint       string
-	ak             string
-	sk             string
-	schema         string
-	schemaFree     bool   // schemaFree在用户数据有新字段时就更新repo添加字段，如果repo不存在，创建repo。schemaFree功能包含autoCreate
-	autoCreate     string // 自动创建用户的repo，dsl语言填写schema
-	updateInterval time.Duration
-	reqRateLimit   int64
-	flowRateLimit  int64
-	gzip           bool
-	uuid           bool
-	enableLogdb    bool
-	logdbReponame  string
-	logdbendpoint  string
+	runnerName       string
+	name             string
+	repoName         string
+	region           string
+	endpoint         string
+	ak               string
+	sk               string
+	schema           string
+	schemaFree       bool   // schemaFree在用户数据有新字段时就更新repo添加字段，如果repo不存在，创建repo。schemaFree功能包含autoCreate
+	autoCreate       string // 自动创建用户的repo，dsl语言填写schema
+	updateInterval   time.Duration
+	reqRateLimit     int64
+	flowRateLimit    int64
+	gzip             bool
+	uuid             bool
+	enableLogdb      bool
+	logdbReponame    string
+	logdbendpoint    string
+	forceMicrosecond bool
 }
 
 //PandoraMaxBatchSize 发送到Pandora的batch限制
@@ -121,6 +125,7 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("pandoraSender:(%v,repo:%v,region:%v)", host, repoName, region))
 	updateInterval, _ := conf.GetInt64Or(KeyPandoraSchemaUpdateInterval, 300)
 	schemaFree, _ := conf.GetBoolOr(KeyPandoraSchemaFree, false)
+	forceMicrosecond, _ := conf.GetBoolOr(KeyForceMicrosecond, false)
 	autoCreateSchema, _ := conf.GetStringOr(KeyPandoraAutoCreate, "")
 	reqRateLimit, _ := conf.GetInt64Or(KeyRequestRateLimit, 0)
 	flowRateLimit, _ := conf.GetInt64Or(KeyFlowRateLimit, 0)
@@ -131,24 +136,25 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	logdbreponame, _ := conf.GetStringOr(KeyPandoraLogDBName, repoName)
 	logdbhost, _ := conf.GetStringOr(KeyPandoraLogDBHost, "")
 	opt := &PandoraOption{
-		runnerName:     runnerName,
-		name:           name,
-		repoName:       repoName,
-		region:         region,
-		endpoint:       host,
-		ak:             akFromEnv,
-		sk:             skFromEnv,
-		schema:         schema,
-		autoCreate:     autoCreateSchema,
-		schemaFree:     schemaFree,
-		updateInterval: time.Duration(updateInterval) * time.Second,
-		reqRateLimit:   reqRateLimit,
-		flowRateLimit:  flowRateLimit,
-		gzip:           gzip,
-		uuid:           uuid,
-		enableLogdb:    enableLogdb,
-		logdbReponame:  logdbreponame,
-		logdbendpoint:  logdbhost,
+		runnerName:       runnerName,
+		name:             name,
+		repoName:         repoName,
+		region:           region,
+		endpoint:         host,
+		ak:               akFromEnv,
+		sk:               skFromEnv,
+		schema:           schema,
+		autoCreate:       autoCreateSchema,
+		schemaFree:       schemaFree,
+		updateInterval:   time.Duration(updateInterval) * time.Second,
+		reqRateLimit:     reqRateLimit,
+		flowRateLimit:    flowRateLimit,
+		gzip:             gzip,
+		uuid:             uuid,
+		enableLogdb:      enableLogdb,
+		logdbReponame:    logdbreponame,
+		logdbendpoint:    logdbhost,
+		forceMicrosecond: forceMicrosecond,
 	}
 	return newPandoraSender(opt)
 }
@@ -309,8 +315,15 @@ const (
 	PandoraTypeMap    = "map"
 )
 
+type forceMicrosecondOption struct {
+	microsecond      int64
+	forceMicrosecond bool
+}
+
 //临时方案，转换时间，目前sender这边拿到的都是string，很难确定是什么格式的string
-func convertDate(v interface{}) (interface{}, error) {
+//microsecond: 表示要在当前时间基础上加多少偏移量,只在forceMicrosecond为true的情况下才有效
+//forceMicrosecond: 表示是否要对当前时间加偏移量
+func convertDate(v interface{}, option forceMicrosecondOption) (interface{}, error) {
 	var s int64
 	switch newv := v.(type) {
 	case int64:
@@ -327,6 +340,11 @@ func convertDate(v interface{}) (interface{}, error) {
 			return v, err
 		}
 		rfctime := t.Format(time.RFC3339Nano)
+		if option.forceMicrosecond {
+			news := alignTimestamp(t.UTC().UnixNano(), option.microsecond)
+			rfctime = time.Unix(0, news*int64(time.Microsecond)).Format(time.RFC3339Nano)
+		}
+
 		return rfctime, err
 	case json.Number:
 		jsonNumber, err := newv.Int64()
@@ -337,7 +355,11 @@ func convertDate(v interface{}) (interface{}, error) {
 	default:
 		return v, fmt.Errorf("can not parse %v type %v as date time", v, reflect.TypeOf(v))
 	}
-	timestamp := strconv.FormatInt(s, 10)
+	news := s
+	if option.forceMicrosecond {
+		news = alignTimestamp(s, option.microsecond)
+	}
+	timestamp := strconv.FormatInt(news, 10)
 	timeSecondPrecision := 16
 	//补齐16位
 	for i := len(timestamp); i < timeSecondPrecision; i++ {
@@ -351,6 +373,22 @@ func convertDate(v interface{}) (interface{}, error) {
 	}
 	v = time.Unix(0, t*int64(time.Microsecond)).Format(time.RFC3339Nano)
 	return v, nil
+}
+
+// alignTimestamp
+// 1. 根据输入时间戳的位数来补齐对应的位数
+// 2. 对于精度不是微妙的数据点，加一个扰动
+func alignTimestamp(t int64, microsecond int64) int64 {
+	for i := 0; t%10 == 0; i++ {
+		t /= 10
+	}
+	offset := 16 - len(strconv.FormatInt(t, 10))
+	dividend := int64(math.Pow10(offset))
+	if offset > 0 {
+		t = t * dividend //补齐16位
+		return t + microsecond%dividend
+	}
+	return t
 }
 
 func validSchema(valueType string, value interface{}) bool {
@@ -399,11 +437,14 @@ func (s *PandoraSender) generatePoint(data Data) (point Data) {
 		}
 		delete(data, name)
 		if v.ValueType == PandoraTypeDate {
-			formatTime, err := convertDate(value)
+			formatTime, err := convertDate(value, forceMicrosecondOption{
+				microsecond:      s.microsecondCounter,
+				forceMicrosecond: s.opt.forceMicrosecond})
 			if err != nil {
 				log.Error(err)
 				continue
 			}
+			s.microsecondCounter = (s.microsecondCounter + 1) % (2 << 32)
 			value = formatTime
 		}
 
