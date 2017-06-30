@@ -16,6 +16,8 @@ import (
 
 	"reflect"
 
+	"encoding/binary"
+
 	_ "github.com/denisenkom/go-mssqldb" //mssql 驱动
 	_ "github.com/go-sql-driver/mysql"   //mysql 驱动
 )
@@ -311,10 +313,10 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 
 	for idx, rawSQL := range mr.syncSQLs {
 		//分sql执行
-		exit := false
+		exit := 0
 		var isRawSQL bool
-		for !exit {
-			exit = true
+		for exit < 1000 {
+			exit++
 			isRawSQL = false
 			execSQL, err := mr.getSQL(idx)
 			if err != nil {
@@ -348,7 +350,7 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 			}
 			// Fetch rows
 			for rows.Next() {
-				exit = false
+				exit = 0
 				// get RawBytes from data
 				err = rows.Scan(scanArgs...)
 				if err != nil {
@@ -379,9 +381,13 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 				}
 				mr.offsets[idx]++
 			}
-			if exit {
-				exit = mr.checkExit(idx, db)
-				if !exit {
+			if exit > 0 {
+				log.Warnf("nothing found... %v", exit)
+				mr.offsets[idx] += int64(mr.readBatch)
+			}
+			if exit > 999 {
+				xexit := mr.checkExit(idx, db)
+				if !xexit {
 					mr.offsets[idx] += int64(mr.readBatch)
 				}
 			}
@@ -444,6 +450,9 @@ func convertInt(v interface{}) (int64, error) {
 		if ret, ok := idv.(uint32); ok {
 			return int64(ret), nil
 		}
+		if ret, ok := idv.([]byte); ok {
+			return int64(binary.BigEndian.Uint64(ret)), nil
+		}
 	}
 	return 0, fmt.Errorf("%v type can not convert to int", dv.Kind())
 }
@@ -461,7 +470,7 @@ func (mr *SqlReader) getSQL(idx int) (sql string, err error) {
 		return
 	case ModeMssql:
 		if len(mr.offsetKey) > 0 {
-			sql = fmt.Sprintf("%s WHERE %v >= %d AND %v < %d;", rawSQL, mr.offsetKey, mr.offsets[idx], mr.offsetKey, mr.offsets[idx]+int64(mr.readBatch))
+			sql = fmt.Sprintf("%s WHERE CAST(%v AS BIGINT) >= %d AND CAST(%v AS BIGINT) < %d;", rawSQL, mr.offsetKey, mr.offsets[idx], mr.offsetKey, mr.offsets[idx]+int64(mr.readBatch))
 		} else {
 			err = fmt.Errorf("%v dbtype is not support get SQL without id now", mr.dbtype)
 		}
