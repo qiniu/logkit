@@ -267,8 +267,6 @@ func (r *LogExportRunner) Run() {
 		}
 		// read data
 		var lines, froms []string
-		tm := time.Now()
-		log.Debugf("Runner[%v] reader %s start to read at: %v", r.Name(), r.reader.Name(), tm.Format(time.RFC3339))
 		for !r.batchFullOrTimeout() {
 			line, err := r.reader.ReadLine()
 			if err != nil && err != io.EOF {
@@ -300,9 +298,6 @@ func (r *LogExportRunner) Run() {
 			log.Debugf("Runner[%v] fetched 0 lines", r.Name())
 			continue
 		}
-		parsetm := time.Now()
-		log.Debugf("Runner[%v] reader %s start to parse at: %v", r.Name(), r.reader.Name(), parsetm.Format(time.RFC3339))
-
 		// parse data
 		datas, err := r.parser.Parse(lines)
 		se, ok := err.(*utils.StatsError)
@@ -347,7 +342,6 @@ func (r *LogExportRunner) Run() {
 		}
 		success := true
 		log.Debugf("Runner[%v] reader %s start to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
-
 		for _, s := range r.senders {
 			if !r.trySend(s, datas, r.MaxBatchTryTimes) {
 				success = false
@@ -359,7 +353,6 @@ func (r *LogExportRunner) Run() {
 			r.reader.SyncMeta()
 		}
 		log.Debugf("Runner[%v] reader %s finish to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
-
 	}
 }
 

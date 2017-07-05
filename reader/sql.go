@@ -313,10 +313,10 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 
 	for idx, rawSQL := range mr.syncSQLs {
 		//分sql执行
-		exit := 0
+		exit := false
 		var isRawSQL bool
-		for exit < 1000 {
-			exit++
+		for !exit {
+			exit = true
 			isRawSQL = false
 			execSQL, err := mr.getSQL(idx)
 			if err != nil {
@@ -350,7 +350,7 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 			}
 			// Fetch rows
 			for rows.Next() {
-				exit = 0
+				exit = false
 				// get RawBytes from data
 				err = rows.Scan(scanArgs...)
 				if err != nil {
@@ -381,13 +381,9 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 				}
 				mr.offsets[idx]++
 			}
-			if exit > 0 {
-				log.Warnf("nothing found... %v", exit)
-				mr.offsets[idx] += int64(mr.readBatch)
-			}
-			if exit > 999 {
-				xexit := mr.checkExit(idx, db)
-				if !xexit {
+			if exit {
+				exit := mr.checkExit(idx, db)
+				if !exit {
 					mr.offsets[idx] += int64(mr.readBatch)
 				}
 			}
