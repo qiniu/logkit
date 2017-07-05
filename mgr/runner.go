@@ -341,6 +341,7 @@ func (r *LogExportRunner) Run() {
 			}
 		}
 		success := true
+		log.Debugf("Runner[%v] reader %s start to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
 		for _, s := range r.senders {
 			if !r.trySend(s, datas, r.MaxBatchTryTimes) {
 				success = false
@@ -351,6 +352,7 @@ func (r *LogExportRunner) Run() {
 		if success {
 			r.reader.SyncMeta()
 		}
+		log.Debugf("Runner[%v] reader %s finish to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
 	}
 }
 
