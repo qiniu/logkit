@@ -95,6 +95,12 @@
 			"revisionTime": "2016-01-12T16:53:51Z"
 		},
 		{
+			"checksumSHA1": "rJab1YdNhQooDiBWNnt7TLWPyBU=",
+			"path": "github.com/pkg/errors",
+			"revision": "c605e284fe17294bda444b34710735b29d1a9d90",
+			"revisionTime": "2017-05-05T04:36:39Z"
+		},
+		{
 			"checksumSHA1": "LuFv4/jlrmFNnDb/5SCSEPAM9vU=",
 			"path": "github.com/pmezard/go-difflib/difflib",
 			"revision": "792786c7400a136282c1664665ae0a8db921c6c2",
@@ -315,6 +321,22 @@
 			"revisionTime": "2017-03-26T10:19:17Z",
 			"version": "v3.0.68",
 			"versionExact": "v3.0.68"
+		},
+		{
+			"checksumSHA1": "hAHuilJ3EVdKRYMMhvQl9arU+1Y=",
+			"path": "gopkg.in/olivere/elastic.v5",
+			"revision": "3113f9b9ad37509fe5f8a0e5e91c96fdc4435e26",
+			"revisionTime": "2017-06-16T13:27:19Z",
+			"version": "v5.0.41",
+			"versionExact": "v5.0.41"
+		},
+		{
+			"checksumSHA1": "pCApZfp2CeDnWbNVsyzNO62ZUXA=",
+			"path": "gopkg.in/olivere/elastic.v5/uritemplates",
+			"revision": "3113f9b9ad37509fe5f8a0e5e91c96fdc4435e26",
+			"revisionTime": "2017-06-16T13:27:19Z",
+			"version": "v5.0.41",
+			"versionExact": "v5.0.41"
 		}
 	],
 	"rootPath": "github.com/qiniu/logkit"

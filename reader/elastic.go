@@ -1,16 +1,21 @@
 package reader
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"github.com/qiniu/log"
+	elasticV3 "gopkg.in/olivere/elastic.v3"
+	elasticV5 "gopkg.in/olivere/elastic.v5"
 	"io"
 	"sync"
 	"sync/atomic"
 	"time"
+)
 
-	"github.com/qiniu/log"
-
-	"gopkg.in/olivere/elastic.v3"
+var (
+	ElasticVersion2 = "2.x"
+	ElasticVersion5 = "5.x"
 )
 
 type ElasticReader struct {
@@ -19,8 +24,8 @@ type ElasticReader struct {
 	eshost    string //eshost+port
 	readBatch int    // 每次读取的数据量
 	keepAlive string //scrollID 保留时间
-
-	readChan chan json.RawMessage
+	esVersion string //ElasticSearch version
+	readChan  chan json.RawMessage
 
 	meta   *Meta  // 记录offset的元数据
 	offset string // 当前处理es的offset
@@ -30,7 +35,7 @@ type ElasticReader struct {
 	started bool
 }
 
-func NewESReader(meta *Meta, readBatch int, estype, esindex, eshost, keepAlive string) (er *ElasticReader, err error) {
+func NewESReader(meta *Meta, readBatch int, estype, esindex, eshost, esVersion, keepAlive string) (er *ElasticReader, err error) {
 
 	offset, _, err := meta.ReadOffset()
 	if err != nil {
@@ -40,6 +45,7 @@ func NewESReader(meta *Meta, readBatch int, estype, esindex, eshost, keepAlive s
 		esindex:   esindex,
 		estype:    estype,
 		eshost:    eshost,
+		esVersion: esVersion,
 		readBatch: readBatch,
 		keepAlive: keepAlive,
 		meta:      meta,
@@ -132,29 +138,61 @@ func (er *ElasticReader) run() {
 
 func (er *ElasticReader) exec() (err error) {
 	// Create a client
-	client, err := elastic.NewClient(elastic.SetURL(er.eshost))
-	if err != nil {
-		return
-	}
-	scroll := client.Scroll(er.esindex).Type(er.estype).Size(er.readBatch).KeepAlive(er.keepAlive)
-	for {
-		results, err := scroll.ScrollId(er.offset).Do()
-		if err == io.EOF {
-			return nil // all results retrieved
-		}
+	switch er.esVersion {
+	case ElasticVersion5:
+		var client *elasticV5.Client
+		client, err = elasticV5.NewClient(elasticV5.SetURL(er.eshost))
 		if err != nil {
-			return err // something went wrong
+			return
+		}
+		scroll := client.Scroll(er.esindex).Type(er.estype).Size(er.readBatch).KeepAlive(er.keepAlive)
+		for {
+			ctx := context.Background()
+			results, err := scroll.ScrollId(er.offset).Do(ctx)
+			if err == io.EOF {
+				return nil // all results retrieved
+			}
+			if err != nil {
+				return err // something went wrong
+			}
+
+			// Send the hits to the hits channel
+			for _, hit := range results.Hits.Hits {
+				er.readChan <- *hit.Source
+			}
+			er.offset = results.ScrollId
+			if atomic.LoadInt32(&er.status) == StatusStoping {
+				log.Warnf("Runner[%v] %v stopped from running", er.meta.RunnerName, er.Name())
+				return nil
+			}
+		}
+	default:
+		var client *elasticV3.Client
+		client, err = elasticV3.NewClient(elasticV3.SetURL(er.eshost))
+		if err != nil {
+			return
+		}
+		scroll := client.Scroll(er.esindex).Type(er.estype).Size(er.readBatch).KeepAlive(er.keepAlive)
+		for {
+			results, err := scroll.ScrollId(er.offset).Do()
+			if err == io.EOF {
+				return nil // all results retrieved
+			}
+			if err != nil {
+				return err // something went wrong
+			}
+
+			// Send the hits to the hits channel
+			for _, hit := range results.Hits.Hits {
+				er.readChan <- *hit.Source
+			}
+			er.offset = results.ScrollId
+			if atomic.LoadInt32(&er.status) == StatusStoping {
+				log.Warnf("Runner[%v] %v stopped from running", er.meta.RunnerName, er.Name())
+				return nil
+			}
 		}
 
-		// Send the hits to the hits channel
-		for _, hit := range results.Hits.Hits {
-			er.readChan <- *hit.Source
-		}
-		er.offset = results.ScrollId
-		if atomic.LoadInt32(&er.status) == StatusStoping {
-			log.Warnf("Runner[%v] %v stopped from running", er.meta.RunnerName, er.Name())
-			return nil
-		}
 	}
 }
 
