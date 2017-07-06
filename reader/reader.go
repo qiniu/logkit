@@ -74,6 +74,7 @@ const (
 	KeyESType      = "es_type"
 	KeyESHost      = "es_host"
 	KeyESKeepAlive = "es_keepalive"
+	KeyESVersion   = "es_version"
 
 	KeyMongoHost        = "mongo_host"
 	KeyMongoDatabase    = "mongo_database"
@@ -215,8 +216,9 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta) (reader Reader, err
 		if !strings.HasPrefix(eshost, "http://") && !strings.HasPrefix(eshost, "https://") {
 			eshost = "http://" + eshost
 		}
+		esVersion, _ := conf.GetStringOr(KeyESVersion, ElasticVersion2)
 		keepAlive, _ := conf.GetStringOr(KeyESKeepAlive, "6h")
-		reader, err = NewESReader(meta, readBatch, estype, esindex, eshost, keepAlive)
+		reader, err = NewESReader(meta, readBatch, estype, esindex, eshost, esVersion, keepAlive)
 	case ModeMongo:
 		readBatch, _ := conf.GetIntOr(KeyMongoReadBatch, 100)
 		database, err := conf.GetString(KeyMongoDatabase)
