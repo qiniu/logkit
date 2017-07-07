@@ -148,6 +148,7 @@ func (mr *MongoReader) ReadLine() (data string, err error) {
 }
 
 func (mr *MongoReader) run() {
+	var err error
 	// 防止并发run
 	for {
 		if atomic.LoadInt32(&mr.status) == StatusStopped {
@@ -163,7 +164,9 @@ func (mr *MongoReader) run() {
 		if atomic.CompareAndSwapInt32(&mr.status, StatusStoping, StatusStopped) {
 			close(mr.readChan)
 		}
-		log.Infof("Runner[%v] %v successfully finished", mr.meta.RunnerName, mr.Name())
+		if err == nil {
+			log.Infof("Runner[%v] %v successfully finished", mr.meta.RunnerName, mr.Name())
+		}
 	}()
 
 	// 开始work逻辑
@@ -172,7 +175,7 @@ func (mr *MongoReader) run() {
 			log.Warnf("Runner[%v] %v stopped from running", mr.meta.RunnerName, mr.Name())
 			return
 		}
-		err := mr.exec()
+		err = mr.exec()
 		if err == nil {
 			log.Infof("Runner[%v] %v successfully exec", mr.meta.RunnerName, mr.Name())
 			return

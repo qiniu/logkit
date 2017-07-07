@@ -304,7 +304,7 @@ func (m *Manager) detectMoreWatchers(confsPath []string) {
 	for {
 		select {
 		case <-ticker.C:
-			log.Debug("try to detect more watchers ")
+			log.Debugf("we have totally %v watchers, periodically try to detect more watchers...", len(m.watchers))
 			m.addWatchers(confsPath)
 		}
 	}

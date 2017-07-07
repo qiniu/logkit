@@ -102,7 +102,7 @@ func (er *ElasticReader) ReadLine() (data string, err error) {
 	return
 }
 
-func (er *ElasticReader) run() {
+func (er *ElasticReader) run() (err error) {
 	// 防止并发run
 	for {
 		if atomic.LoadInt32(&er.status) == StatusStopped {
@@ -118,7 +118,9 @@ func (er *ElasticReader) run() {
 		if atomic.CompareAndSwapInt32(&er.status, StatusStoping, StatusStopped) {
 			close(er.readChan)
 		}
-		log.Infof("Runner[%v] %v successfully finished", er.meta.RunnerName, er.Name())
+		if err == nil {
+			log.Infof("Runner[%v] %v successfully finished", er.meta.RunnerName, er.Name())
+		}
 	}()
 
 	// 开始work逻辑
@@ -127,7 +129,7 @@ func (er *ElasticReader) run() {
 			log.Warnf("%v stopped from running", er.Name())
 			return
 		}
-		err := er.exec()
+		err = er.exec()
 		if err == nil {
 			log.Infof("%v successfully exec", er.Name())
 			return
