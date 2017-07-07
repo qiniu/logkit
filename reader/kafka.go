@@ -61,7 +61,7 @@ func (kr *KafkaReader) ReadLine() (data string, err error) {
 	if !kr.started {
 		kr.Start()
 	}
-	timer := time.NewTicker(time.Millisecond)
+	timer := time.NewTicker(time.Second)
 	select {
 	case dat := <-kr.readChan:
 		data = string(dat)

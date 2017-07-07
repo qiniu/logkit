@@ -215,7 +215,7 @@ func (mr *SqlReader) ReadLine() (data string, err error) {
 	if !mr.started {
 		mr.Start()
 	}
-	timer := time.NewTicker(time.Millisecond)
+	timer := time.NewTicker(time.Second)
 	select {
 	case dat := <-mr.readChan:
 		data = string(dat)

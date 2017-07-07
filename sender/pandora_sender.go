@@ -219,6 +219,7 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 		})
 		if err != nil {
 			log.Warnf("Runner[%v] Sender[%v]: AutoExportToLogDB %v error %v", s.opt.runnerName, s.opt.name, s.opt.logdbReponame, err)
+			err = nil
 		}
 	}
 	return
