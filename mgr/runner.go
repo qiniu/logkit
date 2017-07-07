@@ -275,8 +275,8 @@ func (r *LogExportRunner) Run() {
 				break
 			}
 			if len(line) <= 0 {
-				log.Debugf("Runner[%v] reader %s cannot get any content", r.Name(), r.reader.Name())
-				time.Sleep(2 * time.Second)
+				log.Debugf("Runner[%v] reader %s no more content fetched sleep 1 second...", r.Name(), r.reader.Name())
+				time.Sleep(1 * time.Second)
 				continue
 			}
 			if len(line) >= r.MaxBatchSize {

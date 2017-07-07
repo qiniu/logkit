@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/qiniu/log"
-	elasticV3 "gopkg.in/olivere/elastic.v3"
-	elasticV5 "gopkg.in/olivere/elastic.v5"
 	"io"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/qiniu/log"
+	elasticV3 "gopkg.in/olivere/elastic.v3"
+	elasticV5 "gopkg.in/olivere/elastic.v5"
 )
 
 var (
@@ -92,7 +93,7 @@ func (er *ElasticReader) ReadLine() (data string, err error) {
 	if !er.started {
 		er.Start()
 	}
-	timer := time.NewTicker(time.Millisecond)
+	timer := time.NewTicker(time.Second)
 	select {
 	case dat := <-er.readChan:
 		data = string(dat)
