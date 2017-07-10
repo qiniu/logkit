@@ -254,6 +254,7 @@ func (mr *SqlReader) updateOffsets(sqls []string) {
 }
 
 func (mr *SqlReader) run() {
+	var err error
 	// 防止并发run
 	for {
 		if atomic.LoadInt32(&mr.status) == StatusStopped {
@@ -269,7 +270,9 @@ func (mr *SqlReader) run() {
 		if atomic.CompareAndSwapInt32(&mr.status, StatusStoping, StatusStopped) {
 			close(mr.readChan)
 		}
-		log.Infof("Runner[%v] %v successfully finished", mr.meta.RunnerName, mr.Name())
+		if err == nil {
+			log.Infof("Runner[%v] %v successfully finished", mr.meta.RunnerName, mr.Name())
+		}
 	}()
 
 	var connectStr string
@@ -285,7 +288,7 @@ func (mr *SqlReader) run() {
 			log.Warnf("Runner[%v] %v stopped from running", mr.meta.RunnerName, mr.Name())
 			return
 		}
-		err := mr.exec(connectStr)
+		err = mr.exec(connectStr)
 		if err == nil {
 			log.Infof("Runner[%v] %v successfully exec", mr.meta.RunnerName, mr.Name())
 			return

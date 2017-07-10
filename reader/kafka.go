@@ -30,9 +30,10 @@ type KafkaReader struct {
 	readChan chan json.RawMessage
 	errs     <-chan error
 
-	status  int32
-	mux     sync.Mutex
-	started bool
+	status   int32
+	mux      sync.Mutex
+	startMux sync.Mutex
+	started  bool
 }
 
 func NewKafkaReader(meta *Meta, consumerGroup string,
@@ -47,16 +48,20 @@ func NewKafkaReader(meta *Meta, consumerGroup string,
 		errs:           make(chan error, 1000),
 		status:         StatusInit,
 		mux:            sync.Mutex{},
+		startMux:       sync.Mutex{},
 		started:        false,
 	}
 	return kr, nil
 }
+
 func (kr *KafkaReader) Name() string {
 	return fmt.Sprintf("KafkaReader:[%s],[%s]", strings.Join(kr.Topics, ","), kr.ConsumerGroup)
 }
+
 func (kr *KafkaReader) Source() string {
 	return fmt.Sprintf("[%s],[%s]", strings.Join(kr.Topics, ","), kr.ConsumerGroup)
 }
+
 func (kr *KafkaReader) ReadLine() (data string, err error) {
 	if !kr.started {
 		kr.Start()
@@ -68,8 +73,8 @@ func (kr *KafkaReader) ReadLine() (data string, err error) {
 	case <-timer.C:
 	}
 	return
-
 }
+
 func (kr *KafkaReader) Close() (err error) {
 	if atomic.CompareAndSwapInt32(&kr.status, StatusRunning, StatusStoping) {
 		log.Infof("Runner[%v] %v stopping", kr.meta.RunnerName, kr.Name())
@@ -78,6 +83,7 @@ func (kr *KafkaReader) Close() (err error) {
 	}
 	return
 }
+
 func (kr *KafkaReader) SyncMeta() {
 	kr.mux.Lock()
 	if kr.curMsg != nil {
@@ -86,7 +92,13 @@ func (kr *KafkaReader) SyncMeta() {
 	kr.mux.Unlock()
 	return
 }
+
 func (kr *KafkaReader) Start() {
+	kr.startMux.Lock()
+	defer kr.startMux.Unlock()
+	if kr.started {
+		return
+	}
 	config := consumergroup.NewConfig()
 	config.Zookeeper.Chroot = ""
 	switch strings.ToLower(kr.Whence) {

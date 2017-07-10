@@ -30,6 +30,18 @@ type FileReader interface {
 	SyncMeta() error
 }
 
+// TODO 构建统一的 Server reader框架， 减少重复的编码
+type ServerReader interface {
+	//Name reader名称
+	Name() string
+	//Source 读取的数据源
+	Source() string
+	Start()
+	ReadLine() (string, error)
+	Close() error
+	SyncMeta()
+}
+
 // FileReader's conf keys
 const (
 	KeyLogPath       = "log_path"
@@ -105,6 +117,7 @@ const (
 	ModeElastic = "elastic"
 	ModeMongo   = "mongo"
 	ModeKafka   = "kafka"
+	ModeRedis   = "redis"
 )
 
 const (
@@ -247,6 +260,8 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta) (reader Reader, err
 		}
 		zookeepers, err := conf.GetStringList(KeyKafkaZookeeper)
 		reader, err = NewKafkaReader(meta, consumerGroup, topics, zookeepers, whence)
+	case ModeRedis:
+		reader, err = NewRedisReader(meta, conf)
 	default:
 		err = fmt.Errorf("mode %v not supported now", mode)
 	}
