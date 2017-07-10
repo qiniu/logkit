@@ -2,12 +2,10 @@ package reader
 
 import (
 	"errors"
+	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
-
-	"fmt"
-
-	"sync"
 
 	"github.com/go-redis/redis"
 	"github.com/qiniu/log"

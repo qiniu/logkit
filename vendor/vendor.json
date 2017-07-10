@@ -65,6 +65,42 @@
 			"revisionTime": "2017-06-01T13:56:11Z"
 		},
 		{
+			"checksumSHA1": "R82M6FAQgi/38ZffFO2E9GreJAU=",
+			"path": "github.com/go-redis/redis",
+			"revision": "564772f045d89bd55843d7dc8042e0a599401e09",
+			"revisionTime": "2017-07-01T10:54:10Z"
+		},
+		{
+			"checksumSHA1": "MRrokoHPCfm0vPnMSRtckscnIDI=",
+			"path": "github.com/go-redis/redis/internal",
+			"revision": "564772f045d89bd55843d7dc8042e0a599401e09",
+			"revisionTime": "2017-07-01T10:54:10Z"
+		},
+		{
+			"checksumSHA1": "GQZsUVg/+6UpQAYpc4luMvMutSI=",
+			"path": "github.com/go-redis/redis/internal/consistenthash",
+			"revision": "564772f045d89bd55843d7dc8042e0a599401e09",
+			"revisionTime": "2017-07-01T10:54:10Z"
+		},
+		{
+			"checksumSHA1": "VP0K8vvf716n6xuzAZTvpz+wTwc=",
+			"path": "github.com/go-redis/redis/internal/hashtag",
+			"revision": "564772f045d89bd55843d7dc8042e0a599401e09",
+			"revisionTime": "2017-07-01T10:54:10Z"
+		},
+		{
+			"checksumSHA1": "Td4YkoD/zGT8GVgr4x4azclprNs=",
+			"path": "github.com/go-redis/redis/internal/pool",
+			"revision": "564772f045d89bd55843d7dc8042e0a599401e09",
+			"revisionTime": "2017-07-01T10:54:10Z"
+		},
+		{
+			"checksumSHA1": "Ct2AS6Z9YmTAlKOMsBrhwvpXAPY=",
+			"path": "github.com/go-redis/redis/internal/proto",
+			"revision": "564772f045d89bd55843d7dc8042e0a599401e09",
+			"revisionTime": "2017-07-01T10:54:10Z"
+		},
+		{
 			"checksumSHA1": "/A5P2s8crcwfDyqHKCh16Yt9jd4=",
 			"path": "github.com/go-sql-driver/mysql",
 			"revision": "382e13d099fcf5f5994290892ab258fbebbdc5e3",
