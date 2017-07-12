@@ -73,6 +73,8 @@ const (
 	KeyMysqlCron        = "mysql_cron"
 	KeyMysqlExecOnStart = "mysql_exec_onstart"
 
+	KeySQLSchema = "sql_schema"
+
 	KeyMssqlOffsetKey   = "mssql_offset_key"
 	KeyMssqlReadBatch   = "mssql_limit_batch"
 	KeyMssqlDataSource  = "mssql_datasource"
@@ -180,41 +182,9 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta) (reader Reader, err
 		maxOpenFiles, _ := conf.GetIntOr(KeyMaxOpenFiles, 256)
 		reader, err = NewMultiReader(meta, logpath, whence, expireDur, stateIntervalDur, maxOpenFiles)
 	case ModeMysql: // Mysql 模式是启动mysql reader,读取mysql数据表
-		readBatch, _ := conf.GetIntOr(KeyMysqlReadBatch, 100)
-		offsetKey, _ := conf.GetStringOr(KeyMysqlOffsetKey, "")
-		dataSource, err := conf.GetString(KeyMysqlDataSource)
-		if err != nil {
-			dataSource = logpath
-		}
-		database, err := conf.GetString(KeyMysqlDataBase)
-		if err != nil {
-			return nil, err
-		}
-		rawSqls, err := conf.GetString(KeyMysqlSQL)
-		if err != nil {
-			return nil, err
-		}
-		cronSchedule, _ := conf.GetStringOr(KeyMysqlCron, "")
-		execOnStart, _ := conf.GetBoolOr(KeyMysqlExecOnStart, true)
-		reader, err = NewSQLReader(meta, readBatch, ModeMysql, dataSource, database, rawSqls, cronSchedule, offsetKey, execOnStart)
+		reader, err = NewSQLReader(meta, conf)
 	case ModeMssql: // Mssql 模式是启动mssql reader，读取mssql数据表
-		readBatch, _ := conf.GetIntOr(KeyMssqlReadBatch, 100)
-		offsetKey, _ := conf.GetStringOr(KeyMssqlOffsetKey, "")
-		dataSource, err := conf.GetString(KeyMssqlDataSource)
-		if err != nil {
-			dataSource = logpath
-		}
-		database, err := conf.GetString(KeyMssqlDataBase)
-		if err != nil {
-			return nil, err
-		}
-		rawSqls, err := conf.GetString(KeyMssqlSQL)
-		if err != nil {
-			return nil, err
-		}
-		cronSchedule, _ := conf.GetStringOr(KeyMssqlCron, "")
-		execOnStart, _ := conf.GetBoolOr(KeyMssqlExecOnStart, true)
-		reader, err = NewSQLReader(meta, readBatch, ModeMssql, dataSource, database, rawSqls, cronSchedule, offsetKey, execOnStart)
+		reader, err = NewSQLReader(meta, conf)
 	case ModeElastic:
 		readBatch, _ := conf.GetIntOr(KeyESReadBatch, 100)
 		estype, err := conf.GetString(KeyESType)

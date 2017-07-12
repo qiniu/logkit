@@ -20,6 +20,7 @@ import (
 
 	_ "github.com/denisenkom/go-mssqldb" //mssql 驱动
 	_ "github.com/go-sql-driver/mysql"   //mysql 驱动
+	"github.com/qiniu/logkit/conf"
 )
 
 const (
@@ -43,6 +44,7 @@ type SqlReader struct {
 	meta     *Meta    // 记录offset的元数据
 	offsets  []int64  // 当前处理文件的sql的offset
 	syncSQLs []string // 当前在查询的sqls
+	schemas  map[string]string
 
 	status  int32
 	mux     sync.Mutex
@@ -58,7 +60,66 @@ const (
 	StatusRunning
 )
 
-func NewSQLReader(meta *Meta, readBatch int, dbtype, dataSource, database, rawSqls, cronSchedule, offsetKey string, execOnStart bool) (mr *SqlReader, err error) {
+func NewSQLReader(meta *Meta, conf conf.MapConf) (mr *SqlReader, err error) {
+	var readBatch int
+	var dbtype, dataSource, database, rawSqls, cronSchedule, offsetKey string
+	var execOnStart bool
+	dbtype, _ = conf.GetStringOr(KeyMode, ModeMysql)
+	logpath, _ := conf.GetStringOr(KeyLogPath, "")
+
+	switch dbtype {
+	case ModeMysql:
+		readBatch, _ = conf.GetIntOr(KeyMysqlReadBatch, 100)
+		offsetKey, _ = conf.GetStringOr(KeyMysqlOffsetKey, "")
+		dataSource, err = conf.GetString(KeyMysqlDataSource)
+		if err != nil {
+			dataSource = logpath
+			if logpath == "" {
+				return nil, err
+			}
+			err = nil
+		}
+		database, err = conf.GetString(KeyMysqlDataBase)
+		if err != nil {
+			return nil, err
+		}
+		rawSqls, err = conf.GetString(KeyMysqlSQL)
+		if err != nil {
+			return nil, err
+		}
+		cronSchedule, _ = conf.GetStringOr(KeyMysqlCron, "")
+		execOnStart, _ = conf.GetBoolOr(KeyMysqlExecOnStart, true)
+	case ModeMssql:
+		readBatch, _ = conf.GetIntOr(KeyMssqlReadBatch, 100)
+		offsetKey, _ = conf.GetStringOr(KeyMssqlOffsetKey, "")
+		dataSource, err = conf.GetString(KeyMssqlDataSource)
+		if err != nil {
+			dataSource = logpath
+			if logpath == "" {
+				return nil, err
+			}
+			err = nil
+		}
+		database, err = conf.GetString(KeyMssqlDataBase)
+		if err != nil {
+			return nil, err
+		}
+		rawSqls, err = conf.GetString(KeyMssqlSQL)
+		if err != nil {
+			return nil, err
+		}
+		cronSchedule, _ = conf.GetStringOr(KeyMssqlCron, "")
+		execOnStart, _ = conf.GetBoolOr(KeyMssqlExecOnStart, true)
+	default:
+		err = fmt.Errorf("%v mode not support in sql reader", dbtype)
+		return
+	}
+	rawSchemas, _ := conf.GetStringListOr(KeySQLSchema, []string{})
+	schemas, err := schemaCheck(rawSchemas)
+	if err != nil {
+		return
+	}
+
 	offsets, sqls, omitMeta := restoreMeta(meta, rawSqls)
 
 	mr = &SqlReader{
@@ -76,6 +137,7 @@ func NewSQLReader(meta *Meta, readBatch int, dbtype, dataSource, database, rawSq
 		mux:         sync.Mutex{},
 		started:     false,
 		execOnStart: execOnStart,
+		schemas:     schemas,
 	}
 	// 如果meta初始信息损坏
 	if !omitMeta {
@@ -92,6 +154,32 @@ func NewSQLReader(meta *Meta, readBatch int, dbtype, dataSource, database, rawSq
 		log.Infof("Runner[%v] %v Cron job added with schedule <%v>", mr.meta.RunnerName, mr.Name(), cronSchedule)
 	}
 	return mr, nil
+}
+
+func schemaCheck(rawSchemas []string) (schemas map[string]string, err error) {
+	schemas = make(map[string]string)
+	for _, raw := range rawSchemas {
+		rs := strings.Fields(raw)
+		if len(rs) != 2 {
+			err = fmt.Errorf("SQL schema %v not split by space, split lens is %v", raw, len(rs))
+			return
+		}
+		key, vtype := rs[0], rs[1]
+		vtype = strings.ToLower(vtype)
+		switch vtype {
+		case "string", "s":
+			vtype = "string"
+		case "float", "f":
+			vtype = "float"
+		case "long", "l":
+			vtype = "long"
+		default:
+			err = fmt.Errorf("schema type %v not supported", vtype)
+			return
+		}
+		schemas[key] = vtype
+	}
+	return
 }
 
 func restoreMeta(meta *Meta, rawSqls string) (offsets []int64, sqls []string, omitMeta bool) {
@@ -362,6 +450,25 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 				}
 				data := make(map[string]interface{})
 				for i := 0; i < len(scanArgs); i++ {
+					vtype, ok := mr.schemas[columns[i]]
+					if ok {
+						switch vtype {
+						case "long":
+							val, serr := convertLong(scanArgs[i])
+							if serr != nil {
+								log.Errorf("convertLong for %v (%v) error %v", columns[i], scanArgs[i], serr)
+							} else {
+								scanArgs[i] = val
+							}
+						case "float":
+							val, serr := convertFloat(scanArgs[i])
+							if serr != nil {
+								log.Errorf("convertFloat for %v (%v) error %v", columns[i], scanArgs[i], serr)
+							} else {
+								scanArgs[i] = val
+							}
+						}
+					}
 					data[columns[i]] = scanArgs[i]
 				}
 				ret, err := json.Marshal(data)
@@ -376,7 +483,7 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 				mr.readChan <- ret
 
 				if offsetKeyIndex >= 0 {
-					mr.offsets[idx], err = convertInt(scanArgs[offsetKeyIndex])
+					mr.offsets[idx], err = convertLong(scanArgs[offsetKeyIndex])
 					if err != nil {
 						log.Errorf("Runner[%v] %v offset key value parse error %v, offset was not recorded", mr.meta.RunnerName, mr.Name(), err)
 						err = nil
@@ -398,7 +505,7 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 	return nil
 }
 
-func convertInt(v interface{}) (int64, error) {
+func convertLong(v interface{}) (int64, error) {
 	dpv := reflect.ValueOf(v)
 	if dpv.Kind() != reflect.Ptr {
 		return 0, errors.New("scanArgs not a pointer")
@@ -451,6 +558,66 @@ func convertInt(v interface{}) (int64, error) {
 		}
 		if ret, ok := idv.([]byte); ok {
 			return int64(binary.BigEndian.Uint64(ret)), nil
+		}
+	}
+	return 0, fmt.Errorf("%v type can not convert to int", dv.Kind())
+}
+
+func convertFloat(v interface{}) (float64, error) {
+	dpv := reflect.ValueOf(v)
+	if dpv.Kind() != reflect.Ptr {
+		return 0, errors.New("scanArgs not a pointer")
+	}
+	if dpv.IsNil() {
+		return 0, errors.New("scanArgs is a nil pointer")
+	}
+	dv := reflect.Indirect(dpv)
+	switch dv.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return float64(dv.Int()), nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return float64(dv.Uint()), nil
+	case reflect.Float32, reflect.Float64:
+		return dv.Float(), nil
+	case reflect.String:
+		return strconv.ParseFloat(dv.String(), 64)
+	case reflect.Interface:
+		idv := dv.Interface()
+		if ret, ok := idv.(int64); ok {
+			return float64(ret), nil
+		}
+		if ret, ok := idv.(int); ok {
+			return float64(ret), nil
+		}
+		if ret, ok := idv.(uint); ok {
+			return float64(ret), nil
+		}
+		if ret, ok := idv.(uint64); ok {
+			return float64(ret), nil
+		}
+		if ret, ok := idv.(string); ok {
+			return strconv.ParseFloat(ret, 64)
+		}
+		if ret, ok := idv.(int8); ok {
+			return float64(ret), nil
+		}
+		if ret, ok := idv.(int16); ok {
+			return float64(ret), nil
+		}
+		if ret, ok := idv.(int32); ok {
+			return float64(ret), nil
+		}
+		if ret, ok := idv.(uint8); ok {
+			return float64(ret), nil
+		}
+		if ret, ok := idv.(uint16); ok {
+			return float64(ret), nil
+		}
+		if ret, ok := idv.(uint32); ok {
+			return float64(ret), nil
+		}
+		if ret, ok := idv.([]byte); ok {
+			return strconv.ParseFloat(string(ret), 64)
 		}
 	}
 	return 0, fmt.Errorf("%v type can not convert to int", dv.Kind())
