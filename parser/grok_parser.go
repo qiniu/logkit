@@ -272,6 +272,7 @@ func (p *GrokParser) parseLine(line string) (sender.Data, error) {
 		}
 	}
 	if len(values) < 1 {
+		log.Errorf("%v no value was parsed after grok pattern %v", line, p.Patterns)
 		return nil, nil
 	}
 	data := sender.Data{}
