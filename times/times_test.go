@@ -113,6 +113,13 @@ func TestAddLayout(t *testing.T) {
 		t.Error(err)
 	}
 	fmt.Println(tm.String())
+	AddLayout([]string{"2006-1-02 15:04:05"})
+	tm, err = StrToTime("2017-7-11 14:39:24")
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println(tm.String())
+
 }
 
 func a1() map[string]interface{} {
