@@ -11,6 +11,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
+	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
 )
 
@@ -21,6 +22,7 @@ const (
 	TypeFloat   CsvType = "float"
 	TypeLong    CsvType = "long"
 	TypeString  CsvType = "string"
+	TypeDate    CsvType = "date"
 	TypeJsonMap CsvType = "jsonmap"
 )
 
@@ -248,6 +250,11 @@ func makeValue(raw string, valueType CsvType) (interface{}, error) {
 			return 0, nil
 		}
 		return strconv.ParseInt(raw, 10, 64)
+	case TypeDate:
+		if raw == "" {
+			return time.Now(), nil
+		}
+		return times.StrToTime(raw)
 	case TypeString:
 		return raw, nil
 	default:
