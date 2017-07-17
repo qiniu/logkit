@@ -215,7 +215,6 @@ func (ft *FtSender) trySendDatas(datas []Data, failSleep int) (err error) {
 		err = c.ErrorDetail
 	}
 	if err != nil {
-		log.Errorf("Runner[%v] Sender[%v] cannot write points + %v", ft.runnerName, ft.innerSender.Name(), err)
 		failCtx := new(datasContext)
 		var binaryUnpack bool
 		se, succ := err.(*reqerr.SendError)
@@ -229,6 +228,8 @@ func (ft *FtSender) trySendDatas(datas []Data, failSleep int) (err error) {
 				binaryUnpack = true
 			}
 		}
+		log.Errorf("Runner[%v] Sender[%v] cannot write points: %v, failDatas size: %v", ft.runnerName, ft.innerSender.Name(), err, len(failCtx.Datas))
+		log.Debugf("Runner[%v] Sender[%v] failed datas [[%v]]", ft.runnerName, ft.innerSender.Name(), failCtx.Datas)
 		if binaryUnpack {
 			lens := len(failCtx.Datas) / 2
 			if lens > 0 {
