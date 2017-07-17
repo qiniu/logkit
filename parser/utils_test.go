@@ -44,17 +44,17 @@ func Test_getLabels(t *testing.T) {
 		{
 			labelList: []string{"a v", "x y"},
 			nameLabel: map[string]struct{}{},
-			exp:       []Label{{name: "a", dataValue: "v"}, {name: "x", dataValue: "y"}},
+			exp:       []Label{{Name: "a", Value: "v"}, {Name: "x", Value: "y"}},
 		},
 		{
 			labelList: []string{"a v", "x"},
 			nameLabel: map[string]struct{}{},
-			exp:       []Label{{name: "a", dataValue: "v"}},
+			exp:       []Label{{Name: "a", Value: "v"}},
 		},
 		{
 			labelList: []string{"a v", "x y"},
 			nameLabel: map[string]struct{}{"x": struct{}{}},
-			exp:       []Label{{name: "a", dataValue: "v"}},
+			exp:       []Label{{Name: "a", Value: "v"}},
 		},
 	}
 	for _, ti := range tests {

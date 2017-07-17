@@ -62,7 +62,7 @@ func (krp *KafaRestlogParser) parseRequestLog(fields []string) sender.Data {
 	d[KEY_DURATION] = krp.ParseDuration(fields)
 	d[KEY_LOG_TIME] = krp.ParseLogTime(fields)
 	for _, label := range krp.labels {
-		d[label.name] = label.dataValue
+		d[label.Name] = label.Value
 	}
 	return d
 }
@@ -76,7 +76,7 @@ func (krp *KafaRestlogParser) parseAbnormalLog(fields []string) sender.Data {
 		d[KEY_WARN] = 1
 	}
 	for _, label := range krp.labels {
-		d[label.name] = label.dataValue
+		d[label.Name] = label.Value
 	}
 	return d
 }

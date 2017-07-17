@@ -266,7 +266,7 @@ func (p *QiniulogParser) parse(line string) (d sender.Data, err error) {
 	line = strings.TrimSpace(line)
 	d[LogHeadLog] = line
 	for _, l := range p.labels {
-		d[l.name] = l.dataValue
+		d[l.Name] = l.Value
 	}
 	return d, nil
 }

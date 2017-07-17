@@ -330,7 +330,7 @@ func (p *GrokParser) parseLine(line string) (sender.Data, error) {
 	}
 
 	for _, l := range p.labels {
-		data[l.name] = l.dataValue
+		data[l.Name] = l.Value
 	}
 	return data, nil
 }

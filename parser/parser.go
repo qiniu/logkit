@@ -38,8 +38,8 @@ const (
 )
 
 type Label struct {
-	name      string
-	dataValue string
+	Name  string
+	Value string
 }
 
 type ParserRegistry struct {

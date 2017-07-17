@@ -216,8 +216,8 @@ func dataTypeNotSupperted(dataType CsvType) error {
 
 func newLabel(name, dataValue string) Label {
 	return Label{
-		name:      name,
-		dataValue: dataValue,
+		Name:      name,
+		Value: dataValue,
 	}
 }
 
@@ -360,7 +360,7 @@ func (p *CsvParser) parse(line string) (sender.Data, error) {
 		}
 	}
 	for _, l := range p.labels {
-		d[l.name] = l.dataValue
+		d[l.Name] = l.Value
 	}
 	return d, nil
 }
