@@ -6,6 +6,8 @@ import (
 
 	"time"
 
+	"log"
+
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/utils"
@@ -28,11 +30,12 @@ func init() {
 		"remote_user": "-", "body_bytes_sent": int64(4259), "http_referer": `http://www.abc.cn`}
 }
 
-var cfg = conf.MapConf{NginxConfPath: "nginx_test_data/nginx.conf", NginxLogFormat: "main", NginxAccSchema: "remote_addr:string, remote_user:string, time_local:date, request:string, status:long, bytes_sent:long, body_bytes_sent:long, http_referer:string, http_user_agent:string, http_transfer_encoding:string, http_x_forwarded_for:string, upstream_addr:string, host:string, sent_http_x_reqid:string, upstream_response_time:string, request_time:float, request_length:long, upstream_http_x_tag:string, upstream_http_x_uid:string, http_x_stat:string, http_x_estat:string, http_x_from_cdn:string"}
-var cfg2 = conf.MapConf{NginxConfPath: "nginx_test_data/nginx.conf", NginxLogFormat: "logkit", NginxAccSchema: "remote_addr:string, remote_user:string, time_local:date, request:string, status:long, bytes_sent:long, body_bytes_sent:long, http_referer:string, http_user_agent:string, http_transfer_encoding:string, http_x_forwarded_for:string, upstream_addr:string, host:string, sent_http_x_reqid:string, upstream_response_time:string, request_time:float, request_length:long, upstream_http_x_tag:string, upstream_http_x_uid:string, http_x_stat:string, http_x_estat:string, http_x_from_cdn:string"}
+var cfg = conf.MapConf{"name": "nginx", NginxConfPath: "nginx_test_data/nginx.conf", NginxLogFormat: "main", NginxSchema: "remote_addr:string, remote_user:string, time_local:date, request:string, status:long, bytes_sent:long, body_bytes_sent:long, http_referer:string, http_user_agent:string, http_transfer_encoding:string, http_x_forwarded_for:string, upstream_addr:string, host:string, sent_http_x_reqid:string, upstream_response_time:string, request_time:float, request_length:long, upstream_http_x_tag:string, upstream_http_x_uid:string, http_x_stat:string, http_x_estat:string, http_x_from_cdn:string"}
+var cfg2 = conf.MapConf{"name": "nginx", NginxConfPath: "nginx_test_data/nginx.conf", NginxLogFormat: "logkit", NginxSchema: "remote_addr:string, remote_user:string, time_local:date, request:string, status:long, bytes_sent:long, body_bytes_sent:long, http_referer:string, http_user_agent:string, http_transfer_encoding:string, http_x_forwarded_for:string, upstream_addr:string, host:string, sent_http_x_reqid:string, upstream_response_time:string, request_time:float, request_length:long, upstream_http_x_tag:string, upstream_http_x_uid:string, http_x_stat:string, http_x_estat:string, http_x_from_cdn:string"}
+var cfg3 = conf.MapConf{"name": "nginx", NginxConfPath: "nginx_test_data/nginx.conf", NginxLogFormat: "testmain", NginxSchema: "remote_addr:string, remote_user:string, time_local:date, request:string, status:long, bytes_sent:long, body_bytes_sent:long, http_referer:string, http_user_agent:string, http_x_forwarded_for:string, upstream_addr:string, host:string, sent_http_x_reqid:string, request_time:float"}
 
 func TestNewNginxParser(t *testing.T) {
-	p, err := NewNginxAccParser("nginx", cfg)
+	p, err := NewNginxAccParser(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,14 +51,14 @@ func TestNewNginxParser(t *testing.T) {
 	for k, v := range entry1 {
 		assert.Equal(t, accLog1Entry[k], v, "parser "+k+" not match")
 	}
-	errFormat := fmt.Errorf("access log line '%v' does not match given format '%v'", accErrLog[0], p.regexp)
+	errFormat := fmt.Errorf("NginxParser fail to parse log line [%v], given format is [%v]", accErrLog[0], p.regexp)
 	_, err = p.Parse(accErrLog)
 	if c, ok := err.(*utils.StatsError); ok {
 		err = c.ErrorDetail
 	}
 	assert.Equal(t, err, errFormat, "it should be err format")
 
-	p2, err := NewNginxAccParser("nginx", cfg2)
+	p2, err := NewNginxAccParser(cfg2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,4 +69,21 @@ func TestNewNginxParser(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+}
+
+func Benchmark_BenchNginxParser(b *testing.B) {
+	var err error
+	p, err := NewNginxAccParser(cfg3)
+	if err != nil {
+		b.Fatal(err)
+	}
+	var m sender.Data
+	for n := 0; n < b.N; n++ {
+		m, err = p.parseline(`123.0.0.1 - - [17/Jul/2017:14:56:24 +0800] "POST /v2/repos/x/data HTTP/1.1" 200 479 2 "-" "QiniuPandoraJava/0.0.1 (Linux amd64 2.6.32-696.1.1.el6.x86_64) Java/1.8.0_131" "-" 192.168.160.75:80 pipeline.qiniu.com abc123bdc 0.072`)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+	grokBench = m
+	log.Println(m)
 }

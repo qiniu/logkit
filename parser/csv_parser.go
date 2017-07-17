@@ -37,7 +37,7 @@ const MaxParserSchemaErrOutput = 5
 type CsvParser struct {
 	name      string
 	schema    []field
-	labels    []label
+	labels    []Label
 	delim     string
 	schemaErr *schemaErr
 }
@@ -77,7 +77,7 @@ func NewCsvParser(c conf.MapConf) (LogParser, error) {
 	if len(labelList) < 1 {
 		labelList, _ = c.GetStringListOr(KeyCSVLabels, []string{}) //向前兼容老的配置
 	}
-	labels := getLabels(labelList, nameMap)
+	labels := GetLabels(labelList, nameMap)
 
 	return &CsvParser{
 		name:   name,
@@ -214,8 +214,8 @@ func dataTypeNotSupperted(dataType CsvType) error {
 	return errors.New("data type not supported " + string(dataType))
 }
 
-func newLabel(name, dataValue string) label {
-	return label{
+func newLabel(name, dataValue string) Label {
+	return Label{
 		name:      name,
 		dataValue: dataValue,
 	}

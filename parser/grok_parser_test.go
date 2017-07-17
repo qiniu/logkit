@@ -4,7 +4,6 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,7 +34,7 @@ func Benchmark_GrokParseLine_PANDORANGINX(b *testing.B) {
 
 	var m sender.Data
 	for n := 0; n < b.N; n++ {
-		m, _ = p.parseLine(`127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326`)
+		m, _ = p.parseLine(`123.0.0.1 - - [17/Jul/2017:14:56:24 +0800] "POST /v2/repos/x/data HTTP/1.1" 200 479 2 "-" "QiniuPandoraJava/0.0.1 (Linux amd64 2.6.32-696.1.1.el6.x86_64) Java/1.8.0_131" "-" 192.168.160.75:80 pipeline.qiniu.com abc123bdc 0.072`)
 	}
 	grokBench = m
 }
@@ -373,13 +372,13 @@ func TestBuiltinCombinedLogFormat(t *testing.T) {
 		m)
 }
 
-func TestcompileStringAndParse(t *testing.T) {
+func TestCompileStringAndParse(t *testing.T) {
 	p := &GrokParser{
 		Patterns: []string{"%{TEST_LOG_A}"},
 		CustomPatterns: `
 			DURATION %{NUMBER}[nuµm]?s
-			RESPONSE_CODE %{NUMBER:response_code:tag}
-			RESPONSE_TIME %{DURATION:response_time:duration}
+			RESPONSE_CODE %{NUMBER:response_code}
+			RESPONSE_TIME %{DURATION:response_time}
 			TEST_LOG_A %{NUMBER:myfloat:float} %{RESPONSE_CODE} %{IPORHOST:clientip} %{RESPONSE_TIME}
 		`,
 	}
@@ -392,12 +391,13 @@ func TestcompileStringAndParse(t *testing.T) {
 		sender.Data{
 			"clientip":      "192.168.1.1",
 			"myfloat":       float64(1.25),
-			"response_time": int64(5432),
+			"response_time": "5.432µs",
+			"response_code": "200",
 		},
 		metricA)
 }
 
-func TestcompileErrorsOnInvalidPattern(t *testing.T) {
+func TestCompileErrorsOnInvalidPattern(t *testing.T) {
 	p := &GrokParser{
 		Patterns: []string{"%{TEST_LOG_A}", "%{TEST_LOG_B}"},
 		CustomPatterns: `
@@ -431,7 +431,7 @@ func TestParsePatternsWithoutCustom(t *testing.T) {
 		metricA)
 }
 
-func TestcompileFileAndParse(t *testing.T) {
+func TestCompileFileAndParse(t *testing.T) {
 	p := &GrokParser{
 		Patterns:           []string{"%{TEST_LOG_A}", "%{TEST_LOG_B}"},
 		CustomPatternFiles: []string{"./grok_test_data/test-patterns"},
@@ -445,8 +445,10 @@ func TestcompileFileAndParse(t *testing.T) {
 		sender.Data{
 			"clientip":      "192.168.1.1",
 			"myfloat":       float64(1.25),
-			"response_time": int64(5432),
+			"response_time": "5.432µs",
 			"myint":         int64(101),
+			"response_code": "200",
+			"timestamp":     "2016-06-04T12:41:45+01:00",
 		},
 		metricA)
 
@@ -458,14 +460,12 @@ func TestcompileFileAndParse(t *testing.T) {
 			"myfloat":    1.25,
 			"mystring":   "mystring",
 			"nomodifier": "nomodifier",
+			"timestamp":  "2016-06-04T12:41:45Z",
 		},
 		metricB)
-	assert.Equal(t,
-		time.Date(2016, time.June, 4, 12, 41, 45, 0, time.FixedZone("foo", 60*60)).Nanosecond(),
-		metricB["ts"])
 }
 
-func TestcompileNoModifiersAndParse(t *testing.T) {
+func TestCompileNoModifiersAndParse(t *testing.T) {
 	p := &GrokParser{
 		Patterns: []string{"%{TEST_LOG_C}"},
 		CustomPatterns: `
@@ -487,7 +487,7 @@ func TestcompileNoModifiersAndParse(t *testing.T) {
 		metricA)
 }
 
-func TestcompileNoNamesAndParse(t *testing.T) {
+func TestCompileNoNamesAndParse(t *testing.T) {
 	p := &GrokParser{
 		Patterns: []string{"%{TEST_LOG_C}"},
 		CustomPatterns: `
@@ -514,7 +514,7 @@ func TestParseNoMatch(t *testing.T) {
 	assert.Nil(t, metricA)
 }
 
-func TestcompileErrors(t *testing.T) {
+func TestCompileErrors(t *testing.T) {
 	// compile fails because there are multiple timestamps:
 	p := &GrokParser{
 		Patterns: []string{"%{TEST_LOG_A}", "%{TEST_LOG_B}"},

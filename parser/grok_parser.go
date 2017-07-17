@@ -88,14 +88,14 @@ var (
 	//     %{NUMBER:bytes:long}
 	//     %{IPORHOST:clientip:date}
 	//     %{HTTPDATE:ts1:float}
-	modifierRe = regexp.MustCompile(`%{\w+:(\w+):(long|string|date|float)}`)
+	modifierRe = regexp.MustCompile(`%{\w+:(\w+):(long|string|date|float|drop)}`)
 	// matches a plain pattern name. ie, %{NUMBER}
 	patternOnlyRe = regexp.MustCompile(`%{(\w+)}`)
 )
 
 type GrokParser struct {
 	name   string
-	labels []label
+	labels []Label
 	mode   string
 
 	timeZoneOffset int
@@ -164,7 +164,7 @@ func NewGrokParser(c conf.MapConf) (LogParser, error) {
 	timeZoneOffsetRaw, _ := c.GetStringOr(KeyTimeZoneOffset, "")
 	timeZoneOffset := parseTimeZoneOffset(timeZoneOffsetRaw)
 	nameMap := make(map[string]struct{})
-	labels := getLabels(labelList, nameMap)
+	labels := GetLabels(labelList, nameMap)
 
 	customPatterns, _ := c.GetStringOr(KeyGrokCustomPatterns, "")
 	customPatternFiles, _ := c.GetStringListOr(KeyGrokCustomPatternFiles, []string{})
