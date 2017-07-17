@@ -62,10 +62,10 @@ func (im *JsonParser) parseLine(line string) (data sender.Data, err error) {
 	}
 	for _, l := range im.labels {
 		// label 不覆盖数据，其他parser不需要这么一步检验，因为Schema固定，json的Schema不固定
-		if _, ok := data[l.name]; ok {
+		if _, ok := data[l.Name]; ok {
 			continue
 		}
-		data[l.name] = l.dataValue
+		data[l.Name] = l.Value
 	}
 	return
 }

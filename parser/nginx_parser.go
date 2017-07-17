@@ -129,7 +129,7 @@ func (p *NginxParser) parseline(line string) (sender.Data, error) {
 		entry[name] = data
 	}
 	for _, l := range p.labels {
-		entry[l.name] = l.dataValue
+		entry[l.Name] = l.Value
 	}
 	return entry, nil
 }

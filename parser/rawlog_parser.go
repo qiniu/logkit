@@ -45,7 +45,7 @@ func (p *RawlogParser) Parse(lines []string) ([]sender.Data, error) {
 		d[KeyRaw] = line
 		d[KeyTimestamp] = time.Now().Format(time.RFC3339Nano)
 		for _, label := range p.labels {
-			d[label.name] = label.dataValue
+			d[label.Name] = label.Value
 		}
 		datas = append(datas, d)
 	}
