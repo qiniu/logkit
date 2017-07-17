@@ -27,7 +27,7 @@ const (
 
 type KafaRestlogParser struct {
 	name   string
-	labels []label
+	labels []Label
 }
 
 func (krp *KafaRestlogParser) Name() string {
@@ -93,7 +93,7 @@ func NewKafaRestlogParser(c conf.MapConf) (LogParser, error) {
 		KEY_DURATION: struct{}{},
 		KEY_LOG_TIME: struct{}{},
 	}
-	labels := getLabels(labelList, nameMap)
+	labels := GetLabels(labelList, nameMap)
 
 	return &KafaRestlogParser{
 		name:   name,

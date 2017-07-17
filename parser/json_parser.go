@@ -12,7 +12,7 @@ import (
 
 type JsonParser struct {
 	name      string
-	labels    []label
+	labels    []Label
 	schemaErr *schemaErr
 }
 
@@ -20,7 +20,7 @@ func NewJsonParser(c conf.MapConf) (LogParser, error) {
 	name, _ := c.GetStringOr(KeyParserName, "")
 	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
 	nameMap := map[string]struct{}{}
-	labels := getLabels(labelList, nameMap)
+	labels := GetLabels(labelList, nameMap)
 
 	return &JsonParser{
 		name:   name,

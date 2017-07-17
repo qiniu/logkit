@@ -17,7 +17,7 @@ func NewRawlogParser(c conf.MapConf) (LogParser, error) {
 	name, _ := c.GetStringOr(KeyParserName, "")
 	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
 	nameMap := make(map[string]struct{})
-	labels := getLabels(labelList, nameMap)
+	labels := GetLabels(labelList, nameMap)
 
 	return &RawlogParser{
 		name:   name,
@@ -27,7 +27,7 @@ func NewRawlogParser(c conf.MapConf) (LogParser, error) {
 
 type RawlogParser struct {
 	name   string
-	labels []label
+	labels []Label
 }
 
 func (p *RawlogParser) Name() string {

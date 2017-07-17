@@ -45,8 +45,8 @@ func (s *schemaErr) Output(err error) {
 	}
 }
 
-func getLabels(labelList []string, nameMap map[string]struct{}) (labels []label) {
-	labels = make([]label, 0)
+func GetLabels(labelList []string, nameMap map[string]struct{}) (labels []Label) {
+	labels = make([]Label, 0)
 	for _, f := range labelList {
 		parts := strings.Fields(f)
 		if len(parts) < 2 {

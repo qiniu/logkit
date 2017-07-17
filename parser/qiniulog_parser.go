@@ -53,7 +53,7 @@ type QiniulogParser struct {
 	name    string
 	prefix  string
 	headers []string
-	labels  []label
+	labels  []Label
 	se      schemaErr
 }
 
@@ -86,7 +86,7 @@ func NewQiniulogParser(c conf.MapConf) (LogParser, error) {
 	for k, _ := range logHeaders {
 		nameMap[string(k)] = struct{}{}
 	}
-	labels := getLabels(labelList, nameMap)
+	labels := GetLabels(labelList, nameMap)
 
 	return &QiniulogParser{
 		name:    name,
