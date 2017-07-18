@@ -39,26 +39,26 @@ func Test_getLabels(t *testing.T) {
 	tests := []struct {
 		labelList []string
 		nameLabel map[string]struct{}
-		exp       []label
+		exp       []Label
 	}{
 		{
 			labelList: []string{"a v", "x y"},
 			nameLabel: map[string]struct{}{},
-			exp:       []label{label{name: "a", dataValue: "v"}, label{name: "x", dataValue: "y"}},
+			exp:       []Label{{Name: "a", Value: "v"}, {Name: "x", Value: "y"}},
 		},
 		{
 			labelList: []string{"a v", "x"},
 			nameLabel: map[string]struct{}{},
-			exp:       []label{label{name: "a", dataValue: "v"}},
+			exp:       []Label{{Name: "a", Value: "v"}},
 		},
 		{
 			labelList: []string{"a v", "x y"},
 			nameLabel: map[string]struct{}{"x": struct{}{}},
-			exp:       []label{label{name: "a", dataValue: "v"}},
+			exp:       []Label{{Name: "a", Value: "v"}},
 		},
 	}
 	for _, ti := range tests {
-		labes := getLabels(ti.labelList, ti.nameLabel)
+		labes := GetLabels(ti.labelList, ti.nameLabel)
 		if !reflect.DeepEqual(labes, ti.exp) {
 			t.Errorf("Test_getLabels error exp %v but got %v", ti.exp, labes)
 		}

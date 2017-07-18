@@ -11,6 +11,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
+	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
 )
 
@@ -21,6 +22,7 @@ const (
 	TypeFloat   CsvType = "float"
 	TypeLong    CsvType = "long"
 	TypeString  CsvType = "string"
+	TypeDate    CsvType = "date"
 	TypeJsonMap CsvType = "jsonmap"
 )
 
@@ -35,7 +37,7 @@ const MaxParserSchemaErrOutput = 5
 type CsvParser struct {
 	name      string
 	schema    []field
-	labels    []label
+	labels    []Label
 	delim     string
 	schemaErr *schemaErr
 }
@@ -75,7 +77,7 @@ func NewCsvParser(c conf.MapConf) (LogParser, error) {
 	if len(labelList) < 1 {
 		labelList, _ = c.GetStringListOr(KeyCSVLabels, []string{}) //向前兼容老的配置
 	}
-	labels := getLabels(labelList, nameMap)
+	labels := GetLabels(labelList, nameMap)
 
 	return &CsvParser{
 		name:   name,
@@ -212,10 +214,10 @@ func dataTypeNotSupperted(dataType CsvType) error {
 	return errors.New("data type not supported " + string(dataType))
 }
 
-func newLabel(name, dataValue string) label {
-	return label{
-		name:      name,
-		dataValue: dataValue,
+func newLabel(name, dataValue string) Label {
+	return Label{
+		Name:      name,
+		Value: dataValue,
 	}
 }
 
@@ -248,6 +250,11 @@ func makeValue(raw string, valueType CsvType) (interface{}, error) {
 			return 0, nil
 		}
 		return strconv.ParseInt(raw, 10, 64)
+	case TypeDate:
+		if raw == "" {
+			return time.Now(), nil
+		}
+		return times.StrToTime(raw)
 	case TypeString:
 		return raw, nil
 	default:
@@ -353,7 +360,7 @@ func (p *CsvParser) parse(line string) (sender.Data, error) {
 		}
 	}
 	for _, l := range p.labels {
-		d[l.name] = l.dataValue
+		d[l.Name] = l.Value
 	}
 	return d, nil
 }

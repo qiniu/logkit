@@ -27,7 +27,7 @@ const (
 
 type KafaRestlogParser struct {
 	name   string
-	labels []label
+	labels []Label
 }
 
 func (krp *KafaRestlogParser) Name() string {
@@ -62,7 +62,7 @@ func (krp *KafaRestlogParser) parseRequestLog(fields []string) sender.Data {
 	d[KEY_DURATION] = krp.ParseDuration(fields)
 	d[KEY_LOG_TIME] = krp.ParseLogTime(fields)
 	for _, label := range krp.labels {
-		d[label.name] = label.dataValue
+		d[label.Name] = label.Value
 	}
 	return d
 }
@@ -76,7 +76,7 @@ func (krp *KafaRestlogParser) parseAbnormalLog(fields []string) sender.Data {
 		d[KEY_WARN] = 1
 	}
 	for _, label := range krp.labels {
-		d[label.name] = label.dataValue
+		d[label.Name] = label.Value
 	}
 	return d
 }
@@ -93,7 +93,7 @@ func NewKafaRestlogParser(c conf.MapConf) (LogParser, error) {
 		KEY_DURATION: struct{}{},
 		KEY_LOG_TIME: struct{}{},
 	}
-	labels := getLabels(labelList, nameMap)
+	labels := GetLabels(labelList, nameMap)
 
 	return &KafaRestlogParser{
 		name:   name,

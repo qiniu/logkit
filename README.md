@@ -16,6 +16,7 @@ logkit是[七牛Pandora](https://pandora-docs.qiniu.com)开发的一个通用的
 1. Elasticsearch
 1. MongoDB
 1. Kafka
+1. Redis
 
 ## 工作方式
 
@@ -82,6 +83,8 @@ logkit.conf是logkit工具本身的配置文件，主要用于指定logkit运行
 
 
 ## 单个runner的配置详解
+
+为了简化logkit的配置工作，Pandora提供一个[logkit配置文件帮手](https://pandora-toolkits.qiniu.com)来根据不同的runner类型来生成配置文件。
 
 典型的 csv Runner配置如下。
 

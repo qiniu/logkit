@@ -275,8 +275,8 @@ func (r *LogExportRunner) Run() {
 				break
 			}
 			if len(line) <= 0 {
-				log.Debugf("Runner[%v] reader %s cannot get any content", r.Name(), r.reader.Name())
-				time.Sleep(2 * time.Second)
+				log.Debugf("Runner[%v] reader %s no more content fetched sleep 1 second...", r.Name(), r.reader.Name())
+				time.Sleep(1 * time.Second)
 				continue
 			}
 			if len(line) >= r.MaxBatchSize {
@@ -341,6 +341,7 @@ func (r *LogExportRunner) Run() {
 			}
 		}
 		success := true
+		log.Debugf("Runner[%v] reader %s start to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
 		for _, s := range r.senders {
 			if !r.trySend(s, datas, r.MaxBatchTryTimes) {
 				success = false
@@ -351,6 +352,7 @@ func (r *LogExportRunner) Run() {
 		if success {
 			r.reader.SyncMeta()
 		}
+		log.Debugf("Runner[%v] reader %s finish to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
 	}
 }
 

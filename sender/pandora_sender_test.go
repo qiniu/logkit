@@ -417,7 +417,7 @@ func TestConvertDate(t *testing.T) {
 	tnow := time.Now()
 	var tt interface{}
 	tt = tnow.UnixNano()
-	newtime, err := convertDate(tt)
+	newtime, err := convertDate(tt, forceMicrosecondOption{0, true})
 	if err != nil {
 		t.Error(err)
 	}
@@ -427,7 +427,7 @@ func TestConvertDate(t *testing.T) {
 		t.Errorf("convertDate error exp %v,got %v", exp, newtime)
 	}
 	tt = exp
-	newtime, err = convertDate(tt)
+	newtime, err = convertDate(tt, forceMicrosecondOption{0, true})
 	if err != nil {
 		t.Error(err)
 	}
@@ -437,7 +437,7 @@ func TestConvertDate(t *testing.T) {
 	ntSec := tnow.UnixNano() / int64(time.Second)
 	ntnow = ntSec * int64(time.Second)
 	exp = time.Unix(0, ntnow).Format(time.RFC3339Nano)
-	newtime, err = convertDate(ntSec)
+	newtime, err = convertDate(ntSec, forceMicrosecondOption{0, true})
 	if err != nil {
 		t.Error(err)
 	}
@@ -469,17 +469,19 @@ func TestSuppurtedTimeFormat(t *testing.T) {
 		},
 		{
 			timeStr: "2017-04-05T18:15:01+08:00",
-			exp:     "2017-04-05T18:15:01+08:00",
+			exp:     "2017-04-05T10:15:01Z",
 		},
 	}
 	for _, ti := range tests {
-		val, err := convertDate(ti.timeStr)
+		val, err := convertDate(ti.timeStr, forceMicrosecondOption{0, true})
 		if err != nil {
 			t.Error(err)
 		}
-		got := val.(string)
+		gotDateStr := val.(string)
+		tt, _ := time.Parse(time.RFC3339Nano, gotDateStr)
+		got := tt.UTC().Format(time.RFC3339Nano)
 		if ti.exp != got {
-			t.Errorf("TestSuppurtedTimeFormat error exp %v but got %v", ti.exp, got)
+			t.Fatalf("TestSuppurtedTimeFormat error exp %v but got %v", ti.exp, got)
 		}
 	}
 }
@@ -718,4 +720,60 @@ func TestUpdatePandoraSchema(t *testing.T) {
 		},
 	}
 	assert.Equal(t, expschema, pandora.Schemas)
+}
+
+func TestAlignTimestamp(t *testing.T) {
+	tests := []struct {
+		input   int64
+		counter int64
+		output  int64
+	}{
+		{
+			input:   int64(1),
+			counter: int64(0),
+			output:  int64(1000000000000000),
+		},
+		{ //秒 -> 微秒
+			input:   int64(1498720797),
+			counter: int64(0),
+			output:  int64(1498720797000000),
+		},
+		{ //秒 + 扰动 -> 微秒
+			input:   int64(1498720797),
+			counter: int64(10000),
+			output:  int64(1498720797010000),
+		},
+		{ //毫秒 -> 微秒
+			input:   int64(1498720797123),
+			counter: int64(0),
+			output:  int64(1498720797123000),
+		},
+		{ //毫秒 + 扰动 -> 微秒
+			input:   int64(1498720797123),
+			counter: int64(100),
+			output:  int64(1498720797123100),
+		},
+		{ //微秒 -> 微秒
+			input:   int64(1498720797123123),
+			counter: int64(0),
+			output:  int64(1498720797123123),
+		},
+		{ //微秒 + 扰动 -> 微秒
+			input:   int64(1498720797123123),
+			counter: int64(100),
+			output:  int64(1498720797123123),
+		},
+		{ //保留纳秒
+			input:   int64(1498720797123123123),
+			counter: int64(100),
+			output:  int64(1498720797123123123),
+		},
+	}
+
+	for _, test := range tests {
+		output := alignTimestamp(test.input, test.counter)
+		if output != test.output {
+			t.Errorf("test align timestamp fail\ngot:%v\nexp:%v\n", output, test.output)
+		}
+	}
 }

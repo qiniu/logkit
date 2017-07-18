@@ -30,6 +30,18 @@ type FileReader interface {
 	SyncMeta() error
 }
 
+// TODO 构建统一的 Server reader框架， 减少重复的编码
+type ServerReader interface {
+	//Name reader名称
+	Name() string
+	//Source 读取的数据源
+	Source() string
+	Start()
+	ReadLine() (string, error)
+	Close() error
+	SyncMeta()
+}
+
 // FileReader's conf keys
 const (
 	KeyLogPath       = "log_path"
@@ -61,6 +73,8 @@ const (
 	KeyMysqlCron        = "mysql_cron"
 	KeyMysqlExecOnStart = "mysql_exec_onstart"
 
+	KeySQLSchema = "sql_schema"
+
 	KeyMssqlOffsetKey   = "mssql_offset_key"
 	KeyMssqlReadBatch   = "mssql_limit_batch"
 	KeyMssqlDataSource  = "mssql_datasource"
@@ -74,6 +88,7 @@ const (
 	KeyESType      = "es_type"
 	KeyESHost      = "es_host"
 	KeyESKeepAlive = "es_keepalive"
+	KeyESVersion   = "es_version"
 
 	KeyMongoHost        = "mongo_host"
 	KeyMongoDatabase    = "mongo_database"
@@ -104,6 +119,7 @@ const (
 	ModeElastic = "elastic"
 	ModeMongo   = "mongo"
 	ModeKafka   = "kafka"
+	ModeRedis   = "redis"
 )
 
 const (
@@ -166,41 +182,9 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta) (reader Reader, err
 		maxOpenFiles, _ := conf.GetIntOr(KeyMaxOpenFiles, 256)
 		reader, err = NewMultiReader(meta, logpath, whence, expireDur, stateIntervalDur, maxOpenFiles)
 	case ModeMysql: // Mysql 模式是启动mysql reader,读取mysql数据表
-		readBatch, _ := conf.GetIntOr(KeyMysqlReadBatch, 100)
-		offsetKey, _ := conf.GetStringOr(KeyMysqlOffsetKey, "")
-		dataSource, err := conf.GetString(KeyMysqlDataSource)
-		if err != nil {
-			dataSource = logpath
-		}
-		database, err := conf.GetString(KeyMysqlDataBase)
-		if err != nil {
-			return nil, err
-		}
-		rawSqls, err := conf.GetString(KeyMysqlSQL)
-		if err != nil {
-			return nil, err
-		}
-		cronSchedule, _ := conf.GetStringOr(KeyMysqlCron, "")
-		execOnStart, _ := conf.GetBoolOr(KeyMysqlExecOnStart, true)
-		reader, err = NewSQLReader(meta, readBatch, ModeMysql, dataSource, database, rawSqls, cronSchedule, offsetKey, execOnStart)
+		reader, err = NewSQLReader(meta, conf)
 	case ModeMssql: // Mssql 模式是启动mssql reader，读取mssql数据表
-		readBatch, _ := conf.GetIntOr(KeyMssqlReadBatch, 100)
-		offsetKey, _ := conf.GetStringOr(KeyMssqlOffsetKey, "")
-		dataSource, err := conf.GetString(KeyMssqlDataSource)
-		if err != nil {
-			dataSource = logpath
-		}
-		database, err := conf.GetString(KeyMssqlDataBase)
-		if err != nil {
-			return nil, err
-		}
-		rawSqls, err := conf.GetString(KeyMssqlSQL)
-		if err != nil {
-			return nil, err
-		}
-		cronSchedule, _ := conf.GetStringOr(KeyMssqlCron, "")
-		execOnStart, _ := conf.GetBoolOr(KeyMssqlExecOnStart, true)
-		reader, err = NewSQLReader(meta, readBatch, ModeMssql, dataSource, database, rawSqls, cronSchedule, offsetKey, execOnStart)
+		reader, err = NewSQLReader(meta, conf)
 	case ModeElastic:
 		readBatch, _ := conf.GetIntOr(KeyESReadBatch, 100)
 		estype, err := conf.GetString(KeyESType)
@@ -215,8 +199,9 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta) (reader Reader, err
 		if !strings.HasPrefix(eshost, "http://") && !strings.HasPrefix(eshost, "https://") {
 			eshost = "http://" + eshost
 		}
+		esVersion, _ := conf.GetStringOr(KeyESVersion, ElasticVersion2)
 		keepAlive, _ := conf.GetStringOr(KeyESKeepAlive, "6h")
-		reader, err = NewESReader(meta, readBatch, estype, esindex, eshost, keepAlive)
+		reader, err = NewESReader(meta, readBatch, estype, esindex, eshost, esVersion, keepAlive)
 	case ModeMongo:
 		readBatch, _ := conf.GetIntOr(KeyMongoReadBatch, 100)
 		database, err := conf.GetString(KeyMongoDatabase)
@@ -245,6 +230,8 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta) (reader Reader, err
 		}
 		zookeepers, err := conf.GetStringList(KeyKafkaZookeeper)
 		reader, err = NewKafkaReader(meta, consumerGroup, topics, zookeepers, whence)
+	case ModeRedis:
+		reader, err = NewRedisReader(meta, conf)
 	default:
 		err = fmt.Errorf("mode %v not supported now", mode)
 	}
