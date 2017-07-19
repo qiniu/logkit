@@ -450,7 +450,7 @@ func (s *PandoraSender) generatePoint(data Data) (point Data) {
 		}
 
 		if !validSchema(v.ValueType, value) {
-			log.Errorf("Runner[%v] Sender[%v]: %v not match type %v, from data < %v >, ignored this field", s.opt.runnerName, s.opt.name, value, v.ValueType, data)
+			log.Errorf("Runner[%v] Sender[%v]: key <%v %v> not match type %v, from data < %v >, ignored this field", s.opt.runnerName, s.opt.name, name, value, v.ValueType, data)
 			continue
 		}
 		point[k] = value
