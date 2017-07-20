@@ -31,7 +31,6 @@ func createDirWithName(dirx string) {
 	}
 }
 func Test_ActiveReader(t *testing.T) {
-	log.SetOutputLevel(0)
 	testfile := "Test_ActiveReader"
 	createDir()
 	meta, err := NewMeta(metaDir, metaDir, testfile, ModeDir, defautFileRetention)

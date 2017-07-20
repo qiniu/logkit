@@ -71,6 +71,7 @@ func NewActiveReader(logPath, whence string, meta *Meta) (ar *ActiveReader, err 
 		msgchan:    make(chan string),
 		inactive:   false,
 		runnerName: meta.RunnerName,
+		status:     StatusInit,
 	}
 	return
 }
@@ -81,6 +82,7 @@ func (ar *ActiveReader) Run() {
 	timer := time.NewTicker(50 * time.Millisecond)
 	for {
 		if atomic.LoadInt32(&ar.status) == StatusStopped {
+			log.Warnf("Runner[%v] ActiveReader %s was stopped", ar.runnerName, ar.logpath)
 			return
 		}
 		if ar.readcache == "" {
@@ -93,7 +95,7 @@ func (ar *ActiveReader) Run() {
 			//文件EOF，同时没有任何内容，代表不是第一次EOF，休息时间设置长一些
 			if ar.readcache == "" && err == io.EOF {
 				ar.inactive = true
-				log.Debugf("Runner[%v] %v ActiveReader was inactive, sleep 10 seconds", ar.runnerName, ar.logpath)
+				log.Debugf("Runner[%v] %v meet EOF, ActiveReader was inactive now, sleep 10 seconds", ar.runnerName, ar.logpath)
 				time.Sleep(10 * time.Second)
 				continue
 			}
@@ -120,6 +122,7 @@ func (ar *ActiveReader) Run() {
 func (ar *ActiveReader) Close() error {
 	atomic.StoreInt32(&ar.status, StatusStopped)
 	err := ar.br.Close()
+	log.Warnf("Runner[%v] ActiveReader %s was closed", ar.runnerName, ar.logpath)
 	return err
 }
 
@@ -134,7 +137,8 @@ func (ar *ActiveReader) expired(expireDur time.Duration) bool {
 		if os.IsNotExist(err) {
 			return true
 		}
-		log.Errorf("Runner[%v] stat log %v error %v", ar.runnerName, ar.logpath, err)
+		log.Errorf("Runner[%v] stat log %v error %v,will not expire it...", ar.runnerName, ar.logpath, err)
+		return false
 	}
 	if fi.ModTime().Add(expireDur).Before(time.Now()) && ar.inactive {
 		return true
@@ -205,14 +209,13 @@ func (mr *MultiReader) Expire() {
 	mr.armapmux.Lock()
 	for path, ar := range mr.fileReaders {
 		if ar.expired(mr.expire) {
-			go ar.Close()
+			ar.Close()
 			delete(mr.fileReaders, path)
 			delete(mr.cacheMap, path)
 			paths = append(paths, path)
 		}
 	}
 	mr.armapmux.Unlock()
-
 	if len(paths) > 0 {
 		log.Infof("Runner[%v] Expire reader find expired logpath: %v", mr.meta.RunnerName, strings.Join(paths, ", "))
 		mr.updateSelectCase()
@@ -240,6 +243,9 @@ func (mr *MultiReader) StatLogPath() {
 	if err != nil {
 		log.Errorf("Runner[%v] stat logPathPattern error %v", mr.meta.RunnerName, err)
 		return
+	}
+	if len(matches) > 0 {
+		log.Debugf("Runner[%v] StatLogPath %v find matches: %v", mr.meta.RunnerName, mr.logPathPattern, strings.Join(matches, ", "))
 	}
 	var newaddsPath []string
 	for _, mc := range matches {
