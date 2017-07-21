@@ -85,7 +85,7 @@ func (ar *ActiveReader) Run() {
 		return
 	}
 	var err error
-	timer := time.NewTicker(50 * time.Millisecond)
+	timer := time.NewTicker(time.Second)
 	for {
 		if atomic.LoadInt32(&ar.status) == StatusStopped || atomic.LoadInt32(&ar.status) == StatusStoping {
 			atomic.CompareAndSwapInt32(&ar.status, StatusStoping, StatusStopped)
@@ -403,7 +403,7 @@ func (mr *MultiReader) ReadLine() (data string, err error) {
 	if !mr.started {
 		mr.Start()
 	}
-	timer := time.NewTicker(50 * time.Millisecond)
+	timer := time.NewTicker(time.Second)
 	select {
 	case result := <-mr.msgChan:
 		mr.curFile = result.logpath
