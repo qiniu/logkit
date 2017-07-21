@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"strings"
 	"sync"
@@ -21,14 +20,13 @@ type MultiReader struct {
 	started     bool
 	status      int32
 	fileReaders map[string]*ActiveReader
-	scs         []reflect.SelectCase //在updateSelectCase中更新
-	scs2File    []string             //在updateSelectCase中更新
 	armapmux    sync.Mutex
-	scsmux      sync.Mutex
 	startmux    sync.Mutex
 	curFile     string
 	headRegexp  *regexp.Regexp
 	cacheMap    map[string]string
+
+	msgChan chan Result
 
 	//以下为传入参数
 	meta           *Meta
@@ -43,13 +41,18 @@ type ActiveReader struct {
 	br         *BufReader
 	logpath    string
 	readcache  string
-	msgchan    chan string
+	msgchan    chan<- Result
 	status     int32
 	inactive   bool //当inactive为true时才会被expire回收
 	runnerName string
 }
 
-func NewActiveReader(logPath, whence string, meta *Meta) (ar *ActiveReader, err error) {
+type Result struct {
+	result  string
+	logpath string
+}
+
+func NewActiveReader(logPath, whence string, meta *Meta, msgChan chan<- Result) (ar *ActiveReader, err error) {
 	rpath := strings.Replace(logPath, string(os.PathSeparator), "_", -1)
 	subMetaPath := filepath.Join(meta.dir, rpath)
 	subMeta, err := NewMeta(subMetaPath, subMetaPath, logPath, ModeFile, defautFileRetention)
@@ -68,7 +71,7 @@ func NewActiveReader(logPath, whence string, meta *Meta) (ar *ActiveReader, err 
 	ar = &ActiveReader{
 		br:         bf,
 		logpath:    logPath,
-		msgchan:    make(chan string),
+		msgchan:    msgChan,
 		inactive:   false,
 		runnerName: meta.RunnerName,
 		status:     StatusInit,
@@ -77,11 +80,15 @@ func NewActiveReader(logPath, whence string, meta *Meta) (ar *ActiveReader, err 
 }
 
 func (ar *ActiveReader) Run() {
+	if !atomic.CompareAndSwapInt32(&ar.status, StatusInit, StatusRunning) {
+		log.Errorf("Runner[%v] ActiveReader %s was not in StatusInit before Running,exit it...", ar.runnerName, ar.logpath)
+		return
+	}
 	var err error
-	defer close(ar.msgchan)
 	timer := time.NewTicker(50 * time.Millisecond)
 	for {
-		if atomic.LoadInt32(&ar.status) == StatusStopped {
+		if atomic.LoadInt32(&ar.status) == StatusStopped || atomic.LoadInt32(&ar.status) == StatusStoping {
+			atomic.CompareAndSwapInt32(&ar.status, StatusStoping, StatusStopped)
 			log.Warnf("Runner[%v] ActiveReader %s was stopped", ar.runnerName, ar.logpath)
 			return
 		}
@@ -95,24 +102,31 @@ func (ar *ActiveReader) Run() {
 			//文件EOF，同时没有任何内容，代表不是第一次EOF，休息时间设置长一些
 			if ar.readcache == "" && err == io.EOF {
 				ar.inactive = true
-				log.Debugf("Runner[%v] %v meet EOF, ActiveReader was inactive now, sleep 10 seconds", ar.runnerName, ar.logpath)
-				time.Sleep(10 * time.Second)
+				log.Debugf("Runner[%v] %v meet EOF, ActiveReader was inactive now, sleep 5 seconds", ar.runnerName, ar.logpath)
+				time.Sleep(5 * time.Second)
 				continue
 			}
 		}
-		log.Debugf("Runner[%v] >>>>>>readcache <%v> linecache <%v>", ar.runnerName, ar.readcache, ar.br.lineCache)
+		log.Debugf("Runner[%v] %v >>>>>>readcache <%v> linecache <%v>", ar.runnerName, ar.logpath, ar.readcache, ar.br.lineCache)
+		repeat := 0
 		for {
 			if ar.readcache == "" {
 				break
 			}
+			repeat++
+			if repeat%3000 == 0 {
+				log.Errorf("Runner[%v] %v ActiveReader has timeout 3000 times with readcache %v", ar.runnerName, ar.logpath, ar.readcache)
+			}
+
 			ar.inactive = false
 			//做这一层结构为了快速结束
-			if atomic.LoadInt32(&ar.status) == StatusStopped {
+			if atomic.LoadInt32(&ar.status) == StatusStopped || atomic.LoadInt32(&ar.status) == StatusStoping {
 				log.Debugf("Runner[%v] %v ActiveReader was exited when waiting to send data", ar.runnerName, ar.logpath)
+				atomic.CompareAndSwapInt32(&ar.status, StatusStoping, StatusStopped)
 				return
 			}
 			select {
-			case ar.msgchan <- ar.readcache:
+			case ar.msgchan <- Result{result: ar.readcache, logpath: ar.logpath}:
 				ar.readcache = ""
 			case <-timer.C:
 			}
@@ -120,9 +134,26 @@ func (ar *ActiveReader) Run() {
 	}
 }
 func (ar *ActiveReader) Close() error {
-	atomic.StoreInt32(&ar.status, StatusStopped)
+	defer log.Warnf("Runner[%v] ActiveReader %s was closed", ar.runnerName, ar.logpath)
 	err := ar.br.Close()
-	log.Warnf("Runner[%v] ActiveReader %s was closed", ar.runnerName, ar.logpath)
+
+	if atomic.CompareAndSwapInt32(&ar.status, StatusRunning, StatusStoping) {
+		log.Warnf("Runner[%v] ActiveReader %s was closing", ar.runnerName, ar.logpath)
+	} else {
+		return err
+	}
+
+	cnt := 0
+	// 等待结束
+	for atomic.LoadInt32(&ar.status) != StatusStopped {
+		cnt++
+		//超过1000个10ms，即10s，就强行退出
+		if cnt > 1000 {
+			log.Errorf("Runner[%v] ActiveReader %s was not closed after 10s, force closing it", ar.runnerName, ar.logpath)
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 	return err
 }
 
@@ -179,9 +210,7 @@ func NewMultiReader(meta *Meta, logPathPattern, whence, expireDur, statIntervalD
 		fileReaders:    make(map[string]*ActiveReader), //armapmux
 		cacheMap:       make(map[string]string),        //armapmux
 		armapmux:       sync.Mutex{},
-		scs:            make([]reflect.SelectCase, 0), //scsmux
-		scs2File:       make([]string, 0),             //scsmux
-		scsmux:         sync.Mutex{},
+		msgChan:        make(chan Result),
 	}
 	buf := make([]byte, bufsize)
 	if bufsize > 0 {
@@ -206,7 +235,14 @@ func NewMultiReader(meta *Meta, logPathPattern, whence, expireDur, statIntervalD
 //Expire 函数关闭过期的文件，再更新
 func (mr *MultiReader) Expire() {
 	var paths []string
+	if atomic.LoadInt32(&mr.status) == StatusStopped {
+		return
+	}
 	mr.armapmux.Lock()
+	defer mr.armapmux.Unlock()
+	if atomic.LoadInt32(&mr.status) == StatusStopped {
+		return
+	}
 	for path, ar := range mr.fileReaders {
 		if ar.expired(mr.expire) {
 			ar.Close()
@@ -215,10 +251,8 @@ func (mr *MultiReader) Expire() {
 			paths = append(paths, path)
 		}
 	}
-	mr.armapmux.Unlock()
 	if len(paths) > 0 {
-		log.Infof("Runner[%v] Expire reader find expired logpath: %v", mr.meta.RunnerName, strings.Join(paths, ", "))
-		mr.updateSelectCase()
+		log.Infof("Runner[%v] expired logpath: %v", mr.meta.RunnerName, strings.Join(paths, ", "))
 	}
 }
 
@@ -266,9 +300,10 @@ func (mr *MultiReader) StatLogPath() {
 		mr.armapmux.Unlock()
 		//过期的文件不追踪，除非之前追踪的并且有日志没读完
 		if cacheline == "" && fi.ModTime().Add(mr.expire).Before(time.Now()) {
+			log.Debugf("Runner[%v] <%v> is expired, ignore...", mr.meta.RunnerName, mc)
 			continue
 		}
-		ar, err := NewActiveReader(rp, mr.whence, mr.meta)
+		ar, err := NewActiveReader(rp, mr.whence, mr.meta, mr.msgChan)
 		if err != nil {
 			log.Errorf("Runner[%v] NewActiveReader for matches %v error %v, ignore this match...", mr.meta.RunnerName, rp, err)
 			continue
@@ -281,14 +316,21 @@ func (mr *MultiReader) StatLogPath() {
 			}
 		}
 		newaddsPath = append(newaddsPath, rp)
-		go ar.Run()
 		mr.armapmux.Lock()
-		mr.fileReaders[rp] = ar
+		if atomic.LoadInt32(&mr.status) != StatusStopped {
+			mr.fileReaders[rp] = ar
+		} else {
+			log.Warnf("Runner[%v] %v NewActiveReader but reader was stopped, ignore this...", mr.meta.RunnerName, mc)
+		}
 		mr.armapmux.Unlock()
+		if atomic.LoadInt32(&mr.status) != StatusStopped {
+			go ar.Run()
+		} else {
+			log.Warnf("Runner[%v] %v NewActiveReader but reader was stopped, will not running...", mr.meta.RunnerName, mc)
+		}
 	}
 	if len(newaddsPath) > 0 {
 		log.Infof("Runner[%v] StatLogPath find new logpath: %v", mr.meta.RunnerName, strings.Join(newaddsPath, ", "))
-		mr.updateSelectCase()
 	}
 }
 
@@ -302,23 +344,6 @@ func (mr *MultiReader) getActiveReaders() []*ActiveReader {
 	return ars
 }
 
-func (mr *MultiReader) updateSelectCase() {
-	ars := mr.getActiveReaders()
-	var newScs []reflect.SelectCase
-	var newScs2files []string
-	for _, ar := range ars {
-		newScs = append(newScs, reflect.SelectCase{
-			Dir:  reflect.SelectRecv,
-			Chan: reflect.ValueOf(ar.msgchan),
-		})
-		newScs2files = append(newScs2files, ar.logpath)
-	}
-	mr.scsmux.Lock()
-	mr.scs = newScs
-	mr.scs2File = newScs2files
-	mr.scsmux.Unlock()
-}
-
 func (mr *MultiReader) Name() string {
 	return "MultiReader:" + mr.logPathPattern
 }
@@ -328,13 +353,22 @@ func (mr *MultiReader) Source() string {
 }
 
 func (mr *MultiReader) Close() (err error) {
+	atomic.StoreInt32(&mr.status, StatusStopped)
 	ars := mr.getActiveReaders()
+	var wg sync.WaitGroup
 	for _, ar := range ars {
-		err = ar.Close()
-		if err != nil {
-			log.Errorf("Runner[%v] Close ActiveReader %v error %v", mr.meta.RunnerName, ar.logpath, err)
-		}
+		wg.Add(1)
+		go func(ar *ActiveReader) {
+			defer wg.Done()
+			err = ar.Close()
+			if err != nil {
+				log.Errorf("Runner[%v] Close ActiveReader %v error %v", mr.meta.RunnerName, ar.logpath, err)
+			}
+		}(ar)
 	}
+	wg.Wait()
+	//在所有 active readers都关闭后再close msgChan
+	close(mr.msgChan)
 	return
 }
 
@@ -350,12 +384,12 @@ func (mr *MultiReader) Start() {
 	}
 	go mr.run()
 	mr.started = true
-	log.Printf("%v MultiReader stat file deamon started", mr.Name())
+	log.Infof("%v MultiReader stat file deamon started", mr.Name())
 }
 
 func (mr *MultiReader) run() {
 	for {
-		if atomic.LoadInt32(&mr.status) == StatusStoping {
+		if atomic.LoadInt32(&mr.status) == StatusStopped {
 			log.Warnf("%v stopped from running", mr.Name())
 			return
 		}
@@ -369,20 +403,12 @@ func (mr *MultiReader) ReadLine() (data string, err error) {
 	if !mr.started {
 		mr.Start()
 	}
-	if len(mr.scs) <= 0 {
-		return
-	}
-	mr.scsmux.Lock()
-	defer mr.scsmux.Unlock()
-	//double check
-	if len(mr.scs) <= 0 {
-		return
-	}
-	//reflect.Select blocks until at least one of the cases can proceed
-	chosen, value, ok := reflect.Select(mr.scs)
-	if ok {
-		mr.curFile = mr.scs2File[chosen]
-		data = value.String()
+	timer := time.NewTicker(50 * time.Millisecond)
+	select {
+	case result := <-mr.msgChan:
+		mr.curFile = result.logpath
+		data = result.result
+	case <-timer.C:
 	}
 	return
 }
