@@ -13,6 +13,7 @@ import (
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
 
+	"net/http"
 	_ "net/http/pprof"
 
 	"github.com/qiniu/log"
@@ -23,6 +24,7 @@ type Config struct {
 	MaxProcs         int      `json:"max_procs"`
 	DebugLevel       int      `json:"debug_level"`
 	BindHost         string   `json:"bind_host"`
+	ProfileHost      string   `json:"profile_host"`
 	ConfsPath        []string `json:"confs_path"`
 	CleanSelfLog     bool     `json:"clean_self_log"`
 	CleanSelfDir     string   `json:"clean_self_dir"`
@@ -139,7 +141,12 @@ func main() {
 	}
 	// start rest service
 	rs := mgr.NewRestService(m)
-
+	if conf.ProfileHost != "" {
+		log.Printf("profile_host was open at %v", conf.ProfileHost)
+		go func() {
+			log.Println(http.ListenAndServe(conf.ProfileHost, nil))
+		}()
+	}
 	utils.WaitForInterrupt(func() {
 		rs.Stop()
 		if conf.CleanSelfLog {
