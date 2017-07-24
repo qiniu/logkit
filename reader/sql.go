@@ -50,6 +50,8 @@ type SqlReader struct {
 	mux     sync.Mutex
 	started bool
 
+	timer *time.Ticker
+
 	execOnStart bool
 }
 
@@ -138,6 +140,7 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (mr *SqlReader, err error) {
 		started:     false,
 		execOnStart: execOnStart,
 		schemas:     schemas,
+		timer:       time.NewTicker(time.Second),
 	}
 	// 如果meta初始信息损坏
 	if !omitMeta {
@@ -303,11 +306,10 @@ func (mr *SqlReader) ReadLine() (data string, err error) {
 	if !mr.started {
 		mr.Start()
 	}
-	timer := time.NewTicker(time.Second)
 	select {
 	case dat := <-mr.readChan:
 		data = string(dat)
-	case <-timer.C:
+	case <-mr.timer.C:
 	}
 	return
 }

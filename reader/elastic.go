@@ -34,6 +34,7 @@ type ElasticReader struct {
 	status  int32
 	mux     sync.Mutex
 	started bool
+	timer   *time.Ticker
 }
 
 func NewESReader(meta *Meta, readBatch int, estype, esindex, eshost, esVersion, keepAlive string) (er *ElasticReader, err error) {
@@ -55,6 +56,7 @@ func NewESReader(meta *Meta, readBatch int, estype, esindex, eshost, esVersion, 
 		readChan:  make(chan json.RawMessage),
 		mux:       sync.Mutex{},
 		started:   false,
+		timer:     time.NewTicker(time.Second),
 	}
 
 	return er, nil
@@ -93,11 +95,10 @@ func (er *ElasticReader) ReadLine() (data string, err error) {
 	if !er.started {
 		er.Start()
 	}
-	timer := time.NewTicker(time.Second)
 	select {
 	case dat := <-er.readChan:
 		data = string(dat)
-	case <-timer.C:
+	case <-er.timer.C:
 	}
 	return
 }

@@ -270,8 +270,8 @@ func TestMultiReaderSyncMetaOneLine(t *testing.T) {
 		if data != "" {
 			resultmap[data]++
 			maxnum++
+			t.Log(data, maxnum)
 		}
-		t.Log(data)
 		if err == io.EOF {
 			break
 		}
@@ -297,8 +297,8 @@ func TestMultiReaderSyncMetaOneLine(t *testing.T) {
 		if data != "" {
 			resultmap[data]++
 			maxnum++
+			t.Log(data, maxnum)
 		}
-		t.Log(data)
 		if err == io.EOF {
 			break
 		}
@@ -317,9 +317,9 @@ func TestMultiReaderSyncMetaOneLine(t *testing.T) {
 		data, err := mr.ReadLine()
 		if data != "" {
 			resultmap[data]++
+			maxnum++
+			t.Log(data, maxnum)
 		}
-		t.Log(data)
-		maxnum++
 		if err == io.EOF {
 			break
 		}
@@ -384,8 +384,8 @@ func TestMultiReaderSyncMetaMutiline(t *testing.T) {
 		if data != "" {
 			resultmap[data]++
 			maxnum++
+			t.Log(data, maxnum)
 		}
-		t.Log(data)
 		if err == io.EOF {
 			break
 		}
@@ -411,9 +411,7 @@ func TestMultiReaderSyncMetaMutiline(t *testing.T) {
 		if data != "" {
 			resultmap[data]++
 			maxnum++
-		}
-		if data != "" {
-			t.Log(data)
+			t.Log(data, maxnum)
 		}
 		if err == io.EOF {
 			break
@@ -433,9 +431,9 @@ func TestMultiReaderSyncMetaMutiline(t *testing.T) {
 		data, err := mr.ReadLine()
 		if data != "" {
 			resultmap[data]++
+			maxnum++
+			t.Log(data, maxnum)
 		}
-		t.Log(data)
-		maxnum++
 		if err == io.EOF {
 			break
 		}

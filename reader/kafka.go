@@ -34,6 +34,7 @@ type KafkaReader struct {
 	mux      sync.Mutex
 	startMux sync.Mutex
 	started  bool
+	timer    *time.Ticker
 }
 
 func NewKafkaReader(meta *Meta, consumerGroup string,
@@ -50,6 +51,7 @@ func NewKafkaReader(meta *Meta, consumerGroup string,
 		mux:            sync.Mutex{},
 		startMux:       sync.Mutex{},
 		started:        false,
+		timer:          time.NewTicker(time.Second),
 	}
 	return kr, nil
 }
@@ -66,11 +68,11 @@ func (kr *KafkaReader) ReadLine() (data string, err error) {
 	if !kr.started {
 		kr.Start()
 	}
-	timer := time.NewTicker(time.Second)
+
 	select {
 	case dat := <-kr.readChan:
 		data = string(dat)
-	case <-timer.C:
+	case <-kr.timer.C:
 	}
 	return
 }
