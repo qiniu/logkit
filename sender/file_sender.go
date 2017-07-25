@@ -52,11 +52,11 @@ func newFileSender(name, path string, marshalFunc func([]Data) ([]byte, error)) 
 func (fs *FileSender) Send(datas []Data) error {
 	bytes, err := fs.marshalFunc(datas)
 	if err != nil {
-		return reqerr.NewSendError(fs.Name()+" Cannot marshal data into file, error is "+err.Error(), convertDatasBack(datas), reqerr.TypeDefault)
+		return reqerr.NewSendError(fs.Name()+" Cannot marshal data into file, error is "+err.Error(), ConvertDatasBack(datas), reqerr.TypeDefault)
 	}
 	_, err = fs.file.Write(bytes)
 	if err != nil {
-		return reqerr.NewSendError(fs.Name()+"Cannot write data into file, error is "+err.Error(), convertDatasBack(datas), reqerr.TypeDefault)
+		return reqerr.NewSendError(fs.Name()+"Cannot write data into file, error is "+err.Error(), ConvertDatasBack(datas), reqerr.TypeDefault)
 	}
 	return nil
 }

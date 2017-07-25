@@ -5,7 +5,7 @@ package queue
 type BackendQueue interface {
 	Name() string
 	Put([]byte) error
-	ReadChan() chan []byte // this is expected to be an *unbuffered* channel
+	ReadChan() <-chan []byte // this is expected to be an *unbuffered* channel
 	Close() error
 	Delete() error
 	Depth() int64

@@ -20,6 +20,7 @@ import (
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/utils"
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 )
 
 type CleanInfo struct {
@@ -241,6 +242,12 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []sender.Data, times in
 		}
 		if err != nil {
 			time.Sleep(time.Second)
+			se, succ := err.(*reqerr.SendError)
+			if succ {
+				datas = sender.ConvertDatas(se.GetFailDatas())
+				//无限重试的
+				continue
+			}
 			if times <= 0 || cnt < times {
 				cnt++
 				continue

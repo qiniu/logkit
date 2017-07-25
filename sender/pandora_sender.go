@@ -483,7 +483,7 @@ func (s *PandoraSender) checkSchemaUpdate() {
 func (s *PandoraSender) Send(datas []Data) (se error) {
 	s.checkSchemaUpdate()
 	if !s.opt.schemaFree && (len(s.schemas) <= 0 || len(s.alias2key) <= 0) {
-		se = reqerr.NewSendError("Get pandora schema error, faild to send data", convertDatasBack(datas), reqerr.TypeDefault)
+		se = reqerr.NewSendError("Get pandora schema error, faild to send data", ConvertDatasBack(datas), reqerr.TypeDefault)
 		return
 	}
 	var points pipeline.Datas
