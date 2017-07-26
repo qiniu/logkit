@@ -321,7 +321,7 @@ func (p *GrokParser) parseLine(line string) (sender.Data, error) {
 		case DROP:
 		// goodbye!
 		default: //default is STRING
-			data[k] = strings.Trim(v, `"`)
+			data[k] = strings.TrimSpace(strings.Trim(v, `"`))
 		}
 	}
 
