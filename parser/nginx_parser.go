@@ -171,7 +171,7 @@ func (p *NginxParser) makeValue(name, raw string) (data interface{}, err error) 
 		data = tm.Format(time.RFC3339Nano)
 		return
 	default:
-		return raw, nil
+		return strings.TrimSpace(raw), nil
 	}
 }
 

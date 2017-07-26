@@ -216,7 +216,7 @@ func dataTypeNotSupperted(dataType CsvType) error {
 
 func newLabel(name, dataValue string) Label {
 	return Label{
-		Name:      name,
+		Name:  name,
 		Value: dataValue,
 	}
 }
@@ -256,7 +256,7 @@ func makeValue(raw string, valueType CsvType) (interface{}, error) {
 		}
 		return times.StrToTime(raw)
 	case TypeString:
-		return raw, nil
+		return strings.TrimSpace(raw), nil
 	default:
 		// 不应该走到这个分支上
 		return nil, dataTypeNotSupperted(valueType)
