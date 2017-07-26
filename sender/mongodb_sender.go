@@ -141,7 +141,7 @@ func (s *MongoAccSender) Send(datas []Data) (se error) {
 		}
 	}
 	if len(failure) > 0 && lastErr != nil {
-		ss.ErrorDetail = reqerr.NewSendError("Write failure, last err is: "+lastErr.Error(), convertDatasBack(failure), reqerr.TypeDefault)
+		ss.ErrorDetail = reqerr.NewSendError("Write failure, last err is: "+lastErr.Error(), ConvertDatasBack(failure), reqerr.TypeDefault)
 	}
 	return ss
 }

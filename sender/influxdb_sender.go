@@ -99,7 +99,7 @@ func (s *InfluxdbSender) Send(datas []Data) error {
 	}
 	err := s.sendPoints(ps)
 	if err != nil {
-		return reqerr.NewSendError(s.Name()+" Cannot write data into influxdb, error is "+err.Error(), convertDatasBack(datas), reqerr.TypeDefault)
+		return reqerr.NewSendError(s.Name()+" Cannot write data into influxdb, error is "+err.Error(), ConvertDatasBack(datas), reqerr.TypeDefault)
 	}
 	return nil
 }
