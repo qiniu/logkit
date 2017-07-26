@@ -38,8 +38,6 @@ type RedisReader struct {
 	status  int32
 	mux     sync.Mutex
 	started bool
-
-	timer *time.Ticker
 }
 
 type RedisOptionn struct {
@@ -93,7 +91,6 @@ func NewRedisReader(meta *Meta, conf conf.MapConf) (rr *RedisReader, err error) 
 		status:   StatusInit,
 		mux:      sync.Mutex{},
 		started:  false,
-		timer:    time.NewTicker(time.Second),
 	}
 	return
 }
@@ -110,11 +107,13 @@ func (rr *RedisReader) ReadLine() (data string, err error) {
 	if !rr.started {
 		rr.Start()
 	}
+	timer := time.NewTimer(time.Second)
 	select {
 	case dat := <-rr.readChan:
 		data = string(dat)
-	case <-rr.timer.C:
+	case <-timer.C:
 	}
+	timer.Stop()
 	return
 
 }

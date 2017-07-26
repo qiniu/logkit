@@ -35,7 +35,6 @@ type MultiReader struct {
 	statInterval   time.Duration
 	maxOpenFiles   int
 	whence         string
-	timer          *time.Ticker
 }
 
 type ActiveReader struct {
@@ -212,7 +211,6 @@ func NewMultiReader(meta *Meta, logPathPattern, whence, expireDur, statIntervalD
 		cacheMap:       make(map[string]string),        //armapmux
 		armapmux:       sync.Mutex{},
 		msgChan:        make(chan Result),
-		timer:          time.NewTicker(time.Second),
 	}
 	buf := make([]byte, bufsize)
 	if bufsize > 0 {
@@ -405,13 +403,14 @@ func (mr *MultiReader) ReadLine() (data string, err error) {
 	if !mr.started {
 		mr.Start()
 	}
+	timer := time.NewTimer(time.Second)
 	select {
 	case result := <-mr.msgChan:
 		mr.curFile = result.logpath
 		data = result.result
-	case <-time.After(time.Second):
-		case <-mr.timer.C:
+	case <-timer.C:
 	}
+	timer.Stop()
 	return
 }
 

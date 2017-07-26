@@ -40,7 +40,6 @@ type MongoReader struct {
 	status      int32
 	started     bool
 	mux         sync.Mutex
-	timer       *time.Ticker
 }
 
 func NewMongoReader(meta *Meta, readBatch int, host, database, collection, offsetkey, cronSched, filters, certfile string, execOnStart bool) (mr *MongoReader, err error) {
@@ -71,7 +70,6 @@ func NewMongoReader(meta *Meta, readBatch int, host, database, collection, offse
 		execOnStart:       execOnStart,
 		started:           false,
 		mux:               sync.Mutex{},
-		timer:             time.NewTicker(time.Second),
 	}
 	if offsetkey == MongoDefaultOffsetKey {
 		if bson.IsObjectIdHex(keyOrObj) {
@@ -140,11 +138,13 @@ func (mr *MongoReader) ReadLine() (data string, err error) {
 	if !mr.started {
 		mr.Start()
 	}
+	timer := time.NewTimer(time.Second)
 	select {
 	case dat := <-mr.readChan:
 		data = string(dat)
-	case <-mr.timer.C:
+	case <-timer.C:
 	}
+	timer.Stop()
 	return
 }
 
