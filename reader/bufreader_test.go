@@ -134,6 +134,40 @@ func Test_GBKEncoding(t *testing.T) {
 	r.Close()
 }
 
+func Test_NoPanicEncoding(t *testing.T) {
+	body := "123123"
+	createSeqFile(1000, body)
+	exp := "123123"
+	defer destroySeqFile()
+	c := conf.MapConf{
+		"log_path":        dir,
+		"meta_path":       metaDir,
+		"mode":            DirMode,
+		"sync_every":      "1",
+		"ignore_hidden":   "true",
+		"reader_buf_size": "1024",
+		"read_from":       "oldest",
+		"encoding":        "nopanic",
+	}
+	r, err := NewFileBufReader(c)
+	if err != nil {
+		t.Error(err)
+	}
+	rest := []string{}
+	for {
+		line, err := r.ReadLine()
+		if err == nil {
+			rest = append(rest, line)
+		} else {
+			break
+		}
+		if line != exp {
+			t.Fatalf("should exp %v but got %v", exp, line)
+		}
+	}
+	r.Close()
+}
+
 func Test_BuffReaderMultiLine(t *testing.T) {
 	body := "test123\n12\n34\n56\ntest\nxtestx\n123\n"
 	createSeqFile(1000, body)
