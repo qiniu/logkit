@@ -35,11 +35,12 @@ const (
 const MaxParserSchemaErrOutput = 5
 
 type CsvParser struct {
-	name      string
-	schema    []field
-	labels    []Label
-	delim     string
-	schemaErr *schemaErr
+	name           string
+	schema         []field
+	labels         []Label
+	delim          string
+	schemaErr      *schemaErr
+	timeZoneOffset int
 }
 
 type field struct {
@@ -57,6 +58,9 @@ func NewCsvParser(c conf.MapConf) (LogParser, error) {
 	if err != nil {
 		return nil, err
 	}
+	timeZoneOffsetRaw, _ := c.GetStringOr(KeyTimeZoneOffset, "")
+	timeZoneOffset := parseTimeZoneOffset(timeZoneOffsetRaw)
+
 	fieldList, err := parseSchemaFieldList(schema)
 	if err != nil {
 		return nil, err
@@ -88,6 +92,7 @@ func NewCsvParser(c conf.MapConf) (LogParser, error) {
 			number: 0,
 			last:   time.Now(),
 		},
+		timeZoneOffset: timeZoneOffset,
 	}, nil
 }
 
@@ -211,19 +216,19 @@ func parseSchemaFields(fieldList []string) (fields []field, err error) {
 }
 
 func dataTypeNotSupperted(dataType CsvType) error {
-	return errors.New("data type not supported " + string(dataType))
+	return errors.New("type not supported " + string(dataType))
 }
 
 func newLabel(name, dataValue string) Label {
 	return Label{
-		Name:      name,
+		Name:  name,
 		Value: dataValue,
 	}
 }
 
 func newCsvField(name string, dataType CsvType) (f field, err error) {
 	switch dataType {
-	case TypeFloat, TypeLong, TypeString:
+	case TypeFloat, TypeLong, TypeString, TypeDate:
 		f = field{
 			name:     name,
 			dataType: dataType,
@@ -234,11 +239,11 @@ func newCsvField(name string, dataType CsvType) (f field, err error) {
 	return
 }
 
-func (f field) MakeValue(raw string) (interface{}, error) {
-	return makeValue(raw, f.dataType)
+func (f field) MakeValue(raw string, timeZoneOffset int) (interface{}, error) {
+	return makeValue(raw, f.dataType, timeZoneOffset)
 }
 
-func makeValue(raw string, valueType CsvType) (interface{}, error) {
+func makeValue(raw string, valueType CsvType, timeZoneOffset int) (interface{}, error) {
 	switch valueType {
 	case TypeFloat:
 		if raw == "" {
@@ -254,9 +259,13 @@ func makeValue(raw string, valueType CsvType) (interface{}, error) {
 		if raw == "" {
 			return time.Now(), nil
 		}
-		return times.StrToTime(raw)
+		ts, err := times.StrToTime(raw)
+		if err == nil {
+			return ts.Add(time.Duration(timeZoneOffset) * time.Hour).Format(time.RFC3339Nano), nil
+		}
+		return ts, err
 	case TypeString:
-		return raw, nil
+		return strings.TrimSpace(raw), nil
 	default:
 		// 不应该走到这个分支上
 		return nil, dataTypeNotSupperted(valueType)
@@ -296,7 +305,7 @@ func convertValue(v interface{}, valueType CsvType) (ret interface{}, err error)
 	return
 }
 
-func (f field) ValueParse(value string) (datas sender.Data, err error) {
+func (f field) ValueParse(value string, timeZoneOffset int) (datas sender.Data, err error) {
 	datas = sender.Data{}
 	switch f.dataType {
 	case TypeJsonMap:
@@ -331,7 +340,7 @@ func (f field) ValueParse(value string) (datas sender.Data, err error) {
 			}
 		}
 	default:
-		v, err := f.MakeValue(value)
+		v, err := f.MakeValue(value, timeZoneOffset)
 		if err != nil {
 			return nil, err
 		}
@@ -351,7 +360,7 @@ func (p *CsvParser) parse(line string) (sender.Data, error) {
 		return nil, fmt.Errorf("schema length not match: schema %v length %v, actual column %v length %v", p.schema, len(p.schema), parts, len(parts))
 	}
 	for i, part := range parts {
-		dts, err := p.schema[i].ValueParse(strings.TrimSpace(part))
+		dts, err := p.schema[i].ValueParse(strings.TrimSpace(part), p.timeZoneOffset)
 		if err != nil {
 			return nil, fmt.Errorf("schema %v type %v error %v detail: %v", p.schema[i].name, p.schema[i].dataType, part, err)
 		}

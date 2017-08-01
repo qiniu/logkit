@@ -39,7 +39,7 @@ func NewRestService(mgr *Manager) *RestService {
 	}
 
 	mux := rest.NewServeMux()
-	mux.HandleFunc("GET"+PREFIX+"/status", rs.GetStatus)
+	mux.HandleFunc("GET "+PREFIX+"/status", rs.GetStatus)
 	var (
 		port     = DEFAULT_PORT
 		address  string

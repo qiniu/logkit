@@ -33,6 +33,7 @@ func init() {
 var cfg = conf.MapConf{"name": "nginx", NginxConfPath: "nginx_test_data/nginx.conf", NginxLogFormat: "main", NginxSchema: "remote_addr:string, remote_user:string, time_local:date, request:string, status:long, bytes_sent:long, body_bytes_sent:long, http_referer:string, http_user_agent:string, http_transfer_encoding:string, http_x_forwarded_for:string, upstream_addr:string, host:string, sent_http_x_reqid:string, upstream_response_time:string, request_time:float, request_length:long, upstream_http_x_tag:string, upstream_http_x_uid:string, http_x_stat:string, http_x_estat:string, http_x_from_cdn:string"}
 var cfg2 = conf.MapConf{"name": "nginx", NginxConfPath: "nginx_test_data/nginx.conf", NginxLogFormat: "logkit", NginxSchema: "remote_addr:string, remote_user:string, time_local:date, request:string, status:long, bytes_sent:long, body_bytes_sent:long, http_referer:string, http_user_agent:string, http_transfer_encoding:string, http_x_forwarded_for:string, upstream_addr:string, host:string, sent_http_x_reqid:string, upstream_response_time:string, request_time:float, request_length:long, upstream_http_x_tag:string, upstream_http_x_uid:string, http_x_stat:string, http_x_estat:string, http_x_from_cdn:string"}
 var cfg3 = conf.MapConf{"name": "nginx", NginxConfPath: "nginx_test_data/nginx.conf", NginxLogFormat: "testmain", NginxSchema: "remote_addr:string, remote_user:string, time_local:date, request:string, status:long, bytes_sent:long, body_bytes_sent:long, http_referer:string, http_user_agent:string, http_x_forwarded_for:string, upstream_addr:string, host:string, sent_http_x_reqid:string, request_time:float"}
+var cfg4 = conf.MapConf{"name": "nginx", NginxFormatRegex: `^(?P<remote_addr>[^ ]*) - (?P<remote_user>[^ ]*) \[(?P<time_local>[^]]*)\] "(?P<request>[^"]*)" (?P<status>[^ ]*) (?P<bytes_sent>[^ ]*) (?P<body_bytes_sent>[^ ]*) "(?P<http_referer>[^"]*)" "(?P<http_user_agent>[^"]*)" "(?P<http_transfer_encoding>[^"]*)" "(?P<http_x_forwarded_for>[^"]*)" "(?P<upstream_addr>[^"]*)" (?P<host>[^ ]*) (?P<sent_http_x_reqid>[^ ]*) "(?P<upstream_response_time>[^"]*)" (?P<request_time>[^ ]*) (?P<request_length>[^ ]*) "(?P<upstream_http_x_tag>[^"]*)" "(?P<upstream_http_x_uid>[^"]*)" (?P<http_x_stat>[^ ]*) (?P<http_x_estat>[^ ]*) (?P<http_x_from_cdn>[^ ]*)$`, NginxSchema: "remote_addr:string, remote_user:string, time_local:date, request:string, status:long, bytes_sent:long, body_bytes_sent:long, http_referer:string, http_user_agent:string, http_x_forwarded_for:string, upstream_addr:string, host:string, sent_http_x_reqid:string, request_time:float"}
 
 func TestNewNginxParser(t *testing.T) {
 	p, err := NewNginxAccParser(cfg)
@@ -59,6 +60,21 @@ func TestNewNginxParser(t *testing.T) {
 	assert.Equal(t, err, errFormat, "it should be err format")
 
 	p2, err := NewNginxAccParser(cfg2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = p2.Parse(accLog2)
+	if c, ok := err.(*utils.StatsError); ok {
+		err = c.ErrorDetail
+	}
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestNewNginxWithManuelRegex(t *testing.T) {
+
+	p2, err := NewNginxAccParser(cfg4)
 	if err != nil {
 		t.Fatal(err)
 	}

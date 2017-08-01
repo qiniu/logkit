@@ -93,12 +93,13 @@ func (er *ElasticReader) ReadLine() (data string, err error) {
 	if !er.started {
 		er.Start()
 	}
-	timer := time.NewTicker(time.Second)
+	timer := time.NewTimer(time.Second)
 	select {
 	case dat := <-er.readChan:
 		data = string(dat)
 	case <-timer.C:
 	}
+	timer.Stop()
 	return
 }
 

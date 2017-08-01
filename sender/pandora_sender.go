@@ -450,7 +450,7 @@ func (s *PandoraSender) generatePoint(data Data) (point Data) {
 		}
 
 		if !validSchema(v.ValueType, value) {
-			log.Errorf("Runner[%v] Sender[%v]: %v not match type %v, from data < %v >, ignored this field", s.opt.runnerName, s.opt.name, value, v.ValueType, data)
+			log.Errorf("Runner[%v] Sender[%v]: key <%v %v> not match type %v, from data < %v >, ignored this field", s.opt.runnerName, s.opt.name, name, value, v.ValueType, data)
 			continue
 		}
 		point[k] = value
@@ -483,7 +483,7 @@ func (s *PandoraSender) checkSchemaUpdate() {
 func (s *PandoraSender) Send(datas []Data) (se error) {
 	s.checkSchemaUpdate()
 	if !s.opt.schemaFree && (len(s.schemas) <= 0 || len(s.alias2key) <= 0) {
-		se = reqerr.NewSendError("Get pandora schema error, faild to send data", convertDatasBack(datas), reqerr.TypeDefault)
+		se = reqerr.NewSendError("Get pandora schema error, faild to send data", ConvertDatasBack(datas), reqerr.TypeDefault)
 		return
 	}
 	var points pipeline.Datas

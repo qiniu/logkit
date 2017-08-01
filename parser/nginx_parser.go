@@ -17,15 +17,14 @@ import (
 )
 
 const (
-	NginxSchema    string = "nginx_schema"
-	NginxConfPath         = "nginx_log_format_path"
-	NginxLogFormat        = "nginx_log_format_name"
+	NginxSchema      string = "nginx_schema"
+	NginxConfPath           = "nginx_log_format_path"
+	NginxLogFormat          = "nginx_log_format_name"
+	NginxFormatRegex        = "nginx_log_format_regex"
 )
 
 type NginxParser struct {
 	name   string
-	conf   string
-	format string
 	regexp *regexp.Regexp
 	schema map[string]string
 	labels []Label
@@ -39,31 +38,38 @@ func NewNginxParser(c conf.MapConf) (LogParser, error) {
 func NewNginxAccParser(c conf.MapConf) (*NginxParser, error) {
 	name, _ := c.GetStringOr(KeyParserName, "")
 
-	nginxConfPath, err := c.GetString(NginxConfPath)
-	if err != nil {
-		return nil, err
-	}
-	formatName, err := c.GetString(NginxLogFormat)
-	if err != nil {
-		return nil, err
-	}
-	schema, _ := c.GetString(NginxSchema)
+	schema, _ := c.GetStringOr(NginxSchema, "")
+	nginxRegexStr, _ := c.GetStringOr(NginxFormatRegex, "")
 	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
 	nameMap := make(map[string]struct{})
 	labels := GetLabels(labelList, nameMap)
 
 	p := &NginxParser{
 		name:   name,
-		conf:   nginxConfPath,
-		format: formatName,
 		labels: labels,
 	}
 	p.schema = p.parseSchemaFields(schema)
-	re, err := getRegexp(nginxConfPath, formatName)
-	if err != nil {
-		return nil, err
+	if nginxRegexStr == "" {
+		nginxConfPath, err := c.GetString(NginxConfPath)
+		if err != nil {
+			return nil, err
+		}
+		formatName, err := c.GetString(NginxLogFormat)
+		if err != nil {
+			return nil, err
+		}
+		re, err := getRegexp(nginxConfPath, formatName)
+		if err != nil {
+			return nil, err
+		}
+		p.regexp = re
+	} else {
+		re, err := regexp.Compile(nginxRegexStr)
+		if err != nil {
+			return nil, fmt.Errorf("Compile nginx_log_format_regex %v error %v", nginxRegexStr, err)
+		}
+		p.regexp = re
 	}
-	p.regexp = re
 	return p, nil
 }
 
@@ -165,7 +171,7 @@ func (p *NginxParser) makeValue(name, raw string) (data interface{}, err error) 
 		data = tm.Format(time.RFC3339Nano)
 		return
 	default:
-		return raw, nil
+		return strings.TrimSpace(raw), nil
 	}
 }
 
@@ -214,5 +220,7 @@ func getRegexp(conf, name string) (r *regexp.Regexp, err error) {
 	}
 	re := regexp.MustCompile(`\\\$([a-z_]+)(\\?(.))`).ReplaceAllString(
 		regexp.QuoteMeta(format+" "), "(?P<$1>[^$3]*)$2")
+	final := fmt.Sprintf("^%v$", strings.Trim(re, " "))
+	fmt.Println(final)
 	return regexp.MustCompile(fmt.Sprintf("^%v$", strings.Trim(re, " "))), nil
 }

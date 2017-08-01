@@ -107,12 +107,13 @@ func (rr *RedisReader) ReadLine() (data string, err error) {
 	if !rr.started {
 		rr.Start()
 	}
-	timer := time.NewTicker(time.Second)
+	timer := time.NewTimer(time.Second)
 	select {
 	case dat := <-rr.readChan:
 		data = string(dat)
 	case <-timer.C:
 	}
+	timer.Stop()
 	return
 
 }

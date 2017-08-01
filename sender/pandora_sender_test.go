@@ -25,11 +25,13 @@ import (
 )
 
 type mock_pandora struct {
-	Prefix     string
-	Port       string
-	Body       string
-	Schemas    []pipeline.RepoSchemaEntry
-	GetRepoErr bool
+	Prefix      string
+	Port        string
+	Body        string
+	Schemas     []pipeline.RepoSchemaEntry
+	GetRepoErr  bool
+	PostSleep   int
+	PostDataNum int
 }
 
 //NewMockPandoraWithPrefix 测试的mock pandora server
@@ -109,6 +111,9 @@ func (s *mock_pandora) PostRepos_(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (s *mock_pandora) PostRepos_Data(rw http.ResponseWriter, req *http.Request) {
+	if s.PostSleep > 0 {
+		time.Sleep(time.Duration(s.PostSleep) * time.Second)
+	}
 	var bytesx []byte
 	var r *bufio.Reader
 	log.Println("post data!!!")
@@ -143,6 +148,7 @@ func (s *mock_pandora) PostRepos_Data(rw http.ResponseWriter, req *http.Request)
 		rw.Write([]byte(`{"error":"E18111 mock_pandora error"}`))
 		rw.Header().Set("Content-Type", "application/json")
 	}
+	s.PostDataNum++
 	return
 }
 
@@ -224,7 +230,7 @@ func TestPandoraSender(t *testing.T) {
 		t.Error("should pasred as Send Error")
 	}
 	pandora.LetGetRepoError(false)
-	err = s.Send(convertDatas(se.GetFailDatas()))
+	err = s.Send(ConvertDatas(se.GetFailDatas()))
 	if err != nil {
 		t.Error(err)
 	}

@@ -303,12 +303,13 @@ func (mr *SqlReader) ReadLine() (data string, err error) {
 	if !mr.started {
 		mr.Start()
 	}
-	timer := time.NewTicker(time.Second)
+	timer := time.NewTimer(time.Second)
 	select {
 	case dat := <-mr.readChan:
 		data = string(dat)
 	case <-timer.C:
 	}
+	timer.Stop()
 	return
 }
 
@@ -386,6 +387,24 @@ func (mr *SqlReader) run() {
 	}
 }
 
+func getInitScans(length int) []interface{} {
+	scanArgs := make([]interface{}, length)
+	for i := range scanArgs {
+		scanArgs[i] = new(interface{})
+	}
+	return scanArgs
+}
+
+func (mr *SqlReader) getOffsetIndex(columns []string) int {
+	offsetKeyIndex := -1
+	for idx, key := range columns {
+		if key == mr.offsetKey {
+			return idx
+		}
+	}
+	return offsetKeyIndex
+}
+
 func (mr *SqlReader) exec(connectStr string) (err error) {
 	now := time.Now()
 	db, err := sql.Open(mr.dbtype, connectStr)
@@ -428,18 +447,10 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 				continue
 			}
 			log.Infof("Runner[%v] SQL ：<%v>, schemas: <%v>", mr.meta.RunnerName, execSQL, strings.Join(columns, ", "))
-			scanArgs := make([]interface{}, len(columns))
-			for i := range scanArgs {
-				scanArgs[i] = new(interface{})
-			}
-			offsetKeyIndex := -1
-			for idx, key := range columns {
-				if key == mr.offsetKey {
-					offsetKeyIndex = idx
-					break
-				}
-			}
+			scanArgs := getInitScans(len(columns))
+			offsetKeyIndex := mr.getOffsetIndex(columns)
 			// Fetch rows
+			var maxOffset int64 = -1
 			for rows.Next() {
 				exit = false
 				// get RawBytes from data
@@ -456,20 +467,21 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 						case "long":
 							val, serr := convertLong(scanArgs[i])
 							if serr != nil {
-								log.Errorf("convertLong for %v (%v) error %v", columns[i], scanArgs[i], serr)
+								log.Errorf("convertLong for %v (%v) error %v, ignore this key...", columns[i], scanArgs[i], serr)
 							} else {
-								scanArgs[i] = val
+								data[columns[i]] = &val
 							}
 						case "float":
 							val, serr := convertFloat(scanArgs[i])
 							if serr != nil {
-								log.Errorf("convertFloat for %v (%v) error %v", columns[i], scanArgs[i], serr)
+								log.Errorf("convertFloat for %v (%v) error %v, ignore this key...", columns[i], scanArgs[i], serr)
 							} else {
-								scanArgs[i] = val
+								data[columns[i]] = &val
 							}
 						}
+					} else {
+						data[columns[i]] = scanArgs[i]
 					}
-					data[columns[i]] = scanArgs[i]
 				}
 				ret, err := json.Marshal(data)
 				if err != nil {
@@ -483,21 +495,33 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 				mr.readChan <- ret
 
 				if offsetKeyIndex >= 0 {
-					mr.offsets[idx], err = convertLong(scanArgs[offsetKeyIndex])
+					var tmpOffsetIndex int64
+					tmpOffsetIndex, err = convertLong(scanArgs[offsetKeyIndex])
 					if err != nil {
 						log.Errorf("Runner[%v] %v offset key value parse error %v, offset was not recorded", mr.meta.RunnerName, mr.Name(), err)
 						err = nil
+					} else if tmpOffsetIndex > maxOffset {
+						maxOffset = tmpOffsetIndex
 					}
 				}
-				mr.offsets[idx]++
+			}
+			if maxOffset > 0 {
+				mr.offsets[idx] = maxOffset + 1
 			}
 			if exit {
-				exit := mr.checkExit(idx, db)
+				var newOffsetIdx int64
+				exit, newOffsetIdx = mr.checkExit(idx, db)
 				if !exit {
 					mr.offsets[idx] += int64(mr.readBatch)
+					if newOffsetIdx > mr.offsets[idx] {
+						mr.offsets[idx] = newOffsetIdx
+					}
+				} else {
+					log.Infof("Runner[%v] %v no data any more, exit...", mr.meta.RunnerName, mr.Name())
 				}
 			}
 			if isRawSQL {
+				log.Infof("Runner[%v] %v is raw SQL, exit after exec once...", mr.meta.RunnerName, mr.Name())
 				break
 			}
 		}
@@ -559,6 +583,10 @@ func convertLong(v interface{}) (int64, error) {
 		if ret, ok := idv.([]byte); ok {
 			return int64(binary.BigEndian.Uint64(ret)), nil
 		}
+		if idv == nil {
+			return 0, nil
+		}
+		log.Errorf("sql reader convertLong for type %v is not supported", reflect.TypeOf(idv))
 	}
 	return 0, fmt.Errorf("%v type can not convert to int", dv.Kind())
 }
@@ -583,6 +611,12 @@ func convertFloat(v interface{}) (float64, error) {
 		return strconv.ParseFloat(dv.String(), 64)
 	case reflect.Interface:
 		idv := dv.Interface()
+		if ret, ok := idv.(float64); ok {
+			return ret, nil
+		}
+		if ret, ok := idv.(float32); ok {
+			return float64(ret), nil
+		}
 		if ret, ok := idv.(int64); ok {
 			return float64(ret), nil
 		}
@@ -619,6 +653,10 @@ func convertFloat(v interface{}) (float64, error) {
 		if ret, ok := idv.([]byte); ok {
 			return strconv.ParseFloat(string(ret), 64)
 		}
+		if idv == nil {
+			return 0, nil
+		}
+		log.Errorf("sql reader convertFloat for type %v is not supported", reflect.TypeOf(idv))
 	}
 	return 0, fmt.Errorf("%v type can not convert to int", dv.Kind())
 }
@@ -646,33 +684,53 @@ func (mr *SqlReader) getSQL(idx int) (sql string, err error) {
 	return
 }
 
-func (mr *SqlReader) checkExit(idx int, db *sql.DB) bool {
+func (mr *SqlReader) checkExit(idx int, db *sql.DB) (bool, int64) {
 	if len(mr.offsetKey) <= 0 {
-		return true
+		return true, -1
 	}
 	rawSQL := mr.syncSQLs[idx]
 	rawSQL = strings.TrimSuffix(strings.TrimSpace(rawSQL), ";")
 	var tsql string
 	if mr.dbtype == ModeMysql {
-		tsql = fmt.Sprintf("%s WHERE %v >= %d limit 1;", rawSQL, mr.offsetKey, mr.offsets[idx])
+		tsql = fmt.Sprintf("%s WHERE %v >= %d order by %v limit 1;", rawSQL, mr.offsetKey, mr.offsets[idx], mr.offsetKey)
 	} else {
 		ix := strings.Index(rawSQL, "from")
 		if ix < 0 {
-			return true
+			return true, -1
 		}
 		rawSQL = rawSQL[ix:]
-		tsql = fmt.Sprintf("select top(1) * %v WHERE %v >= %d;", rawSQL, mr.offsetKey, mr.offsets[idx])
+		tsql = fmt.Sprintf("select top(1) * %v WHERE CAST(%v AS BIGINT) >= %v order by CAST(%v AS BIGINT);", rawSQL, mr.offsetKey, mr.offsets[idx], mr.offsetKey)
 	}
 	rows, err := db.Query(tsql)
 	if err != nil {
 		log.Error(err)
-		return true
+		return true, -1
 	}
 	defer rows.Close()
-	for rows.Next() {
-		return false
+	// Get column names
+	columns, err := rows.Columns()
+	if err != nil {
+		log.Errorf("Runner[%v] %v prepare %v columns error %v", mr.meta.RunnerName, mr.Name(), mr.dbtype, err)
+		return true, -1
 	}
-	return true
+
+	scanArgs := getInitScans(len(columns))
+	offsetKeyIndex := mr.getOffsetIndex(columns)
+	for rows.Next() {
+		err = rows.Scan(scanArgs...)
+		if err != nil {
+			return false, -1
+		}
+		if offsetKeyIndex >= 0 {
+			offsetIdx, err := convertLong(scanArgs[offsetKeyIndex])
+			if err != nil {
+				return false, -1
+			}
+			return false, offsetIdx
+		}
+		return false, -1
+	}
+	return true, -1
 }
 
 //SyncMeta 从队列取数据时同步队列，作用在于保证数据不重复。

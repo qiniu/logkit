@@ -138,12 +138,13 @@ func (mr *MongoReader) ReadLine() (data string, err error) {
 	if !mr.started {
 		mr.Start()
 	}
-	timer := time.NewTicker(time.Second)
+	timer := time.NewTimer(time.Second)
 	select {
 	case dat := <-mr.readChan:
 		data = string(dat)
 	case <-timer.C:
 	}
+	timer.Stop()
 	return
 }
 

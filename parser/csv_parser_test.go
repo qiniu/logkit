@@ -6,9 +6,11 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
+	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
 
 	"github.com/stretchr/testify/assert"
@@ -35,19 +37,20 @@ func Test_CsvParser(t *testing.T) {
 	c := conf.MapConf{}
 	c[KeyParserName] = "testparser"
 	c[KeyParserType] = "csv"
-	c[KeyCSVSchema] = "a long, b string, c float, d jsonmap"
+	c[KeyCSVSchema] = "a long, b string, c float, d jsonmap,e date"
 	c[KeyCSVSplitter] = " "
 	parser, err := NewCsvParser(c)
 	if err != nil {
 		t.Error(err)
 	}
+	tmstr := time.Now().Format(time.RFC3339Nano)
 	lines := []string{
-		"123 fufu 3.14 {\"x\":1,\"y\":\"2\"}",
-		"cc jj uu {\"x\":1,\"y\":\"2\"}",
-		"123 fufu 3.15 999",
-		"123 fufu 3.16 {\"x\":1,\"y\":[\"xx:12\"]}",
+		"123 fufu 3.14 {\"x\":1,\"y\":\"2\"} " + tmstr,       //correct
+		"cc jj uu {\"x\":1,\"y\":\"2\"} " + tmstr,            // error => uu 不是float
+		"123 fufu 3.15 999 " + tmstr,                         //error，999不是jsonmap
+		"123 fufu 3.16 {\"x\":1,\"y\":[\"xx:12\"]} " + tmstr, //correct
 		"   ",
-		"123 fufu 3.17 ",
+		"123 fufu 3.17  " + tmstr, //correct,jsonmap允许为空
 	}
 	datas, err := parser.Parse(lines)
 	if c, ok := err.(*utils.StatsError); ok {
@@ -63,13 +66,14 @@ func Test_CsvParser(t *testing.T) {
 	exp["c"] = 3.14
 	exp["d-x"] = float64(1)
 	exp["d-y"] = "2"
+	exp["e"] = tmstr
 	for k, v := range datas[0] {
 		if v != exp[k] {
-			t.Error("expect %v but got %v", v, exp[k])
+			t.Errorf("expect %v but got %v", v, exp[k])
 		}
 	}
 
-	expNum := 4
+	expNum := 3
 	if len(datas) != expNum {
 		t.Errorf("correct line should be %v, but got %v", expNum, len(datas))
 	}
@@ -212,4 +216,16 @@ func Test_convertValue(t *testing.T) {
 		checkValue(v)
 		convertValue(v, "jsonmap")
 	}
+}
+
+func TestField_MakeValue(t *testing.T) {
+	tm, err := makeValue("2017/01/02 15:00:00", TypeDate, 1)
+	if err != nil {
+		t.Error(err)
+	}
+	exp, err := times.StrToTime("2017/01/02 16:00:00")
+	if err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, exp.Format(time.RFC3339Nano), tm)
 }
