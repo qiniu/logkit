@@ -175,7 +175,7 @@ func GetEnv(env string) string {
 	if strings.HasPrefix(env, "${") && strings.HasSuffix(env, "}") {
 		envName = strings.Trim(strings.Trim(strings.Trim(env, "$"), "{"), "}")
 	} else {
-		log.Debugf("cannot parse %s. try ${YOUR_ENV_NAME} instead", env)
+		log.Debugf("cannot parse your ak sk as ${YOUR_ENV_NAME} format, use it as raw ak.sk instead", env)
 		return ""
 	}
 	if osEnv := os.Getenv(envName); osEnv != "" {

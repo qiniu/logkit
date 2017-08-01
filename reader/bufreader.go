@@ -108,6 +108,9 @@ func NewReaderSize(rd FileReader, meta *Meta, size int) (*BufReader, error) {
 	r.meta = meta
 	if r.meta.GetEncodingWay() != "" {
 		r.decoder = mahonia.NewDecoder(r.meta.GetEncodingWay())
+		if r.decoder == nil {
+			log.Warnf("Encoding Way [%v] is not supported, will read as utf-8", r.meta.GetEncodingWay())
+		}
 	}
 	if meta.IsExist() && meta.IsValid() {
 		r.r = readPos
@@ -295,7 +298,7 @@ func (b *BufReader) ReadString(delim byte) (ret string, err error) {
 	bytes, err := b.readBytes(delim)
 	ret = string(bytes)
 	//默认都是utf-8
-	if b.meta.GetEncodingWay() != "" && b.meta.GetEncodingWay() != "utf-8" {
+	if b.meta.GetEncodingWay() != "" && b.meta.GetEncodingWay() != "utf-8" && b.decoder != nil {
 		ret = b.decoder.ConvertString(ret)
 	}
 	return
