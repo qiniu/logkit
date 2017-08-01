@@ -15,9 +15,9 @@ import (
 	"testing"
 	"time"
 
-	rest "github.com/qiniu/logkit/http"
 	"github.com/qiniu/logkit/times"
 
+	"github.com/julienschmidt/httprouter"
 	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
@@ -38,12 +38,12 @@ type mock_pandora struct {
 func NewMockPandoraWithPrefix(prefix string) (*mock_pandora, string) {
 	pandora := &mock_pandora{Prefix: prefix}
 
-	mux := rest.NewServeMux()
-	mux.HandleFunc("GET/"+prefix+"/ping", pandora.GetPing)
-	mux.HandleFunc("POST/"+prefix+"/repos/*", pandora.PostRepos_)
-	mux.HandleFunc("PUT/"+prefix+"/repos/*", pandora.PutRepos_)
-	mux.HandleFunc("POST/"+prefix+"/repos/*/data", pandora.PostRepos_Data)
-	mux.HandleFunc("GET/"+prefix+"/repos/*", pandora.GetRepos_)
+	mux := httprouter.New()
+	mux.GET(prefix+"/ping", pandora.GetPing)
+	mux.POST(prefix+"/repos/:reponame", pandora.PostRepos_)
+	mux.PUT(prefix+"/repos/:reponame", pandora.PutRepos_)
+	mux.POST(prefix+"/repos/:reponame/data", pandora.PostRepos_Data)
+	mux.GET(prefix+"/repos/:reponame", pandora.GetRepos_)
 
 	var port = 9000
 	for {
@@ -81,7 +81,7 @@ func NewMockPandoraWithPrefix(prefix string) (*mock_pandora, string) {
 	return pandora, pandora.Port
 }
 
-func (s *mock_pandora) GetPing(rw http.ResponseWriter, req *http.Request) {
+func (s *mock_pandora) GetPing(rw http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	ret := "I am " + s.Prefix
 	log.Println("get ping,", ret, s.Port)
 	return
@@ -95,8 +95,8 @@ type PostReposReq struct {
 	Region string                     `json:"region"`
 }
 
-func (s *mock_pandora) PostRepos_(rw http.ResponseWriter, req *http.Request) {
-	log.Println("PostRepos_ request")
+func (s *mock_pandora) PostRepos_(rw http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	log.Println("PostRepos_ request", params.ByName("reponame"))
 	var data []byte
 	var err error
 	if data, err = ioutil.ReadAll(req.Body); err != nil {
@@ -110,13 +110,13 @@ func (s *mock_pandora) PostRepos_(rw http.ResponseWriter, req *http.Request) {
 	return
 }
 
-func (s *mock_pandora) PostRepos_Data(rw http.ResponseWriter, req *http.Request) {
+func (s *mock_pandora) PostRepos_Data(rw http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	if s.PostSleep > 0 {
 		time.Sleep(time.Duration(s.PostSleep) * time.Second)
 	}
 	var bytesx []byte
 	var r *bufio.Reader
-	log.Println("post data!!!")
+	log.Println(params.ByName("reponame"), "post data!!!")
 
 	if req.Header.Get("Content-Encoding") == "gzip" {
 		reqBody, err := gzip.NewReader(req.Body)
@@ -159,7 +159,7 @@ type GetRepoResult struct {
 	DerivedFrom string                     `json:"derivedFrom" bson:"-"`
 }
 
-func (s *mock_pandora) GetRepos_(rw http.ResponseWriter, req *http.Request) {
+func (s *mock_pandora) GetRepos_(rw http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	if s.GetRepoErr {
 		rw.WriteHeader(400)
 		rw.Write([]byte("this is mock_pandora let GetRepo Error"))
@@ -173,7 +173,7 @@ func (s *mock_pandora) GetRepos_(rw http.ResponseWriter, req *http.Request) {
 	return
 }
 
-func (s *mock_pandora) PutRepos_(rw http.ResponseWriter, req *http.Request) {
+func (s *mock_pandora) PutRepos_(rw http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	log.Println("PutRepos_ request")
 	var data []byte
 	var err error
@@ -196,7 +196,7 @@ func (s *mock_pandora) LetGetRepoError(f bool) {
 }
 
 func TestPandoraSender(t *testing.T) {
-	pandora, pt := NewMockPandoraWithPrefix("v2")
+	pandora, pt := NewMockPandoraWithPrefix("/v2")
 	pandora.LetGetRepoError(true)
 	opt := &PandoraOption{
 		name:           "p",
@@ -340,7 +340,7 @@ func TestPandoraSender(t *testing.T) {
 }
 
 func TestNestPandoraSender(t *testing.T) {
-	pandora, pt := NewMockPandoraWithPrefix("v2")
+	pandora, pt := NewMockPandoraWithPrefix("/v2")
 	opt := &PandoraOption{
 		name:           "p_TestNestPandoraSender",
 		repoName:       "TestNestPandoraSender",
@@ -383,7 +383,7 @@ func TestNestPandoraSender(t *testing.T) {
 }
 
 func TestUUIDPandoraSender(t *testing.T) {
-	pandora, pt := NewMockPandoraWithPrefix("v2")
+	pandora, pt := NewMockPandoraWithPrefix("/v2")
 	opt := &PandoraOption{
 		name:           "TestUUIDPandoraSender",
 		repoName:       "TestUUIDPandoraSender",
@@ -598,7 +598,7 @@ func TestParseUserSchema(t *testing.T) {
 }
 
 func TestUpdatePandoraSchema(t *testing.T) {
-	pandora, pt := NewMockPandoraWithPrefix("v2")
+	pandora, pt := NewMockPandoraWithPrefix("/v2")
 	opt := &PandoraOption{
 		name:           "p_TestUpdatePandoraSchema",
 		repoName:       "TestUpdatePandoraSchema",

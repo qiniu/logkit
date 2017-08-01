@@ -16,6 +16,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 
+	"github.com/julienschmidt/httprouter"
 	"github.com/qiniu/log"
 )
 
@@ -139,8 +140,9 @@ func main() {
 	if len(conf.BindHost) > 0 {
 		m.BindHost = conf.BindHost
 	}
+	router := httprouter.New()
 	// start rest service
-	rs := mgr.NewRestService(m)
+	rs := mgr.NewRestService(m, router)
 	if conf.ProfileHost != "" {
 		log.Printf("profile_host was open at %v", conf.ProfileHost)
 		go func() {

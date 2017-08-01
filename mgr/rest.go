@@ -11,9 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/julienschmidt/httprouter"
 	"github.com/qiniu/log"
-
-	rest "github.com/qiniu/logkit/http"
 )
 
 var DEFAULT_PORT = 4000
@@ -32,14 +31,13 @@ type RestService struct {
 	l   net.Listener
 }
 
-func NewRestService(mgr *Manager) *RestService {
+func NewRestService(mgr *Manager, router *httprouter.Router) *RestService {
 
 	rs := &RestService{
 		mgr: mgr,
 	}
+	router.GET(PREFIX+"/status", rs.Status)
 
-	mux := rest.NewServeMux()
-	mux.HandleFunc("GET "+PREFIX+"/status", rs.GetStatus)
 	var (
 		port     = DEFAULT_PORT
 		address  string
@@ -48,11 +46,14 @@ func NewRestService(mgr *Manager) *RestService {
 	)
 
 	for {
+		if port > 10000 {
+			log.Fatal("bind port failed too many times, exit...")
+		}
 		address = ":" + strconv.Itoa(port)
 		if mgr.BindHost != "" {
 			address = mgr.BindHost
 		}
-		listener, err = httpserve(address, mux)
+		listener, err = httpserve(address, router)
 		if err != nil {
 			err = fmt.Errorf("bind address %v for RestService error %v", address, err)
 			if mgr.BindHost != "" {
@@ -93,7 +94,7 @@ func generateStatsShell(address, prefix string) (err error) {
 }
 
 // get /logkit/status
-func (rs *RestService) GetStatus(rw http.ResponseWriter, req *http.Request) {
+func (rs *RestService) Status(rw http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	rss := rs.mgr.Status()
 	br, _ := json.Marshal(rss)
 	rw.Write(br)

@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/julienschmidt/httprouter"
 	"github.com/qiniu/logkit/utils"
 )
 
@@ -101,7 +102,7 @@ func Test_Rest(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	rs := NewRestService(m)
+	rs := NewRestService(m, httprouter.New())
 	defer func() {
 		rs.Stop()
 		os.Remove(StatsShell)
