@@ -13,6 +13,7 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/conf"
 )
 
 var DEFAULT_PORT = 4000
@@ -27,8 +28,17 @@ type cmdArgs struct {
 }
 
 type RestService struct {
-	mgr *Manager
-	l   net.Listener
+	mgr     *Manager
+	l       net.Listener
+	address string
+}
+
+type ErrorResponse struct {
+	Error error `json:"error"`
+}
+
+func NewErrorResponse(err error) *ErrorResponse {
+	return &ErrorResponse{Error: err}
 }
 
 func NewRestService(mgr *Manager, router *httprouter.Router) *RestService {
@@ -37,6 +47,10 @@ func NewRestService(mgr *Manager, router *httprouter.Router) *RestService {
 		mgr: mgr,
 	}
 	router.GET(PREFIX+"/status", rs.Status)
+	router.GET(PREFIX+"/configs", rs.GetConfigs)
+	router.GET(PREFIX+"/configs/:name", rs.GetConfig)
+	router.POST(PREFIX+"/configs/:name", rs.PostConfig)
+	router.DELETE(PREFIX+"/configs/:name", rs.DeleteConfig)
 
 	var (
 		port     = DEFAULT_PORT
@@ -72,6 +86,7 @@ func NewRestService(mgr *Manager, router *httprouter.Router) *RestService {
 	if err != nil {
 		log.Warn(err)
 	}
+	rs.address = address
 	return rs
 }
 
@@ -99,6 +114,109 @@ func (rs *RestService) Status(rw http.ResponseWriter, req *http.Request, params 
 	br, _ := json.Marshal(rss)
 	rw.Write(br)
 	rw.Header().Set("Content-Type", "application/json")
+	return
+}
+
+// get /logkit/configs
+func (rs *RestService) GetConfigs(rw http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	rss := rs.mgr.runnerConfig
+	br, _ := json.Marshal(rss)
+	rw.Write(br)
+	rw.Header().Set("Content-Type", "application/json")
+	return
+}
+
+// get /logkit/configs/:name
+func (rs *RestService) GetConfig(rw http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	name := params.ByName("name")
+	var err error
+	defer func() {
+		if err != nil {
+			ret, errX := json.Marshal(NewErrorResponse(err))
+			if errX != nil {
+				log.Error(errX)
+			}
+			rw.Write(ret)
+		}
+	}()
+	filename := rs.mgr.RestDir + "/" + name + ".conf"
+	rss, ok := rs.mgr.runnerConfig[filename]
+	if name == "" || !ok {
+		rw.WriteHeader(400)
+		err = fmt.Errorf("config name is empty or file %v not exist", filename)
+		return
+	}
+	br, _ := json.Marshal(rss)
+	rw.Write(br)
+	rw.Header().Set("Content-Type", "application/json")
+	return
+}
+
+// post /logkit/configs/<name>
+func (rs *RestService) PostConfig(rw http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	name := params.ByName("name")
+	rw.Header().Set("Content-Type", "application/json")
+	var err error
+	defer func() {
+		if err != nil {
+			ret, errX := json.Marshal(NewErrorResponse(err))
+			if errX != nil {
+				log.Error(errX)
+			}
+			rw.Write(ret)
+		} else {
+			rw.Write([]byte("{}"))
+		}
+	}()
+	if name == "" {
+		rw.WriteHeader(400)
+		err = fmt.Errorf("config name is empty")
+		return
+	}
+	content, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		rw.WriteHeader(400)
+		return
+	}
+	var nconf RunnerConfig
+	err = conf.LoadData(&nconf, content)
+	if err != nil {
+		rw.WriteHeader(400)
+		return
+	}
+	filename := rs.mgr.RestDir + "/" + nconf.RunnerName + ".conf"
+	if rs.mgr.isRunning(filename) {
+		rw.WriteHeader(400)
+		err = fmt.Errorf("file %v runner is running", filename)
+		return
+	}
+	err = rs.mgr.ForkRunner(filename, nconf, true)
+	return
+}
+
+// delete /logkit/configs/<name>
+func (rs *RestService) DeleteConfig(rw http.ResponseWriter, req *http.Request, params httprouter.Params) {
+	name := params.ByName("name")
+	rw.Header().Set("Content-Type", "application/json")
+	var err error
+	defer func() {
+		if err != nil {
+			ret, errX := json.Marshal(NewErrorResponse(err))
+			if errX != nil {
+				log.Error(errX)
+			}
+			rw.Write(ret)
+		} else {
+			rw.Write([]byte("{}"))
+		}
+	}()
+	if name == "" {
+		rw.WriteHeader(400)
+		err = fmt.Errorf("config name is empty")
+		return
+	}
+	filename := rs.mgr.RestDir + "/" + name + ".conf"
+	err = rs.mgr.Remove(filename)
 	return
 }
 

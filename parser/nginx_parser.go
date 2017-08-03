@@ -2,6 +2,7 @@ package parser
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -35,7 +36,7 @@ func NewNginxParser(c conf.MapConf) (LogParser, error) {
 	return nginxParser, err
 }
 
-func NewNginxAccParser(c conf.MapConf) (*NginxParser, error) {
+func NewNginxAccParser(c conf.MapConf) (p *NginxParser, err error) {
 	name, _ := c.GetStringOr(KeyParserName, "")
 
 	schema, _ := c.GetStringOr(NginxSchema, "")
@@ -44,11 +45,14 @@ func NewNginxAccParser(c conf.MapConf) (*NginxParser, error) {
 	nameMap := make(map[string]struct{})
 	labels := GetLabels(labelList, nameMap)
 
-	p := &NginxParser{
+	p = &NginxParser{
 		name:   name,
 		labels: labels,
 	}
-	p.schema = p.parseSchemaFields(schema)
+	p.schema, err = p.parseSchemaFields(schema)
+	if err != nil {
+		return
+	}
 	if nginxRegexStr == "" {
 		nginxConfPath, err := c.GetString(NginxConfPath)
 		if err != nil {
@@ -73,19 +77,23 @@ func NewNginxAccParser(c conf.MapConf) (*NginxParser, error) {
 	return p, nil
 }
 
-func (p *NginxParser) parseSchemaFields(schema string) (m map[string]string) {
+func (p *NginxParser) parseSchemaFields(schema string) (m map[string]string, err error) {
 	fieldMap := make(map[string]string)
 	if schema == "" {
-		return fieldMap
+		return fieldMap, nil
 	}
-	schema = strings.Replace(schema, " ", "", -1)
+	schema = strings.Replace(schema, ":", " ", -1)
 	schemas := strings.Split(schema, ",")
 
 	for _, s := range schemas {
-		kTpye := strings.Split(s, ":")
-		fieldMap[kTpye[0]] = kTpye[1]
+		parts := strings.Fields(s)
+		if len(parts) < 2 {
+			err = errors.New("column conf error: " + s + ", format should be \"columnName dataType\"")
+			return
+		}
+		fieldMap[parts[0]] = parts[1]
 	}
-	return fieldMap
+	return fieldMap, nil
 }
 
 func (p *NginxParser) Name() string {
