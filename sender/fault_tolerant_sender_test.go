@@ -17,7 +17,7 @@ const (
 )
 
 func TestFtSender(t *testing.T) {
-	_, pt := NewMockPandoraWithPrefix("v2")
+	_, pt := NewMockPandoraWithPrefix("/v2")
 	opt := &PandoraOption{
 		name:           "p",
 		repoName:       "TestFtSender",
@@ -59,7 +59,7 @@ func TestFtSender(t *testing.T) {
 }
 
 func TestFtMemorySender(t *testing.T) {
-	_, pt := NewMockPandoraWithPrefix("v2")
+	_, pt := NewMockPandoraWithPrefix("/v2")
 	opt := &PandoraOption{
 		name:           "p",
 		repoName:       "TestFtMemorySender",
@@ -101,7 +101,7 @@ func TestFtMemorySender(t *testing.T) {
 }
 
 func TestFtChannelFullSender(t *testing.T) {
-	mockP, pt := NewMockPandoraWithPrefix("v2")
+	mockP, pt := NewMockPandoraWithPrefix("/v2")
 	opt := &PandoraOption{
 		name:           "p",
 		repoName:       "TestFtMemorySender",

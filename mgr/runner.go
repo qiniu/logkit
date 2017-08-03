@@ -5,13 +5,12 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
-
-	"os"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/cleaner"
