@@ -56,7 +56,7 @@ wget http://op26gaeek.bkt.clouddn.com/logkit_mac.tar.gz && tar xvf logkit_mac.ta
 ```
 
 按照图示进行修改
-![需要修改的字段](https://github.com/qiniu/logkit/tree/develop/resources/democonfig.png)
+![需要修改的字段](https://raw.githubusercontent.com/qiniu/logkit/develop/resources/democonfig.png)
 
 3. 启动logkit工具
 
