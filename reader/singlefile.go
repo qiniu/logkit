@@ -88,7 +88,18 @@ func NewSingleFile(meta *Meta, path, whence string) (sf *SingleFile, err error) 
 		log.Debugf("Runner[%v] %v restore meta success", sf.meta.RunnerName, sf.Name())
 	}
 	sf.offset = offset
-	f.Seek(offset, os.SEEK_SET)
+	st, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	//遇到Offset超过最大的文件了,重新来过
+	if sf.offset > st.Size() {
+		sf.offset = 0
+	}
+	_, err = f.Seek(sf.offset, os.SEEK_SET)
+	if err != nil {
+		return nil, err
+	}
 	return sf, nil
 }
 

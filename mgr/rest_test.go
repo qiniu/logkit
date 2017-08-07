@@ -3,21 +3,18 @@ package mgr
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
 
-	"net/http"
-
-	"fmt"
-
-	"github.com/julienschmidt/httprouter"
+	"github.com/labstack/echo"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/sender"
@@ -112,7 +109,7 @@ func Test_RestGetStatus(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	rs := NewRestService(m, httprouter.New())
+	rs := NewRestService(m, echo.New())
 	defer func() {
 		rs.Stop()
 		os.Remove(StatsShell)
@@ -128,15 +125,13 @@ func Test_RestGetStatus(t *testing.T) {
 	}
 	rss := make(map[string]RunnerStatus)
 	err = json.Unmarshal([]byte(out.String()), &rss)
-	if err != nil {
-		t.Error(err, out.String())
-	}
+	assert.NoError(t, err, out.String())
 	rp, err := filepath.Abs(logpath)
 	if err != nil {
 		t.Error(err)
 	}
 	exp := map[string]RunnerStatus{
-		"test1.csv": RunnerStatus{
+		"test1.csv": {
 			Name:    "test1.csv",
 			Logpath: rp,
 			Lag: RunnerLag{
@@ -148,16 +143,15 @@ func Test_RestGetStatus(t *testing.T) {
 				Success: 4,
 			},
 			SenderStats: map[string]utils.StatsInfo{
-				"file_sender": utils.StatsInfo{
+				"file_sender": {
 					Errors:  0,
 					Success: 4,
 				},
 			},
 		},
 	}
-	if !reflect.DeepEqual(rss, exp) {
-		t.Errorf("get status error exp %v but got %v", exp, rss)
-	}
+	assert.Equal(t, exp, rss, out.String())
+
 }
 
 func Test_RestCRUD(t *testing.T) {
@@ -238,7 +232,7 @@ func Test_RestCRUD(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rs := NewRestService(m, httprouter.New())
+	rs := NewRestService(m, echo.New())
 	defer func() {
 		rs.Stop()
 		os.Remove(StatsShell)
@@ -253,6 +247,7 @@ func Test_RestCRUD(t *testing.T) {
 	expconf1.ReaderConfig[utils.GlobalKeyName] = expconf1.RunnerName
 	expconf1.ReaderConfig[reader.KeyRunnerName] = expconf1.RunnerName
 	expconf1.ParserConf[parser.KeyRunnerName] = expconf1.RunnerName
+	expconf1.IsInWebFolder = true
 	for i := range expconf1.SenderConfig {
 		expconf1.SenderConfig[i][sender.KeyRunnerName] = expconf1.RunnerName
 	}
@@ -292,6 +287,7 @@ func Test_RestCRUD(t *testing.T) {
 	expconf2.ReaderConfig[utils.GlobalKeyName] = expconf2.RunnerName
 	expconf2.ReaderConfig[reader.KeyRunnerName] = expconf2.RunnerName
 	expconf2.ParserConf[parser.KeyRunnerName] = expconf2.RunnerName
+	expconf2.IsInWebFolder = true
 	for i := range expconf2.SenderConfig {
 		expconf2.SenderConfig[i][sender.KeyRunnerName] = expconf2.RunnerName
 	}
