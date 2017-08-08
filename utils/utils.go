@@ -231,3 +231,11 @@ func CreateDirIfNotExist(dir string) (err error) {
 	}
 	return
 }
+
+type ErrorResponse struct {
+	Error error `json:"error"`
+}
+
+func NewErrorResponse(err error) *ErrorResponse {
+	return &ErrorResponse{Error: err}
+}

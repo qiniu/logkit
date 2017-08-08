@@ -44,9 +44,11 @@ type Manager struct {
 	cleanQueues  map[string]*cleanQueue
 	runners      map[string]Runner
 	runnerConfig map[string]RunnerConfig
-	watchers     map[string]*fsnotify.Watcher // inode到watcher的映射表
-	pregistry    *parser.ParserRegistry
-	sregistry    *sender.SenderRegistry
+
+	watchers   map[string]*fsnotify.Watcher // inode到watcher的映射表
+	watcherMux sync.RWMutex
+	pregistry  *parser.ParserRegistry
+	sregistry  *sender.SenderRegistry
 }
 
 func NewManager(conf ManagerConfig) (*Manager, error) {
@@ -62,7 +64,7 @@ func NewCustomManager(conf ManagerConfig, pr *parser.ParserRegistry, sr *sender.
 			return nil, fmt.Errorf("get system current workdir error %v, please set rest_dir config", err)
 		}
 		conf.RestDir = dir + DEFAULT_LOGKIT_REST_DIR
-		if err = os.Mkdir(conf.RestDir, os.ModeDir); err != nil {
+		if err = os.Mkdir(conf.RestDir, 0755); err != nil && !os.IsExist(err) {
 			log.Warnf("make dir for rest default dir error %v", err)
 		}
 	}
@@ -73,6 +75,7 @@ func NewCustomManager(conf ManagerConfig, pr *parser.ParserRegistry, sr *sender.
 		runners:       make(map[string]Runner),
 		runnerConfig:  make(map[string]RunnerConfig),
 		watchers:      make(map[string]*fsnotify.Watcher),
+		watcherMux:    sync.RWMutex{},
 		pregistry:     pr,
 		sregistry:     sr,
 	}
@@ -85,11 +88,13 @@ func (m *Manager) Stop() error {
 	for _, runner := range m.runners {
 		runner.Stop()
 	}
+	m.watcherMux.RLock()
 	for _, w := range m.watchers {
 		if w != nil {
 			w.Close()
 		}
 	}
+	m.watcherMux.RUnlock()
 	close(m.cleanChan)
 	return nil
 }
@@ -268,7 +273,9 @@ func (m *Manager) handle(path string, watcher *fsnotify.Watcher) {
 					// 如果当前监听文件被删除，则不再监听，退出
 					log.Warnf("close file watcher path %v", path)
 					watcher.Close()
+					m.watcherMux.Lock()
 					delete(m.watchers, path)
+					m.watcherMux.Unlock()
 					return
 				}
 				m.Remove(ev.Name)
@@ -353,7 +360,9 @@ func (m *Manager) addWatchers(confsPath []string) (err error) {
 			log.Warnf("confPath Config %v can not find any real conf dir", dir)
 		}
 		for _, path := range paths {
+			m.watcherMux.RLock()
 			_, exist := m.watchers[path]
+			m.watcherMux.RUnlock()
 			if exist {
 				// 如果文件已经被监听，则不再重复监听
 				continue
@@ -376,7 +385,9 @@ func (m *Manager) addWatchers(confsPath []string) (err error) {
 				log.Errorf("fsnotify.NewWatcher: %v", err)
 				continue
 			}
+			m.watcherMux.Lock()
 			m.watchers[path] = watcher
+			m.watcherMux.Unlock()
 			go m.handle(path, watcher)
 			if err = watcher.Watch(path); err != nil {
 				log.Errorf("watch %v error %v", path, err)
@@ -393,6 +404,25 @@ func (m *Manager) Watch(confsPath []string) (err error) {
 	}
 	go m.detectMoreWatchers(confsPath)
 	go m.clean()
+	return
+}
+
+func (m *Manager) RestoreWebDir() {
+	files, err := ioutil.ReadDir(m.RestDir)
+	if err != nil {
+		log.Errorf("ioutil.ReadDir(%s): %v, err:%v", m.RestDir, files, err)
+		return
+	}
+	nums := 0
+	for _, f := range files {
+		if f.IsDir() {
+			log.Warn("skipped dir", f.Name)
+			continue
+		}
+		m.Add(filepath.Join(m.RestDir, f.Name()))
+		nums++
+	}
+	log.Infof("successfully restored %v runners in %v web rest dir", nums, m.RestDir)
 	return
 }
 

@@ -1,19 +1,21 @@
 package mgr
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/julienschmidt/httprouter"
+	"encoding/json"
+
+	"github.com/labstack/echo"
 	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/utils"
 )
 
 var DEFAULT_PORT = 4000
@@ -33,24 +35,17 @@ type RestService struct {
 	address string
 }
 
-type ErrorResponse struct {
-	Error error `json:"error"`
-}
-
-func NewErrorResponse(err error) *ErrorResponse {
-	return &ErrorResponse{Error: err}
-}
-
-func NewRestService(mgr *Manager, router *httprouter.Router) *RestService {
+func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 
 	rs := &RestService{
 		mgr: mgr,
 	}
-	router.GET(PREFIX+"/status", rs.Status)
-	router.GET(PREFIX+"/configs", rs.GetConfigs)
-	router.GET(PREFIX+"/configs/:name", rs.GetConfig)
-	router.POST(PREFIX+"/configs/:name", rs.PostConfig)
-	router.DELETE(PREFIX+"/configs/:name", rs.DeleteConfig)
+	router.GET(PREFIX+"/status", rs.Status())
+	router.GET(PREFIX+"/configs", rs.GetConfigs())
+	router.GET(PREFIX+"/configs/:name", rs.GetConfig())
+	router.POST(PREFIX+"/configs/:name", rs.PostConfig())
+	router.DELETE(PREFIX+"/configs/:name", rs.DeleteConfig())
+	router.POST(PREFIX+"/parse", rs.PostParse())
 
 	var (
 		port     = DEFAULT_PORT
@@ -109,115 +104,89 @@ func generateStatsShell(address, prefix string) (err error) {
 }
 
 // get /logkit/status
-func (rs *RestService) Status(rw http.ResponseWriter, req *http.Request, params httprouter.Params) {
-	rss := rs.mgr.Status()
-	br, _ := json.Marshal(rss)
-	rw.Write(br)
-	rw.Header().Set("Content-Type", "application/json")
-	return
+func (rs *RestService) Status() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		rss := rs.mgr.Status()
+		return c.JSON(http.StatusOK, rss)
+	}
 }
 
 // get /logkit/configs
-func (rs *RestService) GetConfigs(rw http.ResponseWriter, req *http.Request, params httprouter.Params) {
-	rss := rs.mgr.runnerConfig
-	br, _ := json.Marshal(rss)
-	rw.Write(br)
-	rw.Header().Set("Content-Type", "application/json")
-	return
+func (rs *RestService) GetConfigs() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		rs.mgr.lock.RLock()
+		defer rs.mgr.lock.RUnlock()
+		rss := make(map[string]RunnerConfig)
+		for k, v := range rs.mgr.runnerConfig {
+			if filepath.Dir(k) == rs.mgr.RestDir {
+				v.IsInWebFolder = true
+			}
+			rss[k] = v
+			fmt.Println(rs.mgr.RestDir, filepath.Dir(k))
+		}
+		return c.JSON(http.StatusOK, rss)
+	}
 }
 
 // get /logkit/configs/:name
-func (rs *RestService) GetConfig(rw http.ResponseWriter, req *http.Request, params httprouter.Params) {
-	name := params.ByName("name")
-	var err error
-	defer func() {
-		if err != nil {
-			ret, errX := json.Marshal(NewErrorResponse(err))
-			if errX != nil {
-				log.Error(errX)
-			}
-			rw.Write(ret)
+func (rs *RestService) GetConfig() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		name := c.Param("name")
+		filename := rs.mgr.RestDir + "/" + name + ".conf"
+		rs.mgr.lock.RLock()
+		defer rs.mgr.lock.RUnlock()
+		rss, ok := rs.mgr.runnerConfig[filename]
+		if name == "" || !ok {
+			err := fmt.Errorf("config name is empty or file %v not exist", filename)
+			return c.JSON(http.StatusBadRequest, utils.NewErrorResponse(err))
 		}
-	}()
-	filename := rs.mgr.RestDir + "/" + name + ".conf"
-	rss, ok := rs.mgr.runnerConfig[filename]
-	if name == "" || !ok {
-		rw.WriteHeader(400)
-		err = fmt.Errorf("config name is empty or file %v not exist", filename)
-		return
+		return c.JSON(http.StatusOK, rss)
 	}
-	br, _ := json.Marshal(rss)
-	rw.Write(br)
-	rw.Header().Set("Content-Type", "application/json")
-	return
 }
 
 // post /logkit/configs/<name>
-func (rs *RestService) PostConfig(rw http.ResponseWriter, req *http.Request, params httprouter.Params) {
-	name := params.ByName("name")
-	rw.Header().Set("Content-Type", "application/json")
-	var err error
-	defer func() {
-		if err != nil {
-			ret, errX := json.Marshal(NewErrorResponse(err))
-			if errX != nil {
-				log.Error(errX)
-			}
-			rw.Write(ret)
-		} else {
-			rw.Write([]byte("{}"))
+func (rs *RestService) PostConfig() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		name := c.Param("name")
+		if name == "" {
+			err := fmt.Errorf("config name is empty")
+			return c.JSON(http.StatusBadRequest, utils.NewErrorResponse(err))
 		}
-	}()
-	if name == "" {
-		rw.WriteHeader(400)
-		err = fmt.Errorf("config name is empty")
-		return
+
+		var nconf RunnerConfig
+		if err := c.Bind(&nconf); err != nil {
+			return err
+		}
+		filename := rs.mgr.RestDir + "/" + nconf.RunnerName + ".conf"
+		if rs.mgr.isRunning(filename) {
+			err := fmt.Errorf("file %v runner is running", filename)
+			return c.JSON(http.StatusBadRequest, utils.NewErrorResponse(err))
+		}
+		nconf.IsInWebFolder = true
+		err := rs.mgr.ForkRunner(filename, nconf, true)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, utils.NewErrorResponse(err))
+		}
+		confBytes, err := json.Marshal(nconf)
+		return ioutil.WriteFile(filename, confBytes, 0644)
 	}
-	content, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		rw.WriteHeader(400)
-		return
-	}
-	var nconf RunnerConfig
-	err = conf.LoadData(&nconf, content)
-	if err != nil {
-		rw.WriteHeader(400)
-		return
-	}
-	filename := rs.mgr.RestDir + "/" + nconf.RunnerName + ".conf"
-	if rs.mgr.isRunning(filename) {
-		rw.WriteHeader(400)
-		err = fmt.Errorf("file %v runner is running", filename)
-		return
-	}
-	err = rs.mgr.ForkRunner(filename, nconf, true)
-	return
 }
 
 // delete /logkit/configs/<name>
-func (rs *RestService) DeleteConfig(rw http.ResponseWriter, req *http.Request, params httprouter.Params) {
-	name := params.ByName("name")
-	rw.Header().Set("Content-Type", "application/json")
-	var err error
-	defer func() {
-		if err != nil {
-			ret, errX := json.Marshal(NewErrorResponse(err))
-			if errX != nil {
-				log.Error(errX)
-			}
-			rw.Write(ret)
-		} else {
-			rw.Write([]byte("{}"))
+func (rs *RestService) DeleteConfig() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		name := c.Param("name")
+		if name == "" {
+			err := fmt.Errorf("config name is empty")
+			return c.JSON(http.StatusBadRequest, utils.NewErrorResponse(err))
 		}
-	}()
-	if name == "" {
-		rw.WriteHeader(400)
-		err = fmt.Errorf("config name is empty")
-		return
+		filename := rs.mgr.RestDir + "/" + name + ".conf"
+		err := rs.mgr.Remove(filename)
+		if err != nil {
+			return err
+		}
+		return os.Remove(filename)
 	}
-	filename := rs.mgr.RestDir + "/" + name + ".conf"
-	err = rs.mgr.Remove(filename)
-	return
 }
 
 // Stop will stop RestService
