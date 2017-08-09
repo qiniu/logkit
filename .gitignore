@@ -58,3 +58,4 @@ vendor/github.com/labstack/*
 logkit
 stats
 .logkitconfs/
+public/.project
