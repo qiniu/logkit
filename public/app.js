@@ -1,6 +1,6 @@
 Vue.use(TreeView)
 var ve = new Vue({
-    el: '#tsdb',
+    el: '#main',
     data: {
         ak:"AccessKey",
         sk: "SecretKey",
