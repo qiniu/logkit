@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -15,9 +16,10 @@ import (
 	"testing"
 	"time"
 
-	rest "github.com/qiniu/logkit/http"
 	"github.com/qiniu/logkit/times"
+	"github.com/qiniu/logkit/utils"
 
+	"github.com/labstack/echo"
 	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
@@ -38,12 +40,12 @@ type mock_pandora struct {
 func NewMockPandoraWithPrefix(prefix string) (*mock_pandora, string) {
 	pandora := &mock_pandora{Prefix: prefix}
 
-	mux := rest.NewServeMux()
-	mux.HandleFunc("GET/"+prefix+"/ping", pandora.GetPing)
-	mux.HandleFunc("POST/"+prefix+"/repos/*", pandora.PostRepos_)
-	mux.HandleFunc("PUT/"+prefix+"/repos/*", pandora.PutRepos_)
-	mux.HandleFunc("POST/"+prefix+"/repos/*/data", pandora.PostRepos_Data)
-	mux.HandleFunc("GET/"+prefix+"/repos/*", pandora.GetRepos_)
+	mux := echo.New()
+	mux.GET(prefix+"/ping", pandora.GetPing())
+	mux.POST(prefix+"/repos/:reponame", pandora.PostRepos_())
+	mux.PUT(prefix+"/repos/:reponame", pandora.PutRepos_())
+	mux.POST(prefix+"/repos/:reponame/data", pandora.PostRepos_Data())
+	mux.GET(prefix+"/repos/:reponame", pandora.GetRepos_())
 
 	var port = 9000
 	for {
@@ -81,10 +83,12 @@ func NewMockPandoraWithPrefix(prefix string) (*mock_pandora, string) {
 	return pandora, pandora.Port
 }
 
-func (s *mock_pandora) GetPing(rw http.ResponseWriter, req *http.Request) {
-	ret := "I am " + s.Prefix
-	log.Println("get ping,", ret, s.Port)
-	return
+func (s *mock_pandora) GetPing() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		ret := "I am " + s.Prefix
+		log.Println("get ping,", ret, s.Port)
+		return nil
+	}
 }
 
 type cmdArgs struct {
@@ -95,61 +99,55 @@ type PostReposReq struct {
 	Region string                     `json:"region"`
 }
 
-func (s *mock_pandora) PostRepos_(rw http.ResponseWriter, req *http.Request) {
-	log.Println("PostRepos_ request")
-	var data []byte
-	var err error
-	if data, err = ioutil.ReadAll(req.Body); err != nil {
-		return
+func (s *mock_pandora) PostRepos_() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		log.Println("PostRepos_ request", c.Get("reponame"))
+		var req1 PostReposReq
+		if err := c.Bind(&req1); err != nil {
+			return err
+		}
+		s.Schemas = req1.Schema
+		return nil
 	}
-	var req1 PostReposReq
-	if err = json.Unmarshal(data, &req1); err != nil {
-		return
-	}
-	s.Schemas = req1.Schema
-	return
 }
 
-func (s *mock_pandora) PostRepos_Data(rw http.ResponseWriter, req *http.Request) {
-	if s.PostSleep > 0 {
-		time.Sleep(time.Duration(s.PostSleep) * time.Second)
-	}
-	var bytesx []byte
-	var r *bufio.Reader
-	log.Println("post data!!!")
-
-	if req.Header.Get("Content-Encoding") == "gzip" {
-		reqBody, err := gzip.NewReader(req.Body)
-		if err != nil {
-			rw.WriteHeader(500)
-			rw.Write([]byte(`{"error":"gzip reader error"}`))
-			rw.Header().Set("Content-Type", "application/json")
-			return
+func (s *mock_pandora) PostRepos_Data() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		if s.PostSleep > 0 {
+			time.Sleep(time.Duration(s.PostSleep) * time.Second)
 		}
-		reqBody.Close()
-		r = bufio.NewReader(reqBody)
-		log.Println("gzip got")
-	} else {
-		r = bufio.NewReader(req.Body)
+		var bytesx []byte
+		var r *bufio.Reader
+
+		log.Println(c.Get("reponame"), "post data!!!")
+		req := c.Request()
+		if req.Header.Get("Content-Encoding") == "gzip" {
+			reqBody, err := gzip.NewReader(req.Body)
+			if err != nil {
+				return c.JSON(http.StatusInternalServerError, utils.NewErrorResponse(errors.New("gzip reader error")))
+			}
+			reqBody.Close()
+			r = bufio.NewReader(reqBody)
+			log.Println("gzip got")
+		} else {
+			r = bufio.NewReader(req.Body)
+		}
+		bytesx, err := ioutil.ReadAll(r)
+		if err != nil {
+			log.Println("post repo readall error")
+			return c.NoContent(http.StatusInternalServerError)
+		}
+		s.Body = string(bytesx)
+		sep := strings.Fields(s.Body)
+		sort.Strings(sep)
+		s.Body = strings.Join(sep, " ")
+		log.Println("get datas: ", s.Body)
+		if strings.Contains(s.Body, "E18111") {
+			return c.JSON(http.StatusNotFound, utils.NewErrorResponse(errors.New("E18111 mock_pandora error")))
+		}
+		s.PostDataNum++
+		return nil
 	}
-	bytesx, err := ioutil.ReadAll(r)
-	if err != nil {
-		rw.WriteHeader(500)
-		log.Println("post repo readall error")
-		return
-	}
-	s.Body = string(bytesx)
-	sep := strings.Fields(s.Body)
-	sort.Strings(sep)
-	s.Body = strings.Join(sep, " ")
-	log.Println("get datas: ", s.Body)
-	if strings.Contains(s.Body, "E18111") {
-		rw.WriteHeader(404)
-		rw.Write([]byte(`{"error":"E18111 mock_pandora error"}`))
-		rw.Header().Set("Content-Type", "application/json")
-	}
-	s.PostDataNum++
-	return
 }
 
 type GetRepoResult struct {
@@ -159,32 +157,30 @@ type GetRepoResult struct {
 	DerivedFrom string                     `json:"derivedFrom" bson:"-"`
 }
 
-func (s *mock_pandora) GetRepos_(rw http.ResponseWriter, req *http.Request) {
-	if s.GetRepoErr {
-		rw.WriteHeader(400)
-		rw.Write([]byte("this is mock_pandora let GetRepo Error"))
-		return
+func (s *mock_pandora) GetRepos_() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		if s.GetRepoErr {
+			return c.String(http.StatusBadRequest, "this is mock_pandora let GetRepo Error")
+		}
+		ret := GetRepoResult{
+			Schema: s.Schemas,
+		}
+		return c.JSON(http.StatusOK, ret)
 	}
-	ret := GetRepoResult{
-		Schema: s.Schemas,
-	}
-	by, _ := json.Marshal(ret)
-	rw.Write(by)
-	return
 }
 
-func (s *mock_pandora) PutRepos_(rw http.ResponseWriter, req *http.Request) {
-	log.Println("PutRepos_ request")
-	var data []byte
-	var err error
-	if data, err = ioutil.ReadAll(req.Body); err != nil {
-		return
+func (s *mock_pandora) PutRepos_() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		log.Println("PutRepos_ request")
+		var err error
+		var req1 PostReposReq
+		err = c.Bind(&req1)
+		if err != nil {
+			return err
+		}
+		s.Schemas = req1.Schema
+		return nil
 	}
-	var req1 PostReposReq
-	if err = json.Unmarshal(data, &req1); err != nil {
-		return
-	}
-	s.Schemas = req1.Schema
 }
 
 func (s *mock_pandora) ChangeSchema(Schema []pipeline.RepoSchemaEntry) {
@@ -196,7 +192,7 @@ func (s *mock_pandora) LetGetRepoError(f bool) {
 }
 
 func TestPandoraSender(t *testing.T) {
-	pandora, pt := NewMockPandoraWithPrefix("v2")
+	pandora, pt := NewMockPandoraWithPrefix("/v2")
 	pandora.LetGetRepoError(true)
 	opt := &PandoraOption{
 		name:           "p",
@@ -340,7 +336,7 @@ func TestPandoraSender(t *testing.T) {
 }
 
 func TestNestPandoraSender(t *testing.T) {
-	pandora, pt := NewMockPandoraWithPrefix("v2")
+	pandora, pt := NewMockPandoraWithPrefix("/v2")
 	opt := &PandoraOption{
 		name:           "p_TestNestPandoraSender",
 		repoName:       "TestNestPandoraSender",
@@ -383,7 +379,7 @@ func TestNestPandoraSender(t *testing.T) {
 }
 
 func TestUUIDPandoraSender(t *testing.T) {
-	pandora, pt := NewMockPandoraWithPrefix("v2")
+	pandora, pt := NewMockPandoraWithPrefix("/v2")
 	opt := &PandoraOption{
 		name:           "TestUUIDPandoraSender",
 		repoName:       "TestUUIDPandoraSender",
@@ -598,7 +594,7 @@ func TestParseUserSchema(t *testing.T) {
 }
 
 func TestUpdatePandoraSchema(t *testing.T) {
-	pandora, pt := NewMockPandoraWithPrefix("v2")
+	pandora, pt := NewMockPandoraWithPrefix("/v2")
 	opt := &PandoraOption{
 		name:           "p_TestUpdatePandoraSchema",
 		repoName:       "TestUpdatePandoraSchema",

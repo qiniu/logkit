@@ -5,13 +5,12 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
-
-	"os"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/cleaner"
@@ -59,6 +58,7 @@ type RunnerConfig struct {
 	CleanerConfig conf.MapConf   `json:"cleaner"`
 	ParserConf    conf.MapConf   `json:"parser"`
 	SenderConfig  []conf.MapConf `json:"senders"`
+	IsInWebFolder bool           `json:"web_folder,omitempty"`
 }
 
 type RunnerInfo struct {
@@ -162,7 +162,15 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, p
 		MaxBatchInteval:  rc.MaxBatchInteval,
 		MaxBatchTryTimes: rc.MaxBatchTryTimes,
 	}
-
+	if rc.ReaderConfig == nil {
+		return nil, errors.New(rc.RunnerName + " readerConfig is nil")
+	}
+	if rc.SenderConfig == nil {
+		return nil, errors.New(rc.RunnerName + " SenderConfig is nil")
+	}
+	if rc.ParserConf == nil {
+		return nil, errors.New(rc.RunnerName + " ParserConf is nil")
+	}
 	rc.ReaderConfig[utils.GlobalKeyName] = rc.RunnerName
 	rc.ReaderConfig[reader.KeyRunnerName] = rc.RunnerName
 	for i := range rc.SenderConfig {

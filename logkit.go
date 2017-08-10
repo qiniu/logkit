@@ -16,6 +16,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 
+	"github.com/labstack/echo"
 	"github.com/qiniu/log"
 )
 
@@ -31,6 +32,7 @@ type Config struct {
 	CleanSelfPattern string   `json:"clean_self_pattern"`
 	TimeLayouts      []string `json:"timeformat_layouts"`
 	CleanSelfLogCnt  int      `json:"clean_self_cnt"`
+	StaticRootPath   string   `json:"static_root_path"`
 	mgr.ManagerConfig
 }
 
@@ -131,6 +133,8 @@ func main() {
 	if err = m.Watch(paths); err != nil {
 		log.Fatalf("watch path error %v", err)
 	}
+	m.RestoreWebDir()
+
 	stopClean := make(chan struct{}, 0)
 	defer close(stopClean)
 	if conf.CleanSelfLog {
@@ -139,8 +143,11 @@ func main() {
 	if len(conf.BindHost) > 0 {
 		m.BindHost = conf.BindHost
 	}
+	e := echo.New()
+	e.Static("/", conf.StaticRootPath)
+
 	// start rest service
-	rs := mgr.NewRestService(m)
+	rs := mgr.NewRestService(m, e)
 	if conf.ProfileHost != "" {
 		log.Printf("profile_host was open at %v", conf.ProfileHost)
 		go func() {

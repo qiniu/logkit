@@ -6,6 +6,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"io/ioutil"
+
+	"fmt"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -236,4 +240,33 @@ func createInvalidSuffixFile(dirC string) {
 
 func destroyPidFile() {
 	os.RemoveAll(testPidFile)
+}
+
+func Test_SeekUnreachable(t *testing.T) {
+	filename := "Test_SeekUnreachable"
+	ioutil.WriteFile(filename, []byte("xxx"), os.ModePerm)
+	defer os.Remove(filename)
+	f, err := os.Open(filename)
+	if err != nil {
+		t.Error(err)
+	}
+	x, err := f.Seek(123456, os.SEEK_SET)
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println(x)
+	//ioutil.WriteFile(filename, []byte("yyyy"), os.ModeAppend)
+	bx := []byte{}
+	n, err := f.Read(bx)
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println(n, err, string(bx), "xx")
+	x1, err := f.Seek(0, os.SEEK_END)
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println("x1", x1)
+	st, err := f.Stat()
+	fmt.Println(st.Size())
 }

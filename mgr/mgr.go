@@ -14,16 +14,20 @@ import (
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/utils"
 
+	"fmt"
+
 	"github.com/howeyc/fsnotify"
 	"github.com/qiniu/log"
 )
 
 var DIR_NOT_EXIST_SLEEP_TIME = 300 //300 s
+var DEFAULT_LOGKIT_REST_DIR = "/.logkitconfs"
 
 type ManagerConfig struct {
 	BindHost string `json:"bind_host"`
 	Idc      string `json:"idc"`
 	Zone     string `json:"zone"`
+	RestDir  string `json:"rest_dir"`
 }
 
 type cleanQueue struct {
@@ -33,14 +37,18 @@ type cleanQueue struct {
 
 type Manager struct {
 	ManagerConfig
-	lock        sync.RWMutex
-	cleanlock   sync.Mutex
-	cleanChan   chan cleaner.CleanSignal
-	cleanQueues map[string]*cleanQueue
-	runners     map[string]Runner
-	watchers    map[string]*fsnotify.Watcher // inode到watcher的映射表
-	pregistry   *parser.ParserRegistry
-	sregistry   *sender.SenderRegistry
+	DefaultDir   string
+	lock         sync.RWMutex
+	cleanlock    sync.Mutex
+	cleanChan    chan cleaner.CleanSignal
+	cleanQueues  map[string]*cleanQueue
+	runners      map[string]Runner
+	runnerConfig map[string]RunnerConfig
+
+	watchers   map[string]*fsnotify.Watcher // inode到watcher的映射表
+	watcherMux sync.RWMutex
+	pregistry  *parser.ParserRegistry
+	sregistry  *sender.SenderRegistry
 }
 
 func NewManager(conf ManagerConfig) (*Manager, error) {
@@ -50,12 +58,24 @@ func NewManager(conf ManagerConfig) (*Manager, error) {
 }
 
 func NewCustomManager(conf ManagerConfig, pr *parser.ParserRegistry, sr *sender.SenderRegistry) (*Manager, error) {
+	if conf.RestDir == "" {
+		dir, err := os.Getwd()
+		if err != nil {
+			return nil, fmt.Errorf("get system current workdir error %v, please set rest_dir config", err)
+		}
+		conf.RestDir = dir + DEFAULT_LOGKIT_REST_DIR
+		if err = os.Mkdir(conf.RestDir, 0755); err != nil && !os.IsExist(err) {
+			log.Warnf("make dir for rest default dir error %v", err)
+		}
+	}
 	m := &Manager{
 		ManagerConfig: conf,
 		cleanChan:     make(chan cleaner.CleanSignal),
 		cleanQueues:   make(map[string]*cleanQueue),
 		runners:       make(map[string]Runner),
+		runnerConfig:  make(map[string]RunnerConfig),
 		watchers:      make(map[string]*fsnotify.Watcher),
+		watcherMux:    sync.RWMutex{},
 		pregistry:     pr,
 		sregistry:     sr,
 	}
@@ -68,24 +88,28 @@ func (m *Manager) Stop() error {
 	for _, runner := range m.runners {
 		runner.Stop()
 	}
+	m.watcherMux.RLock()
 	for _, w := range m.watchers {
 		if w != nil {
 			w.Close()
 		}
 	}
+	m.watcherMux.RUnlock()
 	close(m.cleanChan)
 	return nil
 }
 
-func (m *Manager) Remove(confPath string) {
+func (m *Manager) Remove(confPath string) (err error) {
 	if !strings.HasSuffix(confPath, ".conf") {
-		log.Warn(confPath, "not end with .conf, skipped")
+		err = fmt.Errorf("%v not end with .conf, skipped", confPath)
+		log.Warn(err)
 		return
 	}
 	log.Info("try remove", confPath)
 	confPathAbs, err := filepath.Abs(confPath)
 	if err != nil {
-		log.Warnf("filepath.Abs(%s) failed: %v", confPath)
+		err = fmt.Errorf("filepath.Abs(%s) failed: %v", confPath, err)
+		log.Warn(err)
 		return
 	}
 	confPath = confPathAbs
@@ -94,13 +118,15 @@ func (m *Manager) Remove(confPath string) {
 
 	runner, ok := m.runners[confPath]
 	if !ok {
-		log.Warnf("%s not added, nothing to do", confPath)
+		err = fmt.Errorf("%s not added, nothing to do", confPath)
+		log.Warn(err)
 		return
 	}
 
 	m.removeCleanQueue(runner.Cleaner())
 	runner.Stop()
 	delete(m.runners, confPath)
+	delete(m.runnerConfig, confPath)
 	log.Infof("runner %s be removed, total %d", runner.Name(), len(m.runners))
 	return
 }
@@ -167,47 +193,58 @@ func (m *Manager) Add(confPath string) {
 		return
 	}
 
-	forkRunner := func(confPath string) {
-		var runner Runner
-		i := 0
-		for {
-			if m.isRunning(confPath) {
-				log.Errorf("%s already added - ", confPath)
-				return
-			}
-
-			if runner, err = NewCustomRunner(conf, m.cleanChan, m.pregistry, m.sregistry); err != nil {
-				errVal, ok := err.(*os.PathError)
-				if !ok {
-					log.Errorf("NewRunner(%v) failed: %v", conf.RunnerName, err)
-					return
-				}
-				i++
-				log.Warnf("LogDir(%v) does not exsit after %d rounds, sleep 5 minute and try again...", errVal.Path, i)
-				time.Sleep(time.Duration(DIR_NOT_EXIST_SLEEP_TIME) * time.Second)
-				continue
-			}
-			break
-		}
-		m.lock.Lock()
-		defer m.lock.Unlock()
-		// double check
-		if _, ok := m.runners[confPath]; ok {
-			return
-		}
-		m.addCleanQueue(runner.Cleaner())
-		log.Infof("Runner[%v] added: %#v", conf.RunnerName, confPath)
-		go runner.Run()
-		m.runners[confPath] = runner
-		log.Infof("new Runner[%v] is added, total %d", conf.RunnerName, len(m.runners))
-		return
-	}
-
 	log.Infof("Start to try add: %v", conf.RunnerName)
-	go forkRunner(confPath)
-
+	go m.ForkRunner(confPath, conf, false)
 	return
 }
+
+func (m *Manager) ForkRunner(confPath string, nconf RunnerConfig, errReturn bool) error {
+	var runner Runner
+	var err error
+	i := 0
+	for {
+		if m.isRunning(confPath) {
+			err = fmt.Errorf("%s already added - ", confPath)
+			if !errReturn {
+				log.Error(err)
+			}
+			return err
+		}
+
+		if runner, err = NewCustomRunner(nconf, m.cleanChan, m.pregistry, m.sregistry); err != nil {
+			errVal, ok := err.(*os.PathError)
+			if !ok {
+				err = fmt.Errorf("NewRunner(%v) failed: %v", nconf.RunnerName, err)
+				if !errReturn {
+					log.Error(err)
+				}
+				return err
+			}
+			if errReturn {
+				return err
+			}
+			i++
+			log.Warnf("LogDir(%v) does not exsit after %d rounds, sleep 5 minute and try again...", errVal.Path, i)
+			time.Sleep(time.Duration(DIR_NOT_EXIST_SLEEP_TIME) * time.Second)
+			continue
+		}
+		break
+	}
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	// double check
+	if _, ok := m.runners[confPath]; ok {
+		return fmt.Errorf("%s already added - ", confPath)
+	}
+	m.addCleanQueue(runner.Cleaner())
+	log.Infof("Runner[%v] added: %#v", nconf.RunnerName, confPath)
+	go runner.Run()
+	m.runners[confPath] = runner
+	m.runnerConfig[confPath] = nconf
+	log.Infof("new Runner[%v] is added, total %d", nconf.RunnerName, len(m.runners))
+	return nil
+}
+
 func (m *Manager) isRunning(confPath string) bool {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
@@ -236,7 +273,9 @@ func (m *Manager) handle(path string, watcher *fsnotify.Watcher) {
 					// 如果当前监听文件被删除，则不再监听，退出
 					log.Warnf("close file watcher path %v", path)
 					watcher.Close()
+					m.watcherMux.Lock()
 					delete(m.watchers, path)
+					m.watcherMux.Unlock()
 					return
 				}
 				m.Remove(ev.Name)
@@ -321,7 +360,9 @@ func (m *Manager) addWatchers(confsPath []string) (err error) {
 			log.Warnf("confPath Config %v can not find any real conf dir", dir)
 		}
 		for _, path := range paths {
+			m.watcherMux.RLock()
 			_, exist := m.watchers[path]
+			m.watcherMux.RUnlock()
 			if exist {
 				// 如果文件已经被监听，则不再重复监听
 				continue
@@ -344,7 +385,9 @@ func (m *Manager) addWatchers(confsPath []string) (err error) {
 				log.Errorf("fsnotify.NewWatcher: %v", err)
 				continue
 			}
+			m.watcherMux.Lock()
 			m.watchers[path] = watcher
+			m.watcherMux.Unlock()
 			go m.handle(path, watcher)
 			if err = watcher.Watch(path); err != nil {
 				log.Errorf("watch %v error %v", path, err)
@@ -361,6 +404,25 @@ func (m *Manager) Watch(confsPath []string) (err error) {
 	}
 	go m.detectMoreWatchers(confsPath)
 	go m.clean()
+	return
+}
+
+func (m *Manager) RestoreWebDir() {
+	files, err := ioutil.ReadDir(m.RestDir)
+	if err != nil {
+		log.Errorf("ioutil.ReadDir(%s): %v, err:%v", m.RestDir, files, err)
+		return
+	}
+	nums := 0
+	for _, f := range files {
+		if f.IsDir() {
+			log.Warn("skipped dir", f.Name)
+			continue
+		}
+		m.Add(filepath.Join(m.RestDir, f.Name()))
+		nums++
+	}
+	log.Infof("successfully restored %v runners in %v web rest dir", nums, m.RestDir)
 	return
 }
 

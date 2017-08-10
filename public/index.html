@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html>
+
+	<head>
+		<title>Logkit</title>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+		<script src="https://vuejs.org/js/vue.min.js"></script>
+		<!-- JQuery -->
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.2.4/jquery.min.js"></script>
+		<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+		<script src="./vue-json-tree-view.min.js"></script>
+
+		<script src="https://cdn.jsdelivr.net/vue.resource/1.3.1/vue-resource.min.js"></script>
+		<!-- 最新版本的 Bootstrap 核心 CSS 文件 -->
+		<link rel="stylesheet" href="https://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+		<!-- 最新的 Bootstrap 核心 JavaScript 文件 -->
+		<script src="https://cdn.bootcss.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+		<!--
+        	作者：future9988z@163.com
+        	时间：2017-08-08
+        	描述：加密算法，签名使用
+        -->
+		<!-- Latest compiled and minified CSS -->
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.12.4/css/bootstrap-select.min.css">
+
+		<!-- Latest compiled and minified JavaScript -->
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.12.4/js/bootstrap-select.min.js"></script>
+
+		<!-- (Optional) Latest compiled and minified JavaScript translation files -->
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.12.4/js/i18n/defaults-*.min.js"></script>
+		<!--
+        	作者：future9988z@163.com
+        	时间：2017-08-08
+        	描述：自定义样式
+        -->
+		<link rel="stylesheet" href="default.css" />
+	</head>
+
+	<body style="overflow-y: scroll">
+		<div class="container" id="main">
+			<div class="row">
+				<div class="form-group" style="">
+					<h2 style="padding-left: 15px;">logkit配置文件帮手</h2>
+				</div>
+			</div>
+			<div class="row">
+				<div class="form-group">
+					<ul class="nav nav-pills">
+						<li role="presentation" id="configlist" v-bind:class="[configlistactive]">
+							<a href="#" v-on:click="nav('list')">Runners列表</a>
+						</li>
+						<li role="presentation" id="readertab" v-bind:class="[readertabactive]">
+							<a href="#" v-on:click="nav('reader')">第一步：配置数据来源</a>
+						</li>
+						<li role="presentation" id="parsertab" v-bind:class="[parsertabactive]">
+							<a href="#" v-on:click="nav('parser')">第二步：配置解析方式</a>
+						</li>
+						<li role="presentation" id="sendertab" v-bind:class="[sendertabactive]">
+							<a href="#" v-on:click="nav('sender')">第三步：配置发送方式</a>
+						</li>
+						<li role="presentation" id="configtab" v-bind:class="[configtabactive]">
+							<a href="#" v-on:click="nav('config')">第四步：确认并添加Runner</a>
+						</li>
+						<li role="presentation" id="helptab" v-bind:class="[helptabactive]">
+							<a href="#" v-on:click="nav('help')">帮助文档</a>
+						</li>
+					</ul>
+				</div>
+			</div>
+
+			<!--
+            	作者：future9988z@163.com
+            	时间：2017-08-08
+            	描述：用户logkit配置列表
+            -->
+			<div id="list" v-bind:style="{display:listDisplay}" class="row">
+				<div class="panel panel-primary">
+					<div class="panel-heading">
+						<h2 class="panel-title">runners 列表（仅 web 页面添加的runner可以删除）</h2>
+					</div>
+					<div class="panel-body">
+						<div v-for="(runner, key) in runners">
+							<div class="row">
+								<div class="tree-tab">
+									<button class="btn btn-danger fa fa-trash" v-on:click="deleteTask(runner.name)" v-if="runner.web_folder===true">
+              					<span class="glyphicon glyphicon-trash"></span>
+							</button>
+								</div>
+								<div class="tree-content">
+									<tree-view :data="runner" :options="{maxDepth: 0, rootObjectKey: key}"></tree-view>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!--
+            	作者：future9988z@163.com
+            	时间：2017-08-08
+            	描述：第一步：reader配置
+            -->
+			<div id="reader" v-bind:style="{display:readerDisplay}" class="row">
+				<div class="container">
+					<div class="form-group row">
+						<label class="label-tab">选择数据类型:</label>
+						<div class="tree-content">
+							<select class="selectpicker" v-model="readerTypeSelected">
+								<option v-for="roption in readerTypeOptions" v-bind:value="roption.value">
+									{{ roption.text }}
+								</option>
+							</select>
+						</div>
+					</div>
+					<div class="form-group row">
+						<label class="label-tab">选择读取模式:</label>
+						<div class="dropdown">
+							<select class="selectpicker" v-model="modeSelected">
+								<option v-for="option in modeOptions" v-bind:value="option.value">
+									{{ option.text }}
+								</option>
+							</select>
+						</div>
+					</div>
+					<div class="form-group row">
+						<label class="label-tab">选择读取位置:</label>
+						<div class="dropdown">
+							<select class="selectpicker" v-model="readFromTypeSelected">
+								<option v-for="option in readFromTypeOptions" v-bind:value="option.value">
+									{{ option.text }}
+								</option>
+							</select>
+						</div>
+					</div>
+					<div class="form-group row">
+						<label class="label-tab">日志路径:</label>
+						<div class="tree-content">
+							<input type="text" class="form-control" v-model="log_path" style="width: 550px;">
+						</div>
+					</div>
+					<div class="form-group row">
+						<button class="btn btn-success" v-on:click="buildReaderConfig">生成reader配置文件</button>
+						<span style="color: darkorange;margin-left: 15px;"> ←点击此按钮!</span>
+					</div>
+					<div class="form-group row">
+						<div class="panel panel-primary">
+							<div class="panel-heading">
+								<h3 class="panel-title">Reader配置文件</h3>
+							</div>
+							<div class="panel-body">
+								<textarea v-model="readerConfig" rows="12" style="width: 100%;border: 1px solid #007FBB;border-radius: 4px;"></textarea>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!--
+            	作者：future9988z@163.com
+            	时间：2017-08-08
+            	描述：parse配置
+            -->
+			<div id="parser" v-bind:style="{display:parserDisplay}" class="row">
+				<div class="form-group row">
+					<label class="label-tab">选择日志类型:</label>
+					<div class="tree-content">
+						<select class="selectpicker" v-model="selected">
+							<option v-for="option in options" v-bind:value="option.value">
+								{{ option.text }}
+							</option>
+						</select>
+						<button class="btn btn-success" v-on:click="parse">解析样例</button>
+						<span style="color: darkorange;margin-left: 15px;"> ←点击此按钮!</span>
+					</div>
+				</div>
+				<div class="form-group row" v-bind:style="{display:grokDisplay}">
+					<label for="grokPatterns" class="label-tab">grok pattern:</label>
+					<div class="">
+						<textarea style="width: 100%;border: 1px solid #007FBB;border-radius: 4px;" v-model="grokPatterns" rows=6></textarea>
+					</div>
+				</div>
+				<div class="form-group row" v-bind:style="{display:grokDisplay}">
+					<label for="customPattern" class="label-tab">自定义pattern:</label>
+					<div class="">
+						<textarea style="width: 100%;border: 1px solid #007FBB;border-radius: 4px;" v-model="customPattern" rows=6></textarea>
+					</div>
+				</div>
+				<div class="form-group row">
+					<label for="sampleLog" class="label-tab">输入样例日志:</label>
+					<div class="">
+						<textarea v-model="sampleLog" rows=12 style="width: 100%;border: 1px solid #007FBB;border-radius: 4px;"></textarea>
+					</div>
+				</div>
+				<div class="panel panel-primary">
+					<div class="panel-heading">
+						<h3 class="panel-title">Parser配置文件</h3>
+					</div>
+					<div class="panel-body">
+						<textarea v-model="parserConfig" rows=12 style="width: 100%;border: 1px solid #007FBB;border-radius: 4px;"></textarea>
+					</div>
+				</div>
+				<div class="panel panel-primary">
+					<div class="panel-heading">
+						<h3 class="panel-title">样例数据点</h3>
+					</div>
+					<div class="panel-body">
+						<textarea v-bind:value="points" rows=30 disabled=True style="width: 100%;
+							border: 1px solid #007FBB;border-radius: 4px;"></textarea>
+					</div>
+				</div>
+			</div>
+
+			<!--
+            	作者：future9988z@163.com
+            	时间：2017-08-08
+            	描述：sender配置
+            -->
+			<div id="sender" v-bind:style="{display:senderDisplay}">
+				<div class="form-group row">
+					<label class="label-tab">选择发送地址:</label>
+					<div class="tree-content">
+						<select class="selectpicker" v-model="senderTypeSelected">
+							<option v-for="roption in senderTypeOptions" v-bind:value="roption.value">
+								{{ roption.text }}
+							</option>
+						</select>
+					</div>
+				</div>
+				<div class="form-group row">
+					<label class="label-tab">Pandora数据源名称:</label>
+					<div class="tree-content">
+						<input type="text" class="form-control" v-model="pandora_repo_name" style="width: 220px;">
+					</div>
+				</div>
+				<div class="form-group row">
+					<label class="label-tab">是否采用gzip压缩:</label>
+					<div class="tree-content">
+						<select class="selectpicker" v-model="pandora_gzip">
+							<option v-for="option in pandora_gzip_options" v-bind:value="option.value">
+								{{ option.text }}
+							</option>
+						</select>
+					</div>
+				</div>
+				<div class="form-group row">
+					<label class="label-tab">限制网络带宽(KB/s)</label>
+					<div class="tree-content">
+						<input type="text" class="form-control" v-model="flow_rate_limit" style="width: 220px;" placeholder="为空则表示无限制">
+					</div>
+				</div>
+				<div class="form-group row">
+					<label class="label-tab">账户AK</label>
+					<div class="tree-content">
+						<input type="text" class="form-control" v-model="pandora_ak" style="width: 550px;">
+					</div>
+				</div>
+				<div class="form-group row">
+					<label class="label-tab">账户SK</label>
+					<div class="tree-content">
+						<input type="text" class="form-control" v-model="pandora_sk" style="width: 550px;">
+					</div>
+				</div>
+				<div class="form-group row">
+					<button class="btn btn-success" v-on:click="buildSenderConfig">生成Sender配置文件</button>
+					<span style="color: darkorange;margin-left: 15px;"> ←点击此按钮!</span>
+				</div>
+				<div class="form-group">
+					<div class="panel panel-primary">
+						<div class="panel-heading">
+							<h3 class="panel-title">Sender配置文件</h3>
+						</div>
+						<div class="panel-body">
+							<textarea v-model="senderConfig" rows=20 style="width: 100%;border: 1px solid #007FBB;border-radius: 4px;"></textarea>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div id="config" v-bind:style="{display:configDisplay}">
+
+				<div class="form-group">
+					<div class="panel panel-primary">
+						<div class="panel-heading">
+							<h3 class="panel-title">logkit配置文件
+            <button  class="btn btn-warning" v-on:click="formatRunnerConfig" >格式化配置文件</button>
+            <button  class="btn btn-success" v-on:click="addRunner" >添加Runner</button>
+            <span style="color: darkorange;margin-left: 15px;font-weight: normal;font-size: 14px;"> ←点击此按钮!</span>
+          </h3>
+						</div>
+						<div class="panel-body">
+							<textarea v-model="runnerConfig" rows=20 style="width: 100%;border: 1px solid #007FBB;border-radius: 4px;"></textarea>
+						</div>
+					</div>
+				</div>
+
+			</div>
+			<!--
+            	作者：future9988z@163.com
+            	时间：2017-08-08
+            	描述：6
+            -->
+			<div id="help" v-bind:style="{display:helpDisplay}">
+				<div class="row" style="text-align: center;margin: auto;margin-top: 30px;">
+					<a href="https://github.com/qiniu/logkit/wiki" target="_blank">Logkit Wiki 文档站</a>
+				</div>
+				<div class="row" style="text-align: center;margin: auto;margin-top: 30px;">
+					<a href="http://pandora-docs.qiniu.com" target="_blank">Pandora 文档站</a>
+				</div>
+			</div>
+
+		</div>
+	</body>
+	<script type="text/javascript" src="./sha1.js"></script>
+	<!--
+        	作者：future9988z@163.com
+        	时间：2017-08-08
+        	描述：主要逻辑
+        -->
+	<script src="./app.js"></script>
+
+</html>

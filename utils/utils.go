@@ -175,7 +175,7 @@ func GetEnv(env string) string {
 	if strings.HasPrefix(env, "${") && strings.HasSuffix(env, "}") {
 		envName = strings.Trim(strings.Trim(strings.Trim(env, "$"), "{"), "}")
 	} else {
-		log.Debugf("cannot parse your ak sk as ${YOUR_ENV_NAME} format, use it as raw ak.sk instead", env)
+		log.Debug("cannot parse your ak sk as ${YOUR_ENV_NAME} format, use it as raw ak.sk instead")
 		return ""
 	}
 	if osEnv := os.Getenv(envName); osEnv != "" {
@@ -230,4 +230,12 @@ func CreateDirIfNotExist(dir string) (err error) {
 		}
 	}
 	return
+}
+
+type ErrorResponse struct {
+	Error error `json:"error"`
+}
+
+func NewErrorResponse(err error) *ErrorResponse {
+	return &ErrorResponse{Error: err}
 }

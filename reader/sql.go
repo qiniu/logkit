@@ -581,7 +581,11 @@ func convertLong(v interface{}) (int64, error) {
 			return int64(ret), nil
 		}
 		if ret, ok := idv.([]byte); ok {
-			return int64(binary.BigEndian.Uint64(ret)), nil
+			if len(ret) == 8 {
+				return int64(binary.BigEndian.Uint64(ret)), nil
+			} else {
+				return strconv.ParseInt(string(ret), 10, 64)
+			}
 		}
 		if idv == nil {
 			return 0, nil
