@@ -1,58 +1,26 @@
 Vue.use(TreeView)
 
+function timenow() {
+	var now = new Date(),
+		ampm = 'am',
+		mm = now.getMonth()
+	if(mm < 10) mm = '0' + mm
+	dd = now.getDate()
+	if(dd < 10) dd = '0' + dd
+	h = now.getHours(),
+		m = now.getMinutes(),
+		s = now.getSeconds();
+	if(m < 10) m = '0' + m;
+	if(s < 10) s = '0' + s;
+	return '' + now.getFullYear() + mm + dd + h + m + s;
+}
+
 var ve = new Vue({
 	el: '#main',
 	data: {
 		ak: "AccessKey",
 		sk: "SecretKey",
-		repo: "repo",
-		grokMulti: "",
-		grokMultiActive: "",
-		grokMultiPrimary: "",
-		activeMultiGrokHeadRegexp: "none",
-		sampleLog: `[05-May-2017 13:44:39]  [pool log] pid 4109
-script_filename = /data/html/log.ushengsheng.com/index.php
-[0x00007fec119d1720] curl_exec() /data/html/xyframework/base/XySoaClient.php:357
-[0x00007fec119d1590] request_post() /data/html/xyframework/base/XySoaClient.php:284
-[0x00007fff39d538b0] __call() unknown:0
-[0x00007fec119d13a8] add() /data/html/log.ushengsheng.com/1/interface/ErrorLogInterface.php:70
-[0x00007fec119d1298] log() /data/html/log.ushengsheng.com/1/interface/ErrorLogInterface.php:30
-[0x00007fec119d1160] android() /data/html/xyframework/core/x.php:215
-[0x00007fec119d0ff8] +++ dump failed
-[05-May-2017 13:45:39]  [pool log] pid 4108`,
-		points: "",
-		grokPatterns: "%{PHP_FPM_SLOW_LOG}",
-		headLinePattern: `^\\[\\d+-\\w+-\\d+\\s\\d+:\\d+:\\d+]\\s.*`,
-		customPattern: `
-PHPLOGTIMESTAMP (%{MONTHDAY}-%{MONTH}-%{YEAR}|%{YEAR}-%{MONTHNUM}-%{MONTHDAY}) %{HOUR}:%{MINUTE}:%{SECOND}
-PHPTZ (%{WORD}\\/%{WORD})
-PHPTIMESTAMP \\[%{PHPLOGTIMESTAMP:timestamp}(?:\\s+%{PHPTZ}|)\\]
-
-PHPFPMPOOL \\[pool %{WORD:pool}\\]
-PHPFPMCHILD child %{NUMBER:childid}
-
-FPMERRORLOG \\[%{PHPLOGTIMESTAMP:timestamp}\\] %{WORD:type}: %{GREEDYDATA:message}
-PHPERRORLOG %{PHPTIMESTAMP} %{WORD:type} %{GREEDYDATA:message}
-
-PHP_FPM_SLOW_LOG (?m)^\\[%{PHPLOGTIMESTAMP:timestamp}\\]\\s\\s\\[%{WORD:type}\\s%{WORD}\\]\\s%{GREEDYDATA:message}$`,
-
-		selected: 'raw',
-		grokDisplay: "none",
-		parserConfig: `"parser":{
-}`,
-		options: [{
-				text: '原始日志（raw log)',
-				value: 'raw'
-			},
-			{
-				text: 'json日志(json log)',
-				value: 'json'
-			},
-			{
-				text: 'grok日志（grok log)',
-				value: 'grok'
-			}
-		],
+		repo: "repo",		
 
 		//nav related params
 		readerDisplay: "none",
@@ -78,7 +46,22 @@ PHP_FPM_SLOW_LOG (?m)^\\[%{PHPLOGTIMESTAMP:timestamp}\\]\\s\\s\\[%{WORD:type}\\s
 		curReaderOptionStyle: {},
 		readerConfig: `"reader":{
   }`,
+  		
 
+		//parser related params
+		parserTypeSelected: 'json',
+		parserTypeOptions: [],
+		parserOptions: {},
+		curParserOption: {},
+		curParserDefaultOption: {},
+		curParserOptionStyle: {},
+		parserConfig: `"parser":{
+}`,
+		parserSampleLogs:{},
+		parserPoints: "",
+		curSampleLog:"",
+		parserPointsButtonTips:" ← 点此按钮可以调试您的配置!",
+		
 		//sender related params
 		senderTypeSelected: 'pandora',
 		senderTypeOptions: [{
@@ -117,17 +100,7 @@ PHP_FPM_SLOW_LOG (?m)^\\[%{PHPLOGTIMESTAMP:timestamp}\\]\\s\\s\\[%{WORD:type}\\s
 		runners: []
 	},
 	watch: {
-		selected: function(val) {
-			switch(val) {
-				case "raw", "json":
-					this.grokDisplay = "none"
-					this.activeMultiGrokHeadRegexp = "none"
-					break
-				case "grok":
-					this.grokDisplay = ""
-					break
-			}
-		}
+		
 	},
 	methods: {
 		getlists: function() {
@@ -141,7 +114,7 @@ PHP_FPM_SLOW_LOG (?m)^\\[%{PHPLOGTIMESTAMP:timestamp}\\]\\s\\s\\[%{WORD:type}\\s
 		},
 		deleteTask: function(name) {
 			var r = confirm("确认删除 runner: " + name + " 吗？")
-			if(r == true) {
+			if(r) {
 				axios.delete('/logkit/configs/' + name)
 					.catch(function(error) {
 						console.log(error);
@@ -154,78 +127,26 @@ PHP_FPM_SLOW_LOG (?m)^\\[%{PHPLOGTIMESTAMP:timestamp}\\]\\s\\s\\[%{WORD:type}\\s
 			var now = new Date()
 			var date = now.getUTCSeconds();
 			var log = "";
-
-			var data
-			switch(this.selected) {
-				case 'raw':
-					for(var i = 0; i < this.sampleLog.split("\n").length; i++) {
-						log = log + "\\n" + this.sampleLog.split("\n")[i]
+			var reqdata = this.buildParserConf()
+			reqdata['sampleLog']=this.curSampleLog
+			let that = this
+			axios.post("/logkit/parser/parse", reqdata)
+				.then(function(response) {
+					that.parserPoints = JSON.stringify(response.data, null, 2);
+					that.parserPointsButtonTips=" 解析成功！"
+				})
+				.catch(function(error) {
+					if(error.response) {
+						console.log(error.response);
+						that.parserPoints = error.response.data.message;
+					} else if(error.request) {
+						console.log(error.request);
+					} else {
+						console.log('Error', error.message);
 					}
-					data = '{"sampleLog":"' + log + '","logType":"' + this.selected + '"}'
-					break
-				case 'json':
-					data = '{"sampleLog":"' + btoa(unescape(encodeURIComponent(this.sampleLog))) + '","logType":"' + this.selected + '"}'
-					break
-				case 'grok':
-					for(var i = 0; i < this.sampleLog.split("\n").length; i++) {
-						log = log + "\\n" + this.sampleLog.split("\n")[i]
-					}
-					data = '{"sampleLog":"' + log + '","logType":"' + this.selected +
-						'", "grok_mode":"' + this.grokMulti + '","grok_patterns":"' + btoa(this.grokPatterns) +
-						'","grok_line_head_pattern":"' + btoa(this.headLinePattern) +
-						'","grok_custom_patterns":"' + btoa('\n' + this.customPattern) + '"}'
-					break
-			}
-			this.$http.post('/logkit/parse',
-				data, {
-					emulateJSON: true
-				}).then(response => {
-				// get body data
-				this.points = JSON.stringify(response.body, null, 2);
-				this.buildConf()
-			}, response => {
-				// error callback
-				this.points = response.body;
-			});
-
-		},
-		activeMultiGrok: function() {
-			if(this.grokMultiActive == "") {
-				this.grokMultiActive = "active"
-				this.grokMultiPrimary = "btn-primary"
-				this.activeMultiGrokHeadRegexp = ""
-				this.grokMulti = "multi"
-
-			} else {
-				this.grokMultiActive = ""
-				this.grokMultiPrimary = ""
-				this.activeMultiGrokHeadRegexp = "none"
-				this.grokMulti = ""
-			}
-
-		},
-		buildConf: function() {
-			var now = new Date()
-			var date = now.getMinutes() + now.getUTCSeconds();
-			conf = {
-				"name": this.selected + "-parser-" + date,
-				"type": this.selected,
-				"labels": ""
-			}
-			switch(this.selected) {
-				case "grok":
-					conf["grok_mode"] = this.grokMulti
-					conf["grok_patterns"] = this.grokPatterns
-					conf["grok_custom_patterns"] = this.customPattern.split(String.fromCharCode(92)).join(String.fromCharCode(92))
-					conf["grok_line_head_pattern"] = this.headLinePattern
-					
-					conf["timezone_offset"] = "+08"
-					break
-
-			}
-
-			this.parserConfig = '"parser":' + JSON.stringify(conf, null, 2).split(String.fromCharCode(92, 92)).join(String.fromCharCode(92))
-			return conf
+					console.log(error.config);
+					that.parserPointsButtonTips=" 解析失败！"
+				});
 		},
 		buildSenderConfig: function() {
 			var now = new Date()
@@ -251,11 +172,20 @@ PHP_FPM_SLOW_LOG (?m)^\\[%{PHPLOGTIMESTAMP:timestamp}\\]\\s\\s\\[%{WORD:type}\\s
 			var config = {
 				"mode": this.readerTypeSelected,
 			}
-			console.log(config)
-			for (var prop in this.curReaderDefaultOption) {
+			for(var prop in this.curReaderDefaultOption) {
 				config[prop] = this.curReaderDefaultOption[prop]
 			}
 			this.readerConfig = '"reader":' + JSON.stringify(config, null, 2)
+			return config
+		},
+		buildParserConf: function() {
+			var config = {
+				"type": this.parserTypeSelected,
+			}
+			for(var prop in this.curParserDefaultOption) {
+				config[prop] = this.curParserDefaultOption[prop]
+			}
+			this.parserConfig = '"parser":' + JSON.stringify(config, null, 2).split(String.fromCharCode(92, 92)).join(String.fromCharCode(92))
 			return config
 		},
 		resetNav: function() {
@@ -281,8 +211,6 @@ PHP_FPM_SLOW_LOG (?m)^\\[%{PHPLOGTIMESTAMP:timestamp}\\]\\s\\s\\[%{WORD:type}\\s
 				case "reader":
 					this.readerDisplay = ""
 					this.readertabactive = "active"
-					//this.readerSelectOption()
-					//this.readerTypeOptions=this.myNewoptions
 					break
 				case "parser":
 					this.parserDisplay = ""
@@ -323,17 +251,11 @@ PHP_FPM_SLOW_LOG (?m)^\\[%{PHPLOGTIMESTAMP:timestamp}\\]\\s\\s\\[%{WORD:type}\\s
 				})
 				.catch(function(error) {
 					if(error.response) {
-						// The request was made and the server responded with a status code
-						// that falls out of the range of 2xx
 						console.log(error.response);
 						alert("添加失败： " + error.response.data.message)
 					} else if(error.request) {
-						// The request was made but no response was received
-						// `error.request` is an instance of XMLHttpRequest in the browser and an instance of
-						// http.ClientRequest in node.js
 						console.log(error.request);
 					} else {
-						// Something happened in setting up the request that triggered an Error
 						console.log('Error', error.message);
 					}
 					console.log(error.config);
@@ -341,22 +263,23 @@ PHP_FPM_SLOW_LOG (?m)^\\[%{PHPLOGTIMESTAMP:timestamp}\\]\\s\\s\\[%{WORD:type}\\s
 		},
 		formatRunnerConfig: function() {
 			this.buildReaderConfig()
-			this.buildConf() //parser config
+			this.buildParserConf() //parser config
 			this.buildSenderConfig()
 			this.runnerConfig = '{\n"name":"' + this.runnerName + '",\n' + this.readerConfig + ",\n" + this.parserConfig + ",\n" + this.senderConfig + "\n}"
 			this.runnerConfig = JSON.stringify(JSON.parse(this.runnerConfig), null, 2)
 		},
-		getCurReaderOption: function(){
+
+		getCurReaderOption: function() {
 			this.curReaderDefaultOption = {}
 			this.curReaderOption = this.readerOptions[this.readerTypeSelected]
-			for (var prop in this.curReaderOption) {
+			for(var prop in this.curReaderOption) {
 				this.curReaderDefaultOption[prop] = this.curReaderOption[prop].Default
-				if  (this.curReaderOption[prop].ChooseOnly==true) {
+				if(this.curReaderOption[prop].ChooseOnly) {
 					this.curReaderDefaultOption[prop] = this.curReaderOption[prop].ChooseOptions[0]
 				}
-				if  (this.curReaderOption[prop].DefaultNoUse==true) {
+				if(this.curReaderOption[prop].DefaultNoUse) {
 					this.curReaderOptionStyle[prop] = "width: 350px; color:red;"
-				}else{
+				} else {
 					this.curReaderOptionStyle[prop] = "width: 350px;"
 				}
 			}
@@ -364,27 +287,77 @@ PHP_FPM_SLOW_LOG (?m)^\\[%{PHPLOGTIMESTAMP:timestamp}\\]\\s\\s\\[%{WORD:type}\\s
 		onReaderTypeChange: function() {
 			this.getCurReaderOption()
 		},
-		changeTextColor: function(value){
-			this.curReaderOptionStyle = Object.assign({}, this.curReaderOptionStyle, {[value]: "width: 350px;"})
+		changeReaderTextColor: function(value) {
+			this.curReaderOptionStyle = Object.assign({}, this.curReaderOptionStyle, {
+				[value]: "width: 350px;"
+			})
+		},
+
+		getCurParserOption: function() {
+			this.curParserDefaultOption = {}
+			this.curParserOption = this.parserOptions[this.parserTypeSelected]
+			for(var prop in this.curParserOption) {
+				this.curParserDefaultOption[prop] = this.curParserOption[prop].Default
+				if(this.curParserOption[prop].ChooseOnly) {
+					this.curParserDefaultOption[prop] = this.curParserOption[prop].ChooseOptions[0]
+				}
+				if(prop === "name") {
+					this.curParserDefaultOption[prop] = "parser." + timenow()
+				}
+				if(this.curParserOption[prop].DefaultNoUse) {
+					this.curParserOptionStyle[prop] = "width: 350px; color:red;"
+				} else {
+					this.curParserOptionStyle[prop] = "width: 350px;"
+				}
+			}
+		},
+		onParserTypeChange: function() {
+			this.getCurParserOption()
+			try{this.curSampleLog = this.parserSamplelogs[this.parserTypeSelected]}catch(err){}
+			this.parserPoints = ""
+			this.parserPointsButtonTips=" ← 点此按钮可以调试您的配置!"
+		},
+		changeParserTextColor: function(value) {
+			this.curParserOptionStyle = Object.assign({}, this.curParserOptionStyle, {
+				[value]: "width: 350px;"
+			})
 		}
 	},
-	computed: {
-
-	},
+	computed: {},
 
 	mounted() {
+		this.getlists()
 		let that = this
-		axios.get('/logkit/readerusages').then(function(response) {
+		//prepare reader options
+		axios.get('/logkit/reader/usages').then(function(response) {
 			that.readerTypeOptions = response.data;
 		}).catch(function(error) {
 			console.log(error);
 		});
-		axios.get('/logkit/readeroptions').then(function(response) {
+		axios.get('/logkit/reader/options').then(function(response) {
 			that.readerOptions = response.data;
 			that.getCurReaderOption()
 		}).catch(function(error) {
 			console.log(error);
-		});		
+		});
+
+		//prepare parser options
+		axios.get('/logkit/parser/usages').then(function(response) {
+			that.parserTypeOptions = response.data;
+		}).catch(function(error) {
+			console.log(error);
+		});
+		axios.get('/logkit/parser/samplelogs').then(function(response) {
+			that.parserSamplelogs = response.data;
+			that.curSampleLog = that.parserSamplelogs[that.parserTypeSelected]
+		}).catch(function(error) {
+			console.log(error);
+		});
+		axios.get('/logkit/parser/options').then(function(response) {
+			that.parserOptions = response.data;
+			that.getCurParserOption()
+		}).catch(function(error) {
+			console.log(error);
+		});
 	}
 })
-ve.getlists()

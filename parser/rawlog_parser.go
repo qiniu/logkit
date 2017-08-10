@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	KeyRaw       = "raw"       //qiniulog的日志前缀
-	KeyTimestamp = "timestamp" //qiniulog最大一条日志行数
+	KeyRaw       = "raw"
+	KeyTimestamp = "timestamp"
 )
 
 func NewRawlogParser(c conf.MapConf) (LogParser, error) {

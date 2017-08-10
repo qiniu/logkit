@@ -1,67 +1,174 @@
 package mgr
 
 import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"os"
 	"testing"
 
+	"bytes"
+
+	"github.com/labstack/echo"
+	conf2 "github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/sender"
+	"github.com/qiniu/logkit/utils"
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_ParseRaw(t *testing.T) {
-	ret, err := ParseRaw("this is a test line 1\nthis is a test line 2")
-	if err != nil {
-		return
-	}
-	if len(ret.SamplePoints) != 2 {
-		t.Error("test ParseRaw fail")
-	}
-}
-
-func Test_ParseJson(t *testing.T) {
-	ret, _ := ParseJson(`{"client":"android","version":"2.0.0","system_name":"Android","system_version":"6.0.1"}`)
-
-	if len(ret.SamplePoints[0]) != 4 {
-		t.Errorf("test parse json parser fail\ngot:%v\nexp:%v\n", len(ret.SamplePoints), 4)
-	}
-}
-
-func Test_ParseGrok(t *testing.T) {
-
-	mode := "multi"
-	pattern := "%{PHP_FPM_SLOW_LOG}"
-	custom_pattern := `
-            PHPLOGTIMESTAMP (%{MONTHDAY}-%{MONTH}-%{YEAR}|%{YEAR}-%{MONTHNUM}-%{MONTHDAY}) %{HOUR}:%{MINUTE}:%{SECOND}
-			PHPTZ (%{WORD}\/%{WORD})
-			PHPTIMESTAMP \[%{PHPLOGTIMESTAMP:timestamp}(?:\s+%{PHPTZ}|)\]
-			PHPFPMPOOL \[pool %{WORD:pool}\]
-			PHPFPMCHILD child %{NUMBER:childid}
-			FPMERRORLOG \[%{PHPLOGTIMESTAMP:timestamp}\] %{WORD:type}: %{GREEDYDATA:message}
-			PHPERRORLOG %{PHPTIMESTAMP} %{WORD:type} %{GREEDYDATA:message}
-
-			PHP_FPM_SLOW_LOG (?m)^\[%{PHPLOGTIMESTAMP:timestamp}\]\s\s\[%{WORD:type}\s%{WORD}\]\s%{GREEDYDATA:message}$
-		`
-	sampleLog := `[05-May-2017 13:44:39]  [pool log] pid 4109
-script_filename = /data/html/abc.com/index.php
-[0x00007fec119d1720] curl_exec() /data/html/xyframework/base/XySoaClient.php:357
-[0x00007fec119d1590] request_post() /data/html/xyframework/base/XySoaClient.php:284
-[0x00007fff39d538b0] __call() unknown:0
-[0x00007fec119d13a8] add() /data/html/abc.com/1/interface/ErrorLogInterface.php:70
-[0x00007fec119d1298] log() /data/html/abc.com/1/interface/ErrorLogInterface.php:30
-[0x00007fec119d1160] android() /data/html/xyframework/core/x.php:215
-[0x00007fec119d0ff8] +++ dump failed`
-
-	ret, err := ParseGrok(mode, pattern, custom_pattern, sampleLog)
+func TestParserParse(t *testing.T) {
+	pwd, err := os.Getwd()
 	if err != nil {
 		t.Error(err)
 	}
-	exp := PostParseRet{
-		SamplePoints: []sender.Data{
-			sender.Data{
-				"timestamp": "05-May-2017 13:44:39",
-				"type":      "pool",
-				"message":   "pid 4109 script_filename = /data/html/abc.com/index.php [0x00007fec119d1720] curl_exec() /data/html/xyframework/base/XySoaClient.php:357 [0x00007fec119d1590] request_post() /data/html/xyframework/base/XySoaClient.php:284 [0x00007fff39d538b0] __call() unknown:0 [0x00007fec119d13a8] add() /data/html/abc.com/1/interface/ErrorLogInterface.php:70 [0x00007fec119d1298] log() /data/html/abc.com/1/interface/ErrorLogInterface.php:30 [0x00007fec119d1160] android() /data/html/xyframework/core/x.php:215 [0x00007fec119d0ff8] +++ dump failed",
-			},
-		},
+	confdir := pwd + DEFAULT_LOGKIT_REST_DIR
+	defer os.RemoveAll(confdir)
+
+	var conf ManagerConfig
+	m, err := NewManager(conf)
+	if err != nil {
+		t.Fatal(err)
 	}
-	assert.Equal(t, exp, ret)
+	rs := NewRestService(m, echo.New())
+	defer func() {
+		rs.Stop()
+		os.Remove(StatsShell)
+	}()
+
+	// raw
+	rawConf := conf2.MapConf{}
+	rawConf[KeySampleLog] = parser.SampleLogs[parser.TypeRaw]
+	rawConf[parser.KeyParserType] = parser.TypeRaw
+	rawpst, err := json.Marshal(rawConf)
+	assert.NoError(t, err)
+	resp, err := http.Post("http://127.0.0.1"+rs.address+"/logkit/parser/parse", TESTContentApplictionJson, bytes.NewReader(rawpst))
+	assert.NoError(t, err)
+	content, _ := ioutil.ReadAll(resp.Body)
+	assert.Equal(t, 200, resp.StatusCode, string(content))
+	var got1 PostParseRet
+	err = json.Unmarshal(content, &got1)
+	assert.NoError(t, err, string(content))
+	assert.Equal(t, 4, len(got1.SamplePoints))
+
+	// json
+	var got2 PostParseRet
+	jsonConf := conf2.MapConf{}
+	jsonConf[KeySampleLog] = parser.SampleLogs[parser.TypeJson]
+	jsonConf[parser.KeyParserType] = parser.TypeJson
+	rawpst, err = json.Marshal(jsonConf)
+	assert.NoError(t, err)
+	resp, err = http.Post("http://127.0.0.1"+rs.address+"/logkit/parser/parse", TESTContentApplictionJson, bytes.NewReader(rawpst))
+	assert.NoError(t, err)
+	content, _ = ioutil.ReadAll(resp.Body)
+	assert.Equal(t, 200, resp.StatusCode, string(content))
+	err = json.Unmarshal(content, &got2)
+	if err != nil {
+		t.Error(err)
+	}
+	exp2 := sender.Data{
+		"a": "b",
+		"c": 1.0,
+		"d": 1.1,
+	}
+	assert.Equal(t, exp2, got2.SamplePoints[0])
+
+	// grok
+	grokConf := conf2.MapConf{}
+	var got3 PostParseRet
+	grokConf[KeySampleLog] = parser.SampleLogs[parser.TypeGrok]
+	grokConf[parser.KeyParserType] = parser.TypeGrok
+	grokConf[parser.KeyGrokPatterns] = "%{COMMON_LOG_FORMAT}"
+	rawpst, err = json.Marshal(grokConf)
+	assert.NoError(t, err)
+	resp, err = http.Post("http://127.0.0.1"+rs.address+"/logkit/parser/parse", TESTContentApplictionJson, bytes.NewReader(rawpst))
+	assert.NoError(t, err)
+	content, _ = ioutil.ReadAll(resp.Body)
+	assert.Equal(t, 200, resp.StatusCode, string(content))
+	err = json.Unmarshal(content, &got3)
+	if err != nil {
+		t.Error(err)
+	}
+
+	exp3 := sender.Data{
+		"ts":           "2000-10-10T13:55:36-07:00",
+		"verb":         "GET",
+		"http_version": 1.0,
+		"request":      "/apache_pb.gif",
+		"ident":        "user-identifier",
+		"resp_bytes":   2326.0,
+		"resp_code":    "200",
+		"auth":         "frank", "client_ip": "127.0.0.1"}
+
+	assert.Equal(t, exp3, got3.SamplePoints[0])
+}
+
+func TestParserAPI(t *testing.T) {
+	pwd, err := os.Getwd()
+	if err != nil {
+		t.Error(err)
+	}
+	confdir := pwd + DEFAULT_LOGKIT_REST_DIR
+	defer os.RemoveAll(confdir)
+
+	var conf ManagerConfig
+	m, err := NewManager(conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rs := NewRestService(m, echo.New())
+	defer func() {
+		rs.Stop()
+		os.Remove(StatsShell)
+	}()
+
+	var got1 []utils.KeyValue
+
+	resp, err := http.Get("http://127.0.0.1" + rs.address + "/logkit/parser/usages")
+	if err != nil {
+		t.Error(err)
+	}
+	content, _ := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		t.Error(string(content))
+	}
+	err = json.Unmarshal(content, &got1)
+	if err != nil {
+		fmt.Println(string(content))
+		t.Error(err)
+	}
+	assert.Equal(t, parser.ModeUsages, got1)
+
+	var got2 map[string]map[string]utils.Option
+	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/parser/options")
+	if err != nil {
+		t.Error(err)
+	}
+	content, _ = ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		t.Error(string(content))
+	}
+	err = json.Unmarshal(content, &got2)
+	if err != nil {
+		fmt.Println(string(content))
+		t.Error(err)
+	}
+	assert.Equal(t, parser.ModeKeyOptions, got2)
+
+	var got3 map[string]string
+	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/parser/samplelogs")
+	if err != nil {
+		t.Error(err)
+	}
+	content, _ = ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		t.Error(string(content))
+	}
+	err = json.Unmarshal(content, &got3)
+	if err != nil {
+		fmt.Println(string(content))
+		t.Error(err)
+	}
+	assert.Equal(t, parser.SampleLogs, got3)
 }

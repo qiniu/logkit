@@ -35,7 +35,7 @@ func TestReaderAPI(t *testing.T) {
 
 	var got1 []utils.KeyValue
 
-	resp, err := http.Get("http://127.0.0.1" + rs.address + "/logkit/readerusages")
+	resp, err := http.Get("http://127.0.0.1" + rs.address + "/logkit/reader/usages")
 	if err != nil {
 		t.Error(err)
 	}
@@ -51,7 +51,7 @@ func TestReaderAPI(t *testing.T) {
 	assert.Equal(t, reader.ModeUsages, got1)
 
 	var got2 map[string]map[string]utils.Option
-	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/readeroptions")
+	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/reader/options")
 	if err != nil {
 		t.Error(err)
 	}
@@ -65,4 +65,5 @@ func TestReaderAPI(t *testing.T) {
 		t.Error(err)
 	}
 	assert.Equal(t, reader.ModeKeyOptions, got2)
+
 }

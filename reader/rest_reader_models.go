@@ -8,15 +8,15 @@ import (
 
 // ModeUsages 用途说明
 var ModeUsages = []utils.KeyValue{
-	{ModeDir, "File Reader dir 读取模式"},
-	{ModeFile, "File Reader file 读取模式"},
-	{ModeTailx, "File Reader tailx 读取模式"},
-	{ModeMysql, "mysql 读取模式"},
-	{ModeMssql, "mssql 读取模式"},
-	{ModeElastic, "elastic 读取模式"},
-	{ModeMongo, "mongo 读取模式"},
-	{ModeKafka, "kafka 读取模式"},
-	{ModeRedis, "redis 读取模式"},
+	{ModeDir, "从文件读取( dir 模式)"},
+	{ModeFile, "从文件读取( file 模式)"},
+	{ModeTailx, "从文件读取( tailx 模式)"},
+	{ModeMysql, "从 MySQL 读取"},
+	{ModeMssql, "从 MSSQL 读取"},
+	{ModeElastic, "从 Elasticsearch 读取"},
+	{ModeMongo, "从 MongoDB 读取"},
+	{ModeKafka, "从 kafka 读取"},
+	{ModeRedis, "从 redis 读取"},
 }
 
 var ModeKeyOptions = map[string]map[string]utils.Option{
@@ -182,7 +182,7 @@ var ModeKeyOptions = map[string]map[string]utils.Option{
 			ChooseOnly:   false,
 			Default:      "24h",
 			DefaultNoUse: false,
-			Description:  "文件过期时间(单位：时h，分m，秒s)",
+			Description:  "文件过期时间(时h，分m，秒s)",
 		},
 		KeyMaxOpenFiles: utils.Option{
 			ChooseOnly:   false,
@@ -467,7 +467,7 @@ var ModeKeyOptions = map[string]map[string]utils.Option{
 			ChooseOnly:   false,
 			Default:      "5s",
 			DefaultNoUse: false,
-			Description:  "单次读取超时时间(单位：m(分)、s(秒))",
+			Description:  "单次读取超时时间(m(分)、s(秒))",
 		},
 	},
 }

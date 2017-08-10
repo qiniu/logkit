@@ -44,9 +44,12 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	router.GET(PREFIX+"/configs/:name", rs.GetConfig())
 	router.POST(PREFIX+"/configs/:name", rs.PostConfig())
 	router.DELETE(PREFIX+"/configs/:name", rs.DeleteConfig())
-	router.POST(PREFIX+"/parse", rs.PostParse())
-	router.GET(PREFIX+"/readerusages", rs.GetReaderUsages())
-	router.GET(PREFIX+"/readeroptions", rs.GetReaderKeyOptions())
+	router.GET(PREFIX+"/reader/usages", rs.GetReaderUsages())
+	router.GET(PREFIX+"/reader/options", rs.GetReaderKeyOptions())
+	router.GET(PREFIX+"/parser/usages", rs.GetParserUsages())
+	router.GET(PREFIX+"/parser/options", rs.GetParserKeyOptions())
+	router.POST(PREFIX+"/parser/parse", rs.PostParse())
+	router.GET(PREFIX+"/parser/samplelogs", rs.GetParserSampleLogs())
 
 	var (
 		port     = DEFAULT_PORT
