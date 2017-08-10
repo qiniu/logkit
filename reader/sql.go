@@ -503,6 +503,8 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 					} else if tmpOffsetIndex > maxOffset {
 						maxOffset = tmpOffsetIndex
 					}
+				} else {
+					mr.offsets[idx]++
 				}
 			}
 			if maxOffset > 0 {
