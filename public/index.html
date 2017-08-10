@@ -5,36 +5,20 @@
 		<title>Logkit</title>
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 
-		<script src="https://vuejs.org/js/vue.min.js"></script>
+		<script src="https://unpkg.com/vue/dist/vue.js"></script>
 		<!-- JQuery -->
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.2.4/jquery.min.js"></script>
 		<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
 		<script src="./vue-json-tree-view.min.js"></script>
 
-		<script src="https://cdn.jsdelivr.net/vue.resource/1.3.1/vue-resource.min.js"></script>
 		<!-- 最新版本的 Bootstrap 核心 CSS 文件 -->
 		<link rel="stylesheet" href="https://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
-		<!-- 最新的 Bootstrap 核心 JavaScript 文件 -->
-		<script src="https://cdn.bootcss.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
-		<!--
-        	作者：future9988z@163.com
-        	时间：2017-08-08
-        	描述：加密算法，签名使用
-        -->
-		<!-- Latest compiled and minified CSS -->
-		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.12.4/css/bootstrap-select.min.css">
-
-		<!-- Latest compiled and minified JavaScript -->
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.12.4/js/bootstrap-select.min.js"></script>
-
-		<!-- (Optional) Latest compiled and minified JavaScript translation files -->
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.12.4/js/i18n/defaults-*.min.js"></script>
-		<!--
-        	作者：future9988z@163.com
-        	时间：2017-08-08
-        	描述：自定义样式
-        -->
+		
 		<link rel="stylesheet" href="default.css" />
+		<style type="text/css">
+			select {	
+			}
+		</style>
 	</head>
 
 	<body style="overflow-y: scroll">
@@ -77,7 +61,8 @@
 			<div id="list" v-bind:style="{display:listDisplay}" class="row">
 				<div class="panel panel-primary">
 					<div class="panel-heading">
-						<h2 class="panel-title">runners 列表（仅 web 页面添加的runner可以删除）</h2>
+						<h2 class="panel-title">runners 列表 <label style="color: yellow;">（仅 web 页面添加的runner可以删除）</label></h2> 
+							
 					</div>
 					<div class="panel-body">
 						<div v-for="(runner, key) in runners">
@@ -96,74 +81,38 @@
 				</div>
 			</div>
 
-			<!--
-            	作者：future9988z@163.com
-            	时间：2017-08-08
-            	描述：第一步：reader配置
-            -->
 			<div id="reader" v-bind:style="{display:readerDisplay}" class="row">
 				<div class="container">
 					<div class="form-group row">
 						<label class="label-tab">选择数据类型:</label>
 						<div class="tree-content">
-							<select class="selectpicker" v-model="readerTypeSelected">
-								<option v-for="roption in readerTypeOptions" v-bind:value="roption.value">
-									{{ roption.text }}
+							<select class="form-control" v-model="readerTypeSelected" v-on:change="onReaderTypeChange" style="width: 200px;text-align: center;">		
+								<option v-for="roption in readerTypeOptions" v-bind:value="roption.key">
+									{{  roption.value }}
 								</option>
 							</select>
+							<label style="color:red;"> 注意：红色字体选框需根据实际情况修改，其他可作为默认值 </label>
 						</div>
 					</div>
-					<div class="form-group row">
-						<label class="label-tab">选择读取模式:</label>
+					<div class="form-group row" v-for="(roption,key) in curReaderOption">
+						<label class="label-tab">{{roption.Description}}</label>
 						<div class="dropdown">
-							<select class="selectpicker" v-model="modeSelected">
-								<option v-for="option in modeOptions" v-bind:value="option.value">
-									{{ option.text }}
+							<select class="form-control" v-model="curReaderDefaultOption[key]" v-if="roption.ChooseOnly==true"  style="width: 200px;text-align: center;">
+								<option v-for="option in roption.ChooseOptions" v-bind:value="option">
+									{{ option }}
 								</option>
 							</select>
 						</div>
-					</div>
-					<div class="form-group row">
-						<label class="label-tab">选择读取位置:</label>
-						<div class="dropdown">
-							<select class="selectpicker" v-model="readFromTypeSelected">
-								<option v-for="option in readFromTypeOptions" v-bind:value="option.value">
-									{{ option.text }}
-								</option>
-							</select>
-						</div>
-					</div>
-					<div class="form-group row">
-						<label class="label-tab">日志路径:</label>
 						<div class="tree-content">
-							<input type="text" class="form-control" v-model="log_path" style="width: 550px;">
-						</div>
-					</div>
-					<div class="form-group row">
-						<button class="btn btn-success" v-on:click="buildReaderConfig">生成reader配置文件</button>
-						<span style="color: darkorange;margin-left: 15px;"> ←点击此按钮!</span>
-					</div>
-					<div class="form-group row">
-						<div class="panel panel-primary">
-							<div class="panel-heading">
-								<h3 class="panel-title">Reader配置文件</h3>
-							</div>
-							<div class="panel-body">
-								<textarea v-model="readerConfig" rows="12" style="width: 100%;border: 1px solid #007FBB;border-radius: 4px;"></textarea>
-							</div>
+							<input type="text" class="form-control" v-model="curReaderDefaultOption[key]" v-bind:style="curReaderOptionStyle[key]" v-if="roption.ChooseOnly==false"  @change="changeTextColor(key)" v-bind:value="curReaderDefaultOption[key]" placeholder="空值可作为默认值">
 						</div>
 					</div>
 				</div>
 			</div>
 
-			<!--
-            	作者：future9988z@163.com
-            	时间：2017-08-08
-            	描述：parse配置
-            -->
 			<div id="parser" v-bind:style="{display:parserDisplay}" class="row">
 				<div class="form-group row">
-					<label class="label-tab">选择日志类型:</label>
+					<label class="label-tab">选择解析方式:</label>
 					<div class="tree-content">
 						<select class="selectpicker" v-model="selected">
 							<option v-for="option in options" v-bind:value="option.value">
@@ -190,14 +139,6 @@
 					<label for="sampleLog" class="label-tab">输入样例日志:</label>
 					<div class="">
 						<textarea v-model="sampleLog" rows=12 style="width: 100%;border: 1px solid #007FBB;border-radius: 4px;"></textarea>
-					</div>
-				</div>
-				<div class="panel panel-primary">
-					<div class="panel-heading">
-						<h3 class="panel-title">Parser配置文件</h3>
-					</div>
-					<div class="panel-body">
-						<textarea v-model="parserConfig" rows=12 style="width: 100%;border: 1px solid #007FBB;border-radius: 4px;"></textarea>
 					</div>
 				</div>
 				<div class="panel panel-primary">
@@ -261,20 +202,6 @@
 						<input type="text" class="form-control" v-model="pandora_sk" style="width: 550px;">
 					</div>
 				</div>
-				<div class="form-group row">
-					<button class="btn btn-success" v-on:click="buildSenderConfig">生成Sender配置文件</button>
-					<span style="color: darkorange;margin-left: 15px;"> ←点击此按钮!</span>
-				</div>
-				<div class="form-group">
-					<div class="panel panel-primary">
-						<div class="panel-heading">
-							<h3 class="panel-title">Sender配置文件</h3>
-						</div>
-						<div class="panel-body">
-							<textarea v-model="senderConfig" rows=20 style="width: 100%;border: 1px solid #007FBB;border-radius: 4px;"></textarea>
-						</div>
-					</div>
-				</div>
 			</div>
 
 			<div id="config" v-bind:style="{display:configDisplay}">
@@ -283,13 +210,13 @@
 					<div class="panel panel-primary">
 						<div class="panel-heading">
 							<h3 class="panel-title">logkit配置文件
-            <button  class="btn btn-warning" v-on:click="formatRunnerConfig" >格式化配置文件</button>
+            <button  class="btn btn-warning" v-on:click="formatRunnerConfig" >生成配置文件</button>
             <button  class="btn btn-success" v-on:click="addRunner" >添加Runner</button>
-            <span style="color: darkorange;margin-left: 15px;font-weight: normal;font-size: 14px;"> ←点击此按钮!</span>
+            <span style="color: darkorange;margin-left: 15px;font-weight: normal;font-size: 14px;"> ← 点击生成配置文件后，再点击添加Runner按钮!</span>
           </h3>
 						</div>
 						<div class="panel-body">
-							<textarea v-model="runnerConfig" rows=20 style="width: 100%;border: 1px solid #007FBB;border-radius: 4px;"></textarea>
+							<textarea v-model="runnerConfig" rows=30 style="width: 100%;border: 1px solid #007FBB;border-radius: 4px;"></textarea>
 						</div>
 					</div>
 				</div>

@@ -221,7 +221,7 @@ func (m *Manager) ForkRunner(confPath string, nconf RunnerConfig, errReturn bool
 				return err
 			}
 			if errReturn {
-				return err
+				return fmt.Errorf("NewRunner(%v) failed: os.PathError %v", nconf.RunnerName, err)
 			}
 			i++
 			log.Warnf("LogDir(%v) does not exsit after %d rounds, sleep 5 minute and try again...", errVal.Path, i)
