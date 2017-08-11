@@ -1,6 +1,7 @@
 package utils
 
 type Option struct {
+	KeyName       string
 	ChooseOnly    bool
 	ChooseOptions []string
 	Default       string

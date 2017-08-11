@@ -18,10 +18,6 @@ function timenow() {
 var ve = new Vue({
 	el: '#main',
 	data: {
-		ak: "AccessKey",
-		sk: "SecretKey",
-		repo: "repo",		
-
 		//nav related params
 		readerDisplay: "none",
 		parserDisplay: "none",
@@ -64,28 +60,11 @@ var ve = new Vue({
 		
 		//sender related params
 		senderTypeSelected: 'pandora',
-		senderTypeOptions: [{
-			text: '发送数据到Pandora(Pandora Sender)',
-			value: "pandora"
-		}],
-
-		pandora_gzip: "false",
-		pandora_gzip_options: [{
-				text: '不压缩(false)',
-				value: "false"
-			},
-			{
-				text: '压缩(true)',
-				value: "true"
-			},
-		],
-		pandora_ak: "",
-		pandora_sk: "",
-		pandora_repo_name: "",
-		pandora_host: "https://pipeline.qiniu.com",
-		pandora_region: "nb",
-		request_rate_limit: "",
-		flow_rate_limit: "",
+		senderTypeOptions: [],
+		senderOptions: {},
+		curSenderOption: {},
+		curSenderDefaultOption: {},
+		curSenderOptionStyle: {},
 		senderConfig: `"senders":[{
     }]`,
 
@@ -149,21 +128,12 @@ var ve = new Vue({
 				});
 		},
 		buildSenderConfig: function() {
-			var now = new Date()
-			var date = now.getMinutes() + now.getUTCSeconds();
-			config = {
-				"name": "pandora.sender." + date,
+			var config = {
+				"name": "pandora.sender." + timenow(),
 				"sender_type": this.senderTypeSelected,
-				"pandora_ak": this.pandora_ak,
-				"pandora_sk": this.pandora_sk,
-				"pandora_host": this.pandora_host,
-				"pandora_repo_name": this.pandora_repo_name,
-				"pandora_region": this.pandora_region,
-				"pandora_gzip": this.pandora_gzip,
-				"pandora_schema_free": "true"
 			}
-			if(this.flow_rate_limit != "") {
-				config["flow_rate_limit"] = this.flow_rate_limit
+			for(var prop in this.curSenderDefaultOption) {
+				config[prop] = this.curSenderDefaultOption[prop]
 			}
 			this.senderConfig = '"senders":[' + JSON.stringify(config, null, 2) + "]"
 			return config
@@ -223,9 +193,7 @@ var ve = new Vue({
 				case "config":
 					this.configDisplay = ""
 					this.configtabactive = "active"
-					var now = new Date()
-					var date = now.getMinutes() + now.getUTCSeconds();
-					this.runnerName = "logkit.runner." + date
+					this.runnerName = "logkit.runner." + timenow()
 					break
 				case "help":
 					this.helpDisplay = ""
@@ -302,7 +270,7 @@ var ve = new Vue({
 					this.curParserDefaultOption[prop] = this.curParserOption[prop].ChooseOptions[0]
 				}
 				if(prop === "name") {
-					this.curParserDefaultOption[prop] = "parser." + timenow()
+					this.curParserDefaultOption[prop] = "pandora.parser." + timenow()
 				}
 				if(this.curParserOption[prop].DefaultNoUse) {
 					this.curParserOptionStyle[prop] = "width: 350px; color:red;"
@@ -321,7 +289,32 @@ var ve = new Vue({
 			this.curParserOptionStyle = Object.assign({}, this.curParserOptionStyle, {
 				[value]: "width: 350px;"
 			})
-		}
+		},
+		
+		getCurSenderOption: function() {
+			this.curSenderDefaultOption = {}
+			this.curSenderOption = this.senderOptions[this.senderTypeSelected]
+			for(var prop in this.curSenderOption) {
+				var value = this.curSenderOption[prop]
+				this.curSenderDefaultOption[value.KeyName] = value.Default
+				if(this.curSenderOption[prop].ChooseOnly) {
+					this.curSenderDefaultOption[value.KeyName] = this.curSenderOption[prop].ChooseOptions[0]
+				}
+				if(this.curSenderOption[prop].DefaultNoUse) {
+					this.curSenderOptionStyle[value.KeyName] = "width: 350px; color:red;"
+				} else {
+					this.curSenderOptionStyle[value.KeyName] = "width: 350px;"
+				}
+			}
+		},
+		onSenderTypeChange: function() {
+			this.getCurSenderOption()
+		},
+		changeSenderTextColor: function(value) {
+			this.curSenderOptionStyle = Object.assign({}, this.curSenderOptionStyle, {
+				[this.curSenderOption[prop]]: "width: 350px;"
+			})
+		},	
 	},
 	computed: {},
 
@@ -337,6 +330,19 @@ var ve = new Vue({
 		axios.get('/logkit/reader/options').then(function(response) {
 			that.readerOptions = response.data;
 			that.getCurReaderOption()
+		}).catch(function(error) {
+			console.log(error);
+		});
+		
+		//prepare sender options
+		axios.get('/logkit/sender/usages').then(function(response) {
+			that.senderTypeOptions = response.data;
+		}).catch(function(error) {
+			console.log(error);
+		});
+		axios.get('/logkit/sender/options').then(function(response) {
+			that.senderOptions = response.data;
+			that.getCurSenderOption()
 		}).catch(function(error) {
 			console.log(error);
 		});

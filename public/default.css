@@ -11,6 +11,14 @@
 	line-height: 34px;
 	min-width: 200px;
 }
+
+.sender-label-tab{
+	float: left;
+	margin-right: 15px;
+	line-height: 34px;
+	min-width: 365px;
+}
+
 .tree-content{
 	float: left;
 	line-height: 30px;

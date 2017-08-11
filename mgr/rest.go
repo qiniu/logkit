@@ -50,6 +50,8 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	router.GET(PREFIX+"/parser/options", rs.GetParserKeyOptions())
 	router.POST(PREFIX+"/parser/parse", rs.PostParse())
 	router.GET(PREFIX+"/parser/samplelogs", rs.GetParserSampleLogs())
+	router.GET(PREFIX+"/sender/usages", rs.GetSenderUsages())
+	router.GET(PREFIX+"/sender/options", rs.GetSenderKeyOptions())
 
 	var (
 		port     = DEFAULT_PORT
