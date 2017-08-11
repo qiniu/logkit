@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Rest 测试 端口容易冲突导致混淆，62xx
 func TestParserParse(t *testing.T) {
 	pwd, err := os.Getwd()
 	if err != nil {
@@ -27,6 +28,7 @@ func TestParserParse(t *testing.T) {
 	defer os.RemoveAll(confdir)
 
 	var conf ManagerConfig
+	conf.BindHost = ":6240"
 	m, err := NewManager(conf)
 	if err != nil {
 		t.Fatal(err)
@@ -113,6 +115,7 @@ func TestParserAPI(t *testing.T) {
 	defer os.RemoveAll(confdir)
 
 	var conf ManagerConfig
+	conf.BindHost = ":6241"
 	m, err := NewManager(conf)
 	if err != nil {
 		t.Fatal(err)

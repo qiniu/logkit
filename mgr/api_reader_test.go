@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Rest 测试 端口容易冲突导致混淆，61xx
 func TestReaderAPI(t *testing.T) {
 	pwd, err := os.Getwd()
 	if err != nil {
@@ -23,6 +24,7 @@ func TestReaderAPI(t *testing.T) {
 	defer os.RemoveAll(confdir)
 
 	var conf ManagerConfig
+	conf.BindHost = ":6101"
 	m, err := NewManager(conf)
 	if err != nil {
 		t.Fatal(err)
