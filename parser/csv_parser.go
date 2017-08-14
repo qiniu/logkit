@@ -27,7 +27,7 @@ const (
 )
 
 const (
-	KeyCSVSchema   = "csv_schema"   // csv 每个列的列名和类型 long/string/float
+	KeyCSVSchema   = "csv_schema"   // csv 每个列的列名和类型 long/string/float/date
 	KeyCSVSplitter = "csv_splitter" // csv 的分隔符
 	KeyCSVLabels   = "csv_labels"   // csv 额外增加的标签信息，比如机器信息等
 )
@@ -144,6 +144,16 @@ func parseSchemaRawField(f string) (newField field, err error) {
 		return
 	}
 	columnName, dataType := parts[0], parts[1]
+	switch strings.ToLower(dataType) {
+	case "s", "string":
+		dataType = "string"
+	case "f", "float":
+		dataType = "float"
+	case "l", "long":
+		dataType = "long"
+	case "d", "date":
+		dataType = "date"
+	}
 	return newCsvField(columnName, CsvType(dataType))
 }
 func parseSchemaJsonField(f string) (fd field, err error) {
@@ -216,7 +226,7 @@ func parseSchemaFields(fieldList []string) (fields []field, err error) {
 }
 
 func dataTypeNotSupperted(dataType CsvType) error {
-	return errors.New("type not supported " + string(dataType))
+	return errors.New("type not supported " + string(dataType) + " csv parser currently support string long float date jsonmap 5 types")
 }
 
 func newLabel(name, dataValue string) Label {

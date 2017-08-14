@@ -212,7 +212,7 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 	// sender时会尝试不断获取pandora schema，若还是获取失败则返回发送错误。
 	s.UpdateSchemas()
 	if s.opt.enableLogdb && len(s.schemas) > 0 {
-		log.Printf("Runner[%v] Sender[%v]: auto create export to logdb (%v)", opt.runnerName, opt.name, opt.logdbReponame)
+		log.Infof("Runner[%v] Sender[%v]: auto create export to logdb (%v)", opt.runnerName, opt.name, opt.logdbReponame)
 		err = s.client.AutoExportToLogDB(&pipeline.AutoExportToLogDBInput{
 			RepoName:    s.opt.repoName,
 			LogRepoName: s.opt.logdbReponame,

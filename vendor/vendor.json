@@ -119,12 +119,6 @@
 			"revisionTime": "2015-10-03T19:46:02Z"
 		},
 		{
-			"checksumSHA1": "NVP3w8D0NxMVAI2w/qpA/rQjEgM=",
-			"path": "github.com/labstack/echo",
-			"revision": "2b6ea65ccde7286f0cdcb92dfddb2e9dc90878f9",
-			"revisionTime": "2017-08-03T14:52:47Z"
-		},
-		{
 			"checksumSHA1": "R6DzcBLEP0BONPpsyr+11N7xh5w=",
 			"path": "github.com/labstack/gommon/color",
 			"revision": "779b8a8b9850a97acba6a3fe20feb628c39e17c1",

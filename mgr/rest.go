@@ -15,7 +15,6 @@ import (
 
 	"github.com/labstack/echo"
 	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/utils"
 )
 
 var DEFAULT_PORT = 4000
@@ -45,7 +44,14 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	router.GET(PREFIX+"/configs/:name", rs.GetConfig())
 	router.POST(PREFIX+"/configs/:name", rs.PostConfig())
 	router.DELETE(PREFIX+"/configs/:name", rs.DeleteConfig())
-	router.POST(PREFIX+"/parse", rs.PostParse())
+	router.GET(PREFIX+"/reader/usages", rs.GetReaderUsages())
+	router.GET(PREFIX+"/reader/options", rs.GetReaderKeyOptions())
+	router.GET(PREFIX+"/parser/usages", rs.GetParserUsages())
+	router.GET(PREFIX+"/parser/options", rs.GetParserKeyOptions())
+	router.POST(PREFIX+"/parser/parse", rs.PostParse())
+	router.GET(PREFIX+"/parser/samplelogs", rs.GetParserSampleLogs())
+	router.GET(PREFIX+"/sender/usages", rs.GetSenderUsages())
+	router.GET(PREFIX+"/sender/options", rs.GetSenderKeyOptions())
 
 	var (
 		port     = DEFAULT_PORT
@@ -122,7 +128,6 @@ func (rs *RestService) GetConfigs() echo.HandlerFunc {
 				v.IsInWebFolder = true
 			}
 			rss[k] = v
-			fmt.Println(rs.mgr.RestDir, filepath.Dir(k))
 		}
 		return c.JSON(http.StatusOK, rss)
 	}
@@ -137,8 +142,7 @@ func (rs *RestService) GetConfig() echo.HandlerFunc {
 		defer rs.mgr.lock.RUnlock()
 		rss, ok := rs.mgr.runnerConfig[filename]
 		if name == "" || !ok {
-			err := fmt.Errorf("config name is empty or file %v not exist", filename)
-			return c.JSON(http.StatusBadRequest, utils.NewErrorResponse(err))
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("config name is empty or file %v not exist", filename))
 		}
 		return c.JSON(http.StatusOK, rss)
 	}
@@ -146,29 +150,28 @@ func (rs *RestService) GetConfig() echo.HandlerFunc {
 
 // post /logkit/configs/<name>
 func (rs *RestService) PostConfig() echo.HandlerFunc {
-	return func(c echo.Context) error {
+	return func(c echo.Context) (err error) {
 		name := c.Param("name")
 		if name == "" {
-			err := fmt.Errorf("config name is empty")
-			return c.JSON(http.StatusBadRequest, utils.NewErrorResponse(err))
+			return echo.NewHTTPError(http.StatusBadRequest, "config name is empty")
 		}
 
 		var nconf RunnerConfig
-		if err := c.Bind(&nconf); err != nil {
+		if err = c.Bind(&nconf); err != nil {
 			return err
 		}
 		filename := rs.mgr.RestDir + "/" + nconf.RunnerName + ".conf"
 		if rs.mgr.isRunning(filename) {
-			err := fmt.Errorf("file %v runner is running", filename)
-			return c.JSON(http.StatusBadRequest, utils.NewErrorResponse(err))
+			return echo.NewHTTPError(http.StatusBadRequest, "file "+filename+" runner is running")
 		}
 		nconf.IsInWebFolder = true
-		err := rs.mgr.ForkRunner(filename, nconf, true)
+		err = rs.mgr.ForkRunner(filename, nconf, true)
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, utils.NewErrorResponse(err))
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 		}
 		confBytes, err := json.Marshal(nconf)
-		return ioutil.WriteFile(filename, confBytes, 0644)
+		err = ioutil.WriteFile(filename, confBytes, 0644)
+		return
 	}
 }
 
@@ -177,8 +180,7 @@ func (rs *RestService) DeleteConfig() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		name := c.Param("name")
 		if name == "" {
-			err := fmt.Errorf("config name is empty")
-			return c.JSON(http.StatusBadRequest, utils.NewErrorResponse(err))
+			return echo.NewHTTPError(http.StatusBadRequest, "config name is empty")
 		}
 		filename := rs.mgr.RestDir + "/" + name + ".conf"
 		err := rs.mgr.Remove(filename)

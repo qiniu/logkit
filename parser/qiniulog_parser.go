@@ -24,8 +24,7 @@ const (
 
 // conf 字段
 const (
-	KeyQiniulogPrefix = "qiniulog_prefix"   //qiniulog的日志前缀
-	KeyLogMaxLine     = "qiniulog_max_line" //qiniulog最大一条日志行数
+	KeyQiniulogPrefix = "qiniulog_prefix" //qiniulog的日志前缀
 	KeyLogHeaders     = "qiniulog_log_headers"
 )
 
