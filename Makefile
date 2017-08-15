@@ -1,5 +1,5 @@
 all:
-	govendor sync; go get ./...; cd main;CGO_ENABLED=1 go build -v -o logkit
+	govendor sync; CGO_ENABLED=1 go build -v -o logkit
 
 install: all
 	@echo

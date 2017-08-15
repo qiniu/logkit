@@ -19,68 +19,91 @@ var ModeUsages = []utils.KeyValue{
 	{ModeRedis, "从 redis 读取"},
 }
 
-var ModeKeyOptions = map[string]map[string]utils.Option{
+var ModeKeyOptions = map[string][]utils.Option{
 	ModeDir: {
-		KeyLogPath: utils.Option{
+		{
+			KeyName:      KeyLogPath,
 			ChooseOnly:   false,
 			Default:      "/home/users/john/log/",
 			DefaultNoUse: true,
 			Description:  "日志文件夹路径",
 		},
-		KeyMetaPath: utils.Option{
+		{
+			KeyName:      KeyMetaPath,
 			ChooseOnly:   false,
-			Default:      "meta_path",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "断点续传元数据路径",
 		},
-		KeyFileDone: utils.Option{
+		{
+			KeyName:      KeyFileDone,
 			ChooseOnly:   false,
-			Default:      "meta_path",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "读取过的文件信息保存路径",
 		},
-		KeyBufSize: utils.Option{
+		{
+			KeyName:      KeyBufSize,
 			ChooseOnly:   false,
 			Default:      "4096",
 			DefaultNoUse: false,
 			Description:  "文件缓存数据大小",
 		},
-		KeyWhence: utils.Option{
+		{
+			KeyName:       KeyWhence,
 			ChooseOnly:    true,
 			ChooseOptions: []string{WhenceOldest, WhenceNewest},
 			Description:   "读取的起始位置",
 		},
-		KeyEncoding: utils.Option{
-			ChooseOnly:   false,
+		{
+			KeyName:    KeyEncoding,
+			ChooseOnly: true,
+			ChooseOptions: []string{"UTF-8", "UTF-16", "US-ASCII", "ISO-8859-1",
+				"GBK", "GB18030", "EUC-JP", "UTF-16BE", "UTF-16LE", "Big5", "Shift_JIS",
+				"ISO-8859-2", "ISO-8859-3", "ISO-8859-4", "ISO-8859-5", "ISO-8859-6", "ISO-8859-7",
+				"ISO-8859-8", "ISO-8859-9", "ISO-8859-10", "ISO-8859-11", "ISO-8859-12", "ISO-8859-13",
+				"ISO-8859-14", "ISO-8859-15", "ISO-8859-16", "macos-0_2-10.2", "macos-6_2-10.4",
+				"macos-7_3-10.2", "macos-29-10.2", "macos-35-10.2", "windows-1250", "windows-1251",
+				"windows-1252", "windows-1253", "windows-1254", "windows-1255", "windows-1256",
+				"windows-1257", "windows-1258", "windows-874", "IBM037", "ibm-273_P100-1995",
+				"ibm-277_P100-1995", "ibm-278_P100-1995", "ibm-280_P100-1995", "ibm-284_P100-1995",
+				"ibm-285_P100-1995", "ibm-290_P100-1995", "ibm-297_P100-1995", "ibm-420_X120-1999",
+				//此处省略大量IBM的字符集，太多，等用户需要再加
+				"KOI8-R", "KOI8-U", "ebcdic-xml-us"},
 			Default:      "UTF-8",
 			DefaultNoUse: false,
 			Description:  "编码方式",
 		},
-		KeyReadIOLimit: utils.Option{
+		{
+			KeyName:      KeyReadIOLimit,
 			ChooseOnly:   false,
 			Default:      "20",
 			DefaultNoUse: false,
 			Description:  "读取速度限制(MB/s)",
 		},
-		KeyHeadPattern: utils.Option{
+		{
+			KeyName:      KeyHeadPattern,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
 			Description:  "多行读取的起始行正则表达式",
 		},
-		KeyIgnoreHiddenFile: utils.Option{
+		{
+			KeyName:      KeyIgnoreHiddenFile,
 			ChooseOnly:   false,
 			Default:      "true",
 			DefaultNoUse: false,
 			Description:  "是否忽略隐藏文件",
 		},
-		KeyIgnoreFileSuffix: utils.Option{
+		{
+			KeyName:      KeyIgnoreFileSuffix,
 			ChooseOnly:   false,
 			Default:      strings.Join(defaultIgnoreFileSuffix, ","),
 			DefaultNoUse: false,
 			Description:  "根据后缀忽略文件",
 		},
-		KeyValidFilePattern: utils.Option{
+		{
+			KeyName:      KeyValidFilePattern,
 			ChooseOnly:   false,
 			Default:      "*",
 			DefaultNoUse: false,
@@ -88,42 +111,61 @@ var ModeKeyOptions = map[string]map[string]utils.Option{
 		},
 	},
 	ModeFile: {
-		KeyLogPath: utils.Option{
+		{
+			KeyName:      KeyLogPath,
 			ChooseOnly:   false,
 			Default:      "/home/users/john/log/my.log",
 			DefaultNoUse: true,
 			Description:  "日志文件路径",
 		},
-		KeyMetaPath: utils.Option{
+		{
+			KeyName:      KeyMetaPath,
 			ChooseOnly:   false,
-			Default:      "meta_path",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "断点续传元数据路径",
 		},
-		KeyBufSize: utils.Option{
+		{
+			KeyName:      KeyBufSize,
 			ChooseOnly:   false,
 			Default:      "4096",
 			DefaultNoUse: false,
 			Description:  "文件缓存数据大小",
 		},
-		KeyWhence: utils.Option{
+		{
+			KeyName:       KeyWhence,
 			ChooseOnly:    true,
 			ChooseOptions: []string{WhenceOldest, WhenceNewest},
 			Description:   "读取的起始位置",
 		},
-		KeyEncoding: utils.Option{
-			ChooseOnly:   false,
+		{
+			KeyName:    KeyEncoding,
+			ChooseOnly: true,
+			ChooseOptions: []string{"UTF-8", "UTF-16", "US-ASCII", "ISO-8859-1",
+				"GBK", "GB18030", "EUC-JP", "UTF-16BE", "UTF-16LE", "Big5", "Shift_JIS",
+				"ISO-8859-2", "ISO-8859-3", "ISO-8859-4", "ISO-8859-5", "ISO-8859-6", "ISO-8859-7",
+				"ISO-8859-8", "ISO-8859-9", "ISO-8859-10", "ISO-8859-11", "ISO-8859-12", "ISO-8859-13",
+				"ISO-8859-14", "ISO-8859-15", "ISO-8859-16", "macos-0_2-10.2", "macos-6_2-10.4",
+				"macos-7_3-10.2", "macos-29-10.2", "macos-35-10.2", "windows-1250", "windows-1251",
+				"windows-1252", "windows-1253", "windows-1254", "windows-1255", "windows-1256",
+				"windows-1257", "windows-1258", "windows-874", "IBM037", "ibm-273_P100-1995",
+				"ibm-277_P100-1995", "ibm-278_P100-1995", "ibm-280_P100-1995", "ibm-284_P100-1995",
+				"ibm-285_P100-1995", "ibm-290_P100-1995", "ibm-297_P100-1995", "ibm-420_X120-1999",
+				//省略大量IBM的字符集，太多，等用户需要再加
+				"KOI8-R", "KOI8-U", "ebcdic-xml-us"},
 			Default:      "UTF-8",
 			DefaultNoUse: false,
 			Description:  "编码方式",
 		},
-		KeyReadIOLimit: utils.Option{
+		{
+			KeyName:      KeyReadIOLimit,
 			ChooseOnly:   false,
 			Default:      "20",
 			DefaultNoUse: false,
 			Description:  "读取速度限制(MB/s)",
 		},
-		KeyHeadPattern: utils.Option{
+		{
+			KeyName:      KeyHeadPattern,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
@@ -131,66 +173,89 @@ var ModeKeyOptions = map[string]map[string]utils.Option{
 		},
 	},
 	ModeTailx: {
-		KeyLogPath: utils.Option{
+		{
+			KeyName:      KeyLogPath,
 			ChooseOnly:   false,
 			Default:      "/home/users/*/mylog/*.log",
 			DefaultNoUse: true,
 			Description:  "日志文件路径模式串",
 		},
-		KeyMetaPath: utils.Option{
+		{
+			KeyName:      KeyMetaPath,
 			ChooseOnly:   false,
-			Default:      "meta_path",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "断点续传元数据路径",
 		},
-		KeyBufSize: utils.Option{
+		{
+			KeyName:      KeyBufSize,
 			ChooseOnly:   false,
 			Default:      "4096",
 			DefaultNoUse: false,
 			Description:  "文件缓存数据大小",
 		},
-		KeyWhence: utils.Option{
+		{
+			KeyName:       KeyWhence,
 			ChooseOnly:    true,
 			ChooseOptions: []string{WhenceOldest, WhenceNewest},
 			Description:   "读取的起始位置",
 		},
-		KeyEncoding: utils.Option{
-			ChooseOnly:   false,
+		{
+			KeyName:    KeyEncoding,
+			ChooseOnly: true,
+			ChooseOptions: []string{"UTF-8", "UTF-16", "US-ASCII", "ISO-8859-1",
+				"GBK", "GB18030", "EUC-JP", "UTF-16BE", "UTF-16LE", "Big5", "Shift_JIS",
+				"ISO-8859-2", "ISO-8859-3", "ISO-8859-4", "ISO-8859-5", "ISO-8859-6", "ISO-8859-7",
+				"ISO-8859-8", "ISO-8859-9", "ISO-8859-10", "ISO-8859-11", "ISO-8859-12", "ISO-8859-13",
+				"ISO-8859-14", "ISO-8859-15", "ISO-8859-16", "macos-0_2-10.2", "macos-6_2-10.4",
+				"macos-7_3-10.2", "macos-29-10.2", "macos-35-10.2", "windows-1250", "windows-1251",
+				"windows-1252", "windows-1253", "windows-1254", "windows-1255", "windows-1256",
+				"windows-1257", "windows-1258", "windows-874", "IBM037", "ibm-273_P100-1995",
+				"ibm-277_P100-1995", "ibm-278_P100-1995", "ibm-280_P100-1995", "ibm-284_P100-1995",
+				"ibm-285_P100-1995", "ibm-290_P100-1995", "ibm-297_P100-1995", "ibm-420_X120-1999",
+				//省略大量IBM的字符集，太多，等用户需要再加
+				"KOI8-R", "KOI8-U", "ebcdic-xml-us"},
 			Default:      "UTF-8",
 			DefaultNoUse: false,
 			Description:  "编码方式",
 		},
-		KeyReadIOLimit: utils.Option{
+		{
+			KeyName:      KeyReadIOLimit,
 			ChooseOnly:   false,
 			Default:      "20",
 			DefaultNoUse: false,
 			Description:  "读取速度限制(MB/s)",
 		},
-		KeyDataSourceTag: utils.Option{
+		{
+			KeyName:      KeyDataSourceTag,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
 			Description:  "具体的数据文件路径来源标签",
 		},
-		KeyHeadPattern: utils.Option{
+		{
+			KeyName:      KeyHeadPattern,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
 			Description:  "多行读取的起始行正则表达式",
 		},
-		KeyExpire: utils.Option{
+		{
+			KeyName:      KeyExpire,
 			ChooseOnly:   false,
 			Default:      "24h",
 			DefaultNoUse: false,
 			Description:  "文件过期时间(时h，分m，秒s)",
 		},
-		KeyMaxOpenFiles: utils.Option{
+		{
+			KeyName:      KeyMaxOpenFiles,
 			ChooseOnly:   false,
 			Default:      "256",
 			DefaultNoUse: false,
 			Description:  "最大的打开文件数",
 		},
-		KeyStatInterval: utils.Option{
+		{
+			KeyName:      KeyStatInterval,
 			ChooseOnly:   false,
 			Default:      "3m",
 			DefaultNoUse: false,
@@ -198,55 +263,64 @@ var ModeKeyOptions = map[string]map[string]utils.Option{
 		},
 	},
 	ModeMysql: {
-		KeyMysqlDataSource: utils.Option{
+		{
+			KeyName:      KeyMysqlDataSource,
 			ChooseOnly:   false,
 			Default:      "<username>:<password>@tcp(<hostname>:<port>)",
 			DefaultNoUse: true,
 			Description:  "数据库地址",
 		},
-		KeyMysqlDataBase: utils.Option{
+		{
+			KeyName:      KeyMysqlDataBase,
 			ChooseOnly:   false,
 			Default:      "<database>",
 			DefaultNoUse: true,
 			Description:  "数据库名称",
 		},
-		KeyMysqlSQL: utils.Option{
+		{
+			KeyName:      KeyMysqlSQL,
 			ChooseOnly:   false,
 			Default:      "select * from <table>;",
 			DefaultNoUse: true,
 			Description:  "数据查询语句",
 		},
-		KeyMysqlOffsetKey: utils.Option{
+		{
+			KeyName:      KeyMysqlOffsetKey,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
 			Description:  "递增的列名称",
 		},
-		KeyMysqlReadBatch: utils.Option{
+		{
+			KeyName:      KeyMysqlReadBatch,
 			ChooseOnly:   false,
 			Default:      "100",
 			DefaultNoUse: false,
 			Description:  "分批查询的单批次大小",
 		},
-		KeyMetaPath: utils.Option{
+		{
+			KeyName:      KeyMetaPath,
 			ChooseOnly:   false,
-			Default:      "meta_path",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "断点续传元数据路径",
 		},
-		KeyMysqlCron: utils.Option{
+		{
+			KeyName:      KeyMysqlCron,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
 			Description:  "定时任务调度Cron",
 		},
-		KeyMysqlExecOnStart: utils.Option{
+		{
+			KeyName:      KeyMysqlExecOnStart,
 			ChooseOnly:   false,
 			Default:      "true",
 			DefaultNoUse: false,
 			Description:  "启动时立即执行",
 		},
-		KeySQLSchema: utils.Option{
+		{
+			KeyName:      KeySQLSchema,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
@@ -254,55 +328,64 @@ var ModeKeyOptions = map[string]map[string]utils.Option{
 		},
 	},
 	ModeMssql: {
-		KeyMssqlDataSource: utils.Option{
+		{
+			KeyName:      KeyMssqlDataSource,
 			ChooseOnly:   false,
-			Default:      "<username>:<password>@tcp(<hostname>:<port>)",
+			Default:      "server=<hostname or instance>;user id=<username>;password=<password>;port=<port>",
 			DefaultNoUse: true,
 			Description:  "数据库地址",
 		},
-		KeyMssqlDataBase: utils.Option{
+		{
+			KeyName:      KeyMssqlDataBase,
 			ChooseOnly:   false,
 			Default:      "<database>",
 			DefaultNoUse: true,
 			Description:  "数据库名称",
 		},
-		KeyMssqlSQL: utils.Option{
+		{
+			KeyName:      KeyMssqlSQL,
 			ChooseOnly:   false,
 			Default:      "select * from <table>;",
 			DefaultNoUse: true,
 			Description:  "数据查询语句",
 		},
-		KeyMssqlOffsetKey: utils.Option{
+		{
+			KeyName:      KeyMssqlOffsetKey,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: true,
 			Description:  "递增的列名称",
 		},
-		KeyMetaPath: utils.Option{
+		{
+			KeyName:      KeyMetaPath,
 			ChooseOnly:   false,
-			Default:      "meta_path",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "断点续传元数据路径",
 		},
-		KeyMssqlReadBatch: utils.Option{
+		{
+			KeyName:      KeyMssqlReadBatch,
 			ChooseOnly:   false,
 			Default:      "100",
 			DefaultNoUse: false,
 			Description:  "分批查询的单批次大小",
 		},
-		KeyMssqlCron: utils.Option{
+		{
+			KeyName:      KeyMssqlCron,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
 			Description:  "定时任务调度Crontab",
 		},
-		KeyMssqlExecOnStart: utils.Option{
+		{
+			KeyName:      KeyMssqlExecOnStart,
 			ChooseOnly:   false,
 			Default:      "true",
 			DefaultNoUse: false,
 			Description:  "启动时立即执行",
 		},
-		KeySQLSchema: utils.Option{
+		{
+			KeyName:      KeySQLSchema,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
@@ -310,42 +393,49 @@ var ModeKeyOptions = map[string]map[string]utils.Option{
 		},
 	},
 	ModeElastic: {
-		KeyESHost: utils.Option{
+		{
+			KeyName:      KeyESHost,
 			ChooseOnly:   false,
 			Default:      "http://localhost:9200",
-			DefaultNoUse: false,
+			DefaultNoUse: true,
 			Description:  "数据库地址",
 		},
-		KeyESVersion: utils.Option{
+		{
+			KeyName:       KeyESVersion,
 			ChooseOnly:    true,
 			ChooseOptions: []string{ElasticVersion2, ElasticVersion5},
 			Description:   "ES版本号",
 		},
-		KeyESIndex: utils.Option{
+		{
+			KeyName:      KeyESIndex,
 			ChooseOnly:   false,
 			Default:      "app-repo-123",
 			DefaultNoUse: true,
 			Description:  "ES索引名称",
 		},
-		KeyESType: utils.Option{
+		{
+			KeyName:      KeyESType,
 			ChooseOnly:   false,
 			Default:      "type_app",
 			DefaultNoUse: true,
 			Description:  "ES的app名称",
 		},
-		KeyMetaPath: utils.Option{
+		{
+			KeyName:      KeyMetaPath,
 			ChooseOnly:   false,
-			Default:      "meta_path",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "断点续传元数据路径",
 		},
-		KeyESReadBatch: utils.Option{
+		{
+			KeyName:      KeyESReadBatch,
 			ChooseOnly:   false,
 			Default:      "100",
 			DefaultNoUse: false,
 			Description:  "分批查询的单批次大小",
 		},
-		KeyESKeepAlive: utils.Option{
+		{
+			KeyName:      KeyESKeepAlive,
 			ChooseOnly:   false,
 			Default:      "1d",
 			DefaultNoUse: false,
@@ -353,55 +443,64 @@ var ModeKeyOptions = map[string]map[string]utils.Option{
 		},
 	},
 	ModeMongo: {
-		KeyMongoHost: utils.Option{
+		{
+			KeyName:      KeyMongoHost,
 			ChooseOnly:   false,
 			Default:      "mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]",
 			DefaultNoUse: true,
 			Description:  "数据库地址",
 		},
-		KeyMongoDatabase: utils.Option{
+		{
+			KeyName:      KeyMongoDatabase,
 			ChooseOnly:   false,
 			Default:      "app123",
 			DefaultNoUse: true,
 			Description:  "数据库名称",
 		},
-		KeyMongoCollection: utils.Option{
+		{
+			KeyName:      KeyMongoCollection,
 			ChooseOnly:   false,
 			Default:      "collection1",
 			DefaultNoUse: true,
 			Description:  "数据表名称",
 		},
-		KeyMongoOffsetKey: utils.Option{
+		{
+			KeyName:      KeyMongoOffsetKey,
 			ChooseOnly:   false,
 			Default:      "_id",
-			DefaultNoUse: false,
+			DefaultNoUse: true,
 			Description:  "递增的主键",
 		},
-		KeyMetaPath: utils.Option{
+		{
+			KeyName:      KeyMetaPath,
 			ChooseOnly:   false,
-			Default:      "meta_path",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "断点续传元数据路径",
 		},
-		KeyMongoReadBatch: utils.Option{
+		{
+			KeyName:      KeyMongoReadBatch,
 			ChooseOnly:   false,
 			Default:      "100",
 			DefaultNoUse: false,
 			Description:  "分批查询的单批次大小",
 		},
-		KeyMongoCron: utils.Option{
+		{
+			KeyName:      KeyMongoCron,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
 			Description:  "定时任务调度Cron",
 		},
-		KeyMongoExecOnstart: utils.Option{
+		{
+			KeyName:      KeyMongoExecOnstart,
 			ChooseOnly:   false,
 			Default:      "true",
 			DefaultNoUse: false,
 			Description:  "启动时立即执行",
 		},
-		KeyMongoFilters: utils.Option{
+		{
+			KeyName:      KeyMongoFilters,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
@@ -409,61 +508,71 @@ var ModeKeyOptions = map[string]map[string]utils.Option{
 		},
 	},
 	ModeKafka: {
-		KeyKafkaGroupID: utils.Option{
+		{
+			KeyName:      KeyKafkaGroupID,
 			ChooseOnly:   false,
 			Default:      "logkit1",
-			DefaultNoUse: false,
+			DefaultNoUse: true,
 			Description:  "Kafka的consumer组名称",
 		},
-		KeyKafkaTopic: utils.Option{
+		{
+			KeyName:      KeyKafkaTopic,
 			ChooseOnly:   false,
 			Default:      "test_topic1",
 			DefaultNoUse: true,
 			Description:  "Kafka的topic名称",
 		},
-		KeyKafkaZookeeper: utils.Option{
+		{
+			KeyName:      KeyKafkaZookeeper,
 			ChooseOnly:   false,
 			Default:      "localhost:2181",
 			DefaultNoUse: true,
 			Description:  "Zookeeper地址",
 		},
-		KeyWhence: utils.Option{
+		{
+			KeyName:       KeyWhence,
 			ChooseOnly:    true,
 			ChooseOptions: []string{WhenceOldest, WhenceNewest},
 			Description:   "读取的起始位置",
 		},
 	},
 	ModeRedis: {
-		KeyRedisDataType: utils.Option{
+		{
+			KeyName:       KeyRedisDataType,
 			ChooseOnly:    true,
 			ChooseOptions: []string{DataTypeList, DataTypeChannel, DataTypePatterChannel},
 			Description:   "Redis的数据读取模式",
 		},
-		KeyRedisDB: utils.Option{
+		{
+			KeyName:      KeyRedisDB,
 			ChooseOnly:   false,
 			Default:      "0",
 			DefaultNoUse: true,
 			Description:  "数据库名称",
 		},
-		KeyRedisKey: utils.Option{
+		{
+			KeyName:      KeyRedisKey,
 			ChooseOnly:   false,
 			Default:      "key1",
 			DefaultNoUse: true,
 			Description:  "redis键(key)",
 		},
-		KeyRedisAddress: utils.Option{
+		{
+			KeyName:      KeyRedisAddress,
 			ChooseOnly:   false,
 			Default:      "127.0.0.1:6379",
 			DefaultNoUse: false,
 			Description:  "数据库地址",
 		},
-		KeyRedisPassword: utils.Option{
+		{
+			KeyName:      KeyRedisPassword,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
 			Description:  "密码",
 		},
-		KeyTimeoutDuration: utils.Option{
+		{
+			KeyName:      KeyTimeoutDuration,
 			ChooseOnly:   false,
 			Default:      "5s",
 			DefaultNoUse: false,

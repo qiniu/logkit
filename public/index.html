@@ -5,14 +5,14 @@
 		<title>logkit配置文件助手</title>
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 
-		<script src="https://unpkg.com/vue@2.4.2/dist/vue.min.js"></script>
+		<script src="./vue.min.js"></script>
 		<!-- JQuery -->
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.2.4/jquery.min.js"></script>
-		<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+		<script src="./jquery.min.js"></script>
+		<script src="./axios.min.js"></script>
 		<script src="./vue-json-tree-view.min.js"></script>
 
 		<!-- 最新版本的 Bootstrap 核心 CSS 文件 -->
-		<link rel="stylesheet" href="https://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+		<link rel="stylesheet" href="bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
 		
 		<link rel="stylesheet" href="default.css" />
 		<style type="text/css">
@@ -89,17 +89,17 @@
 							<label style="color:red;"> 注意：红色字体选框需根据实际情况修改，其他可作为默认值 </label>
 						</div>
 					</div>
-					<div class="form-group row" v-for="(roption,key) in curReaderOption">
+					<div class="form-group row" v-for="roption in curReaderOption">
 						<label class="label-tab">{{roption.Description}}</label>
 						<div class="dropdown">
-							<select class="form-control" v-model="curReaderDefaultOption[key]" v-if="roption.ChooseOnly==true"  style="width: 200px;text-align: center;">
+							<select class="form-control" v-model="curReaderDefaultOption[roption.KeyName]" v-if="roption.ChooseOnly==true"  style="width: 200px;text-align: center;">
 								<option v-for="option in roption.ChooseOptions" v-bind:value="option">
 									{{ option }}
 								</option>
 							</select>
 						</div>
 						<div class="tree-content">
-							<input type="text" class="form-control" v-model="curReaderDefaultOption[key]" v-bind:style="curReaderOptionStyle[key]" v-if="roption.ChooseOnly==false"  @change="changeReaderTextColor(key)" v-bind:value="curReaderDefaultOption[key]" placeholder="空值可作为默认值">
+							<input type="text" class="form-control" v-model="curReaderDefaultOption[roption.KeyName]" v-bind:style="curReaderOptionStyle[roption.KeyName]" v-if="roption.ChooseOnly==false"  @change="changeReaderTextColor(roption.KeyName)" v-bind:value="curReaderDefaultOption[roption.KeyName]" placeholder="空值可作为默认值">
 						</div>
 					</div>
 				</div>
@@ -118,17 +118,17 @@
 							<label style="color:red;"> 注意：红色字体选框需根据实际情况修改，其他可作为默认值 </label>
 						</div>
 					</div>
-					<div class="form-group row" v-for="(roption,key) in curParserOption">
+					<div class="form-group row" v-for="roption in curParserOption">
 						<label class="label-tab">{{roption.Description}}</label>
 						<div class="dropdown">
-							<select class="form-control" v-model="curParserDefaultOption[key]" v-if="roption.ChooseOnly==true"  style="width: 200px;text-align: center;">
+							<select class="form-control" v-model="curParserDefaultOption[roption.KeyName]" v-if="roption.ChooseOnly==true"  style="width: 200px;text-align: center;">
 								<option v-for="option in roption.ChooseOptions" v-bind:value="option">
 									{{ option }}
 								</option>
 							</select>
 						</div>
 						<div class="tree-content">
-							<input type="text" class="form-control" v-model="curParserDefaultOption[key]" v-bind:style="curParserOptionStyle[key]" v-if="roption.ChooseOnly==false"  @change="changeParserTextColor(key)" v-bind:value="curParserDefaultOption[key]" placeholder="空值可作为默认值">
+							<input type="text" class="form-control" v-model="curParserDefaultOption[roption.KeyName]" v-bind:style="curParserOptionStyle[roption.KeyName]" v-if="roption.ChooseOnly==false"  @change="changeParserTextColor(roption.KeyName)" v-bind:value="curParserDefaultOption[roption.KeyName]" placeholder="空值可作为默认值">
 						</div>
 					</div>
 					<div class="tree-content">

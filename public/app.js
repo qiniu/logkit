@@ -42,7 +42,6 @@ var ve = new Vue({
 		curReaderOptionStyle: {},
 		readerConfig: `"reader":{
   }`,
-  		
 
 		//parser related params
 		parserTypeSelected: 'json',
@@ -53,11 +52,11 @@ var ve = new Vue({
 		curParserOptionStyle: {},
 		parserConfig: `"parser":{
 }`,
-		parserSampleLogs:{},
+		parserSampleLogs: {},
 		parserPoints: "",
-		curSampleLog:"",
-		parserPointsButtonTips:" ← 点此按钮可以调试您的配置!",
-		
+		curSampleLog: "",
+		parserPointsButtonTips: " ← 点此按钮可以调试您的配置!",
+
 		//sender related params
 		senderTypeSelected: 'pandora',
 		senderTypeOptions: [],
@@ -79,7 +78,7 @@ var ve = new Vue({
 		runners: []
 	},
 	watch: {
-		
+
 	},
 	methods: {
 		getlists: function() {
@@ -107,12 +106,12 @@ var ve = new Vue({
 			var date = now.getUTCSeconds();
 			var log = "";
 			var reqdata = this.buildParserConf()
-			reqdata['sampleLog']=this.curSampleLog
+			reqdata['sampleLog'] = this.curSampleLog
 			let that = this
 			axios.post("/logkit/parser/parse", reqdata)
 				.then(function(response) {
 					that.parserPoints = JSON.stringify(response.data, null, 2);
-					that.parserPointsButtonTips=" 解析成功！"
+					that.parserPointsButtonTips = " 解析成功！"
 				})
 				.catch(function(error) {
 					if(error.response) {
@@ -124,7 +123,7 @@ var ve = new Vue({
 						console.log('Error', error.message);
 					}
 					console.log(error.config);
-					that.parserPointsButtonTips=" 解析失败！"
+					that.parserPointsButtonTips = " 解析失败！"
 				});
 		},
 		buildSenderConfig: function() {
@@ -133,6 +132,9 @@ var ve = new Vue({
 				"sender_type": this.senderTypeSelected,
 			}
 			for(var prop in this.curSenderDefaultOption) {
+				if (this.curSenderDefaultOption[prop] === ""){
+					continue;
+				}
 				config[prop] = this.curSenderDefaultOption[prop]
 			}
 			this.senderConfig = '"senders":[' + JSON.stringify(config, null, 2) + "]"
@@ -143,6 +145,9 @@ var ve = new Vue({
 				"mode": this.readerTypeSelected,
 			}
 			for(var prop in this.curReaderDefaultOption) {
+				if (this.curReaderDefaultOption[prop]===""){
+					continue;
+				}
 				config[prop] = this.curReaderDefaultOption[prop]
 			}
 			this.readerConfig = '"reader":' + JSON.stringify(config, null, 2)
@@ -153,6 +158,9 @@ var ve = new Vue({
 				"type": this.parserTypeSelected,
 			}
 			for(var prop in this.curParserDefaultOption) {
+				if (this.curParserDefaultOption[prop] ===""){
+					continue;
+				}
 				config[prop] = this.curParserDefaultOption[prop]
 			}
 			this.parserConfig = '"parser":' + JSON.stringify(config, null, 2).split(String.fromCharCode(92, 92)).join(String.fromCharCode(92))
@@ -241,14 +249,15 @@ var ve = new Vue({
 			this.curReaderDefaultOption = {}
 			this.curReaderOption = this.readerOptions[this.readerTypeSelected]
 			for(var prop in this.curReaderOption) {
-				this.curReaderDefaultOption[prop] = this.curReaderOption[prop].Default
-				if(this.curReaderOption[prop].ChooseOnly) {
-					this.curReaderDefaultOption[prop] = this.curReaderOption[prop].ChooseOptions[0]
+				var value = this.curReaderOption[prop]
+				this.curReaderDefaultOption[value.KeyName] = value.Default
+				if(value.ChooseOnly) {
+					this.curReaderDefaultOption[value.KeyName] = value.ChooseOptions[0]
 				}
-				if(this.curReaderOption[prop].DefaultNoUse) {
-					this.curReaderOptionStyle[prop] = "width: 350px; color:red;"
+				if(value.DefaultNoUse) {
+					this.curReaderOptionStyle[value.KeyName] = "width: 350px; color:red;"
 				} else {
-					this.curReaderOptionStyle[prop] = "width: 350px;"
+					this.curReaderOptionStyle[value.KeyName] = "width: 350px;"
 				}
 			}
 		},
@@ -265,32 +274,35 @@ var ve = new Vue({
 			this.curParserDefaultOption = {}
 			this.curParserOption = this.parserOptions[this.parserTypeSelected]
 			for(var prop in this.curParserOption) {
-				this.curParserDefaultOption[prop] = this.curParserOption[prop].Default
-				if(this.curParserOption[prop].ChooseOnly) {
-					this.curParserDefaultOption[prop] = this.curParserOption[prop].ChooseOptions[0]
+				var value = this.curParserOption[prop]
+				this.curParserDefaultOption[value.KeyName] = value.Default
+				if(value.ChooseOnly) {
+					this.curParserDefaultOption[value.KeyName] = value.ChooseOptions[0]
 				}
-				if(prop === "name") {
-					this.curParserDefaultOption[prop] = "pandora.parser." + timenow()
+				if(value.KeyName === "name") {
+					this.curParserDefaultOption[value.KeyName] = "pandora.parser." + timenow()
 				}
-				if(this.curParserOption[prop].DefaultNoUse) {
-					this.curParserOptionStyle[prop] = "width: 350px; color:red;"
+				if(value.DefaultNoUse) {
+					this.curParserOptionStyle[value.KeyName] = "width: 350px; color:red;"
 				} else {
-					this.curParserOptionStyle[prop] = "width: 350px;"
+					this.curParserOptionStyle[value.KeyName] = "width: 350px;"
 				}
 			}
 		},
 		onParserTypeChange: function() {
 			this.getCurParserOption()
-			try{this.curSampleLog = this.parserSamplelogs[this.parserTypeSelected]}catch(err){}
+			try {
+				this.curSampleLog = this.parserSamplelogs[this.parserTypeSelected]
+			} catch(err) {}
 			this.parserPoints = ""
-			this.parserPointsButtonTips=" ← 点此按钮可以调试您的配置!"
+			this.parserPointsButtonTips = " ← 点此按钮可以调试您的配置!"
 		},
 		changeParserTextColor: function(value) {
 			this.curParserOptionStyle = Object.assign({}, this.curParserOptionStyle, {
 				[value]: "width: 350px;"
 			})
 		},
-		
+
 		getCurSenderOption: function() {
 			this.curSenderDefaultOption = {}
 			this.curSenderOption = this.senderOptions[this.senderTypeSelected]
@@ -314,7 +326,7 @@ var ve = new Vue({
 			this.curSenderOptionStyle = Object.assign({}, this.curSenderOptionStyle, {
 				[this.curSenderOption[prop]]: "width: 350px;"
 			})
-		},	
+		},
 	},
 	computed: {},
 
@@ -333,7 +345,7 @@ var ve = new Vue({
 		}).catch(function(error) {
 			console.log(error);
 		});
-		
+
 		//prepare sender options
 		axios.get('/logkit/sender/usages').then(function(response) {
 			that.senderTypeOptions = response.data;
