@@ -226,9 +226,11 @@ func getRegexp(conf, name string) (r *regexp.Regexp, err error) {
 	if err != nil {
 		return
 	}
-	re := regexp.MustCompile(`\\\$([a-z_]+)(\\?(.))`).ReplaceAllString(
+	re, err := regexp.Compile(`\\\$([a-z_]+)(\\?(.))`)
+	if err != nil {
+		return
+	}
+	restr := re.ReplaceAllString(
 		regexp.QuoteMeta(format+" "), "(?P<$1>[^$3]*)$2")
-	final := fmt.Sprintf("^%v$", strings.Trim(re, " "))
-	fmt.Println(final)
-	return regexp.MustCompile(fmt.Sprintf("^%v$", strings.Trim(re, " "))), nil
+	return regexp.Compile(fmt.Sprintf("^%v$", strings.Trim(restr, " ")))
 }

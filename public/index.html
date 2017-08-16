@@ -12,7 +12,7 @@
 		<script src="./vue-json-tree-view.min.js"></script>
 
 		<!-- 最新版本的 Bootstrap 核心 CSS 文件 -->
-		<link rel="stylesheet" href="bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+		<link rel="stylesheet" href="https://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
 		
 		<link rel="stylesheet" href="default.css" />
 		<style type="text/css">
@@ -128,7 +128,11 @@
 							</select>
 						</div>
 						<div class="tree-content">
-							<input type="text" class="form-control" v-model="curParserDefaultOption[roption.KeyName]" v-bind:style="curParserOptionStyle[roption.KeyName]" v-if="roption.ChooseOnly==false"  @change="changeParserTextColor(roption.KeyName)" v-bind:value="curParserDefaultOption[roption.KeyName]" placeholder="空值可作为默认值">
+							<input type="text" class="form-control" v-model="curParserDefaultOption[roption.KeyName]" v-bind:style="curParserOptionStyle[roption.KeyName]" v-if="roption.ChooseOnly==false && roption.KeyName!='grok_custom_patterns'"  @change="changeParserTextColor(roption.KeyName)" v-bind:value="curParserDefaultOption[roption.KeyName]" placeholder="空值可作为默认值">
+						</div>
+						<div class="tree-content">
+							<textarea class="form-control" v-model="curParserDefaultOption[roption.KeyName]" v-bind:style="curParserOptionStyle[roption.KeyName]" v-if="roption.KeyName=='grok_custom_patterns'"  @change="changeParserTextColor(roption.KeyName)" v-bind:value="curParserDefaultOption[roption.KeyName]" placeholder="空值可作为默认值">
+							</textarea>
 						</div>
 					</div>
 					<div class="tree-content">
