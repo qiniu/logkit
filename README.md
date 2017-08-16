@@ -92,15 +92,15 @@ logkit.conf是logkit工具基础配置文件，主要用于指定logkit运行时
 
 * 根据页面配置数据源、配置解析方式、配置发送方式
 
-https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logkitconfig1.png
+![配置数据源](https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logkitconfig1.png)
 
 * 在配置解析方式的页面您还可以根据配置尝试解析您的样例数据
 
-https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logkitconfig2.png
+![尝试解析](https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logkitconfig2.png)
 
 * 最后在确认并添加页面点击生成配置文件，再点击添加Runner即可生效
 
-https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logkitconfig2.png
+![添加runner](https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logkitconfig3.png）
 
 
 ## 从源码安装与启动

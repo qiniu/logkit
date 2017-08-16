@@ -161,7 +161,12 @@ var ve = new Vue({
 				if (this.curParserDefaultOption[prop] ===""){
 					continue;
 				}
-				config[prop] = this.curParserDefaultOption[prop]
+				if (prop==="grok_custom_patterns"){
+					config[prop] = btoa(this.curParserDefaultOption[prop])
+				}else{
+					config[prop] = this.curParserDefaultOption[prop]
+				}
+				console.log(prop,config[prop])
 			}
 			this.parserConfig = '"parser":' + JSON.stringify(config, null, 2).split(String.fromCharCode(92, 92)).join(String.fromCharCode(92))
 			return config
