@@ -122,8 +122,8 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 		return
 	}
 	err = nil
-	metapath, err := conf.GetString(KeyMetaPath)
-	if err != nil {
+	metapath, _ := conf.GetStringOr(KeyMetaPath, "")
+	if metapath == "" {
 		runnerName, _ := conf.GetString(utils.GlobalKeyName)
 		base := filepath.Base(logPath)
 		metapath = "meta/" + runnerName + "_" + hash(base)

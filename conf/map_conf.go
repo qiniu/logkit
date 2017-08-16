@@ -25,11 +25,11 @@ type AliasKey struct {
 }
 
 func ErrConfMissingKey(key, dataType string) error {
-	return fmt.Errorf("MissingKey: The reader conf must contains %s, dataType must be %s", key, dataType)
+	return fmt.Errorf("MissingKey: The configs must contains %s, dataType must be %s", key, dataType)
 }
 
 func ErrConfKeyType(key, dataType string) error {
-	return fmt.Errorf("TypeError: The reader conf must contains %s, dataType must be %s", key, dataType)
+	return fmt.Errorf("TypeError: The configs must contains %s, dataType must be %s", key, dataType)
 }
 
 func ErrMissConfigAliasMap(detailKeys string) error {
@@ -39,7 +39,7 @@ func ErrMissConfigAliasMap(detailKeys string) error {
 func (conf MapConf) Get(key string) (interface{}, error) {
 	value, exist := conf[key]
 	if !exist {
-		return nil, fmt.Errorf("The reader conf must contains %s", key)
+		return nil, fmt.Errorf("The configs must contains %s", key)
 	}
 	return value, nil
 }

@@ -24,7 +24,6 @@ import (
 type Config struct {
 	MaxProcs         int      `json:"max_procs"`
 	DebugLevel       int      `json:"debug_level"`
-	BindHost         string   `json:"bind_host"`
 	ProfileHost      string   `json:"profile_host"`
 	ConfsPath        []string `json:"confs_path"`
 	CleanSelfLog     bool     `json:"clean_self_log"`
@@ -39,7 +38,7 @@ type Config struct {
 var conf Config
 
 const (
-	Version           = "v1.2.2"
+	Version           = "v1.2.3"
 	defaultReserveCnt = 5
 	defaultLogDir     = "./run"
 	defaultLogPattern = "*.log-*"

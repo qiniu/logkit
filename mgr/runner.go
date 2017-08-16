@@ -253,7 +253,10 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []sender.Data, times in
 			se, succ := err.(*reqerr.SendError)
 			if succ {
 				datas = sender.ConvertDatas(se.GetFailDatas())
-				//无限重试的
+				//无限重试的，除非遇到关闭
+				if atomic.LoadInt32(&r.stopped) > 0 {
+					return false
+				}
 				continue
 			}
 			if times <= 0 || cnt < times {
@@ -277,7 +280,9 @@ func (r *LogExportRunner) Run() {
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
 			log.Debugf("Runner[%v] exited from run", r.Name())
-			r.exitChan <- struct{}{}
+			if atomic.LoadInt32(&r.stopped) < 2 {
+				r.exitChan <- struct{}{}
+			}
 			return
 		}
 		// read data
@@ -367,7 +372,7 @@ func (r *LogExportRunner) Run() {
 		if success {
 			r.reader.SyncMeta()
 		}
-		log.Debugf("Runner[%v] reader %s finish to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
+		log.Debugf("Runner[%v] send %s finish to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
 	}
 }
 
@@ -381,6 +386,7 @@ func (r *LogExportRunner) Stop() {
 		log.Warnf("runner " + r.Name() + " has been stopped ")
 	case <-timer.C:
 		log.Warnf("runner " + r.Name() + " exited timeout ")
+		atomic.AddInt32(&r.stopped, 1)
 	}
 	log.Warnf("Runner[%v] wait for reader %v stopped", r.Name(), r.reader.Name())
 	// 清理所有使用到的资源

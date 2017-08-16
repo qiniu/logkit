@@ -68,6 +68,11 @@ func Test_RestGetStatus(t *testing.T) {
 		log.Fatalf("Test_Run error mkdir %v %v", dir, err)
 	}
 	defer os.RemoveAll(dir)
+	pwd, err := os.Getwd()
+	if err != nil {
+		t.Error(err)
+	}
+	confdir := pwd + "/" + dir
 	logpath := dir + "/logdir"
 	metapath := dir + "/meta_mock_csv"
 	logconfs := dir + "/confs"
@@ -92,12 +97,14 @@ func Test_RestGetStatus(t *testing.T) {
 	if err := ioutil.WriteFile(filepath.Join(logpath, "log2"), []byte(log2), 0666); err != nil {
 		log.Fatalf("write log2 fail %v", err)
 	}
-	err := ioutil.WriteFile(logconfs+"/test1.conf", []byte(testRestConf), 0666)
+	err = ioutil.WriteFile(logconfs+"/test1.conf", []byte(testRestConf), 0666)
 	if err != nil {
 		t.Error(err)
 	}
 	time.Sleep(3 * time.Second)
 	var conf ManagerConfig
+	conf.RestDir = confdir
+	conf.BindHost = ":6346"
 	m, err := NewManager(conf)
 	if err != nil {
 		t.Fatal(err)
@@ -224,10 +231,12 @@ func Test_RestCRUD(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	confdir := pwd + DEFAULT_LOGKIT_REST_DIR
+	confdir := pwd + "/Test_RestCRUD"
 	defer os.RemoveAll(confdir)
 
 	var conf ManagerConfig
+	conf.RestDir = confdir
+	conf.BindHost = ":6345"
 	m, err := NewManager(conf)
 	if err != nil {
 		t.Fatal(err)
@@ -237,6 +246,7 @@ func Test_RestCRUD(t *testing.T) {
 		rs.Stop()
 		os.Remove(StatsShell)
 	}()
+	assert.Equal(t, rs.address, conf.BindHost)
 
 	// 开始POST 第一个
 	var expconf1, got1 RunnerConfig
