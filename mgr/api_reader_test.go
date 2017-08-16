@@ -52,7 +52,7 @@ func TestReaderAPI(t *testing.T) {
 	}
 	assert.Equal(t, reader.ModeUsages, got1)
 
-	var got2 map[string]map[string]utils.Option
+	var got2 map[string][]utils.Option
 	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/reader/options")
 	if err != nil {
 		t.Error(err)

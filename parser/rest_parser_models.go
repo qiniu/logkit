@@ -14,39 +14,45 @@ var ModeUsages = []utils.KeyValue{
 	{TypeEmpty, "empty 通过解析清空数据"},
 }
 
-var ModeKeyOptions = map[string]map[string]utils.Option{
+var ModeKeyOptions = map[string][]utils.Option{
 	TypeNginx: {
-		KeyParserName: utils.Option{
-			ChooseOnly:   false,
-			Default:      "parser",
-			DefaultNoUse: false,
-			Description:  "parser名称",
-		},
-		NginxSchema: utils.Option{
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "指定nginx字段类型",
-		},
-		NginxConfPath: utils.Option{
+		{
+			KeyName:      NginxConfPath,
 			ChooseOnly:   false,
 			Default:      "/opt/nginx/conf/nginx.conf",
 			DefaultNoUse: true,
 			Description:  "nginx配置路径",
 		},
-		NginxLogFormat: utils.Option{
+		{
+			KeyName:      NginxLogFormat,
 			ChooseOnly:   false,
 			Default:      "main",
 			DefaultNoUse: true,
 			Description:  "nginx日志格式名称",
 		},
-		NginxFormatRegex: utils.Option{
+		{
+			KeyName:      KeyParserName,
+			ChooseOnly:   false,
+			Default:      "parser",
+			DefaultNoUse: false,
+			Description:  "parser名称",
+		},
+		{
+			KeyName:      NginxSchema,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "指定nginx字段类型",
+		},
+		{
+			KeyName:      NginxFormatRegex,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
 			Description:  "直接通过正则表达式解析",
 		},
-		KeyLabels: utils.Option{
+		{
+			KeyName:      KeyLabels,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
@@ -54,38 +60,44 @@ var ModeKeyOptions = map[string]map[string]utils.Option{
 		},
 	},
 	TypeGrok: {
-		KeyParserName: utils.Option{
+		{
+			KeyName:      KeyGrokPatterns,
+			ChooseOnly:   false,
+			Default:      "%{COMMON_LOG_FORMAT}",
+			DefaultNoUse: true,
+			Description:  "匹配日志的grok表达式",
+		},
+		{
+			KeyName:      KeyParserName,
 			ChooseOnly:   false,
 			Default:      "parser",
 			DefaultNoUse: false,
 			Description:  "parser名称",
 		},
-		KeyGrokMode: utils.Option{
+		{
+			KeyName:       KeyGrokMode,
 			ChooseOnly:    true,
 			ChooseOptions: []string{"oneline", ModeMulti},
 			Default:       "oneline",
 			DefaultNoUse:  false,
 			Description:   "grok单行多行模式",
 		},
-		KeyGrokPatterns: utils.Option{
-			ChooseOnly:   false,
-			Default:      "%{COMMON_LOG_FORMAT}",
-			DefaultNoUse: true,
-			Description:  "匹配日志的grok表达式",
-		},
-		KeyGrokCustomPatternFiles: utils.Option{
+		{
+			KeyName:      KeyGrokCustomPatternFiles,
 			ChooseOnly:   false,
 			Default:      "",
-			DefaultNoUse: true,
+			DefaultNoUse: false,
 			Description:  "自定义 grok pattern 文件路径",
 		},
-		KeyGrokCustomPatterns: utils.Option{
+		{
+			KeyName:      KeyGrokCustomPatterns,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
 			Description:  "自定义 grok pattern 串",
 		},
-		KeyTimeZoneOffset: utils.Option{
+		{
+			KeyName:    KeyTimeZoneOffset,
 			ChooseOnly: true,
 			Default:    "0",
 			ChooseOptions: []string{"0", "-1", "-2", "-3", "-4",
@@ -94,7 +106,8 @@ var ModeKeyOptions = map[string]map[string]utils.Option{
 			DefaultNoUse: false,
 			Description:  "时区偏移量",
 		},
-		KeyLabels: utils.Option{
+		{
+			KeyName:      KeyLabels,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
@@ -102,13 +115,15 @@ var ModeKeyOptions = map[string]map[string]utils.Option{
 		},
 	},
 	TypeJson: {
-		KeyParserName: utils.Option{
+		{
+			KeyName:      KeyParserName,
 			ChooseOnly:   false,
 			Default:      "parser",
 			DefaultNoUse: false,
 			Description:  "parser名称",
 		},
-		KeyLabels: utils.Option{
+		{
+			KeyName:      KeyLabels,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
@@ -116,39 +131,55 @@ var ModeKeyOptions = map[string]map[string]utils.Option{
 		},
 	},
 	TypeCSV: {
-		KeyParserName: utils.Option{
-			ChooseOnly:   false,
-			Default:      "parser",
-			DefaultNoUse: false,
-			Description:  "parser名称",
-		},
-		KeyCSVSchema: utils.Option{
+		{
+			KeyName:      KeyCSVSchema,
 			ChooseOnly:   false,
 			Default:      "abc string,xyz long,data1 string,data2 float",
 			DefaultNoUse: true,
 			Description:  "csv格式的字段类型",
 		},
-		KeyCSVSplitter: utils.Option{
-			ChooseOnly:   false,
-			Default:      ",",
-			DefaultNoUse: false,
-			Description:  "csv分隔符",
-		},
-		KeyLabels: utils.Option{
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "额外的标签信息",
-		},
-	},
-	TypeRaw: {
-		KeyParserName: utils.Option{
+		{
+			KeyName:      KeyParserName,
 			ChooseOnly:   false,
 			Default:      "parser",
 			DefaultNoUse: false,
 			Description:  "parser名称",
 		},
-		KeyLabels: utils.Option{
+		{
+			KeyName:      KeyCSVSplitter,
+			ChooseOnly:   false,
+			Default:      ",",
+			DefaultNoUse: false,
+			Description:  "csv分隔符",
+		},
+		{
+			KeyName:      KeyLabels,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "额外的标签信息",
+		},
+		{
+			KeyName:    KeyTimeZoneOffset,
+			ChooseOnly: true,
+			Default:    "0",
+			ChooseOptions: []string{"0", "-1", "-2", "-3", "-4",
+				"-5", "-6", "-7", "-8", "-9", "-10", "-11", "-12",
+				"1", "2", "3", "4", "5", "6", "7", "8", "9", "11", "12"},
+			DefaultNoUse: false,
+			Description:  "时区偏移量",
+		},
+	},
+	TypeRaw: {
+		{
+			KeyName:      KeyParserName,
+			ChooseOnly:   false,
+			Default:      "parser",
+			DefaultNoUse: false,
+			Description:  "parser名称",
+		},
+		{
+			KeyName:      KeyLabels,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
@@ -156,25 +187,29 @@ var ModeKeyOptions = map[string]map[string]utils.Option{
 		},
 	},
 	TypeLogv1: {
-		KeyParserName: utils.Option{
+		{
+			KeyName:      KeyParserName,
 			ChooseOnly:   false,
 			Default:      "parser",
 			DefaultNoUse: false,
 			Description:  "parser名称",
 		},
-		KeyLabels: utils.Option{
+		{
+			KeyName:      KeyLabels,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
 			Description:  "额外的标签信息",
 		},
-		KeyQiniulogPrefix: utils.Option{
+		{
+			KeyName:      KeyQiniulogPrefix,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
 			Description:  "日志前缀",
 		},
-		KeyLogHeaders: utils.Option{
+		{
+			KeyName:      KeyLogHeaders,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
@@ -182,13 +217,15 @@ var ModeKeyOptions = map[string]map[string]utils.Option{
 		},
 	},
 	TypeKafkaRest: {
-		KeyParserName: utils.Option{
+		{
+			KeyName:      KeyParserName,
 			ChooseOnly:   false,
 			Default:      "parser",
 			DefaultNoUse: false,
 			Description:  "parser名称",
 		},
-		KeyLabels: utils.Option{
+		{
+			KeyName:      KeyLabels,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
