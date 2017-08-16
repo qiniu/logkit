@@ -100,7 +100,7 @@ logkit.conf是logkit工具基础配置文件，主要用于指定logkit运行时
 
 * 最后在确认并添加页面点击生成配置文件，再点击添加Runner即可生效
 
-![添加runner](https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logkitconfig3.png）
+![添加runner](https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logkitconfig3.png)
 
 
 ## 从源码安装与启动
