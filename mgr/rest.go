@@ -1,6 +1,8 @@
 package mgr
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -11,10 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"encoding/json"
-
 	"github.com/labstack/echo"
 	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/parser"
 )
 
 var DEFAULT_PORT = 4000
@@ -148,6 +150,21 @@ func (rs *RestService) GetConfig() echo.HandlerFunc {
 	}
 }
 
+func convertWebParserConfig(conf conf.MapConf) conf.MapConf {
+	if conf == nil {
+		return conf
+	}
+	rawCustomPatterns, _ := conf.GetStringOr(parser.KeyGrokCustomPatterns, "")
+	if rawCustomPatterns != "" {
+		CustomPatterns, err := base64.StdEncoding.DecodeString(rawCustomPatterns)
+		if err != nil {
+			return conf
+		}
+		conf[parser.KeyGrokCustomPatterns] = string(CustomPatterns)
+	}
+	return conf
+}
+
 // post /logkit/configs/<name>
 func (rs *RestService) PostConfig() echo.HandlerFunc {
 	return func(c echo.Context) (err error) {
@@ -164,6 +181,7 @@ func (rs *RestService) PostConfig() echo.HandlerFunc {
 		if rs.mgr.isRunning(filename) {
 			return echo.NewHTTPError(http.StatusBadRequest, "file "+filename+" runner is running")
 		}
+		nconf.ParserConf = convertWebParserConfig(nconf.ParserConf)
 		nconf.IsInWebFolder = true
 		err = rs.mgr.ForkRunner(filename, nconf, true)
 		if err != nil {

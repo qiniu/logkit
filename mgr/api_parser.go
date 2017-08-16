@@ -30,6 +30,7 @@ func (rs *RestService) PostParse() echo.HandlerFunc {
 		if err := c.Bind(&reqConf); err != nil {
 			return err
 		}
+		reqConf = convertWebParserConfig(reqConf)
 		nparser, err := parser.NewParserRegistry().NewLogParser(reqConf)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
