@@ -124,7 +124,7 @@ func Test_Run(t *testing.T) {
 	}
 	senders = append(senders, s)
 
-	r, err := NewLogExportRunnerWithService(rinfo, reader, cleaner, pparser, senders, meta)
+	r, err := NewLogExportRunnerWithService(rinfo, reader, cleaner, pparser, nil, senders, meta)
 	if err != nil {
 		t.Error(err)
 	}
@@ -324,7 +324,7 @@ func Test_QiniulogRun(t *testing.T) {
 	}
 	senders = append(senders, s)
 
-	r, err := NewLogExportRunnerWithService(rinfo, reader, nil, pparser, senders, meta)
+	r, err := NewLogExportRunnerWithService(rinfo, reader, nil, pparser, nil, senders, meta)
 	if err != nil {
 		t.Error(err)
 	}

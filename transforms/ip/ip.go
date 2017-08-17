@@ -8,7 +8,7 @@ import (
 	"github.com/wangtuanjie/ip17mon"
 )
 
-//更全的数据可以下载： http://op26gaeek.bkt.clouddn.com/17monipdb.dat
+//更全的免费数据可以在ipip.net下载
 type IpTransformer struct {
 	Key      string `json:"key"`
 	DataPath string `json:"data_path"`
