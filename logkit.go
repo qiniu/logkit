@@ -106,6 +106,8 @@ func loopCleanLogkitLog(dir, pattern string, reserveCnt int, exitchan chan struc
 	}
 }
 
+//！！！注意： 自动生成 grok pattern代码，下述注释请勿删除！！！
+//go:generate go run generators/grok_pattern_generater.go
 func main() {
 	config.Init("f", "qbox", "qboxlogexporter.conf")
 	if err := config.Load(&conf); err != nil {
@@ -127,7 +129,7 @@ func main() {
 	}
 	paths := getValidPath(conf.ConfsPath)
 	if len(paths) <= 0 {
-		log.Fatalf("Cannot read or create any ConfsPath %v", conf.ConfsPath)
+		log.Warnf("Cannot read or create any ConfsPath %v", conf.ConfsPath)
 	}
 	if err = m.Watch(paths); err != nil {
 		log.Fatalf("watch path error %v", err)
