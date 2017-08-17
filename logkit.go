@@ -11,6 +11,7 @@ import (
 	_ "github.com/qiniu/logkit/metric/all"
 	"github.com/qiniu/logkit/mgr"
 	"github.com/qiniu/logkit/times"
+	_ "github.com/qiniu/logkit/transforms/all"
 	"github.com/qiniu/logkit/utils"
 
 	"net/http"

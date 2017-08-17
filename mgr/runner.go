@@ -215,6 +215,19 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, p
 	if err != nil {
 		return nil, err
 	}
+	transformers := createTransformers(rc)
+	senders := make([]sender.Sender, 0)
+	for _, c := range rc.SenderConfig {
+		s, err := sr.NewSender(c)
+		if err != nil {
+			return nil, err
+		}
+		senders = append(senders, s)
+	}
+	return NewLogExportRunnerWithService(runnerInfo, rd, cl, parser, transformers, senders, meta)
+}
+
+func createTransformers(rc RunnerConfig) []transforms.Transformer {
 	transformers := make([]transforms.Transformer, 0)
 	for idx := range rc.Transforms {
 		tConf := rc.Transforms[idx]
@@ -247,15 +260,7 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, p
 		}
 		transformers = append(transformers, trans)
 	}
-	senders := make([]sender.Sender, 0)
-	for _, c := range rc.SenderConfig {
-		s, err := sr.NewSender(c)
-		if err != nil {
-			return nil, err
-		}
-		senders = append(senders, s)
-	}
-	return NewLogExportRunnerWithService(runnerInfo, rd, cl, parser, transformers, senders, meta)
+	return transformers
 }
 
 // trySend 尝试发送数据，如果此时runner退出返回false，其他情况无论是达到最大重试次数还是发送成功，都返回true
