@@ -3,6 +3,8 @@ package sender
 import (
 	"encoding/json"
 
+	"sync"
+
 	"github.com/qiniu/logkit/conf"
 )
 
@@ -12,6 +14,7 @@ type MockSender struct {
 	name  string
 	datas []Data
 	count int
+	mux   sync.Mutex
 }
 
 // NewMockSender 测试用sender
@@ -20,6 +23,7 @@ func NewMockSender(c conf.MapConf) (Sender, error) {
 	ms := &MockSender{
 		name:  name,
 		count: 0,
+		mux:   sync.Mutex{},
 	}
 	return ms, nil
 }
@@ -34,6 +38,8 @@ func (mock *MockSender) Name() string {
 }
 
 func (mock *MockSender) Send(d []Data) error {
+	mock.mux.Lock()
+	defer mock.mux.Unlock()
 	mock.datas = append(mock.datas, d...)
 	mock.count++
 	return nil
@@ -43,5 +49,7 @@ func (mock *MockSender) Close() error {
 	return nil
 }
 func (mock *MockSender) SendCount() int {
+	mock.mux.Lock()
+	defer mock.mux.Unlock()
 	return mock.count
 }

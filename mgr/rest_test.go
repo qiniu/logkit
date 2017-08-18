@@ -163,6 +163,7 @@ func Test_RestGetStatus(t *testing.T) {
 
 func Test_RestCRUD(t *testing.T) {
 	dir := "Test_RestCRUD"
+	os.RemoveAll(dir)
 	if err := os.Mkdir(dir, 0755); err != nil {
 		log.Fatalf("Test_Run error mkdir %v %v", dir, err)
 	}
@@ -249,6 +250,7 @@ func Test_RestCRUD(t *testing.T) {
 	assert.Equal(t, rs.address, conf.BindHost)
 
 	// 开始POST 第一个
+	t.Log("开始POST 第一个")
 	var expconf1, got1 RunnerConfig
 	err = json.Unmarshal([]byte(testRestCRUD1), &expconf1)
 	if err != nil {
@@ -271,6 +273,7 @@ func Test_RestCRUD(t *testing.T) {
 		t.Error(string(content))
 	}
 	// GET 第一个
+	t.Log("开始GET 第一个")
 	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/configs/" + "testRestCRUD1")
 	if err != nil {
 		t.Error(err)
@@ -285,6 +288,7 @@ func Test_RestCRUD(t *testing.T) {
 		t.Error(err)
 	}
 	// POST的和GET做验证
+	t.Log("POST的和GET做验证")
 	assert.Equal(t, expconf1, got1)
 	assert.Equal(t, 1, len(m.runners))
 
@@ -302,6 +306,7 @@ func Test_RestCRUD(t *testing.T) {
 		expconf2.SenderConfig[i][sender.KeyRunnerName] = expconf2.RunnerName
 	}
 
+	t.Log("GET 2")
 	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/configs/testRestCRUD2")
 	if err != nil {
 		t.Error(err)
@@ -312,6 +317,7 @@ func Test_RestCRUD(t *testing.T) {
 	}
 
 	// POST 第2个
+	t.Log("Post 2")
 	resp, err = http.Post("http://127.0.0.1"+rs.address+"/logkit/configs/testRestCRUD2", TESTContentApplictionJson, bytes.NewReader([]byte(testRestCRUD2)))
 	if err != nil {
 		t.Error(err)
@@ -338,6 +344,7 @@ func Test_RestCRUD(t *testing.T) {
 	// 验证 一共有2个在运行
 	assert.Equal(t, 2, len(m.runners))
 
+	t.Log("GET all")
 	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/configs")
 	if err != nil {
 		t.Error(err)
@@ -358,6 +365,7 @@ func Test_RestCRUD(t *testing.T) {
 	assert.Equal(t, explists, gotlists)
 
 	// DELETE testRestCRUD2
+	t.Log("delete 2")
 	req, err := http.NewRequest("DELETE", "http://127.0.0.1"+rs.address+"/logkit/configs/testRestCRUD2", nil)
 	if err != nil {
 		t.Error(err)
@@ -370,6 +378,8 @@ func Test_RestCRUD(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Error(string(content))
 	}
+
+	t.Log("get 2")
 	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/configs/testRestCRUD2")
 	if err != nil {
 		t.Error(err)
@@ -381,6 +391,7 @@ func Test_RestCRUD(t *testing.T) {
 	assert.Equal(t, 1, len(m.runners))
 
 	//再次get对比
+	t.Log("get all")
 	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/configs")
 	if err != nil {
 		t.Error(err)

@@ -92,27 +92,6 @@ func TestMultiReaderOneLine(t *testing.T) {
 		time.Sleep(15 * time.Second)
 		createFileWithContent(dir2file1, "hahaha\nhahaha\nhahaha\n")
 	}()
-	for {
-		data, err := mr.ReadLine()
-		if data != "" {
-			resultmap[data]++
-			maxnum++
-		}
-		if err == io.EOF {
-			break
-		}
-		if maxnum >= 15 {
-			break
-		}
-		t.Log(data)
-	}
-	time.Sleep(26 * time.Second)
-	t.Log("mr finished read one")
-	assert.Equal(t, 1, len(mr.fileReaders), "activereader number")
-	for _, ar := range mr.fileReaders {
-		t.Log(ar.logpath)
-	}
-	t.Log("mr listen 2 round")
 	spacenum := 0
 	for {
 		data, err := mr.ReadLine()
@@ -125,8 +104,34 @@ func TestMultiReaderOneLine(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
+		if maxnum >= 15 || spacenum > 100 {
+			break
+		}
 		t.Log(data)
-		if maxnum >= 18 || spacenum > 1000 {
+	}
+	time.Sleep(26 * time.Second)
+	t.Log("mr finished read one")
+	var lens int
+	mr.armapmux.Lock()
+	lens = len(mr.fileReaders)
+	mr.armapmux.Unlock()
+	assert.Equal(t, 1, lens, "activereader number")
+
+	t.Log("mr listen 2 round")
+
+	for {
+		data, err := mr.ReadLine()
+		if data != "" {
+			resultmap[data]++
+			maxnum++
+		} else {
+			spacenum++
+		}
+		if err == io.EOF {
+			break
+		}
+		t.Log(data)
+		if maxnum >= 18 || spacenum > 100 {
 			break
 		}
 	}
@@ -176,38 +181,46 @@ func TestMultiReaderMultiLine(t *testing.T) {
 		time.Sleep(15 * time.Second)
 		createFileWithContent(dir2file1, "abc\nx\nabc\nx\nabc\nx\n")
 	}()
+	spacenum := 0
 	for {
 		data, err := mr.ReadLine()
 		if data != "" {
 			resultmap[data]++
 			maxnum++
+		} else {
+			spacenum++
 		}
 		if err == io.EOF {
 			break
 		}
-		if maxnum >= 7 {
+		if maxnum >= 7 || spacenum > 100 {
 			break
 		}
 		t.Log(data)
 	}
 	time.Sleep(26 * time.Second)
 	t.Log("mr finished read one")
+	mr.armapmux.Lock()
 	assert.Equal(t, 1, len(mr.fileReaders), "activereader number")
 	for _, ar := range mr.fileReaders {
 		t.Log(ar.logpath)
 	}
+	mr.armapmux.Unlock()
+
 	t.Log("mr listen 2 round")
 	for {
 		data, err := mr.ReadLine()
 		if data != "" {
 			resultmap[data]++
 			maxnum++
+		} else {
+			spacenum++
 		}
 		if err == io.EOF {
 			break
 		}
 		t.Log(data)
-		if maxnum >= 10 {
+		if maxnum >= 10 || spacenum > 100 {
 			break
 		}
 	}
@@ -265,17 +278,20 @@ func TestMultiReaderSyncMetaOneLine(t *testing.T) {
 		time.Sleep(15 * time.Second)
 		createFileWithContent(dir2file1, "ab1\nab2\nab3\n")
 	}()
+	spacenum := 0
 	for {
 		data, err := mr.ReadLine()
 		if data != "" {
 			resultmap[data]++
 			maxnum++
 			t.Log(data, maxnum)
+		} else {
+			spacenum++
 		}
 		if err == io.EOF {
 			break
 		}
-		if maxnum >= 2 {
+		if maxnum >= 2 || spacenum > 100 {
 			break
 		}
 	}
@@ -298,20 +314,26 @@ func TestMultiReaderSyncMetaOneLine(t *testing.T) {
 			resultmap[data]++
 			maxnum++
 			t.Log(data, maxnum)
+		} else {
+			spacenum++
 		}
 		if err == io.EOF {
 			break
 		}
-		if maxnum >= 9 {
+		if maxnum >= 9 || spacenum > 100 {
 			break
 		}
 	}
-	t.Log("mr Started again")
-	time.Sleep(20 * time.Second)
+	t.Log("mr Started again", maxnum)
+	time.Sleep(22 * time.Second)
+
+	mr.armapmux.Lock()
 	assert.Equal(t, 1, len(mr.fileReaders), "activereader number")
 	for _, ar := range mr.fileReaders {
 		t.Log(">>>> alive reader", ar.logpath)
 	}
+	mr.armapmux.Unlock()
+
 	t.Log("mr listen 2 round")
 	for {
 		data, err := mr.ReadLine()
@@ -319,11 +341,13 @@ func TestMultiReaderSyncMetaOneLine(t *testing.T) {
 			resultmap[data]++
 			maxnum++
 			t.Log(data, maxnum)
+		} else {
+			spacenum++
 		}
 		if err == io.EOF {
 			break
 		}
-		if maxnum >= 12 {
+		if maxnum >= 12 || spacenum > 100 {
 			break
 		}
 	}
@@ -379,25 +403,24 @@ func TestMultiReaderSyncMetaMutiline(t *testing.T) {
 		time.Sleep(15 * time.Second)
 		createFileWithContent(dir2file1, "abc\nx\nabc\ny\nabc\nz\n")
 	}()
+	spacenum := 0
 	for {
 		data, err := mr.ReadLine()
 		if data != "" {
 			resultmap[data]++
 			maxnum++
 			t.Log(data, maxnum)
+		} else {
+			spacenum++
 		}
 		if err == io.EOF {
 			break
 		}
-		if maxnum >= 5 {
+		if maxnum >= 5 || spacenum > 100 {
 			break
 		}
 	}
 	t.Log("mr finished read one")
-
-	mr.SyncMeta()
-	t.Log("mr finished SyncMeta")
-	time.Sleep(time.Second)
 	err = mr.Close()
 	t.Log(">>>>>>>>>>>>>>>>mr Closed")
 	assert.NoError(t, err)
@@ -405,27 +428,31 @@ func TestMultiReaderSyncMetaMutiline(t *testing.T) {
 	mr, err = NewMultiReader(meta, logPathPattern, WhenceOldest, "15s", "1s", 128)
 	mr.SetMode(ReadModeHeadPatternString, "^abc*")
 	mr.Start()
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	for {
 		data, err := mr.ReadLine()
 		if data != "" {
 			resultmap[data]++
 			maxnum++
 			t.Log(data, maxnum)
+		} else {
+			spacenum++
 		}
 		if err == io.EOF {
 			break
 		}
-		if maxnum >= 7 {
+		if maxnum >= 7 || spacenum > 100 {
 			break
 		}
 	}
 	t.Log("mr Started again")
 	time.Sleep(20 * time.Second)
+	mr.armapmux.Lock()
 	assert.Equal(t, 1, len(mr.fileReaders), "activereader number")
 	for _, ar := range mr.fileReaders {
 		t.Log(">>>> alive reader", ar.logpath)
 	}
+	mr.armapmux.Unlock()
 	t.Log("mr listen 2 round")
 	for {
 		data, err := mr.ReadLine()
@@ -433,11 +460,13 @@ func TestMultiReaderSyncMetaMutiline(t *testing.T) {
 			resultmap[data]++
 			maxnum++
 			t.Log(data, maxnum)
+		} else {
+			spacenum++
 		}
 		if err == io.EOF {
 			break
 		}
-		if maxnum >= 10 {
+		if maxnum >= 10 || spacenum > 100 {
 			break
 		}
 	}

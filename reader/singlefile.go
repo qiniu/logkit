@@ -13,6 +13,8 @@ import (
 	"github.com/qiniu/logkit/rateio"
 	"github.com/qiniu/logkit/utils"
 
+	"sync"
+
 	"github.com/qiniu/log"
 )
 
@@ -27,6 +29,7 @@ type SingleFile struct {
 	lastSyncPath   string
 	lastSyncOffset int64
 
+	mux  sync.Mutex
 	meta *Meta // 记录offset的元数据
 }
 
@@ -76,6 +79,7 @@ func NewSingleFile(meta *Meta, path, whence string) (sf *SingleFile, err error) 
 		pfi:        pfi,
 		f:          f,
 		ratereader: rateio.NewRateReader(f, meta.readlimit),
+		mux:        sync.Mutex{},
 	}
 
 	// 如果meta初始信息损坏
@@ -172,6 +176,8 @@ func (sf *SingleFile) Source() string {
 
 func (sf *SingleFile) Close() (err error) {
 	atomic.AddInt32(&sf.stopped, 1)
+	sf.mux.Lock()
+	defer sf.mux.Unlock()
 	if sf.ratereader != nil {
 		sf.ratereader.Close()
 	}
@@ -267,6 +273,8 @@ func (sf *SingleFile) Read(p []byte) (n int, err error) {
 	if atomic.LoadInt32(&sf.stopped) > 0 {
 		return 0, errors.New("reader " + sf.Name() + " has been exited")
 	}
+	sf.mux.Lock()
+	defer sf.mux.Unlock()
 	n, err = sf.ratereader.Read(p)
 	if err != nil && strings.Contains(err.Error(), "stale NFS file handle") {
 		nerr := sf.reopenForESTALE()
@@ -294,6 +302,8 @@ func (sf *SingleFile) Read(p []byte) (n int, err error) {
 }
 
 func (sf *SingleFile) SyncMeta() error {
+	sf.mux.Lock()
+	defer sf.mux.Unlock()
 	if sf.lastSyncOffset == sf.offset && sf.lastSyncPath == sf.path {
 		log.Debugf("Runner[%v] %v was just syncd %v %v ignore it...", sf.meta.RunnerName, sf.Name(), sf.lastSyncPath, sf.lastSyncOffset)
 		return nil
