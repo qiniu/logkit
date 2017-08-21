@@ -415,3 +415,7 @@ func (b *BufReader) SyncMeta() {
 		return
 	}
 }
+
+func (b *BufReader) Reset() error {
+	
+}

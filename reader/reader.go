@@ -19,6 +19,8 @@ type Reader interface {
 	SetMode(mode string, v interface{}) error
 	Close() error
 	SyncMeta()
+	Reset() error
+	Stats() error
 }
 
 // FileReader reader 接口方法
