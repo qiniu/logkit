@@ -120,7 +120,9 @@ func TestFtChannelFullSender(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	mockP.SetMux.Lock()
 	mockP.PostSleep = 1
+	mockP.SetMux.Unlock()
 	mp := conf.MapConf{}
 	mp[KeyFtMemoryChannel] = "true"
 	mp[KeyFtMemoryChannelSize] = "1"
@@ -147,7 +149,9 @@ func TestFtChannelFullSender(t *testing.T) {
 			}
 		}
 	}
+	mockP.SetMux.Lock()
 	mockP.PostSleep = 0
+	mockP.SetMux.Unlock()
 	for len(moreDatas) > 0 {
 		for _, v := range moreDatas {
 			time.Sleep(100 * time.Millisecond)
@@ -170,6 +174,7 @@ func TestFtChannelFullSender(t *testing.T) {
 		moreAndMoreDatas = make([][]Data, 0)
 	}
 	time.Sleep(time.Second)
+	mockP.SetMux.Lock()
 	assert.Equal(t, mockP.PostDataNum, 10)
-
+	mockP.SetMux.Unlock()
 }

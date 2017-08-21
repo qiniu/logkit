@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"sync"
+
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/rateio"
 	"github.com/qiniu/logkit/utils"
@@ -27,6 +29,7 @@ const deafultFilePerm = 0600
 // SeqFile 按最终修改时间依次读取文件的Reader类型
 type SeqFile struct {
 	meta *Meta
+	mux  sync.Mutex
 
 	dir              string   // 文件目录
 	currFile         string   // 当前处理文件名
@@ -93,6 +96,7 @@ func NewSeqFile(meta *Meta, path string, ignoreHidden bool, suffixes []string, v
 		ignoreFileSuffix: suffixes,
 		ignoreHidden:     ignoreHidden,
 		validFilePattern: validFileRegex,
+		mux:              sync.Mutex{},
 	}
 	//原来的for循环替换成单次执行，启动的时候出错就直接报错给用户即可，不需要等待重试。
 	f, dir, currFile, offset, err := getStartFile(path, whence, meta, sf)
@@ -182,6 +186,8 @@ func (sf *SeqFile) Source() string {
 
 func (sf *SeqFile) Close() (err error) {
 	atomic.AddInt32(&sf.stopped, 1)
+	sf.mux.Lock()
+	defer sf.mux.Unlock()
 	if sf.ratereader != nil {
 		sf.ratereader.Close()
 	}
@@ -222,6 +228,8 @@ func (sf *SeqFile) reopenForESTALE() error {
 
 func (sf *SeqFile) Read(p []byte) (n int, err error) {
 	var nextFileRetry int
+	sf.mux.Lock()
+	defer sf.mux.Unlock()
 	n = 0
 	for n < len(p) {
 		var n1 int
@@ -426,6 +434,8 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 }
 
 func (sf *SeqFile) SyncMeta() (err error) {
+	sf.mux.Lock()
+	defer sf.mux.Unlock()
 	if sf.lastSyncOffset == sf.offset && sf.lastSyncPath == sf.currFile {
 		log.Debugf("Runner[%v] %v was just syncd %v %v ignore it...", sf.meta.RunnerName, sf.Name(), sf.lastSyncPath, sf.lastSyncOffset)
 		return nil

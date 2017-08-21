@@ -13,6 +13,7 @@ import (
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/sender"
+	_ "github.com/qiniu/logkit/transforms/all"
 
 	"github.com/qiniu/log"
 	"github.com/stretchr/testify/assert"
@@ -124,7 +125,7 @@ func Test_Run(t *testing.T) {
 	}
 	senders = append(senders, s)
 
-	r, err := NewLogExportRunnerWithService(rinfo, reader, cleaner, pparser, senders, meta)
+	r, err := NewLogExportRunnerWithService(rinfo, reader, cleaner, pparser, nil, senders, meta)
 	if err != nil {
 		t.Error(err)
 	}
@@ -324,7 +325,7 @@ func Test_QiniulogRun(t *testing.T) {
 	}
 	senders = append(senders, s)
 
-	r, err := NewLogExportRunnerWithService(rinfo, reader, nil, pparser, senders, meta)
+	r, err := NewLogExportRunnerWithService(rinfo, reader, nil, pparser, nil, senders, meta)
 	if err != nil {
 		t.Error(err)
 	}
@@ -360,4 +361,47 @@ func Test_QiniulogRun(t *testing.T) {
 		assert.Equal(t, expfiles[idx], dt["log"], "equl log test")
 		assert.Equal(t, expreqid[idx], dt["reqid"], "equal reqid test")
 	}
+}
+
+func TestCreateTransforms(t *testing.T) {
+
+	config1 := `{
+		"name":"test2.csv",
+		"reader":{
+			"log_path":"./tests/logdir",
+			"mode":"dir"
+		},
+		"parser":{
+			"name":"test2_csv_parser",
+			"type":"csv",
+			"csv_schema":"t1 string"
+		},
+		"transforms":[{
+			"type":"IP",
+			"key":  "ip",
+			"data_path": "../transforms/ip/17monipdb.dat"
+		}],
+		"senders":[{
+			"name":"file_sender",
+			"sender_type":"file",
+			"file_send_path":"./test2/test2_csv_file.txt"
+		}]
+	}`
+
+	rc := RunnerConfig{}
+	err := json.Unmarshal([]byte(config1), &rc)
+	assert.NoError(t, err)
+	transformers := createTransformers(rc)
+	datas := []sender.Data{{"ip": "111.2.3.4"}}
+	exp := []sender.Data{{
+		"ip":      "111.2.3.4",
+		"Region":  "浙江",
+		"City":    "宁波",
+		"Country": "中国",
+		"Isp":     "N/A"}}
+	for k := range transformers {
+		datas, err = transformers[k].Transform(datas)
+		assert.NoError(t, err)
+	}
+	assert.Equal(t, exp, datas)
 }

@@ -11,9 +11,9 @@ type CPUStats struct {
 	ps        PS
 	lastStats []cpu.TimesStat
 
-	PerCPU         bool `toml:"percpu"`
-	TotalCPU       bool `toml:"totalcpu"`
-	CollectCPUTime bool `toml:"collect_cpu_time"`
+	PerCPU         bool
+	TotalCPU       bool
+	CollectCPUTime bool
 }
 
 func NewCPUStats(ps PS) *CPUStats {

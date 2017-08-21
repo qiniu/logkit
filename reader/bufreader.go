@@ -16,6 +16,8 @@ import (
 	"regexp"
 	"sync"
 
+	"sync/atomic"
+
 	"github.com/axgle/mahonia"
 	"github.com/qiniu/log"
 )
@@ -42,6 +44,7 @@ type LastSync struct {
 
 // BufReader implements buffering for an FileReader object.
 type BufReader struct {
+	stopped      int32
 	buf          []byte
 	lineCache    string
 	rd           FileReader // reader provided by the client
@@ -103,6 +106,7 @@ func NewReaderSize(rd FileReader, meta *Meta, size int) (*BufReader, error) {
 	}
 
 	r := new(BufReader)
+	r.stopped = 0
 	r.reset(make([]byte, size), rd)
 
 	r.meta = meta
@@ -206,7 +210,10 @@ func (b *BufReader) readSlice(delim byte) (line []byte, err error) {
 	b.mux.Lock()
 	defer b.mux.Unlock()
 	for {
-
+		if atomic.LoadInt32(&b.stopped) > 0 {
+			log.Warn("BufReader was stopped while reading...")
+			return
+		}
 		// Search buffer.
 		if i := bytes.IndexByte(b.buf[b.r:b.w], delim); i >= 0 {
 			line = b.buf[b.r : b.r+i+1]
@@ -373,12 +380,14 @@ func (b *BufReader) Source() string {
 }
 
 func (b *BufReader) Close() error {
+	atomic.StoreInt32(&b.stopped, 1)
 	return b.rd.Close()
 }
 
 func (b *BufReader) SyncMeta() {
 	b.mux.Lock()
 	defer b.mux.Unlock()
+
 	//把linecache也缓存
 	if b.lastSync.cache != b.lineCache || b.lastSync.buf != string(b.buf) || b.r != b.lastSync.r || b.w != b.lastSync.w {
 		log.Debugf("Runner[%v] %v sync meta started, linecache [%v] buf [%v] （%v %v）", b.meta.RunnerName, b.Name(), b.lineCache, string(b.buf), b.r, b.w)

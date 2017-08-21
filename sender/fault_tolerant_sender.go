@@ -51,7 +51,6 @@ type FtSender struct {
 	writeLimit  int  // 写入速度限制，单位MB
 	backupOnly  bool // 是否只使用backup queue
 	procs       int  //发送并发数
-	se          *utils.StatsError
 	runnerName  string
 	opt         *FtOption
 }
@@ -120,7 +119,6 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 		writeLimit:  opt.writeLimit,
 		backupOnly:  opt.backupOnly,
 		procs:       opt.procs,
-		se:          &utils.StatsError{Ft: true},
 		runnerName:  runnerName,
 	}
 	go ftSender.asyncSendLogFromDiskQueue()
@@ -132,37 +130,38 @@ func (ft *FtSender) Name() string {
 }
 
 func (ft *FtSender) Send(datas []Data) error {
+	se := &utils.StatsError{Ft: true}
 	if ft.backupOnly {
 		// 尝试直接发送数据，当数据失败的时候会加入到本地重试队列。外部不需要重试
 		backDataContext, err := ft.trySendDatas(datas, 1)
 		if err != nil {
 			log.Warnf("Runner[%v] Sender[%v] try Send Datas err: %v", ft.runnerName, ft.innerSender.Name(), err)
-			ft.se.AddErrors()
+			se.AddErrors()
 		} else {
-			ft.se.AddSuccess()
+			se.AddSuccess()
 		}
 		// 容错队列会保证重试，此处不向外部暴露发送错误信息
-		ft.se.ErrorDetail = nil
-		ft.se.Ftlag = ft.backupQueue.Depth()
+		se.ErrorDetail = nil
+		se.Ftlag = ft.backupQueue.Depth()
 		if backDataContext != nil {
 			var nowDatas []Data
 			for _, v := range backDataContext {
 				nowDatas = append(nowDatas, v.Datas...)
 			}
 			if nowDatas != nil {
-				ft.se.ErrorDetail = reqerr.NewSendError("save data to backend queue error", ConvertDatasBack(nowDatas), reqerr.TypeDefault)
+				se.ErrorDetail = reqerr.NewSendError("save data to backend queue error", ConvertDatasBack(nowDatas), reqerr.TypeDefault)
 			}
 		}
 	} else {
 		err := ft.saveToFile(datas)
 		if err != nil {
-			ft.se.ErrorDetail = err
+			se.ErrorDetail = err
 		} else {
-			ft.se.ErrorDetail = nil
+			se.ErrorDetail = nil
 		}
-		ft.se.Ftlag = ft.backupQueue.Depth() + ft.logQueue.Depth()
+		se.Ftlag = ft.backupQueue.Depth() + ft.logQueue.Depth()
 	}
-	return ft.se
+	return se
 }
 
 func (ft *FtSender) Close() error {
@@ -328,10 +327,10 @@ func (ft *FtSender) sendFromQueue(queue queue.BackendQueue) {
 		}
 		if err == nil {
 			waitCnt = 1
-			ft.se.AddSuccess()
+			//此处的成功发送没有被stats统计
 		} else {
 			log.Errorf("Runner[%v] Sender[%v] cannot send points from queue %v, error is %v", ft.runnerName, ft.innerSender.Name(), queue.Name(), err)
-			ft.se.AddErrors()
+			//此处的发送错误没有被stats统计
 			waitCnt++
 			if waitCnt > 10 {
 				waitCnt = 10
