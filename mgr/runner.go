@@ -231,7 +231,7 @@ func createTransformers(rc RunnerConfig) []transforms.Transformer {
 	transformers := make([]transforms.Transformer, 0)
 	for idx := range rc.Transforms {
 		tConf := rc.Transforms[idx]
-		tp := tConf["type"]
+		tp := tConf[transforms.KeyType]
 		if tp == nil {
 			log.Error("field type is empty")
 			continue
@@ -247,7 +247,7 @@ func createTransformers(rc RunnerConfig) []transforms.Transformer {
 			continue
 		}
 		trans := creater()
-		delete(tConf, "type")
+		delete(tConf, transforms.KeyType)
 		bts, err := json.Marshal(tConf)
 		if err != nil {
 			log.Errorf("type %v of transformer marshal config error %v", strTP, err)
@@ -364,6 +364,15 @@ func (r *LogExportRunner) Run() {
 			log.Debugf("Runner[%v] fetched 0 lines", r.Name())
 			continue
 		}
+		for i := range r.transformers {
+			var err error
+			if r.transformers[i].Stage() == transforms.StageBeforeParser {
+				lines, err = r.transformers[i].RawTransform(lines)
+				if err != nil {
+					log.Error(err)
+				}
+			}
+		}
 		// parse data
 		datas, err := r.parser.Parse(lines)
 		se, ok := err.(*utils.StatsError)
@@ -406,10 +415,12 @@ func (r *LogExportRunner) Run() {
 				log.Errorf("Runner[%v] datasourcetag add error, datas %v not match with froms %v", r.Name(), datas, froms)
 			}
 		}
-		for tr := range r.transformers {
-			datas, err = r.transformers[tr].Transform(datas)
-			if err != nil {
-				log.Error(err)
+		for i := range r.transformers {
+			if r.transformers[i].Stage() == transforms.StageAfterParser {
+				datas, err = r.transformers[i].Transform(datas)
+				if err != nil {
+					log.Error(err)
+				}
 			}
 		}
 		success := true

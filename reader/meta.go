@@ -1,6 +1,7 @@
 package reader
 
 import (
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"io/ioutil"
@@ -414,7 +415,8 @@ func (m *Meta) GetDoneFiles() (doneFiles []utils.File, err error) {
 
 //SetEncodingWay 设置文件编码方式，默认为 utf-8
 func (m *Meta) SetEncodingWay(e string) {
-	if e != "utf-8" {
+	e = strings.ToUpper(e)
+	if e != "UTF-8" {
 		m.encodingWay = e
 	}
 }
@@ -430,4 +432,25 @@ func (m *Meta) GetMode() string {
 
 func (m *Meta) GetDataSourceTag() string {
 	return m.dataSourceTag
+}
+
+func (b *Meta) Reset() error {
+	if b == nil {
+		return errors.New("Reset error as meta is nil")
+	}
+	if _, err := os.Stat(b.metaFilePath); err != nil {
+		return err
+	}
+	if err := os.RemoveAll(b.metaFilePath); err != nil {
+		return err
+	}
+	if b.doneFilePath != b.metaFilePath {
+		if _, err := os.Stat(b.doneFilePath); err != nil {
+			return err
+		}
+		if err := os.RemoveAll(b.doneFilePath); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -405,3 +405,60 @@ func TestCreateTransforms(t *testing.T) {
 	}
 	assert.Equal(t, exp, datas)
 }
+
+func TestReplaceTransforms(t *testing.T) {
+
+	config1 := `{
+		"name":"test2.csv",
+		"reader":{
+			"log_path":"./tests/logdir",
+			"mode":"dir"
+		},
+		"parser":{
+			"name":"jsonps",
+			"type":"json"
+		},
+		"transforms":[{
+			"type":"replace",
+			"stage":"before_parser",
+			"old":"\\x",
+			"new":"\\\\x"
+		}],
+		"senders":[{
+			"name":"file_sender",
+			"sender_type":"file",
+			"file_send_path":"./test2/test2_csv_file.txt"
+		}]
+	}`
+	newData := make([]sender.Data, 0)
+	rc := RunnerConfig{}
+	err := json.Unmarshal([]byte(config1), &rc)
+	assert.NoError(t, err)
+	transformers := createTransformers(rc)
+	datas := []string{`{"status":"200","request_method":"POST","request_body":"<xml>\x0A","content_type":"text/xml"}`, `{"status":"200","request_method":"POST","request_body":"<xml>x0A","content_type":"text/xml"}`}
+	for k := range transformers {
+		datas, err = transformers[k].RawTransform(datas)
+		assert.NoError(t, err)
+		for i := range datas {
+			var da sender.Data
+			err = json.Unmarshal([]byte(datas[i]), &da)
+			assert.NoError(t, err)
+			newData = append(newData, da)
+		}
+	}
+	exp := []sender.Data{
+		{
+			"status":         "200",
+			"request_method": "POST",
+			"request_body":   "<xml>\\x0A",
+			"content_type":   "text/xml",
+		},
+		{
+			"status":         "200",
+			"request_method": "POST",
+			"request_body":   "<xml>x0A",
+			"content_type":   "text/xml",
+		},
+	}
+	assert.Equal(t, exp, newData)
+}

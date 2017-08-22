@@ -1,22 +1,30 @@
 package ip
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
+	"github.com/qiniu/logkit/utils"
 	"github.com/wangtuanjie/ip17mon"
 )
 
 //更全的免费数据可以在ipip.net下载
 type IpTransformer struct {
-	Key      string `json:"key"`
-	DataPath string `json:"data_path"`
-	loc      *ip17mon.Locator
+	StageTime string `json:"stage"`
+	Key       string `json:"key"`
+	DataPath  string `json:"data_path"`
+	loc       *ip17mon.Locator
+	stats     utils.StatsInfo
+}
+
+func (it *IpTransformer) RawTransform(datas []string) ([]string, error) {
+	return datas, errors.New("IP transformer not support rawTransform")
 }
 
 func (it *IpTransformer) Transform(datas []sender.Data) ([]sender.Data, error) {
-	var err error
+	var err, ferr error
 	if it.loc == nil {
 		it.loc, err = ip17mon.NewLocator(it.DataPath)
 		if err != nil {
@@ -28,13 +36,13 @@ func (it *IpTransformer) Transform(datas []sender.Data) ([]sender.Data, error) {
 		val, ok := datas[i][it.Key]
 		if !ok {
 			errnums++
-			err = fmt.Errorf("IP key %v not exist in data", it.Key)
+			err = fmt.Errorf("transform key %v not exist in data", it.Key)
 			continue
 		}
 		strval, ok := val.(string)
 		if !ok {
 			errnums++
-			err = fmt.Errorf("IP key %v data type is not string", it.Key)
+			err = fmt.Errorf("transform key %v data type is not string", it.Key)
 			continue
 		}
 		info, nerr := it.loc.Find(strval)
@@ -49,9 +57,12 @@ func (it *IpTransformer) Transform(datas []sender.Data) ([]sender.Data, error) {
 		datas[i]["Isp"] = info.Isp
 	}
 	if err != nil {
-		err = fmt.Errorf("find total %v erorrs in transform IP, last error info is %v", errnums, err)
+		it.stats.LastError = err
+		ferr = fmt.Errorf("find total %v erorrs in transform IP, last error info is %v", errnums, err)
 	}
-	return datas, err
+	it.stats.Errors += int64(errnums)
+	it.stats.Success += int64(len(datas) - errnums)
+	return datas, ferr
 }
 
 func (it *IpTransformer) Description() string {
@@ -60,9 +71,22 @@ func (it *IpTransformer) Description() string {
 
 func (it *IpTransformer) SampleConfig() string {
 	return `{
+		"type":"IP",
+		"stage":"after_parser",
 		"key":"MyIpFieldKey",
 		"data_path":"your/path/to/ip.dat"
 	}`
+}
+
+func (it *IpTransformer) Stage() string {
+	if it.StageTime == "" {
+		return transforms.StageAfterParser
+	}
+	return it.StageTime
+}
+
+func (it *IpTransformer) Stats() utils.StatsInfo {
+	return it.stats
 }
 
 func init() {
