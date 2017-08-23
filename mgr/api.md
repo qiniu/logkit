@@ -212,16 +212,28 @@ Content-Type: application/json
 
 ```
 {
-    "readerType": {
-		{
-			"KeyName":      "ReaderKey",
-			"ChooseOnly":   <true/false>,
-			"Default":      "default value",
-			"DefaultNoUse": <true/false>,
-			"Description":  "字段描述"
-		}
+    "<readerType>": [
+        {
+            "KeyName":      "ReaderKey1",
+            "ChooseOnly":   <true/false>,
+            "Default":      "default value",
+            "DefaultNoUse": <true/false>,
+            "Description":  "字段描述",
+            "CheckRegex":"<校验字段的正则表达式，为空不校验>"
+        },
+        {
+            "KeyName":      "ReaderKey2",
+            "ChooseOnly":   <true/false>,
+            "Default":      "default value",
+            "DefaultNoUse": <true/false>,
+            "Description":  "字段描述",
+            "CheckRegex":"<校验字段的正则表达式，为空不校验>"
+        }
+    ]
 }
 ```
+
+* 目前支持的reader type 包括：  "dir" "file"  "tailx"  "mysql"    "mssql" "elastic"   "mongo"  "kafka"    "redis"
 
 
 ### 校验Reader选项
@@ -251,8 +263,7 @@ Content-Type: application/json
 
 ```
 {
-    "key1": "<error message string>",
-    "key2": "<error message string>"
+    "error": "<error message string>"
 }
 ```
 
@@ -286,8 +297,7 @@ Content-Type: application/json
 
 ```
 {
-    "key1": "<error message  string>",
-    "key2": "<error message string>"
+    "error": "<error message  string>"
 }
 ```
 
@@ -354,16 +364,28 @@ Content-Type: application/json
 
 ```
 {
-    "parserType": {
-		{
-			"KeyName":      "NginxConfPath",
-			"ChooseOnly":   <true/false>,
-			"Default":      "/opt/nginx/conf/nginx.conf",
-			"DefaultNoUse": <true/false>,
-			"Description":  "字段描述"
-		}
+    "<parserType>": [
+        {
+            "KeyName":      "ParserKey1",
+            "ChooseOnly":   <true/false>,
+            "Default":      "<defaultKeyValue>",
+            "DefaultNoUse": <true/false>,
+            "Description":  "字段描述",
+            "CheckRegex":"<校验字段的正则表达式，为空不校验>"
+        },
+        {
+            "KeyName":      "ParserKey2",
+            "ChooseOnly":   <true/false>,
+            "Default":      "<defaultKeyValue>",
+            "DefaultNoUse": <true/false>,
+            "Description":  "字段描述",
+            "CheckRegex":"<校验字段的正则表达式，为空不校验>"
+        }
+    ]
 }
 ```
+
+* 目前支持的parser type 包括： "csv" "qiniulog" "kafkarest" "raw" "empty" "grok" "json" "nginx"
 
 
 ### 获取Parser样例日志
@@ -417,16 +439,35 @@ Content-Type: application/json
 
 ```
 {
-    "senderType": {
-		{
-			"KeyName":      "SenderKey",
-			"ChooseOnly":   <true/false>,
-			"Default":      "default value",
-			"DefaultNoUse": <true/false>,
-			"Description":  "字段描述"
-		}
+    "<senderType>": [
+        {
+            "KeyName":      "SenderKey",
+            "ChooseOnly":   <true/false>,
+            "Default":      "<default key value>",
+            "DefaultNoUse": <true/false>,
+            "Description":  "字段描述",
+            "CheckRegex":"<校验字段的正则表达式，为空不校验>"
+        },
+        {
+            "KeyName":      "SenderKey",
+            "ChooseOnly":   <true/false>,
+            "Default":      "<default key value>",
+            "DefaultNoUse": <true/false>,
+            "Description":  "字段描述",
+            "CheckRegex":"<校验字段的正则表达式，为空不校验>"
+        }
+    ]
 }
 ```
+
+* 目前支持的sender type包括：
+  - "file"          // 本地文件
+  - "pandora"       // Pandora
+  - "mongodb_acc"   // mongodb 并且按字段聚合
+  - "influxdb"      // influxdb
+  - "discard"       // discard sender
+  - "elasticsearch" // elastic
+  
 
 ### 校验Sender选项
 
@@ -435,13 +476,15 @@ Content-Type: application/json
 ```
 POST /logkit/sender/check
 Content-Type: application/json
-{
+[{
     "type": "<senderType>",
     "key2": "value2",
     "key3": "value3",
     "key4": "value4"
-}
+}]
 ```
+
+**注意: sender的校验body是个数组**
 
 返回
 
@@ -455,8 +498,7 @@ Content-Type: application/json
 
 ```
 {
-    "key1": "<error message string>",
-    "key2": "<error message string>"
+    "error": "<error message string>"
 }
 ```
 

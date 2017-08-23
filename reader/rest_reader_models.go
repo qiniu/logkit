@@ -45,9 +45,10 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyBufSize,
 			ChooseOnly:   false,
-			Default:      "4096",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "文件缓存数据大小",
+			CheckRegex:   "\\d+",
 		},
 		{
 			KeyName:       KeyWhence,
@@ -77,9 +78,10 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyReadIOLimit,
 			ChooseOnly:   false,
-			Default:      "20",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "读取速度限制(MB/s)",
+			CheckRegex:   "\\d+",
 		},
 		{
 			KeyName:      KeyHeadPattern,
@@ -89,11 +91,12 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "多行读取的起始行正则表达式",
 		},
 		{
-			KeyName:      KeyIgnoreHiddenFile,
-			ChooseOnly:   false,
-			Default:      "true",
-			DefaultNoUse: false,
-			Description:  "是否忽略隐藏文件",
+			KeyName:       KeyIgnoreHiddenFile,
+			ChooseOnly:    true,
+			ChooseOptions: []string{"true", "false"},
+			Default:       "true",
+			DefaultNoUse:  false,
+			Description:   "是否忽略隐藏文件",
 		},
 		{
 			KeyName:      KeyIgnoreFileSuffix,
@@ -105,7 +108,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyValidFilePattern,
 			ChooseOnly:   false,
-			Default:      "*",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "根据正则表达式匹配文件",
 		},
@@ -128,9 +131,10 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyBufSize,
 			ChooseOnly:   false,
-			Default:      "4096",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "文件缓存数据大小",
+			CheckRegex:   "\\d+",
 		},
 		{
 			KeyName:       KeyWhence,
@@ -160,9 +164,10 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyReadIOLimit,
 			ChooseOnly:   false,
-			Default:      "20",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "读取速度限制(MB/s)",
+			CheckRegex:   "\\d+",
 		},
 		{
 			KeyName:      KeyHeadPattern,
@@ -190,9 +195,10 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyBufSize,
 			ChooseOnly:   false,
-			Default:      "4096",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "文件缓存数据大小",
+			CheckRegex:   "\\d+",
 		},
 		{
 			KeyName:       KeyWhence,
@@ -222,9 +228,10 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyReadIOLimit,
 			ChooseOnly:   false,
-			Default:      "20",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "读取速度限制(MB/s)",
+			CheckRegex:   "\\d+",
 		},
 		{
 			KeyName:      KeyDataSourceTag,
@@ -246,13 +253,15 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "24h",
 			DefaultNoUse: false,
 			Description:  "文件过期时间(时h，分m，秒s)",
+			CheckRegex:   "\\d+[hms]",
 		},
 		{
 			KeyName:      KeyMaxOpenFiles,
 			ChooseOnly:   false,
-			Default:      "256",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "最大的打开文件数",
+			CheckRegex:   "\\d+",
 		},
 		{
 			KeyName:      KeyStatInterval,
@@ -260,6 +269,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "3m",
 			DefaultNoUse: false,
 			Description:  "文件扫描间隔",
+			CheckRegex:   "\\d+[hms]",
 		},
 	},
 	ModeMysql: {
@@ -297,6 +307,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "100",
 			DefaultNoUse: false,
 			Description:  "分批查询的单批次大小",
+			CheckRegex:   "\\d+",
 		},
 		{
 			KeyName:      KeyMetaPath,
@@ -313,11 +324,12 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "定时任务调度Cron",
 		},
 		{
-			KeyName:      KeyMysqlExecOnStart,
-			ChooseOnly:   false,
-			Default:      "true",
-			DefaultNoUse: false,
-			Description:  "启动时立即执行",
+			KeyName:       KeyMysqlExecOnStart,
+			ChooseOnly:    true,
+			ChooseOptions: []string{"true", "false"},
+			Default:       "true",
+			DefaultNoUse:  false,
+			Description:   "启动时立即执行",
 		},
 		{
 			KeyName:      KeySQLSchema,
@@ -369,6 +381,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "100",
 			DefaultNoUse: false,
 			Description:  "分批查询的单批次大小",
+			CheckRegex:   "\\d+",
 		},
 		{
 			KeyName:      KeyMssqlCron,
@@ -378,11 +391,12 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "定时任务调度Crontab",
 		},
 		{
-			KeyName:      KeyMssqlExecOnStart,
-			ChooseOnly:   false,
-			Default:      "true",
-			DefaultNoUse: false,
-			Description:  "启动时立即执行",
+			KeyName:       KeyMssqlExecOnStart,
+			ChooseOnly:    true,
+			ChooseOptions: []string{"true", "false"},
+			Default:       "true",
+			DefaultNoUse:  false,
+			Description:   "启动时立即执行",
 		},
 		{
 			KeyName:      KeySQLSchema,
@@ -440,6 +454,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "1d",
 			DefaultNoUse: false,
 			Description:  "ES的Offset保存时间",
+			CheckRegex:   "\\d+[dms]",
 		},
 	},
 	ModeMongo: {
@@ -484,6 +499,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "100",
 			DefaultNoUse: false,
 			Description:  "分批查询的单批次大小",
+			CheckRegex:   "\\d+",
 		},
 		{
 			KeyName:      KeyMongoCron,
@@ -493,11 +509,12 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "定时任务调度Cron",
 		},
 		{
-			KeyName:      KeyMongoExecOnstart,
-			ChooseOnly:   false,
-			Default:      "true",
-			DefaultNoUse: false,
-			Description:  "启动时立即执行",
+			KeyName:       KeyMongoExecOnstart,
+			ChooseOnly:    true,
+			ChooseOptions: []string{"true", "false"},
+			Default:       "true",
+			DefaultNoUse:  false,
+			Description:   "启动时立即执行",
 		},
 		{
 			KeyName:      KeyMongoFilters,
@@ -577,6 +594,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "5s",
 			DefaultNoUse: false,
 			Description:  "单次读取超时时间(m(分)、s(秒))",
+			CheckRegex:   "\\d+[ms]",
 		},
 	},
 }
