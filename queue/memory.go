@@ -2,7 +2,6 @@ package queue
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 )
 
@@ -35,7 +34,6 @@ func (mq *memoryQueue) Name() string {
 
 func (mq *memoryQueue) Put(msg []byte) error {
 	if len(mq.channel) >= mq.maxQueueLength {
-		fmt.Println("channel size", len(mq.channel))
 		return errors.New("memory queue is full")
 	}
 	if mq.status == StatusClosed {
@@ -44,7 +42,6 @@ func (mq *memoryQueue) Put(msg []byte) error {
 	mq.mux.Lock()
 	defer mq.mux.Unlock()
 	if len(mq.channel) >= mq.maxQueueLength {
-		fmt.Println("channel size", len(mq.channel))
 		return errors.New("memory queue is full")
 	}
 	if mq.status == StatusClosed {

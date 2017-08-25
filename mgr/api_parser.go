@@ -83,3 +83,18 @@ func (rs *RestService) GetParserSampleLogs() echo.HandlerFunc {
 		return c.JSON(http.StatusOK, parser.SampleLogs)
 	}
 }
+
+// POST /logkit/parser/check
+func (rs *RestService) PostParserCheck() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		reqConf := conf.MapConf{}
+		if err := c.Bind(&reqConf); err != nil {
+			return err
+		}
+		_, err := parser.NewParserRegistry().NewLogParser(reqConf)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+		return c.JSON(http.StatusOK, nil)
+	}
+}
