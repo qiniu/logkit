@@ -99,14 +99,18 @@ func NewFtSender(sender Sender, conf conf.MapConf) (*FtSender, error) {
 
 func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSender, error) {
 	var lq, bq queue.BackendQueue
-	if !opt.memoryChannel {
+	if opt.saveLogPath != "" {
 		err := utils.CreateDirIfNotExist(opt.saveLogPath)
 		if err != nil {
 			return nil, err
 		}
-
-		lq = queue.NewDiskQueue("stream"+qNameSuffix, opt.saveLogPath, maxBytesPerFile, 0, maxBytesPerFile, opt.syncEvery, opt.syncEvery, time.Second*2, opt.writeLimit*mb)
-		bq = queue.NewDiskQueue("backup"+qNameSuffix, opt.saveLogPath, maxBytesPerFile, 0, maxBytesPerFile, opt.syncEvery, opt.syncEvery, time.Second*2, opt.writeLimit*mb)
+	}
+	if !opt.memoryChannel {
+		lq = queue.NewDiskQueue("stream"+qNameSuffix, opt.saveLogPath, maxBytesPerFile, 0, maxBytesPerFile, opt.syncEvery, opt.syncEvery, time.Second*2, opt.writeLimit*mb, false, 0)
+		bq = queue.NewDiskQueue("backup"+qNameSuffix, opt.saveLogPath, maxBytesPerFile, 0, maxBytesPerFile, opt.syncEvery, opt.syncEvery, time.Second*2, opt.writeLimit*mb, false, 0)
+	} else if opt.saveLogPath != "" {
+		lq = queue.NewDiskQueue("stream"+qNameSuffix, opt.saveLogPath, maxBytesPerFile, 0, maxBytesPerFile, opt.syncEvery, opt.syncEvery, time.Second*2, opt.writeLimit*mb, true, opt.memoryChannelSize)
+		bq = queue.NewDiskQueue("backup"+qNameSuffix, opt.saveLogPath, maxBytesPerFile, 0, maxBytesPerFile, opt.syncEvery, opt.syncEvery, time.Second*2, opt.writeLimit*mb, true, opt.memoryChannelSize)
 	} else {
 		lq = queue.NewMemoryQueue("steam"+memoryChanSuffix, opt.memoryChannelSize)
 		bq = queue.NewMemoryQueue("backup"+memoryChanSuffix, opt.memoryChannelSize)
