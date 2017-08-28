@@ -16,6 +16,7 @@ type Controller struct {
 	cond          *sync.Cond
 	done          chan struct{}
 	ratePerSecond int
+	closeOnce     *sync.Once
 }
 
 func NewController(ratePerSecond int) *Controller {
@@ -29,6 +30,7 @@ func NewController(ratePerSecond int) *Controller {
 		capacity:      capacity,
 		cond:          sync.NewCond(new(sync.Mutex)),
 		done:          make(chan struct{}, 1),
+		closeOnce:     &sync.Once{},
 	}
 	go self.run(capacity)
 	return self
@@ -79,7 +81,9 @@ func (self *Controller) run(capacity int) {
 }
 
 func (self *Controller) Close() error {
-	self.done <- struct{}{}
+	self.closeOnce.Do(func() {
+		self.done <- struct{}{}
+	})
 	return nil
 }
 
