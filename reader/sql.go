@@ -478,7 +478,7 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 							} else {
 								data[columns[i]] = &val
 							}
-						case "string":
+						default:
 							val, serr := convertString(scanArgs[i])
 							if serr != nil {
 								log.Errorf("convertString for %v (%v) error %v, ignore this key...", columns[i], scanArgs[i], serr)
