@@ -484,7 +484,7 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 						if serr != nil {
 							log.Errorf("convertString for %v (%v) error %v, ignore this key...", columns[i], scanArgs[i], serr)
 						}
-						data[columns[i]] = val
+						data[columns[i]] = &val
 					}
 				}
 				ret, err := json.Marshal(data)
@@ -685,7 +685,6 @@ func convertString(v interface{}) (string, error) {
 		return strconv.Itoa(int(dv.Int())), nil
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		return strconv.Itoa(int(dv.Uint())), nil
-		// return int64(dv.Uint()), nil
 	case reflect.String:
 		return dv.String(), nil
 	case reflect.Interface:
@@ -729,7 +728,7 @@ func convertString(v interface{}) (string, error) {
 		if idv == nil {
 			return "", nil
 		}
-		log.Errorf("sql reader convertLong for type %v is not supported", reflect.TypeOf(idv))
+		log.Errorf("sql reader convertString for type %v is not supported", reflect.TypeOf(idv))
 	}
 	return "", fmt.Errorf("%v type can not convert to string", dv.Kind())
 }
