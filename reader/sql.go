@@ -480,7 +480,11 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 							}
 						}
 					} else {
-						data[columns[i]] = scanArgs[i]
+						val, serr := convertString(scanArgs[i])
+						if serr != nil {
+							log.Errorf("convertString for %v (%v) error %v, ignore this key...", columns[i], scanArgs[i], serr)
+						}
+						data[columns[i]] = val
 					}
 				}
 				ret, err := json.Marshal(data)
@@ -665,6 +669,69 @@ func convertFloat(v interface{}) (float64, error) {
 		log.Errorf("sql reader convertFloat for type %v is not supported", reflect.TypeOf(idv))
 	}
 	return 0, fmt.Errorf("%v type can not convert to int", dv.Kind())
+}
+
+func convertString(v interface{}) (string, error) {
+	dpv := reflect.ValueOf(v)
+	if dpv.Kind() != reflect.Ptr {
+		return "", errors.New("scanArgs not a pointer")
+	}
+	if dpv.IsNil() {
+		return "", errors.New("scanArgs is a nil pointer")
+	}
+	dv := reflect.Indirect(dpv)
+	switch dv.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return strconv.Itoa(int(dv.Int())), nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return strconv.Itoa(int(dv.Uint())), nil
+		// return int64(dv.Uint()), nil
+	case reflect.String:
+		return dv.String(), nil
+	case reflect.Interface:
+		idv := dv.Interface()
+		if ret, ok := idv.(int64); ok {
+			return strconv.Itoa(int(ret)), nil
+		}
+		if ret, ok := idv.(int); ok {
+			return strconv.Itoa(int(ret)), nil
+		}
+		if ret, ok := idv.(uint); ok {
+			return strconv.Itoa(int(ret)), nil
+		}
+		if ret, ok := idv.(uint64); ok {
+			return strconv.Itoa(int(ret)), nil
+		}
+		if ret, ok := idv.(string); ok {
+			return ret, nil
+		}
+		if ret, ok := idv.(int8); ok {
+			return strconv.Itoa(int(ret)), nil
+		}
+		if ret, ok := idv.(int16); ok {
+			return strconv.Itoa(int(ret)), nil
+		}
+		if ret, ok := idv.(int32); ok {
+			return strconv.Itoa(int(ret)), nil
+		}
+		if ret, ok := idv.(uint8); ok {
+			return strconv.Itoa(int(ret)), nil
+		}
+		if ret, ok := idv.(uint16); ok {
+			return strconv.Itoa(int(ret)), nil
+		}
+		if ret, ok := idv.(uint32); ok {
+			return strconv.Itoa(int(ret)), nil
+		}
+		if ret, ok := idv.([]byte); ok {
+			return string(ret), nil
+		}
+		if idv == nil {
+			return "", nil
+		}
+		log.Errorf("sql reader convertLong for type %v is not supported", reflect.TypeOf(idv))
+	}
+	return "", fmt.Errorf("%v type can not convert to string", dv.Kind())
 }
 
 func (mr *SqlReader) getSQL(idx int) (sql string, err error) {
