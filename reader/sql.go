@@ -478,6 +478,13 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 							} else {
 								data[columns[i]] = &val
 							}
+						default:
+							val, serr := convertString(scanArgs[i])
+							if serr != nil {
+								log.Errorf("convertString for %v (%v) error %v, ignore this key...", columns[i], scanArgs[i], serr)
+							} else {
+								data[columns[i]] = &val
+							}
 						}
 					} else {
 						val, serr := convertString(scanArgs[i])
