@@ -1,9 +1,9 @@
 import React, {Component} from 'react';
 import {notification, message, Button, Steps} from 'antd';
-import Source from  './containers/sourceConfig'
-import Parser from  './containers/parserConfig'
-import Sender from './containers/senderConfig'
-import RenderConfig from './containers/renderConfig'
+import Source from  './components/sourceConfig'
+import Parser from  './components/parserConfig'
+import Sender from './components/senderConfig'
+import RenderConfig from './components/renderConfig'
 
 const Step = Steps.Step;
 const steps = [{
