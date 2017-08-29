@@ -63,23 +63,38 @@ func (rs *RestService) PostParse() echo.HandlerFunc {
 	}
 }
 
-// get /logkit/parser/usages 接受解析请求
+// get /logkit/parser/usages 获得解析用途说明
 func (rs *RestService) GetParserUsages() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		return c.JSON(http.StatusOK, parser.ModeUsages)
 	}
 }
 
-// get /logkit/parser/options 接受解析请求
+// get /logkit/parser/options 获取解析选项
 func (rs *RestService) GetParserKeyOptions() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		return c.JSON(http.StatusOK, parser.ModeKeyOptions)
 	}
 }
 
-// get /logkit/parser/samplelogs 接受解析请求
+// get /logkit/parser/samplelogs 获取样例日志
 func (rs *RestService) GetParserSampleLogs() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		return c.JSON(http.StatusOK, parser.SampleLogs)
+	}
+}
+
+// POST /logkit/parser/check
+func (rs *RestService) PostParserCheck() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		reqConf := conf.MapConf{}
+		if err := c.Bind(&reqConf); err != nil {
+			return err
+		}
+		_, err := parser.NewParserRegistry().NewLogParser(reqConf)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+		return c.JSON(http.StatusOK, nil)
 	}
 }

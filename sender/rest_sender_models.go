@@ -29,6 +29,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "my_work",
 			DefaultNoUse: true,
 			Description:  "Pandora 数据源(repo)名称",
+			CheckRegex:   "^[a-zA-Z_][a-zA-Z0-9_]{0,127}$",
 		},
 		{
 			KeyName:      KeyPandoraAk,
@@ -52,11 +53,12 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "Host地址",
 		},
 		{
-			KeyName:      KeyPandoraRegion,
-			ChooseOnly:   false,
-			Default:      "nb",
-			DefaultNoUse: false,
-			Description:  "创建的资源所在区域",
+			KeyName:       KeyPandoraRegion,
+			ChooseOnly:    true,
+			ChooseOptions: []string{"nb"},
+			Default:       "nb",
+			DefaultNoUse:  false,
+			Description:   "创建的资源所在区域",
 		},
 		{
 			KeyName:       KeyPandoraSchemaFree,
@@ -113,16 +115,18 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyFlowRateLimit,
 			ChooseOnly:   false,
-			Default:      "1024",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "流量限制(KB/s)",
+			CheckRegex:   "\\d+",
 		},
 		{
 			KeyName:      KeyRequestRateLimit,
 			ChooseOnly:   false,
-			Default:      "100",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "请求限制(次/s)",
+			CheckRegex:   "\\d+",
 		},
 		{
 			KeyName:      KeyPandoraUUID,
@@ -157,16 +161,18 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyFtWriteLimit,
 			ChooseOnly:   false,
-			Default:      "10",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "磁盘写入限速(MB/s)",
+			CheckRegex:   "\\d+",
 		},
 		{
 			KeyName:      KeyFtSyncEvery,
 			ChooseOnly:   false,
-			Default:      "10",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "同步meta的间隔",
+			CheckRegex:   "\\d+",
 		},
 		{
 			KeyName:       KeyFtStrategy,
@@ -182,6 +188,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "2",
 			DefaultNoUse: false,
 			Description:  "发送并发数量(磁盘管道或内存管道 always_save 模式生效)",
+			CheckRegex:   "\\d+",
 		},
 		{
 			KeyName:       KeyFtMemoryChannel,
@@ -194,9 +201,10 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyFtMemoryChannelSize,
 			ChooseOnly:   false,
-			Default:      "100",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "内存管道长度",
+			CheckRegex:   "\\d+",
 		},
 		{
 			KeyName:       KeyForceMicrosecond,
@@ -261,9 +269,10 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyFtWriteLimit,
 			ChooseOnly:   false,
-			Default:      "10",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "磁盘写入限速(MB/s)",
+			CheckRegex:   "\\d+",
 		},
 		{
 			KeyName:      KeyFtSyncEvery,
@@ -378,9 +387,10 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyFtWriteLimit,
 			ChooseOnly:   false,
-			Default:      "10",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "磁盘写入限速(MB/s)",
+			CheckRegex:   "\\d+",
 		},
 		{
 			KeyName:      KeyFtSyncEvery,
@@ -425,7 +435,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyElasticHost,
 			ChooseOnly:   false,
-			Default:      "100",
+			Default:      "localhost:9200",
 			DefaultNoUse: false,
 			Description:  "es host地址",
 		},
@@ -461,9 +471,10 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyFtWriteLimit,
 			ChooseOnly:   false,
-			Default:      "10",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "磁盘写入限速(MB/s)",
+			CheckRegex:   "\\d+",
 		},
 		{
 			KeyName:      KeyFtSyncEvery,

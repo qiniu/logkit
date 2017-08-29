@@ -41,47 +41,6 @@ const (
 
 const MaxGrokMultiLineBuffer = 64 * 1024 * 1024 // 64MB
 
-const DEFAULT_PATTERNS = `LOGDATE %{DATESTAMP:logdate:date}
-REQID %{WORD:reqid}
-LOGLEVEL %{WORD:loglevel}
-LOGDATA %{%DATA:log}
-LOGKIT_LOG %{LOGDATE} \[%{REQID}\] \[%{LOGLEVEL}\] %{LOGDATA}
-
-# 可见，合理的将grok pattern作为中间结果为我们利用，可以逐渐构筑复杂的grok pattern
-# 但是使用grok pattern依旧建议使用社区成熟的grok pattern为主，不建议大量自定义grok pattern
-
-DURATION %{NUMBER}[nuµm]?s
-RESPONSE_CODE %{NUMBER:response_code:string}
-RESPONSE_TIME %{DURATION:response_time_ns:string}
-EXAMPLE_LOG \[%{HTTPDATE:ts:date}\] %{NUMBER:myfloat:float} %{RESPONSE_CODE} %{IPORHOST:clientip} %{RESPONSE_TIME}
-
-# Wider-ranging username matching vs. logstash built-in %{USER}
-NGUSERNAME [a-zA-Z0-9\.\@\-\+_%]+
-NGUSER %{NGUSERNAME}
-# Wider-ranging client IP matching
-CLIENT (?:%{IPORHOST}|%{HOSTPORT}|::1)
-
-##
-## 常见日志匹配方式
-##
-
-# apache & nginx logs, this is also known as the "common log format"
-#   see https://en.wikipedia.org/wiki/Common_Log_Format
-COMMON_LOG_FORMAT %{CLIENT:client_ip} %{NOTSPACE:ident} %{NOTSPACE:auth} \[%{HTTPDATE:ts:date}\] "(?:%{WORD:verb} %{NOTSPACE:request}(?: HTTP/%{NUMBER:http_version:float})?|%{DATA})" %{NUMBER:resp_code} (?:%{NUMBER:resp_bytes:long}|-)
-NGINX_LOG %{IPORHOST:client_ip} %{USER:ident} %{USER:auth} \[%{HTTPDATE:ts:date}\] "(?:%{WORD:verb} %{NOTSPACE:request}(?: HTTP/%{NUMBER:http_version:float})?|%{DATA})" %{NUMBER:resp_code} (?:%{NUMBER:resp_bytes:long}|-)
-
-PANDORA_NGINX %{NOTSPACE:client_ip} %{USER:ident} %{USER:auth} \[%{HTTPDATE:ts:date}\] "(?:%{WORD:verb} %{NOTSPACE:request}(?: HTTP/%{NUMBER:http_version:float})?|%{DATA})" %{NUMBER:resp_code} (?:%{NUMBER:resp_bytes:long}|-) (?:%{NUMBER:resp_body_bytes:long}|-) "(?:%{NOTSPACE:referrer}|-)" %{QUOTEDSTRING:agent} %{QUOTEDSTRING:forward_for} %{NOTSPACE:upstream_addr} (%{HOSTNAME:host}|-) (%{NOTSPACE:reqid}) %{NUMBER:resp_time:float}
-
-# Combined log format is the same as the common log format but with the addition
-# of two quoted strings at the end for "referrer" and "agent"
-#   See Examples at http://httpd.apache.org/docs/current/mod/mod_log_config.html
-COMBINED_LOG_FORMAT %{COMMON_LOG_FORMAT} %{QS:referrer} %{QS:agent}
-
-# HTTPD log formats
-HTTPD20_ERRORLOG \[%{HTTPDERROR_DATE:timestamp}\] \[%{LOGLEVEL:loglevel}\] (?:\[client %{IPORHOST:clientip}\] ){0,1}%{GREEDYDATA:errormsg}
-HTTPD24_ERRORLOG \[%{HTTPDERROR_DATE:timestamp}\] \[%{WORD:module}:%{LOGLEVEL:loglevel}\] \[pid %{POSINT:pid:long}:tid %{NUMBER:tid:long}\]( \(%{POSINT:proxy_errorcode:long}\)%{DATA:proxy_errormessage}:)?( \[client %{IPORHOST:client}:%{POSINT:clientport}\])? %{DATA:errorcode}: %{GREEDYDATA:message}
-HTTPD_ERRORLOG %{HTTPD20_ERRORLOG}|%{HTTPD24_ERRORLOG}`
-
 var (
 	// matches named captures that contain a modifier.
 	//   ie,

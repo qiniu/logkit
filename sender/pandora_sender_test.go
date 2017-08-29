@@ -19,6 +19,8 @@ import (
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
 
+	"sync"
+
 	"github.com/labstack/echo"
 	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
@@ -33,12 +35,13 @@ type mock_pandora struct {
 	Schemas     []pipeline.RepoSchemaEntry
 	GetRepoErr  bool
 	PostSleep   int
+	SetMux      sync.Mutex
 	PostDataNum int
 }
 
 //NewMockPandoraWithPrefix 测试的mock pandora server
 func NewMockPandoraWithPrefix(prefix string) (*mock_pandora, string) {
-	pandora := &mock_pandora{Prefix: prefix}
+	pandora := &mock_pandora{Prefix: prefix, SetMux: sync.Mutex{}}
 
 	mux := echo.New()
 	mux.GET(prefix+"/ping", pandora.GetPing())
@@ -113,6 +116,8 @@ func (s *mock_pandora) PostRepos_() echo.HandlerFunc {
 
 func (s *mock_pandora) PostRepos_Data() echo.HandlerFunc {
 	return func(c echo.Context) error {
+		s.SetMux.Lock()
+		defer s.SetMux.Unlock()
 		if s.PostSleep > 0 {
 			time.Sleep(time.Duration(s.PostSleep) * time.Second)
 		}

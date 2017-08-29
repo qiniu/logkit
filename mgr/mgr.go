@@ -88,13 +88,13 @@ func (m *Manager) Stop() error {
 	for _, runner := range m.runners {
 		runner.Stop()
 	}
-	m.watcherMux.RLock()
+	m.watcherMux.Lock()
 	for _, w := range m.watchers {
 		if w != nil {
 			w.Close()
 		}
 	}
-	m.watcherMux.RUnlock()
+	m.watcherMux.Unlock()
 	close(m.cleanChan)
 	return nil
 }
@@ -343,7 +343,10 @@ func (m *Manager) detectMoreWatchers(confsPath []string) {
 	for {
 		select {
 		case <-ticker.C:
-			log.Debugf("we have totally %v watchers, periodically try to detect more watchers...", len(m.watchers))
+			m.watcherMux.Lock()
+			watcherNum := len(m.watchers)
+			m.watcherMux.Unlock()
+			log.Debugf("we have totally %v watchers, periodically try to detect more watchers...", watcherNum)
 			m.addWatchers(confsPath)
 		}
 	}

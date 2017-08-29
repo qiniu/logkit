@@ -295,8 +295,12 @@ func Test_Watch(t *testing.T) {
 		t.Errorf("watchers exp 2 but got %v", len(m.watchers))
 	}
 	time.Sleep(time.Second) //因为使用了异步add runners 有可能还没执行完。
-	if len(m.runners) != 2 {
-		t.Fatalf("runners exp 2 but got %v", len(m.runners))
+	var runnerLength int
+	m.lock.Lock()
+	runnerLength = len(m.runners)
+	m.lock.Unlock()
+	if runnerLength != 2 {
+		t.Fatalf("runners exp 2 but got %v", runnerLength)
 	}
 	time.Sleep(time.Second)
 
@@ -305,8 +309,14 @@ func Test_Watch(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if !tryTest(10, func() bool { return len(m.runners) == 3 }) {
-		t.Fatalf("runners exp 3 after add test3.conf but got %v", len(m.runners))
+
+	if !tryTest(10, func() bool {
+		m.lock.Lock()
+		runnerLength = len(m.runners)
+		m.lock.Unlock()
+		return runnerLength == 3
+	}) {
+		t.Fatalf("runners exp 3 after add test3.conf but got %v", runnerLength)
 	}
 	if !tryTest(10, func() bool { return m.cleanQueues[realdir].cleanerCount == 2 }) {
 		t.Fatalf("cleanerCount exp 2 after add test3.conf  but got %v", m.cleanQueues[realdir].cleanerCount)
@@ -318,8 +328,14 @@ func Test_Watch(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if !tryTest(10, func() bool { return len(m.runners) == 4 }) {
-		t.Fatalf("runners exp 4 after add test4.conf but got %v", len(m.runners))
+
+	if !tryTest(10, func() bool {
+		m.lock.Lock()
+		runnerLength = len(m.runners)
+		m.lock.Unlock()
+		return runnerLength == 4
+	}) {
+		t.Fatalf("runners exp 4 after add test4.conf but got %v", runnerLength)
 	}
 	if !tryTest(10, func() bool { return m.cleanQueues[realdir].cleanerCount == 3 }) {
 		t.Fatalf("cleanerCount exp 3 after add test4.conf but got %v", m.cleanQueues[realdir].cleanerCount)
@@ -369,8 +385,13 @@ func Test_Watch(t *testing.T) {
 	time.Sleep(2 * time.Second)
 	// 移除一个文件，变成三个runner
 	os.Remove("./tests/confs1/test4.conf")
-	if !tryTest(10, func() bool { return len(m.runners) == 3 }) {
-		t.Fatalf("runners exp 3 after remove test4.conf but got %v", len(m.runners))
+	if !tryTest(10, func() bool {
+		m.lock.Lock()
+		runnerLength = len(m.runners)
+		m.lock.Unlock()
+		return runnerLength == 3
+	}) {
+		t.Fatalf("runners exp 3 after remove test4.conf but got %v", runnerLength)
 	}
 	if m.cleanQueues[realdir].cleanerCount != 2 {
 		t.Errorf("cleanerCount exp 2 after remove test4.conf but got %v", m.cleanQueues[realdir].cleanerCount)
@@ -379,8 +400,13 @@ func Test_Watch(t *testing.T) {
 	time.Sleep(2 * time.Second)
 	// 移除一个文件，变回两个runner
 	os.Remove("./tests/confs2/test3.conf")
-	if !tryTest(10, func() bool { return len(m.runners) == 2 }) {
-		t.Fatalf("runners exp 2 after remove test3.conf but got %v", len(m.runners))
+	if !tryTest(10, func() bool {
+		m.lock.Lock()
+		runnerLength = len(m.runners)
+		m.lock.Unlock()
+		return runnerLength == 2
+	}) {
+		t.Fatalf("runners exp 2 after remove test3.conf but got %v", runnerLength)
 	}
 	if m.cleanQueues[realdir].cleanerCount != 2 {
 		t.Errorf("cleanerCount exp 2 after remove test3.conf but got %v", m.cleanQueues[realdir].cleanerCount)
@@ -414,8 +440,10 @@ func Test_Watch_LogDir(t *testing.T) {
 		t.Error(err)
 	}
 	confPathAbs, err := filepath.Abs("./tests2/confs1/test5.conf")
-
-	if _, ok := m.runners[confPathAbs]; ok {
+	m.lock.Lock()
+	_, ok := m.runners[confPathAbs]
+	m.lock.Unlock()
+	if ok {
 		t.Fatal("not exp, the runner should be not exsit")
 	}
 
@@ -431,8 +459,10 @@ func Test_Watch_LogDir(t *testing.T) {
 	}
 
 	time.Sleep(time.Duration(DIR_NOT_EXIST_SLEEP_TIME) * time.Second)
-
-	if _, ok := m.runners[confPathAbs]; !ok {
+	m.lock.Lock()
+	_, ok = m.runners[confPathAbs]
+	m.lock.Unlock()
+	if !ok {
 		t.Fatal("runner of \"./tests2/confs1/test5.conf\" exp  after add test5.conf but not", m.runners, confPathAbs, time.Now().Format(time.RFC3339Nano))
 	}
 	m.Stop()

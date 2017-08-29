@@ -38,13 +38,14 @@ type MultiReader struct {
 }
 
 type ActiveReader struct {
-	br         *BufReader
-	logpath    string
-	readcache  string
-	msgchan    chan<- Result
-	status     int32
-	inactive   bool //当inactive为true时才会被expire回收
-	runnerName string
+	cacheLineMux sync.RWMutex
+	br           *BufReader
+	logpath      string
+	readcache    string
+	msgchan      chan<- Result
+	status       int32
+	inactive     int32 //当inactive>0 时才会被expire回收
+	runnerName   string
 }
 
 type Result struct {
@@ -69,12 +70,13 @@ func NewActiveReader(logPath, whence string, meta *Meta, msgChan chan<- Result) 
 		return
 	}
 	ar = &ActiveReader{
-		br:         bf,
-		logpath:    logPath,
-		msgchan:    msgChan,
-		inactive:   false,
-		runnerName: meta.RunnerName,
-		status:     StatusInit,
+		cacheLineMux: sync.RWMutex{},
+		br:           bf,
+		logpath:      logPath,
+		msgchan:      msgChan,
+		inactive:     1,
+		runnerName:   meta.RunnerName,
+		status:       StatusInit,
 	}
 	return
 }
@@ -93,7 +95,9 @@ func (ar *ActiveReader) Run() {
 			return
 		}
 		if ar.readcache == "" {
+			ar.cacheLineMux.Lock()
 			ar.readcache, err = ar.br.ReadLine()
+			ar.cacheLineMux.Unlock()
 			if err != nil && err != io.EOF {
 				log.Warnf("Runner[%v] ActiveReader %s read error: %v", ar.runnerName, ar.logpath, err)
 				time.Sleep(3 * time.Second)
@@ -101,7 +105,7 @@ func (ar *ActiveReader) Run() {
 			}
 			//文件EOF，同时没有任何内容，代表不是第一次EOF，休息时间设置长一些
 			if ar.readcache == "" && err == io.EOF {
-				ar.inactive = true
+				atomic.StoreInt32(&ar.inactive, 1)
 				log.Debugf("Runner[%v] %v meet EOF, ActiveReader was inactive now, sleep 5 seconds", ar.runnerName, ar.logpath)
 				time.Sleep(5 * time.Second)
 				continue
@@ -118,16 +122,18 @@ func (ar *ActiveReader) Run() {
 				log.Errorf("Runner[%v] %v ActiveReader has timeout 3000 times with readcache %v", ar.runnerName, ar.logpath, ar.readcache)
 			}
 
-			ar.inactive = false
+			atomic.StoreInt32(&ar.inactive, 0)
 			//做这一层结构为了快速结束
 			if atomic.LoadInt32(&ar.status) == StatusStopped || atomic.LoadInt32(&ar.status) == StatusStoping {
-				log.Debugf("Runner[%v] %v ActiveReader was exited when waiting to send data", ar.runnerName, ar.logpath)
+				log.Debugf("Runner[%v] %v ActiveReader was stopped when waiting to send data", ar.runnerName, ar.logpath)
 				atomic.CompareAndSwapInt32(&ar.status, StatusStoping, StatusStopped)
 				return
 			}
 			select {
 			case ar.msgchan <- Result{result: ar.readcache, logpath: ar.logpath}:
+				ar.cacheLineMux.Lock()
 				ar.readcache = ""
+				ar.cacheLineMux.Unlock()
 			case <-timer.C:
 			}
 		}
@@ -147,9 +153,9 @@ func (ar *ActiveReader) Close() error {
 	// 等待结束
 	for atomic.LoadInt32(&ar.status) != StatusStopped {
 		cnt++
-		//超过1000个10ms，即10s，就强行退出
-		if cnt > 1000 {
-			log.Errorf("Runner[%v] ActiveReader %s was not closed after 10s, force closing it", ar.runnerName, ar.logpath)
+		//超过300个10ms，即3s，就强行退出
+		if cnt > 300 {
+			log.Errorf("Runner[%v] ActiveReader %s was not closed after 3s, force closing it", ar.runnerName, ar.logpath)
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -158,8 +164,11 @@ func (ar *ActiveReader) Close() error {
 }
 
 //除了sync自己的bufreader，还要sync一行linecache
-func (ar *ActiveReader) SyncMeta() {
+func (ar *ActiveReader) SyncMeta() string {
+	ar.cacheLineMux.Lock()
+	defer ar.cacheLineMux.Unlock()
 	ar.br.SyncMeta()
+	return ar.readcache
 }
 
 func (ar *ActiveReader) expired(expireDur time.Duration) bool {
@@ -171,7 +180,7 @@ func (ar *ActiveReader) expired(expireDur time.Duration) bool {
 		log.Errorf("Runner[%v] stat log %v error %v,will not expire it...", ar.runnerName, ar.logpath, err)
 		return false
 	}
-	if fi.ModTime().Add(expireDur).Before(time.Now()) && ar.inactive {
+	if fi.ModTime().Add(expireDur).Before(time.Now()) && atomic.LoadInt32(&ar.inactive) > 0 {
 		return true
 	}
 	return false
@@ -354,15 +363,18 @@ func (mr *MultiReader) Source() string {
 
 func (mr *MultiReader) Close() (err error) {
 	atomic.StoreInt32(&mr.status, StatusStopped)
+	// 停10ms为了管道中的数据传递完毕，确认reader run函数已经结束不会再读取，保证syncMeta的正确性
+	time.Sleep(10 * time.Millisecond)
+	mr.SyncMeta()
 	ars := mr.getActiveReaders()
 	var wg sync.WaitGroup
 	for _, ar := range ars {
 		wg.Add(1)
-		go func(ar *ActiveReader) {
+		go func(mar *ActiveReader) {
 			defer wg.Done()
-			err = ar.Close()
-			if err != nil {
-				log.Errorf("Runner[%v] Close ActiveReader %v error %v", mr.meta.RunnerName, ar.logpath, err)
+			xerr := mar.Close()
+			if xerr != nil {
+				log.Errorf("Runner[%v] Close ActiveReader %v error %v", mr.meta.RunnerName, ar.logpath, xerr)
 			}
 		}(ar)
 	}
@@ -418,9 +430,9 @@ func (mr *MultiReader) ReadLine() (data string, err error) {
 func (mr *MultiReader) SyncMeta() {
 	ars := mr.getActiveReaders()
 	for _, ar := range ars {
-		ar.SyncMeta()
+		readcache := ar.SyncMeta()
 		mr.armapmux.Lock()
-		mr.cacheMap[ar.logpath] = ar.readcache
+		mr.cacheMap[ar.logpath] = readcache
 		mr.armapmux.Unlock()
 	}
 	mr.armapmux.Lock()

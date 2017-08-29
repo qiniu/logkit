@@ -7,6 +7,7 @@ type Option struct {
 	Default       string
 	DefaultNoUse  bool
 	Description   string
+	CheckRegex    string
 }
 
 type KeyValue struct {
