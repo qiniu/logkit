@@ -3,6 +3,7 @@ package sender
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"sync/atomic"
 	"time"
 
@@ -53,6 +54,7 @@ type FtSender struct {
 	procs       int  //发送并发数
 	runnerName  string
 	opt         *FtOption
+	stats       utils.StatsInfo
 }
 
 type FtOption struct {
@@ -136,9 +138,6 @@ func (ft *FtSender) Send(datas []Data) error {
 		backDataContext, err := ft.trySendDatas(datas, 1)
 		if err != nil {
 			log.Warnf("Runner[%v] Sender[%v] try Send Datas err: %v", ft.runnerName, ft.innerSender.Name(), err)
-			se.AddErrors()
-		} else {
-			se.AddSuccess()
 		}
 		// 容错队列会保证重试，此处不向外部暴露发送错误信息
 		se.ErrorDetail = nil
@@ -150,18 +149,26 @@ func (ft *FtSender) Send(datas []Data) error {
 			}
 			if nowDatas != nil {
 				se.ErrorDetail = reqerr.NewSendError("save data to backend queue error", ConvertDatasBack(nowDatas), reqerr.TypeDefault)
+				ft.stats.Errors += int64(len(nowDatas))
+				ft.stats.LastError = se.ErrorDetail
 			}
 		}
 	} else {
 		err := ft.saveToFile(datas)
 		if err != nil {
 			se.ErrorDetail = err
+			ft.stats.LastError = err
+			ft.stats.Errors += int64(len(datas))
 		} else {
 			se.ErrorDetail = nil
 		}
 		se.Ftlag = ft.backupQueue.Depth() + ft.logQueue.Depth()
 	}
 	return se
+}
+
+func (ft *FtSender) Stats() utils.StatsInfo {
+	return ft.stats
 }
 
 func (ft *FtSender) Close() error {
@@ -256,6 +263,8 @@ func (ft *FtSender) trySendDatas(datas []Data, failSleep int) (backDataContext [
 	err = ft.innerSender.Send(datas)
 	if c, ok := err.(*utils.StatsError); ok {
 		err = c.ErrorDetail
+		ft.stats.Errors += c.Errors
+		ft.stats.Success += c.Success
 	}
 	if err != nil {
 		retDatasContext := ft.handleSendError(err, datas)
@@ -273,6 +282,7 @@ func (ft *FtSender) trySendDatas(datas []Data, failSleep int) (backDataContext [
 }
 
 func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []*datasContext) {
+
 	failCtx := new(datasContext)
 	var binaryUnpack bool
 	se, succ := err.(*reqerr.SendError)
@@ -280,11 +290,13 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 		// 如果不是SendError 默认所有的数据都发送失败
 		log.Infof("Runner[%v] Sender[%v] error type is not *SendError! reSend all datas by default", ft.runnerName, ft.innerSender.Name())
 		failCtx.Datas = datas
+		ft.stats.LastError = err
 	} else {
 		failCtx.Datas = ConvertDatas(se.GetFailDatas())
 		if se.ErrorType == reqerr.TypeBinaryUnpack {
 			binaryUnpack = true
 		}
+		ft.stats.LastError = errors.New(se.Error())
 	}
 	log.Errorf("Runner[%v] Sender[%v] cannot write points: %v, failDatas size: %v", ft.runnerName, ft.innerSender.Name(), err, len(failCtx.Datas))
 	log.Debugf("Runner[%v] Sender[%v] failed datas [[%v]]", ft.runnerName, ft.innerSender.Name(), failCtx.Datas)
