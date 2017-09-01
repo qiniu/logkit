@@ -226,6 +226,11 @@ func TestPandoraSender(t *testing.T) {
 	if err == nil {
 		t.Error(fmt.Errorf("should get as send LetGetRepoError error but nil"))
 	}
+	sts, ok := err.(*utils.StatsError)
+	if !ok {
+		t.Error("should pasred as State Error")
+	}
+	err = sts.ErrorDetail
 	se, ok := err.(*reqerr.SendError)
 	if !ok {
 		t.Error("should pasred as Send Error")
@@ -418,6 +423,43 @@ func TestUUIDPandoraSender(t *testing.T) {
 		t.Error("no uuid found")
 	}
 	fmt.Println(pandora.Body)
+}
+
+func TestStatsSender(t *testing.T) {
+	pandora, pt := NewMockPandoraWithPrefix("/v2")
+	opt := &PandoraOption{
+		name:           "TestStatsSender",
+		repoName:       "TestStatsSender",
+		region:         "nb",
+		endpoint:       "http://127.0.0.1:" + pt,
+		ak:             "ak",
+		sk:             "sk",
+		schema:         "",
+		autoCreate:     "x1 s",
+		updateInterval: time.Second,
+		schemaFree:     true,
+	}
+	s, err := newPandoraSender(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := Data{}
+	d["x1"] = "hh"
+	err = s.Send([]Data{d})
+	if err != nil {
+		t.Error(err)
+	}
+	if !strings.Contains(pandora.Body, "x1=hh") {
+		t.Error("not x1 find error")
+	}
+	var sd Sender = s
+	stsd, ok := sd.(StatsSender)
+	assert.Equal(t, true, ok)
+	stats := stsd.Stats()
+	expstats := utils.StatsInfo{
+		Success: 1,
+	}
+	assert.Equal(t, stats, expstats)
 }
 
 func TestConvertDate(t *testing.T) {

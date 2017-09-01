@@ -19,6 +19,9 @@ Content-Type: application/json
    {  
       "name":"runner1",
       "logpath":"/your/log/path1",
+      "readDataSize": <读取数据的bytes大小>.
+      "readDataCount":<读取数据条数>,
+      "elaspedtime"<总用时>,
       "lag":{  
          "size":<lag size>,
          "files":<lag file number>,
@@ -29,34 +32,56 @@ Content-Type: application/json
          "success":<success number>,
          "last_error":"error message"
       },
-      "senderStats":{  
-         "errors":<error number>,
-         "success":<success number>,
-         "last_error":"error message"
+      "transformStats":{
+          "<transformtype>":{
+             "errors":<error number>,
+             "success":<success number>,
+             "last_error":"error message"
+           }
+      }
+      "senderStats":{
+         "senderName":{
+           "errors":<error number>,
+           "success":<success number>,
+           "last_error":"error message"
+         }
       },
       "error":"error msg"
    },
    {  
       "name":"runner2",
       "logpath":"/your/log/path2",
-      "lag":{  
-         "size":<lag size>,
-         "files":<lag file number>,
-         "ftlags":<fault torrent lags>
-      },
-      "parserStats":{  
-         "errors":<error number>,
-         "success":<success number>,
-         "last_error":"error message"
-      },
-      "senderStats":{  
-         "errors":<error number>,
-         "success":<success number>,
-         "last_error":"error message"
-      },
-      "error":"error msg"
-   }
+      "readDataSize": <读取数据的bytes大小>.
+        "readDataCount":<读取数据条数>,
+        "elaspedtime"<总用时>,
+        "lag":{  
+           "size":<lag size>,
+           "files":<lag file number>,
+           "ftlags":<fault torrent lags>
+        },
+        "parserStats":{  
+           "errors":<error number>,
+           "success":<success number>,
+           "last_error":"error message"
+        },
+        "transformStats":{
+            "<transformtype>":{
+               "errors":<error number>,
+               "success":<success number>,
+               "last_error":"error message"
+             }
+        }
+        "senderStats":{
+           "senderName":{
+             "errors":<error number>,
+             "success":<success number>,
+             "last_error":"error message"
+           }
+        },
+        "error":"error msg"
+     }
 }
+
 ```
 
 ### 获取指定runner运行状态
