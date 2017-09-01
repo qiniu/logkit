@@ -66,6 +66,27 @@ func TestDiskQueueWithMemory(t *testing.T) {
 	dq2.Close()
 }
 
+func TestDiskQueueMemoryLength(t *testing.T) {
+	dqName := "test_disk_queue_memory_length" + strconv.Itoa(int(time.Now().Unix()))
+	tmpDir, err := ioutil.TempDir("", fmt.Sprintf("nsq-test-%d", time.Now().UnixNano()))
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(tmpDir)
+	dq1 := NewDiskQueue(dqName, tmpDir, 1024, 0, 1<<10, 2500, 2500, 2*time.Second, 10*1024*1024, false, -1).(*diskQueue)
+	assert.NotEqual(t, dq1, nil)
+	assert.Equal(t, 0, cap(dq1.memoryChan))
+	dq1.Close()
+	dq2 := NewDiskQueue(dqName, tmpDir, 1024, 0, 1<<10, 2500, 2500, 2*time.Second, 10*1024*1024, true, 0).(*diskQueue)
+	assert.NotEqual(t, dq2, nil)
+	assert.Equal(t, 100, cap(dq2.memoryChan))
+	dq2.Close()
+	dq3 := NewDiskQueue(dqName, tmpDir, 1024, 0, 1<<10, 2500, 2500, 2*time.Second, 10*1024*1024, true, 1).(*diskQueue)
+	assert.NotEqual(t, dq3, nil)
+	assert.Equal(t, 1, cap(dq3.memoryChan))
+	dq3.Close()
+}
+
 func TestDiskQueueRoll(t *testing.T) {
 	dqName := "test_disk_queue_roll" + strconv.Itoa(int(time.Now().Unix()))
 	tmpDir, err := ioutil.TempDir("", fmt.Sprintf("nsq-test-%d", time.Now().UnixNano()))

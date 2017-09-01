@@ -79,8 +79,10 @@ func NewDiskQueue(name string, dataPath string, maxBytesPerFile int64,
 	minMsgSize int32, maxMsgSize int32,
 	syncEveryWrite, syncEveryRead int64, syncTimeout time.Duration, writeLimit int,
 	enableMemory bool, maxMemoryLength int) BackendQueue {
-	if enableMemory && maxMemoryLength <= 0 {
-		return nil
+	if !enableMemory {
+		maxMemoryLength = 0
+	} else if enableMemory && maxMemoryLength <= 0 {
+		maxMemoryLength = 100
 	}
 	d := diskQueue{
 		name:              name,
