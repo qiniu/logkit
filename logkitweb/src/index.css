@@ -75,7 +75,7 @@ body {
   border-radius: 0px 0px 0px 0px;
   position: fixed;
   width: 90%;
-  z-index: 9999;
+  z-index: 999;
 }
 
 .logkit-body {

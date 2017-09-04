@@ -114,6 +114,7 @@ class Sender extends Component {
             initialValue: !ele.DefaultNoUse ? ele.Default : '',
             rules: [{required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur'},
               {min: 1, max: 128, message: '长度在 1 到 128 个字符', trigger: 'change'},
+              {pattern: ele.CheckRegex, message: '输入不符合规范' },
             ]
           })(
               <Input placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值' } disabled={this.state.isReadonly}/>

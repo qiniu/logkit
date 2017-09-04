@@ -112,7 +112,6 @@ class Source extends Component {
           {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
             initialValue: !ele.DefaultNoUse ? ele.Default : '',
             rules: [{required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur'},
-              {min: 1, max: 128, message: '长度在 1 到 128 个字符', trigger: 'change'},
               {pattern: ele.CheckRegex, message: '输入不符合规范' },
             ]
           })(

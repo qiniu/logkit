@@ -1,10 +1,12 @@
 import React, {Component} from 'react';
-import {notification, message, Button, Steps} from 'antd';
+import {notification, message, Button, Steps, Icon} from 'antd';
 import Source from  './components/sourceConfig'
 import Parser from  './components/parserConfig'
 import Sender from './components/senderConfig'
 import RenderConfig from './components/renderConfig'
-
+import config from './store/config'
+import moment from 'moment'
+import {postConfigData} from './services/logkit';
 
 const Step = Steps.Step;
 const steps = [{
@@ -27,6 +29,7 @@ class Create extends Component {
       current: 0,
       sourceConfigCheck: false,
     };
+    window.clearInterval(window.statusInterval);
   }
 
   componentDidMount() {
@@ -43,11 +46,16 @@ class Create extends Component {
   }
 
   init = () => {
+    let that = this
     let isCopy =  this.props.location.query.copyConfig
     if (isCopy == 'true') {
       this.setState({
         current: 3
       })
+      if (window.nodeCopy) {
+        that.refs.initConfig.setFieldsValue({config: JSON.stringify(window.nodeCopy, null, 2)});
+      }
+
     }
   }
 
@@ -81,9 +89,51 @@ class Create extends Component {
         } else {
           const current = this.state.current + 1;
           this.setState({current});
+          let name = "logkit.runner." + moment().format("YYYYMMDDHHmmss");
+          let data = {
+            name,
+            ...config.getNodeData()
+          }
+          that.refs.initConfig.setFieldsValue({config: JSON.stringify(data, null, 2)});
         }
       });
     }
+
+  }
+
+  isJSON = (str) => {
+    if (typeof str == 'string') {
+      try {
+        JSON.parse(str);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+  }
+
+  addRunner = () => {
+    let that = this
+    const {validateFields, getFieldsValue} =  that.refs.initConfig;
+    let formData = getFieldsValue();
+    validateFields(null, {}, (err) => {
+      if (err) {
+        notification.warning({message: "表单校验未通过,请检查", duration: 20,})
+        return
+      } else {
+        if (this.isJSON(formData.config)) {
+          let data = JSON.parse(formData.config);
+          postConfigData({name: data.name, body: data}).then(data => {
+            if (data == undefined) {
+              notification.success({message: "Runner添加成功", duration: 10,})
+            }
+
+          })
+        } else {
+          notification.warning({message: "不是一个合法的json对象,请检查", duration: 20,})
+        }
+      }
+    });
 
   }
 
@@ -93,6 +143,7 @@ class Create extends Component {
   }
 
   turnToIndex() {
+    window.nodeCopy = config.getNodeData()
     this.props.router.push({pathname: `/index`})
   }
 
@@ -101,7 +152,11 @@ class Create extends Component {
     const {current} = this.state;
     return (
         <div className="logkit-create-container">
-          <div className="header">七牛Logkit配置文件助手</div>
+          <div className="header">
+            <Button style={{float:'left',marginTop:'15px'}} type="primary" className="index-btn" onClick={() => this.turnToIndex()}>
+              <Icon type="link" />回到首页
+            </Button>七牛Logkit配置文件助手
+          </div>
           <Steps current={current}>
             {steps.map(item => <Step key={item.title} title={item.title}/>)}
           </Steps>
@@ -133,7 +188,7 @@ class Create extends Component {
             {
               this.state.current === steps.length - 1
               &&
-              <Button type="primary" onClick={() => this.turnToIndex()}>回到首页</Button>
+              <Button type="primary" onClick={() => this.addRunner()}>确认并提交</Button>
             }
             {
               this.state.current > 0

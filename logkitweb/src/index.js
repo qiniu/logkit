@@ -24,6 +24,14 @@ export class Index extends Component {
 
   }
 
+  componentWillReceiveProps(nextProps) {
+    console.log(nextProps)
+    if (nextProps.location.pathname != this.props.location.pathname) {
+      console.log('test11')
+      window.clearInterval(window.myInterval);
+    }
+  }
+
 
   render() {
     return

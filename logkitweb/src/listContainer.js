@@ -15,33 +15,49 @@ class List extends Component {
       isShow: false,
       currentError: ''
     };
-  }
-
-  componentDidMount() {
     this.init()
   }
 
+  componentDidMount() {
+
+  }
+
   componentWillUnmount() {
+
   }
 
   componentDidUpdate(prevProps) {
+
   }
 
-  init = () => {
+  getStatus = () => {
+    let that = this
     getRunnerConfigs().then(data => {
       if (data.success) {
-        this.setState({
+        that.setState({
           runners: _.omit(data, 'success')
         })
         getRunnerStatus().then(data => {
           if (data.success) {
-            this.setState({
+            that.setState({
               status: _.values(_.omit(data, 'success'))
             })
           }
         })
       }
     })
+  }
+
+  init = () => {
+    let that = this
+    that.getStatus()
+
+    if (window.statusInterval != undefined && window.statusInterval != 'undefined') {
+      window.clearInterval(window.statusInterval);
+    }
+    window.statusInterval = setInterval(function () {
+      that.getStatus()
+    }, 10000)
 
   }
 
@@ -147,7 +163,7 @@ class List extends Component {
       width: '6%',
       render: (text, record) => {
         return (
-            <a>
+            record.isWebFolder == true ? (<a>
               <div className="editable-row-operations">
                 {
                   <Popconfirm title="是否删除该Runner?" onConfirm={() => this.deleteRunner(record)}>
@@ -155,7 +171,7 @@ class List extends Component {
                   </Popconfirm>
                 }
               </div>
-            </a>
+            </a>) : null
         );
       },
 
@@ -172,6 +188,7 @@ class List extends Component {
         let logpath = ''
         let sendNumber = 0
         let parseNumber = 0
+        let isWebFolder = false
         let errorLog = {
           parseError: '',
           sendError: '',
@@ -189,6 +206,7 @@ class List extends Component {
             logpath = ele.logpath
             errorLog.parseError = ele.parserStats.last_error
             errorLog.sendError = _.values(ele.senderStats)[0].last_error
+            isWebFolder = item.web_folder
           }
         })
         data.push({
@@ -203,7 +221,8 @@ class List extends Component {
           failNUmber: failNUmber,
           path: logpath,
           errorLog: errorLog,
-          copy: JSON.stringify(item, null, 2)
+          copy: JSON.stringify(item, null, 2),
+          isWebFolder: isWebFolder
         })
       })
 
@@ -221,7 +240,9 @@ class List extends Component {
   render() {
     return (
         <div className="logkit-container">
-          <div className="header">七牛Logkit配置文件助手</div>
+          <div className="header">
+            七牛Logkit配置文件助手
+          </div>
           <div className="content">
             <Button type="primary" className="index-btn" ghost onClick={this.add}>
               <Icon type="plus"/> 增加Runner

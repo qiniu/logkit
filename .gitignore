@@ -60,3 +60,26 @@ logkit
 stats
 .logkitconfs/
 public/.project
+
+# logkitWeb ignore 
+# See https://help.github.com/ignore-files/ for more about ignoring files.
+
+# dependencies
+./logkitweb/node_modules
+
+# testing
+./logkitweb/coverage
+
+# production
+./logkitweb/build
+
+# misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+npm-debug.log*
+./logkitweb/yarn-debug.log*
+./logkitweb/yarn-error.log*
