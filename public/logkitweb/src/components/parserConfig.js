@@ -7,6 +7,7 @@ import {
 } from 'antd';
 import _ from "lodash";
 import config from '../store/config'
+import moment from 'moment'
 import {
   getSourceParseOptionsFormData,
   getSourceParseOptions,
@@ -68,7 +69,14 @@ class Parser extends Component {
   submit = () => {
     const {getFieldsValue} = this.props.form;
     let data = getFieldsValue();
-    config.set('parser', data[this.state.currentOption])
+    let notEmptyKeys = []
+    _.forIn(data[this.state.currentOption], function(value,key) {
+      if(value != ""){
+        notEmptyKeys.push(key)
+      }
+    });
+
+    config.set('parser', _.pick(data[this.state.currentOption],notEmptyKeys))
   }
 
 
@@ -107,6 +115,9 @@ class Parser extends Component {
     let result = []
     this.state.currentItem.map((ele) => {
       if (ele.ChooseOnly == false) {
+        if (ele.KeyName == 'name'){
+          ele.Default = "pandora.parser." + moment().format("YYYYMMDDHHmmss");
+        }
         result.push(<FormItem
             {...formItemLayout}
             label={(
@@ -118,6 +129,7 @@ class Parser extends Component {
             initialValue: !ele.DefaultNoUse ? ele.Default : '',
             rules: [{required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur'},
               {min: 1, max: 128, message: '长度在 1 到 128 个字符', trigger: 'change'},
+              {pattern: ele.CheckRegex, message: '输入不符合规范' },
             ]
           })(
               <Input placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值' } disabled={this.state.isReadonly}/>

@@ -6,6 +6,8 @@ import {
 } from 'antd';
 import {getSenderOptionsFormData, getSenderOptions} from '../services/logkit';
 import config from '../store/config'
+import moment from 'moment'
+import _ from "lodash";
 
 const Option = Select.Option
 const FormItem = Form.Item;
@@ -60,7 +62,13 @@ class Sender extends Component {
     const {getFieldsValue} = this.props.form;
     let data = getFieldsValue();
     data[this.state.currentOption].sender_type = this.state.currentOption
-    config.set('senders', [data[this.state.currentOption]])
+    let notEmptyKeys = []
+    _.forIn(data[this.state.currentOption], function(value,key) {
+      if(value != ""){
+        notEmptyKeys.push(key)
+      }
+    });
+    config.set('senders', [_.pick(data[this.state.currentOption],notEmptyKeys)])
   }
 
 
@@ -91,6 +99,9 @@ class Sender extends Component {
     let result = []
     this.state.currentItem.map((ele) => {
       if (ele.ChooseOnly == false) {
+        if (ele.KeyName == 'name'){
+          ele.Default = "pandora.sender." + moment().format("YYYYMMDDHHmmss");
+        }
         result.push(<FormItem
             {...formItemLayout}
             className=""

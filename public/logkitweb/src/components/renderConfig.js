@@ -61,6 +61,17 @@ class renderConfig extends Component {
     resetFields();
   }
 
+  isJSON = (str) => {
+    if (typeof str == 'string') {
+      try {
+        JSON.parse(str);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+  }
+
   addRunner = () => {
     const {validateFields, getFieldsValue} = this.props.form;
     let formData = getFieldsValue();
@@ -69,10 +80,17 @@ class renderConfig extends Component {
         notification.warning({message: "表单校验未通过,请检查", duration: 20,})
         return
       } else {
-        let data = JSON.parse(formData.config);
-        postConfigData({name: data.name, body: data}).then(data => {
-            notification.success({message: "Runner添加成功", duration: 10,})
-        })
+        if (this.isJSON(formData.config)) {
+          let data = JSON.parse(formData.config);
+          postConfigData({name: data.name, body: data}).then(data => {
+            if (data == undefined) {
+              notification.success({message: "Runner添加成功", duration: 10,})
+            }
+
+          })
+        } else {
+          notification.warning({message: "不是一个合法的json对象,请检查", duration: 20,})
+        }
       }
     });
 
@@ -82,30 +100,33 @@ class renderConfig extends Component {
     const {getFieldDecorator} = this.props.form;
     return (
         <div >
-          <Row className='logkit-header'>
-            <Col span={12}>
-              <h2 className="logkit-title">logkit配置文件</h2>
-              <Button className="btn-config" onClick={this.renderConfigFile}>生成配置文件</Button>
-              <Button onClick={this.addRunner}>添加Runner</Button></Col>
-            <Col span={12}>
-              <h4 className="logkit-tip">← 点击生成配置文件, 可对配置文本手动修改后再添加Runner!</h4>
-            </Col>
-          </Row>
-          <Row>
-            <Form>
-              <FormItem
-                  {...optionFormItemLayout}
-              >
-                {getFieldDecorator('config', {
-                  initialValue: this.state.currentConfig,
-                  rules: [{required: true, message: '配置文件不能为空', trigger: 'blur'}]
-                })(
-                    <Input type="textarea" rows="50"/>
-                )}
-              </FormItem>
-            </Form>
-          </Row>
-
+          <div className='logkit-header'>
+            <Row >
+              <Col span={12}>
+                <h2 className="logkit-title">logkit配置文件</h2>
+                <Button className="btn-config" onClick={this.renderConfigFile}>生成配置文件</Button>
+                <Button onClick={this.addRunner}>添加Runner</Button></Col>
+              <Col span={12}>
+                <h4 className="logkit-tip">← 点击生成配置文件, 可对配置文本手动修改后再添加Runner!</h4>
+              </Col>
+            </Row>
+          </div>
+          <div className='logkit-body'>
+            <Row>
+              <Form>
+                <FormItem
+                    {...optionFormItemLayout}
+                >
+                  {getFieldDecorator('config', {
+                    initialValue: this.state.currentConfig,
+                    rules: [{required: true, message: '配置文件不能为空', trigger: 'blur'}]
+                  })(
+                      <Input type="textarea" rows="50"/>
+                  )}
+                </FormItem>
+              </Form>
+            </Row>
+          </div>
         </div>
     );
   }
