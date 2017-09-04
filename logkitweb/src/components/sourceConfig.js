@@ -2,10 +2,11 @@ import React, {Component} from 'react';
 import {
   Form,
   Input,
-  Select
+  Select,
 } from 'antd';
-import {getSenderOptionsFormData, getSenderOptions} from '../services/logkit';
 import config from '../store/config'
+import _ from "lodash";
+import {getSourceOptionsFormData, getSourceOptions} from '../services/logkit';
 
 const Option = Select.Option
 const FormItem = Form.Item;
@@ -32,17 +33,17 @@ const optionFormItemLayout = {
   },
 };
 
-class Sender extends Component {
+class Source extends Component {
   constructor(props) {
     super(props);
     this.state = {
       current: 0,
       items: [],
       options: [],
-      currentOption: 'pandora',
+      currentOption: 'dir',
       currentItem: []
-    }
-    ;
+    };
+
   }
 
   componentDidMount() {
@@ -56,27 +57,36 @@ class Sender extends Component {
     this.submit()
   }
 
+  componentWillReceiveProps(nextProps) {
+
+  }
+
   submit = () => {
     const {getFieldsValue} = this.props.form;
     let data = getFieldsValue();
-    data[this.state.currentOption].sender_type = this.state.currentOption
-    config.set('senders', [data[this.state.currentOption]])
-  }
+    let notEmptyKeys = []
+    _.forIn(data[this.state.currentOption], function(value,key) {
+      if(value != ""){
+        notEmptyKeys.push(key)
+      }
+    });
 
+    config.set('reader', _.pick(data[this.state.currentOption],notEmptyKeys))
+  }
 
   init = () => {
 
-    getSenderOptions().then(data => {
+    getSourceOptions().then(data => {
       if (data.success) {
         this.setState({
           options: data,
           currentOption: data[0].key
         })
-        getSenderOptionsFormData().then(data => {
+        getSourceOptionsFormData().then(data => {
           if (data.success) {
             this.setState({
               items: data,
-              currentItem: data.pandora
+              currentItem: data.dir
             })
           }
         })
@@ -103,6 +113,7 @@ class Sender extends Component {
             initialValue: !ele.DefaultNoUse ? ele.Default : '',
             rules: [{required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur'},
               {min: 1, max: 128, message: '长度在 1 到 128 个字符', trigger: 'change'},
+              {pattern: ele.CheckRegex, message: '输入不符合规范' },
             ]
           })(
               <Input placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值' } disabled={this.state.isReadonly}/>
@@ -125,6 +136,7 @@ class Sender extends Component {
           )}
         </FormItem>)
       }
+
 
     })
     return (
@@ -164,10 +176,10 @@ class Sender extends Component {
   render() {
     const {getFieldDecorator} = this.props.form;
     return (
-        <div >
+        <div>
           <Form className="slide-in text-color">
             <FormItem {...optionFormItemLayout} label="选择数据源类型">
-              {getFieldDecorator(`${this.state.currentOption}.sender_type`, {
+              {getFieldDecorator(`${this.state.currentOption}.mode`, {
                 initialValue: this.state.currentOption
               })(
                   <Select onChange={this.handleChange}>
@@ -180,4 +192,4 @@ class Sender extends Component {
     );
   }
 }
-export default Form.create()(Sender);
+export default Form.create()(Source);

@@ -2,17 +2,12 @@ import React, {Component} from 'react';
 import {
   Form,
   Input,
-  Select,
-  Button,
+  Select
 } from 'antd';
-import _ from "lodash";
+import {getSenderOptionsFormData, getSenderOptions} from '../services/logkit';
 import config from '../store/config'
-import {
-  getSourceParseOptionsFormData,
-  getSourceParseOptions,
-  getSourceParsesamplelogs,
-  postParseData
-} from '../services/logkit';
+import moment from 'moment'
+import _ from "lodash";
 
 const Option = Select.Option
 const FormItem = Form.Item;
@@ -39,19 +34,17 @@ const optionFormItemLayout = {
   },
 };
 
-class Parser extends Component {
+class Sender extends Component {
   constructor(props) {
     super(props);
     this.state = {
       current: 0,
       items: [],
       options: [],
-      currentOption: 'nginx',
-      currentItem: [],
-      parseData: '',
-      sampleData: [],
-      currentSampleData: ''
-    };
+      currentOption: 'pandora',
+      currentItem: []
+    }
+    ;
   }
 
   componentDidMount() {
@@ -68,33 +61,32 @@ class Parser extends Component {
   submit = () => {
     const {getFieldsValue} = this.props.form;
     let data = getFieldsValue();
-    config.set('parser', data[this.state.currentOption])
+    data[this.state.currentOption].sender_type = this.state.currentOption
+    let notEmptyKeys = []
+    _.forIn(data[this.state.currentOption], function(value,key) {
+      if(value != ""){
+        notEmptyKeys.push(key)
+      }
+    });
+    config.set('senders', [_.pick(data[this.state.currentOption],notEmptyKeys)])
   }
 
 
   init = () => {
-    getSourceParseOptions().then(data => {
+
+    getSenderOptions().then(data => {
       if (data.success) {
         this.setState({
           options: data,
           currentOption: data[0].key
         })
-        getSourceParseOptionsFormData().then(data => {
+        getSenderOptionsFormData().then(data => {
           if (data.success) {
             this.setState({
               items: data,
-              currentItem: data.nginx
+              currentItem: data.pandora
             })
           }
-        })
-      }
-    })
-
-    getSourceParsesamplelogs().then(data => {
-      if (data.success) {
-        this.setState({
-          sampleData: data,
-          currentSampleData: data[this.state.currentOption]
         })
       }
     })
@@ -107,8 +99,12 @@ class Parser extends Component {
     let result = []
     this.state.currentItem.map((ele) => {
       if (ele.ChooseOnly == false) {
+        if (ele.KeyName == 'name'){
+          ele.Default = "pandora.sender." + moment().format("YYYYMMDDHHmmss");
+        }
         result.push(<FormItem
             {...formItemLayout}
+            className=""
             label={(
                 <span className={ele.DefaultNoUse ? 'warningTip' : '' }>
                   {ele.Description}
@@ -141,7 +137,6 @@ class Parser extends Component {
         </FormItem>)
       }
 
-
     })
     return (
         result
@@ -152,8 +147,7 @@ class Parser extends Component {
   handleChange = (option) => {
     this.setState({
       currentOption: option,
-      currentItem: this.state.items[option],
-      currentSampleData: this.state.sampleData[option]
+      currentItem: this.state.items[option]
     })
 
   }
@@ -178,30 +172,13 @@ class Parser extends Component {
     )
   }
 
-  parseSampleData = () => {
-    const {getFieldsValue} = this.props.form;
-    let data = getFieldsValue();
-    const requestData = {
-      type: this.state.currentOption,
-      ...data[this.state.currentOption],
-      sampleLog: this.state.currentSampleData
-    }
-    postParseData({body: requestData}).then(data => {
-      if (data.success) {
-        this.setState({
-          parseData: JSON.stringify(_.pick(data, 'SamplePoints'), null, 2)
-        })
-      }
-    })
-  }
-
   render() {
     const {getFieldDecorator} = this.props.form;
     return (
         <div >
           <Form className="slide-in text-color">
-            <FormItem {...optionFormItemLayout} label="选择解析方式">
-              {getFieldDecorator(`${this.state.currentOption}.type`, {
+            <FormItem {...optionFormItemLayout} label="选择数据源类型">
+              {getFieldDecorator(`${this.state.currentOption}.sender_type`, {
                 initialValue: this.state.currentOption
               })(
                   <Select onChange={this.handleChange}>
@@ -209,18 +186,9 @@ class Parser extends Component {
                   </Select>)}
             </FormItem>
             {this.renderFormItem()}
-            <FormItem {...optionFormItemLayout} >
-              <Button type="primary" onClick={this.parseSampleData}>解析样例数据</Button>
-            </FormItem>
-            <FormItem {...optionFormItemLayout} label="输入样例日志">
-              <Input type="textarea" value={this.state.currentSampleData} rows="6"></Input>
-            </FormItem>
-            <FormItem {...optionFormItemLayout} label="样例日志">
-              <Input type="textarea" value={this.state.parseData} rows="20"></Input>
-            </FormItem>
           </Form>
         </div>
     );
   }
 }
-export default Form.create()(Parser);
+export default Form.create()(Sender);
