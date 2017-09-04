@@ -15,6 +15,7 @@ import (
 	"os"
 	"regexp"
 	"sync"
+	"unsafe"
 
 	"sync/atomic"
 
@@ -303,7 +304,7 @@ func (b *BufReader) readBytes(delim byte) ([]byte, error) {
 // For simple uses, a Scanner may be more convenient.
 func (b *BufReader) ReadString(delim byte) (ret string, err error) {
 	bytes, err := b.readBytes(delim)
-	ret = string(bytes)
+	ret = *(*string)(unsafe.Pointer(&bytes))
 	//默认都是utf-8
 	if b.meta.GetEncodingWay() != "" && b.meta.GetEncodingWay() != "utf-8" && b.decoder != nil {
 		ret = b.decoder.ConvertString(ret)
