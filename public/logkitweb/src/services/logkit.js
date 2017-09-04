@@ -50,6 +50,12 @@ export async function getSenderOptions(params) {
 }
 
 export async function getRunnerConfigs(params) {
+  return request(window.logkitUrl + '/logkit/configs', {
+    method: 'get',
+  });
+}
+
+export async function getRunnerStatus(params) {
   return request(window.logkitUrl + '/logkit/status', {
     method: 'get',
   });

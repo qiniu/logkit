@@ -14,7 +14,9 @@ body {
   width: 90%
 }
 
-.logkit-container .add-btn {
+.logkit-container .index-btn {
+  width:300px;
+  margin-right: 50px;
   margin-bottom: 8px;
 }
 
@@ -71,6 +73,13 @@ body {
   background: #108ee9;
   padding: 10px 20px 10px 20px;
   border-radius: 0px 0px 0px 0px;
+  position: fixed;
+  width: 90%;
+  z-index: 9999;
+}
+
+.logkit-body {
+  padding-top: 55px;
 }
 
 .logkit-title {

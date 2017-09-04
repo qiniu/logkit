@@ -13,4 +13,8 @@ config.getNodeData = () => {
   return window.nodes
 }
 
+config.setNodeData = (data) => {
+  return window.nodes = data
+}
+
 export default config
