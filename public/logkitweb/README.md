@@ -62,6 +62,7 @@ git clone https://github.com/qiniu/logkit.git
 ```
 
 进入目录安装依赖:
+cd logkit/public/logkitweb
 
 ```bash
 #开始前请确保安装了npm 或者 yarn (npm在安装node的时候就自带了 可以 npm -v查看版本信息)
@@ -82,4 +83,4 @@ yarn start
 ```bash
 yarn build
 
-将会打包至build目录
+将会打包至当前的build目录
