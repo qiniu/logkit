@@ -1,9 +1,7 @@
 /**
- * Created by zhonghuiping on 2017/8/25.
+ * Created by zhonghuiping on 2017/7/7.
  */
 import request  from '../utils/request';
-
-window.logkitUrl = ''
 
 /* window.logkitUrl = 'http://localhost:12581' */
 
@@ -32,6 +30,7 @@ export async function getSourceParseOptions(params) {
 }
 
 export async function getSourceParsesamplelogs(params) {
+  window.logkitUrl = 'http://localhost:12581'
   return request(window.logkitUrl + '/logkit/parser/samplelogs', {
     method: 'get',
   });
@@ -50,12 +49,6 @@ export async function getSenderOptions(params) {
 }
 
 export async function getRunnerConfigs(params) {
-  return request(window.logkitUrl + '/logkit/configs', {
-    method: 'get',
-  });
-}
-
-export async function getRunnerStatus(params) {
   return request(window.logkitUrl + '/logkit/status', {
     method: 'get',
   });

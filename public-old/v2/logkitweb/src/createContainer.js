@@ -1,10 +1,9 @@
 import React, {Component} from 'react';
 import {notification, message, Button, Steps} from 'antd';
-import Source from  './components/sourceConfig'
-import Parser from  './components/parserConfig'
-import Sender from './components/senderConfig'
-import RenderConfig from './components/renderConfig'
-
+import Source from  './containers/sourceConfig'
+import Parser from  './containers/parserConfig'
+import Sender from './containers/senderConfig'
+import RenderConfig from './containers/renderConfig'
 
 const Step = Steps.Step;
 const steps = [{
@@ -30,9 +29,8 @@ class Create extends Component {
   }
 
   componentDidMount() {
-    this.init()
-  }
 
+  }
 
   componentWillUnmount() {
 
@@ -40,15 +38,6 @@ class Create extends Component {
 
   componentDidUpdate(prevProps) {
 
-  }
-
-  init = () => {
-    let isCopy =  this.props.location.query.copyConfig
-    if (isCopy == 'true') {
-      this.setState({
-        current: 3
-      })
-    }
   }
 
   next() {
@@ -92,13 +81,10 @@ class Create extends Component {
     this.setState({current});
   }
 
-  turnToIndex() {
-    this.props.router.push({pathname: `/index`})
-  }
-
 
   render() {
     const {current} = this.state;
+    console.log(this.state.current)
     return (
         <div className="logkit-create-container">
           <div className="header">七牛Logkit配置文件助手</div>
@@ -133,7 +119,7 @@ class Create extends Component {
             {
               this.state.current === steps.length - 1
               &&
-              <Button type="primary" onClick={() => this.turnToIndex()}>回到首页</Button>
+              <Button type="primary" onClick={() => message.success('Processing complete!')}>Done</Button>
             }
             {
               this.state.current > 0
