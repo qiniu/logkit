@@ -48,7 +48,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyFaultTolerant,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"false", "true"},
+			ChooseOptions: []string{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   "是否开启磁盘发送管道(fault_tolerant)",
@@ -246,7 +246,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyFaultTolerant,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"false", "true"},
+			ChooseOptions: []string{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   "是否开启磁盘发送管道(fault_tolerant)",
@@ -366,8 +366,8 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyFaultTolerant,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"false", "true"},
-			Default:       "false",
+			ChooseOptions: []string{"true", "false"},
+			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   "是否开启磁盘发送管道(fault_tolerant)",
 		},
@@ -452,8 +452,8 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyFaultTolerant,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"false", "true"},
-			Default:       "false",
+			ChooseOptions: []string{"true", "false"},
+			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   "是否开启磁盘发送管道(fault_tolerant)",
 		},
