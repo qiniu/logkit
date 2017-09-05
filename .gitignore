@@ -65,13 +65,14 @@ public/.project
 # See https://help.github.com/ignore-files/ for more about ignoring files.
 
 # dependencies
-./logkitweb/node_modules
+logkitweb/node_modules
 
 # testing
-./logkitweb/coverage
+logkitweb/coverage
+node_modules
 
 # production
-./logkitweb/build
+logkitweb/build
 
 # misc
 .DS_Store

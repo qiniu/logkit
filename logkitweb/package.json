@@ -14,9 +14,9 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build && cp -rf ./build/* ../public",
+    "build": "rm ../public/static/js/* && react-scripts build && cp -rf ./build/* ../public",
     "test": "react-scripts test --env=jsdom",
     "eject": "react-scripts eject"
   },
-  "proxy": "http://localhost:30010"
+  "proxy": "http://localhost:3000"
 }

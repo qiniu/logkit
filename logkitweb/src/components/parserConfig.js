@@ -47,7 +47,7 @@ class Parser extends Component {
       current: 0,
       items: [],
       options: [],
-      currentOption: 'nginx',
+      currentOption: 'json',
       currentItem: [],
       parseData: '',
       sampleData: [],

@@ -33,7 +33,7 @@ export class Index extends Component {
 
 ReactDOM.render(
     <Router history={hashHistory}>
-      <Route path="/index" components={List}/>
+      <Route path="/" components={List}/>
       <Route path="/index/create" components={Create}/>
     </Router>,
     document.getElementById('root')
