@@ -128,7 +128,7 @@ class Create extends Component {
           postConfigData({name: data.name, body: data}).then(data => {
             if (data === undefined) {
               notification.success({message: "Runner添加成功", duration: 10,})
-              this.props.router.push({pathname: `/index`})
+              this.props.router.push({pathname: `/`})
             }
 
           })
@@ -147,7 +147,7 @@ class Create extends Component {
 
   turnToIndex() {
     window.nodeCopy = config.getNodeData()
-    this.props.router.push({pathname: `/index`})
+    this.props.router.push({pathname: `/`})
   }
 
 

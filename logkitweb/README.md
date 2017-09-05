@@ -62,7 +62,7 @@ git clone https://github.com/qiniu/logkit.git
 ```
 
 进入目录安装依赖:
-cd logkit/public/logkitweb
+cd logkit/logkitweb
 
 ```bash
 #开始前请确保安装了npm 或者 yarn (npm在安装node的时候就自带了 可以 npm -v查看版本信息)
@@ -75,7 +75,7 @@ npm i 或者 yarn install
 ```bash
 yarn start
 # 注意: (package.json里面的  "proxy": "http://localhost:3000" 必须跟 logkit.conf里面的bind_host的端口相同)
-打开 http://localhost:3000/#/index
+打开 http://localhost:3000/
 ```
 
 构建：
