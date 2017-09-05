@@ -99,9 +99,9 @@ class Source extends Component {
   renderFormItem = () => {
     const {getFieldDecorator} = this.props.form;
     let result = []
-    this.state.currentItem.map((ele) => {
+    this.state.currentItem.map((ele,index) => {
       if (ele.ChooseOnly == false) {
-        result.push(<FormItem
+        result.push(<FormItem key={index}
             {...formItemLayout}
             className=""
             label={(
@@ -119,14 +119,13 @@ class Source extends Component {
           )}
         </FormItem>)
       } else {
-        result.push(<FormItem
+        result.push(<FormItem key={index}
             {...formItemLayout}
             className=""
             label={ele.Description}>
           {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
             initialValue: ele.ChooseOptions[0],
             rules: [{required: true, message: '不能为空', trigger: 'blur'},
-              {min: 1, max: 128, message: '长度在 1 到 128 个字符', trigger: 'change'},
             ]
           })(
               <Select>
@@ -155,7 +154,7 @@ class Source extends Component {
   renderSelectOptions = () => {
     let options = []
     this.state.options.map((ele) => {
-      options.push(<Option value={ele.key}>{ele.value}</Option>)
+      options.push(<Option key={ele.key} value={ele.key}>{ele.value}</Option>)
     })
     return (
         options
@@ -165,7 +164,7 @@ class Source extends Component {
   renderChooseOption = (items) => {
     let options = []
     items.map((ele) => {
-      options.push(<Option value={ele}>{ele}</Option>)
+      options.push(<Option key={ele} value={ele}>{ele}</Option>)
     })
     return (
         options

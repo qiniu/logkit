@@ -81,6 +81,8 @@ class Parser extends Component {
 
 
   init = () => {
+    const {getFieldDecorator} = this.props.form;
+
     getSourceParseOptions().then(data => {
       if (data.success) {
         this.setState({
@@ -104,6 +106,8 @@ class Parser extends Component {
           sampleData: data,
           currentSampleData: data[this.state.currentOption]
         })
+        console.log(data[this.state.currentOption])
+        getFieldDecorator("sampleData", {initialValue: data[this.state.currentOption]});
       }
     })
 
@@ -113,12 +117,12 @@ class Parser extends Component {
   renderFormItem = () => {
     const {getFieldDecorator} = this.props.form;
     let result = []
-    this.state.currentItem.map((ele) => {
+    this.state.currentItem.map((ele,index) => {
       if (ele.ChooseOnly == false) {
         if (ele.KeyName == 'name'){
           ele.Default = "pandora.parser." + moment().format("YYYYMMDDHHmmss");
         }
-        result.push(<FormItem
+        result.push(<FormItem key={index}
             {...formItemLayout}
             label={(
                 <span className={ele.DefaultNoUse ? 'warningTip' : '' }>
@@ -135,14 +139,13 @@ class Parser extends Component {
           )}
         </FormItem>)
       } else {
-        result.push(<FormItem
+        result.push(<FormItem key={index}
             {...formItemLayout}
             className=""
             label={ele.Description}>
           {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
             initialValue: ele.ChooseOptions[0],
             rules: [{required: true, message: '不能为空', trigger: 'blur'},
-              {min: 1, max: 128, message: '长度在 1 到 128 个字符', trigger: 'change'},
             ]
           })(
               <Select>
@@ -160,18 +163,19 @@ class Parser extends Component {
   }
 
   handleChange = (option) => {
+    const {getFieldDecorator} = this.props.form;
     this.setState({
       currentOption: option,
       currentItem: this.state.items[option],
       currentSampleData: this.state.sampleData[option]
     })
-
+    getFieldDecorator("sampleData", {initialValue: this.state.sampleData[option]});
   }
 
   renderSelectOptions = () => {
     let options = []
     this.state.options.map((ele) => {
-      options.push(<Option value={ele.key}>{ele.value}</Option>)
+      options.push(<Option key={ele.key} value={ele.key}>{ele.value}</Option>)
     })
     return (
         options
@@ -181,7 +185,7 @@ class Parser extends Component {
   renderChooseOption = (items) => {
     let options = []
     items.map((ele) => {
-      options.push(<Option value={ele}>{ele}</Option>)
+      options.push(<Option key={ele} value={ele}>{ele}</Option>)
     })
     return (
         options
@@ -194,7 +198,7 @@ class Parser extends Component {
     const requestData = {
       type: this.state.currentOption,
       ...data[this.state.currentOption],
-      sampleLog: this.state.currentSampleData
+      sampleLog: data.sampleData
     }
     postParseData({body: requestData}).then(data => {
       if (data.success) {
@@ -222,9 +226,16 @@ class Parser extends Component {
             <FormItem {...optionFormItemLayout} >
               <Button type="primary" onClick={this.parseSampleData}>解析样例数据</Button>
             </FormItem>
-            <FormItem {...optionFormItemLayout} label="输入样例日志">
-              <Input type="textarea" value={this.state.currentSampleData} rows="6"></Input>
-            </FormItem>
+              <FormItem
+                  label={'输入样例日志'}
+                  {...optionFormItemLayout}
+              >
+                {getFieldDecorator('sampleData', {
+                  rules: [{required: true, message: '配置文件不能为空', trigger: 'blur'}]
+                })(
+                    <Input type="textarea" rows="8"/>
+                )}
+              </FormItem>
             <FormItem {...optionFormItemLayout} label="样例日志">
               <Input type="textarea" value={this.state.parseData} rows="20"></Input>
             </FormItem>
