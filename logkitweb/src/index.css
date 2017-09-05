@@ -1,0 +1,112 @@
+body,html{
+  height:100%;
+}
+body {
+  position: fixed;
+  margin: 0;
+  padding: 0;
+  font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
+}
+
+.logkit-container {
+  padding-top: 2%;
+  margin: auto;
+  width: 90%
+}
+
+.logkit-container .index-btn {
+  width:300px;
+  margin-right: 50px;
+  margin-bottom: 8px;
+}
+
+.header {
+  background: #1989fa;
+  border-top-right-radius: 8px;
+  border-top-left-radius: 8px;
+  width: 100%;
+  box-shadow: 0 2px 5px rgba(0,0,0,.2)!important;
+  height: 60px;
+  text-align: center;
+  line-height: 60px;
+  color: #fff;
+  font-size: 24px;
+  margin-bottom: 20px;
+}
+
+.steps-content {
+  border: 1px dashed #e9e9e9;
+  border-radius: 0px 0px 6px 6px;
+  background-color: #fafafa;
+  text-align: center;
+  height: 90%;
+  overflow: scroll;
+}
+
+.steps-action {
+  margin-top: 24px;
+}
+
+.logkit-create-container {
+  padding-top: 2%;
+  margin: auto;
+  width: 90%;
+  height: 78%;
+}
+
+.hide-div {
+  display: none;
+}
+
+.show-div {
+  display: block;
+}
+
+.info {
+  margin: auto;
+  color: #f04134;
+  font-size: 18px;
+  padding: 20px;
+}
+
+.logkit-header {
+  background: #108ee9;
+  padding: 10px 20px 10px 20px;
+  border-radius: 0px 0px 0px 0px;
+  position: fixed;
+  width: 90%;
+  z-index: 999;
+}
+
+.logkit-body {
+  padding-top: 55px;
+}
+
+.logkit-title {
+  float: left;
+  color: #fff;
+}
+
+.btn-config {
+  margin-right: 10px;
+}
+
+.logkit-tip {
+  line-height: 35px;
+  color: #fff;
+}
+
+.ant-steps {
+  margin-bottom: 20px;
+}
+
+.warningTip {
+  color: #ffbf00;
+}
+
+.ant-form-item-label label {
+  color: rgb(0, 0, 0);
+}
+.hide {
+  display: none;
+}

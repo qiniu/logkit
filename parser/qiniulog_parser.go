@@ -226,7 +226,7 @@ func errorCanNotParse(s string, line string, err error) error {
 }
 
 func (p *QiniulogParser) parse(line string) (d sender.Data, err error) {
-	d = sender.Data{}
+	d = make(sender.Data, len(p.headers)+len(p.labels))
 	line = strings.Replace(line, "\n", " ", -1)
 	line = strings.Replace(line, "\t", "\\t", -1)
 	var result, logdate string

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/utils"
 )
 
 // Data store as use key/value map
@@ -20,6 +21,14 @@ type Sender interface {
 	// send data, error if failed
 	Send([]Data) error
 	Close() error
+}
+
+type StatsSender interface {
+	Name() string
+	// send data, error if failed
+	Send([]Data) error
+	Close() error
+	Stats() utils.StatsInfo
 }
 
 // Sender's conf keys

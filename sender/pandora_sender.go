@@ -2,6 +2,7 @@ package sender
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -56,6 +57,7 @@ type PandoraSender struct {
 	alias2key          map[string]string // map[alias]name
 	opt                PandoraOption
 	microsecondCounter int64
+	stats              utils.StatsInfo
 }
 
 // UserSchema was parsed pandora schema from user's raw schema
@@ -419,7 +421,7 @@ func (s *PandoraSender) getSchemasAlias() (map[string]pipeline.RepoSchemaEntry, 
 }
 
 func (s *PandoraSender) generatePoint(data Data) (point Data) {
-	point = Data{}
+	point = make(Data, len(data))
 	schemas, alias2key := s.getSchemasAlias()
 	for k, v := range schemas {
 		name, ok := alias2key[k]
@@ -481,10 +483,22 @@ func (s *PandoraSender) checkSchemaUpdate() {
 }
 
 func (s *PandoraSender) Send(datas []Data) (se error) {
+
 	s.checkSchemaUpdate()
 	if !s.opt.schemaFree && (len(s.schemas) <= 0 || len(s.alias2key) <= 0) {
 		se = reqerr.NewSendError("Get pandora schema error, faild to send data", ConvertDatasBack(datas), reqerr.TypeDefault)
-		return
+		ste := &utils.StatsError{
+			StatsInfo: utils.StatsInfo{
+				Success:   0,
+				Errors:    int64(len(datas)),
+				LastError: errors.New("Get pandora schema error"),
+			},
+			ErrorDetail: se,
+		}
+		s.stats.LastError = ste.LastError
+		s.stats.Errors += ste.Errors
+		s.stats.Success += ste.Success
+		return ste
 	}
 	var points pipeline.Datas
 	for _, d := range datas {
@@ -503,6 +517,27 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 	if schemas != nil {
 		s.updateSchemas(schemas)
 	}
+
+	if se != nil {
+		nse, ok := se.(*reqerr.SendError)
+		ste := &utils.StatsError{
+			ErrorDetail: se,
+		}
+		if ok {
+			ste.LastError = errors.New(nse.Error())
+			ste.Errors = int64(len(nse.GetFailDatas()))
+			ste.Success = int64(len(datas)) - ste.Errors
+		} else {
+			ste.LastError = se
+			ste.Errors = int64(len(datas))
+		}
+		se = ste
+		s.stats.LastError = ste.LastError
+		s.stats.Errors += ste.Errors
+		s.stats.Success += ste.Success
+	} else {
+		s.stats.Success += int64(len(datas))
+	}
 	return
 }
 
@@ -515,4 +550,8 @@ func (s *PandoraSender) Name() string {
 
 func (s *PandoraSender) Close() error {
 	return s.client.Close()
+}
+
+func (s *PandoraSender) Stats() utils.StatsInfo {
+	return s.stats
 }

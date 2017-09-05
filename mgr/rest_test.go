@@ -139,8 +139,10 @@ func Test_RestGetStatus(t *testing.T) {
 	}
 	exp := map[string]RunnerStatus{
 		"test1.csv": {
-			Name:    "test1.csv",
-			Logpath: rp,
+			Name:          "test1.csv",
+			Logpath:       rp,
+			ReadDataCount: 4,
+			ReadDataSize:  29,
 			Lag: RunnerLag{
 				Size:  0,
 				Files: 0,
@@ -149,6 +151,7 @@ func Test_RestGetStatus(t *testing.T) {
 				Errors:  0,
 				Success: 4,
 			},
+			TransformStats: make(map[string]utils.StatsInfo),
 			SenderStats: map[string]utils.StatsInfo{
 				"file_sender": {
 					Errors:  0,
@@ -157,6 +160,10 @@ func Test_RestGetStatus(t *testing.T) {
 			},
 		},
 	}
+
+	v := rss["test1.csv"]
+	v.Elaspedtime = 0
+	rss["test1.csv"] = v
 	assert.Equal(t, exp, rss, out.String())
 
 }

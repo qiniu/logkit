@@ -11,3 +11,9 @@ type BackendQueue interface {
 	Depth() int64
 	Empty() error
 }
+
+const (
+	FROM_NONE = iota
+	FROM_DISK
+	FROM_MEMORY
+)

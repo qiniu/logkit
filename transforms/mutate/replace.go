@@ -56,6 +56,10 @@ func (g *Replacer) Description() string {
 	return "transform replace can replace old string to new"
 }
 
+func (g *Replacer) Type() string {
+	return "replace"
+}
+
 func (g *Replacer) SampleConfig() string {
 	return `{
 		"type":"replace",
