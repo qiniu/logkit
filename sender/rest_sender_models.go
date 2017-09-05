@@ -146,7 +146,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyPandoraUUID,
 			ChooseOnly:   false,
-			Default:      "UUID",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "每条数据植入UUID(pandora_uuid)",
 		},
@@ -177,7 +177,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyFtProcs,
 			ChooseOnly:   false,
-			Default:      "2",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "发送并发数量(磁盘管道或内存管道 always_save 模式生效)(ft_procs)",
 			CheckRegex:   "\\d+",
@@ -284,7 +284,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyFtProcs,
 			ChooseOnly:   false,
-			Default:      "2",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "发送并发数量(磁盘管道或内存管道 always_save 模式生效)(ft_procs)",
 			CheckRegex:   "\\d+",
@@ -404,7 +404,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyFtProcs,
 			ChooseOnly:   false,
-			Default:      "2",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "发送并发数量(磁盘管道或内存管道 always_save 模式生效)(ft_procs)",
 			CheckRegex:   "\\d+",
@@ -490,7 +490,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyFtProcs,
 			ChooseOnly:   false,
-			Default:      "2",
+			Default:      "",
 			DefaultNoUse: false,
 			Description:  "发送并发数量(磁盘管道或内存管道 always_save 模式生效)(ft_procs)",
 			CheckRegex:   "\\d+",
