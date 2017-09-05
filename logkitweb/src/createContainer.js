@@ -92,6 +92,10 @@ class Create extends Component {
           const current = this.state.current + 1;
           this.setState({current});
           let name = "logkit.runner." + moment().format("YYYYMMDDHHmmss");
+          let nodeData = config.getNodeData()
+          if (nodeData && nodeData.parser.type === 'grok') {
+            nodeData.parser.grok_custom_patterns = window.btoa(nodeData.parser.grok_custom_patterns)
+          }
           let data = {
             name,
             ...config.getNodeData()

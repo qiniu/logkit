@@ -40,7 +40,7 @@ class Source extends Component {
       current: 0,
       items: [],
       options: [],
-      currentOption: 'dir',
+      currentOption: '',
       currentItem: []
     };
 
@@ -86,7 +86,7 @@ class Source extends Component {
           if (data.success) {
             this.setState({
               items: data,
-              currentItem: data.dir
+              currentItem: data[this.state.currentOption]
             })
           }
         })
@@ -102,13 +102,13 @@ class Source extends Component {
     this.state.currentItem.map((ele,index) => {
       if (ele.ChooseOnly == false) {
         result.push(<FormItem key={index}
-            {...formItemLayout}
-            className=""
-            label={(
-                <span className={ele.DefaultNoUse ? 'warningTip' : '' }>
+                              {...formItemLayout}
+                              className=""
+                              label={(
+                                  <span className={ele.DefaultNoUse ? 'warningTip' : '' }>
                   {ele.Description}
                 </span>
-            )}>
+                              )}>
           {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
             initialValue: !ele.DefaultNoUse ? ele.Default : '',
             rules: [{required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur'},
@@ -120,9 +120,9 @@ class Source extends Component {
         </FormItem>)
       } else {
         result.push(<FormItem key={index}
-            {...formItemLayout}
-            className=""
-            label={ele.Description}>
+                              {...formItemLayout}
+                              className=""
+                              label={ele.Description}>
           {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
             initialValue: ele.ChooseOptions[0],
             rules: [{required: true, message: '不能为空', trigger: 'blur'},
