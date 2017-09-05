@@ -2,14 +2,11 @@ import React, {Component} from 'react';
 import {
   Form,
   Input,
-  notification,
-  Button,
   Row,
   Col
 } from 'antd';
 import config from '../store/config'
 import moment from 'moment'
-import {postConfigData} from '../services/logkit';
 
 const FormItem = Form.Item;
 
@@ -69,9 +66,6 @@ class renderConfig extends Component {
             <Row >
               <Col span={12}>
                 <h2 className="logkit-title">logkit配置文件</h2>
-              </Col>
-              <Col span={12}>
-                <h4 className="logkit-tip">← 点击生成配置文件, 可对配置文本手动修改后再添加Runner!</h4>
               </Col>
             </Row>
           </div>

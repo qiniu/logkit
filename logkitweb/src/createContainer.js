@@ -1,5 +1,5 @@
 import React, {Component} from 'react';
-import {notification, message, Button, Steps, Icon} from 'antd';
+import {notification, Button, Steps, Icon} from 'antd';
 import Source from  './components/sourceConfig'
 import Parser from  './components/parserConfig'
 import Sender from './components/senderConfig'
@@ -27,6 +27,7 @@ class Create extends Component {
     super(props);
     this.state = {
       current: 0,
+      isCpoyStatus: false,
       sourceConfigCheck: false,
     };
     window.clearInterval(window.statusInterval);
@@ -48,9 +49,10 @@ class Create extends Component {
   init = () => {
     let that = this
     let isCopy =  this.props.location.query.copyConfig
-    if (isCopy == 'true') {
+    if (isCopy === 'true') {
       this.setState({
-        current: 3
+        current: 3,
+        isCpoyStatus: true
       })
       if (window.nodeCopy) {
         that.refs.initConfig.setFieldsValue({config: JSON.stringify(window.nodeCopy, null, 2)});
@@ -64,7 +66,7 @@ class Create extends Component {
     this.setState({
       sourceConfigCheck: true
     })
-    if (this.state.current == 0) {
+    if (this.state.current === 0) {
       that.refs.checkSourceData.validateFields(null, {}, (err) => {
         if (err) {
           notification.warning({message: "表单校验未通过,请检查", duration: 20,})
@@ -73,7 +75,7 @@ class Create extends Component {
           this.setState({current});
         }
       });
-    } else if (this.state.current == 1) {
+    } else if (this.state.current === 1) {
       that.refs.checkParseData.validateFields(null, {}, (err) => {
         if (err) {
           notification.warning({message: "表单校验未通过,请检查", duration: 20,})
@@ -82,7 +84,7 @@ class Create extends Component {
           this.setState({current});
         }
       });
-    } else if (this.state.current == 2) {
+    } else if (this.state.current === 2) {
       that.refs.checkSenderData.validateFields(null, {}, (err) => {
         if (err) {
           notification.warning({message: "表单校验未通过,请检查", duration: 20,})
@@ -102,7 +104,7 @@ class Create extends Component {
   }
 
   isJSON = (str) => {
-    if (typeof str == 'string') {
+    if (typeof str === 'string') {
       try {
         JSON.parse(str);
         return true;
@@ -124,8 +126,9 @@ class Create extends Component {
         if (this.isJSON(formData.config)) {
           let data = JSON.parse(formData.config);
           postConfigData({name: data.name, body: data}).then(data => {
-            if (data == undefined) {
+            if (data === undefined) {
               notification.success({message: "Runner添加成功", duration: 10,})
+              this.props.router.push({pathname: `/index`})
             }
 
           })
@@ -163,18 +166,18 @@ class Create extends Component {
           <div className="steps-content">
             <div><p className={this.state.current <= 2 ? 'show-div info' : 'hide-div'}>注意：黄色字体选框需根据实际情况修改，其他可作为默认值</p>
             </div>
-            <div className={this.state.current == 0 ? 'show-div' : 'hide-div'}>
+            <div className={this.state.current === 0 ? 'show-div' : 'hide-div'}>
               <Source ref="checkSourceData"></Source>
             </div>
-            <div className={this.state.current == 1 ? 'show-div' : 'hide-div'}>
+            <div className={this.state.current === 1 ? 'show-div' : 'hide-div'}>
               <Parser ref="checkParseData"></Parser>
             </div>
 
-            <div className={this.state.current == 2 ? 'show-div' : 'hide-div'}>
+            <div className={this.state.current === 2 ? 'show-div' : 'hide-div'}>
               <Sender ref="checkSenderData"></Sender>
             </div>
 
-            <div className={this.state.current == 3 ? 'show-div' : 'hide-div'}>
+            <div className={this.state.current === 3 ? 'show-div' : 'hide-div'}>
               <RenderConfig ref="initConfig"></RenderConfig>
             </div>
 
@@ -193,7 +196,7 @@ class Create extends Component {
             {
               this.state.current > 0
               &&
-              <Button style={{marginLeft: 8}} onClick={() => this.prev()}>
+              <Button className={this.state.isCpoyStatus === true ? 'hide': ''} style={{marginLeft: 8}} onClick={() => this.prev()}>
                 上一步
               </Button>
             }

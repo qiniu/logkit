@@ -13,7 +13,7 @@ class List extends Component {
       runners: [],
       status: [],
       isShow: false,
-      currentError: ''
+      currentItem: ''
     };
     this.init()
   }
@@ -52,7 +52,7 @@ class List extends Component {
     let that = this
     that.getStatus()
 
-    if (window.statusInterval != undefined && window.statusInterval != 'undefined') {
+    if (window.statusInterval !== undefined && window.statusInterval !== 'undefined') {
       window.clearInterval(window.statusInterval);
     }
     window.statusInterval = setInterval(function () {
@@ -73,9 +73,9 @@ class List extends Component {
     this.props.router.push({pathname: `/index/create?copyConfig=true`})
   }
 
-  isShow = (currentError) => {
+  isShow = (currentItem) => {
     this.setState({
-      currentError: currentError,
+      currentItem: currentItem,
       isShow: true
     })
   }
@@ -84,6 +84,10 @@ class List extends Component {
     this.setState({
       isShow: false
     })
+  }
+
+  copyConfig = () => {
+    notification.success({message: "复制配置文件成功,",description: '可点击跳转至配置页面进行编辑添加Runner', duration: 10,})
   }
 
   renderRunnerList() {
@@ -149,7 +153,7 @@ class List extends Component {
             <a>
               <div className="editable-row-operations">
                 <ClipboardButton data-clipboard-text={text}>
-                  <Icon style={{fontSize: '15px'}} type="copy"/>
+                  <Icon style={{fontSize: '15px'}} onClick={() => this.copyConfig()} type="copy"/>
                 </ClipboardButton>
               </div>
             </a>
@@ -163,7 +167,7 @@ class List extends Component {
       width: '6%',
       render: (text, record) => {
         return (
-            record.isWebFolder == true ? (<a>
+            record.isWebFolder === true ? (<a>
               <div className="editable-row-operations">
                 {
                   <Popconfirm title="是否删除该Runner?" onConfirm={() => this.deleteRunner(record)}>
@@ -179,7 +183,7 @@ class List extends Component {
 
     let data = []
     if (this.state.runners != null) {
-      _.values(this.state.runners).map((item, value) => {
+      _.values(this.state.runners).map((item) => {
         let status = '异常'
         let parseSuccessNumber = 0
         let parseFailNUmber = 0
@@ -189,13 +193,12 @@ class List extends Component {
         let sendNumber = 0
         let parseNumber = 0
         let isWebFolder = false
-        let errorLog = {
-          parseError: '',
-          sendError: '',
-        }
+        let parseError = ''
+        let sendError = ''
+        let logkitError = ''
 
         this.state.status.map((ele) => {
-          if (item.name == ele.name) {
+          if (item.name === ele.name) {
             status = '正常'
             parseSuccessNumber = ele.parserStats.success
             parseFailNUmber = ele.parserStats.errors
@@ -204,9 +207,10 @@ class List extends Component {
             sendNumber = _.floor(_.values(ele.senderStats)[0].success / ele.elaspedtime, 3)
             parseNumber = _.floor(ele.readDataCount / ele.elaspedtime, 3)
             logpath = ele.logpath
-            errorLog.parseError = ele.parserStats.last_error
-            errorLog.sendError = _.values(ele.senderStats)[0].last_error
+            parseError = ele.parserStats.last_error
+            sendError = _.values(ele.senderStats)[0].last_error
             isWebFolder = item.web_folder
+            logkitError = ele.error
           }
         })
         data.push({
@@ -220,7 +224,9 @@ class List extends Component {
           successNumber: successNumber,
           failNUmber: failNUmber,
           path: logpath,
-          errorLog: errorLog,
+          parseError: parseError,
+          sendError: sendError,
+          logkitError: logkitError,
           copy: JSON.stringify(item, null, 2),
           isWebFolder: isWebFolder
         })
@@ -252,16 +258,20 @@ class List extends Component {
             </Button>
             {this.renderRunnerList()}
           </div>
-          <Modal footer={null} title="错误日志" width="1000" visible={this.state.isShow}
+          <Modal footer={null} title="错误日志" width={1000} visible={this.state.isShow}
                  onCancel={this.handleErrorCancel}
           >
             <Tag color="#108ee9">解析错误日志:</Tag>
-            <Row>
-              <Col span={24}>{this.state.currentError.parseError}</Col>
+            <Row style={{marginTop: '10px'}}>
+              <Col span={24}>{this.state.currentItem.parseError}</Col>
             </Row>
             <Tag color="#108ee9" style={{marginTop: '30px'}}>发送错误日志:</Tag>
-            <Row>
-              <Col span={24}>{this.state.currentError.sendError}</Col>
+            <Row style={{marginTop: '10px'}}>
+              <Col span={24}>{this.state.currentItem.sendError}</Col>
+            </Row>
+            <Tag color="#108ee9" style={{marginTop: '30px'}}>Logkit错误日志:</Tag>
+            <Row style={{marginTop: '10px'}}>
+              <Col span={24}>{this.state.currentItem.logkitError}</Col>
             </Row>
 
           </Modal>

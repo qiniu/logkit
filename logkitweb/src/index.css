@@ -107,3 +107,6 @@ body {
 .ant-form-item-label label {
   color: rgb(0, 0, 0);
 }
+.hide {
+  display: none;
+}

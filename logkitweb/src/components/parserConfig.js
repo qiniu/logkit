@@ -71,7 +71,7 @@ class Parser extends Component {
     let data = getFieldsValue();
     let notEmptyKeys = []
     _.forIn(data[this.state.currentOption], function(value,key) {
-      if(value != ""){
+      if(value !== ""){
         notEmptyKeys.push(key)
       }
     });
