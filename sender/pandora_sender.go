@@ -421,7 +421,7 @@ func (s *PandoraSender) getSchemasAlias() (map[string]pipeline.RepoSchemaEntry, 
 }
 
 func (s *PandoraSender) generatePoint(data Data) (point Data) {
-	point = Data{}
+	point = make(Data, len(data))
 	schemas, alias2key := s.getSchemasAlias()
 	for k, v := range schemas {
 		name, ok := alias2key[k]
