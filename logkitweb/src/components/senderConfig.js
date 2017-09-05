@@ -41,7 +41,7 @@ class Sender extends Component {
       current: 0,
       items: [],
       options: [],
-      currentOption: 'pandora',
+      currentOption: '',
       currentItem: []
     }
     ;
@@ -84,7 +84,7 @@ class Sender extends Component {
           if (data.success) {
             this.setState({
               items: data,
-              currentItem: data.pandora
+              currentItem: data[this.state.currentOption]
             })
           }
         })
@@ -103,13 +103,13 @@ class Sender extends Component {
           ele.Default = "pandora.sender." + moment().format("YYYYMMDDHHmmss");
         }
         result.push(<FormItem key={index}
-            {...formItemLayout}
-            className=""
-            label={(
-                <span className={ele.DefaultNoUse ? 'warningTip' : '' }>
+                              {...formItemLayout}
+                              className=""
+                              label={(
+                                  <span className={ele.DefaultNoUse ? 'warningTip' : '' }>
                   {ele.Description}
                 </span>
-            )}>
+                              )}>
           {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
             initialValue: !ele.DefaultNoUse ? ele.Default : '',
             rules: [{required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur'},
@@ -121,9 +121,9 @@ class Sender extends Component {
         </FormItem>)
       } else {
         result.push(<FormItem key={index}
-            {...formItemLayout}
-            className=""
-            label={ele.Description}>
+                              {...formItemLayout}
+                              className=""
+                              label={ele.Description}>
           {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
             initialValue: ele.ChooseOptions[0],
             rules: [{required: true, message: '不能为空', trigger: 'blur'},

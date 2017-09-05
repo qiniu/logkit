@@ -47,7 +47,7 @@ class Parser extends Component {
       current: 0,
       items: [],
       options: [],
-      currentOption: 'json',
+      currentOption: '',
       currentItem: [],
       parseData: '',
       sampleData: [],
@@ -70,13 +70,13 @@ class Parser extends Component {
     const {getFieldsValue} = this.props.form;
     let data = getFieldsValue();
     let notEmptyKeys = []
-    _.forIn(data[this.state.currentOption], function(value,key) {
-      if(value !== ""){
+    _.forIn(data[this.state.currentOption], function (value, key) {
+      if (value !== "") {
         notEmptyKeys.push(key)
       }
     });
 
-    config.set('parser', _.pick(data[this.state.currentOption],notEmptyKeys))
+    config.set('parser', _.pick(data[this.state.currentOption], notEmptyKeys))
   }
 
 
@@ -93,7 +93,7 @@ class Parser extends Component {
           if (data.success) {
             this.setState({
               items: data,
-              currentItem: data.nginx
+              currentItem: data[this.state.currentOption]
             })
           }
         })
@@ -106,7 +106,6 @@ class Parser extends Component {
           sampleData: data,
           currentSampleData: data[this.state.currentOption]
         })
-        console.log(data[this.state.currentOption])
         getFieldDecorator("sampleData", {initialValue: data[this.state.currentOption]});
       }
     })
@@ -117,32 +116,53 @@ class Parser extends Component {
   renderFormItem = () => {
     const {getFieldDecorator} = this.props.form;
     let result = []
-    this.state.currentItem.map((ele,index) => {
+    this.state.currentItem.map((ele, index) => {
       if (ele.ChooseOnly == false) {
-        if (ele.KeyName == 'name'){
+        if (ele.KeyName == 'name') {
           ele.Default = "pandora.parser." + moment().format("YYYYMMDDHHmmss");
         }
-        result.push(<FormItem key={index}
-            {...formItemLayout}
-            label={(
-                <span className={ele.DefaultNoUse ? 'warningTip' : '' }>
+        if (ele.KeyName === 'grok_custom_patterns') {
+          result.push(<FormItem key={index}
+                                {...formItemLayout}
+                                label={(
+                                    <span className={ele.DefaultNoUse ? 'warningTip' : '' }>
                   {ele.Description}
                 </span>
-            )}>
-          {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
-            initialValue: !ele.DefaultNoUse ? ele.Default : '',
-            rules: [{required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur'},
-              {pattern: ele.CheckRegex, message: '输入不符合规范' },
-            ]
-          })(
-              <Input placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值' } disabled={this.state.isReadonly}/>
-          )}
-        </FormItem>)
+                                )}>
+            {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
+              initialValue: !ele.DefaultNoUse ? ele.Default : '',
+              rules: [{required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur'},
+                {pattern: ele.CheckRegex, message: '输入不符合规范'},
+              ]
+            })(
+                <Input type="textarea" rows="6" placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值' }
+                       disabled={this.state.isReadonly}/>
+            )}
+          </FormItem>)
+        } else {
+          result.push(<FormItem key={index}
+                                {...formItemLayout}
+                                label={(
+                                    <span className={ele.DefaultNoUse ? 'warningTip' : '' }>
+                  {ele.Description}
+                </span>
+                                )}>
+            {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
+              initialValue: !ele.DefaultNoUse ? ele.Default : '',
+              rules: [{required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur'},
+                {pattern: ele.CheckRegex, message: '输入不符合规范'},
+              ]
+            })(
+                <Input placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值' } disabled={this.state.isReadonly}/>
+            )}
+          </FormItem>)
+        }
+
       } else {
         result.push(<FormItem key={index}
-            {...formItemLayout}
-            className=""
-            label={ele.Description}>
+                              {...formItemLayout}
+                              className=""
+                              label={ele.Description}>
           {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
             initialValue: ele.ChooseOptions[0],
             rules: [{required: true, message: '不能为空', trigger: 'blur'},
@@ -195,6 +215,9 @@ class Parser extends Component {
   parseSampleData = () => {
     const {getFieldsValue} = this.props.form;
     let data = getFieldsValue();
+    if (this.state.currentOption === 'grok') {
+      data[this.state.currentOption].grok_custom_patterns = window.btoa(data[this.state.currentOption].grok_custom_patterns)
+    }
     const requestData = {
       type: this.state.currentOption,
       ...data[this.state.currentOption],
@@ -226,16 +249,16 @@ class Parser extends Component {
             <FormItem {...optionFormItemLayout} >
               <Button type="primary" onClick={this.parseSampleData}>解析样例数据</Button>
             </FormItem>
-              <FormItem
-                  label={'输入样例日志'}
-                  {...optionFormItemLayout}
-              >
-                {getFieldDecorator('sampleData', {
-                  rules: [{required: true, message: '配置文件不能为空', trigger: 'blur'}]
-                })(
-                    <Input type="textarea" rows="8"/>
-                )}
-              </FormItem>
+            <FormItem
+                label={'输入样例日志'}
+                {...optionFormItemLayout}
+            >
+              {getFieldDecorator('sampleData', {
+                rules: [{required: true, message: '配置文件不能为空', trigger: 'blur'}]
+              })(
+                  <Input type="textarea" rows="8"/>
+              )}
+            </FormItem>
             <FormItem {...optionFormItemLayout} label="样例日志">
               <Input type="textarea" value={this.state.parseData} rows="20"></Input>
             </FormItem>
