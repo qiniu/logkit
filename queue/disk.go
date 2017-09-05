@@ -29,6 +29,7 @@ type diskQueue struct {
 	readFileNum  int64
 	writeFileNum int64
 	depth        int64
+	depthMemory  int64
 
 	sync.RWMutex
 
@@ -44,6 +45,8 @@ type diskQueue struct {
 	exitFlag        int32
 	needSync        bool
 	writeLimit      int // 限速 单位byte
+	enableMemory    bool
+	maxMemoryLength int64
 
 	// keeps track of the position where we have read
 	// (but not yet sent over readChan)
@@ -58,6 +61,9 @@ type diskQueue struct {
 	// exposed via ReadChan()
 	readChan chan []byte
 
+	// memory channel
+	memoryChan chan []byte
+
 	// internal channels
 	writeChan         chan []byte
 	writeResponseChan chan error
@@ -71,14 +77,23 @@ type diskQueue struct {
 // from the filesystem and starting the read ahead goroutine
 func NewDiskQueue(name string, dataPath string, maxBytesPerFile int64,
 	minMsgSize int32, maxMsgSize int32,
-	syncEveryWrite, syncEveryRead int64, syncTimeout time.Duration, writeLimit int) BackendQueue {
+	syncEveryWrite, syncEveryRead int64, syncTimeout time.Duration, writeLimit int,
+	enableMemory bool, maxMemoryLength int) BackendQueue {
+	if !enableMemory {
+		maxMemoryLength = 0
+	} else if enableMemory && maxMemoryLength <= 0 {
+		maxMemoryLength = 100
+	}
 	d := diskQueue{
 		name:              name,
 		dataPath:          dataPath,
 		maxBytesPerFile:   maxBytesPerFile,
 		minMsgSize:        minMsgSize,
 		maxMsgSize:        maxMsgSize,
+		enableMemory:      enableMemory,
+		maxMemoryLength:   int64(maxMemoryLength),
 		readChan:          make(chan []byte),
+		memoryChan:        make(chan []byte, maxMemoryLength),
 		writeChan:         make(chan []byte),
 		writeResponseChan: make(chan error),
 		emptyChan:         make(chan int),
@@ -109,7 +124,10 @@ func (d *diskQueue) Name() string {
 
 // Depth returns the depth of the queue
 func (d *diskQueue) Depth() int64 {
-	return atomic.LoadInt64(&d.depth)
+	d.RLock()
+	defer d.RUnlock()
+
+	return atomic.LoadInt64(&d.depth) + atomic.LoadInt64(&d.depthMemory)
 }
 
 // ReadChan returns the []byte channel for reading data
@@ -198,6 +216,17 @@ func (d *diskQueue) deleteAllFiles() error {
 	}
 
 	return err
+}
+
+func (d *diskQueue) deleteAllMemory() {
+	for {
+		select {
+		case <-d.memoryChan:
+		default:
+			atomic.StoreInt64(&d.depthMemory, 0)
+			return
+		}
+	}
 }
 
 func (d *diskQueue) skipToNextRWFile() error {
@@ -378,6 +407,30 @@ func (d *diskQueue) writeOne(data []byte) error {
 	}
 
 	return err
+}
+
+func (d *diskQueue) writeMemory(msg []byte) error {
+	if atomic.LoadInt64(&d.depthMemory) >= d.maxMemoryLength {
+		return errors.New("memory channel is full")
+	}
+	select {
+	case d.memoryChan <- msg:
+		atomic.AddInt64(&d.depthMemory, 1)
+		return nil
+	default:
+		return errors.New("memory channel is full")
+	}
+}
+
+func (d *diskQueue) saveToDisk() {
+	for {
+		select {
+		case msg := <-d.memoryChan:
+			d.writeOne(msg)
+		default:
+			return
+		}
+	}
 }
 
 // sync fsyncs the current writeFile and persists metadata
@@ -576,6 +629,7 @@ func (d *diskQueue) handleReadError() {
 //
 // conveniently this also means that we're asynchronously reading from the filesystem
 func (d *diskQueue) ioLoop() {
+	var origin int = FROM_NONE
 	var dataRead []byte
 	var err error
 	var count int64
@@ -603,35 +657,62 @@ func (d *diskQueue) ioLoop() {
 			}
 		}
 
-		if (d.readFileNum < d.writeFileNum) || (d.readPos < d.writePos) {
-			if d.nextReadPos == d.readPos {
-				dataRead, err = d.readOne()
-				if err != nil {
-					log.Warnf("ERROR: reading from diskqueue(%s) at %d of %s - %s",
-						d.name, d.readPos, d.fileName(d.readFileNum), err)
-					// NOTE: 根据 handleReadError() 的逻辑，只要读发生错误，就会调过当前这个文件，直接开始读下一个文件
-					d.handleReadError()
-					continue
+		if origin == FROM_NONE {
+			if (d.readFileNum < d.writeFileNum) || (d.readPos < d.writePos) {
+				if d.nextReadPos == d.readPos {
+					dataRead, err = d.readOne()
+					if err != nil {
+						log.Warnf("ERROR: reading from diskqueue(%s) at %d of %s - %s",
+							d.name, d.readPos, d.fileName(d.readFileNum), err)
+						// NOTE: 根据 handleReadError() 的逻辑，只要读发生错误，就会调过当前这个文件，直接开始读下一个文件
+						d.handleReadError()
+						continue
+					}
 				}
+				origin = FROM_DISK
+				r = d.readChan
+			} else if d.enableMemory {
+				select {
+				case dataRead = <-d.memoryChan:
+					origin = FROM_MEMORY
+					r = d.readChan
+				default:
+					r = nil
+				}
+			} else {
+				r = nil
 			}
-			r = d.readChan
 		} else {
-			r = nil
+			r = d.readChan
 		}
 
 		select {
 		// the Go channel spec dictates that nil channel operations (read or write)
 		// in a select are skipped, we set r to d.readChan only when there is data to read
 		case r <- dataRead:
-			// moveForward sets needSync flag if a file is removed
-			readCount++
-			d.moveForward()
+			switch origin {
+			case FROM_DISK:
+				// moveForward sets needSync flag if a file is removed
+				readCount++
+				d.moveForward()
+			case FROM_MEMORY:
+				atomic.AddInt64(&d.depthMemory, -1)
+			}
+			origin = FROM_NONE
 		case <-d.emptyChan:
+			if d.enableMemory {
+				d.deleteAllMemory()
+			}
 			d.emptyResponseChan <- d.deleteAllFiles()
 			count = 0
+			origin = FROM_NONE
 		case dataWrite := <-d.writeChan:
-			count++
-			d.writeResponseChan <- d.writeOne(dataWrite)
+			if d.enableMemory {
+				d.writeResponseChan <- d.writeMemory(dataWrite)
+			} else {
+				count++
+				d.writeResponseChan <- d.writeOne(dataWrite)
+			}
 		case <-syncTicker.C:
 			if count > 0 || readCount > 0 {
 				count = 0
@@ -639,12 +720,21 @@ func (d *diskQueue) ioLoop() {
 				d.needSync = true
 			}
 		case <-d.exitChan:
+			if origin == FROM_MEMORY {
+				err = d.writeOne(dataRead)
+				if err != nil {
+					log.Errorf("DISKQUEUE(%s): drop one msg - %v", d.name, err)
+				}
+			}
 			goto exit
 		}
 	}
 
 exit:
 	log.Warnf("DISKQUEUE(%s): closing ... ioLoop", d.name)
+	if d.enableMemory {
+		d.saveToDisk()
+	}
 	syncTicker.Stop()
 	d.exitSyncChan <- 1
 }

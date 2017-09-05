@@ -19,6 +19,7 @@ const (
 type Transformer interface {
 	Description() string
 	SampleConfig() string
+	Type() string
 	Transform([]sender.Data) ([]sender.Data, error)
 	RawTransform([]string) ([]string, error)
 	Stage() string

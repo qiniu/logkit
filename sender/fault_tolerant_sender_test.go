@@ -1,6 +1,8 @@
 package sender
 
 import (
+	"fmt"
+	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -59,6 +61,11 @@ func TestFtSender(t *testing.T) {
 }
 
 func TestFtMemorySender(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", fmt.Sprintf("nsq-test-%d", time.Now().UnixNano()))
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(tmpDir)
 	_, pt := NewMockPandoraWithPrefix("/v2")
 	opt := &PandoraOption{
 		name:           "p",
@@ -79,6 +86,7 @@ func TestFtMemorySender(t *testing.T) {
 		t.Fatal(err)
 	}
 	mp := conf.MapConf{}
+	mp[KeyFtSaveLogPath] = tmpDir
 	mp[KeyFtMemoryChannel] = "true"
 	mp[KeyFtMemoryChannelSize] = "3"
 	mp[KeyFtStrategy] = KeyFtStrategyAlwaysSave
@@ -101,6 +109,11 @@ func TestFtMemorySender(t *testing.T) {
 }
 
 func TestFtChannelFullSender(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", fmt.Sprintf("nsq-test-%d", time.Now().UnixNano()))
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(tmpDir)
 	mockP, pt := NewMockPandoraWithPrefix("/v2")
 	opt := &PandoraOption{
 		name:           "p",
@@ -124,6 +137,7 @@ func TestFtChannelFullSender(t *testing.T) {
 	mockP.PostSleep = 1
 	mockP.SetMux.Unlock()
 	mp := conf.MapConf{}
+	mp[KeyFtSaveLogPath] = tmpDir
 	mp[KeyFtMemoryChannel] = "true"
 	mp[KeyFtMemoryChannelSize] = "1"
 	mp[KeyFtStrategy] = KeyFtStrategyAlwaysSave

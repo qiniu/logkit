@@ -39,12 +39,17 @@ type Runner interface {
 }
 
 type RunnerStatus struct {
-	Name        string                     `json:"name"`
-	Logpath     string                     `json:"logpath"`
-	Lag         RunnerLag                  `json:"lag,omitempty"`
-	ParserStats utils.StatsInfo            `json:"parserStats,omitempty"`
-	SenderStats map[string]utils.StatsInfo `json:"senderStats,omitempty"`
-	Error       error                      `json:"error,omitempty"`
+	Name           string                     `json:"name"`
+	Logpath        string                     `json:"logpath"`
+	ReadDataSize   int64                      `json:"readDataSize"`
+	ReadDataCount  int64                      `json:"readDataCount"`
+	Elaspedtime    float64                    `json:"elaspedtime"`
+	Lag            RunnerLag                  `json:"lag"`
+	ParserStats    utils.StatsInfo            `json:"parserStats"`
+	SenderStats    map[string]utils.StatsInfo `json:"senderStats"`
+	TransformStats map[string]utils.StatsInfo `json:"transformStats"`
+	Error          string                     `json:"error,omitempty"`
+	lastState      time.Time
 }
 
 type RunnerLag struct {
@@ -131,7 +136,12 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 		RunnerInfo: info,
 		exitChan:   make(chan struct{}),
 		lastSend:   time.Now(), // 上一次发送时间
-		rs:         RunnerStatus{SenderStats: make(map[string]utils.StatsInfo)},
+		rs: RunnerStatus{
+			SenderStats:    make(map[string]utils.StatsInfo),
+			TransformStats: make(map[string]utils.StatsInfo),
+			lastState:      time.Now(),
+			Name:           info.RunnerName,
+		},
 	}
 	if reader == nil {
 		err = errors.New("reader can not be nil")
@@ -349,6 +359,8 @@ func (r *LogExportRunner) Run() {
 				log.Errorf("Runner[%v] reader %s read lines larger than MaxBatchSize %v, content is %s", r.Name(), r.reader.Name(), r.MaxBatchSize, line)
 				continue
 			}
+			r.rs.ReadDataSize += int64(len(line))
+			r.rs.ReadDataCount++
 			lines = append(lines, line)
 			if datasourceTag != "" {
 				froms = append(froms, r.reader.Source())
@@ -364,6 +376,7 @@ func (r *LogExportRunner) Run() {
 			log.Debugf("Runner[%v] fetched 0 lines", r.Name())
 			continue
 		}
+
 		for i := range r.transformers {
 			var err error
 			if r.transformers[i].Stage() == transforms.StageBeforeParser {
@@ -564,14 +577,28 @@ func (r *LogExportRunner) LagStats() (rl RunnerLag, err error) {
 }
 
 func (r *LogExportRunner) Status() RunnerStatus {
-	r.rs.Name = r.RunnerName
 	r.rs.Logpath = r.meta.LogPath()
 	rl, err := r.LagStats()
 	if err != nil {
-		r.rs.Error = err
-		return r.rs
+		r.rs.Error = fmt.Sprintf("get lag error %v", err)
 	}
 	r.rs.Lag = rl
+
+	now := time.Now()
+	r.rs.Elaspedtime += now.Sub(r.rs.lastState).Seconds()
+	r.rs.lastState = now
+
+	for i := range r.transformers {
+		r.rs.TransformStats[r.transformers[i].Type()] = r.transformers[i].Stats()
+	}
+
+	for i := range r.senders {
+		sts, ok := r.senders[i].(sender.StatsSender)
+		if ok {
+			r.rs.SenderStats[r.senders[i].Name()] = sts.Stats()
+		}
+	}
+
 	return r.rs
 }
 

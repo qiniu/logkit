@@ -69,6 +69,10 @@ func (it *IpTransformer) Description() string {
 	return "transform ip to country region and isp"
 }
 
+func (g *IpTransformer) Type() string {
+	return "IP"
+}
+
 func (it *IpTransformer) SampleConfig() string {
 	return `{
 		"type":"IP",
