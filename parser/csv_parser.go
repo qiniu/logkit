@@ -364,7 +364,7 @@ func (p *CsvParser) Name() string {
 }
 
 func (p *CsvParser) parse(line string) (sender.Data, error) {
-	d := sender.Data{}
+	d := make(sender.Data, len(p.schema)+len(p.labels))
 	parts := strings.Split(line, p.delim)
 	if len(parts) != len(p.schema) {
 		return nil, fmt.Errorf("schema length not match: schema %v length %v, actual column %v length %v", p.schema, len(p.schema), parts, len(parts))
