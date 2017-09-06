@@ -196,7 +196,7 @@ func (rs *RestService) PostConfig() echo.HandlerFunc {
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 		}
-		confBytes, err := json.Marshal(nconf)
+		confBytes, err := json.MarshalIndent(nconf, "", "    ")
 		err = ioutil.WriteFile(filename, confBytes, 0644)
 		return
 	}

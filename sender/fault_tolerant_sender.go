@@ -3,7 +3,6 @@ package sender
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"sync/atomic"
 	"time"
 
@@ -148,14 +147,14 @@ func (ft *FtSender) Send(datas []Data) error {
 			if nowDatas != nil {
 				se.ErrorDetail = reqerr.NewSendError("save data to backend queue error", ConvertDatasBack(nowDatas), reqerr.TypeDefault)
 				ft.stats.Errors += int64(len(nowDatas))
-				ft.stats.LastError = se.ErrorDetail
+				ft.stats.LastError = se.ErrorDetail.Error()
 			}
 		}
 	} else {
 		err := ft.saveToFile(datas)
 		if err != nil {
 			se.ErrorDetail = err
-			ft.stats.LastError = err
+			ft.stats.LastError = err.Error()
 			ft.stats.Errors += int64(len(datas))
 		} else {
 			se.ErrorDetail = nil
@@ -288,13 +287,13 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 		// 如果不是SendError 默认所有的数据都发送失败
 		log.Infof("Runner[%v] Sender[%v] error type is not *SendError! reSend all datas by default", ft.runnerName, ft.innerSender.Name())
 		failCtx.Datas = datas
-		ft.stats.LastError = err
+		ft.stats.LastError = err.Error()
 	} else {
 		failCtx.Datas = ConvertDatas(se.GetFailDatas())
 		if se.ErrorType == reqerr.TypeBinaryUnpack {
 			binaryUnpack = true
 		}
-		ft.stats.LastError = errors.New(se.Error())
+		ft.stats.LastError = se.Error()
 	}
 	log.Errorf("Runner[%v] Sender[%v] cannot write points: %v, failDatas size: %v", ft.runnerName, ft.innerSender.Name(), err, len(failCtx.Datas))
 	log.Debugf("Runner[%v] Sender[%v] failed datas [[%v]]", ft.runnerName, ft.innerSender.Name(), failCtx.Datas)

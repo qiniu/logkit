@@ -180,6 +180,14 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "parser名称(name)",
 		},
 		{
+			KeyName:       KeyTimestamp,
+			ChooseOnly:    true,
+			ChooseOptions: []string{"true", "false"},
+			Default:       "true",
+			DefaultNoUse:  false,
+			Description:   "数据附带时间戳(timestamp)",
+		},
+		{
 			KeyName:      KeyLabels,
 			ChooseOnly:   false,
 			Default:      "",

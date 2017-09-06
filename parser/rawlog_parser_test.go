@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/utils"
 )
 
 func Test_RawlogParser(t *testing.T) {
@@ -18,6 +19,9 @@ func Test_RawlogParser(t *testing.T) {
 		"Oct 31 17:35:01 dell CRON[23562]: (root) CMD (command -v debian-sa1 > /dev/null && debian-sa1 1 1)",
 	}
 	dts, err := p.Parse(lines)
+	if st, ok := err.(*utils.StatsError); ok {
+		err = st.ErrorDetail
+	}
 	if err != nil {
 		t.Error(err)
 	}
