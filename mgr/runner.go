@@ -61,22 +61,22 @@ type RunnerLag struct {
 // RunnerConfig 从多数据源读取，经过解析后，发往多个数据目的地
 type RunnerConfig struct {
 	RunnerInfo
-	Metric        []conf.MapConf           `json:"metric"`
+	Metric        []conf.MapConf           `json:"metric,omitempty"`
 	ReaderConfig  conf.MapConf             `json:"reader"`
-	CleanerConfig conf.MapConf             `json:"cleaner"`
+	CleanerConfig conf.MapConf             `json:"cleaner,omitempty"`
 	ParserConf    conf.MapConf             `json:"parser"`
-	Transforms    []map[string]interface{} `json:"transforms"`
+	Transforms    []map[string]interface{} `json:"transforms,omitempty"`
 	SenderConfig  []conf.MapConf           `json:"senders"`
 	IsInWebFolder bool                     `json:"web_folder,omitempty"`
 }
 
 type RunnerInfo struct {
 	RunnerName       string `json:"name"`
-	CollectInterval  string `json:"collect_interval"` // metric runner收集的频率
-	MaxBatchLen      int    `json:"batch_len"`        // 每个read batch的行数
-	MaxBatchSize     int    `json:"batch_size"`       // 每个read batch的字节数
-	MaxBatchInteval  int    `json:"batch_interval"`   // 最大发送时间间隔
-	MaxBatchTryTimes int    `json:"batch_try_times"`  // 最大发送次数，小于等于0代表无限重试
+	CollectInterval  string `json:"collect_interval,omitempty"` // metric runner收集的频率
+	MaxBatchLen      int    `json:"batch_len,omitempty"`        // 每个read batch的行数
+	MaxBatchSize     int    `json:"batch_size,omitempty"`       // 每个read batch的字节数
+	MaxBatchInteval  int    `json:"batch_interval,omitempty"`   // 最大发送时间间隔
+	MaxBatchTryTimes int    `json:"batch_try_times,omitempty"`  // 最大发送次数，小于等于0代表无限重试
 }
 
 type LogExportRunner struct {
@@ -313,6 +313,8 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []sender.Data, times in
 				if atomic.LoadInt32(&r.stopped) > 0 {
 					return false
 				}
+				log.Errorf("Runner[%v] send error %v for %v times, failed datas %v will retry send it", r.RunnerName, se.Error(), cnt, len(datas))
+				cnt++
 				continue
 			}
 			if times <= 0 || cnt < times {
@@ -441,7 +443,7 @@ func (r *LogExportRunner) Run() {
 		for _, s := range r.senders {
 			if !r.trySend(s, datas, r.MaxBatchTryTimes) {
 				success = false
-				log.Errorf("Runner[%v] failed to send data: << %v >>", r.Name(), datas)
+				log.Errorf("Runner[%v] failed to send data finally", r.Name())
 				break
 			}
 		}
@@ -577,12 +579,14 @@ func (r *LogExportRunner) LagStats() (rl RunnerLag, err error) {
 }
 
 func (r *LogExportRunner) Status() RunnerStatus {
-	r.rs.Logpath = r.meta.LogPath()
-	rl, err := r.LagStats()
-	if err != nil {
-		r.rs.Error = fmt.Sprintf("get lag error %v", err)
+	if r.meta.IsFileMode() {
+		r.rs.Logpath = r.meta.LogPath()
+		rl, err := r.LagStats()
+		if err != nil {
+			r.rs.Error = fmt.Sprintf("get lag error %v", err)
+		}
+		r.rs.Lag = rl
 	}
-	r.rs.Lag = rl
 
 	now := time.Now()
 	r.rs.Elaspedtime += now.Sub(r.rs.lastState).Seconds()

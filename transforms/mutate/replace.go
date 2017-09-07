@@ -36,7 +36,7 @@ func (g *Replacer) Transform(datas []sender.Data) ([]sender.Data, error) {
 		datas[i][g.Key] = strings.Replace(strval, g.Old, g.New, -1)
 	}
 	if err != nil {
-		g.stats.LastError = err
+		g.stats.LastError = err.Error()
 		ferr = fmt.Errorf("find total %v erorrs in transform replace, last error info is %v", errnums, err)
 	}
 	g.stats.Errors += int64(errnums)

@@ -57,7 +57,7 @@ func (it *IpTransformer) Transform(datas []sender.Data) ([]sender.Data, error) {
 		datas[i]["Isp"] = info.Isp
 	}
 	if err != nil {
-		it.stats.LastError = err
+		it.stats.LastError = err.Error()
 		ferr = fmt.Errorf("find total %v erorrs in transform IP, last error info is %v", errnums, err)
 	}
 	it.stats.Errors += int64(errnums)
