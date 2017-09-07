@@ -139,10 +139,12 @@ func Test_RestGetStatus(t *testing.T) {
 	}
 	exp := map[string]RunnerStatus{
 		"test1.csv": {
-			Name:          "test1.csv",
-			Logpath:       rp,
-			ReadDataCount: 4,
-			ReadDataSize:  29,
+			Name:             "test1.csv",
+			Logpath:          rp,
+			ReadDataCount:    4,
+			ReadDataSize:     29,
+			ReadSpeedTrend:   SpeedUp,
+			ReadSpeedTrendKb: SpeedUp,
 			Lag: RunnerLag{
 				Size:  0,
 				Files: 0,
@@ -150,12 +152,14 @@ func Test_RestGetStatus(t *testing.T) {
 			ParserStats: utils.StatsInfo{
 				Errors:  0,
 				Success: 4,
+				Trend:   SpeedUp,
 			},
 			TransformStats: make(map[string]utils.StatsInfo),
 			SenderStats: map[string]utils.StatsInfo{
 				"file_sender": {
 					Errors:  0,
 					Success: 4,
+					Trend:   SpeedUp,
 				},
 			},
 		},
@@ -163,9 +167,14 @@ func Test_RestGetStatus(t *testing.T) {
 
 	v := rss["test1.csv"]
 	v.Elaspedtime = 0
+	v.ReadSpeed = 0
+	v.ReadSpeedKB = 0
+	v.ParserStats.Speed = 0
+	fs := v.SenderStats["file_sender"]
+	fs.Speed = 0
+	v.SenderStats["file_sender"] = fs
 	rss["test1.csv"] = v
 	assert.Equal(t, exp, rss, out.String())
-
 }
 
 func Test_RestCRUD(t *testing.T) {

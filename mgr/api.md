@@ -38,7 +38,11 @@ Content-Type: application/json
       "logpath":"/your/log/path1",
       "readDataSize": <读取数据的bytes大小>.
       "readDataCount":<读取数据条数>,
-      "elaspedtime"<总用时>,
+      "elaspedtime":<总用时>,
+      "readspeed_kb":<float>,
+      "readspeed":<float>,
+      "readspeedtrend_kb":<string>,
+      "readspeedtrend":<string>,
       "lag":{  
          "size":<lag size>,
          "files":<lag file number>,
@@ -50,12 +54,16 @@ Content-Type: application/json
       "parserStats":{  
          "errors":<error number>,
          "success":<success number>,
+         "speed":<float>,
+          "trend":<string>,
          "last_error":"error message"
       },
       "transformStats":{
           "<transformtype>":{
              "errors":<error number>,
              "success":<success number>,
+             "speed":<float>,
+              "trend":<string>,
              "last_error":"error message"
            }
       }
@@ -63,6 +71,8 @@ Content-Type: application/json
          "senderName":{
            "errors":<error number>,
            "success":<success number>,
+           "speed":<float>,
+           "trend":<string>,
            "last_error":"error message"
          }
       },
@@ -74,20 +84,31 @@ Content-Type: application/json
       "readDataSize": <读取数据的bytes大小>.
         "readDataCount":<读取数据条数>,
         "elaspedtime"<总用时>,
+         "readspeed_kb":<float>,
+          "readspeed":<float>,
+          "readspeedtrend_kb":<string>,
+          "readspeedtrend":<string>,
         "lag":{  
            "size":<lag size>,
            "files":<lag file number>,
            "ftlags":<fault torrent lags>
         },
+        "readerStats":{
+           "last_error":"error message"
+         },
         "parserStats":{  
            "errors":<error number>,
            "success":<success number>,
+           "speed":<float>,
+           "trend":<string>,
            "last_error":"error message"
         },
         "transformStats":{
             "<transformtype>":{
                "errors":<error number>,
                "success":<success number>,
+               "speed":<float>,
+                "trend":<string>,
                "last_error":"error message"
              }
         }
@@ -95,6 +116,8 @@ Content-Type: application/json
            "senderName":{
              "errors":<error number>,
              "success":<success number>,
+             "speed":<float>,
+             "trend":<string>,
              "last_error":"error message"
            }
         },
@@ -103,6 +126,16 @@ Content-Type: application/json
 }
 
 ```
+
+* "readspeed_kb": 每秒的读取流量大小 KB/s
+* "readspeed": 每秒读取记录个数 条/s
+* "readspeedtrend_kb": 流量读取速度趋势  "up" 上升,"down" 下降,"stable" 不变
+* "readspeedtrend": 记录个数速度读取趋势 "up" 上升,"down" 下降,"stable" 不变
+* "speed": 速度 条/s
+* "trend": 速度趋势 "up" 上升,"down" 下降,"stable" 不变
+* "elaspedtime": 运行时长
+
+
 
 ### 获取指定runner运行状态
 
@@ -117,26 +150,60 @@ GET /logkit/<runnerName>/status
 ```
 Content-Type: application/json
 {  
-   "name":"<runnerName>",
-   "logpath":"/your/log/path1",
-   "lag":{  
-      "size":<lag size>,
-      "files":<lag file number>,
-      "ftlags":<fault torrent lags>
-   },
-   "parserStats":{  
-      "errors":<error number>,
-      "success":<success number>,
+  "name":"runner1",
+  "logpath":"/your/log/path1",
+  "readDataSize": <读取数据的bytes大小>.
+  "readDataCount":<读取数据条数>,
+  "elaspedtime"<总用时>,
+   "readspeed_kb":<float>,
+    "readspeed":<float>,
+    "readspeedtrend_kb":<string>,
+    "readspeedtrend":<string>,
+  "lag":{  
+     "size":<lag size>,
+     "files":<lag file number>,
+     "ftlags":<fault torrent lags>
+  },
+  "readerStats":{
       "last_error":"error message"
-   },
-   "senderStats":{  
-      "errors":<error number>,
-      "success":<success number>,
-      "last_error":"error message"
-   },
-   "error":"error msg"
+  },
+  "parserStats":{  
+     "errors":<error number>,
+     "success":<success number>,
+     "speed":<float>,
+     "trend":<string>,
+     "last_error":"error message"
+  },
+  "transformStats":{
+      "<transformtype>":{
+         "errors":<error number>,
+         "success":<success number>,
+         "speed":<float>,
+          "trend":<string>,
+         "last_error":"error message"
+       }
+  }
+  "senderStats":{
+     "senderName":{
+       "errors":<error number>,
+       "success":<success number>,
+       "speed":<float>,
+        "trend":<string>,
+       "last_error":"error message"
+     }
+  },
+  "error":"error msg"
 }
 ```
+
+* "readspeed_kb": 每秒的读取流量大小 KB/s
+* "readspeed": 每秒读取记录个数 条/s
+* "readspeedtrend_kb": 流量读取速度趋势  "up" 上升,"down" 下降,"stable" 不变
+* "readspeedtrend": 记录个数速度读取趋势 "up" 上升,"down" 下降,"stable" 不变
+* "speed": 速度 条/s
+* "trend": 速度趋势 "up" 上升,"down" 下降,"stable" 不变
+* "elaspedtime": 运行时长
+
 
 ### 添加 Runner
 
