@@ -12,6 +12,7 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/utils"
 	"github.com/wvanbergen/kafka/consumergroup"
 )
 
@@ -34,6 +35,9 @@ type KafkaReader struct {
 	mux      sync.Mutex
 	startMux sync.Mutex
 	started  bool
+
+	stats     utils.StatsInfo
+	statsLock sync.RWMutex
 }
 
 func NewKafkaReader(meta *Meta, consumerGroup string,
@@ -49,6 +53,7 @@ func NewKafkaReader(meta *Meta, consumerGroup string,
 		status:         StatusInit,
 		mux:            sync.Mutex{},
 		startMux:       sync.Mutex{},
+		statsLock:      sync.RWMutex{},
 		started:        false,
 	}
 	return kr, nil
@@ -56,6 +61,18 @@ func NewKafkaReader(meta *Meta, consumerGroup string,
 
 func (kr *KafkaReader) Name() string {
 	return fmt.Sprintf("KafkaReader:[%s],[%s]", strings.Join(kr.Topics, ","), kr.ConsumerGroup)
+}
+
+func (kr *KafkaReader) Status() utils.StatsInfo {
+	kr.statsLock.RLock()
+	defer kr.statsLock.RUnlock()
+	return kr.stats
+}
+
+func (kr *KafkaReader) setStatsError(err string) {
+	kr.statsLock.Lock()
+	defer kr.statsLock.Unlock()
+	kr.stats.LastError = err
 }
 
 func (kr *KafkaReader) Source() string {
@@ -158,6 +175,7 @@ func (kr *KafkaReader) run() {
 		case err := <-kr.errs:
 			if err != nil {
 				log.Errorf("Runner[%v] Consumer Error: %s\n", kr.meta.RunnerName, err)
+				kr.setStatsError("Runner[" + kr.meta.RunnerName + "] Consumer Error: " + err.Error())
 			}
 		case msg := <-kr.in:
 			kr.readChan <- msg.Value

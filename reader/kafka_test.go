@@ -8,6 +8,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 
+	"github.com/qiniu/logkit/utils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,4 +34,6 @@ func TestKafkaReader(t *testing.T) {
 		started:        false,
 	}
 	assert.EqualValues(t, "KafkaReader:[topic1],[group1]", er.Name())
+
+	assert.Equal(t, utils.StatsInfo{}, er.Status())
 }

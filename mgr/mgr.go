@@ -49,6 +49,8 @@ type Manager struct {
 	watcherMux sync.RWMutex
 	pregistry  *parser.ParserRegistry
 	sregistry  *sender.SenderRegistry
+
+	Version string
 }
 
 func NewManager(conf ManagerConfig) (*Manager, error) {

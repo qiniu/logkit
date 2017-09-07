@@ -45,6 +45,7 @@ type RunnerStatus struct {
 	ReadDataCount  int64                      `json:"readDataCount"`
 	Elaspedtime    float64                    `json:"elaspedtime"`
 	Lag            RunnerLag                  `json:"lag"`
+	ReaderStats    utils.StatsInfo            `json:"readerStats"`
 	ParserStats    utils.StatsInfo            `json:"parserStats"`
 	SenderStats    map[string]utils.StatsInfo `json:"senderStats"`
 	TransformStats map[string]utils.StatsInfo `json:"transformStats"`
@@ -594,6 +595,10 @@ func (r *LogExportRunner) Status() RunnerStatus {
 
 	for i := range r.transformers {
 		r.rs.TransformStats[r.transformers[i].Type()] = r.transformers[i].Stats()
+	}
+
+	if str, ok := r.reader.(reader.StatsReader); ok {
+		r.rs.ReaderStats = str.Status()
 	}
 
 	for i := range r.senders {

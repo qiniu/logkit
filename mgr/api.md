@@ -1,6 +1,22 @@
 # logkit Rest API
 
 
+## Version
+
+### 获取logkit版本号
+
+请求
+```
+GET /logkit/version
+```
+
+返回一个字符串
+
+```
+"<版本号>"
+```
+
+
 ## Runner
 
 ### 获取runner运行状态
@@ -9,12 +25,13 @@
 
 ```
 GET /logkit/status
-Content-Type: application/json
 ```
 
 返回
 
 ```
+Content-Type: application/json
+
 {  
    {  
       "name":"runner1",
@@ -26,6 +43,9 @@ Content-Type: application/json
          "size":<lag size>,
          "files":<lag file number>,
          "ftlags":<fault torrent lags>
+      },
+      "readerStats":{
+          "last_error":"error message"
       },
       "parserStats":{  
          "errors":<error number>,
@@ -90,12 +110,12 @@ Content-Type: application/json
 
 ```
 GET /logkit/<runnerName>/status 
-Content-Type: application/json
 ```
 
 返回
 
 ```
+Content-Type: application/json
 {  
    "name":"<runnerName>",
    "logpath":"/your/log/path1",

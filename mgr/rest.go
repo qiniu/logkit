@@ -64,6 +64,9 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	router.GET(PREFIX+"/sender/options", rs.GetSenderKeyOptions())
 	router.POST(PREFIX+"/sender/check", rs.PostSenderCheck())
 
+	//version
+	router.GET(PREFIX+"/version", rs.GetVersion())
+
 	var (
 		port     = DEFAULT_PORT
 		address  string
@@ -215,6 +218,12 @@ func (rs *RestService) DeleteConfig() echo.HandlerFunc {
 			return err
 		}
 		return os.Remove(filename)
+	}
+}
+
+func (rs *RestService) GetVersion() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		return c.String(http.StatusOK, rs.mgr.Version)
 	}
 }
 

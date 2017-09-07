@@ -35,6 +35,9 @@ type MultiReader struct {
 	statInterval   time.Duration
 	maxOpenFiles   int
 	whence         string
+
+	stats     utils.StatsInfo
+	statsLock sync.RWMutex
 }
 
 type ActiveReader struct {
@@ -46,6 +49,9 @@ type ActiveReader struct {
 	status       int32
 	inactive     int32 //当inactive>0 时才会被expire回收
 	runnerName   string
+
+	stats     utils.StatsInfo
+	statsLock sync.RWMutex
 }
 
 type Result struct {
@@ -77,6 +83,7 @@ func NewActiveReader(logPath, whence string, meta *Meta, msgChan chan<- Result) 
 		inactive:     1,
 		runnerName:   meta.RunnerName,
 		status:       StatusInit,
+		statsLock:    sync.RWMutex{},
 	}
 	return
 }
@@ -100,6 +107,7 @@ func (ar *ActiveReader) Run() {
 			ar.cacheLineMux.Unlock()
 			if err != nil && err != io.EOF {
 				log.Warnf("Runner[%v] ActiveReader %s read error: %v", ar.runnerName, ar.logpath, err)
+				ar.setStatsError(err.Error())
 				time.Sleep(3 * time.Second)
 				continue
 			}
@@ -163,6 +171,18 @@ func (ar *ActiveReader) Close() error {
 	return err
 }
 
+func (ar *ActiveReader) setStatsError(err string) {
+	ar.statsLock.Lock()
+	defer ar.statsLock.Unlock()
+	ar.stats.LastError = err
+}
+
+func (ar *ActiveReader) Status() utils.StatsInfo {
+	ar.statsLock.RLock()
+	defer ar.statsLock.RUnlock()
+	return ar.stats
+}
+
 //除了sync自己的bufreader，还要sync一行linecache
 func (ar *ActiveReader) SyncMeta() string {
 	ar.cacheLineMux.Lock()
@@ -220,6 +240,7 @@ func NewMultiReader(meta *Meta, logPathPattern, whence, expireDur, statIntervalD
 		cacheMap:       make(map[string]string),        //armapmux
 		armapmux:       sync.Mutex{},
 		msgChan:        make(chan Result),
+		statsLock:      sync.RWMutex{},
 	}
 	buf := make([]byte, bufsize)
 	if bufsize > 0 {
@@ -285,6 +306,7 @@ func (mr *MultiReader) StatLogPath() {
 	matches, err := filepath.Glob(mr.logPathPattern)
 	if err != nil {
 		log.Errorf("Runner[%v] stat logPathPattern error %v", mr.meta.RunnerName, err)
+		mr.setStatsError("Runner[" + mr.meta.RunnerName + "] stat logPathPattern error " + err.Error())
 		return
 	}
 	if len(matches) > 0 {
@@ -322,6 +344,7 @@ func (mr *MultiReader) StatLogPath() {
 			err = ar.br.SetMode(ReadModeHeadPatternRegexp, mr.headRegexp)
 			if err != nil {
 				log.Errorf("Runner[%v] NewActiveReader for matches %v SetMode error %v", mr.meta.RunnerName, rp, err)
+				mr.setStatsError("Runner[" + mr.meta.RunnerName + "] NewActiveReader for matches " + rp + " SetMode error " + err.Error())
 			}
 		}
 		newaddsPath = append(newaddsPath, rp)
@@ -359,6 +382,26 @@ func (mr *MultiReader) Name() string {
 
 func (mr *MultiReader) Source() string {
 	return mr.curFile
+}
+
+func (mr *MultiReader) setStatsError(err string) {
+	mr.statsLock.Lock()
+	defer mr.statsLock.Unlock()
+	mr.stats.LastError = err
+}
+
+func (mr *MultiReader) Status() utils.StatsInfo {
+	mr.statsLock.RLock()
+	defer mr.statsLock.RUnlock()
+
+	ars := mr.getActiveReaders()
+	for _, ar := range ars {
+		st := ar.Status()
+		if st.LastError != "" {
+			mr.stats.LastError += "\n<" + ar.logpath + ">: " + st.LastError
+		}
+	}
+	return mr.stats
 }
 
 func (mr *MultiReader) Close() (err error) {

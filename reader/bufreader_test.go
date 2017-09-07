@@ -9,6 +9,7 @@ import (
 	"github.com/qiniu/logkit/conf"
 
 	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/utils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -222,5 +223,29 @@ func Test_BuffReaderMultiLine(t *testing.T) {
 		"test\nxtestx\n123\n":   3,
 	}
 	assert.Equal(t, exp, rest)
+	r.Close()
+}
+
+func Test_BuffReaderStats(t *testing.T) {
+	body := "Test_BuffReaderStats\n"
+	createSeqFile(1000, body)
+	defer destroySeqFile()
+	c := conf.MapConf{
+		"log_path":  dir,
+		"meta_path": metaDir,
+		"mode":      DirMode,
+		"read_from": "oldest",
+	}
+	r, err := NewFileBufReader(c)
+	if err != nil {
+		t.Error(err)
+	}
+	_, err = r.ReadLine()
+	assert.NoError(t, err)
+	str, ok := r.(StatsReader)
+	assert.Equal(t, true, ok)
+	stsx := str.Status()
+	expsts := utils.StatsInfo{}
+	assert.Equal(t, expsts, stsx)
 	r.Close()
 }
