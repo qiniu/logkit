@@ -1,6 +1,7 @@
 package mgr
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -11,8 +12,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
-
-	"encoding/json"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/cleaner"
@@ -42,6 +41,10 @@ type Runner interface {
 	Stop()
 	Cleaner() CleanInfo
 	Status() RunnerStatus
+}
+
+type Resetable interface {
+	Reset() error
 }
 
 type RunnerStatus struct {
@@ -509,6 +512,23 @@ func (r *LogExportRunner) Name() string {
 	return r.RunnerName
 }
 
+func (r *LogExportRunner) Reset() error {
+	var errmsg string
+	err := r.meta.Reset()
+	if err != nil {
+		errmsg += err.Error() + "\n"
+	}
+	for _, sd := range r.senders {
+		ssd, ok := sd.(Resetable)
+		if ok {
+			if nerr := ssd.Reset(); nerr != nil {
+				errmsg += err.Error() + "\n"
+			}
+		}
+	}
+	return errors.New(errmsg)
+}
+
 func (r *LogExportRunner) Cleaner() CleanInfo {
 	ci := CleanInfo{
 		enable: r.cleaner != nil,
@@ -538,7 +558,6 @@ func (r *LogExportRunner) batchFullOrTimeout() bool {
 		log.Warnf("Runner[%v] meet the stopped signal", r.RunnerName)
 		return true
 	}
-
 	return false
 }
 

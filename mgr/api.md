@@ -358,6 +358,38 @@ Content-Type: application/json
 }
 ```
 
+### 重置 runner
+
+请求
+
+```
+POST /logkit/configs/<runnerName>/reset
+```
+
+返回
+
+如果请求成功, 返回HTTP状态码200:
+
+```
+{}
+```
+
+如果请求失败, 返回包含如下内容的JSON字符串（已格式化,便于阅读）:
+
+```
+{
+    "error":   "<error message string>"
+}
+```
+
+**注意**
+
+**重置runner的作用：**
+
+1. 删除runner
+2. 删除runner的meta文件夹
+3. 重新启动runner
+
 ## Reader
 
 ### 获得Reader用途说明

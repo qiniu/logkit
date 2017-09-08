@@ -64,8 +64,9 @@ var testRestConf = `{
 
 func Test_RestGetStatus(t *testing.T) {
 	dir := "Test_Rest"
+	os.RemoveAll(dir)
 	if err := os.Mkdir(dir, 0755); err != nil {
-		log.Fatalf("Test_Run error mkdir %v %v", dir, err)
+		t.Fatalf("Test_Run error mkdir %v %v", dir, err)
 	}
 	defer os.RemoveAll(dir)
 	pwd, err := os.Getwd()
@@ -286,6 +287,7 @@ func Test_RestCRUD(t *testing.T) {
 	defer func() {
 		rs.Stop()
 		os.Remove(StatsShell)
+		os.RemoveAll(".logkitconfs")
 	}()
 	assert.Equal(t, rs.address, conf.BindHost)
 
@@ -443,4 +445,182 @@ func Test_RestCRUD(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, explists, gotlists)
 
+}
+
+func Test_RunnerReset(t *testing.T) {
+	var runnerResetConf = `{
+    "name":"test1.csv",
+    "batch_len": 1,
+    "batch_size": 200,
+    "batch_interval": 60,
+    "batch_try_times": 3,
+    "reader":{
+        "log_path":"./Test_RunnerReset/logdir",
+        "meta_path":"./Test_RunnerReset/meta_mock_csv",
+        "mode":"dir",
+        "read_from":"oldest",
+        "ignore_hidden":"true"
+    },
+    "parser":{
+        "name":         "req_csv",
+		"type":         "json"
+    },
+    "senders":[{
+		"name":           "file_sender",
+		"sender_type":    "file",
+		"file_send_path": "./Test_RunnerReset/filesenderdata"
+    }]
+}`
+
+	dir := "Test_RunnerReset"
+	if err := os.Mkdir(dir, 0755); err != nil {
+		log.Fatalf("Test_RunnerReset error mkdir %v %v", dir, err)
+	}
+	defer os.RemoveAll(dir)
+	pwd, err := os.Getwd()
+	if err != nil {
+		t.Error(err)
+	}
+	confdir := pwd + "/" + dir
+	logpath := dir + "/logdir"
+	metapath := dir + "/meta_mock_csv"
+	logconfs := dir + "/confs"
+	if err := os.Mkdir(logpath, 0755); err != nil {
+		log.Fatalf("Test_Run error mkdir %v %v", logpath, err)
+	}
+	if err := os.Mkdir(metapath, 0755); err != nil {
+		log.Fatalf("Test_Run error mkdir %v %v", metapath, err)
+	}
+	if err := os.Mkdir(logconfs, 0755); err != nil {
+		log.Fatalf("Test_Run error mkdir %v %v", logconfs, err)
+	}
+	log1 := `{"a":1,"b":"2"}
+	{"a":3,"b":"4"}
+	`
+	log2 := `{"a":5,"b":"6"}
+	{"a":7,"b":"8"}
+	`
+	if err := ioutil.WriteFile(filepath.Join(logpath, "log1"), []byte(log1), 0666); err != nil {
+		log.Fatalf("write log1 fail %v", err)
+	}
+	time.Sleep(time.Second)
+	if err := ioutil.WriteFile(filepath.Join(logpath, "log2"), []byte(log2), 0666); err != nil {
+		log.Fatalf("write log2 fail %v", err)
+	}
+
+	rp, err := filepath.Abs(logpath)
+	if err != nil {
+		t.Error(err)
+	}
+
+	exp := map[string]RunnerStatus{
+		"test1.csv": {
+			Name:             "test1.csv",
+			Logpath:          rp,
+			ReadDataCount:    5,
+			ReadDataSize:     68,
+			ReadSpeedTrend:   SpeedUp,
+			ReadSpeedTrendKb: SpeedUp,
+			Lag: RunnerLag{
+				Size:  0,
+				Files: 0,
+			},
+			ParserStats: utils.StatsInfo{
+				Errors:  1,
+				Success: 4,
+				Trend:   SpeedUp,
+			},
+			TransformStats: make(map[string]utils.StatsInfo),
+			SenderStats: map[string]utils.StatsInfo{
+				"file_sender": {
+					Errors:  0,
+					Success: 4,
+					Trend:   SpeedUp,
+				},
+			},
+		},
+	}
+
+	var conf ManagerConfig
+	conf.RestDir = confdir
+	conf.BindHost = ":6346"
+	m, err := NewManager(conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	confs := []string{
+		dir + "/confs",
+	}
+	err = m.Watch(confs)
+	assert.NoError(t, err)
+	rs := NewRestService(m, echo.New())
+	defer func() {
+		rs.Stop()
+		os.Remove(StatsShell)
+		os.RemoveAll(".logkitconfs")
+	}()
+
+	resp, err := http.Post("http://127.0.0.1"+rs.address+"/logkit/configs/"+"test1.csv", TESTContentApplictionJson, bytes.NewReader([]byte(runnerResetConf)))
+	assert.NoError(t, err)
+	content, _ := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		t.Error(string(content))
+	}
+	time.Sleep(5 * time.Second)
+
+	cmd := exec.Command("./stats")
+	cmd.Stdin = strings.NewReader("some input")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err = cmd.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rss := make(map[string]RunnerStatus)
+	err = json.Unmarshal([]byte(out.String()), &rss)
+	assert.NoError(t, err, out.String())
+
+	v := rss["test1.csv"]
+	v.Elaspedtime = 0
+	v.ReadSpeed = 0
+	v.ReadSpeedKB = 0
+	v.ParserStats.Speed = 0
+	fs := v.SenderStats["file_sender"]
+	fs.Speed = 0
+	v.SenderStats["file_sender"] = fs
+	rss["test1.csv"] = v
+	assert.Equal(t, exp, rss, out.String())
+
+	resp, err = http.Post("http://127.0.0.1"+rs.address+"/logkit/configs/"+"test1.csv/reset", TESTContentApplictionJson, nil)
+	assert.NoError(t, err)
+	content, _ = ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		t.Error(string(content))
+	}
+	time.Sleep(5 * time.Second)
+	out.Reset()
+	cmd = exec.Command("./stats")
+	cmd.Stdin = strings.NewReader("some input")
+	cmd.Stdout = &out
+	err = cmd.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rss = make(map[string]RunnerStatus)
+	err = json.Unmarshal([]byte(out.String()), &rss)
+	assert.NoError(t, err, "OUTSTRING: "+out.String())
+	rp, err = filepath.Abs(logpath)
+	if err != nil {
+		t.Error(err)
+	}
+	v = rss["test1.csv"]
+	v.Elaspedtime = 0
+	v.ReadSpeed = 0
+	v.ReadSpeedKB = 0
+	v.ParserStats.Speed = 0
+	fs = v.SenderStats["file_sender"]
+	fs.Speed = 0
+	v.SenderStats["file_sender"] = fs
+	rss["test1.csv"] = v
+	assert.Equal(t, exp, rss, out.String())
 }
