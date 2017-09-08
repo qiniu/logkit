@@ -244,10 +244,34 @@ func Test_RestCRUD(t *testing.T) {
     }]
 }`
 
+	testRestCRUD3_Up2 := `{
+    "name":"testRestCRUD2",
+    "batch_len": 10,
+    "batch_size": 10,
+    "batch_interval": 10,
+    "batch_try_times": 3,
+    "reader":{
+        "log_path":"./Test_RestCRUD/logdir2",
+        "meta_path":"./Test_RestCRUD/meta_mock_csv",
+        "mode":"dir",
+        "read_from":"oldest",
+        "ignore_hidden":"true"
+    },
+    "parser":{
+        "name":         "req_csv",
+		"type":         "csv",
+		"csv_schema":   "logtype string, xx long",
+		"csv_splitter": " "
+    },
+    "senders":[{
+		"name":           "file_sender",
+		"sender_type":    "file",
+		"file_send_path": "./Test_RestCRUD/filesenderdata2"
+    }]
+}`
+
 	pwd, err := os.Getwd()
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 	confdir := pwd + "/Test_RestCRUD"
 	defer os.RemoveAll(confdir)
 
@@ -269,9 +293,7 @@ func Test_RestCRUD(t *testing.T) {
 	t.Log("开始POST 第一个")
 	var expconf1, got1 RunnerConfig
 	err = json.Unmarshal([]byte(testRestCRUD1), &expconf1)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 	expconf1.ReaderConfig[utils.GlobalKeyName] = expconf1.RunnerName
 	expconf1.ReaderConfig[reader.KeyRunnerName] = expconf1.RunnerName
 	expconf1.ParserConf[parser.KeyRunnerName] = expconf1.RunnerName
@@ -281,9 +303,7 @@ func Test_RestCRUD(t *testing.T) {
 	}
 
 	resp, err := http.Post("http://127.0.0.1"+rs.address+"/logkit/configs/"+"testRestCRUD1", TESTContentApplictionJson, bytes.NewReader([]byte(testRestCRUD1)))
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 	content, _ := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode != 200 {
 		t.Error(string(content))
@@ -291,9 +311,7 @@ func Test_RestCRUD(t *testing.T) {
 	// GET 第一个
 	t.Log("开始GET 第一个")
 	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/configs/" + "testRestCRUD1")
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 	content, _ = ioutil.ReadAll(resp.Body)
 	if resp.StatusCode != 200 {
 		t.Error(string(content))
@@ -310,9 +328,7 @@ func Test_RestCRUD(t *testing.T) {
 
 	var expconf2, got2 RunnerConfig
 	err = json.Unmarshal([]byte(testRestCRUD2), &expconf2)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 
 	expconf2.ReaderConfig[utils.GlobalKeyName] = expconf2.RunnerName
 	expconf2.ReaderConfig[reader.KeyRunnerName] = expconf2.RunnerName
@@ -324,9 +340,7 @@ func Test_RestCRUD(t *testing.T) {
 
 	t.Log("GET 2")
 	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/configs/testRestCRUD2")
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 	content, _ = ioutil.ReadAll(resp.Body)
 	if resp.StatusCode != 400 {
 		t.Error(string(content), resp.StatusCode)
@@ -335,25 +349,19 @@ func Test_RestCRUD(t *testing.T) {
 	// POST 第2个
 	t.Log("Post 2")
 	resp, err = http.Post("http://127.0.0.1"+rs.address+"/logkit/configs/testRestCRUD2", TESTContentApplictionJson, bytes.NewReader([]byte(testRestCRUD2)))
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 	content, _ = ioutil.ReadAll(resp.Body)
 	if resp.StatusCode != 200 {
 		t.Error(string(content))
 	}
 	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/configs/testRestCRUD2")
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 	content, _ = ioutil.ReadAll(resp.Body)
 	if resp.StatusCode != 200 {
 		t.Error(string(content))
 	}
 	err = json.Unmarshal(content, &got2)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 	// 验证 第2个
 	assert.Equal(t, expconf2, got2)
 
@@ -362,9 +370,7 @@ func Test_RestCRUD(t *testing.T) {
 
 	t.Log("GET all")
 	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/configs")
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 	content, _ = ioutil.ReadAll(resp.Body)
 	if resp.StatusCode != 200 {
 		t.Error(string(content))
@@ -375,21 +381,38 @@ func Test_RestCRUD(t *testing.T) {
 	}
 	gotlists := make(map[string]RunnerConfig)
 	err = json.Unmarshal(content, &gotlists)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 	assert.Equal(t, explists, gotlists)
+
+	// PUT testRestCRUD2
+	req, err := http.NewRequest("PUT", "http://127.0.0.1"+rs.address+"/logkit/configs/testRestCRUD2", bytes.NewReader([]byte(testRestCRUD3_Up2)))
+	assert.NoError(t, err)
+	req.Header.Set("Content-Type", TESTContentApplictionJson)
+	resp, err = http.DefaultClient.Do(req)
+	assert.NoError(t, err)
+	content, _ = ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		t.Error(string(content))
+	}
+	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/configs/testRestCRUD2")
+	assert.NoError(t, err)
+	content, _ = ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		t.Error(string(content))
+	}
+	var gotUpdate RunnerConfig
+	err = json.Unmarshal(content, &gotUpdate)
+	assert.NoError(t, err)
+	assert.Equal(t, 10, gotUpdate.MaxBatchLen)
+	assert.Equal(t, 10, gotUpdate.MaxBatchSize)
+	assert.Equal(t, 10, gotUpdate.MaxBatchInteval)
 
 	// DELETE testRestCRUD2
 	t.Log("delete 2")
-	req, err := http.NewRequest("DELETE", "http://127.0.0.1"+rs.address+"/logkit/configs/testRestCRUD2", nil)
-	if err != nil {
-		t.Error(err)
-	}
+	req, err = http.NewRequest("DELETE", "http://127.0.0.1"+rs.address+"/logkit/configs/testRestCRUD2", nil)
+	assert.NoError(t, err)
 	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 	content, _ = ioutil.ReadAll(resp.Body)
 	if resp.StatusCode != 200 {
 		t.Error(string(content))
@@ -397,9 +420,7 @@ func Test_RestCRUD(t *testing.T) {
 
 	t.Log("get 2")
 	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/configs/testRestCRUD2")
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 	content, _ = ioutil.ReadAll(resp.Body)
 	if resp.StatusCode != 400 {
 		t.Error(string(content), resp.StatusCode)
@@ -409,9 +430,7 @@ func Test_RestCRUD(t *testing.T) {
 	//再次get对比
 	t.Log("get all")
 	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/configs")
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 	content, _ = ioutil.ReadAll(resp.Body)
 	if resp.StatusCode != 200 {
 		t.Error(string(content))
@@ -421,8 +440,7 @@ func Test_RestCRUD(t *testing.T) {
 	}
 	gotlists = make(map[string]RunnerConfig)
 	err = json.Unmarshal(content, &gotlists)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 	assert.Equal(t, explists, gotlists)
+
 }

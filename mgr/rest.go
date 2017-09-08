@@ -45,6 +45,7 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	router.GET(PREFIX+"/configs", rs.GetConfigs())
 	router.GET(PREFIX+"/configs/:name", rs.GetConfig())
 	router.POST(PREFIX+"/configs/:name", rs.PostConfig())
+	router.PUT(PREFIX+"/configs/:name", rs.PutConfig())
 	router.DELETE(PREFIX+"/configs/:name", rs.DeleteConfig())
 
 	//reader API
@@ -192,6 +193,37 @@ func (rs *RestService) PostConfig() echo.HandlerFunc {
 		filename := rs.mgr.RestDir + "/" + nconf.RunnerName + ".conf"
 		if rs.mgr.isRunning(filename) {
 			return echo.NewHTTPError(http.StatusBadRequest, "file "+filename+" runner is running")
+		}
+		nconf.ParserConf = convertWebParserConfig(nconf.ParserConf)
+		nconf.IsInWebFolder = true
+		err = rs.mgr.ForkRunner(filename, nconf, true)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+		confBytes, err := json.MarshalIndent(nconf, "", "    ")
+		err = ioutil.WriteFile(filename, confBytes, 0644)
+		return
+	}
+}
+
+// put /logkit/configs/<name>
+func (rs *RestService) PutConfig() echo.HandlerFunc {
+	return func(c echo.Context) (err error) {
+		name := c.Param("name")
+		if name == "" {
+			return echo.NewHTTPError(http.StatusBadRequest, "config name is empty")
+		}
+
+		var nconf RunnerConfig
+		if err = c.Bind(&nconf); err != nil {
+			return err
+		}
+		filename := rs.mgr.RestDir + "/" + nconf.RunnerName + ".conf"
+		if rs.mgr.isRunning(filename) {
+			if subErr := rs.mgr.Remove(filename); subErr != nil {
+				log.Errorf("remove runner %v error %v", filename, subErr)
+			}
+			os.Remove(filename)
 		}
 		nconf.ParserConf = convertWebParserConfig(nconf.ParserConf)
 		nconf.IsInWebFolder = true

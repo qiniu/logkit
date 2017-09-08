@@ -266,6 +266,73 @@ Content-Type: application/json
 }
 ```
 
+### 修改 Runner
+
+请求
+
+```
+PUT /logkit/configs/<runnerName>
+Content-Type: application/json
+{
+    "name":"logkit_runner",
+    "batch_len": 1000,
+    "batch_size": 2097152,
+    "batch_interval": 300, 
+    "reader":{
+        "log_path":"/home/user/app/log/dir/",
+        "meta_path":"./metapath",
+        "donefile_retention":"7",
+        "read_from":"newest",
+        "mode":"dir",
+        "valid_file_pattern":"qiniulog-*.log" // 可不选，默认为 "*"
+    },
+     "cleaner":{
+        "delete_enable":"true",
+        "delete_interval":"10",
+        "reserve_file_number":"10",
+        "reserve_file_size":"10240"
+    },
+    "parser":{
+        "name":"json_parser",
+        "type":"json"
+    },
+    "senders":[{
+        "name":"test_sender",
+        "sender_type":"pandora",
+        "fault_tolerant":"false",
+        "pandora_ak":"your_ak",
+        "pandora_sk":"your_sk",
+        "pandora_host":"https://pipeline.qiniu.com",
+        "pandora_repo_name":"repo_test",
+        "pandora_region":"nb",
+        "pandora_schema_free":"true"
+}]
+}
+```
+
+
+返回
+
+如果请求成功, 返回HTTP状态码200:
+
+```
+{}
+```
+
+如果请求失败, 返回包含如下内容的JSON字符串（已格式化,便于阅读）:
+
+```
+{
+    "error":   "<error message string>"
+}
+```
+
+**说明**
+
+1. 修改runner时，请求体需要包含全量的配置
+2. 修改runner时，会先把原来的runner移除，然后再添加新的runner。
+
+
 ### 删除 runner
 
 请求
