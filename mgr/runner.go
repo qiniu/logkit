@@ -1,6 +1,7 @@
 package mgr
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -11,8 +12,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
-
-	"encoding/json"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/cleaner"
@@ -30,6 +29,12 @@ type CleanInfo struct {
 	logdir string
 }
 
+const (
+	SpeedUp     = "up"
+	SpeedDown   = "down"
+	SpeedStable = "stable"
+)
+
 type Runner interface {
 	Name() string
 	Run()
@@ -38,18 +43,27 @@ type Runner interface {
 	Status() RunnerStatus
 }
 
+type Resetable interface {
+	Reset() error
+}
+
 type RunnerStatus struct {
-	Name           string                     `json:"name"`
-	Logpath        string                     `json:"logpath"`
-	ReadDataSize   int64                      `json:"readDataSize"`
-	ReadDataCount  int64                      `json:"readDataCount"`
-	Elaspedtime    float64                    `json:"elaspedtime"`
-	Lag            RunnerLag                  `json:"lag"`
-	ParserStats    utils.StatsInfo            `json:"parserStats"`
-	SenderStats    map[string]utils.StatsInfo `json:"senderStats"`
-	TransformStats map[string]utils.StatsInfo `json:"transformStats"`
-	Error          string                     `json:"error,omitempty"`
-	lastState      time.Time
+	Name             string                     `json:"name"`
+	Logpath          string                     `json:"logpath"`
+	ReadDataSize     int64                      `json:"readDataSize"`
+	ReadDataCount    int64                      `json:"readDataCount"`
+	Elaspedtime      float64                    `json:"elaspedtime"`
+	Lag              RunnerLag                  `json:"lag"`
+	ReaderStats      utils.StatsInfo            `json:"readerStats"`
+	ParserStats      utils.StatsInfo            `json:"parserStats"`
+	SenderStats      map[string]utils.StatsInfo `json:"senderStats"`
+	TransformStats   map[string]utils.StatsInfo `json:"transformStats"`
+	Error            string                     `json:"error,omitempty"`
+	lastState        time.Time
+	ReadSpeedKB      float64 `json:"readspeed_kb"`
+	ReadSpeed        float64 `json:"readspeed"`
+	ReadSpeedTrendKb string  `json:"readspeedtrend_kb"`
+	ReadSpeedTrend   string  `json:"readspeedtrend"`
 }
 
 type RunnerLag struct {
@@ -90,7 +104,8 @@ type LogExportRunner struct {
 	senders      []sender.Sender
 	transformers []transforms.Transformer
 
-	rs RunnerStatus
+	rs     RunnerStatus
+	lastRs RunnerStatus
 
 	meta *reader.Meta
 
@@ -137,6 +152,12 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 		exitChan:   make(chan struct{}),
 		lastSend:   time.Now(), // 上一次发送时间
 		rs: RunnerStatus{
+			SenderStats:    make(map[string]utils.StatsInfo),
+			TransformStats: make(map[string]utils.StatsInfo),
+			lastState:      time.Now(),
+			Name:           info.RunnerName,
+		},
+		lastRs: RunnerStatus{
 			SenderStats:    make(map[string]utils.StatsInfo),
 			TransformStats: make(map[string]utils.StatsInfo),
 			lastState:      time.Now(),
@@ -491,6 +512,23 @@ func (r *LogExportRunner) Name() string {
 	return r.RunnerName
 }
 
+func (r *LogExportRunner) Reset() error {
+	var errmsg string
+	err := r.meta.Reset()
+	if err != nil {
+		errmsg += err.Error() + "\n"
+	}
+	for _, sd := range r.senders {
+		ssd, ok := sd.(Resetable)
+		if ok {
+			if nerr := ssd.Reset(); nerr != nil {
+				errmsg += err.Error() + "\n"
+			}
+		}
+	}
+	return errors.New(errmsg)
+}
+
 func (r *LogExportRunner) Cleaner() CleanInfo {
 	ci := CleanInfo{
 		enable: r.cleaner != nil,
@@ -520,7 +558,6 @@ func (r *LogExportRunner) batchFullOrTimeout() bool {
 		log.Warnf("Runner[%v] meet the stopped signal", r.RunnerName)
 		return true
 	}
-
 	return false
 }
 
@@ -578,7 +615,24 @@ func (r *LogExportRunner) LagStats() (rl RunnerLag, err error) {
 	return
 }
 
+func getTrend(old, new float64) string {
+	if old < new-0.1 {
+		return SpeedUp
+	}
+	if old > new+0.1 {
+		return SpeedDown
+	}
+	return SpeedStable
+}
+
 func (r *LogExportRunner) Status() RunnerStatus {
+
+	now := time.Now()
+	elaspedtime := now.Sub(r.rs.lastState).Seconds()
+	if elaspedtime <= 0.1 {
+		return r.rs
+	}
+
 	if r.meta.IsFileMode() {
 		r.rs.Logpath = r.meta.LogPath()
 		rl, err := r.LagStats()
@@ -588,13 +642,30 @@ func (r *LogExportRunner) Status() RunnerStatus {
 		r.rs.Lag = rl
 	}
 
-	now := time.Now()
-	r.rs.Elaspedtime += now.Sub(r.rs.lastState).Seconds()
+	r.rs.Elaspedtime += elaspedtime
 	r.rs.lastState = now
-
 	for i := range r.transformers {
-		r.rs.TransformStats[r.transformers[i].Type()] = r.transformers[i].Stats()
+		newtsts := r.transformers[i].Stats()
+		ttp := r.transformers[i].Type()
+
+		if oldtsts, ok := r.lastRs.TransformStats[ttp]; ok {
+			newtsts.Speed, newtsts.Trend = calcSpeedTrend(oldtsts, newtsts, elaspedtime)
+		} else {
+			newtsts.Speed, newtsts.Trend = calcSpeedTrend(utils.StatsInfo{}, newtsts, elaspedtime)
+		}
+		r.rs.TransformStats[ttp] = newtsts
 	}
+
+	if str, ok := r.reader.(reader.StatsReader); ok {
+		r.rs.ReaderStats = str.Status()
+	}
+
+	r.rs.ReadSpeedKB = float64(r.rs.ReadDataSize-r.lastRs.ReadDataSize) / elaspedtime
+	r.rs.ReadSpeedTrendKb = getTrend(r.lastRs.ReadSpeedKB, r.rs.ReadSpeedKB)
+	r.rs.ReadSpeed = float64(r.rs.ReadDataCount-r.lastRs.ReadDataCount) / elaspedtime
+	r.rs.ReadSpeedTrend = getTrend(r.lastRs.ReadSpeed, r.rs.ReadSpeed)
+
+	r.rs.ParserStats.Speed, r.rs.ParserStats.Trend = calcSpeedTrend(r.lastRs.ParserStats, r.rs.ParserStats, elaspedtime)
 
 	for i := range r.senders {
 		sts, ok := r.senders[i].(sender.StatsSender)
@@ -603,7 +674,45 @@ func (r *LogExportRunner) Status() RunnerStatus {
 		}
 	}
 
+	for k, v := range r.rs.SenderStats {
+		if lv, ok := r.lastRs.SenderStats[k]; ok {
+			v.Speed, v.Trend = calcSpeedTrend(lv, v, elaspedtime)
+		} else {
+			v.Speed, v.Trend = calcSpeedTrend(utils.StatsInfo{}, v, elaspedtime)
+		}
+		r.rs.SenderStats[k] = v
+	}
+
+	copyRunnerStatus(&r.lastRs, &r.rs)
+
 	return r.rs
+}
+
+func calcSpeedTrend(old, new utils.StatsInfo, elaspedtime float64) (speed float64, trend string) {
+	if elaspedtime < 0.001 {
+		speed = old.Speed
+	} else {
+		speed = float64(new.Success-old.Success) / elaspedtime
+	}
+	trend = getTrend(old.Speed, speed)
+	return
+}
+
+func copyRunnerStatus(dst, src *RunnerStatus) {
+	dst.TransformStats = make(map[string]utils.StatsInfo, len(src.TransformStats))
+	dst.SenderStats = make(map[string]utils.StatsInfo, len(src.SenderStats))
+	dst.ReadDataSize = src.ReadDataSize
+	dst.ReadDataCount = src.ReadDataCount
+
+	dst.ParserStats = src.ParserStats
+	for k, v := range src.SenderStats {
+		dst.SenderStats[k] = v
+	}
+	for k, v := range src.TransformStats {
+		dst.TransformStats[k] = v
+	}
+	dst.ReadSpeedKB = src.ReadSpeedKB
+	dst.ReadSpeed = src.ReadSpeed
 }
 
 //Compatible 用于新老配置的兼容

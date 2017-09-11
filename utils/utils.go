@@ -133,10 +133,12 @@ type StatsError struct {
 }
 
 type StatsInfo struct {
-	Errors    int64  `json:"errors"`
-	Success   int64  `json:"success"`
-	LastError string `json:"last_error"`
-	Ftlag     int64  `json:"-"`
+	Errors    int64   `json:"errors"`
+	Success   int64   `json:"success"`
+	Speed     float64 `json:"speed,omitempty"`
+	Trend     string  `json:"trend,omitempty"`
+	LastError string  `json:"last_error"`
+	Ftlag     int64   `json:"-"`
 }
 
 func (se *StatsError) AddSuccess() {

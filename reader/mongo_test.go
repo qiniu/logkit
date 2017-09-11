@@ -6,6 +6,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 
+	"github.com/qiniu/logkit/utils"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -45,4 +46,6 @@ func TestMongoReader(t *testing.T) {
 	assert.NoError(t, err)
 	assert.EqualValues(t, er.offsetkey, got)
 	assert.EqualValues(t, int64(123), gotoffset)
+
+	assert.Equal(t, utils.StatsInfo{}, er.Status())
 }

@@ -21,6 +21,7 @@ import (
 
 	"github.com/axgle/mahonia"
 	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/utils"
 )
 
 const (
@@ -60,6 +61,9 @@ type BufReader struct {
 
 	meta            *Meta // 存放offset的元信息
 	multiLineRegexp *regexp.Regexp
+
+	stats     utils.StatsInfo
+	statsLock sync.RWMutex
 }
 
 const minReadBufferSize = 16
@@ -152,6 +156,7 @@ func (b *BufReader) reset(buf []byte, r FileReader) {
 		lineCache:    "",
 		lastSync:     LastSync{},
 		mux:          sync.Mutex{},
+		statsLock:    sync.RWMutex{},
 	}
 }
 
@@ -355,9 +360,14 @@ func (b *BufReader) ReadPattern() (string, error) {
 //ReadLine returns a string line as a normal Reader
 func (b *BufReader) ReadLine() (ret string, err error) {
 	if b.multiLineRegexp == nil {
-		return b.ReadString('\n')
+		ret, err = b.ReadString('\n')
+	} else {
+		ret, err = b.ReadPattern()
 	}
-	return b.ReadPattern()
+	if err != nil && err != io.EOF {
+		b.setStatsError(err.Error())
+	}
+	return
 }
 
 var errNegativeWrite = errors.New("bufio: writer returned negative count from Write")
@@ -383,6 +393,18 @@ func (b *BufReader) Source() string {
 func (b *BufReader) Close() error {
 	atomic.StoreInt32(&b.stopped, 1)
 	return b.rd.Close()
+}
+
+func (b *BufReader) Status() utils.StatsInfo {
+	b.statsLock.RLock()
+	defer b.statsLock.RUnlock()
+	return b.stats
+}
+
+func (b *BufReader) setStatsError(err string) {
+	b.statsLock.Lock()
+	defer b.statsLock.Unlock()
+	b.stats.LastError = err
 }
 
 func (b *BufReader) SyncMeta() {

@@ -7,6 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"os"
+
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/queue"
@@ -176,6 +178,10 @@ func (ft *FtSender) Send(datas []Data) error {
 
 func (ft *FtSender) Stats() utils.StatsInfo {
 	return ft.stats
+}
+
+func (ft *FtSender) Reset() error {
+	return os.RemoveAll(ft.opt.saveLogPath)
 }
 
 func (ft *FtSender) Close() error {

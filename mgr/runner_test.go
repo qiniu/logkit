@@ -16,6 +16,7 @@ import (
 	_ "github.com/qiniu/logkit/transforms/all"
 
 	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/utils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -461,4 +462,175 @@ func TestReplaceTransforms(t *testing.T) {
 		},
 	}
 	assert.Equal(t, exp, newData)
+}
+
+func TestGetTrend(t *testing.T) {
+	assert.Equal(t, SpeedUp, getTrend(0, 1))
+	assert.Equal(t, SpeedDown, getTrend(1, 0))
+	assert.Equal(t, SpeedStable, getTrend(0.02, 0))
+}
+
+func TestSpeedTrend(t *testing.T) {
+	tests := []struct {
+		olds  utils.StatsInfo
+		news  utils.StatsInfo
+		etime float64
+		exp   utils.StatsInfo
+	}{
+		{
+			olds: utils.StatsInfo{
+				Success: 1,
+				Speed:   1.0,
+			},
+			news: utils.StatsInfo{
+				Success: 2,
+			},
+			etime: 1.0,
+			exp: utils.StatsInfo{
+				Success: 2,
+				Speed:   1.0,
+				Trend:   SpeedStable,
+			},
+		},
+		{
+			olds:  utils.StatsInfo{},
+			news:  utils.StatsInfo{},
+			etime: 0,
+			exp: utils.StatsInfo{
+				Success: 0,
+				Speed:   0,
+				Trend:   SpeedStable,
+			},
+		},
+		{
+			olds: utils.StatsInfo{
+				Success: 1,
+				Speed:   1.0,
+			},
+			news: utils.StatsInfo{
+				Success: 10,
+			},
+			etime: 1.0,
+			exp: utils.StatsInfo{
+				Success: 10,
+				Speed:   9.0,
+				Trend:   SpeedUp,
+			},
+		},
+		{
+			olds: utils.StatsInfo{
+				Success: 10,
+				Speed:   10.0,
+			},
+			news: utils.StatsInfo{
+				Success: 11,
+			},
+			etime: 1.0,
+			exp: utils.StatsInfo{
+				Success: 11,
+				Speed:   1.0,
+				Trend:   SpeedDown,
+			},
+		},
+	}
+	for _, ti := range tests {
+		ti.news.Speed, ti.news.Trend = calcSpeedTrend(ti.olds, ti.news, ti.etime)
+		assert.Equal(t, ti.exp, ti.news)
+	}
+}
+
+func TestCopyStats(t *testing.T) {
+	tests := []struct {
+		src RunnerStatus
+		dst RunnerStatus
+		exp RunnerStatus
+	}{
+		{
+			src: RunnerStatus{
+				ReadDataSize:  10,
+				ReadDataCount: 10,
+				SenderStats: map[string]utils.StatsInfo{
+					"a": {
+						Success: 11,
+						Speed:   1.0,
+						Trend:   SpeedDown,
+					},
+					"c": {
+						Success: 12,
+						Speed:   1.0,
+						Trend:   SpeedDown,
+					},
+				},
+				TransformStats: map[string]utils.StatsInfo{
+					"x": {
+						Success: 2,
+						Speed:   5.0,
+						Trend:   SpeedDown,
+					},
+				},
+				ReadSpeedKB: 10,
+				ReadSpeed:   10,
+			},
+			exp: RunnerStatus{
+				ReadDataSize:  10,
+				ReadDataCount: 10,
+				SenderStats: map[string]utils.StatsInfo{
+					"a": {
+						Success: 11,
+						Speed:   1.0,
+						Trend:   SpeedDown,
+					},
+					"c": {
+						Success: 12,
+						Speed:   1.0,
+						Trend:   SpeedDown,
+					},
+				},
+				TransformStats: map[string]utils.StatsInfo{
+					"x": {
+						Success: 2,
+						Speed:   5.0,
+						Trend:   SpeedDown,
+					},
+				},
+				ReadSpeedKB: 10,
+				ReadSpeed:   10,
+			},
+			dst: RunnerStatus{
+				ReadDataSize:  5,
+				ReadDataCount: 0,
+				SenderStats: map[string]utils.StatsInfo{
+					"x": {
+						Success: 0,
+						Speed:   2.0,
+						Trend:   SpeedDown,
+					},
+					"b": {
+						Success: 5,
+						Speed:   1.0,
+						Trend:   SpeedDown,
+					},
+				},
+				TransformStats: map[string]utils.StatsInfo{
+					"s": {
+						Success: 21,
+						Speed:   50.0,
+						Trend:   SpeedUp,
+					},
+				},
+				ReadSpeedKB: 11,
+				ReadSpeed:   2,
+			},
+		},
+	}
+	for _, ti := range tests {
+		copyRunnerStatus(&ti.dst, &ti.src)
+		for i, v := range ti.src.SenderStats {
+			v.Speed = 0
+			v.Success = 0
+			ti.src.SenderStats[i] = v
+		}
+		assert.Equal(t, ti.exp, ti.dst)
+	}
+
 }

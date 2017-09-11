@@ -7,6 +7,7 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/utils"
 )
 
 // Reader 是一个通用的行读取reader接口
@@ -19,6 +20,13 @@ type Reader interface {
 	SetMode(mode string, v interface{}) error
 	Close() error
 	SyncMeta()
+}
+
+// StatsReader 是一个通用的带有统计接口的reader
+type StatsReader interface {
+	//Name reader名称
+	Name() string
+	Status() utils.StatsInfo
 }
 
 // FileReader reader 接口方法

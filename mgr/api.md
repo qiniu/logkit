@@ -1,6 +1,22 @@
 # logkit Rest API
 
 
+## Version
+
+### 获取logkit版本号
+
+请求
+```
+GET /logkit/version
+```
+
+返回一个字符串
+
+```
+"<版本号>"
+```
+
+
 ## Runner
 
 ### 获取runner运行状态
@@ -9,33 +25,45 @@
 
 ```
 GET /logkit/status
-Content-Type: application/json
 ```
 
 返回
 
 ```
+Content-Type: application/json
+
 {  
    {  
       "name":"runner1",
       "logpath":"/your/log/path1",
       "readDataSize": <读取数据的bytes大小>.
       "readDataCount":<读取数据条数>,
-      "elaspedtime"<总用时>,
+      "elaspedtime":<总用时>,
+      "readspeed_kb":<float>,
+      "readspeed":<float>,
+      "readspeedtrend_kb":<string>,
+      "readspeedtrend":<string>,
       "lag":{  
          "size":<lag size>,
          "files":<lag file number>,
          "ftlags":<fault torrent lags>
       },
+      "readerStats":{
+          "last_error":"error message"
+      },
       "parserStats":{  
          "errors":<error number>,
          "success":<success number>,
+         "speed":<float>,
+          "trend":<string>,
          "last_error":"error message"
       },
       "transformStats":{
           "<transformtype>":{
              "errors":<error number>,
              "success":<success number>,
+             "speed":<float>,
+              "trend":<string>,
              "last_error":"error message"
            }
       }
@@ -43,6 +71,8 @@ Content-Type: application/json
          "senderName":{
            "errors":<error number>,
            "success":<success number>,
+           "speed":<float>,
+           "trend":<string>,
            "last_error":"error message"
          }
       },
@@ -54,20 +84,31 @@ Content-Type: application/json
       "readDataSize": <读取数据的bytes大小>.
         "readDataCount":<读取数据条数>,
         "elaspedtime"<总用时>,
+         "readspeed_kb":<float>,
+          "readspeed":<float>,
+          "readspeedtrend_kb":<string>,
+          "readspeedtrend":<string>,
         "lag":{  
            "size":<lag size>,
            "files":<lag file number>,
            "ftlags":<fault torrent lags>
         },
+        "readerStats":{
+           "last_error":"error message"
+         },
         "parserStats":{  
            "errors":<error number>,
            "success":<success number>,
+           "speed":<float>,
+           "trend":<string>,
            "last_error":"error message"
         },
         "transformStats":{
             "<transformtype>":{
                "errors":<error number>,
                "success":<success number>,
+               "speed":<float>,
+                "trend":<string>,
                "last_error":"error message"
              }
         }
@@ -75,6 +116,8 @@ Content-Type: application/json
            "senderName":{
              "errors":<error number>,
              "success":<success number>,
+             "speed":<float>,
+             "trend":<string>,
              "last_error":"error message"
            }
         },
@@ -84,39 +127,83 @@ Content-Type: application/json
 
 ```
 
+* "readspeed_kb": 每秒的读取流量大小 KB/s
+* "readspeed": 每秒读取记录个数 条/s
+* "readspeedtrend_kb": 流量读取速度趋势  "up" 上升,"down" 下降,"stable" 不变
+* "readspeedtrend": 记录个数速度读取趋势 "up" 上升,"down" 下降,"stable" 不变
+* "speed": 速度 条/s
+* "trend": 速度趋势 "up" 上升,"down" 下降,"stable" 不变
+* "elaspedtime": 运行时长
+
+
+
 ### 获取指定runner运行状态
 
 请求
 
 ```
 GET /logkit/<runnerName>/status 
-Content-Type: application/json
 ```
 
 返回
 
 ```
+Content-Type: application/json
 {  
-   "name":"<runnerName>",
-   "logpath":"/your/log/path1",
-   "lag":{  
-      "size":<lag size>,
-      "files":<lag file number>,
-      "ftlags":<fault torrent lags>
-   },
-   "parserStats":{  
-      "errors":<error number>,
-      "success":<success number>,
+  "name":"runner1",
+  "logpath":"/your/log/path1",
+  "readDataSize": <读取数据的bytes大小>.
+  "readDataCount":<读取数据条数>,
+  "elaspedtime"<总用时>,
+   "readspeed_kb":<float>,
+    "readspeed":<float>,
+    "readspeedtrend_kb":<string>,
+    "readspeedtrend":<string>,
+  "lag":{  
+     "size":<lag size>,
+     "files":<lag file number>,
+     "ftlags":<fault torrent lags>
+  },
+  "readerStats":{
       "last_error":"error message"
-   },
-   "senderStats":{  
-      "errors":<error number>,
-      "success":<success number>,
-      "last_error":"error message"
-   },
-   "error":"error msg"
+  },
+  "parserStats":{  
+     "errors":<error number>,
+     "success":<success number>,
+     "speed":<float>,
+     "trend":<string>,
+     "last_error":"error message"
+  },
+  "transformStats":{
+      "<transformtype>":{
+         "errors":<error number>,
+         "success":<success number>,
+         "speed":<float>,
+          "trend":<string>,
+         "last_error":"error message"
+       }
+  }
+  "senderStats":{
+     "senderName":{
+       "errors":<error number>,
+       "success":<success number>,
+       "speed":<float>,
+        "trend":<string>,
+       "last_error":"error message"
+     }
+  },
+  "error":"error msg"
 }
 ```
+
+* "readspeed_kb": 每秒的读取流量大小 KB/s
+* "readspeed": 每秒读取记录个数 条/s
+* "readspeedtrend_kb": 流量读取速度趋势  "up" 上升,"down" 下降,"stable" 不变
+* "readspeedtrend": 记录个数速度读取趋势 "up" 上升,"down" 下降,"stable" 不变
+* "speed": 速度 条/s
+* "trend": 速度趋势 "up" 上升,"down" 下降,"stable" 不变
+* "elaspedtime": 运行时长
+
 
 ### 添加 Runner
 
@@ -179,6 +266,73 @@ Content-Type: application/json
 }
 ```
 
+### 修改 Runner
+
+请求
+
+```
+PUT /logkit/configs/<runnerName>
+Content-Type: application/json
+{
+    "name":"logkit_runner",
+    "batch_len": 1000,
+    "batch_size": 2097152,
+    "batch_interval": 300, 
+    "reader":{
+        "log_path":"/home/user/app/log/dir/",
+        "meta_path":"./metapath",
+        "donefile_retention":"7",
+        "read_from":"newest",
+        "mode":"dir",
+        "valid_file_pattern":"qiniulog-*.log" // 可不选，默认为 "*"
+    },
+     "cleaner":{
+        "delete_enable":"true",
+        "delete_interval":"10",
+        "reserve_file_number":"10",
+        "reserve_file_size":"10240"
+    },
+    "parser":{
+        "name":"json_parser",
+        "type":"json"
+    },
+    "senders":[{
+        "name":"test_sender",
+        "sender_type":"pandora",
+        "fault_tolerant":"false",
+        "pandora_ak":"your_ak",
+        "pandora_sk":"your_sk",
+        "pandora_host":"https://pipeline.qiniu.com",
+        "pandora_repo_name":"repo_test",
+        "pandora_region":"nb",
+        "pandora_schema_free":"true"
+}]
+}
+```
+
+
+返回
+
+如果请求成功, 返回HTTP状态码200:
+
+```
+{}
+```
+
+如果请求失败, 返回包含如下内容的JSON字符串（已格式化,便于阅读）:
+
+```
+{
+    "error":   "<error message string>"
+}
+```
+
+**说明**
+
+1. 修改runner时，请求体需要包含全量的配置
+2. 修改runner时，会先把原来的runner移除，然后再添加新的runner。
+
+
 ### 删除 runner
 
 请求
@@ -203,6 +357,38 @@ Content-Type: application/json
     "error":   "<error message string>"
 }
 ```
+
+### 重置 runner
+
+请求
+
+```
+POST /logkit/configs/<runnerName>/reset
+```
+
+返回
+
+如果请求成功, 返回HTTP状态码200:
+
+```
+{}
+```
+
+如果请求失败, 返回包含如下内容的JSON字符串（已格式化,便于阅读）:
+
+```
+{
+    "error":   "<error message string>"
+}
+```
+
+**注意**
+
+**重置runner的作用：**
+
+1. 删除runner
+2. 删除runner的meta文件夹
+3. 重新启动runner
 
 ## Reader
 

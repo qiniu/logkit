@@ -136,6 +136,7 @@ func main() {
 		log.Fatalf("watch path error %v", err)
 	}
 	m.RestoreWebDir()
+	m.Version = Version
 
 	stopClean := make(chan struct{}, 0)
 	defer close(stopClean)
