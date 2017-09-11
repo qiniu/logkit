@@ -293,9 +293,13 @@ func (rs *RestService) DeleteConfig() echo.HandlerFunc {
 	}
 }
 
+type Version struct {
+	Version string `json:"version"`
+}
+
 func (rs *RestService) GetVersion() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		return c.String(http.StatusOK, rs.mgr.Version)
+		return c.JSON(http.StatusOK, &Version{Version: rs.mgr.Version})
 	}
 }
 
