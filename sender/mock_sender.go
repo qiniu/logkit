@@ -30,6 +30,8 @@ func NewMockSender(c conf.MapConf) (Sender, error) {
 
 //Name function will return the name and datas recieved as string
 func (mock *MockSender) Name() string {
+	mock.mux.Lock()
+	defer mock.mux.Unlock()
 	raw, err := json.Marshal(mock.datas)
 	if err != nil {
 		raw = []byte(err.Error())
