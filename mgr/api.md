@@ -13,7 +13,9 @@ GET /logkit/version
 返回一个字符串
 
 ```
-"<版本号>"
+{
+"version":"<版本号>"
+}
 ```
 
 
