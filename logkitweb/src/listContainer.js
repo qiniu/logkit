@@ -68,7 +68,7 @@ class List extends Component {
     }
     window.statusInterval = setInterval(function () {
       that.getStatus()
-    }, 10000)
+    }, 5000)
 
   }
 
