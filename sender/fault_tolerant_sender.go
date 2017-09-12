@@ -131,6 +131,7 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 		strategy:    opt.strategy,
 		procs:       opt.procs,
 		runnerName:  runnerName,
+		opt:         opt,
 	}
 	go ftSender.asyncSendLogFromDiskQueue()
 	return &ftSender, nil
@@ -181,6 +182,10 @@ func (ft *FtSender) Stats() utils.StatsInfo {
 }
 
 func (ft *FtSender) Reset() error {
+	if ft.opt == nil {
+		log.Errorf("Runner[%v] ft %v option is nill", ft.runnerName, ft.Name())
+		return nil
+	}
 	return os.RemoveAll(ft.opt.saveLogPath)
 }
 
