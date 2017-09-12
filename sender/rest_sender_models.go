@@ -29,7 +29,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "my_work",
 			DefaultNoUse: true,
 			Description:  "Pandora 数据源名称(pandora_repo_name)",
-			CheckRegex:   "^[a-zA-Z_][a-zA-Z0-9_]{0,127}$",
+			CheckRegex:   "^[a-zA-Z][a-zA-Z0-9_]{0,127}$",
 		},
 		{
 			KeyName:      KeyPandoraAk,
