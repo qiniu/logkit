@@ -314,21 +314,21 @@ class List extends Component {
             status = '正常'
             parseSuccessNumber = ele.parserStats.success
             parseFailNumber = ele.parserStats.errors
-            successNumber = _.values(ele.senderStats)[0].success
-            failNUmber = _.values(ele.senderStats)[0].errors
-            sendNumber = _.floor(_.values(ele.senderStats)[0].speed, 3)
+            successNumber = _.values(ele.senderStats)[0] == undefined ? 0 : _.values(ele.senderStats)[0].success
+            failNUmber = _.values(ele.senderStats)[0] == undefined ? 0 : _.values(ele.senderStats)[0].errors
+            sendNumber = _.floor((_.values(ele.senderStats)[0] == undefined ? 0 : _.values(ele.senderStats)[0].speed), 3)
             parseNumber = _.floor(ele.parserStats.speed, 3)
             readDataCount = ele.readDataCount
             readerNumber = _.floor(ele.readspeed, 3)
             readerkbNumber = _.floor(ele.readspeed_kb, 3)
-            sendTrend = _.values(ele.senderStats)[0].trend
+            sendTrend = _.values(ele.senderStats)[0] == undefined ? '' : _.values(ele.senderStats)[0].trend
             parseTrend = ele.parserStats.trend
             readerTrend = ele.readspeedtrend
             readerkbTrend = ele.readspeedtrend_kb
             logpath = ele.logpath
             readerError = ele.readerStats.last_error
             parseError = ele.parserStats.last_error
-            sendError = _.values(ele.senderStats)[0].last_error
+            sendError = _.values(ele.senderStats)[0] == undefined ? '' : _.values(ele.senderStats)[0].last_error
             isWebFolder = item.web_folder
             logkitError = ele.error
           }
