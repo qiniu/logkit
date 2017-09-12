@@ -629,9 +629,10 @@ func (r *LogExportRunner) Status() RunnerStatus {
 
 	now := time.Now()
 	elaspedtime := now.Sub(r.rs.lastState).Seconds()
-	if elaspedtime <= 0.1 {
+	if elaspedtime <= 3 {
 		return r.rs
 	}
+	r.rs.Error = ""
 
 	if r.meta.IsFileMode() {
 		r.rs.Logpath = r.meta.LogPath()
@@ -689,7 +690,7 @@ func (r *LogExportRunner) Status() RunnerStatus {
 }
 
 func calcSpeedTrend(old, new utils.StatsInfo, elaspedtime float64) (speed float64, trend string) {
-	if elaspedtime < 0.001 {
+	if elaspedtime < 0.001 || new.Success == old.Success {
 		speed = old.Speed
 	} else {
 		speed = float64(new.Success-old.Success) / elaspedtime
