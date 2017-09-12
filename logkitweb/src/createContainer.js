@@ -198,7 +198,7 @@ class Create extends Component {
           <div className="header">
             <Button style={{float:'left',marginTop:'15px'}} type="primary" className="index-btn" onClick={() => this.turnToIndex()}>
               <Icon type="link" />回到首页
-            </Button>七牛Logkit配置文件助手 - {this.state.version}
+            </Button>七牛Logkit配置文件助手 {this.state.version}
           </div>
           <Steps current={current}>
             {steps.map(item => <Step key={item.title} title={item.title}/>)}

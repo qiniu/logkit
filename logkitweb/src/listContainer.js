@@ -159,7 +159,11 @@ class List extends Component {
       dataIndex: 'status',
       width: '5%'
     }, {
-      title: '读取速率(KB/s)',
+      title: '读取总条数',
+      dataIndex: 'readDataCount',
+      width: '5%'
+    }, {
+      title: '读取条数(条/秒)',
       dataIndex: 'readerNumber',
       width: '7%',
       render: (text, record) => {
@@ -168,12 +172,12 @@ class List extends Component {
         );
       },
     }, {
-      title: '解析速率(KB/s)',
-      dataIndex: 'parseNumber',
+      title: '读取速率(KB/s)',
+      dataIndex: 'readerkbNumber',
       width: '7%',
       render: (text, record) => {
         return (
-            this.renderArrow(text, record.parseTrend)
+            this.renderArrow(text, record.readerkbTrend)
         );
       },
     }, {
@@ -186,20 +190,12 @@ class List extends Component {
         );
       },
     }, {
-      title: '解析成功条数',
-      dataIndex: 'parseSuccessNumber',
+      title: '解析成功/总 (条数)',
+      dataIndex: 'parseSuccessOfTotal',
       width: '8%'
     }, {
-      title: '解析失败条数',
-      dataIndex: 'parseFailNumber',
-      width: '8%'
-    }, {
-      title: '发送成功条数',
-      dataIndex: 'successNumber',
-      width: '8%'
-    }, {
-      title: '发送失败条数',
-      dataIndex: 'failNUmber',
+      title: '发送成功/总 (条数)',
+      dataIndex: 'successOfTotal',
       width: '8%'
     }, {
       title: '路径',
@@ -239,29 +235,29 @@ class List extends Component {
     }, {
       title: '重置配置',
       dataIndex: 'reset',
-      width: '3%',
+      width: '5%',
       render: (text, record) => {
         return (
             <a>
               <div className="editable-row-operations">
                 {
-                  <Button type="primary" onClick={() => this.showResetConfig(record)}>重置</Button>
+                  <Icon style={{fontSize: 16}} onClick={() => this.showResetConfig(record)} type="reload"/>
                 }
               </div>
             </a>
         );
       },
     }, {
-      title: '复制配置并跳转至配置页面',
+      title: '修改配置',
       key: 'copy',
       dataIndex: 'copy',
-      width: '6%',
+      width: '5%',
       render: (text, record) => {
         return (
             <a>
               <div className="editable-row-operations">
                 <ClipboardButton data-clipboard-text={text}>
-                  <Icon style={{fontSize: '15px'}} onClick={() => this.copyConfig(text)} type="copy"/>
+                  <Icon style={{fontSize: 16}} onClick={() => this.copyConfig(text)} type="edit"/>
                 </ClipboardButton>
               </div>
             </a>
@@ -272,14 +268,14 @@ class List extends Component {
       title: '删除',
       key: 'edit',
       dataIndex: 'edit',
-      width: '6%',
+      width: '5%',
       render: (text, record) => {
         return (
             record.isWebFolder === true ? (<a>
               <div className="editable-row-operations">
                 {
                   <Popconfirm title="是否删除该Runner?" onConfirm={() => this.deleteRunner(record)}>
-                    <Icon style={{fontSize: '15px'}} type="delete"/>
+                    <Icon style={{fontSize: 16}} type="delete"/>
                   </Popconfirm>
                 }
               </div>
@@ -297,6 +293,8 @@ class List extends Component {
         let parseFailNumber = 0
         let successNumber = 0
         let readerNumber = 0
+        let readDataCount = 0
+        let readerkbNumber = 0
         let failNUmber = 0
         let logpath = ''
         let sendNumber = 0
@@ -309,6 +307,7 @@ class List extends Component {
         let sendTrend = 'stable'
         let parseTrend = 'stable'
         let readerTrend = 'stable'
+        let readerkbTrend = 'stable'
 
         this.state.status.map((ele) => {
           if (item.name === ele.name) {
@@ -319,10 +318,13 @@ class List extends Component {
             failNUmber = _.values(ele.senderStats)[0].errors
             sendNumber = _.floor(_.values(ele.senderStats)[0].speed, 3)
             parseNumber = _.floor(ele.parserStats.speed, 3)
-            readerNumber = _.floor(ele.readerStats.speed, 3)
+            readDataCount = ele.readDataCount
+            readerNumber = _.floor(ele.readspeed, 3)
+            readerkbNumber = _.floor(ele.readspeed_kb, 3)
             sendTrend = _.values(ele.senderStats)[0].trend
             parseTrend = ele.parserStats.trend
-            readerTrend = ele.readerStats.trend
+            readerTrend = ele.readspeedtrend
+            readerkbTrend = ele.readspeedtrend_kb
             logpath = ele.logpath
             readerError = ele.readerStats.last_error
             parseError = ele.parserStats.last_error
@@ -337,14 +339,15 @@ class List extends Component {
           status,
           sendNumber,
           parseNumber,
+          readDataCount,
           readerNumber,
+          readerkbNumber,
           readerTrend,
+          readerkbTrend,
           sendTrend,
           parseTrend,
-          parseSuccessNumber,
-          parseFailNumber,
-          successNumber,
-          failNUmber,
+          parseSuccessOfTotal: parseSuccessNumber + '/' + (parseSuccessNumber + parseFailNumber),
+          successOfTotal: successNumber + '/' + (successNumber + failNUmber),
           path: logpath,
           readerError,
           parseError,
@@ -370,14 +373,14 @@ class List extends Component {
     return (
         <div className="logkit-container">
           <div className="header">
-            七牛Logkit配置文件助手- {this.state.version}
+            七牛Logkit配置文件助手 {this.state.version}
           </div>
           <div className="content">
             <Button type="primary" className="index-btn" ghost onClick={this.add}>
               <Icon type="plus"/> 增加Runner
             </Button>
             {/*<Button type="primary" className="index-btn" ghost onClick={() => this.turnToConfigPage()}>*/}
-              {/*<Icon type="link"/>跳转至配置页面*/}
+            {/*<Icon type="link"/>跳转至配置页面*/}
             {/*</Button>*/}
             {this.renderRunnerList()}
           </div>
@@ -412,7 +415,7 @@ class List extends Component {
           <Modal title="是否重置配置文件？" visible={this.state.isShowResetConfig}
                  onOk={this.handleResetConfig} onCancel={this.handleResetConfigCancel}
           >
-            注意:<Tag color="#108ee9">重置配置文件会删除meta信息并重启</Tag>
+            注意:<Tag color="#ffbf00">重置配置文件会删除meta信息并重启</Tag>
           </Modal>
         </div>
     );
