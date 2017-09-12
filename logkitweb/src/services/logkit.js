@@ -81,8 +81,34 @@ export async function postConfigData(params) {
   });
 }
 
+export async function putConfigData(params) {
+  return request(window.logkitUrl + '/logkit/configs/' + params.name, {
+    method: 'put',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(params.body),
+  });
+}
+
 export async function deleteConfigData(params) {
   return request(window.logkitUrl + '/logkit/configs/' + params.name, {
     method: 'delete'
   });
 }
+
+export async function getRunnerVersion(params) {
+  return request(window.logkitUrl + '/logkit/version', {
+    method: 'get',
+  });
+}
+
+export async function resetConfigData(params) {
+  return request(window.logkitUrl + '/logkit/configs/' + params.name + '/reset', {
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  });
+}
+

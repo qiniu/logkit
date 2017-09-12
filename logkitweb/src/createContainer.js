@@ -6,7 +6,8 @@ import Sender from './components/senderConfig'
 import RenderConfig from './components/renderConfig'
 import config from './store/config'
 import moment from 'moment'
-import {postConfigData} from './services/logkit';
+import {postConfigData, getRunnerVersion,putConfigData} from './services/logkit';
+import _ from "lodash";
 
 const Step = Steps.Step;
 const steps = [{
@@ -29,6 +30,7 @@ class Create extends Component {
       current: 0,
       isCpoyStatus: false,
       sourceConfigCheck: false,
+      version: ''
     };
     window.clearInterval(window.statusInterval);
   }
@@ -55,10 +57,18 @@ class Create extends Component {
         isCpoyStatus: true
       })
       if (window.nodeCopy) {
-        that.refs.initConfig.setFieldsValue({config: JSON.stringify(window.nodeCopy, null, 2)});
+        that.refs.initConfig.setFieldsValue({config: window.nodeCopy});
       }
 
     }
+
+    getRunnerVersion().then(data => {
+      if (data.success) {
+        that.setState({
+          version: _.values(_.omit(data, 'success'))
+        })
+      }
+    })
   }
 
   next() {
@@ -144,6 +154,32 @@ class Create extends Component {
 
   }
 
+  updateRunner = () => {
+    let that = this
+    const {validateFields, getFieldsValue} =  that.refs.initConfig;
+    let formData = getFieldsValue();
+    validateFields(null, {}, (err) => {
+      if (err) {
+        notification.warning({message: "表单校验未通过,请检查", duration: 20,})
+        return
+      } else {
+        if (this.isJSON(formData.config)) {
+          let data = JSON.parse(formData.config);
+          putConfigData({name: data.name, body: data}).then(data => {
+            if (data === undefined) {
+              notification.success({message: "Runner修改成功", duration: 10,})
+              this.props.router.push({pathname: `/`})
+            }
+
+          })
+        } else {
+          notification.warning({message: "不是一个合法的json对象,请检查", duration: 20,})
+        }
+      }
+    });
+
+  }
+
   prev() {
     const current = this.state.current - 1;
     this.setState({current});
@@ -162,7 +198,7 @@ class Create extends Component {
           <div className="header">
             <Button style={{float:'left',marginTop:'15px'}} type="primary" className="index-btn" onClick={() => this.turnToIndex()}>
               <Icon type="link" />回到首页
-            </Button>七牛Logkit配置文件助手
+            </Button>七牛Logkit配置文件助手 - {this.state.version}
           </div>
           <Steps current={current}>
             {steps.map(item => <Step key={item.title} title={item.title}/>)}
@@ -193,9 +229,14 @@ class Create extends Component {
               <Button type="primary" onClick={() => this.next()}>下一步</Button>
             }
             {
-              this.state.current === steps.length - 1
+              this.state.current === steps.length - 1 && this.state.isCpoyStatus === false
               &&
               <Button type="primary" onClick={() => this.addRunner()}>确认并提交</Button>
+            }
+            {
+              this.state.current === steps.length - 1 && this.state.isCpoyStatus === true
+              &&
+              <Button type="primary" onClick={() => this.updateRunner()}>修改并提交</Button>
             }
             {
               this.state.current > 0
