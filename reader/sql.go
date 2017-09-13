@@ -21,6 +21,7 @@ import (
 	_ "github.com/denisenkom/go-mssqldb" //mssql 驱动
 	_ "github.com/go-sql-driver/mysql"   //mysql 驱动
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/utils"
 )
 
 const (
@@ -51,6 +52,9 @@ type SqlReader struct {
 	started bool
 
 	execOnStart bool
+
+	stats     utils.StatsInfo
+	statsLock sync.RWMutex
 }
 
 const (
@@ -138,6 +142,7 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (mr *SqlReader, err error) {
 		started:     false,
 		execOnStart: execOnStart,
 		schemas:     schemas,
+		statsLock:   sync.RWMutex{},
 	}
 	// 如果meta初始信息损坏
 	if !omitMeta {
@@ -270,6 +275,18 @@ func (mr *SqlReader) Name() string {
 	return strings.ToUpper(mr.dbtype) + "_Reader:" + mr.database + "_" + hash(mr.rawsqls)
 }
 
+func (mr *SqlReader) setStatsError(err string) {
+	mr.statsLock.Lock()
+	defer mr.statsLock.Unlock()
+	mr.stats.LastError = err
+}
+
+func (mr *SqlReader) Status() utils.StatsInfo {
+	mr.statsLock.RLock()
+	defer mr.statsLock.RUnlock()
+	return mr.stats
+}
+
 func (mr *SqlReader) Source() string {
 	return mr.datasource + "_" + mr.database
 }
@@ -383,6 +400,7 @@ func (mr *SqlReader) run() {
 			return
 		}
 		log.Error(err)
+		mr.setStatsError(err.Error())
 		time.Sleep(3 * time.Second)
 	}
 }

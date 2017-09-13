@@ -7,6 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"os"
+
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/queue"
@@ -19,7 +21,7 @@ const (
 	defaultWriteLimit = 10          // 默认写速限制为10MB
 	maxBytesPerFile   = 100 * mb
 	qNameSuffix       = "_local_save"
-	memoryChanSuffix  = "_memory"
+	directSuffix      = "_direct"
 	defaultMaxProcs   = 1 // 默认没有并发
 )
 
@@ -29,7 +31,7 @@ const (
 	KeyFtSaveLogPath       = "ft_save_log_path" // disk queue 数据日志路径
 	KeyFtWriteLimit        = "ft_write_limit"   // 写入速度限制，单位MB
 	KeyFtStrategy          = "ft_strategy"      // ft 的策略
-	KeyFtProcs             = "ft_procs"         // ft并发数，当always_save 策略时启用
+	KeyFtProcs             = "ft_procs"         // ft并发数，当always_save或concurrent策略时启用
 	KeyFtMemoryChannel     = "ft_memory_channel"
 	KeyFtMemoryChannelSize = "ft_memory_channel_size"
 )
@@ -40,6 +42,8 @@ const (
 	KeyFtStrategyBackupOnly = "backup_only"
 	// KeyFtStrategyAlwaysSave 所有数据都进行容错
 	KeyFtStrategyAlwaysSave = "always_save"
+	// KeyFtStrategyConcurrent 适合并发发送数据，只在失败的时候进行容错
+	KeyFtStrategyConcurrent = "concurrent"
 )
 
 // FtSender fault tolerance sender wrapper
@@ -49,9 +53,9 @@ type FtSender struct {
 	innerSender Sender
 	logQueue    queue.BackendQueue
 	backupQueue queue.BackendQueue
-	writeLimit  int  // 写入速度限制，单位MB
-	backupOnly  bool // 是否只使用backup queue
-	procs       int  //发送并发数
+	writeLimit  int // 写入速度限制，单位MB
+	strategy    string
+	procs       int //发送并发数
 	runnerName  string
 	opt         *FtOption
 	stats       utils.StatsInfo
@@ -61,7 +65,7 @@ type FtOption struct {
 	saveLogPath       string
 	syncEvery         int64
 	writeLimit        int
-	backupOnly        bool
+	strategy          string
 	procs             int
 	memoryChannel     bool
 	memoryChannelSize int
@@ -83,6 +87,11 @@ func NewFtSender(sender Sender, conf conf.MapConf) (*FtSender, error) {
 	syncEvery, _ := conf.GetIntOr(KeyFtSyncEvery, DefaultFtSyncEvery)
 	writeLimit, _ := conf.GetIntOr(KeyFtWriteLimit, defaultWriteLimit)
 	strategy, _ := conf.GetStringOr(KeyFtStrategy, KeyFtStrategyAlwaysSave)
+	switch strategy {
+	case KeyFtStrategyAlwaysSave, KeyFtStrategyBackupOnly, KeyFtStrategyConcurrent:
+	default:
+		return nil, errors.New("no match ft_strategy")
+	}
 	procs, _ := conf.GetIntOr(KeyFtProcs, defaultMaxProcs)
 	runnerName, _ := conf.GetStringOr(KeyRunnerName, UnderfinedRunnerName)
 
@@ -90,7 +99,7 @@ func NewFtSender(sender Sender, conf conf.MapConf) (*FtSender, error) {
 		saveLogPath:       logpath,
 		syncEvery:         int64(syncEvery),
 		writeLimit:        writeLimit,
-		backupOnly:        strategy == KeyFtStrategyBackupOnly,
+		strategy:          strategy,
 		procs:             procs,
 		memoryChannel:     memoryChannel,
 		memoryChannelSize: memoryChannelSize,
@@ -105,7 +114,9 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 	if err != nil {
 		return nil, err
 	}
-	if !opt.memoryChannel {
+	if opt.strategy == KeyFtStrategyConcurrent {
+		lq = queue.NewDirectQueue("stream" + directSuffix)
+	} else if !opt.memoryChannel {
 		lq = queue.NewDiskQueue("stream"+qNameSuffix, opt.saveLogPath, maxBytesPerFile, 0, maxBytesPerFile, opt.syncEvery, opt.syncEvery, time.Second*2, opt.writeLimit*mb, false, 0)
 	} else {
 		lq = queue.NewDiskQueue("stream"+qNameSuffix, opt.saveLogPath, maxBytesPerFile, 0, maxBytesPerFile, opt.syncEvery, opt.syncEvery, time.Second*2, opt.writeLimit*mb, true, opt.memoryChannelSize)
@@ -117,9 +128,10 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 		logQueue:    lq,
 		backupQueue: bq,
 		writeLimit:  opt.writeLimit,
-		backupOnly:  opt.backupOnly,
+		strategy:    opt.strategy,
 		procs:       opt.procs,
 		runnerName:  runnerName,
+		opt:         opt,
 	}
 	go ftSender.asyncSendLogFromDiskQueue()
 	return &ftSender, nil
@@ -131,7 +143,7 @@ func (ft *FtSender) Name() string {
 
 func (ft *FtSender) Send(datas []Data) error {
 	se := &utils.StatsError{Ft: true}
-	if ft.backupOnly {
+	if ft.strategy == KeyFtStrategyBackupOnly {
 		// 尝试直接发送数据，当数据失败的时候会加入到本地重试队列。外部不需要重试
 		backDataContext, err := ft.trySendDatas(datas, 1)
 		if err != nil {
@@ -148,14 +160,14 @@ func (ft *FtSender) Send(datas []Data) error {
 			if nowDatas != nil {
 				se.ErrorDetail = reqerr.NewSendError("save data to backend queue error", ConvertDatasBack(nowDatas), reqerr.TypeDefault)
 				ft.stats.Errors += int64(len(nowDatas))
-				ft.stats.LastError = se.ErrorDetail
+				ft.stats.LastError = se.ErrorDetail.Error()
 			}
 		}
 	} else {
 		err := ft.saveToFile(datas)
 		if err != nil {
 			se.ErrorDetail = err
-			ft.stats.LastError = err
+			ft.stats.LastError = err.Error()
 			ft.stats.Errors += int64(len(datas))
 		} else {
 			se.ErrorDetail = nil
@@ -167,6 +179,14 @@ func (ft *FtSender) Send(datas []Data) error {
 
 func (ft *FtSender) Stats() utils.StatsInfo {
 	return ft.stats
+}
+
+func (ft *FtSender) Reset() error {
+	if ft.opt == nil {
+		log.Errorf("Runner[%v] ft %v option is nill", ft.runnerName, ft.Name())
+		return nil
+	}
+	return os.RemoveAll(ft.opt.saveLogPath)
 }
 
 func (ft *FtSender) Close() error {
@@ -288,13 +308,13 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 		// 如果不是SendError 默认所有的数据都发送失败
 		log.Infof("Runner[%v] Sender[%v] error type is not *SendError! reSend all datas by default", ft.runnerName, ft.innerSender.Name())
 		failCtx.Datas = datas
-		ft.stats.LastError = err
+		ft.stats.LastError = err.Error()
 	} else {
 		failCtx.Datas = ConvertDatas(se.GetFailDatas())
 		if se.ErrorType == reqerr.TypeBinaryUnpack {
 			binaryUnpack = true
 		}
-		ft.stats.LastError = errors.New(se.Error())
+		ft.stats.LastError = se.Error()
 	}
 	log.Errorf("Runner[%v] Sender[%v] cannot write points: %v, failDatas size: %v", ft.runnerName, ft.innerSender.Name(), err, len(failCtx.Datas))
 	log.Debugf("Runner[%v] Sender[%v] failed datas [[%v]]", ft.runnerName, ft.innerSender.Name(), failCtx.Datas)

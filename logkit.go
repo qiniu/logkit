@@ -39,7 +39,7 @@ type Config struct {
 var conf Config
 
 const (
-	Version           = "v1.3.0"
+	Version           = "v1.3.1"
 	defaultReserveCnt = 5
 	defaultLogDir     = "./run"
 	defaultLogPattern = "*.log-*"
@@ -136,6 +136,7 @@ func main() {
 		log.Fatalf("watch path error %v", err)
 	}
 	m.RestoreWebDir()
+	m.Version = Version
 
 	stopClean := make(chan struct{}, 0)
 	defer close(stopClean)

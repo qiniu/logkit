@@ -1,7 +1,6 @@
 package ip
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/qiniu/logkit/sender"
@@ -31,7 +30,7 @@ func TestIpTransformer(t *testing.T) {
 	expe := utils.StatsInfo{
 		Errors:    1,
 		Success:   1,
-		LastError: errors.New("invalid ip format"),
+		LastError: "invalid ip format",
 	}
 	assert.Equal(t, expe, ipt.stats)
 	assert.Equal(t, ipt.Stage(), transforms.StageAfterParser)

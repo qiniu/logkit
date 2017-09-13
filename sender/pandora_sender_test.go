@@ -237,6 +237,9 @@ func TestPandoraSender(t *testing.T) {
 	}
 	pandora.LetGetRepoError(false)
 	err = s.Send(ConvertDatas(se.GetFailDatas()))
+	if st, ok := err.(*utils.StatsError); ok {
+		err = st.ErrorDetail
+	}
 	if err != nil {
 		t.Error(err)
 	}
@@ -260,6 +263,9 @@ func TestPandoraSender(t *testing.T) {
 	}
 	d = Data{"ab": "h1"}
 	err = s.Send([]Data{d})
+	if st, ok := err.(*utils.StatsError); ok {
+		err = st.ErrorDetail
+	}
 	if err != nil {
 		t.Error(err)
 	}
@@ -271,6 +277,9 @@ func TestPandoraSender(t *testing.T) {
 	d["ab"] = "h"
 	d["d"] = "2016/11/01 12:00:00.123456" + zoneValue
 	err = s.Send([]Data{d})
+	if st, ok := err.(*utils.StatsError); ok {
+		err = st.ErrorDetail
+	}
 	if err != nil {
 		t.Error(err)
 	}
@@ -290,6 +299,9 @@ func TestPandoraSender(t *testing.T) {
 		t.Error(err)
 	}
 	err = s.Send([]Data{d})
+	if st, ok := err.(*utils.StatsError); ok {
+		err = st.ErrorDetail
+	}
 	if err != nil {
 		t.Error(err)
 	}
@@ -334,6 +346,9 @@ func TestPandoraSender(t *testing.T) {
 	d["ax"] = "b"
 	s.opt.updateInterval = 0
 	err = s.Send([]Data{d})
+	if st, ok := err.(*utils.StatsError); ok {
+		err = st.ErrorDetail
+	}
 	if err != nil {
 		t.Error(err)
 	}
@@ -378,6 +393,9 @@ func TestNestPandoraSender(t *testing.T) {
 		},
 	}
 	err = s.Send([]Data{d})
+	if st, ok := err.(*utils.StatsError); ok {
+		err = st.ErrorDetail
+	}
 	if err != nil {
 		t.Error(err)
 	}
@@ -413,6 +431,9 @@ func TestUUIDPandoraSender(t *testing.T) {
 	d := Data{}
 	d["x1"] = "hh"
 	err = s.Send([]Data{d})
+	if st, ok := err.(*utils.StatsError); ok {
+		err = st.ErrorDetail
+	}
 	if err != nil {
 		t.Error(err)
 	}
@@ -422,7 +443,6 @@ func TestUUIDPandoraSender(t *testing.T) {
 	if !strings.Contains(pandora.Body, PandoraUUID) {
 		t.Error("no uuid found")
 	}
-	fmt.Println(pandora.Body)
 }
 
 func TestStatsSender(t *testing.T) {
@@ -446,6 +466,9 @@ func TestStatsSender(t *testing.T) {
 	d := Data{}
 	d["x1"] = "hh"
 	err = s.Send([]Data{d})
+	if st, ok := err.(*utils.StatsError); ok {
+		err = st.ErrorDetail
+	}
 	if err != nil {
 		t.Error(err)
 	}
@@ -660,6 +683,9 @@ func TestUpdatePandoraSchema(t *testing.T) {
 	d := Data{}
 	d["x1"] = "hh"
 	err = s.Send([]Data{d})
+	if st, ok := err.(*utils.StatsError); ok {
+		err = st.ErrorDetail
+	}
 	if err != nil {
 		t.Error(err)
 	}
@@ -669,6 +695,9 @@ func TestUpdatePandoraSchema(t *testing.T) {
 	}
 	d["x2"] = 2
 	err = s.Send([]Data{d})
+	if st, ok := err.(*utils.StatsError); ok {
+		err = st.ErrorDetail
+	}
 	if err != nil {
 		t.Error(err)
 	}
@@ -691,6 +720,9 @@ func TestUpdatePandoraSchema(t *testing.T) {
 	d["x2"] = 2
 	d["x3"] = 2.1
 	err = s.Send([]Data{d})
+	if st, ok := err.(*utils.StatsError); ok {
+		err = st.ErrorDetail
+	}
 	if err != nil {
 		t.Error(err)
 	}
@@ -735,6 +767,9 @@ func TestUpdatePandoraSchema(t *testing.T) {
 	tm := time.Now().Format(time.RFC3339)
 	d["x3"] = tm
 	err = s.Send([]Data{d})
+	if st, ok := err.(*utils.StatsError); ok {
+		err = st.ErrorDetail
+	}
 	if err != nil {
 		t.Error(err)
 	}
@@ -752,6 +787,9 @@ func TestUpdatePandoraSchema(t *testing.T) {
 	d["x3"] = tm
 	d["x4"] = 1
 	err = s.Send([]Data{d})
+	if st, ok := err.(*utils.StatsError); ok {
+		err = st.ErrorDetail
+	}
 	if err != nil {
 		t.Error(err)
 	}

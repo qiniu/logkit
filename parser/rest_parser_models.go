@@ -4,9 +4,9 @@ import "github.com/qiniu/logkit/utils"
 
 // ModeUsages 用途说明
 var ModeUsages = []utils.KeyValue{
+	{TypeJson, "json 格式解析"},
 	{TypeNginx, "nginx 日志解析"},
 	{TypeGrok, "grok 方式解析"},
-	{TypeJson, "json 格式解析"},
 	{TypeCSV, "csv 格式日志解析"},
 	{TypeRaw, "raw 原始日志按行解析"},
 	{TypeLogv1, "qiniulog 七牛日志库解析"},
@@ -178,6 +178,14 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "parser",
 			DefaultNoUse: false,
 			Description:  "parser名称(name)",
+		},
+		{
+			KeyName:       KeyTimestamp,
+			ChooseOnly:    true,
+			ChooseOptions: []string{"true", "false"},
+			Default:       "true",
+			DefaultNoUse:  false,
+			Description:   "数据附带时间戳(timestamp)",
 		},
 		{
 			KeyName:      KeyLabels,

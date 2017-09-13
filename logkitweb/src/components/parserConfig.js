@@ -148,7 +148,7 @@ class Parser extends Component {
                 </span>
                                 )}>
             {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
-              initialValue: !ele.DefaultNoUse ? ele.Default : '',
+              initialValue: ele.Default,
               rules: [{required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur'},
                 {pattern: ele.CheckRegex, message: '输入不符合规范'},
               ]

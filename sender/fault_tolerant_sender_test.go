@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/utils"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
@@ -191,4 +192,94 @@ func TestFtChannelFullSender(t *testing.T) {
 	mockP.SetMux.Lock()
 	assert.Equal(t, mockP.PostDataNum, 10)
 	mockP.SetMux.Unlock()
+}
+
+func TestFtSenderConcurrent(t *testing.T) {
+	s, err := NewMockSender(conf.MapConf{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpDir, err := ioutil.TempDir("", fmt.Sprintf("nsq-test-%d", time.Now().UnixNano()))
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(tmpDir)
+	mp := conf.MapConf{}
+	mp[KeyFtSaveLogPath] = tmpDir
+	mp[KeyFtStrategy] = KeyFtStrategyConcurrent
+	mp[KeyFtProcs] = "3"
+	fts, err := NewFtSender(s, mp)
+	assert.NoError(t, err)
+	datas := []Data{
+		{"ab": "ababab"},
+		{"cd": "cdcdcd"},
+	}
+	for i := 0; i < 100; i++ {
+		err = fts.Send(datas)
+		se, ok := err.(*utils.StatsError)
+		if !ok {
+			t.Fatal("ft send return error should .(*SendError)")
+		}
+		assert.NoError(t, se.ErrorDetail)
+	}
+	fts.Close()
+	ms := s.(*MockSender)
+	assert.Equal(t, 100, ms.SendCount())
+	assert.Equal(t, len(datas)*100, len(ms.datas))
+}
+
+func BenchmarkFtSenderConcurrentDirect(b *testing.B) {
+	c := conf.MapConf{}
+	c[KeyFtStrategy] = KeyFtStrategyConcurrent
+	ftSenderConcurrent(b, c)
+}
+
+func BenchmarkFtSenderConcurrentDisk(b *testing.B) {
+	c := conf.MapConf{}
+	c[KeyFtStrategy] = KeyFtStrategyAlwaysSave
+	ftSenderConcurrent(b, c)
+}
+
+func BenchmarkFtSenderConcurrentMemory(b *testing.B) {
+	c := conf.MapConf{}
+	c[KeyFtStrategy] = KeyFtStrategyAlwaysSave
+	c[KeyFtMemoryChannel] = "true"
+	ftSenderConcurrent(b, c)
+}
+
+func ftSenderConcurrent(b *testing.B, c conf.MapConf) {
+	log.SetOutputLevel(log.Lerror)
+	s, err := NewMockSender(conf.MapConf{})
+	if err != nil {
+		b.Fatal(err)
+	}
+	tmpDir, err := ioutil.TempDir("", fmt.Sprintf("nsq-test-%d", time.Now().UnixNano()))
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(tmpDir)
+	c[KeyFtSaveLogPath] = tmpDir
+	c[KeyFtProcs] = "3"
+	fts, err := NewFtSender(s, c)
+	if err != nil {
+		b.Fatal(err)
+	}
+	datas := []Data{
+		{"ab": "ababab"},
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for {
+			err = fts.Send(datas)
+			se, _ := err.(*utils.StatsError)
+			if se.ErrorDetail == nil {
+				break
+			}
+		}
+	}
+	b.StopTimer()
+	fts.Close()
+	ms := s.(*MockSender)
+	b.Logf("Benchmark.N: %d", b.N)
+	b.Logf("MockSender.SendCount: %d", ms.SendCount())
 }

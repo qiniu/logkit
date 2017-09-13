@@ -29,7 +29,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "my_work",
 			DefaultNoUse: true,
 			Description:  "Pandora 数据源名称(pandora_repo_name)",
-			CheckRegex:   "^[a-zA-Z_][a-zA-Z0-9_]{0,127}$",
+			CheckRegex:   "^[a-zA-Z][a-zA-Z0-9_]{0,127}$",
 		},
 		{
 			KeyName:      KeyPandoraAk,
@@ -169,7 +169,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyFtStrategy,
 			ChooseOnly:    true,
-			ChooseOptions: []string{KeyFtStrategyBackupOnly, KeyFtStrategyAlwaysSave},
+			ChooseOptions: []string{KeyFtStrategyBackupOnly, KeyFtStrategyAlwaysSave, KeyFtStrategyConcurrent},
 			Default:       KeyFtStrategyBackupOnly,
 			DefaultNoUse:  false,
 			Description:   "磁盘管道容错策略(仅备份错误|全部数据走管道)(ft_strategy)",
@@ -179,7 +179,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
-			Description:  "发送并发数量(磁盘管道或内存管道 always_save 模式生效)(ft_procs)",
+			Description:  "发送并发数量(磁盘管道或内存管道 always_save 或 concurrent 模式生效)(ft_procs)",
 			CheckRegex:   "\\d+",
 		},
 		{
@@ -276,7 +276,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyFtStrategy,
 			ChooseOnly:    true,
-			ChooseOptions: []string{KeyFtStrategyBackupOnly, KeyFtStrategyAlwaysSave},
+			ChooseOptions: []string{KeyFtStrategyBackupOnly, KeyFtStrategyAlwaysSave, KeyFtStrategyConcurrent},
 			Default:       KeyFtStrategyBackupOnly,
 			DefaultNoUse:  false,
 			Description:   "磁盘管道容错策略(仅备份错误|全部数据走管道)(ft_strategy)",
@@ -286,7 +286,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
-			Description:  "发送并发数量(磁盘管道或内存管道 always_save 模式生效)(ft_procs)",
+			Description:  "发送并发数量(磁盘管道或内存管道 always_save 或 concurrent 模式生效)(ft_procs)",
 			CheckRegex:   "\\d+",
 		},
 		{
@@ -396,7 +396,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyFtStrategy,
 			ChooseOnly:    true,
-			ChooseOptions: []string{KeyFtStrategyBackupOnly, KeyFtStrategyAlwaysSave},
+			ChooseOptions: []string{KeyFtStrategyBackupOnly, KeyFtStrategyAlwaysSave, KeyFtStrategyConcurrent},
 			Default:       KeyFtStrategyBackupOnly,
 			DefaultNoUse:  false,
 			Description:   "磁盘管道容错策略(仅备份错误|全部数据走管道)(ft_strategy)",
@@ -406,7 +406,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
-			Description:  "发送并发数量(磁盘管道或内存管道 always_save 模式生效)(ft_procs)",
+			Description:  "发送并发数量(磁盘管道或内存管道 always_save 或 concurrent 模式生效)(ft_procs)",
 			CheckRegex:   "\\d+",
 		},
 		{
@@ -482,7 +482,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyFtStrategy,
 			ChooseOnly:    true,
-			ChooseOptions: []string{KeyFtStrategyBackupOnly, KeyFtStrategyAlwaysSave},
+			ChooseOptions: []string{KeyFtStrategyBackupOnly, KeyFtStrategyAlwaysSave, KeyFtStrategyConcurrent},
 			Default:       KeyFtStrategyBackupOnly,
 			DefaultNoUse:  false,
 			Description:   "磁盘管道容错策略(仅备份错误|全部数据走管道)(ft_strategy)",
@@ -492,7 +492,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
-			Description:  "发送并发数量(磁盘管道或内存管道 always_save 模式生效)(ft_procs)",
+			Description:  "发送并发数量(磁盘管道或内存管道 always_save 或 concurrent 模式生效)(ft_procs)",
 			CheckRegex:   "\\d+",
 		},
 		{

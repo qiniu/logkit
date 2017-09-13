@@ -2,7 +2,6 @@ package sender
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -491,7 +490,7 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 			StatsInfo: utils.StatsInfo{
 				Success:   0,
 				Errors:    int64(len(datas)),
-				LastError: errors.New("Get pandora schema error"),
+				LastError: "Get pandora schema error or repo not exist",
 			},
 			ErrorDetail: se,
 		}
@@ -524,21 +523,26 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 			ErrorDetail: se,
 		}
 		if ok {
-			ste.LastError = errors.New(nse.Error())
+			ste.LastError = nse.Error()
 			ste.Errors = int64(len(nse.GetFailDatas()))
 			ste.Success = int64(len(datas)) - ste.Errors
 		} else {
-			ste.LastError = se
+			ste.LastError = se.Error()
 			ste.Errors = int64(len(datas))
 		}
-		se = ste
 		s.stats.LastError = ste.LastError
 		s.stats.Errors += ste.Errors
 		s.stats.Success += ste.Success
-	} else {
-		s.stats.Success += int64(len(datas))
+		return ste
 	}
-	return
+	s.stats.Success += int64(len(datas))
+	s.stats.LastError = ""
+
+	ste := &utils.StatsError{
+		ErrorDetail: se,
+	}
+	ste.Success = int64(len(datas))
+	return ste
 }
 
 func (s *PandoraSender) Name() string {

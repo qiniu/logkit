@@ -10,6 +10,7 @@ import (
 	"github.com/qiniu/logkit/conf"
 
 	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/utils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -49,6 +50,8 @@ func Test_ActiveReader(t *testing.T) {
 	go ar.Run()
 	data := <-msgchan
 	assert.Equal(t, testContent, data.result)
+
+	assert.Equal(t, utils.StatsInfo{}, ar.Status())
 	ar.Close()
 }
 
@@ -138,6 +141,8 @@ func TestMultiReaderOneLine(t *testing.T) {
 	t.Log("mr finish listen 2 round")
 
 	assert.EqualValues(t, expresult, resultmap)
+
+	assert.Equal(t, utils.StatsInfo{}, mr.Status())
 }
 
 func TestMultiReaderMultiLine(t *testing.T) {

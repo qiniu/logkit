@@ -7,6 +7,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 
+	"github.com/qiniu/logkit/utils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -166,6 +167,8 @@ func TestSQLReader(t *testing.T) {
 	gotSQL, err = mr.getSQL(0)
 	assert.NoError(t, err)
 	assert.EqualValues(t, testsqls[0]+" LIMIT 123,223;", gotSQL)
+
+	assert.Equal(t, utils.StatsInfo{}, mr.Status())
 }
 
 func TestUpdateSql(t *testing.T) {

@@ -430,6 +430,10 @@ func (m *Meta) GetMode() string {
 	return m.mode
 }
 
+func (m *Meta) IsFileMode() bool {
+	return m.mode == ModeDir || m.mode == ModeFile || m.mode == ModeTailx
+}
+
 func (m *Meta) GetDataSourceTag() string {
 	return m.dataSourceTag
 }

@@ -7,9 +7,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"strings"
+
 	"github.com/go-redis/redis"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/utils"
 )
 
 const (
@@ -38,6 +41,9 @@ type RedisReader struct {
 	status  int32
 	mux     sync.Mutex
 	started bool
+
+	stats     utils.StatsInfo
+	statsLock sync.RWMutex
 }
 
 type RedisOptionn struct {
@@ -87,16 +93,29 @@ func NewRedisReader(meta *Meta, conf conf.MapConf) (rr *RedisReader, err error) 
 		opt:    opt,
 		client: client,
 
-		readChan: make(chan string),
-		status:   StatusInit,
-		mux:      sync.Mutex{},
-		started:  false,
+		readChan:  make(chan string),
+		status:    StatusInit,
+		mux:       sync.Mutex{},
+		started:   false,
+		statsLock: sync.RWMutex{},
 	}
 	return
 }
 
 func (rr *RedisReader) Name() string {
 	return fmt.Sprintf("[%s],[%v],[%s]", rr.opt.dataType, rr.opt.db, rr.opt.key)
+}
+
+func (rr *RedisReader) setStatsError(err string) {
+	rr.statsLock.Lock()
+	defer rr.statsLock.Unlock()
+	rr.stats.LastError = err
+}
+
+func (rr *RedisReader) Status() utils.StatsInfo {
+	rr.statsLock.RLock()
+	defer rr.statsLock.RUnlock()
+	return rr.stats
 }
 
 func (rr *RedisReader) Source() string {
@@ -131,6 +150,7 @@ func (rr *RedisReader) SyncMeta() {
 	log.Debugf("Runner[%v] %v redis reader do not support meta sync", rr.meta.RunnerName, rr.Name())
 	return
 }
+
 func (rr *RedisReader) Start() {
 	rr.mux.Lock()
 	defer rr.mux.Unlock()
@@ -190,14 +210,17 @@ func (rr *RedisReader) run() (err error) {
 			ans, subErr := rr.client.BLPop(rr.opt.timeout, rr.opt.key).Result()
 			if subErr != nil && subErr != redis.Nil {
 				log.Errorf("Runner[%v] %v BLPop redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
+				rr.setStatsError("Runner[" + rr.meta.RunnerName + "] " + rr.Name() + " BLPop redis error " + subErr.Error())
 			} else if len(ans) > 1 {
 				rr.readChan <- ans[1]
 			} else if len(ans) == 1 {
 				log.Errorf("Runner[%v] %v list read only one result in arrary %v", rr.meta.RunnerName, rr.Name(), ans)
+				rr.setStatsError("Runner[" + rr.meta.RunnerName + "] " + rr.Name() + " list read only one result in arrary: " + strings.Join(ans, ","))
 			}
 		default:
 			err = fmt.Errorf("data Type < %v > not exist, exit", rr.opt.dataType)
 			log.Error(err)
+			rr.setStatsError(err.Error())
 			return
 		}
 	}

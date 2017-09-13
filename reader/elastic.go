@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/utils"
 	elasticV3 "gopkg.in/olivere/elastic.v3"
 	elasticV5 "gopkg.in/olivere/elastic.v5"
 )
@@ -30,6 +31,9 @@ type ElasticReader struct {
 
 	meta   *Meta  // 记录offset的元数据
 	offset string // 当前处理es的offset
+
+	stats     utils.StatsInfo
+	statsLock sync.RWMutex
 
 	status  int32
 	mux     sync.Mutex
@@ -54,6 +58,7 @@ func NewESReader(meta *Meta, readBatch int, estype, esindex, eshost, esVersion, 
 		offset:    offset,
 		readChan:  make(chan json.RawMessage),
 		mux:       sync.Mutex{},
+		statsLock: sync.RWMutex{},
 		started:   false,
 	}
 
@@ -66,6 +71,18 @@ func (er *ElasticReader) Name() string {
 
 func (er *ElasticReader) Source() string {
 	return er.eshost + "_" + er.esindex + "_" + er.estype
+}
+
+func (er *ElasticReader) setStatsError(err string) {
+	er.statsLock.Lock()
+	defer er.statsLock.Unlock()
+	er.stats.LastError = err
+}
+
+func (er *ElasticReader) Status() utils.StatsInfo {
+	er.statsLock.RLock()
+	defer er.statsLock.RUnlock()
+	return er.stats
 }
 
 func (er *ElasticReader) Close() (err error) {
@@ -136,6 +153,7 @@ func (er *ElasticReader) run() (err error) {
 			return
 		}
 		log.Error(err)
+		er.setStatsError(err.Error())
 		time.Sleep(3 * time.Second)
 	}
 }
