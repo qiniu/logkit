@@ -206,6 +206,14 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse:  false,
 			Description:   "对于数据的时间字段抖动(force_microsecond)",
 		},
+		{
+			KeyName:       KeyForceDataConvert,
+			ChooseOnly:    true,
+			ChooseOptions: []string{"false", "true"},
+			Default:       "false",
+			DefaultNoUse:  false,
+			Description:   "数据强制类型转换(pandora_force_convert)",
+		},
 	},
 	TypeMongodbAccumulate: {
 		{

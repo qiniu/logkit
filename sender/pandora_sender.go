@@ -41,6 +41,7 @@ const (
 	KeyPandoraGzip                 = "pandora_gzip"
 	KeyPandoraUUID                 = "pandora_uuid"
 	KeyForceMicrosecond            = "force_microsecond"
+	KeyForceDataConvert            = "pandora_force_convert"
 
 	PandoraUUID = "Pandora_UUID"
 )
@@ -86,6 +87,7 @@ type PandoraOption struct {
 	logdbReponame    string
 	logdbendpoint    string
 	forceMicrosecond bool
+	forceDataConvert bool
 }
 
 //PandoraMaxBatchSize 发送到Pandora的batch限制
@@ -136,6 +138,7 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	enableLogdb, _ := conf.GetBoolOr(KeyPandoraEnableLogDB, false)
 	logdbreponame, _ := conf.GetStringOr(KeyPandoraLogDBName, repoName)
 	logdbhost, _ := conf.GetStringOr(KeyPandoraLogDBHost, "")
+	forceconvert, _ := conf.GetBoolOr(KeyForceDataConvert, false)
 	opt := &PandoraOption{
 		runnerName:       runnerName,
 		name:             name,
@@ -156,6 +159,7 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 		logdbReponame:    logdbreponame,
 		logdbendpoint:    logdbhost,
 		forceMicrosecond: forceMicrosecond,
+		forceDataConvert: forceconvert,
 	}
 	return newPandoraSender(opt)
 }
@@ -394,13 +398,14 @@ func alignTimestamp(t int64, microsecond int64) int64 {
 }
 
 func validSchema(valueType string, value interface{}) bool {
-	v := fmt.Sprintf("%v", value)
 	switch valueType {
 	case PandoraTypeLong:
+		v := fmt.Sprintf("%v", value)
 		if _, err := strconv.ParseInt(v, 10, 64); err != nil {
 			return false
 		}
 	case PandoraTypeFloat:
+		v := fmt.Sprintf("%v", value)
 		if _, err := strconv.ParseFloat(v, 64); err != nil {
 			return false
 		}
@@ -449,9 +454,8 @@ func (s *PandoraSender) generatePoint(data Data) (point Data) {
 			s.microsecondCounter = (s.microsecondCounter + 1) % (2 << 32)
 			value = formatTime
 		}
-
-		if !validSchema(v.ValueType, value) {
-			log.Errorf("Runner[%v] Sender[%v]: key <%v %v> not match type %v, from data < %v >, ignored this field", s.opt.runnerName, s.opt.name, name, value, v.ValueType, data)
+		if !s.opt.forceDataConvert && !validSchema(v.ValueType, value) {
+			log.Errorf("Runner[%v] Sender[%v]: key <%v> value < %v > not match type %v, from data < %v >, ignored this field", s.opt.runnerName, s.opt.name, name, value, v.ValueType, data)
 			continue
 		}
 		point[k] = value
@@ -509,8 +513,9 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 		NoUpdate: !s.opt.schemaFree,
 		Datas:    points,
 		Option: &pipeline.SchemaFreeOption{
-			ToLogDB:       s.opt.enableLogdb,
-			LogDBRepoName: s.opt.logdbReponame,
+			ToLogDB:          s.opt.enableLogdb,
+			LogDBRepoName:    s.opt.logdbReponame,
+			ForceDataConvert: s.opt.forceDataConvert,
 		},
 	})
 	if schemas != nil {
