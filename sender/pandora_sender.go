@@ -40,6 +40,7 @@ const (
 	KeyFlowRateLimit               = "flow_rate_limit"
 	KeyPandoraGzip                 = "pandora_gzip"
 	KeyPandoraUUID                 = "pandora_uuid"
+	KeyPandoraWithIP               = "pandora_withip"
 	KeyForceMicrosecond            = "force_microsecond"
 	KeyForceDataConvert            = "pandora_force_convert"
 
@@ -83,6 +84,7 @@ type PandoraOption struct {
 	flowRateLimit    int64
 	gzip             bool
 	uuid             bool
+	withip           string
 	enableLogdb      bool
 	logdbReponame    string
 	logdbendpoint    string
@@ -134,6 +136,7 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	flowRateLimit, _ := conf.GetInt64Or(KeyFlowRateLimit, 0)
 	gzip, _ := conf.GetBoolOr(KeyPandoraGzip, false)
 	uuid, _ := conf.GetBoolOr(KeyPandoraUUID, false)
+	withIp, _ := conf.GetBoolOr(KeyPandoraWithIP, false)
 	runnerName, _ := conf.GetStringOr(KeyRunnerName, UnderfinedRunnerName)
 	enableLogdb, _ := conf.GetBoolOr(KeyPandoraEnableLogDB, false)
 	logdbreponame, _ := conf.GetStringOr(KeyPandoraLogDBName, repoName)
@@ -161,19 +164,25 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 		forceMicrosecond: forceMicrosecond,
 		forceDataConvert: forceconvert,
 	}
+	if withIp {
+		opt.withip = "logkitIP"
+	}
 	return newPandoraSender(opt)
 }
 
-func createPandoraRepo(autoCreateSchema, repoName, region string, client pipeline.PipelineAPI) (err error) {
-	dsl := strings.TrimSpace(autoCreateSchema)
+func createPandoraRepo(opt *PandoraOption, client pipeline.PipelineAPI) (err error) {
+	dsl := strings.TrimSpace(opt.autoCreate)
 	if dsl == "" {
 		return
 	}
-	return client.CreateRepoFromDSL(&pipeline.CreateRepoDSLInput{
-		RepoName: repoName,
-		Region:   region,
+	input := &pipeline.CreateRepoDSLInput{
+		RepoName: opt.repoName,
+		Region:   opt.region,
 		DSL:      dsl,
-	})
+	}
+	input.Options = &pipeline.RepoOptions{WithIP: opt.withip}
+
+	return client.CreateRepoFromDSL(input)
 }
 
 func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
@@ -208,7 +217,7 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 		UserSchema: userSchema,
 		schemas:    make(map[string]pipeline.RepoSchemaEntry),
 	}
-	if createErr := createPandoraRepo(opt.autoCreate, opt.repoName, opt.region, client); createErr != nil {
+	if createErr := createPandoraRepo(opt, client); createErr != nil {
 		if !strings.Contains(createErr.Error(), "E18101") {
 			log.Errorf("Runner[%v] Sender[%v]: auto create pandora repo error: %v, you can create on pandora portal, ignored...", opt.runnerName, opt.name, createErr)
 		}
@@ -509,9 +518,10 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 		points = append(points, pipeline.Data(map[string]interface{}(point)))
 	}
 	schemas, se := s.client.PostDataSchemaFree(&pipeline.SchemaFreeInput{
-		RepoName: s.opt.repoName,
-		NoUpdate: !s.opt.schemaFree,
-		Datas:    points,
+		RepoName:    s.opt.repoName,
+		NoUpdate:    !s.opt.schemaFree,
+		Datas:       points,
+		RepoOptions: &pipeline.RepoOptions{WithIP: s.opt.withip},
 		Option: &pipeline.SchemaFreeOption{
 			ToLogDB:          s.opt.enableLogdb,
 			LogDBRepoName:    s.opt.logdbReponame,

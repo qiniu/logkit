@@ -179,52 +179,52 @@
 			"revisionTime": "2014-07-28T01:09:19Z"
 		},
 		{
-			"checksumSHA1": "RuEbOMBYmOsA1pcgl1ZBdafO2fM=",
+			"checksumSHA1": "tbs6iqxjPtJyMqtN3qaIF9hqs0Q=",
 			"path": "github.com/qiniu/pandora-go-sdk/base",
-			"revision": "ee1ec05211f3a3fe58fb3d1f5e276c037c917518",
-			"revisionTime": "2017-09-19T08:34:23Z"
+			"revision": "6e4970bcaca89d131713f5ea40040e60d413fe64",
+			"revisionTime": "2017-09-21T07:01:15Z"
 		},
 		{
 			"checksumSHA1": "He9OLZUB4m9+VWPodWaHEecCNi8=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/config",
-			"revision": "ee1ec05211f3a3fe58fb3d1f5e276c037c917518",
-			"revisionTime": "2017-09-19T08:34:23Z"
+			"revision": "6e4970bcaca89d131713f5ea40040e60d413fe64",
+			"revisionTime": "2017-09-21T07:01:15Z"
 		},
 		{
 			"checksumSHA1": "gmWdZ+75y1U5KEL6uW9RI/xRUTU=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/ratelimit",
-			"revision": "ee1ec05211f3a3fe58fb3d1f5e276c037c917518",
-			"revisionTime": "2017-09-19T08:34:23Z"
+			"revision": "6e4970bcaca89d131713f5ea40040e60d413fe64",
+			"revisionTime": "2017-09-21T07:01:15Z"
 		},
 		{
-			"checksumSHA1": "Zto9U1Z+aOyp6yMsu0wuIfK+vZ8=",
+			"checksumSHA1": "17Iogw6xFOVjUvB6GYIKug9ujMU=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/reqerr",
-			"revision": "ee1ec05211f3a3fe58fb3d1f5e276c037c917518",
-			"revisionTime": "2017-09-19T08:34:23Z"
+			"revision": "6e4970bcaca89d131713f5ea40040e60d413fe64",
+			"revisionTime": "2017-09-21T07:01:15Z"
 		},
 		{
 			"checksumSHA1": "gPoePtUzsRQJHf6pYYRwwUFeZ2A=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/request",
-			"revision": "ee1ec05211f3a3fe58fb3d1f5e276c037c917518",
-			"revisionTime": "2017-09-19T08:34:23Z"
+			"revision": "6e4970bcaca89d131713f5ea40040e60d413fe64",
+			"revisionTime": "2017-09-21T07:01:15Z"
 		},
 		{
-			"checksumSHA1": "GBeGxO6ioDCpURfkf10/zVTfb1I=",
+			"checksumSHA1": "ZHMxrfp89L10TvtSL123/fQDeYI=",
 			"path": "github.com/qiniu/pandora-go-sdk/logdb",
-			"revision": "ee1ec05211f3a3fe58fb3d1f5e276c037c917518",
-			"revisionTime": "2017-09-19T08:34:23Z"
+			"revision": "6e4970bcaca89d131713f5ea40040e60d413fe64",
+			"revisionTime": "2017-09-21T07:01:15Z"
 		},
 		{
-			"checksumSHA1": "X0Sv/f13hhP61PCueaJzIVmvNkA=",
+			"checksumSHA1": "b6cOHc1GxcLiKOsOh1tMUFMVgEQ=",
 			"path": "github.com/qiniu/pandora-go-sdk/pipeline",
-			"revision": "ee1ec05211f3a3fe58fb3d1f5e276c037c917518",
-			"revisionTime": "2017-09-19T08:34:23Z"
+			"revision": "6e4970bcaca89d131713f5ea40040e60d413fe64",
+			"revisionTime": "2017-09-21T07:01:15Z"
 		},
 		{
 			"checksumSHA1": "fjT/MuiyHbBoZ2zjj2kCnpUkYcw=",
 			"path": "github.com/qiniu/pandora-go-sdk/tsdb",
-			"revision": "ee1ec05211f3a3fe58fb3d1f5e276c037c917518",
-			"revisionTime": "2017-09-19T08:34:23Z"
+			"revision": "6e4970bcaca89d131713f5ea40040e60d413fe64",
+			"revisionTime": "2017-09-21T07:01:15Z"
 		},
 		{
 			"checksumSHA1": "KAzbLjI9MzW2tjfcAsK75lVRp6I=",
