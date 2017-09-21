@@ -716,3 +716,76 @@ Content-Type: application/json
 ```
 
 ## Transformer
+
+### 获得 Transformer 用途说明
+
+
+```
+GET /logkit/transformer/usages
+Content-Type: application/json
+```
+
+返回
+
+```
+{
+    "transformerType1":"transformer用途说明1",
+    "transformerType2":"transformer用途说明2"
+}
+```
+
+### 获取 Transformer 样例配置
+
+请求
+
+```
+GET /logkit/transformer/<transformtype>/sampleconfig
+Content-Type: application/json
+```
+
+返回
+
+```
+{
+    "IP":[
+         {
+             "KeyName":      "IPKey",
+             "ChooseOnly":   <true/false>,
+             "Default":      "<default key value>",
+             "DefaultNoUse": <true/false>,
+             "Description":  "字段描述",
+             "CheckRegex":"<校验字段的正则表达式，为空不校验>",
+             "Type":"<string/long>"
+         },
+         {
+             "KeyName":      "SenderKey",
+             "ChooseOnly":   <true/false>,
+             "Default":      "<default key value>",
+             "DefaultNoUse": <true/false>,
+             "Description":  "字段描述",
+             "CheckRegex":"<校验字段的正则表达式，为空不校验>",
+             "Type":"<string/long>"
+         }
+     ],
+    "replace":[
+       {
+           "KeyName":      "IPKey",
+           "ChooseOnly":   <true/false>,
+           "Default":      "<default key value>",
+           "DefaultNoUse": <true/false>,
+           "Description":  "字段描述",
+           "CheckRegex":"<校验字段的正则表达式，为空不校验>",
+           "Type":"<string/long>"
+       },
+       {
+           "KeyName":      "SenderKey",
+           "ChooseOnly":   <true/false>,
+           "Default":      "<default key value>",
+           "DefaultNoUse": <true/false>,
+           "Description":  "字段描述",
+           "CheckRegex":"<校验字段的正则表达式，为空不校验>",
+           "Type":"<string/long>"
+       }
+   ]
+}
+```

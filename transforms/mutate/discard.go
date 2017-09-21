@@ -9,9 +9,8 @@ import (
 )
 
 type Discarder struct {
-	StageTime string `json:"stage"`
-	Key       string `json:"key"`
-	stats     utils.StatsInfo
+	Key   string `json:"key"`
+	stats utils.StatsInfo
 }
 
 func (g *Discarder) RawTransform(datas []string) ([]string, error) {
