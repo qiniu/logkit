@@ -69,7 +69,7 @@ func (it *IpTransformer) Description() string {
 	return "transform ip to country region and isp"
 }
 
-func (g *IpTransformer) Type() string {
+func (it *IpTransformer) Type() string {
 	return "IP"
 }
 
@@ -80,6 +80,21 @@ func (it *IpTransformer) SampleConfig() string {
 		"key":"MyIpFieldKey",
 		"data_path":"your/path/to/ip.dat"
 	}`
+}
+
+func (it *IpTransformer) ConfigOptions() []utils.Option {
+	return []utils.Option{
+		transforms.KeyStageAfterOnly,
+		transforms.KeyFieldName,
+		{
+			KeyName:      "data_path",
+			ChooseOnly:   false,
+			Default:      "your/path/to/ip.dat",
+			DefaultNoUse: true,
+			Description:  "IP数据库路径(data_path)",
+			Type:         transforms.TransformTypeString,
+		},
+	}
 }
 
 func (it *IpTransformer) Stage() string {

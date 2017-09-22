@@ -90,6 +90,7 @@ type PandoraOption struct {
 	logdbendpoint    string
 	forceMicrosecond bool
 	forceDataConvert bool
+	useragent        string
 }
 
 //PandoraMaxBatchSize 发送到Pandora的batch限制
@@ -126,6 +127,7 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	if err != nil {
 		return
 	}
+	useragent, _ := conf.GetStringOr(InnerUserAgent, "")
 	schema, _ := conf.GetStringOr(KeyPandoraSchema, "")
 	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("pandoraSender:(%v,repo:%v,region:%v)", host, repoName, region))
 	updateInterval, _ := conf.GetInt64Or(KeyPandoraSchemaUpdateInterval, 300)
@@ -163,6 +165,7 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 		logdbendpoint:    logdbhost,
 		forceMicrosecond: forceMicrosecond,
 		forceDataConvert: forceconvert,
+		useragent:        useragent,
 	}
 	if withIp {
 		opt.withip = "logkitIP"
@@ -194,7 +197,8 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 		WithLoggerLevel(pipelinebase.LogInfo).
 		WithRequestRateLimit(opt.reqRateLimit).
 		WithFlowRateLimit(opt.flowRateLimit).
-		WithGzipData(opt.gzip)
+		WithGzipData(opt.gzip).
+		WithHeaderUserAgent(opt.useragent)
 	if opt.logdbendpoint != "" {
 		config = config.WithLogDBEndpoint(opt.logdbendpoint)
 	}

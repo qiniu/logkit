@@ -8,6 +8,7 @@ type Option struct {
 	DefaultNoUse  bool
 	Description   string
 	CheckRegex    string
+	Type          string `json:"Type,omitempty"`
 }
 
 type KeyValue struct {
