@@ -110,3 +110,33 @@ body {
 .hide {
   display: none;
 }
+
+.inline {
+  display: inline-block;
+}
+
+.fields.key {
+  width: 250px;
+}
+
+.fields.value {
+  width: 250px;
+  margin-left: 20px;
+}
+.dynamic-delete-button {
+  marginTop: 30px;
+  margin-left: 20px;
+  cursor: pointer;
+  position: relative;
+  top: 4px;
+  font-size: 24px;
+  color: #999;
+  transition: all .3s;
+}
+.dynamic-delete-button:hover {
+  color: #777;
+}
+.dynamic-delete-button[disabled] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}

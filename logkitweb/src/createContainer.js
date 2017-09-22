@@ -4,6 +4,7 @@ import Source from  './components/sourceConfig'
 import Parser from  './components/parserConfig'
 import Sender from './components/senderConfig'
 import RenderConfig from './components/renderConfig'
+import Transformer from './components/transformer'
 import config from './store/config'
 import moment from 'moment'
 import {postConfigData, getRunnerVersion,putConfigData} from './services/logkit';
@@ -19,6 +20,9 @@ const steps = [{
 }, {
   title: '配置发送方式',
   content: '配置相关发送方式',
+}, {
+  title: '配置Transformer',
+  content: '配置相关字段解析',
 }, {
   title: '确认并添加Runner',
   content: '确认并添加',
@@ -53,7 +57,7 @@ class Create extends Component {
     let isCopy =  this.props.location.query.copyConfig
     if (isCopy === 'true') {
       this.setState({
-        current: 3,
+        current: 4,
         isCpoyStatus: true
       })
       if (window.nodeCopy) {
@@ -95,6 +99,10 @@ class Create extends Component {
         }
       });
     } else if (this.state.current === 2) {
+      const current = this.state.current + 1;
+      this.setState({current});
+
+    }else if (this.state.current === 3) {
       that.refs.checkSenderData.validateFields(null, {}, (err) => {
         if (err) {
           notification.warning({message: "表单校验未通过,请检查", duration: 20,})
@@ -204,7 +212,7 @@ class Create extends Component {
             {steps.map(item => <Step key={item.title} title={item.title}/>)}
           </Steps>
           <div className="steps-content">
-            <div><p className={this.state.current <= 2 ? 'show-div info' : 'hide-div'}>注意：黄色字体选框需根据实际情况修改，其他可作为默认值</p>
+            <div><p className={this.state.current <= 3 ? 'show-div info' : 'hide-div'}>注意：黄色字体选框需根据实际情况修改，其他可作为默认值</p>
             </div>
             <div className={this.state.current === 0 ? 'show-div' : 'hide-div'}>
               <Source ref="checkSourceData"></Source>
@@ -212,12 +220,13 @@ class Create extends Component {
             <div className={this.state.current === 1 ? 'show-div' : 'hide-div'}>
               <Parser ref="checkParseData"></Parser>
             </div>
-
             <div className={this.state.current === 2 ? 'show-div' : 'hide-div'}>
+              <Transformer ref="initTransform"></Transformer>
+            </div>
+            <div className={this.state.current === 3 ? 'show-div' : 'hide-div'}>
               <Sender ref="checkSenderData"></Sender>
             </div>
-
-            <div className={this.state.current === 3 ? 'show-div' : 'hide-div'}>
+            <div className={this.state.current === 4 ? 'show-div' : 'hide-div'}>
               <RenderConfig ref="initConfig"></RenderConfig>
             </div>
 
