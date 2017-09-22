@@ -50,7 +50,10 @@ const (
 	TypeMock              = "mock"          // mock sender
 	TypeDiscard           = "discard"       // discard sender
 	TypeElastic           = "elasticsearch" // elastic
+)
 
+const (
+	InnerUserAgent = "_useragent"
 )
 
 // Ft sender默认同步一次meta信息的数据次数

@@ -248,12 +248,13 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, p
 	}
 	transformers := createTransformers(rc)
 	senders := make([]sender.Sender, 0)
-	for _, c := range rc.SenderConfig {
+	for i, c := range rc.SenderConfig {
 		s, err := sr.NewSender(c)
 		if err != nil {
 			return nil, err
 		}
 		senders = append(senders, s)
+		delete(rc.SenderConfig[i], sender.InnerUserAgent)
 	}
 	return NewLogExportRunnerWithService(runnerInfo, rd, cl, parser, transformers, senders, meta)
 }

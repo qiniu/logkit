@@ -242,3 +242,15 @@ type ErrorResponse struct {
 func NewErrorResponse(err error) *ErrorResponse {
 	return &ErrorResponse{Error: err}
 }
+
+type OSInfo struct {
+	Kernel   string
+	Core     string
+	Platform string
+	OS       string
+	Hostname string
+}
+
+func (oi *OSInfo) String() string {
+	return fmt.Sprintf("(%s; %s; %s %s)", oi.OS, oi.Core, oi.Kernel, oi.Platform)
+}
