@@ -464,6 +464,50 @@ func TestReplaceTransforms(t *testing.T) {
 	assert.Equal(t, exp, newData)
 }
 
+func TestDateTransforms(t *testing.T) {
+
+	config1 := `{
+		"name":"test2.csv",
+		"reader":{
+			"log_path":"./tests/logdir",
+			"mode":"dir"
+		},
+		"parser":{
+			"name":"jsonps",
+			"type":"json"
+		},
+		"transforms":[{
+			"type":"date",
+			"key":"status",
+			"offset":1,
+			"time_layout_before":"",
+			"time_layout_after":"2006-01-02T15:04:05"
+		}],
+		"senders":[{
+			"name":"file_sender",
+			"sender_type":"file",
+			"file_send_path":"./test2/test2_csv_file.txt"
+		}]
+	}`
+	rc := RunnerConfig{}
+	err := json.Unmarshal([]byte(config1), &rc)
+	assert.NoError(t, err)
+	transformers := createTransformers(rc)
+	datas := []sender.Data{{"status": "02/01/2016--15:04:05"}, {"status": "2006-01-02 15:04:15"}}
+	for k := range transformers {
+		datas, err = transformers[k].Transform(datas)
+	}
+	exp := []sender.Data{
+		{
+			"status": "2016-01-02T16:04:05",
+		},
+		{
+			"status": "2006-01-02T16:04:15",
+		},
+	}
+	assert.Equal(t, exp, datas)
+}
+
 func TestGetTrend(t *testing.T) {
 	assert.Equal(t, SpeedUp, getTrend(0, 1))
 	assert.Equal(t, SpeedDown, getTrend(1, 0))
