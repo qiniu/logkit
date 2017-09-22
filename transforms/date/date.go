@@ -115,7 +115,7 @@ func (g *DateTrans) formatWithUserOption(t time.Time) interface{} {
 }
 
 func (g *DateTrans) Description() string {
-	return "transform date can transform string/long to specified date format"
+	return "transform string/long to specified date format"
 }
 
 func (g *DateTrans) Type() string {
@@ -130,6 +130,40 @@ func (g *DateTrans) SampleConfig() string {
 		"time_layout_before":"",
 		"time_layout_after":"2006-01-02T15:04:05Z07:00"
 	}`
+}
+
+func (it *DateTrans) ConfigOptions() []utils.Option {
+	return []utils.Option{
+		transforms.KeyStageAfterOnly,
+		transforms.KeyFieldName,
+		{
+			KeyName:    "offset",
+			ChooseOnly: true,
+			ChooseOptions: []string{"0", "-1", "-2", "-3", "-4",
+				"-5", "-6", "-7", "-8", "-9", "-10", "-11", "-12",
+				"1", "2", "3", "4", "5", "6", "7", "8", "9", "11", "12"},
+			Default:      "0",
+			DefaultNoUse: false,
+			Description:  "时区偏移量(offset)",
+			Type:         transforms.TransformTypeString,
+		},
+		{
+			KeyName:      "time_layout_before",
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "时间样式(不填自动解析)(time_layout_before)",
+			Type:         transforms.TransformTypeString,
+		},
+		{
+			KeyName:      "time_layout_after",
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "解析后时间样式(不填默认rfc3339)(time_layout_after)",
+			Type:         transforms.TransformTypeString,
+		},
+	}
 }
 
 func (g *DateTrans) Stage() string {

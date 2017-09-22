@@ -734,12 +734,12 @@ Content-Type: application/json
 }
 ```
 
-### 获取 Transformer 样例配置
+### 获取 Transformer 选项
 
 请求
 
 ```
-GET /logkit/transformer/<transformtype>/sampleconfig
+GET /logkit/transformer/options
 Content-Type: application/json
 ```
 
@@ -787,5 +787,43 @@ Content-Type: application/json
            "Type":"<string/long>"
        }
    ]
+}
+```
+
+### 获取 Transformer 样例
+
+请求
+
+```
+GET /logkit/transformer/sampleconfigs
+Content-Type: application/json
+```
+
+返回
+
+一个 map[string]string的接口，key是类型，value是样例配置字符串
+
+```
+{
+    "IP":"{
+         		"type":"IP",
+         		"stage":"after_parser",
+         		"key":"MyIpFieldKey",
+         		"data_path":"your/path/to/ip.dat"
+         	}",
+    "replace":"{
+               		"type":"replace",
+               		"stage":"before_parser",
+               		"key":"MyReplaceFieldKey",
+               		"old":"myOldString",
+               		"new":"myNewString"
+               	}",
+     "date":"{
+             		"type":"date",
+             		"key":"DateFieldKey",
+             		"offset":0,
+             		"time_layout_before":"",
+             		"time_layout_after":"2006-01-02T15:04:05Z07:00"
+             	}"
 }
 ```

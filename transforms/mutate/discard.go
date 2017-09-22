@@ -29,7 +29,7 @@ func (g *Discarder) Transform(datas []sender.Data) ([]sender.Data, error) {
 }
 
 func (g *Discarder) Description() string {
-	return "transform discard can discard field from data"
+	return "discard onefield from data"
 }
 
 func (g *Discarder) Type() string {
@@ -41,6 +41,13 @@ func (g *Discarder) SampleConfig() string {
 		"type":"discard",
 		"key":"DiscardFieldKey"
 	}`
+}
+
+func (g *Discarder) ConfigOptions() []utils.Option {
+	return []utils.Option{
+		transforms.KeyStageAfterOnly,
+		transforms.KeyFieldName,
+	}
 }
 
 func (g *Discarder) Stage() string {
