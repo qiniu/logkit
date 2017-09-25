@@ -42,6 +42,7 @@ wget https://pandora-dl.qiniu.com/logkit.tar.gz && tar xvf logkit.tar.gz && cd _
 **MacOS 版本**
 
 ```
+brew install wget
 wget https://pandora-dl.qiniu.com/logkit_mac.tar.gz && tar xvf logkit_mac.tar.gz && cd _package_mac/
 ```
 
