@@ -18,11 +18,11 @@ const steps = [{
   title: '配置解析方式',
   content: '配置相关解析方式',
 }, {
+  title: '配置Transformer(非必填)',
+  content: '配置相关字段解析',
+}, {
   title: '配置发送方式',
   content: '配置相关发送方式',
-}, {
-  title: '配置Transformer',
-  content: '配置相关字段解析',
 }, {
   title: '确认并添加Runner',
   content: '确认并添加',
@@ -204,9 +204,12 @@ class Create extends Component {
     return (
         <div className="logkit-create-container">
           <div className="header">
-            <Button style={{float:'left',marginTop:'15px'}} type="primary" className="index-btn" onClick={() => this.turnToIndex()}>
+            <Button style={{float:'left',marginTop:'20px'}} type="primary" className="index-btn" onClick={() => this.turnToIndex()}>
               <Icon type="link" />回到首页
             </Button>七牛Logkit配置文件助手 {this.state.version}
+            <a href="https://github.com/qiniu/logkit">
+            <Button type="primary" >
+              <Icon type="link" />帮助文档</Button></a>
           </div>
           <Steps current={current}>
             {steps.map(item => <Step key={item.title} title={item.title}/>)}

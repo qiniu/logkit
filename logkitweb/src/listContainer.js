@@ -374,6 +374,9 @@ class List extends Component {
         <div className="logkit-container">
           <div className="header">
             七牛Logkit配置文件助手 {this.state.version}
+            <a href="https://github.com/qiniu/logkit">
+              <Button type="primary">
+                <Icon type="link" />帮助文档</Button></a>
           </div>
           <div className="content">
             <Button type="primary" className="index-btn" ghost onClick={this.add}>

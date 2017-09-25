@@ -3,7 +3,8 @@ import {
   Form,
   Input,
   Select,
-  Icon
+  Icon,
+  notification
 } from 'antd';
 import {getTransformOptions} from '../services/logkit';
 import config from '../store/config'
@@ -73,9 +74,9 @@ class Transformer extends Component {
         let options = _.keys(_.omit(data, 'success'))
         this.setState({
           options: options,
-          currentOption: options[0],
+          currentOption: '请选择需要转化的类型',
           items: data,
-          currentItem: data[options[0]]
+          currentItem: []
         })
       }
     })
@@ -179,13 +180,14 @@ class Transformer extends Component {
   handleChange = (option) => {
     this.setState({
       currentOption: option,
-      currentItem: this.state.items[option]
+      currentItem: option != '请选择需要转化的类型' ? this.state.items[option] : []
     })
 
   }
 
   renderSelectOptions = () => {
     let options = []
+    options.push(<Option key={'请选择需要转化的类型'} value={'请选择需要转化的类型'}>{'请选择需要转化的类型'}</Option>)
     this.state.options.map((ele) => {
       options.push(<Option key={ele} value={ele}>{ele}</Option>)
     })
@@ -207,35 +209,40 @@ class Transformer extends Component {
   addTag = () => {
     const {getFieldsValue, getFieldDecorator} = this.props.form;
     let data = getFieldsValue();
-    this.setState({
-      tags: this.state.tags.concat(`uuid${this.schemaUUID}`)
-    });
+    if (this.state.currentOption != '请选择需要转化的类型'){
+      this.setState({
+        tags: this.state.tags.concat(`uuid${this.schemaUUID}`)
+      });
 
-    getFieldDecorator(`spec.${"uuid" + this.schemaUUID}.key`, {
-      initialValue: data[this.state.currentOption].key,
-      rules: [{required: true, message: '源字段不能为空'},
-        {min: 1, max: 100, message: '长度在 1 到 100 个字符'}]
-    });
-    getFieldDecorator(`spec.${"uuid" + this.schemaUUID}.type`, {
-      initialValue: data[this.state.currentOption].type,
-      rules: [{required: true, message: '源字段不能为空'},
-        {min: 1, max: 100, message: '长度在 1 到 100 个字符'}]
-    });
+      getFieldDecorator(`spec.${"uuid" + this.schemaUUID}.key`, {
+        initialValue: data[this.state.currentOption].key,
+        rules: [{required: true, message: '源字段不能为空'},
+          {min: 1, max: 100, message: '长度在 1 到 100 个字符'}]
+      });
+      getFieldDecorator(`spec.${"uuid" + this.schemaUUID}.type`, {
+        initialValue: data[this.state.currentOption].type,
+        rules: [{required: true, message: '源字段不能为空'},
+          {min: 1, max: 100, message: '长度在 1 到 100 个字符'}]
+      });
 
-    getFieldDecorator(`spec.${"uuid" + this.schemaUUID}.stage`, {
-      initialValue: data[this.state.currentOption].stage,
-      rules: [{required: true, message: '源字段不能为空'},
-        {min: 1, max: 100, message: '长度在 1 到 100 个字符'}]
-    });
+      getFieldDecorator(`spec.${"uuid" + this.schemaUUID}.stage`, {
+        initialValue: data[this.state.currentOption].stage,
+        rules: [{required: true, message: '源字段不能为空'},
+          {min: 1, max: 100, message: '长度在 1 到 100 个字符'}]
+      });
 
-    let transforms = this.state.transforms
-    let key = "uuid" + this.schemaUUID
-    _.set(transforms, key, data[this.state.currentOption]);
-    this.setState({
-      transforms
-    })
+      let transforms = this.state.transforms
+      let key = "uuid" + this.schemaUUID
+      _.set(transforms, key, data[this.state.currentOption]);
+      this.setState({
+        transforms
+      })
 
-    this.schemaUUID++;
+      this.schemaUUID++;
+    } else {
+      notification.warning({message: "未选择具体类型", description: '请选择需要转化的类型再添加', duration: 10})
+    }
+
 
   };
 
@@ -251,7 +258,7 @@ class Transformer extends Component {
     return (
         <div >
           <Form className="slide-in text-color">
-            <FormItem {...optionFormItemLayout} label="选择需要转化的类型">
+            <FormItem {...optionFormItemLayout} label="需要转化字段的类型">
               {getFieldDecorator(`${this.state.currentOption}.type`, {
                 initialValue: this.state.currentOption
               })(
