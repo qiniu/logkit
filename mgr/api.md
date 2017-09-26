@@ -728,10 +728,16 @@ Content-Type: application/json
 返回
 
 ```
-{
-    "transformerType1":"transformer用途说明1",
-    "transformerType2":"transformer用途说明2"
-}
+[
+    "transformerType1":{
+        "key":"transformerType1",
+        "value":"transformer用途说明1"
+    }
+    "transformerType2":{
+       "key": "transformerType2",
+       "value":"transformer用途说明2"
+     }
+]
 ```
 
 ### 获取 Transformer 选项
