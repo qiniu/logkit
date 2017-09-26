@@ -6,14 +6,13 @@ import {
   Icon,
   notification
 } from 'antd';
-import {getTransformOptions} from '../services/logkit';
+import {getTransformOptions, getTransformUsages} from '../services/logkit';
 import config from '../store/config'
 import moment from 'moment'
 import _ from "lodash";
 
 const Option = Select.Option
 const FormItem = Form.Item;
-
 const formItemLayout = {
   labelCol: {
     xs: {span: 24},
@@ -46,8 +45,10 @@ class Transformer extends Component {
       currentOption: '',
       currentItem: [],
       tags: [],
-      transforms: {}
+      transforms: {},
+      transformerTypes: []
     }
+
     this.schemaUUID = 0;
   }
 
@@ -68,7 +69,7 @@ class Transformer extends Component {
 
 
   init = () => {
-
+    const {getFieldDecorator, setFieldsValue, resetFields} = this.props.form;
     getTransformOptions().then(data => {
       if (data.success) {
         let options = _.keys(_.omit(data, 'success'))
@@ -77,6 +78,40 @@ class Transformer extends Component {
           currentOption: '请选择需要转化的类型',
           items: data,
           currentItem: []
+        })
+
+        if (window.nodeCopy && window.nodeCopy.transforms) {
+          let data = {}
+          let _key = []
+          let transforms = {}
+          data.spec = _.reduce(
+              _.map(window.nodeCopy.transforms),
+              (result, item) => {
+                result["uuid" + this.schemaUUID] = item;
+                _key.push("uuid" + this.schemaUUID);
+                getFieldDecorator(`spec.${"uuid" + this.schemaUUID}.key`, {initialValue: item.key});
+                getFieldDecorator(`spec.${"uuid" + this.schemaUUID}.type`, {initialValue: item.type});
+                getFieldDecorator(`spec.${"uuid" + this.schemaUUID}.stage`, {initialValue: item.stage});
+                _.set(transforms, "uuid" + this.schemaUUID, item);
+                this.schemaUUID++;
+                return result
+              },
+              {});
+          resetFields();
+          setFieldsValue(data);
+
+          this.setState({
+            transforms,
+            tags: _key
+          })
+        }
+      }
+    })
+
+    getTransformUsages().then(data => {
+      if (data.success) {
+        this.setState({
+          transformerTypes: data
         })
       }
     })
@@ -94,7 +129,7 @@ class Transformer extends Component {
                 label={index === 0 ? '字段' : ''}
                 className="inline fields key">
               {getFieldDecorator(`spec.${k}.key`, {
-                rules: [{required: true, message: '目的字段不能为空'},
+                rules: [{required: true, message: '字段不能为空'},
                   {min: 1, max: 100, message: '长度在 1 到 100 个字符'}]
               })(<Input disabled={true}/>)}
             </FormItem>
@@ -102,7 +137,7 @@ class Transformer extends Component {
                 label={index === 0 ? '类型' : ''}
                 className="inline fields value">
               {getFieldDecorator(`spec.${k}.type`, {
-                rules: [{required: true, message: '目的字段不能为空'},
+                rules: [{required: true, message: '字段不能为空'},
                   {min: 1, max: 100, message: '长度在 1 到 100 个字符'}]
               })(<Input disabled={true}/>)}
             </FormItem>
@@ -110,7 +145,7 @@ class Transformer extends Component {
                 label={index === 0 ? '转化时机' : ''}
                 className="inline fields value">
               {getFieldDecorator(`spec.${k}.stage`, {
-                rules: [{required: true, message: '目的字段不能为空'},
+                rules: [{required: true, message: '字段不能为空'},
                   {min: 1, max: 100, message: '长度在 1 到 100 个字符'}]
               })(<Input disabled={true}/>)}
             </FormItem>
@@ -187,9 +222,9 @@ class Transformer extends Component {
 
   renderSelectOptions = () => {
     let options = []
-    options.push(<Option key={'请选择需要转化的类型'} value={'请选择需要转化的类型'}>{'请选择需要转化的类型'}</Option>)
-    this.state.options.map((ele) => {
-      options.push(<Option key={ele} value={ele}>{ele}</Option>)
+    options.push(<Option key={'请选择需要转化的类型'} value={'请选择需要转化的类型'}>{'请选择需要转化的类型(若无,直接到下一步)'}</Option>)
+    this.state.transformerTypes.map((ele) => {
+      options.push(<Option key={ele.key} value={ele.key}>{ele.key +  "  （" + ele.value + "）"}</Option>)
     })
     return (
         options
@@ -209,7 +244,7 @@ class Transformer extends Component {
   addTag = () => {
     const {getFieldsValue, getFieldDecorator} = this.props.form;
     let data = getFieldsValue();
-    if (this.state.currentOption != '请选择需要转化的类型'){
+    if (this.state.currentOption != '请选择需要转化的类型') {
       this.setState({
         tags: this.state.tags.concat(`uuid${this.schemaUUID}`)
       });
@@ -268,7 +303,6 @@ class Transformer extends Component {
             </FormItem>
             {this.renderFormItem()}
             <FormItem label="需要转化的字段和类型" className="inline title"/>
-            {this.renderTags()}
             <FormItem>
               <div style={{width: "140px", margin: "0px auto"}}>
                 <button onClick={this.addTag} type="button"
@@ -277,6 +311,7 @@ class Transformer extends Component {
                 </button>
               </div>
             </FormItem>
+            {this.renderTags()}
           </Form>
         </div>
     );
