@@ -204,6 +204,7 @@ func (rs *RestService) PostConfig() echo.HandlerFunc {
 		if err = c.Bind(&nconf); err != nil {
 			return err
 		}
+		nconf.RunnerName = name
 		filename := rs.mgr.RestDir + "/" + nconf.RunnerName + ".conf"
 		if rs.mgr.isRunning(filename) {
 			return echo.NewHTTPError(http.StatusBadRequest, "file "+filename+" runner is running")
@@ -230,6 +231,7 @@ func (rs *RestService) PutConfig() echo.HandlerFunc {
 		if err = c.Bind(&nconf); err != nil {
 			return err
 		}
+		nconf.RunnerName = name
 		filename := rs.mgr.RestDir + "/" + nconf.RunnerName + ".conf"
 		if rs.mgr.isRunning(filename) {
 			if subErr := rs.mgr.Remove(filename); subErr != nil {
