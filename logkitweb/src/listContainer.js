@@ -145,7 +145,7 @@ class List extends Component {
 
   copyConfig = (record) => {
     window.nodeCopy = record
-    notification.success({message: "复制配置文件成功,", description: '配置页面可修改Runner的配置信息', duration: 10,})
+    notification.success({message: "修改配置文件,", description: '按步骤去修改配置页面的Runner信息', duration: 10,})
     this.props.router.push({pathname: `/index/create?copyConfig=true`})
   }
 
@@ -257,7 +257,7 @@ class List extends Component {
             <a>
               <div className="editable-row-operations">
                 <ClipboardButton data-clipboard-text={text}>
-                  <Icon style={{fontSize: 16}} onClick={() => this.copyConfig(text)} type="edit"/>
+                  <Icon style={{fontSize: 16}} onClick={() => this.copyConfig(record.currentItem)} type="edit"/>
                 </ClipboardButton>
               </div>
             </a>
@@ -354,6 +354,7 @@ class List extends Component {
           sendError,
           logkitError,
           copy: JSON.stringify(item, null, 2),
+          currentItem: item,
           isWebFolder
         })
       })
@@ -374,9 +375,9 @@ class List extends Component {
         <div className="logkit-container">
           <div className="header">
             七牛Logkit配置文件助手 {this.state.version}
-            <a href="https://github.com/qiniu/logkit">
-              <Button type="primary">
-                <Icon type="link" />帮助文档</Button></a>
+            <a href="https://github.com/qiniu/logkit/wiki">
+              <Tag color="#f50"><Icon type="link"/>帮助文档</Tag>
+            </a>
           </div>
           <div className="content">
             <Button type="primary" className="index-btn" ghost onClick={this.add}>

@@ -1,5 +1,5 @@
 import React, {Component} from 'react';
-import {notification, Button, Steps, Icon} from 'antd';
+import {notification, Button, Steps, Icon, Tag} from 'antd';
 import Source from  './components/sourceConfig'
 import Parser from  './components/parserConfig'
 import Sender from './components/senderConfig'
@@ -7,7 +7,7 @@ import RenderConfig from './components/renderConfig'
 import Transformer from './components/transformer'
 import config from './store/config'
 import moment from 'moment'
-import {postConfigData, getRunnerVersion,putConfigData} from './services/logkit';
+import {postConfigData, getRunnerVersion, putConfigData} from './services/logkit';
 import _ from "lodash";
 
 const Step = Steps.Step;
@@ -54,16 +54,14 @@ class Create extends Component {
 
   init = () => {
     let that = this
-    let isCopy =  this.props.location.query.copyConfig
+    let isCopy = this.props.location.query.copyConfig
     if (isCopy === 'true') {
+      window.isCopy = true
       this.setState({
-        current: 4,
         isCpoyStatus: true
       })
-      if (window.nodeCopy) {
-        that.refs.initConfig.setFieldsValue({config: window.nodeCopy});
-      }
-
+    } else {
+      window.isCopy = false
     }
 
     getRunnerVersion().then(data => {
@@ -102,7 +100,7 @@ class Create extends Component {
       const current = this.state.current + 1;
       this.setState({current});
 
-    }else if (this.state.current === 3) {
+    } else if (this.state.current === 3) {
       that.refs.checkSenderData.validateFields(null, {}, (err) => {
         if (err) {
           notification.warning({message: "表单校验未通过,请检查", duration: 20,})
@@ -110,6 +108,9 @@ class Create extends Component {
           const current = this.state.current + 1;
           this.setState({current});
           let name = "logkit.runner." + moment().format("YYYYMMDDHHmmss");
+          if (window.isCopy && window.nodeCopy) {
+            name = window.nodeCopy.name
+          }
           let nodeData = config.getNodeData()
           if (nodeData && nodeData.parser.type === 'grok') {
             nodeData.parser.grok_custom_patterns = window.btoa(nodeData.parser.grok_custom_patterns)
@@ -204,12 +205,13 @@ class Create extends Component {
     return (
         <div className="logkit-create-container">
           <div className="header">
-            <Button style={{float:'left',marginTop:'20px'}} type="primary" className="index-btn" onClick={() => this.turnToIndex()}>
-              <Icon type="link" />回到首页
+            <Button style={{float: 'left', marginTop: '20px'}} type="primary" className="index-btn"
+                    onClick={() => this.turnToIndex()}>
+              <Icon type="link"/>回到首页
             </Button>七牛Logkit配置文件助手 {this.state.version}
-            <a href="https://github.com/qiniu/logkit">
-            <Button type="primary" >
-              <Icon type="link" />帮助文档</Button></a>
+            <a href="https://github.com/qiniu/logkit/wiki">
+              <Tag color="#f50"><Icon type="link"/>帮助文档</Tag>
+            </a>
           </div>
           <Steps current={current}>
             {steps.map(item => <Step key={item.title} title={item.title}/>)}
@@ -253,7 +255,7 @@ class Create extends Component {
             {
               this.state.current > 0
               &&
-              <Button className={this.state.isCpoyStatus === true ? 'hide': ''} style={{marginLeft: 8}} onClick={() => this.prev()}>
+              <Button style={{marginLeft: 8}} onClick={() => this.prev()}>
                 上一步
               </Button>
             }
