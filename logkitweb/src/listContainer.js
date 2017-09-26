@@ -375,7 +375,7 @@ class List extends Component {
         <div className="logkit-container">
           <div className="header">
             七牛Logkit配置文件助手 {this.state.version}
-            <a href="https://github.com/qiniu/logkit/wiki">
+            <a target="_blank" href="https://github.com/qiniu/logkit/wiki">
               <Tag color="#f50"><Icon type="link"/>帮助文档</Tag>
             </a>
           </div>
