@@ -279,7 +279,6 @@ func createTransformers(rc RunnerConfig) []transforms.Transformer {
 			continue
 		}
 		trans := creater()
-		delete(tConf, transforms.KeyType)
 		bts, err := json.Marshal(tConf)
 		if err != nil {
 			log.Errorf("type %v of transformer marshal config error %v", strTP, err)
