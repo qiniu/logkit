@@ -257,7 +257,7 @@ xsxs,456,asv,5.12`,
 script_filename = /data/html/
 [0x00007fec119d1720] curl_exec() /data/html/xyframework/base.go:123
 [05-May-2017 13:45:39]  [pool log] pid 4108`,
-	TypeLogv1:     `2017/08/11 10:24:17 [WARN][github.com/qiniu/logkit/mgr] runner.go:398: Runner[byds] sender pandora.sender.31 closed`,
+	TypeLogv1:     `2016/10/20 17:30:21.433423 [GE2owHck-Y4IWJHS][WARN] github.com/qiniu/http/rpcutil.v1/rpc_util.go:203: E18102: The specified repo does not exist under the provided appid ~`,
 	TypeKafkaRest: `[2016-12-05 03:35:20,682] INFO 172.16.16.191 - - [05/Dec/2016:03:35:20 +0000] "POST /topics/VIP_VvBVy0tuMPPspm1A_0000000000 HTTP/1.1" 200 101640  46 (io.confluent.rest-utils.requests)`,
 	TypeEmpty:     "empty 通过解析清空数据",
 }
