@@ -7,6 +7,7 @@
     "react": "^15.6.1",
     "react-dom": "^15.6.1",
     "react-scripts": "1.0.11",
+    "moment": "^2.18.1",
     "imports-loader": "^0.7.0",
     "isomorphic-fetch": "^2.2.1",
     "react-clipboard.js": "^1.0.1",
@@ -14,7 +15,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "rm ../public/static/js/* && react-scripts build && cp -rf ./build/* ../public",
+    "build": "rm ../public/static/css/* && ../public/static/js/* && react-scripts build && cp -rf ./build/* ../public",
     "test": "react-scripts test --env=jsdom",
     "eject": "react-scripts eject"
   },

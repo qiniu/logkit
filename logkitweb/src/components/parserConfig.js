@@ -81,8 +81,8 @@ class Parser extends Component {
 
 
   init = () => {
-    const {getFieldDecorator} = this.props.form;
-
+    const {getFieldDecorator, setFieldsValue, resetFields} = this.props.form;
+    let that = this
     getSourceParseOptions().then(data => {
       if (data.success) {
         this.setState({
@@ -95,6 +95,17 @@ class Parser extends Component {
               items: data,
               currentItem: data[this.state.currentOption]
             })
+
+            if (window.nodeCopy) {
+              that.handleChange(window.nodeCopy.parser.type)
+              resetFields();
+              let formData = {}
+              formData[window.nodeCopy.parser.type] = window.nodeCopy.parser
+              that.setState({
+                currentOption: window.nodeCopy.parser.type,
+              })
+              setFieldsValue(formData);
+            }
           }
         })
       }
@@ -118,7 +129,7 @@ class Parser extends Component {
     let result = []
     this.state.currentItem.map((ele, index) => {
       if (ele.ChooseOnly == false) {
-        if (ele.KeyName == 'name') {
+        if (ele.KeyName == 'name' && window.isCopy != true) {
           ele.Default = "pandora.parser." + moment().format("YYYYMMDDHHmmss");
         }
         if (ele.KeyName === 'grok_custom_patterns') {

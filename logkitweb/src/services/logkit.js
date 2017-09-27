@@ -55,6 +55,25 @@ export async function getRunnerConfigs(params) {
   });
 }
 
+export async function getTransformOptions(params) {
+  return request(window.logkitUrl + '/logkit/transformer/options', {
+    method: 'get',
+  });
+}
+
+export async function getTransformConfigs(params) {
+  return request(window.logkitUrl + '/logkit/transformer/sampleconfigs', {
+    method: 'get',
+  });
+}
+
+export async function getTransformUsages(params) {
+  return request(window.logkitUrl + '/logkit/transformer/usages', {
+    method: 'get',
+  });
+}
+
+
 export async function getRunnerStatus(params) {
   return request(window.logkitUrl + '/logkit/status', {
     method: 'get',
