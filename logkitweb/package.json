@@ -15,7 +15,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "rm ../public/static/js/* && react-scripts build && cp -rf ./build/* ../public",
+    "build": "rm ../public/static/css/* && ../public/static/js/* && react-scripts build && cp -rf ./build/* ../public",
     "test": "react-scripts test --env=jsdom",
     "eject": "react-scripts eject"
   },
