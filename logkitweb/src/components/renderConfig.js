@@ -144,7 +144,7 @@ class renderConfig extends Component {
                       <Input onChange={this.handleNameChange} placeholder={'Runner名称'}/>
                   )}
                 </FormItem>
-                <FormItem {...formItemLayout} label="最长发送间隔">
+                <FormItem {...formItemLayout} label="最长发送间隔(秒)">
                   {getFieldDecorator('batch_interval', {rules: [{required: true, message: '发送间隔不能为空'},
                     {pattern: /^[0-9]*$/, message: '输入不符合规范,只能为整数'}]})(
                       <Input onChange={this.handleIntervalChange} placeholder={'发送间隔单位(秒)'}/>

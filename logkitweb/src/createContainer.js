@@ -11,7 +11,7 @@ import {postConfigData, getRunnerVersion, putConfigData} from './services/logkit
 import _ from "lodash";
 
 const Step = Steps.Step;
-const { Header, Content, Footer, Sider } = Layout;
+const {Header, Content, Footer, Sider} = Layout;
 const steps = [{
   title: '配置数据源',
   content: '配置相关数据源信息',
@@ -109,6 +109,8 @@ class Create extends Component {
           const current = this.state.current + 1;
           this.setState({current});
           let name = "runner." + moment().format("YYYYMMDDHHmmss");
+          let interval = that.refs.initConfig.getFieldValue('batch_interval')
+          let runnerName = that.refs.initConfig.getFieldValue('name')
           if (window.isCopy && window.nodeCopy) {
             name = window.nodeCopy.name
           }
@@ -116,14 +118,20 @@ class Create extends Component {
           if (nodeData && nodeData.parser.type === 'grok') {
             nodeData.parser.grok_custom_patterns = window.btoa(nodeData.parser.grok_custom_patterns)
           }
+
           let data = {
-            name,
-            batch_interval: 60,
+            name: runnerName != undefined ? runnerName : name,
+            batch_interval: interval != undefined ? interval : 60,
             ...config.getNodeData()
           }
           that.refs.initConfig.setFieldsValue({config: JSON.stringify(data, null, 2)});
-          that.refs.initConfig.setFieldsValue({name: name});
-          that.refs.initConfig.setFieldsValue({batch_interval: 60});
+          if (runnerName == undefined) {
+            that.refs.initConfig.setFieldsValue({name: name});
+          }
+
+          if (interval == undefined) {
+            that.refs.initConfig.setFieldsValue({batch_interval: 60});
+          }
 
         }
       });
@@ -262,9 +270,14 @@ class Create extends Component {
               </Button>
             }
           </div>
-          <Footer style={{ textAlign: 'center' }}>
-            Logkit ©2017 Created by Pandora Team | <a target="_blank" href="https://github.com/qiniu/logkit/wiki">
-            <Tag color="#108ee9">帮助文档</Tag>
+          <Footer style={{textAlign: 'center'}}>
+            更多信息请访问：
+            <a target="_blank" href="https://github.com/qiniu/logkit">
+            <Tag color="#108ee9">Logkit</Tag> </a> |
+            <a target="_blank" href="https://github.com/qiniu/logkit/wiki">
+            <Tag color="#108ee9">帮助文档</Tag> </a> |
+            <a target="_blank" href="https://qiniu.github.io/pandora-docs/#/"><Tag
+              color="#108ee9">Pandora产品</Tag>
           </a>
           </Footer>
         </div>

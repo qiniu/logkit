@@ -395,10 +395,15 @@ class List extends Component {
             {/*</Button>*/}
             {this.renderRunnerList()}
           </div>
-          <Footer style={{ textAlign: 'center' }}>
-            Logkit ©2017 Created by Pandora Team | <a target="_blank" href="https://github.com/qiniu/logkit/wiki">
-            <Tag color="#108ee9">帮助文档</Tag>
-          </a>
+          <Footer style={{textAlign: 'center'}}>
+            更多信息请访问：
+            <a target="_blank" href="https://github.com/qiniu/logkit">
+              <Tag color="#108ee9">Logkit</Tag> </a> |
+            <a target="_blank" href="https://github.com/qiniu/logkit/wiki">
+              <Tag color="#108ee9">帮助文档</Tag> </a> |
+            <a target="_blank" href="https://qiniu.github.io/pandora-docs/#/"><Tag
+                color="#108ee9">Pandora产品</Tag>
+            </a>
           </Footer>
           <Modal footer={null} title="错误日志" width={1000} visible={this.state.isShow}
                  onCancel={this.handleErrorCancel}
