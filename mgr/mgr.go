@@ -198,6 +198,7 @@ func (m *Manager) Add(confPath string) {
 	}
 
 	log.Infof("Start to try add: %v", conf.RunnerName)
+	conf.CreateTime = time.Now().Format(time.RFC3339Nano)
 	go m.ForkRunner(confPath, conf, false)
 	return
 }

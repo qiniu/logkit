@@ -3,8 +3,10 @@ package parser
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"time"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/utils"
@@ -58,6 +60,8 @@ func (im *JsonParser) parseLine(line string) (data sender.Data, err error) {
 	decoder := json.NewDecoder(bytes.NewReader([]byte(line)))
 	decoder.UseNumber()
 	if err = decoder.Decode(&data); err != nil {
+		err = fmt.Errorf("parse json line error %v, raw data is: %v", err, line)
+		log.Debug(err)
 		return
 	}
 	for _, l := range im.labels {
