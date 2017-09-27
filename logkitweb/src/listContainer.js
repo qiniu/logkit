@@ -1,10 +1,13 @@
 import React, {Component} from 'react';
-import {Table, Icon, Popconfirm, Button, notification, Modal, Row, Col, Tag, Input} from 'antd';
+import {Table, Icon, Popconfirm, Button, notification, Modal, Row, Col, Tag, Input, Layout} from 'antd';
+import moment from 'moment'
 import ClipboardButton from 'react-clipboard.js';
 import {
   getRunnerConfigs, deleteConfigData, getRunnerStatus, getRunnerVersion, resetConfigData
 } from './services/logkit';
 import _ from "lodash";
+
+const { Header, Content, Footer, Sider } = Layout;
 
 class List extends Component {
   constructor(props) {
@@ -154,6 +157,10 @@ class List extends Component {
       title: '名称',
       dataIndex: 'name',
       width: '10%'
+    },{
+      title: '修改时间',
+      dataIndex: 'createTime',
+      width: '10%'
     }, {
       title: '运行状态',
       dataIndex: 'status',
@@ -289,6 +296,7 @@ class List extends Component {
     if (this.state.runners != null) {
       _.values(this.state.runners).map((item) => {
         let status = '异常'
+        let createTime = ''
         let parseSuccessNumber = 0
         let parseFailNumber = 0
         let successNumber = 0
@@ -312,6 +320,7 @@ class List extends Component {
         this.state.status.map((ele) => {
           if (item.name === ele.name) {
             status = '正常'
+            createTime = moment(item.createtime).format("YYYY-MM-DD HH:mm:ss")
             parseSuccessNumber = ele.parserStats.success
             parseFailNumber = ele.parserStats.errors
             successNumber = _.values(ele.senderStats)[0] == undefined ? 0 : _.values(ele.senderStats)[0].success
@@ -336,6 +345,7 @@ class List extends Component {
         data.push({
           key: item.name,
           name: item.name,
+          createTime,
           status,
           sendNumber,
           parseNumber,
@@ -375,9 +385,6 @@ class List extends Component {
         <div className="logkit-container">
           <div className="header">
             七牛Logkit配置文件助手 {this.state.version}
-            <a target="_blank" href="https://github.com/qiniu/logkit/wiki">
-              <Tag color="#f50"><Icon type="link"/>帮助文档</Tag>
-            </a>
           </div>
           <div className="content">
             <Button type="primary" className="index-btn" ghost onClick={this.add}>
@@ -388,6 +395,11 @@ class List extends Component {
             {/*</Button>*/}
             {this.renderRunnerList()}
           </div>
+          <Footer style={{ textAlign: 'center' }}>
+            Logkit ©2017 Created by Pandora Team | <a target="_blank" href="https://github.com/qiniu/logkit/wiki">
+            <Tag color="#108ee9">帮助文档</Tag>
+          </a>
+          </Footer>
           <Modal footer={null} title="错误日志" width={1000} visible={this.state.isShow}
                  onCancel={this.handleErrorCancel}
           >

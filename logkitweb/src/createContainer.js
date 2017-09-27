@@ -1,5 +1,5 @@
 import React, {Component} from 'react';
-import {notification, Button, Steps, Icon, Tag} from 'antd';
+import {notification, Button, Steps, Icon, Tag, Layout} from 'antd';
 import Source from  './components/sourceConfig'
 import Parser from  './components/parserConfig'
 import Sender from './components/senderConfig'
@@ -11,6 +11,7 @@ import {postConfigData, getRunnerVersion, putConfigData} from './services/logkit
 import _ from "lodash";
 
 const Step = Steps.Step;
+const { Header, Content, Footer, Sider } = Layout;
 const steps = [{
   title: '配置数据源',
   content: '配置相关数据源信息',
@@ -107,7 +108,7 @@ class Create extends Component {
         } else {
           const current = this.state.current + 1;
           this.setState({current});
-          let name = "logkit.runner." + moment().format("YYYYMMDDHHmmss");
+          let name = "runner." + moment().format("YYYYMMDDHHmmss");
           if (window.isCopy && window.nodeCopy) {
             name = window.nodeCopy.name
           }
@@ -117,9 +118,13 @@ class Create extends Component {
           }
           let data = {
             name,
+            batch_interval: 60,
             ...config.getNodeData()
           }
           that.refs.initConfig.setFieldsValue({config: JSON.stringify(data, null, 2)});
+          that.refs.initConfig.setFieldsValue({name: name});
+          that.refs.initConfig.setFieldsValue({batch_interval: 60});
+
         }
       });
     }
@@ -209,9 +214,6 @@ class Create extends Component {
                     onClick={() => this.turnToIndex()}>
               <Icon type="link"/>回到首页
             </Button>七牛Logkit配置文件助手 {this.state.version}
-            <a target="_blank" href="https://github.com/qiniu/logkit/wiki">
-              <Tag color="#f50"><Icon type="link"/>帮助文档</Tag>
-            </a>
           </div>
           <Steps current={current}>
             {steps.map(item => <Step key={item.title} title={item.title}/>)}
@@ -260,6 +262,11 @@ class Create extends Component {
               </Button>
             }
           </div>
+          <Footer style={{ textAlign: 'center' }}>
+            Logkit ©2017 Created by Pandora Team | <a target="_blank" href="https://github.com/qiniu/logkit/wiki">
+            <Tag color="#108ee9">帮助文档</Tag>
+          </a>
+          </Footer>
         </div>
     );
   }
