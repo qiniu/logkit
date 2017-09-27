@@ -66,6 +66,11 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	router.GET(PREFIX+"/sender/options", rs.GetSenderKeyOptions())
 	router.POST(PREFIX+"/sender/check", rs.PostSenderCheck())
 
+	//transformer API
+	router.GET(PREFIX+"/transformer/usages", rs.GetTransformerUsages())
+	router.GET(PREFIX+"/transformer/options", rs.GetTransformerOptions())
+	router.GET(PREFIX+"/transformer/sampleconfigs", rs.GetTransformerSampleConfigs())
+
 	//version
 	router.GET(PREFIX+"/version", rs.GetVersion())
 
@@ -199,6 +204,8 @@ func (rs *RestService) PostConfig() echo.HandlerFunc {
 		if err = c.Bind(&nconf); err != nil {
 			return err
 		}
+		nconf.CreateTime = time.Now().Format(time.RFC3339Nano)
+		nconf.RunnerName = name
 		filename := rs.mgr.RestDir + "/" + nconf.RunnerName + ".conf"
 		if rs.mgr.isRunning(filename) {
 			return echo.NewHTTPError(http.StatusBadRequest, "file "+filename+" runner is running")
@@ -225,6 +232,8 @@ func (rs *RestService) PutConfig() echo.HandlerFunc {
 		if err = c.Bind(&nconf); err != nil {
 			return err
 		}
+		nconf.CreateTime = time.Now().Format(time.RFC3339Nano)
+		nconf.RunnerName = name
 		filename := rs.mgr.RestDir + "/" + nconf.RunnerName + ".conf"
 		if rs.mgr.isRunning(filename) {
 			if subErr := rs.mgr.Remove(filename); subErr != nil {
@@ -259,6 +268,7 @@ func (rs *RestService) PostConfigReset() echo.HandlerFunc {
 		if !ok {
 			return echo.NewHTTPError(http.StatusInternalServerError, "runner is exist but config not found")
 		}
+		runnerConfig.CreateTime = time.Now().Format(time.RFC3339Nano)
 		if subErr := rs.mgr.Remove(filename); subErr != nil {
 			log.Errorf("remove runner %v error %v", filename, subErr)
 		}
@@ -268,7 +278,6 @@ func (rs *RestService) PostConfigReset() echo.HandlerFunc {
 		if ok {
 			err = runnerReset.Reset()
 		}
-
 		err = rs.mgr.ForkRunner(filename, runnerConfig, true)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err.Error())

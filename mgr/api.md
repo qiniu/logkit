@@ -716,3 +716,120 @@ Content-Type: application/json
 ```
 
 ## Transformer
+
+### 获得 Transformer 用途说明
+
+
+```
+GET /logkit/transformer/usages
+Content-Type: application/json
+```
+
+返回
+
+```
+[
+    "transformerType1":{
+        "key":"transformerType1",
+        "value":"transformer用途说明1"
+    }
+    "transformerType2":{
+       "key": "transformerType2",
+       "value":"transformer用途说明2"
+     }
+]
+```
+
+### 获取 Transformer 选项
+
+请求
+
+```
+GET /logkit/transformer/options
+Content-Type: application/json
+```
+
+返回
+
+```
+{
+    "IP":[
+         {
+             "KeyName":      "IPKey",
+             "ChooseOnly":   <true/false>,
+             "Default":      "<default key value>",
+             "DefaultNoUse": <true/false>,
+             "Description":  "字段描述",
+             "CheckRegex":"<校验字段的正则表达式，为空不校验>",
+             "Type":"<string/long>"
+         },
+         {
+             "KeyName":      "SenderKey",
+             "ChooseOnly":   <true/false>,
+             "Default":      "<default key value>",
+             "DefaultNoUse": <true/false>,
+             "Description":  "字段描述",
+             "CheckRegex":"<校验字段的正则表达式，为空不校验>",
+             "Type":"<string/long>"
+         }
+     ],
+    "replace":[
+       {
+           "KeyName":      "IPKey",
+           "ChooseOnly":   <true/false>,
+           "Default":      "<default key value>",
+           "DefaultNoUse": <true/false>,
+           "Description":  "字段描述",
+           "CheckRegex":"<校验字段的正则表达式，为空不校验>",
+           "Type":"<string/long>"
+       },
+       {
+           "KeyName":      "SenderKey",
+           "ChooseOnly":   <true/false>,
+           "Default":      "<default key value>",
+           "DefaultNoUse": <true/false>,
+           "Description":  "字段描述",
+           "CheckRegex":"<校验字段的正则表达式，为空不校验>",
+           "Type":"<string/long>"
+       }
+   ]
+}
+```
+
+### 获取 Transformer 样例
+
+请求
+
+```
+GET /logkit/transformer/sampleconfigs
+Content-Type: application/json
+```
+
+返回
+
+一个 map[string]string的接口，key是类型，value是样例配置字符串
+
+```
+{
+    "IP":"{
+         		"type":"IP",
+         		"stage":"after_parser",
+         		"key":"MyIpFieldKey",
+         		"data_path":"your/path/to/ip.dat"
+         	}",
+    "replace":"{
+               		"type":"replace",
+               		"stage":"before_parser",
+               		"key":"MyReplaceFieldKey",
+               		"old":"myOldString",
+               		"new":"myNewString"
+               	}",
+     "date":"{
+             		"type":"date",
+             		"key":"DateFieldKey",
+             		"offset":0,
+             		"time_layout_before":"",
+             		"time_layout_after":"2006-01-02T15:04:05Z07:00"
+             	}"
+}
+```

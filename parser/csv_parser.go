@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/times"
@@ -390,6 +391,7 @@ func (p *CsvParser) Parse(lines []string) ([]sender.Data, error) {
 	for idx, line := range lines {
 		d, err := p.parse(line)
 		if err != nil {
+			log.Debug(err)
 			p.schemaErr.Output(err)
 			se.AddErrors()
 			se.ErrorIndex = append(se.ErrorIndex, idx)

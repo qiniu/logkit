@@ -65,16 +65,18 @@ class Source extends Component {
     const {getFieldsValue} = this.props.form;
     let data = getFieldsValue();
     let notEmptyKeys = []
-    _.forIn(data[this.state.currentOption], function(value,key) {
-      if(value != ""){
+    _.forIn(data[this.state.currentOption], function (value, key) {
+      if (value != "") {
         notEmptyKeys.push(key)
       }
     });
 
-    config.set('reader', _.pick(data[this.state.currentOption],notEmptyKeys))
+    config.set('reader', _.pick(data[this.state.currentOption], notEmptyKeys))
   }
 
   init = () => {
+    const {setFieldsValue, resetFields} = this.props.form;
+    let that = this
 
     getSourceOptions().then(data => {
       if (data.success) {
@@ -88,18 +90,27 @@ class Source extends Component {
               items: data,
               currentItem: data[this.state.currentOption]
             })
+
+            if (window.nodeCopy) {
+              that.handleChange(window.nodeCopy.reader.mode)
+              resetFields();
+              let formData = {}
+              formData[window.nodeCopy.reader.mode] = window.nodeCopy.reader
+              that.setState({
+                currentOption: window.nodeCopy.reader.mode
+              })
+              setFieldsValue(formData);
+            }
           }
         })
       }
     })
-
-
   }
 
   renderFormItem = () => {
     const {getFieldDecorator} = this.props.form;
     let result = []
-    this.state.currentItem.map((ele,index) => {
+    this.state.currentItem.map((ele, index) => {
       if (ele.ChooseOnly == false) {
         result.push(<FormItem key={index}
                               {...formItemLayout}
@@ -112,7 +123,7 @@ class Source extends Component {
           {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
             initialValue: ele.Default,
             rules: [{required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur'},
-              {pattern: ele.CheckRegex, message: '输入不符合规范' },
+              {pattern: ele.CheckRegex, message: '输入不符合规范'},
             ]
           })(
               <Input placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值' } disabled={this.state.isReadonly}/>

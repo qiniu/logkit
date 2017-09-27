@@ -4,11 +4,11 @@ import (
 	"testing"
 
 	"github.com/qiniu/logkit/sender"
-	"github.com/stretchr/testify/assert"
 	"github.com/qiniu/logkit/transforms"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestIpTransformer(t *testing.T) {
+func TestReplaceTransformer(t *testing.T) {
 	gsub := &Replacer{
 		Key: "myword",
 		Old: "x1",

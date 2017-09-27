@@ -63,17 +63,18 @@ class Sender extends Component {
     let data = getFieldsValue();
     data[this.state.currentOption].sender_type = this.state.currentOption
     let notEmptyKeys = []
-    _.forIn(data[this.state.currentOption], function(value,key) {
-      if(value != ""){
+    _.forIn(data[this.state.currentOption], function (value, key) {
+      if (value != "") {
         notEmptyKeys.push(key)
       }
     });
-    config.set('senders', [_.pick(data[this.state.currentOption],notEmptyKeys)])
+    config.set('senders', [_.pick(data[this.state.currentOption], notEmptyKeys)])
   }
 
 
   init = () => {
-
+    const {setFieldsValue, resetFields} = this.props.form;
+    let that = this
     getSenderOptions().then(data => {
       if (data.success) {
         this.setState({
@@ -86,6 +87,16 @@ class Sender extends Component {
               items: data,
               currentItem: data[this.state.currentOption]
             })
+            if (window.nodeCopy) {
+              that.handleChange(window.nodeCopy.senders[0].sender_type)
+              resetFields();
+              let formData = {}
+              formData[window.nodeCopy.senders[0].sender_type] = window.nodeCopy.senders[0]
+              that.setState({
+                currentOption: window.nodeCopy.senders[0].sender_type
+              })
+              setFieldsValue(formData);
+            }
           }
         })
       }
@@ -97,9 +108,9 @@ class Sender extends Component {
   renderFormItem = () => {
     const {getFieldDecorator} = this.props.form;
     let result = []
-    this.state.currentItem.map((ele,index) => {
+    this.state.currentItem.map((ele, index) => {
       if (ele.ChooseOnly == false) {
-        if (ele.KeyName == 'name'){
+        if (ele.KeyName == 'name' && window.isCopy != true) {
           ele.Default = "pandora.sender." + moment().format("YYYYMMDDHHmmss");
         }
         result.push(<FormItem key={index}
@@ -113,7 +124,7 @@ class Sender extends Component {
           {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
             initialValue: ele.Default,
             rules: [{required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur'},
-              {pattern: ele.CheckRegex, message: '输入不符合规范' },
+              {pattern: ele.CheckRegex, message: '输入不符合规范'},
             ]
           })(
               <Input placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值' } disabled={this.state.isReadonly}/>

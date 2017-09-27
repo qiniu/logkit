@@ -864,3 +864,39 @@ func TestAlignTimestamp(t *testing.T) {
 		}
 	}
 }
+
+func TestConvertDataPandoraSender(t *testing.T) {
+	pandora, pt := NewMockPandoraWithPrefix("/v2")
+	opt := &PandoraOption{
+		name:             "TestConvertDataPandoraSender",
+		repoName:         "TestConvertDataPandoraSender",
+		region:           "nb",
+		endpoint:         "http://127.0.0.1:" + pt,
+		ak:               "ak",
+		sk:               "sk",
+		schema:           "",
+		updateInterval:   time.Second,
+		reqRateLimit:     0,
+		flowRateLimit:    0,
+		gzip:             false,
+		autoCreate:       "x1 long",
+		schemaFree:       true,
+		forceDataConvert: true,
+	}
+	s, err := newPandoraSender(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := Data{}
+	d["x1"] = "123.2"
+	err = s.Send([]Data{d})
+	if st, ok := err.(*utils.StatsError); ok {
+		err = st.ErrorDetail
+	}
+	if err != nil {
+		t.Error(err)
+	}
+	if !strings.Contains(pandora.Body, "x1=123") {
+		t.Error("not x1 find error")
+	}
+}

@@ -53,7 +53,7 @@ func (g *Replacer) RawTransform(datas []string) ([]string, error) {
 }
 
 func (g *Replacer) Description() string {
-	return "transform replace can replace old string to new"
+	return "replace old string to new"
 }
 
 func (g *Replacer) Type() string {
@@ -68,6 +68,29 @@ func (g *Replacer) SampleConfig() string {
 		"old":"myOldString",
 		"new":"myNewString"
 	}`
+}
+
+func (g *Replacer) ConfigOptions() []utils.Option {
+	return []utils.Option{
+		transforms.KeyStage,
+		transforms.KeyFieldName,
+		{
+			KeyName:      "old",
+			ChooseOnly:   false,
+			Default:      "myOldString",
+			DefaultNoUse: true,
+			Description:  "要替换的字符串内容(old)",
+			Type:         transforms.TransformTypeString,
+		},
+		{
+			KeyName:      "new",
+			ChooseOnly:   false,
+			Default:      "myNewString",
+			DefaultNoUse: true,
+			Description:  "替换为的字符串内容(new)",
+			Type:         transforms.TransformTypeString,
+		},
+	}
 }
 
 func (g *Replacer) Stage() string {

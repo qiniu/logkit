@@ -1,10 +1,13 @@
 import React, {Component} from 'react';
-import {Table, Icon, Popconfirm, Button, notification, Modal, Row, Col, Tag, Input} from 'antd';
+import {Table, Icon, Popconfirm, Button, notification, Modal, Row, Col, Tag, Input, Layout} from 'antd';
+import moment from 'moment'
 import ClipboardButton from 'react-clipboard.js';
 import {
   getRunnerConfigs, deleteConfigData, getRunnerStatus, getRunnerVersion, resetConfigData
 } from './services/logkit';
 import _ from "lodash";
+
+const { Header, Content, Footer, Sider } = Layout;
 
 class List extends Component {
   constructor(props) {
@@ -145,7 +148,7 @@ class List extends Component {
 
   copyConfig = (record) => {
     window.nodeCopy = record
-    notification.success({message: "复制配置文件成功,", description: '配置页面可修改Runner的配置信息', duration: 10,})
+    notification.success({message: "修改配置文件,", description: '按步骤去修改配置页面的Runner信息', duration: 10,})
     this.props.router.push({pathname: `/index/create?copyConfig=true`})
   }
 
@@ -153,6 +156,10 @@ class List extends Component {
     const columns = [{
       title: '名称',
       dataIndex: 'name',
+      width: '10%'
+    },{
+      title: '修改时间',
+      dataIndex: 'createTime',
       width: '10%'
     }, {
       title: '运行状态',
@@ -257,7 +264,7 @@ class List extends Component {
             <a>
               <div className="editable-row-operations">
                 <ClipboardButton data-clipboard-text={text}>
-                  <Icon style={{fontSize: 16}} onClick={() => this.copyConfig(text)} type="edit"/>
+                  <Icon style={{fontSize: 16}} onClick={() => this.copyConfig(record.currentItem)} type="edit"/>
                 </ClipboardButton>
               </div>
             </a>
@@ -289,6 +296,7 @@ class List extends Component {
     if (this.state.runners != null) {
       _.values(this.state.runners).map((item) => {
         let status = '异常'
+        let createTime = ''
         let parseSuccessNumber = 0
         let parseFailNumber = 0
         let successNumber = 0
@@ -312,6 +320,7 @@ class List extends Component {
         this.state.status.map((ele) => {
           if (item.name === ele.name) {
             status = '正常'
+            createTime = moment(item.createtime).format("YYYY-MM-DD HH:mm:ss")
             parseSuccessNumber = ele.parserStats.success
             parseFailNumber = ele.parserStats.errors
             successNumber = _.values(ele.senderStats)[0] == undefined ? 0 : _.values(ele.senderStats)[0].success
@@ -336,6 +345,7 @@ class List extends Component {
         data.push({
           key: item.name,
           name: item.name,
+          createTime,
           status,
           sendNumber,
           parseNumber,
@@ -354,6 +364,7 @@ class List extends Component {
           sendError,
           logkitError,
           copy: JSON.stringify(item, null, 2),
+          currentItem: item,
           isWebFolder
         })
       })
@@ -384,6 +395,16 @@ class List extends Component {
             {/*</Button>*/}
             {this.renderRunnerList()}
           </div>
+          <Footer style={{textAlign: 'center'}}>
+            更多信息请访问：
+            <a target="_blank" href="https://github.com/qiniu/logkit">
+              <Tag color="#108ee9">Logkit</Tag> </a> |
+            <a target="_blank" href="https://github.com/qiniu/logkit/wiki">
+              <Tag color="#108ee9">帮助文档</Tag> </a> |
+            <a target="_blank" href="https://qiniu.github.io/pandora-docs/#/"><Tag
+                color="#108ee9">Pandora产品</Tag>
+            </a>
+          </Footer>
           <Modal footer={null} title="错误日志" width={1000} visible={this.state.isShow}
                  onCancel={this.handleErrorCancel}
           >

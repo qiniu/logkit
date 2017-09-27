@@ -50,7 +50,8 @@ type Manager struct {
 	pregistry  *parser.ParserRegistry
 	sregistry  *sender.SenderRegistry
 
-	Version string
+	Version    string
+	SystemInfo string
 }
 
 func NewManager(conf ManagerConfig) (*Manager, error) {
@@ -80,6 +81,7 @@ func NewCustomManager(conf ManagerConfig, pr *parser.ParserRegistry, sr *sender.
 		watcherMux:    sync.RWMutex{},
 		pregistry:     pr,
 		sregistry:     sr,
+		SystemInfo:    utils.GetOSInfo().String(),
 	}
 	return m, nil
 }
@@ -196,6 +198,7 @@ func (m *Manager) Add(confPath string) {
 	}
 
 	log.Infof("Start to try add: %v", conf.RunnerName)
+	conf.CreateTime = time.Now().Format(time.RFC3339Nano)
 	go m.ForkRunner(confPath, conf, false)
 	return
 }
@@ -211,6 +214,15 @@ func (m *Manager) ForkRunner(confPath string, nconf RunnerConfig, errReturn bool
 				log.Error(err)
 			}
 			return err
+		}
+		for k := range nconf.SenderConfig {
+			var webornot string
+			if nconf.IsInWebFolder {
+				webornot = "Web"
+			} else {
+				webornot = "Terminal"
+			}
+			nconf.SenderConfig[k][sender.InnerUserAgent] = "logkit/" + m.Version + " " + m.SystemInfo + " " + webornot
 		}
 
 		if runner, err = NewCustomRunner(nconf, m.cleanChan, m.pregistry, m.sregistry); err != nil {
