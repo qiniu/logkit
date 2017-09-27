@@ -325,6 +325,7 @@ func Test_RestCRUD(t *testing.T) {
 	}
 	// POST的和GET做验证
 	t.Log("POST的和GET做验证")
+	got1.CreateTime = ""
 	assert.Equal(t, expconf1, got1)
 	assert.Equal(t, 1, len(m.runners))
 
@@ -364,6 +365,7 @@ func Test_RestCRUD(t *testing.T) {
 	}
 	err = json.Unmarshal(content, &got2)
 	assert.NoError(t, err)
+	got2.CreateTime = ""
 	// 验证 第2个
 	assert.Equal(t, expconf2, got2)
 
@@ -384,6 +386,10 @@ func Test_RestCRUD(t *testing.T) {
 	gotlists := make(map[string]RunnerConfig)
 	err = json.Unmarshal(content, &gotlists)
 	assert.NoError(t, err)
+	for i, v := range gotlists {
+		v.CreateTime = ""
+		gotlists[i] = v
+	}
 	assert.Equal(t, explists, gotlists)
 
 	// PUT testRestCRUD2
@@ -442,6 +448,10 @@ func Test_RestCRUD(t *testing.T) {
 	}
 	gotlists = make(map[string]RunnerConfig)
 	err = json.Unmarshal(content, &gotlists)
+	for i, v := range gotlists {
+		v.CreateTime = ""
+		gotlists[i] = v
+	}
 	assert.NoError(t, err)
 	assert.Equal(t, explists, gotlists)
 

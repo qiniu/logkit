@@ -91,6 +91,7 @@ type RunnerInfo struct {
 	MaxBatchSize     int    `json:"batch_size,omitempty"`       // 每个read batch的字节数
 	MaxBatchInteval  int    `json:"batch_interval,omitempty"`   // 最大发送时间间隔
 	MaxBatchTryTimes int    `json:"batch_try_times,omitempty"`  // 最大发送次数，小于等于0代表无限重试
+	CreateTime       string `json:"createtime"`
 }
 
 type LogExportRunner struct {
@@ -561,13 +562,12 @@ func (r *LogExportRunner) batchFullOrTimeout() bool {
 	return false
 }
 
-func (r *LogExportRunner) LagStats() (rl RunnerLag, err error) {
+func (r *LogExportRunner) getReadDoneSize() (size int64, logreading string, err error) {
 	mf := r.meta.MetaFile()
-
 	bd, err := ioutil.ReadFile(mf)
 	if err != nil {
 		log.Warnf("Runner[%v] Read meta File err %v, can't get stats", r.Name(), err)
-		return
+		return 0, "", nil
 	}
 	ss := strings.Split(strings.TrimSpace(string(bd)), "\t")
 	if len(ss) != 2 {
@@ -576,9 +576,17 @@ func (r *LogExportRunner) LagStats() (rl RunnerLag, err error) {
 		return
 	}
 	logreading, logsize := ss[0], ss[1]
-	size, err := strconv.ParseInt(logsize, 10, 64)
+	size, err = strconv.ParseInt(logsize, 10, 64)
 	if err != nil {
 		log.Errorf("Runner[%v] parse log meta error %v, can't get stats", r.Name(), err)
+		return
+	}
+	return
+}
+
+func (r *LogExportRunner) LagStats() (rl RunnerLag, err error) {
+	size, logreading, err := r.getReadDoneSize()
+	if err != nil {
 		return
 	}
 	rl = RunnerLag{Files: 0, Size: -size}
