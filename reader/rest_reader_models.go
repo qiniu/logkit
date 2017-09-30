@@ -19,6 +19,15 @@ var ModeUsages = []utils.KeyValue{
 	{ModeRedis, "从 redis 读取"},
 }
 
+var (
+	OptionDataSourceTag = utils.Option{
+		KeyName:      KeyDataSourceTag,
+		ChooseOnly:   false,
+		Default:      "",
+		DefaultNoUse: false,
+		Description:  "具体的数据文件路径来源标签(datasource_tag)",
+	}
+)
 var ModeKeyOptions = map[string][]utils.Option{
 	ModeDir: {
 		{
@@ -75,6 +84,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse: false,
 			Description:  "编码方式(encoding)",
 		},
+		OptionDataSourceTag,
 		{
 			KeyName:      KeyReadIOLimit,
 			ChooseOnly:   false,
@@ -142,6 +152,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			ChooseOptions: []string{WhenceOldest, WhenceNewest},
 			Description:   "读取的起始位置(read_from)",
 		},
+		OptionDataSourceTag,
 		{
 			KeyName:    KeyEncoding,
 			ChooseOnly: true,
@@ -233,13 +244,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "读取速度限制(MB/s)(readio_limit)",
 			CheckRegex:   "\\d+",
 		},
-		{
-			KeyName:      KeyDataSourceTag,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "具体的数据文件路径来源标签(datasource_tag)",
-		},
+		OptionDataSourceTag,
 		{
 			KeyName:      KeyHeadPattern,
 			ChooseOnly:   false,
@@ -316,6 +321,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse: false,
 			Description:  "断点续传元数据路径(meta_path)",
 		},
+		OptionDataSourceTag,
 		{
 			KeyName:      KeyMysqlCron,
 			ChooseOnly:   false,
@@ -375,6 +381,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse: false,
 			Description:  "断点续传元数据路径(meta_path)",
 		},
+		OptionDataSourceTag,
 		{
 			KeyName:      KeyMssqlReadBatch,
 			ChooseOnly:   false,
@@ -441,6 +448,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse: false,
 			Description:  "断点续传元数据路径(meta_path)",
 		},
+		OptionDataSourceTag,
 		{
 			KeyName:      KeyESReadBatch,
 			ChooseOnly:   false,
@@ -493,6 +501,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse: false,
 			Description:  "断点续传元数据路径(meta_path)",
 		},
+		OptionDataSourceTag,
 		{
 			KeyName:      KeyMongoReadBatch,
 			ChooseOnly:   false,
@@ -552,6 +561,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			ChooseOptions: []string{WhenceOldest, WhenceNewest},
 			Description:   "读取的起始位置(read_from)",
 		},
+		OptionDataSourceTag,
 	},
 	ModeRedis: {
 		{
@@ -596,5 +606,6 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "单次读取超时时间(m(分)、s(秒))(redis_timeout)",
 			CheckRegex:   "\\d+[ms]",
 		},
+		OptionDataSourceTag,
 	},
 }

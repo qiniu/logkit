@@ -240,7 +240,7 @@ class List extends Component {
         );
       },
     }, {
-      title: '重置配置',
+      title: '重置',
       dataIndex: 'reset',
       width: '5%',
       render: (text, record) => {
