@@ -12,16 +12,16 @@ type NetIOStats struct {
 	ps PS
 
 	skipChecks bool
-	Interfaces []string
+	Interfaces []string `json:"interfaces"`
 }
 
 func (_ *NetIOStats) Name() string {
 	return "net"
 }
 
-var netSampleConfig = `
-  # interfaces = ["eth0"]
-`
+var netSampleConfig = `{
+  "interfaces":["eth0"]
+}`
 
 func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 	netio, err := s.ps.NetIO()

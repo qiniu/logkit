@@ -9,11 +9,11 @@ import (
 
 type CPUStats struct {
 	ps        PS
-	lastStats []cpu.TimesStat
+	lastStats map[string]cpu.TimesStat
 
-	PerCPU         bool
-	TotalCPU       bool
-	CollectCPUTime bool
+	PerCPU         bool `json:"percpu"`
+	TotalCPU       bool `json:"totalcpu"`
+	CollectCPUTime bool `json:"collect_cpu_time"`
 }
 
 func NewCPUStats(ps PS) *CPUStats {
@@ -27,14 +27,11 @@ func (_ *CPUStats) Name() string {
 	return "cpu"
 }
 
-var sampleConfig = `
-  ## Whether to report per-cpu stats or not
-  percpu = true
-  ## Whether to report total system cpu stats or not
-  totalcpu = true
-  ## If true, collect raw CPU time metrics.
-  collect_cpu_time = false
-`
+var sampleConfig = `{
+  "percpu": true,
+  "totalcpu" : true,
+  "collect_cpu_time": false
+}`
 
 func (_ *CPUStats) SampleConfig() string {
 	return sampleConfig
@@ -46,7 +43,7 @@ func (s *CPUStats) Collect() (datas []map[string]interface{}, err error) {
 		return nil, fmt.Errorf("error getting CPU info: %s", err)
 	}
 
-	for i, cts := range times {
+	for _, cts := range times {
 
 		total := totalCpuTime(cts)
 
@@ -73,12 +70,14 @@ func (s *CPUStats) Collect() (datas []map[string]interface{}, err error) {
 			// If it's the 1st gather, can't get CPU Usage stats yet
 			continue
 		}
-		lastCts := s.lastStats[i]
+		lastCts, ok := s.lastStats[cts.CPU]
+		if !ok {
+			continue
+		}
 		lastTotal := totalCpuTime(lastCts)
 		totalDelta := total - lastTotal
 
 		if totalDelta < 0 {
-			s.lastStats = times
 			return nil, fmt.Errorf("Error: current total CPU time is less than previous total CPU time")
 		}
 
@@ -101,7 +100,10 @@ func (s *CPUStats) Collect() (datas []map[string]interface{}, err error) {
 		datas = append(datas, fieldsG)
 	}
 
-	s.lastStats = times
+	s.lastStats = make(map[string]cpu.TimesStat)
+	for _, cts := range times {
+		s.lastStats[cts.CPU] = cts
+	}
 
 	return
 }
