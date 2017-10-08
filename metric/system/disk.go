@@ -11,34 +11,24 @@ import (
 type DiskStats struct {
 	ps PS
 
-	// Legacy support
-	Mountpoints []string
-
-	MountPoints []string
-	IgnoreFS    []string
+	MountPoints []string `json:"mount_points"`
+	IgnoreFS    []string `json:"ignore_fs"`
 }
 
 func (_ *DiskStats) Name() string {
 	return "disk"
 }
 
-var diskSampleConfig = `
-  # mount_points = ["/"]
-
-  ## present on /run, /var/run, /dev/shm or /dev).
-  ignore_fs = ["tmpfs", "devtmpfs", "devfs"]
-`
+var diskSampleConfig = `{
+  "mount_points": ["/"],
+  "ignore_fs":["tmpfs", "devtmpfs", "devfs"]
+}`
 
 func (_ *DiskStats) SampleConfig() string {
 	return diskSampleConfig
 }
 
 func (s *DiskStats) Collect() (datas []map[string]interface{}, err error) {
-	// Legacy support:
-	if len(s.Mountpoints) != 0 {
-		s.MountPoints = s.Mountpoints
-	}
-
 	disks, partitions, err := s.ps.DiskUsage(s.MountPoints, s.IgnoreFS)
 	if err != nil {
 		return nil, fmt.Errorf("error getting disk usage info: %s", err)
