@@ -43,6 +43,8 @@ const (
 	KeyPandoraWithIP               = "pandora_withip"
 	KeyForceMicrosecond            = "force_microsecond"
 	KeyForceDataConvert            = "pandora_force_convert"
+	KeyPandoraAutoConvertDate      = "pandora_auto_convert_date"
+	KeyIgnoreInvalidField          = "ignore_invalid_field"
 
 	PandoraUUID = "Pandora_UUID"
 )
@@ -69,28 +71,30 @@ type UserSchema struct {
 
 // PandoraOption 创建Pandora Sender的选项
 type PandoraOption struct {
-	runnerName       string
-	name             string
-	repoName         string
-	region           string
-	endpoint         string
-	ak               string
-	sk               string
-	schema           string
-	schemaFree       bool   // schemaFree在用户数据有新字段时就更新repo添加字段，如果repo不存在，创建repo。schemaFree功能包含autoCreate
-	autoCreate       string // 自动创建用户的repo，dsl语言填写schema
-	updateInterval   time.Duration
-	reqRateLimit     int64
-	flowRateLimit    int64
-	gzip             bool
-	uuid             bool
-	withip           string
-	enableLogdb      bool
-	logdbReponame    string
-	logdbendpoint    string
-	forceMicrosecond bool
-	forceDataConvert bool
-	useragent        string
+	runnerName         string
+	name               string
+	repoName           string
+	region             string
+	endpoint           string
+	ak                 string
+	sk                 string
+	schema             string
+	schemaFree         bool   // schemaFree在用户数据有新字段时就更新repo添加字段，如果repo不存在，创建repo。schemaFree功能包含autoCreate
+	autoCreate         string // 自动创建用户的repo，dsl语言填写schema
+	updateInterval     time.Duration
+	reqRateLimit       int64
+	flowRateLimit      int64
+	gzip               bool
+	uuid               bool
+	withip             string
+	enableLogdb        bool
+	logdbReponame      string
+	logdbendpoint      string
+	forceMicrosecond   bool
+	forceDataConvert   bool
+	ignoreInvalidField bool
+	autoConvertDate    bool
+	useragent          string
 }
 
 //PandoraMaxBatchSize 发送到Pandora的batch限制
@@ -144,28 +148,32 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	logdbreponame, _ := conf.GetStringOr(KeyPandoraLogDBName, repoName)
 	logdbhost, _ := conf.GetStringOr(KeyPandoraLogDBHost, "")
 	forceconvert, _ := conf.GetBoolOr(KeyForceDataConvert, false)
+	ignoreInvalidField, _ := conf.GetBoolOr(KeyIgnoreInvalidField, true)
+	autoconvertDate, _ := conf.GetBoolOr(KeyPandoraAutoConvertDate, true)
 	opt := &PandoraOption{
-		runnerName:       runnerName,
-		name:             name,
-		repoName:         repoName,
-		region:           region,
-		endpoint:         host,
-		ak:               akFromEnv,
-		sk:               skFromEnv,
-		schema:           schema,
-		autoCreate:       autoCreateSchema,
-		schemaFree:       schemaFree,
-		updateInterval:   time.Duration(updateInterval) * time.Second,
-		reqRateLimit:     reqRateLimit,
-		flowRateLimit:    flowRateLimit,
-		gzip:             gzip,
-		uuid:             uuid,
-		enableLogdb:      enableLogdb,
-		logdbReponame:    logdbreponame,
-		logdbendpoint:    logdbhost,
-		forceMicrosecond: forceMicrosecond,
-		forceDataConvert: forceconvert,
-		useragent:        useragent,
+		runnerName:         runnerName,
+		name:               name,
+		repoName:           repoName,
+		region:             region,
+		endpoint:           host,
+		ak:                 akFromEnv,
+		sk:                 skFromEnv,
+		schema:             schema,
+		autoCreate:         autoCreateSchema,
+		schemaFree:         schemaFree,
+		updateInterval:     time.Duration(updateInterval) * time.Second,
+		reqRateLimit:       reqRateLimit,
+		flowRateLimit:      flowRateLimit,
+		gzip:               gzip,
+		uuid:               uuid,
+		enableLogdb:        enableLogdb,
+		logdbReponame:      logdbreponame,
+		logdbendpoint:      logdbhost,
+		forceMicrosecond:   forceMicrosecond,
+		forceDataConvert:   forceconvert,
+		ignoreInvalidField: ignoreInvalidField,
+		autoConvertDate:    autoconvertDate,
+		useragent:          useragent,
 	}
 	if withIp {
 		opt.withip = "logkitIP"
@@ -325,13 +333,14 @@ func fillAlias2Keys(repoName string, schemas map[string]pipeline.RepoSchemaEntry
 }
 
 const (
-	PandoraTypeLong   = "long"
-	PandoraTypeFloat  = "float"
-	PandoraTypeString = "string"
-	PandoraTypeDate   = "date"
-	PandoraTypeBool   = "boolean"
-	PandoraTypeArray  = "array"
-	PandoraTypeMap    = "map"
+	PandoraTypeLong       = "long"
+	PandoraTypeFloat      = "float"
+	PandoraTypeString     = "string"
+	PandoraTypeDate       = "date"
+	PandoraTypeBool       = "boolean"
+	PandoraTypeArray      = "array"
+	PandoraTypeMap        = "map"
+	PandoraTypeJsonString = "jsonstring"
 )
 
 type forceMicrosecondOption struct {
@@ -411,6 +420,9 @@ func alignTimestamp(t int64, microsecond int64) int64 {
 }
 
 func validSchema(valueType string, value interface{}) bool {
+	if value == nil {
+		return false
+	}
 	switch valueType {
 	case PandoraTypeLong:
 		v := fmt.Sprintf("%v", value)
@@ -423,10 +435,47 @@ func validSchema(valueType string, value interface{}) bool {
 			return false
 		}
 	case PandoraTypeString:
+		//所有数据在pandora协议中均是string
 	case PandoraTypeDate:
+		switch vu := value.(type) {
+		case string:
+			if _, err := time.Parse(time.RFC3339Nano, vu); err != nil {
+				return false
+			}
+			return true
+		case time.Time, *time.Time:
+			return true
+		default:
+			return false
+		}
 	case PandoraTypeArray:
+		kd := reflect.ValueOf(value).Kind()
+		return kd == reflect.Slice || kd == reflect.Array
 	case PandoraTypeMap:
+		return reflect.ValueOf(value).Kind() == reflect.Map
 	case PandoraTypeBool:
+		vu := reflect.ValueOf(value)
+		switch vu.Kind() {
+		case reflect.String:
+			ret, _ := strconv.ParseBool(vu.String())
+			return ret
+		case reflect.Bool:
+			return true
+		default:
+			return false
+		}
+	case PandoraTypeJsonString:
+		vu := reflect.ValueOf(value)
+		var str string
+		if vu.Kind() == reflect.String {
+			str = vu.String()
+		} else {
+			str = fmt.Sprintf("%v", value)
+		}
+		if str == "" {
+			return true
+		}
+		return utils.IsJSON(str)
 	}
 	return true
 }
@@ -456,7 +505,7 @@ func (s *PandoraSender) generatePoint(data Data) (point Data) {
 			}
 		}
 		delete(data, name)
-		if v.ValueType == PandoraTypeDate {
+		if v.ValueType == PandoraTypeDate && s.opt.autoConvertDate {
 			formatTime, err := convertDate(value, forceMicrosecondOption{
 				microsecond:      s.microsecondCounter,
 				forceMicrosecond: s.opt.forceMicrosecond})
@@ -467,7 +516,7 @@ func (s *PandoraSender) generatePoint(data Data) (point Data) {
 			s.microsecondCounter = (s.microsecondCounter + 1) % (2 << 32)
 			value = formatTime
 		}
-		if !s.opt.forceDataConvert && !validSchema(v.ValueType, value) {
+		if !s.opt.forceDataConvert && s.opt.ignoreInvalidField && !validSchema(v.ValueType, value) {
 			log.Errorf("Runner[%v] Sender[%v]: key <%v> value < %v > not match type %v, from data < %v >, ignored this field", s.opt.runnerName, s.opt.name, name, value, v.ValueType, data)
 			continue
 		}

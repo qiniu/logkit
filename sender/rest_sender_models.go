@@ -223,6 +223,22 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse:  false,
 			Description:   "数据强制类型转换(pandora_force_convert)",
 		},
+		{
+			KeyName:       KeyIgnoreInvalidField,
+			ChooseOnly:    true,
+			ChooseOptions: []string{"true", "false"},
+			Default:       "true",
+			DefaultNoUse:  false,
+			Description:   "忽略格式错误的字段(ignore_invalid_field)",
+		},
+		{
+			KeyName:       KeyPandoraAutoConvertDate,
+			ChooseOnly:    true,
+			ChooseOptions: []string{"true", "false"},
+			Default:       "true",
+			DefaultNoUse:  false,
+			Description:   "时间类型自动转换(pandora_auto_convert_date)",
+		},
 	},
 	TypeMongodbAccumulate: {
 		{

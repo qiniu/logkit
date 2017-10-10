@@ -155,3 +155,35 @@ func TestTuoEncodeDecode(t *testing.T) {
 		assert.EqualValues(t, ti.exp, exps)
 	}
 }
+
+func TestIsJsonString(t *testing.T) {
+	cases := []struct {
+		c   string
+		exp bool
+	}{
+		{
+			`[{"a":1}]`,
+			true,
+		},
+		{
+			`{"a":1}`,
+			true,
+		},
+		{
+			`{"a":1`,
+			false,
+		},
+		{
+			`xsx`,
+			false,
+		},
+		{
+			` `,
+			false,
+		},
+	}
+	for _, c := range cases {
+		got := IsJSON(c.c)
+		assert.Equal(t, c.exp, got)
+	}
+}

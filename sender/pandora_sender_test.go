@@ -200,18 +200,20 @@ func TestPandoraSender(t *testing.T) {
 	pandora, pt := NewMockPandoraWithPrefix("/v2")
 	pandora.LetGetRepoError(true)
 	opt := &PandoraOption{
-		name:           "p",
-		repoName:       "TestPandoraSender",
-		region:         "nb",
-		endpoint:       "http://127.0.0.1:" + pt,
-		ak:             "ak",
-		sk:             "sk",
-		schema:         "ab, abc a1,d",
-		autoCreate:     "ab *s,a1 f*,ac *long,d DATE*",
-		updateInterval: time.Second,
-		reqRateLimit:   0,
-		flowRateLimit:  0,
-		gzip:           true,
+		name:               "p",
+		repoName:           "TestPandoraSender",
+		region:             "nb",
+		endpoint:           "http://127.0.0.1:" + pt,
+		ak:                 "ak",
+		sk:                 "sk",
+		schema:             "ab, abc a1,d",
+		autoCreate:         "ab *s,a1 f*,ac *long,d DATE*",
+		updateInterval:     time.Second,
+		reqRateLimit:       0,
+		flowRateLimit:      0,
+		ignoreInvalidField: true,
+		autoConvertDate:    true,
+		gzip:               true,
 	}
 	s, err := newPandoraSender(opt)
 	if err != nil {
@@ -602,6 +604,56 @@ func TestValidSchema(t *testing.T) {
 		{
 			v:   json.Number("1.0"),
 			t:   "float",
+			exp: true,
+		},
+		{
+			v:   `{"x":1}`,
+			t:   "jsonstring",
+			exp: true,
+		},
+		{
+			v:   `{"x":1`,
+			t:   "jsonstring",
+			exp: false,
+		},
+		{
+			v:   `{"x":`,
+			t:   "string",
+			exp: true,
+		},
+		{
+			v:   "true",
+			t:   PandoraTypeBool,
+			exp: true,
+		},
+		{
+			v:   map[string]interface{}{"ahh": 123},
+			t:   PandoraTypeMap,
+			exp: true,
+		},
+		{
+			v:   []string{"12"},
+			t:   PandoraTypeMap,
+			exp: false,
+		},
+		{
+			v:   []string{"12"},
+			t:   PandoraTypeArray,
+			exp: true,
+		},
+		{
+			v:   time.Now(),
+			t:   PandoraTypeDate,
+			exp: true,
+		},
+		{
+			v:   time.Now().Format(time.RFC3339Nano),
+			t:   PandoraTypeDate,
+			exp: true,
+		},
+		{
+			v:   time.Now().Format(time.RFC3339),
+			t:   PandoraTypeDate,
 			exp: true,
 		},
 	}

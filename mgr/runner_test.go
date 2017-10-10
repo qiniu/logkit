@@ -508,6 +508,54 @@ func TestDateTransforms(t *testing.T) {
 	assert.Equal(t, exp, datas)
 }
 
+func TestSplitAndConvertTransforms(t *testing.T) {
+
+	config1 := `{
+		"name":"test2.csv",
+		"reader":{
+			"log_path":"./tests/logdir",
+			"mode":"dir"
+		},
+		"parser":{
+			"name":"jsonps",
+			"type":"json"
+		},
+		"transforms":[{
+			"type":"split",
+			"key":"status",
+			"sep":",",
+			"newfield":"newarray"
+		},{
+			"type":"convert",
+			"dsl":"newarray array(long)"
+		}],
+		"senders":[{
+			"name":"file_sender",
+			"sender_type":"file",
+			"file_send_path":"./test2/test2_csv_file.txt"
+		}]
+	}`
+	rc := RunnerConfig{}
+	err := json.Unmarshal([]byte(config1), &rc)
+	assert.NoError(t, err)
+	transformers := createTransformers(rc)
+	datas := []sender.Data{{"status": "1,2,3"}, {"status": "4,5,6"}}
+	for k := range transformers {
+		datas, err = transformers[k].Transform(datas)
+	}
+	exp := []sender.Data{
+		{
+			"status":   "1,2,3",
+			"newarray": []interface{}{int64(1), int64(2), int64(3)},
+		},
+		{
+			"status":   "4,5,6",
+			"newarray": []interface{}{int64(4), int64(5), int64(6)},
+		},
+	}
+	assert.Equal(t, exp, datas)
+}
+
 func TestGetTrend(t *testing.T) {
 	assert.Equal(t, SpeedUp, getTrend(0, 1))
 	assert.Equal(t, SpeedDown, getTrend(1, 0))

@@ -52,6 +52,7 @@ type SqlReader struct {
 	started bool
 
 	execOnStart bool
+	loop        bool
 
 	stats     utils.StatsInfo
 	statsLock sync.RWMutex
@@ -152,11 +153,16 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (mr *SqlReader, err error) {
 	}
 	//schedule    string     //定时任务配置串
 	if len(cronSchedule) > 0 {
-		err = mr.Cron.AddFunc(cronSchedule, mr.run)
-		if err != nil {
-			return
+		cronSchedule = strings.ToLower(cronSchedule)
+		if cronSchedule != "loop" {
+			err = mr.Cron.AddFunc(cronSchedule, mr.run)
+			if err != nil {
+				return
+			}
+			log.Infof("Runner[%v] %v Cron job added with schedule <%v>", mr.meta.RunnerName, mr.Name(), cronSchedule)
+		} else {
+			mr.loop = true
 		}
-		log.Infof("Runner[%v] %v Cron job added with schedule <%v>", mr.meta.RunnerName, mr.Name(), cronSchedule)
 	}
 	return mr, nil
 }
@@ -308,9 +314,13 @@ func (mr *SqlReader) Start() {
 	if mr.started {
 		return
 	}
-	mr.Cron.Start()
-	if mr.execOnStart {
-		go mr.run()
+	if mr.loop {
+		go mr.LoopRun()
+	} else {
+		mr.Cron.Start()
+		if mr.execOnStart {
+			go mr.run()
+		}
 	}
 	mr.started = true
 	log.Infof("Runner[%v] %v pull data deamon started", mr.meta.RunnerName, mr.Name())
@@ -356,6 +366,16 @@ func (mr *SqlReader) updateOffsets(sqls []string) {
 		if mr.syncSQLs[idx] != sql {
 			mr.offsets[idx] = 0
 		}
+	}
+}
+
+func (mr *SqlReader) LoopRun() {
+	for {
+		if atomic.LoadInt32(&mr.status) == StatusStopped {
+			return
+		}
+		//run 函数里面处理stopping的逻辑
+		mr.run()
 	}
 }
 

@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"encoding/json"
+
 	"github.com/qiniu/log"
 )
 
@@ -253,4 +255,9 @@ type OSInfo struct {
 
 func (oi *OSInfo) String() string {
 	return fmt.Sprintf("(%s; %s; %s %s)", oi.OS, oi.Core, oi.Kernel, oi.Platform)
+}
+
+func IsJSON(str string) bool {
+	var js json.RawMessage
+	return json.Unmarshal([]byte(str), &js) == nil
 }
