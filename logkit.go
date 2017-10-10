@@ -39,7 +39,7 @@ type Config struct {
 var conf Config
 
 const (
-	Version           = "v1.3.2"
+	Version           = "v1.3.3"
 	defaultReserveCnt = 5
 	defaultLogDir     = "./run"
 	defaultLogPattern = "*.log-*"
@@ -128,6 +128,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("NewManager: %v", err)
 	}
+	m.Version = Version
+
 	paths := getValidPath(conf.ConfsPath)
 	if len(paths) <= 0 {
 		log.Warnf("Cannot read or create any ConfsPath %v", conf.ConfsPath)
@@ -136,7 +138,6 @@ func main() {
 		log.Fatalf("watch path error %v", err)
 	}
 	m.RestoreWebDir()
-	m.Version = Version
 
 	stopClean := make(chan struct{}, 0)
 	defer close(stopClean)
