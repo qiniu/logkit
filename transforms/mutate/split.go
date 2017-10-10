@@ -78,9 +78,9 @@ func (g *Spliter) ConfigOptions() []utils.Option {
 		transforms.KeyStageAfterOnly,
 		transforms.KeyFieldName,
 		{
-			KeyName:      "arrayName",
+			KeyName:      "newfield",
 			ChooseOnly:   false,
-			Default:      "newArraryName",
+			Default:      "newfieldname",
 			DefaultNoUse: true,
 			Description:  "split后生成的array字段名称(newfield)",
 			Type:         transforms.TransformTypeString,
