@@ -40,6 +40,12 @@ body {
   color: #fff;
 }
 
+.header img {
+  float: left;
+  height: 35px;
+  margin: 15px 0px 0px 15px;
+}
+
 .steps-content {
   border: 1px dashed #e9e9e9;
   border-radius: 0px 0px 6px 6px;
