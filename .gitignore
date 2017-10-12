@@ -49,10 +49,17 @@ _testmain.go
 vendor/*
 !vendor/github.com/
 vendor/github.com/*
+
 !vendor/github.com/labstack/
 vendor/github.com/labstack/*
 !vendor/github.com/labstack/echo/
+
 !vendor/github.com/wangtuanjie/
+
+!vendor/github.com/wvanbergen/
+vendor/github.com/wvanbergen/*
+!vendor/github.com/wvanbergen/kafka
+
 .DS_Store
 .cache
 .vscode

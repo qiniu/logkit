@@ -366,12 +366,6 @@
 			"revision": ""
 		},
 		{
-			"checksumSHA1": "azeqbBjYyd/UYnL21UBo2JmM8Mo=",
-			"path": "github.com/wvanbergen/kafka/consumergroup",
-			"revision": "bc265fedb9ff5b5c5d3c0fdcef4a819b3523d3ee",
-			"revisionTime": "2016-09-27T09:30:20Z"
-		},
-		{
 			"checksumSHA1": "CiDIt0xu07NzokEH0lTsCiMDA3U=",
 			"path": "github.com/wvanbergen/kazoo-go",
 			"revision": "968957352185472eacb69215fa3dbfcfdbac1096",

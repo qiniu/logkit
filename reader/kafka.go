@@ -19,6 +19,7 @@ import (
 type KafkaReader struct {
 	meta            *Meta
 	ConsumerGroup   string
+	ClientID        string
 	Topics          []string
 	ZookeeperPeers  []string
 	ZookeeperChroot string
@@ -40,11 +41,12 @@ type KafkaReader struct {
 	statsLock sync.RWMutex
 }
 
-func NewKafkaReader(meta *Meta, consumerGroup string,
+func NewKafkaReader(meta *Meta, consumerGroup, clientID string,
 	topics []string, zookeeper []string, whence string) (kr *KafkaReader, err error) {
 	kr = &KafkaReader{
 		meta:           meta,
 		ConsumerGroup:  consumerGroup,
+		ClientID:       clientID,
 		ZookeeperPeers: zookeeper,
 		Topics:         topics,
 		Whence:         whence,
@@ -132,6 +134,7 @@ func (kr *KafkaReader) Start() {
 		var consumerErr error
 		kr.Consumer, consumerErr = consumergroup.JoinConsumerGroup(
 			kr.ConsumerGroup,
+			kr.ClientID,
 			kr.Topics,
 			kr.ZookeeperPeers,
 			config,
