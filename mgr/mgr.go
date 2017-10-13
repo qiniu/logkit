@@ -24,7 +24,11 @@ var DIR_NOT_EXIST_SLEEP_TIME = 300 //300 s
 var DEFAULT_LOGKIT_REST_DIR = "/.logkitconfs"
 
 type ManagerConfig struct {
-	BindHost string `json:"bind_host"`
+	//BindHost string `json:"bind_host"`
+	//将host拆分为ip和port
+	BindIP string `json:"bind_ip"`
+	BindPort string `json:"bind_port"`
+
 	Idc      string `json:"idc"`
 	Zone     string `json:"zone"`
 	RestDir  string `json:"rest_dir"`

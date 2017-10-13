@@ -86,13 +86,25 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 			log.Fatal("bind port failed too many times, exit...")
 		}
 		address = ":" + strconv.Itoa(port)
-		if mgr.BindHost != "" {
-			address = mgr.BindHost
+
+		//原码
+		//if mgr.BindHost != "" {
+		//	address = mgr.BindHost
+		//}
+
+		//改动
+		/*if mgr.BindIP == ""{
+			mgr.BindIP = "127.0.0.1"
+		}*/
+		if mgr.BindPort != "" {
+			address = mgr.BindIP + ":" + mgr.BindPort
+		} else {
+			address = mgr.BindIP + address
 		}
 		listener, err = httpserve(address, router)
 		if err != nil {
 			err = fmt.Errorf("bind address %v for RestService error %v", address, err)
-			if mgr.BindHost != "" {
+			if mgr.BindPort != ""{
 				log.Fatal(err)
 			} else {
 				log.Warnf("%v, try next port", err)
