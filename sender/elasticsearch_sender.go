@@ -136,7 +136,7 @@ func startTimer(f func(e *ElasticsearchSender, i int), e *ElasticsearchSender, i
 				//继续定时任务
 			default:
 				f(e, i)
-				now := time.Now()
+				now := time.Now().UTC()
 				next := now.AddDate(addDate[0], addDate[1], addDate[2])
 
 				if i == 3{
@@ -159,7 +159,7 @@ func startTimer(f func(e *ElasticsearchSender, i int), e *ElasticsearchSender, i
 
 func generateIndex(e *ElasticsearchSender, i int){
 	//改变索引
-	time := time.Now()
+	time := time.Now().UTC()
 	year := strconv.Itoa(time.Year())
 	month := strconv.Itoa(int(time.Month()))
 	day := strconv.Itoa(time.Day())
