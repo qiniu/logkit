@@ -539,7 +539,14 @@ var ModeKeyOptions = map[string][]utils.Option{
 			ChooseOnly:   false,
 			Default:      "logkit1",
 			DefaultNoUse: true,
-			Description:  "Kafka的consumer组名称(kafka_groupid)",
+			Description:  "Kafka的consumer组名称(多个同时消费需保持一致)(kafka_groupid)",
+		},
+		{
+			KeyName:      KeyKafkaClientID,
+			ChooseOnly:   false,
+			Default:      "client0",
+			DefaultNoUse: true,
+			Description:  "Kafka的client名称(多个同时消费需保证不同)(kafka_clientid)",
 		},
 		{
 			KeyName:      KeyKafkaTopic,
