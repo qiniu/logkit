@@ -120,8 +120,8 @@ func machPattern(s string, intervals []string) (i int)  {
 
 //定时器---定时改变索引
 func startTimer(f func(e *ElasticsearchSender, i int), e *ElasticsearchSender, i int){
+	log.Infof("%s 开启定时任务,周期创建ES索引:%s, 索引周期 %s", e.name, e.baseIndexName, e.indexInterval)
 	addDate := []int{0, 0, 0}
-
 	if i < 3{
 		addDate[i] = 1
 	}
@@ -131,7 +131,7 @@ func startTimer(f func(e *ElasticsearchSender, i int), e *ElasticsearchSender, i
 			//接收到关闭信号后,结束循环
 			case <- e.c :
 				close(e.c)
-				fmt.Println("close-------------------------------------->",e.indexName)
+				log.Infof("%s 关闭定时任务: 周期创建ES索引%s, 索引周期 %s", e.name, e.baseIndexName, e.indexInterval)
 				return
 				//继续定时任务
 			default:
@@ -176,17 +176,17 @@ func generateIndex(e *ElasticsearchSender, i int){
 	e.indexName = indexName
 	exists, err := client.IndexExists(e.indexName).Do()
 	if err != nil {
-		fmt.Println(err)
+		log.Error(err)
 	}
 	if !exists {
 		_, errIn := client.CreateIndex(e.indexName).Do()
 		if errIn != nil {
-			fmt.Println(errIn)
+			log.Error(errIn)
 		}
-		fmt.Println("create-------------------------------------->",e.indexName)
+		log.Infof("%s 创建ES索引: %s", e.name, e.indexName)
 	}
 	e.rw.Unlock()
-	fmt.Println("change-------------------------------------->",e.indexName)
+	log.Infof("%s 切换ES索引 %s", e.name, e.indexName)
 }
 
 func (this *ElasticsearchSender) Name() string {
@@ -221,7 +221,7 @@ func (this *ElasticsearchSender) Send(data []Data) (err error) {
 		}
 	}
 	_, err = bulkService.Do()
-	fmt.Println("send---------------------------------------->", this.indexName)
+	//fmt.Println("send---------------------------------------->", this.indexName)
 	if err != nil {
 		return
 	}
