@@ -32,12 +32,13 @@ type MongoReader struct {
 	readBatch         int // 每次读取的数据量
 	collectionFilters map[string]CollectionFilter
 
-	Cron     *cron.Cron //定时任务
-	loop     bool
-	readChan chan []byte //bson
-	meta     *Meta       // 记录offset的元数据
-	session  *mgo.Session
-	offset   interface{} //对于默认的offset_key: "_id", 是objectID作为offset，存储的表现形式是string，其他则是int64
+	Cron         *cron.Cron //定时任务
+	loop         bool
+	loopDuration time.Duration
+	readChan     chan []byte //bson
+	meta         *Meta       // 记录offset的元数据
+	session      *mgo.Session
+	offset       interface{} //对于默认的offset_key: "_id", 是objectID作为offset，存储的表现形式是string，其他则是int64
 
 	execOnStart bool
 	status      int32
@@ -95,14 +96,19 @@ func NewMongoReader(meta *Meta, readBatch int, host, database, collection, offse
 	}
 	if len(cronSched) > 0 {
 		cronSched = strings.ToLower(cronSched)
-		if cronSched != "loop" {
+		if strings.HasPrefix(cronSched, Loop) {
+			mr.loop = true
+			mr.loopDuration, err = parseLoopDuration(cronSched)
+			if err != nil {
+				log.Errorf("Runner[%v] %v %v", mr.meta.RunnerName, mr.Name(), err)
+				err = nil
+			}
+		} else {
 			err = mr.Cron.AddFunc(cronSched, mr.run)
 			if err != nil {
 				return
 			}
 			log.Infof("Runner[%v] %v Cron added with schedule <%v>", mr.meta.RunnerName, mr.Name(), cronSched)
-		} else {
-			mr.loop = true
 		}
 	}
 
@@ -168,6 +174,7 @@ func (mr *MongoReader) LoopRun() {
 			return
 		}
 		mr.run()
+		time.Sleep(mr.loopDuration)
 	}
 }
 
