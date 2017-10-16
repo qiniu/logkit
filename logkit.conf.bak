@@ -2,7 +2,8 @@
 	"max_procs": 8,
 	"debug_level": 1,
 	"clean_self_log":true,
-	"bind_host":"localhost:3000",
+	"bind_ip":"localhost",
+	"bind_port":"7777",
 	"static_root_path":"./public",
 	"confs_path": ["confs*"]
 }
