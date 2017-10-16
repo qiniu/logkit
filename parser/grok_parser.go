@@ -297,6 +297,7 @@ func (p *GrokParser) parseLine(line string) (sender.Data, error) {
 func (p *GrokParser) addCustomPatterns(scanner *bufio.Scanner) {
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
+		line = trimInvalidSpace(line)
 		if len(line) > 0 && line[0] != '#' {
 			names := strings.SplitN(line, " ", 2)
 			p.patterns[names[0]] = names[1]
@@ -333,6 +334,34 @@ func (p *GrokParser) compileCustomPatterns() error {
 	}
 
 	return p.g.AddPatternsFromMap(p.patterns)
+}
+
+func trimInvalidSpace(pattern string) string {
+	reg:= regexp.MustCompile(`%{((.*?:)*?.*?)}`)
+	substringIndex := reg.FindAllStringSubmatchIndex(pattern, -1)
+	curIndex := 0
+	var clearString string = ""
+	for _, val := range substringIndex {
+		if curIndex < val[2] {
+			clearString += pattern[curIndex: val[2]]
+		}
+		subString := pattern[val[2]: val[3]]
+		subStringSlice := strings.Split(subString, ":")
+		subLen := len(subStringSlice)
+		for index, chr := range subStringSlice {
+			clearString += strings.TrimSpace(chr)
+			if index != subLen - 1 {
+				clearString += ":"
+			}else{
+				clearString += "}"
+			}
+		}
+		curIndex = val[3] + 1
+	}
+	if curIndex < len(pattern) {
+		clearString += pattern[curIndex:]
+	}
+	return clearString
 }
 
 // parseTypedCaptures parses the capture modifiers, and then deletes the
