@@ -119,6 +119,30 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse: false,
 			Description:  "LogDB host 地址(pandora_logdb_host)",
 		},
+
+		{
+			KeyName:       KeyPandoraEnableKodo,
+			ChooseOnly:    true,
+			ChooseOptions: []string{"false", "true"},
+			Default:       "false",
+			DefaultNoUse:  false,
+			Description:   "是否自动导出到七牛云存储(pandora_enable_kodo)",
+		},
+		{
+			KeyName:      KeyPandoraKodoBucketName,
+			ChooseOnly:   false,
+			Default:      "my_bucket_name",
+			DefaultNoUse: true,
+			Description:  "云存储 Bucket 仓库名称(启用自动导出到云存储时必填)(pandora_bucket_name)",
+		},
+		{
+			KeyName:      KeyPandoraEmail,
+			ChooseOnly:   false,
+			Default:      "my@email.com",
+			DefaultNoUse: true,
+			Description:  "邮箱(启用自动导出到云存储时必填)(qiniu_email)",
+		},
+
 		{
 			KeyName:       KeyPandoraGzip,
 			ChooseOnly:    true,
