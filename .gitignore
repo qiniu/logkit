@@ -46,9 +46,15 @@ _testmain.go
 *.test
 *.prof
 
-vendor/
 meta/
-
+!vendor/
+vendor/*
+!vendor/github.com/
+vendor/github.com/*
+!vendor/github.com/labstack/
+vendor/github.com/labstack/*
+!vendor/github.com/labstack/echo/
+!vendor/github.com/wangtuanjie/
 .DS_Store
 .cache
 .vscode
