@@ -2,6 +2,7 @@
 
 # Mobile Tools for Java (J2ME)
 .mtj.tmp/
+.project
 
 # Package Files #
 *.jar
@@ -45,14 +46,9 @@ _testmain.go
 *.test
 *.prof
 
-!vendor/
-vendor/*
-!vendor/github.com/
-vendor/github.com/*
-!vendor/github.com/labstack/
-vendor/github.com/labstack/*
-!vendor/github.com/labstack/echo/
-!vendor/github.com/wangtuanjie/
+vendor/
+meta/
+
 .DS_Store
 .cache
 .vscode
