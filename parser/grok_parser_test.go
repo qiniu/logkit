@@ -761,3 +761,16 @@ func TestTrimInvalidSpace(t *testing.T) {
 		assert.Equal(t, ti.exp, got)
 	}
 }
+
+func TestAddCustomPatterns(t *testing.T) {
+	p := &GrokParser{
+		Patterns: []string{"%{TEST_LOG_A}"},
+		CustomPatterns: `
+			DURATION
+			RESPONSE_CODE %{NUMBER:response_code}
+			RESPONSE_TIME %{DURATION:response_time}
+			TEST_LOG_A %{NUMBER:myfloat:float} %{RESPONSE_CODE} %{IPORHOST:clientip} %{RESPONSE_TIME}
+		`,
+	}
+	assert.Error(t, p.compile())
+}

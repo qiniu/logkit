@@ -171,7 +171,10 @@ func (p *GrokParser) compile() error {
 	p.CustomPatterns = DEFAULT_PATTERNS + p.CustomPatterns
 	if len(p.CustomPatterns) != 0 {
 		scanner := bufio.NewScanner(strings.NewReader(p.CustomPatterns))
-		p.addCustomPatterns(scanner)
+		err := p.addCustomPatterns(scanner)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Parse any custom pattern files supplied.
@@ -182,7 +185,10 @@ func (p *GrokParser) compile() error {
 		}
 
 		scanner := bufio.NewScanner(bufio.NewReader(file))
-		p.addCustomPatterns(scanner)
+		err = p.addCustomPatterns(scanner)
+		if err != nil {
+			return err
+		}
 	}
 
 	return p.compileCustomPatterns()
@@ -294,15 +300,19 @@ func (p *GrokParser) parseLine(line string) (sender.Data, error) {
 	return data, nil
 }
 
-func (p *GrokParser) addCustomPatterns(scanner *bufio.Scanner) {
+func (p *GrokParser) addCustomPatterns(scanner *bufio.Scanner) error {
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		line = trimInvalidSpace(line)
 		if len(line) > 0 && line[0] != '#' {
 			names := strings.SplitN(line, " ", 2)
+			if len(names) < 2 {
+				return fmt.Errorf("the pattern %v is invalid, and has been ignored", line)
+			}
 			p.patterns[names[0]] = names[1]
 		}
 	}
+	return nil
 }
 
 func (p *GrokParser) compileCustomPatterns() error {
