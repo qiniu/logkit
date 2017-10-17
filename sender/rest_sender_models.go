@@ -476,6 +476,13 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "索引名称(elastic_index)",
 		},
 		{
+			KeyName:      KeyElasticIndexInterval,
+			ChooseOnly:   false,
+			Default:      "d",
+			DefaultNoUse: true,
+			Description:  "自动索引模式(index_interval)",
+		},
+		{
 			KeyName:      KeyElasticType,
 			ChooseOnly:   false,
 			Default:      "app",

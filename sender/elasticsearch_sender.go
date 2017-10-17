@@ -10,10 +10,10 @@ import (
 
 	"github.com/qiniu/log"
 
-	"time"
+	"errors"
 	"strconv"
 	"sync"
-	"errors"
+	"time"
 )
 
 type ElasticsearchSender struct {
@@ -29,16 +29,16 @@ type ElasticsearchSender struct {
 	//新增
 	baseIndexName string
 	indexInterval string
-	c chan string
-	rw *sync.RWMutex
+	c             chan string
+	rw            *sync.RWMutex
 }
 
 const (
-	KeyElasticHost  = "elastic_host"
-	KeyElasticIndex = "elastic_index"
+	KeyElasticHost          = "elastic_host"
+	KeyElasticIndex         = "elastic_index"
 	KeyElasticIndexInterval = "index_interval"
-	KeyElasticType  = "elastic_type"
-	KeyElasticAlias = "elastic_keys"
+	KeyElasticType          = "elastic_type"
+	KeyElasticAlias         = "elastic_keys"
 )
 
 func NewElasticSender(conf conf.MapConf) (sender Sender, err error) {
@@ -97,12 +97,12 @@ func newElasticsearchSender(name string, hosts []string, index, eType string, fi
 				return nil, errIn
 			}
 		}
-	}else if i := machPattern(e.indexInterval, intervals); i != -1{
+	} else if i := machPattern(e.indexInterval, intervals); i != -1 {
 		e.rw = new(sync.RWMutex)
 		e.baseIndexName = e.indexName
 		e.c = make(chan string, 1)
 		startTimer(generateIndex, e, i)
-	}else {
+	} else {
 		err = errors.New("index_interval参数不正确")
 		return nil, err
 	}
@@ -110,9 +110,9 @@ func newElasticsearchSender(name string, hosts []string, index, eType string, fi
 }
 
 //判断字符串是否符合已有的模式
-func machPattern(s string, intervals []string) (i int)  {
-	for i, pattern := range intervals{
-		if s == pattern{
+func machPattern(s string, intervals []string) (i int) {
+	for i, pattern := range intervals {
+		if s == pattern {
 			return i
 		}
 	}
@@ -120,7 +120,7 @@ func machPattern(s string, intervals []string) (i int)  {
 }
 
 //定时器---定时改变索引
-func startTimer(f func(e *ElasticsearchSender, i int), e *ElasticsearchSender, i int){
+func startTimer(f func(e *ElasticsearchSender, i int), e *ElasticsearchSender, i int) {
 	log.Infof("%s 开启定时任务,周期创建ES索引:%s, 索引周期 %s", e.name, e.baseIndexName, e.indexInterval)
 	addDate := []int{0, 0, 0}
 	/*if i < 3{
@@ -129,9 +129,9 @@ func startTimer(f func(e *ElasticsearchSender, i int), e *ElasticsearchSender, i
 	addDate[i] = 1
 	go func() {
 		for {
-			select{
+			select {
 			//接收到关闭信号后,结束循环
-			case <- e.c :
+			case <-e.c:
 				close(e.c)
 				log.Infof("%s 关闭定时任务: 周期创建ES索引%s, 索引周期 %s", e.name, e.baseIndexName, e.indexInterval)
 				return
@@ -148,7 +148,7 @@ func startTimer(f func(e *ElasticsearchSender, i int), e *ElasticsearchSender, i
 				}*/
 
 				date := []int{next.Year(), int(next.Month()), next.Day(), next.Hour(), next.Minute(), next.Second(), next.Nanosecond()}
-				for j := i + 1; j <= 6 ; j++{
+				for j := i + 1; j <= 6; j++ {
 					date[j] = 0
 				}
 				next = time.Date(date[0], time.Month(date[1]), date[2], date[3], date[4], date[5], date[6], next.Location())
@@ -159,7 +159,7 @@ func startTimer(f func(e *ElasticsearchSender, i int), e *ElasticsearchSender, i
 	}()
 }
 
-func generateIndex(e *ElasticsearchSender, i int){
+func generateIndex(e *ElasticsearchSender, i int) {
 	//改变索引
 	time := time.Now().UTC()
 	year := strconv.Itoa(time.Year())
@@ -169,7 +169,7 @@ func generateIndex(e *ElasticsearchSender, i int){
 	minute := strconv.Itoa(time.Minute())
 	date := []string{year, month, day, hour, minute}
 	indexName := e.baseIndexName
-	for j := 0; j <= i; j++{
+	for j := 0; j <= i; j++ {
 		indexName = indexName + "." + date[j]
 	}
 	client := e.elasticClient
@@ -214,7 +214,7 @@ func (this *ElasticsearchSender) Send(data []Data) (err error) {
 
 		//bug修正---新申明一个变量doc2,赋值为doc
 		doc2 := doc
-		if this.rw != nil{
+		if this.rw != nil {
 			this.rw.RLock()
 			bulkService.Add(elastic.NewBulkIndexRequest().Index(this.indexName).Type(this.eType).Doc(&doc2))
 			this.rw.RUnlock()
