@@ -51,8 +51,9 @@ type SqlReader struct {
 	mux     sync.Mutex
 	started bool
 
-	execOnStart bool
-	loop        bool
+	execOnStart  bool
+	loop         bool
+	loopDuration time.Duration
 
 	stats     utils.StatsInfo
 	statsLock sync.RWMutex
@@ -154,15 +155,21 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (mr *SqlReader, err error) {
 	//schedule    string     //定时任务配置串
 	if len(cronSchedule) > 0 {
 		cronSchedule = strings.ToLower(cronSchedule)
-		if cronSchedule != "loop" {
+		if strings.HasPrefix(cronSchedule, Loop) {
+			mr.loop = true
+			mr.loopDuration, err = parseLoopDuration(cronSchedule)
+			if err != nil {
+				log.Errorf("Runner[%v] %v %v", mr.meta.RunnerName, mr.Name(), err)
+				err = nil
+			}
+		} else {
 			err = mr.Cron.AddFunc(cronSchedule, mr.run)
 			if err != nil {
 				return
 			}
 			log.Infof("Runner[%v] %v Cron job added with schedule <%v>", mr.meta.RunnerName, mr.Name(), cronSchedule)
-		} else {
-			mr.loop = true
 		}
+
 	}
 	return mr, nil
 }
@@ -376,6 +383,7 @@ func (mr *SqlReader) LoopRun() {
 		}
 		//run 函数里面处理stopping的逻辑
 		mr.run()
+		time.Sleep(mr.loopDuration)
 	}
 }
 

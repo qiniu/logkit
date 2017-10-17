@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -112,4 +113,14 @@ func HeadPatternMode(mode string, v interface{}) (reg *regexp.Regexp, err error)
 		err = fmt.Errorf("unknown HeadPatternMode %v", mode)
 		return
 	}
+}
+
+func parseLoopDuration(cronSched string) (dur time.Duration, err error) {
+	cronSched = strings.TrimSpace(strings.TrimPrefix(cronSched, Loop))
+	dur, err = time.ParseDuration(cronSched)
+	if err != nil {
+		dur = time.Duration(0)
+		err = fmt.Errorf("parse Cron loop duration %v error %v, make duration as 1 second", cronSched, err)
+	}
+	return
 }
