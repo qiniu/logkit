@@ -1,9 +1,0 @@
-{
-	"max_procs": 8,
-	"debug_level": 1,
-	"clean_self_log":true,
-	"bind_ip":"localhost",
-	"bind_port":"7777",
-	"static_root_path":"./public",
-	"confs_path": ["confs*"]
-}

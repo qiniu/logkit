@@ -84,7 +84,8 @@ func newElasticsearchSender(name string, hosts []string, index, eType string, fi
 		aliasFields:   fields,
 	}
 	//索引间隔
-	intervals := []string{"y", "M", "d", "H", "m"}
+	//intervals := []string{"y", "M", "d", "H", "m"}
+	intervals := []string{"y", "M", "d"}
 	if e.indexInterval == "null" {
 		exists, err := client.IndexExists(index).Do()
 		if err != nil {
@@ -122,9 +123,10 @@ func machPattern(s string, intervals []string) (i int)  {
 func startTimer(f func(e *ElasticsearchSender, i int), e *ElasticsearchSender, i int){
 	log.Infof("%s 开启定时任务,周期创建ES索引:%s, 索引周期 %s", e.name, e.baseIndexName, e.indexInterval)
 	addDate := []int{0, 0, 0}
-	if i < 3{
+	/*if i < 3{
 		addDate[i] = 1
-	}
+	}*/
+	addDate[i] = 1
 	go func() {
 		for {
 			select{
@@ -139,11 +141,11 @@ func startTimer(f func(e *ElasticsearchSender, i int), e *ElasticsearchSender, i
 				now := time.Now().UTC()
 				next := now.AddDate(addDate[0], addDate[1], addDate[2])
 
-				if i == 3{
+				/*if i == 3{
 					next = next.Add(time.Hour)
 				}else if i == 4{
 					next = next.Add(time.Minute)
-				}
+				}*/
 
 				date := []int{next.Year(), int(next.Month()), next.Day(), next.Hour(), next.Minute(), next.Second(), next.Nanosecond()}
 				for j := i + 1; j <= 6 ; j++{
