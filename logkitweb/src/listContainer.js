@@ -384,6 +384,7 @@ class List extends Component {
     return (
         <div className="logkit-container">
           <div className="header">
+            <img src="../../static/logkit100.png"></img>
             七牛Logkit配置文件助手 {this.state.version}
           </div>
           <div className="content">

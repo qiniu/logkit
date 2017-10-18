@@ -141,6 +141,10 @@ const (
 	WhenceNewest = "newest"
 )
 
+const (
+	Loop = "loop"
+)
+
 // NewFileReader 创建FileReader
 func NewFileBufReader(conf conf.MapConf) (reader Reader, err error) {
 	meta, err := NewMetaWithConf(conf)

@@ -33,18 +33,24 @@ const (
 	KeyPandoraSchemaUpdateInterval = "pandora_schema_update_interval"
 	KeyPandoraAutoCreate           = "pandora_auto_create"
 	KeyPandoraSchemaFree           = "pandora_schema_free"
-	KeyPandoraEnableLogDB          = "pandora_enable_logdb"
-	KeyPandoraLogDBName            = "pandora_logdb_name"
-	KeyPandoraLogDBHost            = "pandora_logdb_host"
-	KeyRequestRateLimit            = "request_rate_limit"
-	KeyFlowRateLimit               = "flow_rate_limit"
-	KeyPandoraGzip                 = "pandora_gzip"
-	KeyPandoraUUID                 = "pandora_uuid"
-	KeyPandoraWithIP               = "pandora_withip"
-	KeyForceMicrosecond            = "force_microsecond"
-	KeyForceDataConvert            = "pandora_force_convert"
-	KeyPandoraAutoConvertDate      = "pandora_auto_convert_date"
-	KeyIgnoreInvalidField          = "ignore_invalid_field"
+
+	KeyPandoraEnableLogDB = "pandora_enable_logdb"
+	KeyPandoraLogDBName   = "pandora_logdb_name"
+	KeyPandoraLogDBHost   = "pandora_logdb_host"
+
+	KeyPandoraEnableKodo     = "pandora_enable_kodo"
+	KeyPandoraKodoBucketName = "pandora_bucket_name"
+	KeyPandoraEmail          = "qiniu_email"
+
+	KeyRequestRateLimit       = "request_rate_limit"
+	KeyFlowRateLimit          = "flow_rate_limit"
+	KeyPandoraGzip            = "pandora_gzip"
+	KeyPandoraUUID            = "pandora_uuid"
+	KeyPandoraWithIP          = "pandora_withip"
+	KeyForceMicrosecond       = "force_microsecond"
+	KeyForceDataConvert       = "pandora_force_convert"
+	KeyPandoraAutoConvertDate = "pandora_auto_convert_date"
+	KeyIgnoreInvalidField     = "ignore_invalid_field"
 
 	PandoraUUID = "Pandora_UUID"
 )
@@ -71,25 +77,31 @@ type UserSchema struct {
 
 // PandoraOption 创建Pandora Sender的选项
 type PandoraOption struct {
-	runnerName         string
-	name               string
-	repoName           string
-	region             string
-	endpoint           string
-	ak                 string
-	sk                 string
-	schema             string
-	schemaFree         bool   // schemaFree在用户数据有新字段时就更新repo添加字段，如果repo不存在，创建repo。schemaFree功能包含autoCreate
-	autoCreate         string // 自动创建用户的repo，dsl语言填写schema
-	updateInterval     time.Duration
-	reqRateLimit       int64
-	flowRateLimit      int64
-	gzip               bool
-	uuid               bool
-	withip             string
-	enableLogdb        bool
-	logdbReponame      string
-	logdbendpoint      string
+	runnerName     string
+	name           string
+	repoName       string
+	region         string
+	endpoint       string
+	ak             string
+	sk             string
+	schema         string
+	schemaFree     bool   // schemaFree在用户数据有新字段时就更新repo添加字段，如果repo不存在，创建repo。schemaFree功能包含autoCreate
+	autoCreate     string // 自动创建用户的repo，dsl语言填写schema
+	updateInterval time.Duration
+	reqRateLimit   int64
+	flowRateLimit  int64
+	gzip           bool
+	uuid           bool
+	withip         string
+
+	enableLogdb   bool
+	logdbReponame string
+	logdbendpoint string
+
+	enableKodo bool
+	bucketName string
+	email      string
+
 	forceMicrosecond   bool
 	forceDataConvert   bool
 	ignoreInvalidField bool
@@ -144,31 +156,43 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	uuid, _ := conf.GetBoolOr(KeyPandoraUUID, false)
 	withIp, _ := conf.GetBoolOr(KeyPandoraWithIP, false)
 	runnerName, _ := conf.GetStringOr(KeyRunnerName, UnderfinedRunnerName)
+
 	enableLogdb, _ := conf.GetBoolOr(KeyPandoraEnableLogDB, false)
 	logdbreponame, _ := conf.GetStringOr(KeyPandoraLogDBName, repoName)
 	logdbhost, _ := conf.GetStringOr(KeyPandoraLogDBHost, "")
+
+	enableKodo, _ := conf.GetBoolOr(KeyPandoraEnableKodo, false)
+	kodobucketName, _ := conf.GetStringOr(KeyPandoraKodoBucketName, repoName)
+	email, _ := conf.GetStringOr(KeyPandoraEmail, "")
+
 	forceconvert, _ := conf.GetBoolOr(KeyForceDataConvert, false)
 	ignoreInvalidField, _ := conf.GetBoolOr(KeyIgnoreInvalidField, true)
 	autoconvertDate, _ := conf.GetBoolOr(KeyPandoraAutoConvertDate, true)
 	opt := &PandoraOption{
-		runnerName:         runnerName,
-		name:               name,
-		repoName:           repoName,
-		region:             region,
-		endpoint:           host,
-		ak:                 akFromEnv,
-		sk:                 skFromEnv,
-		schema:             schema,
-		autoCreate:         autoCreateSchema,
-		schemaFree:         schemaFree,
-		updateInterval:     time.Duration(updateInterval) * time.Second,
-		reqRateLimit:       reqRateLimit,
-		flowRateLimit:      flowRateLimit,
-		gzip:               gzip,
-		uuid:               uuid,
-		enableLogdb:        enableLogdb,
-		logdbReponame:      logdbreponame,
-		logdbendpoint:      logdbhost,
+		runnerName:     runnerName,
+		name:           name,
+		repoName:       repoName,
+		region:         region,
+		endpoint:       host,
+		ak:             akFromEnv,
+		sk:             skFromEnv,
+		schema:         schema,
+		autoCreate:     autoCreateSchema,
+		schemaFree:     schemaFree,
+		updateInterval: time.Duration(updateInterval) * time.Second,
+		reqRateLimit:   reqRateLimit,
+		flowRateLimit:  flowRateLimit,
+		gzip:           gzip,
+		uuid:           uuid,
+
+		enableLogdb:   enableLogdb,
+		logdbReponame: logdbreponame,
+		logdbendpoint: logdbhost,
+
+		enableKodo: enableKodo,
+		email:      email,
+		bucketName: kodobucketName,
+
 		forceMicrosecond:   forceMicrosecond,
 		forceDataConvert:   forceconvert,
 		ignoreInvalidField: ignoreInvalidField,
@@ -237,6 +261,7 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 	// 如果updateSchemas更新schema失败，不会报错，可以正常启动runner，但是在sender时会检查schema是否获取
 	// sender时会尝试不断获取pandora schema，若还是获取失败则返回发送错误。
 	s.UpdateSchemas()
+
 	if s.opt.enableLogdb && len(s.schemas) > 0 {
 		log.Infof("Runner[%v] Sender[%v]: auto create export to logdb (%v)", opt.runnerName, opt.name, opt.logdbReponame)
 		err = s.client.AutoExportToLogDB(&pipeline.AutoExportToLogDBInput{
@@ -248,6 +273,21 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 			err = nil
 		}
 	}
+
+	if s.opt.enableKodo && len(s.schemas) > 0 {
+		log.Infof("Runner[%v] Sender[%v]: auto create export to kodo (%v)", opt.runnerName, opt.name, opt.bucketName)
+		err = s.client.AutoExportToKODO(&pipeline.AutoExportToKODOInput{
+			RepoName:   s.opt.repoName,
+			BucketName: s.opt.bucketName,
+			Email:      s.opt.email,
+			Retention:  30, //默认30天
+		})
+		if err != nil {
+			log.Warnf("Runner[%v] Sender[%v]: AutoExportToKODO %v error %v", s.opt.runnerName, s.opt.name, s.opt.bucketName, err)
+			err = nil
+		}
+	}
+
 	return
 }
 
@@ -576,8 +616,14 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 		Datas:       points,
 		RepoOptions: &pipeline.RepoOptions{WithIP: s.opt.withip},
 		Option: &pipeline.SchemaFreeOption{
-			ToLogDB:          s.opt.enableLogdb,
-			LogDBRepoName:    s.opt.logdbReponame,
+			ToLogDB:       s.opt.enableLogdb,
+			LogDBRepoName: s.opt.logdbReponame,
+
+			ToKODO:         s.opt.enableKodo,
+			KodoRetention:  30,
+			KodoBucketName: s.opt.bucketName,
+			KodoEmail:      s.opt.email,
+
 			ForceDataConvert: s.opt.forceDataConvert,
 		},
 	})

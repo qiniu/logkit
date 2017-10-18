@@ -171,7 +171,10 @@ func (p *GrokParser) compile() error {
 	p.CustomPatterns = DEFAULT_PATTERNS + p.CustomPatterns
 	if len(p.CustomPatterns) != 0 {
 		scanner := bufio.NewScanner(strings.NewReader(p.CustomPatterns))
-		p.addCustomPatterns(scanner)
+		err := p.addCustomPatterns(scanner)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Parse any custom pattern files supplied.
@@ -182,7 +185,10 @@ func (p *GrokParser) compile() error {
 		}
 
 		scanner := bufio.NewScanner(bufio.NewReader(file))
-		p.addCustomPatterns(scanner)
+		err = p.addCustomPatterns(scanner)
+		if err != nil {
+			return err
+		}
 	}
 
 	return p.compileCustomPatterns()
@@ -294,14 +300,19 @@ func (p *GrokParser) parseLine(line string) (sender.Data, error) {
 	return data, nil
 }
 
-func (p *GrokParser) addCustomPatterns(scanner *bufio.Scanner) {
+func (p *GrokParser) addCustomPatterns(scanner *bufio.Scanner) error {
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
+		line = trimInvalidSpace(line)
 		if len(line) > 0 && line[0] != '#' {
 			names := strings.SplitN(line, " ", 2)
+			if len(names) < 2 {
+				return fmt.Errorf("the pattern %v is invalid, and has been ignored", line)
+			}
 			p.patterns[names[0]] = names[1]
 		}
 	}
+	return nil
 }
 
 func (p *GrokParser) compileCustomPatterns() error {
@@ -333,6 +344,34 @@ func (p *GrokParser) compileCustomPatterns() error {
 	}
 
 	return p.g.AddPatternsFromMap(p.patterns)
+}
+
+func trimInvalidSpace(pattern string) string {
+	reg:= regexp.MustCompile(`%{((.*?:)*?.*?)}`)
+	substringIndex := reg.FindAllStringSubmatchIndex(pattern, -1)
+	curIndex := 0
+	var clearString string = ""
+	for _, val := range substringIndex {
+		if curIndex < val[2] {
+			clearString += pattern[curIndex: val[2]]
+		}
+		subString := pattern[val[2]: val[3]]
+		subStringSlice := strings.Split(subString, ":")
+		subLen := len(subStringSlice)
+		for index, chr := range subStringSlice {
+			clearString += strings.TrimSpace(chr)
+			if index != subLen - 1 {
+				clearString += ":"
+			}else{
+				clearString += "}"
+			}
+		}
+		curIndex = val[3] + 1
+	}
+	if curIndex < len(pattern) {
+		clearString += pattern[curIndex:]
+	}
+	return clearString
 }
 
 // parseTypedCaptures parses the capture modifiers, and then deletes the
