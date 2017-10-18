@@ -36,6 +36,7 @@ const (
 	KeyElasticAlias = "elastic_keys"
 
 	KeyElasticIndexInterval = "index_interval"
+	defaultIndexinterval = ""
 )
 
 func NewElasticSender(conf conf.MapConf) (sender Sender, err error) {
@@ -56,10 +57,7 @@ func NewElasticSender(conf conf.MapConf) (sender Sender, err error) {
 	}
 
 	//索引后缀模式
-	indexInterval, err := conf.GetString(KeyElasticIndexInterval)
-	if err != nil {
-		return
-	}
+	indexInterval, _ := conf.GetStringOr(KeyElasticIndexInterval, defaultIndexinterval)
 	eType, _ := conf.GetStringOr(KeyElasticType, defaultType)
 	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("elasticSender:(elasticUrl:%s,index:%s,type:%s)", host, index, eType))
 	fields, _ := conf.GetAliasMapOr(KeyElasticAlias, make(map[string]string))

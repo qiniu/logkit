@@ -478,8 +478,8 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyElasticIndexInterval,
 			ChooseOnly:   false,
-			Default:      "d",
-			DefaultNoUse: true,
+			Default:      "",
+			DefaultNoUse: false,
 			Description:  "自动索引模式(index_interval)",
 		},
 		{
