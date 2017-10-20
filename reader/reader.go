@@ -2,7 +2,7 @@ package reader
 
 import (
 	"strings"
-
+	"time"
 	"fmt"
 
 	"github.com/qiniu/log"
@@ -111,6 +111,7 @@ const (
 	KeyKafkaGroupID   = "kafka_groupid"
 	KeyKafkaTopic     = "kafka_topic"
 	KeyKafkaZookeeper = "kafka_zookeeper"
+	KeyKafkaZookeeperTimeout = "kafka_zookeeper_timeout"
 )
 
 var defaultIgnoreFileSuffix = []string{
@@ -240,8 +241,10 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta) (reader Reader, err
 		if err != nil {
 			return nil, err
 		}
+		zkTimeout,_ := conf.GetIntOr(KeyKafkaZookeeperTimeout,1)
+
 		zookeepers, err := conf.GetStringList(KeyKafkaZookeeper)
-		reader, err = NewKafkaReader(meta, consumerGroup, topics, zookeepers, whence)
+		reader, err = NewKafkaReader(meta, consumerGroup, topics, zookeepers,time.Duration(zkTimeout) * time.Second, whence)
 	case ModeRedis:
 		reader, err = NewRedisReader(meta, conf)
 	default:
