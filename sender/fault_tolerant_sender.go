@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -59,6 +60,7 @@ type FtSender struct {
 	runnerName  string
 	opt         *FtOption
 	stats       utils.StatsInfo
+	mutex		*sync.Mutex
 }
 
 type FtOption struct {
@@ -132,6 +134,7 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 		procs:       opt.procs,
 		runnerName:  runnerName,
 		opt:         opt,
+		mutex:		 new(sync.Mutex),
 	}
 	go ftSender.asyncSendLogFromDiskQueue()
 	return &ftSender, nil
@@ -159,16 +162,20 @@ func (ft *FtSender) Send(datas []Data) error {
 			}
 			if nowDatas != nil {
 				se.ErrorDetail = reqerr.NewSendError("save data to backend queue error", ConvertDatasBack(nowDatas), reqerr.TypeDefault)
+				ft.mutex.Lock()
 				ft.stats.Errors += int64(len(nowDatas))
 				ft.stats.LastError = se.ErrorDetail.Error()
+				ft.mutex.Unlock()
 			}
 		}
 	} else {
 		err := ft.saveToFile(datas)
 		if err != nil {
 			se.ErrorDetail = err
+			ft.mutex.Lock()
 			ft.stats.LastError = err.Error()
 			ft.stats.Errors += int64(len(datas))
+			ft.mutex.Unlock()
 		} else {
 			se.ErrorDetail = nil
 		}
@@ -281,8 +288,10 @@ func (ft *FtSender) trySendDatas(datas []Data, failSleep int) (backDataContext [
 	err = ft.innerSender.Send(datas)
 	if c, ok := err.(*utils.StatsError); ok {
 		err = c.ErrorDetail
+		ft.mutex.Lock()
 		ft.stats.Errors += c.Errors
 		ft.stats.Success += c.Success
+		ft.mutex.Unlock()
 	}
 	if err != nil {
 		retDatasContext := ft.handleSendError(err, datas)

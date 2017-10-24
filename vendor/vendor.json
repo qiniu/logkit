@@ -179,10 +179,10 @@
 			"revisionTime": "2014-07-28T01:09:19Z"
 		},
 		{
-			"checksumSHA1": "fRSfpHx2qvzdSpWPPf7Yc5hgs+g=",
+			"checksumSHA1": "trav5y2Sbgvk1XSl1YzAbt742rQ=",
 			"path": "github.com/qiniu/pandora-go-sdk/base",
-			"revision": "673185877226306092bc827e642f7e53f780f705",
-			"revisionTime": "2017-10-16T10:03:31Z"
+			"revision": "79c6aa7ff50f71ca0f0402d7412c5346f1957e99",
+			"revisionTime": "2017-10-23T09:42:10Z"
 		},
 		{
 			"checksumSHA1": "zwVutdUGEo/jlq6HpXkGwaoHM6c=",
