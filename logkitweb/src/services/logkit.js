@@ -122,6 +122,24 @@ export async function getRunnerVersion(params) {
   });
 }
 
+export async function startRunner(params) {
+    return request(window.logkitUrl + '/logkit/configs/' + params.name + '/start', {
+        method: 'post',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
+}
+
+export async function stopRunner(params) {
+    return request(window.logkitUrl + '/logkit/configs/' + params.name + '/stop', {
+        method: 'post',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
+}
+
 export async function resetConfigData(params) {
   return request(window.logkitUrl + '/logkit/configs/' + params.name + '/reset', {
     method: 'post',

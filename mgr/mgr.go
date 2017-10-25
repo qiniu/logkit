@@ -103,7 +103,7 @@ func (m *Manager) Stop() error {
 	return nil
 }
 
-func (m *Manager) Remove(confPath string) (err error) {
+func (m *Manager) RemoveWithConfig(confPath string, isDelete bool) (err error) {
 	if !strings.HasSuffix(confPath, ".conf") {
 		err = fmt.Errorf("%v not end with .conf, skipped", confPath)
 		log.Warn(err)
@@ -130,9 +130,15 @@ func (m *Manager) Remove(confPath string) (err error) {
 	m.removeCleanQueue(runner.Cleaner())
 	runner.Stop()
 	delete(m.runners, confPath)
-	delete(m.runnerConfig, confPath)
+	if isDelete {
+		delete(m.runnerConfig, confPath)
+	}
 	log.Infof("runner %s be removed, total %d", runner.Name(), len(m.runners))
 	return
+}
+
+func (m *Manager) Remove(confPath string) (err error) {
+	return m.RemoveWithConfig(confPath, true)
 }
 
 func (m *Manager) addCleanQueue(info CleanInfo) {
@@ -214,6 +220,12 @@ func (m *Manager) ForkRunner(confPath string, nconf RunnerConfig, errReturn bool
 				log.Error(err)
 			}
 			return err
+		}
+		if nconf.IsStopped {
+			m.lock.Lock()
+			m.runnerConfig[confPath] = nconf
+			m.lock.Unlock()
+			return nil
 		}
 		for k := range nconf.SenderConfig {
 			var webornot string

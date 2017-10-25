@@ -82,6 +82,7 @@ type RunnerConfig struct {
 	Transforms    []map[string]interface{} `json:"transforms,omitempty"`
 	SenderConfig  []conf.MapConf           `json:"senders"`
 	IsInWebFolder bool                     `json:"web_folder,omitempty"`
+	IsStopped     bool                     `json:"is_stopped,omitempty"`
 }
 
 type RunnerInfo struct {
