@@ -64,17 +64,6 @@ var testRestConf = `{
     }]
 }`
 
-const (
-	FLOAT64_ZERO = float64(1e-6)
-)
-
-func abs(val float64) float64 {
-	if val < 0 {
-		return float64(-val)
-	}
-	return val
-}
-
 func Test_RestGetStatus(t *testing.T) {
 	dir := "Test_Rest"
 	os.RemoveAll(dir)
@@ -1050,7 +1039,8 @@ func Test_RunnerDataIntegrity(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	dataLine := int64(100000)
+	writeCnt := int64(0)
+	dataLine := int64(100)
 	confdir := pwd + "/" + dir
 	logpath := dir + "/logdir"
 	metapath := dir + "/meta_mock_csv"
@@ -1066,7 +1056,7 @@ func Test_RunnerDataIntegrity(t *testing.T) {
 		log.Fatalf("Test_Run error mkdir %v %v", logconfs, err)
 	}
 	log1 := `{"a":1,"b":2}`
-	file, err := os.Create(filepath.Join(logpath, "log1"))
+	file, err := os.OpenFile(filepath.Join(logpath, "log1"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 	if err != nil {
 		log.Fatalf("Test_Run error createfile %v %v", filepath.Join(logpath, "log1"), err)
 	}
@@ -1074,6 +1064,7 @@ func Test_RunnerDataIntegrity(t *testing.T) {
 	for i := int64(0); i < dataLine; i++ {
 		fmt.Fprintln(w, log1)
 	}
+	writeCnt++
 	w.Flush()
 	file.Close()
 	time.Sleep(time.Second)
@@ -1114,6 +1105,19 @@ func Test_RunnerDataIntegrity(t *testing.T) {
 		}
 		time.Sleep(5 * time.Second)
 
+		file, err := os.OpenFile(filepath.Join(logpath, "log1"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+		if err != nil {
+			log.Fatalf("Test_Run error createfile %v %v", filepath.Join(logpath, "log1"), err)
+		}
+		w := bufio.NewWriter(file)
+		for i := int64(0); i < dataLine; i++ {
+			fmt.Fprintln(w, log1)
+		}
+		writeCnt++
+		w.Flush()
+		file.Close()
+		time.Sleep(time.Second)
+
 		resp, err = http.Post("http://127.0.0.1"+rs.address+"/logkit/configs/"+"test4.csv/start", TESTContentApplictionJson, nil)
 		assert.NoError(t, err)
 		content, _ = ioutil.ReadAll(resp.Body)
@@ -1123,36 +1127,16 @@ func Test_RunnerDataIntegrity(t *testing.T) {
 		time.Sleep(6 * time.Second)
 	}
 	var out bytes.Buffer
-	for {
-		out.Reset()
-		cmd := exec.Command("./stats")
-		cmd.Stdin = strings.NewReader("some input")
-		cmd.Stdout = &out
-		err = cmd.Run()
-		if err != nil {
-			t.Fatal(err)
-		}
-		rss := make(map[string]RunnerStatus)
-		err = json.Unmarshal([]byte(out.String()), &rss)
-
-		if abs(rss["test4.csv"].ReadSpeed) > FLOAT64_ZERO {
-			time.Sleep(3 * time.Second)
-			continue
-		}
-		if abs(rss["test4.csv"].ReadSpeedKB) > FLOAT64_ZERO {
-			time.Sleep(3 * time.Second)
-			continue
-		}
-		if abs(rss["test4.csv"].ReaderStats.Speed) > FLOAT64_ZERO {
-			time.Sleep(3 * time.Second)
-			continue
-		}
-		if abs(rss["test4.csv"].ParserStats.Speed) > FLOAT64_ZERO {
-			time.Sleep(3 * time.Second)
-			continue
-		}
-		break
+	out.Reset()
+	cmd := exec.Command("./stats")
+	cmd.Stdin = strings.NewReader("some input")
+	cmd.Stdout = &out
+	err = cmd.Run()
+	if err != nil {
+		t.Fatal(err)
 	}
+	rss := make(map[string]RunnerStatus)
+	err = json.Unmarshal([]byte(out.String()), &rss)
 	var curLine int64 = 0
 	var lineCnt int64 = 0
 	f, err := os.Open(filesenderdata)
@@ -1173,17 +1157,17 @@ func Test_RunnerDataIntegrity(t *testing.T) {
 		curLine += int64(len(result))
 	}
 	out.Reset()
-	cmd := exec.Command("./stats")
+	cmd = exec.Command("./stats")
 	cmd.Stdin = strings.NewReader("some input")
 	cmd.Stdout = &out
 	err = cmd.Run()
 	if err != nil {
 		t.Fatal(err)
 	}
-	rss := make(map[string]RunnerStatus)
+	rss = make(map[string]RunnerStatus)
 	err = json.Unmarshal([]byte(out.String()), &rss)
-	assert.Equal(t, dataLine, curLine)
-	assert.Equal(t, dataLine, rss["test4.csv"].ReadDataCount)
-	assert.Equal(t, dataLine, rss["test4.csv"].ParserStats.Success)
+	assert.Equal(t, dataLine*writeCnt, curLine)
+	assert.Equal(t, dataLine*writeCnt, rss["test4.csv"].ReadDataCount)
+	assert.Equal(t, dataLine*writeCnt, rss["test4.csv"].ParserStats.Success)
 	assert.Equal(t, lineCnt, rss["test4.csv"].SenderStats["file_sender"].Success)
 }
