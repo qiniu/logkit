@@ -45,6 +45,8 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	router.GET(PREFIX+"/configs", rs.GetConfigs())
 	router.GET(PREFIX+"/configs/:name", rs.GetConfig())
 	router.POST(PREFIX+"/configs/:name", rs.PostConfig())
+	router.POST(PREFIX+"/configs/:name/stop", rs.PostConfigStop())
+	router.POST(PREFIX+"/configs/:name/start", rs.PostConfigStart())
 	router.POST(PREFIX+"/configs/:name/reset", rs.PostConfigReset())
 	router.PUT(PREFIX+"/configs/:name", rs.PutConfig())
 	router.DELETE(PREFIX+"/configs/:name", rs.DeleteConfig())
@@ -260,18 +262,25 @@ func (rs *RestService) PostConfigReset() echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusBadRequest, "config name is empty")
 		}
 		filename := rs.mgr.RestDir + "/" + name + ".conf"
-		runner, ok := rs.mgr.runners[filename]
-		if !ok {
-			return echo.NewHTTPError(http.StatusNotFound, "runner"+name+" not found")
+		runnerConfig, configOk := rs.mgr.runnerConfig[filename]
+		if !configOk {
+			return echo.NewHTTPError(http.StatusNotFound, "config "+name+" not found")
 		}
-		runnerConfig, ok := rs.mgr.runnerConfig[filename]
-		if !ok {
-			return echo.NewHTTPError(http.StatusInternalServerError, "runner is exist but config not found")
+		if runnerConfig.IsStopped {
+			runnerConfig.IsStopped = false
+			err = rs.mgr.ForkRunner(filename, runnerConfig, true)
+			if err != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, "runner "+name+" reset failed "+err.Error())
+			}
 		}
-		runnerConfig.CreateTime = time.Now().Format(time.RFC3339Nano)
+		runner, runnerOk := rs.mgr.runners[filename]
+		if !runnerOk {
+			return echo.NewHTTPError(http.StatusNotFound, "runner "+name+" is not found")
+		}
 		if subErr := rs.mgr.Remove(filename); subErr != nil {
 			log.Errorf("remove runner %v error %v", filename, subErr)
 		}
+		runnerConfig.CreateTime = time.Now().Format(time.RFC3339Nano)
 		os.Remove(filename)
 
 		runnerReset, ok := runner.(Resetable)
@@ -286,6 +295,54 @@ func (rs *RestService) PostConfigReset() echo.HandlerFunc {
 	}
 }
 
+// POST /logkit/configs/<name>/start
+func (rs *RestService) PostConfigStart() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		name := c.Param("name")
+		if name == "" {
+			return echo.NewHTTPError(http.StatusBadRequest, "config name is empty")
+		}
+		filename := rs.mgr.RestDir + "/" + name + ".conf"
+		conf, ok := rs.mgr.runnerConfig[filename]
+		if !ok {
+			return echo.NewHTTPError(http.StatusNotFound, "config "+name+" is not exist")
+		}
+		conf.IsStopped = false
+		err := rs.mgr.ForkRunner(filename, conf, true)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+		return backupRunnerConfig(conf, filename)
+	}
+}
+
+// POST /logkit/configs/<name>/stop
+func (rs *RestService) PostConfigStop() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		name := c.Param("name")
+		if name == "" {
+			return echo.NewHTTPError(http.StatusBadRequest, "config name is empty")
+		}
+		filename := rs.mgr.RestDir + "/" + name + ".conf"
+		runnerConfig, ok := rs.mgr.runnerConfig[filename]
+		if !ok {
+			return echo.NewHTTPError(http.StatusNotFound, "config "+name+" not found")
+		}
+		if !rs.mgr.isRunning(filename) {
+			return echo.NewHTTPError(http.StatusNotFound, "the runner "+name+" is not running")
+		}
+		err := rs.mgr.RemoveWithConfig(filename, false)
+		if err != nil {
+			return err
+		}
+		runnerConfig.IsStopped = true
+		rs.mgr.lock.Lock()
+		rs.mgr.runnerConfig[filename] = runnerConfig
+		rs.mgr.lock.Unlock()
+		return backupRunnerConfig(runnerConfig, filename)
+	}
+}
+
 // delete /logkit/configs/<name>
 func (rs *RestService) DeleteConfig() echo.HandlerFunc {
 	return func(c echo.Context) error {
@@ -294,9 +351,19 @@ func (rs *RestService) DeleteConfig() echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusBadRequest, "config name is empty")
 		}
 		filename := rs.mgr.RestDir + "/" + name + ".conf"
-		err := rs.mgr.Remove(filename)
-		if err != nil {
-			return err
+		runnerConfig, ok := rs.mgr.runnerConfig[filename]
+		if !ok {
+			return echo.NewHTTPError(http.StatusNotFound, "config "+name+" not found")
+		}
+		if runnerConfig.IsStopped {
+			rs.mgr.lock.Lock()
+			delete(rs.mgr.runnerConfig, filename)
+			rs.mgr.lock.Unlock()
+		} else {
+			err := rs.mgr.Remove(filename)
+			if err != nil {
+				return err
+			}
 		}
 		return os.Remove(filename)
 	}

@@ -3,7 +3,7 @@ import {Table, Icon, Popconfirm, Button, notification, Modal, Row, Col, Tag, Inp
 import moment from 'moment'
 import ClipboardButton from 'react-clipboard.js';
 import {
-  getRunnerConfigs, deleteConfigData, getRunnerStatus, getRunnerVersion, resetConfigData
+  getRunnerConfigs, deleteConfigData, getRunnerStatus, getRunnerVersion, resetConfigData, startRunner, stopRunner
 } from './services/logkit';
 import _ from "lodash";
 
@@ -75,10 +75,30 @@ class List extends Component {
 
   }
 
+  optRunner = (record) => {
+    if(record.iconType === 'caret-right'){
+      startRunner({name:record.name}).then(data => {
+        if(!data){
+          record.iconType = 'poweroff'
+          notification.success({message: '开启成功', duration: 10})
+        }
+      })
+    }else{
+      stopRunner({name:record.name}).then(data => {
+        if(!data){
+          record.iconType = 'caret-right'
+          notification.success({message: '关闭成功', duration: 10})
+        }
+      })
+    }
+  }
+
   deleteRunner = (record) => {
     deleteConfigData({name: record.name}).then(data => {
-      notification.success({message: "删除成功", duration: 10,})
-      this.init()
+      if(!data){
+        notification.success({message: "删除成功", duration: 10,})
+        this.init()
+      }
     })
   }
 
@@ -116,7 +136,9 @@ class List extends Component {
 
   handleResetConfig = () => {
     resetConfigData({name: this.state.currentItem.name}).then(data => {
-      notification.success({message: "重置成功", duration: 10,})
+      if(!data){
+        notification.success({message: "重置成功", duration: 10,})
+      }
       this.setState({
         isShowResetConfig: false
       })
@@ -240,25 +262,10 @@ class List extends Component {
         );
       },
     }, {
-      title: '重置',
-      dataIndex: 'reset',
-      width: '5%',
-      render: (text, record) => {
-        return (
-            <a>
-              <div className="editable-row-operations">
-                {
-                  <Icon style={{fontSize: 16}} onClick={() => this.showResetConfig(record)} type="reload"/>
-                }
-              </div>
-            </a>
-        );
-      },
-    }, {
-      title: '修改配置',
+      title: '编辑',
       key: 'copy',
       dataIndex: 'copy',
-      width: '5%',
+      width: '3%',
       render: (text, record) => {
         return (
             <a>
@@ -270,12 +277,42 @@ class List extends Component {
             </a>
         );
       },
-
+    }, {
+      title: '操作',
+      key: 'opt',
+      dataIndex: 'opt',
+      width: '3%',
+      render: (text, record) => {
+        return (
+            record.isWebFolder === true ? (<a>
+              <div className="editable-row-operations">
+                <ClipboardButton data-clipboard-text={text}>
+                  <Icon style={{fontSize: 16}} onClick={() => this.optRunner(record)} type={record.iconType}/>
+                </ClipboardButton>
+              </div>
+            </a>): null
+        );
+      },
+    }, {
+      title: '重置',
+      dataIndex: 'reset',
+      width: '3%',
+      render: (text, record) => {
+        return (
+            record.isWebFolder === true ? (<a>
+              <div className="editable-row-operations">
+                {
+                   <Icon style={{fontSize: 16}} onClick={() => this.showResetConfig(record)} type="reload"/>
+                }
+              </div>
+            </a>): null
+        );
+      },
     }, {
       title: '删除',
       key: 'edit',
       dataIndex: 'edit',
-      width: '5%',
+      width: '3%',
       render: (text, record) => {
         return (
             record.isWebFolder === true ? (<a>
@@ -316,6 +353,13 @@ class List extends Component {
         let parseTrend = 'stable'
         let readerTrend = 'stable'
         let readerkbTrend = 'stable'
+        let iconType = 'poweroff'
+
+        if(item["is_stopped"]){
+          status = '停止'
+          iconType = 'caret-right'
+          isWebFolder = item.web_folder
+        }
 
         this.state.status.map((ele) => {
           if (item.name === ele.name) {
@@ -365,10 +409,10 @@ class List extends Component {
           logkitError,
           copy: JSON.stringify(item, null, 2),
           currentItem: item,
+          iconType,
           isWebFolder
         })
       })
-
     }
 
     return (
