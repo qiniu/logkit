@@ -1,6 +1,7 @@
 package reader
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"hash/fnv"
@@ -25,6 +26,7 @@ const (
 	bufMetaFilePath   = "buf.meta"
 	bufFilePath       = "buf.dat"
 	lineCacheFilePath = "cache.dat"
+	statisticFileName = "statistic.meta"
 	doneFileRetention = "donefile_retention"
 )
 
@@ -36,6 +38,12 @@ const (
 	bufMetaFormat       = "read:%d\nwrite:%d\nbufsize:%d\n"
 	defaultIOLimit      = 20 //默认读取速度为20MB/s
 )
+
+type Statistic struct {
+	ReaderCnt int64               `json:"reader_count"` // 读取总条数
+	ParserCnt [2]int64            `json:"parser_connt"` // [解析成功, 解析失败]
+	SenderCnt map[string][2]int64 `json:"sender_count"` // [发送成功, 发送失败]
+}
 
 type Meta struct {
 	mode              string //reader mode
@@ -50,6 +58,7 @@ type Meta struct {
 	logpath           string
 	dataSourceTag     string //记录文件路径的标签名称
 	readlimit         int    //读取磁盘限速单位 MB/s
+	statisticPath     string // 记录 runner 计数信息
 	RunnerName        string
 }
 
@@ -93,6 +102,7 @@ func NewMeta(metadir, filedonedir, logpath, mode string, donefileRetention int) 
 		bufFilePath:       filepath.Join(metadir, bufFilePath),
 		bufMetaFilePath:   filepath.Join(metadir, bufMetaFilePath),
 		lineCacheFile:     filepath.Join(metadir, lineCacheFilePath),
+		statisticPath:     filepath.Join(metadir, statisticFileName),
 		donefileretention: donefileRetention,
 		logpath:           logpath,
 		mode:              mode,
@@ -351,6 +361,11 @@ func (m *Meta) MetaFile() string {
 	return m.metaFilePath
 }
 
+// StatisticFile 返回 Runner 统计信息的文件路径
+func (m *Meta) StatisticFile() string {
+	return m.statisticPath
+}
+
 // BufFile 返回buf的文件路径
 func (m *Meta) BufFile() string {
 	return m.bufFilePath
@@ -456,5 +471,23 @@ func (b *Meta) Reset() error {
 			return err
 		}
 	}
+	os.RemoveAll(b.statisticPath)
 	return nil
+}
+
+func (m *Meta) ReadStatistic() (stat Statistic, err error) {
+	statData, err := ioutil.ReadFile(m.StatisticFile())
+	if statData == nil || err != nil {
+		return
+	}
+	err = json.Unmarshal(statData, &stat)
+	return
+}
+
+func (m *Meta) WriteStatistic(stat *Statistic) error {
+	statStr, err := json.Marshal(stat)
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(m.StatisticFile(), statStr, defaultDirPerm)
 }

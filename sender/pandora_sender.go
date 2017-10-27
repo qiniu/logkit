@@ -673,3 +673,7 @@ func (s *PandoraSender) Close() error {
 func (s *PandoraSender) Stats() utils.StatsInfo {
 	return s.stats
 }
+
+func (s *PandoraSender) Restore(info *utils.StatsInfo) {
+	s.stats = *info
+}

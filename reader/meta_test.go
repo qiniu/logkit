@@ -13,6 +13,7 @@ import (
 	"github.com/qiniu/logkit/utils"
 
 	"github.com/qiniu/log"
+	"github.com/stretchr/testify/assert"
 )
 
 var dir = "logdir"
@@ -138,6 +139,19 @@ func TestMeta(t *testing.T) {
 	if err != nil {
 		t.Errorf("%v shoud not deleted %v", donefile, err)
 	}
+	stat := &Statistic{
+		ReaderCnt: 6,
+		ParserCnt: [2]int64{6, 8},
+		SenderCnt: map[string][2]int64{
+			"aaa": {1, 2},
+			"bbb": {5, 6},
+		},
+	}
+	err = meta.WriteStatistic(stat)
+	assert.NoError(t, err)
+	newStat, err := meta.ReadStatistic()
+	assert.NoError(t, err)
+	assert.Equal(t, *stat, newStat)
 }
 
 func Test_getdonefiles(t *testing.T) {

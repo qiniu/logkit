@@ -188,6 +188,10 @@ func (ft *FtSender) Stats() utils.StatsInfo {
 	return ft.stats
 }
 
+func (ft *FtSender) Restore(info *utils.StatsInfo) {
+	ft.stats = *info
+}
+
 func (ft *FtSender) Reset() error {
 	if ft.opt == nil {
 		log.Errorf("Runner[%v] ft %v option is nill", ft.runnerName, ft.Name())

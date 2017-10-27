@@ -331,14 +331,14 @@ func (rs *RestService) PostConfigStop() echo.HandlerFunc {
 		if !rs.mgr.isRunning(filename) {
 			return echo.NewHTTPError(http.StatusNotFound, "the runner "+name+" is not running")
 		}
-		err := rs.mgr.RemoveWithConfig(filename, false)
-		if err != nil {
-			return err
-		}
 		runnerConfig.IsStopped = true
 		rs.mgr.lock.Lock()
 		rs.mgr.runnerConfig[filename] = runnerConfig
 		rs.mgr.lock.Unlock()
+		err := rs.mgr.RemoveWithConfig(filename, false)
+		if err != nil {
+			return err
+		}
 		return backupRunnerConfig(runnerConfig, filename)
 	}
 }
