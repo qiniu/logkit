@@ -10,6 +10,7 @@ var ModeUsages = []utils.KeyValue{
 	{TypeInfluxdb, "发送到 influxdb"},
 	{TypeDiscard, "消费数据但不发送"},
 	{TypeElastic, "发送到Elasticsearch"},
+	{TypeKafka, "发送到Kafka"},
 }
 
 var ModeKeyOptions = map[string][]utils.Option{
@@ -551,5 +552,50 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "内存管道长度(ft_memory_channel_size)",
 			CheckRegex:   "\\d+",
 		},
+	},
+	TypeKafka: {
+		{
+			KeyName:      KeyKafkaHost,
+			ChooseOnly:   false,
+			Default:      "172.16.11.128:9092",
+			DefaultNoUse: false,
+			Description:  "host地址(elastic_kafka)",
+		},
+		{
+			KeyName:      KeyKafkaTopic,
+			ChooseOnly:   false,
+			Default:      "test",
+			DefaultNoUse: false,
+			Description:  "topic(kafka_topic)",
+		},
+		{
+			KeyName:      KeyKafkaClientId,
+			ChooseOnly:   false,
+			Default:      "logkit",
+			DefaultNoUse: false,
+			Description:  "clientId(kafka_client_id)",
+		},
+		{
+			KeyName:      KeyKafkaFlushNum,
+			ChooseOnly:   false,
+			Default:      "10",
+			DefaultNoUse: false,
+			Description:  "批量发送条数",
+		},
+		{
+			KeyName:      KeyKafkaFlushFrequency,
+			ChooseOnly:   false,
+			Default:      "5",
+			DefaultNoUse: false,
+			Description:  "批量发送频率",
+		},
+		{
+			KeyName:      KeyKafkaRetryMax,
+			ChooseOnly:   false,
+			Default:      "3",
+			DefaultNoUse: false,
+			Description:  "失败重试次数",
+		},
+
 	},
 }

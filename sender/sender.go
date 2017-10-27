@@ -50,6 +50,7 @@ const (
 	TypeMock              = "mock"          // mock sender
 	TypeDiscard           = "discard"       // discard sender
 	TypeElastic           = "elasticsearch" // elastic
+	TypeKafka             = "kafka"         // kafka
 )
 
 const (
@@ -75,6 +76,7 @@ func NewSenderRegistry() *SenderRegistry {
 	ret.RegisterSender(TypeElastic, NewElasticSender)
 	ret.RegisterSender(TypeMock, NewMockSender)
 	ret.RegisterSender(TypeDiscard, NewDiscardSender)
+	ret.RegisterSender(TypeKafka, NewKafkaSender)
 	return ret
 }
 
