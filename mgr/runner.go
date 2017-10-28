@@ -47,6 +47,11 @@ type Resetable interface {
 	Reset() error
 }
 
+type StatusPersistable interface {
+	StatusBackup()
+	StatusRestore()
+}
+
 type RunnerStatus struct {
 	Name             string                     `json:"name"`
 	Logpath          string                     `json:"logpath"`
@@ -193,6 +198,7 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 		return
 	}
 	runner.senders = senders
+	runner.StatusRestore()
 	return runner, nil
 }
 
@@ -751,4 +757,70 @@ func Compatible(rc RunnerConfig) RunnerConfig {
 		rc.ReaderConfig[reader.KeyHeadPattern] = readpattern
 	}
 	return rc
+}
+
+func (r *LogExportRunner) StatusRestore() {
+	rStat, err := r.meta.ReadStatistic()
+
+	if err != nil {
+		log.Warnf("runner %v, restore status failed", r.RunnerName)
+		return
+	}
+	r.rs.ReadDataCount = rStat.ReaderCnt
+	r.rs.ParserStats.Success = rStat.ParserCnt[0]
+	r.rs.ParserStats.Errors = rStat.ParserCnt[1]
+	for _, s := range r.senders {
+		name := s.Name()
+		info, exist := rStat.SenderCnt[name]
+		if !exist {
+			continue
+		}
+		sStatus, ok := s.(sender.StatsSender)
+		if ok {
+			sStatus.Restore(&utils.StatsInfo{
+				Success: info[0],
+				Errors:  info[1],
+			})
+		}
+		status, ext := r.rs.SenderStats[name]
+		if !ext {
+			status = utils.StatsInfo{}
+		}
+		status.Success = info[0]
+		status.Errors = info[1]
+		r.rs.SenderStats[name] = status
+	}
+	copyRunnerStatus(&r.lastRs, &r.rs)
+	log.Infof("runner %v restore status %v", r.RunnerName, rStat)
+}
+
+func (r *LogExportRunner) StatusBackup() {
+	status := r.Status()
+	bStart := &reader.Statistic{
+		ReaderCnt: status.ReadDataCount,
+		ParserCnt: [2]int64{
+			status.ParserStats.Success,
+			status.ParserStats.Errors,
+		},
+		SenderCnt: map[string][2]int64{},
+	}
+	for _, s := range r.senders {
+		name := s.Name()
+		sStatus, ok := s.(sender.StatsSender)
+		if ok {
+			status.SenderStats[name] = sStatus.Stats()
+		}
+		if sta, exist := status.SenderStats[name]; exist {
+			bStart.SenderCnt[name] = [2]int64{
+				sta.Success,
+				sta.Errors,
+			}
+		}
+	}
+	err := r.meta.WriteStatistic(bStart)
+	if err != nil {
+		log.Warnf("runner %v, backup status failed", r.RunnerName)
+	} else {
+		log.Infof("runner %v, backup status %v", r.RunnerName, bStart)
+	}
 }

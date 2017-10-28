@@ -91,6 +91,10 @@ func (m *Manager) Stop() error {
 	defer m.lock.Unlock()
 	for _, runner := range m.runners {
 		runner.Stop()
+		runnerStatus, ok := runner.(StatusPersistable)
+		if ok {
+			runnerStatus.StatusBackup()
+		}
 	}
 	m.watcherMux.Lock()
 	for _, w := range m.watchers {
@@ -134,6 +138,9 @@ func (m *Manager) RemoveWithConfig(confPath string, isDelete bool) (err error) {
 		delete(m.runnerConfig, confPath)
 	}
 	log.Infof("runner %s be removed, total %d", runner.Name(), len(m.runners))
+	if runnerStatus, ok := runner.(StatusPersistable); ok {
+		runnerStatus.StatusBackup()
+	}
 	return
 }
 

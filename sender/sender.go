@@ -29,6 +29,8 @@ type StatsSender interface {
 	Send([]Data) error
 	Close() error
 	Stats() utils.StatsInfo
+	// 恢复 sender 停止之前的状态
+	Restore(*utils.StatsInfo)
 }
 
 // Sender's conf keys

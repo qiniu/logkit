@@ -1050,7 +1050,7 @@ func Test_RunnerDataIntegrity(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	dataLine := 100000
+	dataLine := int64(100000)
 	confdir := pwd + "/" + dir
 	logpath := dir + "/logdir"
 	metapath := dir + "/meta_mock_csv"
@@ -1071,7 +1071,7 @@ func Test_RunnerDataIntegrity(t *testing.T) {
 		log.Fatalf("Test_Run error createfile %v %v", filepath.Join(logpath, "log1"), err)
 	}
 	w := bufio.NewWriter(file)
-	for i := 0; i < dataLine; i++ {
+	for i := int64(0); i < dataLine; i++ {
 		fmt.Fprintln(w, log1)
 	}
 	w.Flush()
@@ -1153,7 +1153,8 @@ func Test_RunnerDataIntegrity(t *testing.T) {
 		}
 		break
 	}
-	curLine := 0
+	var curLine int64 = 0
+	var lineCnt int64 = 0
 	f, err := os.Open(filesenderdata)
 	assert.NoError(t, err)
 	defer f.Close()
@@ -1168,7 +1169,21 @@ func Test_RunnerDataIntegrity(t *testing.T) {
 		if err != nil {
 			log.Fatalf("Test_Run error unmarshal result curLine = %v %v", curLine, err)
 		}
-		curLine += len(result)
+		lineCnt++
+		curLine += int64(len(result))
 	}
+	out.Reset()
+	cmd := exec.Command("./stats")
+	cmd.Stdin = strings.NewReader("some input")
+	cmd.Stdout = &out
+	err = cmd.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rss := make(map[string]RunnerStatus)
+	err = json.Unmarshal([]byte(out.String()), &rss)
 	assert.Equal(t, dataLine, curLine)
+	assert.Equal(t, dataLine, rss["test4.csv"].ReadDataCount)
+	assert.Equal(t, dataLine, rss["test4.csv"].ParserStats.Success)
+	assert.Equal(t, lineCnt, rss["test4.csv"].SenderStats["file_sender"].Success)
 }
