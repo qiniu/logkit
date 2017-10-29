@@ -416,7 +416,7 @@ class List extends Component {
     }
 
     return (
-        <Table columns={columns} pagination={{size: 'small', pageSize: 5}} dataSource={data}/>
+        <Table columns={columns} pagination={{size: 'small', pageSize: 20}} dataSource={data}/>
     )
   }
 

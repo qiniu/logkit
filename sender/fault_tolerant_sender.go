@@ -78,17 +78,14 @@ type datasContext struct {
 }
 
 // NewFtSender Fault tolerant sender constructor
-func NewFtSender(sender Sender, conf conf.MapConf) (*FtSender, error) {
+func NewFtSender(sender Sender, conf conf.MapConf, ftSaveLogPath string) (*FtSender, error) {
 	memoryChannel, _ := conf.GetBoolOr(KeyFtMemoryChannel, false)
 	memoryChannelSize, _ := conf.GetIntOr(KeyFtMemoryChannelSize, 100)
 
-	logpath, err := conf.GetString(KeyFtSaveLogPath)
-	if err != nil {
-		return nil, err
-	}
+	logPath, _ := conf.GetStringOr(KeyFtSaveLogPath, ftSaveLogPath)
 	syncEvery, _ := conf.GetIntOr(KeyFtSyncEvery, DefaultFtSyncEvery)
 	writeLimit, _ := conf.GetIntOr(KeyFtWriteLimit, defaultWriteLimit)
-	strategy, _ := conf.GetStringOr(KeyFtStrategy, KeyFtStrategyAlwaysSave)
+	strategy, _ := conf.GetStringOr(KeyFtStrategy, KeyFtStrategyBackupOnly)
 	switch strategy {
 	case KeyFtStrategyAlwaysSave, KeyFtStrategyBackupOnly, KeyFtStrategyConcurrent:
 	default:
@@ -98,7 +95,7 @@ func NewFtSender(sender Sender, conf conf.MapConf) (*FtSender, error) {
 	runnerName, _ := conf.GetStringOr(KeyRunnerName, UnderfinedRunnerName)
 
 	opt := &FtOption{
-		saveLogPath:       logpath,
+		saveLogPath:       logPath,
 		syncEvery:         int64(syncEvery),
 		writeLimit:        writeLimit,
 		strategy:          strategy,
@@ -141,14 +138,15 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 }
 
 func (ft *FtSender) Name() string {
-	return ft.innerSender.Name() + "(ft)"
+	return ft.innerSender.Name()
 }
 
 func (ft *FtSender) Send(datas []Data) error {
 	se := &utils.StatsError{Ft: true}
 	if ft.strategy == KeyFtStrategyBackupOnly {
 		// 尝试直接发送数据，当数据失败的时候会加入到本地重试队列。外部不需要重试
-		backDataContext, err := ft.trySendDatas(datas, 1)
+		isRetry := false
+		backDataContext, err := ft.trySendDatas(datas, 1, isRetry)
 		if err != nil {
 			log.Warnf("Runner[%v] Sender[%v] try Send Datas err: %v", ft.runnerName, ft.innerSender.Name(), err)
 		}
@@ -258,18 +256,18 @@ func (ft *FtSender) saveToFile(datas []Data) error {
 
 func (ft *FtSender) asyncSendLogFromDiskQueue() {
 	for i := 0; i < ft.procs; i++ {
-		go ft.sendFromQueue(ft.logQueue)
+		go ft.sendFromQueue(ft.logQueue, false)
 	}
-	go ft.sendFromQueue(ft.backupQueue)
+	go ft.sendFromQueue(ft.backupQueue, true)
 }
 
 // trySend 从bytes反序列化数据后尝试发送数据
-func (ft *FtSender) trySendBytes(dat []byte, failSleep int) (backDataContext []*datasContext, err error) {
+func (ft *FtSender) trySendBytes(dat []byte, failSleep int, isRetry bool) (backDataContext []*datasContext, err error) {
 	datas, err := ft.unmarshalData(dat)
 	if err != nil {
 		return
 	}
-	return ft.trySendDatas(datas, failSleep)
+	return ft.trySendDatas(datas, failSleep, isRetry)
 }
 
 func ConvertDatas(ins []map[string]interface{}) []Data {
@@ -288,12 +286,24 @@ func ConvertDatasBack(ins []Data) []map[string]interface{} {
 }
 
 // trySendDatas 尝试发送数据，如果失败，将失败数据加入backup queue，并睡眠指定时间。返回结果为是否正常发送
-func (ft *FtSender) trySendDatas(datas []Data, failSleep int) (backDataContext []*datasContext, err error) {
+func (ft *FtSender) trySendDatas(datas []Data, failSleep int, isRetry bool) (backDataContext []*datasContext, err error) {
 	err = ft.innerSender.Send(datas)
+	if err == nil {
+		ft.mutex.Lock()
+		ft.stats.Success += int64(len(datas))
+		if isRetry {
+			ft.stats.Errors -= int64(len(datas))
+		}
+		ft.mutex.Unlock()
+	}
 	if c, ok := err.(*utils.StatsError); ok {
 		err = c.ErrorDetail
 		ft.mutex.Lock()
-		ft.stats.Errors += c.Errors
+		if isRetry {
+			ft.stats.Errors -= c.Success
+		} else {
+			ft.stats.Errors += c.Errors
+		}
 		ft.stats.Success += c.Success
 		ft.mutex.Unlock()
 	}
@@ -344,7 +354,7 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 	return
 }
 
-func (ft *FtSender) sendFromQueue(queue queue.BackendQueue) {
+func (ft *FtSender) sendFromQueue(queue queue.BackendQueue, isRetry bool) {
 	readChan := queue.ReadChan()
 	timer := time.NewTicker(time.Second)
 	waitCnt := 1
@@ -358,12 +368,12 @@ func (ft *FtSender) sendFromQueue(queue queue.BackendQueue) {
 			return
 		}
 		if curIdx < len(curDataContext) {
-			backDataContext, err = ft.trySendDatas(curDataContext[curIdx].Datas, waitCnt)
+			backDataContext, err = ft.trySendDatas(curDataContext[curIdx].Datas, waitCnt, isRetry)
 			curIdx++
 		} else {
 			select {
 			case dat := <-readChan:
-				backDataContext, err = ft.trySendBytes(dat, waitCnt)
+				backDataContext, err = ft.trySendBytes(dat, waitCnt, isRetry)
 			case <-timer.C:
 				continue
 			}

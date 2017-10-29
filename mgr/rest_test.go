@@ -173,9 +173,10 @@ func Test_RestGetStatus(t *testing.T) {
 	v.ReadSpeed = 0
 	v.ReadSpeedKB = 0
 	v.ParserStats.Speed = 0
-	fs := v.SenderStats["file_sender"]
-	fs.Speed = 0
-	v.SenderStats["file_sender"] = fs
+	for key, val := range v.SenderStats {
+		val.Speed = 0
+		v.SenderStats[key] = val
+	}
 	rss["test1.csv"] = v
 	assert.Equal(t, exp, rss, out.String())
 }
@@ -1138,7 +1139,6 @@ func Test_RunnerDataIntegrity(t *testing.T) {
 	rss := make(map[string]RunnerStatus)
 	err = json.Unmarshal([]byte(out.String()), &rss)
 	var curLine int64 = 0
-	var lineCnt int64 = 0
 	f, err := os.Open(filesenderdata)
 	assert.NoError(t, err)
 	defer f.Close()
@@ -1153,7 +1153,6 @@ func Test_RunnerDataIntegrity(t *testing.T) {
 		if err != nil {
 			log.Fatalf("Test_Run error unmarshal result curLine = %v %v", curLine, err)
 		}
-		lineCnt++
 		curLine += int64(len(result))
 	}
 	out.Reset()
@@ -1169,5 +1168,5 @@ func Test_RunnerDataIntegrity(t *testing.T) {
 	assert.Equal(t, dataLine*writeCnt, curLine)
 	assert.Equal(t, dataLine*writeCnt, rss["test4.csv"].ReadDataCount)
 	assert.Equal(t, dataLine*writeCnt, rss["test4.csv"].ParserStats.Success)
-	assert.Equal(t, lineCnt, rss["test4.csv"].SenderStats["file_sender"].Success)
+	assert.Equal(t, dataLine*writeCnt, rss["test4.csv"].SenderStats["file_sender"].Success)
 }

@@ -35,10 +35,9 @@ type StatsSender interface {
 
 // Sender's conf keys
 const (
-	KeySenderType    = "sender_type"
-	KeyFaultTolerant = "fault_tolerant"
-	KeyName          = "name"
-	KeyRunnerName    = "runner_name"
+	KeySenderType = "sender_type"
+	KeyName       = "name"
+	KeyRunnerName = "runner_name"
 )
 
 const UnderfinedRunnerName = "UnderfinedRunnerName"
@@ -89,7 +88,7 @@ func (registry *SenderRegistry) RegisterSender(senderType string, constructor fu
 	return nil
 }
 
-func (r *SenderRegistry) NewSender(conf conf.MapConf) (sender Sender, err error) {
+func (r *SenderRegistry) NewSender(conf conf.MapConf, ftSaveLogPath string) (sender Sender, err error) {
 	sendType, err := conf.GetString(KeySenderType)
 	if err != nil {
 		return
@@ -102,12 +101,9 @@ func (r *SenderRegistry) NewSender(conf conf.MapConf) (sender Sender, err error)
 	if err != nil {
 		return
 	}
-	faultTolerant, _ := conf.GetBoolOr(KeyFaultTolerant, false)
-	if faultTolerant {
-		sender, err = NewFtSender(sender, conf)
-		if err != nil {
-			return
-		}
+	sender, err = NewFtSender(sender, conf, ftSaveLogPath)
+	if err != nil {
+		return
 	}
 	return sender, nil
 }
