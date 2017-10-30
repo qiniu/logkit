@@ -35,6 +35,8 @@ logkit本身支持多种数据源，并且可以同时发送多个数据源的�
 * [review 代码](https://github.com/qiniu/logkit/pulls)或[提出功能需求](https://github.com/qiniu/logkit/issues/new)
 * 贡献代码（可以贡献的各类插件模块包括[reader](https://github.com/qiniu/logkit/wiki/Readers)、[parser](https://github.com/qiniu/logkit/wiki/Parsers)、[sender](https://github.com/qiniu/logkit/wiki/Senders)以及[transformer](https://github.com/qiniu/logkit/wiki/Transformers)）
 
+## [计划(Roadmap)](https://github.com/qiniu/logkit/blob/develop/ROADMAP.md)
+
 ## 下载
 
 请移步至[Download页面](https://github.com/qiniu/logkit/wiki/Download)
