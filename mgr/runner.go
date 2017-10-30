@@ -260,7 +260,7 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, p
 	transformers := createTransformers(rc)
 	senders := make([]sender.Sender, 0)
 	for i, c := range rc.SenderConfig {
-		s, err := sr.NewSender(c)
+		s, err := sr.NewSender(c, meta.FtSaveLogPath())
 		if err != nil {
 			return nil, err
 		}
@@ -330,13 +330,19 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []sender.Data, times in
 				info.Success = se.Success
 				r.rs.Lag.Ftlags = se.Ftlag
 			} else {
-				info.Errors += se.Errors
+				if cnt > 1 {
+					info.Errors -= se.Success
+				} else {
+					info.Errors += se.Errors
+				}
 				info.Success += se.Success
 			}
 		} else if err != nil {
-			info.Errors++
+			if cnt <= 1 {
+				info.Errors += int64(len(datas))
+			}
 		} else {
-			info.Success++
+			info.Success += int64(len(datas))
 		}
 		if err != nil {
 			time.Sleep(time.Second)

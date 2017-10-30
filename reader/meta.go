@@ -28,6 +28,7 @@ const (
 	lineCacheFilePath = "cache.dat"
 	statisticFileName = "statistic.meta"
 	doneFileRetention = "donefile_retention"
+	ftSaveLogPath     = "ft_log" // ft log 在 meta 中的文件夹名字
 )
 
 const (
@@ -59,6 +60,7 @@ type Meta struct {
 	dataSourceTag     string //记录文件路径的标签名称
 	readlimit         int    //读取磁盘限速单位 MB/s
 	statisticPath     string // 记录 runner 计数信息
+	ftSaveLogPath     string // 记录 ft_sender 日志信息
 	RunnerName        string
 }
 
@@ -103,6 +105,7 @@ func NewMeta(metadir, filedonedir, logpath, mode string, donefileRetention int) 
 		bufMetaFilePath:   filepath.Join(metadir, bufMetaFilePath),
 		lineCacheFile:     filepath.Join(metadir, lineCacheFilePath),
 		statisticPath:     filepath.Join(metadir, statisticFileName),
+		ftSaveLogPath:     filepath.Join(metadir, ftSaveLogPath),
 		donefileretention: donefileRetention,
 		logpath:           logpath,
 		mode:              mode,
@@ -383,6 +386,11 @@ func (m *Meta) DoneFilePath() string {
 
 func (m *Meta) LogPath() string {
 	return m.logpath
+}
+
+// FtSaveLogPath 返回 ft_sender 日志信息记录文件夹路径
+func (m *Meta) FtSaveLogPath() string {
+	return m.ftSaveLogPath
 }
 
 func (m *Meta) DeleteDoneFile(path string) error {
