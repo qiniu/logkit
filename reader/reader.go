@@ -147,16 +147,16 @@ const (
 )
 
 // NewFileReader 创建FileReader
-func NewFileBufReader(conf conf.MapConf) (reader Reader, err error) {
+func NewFileBufReader(conf conf.MapConf, isFromWeb bool) (reader Reader, err error) {
 	meta, err := NewMetaWithConf(conf)
 	if err != nil {
 		log.Warn(err)
 		return
 	}
-	return NewFileBufReaderWithMeta(conf, meta)
+	return NewFileBufReaderWithMeta(conf, meta, isFromWeb)
 }
 
-func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta) (reader Reader, err error) {
+func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (reader Reader, err error) {
 	mode, _ := conf.GetStringOr(KeyMode, ModeDir)
 	logpath, err := conf.GetString(KeyLogPath)
 	if err != nil && (mode == ModeFile || mode == ModeDir || mode == ModeTailx) {
@@ -184,7 +184,7 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta) (reader Reader, err
 		reader, err = NewReaderSize(fr, meta, bufSize)
 
 	case ModeFile:
-		fr, err = NewSingleFile(meta, logpath, whence)
+		fr, err = NewSingleFile(meta, logpath, whence, isFromWeb)
 		if err != nil {
 			return
 		}
