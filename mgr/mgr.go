@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,7 +21,7 @@ import (
 	"github.com/qiniu/log"
 )
 
-var DIR_NOT_EXIST_SLEEP_TIME = 300 //300 s
+var DIR_NOT_EXIST_SLEEP_TIME = "300" //300 s
 var DEFAULT_LOGKIT_REST_DIR = "/.logkitconfs"
 
 type ManagerConfig struct {
@@ -258,7 +259,12 @@ func (m *Manager) ForkRunner(confPath string, nconf RunnerConfig, errReturn bool
 			}
 			i++
 			log.Warnf("LogDir(%v) does not exsit after %d rounds, sleep 5 minute and try again...", errVal.Path, i)
-			time.Sleep(time.Duration(DIR_NOT_EXIST_SLEEP_TIME) * time.Second)
+			sleepTimeStr := os.Getenv("DIR_NOT_EXIST_SLEEP_TIME")
+			if sleepTimeStr == "" {
+				sleepTimeStr = DIR_NOT_EXIST_SLEEP_TIME
+			}
+			sleepTime, _ := strconv.ParseInt(sleepTimeStr, 10, 0)
+			time.Sleep(time.Duration(sleepTime) * time.Second)
 			continue
 		}
 		break
