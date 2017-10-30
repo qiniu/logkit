@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -111,8 +112,9 @@ type LogExportRunner struct {
 	senders      []sender.Sender
 	transformers []transforms.Transformer
 
-	rs     RunnerStatus
-	lastRs RunnerStatus
+	rs      RunnerStatus
+	lastRs  RunnerStatus
+	rsMutex *sync.RWMutex
 
 	meta *reader.Meta
 
@@ -170,6 +172,7 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 			lastState:      time.Now(),
 			Name:           info.RunnerName,
 		},
+		rsMutex: new(sync.RWMutex),
 	}
 	if reader == nil {
 		err = errors.New("reader can not be nil")
@@ -310,7 +313,9 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []sender.Data, times in
 	if _, ok := r.rs.SenderStats[s.Name()]; !ok {
 		r.rs.SenderStats[s.Name()] = utils.StatsInfo{}
 	}
+	r.rsMutex.RLock()
 	info := r.rs.SenderStats[s.Name()]
+	r.rsMutex.RUnlock()
 	cnt := 1
 	for {
 		// 至少尝试一次。如果任务已经停止，那么只尝试一次
@@ -354,7 +359,9 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []sender.Data, times in
 		}
 		break
 	}
+	r.rsMutex.Lock()
 	r.rs.SenderStats[s.Name()] = info
+	r.rsMutex.Unlock()
 	return true
 }
 
@@ -641,14 +648,14 @@ func getTrend(old, new float64) string {
 }
 
 func (r *LogExportRunner) Status() RunnerStatus {
-
 	now := time.Now()
 	elaspedtime := now.Sub(r.rs.lastState).Seconds()
 	if elaspedtime <= 3 {
 		return r.rs
 	}
+	r.rsMutex.Lock()
+	defer r.rsMutex.Unlock()
 	r.rs.Error = ""
-
 	if r.meta.IsFileMode() {
 		r.rs.Logpath = r.meta.LogPath()
 		rl, err := r.LagStats()
@@ -663,7 +670,6 @@ func (r *LogExportRunner) Status() RunnerStatus {
 	for i := range r.transformers {
 		newtsts := r.transformers[i].Stats()
 		ttp := r.transformers[i].Type()
-
 		if oldtsts, ok := r.lastRs.TransformStats[ttp]; ok {
 			newtsts.Speed, newtsts.Trend = calcSpeedTrend(oldtsts, newtsts, elaspedtime)
 		} else {
@@ -698,9 +704,7 @@ func (r *LogExportRunner) Status() RunnerStatus {
 		}
 		r.rs.SenderStats[k] = v
 	}
-
 	copyRunnerStatus(&r.lastRs, &r.rs)
-
 	return r.rs
 }
 
