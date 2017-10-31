@@ -67,7 +67,8 @@ func NewActiveReader(logPath, whence string, meta *Meta, msgChan chan<- Result) 
 		return nil, err
 	}
 	subMeta.readlimit = meta.readlimit
-	fr, err := NewSingleFile(subMeta, logPath, whence)
+	isFromWeb := false
+	fr, err := NewSingleFile(subMeta, logPath, whence, isFromWeb)
 	if err != nil {
 		return
 	}

@@ -7,7 +7,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
 	"fmt"
 
 	"github.com/Shopify/sarama"
@@ -22,6 +21,7 @@ type KafkaReader struct {
 	Topics          []string
 	ZookeeperPeers  []string
 	ZookeeperChroot string
+	ZookeeperTimeout time.Duration
 	Whence          string
 
 	Consumer *consumergroup.ConsumerGroup
@@ -41,11 +41,12 @@ type KafkaReader struct {
 }
 
 func NewKafkaReader(meta *Meta, consumerGroup string,
-	topics []string, zookeeper []string, whence string) (kr *KafkaReader, err error) {
+	topics []string, zookeeper []string,zookeeperTimeout time.Duration, whence string) (kr *KafkaReader, err error) {
 	kr = &KafkaReader{
 		meta:           meta,
 		ConsumerGroup:  consumerGroup,
 		ZookeeperPeers: zookeeper,
+		ZookeeperTimeout:zookeeperTimeout,
 		Topics:         topics,
 		Whence:         whence,
 		readChan:       make(chan json.RawMessage),
@@ -119,6 +120,7 @@ func (kr *KafkaReader) Start() {
 	}
 	config := consumergroup.NewConfig()
 	config.Zookeeper.Chroot = ""
+	config.Zookeeper.Timeout = kr.ZookeeperTimeout
 	switch strings.ToLower(kr.Whence) {
 	case "oldest", "":
 		config.Offsets.Initial = sarama.OffsetOldest

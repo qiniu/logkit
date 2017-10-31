@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,7 +21,7 @@ import (
 	"github.com/qiniu/log"
 )
 
-var DIR_NOT_EXIST_SLEEP_TIME = 300 //300 s
+var DIR_NOT_EXIST_SLEEP_TIME = "300" //300 s
 var DEFAULT_LOGKIT_REST_DIR = "/.logkitconfs"
 
 type ManagerConfig struct {
@@ -91,6 +92,10 @@ func (m *Manager) Stop() error {
 	defer m.lock.Unlock()
 	for _, runner := range m.runners {
 		runner.Stop()
+		runnerStatus, ok := runner.(StatusPersistable)
+		if ok {
+			runnerStatus.StatusBackup()
+		}
 	}
 	m.watcherMux.Lock()
 	for _, w := range m.watchers {
@@ -103,7 +108,7 @@ func (m *Manager) Stop() error {
 	return nil
 }
 
-func (m *Manager) Remove(confPath string) (err error) {
+func (m *Manager) RemoveWithConfig(confPath string, isDelete bool) (err error) {
 	if !strings.HasSuffix(confPath, ".conf") {
 		err = fmt.Errorf("%v not end with .conf, skipped", confPath)
 		log.Warn(err)
@@ -130,9 +135,18 @@ func (m *Manager) Remove(confPath string) (err error) {
 	m.removeCleanQueue(runner.Cleaner())
 	runner.Stop()
 	delete(m.runners, confPath)
-	delete(m.runnerConfig, confPath)
+	if isDelete {
+		delete(m.runnerConfig, confPath)
+	}
 	log.Infof("runner %s be removed, total %d", runner.Name(), len(m.runners))
+	if runnerStatus, ok := runner.(StatusPersistable); ok {
+		runnerStatus.StatusBackup()
+	}
 	return
+}
+
+func (m *Manager) Remove(confPath string) (err error) {
+	return m.RemoveWithConfig(confPath, true)
 }
 
 func (m *Manager) addCleanQueue(info CleanInfo) {
@@ -215,6 +229,12 @@ func (m *Manager) ForkRunner(confPath string, nconf RunnerConfig, errReturn bool
 			}
 			return err
 		}
+		if nconf.IsStopped {
+			m.lock.Lock()
+			m.runnerConfig[confPath] = nconf
+			m.lock.Unlock()
+			return nil
+		}
 		for k := range nconf.SenderConfig {
 			var webornot string
 			if nconf.IsInWebFolder {
@@ -239,7 +259,12 @@ func (m *Manager) ForkRunner(confPath string, nconf RunnerConfig, errReturn bool
 			}
 			i++
 			log.Warnf("LogDir(%v) does not exsit after %d rounds, sleep 5 minute and try again...", errVal.Path, i)
-			time.Sleep(time.Duration(DIR_NOT_EXIST_SLEEP_TIME) * time.Second)
+			sleepTimeStr := os.Getenv("DIR_NOT_EXIST_SLEEP_TIME")
+			if sleepTimeStr == "" {
+				sleepTimeStr = DIR_NOT_EXIST_SLEEP_TIME
+			}
+			sleepTime, _ := strconv.ParseInt(sleepTimeStr, 10, 0)
+			time.Sleep(time.Duration(sleepTime) * time.Second)
 			continue
 		}
 		break
