@@ -24,10 +24,11 @@ var DIR_NOT_EXIST_SLEEP_TIME = 300 //300 s
 var DEFAULT_LOGKIT_REST_DIR = "/.logkitconfs"
 
 type ManagerConfig struct {
-	BindHost string `json:"bind_host"`
-	Idc      string `json:"idc"`
-	Zone     string `json:"zone"`
-	RestDir  string `json:"rest_dir"`
+	BindHost string        `json:"bind_host"`
+	Idc      string        `json:"idc"`
+	Zone     string        `json:"zone"`
+	RestDir  string        `json:"rest_dir"`
+	Cluster  ClusterConfig `json:"cluster"`
 }
 
 type cleanQueue struct {

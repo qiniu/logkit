@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"net"
+
 	"github.com/labstack/echo"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/reader"
@@ -1186,4 +1188,19 @@ func Test_RunnerDataIntegrity(t *testing.T) {
 	assert.Equal(t, dataLine, rss["test4.csv"].ReadDataCount)
 	assert.Equal(t, dataLine, rss["test4.csv"].ParserStats.Success)
 	assert.Equal(t, lineCnt, rss["test4.csv"].SenderStats["file_sender"].Success)
+}
+
+func TestParseUrl(t *testing.T) {
+	host, port, err := net.SplitHostPort(":1234")
+	assert.NoError(t, err)
+	fmt.Println(host, port)
+}
+
+func TestGetMySlaveUrl(t *testing.T) {
+	url, err := GetMySlaveUrl("127.0.0.1:1222", "https://")
+	assert.NoError(t, err)
+	assert.Equal(t, "https://127.0.0.1:1222", url)
+	url, err = GetMySlaveUrl(":1222", "http://")
+	assert.NoError(t, err)
+	fmt.Println("TestGetMySlaveUrl your IP:", url)
 }

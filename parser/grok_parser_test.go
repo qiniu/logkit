@@ -54,12 +54,12 @@ func Benchmark_GrokParseLine_Common(b *testing.B) {
 
 func Benchmark_GroktrimInvalidSpace(b *testing.B) {
 	src := "TEST_LOG_A %{NUMBER :myfloat:  float} %{  RESPONSE_CODE} %{IPORHOST : clientip} %{  RESPONSE_TIME}"
-	for i:= 0; i < b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		trimInvalidSpace(src)
 	}
 }
-//100000	     17110 ns/op
 
+//100000	     17110 ns/op
 
 func TestParseTimeZoneOffset(t *testing.T) {
 	tests := []struct {

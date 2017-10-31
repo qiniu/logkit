@@ -3,16 +3,16 @@ package utils
 import (
 	"database/sql"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync/atomic"
-
-	"encoding/json"
 
 	"github.com/qiniu/log"
 )
@@ -260,4 +260,39 @@ func (oi *OSInfo) String() string {
 func IsJSON(str string) bool {
 	var js json.RawMessage
 	return json.Unmarshal([]byte(str), &js) == nil
+}
+
+func AddHttpProtocal(url string) string {
+	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+		return "http://" + url
+	}
+	return url
+}
+
+func RemoveHttpProtocal(url string) (hostport, schema string) {
+	chttps := "https://"
+	chttp := "http://"
+	if strings.HasPrefix(url, chttp) {
+		return strings.TrimPrefix(url, chttp), chttp
+	}
+	if strings.HasPrefix(url, chttps) {
+		return strings.TrimPrefix(url, chttps), chttps
+	}
+	return url, chttp
+}
+
+func GetLocalIP() (string, error) {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "127.0.0.1", fmt.Errorf("Get local IP error: %v\n", err)
+	}
+	for _, address := range addrs {
+		// check the address type and if it is not a loopback the display it
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String(), nil
+			}
+		}
+	}
+	return "127.0.0.1", errors.New("no local IP found")
 }
