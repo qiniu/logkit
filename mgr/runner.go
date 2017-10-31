@@ -715,7 +715,7 @@ func (r *LogExportRunner) Status() RunnerStatus {
 }
 
 func calcSpeedTrend(old, new utils.StatsInfo, elaspedtime float64) (speed float64, trend string) {
-	if elaspedtime < 0.001 || new.Success == old.Success {
+	if elaspedtime < 0.001 {
 		speed = old.Speed
 	} else {
 		speed = float64(new.Success-old.Success) / elaspedtime

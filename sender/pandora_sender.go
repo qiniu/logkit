@@ -66,7 +66,6 @@ type PandoraSender struct {
 	alias2key          map[string]string // map[alias]name
 	opt                PandoraOption
 	microsecondCounter int64
-	stats              utils.StatsInfo
 }
 
 // UserSchema was parsed pandora schema from user's raw schema
@@ -588,7 +587,6 @@ func (s *PandoraSender) checkSchemaUpdate() {
 }
 
 func (s *PandoraSender) Send(datas []Data) (se error) {
-
 	s.checkSchemaUpdate()
 	if !s.opt.schemaFree && (len(s.schemas) <= 0 || len(s.alias2key) <= 0) {
 		se = reqerr.NewSendError("Get pandora schema error, faild to send data", ConvertDatasBack(datas), reqerr.TypeDefault)
@@ -600,9 +598,6 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 			},
 			ErrorDetail: se,
 		}
-		s.stats.LastError = ste.LastError
-		s.stats.Errors += ste.Errors
-		s.stats.Success += ste.Success
 		return ste
 	}
 	var points pipeline.Datas
@@ -644,18 +639,15 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 			ste.LastError = se.Error()
 			ste.Errors = int64(len(datas))
 		}
-		s.stats.LastError = ste.LastError
-		s.stats.Errors += ste.Errors
-		s.stats.Success += ste.Success
 		return ste
 	}
-	s.stats.Success += int64(len(datas))
-	s.stats.LastError = ""
-
 	ste := &utils.StatsError{
 		ErrorDetail: se,
+		StatsInfo: utils.StatsInfo{
+			Success:   int64(len(datas)),
+			LastError: "",
+		},
 	}
-	ste.Success = int64(len(datas))
 	return ste
 }
 
@@ -668,12 +660,4 @@ func (s *PandoraSender) Name() string {
 
 func (s *PandoraSender) Close() error {
 	return s.client.Close()
-}
-
-func (s *PandoraSender) Stats() utils.StatsInfo {
-	return s.stats
-}
-
-func (s *PandoraSender) Restore(info *utils.StatsInfo) {
-	s.stats = *info
 }

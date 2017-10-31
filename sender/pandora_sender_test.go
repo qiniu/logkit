@@ -468,23 +468,13 @@ func TestStatsSender(t *testing.T) {
 	d := Data{}
 	d["x1"] = "hh"
 	err = s.Send([]Data{d})
-	if st, ok := err.(*utils.StatsError); ok {
-		err = st.ErrorDetail
-	}
-	if err != nil {
-		t.Error(err)
-	}
+	st, ok := err.(*utils.StatsError)
+	assert.Equal(t, true, ok)
+	assert.NoError(t, st.ErrorDetail)
+	assert.Equal(t, st.Success, int64(1))
 	if !strings.Contains(pandora.Body, "x1=hh") {
 		t.Error("not x1 find error")
 	}
-	var sd Sender = s
-	stsd, ok := sd.(StatsSender)
-	assert.Equal(t, true, ok)
-	stats := stsd.Stats()
-	expstats := utils.StatsInfo{
-		Success: 1,
-	}
-	assert.Equal(t, stats, expstats)
 }
 
 func TestConvertDate(t *testing.T) {
