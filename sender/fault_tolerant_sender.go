@@ -81,7 +81,6 @@ type datasContext struct {
 func NewFtSender(sender Sender, conf conf.MapConf, ftSaveLogPath string) (*FtSender, error) {
 	memoryChannel, _ := conf.GetBoolOr(KeyFtMemoryChannel, false)
 	memoryChannelSize, _ := conf.GetIntOr(KeyFtMemoryChannelSize, 100)
-
 	logPath, _ := conf.GetStringOr(KeyFtSaveLogPath, ftSaveLogPath)
 	syncEvery, _ := conf.GetIntOr(KeyFtSyncEvery, DefaultFtSyncEvery)
 	writeLimit, _ := conf.GetIntOr(KeyFtWriteLimit, defaultWriteLimit)
