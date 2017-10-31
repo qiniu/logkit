@@ -3,11 +3,14 @@ package mgr
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/metric"
+	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/utils"
 )
@@ -28,6 +31,9 @@ type MetricRunner struct {
 
 	collectInterval time.Duration
 	rs              RunnerStatus
+	lastRs          RunnerStatus
+	rsMutex         *sync.RWMutex
+	meta            *reader.Meta
 	lastSend        time.Time
 	stopped         int32
 	exitChan        chan struct{}
@@ -47,6 +53,13 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 	interval, err := time.ParseDuration(rc.CollectInterval)
 	if err != nil {
 		return
+	}
+	meta, err := reader.NewMetaWithConf(conf.MapConf{
+		reader.KeyRunnerName: rc.RunnerName,
+		reader.KeyMode:       reader.ModeMetrics,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("Runner "+rc.RunnerName+" add failed, err is %v", err)
 	}
 	collectors := make([]metric.Collector, 0)
 	for _, c := range rc.Metric {
@@ -68,21 +81,35 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 	}
 	senders := make([]sender.Sender, 0)
 	for _, c := range rc.SenderConfig {
-		s, err := sr.NewSender(c, "")
+		s, err := sr.NewSender(c, meta.FtSaveLogPath())
 		if err != nil {
 			return nil, err
 		}
 		senders = append(senders, s)
 	}
 	runner = &MetricRunner{
-		RunnerName:      rc.RunnerName,
-		exitChan:        make(chan struct{}),
-		lastSend:        time.Now(), // 上一次发送时间
-		rs:              RunnerStatus{SenderStats: make(map[string]utils.StatsInfo)},
+		RunnerName: rc.RunnerName,
+		exitChan:   make(chan struct{}),
+		lastSend:   time.Now(), // 上一次发送时间
+		meta:       meta,
+		rs: RunnerStatus{
+			ReaderStats: utils.StatsInfo{},
+			SenderStats: make(map[string]utils.StatsInfo),
+			lastState:   time.Now(),
+			Name:        rc.RunnerName,
+		},
+		lastRs: RunnerStatus{
+			ReaderStats: utils.StatsInfo{},
+			SenderStats: make(map[string]utils.StatsInfo),
+			lastState:   time.Now(),
+			Name:        rc.RunnerName,
+		},
+		rsMutex:         new(sync.RWMutex),
 		collectInterval: interval,
 		collectors:      collectors,
 		senders:         senders,
 	}
+	runner.StatusRestore()
 	return
 }
 
@@ -98,6 +125,7 @@ func (r *MetricRunner) Run() {
 			r.exitChan <- struct{}{}
 			return
 		}
+		dataCnt := 0
 		datas := make([]sender.Data, 0)
 		// collect data
 		for _, c := range r.collectors {
@@ -118,10 +146,12 @@ func (r *MetricRunner) Run() {
 			if len(tmpdatas) < 1 {
 				log.Debugf("MetricRunner %v collect No data", c.Name())
 			}
+			dataCnt += len(tmpdatas)
 		}
-
+		r.rsMutex.Lock()
+		r.rs.ReadDataCount += int64(dataCnt)
+		r.rsMutex.Unlock()
 		r.lastSend = time.Now()
-
 		if len(datas) <= 0 {
 			log.Debug("MetricRunner collect No data")
 			continue
@@ -145,7 +175,9 @@ func (r *MetricRunner) trySend(s sender.Sender, datas []sender.Data, times int) 
 	if _, ok := r.rs.SenderStats[s.Name()]; !ok {
 		r.rs.SenderStats[s.Name()] = utils.StatsInfo{}
 	}
+	r.rsMutex.RLock()
 	info := r.rs.SenderStats[s.Name()]
+	r.rsMutex.RUnlock()
 	cnt := 1
 	for {
 		// 至少尝试一次。如果任务已经停止，那么只尝试一次
@@ -160,13 +192,19 @@ func (r *MetricRunner) trySend(s sender.Sender, datas []sender.Data, times int) 
 				info.Success = se.Success
 				r.rs.Lag.Ftlags = se.Ftlag
 			} else {
-				info.Errors += se.Errors
+				if cnt > 1 {
+					info.Errors -= se.Success
+				} else {
+					info.Errors += se.Errors
+				}
 				info.Success += se.Success
 			}
 		} else if err != nil {
-			info.Errors++
+			if cnt <= 1 {
+				info.Errors += int64(len(datas))
+			}
 		} else {
-			info.Success++
+			info.Success += int64(len(datas))
 		}
 		if err != nil {
 			log.Error(err)
@@ -179,7 +217,9 @@ func (r *MetricRunner) trySend(s sender.Sender, datas []sender.Data, times int) 
 		}
 		break
 	}
+	r.rsMutex.Lock()
 	r.rs.SenderStats[s.Name()] = info
+	r.rsMutex.Unlock()
 	return true
 }
 
@@ -203,11 +243,118 @@ func (mr *MetricRunner) Stop() {
 		}
 	}
 }
+
+func (mr *MetricRunner) Reset() error {
+	var errMsg string
+	err := mr.meta.Reset()
+	if err != nil {
+		errMsg += err.Error() + "\n"
+	}
+	for _, sd := range mr.senders {
+		ssd, ok := sd.(Resetable)
+		if ok {
+			if nerr := ssd.Reset(); nerr != nil {
+				errMsg += err.Error() + "\n"
+			}
+		}
+	}
+	return errors.New(errMsg)
+}
+
 func (_ *MetricRunner) Cleaner() CleanInfo {
 	return CleanInfo{
 		enable: false,
 	}
 }
+
 func (mr *MetricRunner) Status() RunnerStatus {
+	mr.rsMutex.Lock()
+	defer mr.rsMutex.Unlock()
+	durationTime := float64(mr.collectInterval.Seconds())
+	mr.rs.ReadSpeed = float64(mr.rs.ReadDataCount-mr.lastRs.ReadDataCount) / durationTime
+	mr.rs.ReadSpeedTrend = getTrend(mr.lastRs.ReadSpeed, mr.rs.ReadSpeed)
+
+	for i := range mr.senders {
+		sts, ok := mr.senders[i].(sender.StatsSender)
+		if ok {
+			mr.rs.SenderStats[mr.senders[i].Name()] = sts.Stats()
+		}
+	}
+
+	for k, v := range mr.rs.SenderStats {
+		if lv, ok := mr.lastRs.SenderStats[k]; ok {
+			v.Speed, v.Trend = calcSpeedTrend(lv, v, durationTime)
+		} else {
+			v.Speed, v.Trend = calcSpeedTrend(utils.StatsInfo{}, v, durationTime)
+		}
+		mr.rs.SenderStats[k] = v
+	}
+	copyRunnerStatus(&mr.lastRs, &mr.rs)
 	return mr.rs
+}
+
+func (mr *MetricRunner) StatusRestore() {
+	rStat, err := mr.meta.ReadStatistic()
+
+	if err != nil {
+		log.Warnf("runner %v, restore status failed", mr.RunnerName)
+		return
+	}
+	mr.rs.ReadDataCount = rStat.ReaderCnt
+	mr.rs.ParserStats.Success = rStat.ParserCnt[0]
+	mr.rs.ParserStats.Errors = rStat.ParserCnt[1]
+	for _, s := range mr.senders {
+		name := s.Name()
+		info, exist := rStat.SenderCnt[name]
+		if !exist {
+			continue
+		}
+		sStatus, ok := s.(sender.StatsSender)
+		if ok {
+			sStatus.Restore(&utils.StatsInfo{
+				Success: info[0],
+				Errors:  info[1],
+			})
+		}
+		status, ext := mr.rs.SenderStats[name]
+		if !ext {
+			status = utils.StatsInfo{}
+		}
+		status.Success = info[0]
+		status.Errors = info[1]
+		mr.rs.SenderStats[name] = status
+	}
+	copyRunnerStatus(&mr.lastRs, &mr.rs)
+	log.Infof("runner %v restore status %v", mr.RunnerName, rStat)
+}
+
+func (mr *MetricRunner) StatusBackup() {
+	status := mr.Status()
+	bStart := &reader.Statistic{
+		ReaderCnt: status.ReadDataCount,
+		ParserCnt: [2]int64{
+			status.ParserStats.Success,
+			status.ParserStats.Errors,
+		},
+		SenderCnt: map[string][2]int64{},
+	}
+	for _, s := range mr.senders {
+		name := s.Name()
+		sStatus, ok := s.(sender.StatsSender)
+		if ok {
+			status.SenderStats[name] = sStatus.Stats()
+		}
+		if sta, exist := status.SenderStats[name]; exist {
+			bStart.SenderCnt[name] = [2]int64{
+				sta.Success,
+				sta.Errors,
+			}
+		}
+	}
+	err := mr.meta.WriteStatistic(bStart)
+	if err != nil {
+		log.Warnf("runner %v, backup status failed", mr.RunnerName)
+	} else {
+		log.Infof("runner %v, backup status %v", mr.RunnerName, bStart)
+	}
 }
