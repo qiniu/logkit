@@ -1,9 +1,9 @@
 package reader
 
 import (
-	"strings"
-
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
@@ -108,9 +108,10 @@ const (
 	KeyMongoFilters     = "mongo_filters"
 	KeyMongoCert        = "mongo_cacert"
 
-	KeyKafkaGroupID   = "kafka_groupid"
-	KeyKafkaTopic     = "kafka_topic"
-	KeyKafkaZookeeper = "kafka_zookeeper"
+	KeyKafkaGroupID          = "kafka_groupid"
+	KeyKafkaTopic            = "kafka_topic"
+	KeyKafkaZookeeper        = "kafka_zookeeper"
+	KeyKafkaZookeeperTimeout = "kafka_zookeeper_timeout"
 )
 
 var defaultIgnoreFileSuffix = []string{
@@ -146,16 +147,16 @@ const (
 )
 
 // NewFileReader 创建FileReader
-func NewFileBufReader(conf conf.MapConf) (reader Reader, err error) {
+func NewFileBufReader(conf conf.MapConf, isFromWeb bool) (reader Reader, err error) {
 	meta, err := NewMetaWithConf(conf)
 	if err != nil {
 		log.Warn(err)
 		return
 	}
-	return NewFileBufReaderWithMeta(conf, meta)
+	return NewFileBufReaderWithMeta(conf, meta, isFromWeb)
 }
 
-func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta) (reader Reader, err error) {
+func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (reader Reader, err error) {
 	mode, _ := conf.GetStringOr(KeyMode, ModeDir)
 	logpath, err := conf.GetString(KeyLogPath)
 	if err != nil && (mode == ModeFile || mode == ModeDir || mode == ModeTailx) {
@@ -183,7 +184,7 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta) (reader Reader, err
 		reader, err = NewReaderSize(fr, meta, bufSize)
 
 	case ModeFile:
-		fr, err = NewSingleFile(meta, logpath, whence)
+		fr, err = NewSingleFile(meta, logpath, whence, isFromWeb)
 		if err != nil {
 			return
 		}
@@ -240,8 +241,10 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta) (reader Reader, err
 		if err != nil {
 			return nil, err
 		}
+		zkTimeout, _ := conf.GetIntOr(KeyKafkaZookeeperTimeout, 1)
+
 		zookeepers, err := conf.GetStringList(KeyKafkaZookeeper)
-		reader, err = NewKafkaReader(meta, consumerGroup, topics, zookeepers, whence)
+		reader, err = NewKafkaReader(meta, consumerGroup, topics, zookeepers, time.Duration(zkTimeout)*time.Second, whence)
 	case ModeRedis:
 		reader, err = NewRedisReader(meta, conf)
 	default:

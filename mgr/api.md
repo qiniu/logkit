@@ -392,6 +392,57 @@ POST /logkit/configs/<runnerName>/reset
 2. 删除runner的meta文件夹
 3. 重新启动runner
 
+### 启动 runner
+
+请求
+
+```
+POST /logkit/configs/<runnerName>/start
+```
+
+返回
+
+如果请求成功, 返回HTTP状态码200:
+
+```
+{}
+```
+
+如果请求失败, 返回包含如下内容的JSON字符串（已格式化,便于阅读）:
+
+```
+{
+    "error":   "<error message string>"
+}
+```
+
+### 停止 runner
+
+请求
+
+```
+POST /logkit/configs/<runnerName>/stop
+```
+
+返回
+
+如果请求成功, 返回HTTP状态码200:
+
+```
+{}
+```
+
+如果请求失败, 返回包含如下内容的JSON字符串（已格式化,便于阅读）:
+
+```
+{
+    "error":   "<error message string>"
+}
+```
+**注意**
+
+停止runner后，前端界面所有的动态归零，但是不会影响到runner的工作进度，runner重新启动后所有的状态都恢复到停止之前。
+
 ## Reader
 
 ### 获得Reader用途说明

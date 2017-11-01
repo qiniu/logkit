@@ -561,6 +561,13 @@ var ModeKeyOptions = map[string][]utils.Option{
 			ChooseOptions: []string{WhenceOldest, WhenceNewest},
 			Description:   "读取的起始位置(read_from)",
 		},
+		{
+			KeyName:      KeyKafkaZookeeperTimeout,
+			ChooseOnly:   false,
+			Default:      "1",
+			DefaultNoUse: false,
+			Description:  "zookeeper超时时间(秒)(kafka_zookeeper_timeout)",
+		},
 		OptionDataSourceTag,
 	},
 	ModeRedis: {

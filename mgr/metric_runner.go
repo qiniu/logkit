@@ -68,7 +68,7 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 	}
 	senders := make([]sender.Sender, 0)
 	for _, c := range rc.SenderConfig {
-		s, err := sr.NewSender(c)
+		s, err := sr.NewSender(c, "")
 		if err != nil {
 			return nil, err
 		}

@@ -46,18 +46,10 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "七牛的私钥(secret_key)",
 		},
 		{
-			KeyName:       KeyFaultTolerant,
-			ChooseOnly:    true,
-			ChooseOptions: []string{"true", "false"},
-			Default:       "true",
-			DefaultNoUse:  false,
-			Description:   "是否开启磁盘发送管道(fault_tolerant)",
-		},
-		{
 			KeyName:      KeyFtSaveLogPath,
 			ChooseOnly:   false,
-			Default:      "/disk1/ftsendor/",
-			DefaultNoUse: true,
+			Default:      "",
+			DefaultNoUse: false,
 			Description:  "管道本地盘数据保存路径(ft_save_log_path)",
 		},
 		{
@@ -301,18 +293,10 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "聚合列(mongodb_acc_acckey)",
 		},
 		{
-			KeyName:       KeyFaultTolerant,
-			ChooseOnly:    true,
-			ChooseOptions: []string{"true", "false"},
-			Default:       "true",
-			DefaultNoUse:  false,
-			Description:   "是否开启磁盘发送管道(fault_tolerant)",
-		},
-		{
 			KeyName:      KeyFtSaveLogPath,
 			ChooseOnly:   false,
-			Default:      "/disk1/ftsendor/",
-			DefaultNoUse: true,
+			Default:      "",
+			DefaultNoUse: false,
 			Description:  "管道本地盘数据保存路径(ft_save_log_path)",
 		},
 		{
@@ -421,18 +405,10 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "时间戳列精度调整(influxdb_timestamp_precision)",
 		},
 		{
-			KeyName:       KeyFaultTolerant,
-			ChooseOnly:    true,
-			ChooseOptions: []string{"true", "false"},
-			Default:       "true",
-			DefaultNoUse:  false,
-			Description:   "是否开启磁盘发送管道(fault_tolerant)",
-		},
-		{
 			KeyName:      KeyFtSaveLogPath,
 			ChooseOnly:   false,
-			Default:      "/disk1/ftsendor/",
-			DefaultNoUse: true,
+			Default:      "",
+			DefaultNoUse: false,
 			Description:  "管道本地盘数据保存路径(ft_save_log_path)",
 		},
 		{
@@ -507,18 +483,10 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "索引类型名称(elastic_type)",
 		},
 		{
-			KeyName:       KeyFaultTolerant,
-			ChooseOnly:    true,
-			ChooseOptions: []string{"true", "false"},
-			Default:       "true",
-			DefaultNoUse:  false,
-			Description:   "是否开启磁盘发送管道(fault_tolerant)",
-		},
-		{
 			KeyName:      KeyFtSaveLogPath,
 			ChooseOnly:   false,
-			Default:      "/disk1/ftsendor/",
-			DefaultNoUse: true,
+			Default:      "",
+			DefaultNoUse: false,
 			Description:  "管道本地盘数据保存路径(ft_save_log_path)",
 		},
 		{

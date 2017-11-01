@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"sync"
+	"time"
 	"testing"
 
 	"github.com/qiniu/logkit/conf"
@@ -26,6 +27,7 @@ func TestKafkaReader(t *testing.T) {
 		ConsumerGroup:  "group1",
 		Topics:         []string{"topic1"},
 		ZookeeperPeers: []string{"localhost:2181"},
+		ZookeeperTimeout:time.Second,
 		Whence:         "oldest",
 		readChan:       make(chan json.RawMessage),
 		errs:           make(chan error, 1000),

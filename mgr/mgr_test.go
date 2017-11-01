@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -421,9 +422,9 @@ func Test_Watch_LogDir(t *testing.T) {
 		t.Error(err)
 	}
 	defer os.RemoveAll("./tests2")
-	DIR_NOT_EXIST_SLEEP_TIME = 10
+	os.Setenv("DIR_NOT_EXIST_SLEEP_TIME", "10")
 	defer func() {
-		DIR_NOT_EXIST_SLEEP_TIME = 300
+		os.Setenv("DIR_NOT_EXIST_SLEEP_TIME", DIR_NOT_EXIST_SLEEP_TIME)
 	}()
 	var conf ManagerConfig
 	m, err := NewManager(conf)
@@ -457,8 +458,12 @@ func Test_Watch_LogDir(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-
-	time.Sleep(time.Duration(DIR_NOT_EXIST_SLEEP_TIME) * time.Second)
+	sleepTimeStr := os.Getenv("DIR_NOT_EXIST_SLEEP_TIME")
+	if sleepTimeStr == "" {
+		sleepTimeStr = "10"
+	}
+	sleepTime, _ := strconv.ParseInt(sleepTimeStr, 10, 0)
+	time.Sleep(time.Duration(sleepTime) * time.Second)
 	m.lock.Lock()
 	_, ok = m.runners[confPathAbs]
 	m.lock.Unlock()

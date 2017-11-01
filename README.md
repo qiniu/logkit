@@ -26,6 +26,17 @@ logkit本身支持多种数据源，并且可以同时发送多个数据源的�
 
 ![logkit 工作原理图](https://qiniu.github.io/pandora-docs/_media/logkit.png)
 
+## 参与项目(contributing)
+
+我们非常欢迎您参与到项目中来，你可以通过以下途径参与到项目中来：
+
+* 修复或者[报告bug](https://github.com/qiniu/logkit/issues/new)
+* [提issue](https://github.com/qiniu/logkit/issues/new)改善我们的[wiki文档](https://github.com/qiniu/logkit/wiki)
+* [review 代码](https://github.com/qiniu/logkit/pulls)或[提出功能需求](https://github.com/qiniu/logkit/issues/new)
+* 贡献代码（可以贡献的各类插件模块包括[reader](https://github.com/qiniu/logkit/wiki/Readers)、[parser](https://github.com/qiniu/logkit/wiki/Parsers)、[sender](https://github.com/qiniu/logkit/wiki/Senders)以及[transformer](https://github.com/qiniu/logkit/wiki/Transformers)）
+
+## [计划(Roadmap)](https://github.com/qiniu/logkit/blob/develop/ROADMAP.md)
+
 ## 下载
 
 请移步至[Download页面](https://github.com/qiniu/logkit/wiki/Download)
@@ -141,4 +152,6 @@ docker run -d -p 3000:3000 -v /local/logkit/dataconf:/app/confs -v /local/log/pa
 
 需要注意的是，镜像中的logkit收集 `/logs`目录下的日志，需要把本地的日志目录也挂载到镜像里面去才能启动，比如本地的日志目录为`/local/log/path`, 挂载到镜像中的`/logs/path`目录，那么`/local/logkit/dataconf`目录下的配置文件填写的日志路径必须是`/logs/path`。
 
-Enjoy it！
+enjoy it！
+
+
