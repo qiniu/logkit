@@ -116,7 +116,10 @@ class Create extends Component {
           }
           let nodeData = config.getNodeData()
           if (nodeData && nodeData.parser.type === 'grok') {
-            nodeData.parser.grok_custom_patterns = window.btoa(nodeData.parser.grok_custom_patterns)
+            if (nodeData.parser.grok_custom_patterns != '' && nodeData.parser.grok_custom_patterns != undefined) {
+              nodeData.parser.grok_custom_patterns = window.btoa(nodeData.parser.grok_custom_patterns)
+            }
+
           }
 
           let data = {

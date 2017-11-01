@@ -43,7 +43,7 @@ func TestFtSender(t *testing.T) {
 	mp[KeyFtSaveLogPath] = fttestdir
 	mp[KeyFtStrategy] = KeyFtStrategyAlwaysSave
 	defer os.RemoveAll(fttestdir)
-	fts, err := NewFtSender(s, mp)
+	fts, err := NewFtSender(s, mp, fttestdir)
 	assert.NoError(t, err)
 	datas := []Data{
 		{"ab": "abcccc"},
@@ -91,7 +91,7 @@ func TestFtMemorySender(t *testing.T) {
 	mp[KeyFtMemoryChannel] = "true"
 	mp[KeyFtMemoryChannelSize] = "3"
 	mp[KeyFtStrategy] = KeyFtStrategyAlwaysSave
-	fts, err := NewFtSender(s, mp)
+	fts, err := NewFtSender(s, mp, tmpDir)
 	assert.NoError(t, err)
 	datas := []Data{
 		{"ab": "abcccc"},
@@ -142,7 +142,7 @@ func TestFtChannelFullSender(t *testing.T) {
 	mp[KeyFtMemoryChannel] = "true"
 	mp[KeyFtMemoryChannelSize] = "1"
 	mp[KeyFtStrategy] = KeyFtStrategyAlwaysSave
-	fts, err := NewFtSender(s, mp)
+	fts, err := NewFtSender(s, mp, tmpDir)
 	assert.NoError(t, err)
 
 	var moreDatas, moreAndMoreDatas [][]Data
@@ -208,7 +208,7 @@ func TestFtSenderConcurrent(t *testing.T) {
 	mp[KeyFtSaveLogPath] = tmpDir
 	mp[KeyFtStrategy] = KeyFtStrategyConcurrent
 	mp[KeyFtProcs] = "3"
-	fts, err := NewFtSender(s, mp)
+	fts, err := NewFtSender(s, mp, tmpDir)
 	assert.NoError(t, err)
 	datas := []Data{
 		{"ab": "ababab"},
@@ -260,7 +260,7 @@ func ftSenderConcurrent(b *testing.B, c conf.MapConf) {
 	defer os.RemoveAll(tmpDir)
 	c[KeyFtSaveLogPath] = tmpDir
 	c[KeyFtProcs] = "3"
-	fts, err := NewFtSender(s, c)
+	fts, err := NewFtSender(s, c, tmpDir)
 	if err != nil {
 		b.Fatal(err)
 	}

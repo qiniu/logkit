@@ -52,6 +52,15 @@ func Benchmark_GrokParseLine_Common(b *testing.B) {
 	grokBench = m
 }
 
+func Benchmark_GroktrimInvalidSpace(b *testing.B) {
+	src := "TEST_LOG_A %{NUMBER :myfloat:  float} %{  RESPONSE_CODE} %{IPORHOST : clientip} %{  RESPONSE_TIME}"
+	for i:= 0; i < b.N; i++ {
+		trimInvalidSpace(src)
+	}
+}
+//100000	     17110 ns/op
+
+
 func TestParseTimeZoneOffset(t *testing.T) {
 	tests := []struct {
 		s   string
@@ -397,6 +406,31 @@ func TestCompileStringAndParse(t *testing.T) {
 		metricA)
 }
 
+func TestCompileInvalidStringAndParse(t *testing.T) {
+	p := &GrokParser{
+		Patterns: []string{"%{TEST_LOG_A}"},
+		CustomPatterns: `
+			DURATION %{NUMBER}[nuµm]?s
+			RESPONSE_CODE %{ NUMBER :   response_code }
+			RESPONSE_TIME %{ DURATION :  response_time  }
+			TEST_LOG_A %{ NUMBER :myfloat:  float} %{ RESPONSE_CODE  } %{ IPORHOST : clientip} %{  RESPONSE_TIME }
+		`,
+	}
+	assert.NoError(t, p.compile())
+
+	metricA, err := p.parseLine(`1.25 200 192.168.1.1 5.432µs`)
+	require.NotNil(t, metricA)
+	assert.NoError(t, err)
+	assert.Equal(t,
+		sender.Data{
+			"clientip":      "192.168.1.1",
+			"myfloat":       float64(1.25),
+			"response_time": "5.432µs",
+			"response_code": "200",
+		},
+		metricA)
+}
+
 func TestCompileErrorsOnInvalidPattern(t *testing.T) {
 	p := &GrokParser{
 		Patterns: []string{"%{TEST_LOG_A}", "%{TEST_LOG_B}"},
@@ -596,7 +630,7 @@ func TestParseMultiLine(t *testing.T) {
 
 			FPMERRORLOG \[%{PHPLOGTIMESTAMP:timestamp}\] %{WORD:type}: %{GREEDYDATA:message}
 			PHPERRORLOG %{PHPTIMESTAMP} %{WORD:type} %{GREEDYDATA:message}
-			
+
 			PHP_FPM_SLOW_LOG (?m)^\[%{PHPLOGTIMESTAMP:timestamp}\]\s\s\[%{WORD:type}\s%{WORD}\]\s%{GREEDYDATA:message}$
 		`,
 	}
@@ -622,4 +656,121 @@ func TestParseMultiLine(t *testing.T) {
 			"type":      "pool",
 			"message":   "pid 4109 script_filename = /data/html/log.ushengsheng.com/index.php [0x00007fec119d1720] curl_exec() /data/html/xyframework/base/XySoaClient.php:357 [0x00007fec119d1590] request_post() /data/html/xyframework/base/XySoaClient.php:284 [0x00007fff39d538b0] __call() unknown:0 [0x00007fec119d13a8] add() /data/html/log.ushengsheng.com/1/interface/ErrorLogInterface.php:70 [0x00007fec119d1298] log() /data/html/log.ushengsheng.com/1/interface/ErrorLogInterface.php:30 [0x00007fec119d1160] android() /data/html/xyframework/core/x.php:215 [0x00007fec119d0ff8] +++ dump failed",
 		}, data)
+}
+
+func TestTrimInvalidSpace(t *testing.T) {
+	tests := []struct {
+		s   string
+		exp string
+	}{
+		{
+			"%{aaa}",
+			"%{aaa}",
+		},
+		{
+			"%{  aa}",
+			"%{aa}",
+		},
+		{
+			"%{aaa }",
+			"%{aaa}",
+		},
+		{
+			"%{ aa a }",
+			"%{aa a}",
+		},
+		{
+			"%{ a a:	bb }",
+			"%{a a:bb}",
+		},
+		{
+			"%{ aa a : b	bb b :ss }",
+			"%{aa a:b	bb b:ss}",
+		},
+		{
+			"%{ a aa: b b :c} :$ s absc%{ aa: b bb }",
+			"%{a aa:b b:c} :$ s absc%{aa:b bb}",
+		},
+		{
+			"%{ a a : b b : c c } : %{ d d : e e } : %{ f f }",
+			"%{a a:b b:c c} : %{d d:e e} : %{f f}",
+		},
+		{
+			"%{a:a} aa : bb %{b:c} bb : cc %{e} ee: ff",
+			"%{a:a} aa : bb %{b:c} bb : cc %{e} ee: ff",
+		},
+		{
+			"%{aaa:bbb:ccc}%{aaa:bbb}%{aaa}",
+			"%{aaa:bbb:ccc}%{aaa:bbb}%{aaa}",
+		},
+		{
+			"DURATION %{NUMBER  }[nuµm]?s",
+			"DURATION %{NUMBER}[nuµm]?s",
+		},
+		{
+			"DURATION %{NUMBER  }[nuµm]?s",
+			"DURATION %{NUMBER}[nuµm]?s",
+		},
+		{
+			"RESPONSE_CODE %{ NUMBER :   response_code }",
+			"RESPONSE_CODE %{NUMBER:response_code}",
+		},
+		{
+			"RESPONSE_TIME %{ DURATION :  response_time  }",
+			"RESPONSE_TIME %{DURATION:response_time}",
+		},
+		{
+			"TEST_LOG_A %{NUMBER :myfloat:  float} %{  RESPONSE_CODE} %{IPORHOST : clientip} %{  RESPONSE_TIME}",
+			"TEST_LOG_A %{NUMBER:myfloat:float} %{RESPONSE_CODE} %{IPORHOST:clientip} %{RESPONSE_TIME}",
+		},
+		{
+			"%{{}",
+			"%{{}",
+		},
+		{
+			"%{ { }",
+			"%{{}",
+		},
+		{
+			"%{ { } } ",
+			"%{{} } ",
+		},
+		{
+			"%{}",
+			"%{}",
+		},
+		{
+			"%{ }",
+			"%{}",
+		},
+		{
+			"%{",
+			"%{",
+		},
+		{
+			"%}",
+			"%}",
+		},
+		{
+			"{ }",
+			"{ }",
+		},
+	}
+	for _, ti := range tests {
+		got := trimInvalidSpace(ti.s)
+		assert.Equal(t, ti.exp, got)
+	}
+}
+
+func TestAddCustomPatterns(t *testing.T) {
+	p := &GrokParser{
+		Patterns: []string{"%{TEST_LOG_A}"},
+		CustomPatterns: `
+			DURATION
+			RESPONSE_CODE %{NUMBER:response_code}
+			RESPONSE_TIME %{DURATION:response_time}
+			TEST_LOG_A %{NUMBER:myfloat:float} %{RESPONSE_CODE} %{IPORHOST:clientip} %{RESPONSE_TIME}
+		`,
+	}
+	assert.Error(t, p.compile())
 }

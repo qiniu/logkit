@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"testing"
 
+	"time"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -79,4 +81,14 @@ func TestHeadPatternMode(t *testing.T) {
 	ret := headreg.Match([]byte(`{
 `))
 	assert.Equal(t, true, ret)
+}
+
+func TestParseDuration(t *testing.T) {
+	dur, err := parseLoopDuration("loop 1s")
+	assert.NoError(t, err)
+	assert.Equal(t, time.Second, dur)
+
+	dur, err = parseLoopDuration("loop 1-")
+	assert.Error(t, err)
+	assert.Equal(t, time.Duration(0), dur)
 }

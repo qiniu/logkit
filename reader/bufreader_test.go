@@ -51,7 +51,8 @@ func Test_BuffReader(t *testing.T) {
 		"reader_buf_size": "24",
 		"read_from":       "oldest",
 	}
-	r, err := NewFileBufReader(c)
+	isFromWeb := false
+	r, err := NewFileBufReader(c, isFromWeb)
 	if err != nil {
 		t.Error(err)
 	}
@@ -82,7 +83,8 @@ func Test_BuffReaderBufSizeLarge(t *testing.T) {
 		"reader_buf_size": "1024",
 		"read_from":       "oldest",
 	}
-	r, err := NewFileBufReader(c)
+	isFromWeb := false
+	r, err := NewFileBufReader(c, isFromWeb)
 	if err != nil {
 		t.Error(err)
 	}
@@ -116,7 +118,8 @@ func Test_GBKEncoding(t *testing.T) {
 		"read_from":       "oldest",
 		"encoding":        "gb18030",
 	}
-	r, err := NewFileBufReader(c)
+	isFromWeb := false
+	r, err := NewFileBufReader(c, isFromWeb)
 	if err != nil {
 		t.Error(err)
 	}
@@ -150,7 +153,8 @@ func Test_NoPanicEncoding(t *testing.T) {
 		"read_from":       "oldest",
 		"encoding":        "nopanic",
 	}
-	r, err := NewFileBufReader(c)
+	isFromWeb := false
+	r, err := NewFileBufReader(c, isFromWeb)
 	if err != nil {
 		t.Error(err)
 	}
@@ -183,7 +187,8 @@ func Test_BuffReaderMultiLine(t *testing.T) {
 		"read_from":       "oldest",
 		"head_pattern":    "^test*",
 	}
-	r, err := NewFileBufReader(c)
+	isFromWeb := false
+	r, err := NewFileBufReader(c, isFromWeb)
 	if err != nil {
 		t.Error(err)
 	}
@@ -202,7 +207,7 @@ func Test_BuffReaderMultiLine(t *testing.T) {
 		assert.NoError(t, err)
 	}
 	r.Close()
-	r, err = NewFileBufReader(c)
+	r, err = NewFileBufReader(c, isFromWeb)
 	if err != nil {
 		t.Error(err)
 	}
@@ -236,7 +241,8 @@ func Test_BuffReaderStats(t *testing.T) {
 		"mode":      DirMode,
 		"read_from": "oldest",
 	}
-	r, err := NewFileBufReader(c)
+	isFromWeb := false
+	r, err := NewFileBufReader(c, isFromWeb)
 	if err != nil {
 		t.Error(err)
 	}
@@ -247,5 +253,39 @@ func Test_BuffReaderStats(t *testing.T) {
 	stsx := str.Status()
 	expsts := utils.StatsInfo{}
 	assert.Equal(t, expsts, stsx)
+	r.Close()
+}
+
+func Test_FileNotFound(t *testing.T) {
+	createSeqFile(1000, lines)
+	defer destroySeqFile()
+	c := conf.MapConf{
+		"mode":            ModeFile,
+		"log_path":        "/home/users/john/log/my.log",
+		"meta_path":       metaDir,
+		"sync_every":      "1",
+		"ignore_hidden":   "true",
+		"reader_buf_size": "24",
+		"read_from":       "oldest",
+	}
+	isFromWeb := true
+	r, err := NewFileBufReader(c, isFromWeb)
+	assert.Error(t, err)
+
+	c["log_path"] = filepath.Join(dir, files[0])
+	r, err = NewFileBufReader(c, isFromWeb)
+	assert.NoError(t, err)
+	rest := []string{}
+	for {
+		line, err := r.ReadLine()
+		if err == nil {
+			rest = append(rest, line)
+		} else {
+			break
+		}
+	}
+	if len(rest) != 4 {
+		t.Errorf("rest should be 4, but got %v", len(rest))
+	}
 	r.Close()
 }

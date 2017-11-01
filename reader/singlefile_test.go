@@ -28,7 +28,7 @@ func Test_singleFileRotate(t *testing.T) {
 		t.Error(err)
 	}
 
-	sf, err := NewSingleFile(meta, fileName, WhenceOldest)
+	sf, err := NewSingleFile(meta, fileName, WhenceOldest, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -83,7 +83,7 @@ func Test_singleFileNotRotate(t *testing.T) {
 		t.Error(err)
 	}
 
-	sf, err := NewSingleFile(meta, fileName, WhenceOldest)
+	sf, err := NewSingleFile(meta, fileName, WhenceOldest, false)
 	if err != nil {
 		t.Error(err)
 	}

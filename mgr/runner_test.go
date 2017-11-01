@@ -89,7 +89,8 @@ func Test_Run(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	reader, err := reader.NewFileBufReader(readerConfig)
+	isFromWeb := false
+	reader, err := reader.NewFileBufReader(readerConfig, isFromWeb)
 	if err != nil {
 		t.Error(err)
 	}
@@ -295,17 +296,18 @@ func Test_QiniulogRun(t *testing.T) {
 	}
 
 	rc := RunnerConfig{
-		RunnerInfo:   rinfo,
-		ReaderConfig: readerConfig,
-		ParserConf:   parseConf,
-		SenderConfig: senderConfigs,
+		RunnerInfo:    rinfo,
+		ReaderConfig:  readerConfig,
+		ParserConf:    parseConf,
+		SenderConfig:  senderConfigs,
+		IsInWebFolder: false,
 	}
 	rc = Compatible(rc)
 	meta, err := reader.NewMetaWithConf(rc.ReaderConfig)
 	if err != nil {
 		t.Error(err)
 	}
-	reader, err := reader.NewFileBufReader(rc.ReaderConfig)
+	reader, err := reader.NewFileBufReader(rc.ReaderConfig, rc.IsInWebFolder)
 	if err != nil {
 		t.Error(err)
 	}
