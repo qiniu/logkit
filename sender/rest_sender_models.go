@@ -569,13 +569,6 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "topic(kafka_topic)",
 		},
 		{
-			KeyName:      KeyKafkaClientId,
-			ChooseOnly:   false,
-			Default:      "logkit",
-			DefaultNoUse: false,
-			Description:  "clientId(kafka_client_id)",
-		},
-		{
 			KeyName:      KeyKafkaFlushNum,
 			ChooseOnly:   false,
 			Default:      "10",

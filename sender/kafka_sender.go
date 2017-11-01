@@ -7,16 +7,19 @@ import (
 	"fmt"
 	"github.com/qiniu/log"
 	"encoding/json"
+	"github.com/qiniu/logkit/utils"
+	"sync"
 )
 
 type KafkaSender struct {
 	name  			string
-	host  			[]string
+	hosts  			[]string
 	topic 			string
-	successCount 	int64
-	failedCount		int64
+	cfg 			*sarama.Config
 
-	interrupt 		chan string
+	wg				sync.WaitGroup
+
+	stats 			utils.StatsInfo
 
 	producer 		sarama.AsyncProducer
 }
@@ -48,50 +51,64 @@ func NewKafkaSender(conf conf.MapConf) (sender Sender, err error){
 
 	retryMax, _ := conf.GetIntOr(KeyKafkaRetryMax, 3)
 
+	clientIp, _ := conf.GetStringOr(KeyKafkaClientId, "sarama")
 
 	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("kafkaSender:(kafkaUrl:%s,topic:%s)", hosts, topic))
-	config := sarama.NewConfig()
-	config.ClientID = KeyKafkaClientId
-	config.Producer.Return.Successes = true //必须有这个选项
-	config.Producer.Timeout = 5 * time.Second
+	cfg := sarama.NewConfig()
+	cfg.ClientID = clientIp
+	cfg.Producer.Return.Successes = true //必须有这个选项
+	cfg.Producer.Timeout = 5 * time.Second
 	//批量发送条数
-	config.Producer.Flush.Messages = num
+	cfg.Producer.Flush.Messages = num
 	//批量发送间隔
-	config.Producer.Flush.Frequency =  time.Duration(frequency) * time.Second
+	cfg.Producer.Flush.Frequency =  time.Duration(frequency) * time.Second
 	//失败重试次数
-	config.Producer.Retry.Max = retryMax
+	cfg.Producer.Retry.Max = retryMax
 
-	producer, err := sarama.NewAsyncProducer(hosts, config)
-
-	sender = &KafkaSender{
-		name:     		name,
-		host:     		hosts,
-		topic:    		topic,
-		producer: 		producer,
-		successCount: 	0,
-		failedCount:  	0,
-		interrupt:      make(chan string, 1),
+	producer, err := sarama.NewAsyncProducer(hosts, cfg)
+	if err != nil {
+		return
 	}
-	go func(p sarama.AsyncProducer, kafkaSender *KafkaSender) {
-		errors := p.Errors()
-		success := p.Successes()
-		close := kafkaSender.interrupt
-		for {
-			select {
-			case err := <-errors:
-				if err != nil {
-					kafkaSender.failedCount++
-					log.Errorf("send to kafka failed: %s", err)
-				}
-			case <-success:
-				kafkaSender.successCount++
-			case <-close:
-				//log.Error("------------------------------------------close-----------------------------------------------------")
-				return
-			}
-		}
-	}(producer, sender.(*KafkaSender))
+
+	sender, err = newKafkaSender(name, hosts, topic, cfg, producer)
+	if err != nil {
+		return
+	}
+
 	return
+}
+
+func newKafkaSender(name string, hosts []string, topic string, cfg *sarama.Config, producer sarama.AsyncProducer) (k *KafkaSender, err error){
+	k = &KafkaSender{
+		name:		name,
+		hosts: 		hosts,
+		topic:		topic,
+		cfg:		cfg,
+		producer:	producer,
+	}
+	k.wg.Add(2)
+	go k.successWorker(producer.Successes())
+	go k.errorWorker(producer.Errors())
+	return
+}
+
+func (ks *KafkaSender) successWorker(ch <-chan *sarama.ProducerMessage)	{
+	defer ks.wg.Done()
+	defer log.Debugf("Stop kafka ack worker")
+	for range ch {
+		ks.stats.Success ++
+	}
+}
+
+func (ks *KafkaSender) errorWorker(ch <-chan *sarama.ProducerError){
+	defer ks.wg.Done()
+	defer log.Debugf("Stop kafka error handler")
+
+	for errMsg := range ch{
+		ks.stats.Errors ++
+		ks.stats.LastError = errMsg.Error()
+		log.Debug(errMsg.Error())
+	}
 }
 
 func (this *KafkaSender) Name() string {
@@ -100,23 +117,35 @@ func (this *KafkaSender) Name() string {
 
 func (this *KafkaSender) Send(data []Data) (err error){
 	producer := this.producer
-	topic := this.topic
-
 	for _, doc := range data {
-		/*for k, v := range doc {
-			producer.Input() <- &sarama.ProducerMessage{Topic: topic, Key: sarama.StringEncoder(k),Value: sarama.StringEncoder(v.(string))}
-		}*/
-		value, _ := json.Marshal(doc)
-		producer.Input() <- &sarama.ProducerMessage{Topic: topic, Value: sarama.StringEncoder(string(value))}
-
+		message, err := this.getEventMessage(doc)
+		if err != nil {
+			log.Debug(err)
+			continue
+		}
+		producer.Input() <- message
 	}
-
 	return nil
 }
 
+func (kf *KafkaSender) getEventMessage(event map[string]interface{}) (pm *sarama.ProducerMessage, err error){
+	value, _ := json.Marshal(event)
+	pm = &sarama.ProducerMessage{
+		Topic: kf.topic,
+		Value: sarama.StringEncoder(string(value)),
+	}
+	return
+}
+
 func (this *KafkaSender) Close() (err error){
-	this.producer.Close()
-	this.interrupt <- "close"
+	log.Debugf("closed kafka sender")
+	this.wg.Wait()
+	this.producer.AsyncClose()
+	this.producer = nil
 	return nil
+}
+
+func (ks *KafkaSender) Stats() utils.StatsInfo{
+	return ks.stats
 }
 
