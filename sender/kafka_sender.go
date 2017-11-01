@@ -96,7 +96,7 @@ func (ks *KafkaSender) successWorker(ch <-chan *sarama.ProducerMessage)	{
 	defer ks.wg.Done()
 	defer log.Debugf("Stop kafka ack worker")
 	for range ch {
-		//ks.stats.Success ++
+		ks.stats.Success ++
 	}
 }
 
@@ -105,8 +105,8 @@ func (ks *KafkaSender) errorWorker(ch <-chan *sarama.ProducerError){
 	defer log.Debugf("Stop kafka error handler")
 
 	for errMsg := range ch{
-		//ks.stats.Errors ++
-		//ks.stats.LastError = errMsg.Error()
+		ks.stats.Errors ++
+		ks.stats.LastError = errMsg.Error()
 		log.Debug(errMsg.Error())
 	}
 }
@@ -145,7 +145,7 @@ func (this *KafkaSender) Close() (err error){
 	return nil
 }
 
-/*func (ks *KafkaSender) Stats() utils.StatsInfo{
+func (ks *KafkaSender) Stats() utils.StatsInfo{
 	return ks.stats
-}*/
+}
 
