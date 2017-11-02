@@ -9,12 +9,14 @@ import (
 	"encoding/json"
 	"github.com/qiniu/logkit/utils"
 	"sync"
+	"regexp"
+	"os"
 )
 
 type KafkaSender struct {
 	name  			string
 	hosts  			[]string
-	topic 			string
+	topic 			[]string
 	cfg 			*sarama.Config
 
 	wg				sync.WaitGroup
@@ -39,10 +41,16 @@ func NewKafkaSender(conf conf.MapConf) (sender Sender, err error){
 		return
 	}
 
-	topic, err := conf.GetString(KeyKafkaTopic)
+	topic, err := conf.GetStringList(KeyKafkaTopic)
 	if err != nil{
 		return
 	}
+
+	topic, err = utils.ExtractField(topic)
+	if err != nil {
+		return
+	}
+
 
 	num, _ := conf.GetIntOr(KeyKafkaFlushNum, 10)
 
@@ -51,7 +59,9 @@ func NewKafkaSender(conf conf.MapConf) (sender Sender, err error){
 
 	retryMax, _ := conf.GetIntOr(KeyKafkaRetryMax, 3)
 
-	clientIp, _ := conf.GetStringOr(KeyKafkaClientId, "sarama")
+	hostName, _ := os.Hostname()
+
+	clientIp, _ := conf.GetStringOr(KeyKafkaClientId, hostName)
 
 	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("kafkaSender:(kafkaUrl:%s,topic:%s)", hosts, topic))
 	cfg := sarama.NewConfig()
@@ -78,7 +88,7 @@ func NewKafkaSender(conf conf.MapConf) (sender Sender, err error){
 	return
 }
 
-func newKafkaSender(name string, hosts []string, topic string, cfg *sarama.Config, producer sarama.AsyncProducer) (k *KafkaSender, err error){
+func newKafkaSender(name string, hosts []string, topic []string, cfg *sarama.Config, producer sarama.AsyncProducer) (k *KafkaSender, err error){
 	k = &KafkaSender{
 		name:		name,
 		hosts: 		hosts,
@@ -112,7 +122,7 @@ func (ks *KafkaSender) errorWorker(ch <-chan *sarama.ProducerError){
 }
 
 func (this *KafkaSender) Name() string {
-	return "//" + this.topic
+	return this.name
 }
 
 func (this *KafkaSender) Send(data []Data) (err error){
@@ -129,9 +139,21 @@ func (this *KafkaSender) Send(data []Data) (err error){
 }
 
 func (kf *KafkaSender) getEventMessage(event map[string]interface{}) (pm *sarama.ProducerMessage, err error){
+	var topic string
+	if len(kf.topic) == 2 {
+		if event[kf.topic[0]] == nil{
+			topic = kf.topic[1]
+		} else {
+			topic = event[kf.topic[0]].(string)
+		}
+	} else {
+		topic = kf.topic[0]
+	}
+	regexp.Compile("")
 	value, _ := json.Marshal(event)
+
 	pm = &sarama.ProducerMessage{
-		Topic: kf.topic,
+		Topic: topic,
 		Value: sarama.StringEncoder(string(value)),
 	}
 	return
