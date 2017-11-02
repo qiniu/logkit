@@ -83,7 +83,7 @@ type RunnerLag struct {
 // RunnerConfig 从多数据源读取，经过解析后，发往多个数据目的地
 type RunnerConfig struct {
 	RunnerInfo
-	Metric        []conf.MapConf           `json:"metric,omitempty"`
+	MetricConfig  []MetricConfig           `json:"metric,omitempty"`
 	ReaderConfig  conf.MapConf             `json:"reader"`
 	CleanerConfig conf.MapConf             `json:"cleaner,omitempty"`
 	ParserConf    conf.MapConf             `json:"parser"`
@@ -141,7 +141,7 @@ func NewCustomRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, ps *
 	if sr == nil {
 		sr = sender.NewSenderRegistry()
 	}
-	if rc.Metric != nil {
+	if rc.MetricConfig != nil {
 		return NewMetricRunner(rc, sender.NewSenderRegistry())
 	}
 	return NewLogExportRunner(rc, cleanChan, ps, sr)

@@ -7,11 +7,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"encoding/json"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/sender"
+	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
 )
 
@@ -23,11 +25,18 @@ const (
 	defaultCollectInterval = "3s"
 )
 
+type MetricConfig struct {
+	MetricType string                 `json:"type"`
+	Attributes map[string]bool        `json:"attributes"`
+	Config     map[string]interface{} `json:"config"`
+}
+
 type MetricRunner struct {
 	RunnerName string `json:"name"`
 
-	collectors []metric.Collector
-	senders    []sender.Sender
+	collectors   []metric.Collector
+	transformers []transforms.Transformer
+	senders      []sender.Sender
 
 	collectInterval time.Duration
 	rs              RunnerStatus
@@ -62,23 +71,43 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 		return nil, fmt.Errorf("Runner "+rc.RunnerName+" add failed, err is %v", err)
 	}
 	collectors := make([]metric.Collector, 0)
-	for _, c := range rc.Metric {
-		tp, err := c.GetString(KeyMetricType)
-		if err != nil {
-			return nil, err
-		}
+	transformers := make([]transforms.Transformer, 0)
+	for _, m := range rc.MetricConfig {
+		tp := m.MetricType
 		c, err := NewMetric(tp)
 		if err != nil {
 			log.Errorf("%v ignore it...", err)
 			err = nil
 			continue
 		}
+		configBytes, err := json.Marshal(m.Config)
+		if err != nil {
+			return nil, fmt.Errorf("metric %v marshal config error %v", tp, err)
+		}
+		err = json.Unmarshal(configBytes, c)
+		if err != nil {
+			return nil, fmt.Errorf("metric %v unmarshal config error %v", tp, err)
+		}
 		collectors = append(collectors, c)
+
+		// 配置文件中明确标明 false 的 attr 加入 discard transformer
+		attributes := c.Attributes()
+		for _, attr := range attributes {
+			val, exist := m.Attributes[attr.Key]
+			if exist && !val {
+				trans, err := createDiscardTransformer(attr.Key)
+				if err != nil {
+					return nil, fmt.Errorf("metric %v key %v, transform add failed, %v", tp, attr.Key, err)
+				}
+				transformers = append(transformers, trans)
+			}
+		}
 	}
 	if len(collectors) < 1 {
 		err = errors.New("no collectors were added")
 		return
 	}
+
 	senders := make([]sender.Sender, 0)
 	for _, c := range rc.SenderConfig {
 		s, err := sr.NewSender(c, meta.FtSaveLogPath())
@@ -107,6 +136,7 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 		rsMutex:         new(sync.RWMutex),
 		collectInterval: interval,
 		collectors:      collectors,
+		transformers:    transformers,
 		senders:         senders,
 	}
 	runner.StatusRestore()
@@ -135,12 +165,8 @@ func (r *MetricRunner) Run() {
 				continue
 			}
 			for i := range tmpdatas {
-				newdata := sender.Data{}
-				for k, v := range tmpdatas[i] {
-					newdata[c.Name()+"_"+k] = v
-				}
-				if len(newdata) > 0 {
-					datas = append(datas, newdata)
+				if len(tmpdatas[i]) > 0 {
+					datas = append(datas, tmpdatas[i])
 				}
 			}
 			if len(tmpdatas) < 1 {
@@ -156,7 +182,17 @@ func (r *MetricRunner) Run() {
 			log.Debug("MetricRunner collect No data")
 			continue
 		}
-
+		var err error
+		for i := range r.transformers {
+			datas, err = r.transformers[i].Transform(datas)
+			if err != nil {
+				log.Error(err)
+			}
+		}
+		if len(datas) <= 0 {
+			log.Warnf("data has been cleared by transformer")
+			continue
+		}
 		for _, s := range r.senders {
 			if !r.trySend(s, datas, 3) {
 				log.Errorf("failed to send metricData: << %v >>", datas)
@@ -357,4 +393,27 @@ func (mr *MetricRunner) StatusBackup() {
 	} else {
 		log.Infof("runner %v, backup status %v", mr.RunnerName, bStart)
 	}
+}
+
+func createDiscardTransformer(key string) (transforms.Transformer, error) {
+	strTP := "discard"
+	creater, ok := transforms.Transformers[strTP]
+	if !ok {
+		return nil, fmt.Errorf("type %v of transformer not exist", strTP)
+	}
+	tConf := map[string]string{
+		"key":   key,
+		"type":  strTP,
+		"stage": "after_parser",
+	}
+	trans := creater()
+	bts, err := json.Marshal(tConf)
+	if err != nil {
+		return nil, fmt.Errorf("type %v of transformer marshal config error %v", strTP, err)
+	}
+	err = json.Unmarshal(bts, trans)
+	if err != nil {
+		return nil, fmt.Errorf("type %v of transformer unmarshal config error %v", strTP, err)
+	}
+	return trans, nil
 }

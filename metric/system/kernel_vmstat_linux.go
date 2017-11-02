@@ -10,6 +10,12 @@ import (
 	"strconv"
 
 	"github.com/qiniu/logkit/metric"
+	"github.com/qiniu/logkit/utils"
+)
+
+const (
+	TypeMetricKernelVmstat   = "kernel_vmstat"
+	MetricKernelVmstatUsages = "内核(kernel_vmstat)"
 )
 
 type KernelVmstat struct {
@@ -17,7 +23,19 @@ type KernelVmstat struct {
 }
 
 func (k *KernelVmstat) Name() string {
-	return "kernel_vmstat"
+	return TypeMetricKernelVmstat
+}
+
+func (k *KernelVmstat) Usages() string {
+	return MetricKernelVmstatUsages
+}
+
+func (k *KernelVmstat) Config() []utils.Option {
+	return []utils.Option{}
+}
+
+func (k *KernelVmstat) Attributes() []utils.KeyValue {
+	return []utils.KeyValue{}
 }
 
 func (k *KernelVmstat) Collect() (datas []map[string]interface{}, err error) {
@@ -64,7 +82,7 @@ func (k *KernelVmstat) getProcVmstat() ([]byte, error) {
 }
 
 func init() {
-	metric.Add("kernel_vmstat", func() metric.Collector {
+	metric.Add(TypeMetricKernelVmstat, func() metric.Collector {
 		return &KernelVmstat{
 			statFile: "/proc/vmstat",
 		}

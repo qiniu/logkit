@@ -1,8 +1,13 @@
 package metric
 
+import "github.com/qiniu/logkit/utils"
+
 //Collector 收集metrics的接口
 type Collector interface {
 	Name() string
+	Usages() string
+	Config() []utils.Option
+	Attributes() []utils.KeyValue
 	Collect() ([]map[string]interface{}, error)
 }
 

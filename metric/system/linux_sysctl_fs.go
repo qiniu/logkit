@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/qiniu/logkit/metric"
+	"github.com/qiniu/logkit/utils"
 )
 
 // https://www.kernel.org/doc/Documentation/sysctl/fs.txt
@@ -15,6 +16,18 @@ type SysctlFS struct {
 
 func (_ SysctlFS) Name() string {
 	return "linux_sysctl_fs"
+}
+
+func (_ SysctlFS) Usages() string {
+	return "linux_sysctl_fs"
+}
+
+func (_ SysctlFS) Config() []utils.Option {
+	return []utils.Option{}
+}
+
+func (_ SysctlFS) Attributes() []utils.KeyValue {
+	return []utils.KeyValue{}
 }
 
 func (sfs *SysctlFS) gatherList(file string, fields map[string]interface{}, fieldNames ...string) error {

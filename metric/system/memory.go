@@ -4,14 +4,58 @@ import (
 	"fmt"
 
 	"github.com/qiniu/logkit/metric"
+	"github.com/qiniu/logkit/utils"
 )
+
+const (
+	TypeMetricMem   = "mem"
+	MetricMemUsages = "内存(mem)"
+
+	// TypeMetricMem 信息中的字段
+	KeyMemTotal            = "mem_total"
+	KeyMemAvailable        = "mem_available"
+	KeyMemUsed             = "mem_used"
+	KeyMemFree             = "mem_free"
+	KeyMemCached           = "mem_cached"
+	KeyMemBuffered         = "mem_buffered"
+	KeyMemActive           = "mem_active"
+	KeyMemInactive         = "mem_inactive"
+	KeyMemUsedPercent      = "mem_used_percent"
+	KeyMemAvailablePercent = "mem_available_percent"
+)
+
+// KeyMemUsages TypeMetricMem 中的字段名称
+var KeyMemUsages = []utils.KeyValue{
+	{KeyMemTotal, "内存总数"},
+	{KeyMemAvailable, "可用内存数"},
+	{KeyMemUsed, "已用内存数"},
+	{KeyMemFree, "空闲内存"},
+	{KeyMemCached, "用于缓存的内存"},
+	{KeyMemBuffered, "文件buffer内存"},
+	{KeyMemActive, "活跃使用的内存总数(包括cache和buffer内存)"},
+	{KeyMemInactive, "空闲的内存数(包括free和avalible的内存)"},
+	{KeyMemUsedPercent, "内存已用百分比(0~100)"},
+	{KeyMemAvailablePercent, "内存剩余百分比(0~100)"},
+}
 
 type MemStats struct {
 	ps PS
 }
 
 func (_ *MemStats) Name() string {
-	return "mem"
+	return TypeMetricMem
+}
+
+func (_ *MemStats) Usages() string {
+	return MetricMemUsages
+}
+
+func (_ *MemStats) Config() []utils.Option {
+	return []utils.Option{}
+}
+
+func (_ *MemStats) Attributes() []utils.KeyValue {
+	return KeyMemUsages
 }
 
 func (s *MemStats) Collect() (datas []map[string]interface{}, err error) {
@@ -21,19 +65,42 @@ func (s *MemStats) Collect() (datas []map[string]interface{}, err error) {
 	}
 
 	fields := map[string]interface{}{
-		"total":             vm.Total,
-		"available":         vm.Available,
-		"used":              vm.Used,
-		"free":              vm.Free,
-		"cached":            vm.Cached,
-		"buffered":          vm.Buffers,
-		"active":            vm.Active,
-		"inactive":          vm.Inactive,
-		"used_percent":      100 * float64(vm.Used) / float64(vm.Total),
-		"available_percent": 100 * float64(vm.Available) / float64(vm.Total),
+		KeyMemTotal:            vm.Total,
+		KeyMemAvailable:        vm.Available,
+		KeyMemUsed:             vm.Used,
+		KeyMemFree:             vm.Free,
+		KeyMemCached:           vm.Cached,
+		KeyMemBuffered:         vm.Buffers,
+		KeyMemActive:           vm.Active,
+		KeyMemInactive:         vm.Inactive,
+		KeyMemUsedPercent:      100 * float64(vm.Used) / float64(vm.Total),
+		KeyMemAvailablePercent: 100 * float64(vm.Available) / float64(vm.Total),
 	}
 	datas = append(datas, fields)
 	return
+}
+
+const (
+	TypeMetricSwap   = "swap"
+	MetricSwapUsages = "CPU(Swap)"
+
+	// TypeMetricSwap 中的字段
+	KeySwapTotal       = "swap_total"
+	KeySwapUsed        = "swap_used"
+	KeySwapFree        = "swap_free"
+	KeySwapIn          = "swap_in"
+	KeySwapOut         = "swap_out"
+	KeySwapUsedPercent = "swap_used_percent"
+)
+
+// KeySwapUsages TypeMetricSwap 中的字段名称
+var KeySwapUsages = []utils.KeyValue{
+	{KeySwapTotal, "Swap空间总量"},
+	{KeySwapUsed, "Swap已使用空间"},
+	{KeySwapFree, "Swap空闲空间"},
+	{KeySwapUsedPercent, "used percent"},
+	{KeySwapIn, "swap in"},
+	{KeySwapOut, "swap out"},
 }
 
 type SwapStats struct {
@@ -41,7 +108,19 @@ type SwapStats struct {
 }
 
 func (_ *SwapStats) Name() string {
-	return "swap"
+	return TypeMetricSwap
+}
+
+func (_ *SwapStats) Usages() string {
+	return MetricSwapUsages
+}
+
+func (_ *SwapStats) Config() []utils.Option {
+	return []utils.Option{}
+}
+
+func (_ *SwapStats) Attributes() []utils.KeyValue {
+	return KeySwapUsages
 }
 
 func (s *SwapStats) Collect() (datas []map[string]interface{}, err error) {
@@ -51,15 +130,15 @@ func (s *SwapStats) Collect() (datas []map[string]interface{}, err error) {
 	}
 
 	fieldsG := map[string]interface{}{
-		"total":        swap.Total,
-		"used":         swap.Used,
-		"free":         swap.Free,
-		"used_percent": swap.UsedPercent,
+		KeySwapTotal:       swap.Total,
+		KeySwapUsed:        swap.Used,
+		KeySwapFree:        swap.Free,
+		KeySwapUsedPercent: swap.UsedPercent,
 	}
 	datas = append(datas, fieldsG)
 	fieldsC := map[string]interface{}{
-		"in":  swap.Sin,
-		"out": swap.Sout,
+		KeySwapIn:  swap.Sin,
+		KeySwapOut: swap.Sout,
 	}
 	datas = append(datas, fieldsC)
 	return
@@ -67,11 +146,11 @@ func (s *SwapStats) Collect() (datas []map[string]interface{}, err error) {
 
 func init() {
 	ps := newSystemPS()
-	metric.Add("mem", func() metric.Collector {
+	metric.Add(TypeMetricMem, func() metric.Collector {
 		return &MemStats{ps: ps}
 	})
 
-	metric.Add("swap", func() metric.Collector {
+	metric.Add(TypeMetricSwap, func() metric.Collector {
 		return &SwapStats{ps: ps}
 	})
 }
