@@ -13,35 +13,50 @@ import (
 	"strings"
 	"time"
 
+	"sync"
+
 	"github.com/labstack/echo"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	"github.com/qiniu/logkit/utils"
 )
 
-var DEFAULT_PORT = 4000
+var DEFAULT_PORT = 3000
 
 const (
 	StatsShell = "stats"
 	PREFIX     = "/logkit"
 )
 
-type cmdArgs struct {
-	CmdArgs []string
-}
-
 type RestService struct {
 	mgr     *Manager
 	l       net.Listener
+	cluster *Cluster
 	address string
 }
 
 func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 
-	rs := &RestService{
-		mgr: mgr,
+	if mgr.Cluster.Enable && !mgr.Cluster.IsMaster {
+		if len(mgr.Cluster.MasterUrl) < 1 {
+			log.Fatalf("cluster is enabled but master url is empty")
+		}
+		for i := range mgr.Cluster.MasterUrl {
+			if !strings.HasPrefix(mgr.Cluster.MasterUrl[i], "http://") {
+				mgr.Cluster.MasterUrl[i] = "http://" + mgr.Cluster.MasterUrl[i]
+			}
+		}
 	}
+
+	rs := &RestService{
+		mgr:     mgr,
+		cluster: NewCluster(&mgr.Cluster),
+	}
+	rs.cluster.mutex = new(sync.RWMutex)
 	router.GET(PREFIX+"/status", rs.Status())
+
+	//configs API
 	router.GET(PREFIX+"/configs", rs.GetConfigs())
 	router.GET(PREFIX+"/configs/:name", rs.GetConfig())
 	router.POST(PREFIX+"/configs/:name", rs.PostConfig())
@@ -76,11 +91,19 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	//version
 	router.GET(PREFIX+"/version", rs.GetVersion())
 
+	//cluster API
+	router.GET(PREFIX+"/cluster/ping", rs.Ping())
+	router.POST(PREFIX+"/cluster/register", rs.PostRegister())
+	router.POST(PREFIX+"/cluster/tag", rs.PostTag())
+	router.GET(PREFIX+"/cluster/slaves", rs.Slaves())
+	router.GET(PREFIX+"/cluster/status", rs.ClusterStatus())
+
 	var (
-		port     = DEFAULT_PORT
-		address  string
-		listener net.Listener
-		err      error
+		port       = DEFAULT_PORT
+		address    string
+		listener   net.Listener
+		err        error
+		httpschema = "http://"
 	)
 
 	for {
@@ -89,7 +112,7 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 		}
 		address = ":" + strconv.Itoa(port)
 		if mgr.BindHost != "" {
-			address = mgr.BindHost
+			address, httpschema = utils.RemoveHttpProtocal(mgr.BindHost)
 		}
 		listener, err = httpserve(address, router)
 		if err != nil {
@@ -111,7 +134,27 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 		log.Warn(err)
 	}
 	rs.address = address
+	if rs.cluster.Enable {
+		rs.cluster.myaddress, err = GetMySlaveUrl(address, httpschema)
+		if err != nil {
+			log.Fatalf("get slave url bindaddress[%v] error %v", address, err)
+		}
+	}
 	return rs
+}
+
+func GetMySlaveUrl(address, schema string) (uri string, err error) {
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return
+	}
+	if host == "" {
+		host, err = utils.GetLocalIP()
+		if err != nil {
+			return
+		}
+	}
+	return schema + host + ":" + port, nil
 }
 
 func generateStatsShell(address, prefix string) (err error) {
@@ -136,6 +179,13 @@ func generateStatsShell(address, prefix string) (err error) {
 func (rs *RestService) Status() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		rss := rs.mgr.Status()
+		if rs.cluster.Enable {
+			for k, v := range rss {
+				v.Tag = rs.cluster.mytag
+				v.Url = rs.cluster.myaddress
+				rss[k] = v
+			}
+		}
 		return c.JSON(http.StatusOK, rss)
 	}
 }
@@ -377,6 +427,13 @@ func (rs *RestService) GetVersion() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		return c.JSON(http.StatusOK, &Version{Version: rs.mgr.Version})
 	}
+}
+
+func (rs *RestService) Register() error {
+	if rs.cluster.Enable {
+		return rs.cluster.RunRegisterLoop()
+	}
+	return nil
 }
 
 // Stop will stop RestService
