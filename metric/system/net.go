@@ -54,16 +54,20 @@ func (_ *NetIOStats) Usages() string {
 }
 
 func (_ *NetIOStats) Config() []utils.Option {
-	return []utils.Option{}
+	return []utils.Option{
+		{
+			KeyName:      "interfaces",
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "收集特定网卡的信息,用','分隔(interfaces)",
+		},
+	}
 }
 
 func (_ *NetIOStats) Attributes() []utils.KeyValue {
 	return KeyNetUsages
 }
-
-//var netSampleConfig = `{
-//  "interfaces":["eth0"]
-//}`
 
 func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 	netio, err := s.ps.NetIO()

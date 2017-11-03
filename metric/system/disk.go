@@ -24,6 +24,10 @@ const (
 	KeyDiskInodesTotal = "disk_inodes_total"
 	KeyDiskInodesFree  = "disk_inodes_fress"
 	KeyDiskInodesUsed  = "disk_inodes_used"
+
+	// Config 中的字段
+	ConfigDiskIgnoreFs    = "ignore_fs"
+	ConfigDiskMountPoints = "mount_points"
 )
 
 // KeyDiskUsages TypeMetricDisk 字段名称
@@ -38,6 +42,12 @@ var KeyDiskUsages = []utils.KeyValue{
 	{KeyDiskInodesTotal, "总inode数量"},
 	{KeyDiskInodesFree, "空闲的inode数量"},
 	{KeyDiskInodesUsed, "适用的inode数量"},
+}
+
+// ConfigDiskUsages TypeMetricDisk config 中的字段描述
+var ConfigDiskUsages = []utils.KeyValue{
+	{ConfigDiskIgnoreFs, "忽略的挂载点,用','分隔(" + ConfigDiskIgnoreFs + ")"},
+	{ConfigDiskMountPoints, "收集特定挂载点信息,默认收集所有挂载点,用','分隔(" + ConfigDiskMountPoints + ")"},
 }
 
 type DiskStats struct {
@@ -56,20 +66,22 @@ func (_ *DiskStats) Usages() string {
 }
 
 func (_ *DiskStats) Config() []utils.Option {
-	return []utils.Option{}
+	configOptions := make([]utils.Option, 0)
+	for _, val := range ConfigDiskUsages {
+		option := utils.Option{
+			KeyName:      val.Key,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  val.Value,
+		}
+		configOptions = append(configOptions, option)
+	}
+	return configOptions
 }
 
 func (_ *DiskStats) Attributes() []utils.KeyValue {
 	return KeyDiskUsages
-}
-
-var diskSampleConfig = `{
-  "mount_points": ["/"],
-  "ignore_fs":["tmpfs", "devtmpfs", "devfs"]
-}`
-
-func (_ *DiskStats) SampleConfig() string {
-	return diskSampleConfig
 }
 
 func (s *DiskStats) Collect() (datas []map[string]interface{}, err error) {
@@ -103,7 +115,6 @@ func (s *DiskStats) Collect() (datas []map[string]interface{}, err error) {
 		}
 		datas = append(datas, fields)
 	}
-
 	return
 }
 
@@ -122,6 +133,12 @@ const (
 	KeyDiskioIopsInProgress = "diskio_iops_in_progress"
 	KeyDiskioName           = "diskio_name"
 	KeyDiskioSerial         = "serial"
+
+	// Config 字段
+	ConfigDiskioDevices          = "devices"
+	ConfigDiskioDeviceTags       = "device_tags"
+	ConfigDiskioNameTemplates    = "name_templates"
+	ConfigDiskioSkipSerialNumber = "skip_serial_number"
 )
 
 // KeyDiskioUsages TypeMetricDiskio 中的字段名称
@@ -137,13 +154,21 @@ var KeyDiskioUsages = []utils.KeyValue{
 	{KeyDiskioName, "磁盘名称"},
 }
 
+// ConfigDiskioUsages TypeMetricDiskio 配置项描述
+var ConfigDiskioUsages = []utils.KeyValue{
+	{ConfigDiskioDevices, "获取特定设备的信息,用','隔开(" + ConfigDiskioDevices + ")"},
+	{ConfigDiskioDeviceTags, "采集磁盘某些tag的信息,用','隔开(" + ConfigDiskioDeviceTags + ")"},
+	{ConfigDiskioNameTemplates, "一些尝试加入设备的模板列表,用','隔开(" + ConfigDiskioNameTemplates + ")"},
+	{ConfigDiskioSkipSerialNumber, "是否忽略磁盘序列号(" + ConfigDiskioSkipSerialNumber + ")"},
+}
+
 type DiskIOStats struct {
 	ps PS
 
-	Devices          []string
-	DeviceTags       []string
-	NameTemplates    []string
-	SkipSerialNumber bool
+	Devices          []string `json:"devices"`
+	DeviceTags       []string `json:"device_tags"`
+	NameTemplates    []string `json:"name_templates"`
+	SkipSerialNumber bool     `json:"skip_serial_number"`
 
 	infoCache map[string]diskInfoCache
 }
@@ -152,16 +177,32 @@ func (_ *DiskIOStats) Name() string {
 	return TypeMetricDiskio
 }
 
-var diskIoSampleConfig = `
-
-`
-
 func (_ *DiskIOStats) Usages() string {
 	return MetricDiskioUsages
 }
 
 func (_ *DiskIOStats) Config() []utils.Option {
-	return []utils.Option{}
+	configOptions := make([]utils.Option, 0)
+	for i := 0; i < 3; i++ {
+		option := utils.Option{
+			KeyName:      ConfigDiskioUsages[i].Key,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  ConfigDiskioUsages[i].Value,
+		}
+		configOptions = append(configOptions, option)
+	}
+	option := utils.Option{
+		KeyName:       ConfigDiskioUsages[3].Key,
+		ChooseOnly:    true,
+		ChooseOptions: []string{"true", "false"},
+		Default:       "true",
+		DefaultNoUse:  false,
+		Description:   ConfigDiskioUsages[3].Value,
+	}
+	configOptions = append(configOptions, option)
+	return configOptions
 }
 
 func (_ *DiskIOStats) Attributes() []utils.KeyValue {

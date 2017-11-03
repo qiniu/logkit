@@ -38,6 +38,11 @@ const (
 	CpuUsageGuest     = "cpu_usage_guest"
 	CpuUsageGuestNice = "cpu_usage_guest_nice"
 	CpuUsageCPU       = "cpu_usage_cpu"
+
+	// Config 中的字段
+	CpuConfigPerCpu         = "per_cpu"
+	CpuConfigTotalCpu       = "total_cpu"
+	CpuConfigCollectCpuTime = "collect_cpu_time"
 )
 
 // KeyCpuUsages TypeMetricCpu 中的字段名称
@@ -69,12 +74,19 @@ var KeyCpuUsages = []utils.KeyValue{
 	{CpuUsageCPU, "CPU序号名称"},
 }
 
+// ConfigCpuUsages TypeMetricCpu 配置项的描述
+var ConfigCpuUsages = []utils.KeyValue{
+	{CpuConfigPerCpu, "是否收集每个 cpu 的统计数据(" + CpuConfigPerCpu + ")"},
+	{CpuConfigTotalCpu, "是否收集整个系统的 cpu 统计信息(" + CpuConfigTotalCpu + ")"},
+	{CpuConfigCollectCpuTime, "是否收集 cpu 时间统计信息(" + CpuConfigCollectCpuTime + ")"},
+}
+
 type CPUStats struct {
 	ps        PS
 	lastStats map[string]cpu.TimesStat
 
-	PerCPU         bool `json:"percpu"`
-	TotalCPU       bool `json:"totalcpu"`
+	PerCPU         bool `json:"per_cpu"`
+	TotalCPU       bool `json:"total_cpu"`
 	CollectCPUTime bool `json:"collect_cpu_time"`
 }
 
@@ -82,26 +94,28 @@ func (_ *CPUStats) Name() string {
 	return TypeMetricCpu
 }
 
-var sampleConfig = `{
-  "percpu": true,
-  "totalcpu" : true,
-  "collect_cpu_time": false
-}`
-
 func (_ *CPUStats) Usages() string {
 	return MetricCpuUsages
 }
 
 func (_ *CPUStats) Config() []utils.Option {
-	return []utils.Option{}
+	cpuConfig := make([]utils.Option, 0)
+	for _, val := range ConfigCpuUsages {
+		opt := utils.Option{
+			KeyName:       val.Key,
+			ChooseOnly:    true,
+			ChooseOptions: []string{"true", "false"},
+			Default:       "true",
+			DefaultNoUse:  false,
+			Description:   val.Value,
+		}
+		cpuConfig = append(cpuConfig, opt)
+	}
+	return cpuConfig
 }
 
 func (_ *CPUStats) Attributes() []utils.KeyValue {
 	return KeyCpuUsages
-}
-
-func (_ *CPUStats) SampleConfig() string {
-	return sampleConfig
 }
 
 func (s *CPUStats) Collect() (datas []map[string]interface{}, err error) {
