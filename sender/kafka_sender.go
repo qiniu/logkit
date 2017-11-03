@@ -11,6 +11,7 @@ import (
 	"sync"
 	"regexp"
 	"os"
+	"strings"
 )
 
 type KafkaSender struct {
@@ -27,12 +28,24 @@ type KafkaSender struct {
 }
 
 const (
-	KeyKafkaHost = "kafka_host"
-	KeyKafkaTopic = "kafka_topic"
-	KeyKafkaClientId = "kafka_client_id"
-	KeyKafkaFlushNum = "kafka_flush_num"
-	KeyKafkaFlushFrequency = "kafka_flush_frequency"
-	KeyKafkaRetryMax = "kafka_retry_max"
+	KeyKafkaHost = "kafka_host"                  		//主机地址,可以有多个
+	KeyKafkaTopic = "kafka_topic"						//topic 1.填一个值,则topic为所填值 2.天两个值: %{[字段名]}, defaultTopic :根据每条event,以指定字段值为topic,若无,则用默认值
+	KeyKafkaClientId = "kafka_client_id"				//客户端ID
+	KeyKafkaFlushNum = "kafka_flush_num"				//缓冲条数
+	KeyKafkaFlushFrequency = "kafka_flush_frequency"	//缓冲频率
+	KeyKafkaRetryMax = "kafka_retry_max"				//最大重试次数
+	KeyKafkaCompression = "kafka_compression"			//压缩模式,有none, gzip, snappy
+	KeyKafkaTimeout = "kafka_timeout"					//连接超时时间
+	KeyKafkaKeepAlive = "kafka_keepAlive"				//保持连接时长
+
+)
+
+var (
+	compressionModes = map[string]sarama.CompressionCodec{
+		"none":   sarama.CompressionNone,
+		"gzip":   sarama.CompressionGZIP,
+		"snappy": sarama.CompressionSnappy,
+	}
 )
 
 func NewKafkaSender(conf conf.MapConf) (sender Sender, err error){
@@ -40,40 +53,46 @@ func NewKafkaSender(conf conf.MapConf) (sender Sender, err error){
 	if err != nil {
 		return
 	}
-
 	topic, err := conf.GetStringList(KeyKafkaTopic)
 	if err != nil{
 		return
 	}
-
 	topic, err = utils.ExtractField(topic)
 	if err != nil {
 		return
 	}
-
-
-	num, _ := conf.GetIntOr(KeyKafkaFlushNum, 10)
-
-
-	frequency, _ := conf.GetIntOr(KeyKafkaFlushFrequency, 5)
-
-	retryMax, _ := conf.GetIntOr(KeyKafkaRetryMax, 3)
-
 	hostName, _ := os.Hostname()
+	clientID, _ := conf.GetStringOr(KeyKafkaClientId, hostName)
+	num, _ := conf.GetIntOr(KeyKafkaFlushNum, 200)
+	frequency, _ := conf.GetIntOr(KeyKafkaFlushFrequency, 5)
+	retryMax, _ := conf.GetIntOr(KeyKafkaRetryMax, 3)
+	compression, _ := conf.GetStringOr(KeyKafkaCompression, "none")
+	timeout, _ := conf.GetIntOr(KeyKafkaTimeout, 30)
+	keepAlive, _ := conf.GetIntOr(KeyKafkaKeepAlive, 0)
 
-	clientIp, _ := conf.GetStringOr(KeyKafkaClientId, hostName)
 
 	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("kafkaSender:(kafkaUrl:%s,topic:%s)", hosts, topic))
 	cfg := sarama.NewConfig()
-	cfg.ClientID = clientIp
-	cfg.Producer.Return.Successes = true //必须有这个选项
-	cfg.Producer.Timeout = 5 * time.Second
+	cfg.Producer.Return.Successes = true
+	cfg.Producer.Return.Errors = true
+	//客户端ID
+	cfg.ClientID = clientID
 	//批量发送条数
 	cfg.Producer.Flush.Messages = num
 	//批量发送间隔
 	cfg.Producer.Flush.Frequency =  time.Duration(frequency) * time.Second
 	//失败重试次数
 	cfg.Producer.Retry.Max = retryMax
+	//压缩模式
+	compressionMode, ok := compressionModes[strings.ToLower(compression)]
+	if !ok {
+		return nil, fmt.Errorf("Unknown compression mode: '%v'", compression)
+	}
+	cfg.Producer.Compression = compressionMode
+	//连接超时时间
+	cfg.Net.DialTimeout = time.Duration(timeout) * time.Second
+	//保持连接的时间
+	cfg.Net.KeepAlive = time.Duration(keepAlive) * time.Second
 
 	producer, err := sarama.NewAsyncProducer(hosts, cfg)
 	if err != nil {
@@ -130,7 +149,7 @@ func (this *KafkaSender) Send(data []Data) (err error){
 	for _, doc := range data {
 		message, err := this.getEventMessage(doc)
 		if err != nil {
-			log.Debug(err)
+			log.Debugf("Dropping event: %v", err)
 			continue
 		}
 		producer.Input() <- message
@@ -141,7 +160,7 @@ func (this *KafkaSender) Send(data []Data) (err error){
 func (kf *KafkaSender) getEventMessage(event map[string]interface{}) (pm *sarama.ProducerMessage, err error){
 	var topic string
 	if len(kf.topic) == 2 {
-		if event[kf.topic[0]] == nil{
+		if event[kf.topic[0]] == nil || event[kf.topic[0]] == ""{
 			topic = kf.topic[1]
 		} else {
 			topic = event[kf.topic[0]].(string)
