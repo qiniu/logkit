@@ -22,7 +22,7 @@ const (
 )
 
 const (
-	defaultCollectInterval = "3s"
+	defaultCollectInterval = 3
 )
 
 type MetricConfig struct {
@@ -56,14 +56,12 @@ func NewMetric(tp string) (metric.Collector, error) {
 }
 
 func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *MetricRunner, err error) {
-	if rc.CollectInterval == "" {
+	if rc.CollectInterval <= 0 {
 		rc.CollectInterval = defaultCollectInterval
 	}
-	interval, err := time.ParseDuration(rc.CollectInterval)
-	if err != nil {
-		return
-	}
+	interval := time.Duration(rc.CollectInterval) * time.Second
 	meta, err := reader.NewMetaWithConf(conf.MapConf{
+		utils.GlobalKeyName:  rc.RunnerName,
 		reader.KeyRunnerName: rc.RunnerName,
 		reader.KeyMode:       reader.ModeMetrics,
 	})
@@ -72,6 +70,9 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 	}
 	collectors := make([]metric.Collector, 0)
 	transformers := make([]transforms.Transformer, 0)
+	if len(rc.MetricConfig) == 0 {
+		return nil, fmt.Errorf("Runner " + rc.RunnerName + " has zero metric, ignore it")
+	}
 	for _, m := range rc.MetricConfig {
 		tp := m.MetricType
 		c, err := NewMetric(tp)
@@ -166,13 +167,13 @@ func (r *MetricRunner) Run() {
 			}
 			for i := range tmpdatas {
 				if len(tmpdatas[i]) > 0 {
+					dataCnt++
 					datas = append(datas, tmpdatas[i])
 				}
 			}
 			if len(tmpdatas) < 1 {
 				log.Debugf("MetricRunner %v collect No data", c.Name())
 			}
-			dataCnt += len(tmpdatas)
 		}
 		r.rsMutex.Lock()
 		r.rs.ReadDataCount += int64(dataCnt)
@@ -180,6 +181,7 @@ func (r *MetricRunner) Run() {
 		r.lastSend = time.Now()
 		if len(datas) <= 0 {
 			log.Debug("MetricRunner collect No data")
+			time.Sleep(r.collectInterval)
 			continue
 		}
 		var err error
@@ -191,6 +193,7 @@ func (r *MetricRunner) Run() {
 		}
 		if len(datas) <= 0 {
 			log.Warnf("data has been cleared by transformer")
+			time.Sleep(r.collectInterval)
 			continue
 		}
 		for _, s := range r.senders {

@@ -2,6 +2,12 @@ package metric
 
 import "github.com/qiniu/logkit/utils"
 
+const (
+	ConfigTypeBool   = "bool"
+	ConfigTypeArray  = "array"
+	ConsifTypeString = "string"
+)
+
 //Collector 收集metrics的接口
 type Collector interface {
 	Name() string

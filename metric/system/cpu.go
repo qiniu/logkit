@@ -108,6 +108,7 @@ func (_ *CPUStats) Config() []utils.Option {
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   val.Value,
+			Type:          metric.ConfigTypeBool,
 		}
 		cpuConfig = append(cpuConfig, opt)
 	}

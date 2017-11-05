@@ -11,7 +11,7 @@ import (
 
 const (
 	TypeMetricNet   = "net"
-	MetricNetUsages = "网络设备状态"
+	MetricNetUsages = "网络设备状态(net)"
 
 	// TypeMetricNet 信息中的字段
 	KeyNetBytesSent   = "net_bytes_sent"
@@ -61,6 +61,7 @@ func (_ *NetIOStats) Config() []utils.Option {
 			Default:      "",
 			DefaultNoUse: false,
 			Description:  "收集特定网卡的信息,用','分隔(interfaces)",
+			Type:         metric.ConfigTypeArray,
 		},
 	}
 }

@@ -1,13 +1,13 @@
 import React, {Component} from 'react';
 import {notification, Button, Steps, Icon, Tag, Layout} from 'antd';
-import Source from  './components/sourceConfig'
-import Parser from  './components/parserConfig'
-import Sender from './components/senderConfig'
-import RenderConfig from './components/renderConfig'
-import Transformer from './components/transformer'
-import config from './store/config'
+import Source from  '../components/sourceConfig'
+import Parser from  '../components/parserConfig'
+import Sender from '../components/senderConfig'
+import RenderConfig from '../components/renderConfig'
+import Transformer from '../components/transformer'
+import config from '../store/config'
 import moment from 'moment'
-import {postConfigData, getRunnerVersion, putConfigData} from './services/logkit';
+import {postConfigData, getRunnerVersion, putConfigData} from '../services/logkit';
 import _ from "lodash";
 
 const Step = Steps.Step;
@@ -28,7 +28,7 @@ const steps = [{
   title: '确认并添加Runner',
   content: '确认并添加',
 }];
-class Create extends Component {
+class CreateLogRunner extends Component {
   constructor(props) {
     super(props);
     this.state = {
@@ -219,72 +219,72 @@ class Create extends Component {
   render() {
     const {current} = this.state;
     return (
-        <div className="logkit-create-container">
-          <div className="header">
-            <Button style={{float: 'left', marginTop: '20px'}} type="primary" className="index-btn"
-                    onClick={() => this.turnToIndex()}>
-              <Icon type="link"/>回到首页
-            </Button>七牛Logkit配置文件助手 {this.state.version}
-          </div>
-          <Steps current={current}>
-            {steps.map(item => <Step key={item.title} title={item.title}/>)}
-          </Steps>
-          <div className="steps-content">
-            <div><p className={this.state.current <= 3 ? 'show-div info' : 'hide-div'}>注意：黄色字体选框需根据实际情况修改，其他可作为默认值</p>
-            </div>
-            <div className={this.state.current === 0 ? 'show-div' : 'hide-div'}>
-              <Source ref="checkSourceData"></Source>
-            </div>
-            <div className={this.state.current === 1 ? 'show-div' : 'hide-div'}>
-              <Parser ref="checkParseData"></Parser>
-            </div>
-            <div className={this.state.current === 2 ? 'show-div' : 'hide-div'}>
-              <Transformer ref="initTransform"></Transformer>
-            </div>
-            <div className={this.state.current === 3 ? 'show-div' : 'hide-div'}>
-              <Sender ref="checkSenderData"></Sender>
-            </div>
-            <div className={this.state.current === 4 ? 'show-div' : 'hide-div'}>
-              <RenderConfig ref="initConfig"></RenderConfig>
-            </div>
-
-          </div>
-          <div className="steps-action">
-            {
-              this.state.current < steps.length - 1
-              &&
-              <Button type="primary" onClick={() => this.next()}>下一步</Button>
-            }
-            {
-              this.state.current === steps.length - 1 && this.state.isCpoyStatus === false
-              &&
-              <Button type="primary" onClick={() => this.addRunner()}>确认并提交</Button>
-            }
-            {
-              this.state.current === steps.length - 1 && this.state.isCpoyStatus === true
-              &&
-              <Button type="primary" onClick={() => this.updateRunner()}>修改并提交</Button>
-            }
-            {
-              this.state.current > 0
-              &&
-              <Button style={{marginLeft: 8}} onClick={() => this.prev()}>
-                上一步
-              </Button>
-            }
-          </div>
-          <Footer style={{textAlign: 'center'}}>
-            更多信息请访问：
-            <a target="_blank" href="https://github.com/qiniu/logkit">
-            <Tag color="#108ee9">Logkit</Tag> </a> |
-            <a target="_blank" href="https://github.com/qiniu/logkit/wiki">
-            <Tag color="#108ee9">帮助文档</Tag> </a> |
-            <a target="_blank" href="https://qiniu.github.io/pandora-docs/#/"><Tag
-              color="#108ee9">Pandora产品</Tag>
-          </a>
-          </Footer>
+      <div className="logkit-create-container">
+        <div className="header">
+          <Button style={{float: 'left', marginTop: '20px'}} type="primary" className="index-btn"
+                  onClick={() => this.turnToIndex()}>
+            <Icon type="link"/>回到首页
+          </Button>七牛Logkit配置文件助手 {this.state.version}
         </div>
+        <Steps current={current}>
+          {steps.map(item => <Step key={item.title} title={item.title}/>)}
+        </Steps>
+        <div className="steps-content">
+          <div><p className={this.state.current <= 3 ? 'show-div info' : 'hide-div'}>注意：黄色字体选框需根据实际情况修改，其他可作为默认值</p>
+          </div>
+          <div className={this.state.current === 0 ? 'show-div' : 'hide-div'}>
+            <Source ref="checkSourceData"></Source>
+          </div>
+          <div className={this.state.current === 1 ? 'show-div' : 'hide-div'}>
+            <Parser ref="checkParseData"></Parser>
+          </div>
+          <div className={this.state.current === 2 ? 'show-div' : 'hide-div'}>
+            <Transformer ref="initTransform"></Transformer>
+          </div>
+          <div className={this.state.current === 3 ? 'show-div' : 'hide-div'}>
+            <Sender ref="checkSenderData"></Sender>
+          </div>
+          <div className={this.state.current === 4 ? 'show-div' : 'hide-div'}>
+            <RenderConfig ref="initConfig"></RenderConfig>
+          </div>
+
+        </div>
+        <div className="steps-action">
+          {
+            this.state.current < steps.length - 1
+            &&
+            <Button type="primary" onClick={() => this.next()}>下一步</Button>
+          }
+          {
+            this.state.current === steps.length - 1 && this.state.isCpoyStatus === false
+            &&
+            <Button type="primary" onClick={() => this.addRunner()}>确认并提交</Button>
+          }
+          {
+            this.state.current === steps.length - 1 && this.state.isCpoyStatus === true
+            &&
+            <Button type="primary" onClick={() => this.updateRunner()}>修改并提交</Button>
+          }
+          {
+            this.state.current > 0
+            &&
+            <Button style={{marginLeft: 8}} onClick={() => this.prev()}>
+              上一步
+            </Button>
+          }
+        </div>
+        <Footer style={{textAlign: 'center'}}>
+          更多信息请访问：
+          <a target="_blank" href="https://github.com/qiniu/logkit">
+            <Tag color="#108ee9">Logkit</Tag> </a> |
+          <a target="_blank" href="https://github.com/qiniu/logkit/wiki">
+            <Tag color="#108ee9">帮助文档</Tag> </a> |
+          <a target="_blank" href="https://qiniu.github.io/pandora-docs/#/"><Tag
+            color="#108ee9">Pandora产品</Tag>
+          </a>
+        </Footer>
+      </div>
     );
   }
 }
-export default Create;
+export default CreateLogRunner;

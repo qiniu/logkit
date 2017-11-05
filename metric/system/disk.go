@@ -74,6 +74,7 @@ func (_ *DiskStats) Config() []utils.Option {
 			Default:      "",
 			DefaultNoUse: false,
 			Description:  val.Value,
+			Type:         metric.ConfigTypeArray,
 		}
 		configOptions = append(configOptions, option)
 	}
@@ -190,6 +191,7 @@ func (_ *DiskIOStats) Config() []utils.Option {
 			Default:      "",
 			DefaultNoUse: false,
 			Description:  ConfigDiskioUsages[i].Value,
+			Type:         metric.ConfigTypeArray,
 		}
 		configOptions = append(configOptions, option)
 	}
@@ -200,6 +202,7 @@ func (_ *DiskIOStats) Config() []utils.Option {
 		Default:       "true",
 		DefaultNoUse:  false,
 		Description:   ConfigDiskioUsages[3].Value,
+		Type:          metric.ConfigTypeBool,
 	}
 	configOptions = append(configOptions, option)
 	return configOptions
