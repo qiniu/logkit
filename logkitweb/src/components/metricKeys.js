@@ -16,7 +16,6 @@ class Keys extends Component {
     this.state = {
       items: {},
       isChecked: {},
-      checkedList: {},
       indeterminate: {},
       checkAll: {},
     };
@@ -47,35 +46,90 @@ class Keys extends Component {
           if(m === "success") continue;
           isChecked[m] = {};
           data[m].map(i =>{
-            isChecked[m][i.KeyName] = true;
+            isChecked[m][i.key] = true;
           });
         }
         if(window.nodeCopy){
           window.nodeCopy.metric.map(m => {
-            isChecked[m.type] = m.attributes;
+            isChecked[m.type] = {};
+            for(let k in m.attributes){
+              isChecked[m.type][k] = m.attributes[k];
+            }
           });
         }
         this.setState({
           items: data,
           isChecked: isChecked,
         });
+        this.initCheckAll();
       }
     })
   }
 
-  getChecked = (m, k) => {
-    let checked = true;
-    try{
-      checked = this.state.isChecked[m][k];
-    }catch(e){}
-    if(checked === undefined){
-      checked = true;
+  initCheckAll = () => {
+    let checkAll = {};
+    let indeterminate = {};
+    let data = this.state.items;
+    for(let m in this.state.isChecked){
+      let falseCnt = 0;
+      for(let k in this.state.isChecked[m]){
+        if(!this.state.isChecked[m][k]){
+          falseCnt++;
+        }
+      }
+      if(falseCnt === 0) {
+        checkAll[m] = true;
+        indeterminate[m] = false;
+      }else if(falseCnt === data[m].length){
+        checkAll[m] = false;
+        indeterminate[m] = false;
+      }else{
+        checkAll[m] = false;
+        indeterminate[m] = true;
+      }
     }
-    return checked;
+    this.setState({
+      checkAll: checkAll,
+      indeterminate: indeterminate,
+    })
+  }
+
+  onCheckboxChange = (m, k) => {
+    let isChecked = this.state.isChecked;
+    isChecked[m][k] = !isChecked[m][k];
+    this.setState({
+      isChecked: isChecked,
+    });
+    this.initCheckAll();
+  }
+
+  onCheckAllChange = (key) => {
+    let checkAll = this.state.checkAll;
+    let isChecked = this.state.isChecked;
+    let indeterminate = this.state.indeterminate;
+    if(checkAll[key]){
+      for(let k in isChecked[key]){
+        isChecked[key][k] = false;
+      }
+      indeterminate[key] = false;
+      checkAll[key] = false;
+    }else{
+      for(let k in isChecked[key]){
+        isChecked[key][k] = true;
+      }
+      indeterminate[key] = false;
+      checkAll[key] = true;
+    }
+    this.setState({
+      checkAll: checkAll,
+      isChecked: isChecked,
+      indeterminate: indeterminate,
+    })
   }
 
   renderFormItem = () => {
-    let result = []
+    let result = [];
+    let isChecked = this.state.isChecked;
     let selectedMetric = config.get("metric");
     if(!selectedMetric) selectedMetric = [];
     const {getFieldDecorator} = this.props.form;
@@ -89,21 +143,23 @@ class Keys extends Component {
         <FormItem key={key}>
           <dis>
             <span><b>{key} 字段配置</b></span>
-            {/*<span style={{marginLeft:"26px"}}>*/}
-              {/*<Checkbox*/}
-                {/*key={key}*/}
-                {/*indeterminate={this.state.indeterminate[key]}*/}
-                {/*onChange={this.onCheckAllChange[key]}*/}
-                {/*checked={this.state.checkAll[key]}*/}
-              {/*>全选/全不选</Checkbox>*/}
-            {/*</span>*/}
+            <span style={{marginLeft:"26px"}}>
+              <Checkbox
+                key={key}
+                indeterminate={this.state.indeterminate[key]}
+                onChange={()=>{this.onCheckAllChange(key)}}
+                checked={this.state.checkAll[key]}
+              >全选/全不选</Checkbox>
+            </span>
             <hr/>
           </dis>
             <Row style={{textAlign: "left", paddingLeft: "26px"}}>
               {ele.map(i => (
-                getFieldDecorator(`${key}.${i.key}`, {valuePropName: 'checked', initialValue: this.getChecked(key, i.key)})(
+                getFieldDecorator(`${key}.${i.key}`, {valuePropName: 'checked', initialValue: isChecked[key][i.key]})(
                   <Col span={12} key={i.key}>
-                    <Checkbox defaultChecked={this.getChecked(key, i.key)}>{i.key+" ("+i.value+")"}</Checkbox>
+                    <Checkbox checked={isChecked[key][i.key]} onChange={() => this.onCheckboxChange(key, i.key)}>
+                      {i.key+" ("+i.value+")"}
+                    </Checkbox>
                   </Col>
                 )
               ))}
