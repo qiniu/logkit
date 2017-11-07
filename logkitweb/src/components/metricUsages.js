@@ -51,10 +51,9 @@ class Usages extends Component {
         this.setState({
           items: data,
         })
-        if(window.nodeCopy){
+        if(window.nodeCopy && window.nodeCopy.metric){
           let formData = {};
-          let metric = window.nodeCopy.metric;
-          metric.map((m, _) => {
+          window.nodeCopy.metric.map((m, _) => {
             formData[m.type] = "true";
           });
           data.map((m, _) => {

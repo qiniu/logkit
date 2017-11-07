@@ -33,26 +33,27 @@ class Keys extends Component {
   }
 
   submit = () => {
-    const {getFieldsValue} = this.props.form;
-    let data = getFieldsValue();
-    this.props.handleMetricKeys(data);
+    this.props.handleMetricKeys(this.state.isChecked);
   }
 
   init = () => {
     getMetricKeys().then(data => {
       if (data.success) {
-        let isChecked = {};
-        for(let m in data){
-          if(m === "success") continue;
-          isChecked[m] = {};
-          data[m].map(i =>{
-            isChecked[m][i.key] = true;
-          });
-        }
-        if(window.nodeCopy){
+        const isChecked = {}
+        Object.keys(data).filter(key => key !== 'success').forEach(
+          key => {
+            const child = {}
+            data[key].forEach(
+              item => {
+                child[item.key] = true;
+              }
+            )
+            isChecked[key] = child;
+          }
+        )
+        if(window.nodeCopy && window.nodeCopy.metric) {
           window.nodeCopy.metric.map(m => {
-            isChecked[m.type] = {};
-            for(let k in m.attributes){
+            for (let k in m.attributes) {
               isChecked[m.type][k] = m.attributes[k];
             }
           });

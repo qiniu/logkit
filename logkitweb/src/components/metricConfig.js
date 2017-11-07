@@ -85,7 +85,7 @@ class Opt extends Component {
         this.setState({
           items: data,
         });
-        if(window.nodeCopy){
+        if(window.nodeCopy && window.nodeCopy.metric){
           let formData = {};
           window.nodeCopy.metric.map(m => {
             formData[m.type] = {};

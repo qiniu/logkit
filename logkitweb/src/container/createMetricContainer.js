@@ -93,7 +93,7 @@ class CreateMetricRunner extends Component {
             return true;
           }
         }
-        if(!isHasTrue && this.state.metricKeys[m.type]) flag.push(m.type);
+        if(!isHasTrue && Object.keys(this.state.metricKeys[m.type]).length) flag.push(m.type);
       });
       if(flag.length <= 0){
         const current = this.state.current + 1;
