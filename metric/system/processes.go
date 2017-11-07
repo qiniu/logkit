@@ -69,12 +69,12 @@ func (p *Processes) Usages() string {
 	return MetricProcessesUsage
 }
 
-func (p *Processes) Config() []utils.Option {
-	return []utils.Option{}
-}
-
-func (p *Processes) Attributes() []utils.KeyValue {
-	return KeyProcessesUsages
+func (_ *Processes) Config() map[string]interface{} {
+	config := map[string]interface{}{
+		metric.OptionString:     []utils.Option{},
+		metric.AttributesString: KeyProcessesUsages,
+	}
+	return config
 }
 
 func (p *Processes) Collect() (datas []map[string]interface{}, err error) {

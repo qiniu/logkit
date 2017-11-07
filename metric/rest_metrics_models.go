@@ -3,9 +3,15 @@ package metric
 import "github.com/qiniu/logkit/utils"
 
 func GetMetricTypeKey() map[string][]utils.KeyValue {
-	typeKey := map[string][]utils.KeyValue{}
+	typeKey := make(map[string][]utils.KeyValue)
 	for key, collector := range Collectors {
-		typeKey[key] = collector().Attributes()
+		coll := collector()
+		config := coll.Config()
+		if attributes, ex := config[AttributesString]; ex {
+			if attr, ok := attributes.([]utils.KeyValue); ok {
+				typeKey[key] = attr
+			}
+		}
 	}
 	return typeKey
 }
@@ -27,10 +33,15 @@ func GetMetricUsages() []utils.Option {
 }
 
 func GetMetricOptions() map[string][]utils.Option {
-	metricOptions := map[string][]utils.Option{}
+	metricOptions := make(map[string][]utils.Option)
 	for key, collector := range Collectors {
-		option := collector().Config()
-		metricOptions[key] = option
+		coll := collector()
+		config := coll.Config()
+		if option, ex := config[OptionString]; ex {
+			if opt, ok := option.([]utils.Option); ok {
+				metricOptions[key] = opt
+			}
+		}
 	}
 	return metricOptions
 }

@@ -57,12 +57,12 @@ func (k *Kernel) Usages() string {
 	return MetricKernelUsages
 }
 
-func (k *Kernel) Config() []utils.Option {
-	return []utils.Option{}
-}
-
-func (k *Kernel) Attributes() []utils.KeyValue {
-	return KeyKernelUsages
+func (k *Kernel) Config() map[string]interface{} {
+	config := map[string]interface{}{
+		metric.OptionString:     []utils.Option{},
+		metric.AttributesString: KeyKernelUsages,
+	}
+	return config
 }
 
 func (k *Kernel) Collect() (datas []map[string]interface{}, err error) {

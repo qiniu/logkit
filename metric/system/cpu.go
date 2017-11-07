@@ -98,7 +98,7 @@ func (_ *CPUStats) Usages() string {
 	return MetricCpuUsages
 }
 
-func (_ *CPUStats) Config() []utils.Option {
+func (_ *CPUStats) Config() map[string]interface{} {
 	cpuConfig := make([]utils.Option, 0)
 	for _, val := range ConfigCpuUsages {
 		opt := utils.Option{
@@ -112,11 +112,11 @@ func (_ *CPUStats) Config() []utils.Option {
 		}
 		cpuConfig = append(cpuConfig, opt)
 	}
-	return cpuConfig
-}
-
-func (_ *CPUStats) Attributes() []utils.KeyValue {
-	return KeyCpuUsages
+	config := map[string]interface{}{
+		metric.OptionString:     cpuConfig,
+		metric.AttributesString: KeyCpuUsages,
+	}
+	return config
 }
 
 func (s *CPUStats) Collect() (datas []map[string]interface{}, err error) {

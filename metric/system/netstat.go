@@ -57,12 +57,12 @@ func (_ *NetStats) Usages() string {
 	return MetricNetstatUsages
 }
 
-func (_ *NetStats) Config() []utils.Option {
-	return []utils.Option{}
-}
-
-func (_ *NetStats) Attributes() []utils.KeyValue {
-	return KeyNetStatUsages
+func (_ *NetStats) Config() map[string]interface{} {
+	config := map[string]interface{}{
+		metric.OptionString:     []utils.Option{},
+		metric.AttributesString: KeyNetStatUsages,
+	}
+	return config
 }
 
 func (s *NetStats) Collect() (datas []map[string]interface{}, err error) {

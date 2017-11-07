@@ -39,10 +39,6 @@ var KeySystemUsages = []utils.KeyValue{
 }
 
 type SystemStats struct {
-	config SystemConfig
-}
-
-type SystemConfig struct {
 }
 
 func (_ *SystemStats) Name() string {
@@ -53,12 +49,12 @@ func (_ *SystemStats) Usages() string {
 	return MetricSystemUsage
 }
 
-func (s *SystemStats) Config() []utils.Option {
-	return []utils.Option{}
-}
-
-func (s *SystemStats) Attributes() []utils.KeyValue {
-	return KeySystemUsages
+func (s *SystemStats) Config() map[string]interface{} {
+	config := map[string]interface{}{
+		metric.OptionString:     []utils.Option{},
+		metric.AttributesString: KeySystemUsages,
+	}
+	return config
 }
 
 func (_ *SystemStats) Collect() (datas []map[string]interface{}, err error) {

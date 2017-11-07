@@ -50,12 +50,12 @@ func (_ *MemStats) Usages() string {
 	return MetricMemUsages
 }
 
-func (_ *MemStats) Config() []utils.Option {
-	return []utils.Option{}
-}
-
-func (_ *MemStats) Attributes() []utils.KeyValue {
-	return KeyMemUsages
+func (_ *MemStats) Config() map[string]interface{} {
+	config := map[string]interface{}{
+		metric.OptionString:     []utils.Option{},
+		metric.AttributesString: KeyMemUsages,
+	}
+	return config
 }
 
 func (s *MemStats) Collect() (datas []map[string]interface{}, err error) {
@@ -115,12 +115,12 @@ func (_ *SwapStats) Usages() string {
 	return MetricSwapUsages
 }
 
-func (_ *SwapStats) Config() []utils.Option {
-	return []utils.Option{}
-}
-
-func (_ *SwapStats) Attributes() []utils.KeyValue {
-	return KeySwapUsages
+func (_ *SwapStats) Config() map[string]interface{} {
+	config := map[string]interface{}{
+		metric.OptionString:     []utils.Option{},
+		metric.AttributesString: KeySwapUsages,
+	}
+	return config
 }
 
 func (s *SwapStats) Collect() (datas []map[string]interface{}, err error) {

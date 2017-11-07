@@ -92,15 +92,19 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 		collectors = append(collectors, c)
 
 		// 配置文件中明确标明 false 的 attr 加入 discard transformer
-		attributes := c.Attributes()
-		for _, attr := range attributes {
-			val, exist := m.Attributes[attr.Key]
-			if exist && !val {
-				trans, err := createDiscardTransformer(attr.Key)
-				if err != nil {
-					return nil, fmt.Errorf("metric %v key %v, transform add failed, %v", tp, attr.Key, err)
+		config := c.Config()
+		if attributes, ex := config[metric.AttributesString]; ex {
+			if attrs, ok := attributes.([]utils.KeyValue); ok {
+				for _, attr := range attrs {
+					val, exist := m.Attributes[attr.Key]
+					if exist && !val {
+						trans, err := createDiscardTransformer(attr.Key)
+						if err != nil {
+							return nil, fmt.Errorf("metric %v key %v, transform add failed, %v", tp, attr.Key, err)
+						}
+						transformers = append(transformers, trans)
+					}
 				}
-				transformers = append(transformers, trans)
 			}
 		}
 	}

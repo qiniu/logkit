@@ -53,8 +53,8 @@ func (_ *NetIOStats) Usages() string {
 	return MetricNetUsages
 }
 
-func (_ *NetIOStats) Config() []utils.Option {
-	return []utils.Option{
+func (_ *NetIOStats) Config() map[string]interface{} {
+	configOption := []utils.Option{
 		{
 			KeyName:      "interfaces",
 			ChooseOnly:   false,
@@ -64,10 +64,11 @@ func (_ *NetIOStats) Config() []utils.Option {
 			Type:         metric.ConfigTypeArray,
 		},
 	}
-}
-
-func (_ *NetIOStats) Attributes() []utils.KeyValue {
-	return KeyNetUsages
+	config := map[string]interface{}{
+		metric.OptionString:     configOption,
+		metric.AttributesString: KeyNetUsages,
+	}
+	return config
 }
 
 func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {

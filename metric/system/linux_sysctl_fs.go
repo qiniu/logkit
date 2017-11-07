@@ -22,12 +22,12 @@ func (_ SysctlFS) Usages() string {
 	return "linux_sysctl_fs"
 }
 
-func (_ SysctlFS) Config() []utils.Option {
-	return []utils.Option{}
-}
-
-func (_ SysctlFS) Attributes() []utils.KeyValue {
-	return []utils.KeyValue{}
+func (_ SysctlFS) Config() map[string]interface{} {
+	config := map[string]interface{}{
+		metric.OptionString:     []utils.Option{},
+		metric.AttributesString: []utils.KeyValue{},
+	}
+	return config
 }
 
 func (sfs *SysctlFS) gatherList(file string, fields map[string]interface{}, fieldNames ...string) error {

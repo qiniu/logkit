@@ -30,12 +30,12 @@ func (k *KernelVmstat) Usages() string {
 	return MetricKernelVmstatUsages
 }
 
-func (k *KernelVmstat) Config() []utils.Option {
-	return []utils.Option{}
-}
-
-func (k *KernelVmstat) Attributes() []utils.KeyValue {
-	return []utils.KeyValue{}
+func (k *KernelVmstat) Config() map[string]interface{} {
+	config := map[string]interface{}{
+		metric.OptionString:     []utils.Option{},
+		metric.AttributesString: []utils.KeyValue{},
+	}
+	return config
 }
 
 func (k *KernelVmstat) Collect() (datas []map[string]interface{}, err error) {

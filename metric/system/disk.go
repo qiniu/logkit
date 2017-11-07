@@ -65,7 +65,7 @@ func (_ *DiskStats) Usages() string {
 	return MetricDiskUsages
 }
 
-func (_ *DiskStats) Config() []utils.Option {
+func (_ *DiskStats) Config() map[string]interface{} {
 	configOptions := make([]utils.Option, 0)
 	for _, val := range ConfigDiskUsages {
 		option := utils.Option{
@@ -78,11 +78,11 @@ func (_ *DiskStats) Config() []utils.Option {
 		}
 		configOptions = append(configOptions, option)
 	}
-	return configOptions
-}
-
-func (_ *DiskStats) Attributes() []utils.KeyValue {
-	return KeyDiskUsages
+	config := map[string]interface{}{
+		metric.OptionString:     configOptions,
+		metric.AttributesString: KeyDiskUsages,
+	}
+	return config
 }
 
 func (s *DiskStats) Collect() (datas []map[string]interface{}, err error) {
@@ -182,7 +182,7 @@ func (_ *DiskIOStats) Usages() string {
 	return MetricDiskioUsages
 }
 
-func (_ *DiskIOStats) Config() []utils.Option {
+func (_ *DiskIOStats) Config() map[string]interface{} {
 	configOptions := make([]utils.Option, 0)
 	for i := 0; i < 3; i++ {
 		option := utils.Option{
@@ -205,11 +205,12 @@ func (_ *DiskIOStats) Config() []utils.Option {
 		Type:          metric.ConfigTypeBool,
 	}
 	configOptions = append(configOptions, option)
-	return configOptions
-}
 
-func (_ *DiskIOStats) Attributes() []utils.KeyValue {
-	return KeyDiskioUsages
+	config := map[string]interface{}{
+		metric.OptionString:     configOptions,
+		metric.AttributesString: KeyDiskioUsages,
+	}
+	return config
 }
 
 func (s *DiskIOStats) Collect() (datas []map[string]interface{}, err error) {
