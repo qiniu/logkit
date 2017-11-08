@@ -97,6 +97,13 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	router.POST(PREFIX+"/cluster/tag", rs.PostTag())
 	router.GET(PREFIX+"/cluster/slaves", rs.Slaves())
 	router.GET(PREFIX+"/cluster/status", rs.ClusterStatus())
+	router.GET(PREFIX+"/cluster/configs", rs.GetClusterConfigs())
+	router.POST(PREFIX+"/cluster/configs/:name", rs.PostClusterConfig())
+	router.PUT(PREFIX+"/cluster/configs/:name", rs.PutClusterConfig())
+	router.DELETE(PREFIX+"/cluster/configs/:name", rs.DeleteClusterConfig())
+	router.POST(PREFIX+"/cluster/configs/:name/stop", rs.PostClusterConfigStop())
+	router.POST(PREFIX+"/cluster/configs/:name/start", rs.PostClusterConfigStart())
+	router.POST(PREFIX+"/cluster/configs/:name/reset", rs.PostClusterConfigReset())
 
 	var (
 		port       = DEFAULT_PORT
