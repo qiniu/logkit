@@ -6,6 +6,7 @@ import Sender from '../components/senderConfig'
 import RenderConfig from '../components/renderConfig'
 import Transformer from '../components/transformer'
 import config from '../store/config'
+import {isJSON} from '../utils/tools'
 import moment from 'moment'
 import {postConfigData, getRunnerVersion, putConfigData} from '../services/logkit';
 import _ from "lodash";
@@ -142,17 +143,6 @@ class CreateLogRunner extends Component {
 
   }
 
-  isJSON = (str) => {
-    if (typeof str === 'string') {
-      try {
-        JSON.parse(str);
-        return true;
-      } catch (e) {
-        return false;
-      }
-    }
-  }
-
   addRunner = () => {
     let that = this
     const {validateFields, getFieldsValue} =  that.refs.initConfig;
@@ -162,7 +152,7 @@ class CreateLogRunner extends Component {
         notification.warning({message: "表单校验未通过,请检查", duration: 20,})
         return
       } else {
-        if (this.isJSON(formData.config)) {
+        if (isJSON(formData.config)) {
           let data = JSON.parse(formData.config);
           postConfigData({name: data.name, body: data}).then(data => {
             if (data === undefined) {
@@ -188,7 +178,7 @@ class CreateLogRunner extends Component {
         notification.warning({message: "表单校验未通过,请检查", duration: 20,})
         return
       } else {
-        if (this.isJSON(formData.config)) {
+        if (isJSON(formData.config)) {
           let data = JSON.parse(formData.config);
           putConfigData({name: data.name, body: data}).then(data => {
             if (data === undefined) {

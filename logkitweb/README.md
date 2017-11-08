@@ -16,41 +16,54 @@
 
 ```bash
 ├── README.md
-├── build                                # 项目输出目录
+├── build										# 项目输出目录
 │   ├── asset-manifest.json
 │   ├── favicon.ico
 │   ├── index.html
 │   ├── manifest.json
 │   ├── service-worker.js
 │   └── static
+│       ├── antd.css
 │       ├── css
-│       │   ├── main.8c13a3a5.css
-│       │   └── main.8c13a3a5.css.map
-│       └── js
-│           ├── main.82f98664.js
-│           └── main.82f98664.js.map
-├── package.json                        # 项目信息
-├── public                              # 公共文件,编译时copy至build目录
+│       │   ├── main.19bfac5c.css
+│       │   └── main.19bfac5c.css.map
+│       ├── favicon.ico
+│       ├── js
+│       │   ├── main.4905a907.js
+│       │   └── main.4905a907.js.map
+│       └── logkit100.png
+├── package.json								# 项目信息
+├── public										# 公共文件夹，编译时copy至build目录
 │   ├── favicon.ico
 │   ├── index.html
-│   └── manifest.json
-├── src                                 # 源码目录
-│   ├── components                      # 配置页UI组件
+│   ├── manifest.json
+│   └── static
+│       ├── antd.css
+│       ├── favicon.ico
+│       └── logkit100.png
+├── src											# 源码目录
+│   ├── components								# 配置页 UI 组件
+│   │   ├── metricConfig.js
+│   │   ├── metricKeys.js
+│   │   ├── metricUsages.js
 │   │   ├── parserConfig.js
 │   │   ├── renderConfig.js
 │   │   ├── senderConfig.js
-│   │   └── sourceConfig.js
-│   ├── createContainer.js              # 配置页容器组件
-│   ├── index.css                       # 全局样式文件
-│   ├── index.js                        # 入口文件
-│   ├── listContainer.js                # 列表组件
-│   ├── services                        # 数据接口
+│   │   ├── sourceConfig.js
+│   │   └── transformer.js
+│   ├── container								# 列表和配置页容器组件
+│   │   ├── createLogContainer.js
+│   │   ├── createMetricContainer.js
+│   │   └── listContainer.js
+│   ├── index.css								# 全局样式文件
+│   ├── index.js								# 入口文件
+│   ├── services								# 数据接口
 │   │   └── logkit.js
-│   ├── store                           # 数据仓库
+│   ├── store									# 数据仓库
 │   │   └── config.js
-│   └── utils                           # 工具函数
+│   └── utils									# 工具函数
 │       └── request.js
-└── yarn.lock                           # yarn 包依赖管理
+└── yarn.lock									# yarn 包依赖管理
 ```
 
 ### 快速开始
