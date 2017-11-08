@@ -72,13 +72,13 @@ func NewCluster(cc *ClusterConfig) *Cluster {
 }
 
 func (cc *Cluster) RunRegisterLoop() error {
-	if err := Register(cc.MasterUrl, cc.myaddress, "default"); err != nil {
+	if err := Register(cc.MasterUrl, cc.myaddress, cc.mytag); err != nil {
 		return fmt.Errorf("master %v is unavaliable", cc.MasterUrl)
 	}
 	go func() {
 		for {
 			time.Sleep(15 * time.Second)
-			if err := Register(cc.MasterUrl, cc.myaddress, "default"); err != nil {
+			if err := Register(cc.MasterUrl, cc.myaddress, cc.mytag); err != nil {
 				log.Errorf("master %v is unavaliable", cc.MasterUrl)
 			}
 		}
