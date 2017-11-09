@@ -465,7 +465,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyElasticHost,
 			ChooseOnly:   false,
-			Default:      "localhost:9200",
+			Default:      "192.168.31.203:9200",
 			DefaultNoUse: false,
 			Description:  "host地址(elastic_host)",
 		},
@@ -549,7 +549,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyKafkaHost,
 			ChooseOnly:   false,
-			Default:      "172.16.11.128:9092",
+			Default:      "192.168.31.201:9092",
 			DefaultNoUse: false,
 			Description:  "host地址(elastic_kafka)",
 		},
@@ -558,30 +558,15 @@ var ModeKeyOptions = map[string][]utils.Option{
 			ChooseOnly:   false,
 			Default:      "test",
 			DefaultNoUse: false,
-			Description:  "topic(kafka_topic)",
+			Description:  "topic, 示例1:myTopic,  2:%{[fieldName]}, defaultTopic",
 		},
 		{
-			KeyName:      KeyKafkaFlushNum,
+			KeyName:      KeyKafkaCompression,
 			ChooseOnly:   false,
-			Default:      "10",
+			Default:      "none",
 			DefaultNoUse: false,
-			Description:  "批量发送条数",
+			Description:  "数据压缩模式",
 		},
-		{
-			KeyName:      KeyKafkaFlushFrequency,
-			ChooseOnly:   false,
-			Default:      "5",
-			DefaultNoUse: false,
-			Description:  "批量发送频率",
-		},
-		{
-			KeyName:      KeyKafkaRetryMax,
-			ChooseOnly:   false,
-			Default:      "3",
-			DefaultNoUse: false,
-			Description:  "失败重试次数",
-		},
-
 		{
 			KeyName:       KeyFaultTolerant,
 			ChooseOnly:    true,

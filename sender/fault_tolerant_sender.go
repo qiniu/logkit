@@ -182,6 +182,10 @@ func (ft *FtSender) Send(datas []Data) error {
 }
 
 func (ft *FtSender) Stats() utils.StatsInfo {
+	innerSender, ok := ft.innerSender.(StatsSender)
+	if ok {
+		return innerSender.Stats()
+	}
 	return ft.stats
 }
 
@@ -286,6 +290,7 @@ func ConvertDatasBack(ins []Data) []map[string]interface{} {
 
 // trySendDatas 尝试发送数据，如果失败，将失败数据加入backup queue，并睡眠指定时间。返回结果为是否正常发送
 func (ft *FtSender) trySendDatas(datas []Data, failSleep int, isRetry bool) (backDataContext []*datasContext, err error) {
+
 	err = ft.innerSender.Send(datas)
 	if err == nil {
 		ft.mutex.Lock()
