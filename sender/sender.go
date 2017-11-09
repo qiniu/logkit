@@ -33,9 +33,6 @@ type StatsSender interface {
 	Restore(*utils.StatsInfo)
 }
 
-type asyncSender interface {
-
-}
 
 // Sender's conf keys
 const (
