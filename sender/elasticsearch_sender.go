@@ -10,7 +10,6 @@ import (
 
 	"github.com/qiniu/log"
 
-	"errors"
 	"time"
 	"strconv"
 )
@@ -35,8 +34,15 @@ const (
 	KeyElasticType  = "elastic_type"
 	KeyElasticAlias = "elastic_keys"
 
-	KeyElasticIndexInterval = "index_interval"
-	DefaultIndexinterval = ""
+	KeyElasticIndexStrategy = "index_strategy"
+
+)
+
+const (
+	KeyDefaultIndexStrategy = "default"
+	KeyYearIndexStrategy = "year"
+	KeyMonthIndexStrategy = "month"
+	KeyDayIndexStrategy = "day"
 )
 
 func NewElasticSender(conf conf.MapConf) (sender Sender, err error) {
@@ -57,39 +63,27 @@ func NewElasticSender(conf conf.MapConf) (sender Sender, err error) {
 	}
 
 	//索引后缀模式
-	indexInterval, _ := conf.GetStringOr(KeyElasticIndexInterval, DefaultIndexinterval)
+	indexStrategy, _ := conf.GetStringOr(KeyElasticIndexStrategy, KeyDefaultIndexStrategy)
 	eType, _ := conf.GetStringOr(KeyElasticType, defaultType)
 	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("elasticSender:(elasticUrl:%s,index:%s,type:%s)", host, index, eType))
 	fields, _ := conf.GetAliasMapOr(KeyElasticAlias, make(map[string]string))
 
-	return newElasticsearchSender(name, host, index, eType, fields, indexInterval)
+	return newElasticsearchSender(name, host, index, eType, fields, indexStrategy)
 }
 
 const defaultType string = "logkit"
 
-func newElasticsearchSender(name string, hosts []string, index, eType string, fields map[string]string, indexInterval string) (e *ElasticsearchSender, err error) {
+func newElasticsearchSender(name string, hosts []string, index, eType string, fields map[string]string, indexStrategy string) (e *ElasticsearchSender, err error) {
 
 	client, err := elastic.NewClient(elastic.SetURL(hosts...))
 	if err != nil {
 		return
 	}
 
-	/*exists, err := client.IndexExists(index).Do()
-	if err != nil {
-		return
-	}
-	if !exists {
-		_, errIn := client.CreateIndex(index).Do()
-		if errIn != nil {
-			return nil, errIn
-		}
-	}*/
+	strategy := []string{KeyDefaultIndexStrategy, KeyYearIndexStrategy, KeyMonthIndexStrategy, KeyDayIndexStrategy}
 
-	intervals := []string{"", "year", "month", "day"}
-
-	i := machPattern(indexInterval, intervals)
-	if  i == -1{
-		err = errors.New("index_interval参数不正确")
+	i, err := machPattern(indexStrategy, strategy)
+	if  err != nil{
 		return nil, err
 	}
 
@@ -106,13 +100,14 @@ func newElasticsearchSender(name string, hosts []string, index, eType string, fi
 }
 
 //判断字符串是否符合已有的模式
-func machPattern(s string, intervals []string) (i int) {
-	for i, pattern := range intervals {
-		if s == pattern {
-			return i
+func machPattern(s string, strategys []string) (i int, err error) {
+	for i, strategy := range strategys {
+		if s == strategy {
+			return i, err
 		}
 	}
-	return -1
+	err = fmt.Errorf("Unknown index_strategy: '%s'", s)
+	return i, err
 }
 
 func (this *ElasticsearchSender) Name() string {

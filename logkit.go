@@ -167,11 +167,8 @@ func main() {
 	if conf.CleanSelfLog {
 		go loopCleanLogkitLog(conf.CleanSelfDir, conf.CleanSelfPattern, conf.CleanSelfLogCnt, stopClean)
 	}
-	if len(conf.BindIP) > 0 {
-		m.BindIP = conf.BindIP
-	}
-	if len(conf.BindPort) > 0 {
-		m.BindPort = conf.BindPort
+	if len(conf.BindHost) > 0 {
+		m.BindHost = conf.BindHost
 	}
 	e := echo.New()
 	e.Static("/", conf.StaticRootPath)
