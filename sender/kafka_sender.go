@@ -43,11 +43,8 @@ var (
 )
 
 const (
-	// KeyFtStrategyBackupOnly 只在失败的时候进行容错
 	KeyKafkaCompressionNone = "none"
-	// KeyFtStrategyAlwaysSave 所有数据都进行容错
 	KeyKafkaCompressionGzip = "gzip"
-	// KeyFtStrategyConcurrent 适合并发发送数据，只在失败的时候进行容错
 	KeyKafkaCompressionSnappy = "snappy"
 )
 
