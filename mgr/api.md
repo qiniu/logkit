@@ -1,6 +1,8 @@
 # logkit Rest API
 
 
+## Cluster相关API 参阅 [cluser_design](https://github.com/qiniu/logkit/blob/develop/mgr/cluster_design.md)
+
 ## Version
 
 ### 获取logkit版本号

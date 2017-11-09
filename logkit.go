@@ -184,6 +184,9 @@ func main() {
 			log.Println(http.ListenAndServe(conf.ProfileHost, nil))
 		}()
 	}
+	if err = rs.Register(); err != nil {
+		log.Fatalf("register master error %v", err)
+	}
 	utils.WaitForInterrupt(func() {
 		rs.Stop()
 		if conf.CleanSelfLog {

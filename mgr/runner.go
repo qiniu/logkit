@@ -70,6 +70,8 @@ type RunnerStatus struct {
 	ReadSpeed        float64 `json:"readspeed"`
 	ReadSpeedTrendKb string  `json:"readspeedtrend_kb"`
 	ReadSpeedTrend   string  `json:"readspeedtrend"`
+	Tag              string  `json:"tag,omitempty"`
+	Url              string  `json:"url,omitempty"`
 }
 
 type RunnerLag struct {
