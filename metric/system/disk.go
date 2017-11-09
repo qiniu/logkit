@@ -133,7 +133,7 @@ const (
 	KeyDiskioIoTime         = "diskio_io_time"
 	KeyDiskioIopsInProgress = "diskio_iops_in_progress"
 	KeyDiskioName           = "diskio_name"
-	KeyDiskioSerial         = "serial"
+	KeyDiskioSerial         = "diskio_serial"
 
 	// Config 字段
 	ConfigDiskioDevices          = "devices"
