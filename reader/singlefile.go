@@ -16,6 +16,7 @@ import (
 	"sync"
 
 	"fmt"
+
 	"github.com/qiniu/log"
 )
 

@@ -203,7 +203,8 @@ func (mr *MongoReader) run() {
 			break
 		}
 	}
-	// running在退出状态改为Init
+	// running时退出 状态改为Init，以便 cron 调度下次运行
+	// stopping时推出改为 stopped，不再运行
 	defer func() {
 		atomic.CompareAndSwapInt32(&mr.status, StatusRunning, StatusInit)
 		if atomic.CompareAndSwapInt32(&mr.status, StatusStoping, StatusStopped) {
