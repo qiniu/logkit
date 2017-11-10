@@ -119,6 +119,24 @@
 			"revisionTime": "2015-10-03T19:46:02Z"
 		},
 		{
+			"checksumSHA1": "2jm5p7TKKExCRmt+McpLz0jPg2U=",
+			"path": "github.com/jeromer/syslogparser",
+			"revision": "0e4ae46ea3f08de351074b643d649d5d00661a3c",
+			"revisionTime": "2016-09-06T13:20:35Z"
+		},
+		{
+			"checksumSHA1": "Iqq1ENh1zUfKx1ikawuI7oeLko0=",
+			"path": "github.com/jeromer/syslogparser/rfc3164",
+			"revision": "0e4ae46ea3f08de351074b643d649d5d00661a3c",
+			"revisionTime": "2016-09-06T13:20:35Z"
+		},
+		{
+			"checksumSHA1": "Xfzh6sQV/bWHY6XOFnr8mJ+LfkY=",
+			"path": "github.com/jeromer/syslogparser/rfc5424",
+			"revision": "0e4ae46ea3f08de351074b643d649d5d00661a3c",
+			"revisionTime": "2016-09-06T13:20:35Z"
+		},
+		{
 			"checksumSHA1": "hz/wVE0xwQ+d8aQbX7ApZVj8Hbg=",
 			"path": "github.com/labstack/echo",
 			"revision": "70c18060bde41901b2675da5629611f6afc580bc",

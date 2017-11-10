@@ -38,6 +38,10 @@ func (im *JsonParser) Name() string {
 	return im.name
 }
 
+func (im *JsonParser) Type() string {
+	return TypeJson
+}
+
 func (im *JsonParser) Parse(lines []string) ([]sender.Data, error) {
 	datas := []sender.Data{}
 	se := &utils.StatsError{}

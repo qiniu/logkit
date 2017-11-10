@@ -23,7 +23,7 @@ func TestUdpSocketReader(t *testing.T) {
 	assert.NoError(t, err)
 	defer os.RemoveAll(metaDir)
 
-	sr, err := NewSocketReder(meta, logkitConf)
+	sr, err := NewSocketReader(meta, logkitConf)
 	assert.NoError(t, err)
 	err = sr.Start()
 	assert.NoError(t, err)
@@ -61,7 +61,7 @@ func TestTCPSocketReader(t *testing.T) {
 	assert.NoError(t, err)
 	defer os.RemoveAll(metaDir)
 
-	sr, err := NewSocketReder(meta, logkitConf)
+	sr, err := NewSocketReader(meta, logkitConf)
 	assert.NoError(t, err)
 	err = sr.Start()
 	assert.NoError(t, err)
@@ -103,7 +103,7 @@ func TestUnixSocketReader(t *testing.T) {
 	assert.NoError(t, err)
 	defer os.RemoveAll("TestUnixSocketReader")
 
-	sr, err := NewSocketReder(meta, logkitConf)
+	sr, err := NewSocketReader(meta, logkitConf)
 	assert.NoError(t, err)
 	err = sr.Start()
 	assert.NoError(t, err)

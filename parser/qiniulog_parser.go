@@ -103,6 +103,10 @@ func (p *QiniulogParser) Name() string {
 	return p.name
 }
 
+func (p *QiniulogParser) Type() string {
+	return TypeLogv1
+}
+
 func (p *QiniulogParser) GetParser(head string) (func(string) (string, string, error), error) {
 	switch head {
 	case LogHeadPrefix:

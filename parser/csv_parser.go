@@ -364,6 +364,10 @@ func (p *CsvParser) Name() string {
 	return p.name
 }
 
+func (p *CsvParser) Type() string {
+	return TypeCSV
+}
+
 func (p *CsvParser) parse(line string) (sender.Data, error) {
 	d := make(sender.Data, len(p.schema)+len(p.labels))
 	parts := strings.Split(line, p.delim)
