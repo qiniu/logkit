@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"encoding/json"
+
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/metric"

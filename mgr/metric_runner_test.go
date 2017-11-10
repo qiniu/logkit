@@ -10,11 +10,12 @@ import (
 
 	"bufio"
 	"bytes"
+	"io"
+	"net/http"
+
 	"github.com/labstack/echo"
 	"github.com/qiniu/logkit/metric/system"
 	"github.com/stretchr/testify/assert"
-	"io"
-	"net/http"
 )
 
 const (

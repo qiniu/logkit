@@ -418,11 +418,6 @@ func (r *LogExportRunner) Run() {
 		r.batchSize = 0
 		r.lastSend = time.Now()
 
-		if len(lines) <= 0 {
-			log.Debugf("Runner[%v] fetched 0 lines", r.Name())
-			continue
-		}
-
 		for i := range r.transformers {
 			var err error
 			if r.transformers[i].Stage() == transforms.StageBeforeParser {
@@ -432,6 +427,17 @@ func (r *LogExportRunner) Run() {
 				}
 			}
 		}
+
+		if len(lines) <= 0 {
+			log.Debugf("Runner[%v] fetched 0 lines", r.Name())
+			pt, ok := r.parser.(parser.ParserType)
+			if ok && pt.Type() == parser.TypeSyslog {
+				lines = []string{parser.SyslogEofLine}
+			} else {
+				continue
+			}
+		}
+
 		// parse data
 		datas, err := r.parser.Parse(lines)
 		se, ok := err.(*utils.StatsError)
