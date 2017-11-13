@@ -6,7 +6,37 @@ import (
 	"strings"
 
 	"github.com/qiniu/logkit/metric"
+	"github.com/qiniu/logkit/utils"
 )
+
+const (
+	TypeMetricNet   = "net"
+	MetricNetUsages = "网络设备状态(net)"
+
+	// TypeMetricNet 信息中的字段
+	KeyNetBytesSent   = "net_bytes_sent"
+	KeyNetBytesRecv   = "net_bytes_recv"
+	KeyNetPacketsSent = "net_packets_sent"
+	KeyNetPacketsRecv = "net_packets_recv"
+	KeyNetErrIn       = "net_err_in"
+	KeyNetErrOut      = "net_err_out"
+	KeyNetDropIn      = "net_drop_in"
+	KeyNetDropOut     = "net_drop_out"
+	KeyNetInterface   = "net_interface"
+)
+
+// KeyNetUsages TypeMetricNet 中的字段名称
+var KeyNetUsages = []utils.KeyValue{
+	{KeyNetBytesSent, "网卡发包总数(bytes)"},
+	{KeyNetBytesRecv, "网卡收包总数(bytes)"},
+	{KeyNetPacketsSent, "网卡发包数量"},
+	{KeyNetPacketsRecv, "网卡收包数量"},
+	{KeyNetErrIn, "网卡收包错误数量"},
+	{KeyNetErrOut, "网卡发包错误数量"},
+	{KeyNetDropIn, "网卡收 丢包数量"},
+	{KeyNetDropOut, "网卡发 丢包数量"},
+	{KeyNetInterface, "网卡设备名称"},
+}
 
 type NetIOStats struct {
 	ps PS
@@ -16,12 +46,30 @@ type NetIOStats struct {
 }
 
 func (_ *NetIOStats) Name() string {
-	return "net"
+	return TypeMetricNet
 }
 
-var netSampleConfig = `{
-  "interfaces":["eth0"]
-}`
+func (_ *NetIOStats) Usages() string {
+	return MetricNetUsages
+}
+
+func (_ *NetIOStats) Config() map[string]interface{} {
+	configOption := []utils.Option{
+		{
+			KeyName:      "interfaces",
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "收集特定网卡的信息,用','分隔(interfaces)",
+			Type:         metric.ConfigTypeArray,
+		},
+	}
+	config := map[string]interface{}{
+		metric.OptionString:     configOption,
+		metric.AttributesString: KeyNetUsages,
+	}
+	return config
+}
 
 func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 	netio, err := s.ps.NetIO()
@@ -59,15 +107,15 @@ func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 		}
 
 		fields := map[string]interface{}{
-			"bytes_sent":   io.BytesSent,
-			"bytes_recv":   io.BytesRecv,
-			"packets_sent": io.PacketsSent,
-			"packets_recv": io.PacketsRecv,
-			"err_in":       io.Errin,
-			"err_out":      io.Errout,
-			"drop_in":      io.Dropin,
-			"drop_out":     io.Dropout,
-			"interface":    io.Name,
+			KeyNetBytesSent:   io.BytesSent,
+			KeyNetBytesRecv:   io.BytesRecv,
+			KeyNetPacketsSent: io.PacketsSent,
+			KeyNetPacketsRecv: io.PacketsRecv,
+			KeyNetErrIn:       io.Errin,
+			KeyNetErrOut:      io.Errout,
+			KeyNetDropIn:      io.Dropin,
+			KeyNetDropOut:     io.Dropout,
+			KeyNetInterface:   io.Name,
 		}
 		datas = append(datas, fields)
 	}
@@ -83,13 +131,13 @@ func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 			fields[name] = value
 		}
 	}
-	fields["interface"] = "all"
+	fields[KeyNetInterface] = "all"
 	datas = append(datas, fields)
 	return
 }
 
 func init() {
-	metric.Add("net", func() metric.Collector {
+	metric.Add(TypeMetricNet, func() metric.Collector {
 		return &NetIOStats{ps: newSystemPS()}
 	})
 }

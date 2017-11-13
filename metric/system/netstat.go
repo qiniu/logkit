@@ -5,14 +5,64 @@ import (
 	"syscall"
 
 	"github.com/qiniu/logkit/metric"
+	"github.com/qiniu/logkit/utils"
 )
+
+const (
+	TypeMetricNetstat   = "netstat"
+	MetricNetstatUsages = "网络连接情况(netstat)"
+
+	// TypeMetricNetstat 信息中的字段
+	KeyNetstatTcpEstablished = "netstat_tcp_established"
+	KeyNetstatTcpSynSent     = "netstat_tcp_syn_sent"
+	KeyNetstatTcpSynRecv     = "netstat_tcp_syn_recv"
+	KeyNetstatTcpFinWait1    = "netstat_tcp_fin_wait1"
+	KeyNetstatTcpFinWait2    = "netstat_tcp_fin_wait2"
+	KeyNetstatTcpTimeWait    = "netstat_tcp_time_wait"
+	KeyNetstatTcpClose       = "netstat_tcp_close"
+	KeyNetstatTcpCloseWait   = "netstat_tcp_close_wait"
+	KeyNetstatTcpLastAck     = "netstat_tcp_last_ack"
+	KeyNetstatTcpListen      = "netstat_tcp_listen"
+	KeyNetstatTcpClosing     = "netstat_tcp_closing"
+	KeyNetstatTcpNone        = "netstat_tcp_none"
+	KeyNetstatUdpSocket      = "netstat_tcp_socket"
+)
+
+// KeyNetStatUsages TypeMetricNetstat 的字段名称
+var KeyNetStatUsages = []utils.KeyValue{
+	{KeyNetstatTcpEstablished, "ESTABLISHED状态的网络链接数"},
+	{KeyNetstatTcpSynSent, "SYN_SENT状态的网络链接数"},
+	{KeyNetstatTcpSynRecv, "SYN_RECV状态的网络链接数"},
+	{KeyNetstatTcpFinWait1, "FIN_WAIT1状态的网络链接数"},
+	{KeyNetstatTcpFinWait2, "FIN_WAIT2状态的网络链接数"},
+	{KeyNetstatTcpTimeWait, "TIME_WAIT状态的网络链接数"},
+	{KeyNetstatTcpClose, "CLOSE状态的网络链接数"},
+	{KeyNetstatTcpCloseWait, "CLOSE_WAIT状态的网络链接数"},
+	{KeyNetstatTcpLastAck, "LAST_ACK状态的网络链接数"},
+	{KeyNetstatTcpListen, "LISTEN状态的网络链接数"},
+	{KeyNetstatTcpClosing, "CLOSING状态的网络链接数"},
+	{KeyNetstatTcpNone, "NONE状态的网络链接数"},
+	{KeyNetstatUdpSocket, "UDP状态的网络链接数"},
+}
 
 type NetStats struct {
 	ps PS
 }
 
 func (_ *NetStats) Name() string {
-	return "netstat"
+	return TypeMetricNetstat
+}
+
+func (_ *NetStats) Usages() string {
+	return MetricNetstatUsages
+}
+
+func (_ *NetStats) Config() map[string]interface{} {
+	config := map[string]interface{}{
+		metric.OptionString:     []utils.Option{},
+		metric.AttributesString: KeyNetStatUsages,
+	}
+	return config
 }
 
 func (s *NetStats) Collect() (datas []map[string]interface{}, err error) {
@@ -37,26 +87,26 @@ func (s *NetStats) Collect() (datas []map[string]interface{}, err error) {
 	}
 
 	fields := map[string]interface{}{
-		"tcp_established": counts["ESTABLISHED"],
-		"tcp_syn_sent":    counts["SYN_SENT"],
-		"tcp_syn_recv":    counts["SYN_RECV"],
-		"tcp_fin_wait1":   counts["FIN_WAIT1"],
-		"tcp_fin_wait2":   counts["FIN_WAIT2"],
-		"tcp_time_wait":   counts["TIME_WAIT"],
-		"tcp_close":       counts["CLOSE"],
-		"tcp_close_wait":  counts["CLOSE_WAIT"],
-		"tcp_last_ack":    counts["LAST_ACK"],
-		"tcp_listen":      counts["LISTEN"],
-		"tcp_closing":     counts["CLOSING"],
-		"tcp_none":        counts["NONE"],
-		"udp_socket":      counts["UDP"],
+		KeyNetstatTcpEstablished: counts["ESTABLISHED"],
+		KeyNetstatTcpSynSent:     counts["SYN_SENT"],
+		KeyNetstatTcpSynRecv:     counts["SYN_RECV"],
+		KeyNetstatTcpFinWait1:    counts["FIN_WAIT1"],
+		KeyNetstatTcpFinWait2:    counts["FIN_WAIT2"],
+		KeyNetstatTcpTimeWait:    counts["TIME_WAIT"],
+		KeyNetstatTcpClose:       counts["CLOSE"],
+		KeyNetstatTcpCloseWait:   counts["CLOSE_WAIT"],
+		KeyNetstatTcpLastAck:     counts["LAST_ACK"],
+		KeyNetstatTcpListen:      counts["LISTEN"],
+		KeyNetstatTcpClosing:     counts["CLOSING"],
+		KeyNetstatTcpNone:        counts["NONE"],
+		KeyNetstatUdpSocket:      counts["UDP"],
 	}
 	datas = append(datas, fields)
 	return
 }
 
 func init() {
-	metric.Add("netstat", func() metric.Collector {
+	metric.Add(TypeMetricNetstat, func() metric.Collector {
 		return &NetStats{ps: newSystemPS()}
 	})
 }

@@ -49,6 +49,24 @@ export async function getSenderOptions(params) {
   });
 }
 
+export async function getMetricKeys(params) {
+  return request(window.logkitUrl + '/logkit/metric/keys', {
+    method: 'get',
+  });
+}
+
+export async function getMetricUsages(params) {
+  return request(window.logkitUrl + '/logkit/metric/usages', {
+    method: 'get',
+  });
+}
+
+export async function getMetricOptions(params) {
+  return request(window.logkitUrl + '/logkit/metric/options', {
+    method: 'get',
+  });
+}
+
 export async function getRunnerConfigs(params) {
   return request(window.logkitUrl + '/logkit/configs', {
     method: 'get',

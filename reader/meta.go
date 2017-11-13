@@ -38,6 +38,7 @@ const (
 	metaFormat          = "%s\t%d\n"
 	bufMetaFormat       = "read:%d\nwrite:%d\nbufsize:%d\n"
 	defaultIOLimit      = 20 //默认读取速度为20MB/s
+	ModeMetrics         = "metrics"
 )
 
 type Statistic struct {
@@ -465,6 +466,7 @@ func (b *Meta) Reset() error {
 	if b == nil {
 		return errors.New("Reset error as meta is nil")
 	}
+	os.RemoveAll(b.statisticPath)
 	if _, err := os.Stat(b.metaFilePath); err != nil {
 		return err
 	}
@@ -479,7 +481,6 @@ func (b *Meta) Reset() error {
 			return err
 		}
 	}
-	os.RemoveAll(b.statisticPath)
 	return nil
 }
 

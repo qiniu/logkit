@@ -90,6 +90,23 @@ class renderConfig extends Component {
       resetFields()
       getFieldDecorator("config", {initialValue: JSON.stringify(jsonData, null, 2)});
       getFieldDecorator("name", {initialValue: data.name});
+      getFieldDecorator("collect_interval", {initialValue: parseInt(data.collect_interval)});
+    } else {
+      notification.warning({message: "不是一个合法的json对象,请检查", duration: 10,})
+    }
+
+  }
+
+  handleMetricIntervalChange = (e) => {
+    const {getFieldsValue, getFieldDecorator, resetFields} = this.props.form;
+    let data = getFieldsValue();
+    if (this.isJSON(data.config)) {
+      const jsonData = JSON.parse(data.config)
+      jsonData.collect_interval = parseInt(e.target.value)
+      resetFields()
+      getFieldDecorator("config", {initialValue: JSON.stringify(jsonData, null, 2)});
+      getFieldDecorator("name", {initialValue: data.name});
+      getFieldDecorator("batch_interval", {initialValue: parseInt(data.batch_interval)});
     } else {
       notification.warning({message: "不是一个合法的json对象,请检查", duration: 10,})
     }
@@ -105,6 +122,7 @@ class renderConfig extends Component {
       resetFields()
       getFieldDecorator("config", {initialValue: JSON.stringify(jsonData, null, 2)});
       getFieldDecorator("batch_interval", {initialValue: parseInt(data.batch_interval)});
+      getFieldDecorator("collect_interval", {initialValue: parseInt(data.collect_interval)});
     } else {
       notification.warning({message: "不是一个合法的json对象,请检查", duration: 10,})
     }
@@ -118,6 +136,7 @@ class renderConfig extends Component {
       resetFields()
       getFieldDecorator("name", {initialValue: jsonData.name});
       getFieldDecorator("batch_interval", {initialValue: parseInt(jsonData.batch_interval)});
+      getFieldDecorator("collect_interval", {initialValue: parseInt(jsonData.collect_interval)});
     } else {
       notification.warning({message: "不是一个合法的json对象,请检查", duration: 10,})
     }
@@ -148,6 +167,12 @@ class renderConfig extends Component {
                   {getFieldDecorator('batch_interval', {rules: [{required: true, message: '发送间隔不能为空'},
                     {pattern: /^[0-9]*$/, message: '输入不符合规范,只能为整数'}]})(
                       <Input onChange={this.handleIntervalChange} placeholder={'发送间隔单位(秒)'}/>
+                  )}
+                </FormItem>
+                <FormItem {...formItemLayout} label="系统信息收集间隔(metric配置专用, 秒)">
+                  {getFieldDecorator('collect_interval', {rules: [{required: true, message: '收集间隔不能为空'},
+                      {pattern: /^[0-9]*$/, message: '输入不符合规范,只能为整数'}]})(
+                    <Input onChange={this.handleMetricIntervalChange} placeholder={'系统信息收集间隔单位(秒)'}/>
                   )}
                 </FormItem>
                 <FormItem
