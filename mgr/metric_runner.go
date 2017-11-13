@@ -68,6 +68,9 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 	if err != nil {
 		return nil, fmt.Errorf("Runner "+rc.RunnerName+" add failed, err is %v", err)
 	}
+	for i := range rc.SenderConfig {
+		rc.SenderConfig[i][sender.KeyRunnerName] = rc.RunnerName
+	}
 	collectors := make([]metric.Collector, 0)
 	transformers := make([]transforms.Transformer, 0)
 	if len(rc.MetricConfig) == 0 {
