@@ -123,7 +123,7 @@ class CreateMetricRunner extends Component {
           let data = {
             name: runnerName != undefined ? runnerName : name,
             batch_interval: batch_interval != undefined ? batch_interval : 60,
-            metric_interval: collect_interval != undefined ? collect_interval : 3,
+            collect_interval: collect_interval != undefined ? collect_interval : 3,
             ...config.getNodeData()
           }
           that.refs.initConfig.setFieldsValue({config: JSON.stringify(data, null, 2)});

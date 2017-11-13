@@ -110,7 +110,8 @@ class CreateLogRunner extends Component {
           const current = this.state.current + 1;
           this.setState({current});
           let name = "runner." + moment().format("YYYYMMDDHHmmss");
-          let interval = that.refs.initConfig.getFieldValue('batch_interval')
+          let batch_interval = that.refs.initConfig.getFieldValue('batch_interval')
+          let collect_interval = that.refs.initConfig.getFieldValue('collect_interval')
           let runnerName = that.refs.initConfig.getFieldValue('name')
           if (window.isCopy && window.nodeCopy) {
             name = window.nodeCopy.name
@@ -125,7 +126,8 @@ class CreateLogRunner extends Component {
 
           let data = {
             name: runnerName != undefined ? runnerName : name,
-            batch_interval: interval != undefined ? interval : 60,
+            batch_interval: batch_interval != undefined ? batch_interval : 60,
+            collect_interval: collect_interval != undefined ? collect_interval : 3,
             ...config.getNodeData()
           }
           that.refs.initConfig.setFieldsValue({config: JSON.stringify(data, null, 2)});
@@ -133,10 +135,12 @@ class CreateLogRunner extends Component {
             that.refs.initConfig.setFieldsValue({name: name});
           }
 
-          if (interval == undefined) {
+          if (batch_interval == undefined) {
             that.refs.initConfig.setFieldsValue({batch_interval: 60});
           }
-
+          if (collect_interval == undefined) {
+            that.refs.initConfig.setFieldsValue({collect_interval: 3});
+          }
         }
       });
     }
