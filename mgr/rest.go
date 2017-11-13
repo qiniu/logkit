@@ -88,6 +88,11 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	router.GET(PREFIX+"/transformer/options", rs.GetTransformerOptions())
 	router.GET(PREFIX+"/transformer/sampleconfigs", rs.GetTransformerSampleConfigs())
 
+	//metric API
+	router.GET(PREFIX+"/metric/keys", rs.GetMetricKeys())
+	router.GET(PREFIX+"/metric/usages", rs.GetMetricUsages())
+	router.GET(PREFIX+"/metric/options", rs.GetMetricOptions())
+
 	//version
 	router.GET(PREFIX+"/version", rs.GetVersion())
 

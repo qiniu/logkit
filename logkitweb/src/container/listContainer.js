@@ -4,7 +4,7 @@ import moment from 'moment'
 import ClipboardButton from 'react-clipboard.js';
 import {
   getRunnerConfigs, deleteConfigData, getRunnerStatus, getRunnerVersion, resetConfigData, startRunner, stopRunner
-} from './services/logkit';
+} from '../services/logkit';
 import _ from "lodash";
 
 const { Header, Content, Footer, Sider } = Layout;
@@ -171,7 +171,11 @@ class List extends Component {
   copyConfig = (record) => {
     window.nodeCopy = record
     notification.success({message: "修改配置文件,", description: '按步骤去修改配置页面的Runner信息', duration: 10,})
-    this.props.router.push({pathname: `/index/create?copyConfig=true`})
+    if(record["metric"] === undefined){
+      this.props.router.push({pathname: `/index/create-log-runner?copyConfig=true`})
+    }else{
+      this.props.router.push({pathname: `/index/create-metric-runner?copyConfig=true`})
+    }
   }
 
   renderRunnerList() {
@@ -197,7 +201,7 @@ class List extends Component {
       width: '7%',
       render: (text, record) => {
         return (
-            this.renderArrow(text, record.readerTrend)
+          this.renderArrow(text, record.readerTrend)
         );
       },
     }, {
@@ -206,7 +210,7 @@ class List extends Component {
       width: '7%',
       render: (text, record) => {
         return (
-            this.renderArrow(text, record.readerkbTrend)
+          this.renderArrow(text, record.readerkbTrend)
         );
       },
     }, {
@@ -215,7 +219,7 @@ class List extends Component {
       width: '7%',
       render: (text, record) => {
         return (
-            this.renderArrow(text, record.sendTrend)
+          this.renderArrow(text, record.sendTrend)
         );
       },
     }, {
@@ -236,13 +240,13 @@ class List extends Component {
       width: '8%',
       render: (text, record) => {
         return (
-            <a>
-              <div className="editable-row-operations">
-                {
-                  <Button type="primary" onClick={() => this.isShow(record)}>查看错误日志</Button>
-                }
-              </div>
-            </a>
+          <a>
+            <div className="editable-row-operations">
+              {
+                <Button type="primary" onClick={() => this.isShow(record)}>查看错误日志</Button>
+              }
+            </div>
+          </a>
         );
       },
 
@@ -252,13 +256,13 @@ class List extends Component {
       width: '6%',
       render: (text, record) => {
         return (
-            <a>
-              <div className="editable-row-operations">
-                {
-                  <Button type="primary" onClick={() => this.showConfig(record)}>查看配置</Button>
-                }
-              </div>
-            </a>
+          <a>
+            <div className="editable-row-operations">
+              {
+                <Button type="primary" onClick={() => this.showConfig(record)}>查看配置</Button>
+              }
+            </div>
+          </a>
         );
       },
     }, {
@@ -268,13 +272,13 @@ class List extends Component {
       width: '3%',
       render: (text, record) => {
         return (
-            <a>
-              <div className="editable-row-operations">
-                <ClipboardButton data-clipboard-text={text}>
-                  <Icon style={{fontSize: 16}} onClick={() => this.copyConfig(record.currentItem)} type="edit"/>
-                </ClipboardButton>
-              </div>
-            </a>
+          <a>
+            <div className="editable-row-operations">
+              <ClipboardButton data-clipboard-text={text}>
+                <Icon style={{fontSize: 16}} onClick={() => this.copyConfig(record.currentItem)} type="edit"/>
+              </ClipboardButton>
+            </div>
+          </a>
         );
       },
     }, {
@@ -284,13 +288,13 @@ class List extends Component {
       width: '3%',
       render: (text, record) => {
         return (
-            record.isWebFolder === true ? (<a>
-              <div className="editable-row-operations">
-                <ClipboardButton data-clipboard-text={text}>
-                  <Icon style={{fontSize: 16}} onClick={() => this.optRunner(record)} type={record.iconType}/>
-                </ClipboardButton>
-              </div>
-            </a>): null
+          record.isWebFolder === true ? (<a>
+            <div className="editable-row-operations">
+              <ClipboardButton data-clipboard-text={text}>
+                <Icon style={{fontSize: 16}} onClick={() => this.optRunner(record)} type={record.iconType}/>
+              </ClipboardButton>
+            </div>
+          </a>): null
         );
       },
     }, {
@@ -299,13 +303,13 @@ class List extends Component {
       width: '3%',
       render: (text, record) => {
         return (
-            record.isWebFolder === true ? (<a>
-              <div className="editable-row-operations">
-                {
-                   <Icon style={{fontSize: 16}} onClick={() => this.showResetConfig(record)} type="reload"/>
-                }
-              </div>
-            </a>): null
+          record.isWebFolder === true ? (<a>
+            <div className="editable-row-operations">
+              {
+                <Icon style={{fontSize: 16}} onClick={() => this.showResetConfig(record)} type="reload"/>
+              }
+            </div>
+          </a>): null
         );
       },
     }, {
@@ -315,15 +319,15 @@ class List extends Component {
       width: '3%',
       render: (text, record) => {
         return (
-            record.isWebFolder === true ? (<a>
-              <div className="editable-row-operations">
-                {
-                  <Popconfirm title="是否删除该Runner?" onConfirm={() => this.deleteRunner(record)}>
-                    <Icon style={{fontSize: 16}} type="delete"/>
-                  </Popconfirm>
-                }
-              </div>
-            </a>) : null
+          record.isWebFolder === true ? (<a>
+            <div className="editable-row-operations">
+              {
+                <Popconfirm title="是否删除该Runner?" onConfirm={() => this.deleteRunner(record)}>
+                  <Icon style={{fontSize: 16}} type="delete"/>
+                </Popconfirm>
+              }
+            </div>
+          </a>) : null
         );
       },
 
@@ -416,74 +420,81 @@ class List extends Component {
     }
 
     return (
-        <Table columns={columns} pagination={{size: 'small', pageSize: 20}} dataSource={data}/>
+      <Table columns={columns} pagination={{size: 'small', pageSize: 20}} dataSource={data}/>
     )
   }
 
-  add = () => {
-    this.props.router.push({pathname: `/index/create`})
+  addLogRunner = () => {
+    this.props.router.push({pathname: `/index/create-log-runner`})
+  }
+
+  addMetricRunner = () => {
+    this.props.router.push({pathname: `/index/create-metric-runner`})
   }
 
   render() {
     return (
-        <div className="logkit-container">
-          <div className="header">
-            <img src="../../static/logkit100.png"></img>
-            七牛Logkit配置文件助手 {this.state.version}
-          </div>
-          <div className="content">
-            <Button type="primary" className="index-btn" ghost onClick={this.add}>
-              <Icon type="plus"/> 增加Runner
-            </Button>
-            {/*<Button type="primary" className="index-btn" ghost onClick={() => this.turnToConfigPage()}>*/}
-            {/*<Icon type="link"/>跳转至配置页面*/}
-            {/*</Button>*/}
-            {this.renderRunnerList()}
-          </div>
-          <Footer style={{textAlign: 'center'}}>
-            更多信息请访问：
-            <a target="_blank" href="https://github.com/qiniu/logkit">
-              <Tag color="#108ee9">Logkit</Tag> </a> |
-            <a target="_blank" href="https://github.com/qiniu/logkit/wiki">
-              <Tag color="#108ee9">帮助文档</Tag> </a> |
-            <a target="_blank" href="https://qiniu.github.io/pandora-docs/#/"><Tag
-                color="#108ee9">Pandora产品</Tag>
-            </a>
-          </Footer>
-          <Modal footer={null} title="错误日志" width={1000} visible={this.state.isShow}
-                 onCancel={this.handleErrorCancel}
-          >
-            <Tag color="#108ee9">读取错误日志:</Tag>
-            <Row style={{marginTop: '10px'}}>
-              <Col span={24}>{this.state.currentItem.readerError}</Col>
-            </Row>
-            <Tag color="#108ee9" style={{marginTop: '30px'}}>解析错误日志:</Tag>
-            <Row style={{marginTop: '10px'}}>
-              <Col span={24}>{this.state.currentItem.parseError}</Col>
-            </Row>
-            <Tag color="#108ee9" style={{marginTop: '30px'}}>发送错误日志:</Tag>
-            <Row style={{marginTop: '10px'}}>
-              <Col span={24}>{this.state.currentItem.sendError}</Col>
-            </Row>
-            <Tag color="#108ee9" style={{marginTop: '30px'}}>Logkit错误日志:</Tag>
-            <Row style={{marginTop: '10px'}}>
-              <Col span={24}>{this.state.currentItem.logkitError}</Col>
-            </Row>
-
-          </Modal>
-          <Modal footer={null} title="详细配置情况" width={1000} visible={this.state.isShowConfig}
-                 onCancel={this.handleConfigCancel}
-          >
-            <Input type="textarea" value={this.state.currentItem.copy} rows="50"/>
-
-          </Modal>
-
-          <Modal title="是否重置配置文件？" visible={this.state.isShowResetConfig}
-                 onOk={this.handleResetConfig} onCancel={this.handleResetConfigCancel}
-          >
-            注意:<Tag color="#ffbf00">重置配置文件会删除meta信息并重启</Tag>
-          </Modal>
+      <div className="logkit-container">
+        <div className="header">
+          <img src="../../../static/logkit100.png"></img>
+          七牛Logkit配置文件助手 {this.state.version}
         </div>
+        <div className="content">
+          <Button type="primary" className="index-btn" ghost onClick={this.addLogRunner}>
+            <Icon type="plus"/> 增加日志采集 Runner
+          </Button>
+          <Button type="primary" className="index-btn" ghost onClick={this.addMetricRunner}>
+            <Icon type="plus"/> 增加系统信息采集 Runner
+          </Button>
+          {/*<Button type="primary" className="index-btn" ghost onClick={() => this.turnToConfigPage()}>*/}
+          {/*<Icon type="link"/>跳转至配置页面*/}
+          {/*</Button>*/}
+          {this.renderRunnerList()}
+        </div>
+        <Footer style={{textAlign: 'center'}}>
+          更多信息请访问：
+          <a target="_blank" href="https://github.com/qiniu/logkit">
+            <Tag color="#108ee9">Logkit</Tag> </a> |
+          <a target="_blank" href="https://github.com/qiniu/logkit/wiki">
+            <Tag color="#108ee9">帮助文档</Tag> </a> |
+          <a target="_blank" href="https://qiniu.github.io/pandora-docs/#/"><Tag
+            color="#108ee9">Pandora产品</Tag>
+          </a>
+        </Footer>
+        <Modal footer={null} title="错误日志" width={1000} visible={this.state.isShow}
+               onCancel={this.handleErrorCancel}
+        >
+          <Tag color="#108ee9">读取错误日志:</Tag>
+          <Row style={{marginTop: '10px'}}>
+            <Col span={24}>{this.state.currentItem.readerError}</Col>
+          </Row>
+          <Tag color="#108ee9" style={{marginTop: '30px'}}>解析错误日志:</Tag>
+          <Row style={{marginTop: '10px'}}>
+            <Col span={24}>{this.state.currentItem.parseError}</Col>
+          </Row>
+          <Tag color="#108ee9" style={{marginTop: '30px'}}>发送错误日志:</Tag>
+          <Row style={{marginTop: '10px'}}>
+            <Col span={24}>{this.state.currentItem.sendError}</Col>
+          </Row>
+          <Tag color="#108ee9" style={{marginTop: '30px'}}>Logkit错误日志:</Tag>
+          <Row style={{marginTop: '10px'}}>
+            <Col span={24}>{this.state.currentItem.logkitError}</Col>
+          </Row>
+
+        </Modal>
+        <Modal footer={null} title="详细配置情况" width={1000} visible={this.state.isShowConfig}
+               onCancel={this.handleConfigCancel}
+        >
+          <Input type="textarea" value={this.state.currentItem.copy} rows="50"/>
+
+        </Modal>
+
+        <Modal title="是否重置配置文件？" visible={this.state.isShowResetConfig}
+               onOk={this.handleResetConfig} onCancel={this.handleResetConfigCancel}
+        >
+          注意:<Tag color="#ffbf00">重置配置文件会删除meta信息并重启</Tag>
+        </Modal>
+      </div>
     );
   }
 }

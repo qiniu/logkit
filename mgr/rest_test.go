@@ -558,7 +558,7 @@ func Test_RunnerReset(t *testing.T) {
 
 	var conf ManagerConfig
 	conf.RestDir = confdir
-	conf.BindHost = ":6346"
+	conf.BindHost = ":6344"
 	m, err := NewManager(conf)
 	if err != nil {
 		t.Fatal(err)
@@ -1074,7 +1074,7 @@ func Test_RunnerDataIntegrity(t *testing.T) {
 
 	var conf ManagerConfig
 	conf.RestDir = confdir
-	conf.BindHost = ":6350"
+	conf.BindHost = ":6343"
 	m, err := NewManager(conf)
 	if err != nil {
 		t.Fatal(err)
