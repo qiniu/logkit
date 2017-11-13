@@ -182,10 +182,6 @@ func (ft *FtSender) Send(datas []Data) error {
 }
 
 func (ft *FtSender) Stats() utils.StatsInfo {
-	innerSender, ok := ft.innerSender.(StatsSender)
-	if ok {
-		return innerSender.Stats()
-	}
 	return ft.stats
 }
 

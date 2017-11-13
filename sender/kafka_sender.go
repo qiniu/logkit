@@ -1,15 +1,16 @@
 package sender
 
 import (
-	"github.com/qiniu/logkit/conf"
-	"github.com/Shopify/sarama"
 	"time"
 	"fmt"
-	"github.com/qiniu/log"
 	"encoding/json"
-	"github.com/qiniu/logkit/utils"
 	"os"
 	"strings"
+
+	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/utils"
+	"github.com/Shopify/sarama"
 )
 
 type KafkaSender struct {
