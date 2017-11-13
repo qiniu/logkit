@@ -58,14 +58,16 @@ class CreateLogRunner extends Component {
     let that = this
     let isCopy = this.props.location.query.copyConfig
     if (isCopy === 'true') {
-      window.isCopy = true
+      window.isCopy = true;
       this.setState({
         isCpoyStatus: true
       })
     } else {
       window.isCopy = false
     }
-
+    if(window.nodeCopy){
+      config.delete("metric");
+    }
     getRunnerVersion().then(data => {
       if (data.success) {
         that.setState({

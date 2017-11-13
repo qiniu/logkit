@@ -58,14 +58,18 @@ class CreateMetricRunner extends Component {
     let that = this
     let isCopy = this.props.location.query.copyConfig
     if (isCopy === 'true') {
-      window.isCopy = true
+      window.isCopy = true;
       this.setState({
         isCopyStatus: true
       })
     } else {
       window.isCopy = false
     }
-
+    if(window.nodeCopy){
+      config.delete("reader");
+      config.delete("parser");
+      config.delete("transforms");
+    }
     getRunnerVersion().then(data => {
       if (data.success) {
         that.setState({
