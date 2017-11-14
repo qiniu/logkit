@@ -482,7 +482,15 @@ var ModeKeyOptions = map[string][]utils.Option{
 			ChooseOptions: []string{KeyDefaultIndexStrategy, KeyYearIndexStrategy, KeyMonthIndexStrategy, KeyDayIndexStrategy},
 			Default:       KeyFtStrategyBackupOnly,
 			DefaultNoUse:  false,
-			Description:   "自动索引模式(默认索引|按年索引|按月索引|按日索引)(index_strategy)",
+			Description:   "自动索引模式(默认索引|按年索引|按月索引|按日索引)(elastic_index_strategy)",
+		},
+		{
+			KeyName:       KeyElasticTimezone,
+			ChooseOnly:    true,
+			ChooseOptions: []string{KeylocalTimezone, KeyUTCTimezone, KeyPRCTimezone},
+			Default:       KeyUTCTimezone,
+			DefaultNoUse:  false,
+			Description:   "索引时区(Local(本地)|UTC(标准时间)|PRC(北京时间))(elastic_time_zone)",
 		},
 		{
 			KeyName:      KeyElasticType,

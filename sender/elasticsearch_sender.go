@@ -26,6 +26,7 @@ type ElasticsearchSender struct {
 	elasticClient *elastic.Client
 
 	intervalIndex int
+	timeZone *time.Location
 }
 
 const (
@@ -34,15 +35,21 @@ const (
 	KeyElasticType  = "elastic_type"
 	KeyElasticAlias = "elastic_keys"
 
-	KeyElasticIndexStrategy = "index_strategy"
-
+	KeyElasticIndexStrategy = "elastic_index_strategy"
+	KeyElasticTimezone = "elastic_time_zone"
 )
-
+//indexStrategy
 const (
 	KeyDefaultIndexStrategy = "default"
 	KeyYearIndexStrategy = "year"
 	KeyMonthIndexStrategy = "month"
 	KeyDayIndexStrategy = "day"
+)
+//timeZone
+const (
+	KeylocalTimezone = "Local"
+	KeyUTCTimezone = "UTC"
+	KeyPRCTimezone = "PRC"
 )
 
 func NewElasticSender(conf conf.MapConf) (sender Sender, err error) {
@@ -64,16 +71,20 @@ func NewElasticSender(conf conf.MapConf) (sender Sender, err error) {
 
 	//索引后缀模式
 	indexStrategy, _ := conf.GetStringOr(KeyElasticIndexStrategy, KeyDefaultIndexStrategy)
+	timezone, _ := conf.GetStringOr(KeyElasticTimezone, KeyUTCTimezone)
+	timeZone, err := time.LoadLocation(timezone)
+	if err != nil {
+		return
+	}
 	eType, _ := conf.GetStringOr(KeyElasticType, defaultType)
 	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("elasticSender:(elasticUrl:%s,index:%s,type:%s)", host, index, eType))
 	fields, _ := conf.GetAliasMapOr(KeyElasticAlias, make(map[string]string))
-
-	return newElasticsearchSender(name, host, index, eType, fields, indexStrategy)
+	return newElasticsearchSender(name, host, index, eType, fields, indexStrategy, timeZone)
 }
 
 const defaultType string = "logkit"
 
-func newElasticsearchSender(name string, hosts []string, index, eType string, fields map[string]string, indexStrategy string) (e *ElasticsearchSender, err error) {
+func newElasticsearchSender(name string, hosts []string, index, eType string, fields map[string]string, indexStrategy string, timeZone *time.Location) (e *ElasticsearchSender, err error) {
 
 	client, err := elastic.NewClient(elastic.SetURL(hosts...))
 	if err != nil {
@@ -95,6 +106,7 @@ func newElasticsearchSender(name string, hosts []string, index, eType string, fi
 		eType:         eType,
 		aliasFields:   fields,
 		intervalIndex: i,
+		timeZone:	   timeZone,
 	}
 	return
 }
@@ -106,7 +118,7 @@ func machPattern(s string, strategys []string) (i int, err error) {
 			return i, err
 		}
 	}
-	err = fmt.Errorf("Unknown index_strategy: '%s'", s)
+	err = fmt.Errorf("Unknown elastic_index_strategy: '%s'", s)
 	return i, err
 }
 
@@ -129,7 +141,7 @@ func (this *ElasticsearchSender) Send(data []Data) (err error) {
 	var intervals []string
 	for _, doc := range data {
 		indexName = this.indexName
-		now := time.Now().UTC()
+		now := time.Now().In(this.timeZone)
 		intervals = []string{strconv.Itoa(now.Year()), strconv.Itoa(int(now.Month())), strconv.Itoa(now.Day())}
 		for j := 1; j <= i; j ++ {
 			indexName = indexName + "." + intervals[j - 1]
