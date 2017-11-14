@@ -10,6 +10,7 @@ var ModeUsages = []utils.KeyValue{
 	{TypeInfluxdb, "发送到 influxdb"},
 	{TypeDiscard, "消费数据但不发送"},
 	{TypeElastic, "发送到Elasticsearch"},
+	{TypeKafka, "发送到Kafka"},
 }
 
 var ModeKeyOptions = map[string][]utils.Option{
@@ -464,7 +465,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyElasticHost,
 			ChooseOnly:   false,
-			Default:      "localhost:9200",
+			Default:      "192.168.31.203:9200",
 			DefaultNoUse: false,
 			Description:  "host地址(elastic_host)",
 		},
@@ -474,6 +475,14 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "app-repo-123",
 			DefaultNoUse: true,
 			Description:  "索引名称(elastic_index)",
+		},
+		{
+			KeyName:       KeyElasticIndexStrategy,
+			ChooseOnly:    true,
+			ChooseOptions: []string{KeyDefaultIndexStrategy, KeyYearIndexStrategy, KeyMonthIndexStrategy, KeyDayIndexStrategy},
+			Default:       KeyFtStrategyBackupOnly,
+			DefaultNoUse:  false,
+			Description:   "自动索引模式(默认索引|按年索引|按月索引|按日索引)(index_strategy)",
 		},
 		{
 			KeyName:      KeyElasticType,
@@ -536,5 +545,84 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "内存管道长度(ft_memory_channel_size)",
 			CheckRegex:   "\\d+",
 		},
+	},
+	TypeKafka: {
+		{
+			KeyName:      KeyKafkaHost,
+			ChooseOnly:   false,
+			Default:      "192.168.31.201:9092",
+			DefaultNoUse: false,
+			Description:  "host地址(elastic_kafka)",
+		},
+		{
+			KeyName:      KeyKafkaTopic,
+			ChooseOnly:   false,
+			Default:      "test",
+			DefaultNoUse: false,
+			Description:  "topic, 示例1:myTopic,  2:%{[fieldName]}, defaultTopic",
+		},
+		{
+			KeyName:       KeyKafkaCompression,
+			ChooseOnly:    true,
+			ChooseOptions: []string{KeyKafkaCompressionNone, KeyKafkaCompressionGzip, KeyKafkaCompressionSnappy},
+			Default:       KeyKafkaCompressionNone,
+			DefaultNoUse:  false,
+			Description:   "数据压缩模式(不压缩|gzip|snappy)(kafka_compression)",
+		},
+		{
+			KeyName:      KeyFtSaveLogPath,
+			ChooseOnly:   false,
+			Default:      "/disk1/ftsendor/",
+			DefaultNoUse: true,
+			Description:  "管道本地盘数据保存路径(ft_save_log_path)",
+		},
+		{
+			KeyName:      KeyFtWriteLimit,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "磁盘写入限速(MB/s)(ft_write_limit)",
+			CheckRegex:   "\\d+",
+		},
+		{
+			KeyName:      KeyFtSyncEvery,
+			ChooseOnly:   false,
+			Default:      "10",
+			DefaultNoUse: false,
+			Description:  "同步meta的间隔(ft_sync_every)",
+		},
+		{
+			KeyName:       KeyFtStrategy,
+			ChooseOnly:    true,
+			ChooseOptions: []string{KeyFtStrategyBackupOnly, KeyFtStrategyAlwaysSave, KeyFtStrategyConcurrent},
+			Default:       KeyFtStrategyBackupOnly,
+			DefaultNoUse:  false,
+			Description:   "磁盘管道容错策略(仅备份错误|全部数据走管道)(ft_strategy)",
+		},
+		{
+			KeyName:      KeyFtProcs,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "发送并发数量(磁盘管道或内存管道 always_save 或 concurrent 模式生效)(ft_procs)",
+			CheckRegex:   "\\d+",
+		},
+		{
+			KeyName:       KeyFtMemoryChannel,
+			ChooseOnly:    true,
+			ChooseOptions: []string{"false", "true"},
+			Default:       "false",
+			DefaultNoUse:  false,
+			Description:   "使用内存替换磁盘管道(加速)(ft_memory_channel)",
+		},
+		{
+			KeyName:      KeyFtMemoryChannelSize,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "内存管道长度(ft_memory_channel_size)",
+			CheckRegex:   "\\d+",
+		},
+
 	},
 }
