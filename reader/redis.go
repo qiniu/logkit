@@ -16,6 +16,7 @@ import (
 )
 
 const (
+	DataTypeSet           = "set"
 	DataTypeString        = "string"
 	DataTypeList          = "list"
 	DataTypeChannel       = "channel"
@@ -170,6 +171,7 @@ func (rr *RedisReader) Start() {
 		rr.channelIn = rr.client.PSubscribe(rr.opt.key).Channel()
 	case DataTypeList:
 	case DataTypeString:
+	case DataTypeSet:
 	default:
 		err := fmt.Errorf("data Type < %v > not exist, exit", rr.opt.dataType)
 		log.Error(err)
@@ -232,12 +234,23 @@ func (rr *RedisReader) run() (err error) {
 				log.Errorf("Runner[%v] %v Get redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
 				rr.setStatsError("Runner[" + rr.meta.RunnerName + "] " + rr.Name() + " Get redis error " + subErr.Error())
 			} else if anString == "" {
-				log.Errorf("Runner[%v] %v string read is nil %v", rr.meta.RunnerName, rr.Name(), anString)
+				log.Errorf("Runner[%v] %v string read is [%s] data exist %v", rr.meta.RunnerName, rr.Name(), rr.opt.dataType, anString)
 			}else {
 				//Avoid data duplication
 				//rr.client.Del(rr.opt.key[0])
 				rr.client.Del(rr.opt.key)
 				rr.readChan <- anString
+			}
+			//Added set support for redis
+	    case DataTypeSet:
+	        anSet, subErr := rr.client.SPop(rr.opt.key,).Result()
+			if subErr != nil && subErr != redis.Nil {
+				log.Errorf("Runner[%v] %v SPop redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
+				rr.setStatsError("Runner[" + rr.meta.RunnerName + "] " + rr.Name() + " Get redis error " + subErr.Error())
+			} else if anSet == "" {
+				log.Errorf("Runner[%v] %v set read [%s] data is not exist %v", rr.meta.RunnerName, rr.Name(), rr.opt.dataType, anSet)
+			}else {
+				rr.readChan <- anSet
 			}
 		default:
 			err = fmt.Errorf("data Type < %v > not exist, exit", rr.opt.dataType)
