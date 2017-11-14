@@ -100,6 +100,10 @@ func (p *NginxParser) Name() string {
 	return p.name
 }
 
+func (p *NginxParser) Type() string {
+	return TypeNginx
+}
+
 func (p *NginxParser) Parse(lines []string) ([]sender.Data, error) {
 	var ret []sender.Data
 	se := &utils.StatsError{}

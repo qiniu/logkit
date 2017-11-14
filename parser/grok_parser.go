@@ -198,6 +198,10 @@ func (gp *GrokParser) Name() string {
 	return gp.name
 }
 
+func (gp *GrokParser) Type() string {
+	return TypeGrok
+}
+
 func (gp *GrokParser) Parse(lines []string) ([]sender.Data, error) {
 	datas := []sender.Data{}
 	se := &utils.StatsError{}
