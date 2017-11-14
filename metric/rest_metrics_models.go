@@ -1,6 +1,10 @@
 package metric
 
-import "github.com/qiniu/logkit/utils"
+import (
+	"sort"
+
+	"github.com/qiniu/logkit/utils"
+)
 
 func GetMetricTypeKey() map[string][]utils.KeyValue {
 	typeKey := make(map[string][]utils.KeyValue)
@@ -29,6 +33,10 @@ func GetMetricUsages() []utils.Option {
 		}
 		metricOptions = append(metricOptions, option)
 	}
+	// 使传递到前端的数组有序
+	sort.Slice(metricOptions, func(i, j int) bool {
+		return metricOptions[i].KeyName < metricOptions[j].KeyName
+	})
 	return metricOptions
 }
 

@@ -44,9 +44,6 @@ class Usages extends Component {
   init = () => {
     getMetricUsages().then(data => {
       const {setFieldsValue} = this.props.form;
-      data = data.sort(function(a,b){
-        return a.KeyName > b.KeyName;
-      });
       if (data.success) {
         this.setState({
           items: data,

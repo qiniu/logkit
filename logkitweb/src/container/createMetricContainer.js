@@ -58,14 +58,18 @@ class CreateMetricRunner extends Component {
     let that = this
     let isCopy = this.props.location.query.copyConfig
     if (isCopy === 'true') {
-      window.isCopy = true
+      window.isCopy = true;
       this.setState({
         isCopyStatus: true
       })
     } else {
       window.isCopy = false
     }
-
+    if(window.nodeCopy){
+      config.delete("reader");
+      config.delete("parser");
+      config.delete("transforms");
+    }
     getRunnerVersion().then(data => {
       if (data.success) {
         that.setState({
@@ -123,7 +127,7 @@ class CreateMetricRunner extends Component {
           let data = {
             name: runnerName != undefined ? runnerName : name,
             batch_interval: batch_interval != undefined ? batch_interval : 60,
-            metric_interval: collect_interval != undefined ? collect_interval : 3,
+            collect_interval: collect_interval != undefined ? collect_interval : 3,
             ...config.getNodeData()
           }
           that.refs.initConfig.setFieldsValue({config: JSON.stringify(data, null, 2)});

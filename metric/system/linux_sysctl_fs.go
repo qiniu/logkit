@@ -14,18 +14,75 @@ type SysctlFS struct {
 	path string
 }
 
+const (
+	TypeLinuxSysctlFs        = "linux_sysctl_fs"
+	MetricLinuxSysctlFsUsage = "linux内核信息(linux_sysctl_fs)"
+
+	KeyLinuxSysctlFsAioNr           = "aio-nr"
+	KeyLinuxSysctlFsAioMaxNr        = "aio-max-nr"
+	KeyLinuxSysctlFsDquotNr         = "dquot-nr"
+	KeyLinuxSysctlFsDquotMax        = "dquot-max"
+	KeyLinuxSysctlFsSuperNr         = "super-nr"
+	KeyLinuxSysctlFsSuperMax        = "superMax"
+	KeyLinuxSysctlFsInodeNr         = "inode-nr"
+	KeyLinuxSysctlFsInodeFreeNr     = "inode-free-nr"
+	KeyLinuxSysctlFsInodePreNr      = "inode-preshrink-nr"
+	KeyLinuxSysctlFsDentryNr        = "dentry-nr"
+	KeyLinuxSysctlFsDentryUnNr      = "dentry-unused-nr"
+	KeyLinuxSysctlFsDetryAgeLimit   = "detry-age-limit"
+	KeyLinuxSysctlFsDentryWantPages = "detry-want-pages"
+	KeyLinuxSysctlFsFileNr          = "file-nr"
+	KeyLinuxSysctlFsFileMax         = "file-max"
+)
+
+var KeySysctlFsFieldNameMap = map[string]string{
+	KeyLinuxSysctlFsAioNr:           "sysctl_fs_aio_nr",
+	KeyLinuxSysctlFsAioMaxNr:        "sysctl_fs_aio_max_nr",
+	KeyLinuxSysctlFsDquotNr:         "sysctl_fs_dquot_nr",
+	KeyLinuxSysctlFsDquotMax:        "sysctl_fs_dquot_max",
+	KeyLinuxSysctlFsSuperNr:         "sysctl_fs_super_nr",
+	KeyLinuxSysctlFsSuperMax:        "sysctl_fs_superMax",
+	KeyLinuxSysctlFsInodeNr:         "sysctl_fs_inode_nr",
+	KeyLinuxSysctlFsInodeFreeNr:     "sysctl_fs_inode_free_nr",
+	KeyLinuxSysctlFsInodePreNr:      "sysctl_fs_inode_preshrink_nr",
+	KeyLinuxSysctlFsDentryNr:        "sysctl_fs_dentry_nr",
+	KeyLinuxSysctlFsDentryUnNr:      "sysctl_fs_dentry_unused_nr",
+	KeyLinuxSysctlFsDetryAgeLimit:   "sysctl_fs_detry_age_limit",
+	KeyLinuxSysctlFsDentryWantPages: "sysctl_fs_detry_want_pages",
+	KeyLinuxSysctlFsFileNr:          "sysctl_fs_file_nr",
+	KeyLinuxSysctlFsFileMax:         "sysctl_fs_file_max",
+}
+
+var KeyLinuxSysctlFsUsage = []utils.KeyValue{
+	{KeySysctlFsFieldNameMap[KeyLinuxSysctlFsAioNr], "当前 aio 请求数"},
+	{KeySysctlFsFieldNameMap[KeyLinuxSysctlFsAioMaxNr], "最大允许的 aio 请求"},
+	{KeySysctlFsFieldNameMap[KeyLinuxSysctlFsDquotNr], "分配的磁盘配额项及空余项"},
+	{KeySysctlFsFieldNameMap[KeyLinuxSysctlFsDquotMax], "缓存的磁盘配额的最大值"},
+	{KeySysctlFsFieldNameMap[KeyLinuxSysctlFsSuperNr], "已分配的 super block 数"},
+	{KeySysctlFsFieldNameMap[KeyLinuxSysctlFsSuperMax], "系统能够分配的 super block 数"},
+	{KeySysctlFsFieldNameMap[KeyLinuxSysctlFsInodeNr], "分配的 inode 数"},
+	{KeySysctlFsFieldNameMap[KeyLinuxSysctlFsInodeFreeNr], "空闲的 inode 数"},
+	{KeySysctlFsFieldNameMap[KeyLinuxSysctlFsInodePreNr], "inode 预缩减数"},
+	{KeySysctlFsFieldNameMap[KeyLinuxSysctlFsDentryNr], "当前分配的 dentry 缓存数"},
+	{KeySysctlFsFieldNameMap[KeyLinuxSysctlFsDentryUnNr], "未使用的 dentry 缓存数"},
+	{KeySysctlFsFieldNameMap[KeyLinuxSysctlFsDetryAgeLimit], "dentry 缓存被创建以来的时长"},
+	{KeySysctlFsFieldNameMap[KeyLinuxSysctlFsDentryWantPages], "系统需要的页面数"},
+	{KeySysctlFsFieldNameMap[KeyLinuxSysctlFsFileNr], "已分配、使用的和最大的文件句柄数"},
+	{KeySysctlFsFieldNameMap[KeyLinuxSysctlFsFileMax], "内核支持的最大file handle数量"},
+}
+
 func (_ SysctlFS) Name() string {
-	return "linux_sysctl_fs"
+	return TypeLinuxSysctlFs
 }
 
 func (_ SysctlFS) Usages() string {
-	return "linux_sysctl_fs"
+	return MetricLinuxSysctlFsUsage
 }
 
 func (_ SysctlFS) Config() map[string]interface{} {
 	config := map[string]interface{}{
 		metric.OptionString:     []utils.Option{},
-		metric.AttributesString: []utils.KeyValue{},
+		metric.AttributesString: KeyLinuxSysctlFsUsage,
 	}
 	return config
 }
@@ -49,7 +106,7 @@ func (sfs *SysctlFS) gatherList(file string, fields map[string]interface{}, fiel
 		if err != nil {
 			return err
 		}
-		fields[name] = v
+		fields[KeySysctlFsFieldNameMap[name]] = v
 	}
 
 	return nil
@@ -66,7 +123,7 @@ func (sfs *SysctlFS) gatherOne(name string, fields map[string]interface{}) error
 		return err
 	}
 
-	fields[name] = v
+	fields[KeySysctlFsFieldNameMap[name]] = v
 	return nil
 }
 
@@ -86,7 +143,7 @@ func (sfs *SysctlFS) Collect() (datas []map[string]interface{}, err error) {
 }
 
 func init() {
-	metric.Add("linux_sysctl_fs", func() metric.Collector {
+	metric.Add(TypeLinuxSysctlFs, func() metric.Collector {
 		return &SysctlFS{
 			path: "/proc/sys/fs",
 		}
