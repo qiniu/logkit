@@ -23,14 +23,14 @@ const (
 	KeyLinuxSysctlFsDquotNr         = "dquot-nr"
 	KeyLinuxSysctlFsDquotMax        = "dquot-max"
 	KeyLinuxSysctlFsSuperNr         = "super-nr"
-	KeyLinuxSysctlFsSuperMax        = "superMax"
+	KeyLinuxSysctlFsSuperMax        = "super-max"
 	KeyLinuxSysctlFsInodeNr         = "inode-nr"
 	KeyLinuxSysctlFsInodeFreeNr     = "inode-free-nr"
 	KeyLinuxSysctlFsInodePreNr      = "inode-preshrink-nr"
 	KeyLinuxSysctlFsDentryNr        = "dentry-nr"
 	KeyLinuxSysctlFsDentryUnNr      = "dentry-unused-nr"
-	KeyLinuxSysctlFsDetryAgeLimit   = "detry-age-limit"
-	KeyLinuxSysctlFsDentryWantPages = "detry-want-pages"
+	KeyLinuxSysctlFsDetryAgeLimit   = "dentry-age-limit"
+	KeyLinuxSysctlFsDentryWantPages = "dentry-want-pages"
 	KeyLinuxSysctlFsFileNr          = "file-nr"
 	KeyLinuxSysctlFsFileMax         = "file-max"
 )
@@ -41,14 +41,14 @@ var KeySysctlFsFieldNameMap = map[string]string{
 	KeyLinuxSysctlFsDquotNr:         "sysctl_fs_dquot_nr",
 	KeyLinuxSysctlFsDquotMax:        "sysctl_fs_dquot_max",
 	KeyLinuxSysctlFsSuperNr:         "sysctl_fs_super_nr",
-	KeyLinuxSysctlFsSuperMax:        "sysctl_fs_superMax",
+	KeyLinuxSysctlFsSuperMax:        "sysctl_fs_super-max",
 	KeyLinuxSysctlFsInodeNr:         "sysctl_fs_inode_nr",
 	KeyLinuxSysctlFsInodeFreeNr:     "sysctl_fs_inode_free_nr",
 	KeyLinuxSysctlFsInodePreNr:      "sysctl_fs_inode_preshrink_nr",
 	KeyLinuxSysctlFsDentryNr:        "sysctl_fs_dentry_nr",
 	KeyLinuxSysctlFsDentryUnNr:      "sysctl_fs_dentry_unused_nr",
-	KeyLinuxSysctlFsDetryAgeLimit:   "sysctl_fs_detry_age_limit",
-	KeyLinuxSysctlFsDentryWantPages: "sysctl_fs_detry_want_pages",
+	KeyLinuxSysctlFsDetryAgeLimit:   "sysctl_fs_dentry_age_limit",
+	KeyLinuxSysctlFsDentryWantPages: "sysctl_fs_dentry_want_pages",
 	KeyLinuxSysctlFsFileNr:          "sysctl_fs_file_nr",
 	KeyLinuxSysctlFsFileMax:         "sysctl_fs_file_max",
 }

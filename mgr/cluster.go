@@ -59,6 +59,7 @@ const (
 )
 
 const (
+	DefaultMyTag    = "default"
 	ContentType     = "Content-Type"
 	ApplicationJson = "application/json"
 )
@@ -66,6 +67,7 @@ const (
 func NewCluster(cc *ClusterConfig) *Cluster {
 	cl := new(Cluster)
 	cl.ClusterConfig = *cc
+	cl.mytag = DefaultMyTag
 	cl.slaves = make([]Slave, 0)
 	cl.mutex = new(sync.RWMutex)
 	return cl
