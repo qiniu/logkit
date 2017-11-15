@@ -574,7 +574,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyRedisDataType,
 			ChooseOnly:    true,
-			ChooseOptions: []string{DataTypeList, DataTypeChannel, DataTypePatterChannel, DataTypeString, DataTypeSet},
+			ChooseOptions: []string{DataTypeList, DataTypeChannel, DataTypePatterChannel, DataTypeString, DataTypeSet, DateTypeSortedSet},
 			Description:   "Redis的数据读取模式(redis_datatype)",
 		},
 		{

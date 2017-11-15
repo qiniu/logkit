@@ -16,6 +16,7 @@ import (
 )
 
 const (
+	DateTypeSortedSet     = "sortedSet"
 	DataTypeSet           = "set"
 	DataTypeString        = "string"
 	DataTypeList          = "list"
@@ -172,6 +173,7 @@ func (rr *RedisReader) Start() {
 	case DataTypeList:
 	case DataTypeString:
 	case DataTypeSet:
+	case DateTypeSortedSet:
 	default:
 		err := fmt.Errorf("data Type < %v > not exist, exit", rr.opt.dataType)
 		log.Error(err)
@@ -251,6 +253,19 @@ func (rr *RedisReader) run() (err error) {
 				log.Errorf("Runner[%v] %v set read [%s] data is not exist %v", rr.meta.RunnerName, rr.Name(), rr.opt.dataType, anSet)
 			}else {
 				rr.readChan <- anSet
+			}
+	    case DateTypeSortedSet:
+		    anSortedSet, subErr := rr.client.ZRange(rr.opt.key,0,-1).Result()
+		    if subErr != nil && subErr != redis.Nil {
+				log.Errorf("Runner[%v] %v ZRange redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
+				rr.setStatsError("Runner[" + rr.meta.RunnerName + "] " + rr.Name() + " Get redis error " + subErr.Error())
+			} else if len(anSortedSet) == 0 {
+				log.Errorf("Runner[%v] %v sortedSet read [%s] data is not exist %v", rr.meta.RunnerName, rr.Name(), rr.opt.dataType, anSortedSet)
+			}else {
+				if len(anSortedSet) > 0{
+					rr.client.Del(rr.opt.key)
+					rr.readChan <- anSortedSet[0]
+				}
 			}
 		default:
 			err = fmt.Errorf("data Type < %v > not exist, exit", rr.opt.dataType)
