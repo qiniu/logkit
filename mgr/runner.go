@@ -328,8 +328,6 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []sender.Data, times in
 		if se, ok := err.(*utils.StatsError); ok {
 			err = se.ErrorDetail
 			if se.Ft {
-				info.Errors = se.Errors
-				info.Success = se.Success
 				r.rs.Lag.Ftlags = se.Ftlag
 			} else {
 				if cnt > 1 {
