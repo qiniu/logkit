@@ -290,9 +290,11 @@ class List extends Component {
         return (
           record.isWebFolder === true ? (<a>
             <div className="editable-row-operations">
-              <ClipboardButton data-clipboard-text={text}>
-                <Icon style={{fontSize: 16}} onClick={() => this.optRunner(record)} type={record.iconType}/>
-              </ClipboardButton>
+              {
+                <Popconfirm title={"是否"+record.runnerOpt+"该Runner?"} onConfirm={() => this.optRunner(record)}>
+                  <Icon title={record.runnerOpt+"Runner"} style={{fontSize: 16}} type={record.iconType}/>
+                </Popconfirm>
+              }
             </div>
           </a>): null
         );
@@ -358,9 +360,11 @@ class List extends Component {
         let readerTrend = 'stable'
         let readerkbTrend = 'stable'
         let iconType = 'poweroff'
+        let runnerOpt = '关闭'
 
         if(item["is_stopped"]){
-          status = '停止'
+          status = '关闭'
+          runnerOpt = '开启'
           iconType = 'caret-right'
           isWebFolder = item.web_folder
         }
@@ -414,6 +418,7 @@ class List extends Component {
           copy: JSON.stringify(item, null, 2),
           currentItem: item,
           iconType,
+          runnerOpt,
           isWebFolder
         })
       })
