@@ -135,9 +135,9 @@ func TestMetricRun(t *testing.T) {
 		}
 		curLine++
 		if curLine == 1 {
-			assert.Equal(t, len(cpuAttr)/2, len(result[0]))
+			assert.Equal(t, len(cpuAttr)/2+1, len(result[0]))
 		} else {
-			assert.Equal(t, len(cpuAttr)/2, len(result[0]))
+			assert.Equal(t, len(cpuAttr)/2+1, len(result[0]))
 			assert.Equal(t, 2, len(result))
 		}
 	}
@@ -212,7 +212,7 @@ func TestMetricRun(t *testing.T) {
 			log.Fatalf("Test_Run error unmarshal %v curLine = %v %v", string(str), curLine, err)
 		}
 		assert.Equal(t, 1, len(result))
-		assert.Equal(t, len(cpuAttr)/2-1, len(result[0]))
+		assert.Equal(t, len(cpuAttr)/2, len(result[0]))
 		curLine++
 	}
 }
@@ -409,7 +409,7 @@ func TestMetricDiskio(t *testing.T) {
 		if err != nil {
 			log.Fatalf("Test_Run error unmarshal %v curLine = %v %v", string(str), curLine, err)
 		}
-		assert.Equal(t, len(diskIoAttr)+1, len(result[0]))
+		assert.Equal(t, len(diskIoAttr)+2, len(result[0]))
 	}
 
 	var testMetricConf1 = `{
@@ -479,6 +479,6 @@ func TestMetricDiskio(t *testing.T) {
 		if err != nil {
 			log.Fatalf("Test_Run error unmarshal %v curLine = %v %v", string(str), curLine, err)
 		}
-		assert.Equal(t, len(diskIoAttr)-1, len(result[0]))
+		assert.Equal(t, len(diskIoAttr), len(result[0]))
 	}
 }
