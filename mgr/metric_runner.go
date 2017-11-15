@@ -20,6 +20,7 @@ import (
 
 const (
 	KeyMetricType = "type"
+	KeyMetricTime = "timestamp"
 )
 
 const (
@@ -169,6 +170,7 @@ func (r *MetricRunner) Run() {
 		// collect data
 		for _, c := range r.collectors {
 			tmpdatas, err := c.Collect()
+			now := time.Now().Format(time.RFC3339Nano)
 			if err != nil {
 				log.Errorf("collecter <%v> collect data error: %v", c.Name(), err)
 				continue
@@ -176,6 +178,7 @@ func (r *MetricRunner) Run() {
 			for i := range tmpdatas {
 				if len(tmpdatas[i]) > 0 {
 					dataCnt++
+					tmpdatas[i][KeyMetricTime] = now
 					datas = append(datas, tmpdatas[i])
 				}
 			}
