@@ -170,7 +170,7 @@ func (r *MetricRunner) Run() {
 		// collect data
 		for _, c := range r.collectors {
 			tmpdatas, err := c.Collect()
-			now := time.Now().Format(time.RFC3339)
+			now := time.Now().Format(time.RFC3339Nano)
 			if err != nil {
 				log.Errorf("collecter <%v> collect data error: %v", c.Name(), err)
 				continue
