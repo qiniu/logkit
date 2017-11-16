@@ -33,6 +33,10 @@ type Transformer interface {
 	Stats() utils.StatsInfo
 }
 
+type Initialize interface{
+	Init() error
+}
+
 type Creator func() Transformer
 
 var Transformers = map[string]Creator{}

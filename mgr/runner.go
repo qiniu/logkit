@@ -302,6 +302,14 @@ func createTransformers(rc RunnerConfig) []transforms.Transformer {
 			log.Errorf("type %v of transformer unmarshal config error %v", strTP, err)
 			continue
 		}
+		//transformer初始化
+		if trans, ok := trans.(transforms.Initialize); ok{
+			err = trans.Init()
+			if err != nil {
+				log.Errorf("type %v of transformer init error %v", strTP, err)
+				continue
+			}
+		}
 		transformers = append(transformers, trans)
 	}
 	return transformers

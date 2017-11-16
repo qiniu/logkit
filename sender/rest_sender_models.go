@@ -487,7 +487,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyElasticTimezone,
 			ChooseOnly:    true,
-			ChooseOptions: []string{KeylocalTimezone, KeyUTCTimezone, KeyPRCTimezone},
+			ChooseOptions: []string{KeyUTCTimezone, KeylocalTimezone, KeyPRCTimezone},
 			Default:       KeyUTCTimezone,
 			DefaultNoUse:  false,
 			Description:   "索引时区(Local(本地)|UTC(标准时间)|PRC(北京时间))(elastic_time_zone)",
