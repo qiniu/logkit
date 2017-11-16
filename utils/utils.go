@@ -14,8 +14,9 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/qiniu/log"
 	"regexp"
+
+	"github.com/qiniu/log"
 )
 
 const (
@@ -263,21 +264,23 @@ func IsJSON(str string) bool {
 	return json.Unmarshal([]byte(str), &js) == nil
 }
 
-func ExtractField(slice []string) (s []string, err error){
+func ExtractField(slice []string) (s []string, err error) {
 	if len(slice) == 1 {
 		return slice, nil
-	}else if len(slice) == 2 {
-		rgexpr := "^%\\{\\[\\S+\\]}$" 		// --->  %{[type]}
+	}
+	if len(slice) == 2 {
+		rgexpr := "^%\\{\\[\\S+\\]}$" // --->  %{[type]}
 		r, _ := regexp.Compile(rgexpr)
 		slice[0] = strings.TrimSpace(slice[0])
 		bool := r.MatchString(slice[0])
 		if bool {
 			rs := []rune(slice[0])
-			slice[0] = string(rs[3:len(rs) -2])
+			slice[0] = string(rs[3 : len(rs)-2])
 		} else {
 			err = errors.New("topic参数错误")
 		}
 	}
+	err = errors.New("topic参数错误")
 	return slice, err
 }
 
