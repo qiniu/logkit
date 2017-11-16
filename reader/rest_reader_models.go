@@ -574,7 +574,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyRedisDataType,
 			ChooseOnly:    true,
-			ChooseOptions: []string{DataTypeList, DataTypeChannel, DataTypePatterChannel, DataTypeString, DataTypeSet, DateTypeSortedSet},
+			ChooseOptions: []string{DataTypeList, DataTypeChannel, DataTypePatterChannel, DataTypeString, DataTypeSet, DateTypeSortedSet, DateTypeHash},
 			Description:   "Redis的数据读取模式(redis_datatype)",
 		},
 		{
@@ -590,6 +590,13 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "key1",
 			DefaultNoUse: true,
 			Description:  "redis键(redis_key)",
+		},
+		{
+			KeyName:	  KeyRedisHashArea,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "hash模式对应redis的hash数据结构的域(redisHash_area)",
 		},
 		{
 			KeyName:      KeyRedisAddress,
