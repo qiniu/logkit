@@ -167,3 +167,33 @@ export async function resetConfigData(params) {
   });
 }
 
+/* cluster api
+
+ */
+export async function postClusterConfigData(params) {
+  return request(window.logkitUrl + '/logkit/cluster/configs/' + params.name + '?tag=' + params.tag + '&url=' + params.url, {
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(params.body),
+  });
+}
+
+export async function getClusterRunnerConfigs(params) {
+  return request(window.logkitUrl + '/logkit/cluster/configs', {
+    method: 'get',
+  });
+}
+
+export async function getClusterRunnerStatus(params) {
+  return request(window.logkitUrl + '/logkit/cluster/status', {
+    method: 'get',
+  });
+}
+
+export async function getClusterSlaves(params) {
+  return request(window.logkitUrl + '/logkit/cluster/slaves', {
+    method: 'get',
+  });
+}

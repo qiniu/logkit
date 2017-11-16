@@ -8,7 +8,7 @@ import RenderConfig from '../components/renderConfig'
 import config from '../store/config'
 import {isJSON} from '../utils/tools'
 import moment from 'moment'
-import {postConfigData, getRunnerVersion, putConfigData} from '../services/logkit';
+import {postConfigData, getRunnerVersion, putConfigData, postClusterConfigData} from '../services/logkit';
 import _ from "lodash";
 
 const Step = Steps.Step;
@@ -177,7 +177,7 @@ class CreateMetricRunner extends Component {
       } else {
         if (isJSON(formData.config)) {
           let data = JSON.parse(formData.config);
-          postConfigData({name: data.name, body: data}).then(data => {
+          postClusterConfigData({name: data.name, body: data}).then(data => {
             if (data === undefined) {
               notification.success({message: "Runner添加成功", duration: 10,})
               this.props.router.push({pathname: `/`})

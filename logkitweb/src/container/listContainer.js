@@ -1,12 +1,12 @@
 import React, {Component} from 'react';
-import {Table, Icon, Popconfirm, Button, notification, Modal, Row, Col, Tag, Input, Layout} from 'antd';
 import moment from 'moment'
 import ClipboardButton from 'react-clipboard.js';
 import {
-  getRunnerConfigs, deleteConfigData, getRunnerStatus, getRunnerVersion, resetConfigData, startRunner, stopRunner
+  getRunnerConfigs, getClusterRunnerConfigs, deleteConfigData, getClusterSlaves, getRunnerStatus, getClusterRunnerStatus, getRunnerVersion, resetConfigData, startRunner, stopRunner
 } from '../services/logkit';
 import _ from "lodash";
-
+import {Table, Icon, Popconfirm, Button, notification, Modal, Row, Col, Tag, Input, Layout, Menu, Breadcrumb } from 'antd';
+const SubMenu = Menu.SubMenu;
 const { Header, Content, Footer, Sider } = Layout;
 
 class List extends Component {
@@ -19,7 +19,10 @@ class List extends Component {
       isShowConfig: false,
       isShowResetConfig: false,
       currentItem: '',
-      version: ''
+      version: '',
+      collapsed: false,
+      currentMenu: 'tag',
+      machines: []
     };
     this.init()
   }
@@ -36,20 +39,96 @@ class List extends Component {
 
   }
 
+  onCollapse = (collapsed) => {
+    //console.log(collapsed);
+    this.setState({ collapsed });
+  }
+
+  transform = (srcData) => {
+      let dataArray = []
+      _.forIn(srcData,(value, key) => {
+        //console.log(value)
+      let runners = [];
+      if (value.configs != null) {
+        _.forIn(value.configs,(v, k) => {  runners.push(v); })
+      }
+      dataArray.push({
+        machineUrl: key,
+        configs: runners,
+        error: value.error,
+        tag: value.tag
+      })
+
+    })
+    //console.log(dataArray)
+    return dataArray
+  }
+
+  transformStatus = (srcData) => {
+    let dataArray = []
+    _.forIn(srcData,(value, key) => {
+      let runnerStatus = [];
+      if (value.status !== null) {
+        _.forIn(value.status,(v, k) => {  runnerStatus.push(v); })
+      }
+      dataArray.push({
+        machineUrl: key,
+        runnerStatus: runnerStatus,
+        error: value.error,
+        tag: value.tag
+      })
+
+    })
+    //console.log(dataArray)
+    return dataArray
+  }
+
+
   getStatus = () => {
     let that = this
-    getRunnerConfigs().then(data => {
+    getClusterRunnerConfigs().then(data => {
       if (data.success) {
+        //console.log(_.omit(data, 'success'))
+        let mapData = _.omit(data, 'success')
+        let tagMapData = this.transform(mapData)
         that.setState({
-          runners: _.omit(data, 'success')
+          runners: tagMapData
         })
-        getRunnerStatus().then(data => {
+        getClusterRunnerStatus().then(data => {
           if (data.success) {
             that.setState({
-              status: _.values(_.omit(data, 'success'))
+              status: this.transformStatus(_.omit(data, 'success'))
             })
           }
         })
+      }
+    })
+
+    // getRunnerConfigs().then(data => {
+    //   if (data.success) {
+    //     //console.log(_.omit(data, 'success'))
+    //     let mapData = _.omit(data, 'success')
+    //     //let tagMapData = this.transform(mapData)
+    //     that.setState({
+    //       runners: _.omit(data, 'success')
+    //     })
+    //     getRunnerStatus().then(data => {
+    //       if (data.success) {
+    //         that.setState({
+    //           status: _.values(_.omit(data, 'success'))
+    //         })
+    //       }
+    //     })
+    //   }
+    // })
+
+    getClusterSlaves().then(data => {
+      if (data.success) {
+        //console.log(data)
+        that.setState({
+          machines: _.values(_.omit(data, 'success'))
+        })
+        //console.log(this.state.machines)
       }
     })
   }
@@ -176,6 +255,106 @@ class List extends Component {
     }else{
       this.props.router.push({pathname: `/index/create-metric-runner?copyConfig=true`})
     }
+  }
+
+  renderTagList() {
+    let dataSource = []
+
+    this.state.runners.map((item) => {
+      //console.log(item)
+      dataSource.push({
+        name: item.tag,
+        machineUrl: item.machineUrl,
+        error: item.error
+      })
+    })
+    //console.log(dataSource)
+
+    const columns = [{
+      title: '标签名称',
+      dataIndex: 'name',
+      key: 'name',
+    }, {
+      title: '机器地址',
+      dataIndex: 'machineUrl',
+      key: 'machineUrl',
+    }, {
+      title: '错误信息',
+      dataIndex: 'error',
+      key: 'error',
+    }, {
+      title: '添加runner',
+      key: 'edit',
+      dataIndex: 'edit',
+      width: '10%',
+      render: (text, record) => {
+        return (
+            (<a>
+              <div className="editable-row-operations">
+                {
+                  <Icon onClick={this.addLogRunner} style={{fontSize: 16}} type="plus"/>
+                }
+              </div>
+            </a>)
+        );
+      },
+
+    }];
+    return (
+            <Table columns={columns} pagination={{size: 'small', pageSize: 20}} dataSource={dataSource}/>
+        )
+  }
+
+  renderMachineList() {
+    let dataSource = []
+    //console.log(this.state.machines)
+    this.state.machines.map((item) => {
+      dataSource.push({
+        name: item.tag,
+        machineUrl: item.url,
+        status: item.status,
+        last_touch: item.last_touch
+      })
+    })
+    //console.log(dataSource)
+
+    const columns = [ {
+      title: '机器地址',
+      dataIndex: 'machineUrl',
+      key: 'machineUrl',
+    },{
+      title: '标签名称',
+      dataIndex: 'name',
+      key: 'name',
+    }, {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+    }, {
+      title: '心跳时间',
+      dataIndex: 'last_touch',
+      key: 'last_touch',
+    }, {
+      title: '添加runner',
+      key: 'edit',
+      dataIndex: 'edit',
+      width: '10%',
+      render: (text, record) => {
+        return (
+            (<a>
+              <div className="editable-row-operations">
+                {
+                  <Icon  onClick={this.addLogRunner} style={{fontSize: 16}} type="plus"/>
+                }
+              </div>
+            </a>)
+        );
+      },
+
+    }];
+    return (
+        <Table columns={columns} pagination={{size: 'small', pageSize: 20}} dataSource={dataSource}/>
+    )
   }
 
   renderRunnerList() {
@@ -336,8 +515,10 @@ class List extends Component {
     }];
 
     let data = []
+    console.log(this.state.runners)
+    console.log(this.state.status)
     if (this.state.runners != null) {
-      _.values(this.state.runners).map((item) => {
+      this.state.runners[0].configs.map((item) => {
         let status = '异常'
         let createTime = ''
         let parseSuccessNumber = 0
@@ -369,7 +550,7 @@ class List extends Component {
           isWebFolder = item.web_folder
         }
 
-        this.state.status.map((ele) => {
+        this.state.status[0].runnerStatus.map((ele) => {
           if (item.name === ele.name) {
             status = '正常'
             createTime = moment(item.createtime).format("YYYY-MM-DD HH:mm:ss")
@@ -437,69 +618,118 @@ class List extends Component {
     this.props.router.push({pathname: `/index/create-metric-runner`})
   }
 
+  changeMenu = (e) => {
+    //console.log(e)
+    this.setState({
+      currentMenu: e.key
+    })
+  }
+
   render() {
     return (
-      <div className="logkit-container">
-        <div className="header">
-          <img src="../../../static/logkit100.png"></img>
-          七牛Logkit配置文件助手 {this.state.version}
-        </div>
-        <div className="content">
-          <Button type="primary" className="index-btn" ghost onClick={this.addLogRunner}>
-            <Icon type="plus"/> 增加日志采集 Runner
-          </Button>
-          <Button type="primary" className="index-btn" ghost onClick={this.addMetricRunner}>
-            <Icon type="plus"/> 增加系统信息采集 Runner
-          </Button>
-          {/*<Button type="primary" className="index-btn" ghost onClick={() => this.turnToConfigPage()}>*/}
-          {/*<Icon type="link"/>跳转至配置页面*/}
-          {/*</Button>*/}
-          {this.renderRunnerList()}
-        </div>
-        <Footer style={{textAlign: 'center'}}>
-          更多信息请访问：
-          <a target="_blank" href="https://github.com/qiniu/logkit">
-            <Tag color="#108ee9">Logkit</Tag> </a> |
-          <a target="_blank" href="https://github.com/qiniu/logkit/wiki">
-            <Tag color="#108ee9">帮助文档</Tag> </a> |
-          <a target="_blank" href="https://qiniu.github.io/pandora-docs/#/"><Tag
-            color="#108ee9">Pandora产品</Tag>
-          </a>
-        </Footer>
-        <Modal footer={null} title="错误日志" width={1000} visible={this.state.isShow}
-               onCancel={this.handleErrorCancel}
-        >
-          <Tag color="#108ee9">读取错误日志:</Tag>
-          <Row style={{marginTop: '10px'}}>
-            <Col span={24}>{this.state.currentItem.readerError}</Col>
-          </Row>
-          <Tag color="#108ee9" style={{marginTop: '30px'}}>解析错误日志:</Tag>
-          <Row style={{marginTop: '10px'}}>
-            <Col span={24}>{this.state.currentItem.parseError}</Col>
-          </Row>
-          <Tag color="#108ee9" style={{marginTop: '30px'}}>发送错误日志:</Tag>
-          <Row style={{marginTop: '10px'}}>
-            <Col span={24}>{this.state.currentItem.sendError}</Col>
-          </Row>
-          <Tag color="#108ee9" style={{marginTop: '30px'}}>Logkit错误日志:</Tag>
-          <Row style={{marginTop: '10px'}}>
-            <Col span={24}>{this.state.currentItem.logkitError}</Col>
-          </Row>
+        <Layout style={{ minHeight: '100vh' }}>
+          <Sider
+              collapsible
+              collapsed={this.state.collapsed}
+              onCollapse={this.onCollapse}
+          >
+            <div className="logo" >  <img src="../../../static/logkit100.png"></img> </div>
+            <Menu theme="dark" defaultSelectedKeys={['1']} mode="inline" onClick={this.changeMenu}>
+              <Menu.Item key="tag">
+                <Icon type="pie-chart" />
+                <span>标签</span>
+              </Menu.Item>
+              <Menu.Item key="machine">
+                <Icon type="desktop" />
+                <span>机器</span>
+              </Menu.Item>
+              <Menu.Item key="runner">
+                <Icon type="file" />
+                <span>Runner</span>
+              </Menu.Item>
+            </Menu>
+          </Sider>
+          <Layout>
+            <Header style={{ background: '#fff', padding: 0 }} />
+            {this.state.currentMenu === 'tag' ? (<Content style={{ margin: '0 16px' }}>
+              <Breadcrumb style={{ margin: '16px 0' }}>
+                <Breadcrumb.Item>标签管理列表</Breadcrumb.Item>
+              </Breadcrumb>
+              <div style={{ padding: 24, background: '#fff', minHeight: 360 }}>
+                <div className="content">
+                  {this.renderTagList()}
+                </div>
 
-        </Modal>
-        <Modal footer={null} title="详细配置情况" width={1000} visible={this.state.isShowConfig}
-               onCancel={this.handleConfigCancel}
-        >
-          <Input type="textarea" value={this.state.currentItem.copy} rows="50"/>
+              </div>
+            </Content>) : null}
+            {this.state.currentMenu === 'machine' ? (<Content style={{ margin: '0 16px' }}>
+              <Breadcrumb style={{ margin: '16px 0' }}>
+                <Breadcrumb.Item>机器管理列表</Breadcrumb.Item>
+              </Breadcrumb>
+              <div style={{ padding: 24, background: '#fff', minHeight: 360 }}>
+                <div className="content">
+                  {this.renderMachineList()}
+                </div>
 
-        </Modal>
+              </div>
+            </Content>) : null}
+            {this.state.currentMenu === 'runner' ? (<Content style={{ margin: '0 16px' }}>
+              <Breadcrumb style={{ margin: '16px 0' }}>
+                <Breadcrumb.Item>Runner管理列表</Breadcrumb.Item>
+              </Breadcrumb>
+              <div style={{ padding: 24, background: '#fff', minHeight: 360 }}>
+                <div className="content">
+                  {this.renderRunnerList()}
+                </div>
 
-        <Modal title="是否重置配置文件？" visible={this.state.isShowResetConfig}
-               onOk={this.handleResetConfig} onCancel={this.handleResetConfigCancel}
-        >
-          注意:<Tag color="#ffbf00">重置配置文件会删除meta信息并重启</Tag>
-        </Modal>
-      </div>
+              </div>
+            </Content>) : null}
+            <Footer style={{textAlign: 'center'}}>
+              更多信息请访问：
+              <a target="_blank" href="https://github.com/qiniu/logkit">
+              <Tag color="#108ee9">Logkit</Tag> </a> |
+              <a target="_blank" href="https://github.com/qiniu/logkit/wiki">
+              <Tag color="#108ee9">帮助文档</Tag> </a> |
+              <a target="_blank" href="https://qiniu.github.io/pandora-docs/#/"><Tag
+                   color="#108ee9">Pandora产品</Tag>
+                 </a>
+            </Footer>
+          </Layout>
+          <Modal footer={null} title="错误日志" width={1000} visible={this.state.isShow}
+                 onCancel={this.handleErrorCancel}
+          >
+            <Tag color="#108ee9">读取错误日志:</Tag>
+            <Row style={{marginTop: '10px'}}>
+              <Col span={24}>{this.state.currentItem.readerError}</Col>
+            </Row>
+            <Tag color="#108ee9" style={{marginTop: '30px'}}>解析错误日志:</Tag>
+            <Row style={{marginTop: '10px'}}>
+              <Col span={24}>{this.state.currentItem.parseError}</Col>
+            </Row>
+            <Tag color="#108ee9" style={{marginTop: '30px'}}>发送错误日志:</Tag>
+            <Row style={{marginTop: '10px'}}>
+              <Col span={24}>{this.state.currentItem.sendError}</Col>
+            </Row>
+            <Tag color="#108ee9" style={{marginTop: '30px'}}>Logkit错误日志:</Tag>
+            <Row style={{marginTop: '10px'}}>
+              <Col span={24}>{this.state.currentItem.logkitError}</Col>
+            </Row>
+
+          </Modal>
+          <Modal footer={null} title="详细配置情况" width={1000} visible={this.state.isShowConfig}
+                 onCancel={this.handleConfigCancel}
+          >
+            <Input type="textarea" value={this.state.currentItem.copy} rows="50"/>
+
+          </Modal>
+
+          <Modal title="是否重置配置文件？" visible={this.state.isShowResetConfig}
+                 onOk={this.handleResetConfig} onCancel={this.handleResetConfigCancel}
+          >
+            注意:<Tag color="#ffbf00">重置配置文件会删除meta信息并重启</Tag>
+          </Modal>
+        </Layout>
+
     );
   }
 }

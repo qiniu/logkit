@@ -113,6 +113,32 @@ class renderConfig extends Component {
 
   }
 
+  handleTagChange = (e) => {
+    const {getFieldsValue, getFieldDecorator, resetFields} = this.props.form;
+    let data = getFieldsValue();
+    window.tag = ''
+    if (this.isJSON(data.config)) {
+      console.log(e.target.value)
+      window.tag = e.target.value
+    } else {
+      notification.warning({message: "不是一个合法的json对象,请检查", duration: 10,})
+    }
+
+  }
+
+  handleMachineChange = (e) => {
+    const {getFieldsValue, getFieldDecorator, resetFields} = this.props.form;
+    let data = getFieldsValue();
+    window.machine_url = ''
+    if (this.isJSON(data.config)) {
+      console.log(e.target.value)
+      window.machine_url = e.target.value
+    } else {
+      notification.warning({message: "不是一个合法的json对象,请检查", duration: 10,})
+    }
+
+  }
+
   handleNameChange = (e) => {
     const {getFieldsValue, getFieldDecorator, resetFields} = this.props.form;
     let data = getFieldsValue();
@@ -174,6 +200,12 @@ class renderConfig extends Component {
                       {pattern: /^[0-9]*$/, message: '输入不符合规范,只能为整数'}]})(
                     <Input onChange={this.handleMetricIntervalChange} placeholder={'系统信息收集间隔单位(秒)'}/>
                   )}
+                </FormItem>
+                <FormItem {...formItemLayout} label="标签名称">
+                      <Input onChange={this.handleTagChange} placeholder={'标签名称'}/>
+                </FormItem>
+                <FormItem {...formItemLayout} label="机器地址">
+                      <Input onChange={this.handleMachineChange} placeholder={'机器地址'}/>
                 </FormItem>
                 <FormItem
                     {...optionFormItemLayout}
