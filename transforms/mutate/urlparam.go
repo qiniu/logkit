@@ -7,11 +7,12 @@ import (
 
 	"fmt"
 
+	"strconv"
+
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
-	"strconv"
 )
 
 type UrlParam struct {
