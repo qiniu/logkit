@@ -95,6 +95,23 @@ func TestArrayExpandIgnore(t *testing.T) {
 			"myword":  []interface{}{1, 2, 3, 4, 5},
 			"myword0": "aaa",
 		},
+		{
+			"myword":  []interface{}{1, 2, 3, 4, 5},
+			"myword0": "aaa",
+			"myword1": "aaa",
+			"myword2": "aaa",
+			"myword3": "aaa",
+		},
+		{
+			"myword":    []interface{}{1, 2, 3, 4, 5},
+			"myword0":   "aaa",
+			"myword0_0": "aaa",
+			"myword0_1": "aaa",
+			"myword0_2": "aaa",
+			"myword0_3": "aaa",
+			"myword0_4": "aaa",
+			"myword0_5": "aaa",
+		},
 	})
 	assert.Error(t, err)
 	exp := []sender.Data{
@@ -102,12 +119,39 @@ func TestArrayExpandIgnore(t *testing.T) {
 			"myword": "aaaaaaaaaaaaaaaa",
 		},
 		{
-			"myword":  []interface{}{1, 2, 3, 4, 5},
-			"myword0": "aaa",
-			"myword1": 2,
-			"myword2": 3,
-			"myword3": 4,
-			"myword4": 5,
+			"myword":    []interface{}{1, 2, 3, 4, 5},
+			"myword0":   "aaa",
+			"myword0_0": 1,
+			"myword1":   2,
+			"myword2":   3,
+			"myword3":   4,
+			"myword4":   5,
+		},
+		{
+			"myword":    []interface{}{1, 2, 3, 4, 5},
+			"myword0":   "aaa",
+			"myword1":   "aaa",
+			"myword2":   "aaa",
+			"myword3":   "aaa",
+			"myword0_0": 1,
+			"myword1_0": 2,
+			"myword2_0": 3,
+			"myword3_0": 4,
+			"myword4":   5,
+		},
+		{
+			"myword":    []interface{}{1, 2, 3, 4, 5},
+			"myword0":   "aaa",
+			"myword0_0": "aaa",
+			"myword0_1": "aaa",
+			"myword0_2": "aaa",
+			"myword0_3": "aaa",
+			"myword0_4": "aaa",
+			"myword0_5": "aaa",
+			"myword1":   2,
+			"myword2":   3,
+			"myword3":   4,
+			"myword4":   5,
 		},
 	}
 	assert.Equal(t, len(exp), len(data))
@@ -121,7 +165,7 @@ func TestArrayExpandIgnore(t *testing.T) {
 	}
 	ae.stats.LastError = ""
 	assert.Equal(t, ae.Stage(), transforms.StageAfterParser)
-	assert.Equal(t, utils.StatsInfo{Success: 1, Errors: 1}, ae.stats)
+	assert.Equal(t, utils.StatsInfo{Success: 3, Errors: 1}, ae.stats)
 }
 
 func TestArrayExpandEveryType(t *testing.T) {

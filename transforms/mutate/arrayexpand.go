@@ -142,11 +142,20 @@ func (p *ArrayExpand) Transform(datas []sender.Data) ([]sender.Data, error) {
 		}
 		if resultMap := p.transformToMap(val); resultMap != nil {
 			for key, arrVal := range resultMap {
-				if _, exist := datas[i][key]; exist {
-					log.Warnf("the array item key %v already exists in sender.Data, it will be ignored", key)
-					continue
+				suffix := 0
+				keyName := key
+				_, exist := datas[i][keyName]
+				for ; exist; suffix++ {
+					if suffix > 5 {
+						log.Warnf("keys %v -- %v already exist, the key %v will be ignored", key, keyName, key)
+						break
+					}
+					keyName = key + "_" + strconv.Itoa(suffix)
+					_, exist = datas[i][keyName]
 				}
-				datas[i][key] = arrVal
+				if suffix <= 5 {
+					datas[i][keyName] = arrVal
+				}
 			}
 		} else {
 			errNums++
