@@ -11,6 +11,7 @@ import (
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+	"strconv"
 )
 
 type UrlParam struct {
@@ -29,16 +30,7 @@ func (p *UrlParam) transformToMap(strVal string) (map[string]string, error) {
 		if keyVal[0] == "" {
 			return nil, fmt.Errorf("the key value %v is not legal", strVal)
 		}
-
-		// 若 key 重复则在后面添加数字直到不再重复为止
-		suffix := 0
 		keyName := p.Key + "_" + keyVal[0]
-		_, exist := resultMap[keyName]
-		for exist {
-			suffix++
-			keyName = fmt.Sprintf("%s_%s%d", p.Key, keyVal[0], suffix)
-			_, exist = resultMap[keyName]
-		}
 		resultMap[keyName] = keyVal[1]
 	}
 	return resultMap, nil
@@ -65,12 +57,21 @@ func (p *UrlParam) Transform(datas []sender.Data) ([]sender.Data, error) {
 			err = fmt.Errorf("transform key %v data type is not string", p.Key)
 		}
 		if err == nil {
-			for key, val := range res {
-				if _, exist := datas[i][key]; exist {
-					log.Warnf("the params key %v already exists, it will be ignored", key)
-					continue
+			for key, mapVal := range res {
+				suffix := 1
+				keyName := key
+				_, exist := datas[i][keyName]
+				for ; exist; suffix++ {
+					if suffix > 5 {
+						log.Warnf("keys %v -- %v already exist, the item %v will be ignored", key, keyName, key)
+						break
+					}
+					keyName = key + strconv.Itoa(suffix)
+					_, exist = datas[i][keyName]
 				}
-				datas[i][key] = val
+				if suffix <= 5 {
+					datas[i][keyName] = mapVal
+				}
 			}
 		} else {
 			errNums++

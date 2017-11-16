@@ -39,12 +39,12 @@ func TestParamTransformer(t *testing.T) {
 		},
 	}
 	assert.Equal(t, len(exp), len(data))
-	for i, d := range data {
-		ex := exp[i]
-		for k, v := range d {
-			e, exist := ex[k]
+	for i, ex := range exp {
+		da := data[i]
+		for k, e := range ex {
+			d, exist := da[k]
 			assert.Equal(t, true, exist)
-			assert.Equal(t, e, v)
+			assert.Equal(t, e, d)
 		}
 	}
 	assert.Equal(t, par.Stage(), transforms.StageAfterParser)
@@ -64,9 +64,16 @@ func TestParamTransformerError(t *testing.T) {
 		{"myword": "platform=2=372&vu=caea966558&chan=android_sougou&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
 		{"myword": "platform=2&vid&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
 	}
-	assert.Equal(t, exp, data)
+	assert.Equal(t, len(exp), len(data))
+	for i, ex := range exp {
+		da := data[i]
+		for k, e := range ex {
+			d, exist := da[k]
+			assert.Equal(t, true, exist)
+			assert.Equal(t, e, d)
+		}
+	}
 	assert.Equal(t, par.Stage(), transforms.StageAfterParser)
-
 	par.stats.LastError = ""
 	assert.Equal(t, utils.StatsInfo{Errors: 2}, par.stats)
 }
@@ -77,27 +84,65 @@ func TestParamTransformerKeyRepeat(t *testing.T) {
 	}
 	data, err := par.Transform([]sender.Data{
 		{"myword": "a=a&a=b&a=c&a=d"},
-		{"myword": "a=a&a=b&b=c&b=d&b=e"},
+		{
+			"myword":   "a=a&a=b&b=c&b=d&b=e",
+			"myword_a": "xx",
+		},
+		{
+			"myword":    "a=x",
+			"myword_a":  "a",
+			"myword_a1": "b",
+			"myword_a2": "c",
+		},
+		{
+			"myword":    "a=x",
+			"myword_a":  "a",
+			"myword_a1": "b",
+			"myword_a2": "c",
+			"myword_a3": "c",
+			"myword_a4": "c",
+			"myword_a5": "c",
+		},
 	})
 	assert.NoError(t, err)
 	exp := []sender.Data{
 		{
-			"myword":    "a=a&a=b&a=c&a=d",
-			"myword_a":  "a",
-			"myword_a1": "b",
-			"myword_a2": "c",
-			"myword_a3": "d",
+			"myword":   "a=a&a=b&a=c&a=d",
+			"myword_a": "d",
 		},
 		{
 			"myword":    "a=a&a=b&b=c&b=d&b=e",
+			"myword_a":  "xx",
+			"myword_a1": "b",
+			"myword_b":  "e",
+		},
+		{
+			"myword":    "a=x",
 			"myword_a":  "a",
 			"myword_a1": "b",
-			"myword_b":  "c",
-			"myword_b1": "d",
-			"myword_b2": "e",
+			"myword_a2": "c",
+			"myword_a3": "x",
+		},
+		{
+			"myword":    "a=x",
+			"myword_a":  "a",
+			"myword_a1": "b",
+			"myword_a2": "c",
+			"myword_a3": "c",
+			"myword_a4": "c",
+			"myword_a5": "c",
 		},
 	}
-	assert.Equal(t, exp, data)
+	assert.Equal(t, len(exp), len(data))
+	for i, ex := range exp {
+		da := data[i]
+		for k, e := range ex {
+			d, exist := da[k]
+			assert.Equal(t, true, exist)
+			assert.Equal(t, e, d)
+		}
+	}
 	assert.Equal(t, par.Stage(), transforms.StageAfterParser)
-	assert.Equal(t, utils.StatsInfo{Success: 2}, par.stats)
+	par.stats.LastError = ""
+	assert.Equal(t, utils.StatsInfo{Success: 4}, par.stats)
 }
