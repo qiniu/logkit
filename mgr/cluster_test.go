@@ -480,9 +480,8 @@ func TestClusterUpdate(t *testing.T) {
 	request, err = http.NewRequest(http.MethodPut, master_rs.cluster.myaddress+"/logkit/cluster/configs/test2?tag=test&url="+slave_rs3.cluster.myaddress, bytes.NewReader([]byte(testClusterApiConf1)))
 	request.Header.Set(ContentType, ApplicationJson)
 	resp, err = http.DefaultClient.Do(request)
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
+	assert.Equal(t, resp.StatusCode, http.StatusNotFound)
 	assert.NoError(t, err)
-	time.Sleep(3 * time.Second)
 
 	// 上述配置文件改变了 logpath, 所以下面验证 status 中的 logpath 是否正确
 	// tag == "" && url == ""

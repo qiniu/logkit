@@ -136,7 +136,7 @@ POST /logkit/cluster/configs/<runnerName>?tag=tagValue&url=urlValue
 ```
 * 参数`tag`和`url`非空时将作为被操作`slave`的过滤条件，即上述操作只对满足对应条件的`slave`有效。
 * 如果有错误，response body 中为错误信息:
-    * 若返回码为 400, 则错误信息格式为:
+    * 若返回码为 400/404, 则错误信息格式为:
     ```
     {"error": <error message>}
     ```
@@ -165,7 +165,7 @@ PUT /logkit/cluster/configs/<runnerName>?tag=tagValue&url=urlValue
 ```
 * 参数`tag`和`url`非空时将作为被操作`slave`的过滤条件，即上述操作只对满足对应条件的`slave`有效。
 * 如果有错误，response body 中为错误信息:
-    * 若返回码为 400, 则错误信息格式为:
+    * 若返回码为 400/404, 则错误信息格式为:
     ```
     {"error": <error message>}
     ```
@@ -189,7 +189,7 @@ DELETE /logkit/cluster/configs/<runnerName>?tag=tagValue&url=urlValue
 ```
 * 参数`tag`和`url`非空时将作为被操作`slave`的过滤条件，即上述操作只对满足对应条件的`slave`有效。
 * 如果有错误，response body 中为错误信息:
-    * 若返回码为 400, 则错误信息格式为:
+    * 若返回码为 400/404, 则错误信息格式为:
     ```
     {"error": <error message>}
     ```
@@ -213,7 +213,7 @@ POST /logkit/cluster/configs/<runnerName>/stop?tag=tagValue&url=urlValue
 ```
 * 参数`tag`和`url`非空时将作为被操作`slave`的过滤条件，即上述操作只对满足对应条件的`slave`有效。
 * 如果有错误，response body 中为错误信息:
-    * 若返回码为 400, 则错误信息格式为:
+    * 若返回码为 400/404, 则错误信息格式为:
     ```
     {"error": <error message>}
     ```
@@ -237,7 +237,7 @@ POST /logkit/cluster/configs/<runnerName>/start?tag=tagValue&url=urlValue
 ```
 * 参数`tag`和`url`非空时将作为被操作`slave`的过滤条件，即上述操作只对满足对应条件的`slave`有效。
 * 如果有错误，response body 中为错误信息:
-    * 若返回码为 400, 则错误信息格式为:
+    * 若返回码为 400/404, 则错误信息格式为:
     ```
     {"error": <error message>}
     ```
@@ -262,7 +262,7 @@ POST /logkit/cluster/configs/<runnerName>/reset?tag=tagValue&url=urlValue
 
 * 参数`tag`和`url`非空时将作为被操作`slave`的过滤条件，即上述操作只对满足对应条件的`slave`有效。
 * 如果有错误，response body 中为错误信息:
-    * 若返回码为 400, 则错误信息格式为:
+    * 若返回码为 400/404, 则错误信息格式为:
     ```
     {"error": <error message>}
     ```
@@ -290,7 +290,7 @@ POST logkit/cluster/slaves/tag?tag=tagValue&url=urlValue
 
 * 参数`tag`和`url`非空时将作为被操作`slave`的过滤条件，即上述操作只对满足对应条件的`slave`有效。
 * 如果有错误，response body 中为错误信息:
-    * 若返回码为 400, 则错误信息格式为:
+    * 若返回码为 400/404, 则错误信息格式为:
     ```
     {"error": <error message>}
     ```

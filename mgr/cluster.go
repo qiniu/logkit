@@ -275,6 +275,10 @@ func (rs *RestService) PostClusterConfig() echo.HandlerFunc {
 		rs.cluster.mutex.RLock()
 		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
+		if len(slaves) == 0 {
+			errMess := "the slaves(tag = '" + tag + "', url = '" + url + "') are not found"
+			return c.JSON(http.StatusNotFound, map[string]string{"error": errMess})
+		}
 		method := http.MethodPost
 		mgrType := "add runner " + configName
 		urlPattern := "%v" + PREFIX + "/configs/" + configName
@@ -295,6 +299,10 @@ func (rs *RestService) PutClusterConfig() echo.HandlerFunc {
 		rs.cluster.mutex.RLock()
 		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
+		if len(slaves) == 0 {
+			errMess := "the slaves(tag = '" + tag + "', url = '" + url + "') are not found"
+			return c.JSON(http.StatusNotFound, map[string]string{"error": errMess})
+		}
 		method := http.MethodPut
 		mgrType := "update runner " + configName
 		urlPattern := "%v" + PREFIX + "/configs/" + configName
@@ -315,6 +323,10 @@ func (rs *RestService) DeleteClusterConfig() echo.HandlerFunc {
 		rs.cluster.mutex.RLock()
 		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
+		if len(slaves) == 0 {
+			errMess := "the slaves(tag = '" + tag + "', url = '" + url + "') are not found"
+			return c.JSON(http.StatusNotFound, map[string]string{"error": errMess})
+		}
 		method := http.MethodDelete
 		mgrType := "delete runner " + configName
 		urlPattern := "%v" + PREFIX + "/configs/" + configName
@@ -334,9 +346,13 @@ func (rs *RestService) PostClusterConfigStop() echo.HandlerFunc {
 		}
 		rs.cluster.mutex.RLock()
 		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
-		mgrType := "stop runner " + configName
 		rs.cluster.mutex.RUnlock()
+		if len(slaves) == 0 {
+			errMess := "the slaves(tag = '" + tag + "', url = '" + url + "') are not found"
+			return c.JSON(http.StatusNotFound, map[string]string{"error": errMess})
+		}
 		method := http.MethodPost
+		mgrType := "stop runner " + configName
 		urlPattern := "%v" + PREFIX + "/configs/" + configName + "/stop"
 		if err := executeToClusters(slaves, urlPattern, method, mgrType, configBytes); err != nil {
 			return c.JSON(http.StatusServiceUnavailable, err)
@@ -355,6 +371,10 @@ func (rs *RestService) PostClusterConfigStart() echo.HandlerFunc {
 		rs.cluster.mutex.RLock()
 		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
+		if len(slaves) == 0 {
+			errMess := "the slaves(tag = '" + tag + "', url = '" + url + "') are not found"
+			return c.JSON(http.StatusNotFound, map[string]string{"error": errMess})
+		}
 		method := http.MethodPost
 		mgrType := "start runner " + configName
 		urlPattern := "%v" + PREFIX + "/configs/" + configName + "/start"
@@ -375,6 +395,10 @@ func (rs *RestService) PostClusterConfigReset() echo.HandlerFunc {
 		rs.cluster.mutex.RLock()
 		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
+		if len(slaves) == 0 {
+			errMess := "the slaves(tag = '" + tag + "', url = '" + url + "') are not found"
+			return c.JSON(http.StatusNotFound, map[string]string{"error": errMess})
+		}
 		method := http.MethodPost
 		mgrType := "reset runner " + configName
 		urlPattern := "%v" + PREFIX + "/configs/" + configName + "/reset"
@@ -418,6 +442,10 @@ func (rs *RestService) PostSlaveTag() echo.HandlerFunc {
 		rs.cluster.mutex.RLock()
 		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
+		if len(slaves) == 0 {
+			errMess := "the slaves(tag = '" + tag + "', url = '" + url + "') are not found"
+			return c.JSON(http.StatusNotFound, map[string]string{"error": errMess})
+		}
 		mgrType := "change tag"
 		method := http.MethodPost
 		urlPattern := "%v" + PREFIX + "/cluster/tag"
