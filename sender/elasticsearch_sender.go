@@ -17,16 +17,16 @@ import (
 type ElasticsearchSender struct {
 	name string
 
-	host      []string
-	retention int
-	indexName string
-	eType     string
+	host      		[]string
+	retention 		int
+	indexName 		string
+	eType     		string
+	logkitSendTime 	bool
+	aliasFields   	map[string]string
+	elasticClient 	*elastic.Client
 
-	aliasFields   map[string]string
-	elasticClient *elastic.Client
-
-	intervalIndex int
-	timeZone *time.Location
+	intervalIndex 	int
+	timeZone 		*time.Location
 }
 
 const (
@@ -51,6 +51,8 @@ const (
 	KeyUTCTimezone = "UTC"
 	KeyPRCTimezone = "PRC"
 )
+
+const KeySendTime = "sendTime"
 
 func NewElasticSender(conf conf.MapConf) (sender Sender, err error) {
 
@@ -79,12 +81,13 @@ func NewElasticSender(conf conf.MapConf) (sender Sender, err error) {
 	eType, _ := conf.GetStringOr(KeyElasticType, defaultType)
 	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("elasticSender:(elasticUrl:%s,index:%s,type:%s)", host, index, eType))
 	fields, _ := conf.GetAliasMapOr(KeyElasticAlias, make(map[string]string))
-	return newElasticsearchSender(name, host, index, eType, fields, indexStrategy, timeZone)
+	logkitSendTime, _ := conf.GetBoolOr(KeyLogkitSendTime, true)
+	return newElasticsearchSender(name, host, index, eType, fields, logkitSendTime, indexStrategy, timeZone)
 }
 
 const defaultType string = "logkit"
 
-func newElasticsearchSender(name string, hosts []string, index, eType string, fields map[string]string, indexStrategy string, timeZone *time.Location) (e *ElasticsearchSender, err error) {
+func newElasticsearchSender(name string, hosts []string, index, eType string, fields map[string]string, logkitSendTime bool, indexStrategy string, timeZone *time.Location) (e *ElasticsearchSender, err error) {
 
 	client, err := elastic.NewClient(elastic.SetURL(hosts...))
 	if err != nil {
@@ -99,14 +102,15 @@ func newElasticsearchSender(name string, hosts []string, index, eType string, fi
 	}
 
 	e = &ElasticsearchSender{
-		name:          name,
-		host:          hosts,
-		indexName:     index,
-		elasticClient: client,
-		eType:         eType,
-		aliasFields:   fields,
-		intervalIndex: i,
-		timeZone:	   timeZone,
+		name:          	name,
+		host:          	hosts,
+		indexName:     	index,
+		elasticClient: 	client,
+		eType:         	eType,
+		logkitSendTime: logkitSendTime,
+		aliasFields:   	fields,
+		intervalIndex:	i,
+		timeZone:	   	timeZone,
 	}
 	return
 }
@@ -150,6 +154,10 @@ func (this *ElasticsearchSender) Send(data []Data) (err error) {
 		//字段名称替换
 		if makeDoc {
 			doc = this.wrapDoc(doc)
+		}
+		//添加发送时间
+		if this.logkitSendTime {
+			doc[KeySendTime] = now
 		}
 		doc2 := doc
 		bulkService.Add(elastic.NewBulkIndexRequest().Index(indexName).Type(this.eType).Doc(&doc2))
