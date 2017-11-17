@@ -174,13 +174,6 @@ class renderConfig extends Component {
     const {getFieldDecorator} = this.props.form;
     return (
         <div >
-          <div className='logkit-header'>
-            <Row >
-              <Col span={12}>
-                <h2 className="logkit-title">logkit配置文件</h2>
-              </Col>
-            </Row>
-          </div>
           <div className='logkit-body'>
             <Row>
               <Form>
