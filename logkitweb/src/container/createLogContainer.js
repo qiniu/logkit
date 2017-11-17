@@ -56,18 +56,18 @@ class CreateLogRunner extends Component {
 
   init = () => {
     let that = this
-    let isCopy = this.props.location.query.copyConfig
-    if (isCopy === 'true') {
-      window.isCopy = true;
-      this.setState({
-        isCpoyStatus: true
-      })
-    } else {
-      window.isCopy = false
-    }
-    if(window.nodeCopy){
-      config.delete("metric");
-    }
+    // let isCopy = this.props.location.query.copyConfig
+    // if (isCopy === 'true') {
+    //   window.isCopy = true;
+    //   this.setState({
+    //     isCpoyStatus: true
+    //   })
+    // } else {
+    //   window.isCopy = false
+    // }
+    // if(window.nodeCopy){
+    //   config.delete("metric");
+    // }
     getRunnerVersion().then(data => {
       if (data.success) {
         that.setState({
@@ -218,12 +218,6 @@ class CreateLogRunner extends Component {
     const {current} = this.state;
     return (
       <div className="logkit-create-container">
-        <div className="header">
-          <Button style={{float: 'left', marginTop: '20px'}} type="primary" className="index-btn"
-                  onClick={() => this.turnToIndex()}>
-            <Icon type="link"/>回到首页
-          </Button>七牛Logkit配置文件助手 {this.state.version}
-        </div>
         <Steps current={current}>
           {steps.map(item => <Step key={item.title} title={item.title}/>)}
         </Steps>
@@ -271,16 +265,6 @@ class CreateLogRunner extends Component {
             </Button>
           }
         </div>
-        <Footer style={{textAlign: 'center'}}>
-          更多信息请访问：
-          <a target="_blank" href="https://github.com/qiniu/logkit">
-            <Tag color="#108ee9">Logkit</Tag> </a> |
-          <a target="_blank" href="https://github.com/qiniu/logkit/wiki">
-            <Tag color="#108ee9">帮助文档</Tag> </a> |
-          <a target="_blank" href="https://qiniu.github.io/pandora-docs/#/"><Tag
-            color="#108ee9">Pandora产品</Tag>
-          </a>
-        </Footer>
       </div>
     );
   }
