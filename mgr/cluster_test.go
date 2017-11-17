@@ -17,6 +17,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type respSlave struct {
+	Code string  `json:"code"`
+	Data []Slave `json:"data"`
+}
+
+type respClusterStatus struct {
+	Code string                   `json:"code"`
+	Data map[string]ClusterStatus `json:"data"`
+}
+
+type respSlaveConfig struct {
+	Code string                 `json:"code"`
+	Data map[string]SlaveConfig `json:"data"`
+}
+
 func TestClusterApi(t *testing.T) {
 	dir := "TestClusterApi"
 	os.RemoveAll(dir)
@@ -80,9 +95,10 @@ func TestClusterApi(t *testing.T) {
 	resp, err = http.Get(slave_rs.cluster.MasterUrl[0] + "/logkit/cluster/slaves?tag=test_changed")
 	assert.NoError(t, err)
 	content, _ = ioutil.ReadAll(resp.Body)
-	var slaves []Slave
-	err = json.Unmarshal(content, &slaves)
+	var respSlaves respSlave
+	err = json.Unmarshal(content, &respSlaves)
 	assert.NoError(t, err)
+	slaves := respSlaves.Data
 	for i := range slaves {
 		slaves[i].LastTouch = time.Time{}
 	}
@@ -136,9 +152,10 @@ func TestClusterApi(t *testing.T) {
 	assert.NoError(t, err)
 	allstdata, err := ioutil.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	allstatus := make(map[string]ClusterStatus)
-	err = json.Unmarshal(allstdata, &allstatus)
+	var respAllStatus respClusterStatus
+	err = json.Unmarshal(allstdata, &respAllStatus)
 	assert.NoError(t, err, string(allstdata))
+	allstatus := respAllStatus.Data
 	rp, err := filepath.Abs(logpath)
 	if err != nil {
 		t.Error(err)
@@ -331,9 +348,10 @@ func TestClusterUpdate(t *testing.T) {
 	assert.NoError(t, err)
 	allStData, err := ioutil.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	allStatus := make(map[string]ClusterStatus)
-	err = json.Unmarshal(allStData, &allStatus)
+	var respAllStatus respClusterStatus
+	err = json.Unmarshal(allStData, &respAllStatus)
 	assert.NoError(t, err, string(allStData))
+	allStatus := respAllStatus.Data
 	rp, err := filepath.Abs(logpath)
 	if err != nil {
 		t.Error(err)
@@ -489,9 +507,10 @@ func TestClusterUpdate(t *testing.T) {
 	assert.NoError(t, err)
 	allStData, err = ioutil.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	allStatus = make(map[string]ClusterStatus)
-	err = json.Unmarshal(allStData, &allStatus)
+	respAllStatus = respClusterStatus{}
+	err = json.Unmarshal(allStData, &respAllStatus)
 	assert.NoError(t, err, string(allStData))
+	allStatus = respAllStatus.Data
 	logPath := allStatus[slave_rs.cluster.myaddress].Status["test2"].Logpath
 	assert.Equal(t, confdir+"/logdir/log1", logPath)
 	logPath = allStatus[slave_rs2.cluster.myaddress].Status["test2"].Logpath
@@ -643,9 +662,10 @@ func TestClusterStartStop(t *testing.T) {
 	assert.NoError(t, err)
 	allStData, err := ioutil.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	allStatus := make(map[string]ClusterStatus)
-	err = json.Unmarshal(allStData, &allStatus)
+	var respAllStatus respClusterStatus
+	err = json.Unmarshal(allStData, &respAllStatus)
 	assert.NoError(t, err, string(allStData))
+	allStatus := respAllStatus.Data
 	assert.Equal(t, map[string]ClusterStatus{
 		slave_rs.cluster.myaddress:  ClusterStatus{Status: map[string]RunnerStatus{}, Tag: "test"},
 		slave_rs2.cluster.myaddress: ClusterStatus{Status: map[string]RunnerStatus{}, Tag: "test"},
@@ -660,9 +680,10 @@ func TestClusterStartStop(t *testing.T) {
 	assert.NoError(t, err)
 	allStData, err = ioutil.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	allStatus = make(map[string]ClusterStatus)
-	err = json.Unmarshal(allStData, &allStatus)
+	respAllStatus = respClusterStatus{}
+	err = json.Unmarshal(allStData, &respAllStatus)
 	assert.NoError(t, err, string(allStData))
+	allStatus = respAllStatus.Data
 	rs3_CS, ok := allStatus[slave_rs3.cluster.myaddress]
 	assert.Equal(t, true, ok)
 	_, ok = rs3_CS.Status["test3"]
@@ -680,8 +701,10 @@ func TestClusterStartStop(t *testing.T) {
 	allStData, err = ioutil.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	allStatus = make(map[string]ClusterStatus)
-	err = json.Unmarshal(allStData, &allStatus)
+	respAllStatus = respClusterStatus{}
+	err = json.Unmarshal(allStData, &respAllStatus)
 	assert.NoError(t, err, string(allStData))
+	allStatus = respAllStatus.Data
 	rp, err := filepath.Abs(logpath)
 	if err != nil {
 		t.Error(err)
@@ -807,9 +830,10 @@ func TestClusterStartStop(t *testing.T) {
 	assert.NoError(t, err)
 	allStData, err = ioutil.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	allStatus = make(map[string]ClusterStatus)
-	err = json.Unmarshal(allStData, &allStatus)
+	respAllStatus = respClusterStatus{}
+	err = json.Unmarshal(allStData, &respAllStatus)
 	assert.NoError(t, err, string(allStData))
+	allStatus = respAllStatus.Data
 	gotStatus = make(map[string]ClusterStatus)
 	gotStatus[slave_rs.cluster.myaddress] = ClusterStatus{
 		Status: map[string]RunnerStatus{},
@@ -1018,9 +1042,10 @@ func TestClusterResetDelete(t *testing.T) {
 	assert.NoError(t, err)
 	allStData, err := ioutil.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	allStatus := make(map[string]ClusterStatus)
-	err = json.Unmarshal(allStData, &allStatus)
+	respAllStatus := respClusterStatus{}
+	err = json.Unmarshal(allStData, &respAllStatus)
 	assert.NoError(t, err, string(allStData))
+	allStatus := respAllStatus.Data
 	assert.Equal(t, map[string]ClusterStatus{
 		slave_rs.cluster.myaddress:  ClusterStatus{Status: map[string]RunnerStatus{}, Tag: "test"},
 		slave_rs2.cluster.myaddress: ClusterStatus{Status: map[string]RunnerStatus{}, Tag: "test"},
@@ -1035,9 +1060,10 @@ func TestClusterResetDelete(t *testing.T) {
 	assert.NoError(t, err)
 	allStData, err = ioutil.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	allStatus = make(map[string]ClusterStatus)
-	err = json.Unmarshal(allStData, &allStatus)
+	respAllStatus = respClusterStatus{}
+	err = json.Unmarshal(allStData, &respAllStatus)
 	assert.NoError(t, err, string(allStData))
+	allStatus = respAllStatus.Data
 	rs3_CS, ok := allStatus[slave_rs3.cluster.myaddress]
 	assert.Equal(t, true, ok)
 	_, ok = rs3_CS.Status["test4"]
@@ -1179,9 +1205,10 @@ func TestSalveConfigs(t *testing.T) {
 	assert.Equal(t, resp.StatusCode, http.StatusOK)
 	con, err := ioutil.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	allConfigs := make(map[string]SlaveConfig)
-	err = json.Unmarshal(con, &allConfigs)
+	respAllConfigs := respSlaveConfig{}
+	err = json.Unmarshal(con, &respAllConfigs)
 	assert.NoError(t, err, string(con))
+	allConfigs := respAllConfigs.Data
 
 	rc := RunnerConfig{}
 	err = json.Unmarshal([]byte(testClusterApiConf), &rc)
@@ -1201,9 +1228,10 @@ func TestSalveConfigs(t *testing.T) {
 	assert.Equal(t, resp.StatusCode, http.StatusOK)
 	con, err = ioutil.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	allConfigs = make(map[string]SlaveConfig)
-	err = json.Unmarshal(con, &allConfigs)
+	respAllConfigs = respSlaveConfig{}
+	err = json.Unmarshal(con, &respAllConfigs)
 	assert.NoError(t, err, string(con))
+	allConfigs = respAllConfigs.Data
 	assert.Equal(t, 3, len(allConfigs))
 
 	// url 方式
@@ -1212,9 +1240,10 @@ func TestSalveConfigs(t *testing.T) {
 	assert.Equal(t, resp.StatusCode, http.StatusOK)
 	con, err = ioutil.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	allConfigs = make(map[string]SlaveConfig)
-	err = json.Unmarshal(con, &allConfigs)
+	respAllConfigs = respSlaveConfig{}
+	err = json.Unmarshal(con, &respAllConfigs)
 	assert.NoError(t, err, string(con))
+	allConfigs = respAllConfigs.Data
 	rc = RunnerConfig{}
 	err = json.Unmarshal([]byte(testClusterApiConf), &rc)
 	assert.NoError(t, err)
@@ -1369,12 +1398,13 @@ func TestChangeSalveTag(t *testing.T) {
 	slaves = append(slaves, Slave{Url: slave_rs2.cluster.myaddress, Tag: "test-test", Status: StatusOK})
 	slaves = append(slaves, Slave{Url: slave_rs3.cluster.myaddress, Tag: "test_change", Status: StatusOK})
 
-	var getSlaves []Slave
+	var respGetSlaves respSlave
 	resp, err = http.Get(master_rs.cluster.myaddress + "/logkit/cluster/slaves?tag=")
 	assert.NoError(t, err)
 	content, _ = ioutil.ReadAll(resp.Body)
-	err = json.Unmarshal(content, &getSlaves)
+	err = json.Unmarshal(content, &respGetSlaves)
 	assert.NoError(t, err)
+	getSlaves := respGetSlaves.Data
 	for i, _ := range getSlaves {
 		getSlaves[i].LastTouch = time.Time{}
 	}
@@ -1387,8 +1417,10 @@ func TestChangeSalveTag(t *testing.T) {
 	resp, err = http.Get(master_rs.cluster.myaddress + "/logkit/cluster/slaves?tag=&url=")
 	assert.NoError(t, err)
 	content, _ = ioutil.ReadAll(resp.Body)
-	err = json.Unmarshal(content, &getSlaves)
+	respGetSlaves = respSlave{}
+	err = json.Unmarshal(content, &respGetSlaves)
 	assert.NoError(t, err)
+	getSlaves = respGetSlaves.Data
 	for i, _ := range getSlaves {
 		getSlaves[i].LastTouch = time.Time{}
 	}
@@ -1536,12 +1568,13 @@ func TestSlavesDelete(t *testing.T) {
 	slaves = append(slaves, Slave{Url: slave_rs.cluster.myaddress, Tag: "test", Status: StatusOK})
 	slaves = append(slaves, Slave{Url: slave_rs2.cluster.myaddress, Tag: "test", Status: StatusOK})
 
-	var getSlaves []Slave
+	var respGetSlaves respSlave
 	resp, err = http.Get(master_rs.cluster.myaddress + "/logkit/cluster/slaves?tag=")
 	assert.NoError(t, err)
 	content, _ = ioutil.ReadAll(resp.Body)
-	err = json.Unmarshal(content, &getSlaves)
+	err = json.Unmarshal(content, &respGetSlaves)
 	assert.NoError(t, err)
+	getSlaves := respGetSlaves.Data
 	for i, _ := range getSlaves {
 		getSlaves[i].LastTouch = time.Time{}
 	}
@@ -1556,8 +1589,10 @@ func TestSlavesDelete(t *testing.T) {
 	resp, err = http.Get(master_rs.cluster.myaddress + "/logkit/cluster/slaves?tag=")
 	assert.NoError(t, err)
 	content, _ = ioutil.ReadAll(resp.Body)
-	err = json.Unmarshal(content, &getSlaves)
+	respGetSlaves = respSlave{}
+	err = json.Unmarshal(content, &respGetSlaves)
 	assert.NoError(t, err)
+	getSlaves = respGetSlaves.Data
 	for i, _ := range getSlaves {
 		getSlaves[i].LastTouch = time.Time{}
 	}
