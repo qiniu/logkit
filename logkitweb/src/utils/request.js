@@ -25,11 +25,13 @@ export default function request(url, options) {
     .then(checkStatus)
     .then(parseJSON)
     .then((data) => {
-      if(data.message != undefined) {
+      if (data === null){
+        return {success: true};
+      } else if(data.message != undefined) {
         notification.error({message: "失败", description: data.message, duration: 20})
         data.success = false;
         return data
-      }else {
+      } else {
         data.success = true;
         return data;
       }
