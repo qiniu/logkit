@@ -181,13 +181,13 @@ export async function postClusterConfigData(params) {
 }
 
 export async function getClusterRunnerConfigs(params) {
-  return request(window.logkitUrl + '/logkit/cluster/configs', {
+  return request(window.logkitUrl + '/logkit/cluster/configs?tag=' + params.tag + '&url=' + params.machineUrl, {
     method: 'get',
   });
 }
 
 export async function getClusterRunnerStatus(params) {
-  return request(window.logkitUrl + '/logkit/cluster/status', {
+  return request(window.logkitUrl + '/logkit/cluster/status?tag=' + params.tag + '&url=' + params.machineUrl, {
     method: 'get',
   });
 }
@@ -195,5 +195,33 @@ export async function getClusterRunnerStatus(params) {
 export async function getClusterSlaves(params) {
   return request(window.logkitUrl + '/logkit/cluster/slaves', {
     method: 'get',
+  });
+}
+
+export async function postClusterSlaveTag(params) {
+  return request(window.logkitUrl + '/logkit/cluster/slaves/tag?tag=' + params.name + '&url=' + params.url, {
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(params.body),
+  });
+}
+
+export async function deleteClusterSlaveTag(params) {
+  return request(window.logkitUrl + '/logkit/cluster/slaves?tag=' + params.name + '&url=' + params.url, {
+    method: 'delete'
+  });
+}
+
+export async function postClusterStopSlaveTag(params) {
+  return request(window.logkitUrl + '/logkit/cluster/configs/' + params.name + '/stop?tag=' + params.tag + '&url=' + params.url, {
+    method: 'post'
+  });
+}
+
+export async function postClusterStartSlaveTag(params) {
+  return request(window.logkitUrl + '/logkit/cluster/configs/' + params.name + '/start?tag=' + params.tag + '&url=' + params.url, {
+    method: 'post'
   });
 }
