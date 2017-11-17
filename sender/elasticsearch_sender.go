@@ -140,13 +140,14 @@ func (this *ElasticsearchSender) Send(data []Data) (err error) {
 	var indexName string
 	var intervals []string
 	for _, doc := range data {
+		//实时计算索引
 		indexName = this.indexName
 		now := time.Now().In(this.timeZone)
 		intervals = []string{strconv.Itoa(now.Year()), strconv.Itoa(int(now.Month())), strconv.Itoa(now.Day())}
 		for j := 1; j <= i; j ++ {
 			indexName = indexName + "." + intervals[j - 1]
 		}
-
+		//字段名称替换
 		if makeDoc {
 			doc = this.wrapDoc(doc)
 		}
@@ -166,14 +167,17 @@ func (this *ElasticsearchSender) Close() error {
 }
 
 func (this *ElasticsearchSender) wrapDoc(doc map[string]interface{}) map[string]interface{} {
-	newDoc := make(map[string]interface{})
+	//newDoc := make(map[string]interface{})
 	for oldKey, newKey := range this.aliasFields {
 		val, ok := doc[oldKey]
 		if ok {
-			newDoc[newKey] = val
+			//newDoc[newKey] = val
+			delete(doc, oldKey)
+			doc[newKey] = val
 			continue
 		}
 		log.Errorf("key %s not found in doc", oldKey)
 	}
-	return newDoc
+	//return newDoc
+	return doc
 }

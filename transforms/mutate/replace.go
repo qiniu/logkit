@@ -2,11 +2,12 @@ package mutate
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
-	"regexp"
+
 )
 
 type Replacer struct {
