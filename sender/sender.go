@@ -33,13 +33,13 @@ type StatsSender interface {
 	Restore(*utils.StatsInfo)
 }
 
-
 // Sender's conf keys
 const (
-	KeySenderType    = "sender_type"
-	KeyFaultTolerant = "fault_tolerant"
-	KeyName          = "name"
-	KeyRunnerName    = "runner_name"
+	KeySenderType     = "sender_type"
+	KeyFaultTolerant  = "fault_tolerant"
+	KeyName           = "name"
+	KeyRunnerName     = "runner_name"
+	KeyLogkitSendTime = "logkit_send_time"
 )
 
 const UnderfinedRunnerName = "UnderfinedRunnerName"
