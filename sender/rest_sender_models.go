@@ -54,6 +54,14 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "管道本地盘数据保存路径(ft_save_log_path)",
 		},
 		{
+			KeyName:       KeyLogkitSendTime,
+			ChooseOnly:    true,
+			ChooseOptions: []string{"true", "false"},
+			Default:       "true",
+			DefaultNoUse:  false,
+			Description:   "是否在发送数据时自动添加发送时间(logkit_send_time)",
+		},
+		{
 			KeyName:      KeyPandoraHost,
 			ChooseOnly:   false,
 			Default:      "https://pipeline.qiniu.com",
