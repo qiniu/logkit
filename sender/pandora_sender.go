@@ -106,6 +106,7 @@ type PandoraOption struct {
 	ignoreInvalidField bool
 	autoConvertDate    bool
 	useragent          string
+	logkitSendTime     bool
 }
 
 //PandoraMaxBatchSize 发送到Pandora的batch限制
@@ -167,6 +168,7 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	forceconvert, _ := conf.GetBoolOr(KeyForceDataConvert, false)
 	ignoreInvalidField, _ := conf.GetBoolOr(KeyIgnoreInvalidField, true)
 	autoconvertDate, _ := conf.GetBoolOr(KeyPandoraAutoConvertDate, true)
+	logkitSendTime, _ := conf.GetBoolOr(KeyLogkitSendTime, true)
 	opt := &PandoraOption{
 		runnerName:     runnerName,
 		name:           name,
@@ -197,6 +199,7 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 		ignoreInvalidField: ignoreInvalidField,
 		autoConvertDate:    autoconvertDate,
 		useragent:          useragent,
+		logkitSendTime:     logkitSendTime,
 	}
 	if withIp {
 		opt.withip = "logkitIP"
@@ -601,7 +604,11 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 		return ste
 	}
 	var points pipeline.Datas
+	now := time.Now().Format(time.RFC3339Nano)
 	for _, d := range datas {
+		if s.opt.logkitSendTime {
+			d[KeyLogkitSendTime] = now
+		}
 		point := s.generatePoint(d)
 		points = append(points, pipeline.Data(map[string]interface{}(point)))
 	}
