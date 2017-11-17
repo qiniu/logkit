@@ -170,10 +170,10 @@ func (rr *RedisReader) Start() {
 	rr.started = true
 	switch rr.opt.dataType {
 	case DataTypeChannel:
-		//rr.channelIn = rr.client.Subscribe(rr.opt.key[0],rr.opt.key[1]).Channel()
+		//rr.channelIn = rr.client.Subscribe(rr.opt.key[0]).Channel()
 		rr.channelIn = rr.client.Subscribe(rr.opt.key).Channel()
 	case DataTypePatterChannel:
-		//rr.channelIn = rr.client.PSubscribe(rr.opt.key[0],rr.opt.key[1]).Channel()
+		//rr.channelIn = rr.client.PSubscribe(rr.opt.key[0]).Channel()
 		rr.channelIn = rr.client.PSubscribe(rr.opt.key).Channel()
 	case DataTypeList:
 	case DataTypeString:
@@ -223,7 +223,6 @@ func (rr *RedisReader) run() (err error) {
 				rr.readChan <- message.Payload
 			}
 		case DataTypeList:
-			//ans, subErr := rr.client.BLPop(rr.opt.timeout, rr.opt.key[0],rr.opt.key[1]).Result()
 			ans, subErr := rr.client.BLPop(rr.opt.timeout, rr.opt.key).Result()
 			if subErr != nil && subErr != redis.Nil {
 				log.Errorf("Runner[%v] %v BLPop redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
@@ -249,7 +248,7 @@ func (rr *RedisReader) run() (err error) {
 			}
 			//Added set support for redis
 	    case DataTypeSet:
-	        anSet, subErr := rr.client.SPop(rr.opt.key,).Result()
+	        anSet, subErr := rr.client.SPop(rr.opt.key).Result()
 			if subErr != nil && subErr != redis.Nil {
 				log.Errorf("Runner[%v] %v SPop redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
 				rr.setStatsError("Runner[" + rr.meta.RunnerName + "] " + rr.Name() + " Get redis error " + subErr.Error())
