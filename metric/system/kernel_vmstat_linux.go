@@ -58,8 +58,8 @@ func (k *KernelVmstat) Collect() (datas []map[string]interface{}, err error) {
 			if err != nil {
 				return nil, err
 			}
-
-			fields[string(field)] = int64(m)
+			key := "vmstat_" + string(field)
+			fields[key] = int64(m)
 		}
 	}
 	datas = append(datas, fields)

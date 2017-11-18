@@ -41,8 +41,9 @@ var KeyNetUsages = []utils.KeyValue{
 type NetIOStats struct {
 	ps PS
 
-	skipChecks bool
-	Interfaces []string `json:"interfaces"`
+	skipChecks     bool
+	skipProtoState bool     `json:"skip_protocols_state"`
+	Interfaces     []string `json:"interfaces"`
 }
 
 func (_ *NetIOStats) Name() string {
@@ -62,6 +63,15 @@ func (_ *NetIOStats) Config() map[string]interface{} {
 			DefaultNoUse: false,
 			Description:  "收集特定网卡的信息,用','分隔(interfaces)",
 			Type:         metric.ConfigTypeArray,
+		},
+		{
+			KeyName:       "skip_protocols_state",
+			ChooseOnly:    true,
+			ChooseOptions: []string{"true", "false"},
+			Default:       "true",
+			DefaultNoUse:  false,
+			Description:   "是否忽略各个网络协议的状态信息",
+			Type:          metric.ConfigTypeBool,
 		},
 	}
 	config := map[string]interface{}{
@@ -120,19 +130,20 @@ func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 		datas = append(datas, fields)
 	}
 
-	// Get system wide stats for different network protocols
-	// (ignore these stats if the call fails)
-	netprotos, _ := s.ps.NetProto()
-	fields := make(map[string]interface{})
-	for _, proto := range netprotos {
-		for stat, value := range proto.Stats {
-			name := fmt.Sprintf("%s_%s", strings.ToLower(proto.Protocol),
-				strings.ToLower(stat))
-			fields[name] = value
+	if !s.skipProtoState {
+		// Get system wide stats for different network protocols
+		// (ignore these stats if the call fails)
+		netprotos, _ := s.ps.NetProto()
+		fields := make(map[string]interface{})
+		for _, proto := range netprotos {
+			for stat, value := range proto.Stats {
+				name := TypeMetricNet + "_" + strings.ToLower(proto.Protocol) + "_" + strings.ToLower(stat)
+				fields[name] = value
+			}
 		}
+		fields[KeyNetInterface] = "all"
+		datas = append(datas, fields)
 	}
-	fields[KeyNetInterface] = "all"
-	datas = append(datas, fields)
 	return
 }
 
