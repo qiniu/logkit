@@ -50,6 +50,10 @@ func (_ *SystemStats) Usages() string {
 	return MetricSystemUsage
 }
 
+func (_ *SystemStats) Tags() []string {
+	return []string{}
+}
+
 func (s *SystemStats) Config() map[string]interface{} {
 	config := map[string]interface{}{
 		metric.OptionString:     []utils.Option{},

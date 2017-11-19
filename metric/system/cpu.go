@@ -99,6 +99,10 @@ func (_ *CPUStats) Usages() string {
 	return MetricCpuUsages
 }
 
+func (_ *CPUStats) Tags() []string {
+	return []string{CpuTimeCPU, CpuUsageCPU}
+}
+
 func (_ *CPUStats) Config() map[string]interface{} {
 	cpuConfig := make([]utils.Option, 0)
 	for _, val := range ConfigCpuUsages {

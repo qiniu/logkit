@@ -66,6 +66,10 @@ func (_ *DiskStats) Usages() string {
 	return MetricDiskUsages
 }
 
+func (_ *DiskStats) Tags() []string {
+	return []string{KeyDiskFstype, KeyDiskPath, KeyDiskDevice}
+}
+
 func (_ *DiskStats) Config() map[string]interface{} {
 	configOptions := make([]utils.Option, 0)
 	for _, val := range ConfigDiskUsages {
@@ -183,6 +187,10 @@ func (_ *DiskIOStats) Name() string {
 
 func (_ *DiskIOStats) Usages() string {
 	return MetricDiskioUsages
+}
+
+func (_ *DiskIOStats) Tags() []string {
+	return []string{KeyDiskioName, KeyDiskioSerial}
 }
 
 func (_ *DiskIOStats) Config() map[string]interface{} {
