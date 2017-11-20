@@ -2,6 +2,7 @@ package system
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/utils"
@@ -64,6 +65,7 @@ func (s *MemStats) Collect() (datas []map[string]interface{}, err error) {
 		return nil, fmt.Errorf("error getting virtual memory info: %s", err)
 	}
 
+	now := time.Now().Format(time.RFC3339Nano)
 	fields := map[string]interface{}{
 		KeyMemTotal:            vm.Total,
 		KeyMemAvailable:        vm.Available,
@@ -76,6 +78,7 @@ func (s *MemStats) Collect() (datas []map[string]interface{}, err error) {
 		KeyMemUsedPercent:      100 * float64(vm.Used) / float64(vm.Total),
 		KeyMemAvailablePercent: 100 * float64(vm.Available) / float64(vm.Total),
 	}
+	fields[TypeMetricMem+"_"+metric.Timestamp] = now
 	datas = append(datas, fields)
 	return
 }
@@ -129,18 +132,17 @@ func (s *SwapStats) Collect() (datas []map[string]interface{}, err error) {
 		return nil, fmt.Errorf("error getting swap memory info: %s", err)
 	}
 
+	now := time.Now().Format(time.RFC3339Nano)
 	fieldsG := map[string]interface{}{
+		KeySwapIn:          swap.Sin,
+		KeySwapOut:         swap.Sout,
 		KeySwapTotal:       swap.Total,
 		KeySwapUsed:        swap.Used,
 		KeySwapFree:        swap.Free,
 		KeySwapUsedPercent: swap.UsedPercent,
 	}
+	fieldsG[TypeMetricSwap+"_"+metric.Timestamp] = now
 	datas = append(datas, fieldsG)
-	fieldsC := map[string]interface{}{
-		KeySwapIn:  swap.Sin,
-		KeySwapOut: swap.Sout,
-	}
-	datas = append(datas, fieldsC)
 	return
 }
 
