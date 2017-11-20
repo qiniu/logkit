@@ -19,6 +19,7 @@ logkit是[七牛Pandora](https://pandora-docs.qiniu.com)开发的一个通用的
 1. MongoDB
 1. Kafka
 1. Redis
+1. TCP/UDP/Unix Socket
 
 ## 工作方式
 
@@ -134,9 +135,6 @@ logkit.conf是logkit工具基础配置文件，主要用于指定logkit运行时
 启动服务的命令中可以指定服务的启动配置
 
 ```
-go get -u github.com/kardianos/govendor
-govendor sync
-go get ./...
 go build -o logkit logkit.go
 ./logkit -f logkit.conf
 ```
