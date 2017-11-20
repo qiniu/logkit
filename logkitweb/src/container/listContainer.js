@@ -60,10 +60,6 @@ class List extends Component {
 
   }
 
-  onCollapse = (collapsed) => {
-    this.setState({collapsed, logSrc: '../../../static/favicon.ico'});
-  }
-
   transformRunner = (srcData) => {
     let dataArray = []
     _.forIn(srcData, (value, key) => {
@@ -110,17 +106,23 @@ class List extends Component {
 
   getStatus = () => {
     let that = this
-    getClusterRunnerConfigs({tag: window.tag ?  window.tag : '', machineUrl:  window.machine_url ? window.machine_url : ''}).then(data => {
-      if (data.success) {
-        let mapData = _.omit(data, 'success')
+    getClusterRunnerConfigs({
+      tag: window.tag ? window.tag : '',
+      machineUrl: window.machine_url ? window.machine_url : ''
+    }).then(data => {
+      if (data.code === 'L200') {
+        let mapData = data.data
         let tagMapData = this.transformRunner(mapData)
         that.setState({
           runners: tagMapData
         })
-        getClusterRunnerStatus({tag: window.tag ?  window.tag : '', machineUrl:  window.machine_url ? window.machine_url : ''}).then(data => {
-          if (data.success) {
+        getClusterRunnerStatus({
+          tag: window.tag ? window.tag : '',
+          machineUrl: window.machine_url ? window.machine_url : ''
+        }).then(data => {
+          if (data.code === 'L200') {
             that.setState({
-              status: this.transformStatus(_.omit(data, 'success'))
+              status: this.transformStatus(data.data)
             })
           }
         })
@@ -145,23 +147,15 @@ class List extends Component {
     //   }
     // })
 
-    getClusterSlaves().then(data => {
-      if (data.success) {
-        that.setState({
-          machines: _.values(_.omit(data, 'success'))
-        })
-      }
-    })
+
   }
 
   init = () => {
     let that = this
     getRunnerVersion().then(data => {
-      if (data.success) {
-        that.setState({
-          version: _.values(_.omit(data, 'success'))
-        })
-      }
+      that.setState({
+        version: _.values(data)
+      })
     })
 
     that.getStatus()
@@ -185,6 +179,12 @@ class List extends Component {
       currentMenu: 'createLog'
     })
     //this.props.router.push({pathname: `/index/create-log-runner`})
+  }
+
+  trunToRunnerTab = () => {
+    this.setState({
+      currentMenu: 'runner'
+    })
   }
 
   addMetricRunner = () => {
@@ -219,7 +219,7 @@ class List extends Component {
                 <img src='../../../static/favicon.ico'></img>)}</div>
             <Menu theme="dark" defaultSelectedKeys={['runner']} mode="inline" onClick={this.changeMenu}>
               <Menu.Item key="tag">
-                <Icon type="tags-o" />
+                <Icon type="tags-o"/>
                 <span>标签</span>
               </Menu.Item>
               <Menu.Item key="machine">
@@ -240,7 +240,7 @@ class List extends Component {
               </Breadcrumb>
               <div style={{padding: 24, background: '#fff', minHeight: 360}}>
                 <div className="content">
-                  <TagTable tags={this.state.runners} handleAddRunner={this.addLogRunner.bind(this)}
+                  <TagTable  tags={this.state.runners} handleAddRunner={this.addLogRunner.bind(this)}
                             handleAddMetricRunner={this.addMetricRunner.bind(this)}/>
                 </div>
 
@@ -252,7 +252,7 @@ class List extends Component {
               </Breadcrumb>
               <div style={{padding: 24, background: '#fff', minHeight: 360}}>
                 <div className="content">
-                  <MachineTable machines={this.state.machines} handleAddRunner={this.addLogRunner.bind(this)}
+                  <MachineTable  handleAddRunner={this.addLogRunner.bind(this)}
                                 handleAddMetricRunner={this.addMetricRunner.bind(this)}/>
                 </div>
               </div>
@@ -275,7 +275,7 @@ class List extends Component {
               </Breadcrumb>
               <div style={{padding: 24, background: '#fff', minHeight: 360}}>
                 <div className="content">
-                  <CreateLogRunner/>
+                  <CreateLogRunner handleTrunToRunner={this.trunToRunnerTab.bind(this)} />
                 </div>
 
               </div>

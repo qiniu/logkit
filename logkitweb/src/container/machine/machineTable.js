@@ -1,9 +1,35 @@
 import React, {Component} from 'react';
 import moment from 'moment'
 import ClipboardButton from 'react-clipboard.js';
-import {Table, Icon, Popconfirm, Button, notification, Modal, Row, Col, Tag, Input, Layout, Menu, Breadcrumb, Form } from 'antd';
 import {
-  getRunnerConfigs, deleteClusterSlaveTag, getClusterRunnerConfigs, postClusterSlaveTag, deleteConfigData, getClusterSlaves, getRunnerStatus, getClusterRunnerStatus, getRunnerVersion, resetConfigData, startRunner, stopRunner
+  Table,
+  Icon,
+  Popconfirm,
+  Button,
+  notification,
+  Modal,
+  Row,
+  Col,
+  Tag,
+  Input,
+  Layout,
+  Menu,
+  Breadcrumb,
+  Form
+} from 'antd';
+import {
+  getRunnerConfigs,
+  deleteClusterSlaveTag,
+  getClusterRunnerConfigs,
+  postClusterSlaveTag,
+  deleteConfigData,
+  getClusterSlaves,
+  getRunnerStatus,
+  getClusterRunnerStatus,
+  getRunnerVersion,
+  resetConfigData,
+  startRunner,
+  stopRunner
 } from '../../services/logkit';
 import config from '../../store/config'
 import _ from "lodash";
@@ -21,7 +47,7 @@ class MachineTable extends Component {
   }
 
   componentDidMount() {
-
+    this.init()
   }
 
   componentWillUnmount() {
@@ -31,11 +57,22 @@ class MachineTable extends Component {
 
   }
 
+  init() {
+    getClusterSlaves().then(data => {
+      if (data.code === 'L200') {
+        console.log(data)
+        this.setState({
+          machines: _.values(data.data)
+        })
+      }
+    })
+  }
+
   renderMachineList() {
     let dataSource = []
-    const { machines, handleAddRunner, handleAddMetricRunner } = this.props
+    const {machines, handleAddRunner, handleAddMetricRunner} = this.props
     //console.log(this.state.machines)
-    machines.map((item) => {
+    this.state.machines.map((item) => {
       dataSource.push({
         name: item.tag,
         machineUrl: item.url,
@@ -45,11 +82,11 @@ class MachineTable extends Component {
     })
     //console.log(dataSource)
 
-    const columns = [ {
+    const columns = [{
       title: '机器地址',
       dataIndex: 'machineUrl',
       key: 'machineUrl',
-    },{
+    }, {
       title: '标签名称',
       dataIndex: 'name',
       key: 'name',
@@ -71,7 +108,7 @@ class MachineTable extends Component {
             (<a>
               <div className="editable-row-operations">
                 {
-                  <Icon  onClick={handleAddRunner} style={{fontSize: 16}} type="plus"/>
+                  <Icon onClick={handleAddRunner} style={{fontSize: 16}} type="plus"/>
                 }
               </div>
             </a>)

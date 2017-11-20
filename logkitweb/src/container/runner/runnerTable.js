@@ -118,7 +118,7 @@ class RunnerTable extends Component {
   }
 
   setMachine = (machineUrl) => {
-    const { searchRunner } = this.props
+    const {searchRunner} = this.props
     // this.setState({
     //   machineUrl: machineUrl
     // })
@@ -128,7 +128,7 @@ class RunnerTable extends Component {
 
   setTag = (tag) => {
     console.log(tag)
-    const { searchRunner } = this.props
+    const {searchRunner} = this.props
     // this.setState({
     //   tag: tag
     // })
@@ -188,7 +188,7 @@ class RunnerTable extends Component {
           runnerList.push(runner)
         })
       }
-      if (!_.includes(tagList,item.tag)) {
+      if (!_.includes(tagList, item.tag)) {
         tagList.push(item.tag)
       }
 

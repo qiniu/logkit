@@ -1,11 +1,39 @@
 import React, {Component} from 'react';
 import moment from 'moment'
 import ClipboardButton from 'react-clipboard.js';
-import {Table, Icon, Popconfirm, Button, notification, Modal, Row, Col, Tag, Input, Layout, Menu, Breadcrumb, Form } from 'antd';
 import {
-  getRunnerConfigs, deleteClusterSlaveTag, postClusterStopSlaveTag, postClusterStartSlaveTag, getClusterRunnerConfigs, postClusterSlaveTag, deleteConfigData, getClusterSlaves, getRunnerStatus, getClusterRunnerStatus, getRunnerVersion, resetConfigData, startRunner, stopRunner
+  Table,
+  Icon,
+  Popconfirm,
+  Button,
+  notification,
+  Modal,
+  Row,
+  Col,
+  Tag,
+  Input,
+  Layout,
+  Menu,
+  Breadcrumb,
+  Form
+} from 'antd';
+import {
+  getRunnerConfigs,
+  deleteClusterSlaveTag,
+  postClusterStopSlaveTag,
+  postClusterStartSlaveTag,
+  getClusterRunnerConfigs,
+  postClusterSlaveTag,
+  deleteConfigData,
+  getClusterSlaves,
+  getRunnerStatus,
+  getClusterRunnerStatus,
+  getRunnerVersion,
+  resetConfigData,
+  startRunner,
+  stopRunner
 } from '../../services/logkit';
-import { titles } from './constant'
+import {titles} from './constant'
 import config from '../../store/config'
 import _ from "lodash";
 const FormItem = Form.Item;
@@ -28,7 +56,7 @@ class TagTable extends Component {
   }
 
   componentDidMount() {
-
+    this.init()
   }
 
   componentWillUnmount() {
@@ -36,6 +64,17 @@ class TagTable extends Component {
 
   componentDidUpdate(prevProps) {
 
+  }
+
+  init() {
+    getClusterSlaves().then(data => {
+      if (data.code === 'L200') {
+        console.log(data)
+        this.setState({
+          machines: _.values(data.data)
+        })
+      }
+    })
   }
 
   showTagModal = (item, type) => {
@@ -59,23 +98,21 @@ class TagTable extends Component {
     if (this.state.currentModalType == 'rename') {
       postClusterSlaveTag({
         name: this.state.currentTag.name,
-        url: this.state.currentTag.machineUrl,
+        url: '',
         body: {tag: this.state.currentTagName}
       }).then(data => {
-        if (data.success) {
-          notification.success({message: "重置成功", duration: 10,})
-        }
+        notification.success({message: "重置成功", duration: 10,})
         this.setState({
-          isShowRename: false
+          isShowTagModal: false
         })
       })
     } else if (this.state.currentModalType == 'stop') {
       postClusterStopSlaveTag({
         name: this.state.currentRunnerName,
         tag: this.state.currentTag.name,
-        url: this.state.currentTag.machineUrl
+        url: ''
       }).then(data => {
-        if(!data){
+        if (!data) {
           notification.success({message: '关闭成功', duration: 10})
         }
       })
@@ -83,9 +120,9 @@ class TagTable extends Component {
       postClusterStartSlaveTag({
         name: this.state.currentRunnerName,
         tag: this.state.currentTag.name,
-        url: this.state.currentTag.machineUrl
+        url: ''
       }).then(data => {
-        if(!data){
+        if (!data) {
           notification.success({message: '开启成功', duration: 10})
         }
       })
@@ -93,10 +130,8 @@ class TagTable extends Component {
   }
 
   handleDeleteTag = () => {
-    deleteClusterSlaveTag({name: this.state.currentTag.name, url: this.state.currentTag.machineUrl}).then(data => {
-      if (data.success) {
-        notification.success({message: "重置成功", duration: 10,})
-      }
+    deleteClusterSlaveTag({name: this.state.currentTag.name, url: ''}).then(data => {
+      notification.success({message: "重置成功", duration: 10,})
       this.setState({
         isShowDeleteTag: false
       })
@@ -118,33 +153,83 @@ class TagTable extends Component {
   changeTagName = (e) => {
     console.log(e.target.value)
     this.setState({
-      currentTagName : e.target.value
+      currentTagName: e.target.value
     })
   }
 
   changeRunnerName = (e) => {
     console.log(e.target.value)
     this.setState({
-      currentRunnerName : e.target.value
+      currentRunnerName: e.target.value
     })
   }
 
+  printString = (strs) => {
+    let prints = ''
+    strs.map((item, i) => {
+      prints += item + '   '
+    })
+    return prints
+  }
+
+  checkStatus = (status) => {
+    if (_.includes(status,'lost')) {
+      return 'lost'
+    }
+    else if (_.includes(status,'bad')) {
+      return 'bad'
+    }
+    else {
+      return 'ok'
+    }
+  }
 
 
   renderTagList() {
     let dataSource = []
-    const { tags, handleAddRunner, handleAddMetricRunner } = this.props
+    const {tags, handleAddRunner, handleAddMetricRunner} = this.props
+    let machines = this.state.machines
+    let currentItem = null
+    let count = 0
+    if (machines.length > 0) {
+      currentItem = _.sortBy(machines, 'tag')[0]
+    }
+    let machineUrl = []
+    let status = []
+    _.sortBy(machines, 'tag').map((item, i) => {
+      console.log(i)
+      if (item.tag === currentItem.tag) {
+        machineUrl.push(item.url)
+        status.push(item.status);
+        if (i === machines.length - 1) {
+          dataSource.push({
+            name: currentItem.tag,
+            machineUrl: machineUrl,
+            status: status,
+          })
+        }
+      }
+      else if (item.tag !== currentItem.tag) {
+        console.log(currentItem)
+        dataSource.push({
+          name: currentItem.tag,
+          machineUrl: machineUrl,
+          status: status,
+        })
+        if (i === machines.length - 1) {
+          dataSource.push({
+            name: item.tag,
+            machineUrl: machineUrl,
+            status: status,
+          })
+        }
+        currentItem = item;
+        count = 0;
+        machineUrl = [item.url]
+        status = [item.status]
+      }
 
-    tags.map((item) => {
-      dataSource.push({
-        name: item.tag,
-        machineUrl: item.machineUrl,
-        error: item.error
-      })
     })
-
-
-    //console.log(dataSource)
 
     const columns = [{
       title: '标签名称',
@@ -155,10 +240,32 @@ class TagTable extends Component {
       title: '机器地址',
       dataIndex: 'machineUrl',
       key: 'machineUrl',
+      render: (text, record) => {
+        return (
+            (
+                <div className="editable-row-operations">
+                  {
+                    this.printString(record.machineUrl)
+                  }
+                </div>
+            )
+        );
+      }
     }, {
-      title: '错误信息',
-      dataIndex: 'error',
-      key: 'error',
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      render: (text, record) => {
+        return (
+            (
+                <div className="editable-row-operations">
+                  {
+                    this.checkStatus(record.status)
+                  }
+                </div>
+            )
+        );
+      }
     }, {
       title: '重命名',
       dataIndex: 'rename',
@@ -166,13 +273,14 @@ class TagTable extends Component {
       width: '10%',
       render: (text, record) => {
         return (
-            (<a>
+            (
+            <a>
               <div className="editable-row-operations">
-                {
-                  <Button onClick={() => this.showTagModal(record,'rename')}  type="primary">重命名</Button>
+                { this.checkStatus(record.status) === 'ok' ? (<Button onClick={() => this.showTagModal(record, 'rename')} type="primary">重命名</Button>) : null
                 }
               </div>
-            </a>)
+            </a>
+        )
         );
       }
     }, {
@@ -182,13 +290,12 @@ class TagTable extends Component {
       width: '10%',
       render: (text, record) => {
         return (
-            (<a>
+            <a>
               <div className="editable-row-operations">
-                {
-                  <Icon onClick={handleAddRunner} style={{fontSize: 16}} type="plus"/>
+                {this.checkStatus(record.status) === 'ok' ? (<Icon onClick={handleAddRunner} style={{fontSize: 16}} type="plus"/>) : null
                 }
               </div>
-            </a>)
+            </a>
         );
       },
 
@@ -201,8 +308,8 @@ class TagTable extends Component {
         return (
             (<a>
               <div className="editable-row-operations">
-                {
-                  <Icon onClick={handleAddMetricRunner} style={{fontSize: 16}} type="plus"/>
+                {this.checkStatus(record.status) === 'ok' ? (
+                  <Icon onClick={handleAddMetricRunner} style={{fontSize: 16}} type="plus"/>) : null
                 }
               </div>
             </a>)
@@ -215,13 +322,15 @@ class TagTable extends Component {
       dataIndex: 'stop',
       width: '3%',
       render: (text, record) => {
-        return ((<a>
+        return (<a>
               <div className="editable-row-operations">
-                {
-                  <Icon onClick={() => this.showTagModal(record,'stop')} title={"停止Runner"} style={{fontSize: 16}} type='poweroff'/>
+                {this.checkStatus(record.status) === 'ok' ? (
+                  <Icon onClick={() => this.showTagModal(record, 'stop')} title={"停止Runner"} style={{fontSize: 16}}
+                        type='poweroff'/>) : null
                 }
               </div>
-            </a>)
+            </a>
+
         );
       },
     }, {
@@ -230,13 +339,15 @@ class TagTable extends Component {
       dataIndex: 'start',
       width: '3%',
       render: (text, record) => {
-        return ((<a>
+        return (<a>
               <div className="editable-row-operations">
-                {
-                  <Icon onClick={() => this.showTagModal(record,'start')} title={"重启Runner"} style={{fontSize: 16}} type='caret-right'/>
+                {this.checkStatus(record.status) === 'ok' ? (
+                  <Icon onClick={() => this.showTagModal(record, 'start')} title={"重启Runner"} style={{fontSize: 16}}
+                        type='caret-right'/>) : null
                 }
               </div>
-            </a>)
+            </a>
+
         );
       },
     }, {
@@ -246,13 +357,13 @@ class TagTable extends Component {
       width: '10%',
       render: (text, record) => {
         return (
-            (<a>
+            <a>
               <div className="editable-row-operations">
-                {
-                  <Icon onClick={() => this.showDeleteTag(record)} style={{fontSize: 16}} type="delete"/>
+                {this.checkStatus(record.status) !== 'bad' ? (
+                  <Icon onClick={() => this.showDeleteTag(record)} style={{fontSize: 16}} type="delete"/>) : null
                 }
               </div>
-            </a>)
+            </a>
         );
       }
     }];
@@ -263,7 +374,6 @@ class TagTable extends Component {
 
 
   render() {
-    const { tags } = this.props
     return (
         <div>
           {this.renderTagList()}
@@ -271,7 +381,9 @@ class TagTable extends Component {
                  onOk={this.handleTagModal} onCancel={this.handleTagModalCancel}
           >
             <FormItem label="名称">
-              {this.state.currentModalType === 'rename' ? (<Input onChange={this.changeTagName} placeholder="新tag名称" />) : (<Input onChange={this.changeRunnerName} placeholder="指定runner名称" />
+              {this.state.currentModalType === 'rename' ? (
+                  <Input onChange={this.changeTagName} placeholder="新tag名称"/>) : (
+                  <Input onChange={this.changeRunnerName} placeholder="指定该标签下面具体的runner名称"/>
               ) }</FormItem>
           </Modal>
 

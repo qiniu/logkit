@@ -1,5 +1,5 @@
 import 'isomorphic-fetch';
-import { notification,} from 'antd';
+import {notification,} from 'antd';
 
 function parseJSON(response) {
   return response.json();
@@ -22,19 +22,18 @@ function checkStatus(response) {
  */
 export default function request(url, options) {
   return fetch(url, options)
-    .then(checkStatus)
-    .then(parseJSON)
-    .then((data) => {
-      if (data === null){
-        return {success: true};
-      } else if(data.message != undefined) {
-        notification.error({message: "失败", description: data.message, duration: 20})
-        data.success = false;
-        return data
-      } else {
-        data.success = true;
-        return data;
-      }
-    })
-    .catch(err => { err });
+      .then(checkStatus)
+      .then(parseJSON)
+      .then((data) => {
+        console.log(data)
+        if (data.code === 'L200') {
+          return data;
+        } else {
+          notification.error({message: "失败", description: data.message, duration: 20})
+          return data
+        }
+      })
+      .catch(err => {
+        err
+      });
 }

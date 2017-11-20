@@ -183,22 +183,26 @@ class renderConfig extends Component {
                   )}
                 </FormItem>
                 <FormItem {...formItemLayout} label="最长发送间隔(秒)">
-                  {getFieldDecorator('batch_interval', {rules: [{required: true, message: '发送间隔不能为空'},
-                    {pattern: /^[0-9]*$/, message: '输入不符合规范,只能为整数'}]})(
+                  {getFieldDecorator('batch_interval', {
+                    rules: [{required: true, message: '发送间隔不能为空'},
+                      {pattern: /^[0-9]*$/, message: '输入不符合规范,只能为整数'}]
+                  })(
                       <Input onChange={this.handleIntervalChange} placeholder={'发送间隔单位(秒)'}/>
                   )}
                 </FormItem>
                 <FormItem {...formItemLayout} label="系统信息收集间隔(metric配置专用, 秒)">
-                  {getFieldDecorator('collect_interval', {rules: [{required: true, message: '收集间隔不能为空'},
-                      {pattern: /^[0-9]*$/, message: '输入不符合规范,只能为整数'}]})(
-                    <Input onChange={this.handleMetricIntervalChange} placeholder={'系统信息收集间隔单位(秒)'}/>
+                  {getFieldDecorator('collect_interval', {
+                    rules: [{required: true, message: '收集间隔不能为空'},
+                      {pattern: /^[0-9]*$/, message: '输入不符合规范,只能为整数'}]
+                  })(
+                      <Input onChange={this.handleMetricIntervalChange} placeholder={'系统信息收集间隔单位(秒)'}/>
                   )}
                 </FormItem>
                 <FormItem {...formItemLayout} label="标签名称">
-                      <Input onChange={this.handleTagChange} placeholder={'标签名称'}/>
+                  <Input onChange={this.handleTagChange} placeholder={'标签名称'}/>
                 </FormItem>
                 <FormItem {...formItemLayout} label="机器地址">
-                      <Input onChange={this.handleMachineChange} placeholder={'机器地址'}/>
+                  <Input onChange={this.handleMachineChange} placeholder={'机器地址'}/>
                 </FormItem>
                 <FormItem
                     {...optionFormItemLayout}

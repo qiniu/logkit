@@ -71,40 +71,38 @@ class CreateMetricRunner extends Component {
     //   config.delete("transforms");
     // }
     getRunnerVersion().then(data => {
-      if (data.success) {
-        that.setState({
-          version: _.values(_.omit(data, 'success'))
-        })
-      }
+      that.setState({
+        version: _.values(_.omit(data, 'success'))
+      })
     })
   }
 
   next() {
     let that = this;
     if (this.state.current === 0) {
-      if(config.get("metric").length > 0){
+      if (config.get("metric").length > 0) {
         const current = this.state.current + 1;
         this.setState({current});
-      }else{
+      } else {
         notification.warning({message: "请至少采集一种系统信息", duration: 20,})
       }
     } else if (this.state.current === 1) {
       let flag = [];
       config.get("metric").map(m => {
         let isHasTrue = false;
-        for(let k in this.state.metricKeys[m.type]){
-          if(this.state.metricKeys[m.type][k]){
+        for (let k in this.state.metricKeys[m.type]) {
+          if (this.state.metricKeys[m.type][k]) {
             isHasTrue = true;
             return true;
           }
         }
-        if(!isHasTrue && Object.keys(this.state.metricKeys[m.type]).length) flag.push(m.type);
+        if (!isHasTrue && Object.keys(this.state.metricKeys[m.type]).length) flag.push(m.type);
       });
-      if(flag.length <= 0){
+      if (flag.length <= 0) {
         const current = this.state.current + 1;
         this.setState({current});
       } else {
-        notification.warning({message: "请至少为"+flag.join(", ")+"选择一个采集的字段", duration: 20,})
+        notification.warning({message: "请至少为" + flag.join(", ") + "选择一个采集的字段", duration: 20,})
       }
     } else if (this.state.current === 2) {
       const current = this.state.current + 1;
@@ -157,7 +155,7 @@ class CreateMetricRunner extends Component {
   setConfig = () => {
     let configData = [];
     let metric = config.get("metric");
-    if(!metric) return;
+    if (!metric) return;
     metric.map((m, _) => {
       m["attributes"] = this.state.metricKeys[m.type];
       m["config"] = this.state.metricConfigs[m.type];
@@ -177,10 +175,12 @@ class CreateMetricRunner extends Component {
       } else {
         if (isJSON(formData.config)) {
           let data = JSON.parse(formData.config);
-          postClusterConfigData({name: data.name, body: data}).then(data => {
+          let tag = (window.tag != null && window.tag != undefined) ? window.tag : ''
+          let url = (window.machine_url != null && window.machine_url != undefined) ? window.machine_url : ''
+          postClusterConfigData({name: data.name, tag: tag, url: url, body: data}).then(data => {
             if (data === undefined) {
               notification.success({message: "Runner添加成功", duration: 10,})
-              this.props.router.push({pathname: `/`})
+              // this.props.router.push({pathname: `/`})
             }
 
           })
@@ -206,7 +206,7 @@ class CreateMetricRunner extends Component {
           putConfigData({name: data.name, body: data}).then(data => {
             if (data === undefined) {
               notification.success({message: "Runner修改成功", duration: 10,})
-              this.props.router.push({pathname: `/`})
+              // this.props.router.push({pathname: `/`})
             }
 
           })
@@ -231,65 +231,65 @@ class CreateMetricRunner extends Component {
   render() {
     const {current} = this.state;
     return (
-      <div className="logkit-create-container">
-        <Steps current={current}>
-          {steps.map(item => <Step key={item.title} title={item.title}/>)}
-        </Steps>
-        <div className="steps-content">
-          <div className={this.state.current === 0 ? 'show-div' : 'hide-div'}>
-            <div>
-              <p className={'show-div info'}>根据需要选择需要采集的系统信息类型</p>
+        <div className="logkit-create-container">
+          <Steps current={current}>
+            {steps.map(item => <Step key={item.title} title={item.title}/>)}
+          </Steps>
+          <div className="steps-content">
+            <div className={this.state.current === 0 ? 'show-div' : 'hide-div'}>
+              <div>
+                <p className={'show-div info'}>根据需要选择需要采集的系统信息类型</p>
+              </div>
+              <Usages ref="checkUsages"></Usages>
             </div>
-            <Usages ref="checkUsages"></Usages>
-          </div>
-          <div className={this.state.current === 1 ? 'show-div' : 'hide-div'}>
-            <div>
-              <p className={'show-div info'}>选择需要采集的系统信息的字段(某些metric可能无法设置)</p>
+            <div className={this.state.current === 1 ? 'show-div' : 'hide-div'}>
+              <div>
+                <p className={'show-div info'}>选择需要采集的系统信息的字段(某些metric可能无法设置)</p>
+              </div>
+              <Keys handleMetricKeys={metricKeys => this.handleMetricKeys(metricKeys)}></Keys>
             </div>
-            <Keys handleMetricKeys={metricKeys=>this.handleMetricKeys(metricKeys)}></Keys>
-          </div>
-          <div className={this.state.current === 2 ? 'show-div' : 'hide-div'}>
-            <div>
-              <p className={'show-div info'}>设置Metric的一些配置项(某些metric可能没有配置项)</p>
+            <div className={this.state.current === 2 ? 'show-div' : 'hide-div'}>
+              <div>
+                <p className={'show-div info'}>设置Metric的一些配置项(某些metric可能没有配置项)</p>
+              </div>
+              <Opt handleMetricConfigs={metricConfigs => this.handleMetricConfigs(metricConfigs)}></Opt>
             </div>
-            <Opt handleMetricConfigs={metricConfigs=>this.handleMetricConfigs(metricConfigs)}></Opt>
-          </div>
-          <div className={this.state.current === 3 ? 'show-div' : 'hide-div'}>
-            <div>
-              <p className={'show-div info'}>黄色字体选框需根据实际情况修改，其他可作为默认值</p>
+            <div className={this.state.current === 3 ? 'show-div' : 'hide-div'}>
+              <div>
+                <p className={'show-div info'}>黄色字体选框需根据实际情况修改，其他可作为默认值</p>
+              </div>
+              <Sender ref="checkSenderData"></Sender>
             </div>
-            <Sender ref="checkSenderData"></Sender>
-          </div>
-          <div className={this.state.current === 4 ? 'show-div' : 'hide-div'}>
-            <RenderConfig ref="initConfig"></RenderConfig>
-          </div>
+            <div className={this.state.current === 4 ? 'show-div' : 'hide-div'}>
+              <RenderConfig ref="initConfig"></RenderConfig>
+            </div>
 
+          </div>
+          <div className="steps-action">
+            {
+              this.state.current < steps.length - 1
+              &&
+              <Button type="primary" onClick={() => this.next()}>下一步</Button>
+            }
+            {
+              this.state.current === steps.length - 1 && this.state.isCopyStatus === false
+              &&
+              <Button type="primary" onClick={() => this.addRunner()}>确认并提交</Button>
+            }
+            {
+              this.state.current === steps.length - 1 && this.state.isCopyStatus === true
+              &&
+              <Button type="primary" onClick={() => this.updateRunner()}>修改并提交</Button>
+            }
+            {
+              this.state.current > 0
+              &&
+              <Button style={{marginLeft: 8}} onClick={() => this.prev()}>
+                上一步
+              </Button>
+            }
+          </div>
         </div>
-        <div className="steps-action">
-          {
-            this.state.current < steps.length - 1
-            &&
-            <Button type="primary" onClick={() => this.next()}>下一步</Button>
-          }
-          {
-            this.state.current === steps.length - 1 && this.state.isCopyStatus === false
-            &&
-            <Button type="primary" onClick={() => this.addRunner()}>确认并提交</Button>
-          }
-          {
-            this.state.current === steps.length - 1 && this.state.isCopyStatus === true
-            &&
-            <Button type="primary" onClick={() => this.updateRunner()}>修改并提交</Button>
-          }
-          {
-            this.state.current > 0
-            &&
-            <Button style={{marginLeft: 8}} onClick={() => this.prev()}>
-              上一步
-            </Button>
-          }
-        </div>
-      </div>
     );
   }
 }

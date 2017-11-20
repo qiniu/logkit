@@ -57,20 +57,20 @@ class Opt extends Component {
     let data = this.state.items;
     let formData = getFieldsValue();
     let metricConfigs = {};
-    for(let m in formData){
+    for (let m in formData) {
       metricConfigs[m] = {};
       data[m].map(c => {
-        if(c.Type === "bool"){
+        if (c.Type === "bool") {
           metricConfigs[m][c.KeyName] = formData[m][c.KeyName] === "true";
-        }else if(c.Type === "array"){
+        } else if (c.Type === "array") {
           let tmp = formData[m][c.KeyName].split(/\s*,\s*/);
           metricConfigs[m][c.KeyName] = [];
           tmp.map(i => {
-            if(i.length > 0){
+            if (i.length > 0) {
               metricConfigs[m][c.KeyName].push(i);
             }
           });
-        }else{
+        } else {
           metricConfigs[m][c.KeyName] = formData[m][c.KeyName];
         }
       });
@@ -81,28 +81,26 @@ class Opt extends Component {
   init = () => {
     getMetricOptions().then(data => {
       const {setFieldsValue} = this.props.form;
-      if (data.success) {
-        this.setState({
-          items: data,
-        });
-        if(window.nodeCopy && window.nodeCopy.metric){
-          let formData = {};
-          window.nodeCopy.metric.map(m => {
-            formData[m.type] = {};
-            data[m.type].map(c => {
-              if(m.config && m.config[c.KeyName] !== undefined){
-                if(c.Type ==="bool"){
-                  formData[m.type][c.KeyName] = m.config[c.KeyName].toString();
-                }else if(c.Type === "array"){
-                  formData[m.type][c.KeyName] = m.config[c.KeyName].join(',');
-                }else{
-                  formData[m.type][c.KeyName] = m.config[c.KeyName];
-                }
+      this.setState({
+        items: data,
+      });
+      if (window.nodeCopy && window.nodeCopy.metric) {
+        let formData = {};
+        window.nodeCopy.metric.map(m => {
+          formData[m.type] = {};
+          data[m.type].map(c => {
+            if (m.config && m.config[c.KeyName] !== undefined) {
+              if (c.Type === "bool") {
+                formData[m.type][c.KeyName] = m.config[c.KeyName].toString();
+              } else if (c.Type === "array") {
+                formData[m.type][c.KeyName] = m.config[c.KeyName].join(',');
+              } else {
+                formData[m.type][c.KeyName] = m.config[c.KeyName];
               }
-            });
+            }
           });
-          setFieldsValue(formData);
-        }
+        });
+        setFieldsValue(formData);
       }
     })
   }
@@ -110,18 +108,19 @@ class Opt extends Component {
   renderFormItem = () => {
     let result = [];
     let selectedMetric = config.get("metric");
-    if(!selectedMetric) selectedMetric = [];
+    if (!selectedMetric) selectedMetric = [];
     const {getFieldDecorator} = this.props.form;
     selectedMetric.map((metric, _) => {
       let key = metric.type;
       let configs = this.state.items[key];
-      if(!configs || configs.length <= 0){
+      if (!configs || configs.length <= 0) {
         return true;
       }
       result.push(
-        <FormItem key={key}>
-          <b>{key} 配置项</b><hr/>
-        </FormItem>
+          <FormItem key={key}>
+            <b>{key} 配置项</b>
+            <hr/>
+          </FormItem>
       );
       configs.map((ele, index) => {
         if (ele.ChooseOnly == false) {
@@ -129,7 +128,7 @@ class Opt extends Component {
                                 {...formItemLayout}
                                 className=""
                                 label={(
-                                  <span className={ele.DefaultNoUse ? 'warningTip' : '' }>
+                                    <span className={ele.DefaultNoUse ? 'warningTip' : '' }>
                   {ele.Description}
                 </span>
                                 )}>
@@ -139,7 +138,7 @@ class Opt extends Component {
                 {pattern: ele.CheckRegex, message: '输入不符合规范'},
               ]
             })(
-              <Input placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值' } disabled={this.state.isReadonly}/>
+                <Input placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值' } disabled={this.state.isReadonly}/>
             )}
           </FormItem>)
         } else {
@@ -152,16 +151,16 @@ class Opt extends Component {
               rules: [{required: true, message: '不能为空', trigger: 'blur'},
               ]
             })(
-              <Select>
-                {this.renderChooseOption(ele.ChooseOptions)}
-              </Select>
+                <Select>
+                  {this.renderChooseOption(ele.ChooseOptions)}
+                </Select>
             )}
           </FormItem>)
         }
       });
     });
     return (
-      result
+        result
     )
   }
 
@@ -171,17 +170,17 @@ class Opt extends Component {
       options.push(<Option key={ele} value={ele}>{ele}</Option>)
     })
     return (
-      options
+        options
     )
   }
 
   render() {
     return (
-      <div>
-        <Form className="slide-in text-color">
-          {this.renderFormItem()}
-        </Form>
-      </div>
+        <div>
+          <Form className="slide-in text-color">
+            {this.renderFormItem()}
+          </Form>
+        </div>
     );
   }
 }
