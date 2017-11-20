@@ -1010,38 +1010,42 @@ Content-Type: application/json
 ```
 
 ## 返回码列表
-```
-# 一切正常
-`L200`: 操作成功
+#### 一切正常
 
-# logkti 自身 Runner 操作相关
-`L1001`: 获取 Config 出现错误
-`L1002`: 添加 Runner 出现错误
-`L1003`: 删除 Runner 出现错误
-`L1004`: 开启 Runner 出现错误
-`L1005`: 关闭 Runner 出现错误
-`L1006`: 重置 Runner 出现错误
-`L1007`: 更新 Runner 出现错误
+* `L200`: 操作成功
 
-# logkit 自身 Parser 相关
-`L1101`: 解析字符串出现错误
+#### logkti 自身 Runner 操作相关
 
-# logkit cluster Master 相关
-`L2001`: 获取 Slaves 列表出现错误
-`L2002`: 获取 Slaves 状态出现错误
-`L2003`: 获取 Slaves Configs 出现错误
-`L2004`: 接受 Slaves 注册出现错误
+* `L1001`: 获取 Config 出现错误
+* `L1002`: 添加 Runner 出现错误
+* `L1003`: 删除 Runner 出现错误
+* `L1004`: 开启 Runner 出现错误
+* `L1005`: 关闭 Runner 出现错误
+* `L1006`: 重置 Runner 出现错误
+* `L1007`: 更新 Runner 出现错误
 
-# logkit cluster slave 自身相关
-`L2005`: 更改 Tag 出现错误
+#### logkit 自身 Parser 相关
 
-# logkit cluster Master 管理 slaves 相关
-`L2006`: Slaves 添加 Runner 出现错误
-`L2007`: Slaves 删除 Runner 出现错误
-`L2008`: Slaves 启动 Runner 出现错误
-`L2009`: Slaves 关闭 Runner 出现错误
-`L2010`: Slaves 重置 Runner 出现错误
-`L2011`: Slaves 更新 Runner 出现错误
-`L2012`: Slaves 从列表中移除时出现错误
-`L2013`: Slaves 更改 Tag 出现错
-```
+* `L1101`: 解析字符串出现错误
+
+#### logkit cluster Master 相关
+
+* `L2001`: 获取 Slaves 列表出现错误
+* `L2002`: 获取 Slaves 状态出现错误
+* `L2003`: 获取 Slaves Configs 出现错误
+* `L2004`: 接受 Slaves 注册时出现错误
+
+#### logkit cluster slave 自身相关
+
+* `L2005`: 更改 Tag 出现错误
+
+#### logkit cluster Master 管理 slaves 相关
+
+* `L2006`: Slaves 添加 Runner 出现错误
+* `L2007`: Slaves 删除 Runner 出现错误
+* `L2008`: Slaves 启动 Runner 出现错误
+* `L2009`: Slaves 关闭 Runner 出现错误
+* `L2010`: Slaves 重置 Runner 出现错误
+* `L2011`: Slaves 更新 Runner 出现错误
+* `L2012`: Slaves 从列表中移除时出现错误
+* `L2013`: Slaves 更改 Tag 出现错误
