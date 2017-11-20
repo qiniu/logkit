@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"runtime"
+	"time"
 
 	"github.com/shirou/gopsutil/host"
 	"github.com/shirou/gopsutil/load"
@@ -82,6 +83,8 @@ func (_ *SystemStats) Collect() (datas []map[string]interface{}, err error) {
 		KeySystemUptime:       hostinfo.Uptime,
 		KeySystemUptimeFormat: format_uptime(hostinfo.Uptime),
 	}
+	now := time.Now().Format(time.RFC3339Nano)
+	data[TypeMetricSystem+"_"+metric.Timestamp] = now
 	datas = append(datas, data)
 	return
 }

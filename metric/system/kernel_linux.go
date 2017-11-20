@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/utils"
@@ -71,8 +72,8 @@ func (k *Kernel) Collect() (datas []map[string]interface{}, err error) {
 		return nil, err
 	}
 
+	now := time.Now().Format(time.RFC3339Nano)
 	fields := make(map[string]interface{})
-
 	dataFields := bytes.Fields(data)
 	for i, field := range dataFields {
 		switch {
@@ -114,6 +115,7 @@ func (k *Kernel) Collect() (datas []map[string]interface{}, err error) {
 		}
 	}
 
+	fields[TypeMetricKernel+"_"+metric.Timestamp] = now
 	datas = append(datas, fields)
 	return
 }

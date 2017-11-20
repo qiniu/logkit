@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/utils"
@@ -87,6 +88,7 @@ func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 		return nil, fmt.Errorf("error getting net io info: %s", err)
 	}
 
+	now := time.Now().Format(time.RFC3339Nano)
 	for _, io := range netio {
 		if len(s.Interfaces) != 0 {
 			var found bool
@@ -127,6 +129,7 @@ func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 			KeyNetDropOut:     io.Dropout,
 			KeyNetInterface:   io.Name,
 		}
+		fields[TypeMetricNet+"_"+metric.Timestamp] = now
 		datas = append(datas, fields)
 	}
 
@@ -142,6 +145,7 @@ func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 			}
 		}
 		fields[KeyNetInterface] = "all"
+		fields[TypeMetricNet+"_"+metric.Timestamp] = now
 		datas = append(datas, fields)
 	}
 	return

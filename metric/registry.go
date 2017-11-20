@@ -7,6 +7,7 @@ const (
 
 	OptionString     = "options"
 	AttributesString = "attributes"
+	Timestamp        = "timestamp"
 )
 
 //Collector 收集metrics的接口
