@@ -512,8 +512,8 @@ func executeToClusters(slaves []Slave, urlP, method, mgr string, reqBd []byte) (
 		url := fmt.Sprintf(urlP, v.Url)
 		respCode, respBody, err := executeToOneCluster(url, method, reqBd)
 		if respCode != http.StatusOK || err != nil {
-			log.Errorf("url %v %v failed, %v", v.Url, mgr, err)
-			errMsg := fmt.Sprintf("url %v %v failed, resp is %v, err is %v", v.Url, mgr, string(respBody), err)
+			log.Errorf("url %v %v occurred an error, resp is %v, err is %v", v.Url, mgr, string(respBody), err)
+			errMsg := fmt.Sprintf("url %v %v occurred an error, resp is %v, err is %v", v.Url, mgr, string(respBody), err)
 			errInfo = append(errInfo, errMsg)
 		}
 	}

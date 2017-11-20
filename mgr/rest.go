@@ -268,12 +268,26 @@ func convertWebParserConfig(conf conf.MapConf) conf.MapConf {
 	return conf
 }
 
-func backupRunnerConfig(rconf interface{}, filename string) error {
+func (rs *RestService) backupRunnerConfig(rconf interface{}, filename string) error {
 	confBytes, err := json.MarshalIndent(rconf, "", "    ")
 	if err != nil {
-		return err
+		log.Warnf("runner config %v marshal failed, err is %v", rconf, err)
+		return nil
 	}
-	return ioutil.WriteFile(filename, confBytes, 0644)
+	// 判断默认备份文件夹是否存在，不存在就尝试创建
+	if _, err := os.Stat(rs.mgr.RestDir); err != nil {
+		if os.IsNotExist(err) {
+			if err = os.Mkdir(rs.mgr.RestDir, 0755); err != nil && !os.IsExist(err) {
+				log.Warnf("rest default dir not exists and make dir failed, err is %v", err)
+				return nil
+			}
+		}
+	}
+	err = ioutil.WriteFile(filename, confBytes, 0644)
+	if err != nil {
+		log.Warnf("backup runner config %v failed, err is %v", filename, err)
+	}
+	return nil
 }
 
 func (rs *RestService) checkNameAndConfig(c echo.Context) (name string, conf RunnerConfig, file string, err error) {
@@ -318,7 +332,7 @@ func (rs *RestService) PostConfig() echo.HandlerFunc {
 		if err = rs.mgr.ForkRunner(filename, nconf, true); err != nil {
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerAdd, err.Error())
 		}
-		if err := backupRunnerConfig(nconf, filename); err != nil {
+		if err := rs.backupRunnerConfig(nconf, filename); err != nil {
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerAdd, err.Error())
 		}
 		return RespSuccess(c, nil)
@@ -352,7 +366,7 @@ func (rs *RestService) PutConfig() echo.HandlerFunc {
 		if err = rs.mgr.ForkRunner(filename, nconf, true); err != nil {
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerUpdate, err.Error())
 		}
-		if err = backupRunnerConfig(nconf, filename); err != nil {
+		if err = rs.backupRunnerConfig(nconf, filename); err != nil {
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerUpdate, err.Error())
 		}
 		return RespSuccess(c, nil)
@@ -391,7 +405,7 @@ func (rs *RestService) PostConfigReset() echo.HandlerFunc {
 		if err = rs.mgr.ForkRunner(filename, runnerConfig, true); err != nil {
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerReset, err.Error())
 		}
-		if err = backupRunnerConfig(runnerConfig, filename); err != nil {
+		if err = rs.backupRunnerConfig(runnerConfig, filename); err != nil {
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerReset, err.Error())
 		}
 		return RespSuccess(c, nil)
@@ -409,7 +423,7 @@ func (rs *RestService) PostConfigStart() echo.HandlerFunc {
 		if err = rs.mgr.ForkRunner(filename, conf, true); err != nil {
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerStart, err.Error())
 		}
-		if err = backupRunnerConfig(conf, filename); err != nil {
+		if err = rs.backupRunnerConfig(conf, filename); err != nil {
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerStart, err.Error())
 		}
 		return RespSuccess(c, nil)
@@ -440,7 +454,7 @@ func (rs *RestService) PostConfigStop() echo.HandlerFunc {
 			rs.mgr.lock.Unlock()
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerStop, err.Error())
 		}
-		if err = backupRunnerConfig(runnerConfig, filename); err != nil {
+		if err = rs.backupRunnerConfig(runnerConfig, filename); err != nil {
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerStop, err.Error())
 		}
 		return RespSuccess(c, nil)
