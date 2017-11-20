@@ -1,11 +1,11 @@
 all:
-	govendor sync; go generate; CGO_ENABLED=1 go build -v -o logkit
+	go generate; CGO_ENABLED=1 go build -v -o logkit
 
 install: all
 	@echo
 
 test:
-	govendor sync; go generate; CGO_ENABLED=1 go test -race -cover ./...
+	go generate; CGO_ENABLED=1 go test -race -cover ./...
 
 clean:
 	go clean -i ./...

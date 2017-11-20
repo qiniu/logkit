@@ -4,5 +4,4 @@ go:
   - 1.8
   - 1.9
 script:
-  - go get -u github.com/kardianos/govendor
   - make test

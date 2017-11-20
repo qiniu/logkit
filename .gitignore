@@ -29,6 +29,7 @@ hs_err_pid*
 _obj
 _test
 bin/
+!vendor/github.com/pkg
 pkg/
 tests
 tests/meta_mock_csv
@@ -52,14 +53,6 @@ _testmain.go
 *.prof
 
 meta/
-!vendor/
-vendor/*
-!vendor/github.com/
-vendor/github.com/*
-!vendor/github.com/labstack/
-vendor/github.com/labstack/*
-!vendor/github.com/labstack/echo/
-!vendor/github.com/wangtuanjie/
 .DS_Store
 .cache
 .vscode
