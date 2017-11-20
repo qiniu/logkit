@@ -148,8 +148,15 @@ func (this *ElasticsearchSender) Send(data []Data) (err error) {
 		indexName = this.indexName
 		now := time.Now().In(this.timeZone)
 		intervals = []string{strconv.Itoa(now.Year()), strconv.Itoa(int(now.Month())), strconv.Itoa(now.Day())}
-		for j := 1; j <= i; j ++ {
-			indexName = indexName + "." + intervals[j - 1]
+		for j := 0; j < i; j ++ {
+			if j == 0 {
+				indexName = indexName + "-" + intervals[j]
+			} else {
+				if len(intervals[j]) == 1 {
+					intervals[j] = "0" + intervals[j]
+				}
+				indexName = indexName + "." + intervals[j]
+			}
 		}
 		//字段名称替换
 		if makeDoc {
