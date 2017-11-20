@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io/ioutil"
 	"strconv"
+	"time"
 
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/utils"
@@ -130,6 +131,7 @@ func (sfs *SysctlFS) gatherOne(name string, fields map[string]interface{}) error
 func (sfs *SysctlFS) Collect() (datas []map[string]interface{}, err error) {
 	fields := map[string]interface{}{}
 
+	now := time.Now().Format(time.RFC3339Nano)
 	for _, n := range []string{"aio-nr", "aio-max-nr", "dquot-nr", "dquot-max", "super-nr", "super-max"} {
 		sfs.gatherOne(n, fields)
 	}
@@ -138,6 +140,7 @@ func (sfs *SysctlFS) Collect() (datas []map[string]interface{}, err error) {
 	sfs.gatherList("dentry-state", fields, "dentry-nr", "dentry-unused-nr", "dentry-age-limit", "dentry-want-pages")
 	sfs.gatherList("file-nr", fields, "file-nr", "", "file-max")
 
+	fields["sysctl_"+metric.Timestamp] = now
 	datas = append(datas, fields)
 	return
 }

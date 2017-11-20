@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/utils"
@@ -102,6 +103,8 @@ func (p *Processes) Collect() (datas []map[string]interface{}, err error) {
 			return nil, err
 		}
 	}
+	now := time.Now().Format(time.RFC3339Nano)
+	fields[TypeMetricProcesses+"_"+metric.Timestamp] = now
 	datas = append(datas, fields)
 	return
 }

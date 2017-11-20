@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/utils"
@@ -91,6 +92,7 @@ func (s *DiskStats) Collect() (datas []map[string]interface{}, err error) {
 		return nil, fmt.Errorf("error getting disk usage info: %s", err)
 	}
 
+	now := time.Now().Format(time.RFC3339Nano)
 	for i, du := range disks {
 		if du.Total == 0 {
 			// Skip dummy filesystem (procfs, cgroupfs, ...)
@@ -114,6 +116,7 @@ func (s *DiskStats) Collect() (datas []map[string]interface{}, err error) {
 			KeyDiskInodesFree:  du.InodesFree,
 			KeyDiskInodesUsed:  du.InodesUsed,
 		}
+		fields[TypeMetricDisk+"_"+metric.Timestamp] = now
 		datas = append(datas, fields)
 	}
 	return
@@ -219,6 +222,7 @@ func (s *DiskIOStats) Collect() (datas []map[string]interface{}, err error) {
 		return nil, fmt.Errorf("error getting disk io info: %s", err)
 	}
 
+	now := time.Now().Format(time.RFC3339Nano)
 	for _, io := range diskio {
 		fields := map[string]interface{}{
 			KeyDiskioReads:          io.ReadCount,
@@ -241,6 +245,7 @@ func (s *DiskIOStats) Collect() (datas []map[string]interface{}, err error) {
 				fields[KeyDiskioSerial] = "unknown"
 			}
 		}
+		fields[TypeMetricDiskio+"_"+metric.Timestamp] = now
 		datas = append(datas, fields)
 	}
 	return
