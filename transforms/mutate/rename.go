@@ -11,9 +11,9 @@ import (
 
 
 type Rename struct {
-	OldField  string `json:"old_field"`
-	NewField  string `json:"new_field"`
-	stats utils.StatsInfo
+	Key        string `json:"key"`
+	NewKeyName string `json:"new_key_name"`
+	stats      utils.StatsInfo
 }
 
 func (g *Rename) RawTransform(datas []string) ([]string, error) {
@@ -24,14 +24,14 @@ func (g *Rename) Transform(datas []sender.Data) ([]sender.Data, error) {
 	var err, ferr error
 	errnums := 0
 	for i := range datas {
-		val, exists := datas[i][g.OldField]
+		val, exists := datas[i][g.Key]
 		if !exists {
 			errnums ++
-			fmt.Errorf("transform key %v not exist in data", g.OldField)
+			fmt.Errorf("transform key %v not exist in data", g.Key)
 			continue
 		}
-		delete(datas[i], g.OldField)
-		datas[i][g.NewField] = val
+		delete(datas[i], g.Key)
+		datas[i][g.NewKeyName] = val
 	}
 	if err != nil {
 		g.stats.LastError = err.Error()
@@ -53,26 +53,19 @@ func (g *Rename) Type() string {
 func (g *Rename) SampleConfig() string {
 	return `{
 		"type":"rename",
-		"old_field":"old_field_name"
-	    "new_field":"new_field_name"
+		"key":"old_key_name"
+	    "new_key_name":"new_key_name"
 	}`
 }
 
 func (g *Rename) ConfigOptions() []utils.Option {
 	return []utils.Option{
+		transforms.KeyFieldName,
 		transforms.KeyStageAfterOnly,
 		{
-			KeyName:      "old_field",
+			KeyName:      "new_key_name",
 			ChooseOnly:   false,
-			Default:      "old_field_name",
-			DefaultNoUse: true,
-			Description:  "要修改的字段名",
-			Type:         transforms.TransformTypeString,
-		},
-		{
-			KeyName:      "new_field",
-			ChooseOnly:   false,
-			Default:      "new_field_name",
+			Default:      "new_key_name",
 			DefaultNoUse: true,
 			Description:  "修改后的字段名",
 			Type:         transforms.TransformTypeString,
