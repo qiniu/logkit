@@ -167,6 +167,12 @@
 			"revisionTime": "2017-03-22T23:44:13Z"
 		},
 		{
+			"checksumSHA1": "qyZO6SotinKrz40LxXjw0LtIwA8=",
+			"path": "github.com/olivere/elastic",
+			"revision": "09755b303b32ccae2968681e77473399cb48378c",
+			"revisionTime": "2017-11-17T18:00:47Z"
+		},
+		{
 			"checksumSHA1": "FGg99nQ56Fo3radSCuU1AeEUJug=",
 			"path": "github.com/pierrec/lz4",
 			"revision": "88df27974e3644957507a1ca1866edc8e98d4897",
