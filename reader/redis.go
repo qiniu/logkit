@@ -171,15 +171,33 @@ func (rr *RedisReader) Start() {
 	rr.started = true
 	switch rr.opt.dataType {
 	case DataTypeChannel:
-//		for i, key := range rr.opt.key {
-//			rr.channelIn[i] = rr.client.Subscribe(key).Channel()
-//		}
-		rr.channelIn = rr.client.Subscribe(rr.opt.key[0]).Channel()
+		if len(rr.opt.key) == 1 {
+			rr.channelIn = rr.client.Subscribe(rr.opt.key[0]).Channel()
+		}else if len(rr.opt.key) == 2 {
+			rr.channelIn = rr.client.Subscribe(rr.opt.key[0],rr.opt.key[1]).Channel()
+		}else if len(rr.opt.key) == 3 {
+			rr.channelIn = rr.client.Subscribe(rr.opt.key[0],rr.opt.key[1],rr.opt.key[2]).Channel()
+		}else if len(rr.opt.key) == 4 {
+			rr.channelIn = rr.client.Subscribe(rr.opt.key[0],rr.opt.key[1],rr.opt.key[2],rr.opt.key[3]).Channel()
+		}else if len(rr.opt.key) == 5 {
+			rr.channelIn = rr.client.Subscribe(rr.opt.key[0],rr.opt.key[1],rr.opt.key[2],rr.opt.key[3],rr.opt.key[4]).Channel()
+		}else {
+			log.Errorf("too many subscription channels")
+		}
 	case DataTypePatterChannel:
-//		for i ,key := range rr.opt.key {
-//			rr.channelIn[i] = rr.client.PSubscribe(key).Channel()
-//		}
-		rr.channelIn = rr.client.PSubscribe(rr.opt.key[0]).Channel()
+		if len(rr.opt.key) == 1 {
+			rr.channelIn = rr.client.PSubscribe(rr.opt.key[0]).Channel()
+		}else if len(rr.opt.key) == 2 {
+			rr.channelIn = rr.client.PSubscribe(rr.opt.key[0],rr.opt.key[1]).Channel()
+		}else if len(rr.opt.key) == 3 {
+			rr.channelIn = rr.client.PSubscribe(rr.opt.key[0],rr.opt.key[1],rr.opt.key[2]).Channel()
+		}else if len(rr.opt.key) == 4 {
+			rr.channelIn = rr.client.PSubscribe(rr.opt.key[0],rr.opt.key[1],rr.opt.key[2],rr.opt.key[3]).Channel()
+		}else if len(rr.opt.key) == 5 {
+			rr.channelIn = rr.client.PSubscribe(rr.opt.key[0],rr.opt.key[1],rr.opt.key[2],rr.opt.key[3],rr.opt.key[4]).Channel()
+		}else {
+			log.Errorf("too many subscription channels")
+		}
 	case DataTypeList:
 	case DataTypeString:
 	case DataTypeSet:
@@ -223,12 +241,6 @@ func (rr *RedisReader) run() (err error) {
 		}
 		switch rr.opt.dataType {
 		case DataTypeChannel, DataTypePatterChannel:
-//			for i, _ := range rr.opt.key {
-//				message := <- rr.channelIn[i]
-//				if message != nil {
-//					rr.readChan <- message.Payload
-//				}
-//			}
 			message := <- rr.channelIn
 			if message != nil {
 				rr.readChan <- message.Payload
@@ -248,48 +260,52 @@ func (rr *RedisReader) run() (err error) {
 			}
 			//Added string support for redis
 		case DataTypeString:
-			//anString, subErr := rr.client.Get(rr.opt.key[0]).Result()
-			anString, subErr := rr.client.Get(rr.opt.key[0]).Result()
-			if subErr != nil && subErr != redis.Nil {
-				log.Errorf("Runner[%v] %v Get redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
-				rr.setStatsError("Runner[" + rr.meta.RunnerName + "] " + rr.Name() + " Get redis error " + subErr.Error())
-			} else if anString != "" {
-				//Avoid data duplication
-				//rr.client.Del(rr.opt.key[0])
-				rr.client.Del(rr.opt.key[0])
-				rr.readChan <- anString
+			for _, key := range rr.opt.key {
+				anString, subErr := rr.client.Get(key).Result()
+				if subErr != nil && subErr != redis.Nil {
+					log.Errorf("Runner[%v] %v Get redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
+					rr.setStatsError("Runner[" + rr.meta.RunnerName + "] " + rr.Name() + " Get redis error " + subErr.Error())
+				} else if anString != "" {
+					//Avoid data duplication
+					rr.client.Del(key)
+					rr.readChan <- anString
+				}
 			}
 			//Added set support for redis
 	    case DataTypeSet:
-	        anSet, subErr := rr.client.SPop(rr.opt.key[0]).Result()
-			if subErr != nil && subErr != redis.Nil {
-				log.Errorf("Runner[%v] %v SPop redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
-				rr.setStatsError("Runner[" + rr.meta.RunnerName + "] " + rr.Name() + " Get redis error " + subErr.Error())
-			} else if anSet == "" {
-				log.Errorf("Runner[%v] %v set read [%s] data is not exist %v", rr.meta.RunnerName, rr.Name(), rr.opt.dataType, anSet)
-			}else {
-				rr.readChan <- anSet
-			}
+		    for _ , key := range rr.opt.key {
+				anSet, subErr := rr.client.SPop(key).Result()
+				if subErr != nil && subErr != redis.Nil {
+					log.Errorf("Runner[%v] %v SPop redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
+					rr.setStatsError("Runner[" + rr.meta.RunnerName + "] " + rr.Name() + " Get redis error " + subErr.Error())
+				} else if anSet != "" {
+					rr.readChan <- anSet
+				}  
+		    }
 			//Added sortedSet support for redis
 	    case DateTypeSortedSet:
-		    anSortedSet, subErr := rr.client.ZRange(rr.opt.key[0],0,-1).Result()
-		    if subErr != nil && subErr != redis.Nil {
-				log.Errorf("Runner[%v] %v ZRange redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
-				rr.setStatsError("Runner[" + rr.meta.RunnerName + "] " + rr.Name() + " Get redis error " + subErr.Error())
-			} else if len(anSortedSet) > 0 {
-				rr.client.Del(rr.opt.key[0])
-				rr.readChan <- anSortedSet[0]
-			}
+		    for _ , key := range rr.opt.key {
+			     anSortedSet, subErr := rr.client.ZRange(key,0,-1).Result()
+			    if subErr != nil && subErr != redis.Nil {
+					log.Errorf("Runner[%v] %v ZRange redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
+					rr.setStatsError("Runner[" + rr.meta.RunnerName + "] " + rr.Name() + " Get redis error " + subErr.Error())
+				} else if len(anSortedSet) > 0 {
+					rr.client.Del(key)
+					rr.readChan <- anSortedSet[0]
+				}
+		    }
 			//Added hash support for redis
 	    case DateTypeHash:
-		    anHash, subErr := rr.client.HGet(rr.opt.key[0],rr.opt.area).Result()  //redis key and area for hash
-		    if subErr != nil && subErr != redis.Nil {
-				log.Errorf("Runner[%v] %v HGetAll redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
-				rr.setStatsError("Runner[" + rr.meta.RunnerName + "] " + rr.Name() + " Get redis error " + subErr.Error())
-			}else if anHash != ""{
-				rr.client.Del(rr.opt.key[0])
-				rr.readChan <- anHash
-			}
+		    for _ , key := range rr.opt.key {
+			    anHash, subErr := rr.client.HGet(key,rr.opt.area).Result()  //redis key and area for hash
+			    if subErr != nil && subErr != redis.Nil {
+					log.Errorf("Runner[%v] %v HGetAll redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
+					rr.setStatsError("Runner[" + rr.meta.RunnerName + "] " + rr.Name() + " Get redis error " + subErr.Error())
+				}else if anHash != ""{
+					rr.client.Del(key)
+					rr.readChan <- anHash
+				}
+		    }
 		default:
 			err = fmt.Errorf("data Type < %v > not exist, exit", rr.opt.dataType)
 			log.Error(err)

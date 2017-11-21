@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"io/ioutil"
+	"path"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
@@ -185,7 +187,6 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 			return
 		}
 		reader, err = NewReaderSize(fr, meta, bufSize)
-
 	case ModeFile:
 		fr, err = NewSingleFile(meta, logpath, whence, isFromWeb)
 		if err != nil {
