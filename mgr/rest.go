@@ -13,38 +13,55 @@ import (
 	"strings"
 	"time"
 
+	"sync"
+
 	"github.com/labstack/echo"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	"github.com/qiniu/logkit/utils"
 )
 
-var DEFAULT_PORT = 4000
+var DEFAULT_PORT = 3000
 
 const (
 	StatsShell = "stats"
 	PREFIX     = "/logkit"
 )
 
-type cmdArgs struct {
-	CmdArgs []string
-}
-
 type RestService struct {
 	mgr     *Manager
 	l       net.Listener
+	cluster *Cluster
 	address string
 }
 
 func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 
-	rs := &RestService{
-		mgr: mgr,
+	if mgr.Cluster.Enable && !mgr.Cluster.IsMaster {
+		if len(mgr.Cluster.MasterUrl) < 1 {
+			log.Fatalf("cluster is enabled but master url is empty")
+		}
+		for i := range mgr.Cluster.MasterUrl {
+			if !strings.HasPrefix(mgr.Cluster.MasterUrl[i], "http://") {
+				mgr.Cluster.MasterUrl[i] = "http://" + mgr.Cluster.MasterUrl[i]
+			}
+		}
 	}
+
+	rs := &RestService{
+		mgr:     mgr,
+		cluster: NewCluster(&mgr.Cluster),
+	}
+	rs.cluster.mutex = new(sync.RWMutex)
 	router.GET(PREFIX+"/status", rs.Status())
+
+	//configs API
 	router.GET(PREFIX+"/configs", rs.GetConfigs())
 	router.GET(PREFIX+"/configs/:name", rs.GetConfig())
 	router.POST(PREFIX+"/configs/:name", rs.PostConfig())
+	router.POST(PREFIX+"/configs/:name/stop", rs.PostConfigStop())
+	router.POST(PREFIX+"/configs/:name/start", rs.PostConfigStart())
 	router.POST(PREFIX+"/configs/:name/reset", rs.PostConfigReset())
 	router.PUT(PREFIX+"/configs/:name", rs.PutConfig())
 	router.DELETE(PREFIX+"/configs/:name", rs.DeleteConfig())
@@ -71,14 +88,36 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	router.GET(PREFIX+"/transformer/options", rs.GetTransformerOptions())
 	router.GET(PREFIX+"/transformer/sampleconfigs", rs.GetTransformerSampleConfigs())
 
+	//metric API
+	router.GET(PREFIX+"/metric/keys", rs.GetMetricKeys())
+	router.GET(PREFIX+"/metric/usages", rs.GetMetricUsages())
+	router.GET(PREFIX+"/metric/options", rs.GetMetricOptions())
+
 	//version
 	router.GET(PREFIX+"/version", rs.GetVersion())
 
+	//cluster API
+	router.GET(PREFIX+"/cluster/ping", rs.Ping())
+	router.POST(PREFIX+"/cluster/register", rs.PostRegister())
+	router.POST(PREFIX+"/cluster/tag", rs.PostTag())
+	router.GET(PREFIX+"/cluster/slaves", rs.Slaves())
+	router.DELETE(PREFIX+"/cluster/slaves", rs.DeleteSlaves())
+	router.POST(PREFIX+"/cluster/slaves/tag", rs.PostSlaveTag())
+	router.GET(PREFIX+"/cluster/status", rs.ClusterStatus())
+	router.GET(PREFIX+"/cluster/configs", rs.GetClusterConfigs())
+	router.POST(PREFIX+"/cluster/configs/:name", rs.PostClusterConfig())
+	router.PUT(PREFIX+"/cluster/configs/:name", rs.PutClusterConfig())
+	router.DELETE(PREFIX+"/cluster/configs/:name", rs.DeleteClusterConfig())
+	router.POST(PREFIX+"/cluster/configs/:name/stop", rs.PostClusterConfigStop())
+	router.POST(PREFIX+"/cluster/configs/:name/start", rs.PostClusterConfigStart())
+	router.POST(PREFIX+"/cluster/configs/:name/reset", rs.PostClusterConfigReset())
+
 	var (
-		port     = DEFAULT_PORT
-		address  string
-		listener net.Listener
-		err      error
+		port       = DEFAULT_PORT
+		address    string
+		listener   net.Listener
+		err        error
+		httpschema = "http://"
 	)
 
 	for {
@@ -87,7 +126,7 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 		}
 		address = ":" + strconv.Itoa(port)
 		if mgr.BindHost != "" {
-			address = mgr.BindHost
+			address, httpschema = utils.RemoveHttpProtocal(mgr.BindHost)
 		}
 		listener, err = httpserve(address, router)
 		if err != nil {
@@ -109,7 +148,27 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 		log.Warn(err)
 	}
 	rs.address = address
+	if rs.cluster.Enable {
+		rs.cluster.myaddress, err = GetMySlaveUrl(address, httpschema)
+		if err != nil {
+			log.Fatalf("get slave url bindaddress[%v] error %v", address, err)
+		}
+	}
 	return rs
+}
+
+func GetMySlaveUrl(address, schema string) (uri string, err error) {
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return
+	}
+	if host == "" {
+		host, err = utils.GetLocalIP()
+		if err != nil {
+			return
+		}
+	}
+	return schema + host + ":" + port, nil
 }
 
 func generateStatsShell(address, prefix string) (err error) {
@@ -134,6 +193,13 @@ func generateStatsShell(address, prefix string) (err error) {
 func (rs *RestService) Status() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		rss := rs.mgr.Status()
+		if rs.cluster.Enable {
+			for k, v := range rss {
+				v.Tag = rs.cluster.mytag
+				v.Url = rs.cluster.myaddress
+				rss[k] = v
+			}
+		}
 		return c.JSON(http.StatusOK, rss)
 	}
 }
@@ -204,6 +270,8 @@ func (rs *RestService) PostConfig() echo.HandlerFunc {
 		if err = c.Bind(&nconf); err != nil {
 			return err
 		}
+		nconf.CreateTime = time.Now().Format(time.RFC3339Nano)
+		nconf.RunnerName = name
 		filename := rs.mgr.RestDir + "/" + nconf.RunnerName + ".conf"
 		if rs.mgr.isRunning(filename) {
 			return echo.NewHTTPError(http.StatusBadRequest, "file "+filename+" runner is running")
@@ -230,6 +298,8 @@ func (rs *RestService) PutConfig() echo.HandlerFunc {
 		if err = c.Bind(&nconf); err != nil {
 			return err
 		}
+		nconf.CreateTime = time.Now().Format(time.RFC3339Nano)
+		nconf.RunnerName = name
 		filename := rs.mgr.RestDir + "/" + nconf.RunnerName + ".conf"
 		if rs.mgr.isRunning(filename) {
 			if subErr := rs.mgr.Remove(filename); subErr != nil {
@@ -256,27 +326,82 @@ func (rs *RestService) PostConfigReset() echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusBadRequest, "config name is empty")
 		}
 		filename := rs.mgr.RestDir + "/" + name + ".conf"
-		runner, ok := rs.mgr.runners[filename]
-		if !ok {
-			return echo.NewHTTPError(http.StatusNotFound, "runner"+name+" not found")
+		runnerConfig, configOk := rs.mgr.runnerConfig[filename]
+		if !configOk {
+			return echo.NewHTTPError(http.StatusNotFound, "config "+name+" not found")
 		}
-		runnerConfig, ok := rs.mgr.runnerConfig[filename]
-		if !ok {
-			return echo.NewHTTPError(http.StatusInternalServerError, "runner is exist but config not found")
+		if runnerConfig.IsStopped {
+			runnerConfig.IsStopped = false
+			err = rs.mgr.ForkRunner(filename, runnerConfig, true)
+			if err != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, "runner "+name+" reset failed "+err.Error())
+			}
+		}
+		runner, runnerOk := rs.mgr.runners[filename]
+		if !runnerOk {
+			return echo.NewHTTPError(http.StatusNotFound, "runner "+name+" is not found")
 		}
 		if subErr := rs.mgr.Remove(filename); subErr != nil {
 			log.Errorf("remove runner %v error %v", filename, subErr)
 		}
+		runnerConfig.CreateTime = time.Now().Format(time.RFC3339Nano)
 		os.Remove(filename)
 
 		runnerReset, ok := runner.(Resetable)
 		if ok {
 			err = runnerReset.Reset()
 		}
-
 		err = rs.mgr.ForkRunner(filename, runnerConfig, true)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+		return backupRunnerConfig(runnerConfig, filename)
+	}
+}
+
+// POST /logkit/configs/<name>/start
+func (rs *RestService) PostConfigStart() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		name := c.Param("name")
+		if name == "" {
+			return echo.NewHTTPError(http.StatusBadRequest, "config name is empty")
+		}
+		filename := rs.mgr.RestDir + "/" + name + ".conf"
+		conf, ok := rs.mgr.runnerConfig[filename]
+		if !ok {
+			return echo.NewHTTPError(http.StatusNotFound, "config "+name+" is not exist")
+		}
+		conf.IsStopped = false
+		err := rs.mgr.ForkRunner(filename, conf, true)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+		return backupRunnerConfig(conf, filename)
+	}
+}
+
+// POST /logkit/configs/<name>/stop
+func (rs *RestService) PostConfigStop() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		name := c.Param("name")
+		if name == "" {
+			return echo.NewHTTPError(http.StatusBadRequest, "config name is empty")
+		}
+		filename := rs.mgr.RestDir + "/" + name + ".conf"
+		runnerConfig, ok := rs.mgr.runnerConfig[filename]
+		if !ok {
+			return echo.NewHTTPError(http.StatusNotFound, "config "+name+" not found")
+		}
+		if !rs.mgr.isRunning(filename) {
+			return echo.NewHTTPError(http.StatusNotFound, "the runner "+name+" is not running")
+		}
+		runnerConfig.IsStopped = true
+		rs.mgr.lock.Lock()
+		rs.mgr.runnerConfig[filename] = runnerConfig
+		rs.mgr.lock.Unlock()
+		err := rs.mgr.RemoveWithConfig(filename, false)
+		if err != nil {
+			return err
 		}
 		return backupRunnerConfig(runnerConfig, filename)
 	}
@@ -290,9 +415,19 @@ func (rs *RestService) DeleteConfig() echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusBadRequest, "config name is empty")
 		}
 		filename := rs.mgr.RestDir + "/" + name + ".conf"
-		err := rs.mgr.Remove(filename)
-		if err != nil {
-			return err
+		runnerConfig, ok := rs.mgr.runnerConfig[filename]
+		if !ok {
+			return echo.NewHTTPError(http.StatusNotFound, "config "+name+" not found")
+		}
+		if runnerConfig.IsStopped {
+			rs.mgr.lock.Lock()
+			delete(rs.mgr.runnerConfig, filename)
+			rs.mgr.lock.Unlock()
+		} else {
+			err := rs.mgr.Remove(filename)
+			if err != nil {
+				return err
+			}
 		}
 		return os.Remove(filename)
 	}
@@ -306,6 +441,13 @@ func (rs *RestService) GetVersion() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		return c.JSON(http.StatusOK, &Version{Version: rs.mgr.Version})
 	}
+}
+
+func (rs *RestService) Register() error {
+	if rs.cluster.Enable {
+		return rs.cluster.RunRegisterLoop()
+	}
+	return nil
 }
 
 // Stop will stop RestService

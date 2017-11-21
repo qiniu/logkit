@@ -39,7 +39,7 @@ type Config struct {
 var conf Config
 
 const (
-	Version           = "v1.3.1"
+	Version           = "v1.3.5"
 	defaultReserveCnt = 5
 	defaultLogDir     = "./run"
 	defaultLogPattern = "*.log-*"
@@ -64,6 +64,17 @@ func getValidPath(confPaths []string) (paths []string) {
 	return
 }
 
+type MatchFile struct {
+	Name    string
+	ModTime time.Time
+}
+
+type MatchFiles []MatchFile
+
+func (f MatchFiles) Len() int           { return len(f) }
+func (f MatchFiles) Swap(i, j int)      { f[i], f[j] = f[j], f[i] }
+func (f MatchFiles) Less(i, j int) bool { return f[i].ModTime.Before(f[j].ModTime) }
+
 func cleanLogkitLog(dir, pattern string, reserveCnt int) {
 	var err error
 	path := filepath.Join(dir, pattern)
@@ -72,12 +83,24 @@ func cleanLogkitLog(dir, pattern string, reserveCnt int) {
 		log.Errorf("filepath.Glob path %v error %v", path, err)
 		return
 	}
-	if len(matches) <= reserveCnt {
+	var files MatchFiles
+	for _, name := range matches {
+		info, err := os.Stat(name)
+		if err != nil {
+			log.Errorf("os.Stat name %v error %v", name, err)
+			continue
+		}
+		files = append(files, MatchFile{
+			Name:    name,
+			ModTime: info.ModTime(),
+		})
+	}
+	if len(files) <= reserveCnt {
 		return
 	}
-	sort.Strings(matches)
-	for _, f := range matches[0 : len(matches)-reserveCnt] {
-		err := os.Remove(f)
+	sort.Sort(files)
+	for _, f := range files[0 : len(files)-reserveCnt] {
+		err := os.Remove(f.Name)
 		if err != nil {
 			log.Errorf("Remove %s failed , error: %v", f, err)
 			continue
@@ -128,6 +151,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("NewManager: %v", err)
 	}
+	m.Version = Version
+
 	paths := getValidPath(conf.ConfsPath)
 	if len(paths) <= 0 {
 		log.Warnf("Cannot read or create any ConfsPath %v", conf.ConfsPath)
@@ -136,7 +161,6 @@ func main() {
 		log.Fatalf("watch path error %v", err)
 	}
 	m.RestoreWebDir()
-	m.Version = Version
 
 	stopClean := make(chan struct{}, 0)
 	defer close(stopClean)
@@ -156,6 +180,9 @@ func main() {
 		go func() {
 			log.Println(http.ListenAndServe(conf.ProfileHost, nil))
 		}()
+	}
+	if err = rs.Register(); err != nil {
+		log.Fatalf("register master error %v", err)
 	}
 	utils.WaitForInterrupt(func() {
 		rs.Stop()

@@ -15,6 +15,8 @@ import (
 
 	"sync"
 
+	"fmt"
+
 	"github.com/qiniu/log"
 )
 
@@ -33,24 +35,33 @@ type SingleFile struct {
 	meta *Meta // 记录offset的元数据
 }
 
-func NewSingleFile(meta *Meta, path, whence string) (sf *SingleFile, err error) {
+func NewSingleFile(meta *Meta, path, whence string, isFromWeb bool) (sf *SingleFile, err error) {
 	var pfi os.FileInfo
 	var f *os.File
 
 	for {
 		path, pfi, err = utils.GetRealPath(path)
 		if err != nil || pfi == nil {
+			if isFromWeb {
+				return sf, fmt.Errorf("runner[%v] %s - utils.GetRealPath failed, err:%v", meta.RunnerName, path, err)
+			}
 			log.Warnf("Runner[%v] %s - utils.GetRealPath failed, err:%v", meta.RunnerName, path, err)
 			time.Sleep(time.Minute)
 			continue
 		}
 		if !pfi.Mode().IsRegular() {
+			if isFromWeb {
+				return sf, fmt.Errorf("runner[%v] %s - file failed, err: file is not regular", meta.RunnerName, path)
+			}
 			log.Warnf("Runner[%v] %s - file failed, err: file is not regular", meta.RunnerName, path)
 			time.Sleep(time.Minute)
 			continue
 		}
 		f, err = os.Open(path)
 		if err != nil {
+			if isFromWeb {
+				return sf, fmt.Errorf("runner[%v] %s - open file err:%v", meta.RunnerName, path, err)
+			}
 			log.Warnf("Runner[%v] %s - open file err:%v", meta.RunnerName, path, err)
 			time.Sleep(time.Minute)
 			continue

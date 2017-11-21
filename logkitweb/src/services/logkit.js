@@ -49,11 +49,48 @@ export async function getSenderOptions(params) {
   });
 }
 
+export async function getMetricKeys(params) {
+  return request(window.logkitUrl + '/logkit/metric/keys', {
+    method: 'get',
+  });
+}
+
+export async function getMetricUsages(params) {
+  return request(window.logkitUrl + '/logkit/metric/usages', {
+    method: 'get',
+  });
+}
+
+export async function getMetricOptions(params) {
+  return request(window.logkitUrl + '/logkit/metric/options', {
+    method: 'get',
+  });
+}
+
 export async function getRunnerConfigs(params) {
   return request(window.logkitUrl + '/logkit/configs', {
     method: 'get',
   });
 }
+
+export async function getTransformOptions(params) {
+  return request(window.logkitUrl + '/logkit/transformer/options', {
+    method: 'get',
+  });
+}
+
+export async function getTransformConfigs(params) {
+  return request(window.logkitUrl + '/logkit/transformer/sampleconfigs', {
+    method: 'get',
+  });
+}
+
+export async function getTransformUsages(params) {
+  return request(window.logkitUrl + '/logkit/transformer/usages', {
+    method: 'get',
+  });
+}
+
 
 export async function getRunnerStatus(params) {
   return request(window.logkitUrl + '/logkit/status', {
@@ -101,6 +138,24 @@ export async function getRunnerVersion(params) {
   return request(window.logkitUrl + '/logkit/version', {
     method: 'get',
   });
+}
+
+export async function startRunner(params) {
+    return request(window.logkitUrl + '/logkit/configs/' + params.name + '/start', {
+        method: 'post',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
+}
+
+export async function stopRunner(params) {
+    return request(window.logkitUrl + '/logkit/configs/' + params.name + '/stop', {
+        method: 'post',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
 }
 
 export async function resetConfigData(params) {

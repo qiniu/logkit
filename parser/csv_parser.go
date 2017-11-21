@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/times"
@@ -363,6 +364,10 @@ func (p *CsvParser) Name() string {
 	return p.name
 }
 
+func (p *CsvParser) Type() string {
+	return TypeCSV
+}
+
 func (p *CsvParser) parse(line string) (sender.Data, error) {
 	d := make(sender.Data, len(p.schema)+len(p.labels))
 	parts := strings.Split(line, p.delim)
@@ -390,6 +395,7 @@ func (p *CsvParser) Parse(lines []string) ([]sender.Data, error) {
 	for idx, line := range lines {
 		d, err := p.parse(line)
 		if err != nil {
+			log.Debug(err)
 			p.schemaErr.Output(err)
 			se.AddErrors()
 			se.ErrorIndex = append(se.ErrorIndex, idx)

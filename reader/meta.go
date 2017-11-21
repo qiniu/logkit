@@ -1,6 +1,7 @@
 package reader
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"hash/fnv"
@@ -25,7 +26,9 @@ const (
 	bufMetaFilePath   = "buf.meta"
 	bufFilePath       = "buf.dat"
 	lineCacheFilePath = "cache.dat"
+	statisticFileName = "statistic.meta"
 	doneFileRetention = "donefile_retention"
+	ftSaveLogPath     = "ft_log" // ft log 在 meta 中的文件夹名字
 )
 
 const (
@@ -35,7 +38,14 @@ const (
 	metaFormat          = "%s\t%d\n"
 	bufMetaFormat       = "read:%d\nwrite:%d\nbufsize:%d\n"
 	defaultIOLimit      = 20 //默认读取速度为20MB/s
+	ModeMetrics         = "metrics"
 )
+
+type Statistic struct {
+	ReaderCnt int64               `json:"reader_count"` // 读取总条数
+	ParserCnt [2]int64            `json:"parser_connt"` // [解析成功, 解析失败]
+	SenderCnt map[string][2]int64 `json:"sender_count"` // [发送成功, 发送失败]
+}
 
 type Meta struct {
 	mode              string //reader mode
@@ -50,6 +60,8 @@ type Meta struct {
 	logpath           string
 	dataSourceTag     string //记录文件路径的标签名称
 	readlimit         int    //读取磁盘限速单位 MB/s
+	statisticPath     string // 记录 runner 计数信息
+	ftSaveLogPath     string // 记录 ft_sender 日志信息
 	RunnerName        string
 }
 
@@ -93,6 +105,8 @@ func NewMeta(metadir, filedonedir, logpath, mode string, donefileRetention int) 
 		bufFilePath:       filepath.Join(metadir, bufFilePath),
 		bufMetaFilePath:   filepath.Join(metadir, bufMetaFilePath),
 		lineCacheFile:     filepath.Join(metadir, lineCacheFilePath),
+		statisticPath:     filepath.Join(metadir, statisticFileName),
+		ftSaveLogPath:     filepath.Join(metadir, ftSaveLogPath),
 		donefileretention: donefileRetention,
 		logpath:           logpath,
 		mode:              mode,
@@ -351,6 +365,11 @@ func (m *Meta) MetaFile() string {
 	return m.metaFilePath
 }
 
+// StatisticFile 返回 Runner 统计信息的文件路径
+func (m *Meta) StatisticFile() string {
+	return m.statisticPath
+}
+
 // BufFile 返回buf的文件路径
 func (m *Meta) BufFile() string {
 	return m.bufFilePath
@@ -368,6 +387,11 @@ func (m *Meta) DoneFilePath() string {
 
 func (m *Meta) LogPath() string {
 	return m.logpath
+}
+
+// FtSaveLogPath 返回 ft_sender 日志信息记录文件夹路径
+func (m *Meta) FtSaveLogPath() string {
+	return m.ftSaveLogPath
 }
 
 func (m *Meta) DeleteDoneFile(path string) error {
@@ -442,6 +466,7 @@ func (b *Meta) Reset() error {
 	if b == nil {
 		return errors.New("Reset error as meta is nil")
 	}
+	os.RemoveAll(b.statisticPath)
 	if _, err := os.Stat(b.metaFilePath); err != nil {
 		return err
 	}
@@ -457,4 +482,21 @@ func (b *Meta) Reset() error {
 		}
 	}
 	return nil
+}
+
+func (m *Meta) ReadStatistic() (stat Statistic, err error) {
+	statData, err := ioutil.ReadFile(m.StatisticFile())
+	if statData == nil || err != nil {
+		return
+	}
+	err = json.Unmarshal(statData, &stat)
+	return
+}
+
+func (m *Meta) WriteStatistic(stat *Statistic) error {
+	statStr, err := json.Marshal(stat)
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(m.StatisticFile(), statStr, defaultDirPerm)
 }

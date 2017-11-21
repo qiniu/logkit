@@ -3,12 +3,11 @@ package reader
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"fmt"
 
 	"github.com/Shopify/sarama"
 	"github.com/qiniu/log"
@@ -17,12 +16,13 @@ import (
 )
 
 type KafkaReader struct {
-	meta            *Meta
-	ConsumerGroup   string
-	Topics          []string
-	ZookeeperPeers  []string
-	ZookeeperChroot string
-	Whence          string
+	meta             *Meta
+	ConsumerGroup    string
+	Topics           []string
+	ZookeeperPeers   []string
+	ZookeeperChroot  string
+	ZookeeperTimeout time.Duration
+	Whence           string
 
 	Consumer *consumergroup.ConsumerGroup
 	in       <-chan *sarama.ConsumerMessage
@@ -41,20 +41,21 @@ type KafkaReader struct {
 }
 
 func NewKafkaReader(meta *Meta, consumerGroup string,
-	topics []string, zookeeper []string, whence string) (kr *KafkaReader, err error) {
+	topics []string, zookeeper []string, zookeeperTimeout time.Duration, whence string) (kr *KafkaReader, err error) {
 	kr = &KafkaReader{
-		meta:           meta,
-		ConsumerGroup:  consumerGroup,
-		ZookeeperPeers: zookeeper,
-		Topics:         topics,
-		Whence:         whence,
-		readChan:       make(chan json.RawMessage),
-		errs:           make(chan error, 1000),
-		status:         StatusInit,
-		mux:            sync.Mutex{},
-		startMux:       sync.Mutex{},
-		statsLock:      sync.RWMutex{},
-		started:        false,
+		meta:             meta,
+		ConsumerGroup:    consumerGroup,
+		ZookeeperPeers:   zookeeper,
+		ZookeeperTimeout: zookeeperTimeout,
+		Topics:           topics,
+		Whence:           whence,
+		readChan:         make(chan json.RawMessage),
+		errs:             make(chan error, 1000),
+		status:           StatusInit,
+		mux:              sync.Mutex{},
+		startMux:         sync.Mutex{},
+		statsLock:        sync.RWMutex{},
+		started:          false,
 	}
 	return kr, nil
 }
@@ -119,6 +120,7 @@ func (kr *KafkaReader) Start() {
 	}
 	config := consumergroup.NewConfig()
 	config.Zookeeper.Chroot = ""
+	config.Zookeeper.Timeout = kr.ZookeeperTimeout
 	switch strings.ToLower(kr.Whence) {
 	case "oldest", "":
 		config.Offsets.Initial = sarama.OffsetOldest
@@ -128,7 +130,7 @@ func (kr *KafkaReader) Start() {
 		log.Warnf("Runner[%v] WARNING: Kafka consumer invalid offset '%s', using 'oldest'\n", kr.meta.RunnerName, kr.Whence)
 		config.Offsets.Initial = sarama.OffsetNewest
 	}
-	if kr.Consumer == nil {
+	if kr.Consumer == nil || kr.Consumer.Closed() {
 		var consumerErr error
 		kr.Consumer, consumerErr = consumergroup.JoinConsumerGroup(
 			kr.ConsumerGroup,
@@ -157,11 +159,20 @@ func (kr *KafkaReader) run() {
 			break
 		}
 	}
-	// running在退出状态改为Init
+	// running时退出 状态改为Init，以便 cron 调度下次运行
+	// stopping时推出改为 stopped，不再运行
 	defer func() {
 		atomic.CompareAndSwapInt32(&kr.status, StatusRunning, StatusInit)
 		if atomic.CompareAndSwapInt32(&kr.status, StatusStoping, StatusStopped) {
 			close(kr.readChan)
+			go func() {
+				kr.mux.Lock()
+				defer kr.mux.Unlock()
+				err := kr.Consumer.Close()
+				if err != nil {
+					log.Infof("Runner[%v] %v stop failed error: %v", kr.meta.RunnerName, kr.Name(), err)
+				}
+			}()
 		}
 		log.Infof("Runner[%v] %v successfully finished", kr.meta.RunnerName, kr.Name())
 	}()
@@ -178,8 +189,12 @@ func (kr *KafkaReader) run() {
 				kr.setStatsError("Runner[" + kr.meta.RunnerName + "] Consumer Error: " + err.Error())
 			}
 		case msg := <-kr.in:
-			kr.readChan <- msg.Value
-			kr.curMsg = msg
+			if msg != nil && msg.Value != nil && len(msg.Value) > 0 {
+				kr.readChan <- msg.Value
+				kr.curMsg = msg
+			}
+		default:
+			time.Sleep(time.Second)
 		}
 	}
 }

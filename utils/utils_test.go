@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"fmt"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -154,4 +156,57 @@ func TestTuoEncodeDecode(t *testing.T) {
 		}
 		assert.EqualValues(t, ti.exp, exps)
 	}
+}
+
+func TestIsJsonString(t *testing.T) {
+	cases := []struct {
+		c   string
+		exp bool
+	}{
+		{
+			`[{"a":1}]`,
+			true,
+		},
+		{
+			`{"a":1}`,
+			true,
+		},
+		{
+			`{"a":1`,
+			false,
+		},
+		{
+			`xsx`,
+			false,
+		},
+		{
+			` `,
+			false,
+		},
+	}
+	for _, c := range cases {
+		got := IsJSON(c.c)
+		assert.Equal(t, c.exp, got)
+	}
+}
+
+func TestGetLocalIp(t *testing.T) {
+	ip, err := GetLocalIP()
+	assert.NoError(t, err)
+	fmt.Println(ip)
+}
+
+func TestAddRemoveHttpProc(t *testing.T) {
+	exp := "127.0.0.1:122"
+	url := AddHttpProtocal(exp)
+	assert.Equal(t, "http://"+exp, url)
+	got, chttp := RemoveHttpProtocal(url)
+	assert.Equal(t, exp, got)
+	assert.Equal(t, "http://", chttp)
+
+	exp2 := ":1233"
+	got2, chttp2 := RemoveHttpProtocal(exp2)
+	assert.Equal(t, exp2, got2)
+	assert.Equal(t, "http://", chttp2)
+
 }

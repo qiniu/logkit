@@ -3,7 +3,5 @@ sudo: false
 go:
   - 1.8
   - 1.9
-before_script:
 script:
-  - go get -u github.com/kardianos/govendor
   - make test

@@ -38,6 +38,10 @@ func (p *RawlogParser) Name() string {
 	return p.name
 }
 
+func (p *RawlogParser) Type() string {
+	return TypeRaw
+}
+
 func (p *RawlogParser) Parse(lines []string) ([]sender.Data, error) {
 
 	se := &utils.StatsError{}

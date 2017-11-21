@@ -2,7 +2,6 @@ body,html{
   height:100%;
 }
 body {
-  position: fixed;
   margin: 0;
   padding: 0;
   font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
@@ -32,6 +31,18 @@ body {
   color: #fff;
   font-size: 24px;
   margin-bottom: 20px;
+}
+
+.header a {
+  margin-left: 100px;
+  font-size: 16px;
+  color: #fff;
+}
+
+.header img {
+  float: left;
+  height: 35px;
+  margin: 15px 0px 0px 15px;
 }
 
 .steps-content {
@@ -109,4 +120,34 @@ body {
 }
 .hide {
   display: none;
+}
+
+.inline {
+  display: inline-block;
+}
+
+.fields.key {
+  width: 250px;
+}
+
+.fields.value {
+  width: 250px;
+  margin-left: 20px;
+}
+.dynamic-delete-button {
+  marginTop: 30px;
+  margin-left: 20px;
+  cursor: pointer;
+  position: relative;
+  top: 4px;
+  font-size: 24px;
+  color: #999;
+  transition: all .3s;
+}
+.dynamic-delete-button:hover {
+  color: #777;
+}
+.dynamic-delete-button[disabled] {
+  cursor: not-allowed;
+  opacity: 0.5;
 }

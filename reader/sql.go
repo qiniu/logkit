@@ -51,7 +51,9 @@ type SqlReader struct {
 	mux     sync.Mutex
 	started bool
 
-	execOnStart bool
+	execOnStart  bool
+	loop         bool
+	loopDuration time.Duration
 
 	stats     utils.StatsInfo
 	statsLock sync.RWMutex
@@ -152,11 +154,22 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (mr *SqlReader, err error) {
 	}
 	//schedule    string     //定时任务配置串
 	if len(cronSchedule) > 0 {
-		err = mr.Cron.AddFunc(cronSchedule, mr.run)
-		if err != nil {
-			return
+		cronSchedule = strings.ToLower(cronSchedule)
+		if strings.HasPrefix(cronSchedule, Loop) {
+			mr.loop = true
+			mr.loopDuration, err = parseLoopDuration(cronSchedule)
+			if err != nil {
+				log.Errorf("Runner[%v] %v %v", mr.meta.RunnerName, mr.Name(), err)
+				err = nil
+			}
+		} else {
+			err = mr.Cron.AddFunc(cronSchedule, mr.run)
+			if err != nil {
+				return
+			}
+			log.Infof("Runner[%v] %v Cron job added with schedule <%v>", mr.meta.RunnerName, mr.Name(), cronSchedule)
 		}
-		log.Infof("Runner[%v] %v Cron job added with schedule <%v>", mr.meta.RunnerName, mr.Name(), cronSchedule)
+
 	}
 	return mr, nil
 }
@@ -308,9 +321,13 @@ func (mr *SqlReader) Start() {
 	if mr.started {
 		return
 	}
-	mr.Cron.Start()
-	if mr.execOnStart {
-		go mr.run()
+	if mr.loop {
+		go mr.LoopRun()
+	} else {
+		mr.Cron.Start()
+		if mr.execOnStart {
+			go mr.run()
+		}
 	}
 	mr.started = true
 	log.Infof("Runner[%v] %v pull data deamon started", mr.meta.RunnerName, mr.Name())
@@ -359,6 +376,17 @@ func (mr *SqlReader) updateOffsets(sqls []string) {
 	}
 }
 
+func (mr *SqlReader) LoopRun() {
+	for {
+		if atomic.LoadInt32(&mr.status) == StatusStopped {
+			return
+		}
+		//run 函数里面处理stopping的逻辑
+		mr.run()
+		time.Sleep(mr.loopDuration)
+	}
+}
+
 func (mr *SqlReader) run() {
 	var err error
 	// 防止并发run
@@ -370,7 +398,8 @@ func (mr *SqlReader) run() {
 			break
 		}
 	}
-	// running在退出状态改为Init
+	// running时退出 状态改为Init，以便 cron 调度下次运行
+	// stopping时推出改为 stopped，不再运行
 	defer func() {
 		atomic.CompareAndSwapInt32(&mr.status, StatusRunning, StatusInit)
 		if atomic.CompareAndSwapInt32(&mr.status, StatusStoping, StatusStopped) {

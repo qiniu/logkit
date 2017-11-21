@@ -8,8 +8,10 @@ import (
 	"io/ioutil"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/qiniu/logkit/metric"
+	"github.com/qiniu/logkit/utils"
 )
 
 // /proc/stat file line prefixes to gather stats on:
@@ -21,12 +23,47 @@ var (
 	boot_time        = []byte("btime")
 )
 
+const (
+	TypeMetricKernel   = "kernel"
+	MetricKernelUsages = "内核(kernel)"
+
+	// TypeMetricKernel 信息中的字段
+	KernelInterrupts      = "kernel_interrupts"
+	KernelContextSwitches = "kernel_context_switches"
+	KernelProcessesForked = "kernel_processes_forked"
+	KernelBootTime        = "kernel_boot_time"
+	KernelDiskPagesIn     = "kernel_disk_pages_in"
+	KernelDiskPagesOut    = "kernel_disk_pages_out"
+)
+
+// KeyKernelUsages TypeMetricKernel 中的字段名称
+var KeyKernelUsages = []utils.KeyValue{
+	{KernelInterrupts, "内核中断次数"},
+	{KernelContextSwitches, "内核上下文切换次数"},
+	{KernelProcessesForked, "fork的进程数"},
+	{KernelBootTime, "内核启动时间"},
+	{KernelDiskPagesIn, "磁盘换入数量"},
+	{KernelDiskPagesOut, "磁盘换出数量"},
+}
+
 type Kernel struct {
 	statFile string
 }
 
 func (k *Kernel) Name() string {
-	return "kernel"
+	return TypeMetricKernel
+}
+
+func (k *Kernel) Usages() string {
+	return MetricKernelUsages
+}
+
+func (k *Kernel) Config() map[string]interface{} {
+	config := map[string]interface{}{
+		metric.OptionString:     []utils.Option{},
+		metric.AttributesString: KeyKernelUsages,
+	}
+	return config
 }
 
 func (k *Kernel) Collect() (datas []map[string]interface{}, err error) {
@@ -35,8 +72,8 @@ func (k *Kernel) Collect() (datas []map[string]interface{}, err error) {
 		return nil, err
 	}
 
+	now := time.Now().Format(time.RFC3339Nano)
 	fields := make(map[string]interface{})
-
 	dataFields := bytes.Fields(data)
 	for i, field := range dataFields {
 		switch {
@@ -45,25 +82,25 @@ func (k *Kernel) Collect() (datas []map[string]interface{}, err error) {
 			if err != nil {
 				return nil, err
 			}
-			fields["interrupts"] = int64(m)
+			fields[KernelInterrupts] = int64(m)
 		case bytes.Equal(field, context_switches):
 			m, err := strconv.ParseInt(string(dataFields[i+1]), 10, 64)
 			if err != nil {
 				return nil, err
 			}
-			fields["context_switches"] = int64(m)
+			fields[KernelContextSwitches] = int64(m)
 		case bytes.Equal(field, processes_forked):
 			m, err := strconv.ParseInt(string(dataFields[i+1]), 10, 64)
 			if err != nil {
 				return nil, err
 			}
-			fields["processes_forked"] = int64(m)
+			fields[KernelProcessesForked] = int64(m)
 		case bytes.Equal(field, boot_time):
 			m, err := strconv.ParseInt(string(dataFields[i+1]), 10, 64)
 			if err != nil {
 				return nil, err
 			}
-			fields["boot_time"] = int64(m)
+			fields[KernelBootTime] = int64(m)
 		case bytes.Equal(field, disk_pages):
 			in, err := strconv.ParseInt(string(dataFields[i+1]), 10, 64)
 			if err != nil {
@@ -73,11 +110,12 @@ func (k *Kernel) Collect() (datas []map[string]interface{}, err error) {
 			if err != nil {
 				return nil, err
 			}
-			fields["disk_pages_in"] = int64(in)
-			fields["disk_pages_out"] = int64(out)
+			fields[KernelDiskPagesIn] = int64(in)
+			fields[KernelDiskPagesOut] = int64(out)
 		}
 	}
 
+	fields[TypeMetricKernel+"_"+metric.Timestamp] = now
 	datas = append(datas, fields)
 	return
 }
@@ -98,7 +136,7 @@ func (k *Kernel) getProcStat() ([]byte, error) {
 }
 
 func init() {
-	metric.Add("kernel", func() metric.Collector {
+	metric.Add(TypeMetricKernel, func() metric.Collector {
 		return &Kernel{
 			statFile: "/proc/stat",
 		}

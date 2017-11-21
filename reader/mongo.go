@@ -9,6 +9,8 @@ import (
 
 	"github.com/qiniu/logkit/utils"
 
+	"strings"
+
 	"github.com/qiniu/log"
 	"github.com/robfig/cron"
 	"gopkg.in/mgo.v2"
@@ -30,11 +32,13 @@ type MongoReader struct {
 	readBatch         int // 每次读取的数据量
 	collectionFilters map[string]CollectionFilter
 
-	Cron     *cron.Cron  //定时任务
-	readChan chan []byte //bson
-	meta     *Meta       // 记录offset的元数据
-	session  *mgo.Session
-	offset   interface{} //对于默认的offset_key: "_id", 是objectID作为offset，存储的表现形式是string，其他则是int64
+	Cron         *cron.Cron //定时任务
+	loop         bool
+	loopDuration time.Duration
+	readChan     chan []byte //bson
+	meta         *Meta       // 记录offset的元数据
+	session      *mgo.Session
+	offset       interface{} //对于默认的offset_key: "_id", 是objectID作为offset，存储的表现形式是string，其他则是int64
 
 	execOnStart bool
 	status      int32
@@ -91,11 +95,21 @@ func NewMongoReader(meta *Meta, readBatch int, host, database, collection, offse
 		}
 	}
 	if len(cronSched) > 0 {
-		err = mr.Cron.AddFunc(cronSched, mr.run)
-		if err != nil {
-			return
+		cronSched = strings.ToLower(cronSched)
+		if strings.HasPrefix(cronSched, Loop) {
+			mr.loop = true
+			mr.loopDuration, err = parseLoopDuration(cronSched)
+			if err != nil {
+				log.Errorf("Runner[%v] %v %v", mr.meta.RunnerName, mr.Name(), err)
+				err = nil
+			}
+		} else {
+			err = mr.Cron.AddFunc(cronSched, mr.run)
+			if err != nil {
+				return
+			}
+			log.Infof("Runner[%v] %v Cron added with schedule <%v>", mr.meta.RunnerName, mr.Name(), cronSched)
 		}
-		log.Infof("Runner[%v] %v Cron added with schedule <%v>", mr.meta.RunnerName, mr.Name(), cronSched)
 	}
 
 	return mr, nil
@@ -141,12 +155,27 @@ func (mr *MongoReader) Start() {
 	if mr.started {
 		return
 	}
-	if mr.execOnStart {
-		go mr.run()
+	if mr.loop {
+		go mr.LoopRun()
+	} else {
+		if mr.execOnStart {
+			go mr.run()
+		}
 		mr.Cron.Start()
 	}
 	mr.started = true
 	log.Infof("Runner[%v] %v pull data daemon started", mr.meta.RunnerName, mr.Name())
+}
+
+func (mr *MongoReader) LoopRun() {
+	for {
+		if atomic.LoadInt32(&mr.status) == StatusStoping {
+			log.Warnf("Runner[%v] %v stopped from running", mr.meta.RunnerName, mr.Name())
+			return
+		}
+		mr.run()
+		time.Sleep(mr.loopDuration)
+	}
 }
 
 func (mr *MongoReader) ReadLine() (data string, err error) {
@@ -174,7 +203,8 @@ func (mr *MongoReader) run() {
 			break
 		}
 	}
-	// running在退出状态改为Init
+	// running时退出 状态改为Init，以便 cron 调度下次运行
+	// stopping时推出改为 stopped，不再运行
 	defer func() {
 		atomic.CompareAndSwapInt32(&mr.status, StatusRunning, StatusInit)
 		if atomic.CompareAndSwapInt32(&mr.status, StatusStoping, StatusStopped) {

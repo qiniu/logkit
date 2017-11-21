@@ -1,6 +1,8 @@
 
 # logkit [![Build Status](https://api.travis-ci.org/qiniu/logkit.svg)](http://travis-ci.org/qiniu/logkit)
 
+![logkit LOGO](https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logkit100.png)
+
 ## 简介
 
 logkit是[七牛Pandora](https://pandora-docs.qiniu.com)开发的一个通用的日志收集工具，可以将不同数据源的数据方便的发送到[Pandora](https://pandora-docs.qiniu.com)进行数据分析，除了基本的数据发送功能，logkit还有容错、并发、监控、删除等功能。
@@ -17,12 +19,24 @@ logkit是[七牛Pandora](https://pandora-docs.qiniu.com)开发的一个通用的
 1. MongoDB
 1. Kafka
 1. Redis
+1. TCP/UDP/Unix Socket
 
 ## 工作方式
 
 logkit本身支持多种数据源，并且可以同时发送多个数据源的数据到Pandora，每个数据源对应一个逻辑上的runner，一个runner负责一个数据源的数据推送，工作原理如下图所示
 
 ![logkit 工作原理图](https://qiniu.github.io/pandora-docs/_media/logkit.png)
+
+## 参与项目(contributing)
+
+我们非常欢迎您参与到项目中来，你可以通过以下途径参与到项目中来：
+
+* 修复或者[报告bug](https://github.com/qiniu/logkit/issues/new)
+* [提issue](https://github.com/qiniu/logkit/issues/new)改善我们的[wiki文档](https://github.com/qiniu/logkit/wiki)
+* [review 代码](https://github.com/qiniu/logkit/pulls)或[提出功能需求](https://github.com/qiniu/logkit/issues/new)
+* 贡献代码（可以贡献的各类插件模块包括[reader](https://github.com/qiniu/logkit/wiki/Readers)、[parser](https://github.com/qiniu/logkit/wiki/Parsers)、[sender](https://github.com/qiniu/logkit/wiki/Senders)以及[transformer](https://github.com/qiniu/logkit/wiki/Transformers)）
+
+## [计划(Roadmap)](https://github.com/qiniu/logkit/blob/develop/ROADMAP.md)
 
 ## 下载
 
@@ -42,6 +56,7 @@ wget https://pandora-dl.qiniu.com/logkit.tar.gz && tar xvf logkit.tar.gz && cd _
 **MacOS 版本**
 
 ```
+brew install wget
 wget https://pandora-dl.qiniu.com/logkit_mac.tar.gz && tar xvf logkit_mac.tar.gz && cd _package_mac/
 ```
 
@@ -102,6 +117,10 @@ logkit.conf是logkit工具基础配置文件，主要用于指定logkit运行时
 
 ![尝试解析](https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logkitnewconfig3.png)
 
+* 除了解析以外，您可以可以针对解析出来的某个字段内容做数据变换（Transform），可以像管道一样多个拼接。
+
+![尝试解析](https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logkitnewconfig5.png)
+
 * 最后在确认并添加页面点击生成配置文件，再点击添加Runner即可生效
 
 ![添加runner](https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logkitnewconfig4.png)
@@ -116,9 +135,6 @@ logkit.conf是logkit工具基础配置文件，主要用于指定logkit运行时
 启动服务的命令中可以指定服务的启动配置
 
 ```
-go get -u github.com/kardianos/govendor
-govendor sync
-go get ./...
 go build -o logkit logkit.go
 ./logkit -f logkit.conf
 ```
@@ -126,12 +142,14 @@ go build -o logkit logkit.go
 ## 使用logkit的docker镜像启动
 
 ```
-docker pull wonderflow/logkit
-docker run -d -p 3000:3000 -v /local/logkit/dataconf:/app/confs -v /local/log/path:/logs/path logkit
+docker pull wonderflow/logkit:<version>
+docker run -d -p 3000:3000 -v /local/logkit/dataconf:/app/confs -v /local/log/path:/logs/path logkit:<version>
 ```
 
 镜像中，logkit读取`/app/confs`下的配置文件，所以可以通过挂载目录的形式，将本地的logkit配置目录`/local/logkit/dataconf`挂载到镜像里面。
 
 需要注意的是，镜像中的logkit收集 `/logs`目录下的日志，需要把本地的日志目录也挂载到镜像里面去才能启动，比如本地的日志目录为`/local/log/path`, 挂载到镜像中的`/logs/path`目录，那么`/local/logkit/dataconf`目录下的配置文件填写的日志路径必须是`/logs/path`。
 
-Enjoy it！
+enjoy it！
+
+

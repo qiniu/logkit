@@ -34,6 +34,10 @@ func (krp *KafaRestlogParser) Name() string {
 	return krp.name
 }
 
+func (krp *KafaRestlogParser) Type() string {
+	return TypeKafkaRest
+}
+
 func (krp *KafaRestlogParser) Parse(lines []string) ([]sender.Data, error) {
 	datas := []sender.Data{}
 	for _, line := range lines {

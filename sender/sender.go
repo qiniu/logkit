@@ -29,14 +29,17 @@ type StatsSender interface {
 	Send([]Data) error
 	Close() error
 	Stats() utils.StatsInfo
+	// 恢复 sender 停止之前的状态
+	Restore(*utils.StatsInfo)
 }
 
 // Sender's conf keys
 const (
-	KeySenderType    = "sender_type"
-	KeyFaultTolerant = "fault_tolerant"
-	KeyName          = "name"
-	KeyRunnerName    = "runner_name"
+	KeySenderType     = "sender_type"
+	KeyFaultTolerant  = "fault_tolerant"
+	KeyName           = "name"
+	KeyRunnerName     = "runner_name"
+	KeyLogkitSendTime = "logkit_send_time"
 )
 
 const UnderfinedRunnerName = "UnderfinedRunnerName"
@@ -50,6 +53,7 @@ const (
 	TypeMock              = "mock"          // mock sender
 	TypeDiscard           = "discard"       // discard sender
 	TypeElastic           = "elasticsearch" // elastic
+	TypeKafka             = "kafka"         // kafka
 )
 
 const (
@@ -75,6 +79,7 @@ func NewSenderRegistry() *SenderRegistry {
 	ret.RegisterSender(TypeElastic, NewElasticSender)
 	ret.RegisterSender(TypeMock, NewMockSender)
 	ret.RegisterSender(TypeDiscard, NewDiscardSender)
+	ret.RegisterSender(TypeKafka, NewKafkaSender)
 	return ret
 }
 
@@ -87,7 +92,7 @@ func (registry *SenderRegistry) RegisterSender(senderType string, constructor fu
 	return nil
 }
 
-func (r *SenderRegistry) NewSender(conf conf.MapConf) (sender Sender, err error) {
+func (r *SenderRegistry) NewSender(conf conf.MapConf, ftSaveLogPath string) (sender Sender, err error) {
 	sendType, err := conf.GetString(KeySenderType)
 	if err != nil {
 		return
@@ -100,9 +105,9 @@ func (r *SenderRegistry) NewSender(conf conf.MapConf) (sender Sender, err error)
 	if err != nil {
 		return
 	}
-	faultTolerant, _ := conf.GetBoolOr(KeyFaultTolerant, false)
+	faultTolerant, _ := conf.GetBoolOr(KeyFaultTolerant, true)
 	if faultTolerant {
-		sender, err = NewFtSender(sender, conf)
+		sender, err = NewFtSender(sender, conf, ftSaveLogPath)
 		if err != nil {
 			return
 		}

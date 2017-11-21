@@ -15,6 +15,10 @@ import (
 	"github.com/qiniu/logkit/sender"
 	_ "github.com/qiniu/logkit/transforms/all"
 
+	"log/syslog"
+
+	"strings"
+
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/utils"
 	"github.com/stretchr/testify/assert"
@@ -89,7 +93,8 @@ func Test_Run(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	reader, err := reader.NewFileBufReader(readerConfig)
+	isFromWeb := false
+	reader, err := reader.NewFileBufReader(readerConfig, isFromWeb)
 	if err != nil {
 		t.Error(err)
 	}
@@ -295,17 +300,18 @@ func Test_QiniulogRun(t *testing.T) {
 	}
 
 	rc := RunnerConfig{
-		RunnerInfo:   rinfo,
-		ReaderConfig: readerConfig,
-		ParserConf:   parseConf,
-		SenderConfig: senderConfigs,
+		RunnerInfo:    rinfo,
+		ReaderConfig:  readerConfig,
+		ParserConf:    parseConf,
+		SenderConfig:  senderConfigs,
+		IsInWebFolder: false,
 	}
 	rc = Compatible(rc)
 	meta, err := reader.NewMetaWithConf(rc.ReaderConfig)
 	if err != nil {
 		t.Error(err)
 	}
-	reader, err := reader.NewFileBufReader(rc.ReaderConfig)
+	reader, err := reader.NewFileBufReader(rc.ReaderConfig, rc.IsInWebFolder)
 	if err != nil {
 		t.Error(err)
 	}
@@ -508,6 +514,54 @@ func TestDateTransforms(t *testing.T) {
 	assert.Equal(t, exp, datas)
 }
 
+func TestSplitAndConvertTransforms(t *testing.T) {
+
+	config1 := `{
+		"name":"test2.csv",
+		"reader":{
+			"log_path":"./tests/logdir",
+			"mode":"dir"
+		},
+		"parser":{
+			"name":"jsonps",
+			"type":"json"
+		},
+		"transforms":[{
+			"type":"split",
+			"key":"status",
+			"sep":",",
+			"newfield":"newarray"
+		},{
+			"type":"convert",
+			"dsl":"newarray array(long)"
+		}],
+		"senders":[{
+			"name":"file_sender",
+			"sender_type":"file",
+			"file_send_path":"./test2/test2_csv_file.txt"
+		}]
+	}`
+	rc := RunnerConfig{}
+	err := json.Unmarshal([]byte(config1), &rc)
+	assert.NoError(t, err)
+	transformers := createTransformers(rc)
+	datas := []sender.Data{{"status": "1,2,3"}, {"status": "4,5,6"}}
+	for k := range transformers {
+		datas, err = transformers[k].Transform(datas)
+	}
+	exp := []sender.Data{
+		{
+			"status":   "1,2,3",
+			"newarray": []interface{}{int64(1), int64(2), int64(3)},
+		},
+		{
+			"status":   "4,5,6",
+			"newarray": []interface{}{int64(4), int64(5), int64(6)},
+		},
+	}
+	assert.Equal(t, exp, datas)
+}
+
 func TestGetTrend(t *testing.T) {
 	assert.Equal(t, SpeedUp, getTrend(0, 1))
 	assert.Equal(t, SpeedDown, getTrend(1, 0))
@@ -676,5 +730,52 @@ func TestCopyStats(t *testing.T) {
 		}
 		assert.Equal(t, ti.exp, ti.dst)
 	}
+}
 
+func TestSyslogRunnerX(t *testing.T) {
+	metaDir := "TestSyslogRunner"
+
+	os.Mkdir(metaDir, 0755)
+	defer os.RemoveAll(metaDir)
+
+	config1 := `{
+		"name":"TestSyslogRunner",
+		"batch_len":1,
+		"reader":{
+			"mode":"socket",
+			"meta_path":"TestSyslogRunner",
+			"socket_service_address":"tcp://:5142"
+		},
+		"parser":{
+			"name":"syslog",
+			"type":"raw"
+		},
+		"senders":[{
+			"name":"file_sender",
+			"sender_type":"file",
+			"file_send_path":"./TestSyslogRunner/syslog.txt"
+		}]
+	}`
+
+	rc := RunnerConfig{}
+	err := json.Unmarshal([]byte(config1), &rc)
+	assert.NoError(t, err)
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), parser.NewParserRegistry(), sender.NewSenderRegistry())
+	assert.NoError(t, err)
+	go rr.Run()
+	sysLog, err := syslog.Dial("tcp", "localhost:5142",
+		syslog.LOG_WARNING|syslog.LOG_DAEMON, "demotag")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = sysLog.Emerg("And this is a daemon emergency with demotag.")
+	assert.NoError(t, err)
+	err = sysLog.Emerg("this is OK")
+	assert.NoError(t, err)
+	time.Sleep(2 * time.Second)
+	data, err := ioutil.ReadFile("./TestSyslogRunner/syslog.txt")
+	assert.NoError(t, err)
+	if !strings.Contains(string(data), "this is OK") || !strings.Contains(string(data), "And this is a daemon emergency with demotag.") {
+		t.Error("syslog parse error")
+	}
 }

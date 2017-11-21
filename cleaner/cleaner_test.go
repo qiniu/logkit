@@ -123,6 +123,7 @@ func Test_clean(t *testing.T) {
 	c[clean_enable] = "true"
 	c[reservefileSize] = "15"
 	c[reservefileNumber] = "1"
+	c[clean_interval] = "1"
 	meta, err := reader.NewMetaWithConf(c)
 	if err != nil {
 		t.Error(err)
@@ -143,7 +144,7 @@ func Test_clean(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	time.Sleep(30 * time.Microsecond)
+	time.Sleep(3 * time.Second)
 	files, err := ioutil.ReadDir(donefiles)
 	if err != nil {
 		t.Error(err)
@@ -170,7 +171,7 @@ func Test_clean(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	time.Sleep(30 * time.Microsecond)
+	time.Sleep(3 * time.Second)
 	files, err = ioutil.ReadDir(donefiles)
 	if err != nil {
 		t.Error(err)
@@ -203,7 +204,7 @@ func Test_clean(t *testing.T) {
 	cl.reserveNumber = 10
 	cl.reserveSize = 10 * 1024 * 1024
 	err = cl.Clean()
-	time.Sleep(30 * time.Microsecond)
+	time.Sleep(3 * time.Second)
 	if err != nil {
 		t.Error(err)
 	}

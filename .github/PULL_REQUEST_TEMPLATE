@@ -11,10 +11,14 @@
 
   - [ ] @[someone] please review
   - [ ] @[someotherone] please review
+
+## Wiki Changes
+ 
+  - options1...
+  - options2...
     
 ## Checklist
    
    - [ ] Rebased/mergable
    - [ ] Tests pass
-   - [ ] CHANGELOG.md updated
-   - [ ] Jira issue/task done
+   - [ ] Wiki updated
