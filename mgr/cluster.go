@@ -146,6 +146,18 @@ func (rs *RestService) Ping() echo.HandlerFunc {
 }
 
 // master API
+// GET /logkit/cluster/ismaster
+func (rs *RestService) IsMaster() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		isMaster := true
+		if rs.cluster == nil || !rs.cluster.Enable || !rs.cluster.IsMaster {
+			isMaster = false
+		}
+		return RespSuccess(c, isMaster)
+	}
+}
+
+// master API
 // GET /logkit/cluster/slaves?tag=tagValue&url=urlValue
 func (rs *RestService) Slaves() echo.HandlerFunc {
 	return func(c echo.Context) error {

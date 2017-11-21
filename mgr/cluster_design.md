@@ -78,6 +78,25 @@ cluster 配置参数说明如下:
 * 在配置结束后，建议先启动作为`master`的`logkit`，再启动作为`slave`的`logkit`，这样可以避免`slave`产生向`master`发心跳失败的错误日志。
 
 ## API
+### Master API -- 是否为 Master
+```
+GET /logkit/cluster/ismaster
+```
+返回值:
+* 如果是 master, 返回
+```
+{
+    "code": "L200",
+    "data": true
+}
+```
+* 如果不是 master(包括没有开启 cluster 功能), 返回
+```
+{
+    "code": "L200",
+    "data": false
+}
+```
 
 ### Master API -- 注册slave
 

@@ -102,6 +102,7 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 
 	//cluster API
 	router.GET(PREFIX+"/cluster/ping", rs.Ping())
+	router.GET(PREFIX+"/cluster/ismaster", rs.IsMaster())
 	router.POST(PREFIX+"/cluster/register", rs.PostRegister())
 	router.POST(PREFIX+"/cluster/tag", rs.PostTag())
 	router.GET(PREFIX+"/cluster/slaves", rs.Slaves())
