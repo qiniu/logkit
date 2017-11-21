@@ -186,8 +186,9 @@ func TestClusterApi(t *testing.T) {
 					Trend:   SpeedUp,
 				},
 			},
-			Tag: "test_changed",
-			Url: slave_rs.cluster.myaddress,
+			Tag:           "test_changed",
+			Url:           slave_rs.cluster.myaddress,
+			RunningStatus: RunnerRunning,
 		},
 	}
 
@@ -382,8 +383,9 @@ func TestClusterUpdate(t *testing.T) {
 					Trend:   SpeedUp,
 				},
 			},
-			Tag: "test",
-			Url: slave_rs.cluster.myaddress,
+			Tag:           "test",
+			Url:           slave_rs.cluster.myaddress,
+			RunningStatus: RunnerRunning,
 		},
 	}
 
@@ -412,8 +414,9 @@ func TestClusterUpdate(t *testing.T) {
 					Trend:   SpeedUp,
 				},
 			},
-			Tag: "test",
-			Url: slave_rs2.cluster.myaddress,
+			Tag:           "test",
+			Url:           slave_rs2.cluster.myaddress,
+			RunningStatus: RunnerRunning,
 		},
 	}
 
@@ -498,7 +501,7 @@ func TestClusterUpdate(t *testing.T) {
 	request, err = http.NewRequest(http.MethodPut, master_rs.cluster.myaddress+"/logkit/cluster/configs/test2?tag=test&url="+slave_rs3.cluster.myaddress, bytes.NewReader([]byte(testClusterApiConf1)))
 	request.Header.Set(ContentType, ApplicationJson)
 	resp, err = http.DefaultClient.Do(request)
-	assert.Equal(t, resp.StatusCode, http.StatusNotFound)
+	assert.Equal(t, resp.StatusCode, http.StatusBadRequest)
 	assert.NoError(t, err)
 
 	// 上述配置文件改变了 logpath, 所以下面验证 status 中的 logpath 是否正确
@@ -657,7 +660,7 @@ func TestClusterStartStop(t *testing.T) {
 	assert.NoError(t, err)
 	time.Sleep(4 * time.Second)
 
-	// 停止后，tag == 'test' 的 status 返回为空
+	// 停止后，tag == 'test' 的 status runningStatus 为 stopped
 	resp, err = http.Get(slave_rs.cluster.MasterUrl[0] + "/logkit/cluster/status?tag=test")
 	assert.NoError(t, err)
 	allStData, err := ioutil.ReadAll(resp.Body)
@@ -667,8 +670,26 @@ func TestClusterStartStop(t *testing.T) {
 	assert.NoError(t, err, string(allStData))
 	allStatus := respAllStatus.Data
 	assert.Equal(t, map[string]ClusterStatus{
-		slave_rs.cluster.myaddress:  ClusterStatus{Status: map[string]RunnerStatus{}, Tag: "test"},
-		slave_rs2.cluster.myaddress: ClusterStatus{Status: map[string]RunnerStatus{}, Tag: "test"},
+		slave_rs.cluster.myaddress: ClusterStatus{
+			Status: map[string]RunnerStatus{
+				"test3": RunnerStatus{
+					RunningStatus: RunnerStopped,
+					Url:           slave_rs.cluster.myaddress,
+					Tag:           slave_rs.cluster.mytag,
+				},
+			},
+			Tag: "test",
+		},
+		slave_rs2.cluster.myaddress: ClusterStatus{
+			Status: map[string]RunnerStatus{
+				"test3": RunnerStatus{
+					RunningStatus: RunnerStopped,
+					Url:           slave_rs2.cluster.myaddress,
+					Tag:           slave_rs2.cluster.mytag,
+				},
+			},
+			Tag: "test",
+		},
 	}, allStatus)
 
 	// 再次停止会有错误
@@ -737,8 +758,9 @@ func TestClusterStartStop(t *testing.T) {
 					Trend:   SpeedStable,
 				},
 			},
-			Tag: "test",
-			Url: slave_rs.cluster.myaddress,
+			Tag:           "test",
+			Url:           slave_rs.cluster.myaddress,
+			RunningStatus: RunnerRunning,
 		},
 	}
 
@@ -767,8 +789,9 @@ func TestClusterStartStop(t *testing.T) {
 					Trend:   SpeedStable,
 				},
 			},
-			Tag: "test",
-			Url: slave_rs2.cluster.myaddress,
+			Tag:           "test",
+			Url:           slave_rs2.cluster.myaddress,
+			RunningStatus: RunnerRunning,
 		},
 	}
 
@@ -825,7 +848,7 @@ func TestClusterStartStop(t *testing.T) {
 	assert.NoError(t, err)
 	time.Sleep(4 * time.Second)
 
-	// url == "test" status 中 slave1 的那个是空的
+	// tag == "test" status 中 slave1 的那个状态为 stopped
 	resp, err = http.Get(slave_rs.cluster.MasterUrl[0] + "/logkit/cluster/status?tag=test")
 	assert.NoError(t, err)
 	allStData, err = ioutil.ReadAll(resp.Body)
@@ -836,8 +859,14 @@ func TestClusterStartStop(t *testing.T) {
 	allStatus = respAllStatus.Data
 	gotStatus = make(map[string]ClusterStatus)
 	gotStatus[slave_rs.cluster.myaddress] = ClusterStatus{
-		Status: map[string]RunnerStatus{},
-		Tag:    "test",
+		Status: map[string]RunnerStatus{
+			"test3": RunnerStatus{
+				RunningStatus: RunnerStopped,
+				Url:           slave_rs.cluster.myaddress,
+				Tag:           slave_rs.cluster.mytag,
+			},
+		},
+		Tag: "test",
 	}
 	gotStatus[slave_rs2.cluster.myaddress] = ClusterStatus{
 		Status: sts2,

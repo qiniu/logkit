@@ -63,11 +63,6 @@ type respRunnerConfigs struct {
 	Data map[string]RunnerConfig `json:"data"`
 }
 
-type respErrorMessage struct {
-	Code string `json:"code"`
-	Data string `json:"data"`
-}
-
 const (
 	StatusOK   = "ok"
 	StatusBad  = "bad"
@@ -143,7 +138,7 @@ func (cc *Cluster) UpdateSlaveStatus() {
 }
 
 // master API
-// get /logkit/cluster/ping
+// GET /logkit/cluster/ping
 func (rs *RestService) Ping() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		return RespSuccess(c, nil)
@@ -151,7 +146,7 @@ func (rs *RestService) Ping() echo.HandlerFunc {
 }
 
 // master API
-// get /logkit/cluster/slaves?tag=tagValue&url=urlValue
+// GET /logkit/cluster/slaves?tag=tagValue&url=urlValue
 func (rs *RestService) Slaves() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		_, tag, url, _, err := rs.checkClusterRequest(c)
@@ -160,14 +155,14 @@ func (rs *RestService) Slaves() echo.HandlerFunc {
 		}
 		rs.cluster.UpdateSlaveStatus()
 		rs.cluster.mutex.RLock()
-		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
+		slaves, _ := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
 		return RespSuccess(c, slaves)
 	}
 }
 
 // master API
-// get /logkit/cluster/status?tag=tagValue&url=urlValue
+// GET /logkit/cluster/status?tag=tagValue&url=urlValue
 func (rs *RestService) ClusterStatus() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		_, tag, url, _, err := rs.checkClusterRequest(c)
@@ -175,13 +170,18 @@ func (rs *RestService) ClusterStatus() echo.HandlerFunc {
 			return RespError(c, http.StatusBadRequest, utils.ErrClusterStatus, err.Error())
 		}
 		rs.cluster.mutex.RLock()
-		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
+		slaves, _ := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
 		allstatus := make(map[string]ClusterStatus)
 		for _, v := range slaves {
 			var cs ClusterStatus
 			cs.Tag = v.Tag
 			var respRss respRunnerStatus
+			if v.Status != StatusOK {
+				cs.Status = map[string]RunnerStatus{}
+				allstatus[v.Url] = cs
+				continue
+			}
 			url := fmt.Sprintf("%v/logkit/status", v.Url)
 			respCode, respBody, err := executeToOneCluster(url, http.MethodGet, []byte{})
 			if err != nil || respCode != http.StatusOK {
@@ -209,13 +209,18 @@ func (rs *RestService) GetClusterConfigs() echo.HandlerFunc {
 			return RespError(c, http.StatusBadRequest, utils.ErrClusterConfigs, err.Error())
 		}
 		rs.cluster.mutex.RLock()
-		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
+		slaves, _ := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
 		allConfigs := make(map[string]SlaveConfig)
 		for _, v := range slaves {
 			var sc SlaveConfig
 			sc.Tag = v.Tag
 			var respRss respRunnerConfigs
+			if v.Status != StatusOK {
+				sc.Configs = map[string]RunnerConfig{}
+				allConfigs[v.Url] = sc
+				continue
+			}
 			url := fmt.Sprintf("%v/logkit/configs", v.Url)
 			respCode, respBody, err := executeToOneCluster(url, http.MethodGet, []byte{})
 			if err != nil || respCode != http.StatusOK {
@@ -291,11 +296,10 @@ func (rs *RestService) PostClusterConfig() echo.HandlerFunc {
 			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerAdd, err.Error())
 		}
 		rs.cluster.mutex.RLock()
-		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
+		slaves, err := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
-		if len(slaves) == 0 {
-			errMsg := "the slaves(tag = '" + tag + "', url = '" + url + "') are not found"
-			return RespError(c, http.StatusNotFound, utils.ErrClusterRunnerAdd, errMsg)
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerAdd, err.Error())
 		}
 		method := http.MethodPost
 		mgrType := "add runner " + configName
@@ -315,11 +319,10 @@ func (rs *RestService) PutClusterConfig() echo.HandlerFunc {
 			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerUpdate, err.Error())
 		}
 		rs.cluster.mutex.RLock()
-		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
+		slaves, err := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
-		if len(slaves) == 0 {
-			errMsg := "the slaves(tag = '" + tag + "', url = '" + url + "') are not found"
-			return RespError(c, http.StatusNotFound, utils.ErrClusterRunnerUpdate, errMsg)
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerUpdate, err.Error())
 		}
 		method := http.MethodPut
 		mgrType := "update runner " + configName
@@ -339,11 +342,10 @@ func (rs *RestService) DeleteClusterConfig() echo.HandlerFunc {
 			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerDelete, err.Error())
 		}
 		rs.cluster.mutex.RLock()
-		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
+		slaves, err := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
-		if len(slaves) == 0 {
-			errMsg := "the slaves(tag = '" + tag + "', url = '" + url + "') are not found"
-			return RespError(c, http.StatusNotFound, utils.ErrClusterRunnerDelete, errMsg)
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerDelete, err.Error())
 		}
 		method := http.MethodDelete
 		mgrType := "delete runner " + configName
@@ -363,11 +365,10 @@ func (rs *RestService) PostClusterConfigStop() echo.HandlerFunc {
 			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerStop, err.Error())
 		}
 		rs.cluster.mutex.RLock()
-		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
+		slaves, err := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
-		if len(slaves) == 0 {
-			errMsg := "the slaves(tag = '" + tag + "', url = '" + url + "') are not found"
-			return RespError(c, http.StatusNotFound, utils.ErrClusterRunnerStop, errMsg)
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerStop, err.Error())
 		}
 		method := http.MethodPost
 		mgrType := "stop runner " + configName
@@ -387,11 +388,10 @@ func (rs *RestService) PostClusterConfigStart() echo.HandlerFunc {
 			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerStart, err.Error())
 		}
 		rs.cluster.mutex.RLock()
-		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
+		slaves, err := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
-		if len(slaves) == 0 {
-			errMsg := "the slaves(tag = '" + tag + "', url = '" + url + "') are not found"
-			return RespError(c, http.StatusNotFound, utils.ErrClusterRunnerStart, errMsg)
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerStart, err.Error())
 		}
 		method := http.MethodPost
 		mgrType := "start runner " + configName
@@ -411,11 +411,10 @@ func (rs *RestService) PostClusterConfigReset() echo.HandlerFunc {
 			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerReset, err.Error())
 		}
 		rs.cluster.mutex.RLock()
-		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
+		slaves, err := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
-		if len(slaves) == 0 {
-			errMsg := "the slaves(tag = '" + tag + "', url = '" + url + "') are not found"
-			return RespError(c, http.StatusNotFound, utils.ErrClusterRunnerReset, errMsg)
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerReset, err.Error())
 		}
 		method := http.MethodPost
 		mgrType := "reset runner " + configName
@@ -458,11 +457,10 @@ func (rs *RestService) PostSlaveTag() echo.HandlerFunc {
 			return RespError(c, http.StatusBadRequest, utils.ErrClusterSlavesTag, err.Error())
 		}
 		rs.cluster.mutex.RLock()
-		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
+		slaves, err := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
-		if len(slaves) == 0 {
-			errMsg := "the slaves(tag = '" + tag + "', url = '" + url + "') are not found"
-			return RespError(c, http.StatusNotFound, utils.ErrClusterSlavesTag, errMsg)
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterSlavesTag, err.Error())
 		}
 		mgrType := "change tag"
 		method := http.MethodPost
@@ -474,15 +472,28 @@ func (rs *RestService) PostSlaveTag() echo.HandlerFunc {
 	}
 }
 
-func getQualifySlaves(slaves []Slave, tag, url string) []Slave {
+func getQualifySlaves(slaves []Slave, tag, url string) ([]Slave, error) {
+	errInfo := make([]string, 0)
 	slave := make([]Slave, 0)
 	//(u == "" && t == "") || (u == "" && s.t == t) || (u == s.u && t == "") || (u == s.u && t == s.t)
 	for _, s := range slaves {
 		if (url == "" || url == s.Url) && (tag == "" || tag == s.Tag) {
+			if s.Status != StatusOK {
+				errMsg := "the slaves(tag = '" + tag + "', url = '" + url + "') status is " + s.Status + ", options are terminated"
+				errInfo = append(errInfo, errMsg)
+			}
 			slave = append(slave, s)
 		}
 	}
-	return slave
+	// 没有找到 slave 的错误只有当没有其他错误的时候才报
+	if len(slave)+len(errInfo) <= 0 {
+		errMsg := "the slaves(tag = '" + tag + "', url = '" + url + "') is not found"
+		errInfo = append(errInfo, errMsg)
+	}
+	if len(errInfo) > 0 {
+		return slave, errors.New(strings.Join(errInfo, "\n"))
+	}
+	return slave, nil
 }
 
 func (rs *RestService) checkClusterRequest(c echo.Context) (name, tag, url string, configBytes []byte, err error) {

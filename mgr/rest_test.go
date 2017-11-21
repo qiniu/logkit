@@ -194,6 +194,7 @@ func Test_RestGetStatus(t *testing.T) {
 					Trend:   SpeedUp,
 				},
 			},
+			RunningStatus: RunnerRunning,
 		},
 	}
 
@@ -589,6 +590,7 @@ func Test_RunnerReset(t *testing.T) {
 					Trend:   SpeedUp,
 				},
 			},
+			RunningStatus: RunnerRunning,
 		},
 	}
 
@@ -770,6 +772,7 @@ func Test_RunnerStart(t *testing.T) {
 					Trend:   SpeedUp,
 				},
 			},
+			RunningStatus: RunnerRunning,
 		},
 	}
 
@@ -812,7 +815,11 @@ func Test_RunnerStart(t *testing.T) {
 	err = json.Unmarshal([]byte(out.String()), &respRss)
 	assert.NoError(t, err, out.String())
 	rss := respRss.Data
-	assert.Empty(t, rss)
+	assert.Equal(t, map[string]RunnerStatus{
+		"test2.csv": RunnerStatus{
+			RunningStatus: RunnerStopped,
+		},
+	}, rss)
 
 	resp, err = http.Post("http://127.0.0.1"+rs.address+"/logkit/configs/"+"test2.csv/start", TESTContentApplictionJson, nil)
 	assert.NoError(t, err)
@@ -944,6 +951,7 @@ func Test_RunnerStop(t *testing.T) {
 					Trend:   SpeedUp,
 				},
 			},
+			RunningStatus: RunnerRunning,
 		},
 	}
 
@@ -1017,7 +1025,11 @@ func Test_RunnerStop(t *testing.T) {
 	err = json.Unmarshal([]byte(out.String()), &respRss)
 	rss = respRss.Data
 	assert.NoError(t, err, "OUTSTRING: "+out.String())
-	assert.Empty(t, rss)
+	assert.Equal(t, map[string]RunnerStatus{
+		"test3.csv": RunnerStatus{
+			RunningStatus: RunnerStopped,
+		},
+	}, rss)
 
 	resp, err = http.Post("http://127.0.0.1"+rs.address+"/logkit/configs/"+"test3.csv/reset", TESTContentApplictionJson, bytes.NewReader([]byte(runnerStopConf)))
 	assert.NoError(t, err)

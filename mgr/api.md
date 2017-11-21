@@ -80,6 +80,7 @@ Content-Type: application/json
   "data": {
     <runner_name1>: {
       "name":"runner1",
+      "runningStatus": "running",
       "logpath":"/your/log/path1",
       "readDataSize": <读取数据的bytes大小>.
       "readDataCount":<读取数据条数>,
@@ -177,6 +178,7 @@ Content-Type: application/json
 * "speed": 速度 条/s
 * "trend": 速度趋势 "up" 上升,"down" 下降,"stable" 不变
 * "elaspedtime": 运行时长
+* "runningStatus": 当前 runner 的运行状态, "running"表示正在运行, "stopped"表示已停止
 
 如果请求失败, 返回包含如下内容的JSON字符串（已格式化,便于阅读）:
 
@@ -203,6 +205,7 @@ Content-Type: application/json
   "code": "L200",
   "data": {
     "name":"runner1",
+    "runningStatus": "running",
     "logpath":"/your/log/path1",
     "readDataSize": <读取数据的bytes大小>.
     "readDataCount":<读取数据条数>,
@@ -255,6 +258,7 @@ Content-Type: application/json
 * "speed": 速度 条/s
 * "trend": 速度趋势 "up" 上升,"down" 下降,"stable" 不变
 * "elaspedtime": 运行时长
+* "runningStatus": 当前 runner 的运行状态, "running"表示正在运行, "stopped"表示已停止
 
 如果请求失败, 返回包含如下内容的JSON字符串（已格式化,便于阅读）:
 
