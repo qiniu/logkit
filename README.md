@@ -9,6 +9,9 @@ logkit是[七牛Pandora](https://pandora-docs.qiniu.com)开发的一个通用的
 
 ### logkit 详细的文档可以参见[WIKI](https://github.com/qiniu/logkit/wiki)页面
 
+## Stargazers over time
+
+[![Stargazers over time](https://starcharts.herokuapp.com/qiniu/logkit.svg)](https://starcharts.herokuapp.com/qiniu/logkit)
 
 ## 支持的数据源
 
