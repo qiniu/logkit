@@ -6,6 +6,10 @@ import (
 	"github.com/labstack/echo"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+	"github.com/qiniu/logkit/conf"
+	"fmt"
+	"encoding/json"
+	"github.com/qiniu/logkit/sender"
 )
 
 // GET /logkit/transformer/usages
@@ -44,5 +48,66 @@ func (rs *RestService) GetTransformerSampleConfigs() echo.HandlerFunc {
 			SampleConfigs[cr.Type()] = cr.SampleConfig()
 		}
 		return c.JSON(http.StatusOK, SampleConfigs)
+	}
+}
+
+// POST /logkit/transformer/transform
+// transform logs in json array format with registered transformers
+func (rs *RestService) PostTransform() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		var err error
+		var tp string
+		var trans transforms.Transformer
+		var rawLogs string
+		var data []sender.Data
+		reqConf := conf.MapConf{}
+		err = c.Bind(&reqConf)
+
+		// Valid Params & Initialize Transformer
+		if err == nil {
+			tp,err = reqConf.GetString(transforms.KeyType)
+			if err == nil {
+				create, ok := transforms.Transformers[tp]
+				if !ok {
+					err = fmt.Errorf("type %v of transformer not exist", tp)
+				}
+				rawLogs, err = reqConf.GetString(KeySampleLog)
+				if err == nil {
+					err = json.Unmarshal([]byte(rawLogs), &data)
+					if err == nil {
+						trans = create()
+						var bts []byte
+						reqConf = convertWebTransformerConfig(reqConf)
+						delete(reqConf, KeySampleLog)
+						bts, err = json.Marshal(reqConf)
+						if err == nil {
+							err = json.Unmarshal(bts, trans)
+							if err == nil {
+								if trans, ok := trans.(transforms.Initialize); ok {
+									err = trans.Init()
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+
+		// Act Transform
+		data, err = trans.Transform(data)
+		se, ok := err.(*utils.StatsError)
+		if ok {
+			err = se.ErrorDetail
+		}
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("transformer type error %v", err))
+		}
+
+		// Transform Success
+		return c.JSON(http.StatusOK, data)
 	}
 }
