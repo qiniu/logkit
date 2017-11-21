@@ -59,7 +59,8 @@ func (rs *RestService) PostTransform() echo.HandlerFunc {
 		var tp string
 		var trans transforms.Transformer
 		var rawLogs string
-		var data []sender.Data
+		var data = []sender.Data{}
+		var singleData sender.Data
 		reqConf := conf.MapConf{}
 		err = c.Bind(&reqConf)
 
@@ -73,7 +74,14 @@ func (rs *RestService) PostTransform() echo.HandlerFunc {
 				}
 				rawLogs, err = reqConf.GetString(KeySampleLog)
 				if err == nil {
-					err = json.Unmarshal([]byte(rawLogs), &data)
+					// single sample log
+					err = json.Unmarshal([]byte(rawLogs), &singleData)
+					// multi sample log
+					if err != nil {
+						err = json.Unmarshal([]byte(rawLogs), &data)
+					} else {
+						data = append(data, singleData)
+					}
 					if err == nil {
 						trans = create()
 						var bts []byte
