@@ -1,37 +1,21 @@
 import React, {Component} from 'react';
-import ClipboardButton from 'react-clipboard.js';
 import {
-  getRunnerConfigs,
-  deleteClusterSlaveTag,
-  getClusterRunnerConfigs,
-  postClusterSlaveTag,
-  deleteConfigData,
-  getClusterSlaves,
-  getRunnerStatus,
-  getClusterRunnerStatus,
   getRunnerVersion,
-  resetConfigData,
-  startRunner,
-  stopRunner
+  getIsCluster
 } from '../services/logkit';
 import CreateLogRunner from './createLogContainer'
 import RunnerTable from './runner/runnerTable'
 import MachineTable from './machine/machineTable'
 import CreateMetricRunner from './createMetricContainer'
 import TagTable from './tag/tagTable'
-import _ from "lodash";
 import {
   Icon,
   Tag,
   Layout,
   Menu,
   Breadcrumb,
-  Form
 } from 'antd';
-const SubMenu = Menu.SubMenu;
 const {Header, Content, Footer, Sider} = Layout;
-const FormItem = Form.Item;
-
 
 class List extends Component {
   constructor(props) {
@@ -41,7 +25,7 @@ class List extends Component {
       status: [],
       currentItem: '',
       version: '',
-      collapsed: false,
+      collapsed: true,
       currentMenu: 'runner',
       machines: []
     };
@@ -60,113 +44,20 @@ class List extends Component {
 
   }
 
-  transformRunner = (srcData) => {
-    let dataArray = []
-    _.forIn(srcData, (value, key) => {
-      let runners = [];
-      if (value.configs != null) {
-
-        _.forIn(value.configs, (v, k) => {
-          _.merge(v, {tag: value.tag, machineUrl: key});
-          runners.push(v);
-        })
-      }
-      dataArray.push({
-        machineUrl: key,
-        configs: runners,
-        error: value.error,
-        tag: value.tag
-      })
-
-    })
-    return dataArray
-  }
-
-  transformStatus = (srcData) => {
-    let dataArray = []
-    _.forIn(srcData, (value, key) => {
-      let runnerStatus = [];
-      if (value.status !== null) {
-        _.forIn(value.status, (v, k) => {
-          _.merge(v, {tag: value.tag, machineUrl: key});
-          runnerStatus.push(v);
-        })
-      }
-      dataArray.push({
-        machineUrl: key,
-        runnerStatus: runnerStatus,
-        error: value.error,
-        tag: value.tag
-      })
-
-    })
-    return dataArray
-  }
-
-
-  getStatus = () => {
-    let that = this
-    getClusterRunnerConfigs({
-      tag: window.tag ? window.tag : '',
-      machineUrl: window.machine_url ? window.machine_url : ''
-    }).then(data => {
-      if (data.code === 'L200') {
-        let mapData = data.data
-        let tagMapData = this.transformRunner(mapData)
-        that.setState({
-          runners: tagMapData
-        })
-        getClusterRunnerStatus({
-          tag: window.tag ? window.tag : '',
-          machineUrl: window.machine_url ? window.machine_url : ''
-        }).then(data => {
-          if (data.code === 'L200') {
-            that.setState({
-              status: this.transformStatus(data.data)
-            })
-          }
-        })
-      }
-    })
-
-    // getRunnerConfigs().then(data => {
-    //   if (data.success) {
-    //     //console.log(_.omit(data, 'success'))
-    //     let mapData = _.omit(data, 'success')
-    //     //let tagMapData = this.transform(mapData)
-    //     that.setState({
-    //       runners: _.omit(data, 'success')
-    //     })
-    //     getRunnerStatus().then(data => {
-    //       if (data.success) {
-    //         that.setState({
-    //           status: _.values(_.omit(data, 'success'))
-    //         })
-    //       }
-    //     })
-    //   }
-    // })
-
-
-  }
-
   init = () => {
-    let that = this
-    getRunnerVersion().then(data => {
-      that.setState({
-        version: _.values(data)
-      })
+    getRunnerVersion().then(item => {
+      if (item.code === 'L200') {
+        window.version = item.data
+      }
     })
 
-    that.getStatus()
-
-    if (window.statusInterval !== undefined && window.statusInterval !== 'undefined') {
-      window.clearInterval(window.statusInterval);
-    }
-
-    window.statusInterval = setInterval(function () {
-      that.getStatus()
-    }, 8000)
+    getIsCluster().then(item => {
+      if (item.data === true) {
+        window.isCluster = true
+      } else {
+        window.isCluster = false
+      }
+    })
 
   }
 
@@ -178,20 +69,40 @@ class List extends Component {
     this.setState({
       currentMenu: 'createLog'
     })
-    //this.props.router.push({pathname: `/index/create-log-runner`})
+    window.isCopy = false
+    window.nodeCopy = null
   }
 
-  trunToRunnerTab = () => {
+  turnToRunnerTab = () => {
     this.setState({
       currentMenu: 'runner'
     })
   }
 
   addMetricRunner = () => {
-    console.log('test1')
     this.setState({
       currentMenu: 'createMetricLog'
     })
+    window.isCopy = false
+    window.nodeCopy = null
+  }
+
+  onCollapse = (collapsed) => {
+    this.setState({collapsed});
+  }
+
+  TurnToLogRunner = () => {
+    this.setState({
+      currentMenu: 'createLog'
+    })
+    window.isCopy = true
+  }
+
+  TurnToMetricRunner = () => {
+    this.setState({
+      currentMenu: 'createMetricLog'
+    })
+    window.isCopy = true
   }
 
 
@@ -201,8 +112,6 @@ class List extends Component {
     })
     if (e.key !== 'runner') {
       window.clearInterval(window.statusInterval);
-    } else {
-      this.init()
     }
   }
 
@@ -218,17 +127,18 @@ class List extends Component {
                 <img style={{marginLeft: '15px'}} src='../../../static/logkit100.png'></img>) : (
                 <img src='../../../static/favicon.ico'></img>)}</div>
             <Menu theme="dark" defaultSelectedKeys={['runner']} mode="inline" onClick={this.changeMenu}>
-              <Menu.Item key="tag">
-                <Icon type="tags-o"/>
-                <span>标签</span>
-              </Menu.Item>
-              <Menu.Item key="machine">
+              {window.isCluster === true ? (<Menu.Item key="tag">
+                    <Icon type="tags-o"/>
+                    <span>标签</span>
+                  </Menu.Item>
+              ) : null}
+              {window.isCluster === true ? (<Menu.Item key="machine">
                 <Icon type="desktop"/>
                 <span>机器</span>
-              </Menu.Item>
+              </Menu.Item>) : null}
               <Menu.Item key="runner">
                 <Icon type="file"/>
-                <span>Runner</span>
+                <span>Runner管理</span>
               </Menu.Item>
             </Menu>
           </Sider>
@@ -240,7 +150,7 @@ class List extends Component {
               </Breadcrumb>
               <div style={{padding: 24, background: '#fff', minHeight: 360}}>
                 <div className="content">
-                  <TagTable  tags={this.state.runners} handleAddRunner={this.addLogRunner.bind(this)}
+                  <TagTable tags={this.state.runners} handleAddRunner={this.addLogRunner.bind(this)}
                             handleAddMetricRunner={this.addMetricRunner.bind(this)}/>
                 </div>
 
@@ -252,7 +162,7 @@ class List extends Component {
               </Breadcrumb>
               <div style={{padding: 24, background: '#fff', minHeight: 360}}>
                 <div className="content">
-                  <MachineTable  handleAddRunner={this.addLogRunner.bind(this)}
+                  <MachineTable handleAddRunner={this.addLogRunner.bind(this)}
                                 handleAddMetricRunner={this.addMetricRunner.bind(this)}/>
                 </div>
               </div>
@@ -263,8 +173,12 @@ class List extends Component {
               </Breadcrumb>
               <div style={{padding: 24, background: '#fff', minHeight: 360}}>
                 <div className="content">
-                  <RunnerTable runners={this.state.runners} runnerStatus={this.state.status}
-                               searchRunner={this.getStatus.bind(this)}/>
+                  <RunnerTable handleAddRunner={this.addLogRunner.bind(this)}
+                               handleAddMetricRunner={this.addMetricRunner.bind(this)}
+                               handleTurnToRunner={this.TurnToLogRunner.bind(this)}
+                               handleTurnToMetricRunner={this.TurnToMetricRunner.bind(this)}
+                               runners={this.state.runners} runnerStatus={this.state.status}
+                  />
                 </div>
 
               </div>
@@ -275,7 +189,7 @@ class List extends Component {
               </Breadcrumb>
               <div style={{padding: 24, background: '#fff', minHeight: 360}}>
                 <div className="content">
-                  <CreateLogRunner handleTrunToRunner={this.trunToRunnerTab.bind(this)} />
+                  <CreateLogRunner handleTurnToRunner={this.turnToRunnerTab.bind(this)}/>
                 </div>
 
               </div>
@@ -286,7 +200,7 @@ class List extends Component {
               </Breadcrumb>
               <div style={{padding: 24, background: '#fff', minHeight: 360}}>
                 <div className="content">
-                  <CreateMetricRunner/>
+                  <CreateMetricRunner handleTurnToRunner={this.turnToRunnerTab.bind(this)}/>
                 </div>
 
               </div>
