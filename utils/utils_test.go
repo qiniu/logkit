@@ -59,13 +59,13 @@ func Test_TrimeList(t *testing.T) {
 	}
 }
 
-func Test_GetInode(t *testing.T) {
+/*func Test_GetInode(t *testing.T) {
 	os.Mkdir("abc", 0777)
 	fi, _ := os.Stat("abc")
 	inode := getInode(fi)
 	assert.True(t, inode > 0)
 	os.RemoveAll("abc")
-}
+}*/
 
 func Test_GetLogFiles(t *testing.T) {
 	logfiles := "Test_getLogFiles"
@@ -209,4 +209,14 @@ func TestAddRemoveHttpProc(t *testing.T) {
 	assert.Equal(t, exp2, got2)
 	assert.Equal(t, "http://", chttp2)
 
+}
+
+func TestExtractField(t *testing.T) {
+	slice := []string{"%{[type]}", "a"}
+	slice, err := ExtractField(slice)
+	if err != nil {
+		fmt.Println("wrong arguments")
+	} else {
+		fmt.Println(slice)
+	}
 }

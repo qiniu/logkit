@@ -264,9 +264,10 @@ func IsJSON(str string) bool {
 	return json.Unmarshal([]byte(str), &js) == nil
 }
 
-func ExtractField(slice []string) (s []string, err error) {
+func ExtractField(slice []string) ([]string, error) {
+	var err error
 	if len(slice) == 1 {
-		return slice, nil
+		return slice, err
 	}
 	if len(slice) == 2 {
 		rgexpr := "^%\\{\\[\\S+\\]}$" // --->  %{[type]}
@@ -277,11 +278,56 @@ func ExtractField(slice []string) (s []string, err error) {
 			rs := []rune(slice[0])
 			slice[0] = string(rs[3 : len(rs)-2])
 		} else {
-			err = errors.New("topic参数错误")
+			err = errors.New("参数错误")
 		}
 	}
-	err = errors.New("topic参数错误")
+	//err = errors.New("参数错误")
 	return slice, err
+}
+
+func GetMapValue(m map[string]interface{}, keys []string) interface{} {
+	var val interface{}
+	val = m
+	for i := 0; i < len(keys) - 1; i++ {
+		k := keys[i]
+		if _, ok := val.(map[string]interface{}); ok {
+			if _, ok := val.(map[string]interface{})[k]; ok {
+				val = val.(map[string]interface{})[k]
+			} else {
+				return nil
+			}
+		} else {
+			return nil
+		}
+	}
+	val = val.(map[string]interface{})[keys[len(keys) - 1]]
+	return val
+}
+
+func SetMapValue(m map[string]interface{}, keys []string, val interface{}) {
+	if len(keys) == 0 {
+		return
+	}
+	curr := m
+	for i := 0; i < len(keys)-1; i++ {
+		k := keys[i]
+		// key exists?
+		if _, ok := curr[k]; !ok {
+			n := make(map[string]interface{})
+			curr[k] = n
+			curr = n
+			continue
+		}
+		// make sure the value is the right sort of thing
+		if _, ok := curr[k].(map[string]interface{}); !ok {
+			// have to replace with something suitable
+			n := make(map[string]interface{})
+			curr[k] = n
+		}
+		curr = curr[k].(map[string]interface{})
+	}
+	// add remaining k/v
+	curr[keys[len(keys)-1]] = val
 }
 
 func AddHttpProtocal(url string) string {

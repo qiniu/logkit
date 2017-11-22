@@ -8,6 +8,7 @@ import (
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
 
+	"strings"
 )
 
 type Replacer struct {
@@ -32,8 +33,11 @@ func (g *Replacer) Transform(datas []sender.Data) ([]sender.Data, error) {
 	var err, ferr error
 	errnums := 0
 	for i := range datas {
-		val, ok := datas[i][g.Key]
-		if !ok {
+		//val, ok := datas[i][g.Key]
+		separator := "."
+		keys := strings.Split(g.Key, separator)
+		val := utils.GetMapValue(datas[i], keys)
+		if val == nil {
 			errnums++
 			err = fmt.Errorf("transform key %v not exist in data", g.Key)
 			continue
@@ -45,7 +49,8 @@ func (g *Replacer) Transform(datas []sender.Data) ([]sender.Data, error) {
 			continue
 		}
 		//datas[i][g.Key] = strings.Replace(strval, g.Old, g.New, -1)
-		datas[i][g.Key] = g.rgx.ReplaceAllString(strval, g.New)
+		//datas[i][g.Key] = g.rgx.ReplaceAllString(strval, g.New)
+		utils.SetMapValue(datas[i], keys, g.rgx.ReplaceAllString(strval, g.New))
 	}
 
 	if err != nil {
