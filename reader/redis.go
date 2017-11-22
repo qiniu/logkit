@@ -42,7 +42,6 @@ type RedisReader struct {
 
 	readChan  chan string
 	channelIn <-chan *redis.Message
-	//channelIn []<-chan *redis.Message
 
 	status  int32
 	mux     sync.Mutex
@@ -103,7 +102,6 @@ func NewRedisReader(meta *Meta, conf conf.MapConf, keys []string) (rr *RedisRead
 		meta:   meta,
 		opt:    opt,
 		client: client,
-		//channelIn: make([] <-chan*redis.Message, len(opt.key)),
 		readChan:  make(chan string),
 		status:    StatusInit,
 		mux:       sync.Mutex{},
@@ -171,33 +169,9 @@ func (rr *RedisReader) Start() {
 	rr.started = true
 	switch rr.opt.dataType {
 	case DataTypeChannel:
-		if len(rr.opt.key) == 1 {
-			rr.channelIn = rr.client.Subscribe(rr.opt.key[0]).Channel()
-		}else if len(rr.opt.key) == 2 {
-			rr.channelIn = rr.client.Subscribe(rr.opt.key[0],rr.opt.key[1]).Channel()
-		}else if len(rr.opt.key) == 3 {
-			rr.channelIn = rr.client.Subscribe(rr.opt.key[0],rr.opt.key[1],rr.opt.key[2]).Channel()
-		}else if len(rr.opt.key) == 4 {
-			rr.channelIn = rr.client.Subscribe(rr.opt.key[0],rr.opt.key[1],rr.opt.key[2],rr.opt.key[3]).Channel()
-		}else if len(rr.opt.key) == 5 {
-			rr.channelIn = rr.client.Subscribe(rr.opt.key[0],rr.opt.key[1],rr.opt.key[2],rr.opt.key[3],rr.opt.key[4]).Channel()
-		}else {
-			log.Errorf("too many subscription channels")
-		}
+		rr.channelIn = rr.client.Subscribe(rr.opt.key...).Channel()
 	case DataTypePatterChannel:
-		if len(rr.opt.key) == 1 {
-			rr.channelIn = rr.client.PSubscribe(rr.opt.key[0]).Channel()
-		}else if len(rr.opt.key) == 2 {
-			rr.channelIn = rr.client.PSubscribe(rr.opt.key[0],rr.opt.key[1]).Channel()
-		}else if len(rr.opt.key) == 3 {
-			rr.channelIn = rr.client.PSubscribe(rr.opt.key[0],rr.opt.key[1],rr.opt.key[2]).Channel()
-		}else if len(rr.opt.key) == 4 {
-			rr.channelIn = rr.client.PSubscribe(rr.opt.key[0],rr.opt.key[1],rr.opt.key[2],rr.opt.key[3]).Channel()
-		}else if len(rr.opt.key) == 5 {
-			rr.channelIn = rr.client.PSubscribe(rr.opt.key[0],rr.opt.key[1],rr.opt.key[2],rr.opt.key[3],rr.opt.key[4]).Channel()
-		}else {
-			log.Errorf("too many subscription channels")
-		}
+		rr.channelIn = rr.client.PSubscribe(rr.opt.key...).Channel()
 	case DataTypeList:
 	case DataTypeString:
 	case DataTypeSet:
