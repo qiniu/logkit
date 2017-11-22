@@ -1,6 +1,5 @@
 import React, {Component} from 'react';
 import moment from 'moment'
-import ClipboardButton from 'react-clipboard.js';
 import {
   Table,
   Icon,
@@ -21,7 +20,20 @@ import {
   deleteConfigData,
   resetConfigData,
   startRunner,
-  stopRunner
+  stopRunner,
+  deleteClusterConfigData,
+  startClusterRunner,
+  stopClusterRunner,
+  resetClusterConfigData,
+  getRunnerConfigs,
+  deleteClusterSlaveTag,
+  getClusterRunnerConfigs,
+  postClusterSlaveTag,
+  getClusterSlaves,
+  getRunnerStatus,
+  getIsCluster,
+  getClusterRunnerStatus,
+  getRunnerVersion
 } from '../../services/logkit';
 import config from '../../store/config'
 import * as uuid from 'uuid'
@@ -41,9 +53,11 @@ class RunnerTable extends Component {
       currentItem: '',
       status: [],
       runners: [],
+      runnerStatus: [],
       machineUrl: '',
       tag: ''
     };
+    this.init()
   }
 
   componentDidMount() {
@@ -57,13 +71,131 @@ class RunnerTable extends Component {
 
   }
 
-  deleteRunner = (record) => {
-    deleteConfigData({name: record.name}).then(data => {
-      if (!data) {
-        notification.success({message: "删除成功", duration: 10,})
-        this.init()
+  transformRunner = (srcData) => {
+    let dataArray = []
+    _.forIn(srcData, (value, key) => {
+      let runners = [];
+      if (value.configs != null) {
+
+        _.forIn(value.configs, (v, k) => {
+          _.merge(v, {tag: value.tag, machineUrl: key});
+          runners.push(v);
+        })
       }
+      dataArray.push({
+        machineUrl: key,
+        configs: runners,
+        error: value.error,
+        tag: value.tag
+      })
+
     })
+    return dataArray
+  }
+
+  transformStatus = (srcData) => {
+    let dataArray = []
+    _.forIn(srcData, (value, key) => {
+      let runnerStatus = [];
+      if (value.status !== null) {
+        _.forIn(value.status, (v, k) => {
+          _.merge(v, {tag: value.tag, machineUrl: key});
+          runnerStatus.push(v);
+        })
+      }
+      dataArray.push({
+        machineUrl: key,
+        runnerStatus: runnerStatus,
+        error: value.error,
+        tag: value.tag
+      })
+
+    })
+    return dataArray
+  }
+
+
+  getStatus = () => {
+    let that = this
+    if (window.isCluster && window.isCluster === true) {
+      getClusterRunnerConfigs({
+        tag: window.tag ? window.tag : '',
+        machineUrl: window.machine_url ? window.machine_url : ''
+      }).then(data => {
+        if (data.code === 'L200') {
+          let mapData = data.data
+          let tagMapData = this.transformRunner(mapData)
+          that.setState({
+            runners: tagMapData
+          })
+          getClusterRunnerStatus({
+            tag: window.tag ? window.tag : '',
+            machineUrl: window.machine_url ? window.machine_url : ''
+          }).then(data => {
+            if (data.code === 'L200') {
+              that.setState({
+                runnerStatus: this.transformStatus(data.data)
+              })
+            }
+          })
+        }
+      })
+    } else {
+      console.log('not cluster version')
+      getRunnerConfigs().then(item => {
+        if (item.code === 'L200') {
+          that.setState({
+            runners: _.values(item.data)
+          })
+          getRunnerStatus().then(item => {
+            if (item.code === 'L200') {
+              that.setState({
+                runnerStatus: _.values(item.data)
+              })
+            }
+          })
+        }
+      })
+    }
+  }
+
+  init = () => {
+    let that = this
+    getRunnerVersion().then(data => {
+      that.setState({
+        version: _.values(data)
+      })
+    })
+
+    that.getStatus()
+
+    if (window.statusInterval !== undefined && window.statusInterval !== 'undefined') {
+      window.clearInterval(window.statusInterval);
+    }
+
+    window.statusInterval = setInterval(function () {
+      that.getStatus()
+    }, 8000)
+
+  }
+
+  deleteRunner = (record) => {
+    if (window.isCluster === true) {
+      deleteClusterConfigData({name: record.name, tag: record.tag, url: record.machineUrl}).then(item => {
+        if (item.code === 'L200') {
+          notification.success({message: "删除成功", duration: 10,})
+          this.init()
+        }
+      })
+    } else {
+      deleteConfigData({name: record.name}).then(item => {
+        if (item.code === 'L200') {
+          notification.success({message: "删除成功", duration: 10,})
+          this.init()
+        }
+      })
+    }
+
   }
 
   isShow = (currentItem) => {
@@ -80,29 +212,22 @@ class RunnerTable extends Component {
     })
   }
 
-  showResetConfig = (currentItem) => {
-    this.setState({
-      currentItem: currentItem,
-      isShowResetConfig: true
-    })
-  }
-
-  handleResetConfigCancel = () => {
-    this.setState({
-      isShowResetConfig: false
-    })
-  }
-
-  handleResetConfig = () => {
-    resetConfigData({name: this.state.currentItem.name}).then(data => {
-      if (!data) {
-        notification.success({message: "重置成功", duration: 10,})
-      }
-      this.setState({
-        isShowResetConfig: false
+  handleResetConfig = (record) => {
+    if (window.isCluster === true) {
+      resetClusterConfigData({name: record.name, tag: record.tag, url: record.machineUrl}).then(item => {
+        if (item.code === 'L200') {
+          notification.success({message: "重置成功", duration: 10,})
+        }
+        this.init()
       })
-      this.init()
-    })
+    } else {
+      resetConfigData({name: record.name}).then(item => {
+        if (item.code === 'L200') {
+          notification.success({message: "重置成功", duration: 10,})
+        }
+        this.init()
+      })
+    }
   }
 
   handleErrorCancel = () => {
@@ -118,49 +243,59 @@ class RunnerTable extends Component {
   }
 
   setMachine = (machineUrl) => {
-    const {searchRunner} = this.props
-    // this.setState({
-    //   machineUrl: machineUrl
-    // })
     window.machine_url = machineUrl
-    searchRunner()
+    this.getStatus()
   }
 
   setTag = (tag) => {
-    console.log(tag)
-    const {searchRunner} = this.props
-    // this.setState({
-    //   tag: tag
-    // })
     window.tag = tag
-    searchRunner()
+    this.getStatus()
   }
 
   copyConfig = (record) => {
+    const {handleTurnToRunner, handleTurnToMetricRunner} = this.props
     window.nodeCopy = record
     notification.success({message: "修改配置文件,", description: '按步骤去修改配置页面的Runner信息', duration: 10,})
     if (record["metric"] === undefined) {
-      this.props.router.push({pathname: `/index/create-log-runner?copyConfig=true`})
+      handleTurnToRunner()
     } else {
-      this.props.router.push({pathname: `/index/create-metric-runner?copyConfig=true`})
+      handleTurnToMetricRunner()
     }
   }
 
   optRunner = (record) => {
     if (record.iconType === 'caret-right') {
-      startRunner({name: record.name}).then(data => {
-        if (!data) {
-          record.iconType = 'poweroff'
-          notification.success({message: '开启成功', duration: 10})
-        }
-      })
+      if (window.isCluster === true) {
+        startClusterRunner({name: record.name, tag: record.tag, url: record.machineUrl}).then(item => {
+          if (item.code === 'L200') {
+            record.iconType = 'poweroff'
+            notification.success({message: '开启成功', duration: 10})
+          }
+        })
+      } else {
+        startRunner({name: record.name}).then(item => {
+          if (item.code === 'L200') {
+            record.iconType = 'poweroff'
+            notification.success({message: '开启成功', duration: 10})
+          }
+        })
+      }
     } else {
-      stopRunner({name: record.name}).then(data => {
-        if (!data) {
-          record.iconType = 'caret-right'
-          notification.success({message: '关闭成功', duration: 10})
-        }
-      })
+      if (window.isCluster === true) {
+        stopClusterRunner({name: record.name, tag: record.tag, url: record.machineUrl}).then(item => {
+          if (item.code === 'L200') {
+            record.iconType = 'caret-right'
+            notification.success({message: '关闭成功', duration: 10})
+          }
+        })
+      } else {
+        stopRunner({name: record.name}).then(item => {
+          if (item.code === 'L200') {
+            record.iconType = 'caret-right'
+            notification.success({message: '关闭成功', duration: 10})
+          }
+        })
+      }
     }
   }
 
@@ -176,32 +311,37 @@ class RunnerTable extends Component {
 
 
   renderRunnerList() {
-    const {runners, runnerStatus} = this.props
 
+    const {handleAddRunner, handleAddMetricRunner} = this.props
     let runnerList = []
     let statusList = []
     let tagList = []
     let machineList = []
-    runners.map(item => {
-      if (item.configs.length > 0) {
-        item.configs.map(runner => {
-          runnerList.push(runner)
-        })
-      }
-      if (!_.includes(tagList, item.tag)) {
-        tagList.push(item.tag)
-      }
+    if (window.isCluster && window.isCluster === true) {
+      this.state.runners.map(item => {
+        if (item.configs.length > 0) {
+          item.configs.map(runner => {
+            runnerList.push(runner)
+          })
+        }
+        if (!_.includes(tagList, item.tag)) {
+          tagList.push(item.tag)
+        }
 
-    })
+      })
 
-    runnerStatus.map(item => {
-      if (item.runnerStatus.length > 0) {
-        item.runnerStatus.map(statu => {
-          statusList.push(statu)
-        })
-      }
-      machineList.push(item.machineUrl)
-    })
+      this.state.runnerStatus.map(item => {
+        if (item.runnerStatus.length > 0) {
+          item.runnerStatus.map(statu => {
+            statusList.push(statu)
+          })
+        }
+        machineList.push(item.machineUrl)
+      })
+    } else {
+      runnerList = this.state.runners
+      statusList = this.state.runnerStatus
+    }
 
     const columns = [{
       title: '名称',
@@ -306,9 +446,7 @@ class RunnerTable extends Component {
         return (
             <a>
               <div className="editable-row-operations">
-                <ClipboardButton data-clipboard-text={text}>
-                  <Icon style={{fontSize: 16}} onClick={() => this.copyConfig(record.currentItem)} type="edit"/>
-                </ClipboardButton>
+                <Icon style={{fontSize: 16}} onClick={() => this.copyConfig(record.currentItem)} type="edit"/>
               </div>
             </a>
         );
@@ -340,7 +478,10 @@ class RunnerTable extends Component {
             record.isWebFolder === true ? (<a>
               <div className="editable-row-operations">
                 {
-                  <Icon style={{fontSize: 16}} onClick={() => this.showResetConfig(record)} type="reload"/>
+                  <Popconfirm title={"重置配置文件会删除meta信息并重启,是否重置该Runner?"}
+                              onConfirm={() => this.handleResetConfig(record)}>
+                    <Icon title={"重置Runner"} style={{fontSize: 16}} type='reload'/>
+                  </Popconfirm>
                 }
               </div>
             </a>) : null
@@ -462,7 +603,7 @@ class RunnerTable extends Component {
     }
 
     return (<div>
-          <Form layout="inline">
+          {window.isCluster === true ? (<Form layout="inline">
             <FormItem {...formItemLayout} style={{width: '300px'}} label="标签名称">
               <Select className="select-field"
                       showSearch
@@ -497,7 +638,14 @@ class RunnerTable extends Component {
                 }
               </Select>
             </FormItem>
-          </Form>
+          </Form>) : (<div><Button type="primary" style={{marginRight: '50px'}} className="index-btn" ghost
+                                   onClick={handleAddRunner}>
+            <Icon type="plus"/> 增加日志采集 Runner
+          </Button>
+            <Button type="primary" className="index-btn" ghost onClick={handleAddMetricRunner}>
+              <Icon type="plus"/> 增加系统信息采集 Runner
+            </Button></div>)}
+
           <Table columns={columns} pagination={{size: 'small', pageSize: 20}} dataSource={data}/></div>
     )
   }
@@ -532,12 +680,6 @@ class RunnerTable extends Component {
           >
             <Input type="textarea" value={this.state.currentItem.copy} rows="50"/>
 
-          </Modal>
-
-          <Modal title="是否重置配置文件？" visible={this.state.isShowResetConfig}
-                 onOk={this.handleResetConfig} onCancel={this.handleResetConfigCancel}
-          >
-            注意:<Tag color="#ffbf00">重置配置文件会删除meta信息并重启</Tag>
           </Modal>
         </div>
     );
