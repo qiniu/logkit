@@ -31,6 +31,7 @@ import {
   startRunner,
   stopRunner
 } from '../../services/logkit';
+import * as uuid from 'uuid'
 import config from '../../store/config'
 import _ from "lodash";
 
@@ -60,7 +61,6 @@ class MachineTable extends Component {
   init() {
     getClusterSlaves().then(data => {
       if (data.code === 'L200') {
-        console.log(data)
         this.setState({
           machines: _.values(data.data)
         })
@@ -71,16 +71,15 @@ class MachineTable extends Component {
   renderMachineList() {
     let dataSource = []
     const {machines, handleAddRunner, handleAddMetricRunner} = this.props
-    //console.log(this.state.machines)
     this.state.machines.map((item) => {
       dataSource.push({
+        key: uuid(),
         name: item.tag,
         machineUrl: item.url,
         status: item.status,
-        last_touch: item.last_touch
+        last_touch: moment(item.last_touch).format("YYYY-MM-DD HH:mm:ss")
       })
     })
-    //console.log(dataSource)
 
     const columns = [{
       title: '机器地址',
