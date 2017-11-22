@@ -21,17 +21,6 @@ const formItemLayout = {
   },
 };
 
-const optionFormItemLayout = {
-  labelCol: {
-    xs: {span: 24},
-    sm: {span: 7},
-  },
-  wrapperCol: {
-    xs: {span: 24},
-    sm: {span: 10},
-  },
-};
-
 class Opt extends Component {
   constructor(props) {
     super(props);
@@ -79,29 +68,32 @@ class Opt extends Component {
   }
 
   init = () => {
-    getMetricOptions().then(data => {
-      const {setFieldsValue} = this.props.form;
-      this.setState({
-        items: data,
-      });
-      if (window.nodeCopy && window.nodeCopy.metric) {
-        let formData = {};
-        window.nodeCopy.metric.map(m => {
-          formData[m.type] = {};
-          data[m.type].map(c => {
-            if (m.config && m.config[c.KeyName] !== undefined) {
-              if (c.Type === "bool") {
-                formData[m.type][c.KeyName] = m.config[c.KeyName].toString();
-              } else if (c.Type === "array") {
-                formData[m.type][c.KeyName] = m.config[c.KeyName].join(',');
-              } else {
-                formData[m.type][c.KeyName] = m.config[c.KeyName];
-              }
-            }
-          });
+    getMetricOptions().then(item => {
+      if (item.code === 'L200') {
+        const {setFieldsValue} = this.props.form;
+        this.setState({
+          items: item.data,
         });
-        setFieldsValue(formData);
+        if (window.nodeCopy && window.nodeCopy.metric) {
+          let formData = {};
+          window.nodeCopy.metric.map(m => {
+            formData[m.type] = {};
+            item.data[m.type].map(c => {
+              if (m.config && m.config[c.KeyName] !== undefined) {
+                if (c.Type === "bool") {
+                  formData[m.type][c.KeyName] = m.config[c.KeyName].toString();
+                } else if (c.Type === "array") {
+                  formData[m.type][c.KeyName] = m.config[c.KeyName].join(',');
+                } else {
+                  formData[m.type][c.KeyName] = m.config[c.KeyName];
+                }
+              }
+            });
+          });
+          setFieldsValue(formData);
+        }
       }
+
     })
   }
 
