@@ -8,7 +8,13 @@ import Transformer from '../components/transformer'
 import config from '../store/config'
 import {isJSON} from '../utils/tools'
 import moment from 'moment'
-import {postConfigData, getRunnerVersion, putConfigData, postClusterConfigData} from '../services/logkit';
+import {
+  postConfigData,
+  getRunnerVersion,
+  putConfigData,
+  postClusterConfigData,
+  putClusterConfigData
+} from '../services/logkit';
 import _ from "lodash";
 
 const Step = Steps.Step;
@@ -56,18 +62,15 @@ class CreateLogRunner extends Component {
 
   init = () => {
     let that = this
-    // let isCopy = this.props.location.query.copyConfig
-    // if (isCopy === 'true') {
-    //   window.isCopy = true;
-    //   this.setState({
-    //     isCpoyStatus: true
-    //   })
-    // } else {
-    //   window.isCopy = false
-    // }
-    // if(window.nodeCopy){
-    //   config.delete("metric");
-    // }
+    //let isCopy = this.props.location.query.copyConfig
+    if (window.isCopy === true) {
+      this.setState({
+        isCpoyStatus: true
+      })
+    }
+    if (window.nodeCopy) {
+      config.delete("metric");
+    }
     getRunnerVersion().then(data => {
       that.setState({
         version: _.values(_.omit(data, 'success'))
@@ -124,6 +127,11 @@ class CreateLogRunner extends Component {
 
           }
 
+          if (window.isCopy && window.nodeCopy) {
+            runnerName = window.nodeCopy.name
+            batch_interval = window.nodeCopy.batch_interval
+            collect_interval = window.nodeCopy.collect_interval
+          }
           let data = {
             name: runnerName != undefined ? runnerName : name,
             batch_interval: batch_interval != undefined ? batch_interval : 60,
@@ -131,16 +139,9 @@ class CreateLogRunner extends Component {
             ...config.getNodeData()
           }
           that.refs.initConfig.setFieldsValue({config: JSON.stringify(data, null, 2)});
-          if (runnerName == undefined) {
-            that.refs.initConfig.setFieldsValue({name: name});
-          }
-
-          if (batch_interval == undefined) {
-            that.refs.initConfig.setFieldsValue({batch_interval: 60});
-          }
-          if (collect_interval == undefined) {
-            that.refs.initConfig.setFieldsValue({collect_interval: 3});
-          }
+          that.refs.initConfig.setFieldsValue({name: runnerName != undefined ? runnerName : name});
+          that.refs.initConfig.setFieldsValue({batch_interval: batch_interval != undefined ? batch_interval : 60});
+          that.refs.initConfig.setFieldsValue({collect_interval: collect_interval != undefined ? collect_interval : 3});
         }
       });
     }
@@ -148,7 +149,7 @@ class CreateLogRunner extends Component {
   }
 
   addRunner = () => {
-    const { handleTrunToRunner } = this.props
+    const {handleTurnToRunner} = this.props
     let that = this
     const {validateFields, getFieldsValue} =  that.refs.initConfig;
     let formData = getFieldsValue();
@@ -161,14 +162,23 @@ class CreateLogRunner extends Component {
           let data = JSON.parse(formData.config);
           let tag = (window.tag != null && window.tag != undefined) ? window.tag : ''
           let url = (window.machine_url != null && window.machine_url != undefined) ? window.machine_url : ''
-          postClusterConfigData({name: data.name, tag: tag, url: url, body: data}).then(data => {
-            if (data && data.code === 'L200') {
-              notification.success({message: "Runner添加成功", duration: 10,})
-              //this.props.router.push({pathname: `/`})
-              handleTrunToRunner()
-            }
+          if (window.isCluster && window.isCluster === true) {
+            postClusterConfigData({name: data.name, tag: tag, url: url, body: data}).then(data => {
+              if (data && data.code === 'L200') {
+                notification.success({message: "Runner添加成功", duration: 10,})
+                handleTurnToRunner()
+              }
 
-          })
+            })
+          } else {
+            postConfigData({name: data.name, body: data}).then(data => {
+              if (data && data.code === 'L200') {
+                notification.success({message: "Runner添加成功", duration: 10,})
+                handleTurnToRunner()
+              }
+
+            })
+          }
         } else {
           notification.warning({message: "不是一个合法的json对象,请检查", duration: 20,})
         }
@@ -178,7 +188,7 @@ class CreateLogRunner extends Component {
   }
 
   updateRunner = () => {
-    const { handleTrunToRunner } = this.props
+    const {handleTurnToRunner} = this.props
     let that = this
     const {validateFields, getFieldsValue} =  that.refs.initConfig;
     let formData = getFieldsValue();
@@ -189,14 +199,24 @@ class CreateLogRunner extends Component {
       } else {
         if (isJSON(formData.config)) {
           let data = JSON.parse(formData.config);
-          putConfigData({name: data.name, body: data}).then(data => {
-            if (data && data.code === 'L200') {
-              notification.success({message: "Runner修改成功", duration: 10,})
-              handleTrunToRunner()
-              //this.props.router.push({pathname: `/`})
-            }
+          let tag = (window.tag != null && window.tag != undefined) ? window.tag : ''
+          let url = (window.machine_url != null && window.machine_url != undefined) ? window.machine_url : ''
+          if (window.isCluster && window.isCluster === true) {
+            putClusterConfigData({name: data.name, tag: tag, url: url, body: data}).then(data => {
+              if (data && data.code === 'L200') {
+                notification.success({message: "Runner修改成功", duration: 10,})
+                handleTurnToRunner()
+              }
 
-          })
+            })
+          } else {
+            putConfigData({name: data.name, body: data}).then(data => {
+              if (data && data.code === 'L200') {
+                notification.success({message: "Runner修改成功", duration: 10,})
+                handleTurnToRunner()
+              }
+            })
+          }
         } else {
           notification.warning({message: "不是一个合法的json对象,请检查", duration: 20,})
         }

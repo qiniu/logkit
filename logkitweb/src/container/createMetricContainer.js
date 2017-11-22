@@ -56,20 +56,16 @@ class CreateMetricRunner extends Component {
 
   init = () => {
     let that = this
-    // let isCopy = this.props.location.query.copyConfig
-    // if (isCopy === 'true') {
-    //   window.isCopy = true;
-    //   this.setState({
-    //     isCopyStatus: true
-    //   })
-    // } else {
-    //   window.isCopy = false
-    // }
-    // if(window.nodeCopy){
-    //   config.delete("reader");
-    //   config.delete("parser");
-    //   config.delete("transforms");
-    // }
+    if (window.isCopy === true) {
+      this.setState({
+        isCopyStatus: true
+      })
+    }
+    if (window.nodeCopy) {
+      config.delete("reader");
+      config.delete("parser");
+      config.delete("transforms");
+    }
     getRunnerVersion().then(data => {
       that.setState({
         version: _.values(_.omit(data, 'success'))
@@ -120,7 +116,9 @@ class CreateMetricRunner extends Component {
           let collect_interval = that.refs.initConfig.getFieldValue('collect_interval')
           let runnerName = that.refs.initConfig.getFieldValue('name')
           if (window.isCopy && window.nodeCopy) {
-            name = window.nodeCopy.name
+            runnerName = window.nodeCopy.name
+            batch_interval = window.nodeCopy.batch_interval
+            collect_interval = window.nodeCopy.collect_interval
           }
           let data = {
             name: runnerName != undefined ? runnerName : name,
@@ -129,16 +127,9 @@ class CreateMetricRunner extends Component {
             ...config.getNodeData()
           }
           that.refs.initConfig.setFieldsValue({config: JSON.stringify(data, null, 2)});
-          if (runnerName == undefined) {
-            that.refs.initConfig.setFieldsValue({name: name});
-          }
-
-          if (batch_interval == undefined) {
-            that.refs.initConfig.setFieldsValue({batch_interval: 60});
-          }
-          if (collect_interval == undefined) {
-            that.refs.initConfig.setFieldsValue({collect_interval: 3});
-          }
+          that.refs.initConfig.setFieldsValue({name: runnerName != undefined ? runnerName : name});
+          that.refs.initConfig.setFieldsValue({batch_interval: batch_interval != undefined ? batch_interval : 60});
+          that.refs.initConfig.setFieldsValue({collect_interval: collect_interval != undefined ? collect_interval : 3});
         }
       });
     }
@@ -165,6 +156,7 @@ class CreateMetricRunner extends Component {
   }
 
   addRunner = () => {
+    const {handleTurnToRunner} = this.props
     let that = this
     const {validateFields, getFieldsValue} =  that.refs.initConfig;
     let formData = getFieldsValue();
@@ -177,13 +169,23 @@ class CreateMetricRunner extends Component {
           let data = JSON.parse(formData.config);
           let tag = (window.tag != null && window.tag != undefined) ? window.tag : ''
           let url = (window.machine_url != null && window.machine_url != undefined) ? window.machine_url : ''
-          postClusterConfigData({name: data.name, tag: tag, url: url, body: data}).then(data => {
-            if (data === undefined) {
-              notification.success({message: "Runner添加成功", duration: 10,})
-              // this.props.router.push({pathname: `/`})
-            }
+          if (window.isCluster && window.isCluster === true) {
+            postClusterConfigData({name: data.name, tag: tag, url: url, body: data}).then(data => {
+              if (data && data.code === 'L200') {
+                notification.success({message: "Metric Runner添加成功", duration: 10,})
+                handleTurnToRunner()
+              }
 
-          })
+            })
+          } else {
+            postConfigData({name: data.name, body: data}).then(data => {
+              if (data && data.code === 'L200') {
+                notification.success({message: "Metric Runner添加成功", duration: 10,})
+                handleTurnToRunner()
+              }
+
+            })
+          }
         } else {
           notification.warning({message: "不是一个合法的json对象,请检查", duration: 20,})
         }
@@ -193,6 +195,7 @@ class CreateMetricRunner extends Component {
   }
 
   updateRunner = () => {
+    const {handleTurnToRunner} = this.props
     let that = this
     const {validateFields, getFieldsValue} =  that.refs.initConfig;
     let formData = getFieldsValue();
@@ -203,13 +206,25 @@ class CreateMetricRunner extends Component {
       } else {
         if (isJSON(formData.config)) {
           let data = JSON.parse(formData.config);
-          putConfigData({name: data.name, body: data}).then(data => {
-            if (data === undefined) {
-              notification.success({message: "Runner修改成功", duration: 10,})
-              // this.props.router.push({pathname: `/`})
-            }
+          let tag = (window.tag != null && window.tag != undefined) ? window.tag : ''
+          let url = (window.machine_url != null && window.machine_url != undefined) ? window.machine_url : ''
+          if (window.isCluster && window.isCluster === true) {
+            putConfigData({name: data.name, tag: tag, url: url, body: data}).then(data => {
+              if (data && data.code === 'L200') {
+                notification.success({message: "Runner修改成功", duration: 10,})
+                handleTurnToRunner()
+              }
 
-          })
+            })
+          } else {
+            putConfigData({name: data.name, body: data}).then(data => {
+              if (data && data.code === 'L200') {
+                notification.success({message: "Runner修改成功", duration: 10,})
+                handleTurnToRunner()
+              }
+
+            })
+          }
         } else {
           notification.warning({message: "不是一个合法的json对象,请检查", duration: 20,})
         }
