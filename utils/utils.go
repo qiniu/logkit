@@ -256,7 +256,19 @@ type OSInfo struct {
 }
 
 func (oi *OSInfo) String() string {
-	return fmt.Sprintf("(%s; %s; %s %s)", oi.OS, oi.Core, oi.Kernel, oi.Platform)
+	return fmt.Sprintf("%s; %s; %s; %s %s", oi.Hostname, oi.OS, oi.Core, oi.Kernel, oi.Platform)
+}
+
+func GetExtraInfo() map[string]string {
+	osInfo := GetOSInfo()
+	exInfo := make(map[string]string)
+	exInfo["core"] = osInfo.Core
+	exInfo["hostname"] = osInfo.Hostname
+	exInfo["osinfo"] = osInfo.OS + "-" + osInfo.Kernel + "-" + osInfo.Platform
+	if ip, err := GetLocalIP(); err != nil {
+		exInfo["localip"] = ip
+	}
+	return exInfo
 }
 
 func IsJSON(str string) bool {
