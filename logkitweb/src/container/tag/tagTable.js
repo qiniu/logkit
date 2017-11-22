@@ -36,6 +36,7 @@ import {
 import {titles} from './constant'
 import config from '../../store/config'
 import _ from "lodash";
+import * as uuid from 'uuid'
 const FormItem = Form.Item;
 
 class TagTable extends Component {
@@ -173,10 +174,10 @@ class TagTable extends Component {
   }
 
   checkStatus = (status) => {
-    if (_.includes(status,'lost')) {
+    if (_.includes(status, 'lost')) {
       return 'lost'
     }
-    else if (_.includes(status,'bad')) {
+    else if (_.includes(status, 'bad')) {
       return 'bad'
     }
     else {
@@ -203,6 +204,7 @@ class TagTable extends Component {
         status.push(item.status);
         if (i === machines.length - 1) {
           dataSource.push({
+            key: uuid(),
             name: currentItem.tag,
             machineUrl: machineUrl,
             status: status,
@@ -212,12 +214,14 @@ class TagTable extends Component {
       else if (item.tag !== currentItem.tag) {
         console.log(currentItem)
         dataSource.push({
+          key: uuid(),
           name: currentItem.tag,
           machineUrl: machineUrl,
           status: status,
         })
         if (i === machines.length - 1) {
           dataSource.push({
+            key: uuid(),
             name: item.tag,
             machineUrl: machineUrl,
             status: status,
@@ -274,13 +278,14 @@ class TagTable extends Component {
       render: (text, record) => {
         return (
             (
-            <a>
-              <div className="editable-row-operations">
-                { this.checkStatus(record.status) === 'ok' ? (<Button onClick={() => this.showTagModal(record, 'rename')} type="primary">重命名</Button>) : null
-                }
-              </div>
-            </a>
-        )
+                <a>
+                  <div className="editable-row-operations">
+                    { this.checkStatus(record.status) === 'ok' ? (
+                        <Button onClick={() => this.showTagModal(record, 'rename')} type="primary">重命名</Button>) : null
+                    }
+                  </div>
+                </a>
+            )
         );
       }
     }, {
@@ -292,7 +297,8 @@ class TagTable extends Component {
         return (
             <a>
               <div className="editable-row-operations">
-                {this.checkStatus(record.status) === 'ok' ? (<Icon onClick={handleAddRunner} style={{fontSize: 16}} type="plus"/>) : null
+                {this.checkStatus(record.status) === 'ok' ? (
+                    <Icon onClick={handleAddRunner} style={{fontSize: 16}} type="plus"/>) : null
                 }
               </div>
             </a>
@@ -309,7 +315,7 @@ class TagTable extends Component {
             (<a>
               <div className="editable-row-operations">
                 {this.checkStatus(record.status) === 'ok' ? (
-                  <Icon onClick={handleAddMetricRunner} style={{fontSize: 16}} type="plus"/>) : null
+                    <Icon onClick={handleAddMetricRunner} style={{fontSize: 16}} type="plus"/>) : null
                 }
               </div>
             </a>)
@@ -325,8 +331,8 @@ class TagTable extends Component {
         return (<a>
               <div className="editable-row-operations">
                 {this.checkStatus(record.status) === 'ok' ? (
-                  <Icon onClick={() => this.showTagModal(record, 'stop')} title={"停止Runner"} style={{fontSize: 16}}
-                        type='poweroff'/>) : null
+                    <Icon onClick={() => this.showTagModal(record, 'stop')} title={"停止Runner"} style={{fontSize: 16}}
+                          type='poweroff'/>) : null
                 }
               </div>
             </a>
@@ -342,8 +348,8 @@ class TagTable extends Component {
         return (<a>
               <div className="editable-row-operations">
                 {this.checkStatus(record.status) === 'ok' ? (
-                  <Icon onClick={() => this.showTagModal(record, 'start')} title={"重启Runner"} style={{fontSize: 16}}
-                        type='caret-right'/>) : null
+                    <Icon onClick={() => this.showTagModal(record, 'start')} title={"重启Runner"} style={{fontSize: 16}}
+                          type='caret-right'/>) : null
                 }
               </div>
             </a>
@@ -360,7 +366,7 @@ class TagTable extends Component {
             <a>
               <div className="editable-row-operations">
                 {this.checkStatus(record.status) !== 'bad' ? (
-                  <Icon onClick={() => this.showDeleteTag(record)} style={{fontSize: 16}} type="delete"/>) : null
+                    <Icon onClick={() => this.showDeleteTag(record)} style={{fontSize: 16}} type="delete"/>) : null
                 }
               </div>
             </a>
