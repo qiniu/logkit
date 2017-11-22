@@ -180,6 +180,16 @@ export async function postClusterConfigData(params) {
   });
 }
 
+export async function putClusterConfigData(params) {
+  return request(window.logkitUrl + '/logkit/configs/' + params.name + '?tag=' + params.tag + '&url=' + params.url, {
+    method: 'put',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(params.body),
+  });
+}
+
 export async function getClusterRunnerConfigs(params) {
   return request(window.logkitUrl + '/logkit/cluster/configs?tag=' + params.tag + '&url=' + params.machineUrl, {
     method: 'get',
@@ -223,5 +233,45 @@ export async function postClusterStopSlaveTag(params) {
 export async function postClusterStartSlaveTag(params) {
   return request(window.logkitUrl + '/logkit/cluster/configs/' + params.name + '/start?tag=' + params.tag + '&url=' + params.url, {
     method: 'post'
+  });
+}
+
+
+export async function startClusterRunner(params) {
+  return request(window.logkitUrl + '/logkit/cluster/configs/' + params.name + '/start?tag=' + params.tag + '&url=' + params.url, {
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  });
+}
+
+export async function stopClusterRunner(params) {
+  return request(window.logkitUrl + '/logkit/cluster/configs/' + params.name + '/stop?tag=' + params.tag + '&url=' + params.url, {
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  });
+}
+
+export async function resetClusterConfigData(params) {
+  return request(window.logkitUrl + '/logkit/cluster/configs/' + params.name + '/reset?tag=' + params.tag + '&url=' + params.url, {
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  });
+}
+
+export async function deleteClusterConfigData(params) {
+  return request(window.logkitUrl + '/logkit/cluster/configs/' + params.name, {
+    method: 'delete'
+  });
+}
+
+export async function getIsCluster(params) {
+  return request(window.logkitUrl + '/logkit/cluster/ismaster', {
+    method: 'get'
   });
 }
