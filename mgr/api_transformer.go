@@ -52,67 +52,77 @@ func (rs *RestService) GetTransformerSampleConfigs() echo.HandlerFunc {
 }
 
 // POST /logkit/transformer/transform
-// transform logs in json array format with registered transformers
+// Transform (multiple logs/single log) in (json array/json object) format with registered transformers
+// Return result string in json array format
 func (rs *RestService) PostTransform() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		var err error
-		var tp string
-		var trans transforms.Transformer
-		var rawLogs string
-		var data = []sender.Data{}
-		var singleData sender.Data
-		reqConf := conf.MapConf{}
-		err = c.Bind(&reqConf)
+		var paramErr error // error caused by invalid param
+		var transErr error // error caused by incorrect transform process
+		var tp string // transformer type string
+		var trans transforms.Transformer // transformer itself
+		var rawLogs string // sample logs picked from request in json format
+		var data = []sender.Data{} // multiple sample logs in map format
+		var singleData sender.Data // single sample log in map format
+		var bts []byte
+		reqConf := conf.MapConf{} // request body params in map format
 
-		// Valid Params & Initialize Transformer
-		if err == nil {
-			tp,err = reqConf.GetString(transforms.KeyType)
-			if err == nil {
-				create, ok := transforms.Transformers[tp]
-				if !ok {
-					err = fmt.Errorf("type %v of transformer not exist", tp)
-				}
-				rawLogs, err = reqConf.GetString(KeySampleLog)
-				if err == nil {
-					// single sample log
-					err = json.Unmarshal([]byte(rawLogs), &singleData)
-					// multi sample log
-					if err != nil {
-						err = json.Unmarshal([]byte(rawLogs), &data)
-					} else {
-						data = append(data, singleData)
-					}
-					if err == nil {
-						trans = create()
-						var bts []byte
-						reqConf = convertWebTransformerConfig(reqConf)
-						delete(reqConf, KeySampleLog)
-						bts, err = json.Marshal(reqConf)
-						if err == nil {
-							err = json.Unmarshal(bts, trans)
-							if err == nil {
-								if trans, ok := trans.(transforms.Initialize); ok {
-									err = trans.Init()
-								}
-							}
-						}
-					}
-				}
+		// bind request context onto map[string]string
+		if err := c.Bind(&reqConf); err != nil {
+			return err
+		}
+
+		// Get params from request & Valid Params & Initialize transformer using valid params
+		// param 1: transformer type
+		tp, paramErr = reqConf.GetString(transforms.KeyType)
+		if paramErr != nil {
+			// param absence
+			return echo.NewHTTPError(http.StatusBadRequest, paramErr.Error())
+		}
+		create, ok := transforms.Transformers[tp]
+		if !ok {
+			// no such type transformer
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("type %v of transformer not exist", tp))
+		}
+		// param 2: sample logs
+		rawLogs, paramErr = reqConf.GetString(KeySampleLog)
+		if paramErr != nil {
+			// param absence
+			return echo.NewHTTPError(http.StatusBadRequest, paramErr.Error())
+		}
+		if paramErr = json.Unmarshal([]byte(rawLogs), &singleData); paramErr != nil {
+			// may be multiple sample logs
+			if paramErr = json.Unmarshal([]byte(rawLogs), &data); paramErr != nil {
+				// invalid JSON, neither multiple sample logs nor single sample log
+				return echo.NewHTTPError(http.StatusBadRequest, paramErr.Error())
+			}
+		} else {
+			// is single log, and method transformer.transform(data []sender.Data) accept a param of slice type
+			data = append(data, singleData)
+		}
+		// initialize transformer
+		trans = create()
+		reqConf = convertWebTransformerConfig(reqConf)
+		delete(reqConf, KeySampleLog)
+		if bts, paramErr = json.Marshal(reqConf); paramErr != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, paramErr.Error())
+		}
+		if paramErr = json.Unmarshal(bts, trans); paramErr != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, paramErr.Error())
+		}
+		if trans, ok := trans.(transforms.Initialize); ok {
+			if paramErr = trans.Init(); paramErr != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, paramErr.Error())
 			}
 		}
 
-		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-		}
-
 		// Act Transform
-		data, err = trans.Transform(data)
-		se, ok := err.(*utils.StatsError)
-		if ok {
-			err = se.ErrorDetail
-		}
-		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("transformer type error %v", err))
+		data, transErr = trans.Transform(data)
+		if transErr != nil {
+			se, ok := transErr.(*utils.StatsError)
+			if ok {
+				transErr = se.ErrorDetail
+			}
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("transformer type error %v", transErr))
 		}
 
 		// Transform Success
