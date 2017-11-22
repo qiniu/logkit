@@ -6,6 +6,8 @@ ft_log
 
 # Mobile Tools for Java (J2ME)
 .mtj.tmp/
+.project
+.settings
 
 # Package Files #
 *.jar
@@ -27,6 +29,7 @@ hs_err_pid*
 _obj
 _test
 bin/
+!vendor/github.com/pkg
 pkg/
 tests
 tests/meta_mock_csv
@@ -49,14 +52,7 @@ _testmain.go
 *.test
 *.prof
 
-!vendor/
-vendor/*
-!vendor/github.com/
-vendor/github.com/*
-!vendor/github.com/labstack/
-vendor/github.com/labstack/*
-!vendor/github.com/labstack/echo/
-!vendor/github.com/wangtuanjie/
+meta/
 .DS_Store
 .cache
 .vscode

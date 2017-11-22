@@ -15,8 +15,9 @@ var ModeUsages = []utils.KeyValue{
 	{ModeMssql, "从 MSSQL 读取"},
 	{ModeElastic, "从 Elasticsearch 读取"},
 	{ModeMongo, "从 MongoDB 读取"},
-	{ModeKafka, "从 kafka 读取"},
-	{ModeRedis, "从 redis 读取"},
+	{ModeKafka, "从 Kafka 读取"},
+	{ModeRedis, "从 Redis 读取"},
+	{ModeSocket, "从 Socket 读取"},
 }
 
 var (
@@ -574,7 +575,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyRedisDataType,
 			ChooseOnly:    true,
-			ChooseOptions: []string{DataTypeList, DataTypeChannel, DataTypePatterChannel},
+			ChooseOptions: []string{DataTypeList, DataTypeChannel, DataTypePatterChannel, DataTypeString},
 			Description:   "Redis的数据读取模式(redis_datatype)",
 		},
 		{
@@ -614,5 +615,42 @@ var ModeKeyOptions = map[string][]utils.Option{
 			CheckRegex:   "\\d+[ms]",
 		},
 		OptionDataSourceTag,
+	},
+	ModeSocket: {
+		{
+			KeyName:      KeySocketServiceAddress,
+			ChooseOnly:   false,
+			Default:      "tcp://127.0.0.1:3110",
+			DefaultNoUse: true,
+			Description:  "socket监听的地址(协议://端口)(socket_service_address)",
+		},
+		{
+			KeyName:      KeySocketMaxConnections,
+			ChooseOnly:   false,
+			Default:      "0",
+			DefaultNoUse: false,
+			Description:  "最大并发连接数(tcp)(socket_max_connections)",
+		},
+		{
+			KeyName:      KeySocketReadTimeout,
+			ChooseOnly:   false,
+			Default:      "1m",
+			DefaultNoUse: false,
+			Description:  "连接超时时间(0为不超时)(socket_read_timeout)",
+		},
+		{
+			KeyName:      KeySocketReadBufferSize,
+			ChooseOnly:   false,
+			Default:      "65535",
+			DefaultNoUse: false,
+			Description:  "连接缓存大小(udp)(socket_read_buffer_size)",
+		},
+		{
+			KeyName:      KeySocketKeepAlivePeriod,
+			ChooseOnly:   false,
+			Default:      "5m",
+			DefaultNoUse: false,
+			Description:  "连接保持时长(0为关闭)(socket_keep_alive_period)",
+		},
 	},
 }

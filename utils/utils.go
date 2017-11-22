@@ -3,16 +3,18 @@ package utils
 import (
 	"database/sql"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync/atomic"
 
-	"encoding/json"
+	"regexp"
 
 	"github.com/qiniu/log"
 )
@@ -260,4 +262,59 @@ func (oi *OSInfo) String() string {
 func IsJSON(str string) bool {
 	var js json.RawMessage
 	return json.Unmarshal([]byte(str), &js) == nil
+}
+
+func ExtractField(slice []string) (s []string, err error) {
+	if len(slice) == 1 {
+		return slice, nil
+	}
+	if len(slice) == 2 {
+		rgexpr := "^%\\{\\[\\S+\\]}$" // --->  %{[type]}
+		r, _ := regexp.Compile(rgexpr)
+		slice[0] = strings.TrimSpace(slice[0])
+		bool := r.MatchString(slice[0])
+		if bool {
+			rs := []rune(slice[0])
+			slice[0] = string(rs[3 : len(rs)-2])
+		} else {
+			err = errors.New("topic参数错误")
+		}
+	}
+	err = errors.New("topic参数错误")
+	return slice, err
+}
+
+func AddHttpProtocal(url string) string {
+	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+		return "http://" + url
+	}
+	return url
+}
+
+func RemoveHttpProtocal(url string) (hostport, schema string) {
+	chttps := "https://"
+	chttp := "http://"
+	if strings.HasPrefix(url, chttp) {
+		return strings.TrimPrefix(url, chttp), chttp
+	}
+	if strings.HasPrefix(url, chttps) {
+		return strings.TrimPrefix(url, chttps), chttps
+	}
+	return url, chttp
+}
+
+func GetLocalIP() (string, error) {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "127.0.0.1", fmt.Errorf("Get local IP error: %v\n", err)
+	}
+	for _, address := range addrs {
+		// check the address type and if it is not a loopback the display it
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String(), nil
+			}
+		}
+	}
+	return "127.0.0.1", errors.New("no local IP found")
 }

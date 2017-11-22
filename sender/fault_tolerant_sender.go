@@ -60,7 +60,7 @@ type FtSender struct {
 	runnerName  string
 	opt         *FtOption
 	stats       utils.StatsInfo
-	mutex       *sync.Mutex
+	statsMutex  *sync.Mutex
 }
 
 type FtOption struct {
@@ -130,7 +130,7 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 		procs:       opt.procs,
 		runnerName:  runnerName,
 		opt:         opt,
-		mutex:       new(sync.Mutex),
+		statsMutex:  new(sync.Mutex),
 	}
 	go ftSender.asyncSendLogFromDiskQueue()
 	return &ftSender, nil
@@ -159,20 +159,19 @@ func (ft *FtSender) Send(datas []Data) error {
 			}
 			if nowDatas != nil {
 				se.ErrorDetail = reqerr.NewSendError("save data to backend queue error", ConvertDatasBack(nowDatas), reqerr.TypeDefault)
-				ft.mutex.Lock()
-				ft.stats.Errors += int64(len(nowDatas))
+				ft.statsMutex.Lock()
 				ft.stats.LastError = se.ErrorDetail.Error()
-				ft.mutex.Unlock()
+				ft.statsMutex.Unlock()
 			}
 		}
 	} else {
 		err := ft.saveToFile(datas)
 		if err != nil {
 			se.ErrorDetail = err
-			ft.mutex.Lock()
+			ft.statsMutex.Lock()
 			ft.stats.LastError = err.Error()
 			ft.stats.Errors += int64(len(datas))
-			ft.mutex.Unlock()
+			ft.statsMutex.Unlock()
 		} else {
 			se.ErrorDetail = nil
 		}
@@ -287,24 +286,29 @@ func ConvertDatasBack(ins []Data) []map[string]interface{} {
 // trySendDatas 尝试发送数据，如果失败，将失败数据加入backup queue，并睡眠指定时间。返回结果为是否正常发送
 func (ft *FtSender) trySendDatas(datas []Data, failSleep int, isRetry bool) (backDataContext []*datasContext, err error) {
 	err = ft.innerSender.Send(datas)
-	if err == nil {
-		ft.mutex.Lock()
-		ft.stats.Success += int64(len(datas))
-		if isRetry {
-			ft.stats.Errors -= int64(len(datas))
-		}
-		ft.mutex.Unlock()
-	}
 	if c, ok := err.(*utils.StatsError); ok {
 		err = c.ErrorDetail
-		ft.mutex.Lock()
+		ft.statsMutex.Lock()
 		if isRetry {
 			ft.stats.Errors -= c.Success
 		} else {
 			ft.stats.Errors += c.Errors
 		}
 		ft.stats.Success += c.Success
-		ft.mutex.Unlock()
+		ft.statsMutex.Unlock()
+	} else if err != nil {
+		if !isRetry {
+			ft.statsMutex.Lock()
+			ft.stats.Errors += int64(len(datas))
+			ft.statsMutex.Unlock()
+		}
+	} else {
+		ft.statsMutex.Lock()
+		ft.stats.Success += int64(len(datas))
+		if isRetry {
+			ft.stats.Errors -= int64(len(datas))
+		}
+		ft.statsMutex.Unlock()
 	}
 	if err != nil {
 		retDatasContext := ft.handleSendError(err, datas)

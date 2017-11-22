@@ -15,6 +15,10 @@ type LogParser interface {
 	Parse(lines []string) (datas []sender.Data, err error)
 }
 
+type ParserType interface {
+	Type() string
+}
+
 // conf 字段
 const (
 	KeyParserName = utils.GlobalKeyName
@@ -35,6 +39,7 @@ const (
 	TypeInnerMysql = "_mysql"
 	TypeJson       = "json"
 	TypeNginx      = "nginx"
+	TypeSyslog     = "syslog"
 )
 
 type Label struct {
@@ -60,6 +65,7 @@ func NewParserRegistry() *ParserRegistry {
 	ps.RegisterParser(TypeInnerMysql, NewJsonParser) //兼容
 	ps.RegisterParser(TypeJson, NewJsonParser)
 	ps.RegisterParser(TypeNginx, NewNginxParser)
+	ps.RegisterParser(TypeSyslog, NewSyslogParser)
 	return ps
 }
 

@@ -198,6 +198,10 @@ func (gp *GrokParser) Name() string {
 	return gp.name
 }
 
+func (gp *GrokParser) Type() string {
+	return TypeGrok
+}
+
 func (gp *GrokParser) Parse(lines []string) ([]sender.Data, error) {
 	datas := []sender.Data{}
 	se := &utils.StatsError{}
@@ -347,22 +351,22 @@ func (p *GrokParser) compileCustomPatterns() error {
 }
 
 func trimInvalidSpace(pattern string) string {
-	reg:= regexp.MustCompile(`%{((.*?:)*?.*?)}`)
+	reg := regexp.MustCompile(`%{((.*?:)*?.*?)}`)
 	substringIndex := reg.FindAllStringSubmatchIndex(pattern, -1)
 	curIndex := 0
 	var clearString string = ""
 	for _, val := range substringIndex {
 		if curIndex < val[2] {
-			clearString += pattern[curIndex: val[2]]
+			clearString += pattern[curIndex:val[2]]
 		}
-		subString := pattern[val[2]: val[3]]
+		subString := pattern[val[2]:val[3]]
 		subStringSlice := strings.Split(subString, ":")
 		subLen := len(subStringSlice)
 		for index, chr := range subStringSlice {
 			clearString += strings.TrimSpace(chr)
-			if index != subLen - 1 {
+			if index != subLen-1 {
 				clearString += ":"
-			}else{
+			} else {
 				clearString += "}"
 			}
 		}

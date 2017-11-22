@@ -8,8 +8,15 @@ import (
 	"io/ioutil"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/qiniu/logkit/metric"
+	"github.com/qiniu/logkit/utils"
+)
+
+const (
+	TypeMetricKernelVmstat   = "kernel_vmstat"
+	MetricKernelVmstatUsages = "内核(kernel_vmstat)"
 )
 
 type KernelVmstat struct {
@@ -17,7 +24,19 @@ type KernelVmstat struct {
 }
 
 func (k *KernelVmstat) Name() string {
-	return "kernel_vmstat"
+	return TypeMetricKernelVmstat
+}
+
+func (k *KernelVmstat) Usages() string {
+	return MetricKernelVmstatUsages
+}
+
+func (k *KernelVmstat) Config() map[string]interface{} {
+	config := map[string]interface{}{
+		metric.OptionString:     []utils.Option{},
+		metric.AttributesString: []utils.KeyValue{},
+	}
+	return config
 }
 
 func (k *KernelVmstat) Collect() (datas []map[string]interface{}, err error) {
@@ -26,8 +45,8 @@ func (k *KernelVmstat) Collect() (datas []map[string]interface{}, err error) {
 		return nil, err
 	}
 
+	now := time.Now().Format(time.RFC3339Nano)
 	fields := make(map[string]interface{})
-
 	dataFields := bytes.Fields(data)
 	for i, field := range dataFields {
 
@@ -40,10 +59,11 @@ func (k *KernelVmstat) Collect() (datas []map[string]interface{}, err error) {
 			if err != nil {
 				return nil, err
 			}
-
-			fields[string(field)] = int64(m)
+			key := "vmstat_" + string(field)
+			fields[key] = int64(m)
 		}
 	}
+	fields["vmstat_"+metric.Timestamp] = now
 	datas = append(datas, fields)
 	return
 }
@@ -64,7 +84,7 @@ func (k *KernelVmstat) getProcVmstat() ([]byte, error) {
 }
 
 func init() {
-	metric.Add("kernel_vmstat", func() metric.Collector {
+	metric.Add(TypeMetricKernelVmstat, func() metric.Collector {
 		return &KernelVmstat{
 			statFile: "/proc/vmstat",
 		}

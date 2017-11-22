@@ -23,6 +23,7 @@ import (
 
 	"github.com/labstack/echo"
 	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 	"github.com/stretchr/testify/assert"
@@ -941,4 +942,131 @@ func TestConvertDataPandoraSender(t *testing.T) {
 	if !strings.Contains(pandora.Body, "x1=123") {
 		t.Error("not x1 find error")
 	}
+}
+
+func TestPandoraSenderTime(t *testing.T) {
+	pandora, pt := NewMockPandoraWithPrefix("/v2")
+	conf1 := conf.MapConf{
+		"force_microsecond":         "false",
+		"ft_memory_channel":         "false",
+		"ft_strategy":               "backup_only",
+		"ignore_invalid_field":      "true",
+		"logkit_send_time":          "true",
+		"pandora_ak":                "ak",
+		"pandora_auto_convert_date": "true",
+		"pandora_gzip":              "true",
+		"pandora_host":              "http://127.0.0.1:" + pt,
+		"pandora_region":            "nb",
+		"pandora_repo_name":         "TestPandoraSenderTime",
+		"pandora_schema_free":       "true",
+		"pandora_sk":                "sk",
+		"runner_name":               "runner.20171117110730",
+		"sender_type":               "pandora",
+		"name":                      "TestPandoraSenderTime",
+		"KeyPandoraSchemaUpdateInterval": "1s",
+	}
+	s, err := NewPandoraSender(conf1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := Data{}
+	d["x1"] = "123.2"
+	err = s.Send([]Data{d})
+	if st, ok := err.(*utils.StatsError); ok {
+		err = st.ErrorDetail
+	}
+	if err != nil {
+		t.Error(err)
+	}
+	lastTime := time.Now()
+	resp := pandora.Body
+	params := strings.Split(resp, " ")
+	if len(params) == 2 {
+		logkitSendTime := strings.Split(params[0], "=")
+		if len(logkitSendTime) == 2 {
+			assert.Equal(t, KeyLogkitSendTime, logkitSendTime[0])
+			lastTime, err = time.Parse(time.RFC3339Nano, logkitSendTime[1])
+			assert.NoError(t, err)
+		} else {
+			t.Fatal("response body logkitSendTime error, exp logkit_send_time=<value>, but got " + params[0])
+		}
+		x1Value := strings.Split(params[1], "=")
+		if len(x1Value) == 2 {
+			assert.Equal(t, "x1", x1Value[0])
+			assert.Equal(t, "123.2", x1Value[1])
+		} else {
+			t.Fatal("response body x1 value error, exp x1=123.2, but got " + params[1])
+		}
+	} else {
+		t.Fatal("response body error, exp logkit_send_time=<value> x1=123.2, but got " + resp)
+	}
+	time.Sleep(1 * time.Second)
+
+	d = Data{}
+	d["x1"] = "123.2"
+	err = s.Send([]Data{d})
+	if st, ok := err.(*utils.StatsError); ok {
+		err = st.ErrorDetail
+	}
+	if err != nil {
+		t.Error(err)
+	}
+	curTime := time.Now()
+	resp = pandora.Body
+	params = strings.Split(resp, " ")
+	if len(params) == 2 {
+		logkitSendTime := strings.Split(params[0], "=")
+		if len(logkitSendTime) == 2 {
+			assert.Equal(t, KeyLogkitSendTime, logkitSendTime[0])
+			curTime, err = time.Parse(time.RFC3339Nano, logkitSendTime[1])
+			assert.NoError(t, err)
+		} else {
+			t.Fatal("response body logkitSendTime error, exp logkit_send_time=<value>, but got " + params[0])
+		}
+		x1Value := strings.Split(params[1], "=")
+		if len(x1Value) == 2 {
+			assert.Equal(t, "x1", x1Value[0])
+			assert.Equal(t, "123.2", x1Value[1])
+		} else {
+			t.Fatal("response body x1 value error, exp x1=123.2, but got " + params[1])
+		}
+	} else {
+		t.Fatal("response body error, exp logkit_send_time=<value> x1=123.2, but got " + resp)
+	}
+	assert.Equal(t, true, curTime.Sub(lastTime).Seconds() >= 1.0)
+
+	conf2 := conf.MapConf{
+		"force_microsecond":         "false",
+		"ft_memory_channel":         "false",
+		"ft_strategy":               "backup_only",
+		"ignore_invalid_field":      "true",
+		"logkit_send_time":          "false",
+		"pandora_ak":                "ak",
+		"pandora_auto_convert_date": "true",
+		"pandora_gzip":              "true",
+		"pandora_host":              "http://127.0.0.1:" + pt,
+		"pandora_region":            "nb",
+		"pandora_repo_name":         "TestPandoraSenderTime",
+		"pandora_schema_free":       "true",
+		"pandora_sk":                "sk",
+		"runner_name":               "runner.20171117110730",
+		"sender_type":               "pandora",
+		"name":                      "TestPandoraSenderTime",
+		"KeyPandoraSchemaUpdateInterval": "1s",
+	}
+	s, err = NewPandoraSender(conf2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d = Data{}
+	d["x1"] = "123.2"
+	err = s.Send([]Data{d})
+	if st, ok := err.(*utils.StatsError); ok {
+		err = st.ErrorDetail
+	}
+	if err != nil {
+		t.Error(err)
+	}
+	resp = pandora.Body
+	assert.Equal(t, resp, "x1=123.2")
 }

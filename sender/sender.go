@@ -35,10 +35,11 @@ type StatsSender interface {
 
 // Sender's conf keys
 const (
-	KeySenderType    = "sender_type"
-	KeyFaultTolerant = "fault_tolerant"
-	KeyName          = "name"
-	KeyRunnerName    = "runner_name"
+	KeySenderType     = "sender_type"
+	KeyFaultTolerant  = "fault_tolerant"
+	KeyName           = "name"
+	KeyRunnerName     = "runner_name"
+	KeyLogkitSendTime = "logkit_send_time"
 )
 
 const UnderfinedRunnerName = "UnderfinedRunnerName"
@@ -52,6 +53,7 @@ const (
 	TypeMock              = "mock"          // mock sender
 	TypeDiscard           = "discard"       // discard sender
 	TypeElastic           = "elasticsearch" // elastic
+	TypeKafka             = "kafka"         // kafka
 )
 
 const (
@@ -77,6 +79,7 @@ func NewSenderRegistry() *SenderRegistry {
 	ret.RegisterSender(TypeElastic, NewElasticSender)
 	ret.RegisterSender(TypeMock, NewMockSender)
 	ret.RegisterSender(TypeDiscard, NewDiscardSender)
+	ret.RegisterSender(TypeKafka, NewKafkaSender)
 	return ret
 }
 

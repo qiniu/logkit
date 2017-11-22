@@ -26,9 +26,11 @@ var DEFAULT_LOGKIT_REST_DIR = "/.logkitconfs"
 
 type ManagerConfig struct {
 	BindHost string `json:"bind_host"`
+
 	Idc      string `json:"idc"`
 	Zone     string `json:"zone"`
 	RestDir  string `json:"rest_dir"`
+	Cluster  ClusterConfig `json:"cluster"`
 }
 
 type cleanQueue struct {
@@ -399,7 +401,7 @@ func (m *Manager) addWatchers(confsPath []string) (err error) {
 			continue
 		}
 		if len(paths) <= 0 {
-			log.Warnf("confPath Config %v can not find any real conf dir", dir)
+			log.Debugf("confPath Config %v can not find any real conf dir", dir)
 		}
 		for _, path := range paths {
 			m.watcherMux.RLock()

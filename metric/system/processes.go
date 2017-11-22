@@ -13,9 +13,46 @@ import (
 	"runtime"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/qiniu/logkit/metric"
+	"github.com/qiniu/logkit/utils"
 )
+
+const (
+	TypeMetricProcesses  = "processes"
+	MetricProcessesUsage = "系统进程(processes)"
+
+	// TypeMetricProcesses 信息中的字段
+	KeyProcessesBlocked      = "processes_blocked"
+	KeyProcessesZombies      = "processes_zombies"
+	KeyProcessesStopped      = "processes_stopped"
+	KeyProcessesRunning      = "processes_running"
+	KeyProcessesSleeping     = "processes_sleeping"
+	KeyProcessesTotal        = "processes_total"
+	KeyProcessesUnknown      = "processes_unknown"
+	KeyProcessesIdle         = "processes_idle"
+	KeyProcessesWait         = "processes_wait"
+	KeyProcessesDead         = "processes_dead"
+	KeyProcessesPaging       = "processes_paging"
+	KeyProcessesTotalThreads = "processes_total_threads"
+)
+
+// KeyProcessesUsages TypeMetricProcesses 的字段名称
+var KeyProcessesUsages = []utils.KeyValue{
+	{KeyProcessesBlocked, "不可中断的睡眠状态下的进程数('U','D','L')"},
+	{KeyProcessesZombies, "僵尸态进程数('Z')"},
+	{KeyProcessesStopped, "暂停状态进程数('T')"},
+	{KeyProcessesRunning, "运行中的进程数('R')"},
+	{KeyProcessesSleeping, "可中断进程数('S')"},
+	{KeyProcessesTotal, "总进程数"},
+	{KeyProcessesIdle, "挂起的空闲进程数('I')"},
+	{KeyProcessesWait, "等待中的进程数('W')"},
+	{KeyProcessesDead, "回收中的进程数('X')"},
+	{KeyProcessesPaging, "等待中的进程数('W')"},
+	{KeyProcessesTotalThreads, "总线程数"},
+	{KeyProcessesUnknown, "未知状态进程数"},
+}
 
 type Processes struct {
 	execPS       func() ([]byte, error)
@@ -26,7 +63,19 @@ type Processes struct {
 }
 
 func (p *Processes) Name() string {
-	return "processes"
+	return TypeMetricProcesses
+}
+
+func (p *Processes) Usages() string {
+	return MetricProcessesUsage
+}
+
+func (_ *Processes) Config() map[string]interface{} {
+	config := map[string]interface{}{
+		metric.OptionString:     []utils.Option{},
+		metric.AttributesString: KeyProcessesUsages,
+	}
+	return config
 }
 
 func (p *Processes) Collect() (datas []map[string]interface{}, err error) {
@@ -54,6 +103,8 @@ func (p *Processes) Collect() (datas []map[string]interface{}, err error) {
 			return nil, err
 		}
 	}
+	now := time.Now().Format(time.RFC3339Nano)
+	fields[TypeMetricProcesses+"_"+metric.Timestamp] = now
 	datas = append(datas, fields)
 	return
 }
@@ -61,26 +112,26 @@ func (p *Processes) Collect() (datas []map[string]interface{}, err error) {
 // Gets empty fields of metrics based on the OS
 func getEmptyFields() map[string]interface{} {
 	fields := map[string]interface{}{
-		"blocked":  int64(0),
-		"zombies":  int64(0),
-		"stopped":  int64(0),
-		"running":  int64(0),
-		"sleeping": int64(0),
-		"total":    int64(0),
-		"unknown":  int64(0),
+		KeyProcessesBlocked:  int64(0),
+		KeyProcessesZombies:  int64(0),
+		KeyProcessesStopped:  int64(0),
+		KeyProcessesRunning:  int64(0),
+		KeyProcessesSleeping: int64(0),
+		KeyProcessesTotal:    int64(0),
+		KeyProcessesUnknown:  int64(0),
 	}
 	switch runtime.GOOS {
 	case "freebsd":
-		fields["idle"] = int64(0)
-		fields["wait"] = int64(0)
+		fields[KeyProcessesIdle] = int64(0)
+		fields[KeyProcessesWait] = int64(0)
 	case "darwin":
-		fields["idle"] = int64(0)
+		fields[KeyProcessesIdle] = int64(0)
 	case "openbsd":
-		fields["idle"] = int64(0)
+		fields[KeyProcessesIdle] = int64(0)
 	case "linux":
-		fields["dead"] = int64(0)
-		fields["paging"] = int64(0)
-		fields["total_threads"] = int64(0)
+		fields[KeyProcessesDead] = int64(0)
+		fields[KeyProcessesPaging] = int64(0)
+		fields[KeyProcessesTotalThreads] = int64(0)
 	}
 	return fields
 }
@@ -99,29 +150,29 @@ func (p *Processes) gatherFromPS(fields map[string]interface{}) error {
 		}
 		switch status[0] {
 		case 'W':
-			fields["wait"] = fields["wait"].(int64) + int64(1)
+			fields[KeyProcessesWait] = fields[KeyProcessesWait].(int64) + int64(1)
 		case 'U', 'D', 'L':
 			// Also known as uninterruptible sleep or disk sleep
-			fields["blocked"] = fields["blocked"].(int64) + int64(1)
+			fields[KeyProcessesBlocked] = fields[KeyProcessesBlocked].(int64) + int64(1)
 		case 'Z':
-			fields["zombies"] = fields["zombies"].(int64) + int64(1)
+			fields[KeyProcessesZombies] = fields[KeyProcessesZombies].(int64) + int64(1)
 		case 'X':
-			fields["dead"] = fields["dead"].(int64) + int64(1)
+			fields[KeyProcessesDead] = fields[KeyProcessesDead].(int64) + int64(1)
 		case 'T':
-			fields["stopped"] = fields["stopped"].(int64) + int64(1)
+			fields[KeyProcessesStopped] = fields[KeyProcessesStopped].(int64) + int64(1)
 		case 'R':
-			fields["running"] = fields["running"].(int64) + int64(1)
+			fields[KeyProcessesRunning] = fields[KeyProcessesRunning].(int64) + int64(1)
 		case 'S':
-			fields["sleeping"] = fields["sleeping"].(int64) + int64(1)
+			fields[KeyProcessesSleeping] = fields[KeyProcessesSleeping].(int64) + int64(1)
 		case 'I':
-			fields["idle"] = fields["idle"].(int64) + int64(1)
+			fields[KeyProcessesIdle] = fields[KeyProcessesIdle].(int64) + int64(1)
 		case '?':
-			fields["unknown"] = fields["unknown"].(int64) + int64(1)
+			fields[KeyProcessesUnknown] = fields[KeyProcessesUnknown].(int64) + int64(1)
 		default:
 			log.Printf("I! processes: Unknown state [ %s ] from ps",
 				string(status[0]))
 		}
-		fields["total"] = fields["total"].(int64) + int64(1)
+		fields[KeyProcessesTotal] = fields[KeyProcessesTotal].(int64) + int64(1)
 	}
 	return nil
 }
@@ -157,31 +208,31 @@ func (p *Processes) gatherFromProc(fields map[string]interface{}) error {
 		}
 		switch stats[0][0] {
 		case 'R':
-			fields["running"] = fields["running"].(int64) + int64(1)
+			fields[KeyProcessesRunning] = fields[KeyProcessesRunning].(int64) + int64(1)
 		case 'S':
-			fields["sleeping"] = fields["sleeping"].(int64) + int64(1)
+			fields[KeyProcessesSleeping] = fields[KeyProcessesSleeping].(int64) + int64(1)
 		case 'D':
-			fields["blocked"] = fields["blocked"].(int64) + int64(1)
+			fields[KeyProcessesBlocked] = fields[KeyProcessesBlocked].(int64) + int64(1)
 		case 'Z':
-			fields["zombies"] = fields["zombies"].(int64) + int64(1)
+			fields[KeyProcessesZombies] = fields[KeyProcessesZombies].(int64) + int64(1)
 		case 'X':
-			fields["dead"] = fields["dead"].(int64) + int64(1)
+			fields[KeyProcessesDead] = fields[KeyProcessesDead].(int64) + int64(1)
 		case 'T', 't':
-			fields["stopped"] = fields["stopped"].(int64) + int64(1)
+			fields[KeyProcessesStopped] = fields[KeyProcessesStopped].(int64) + int64(1)
 		case 'W':
-			fields["paging"] = fields["paging"].(int64) + int64(1)
+			fields[KeyProcessesPaging] = fields[KeyProcessesPaging].(int64) + int64(1)
 		default:
 			log.Printf("I! processes: Unknown state [ %s ] in file %s",
 				string(stats[0][0]), filename)
 		}
-		fields["total"] = fields["total"].(int64) + int64(1)
+		fields[KeyProcessesTotal] = fields[KeyProcessesTotal].(int64) + int64(1)
 
 		threads, err := strconv.Atoi(string(stats[17]))
 		if err != nil {
 			log.Printf("I! processes: Error parsing thread count: %s", err)
 			continue
 		}
-		fields["total_threads"] = fields["total_threads"].(int64) + int64(threads)
+		fields[KeyProcessesTotalThreads] = fields[KeyProcessesTotalThreads].(int64) + int64(threads)
 	}
 	return nil
 }
@@ -220,7 +271,7 @@ func execPS() ([]byte, error) {
 }
 
 func init() {
-	metric.Add("processes", func() metric.Collector {
+	metric.Add(TypeMetricProcesses, func() metric.Collector {
 		return &Processes{
 			execPS:       execPS,
 			readProcFile: readProcFile,

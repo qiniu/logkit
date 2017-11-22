@@ -3,11 +3,11 @@ package reader
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-	"fmt"
 
 	"github.com/Shopify/sarama"
 	"github.com/qiniu/log"
@@ -16,13 +16,13 @@ import (
 )
 
 type KafkaReader struct {
-	meta            *Meta
-	ConsumerGroup   string
-	Topics          []string
-	ZookeeperPeers  []string
-	ZookeeperChroot string
+	meta             *Meta
+	ConsumerGroup    string
+	Topics           []string
+	ZookeeperPeers   []string
+	ZookeeperChroot  string
 	ZookeeperTimeout time.Duration
-	Whence          string
+	Whence           string
 
 	Consumer *consumergroup.ConsumerGroup
 	in       <-chan *sarama.ConsumerMessage
@@ -41,21 +41,21 @@ type KafkaReader struct {
 }
 
 func NewKafkaReader(meta *Meta, consumerGroup string,
-	topics []string, zookeeper []string,zookeeperTimeout time.Duration, whence string) (kr *KafkaReader, err error) {
+	topics []string, zookeeper []string, zookeeperTimeout time.Duration, whence string) (kr *KafkaReader, err error) {
 	kr = &KafkaReader{
-		meta:           meta,
-		ConsumerGroup:  consumerGroup,
-		ZookeeperPeers: zookeeper,
-		ZookeeperTimeout:zookeeperTimeout,
-		Topics:         topics,
-		Whence:         whence,
-		readChan:       make(chan json.RawMessage),
-		errs:           make(chan error, 1000),
-		status:         StatusInit,
-		mux:            sync.Mutex{},
-		startMux:       sync.Mutex{},
-		statsLock:      sync.RWMutex{},
-		started:        false,
+		meta:             meta,
+		ConsumerGroup:    consumerGroup,
+		ZookeeperPeers:   zookeeper,
+		ZookeeperTimeout: zookeeperTimeout,
+		Topics:           topics,
+		Whence:           whence,
+		readChan:         make(chan json.RawMessage),
+		errs:             make(chan error, 1000),
+		status:           StatusInit,
+		mux:              sync.Mutex{},
+		startMux:         sync.Mutex{},
+		statsLock:        sync.RWMutex{},
+		started:          false,
 	}
 	return kr, nil
 }
@@ -159,7 +159,8 @@ func (kr *KafkaReader) run() {
 			break
 		}
 	}
-	// running在退出状态改为Init
+	// running时退出 状态改为Init，以便 cron 调度下次运行
+	// stopping时推出改为 stopped，不再运行
 	defer func() {
 		atomic.CompareAndSwapInt32(&kr.status, StatusRunning, StatusInit)
 		if atomic.CompareAndSwapInt32(&kr.status, StatusStoping, StatusStopped) {

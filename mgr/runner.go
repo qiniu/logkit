@@ -70,6 +70,8 @@ type RunnerStatus struct {
 	ReadSpeed        float64 `json:"readspeed"`
 	ReadSpeedTrendKb string  `json:"readspeedtrend_kb"`
 	ReadSpeedTrend   string  `json:"readspeedtrend"`
+	Tag              string  `json:"tag,omitempty"`
+	Url              string  `json:"url,omitempty"`
 }
 
 type RunnerLag struct {
@@ -81,7 +83,7 @@ type RunnerLag struct {
 // RunnerConfig 从多数据源读取，经过解析后，发往多个数据目的地
 type RunnerConfig struct {
 	RunnerInfo
-	Metric        []conf.MapConf           `json:"metric,omitempty"`
+	MetricConfig  []MetricConfig           `json:"metric,omitempty"`
 	ReaderConfig  conf.MapConf             `json:"reader"`
 	CleanerConfig conf.MapConf             `json:"cleaner,omitempty"`
 	ParserConf    conf.MapConf             `json:"parser"`
@@ -93,7 +95,7 @@ type RunnerConfig struct {
 
 type RunnerInfo struct {
 	RunnerName       string `json:"name"`
-	CollectInterval  string `json:"collect_interval,omitempty"` // metric runner收集的频率
+	CollectInterval  int    `json:"collect_interval,omitempty"` // metric runner收集的频率
 	MaxBatchLen      int    `json:"batch_len,omitempty"`        // 每个read batch的行数
 	MaxBatchSize     int    `json:"batch_size,omitempty"`       // 每个read batch的字节数
 	MaxBatchInteval  int    `json:"batch_interval,omitempty"`   // 最大发送时间间隔
@@ -139,7 +141,7 @@ func NewCustomRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, ps *
 	if sr == nil {
 		sr = sender.NewSenderRegistry()
 	}
-	if rc.Metric != nil {
+	if rc.MetricConfig != nil {
 		return NewMetricRunner(rc, sender.NewSenderRegistry())
 	}
 	return NewLogExportRunner(rc, cleanChan, ps, sr)
@@ -326,8 +328,6 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []sender.Data, times in
 		if se, ok := err.(*utils.StatsError); ok {
 			err = se.ErrorDetail
 			if se.Ft {
-				info.Errors = se.Errors
-				info.Success = se.Success
 				r.rs.Lag.Ftlags = se.Ftlag
 			} else {
 				if cnt > 1 {
@@ -416,11 +416,6 @@ func (r *LogExportRunner) Run() {
 		r.batchSize = 0
 		r.lastSend = time.Now()
 
-		if len(lines) <= 0 {
-			log.Debugf("Runner[%v] fetched 0 lines", r.Name())
-			continue
-		}
-
 		for i := range r.transformers {
 			var err error
 			if r.transformers[i].Stage() == transforms.StageBeforeParser {
@@ -430,6 +425,17 @@ func (r *LogExportRunner) Run() {
 				}
 			}
 		}
+
+		if len(lines) <= 0 {
+			log.Debugf("Runner[%v] fetched 0 lines", r.Name())
+			pt, ok := r.parser.(parser.ParserType)
+			if ok && pt.Type() == parser.TypeSyslog {
+				lines = []string{parser.SyslogEofLine}
+			} else {
+				continue
+			}
+		}
+
 		// parse data
 		datas, err := r.parser.Parse(lines)
 		se, ok := err.(*utils.StatsError)

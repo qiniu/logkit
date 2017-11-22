@@ -39,7 +39,7 @@ type Config struct {
 var conf Config
 
 const (
-	Version           = "v1.3.5"
+	Version           = "v1.3.6"
 	defaultReserveCnt = 5
 	defaultLogDir     = "./run"
 	defaultLogPattern = "*.log-*"
@@ -180,6 +180,9 @@ func main() {
 		go func() {
 			log.Println(http.ListenAndServe(conf.ProfileHost, nil))
 		}()
+	}
+	if err = rs.Register(); err != nil {
+		log.Fatalf("register master error %v", err)
 	}
 	utils.WaitForInterrupt(func() {
 		rs.Stop()
