@@ -442,19 +442,13 @@ func (rs *RestService) PostConfigStop() echo.HandlerFunc {
 			errMsg := "the runner " + name + " is not running"
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerStop, errMsg)
 		}
-		// 如果不置为 true 就会在前端短暂性的出现 runner 的状态为 "异常"
+		if err = rs.mgr.RemoveWithConfig(filename, false); err != nil {
+			return RespError(c, http.StatusBadRequest, utils.ErrRunnerStop, err.Error())
+		}
 		runnerConfig.IsStopped = true
 		rs.mgr.lock.Lock()
 		rs.mgr.runnerConfig[filename] = runnerConfig
 		rs.mgr.lock.Unlock()
-		if err = rs.mgr.RemoveWithConfig(filename, false); err != nil {
-			// 失败了要把它改回来
-			runnerConfig.IsStopped = false
-			rs.mgr.lock.Lock()
-			rs.mgr.runnerConfig[filename] = runnerConfig
-			rs.mgr.lock.Unlock()
-			return RespError(c, http.StatusBadRequest, utils.ErrRunnerStop, err.Error())
-		}
 		if err = rs.backupRunnerConfig(runnerConfig, filename); err != nil {
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerStop, err.Error())
 		}
