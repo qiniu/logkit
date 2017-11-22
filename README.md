@@ -150,6 +150,35 @@ docker run -d -p 3000:3000 -v /local/logkit/dataconf:/app/confs -v /local/log/pa
 
 需要注意的是，镜像中的logkit收集 `/logs`目录下的日志，需要把本地的日志目录也挂载到镜像里面去才能启动，比如本地的日志目录为`/local/log/path`, 挂载到镜像中的`/logs/path`目录，那么`/local/logkit/dataconf`目录下的配置文件填写的日志路径必须是`/logs/path`。
 
+## 在 Kubernetes 上部署logkit
+
+获取部署到Kubernetes的配置文件。
+
+```
+curl -L -O https://raw.githubusercontent.com/qiniu/logkit/develop/deploy/logkit_on_k8s.yaml
+```
+
+默认情况下，我们的配置文件会使用 `kube-system` 这个 Kubernetes 的 namespace ，所有的部署仅针对该 namespace 生效。如果你想要使用别的 namespace ，只需要修改配置文件的 namespace 部分，将之改为你的 namespace 名称。
+
+运行这份默认的配置文件之前，只需要修改2个基本参数：
+ 
+``` 
+ - name: QINIU_ACCESS_KEY
+   value: change_me_to_your_qiniu_access_key
+ - name: QINIU_SECRET_KEY
+   value: change_me_to_your_qiniu_secret_key
+```
+
+将 `change_me_to_your_qiniu_access_key` 改为您七牛账号的 AK(access_key) ，将 `change_me_to_your_qiniu_secret_key` 改为您七牛账号的SK(secret_key)。
+
+执行 Kubernetes 命令，启动：
+
+```
+kubectl create -f logkit_on_k8s.yaml
+```
+
+然后日志就会源源不断流向你的pandora账号啦！
+
 enjoy it！
 
 
