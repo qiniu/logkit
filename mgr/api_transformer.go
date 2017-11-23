@@ -6,7 +6,6 @@ import (
 	"github.com/labstack/echo"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
-	"github.com/qiniu/logkit/conf"
 	"fmt"
 	"encoding/json"
 	"github.com/qiniu/logkit/sender"
@@ -56,15 +55,16 @@ func (rs *RestService) GetTransformerSampleConfigs() echo.HandlerFunc {
 // Return result string in json array format
 func (rs *RestService) PostTransform() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		var paramErr error // error caused by invalid param
-		var transErr error // error caused by incorrect transform process
-		var tp string // transformer type string
+		var ok bool                      // value exists in a map / assertion is successful
+		var jsonErr error                // error caused by json marshal or unmarshal
+		var transErr error               // error caused by incorrect transform process
+		var tp string                    // transformer type string
 		var trans transforms.Transformer // transformer itself
-		var rawLogs string // sample logs picked from request in json format
-		var data = []sender.Data{} // multiple sample logs in map format
-		var singleData sender.Data // single sample log in map format
+		var rawLogs string               // sample logs picked from request in json format
+		var data = []sender.Data{}       // multiple sample logs in map format
+		var singleData sender.Data       // single sample log in map format
 		var bts []byte
-		reqConf := conf.MapConf{} // request body params in map format
+		var reqConf map[string]interface{} // request body params in map format
 
 		// bind request context onto map[string]string
 		if err := c.Bind(&reqConf); err != nil {
@@ -73,10 +73,13 @@ func (rs *RestService) PostTransform() echo.HandlerFunc {
 
 		// Get params from request & Valid Params & Initialize transformer using valid params
 		// param 1: transformer type
-		tp, paramErr = reqConf.GetString(transforms.KeyType)
-		if paramErr != nil {
+		if _, ok = reqConf[transforms.KeyType]; !ok {
 			// param absence
-			return echo.NewHTTPError(http.StatusBadRequest, paramErr.Error())
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("missing param %s", transforms.KeyType))
+		}
+		tp, ok = (reqConf[transforms.KeyType]).(string)
+		if !ok {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("param %s must be of type string", transforms.KeyType))
 		}
 		create, ok := transforms.Transformers[tp]
 		if !ok {
@@ -84,16 +87,17 @@ func (rs *RestService) PostTransform() echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("type %v of transformer not exist", tp))
 		}
 		// param 2: sample logs
-		rawLogs, paramErr = reqConf.GetString(KeySampleLog)
-		if paramErr != nil {
-			// param absence
-			return echo.NewHTTPError(http.StatusBadRequest, paramErr.Error())
+		if _, ok = reqConf[KeySampleLog]; !ok {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("missing param %s", KeySampleLog))
 		}
-		if paramErr = json.Unmarshal([]byte(rawLogs), &singleData); paramErr != nil {
+		if rawLogs, ok = (reqConf[KeySampleLog]).(string); !ok {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("param %s must be of type string", KeySampleLog))
+		}
+		if jsonErr = json.Unmarshal([]byte(rawLogs), &singleData); jsonErr != nil {
 			// may be multiple sample logs
-			if paramErr = json.Unmarshal([]byte(rawLogs), &data); paramErr != nil {
+			if jsonErr = json.Unmarshal([]byte(rawLogs), &data); jsonErr != nil {
 				// invalid JSON, neither multiple sample logs nor single sample log
-				return echo.NewHTTPError(http.StatusBadRequest, paramErr.Error())
+				return echo.NewHTTPError(http.StatusBadRequest, jsonErr.Error())
 			}
 		} else {
 			// is single log, and method transformer.transform(data []sender.Data) accept a param of slice type
@@ -103,15 +107,15 @@ func (rs *RestService) PostTransform() echo.HandlerFunc {
 		trans = create()
 		reqConf = convertWebTransformerConfig(reqConf)
 		delete(reqConf, KeySampleLog)
-		if bts, paramErr = json.Marshal(reqConf); paramErr != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, paramErr.Error())
+		if bts, jsonErr = json.Marshal(reqConf); jsonErr != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, jsonErr.Error())
 		}
-		if paramErr = json.Unmarshal(bts, trans); paramErr != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, paramErr.Error())
+		if jsonErr = json.Unmarshal(bts, trans); jsonErr != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, jsonErr.Error())
 		}
 		if trans, ok := trans.(transforms.Initialize); ok {
-			if paramErr = trans.Init(); paramErr != nil {
-				return echo.NewHTTPError(http.StatusBadRequest, paramErr.Error())
+			if err := trans.Init(); err != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 			}
 		}
 
@@ -122,7 +126,7 @@ func (rs *RestService) PostTransform() echo.HandlerFunc {
 			if ok {
 				transErr = se.ErrorDetail
 			}
-			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("transformer type error %v", transErr))
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("transform processing error %v", transErr))
 		}
 
 		// Transform Success

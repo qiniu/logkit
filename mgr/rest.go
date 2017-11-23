@@ -251,7 +251,7 @@ func convertWebParserConfig(conf conf.MapConf) conf.MapConf {
 	return conf
 }
 
-func convertWebTransformerConfig(conf conf.MapConf) conf.MapConf {
+func convertWebTransformerConfig(conf map[string]interface{}) map[string]interface{} {
 	if conf == nil {
 		return conf
 	}
