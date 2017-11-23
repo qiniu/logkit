@@ -70,6 +70,9 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	router.PUT(PREFIX+"/configs/:name", rs.PutConfig())
 	router.DELETE(PREFIX+"/configs/:name", rs.DeleteConfig())
 
+	// runners API
+	router.GET(PREFIX+"/runners", rs.GetRunners())
+
 	//reader API
 	router.GET(PREFIX+"/reader/usages", rs.GetReaderUsages())
 	router.GET(PREFIX+"/reader/options", rs.GetReaderKeyOptions())
@@ -109,6 +112,7 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	router.DELETE(PREFIX+"/cluster/slaves", rs.DeleteSlaves())
 	router.POST(PREFIX+"/cluster/slaves/tag", rs.PostSlaveTag())
 	router.GET(PREFIX+"/cluster/status", rs.ClusterStatus())
+	router.GET(PREFIX+"/cluster/runners", rs.GetClusterRunners())
 	router.GET(PREFIX+"/cluster/configs", rs.GetClusterConfigs())
 	router.POST(PREFIX+"/cluster/configs/:name", rs.PostClusterConfig())
 	router.PUT(PREFIX+"/cluster/configs/:name", rs.PutClusterConfig())
@@ -224,6 +228,17 @@ func (rs *RestService) Status() echo.HandlerFunc {
 			}
 		}
 		return RespSuccess(c, rss)
+	}
+}
+
+// get /logkit/runners
+func (rs *RestService) GetRunners() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		runnerNameList := make([]string, 0)
+		for _, conf := range rs.mgr.runnerConfig {
+			runnerNameList = append(runnerNameList, conf.RunnerName)
+		}
+		return RespSuccess(c, runnerNameList)
 	}
 }
 

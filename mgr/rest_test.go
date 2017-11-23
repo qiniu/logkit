@@ -69,7 +69,7 @@ var testRestConf = `{
     "name":"test1.csv",
     "batch_len": 1,
     "batch_size": 20,
-    "batch_interval": 60,
+    "batch_interval": 1,
     "batch_try_times": 3,
     "reader":{
         "log_path":"./Test_Rest/logdir",
@@ -1253,6 +1253,9 @@ func TestGetErrorCode(t *testing.T) {
 		t.Fatal(err)
 	}
 	rs := NewRestService(m, echo.New())
+	defer func() {
+		rs.Stop()
+	}()
 	resp, err := http.Get("http://127.0.0.1" + conf.BindHost + "/logkit/errorcode")
 	assert.NoError(t, err)
 	respCodeMap := respErrorCode{}
@@ -1268,7 +1271,109 @@ func TestGetErrorCode(t *testing.T) {
 			assert.Equal(t, val, cm)
 		}
 	}
+}
+
+func TestGetRunners(t *testing.T) {
+	var runnerConf1 = `{
+    "name":"test1.csv",
+    "batch_size": 1000,
+    "batch_interval": 1,
+    "batch_try_times": 3,
+    "reader":{
+        "log_path":"./TestGetRunners/logdir",
+        "meta_path":"./TestGetRunners/meta_mock_csv",
+        "mode":"dir",
+        "read_from":"oldest",
+        "ignore_hidden":"true"
+    },
+    "parser":{
+        "name":         "req_csv",
+		"type":         "json"
+    },
+    "senders":[{
+		"name":           "file_sender",
+		"sender_type":    "file",
+		"file_send_path": "./TestGetRunners/filesenderdata"
+    }]
+}`
+	var runnerConf2 = `{
+    "name":"test2.csv",
+    "batch_size": 1000,
+    "batch_interval": 1,
+    "batch_try_times": 3,
+    "reader":{
+        "log_path":"./TestGetRunners/logdir",
+        "meta_path":"./TestGetRunners/meta_mock_csv",
+        "mode":"dir",
+        "read_from":"oldest",
+        "ignore_hidden":"true"
+    },
+    "parser":{
+        "name":         "req_csv",
+		"type":         "json"
+    },
+    "senders":[{
+		"name":           "file_sender",
+		"sender_type":    "file",
+		"file_send_path": "./TestGetRunners/filesenderdata"
+    }]
+}`
+	dir := "TestGetRunners"
+	if err := os.Mkdir(dir, 0755); err != nil {
+		log.Fatalf("Test_RunnerData error mkdir %v %v", dir, err)
+	}
+	defer os.RemoveAll(dir)
+	logPath := dir + "/logdir"
+	metaPath := dir + "/meta_mock_csv"
+	logConfs := dir + "/confs"
+	if err := os.Mkdir(logPath, 0755); err != nil {
+		log.Fatalf("Test_Run error mkdir %v %v", logPath, err)
+	}
+	if err := os.Mkdir(metaPath, 0755); err != nil {
+		log.Fatalf("Test_Run error mkdir %v %v", metaPath, err)
+	}
+	if err := os.Mkdir(logConfs, 0755); err != nil {
+		log.Fatalf("Test_Run error mkdir %v %v", logConfs, err)
+	}
+	var conf ManagerConfig
+	conf.BindHost = ":6701"
+	m, err := NewManager(conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rs := NewRestService(m, echo.New())
 	defer func() {
 		rs.Stop()
 	}()
+	resp, err := http.Post("http://127.0.0.1"+rs.address+"/logkit/configs/"+"test1.csv", TESTContentApplictionJson, bytes.NewReader([]byte(runnerConf1)))
+	assert.NoError(t, err)
+	content, _ := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		t.Error(string(content))
+	}
+	time.Sleep(1 * time.Second)
+	resp, err = http.Post("http://127.0.0.1"+rs.address+"/logkit/configs/"+"test2.csv", TESTContentApplictionJson, bytes.NewReader([]byte(runnerConf2)))
+	assert.NoError(t, err)
+	content, _ = ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		t.Error(string(content))
+	}
+	time.Sleep(1 * time.Second)
+	resp, err = http.Get("http://127.0.0.1" + conf.BindHost + "/logkit/runners")
+	assert.NoError(t, err)
+	var respRunner respRunnersNameList
+	content, _ = ioutil.ReadAll(resp.Body)
+	err = json.Unmarshal(content, &respRunner)
+	assert.NoError(t, err)
+	runnerNameList := respRunner.Data
+	assert.Equal(t, 2, len(runnerNameList))
+	res := make([]string, 0)
+	if runnerNameList[0] == "test1.csv" {
+		res = append(res, "test1.csv")
+		res = append(res, "test2.csv")
+	} else {
+		res = append(res, "test2.csv")
+		res = append(res, "test1.csv")
+	}
+	assert.Equal(t, res, runnerNameList)
 }

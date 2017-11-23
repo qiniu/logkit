@@ -62,6 +62,27 @@ Content-Type: application/json
 
 ## Runner
 
+### 获取runner name list
+```
+GET /logkit/runners
+```
+
+返回值:
+* 如果没有错误, 返回
+```
+{
+    "code": "L200",
+    "data": ["runner1", "runner2"]
+}
+```
+* 如果有错误:
+```
+{
+    "code": <error code>,
+    "error": <error message>
+}
+```
+
 ### 获取runner运行状态
 
 请求

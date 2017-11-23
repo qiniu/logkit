@@ -148,6 +148,29 @@ GET /logkit/cluster/slaves?tag=tagvalue&url=urlvalue
 * status 状态有三种， ok，表示正常，30s内有联系；bad，表示1分钟内有联系；lost，表示超过1分钟无心跳
 * 可以通过tag url参数获取一类tag的列表
 
+### Master API -- 获取slave的 runner name list
+```
+GET /logkit/cluster/runners?tag=tagvalue&url=urlvalue
+```
+
+返回值:
+* 如果没有错误, 返回
+```
+{
+    "code": "L200",
+    "data": ["runner1", "runner2"]
+}
+```
+* 如果有错误:
+```
+{
+    "code": <error code>,
+    "error": <error message>
+}
+```
+* 参数`tag`和`url`非空时将作为被操作`slave`的过滤条件，即上述操作只对满足对应条件的`slave`有效。
+* 获取的 runner name list 为各个符合条件的 slave 上的 runner name 的并集
+
 ### Master API -- 删除slave
 
 ```

@@ -53,6 +53,11 @@ type SlaveConfig struct {
 	Err     error                   `json:"error"`
 }
 
+type respRunnersNameList struct {
+	Code string   `json:"code"`
+	Data []string `json:"data"`
+}
+
 type respRunnerStatus struct {
 	Code string                  `json:"code"`
 	Data map[string]RunnerStatus `json:"data"`
@@ -170,6 +175,38 @@ func (rs *RestService) Slaves() echo.HandlerFunc {
 		slaves, _ := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
 		return RespSuccess(c, slaves)
+	}
+}
+
+// master API
+// GET /logkit/cluster/runners?tag=tagValue&url=urlValue
+func (rs *RestService) GetClusterRunners() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		_, tag, url, _, err := rs.checkClusterRequest(c)
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterSlaves, err.Error())
+		}
+		rs.cluster.UpdateSlaveStatus()
+		rs.cluster.mutex.RLock()
+		slaves, _ := getQualifySlaves(rs.cluster.slaves, tag, url)
+		rs.cluster.mutex.RUnlock()
+		runnerNameSet := utils.NewHashSet()
+		for _, v := range slaves {
+			var respRss respRunnersNameList
+			url := fmt.Sprintf("%v/logkit/runners", v.Url)
+			respCode, respBody, err := executeToOneCluster(url, http.MethodGet, []byte{})
+			if err != nil || respCode != http.StatusOK {
+				log.Errorf("get slave(tag='%v', url='%v') runner name list failed, resp is %v, error is %v", v.Tag, v.Url, string(respBody), err.Error())
+				continue
+			} else {
+				if err = json.Unmarshal(respBody, &respRss); err != nil {
+					log.Errorf("unmarshal slave(tag='%v', url='%v') runner name list failed, error is %v", v.Tag, v.Url, err.Error())
+				} else {
+					runnerNameSet.AddStringArray(respRss.Data)
+				}
+			}
+		}
+		return RespSuccess(c, runnerNameSet.Elements())
 	}
 }
 
