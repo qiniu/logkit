@@ -179,54 +179,7 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 	var fr FileReader
 	switch mode {
 	case ModeDir:
-		// for example: The path is "/usr/logkit/" It must be a directory
-		_ , after := path.Split(logpath)
-		//path with * matching tailx mode
-		isSub := strings.Contains(logpath, "*")
-		if isSub == true {
-			meta.mode = ModeTailx
-			expireDur, _ := conf.GetStringOr(KeyExpire, "24h")
-			stateIntervalDur, _ := conf.GetStringOr(KeyStatInterval, "3m")
-			maxOpenFiles, _ := conf.GetIntOr(KeyMaxOpenFiles, 256)
-			reader, err = NewMultiReader(meta, logpath, whence, expireDur, stateIntervalDur, maxOpenFiles)
-		}else if after == "" {
-			// 默认不读取隐藏文件
-			ignoreHidden, _ := conf.GetBoolOr(KeyIgnoreHiddenFile, true)
-			ignoreFileSuffix, _ := conf.GetStringListOr(KeyIgnoreFileSuffix, defaultIgnoreFileSuffix)
-			validFilesRegex, _ := conf.GetStringOr(KeyValidFilePattern, "*")
-			fr, err = NewSeqFile(meta, logpath, ignoreHidden, ignoreFileSuffix, validFilesRegex, whence)
-			if err != nil {
-				return
-			}
-			reader, err = NewReaderSize(fr, meta, bufSize)
-		}else {
-			//for "/usr/logkit" this path to make judgments
-			dirStr := path.Dir(logpath)
-			lastStr := path.Base(logpath)
-			files,_ := ioutil.ReadDir(dirStr)
-			for _, file := range files {
-				if file.Name() == lastStr {
-					if file.IsDir(){
-						ignoreHidden, _ := conf.GetBoolOr(KeyIgnoreHiddenFile, true)
-						ignoreFileSuffix, _ := conf.GetStringListOr(KeyIgnoreFileSuffix, defaultIgnoreFileSuffix)
-						validFilesRegex, _ := conf.GetStringOr(KeyValidFilePattern, "*")
-						fr, err = NewSeqFile(meta, logpath, ignoreHidden, ignoreFileSuffix, validFilesRegex, whence)
-						if err != nil {
-							return
-						}
-						reader, err = NewReaderSize(fr, meta, bufSize)
-					}else{
-						meta.mode = ModeFile
-						fr, err = NewSingleFile(meta, logpath, whence, isFromWeb)
-						if err != nil {
-							return
-						}
-						reader, err = NewReaderSize(fr, meta, bufSize)
-					}
-					break;
-				}
-			}
-		}
+		
 	case ModeFile:
 		fr, err = NewSingleFile(meta, logpath, whence, isFromWeb)
 		if err != nil {
