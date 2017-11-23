@@ -198,6 +198,9 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 		logpath = strings.Replace(logpath,winsign,comsign,-1)
 		// for example: The path is "/usr/logkit/"
 		_ , after := path.Split(logpath)
+		if after == "" {
+			logpath = path.Dir(logpath)
+		}
 		//path with * matching tailx mode
 		isSub := strings.Contains(logpath, "*")
 		if isSub == true {
@@ -206,16 +209,6 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 			stateIntervalDur, _ := conf.GetStringOr(KeyStatInterval, "3m")
 			maxOpenFiles, _ := conf.GetIntOr(KeyMaxOpenFiles, 256)
 			reader, err = NewMultiReader(meta, logpath, whence, expireDur, stateIntervalDur, maxOpenFiles)
-		}else if after == "" {
-			meta.mode = ModeDir
-			ignoreHidden, _ := conf.GetBoolOr(KeyIgnoreHiddenFile, true)
-			ignoreFileSuffix, _ := conf.GetStringListOr(KeyIgnoreFileSuffix, defaultIgnoreFileSuffix)
-			validFilesRegex, _ := conf.GetStringOr(KeyValidFilePattern, "*")
-			fr, err = NewSeqFile(meta, logpath, ignoreHidden, ignoreFileSuffix, validFilesRegex, whence)
-			if err != nil {
-				return
-			}
-			reader, err = NewReaderSize(fr, meta, bufSize)				
 		}else{
 			//for "/usr/logkit" this path to make judgments
 			dirStr := path.Dir(logpath)
