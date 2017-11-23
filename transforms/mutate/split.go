@@ -31,9 +31,13 @@ func (g *Spliter) Transform(datas []sender.Data) ([]sender.Data, error) {
 		g.stats.LastError = ferr.Error()
 		errnums = len(datas)
 	} else {
+		separator := "."
+		keys := strings.Split(g.Key, separator)
 		for i := range datas {
-			val, ok := datas[i][g.Key]
-			if !ok {
+			newkeys := make([]string, len(keys))
+			copy(newkeys, keys)
+			val, gerr := utils.GetMapValue(datas[i], keys)
+			if gerr != nil {
 				errnums++
 				err = fmt.Errorf("transform key %v not exist in data", g.Key)
 				continue
@@ -44,7 +48,8 @@ func (g *Spliter) Transform(datas []sender.Data) ([]sender.Data, error) {
 				err = fmt.Errorf("transform key %v data type is not string", g.Key)
 				continue
 			}
-			datas[i][g.ArraryName] = strings.Split(strval, g.SeperateKey)
+			newkeys[len(newkeys) -1] = g.ArraryName
+			utils.SetMapValue(datas[i], newkeys, strings.Split(strval, g.SeperateKey))
 		}
 	}
 	if err != nil {

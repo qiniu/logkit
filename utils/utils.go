@@ -285,25 +285,31 @@ func ExtractField(slice []string) ([]string, error) {
 	return slice, err
 }
 
-func GetMapValue(m map[string]interface{}, keys []string) interface{} {
+//通过层级key获取value.
+//所有层级的map必须为 map[string]interface{} 类型.
+func GetMapValue(m map[string]interface{}, keys []string) (interface{}, error) {
+	err := errors.New("keys错误")
 	var val interface{}
 	val = m
-	for i := 0; i < len(keys) - 1; i++ {
+	for i := 0; i < len(keys); i++ {
 		k := keys[i]
+		//判断val是否为map[string]interface{}类型
 		if _, ok := val.(map[string]interface{}); ok {
+			//判断val(k)是否存在
 			if _, ok := val.(map[string]interface{})[k]; ok {
 				val = val.(map[string]interface{})[k]
 			} else {
-				return nil
+				return nil, err
 			}
 		} else {
-			return nil
+			return nil, err
 		}
 	}
-	val = val.(map[string]interface{})[keys[len(keys) - 1]]
-	return val
+	return val, nil
 }
 
+//通过层级key设置value值.
+//如果key不存在,将会自动创建.
 func SetMapValue(m map[string]interface{}, keys []string, val interface{}) {
 	if len(keys) == 0 {
 		return
@@ -328,6 +334,31 @@ func SetMapValue(m map[string]interface{}, keys []string, val interface{}) {
 	}
 	// add remaining k/v
 	curr[keys[len(keys)-1]] = val
+}
+
+//通过层级key删除key-val,并返回被删除的val,是否删除成功
+//如果key不存在,则返回 nil,false
+func DeleteMapValue(m map[string]interface{}, keys []string) (interface{}, bool) {
+	var val interface{}
+	val = m
+	for i := 0; i < len(keys); i++ {
+		k := keys[i]
+		if _, ok := val.(map[string]interface{}); ok {
+			if _, ok := val.(map[string]interface{})[k]; ok {
+				if i == len(keys) -1 {
+					delVal := val.(map[string]interface{})[k]
+					delete(val.(map[string]interface{}), keys[len(keys) - 1])
+					return delVal, true
+				}
+				val = val.(map[string]interface{})[k]
+			} else {
+				return nil, false
+			}
+		} else {
+			return nil, false
+		}
+	}
+	return nil, false
 }
 
 func AddHttpProtocal(url string) string {

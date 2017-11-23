@@ -7,12 +7,12 @@ import (
 	"reflect"
 	"strconv"
 	"time"
+	"strings"
 
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
-	"strings"
 )
 
 type DateTrans struct {
@@ -31,11 +31,10 @@ func (g *DateTrans) Transform(datas []sender.Data) ([]sender.Data, error) {
 	var err, ferr error
 	errnums := 0
 	for i := range datas {
-		//val, ok := datas[i][g.Key]
 		separator := "."
 		keys := strings.Split(g.Key, separator)
-		val := utils.GetMapValue(datas[i], keys)
-		if val == nil {
+		val, err := utils.GetMapValue(datas[i], keys)
+		if err != nil {
 			errnums++
 			err = fmt.Errorf("transform key %v not exist in data", g.Key)
 			continue
@@ -45,7 +44,6 @@ func (g *DateTrans) Transform(datas []sender.Data) ([]sender.Data, error) {
 			errnums++
 			continue
 		}
-		//datas[i][g.Key] = val
 		utils.SetMapValue(datas[i], keys, val)
 	}
 	if err != nil {

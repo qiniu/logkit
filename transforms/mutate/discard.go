@@ -6,6 +6,7 @@ import (
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+	"strings"
 )
 
 type Discarder struct {
@@ -20,8 +21,10 @@ func (g *Discarder) RawTransform(datas []string) ([]string, error) {
 func (g *Discarder) Transform(datas []sender.Data) ([]sender.Data, error) {
 	var ferr error
 	errnums := 0
+	separator := "."
+	keys := strings.Split(g.Key, separator)
 	for i := range datas {
-		delete(datas[i], g.Key)
+		utils.DeleteMapValue(datas[i], keys)
 	}
 	g.stats.Errors += int64(errnums)
 	g.stats.Success += int64(len(datas) - errnums)

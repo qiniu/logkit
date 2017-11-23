@@ -8,6 +8,7 @@ import (
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
 	"github.com/wangtuanjie/ip17mon"
+	"strings"
 )
 
 //更全的免费数据可以在ipip.net下载
@@ -32,9 +33,13 @@ func (it *IpTransformer) Transform(datas []sender.Data) ([]sender.Data, error) {
 		}
 	}
 	errnums := 0
+	separator := "."
+	keys := strings.Split(it.Key, separator)
 	for i := range datas {
-		val, ok := datas[i][it.Key]
-		if !ok {
+		newkeys := make([]string, len(keys))
+		copy(newkeys, keys)
+		val, gerr := utils.GetMapValue(datas[i], keys)
+		if gerr != nil {
 			errnums++
 			err = fmt.Errorf("transform key %v not exist in data", it.Key)
 			continue
@@ -51,10 +56,14 @@ func (it *IpTransformer) Transform(datas []sender.Data) ([]sender.Data, error) {
 			errnums++
 			continue
 		}
-		datas[i]["Region"] = info.Region
-		datas[i]["City"] = info.City
-		datas[i]["Country"] = info.Country
-		datas[i]["Isp"] = info.Isp
+		newkeys[len(newkeys) -1] = "Region"
+		utils.SetMapValue(datas[i], newkeys, info.Region)
+		newkeys[len(newkeys) -1] = "City"
+		utils.SetMapValue(datas[i], newkeys, info.City)
+		newkeys[len(newkeys) -1] = "Country"
+		utils.SetMapValue(datas[i], newkeys, info.Country)
+		newkeys[len(newkeys) -1] = "Isp"
+		utils.SetMapValue(datas[i], newkeys, info.Isp)
 	}
 	if err != nil {
 		it.stats.LastError = err.Error()

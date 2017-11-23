@@ -8,6 +8,7 @@ import (
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
+	"strings"
 )
 
 type Converter struct {
@@ -30,8 +31,10 @@ func (g *Converter) Transform(datas []sender.Data) ([]sender.Data, error) {
 	} else {
 		for i := range datas {
 			for _, sc := range schemas {
-				val, ok := datas[i][sc.Key]
-				if !ok {
+				separator := "."
+				keys := strings.Split(sc.Key, separator)
+				val, gerr := utils.GetMapValue(datas[i], keys)
+				if gerr != nil {
 					errnums++
 					err = fmt.Errorf("transform key %v not exist in data", sc.Key)
 					continue
@@ -40,7 +43,7 @@ func (g *Converter) Transform(datas []sender.Data) ([]sender.Data, error) {
 				if err != nil {
 					errnums++
 				}
-				datas[i][sc.Key] = val
+				utils.SetMapValue(datas[i], keys, val)
 			}
 		}
 	}

@@ -44,9 +44,13 @@ func (p *UrlParam) RawTransform(datas []string) ([]string, error) {
 func (p *UrlParam) Transform(datas []sender.Data) ([]sender.Data, error) {
 	var err, pErr error
 	errNums := 0
+	separator := "."
+	keys := strings.Split(p.Key, separator)
 	for i := range datas {
-		val, ok := datas[i][p.Key]
-		if !ok {
+		newkeys := make([]string, len(keys))
+		copy(newkeys, keys)
+		val, gerr := utils.GetMapValue(datas[i], newkeys)
+		if gerr != nil {
 			errNums++
 			err = fmt.Errorf("transform key %v not exist in data", p.Key)
 			continue
@@ -61,17 +65,20 @@ func (p *UrlParam) Transform(datas []sender.Data) ([]sender.Data, error) {
 			for key, mapVal := range res {
 				suffix := 1
 				keyName := key
-				_, exist := datas[i][keyName]
-				for ; exist; suffix++ {
+				//for ; exist; suffix++ {
+				newkeys[len(newkeys) -1] = keyName
+				_, gerr := utils.GetMapValue(datas[i], newkeys)
+				for ; gerr == nil; suffix++ {
 					if suffix > 5 {
 						log.Warnf("keys %v -- %v already exist, the item %v will be ignored", key, keyName, key)
 						break
 					}
 					keyName = key + strconv.Itoa(suffix)
-					_, exist = datas[i][keyName]
+					newkeys[len(newkeys) -1] = keyName
+					_, gerr = utils.GetMapValue(datas[i], newkeys)
 				}
 				if suffix <= 5 {
-					datas[i][keyName] = mapVal
+					utils.SetMapValue(datas[i], newkeys, mapVal)
 				}
 			}
 		} else {

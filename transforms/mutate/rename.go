@@ -7,6 +7,7 @@ import (
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+	"strings"
 )
 
 
@@ -23,15 +24,18 @@ func (g *Rename) RawTransform(datas []string) ([]string, error) {
 func (g *Rename) Transform(datas []sender.Data) ([]sender.Data, error) {
 	var err, ferr error
 	errnums := 0
+	separator := "."
+	keys := strings.Split(g.Key, separator)
 	for i := range datas {
-		val, exists := datas[i][g.Key]
-		if !exists {
+		val, gerr := utils.GetMapValue(datas[i], keys)
+		if gerr != nil {
 			errnums ++
 			fmt.Errorf("transform key %v not exist in data", g.Key)
 			continue
 		}
-		delete(datas[i], g.Key)
-		datas[i][g.NewKeyName] = val
+		utils.DeleteMapValue(datas[i], keys)
+		keys[len(keys) - 1] = g.NewKeyName
+		utils.SetMapValue(datas[i], keys, val)
 	}
 	if err != nil {
 		g.stats.LastError = err.Error()
