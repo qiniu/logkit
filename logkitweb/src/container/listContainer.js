@@ -27,7 +27,10 @@ class List extends Component {
       version: '',
       collapsed: true,
       currentMenu: 'runner',
-      machines: []
+      machines: [],
+      currentTagName: '',
+      currentMachineUrl: '',
+      isCluster: false
     };
     this.init()
   }
@@ -47,44 +50,71 @@ class List extends Component {
   init = () => {
     getRunnerVersion().then(item => {
       if (item.code === 'L200') {
-        window.version = item.data
+        this.setState({
+          version: item.data.version
+        })
       }
     })
-
     getIsCluster().then(item => {
-      if (item.data === true) {
-        window.isCluster = true
-      } else {
-        window.isCluster = false
+      if (item.code === 'L200') {
+        window.isCluster = item.data
+        this.setState({ isCluster: item.data});
       }
     })
 
+  }
+
+  initInterval = () => {
+    window.clearInterval(window.tagInterval);
+    window.clearInterval(window.machineInterval);
+    window.clearInterval(window.statusInterval);
   }
 
   turnToConfigPage() {
     this.props.router.push({pathname: `/index/create?copyConfig=true`})
   }
 
-  addLogRunner = () => {
-    this.setState({
-      currentMenu: 'createLog'
-    })
+  addLogRunner = (record, type) => {
+    if (type === 'tag') {
+      this.setState({
+        currentMenu: 'createLog',
+        currentTagName: record
+      })
+    } else {
+      this.setState({
+        currentMenu: 'createLog',
+        currentMachineUrl: record
+      })
+    }
+
     window.isCopy = false
     window.nodeCopy = null
+    this.initInterval()
   }
 
   turnToRunnerTab = () => {
+    window.tag = ''
+    window.machine_url = ''
     this.setState({
       currentMenu: 'runner'
     })
   }
 
-  addMetricRunner = () => {
-    this.setState({
-      currentMenu: 'createMetricLog'
-    })
+  addMetricRunner = (record,type) => {
+    if (type === 'tag') {
+      this.setState({
+        currentMenu: 'createMetricLog',
+        currentTagName: record
+      })
+    } else {
+      this.setState({
+        currentMenu: 'createMetricLog',
+        currentMachineUrl: record
+      })
+    }
     window.isCopy = false
     window.nodeCopy = null
+    this.initInterval()
   }
 
   onCollapse = (collapsed) => {
@@ -96,6 +126,7 @@ class List extends Component {
       currentMenu: 'createLog'
     })
     window.isCopy = true
+    this.initInterval()
   }
 
   TurnToMetricRunner = () => {
@@ -103,6 +134,7 @@ class List extends Component {
       currentMenu: 'createMetricLog'
     })
     window.isCopy = true
+    this.initInterval()
   }
 
 
@@ -110,11 +142,18 @@ class List extends Component {
     this.setState({
       currentMenu: e.key
     })
-    if (e.key !== 'runner') {
+    if (e.key === 'runner') {
+      window.clearInterval(window.tagInterval);
+      window.clearInterval(window.machineInterval);
+    } else if (e.key === 'tag') {
+      window.clearInterval(window.statusInterval);
+      window.clearInterval(window.machineInterval);
+    } else if (e.key === 'machine') {
+      window.clearInterval(window.tagInterval);
       window.clearInterval(window.statusInterval);
     }
-  }
 
+  }
   render() {
     return (
         <Layout style={{minHeight: '100vh'}}>
@@ -143,14 +182,14 @@ class List extends Component {
             </Menu>
           </Sider>
           <Layout>
-            <Header style={{background: '#fff', padding: 0}}/>
+            <Header className="header" style={{background: '#fff', padding: 0}}> 七牛Logkit监控中心{this.state.version} </Header>
             {this.state.currentMenu === 'tag' ? (<Content style={{margin: '0 16px'}}>
               <Breadcrumb style={{margin: '16px 0'}}>
                 <Breadcrumb.Item>标签管理列表</Breadcrumb.Item>
               </Breadcrumb>
               <div style={{padding: 24, background: '#fff', minHeight: 360}}>
                 <div className="content">
-                  <TagTable tags={this.state.runners} handleAddRunner={this.addLogRunner.bind(this)}
+                  <TagTable handleAddRunner={this.addLogRunner.bind(this)}
                             handleAddMetricRunner={this.addMetricRunner.bind(this)}/>
                 </div>
 
@@ -173,7 +212,7 @@ class List extends Component {
               </Breadcrumb>
               <div style={{padding: 24, background: '#fff', minHeight: 360}}>
                 <div className="content">
-                  <RunnerTable handleAddRunner={this.addLogRunner.bind(this)}
+                  <RunnerTable isCluster={this.state.isCluster} handleAddRunner={this.addLogRunner.bind(this)}
                                handleAddMetricRunner={this.addMetricRunner.bind(this)}
                                handleTurnToRunner={this.TurnToLogRunner.bind(this)}
                                handleTurnToMetricRunner={this.TurnToMetricRunner.bind(this)}
@@ -189,7 +228,7 @@ class List extends Component {
               </Breadcrumb>
               <div style={{padding: 24, background: '#fff', minHeight: 360}}>
                 <div className="content">
-                  <CreateLogRunner handleTurnToRunner={this.turnToRunnerTab.bind(this)}/>
+                  <CreateLogRunner currentTagName={this.state.currentTagName} currentMachineUrl={this.state.currentMachineUrl} handleTurnToRunner={this.turnToRunnerTab.bind(this)}/>
                 </div>
 
               </div>
@@ -200,7 +239,7 @@ class List extends Component {
               </Breadcrumb>
               <div style={{padding: 24, background: '#fff', minHeight: 360}}>
                 <div className="content">
-                  <CreateMetricRunner handleTurnToRunner={this.turnToRunnerTab.bind(this)}/>
+                  <CreateMetricRunner currentTagName={this.state.currentTagName} currentMachineUrl={this.state.currentMachineUrl} handleTurnToRunner={this.turnToRunnerTab.bind(this)}/>
                 </div>
 
               </div>

@@ -20,15 +20,10 @@ body {
 }
 
 .header {
-  background: #1989fa;
-  border-top-right-radius: 8px;
-  border-top-left-radius: 8px;
   width: 100%;
-  box-shadow: 0 2px 5px rgba(0,0,0,.2)!important;
   height: 60px;
   text-align: center;
   line-height: 60px;
-  color: #fff;
   font-size: 24px;
   margin-bottom: 20px;
 }

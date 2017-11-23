@@ -1,35 +1,12 @@
 import React, {Component} from 'react';
 import moment from 'moment'
-import ClipboardButton from 'react-clipboard.js';
 import {
   Table,
   Icon,
-  Popconfirm,
-  Button,
-  notification,
-  Modal,
-  Row,
-  Col,
-  Tag,
-  Input,
-  Layout,
-  Menu,
-  Breadcrumb,
   Form
 } from 'antd';
 import {
-  getRunnerConfigs,
-  deleteClusterSlaveTag,
-  getClusterRunnerConfigs,
-  postClusterSlaveTag,
-  deleteConfigData,
   getClusterSlaves,
-  getRunnerStatus,
-  getClusterRunnerStatus,
-  getRunnerVersion,
-  resetConfigData,
-  startRunner,
-  stopRunner
 } from '../../services/logkit';
 import * as uuid from 'uuid'
 import config from '../../store/config'
@@ -58,14 +35,22 @@ class MachineTable extends Component {
 
   }
 
-  init() {
-    getClusterSlaves().then(data => {
-      if (data.code === 'L200') {
+  getClusterSLave = () => {
+    getClusterSlaves().then(item => {
+      if (item.code === 'L200') {
         this.setState({
-          machines: _.values(data.data)
+          machines: _.values(item.data)
         })
       }
     })
+  }
+
+  init() {
+    let that = this
+    this.getClusterSLave()
+    window.machineInterval = setInterval(function () {
+      that.getClusterSLave()
+    }, 15000)
   }
 
   renderMachineList() {
@@ -107,7 +92,7 @@ class MachineTable extends Component {
             (<a>
               <div className="editable-row-operations">
                 {
-                  <Icon onClick={handleAddRunner} style={{fontSize: 16}} type="plus"/>
+                  <Icon title={"添加runner"} onClick={() => handleAddRunner(record.machineUrl,'machine')} style={{fontSize: 16}} type="plus-circle-o"/>
                 }
               </div>
             </a>)
@@ -124,7 +109,7 @@ class MachineTable extends Component {
             (<a>
               <div className="editable-row-operations">
                 {
-                  <Icon onClick={handleAddMetricRunner} style={{fontSize: 16}} type="plus"/>
+                  <Icon title={"添加metric runner"} onClick={() => handleAddMetricRunner(record.machineUrl,'machine')} style={{fontSize: 16}} type="plus-circle-o"/>
                 }
               </div>
             </a>)

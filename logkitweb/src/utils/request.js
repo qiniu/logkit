@@ -25,7 +25,6 @@ export default function request(url, options) {
       .then(checkStatus)
       .then(parseJSON)
       .then((data) => {
-        console.log(data)
         if (data.code === 'L200') {
           return data;
         } else {

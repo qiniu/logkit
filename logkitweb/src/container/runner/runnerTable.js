@@ -26,12 +26,8 @@ import {
   stopClusterRunner,
   resetClusterConfigData,
   getRunnerConfigs,
-  deleteClusterSlaveTag,
   getClusterRunnerConfigs,
-  postClusterSlaveTag,
-  getClusterSlaves,
   getRunnerStatus,
-  getIsCluster,
   getClusterRunnerStatus,
   getRunnerVersion
 } from '../../services/logkit';
@@ -55,16 +51,22 @@ class RunnerTable extends Component {
       runners: [],
       runnerStatus: [],
       machineUrl: '',
-      tag: ''
+      tag: '',
+      isLoading: false
     };
-    this.init()
+
   }
 
   componentDidMount() {
-
+    this.init()
   }
 
   componentWillUnmount() {
+
+  }
+
+  componentWillReceiveProps(nextProps) {
+    this.getStatus()
   }
 
   componentDidUpdate(prevProps) {
@@ -134,14 +136,14 @@ class RunnerTable extends Component {
           }).then(data => {
             if (data.code === 'L200') {
               that.setState({
-                runnerStatus: this.transformStatus(data.data)
+                runnerStatus: this.transformStatus(data.data),
+                isLoading: false
               })
             }
           })
         }
       })
     } else {
-      console.log('not cluster version')
       getRunnerConfigs().then(item => {
         if (item.code === 'L200') {
           that.setState({
@@ -150,7 +152,8 @@ class RunnerTable extends Component {
           getRunnerStatus().then(item => {
             if (item.code === 'L200') {
               that.setState({
-                runnerStatus: _.values(item.data)
+                runnerStatus: _.values(item.data),
+                isLoading: false
               })
             }
           })
@@ -161,12 +164,6 @@ class RunnerTable extends Component {
 
   init = () => {
     let that = this
-    getRunnerVersion().then(data => {
-      that.setState({
-        version: _.values(data)
-      })
-    })
-
     that.getStatus()
 
     if (window.statusInterval !== undefined && window.statusInterval !== 'undefined') {
@@ -180,18 +177,21 @@ class RunnerTable extends Component {
   }
 
   deleteRunner = (record) => {
+    this.setState({
+      isLoading: true
+    })
     if (window.isCluster === true) {
       deleteClusterConfigData({name: record.name, tag: record.tag, url: record.machineUrl}).then(item => {
         if (item.code === 'L200') {
           notification.success({message: "删除成功", duration: 10,})
-          this.init()
+          this.getStatus()
         }
       })
     } else {
       deleteConfigData({name: record.name}).then(item => {
         if (item.code === 'L200') {
           notification.success({message: "删除成功", duration: 10,})
-          this.init()
+          this.getStatus()
         }
       })
     }
@@ -213,19 +213,22 @@ class RunnerTable extends Component {
   }
 
   handleResetConfig = (record) => {
+    this.setState({
+      isLoading: true
+    })
     if (window.isCluster === true) {
       resetClusterConfigData({name: record.name, tag: record.tag, url: record.machineUrl}).then(item => {
         if (item.code === 'L200') {
           notification.success({message: "重置成功", duration: 10,})
         }
-        this.init()
+        this.getStatus()
       })
     } else {
       resetConfigData({name: record.name}).then(item => {
         if (item.code === 'L200') {
           notification.success({message: "重置成功", duration: 10,})
         }
-        this.init()
+        this.getStatus()
       })
     }
   }
@@ -264,12 +267,16 @@ class RunnerTable extends Component {
   }
 
   optRunner = (record) => {
+    this.setState({
+      isLoading: true
+    })
     if (record.iconType === 'caret-right') {
       if (window.isCluster === true) {
         startClusterRunner({name: record.name, tag: record.tag, url: record.machineUrl}).then(item => {
           if (item.code === 'L200') {
             record.iconType = 'poweroff'
             notification.success({message: '开启成功', duration: 10})
+            this.getStatus()
           }
         })
       } else {
@@ -277,6 +284,7 @@ class RunnerTable extends Component {
           if (item.code === 'L200') {
             record.iconType = 'poweroff'
             notification.success({message: '开启成功', duration: 10})
+            this.getStatus()
           }
         })
       }
@@ -286,6 +294,7 @@ class RunnerTable extends Component {
           if (item.code === 'L200') {
             record.iconType = 'caret-right'
             notification.success({message: '关闭成功', duration: 10})
+            this.getStatus()
           }
         })
       } else {
@@ -293,6 +302,7 @@ class RunnerTable extends Component {
           if (item.code === 'L200') {
             record.iconType = 'caret-right'
             notification.success({message: '关闭成功', duration: 10})
+            this.getStatus()
           }
         })
       }
@@ -319,7 +329,7 @@ class RunnerTable extends Component {
     let machineList = []
     if (window.isCluster && window.isCluster === true) {
       this.state.runners.map(item => {
-        if (item.configs.length > 0) {
+        if (item.configs && item.configs.length > 0) {
           item.configs.map(runner => {
             runnerList.push(runner)
           })
@@ -331,7 +341,7 @@ class RunnerTable extends Component {
       })
 
       this.state.runnerStatus.map(item => {
-        if (item.runnerStatus.length > 0) {
+        if (item.runnerStatus && item.runnerStatus.length > 0) {
           item.runnerStatus.map(statu => {
             statusList.push(statu)
           })
@@ -350,11 +360,13 @@ class RunnerTable extends Component {
     }, {
       title: '标签',
       dataIndex: 'tag',
-      width: '5%'
+      width: '5%',
+      className: window.isCluster === true ? '' : 'hide-div'
     }, {
       title: '机器地址',
       dataIndex: 'machineUrl',
-      width: '5%'
+      width: '10%',
+      className: window.isCluster === true ? '' : 'hide-div'
     }, {
       title: '修改时间',
       dataIndex: 'createTime',
@@ -370,7 +382,7 @@ class RunnerTable extends Component {
     }, {
       title: '读取条数(条/秒)',
       dataIndex: 'readerNumber',
-      width: '7%',
+      width: '6%',
       render: (text, record) => {
         return (
             this.renderArrow(text, record.readerTrend)
@@ -379,7 +391,7 @@ class RunnerTable extends Component {
     }, {
       title: '读取速率(KB/s)',
       dataIndex: 'readerkbNumber',
-      width: '7%',
+      width: '6%',
       render: (text, record) => {
         return (
             this.renderArrow(text, record.readerkbTrend)
@@ -388,7 +400,7 @@ class RunnerTable extends Component {
     }, {
       title: '发送速率(条/s)',
       dataIndex: 'sendNumber',
-      width: '7%',
+      width: '6%',
       render: (text, record) => {
         return (
             this.renderArrow(text, record.sendTrend)
@@ -397,11 +409,11 @@ class RunnerTable extends Component {
     }, {
       title: '解析成功/总 (条数)',
       dataIndex: 'parseSuccessOfTotal',
-      width: '8%'
+      width: '6%'
     }, {
       title: '发送成功/总 (条数)',
       dataIndex: 'successOfTotal',
-      width: '8%'
+      width: '6%'
     }, {
       title: '路径',
       dataIndex: 'path',
@@ -409,13 +421,13 @@ class RunnerTable extends Component {
     }, {
       title: '错误日志',
       dataIndex: 'errorLog',
-      width: '8%',
+      width: '3%',
       render: (text, record) => {
         return (
             <a>
               <div className="editable-row-operations">
                 {
-                  <Button type="primary" onClick={() => this.isShow(record)}>查看错误日志</Button>
+                  <Icon title="查看错误日志" style={{fontSize: 16}} type="eye-o" onClick={() => this.isShow(record)} />
                 }
               </div>
             </a>
@@ -425,13 +437,13 @@ class RunnerTable extends Component {
     }, {
       title: '详细配置',
       dataIndex: 'config',
-      width: '6%',
+      width: '3%',
       render: (text, record) => {
         return (
             <a>
               <div className="editable-row-operations">
                 {
-                  <Button type="primary" onClick={() => this.showConfig(record)}>查看配置</Button>
+                  <Icon title="查看runner配置" style={{fontSize: 16}} type="eye-o" onClick={() => this.showConfig(record)} />
                 }
               </div>
             </a>
@@ -441,12 +453,12 @@ class RunnerTable extends Component {
       title: '编辑',
       key: 'copy',
       dataIndex: 'copy',
-      width: '3%',
+      width: '4%',
       render: (text, record) => {
         return (
             <a>
               <div className="editable-row-operations">
-                <Icon style={{fontSize: 16}} onClick={() => this.copyConfig(record.currentItem)} type="edit"/>
+                <Icon title={"编辑Runner"} style={{fontSize: 16}} onClick={() => this.copyConfig(record.currentItem)} type="edit"/>
               </div>
             </a>
         );
@@ -455,7 +467,7 @@ class RunnerTable extends Component {
       title: '操作',
       key: 'opt',
       dataIndex: 'opt',
-      width: '3%',
+      width: '4%',
       render: (text, record) => {
         return (
             record.isWebFolder === true ? (<a>
@@ -472,7 +484,7 @@ class RunnerTable extends Component {
     }, {
       title: '重置',
       dataIndex: 'reset',
-      width: '3%',
+      width: '4%',
       render: (text, record) => {
         return (
             record.isWebFolder === true ? (<a>
@@ -491,14 +503,14 @@ class RunnerTable extends Component {
       title: '删除',
       key: 'edit',
       dataIndex: 'edit',
-      width: '3%',
+      width: '4%',
       render: (text, record) => {
         return (
             record.isWebFolder === true ? (<a>
               <div className="editable-row-operations">
                 {
                   <Popconfirm title="是否删除该Runner?" onConfirm={() => this.deleteRunner(record)}>
-                    <Icon style={{fontSize: 16}} type="delete"/>
+                    <Icon title={"删除runner"} style={{fontSize: 16}} type="delete"/>
                   </Popconfirm>
                 }
               </div>
@@ -533,13 +545,13 @@ class RunnerTable extends Component {
         let readerTrend = 'stable'
         let readerkbTrend = 'stable'
         let iconType = 'poweroff'
-        let runnerOpt = '关闭'
+        let runnerOpt = '停止'
         let tag = ''
         let machineUrl = ''
 
         if (item["is_stopped"]) {
           status = '关闭'
-          runnerOpt = '开启'
+          runnerOpt = '重启'
           iconType = 'caret-right'
           isWebFolder = item.web_folder
         }
@@ -646,7 +658,7 @@ class RunnerTable extends Component {
               <Icon type="plus"/> 增加系统信息采集 Runner
             </Button></div>)}
 
-          <Table columns={columns} pagination={{size: 'small', pageSize: 20}} dataSource={data}/></div>
+          <Table columns={columns} pagination={{size: 'small', pageSize: 20}} dataSource={data} loading={this.state.isLoading} /></div>
     )
   }
 

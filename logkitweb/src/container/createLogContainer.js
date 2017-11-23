@@ -10,7 +10,6 @@ import {isJSON} from '../utils/tools'
 import moment from 'moment'
 import {
   postConfigData,
-  getRunnerVersion,
   putConfigData,
   postClusterConfigData,
   putClusterConfigData
@@ -62,7 +61,6 @@ class CreateLogRunner extends Component {
 
   init = () => {
     let that = this
-    //let isCopy = this.props.location.query.copyConfig
     if (window.isCopy === true) {
       this.setState({
         isCpoyStatus: true
@@ -71,11 +69,6 @@ class CreateLogRunner extends Component {
     if (window.nodeCopy) {
       config.delete("metric");
     }
-    getRunnerVersion().then(data => {
-      that.setState({
-        version: _.values(_.omit(data, 'success'))
-      })
-    })
   }
 
   next() {
@@ -237,6 +230,7 @@ class CreateLogRunner extends Component {
 
 
   render() {
+    const { currentTagName, currentMachineUrl } = this.props
     const {current} = this.state;
     return (
         <div className="logkit-create-container">
@@ -259,7 +253,7 @@ class CreateLogRunner extends Component {
               <Sender ref="checkSenderData"></Sender>
             </div>
             <div className={this.state.current === 4 ? 'show-div' : 'hide-div'}>
-              <RenderConfig ref="initConfig"></RenderConfig>
+              <RenderConfig currentTagName={currentTagName} currentMachineUrl={currentMachineUrl} ref="initConfig"></RenderConfig>
             </div>
 
           </div>

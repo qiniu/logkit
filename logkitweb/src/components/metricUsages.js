@@ -43,21 +43,23 @@ class Usages extends Component {
 
   init = () => {
     getMetricUsages().then(item => {
-      const {setFieldsValue} = this.props.form;
-      this.setState({
-        items: item.data,
-      })
-      if (window.nodeCopy && window.nodeCopy.metric) {
-        let formData = {};
-        window.nodeCopy.metric.map((m, _) => {
-          formData[m.type] = "true";
-        });
-        item.data.map((m, _) => {
-          if (formData[m.KeyName] === undefined) {
-            formData[m.KeyName] = "false";
-          }
-        });
-        setFieldsValue(formData);
+      if (item.code === 'L200') {
+        const {setFieldsValue} = this.props.form;
+        this.setState({
+          items: item.data,
+        })
+        if (window.nodeCopy && window.nodeCopy.metric) {
+          let formData = {};
+          window.nodeCopy.metric.map((m, _) => {
+            formData[m.type] = "true";
+          });
+          item.data.map((m, _) => {
+            if (formData[m.KeyName] === undefined) {
+              formData[m.KeyName] = "false";
+            }
+          });
+          setFieldsValue(formData);
+        }
       }
     })
   }

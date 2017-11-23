@@ -1,59 +1,44 @@
 import React, {Component} from 'react';
-import moment from 'moment'
-import ClipboardButton from 'react-clipboard.js';
 import {
   Table,
   Icon,
-  Popconfirm,
-  Button,
   notification,
   Modal,
-  Row,
-  Col,
-  Tag,
   Input,
-  Layout,
-  Menu,
-  Breadcrumb,
-  Form
+  Form,
+  Select
 } from 'antd';
 import {
-  getRunnerConfigs,
   deleteClusterSlaveTag,
   postClusterStopSlaveTag,
   postClusterStartSlaveTag,
-  getClusterRunnerConfigs,
   postClusterSlaveTag,
-  deleteConfigData,
   getClusterSlaves,
-  getRunnerStatus,
-  getClusterRunnerStatus,
-  getRunnerVersion,
-  resetConfigData,
-  startRunner,
-  stopRunner
+  getRunnersByTagOrMachineUrl
 } from '../../services/logkit';
 import {titles} from './constant'
-import config from '../../store/config'
 import _ from "lodash";
 import * as uuid from 'uuid'
 const FormItem = Form.Item;
+const Option = Select.Option
 
 class TagTable extends Component {
   constructor(props) {
     super(props);
     this.state = {
       status: [],
-      runners: [],
       machines: [],
+      runners: [],
       tags: [],
       isShowTagModal: false,
       isShowDeleteTag: false,
       currentTag: '',
       currentTagName: '',
       currentModalType: '',
-      currentRunnerName: ''
+      currentRunnerName: '',
+      isLoading: false
     };
+
   }
 
   componentDidMount() {
@@ -67,19 +52,39 @@ class TagTable extends Component {
 
   }
 
-  init() {
+  getClusterSLave = () => {
     getClusterSlaves().then(data => {
       if (data.code === 'L200') {
-        console.log(data)
         this.setState({
-          machines: _.values(data.data)
+          tags: _.values(data.data),
+          isLoading: false
+        })
+      }
+    })
+  }
+
+  init() {
+    let that = this
+    this.getClusterSLave()
+    window.tagInterval = setInterval(function () {
+      that.getClusterSLave()
+    }, 15000)
+  }
+
+  getRunnersByTag = (item) => {
+    getRunnersByTagOrMachineUrl({ tag: item.name, url: ''  }).then(item => {
+      if (item.code === 'L200') {
+        this.setState({
+          runners: item.data
         })
       }
     })
   }
 
   showTagModal = (item, type) => {
-    console.log(item)
+    if (type !== 'rename') {
+      this.getRunnersByTag(item)
+    }
     this.setState({
       currentTag: item,
       isShowTagModal: true,
@@ -96,25 +101,33 @@ class TagTable extends Component {
   }
 
   handleTagModal = () => {
+    this.setState({
+      isLoading: true
+    })
     if (this.state.currentModalType == 'rename') {
       postClusterSlaveTag({
         name: this.state.currentTag.name,
         url: '',
         body: {tag: this.state.currentTagName}
-      }).then(data => {
-        notification.success({message: "重置成功", duration: 10,})
-        this.setState({
-          isShowTagModal: false
-        })
+      }).then(item => {
+        if (item.code === 'L200') {
+          notification.success({message: "重置成功", duration: 10,})
+          this.setState({
+            isShowTagModal: false
+          })
+          this.getClusterSLave()
+        }
+
       })
     } else if (this.state.currentModalType == 'stop') {
       postClusterStopSlaveTag({
         name: this.state.currentRunnerName,
         tag: this.state.currentTag.name,
         url: ''
-      }).then(data => {
-        if (!data) {
+      }).then(item => {
+        if (item.code === 'L200') {
           notification.success({message: '关闭成功', duration: 10})
+          this.getClusterSLave()
         }
       })
     } else if (this.state.currentModalType == 'start') {
@@ -122,20 +135,27 @@ class TagTable extends Component {
         name: this.state.currentRunnerName,
         tag: this.state.currentTag.name,
         url: ''
-      }).then(data => {
-        if (!data) {
+      }).then(item => {
+        if (item.code === 'L200') {
           notification.success({message: '开启成功', duration: 10})
+          this.getClusterSLave()
         }
       })
     }
   }
 
   handleDeleteTag = () => {
-    deleteClusterSlaveTag({name: this.state.currentTag.name, url: ''}).then(data => {
-      notification.success({message: "重置成功", duration: 10,})
-      this.setState({
-        isShowDeleteTag: false
-      })
+    this.setState({
+      isLoading: true
+    })
+    deleteClusterSlaveTag({name: this.state.currentTag.name, url: ''}).then(item => {
+      if (item.code === 'L200') {
+        notification.success({message: "重置成功", duration: 10,})
+        this.setState({
+          isShowDeleteTag: false
+        })
+        this.getClusterSLave()
+      }
     })
   }
 
@@ -152,16 +172,14 @@ class TagTable extends Component {
   }
 
   changeTagName = (e) => {
-    console.log(e.target.value)
     this.setState({
       currentTagName: e.target.value
     })
   }
 
-  changeRunnerName = (e) => {
-    console.log(e.target.value)
+  changeRunnerName = (value) => {
     this.setState({
-      currentRunnerName: e.target.value
+      currentRunnerName: value
     })
   }
 
@@ -188,51 +206,24 @@ class TagTable extends Component {
 
   renderTagList() {
     let dataSource = []
-    const {tags, handleAddRunner, handleAddMetricRunner} = this.props
-    let machines = this.state.machines
-    let currentItem = null
-    let count = 0
-    if (machines.length > 0) {
-      currentItem = _.sortBy(machines, 'tag')[0]
-    }
+    const {handleAddRunner, handleAddMetricRunner} = this.props
+    let tags = []
     let machineUrl = []
     let status = []
-    _.sortBy(machines, 'tag').map((item, i) => {
-      console.log(i)
-      if (item.tag === currentItem.tag) {
-        machineUrl.push(item.url)
-        status.push(item.status);
-        if (i === machines.length - 1) {
-          dataSource.push({
-            key: uuid(),
-            name: currentItem.tag,
-            machineUrl: machineUrl,
-            status: status,
-          })
-        }
-      }
-      else if (item.tag !== currentItem.tag) {
-        console.log(currentItem)
+
+    _.sortBy(this.state.tags, 'tag').map((item, i) => {
+      if (_.includes(tags,item.tag)) {
+        dataSource[_.findIndex(dataSource, 'name', item.tag)].machineUrl.push(item.url)
+        dataSource[_.findIndex(dataSource, 'name', item.tag)].status.push(item.status)
+      }else {
+        tags.push(item.tag)
         dataSource.push({
           key: uuid(),
-          name: currentItem.tag,
-          machineUrl: machineUrl,
-          status: status,
+          name:item.tag,
+          machineUrl:[item.url],
+          status:[item.status]
         })
-        if (i === machines.length - 1) {
-          dataSource.push({
-            key: uuid(),
-            name: item.tag,
-            machineUrl: machineUrl,
-            status: status,
-          })
-        }
-        currentItem = item;
-        count = 0;
-        machineUrl = [item.url]
-        status = [item.status]
       }
-
     })
 
     const columns = [{
@@ -281,7 +272,7 @@ class TagTable extends Component {
                 <a>
                   <div className="editable-row-operations">
                     { this.checkStatus(record.status) === 'ok' ? (
-                        <Button onClick={() => this.showTagModal(record, 'rename')} type="primary">重命名</Button>) : null
+                    <Icon style={{fontSize: 16}} type="setting" title="tag重命名" onClick={() => this.showTagModal(record, 'rename')} />) : null
                     }
                   </div>
                 </a>
@@ -298,7 +289,7 @@ class TagTable extends Component {
             <a>
               <div className="editable-row-operations">
                 {this.checkStatus(record.status) === 'ok' ? (
-                    <Icon onClick={handleAddRunner} style={{fontSize: 16}} type="plus"/>) : null
+                    <Icon title={"添加runner"}  onClick={() => handleAddRunner(record.name,'tag')} style={{fontSize: 16}} type="plus-circle-o"/>) : null
                 }
               </div>
             </a>
@@ -315,23 +306,22 @@ class TagTable extends Component {
             (<a>
               <div className="editable-row-operations">
                 {this.checkStatus(record.status) === 'ok' ? (
-                    <Icon onClick={handleAddMetricRunner} style={{fontSize: 16}} type="plus"/>) : null
+                    <Icon title={"添加metric runner"} onClick={() => handleAddMetricRunner(record.name,'tag')} style={{fontSize: 16}} type="plus-circle-o"/>) : null
                 }
               </div>
             </a>)
         );
       },
-
     }, {
       title: '停止',
       key: 'stop',
       dataIndex: 'stop',
-      width: '3%',
+      width: '6%',
       render: (text, record) => {
         return (<a>
               <div className="editable-row-operations">
                 {this.checkStatus(record.status) === 'ok' ? (
-                    <Icon onClick={() => this.showTagModal(record, 'stop')} title={"停止Runner"} style={{fontSize: 16}}
+                    <Icon onClick={() => this.showTagModal(record, 'stop')} title={"停止该tag对应的runner"} style={{fontSize: 16}}
                           type='poweroff'/>) : null
                 }
               </div>
@@ -343,12 +333,12 @@ class TagTable extends Component {
       title: '重启',
       key: 'start',
       dataIndex: 'start',
-      width: '3%',
+      width: '6%',
       render: (text, record) => {
         return (<a>
               <div className="editable-row-operations">
                 {this.checkStatus(record.status) === 'ok' ? (
-                    <Icon onClick={() => this.showTagModal(record, 'start')} title={"重启Runner"} style={{fontSize: 16}}
+                    <Icon onClick={() => this.showTagModal(record, 'start')} title={"重启该tag对应的runner"} style={{fontSize: 16}}
                           type='caret-right'/>) : null
                 }
               </div>
@@ -360,13 +350,13 @@ class TagTable extends Component {
       title: '删除',
       dataIndex: 'delete',
       key: 'delete',
-      width: '10%',
+      width: '6%',
       render: (text, record) => {
         return (
             <a>
               <div className="editable-row-operations">
                 {this.checkStatus(record.status) !== 'bad' ? (
-                    <Icon onClick={() => this.showDeleteTag(record)} style={{fontSize: 16}} type="delete"/>) : null
+                    <Icon onClick={() => this.showDeleteTag(record)} title={"删除该tag对应的runner"} style={{fontSize: 16}} type="delete"/>) : null
                 }
               </div>
             </a>
@@ -374,7 +364,19 @@ class TagTable extends Component {
       }
     }];
     return (
-        <Table columns={columns} pagination={{size: 'small', pageSize: 20}} dataSource={dataSource}/>
+        <Table columns={columns} pagination={{size: 'small', pageSize: 20}} dataSource={dataSource} loading={this.state.isLoading}  />
+    )
+  }
+
+  renderSelectOptions = (items) => {
+    let options = []
+    if (items != undefined) {
+      items.map((ele) => {
+        options.push(<Option key={ele} value={ele}>{ele}</Option>)
+      })
+    }
+    return (
+        options
     )
   }
 
@@ -388,8 +390,10 @@ class TagTable extends Component {
           >
             <FormItem label="名称">
               {this.state.currentModalType === 'rename' ? (
-                  <Input onChange={this.changeTagName} placeholder="新tag名称"/>) : (
-                  <Input onChange={this.changeRunnerName} placeholder="指定该标签下面具体的runner名称"/>
+                  <Input key="rename" onChange={this.changeTagName} placeholder="新tag名称"/>) : (
+              <Select style={{width: '200px'}} key="opt" onChange={this.changeRunnerName} placeholder="选择该标签下的一个runner" >
+                {this.renderSelectOptions(this.state.runners)}
+              </Select>
               ) }</FormItem>
           </Modal>
 

@@ -8,11 +8,10 @@ import RenderConfig from '../components/renderConfig'
 import config from '../store/config'
 import {isJSON} from '../utils/tools'
 import moment from 'moment'
-import {postConfigData, getRunnerVersion, putConfigData, postClusterConfigData} from '../services/logkit';
+import {postConfigData, putConfigData, putClusterConfigData, postClusterConfigData} from '../services/logkit';
 import _ from "lodash";
 
 const Step = Steps.Step;
-const {Header, Content, Footer, Sider} = Layout;
 const steps = [{
   title: '系统信息选择',
   content: '配置需要采集的系统信息类型',
@@ -66,11 +65,6 @@ class CreateMetricRunner extends Component {
       config.delete("parser");
       config.delete("transforms");
     }
-    getRunnerVersion().then(data => {
-      that.setState({
-        version: _.values(_.omit(data, 'success'))
-      })
-    })
   }
 
   next() {
@@ -209,7 +203,7 @@ class CreateMetricRunner extends Component {
           let tag = (window.tag != null && window.tag != undefined) ? window.tag : ''
           let url = (window.machine_url != null && window.machine_url != undefined) ? window.machine_url : ''
           if (window.isCluster && window.isCluster === true) {
-            putConfigData({name: data.name, tag: tag, url: url, body: data}).then(data => {
+            putClusterConfigData({name: data.name, tag: tag, url: url, body: data}).then(data => {
               if (data && data.code === 'L200') {
                 notification.success({message: "Runner修改成功", duration: 10,})
                 handleTurnToRunner()
@@ -244,6 +238,7 @@ class CreateMetricRunner extends Component {
   }
 
   render() {
+    const { currentTagName, currentMachineUrl } = this.props
     const {current} = this.state;
     return (
         <div className="logkit-create-container">
@@ -276,7 +271,7 @@ class CreateMetricRunner extends Component {
               <Sender ref="checkSenderData"></Sender>
             </div>
             <div className={this.state.current === 4 ? 'show-div' : 'hide-div'}>
-              <RenderConfig ref="initConfig"></RenderConfig>
+              <RenderConfig currentTagName={currentTagName} currentMachineUrl={currentMachineUrl} ref="initConfig"></RenderConfig>
             </div>
 
           </div>

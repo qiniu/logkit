@@ -5,11 +5,16 @@ import {
   Row,
   Col,
   notification,
-  InputNumber
+  InputNumber,
+  Select
 } from 'antd';
 import config from '../store/config'
 import moment from 'moment'
-
+import {
+  getClusterSlaves,
+} from '../services/logkit';
+import _ from "lodash";
+const Option = Select.Option
 const FormItem = Form.Item;
 
 const optionFormItemLayout = {
@@ -38,8 +43,10 @@ class renderConfig extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      current: 0
+      current: 0,
+      machines: []
     };
+    this.init()
   }
 
   componentDidMount() {
@@ -50,6 +57,31 @@ class renderConfig extends Component {
   }
 
   componentDidUpdate(prevProps) {
+
+  }
+
+  computeTagsAndMachine = (items) => {
+    window.machineUrls = []
+    window.tags = []
+    items.forEach((item) => {
+      if (!_.includes(window.machineUrl,item.url)) {
+        window.machineUrls.push(item.url)
+      }
+      if (!_.includes(window.tags,item.tag)) {
+        window.tags.push(item.tag)
+      }
+    })
+  }
+
+  init = () => {
+    let that = this
+    if (window.isCluster && window.isCluster === true) {
+      getClusterSlaves().then(item => {
+        if (item.code === 'L200') {
+          that.computeTagsAndMachine(_.values(item.data))
+        }
+      })
+    }
 
   }
 
@@ -113,24 +145,24 @@ class renderConfig extends Component {
 
   }
 
-  handleTagChange = (e) => {
+  handleTagChange = (value) => {
     const {getFieldsValue} = this.props.form;
     let data = getFieldsValue();
     window.tag = ''
     if (this.isJSON(data.config)) {
-      window.tag = e.target.value
+      window.tag = value
     } else {
       notification.warning({message: "不是一个合法的json对象,请检查", duration: 10,})
     }
 
   }
 
-  handleMachineChange = (e) => {
+  handleMachineChange = (value) => {
     const {getFieldsValue} = this.props.form;
     let data = getFieldsValue();
     window.machine_url = ''
     if (this.isJSON(data.config)) {
-      window.machine_url = e.target.value
+      window.machine_url = value
     } else {
       notification.warning({message: "不是一个合法的json对象,请检查", duration: 10,})
     }
@@ -167,9 +199,28 @@ class renderConfig extends Component {
 
   }
 
+  renderSelectOptions = (items) => {
+    let options = []
+    if (items != undefined) {
+      items.map((ele) => {
+        options.push(<Option key={ele} value={ele}>{ele}</Option>)
+      })
+    }
+    return (
+        options
+    )
+  }
+
 
   render() {
     const {getFieldDecorator} = this.props.form;
+    const { currentTagName, currentMachineUrl } = this.props
+    if (currentTagName && currentTagName != '') {
+      window.tag = currentTagName
+    }
+    if (currentMachineUrl && currentMachineUrl != '') {
+      window.machine_url = currentMachineUrl
+    }
     return (
         <div >
           <div className='logkit-body'>
@@ -196,11 +247,15 @@ class renderConfig extends Component {
                       <Input onChange={this.handleMetricIntervalChange} placeholder={'系统信息收集间隔单位(秒)'}/>
                   )}
                 </FormItem>
-                {window.isCluster === true ? (<div><FormItem {...formItemLayout} label="标签名称">
-                  <Input onChange={this.handleTagChange} placeholder={'标签名称'}/>
+                {(window.isCluster === true && window.isCopy == false) ? (<div><FormItem {...formItemLayout} label="标签名称">
+                  <Select onChange={this.handleTagChange} defaultValue={currentTagName}>
+                    {this.renderSelectOptions(window.tags)}
+                  </Select>
                 </FormItem>
                   <FormItem {...formItemLayout} label="机器地址">
-                    <Input onChange={this.handleMachineChange} placeholder={'机器地址'}/>
+                    <Select onChange={this.handleMachineChange} defaultValue={currentMachineUrl}>
+                      {this.renderSelectOptions(window.machineUrls)}
+                    </Select>
                   </FormItem></div>) : null}
 
                 <FormItem

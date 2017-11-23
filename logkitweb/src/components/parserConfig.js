@@ -237,10 +237,13 @@ class Parser extends Component {
       ...data[this.state.currentOption],
       sampleLog: data.sampleData
     }
-    postParseData({body: requestData}).then(data => {
-      this.setState({
-        parseData: JSON.stringify(_.pick(data, 'SamplePoints'), null, 2)
-      })
+    postParseData({body: requestData}).then(item => {
+      if (item.code === 'L200') {
+        this.setState({
+          parseData: JSON.stringify(_.pick(item.data, 'SamplePoints'), null, 2)
+        })
+      }
+
     })
   }
 

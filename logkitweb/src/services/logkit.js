@@ -181,7 +181,7 @@ export async function postClusterConfigData(params) {
 }
 
 export async function putClusterConfigData(params) {
-  return request(window.logkitUrl + '/logkit/configs/' + params.name + '?tag=' + params.tag + '&url=' + params.url, {
+  return request(window.logkitUrl + '/logkit/cluster/configs/' + params.name + '?tag=' + params.tag + '&url=' + params.url, {
     method: 'put',
     headers: {
       'Content-Type': 'application/json'
@@ -272,6 +272,12 @@ export async function deleteClusterConfigData(params) {
 
 export async function getIsCluster(params) {
   return request(window.logkitUrl + '/logkit/cluster/ismaster', {
+    method: 'get'
+  });
+}
+
+export async function getRunnersByTagOrMachineUrl(params) {
+  return request(window.logkitUrl + '/logkit/cluster/runners?tag=' + params.tag + '&url=' + params.url, {
     method: 'get'
   });
 }
