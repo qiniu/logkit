@@ -2,11 +2,11 @@ package mutate
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
-	"strings"
 )
 
 type Discarder struct {

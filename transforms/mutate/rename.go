@@ -3,11 +3,11 @@ package mutate
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
-	"strings"
 )
 
 
@@ -27,15 +27,17 @@ func (g *Rename) Transform(datas []sender.Data) ([]sender.Data, error) {
 	separator := "."
 	keys := strings.Split(g.Key, separator)
 	for i := range datas {
-		val, gerr := utils.GetMapValue(datas[i], keys)
+		newkeys := make([]string, len(keys))
+		copy(newkeys, keys)
+		val, gerr := utils.GetMapValue(datas[i], newkeys)
 		if gerr != nil {
 			errnums ++
 			fmt.Errorf("transform key %v not exist in data", g.Key)
 			continue
 		}
-		utils.DeleteMapValue(datas[i], keys)
-		keys[len(keys) - 1] = g.NewKeyName
-		utils.SetMapValue(datas[i], keys, val)
+		utils.DeleteMapValue(datas[i], newkeys)
+		newkeys[len(newkeys) - 1] = g.NewKeyName
+		utils.SetMapValue(datas[i], newkeys, val)
 	}
 	if err != nil {
 		g.stats.LastError = err.Error()

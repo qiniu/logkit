@@ -3,12 +3,12 @@ package mutate
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
-	"strings"
 )
 
 type Converter struct {

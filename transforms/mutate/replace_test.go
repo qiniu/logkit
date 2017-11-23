@@ -14,6 +14,7 @@ func TestReplaceTransformer(t *testing.T) {
 		Old: "x1",
 		New: "y2",
 	}
+	gsub.Init()
 	data, err := gsub.Transform([]sender.Data{{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}, {"myword": "x1x.x.x11", "abc": "x1"}})
 	assert.NoError(t, err)
 	exp := []sender.Data{
@@ -22,9 +23,10 @@ func TestReplaceTransformer(t *testing.T) {
 	assert.Equal(t, exp, data)
 	gsub2 := &Replacer{
 		Key: "myword",
-		Old: `\x`,
+		Old: `\\x`,
 		New: `\\x`,
 	}
+	gsub2.Init()
 	newd, err := gsub2.RawTransform([]string{`\x0A`, "hello"})
 	assert.NoError(t, err)
 	expdata := []string{`\\x0A`, "hello"}

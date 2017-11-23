@@ -3,12 +3,12 @@ package ip
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
 	"github.com/wangtuanjie/ip17mon"
-	"strings"
 )
 
 //更全的免费数据可以在ipip.net下载

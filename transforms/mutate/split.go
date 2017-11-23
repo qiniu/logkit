@@ -2,9 +2,7 @@ package mutate
 
 import (
 	"errors"
-
 	"strings"
-
 	"fmt"
 
 	"github.com/qiniu/logkit/sender"
