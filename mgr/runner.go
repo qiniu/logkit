@@ -395,6 +395,9 @@ func (r *LogExportRunner) Run() {
 				break
 			}
 			if len(line) <= 0 {
+				if r.batchSize > 0 {
+					break
+				}
 				log.Debugf("Runner[%v] reader %s no more content fetched sleep 1 second...", r.Name(), r.reader.Name())
 				time.Sleep(1 * time.Second)
 				continue
@@ -411,6 +414,9 @@ func (r *LogExportRunner) Run() {
 			}
 			r.batchLen++
 			r.batchSize += len(line)
+			if err != nil && err == io.EOF {
+				break
+			}
 		}
 		r.batchLen = 0
 		r.batchSize = 0
