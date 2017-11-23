@@ -127,6 +127,7 @@ const (
 	ModeDir     = "dir"
 	ModeFile    = "file"
 	ModeTailx   = "tailx"
+	ModeMatch   = "match"
 	ModeMysql   = "mysql"
 	ModeMssql   = "mssql"
 	ModeElastic = "elastic"
@@ -151,6 +152,11 @@ const (
 	Loop = "loop"
 )
 
+const (
+	winsign = "\\"
+	comsign = "/"
+)
+
 // NewFileReader 创建FileReader
 func NewFileBufReader(conf conf.MapConf, isFromWeb bool) (reader Reader, err error) {
 	meta, err := NewMetaWithConf(conf)
@@ -164,7 +170,6 @@ func NewFileBufReader(conf conf.MapConf, isFromWeb bool) (reader Reader, err err
 func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (reader Reader, err error) {
 	mode, _ := conf.GetStringOr(KeyMode, ModeDir)
 	logpath, err := conf.GetString(KeyLogPath)
-	logpath = strings.Replace(logpath,"\\","/",-1)
 	if err != nil && (mode == ModeFile || mode == ModeDir || mode == ModeTailx) {
 		return
 	}
@@ -179,7 +184,19 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 	var fr FileReader
 	switch mode {
 	case ModeDir:
-		// for example: The path is "/usr/logkit/" It must be a directory
+		// 默认不读取隐藏文件
+		ignoreHidden, _ := conf.GetBoolOr(KeyIgnoreHiddenFile, true)
+		ignoreFileSuffix, _ := conf.GetStringListOr(KeyIgnoreFileSuffix, defaultIgnoreFileSuffix)
+		validFilesRegex, _ := conf.GetStringOr(KeyValidFilePattern, "*")
+		fr, err = NewSeqFile(meta, logpath, ignoreHidden, ignoreFileSuffix, validFilesRegex, whence)
+		if err != nil {
+			return
+		}
+		reader, err = NewReaderSize(fr, meta, bufSize)
+	case ModeMatch:
+		//windows path for replacement
+		logpath = strings.Replace(logpath,winsign,comsign,-1)
+		// for example: The path is "/usr/logkit/"
 		_ , after := path.Split(logpath)
 		//path with * matching tailx mode
 		isSub := strings.Contains(logpath, "*")
@@ -190,7 +207,7 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 			maxOpenFiles, _ := conf.GetIntOr(KeyMaxOpenFiles, 256)
 			reader, err = NewMultiReader(meta, logpath, whence, expireDur, stateIntervalDur, maxOpenFiles)
 		}else if after == "" {
-			// 默认不读取隐藏文件
+			meta.mode = ModeDir
 			ignoreHidden, _ := conf.GetBoolOr(KeyIgnoreHiddenFile, true)
 			ignoreFileSuffix, _ := conf.GetStringListOr(KeyIgnoreFileSuffix, defaultIgnoreFileSuffix)
 			validFilesRegex, _ := conf.GetStringOr(KeyValidFilePattern, "*")
@@ -198,8 +215,8 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 			if err != nil {
 				return
 			}
-			reader, err = NewReaderSize(fr, meta, bufSize)
-		}else {
+			reader, err = NewReaderSize(fr, meta, bufSize)				
+		}else{
 			//for "/usr/logkit" this path to make judgments
 			dirStr := path.Dir(logpath)
 			lastStr := path.Base(logpath)
@@ -207,6 +224,7 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 			for _, file := range files {
 				if file.Name() == lastStr {
 					if file.IsDir(){
+						meta.mode = ModeDir
 						ignoreHidden, _ := conf.GetBoolOr(KeyIgnoreHiddenFile, true)
 						ignoreFileSuffix, _ := conf.GetStringListOr(KeyIgnoreFileSuffix, defaultIgnoreFileSuffix)
 						validFilesRegex, _ := conf.GetStringOr(KeyValidFilePattern, "*")
