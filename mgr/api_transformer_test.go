@@ -12,6 +12,8 @@ import (
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
 	"github.com/stretchr/testify/assert"
+	"bytes"
+	_ "github.com/qiniu/logkit/transforms/date"
 )
 
 // Rest 测试 端口容易冲突导致混淆，63xx
@@ -68,4 +70,21 @@ func TestTransformerAPI(t *testing.T) {
 	}
 	assert.Equal(t, len(transforms.Transformers), len(got2))
 
+	// Test transformer/transform with date transformer
+	var got3 []map[string]string
+	var dateTransformerConfig = `{
+		"type":"date",
+		"key":"ts",
+		"offset":-1,
+		"time_layout_before":"",
+		"time_layout_after":"2006-01-02T15:04:05Z07:00",
+		"sampleLog":"{\"ts\":\"2006-01-02 15:04:05.997\"}"
+    }`
+	resp, err = http.Post("http://127.0.0.1"+rs.address+"/logkit/transformer/transform", "application/json", bytes.NewReader([]byte(dateTransformerConfig)))
+	content, _ = ioutil.ReadAll(resp.Body)
+	if err = json.Unmarshal(content, &got3); err != nil {
+		t.Error(err)
+	}
+	exp := []map[string]string{{"ts":"2006-01-02T14:04:05Z"}}
+	assert.Equal(t, exp, got3)
 }

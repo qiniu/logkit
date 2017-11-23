@@ -84,7 +84,7 @@ func (rs *RestService) PostTransform() echo.HandlerFunc {
 		create, ok := transforms.Transformers[tp]
 		if !ok {
 			// no such type transformer
-			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("type %v of transformer not exist", tp))
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("transformer of type %v not exist", tp))
 		}
 		// param 2: sample logs
 		if _, ok = reqConf[KeySampleLog]; !ok {
