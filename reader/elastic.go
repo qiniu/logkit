@@ -9,9 +9,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	elasticV6 "github.com/olivere/elastic"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/utils"
+
+	elasticV6 "github.com/olivere/elastic"
 	elasticV3 "gopkg.in/olivere/elastic.v3"
 	elasticV5 "gopkg.in/olivere/elastic.v5"
 )
