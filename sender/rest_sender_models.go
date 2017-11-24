@@ -113,6 +113,14 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:   "是否在发送数据时自动添加发送时间(logkit_send_time)",
 		},
 		{
+			KeyName:       KeyPandoraExtraInfo,
+			ChooseOnly:    true,
+			ChooseOptions: []string{"true", "false"},
+			Default:       "true",
+			DefaultNoUse:  false,
+			Description:   "自动添加额外信息(pandora_extra_info)",
+		},
+		{
 			KeyName:      KeyPandoraHost,
 			ChooseOnly:   false,
 			Default:      "https://pipeline.qiniu.com",
