@@ -11,10 +11,11 @@ import {
 import {
   deleteClusterSlaveTag,
   postClusterStopSlaveTag,
-  postClusterStartSlaveTag,
+  postClusterResetSlaveTag,
   postClusterSlaveTag,
   getClusterSlaves,
-  getRunnersByTagOrMachineUrl
+  getRunnersByTagOrMachineUrl,
+  postClusterDeleteSlaveTag
 } from '../../services/logkit';
 import {titles} from './constant'
 import _ from "lodash";
@@ -111,7 +112,7 @@ class TagTable extends Component {
         body: {tag: this.state.currentTagName}
       }).then(item => {
         if (item.code === 'L200') {
-          notification.success({message: "重置成功", duration: 10,})
+          notification.success({message: "重命名成功", duration: 10,})
           this.setState({
             isShowTagModal: false
           })
@@ -127,17 +128,37 @@ class TagTable extends Component {
       }).then(item => {
         if (item.code === 'L200') {
           notification.success({message: '关闭成功', duration: 10})
+          this.setState({
+            isShowTagModal: false
+          })
           this.getClusterSLave()
         }
       })
     } else if (this.state.currentModalType == 'start') {
-      postClusterStartSlaveTag({
+      postClusterResetSlaveTag({
         name: this.state.currentRunnerName,
         tag: this.state.currentTag.name,
         url: ''
       }).then(item => {
         if (item.code === 'L200') {
-          notification.success({message: '开启成功', duration: 10})
+          notification.success({message: '重启成功', duration: 10})
+          this.setState({
+            isShowTagModal: false
+          })
+          this.getClusterSLave()
+        }
+      })
+    } else if (this.state.currentModalType == 'delete') {
+      postClusterDeleteSlaveTag({
+        name: this.state.currentRunnerName,
+        tag: this.state.currentTag.name,
+        url: ''
+      }).then(item => {
+        if (item.code === 'L200') {
+          notification.success({message: '删除成功', duration: 10})
+          this.setState({
+            isShowTagModal: false
+          })
           this.getClusterSLave()
         }
       })
@@ -150,7 +171,7 @@ class TagTable extends Component {
     })
     deleteClusterSlaveTag({name: this.state.currentTag.name, url: ''}).then(item => {
       if (item.code === 'L200') {
-        notification.success({message: "重置成功", duration: 10,})
+        notification.success({message: "删除成功", duration: 10,})
         this.setState({
           isShowDeleteTag: false
         })
@@ -356,7 +377,7 @@ class TagTable extends Component {
             <a>
               <div className="editable-row-operations">
                 {this.checkStatus(record.status) !== 'bad' ? (
-                    <Icon onClick={() => this.showDeleteTag(record)} title={"删除该tag对应的runner"} style={{fontSize: 16}} type="delete"/>) : null
+                    <Icon onClick={() => this.showTagModal(record, 'delete')} title={"删除该tag对应的runner"} style={{fontSize: 16}} type="delete"/>) : null
                 }
               </div>
             </a>

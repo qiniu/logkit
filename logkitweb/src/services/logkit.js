@@ -230,8 +230,8 @@ export async function postClusterStopSlaveTag(params) {
   });
 }
 
-export async function postClusterStartSlaveTag(params) {
-  return request(window.logkitUrl + '/logkit/cluster/configs/' + params.name + '/start?tag=' + params.tag + '&url=' + params.url, {
+export async function postClusterResetSlaveTag(params) {
+  return request(window.logkitUrl + '/logkit/cluster/configs/' + params.name + '/reset?tag=' + params.tag + '&url=' + params.url, {
     method: 'post'
   });
 }
@@ -243,6 +243,12 @@ export async function startClusterRunner(params) {
     headers: {
       'Content-Type': 'application/json'
     }
+  });
+}
+
+export async function postClusterDeleteSlaveTag(params) {
+  return request(window.logkitUrl + '/logkit/cluster/configs/' + params.name + '?tag=' + params.tag + '&url=' + params.url, {
+    method: 'delete'
   });
 }
 
@@ -265,7 +271,7 @@ export async function resetClusterConfigData(params) {
 }
 
 export async function deleteClusterConfigData(params) {
-  return request(window.logkitUrl + '/logkit/cluster/configs/' + params.name, {
+  return request(window.logkitUrl + '/logkit/cluster/configs/' + params.name + '?tag=' + params.tag + '&url=' + params.url, {
     method: 'delete'
   });
 }

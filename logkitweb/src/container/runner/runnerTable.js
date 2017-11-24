@@ -31,6 +31,7 @@ import {
   getClusterRunnerStatus,
   getRunnerVersion
 } from '../../services/logkit';
+import {runnerStatu} from './constant'
 import config from '../../store/config'
 import * as uuid from 'uuid'
 import _ from "lodash";
@@ -556,8 +557,8 @@ class RunnerTable extends Component {
           isWebFolder = item.web_folder
         }
         statusList.map((ele) => {
-          if (item.name === ele.name) {
-            status = '正常'
+          if ((item.name + item.machineUrl) === (ele.name + ele.url)) {
+            status = runnerStatu[ele.runningStatus]
             tag = item.tag
             machineUrl = item.machineUrl
             createTime = moment(item.createtime).format("YYYY-MM-DD HH:mm:ss")
