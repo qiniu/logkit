@@ -33,6 +33,7 @@ const (
 	KeyPandoraSchemaUpdateInterval = "pandora_schema_update_interval"
 	KeyPandoraAutoCreate           = "pandora_auto_create"
 	KeyPandoraSchemaFree           = "pandora_schema_free"
+	KeyPandoraExtraInfo            = "pandora_extra_info"
 
 	KeyPandoraEnableLogDB = "pandora_enable_logdb"
 	KeyPandoraLogDBName   = "pandora_logdb_name"
@@ -92,6 +93,7 @@ type PandoraOption struct {
 	gzip           bool
 	uuid           bool
 	withip         string
+	extraInfo      bool
 
 	enableLogdb   bool
 	logdbReponame string
@@ -156,6 +158,7 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	uuid, _ := conf.GetBoolOr(KeyPandoraUUID, false)
 	withIp, _ := conf.GetBoolOr(KeyPandoraWithIP, false)
 	runnerName, _ := conf.GetStringOr(KeyRunnerName, UnderfinedRunnerName)
+	extraInfo, _ := conf.GetBoolOr(KeyPandoraExtraInfo, true)
 
 	enableLogdb, _ := conf.GetBoolOr(KeyPandoraEnableLogDB, false)
 	logdbreponame, _ := conf.GetStringOr(KeyPandoraLogDBName, repoName)
@@ -185,6 +188,7 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 		flowRateLimit:  flowRateLimit,
 		gzip:           gzip,
 		uuid:           uuid,
+		extraInfo:      extraInfo,
 
 		enableLogdb:   enableLogdb,
 		logdbReponame: logdbreponame,
@@ -608,6 +612,18 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 	for _, d := range datas {
 		if s.opt.logkitSendTime {
 			d[KeyLogkitSendTime] = now
+		}
+		if s.opt.extraInfo {
+			exInfo := utils.GetExtraInfo()
+			for key, val := range exInfo {
+				suffix := 0
+				keyName := key
+				for _, exist := d[keyName]; exist; suffix++ {
+					keyName = key + strconv.Itoa(suffix)
+					_, exist = d[keyName]
+				}
+				d[keyName] = val
+			}
 		}
 		point := s.generatePoint(d)
 		points = append(points, pipeline.Data(map[string]interface{}(point)))

@@ -65,7 +65,6 @@ func (p *UrlParam) Transform(datas []sender.Data) ([]sender.Data, error) {
 			for key, mapVal := range res {
 				suffix := 1
 				keyName := key
-				//for ; exist; suffix++ {
 				newkeys[len(newkeys) -1] = keyName
 				_, gerr := utils.GetMapValue(datas[i], newkeys...)
 				for ; gerr == nil; suffix++ {

@@ -256,7 +256,19 @@ type OSInfo struct {
 }
 
 func (oi *OSInfo) String() string {
-	return fmt.Sprintf("(%s; %s; %s %s)", oi.OS, oi.Core, oi.Kernel, oi.Platform)
+	return fmt.Sprintf("%s; %s; %s; %s %s", oi.Hostname, oi.OS, oi.Core, oi.Kernel, oi.Platform)
+}
+
+func GetExtraInfo() map[string]string {
+	osInfo := GetOSInfo()
+	exInfo := make(map[string]string)
+	exInfo["core"] = osInfo.Core
+	exInfo["hostname"] = osInfo.Hostname
+	exInfo["osinfo"] = osInfo.OS + "-" + osInfo.Kernel + "-" + osInfo.Platform
+	if ip, err := GetLocalIP(); err != nil {
+		exInfo["localip"] = ip
+	}
+	return exInfo
 }
 
 func IsJSON(str string) bool {
@@ -273,15 +285,14 @@ func ExtractField(slice []string) ([]string, error) {
 		rgexpr := "^%\\{\\[\\S+\\]}$" // --->  %{[type]}
 		r, _ := regexp.Compile(rgexpr)
 		slice[0] = strings.TrimSpace(slice[0])
-		bool := r.MatchString(slice[0])
-		if bool {
+		b := r.MatchString(slice[0])
+		if b {
 			rs := []rune(slice[0])
 			slice[0] = string(rs[3 : len(rs)-2])
 		} else {
 			err = errors.New("参数错误")
 		}
 	}
-	//err = errors.New("参数错误")
 	return slice, err
 }
 
