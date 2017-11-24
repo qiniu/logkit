@@ -30,10 +30,10 @@ func (g *DateTrans) RawTransform(datas []string) ([]string, error) {
 func (g *DateTrans) Transform(datas []sender.Data) ([]sender.Data, error) {
 	var err, ferr error
 	errnums := 0
+	separator := "."
+	keys := strings.Split(g.Key, separator)
 	for i := range datas {
-		separator := "."
-		keys := strings.Split(g.Key, separator)
-		val, err := utils.GetMapValue(datas[i], keys)
+		val, err := utils.GetMapValue(datas[i], keys...)
 		if err != nil {
 			errnums++
 			err = fmt.Errorf("transform key %v not exist in data", g.Key)
@@ -44,7 +44,7 @@ func (g *DateTrans) Transform(datas []sender.Data) ([]sender.Data, error) {
 			errnums++
 			continue
 		}
-		utils.SetMapValue(datas[i], keys, val)
+		utils.SetMapValue(datas[i],  val, keys...)
 	}
 	if err != nil {
 		g.stats.LastError = err.Error()

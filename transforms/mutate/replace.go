@@ -34,7 +34,7 @@ func (g *Replacer) Transform(datas []sender.Data) ([]sender.Data, error) {
 	separator := "."
 	keys := strings.Split(g.Key, separator)
 	for i := range datas {
-		val, gerr := utils.GetMapValue(datas[i], keys)
+		val, gerr := utils.GetMapValue(datas[i], keys...)
 		if gerr != nil {
 			errnums++
 			err = fmt.Errorf("transform key %v not exist in data", g.Key)
@@ -46,7 +46,7 @@ func (g *Replacer) Transform(datas []sender.Data) ([]sender.Data, error) {
 			err = fmt.Errorf("transform key %v data type is not string", g.Key)
 			continue
 		}
-		utils.SetMapValue(datas[i], keys, g.rgx.ReplaceAllString(strval, g.New))
+		utils.SetMapValue(datas[i], g.rgx.ReplaceAllString(strval, g.New), keys...)
 	}
 
 	if err != nil {

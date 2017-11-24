@@ -26,18 +26,18 @@ func (g *Rename) Transform(datas []sender.Data) ([]sender.Data, error) {
 	errnums := 0
 	separator := "."
 	keys := strings.Split(g.Key, separator)
+	newkeys := make([]string, len(keys))
 	for i := range datas {
-		newkeys := make([]string, len(keys))
 		copy(newkeys, keys)
-		val, gerr := utils.GetMapValue(datas[i], newkeys)
+		val, gerr := utils.GetMapValue(datas[i], newkeys...)
 		if gerr != nil {
 			errnums ++
 			fmt.Errorf("transform key %v not exist in data", g.Key)
 			continue
 		}
-		utils.DeleteMapValue(datas[i], newkeys)
+		utils.DeleteMapValue(datas[i], newkeys...)
 		newkeys[len(newkeys) - 1] = g.NewKeyName
-		utils.SetMapValue(datas[i], newkeys, val)
+		utils.SetMapValue(datas[i], val, newkeys...)
 	}
 	if err != nil {
 		g.stats.LastError = err.Error()

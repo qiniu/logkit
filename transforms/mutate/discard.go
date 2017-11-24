@@ -24,7 +24,7 @@ func (g *Discarder) Transform(datas []sender.Data) ([]sender.Data, error) {
 	separator := "."
 	keys := strings.Split(g.Key, separator)
 	for i := range datas {
-		utils.DeleteMapValue(datas[i], keys)
+		utils.DeleteMapValue(datas[i], keys...)
 	}
 	g.stats.Errors += int64(errnums)
 	g.stats.Success += int64(len(datas) - errnums)

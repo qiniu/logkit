@@ -287,7 +287,7 @@ func ExtractField(slice []string) ([]string, error) {
 
 //通过层级key获取value.
 //所有层级的map必须为 map[string]interface{} 类型.
-func GetMapValue(m map[string]interface{}, keys []string) (interface{}, error) {
+func GetMapValue(m map[string]interface{}, keys ...string) (interface{}, error) {
 	err := errors.New("keys错误")
 	var val interface{}
 	val = m
@@ -310,7 +310,7 @@ func GetMapValue(m map[string]interface{}, keys []string) (interface{}, error) {
 
 //通过层级key设置value值.
 //如果key不存在,将会自动创建.
-func SetMapValue(m map[string]interface{}, keys []string, val interface{}) {
+func SetMapValue(m map[string]interface{}, val interface{}, keys ...string,) {
 	if len(keys) == 0 {
 		return
 	}
@@ -338,7 +338,7 @@ func SetMapValue(m map[string]interface{}, keys []string, val interface{}) {
 
 //通过层级key删除key-val,并返回被删除的val,是否删除成功
 //如果key不存在,则返回 nil,false
-func DeleteMapValue(m map[string]interface{}, keys []string) (interface{}, bool) {
+func DeleteMapValue(m map[string]interface{}, keys ...string) (interface{}, bool) {
 	var val interface{}
 	val = m
 	for i := 0; i < len(keys); i++ {

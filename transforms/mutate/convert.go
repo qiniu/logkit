@@ -29,21 +29,25 @@ func (g *Converter) Transform(datas []sender.Data) ([]sender.Data, error) {
 		g.stats.LastError = ferr.Error()
 		errnums = len(datas)
 	} else {
+		keyss := map[int][]string{}
+		for i, sc := range schemas {
+			separator := "."
+			keys := strings.Split(sc.Key, separator)
+			keyss[i] = keys
+		}
 		for i := range datas {
-			for _, sc := range schemas {
-				separator := "."
-				keys := strings.Split(sc.Key, separator)
-				val, gerr := utils.GetMapValue(datas[i], keys)
+			for k, keys := range keyss {
+				val, gerr := utils.GetMapValue(datas[i], keys...)
 				if gerr != nil {
 					errnums++
-					err = fmt.Errorf("transform key %v not exist in data", sc.Key)
+					err = fmt.Errorf("transform key %v not exist in data", schemas[k].Key)
 					continue
 				}
-				val, err = pipeline.DataConvert(val, sc)
+				val, err = pipeline.DataConvert(val, schemas[k])
 				if err != nil {
 					errnums++
 				}
-				utils.SetMapValue(datas[i], keys, val)
+				utils.SetMapValue(datas[i], val, keys...)
 			}
 		}
 	}

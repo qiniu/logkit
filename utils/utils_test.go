@@ -227,7 +227,7 @@ func TestGetMapValue(t *testing.T) {
 	m3 := map[string]interface{}{"name": "小明"}
 	m2["m3"] = m3
 	m1["m2"] = m2
-	value, err := GetMapValue(m1, []string{"m2", "m3", "name"})
+	value, err := GetMapValue(m1, []string{"m2", "m3", "name"}...)
 	assert.Equal(t, err, nil)
 	assert.Equal(t, value, "小明")
 }
@@ -238,12 +238,12 @@ func TestSetMapValue(t *testing.T) {
 	m3 := map[string]interface{}{"name": "小明"}
 	m2["m3"] = m3
 	m1["m2"] = m2
-	SetMapValue(m1, []string{"m2", "m3", "name"}, "小红")
-	SetMapValue(m1, []string{"m2", "m3", "m4","name"}, "小黑")
-	value, err := GetMapValue(m1, []string{"m2", "m3", "name"})
+	SetMapValue(m1, "小红", []string{"m2", "m3", "name"}...)
+	SetMapValue(m1, "小黑", []string{"m2", "m3", "m4","name"}...)
+	value, err := GetMapValue(m1, []string{"m2", "m3", "name"}...)
 	assert.Equal(t, err, nil)
 	assert.Equal(t, value, "小红")
-	value2, err2 := GetMapValue(m1, []string{"m2", "m3", "m4", "name"})
+	value2, err2 := GetMapValue(m1, []string{"m2", "m3", "m4", "name"}...)
 	assert.Equal(t, err2, nil)
 	assert.Equal(t, value2, "小黑")
 }
@@ -254,7 +254,7 @@ func TestDeleteMapValue(t *testing.T) {
 	m3 := map[string]interface{}{"name": "小明"}
 	m2["m3"] = m3
 	m1["m2"] = m2
-	val, b := DeleteMapValue(m1, []string{"m2", "m3", "name"})
+	val, b := DeleteMapValue(m1, []string{"m2", "m3", "name"}...)
 	assert.Equal(t, val, "小明")
 	assert.Equal(t, b, true)
 }

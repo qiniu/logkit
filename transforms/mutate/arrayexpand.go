@@ -136,10 +136,10 @@ func (p *ArrayExpand) Transform(datas []sender.Data) ([]sender.Data, error) {
 	errNums := 0
 	separator := "."
 	keys := strings.Split(p.Key, separator)
+	newkeys := make([]string, len(keys))
 	for i := range datas {
-		newkeys := make([]string, len(keys))
 		copy(newkeys, keys)
-		val, gerr := utils.GetMapValue(datas[i], keys)
+		val, gerr := utils.GetMapValue(datas[i], keys...)
 		if gerr != nil {
 			errNums++
 			err = fmt.Errorf("transform key %v not exist in data", p.Key)
@@ -150,7 +150,7 @@ func (p *ArrayExpand) Transform(datas []sender.Data) ([]sender.Data, error) {
 				suffix := 0
 				keyName := key
 				newkeys[len(newkeys) -1] = keyName
-				_, gerr := utils.GetMapValue(datas[i], newkeys)
+				_, gerr := utils.GetMapValue(datas[i], newkeys...)
 				for ; gerr == nil; suffix++ {
 					if suffix > 5 {
 						log.Warnf("keys %v -- %v already exist, the key %v will be ignored", key, keyName, key)
@@ -158,10 +158,10 @@ func (p *ArrayExpand) Transform(datas []sender.Data) ([]sender.Data, error) {
 					}
 					keyName = key + "_" + strconv.Itoa(suffix)
 					newkeys[len(newkeys) -1] = keyName
-					_, gerr = utils.GetMapValue(datas[i], newkeys)
+					_, gerr = utils.GetMapValue(datas[i], newkeys...)
 				}
 				if suffix <= 5 {
-					utils.SetMapValue(datas[i], newkeys, arrVal)
+					utils.SetMapValue(datas[i], arrVal, newkeys...)
 				}
 			}
 		} else {
