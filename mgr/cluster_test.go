@@ -673,9 +673,14 @@ func TestClusterStartStop(t *testing.T) {
 		slave_rs.cluster.myaddress: ClusterStatus{
 			Status: map[string]RunnerStatus{
 				"test3": RunnerStatus{
-					RunningStatus: RunnerStopped,
-					Url:           slave_rs.cluster.myaddress,
-					Tag:           slave_rs.cluster.mytag,
+					Name:           "test3",
+					ReaderStats:    utils.StatsInfo{},
+					ParserStats:    utils.StatsInfo{},
+					TransformStats: make(map[string]utils.StatsInfo),
+					SenderStats:    make(map[string]utils.StatsInfo),
+					RunningStatus:  RunnerStopped,
+					Url:            slave_rs.cluster.myaddress,
+					Tag:            slave_rs.cluster.mytag,
 				},
 			},
 			Tag: "test",
@@ -683,9 +688,14 @@ func TestClusterStartStop(t *testing.T) {
 		slave_rs2.cluster.myaddress: ClusterStatus{
 			Status: map[string]RunnerStatus{
 				"test3": RunnerStatus{
-					RunningStatus: RunnerStopped,
-					Url:           slave_rs2.cluster.myaddress,
-					Tag:           slave_rs2.cluster.mytag,
+					Name:           "test3",
+					ReaderStats:    utils.StatsInfo{},
+					ParserStats:    utils.StatsInfo{},
+					TransformStats: make(map[string]utils.StatsInfo),
+					SenderStats:    make(map[string]utils.StatsInfo),
+					RunningStatus:  RunnerStopped,
+					Url:            slave_rs2.cluster.myaddress,
+					Tag:            slave_rs2.cluster.mytag,
 				},
 			},
 			Tag: "test",
@@ -861,9 +871,14 @@ func TestClusterStartStop(t *testing.T) {
 	gotStatus[slave_rs.cluster.myaddress] = ClusterStatus{
 		Status: map[string]RunnerStatus{
 			"test3": RunnerStatus{
-				RunningStatus: RunnerStopped,
-				Url:           slave_rs.cluster.myaddress,
-				Tag:           slave_rs.cluster.mytag,
+				Name:           "test3",
+				ReaderStats:    utils.StatsInfo{},
+				ParserStats:    utils.StatsInfo{},
+				TransformStats: make(map[string]utils.StatsInfo),
+				SenderStats:    make(map[string]utils.StatsInfo),
+				RunningStatus:  RunnerStopped,
+				Url:            slave_rs.cluster.myaddress,
+				Tag:            slave_rs.cluster.mytag,
 			},
 		},
 		Tag: "test",

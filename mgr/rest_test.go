@@ -817,7 +817,12 @@ func Test_RunnerStart(t *testing.T) {
 	rss := respRss.Data
 	assert.Equal(t, map[string]RunnerStatus{
 		"test2.csv": RunnerStatus{
-			RunningStatus: RunnerStopped,
+			Name:           "test2.csv",
+			ReaderStats:    utils.StatsInfo{},
+			ParserStats:    utils.StatsInfo{},
+			TransformStats: make(map[string]utils.StatsInfo),
+			SenderStats:    make(map[string]utils.StatsInfo),
+			RunningStatus:  RunnerStopped,
 		},
 	}, rss)
 
@@ -1027,7 +1032,12 @@ func Test_RunnerStop(t *testing.T) {
 	assert.NoError(t, err, "OUTSTRING: "+out.String())
 	assert.Equal(t, map[string]RunnerStatus{
 		"test3.csv": RunnerStatus{
-			RunningStatus: RunnerStopped,
+			Name:           "test3.csv",
+			ReaderStats:    utils.StatsInfo{},
+			ParserStats:    utils.StatsInfo{},
+			TransformStats: make(map[string]utils.StatsInfo),
+			SenderStats:    make(map[string]utils.StatsInfo),
+			RunningStatus:  RunnerStopped,
 		},
 	}, rss)
 

@@ -477,7 +477,12 @@ func (m *Manager) Status() (rss map[string]RunnerStatus) {
 			rss[r.Name()] = r.Status()
 		} else {
 			rss[conf.RunnerName] = RunnerStatus{
-				RunningStatus: RunnerStopped,
+				Name:           conf.RunnerName,
+				ReaderStats:    utils.StatsInfo{},
+				ParserStats:    utils.StatsInfo{},
+				TransformStats: make(map[string]utils.StatsInfo),
+				SenderStats:    make(map[string]utils.StatsInfo),
+				RunningStatus:  RunnerStopped,
 			}
 		}
 	}
