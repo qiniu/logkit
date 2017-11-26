@@ -142,6 +142,7 @@ class CreateLogRunner extends Component {
   }
 
   addRunner = () => {
+    const { currentTagName, currentMachineUrl } = this.props
     const {handleTurnToRunner} = this.props
     let that = this
     const {validateFields, getFieldsValue} =  that.refs.initConfig;
@@ -153,8 +154,8 @@ class CreateLogRunner extends Component {
       } else {
         if (isJSON(formData.config)) {
           let data = JSON.parse(formData.config);
-          let tag = (window.tag != null && window.tag != undefined) ? window.tag : ''
-          let url = (window.machine_url != null && window.machine_url != undefined) ? window.machine_url : ''
+          let tag = (currentTagName != null && currentTagName != undefined) ? currentTagName : ''
+          let url = (currentMachineUrl != null && currentMachineUrl != undefined) ? currentMachineUrl : ''
           if (window.isCluster && window.isCluster === true) {
             postClusterConfigData({name: data.name, tag: tag, url: url, body: data}).then(data => {
               if (data && data.code === 'L200') {
@@ -181,6 +182,7 @@ class CreateLogRunner extends Component {
   }
 
   updateRunner = () => {
+    const { currentTagName, currentMachineUrl } = this.props
     const {handleTurnToRunner} = this.props
     let that = this
     const {validateFields, getFieldsValue} =  that.refs.initConfig;
@@ -192,8 +194,8 @@ class CreateLogRunner extends Component {
       } else {
         if (isJSON(formData.config)) {
           let data = JSON.parse(formData.config);
-          let tag = (window.tag != null && window.tag != undefined) ? window.tag : ''
-          let url = (window.machine_url != null && window.machine_url != undefined) ? window.machine_url : ''
+          let tag = (currentTagName != null && currentTagName != undefined) ? currentTagName : ''
+          let url = (currentMachineUrl != null && currentMachineUrl != undefined) ? currentMachineUrl : ''
           if (window.isCluster && window.isCluster === true) {
             putClusterConfigData({name: data.name, tag: tag, url: url, body: data}).then(data => {
               if (data && data.code === 'L200') {
@@ -230,7 +232,6 @@ class CreateLogRunner extends Component {
 
 
   render() {
-    const { currentTagName, currentMachineUrl } = this.props
     const {current} = this.state;
     return (
         <div className="logkit-create-container">
@@ -253,7 +254,7 @@ class CreateLogRunner extends Component {
               <Sender ref="checkSenderData"></Sender>
             </div>
             <div className={this.state.current === 4 ? 'show-div' : 'hide-div'}>
-              <RenderConfig currentTagName={currentTagName} currentMachineUrl={currentMachineUrl} ref="initConfig"></RenderConfig>
+              <RenderConfig ref="initConfig"></RenderConfig>
             </div>
 
           </div>

@@ -78,12 +78,14 @@ class List extends Component {
     if (type === 'tag') {
       this.setState({
         currentMenu: 'createLog',
-        currentTagName: record
+        currentTagName: record,
+        currentMachineUrl: ''
       })
     } else {
       this.setState({
         currentMenu: 'createLog',
-        currentMachineUrl: record
+        currentMachineUrl: record,
+        currentTagName: ''
       })
     }
 
@@ -93,8 +95,6 @@ class List extends Component {
   }
 
   turnToRunnerTab = () => {
-    window.tag = ''
-    window.machine_url = ''
     this.setState({
       currentMenu: 'runner'
     })
@@ -104,12 +104,14 @@ class List extends Component {
     if (type === 'tag') {
       this.setState({
         currentMenu: 'createMetricLog',
-        currentTagName: record
+        currentTagName: record,
+        currentMachineUrl: ''
       })
     } else {
       this.setState({
         currentMenu: 'createMetricLog',
-        currentMachineUrl: record
+        currentMachineUrl: record,
+        currentTagName: ''
       })
     }
     window.isCopy = false
@@ -216,7 +218,6 @@ class List extends Component {
                                handleAddMetricRunner={this.addMetricRunner.bind(this)}
                                handleTurnToRunner={this.TurnToLogRunner.bind(this)}
                                handleTurnToMetricRunner={this.TurnToMetricRunner.bind(this)}
-                               runners={this.state.runners} runnerStatus={this.state.status}
                   />
                 </div>
 

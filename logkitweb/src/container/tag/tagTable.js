@@ -293,7 +293,7 @@ class TagTable extends Component {
                 <a>
                   <div className="editable-row-operations">
                     { this.checkStatus(record.status) === 'ok' ? (
-                    <Icon style={{fontSize: 16}} type="setting" title="tag重命名" onClick={() => this.showTagModal(record, 'rename')} />) : null
+                    <Icon style={{fontSize: 16}} type="setting" title="标签重命名" onClick={() => this.showTagModal(record, 'rename')} />) : null
                     }
                   </div>
                 </a>
@@ -342,7 +342,7 @@ class TagTable extends Component {
         return (<a>
               <div className="editable-row-operations">
                 {this.checkStatus(record.status) === 'ok' ? (
-                    <Icon onClick={() => this.showTagModal(record, 'stop')} title={"停止该tag对应的runner"} style={{fontSize: 16}}
+                    <Icon onClick={() => this.showTagModal(record, 'stop')} title={"停止该标签对应的runner"} style={{fontSize: 16}}
                           type='poweroff'/>) : null
                 }
               </div>
@@ -359,7 +359,7 @@ class TagTable extends Component {
         return (<a>
               <div className="editable-row-operations">
                 {this.checkStatus(record.status) === 'ok' ? (
-                    <Icon onClick={() => this.showTagModal(record, 'start')} title={"重启该tag对应的runner"} style={{fontSize: 16}}
+                    <Icon onClick={() => this.showTagModal(record, 'start')} title={"重启该标签对应的runner"} style={{fontSize: 16}}
                           type='caret-right'/>) : null
                 }
               </div>
@@ -377,7 +377,7 @@ class TagTable extends Component {
             <a>
               <div className="editable-row-operations">
                 {this.checkStatus(record.status) !== 'bad' ? (
-                    <Icon onClick={() => this.showTagModal(record, 'delete')} title={"删除该tag对应的runner"} style={{fontSize: 16}} type="delete"/>) : null
+                    <Icon onClick={() => this.showTagModal(record, 'delete')} title={"删除该标签对应的runner"} style={{fontSize: 16}} type="delete"/>) : null
                 }
               </div>
             </a>
@@ -411,14 +411,14 @@ class TagTable extends Component {
           >
             <FormItem label="名称">
               {this.state.currentModalType === 'rename' ? (
-                  <Input key="rename" onChange={this.changeTagName} placeholder="新tag名称"/>) : (
+                  <Input key="rename" onChange={this.changeTagName} placeholder="新标签名称"/>) : (
               <Select style={{width: '200px'}} key="opt" onChange={this.changeRunnerName} placeholder="选择该标签下的一个runner" >
                 {this.renderSelectOptions(this.state.runners)}
               </Select>
               ) }</FormItem>
           </Modal>
 
-          <Modal title="是否删除Tag？" visible={this.state.isShowDeleteTag}
+          <Modal title="是否删除标签？" visible={this.state.isShowDeleteTag}
                  onOk={this.handleDeleteTag} onCancel={this.handleDeleteTagCancel}
           >
           </Modal>

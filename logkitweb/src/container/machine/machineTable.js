@@ -3,14 +3,22 @@ import moment from 'moment'
 import {
   Table,
   Icon,
-  Form
+  notification,
+  Modal,
+  Input,
+  Form,
+  Select
 } from 'antd';
 import {
   getClusterSlaves,
+  postClusterSlaveTag
 } from '../../services/logkit';
 import * as uuid from 'uuid'
+import {titles} from '../tag/constant'
 import config from '../../store/config'
 import _ from "lodash";
+const FormItem = Form.Item;
+const Option = Select.Option
 
 
 class MachineTable extends Component {
@@ -20,7 +28,11 @@ class MachineTable extends Component {
       current: 0,
       currentItem: '',
       status: [],
-      machines: []
+      machines: [],
+      isShowTagModal: false,
+      currentTag: '',
+      currentTagName: '',
+      currentModalType: '',
     };
   }
 
@@ -33,6 +45,50 @@ class MachineTable extends Component {
 
   componentDidUpdate(prevProps) {
 
+  }
+
+  showTagModal = (item, type) => {
+    console.log(item)
+    this.setState({
+      currentTag: item,
+      isShowTagModal: true,
+      currentModalType: type,
+      currentModalTitle: titles[type]
+    })
+  }
+
+  handleTagModal = () => {
+    this.setState({
+      isLoading: true
+    })
+    if (this.state.currentModalType == 'rename') {
+      postClusterSlaveTag({
+        name: this.state.currentTag.name,
+        url: '',
+        body: {tag: this.state.currentTagName}
+      }).then(item => {
+        if (item.code === 'L200') {
+          notification.success({message: "重命名成功", duration: 10,})
+          this.setState({
+            isShowTagModal: false
+          })
+          this.getClusterSLave()
+        }
+
+      })
+    }
+  }
+
+  handleTagModalCancel = () => {
+    this.setState({
+      isShowTagModal: false
+    })
+  }
+
+  changeTagName = (e) => {
+    this.setState({
+      currentTagName: e.target.value
+    })
   }
 
   getClusterSLave = () => {
@@ -83,6 +139,24 @@ class MachineTable extends Component {
       dataIndex: 'last_touch',
       key: 'last_touch',
     }, {
+      title: '重命名',
+      dataIndex: 'rename',
+      key: 'rename',
+      width: '10%',
+      render: (text, record) => {
+        return (
+            (
+                <a>
+                  <div className="editable-row-operations">
+                    { record.status === 'ok' ? (
+                        <Icon style={{fontSize: 16}} type="setting" title="标签重命名" onClick={() => this.showTagModal(record, 'rename')} />) : null
+                    }
+                  </div>
+                </a>
+            )
+        );
+      }
+    }, {
       title: '添加runner',
       key: 'edit',
       dataIndex: 'edit',
@@ -127,7 +201,14 @@ class MachineTable extends Component {
     return (
         <div>
           {this.renderMachineList()}
+          <Modal title={this.state.currentModalTitle} visible={this.state.isShowTagModal}
+                 onOk={this.handleTagModal} onCancel={this.handleTagModalCancel}
+          >
+            <FormItem label="名称">
+              <Input key="rename" onChange={this.changeTagName} placeholder="新标签名称"/></FormItem>
+          </Modal>
         </div>
+
     );
   }
 }

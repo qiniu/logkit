@@ -53,7 +53,9 @@ class RunnerTable extends Component {
       runnerStatus: [],
       machineUrl: '',
       tag: '',
-      isLoading: false
+      isLoading: false,
+      currentTag: '',
+      currentUrl: ''
     };
 
   }
@@ -118,12 +120,12 @@ class RunnerTable extends Component {
   }
 
 
-  getStatus = () => {
+  getStatus = (tag, url) => {
     let that = this
     if (window.isCluster && window.isCluster === true) {
       getClusterRunnerConfigs({
-        tag: window.tag ? window.tag : '',
-        machineUrl: window.machine_url ? window.machine_url : ''
+        tag: tag ? tag : this.state.currentTag,
+        machineUrl: url ? url : this.state.currentUrl
       }).then(data => {
         if (data.code === 'L200') {
           let mapData = data.data
@@ -132,8 +134,8 @@ class RunnerTable extends Component {
             runners: tagMapData
           })
           getClusterRunnerStatus({
-            tag: window.tag ? window.tag : '',
-            machineUrl: window.machine_url ? window.machine_url : ''
+            tag: tag ? tag : this.state.currentTag,
+            machineUrl: url ? url : this.state.currentUrl
           }).then(data => {
             if (data.code === 'L200') {
               that.setState({
@@ -247,13 +249,19 @@ class RunnerTable extends Component {
   }
 
   setMachine = (machineUrl) => {
-    window.machine_url = machineUrl
-    this.getStatus()
+    console.log(machineUrl)
+    this.setState({
+      currentUrl: machineUrl
+    })
+    this.getStatus('',machineUrl)
   }
 
   setTag = (tag) => {
-    window.tag = tag
-    this.getStatus()
+
+    this.setState({
+      currentTag: tag
+    })
+    this.getStatus(tag,'')
   }
 
   copyConfig = (record) => {
@@ -627,8 +635,8 @@ class RunnerTable extends Component {
                   value={''}>{'全部'}</Option>
                 {
                   tagList.map(
-                      tag => <Option
-                          key={tag}
+                      (tag,i) => <Option
+                          key={tag+i}
                           value={tag}>{tag}</Option>
                   )
                 }
@@ -644,8 +652,8 @@ class RunnerTable extends Component {
                   value={''}>{'全部'}</Option>
                 {
                   machineList.map(
-                      machineUrl => <Option
-                          key={machineUrl}
+                      (machineUrl,i) => <Option
+                          key={machineUrl+i}
                           value={machineUrl}>{machineUrl}</Option>
                   )
                 }
