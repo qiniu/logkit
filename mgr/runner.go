@@ -426,8 +426,10 @@ func (r *LogExportRunner) Run() {
 				log.Errorf("Runner[%v] reader %s read lines larger than MaxBatchSize %v, content is %s", r.Name(), r.reader.Name(), r.MaxBatchSize, line)
 				continue
 			}
+			r.rsMutex.Lock()
 			r.rs.ReadDataSize += int64(len(line))
 			r.rs.ReadDataCount++
+			r.rsMutex.Unlock()
 			lines = append(lines, line)
 			if datasourceTag != "" {
 				froms = append(froms, r.reader.Source())
@@ -463,6 +465,7 @@ func (r *LogExportRunner) Run() {
 		errorCnt := int64(0)
 		datas, err := r.parser.Parse(lines)
 		se, ok := err.(*utils.StatsError)
+		r.rsMutex.Lock()
 		if ok {
 			errorCnt = se.Errors
 			err = se.ErrorDetail
@@ -474,6 +477,7 @@ func (r *LogExportRunner) Run() {
 		} else {
 			r.rs.ParserStats.Success++
 		}
+		r.rsMutex.Unlock()
 		if err != nil {
 			errMsg := fmt.Sprintf("Runner[%v] parser %s error : %v ", r.Name(), r.parser.Name(), err.Error())
 			log.Debugf(errMsg)
