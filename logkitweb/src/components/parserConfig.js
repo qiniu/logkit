@@ -83,17 +83,17 @@ class Parser extends Component {
   init = () => {
     const {getFieldDecorator, setFieldsValue, resetFields} = this.props.form;
     let that = this
-    getSourceParseOptions().then(data => {
-      if (data.success) {
+    getSourceParseOptions().then(item => {
+      if (item.code === 'L200') {
         this.setState({
-          options: data,
-          currentOption: data[0].key
+          options: item.data,
+          currentOption: item.data[0].key
         })
-        getSourceParseOptionsFormData().then(data => {
-          if (data.success) {
+        getSourceParseOptionsFormData().then(item => {
+          if (item.code === 'L200') {
             this.setState({
-              items: data,
-              currentItem: data[this.state.currentOption]
+              items: item.data,
+              currentItem: item.data[this.state.currentOption]
             })
 
             if (window.nodeCopy) {
@@ -109,15 +109,16 @@ class Parser extends Component {
           }
         })
       }
+
     })
 
-    getSourceParsesamplelogs().then(data => {
-      if (data.success) {
+    getSourceParsesamplelogs().then(item => {
+      if (item.code === 'L200') {
         this.setState({
-          sampleData: data,
-          currentSampleData: data[this.state.currentOption]
+          sampleData: item.data,
+          currentSampleData: item.data[this.state.currentOption]
         })
-        getFieldDecorator("sampleData", {initialValue: data[this.state.currentOption]});
+        getFieldDecorator("sampleData", {initialValue: item.data[this.state.currentOption]});
       }
     })
 
@@ -236,12 +237,13 @@ class Parser extends Component {
       ...data[this.state.currentOption],
       sampleLog: data.sampleData
     }
-    postParseData({body: requestData}).then(data => {
-      if (data.success) {
+    postParseData({body: requestData}).then(item => {
+      if (item.code === 'L200') {
         this.setState({
-          parseData: JSON.stringify(_.pick(data, 'SamplePoints'), null, 2)
+          parseData: JSON.stringify(_.pick(item.data, 'SamplePoints'), null, 2)
         })
       }
+
     })
   }
 

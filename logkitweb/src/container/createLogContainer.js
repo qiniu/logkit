@@ -8,7 +8,12 @@ import Transformer from '../components/transformer'
 import config from '../store/config'
 import {isJSON} from '../utils/tools'
 import moment from 'moment'
-import {postConfigData, getRunnerVersion, putConfigData} from '../services/logkit';
+import {
+  postConfigData,
+  putConfigData,
+  postClusterConfigData,
+  putClusterConfigData
+} from '../services/logkit';
 import _ from "lodash";
 
 const Step = Steps.Step;
@@ -56,25 +61,14 @@ class CreateLogRunner extends Component {
 
   init = () => {
     let that = this
-    let isCopy = this.props.location.query.copyConfig
-    if (isCopy === 'true') {
-      window.isCopy = true;
+    if (window.isCopy === true) {
       this.setState({
         isCpoyStatus: true
       })
-    } else {
-      window.isCopy = false
     }
-    if(window.nodeCopy){
+    if (window.nodeCopy) {
       config.delete("metric");
     }
-    getRunnerVersion().then(data => {
-      if (data.success) {
-        that.setState({
-          version: _.values(_.omit(data, 'success'))
-        })
-      }
-    })
   }
 
   next() {
@@ -126,6 +120,11 @@ class CreateLogRunner extends Component {
 
           }
 
+          if (window.isCopy && window.nodeCopy) {
+            runnerName = window.nodeCopy.name
+            batch_interval = window.nodeCopy.batch_interval
+            collect_interval = window.nodeCopy.collect_interval
+          }
           let data = {
             name: runnerName != undefined ? runnerName : name,
             batch_interval: batch_interval != undefined ? batch_interval : 60,
@@ -133,16 +132,9 @@ class CreateLogRunner extends Component {
             ...config.getNodeData()
           }
           that.refs.initConfig.setFieldsValue({config: JSON.stringify(data, null, 2)});
-          if (runnerName == undefined) {
-            that.refs.initConfig.setFieldsValue({name: name});
-          }
-
-          if (batch_interval == undefined) {
-            that.refs.initConfig.setFieldsValue({batch_interval: 60});
-          }
-          if (collect_interval == undefined) {
-            that.refs.initConfig.setFieldsValue({collect_interval: 3});
-          }
+          that.refs.initConfig.setFieldsValue({name: runnerName != undefined ? runnerName : name});
+          that.refs.initConfig.setFieldsValue({batch_interval: batch_interval != undefined ? batch_interval : 60});
+          that.refs.initConfig.setFieldsValue({collect_interval: collect_interval != undefined ? collect_interval : 3});
         }
       });
     }
@@ -150,6 +142,8 @@ class CreateLogRunner extends Component {
   }
 
   addRunner = () => {
+    const { currentTagName, currentMachineUrl } = this.props
+    const {handleTurnToRunner} = this.props
     let that = this
     const {validateFields, getFieldsValue} =  that.refs.initConfig;
     let formData = getFieldsValue();
@@ -160,13 +154,25 @@ class CreateLogRunner extends Component {
       } else {
         if (isJSON(formData.config)) {
           let data = JSON.parse(formData.config);
-          postConfigData({name: data.name, body: data}).then(data => {
-            if (data === undefined) {
-              notification.success({message: "Runner添加成功", duration: 10,})
-              this.props.router.push({pathname: `/`})
-            }
+          let tag = (currentTagName != null && currentTagName != undefined) ? currentTagName : ''
+          let url = (currentMachineUrl != null && currentMachineUrl != undefined) ? currentMachineUrl : ''
+          if (window.isCluster && window.isCluster === true) {
+            postClusterConfigData({name: data.name, tag: tag, url: url, body: data}).then(data => {
+              if (data && data.code === 'L200') {
+                notification.success({message: "Runner添加成功", duration: 10,})
+                handleTurnToRunner()
+              }
 
-          })
+            })
+          } else {
+            postConfigData({name: data.name, body: data}).then(data => {
+              if (data && data.code === 'L200') {
+                notification.success({message: "Runner添加成功", duration: 10,})
+                handleTurnToRunner()
+              }
+
+            })
+          }
         } else {
           notification.warning({message: "不是一个合法的json对象,请检查", duration: 20,})
         }
@@ -176,6 +182,8 @@ class CreateLogRunner extends Component {
   }
 
   updateRunner = () => {
+    const { currentTagName, currentMachineUrl } = this.props
+    const {handleTurnToRunner} = this.props
     let that = this
     const {validateFields, getFieldsValue} =  that.refs.initConfig;
     let formData = getFieldsValue();
@@ -186,13 +194,24 @@ class CreateLogRunner extends Component {
       } else {
         if (isJSON(formData.config)) {
           let data = JSON.parse(formData.config);
-          putConfigData({name: data.name, body: data}).then(data => {
-            if (data === undefined) {
-              notification.success({message: "Runner修改成功", duration: 10,})
-              this.props.router.push({pathname: `/`})
-            }
+          let tag = (currentTagName != null && currentTagName != undefined) ? currentTagName : ''
+          let url = (currentMachineUrl != null && currentMachineUrl != undefined) ? currentMachineUrl : ''
+          if (window.isCluster && window.isCluster === true) {
+            putClusterConfigData({name: data.name, tag: tag, url: url, body: data}).then(data => {
+              if (data && data.code === 'L200') {
+                notification.success({message: "Runner修改成功", duration: 10,})
+                handleTurnToRunner()
+              }
 
-          })
+            })
+          } else {
+            putConfigData({name: data.name, body: data}).then(data => {
+              if (data && data.code === 'L200') {
+                notification.success({message: "Runner修改成功", duration: 10,})
+                handleTurnToRunner()
+              }
+            })
+          }
         } else {
           notification.warning({message: "不是一个合法的json对象,请检查", duration: 20,})
         }
@@ -215,71 +234,55 @@ class CreateLogRunner extends Component {
   render() {
     const {current} = this.state;
     return (
-      <div className="logkit-create-container">
-        <div className="header">
-          <Button style={{float: 'left', marginTop: '20px'}} type="primary" className="index-btn"
-                  onClick={() => this.turnToIndex()}>
-            <Icon type="link"/>回到首页
-          </Button>七牛Logkit配置文件助手 {this.state.version}
-        </div>
-        <Steps current={current}>
-          {steps.map(item => <Step key={item.title} title={item.title}/>)}
-        </Steps>
-        <div className="steps-content">
-          <div><p className={this.state.current <= 3 ? 'show-div info' : 'hide-div'}>注意：黄色字体选框需根据实际情况修改，其他可作为默认值</p>
-          </div>
-          <div className={this.state.current === 0 ? 'show-div' : 'hide-div'}>
-            <Source ref="checkSourceData"></Source>
-          </div>
-          <div className={this.state.current === 1 ? 'show-div' : 'hide-div'}>
-            <Parser ref="checkParseData"></Parser>
-          </div>
-          <div className={this.state.current === 2 ? 'show-div' : 'hide-div'}>
-            <Transformer ref="initTransform"></Transformer>
-          </div>
-          <div className={this.state.current === 3 ? 'show-div' : 'hide-div'}>
-            <Sender ref="checkSenderData"></Sender>
-          </div>
-          <div className={this.state.current === 4 ? 'show-div' : 'hide-div'}>
-            <RenderConfig ref="initConfig"></RenderConfig>
-          </div>
+        <div className="logkit-create-container">
+          <Steps current={current}>
+            {steps.map(item => <Step key={item.title} title={item.title}/>)}
+          </Steps>
+          <div className="steps-content">
+            <div><p className={this.state.current <= 3 ? 'show-div info' : 'hide-div'}>注意：黄色字体选框需根据实际情况修改，其他可作为默认值</p>
+            </div>
+            <div className={this.state.current === 0 ? 'show-div' : 'hide-div'}>
+              <Source ref="checkSourceData"></Source>
+            </div>
+            <div className={this.state.current === 1 ? 'show-div' : 'hide-div'}>
+              <Parser ref="checkParseData"></Parser>
+            </div>
+            <div className={this.state.current === 2 ? 'show-div' : 'hide-div'}>
+              <Transformer ref="initTransform"></Transformer>
+            </div>
+            <div className={this.state.current === 3 ? 'show-div' : 'hide-div'}>
+              <Sender ref="checkSenderData"></Sender>
+            </div>
+            <div className={this.state.current === 4 ? 'show-div' : 'hide-div'}>
+              <RenderConfig ref="initConfig"></RenderConfig>
+            </div>
 
+          </div>
+          <div className="steps-action">
+            {
+              this.state.current < steps.length - 1
+              &&
+              <Button type="primary" onClick={() => this.next()}>下一步</Button>
+            }
+            {
+              this.state.current === steps.length - 1 && this.state.isCpoyStatus === false
+              &&
+              <Button type="primary" onClick={() => this.addRunner()}>确认并提交</Button>
+            }
+            {
+              this.state.current === steps.length - 1 && this.state.isCpoyStatus === true
+              &&
+              <Button type="primary" onClick={() => this.updateRunner()}>修改并提交</Button>
+            }
+            {
+              this.state.current > 0
+              &&
+              <Button style={{marginLeft: 8}} onClick={() => this.prev()}>
+                上一步
+              </Button>
+            }
+          </div>
         </div>
-        <div className="steps-action">
-          {
-            this.state.current < steps.length - 1
-            &&
-            <Button type="primary" onClick={() => this.next()}>下一步</Button>
-          }
-          {
-            this.state.current === steps.length - 1 && this.state.isCpoyStatus === false
-            &&
-            <Button type="primary" onClick={() => this.addRunner()}>确认并提交</Button>
-          }
-          {
-            this.state.current === steps.length - 1 && this.state.isCpoyStatus === true
-            &&
-            <Button type="primary" onClick={() => this.updateRunner()}>修改并提交</Button>
-          }
-          {
-            this.state.current > 0
-            &&
-            <Button style={{marginLeft: 8}} onClick={() => this.prev()}>
-              上一步
-            </Button>
-          }
-        </div>
-        <Footer style={{textAlign: 'center'}}>
-          更多信息请访问：
-          <a target="_blank" href="https://github.com/qiniu/logkit">
-            <Tag color="#108ee9">Logkit</Tag> </a> |
-          <a target="_blank" href="https://github.com/qiniu/logkit/wiki">
-            <Tag color="#108ee9">帮助文档</Tag> </a> |
-          <a target="_blank" href="https://qiniu.github.io/pandora-docs/#/"><Tag
-            color="#108ee9">Pandora产品</Tag>
-          </a>
-        </Footer>
-      </div>
     );
   }
 }

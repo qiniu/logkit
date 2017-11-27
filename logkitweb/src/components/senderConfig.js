@@ -75,17 +75,17 @@ class Sender extends Component {
   init = () => {
     const {setFieldsValue, resetFields} = this.props.form;
     let that = this
-    getSenderOptions().then(data => {
-      if (data.success) {
+    getSenderOptions().then(item => {
+      if (item.code === 'L200') {
         this.setState({
-          options: data,
-          currentOption: data[0].key
+          options: item.data,
+          currentOption: item.data[0].key
         })
-        getSenderOptionsFormData().then(data => {
-          if (data.success) {
+        getSenderOptionsFormData().then(item => {
+          if (item.code === 'L200') {
             this.setState({
-              items: data,
-              currentItem: data[this.state.currentOption]
+              items: item.data,
+              currentItem: item.data[this.state.currentOption]
             })
             if (window.nodeCopy) {
               that.handleChange(window.nodeCopy.senders[0].sender_type)
@@ -98,8 +98,10 @@ class Sender extends Component {
               setFieldsValue(formData);
             }
           }
+
         })
       }
+
     })
 
 
