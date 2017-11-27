@@ -58,6 +58,10 @@ func (_ *NetStats) Usages() string {
 	return MetricNetstatUsages
 }
 
+func (_ *NetStats) Tags() []string {
+	return []string{}
+}
+
 func (_ *NetStats) Config() map[string]interface{} {
 	config := map[string]interface{}{
 		metric.OptionString:     []utils.Option{},

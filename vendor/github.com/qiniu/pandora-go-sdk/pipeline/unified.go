@@ -6,7 +6,6 @@ import (
 	"github.com/qiniu/pandora-go-sdk/base"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 	"github.com/qiniu/pandora-go-sdk/logdb"
-	"github.com/qiniu/pandora-go-sdk/tsdb"
 )
 
 func (c *Pipeline) FormExportInput(repoName, exportType string, spec interface{}) *CreateExportInput {
@@ -20,48 +19,57 @@ func (c *Pipeline) FormExportInput(repoName, exportType string, spec interface{}
 	}
 }
 
-func (c *Pipeline) FormLogDBSpec(RepoName string, Schema []RepoSchemaEntry) *ExportLogDBSpec {
+func (c *Pipeline) FormLogDBSpec(input *CreateRepoForLogDBInput) *ExportLogDBSpec {
 	doc := make(map[string]interface{})
-	for _, v := range Schema {
+	for _, v := range input.Schema {
 		doc[v.Key] = "#" + v.Key
 	}
 	return &ExportLogDBSpec{
-		DestRepoName: RepoName,
+		DestRepoName: input.RepoName,
 		Doc:          doc,
+		OmitInvalid:  input.OmitInvalid,
+		OmitEmpty:    input.OmitEmpty,
 	}
 }
 
-func (c *Pipeline) FormKodoSpec(bucketName string, Schema []RepoSchemaEntry, email, ak string, retention int) *ExportKodoSpec {
+func (c *Pipeline) FormKodoSpec(input *CreateRepoForKodoInput) *ExportKodoSpec {
 	doc := make(map[string]string)
-	for _, v := range Schema {
+	for _, v := range input.Schema {
 		doc[v.Key] = "#" + v.Key
 	}
 	return &ExportKodoSpec{
-		Bucket:    bucketName,
+		Bucket:    input.Bucket,
 		KeyPrefix: "logkitauto/date=$(year)-$(mon)-$(day)/hour=$(hour)/min=$(min)/$(sec)",
 		Fields:    doc,
-		Email:     email,
-		AccessKey: ak,
+		Email:     input.Email,
+		AccessKey: input.Ak,
 		Format:    "parquet",
-		Retention: retention,
+		Retention: input.Retention,
 	}
 }
 
-func (c *Pipeline) FormTSDBSpec(TSDBRepoName, seriesName string, rtags []string, Schema []RepoSchemaEntry) *ExportTsdbSpec {
+func (c *Pipeline) FormTSDBSpec(input *CreateRepoForTSDBInput) *ExportTsdbSpec {
 	tags := make(map[string]string)
 	fields := make(map[string]string)
-	for _, v := range Schema {
-		if IsTag(v.Key, rtags) {
+	for _, v := range input.Schema {
+		if IsTag(v.Key, input.Tags) {
 			tags[v.Key] = "#" + v.Key
 		} else {
 			fields[v.Key] = "#" + v.Key
 		}
 	}
+	timestamp := input.Timestamp
+	if timestamp != "" {
+		timestamp = "#" + timestamp
+	}
 	return &ExportTsdbSpec{
-		DestRepoName: TSDBRepoName,
-		SeriesName:   seriesName,
 		Tags:         tags,
 		Fields:       fields,
+		Timestamp:    timestamp,
+		DestRepoName: input.TSDBRepoName,
+		SeriesName:   input.SeriesName,
+		OmitEmpty:    input.OmitEmpty,
+		OmitInvalid:  input.OmitInvalid,
 	}
 }
 
@@ -110,6 +118,20 @@ func convertSchema2LogDB(scs []RepoSchemaEntry) (ret []logdb.RepoSchemaEntry) {
 	return ret
 }
 
+func getSeriesName(seriesTag map[string][]string, schemaKey string) string {
+	for series, _ := range seriesTag {
+		if len(series) < len(schemaKey) {
+			// 判断 schemaKey 的前缀是不是 series, 如果是并且 schemaKey 除去前缀后的下一位为"_" 则认为 schemaKey 属于这个 series
+			// 之所以判断前缀的下一位是为了避免 disk 和 diskio 这种情况，具有相同的前缀, 无法区分
+			if schemaKey[:len(series)] == series && string(schemaKey[len(series)]) == "_" {
+				return series
+			}
+		}
+	}
+	return ""
+}
+
+// logkit 开启导出到 tsdb 功能时会调用这个函数，如果不是 metric 信息，走正常的流程，否则根据字段名称前缀 export 到不同的 series 里面
 func (c *Pipeline) AutoExportToTSDB(input *AutoExportToTSDBInput) error {
 	if input.TSDBRepoName == "" {
 		input.TSDBRepoName = input.RepoName
@@ -118,7 +140,7 @@ func (c *Pipeline) AutoExportToTSDB(input *AutoExportToTSDBInput) error {
 		input.SeriesName = input.RepoName
 	}
 	if input.Retention == "" {
-		input.Retention = "7d"
+		input.Retention = "30d"
 	}
 	repoInfo, err := c.GetRepo(&GetRepoInput{
 		RepoName: input.RepoName,
@@ -126,41 +148,58 @@ func (c *Pipeline) AutoExportToTSDB(input *AutoExportToTSDBInput) error {
 	if err != nil {
 		return err
 	}
-	tsdbapi, err := c.GetTSDBAPI()
-	if err != nil {
-		return err
+	tags := make([]string, 0)
+	if val, ok := input.SeriesTags[input.SeriesName]; ok {
+		tags = val
 	}
 
-	if reqerr.IsNoSuchResourceError(err) {
-		err = tsdbapi.CreateRepo(&tsdb.CreateRepoInput{
-			RepoName: input.TSDBRepoName,
-			Region:   repoInfo.Region,
+	if !input.IsMetric {
+		return c.CreateForTSDB(&CreateRepoForTSDBInput{
+			Tags:         tags,
+			RepoName:     input.RepoName,
+			TSDBRepoName: input.TSDBRepoName,
+			Region:       repoInfo.Region,
+			Schema:       repoInfo.Schema,
+			Retention:    input.Retention,
+			SeriesName:   input.SeriesName,
+			OmitInvalid:  input.OmitInvalid,
+			OmitEmpty:    input.OmitEmpty,
+			Timestamp:    input.Timestamp,
 		})
-		if err != nil && !reqerr.IsExistError(err) {
-			return err
-		}
-		if input.SeriesName == "" {
-			input.SeriesName = input.RepoName
-		}
-		err = tsdbapi.CreateSeries(&tsdb.CreateSeriesInput{
-			RepoName:   input.TSDBRepoName,
-			SeriesName: input.SeriesName,
-			Retention:  input.Retention,
-		})
-		if err != nil && !reqerr.IsExistError(err) {
-			return err
-		}
-	} else if err != nil {
-		return err
 	}
-	_, err = c.GetExport(&GetExportInput{
-		RepoName:   input.RepoName,
-		ExportName: base.FormExportName(input.RepoName, ExportTypeTSDB),
+
+	// 获取字段，并根据 seriesTag 中的 key 拿到series name
+	seriesMap := make(map[string]SeriesInfo)
+	for _, val := range repoInfo.Schema {
+		seriesName := getSeriesName(input.SeriesTags, val.Key)
+		if seriesName == "" {
+			continue
+		}
+		series, exist := seriesMap[seriesName]
+		if !exist {
+			series = SeriesInfo{
+				SeriesName: seriesName,
+				Schema:     input.ExpandAttr,
+				Tags:       input.SeriesTags[seriesName],
+			}
+		}
+		if val.Key == seriesName+"_"+input.Timestamp {
+			series.TimeStamp = val.Key
+		}
+		series.Schema = append(series.Schema, val)
+		seriesMap[seriesName] = series
+	}
+
+	err = c.CreateForMutiExportTSDB(&CreateRepoForMutiExportTSDBInput{
+		RepoName:     input.RepoName,
+		TSDBRepoName: input.TSDBRepoName,
+		Region:       repoInfo.Region,
+		Retention:    input.Retention,
+		OmitInvalid:  input.OmitInvalid,
+		OmitEmpty:    input.OmitEmpty,
+		SeriesMap:    seriesMap,
 	})
-	if reqerr.IsNoSuchResourceError(err) {
-		return c.CreateExport(c.FormExportInput(input.RepoName, ExportTypeTSDB, c.FormTSDBSpec(input.TSDBRepoName, input.SeriesName, input.Tags, repoInfo.Schema)))
-	}
-	return nil
+	return err
 }
 
 // 这个api在logkit启动的时候调用一次
@@ -170,7 +209,7 @@ func (c *Pipeline) AutoExportToLogDB(input *AutoExportToLogDBInput) error {
 	}
 	input.LogRepoName = strings.ToLower(input.LogRepoName)
 	if input.Retention == "" {
-		input.Retention = "3d"
+		input.Retention = "30d"
 	}
 	repoInfo, err := c.GetRepo(&GetRepoInput{
 		RepoName: input.RepoName,
@@ -225,7 +264,14 @@ func (c *Pipeline) AutoExportToLogDB(input *AutoExportToLogDBInput) error {
 		ExportName: base.FormExportName(input.RepoName, ExportTypeLogDB),
 	})
 	if reqerr.IsNoSuchResourceError(err) {
-		return c.CreateExport(c.FormExportInput(input.RepoName, ExportTypeLogDB, c.FormLogDBSpec(input.LogRepoName, repoInfo.Schema)))
+		logDBSpec := c.FormLogDBSpec(&CreateRepoForLogDBInput{
+			RepoName:    input.RepoName,
+			Schema:      repoInfo.Schema,
+			OmitEmpty:   input.OmitEmpty,
+			OmitInvalid: input.OmitInvalid,
+		})
+		exportInput := c.FormExportInput(input.RepoName, ExportTypeLogDB, logDBSpec)
+		return c.CreateExport(exportInput)
 	}
 	return err
 }
@@ -234,6 +280,9 @@ func (c *Pipeline) AutoExportToLogDB(input *AutoExportToLogDBInput) error {
 func (c *Pipeline) AutoExportToKODO(input *AutoExportToKODOInput) error {
 	if input.BucketName == "" {
 		input.BucketName = input.RepoName
+	}
+	if input.Retention == 0 {
+		input.Retention = 90
 	}
 	input.BucketName = strings.Replace(input.BucketName, "_", "-", -1)
 
@@ -249,7 +298,16 @@ func (c *Pipeline) AutoExportToKODO(input *AutoExportToKODOInput) error {
 		ExportName: base.FormExportName(input.RepoName, ExportTypeKODO),
 	})
 	if reqerr.IsNoSuchResourceError(err) {
-		return c.CreateExport(c.FormExportInput(input.RepoName, ExportTypeKODO, c.FormKodoSpec(input.BucketName, repoInfo.Schema, input.Email, c.Config.Ak, input.Retention)))
+		kodoSpec := c.FormKodoSpec(&CreateRepoForKodoInput{
+			Retention: input.Retention,
+			Ak:        c.Config.Ak,
+			Email:     input.Email,
+			Bucket:    input.BucketName,
+			RepoName:  input.RepoName,
+			Schema:    repoInfo.Schema,
+		})
+		exportInput := c.FormExportInput(input.RepoName, ExportTypeKODO, kodoSpec)
+		return c.CreateExport(exportInput)
 	}
 	return err
 }

@@ -51,6 +51,10 @@ func (_ *MemStats) Usages() string {
 	return MetricMemUsages
 }
 
+func (_ *MemStats) Tags() []string {
+	return []string{}
+}
+
 func (_ *MemStats) Config() map[string]interface{} {
 	config := map[string]interface{}{
 		metric.OptionString:     []utils.Option{},
@@ -116,6 +120,10 @@ func (_ *SwapStats) Name() string {
 
 func (_ *SwapStats) Usages() string {
 	return MetricSwapUsages
+}
+
+func (_ *SwapStats) Tags() []string {
+	return []string{}
 }
 
 func (_ *SwapStats) Config() map[string]interface{} {

@@ -15,7 +15,7 @@ import (
 	"github.com/qiniu/pandora-go-sdk/tsdb"
 )
 
-var builder errBuilder
+var builder PipelineErrBuilder
 
 type Pipeline struct {
 	Config        *config.Config
@@ -157,6 +157,8 @@ func (c *Pipeline) newOperation(opName string, args ...interface{}) *request.Ope
 		method, urlTmpl = base.MethodDelete, "/v2/repos/%s/exports/%s"
 	case base.OpUploadPlugin:
 		method, urlTmpl = base.MethodPost, "/v2/plugins/%s"
+	case base.OpVerifyPlugin:
+		method, urlTmpl = base.MethodPost, "/v2/verify/plugins/%s"
 	case base.OpListPlugins:
 		method, urlTmpl = base.MethodGet, "/v2/plugins"
 	case base.OpGetPlugin:
