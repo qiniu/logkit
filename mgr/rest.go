@@ -315,7 +315,7 @@ func (rs *RestService) checkNameAndConfig(c echo.Context) (name string, conf Run
 	var exist bool
 	rs.mgr.lock.RLock()
 	defer rs.mgr.lock.RUnlock()
-	file = rs.mgr.RestDir + "/" + name + ".conf"
+	file = filepath.Join(rs.mgr.RestDir, name+".conf")
 	if conf, exist = rs.mgr.runnerConfig[file]; !exist {
 		err = errors.New("config " + name + " is not found")
 		return
@@ -338,7 +338,7 @@ func (rs *RestService) PostConfig() echo.HandlerFunc {
 		}
 		nconf.CreateTime = time.Now().Format(time.RFC3339Nano)
 		nconf.RunnerName = name
-		filename := rs.mgr.RestDir + "/" + nconf.RunnerName + ".conf"
+		filename := filepath.Join(rs.mgr.RestDir, nconf.RunnerName+".conf")
 		if rs.mgr.isRunning(filename) {
 			errMsg := "file " + filename + " runner is running"
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerAdd, errMsg)
@@ -370,7 +370,7 @@ func (rs *RestService) PutConfig() echo.HandlerFunc {
 		}
 		nconf.CreateTime = time.Now().Format(time.RFC3339Nano)
 		nconf.RunnerName = name
-		filename := rs.mgr.RestDir + "/" + nconf.RunnerName + ".conf"
+		filename := filepath.Join(rs.mgr.RestDir, nconf.RunnerName+".conf")
 		if rs.mgr.isRunning(filename) {
 			if subErr := rs.mgr.Remove(filename); subErr != nil {
 				log.Errorf("remove runner %v error %v", filename, subErr)
