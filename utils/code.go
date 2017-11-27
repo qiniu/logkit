@@ -16,6 +16,9 @@ const (
 	// parse 相关
 	ErrParseParse = "L1101"
 
+	// transform相关
+	ErrTransformTransform = "L1201"
+
 	// 集群版 master API
 	ErrClusterSlaves   = "L2001"
 	ErrClusterStatus   = "L2002"
@@ -48,6 +51,8 @@ var ErrorCodeHumanize = map[string]string{
 	ErrRunnerUpdate: "更新 Runner 出现错误",
 
 	ErrParseParse: "解析字符串失败",
+
+	ErrTransformTransform: "转化字段失败",
 
 	ErrClusterSlaves:   "获取 Slaves 列表出现错误",
 	ErrClusterStatus:   "获取 Slaves 状态出现错误",
