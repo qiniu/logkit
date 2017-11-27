@@ -464,20 +464,7 @@ func (r *LogExportRunner) Run() {
 
 		if datasourceTag != "" {
 			if len(datas)+len(se.ErrorIndex) == len(froms) {
-				var j int = 0
-				for i, v := range froms {
-					if se.ErrorIndexIn(i) {
-						continue
-					}
-					if j >= len(datas) {
-						continue
-					}
-					if dt, ok := datas[j][datasourceTag]; ok {
-						log.Debugf("Runner[%v] datasource tag already has data %v, ignore %v", r.Name(), dt, v)
-					} else {
-						datas[j][datasourceTag] = v
-					}
-				}
+				datas = addSourceToData(froms, se, datas, datasourceTag, r.Name())
 			} else {
 				log.Errorf("Runner[%v] datasourcetag add error, datas %v not match with froms %v", r.Name(), datas, froms)
 			}
@@ -504,6 +491,25 @@ func (r *LogExportRunner) Run() {
 		}
 		log.Debugf("Runner[%v] send %s finish to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
 	}
+}
+
+func addSourceToData(sourceFroms []string, se *utils.StatsError, datas []sender.Data, datasourceTagName, runnername string) []sender.Data {
+	var j int = 0
+	for i, v := range sourceFroms {
+		if se.ErrorIndexIn(i) {
+			continue
+		}
+		if j >= len(datas) {
+			continue
+		}
+		if dt, ok := datas[j][datasourceTagName]; ok {
+			log.Debugf("Runner[%v] datasource tag already has data %v, ignore %v", runnername, dt, v)
+		} else {
+			datas[j][datasourceTagName] = v
+		}
+		j++
+	}
+	return datas
 }
 
 func (r *LogExportRunner) Stop() {

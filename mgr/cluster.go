@@ -14,9 +14,10 @@ import (
 	"fmt"
 	"time"
 
+	"strings"
+
 	"github.com/labstack/echo"
 	"github.com/qiniu/log"
-	"strings"
 )
 
 type ClusterConfig struct {
