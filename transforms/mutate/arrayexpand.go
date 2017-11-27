@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/sender"
@@ -134,8 +133,7 @@ func (p *ArrayExpand) RawTransform(datas []string) ([]string, error) {
 func (p *ArrayExpand) Transform(datas []sender.Data) ([]sender.Data, error) {
 	var err, pErr error
 	errNums := 0
-	separator := "."
-	keys := strings.Split(p.Key, separator)
+	keys := utils.GetKeys(p.Key)
 	newkeys := make([]string, len(keys))
 	for i := range datas {
 		copy(newkeys, keys)

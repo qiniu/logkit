@@ -125,7 +125,7 @@ const (
 	ModeDir     = "dir"
 	ModeFile    = "file"
 	ModeTailx   = "tailx"
-	ModeMatch   = "match"
+	ModeFileAuto   = "fileauto"
 	ModeMysql   = "mysql"
 	ModeMssql   = "mssql"
 	ModeElastic = "elastic"
@@ -191,7 +191,7 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 			return
 		}
 		reader, err = NewReaderSize(fr, meta, bufSize)
-	case ModeMatch:
+	case ModeFileAuto:
 		//windows path for replacement
 		logpath = strings.Replace(logpath,winsign,comsign,-1)
 		// for example: The path is "/usr/logkit/"

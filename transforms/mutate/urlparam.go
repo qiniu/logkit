@@ -44,8 +44,7 @@ func (p *UrlParam) RawTransform(datas []string) ([]string, error) {
 func (p *UrlParam) Transform(datas []sender.Data) ([]sender.Data, error) {
 	var err, pErr error
 	errNums := 0
-	separator := "."
-	keys := strings.Split(p.Key, separator)
+	keys := utils.GetKeys(p.Key)
 	newkeys := make([]string, len(keys))
 	for i := range datas {
 		copy(newkeys, keys)

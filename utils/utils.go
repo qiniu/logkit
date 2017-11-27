@@ -296,6 +296,13 @@ func ExtractField(slice []string) ([]string, error) {
 	return slice, err
 }
 
+//根据key字符串,拆分出层级keys数据
+func GetKeys(keyStr string) []string{
+	separator := "."
+	keys := strings.Split(keyStr, separator)
+	return keys
+}
+
 //通过层级key获取value.
 //所有层级的map必须为 map[string]interface{} 类型.
 func GetMapValue(m map[string]interface{}, keys ...string) (interface{}, error) {

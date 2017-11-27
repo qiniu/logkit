@@ -3,7 +3,6 @@ package mutate
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
@@ -31,8 +30,7 @@ func (g *Converter) Transform(datas []sender.Data) ([]sender.Data, error) {
 	} else {
 		keyss := map[int][]string{}
 		for i, sc := range schemas {
-			separator := "."
-			keys := strings.Split(sc.Key, separator)
+			keys := utils.GetKeys(sc.Key)
 			keyss[i] = keys
 		}
 		for i := range datas {

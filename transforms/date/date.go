@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"strconv"
 	"time"
-	"strings"
 
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/times"
@@ -30,8 +29,7 @@ func (g *DateTrans) RawTransform(datas []string) ([]string, error) {
 func (g *DateTrans) Transform(datas []sender.Data) ([]sender.Data, error) {
 	var err, ferr error
 	errnums := 0
-	separator := "."
-	keys := strings.Split(g.Key, separator)
+	keys := utils.GetKeys(g.Key)
 	for i := range datas {
 		val, err := utils.GetMapValue(datas[i], keys...)
 		if err != nil {

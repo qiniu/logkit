@@ -3,7 +3,6 @@ package mutate
 import (
 	"fmt"
 	"regexp"
-	"strings"
 
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
@@ -31,8 +30,7 @@ func (g *Replacer) Init() error  {
 func (g *Replacer) Transform(datas []sender.Data) ([]sender.Data, error) {
 	var err, ferr error
 	errnums := 0
-	separator := "."
-	keys := strings.Split(g.Key, separator)
+	keys := utils.GetKeys(g.Key)
 	for i := range datas {
 		val, gerr := utils.GetMapValue(datas[i], keys...)
 		if gerr != nil {

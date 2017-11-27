@@ -2,7 +2,6 @@ package mutate
 
 import (
 	"errors"
-	"strings"
 
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
@@ -21,8 +20,7 @@ func (g *Discarder) RawTransform(datas []string) ([]string, error) {
 func (g *Discarder) Transform(datas []sender.Data) ([]sender.Data, error) {
 	var ferr error
 	errnums := 0
-	separator := "."
-	keys := strings.Split(g.Key, separator)
+	keys := utils.GetKeys(g.Key)
 	for i := range datas {
 		utils.DeleteMapValue(datas[i], keys...)
 	}

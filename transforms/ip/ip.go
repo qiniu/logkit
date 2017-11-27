@@ -3,7 +3,6 @@ package ip
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
@@ -33,8 +32,7 @@ func (it *IpTransformer) Transform(datas []sender.Data) ([]sender.Data, error) {
 		}
 	}
 	errnums := 0
-	separator := "."
-	keys := strings.Split(it.Key, separator)
+	keys := utils.GetKeys(it.Key)
 	newkeys := make([]string, len(keys))
 	for i := range datas {
 		copy(newkeys, keys)
