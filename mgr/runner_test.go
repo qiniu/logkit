@@ -779,3 +779,39 @@ func TestSyslogRunnerX(t *testing.T) {
 		t.Error("syslog parse error")
 	}
 }
+
+func TestAddDatasource(t *testing.T) {
+	sourceFroms := []string{"a", "b", "c", "d", "e", "f"}
+	se := &utils.StatsError{
+		ErrorIndex: []int{0, 3, 5},
+	}
+	datas := []sender.Data{
+		{
+			"f1": "2",
+		},
+		{
+			"f2": "1",
+		},
+		{
+			"f3": "3",
+		},
+	}
+	datasourceTagName := "source"
+	runnername := "runner1"
+	exp := []sender.Data{
+		{
+			"f1":     "2",
+			"source": "b",
+		},
+		{
+			"f2":     "1",
+			"source": "c",
+		},
+		{
+			"f3":     "3",
+			"source": "e",
+		},
+	}
+	gots := addSourceToData(sourceFroms, se, datas, datasourceTagName, runnername)
+	assert.Equal(t, exp, gots)
+}

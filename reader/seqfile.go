@@ -104,7 +104,7 @@ func NewSeqFile(meta *Meta, path string, ignoreHidden bool, suffixes []string, v
 		return
 	}
 	if f != nil {
-		_, err = f.Seek(offset, os.SEEK_SET)
+		_, err = f.Seek(offset, io.SeekStart)
 		if err != nil {
 			f.Close()
 			return nil, err
@@ -160,7 +160,7 @@ func newestFile(logdir string, condition func(os.FileInfo) bool) (currFile strin
 	if err != nil {
 		return
 	}
-	offset, err = f.Seek(0, os.SEEK_END)
+	offset, err = f.Seek(0, io.SeekEnd)
 	if err != nil {
 		return
 	}
@@ -204,7 +204,7 @@ func (sf *SeqFile) reopenForESTALE() error {
 		return fmt.Errorf("%s -cannot reopen currfile file err:%v", sf.currFile, err)
 	}
 
-	_, err = f.Seek(sf.offset, os.SEEK_SET)
+	_, err = f.Seek(sf.offset, io.SeekStart)
 	if err != nil {
 		f.Close()
 		return err

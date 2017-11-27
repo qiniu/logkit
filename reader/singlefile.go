@@ -21,7 +21,8 @@ import (
 )
 
 type SingleFile struct {
-	path       string      // 处理文件路径
+	realpath   string // 处理文件路径
+	originpath string
 	pfi        os.FileInfo // path 的文件信息
 	f          *os.File    // 当前处理文件
 	ratereader io.ReadCloser
@@ -38,6 +39,7 @@ type SingleFile struct {
 func NewSingleFile(meta *Meta, path, whence string, isFromWeb bool) (sf *SingleFile, err error) {
 	var pfi os.FileInfo
 	var f *os.File
+	originpath := path
 
 	for {
 		path, pfi, err = utils.GetRealPath(path)
@@ -79,14 +81,15 @@ func NewSingleFile(meta *Meta, path, whence string, isFromWeb bool) (sf *SingleF
 		}
 		omitMeta = true
 	}
-	if metafile != path {
-		log.Warnf("Runner[%v] %v -meta file <%v> is not current file <%v>， omit meta data", meta.RunnerName, meta.MetaFile(), metafile, path)
+	if metafile != originpath {
+		log.Warnf("Runner[%v] %v -meta file <%v> is not current file <%v>， omit meta data", meta.RunnerName, meta.MetaFile(), metafile, originpath)
 		omitMeta = true
 	}
 
 	sf = &SingleFile{
 		meta:       meta,
-		path:       path,
+		realpath:   path,
+		originpath: originpath,
 		pfi:        pfi,
 		f:          f,
 		ratereader: rateio.NewRateReader(f, meta.readlimit),
@@ -111,7 +114,7 @@ func NewSingleFile(meta *Meta, path, whence string, isFromWeb bool) (sf *SingleF
 	if sf.offset > st.Size() {
 		sf.offset = 0
 	}
-	_, err = f.Seek(sf.offset, os.SEEK_SET)
+	_, err = f.Seek(sf.offset, io.SeekStart)
 	if err != nil {
 		return nil, err
 	}
@@ -171,18 +174,18 @@ func (sf *SingleFile) startOffset(whence string) (int64, error) {
 	case WhenceOldest:
 		return 0, nil
 	case WhenceNewest:
-		return sf.f.Seek(0, os.SEEK_END)
+		return sf.f.Seek(0, io.SeekEnd)
 	default:
 		return 0, errors.New("whence not supported " + whence)
 	}
 }
 
 func (sf *SingleFile) Name() string {
-	return "SingleFile:" + sf.path
+	return "SingleFile:" + sf.originpath
 }
 
 func (sf *SingleFile) Source() string {
-	return sf.path
+	return sf.originpath
 }
 
 func (sf *SingleFile) Close() (err error) {
@@ -196,7 +199,7 @@ func (sf *SingleFile) Close() (err error) {
 }
 
 func (sf *SingleFile) detectMovedName(inode uint64) (name string) {
-	dir := filepath.Dir(sf.path)
+	dir := filepath.Dir(sf.realpath)
 	fis, err := ioutil.ReadDir(dir)
 	if err != nil {
 		log.Errorf("Runner[%v] read SingleFile path %v err %v", sf.meta.RunnerName, dir, err)
@@ -221,7 +224,7 @@ func (sf *SingleFile) detectMovedName(inode uint64) (name string) {
 }
 
 func (sf *SingleFile) Reopen() (err error) {
-	newInode, err := utils.GetIdentifyIDByPath(sf.path)
+	newInode, err := utils.GetIdentifyIDByPath(sf.originpath)
 	if err != nil {
 		return
 	}
@@ -240,8 +243,8 @@ func (sf *SingleFile) Reopen() (err error) {
 			log.Errorf("Runner[%v] AppendDoneFile %v error %v", sf.meta.RunnerName, detectStr, derr)
 		}
 	}
-	log.Infof("Runner[%v] rotate %s successfully , rotated file is <%v>", sf.meta.RunnerName, sf.path, detectStr)
-	pfi, f, err := sf.openSingleFile(sf.path)
+	log.Infof("Runner[%v] rotate %s successfully , rotated file is <%v>", sf.meta.RunnerName, sf.originpath, detectStr)
+	pfi, f, err := sf.openSingleFile(sf.originpath)
 	if err != nil {
 		return
 	}
@@ -256,7 +259,7 @@ func (sf *SingleFile) Reopen() (err error) {
 }
 
 func (sf *SingleFile) reopenForESTALE() (err error) {
-	f, err := os.Open(sf.path)
+	f, err := os.Open(sf.originpath)
 	if err != nil {
 		return
 	}
@@ -265,7 +268,7 @@ func (sf *SingleFile) reopenForESTALE() (err error) {
 		f.Close()
 		return
 	}
-	_, err = f.Seek(sf.offset, os.SEEK_SET)
+	_, err = f.Seek(sf.offset, io.SeekStart)
 	if err != nil {
 		f.Close()
 		return
@@ -290,7 +293,7 @@ func (sf *SingleFile) Read(p []byte) (n int, err error) {
 	if err != nil && strings.Contains(err.Error(), "stale NFS file handle") {
 		nerr := sf.reopenForESTALE()
 		if nerr != nil {
-			log.Errorf("Runner[%v] %v meet eror %v reopen error %v", sf.meta.RunnerName, sf.path, err, nerr)
+			log.Errorf("Runner[%v] %v meet eror %v reopen error %v", sf.meta.RunnerName, sf.originpath, err, nerr)
 		}
 		return
 	}
@@ -315,12 +318,12 @@ func (sf *SingleFile) Read(p []byte) (n int, err error) {
 func (sf *SingleFile) SyncMeta() error {
 	sf.mux.Lock()
 	defer sf.mux.Unlock()
-	if sf.lastSyncOffset == sf.offset && sf.lastSyncPath == sf.path {
+	if sf.lastSyncOffset == sf.offset && sf.lastSyncPath == sf.originpath {
 		log.Debugf("Runner[%v] %v was just syncd %v %v ignore it...", sf.meta.RunnerName, sf.Name(), sf.lastSyncPath, sf.lastSyncOffset)
 		return nil
 	}
 	log.Debugf("Runner[%v] %v Sync file success: %v", sf.meta.RunnerName, sf.Name(), sf.offset)
 	sf.lastSyncOffset = sf.offset
-	sf.lastSyncPath = sf.path
-	return sf.meta.WriteOffset(sf.path, sf.offset)
+	sf.lastSyncPath = sf.originpath
+	return sf.meta.WriteOffset(sf.originpath, sf.offset)
 }
