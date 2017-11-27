@@ -76,6 +76,7 @@ type PandoraSender struct {
 	alias2key          map[string]string // map[alias]name
 	opt                PandoraOption
 	microsecondCounter int64
+	extraInfo          map[string]string
 }
 
 // UserSchema was parsed pandora schema from user's raw schema
@@ -281,7 +282,7 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 	}
 	client, err := pipeline.New(config)
 	if err != nil {
-		err = fmt.Errorf("Cannot init pipelineClient %v", err)
+		err = fmt.Errorf("cannot init pipelineClient %v", err)
 		return
 	}
 	if opt.reqRateLimit > 0 {
@@ -297,6 +298,7 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 		alias2key:  make(map[string]string),
 		UserSchema: userSchema,
 		schemas:    make(map[string]pipeline.RepoSchemaEntry),
+		extraInfo:  utils.GetExtraInfo(),
 	}
 	if createErr := createPandoraRepo(opt, client); createErr != nil {
 		if !strings.Contains(createErr.Error(), "E18101") {
@@ -687,8 +689,7 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 			d[KeyLogkitSendTime] = now
 		}
 		if s.opt.extraInfo {
-			exInfo := utils.GetExtraInfo()
-			for key, val := range exInfo {
+			for key, val := range s.extraInfo {
 				suffix := 0
 				keyName := key
 				for _, exist := d[keyName]; exist; suffix++ {

@@ -6,6 +6,8 @@ import (
 
 	"fmt"
 
+	"path/filepath"
+
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
@@ -43,6 +45,7 @@ func (g *K8sTag) Transform(datas []sender.Data) ([]sender.Data, error) {
 			err = fmt.Errorf("transform key %v data type is not string", g.SourceFileKey)
 			continue
 		}
+		strval = filepath.Base(strval)
 		splits := strings.Split(strval, "_")
 		if len(splits) < 3 {
 			errnums++
