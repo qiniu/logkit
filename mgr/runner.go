@@ -480,10 +480,10 @@ func (r *LogExportRunner) Run() {
 					if j >= len(datas) {
 						continue
 					}
-					if dt, ok := datas[i][datasourceTag]; ok {
+					if dt, ok := datas[j][datasourceTag]; ok {
 						log.Debugf("Runner[%v] datasource tag already has data %v, ignore %v", r.Name(), dt, v)
 					} else {
-						datas[i][datasourceTag] = v
+						datas[j][datasourceTag] = v
 					}
 				}
 			} else {
