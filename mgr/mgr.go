@@ -27,10 +27,10 @@ var DEFAULT_LOGKIT_REST_DIR = "/.logkitconfs"
 type ManagerConfig struct {
 	BindHost string `json:"bind_host"`
 
-	Idc      string `json:"idc"`
-	Zone     string `json:"zone"`
-	RestDir  string `json:"rest_dir"`
-	Cluster  ClusterConfig `json:"cluster"`
+	Idc     string        `json:"idc"`
+	Zone    string        `json:"zone"`
+	RestDir string        `json:"rest_dir"`
+	Cluster ClusterConfig `json:"cluster"`
 }
 
 type cleanQueue struct {
@@ -472,8 +472,19 @@ func (m *Manager) RestoreWebDir() {
 
 func (m *Manager) Status() (rss map[string]RunnerStatus) {
 	rss = make(map[string]RunnerStatus)
-	for _, r := range m.runners {
-		rss[r.Name()] = r.Status()
+	for key, conf := range m.runnerConfig {
+		if r, ex := m.runners[key]; ex {
+			rss[r.Name()] = r.Status()
+		} else {
+			rss[conf.RunnerName] = RunnerStatus{
+				Name:           conf.RunnerName,
+				ReaderStats:    utils.StatsInfo{},
+				ParserStats:    utils.StatsInfo{},
+				TransformStats: make(map[string]utils.StatsInfo),
+				SenderStats:    make(map[string]utils.StatsInfo),
+				RunningStatus:  RunnerStopped,
+			}
+		}
 	}
 	return
 }

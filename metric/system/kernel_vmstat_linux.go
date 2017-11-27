@@ -31,6 +31,10 @@ func (k *KernelVmstat) Usages() string {
 	return MetricKernelVmstatUsages
 }
 
+func (k *KernelVmstat) Tags() []string {
+	return []string{}
+}
+
 func (k *KernelVmstat) Config() map[string]interface{} {
 	config := map[string]interface{}{
 		metric.OptionString:     []utils.Option{},
@@ -59,12 +63,14 @@ func (k *KernelVmstat) Collect() (datas []map[string]interface{}, err error) {
 			if err != nil {
 				return nil, err
 			}
-			key := "vmstat_" + string(field)
+			key := "kernel_vmstat_" + string(field)
 			fields[key] = int64(m)
 		}
 	}
-	fields["vmstat_"+metric.Timestamp] = now
-	datas = append(datas, fields)
+	if len(fields) > 0 {
+		fields["kernel_vmstat_"+metric.Timestamp] = now
+		datas = append(datas, fields)
+	}
 	return
 }
 

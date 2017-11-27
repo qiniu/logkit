@@ -10,11 +10,11 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
-
-	"regexp"
 
 	"github.com/qiniu/log"
 )
@@ -405,4 +405,71 @@ func GetLocalIP() (string, error) {
 		}
 	}
 	return "127.0.0.1", errors.New("no local IP found")
+}
+
+type HashSet struct {
+	data map[interface{}]bool
+	mu   *sync.RWMutex
+}
+
+func NewHashSet() *HashSet {
+	return &HashSet{
+		data: make(map[interface{}]bool),
+		mu:   new(sync.RWMutex),
+	}
+}
+
+func (s *HashSet) Add(ele interface{}) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.data[ele] = true
+}
+
+func (s *HashSet) AddStringArray(ele []string) {
+	for _, e := range ele {
+		s.Add(e)
+	}
+}
+
+func (s *HashSet) Remove(ele interface{}) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.data, ele)
+}
+
+func (s *HashSet) Clear() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.data = make(map[interface{}]bool)
+}
+
+func (s *HashSet) IsIn(ele interface{}) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.data[ele]
+}
+
+func (s *HashSet) IsEmpty() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.Len() == 0 {
+		return true
+	}
+	return false
+}
+
+func (s *HashSet) Len() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.data)
+}
+
+func (s *HashSet) Elements() []interface{} {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	element := make([]interface{}, 0)
+	for key, _ := range s.data {
+		element = append(element, key)
+	}
+	return element
 }

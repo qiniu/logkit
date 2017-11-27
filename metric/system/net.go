@@ -55,6 +55,10 @@ func (_ *NetIOStats) Usages() string {
 	return MetricNetUsages
 }
 
+func (_ *NetIOStats) Tags() []string {
+	return []string{KeyNetInterface}
+}
+
 func (_ *NetIOStats) Config() map[string]interface{} {
 	configOption := []utils.Option{
 		{

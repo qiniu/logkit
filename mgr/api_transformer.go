@@ -22,7 +22,7 @@ func (rs *RestService) GetTransformerUsages() echo.HandlerFunc {
 				Value: cr.Description(),
 			})
 		}
-		return c.JSON(http.StatusOK, ModeUsages)
+		return RespSuccess(c, ModeUsages)
 	}
 }
 
@@ -34,7 +34,7 @@ func (rs *RestService) GetTransformerOptions() echo.HandlerFunc {
 			cr := v()
 			ModeKeyOptions[cr.Type()] = cr.ConfigOptions()
 		}
-		return c.JSON(http.StatusOK, ModeKeyOptions)
+		return RespSuccess(c, ModeKeyOptions)
 	}
 }
 
@@ -46,7 +46,7 @@ func (rs *RestService) GetTransformerSampleConfigs() echo.HandlerFunc {
 			cr := v()
 			SampleConfigs[cr.Type()] = cr.SampleConfig()
 		}
-		return c.JSON(http.StatusOK, SampleConfigs)
+		return RespSuccess(c, SampleConfigs)
 	}
 }
 

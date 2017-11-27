@@ -11,7 +11,6 @@ import (
 
 	"github.com/labstack/echo"
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	"github.com/stretchr/testify/assert"
 	_ "github.com/qiniu/logkit/transforms/date"
 )
@@ -37,7 +36,7 @@ func TestTransformerAPI(t *testing.T) {
 		os.Remove(StatsShell)
 	}()
 
-	var got1 []utils.KeyValue
+	var got1 respModeUsages
 
 	resp, err := http.Get("http://127.0.0.1" + rs.address + "/logkit/transformer/usages")
 	if err != nil {
@@ -52,9 +51,9 @@ func TestTransformerAPI(t *testing.T) {
 		fmt.Println(string(content))
 		t.Error(err)
 	}
-	assert.Equal(t, len(transforms.Transformers), len(got1))
+	assert.Equal(t, len(transforms.Transformers), len(got1.Data))
 
-	var got2 map[string][]utils.Option
+	var got2 respModeKeyOptions
 	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/transformer/options")
 	if err != nil {
 		t.Error(err)
@@ -68,7 +67,7 @@ func TestTransformerAPI(t *testing.T) {
 		fmt.Println(string(content))
 		t.Error(err)
 	}
-	assert.Equal(t, len(transforms.Transformers), len(got2))
+	assert.Equal(t, len(transforms.Transformers), len(got2.Data))
 
 	// Test transformer/transform with date transformer
 	var got3 []map[string]string

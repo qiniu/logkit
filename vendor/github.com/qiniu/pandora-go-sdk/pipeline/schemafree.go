@@ -522,34 +522,19 @@ func (c *Pipeline) addRepoSchemas(repoName string, addSchemas map[string]RepoSch
 			return
 		}
 		if option != nil && option.ToLogDB {
-			err = c.AutoExportToLogDB(&AutoExportToLogDBInput{
-				RepoName:    repoName,
-				LogRepoName: option.LogDBRepoName,
-				Retention:   option.LogDBRetention,
-			})
+			err = c.AutoExportToLogDB(&option.AutoExportToLogDBInput)
 			if err != nil {
 				return
 			}
 		}
 		if option != nil && option.ToKODO {
-			err = c.AutoExportToKODO(&AutoExportToKODOInput{
-				RepoName:   repoName,
-				BucketName: option.KodoBucketName,
-				Retention:  option.KodoRetention,
-				Email:      option.KodoEmail,
-			})
+			err = c.AutoExportToKODO(&option.AutoExportToKODOInput)
 			if err != nil {
 				return
 			}
 		}
 		if option != nil && option.ToTSDB {
-			err = c.AutoExportToTSDB(&AutoExportToTSDBInput{
-				RepoName:     repoName,
-				TSDBRepoName: option.TSDBRepoName,
-				SeriesName:   option.TSDBSeriesName,
-				Retention:    option.TSDBRetention,
-				Tags:         option.TSDBtags,
-			})
+			err = c.AutoExportToTSDB(&option.AutoExportToTSDBInput)
 			if err != nil {
 				return
 			}

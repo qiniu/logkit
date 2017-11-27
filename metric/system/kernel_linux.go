@@ -58,6 +58,10 @@ func (k *Kernel) Usages() string {
 	return MetricKernelUsages
 }
 
+func (_ *Kernel) Tags() []string {
+	return []string{}
+}
+
 func (k *Kernel) Config() map[string]interface{} {
 	config := map[string]interface{}{
 		metric.OptionString:     []utils.Option{},

@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"testing"
 	"time"
-
 	"fmt"
 
 	"github.com/stretchr/testify/assert"
@@ -154,7 +153,7 @@ func TestTuoEncodeDecode(t *testing.T) {
 		for _, g := range gots {
 			exps = append(exps, string(g))
 		}
-		assert.EqualValues(t, ti.exp, exps)
+		assert.Equal(t, ti.exp, exps)
 	}
 }
 
@@ -257,4 +256,31 @@ func TestDeleteMapValue(t *testing.T) {
 	val, b := DeleteMapValue(m1, []string{"m2", "m3", "name"}...)
 	assert.Equal(t, val, "小明")
 	assert.Equal(t, b, true)
+  }
+
+func TestHashSet(t *testing.T) {
+	set := NewHashSet()
+	const CNT = 100
+	arr := make([]int, CNT)
+	for i := 0; i < CNT; i++ {
+		arr[i] = i
+	}
+	for _, v := range arr {
+		set.Add(v)
+	}
+	assert.Equal(t, false, set.IsEmpty())
+	assert.Equal(t, len(arr), set.Len())
+
+	for i := 0; i < CNT; i += 2 {
+		set.Remove(i)
+	}
+	assert.Equal(t, len(arr)/2, set.Len())
+	for i := 1; i < CNT; i += 2 {
+		assert.Equal(t, true, set.IsIn(i), i)
+	}
+	set.Clear()
+	assert.Equal(t, true, set.IsEmpty())
+	arrStr := []string{"1", "2", "3", "4", "5"}
+	set.AddStringArray(arrStr)
+	assert.Equal(t, len(arrStr), set.Len())
 }

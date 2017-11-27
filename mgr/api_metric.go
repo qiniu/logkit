@@ -1,8 +1,6 @@
 package mgr
 
 import (
-	"net/http"
-
 	"github.com/labstack/echo"
 	"github.com/qiniu/logkit/metric"
 )
@@ -10,20 +8,20 @@ import (
 //GET /logkit/metric/keys
 func (rs *RestService) GetMetricKeys() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		return c.JSON(http.StatusOK, metric.GetMetricTypeKey())
+		return RespSuccess(c, metric.GetMetricTypeKey())
 	}
 }
 
 //GET /logkit/metric/usages
 func (rs *RestService) GetMetricUsages() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		return c.JSON(http.StatusOK, metric.GetMetricUsages())
+		return RespSuccess(c, metric.GetMetricUsages())
 	}
 }
 
 //GET /logkit/metric/options
 func (rs *RestService) GetMetricOptions() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		return c.JSON(http.StatusOK, metric.GetMetricOptions())
+		return RespSuccess(c, metric.GetMetricOptions())
 	}
 }
