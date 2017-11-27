@@ -10,7 +10,6 @@ import (
 
 	"github.com/labstack/echo"
 	"github.com/qiniu/logkit/sender"
-	"github.com/qiniu/logkit/utils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -35,7 +34,7 @@ func TestSenderAPI(t *testing.T) {
 		os.Remove(StatsShell)
 	}()
 
-	var got1 []utils.KeyValue
+	var got1 respModeUsages
 
 	resp, err := http.Get("http://127.0.0.1" + rs.address + "/logkit/sender/usages")
 	if err != nil {
@@ -50,9 +49,9 @@ func TestSenderAPI(t *testing.T) {
 		fmt.Println(string(content))
 		t.Error(err)
 	}
-	assert.Equal(t, sender.ModeUsages, got1)
+	assert.Equal(t, sender.ModeUsages, got1.Data)
 
-	var got2 map[string][]utils.Option
+	var got2 respModeKeyOptions
 	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/sender/options")
 	if err != nil {
 		t.Error(err)
@@ -66,6 +65,6 @@ func TestSenderAPI(t *testing.T) {
 		fmt.Println(string(content))
 		t.Error(err)
 	}
-	assert.Equal(t, sender.ModeKeyOptions, got2)
+	assert.Equal(t, sender.ModeKeyOptions, got2.Data)
 
 }

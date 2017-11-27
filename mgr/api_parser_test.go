@@ -14,9 +14,13 @@ import (
 	conf2 "github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/sender"
-	"github.com/qiniu/logkit/utils"
 	"github.com/stretchr/testify/assert"
 )
+
+type respParserRet struct {
+	Code string       `json:"code"`
+	Data PostParseRet `json:"data"`
+}
 
 // Rest 测试 端口容易冲突导致混淆，62xx
 func TestParserParse(t *testing.T) {
@@ -49,13 +53,13 @@ func TestParserParse(t *testing.T) {
 	assert.NoError(t, err)
 	content, _ := ioutil.ReadAll(resp.Body)
 	assert.Equal(t, 200, resp.StatusCode, string(content))
-	var got1 PostParseRet
+	var got1 respParserRet
 	err = json.Unmarshal(content, &got1)
 	assert.NoError(t, err, string(content))
-	assert.Equal(t, 4, len(got1.SamplePoints))
+	assert.Equal(t, 4, len(got1.Data.SamplePoints))
 
 	// json
-	var got2 PostParseRet
+	var got2 respParserRet
 	jsonConf := conf2.MapConf{}
 	jsonConf[KeySampleLog] = parser.SampleLogs[parser.TypeJson]
 	jsonConf[parser.KeyParserType] = parser.TypeJson
@@ -74,11 +78,11 @@ func TestParserParse(t *testing.T) {
 		"c": 1.0,
 		"d": 1.1,
 	}
-	assert.Equal(t, exp2, got2.SamplePoints[0])
+	assert.Equal(t, exp2, got2.Data.SamplePoints[0])
 
 	// grok
 	grokConf := conf2.MapConf{}
-	var got3 PostParseRet
+	var got3 respParserRet
 	grokConf[KeySampleLog] = parser.SampleLogs[parser.TypeGrok]
 	grokConf[parser.KeyParserType] = parser.TypeGrok
 	grokConf[parser.KeyGrokPatterns] = "%{COMMON_LOG_FORMAT}"
@@ -103,7 +107,7 @@ func TestParserParse(t *testing.T) {
 		"resp_code":    "200",
 		"auth":         "frank", "client_ip": "127.0.0.1"}
 
-	assert.Equal(t, exp3, got3.SamplePoints[0])
+	assert.Equal(t, exp3, got3.Data.SamplePoints[0])
 }
 
 func TestParserAPI(t *testing.T) {
@@ -126,7 +130,7 @@ func TestParserAPI(t *testing.T) {
 		os.Remove(StatsShell)
 	}()
 
-	var got1 []utils.KeyValue
+	var got1 respModeUsages
 
 	resp, err := http.Get("http://127.0.0.1" + rs.address + "/logkit/parser/usages")
 	if err != nil {
@@ -141,9 +145,9 @@ func TestParserAPI(t *testing.T) {
 		fmt.Println(string(content))
 		t.Error(err)
 	}
-	assert.Equal(t, parser.ModeUsages, got1)
+	assert.Equal(t, parser.ModeUsages, got1.Data)
 
-	var got2 map[string][]utils.Option
+	var got2 respModeKeyOptions
 	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/parser/options")
 	if err != nil {
 		t.Error(err)
@@ -157,9 +161,9 @@ func TestParserAPI(t *testing.T) {
 		fmt.Println(string(content))
 		t.Error(err)
 	}
-	assert.Equal(t, parser.ModeKeyOptions, got2)
+	assert.Equal(t, parser.ModeKeyOptions, got2.Data)
 
-	var got3 map[string]string
+	var got3 respSampleLogs
 	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/parser/samplelogs")
 	if err != nil {
 		t.Error(err)
@@ -173,5 +177,5 @@ func TestParserAPI(t *testing.T) {
 		fmt.Println(string(content))
 		t.Error(err)
 	}
-	assert.Equal(t, parser.SampleLogs, got3)
+	assert.Equal(t, parser.SampleLogs, got3.Data)
 }

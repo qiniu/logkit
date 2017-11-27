@@ -1,8 +1,6 @@
 package mgr
 
 import (
-	"net/http"
-
 	"github.com/labstack/echo"
 	"github.com/qiniu/logkit/sender"
 )
@@ -10,14 +8,14 @@ import (
 // get /logkit/sender/usages 获取sender用途说明
 func (rs *RestService) GetSenderUsages() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		return c.JSON(http.StatusOK, sender.ModeUsages)
+		return RespSuccess(c, sender.ModeUsages)
 	}
 }
 
 // get /logkit/sender/options 获取sender配置参数
 func (rs *RestService) GetSenderKeyOptions() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		return c.JSON(http.StatusOK, sender.ModeKeyOptions)
+		return RespSuccess(c, sender.ModeKeyOptions)
 	}
 }
 
@@ -25,6 +23,6 @@ func (rs *RestService) GetSenderKeyOptions() echo.HandlerFunc {
 func (rs *RestService) PostSenderCheck() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		//TODO check sender
-		return c.JSON(http.StatusOK, nil)
+		return RespSuccess(c, nil)
 	}
 }

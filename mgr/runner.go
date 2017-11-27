@@ -34,6 +34,9 @@ const (
 	SpeedUp     = "up"
 	SpeedDown   = "down"
 	SpeedStable = "stable"
+
+	RunnerRunning = "running"
+	RunnerStopped = "stopped"
 )
 
 type Runner interface {
@@ -70,6 +73,7 @@ type RunnerStatus struct {
 	ReadSpeed        float64 `json:"readspeed"`
 	ReadSpeedTrendKb string  `json:"readspeedtrend_kb"`
 	ReadSpeedTrend   string  `json:"readspeedtrend"`
+	RunningStatus    string  `json:"runningStatus"`
 	Tag              string  `json:"tag,omitempty"`
 	Url              string  `json:"url,omitempty"`
 }
@@ -716,6 +720,7 @@ func (r *LogExportRunner) Status() RunnerStatus {
 		}
 		r.rs.SenderStats[k] = v
 	}
+	r.rs.RunningStatus = RunnerRunning
 	copyRunnerStatus(&r.lastRs, &r.rs)
 	return r.rs
 }

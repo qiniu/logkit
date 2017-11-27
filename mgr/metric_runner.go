@@ -334,6 +334,7 @@ func (mr *MetricRunner) Status() RunnerStatus {
 		}
 		mr.rs.SenderStats[k] = v
 	}
+	mr.rs.RunningStatus = RunnerRunning
 	copyRunnerStatus(&mr.lastRs, &mr.rs)
 	return mr.rs
 }
