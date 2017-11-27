@@ -50,19 +50,20 @@ logkit本身支持多种数据源，并且可以同时发送多个数据源的�
 **Linux 版本**
 
 ```
-wget https://pandora-dl.qiniu.com/logkit.tar.gz && tar xvf logkit.tar.gz && cd _package_linux64/
+export LOGKIT_VERSION=<version number>
+wget https://pandora-dl.qiniu.com/logkit_${LOGKIT_VERSION}.tar.gz && tar xvf logkit_${LOGKIT_VERSION}.tar.gz && rm logkit_${LOGKIT_VERSION}.tar.gz && cd _package_linux64/
 ```
 
 **MacOS 版本**
 
 ```
-brew install wget
-wget https://pandora-dl.qiniu.com/logkit_mac.tar.gz && tar xvf logkit_mac.tar.gz && cd _package_mac/
+export LOGKIT_VERSION=<version number>
+wget https://pandora-dl.qiniu.com/logkit_${LOGKIT_VERSION}.tar.gz && tar xvf logkit_${LOGKIT_VERSION}.tar.gz && rm logkit_${LOGKIT_VERSION}.tar.gz && cd _package_mac/
 ```
 
 **Windows 版本**
 
-请下载 https://pandora-dl.qiniu.com/logkit_windows.zip 并解压缩，进入目录
+请下载 https://pandora-dl.qiniu.com/logkit_windows_<LOGKIT_VERSION>.zip 并解压缩，进入目录
 
 2. 修改logkit基本配置
 
