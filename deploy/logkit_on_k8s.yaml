@@ -12,17 +12,21 @@ data:
       "name": "k8s_runner",
       "batch_interval": 60,
       "reader": {
-        "mode": "tailx",
-        "log_path": "/var/log/containers/*.log",
-        "read_from": "oldest",
-        "datasource_tag": "source_file",
-        "expire": "240h",
-        "stat_interval": "3m"
+          "mode": "tailx",
+          "log_path": "/var/log/containers/*.log",
+          "read_from": "oldest",
+          "datasource_tag": "log_source",
+          "expire": "240h",
+          "stat_interval": "3m"
       },
       "parser": {
-        "type": "raw",
-        "timestamp": "true"
+          "type": "raw",
+          "timestamp": "true"
       },
+      "transforms":[{
+          "type":"k8stag",
+          "sourcefilefield":"log_source"
+      }],
       "senders": [
         {
           "sender_type": "pandora",
@@ -60,7 +64,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
       - name: logkit
-        image: wonderflow/logkit:v1.3.6
+        image: wonderflow/logkit:v1.4.0
         env:
         - name: QINIU_ACCESS_KEY
           value: change_me_to_your_qiniu_access_key
