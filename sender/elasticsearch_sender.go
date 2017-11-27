@@ -1,29 +1,32 @@
 package sender
 
 import (
+	"context"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	elasticV6 "github.com/olivere/elastic"
 	elasticV3 "gopkg.in/olivere/elastic.v3"
 	elasticV5 "gopkg.in/olivere/elastic.v5"
 
-	"github.com/qiniu/logkit/conf"
-
-	"context"
 	"github.com/qiniu/log"
-	"strconv"
-	"time"
+	"github.com/qiniu/logkit/conf"
 )
 
+// ElasticsearchSender ElasticSearch sender
 type ElasticsearchSender struct {
 	name string
 
-	host      []string
-	retention int
-	indexName string
-	eType     string
-	eVersion  string
+	host            []string
+	retention       int
+	indexName       string
+	eType           string
+	eVersion        string
+	elasticV3Client *elasticV3.Client
+	elasticV5Client *elasticV5.Client
+	elasticV6Client *elasticV6.Client
 
 	aliasFields map[string]string
 
@@ -48,11 +51,15 @@ const (
 )
 
 var (
+	// ElasticVersion3 v3.x
 	ElasticVersion3 = "3.x"
+	// ElasticVersion5 v5.x
 	ElasticVersion5 = "5.x"
+	// ElasticVersion6 v6.x
 	ElasticVersion6 = "6.x"
 )
 
+// NewElasticSender New ElasticSender
 func NewElasticSender(conf conf.MapConf) (sender Sender, err error) {
 	host, err := conf.GetStringList(KeyElasticHost)
 	if err != nil {
@@ -69,7 +76,7 @@ func NewElasticSender(conf conf.MapConf) (sender Sender, err error) {
 		return
 	}
 
-	//索引后缀模式
+	// 索引后缀模式
 	indexStrategy, _ := conf.GetStringOr(KeyElasticIndexStrategy, KeyDefaultIndexStrategy)
 	eType, _ := conf.GetStringOr(KeyElasticType, defaultType)
 	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("elasticSender:(elasticUrl:%s,index:%s,type:%s)", host, index, eType))
@@ -83,20 +90,51 @@ func NewElasticSender(conf conf.MapConf) (sender Sender, err error) {
 		return nil, err
 	}
 
+	// 初始化 client
+	var elasticV3Client *elasticV3.Client
+	var elasticV5Client *elasticV5.Client
+	var elasticV6Client *elasticV6.Client
+	switch eVersion {
+	case ElasticVersion6:
+		elasticV6Client, err = elasticV6.NewClient(
+			elasticV6.SetSniff(false),
+			elasticV6.SetHealthcheck(false),
+			elasticV6.SetURL(host...))
+		if err != nil {
+			return
+		}
+	case ElasticVersion5:
+		elasticV5Client, err = elasticV5.NewClient(
+			elasticV5.SetSniff(false),
+			elasticV5.SetHealthcheck(false),
+			elasticV5.SetURL(host...))
+		if err != nil {
+			return
+		}
+	default:
+		elasticV3Client, err = elasticV3.NewClient(elasticV3.SetURL(host...))
+		if err != nil {
+			return
+		}
+	}
+
 	return &ElasticsearchSender{
-		name:          name,
-		host:          host,
-		indexName:     index,
-		eVersion:      eVersion,
-		eType:         eType,
-		aliasFields:   fields,
-		intervalIndex: i,
+		name:            name,
+		host:            host,
+		indexName:       index,
+		eVersion:        eVersion,
+		elasticV3Client: elasticV3Client,
+		elasticV5Client: elasticV5Client,
+		elasticV6Client: elasticV6Client,
+		eType:           eType,
+		aliasFields:     fields,
+		intervalIndex:   i,
 	}, nil
 }
 
 const defaultType string = "logkit"
 
-//判断字符串是否符合已有的模式
+// machPattern 判断字符串是否符合已有的模式
 func machPattern(s string, strategys []string) (i int, err error) {
 	for i, strategy := range strategys {
 		if s == strategy {
@@ -107,34 +145,27 @@ func machPattern(s string, strategys []string) (i int, err error) {
 	return i, err
 }
 
-func (this *ElasticsearchSender) Name() string {
-	return "//" + this.indexName
+// Name ElasticSearchSenderName
+func (ess *ElasticsearchSender) Name() string {
+	return "//" + ess.indexName
 }
 
-func (this *ElasticsearchSender) Send(data []Data) (err error) {
-	// Create a client
-	switch this.eVersion {
+// Send ElasticSearchSender
+func (ess *ElasticsearchSender) Send(data []Data) (err error) {
+	switch ess.eVersion {
 	case ElasticVersion6:
-		var client *elasticV6.Client
-		client, err = elasticV6.NewClient(
-			elasticV6.SetSniff(false),
-			elasticV6.SetHealthcheck(false),
-			elasticV6.SetURL(this.host...))
-		if err != nil {
-			return
-		}
-		bulkService := client.Bulk()
+		bulkService := ess.elasticV6Client.Bulk()
 
 		makeDoc := true
-		if len(this.aliasFields) == 0 {
+		if len(ess.aliasFields) == 0 {
 			makeDoc = false
 		}
 
-		i := this.intervalIndex
+		i := ess.intervalIndex
 		var indexName string
 		var intervals []string
 		for _, doc := range data {
-			indexName = this.indexName
+			indexName = ess.indexName
 			now := time.Now().UTC()
 			intervals = []string{strconv.Itoa(now.Year()), strconv.Itoa(int(now.Month())), strconv.Itoa(now.Day())}
 			for j := 1; j <= i; j++ {
@@ -142,10 +173,10 @@ func (this *ElasticsearchSender) Send(data []Data) (err error) {
 			}
 
 			if makeDoc {
-				doc = this.wrapDoc(doc)
+				doc = ess.wrapDoc(doc)
 			}
 			doc2 := doc
-			bulkService.Add(elasticV6.NewBulkIndexRequest().Index(indexName).Type(this.eType).Doc(&doc2))
+			bulkService.Add(elasticV6.NewBulkIndexRequest().Index(indexName).Type(ess.eType).Doc(&doc2))
 		}
 
 		_, err = bulkService.Do(context.Background())
@@ -153,26 +184,18 @@ func (this *ElasticsearchSender) Send(data []Data) (err error) {
 			return
 		}
 	case ElasticVersion5:
-		var client *elasticV5.Client
-		client, err = elasticV5.NewClient(
-			elasticV5.SetSniff(false),
-			elasticV5.SetHealthcheck(false),
-			elasticV5.SetURL(this.host...))
-		if err != nil {
-			return
-		}
-		bulkService := client.Bulk()
+		bulkService := ess.elasticV5Client.Bulk()
 
 		makeDoc := true
-		if len(this.aliasFields) == 0 {
+		if len(ess.aliasFields) == 0 {
 			makeDoc = false
 		}
 
-		i := this.intervalIndex
+		i := ess.intervalIndex
 		var indexName string
 		var intervals []string
 		for _, doc := range data {
-			indexName = this.indexName
+			indexName = ess.indexName
 			now := time.Now().UTC()
 			intervals = []string{strconv.Itoa(now.Year()), strconv.Itoa(int(now.Month())), strconv.Itoa(now.Day())}
 			for j := 1; j <= i; j++ {
@@ -180,10 +203,10 @@ func (this *ElasticsearchSender) Send(data []Data) (err error) {
 			}
 
 			if makeDoc {
-				doc = this.wrapDoc(doc)
+				doc = ess.wrapDoc(doc)
 			}
 			doc2 := doc
-			bulkService.Add(elasticV5.NewBulkIndexRequest().Index(indexName).Type(this.eType).Doc(&doc2))
+			bulkService.Add(elasticV5.NewBulkIndexRequest().Index(indexName).Type(ess.eType).Doc(&doc2))
 		}
 
 		_, err = bulkService.Do(context.Background())
@@ -191,23 +214,18 @@ func (this *ElasticsearchSender) Send(data []Data) (err error) {
 			return
 		}
 	default:
-		var client *elasticV3.Client
-		client, err = elasticV3.NewClient(elasticV3.SetURL(this.host...))
-		if err != nil {
-			return
-		}
-		bulkService := client.Bulk()
+		bulkService := ess.elasticV3Client.Bulk()
 
 		makeDoc := true
-		if len(this.aliasFields) == 0 {
+		if len(ess.aliasFields) == 0 {
 			makeDoc = false
 		}
 
-		i := this.intervalIndex
+		i := ess.intervalIndex
 		var indexName string
 		var intervals []string
 		for _, doc := range data {
-			indexName = this.indexName
+			indexName = ess.indexName
 			now := time.Now().UTC()
 			intervals = []string{strconv.Itoa(now.Year()), strconv.Itoa(int(now.Month())), strconv.Itoa(now.Day())}
 			for j := 1; j <= i; j++ {
@@ -215,10 +233,10 @@ func (this *ElasticsearchSender) Send(data []Data) (err error) {
 			}
 
 			if makeDoc {
-				doc = this.wrapDoc(doc)
+				doc = ess.wrapDoc(doc)
 			}
 			doc2 := doc
-			bulkService.Add(elasticV3.NewBulkIndexRequest().Index(indexName).Type(this.eType).Doc(&doc2))
+			bulkService.Add(elasticV3.NewBulkIndexRequest().Index(indexName).Type(ess.eType).Doc(&doc2))
 		}
 
 		_, err = bulkService.Do()
@@ -230,13 +248,14 @@ func (this *ElasticsearchSender) Send(data []Data) (err error) {
 	return
 }
 
-func (this *ElasticsearchSender) Close() error {
+// Close ElasticSearch Sender Close
+func (ess *ElasticsearchSender) Close() error {
 	return nil
 }
 
-func (this *ElasticsearchSender) wrapDoc(doc map[string]interface{}) map[string]interface{} {
+func (ess *ElasticsearchSender) wrapDoc(doc map[string]interface{}) map[string]interface{} {
 	newDoc := make(map[string]interface{})
-	for oldKey, newKey := range this.aliasFields {
+	for oldKey, newKey := range ess.aliasFields {
 		val, ok := doc[oldKey]
 		if ok {
 			newDoc[newKey] = val
