@@ -7,7 +7,8 @@ import {
   Modal,
   Input,
   Form,
-  Select
+  Select,
+  Popconfirm,
 } from 'antd';
 import {
   getClusterSlaves,
@@ -55,6 +56,18 @@ class MachineTable extends Component {
       isShowTagModal: true,
       currentModalType: type,
       currentModalTitle: titles[type]
+    })
+  }
+
+  deleteSlave = (param) => {
+    deleteClusterSlaveTag({
+      name: param.name,
+      url: param.machineUrl
+    }).then(item => {
+      if(item.code === 'L200') {
+        notification.success({message: "删除成功", duration: 10,})
+        this.getClusterSLave()
+      }
     })
   }
 
@@ -213,8 +226,10 @@ class MachineTable extends Component {
         return (
             <a>
               <div className="editable-row-operations">
-                {record.status !== 'bad' ? (
-                    <Icon onClick={() => this.showTagModal(record, 'delete')} title={"删除该机器"} style={{fontSize: 16}} type="delete"/>) : null
+                {
+                  <Popconfirm title="是否删除该机器?" onConfirm={() => this.deleteSlave(record)}>
+                    <Icon title={"删除runner"} style={{fontSize: 16}} type="delete"/>
+                  </Popconfirm>
                 }
               </div>
             </a>

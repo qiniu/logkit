@@ -182,7 +182,9 @@ class CreateLogRunner extends Component {
   }
 
   updateRunner = () => {
-    const { currentTagName, currentMachineUrl } = this.props
+    const currentTagName = window.nodeCopy.tag
+    const currentMachineUrl = window.nodeCopy.machineUrl
+    // const { currentTagName, currentMachineUrl } = this.props
     const {handleTurnToRunner} = this.props
     let that = this
     const {validateFields, getFieldsValue} =  that.refs.initConfig;
