@@ -15,7 +15,8 @@ import {
   postClusterSlaveTag,
   getClusterSlaves,
   getRunnersByTagOrMachineUrl,
-  postClusterDeleteSlaveTag
+  postClusterDeleteSlaveTag,
+  startClusterRunner
 } from '../../services/logkit';
 import {titles} from './constant'
 import _ from "lodash";
@@ -135,7 +136,7 @@ class TagTable extends Component {
         }
       })
     } else if (this.state.currentModalType == 'start') {
-      postClusterResetSlaveTag({
+      startClusterRunner({
         name: this.state.currentRunnerName,
         tag: this.state.currentTag.name,
         url: ''
@@ -150,6 +151,20 @@ class TagTable extends Component {
       })
     } else if (this.state.currentModalType == 'delete') {
       postClusterDeleteSlaveTag({
+        name: this.state.currentRunnerName,
+        tag: this.state.currentTag.name,
+        url: ''
+      }).then(item => {
+        if (item.code === 'L200') {
+          notification.success({message: '删除成功', duration: 10})
+          this.setState({
+            isShowTagModal: false
+          })
+          this.getClusterSLave()
+        }
+      })
+    } else if (this.state.currentModalType == 'reset') {
+      postClusterResetSlaveTag({
         name: this.state.currentRunnerName,
         tag: this.state.currentTag.name,
         url: ''
@@ -316,7 +331,6 @@ class TagTable extends Component {
             </a>
         );
       },
-
     }, {
       title: '添加Metric Runner',
       key: 'addMetricRunner',
@@ -361,6 +375,23 @@ class TagTable extends Component {
                 {this.checkStatus(record.status) === 'ok' ? (
                     <Icon onClick={() => this.showTagModal(record, 'start')} title={"重启该标签对应的runner"} style={{fontSize: 16}}
                           type='caret-right'/>) : null
+                }
+              </div>
+            </a>
+
+        );
+      },
+    }, {
+      title: '重置',
+      key: 'reset',
+      dataIndex: 'reset',
+      width: '6%',
+      render: (text, record) => {
+        return (<a>
+              <div className="editable-row-operations">
+                {this.checkStatus(record.status) === 'ok' ? (
+                    <Icon onClick={() => this.showTagModal(record, 'reset')} title={"重置该标签对应的runner"} style={{fontSize: 16}}
+                          type='reload'/>) : null
                 }
               </div>
             </a>

@@ -11,7 +11,9 @@ import {
 } from 'antd';
 import {
   getClusterSlaves,
-  postClusterSlaveTag
+  postClusterSlaveTag,
+  postClusterDeleteSlaveTag,
+  deleteClusterSlaveTag
 } from '../../services/logkit';
 import * as uuid from 'uuid'
 import {titles} from '../tag/constant'
@@ -48,7 +50,6 @@ class MachineTable extends Component {
   }
 
   showTagModal = (item, type) => {
-    console.log(item)
     this.setState({
       currentTag: item,
       isShowTagModal: true,
@@ -64,7 +65,7 @@ class MachineTable extends Component {
     if (this.state.currentModalType == 'rename') {
       postClusterSlaveTag({
         name: this.state.currentTag.name,
-        url: '',
+        url: this.state.currentTag.machineUrl,
         body: {tag: this.state.currentTagName}
       }).then(item => {
         if (item.code === 'L200') {
@@ -75,6 +76,19 @@ class MachineTable extends Component {
           this.getClusterSLave()
         }
 
+      })
+    } else if (this.state.currentModalType == 'delete') {
+      deleteClusterSlaveTag({
+        tag: this.state.currentTag.name,
+        url: this.state.currentTag.machineUrl
+      }).then(item => {
+        if (item.code === 'L200') {
+          notification.success({message: '删除成功', duration: 10})
+          this.setState({
+            isShowTagModal: false
+          })
+          this.getClusterSLave()
+        }
       })
     }
   }
@@ -190,6 +204,22 @@ class MachineTable extends Component {
         );
       },
 
+    }, {
+      title: '删除',
+      dataIndex: 'delete',
+      key: 'delete',
+      width: '6%',
+      render: (text, record) => {
+        return (
+            <a>
+              <div className="editable-row-operations">
+                {record.status !== 'bad' ? (
+                    <Icon onClick={() => this.showTagModal(record, 'delete')} title={"删除该机器"} style={{fontSize: 16}} type="delete"/>) : null
+                }
+              </div>
+            </a>
+        );
+      }
     }];
     return (
         <Table columns={columns} pagination={{size: 'small', pageSize: 20}} dataSource={dataSource}/>
