@@ -1,8 +1,6 @@
 package mgr
 
 import (
-	"net/http"
-
 	"github.com/labstack/echo"
 	"github.com/qiniu/logkit/reader"
 )
@@ -10,14 +8,14 @@ import (
 // get /logkit/reader/usages 获取Reader用途
 func (rs *RestService) GetReaderUsages() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		return c.JSON(http.StatusOK, reader.ModeUsages)
+		return RespSuccess(c, reader.ModeUsages)
 	}
 }
 
 // get /logkit/reader/options 获取Reader参数配置
 func (rs *RestService) GetReaderKeyOptions() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		return c.JSON(http.StatusOK, reader.ModeKeyOptions)
+		return RespSuccess(c, reader.ModeKeyOptions)
 	}
 }
 
@@ -27,6 +25,6 @@ func (rs *RestService) PostReaderCheck() echo.HandlerFunc {
 
 		//TODO check reader
 
-		return c.JSON(http.StatusOK, nil)
+		return RespSuccess(c, nil)
 	}
 }

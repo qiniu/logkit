@@ -40,6 +40,8 @@ const (
 	KeyName           = "name"
 	KeyRunnerName     = "runner_name"
 	KeyLogkitSendTime = "logkit_send_time"
+	KeyIsMetrics      = "is_metrics"
+	KeyMetricTime     = "timestamp"
 )
 
 const UnderfinedRunnerName = "UnderfinedRunnerName"

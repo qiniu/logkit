@@ -14,6 +14,8 @@ import (
 	"fmt"
 	"time"
 
+	"strings"
+
 	"github.com/labstack/echo"
 	"github.com/qiniu/log"
 )
@@ -50,6 +52,21 @@ type SlaveConfig struct {
 	Configs map[string]RunnerConfig `json:"configs"`
 	Tag     string                  `json:"tag"`
 	Err     error                   `json:"error"`
+}
+
+type respRunnersNameList struct {
+	Code string   `json:"code"`
+	Data []string `json:"data"`
+}
+
+type respRunnerStatus struct {
+	Code string                  `json:"code"`
+	Data map[string]RunnerStatus `json:"data"`
+}
+
+type respRunnerConfigs struct {
+	Code string                  `json:"code"`
+	Data map[string]RunnerConfig `json:"data"`
 }
 
 const (
@@ -127,60 +144,109 @@ func (cc *Cluster) UpdateSlaveStatus() {
 }
 
 // master API
-// get /logkit/cluster/ping
+// GET /logkit/cluster/ping
 func (rs *RestService) Ping() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		return c.JSON(http.StatusOK, nil)
+		return RespSuccess(c, nil)
 	}
 }
 
 // master API
-// get /logkit/cluster/slaves?tag=tagValue&url=urlValue
+// GET /logkit/cluster/ismaster
+func (rs *RestService) IsMaster() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		isMaster := true
+		if rs.cluster == nil || !rs.cluster.Enable || !rs.cluster.IsMaster {
+			isMaster = false
+		}
+		return RespSuccess(c, isMaster)
+	}
+}
+
+// master API
+// GET /logkit/cluster/slaves?tag=tagValue&url=urlValue
 func (rs *RestService) Slaves() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		_, tag, url, _, err := rs.checkClusterRequest(c)
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, err)
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterSlaves, err.Error())
 		}
 		rs.cluster.UpdateSlaveStatus()
 		rs.cluster.mutex.RLock()
-		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
+		slaves, _ := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
-		return c.JSON(http.StatusOK, slaves)
+		return RespSuccess(c, slaves)
 	}
 }
 
 // master API
-// get /logkit/cluster/status?tag=tagValue&url=urlValue
+// GET /logkit/cluster/runners?tag=tagValue&url=urlValue
+func (rs *RestService) GetClusterRunners() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		_, tag, url, _, err := rs.checkClusterRequest(c)
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterSlaves, err.Error())
+		}
+		rs.cluster.UpdateSlaveStatus()
+		rs.cluster.mutex.RLock()
+		slaves, _ := getQualifySlaves(rs.cluster.slaves, tag, url)
+		rs.cluster.mutex.RUnlock()
+		runnerNameSet := utils.NewHashSet()
+		for _, v := range slaves {
+			var respRss respRunnersNameList
+			url := fmt.Sprintf("%v/logkit/runners", v.Url)
+			respCode, respBody, err := executeToOneCluster(url, http.MethodGet, []byte{})
+			if err != nil || respCode != http.StatusOK {
+				log.Errorf("get slave(tag='%v', url='%v') runner name list failed, resp is %v, error is %v", v.Tag, v.Url, string(respBody), err.Error())
+				continue
+			} else {
+				if err = json.Unmarshal(respBody, &respRss); err != nil {
+					log.Errorf("unmarshal slave(tag='%v', url='%v') runner name list failed, error is %v", v.Tag, v.Url, err.Error())
+				} else {
+					runnerNameSet.AddStringArray(respRss.Data)
+				}
+			}
+		}
+		return RespSuccess(c, runnerNameSet.Elements())
+	}
+}
+
+// master API
+// GET /logkit/cluster/status?tag=tagValue&url=urlValue
 func (rs *RestService) ClusterStatus() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		_, tag, url, _, err := rs.checkClusterRequest(c)
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, err)
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterStatus, err.Error())
 		}
 		rs.cluster.mutex.RLock()
-		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
+		slaves, _ := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
 		allstatus := make(map[string]ClusterStatus)
 		for _, v := range slaves {
 			var cs ClusterStatus
 			cs.Tag = v.Tag
-			rss := make(map[string]RunnerStatus)
+			var respRss respRunnerStatus
+			if v.Status != StatusOK {
+				cs.Status = map[string]RunnerStatus{}
+				allstatus[v.Url] = cs
+				continue
+			}
 			url := fmt.Sprintf("%v/logkit/status", v.Url)
 			respCode, respBody, err := executeToOneCluster(url, http.MethodGet, []byte{})
 			if err != nil || respCode != http.StatusOK {
 				errInfo := fmt.Errorf("%v %v", string(respBody), err)
 				cs.Err = errInfo
 			} else {
-				if err = json.Unmarshal(respBody, &rss); err != nil {
+				if err = json.Unmarshal(respBody, &respRss); err != nil {
 					cs.Err = fmt.Errorf("unmarshal query result error %v, body is %v", err, string(respBody))
 				} else {
-					cs.Status = rss
+					cs.Status = respRss.Data
 				}
 			}
 			allstatus[v.Url] = cs
 		}
-		return c.JSON(http.StatusOK, allstatus)
+		return RespSuccess(c, allstatus)
 	}
 }
 
@@ -190,31 +256,36 @@ func (rs *RestService) GetClusterConfigs() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		_, tag, url, _, err := rs.checkClusterRequest(c)
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, err)
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterConfigs, err.Error())
 		}
 		rs.cluster.mutex.RLock()
-		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
+		slaves, _ := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
 		allConfigs := make(map[string]SlaveConfig)
 		for _, v := range slaves {
 			var sc SlaveConfig
 			sc.Tag = v.Tag
-			rss := make(map[string]RunnerConfig)
+			var respRss respRunnerConfigs
+			if v.Status != StatusOK {
+				sc.Configs = map[string]RunnerConfig{}
+				allConfigs[v.Url] = sc
+				continue
+			}
 			url := fmt.Sprintf("%v/logkit/configs", v.Url)
 			respCode, respBody, err := executeToOneCluster(url, http.MethodGet, []byte{})
 			if err != nil || respCode != http.StatusOK {
 				errInfo := fmt.Errorf("%v %v", string(respBody), err)
 				sc.Err = errInfo
 			} else {
-				if err = json.Unmarshal(respBody, &rss); err != nil {
+				if err = json.Unmarshal(respBody, &respRss); err != nil {
 					sc.Err = fmt.Errorf("unmarshal query result error %v, body is %v", err, string(respBody))
 				} else {
-					sc.Configs = rss
+					sc.Configs = respRss.Data
 				}
 			}
 			allConfigs[v.Url] = sc
 		}
-		return c.JSON(http.StatusOK, allConfigs)
+		return RespSuccess(c, allConfigs)
 	}
 }
 
@@ -229,15 +300,15 @@ func (rs *RestService) PostRegister() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		var req RegisterReq
 		if err := c.Bind(&req); err != nil {
-			return err
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterRegister, err.Error())
 		}
 		req.Url = utils.AddHttpProtocal(req.Url)
 		if rs.cluster == nil || !rs.cluster.Enable {
-			err := errors.New("this is not master")
-			return c.JSON(http.StatusBadRequest, err)
+			errMsg := "this is not master"
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterRegister, errMsg)
 		}
 		rs.cluster.AddSlave(req.Url, req.Tag)
-		return c.JSON(http.StatusOK, nil)
+		return RespSuccess(c, nil)
 	}
 }
 
@@ -251,17 +322,19 @@ func (rs *RestService) PostTag() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		var req TagReq
 		if err := c.Bind(&req); err != nil {
-			return err
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterTag, err.Error())
 		}
 		if rs.cluster == nil || !rs.cluster.Enable {
-			err := errors.New("cluster function not configed")
-			return c.JSON(http.StatusBadRequest, err)
+			errMsg := "cluster function not configed"
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterTag, errMsg)
 		}
 		if err := Register(rs.cluster.MasterUrl, rs.cluster.myaddress, req.Tag); err != nil {
-			return c.JSON(http.StatusServiceUnavailable, err)
+			return RespError(c, http.StatusServiceUnavailable, utils.ErrClusterTag, err.Error())
 		}
+		rs.cluster.mutex.Lock()
 		rs.cluster.mytag = req.Tag
-		return c.JSON(http.StatusOK, nil)
+		rs.cluster.mutex.Unlock()
+		return RespSuccess(c, nil)
 	}
 }
 
@@ -270,22 +343,21 @@ func (rs *RestService) PostClusterConfig() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		configName, tag, url, configBytes, err := rs.checkClusterRequest(c)
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, err)
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerAdd, err.Error())
 		}
 		rs.cluster.mutex.RLock()
-		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
+		slaves, err := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
-		if len(slaves) == 0 {
-			errMess := "the slaves(tag = '" + tag + "', url = '" + url + "') are not found"
-			return c.JSON(http.StatusNotFound, map[string]string{"error": errMess})
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerAdd, err.Error())
 		}
 		method := http.MethodPost
 		mgrType := "add runner " + configName
 		urlPattern := "%v" + PREFIX + "/configs/" + configName
 		if err := executeToClusters(slaves, urlPattern, method, mgrType, configBytes); err != nil {
-			return c.JSON(http.StatusServiceUnavailable, err)
+			return RespError(c, http.StatusServiceUnavailable, utils.ErrClusterRunnerAdd, err.Error())
 		}
-		return c.JSON(http.StatusOK, nil)
+		return RespSuccess(c, nil)
 	}
 }
 
@@ -294,22 +366,21 @@ func (rs *RestService) PutClusterConfig() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		configName, tag, url, configBytes, err := rs.checkClusterRequest(c)
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, err)
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerUpdate, err.Error())
 		}
 		rs.cluster.mutex.RLock()
-		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
+		slaves, err := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
-		if len(slaves) == 0 {
-			errMess := "the slaves(tag = '" + tag + "', url = '" + url + "') are not found"
-			return c.JSON(http.StatusNotFound, map[string]string{"error": errMess})
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerUpdate, err.Error())
 		}
 		method := http.MethodPut
 		mgrType := "update runner " + configName
 		urlPattern := "%v" + PREFIX + "/configs/" + configName
 		if err := executeToClusters(slaves, urlPattern, method, mgrType, configBytes); err != nil {
-			return c.JSON(http.StatusServiceUnavailable, err)
+			return RespError(c, http.StatusServiceUnavailable, utils.ErrClusterRunnerUpdate, err.Error())
 		}
-		return c.JSON(http.StatusOK, nil)
+		return RespSuccess(c, nil)
 	}
 }
 
@@ -318,22 +389,21 @@ func (rs *RestService) DeleteClusterConfig() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		configName, tag, url, configBytes, err := rs.checkClusterRequest(c)
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, err)
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerDelete, err.Error())
 		}
 		rs.cluster.mutex.RLock()
-		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
+		slaves, err := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
-		if len(slaves) == 0 {
-			errMess := "the slaves(tag = '" + tag + "', url = '" + url + "') are not found"
-			return c.JSON(http.StatusNotFound, map[string]string{"error": errMess})
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerDelete, err.Error())
 		}
 		method := http.MethodDelete
 		mgrType := "delete runner " + configName
 		urlPattern := "%v" + PREFIX + "/configs/" + configName
 		if err := executeToClusters(slaves, urlPattern, method, mgrType, configBytes); err != nil {
-			return c.JSON(http.StatusServiceUnavailable, err)
+			return RespError(c, http.StatusServiceUnavailable, utils.ErrClusterRunnerDelete, err.Error())
 		}
-		return c.JSON(http.StatusOK, nil)
+		return RespSuccess(c, nil)
 	}
 }
 
@@ -342,22 +412,21 @@ func (rs *RestService) PostClusterConfigStop() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		configName, tag, url, configBytes, err := rs.checkClusterRequest(c)
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, err)
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerStop, err.Error())
 		}
 		rs.cluster.mutex.RLock()
-		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
+		slaves, err := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
-		if len(slaves) == 0 {
-			errMess := "the slaves(tag = '" + tag + "', url = '" + url + "') are not found"
-			return c.JSON(http.StatusNotFound, map[string]string{"error": errMess})
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerStop, err.Error())
 		}
 		method := http.MethodPost
 		mgrType := "stop runner " + configName
 		urlPattern := "%v" + PREFIX + "/configs/" + configName + "/stop"
 		if err := executeToClusters(slaves, urlPattern, method, mgrType, configBytes); err != nil {
-			return c.JSON(http.StatusServiceUnavailable, err)
+			return RespError(c, http.StatusServiceUnavailable, utils.ErrClusterRunnerStop, err.Error())
 		}
-		return c.JSON(http.StatusOK, nil)
+		return RespSuccess(c, nil)
 	}
 }
 
@@ -366,22 +435,21 @@ func (rs *RestService) PostClusterConfigStart() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		configName, tag, url, configBytes, err := rs.checkClusterRequest(c)
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, err)
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerStart, err.Error())
 		}
 		rs.cluster.mutex.RLock()
-		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
+		slaves, err := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
-		if len(slaves) == 0 {
-			errMess := "the slaves(tag = '" + tag + "', url = '" + url + "') are not found"
-			return c.JSON(http.StatusNotFound, map[string]string{"error": errMess})
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerStart, err.Error())
 		}
 		method := http.MethodPost
 		mgrType := "start runner " + configName
 		urlPattern := "%v" + PREFIX + "/configs/" + configName + "/start"
 		if err := executeToClusters(slaves, urlPattern, method, mgrType, configBytes); err != nil {
-			return c.JSON(http.StatusServiceUnavailable, err)
+			return RespError(c, http.StatusServiceUnavailable, utils.ErrClusterRunnerStart, err.Error())
 		}
-		return c.JSON(http.StatusOK, nil)
+		return RespSuccess(c, nil)
 	}
 }
 
@@ -390,22 +458,21 @@ func (rs *RestService) PostClusterConfigReset() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		configName, tag, url, configBytes, err := rs.checkClusterRequest(c)
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, err)
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerReset, err.Error())
 		}
 		rs.cluster.mutex.RLock()
-		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
+		slaves, err := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
-		if len(slaves) == 0 {
-			errMess := "the slaves(tag = '" + tag + "', url = '" + url + "') are not found"
-			return c.JSON(http.StatusNotFound, map[string]string{"error": errMess})
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerReset, err.Error())
 		}
 		method := http.MethodPost
 		mgrType := "reset runner " + configName
 		urlPattern := "%v" + PREFIX + "/configs/" + configName + "/reset"
 		if err := executeToClusters(slaves, urlPattern, method, mgrType, configBytes); err != nil {
-			return c.JSON(http.StatusServiceUnavailable, err)
+			return RespError(c, http.StatusServiceUnavailable, utils.ErrClusterRunnerReset, err.Error())
 		}
-		return c.JSON(http.StatusOK, nil)
+		return RespSuccess(c, nil)
 	}
 }
 
@@ -414,7 +481,7 @@ func (rs *RestService) DeleteSlaves() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		_, tag, url, _, err := rs.checkClusterRequest(c)
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, err)
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterSlavesDelete, err.Error())
 		}
 		rs.cluster.mutex.RLock()
 		slaves := make([]Slave, 0)
@@ -428,7 +495,7 @@ func (rs *RestService) DeleteSlaves() echo.HandlerFunc {
 		rs.cluster.mutex.Lock()
 		rs.cluster.slaves = slaves
 		rs.cluster.mutex.Unlock()
-		return c.JSON(http.StatusOK, nil)
+		return RespSuccess(c, nil)
 	}
 }
 
@@ -437,49 +504,61 @@ func (rs *RestService) PostSlaveTag() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		_, tag, url, configBytes, err := rs.checkClusterRequest(c)
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, err)
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterSlavesTag, err.Error())
 		}
 		rs.cluster.mutex.RLock()
-		slaves := getQualifySlaves(rs.cluster.slaves, tag, url)
+		slaves, err := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
-		if len(slaves) == 0 {
-			errMess := "the slaves(tag = '" + tag + "', url = '" + url + "') are not found"
-			return c.JSON(http.StatusNotFound, map[string]string{"error": errMess})
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterSlavesTag, err.Error())
 		}
 		mgrType := "change tag"
 		method := http.MethodPost
 		urlPattern := "%v" + PREFIX + "/cluster/tag"
 		if err := executeToClusters(slaves, urlPattern, method, mgrType, configBytes); err != nil {
-			return c.JSON(http.StatusServiceUnavailable, err)
+			return RespError(c, http.StatusServiceUnavailable, utils.ErrClusterSlavesTag, err.Error())
 		}
-		return c.JSON(http.StatusOK, nil)
+		return RespSuccess(c, nil)
 	}
 }
 
-func getQualifySlaves(slaves []Slave, tag, url string) []Slave {
+func getQualifySlaves(slaves []Slave, tag, url string) ([]Slave, error) {
+	errInfo := make([]string, 0)
 	slave := make([]Slave, 0)
 	//(u == "" && t == "") || (u == "" && s.t == t) || (u == s.u && t == "") || (u == s.u && t == s.t)
 	for _, s := range slaves {
 		if (url == "" || url == s.Url) && (tag == "" || tag == s.Tag) {
+			if s.Status != StatusOK {
+				errMsg := "the slaves(tag = '" + tag + "', url = '" + url + "') status is " + s.Status + ", options are terminated"
+				errInfo = append(errInfo, errMsg)
+			}
 			slave = append(slave, s)
 		}
 	}
-	return slave
+	// 没有找到 slave 的错误只有当没有其他错误的时候才报
+	if len(slave)+len(errInfo) <= 0 {
+		errMsg := "the slaves(tag = '" + tag + "', url = '" + url + "') is not found"
+		errInfo = append(errInfo, errMsg)
+	}
+	if len(errInfo) > 0 {
+		return slave, errors.New(strings.Join(errInfo, "\n"))
+	}
+	return slave, nil
 }
 
-func (rs *RestService) checkClusterRequest(c echo.Context) (name, tag, url string, configBytes []byte, err interface{}) {
+func (rs *RestService) checkClusterRequest(c echo.Context) (name, tag, url string, configBytes []byte, err error) {
 	if rs.cluster == nil || !rs.cluster.Enable {
-		err = map[string]string{"error": "cluster function not configed"}
+		err = errors.New("cluster function not configed")
 		return
 	}
 	var tmpErr error
 	req := c.Request()
 	if tmpErr := req.ParseForm(); tmpErr != nil {
-		err = map[string]string{"error": "can not get form " + tmpErr.Error()}
+		err = errors.New("can not get form from request, err is " + tmpErr.Error())
 		return
 	}
 	if configBytes, tmpErr = ioutil.ReadAll(req.Body); tmpErr != nil {
-		err = map[string]string{"error": "get response body failed " + tmpErr.Error()}
+		err = errors.New("get response body failed, err is " + tmpErr.Error())
 		return
 	}
 	name = c.Param("name")
@@ -488,26 +567,21 @@ func (rs *RestService) checkClusterRequest(c echo.Context) (name, tag, url strin
 	return
 }
 
-func executeToClusters(slaves []Slave, urlP, method, mgr string, reqBd []byte) map[string]interface{} {
-	errInfo := make(map[string]interface{})
+func executeToClusters(slaves []Slave, urlP, method, mgr string, reqBd []byte) (err error) {
+	errInfo := make([]string, 0)
 	for _, v := range slaves {
 		url := fmt.Sprintf(urlP, v.Url)
 		respCode, respBody, err := executeToOneCluster(url, method, reqBd)
 		if respCode != http.StatusOK || err != nil {
-			log.Errorf("url %v %v failed, %v", v.Url, mgr, err)
-			errorInfo := fmt.Sprintf("%v %v", string(respBody), err)
-			errInfo[v.Url] = map[string]string{
-				"url":     v.Url,
-				"tag":     v.Tag,
-				"mgrType": mgr,
-				"error":   errorInfo,
-			}
+			log.Errorf("url %v %v occurred an error, resp is %v, err is %v", v.Url, mgr, string(respBody), err)
+			errMsg := fmt.Sprintf("url %v %v occurred an error, resp is %v, err is %v", v.Url, mgr, string(respBody), err)
+			errInfo = append(errInfo, errMsg)
 		}
 	}
 	if len(errInfo) == 0 {
-		errInfo = nil
+		return nil
 	}
-	return errInfo
+	return errors.New(strings.Join(errInfo, "\n"))
 }
 
 func executeToOneCluster(url, method string, configBytes []byte) (respCode int, respBody []byte, err error) {

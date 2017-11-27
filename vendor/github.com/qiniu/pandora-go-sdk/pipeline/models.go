@@ -579,6 +579,8 @@ type AutoExportToLogDBInput struct {
 	RepoName    string
 	LogRepoName string
 	Retention   string
+	OmitInvalid bool
+	OmitEmpty   bool
 }
 
 type CreateRepoForLogDBInput struct {
@@ -587,6 +589,8 @@ type CreateRepoForLogDBInput struct {
 	Region      string
 	Schema      []RepoSchemaEntry
 	Retention   string
+	OmitInvalid bool
+	OmitEmpty   bool
 }
 
 type CreateRepoForLogDBDSLInput struct {
@@ -602,7 +606,12 @@ type AutoExportToTSDBInput struct {
 	TSDBRepoName string
 	Retention    string
 	SeriesName   string
-	Tags         []string
+	OmitInvalid  bool
+	OmitEmpty    bool
+	Timestamp    string
+	IsMetric     bool
+	SeriesTags   map[string][]string
+	ExpandAttr   []RepoSchemaEntry
 }
 
 type CreateRepoForTSDBInput struct {
@@ -613,6 +622,36 @@ type CreateRepoForTSDBInput struct {
 	Retention    string
 	SeriesName   string
 	Tags         []string
+	OmitInvalid  bool
+	OmitEmpty    bool
+	Timestamp    string
+}
+
+type CreateRepoForKodoInput struct {
+	Retention int
+	Ak        string
+	Email     string
+	Region    string
+	Bucket    string
+	RepoName  string
+	Schema    []RepoSchemaEntry
+}
+
+type SeriesInfo struct {
+	SeriesName string
+	Tags       []string
+	TimeStamp  string
+	Schema     []RepoSchemaEntry
+}
+
+type CreateRepoForMutiExportTSDBInput struct {
+	RepoName     string
+	TSDBRepoName string
+	Region       string
+	Retention    string
+	OmitInvalid  bool
+	OmitEmpty    bool
+	SeriesMap    map[string]SeriesInfo
 }
 
 func IsTag(key string, tags []string) bool {
@@ -679,10 +718,11 @@ type UpdateRepoInput struct {
 }
 
 func (r *UpdateRepoInput) IsTag(key string) bool {
-	if r == nil || r.Option == nil || len(r.Option.TSDBtags) <= 0 {
+	tags := r.Option.SeriesTags[r.Option.SeriesName]
+	if r == nil || r.Option == nil || len(tags) <= 0 {
 		return false
 	}
-	for _, k := range r.Option.TSDBtags {
+	for _, k := range tags {
 		if key == k {
 			return true
 		}
@@ -737,6 +777,8 @@ type GetRepoOutput struct {
 	GroupName   string            `json:"group"`
 	Options     *RepoOptions      `json:"options"`
 	DerivedFrom string            `json:"derivedFrom"`
+	FromDag     bool              `json:"fromDag"`
+	Workflow    string            `json:"workflow"`
 }
 
 type SampleDataOutput struct {
@@ -748,6 +790,8 @@ type RepoDesc struct {
 	Region      string `json:"region"`
 	GroupName   string `json:"group"`
 	DerivedFrom string `json:"derivedFrom"`
+	FromDag     bool   `json:"fromDag"`
+	Workflow    string `json:"workflow"`
 }
 
 type ListReposInput struct {
@@ -854,18 +898,12 @@ type SchemaFreeInput struct {
 
 type SchemaFreeOption struct {
 	ToLogDB          bool
-	LogDBRepoName    string
-	LogDBRetention   string
 	ToTSDB           bool
-	TSDBRepoName     string
-	TSDBtags         []string
-	TSDBSeriesName   string
-	TSDBRetention    string
 	ToKODO           bool
-	KodoBucketName   string
-	KodoRetention    int
-	KodoEmail        string
 	ForceDataConvert bool
+	AutoExportToLogDBInput
+	AutoExportToKODOInput
+	AutoExportToTSDBInput
 }
 
 type PostDataFromFileInput struct {
@@ -911,6 +949,20 @@ type PluginDesc struct {
 
 type GetPluginOutput struct {
 	PluginDesc
+}
+
+type VerifyPluginInput struct {
+	PipelineToken
+	PluginName string
+}
+
+type OutputField struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+type VerifyPluginOutput struct {
+	OutputFields []OutputField `json:"outputFields"`
 }
 
 type ListPluginsInput struct {
@@ -1048,26 +1100,14 @@ type ListTransformsOutput struct {
 	Transforms []TransformDesc `json:"transforms"`
 }
 
-type ExportFilter struct {
-	Rules     map[string]map[string]string `json:"rules"`
-	ToDefault bool                         `json:"toDefault"`
-}
-
-func (f *ExportFilter) Validate() (err error) {
-	if len(f.Rules) == 0 {
-		err = reqerr.NewInvalidArgs("ExportFilter", "rules in filter should be empty")
-		return
-	}
-	return
-}
-
 type ExportTsdbSpec struct {
 	DestRepoName string            `json:"destRepoName"`
 	SeriesName   string            `json:"series"`
 	Tags         map[string]string `json:"tags"`
 	Fields       map[string]string `json:"fields"`
+	OmitInvalid  bool              `json:"omitInvalid,omitempty"`
+	OmitEmpty    bool              `json:"omitEmpty,omitempty"`
 	Timestamp    string            `json:"timestamp,omitempty"`
-	Filter       *ExportFilter     `json:"filter,omitempty"`
 }
 
 func (s *ExportTsdbSpec) Validate() (err error) {
@@ -1079,10 +1119,7 @@ func (s *ExportTsdbSpec) Validate() (err error) {
 		err = reqerr.NewInvalidArgs("ExportSpec", "series name should not be empty")
 		return
 	}
-	if s.Filter == nil {
-		return
-	}
-	return s.Filter.Validate()
+	return
 }
 
 type ExportMongoSpec struct {
@@ -1093,7 +1130,6 @@ type ExportMongoSpec struct {
 	UpdateKey []string               `json:"updateKey,omitempty"`
 	Doc       map[string]interface{} `json:"doc"`
 	Version   string                 `json:"version,omitempty"`
-	Filter    *ExportFilter          `json:"filter,omitempty"`
 }
 
 func (s *ExportMongoSpec) Validate() (err error) {
@@ -1113,16 +1149,14 @@ func (s *ExportMongoSpec) Validate() (err error) {
 		err = reqerr.NewInvalidArgs("ExportSpec", fmt.Sprintf("invalid mode: %s, mode should be one of \"UPSERT\", \"INSERT\" and \"UPDATE\"", s.Mode))
 		return
 	}
-	if s.Filter == nil {
-		return
-	}
-	return s.Filter.Validate()
+	return
 }
 
 type ExportLogDBSpec struct {
 	DestRepoName string                 `json:"destRepoName"`
 	Doc          map[string]interface{} `json:"doc"`
-	Filter       *ExportFilter          `json:"filter,omitempty"`
+	OmitInvalid  bool                   `json:"omitInvalid,omitempty"`
+	OmitEmpty    bool                   `json:"omitEmpty,omitempty"`
 }
 
 func (s *ExportLogDBSpec) Validate() (err error) {
@@ -1130,10 +1164,7 @@ func (s *ExportLogDBSpec) Validate() (err error) {
 		err = reqerr.NewInvalidArgs("ExportSpec", "dest repo name should not be empty")
 		return
 	}
-	if s.Filter == nil {
-		return
-	}
-	return s.Filter.Validate()
+	return
 }
 
 type ExportKodoSpec struct {
@@ -1146,10 +1177,9 @@ type ExportKodoSpec struct {
 	Email          string            `json:"email"`
 	AccessKey      string            `json:"accessKey"`
 	Format         string            `json:"format"`
-	Delimiter      string            `json:"delimiter"`
+	Delimiter      string            `json:"delimiter,omitempty"`
 	Compress       bool              `json:"compress"`
 	Retention      int               `json:"retention"`
-	Filter         *ExportFilter     `json:"filter,omitempty"`
 }
 
 func (s *ExportKodoSpec) Validate() (err error) {
@@ -1157,10 +1187,7 @@ func (s *ExportKodoSpec) Validate() (err error) {
 		err = reqerr.NewInvalidArgs("ExportSpec", "bucket should not be empty")
 		return
 	}
-	if s.Filter == nil {
-		return
-	}
-	return s.Filter.Validate()
+	return
 }
 
 type ExportHttpSpec struct {
@@ -1501,10 +1528,11 @@ type GetDatasourceInput struct {
 }
 
 type GetDatasourceOutput struct {
-	Region string            `json:"region"`
-	Type   string            `json:"type"`
-	Spec   interface{}       `json:"spec"`
-	Schema []RepoSchemaEntry `json:"schema"`
+	Region  string            `json:"region"`
+	Type    string            `json:"type"`
+	Spec    interface{}       `json:"spec"`
+	Schema  []RepoSchemaEntry `json:"schema"`
+	FromDag bool              `json:"fromDag,omitempty"`
 }
 
 type DatasourceExistInput GetDatasourceInput
@@ -2051,14 +2079,15 @@ func (r *GetWorkflowInput) Validate() (err error) {
 }
 
 type GetWorkflowOutput struct {
-	Name       string           `json:"name,omitempty"`
-	Region     string           `json:"region"`
-	Nodes      map[string]*Node `json:"nodes"`
-	Comment    string           `json:"comment"`
-	CreateTime string           `json:"createTime"`
-	UpdateTime string           `json:"updateTime"`
-	Status     string           `json:"status"`
-	CanStart   bool             `json:"canStart"`
+	Name             string           `json:"name,omitempty"`
+	Region           string           `json:"region"`
+	Nodes            map[string]*Node `json:"nodes"`
+	Comment          string           `json:"comment"`
+	CreateTime       string           `json:"createTime"`
+	UpdateTime       string           `json:"updateTime"`
+	Status           string           `json:"status"`
+	CanStart         bool             `json:"canStart"`
+	IsManualWorkflow bool             `json:"isManualWorkflow"`
 }
 
 type GetWorkflowStatusInput GetWorkflowInput

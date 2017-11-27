@@ -237,8 +237,9 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 	if input.Option == nil {
 		return nil
 	}
+	option := input.Option
 	//这边是一个优化，对于没有任何服务的情况，节省 listexports的rpc调用
-	if !input.Option.ToLogDB && !input.Option.ToTSDB && !input.Option.ToKODO {
+	if !option.ToLogDB && !option.ToTSDB && !option.ToKODO {
 		return nil
 	}
 	exports, err := c.ListExports(&ListExportsInput{
@@ -251,7 +252,7 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 	for _, ex := range exports.Exports {
 		exs[ex.Name] = ex
 	}
-	if input.Option.ToLogDB {
+	if option.ToLogDB {
 		ex, ok := exs[base.FormExportName(input.RepoName, ExportTypeLogDB)]
 		if ok {
 			if ex.Type != ExportTypeLogDB {
@@ -263,18 +264,15 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 				return
 			}
 		} else {
-			err = c.AutoExportToLogDB(&AutoExportToLogDBInput{
-				RepoName:    input.RepoName,
-				LogRepoName: input.Option.LogDBRepoName,
-				Retention:   input.Option.LogDBRetention,
-			})
+			err = c.AutoExportToLogDB(&option.AutoExportToLogDBInput)
 			if err != nil {
 				return
 			}
 		}
 	}
-	if input.Option.ToTSDB {
-		ex, ok := exs[base.FormExportName(input.RepoName, ExportTypeTSDB)]
+	if option.ToTSDB {
+		// 对于 metric 信息的多 export，下面的 if 会恒为 false
+		ex, ok := exs[base.FormExportTSDBName(input.RepoName, option.SeriesName, ExportTypeTSDB)]
 		if ok {
 			if ex.Type != ExportTypeTSDB {
 				err = fmt.Errorf("export name is %v but type is %v not %v", ex.Name, ex.Type, ExportTypeTSDB)
@@ -285,19 +283,13 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 				return
 			}
 		} else {
-			err = c.AutoExportToTSDB(&AutoExportToTSDBInput{
-				RepoName:     input.RepoName,
-				TSDBRepoName: input.Option.TSDBRepoName,
-				SeriesName:   input.Option.TSDBSeriesName,
-				Retention:    input.Option.TSDBRetention,
-				Tags:         input.Option.TSDBtags,
-			})
+			err = c.AutoExportToTSDB(&option.AutoExportToTSDBInput)
 			if err != nil {
 				return
 			}
 		}
 	}
-	if input.Option.ToKODO {
+	if option.ToKODO {
 		ex, ok := exs[base.FormExportName(input.RepoName, ExportTypeKODO)]
 		if ok {
 			if ex.Type != ExportTypeKODO {
@@ -309,12 +301,7 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 				return
 			}
 		} else {
-			err = c.AutoExportToKODO(&AutoExportToKODOInput{
-				RepoName:   input.RepoName,
-				BucketName: input.Option.KodoBucketName,
-				Email:      input.Option.KodoEmail,
-				Retention:  input.Option.KodoRetention,
-			})
+			err = c.AutoExportToKODO(&option.AutoExportToKODOInput)
 			if err != nil {
 				return
 			}
@@ -609,6 +596,14 @@ func (c *Pipeline) ListPlugins(input *ListPluginsInput) (output *ListPluginsOutp
 	op := c.newOperation(base.OpListPlugins)
 
 	output = &ListPluginsOutput{}
+	req := c.newRequest(op, input.Token, &output)
+	return output, req.Send()
+}
+
+func (c *Pipeline) VerifyPlugin(input *VerifyPluginInput) (output *VerifyPluginOutput, err error) {
+	op := c.newOperation(base.OpVerifyPlugin, input.PluginName)
+
+	output = &VerifyPluginOutput{}
 	req := c.newRequest(op, input.Token, &output)
 	return output, req.Send()
 }
@@ -934,8 +929,9 @@ func (c *Pipeline) CreateForLogDB(input *CreateRepoForLogDBInput) error {
 	if err != nil && !reqerr.IsExistError(err) {
 		return err
 	}
-
-	return c.CreateExport(c.FormExportInput(input.RepoName, ExportTypeLogDB, c.FormLogDBSpec(input.RepoName, input.Schema)))
+	logDBSpec := c.FormLogDBSpec(input)
+	exportInput := c.FormExportInput(input.RepoName, ExportTypeLogDB, logDBSpec)
+	return c.CreateExport(exportInput)
 }
 
 func (c *Pipeline) CreateForLogDBDSL(input *CreateRepoForLogDBDSLInput) error {
@@ -954,9 +950,10 @@ func (c *Pipeline) CreateForLogDBDSL(input *CreateRepoForLogDBDSLInput) error {
 }
 
 func (c *Pipeline) CreateForTSDB(input *CreateRepoForTSDBInput) error {
-	pinput := formPipelineRepoInput(input.RepoName, input.Region, input.Schema)
-	err := c.CreateRepo(pinput)
-	if err != nil && !reqerr.IsExistError(err) {
+	_, err := c.GetRepo(&GetRepoInput{
+		RepoName: input.RepoName,
+	})
+	if err != nil {
 		return err
 	}
 	tsdbapi, err := c.GetTSDBAPI()
@@ -984,7 +981,79 @@ func (c *Pipeline) CreateForTSDB(input *CreateRepoForTSDBInput) error {
 	if err != nil && !reqerr.IsExistError(err) {
 		return err
 	}
-	return c.CreateExport(c.FormExportInput(input.RepoName, ExportTypeTSDB, c.FormTSDBSpec(input.TSDBRepoName, input.SeriesName, input.Tags, input.Schema)))
+	tsdbSpec := c.FormTSDBSpec(input)
+	exportInput := c.FormExportInput(input.RepoName, ExportTypeTSDB, tsdbSpec)
+	exportInput.ExportName = base.FormExportTSDBName(input.RepoName, input.SeriesName, ExportTypeTSDB)
+	err = c.CreateExport(exportInput)
+	if err != nil && reqerr.IsExistError(err) {
+		err = c.UpdateExport(&UpdateExportInput{
+			RepoName:   exportInput.RepoName,
+			ExportName: exportInput.ExportName,
+			Spec:       exportInput.Spec,
+		})
+	}
+	return err
+}
+
+func (c *Pipeline) CreateForMutiExportTSDB(input *CreateRepoForMutiExportTSDBInput) error {
+	_, err := c.GetRepo(&GetRepoInput{
+		RepoName: input.RepoName,
+	})
+	if err != nil {
+		return err
+	}
+	tsdbapi, err := c.GetTSDBAPI()
+	if err != nil {
+		return err
+	}
+	if input.TSDBRepoName == "" {
+		input.TSDBRepoName = input.RepoName
+	}
+	err = tsdbapi.CreateRepo(&tsdb.CreateRepoInput{
+		RepoName: input.TSDBRepoName,
+		Region:   input.Region,
+	})
+	if err != nil && !reqerr.IsExistError(err) {
+		return err
+	}
+	for _, series := range input.SeriesMap {
+		err = tsdbapi.CreateSeries(&tsdb.CreateSeriesInput{
+			RepoName:   input.TSDBRepoName,
+			SeriesName: series.SeriesName,
+			Retention:  input.Retention,
+		})
+		if err != nil && !reqerr.IsExistError(err) {
+			return err
+		}
+		tsdbSpec := c.FormTSDBSpec(&CreateRepoForTSDBInput{
+			RepoName:     input.RepoName,
+			TSDBRepoName: input.TSDBRepoName,
+			Region:       input.Region,
+			Schema:       series.Schema,
+			Retention:    input.Retention,
+			SeriesName:   series.SeriesName,
+			Tags:         series.Tags,
+			OmitInvalid:  input.OmitInvalid,
+			OmitEmpty:    input.OmitEmpty,
+			Timestamp:    series.TimeStamp,
+		})
+		exportInput := c.FormExportInput(input.RepoName, ExportTypeTSDB, tsdbSpec)
+		exportInput.ExportName = base.FormExportTSDBName(input.RepoName, series.SeriesName, ExportTypeTSDB)
+		err = c.CreateExport(exportInput)
+		if err != nil && reqerr.IsExistError(err) {
+			err = c.UpdateExport(&UpdateExportInput{
+				RepoName:   exportInput.RepoName,
+				ExportName: exportInput.ExportName,
+				Spec:       exportInput.Spec,
+			})
+			if err != nil {
+				return err
+			}
+		} else if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (c *Pipeline) UploadUdf(input *UploadUdfInput) (err error) {

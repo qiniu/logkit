@@ -26,6 +26,7 @@ const (
 	ErrInvalidTransformInterval
 	ErrInvalidTransformSql
 	ErrInvalidTransformPluginOutput
+	ErrInvalidFieldInSQL
 	ErrDuplicateField
 	ErrUnsupportedFieldType
 	InvalidExportSpecError
@@ -114,6 +115,7 @@ const (
 	ErrVariableNotExist
 	ErrVariableAlreadyExist
 	ErrSameToSystemVariable
+	ErrTransformUpdate
 )
 
 type ErrBuilder interface {
@@ -155,6 +157,9 @@ func IsExistError(err error) bool {
 		return false
 	}
 	if reqErr.ErrorType == RepoAlreadyExistsError || reqErr.ErrorType == SeriesAlreadyExistsError {
+		return true
+	}
+	if reqErr.ErrorType == ExportAlreadyExistsError {
 		return true
 	}
 	return false

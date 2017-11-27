@@ -141,21 +141,21 @@ export async function getRunnerVersion(params) {
 }
 
 export async function startRunner(params) {
-    return request(window.logkitUrl + '/logkit/configs/' + params.name + '/start', {
-        method: 'post',
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    });
+  return request(window.logkitUrl + '/logkit/configs/' + params.name + '/start', {
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  });
 }
 
 export async function stopRunner(params) {
-    return request(window.logkitUrl + '/logkit/configs/' + params.name + '/stop', {
-        method: 'post',
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    });
+  return request(window.logkitUrl + '/logkit/configs/' + params.name + '/stop', {
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  });
 }
 
 export async function resetConfigData(params) {
@@ -167,3 +167,123 @@ export async function resetConfigData(params) {
   });
 }
 
+/* cluster api
+
+ */
+export async function postClusterConfigData(params) {
+  return request(window.logkitUrl + '/logkit/cluster/configs/' + params.name + '?tag=' + params.tag + '&url=' + params.url, {
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(params.body),
+  });
+}
+
+export async function putClusterConfigData(params) {
+  return request(window.logkitUrl + '/logkit/cluster/configs/' + params.name + '?tag=' + params.tag + '&url=' + params.url, {
+    method: 'put',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(params.body),
+  });
+}
+
+export async function getClusterRunnerConfigs(params) {
+  return request(window.logkitUrl + '/logkit/cluster/configs?tag=' + params.tag + '&url=' + params.machineUrl, {
+    method: 'get',
+  });
+}
+
+export async function getClusterRunnerStatus(params) {
+  return request(window.logkitUrl + '/logkit/cluster/status?tag=' + params.tag + '&url=' + params.machineUrl, {
+    method: 'get',
+  });
+}
+
+export async function getClusterSlaves(params) {
+  return request(window.logkitUrl + '/logkit/cluster/slaves', {
+    method: 'get',
+  });
+}
+
+export async function postClusterSlaveTag(params) {
+  return request(window.logkitUrl + '/logkit/cluster/slaves/tag?tag=' + params.name + '&url=' + params.url, {
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(params.body),
+  });
+}
+
+export async function deleteClusterSlaveTag(params) {
+  return request(window.logkitUrl + '/logkit/cluster/slaves?tag=' + params.name + '&url=' + params.url, {
+    method: 'delete'
+  });
+}
+
+export async function postClusterStopSlaveTag(params) {
+  return request(window.logkitUrl + '/logkit/cluster/configs/' + params.name + '/stop?tag=' + params.tag + '&url=' + params.url, {
+    method: 'post'
+  });
+}
+
+export async function postClusterResetSlaveTag(params) {
+  return request(window.logkitUrl + '/logkit/cluster/configs/' + params.name + '/reset?tag=' + params.tag + '&url=' + params.url, {
+    method: 'post'
+  });
+}
+
+
+export async function startClusterRunner(params) {
+  return request(window.logkitUrl + '/logkit/cluster/configs/' + params.name + '/start?tag=' + params.tag + '&url=' + params.url, {
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  });
+}
+
+export async function postClusterDeleteSlaveTag(params) {
+  return request(window.logkitUrl + '/logkit/cluster/configs/' + params.name + '?tag=' + params.tag + '&url=' + params.url, {
+    method: 'delete'
+  });
+}
+
+export async function stopClusterRunner(params) {
+  return request(window.logkitUrl + '/logkit/cluster/configs/' + params.name + '/stop?tag=' + params.tag + '&url=' + params.url, {
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  });
+}
+
+export async function resetClusterConfigData(params) {
+  return request(window.logkitUrl + '/logkit/cluster/configs/' + params.name + '/reset?tag=' + params.tag + '&url=' + params.url, {
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  });
+}
+
+export async function deleteClusterConfigData(params) {
+  return request(window.logkitUrl + '/logkit/cluster/configs/' + params.name + '?tag=' + params.tag + '&url=' + params.url, {
+    method: 'delete'
+  });
+}
+
+export async function getIsCluster(params) {
+  return request(window.logkitUrl + '/logkit/cluster/ismaster', {
+    method: 'get'
+  });
+}
+
+export async function getRunnersByTagOrMachineUrl(params) {
+  return request(window.logkitUrl + '/logkit/cluster/runners?tag=' + params.tag + '&url=' + params.url, {
+    method: 'get'
+  });
+}

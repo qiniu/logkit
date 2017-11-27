@@ -70,13 +70,13 @@ class Transformer extends Component {
 
   init = () => {
     const {getFieldDecorator, setFieldsValue, resetFields} = this.props.form;
-    getTransformOptions().then(data => {
-      if (data.success) {
-        let options = _.keys(_.omit(data, 'success'))
+    getTransformOptions().then(item => {
+      if (item.code === 'L200') {
+        let options = item.data
         this.setState({
           options: options,
           currentOption: '请选择需要转化的类型',
-          items: data,
+          items: item.data,
           currentItem: []
         })
 
@@ -106,12 +106,13 @@ class Transformer extends Component {
           })
         }
       }
+
     })
 
-    getTransformUsages().then(data => {
-      if (data.success) {
+    getTransformUsages().then(item => {
+      if (item.code === 'L200') {
         this.setState({
-          transformerTypes: data
+          transformerTypes: item.data
         })
       }
     })
@@ -224,7 +225,7 @@ class Transformer extends Component {
     let options = []
     options.push(<Option key={'请选择需要转化的类型'} value={'请选择需要转化的类型'}>{'请选择需要转化的类型(若无,直接到下一步)'}</Option>)
     this.state.transformerTypes.map((ele) => {
-      options.push(<Option key={ele.key} value={ele.key}>{ele.key +  "  （" + ele.value + "）"}</Option>)
+      options.push(<Option key={ele.key} value={ele.key}>{ele.key + "  （" + ele.value + "）"}</Option>)
     })
     return (
         options
