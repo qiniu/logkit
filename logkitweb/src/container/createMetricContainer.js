@@ -190,7 +190,9 @@ class CreateMetricRunner extends Component {
   }
 
   updateRunner = () => {
-    const { currentTagName, currentMachineUrl } = this.props
+    const currentTagName = window.nodeCopy.tag
+    const currentMachineUrl = window.nodeCopy.machineUrl
+    // const { currentTagName, currentMachineUrl } = this.props
     const {handleTurnToRunner} = this.props
     let that = this
     const {validateFields, getFieldsValue} =  that.refs.initConfig;
@@ -269,7 +271,7 @@ class CreateMetricRunner extends Component {
               <div>
                 <p className={'show-div info'}>黄色字体选框需根据实际情况修改，其他可作为默认值</p>
               </div>
-              <Sender ref="checkSenderData"></Sender>
+              <Sender isMetric="true" ref="checkSenderData"></Sender>
             </div>
             <div className={this.state.current === 4 ? 'show-div' : 'hide-div'}>
               <RenderConfig ref="initConfig"></RenderConfig>
