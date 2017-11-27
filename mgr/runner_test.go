@@ -428,7 +428,7 @@ func TestReplaceTransforms(t *testing.T) {
 		"transforms":[{
 			"type":"replace",
 			"stage":"before_parser",
-			"old":"\\x",
+			"old":"\\\\x",
 			"new":"\\\\x"
 		}],
 		"senders":[{
