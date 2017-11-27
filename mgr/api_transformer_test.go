@@ -6,13 +6,13 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"bytes"
 	"testing"
 
 	"github.com/labstack/echo"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
 	"github.com/stretchr/testify/assert"
-	"bytes"
 	_ "github.com/qiniu/logkit/transforms/date"
 )
 

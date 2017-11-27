@@ -3,15 +3,14 @@ package sender
 import (
 	"fmt"
 	"strings"
+	"time"
+	"strconv"
 
 	"gopkg.in/olivere/elastic.v3"
 
 	"github.com/qiniu/logkit/conf"
 
 	"github.com/qiniu/log"
-
-	"time"
-	"strconv"
 )
 
 type ElasticsearchSender struct {
@@ -21,7 +20,7 @@ type ElasticsearchSender struct {
 	retention 		int
 	indexName 		string
 	eType     		string
-	logkitSendTime 	bool
+	logkitSendTime	bool
 	aliasFields   	map[string]string
 	elasticClient 	*elastic.Client
 

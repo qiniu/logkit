@@ -2,12 +2,12 @@ package mgr
 
 import (
 	"net/http"
+	"fmt"
+	"encoding/json"
 
 	"github.com/labstack/echo"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
-	"fmt"
-	"encoding/json"
 	"github.com/qiniu/logkit/sender"
 )
 
