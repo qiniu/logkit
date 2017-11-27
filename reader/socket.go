@@ -135,13 +135,12 @@ func (ssr *streamSocketReader) read(c net.Conn) {
 	for {
 		if ssr.ReadTimeout != 0 && ssr.ReadTimeout > 0 {
 			c.SetReadDeadline(time.Now().Add(ssr.ReadTimeout))
-		}
+		} 
 		if !scnr.Scan() {
 			break
 		}
 		ssr.ReadChan <- string(scnr.Bytes())
 	}
-
 	if err := scnr.Err(); err != nil {
 		if err, ok := err.(net.Error); ok && err.Timeout() {
 			log.Debugf("streamSocketReader Timeout : %s", err)

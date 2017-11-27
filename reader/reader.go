@@ -114,8 +114,6 @@ const (
 	KeyKafkaTopic            = "kafka_topic"
 	KeyKafkaZookeeper        = "kafka_zookeeper"
 	KeyKafkaZookeeperTimeout = "kafka_zookeeper_timeout"
-	
-	KeyRedisKey = "redis_key"
 )
 
 var defaultIgnoreFileSuffix = []string{
@@ -301,8 +299,7 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 		zookeepers, err := conf.GetStringList(KeyKafkaZookeeper)
 		reader, err = NewKafkaReader(meta, consumerGroup, topics, zookeepers, time.Duration(zkTimeout)*time.Second, whence)
 	case ModeRedis:
-		keys, _ := conf.GetStringList(KeyRedisKey)
-		reader, err = NewRedisReader(meta, conf,keys)
+		reader, err = NewRedisReader(meta, conf)
 	case ModeSocket:
 		reader, err = NewSocketReader(meta, conf)
 	default:

@@ -28,7 +28,7 @@ const (
 const (
 	KeyRedisDataType   = "redis_datatype" // 必填
 	KeyRedisDB         = "redis_db"       //默认 是0
-	//KeyRedisKey        = "redis_key"      //必填
+	KeyRedisKey        = "redis_key"      //必填
 	KeyRedisHashArea   = "redisHash_area" 
 	KeyRedisAddress    = "redis_address"  // 默认127.0.0.1:6379
 	KeyRedisPassword   = "redis_password"
@@ -64,14 +64,13 @@ type RedisOptionn struct {
 	timeout time.Duration
 }
 
-func NewRedisReader(meta *Meta, conf conf.MapConf, keys []string) (rr *RedisReader, err error) {
+func NewRedisReader(meta *Meta, conf conf.MapConf) (rr *RedisReader, err error) {
 	dataType, err := conf.GetString(KeyRedisDataType)
 	if err != nil {
 		return
 	}
 	db, _ := conf.GetIntOr(KeyRedisDB, 0)
-	key := keys
-	//key, err := conf.GetString(KeyRedisKey)
+	key, _ := conf.GetStringList(KeyRedisKey)
 	if err != nil {
 		return
 	}
