@@ -15,6 +15,7 @@ import {
   Menu,
   Breadcrumb,
 } from 'antd';
+import config from '../store/config'
 const {Header, Content, Footer, Sider} = Layout;
 
 class List extends Component {
@@ -75,6 +76,7 @@ class List extends Component {
   }
 
   addLogRunner = (record, type) => {
+    config.setNodeData({})
     if (type === 'tag') {
       this.setState({
         currentMenu: 'createLog',
@@ -101,6 +103,7 @@ class List extends Component {
   }
 
   addMetricRunner = (record,type) => {
+    config.setNodeData({})
     if (type === 'tag') {
       this.setState({
         currentMenu: 'createMetricLog',
