@@ -33,7 +33,6 @@ func (g *Rename) Transform(datas []sender.Data) ([]sender.Data, error) {
 			continue
 		}
 		utils.DeleteMapValue(datas[i], keys...)
-		newkeys[len(newkeys) - 1] = g.NewKeyName
 		utils.SetMapValue(datas[i], val, newkeys...)
 	}
 	if err != nil {
