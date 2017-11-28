@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	"io/ioutil"
-	"path"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
@@ -150,11 +148,6 @@ const (
 	Loop = "loop"
 )
 
-const (
-	winsign = "\\"
-	comsign = "/"
-)
-
 // NewFileReader 创建FileReader
 func NewFileBufReader(conf conf.MapConf, isFromWeb bool) (reader Reader, err error) {
 	meta, err := NewMetaWithConf(conf)
@@ -192,49 +185,12 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 		}
 		reader, err = NewReaderSize(fr, meta, bufSize)
 	case ModeFileAuto:
-		//windows path for replacement
-		logpath = strings.Replace(logpath,winsign,comsign,-1)
-		// for example: The path is "/usr/logkit/"
-		_ , after := path.Split(logpath)
-		if after == "" {
-			logpath = path.Dir(logpath)
+		multiReader, bufReader, _ := NewFileAutoReader(conf,meta,isFromWeb)
+		if multiReader != nil {
+			reader = multiReader
 		}
-		//path with * matching tailx mode
-		isSub := strings.Contains(logpath, "*")
-		if isSub == true {
-			meta.mode = ModeTailx
-			expireDur, _ := conf.GetStringOr(KeyExpire, "24h")
-			stateIntervalDur, _ := conf.GetStringOr(KeyStatInterval, "3m")
-			maxOpenFiles, _ := conf.GetIntOr(KeyMaxOpenFiles, 256)
-			reader, err = NewMultiReader(meta, logpath, whence, expireDur, stateIntervalDur, maxOpenFiles)
-		}else{
-			//for "/usr/logkit" this path to make judgments
-			dirStr := path.Dir(logpath)
-			lastStr := path.Base(logpath)
-			files,_ := ioutil.ReadDir(dirStr)
-			for _, file := range files {
-				if file.Name() == lastStr {
-					if file.IsDir(){
-						meta.mode = ModeDir
-						ignoreHidden, _ := conf.GetBoolOr(KeyIgnoreHiddenFile, true)
-						ignoreFileSuffix, _ := conf.GetStringListOr(KeyIgnoreFileSuffix, defaultIgnoreFileSuffix)
-						validFilesRegex, _ := conf.GetStringOr(KeyValidFilePattern, "*")
-						fr, err = NewSeqFile(meta, logpath, ignoreHidden, ignoreFileSuffix, validFilesRegex, whence)
-						if err != nil {
-							return
-						}
-						reader, err = NewReaderSize(fr, meta, bufSize)
-					}else{
-						meta.mode = ModeFile
-						fr, err = NewSingleFile(meta, logpath, whence, isFromWeb)
-						if err != nil {
-							return
-						}
-						reader, err = NewReaderSize(fr, meta, bufSize)
-					}
-					break;
-				}
-			}
+		if bufReader != nil {
+			reader = bufReader
 		}
 	case ModeFile:
 		fr, err = NewSingleFile(meta, logpath, whence, isFromWeb)
