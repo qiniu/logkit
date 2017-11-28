@@ -11,6 +11,8 @@ type PipelineAPI interface {
 
 	AutoExportToKODO(*AutoExportToKODOInput) error
 
+	AutoExportToTSDB(*AutoExportToTSDBInput) error
+
 	CreateGroup(*CreateGroupInput) error
 
 	UpdateGroup(*UpdateGroupInput) error
@@ -54,6 +56,8 @@ type PipelineAPI interface {
 	UploadPlugin(*UploadPluginInput) error
 
 	UploadPluginFromFile(*UploadPluginFromFileInput) error
+
+	VerifyPlugin(*VerifyPluginInput) (*VerifyPluginOutput, error)
 
 	ListPlugins(*ListPluginsInput) (*ListPluginsOutput, error)
 

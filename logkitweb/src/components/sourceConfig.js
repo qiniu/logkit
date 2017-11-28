@@ -78,17 +78,17 @@ class Source extends Component {
     const {setFieldsValue, resetFields} = this.props.form;
     let that = this
 
-    getSourceOptions().then(data => {
-      if (data.success) {
+    getSourceOptions().then(item => {
+      if (item.code === 'L200') {
         this.setState({
-          options: data,
-          currentOption: data[0].key
+          options: item.data,
+          currentOption: item.data[0].key
         })
-        getSourceOptionsFormData().then(data => {
-          if (data.success) {
+        getSourceOptionsFormData().then(item => {
+          if (item.code === 'L200') {
             this.setState({
-              items: data,
-              currentItem: data[this.state.currentOption]
+              items: item.data,
+              currentItem: item.data[this.state.currentOption]
             })
 
             if (window.nodeCopy) {
@@ -104,6 +104,7 @@ class Source extends Component {
           }
         })
       }
+
     })
   }
 

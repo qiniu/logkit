@@ -52,7 +52,7 @@ func GetOSInfo() *OSInfo {
 	tmp1 := strings.Index(osStr, "[Version")
 	tmp2 := strings.Index(osStr, "]")
 	var ver string
-	if tmp1 == -1 || tmp2 == -1 || tmp2 <= tmp1 || tmp2 > len(osStr) {
+	if tmp1 == -1 || tmp2 == -1 || tmp2 <= tmp1 || tmp2 > len(osStr) || tmp1+9 >= tmp2 {
 		ver = "unknown"
 	} else {
 		ver = osStr[tmp1+9 : tmp2]

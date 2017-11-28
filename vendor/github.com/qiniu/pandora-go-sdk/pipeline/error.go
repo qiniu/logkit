@@ -10,9 +10,9 @@ import (
 
 const errCodePrefixLen = 6
 
-type errBuilder struct{}
+type PipelineErrBuilder struct{}
 
-func (e errBuilder) Build(msg, text, reqId string, code int) error {
+func (e PipelineErrBuilder) Build(msg, text, reqId string, code int) error {
 
 	err := reqerr.New(msg, text, reqId, code)
 	if len(msg) <= errCodePrefixLen {
@@ -64,6 +64,8 @@ func (e errBuilder) Build(msg, text, reqId string, code int) error {
 		err.ErrorType = reqerr.ErrInvalidTransformSql
 	case "E18211":
 		err.ErrorType = reqerr.ErrInvalidTransformPluginOutput
+	case "E18228":
+		err.ErrorType = reqerr.ErrInvalidFieldInSQL
 	case "E18104":
 		err.ErrorType = reqerr.ErrDuplicateField
 	case "E18107":
@@ -188,6 +190,8 @@ func (e errBuilder) Build(msg, text, reqId string, code int) error {
 		err.ErrorType = reqerr.ErrVariableAlreadyExist
 	case "E18656":
 		err.ErrorType = reqerr.ErrSameToSystemVariable
+	case "E18660":
+		err.ErrorType = reqerr.ErrTransformUpdate
 	case "E9000":
 		err.ErrorType = reqerr.InternalServerError
 	case "E9001":

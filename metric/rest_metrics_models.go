@@ -53,3 +53,12 @@ func GetMetricOptions() map[string][]utils.Option {
 	}
 	return metricOptions
 }
+
+func GetMetricTags() map[string][]string {
+	metricTags := make(map[string][]string)
+	for key, collector := range Collectors {
+		coll := collector()
+		metricTags[key] = coll.Tags()
+	}
+	return metricTags
+}

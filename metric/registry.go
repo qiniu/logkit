@@ -13,6 +13,7 @@ const (
 //Collector 收集metrics的接口
 type Collector interface {
 	Name() string
+	Tags() []string
 	Usages() string
 	Config() map[string]interface{}
 	Collect() ([]map[string]interface{}, error)

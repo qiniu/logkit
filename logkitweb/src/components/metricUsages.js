@@ -42,19 +42,19 @@ class Usages extends Component {
   }
 
   init = () => {
-    getMetricUsages().then(data => {
-      const {setFieldsValue} = this.props.form;
-      if (data.success) {
+    getMetricUsages().then(item => {
+      if (item.code === 'L200') {
+        const {setFieldsValue} = this.props.form;
         this.setState({
-          items: data,
+          items: item.data,
         })
-        if(window.nodeCopy && window.nodeCopy.metric){
+        if (window.nodeCopy && window.nodeCopy.metric) {
           let formData = {};
           window.nodeCopy.metric.map((m, _) => {
             formData[m.type] = "true";
           });
-          data.map((m, _) => {
-            if(formData[m.KeyName] === undefined){
+          item.data.map((m, _) => {
+            if (formData[m.KeyName] === undefined) {
               formData[m.KeyName] = "false";
             }
           });
@@ -86,15 +86,16 @@ class Usages extends Component {
                               {...formItemLayout}
                               className=""
                               label={(
-                                <span className={ele.DefaultNoUse ? 'warningTip' : '' }>
+                                  <span className={ele.DefaultNoUse ? 'warningTip' : '' }>
                   {ele.Description}
                 </span>
                               )}>
-          {getFieldDecorator(`${ele.KeyName}`, { initialValue: ele.Default,
+          {getFieldDecorator(`${ele.KeyName}`, {
+            initialValue: ele.Default,
             rules: [{required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur'},
-              {pattern: ele.CheckRegex, message: '输入不符合规范'}, ]
+              {pattern: ele.CheckRegex, message: '输入不符合规范'},]
           })(
-            <Input placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值' } disabled={this.state.isReadonly}/>
+              <Input placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值' } disabled={this.state.isReadonly}/>
           )}
         </FormItem>)
       } else {
@@ -103,18 +104,19 @@ class Usages extends Component {
                               {...formItemLayout}
                               className=""
                               label={ele.Description}>
-          {getFieldDecorator(`${ele.KeyName}`, { initialValue: ele.ChooseOptions[0],
-            rules: [{required: true, message: '不能为空', trigger: 'blur'}, ]
+          {getFieldDecorator(`${ele.KeyName}`, {
+            initialValue: ele.ChooseOptions[0],
+            rules: [{required: true, message: '不能为空', trigger: 'blur'},]
           })(
-            <Select>
-              {this.renderChooseOption(ele.ChooseOptions)}
-            </Select>
+              <Select>
+                {this.renderChooseOption(ele.ChooseOptions)}
+              </Select>
           )}
         </FormItem>)
       }
     })
     return (
-      result
+        result
     )
   }
 
@@ -124,17 +126,17 @@ class Usages extends Component {
       options.push(<Option key={ele} value={ele}>{ele}</Option>)
     })
     return (
-      options
+        options
     )
   }
 
   render() {
     return (
-      <div>
-        <Form className="slide-in text-color">
-          {this.renderFormItem()}
-        </Form>
-      </div>
+        <div>
+          <Form className="slide-in text-color">
+            {this.renderFormItem()}
+          </Form>
+        </div>
     );
   }
 }

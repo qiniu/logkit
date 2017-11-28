@@ -25,7 +25,7 @@ func GetOSInfo() *OSInfo {
 	osStr := strings.Replace(out, "\n", "", -1)
 	osStr = strings.Replace(osStr, "\r\n", "", -1)
 	osInfo := strings.Split(osStr, " ")
-	for i := len(osInfo); i < 3; i++ {
+	for i := len(osInfo); i < 4; i++ {
 		osInfo = append(osInfo, "unknown")
 	}
 	gio := &OSInfo{Kernel: osInfo[0], Core: osInfo[1], Platform: runtime.GOARCH, OS: osInfo[2]}
