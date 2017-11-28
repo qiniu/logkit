@@ -27,7 +27,7 @@ func (g *Rename) Transform(datas []sender.Data) ([]sender.Data, error) {
 	for i := range datas {
 		val, gerr := utils.GetMapValue(datas[i], keySlice...)
 		if gerr != nil {
-			errnums ++
+			errnums++
 			fmt.Errorf("transform key %v not exist in data", g.Key)
 			continue
 		}

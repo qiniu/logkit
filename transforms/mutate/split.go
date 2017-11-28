@@ -2,8 +2,8 @@ package mutate
 
 import (
 	"errors"
-	"strings"
 	"fmt"
+	"strings"
 
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
@@ -45,7 +45,7 @@ func (g *Spliter) Transform(datas []sender.Data) ([]sender.Data, error) {
 				err = fmt.Errorf("transform key %v data type is not string", g.Key)
 				continue
 			}
-			newkeys[len(newkeys) -1] = g.ArraryName
+			newkeys[len(newkeys)-1] = g.ArraryName
 			utils.SetMapValue(datas[i], strings.Split(strval, g.SeperateKey), newkeys...)
 		}
 	}

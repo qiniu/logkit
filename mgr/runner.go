@@ -307,7 +307,7 @@ func createTransformers(rc RunnerConfig) []transforms.Transformer {
 			continue
 		}
 		//transformer初始化
-		if trans, ok := trans.(transforms.Initialize); ok{
+		if trans, ok := trans.(transforms.Initialize); ok {
 			err = trans.Init()
 			if err != nil {
 				log.Errorf("type %v of transformer init error %v", strTP, err)

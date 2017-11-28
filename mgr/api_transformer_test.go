@@ -1,23 +1,23 @@
 package mgr
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
-	"bytes"
 	"testing"
 
 	"github.com/labstack/echo"
-	"github.com/qiniu/logkit/transforms"
-	"github.com/stretchr/testify/assert"
-	_ "github.com/qiniu/logkit/transforms/date"
 	"github.com/qiniu/logkit/sender"
+	"github.com/qiniu/logkit/transforms"
+	_ "github.com/qiniu/logkit/transforms/date"
+	"github.com/stretchr/testify/assert"
 )
 
 type respTransformerRet struct {
-	Code string       `json:"code"`
+	Code string        `json:"code"`
 	Data []sender.Data `json:"data"`
 }
 
@@ -90,6 +90,6 @@ func TestTransformerAPI(t *testing.T) {
 	if err = json.Unmarshal(content, &got3); err != nil {
 		t.Error(err)
 	}
-	exp := []sender.Data{{"ts":"2006-01-02T14:04:05Z"}}
+	exp := []sender.Data{{"ts": "2006-01-02T14:04:05Z"}}
 	assert.Equal(t, exp, got3.Data)
 }

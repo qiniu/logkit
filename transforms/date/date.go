@@ -42,7 +42,7 @@ func (g *DateTrans) Transform(datas []sender.Data) ([]sender.Data, error) {
 			errnums++
 			continue
 		}
-		utils.SetMapValue(datas[i],  val, keys...)
+		utils.SetMapValue(datas[i], val, keys...)
 	}
 	if err != nil {
 		g.stats.LastError = err.Error()

@@ -64,7 +64,7 @@ func (p *UrlParam) Transform(datas []sender.Data) ([]sender.Data, error) {
 			for key, mapVal := range res {
 				suffix := 1
 				keyName := key
-				newkeys[len(newkeys) -1] = keyName
+				newkeys[len(newkeys)-1] = keyName
 				_, gerr := utils.GetMapValue(datas[i], newkeys...)
 				for ; gerr == nil; suffix++ {
 					if suffix > 5 {
@@ -72,7 +72,7 @@ func (p *UrlParam) Transform(datas []sender.Data) ([]sender.Data, error) {
 						break
 					}
 					keyName = key + strconv.Itoa(suffix)
-					newkeys[len(newkeys) -1] = keyName
+					newkeys[len(newkeys)-1] = keyName
 					_, gerr = utils.GetMapValue(datas[i], newkeys...)
 				}
 				if suffix <= 5 {

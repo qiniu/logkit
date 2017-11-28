@@ -15,12 +15,12 @@ type Replacer struct {
 	Old       string `json:"old"`
 	New       string `json:"new"`
 	stats     utils.StatsInfo
-	rgx		  *regexp.Regexp
+	rgx       *regexp.Regexp
 }
 
-func (g *Replacer) Init() error  {
+func (g *Replacer) Init() error {
 	rgx, err := regexp.Compile(g.Old)
-	if err != nil{
+	if err != nil {
 		return err
 	}
 	g.rgx = rgx

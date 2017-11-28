@@ -1,14 +1,14 @@
 package mgr
 
 import (
-	"net/http"
-	"fmt"
 	"encoding/json"
+	"fmt"
+	"net/http"
 
 	"github.com/labstack/echo"
+	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
-	"github.com/qiniu/logkit/sender"
 )
 
 // GET /logkit/transformer/usages

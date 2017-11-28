@@ -297,7 +297,7 @@ func ExtractField(slice []string) ([]string, error) {
 }
 
 //根据key字符串,拆分出层级keys数据
-func GetKeys(keyStr string) []string{
+func GetKeys(keyStr string) []string {
 	separator := "."
 	keys := strings.Split(keyStr, separator)
 	return keys
@@ -328,7 +328,7 @@ func GetMapValue(m map[string]interface{}, keys ...string) (interface{}, error) 
 
 //通过层级key设置value值.
 //如果key不存在,将会自动创建.
-func SetMapValue(m map[string]interface{}, val interface{}, keys ...string,) {
+func SetMapValue(m map[string]interface{}, val interface{}, keys ...string) {
 	if len(keys) == 0 {
 		return
 	}
@@ -363,9 +363,9 @@ func DeleteMapValue(m map[string]interface{}, keys ...string) (interface{}, bool
 		k := keys[i]
 		if _, ok := val.(map[string]interface{}); ok {
 			if _, ok := val.(map[string]interface{})[k]; ok {
-				if i == len(keys) -1 {
+				if i == len(keys)-1 {
 					delVal := val.(map[string]interface{})[k]
-					delete(val.(map[string]interface{}), keys[len(keys) - 1])
+					delete(val.(map[string]interface{}), keys[len(keys)-1])
 					return delVal, true
 				}
 				val = val.(map[string]interface{})[k]

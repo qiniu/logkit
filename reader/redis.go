@@ -29,8 +29,8 @@ const (
 	KeyRedisDataType   = "redis_datatype" // 必填
 	KeyRedisDB         = "redis_db"       //默认 是0
 	KeyRedisKey        = "redis_key"      //必填
-	KeyRedisHashArea   = "redisHash_area" 
-	KeyRedisAddress    = "redis_address"  // 默认127.0.0.1:6379
+	KeyRedisHashArea   = "redisHash_area"
+	KeyRedisAddress    = "redis_address" // 默认127.0.0.1:6379
 	KeyRedisPassword   = "redis_password"
 	KeyTimeoutDuration = "redis_timeout"
 )
@@ -56,7 +56,7 @@ type RedisOptionn struct {
 	db       int
 	//key      string
 	area     string
-	key      [] string
+	key      []string
 	address  string //host:port 列表
 	password string
 	//batchCount int
@@ -98,9 +98,9 @@ func NewRedisReader(meta *Meta, conf conf.MapConf) (rr *RedisReader, err error) 
 	})
 
 	rr = &RedisReader{
-		meta:   meta,
-		opt:    opt,
-		client: client,
+		meta:      meta,
+		opt:       opt,
+		client:    client,
 		readChan:  make(chan string),
 		status:    StatusInit,
 		mux:       sync.Mutex{},
@@ -214,7 +214,7 @@ func (rr *RedisReader) run() (err error) {
 		}
 		switch rr.opt.dataType {
 		case DataTypeChannel, DataTypePatterChannel:
-			message := <- rr.channelIn
+			message := <-rr.channelIn
 			if message != nil {
 				rr.readChan <- message.Payload
 			}
@@ -245,40 +245,40 @@ func (rr *RedisReader) run() (err error) {
 				}
 			}
 			//Added set support for redis
-	    case DataTypeSet:
-		    for _ , key := range rr.opt.key {
+		case DataTypeSet:
+			for _, key := range rr.opt.key {
 				anSet, subErr := rr.client.SPop(key).Result()
 				if subErr != nil && subErr != redis.Nil {
 					log.Errorf("Runner[%v] %v SPop redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
 					rr.setStatsError("Runner[" + rr.meta.RunnerName + "] " + rr.Name() + " Get redis error " + subErr.Error())
 				} else if anSet != "" {
 					rr.readChan <- anSet
-				}  
-		    }
+				}
+			}
 			//Added sortedSet support for redis
-	    case DateTypeSortedSet:
-		    for _ , key := range rr.opt.key {
-			     anSortedSet, subErr := rr.client.ZRange(key,0,-1).Result()
-			    if subErr != nil && subErr != redis.Nil {
+		case DateTypeSortedSet:
+			for _, key := range rr.opt.key {
+				anSortedSet, subErr := rr.client.ZRange(key, 0, -1).Result()
+				if subErr != nil && subErr != redis.Nil {
 					log.Errorf("Runner[%v] %v ZRange redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
 					rr.setStatsError("Runner[" + rr.meta.RunnerName + "] " + rr.Name() + " Get redis error " + subErr.Error())
 				} else if len(anSortedSet) > 0 {
 					rr.client.Del(key)
 					rr.readChan <- anSortedSet[0]
 				}
-		    }
+			}
 			//Added hash support for redis
-	    case DateTypeHash:
-		    for _ , key := range rr.opt.key {
-			    anHash, subErr := rr.client.HGet(key,rr.opt.area).Result()  //redis key and area for hash
-			    if subErr != nil && subErr != redis.Nil {
+		case DateTypeHash:
+			for _, key := range rr.opt.key {
+				anHash, subErr := rr.client.HGet(key, rr.opt.area).Result() //redis key and area for hash
+				if subErr != nil && subErr != redis.Nil {
 					log.Errorf("Runner[%v] %v HGetAll redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
 					rr.setStatsError("Runner[" + rr.meta.RunnerName + "] " + rr.Name() + " Get redis error " + subErr.Error())
-				}else if anHash != ""{
+				} else if anHash != "" {
 					rr.client.Del(key)
 					rr.readChan <- anHash
 				}
-		    }
+			}
 		default:
 			err = fmt.Errorf("data Type < %v > not exist, exit", rr.opt.dataType)
 			log.Error(err)

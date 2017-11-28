@@ -120,17 +120,17 @@ var defaultIgnoreFileSuffix = []string{
 
 // FileReader's modes
 const (
-	ModeDir     = "dir"
-	ModeFile    = "file"
-	ModeTailx   = "tailx"
-	ModeFileAuto   = "fileauto"
-	ModeMysql   = "mysql"
-	ModeMssql   = "mssql"
-	ModeElastic = "elastic"
-	ModeMongo   = "mongo"
-	ModeKafka   = "kafka"
-	ModeRedis   = "redis"
-	ModeSocket  = "socket"
+	ModeDir      = "dir"
+	ModeFile     = "file"
+	ModeTailx    = "tailx"
+	ModeFileAuto = "fileauto"
+	ModeMysql    = "mysql"
+	ModeMssql    = "mssql"
+	ModeElastic  = "elastic"
+	ModeMongo    = "mongo"
+	ModeKafka    = "kafka"
+	ModeRedis    = "redis"
+	ModeSocket   = "socket"
 )
 
 const (
@@ -185,7 +185,7 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 		}
 		reader, err = NewReaderSize(fr, meta, bufSize)
 	case ModeFileAuto:
-		multiReader, bufReader, _ := NewFileAutoReader(conf,meta,isFromWeb)
+		multiReader, bufReader, _ := NewFileAutoReader(conf, meta, isFromWeb)
 		if multiReader != nil {
 			reader = multiReader
 		}

@@ -2,13 +2,13 @@ package utils
 
 import (
 	"database/sql"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
-	"fmt"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -238,7 +238,7 @@ func TestSetMapValue(t *testing.T) {
 	m2["m3"] = m3
 	m1["m2"] = m2
 	SetMapValue(m1, "小红", []string{"m2", "m3", "name"}...)
-	SetMapValue(m1, "小黑", []string{"m2", "m3", "m4","name"}...)
+	SetMapValue(m1, "小黑", []string{"m2", "m3", "m4", "name"}...)
 	value, err := GetMapValue(m1, []string{"m2", "m3", "name"}...)
 	assert.Equal(t, err, nil)
 	assert.Equal(t, value, "小红")
@@ -256,7 +256,7 @@ func TestDeleteMapValue(t *testing.T) {
 	val, b := DeleteMapValue(m1, []string{"m2", "m3", "name"}...)
 	assert.Equal(t, val, "小明")
 	assert.Equal(t, b, true)
-  }
+}
 
 func TestHashSet(t *testing.T) {
 	set := NewHashSet()

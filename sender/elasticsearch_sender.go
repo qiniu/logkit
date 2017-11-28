@@ -2,9 +2,9 @@ package sender
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
-	"strconv"
 
 	"gopkg.in/olivere/elastic.v3"
 
@@ -16,16 +16,16 @@ import (
 type ElasticsearchSender struct {
 	name string
 
-	host      		[]string
-	retention 		int
-	indexName 		string
-	eType     		string
-	logkitSendTime	bool
-	aliasFields   	map[string]string
-	elasticClient 	*elastic.Client
+	host           []string
+	retention      int
+	indexName      string
+	eType          string
+	logkitSendTime bool
+	aliasFields    map[string]string
+	elasticClient  *elastic.Client
 
-	intervalIndex 	int
-	timeZone 		*time.Location
+	intervalIndex int
+	timeZone      *time.Location
 }
 
 const (
@@ -35,20 +35,22 @@ const (
 	KeyElasticAlias = "elastic_keys"
 
 	KeyElasticIndexStrategy = "elastic_index_strategy"
-	KeyElasticTimezone = "elastic_time_zone"
+	KeyElasticTimezone      = "elastic_time_zone"
 )
+
 //indexStrategy
 const (
 	KeyDefaultIndexStrategy = "default"
-	KeyYearIndexStrategy = "year"
-	KeyMonthIndexStrategy = "month"
-	KeyDayIndexStrategy = "day"
+	KeyYearIndexStrategy    = "year"
+	KeyMonthIndexStrategy   = "month"
+	KeyDayIndexStrategy     = "day"
 )
+
 //timeZone
 const (
 	KeylocalTimezone = "Local"
-	KeyUTCTimezone = "UTC"
-	KeyPRCTimezone = "PRC"
+	KeyUTCTimezone   = "UTC"
+	KeyPRCTimezone   = "PRC"
 )
 
 const KeySendTime = "sendTime"
@@ -96,20 +98,20 @@ func newElasticsearchSender(name string, hosts []string, index, eType string, fi
 	strategy := []string{KeyDefaultIndexStrategy, KeyYearIndexStrategy, KeyMonthIndexStrategy, KeyDayIndexStrategy}
 
 	i, err := machPattern(indexStrategy, strategy)
-	if  err != nil{
+	if err != nil {
 		return nil, err
 	}
 
 	e = &ElasticsearchSender{
-		name:          	name,
-		host:          	hosts,
-		indexName:     	index,
-		elasticClient: 	client,
-		eType:         	eType,
+		name:           name,
+		host:           hosts,
+		indexName:      index,
+		elasticClient:  client,
+		eType:          eType,
 		logkitSendTime: logkitSendTime,
-		aliasFields:   	fields,
-		intervalIndex:	i,
-		timeZone:	   	timeZone,
+		aliasFields:    fields,
+		intervalIndex:  i,
+		timeZone:       timeZone,
 	}
 	return
 }
@@ -147,7 +149,7 @@ func (this *ElasticsearchSender) Send(data []Data) (err error) {
 		indexName = this.indexName
 		now := time.Now().In(this.timeZone)
 		intervals = []string{strconv.Itoa(now.Year()), strconv.Itoa(int(now.Month())), strconv.Itoa(now.Day())}
-		for j := 0; j < i; j ++ {
+		for j := 0; j < i; j++ {
 			if j == 0 {
 				indexName = indexName + "-" + intervals[j]
 			} else {

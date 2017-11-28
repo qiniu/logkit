@@ -54,13 +54,13 @@ func (it *IpTransformer) Transform(datas []sender.Data) ([]sender.Data, error) {
 			errnums++
 			continue
 		}
-		newkeys[len(newkeys) -1] = "Region"
+		newkeys[len(newkeys)-1] = "Region"
 		utils.SetMapValue(datas[i], info.Region, newkeys...)
-		newkeys[len(newkeys) -1] = "City"
+		newkeys[len(newkeys)-1] = "City"
 		utils.SetMapValue(datas[i], info.City, newkeys...)
-		newkeys[len(newkeys) -1] = "Country"
+		newkeys[len(newkeys)-1] = "Country"
 		utils.SetMapValue(datas[i], info.Country, newkeys...)
-		newkeys[len(newkeys) -1] = "Isp"
+		newkeys[len(newkeys)-1] = "Isp"
 		utils.SetMapValue(datas[i], info.Isp, newkeys...)
 	}
 	if err != nil {

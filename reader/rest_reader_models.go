@@ -593,7 +593,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "redis键(redis_key)",
 		},
 		{
-			KeyName:	  KeyRedisHashArea,
+			KeyName:      KeyRedisHashArea,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
