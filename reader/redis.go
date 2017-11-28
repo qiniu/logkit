@@ -142,7 +142,7 @@ func (rr *RedisReader) ReadLine() (data string, err error) {
 	}
 	timer.Stop()
 	return
-
+	
 }
 func (rr *RedisReader) Close() (err error) {
 	if atomic.CompareAndSwapInt32(&rr.status, StatusRunning, StatusStoping) {
