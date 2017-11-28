@@ -11,6 +11,7 @@ import (
 
 	"github.com/qiniu/pandora-go-sdk/base"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
+	"github.com/qiniu/pandora-go-sdk/base/request"
 	"github.com/qiniu/pandora-go-sdk/logdb"
 	"github.com/qiniu/pandora-go-sdk/tsdb"
 )
@@ -104,6 +105,7 @@ func (c *Pipeline) CreateRepoFromDSL(input *CreateRepoDSLInput) (err error) {
 		GroupName:     input.GroupName,
 		Schema:        schemas,
 		Options:       input.Options,
+		Workflow:      input.Workflow,
 	})
 }
 
@@ -338,8 +340,12 @@ func (c *Pipeline) GetSampleData(input *GetSampleDataInput) (output *SampleDataO
 }
 
 func (c *Pipeline) ListRepos(input *ListReposInput) (output *ListReposOutput, err error) {
-	op := c.newOperation(base.OpListRepos)
-
+	var op *request.Operation
+	if input.WithDag {
+		op = c.newOperation(base.OpListReposWithDag)
+	} else {
+		op = c.newOperation(base.OpListRepos)
+	}
 	output = &ListReposOutput{}
 	req := c.newRequest(op, input.Token, &output)
 	return output, req.Send()

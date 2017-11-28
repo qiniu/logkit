@@ -28,6 +28,7 @@ const (
 	OpGetRepo             string = "GetRepo"
 	OpGetSampleData       string = "GetSampleData"
 	OpListRepos           string = "ListRepo"
+	OpListReposWithDag    string = "ListRepoWithDag"
 	OpDeleteRepo          string = "DeleteRepo"
 	OpRepoExists          string = "RepoExists"
 	OpPostData            string = "PostData"

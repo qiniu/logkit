@@ -244,7 +244,21 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse: true,
 			Description:  "邮箱(启用自动导出到云存储时必填)(qiniu_email)",
 		},
-
+		{
+			KeyName:      KeyPandoraKodoFilePrefix,
+			ChooseOnly:   false,
+			Default:      "logkitauto/date=$(year)-$(mon)-$(day)/hour=$(hour)/min=$(min)/$(sec)",
+			DefaultNoUse: false,
+			Description:  "云存储文件前缀(pandora_kodo_prefix)",
+		},
+		{
+			KeyName:       KeyPandoraKodoCompressPrefix,
+			ChooseOnly:    true,
+			ChooseOptions: []string{"parquet", "json", "text", "csv"},
+			Default:       "parquet",
+			DefaultNoUse:  false,
+			Description:   "云存储压缩方式(pandora_kodo_compress)",
+		},
 		{
 			KeyName:       KeyPandoraGzip,
 			ChooseOnly:    true,

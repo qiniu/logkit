@@ -16,6 +16,7 @@ import (
 	"sync"
 
 	"errors"
+
 	"github.com/labstack/echo"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
