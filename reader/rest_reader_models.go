@@ -24,7 +24,7 @@ var (
 	OptionDataSourceTag = utils.Option{
 		KeyName:      KeyDataSourceTag,
 		ChooseOnly:   false,
-		Default:      "",
+		Default:      "datasource",
 		DefaultNoUse: false,
 		Description:  "具体的数据文件路径来源标签(datasource_tag)",
 	}

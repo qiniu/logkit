@@ -8,11 +8,10 @@ import RenderConfig from '../components/renderConfig'
 import config from '../store/config'
 import {isJSON} from '../utils/tools'
 import moment from 'moment'
-import {postConfigData, getRunnerVersion, putConfigData} from '../services/logkit';
+import {postConfigData, putConfigData, putClusterConfigData, postClusterConfigData} from '../services/logkit';
 import _ from "lodash";
 
 const Step = Steps.Step;
-const {Header, Content, Footer, Sider} = Layout;
 const steps = [{
   title: '系统信息选择',
   content: '配置需要采集的系统信息类型',
@@ -56,55 +55,44 @@ class CreateMetricRunner extends Component {
 
   init = () => {
     let that = this
-    let isCopy = this.props.location.query.copyConfig
-    if (isCopy === 'true') {
-      window.isCopy = true;
+    if (window.isCopy === true) {
       this.setState({
         isCopyStatus: true
       })
-    } else {
-      window.isCopy = false
     }
-    if(window.nodeCopy){
+    if (window.nodeCopy) {
       config.delete("reader");
       config.delete("parser");
       config.delete("transforms");
     }
-    getRunnerVersion().then(data => {
-      if (data.success) {
-        that.setState({
-          version: _.values(_.omit(data, 'success'))
-        })
-      }
-    })
   }
 
   next() {
     let that = this;
     if (this.state.current === 0) {
-      if(config.get("metric").length > 0){
+      if (config.get("metric").length > 0) {
         const current = this.state.current + 1;
         this.setState({current});
-      }else{
+      } else {
         notification.warning({message: "请至少采集一种系统信息", duration: 20,})
       }
     } else if (this.state.current === 1) {
       let flag = [];
       config.get("metric").map(m => {
         let isHasTrue = false;
-        for(let k in this.state.metricKeys[m.type]){
-          if(this.state.metricKeys[m.type][k]){
+        for (let k in this.state.metricKeys[m.type]) {
+          if (this.state.metricKeys[m.type][k]) {
             isHasTrue = true;
             return true;
           }
         }
-        if(!isHasTrue && Object.keys(this.state.metricKeys[m.type]).length) flag.push(m.type);
+        if (!isHasTrue && Object.keys(this.state.metricKeys[m.type]).length) flag.push(m.type);
       });
-      if(flag.length <= 0){
+      if (flag.length <= 0) {
         const current = this.state.current + 1;
         this.setState({current});
       } else {
-        notification.warning({message: "请至少为"+flag.join(", ")+"选择一个采集的字段", duration: 20,})
+        notification.warning({message: "请至少为" + flag.join(", ") + "选择一个采集的字段", duration: 20,})
       }
     } else if (this.state.current === 2) {
       const current = this.state.current + 1;
@@ -122,7 +110,9 @@ class CreateMetricRunner extends Component {
           let collect_interval = that.refs.initConfig.getFieldValue('collect_interval')
           let runnerName = that.refs.initConfig.getFieldValue('name')
           if (window.isCopy && window.nodeCopy) {
-            name = window.nodeCopy.name
+            runnerName = window.nodeCopy.name
+            batch_interval = window.nodeCopy.batch_interval
+            collect_interval = window.nodeCopy.collect_interval
           }
           let data = {
             name: runnerName != undefined ? runnerName : name,
@@ -131,16 +121,9 @@ class CreateMetricRunner extends Component {
             ...config.getNodeData()
           }
           that.refs.initConfig.setFieldsValue({config: JSON.stringify(data, null, 2)});
-          if (runnerName == undefined) {
-            that.refs.initConfig.setFieldsValue({name: name});
-          }
-
-          if (batch_interval == undefined) {
-            that.refs.initConfig.setFieldsValue({batch_interval: 60});
-          }
-          if (collect_interval == undefined) {
-            that.refs.initConfig.setFieldsValue({collect_interval: 3});
-          }
+          that.refs.initConfig.setFieldsValue({name: runnerName != undefined ? runnerName : name});
+          that.refs.initConfig.setFieldsValue({batch_interval: batch_interval != undefined ? batch_interval : 60});
+          that.refs.initConfig.setFieldsValue({collect_interval: collect_interval != undefined ? collect_interval : 3});
         }
       });
     }
@@ -157,7 +140,7 @@ class CreateMetricRunner extends Component {
   setConfig = () => {
     let configData = [];
     let metric = config.get("metric");
-    if(!metric) return;
+    if (!metric) return;
     metric.map((m, _) => {
       m["attributes"] = this.state.metricKeys[m.type];
       m["config"] = this.state.metricConfigs[m.type];
@@ -167,6 +150,8 @@ class CreateMetricRunner extends Component {
   }
 
   addRunner = () => {
+    const { currentTagName, currentMachineUrl } = this.props
+    const {handleTurnToRunner} = this.props
     let that = this
     const {validateFields, getFieldsValue} =  that.refs.initConfig;
     let formData = getFieldsValue();
@@ -177,13 +162,25 @@ class CreateMetricRunner extends Component {
       } else {
         if (isJSON(formData.config)) {
           let data = JSON.parse(formData.config);
-          postConfigData({name: data.name, body: data}).then(data => {
-            if (data === undefined) {
-              notification.success({message: "Runner添加成功", duration: 10,})
-              this.props.router.push({pathname: `/`})
-            }
+          let tag = (currentTagName != null && currentTagName != undefined) ? currentTagName : ''
+          let url = (currentMachineUrl != null && currentMachineUrl != undefined) ? currentMachineUrl : ''
+          if (window.isCluster && window.isCluster === true) {
+            postClusterConfigData({name: data.name, tag: tag, url: url, body: data}).then(data => {
+              if (data && data.code === 'L200') {
+                notification.success({message: "Metric Runner添加成功", duration: 10,})
+                handleTurnToRunner()
+              }
 
-          })
+            })
+          } else {
+            postConfigData({name: data.name, body: data}).then(data => {
+              if (data && data.code === 'L200') {
+                notification.success({message: "Metric Runner添加成功", duration: 10,})
+                handleTurnToRunner()
+              }
+
+            })
+          }
         } else {
           notification.warning({message: "不是一个合法的json对象,请检查", duration: 20,})
         }
@@ -193,6 +190,10 @@ class CreateMetricRunner extends Component {
   }
 
   updateRunner = () => {
+    const currentTagName = window.nodeCopy.tag
+    const currentMachineUrl = window.nodeCopy.machineUrl
+    // const { currentTagName, currentMachineUrl } = this.props
+    const {handleTurnToRunner} = this.props
     let that = this
     const {validateFields, getFieldsValue} =  that.refs.initConfig;
     let formData = getFieldsValue();
@@ -203,13 +204,25 @@ class CreateMetricRunner extends Component {
       } else {
         if (isJSON(formData.config)) {
           let data = JSON.parse(formData.config);
-          putConfigData({name: data.name, body: data}).then(data => {
-            if (data === undefined) {
-              notification.success({message: "Runner修改成功", duration: 10,})
-              this.props.router.push({pathname: `/`})
-            }
+          let tag = (currentTagName != null && currentTagName != undefined) ? currentTagName : ''
+          let url = (currentMachineUrl != null && currentMachineUrl != undefined) ? currentMachineUrl : ''
+          if (window.isCluster && window.isCluster === true) {
+            putClusterConfigData({name: data.name, tag: tag, url: url, body: data}).then(data => {
+              if (data && data.code === 'L200') {
+                notification.success({message: "Runner修改成功", duration: 10,})
+                handleTurnToRunner()
+              }
 
-          })
+            })
+          } else {
+            putConfigData({name: data.name, body: data}).then(data => {
+              if (data && data.code === 'L200') {
+                notification.success({message: "Runner修改成功", duration: 10,})
+                handleTurnToRunner()
+              }
+
+            })
+          }
         } else {
           notification.warning({message: "不是一个合法的json对象,请检查", duration: 20,})
         }
@@ -231,81 +244,65 @@ class CreateMetricRunner extends Component {
   render() {
     const {current} = this.state;
     return (
-      <div className="logkit-create-container">
-        <div className="header">
-          <Button style={{float: 'left', marginTop: '20px'}} type="primary" className="index-btn"
-                  onClick={() => this.turnToIndex()}>
-            <Icon type="link"/>回到首页
-          </Button>七牛Logkit配置文件助手 {this.state.version}
-        </div>
-        <Steps current={current}>
-          {steps.map(item => <Step key={item.title} title={item.title}/>)}
-        </Steps>
-        <div className="steps-content">
-          <div className={this.state.current === 0 ? 'show-div' : 'hide-div'}>
-            <div>
-              <p className={'show-div info'}>根据需要选择需要采集的系统信息类型</p>
+        <div className="logkit-create-container">
+          <Steps current={current}>
+            {steps.map(item => <Step key={item.title} title={item.title}/>)}
+          </Steps>
+          <div className="steps-content">
+            <div className={this.state.current === 0 ? 'show-div' : 'hide-div'}>
+              <div>
+                <p className={'show-div info'}>根据需要选择需要采集的系统信息类型</p>
+              </div>
+              <Usages ref="checkUsages"></Usages>
             </div>
-            <Usages ref="checkUsages"></Usages>
-          </div>
-          <div className={this.state.current === 1 ? 'show-div' : 'hide-div'}>
-            <div>
-              <p className={'show-div info'}>选择需要采集的系统信息的字段(某些metric可能无法设置)</p>
+            <div className={this.state.current === 1 ? 'show-div' : 'hide-div'}>
+              <div>
+                <p className={'show-div info'}>选择需要采集的系统信息的字段(某些metric可能无法设置)</p>
+              </div>
+              <Keys handleMetricKeys={metricKeys => this.handleMetricKeys(metricKeys)}></Keys>
             </div>
-            <Keys handleMetricKeys={metricKeys=>this.handleMetricKeys(metricKeys)}></Keys>
-          </div>
-          <div className={this.state.current === 2 ? 'show-div' : 'hide-div'}>
-            <div>
-              <p className={'show-div info'}>设置Metric的一些配置项(某些metric可能没有配置项)</p>
+            <div className={this.state.current === 2 ? 'show-div' : 'hide-div'}>
+              <div>
+                <p className={'show-div info'}>设置Metric的一些配置项(某些metric可能没有配置项)</p>
+              </div>
+              <Opt handleMetricConfigs={metricConfigs => this.handleMetricConfigs(metricConfigs)}></Opt>
             </div>
-            <Opt handleMetricConfigs={metricConfigs=>this.handleMetricConfigs(metricConfigs)}></Opt>
-          </div>
-          <div className={this.state.current === 3 ? 'show-div' : 'hide-div'}>
-            <div>
-              <p className={'show-div info'}>黄色字体选框需根据实际情况修改，其他可作为默认值</p>
+            <div className={this.state.current === 3 ? 'show-div' : 'hide-div'}>
+              <div>
+                <p className={'show-div info'}>黄色字体选框需根据实际情况修改，其他可作为默认值</p>
+              </div>
+              <Sender isMetric="true" ref="checkSenderData"></Sender>
             </div>
-            <Sender ref="checkSenderData"></Sender>
-          </div>
-          <div className={this.state.current === 4 ? 'show-div' : 'hide-div'}>
-            <RenderConfig ref="initConfig"></RenderConfig>
-          </div>
+            <div className={this.state.current === 4 ? 'show-div' : 'hide-div'}>
+              <RenderConfig ref="initConfig"></RenderConfig>
+            </div>
 
+          </div>
+          <div className="steps-action">
+            {
+              this.state.current < steps.length - 1
+              &&
+              <Button type="primary" onClick={() => this.next()}>下一步</Button>
+            }
+            {
+              this.state.current === steps.length - 1 && this.state.isCopyStatus === false
+              &&
+              <Button type="primary" onClick={() => this.addRunner()}>确认并提交</Button>
+            }
+            {
+              this.state.current === steps.length - 1 && this.state.isCopyStatus === true
+              &&
+              <Button type="primary" onClick={() => this.updateRunner()}>修改并提交</Button>
+            }
+            {
+              this.state.current > 0
+              &&
+              <Button style={{marginLeft: 8}} onClick={() => this.prev()}>
+                上一步
+              </Button>
+            }
+          </div>
         </div>
-        <div className="steps-action">
-          {
-            this.state.current < steps.length - 1
-            &&
-            <Button type="primary" onClick={() => this.next()}>下一步</Button>
-          }
-          {
-            this.state.current === steps.length - 1 && this.state.isCopyStatus === false
-            &&
-            <Button type="primary" onClick={() => this.addRunner()}>确认并提交</Button>
-          }
-          {
-            this.state.current === steps.length - 1 && this.state.isCopyStatus === true
-            &&
-            <Button type="primary" onClick={() => this.updateRunner()}>修改并提交</Button>
-          }
-          {
-            this.state.current > 0
-            &&
-            <Button style={{marginLeft: 8}} onClick={() => this.prev()}>
-              上一步
-            </Button>
-          }
-        </div>
-        <Footer style={{textAlign: 'center'}}>
-          更多信息请访问：
-          <a target="_blank" href="https://github.com/qiniu/logkit">
-            <Tag color="#108ee9">Logkit</Tag> </a> |
-          <a target="_blank" href="https://github.com/qiniu/logkit/wiki">
-            <Tag color="#108ee9">帮助文档</Tag> </a> |
-          <a target="_blank" href="https://qiniu.github.io/pandora-docs/#/"><Tag
-            color="#108ee9">Pandora产品</Tag>
-          </a>
-        </Footer>
-      </div>
     );
   }
 }

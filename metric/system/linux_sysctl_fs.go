@@ -37,21 +37,21 @@ const (
 )
 
 var KeySysctlFsFieldNameMap = map[string]string{
-	KeyLinuxSysctlFsAioNr:           "sysctl_fs_aio_nr",
-	KeyLinuxSysctlFsAioMaxNr:        "sysctl_fs_aio_max_nr",
-	KeyLinuxSysctlFsDquotNr:         "sysctl_fs_dquot_nr",
-	KeyLinuxSysctlFsDquotMax:        "sysctl_fs_dquot_max",
-	KeyLinuxSysctlFsSuperNr:         "sysctl_fs_super_nr",
-	KeyLinuxSysctlFsSuperMax:        "sysctl_fs_super-max",
-	KeyLinuxSysctlFsInodeNr:         "sysctl_fs_inode_nr",
-	KeyLinuxSysctlFsInodeFreeNr:     "sysctl_fs_inode_free_nr",
-	KeyLinuxSysctlFsInodePreNr:      "sysctl_fs_inode_preshrink_nr",
-	KeyLinuxSysctlFsDentryNr:        "sysctl_fs_dentry_nr",
-	KeyLinuxSysctlFsDentryUnNr:      "sysctl_fs_dentry_unused_nr",
-	KeyLinuxSysctlFsDetryAgeLimit:   "sysctl_fs_dentry_age_limit",
-	KeyLinuxSysctlFsDentryWantPages: "sysctl_fs_dentry_want_pages",
-	KeyLinuxSysctlFsFileNr:          "sysctl_fs_file_nr",
-	KeyLinuxSysctlFsFileMax:         "sysctl_fs_file_max",
+	KeyLinuxSysctlFsAioNr:           "linux_sysctl_fs_aio_nr",
+	KeyLinuxSysctlFsAioMaxNr:        "linux_sysctl_fs_aio_max_nr",
+	KeyLinuxSysctlFsDquotNr:         "linux_sysctl_fs_dquot_nr",
+	KeyLinuxSysctlFsDquotMax:        "linux_sysctl_fs_dquot_max",
+	KeyLinuxSysctlFsSuperNr:         "linux_sysctl_fs_super_nr",
+	KeyLinuxSysctlFsSuperMax:        "linux_sysctl_fs_super-max",
+	KeyLinuxSysctlFsInodeNr:         "linux_sysctl_fs_inode_nr",
+	KeyLinuxSysctlFsInodeFreeNr:     "linux_sysctl_fs_inode_free_nr",
+	KeyLinuxSysctlFsInodePreNr:      "linux_sysctl_fs_inode_preshrink_nr",
+	KeyLinuxSysctlFsDentryNr:        "linux_sysctl_fs_dentry_nr",
+	KeyLinuxSysctlFsDentryUnNr:      "linux_sysctl_fs_dentry_unused_nr",
+	KeyLinuxSysctlFsDetryAgeLimit:   "linux_sysctl_fs_dentry_age_limit",
+	KeyLinuxSysctlFsDentryWantPages: "linux_sysctl_fs_dentry_want_pages",
+	KeyLinuxSysctlFsFileNr:          "linux_sysctl_fs_file_nr",
+	KeyLinuxSysctlFsFileMax:         "linux_sysctl_fs_file_max",
 }
 
 var KeyLinuxSysctlFsUsage = []utils.KeyValue{
@@ -72,15 +72,19 @@ var KeyLinuxSysctlFsUsage = []utils.KeyValue{
 	{KeySysctlFsFieldNameMap[KeyLinuxSysctlFsFileMax], "内核支持的最大file handle数量"},
 }
 
-func (_ SysctlFS) Name() string {
+func (_ *SysctlFS) Name() string {
 	return TypeLinuxSysctlFs
 }
 
-func (_ SysctlFS) Usages() string {
+func (_ *SysctlFS) Usages() string {
 	return MetricLinuxSysctlFsUsage
 }
 
-func (_ SysctlFS) Config() map[string]interface{} {
+func (_ *SysctlFS) Tags() []string {
+	return []string{}
+}
+
+func (_ *SysctlFS) Config() map[string]interface{} {
 	config := map[string]interface{}{
 		metric.OptionString:     []utils.Option{},
 		metric.AttributesString: KeyLinuxSysctlFsUsage,
@@ -140,8 +144,10 @@ func (sfs *SysctlFS) Collect() (datas []map[string]interface{}, err error) {
 	sfs.gatherList("dentry-state", fields, "dentry-nr", "dentry-unused-nr", "dentry-age-limit", "dentry-want-pages")
 	sfs.gatherList("file-nr", fields, "file-nr", "", "file-max")
 
-	fields["sysctl_"+metric.Timestamp] = now
-	datas = append(datas, fields)
+	if len(fields) > 0 {
+		fields["linux_sysctl_fs_"+metric.Timestamp] = now
+		datas = append(datas, fields)
+	}
 	return
 }
 

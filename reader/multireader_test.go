@@ -45,7 +45,7 @@ func Test_ActiveReader(t *testing.T) {
 	ppath, err = filepath.Abs(ppath)
 	assert.NoError(t, err)
 	msgchan := make(chan Result)
-	ar, err := NewActiveReader(ppath, WhenceOldest, meta, msgchan)
+	ar, err := NewActiveReader(ppath, ppath, WhenceOldest, meta, msgchan)
 	assert.NoError(t, err)
 	go ar.Run()
 	data := <-msgchan
@@ -208,7 +208,7 @@ func TestMultiReaderMultiLine(t *testing.T) {
 	mr.armapmux.Lock()
 	assert.Equal(t, 1, len(mr.fileReaders), "activereader number")
 	for _, ar := range mr.fileReaders {
-		t.Log(ar.logpath)
+		t.Log(ar.originpath)
 	}
 	mr.armapmux.Unlock()
 
@@ -335,7 +335,7 @@ func TestMultiReaderSyncMetaOneLine(t *testing.T) {
 	mr.armapmux.Lock()
 	assert.Equal(t, 1, len(mr.fileReaders), "activereader number")
 	for _, ar := range mr.fileReaders {
-		t.Log(">>>> alive reader", ar.logpath)
+		t.Log(">>>> alive reader", ar.originpath)
 	}
 	mr.armapmux.Unlock()
 
@@ -455,7 +455,7 @@ func TestMultiReaderSyncMetaMutiline(t *testing.T) {
 	mr.armapmux.Lock()
 	assert.Equal(t, 1, len(mr.fileReaders), "activereader number")
 	for _, ar := range mr.fileReaders {
-		t.Log(">>>> alive reader", ar.logpath)
+		t.Log(">>>> alive reader", ar.originpath)
 	}
 	mr.armapmux.Unlock()
 	t.Log("mr listen 2 round")

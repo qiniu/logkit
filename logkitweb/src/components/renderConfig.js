@@ -5,11 +5,16 @@ import {
   Row,
   Col,
   notification,
-  InputNumber
+  InputNumber,
+  Select
 } from 'antd';
 import config from '../store/config'
 import moment from 'moment'
-
+import {
+  getClusterSlaves,
+} from '../services/logkit';
+import _ from "lodash";
+const Option = Select.Option
 const FormItem = Form.Item;
 
 const optionFormItemLayout = {
@@ -38,7 +43,8 @@ class renderConfig extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      current: 0
+      current: 0,
+      machines: []
     };
   }
 
@@ -52,7 +58,6 @@ class renderConfig extends Component {
   componentDidUpdate(prevProps) {
 
   }
-
 
   renderConfigFile = () => {
     const {getFieldDecorator, resetFields} = this.props.form;
@@ -143,18 +148,23 @@ class renderConfig extends Component {
 
   }
 
+  renderSelectOptions = (items) => {
+    let options = []
+    if (items != undefined) {
+      items.map((ele) => {
+        options.push(<Option key={ele} value={ele}>{ele}</Option>)
+      })
+    }
+    return (
+        options
+    )
+  }
+
 
   render() {
     const {getFieldDecorator} = this.props.form;
     return (
         <div >
-          <div className='logkit-header'>
-            <Row >
-              <Col span={12}>
-                <h2 className="logkit-title">logkit配置文件</h2>
-              </Col>
-            </Row>
-          </div>
           <div className='logkit-body'>
             <Row>
               <Form>
@@ -164,15 +174,19 @@ class renderConfig extends Component {
                   )}
                 </FormItem>
                 <FormItem {...formItemLayout} label="最长发送间隔(秒)">
-                  {getFieldDecorator('batch_interval', {rules: [{required: true, message: '发送间隔不能为空'},
-                    {pattern: /^[0-9]*$/, message: '输入不符合规范,只能为整数'}]})(
+                  {getFieldDecorator('batch_interval', {
+                    rules: [{required: true, message: '发送间隔不能为空'},
+                      {pattern: /^[0-9]*$/, message: '输入不符合规范,只能为整数'}]
+                  })(
                       <Input onChange={this.handleIntervalChange} placeholder={'发送间隔单位(秒)'}/>
                   )}
                 </FormItem>
                 <FormItem {...formItemLayout} label="系统信息收集间隔(metric配置专用, 秒)">
-                  {getFieldDecorator('collect_interval', {rules: [{required: true, message: '收集间隔不能为空'},
-                      {pattern: /^[0-9]*$/, message: '输入不符合规范,只能为整数'}]})(
-                    <Input onChange={this.handleMetricIntervalChange} placeholder={'系统信息收集间隔单位(秒)'}/>
+                  {getFieldDecorator('collect_interval', {
+                    rules: [{required: true, message: '收集间隔不能为空'},
+                      {pattern: /^[0-9]*$/, message: '输入不符合规范,只能为整数'}]
+                  })(
+                      <Input onChange={this.handleMetricIntervalChange} placeholder={'系统信息收集间隔单位(秒)'}/>
                   )}
                 </FormItem>
                 <FormItem

@@ -46,6 +46,7 @@ const (
 	OpUploadPlugin        string = "UploadPlugin"
 	OpGetPlugin           string = "GetPlugin"
 	OpListPlugins         string = "ListPlugin"
+	OpVerifyPlugin        string = "VerifyPlugin"
 	OpDeletePlugin        string = "DeletePlugin"
 	OpCreateDatasource    string = "CreateDatasource"
 	OpGetDatasource       string = "GetDatasource"
@@ -100,6 +101,7 @@ const (
 	OpPutRepoConfig     string = "PutRepoConfig"
 	OpGetRepoConfig     string = "GetRepoConfig"
 	OpPartialQuery      string = "PartialQuery"
+	OpSchemaRef         string = "SchemaRef"
 
 	OpUpdateRepoMetadata string = "UpdataRepoMetadata"
 	OpDeleteRepoMetadata string = "DeleteRepoMetadata"

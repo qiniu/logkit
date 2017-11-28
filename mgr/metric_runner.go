@@ -119,6 +119,8 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 
 	senders := make([]sender.Sender, 0)
 	for _, c := range rc.SenderConfig {
+		c[sender.KeyIsMetrics] = "true"
+		c[sender.KeyPandoraTSDBTimeStamp] = metric.Timestamp
 		s, err := sr.NewSender(c, meta.FtSaveLogPath())
 		if err != nil {
 			return nil, err
@@ -334,6 +336,7 @@ func (mr *MetricRunner) Status() RunnerStatus {
 		}
 		mr.rs.SenderStats[k] = v
 	}
+	mr.rs.RunningStatus = RunnerRunning
 	copyRunnerStatus(&mr.lastRs, &mr.rs)
 	return mr.rs
 }

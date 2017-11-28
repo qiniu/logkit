@@ -2,6 +2,7 @@ package sender
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -19,6 +20,7 @@ import (
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 
+	"github.com/qiniu/logkit/metric"
 	gouuid "github.com/satori/go.uuid"
 )
 
@@ -33,10 +35,18 @@ const (
 	KeyPandoraSchemaUpdateInterval = "pandora_schema_update_interval"
 	KeyPandoraAutoCreate           = "pandora_auto_create"
 	KeyPandoraSchemaFree           = "pandora_schema_free"
+	KeyPandoraExtraInfo            = "pandora_extra_info"
 
 	KeyPandoraEnableLogDB = "pandora_enable_logdb"
 	KeyPandoraLogDBName   = "pandora_logdb_name"
 	KeyPandoraLogDBHost   = "pandora_logdb_host"
+
+	KeyPandoraEnableTSDB     = "pandora_enable_tsdb"
+	KeyPandoraTSDBName       = "pandora_tsdb_name"
+	KeyPandoraTSDBSeriesName = "pandora_tsdb_series_name"
+	KeyPandoraTSDBSeriesTags = "pandora_tsdb_series_tags"
+	KeyPandoraTSDBHost       = "pandora_tsdb_host"
+	KeyPandoraTSDBTimeStamp  = "pandora_tsdb_timestamp"
 
 	KeyPandoraEnableKodo     = "pandora_enable_kodo"
 	KeyPandoraKodoBucketName = "pandora_bucket_name"
@@ -66,6 +76,7 @@ type PandoraSender struct {
 	alias2key          map[string]string // map[alias]name
 	opt                PandoraOption
 	microsecondCounter int64
+	extraInfo          map[string]string
 }
 
 // UserSchema was parsed pandora schema from user's raw schema
@@ -92,10 +103,18 @@ type PandoraOption struct {
 	gzip           bool
 	uuid           bool
 	withip         string
+	extraInfo      bool
 
 	enableLogdb   bool
 	logdbReponame string
 	logdbendpoint string
+
+	enableTsdb     bool
+	tsdbReponame   string
+	tsdbSeriesName string
+	tsdbendpoint   string
+	tsdbTimestamp  string
+	tsdbSeriesTags map[string][]string
 
 	enableKodo bool
 	bucketName string
@@ -107,6 +126,9 @@ type PandoraOption struct {
 	autoConvertDate    bool
 	useragent          string
 	logkitSendTime     bool
+
+	isMetrics  bool
+	expandAttr []pipeline.RepoSchemaEntry
 }
 
 //PandoraMaxBatchSize 发送到Pandora的batch限制
@@ -117,6 +139,9 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	repoName, err := conf.GetString(KeyPandoraRepoName)
 	if err != nil {
 		return
+	}
+	if repoName == "" {
+		return nil, errors.New("repoName is empty")
 	}
 	region, err := conf.GetString(KeyPandoraRegion)
 	if err != nil {
@@ -156,10 +181,19 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	uuid, _ := conf.GetBoolOr(KeyPandoraUUID, false)
 	withIp, _ := conf.GetBoolOr(KeyPandoraWithIP, false)
 	runnerName, _ := conf.GetStringOr(KeyRunnerName, UnderfinedRunnerName)
+	extraInfo, _ := conf.GetBoolOr(KeyPandoraExtraInfo, true)
 
 	enableLogdb, _ := conf.GetBoolOr(KeyPandoraEnableLogDB, false)
 	logdbreponame, _ := conf.GetStringOr(KeyPandoraLogDBName, repoName)
 	logdbhost, _ := conf.GetStringOr(KeyPandoraLogDBHost, "")
+
+	enableTsdb, _ := conf.GetBoolOr(KeyPandoraEnableTSDB, false)
+	tsdbReponame, _ := conf.GetStringOr(KeyPandoraTSDBName, repoName)
+	tsdbSeriesName, _ := conf.GetStringOr(KeyPandoraTSDBName, repoName)
+	tsdbHost, _ := conf.GetStringOr(KeyPandoraTSDBHost, "")
+	tsdbTimestamp, _ := conf.GetStringOr(KeyPandoraTSDBTimeStamp, "")
+	seriesTags, _ := conf.GetStringListOr(KeyPandoraTSDBSeriesTags, []string{})
+	tsdbSeriesTags := map[string][]string{tsdbSeriesName: seriesTags}
 
 	enableKodo, _ := conf.GetBoolOr(KeyPandoraEnableKodo, false)
 	kodobucketName, _ := conf.GetStringOr(KeyPandoraKodoBucketName, repoName)
@@ -169,6 +203,7 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	ignoreInvalidField, _ := conf.GetBoolOr(KeyIgnoreInvalidField, true)
 	autoconvertDate, _ := conf.GetBoolOr(KeyPandoraAutoConvertDate, true)
 	logkitSendTime, _ := conf.GetBoolOr(KeyLogkitSendTime, true)
+	isMetrics, _ := conf.GetBoolOr(KeyIsMetrics, false)
 	opt := &PandoraOption{
 		runnerName:     runnerName,
 		name:           name,
@@ -185,10 +220,18 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 		flowRateLimit:  flowRateLimit,
 		gzip:           gzip,
 		uuid:           uuid,
+		extraInfo:      extraInfo,
 
 		enableLogdb:   enableLogdb,
 		logdbReponame: logdbreponame,
 		logdbendpoint: logdbhost,
+
+		enableTsdb:     enableTsdb,
+		tsdbReponame:   tsdbReponame,
+		tsdbSeriesName: tsdbSeriesName,
+		tsdbSeriesTags: tsdbSeriesTags,
+		tsdbendpoint:   tsdbHost,
+		tsdbTimestamp:  tsdbTimestamp,
 
 		enableKodo: enableKodo,
 		email:      email,
@@ -200,6 +243,7 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 		autoConvertDate:    autoconvertDate,
 		useragent:          useragent,
 		logkitSendTime:     logkitSendTime,
+		isMetrics:          isMetrics,
 	}
 	if withIp {
 		opt.withip = "logkitIP"
@@ -238,7 +282,7 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 	}
 	client, err := pipeline.New(config)
 	if err != nil {
-		err = fmt.Errorf("Cannot init pipelineClient %v", err)
+		err = fmt.Errorf("cannot init pipelineClient %v", err)
 		return
 	}
 	if opt.reqRateLimit > 0 {
@@ -254,6 +298,7 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 		alias2key:  make(map[string]string),
 		UserSchema: userSchema,
 		schemas:    make(map[string]pipeline.RepoSchemaEntry),
+		extraInfo:  utils.GetExtraInfo(),
 	}
 	if createErr := createPandoraRepo(opt, client); createErr != nil {
 		if !strings.Contains(createErr.Error(), "E18101") {
@@ -264,14 +309,48 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 	// sender时会尝试不断获取pandora schema，若还是获取失败则返回发送错误。
 	s.UpdateSchemas()
 
+	expandAttr := make([]pipeline.RepoSchemaEntry, 0)
+	if s.opt.logkitSendTime {
+		expandAttr = append(expandAttr, pipeline.RepoSchemaEntry{
+			Key:       KeyLogkitSendTime,
+			ValueType: pipeline.PandoraTypeDate,
+			Required:  false,
+		})
+	}
+	s.opt.expandAttr = expandAttr
+	if s.opt.isMetrics {
+		s.opt.tsdbSeriesTags = metric.GetMetricTags()
+	}
+
 	if s.opt.enableLogdb && len(s.schemas) > 0 {
 		log.Infof("Runner[%v] Sender[%v]: auto create export to logdb (%v)", opt.runnerName, opt.name, opt.logdbReponame)
 		err = s.client.AutoExportToLogDB(&pipeline.AutoExportToLogDBInput{
+			OmitEmpty:   true,
+			OmitInvalid: false,
 			RepoName:    s.opt.repoName,
 			LogRepoName: s.opt.logdbReponame,
 		})
 		if err != nil {
 			log.Warnf("Runner[%v] Sender[%v]: AutoExportToLogDB %v error %v", s.opt.runnerName, s.opt.name, s.opt.logdbReponame, err)
+			err = nil
+		}
+	}
+
+	if s.opt.enableTsdb && len(s.schemas) > 0 {
+		log.Infof("Runner[%v] Sender[%v]: auto create export to tsdb (%v)", opt.runnerName, opt.name, opt.tsdbReponame)
+		err = s.client.AutoExportToTSDB(&pipeline.AutoExportToTSDBInput{
+			OmitEmpty:    true,
+			OmitInvalid:  true,
+			SeriesTags:   s.opt.tsdbSeriesTags,
+			IsMetric:     s.opt.isMetrics,
+			ExpandAttr:   s.opt.expandAttr,
+			RepoName:     s.opt.repoName,
+			TSDBRepoName: s.opt.tsdbReponame,
+			SeriesName:   s.opt.tsdbSeriesName,
+			Timestamp:    s.opt.tsdbTimestamp,
+		})
+		if err != nil {
+			log.Warnf("Runner[%v] Sender[%v]: AutoExportLogDataToTSDB %v error %v", s.opt.runnerName, s.opt.name, s.opt.tsdbReponame, err)
 			err = nil
 		}
 	}
@@ -609,6 +688,17 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 		if s.opt.logkitSendTime {
 			d[KeyLogkitSendTime] = now
 		}
+		if s.opt.extraInfo {
+			for key, val := range s.extraInfo {
+				suffix := 0
+				keyName := key
+				for _, exist := d[keyName]; exist; suffix++ {
+					keyName = key + strconv.Itoa(suffix)
+					_, exist = d[keyName]
+				}
+				d[keyName] = val
+			}
+		}
 		point := s.generatePoint(d)
 		points = append(points, pipeline.Data(map[string]interface{}(point)))
 	}
@@ -618,14 +708,32 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 		Datas:       points,
 		RepoOptions: &pipeline.RepoOptions{WithIP: s.opt.withip},
 		Option: &pipeline.SchemaFreeOption{
-			ToLogDB:       s.opt.enableLogdb,
-			LogDBRepoName: s.opt.logdbReponame,
-
-			ToKODO:         s.opt.enableKodo,
-			KodoRetention:  30,
-			KodoBucketName: s.opt.bucketName,
-			KodoEmail:      s.opt.email,
-
+			ToLogDB: s.opt.enableLogdb,
+			AutoExportToLogDBInput: pipeline.AutoExportToLogDBInput{
+				OmitEmpty:   true,
+				OmitInvalid: false,
+				RepoName:    s.opt.repoName,
+				LogRepoName: s.opt.logdbReponame,
+			},
+			ToKODO: s.opt.enableKodo,
+			AutoExportToKODOInput: pipeline.AutoExportToKODOInput{
+				Retention:  30,
+				RepoName:   s.opt.repoName,
+				BucketName: s.opt.bucketName,
+				Email:      s.opt.email,
+			},
+			ToTSDB: s.opt.enableTsdb,
+			AutoExportToTSDBInput: pipeline.AutoExportToTSDBInput{
+				OmitEmpty:    true,
+				OmitInvalid:  true,
+				IsMetric:     s.opt.isMetrics,
+				ExpandAttr:   s.opt.expandAttr,
+				RepoName:     s.opt.repoName,
+				TSDBRepoName: s.opt.tsdbReponame,
+				SeriesName:   s.opt.tsdbSeriesName,
+				SeriesTags:   s.opt.tsdbSeriesTags,
+				Timestamp:    s.opt.tsdbTimestamp,
+			},
 			ForceDataConvert: s.opt.forceDataConvert,
 		},
 	})
