@@ -24,13 +24,13 @@ type ClusterConfig struct {
 	MasterUrl []string `json:"master_url"`
 	IsMaster  bool     `json:"is_master"`
 	Enable    bool     `json:"enable"`
+	Address   string   `json:"address"`
+	Tag       string   `json:"tag"`
 }
 
 type Cluster struct {
 	ClusterConfig
 	slaves       []Slave
-	myaddress    string
-	mytag        string
 	mutex        *sync.RWMutex
 	statusUpdate time.Time
 }
@@ -84,20 +84,22 @@ const (
 func NewCluster(cc *ClusterConfig) *Cluster {
 	cl := new(Cluster)
 	cl.ClusterConfig = *cc
-	cl.mytag = DefaultMyTag
+	if cl.Tag == "" {
+		cl.Tag = DefaultMyTag
+	}
 	cl.slaves = make([]Slave, 0)
 	cl.mutex = new(sync.RWMutex)
 	return cl
 }
 
 func (cc *Cluster) RunRegisterLoop() error {
-	if err := Register(cc.MasterUrl, cc.myaddress, cc.mytag); err != nil {
+	if err := Register(cc.MasterUrl, cc.Address, cc.Tag); err != nil {
 		return fmt.Errorf("master %v is unavaliable", cc.MasterUrl)
 	}
 	go func() {
 		for {
 			time.Sleep(15 * time.Second)
-			if err := Register(cc.MasterUrl, cc.myaddress, cc.mytag); err != nil {
+			if err := Register(cc.MasterUrl, cc.Address, cc.Tag); err != nil {
 				log.Errorf("master %v is unavaliable", cc.MasterUrl)
 			}
 		}
@@ -328,11 +330,11 @@ func (rs *RestService) PostTag() echo.HandlerFunc {
 			errMsg := "cluster function not configed"
 			return RespError(c, http.StatusBadRequest, utils.ErrClusterTag, errMsg)
 		}
-		if err := Register(rs.cluster.MasterUrl, rs.cluster.myaddress, req.Tag); err != nil {
+		if err := Register(rs.cluster.MasterUrl, rs.cluster.Address, req.Tag); err != nil {
 			return RespError(c, http.StatusServiceUnavailable, utils.ErrClusterTag, err.Error())
 		}
 		rs.cluster.mutex.Lock()
-		rs.cluster.mytag = req.Tag
+		rs.cluster.Tag = req.Tag
 		rs.cluster.mutex.Unlock()
 		return RespSuccess(c, nil)
 	}
