@@ -13,7 +13,13 @@ import (
 	"github.com/qiniu/logkit/transforms"
 	"github.com/stretchr/testify/assert"
 	_ "github.com/qiniu/logkit/transforms/date"
+	"github.com/qiniu/logkit/sender"
 )
+
+type respTransformerRet struct {
+	Code string       `json:"code"`
+	Data []sender.Data `json:"data"`
+}
 
 // Rest 测试 端口容易冲突导致混淆，63xx
 func TestTransformerAPI(t *testing.T) {
@@ -70,7 +76,7 @@ func TestTransformerAPI(t *testing.T) {
 	assert.Equal(t, len(transforms.Transformers), len(got2.Data))
 
 	// Test transformer/transform with date transformer
-	var got3 []map[string]string
+	var got3 respTransformerRet
 	var dateTransformerConfig = `{
 		"type":"date",
 		"key":"ts",
@@ -84,6 +90,6 @@ func TestTransformerAPI(t *testing.T) {
 	if err = json.Unmarshal(content, &got3); err != nil {
 		t.Error(err)
 	}
-	exp := []map[string]string{{"ts":"2006-01-02T14:04:05Z"}}
-	assert.Equal(t, exp, got3)
+	exp := []sender.Data{{"ts":"2006-01-02T14:04:05Z"}}
+	assert.Equal(t, exp, got3.Data)
 }
