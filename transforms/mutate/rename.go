@@ -9,7 +9,6 @@ import (
 	"github.com/qiniu/logkit/utils"
 )
 
-
 type Rename struct {
 	Key        string `json:"key"`
 	NewKeyName string `json:"new_key_name"`
@@ -23,17 +22,17 @@ func (g *Rename) RawTransform(datas []string) ([]string, error) {
 func (g *Rename) Transform(datas []sender.Data) ([]sender.Data, error) {
 	var err, ferr error
 	errnums := 0
-	keys := utils.GetKeys(g.Key)
-	newkeys := utils.GetKeys(g.NewKeyName)
+	keySlice := utils.GetKeys(g.Key)
+	newKeySlice := utils.GetKeys(g.NewKeyName)
 	for i := range datas {
-		val, gerr := utils.GetMapValue(datas[i], keys...)
+		val, gerr := utils.GetMapValue(datas[i], keySlice...)
 		if gerr != nil {
 			errnums ++
 			fmt.Errorf("transform key %v not exist in data", g.Key)
 			continue
 		}
-		utils.DeleteMapValue(datas[i], keys...)
-		utils.SetMapValue(datas[i], val, newkeys...)
+		utils.DeleteMapValue(datas[i], keySlice...)
+		utils.SetMapValue(datas[i], val, newKeySlice...)
 	}
 	if err != nil {
 		g.stats.LastError = err.Error()
