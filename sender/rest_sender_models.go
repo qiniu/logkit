@@ -40,7 +40,7 @@ var (
 	OptionFtStrategy = utils.Option{
 		KeyName:       KeyFtStrategy,
 		ChooseOnly:    true,
-		ChooseOptions: []string{KeyFtStrategyBackupOnly, KeyFtStrategyAlwaysSave, KeyFtStrategyConcurrent},
+		ChooseOptions: []interface{}{KeyFtStrategyBackupOnly, KeyFtStrategyAlwaysSave, KeyFtStrategyConcurrent},
 		Default:       KeyFtStrategyBackupOnly,
 		DefaultNoUse:  false,
 		Description:   "磁盘管道容错策略(仅备份错误|全部数据走管道)(ft_strategy)",
@@ -56,7 +56,7 @@ var (
 	OptionFtMemoryChannel = utils.Option{
 		KeyName:       KeyFtMemoryChannel,
 		ChooseOnly:    true,
-		ChooseOptions: []string{"false", "true"},
+		ChooseOptions: []interface{}{"false", "true"},
 		Default:       "false",
 		DefaultNoUse:  false,
 		Description:   "使用内存替换磁盘管道(加速)(ft_memory_channel)",
@@ -107,7 +107,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyLogkitSendTime,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"true", "false"},
+			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   "是否在发送数据时自动添加发送时间(logkit_send_time)",
@@ -115,7 +115,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyPandoraExtraInfo,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"true", "false"},
+			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   "自动添加额外信息(pandora_extra_info)",
@@ -130,7 +130,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyPandoraRegion,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"nb"},
+			ChooseOptions: []interface{}{"nb"},
 			Default:       "nb",
 			DefaultNoUse:  false,
 			Description:   "创建的资源所在区域(pandora_region)",
@@ -138,7 +138,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyPandoraSchemaFree,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"true", "false"},
+			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   "是否根据数据自动创建与增加字段(pandora_schema_free)",
@@ -160,7 +160,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyPandoraEnableLogDB,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"true", "false"},
+			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   "是否自动创建并导出到Pandora LogDB(pandora_enable_logdb)",
@@ -182,7 +182,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyPandoraEnableTSDB,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"true", "false"},
+			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "false",
 			DefaultNoUse:  false,
 			Description:   "是否自动创建并导出到Pandora TSDB(pandora_enable_tsdb)",
@@ -225,7 +225,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyPandoraEnableKodo,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"false", "true"},
+			ChooseOptions: []interface{}{"false", "true"},
 			Default:       "false",
 			DefaultNoUse:  false,
 			Description:   "是否自动导出到七牛云存储(pandora_enable_kodo)",
@@ -254,7 +254,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyPandoraKodoCompressPrefix,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"parquet", "json", "text", "csv"},
+			ChooseOptions: []interface{}{"parquet", "json", "text", "csv"},
 			Default:       "parquet",
 			DefaultNoUse:  false,
 			Description:   "云存储压缩方式(pandora_kodo_compress)",
@@ -262,7 +262,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyPandoraGzip,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"true", "false"},
+			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   "gzip压缩发送(pandora_gzip)",
@@ -286,7 +286,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyPandoraUUID,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"false", "true"},
+			ChooseOptions: []interface{}{"false", "true"},
 			Default:       "false",
 			DefaultNoUse:  false,
 			Description:   "每条数据植入UUID(pandora_uuid)",
@@ -294,7 +294,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyPandoraWithIP,
 			ChooseOnly:    false,
-			ChooseOptions: []string{"false", "true"},
+			ChooseOptions: []interface{}{"false", "true"},
 			Default:       "false",
 			DefaultNoUse:  false,
 			Description:   "每条数据植入IP地址(pandora_withip)",
@@ -308,7 +308,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyForceMicrosecond,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"false", "true"},
+			ChooseOptions: []interface{}{"false", "true"},
 			Default:       "false",
 			DefaultNoUse:  false,
 			Description:   "对于数据的时间字段抖动(force_microsecond)",
@@ -316,7 +316,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyForceDataConvert,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"false", "true"},
+			ChooseOptions: []interface{}{"false", "true"},
 			Default:       "false",
 			DefaultNoUse:  false,
 			Description:   "数据强制类型转换(pandora_force_convert)",
@@ -324,7 +324,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyIgnoreInvalidField,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"true", "false"},
+			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   "忽略格式错误的字段(ignore_invalid_field)",
@@ -332,7 +332,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyPandoraAutoConvertDate,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"true", "false"},
+			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   "时间类型自动转换(pandora_auto_convert_date)",
@@ -459,7 +459,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyElasticVersion,
 			ChooseOnly:    true,
-			ChooseOptions: []string{ElasticVersion3, ElasticVersion5, ElasticVersion6},
+			ChooseOptions: []interface{}{ElasticVersion3, ElasticVersion5, ElasticVersion6},
 			Description:   "ES版本号(es_version)",
 		},
 		{
@@ -472,7 +472,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyElasticIndexStrategy,
 			ChooseOnly:    true,
-			ChooseOptions: []string{KeyDefaultIndexStrategy, KeyYearIndexStrategy, KeyMonthIndexStrategy, KeyDayIndexStrategy},
+			ChooseOptions: []interface{}{KeyDefaultIndexStrategy, KeyYearIndexStrategy, KeyMonthIndexStrategy, KeyDayIndexStrategy},
 			Default:       KeyFtStrategyBackupOnly,
 			DefaultNoUse:  false,
 			Description:   "自动索引模式(默认索引|按年索引|按月索引|按日索引)(index_strategy)",
@@ -510,7 +510,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyKafkaCompression,
 			ChooseOnly:    true,
-			ChooseOptions: []string{KeyKafkaCompressionNone, KeyKafkaCompressionGzip, KeyKafkaCompressionSnappy},
+			ChooseOptions: []interface{}{KeyKafkaCompressionNone, KeyKafkaCompressionGzip, KeyKafkaCompressionSnappy},
 			Default:       KeyKafkaCompressionNone,
 			DefaultNoUse:  false,
 			Description:   "压缩模式(none不压缩|gzip压缩|snappy压缩)(kafka_compression)",

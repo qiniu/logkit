@@ -3,7 +3,7 @@ package utils
 type Option struct {
 	KeyName       string
 	ChooseOnly    bool
-	ChooseOptions []string
+	ChooseOptions []interface{}
 	Default       string
 	DefaultNoUse  bool
 	Description   string

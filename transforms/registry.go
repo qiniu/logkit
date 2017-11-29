@@ -45,7 +45,7 @@ var (
 	KeyStage = utils.Option{
 		KeyName:       "stage",
 		ChooseOnly:    true,
-		ChooseOptions: []string{StageAfterParser, StageBeforeParser},
+		ChooseOptions: []interface{}{StageAfterParser, StageBeforeParser},
 		Default:       StageAfterParser,
 		DefaultNoUse:  false,
 		Description:   "transform运行的阶段(parser前还是parser后)(stage)",
@@ -54,7 +54,7 @@ var (
 	KeyStageAfterOnly = utils.Option{
 		KeyName:       "stage",
 		ChooseOnly:    true,
-		ChooseOptions: []string{StageAfterParser},
+		ChooseOptions: []interface{}{StageAfterParser},
 		Default:       StageAfterParser,
 		DefaultNoUse:  false,
 		Description:   "transform运行的阶段(stage)",
@@ -67,5 +67,17 @@ var (
 		DefaultNoUse: true,
 		Description:  "要进行Transform变化的键(key)",
 		Type:         TransformTypeString,
+	}
+	KeyTimezoneoffset = utils.Option{
+		KeyName:    "offset",
+		ChooseOnly: true,
+		ChooseOptions: []interface{}{0, -1, -2, -3, -4,
+			-5, -6, -7, -8, -9, -10, -11, -12,
+			1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12},
+		Default:      "0",
+		DefaultNoUse: false,
+		Description:  "时区偏移量(offset)",
+		CheckRegex:   "*",
+		Type:         TransformTypeLong,
 	}
 )

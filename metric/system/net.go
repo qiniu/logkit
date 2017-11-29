@@ -72,7 +72,7 @@ func (_ *NetIOStats) Config() map[string]interface{} {
 		{
 			KeyName:       "skip_protocols_state",
 			ChooseOnly:    true,
-			ChooseOptions: []string{"true", "false"},
+			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   "是否忽略各个网络协议的状态信息",
