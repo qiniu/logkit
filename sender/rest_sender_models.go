@@ -457,6 +457,12 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "host地址(elastic_host)",
 		},
 		{
+			KeyName:       KeyElasticVersion,
+			ChooseOnly:    true,
+			ChooseOptions: []string{ElasticVersion3, ElasticVersion5, ElasticVersion6},
+			Description:   "ES版本号(es_version)",
+		},
+		{
 			KeyName:      KeyElasticIndex,
 			ChooseOnly:   false,
 			Default:      "app-repo-123",

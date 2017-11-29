@@ -425,7 +425,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyESVersion,
 			ChooseOnly:    true,
-			ChooseOptions: []string{ElasticVersion2, ElasticVersion5},
+			ChooseOptions: []string{ElasticVersion3, ElasticVersion5, ElasticVersion6},
 			Description:   "ES版本号(es_version)",
 		},
 		{
