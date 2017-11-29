@@ -30,4 +30,6 @@ type LogdbAPI interface {
 	MakeToken(*base.TokenDesc) (string, error)
 
 	PartialQuery(input *PartialQueryInput) (output *PartialQueryOutput, err error)
+
+	GetSampleDataSchema(input *SchemaRefInput) (output *SchemaRefOut, err error)
 }

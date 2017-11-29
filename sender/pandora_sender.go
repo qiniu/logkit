@@ -48,9 +48,12 @@ const (
 	KeyPandoraTSDBHost       = "pandora_tsdb_host"
 	KeyPandoraTSDBTimeStamp  = "pandora_tsdb_timestamp"
 
-	KeyPandoraEnableKodo     = "pandora_enable_kodo"
-	KeyPandoraKodoBucketName = "pandora_bucket_name"
-	KeyPandoraEmail          = "qiniu_email"
+	KeyPandoraEnableKodo         = "pandora_enable_kodo"
+	KeyPandoraKodoBucketName     = "pandora_bucket_name"
+	KeyPandoraKodoFilePrefix     = "pandora_kodo_prefix"
+	KeyPandoraKodoCompressPrefix = "pandora_kodo_compress"
+
+	KeyPandoraEmail = "qiniu_email"
 
 	KeyRequestRateLimit       = "request_rate_limit"
 	KeyFlowRateLimit          = "flow_rate_limit"
@@ -119,6 +122,8 @@ type PandoraOption struct {
 	enableKodo bool
 	bucketName string
 	email      string
+	prefix     string
+	format     string
 
 	forceMicrosecond   bool
 	forceDataConvert   bool
@@ -198,6 +203,8 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	enableKodo, _ := conf.GetBoolOr(KeyPandoraEnableKodo, false)
 	kodobucketName, _ := conf.GetStringOr(KeyPandoraKodoBucketName, repoName)
 	email, _ := conf.GetStringOr(KeyPandoraEmail, "")
+	format, _ := conf.GetStringOr(KeyPandoraKodoCompressPrefix, "parquet")
+	prefix, _ := conf.GetStringOr(KeyPandoraKodoFilePrefix, "logkitauto/date=$(year)-$(mon)-$(day)/hour=$(hour)/min=$(min)/$(sec)")
 
 	forceconvert, _ := conf.GetBoolOr(KeyForceDataConvert, false)
 	ignoreInvalidField, _ := conf.GetBoolOr(KeyIgnoreInvalidField, true)
@@ -236,6 +243,8 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 		enableKodo: enableKodo,
 		email:      email,
 		bucketName: kodobucketName,
+		format:     format,
+		prefix:     prefix,
 
 		forceMicrosecond:   forceMicrosecond,
 		forceDataConvert:   forceconvert,
@@ -360,6 +369,8 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 		err = s.client.AutoExportToKODO(&pipeline.AutoExportToKODOInput{
 			RepoName:   s.opt.repoName,
 			BucketName: s.opt.bucketName,
+			Prefix:     s.opt.prefix,
+			Format:     s.opt.format,
 			Email:      s.opt.email,
 			Retention:  30, //默认30天
 		})
@@ -721,6 +732,8 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 				RepoName:   s.opt.repoName,
 				BucketName: s.opt.bucketName,
 				Email:      s.opt.email,
+				Prefix:     s.opt.prefix,
+				Format:     s.opt.format,
 			},
 			ToTSDB: s.opt.enableTsdb,
 			AutoExportToTSDBInput: pipeline.AutoExportToTSDBInput{

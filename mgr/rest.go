@@ -16,6 +16,7 @@ import (
 	"sync"
 
 	"errors"
+
 	"github.com/labstack/echo"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
@@ -158,9 +159,11 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	}
 	rs.address = address
 	if rs.cluster.Enable {
-		rs.cluster.myaddress, err = GetMySlaveUrl(address, httpschema)
-		if err != nil {
-			log.Fatalf("get slave url bindaddress[%v] error %v", address, err)
+		if rs.cluster.Address == "" {
+			rs.cluster.Address, err = GetMySlaveUrl(address, httpschema)
+			if err != nil {
+				log.Fatalf("get slave url bindaddress[%v] error %v", address, err)
+			}
 		}
 	}
 	return rs
@@ -222,8 +225,8 @@ func (rs *RestService) Status() echo.HandlerFunc {
 		rss := rs.mgr.Status()
 		if rs.cluster.Enable {
 			for k, v := range rss {
-				v.Tag = rs.cluster.mytag
-				v.Url = rs.cluster.myaddress
+				v.Tag = rs.cluster.Tag
+				v.Url = rs.cluster.Address
 				rss[k] = v
 			}
 		}

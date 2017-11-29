@@ -521,6 +521,21 @@ type SendLogOutput struct {
 	Total   int `json:"total"`
 }
 
+type SchemaRefInput struct {
+	LogdbToken
+	SampleData map[string]interface{} `json:"sample_data"`
+}
+
+func (srf SchemaRefInput) Buf() (buf []byte, err error) {
+	buf, err = json.Marshal(srf.SampleData)
+	if err != nil {
+		return
+	}
+	return
+}
+
+type SchemaRefOut []RepoSchemaEntry
+
 type Highlight struct {
 	PreTags           []string               `json:"pre_tags"`
 	PostTags          []string               `json:"post_tags"`
