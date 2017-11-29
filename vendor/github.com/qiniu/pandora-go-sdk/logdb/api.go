@@ -79,6 +79,23 @@ func (c *Logdb) SendLog(input *SendLogInput) (output *SendLogOutput, err error) 
 	return output, req.Send()
 }
 
+// 输入JSON样例数据，输出对应的LOGDB Schema
+func (c *Logdb) GetSampleDataSchema(input *SchemaRefInput) (output *SchemaRefOut, err error) {
+	op := c.newOperation(base.OpSchemaRef)
+
+	output = &SchemaRefOut{}
+	req := c.newRequest(op, input.Token, &output)
+
+	data, err := input.Buf()
+	if err != nil {
+		return
+	}
+
+	req.SetBufferBody(data)
+	req.SetHeader(base.HTTPHeaderContentType, base.ContentTypeJson)
+	return output, req.Send()
+}
+
 func (c *Logdb) QueryLog(input *QueryLogInput) (output *QueryLogOutput, err error) {
 	var highlight bool
 	if input.Highlight != nil {

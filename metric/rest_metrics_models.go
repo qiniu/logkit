@@ -26,7 +26,7 @@ func GetMetricUsages() []utils.Option {
 		option := utils.Option{
 			KeyName:       key,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"true", "false"},
+			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   collector().Usages(),

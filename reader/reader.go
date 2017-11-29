@@ -215,7 +215,7 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 		if !strings.HasPrefix(eshost, "http://") && !strings.HasPrefix(eshost, "https://") {
 			eshost = "http://" + eshost
 		}
-		esVersion, _ := conf.GetStringOr(KeyESVersion, ElasticVersion2)
+		esVersion, _ := conf.GetStringOr(KeyESVersion, ElasticVersion3)
 		keepAlive, _ := conf.GetStringOr(KeyESKeepAlive, "6h")
 		reader, err = NewESReader(meta, readBatch, estype, esindex, eshost, esVersion, keepAlive)
 	case ModeMongo:

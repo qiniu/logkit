@@ -209,7 +209,7 @@ func (_ *DiskIOStats) Config() map[string]interface{} {
 	option := utils.Option{
 		KeyName:       ConfigDiskioUsages[3].Key,
 		ChooseOnly:    true,
-		ChooseOptions: []string{"true", "false"},
+		ChooseOptions: []interface{}{"true", "false"},
 		Default:       "true",
 		DefaultNoUse:  false,
 		Description:   ConfigDiskioUsages[3].Value,

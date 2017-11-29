@@ -4,7 +4,8 @@ import {
   Input,
   Select,
   Icon,
-  notification
+  notification,
+  InputNumber
 } from 'antd';
 import {getTransformOptions, getTransformUsages} from '../services/logkit';
 import config from '../store/config'
@@ -185,8 +186,8 @@ class Transformer extends Component {
             rules: [{required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur'},
               {pattern: ele.CheckRegex, message: '输入不符合规范'},
             ]
-          })(
-              <Input placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值' } disabled={this.state.isReadonly}/>
+          })(ele.Type === 'string' ? (<Input placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值' } disabled={this.state.isReadonly}/>) :
+              (<InputNumber placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值' } disabled={this.state.isReadonly}  />)
           )}
         </FormItem>)
       } else {
@@ -195,9 +196,7 @@ class Transformer extends Component {
                               className=""
                               label={ele.Description}>
           {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
-            initialValue: ele.ChooseOptions[0],
-            rules: [{required: true, message: '不能为空', trigger: 'blur'},
-            ]
+            initialValue: ele.ChooseOptions[0]
           })(
               <Select>
                 {this.renderChooseOption(ele.ChooseOptions)}

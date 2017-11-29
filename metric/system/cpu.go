@@ -109,7 +109,7 @@ func (_ *CPUStats) Config() map[string]interface{} {
 		opt := utils.Option{
 			KeyName:       val.Key,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"true", "false"},
+			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   val.Value,

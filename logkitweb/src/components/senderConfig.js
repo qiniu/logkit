@@ -75,6 +75,9 @@ class Sender extends Component {
   init = () => {
     const {setFieldsValue, resetFields} = this.props.form;
     let that = this
+    let isMetric = this.props.isMetric
+    let trueDefault = ["true", "false"]
+    let falseDefault = ["false", "true"]
     getSenderOptions().then(item => {
       if (item.code === 'L200') {
         this.setState({
@@ -83,6 +86,23 @@ class Sender extends Component {
         })
         getSenderOptionsFormData().then(item => {
           if (item.code === 'L200') {
+            if("pandora" in item.data){
+              item.data["pandora"].forEach(function (val, index, arr) {
+                if(isMetric === "true"){
+                  if(val.KeyName === "pandora_enable_logdb"){
+                    item.data["pandora"][index].ChooseOptions = falseDefault
+                  }else if(val.KeyName === "pandora_enable_tsdb") {
+                    item.data["pandora"][index].ChooseOptions = trueDefault
+                  }
+                }else{
+                  if(val.KeyName === "pandora_enable_logdb"){
+                    item.data["pandora"][index].ChooseOptions = trueDefault
+                  }else if(val.KeyName === "pandora_enable_tsdb") {
+                    item.data["pandora"][index].ChooseOptions = falseDefault
+                  }
+                }
+              })
+            }
             this.setState({
               items: item.data,
               currentItem: item.data[this.state.currentOption]
@@ -101,10 +121,7 @@ class Sender extends Component {
 
         })
       }
-
     })
-
-
   }
 
   renderFormItem = () => {

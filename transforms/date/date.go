@@ -137,17 +137,7 @@ func (it *DateTrans) ConfigOptions() []utils.Option {
 	return []utils.Option{
 		transforms.KeyStageAfterOnly,
 		transforms.KeyFieldName,
-		{
-			KeyName:    "offset",
-			ChooseOnly: true,
-			ChooseOptions: []string{"0", "-1", "-2", "-3", "-4",
-				"-5", "-6", "-7", "-8", "-9", "-10", "-11", "-12",
-				"1", "2", "3", "4", "5", "6", "7", "8", "9", "11", "12"},
-			Default:      "0",
-			DefaultNoUse: false,
-			Description:  "时区偏移量(offset)",
-			Type:         transforms.TransformTypeString,
-		},
+		transforms.KeyTimezoneoffset,
 		{
 			KeyName:      "time_layout_before",
 			ChooseOnly:   false,

@@ -11,7 +11,7 @@ import (
 	"github.com/qiniu/pandora-go-sdk/base/request"
 )
 
-var builder errBuilder
+var builder LogdbErrBuilder
 
 type Logdb struct {
 	Config     *config.Config
@@ -23,10 +23,10 @@ func NewConfig() *config.Config {
 }
 
 func New(c *config.Config) (LogdbAPI, error) {
-	return newClient(c)
+	return NewClient(c)
 }
 
-func newClient(c *config.Config) (p *Logdb, err error) {
+func NewClient(c *config.Config) (p *Logdb, err error) {
 	if c.LogdbEndpoint == "" {
 		c.LogdbEndpoint = c.Endpoint
 	}
@@ -87,6 +87,8 @@ func (c *Logdb) newOperation(opName string, args ...interface{}) *request.Operat
 		method, urlTmpl = base.MethodGet, "/v5/repos/%s/config"
 	case base.OpPartialQuery:
 		method, urlTmpl = base.MethodPost, "/v5/repos/%s/s"
+	case base.OpSchemaRef:
+		method, urlTmpl = base.MethodPost, "/v5/schema/derivation"
 	default:
 		c.Config.Logger.Errorf("unmatched operation name: %s", opName)
 		return nil

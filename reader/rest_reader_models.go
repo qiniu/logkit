@@ -25,9 +25,34 @@ var (
 	OptionDataSourceTag = utils.Option{
 		KeyName:      KeyDataSourceTag,
 		ChooseOnly:   false,
-		Default:      "",
+		Default:      "datasource",
 		DefaultNoUse: false,
 		Description:  "具体的数据文件路径来源标签(datasource_tag)",
+	}
+	OptionEncoding = utils.Option{
+		KeyName:    KeyEncoding,
+		ChooseOnly: true,
+		ChooseOptions: []interface{}{"UTF-8", "UTF-16", "US-ASCII", "ISO-8859-1",
+			"GBK", "GB18030", "EUC-JP", "UTF-16BE", "UTF-16LE", "Big5", "Shift_JIS",
+			"ISO-8859-2", "ISO-8859-3", "ISO-8859-4", "ISO-8859-5", "ISO-8859-6", "ISO-8859-7",
+			"ISO-8859-8", "ISO-8859-9", "ISO-8859-10", "ISO-8859-11", "ISO-8859-12", "ISO-8859-13",
+			"ISO-8859-14", "ISO-8859-15", "ISO-8859-16", "macos-0_2-10.2", "macos-6_2-10.4",
+			"macos-7_3-10.2", "macos-29-10.2", "macos-35-10.2", "windows-1250", "windows-1251",
+			"windows-1252", "windows-1253", "windows-1254", "windows-1255", "windows-1256",
+			"windows-1257", "windows-1258", "windows-874", "IBM037", "ibm-273_P100-1995",
+			"ibm-277_P100-1995", "ibm-278_P100-1995", "ibm-280_P100-1995", "ibm-284_P100-1995",
+			"ibm-285_P100-1995", "ibm-290_P100-1995", "ibm-297_P100-1995", "ibm-420_X120-1999",
+			//此处省略大量IBM的字符集，太多，等用户需要再加
+			"KOI8-R", "KOI8-U", "ebcdic-xml-us"},
+		Default:      "UTF-8",
+		DefaultNoUse: false,
+		Description:  "编码方式(encoding)",
+	}
+	OptionWhence = utils.Option{
+		KeyName:       KeyWhence,
+		ChooseOnly:    true,
+		ChooseOptions: []interface{}{WhenceOldest, WhenceNewest},
+		Description:   "读取的起始位置(read_from)",
 	}
 )
 var ModeKeyOptions = map[string][]utils.Option{
@@ -64,13 +89,13 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyWhence,
 			ChooseOnly:    true,
-			ChooseOptions: []string{WhenceOldest, WhenceNewest},
+			ChooseOptions: []interface{}{WhenceOldest, WhenceNewest},
 			Description:   "读取的起始位置(read_from)",
 		},
 		{
 			KeyName:    KeyEncoding,
 			ChooseOnly: true,
-			ChooseOptions: []string{"UTF-8", "UTF-16", "US-ASCII", "ISO-8859-1",
+			ChooseOptions: []interface{}{"UTF-8", "UTF-16", "US-ASCII", "ISO-8859-1",
 				"GBK", "GB18030", "EUC-JP", "UTF-16BE", "UTF-16LE", "Big5", "Shift_JIS",
 				"ISO-8859-2", "ISO-8859-3", "ISO-8859-4", "ISO-8859-5", "ISO-8859-6", "ISO-8859-7",
 				"ISO-8859-8", "ISO-8859-9", "ISO-8859-10", "ISO-8859-11", "ISO-8859-12", "ISO-8859-13",
@@ -105,7 +130,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyIgnoreHiddenFile,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"true", "false"},
+			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   "是否忽略隐藏文件(ignore_hidden)",
@@ -148,32 +173,9 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "文件缓存数据大小(reader_buf_size)",
 			CheckRegex:   "\\d+",
 		},
-		{
-			KeyName:       KeyWhence,
-			ChooseOnly:    true,
-			ChooseOptions: []string{WhenceOldest, WhenceNewest},
-			Description:   "读取的起始位置(read_from)",
-		},
+		OptionWhence,
 		OptionDataSourceTag,
-		{
-			KeyName:    KeyEncoding,
-			ChooseOnly: true,
-			ChooseOptions: []string{"UTF-8", "UTF-16", "US-ASCII", "ISO-8859-1",
-				"GBK", "GB18030", "EUC-JP", "UTF-16BE", "UTF-16LE", "Big5", "Shift_JIS",
-				"ISO-8859-2", "ISO-8859-3", "ISO-8859-4", "ISO-8859-5", "ISO-8859-6", "ISO-8859-7",
-				"ISO-8859-8", "ISO-8859-9", "ISO-8859-10", "ISO-8859-11", "ISO-8859-12", "ISO-8859-13",
-				"ISO-8859-14", "ISO-8859-15", "ISO-8859-16", "macos-0_2-10.2", "macos-6_2-10.4",
-				"macos-7_3-10.2", "macos-29-10.2", "macos-35-10.2", "windows-1250", "windows-1251",
-				"windows-1252", "windows-1253", "windows-1254", "windows-1255", "windows-1256",
-				"windows-1257", "windows-1258", "windows-874", "IBM037", "ibm-273_P100-1995",
-				"ibm-277_P100-1995", "ibm-278_P100-1995", "ibm-280_P100-1995", "ibm-284_P100-1995",
-				"ibm-285_P100-1995", "ibm-290_P100-1995", "ibm-297_P100-1995", "ibm-420_X120-1999",
-				//省略大量IBM的字符集，太多，等用户需要再加
-				"KOI8-R", "KOI8-U", "ebcdic-xml-us"},
-			Default:      "UTF-8",
-			DefaultNoUse: false,
-			Description:  "编码方式(encoding)",
-		},
+		OptionEncoding,
 		{
 			KeyName:      KeyReadIOLimit,
 			ChooseOnly:   false,
@@ -213,31 +215,8 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "文件缓存数据大小(reader_buf_size)",
 			CheckRegex:   "\\d+",
 		},
-		{
-			KeyName:       KeyWhence,
-			ChooseOnly:    true,
-			ChooseOptions: []string{WhenceOldest, WhenceNewest},
-			Description:   "读取的起始位置(read_from)",
-		},
-		{
-			KeyName:    KeyEncoding,
-			ChooseOnly: true,
-			ChooseOptions: []string{"UTF-8", "UTF-16", "US-ASCII", "ISO-8859-1",
-				"GBK", "GB18030", "EUC-JP", "UTF-16BE", "UTF-16LE", "Big5", "Shift_JIS",
-				"ISO-8859-2", "ISO-8859-3", "ISO-8859-4", "ISO-8859-5", "ISO-8859-6", "ISO-8859-7",
-				"ISO-8859-8", "ISO-8859-9", "ISO-8859-10", "ISO-8859-11", "ISO-8859-12", "ISO-8859-13",
-				"ISO-8859-14", "ISO-8859-15", "ISO-8859-16", "macos-0_2-10.2", "macos-6_2-10.4",
-				"macos-7_3-10.2", "macos-29-10.2", "macos-35-10.2", "windows-1250", "windows-1251",
-				"windows-1252", "windows-1253", "windows-1254", "windows-1255", "windows-1256",
-				"windows-1257", "windows-1258", "windows-874", "IBM037", "ibm-273_P100-1995",
-				"ibm-277_P100-1995", "ibm-278_P100-1995", "ibm-280_P100-1995", "ibm-284_P100-1995",
-				"ibm-285_P100-1995", "ibm-290_P100-1995", "ibm-297_P100-1995", "ibm-420_X120-1999",
-				//省略大量IBM的字符集，太多，等用户需要再加
-				"KOI8-R", "KOI8-U", "ebcdic-xml-us"},
-			Default:      "UTF-8",
-			DefaultNoUse: false,
-			Description:  "编码方式(encoding)",
-		},
+		OptionWhence,
+		OptionEncoding,
 		{
 			KeyName:      KeyReadIOLimit,
 			ChooseOnly:   false,
@@ -428,7 +407,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyMysqlExecOnStart,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"true", "false"},
+			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   "启动时立即执行(mysql_exec_onstart)",
@@ -496,7 +475,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyMssqlExecOnStart,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"true", "false"},
+			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   "启动时立即执行(mssql_exec_onstart)",
@@ -520,7 +499,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyESVersion,
 			ChooseOnly:    true,
-			ChooseOptions: []string{ElasticVersion2, ElasticVersion5},
+			ChooseOptions: []interface{}{ElasticVersion3, ElasticVersion5, ElasticVersion6},
 			Description:   "ES版本号(es_version)",
 		},
 		{
@@ -616,7 +595,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyMongoExecOnstart,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"true", "false"},
+			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   "启动时立即执行(mongo_exec_onstart)",
@@ -651,12 +630,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse: true,
 			Description:  "Zookeeper地址(kafka_zookeeper)",
 		},
-		{
-			KeyName:       KeyWhence,
-			ChooseOnly:    true,
-			ChooseOptions: []string{WhenceOldest, WhenceNewest},
-			Description:   "读取的起始位置(read_from)",
-		},
+		OptionWhence,
 		{
 			KeyName:      KeyKafkaZookeeperTimeout,
 			ChooseOnly:   false,
@@ -670,7 +644,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyRedisDataType,
 			ChooseOnly:    true,
-			ChooseOptions: []string{DataTypeList, DataTypeChannel, DataTypePatterChannel, DataTypeString, DataTypeSet, DateTypeSortedSet, DateTypeHash},
+			ChooseOptions: []interface{}{DataTypeList, DataTypeChannel, DataTypePatterChannel, DataTypeString, DataTypeSet, DateTypeSortedSet, DateTypeHash},
 			Description:   "Redis的数据读取模式(redis_datatype)",
 		},
 		{

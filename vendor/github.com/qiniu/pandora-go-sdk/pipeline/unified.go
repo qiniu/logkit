@@ -37,13 +37,19 @@ func (c *Pipeline) FormKodoSpec(input *CreateRepoForKodoInput) *ExportKodoSpec {
 	for _, v := range input.Schema {
 		doc[v.Key] = "#" + v.Key
 	}
+	if input.Prefix == "" {
+		input.Prefix = "logkitauto/date=$(year)-$(mon)-$(day)/hour=$(hour)/min=$(min)/$(sec)"
+	}
+	if input.Format == "" {
+		input.Format = "parquet"
+	}
 	return &ExportKodoSpec{
 		Bucket:    input.Bucket,
-		KeyPrefix: "logkitauto/date=$(year)-$(mon)-$(day)/hour=$(hour)/min=$(min)/$(sec)",
+		KeyPrefix: input.Prefix,
 		Fields:    doc,
 		Email:     input.Email,
 		AccessKey: input.Ak,
-		Format:    "parquet",
+		Format:    input.Format,
 		Retention: input.Retention,
 	}
 }
@@ -305,6 +311,8 @@ func (c *Pipeline) AutoExportToKODO(input *AutoExportToKODOInput) error {
 			Bucket:    input.BucketName,
 			RepoName:  input.RepoName,
 			Schema:    repoInfo.Schema,
+			Prefix:    input.Prefix,
+			Format:    input.Format,
 		})
 		exportInput := c.FormExportInput(input.RepoName, ExportTypeKODO, kodoSpec)
 		return c.CreateExport(exportInput)

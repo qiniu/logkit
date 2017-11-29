@@ -116,6 +116,7 @@ const (
 	ErrVariableAlreadyExist
 	ErrSameToSystemVariable
 	ErrTransformUpdate
+	ErrSQLWithUndefinedVariable
 )
 
 type ErrBuilder interface {

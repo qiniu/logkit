@@ -18,7 +18,11 @@ type PipelineToken struct {
 	Token string `json:"-"`
 }
 
-const defaultRegion = "nb"
+const (
+	defaultRegion      = "nb"
+	VariableTimeType   = "time"
+	VariableStringType = "string"
+)
 
 //PandoraMaxBatchSize 发送到Pandora的batch限制
 var PandoraMaxBatchSize = 2 * 1024 * 1024
@@ -350,6 +354,7 @@ type CreateRepoDSLInput struct {
 	DSL       string       `json:"dsl"`
 	Options   *RepoOptions `json:"options"`
 	GroupName string       `json:"group"`
+	Workflow  string       `json:"workflow"` // 请注意：果此处workflow不指定，默认会创建名称为前缀"streaming_auto_"与实际RepoName拼接的workflow
 }
 
 /*
@@ -571,6 +576,8 @@ func getFormatDSL(schemas []RepoSchemaEntry, depth int, indent string) (dsl stri
 type AutoExportToKODOInput struct {
 	RepoName   string
 	BucketName string
+	Prefix     string
+	Format     string
 	Email      string
 	Retention  int //数字，单位为天
 }
@@ -634,6 +641,8 @@ type CreateRepoForKodoInput struct {
 	Region    string
 	Bucket    string
 	RepoName  string
+	Prefix    string
+	Format    string
 	Schema    []RepoSchemaEntry
 }
 
@@ -677,11 +686,17 @@ type CreateRepoInput struct {
 	Schema    []RepoSchemaEntry `json:"schema"`
 	Options   *RepoOptions      `json:"options"`
 	GroupName string            `json:"group"`
+	Workflow  string            `json:"workflow"` // 请注意：果此处workflow不指定，默认会创建名称为前缀"streaming_auto_"与实际RepoName拼接的workflow
 }
 
 func (r *CreateRepoInput) Validate() (err error) {
 	if err = validateRepoName(r.RepoName); err != nil {
 		return
+	}
+	if r.Workflow != "" {
+		if err = validateWorkflowName(r.Workflow); err != nil {
+			return
+		}
 	}
 
 	if r.Schema == nil || len(r.Schema) == 0 {
@@ -796,6 +811,7 @@ type RepoDesc struct {
 
 type ListReposInput struct {
 	PipelineToken
+	WithDag bool `json:"-"`
 }
 
 type ListReposOutput struct {
@@ -1057,6 +1073,7 @@ type TransformDesc struct {
 	TransformName string         `json:"name"`
 	DestRepoName  string         `json:"to"`
 	Spec          *TransformSpec `json:"spec"`
+	Workflow      string         `json:"workflow"`
 }
 
 type GetTransformInput struct {
@@ -1105,8 +1122,8 @@ type ExportTsdbSpec struct {
 	SeriesName   string            `json:"series"`
 	Tags         map[string]string `json:"tags"`
 	Fields       map[string]string `json:"fields"`
-	OmitInvalid  bool              `json:"omitInvalid,omitempty"`
-	OmitEmpty    bool              `json:"omitEmpty,omitempty"`
+	OmitInvalid  bool              `json:"omitInvalid"`
+	OmitEmpty    bool              `json:"omitEmpty"`
 	Timestamp    string            `json:"timestamp,omitempty"`
 }
 
@@ -1155,8 +1172,8 @@ func (s *ExportMongoSpec) Validate() (err error) {
 type ExportLogDBSpec struct {
 	DestRepoName string                 `json:"destRepoName"`
 	Doc          map[string]interface{} `json:"doc"`
-	OmitInvalid  bool                   `json:"omitInvalid,omitempty"`
-	OmitEmpty    bool                   `json:"omitEmpty,omitempty"`
+	OmitInvalid  bool                   `json:"omitInvalid"`
+	OmitEmpty    bool                   `json:"omitEmpty"`
 }
 
 func (s *ExportLogDBSpec) Validate() (err error) {
@@ -1290,10 +1307,11 @@ func (e *UpdateExportInput) Validate() (err error) {
 }
 
 type ExportDesc struct {
-	Name   string                 `json:"name,omitempty"`
-	Type   string                 `json:"type"`
-	Spec   map[string]interface{} `json:"spec"`
-	Whence string                 `json:"whence,omitempty"`
+	Name     string                 `json:"name,omitempty"`
+	Type     string                 `json:"type"`
+	Spec     map[string]interface{} `json:"spec"`
+	Whence   string                 `json:"whence,omitempty"`
+	Workflow string                 `json:"workflow"`
 }
 
 type GetExportInput struct {
@@ -1487,6 +1505,7 @@ type CreateDatasourceInput struct {
 	Spec           interface{}       `json:"spec"`
 	Schema         []RepoSchemaEntry `json:"schema"`
 	NoVerifySchema bool              `json:"noVerifySchema"`
+	Workflow       string            `json:"workflow"` // 请注意：果此处workflow不指定，默认会创建名称为前缀"batch_auto_"与实际RepoName拼接的workflow
 }
 
 func (c *CreateDatasourceInput) Validate() (err error) {
@@ -1495,6 +1514,11 @@ func (c *CreateDatasourceInput) Validate() (err error) {
 	}
 	if c.Type == "" {
 		return reqerr.NewInvalidArgs("Type", fmt.Sprintf("type of datasource should not be empty"))
+	}
+	if c.Workflow != "" {
+		if err = validateWorkflowName(c.Workflow); err != nil {
+			return
+		}
 	}
 	if len(c.Schema) == 0 {
 		return reqerr.NewInvalidArgs("Schema", fmt.Sprintf("schema of datasource should not be empty"))
@@ -1528,11 +1552,12 @@ type GetDatasourceInput struct {
 }
 
 type GetDatasourceOutput struct {
-	Region  string            `json:"region"`
-	Type    string            `json:"type"`
-	Spec    interface{}       `json:"spec"`
-	Schema  []RepoSchemaEntry `json:"schema"`
-	FromDag bool              `json:"fromDag,omitempty"`
+	Region   string            `json:"region"`
+	Type     string            `json:"type"`
+	Spec     interface{}       `json:"spec"`
+	Schema   []RepoSchemaEntry `json:"schema"`
+	FromDag  bool              `json:"fromDag,omitempty"`
+	Workflow string            `json:"workflow"`
 }
 
 type DatasourceExistInput GetDatasourceInput
@@ -1549,11 +1574,12 @@ type DatasourceExistOutput struct {
 }
 
 type DatasourceDesc struct {
-	Name   string            `json:"name"`
-	Region string            `json:"region"`
-	Type   string            `json:"type"`
-	Spec   interface{}       `json:"spec"`
-	Schema []RepoSchemaEntry `json:"schema"`
+	Name     string            `json:"name"`
+	Region   string            `json:"region"`
+	Type     string            `json:"type"`
+	Spec     interface{}       `json:"spec"`
+	Schema   []RepoSchemaEntry `json:"schema"`
+	Workflow string            `json:"workflow"`
 }
 
 type ListDatasourcesOutput struct {
@@ -1671,6 +1697,7 @@ type GetJobOutput struct {
 	Container   *Container    `json:"container,omitempty"`
 	Scheduler   *JobScheduler `json:"scheduler,omitempty"`
 	Params      []Param       `json:"params,omitempty"`
+	Workflow    string        `json:"workflow"`
 }
 
 type JobDesc struct {
@@ -1774,14 +1801,16 @@ type RerunJobBatchOutput struct {
 }
 
 type JobExportKodoSpec struct {
-	Bucket      string   `json:"bucket"`
-	KeyPrefix   string   `json:"keyPrefix"`
-	Format      string   `json:"format"`
-	Compression string   `json:"compression,omitempty"`
-	Retention   int      `json:"retention"`
-	PartitionBy []string `json:"partitionBy"`
-	FileCount   int      `json:"fileCount"`
-	SaveMode    string   `json:"saveMode"`
+	Bucket         string   `json:"bucket"`
+	KeyPrefix      string   `json:"keyPrefix"`
+	Format         string   `json:"format"`
+	Compression    string   `json:"compression,omitempty"`
+	Retention      int      `json:"retention"`
+	PartitionBy    []string `json:"partitionBy,omitempty"`
+	FileCount      int      `json:"fileCount"`
+	SaveMode       string   `json:"saveMode"`
+	Delimiter      string   `json:"delimiter"`
+	ContainsHeader bool     `json:"containsHeader"`
 }
 
 func (e *JobExportKodoSpec) Validate() (err error) {
@@ -1790,6 +1819,11 @@ func (e *JobExportKodoSpec) Validate() (err error) {
 	}
 	if e.Format == "" {
 		return reqerr.NewInvalidArgs("Format", fmt.Sprintf("format should not be empty"))
+	}
+	if strings.ToLower(e.Format) == "csv" {
+		if e.Delimiter == "" {
+			return reqerr.NewInvalidArgs("Delimiter", fmt.Sprintf("csv's delimiter should not be empty"))
+		}
 	}
 	if e.FileCount <= 0 {
 		return reqerr.NewInvalidArgs("FileCount", fmt.Sprintf("fileCount should be larger than 0"))
@@ -1893,8 +1927,9 @@ type JobExportExistOutput struct {
 }
 
 type GetJobExportOutput struct {
-	Type string      `json:"type"`
-	Spec interface{} `json:"spec"`
+	Type     string      `json:"type"`
+	Spec     interface{} `json:"spec"`
+	Workflow string      `json:"workflow"`
 }
 
 type JobExportDesc struct {
@@ -2046,13 +2081,17 @@ type Node struct {
 
 type CreateWorkflowInput struct {
 	PipelineToken
+	WorkflowName string `json:"name"`
+	Region       string `json:"region"`
+	Comment      string `json:"comment,omitempty"`
+}
+
+type UpdateWorkflowInput struct {
+	PipelineToken
 	WorkflowName string           `json:"name"`
 	Region       string           `json:"region"`
 	Nodes        map[string]*Node `json:"nodes"`
-	Comment      string           `json:"comment,omitempty"`
 }
-
-type UpdateWorkflowInput CreateWorkflowInput
 
 type DeleteWorkflowInput struct {
 	PipelineToken
@@ -2141,7 +2180,7 @@ func validateWorkflow(name, region string, nodes map[string]*Node) (err error) {
 }
 
 func (r *CreateWorkflowInput) Validate() (err error) {
-	if err = validateWorkflow(r.WorkflowName, r.Region, r.Nodes); err != nil {
+	if err = validateWorkflow(r.WorkflowName, r.Region, nil); err != nil {
 		return
 	}
 	return
