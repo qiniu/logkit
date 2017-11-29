@@ -480,7 +480,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyElasticTimezone,
 			ChooseOnly:    true,
-			ChooseOptions: []string{KeyUTCTimezone, KeylocalTimezone, KeyPRCTimezone},
+			ChooseOptions: []interface{}{KeyUTCTimezone, KeylocalTimezone, KeyPRCTimezone},
 			Default:       KeyUTCTimezone,
 			DefaultNoUse:  false,
 			Description:   "索引时区(Local(本地)|UTC(标准时间)|PRC(北京时间))(elastic_time_zone)",
@@ -488,7 +488,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyLogkitSendTime,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"true", "false"},
+			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   "是否在发送数据时自动添加发送时间(logkit_send_time)",
