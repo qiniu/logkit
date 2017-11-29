@@ -40,7 +40,22 @@ logkit本身支持多种数据源，并且可以同时发送多个数据源的�
 
 ## 下载
 
-请移步至[Download页面](https://github.com/qiniu/logkit/wiki/Download)
+**最新稳定版**：请移步至[Download页面](https://github.com/qiniu/logkit/wiki/Download)
+
+**历史版本**：请移步至[Releases](https://github.com/qiniu/logkit/releases)
+
+**体验版**：develop 分支每天5点会定时构建最新的logkit体验版，需要使用的用户可以下载(注意，体验版不含前端的构建更新)。
+
+[windows 64位版本下载](https://pandora-dl.qiniu.com/logkit_windows_nightly.zip)
+
+[windows 32位版本下载](https://pandora-dl.qiniu.com/logkit_windows32_nightly.zip)
+
+[linux 64位版本下载](https://pandora-dl.qiniu.com/logkit_nightly.tar.gz)
+
+[linux 32位版本下载](https://pandora-dl.qiniu.com/logkit_linux32_nightly.tar.gz)
+
+[MacOS 版本下载](https://pandora-dl.qiniu.com/logkit_mac_nightly.tar.gz)
+
 
 ## 安装与使用
 
