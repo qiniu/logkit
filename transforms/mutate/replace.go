@@ -16,7 +16,7 @@ type Replacer struct {
 	Key       string `json:"key"`
 	Old       string `json:"old"`
 	New       string `json:"new"`
-	Mode      string `json:"regex"`
+	Mode      string `json:"mode"`
 	stats     utils.StatsInfo
 	Regex     *regexp.Regexp
 }
