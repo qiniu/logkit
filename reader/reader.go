@@ -185,7 +185,7 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 		}
 		reader, err = NewReaderSize(fr, meta, bufSize)
 	case ModeFileAuto:
-		reader, err = NewFileAutoReader(conf,meta,isFromWeb)
+		reader, err = NewFileAutoReader(conf, meta, isFromWeb)
 	case ModeFile:
 		fr, err = NewSingleFile(meta, logpath, whence, isFromWeb)
 		if err != nil {

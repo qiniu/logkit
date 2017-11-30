@@ -30,8 +30,8 @@ type ElasticsearchSender struct {
 
 	aliasFields map[string]string
 
-	intervalIndex int
-	timeZone      *time.Location
+	intervalIndex  int
+	timeZone       *time.Location
 	logkitSendTime bool
 }
 
@@ -147,8 +147,8 @@ func NewElasticSender(conf conf.MapConf) (sender Sender, err error) {
 		eType:           eType,
 		aliasFields:     fields,
 		intervalIndex:   i,
-		timeZone:       timeZone,
-		logkitSendTime: logkitSendTime,
+		timeZone:        timeZone,
+		logkitSendTime:  logkitSendTime,
 	}, nil
 }
 

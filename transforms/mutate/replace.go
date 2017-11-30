@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"regexp"
 
+	"errors"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+	"strings"
 )
 
 type Replacer struct {
@@ -14,16 +16,28 @@ type Replacer struct {
 	Key       string `json:"key"`
 	Old       string `json:"old"`
 	New       string `json:"new"`
+	Mode      string `json:"regex"`
 	stats     utils.StatsInfo
-	rgx       *regexp.Regexp
+	Regex     *regexp.Regexp
 }
 
+const (
+	ModeString = "string"
+	ModeRegex  = "regex"
+)
+
 func (g *Replacer) Init() error {
-	rgx, err := regexp.Compile(g.Old)
-	if err != nil {
-		return err
+	if g.Mode == ModeString || g.Mode == "" {
+		g.Mode = ModeString
+	} else if g.Mode == ModeRegex {
+		rgx, err := regexp.Compile(g.Old)
+		if err != nil {
+			return err
+		}
+		g.Regex = rgx
+	} else {
+		return errors.New("illegal mode")
 	}
-	g.rgx = rgx
 	return nil
 }
 
@@ -31,20 +45,39 @@ func (g *Replacer) Transform(datas []sender.Data) ([]sender.Data, error) {
 	var err, ferr error
 	errnums := 0
 	keys := utils.GetKeys(g.Key)
-	for i := range datas {
-		val, gerr := utils.GetMapValue(datas[i], keys...)
-		if gerr != nil {
-			errnums++
-			err = fmt.Errorf("transform key %v not exist in data", g.Key)
-			continue
+	switch g.Mode {
+	case ModeRegex:
+		for i := range datas {
+			val, gerr := utils.GetMapValue(datas[i], keys...)
+			if gerr != nil {
+				errnums++
+				err = fmt.Errorf("transform key %v not exist in data", g.Key)
+				continue
+			}
+			strval, ok := val.(string)
+			if !ok {
+				errnums++
+				err = fmt.Errorf("transform key %v data type is not string", g.Key)
+				continue
+			}
+			utils.SetMapValue(datas[i], g.Regex.ReplaceAllString(strval, g.New), keys...)
 		}
-		strval, ok := val.(string)
-		if !ok {
-			errnums++
-			err = fmt.Errorf("transform key %v data type is not string", g.Key)
-			continue
+	case ModeString:
+		for i := range datas {
+			val, gerr := utils.GetMapValue(datas[i], keys...)
+			if gerr != nil {
+				errnums++
+				err = fmt.Errorf("transform key %v not exist in data", g.Key)
+				continue
+			}
+			strval, ok := val.(string)
+			if !ok {
+				errnums++
+				err = fmt.Errorf("transform key %v data type is not string", g.Key)
+				continue
+			}
+			utils.SetMapValue(datas[i], strings.Replace(strval, g.Old, g.New, -1), keys...)
 		}
-		utils.SetMapValue(datas[i], g.rgx.ReplaceAllString(strval, g.New), keys...)
 	}
 
 	if err != nil {
@@ -57,10 +90,17 @@ func (g *Replacer) Transform(datas []sender.Data) ([]sender.Data, error) {
 }
 
 func (g *Replacer) RawTransform(datas []string) ([]string, error) {
-	for i := range datas {
-		//datas[i] = strings.Replace(datas[i], g.Old, g.New, -1)
-		datas[i] = g.rgx.ReplaceAllString(datas[i], g.New)
+	switch g.Mode {
+	case ModeRegex:
+		for i := range datas {
+			datas[i] = g.Regex.ReplaceAllString(datas[i], g.New)
+		}
+	case ModeString:
+		for i := range datas {
+			datas[i] = strings.Replace(datas[i], g.Old, g.New, -1)
+		}
 	}
+
 	g.stats.Success += int64(len(datas))
 	return datas, nil
 }

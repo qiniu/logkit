@@ -293,7 +293,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{WhenceOldest, WhenceNewest},
 
-			Description:   "读取的起始位置(read_from)",
+			Description: "读取的起始位置(read_from)",
 		},
 		{
 			KeyName:    KeyEncoding,
