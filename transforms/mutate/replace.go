@@ -1,14 +1,14 @@
 package mutate
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 
-	"errors"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
-	"strings"
 )
 
 type Replacer struct {
