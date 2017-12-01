@@ -273,6 +273,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 
 			Description: "读取的起始位置(read_from)",
 		},
+		OptionEncoding,
 		OptionDataSourceTag,
 		{
 			KeyName:      KeyHeadPattern,
