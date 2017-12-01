@@ -133,7 +133,7 @@ type PandoraOption struct {
 	logkitSendTime     bool
 
 	isMetrics  bool
-	expandAttr []pipeline.RepoSchemaEntry
+	expandAttr []string
 }
 
 //PandoraMaxBatchSize 发送到Pandora的batch限制
@@ -318,19 +318,24 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 	// sender时会尝试不断获取pandora schema，若还是获取失败则返回发送错误。
 	s.UpdateSchemas()
 
-	expandAttr := make([]pipeline.RepoSchemaEntry, 0)
-	if s.opt.logkitSendTime {
-		expandAttr = append(expandAttr, pipeline.RepoSchemaEntry{
-			Key:       KeyLogkitSendTime,
-			ValueType: pipeline.PandoraTypeDate,
-			Required:  false,
-		})
+	var osInfo = []string{utils.KeyCore, utils.KeyHostName, utils.KeyOsInfo, utils.KeyLocalIp}
+	expandAttr := make([]string, 0)
+	if s.opt.isMetrics {
+		s.opt.tsdbTimestamp = metric.Timestamp
+		metricTags := metric.GetMetricTags()
+		if s.opt.extraInfo {
+			// 将 osInfo 添加到每个 metric 的 tags 中
+			for key, val := range metricTags {
+				val = append(val, osInfo...)
+				metricTags[key] = val
+			}
+
+			// 将 osInfo 中的字段导出到每个 series 中
+			expandAttr = append(expandAttr, osInfo...)
+		}
+		s.opt.tsdbSeriesTags = metricTags
 	}
 	s.opt.expandAttr = expandAttr
-	if s.opt.isMetrics {
-		s.opt.tsdbSeriesTags = metric.GetMetricTags()
-	}
-
 	if s.opt.enableLogdb && len(s.schemas) > 0 {
 		log.Infof("Runner[%v] Sender[%v]: auto create export to logdb (%v)", opt.runnerName, opt.name, opt.logdbReponame)
 		err = s.client.AutoExportToLogDB(&pipeline.AutoExportToLogDBInput{
@@ -349,7 +354,7 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 		log.Infof("Runner[%v] Sender[%v]: auto create export to tsdb (%v)", opt.runnerName, opt.name, opt.tsdbReponame)
 		err = s.client.AutoExportToTSDB(&pipeline.AutoExportToTSDBInput{
 			OmitEmpty:    true,
-			OmitInvalid:  true,
+			OmitInvalid:  false,
 			SeriesTags:   s.opt.tsdbSeriesTags,
 			IsMetric:     s.opt.isMetrics,
 			ExpandAttr:   s.opt.expandAttr,
@@ -379,7 +384,6 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 			err = nil
 		}
 	}
-
 	return
 }
 
@@ -701,13 +705,9 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 		}
 		if s.opt.extraInfo {
 			for key, val := range s.extraInfo {
-				suffix := 0
-				keyName := key
-				for _, exist := d[keyName]; exist; suffix++ {
-					keyName = key + strconv.Itoa(suffix)
-					_, exist = d[keyName]
+				if _, exist := d[key]; !exist {
+					d[key] = val
 				}
-				d[keyName] = val
 			}
 		}
 		point := s.generatePoint(d)
@@ -738,7 +738,7 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 			ToTSDB: s.opt.enableTsdb,
 			AutoExportToTSDBInput: pipeline.AutoExportToTSDBInput{
 				OmitEmpty:    true,
-				OmitInvalid:  true,
+				OmitInvalid:  false,
 				IsMetric:     s.opt.isMetrics,
 				ExpandAttr:   s.opt.expandAttr,
 				RepoName:     s.opt.repoName,

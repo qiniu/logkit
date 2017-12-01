@@ -3,7 +3,6 @@ package system
 import (
 	"fmt"
 	"syscall"
-	"time"
 
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/utils"
@@ -76,7 +75,6 @@ func (s *NetStats) Collect() (datas []map[string]interface{}, err error) {
 		return nil, fmt.Errorf("error getting net connections info: %s", err)
 	}
 
-	now := time.Now().Format(time.RFC3339Nano)
 	counts := make(map[string]int)
 	counts["UDP"] = 0
 
@@ -108,7 +106,6 @@ func (s *NetStats) Collect() (datas []map[string]interface{}, err error) {
 		KeyNetstatTcpNone:        counts["NONE"],
 		KeyNetstatUdpSocket:      counts["UDP"],
 	}
-	fields[TypeMetricNetstat+"_"+metric.Timestamp] = now
 	datas = append(datas, fields)
 	return
 }
