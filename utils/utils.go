@@ -397,3 +397,20 @@ func (s *HashSet) Elements() []interface{} {
 	}
 	return element
 }
+
+// 创建目录，并返回日志模式
+func LogDirAndPattern(logpath string) (dir, pattern string, err error) {
+	dir, err = filepath.Abs(filepath.Dir(logpath))
+	if err != nil {
+		if !os.IsNotExist(err) {
+			err = fmt.Errorf("get logkit log dir error %v", err)
+			return
+		}
+		if err = os.MkdirAll(logpath, 0755); err != nil {
+			err = fmt.Errorf("create logkit log dir error %v", err)
+			return
+		}
+	}
+	pattern = filepath.Base(logpath)
+	return
+}

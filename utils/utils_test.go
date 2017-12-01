@@ -237,3 +237,25 @@ func TestHashSet(t *testing.T) {
 	set.AddStringArray(arrStr)
 	assert.Equal(t, len(arrStr), set.Len())
 }
+
+func TestLogDirAndPattern(t *testing.T) {
+	dir1, pt1, err := LogDirAndPattern("TestLogDirAndPattern.log")
+	assert.NoError(t, err)
+	assert.Equal(t, pt1, "TestLogDirAndPattern.log")
+
+	dir2, pt2, err := LogDirAndPattern("./TestLogDirAndPattern.log")
+	assert.NoError(t, err)
+	assert.Equal(t, pt2, "TestLogDirAndPattern.log")
+	assert.Equal(t, dir1, dir2)
+
+	absf, err := filepath.Abs("TestLogDirAndPattern")
+	if err != nil {
+		return
+	}
+	dir1, pt1, err = LogDirAndPattern("TestLogDirAndPattern/TestLogDirAndPattern.log")
+	assert.NoError(t, err)
+	assert.Equal(t, absf, dir1)
+	assert.Equal(t, pt1, "TestLogDirAndPattern.log")
+	defer os.RemoveAll("TestLogDirAndPattern")
+
+}
