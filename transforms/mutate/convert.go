@@ -45,7 +45,7 @@ func (g *Converter) Transform(datas []sender.Data) ([]sender.Data, error) {
 				if err != nil {
 					errnums++
 				}
-				utils.SetMapValue(datas[i], val, keys...)
+				utils.SetMapValue(datas[i], val, false, keys...)
 			}
 		}
 	}

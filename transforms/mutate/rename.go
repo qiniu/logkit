@@ -32,7 +32,12 @@ func (g *Rename) Transform(datas []sender.Data) ([]sender.Data, error) {
 			continue
 		}
 		utils.DeleteMapValue(datas[i], keySlice...)
-		utils.SetMapValue(datas[i], val, newKeySlice...)
+		err = utils.SetMapValue(datas[i], val, false, newKeySlice...)
+		if err != nil {
+			errnums++
+			fmt.Errorf("the new key %v already exists ", g.NewKeyName)
+			continue
+		}
 	}
 	if err != nil {
 		g.stats.LastError = err.Error()

@@ -180,32 +180,17 @@ func (ess *ElasticsearchSender) Send(data []Data) (err error) {
 		if len(ess.aliasFields) == 0 {
 			makeDoc = false
 		}
-
-		i := ess.intervalIndex
 		var indexName string
-		var intervals []string
 		for _, doc := range data {
-			//实时计算索引
-			indexName = ess.indexName
-			now := time.Now().In(ess.timeZone)
-			intervals = []string{strconv.Itoa(now.Year()), strconv.Itoa(int(now.Month())), strconv.Itoa(now.Day())}
-			for j := 0; j < i; j++ {
-				if j == 0 {
-					indexName = indexName + "-" + intervals[j]
-				} else {
-					if len(intervals[j]) == 1 {
-						intervals[j] = "0" + intervals[j]
-					}
-					indexName = indexName + "." + intervals[j]
-				}
-			}
+			//计算索引
+			indexName = buildIndexName(ess.indexName, ess.timeZone, ess.intervalIndex)
 			//字段名称替换
 			if makeDoc {
 				doc = ess.wrapDoc(doc)
 			}
 			//添加发送时间
 			if ess.logkitSendTime {
-				doc[KeySendTime] = now
+				doc[KeySendTime] = time.Now().In(ess.timeZone)
 			}
 			doc2 := doc
 			bulkService.Add(elasticV6.NewBulkIndexRequest().Index(indexName).Type(ess.eType).Doc(&doc2))
@@ -222,32 +207,17 @@ func (ess *ElasticsearchSender) Send(data []Data) (err error) {
 		if len(ess.aliasFields) == 0 {
 			makeDoc = false
 		}
-
-		i := ess.intervalIndex
 		var indexName string
-		var intervals []string
 		for _, doc := range data {
-			//实时计算索引
-			indexName = ess.indexName
-			now := time.Now().In(ess.timeZone)
-			intervals = []string{strconv.Itoa(now.Year()), strconv.Itoa(int(now.Month())), strconv.Itoa(now.Day())}
-			for j := 0; j < i; j++ {
-				if j == 0 {
-					indexName = indexName + "-" + intervals[j]
-				} else {
-					if len(intervals[j]) == 1 {
-						intervals[j] = "0" + intervals[j]
-					}
-					indexName = indexName + "." + intervals[j]
-				}
-			}
+			//计算索引
+			indexName = buildIndexName(ess.indexName, ess.timeZone, ess.intervalIndex)
 			//字段名称替换
 			if makeDoc {
 				doc = ess.wrapDoc(doc)
 			}
 			//添加发送时间
 			if ess.logkitSendTime {
-				doc[KeySendTime] = now
+				doc[KeySendTime] = time.Now().In(ess.timeZone)
 			}
 			doc2 := doc
 			bulkService.Add(elasticV5.NewBulkIndexRequest().Index(indexName).Type(ess.eType).Doc(&doc2))
@@ -264,32 +234,17 @@ func (ess *ElasticsearchSender) Send(data []Data) (err error) {
 		if len(ess.aliasFields) == 0 {
 			makeDoc = false
 		}
-
-		i := ess.intervalIndex
 		var indexName string
-		var intervals []string
 		for _, doc := range data {
-			//实时计算索引
-			indexName = ess.indexName
-			now := time.Now().In(ess.timeZone)
-			intervals = []string{strconv.Itoa(now.Year()), strconv.Itoa(int(now.Month())), strconv.Itoa(now.Day())}
-			for j := 0; j < i; j++ {
-				if j == 0 {
-					indexName = indexName + "-" + intervals[j]
-				} else {
-					if len(intervals[j]) == 1 {
-						intervals[j] = "0" + intervals[j]
-					}
-					indexName = indexName + "." + intervals[j]
-				}
-			}
+			//计算索引
+			indexName = buildIndexName(ess.indexName, ess.timeZone, ess.intervalIndex)
 			//字段名称替换
 			if makeDoc {
 				doc = ess.wrapDoc(doc)
 			}
 			//添加发送时间
 			if ess.logkitSendTime {
-				doc[KeySendTime] = now
+				doc[KeySendTime] = time.Now().In(ess.timeZone)
 			}
 			doc2 := doc
 			bulkService.Add(elasticV3.NewBulkIndexRequest().Index(indexName).Type(ess.eType).Doc(&doc2))
@@ -300,8 +255,23 @@ func (ess *ElasticsearchSender) Send(data []Data) (err error) {
 			return
 		}
 	}
-
 	return
+}
+
+func buildIndexName(indexName string, timeZone *time.Location, size int) string {
+	now := time.Now().In(timeZone)
+	intervals := []string{strconv.Itoa(now.Year()), strconv.Itoa(int(now.Month())), strconv.Itoa(now.Day())}
+	for j := 0; j < size; j++ {
+		if j == 0 {
+			indexName = indexName + "-" + intervals[j]
+		} else {
+			if len(intervals[j]) == 1 {
+				intervals[j] = "0" + intervals[j]
+			}
+			indexName = indexName + "." + intervals[j]
+		}
+	}
+	return indexName
 }
 
 // Close ElasticSearch Sender Close

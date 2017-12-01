@@ -1,7 +1,6 @@
 package mutate
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -16,7 +15,7 @@ type Replacer struct {
 	Key       string `json:"key"`
 	Old       string `json:"old"`
 	New       string `json:"new"`
-	Mode      string `json:"mode"`
+	Mode      string `json:"regex"`
 	stats     utils.StatsInfo
 	Regex     *regexp.Regexp
 }
@@ -27,17 +26,16 @@ const (
 )
 
 func (g *Replacer) Init() error {
-	if g.Mode == ModeString || g.Mode == "" {
+	rgexpr := g.Old
+	if g.Mode != ModeRegex {
 		g.Mode = ModeString
-	} else if g.Mode == ModeRegex {
-		rgx, err := regexp.Compile(g.Old)
-		if err != nil {
-			return err
-		}
-		g.Regex = rgx
-	} else {
-		return errors.New("illegal mode")
+		rgexpr = regexp.QuoteMeta(g.Old)
 	}
+	rgx, err := regexp.Compile(rgexpr)
+	if err != nil {
+		return err
+	}
+	g.Regex = rgx
 	return nil
 }
 
@@ -45,39 +43,20 @@ func (g *Replacer) Transform(datas []sender.Data) ([]sender.Data, error) {
 	var err, ferr error
 	errnums := 0
 	keys := utils.GetKeys(g.Key)
-	switch g.Mode {
-	case ModeRegex:
-		for i := range datas {
-			val, gerr := utils.GetMapValue(datas[i], keys...)
-			if gerr != nil {
-				errnums++
-				err = fmt.Errorf("transform key %v not exist in data", g.Key)
-				continue
-			}
-			strval, ok := val.(string)
-			if !ok {
-				errnums++
-				err = fmt.Errorf("transform key %v data type is not string", g.Key)
-				continue
-			}
-			utils.SetMapValue(datas[i], g.Regex.ReplaceAllString(strval, g.New), keys...)
+	for i := range datas {
+		val, gerr := utils.GetMapValue(datas[i], keys...)
+		if gerr != nil {
+			errnums++
+			err = fmt.Errorf("transform key %v not exist in data", g.Key)
+			continue
 		}
-	case ModeString:
-		for i := range datas {
-			val, gerr := utils.GetMapValue(datas[i], keys...)
-			if gerr != nil {
-				errnums++
-				err = fmt.Errorf("transform key %v not exist in data", g.Key)
-				continue
-			}
-			strval, ok := val.(string)
-			if !ok {
-				errnums++
-				err = fmt.Errorf("transform key %v data type is not string", g.Key)
-				continue
-			}
-			utils.SetMapValue(datas[i], strings.Replace(strval, g.Old, g.New, -1), keys...)
+		strval, ok := val.(string)
+		if !ok {
+			errnums++
+			err = fmt.Errorf("transform key %v data type is not string", g.Key)
+			continue
 		}
+		utils.SetMapValue(datas[i], g.Regex.ReplaceAllString(strval, g.New), false, keys...)
 	}
 
 	if err != nil {

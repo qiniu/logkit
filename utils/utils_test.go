@@ -58,13 +58,13 @@ func Test_TrimeList(t *testing.T) {
 	}
 }
 
-func Test_GetInode(t *testing.T) {
+/*func Test_GetInode(t *testing.T) {
 	os.Mkdir("abc", 0777)
 	fi, _ := os.Stat("abc")
 	inode := getInode(fi)
 	assert.True(t, inode > 0)
 	os.RemoveAll("abc")
-}
+}*/
 
 func Test_GetLogFiles(t *testing.T) {
 	logfiles := "Test_getLogFiles"
@@ -211,51 +211,97 @@ func TestAddRemoveHttpProc(t *testing.T) {
 }
 
 func TestExtractField(t *testing.T) {
-	slice := []string{"%{[type]}", "a"}
-	slice, err := ExtractField(slice)
-	if err != nil {
-		fmt.Println("wrong arguments")
-	} else {
-		fmt.Println(slice)
-	}
+	slice1 := []string{"default"}
+	slice1, err1 := ExtractField(slice1)
+	assert.NoError(t, err1)
+	assert.Equal(t, slice1, []string{"default"})
+
+	slice2 := []string{"%{[type]}", "default"}
+	slice2, err2 := ExtractField(slice2)
+	assert.NoError(t, err2)
+	assert.Equal(t, []string{"type", "default"}, slice2)
+
+	slice3 := []string{"%{[type}", "default"}
+	slice3, err3 := ExtractField(slice3)
+	assert.Error(t, err3)
+
 }
 
 func TestGetMapValue(t *testing.T) {
-	m1 := map[string]interface{}{}
-	m2 := map[string]interface{}{}
 	m3 := map[string]interface{}{"name": "小明"}
-	m2["m3"] = m3
-	m1["m2"] = m2
+	m2 := map[string]interface{}{"m3": m3}
+	m1 := map[string]interface{}{"m2": m2}
+	//keys存在
 	value, err := GetMapValue(m1, []string{"m2", "m3", "name"}...)
-	assert.Equal(t, err, nil)
+	assert.NoError(t, err)
 	assert.Equal(t, value, "小明")
+	//keys不存在
+	value2, err2 := GetMapValue(m1, []string{"m2", "m3", "m4"}...)
+	assert.Error(t, err2)
+	assert.Equal(t, nil, value2)
+	//keys为空
+	value3, err3 := GetMapValue(m1, []string{}...)
+	assert.NoError(t, err3)
+	assert.Equal(t, m1, value3)
+	//存在非map[string]interface{}
+	m4 := map[string]interface{}{"m5": map[string]string{"name": "小明"}}
+	value4, err4 := GetMapValue(m4, []string{"m5", "name"}...)
+	assert.Error(t, err4)
+	fmt.Println(err4)
+	assert.Equal(t, nil, value4)
 }
 
 func TestSetMapValue(t *testing.T) {
-	m1 := map[string]interface{}{}
-	m2 := map[string]interface{}{}
 	m3 := map[string]interface{}{"name": "小明"}
-	m2["m3"] = m3
-	m1["m2"] = m2
-	SetMapValue(m1, "小红", []string{"m2", "m3", "name"}...)
-	SetMapValue(m1, "小黑", []string{"m2", "m3", "m4", "name"}...)
-	value, err := GetMapValue(m1, []string{"m2", "m3", "name"}...)
-	assert.Equal(t, err, nil)
-	assert.Equal(t, value, "小红")
-	value2, err2 := GetMapValue(m1, []string{"m2", "m3", "m4", "name"}...)
-	assert.Equal(t, err2, nil)
+	m2 := map[string]interface{}{"m3": m3}
+	m1 := map[string]interface{}{"m2": m2}
+
+	err := SetMapValue(m1, "m1", false)
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]interface{}{"m2": map[string]interface{}{"m3": map[string]interface{}{"name": "小明"}}}, m1)
+
+	err11 := SetMapValue(m1, "小红", false, []string{"m2", "m3", "name"}...)
+	value1, err12 := GetMapValue(m1, []string{"m2", "m3", "name"}...)
+	assert.NoError(t, err11)
+	assert.NoError(t, err12)
+	assert.Equal(t, value1, "小红")
+
+	err21 := SetMapValue(m1, "小黑", false, []string{"m2", "m3", "m4", "name"}...)
+	value2, err22 := GetMapValue(m1, []string{"m2", "m3", "m4", "name"}...)
+	assert.NoError(t, err21)
+	assert.NoError(t, err22)
 	assert.Equal(t, value2, "小黑")
+
+	err31 := SetMapValue(m1, "name1", false, []string{"m2", "m3", "name", "name1"}...)
+	value31, err32 := GetMapValue(m1, []string{"m2", "m3", "name"}...)
+	value32, err33 := GetMapValue(m1, []string{"m2", "m3", "name", "name1"}...)
+	assert.Error(t, err31)
+	assert.NoError(t, err32)
+	assert.Equal(t, "小红", value31)
+	assert.Error(t, err33)
+	assert.Equal(t, nil, value32)
+
+	err41 := SetMapValue(m1, "name1", true, []string{"m2", "m3", "name", "name1"}...)
+	value41, err42 := GetMapValue(m1, []string{"m2", "m3", "name"}...)
+	value42, err43 := GetMapValue(m1, []string{"m2", "m3", "name", "name1"}...)
+	assert.NoError(t, err41)
+	assert.NoError(t, err42)
+	assert.Equal(t, map[string]interface{}{"name1": "name1"}, value41)
+	assert.NoError(t, err43)
+	assert.Equal(t, "name1", value42)
 }
 
 func TestDeleteMapValue(t *testing.T) {
-	m1 := map[string]interface{}{}
-	m2 := map[string]interface{}{}
 	m3 := map[string]interface{}{"name": "小明"}
-	m2["m3"] = m3
-	m1["m2"] = m2
+	m2 := map[string]interface{}{"m3": m3}
+	m1 := map[string]interface{}{"m2": m2}
 	val, b := DeleteMapValue(m1, []string{"m2", "m3", "name"}...)
 	assert.Equal(t, val, "小明")
 	assert.Equal(t, b, true)
+
+	val2, b2 := DeleteMapValue(m1, []string{"m2", "m3", "name", "name2"}...)
+	assert.Equal(t, val2, nil)
+	assert.Equal(t, b2, false)
 }
 
 func TestHashSet(t *testing.T) {

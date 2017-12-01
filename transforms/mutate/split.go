@@ -46,7 +46,7 @@ func (g *Spliter) Transform(datas []sender.Data) ([]sender.Data, error) {
 				continue
 			}
 			newkeys[len(newkeys)-1] = g.ArraryName
-			utils.SetMapValue(datas[i], strings.Split(strval, g.SeperateKey), newkeys...)
+			utils.SetMapValue(datas[i], strings.Split(strval, g.SeperateKey), false, newkeys...)
 		}
 	}
 	if err != nil {

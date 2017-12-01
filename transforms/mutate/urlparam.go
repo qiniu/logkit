@@ -20,7 +20,7 @@ type UrlParam struct {
 	stats utils.StatsInfo
 }
 
-func (p *UrlParam) transformToMap(strVal string) (map[string]string, error) {
+func (p *UrlParam) transformToMap(strVal string, key string) (map[string]string, error) {
 	resultMap := make(map[string]string)
 	params := strings.Split(strVal, "&")
 	for _, param := range params {
@@ -31,7 +31,7 @@ func (p *UrlParam) transformToMap(strVal string) (map[string]string, error) {
 		if keyVal[0] == "" {
 			return nil, fmt.Errorf("the key value %v is not legal", strVal)
 		}
-		keyName := p.Key + "_" + keyVal[0]
+		keyName := key + "_" + keyVal[0]
 		resultMap[keyName] = keyVal[1]
 	}
 	return resultMap, nil
@@ -56,7 +56,7 @@ func (p *UrlParam) Transform(datas []sender.Data) ([]sender.Data, error) {
 		}
 		var res map[string]string
 		if strVal, ok := val.(string); ok {
-			res, err = p.transformToMap(strVal)
+			res, err = p.transformToMap(strVal, newkeys[len(newkeys)-1])
 		} else {
 			err = fmt.Errorf("transform key %v data type is not string", p.Key)
 		}
@@ -76,7 +76,7 @@ func (p *UrlParam) Transform(datas []sender.Data) ([]sender.Data, error) {
 					_, gerr = utils.GetMapValue(datas[i], newkeys...)
 				}
 				if suffix <= 5 {
-					utils.SetMapValue(datas[i], mapVal, newkeys...)
+					utils.SetMapValue(datas[i], mapVal, false, newkeys...)
 				}
 			}
 		} else {
