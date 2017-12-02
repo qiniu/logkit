@@ -242,9 +242,11 @@ func (rs *RestService) Status() echo.HandlerFunc {
 func (rs *RestService) GetRunners() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		runnerNameList := make([]string, 0)
+		rs.mgr.lock.RLock()
 		for _, conf := range rs.mgr.runnerConfig {
 			runnerNameList = append(runnerNameList, conf.RunnerName)
 		}
+		rs.mgr.lock.RUnlock()
 		return RespSuccess(c, runnerNameList)
 	}
 }
@@ -252,15 +254,7 @@ func (rs *RestService) GetRunners() echo.HandlerFunc {
 // get /logkit/configs
 func (rs *RestService) GetConfigs() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		rs.mgr.lock.RLock()
-		defer rs.mgr.lock.RUnlock()
-		rss := make(map[string]RunnerConfig)
-		for k, v := range rs.mgr.runnerConfig {
-			if filepath.Dir(k) == rs.mgr.RestDir {
-				v.IsInWebFolder = true
-			}
-			rss[k] = v
-		}
+		rss := rs.mgr.Configs()
 		return RespSuccess(c, rss)
 	}
 }
@@ -328,13 +322,15 @@ func (rs *RestService) checkNameAndConfig(c echo.Context) (name string, conf Run
 		return
 	}
 	var exist bool
+	var tmpConf RunnerConfig
 	rs.mgr.lock.RLock()
 	defer rs.mgr.lock.RUnlock()
 	file = filepath.Join(rs.mgr.RestDir, name+".conf")
-	if conf, exist = rs.mgr.runnerConfig[file]; !exist {
+	if tmpConf, exist = rs.mgr.runnerConfig[file]; !exist {
 		err = errors.New("config " + name + " is not found")
 		return
 	}
+	deepCopy(&conf, &tmpConf)
 	return
 }
 

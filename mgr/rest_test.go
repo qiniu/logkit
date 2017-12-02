@@ -152,6 +152,7 @@ func writeLogFile(logStr []string, logDir string) error {
 		if err := ioutil.WriteFile(filepath.Join(logDir, "log"+strconv.Itoa(i+1)), []byte(l), 0666); err != nil {
 			return err
 		}
+		time.Sleep(100 * time.Microsecond)
 	}
 	return nil
 }
@@ -887,7 +888,9 @@ func getRunnersTest(p *testParam) {
 	err = json.Unmarshal(respBody, &respRunner)
 	assert.NoError(t, err)
 	runnerNameList := respRunner.Data
-	assert.Equal(t, len(runnerNameList), len(rs.mgr.runnerConfig))
+	rs.mgr.lock.RLock()
+	assert.Equal(t, len(rs.mgr.runnerConfig), len(runnerNameList))
+	rs.mgr.lock.RUnlock()
 }
 
 func senderRouterTest(p *testParam) {

@@ -350,7 +350,9 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []sender.Data, times in
 		if se, ok := err.(*utils.StatsError); ok {
 			err = se.ErrorDetail
 			if se.Ft {
+				r.rsMutex.Lock()
 				r.rs.Lag.Ftlags = se.Ftlag
+				r.rsMutex.Unlock()
 			} else {
 				if cnt > 1 {
 					info.Errors -= se.Success
@@ -722,10 +724,15 @@ func getTrend(old, new float64) string {
 
 func (r *LogExportRunner) Status() RunnerStatus {
 	now := time.Now()
+	r.rsMutex.RLock()
+	rss := RunnerStatus{}
 	elaspedtime := now.Sub(r.rs.lastState).Seconds()
 	if elaspedtime <= 3 {
-		return r.rs
+		defer r.rsMutex.RUnlock()
+		deepCopy(&rss, &r.rs)
+		return rss
 	}
+	r.rsMutex.RUnlock()
 	r.rsMutex.Lock()
 	defer r.rsMutex.Unlock()
 	r.rs.Error = ""
@@ -779,7 +786,8 @@ func (r *LogExportRunner) Status() RunnerStatus {
 	}
 	r.rs.RunningStatus = RunnerRunning
 	copyRunnerStatus(&r.lastRs, &r.rs)
-	return r.rs
+	deepCopy(&rss, &r.rs)
+	return rss
 }
 
 func calcSpeedTrend(old, new utils.StatsInfo, elaspedtime float64) (speed float64, trend string) {
@@ -790,6 +798,19 @@ func calcSpeedTrend(old, new utils.StatsInfo, elaspedtime float64) (speed float6
 	}
 	trend = getTrend(old.Speed, speed)
 	return
+}
+
+func deepCopy(dst, src interface{}) {
+	var err error
+	var confByte []byte
+	if confByte, err = json.Marshal(src); err != nil {
+		log.Debugf("runner config marshal error %v", err)
+		dst = src
+	}
+	if err = json.Unmarshal(confByte, dst); err != nil {
+		log.Debugf("runner config unmarshal error %v", err)
+		dst = src
+	}
 }
 
 func copyRunnerStatus(dst, src *RunnerStatus) {

@@ -1,6 +1,7 @@
 package mgr
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -14,8 +15,6 @@ import (
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/utils"
-
-	"fmt"
 
 	"github.com/howeyc/fsnotify"
 	"github.com/qiniu/log"
@@ -473,6 +472,8 @@ func (m *Manager) RestoreWebDir() {
 }
 
 func (m *Manager) Status() (rss map[string]RunnerStatus) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 	rss = make(map[string]RunnerStatus)
 	for key, conf := range m.runnerConfig {
 		if r, ex := m.runners[key]; ex {
@@ -488,5 +489,30 @@ func (m *Manager) Status() (rss map[string]RunnerStatus) {
 			}
 		}
 	}
+	return
+}
+
+func (m *Manager) Configs() (rss map[string]RunnerConfig) {
+	//var err error
+	//var tmpRssByte []byte
+	rss = make(map[string]RunnerConfig)
+	tmpRss := make(map[string]RunnerConfig)
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	for k, v := range m.runnerConfig {
+		if filepath.Dir(k) == m.RestDir {
+			v.IsInWebFolder = true
+		}
+		tmpRss[k] = v
+	}
+	deepCopy(&rss, &tmpRss)
+	//if tmpRssByte, err = json.Marshal(tmpRss); err != nil {
+	//	log.Debugf("runner configs marshal error %v", err)
+	//	return tmpRss
+	//}
+	//if err = json.Unmarshal(tmpRssByte, &rss); err != nil {
+	//	log.Debugf("runner configs unmarshal error %v", err)
+	//	return tmpRss
+	//}
 	return
 }
