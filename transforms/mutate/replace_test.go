@@ -34,10 +34,10 @@ func TestReplaceTransformer(t *testing.T) {
 	assert.Equal(t, gsub.Stage(), transforms.StageBeforeParser)
 
 	gsub3 := &Replacer{
-		Key:  "multi.myword",
-		Old:  "\\d",
-		New:  "0",
-		Mode: ModeRegex,
+		Key:   "multi.myword",
+		Old:   "\\d",
+		New:   "0",
+		Regex: true,
 	}
 	gsub3.Init()
 	data3, err3 := gsub3.Transform([]sender.Data{{"multi": map[string]interface{}{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}}, {"multi": map[string]interface{}{"myword": "x1x.x.x11", "abc": "x1"}}})

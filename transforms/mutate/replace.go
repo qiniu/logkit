@@ -3,7 +3,6 @@ package mutate
 import (
 	"fmt"
 	"regexp"
-	"strings"
 
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
@@ -15,27 +14,21 @@ type Replacer struct {
 	Key       string `json:"key"`
 	Old       string `json:"old"`
 	New       string `json:"new"`
-	Mode      string `json:"regex"`
+	Regex     bool   `json:"regex"`
 	stats     utils.StatsInfo
-	Regex     *regexp.Regexp
+	Regexp    *regexp.Regexp
 }
-
-const (
-	ModeString = "string"
-	ModeRegex  = "regex"
-)
 
 func (g *Replacer) Init() error {
 	rgexpr := g.Old
-	if g.Mode != ModeRegex {
-		g.Mode = ModeString
+	if !g.Regex {
 		rgexpr = regexp.QuoteMeta(g.Old)
 	}
 	rgx, err := regexp.Compile(rgexpr)
 	if err != nil {
 		return err
 	}
-	g.Regex = rgx
+	g.Regexp = rgx
 	return nil
 }
 
@@ -56,7 +49,7 @@ func (g *Replacer) Transform(datas []sender.Data) ([]sender.Data, error) {
 			err = fmt.Errorf("transform key %v data type is not string", g.Key)
 			continue
 		}
-		utils.SetMapValue(datas[i], g.Regex.ReplaceAllString(strval, g.New), false, keys...)
+		utils.SetMapValue(datas[i], g.Regexp.ReplaceAllString(strval, g.New), false, keys...)
 	}
 
 	if err != nil {
@@ -69,17 +62,9 @@ func (g *Replacer) Transform(datas []sender.Data) ([]sender.Data, error) {
 }
 
 func (g *Replacer) RawTransform(datas []string) ([]string, error) {
-	switch g.Mode {
-	case ModeRegex:
-		for i := range datas {
-			datas[i] = g.Regex.ReplaceAllString(datas[i], g.New)
-		}
-	case ModeString:
-		for i := range datas {
-			datas[i] = strings.Replace(datas[i], g.Old, g.New, -1)
-		}
+	for i := range datas {
+		datas[i] = g.Regexp.ReplaceAllString(datas[i], g.New)
 	}
-
 	g.stats.Success += int64(len(datas))
 	return datas, nil
 }
@@ -121,6 +106,14 @@ func (g *Replacer) ConfigOptions() []utils.Option {
 			DefaultNoUse: true,
 			Description:  "替换为的字符串内容(new)",
 			Type:         transforms.TransformTypeString,
+		},
+		{
+			KeyName:       "regex",
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"false", "true"},
+			Default:       "false",
+			DefaultNoUse:  false,
+			Description:   "是否启用正则匹配",
 		},
 	}
 }
