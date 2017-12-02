@@ -336,8 +336,21 @@ func (_ *MetricRunner) Cleaner() CleanInfo {
 }
 
 func (mr *MetricRunner) Status() RunnerStatus {
+	now := time.Now()
+	mr.rsMutex.RLock()
+	rss := RunnerStatus{}
+	elaspedtime := now.Sub(mr.rs.lastState).Seconds()
+	if elaspedtime <= 3 {
+		defer mr.rsMutex.RUnlock()
+		deepCopy(&rss, &mr.rs)
+		return rss
+	}
+	mr.rsMutex.RUnlock()
+
 	mr.rsMutex.Lock()
 	defer mr.rsMutex.Unlock()
+	mr.rs.Elaspedtime += elaspedtime
+	mr.rs.lastState = now
 	durationTime := float64(mr.collectInterval.Seconds())
 	mr.rs.ReadSpeed = float64(mr.rs.ReadDataCount-mr.lastRs.ReadDataCount) / durationTime
 	mr.rs.ReadSpeedTrend = getTrend(mr.lastRs.ReadSpeed, mr.rs.ReadSpeed)
@@ -359,7 +372,8 @@ func (mr *MetricRunner) Status() RunnerStatus {
 	}
 	mr.rs.RunningStatus = RunnerRunning
 	copyRunnerStatus(&mr.lastRs, &mr.rs)
-	return mr.rs
+	deepCopy(&rss, &mr.rs)
+	return rss
 }
 
 func (mr *MetricRunner) StatusRestore() {
