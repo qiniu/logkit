@@ -175,12 +175,14 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 			TransformStats: make(map[string]utils.StatsInfo),
 			lastState:      time.Now(),
 			Name:           info.RunnerName,
+			RunningStatus:  RunnerRunning,
 		},
 		lastRs: RunnerStatus{
 			SenderStats:    make(map[string]utils.StatsInfo),
 			TransformStats: make(map[string]utils.StatsInfo),
 			lastState:      time.Now(),
 			Name:           info.RunnerName,
+			RunningStatus:  RunnerRunning,
 		},
 		rsMutex: new(sync.RWMutex),
 	}
@@ -722,17 +724,25 @@ func getTrend(old, new float64) string {
 	return SpeedStable
 }
 
-func (r *LogExportRunner) Status() RunnerStatus {
-	now := time.Now()
+func (r *LogExportRunner) getStatusFrequently(rss *RunnerStatus, now time.Time) (bool, float64) {
 	r.rsMutex.RLock()
+	defer r.rsMutex.RUnlock()
+	elaspedTime := now.Sub(r.rs.lastState).Seconds()
+	if elaspedTime <= 3 {
+		deepCopy(rss, &r.rs)
+		return true, elaspedTime
+	}
+	return false, elaspedTime
+}
+
+func (r *LogExportRunner) Status() RunnerStatus {
+	var isFre bool
+	var elaspedtime float64
 	rss := RunnerStatus{}
-	elaspedtime := now.Sub(r.rs.lastState).Seconds()
-	if elaspedtime <= 3 {
-		defer r.rsMutex.RUnlock()
-		deepCopy(&rss, &r.rs)
+	now := time.Now()
+	if isFre, elaspedtime = r.getStatusFrequently(&rss, now); isFre {
 		return rss
 	}
-	r.rsMutex.RUnlock()
 	r.rsMutex.Lock()
 	defer r.rsMutex.Unlock()
 	r.rs.Error = ""

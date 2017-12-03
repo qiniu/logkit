@@ -32,9 +32,9 @@ func Test_RotateClean(t *testing.T) {
 	os.MkdirAll(dirp, 0755)
 	defer os.RemoveAll(dirp)
 	ch1 := make(chan struct{}, 0)
-	go loopCleanLogkitLog(dirp, "logkit.log-*", 3, 100*time.Millisecond, ch1)
+	go loopCleanLogkitLog(dirp, "logkit.log-*", 3, 10*time.Millisecond, ch1)
 	ch2 := make(chan struct{}, 0)
-	go loopRotateLogs(filepath.Join(dirp, "logkit.log"), 10, 100*time.Nanosecond, ch2)
+	go loopRotateLogs(filepath.Join(dirp, "logkit.log"), 10, 10*time.Nanosecond, ch2)
 	exitchan := make(chan struct{}, 0)
 	go func() {
 		i := 0
@@ -51,6 +51,7 @@ func Test_RotateClean(t *testing.T) {
 	time.Sleep(time.Second * 2)
 	exitchan <- struct{}{}
 	ch2 <- struct{}{}
+	time.Sleep(time.Millisecond * 100)
 	ch1 <- struct{}{}
 	nn, _ := ioutil.ReadDir(dirp)
 	assert.Equal(t, 3, len(nn))

@@ -331,7 +331,7 @@ func restGetStatusTest(p *testParam) {
 	if err := writeLogFile([]string{log1}, logDir); err != nil {
 		t.Fatalf("write log data error %v", err)
 	}
-	time.Sleep(40 * time.Second)
+	time.Sleep(20 * time.Second)
 	cmd := exec.Command("./stats")
 	cmd.Stdin = strings.NewReader("some input")
 	var out bytes.Buffer
@@ -403,7 +403,7 @@ func restCRUDTest(p *testParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, conf1)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(5 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	var expconf1, got1 RunnerConfig
 	var respGot1 respRunnerConfig
@@ -455,7 +455,7 @@ func restCRUDTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, conf2)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(5 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName2
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
@@ -514,7 +514,7 @@ func restCRUDTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodDelete, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(5 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	// get runner2
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName2
@@ -569,7 +569,7 @@ func runnerResetTest(p *testParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, resetConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(5 * time.Second)
+	time.Sleep(6 * time.Second)
 
 	exp := getRunnerStatus(runnerName, logDir, RunnerRunning, 1, 29, 0, 1, 0, 1)
 	url = "http://127.0.0.1" + rs.address + "/logkit/status"
@@ -590,7 +590,7 @@ func runnerResetTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(5 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	url = "http://127.0.0.1" + rs.address + "/logkit/status"
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
@@ -636,7 +636,7 @@ func runnerStopStartTest(p *testParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, startConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(5 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	exp := getRunnerStatus(runnerName, logDir, RunnerRunning, 1, 29, 0, 1, 0, 1)
 	url = "http://127.0.0.1" + rs.address + "/logkit/status"
@@ -657,7 +657,7 @@ func runnerStopStartTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(5 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	expStopped := getRunnerStatus(runnerName, "", RunnerStopped, 0, 0, 0, 0, 0, 0)
 	url = "http://127.0.0.1" + rs.address + "/logkit/status"
@@ -751,7 +751,7 @@ func runnerDataIntegrityTest(p *testParam) {
 		respCode, respBody, err := makeRequest(url, http.MethodPost, []byte{})
 		assert.NoError(t, err, string(respBody))
 		assert.Equal(t, http.StatusOK, respCode)
-		time.Sleep(3 * time.Second)
+		time.Sleep(2 * time.Second)
 
 		file, err := os.OpenFile(filepath.Join(logDir, "log1"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 		if err != nil {
@@ -770,8 +770,9 @@ func runnerDataIntegrityTest(p *testParam) {
 		respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 		assert.NoError(t, err, string(respBody))
 		assert.Equal(t, http.StatusOK, respCode)
-		time.Sleep(4 * time.Second)
+		time.Sleep(3 * time.Second)
 	}
+	time.Sleep(10 * time.Second)
 	url = "http://127.0.0.1" + rs.address + "/logkit/status"
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
 	assert.NoError(t, err, string(respBody))
@@ -888,9 +889,39 @@ func getRunnersTest(p *testParam) {
 	err = json.Unmarshal(respBody, &respRunner)
 	assert.NoError(t, err)
 	runnerNameList := respRunner.Data
-	rs.mgr.lock.RLock()
-	assert.Equal(t, len(rs.mgr.runnerConfig), len(runnerNameList))
-	rs.mgr.lock.RUnlock()
+	runnerExist := 0
+	for _, rn := range runnerNameList {
+		if rn == runnerName1 || rn == runnerName2 {
+			runnerExist++
+		}
+	}
+	assert.Equal(t, 2, runnerExist)
+
+	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName1
+	respCode, respBody, err = makeRequest(url, http.MethodDelete, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(1 * time.Second)
+
+	url = "http://127.0.0.1" + rs.address + "/logkit/runners"
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+
+	respRunner = respRunnersNameList{}
+	err = json.Unmarshal(respBody, &respRunner)
+	assert.NoError(t, err)
+	runnerNameList = respRunner.Data
+	runnerExist = 0
+	var gotRunnerName string
+	for _, rn := range runnerNameList {
+		if rn == runnerName1 || rn == runnerName2 {
+			runnerExist++
+			gotRunnerName = rn
+		}
+	}
+	assert.Equal(t, 1, runnerExist)
+	assert.Equal(t, runnerName2, gotRunnerName)
 }
 
 func senderRouterTest(p *testParam) {
@@ -969,7 +1000,7 @@ func senderRouterTest(p *testParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConfBytes)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(5 * time.Second)
+	time.Sleep(6 * time.Second)
 
 	f1, err := os.Open(resvPath1)
 	assert.NoError(t, err)
