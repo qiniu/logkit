@@ -21,6 +21,7 @@ const (
 	ErrClusterStatus   = "L2002"
 	ErrClusterConfigs  = "L2003"
 	ErrClusterRegister = "L2004"
+	ErrClusterConfig   = "L2014"
 
 	// 集群版 slave API
 	ErrClusterTag = "L2005"
@@ -51,6 +52,7 @@ var ErrorCodeHumanize = map[string]string{
 
 	ErrClusterSlaves:   "获取 Slaves 列表出现错误",
 	ErrClusterStatus:   "获取 Slaves 状态出现错误",
+	ErrClusterConfig:   "获取 Slaves Config 出现错误",
 	ErrClusterConfigs:  "获取 Slaves Configs 出现错误",
 	ErrClusterRegister: "接受 Slaves 注册出现错误",
 

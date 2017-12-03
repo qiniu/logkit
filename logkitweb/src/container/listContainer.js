@@ -195,7 +195,9 @@ class List extends Component {
               <div style={{padding: 24, background: '#fff', minHeight: 360}}>
                 <div className="content">
                   <TagTable handleAddRunner={this.addLogRunner.bind(this)}
-                            handleAddMetricRunner={this.addMetricRunner.bind(this)}/>
+                            handleAddMetricRunner={this.addMetricRunner.bind(this)}
+                            handleTurnToRunner={this.TurnToLogRunner.bind(this)}
+                            handleTurnToMetricRunner={this.TurnToMetricRunner.bind(this)}/>
                 </div>
 
               </div>

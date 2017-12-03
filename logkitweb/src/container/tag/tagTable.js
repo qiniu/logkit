@@ -16,7 +16,8 @@ import {
   getClusterSlaves,
   getRunnersByTagOrMachineUrl,
   postClusterDeleteSlaveTag,
-  startClusterRunner
+  startClusterRunner,
+  getClusterConfigData
 } from '../../services/logkit';
 import {titles} from './constant'
 import _ from "lodash";
@@ -120,6 +121,28 @@ class TagTable extends Component {
           this.getClusterSLave()
         }
 
+      })
+    } else if (this.state.currentModalType == 'edit') {
+      const {handleTurnToRunner, handleTurnToMetricRunner} = this.props
+      getClusterConfigData({
+        name: this.state.currentRunnerName,
+        tag: this.state.currentTag.name,
+        url: ''
+      }).then(item => {
+        if (item.code === 'L200') {
+          let conf = item.data
+          conf["machineUrl"] = ''
+          conf["tag"] = this.state.currentTag.name
+          window.nodeCopy = conf
+          if (conf["metric"] === undefined) {
+            handleTurnToRunner()
+          } else {
+            handleTurnToMetricRunner()
+          }
+          this.setState({
+            isShowTagModal: false
+          })
+        }
       })
     } else if (this.state.currentModalType == 'stop') {
       postClusterStopSlaveTag({
@@ -348,6 +371,23 @@ class TagTable extends Component {
         );
       },
     }, {
+      title: '编辑',
+      key: 'edit',
+      dataIndex: 'edit',
+      width: '6%',
+      render: (text, record) => {
+        return (<a>
+            <div className="editable-row-operations">
+              {this.checkStatus(record.status) === 'ok' ? (
+                <Icon onClick={() => this.showTagModal(record, 'edit')} title={"编辑该标签对应的runner"} style={{fontSize: 16}}
+                      type='edit'/>) : null
+              }
+            </div>
+          </a>
+
+        );
+      },
+    }, {
       title: '停止',
       key: 'stop',
       dataIndex: 'stop',
@@ -395,7 +435,6 @@ class TagTable extends Component {
                 }
               </div>
             </a>
-
         );
       },
     }, {

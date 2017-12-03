@@ -276,6 +276,12 @@ export async function deleteClusterConfigData(params) {
   });
 }
 
+export async function getClusterConfigData(params) {
+  return request(window.logkitUrl + '/logkit/cluster/configs/' + params.name + '?tag=' + params.tag + '&url=' + params.url, {
+    method: 'get'
+  });
+}
+
 export async function getIsCluster(params) {
   return request(window.logkitUrl + '/logkit/cluster/ismaster', {
     method: 'get'
