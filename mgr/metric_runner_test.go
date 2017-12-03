@@ -124,7 +124,7 @@ func metricRunTest(p *testParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(5 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	// 停止 runner
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName + "/stop"
@@ -186,7 +186,7 @@ func metricRunTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPut, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(5 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	// 停止 runner
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName + "/stop"
@@ -249,7 +249,7 @@ func metricNetTest(p *testParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(5 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	// 停止 runner
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName + "/stop"
@@ -313,7 +313,7 @@ func metricDiskioTest(p *testParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(5 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	// 停止 runner
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName + "/stop"

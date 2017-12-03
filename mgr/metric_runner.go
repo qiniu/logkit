@@ -136,16 +136,18 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 		lastSend:   time.Now(), // 上一次发送时间
 		meta:       meta,
 		rs: RunnerStatus{
-			ReaderStats: utils.StatsInfo{},
-			SenderStats: make(map[string]utils.StatsInfo),
-			lastState:   time.Now(),
-			Name:        rc.RunnerName,
+			ReaderStats:   utils.StatsInfo{},
+			SenderStats:   make(map[string]utils.StatsInfo),
+			lastState:     time.Now(),
+			Name:          rc.RunnerName,
+			RunningStatus: RunnerRunning,
 		},
 		lastRs: RunnerStatus{
-			ReaderStats: utils.StatsInfo{},
-			SenderStats: make(map[string]utils.StatsInfo),
-			lastState:   time.Now(),
-			Name:        rc.RunnerName,
+			ReaderStats:   utils.StatsInfo{},
+			SenderStats:   make(map[string]utils.StatsInfo),
+			lastState:     time.Now(),
+			Name:          rc.RunnerName,
+			RunningStatus: RunnerRunning,
 		},
 		rsMutex:         new(sync.RWMutex),
 		collectInterval: interval,
@@ -335,18 +337,25 @@ func (_ *MetricRunner) Cleaner() CleanInfo {
 	}
 }
 
-func (mr *MetricRunner) Status() RunnerStatus {
-	now := time.Now()
+func (mr *MetricRunner) getStatusFrequently(rss *RunnerStatus, now time.Time) (bool, float64) {
 	mr.rsMutex.RLock()
+	defer mr.rsMutex.RUnlock()
+	elaspedTime := now.Sub(mr.rs.lastState).Seconds()
+	if elaspedTime <= 3 {
+		deepCopy(rss, &mr.rs)
+		return true, elaspedTime
+	}
+	return false, elaspedTime
+}
+
+func (mr *MetricRunner) Status() RunnerStatus {
+	var isFre bool
+	var elaspedtime float64
 	rss := RunnerStatus{}
-	elaspedtime := now.Sub(mr.rs.lastState).Seconds()
-	if elaspedtime <= 3 {
-		defer mr.rsMutex.RUnlock()
-		deepCopy(&rss, &mr.rs)
+	now := time.Now()
+	if isFre, elaspedtime = mr.getStatusFrequently(&rss, now); isFre {
 		return rss
 	}
-	mr.rsMutex.RUnlock()
-
 	mr.rsMutex.Lock()
 	defer mr.rsMutex.Unlock()
 	mr.rs.Elaspedtime += elaspedtime

@@ -182,7 +182,7 @@ func clusterUpdateTest(p *testCluParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(4 * time.Second)
+	time.Sleep(6 * time.Second)
 
 	// 获取 status , tag = test
 	url = rs[0].cluster.Address + "/logkit/cluster/status?tag=" + rs[1].cluster.Tag
@@ -244,7 +244,7 @@ func clusterUpdateTest(p *testCluParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPut, updateConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(4 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	// 尝试更改一个不存在的 slave
 	url = rs[0].cluster.Address + "/logkit/cluster/configs/" + runnerName + "?tag=" + rs[1].cluster.Tag + "&url=" + rs[3].cluster.Address
@@ -315,7 +315,7 @@ func clusterStartStopTest(p *testCluParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(5 * time.Second)
+	time.Sleep(6 * time.Second)
 
 	// 获取 status , tag = test
 	url = rs[0].cluster.Address + "/logkit/cluster/status?tag=" + rs[1].cluster.Tag
@@ -371,7 +371,7 @@ func clusterStartStopTest(p *testCluParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(4 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	// 停止后，tag == 'test' 的 status runningStatus 为 stopped
 	url = rs[0].cluster.Address + "/logkit/cluster/status?tag=" + rs[1].cluster.Tag
@@ -469,7 +469,7 @@ func clusterStartStopTest(p *testCluParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(4 * time.Second)
+	time.Sleep(6 * time.Second)
 
 	// tag == 'test' 的 status 恢复
 	url = rs[0].cluster.Address + "/logkit/cluster/status?tag=" + rs[1].cluster.Tag
@@ -528,7 +528,7 @@ func clusterStartStopTest(p *testCluParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(4 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// tag == "test_change" status 状态为 stopped
 	url = rs[0].cluster.Address + "/logkit/cluster/status?url=" + rs[3].cluster.Address
@@ -596,7 +596,7 @@ func clusterResetDeleteTest(p *testCluParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(4 * time.Second)
+	time.Sleep(6 * time.Second)
 
 	// 读取日志发送目的文件，记录日志条数
 	dataLine := 0
@@ -612,13 +612,12 @@ func clusterResetDeleteTest(p *testCluParam) {
 	}
 	f.Close()
 
-	time.Sleep(30 * time.Second)
 	// reset tag == 'test' 的 slave
 	url = rs[0].cluster.Address + "/logkit/cluster/configs/" + runnerName + "/reset?tag=" + rs[1].cluster.Tag
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(4 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	// 重置之后, 日志发送目的文件中的日志条数应该增加
 	dataLine1 := 0
@@ -716,7 +715,7 @@ func clusterSalveConfigsTest(p *testCluParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(4 * time.Second)
+	time.Sleep(6 * time.Second)
 
 	// 测试获取 slave configs tag = test
 	url = rs[0].cluster.Address + "/logkit/cluster/configs?tag=" + rs[1].cluster.Tag
@@ -808,7 +807,6 @@ func changeTagsTest(p *testCluParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, marshaled)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(2 * time.Second)
 
 	slaves := make([]Slave, 0)
 	slaves = append(slaves, Slave{Url: rs[1].cluster.Address, Tag: "test-test", Status: StatusOK})
@@ -819,7 +817,6 @@ func changeTagsTest(p *testCluParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(2 * time.Second)
 	var respGetSlaves respSlave
 	err = json.Unmarshal(respBody, &respGetSlaves)
 	assert.NoError(t, err)
@@ -832,7 +829,6 @@ func changeTagsTest(p *testCluParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, marshaled)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(2 * time.Second)
 
 	slaves = make([]Slave, 0)
 	slaves = append(slaves, Slave{Url: rs[1].cluster.Address, Tag: "test-test", Status: StatusOK})
@@ -843,12 +839,11 @@ func changeTagsTest(p *testCluParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(2 * time.Second)
 	respGetSlaves = respSlave{}
 	err = json.Unmarshal(respBody, &respGetSlaves)
 	assert.NoError(t, err)
 	getSlaves = respGetSlaves.Data
-	for i, _ := range getSlaves {
+	for i := range getSlaves {
 		getSlaves[i].LastTouch = time.Time{}
 	}
 }
@@ -868,7 +863,6 @@ func clusterSlavesDeleteTest(p *testCluParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodDelete, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(2 * time.Second)
 
 	slaves := make([]Slave, 0)
 	slaves = append(slaves, Slave{Url: rs[1].cluster.Address, Tag: rs[1].cluster.Tag, Status: StatusOK})
@@ -878,7 +872,6 @@ func clusterSlavesDeleteTest(p *testCluParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(2 * time.Second)
 	var respGetSlaves respSlave
 	err = json.Unmarshal(respBody, &respGetSlaves)
 	assert.NoError(t, err)
@@ -900,7 +893,6 @@ func clusterSlavesDeleteTest(p *testCluParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodDelete, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(2 * time.Second)
 
 	slaves = make([]Slave, 0)
 	slaves = append(slaves, Slave{Url: rs[2].cluster.Address, Tag: rs[2].cluster.Tag, Status: StatusOK})
@@ -910,12 +902,11 @@ func clusterSlavesDeleteTest(p *testCluParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(2 * time.Second)
 	respGetSlaves = respSlave{}
 	err = json.Unmarshal(respBody, &respGetSlaves)
 	assert.NoError(t, err)
 	getSlaves = respGetSlaves.Data
-	for i, _ := range getSlaves {
+	for i := range getSlaves {
 		getSlaves[i].LastTouch = time.Time{}
 	}
 	assert.Equal(t, slaves, getSlaves)
@@ -953,14 +944,13 @@ func getSlavesRunnerTest(p *testCluParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(2 * time.Second)
+	time.Sleep(6 * time.Second)
 
 	// 获取 tag = test 的 runner name
 	url = rs[0].cluster.Address + "/logkit/cluster/runners?tag="
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(4 * time.Second)
 	var respRss respRunnersNameList
 	err = json.Unmarshal(respBody, &respRss)
 	assert.NoError(t, err, string(respBody))
@@ -978,7 +968,6 @@ func getSlavesRunnerTest(p *testCluParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(4 * time.Second)
 	respRss = respRunnersNameList{}
 	err = json.Unmarshal(respBody, &respRss)
 	assert.NoError(t, err, string(respBody))
@@ -1024,7 +1013,7 @@ func getSlaveConfigTest(p *testCluParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(5 * time.Second)
+	time.Sleep(6 * time.Second)
 
 	// 获取 tag = test, runner 的 config
 	url = rs[0].cluster.Address + "/logkit/cluster/configs/" + runnerName + "?tag=" + rs[1].cluster.Tag

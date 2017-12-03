@@ -55,7 +55,30 @@ func Test_ActiveReader(t *testing.T) {
 	ar.Close()
 }
 
-func TestMultiReaderOneLine(t *testing.T) {
+func TestStart(t *testing.T) {
+	c := make(chan string)
+
+	// 以下几个函数 sleep 时间较长，放在此处并发执行
+	funcMap := map[string]func(*testing.T){
+		"multiReaderOneLineTest":          multiReaderOneLineTest,
+		"multiReaderMultiLineTest":        multiReaderMultiLineTest,
+		"multiReaderSyncMetaOneLineTest":  multiReaderSyncMetaOneLineTest,
+		"multiReaderSyncMetaMutilineTest": multiReaderSyncMetaMutilineTest,
+	}
+
+	for k, f := range funcMap {
+		go func(k string, f func(*testing.T), c chan string) {
+			f(t)
+			c <- k
+		}(k, f, c)
+	}
+	funcCnt := len(funcMap)
+	for i := 0; i < funcCnt; i++ {
+		<-c
+	}
+}
+
+func multiReaderOneLineTest(t *testing.T) {
 	maxnum := 0
 	dirname := "TestMultiReaderOneLine"
 	dir1 := filepath.Join(dirname, "abc")
@@ -145,7 +168,7 @@ func TestMultiReaderOneLine(t *testing.T) {
 	assert.Equal(t, utils.StatsInfo{}, mr.Status())
 }
 
-func TestMultiReaderMultiLine(t *testing.T) {
+func multiReaderMultiLineTest(t *testing.T) {
 	maxnum := 0
 	dirname := "TestMultiReaderMultiLine"
 	dir1 := filepath.Join(dirname, "abc")
@@ -234,7 +257,7 @@ func TestMultiReaderMultiLine(t *testing.T) {
 	assert.EqualValues(t, expresult, resultmap)
 }
 
-func TestMultiReaderSyncMetaOneLine(t *testing.T) {
+func multiReaderSyncMetaOneLineTest(t *testing.T) {
 	maxnum := 0
 	dirname := "TestMultiReaderSyncMetaOneLine"
 	dir1 := filepath.Join(dirname, "abc")
@@ -360,7 +383,7 @@ func TestMultiReaderSyncMetaOneLine(t *testing.T) {
 	assert.EqualValues(t, expresult, resultmap)
 }
 
-func TestMultiReaderSyncMetaMutiline(t *testing.T) {
+func multiReaderSyncMetaMutilineTest(t *testing.T) {
 	maxnum := 0
 	dirname := "TestMultiReaderSyncMetaMutiline"
 	dir1 := filepath.Join(dirname, "abc")
