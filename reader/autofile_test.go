@@ -9,7 +9,7 @@ import (
 )
 
 func Test_matchModeDir(t *testing.T) {
-	var logpathdir string = os.TempDir() + "logkit"
+	logpathdir := "Test_matchModeDir/logkit"
 	os.Mkdir(logpathdir,0755)
 	defer remove(logpathdir)
 	modedir, err := matchMode(logpathdir)
@@ -19,7 +19,7 @@ func Test_matchModeDir(t *testing.T) {
 }
 
 func Test_matchModeFile(t *testing.T){
-	var logpathfile string = os.TempDir() + "logkit.log"
+	logpathfile := "Test_matchModeFile/logkit.log"
 	os.Create(logpathfile)
 	defer remove(logpathfile)
 	modefile, err2 := matchMode(logpathfile)
@@ -28,9 +28,9 @@ func Test_matchModeFile(t *testing.T){
 }
 
 func Test_matchModeTailx(t *testing.T){
-	var logpathtailx string = "/logkit/*/*.log"
-	os.Create(os.TempDir() + "logkit/1/logkit.log")
-	defer remove(os.TempDir() + "logkit/1/logkit.log")
+	logpathtailx := "Test_matchModeTailx/*/*.log"
+	os.Create("Test_matchModeTailx/1/logkit.log")
+	defer remove("Test_matchModeTailx/1/logkit.log")
 	modetailx, err3 := matchMode(logpathtailx)
 	fmt.Println(modetailx)
 	assert.NoError(t, err3)
