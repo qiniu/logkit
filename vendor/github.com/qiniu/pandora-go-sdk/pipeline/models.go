@@ -617,8 +617,8 @@ type AutoExportToTSDBInput struct {
 	OmitEmpty    bool
 	Timestamp    string
 	IsMetric     bool
+	ExpandAttr   []string
 	SeriesTags   map[string][]string
-	ExpandAttr   []RepoSchemaEntry
 }
 
 type CreateRepoForTSDBInput struct {

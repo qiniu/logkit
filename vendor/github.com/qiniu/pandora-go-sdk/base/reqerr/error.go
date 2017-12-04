@@ -117,6 +117,8 @@ const (
 	ErrSameToSystemVariable
 	ErrTransformUpdate
 	ErrSQLWithUndefinedVariable
+	ErrWorkflowNameSameToRepoOrDatasource
+	ErrJobReRunOrCancel
 )
 
 type ErrBuilder interface {
