@@ -1,6 +1,10 @@
 package main
 
 import (
+	"flag"
+	"fmt"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -13,11 +17,6 @@ import (
 	"github.com/qiniu/logkit/times"
 	_ "github.com/qiniu/logkit/transforms/all"
 	"github.com/qiniu/logkit/utils"
-
-	"net/http"
-	_ "net/http/pprof"
-
-	"fmt"
 
 	"github.com/labstack/echo"
 	"github.com/qiniu/log"
@@ -42,11 +41,38 @@ type Config struct {
 var conf Config
 
 const (
-	Version           = "v1.4.0"
+	NextVersion       = "v1.4.1"
 	defaultReserveCnt = 5
 	defaultLogDir     = "./run"
 	defaultLogPattern = "*.log-*"
 	defaultRotateSize = 100 * 1024 * 1024
+)
+
+const usage = `logkit, Very easy-to-use server agent for collecting & sending logs & metrics.
+
+Usage:
+
+  logkit [commands|flags]
+
+The commands & flags are:
+
+  -v                 print the version to stdout
+  -h                 print logkit usage info to stdout.
+
+  -f <file>          configuration file to load
+
+Examples:
+
+  # start logkit
+  logkit -f logkit.conf
+
+  # check version
+  logkit -v
+`
+
+var (
+	fversion = flag.Bool("v", false, "print the version to stdout")
+	confName = flag.String("f", "logkit.conf", "configuration file to load")
 )
 
 func getValidPath(confPaths []string) (paths []string) {
@@ -175,11 +201,29 @@ func loopRotateLogs(path string, rotateSize int64, dur time.Duration, exitchan c
 	}
 }
 
+func usageExit(rc int) {
+	fmt.Println(usage)
+	os.Exit(rc)
+}
+
 //！！！注意： 自动生成 grok pattern代码，下述注释请勿删除！！！
 //go:generate go run generators/grok_pattern_generater.go
 func main() {
-	config.Init("f", "logkit", "logkit.conf")
-	if err := config.Load(&conf); err != nil {
+
+	flag.Usage = func() { usageExit(0) }
+	flag.Parse()
+	switch {
+	case *fversion:
+		fmt.Println("logkit version: ", NextVersion)
+		osInfo := utils.GetOSInfo()
+		fmt.Println("Hostname: ", osInfo.Hostname)
+		fmt.Println("Core: ", osInfo.Core)
+		fmt.Println("OS: ", osInfo.OS)
+		fmt.Println("Platform: ", osInfo.Platform)
+		return
+	}
+
+	if err := config.LoadEx(&conf, *confName); err != nil {
 		log.Fatal("config.Load failed:", err)
 	}
 	if conf.TimeLayouts != nil {
@@ -203,12 +247,12 @@ func main() {
 		conf.CleanSelfDir = logdir
 	}
 
-	log.Infof("Welcome to use Logkit, Version: %v \n\nConfig: %#v", Version, conf)
+	log.Infof("Welcome to use Logkit, Version: %v \n\nConfig: %#v", NextVersion, conf)
 	m, err := mgr.NewManager(conf.ManagerConfig)
 	if err != nil {
 		log.Fatalf("NewManager: %v", err)
 	}
-	m.Version = Version
+	m.Version = NextVersion
 
 	paths := getValidPath(conf.ConfsPath)
 	if len(paths) <= 0 {
