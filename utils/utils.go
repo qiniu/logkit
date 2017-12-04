@@ -21,6 +21,10 @@ import (
 
 const (
 	GlobalKeyName = "name"
+	KeyCore       = "core"
+	KeyHostName   = "hostname"
+	KeyOsInfo     = "osinfo"
+	KeyLocalIp    = "localip"
 )
 
 type File struct {
@@ -262,11 +266,11 @@ func (oi *OSInfo) String() string {
 func GetExtraInfo() map[string]string {
 	osInfo := GetOSInfo()
 	exInfo := make(map[string]string)
-	exInfo["core"] = osInfo.Core
-	exInfo["hostname"] = osInfo.Hostname
-	exInfo["osinfo"] = osInfo.OS + "-" + osInfo.Kernel + "-" + osInfo.Platform
+	exInfo[KeyCore] = osInfo.Core
+	exInfo[KeyHostName] = osInfo.Hostname
+	exInfo[KeyOsInfo] = osInfo.OS + "-" + osInfo.Kernel + "-" + osInfo.Platform
 	if ip, err := GetLocalIP(); err != nil {
-		exInfo["localip"] = ip
+		exInfo[KeyLocalIp] = ip
 	}
 	return exInfo
 }

@@ -1031,7 +1031,7 @@ func (c *Pipeline) CreateForMutiExportTSDB(input *CreateRepoForMutiExportTSDBInp
 		if err != nil && !reqerr.IsExistError(err) {
 			return err
 		}
-		tsdbSpec := c.FormTSDBSpec(&CreateRepoForTSDBInput{
+		tsdbSpec := c.FormMutiSeriesTSDBSpec(&CreateRepoForTSDBInput{
 			RepoName:     input.RepoName,
 			TSDBRepoName: input.TSDBRepoName,
 			Region:       input.Region,

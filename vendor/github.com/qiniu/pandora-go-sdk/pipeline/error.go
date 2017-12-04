@@ -194,6 +194,10 @@ func (e PipelineErrBuilder) Build(msg, text, reqId string, code int) error {
 		err.ErrorType = reqerr.ErrSQLWithUndefinedVariable
 	case "E18660":
 		err.ErrorType = reqerr.ErrTransformUpdate
+	case "E18661":
+		err.ErrorType = reqerr.ErrWorkflowNameSameToRepoOrDatasource
+	case "E18662":
+		err.ErrorType = reqerr.ErrJobReRunOrCancel
 	case "E9000":
 		err.ErrorType = reqerr.InternalServerError
 	case "E9001":

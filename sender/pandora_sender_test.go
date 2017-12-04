@@ -1115,8 +1115,6 @@ func TestPandoraExtraInfo(t *testing.T) {
 	}
 	resp := pandora.Body
 	assert.Equal(t, true, strings.Contains(resp, "core"))
-	assert.Equal(t, true, strings.Contains(resp, "osinfo0"))
-	assert.Equal(t, true, strings.Contains(resp, "hostname3"))
 	assert.Equal(t, true, strings.Contains(resp, "x1=123.2"))
 	assert.Equal(t, true, strings.Contains(resp, "osinfo=123.2"))
 	assert.Equal(t, true, strings.Contains(resp, "hostname=123.2"))

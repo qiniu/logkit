@@ -79,6 +79,39 @@ func (c *Pipeline) FormTSDBSpec(input *CreateRepoForTSDBInput) *ExportTsdbSpec {
 	}
 }
 
+func (c *Pipeline) FormMutiSeriesTSDBSpec(input *CreateRepoForTSDBInput) *ExportTsdbSpec {
+	tags := make(map[string]string)
+	fields := make(map[string]string)
+	for _, v := range input.Schema {
+		var key string
+		// 重命名 cpu__time_user --> cpu_time_user
+		// 当字段名称有 __ 分割的前缀，且该前缀为 seriesName 时，导出时将字段去掉一个下划线
+		if strings.HasPrefix(v.Key, input.SeriesName+"__") {
+			key = strings.Replace(v.Key, "__", "_", 1)
+		} else {
+			key = v.Key
+		}
+		if IsTag(key, input.Tags) {
+			tags[key] = "#" + v.Key
+		} else {
+			fields[key] = "#" + v.Key
+		}
+	}
+	timestamp := input.Timestamp
+	if timestamp != "" {
+		timestamp = "#" + timestamp
+	}
+	return &ExportTsdbSpec{
+		Tags:         tags,
+		Fields:       fields,
+		Timestamp:    timestamp,
+		DestRepoName: input.TSDBRepoName,
+		SeriesName:   input.SeriesName,
+		OmitEmpty:    input.OmitEmpty,
+		OmitInvalid:  input.OmitInvalid,
+	}
+}
+
 func formPipelineRepoInput(repoName, region string, schemas []RepoSchemaEntry) *CreateRepoInput {
 	return &CreateRepoInput{
 		Region:   region,
@@ -125,16 +158,24 @@ func convertSchema2LogDB(scs []RepoSchemaEntry) (ret []logdb.RepoSchemaEntry) {
 }
 
 func getSeriesName(seriesTag map[string][]string, schemaKey string) string {
-	for series, _ := range seriesTag {
-		if len(series) < len(schemaKey) {
-			// 判断 schemaKey 的前缀是不是 series, 如果是并且 schemaKey 除去前缀后的下一位为"_" 则认为 schemaKey 属于这个 series
-			// 之所以判断前缀的下一位是为了避免 disk 和 diskio 这种情况，具有相同的前缀, 无法区分
-			if schemaKey[:len(series)] == series && string(schemaKey[len(series)]) == "_" {
-				return series
-			}
-		}
+	tmpSeries := strings.Split(schemaKey, "__")
+	if len(tmpSeries) < 2 {
+		return ""
+	}
+	seriesName := tmpSeries[0]
+	if _, ok := seriesTag[seriesName]; ok {
+		return seriesName
 	}
 	return ""
+}
+
+func isInExpandAttr(key string, expandAttr []string) bool {
+	for _, val := range expandAttr {
+		if key == val {
+			return true
+		}
+	}
+	return false
 }
 
 // logkit 开启导出到 tsdb 功能时会调用这个函数，如果不是 metric 信息，走正常的流程，否则根据字段名称前缀 export 到不同的 series 里面
@@ -176,24 +217,32 @@ func (c *Pipeline) AutoExportToTSDB(input *AutoExportToTSDBInput) error {
 
 	// 获取字段，并根据 seriesTag 中的 key 拿到series name
 	seriesMap := make(map[string]SeriesInfo)
+	expandAttr := make([]RepoSchemaEntry, 0)
 	for _, val := range repoInfo.Schema {
 		seriesName := getSeriesName(input.SeriesTags, val.Key)
 		if seriesName == "" {
+			if isInExpandAttr(val.Key, input.ExpandAttr) {
+				expandAttr = append(expandAttr, val)
+			}
 			continue
 		}
 		series, exist := seriesMap[seriesName]
 		if !exist {
 			series = SeriesInfo{
 				SeriesName: seriesName,
-				Schema:     input.ExpandAttr,
+				TimeStamp:  input.Timestamp,
+				Schema:     make([]RepoSchemaEntry, 0),
 				Tags:       input.SeriesTags[seriesName],
 			}
 		}
-		if val.Key == seriesName+"_"+input.Timestamp {
-			series.TimeStamp = val.Key
-		}
 		series.Schema = append(series.Schema, val)
 		seriesMap[seriesName] = series
+	}
+
+	// 将调用方传递过来的 expand attr 也加入到每个 series 中
+	for k, val := range seriesMap {
+		val.Schema = append(val.Schema, expandAttr...)
+		seriesMap[k] = val
 	}
 
 	err = c.CreateForMutiExportTSDB(&CreateRepoForMutiExportTSDBInput{
