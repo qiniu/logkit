@@ -406,7 +406,9 @@ func LogDirAndPattern(logpath string) (dir, pattern string, err error) {
 			err = fmt.Errorf("get logkit log dir error %v", err)
 			return
 		}
-		if err = os.MkdirAll(logpath, 0755); err != nil {
+	}
+	if _, err = os.Stat(dir); os.IsNotExist(err) {
+		if err = os.MkdirAll(dir, 0755); err != nil {
 			err = fmt.Errorf("create logkit log dir error %v", err)
 			return
 		}
