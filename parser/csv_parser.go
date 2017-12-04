@@ -28,9 +28,10 @@ const (
 )
 
 const (
-	KeyCSVSchema   = "csv_schema"   // csv 每个列的列名和类型 long/string/float/date
-	KeyCSVSplitter = "csv_splitter" // csv 的分隔符
-	KeyCSVLabels   = "csv_labels"   // csv 额外增加的标签信息，比如机器信息等
+	KeyCSVSchema   = "csv_schema"      // csv 每个列的列名和类型 long/string/float/date
+	KeyCSVSplitter = "csv_splitter"    // csv 的分隔符
+	KeyCSVLabels   = "csv_labels"      // csv 额外增加的标签信息，比如机器信息等
+	KeyAutoRename  = "csv_auto_rename" // 是否将不合法的字段名称重命名一下, 比如 header-host 重命名为 header_host
 )
 
 const MaxParserSchemaErrOutput = 5
@@ -41,6 +42,7 @@ type CsvParser struct {
 	labels         []Label
 	delim          string
 	schemaErr      *schemaErr
+	isAutoRename   bool
 	timeZoneOffset int
 }
 
@@ -61,6 +63,7 @@ func NewCsvParser(c conf.MapConf) (LogParser, error) {
 	}
 	timeZoneOffsetRaw, _ := c.GetStringOr(KeyTimeZoneOffset, "")
 	timeZoneOffset := parseTimeZoneOffset(timeZoneOffsetRaw)
+	isAutoRename, _ := c.GetBoolOr(KeyAutoRename, false)
 
 	fieldList, err := parseSchemaFieldList(schema)
 	if err != nil {
@@ -93,6 +96,7 @@ func NewCsvParser(c conf.MapConf) (LogParser, error) {
 			number: 0,
 			last:   time.Now(),
 		},
+		isAutoRename:   isAutoRename,
 		timeZoneOffset: timeZoneOffset,
 	}, nil
 }
@@ -389,6 +393,19 @@ func (p *CsvParser) parse(line string) (sender.Data, error) {
 	return d, nil
 }
 
+func (p *CsvParser) Rename(datas []sender.Data) []sender.Data {
+	newData := make([]sender.Data, 0)
+	for _, d := range datas {
+		data := make(sender.Data)
+		for key, val := range d {
+			newKey := strings.Replace(key, "-", "_", -1)
+			data[newKey] = val
+		}
+		newData = append(newData, data)
+	}
+	return newData
+}
+
 func (p *CsvParser) Parse(lines []string) ([]sender.Data, error) {
 	datas := []sender.Data{}
 	se := &utils.StatsError{}
@@ -403,6 +420,9 @@ func (p *CsvParser) Parse(lines []string) ([]sender.Data, error) {
 		}
 		datas = append(datas, d)
 		se.AddSuccess()
+	}
+	if p.isAutoRename {
+		datas = p.Rename(datas)
 	}
 	return datas, se
 }
