@@ -146,3 +146,47 @@ func TestParamTransformerKeyRepeat(t *testing.T) {
 	par.stats.LastError = ""
 	assert.Equal(t, utils.StatsInfo{Success: 4}, par.stats)
 }
+
+func TestParamTransformerMultiKey(t *testing.T) {
+	par := &UrlParam{
+		Key: "multi.myword",
+	}
+	data, err := par.Transform([]sender.Data{
+		{"multi": map[string]interface{}{"myword": "platform=2&vid=372&vu=caea966558&chan=android_sougou&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"}},
+		{"multi": map[string]interface{}{"myword": "platform=2&vid=&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"}},
+	})
+	assert.NoError(t, err)
+	exp := []sender.Data{
+		{
+			"multi": map[string]interface{}{
+				"myword":           "platform=2&vid=372&vu=caea966558&chan=android_sougou&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032",
+				"myword_platform":  "2",
+				"myword_vid":       "372",
+				"myword_vu":        "caea966558",
+				"myword_chan":      "android_sougou",
+				"myword_sign":      "ad225ec02942c79bdb710e3ad0cf1b43",
+				"myword_nonce_str": "1510555032",
+			}},
+		{
+			"multi": map[string]interface{}{
+				"myword":           "platform=2&vid=&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032",
+				"myword_platform":  "2",
+				"myword_vid":       "",
+				"myword_vu":        "caea966558",
+				"myword_chan":      "",
+				"myword_sign":      "ad225ec02942c79bdb710e3ad0cf1b43",
+				"myword_nonce_str": "1510555032",
+			}},
+	}
+	assert.Equal(t, len(exp), len(data))
+	for i, ex := range exp {
+		da := data[i]["multi"].(map[string]interface{})
+		for k, e := range ex["multi"].(map[string]interface{}) {
+			d, exist := da[k]
+			assert.Equal(t, true, exist)
+			assert.Equal(t, e, d)
+		}
+	}
+	assert.Equal(t, par.Stage(), transforms.StageAfterParser)
+	assert.Equal(t, utils.StatsInfo{Success: 2}, par.stats)
+}

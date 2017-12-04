@@ -16,108 +16,108 @@ type ArrayExpand struct {
 	stats utils.StatsInfo
 }
 
-func (p *ArrayExpand) transformToMap(val interface{}) map[string]interface{} {
+func (p *ArrayExpand) transformToMap(val interface{}, key string) map[string]interface{} {
 	resultMap := make(map[string]interface{})
 	switch legalType := val.(type) {
 	case []int:
 		for index, arrVal := range legalType {
-			key := p.Key + strconv.Itoa(index)
+			key := key + strconv.Itoa(index)
 			resultMap[key] = arrVal
 		}
 		return resultMap
 	case []int8:
 		for index, arrVal := range legalType {
-			key := p.Key + strconv.Itoa(index)
+			key := key + strconv.Itoa(index)
 			resultMap[key] = arrVal
 		}
 		return resultMap
 	case []int16:
 		for index, arrVal := range legalType {
-			key := p.Key + strconv.Itoa(index)
+			key := key + strconv.Itoa(index)
 			resultMap[key] = arrVal
 		}
 		return resultMap
 	case []int32:
 		for index, arrVal := range legalType {
-			key := p.Key + strconv.Itoa(index)
+			key := key + strconv.Itoa(index)
 			resultMap[key] = arrVal
 		}
 		return resultMap
 	case []int64:
 		for index, arrVal := range legalType {
-			key := p.Key + strconv.Itoa(index)
+			key := key + strconv.Itoa(index)
 			resultMap[key] = arrVal
 		}
 		return resultMap
 	case []uint:
 		for index, arrVal := range legalType {
-			key := p.Key + strconv.Itoa(index)
+			key := key + strconv.Itoa(index)
 			resultMap[key] = arrVal
 		}
 		return resultMap
 	case []uint8:
 		for index, arrVal := range legalType {
-			key := p.Key + strconv.Itoa(index)
+			key := key + strconv.Itoa(index)
 			resultMap[key] = arrVal
 		}
 		return resultMap
 	case []uint16:
 		for index, arrVal := range legalType {
-			key := p.Key + strconv.Itoa(index)
+			key := key + strconv.Itoa(index)
 			resultMap[key] = arrVal
 		}
 		return resultMap
 	case []uint32:
 		for index, arrVal := range legalType {
-			key := p.Key + strconv.Itoa(index)
+			key := key + strconv.Itoa(index)
 			resultMap[key] = arrVal
 		}
 		return resultMap
 	case []uint64:
 		for index, arrVal := range legalType {
-			key := p.Key + strconv.Itoa(index)
+			key := key + strconv.Itoa(index)
 			resultMap[key] = arrVal
 		}
 		return resultMap
 	case []bool:
 		for index, arrVal := range legalType {
-			key := p.Key + strconv.Itoa(index)
+			key := key + strconv.Itoa(index)
 			resultMap[key] = arrVal
 		}
 		return resultMap
 	case []string:
 		for index, arrVal := range legalType {
-			key := p.Key + strconv.Itoa(index)
+			key := key + strconv.Itoa(index)
 			resultMap[key] = arrVal
 		}
 		return resultMap
 	case []float32:
 		for index, arrVal := range legalType {
-			key := p.Key + strconv.Itoa(index)
+			key := key + strconv.Itoa(index)
 			resultMap[key] = arrVal
 		}
 		return resultMap
 	case []float64:
 		for index, arrVal := range legalType {
-			key := p.Key + strconv.Itoa(index)
+			key := key + strconv.Itoa(index)
 			resultMap[key] = arrVal
 		}
 		return resultMap
 	case []complex64:
 		for index, arrVal := range legalType {
-			key := p.Key + strconv.Itoa(index)
+			key := key + strconv.Itoa(index)
 			resultMap[key] = arrVal
 		}
 		return resultMap
 	case []complex128:
 		for index, arrVal := range legalType {
-			key := p.Key + strconv.Itoa(index)
+			key := key + strconv.Itoa(index)
 			resultMap[key] = arrVal
 		}
 		return resultMap
 	case []interface{}:
 		for index, arrVal := range legalType {
-			key := p.Key + strconv.Itoa(index)
+			key := key + strconv.Itoa(index)
 			resultMap[key] = arrVal
 		}
 		return resultMap
@@ -133,30 +133,36 @@ func (p *ArrayExpand) RawTransform(datas []string) ([]string, error) {
 func (p *ArrayExpand) Transform(datas []sender.Data) ([]sender.Data, error) {
 	var err, pErr error
 	errNums := 0
+	keys := utils.GetKeys(p.Key)
+	newkeys := make([]string, len(keys))
 	for i := range datas {
-		val, ok := datas[i][p.Key]
-		if !ok {
+		copy(newkeys, keys)
+		val, gerr := utils.GetMapValue(datas[i], keys...)
+		if gerr != nil {
 			errNums++
 			err = fmt.Errorf("transform key %v not exist in data", p.Key)
 			continue
 		}
-		if resultMap := p.transformToMap(val); resultMap != nil {
+		if resultMap := p.transformToMap(val, newkeys[len(keys)-1]); resultMap != nil {
 			for key, arrVal := range resultMap {
 				suffix := 0
 				keyName := key
-				_, exist := datas[i][keyName]
-				for ; exist; suffix++ {
+				newkeys[len(newkeys)-1] = keyName
+				_, gerr := utils.GetMapValue(datas[i], newkeys...)
+				for ; gerr == nil; suffix++ {
 					if suffix > 5 {
 						log.Warnf("keys %v -- %v already exist, the key %v will be ignored", key, keyName, key)
 						break
 					}
 					keyName = key + "_" + strconv.Itoa(suffix)
-					_, exist = datas[i][keyName]
+					newkeys[len(newkeys)-1] = keyName
+					_, gerr = utils.GetMapValue(datas[i], newkeys...)
 				}
 				if suffix <= 5 {
-					datas[i][keyName] = arrVal
+					utils.SetMapValue(datas[i], arrVal, false, newkeys...)
 				}
 			}
+
 		} else {
 			errNums++
 			err = fmt.Errorf("transform key %v data type is not array", p.Key)

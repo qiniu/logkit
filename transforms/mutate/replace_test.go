@@ -14,6 +14,7 @@ func TestReplaceTransformer(t *testing.T) {
 		Old: "x1",
 		New: "y2",
 	}
+	gsub.Init()
 	data, err := gsub.Transform([]sender.Data{{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}, {"myword": "x1x.x.x11", "abc": "x1"}})
 	assert.NoError(t, err)
 	exp := []sender.Data{
@@ -25,9 +26,24 @@ func TestReplaceTransformer(t *testing.T) {
 		Old: `\x`,
 		New: `\\x`,
 	}
+	gsub2.Init()
 	newd, err := gsub2.RawTransform([]string{`\x0A`, "hello"})
 	assert.NoError(t, err)
 	expdata := []string{`\\x0A`, "hello"}
 	assert.Equal(t, expdata, newd)
 	assert.Equal(t, gsub.Stage(), transforms.StageBeforeParser)
+
+	gsub3 := &Replacer{
+		Key:   "multi.myword",
+		Old:   "\\d",
+		New:   "0",
+		Regex: true,
+	}
+	gsub3.Init()
+	data3, err3 := gsub3.Transform([]sender.Data{{"multi": map[string]interface{}{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}}, {"multi": map[string]interface{}{"myword": "x1x.x.x11", "abc": "x1"}}})
+	assert.NoError(t, err3)
+	exp3 := []sender.Data{
+		{"multi": map[string]interface{}{"myword": "hello x0 y0 x0nihao", "abc": "x1 y2"}},
+		{"multi": map[string]interface{}{"myword": "x0x.x.x00", "abc": "x1"}}}
+	assert.Equal(t, exp3, data3)
 }

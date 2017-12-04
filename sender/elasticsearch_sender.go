@@ -30,7 +30,9 @@ type ElasticsearchSender struct {
 
 	aliasFields map[string]string
 
-	intervalIndex int
+	intervalIndex  int
+	timeZone       *time.Location
+	logkitSendTime bool
 }
 
 const (
@@ -40,7 +42,8 @@ const (
 	KeyElasticType    = "elastic_type"
 	KeyElasticAlias   = "elastic_keys"
 
-	KeyElasticIndexStrategy = "index_strategy"
+	KeyElasticIndexStrategy = "elastic_index_strategy"
+	KeyElasticTimezone      = "elastic_time_zone"
 )
 
 const (
@@ -58,6 +61,15 @@ var (
 	// ElasticVersion6 v6.x
 	ElasticVersion6 = "6.x"
 )
+
+//timeZone
+const (
+	KeylocalTimezone = "Local"
+	KeyUTCTimezone   = "UTC"
+	KeyPRCTimezone   = "PRC"
+)
+
+const KeySendTime = "sendTime"
 
 // NewElasticSender New ElasticSender
 func NewElasticSender(conf conf.MapConf) (sender Sender, err error) {
@@ -78,6 +90,12 @@ func NewElasticSender(conf conf.MapConf) (sender Sender, err error) {
 
 	// 索引后缀模式
 	indexStrategy, _ := conf.GetStringOr(KeyElasticIndexStrategy, KeyDefaultIndexStrategy)
+	timezone, _ := conf.GetStringOr(KeyElasticTimezone, KeyUTCTimezone)
+	timeZone, err := time.LoadLocation(timezone)
+	if err != nil {
+		return
+	}
+	logkitSendTime, _ := conf.GetBoolOr(KeyLogkitSendTime, true)
 	eType, _ := conf.GetStringOr(KeyElasticType, defaultType)
 	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("elasticSender:(elasticUrl:%s,index:%s,type:%s)", host, index, eType))
 	fields, _ := conf.GetAliasMapOr(KeyElasticAlias, make(map[string]string))
@@ -129,6 +147,8 @@ func NewElasticSender(conf conf.MapConf) (sender Sender, err error) {
 		eType:           eType,
 		aliasFields:     fields,
 		intervalIndex:   i,
+		timeZone:        timeZone,
+		logkitSendTime:  logkitSendTime,
 	}, nil
 }
 
@@ -160,20 +180,17 @@ func (ess *ElasticsearchSender) Send(data []Data) (err error) {
 		if len(ess.aliasFields) == 0 {
 			makeDoc = false
 		}
-
-		i := ess.intervalIndex
 		var indexName string
-		var intervals []string
 		for _, doc := range data {
-			indexName = ess.indexName
-			now := time.Now().UTC()
-			intervals = []string{strconv.Itoa(now.Year()), strconv.Itoa(int(now.Month())), strconv.Itoa(now.Day())}
-			for j := 1; j <= i; j++ {
-				indexName = indexName + "." + intervals[j-1]
-			}
-
+			//计算索引
+			indexName = buildIndexName(ess.indexName, ess.timeZone, ess.intervalIndex)
+			//字段名称替换
 			if makeDoc {
 				doc = ess.wrapDoc(doc)
+			}
+			//添加发送时间
+			if ess.logkitSendTime {
+				doc[KeySendTime] = time.Now().In(ess.timeZone)
 			}
 			doc2 := doc
 			bulkService.Add(elasticV6.NewBulkIndexRequest().Index(indexName).Type(ess.eType).Doc(&doc2))
@@ -190,20 +207,17 @@ func (ess *ElasticsearchSender) Send(data []Data) (err error) {
 		if len(ess.aliasFields) == 0 {
 			makeDoc = false
 		}
-
-		i := ess.intervalIndex
 		var indexName string
-		var intervals []string
 		for _, doc := range data {
-			indexName = ess.indexName
-			now := time.Now().UTC()
-			intervals = []string{strconv.Itoa(now.Year()), strconv.Itoa(int(now.Month())), strconv.Itoa(now.Day())}
-			for j := 1; j <= i; j++ {
-				indexName = indexName + "." + intervals[j-1]
-			}
-
+			//计算索引
+			indexName = buildIndexName(ess.indexName, ess.timeZone, ess.intervalIndex)
+			//字段名称替换
 			if makeDoc {
 				doc = ess.wrapDoc(doc)
+			}
+			//添加发送时间
+			if ess.logkitSendTime {
+				doc[KeySendTime] = time.Now().In(ess.timeZone)
 			}
 			doc2 := doc
 			bulkService.Add(elasticV5.NewBulkIndexRequest().Index(indexName).Type(ess.eType).Doc(&doc2))
@@ -220,20 +234,17 @@ func (ess *ElasticsearchSender) Send(data []Data) (err error) {
 		if len(ess.aliasFields) == 0 {
 			makeDoc = false
 		}
-
-		i := ess.intervalIndex
 		var indexName string
-		var intervals []string
 		for _, doc := range data {
-			indexName = ess.indexName
-			now := time.Now().UTC()
-			intervals = []string{strconv.Itoa(now.Year()), strconv.Itoa(int(now.Month())), strconv.Itoa(now.Day())}
-			for j := 1; j <= i; j++ {
-				indexName = indexName + "." + intervals[j-1]
-			}
-
+			//计算索引
+			indexName = buildIndexName(ess.indexName, ess.timeZone, ess.intervalIndex)
+			//字段名称替换
 			if makeDoc {
 				doc = ess.wrapDoc(doc)
+			}
+			//添加发送时间
+			if ess.logkitSendTime {
+				doc[KeySendTime] = time.Now().In(ess.timeZone)
 			}
 			doc2 := doc
 			bulkService.Add(elasticV3.NewBulkIndexRequest().Index(indexName).Type(ess.eType).Doc(&doc2))
@@ -244,8 +255,23 @@ func (ess *ElasticsearchSender) Send(data []Data) (err error) {
 			return
 		}
 	}
-
 	return
+}
+
+func buildIndexName(indexName string, timeZone *time.Location, size int) string {
+	now := time.Now().In(timeZone)
+	intervals := []string{strconv.Itoa(now.Year()), strconv.Itoa(int(now.Month())), strconv.Itoa(now.Day())}
+	for j := 0; j < size; j++ {
+		if j == 0 {
+			indexName = indexName + "-" + intervals[j]
+		} else {
+			if len(intervals[j]) == 1 {
+				intervals[j] = "0" + intervals[j]
+			}
+			indexName = indexName + "." + intervals[j]
+		}
+	}
+	return indexName
 }
 
 // Close ElasticSearch Sender Close
@@ -254,14 +280,17 @@ func (ess *ElasticsearchSender) Close() error {
 }
 
 func (ess *ElasticsearchSender) wrapDoc(doc map[string]interface{}) map[string]interface{} {
-	newDoc := make(map[string]interface{})
+	//newDoc := make(map[string]interface{})
 	for oldKey, newKey := range ess.aliasFields {
 		val, ok := doc[oldKey]
 		if ok {
-			newDoc[newKey] = val
+			//newDoc[newKey] = val
+			delete(doc, oldKey)
+			doc[newKey] = val
 			continue
 		}
 		log.Errorf("key %s not found in doc", oldKey)
 	}
-	return newDoc
+	//return newDoc
+	return doc
 }

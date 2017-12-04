@@ -11,6 +11,7 @@ var ModeUsages = []utils.KeyValue{
 	{ModeDir, "从文件读取( dir 模式)"},
 	{ModeFile, "从文件读取( file 模式)"},
 	{ModeTailx, "从文件读取( tailx 模式)"},
+	{ModeFileAuto, "从文件读取( fileauto 模式)"},
 	{ModeMysql, "从 MySQL 读取"},
 	{ModeMssql, "从 MSSQL 读取"},
 	{ModeElastic, "从 Elasticsearch 读取"},
@@ -255,6 +256,38 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse: false,
 			Description:  "文件扫描间隔(stat_interval)",
 			CheckRegex:   "\\d+[hms]",
+		},
+	},
+	ModeFileAuto: {
+		{
+			KeyName:      KeyLogPath,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: true,
+			Description:  "日志文件夹路径(log_path)",
+		},
+		{
+			KeyName:       KeyWhence,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{WhenceOldest, WhenceNewest},
+
+			Description: "读取的起始位置(read_from)",
+		},
+		OptionEncoding,
+		OptionDataSourceTag,
+		{
+			KeyName:      KeyHeadPattern,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "多行读取的起始行正则表达式(head_pattern)",
+		},
+		{
+			KeyName:      KeyValidFilePattern,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "根据正则表达式匹配文件(valid_file_pattern)",
 		},
 	},
 	ModeMysql: {
@@ -549,7 +582,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyRedisDataType,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{DataTypeList, DataTypeChannel, DataTypePatterChannel, DataTypeString},
+			ChooseOptions: []interface{}{DataTypeList, DataTypeChannel, DataTypePatterChannel, DataTypeString, DataTypeSet, DateTypeSortedSet, DateTypeHash},
 			Description:   "Redis的数据读取模式(redis_datatype)",
 		},
 		{
@@ -565,6 +598,13 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "key1",
 			DefaultNoUse: true,
 			Description:  "redis键(redis_key)",
+		},
+		{
+			KeyName:      KeyRedisHashArea,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "hash模式对应redis的hash数据结构的域(redisHash_area)",
 		},
 		{
 			KeyName:      KeyRedisAddress,

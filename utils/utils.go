@@ -280,24 +280,112 @@ func IsJSON(str string) bool {
 	return json.Unmarshal([]byte(str), &js) == nil
 }
 
-func ExtractField(slice []string) (s []string, err error) {
-	if len(slice) == 1 {
-		return slice, nil
-	}
-	if len(slice) == 2 {
+func ExtractField(slice []string) ([]string, error) {
+	var err error
+	switch len(slice) {
+	case 1:
+		return slice, err
+	case 2:
 		rgexpr := "^%\\{\\[\\S+\\]}$" // --->  %{[type]}
 		r, _ := regexp.Compile(rgexpr)
 		slice[0] = strings.TrimSpace(slice[0])
-		bool := r.MatchString(slice[0])
-		if bool {
+		bol := r.MatchString(slice[0])
+		if bol {
 			rs := []rune(slice[0])
 			slice[0] = string(rs[3 : len(rs)-2])
+			return slice, err
+		}
+	default:
+	}
+	err = fmt.Errorf("parameters error,  you can write two parameters like: %{[type]}, default or only one: default")
+	return nil, err
+}
+
+//根据key字符串,拆分出层级keys数据
+func GetKeys(keyStr string) []string {
+	separator := "."
+	keys := strings.Split(keyStr, separator)
+	return keys
+}
+
+//通过层级key获取value.
+//所有层级的map必须为 map[string]interface{} 类型.
+//keys为空切片,返回原m
+func GetMapValue(m map[string]interface{}, keys ...string) (interface{}, error) {
+	var err error
+	var val interface{}
+	val = m
+	for i, k := range keys {
+		//判断val是否为map[string]interface{}类型
+		if _, ok := val.(map[string]interface{}); ok {
+			//判断val(k)是否存在
+			if _, ok := val.(map[string]interface{})[k]; ok {
+				val = val.(map[string]interface{})[k]
+			} else {
+				keys = keys[0 : i+1]
+				err = fmt.Errorf("GetMapValue failed, keys %v are non-existent", keys)
+				return nil, err
+			}
 		} else {
-			err = errors.New("topic参数错误")
+			err = fmt.Errorf("GetMapValue failed, %v is not the type of map[string]interface{}", val)
+			return nil, err
 		}
 	}
-	err = errors.New("topic参数错误")
-	return slice, err
+	return val, err
+}
+
+//通过层级key设置value值.
+//如果key不存在,将会自动创建.
+//当coercive为true时,会强制将非map[string]interface{}类型替换为map[string]interface{}类型,有可能导致数据丢失
+func SetMapValue(m map[string]interface{}, val interface{}, coercive bool, keys ...string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	curr := m
+	for _, k := range keys[0 : len(keys)-1] {
+		if _, ok := curr[k]; !ok {
+			n := make(map[string]interface{})
+			curr[k] = n
+			curr = n
+			continue
+		}
+		if _, ok := curr[k].(map[string]interface{}); !ok {
+			if coercive {
+				n := make(map[string]interface{})
+				curr[k] = n
+			} else {
+				err := fmt.Errorf("SetMapValue failed, %v is not the type of map[string]interface{}", curr[k])
+				return err
+			}
+		}
+		curr = curr[k].(map[string]interface{})
+	}
+	curr[keys[len(keys)-1]] = val
+	return nil
+}
+
+//通过层级key删除key-val,并返回被删除的val,是否删除成功
+//如果key不存在,则返回 nil,false
+func DeleteMapValue(m map[string]interface{}, keys ...string) (interface{}, bool) {
+	var val interface{}
+	val = m
+	for i, k := range keys {
+		if _, ok := val.(map[string]interface{}); ok {
+			if _, ok := val.(map[string]interface{})[k]; ok {
+				if i == len(keys)-1 {
+					delVal := val.(map[string]interface{})[k]
+					delete(val.(map[string]interface{}), keys[len(keys)-1])
+					return delVal, true
+				}
+				val = val.(map[string]interface{})[k]
+			} else {
+				return nil, false
+			}
+		} else {
+			return nil, false
+		}
+	}
+	return nil, false
 }
 
 func AddHttpProtocal(url string) string {

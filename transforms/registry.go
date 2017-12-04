@@ -33,6 +33,11 @@ type Transformer interface {
 	Stats() utils.StatsInfo
 }
 
+//transformer初始化方法接口,err不为空表示初始化失败
+type Initialize interface {
+	Init() error
+}
+
 type Creator func() Transformer
 
 var Transformers = map[string]Creator{}

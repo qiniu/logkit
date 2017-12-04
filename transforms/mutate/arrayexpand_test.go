@@ -390,3 +390,47 @@ func TestArrayExpandEveryType(t *testing.T) {
 	assert.Equal(t, ae.Stage(), transforms.StageAfterParser)
 	assert.Equal(t, utils.StatsInfo{Success: 22, Errors: 1}, ae.stats)
 }
+
+func TestArrayExpandMultiKey(t *testing.T) {
+	ae := &ArrayExpand{
+		Key: "multi.myWord",
+	}
+	data, err := ae.Transform([]sender.Data{
+		{"multi": map[string]interface{}{"myWord": []interface{}{"a", "b", "c", "d", "e"}}},
+		{"multi": map[string]interface{}{"myWord": []interface{}{1, 2, 3, 4, 5}}},
+	})
+	assert.NoError(t, err)
+	exp := []sender.Data{
+		{
+			"multi": map[string]interface{}{
+				"myWord":  []interface{}{"a", "b", "c", "d", "e"},
+				"myWord0": "a",
+				"myWord1": "b",
+				"myWord2": "c",
+				"myWord3": "d",
+				"myWord4": "e",
+			},
+		},
+		{
+			"multi": map[string]interface{}{
+				"myWord":  []interface{}{1, 2, 3, 4, 5},
+				"myWord0": 1,
+				"myWord1": 2,
+				"myWord2": 3,
+				"myWord3": 4,
+				"myWord4": 5,
+			},
+		},
+	}
+	assert.Equal(t, len(exp), len(data))
+	for i, ex := range exp {
+		da := data[i]["multi"].(map[string]interface{})
+		for k, v := range ex["multi"].(map[string]interface{}) {
+			d, exist := da[k]
+			assert.Equal(t, true, exist)
+			assert.Equal(t, v, d)
+		}
+	}
+	assert.Equal(t, ae.Stage(), transforms.StageAfterParser)
+	assert.Equal(t, utils.StatsInfo{Success: 2}, ae.stats)
+}

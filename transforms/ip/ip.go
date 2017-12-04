@@ -32,9 +32,12 @@ func (it *IpTransformer) Transform(datas []sender.Data) ([]sender.Data, error) {
 		}
 	}
 	errnums := 0
+	keys := utils.GetKeys(it.Key)
+	newkeys := make([]string, len(keys))
 	for i := range datas {
-		val, ok := datas[i][it.Key]
-		if !ok {
+		copy(newkeys, keys)
+		val, gerr := utils.GetMapValue(datas[i], keys...)
+		if gerr != nil {
 			errnums++
 			err = fmt.Errorf("transform key %v not exist in data", it.Key)
 			continue
@@ -51,10 +54,14 @@ func (it *IpTransformer) Transform(datas []sender.Data) ([]sender.Data, error) {
 			errnums++
 			continue
 		}
-		datas[i]["Region"] = info.Region
-		datas[i]["City"] = info.City
-		datas[i]["Country"] = info.Country
-		datas[i]["Isp"] = info.Isp
+		newkeys[len(newkeys)-1] = "Region"
+		utils.SetMapValue(datas[i], info.Region, false, newkeys...)
+		newkeys[len(newkeys)-1] = "City"
+		utils.SetMapValue(datas[i], info.City, false, newkeys...)
+		newkeys[len(newkeys)-1] = "Country"
+		utils.SetMapValue(datas[i], info.Country, false, newkeys...)
+		newkeys[len(newkeys)-1] = "Isp"
+		utils.SetMapValue(datas[i], info.Isp, false, newkeys...)
 	}
 	if err != nil {
 		it.stats.LastError = err.Error()

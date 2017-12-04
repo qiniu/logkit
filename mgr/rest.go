@@ -95,6 +95,7 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	router.GET(PREFIX+"/transformer/usages", rs.GetTransformerUsages())
 	router.GET(PREFIX+"/transformer/options", rs.GetTransformerOptions())
 	router.GET(PREFIX+"/transformer/sampleconfigs", rs.GetTransformerSampleConfigs())
+	router.POST(PREFIX+"/transformer/transform", rs.PostTransform())
 
 	//metric API
 	router.GET(PREFIX+"/metric/keys", rs.GetMetricKeys())
@@ -285,6 +286,14 @@ func convertWebParserConfig(conf conf.MapConf) conf.MapConf {
 		}
 		conf[parser.KeyGrokCustomPatterns] = string(CustomPatterns)
 	}
+	return conf
+}
+
+func convertWebTransformerConfig(conf map[string]interface{}) map[string]interface{} {
+	if conf == nil {
+		return conf
+	}
+	//TODO do some pre process
 	return conf
 }
 

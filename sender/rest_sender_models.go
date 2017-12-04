@@ -478,6 +478,22 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:   "自动索引模式(默认索引|按年索引|按月索引|按日索引)(index_strategy)",
 		},
 		{
+			KeyName:       KeyElasticTimezone,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{KeyUTCTimezone, KeylocalTimezone, KeyPRCTimezone},
+			Default:       KeyUTCTimezone,
+			DefaultNoUse:  false,
+			Description:   "索引时区(Local(本地)|UTC(标准时间)|PRC(北京时间))(elastic_time_zone)",
+		},
+		{
+			KeyName:       KeyLogkitSendTime,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"true", "false"},
+			Default:       "true",
+			DefaultNoUse:  false,
+			Description:   "是否在发送数据时自动添加发送时间(logkit_send_time)",
+		},
+		{
 			KeyName:      KeyElasticType,
 			ChooseOnly:   false,
 			Default:      "app",
