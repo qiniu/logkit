@@ -40,8 +40,8 @@ type RestService struct {
 
 func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 
-	if mgr.Cluster.Enable && !mgr.Cluster.IsMaster {
-		if len(mgr.Cluster.MasterUrl) < 1 {
+	if mgr.Cluster.Enable {
+		if !mgr.Cluster.IsMaster && len(mgr.Cluster.MasterUrl) < 1 {
 			log.Fatalf("cluster is enabled but master url is empty")
 		}
 		for i := range mgr.Cluster.MasterUrl {
