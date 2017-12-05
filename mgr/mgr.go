@@ -419,7 +419,7 @@ func (m *Manager) addWatchers(confsPath []string) (err error) {
 			log.Warnf("start to add watcher of conf path %v", path)
 			for _, f := range files {
 				if f.IsDir() {
-					log.Warn("skipped dir", f.Name)
+					log.Warn("skipped dir", f.Name())
 					continue
 				}
 				m.Add(filepath.Join(path, f.Name()))

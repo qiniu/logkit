@@ -14,6 +14,7 @@ var ModeUsages = []utils.KeyValue{
 	{ModeFileAuto, "从文件读取( fileauto 模式)"},
 	{ModeMysql, "从 MySQL 读取"},
 	{ModeMssql, "从 MSSQL 读取"},
+	{ModePG, "从 PostgreSQL 读取"},
 	{ModeElastic, "从 Elasticsearch 读取"},
 	{ModeMongo, "从 MongoDB 读取"},
 	{ModeKafka, "从 Kafka 读取"},
@@ -22,12 +23,27 @@ var ModeUsages = []utils.KeyValue{
 }
 
 var (
+	OptionMetaPath = utils.Option{
+		KeyName:      KeyMetaPath,
+		ChooseOnly:   false,
+		Default:      "",
+		DefaultNoUse: false,
+		Description:  "logkit元数据路径(meta_path)",
+	}
 	OptionDataSourceTag = utils.Option{
 		KeyName:      KeyDataSourceTag,
 		ChooseOnly:   false,
 		Default:      "datasource",
 		DefaultNoUse: false,
 		Description:  "具体的数据文件路径来源标签(datasource_tag)",
+	}
+	OptionBuffSize = utils.Option{
+		KeyName:      KeyBufSize,
+		ChooseOnly:   false,
+		Default:      "",
+		DefaultNoUse: false,
+		Description:  "文件缓存数据大小(reader_buf_size)",
+		CheckRegex:   "\\d+",
 	}
 	OptionEncoding = utils.Option{
 		KeyName:    KeyEncoding,
@@ -52,9 +68,33 @@ var (
 		KeyName:       KeyWhence,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{WhenceOldest, WhenceNewest},
+		Default:       WhenceOldest,
 		Description:   "读取的起始位置(read_from)",
 	}
+	OptionReadIoLimit = utils.Option{
+		KeyName:      KeyReadIOLimit,
+		ChooseOnly:   false,
+		Default:      "",
+		DefaultNoUse: false,
+		Description:  "读取速度限制(MB/s)(readio_limit)",
+		CheckRegex:   "\\d+",
+	}
+	OptionHeadPattern = utils.Option{
+		KeyName:      KeyHeadPattern,
+		ChooseOnly:   false,
+		Default:      "",
+		DefaultNoUse: false,
+		Description:  "多行读取的起始行正则表达式(head_pattern)",
+	}
+	OptionSQLSchema = utils.Option{
+		KeyName:      KeySQLSchema,
+		ChooseOnly:   false,
+		Default:      "",
+		DefaultNoUse: false,
+		Description:  "SQL字段类型定义(sql_schema)",
+	}
 )
+
 var ModeKeyOptions = map[string][]utils.Option{
 	ModeDir: {
 		{
@@ -64,68 +104,19 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse: true,
 			Description:  "日志文件夹路径(log_path)",
 		},
-		{
-			KeyName:      KeyMetaPath,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "断点续传元数据路径(meta_path)",
-		},
+		OptionMetaPath,
+		OptionBuffSize,
+		OptionWhence,
+		OptionEncoding,
+		OptionDataSourceTag,
+		OptionReadIoLimit,
+		OptionHeadPattern,
 		{
 			KeyName:      KeyFileDone,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
 			Description:  "读取过的文件信息保存路径(file_done)",
-		},
-		{
-			KeyName:      KeyBufSize,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "文件缓存数据大小(reader_buf_size)",
-			CheckRegex:   "\\d+",
-		},
-		{
-			KeyName:       KeyWhence,
-			ChooseOnly:    true,
-			ChooseOptions: []interface{}{WhenceOldest, WhenceNewest},
-			Description:   "读取的起始位置(read_from)",
-		},
-		{
-			KeyName:    KeyEncoding,
-			ChooseOnly: true,
-			ChooseOptions: []interface{}{"UTF-8", "UTF-16", "US-ASCII", "ISO-8859-1",
-				"GBK", "GB18030", "EUC-JP", "UTF-16BE", "UTF-16LE", "Big5", "Shift_JIS",
-				"ISO-8859-2", "ISO-8859-3", "ISO-8859-4", "ISO-8859-5", "ISO-8859-6", "ISO-8859-7",
-				"ISO-8859-8", "ISO-8859-9", "ISO-8859-10", "ISO-8859-11", "ISO-8859-12", "ISO-8859-13",
-				"ISO-8859-14", "ISO-8859-15", "ISO-8859-16", "macos-0_2-10.2", "macos-6_2-10.4",
-				"macos-7_3-10.2", "macos-29-10.2", "macos-35-10.2", "windows-1250", "windows-1251",
-				"windows-1252", "windows-1253", "windows-1254", "windows-1255", "windows-1256",
-				"windows-1257", "windows-1258", "windows-874", "IBM037", "ibm-273_P100-1995",
-				"ibm-277_P100-1995", "ibm-278_P100-1995", "ibm-280_P100-1995", "ibm-284_P100-1995",
-				"ibm-285_P100-1995", "ibm-290_P100-1995", "ibm-297_P100-1995", "ibm-420_X120-1999",
-				//此处省略大量IBM的字符集，太多，等用户需要再加
-				"KOI8-R", "KOI8-U", "ebcdic-xml-us"},
-			Default:      "UTF-8",
-			DefaultNoUse: false,
-			Description:  "编码方式(encoding)",
-		},
-		OptionDataSourceTag,
-		{
-			KeyName:      KeyReadIOLimit,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "读取速度限制(MB/s)(readio_limit)",
-			CheckRegex:   "\\d+",
-		},
-		{
-			KeyName:      KeyHeadPattern,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "多行读取的起始行正则表达式(head_pattern)",
 		},
 		{
 			KeyName:       KeyIgnoreHiddenFile,
@@ -158,39 +149,13 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse: true,
 			Description:  "日志文件路径(log_path)",
 		},
-		{
-			KeyName:      KeyMetaPath,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "断点续传元数据路径(meta_path)",
-		},
-		{
-			KeyName:      KeyBufSize,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "文件缓存数据大小(reader_buf_size)",
-			CheckRegex:   "\\d+",
-		},
+		OptionMetaPath,
+		OptionBuffSize,
 		OptionWhence,
 		OptionDataSourceTag,
 		OptionEncoding,
-		{
-			KeyName:      KeyReadIOLimit,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "读取速度限制(MB/s)(readio_limit)",
-			CheckRegex:   "\\d+",
-		},
-		{
-			KeyName:      KeyHeadPattern,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "多行读取的起始行正则表达式(head_pattern)",
-		},
+		OptionReadIoLimit,
+		OptionHeadPattern,
 	},
 	ModeTailx: {
 		{
@@ -200,39 +165,13 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse: true,
 			Description:  "日志文件路径模式串(log_path)",
 		},
-		{
-			KeyName:      KeyMetaPath,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "断点续传元数据路径(meta_path)",
-		},
-		{
-			KeyName:      KeyBufSize,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "文件缓存数据大小(reader_buf_size)",
-			CheckRegex:   "\\d+",
-		},
+		OptionMetaPath,
+		OptionBuffSize,
 		OptionWhence,
 		OptionEncoding,
-		{
-			KeyName:      KeyReadIOLimit,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "读取速度限制(MB/s)(readio_limit)",
-			CheckRegex:   "\\d+",
-		},
+		OptionReadIoLimit,
 		OptionDataSourceTag,
-		{
-			KeyName:      KeyHeadPattern,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "多行读取的起始行正则表达式(head_pattern)",
-		},
+		OptionHeadPattern,
 		{
 			KeyName:      KeyExpire,
 			ChooseOnly:   false,
@@ -262,17 +201,12 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyLogPath,
 			ChooseOnly:   false,
-			Default:      "",
+			Default:      "/your/log/dir/or/path", //TODO 此处前端要做成直接让用户选择文件夹
 			DefaultNoUse: true,
 			Description:  "日志文件夹路径(log_path)",
 		},
-		{
-			KeyName:       KeyWhence,
-			ChooseOnly:    true,
-			ChooseOptions: []interface{}{WhenceOldest, WhenceNewest},
-
-			Description: "读取的起始位置(read_from)",
-		},
+		OptionMetaPath,
+		OptionWhence,
 		OptionEncoding,
 		OptionDataSourceTag,
 		{
@@ -327,13 +261,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "分批查询的单批次大小(mysql_limit_batch)",
 			CheckRegex:   "\\d+",
 		},
-		{
-			KeyName:      KeyMetaPath,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "断点续传元数据路径(meta_path)",
-		},
+		OptionMetaPath,
 		OptionDataSourceTag,
 		{
 			KeyName:      KeyMysqlCron,
@@ -350,13 +278,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse:  false,
 			Description:   "启动时立即执行(mysql_exec_onstart)",
 		},
-		{
-			KeyName:      KeySQLSchema,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "SQL字段类型定义(sql_schema)",
-		},
+		OptionSQLSchema,
 	},
 	ModeMssql: {
 		{
@@ -387,13 +309,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse: true,
 			Description:  "递增的列名称(mssql_offset_key)",
 		},
-		{
-			KeyName:      KeyMetaPath,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "断点续传元数据路径(meta_path)",
-		},
+		OptionMetaPath,
 		OptionDataSourceTag,
 		{
 			KeyName:      KeyMssqlReadBatch,
@@ -418,13 +334,63 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse:  false,
 			Description:   "启动时立即执行(mssql_exec_onstart)",
 		},
+		OptionSQLSchema,
+	},
+	ModePG: {
 		{
-			KeyName:      KeySQLSchema,
+			KeyName:      KeyPGsqlDataSource,
+			ChooseOnly:   false,
+			Default:      "host=localhost port=5432 connect_timeout=10 user=pqgotest password=123456 sslmode=disable",
+			DefaultNoUse: true,
+			Description:  "数据库地址(postgres_datasource)",
+		},
+		{
+			KeyName:      KeyPGsqlDataBase,
+			ChooseOnly:   false,
+			Default:      "<database>",
+			DefaultNoUse: true,
+			Description:  "数据库名称(postgres_database)",
+		},
+		{
+			KeyName:      KeyPGsqlSQL,
+			ChooseOnly:   false,
+			Default:      "select * from <table>;",
+			DefaultNoUse: true,
+			Description:  "数据查询语句(postgres_sql)",
+		},
+		{
+			KeyName:      KeyPGsqlOffsetKey,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: true,
+			Description:  "递增的列名称(postgres_offset_key)",
+		},
+		OptionMetaPath,
+		OptionDataSourceTag,
+		{
+			KeyName:      KeyPGsqlReadBatch,
+			ChooseOnly:   false,
+			Default:      "100",
+			DefaultNoUse: false,
+			Description:  "分批查询的单批次大小(postgres_limit_batch)",
+			CheckRegex:   "\\d+",
+		},
+		{
+			KeyName:      KeyPGsqlCron,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
-			Description:  "SQL字段类型定义(sql_schema)",
+			Description:  "定时任务调度Crontab(postgres_cron)",
 		},
+		{
+			KeyName:       KeyPGsqlExecOnStart,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"true", "false"},
+			Default:       "true",
+			DefaultNoUse:  false,
+			Description:   "启动时立即执行(postgres_exec_onstart)",
+		},
+		OptionSQLSchema,
 	},
 	ModeElastic: {
 		{
@@ -454,13 +420,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse: true,
 			Description:  "ES的app名称(es_type)",
 		},
-		{
-			KeyName:      KeyMetaPath,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "断点续传元数据路径(meta_path)",
-		},
+		OptionMetaPath,
 		OptionDataSourceTag,
 		{
 			KeyName:      KeyESReadBatch,
@@ -507,13 +467,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse: true,
 			Description:  "递增的主键(mongo_offset_key)",
 		},
-		{
-			KeyName:      KeyMetaPath,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "断点续传元数据路径(meta_path)",
-		},
+		OptionMetaPath,
 		OptionDataSourceTag,
 		{
 			KeyName:      KeyMongoReadBatch,
