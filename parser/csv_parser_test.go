@@ -229,3 +229,98 @@ func TestField_MakeValue(t *testing.T) {
 	}
 	assert.Equal(t, exp.Format(time.RFC3339Nano), tm)
 }
+
+func TestRename(t *testing.T) {
+	c := conf.MapConf{}
+	c[KeyParserName] = "testRename"
+	c[KeyParserType] = "csv"
+	c[KeyCSVSchema] = "logType string, service string, timestamp string, method string, path string, reqHeader jsonmap, nullStr string, code long, resBody jsonmap, info string, t1 long, t2 long"
+	c[KeyCSVSplitter] = "	"
+	parser, err := NewCsvParser(c)
+	assert.NoError(t, err)
+	lines := []string{
+		`REQ	REPORT	15112467445566096	POST	/v1/activate	{"Accept-Encoding":"gzip","Content-Length":"0","Host":"10.200.20.68:2308","IP":"10.200.20.41","User-Agent":"Go-http-client/1.1"}		200    	{"Content-Length":"55","Content-Type":"application/json","X-Log":["REPORT:1"],"X-Reqid":"pyAAAO0mQ0HoBvkU"}	{"user":"13805xxxx4","password":"abcjofewfj"}	55	14946`,
+	}
+	gotDatas, err := parser.Parse(lines)
+	if c, ok := err.(*utils.StatsError); ok {
+		err = c.ErrorDetail
+	}
+	assert.NoError(t, err)
+	expDatas := []sender.Data{
+		sender.Data{
+			"logType":                   "REQ",
+			"service":                   "REPORT",
+			"timestamp":                 "15112467445566096",
+			"method":                    "POST",
+			"path":                      "/v1/activate",
+			"reqHeader-User-Agent":      "Go-http-client/1.1",
+			"reqHeader-Accept-Encoding": "gzip",
+			"reqHeader-Host":            "10.200.20.68:2308",
+			"reqHeader-IP":              "10.200.20.41",
+			"reqHeader-Content-Length":  "0",
+			"nullStr":                   "",
+			"code":                      int64(200),
+			"resBody-Content-Length": "55",
+			"resBody-Content-Type":   "application/json",
+			"resBody-X-Reqid":        "pyAAAO0mQ0HoBvkU",
+			"resBody-X-Log": []interface{}{
+				"REPORT:1",
+			},
+			"info": `{"user":"13805xxxx4","password":"abcjofewfj"}`,
+			"t1":   int64(55),
+			"t2":   int64(14946),
+		},
+	}
+	assert.Equal(t, len(gotDatas), len(expDatas))
+	for i := range expDatas {
+		assert.Equal(t, len(expDatas[i]), len(gotDatas[i]))
+		for key, exp := range expDatas[i] {
+			got, exist := gotDatas[i][key]
+			assert.Equal(t, true, exist, key)
+			assert.Equal(t, exp, got)
+		}
+	}
+
+	c[KeyAutoRename] = "true"
+	parser, err = NewCsvParser(c)
+	assert.NoError(t, err)
+	gotDatas, err = parser.Parse(lines)
+	if c, ok := err.(*utils.StatsError); ok {
+		err = c.ErrorDetail
+	}
+	assert.NoError(t, err)
+	expDatas = []sender.Data{
+		sender.Data{
+			"logType":                   "REQ",
+			"service":                   "REPORT",
+			"timestamp":                 "15112467445566096",
+			"method":                    "POST",
+			"path":                      "/v1/activate",
+			"reqHeader_User_Agent":      "Go-http-client/1.1",
+			"reqHeader_Accept_Encoding": "gzip",
+			"reqHeader_Host":            "10.200.20.68:2308",
+			"reqHeader_IP":              "10.200.20.41",
+			"reqHeader_Content_Length":  "0",
+			"nullStr":                   "",
+			"code":                      int64(200),
+			"resBody_Content_Length": "55",
+			"resBody_Content_Type":   "application/json",
+			"resBody_X_Reqid":        "pyAAAO0mQ0HoBvkU",
+			"resBody_X_Log": []interface{}{
+				"REPORT:1",
+			},
+			"info": `{"user":"13805xxxx4","password":"abcjofewfj"}`,
+			"t1":   int64(55),
+			"t2":   int64(14946),
+		},
+	}
+	assert.Equal(t, len(gotDatas), len(expDatas))
+	for i := range expDatas {
+		assert.Equal(t, len(expDatas[i]), len(gotDatas[i]))
+		for key, exp := range expDatas[i] {
+			got, exist := gotDatas[i][key]
+			assert.Equal(t, true, exist, key)
+			assert.Equal(t, exp, got)
+		}
+	}
+}
