@@ -253,7 +253,7 @@ class List extends Component {
             <Footer style={{textAlign: 'center'}}>
               更多信息请访问：
               <a target="_blank" href="https://github.com/qiniu/logkit">
-                <Tag color="#108ee9">Logkit</Tag> </a>
+                <Tag color="#108ee9">logkit</Tag> </a>
               <a target="_blank" href="https://github.com/qiniu/logkit/wiki">
                 <Tag color="#108ee9">帮助文档</Tag> </a>
               <a target="_blank" href="https://qiniu.github.io/pandora-docs/#/"><Tag

@@ -86,12 +86,12 @@ class renderConfig extends Component {
     }
   }
 
-  handleIntervalChange = (e) => {
+  handleIntervalChange = (value) => {
     const {getFieldsValue, getFieldDecorator, resetFields} = this.props.form;
     let data = getFieldsValue();
     if (this.isJSON(data.config)) {
       const jsonData = JSON.parse(data.config)
-      jsonData.batch_interval = parseInt(e.target.value)
+      jsonData.batch_interval = value
       resetFields()
       getFieldDecorator("config", {initialValue: JSON.stringify(jsonData, null, 2)});
       getFieldDecorator("name", {initialValue: data.name});
@@ -99,15 +99,14 @@ class renderConfig extends Component {
     } else {
       notification.warning({message: "不是一个合法的json对象,请检查", duration: 10,})
     }
-
   }
 
-  handleMetricIntervalChange = (e) => {
+  handleMetricIntervalChange = (value) => {
     const {getFieldsValue, getFieldDecorator, resetFields} = this.props.form;
     let data = getFieldsValue();
     if (this.isJSON(data.config)) {
       const jsonData = JSON.parse(data.config)
-      jsonData.collect_interval = parseInt(e.target.value)
+      jsonData.collect_interval = value
       resetFields()
       getFieldDecorator("config", {initialValue: JSON.stringify(jsonData, null, 2)});
       getFieldDecorator("name", {initialValue: data.name});
@@ -170,7 +169,7 @@ class renderConfig extends Component {
               <Form>
                 <FormItem {...formItemLayout} label="名称">
                   {getFieldDecorator('name', {rules: [{required: true, message: '名称不能为空'}]})(
-                      <Input onChange={this.handleNameChange} placeholder={'Runner名称'}/>
+                      <Input onChange={this.handleNameChange} placeholder={'收集器(runner)名称'}/>
                   )}
                 </FormItem>
                 <FormItem {...formItemLayout} label="最长发送间隔(秒)">
@@ -178,7 +177,7 @@ class renderConfig extends Component {
                     rules: [{required: true, message: '发送间隔不能为空'},
                       {pattern: /^[0-9]*$/, message: '输入不符合规范,只能为整数'}]
                   })(
-                      <Input onChange={this.handleIntervalChange} placeholder={'发送间隔单位(秒)'}/>
+                      <InputNumber onChange={this.handleIntervalChange} placeholder={'发送间隔单位(秒)'}/>
                   )}
                 </FormItem>
                 <FormItem {...formItemLayout} label="系统信息收集间隔(metric配置专用, 秒)">
@@ -186,7 +185,7 @@ class renderConfig extends Component {
                     rules: [{required: true, message: '收集间隔不能为空'},
                       {pattern: /^[0-9]*$/, message: '输入不符合规范,只能为整数'}]
                   })(
-                      <Input onChange={this.handleMetricIntervalChange} placeholder={'系统信息收集间隔单位(秒)'}/>
+                      <InputNumber onChange={this.handleMetricIntervalChange} placeholder={'系统信息收集间隔单位(秒)'}/>
                   )}
                 </FormItem>
                 <FormItem

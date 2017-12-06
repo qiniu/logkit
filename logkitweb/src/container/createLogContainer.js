@@ -32,7 +32,7 @@ const steps = [{
   content: '配置相关发送方式',
 }, {
   title: '确认并添加收集器',
-  content: '确认并添加',
+  content: '确认并添加收集器',
 }];
 class CreateLogRunner extends Component {
   constructor(props) {
@@ -231,7 +231,6 @@ class CreateLogRunner extends Component {
     window.nodeCopy = config.getNodeData()
     this.props.router.push({pathname: `/`})
   }
-
 
   render() {
     const {current} = this.state;
