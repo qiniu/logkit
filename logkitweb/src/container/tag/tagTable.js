@@ -286,7 +286,7 @@ class TagTable extends Component {
     })
 
     const columns = [{
-      title: '标签名称',
+      title: '集群名称',
       dataIndex: 'name',
       key: 'name',
       width: '10%',
@@ -321,7 +321,7 @@ class TagTable extends Component {
         );
       }
     }, {
-      title: '重命名',
+      title: '更改集群名称',
       dataIndex: 'rename',
       key: 'rename',
       width: '10%',
@@ -331,7 +331,7 @@ class TagTable extends Component {
                 <a>
                   <div className="editable-row-operations">
                     { this.checkStatus(record.status) === 'ok' ? (
-                    <Icon style={{fontSize: 16}} type="setting" title="标签重命名" onClick={() => this.showTagModal(record, 'rename')} />) : null
+                    <Icon style={{fontSize: 16}} type="setting" title="集群重命名" onClick={() => this.showTagModal(record, 'rename')} />) : null
                     }
                   </div>
                 </a>
@@ -339,7 +339,7 @@ class TagTable extends Component {
         );
       }
     }, {
-      title: '添加runner',
+      title: '日志收集器',
       key: 'addlogRunner',
       dataIndex: 'addlogRunner',
       width: '10%',
@@ -348,14 +348,14 @@ class TagTable extends Component {
             <a>
               <div className="editable-row-operations">
                 {this.checkStatus(record.status) === 'ok' ? (
-                    <Icon title={"添加runner"}  onClick={() => handleAddRunner(record.name,'tag')} style={{fontSize: 16}} type="plus-circle-o"/>) : null
+                    <Icon title={"添加日志收集器"}  onClick={() => handleAddRunner(record.name,'tag')} style={{fontSize: 16}} type="plus-circle-o"/>) : null
                 }
               </div>
             </a>
         );
       },
     }, {
-      title: '添加Metric Runner',
+      title: '系统信息收集器',
       key: 'addMetricRunner',
       dataIndex: 'addMetricRunner',
       width: '10%',
@@ -364,7 +364,7 @@ class TagTable extends Component {
             (<a>
               <div className="editable-row-operations">
                 {this.checkStatus(record.status) === 'ok' ? (
-                    <Icon title={"添加metric runner"} onClick={() => handleAddMetricRunner(record.name,'tag')} style={{fontSize: 16}} type="plus-circle-o"/>) : null
+                    <Icon title={"添加系统信息收集器"} onClick={() => handleAddMetricRunner(record.name,'tag')} style={{fontSize: 16}} type="plus-circle-o"/>) : null
                 }
               </div>
             </a>)
@@ -379,7 +379,7 @@ class TagTable extends Component {
         return (<a>
             <div className="editable-row-operations">
               {this.checkStatus(record.status) === 'ok' ? (
-                <Icon onClick={() => this.showTagModal(record, 'edit')} title={"编辑该标签对应的runner"} style={{fontSize: 16}}
+                <Icon onClick={() => this.showTagModal(record, 'edit')} title={"编辑该集群对应的收集器"} style={{fontSize: 16}}
                       type='edit'/>) : null
               }
             </div>
@@ -396,7 +396,7 @@ class TagTable extends Component {
         return (<a>
               <div className="editable-row-operations">
                 {this.checkStatus(record.status) === 'ok' ? (
-                    <Icon onClick={() => this.showTagModal(record, 'stop')} title={"停止该标签对应的runner"} style={{fontSize: 16}}
+                    <Icon onClick={() => this.showTagModal(record, 'stop')} title={"停止该集群对应的收集器"} style={{fontSize: 16}}
                           type='poweroff'/>) : null
                 }
               </div>
@@ -413,7 +413,7 @@ class TagTable extends Component {
         return (<a>
               <div className="editable-row-operations">
                 {this.checkStatus(record.status) === 'ok' ? (
-                    <Icon onClick={() => this.showTagModal(record, 'start')} title={"重启该标签对应的runner"} style={{fontSize: 16}}
+                    <Icon onClick={() => this.showTagModal(record, 'start')} title={"重启该集群对应的收集器"} style={{fontSize: 16}}
                           type='caret-right'/>) : null
                 }
               </div>
@@ -430,7 +430,7 @@ class TagTable extends Component {
         return (<a>
               <div className="editable-row-operations">
                 {this.checkStatus(record.status) === 'ok' ? (
-                    <Icon onClick={() => this.showTagModal(record, 'reset')} title={"重置该标签对应的runner"} style={{fontSize: 16}}
+                    <Icon onClick={() => this.showTagModal(record, 'reset')} title={"重置该集群对应的收集器"} style={{fontSize: 16}}
                           type='reload'/>) : null
                 }
               </div>
@@ -447,7 +447,7 @@ class TagTable extends Component {
             <a>
               <div className="editable-row-operations">
                 {this.checkStatus(record.status) !== 'bad' ? (
-                    <Icon onClick={() => this.showTagModal(record, 'delete')} title={"删除该标签对应的runner"} style={{fontSize: 16}} type="delete"/>) : null
+                    <Icon onClick={() => this.showTagModal(record, 'delete')} title={"删除该集群对应的收集器"} style={{fontSize: 16}} type="delete"/>) : null
                 }
               </div>
             </a>
@@ -481,14 +481,14 @@ class TagTable extends Component {
           >
             <FormItem label="名称">
               {this.state.currentModalType === 'rename' ? (
-                  <Input key="rename" onChange={this.changeTagName} placeholder="新标签名称"/>) : (
-              <Select style={{width: '200px'}} key="opt" onChange={this.changeRunnerName} placeholder="选择该标签下的一个runner" >
+                  <Input key="rename" onChange={this.changeTagName} placeholder="新集群名称"/>) : (
+              <Select style={{width: '200px'}} key="opt" onChange={this.changeRunnerName} placeholder="选择该集群下的一个收集器" >
                 {this.renderSelectOptions(this.state.runners)}
               </Select>
               ) }</FormItem>
           </Modal>
 
-          <Modal title="是否删除标签？" visible={this.state.isShowDeleteTag}
+          <Modal title="是否删除该集群下所有的机器" visible={this.state.isShowDeleteTag}
                  onOk={this.handleDeleteTag} onCancel={this.handleDeleteTagCancel}
           >
           </Modal>
