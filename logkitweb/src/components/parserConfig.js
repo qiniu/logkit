@@ -195,12 +195,16 @@ class Parser extends Component {
   }
 
   handleChange = (option) => {
-    const {getFieldDecorator} = this.props.form;
+    const {getFieldDecorator,resetFields} = this.props.form;
     this.setState({
       currentOption: option,
       currentItem: this.state.items[option],
       currentSampleData: this.state.sampleData[option]
     })
+    this.setState({
+      parseData: ''
+    })
+    resetFields()
     getFieldDecorator("sampleData", {initialValue: this.state.sampleData[option]});
   }
 
