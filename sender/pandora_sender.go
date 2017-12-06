@@ -66,6 +66,8 @@ const (
 	KeyIgnoreInvalidField     = "ignore_invalid_field"
 
 	PandoraUUID = "Pandora_UUID"
+
+	timestampPrecision = 19
 )
 
 // PandoraSender pandora sender
@@ -78,7 +80,7 @@ type PandoraSender struct {
 	UserSchema         UserSchema
 	alias2key          map[string]string // map[alias]name
 	opt                PandoraOption
-	microsecondCounter int64
+	microsecondCounter uint64
 	extraInfo          map[string]string
 }
 
@@ -480,14 +482,14 @@ const (
 )
 
 type forceMicrosecondOption struct {
-	microsecond      int64
+	nanosecond       uint64
 	forceMicrosecond bool
 }
 
 //临时方案，转换时间，目前sender这边拿到的都是string，很难确定是什么格式的string
 //microsecond: 表示要在当前时间基础上加多少偏移量,只在forceMicrosecond为true的情况下才有效
 //forceMicrosecond: 表示是否要对当前时间加偏移量
-func convertDate(v interface{}, option forceMicrosecondOption) (interface{}, error) {
+func convertDate(v interface{}, option forceMicrosecondOption) (d interface{}, err error) {
 	var s int64
 	switch newv := v.(type) {
 	case int64:
@@ -503,54 +505,41 @@ func convertDate(v interface{}, option forceMicrosecondOption) (interface{}, err
 		if err != nil {
 			return v, err
 		}
-		rfctime := t.Format(time.RFC3339Nano)
-		if option.forceMicrosecond {
-			news := alignTimestamp(t.UTC().UnixNano(), option.microsecond)
-			rfctime = time.Unix(0, news*int64(time.Microsecond)).Format(time.RFC3339Nano)
-		}
-
-		return rfctime, err
+		s = t.UTC().UnixNano()
 	case json.Number:
-		jsonNumber, err := newv.Int64()
-		if err != nil {
+		if s, err = newv.Int64(); err != nil {
 			return v, err
 		}
-		s = jsonNumber
 	default:
 		return v, fmt.Errorf("can not parse %v type %v as date time", v, reflect.TypeOf(v))
 	}
-	news := s
 	if option.forceMicrosecond {
-		news = alignTimestamp(s, option.microsecond)
+		s = alignTimestamp(s, option.nanosecond)
 	}
-	timestamp := strconv.FormatInt(news, 10)
-	timeSecondPrecision := 16
-	//补齐16位
-	for i := len(timestamp); i < timeSecondPrecision; i++ {
-		timestamp += "0"
+	timestampStr := strconv.FormatInt(s, 10)
+	for i := len(timestampStr); i < timestampPrecision; i++ {
+		timestampStr += "0"
 	}
-	// 取前16位，截取精度 微妙
-	timestamp = timestamp[0:timeSecondPrecision]
-	t, err := strconv.ParseInt(timestamp, 10, 64)
-	if err != nil {
+	timestampStr = timestampStr[0:timestampPrecision]
+	if s, err = strconv.ParseInt(timestampStr, 10, 64); err != nil {
 		return v, err
 	}
-	v = time.Unix(0, t*int64(time.Microsecond)).Format(time.RFC3339Nano)
-	return v, nil
+	d = time.Unix(0, s*int64(time.Nanosecond)).Format(time.RFC3339Nano)
+	return
 }
 
 // alignTimestamp
 // 1. 根据输入时间戳的位数来补齐对应的位数
-// 2. 对于精度不是微妙的数据点，加一个扰动
-func alignTimestamp(t int64, microsecond int64) int64 {
+// 2. 对于精度不是微秒的数据点，加一个扰动
+func alignTimestamp(t int64, nanosecond uint64) int64 {
 	for i := 0; t%10 == 0; i++ {
 		t /= 10
 	}
-	offset := 16 - len(strconv.FormatInt(t, 10))
+	offset := timestampPrecision - len(strconv.FormatInt(t, 10))
 	dividend := int64(math.Pow10(offset))
 	if offset > 0 {
-		t = t * dividend //补齐16位
-		return t + microsecond%dividend
+		t = t * dividend //补齐相应的位数
+		return t + int64(nanosecond%uint64(dividend))
 	}
 	return t
 }
@@ -643,13 +632,13 @@ func (s *PandoraSender) generatePoint(data Data) (point Data) {
 		delete(data, name)
 		if v.ValueType == PandoraTypeDate && s.opt.autoConvertDate {
 			formatTime, err := convertDate(value, forceMicrosecondOption{
-				microsecond:      s.microsecondCounter,
+				nanosecond:       s.microsecondCounter,
 				forceMicrosecond: s.opt.forceMicrosecond})
 			if err != nil {
 				log.Error(err)
 				continue
 			}
-			s.microsecondCounter = (s.microsecondCounter + 1) % (2 << 32)
+			s.microsecondCounter = s.microsecondCounter + 1
 			value = formatTime
 		}
 		if !s.opt.forceDataConvert && s.opt.ignoreInvalidField && !validSchema(v.ValueType, value) {
