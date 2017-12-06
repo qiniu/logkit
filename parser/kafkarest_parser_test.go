@@ -64,7 +64,7 @@ func TestParseField(t *testing.T) {
 	rest_parser := &KafaRestlogParser{}
 	log := `[2016-12-05 03:35:20,682] INFO 172.16.16.191 - - [05/Dec/2016:03:35:20 +0000] "POST /topics/VIP_VvBVy0tuMPPspm1A_0000000000 HTTP/1.1" 200 101640  46 (io.confluent.rest-utils.requests)` + "\n"
 	fields := strings.Split(log, " ")
-	time := rest_parser.ParseLogTime(fields)
+	//time := rest_parser.ParseLogTime(fields)
 
 	ip := rest_parser.ParseIp(fields)
 	if ip == EMPTY_STRING {
@@ -94,12 +94,4 @@ func TestParseField(t *testing.T) {
 	if duration == 0 {
 		t.Error("failed to parse field duration")
 	}
-
-	t.Log(ip)
-	t.Log(method)
-	t.Log(topic)
-	t.Log(code)
-	t.Log(resp_len)
-	t.Log(duration)
-	t.Log(time)
 }

@@ -649,7 +649,6 @@ func TestParseMultiLine(t *testing.T) {
 
 	data, err := p.parseLine(strings.Join(lines, "\n"))
 	assert.NoError(t, err)
-	t.Log(data)
 	assert.Equal(t,
 		sender.Data{
 			"timestamp": "05-May-2017 13:44:39",

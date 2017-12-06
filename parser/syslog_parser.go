@@ -7,12 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jeromer/syslogparser"
-	"github.com/jeromer/syslogparser/rfc3164"
-	"github.com/jeromer/syslogparser/rfc5424"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/utils"
+
+	"github.com/jeromer/syslogparser"
+	"github.com/jeromer/syslogparser/rfc3164"
+	"github.com/jeromer/syslogparser/rfc5424"
 )
 
 const (
