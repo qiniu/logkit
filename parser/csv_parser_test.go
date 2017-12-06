@@ -45,20 +45,18 @@ func Test_CsvParser(t *testing.T) {
 	}
 	tmstr := time.Now().Format(time.RFC3339Nano)
 	lines := []string{
-		"123 fufu 3.14 {\"x\":1,\"y\":\"2\"} " + tmstr,       //correct
-		"cc jj uu {\"x\":1,\"y\":\"2\"} " + tmstr,            // error => uu 不是float
-		"123 fufu 3.15 999 " + tmstr,                         //error，999不是jsonmap
-		"123 fufu 3.16 {\"x\":1,\"y\":[\"xx:12\"]} " + tmstr, //correct
-		"   ",
-		"123 fufu 3.17  " + tmstr, //correct,jsonmap允许为空
+		`123 fufu 3.14 {"x":1,"y":"2"} ` + tmstr,       //correct
+		`cc jj uu {"x":1,"y":"2"} ` + tmstr,            // error => uu 不是float
+		`123 fufu 3.15 999 ` + tmstr,                   //error，999不是jsonmap
+		`123 fufu 3.16 {"x":1,"y":["xx:12"]} ` + tmstr, //correct
+		`   `,
+		`123 fufu 3.17  ` + tmstr, //correct,jsonmap允许为空
 	}
 	datas, err := parser.Parse(lines)
 	if c, ok := err.(*utils.StatsError); ok {
 		err = c.ErrorDetail
 	}
-	if err != nil {
-		t.Error(err)
-	}
+	assert.Error(t, err)
 
 	exp := make(map[string]interface{})
 	exp["a"] = int64(123)
@@ -141,9 +139,7 @@ func Test_CsvParserLabel(t *testing.T) {
 	if c, ok := err.(*utils.StatsError); ok {
 		err = c.ErrorDetail
 	}
-	if err != nil {
-		t.Error(err)
-	}
+	assert.Error(t, err)
 	if len(datas) != 1 {
 		t.Errorf("correct line should be one, but got %v", len(datas))
 	}

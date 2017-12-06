@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/qiniu/log"
 )
@@ -131,6 +132,20 @@ func GetLogFiles(doneFilePath string) (files []File) {
 		})
 	}
 	return
+}
+
+type SchemaErr struct {
+	Number int64
+	Last   time.Time
+}
+
+func (s *SchemaErr) Output(count int64, err error) {
+	s.Number += count
+	if time.Now().Sub(s.Last) > 3*time.Second {
+		log.Errorf("%v parse line errors occured, same as %v", s.Number, err)
+		s.Number = 0
+		s.Last = time.Now()
+	}
 }
 
 type StatsError struct {

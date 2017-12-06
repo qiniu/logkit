@@ -389,6 +389,7 @@ func (r *LogExportRunner) Run() {
 	}
 	defer close(r.exitChan)
 	datasourceTag := r.meta.GetDataSourceTag()
+	schemaErr := utils.SchemaErr{Number: 0, Last: time.Now()}
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
 			log.Debugf("Runner[%v] exited from run", r.Name())
@@ -449,19 +450,24 @@ func (r *LogExportRunner) Run() {
 		}
 
 		// parse data
+		errorCnt := int64(0)
 		datas, err := r.parser.Parse(lines)
 		se, ok := err.(*utils.StatsError)
 		if ok {
+			errorCnt = se.Errors
 			err = se.ErrorDetail
 			r.rs.ParserStats.Errors += se.Errors
 			r.rs.ParserStats.Success += se.Success
 		} else if err != nil {
+			errorCnt = 1
 			r.rs.ParserStats.Errors++
 		} else {
 			r.rs.ParserStats.Success++
 		}
 		if err != nil {
-			log.Errorf("Runner[%v] parser %s error : %v ", r.Name(), r.parser.Name(), err.Error())
+			errMsg := fmt.Sprintf("Runner[%v] parser %s error : %v ", r.Name(), r.parser.Name(), err.Error())
+			log.Debugf(errMsg)
+			schemaErr.Output(errorCnt, errors.New(errMsg))
 		}
 		// send data
 		if len(datas) <= 0 {

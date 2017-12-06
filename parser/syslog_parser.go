@@ -91,7 +91,6 @@ func GetFormt(format string) Format {
 		return &RFC5424{}
 	case "rfc6587":
 		return &RFC6587{}
-
 	}
 	return &Automatic{}
 }
@@ -130,7 +129,6 @@ func (p *SyslogParser) Type() string {
 }
 
 func (p *SyslogParser) Parse(lines []string) ([]sender.Data, error) {
-
 	se := &utils.StatsError{}
 	datas := []sender.Data{}
 	for idx, line := range lines {

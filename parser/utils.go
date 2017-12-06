@@ -3,7 +3,6 @@ package parser
 import (
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/qiniu/log"
 )
@@ -29,20 +28,6 @@ func Time5MinInt(t int64) int64 {
 
 func alignTime(t int64, base int64) int64 {
 	return (t / base) * base
-}
-
-type schemaErr struct {
-	number int
-	last   time.Time
-}
-
-func (s *schemaErr) Output(err error) {
-	s.number++
-	if time.Now().Sub(s.last) > 3*time.Second {
-		log.Errorf("%v parse line errors occured, same as %v", s.number, err)
-		s.number = 0
-		s.last = time.Now()
-	}
 }
 
 func GetLabels(labelList []string, nameMap map[string]struct{}) (labels []Label) {

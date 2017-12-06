@@ -41,7 +41,6 @@ type CsvParser struct {
 	schema         []field
 	labels         []Label
 	delim          string
-	schemaErr      *schemaErr
 	isAutoRename   bool
 	timeZoneOffset int
 }
@@ -88,14 +87,10 @@ func NewCsvParser(c conf.MapConf) (LogParser, error) {
 	labels := GetLabels(labelList, nameMap)
 
 	return &CsvParser{
-		name:   name,
-		schema: fields,
-		labels: labels,
-		delim:  splitter,
-		schemaErr: &schemaErr{
-			number: 0,
-			last:   time.Now(),
-		},
+		name:           name,
+		schema:         fields,
+		labels:         labels,
+		delim:          splitter,
 		isAutoRename:   isAutoRename,
 		timeZoneOffset: timeZoneOffset,
 	}, nil
@@ -413,9 +408,9 @@ func (p *CsvParser) Parse(lines []string) ([]sender.Data, error) {
 		d, err := p.parse(line)
 		if err != nil {
 			log.Debug(err)
-			p.schemaErr.Output(err)
 			se.AddErrors()
 			se.ErrorIndex = append(se.ErrorIndex, idx)
+			se.ErrorDetail = err
 			continue
 		}
 		datas = append(datas, d)

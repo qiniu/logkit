@@ -533,7 +533,7 @@ func TestCompileNoNamesAndParse(t *testing.T) {
 
 	metricA, err := p.parseLine(`1.25 200 192.168.1.1 5.432µs`)
 	require.Nil(t, metricA)
-	assert.NoError(t, err)
+	assert.Error(t, err)
 }
 
 func TestParseNoMatch(t *testing.T) {
@@ -544,7 +544,7 @@ func TestParseNoMatch(t *testing.T) {
 	assert.NoError(t, p.compile())
 
 	metricA, err := p.parseLine(`[04/Jun/2016:12:41:45 +0100] notnumber 200 192.168.1.1 5.432µs 101`)
-	assert.NoError(t, err)
+	assert.Error(t, err)
 	assert.Nil(t, metricA)
 }
 
