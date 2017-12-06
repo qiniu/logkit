@@ -29,10 +29,10 @@
 			"revisionTime": "2016-10-29T20:57:26Z"
 		},
 		{
-			"checksumSHA1": "4cVNmizx7CCB78NvqSHA9unCgC0=",
+			"checksumSHA1": "cu3vGt/MP5WOcnbCzPPzezR6EHo=",
 			"path": "github.com/denisenkom/go-mssqldb",
-			"revision": "e3bd523cf238e14637d0e028becc25651098a138",
-			"revisionTime": "2017-04-23T02:16:35Z"
+			"revision": "8a15d1bb0c8eaa4b870c016b312de5b50b493b4e",
+			"revisionTime": "2017-12-04T17:36:08Z"
 		},
 		{
 			"checksumSHA1": "y2Kh4iPlgCPXSGTCcFpzePYdzzg=",
@@ -101,10 +101,10 @@
 			"revisionTime": "2017-07-01T10:54:10Z"
 		},
 		{
-			"checksumSHA1": "/A5P2s8crcwfDyqHKCh16Yt9jd4=",
+			"checksumSHA1": "Z6rD6bmF8InGLXM7EHr8TMxMXNY=",
 			"path": "github.com/go-sql-driver/mysql",
-			"revision": "382e13d099fcf5f5994290892ab258fbebbdc5e3",
-			"revisionTime": "2017-05-12T15:29:33Z"
+			"revision": "9181e3a86a19bacd63e68d43ae8b7b36320d8092",
+			"revisionTime": "2017-12-04T00:43:26Z"
 		},
 		{
 			"checksumSHA1": "p/8vSviYF91gFflhrt5vkyksroo=",
@@ -153,6 +153,18 @@
 			"path": "github.com/labstack/gommon/log",
 			"revision": "779b8a8b9850a97acba6a3fe20feb628c39e17c1",
 			"revisionTime": "2017-07-12T19:11:37Z"
+		},
+		{
+			"checksumSHA1": "IfZcD4U1dtllJKlPNeD2aU4Jn98=",
+			"path": "github.com/lib/pq",
+			"revision": "83612a56d3dd153a94a629cd64925371c9adad78",
+			"revisionTime": "2017-11-26T05:04:59Z"
+		},
+		{
+			"checksumSHA1": "AU3fA8Sm33Vj9PBoRPSeYfxLRuE=",
+			"path": "github.com/lib/pq/oid",
+			"revision": "83612a56d3dd153a94a629cd64925371c9adad78",
+			"revisionTime": "2017-11-26T05:04:59Z"
 		},
 		{
 			"checksumSHA1": "VdvWgxaqcC3pKk/6Q7dRfH7THjM=",

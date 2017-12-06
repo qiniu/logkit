@@ -11,15 +11,9 @@ package mysql
 import (
 	"database/sql/driver"
 	"io"
+	"math"
+	"reflect"
 )
-
-type mysqlField struct {
-	tableName string
-	name      string
-	flags     fieldFlag
-	fieldType byte
-	decimals  byte
-}
 
 type resultSet struct {
 	columns     []mysqlField
@@ -28,8 +22,9 @@ type resultSet struct {
 }
 
 type mysqlRows struct {
-	mc *mysqlConn
-	rs resultSet
+	mc     *mysqlConn
+	rs     resultSet
+	finish func()
 }
 
 type binaryRows struct {
@@ -64,13 +59,59 @@ func (rows *mysqlRows) Columns() []string {
 	return columns
 }
 
+func (rows *mysqlRows) ColumnTypeDatabaseTypeName(i int) string {
+	if name, ok := typeDatabaseName[rows.rs.columns[i].fieldType]; ok {
+		return name
+	}
+	return ""
+}
+
+// func (rows *mysqlRows) ColumnTypeLength(i int) (length int64, ok bool) {
+// 	return int64(rows.rs.columns[i].length), true
+// }
+
+func (rows *mysqlRows) ColumnTypeNullable(i int) (nullable, ok bool) {
+	return rows.rs.columns[i].flags&flagNotNULL == 0, true
+}
+
+func (rows *mysqlRows) ColumnTypePrecisionScale(i int) (int64, int64, bool) {
+	column := rows.rs.columns[i]
+	decimals := int64(column.decimals)
+
+	switch column.fieldType {
+	case fieldTypeDecimal, fieldTypeNewDecimal:
+		if decimals > 0 {
+			return int64(column.length) - 2, decimals, true
+		}
+		return int64(column.length) - 1, decimals, true
+	case fieldTypeTimestamp, fieldTypeDateTime, fieldTypeTime:
+		return decimals, decimals, true
+	case fieldTypeFloat, fieldTypeDouble:
+		if decimals == 0x1f {
+			return math.MaxInt64, math.MaxInt64, true
+		}
+		return math.MaxInt64, decimals, true
+	}
+
+	return 0, 0, false
+}
+
+func (rows *mysqlRows) ColumnTypeScanType(i int) reflect.Type {
+	return rows.rs.columns[i].scanType()
+}
+
 func (rows *mysqlRows) Close() (err error) {
+	if f := rows.finish; f != nil {
+		f()
+		rows.finish = nil
+	}
+
 	mc := rows.mc
 	if mc == nil {
 		return nil
 	}
-	if mc.netConn == nil {
-		return ErrInvalidConn
+	if err := mc.error(); err != nil {
+		return err
 	}
 
 	// Remove unread packets from stream
@@ -98,8 +139,8 @@ func (rows *mysqlRows) nextResultSet() (int, error) {
 	if rows.mc == nil {
 		return 0, io.EOF
 	}
-	if rows.mc.netConn == nil {
-		return 0, ErrInvalidConn
+	if err := rows.mc.error(); err != nil {
+		return 0, err
 	}
 
 	// Remove unread packets from stream
@@ -145,8 +186,8 @@ func (rows *binaryRows) NextResultSet() error {
 
 func (rows *binaryRows) Next(dest []driver.Value) error {
 	if mc := rows.mc; mc != nil {
-		if mc.netConn == nil {
-			return ErrInvalidConn
+		if err := mc.error(); err != nil {
+			return err
 		}
 
 		// Fetch next row from stream
@@ -167,8 +208,8 @@ func (rows *textRows) NextResultSet() (err error) {
 
 func (rows *textRows) Next(dest []driver.Value) error {
 	if mc := rows.mc; mc != nil {
-		if mc.netConn == nil {
-			return ErrInvalidConn
+		if err := mc.error(); err != nil {
+			return err
 		}
 
 		// Fetch next row from stream

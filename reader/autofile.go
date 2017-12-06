@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/conf"
 )
 
 func NewFileAutoReader(conf conf.MapConf, meta *Meta, isFromWeb bool, bufSize int, whence string, logpath string, fr FileReader) (reader Reader, err error) {
