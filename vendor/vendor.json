@@ -29,10 +29,10 @@
 			"revisionTime": "2016-10-29T20:57:26Z"
 		},
 		{
-			"checksumSHA1": "4cVNmizx7CCB78NvqSHA9unCgC0=",
+			"checksumSHA1": "cu3vGt/MP5WOcnbCzPPzezR6EHo=",
 			"path": "github.com/denisenkom/go-mssqldb",
-			"revision": "e3bd523cf238e14637d0e028becc25651098a138",
-			"revisionTime": "2017-04-23T02:16:35Z"
+			"revision": "8a15d1bb0c8eaa4b870c016b312de5b50b493b4e",
+			"revisionTime": "2017-12-04T17:36:08Z"
 		},
 		{
 			"checksumSHA1": "y2Kh4iPlgCPXSGTCcFpzePYdzzg=",
