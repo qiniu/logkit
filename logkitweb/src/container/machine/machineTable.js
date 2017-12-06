@@ -154,7 +154,7 @@ class MachineTable extends Component {
       dataIndex: 'machineUrl',
       key: 'machineUrl',
     }, {
-      title: '标签名称',
+      title: '集群名称',
       dataIndex: 'name',
       key: 'name',
     }, {
@@ -166,7 +166,7 @@ class MachineTable extends Component {
       dataIndex: 'last_touch',
       key: 'last_touch',
     }, {
-      title: '重命名',
+      title: '更改集群名称',
       dataIndex: 'rename',
       key: 'rename',
       width: '10%',
@@ -176,7 +176,7 @@ class MachineTable extends Component {
                 <a>
                   <div className="editable-row-operations">
                     { record.status === 'ok' ? (
-                        <Icon style={{fontSize: 16}} type="setting" title="标签重命名" onClick={() => this.showTagModal(record, 'rename')} />) : null
+                        <Icon style={{fontSize: 16}} type="setting" title="集群重命名" onClick={() => this.showTagModal(record, 'rename')} />) : null
                     }
                   </div>
                 </a>
@@ -184,7 +184,7 @@ class MachineTable extends Component {
         );
       }
     }, {
-      title: '添加runner',
+      title: '添加收集器',
       key: 'edit',
       dataIndex: 'edit',
       width: '10%',
@@ -193,7 +193,7 @@ class MachineTable extends Component {
             (<a>
               <div className="editable-row-operations">
                 {
-                  <Icon title={"添加runner"} onClick={() => handleAddRunner(record.machineUrl,'machine')} style={{fontSize: 16}} type="plus-circle-o"/>
+                  <Icon title={"添加收集器"} onClick={() => handleAddRunner(record.machineUrl,'machine')} style={{fontSize: 16}} type="plus-circle-o"/>
                 }
               </div>
             </a>)
@@ -201,7 +201,7 @@ class MachineTable extends Component {
       },
 
     }, {
-      title: '添加Metric Runner',
+      title: '添加系统信息收集器',
       key: 'addMetricRunner',
       dataIndex: 'addMetricRunner',
       width: '10%',
@@ -210,7 +210,7 @@ class MachineTable extends Component {
             (<a>
               <div className="editable-row-operations">
                 {
-                  <Icon title={"添加metric runner"} onClick={() => handleAddMetricRunner(record.machineUrl,'machine')} style={{fontSize: 16}} type="plus-circle-o"/>
+                  <Icon title={"添加系统信息收集器"} onClick={() => handleAddMetricRunner(record.machineUrl,'machine')} style={{fontSize: 16}} type="plus-circle-o"/>
                 }
               </div>
             </a>)
@@ -228,7 +228,7 @@ class MachineTable extends Component {
               <div className="editable-row-operations">
                 {
                   <Popconfirm title="是否删除该机器?" onConfirm={() => this.deleteSlave(record)}>
-                    <Icon title={"删除runner"} style={{fontSize: 16}} type="delete"/>
+                    <Icon title={"删除收集器"} style={{fontSize: 16}} type="delete"/>
                   </Popconfirm>
                 }
               </div>
@@ -250,7 +250,7 @@ class MachineTable extends Component {
                  onOk={this.handleTagModal} onCancel={this.handleTagModalCancel}
           >
             <FormItem label="名称">
-              <Input key="rename" onChange={this.changeTagName} placeholder="新标签名称"/></FormItem>
+              <Input key="rename" onChange={this.changeTagName} placeholder="新集群名称"/></FormItem>
           </Modal>
         </div>
 
