@@ -504,7 +504,7 @@ func getInitScans(length int, rows *sql.Rows, sqltype string) (scanArgs []interf
 			scanArgs[i] = new(float64)
 		case "uint", "uint8", "uint16", "uint32", "uint64":
 			scanArgs[i] = new(uint64)
-		case "string", "time.Time":
+		case "string", "RawBytes", "time.Time":
 			//时间类型也作为string处理
 			scanArgs[i] = new(string)
 		case "bool":
