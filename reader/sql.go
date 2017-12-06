@@ -128,9 +128,31 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (mr *SqlReader, err error) {
 			}
 			err = nil
 		}
+		sps := strings.Split(dataSource, " ")
+		for _, v := range sps {
+			v = strings.TrimSpace(v)
+			if v == "" {
+				continue
+			}
+			x1s := strings.Split(v, "=")
+			if len(x1s) != 2 {
+				err = fmt.Errorf("datasource %v is invalid, don't contain space beside symbol '='", dataSource)
+				return
+			}
+		}
 		database, err = conf.GetString(KeyPGsqlDataBase)
 		if err != nil {
-			return nil, err
+			got := false
+			for _, v := range sps {
+				if strings.Contains(v, "dbname") {
+					database = strings.TrimPrefix(v, "dbname=")
+					got = true
+					break
+				}
+			}
+			if !got {
+				return nil, err
+			}
 		}
 		rawSqls, err = conf.GetString(KeyPGsqlSQL)
 		if err != nil {
@@ -506,7 +528,7 @@ func getInitScans(length int, rows *sql.Rows, sqltype string) (scanArgs []interf
 			scanArgs[i] = new(uint64)
 		case "string", "RawBytes", "time.Time":
 			//时间类型也作为string处理
-			scanArgs[i] = new(string)
+			scanArgs[i] = new(interface{})
 		case "bool":
 			scanArgs[i] = new(bool)
 		case "[]uint8":
@@ -515,7 +537,6 @@ func getInitScans(length int, rows *sql.Rows, sqltype string) (scanArgs []interf
 			scanArgs[i] = new(interface{})
 			nochoiced[i] = true
 		}
-		fmt.Println("YYYYYYYYYYYYY: ", v.Name(), "===> ", v.ScanType().Name())
 	}
 	return
 }
@@ -639,7 +660,6 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 						case *uint64:
 							data[columns[i]] = *d
 						}
-						fmt.Println("XXXXXXXXXXXXXreal:", columns[i], "===> ", reflect.TypeOf(scanArgs[i]))
 					}
 				}
 				ret, err := json.Marshal(data)

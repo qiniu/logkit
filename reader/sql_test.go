@@ -145,7 +145,7 @@ func TestSQLReader(t *testing.T) {
 		offsets:   []int64{123, 456},
 		dbtype:    "mysql",
 	}
-	assert.Equal(t, "_"+database, mr.Source())
+	assert.Equal(t, mr.dbtype+"_"+database, mr.Source())
 
 	// 测试meta备份和恢复
 	mr.SyncMeta()
