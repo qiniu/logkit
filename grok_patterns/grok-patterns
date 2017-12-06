@@ -11,7 +11,7 @@ NONNEGINT \b(?:[0-9]+)\b
 WORD \b\w+\b
 NOTSPACE \S+
 SPACE \s*
-COMMA ,*
+COMMA ,
 NOTCOMMA [^,]*
 DATA .*?
 GREEDYDATA .*
