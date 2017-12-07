@@ -25,7 +25,7 @@ func (c *Pipeline) FormLogDBSpec(input *CreateRepoForLogDBInput) *ExportLogDBSpe
 		doc[v.Key] = "#" + v.Key
 	}
 	return &ExportLogDBSpec{
-		DestRepoName: input.RepoName,
+		DestRepoName: input.LogRepoName,
 		Doc:          doc,
 		OmitInvalid:  input.OmitInvalid,
 		OmitEmpty:    input.OmitEmpty,
@@ -321,6 +321,7 @@ func (c *Pipeline) AutoExportToLogDB(input *AutoExportToLogDBInput) error {
 	if reqerr.IsNoSuchResourceError(err) {
 		logDBSpec := c.FormLogDBSpec(&CreateRepoForLogDBInput{
 			RepoName:    input.RepoName,
+			LogRepoName: input.LogRepoName,
 			Schema:      repoInfo.Schema,
 			OmitEmpty:   input.OmitEmpty,
 			OmitInvalid: input.OmitInvalid,

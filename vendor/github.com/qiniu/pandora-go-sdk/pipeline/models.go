@@ -1809,7 +1809,7 @@ type JobExportKodoSpec struct {
 	PartitionBy    []string `json:"partitionBy,omitempty"`
 	FileCount      int      `json:"fileCount"`
 	SaveMode       string   `json:"saveMode"`
-	Delimiter      string   `json:"delimiter"`
+	Delimiter      string   `json:"delimiter,omitempty"`
 	ContainsHeader bool     `json:"containsHeader"`
 }
 
