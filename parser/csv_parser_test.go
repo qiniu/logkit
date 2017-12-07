@@ -2,7 +2,6 @@ package parser
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -178,11 +177,10 @@ func Test_ParseField(t *testing.T) {
 	if got != exp {
 		t.Error("parseFieldList error")
 	}
-	f, err := parseSchemaFields(fields)
+	_, err = parseSchemaFields(fields)
 	if err != nil {
 		t.Error(err)
 	}
-	fmt.Println(f)
 
 	schema = "a long, d jsonmap,e jsonmap{x string,y long},f jsonmap{z float,...}"
 	fields, err = parseSchemaFieldList(schema)
@@ -194,11 +192,10 @@ func Test_ParseField(t *testing.T) {
 	if got != exp {
 		t.Error("parseFieldList error")
 	}
-	f, err = parseSchemaFields(fields)
+	_, err = parseSchemaFields(fields)
 	if err != nil {
 		t.Error(err)
 	}
-	fmt.Println(f)
 }
 
 func Test_convertValue(t *testing.T) {
