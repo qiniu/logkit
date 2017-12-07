@@ -112,6 +112,8 @@ const (
 	ErrWorkflowCreatingTooManyRepos
 	ErrWorkflowJobsCoexist
 	ErrInvalidVariableName
+	ErrInvalidVariableValue
+	ErrPathFilter
 	ErrVariableNotExist
 	ErrVariableAlreadyExist
 	ErrSameToSystemVariable
@@ -119,6 +121,8 @@ const (
 	ErrSQLWithUndefinedVariable
 	ErrWorkflowNameSameToRepoOrDatasource
 	ErrJobReRunOrCancel
+	ErrStartOrStopBatchJob
+	ErrTimeFormatInvalid
 )
 
 type ErrBuilder interface {

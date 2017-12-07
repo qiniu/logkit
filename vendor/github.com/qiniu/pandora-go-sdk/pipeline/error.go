@@ -32,6 +32,10 @@ func (e PipelineErrBuilder) Build(msg, text, reqId string, code int) error {
 		err.ErrorType = reqerr.ErrInvalidVariableType
 	case "E18017":
 		err.ErrorType = reqerr.ErrInvalidVariableName
+	case "E18018":
+		err.ErrorType = reqerr.ErrInvalidVariableValue
+	case "E18019":
+		err.ErrorType = reqerr.ErrPathFilter
 	case "E18120":
 		err.ErrorType = reqerr.NoSuchGroupError
 	case "E18218":
@@ -192,12 +196,16 @@ func (e PipelineErrBuilder) Build(msg, text, reqId string, code int) error {
 		err.ErrorType = reqerr.ErrSameToSystemVariable
 	case "E18657":
 		err.ErrorType = reqerr.ErrSQLWithUndefinedVariable
+	case "E18658":
+		err.ErrorType = reqerr.ErrTimeFormatInvalid
 	case "E18660":
 		err.ErrorType = reqerr.ErrTransformUpdate
 	case "E18661":
 		err.ErrorType = reqerr.ErrWorkflowNameSameToRepoOrDatasource
 	case "E18662":
 		err.ErrorType = reqerr.ErrJobReRunOrCancel
+	case "E18663":
+		err.ErrorType = reqerr.ErrStartOrStopBatchJob
 	case "E9000":
 		err.ErrorType = reqerr.InternalServerError
 	case "E9001":
