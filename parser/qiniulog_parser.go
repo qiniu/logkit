@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
@@ -53,7 +52,6 @@ type QiniulogParser struct {
 	prefix  string
 	headers []string
 	labels  []Label
-	se      schemaErr
 }
 
 func getAllLogv1Heads() map[string]bool {
@@ -92,10 +90,6 @@ func NewQiniulogParser(c conf.MapConf) (LogParser, error) {
 		labels:  labels,
 		prefix:  prefix,
 		headers: logHeaders,
-		se: schemaErr{
-			number: 0,
-			last:   time.Now(),
-		},
 	}, nil
 }
 
@@ -279,8 +273,8 @@ func (p *QiniulogParser) Parse(lines []string) ([]sender.Data, error) {
 	for _, line := range lines {
 		d, err := p.parse(line)
 		if err != nil {
-			p.se.Output(err)
 			se.AddErrors()
+			se.ErrorDetail = err
 			continue
 		}
 		se.AddSuccess()

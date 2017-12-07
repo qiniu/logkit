@@ -59,8 +59,6 @@ type GrokParser struct {
 
 	timeZoneOffset int
 
-	schemaErr *schemaErr
-
 	Patterns []string // 正式的pattern名称
 	// namedPatterns is a list of internally-assigned names to the patterns
 	// specified by the user in Patterns.
@@ -136,10 +134,6 @@ func NewGrokParser(c conf.MapConf) (LogParser, error) {
 		CustomPatterns:     customPatterns,
 		CustomPatternFiles: customPatternFiles,
 		timeZoneOffset:     timeZoneOffset,
-		schemaErr: &schemaErr{
-			number: 0,
-			last:   time.Now(),
-		},
 	}
 	err = p.compile()
 	if err != nil {
@@ -208,9 +202,9 @@ func (gp *GrokParser) Parse(lines []string) ([]sender.Data, error) {
 	for idx, line := range lines {
 		data, err := gp.parseLine(line)
 		if err != nil {
-			gp.schemaErr.Output(err)
 			se.AddErrors()
 			se.ErrorIndex = append(se.ErrorIndex, idx)
+			se.ErrorDetail = err
 			continue
 		}
 		if len(data) < 1 { //数据不为空的时候发送
@@ -242,7 +236,7 @@ func (p *GrokParser) parseLine(line string) (sender.Data, error) {
 	}
 	if len(values) < 1 {
 		log.Errorf("%v no value was parsed after grok pattern %v", line, p.Patterns)
-		return nil, nil
+		return nil, fmt.Errorf("%v no value was parsed after grok pattern %v", line, p.Patterns)
 	}
 	data := sender.Data{}
 	for k, v := range values {
