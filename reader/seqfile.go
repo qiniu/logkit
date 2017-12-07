@@ -421,11 +421,17 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 		log.Infof("Runner[%v] %s - start tail new file: %s", sf.meta.RunnerName, sf.dir, fname)
 		break
 	}
+	tryTime := 0
 	for {
 		err = sf.meta.AppendDoneFile(doneFile)
 		if err != nil {
-			log.Errorf("Runner[%v] cannot write done file %s, err:%v", sf.meta.RunnerName, doneFile, err)
+			if tryTime > 3 {
+				log.Errorf("Runner[%v] cannot write done file %s, err:%v, ignore this noefi", sf.meta.RunnerName, doneFile, err)
+				break
+			}
+			log.Errorf("Runner[%v] cannot write done file %s, err:%v, will retry after 3s", sf.meta.RunnerName, doneFile, err)
 			time.Sleep(3 * time.Second)
+			tryTime++
 			continue
 		}
 		break

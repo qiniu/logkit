@@ -5,7 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/qiniu/log"
+	"fmt"
+
 	"github.com/qiniu/logkit/conf"
 )
 
@@ -38,7 +39,7 @@ func NewFileAutoReader(conf conf.MapConf, meta *Meta, isFromWeb bool, bufSize in
 		}
 		reader, err = NewReaderSize(fr, meta, bufSize)
 	default:
-		log.Error("this mode is invalid")
+		err = fmt.Errorf("can not find property mode for this logpath %v", logpath)
 	}
 	return
 }
@@ -54,18 +55,17 @@ func matchMode(logpath string) (mode string, err error) {
 	matchTailx := strings.Contains(logpath, "*")
 	if matchTailx == true {
 		mode = ModeTailx
-	} else {
-		//for logpath this path to make judgments
-		fileInfo, errStat := os.Stat(logpath)
-		if err != nil {
-			err = errStat
-			return
-		}
-		if fileInfo.IsDir() == true {
-			mode = ModeDir
-		} else {
-			mode = ModeFile
-		}
+		return
 	}
+	//for logpath this path to make judgments
+	fileInfo, err := os.Stat(logpath)
+	if err != nil {
+		return
+	}
+	if fileInfo.IsDir() == true {
+		mode = ModeDir
+		return
+	}
+	mode = ModeFile
 	return
 }

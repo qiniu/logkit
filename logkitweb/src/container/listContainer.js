@@ -26,7 +26,7 @@ class List extends Component {
       status: [],
       currentItem: '',
       version: '',
-      collapsed: true,
+      collapsed: false,
       currentMenu: 'runner',
       machines: [],
       currentTagName: '',
