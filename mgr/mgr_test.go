@@ -312,14 +312,18 @@ func Test_Watch(t *testing.T) {
 	}
 
 	if !tryTest(10, func() bool {
-		m.lock.Lock()
+		m.lock.RLock()
 		runnerLength = len(m.runners)
-		m.lock.Unlock()
+		m.lock.RUnlock()
 		return runnerLength == 3
 	}) {
 		t.Fatalf("runners exp 3 after add test3.conf but got %v", runnerLength)
 	}
-	if !tryTest(10, func() bool { return m.cleanQueues[realdir].cleanerCount == 2 }) {
+	if !tryTest(10, func() bool {
+		m.cleanLock.RLock()
+		defer m.cleanLock.RUnlock()
+		return m.cleanQueues[realdir].cleanerCount == 2
+	}) {
 		t.Fatalf("cleanerCount exp 2 after add test3.conf  but got %v", m.cleanQueues[realdir].cleanerCount)
 	}
 
