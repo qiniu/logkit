@@ -24,13 +24,13 @@ type ClusterConfig struct {
 	MasterUrl []string `json:"master_url"`
 	IsMaster  bool     `json:"is_master"`
 	Enable    bool     `json:"enable"`
+	Address   string   `json:"address"`
+	Tag       string   `json:"tag"`
 }
 
 type Cluster struct {
 	ClusterConfig
 	slaves       []Slave
-	myaddress    string
-	mytag        string
 	mutex        *sync.RWMutex
 	statusUpdate time.Time
 }
@@ -64,6 +64,11 @@ type respRunnerStatus struct {
 	Data map[string]RunnerStatus `json:"data"`
 }
 
+type respRunnerConfig struct {
+	Code string       `json:"code"`
+	Data RunnerConfig `json:"data"`
+}
+
 type respRunnerConfigs struct {
 	Code string                  `json:"code"`
 	Data map[string]RunnerConfig `json:"data"`
@@ -84,20 +89,22 @@ const (
 func NewCluster(cc *ClusterConfig) *Cluster {
 	cl := new(Cluster)
 	cl.ClusterConfig = *cc
-	cl.mytag = DefaultMyTag
+	if cl.Tag == "" {
+		cl.Tag = DefaultMyTag
+	}
 	cl.slaves = make([]Slave, 0)
 	cl.mutex = new(sync.RWMutex)
 	return cl
 }
 
 func (cc *Cluster) RunRegisterLoop() error {
-	if err := Register(cc.MasterUrl, cc.myaddress, cc.mytag); err != nil {
+	if err := Register(cc.MasterUrl, cc.Address, cc.Tag); err != nil {
 		return fmt.Errorf("master %v is unavaliable", cc.MasterUrl)
 	}
 	go func() {
 		for {
 			time.Sleep(15 * time.Second)
-			if err := Register(cc.MasterUrl, cc.myaddress, cc.mytag); err != nil {
+			if err := Register(cc.MasterUrl, cc.Address, cc.Tag); err != nil {
 				log.Errorf("master %v is unavaliable", cc.MasterUrl)
 			}
 		}
@@ -251,6 +258,44 @@ func (rs *RestService) ClusterStatus() echo.HandlerFunc {
 }
 
 // master API
+// Get /logkit/cluster/configs:name?tag=tagValue&url=urlValue
+func (rs *RestService) GetClusterConfig() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		runnerName, tag, url, _, err := rs.checkClusterRequest(c)
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, utils.ErrClusterConfig, err.Error())
+		}
+		rs.cluster.mutex.RLock()
+		slaves, _ := getQualifySlaves(rs.cluster.slaves, tag, url)
+		rs.cluster.mutex.RUnlock()
+		var config RunnerConfig
+		var lastErrMsg string
+		for _, v := range slaves {
+			var respRss respRunnerConfig
+			if v.Status != StatusOK {
+				lastErrMsg = "the slaves(tag = '" + tag + "', url = '" + url + "') status is " + v.Status
+				continue
+			}
+			url := fmt.Sprintf("%v/logkit/configs/"+runnerName, v.Url)
+			respCode, respBody, err := executeToOneCluster(url, http.MethodGet, []byte{})
+			if err != nil || respCode != http.StatusOK {
+				lastErrMsg = fmt.Sprintf("get slave(tag = '%v'', url = '%v') config failed resp is %v, error is %v", tag, url, string(respBody), err)
+				continue
+			} else {
+				if err = json.Unmarshal(respBody, &respRss); err != nil {
+					lastErrMsg = fmt.Sprintf("get slave(tag = '%v'', url = '%v') config unmarshal failed, resp is %v, error is %v", tag, url, string(respBody), err)
+					continue
+				} else {
+					config = respRss.Data
+					return RespSuccess(c, config)
+				}
+			}
+		}
+		return RespError(c, http.StatusBadRequest, utils.ErrClusterConfig, lastErrMsg)
+	}
+}
+
+// master API
 // Get /logkit/cluster/configs?tag=tagValue&url=urlValue
 func (rs *RestService) GetClusterConfigs() echo.HandlerFunc {
 	return func(c echo.Context) error {
@@ -328,11 +373,11 @@ func (rs *RestService) PostTag() echo.HandlerFunc {
 			errMsg := "cluster function not configed"
 			return RespError(c, http.StatusBadRequest, utils.ErrClusterTag, errMsg)
 		}
-		if err := Register(rs.cluster.MasterUrl, rs.cluster.myaddress, req.Tag); err != nil {
+		if err := Register(rs.cluster.MasterUrl, rs.cluster.Address, req.Tag); err != nil {
 			return RespError(c, http.StatusServiceUnavailable, utils.ErrClusterTag, err.Error())
 		}
 		rs.cluster.mutex.Lock()
-		rs.cluster.mytag = req.Tag
+		rs.cluster.Tag = req.Tag
 		rs.cluster.mutex.Unlock()
 		return RespSuccess(c, nil)
 	}

@@ -48,9 +48,12 @@ const (
 	KeyPandoraTSDBHost       = "pandora_tsdb_host"
 	KeyPandoraTSDBTimeStamp  = "pandora_tsdb_timestamp"
 
-	KeyPandoraEnableKodo     = "pandora_enable_kodo"
-	KeyPandoraKodoBucketName = "pandora_bucket_name"
-	KeyPandoraEmail          = "qiniu_email"
+	KeyPandoraEnableKodo         = "pandora_enable_kodo"
+	KeyPandoraKodoBucketName     = "pandora_bucket_name"
+	KeyPandoraKodoFilePrefix     = "pandora_kodo_prefix"
+	KeyPandoraKodoCompressPrefix = "pandora_kodo_compress"
+
+	KeyPandoraEmail = "qiniu_email"
 
 	KeyRequestRateLimit       = "request_rate_limit"
 	KeyFlowRateLimit          = "flow_rate_limit"
@@ -63,6 +66,8 @@ const (
 	KeyIgnoreInvalidField     = "ignore_invalid_field"
 
 	PandoraUUID = "Pandora_UUID"
+
+	timestampPrecision = 19
 )
 
 // PandoraSender pandora sender
@@ -75,7 +80,7 @@ type PandoraSender struct {
 	UserSchema         UserSchema
 	alias2key          map[string]string // map[alias]name
 	opt                PandoraOption
-	microsecondCounter int64
+	microsecondCounter uint64
 	extraInfo          map[string]string
 }
 
@@ -119,6 +124,8 @@ type PandoraOption struct {
 	enableKodo bool
 	bucketName string
 	email      string
+	prefix     string
+	format     string
 
 	forceMicrosecond   bool
 	forceDataConvert   bool
@@ -128,7 +135,7 @@ type PandoraOption struct {
 	logkitSendTime     bool
 
 	isMetrics  bool
-	expandAttr []pipeline.RepoSchemaEntry
+	expandAttr []string
 }
 
 //PandoraMaxBatchSize 发送到Pandora的batch限制
@@ -198,6 +205,8 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	enableKodo, _ := conf.GetBoolOr(KeyPandoraEnableKodo, false)
 	kodobucketName, _ := conf.GetStringOr(KeyPandoraKodoBucketName, repoName)
 	email, _ := conf.GetStringOr(KeyPandoraEmail, "")
+	format, _ := conf.GetStringOr(KeyPandoraKodoCompressPrefix, "parquet")
+	prefix, _ := conf.GetStringOr(KeyPandoraKodoFilePrefix, "logkitauto/date=$(year)-$(mon)-$(day)/hour=$(hour)/min=$(min)/$(sec)")
 
 	forceconvert, _ := conf.GetBoolOr(KeyForceDataConvert, false)
 	ignoreInvalidField, _ := conf.GetBoolOr(KeyIgnoreInvalidField, true)
@@ -236,6 +245,8 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 		enableKodo: enableKodo,
 		email:      email,
 		bucketName: kodobucketName,
+		format:     format,
+		prefix:     prefix,
 
 		forceMicrosecond:   forceMicrosecond,
 		forceDataConvert:   forceconvert,
@@ -309,19 +320,24 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 	// sender时会尝试不断获取pandora schema，若还是获取失败则返回发送错误。
 	s.UpdateSchemas()
 
-	expandAttr := make([]pipeline.RepoSchemaEntry, 0)
-	if s.opt.logkitSendTime {
-		expandAttr = append(expandAttr, pipeline.RepoSchemaEntry{
-			Key:       KeyLogkitSendTime,
-			ValueType: pipeline.PandoraTypeDate,
-			Required:  false,
-		})
+	var osInfo = []string{utils.KeyCore, utils.KeyHostName, utils.KeyOsInfo, utils.KeyLocalIp}
+	expandAttr := make([]string, 0)
+	if s.opt.isMetrics {
+		s.opt.tsdbTimestamp = metric.Timestamp
+		metricTags := metric.GetMetricTags()
+		if s.opt.extraInfo {
+			// 将 osInfo 添加到每个 metric 的 tags 中
+			for key, val := range metricTags {
+				val = append(val, osInfo...)
+				metricTags[key] = val
+			}
+
+			// 将 osInfo 中的字段导出到每个 series 中
+			expandAttr = append(expandAttr, osInfo...)
+		}
+		s.opt.tsdbSeriesTags = metricTags
 	}
 	s.opt.expandAttr = expandAttr
-	if s.opt.isMetrics {
-		s.opt.tsdbSeriesTags = metric.GetMetricTags()
-	}
-
 	if s.opt.enableLogdb && len(s.schemas) > 0 {
 		log.Infof("Runner[%v] Sender[%v]: auto create export to logdb (%v)", opt.runnerName, opt.name, opt.logdbReponame)
 		err = s.client.AutoExportToLogDB(&pipeline.AutoExportToLogDBInput{
@@ -340,7 +356,7 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 		log.Infof("Runner[%v] Sender[%v]: auto create export to tsdb (%v)", opt.runnerName, opt.name, opt.tsdbReponame)
 		err = s.client.AutoExportToTSDB(&pipeline.AutoExportToTSDBInput{
 			OmitEmpty:    true,
-			OmitInvalid:  true,
+			OmitInvalid:  false,
 			SeriesTags:   s.opt.tsdbSeriesTags,
 			IsMetric:     s.opt.isMetrics,
 			ExpandAttr:   s.opt.expandAttr,
@@ -360,6 +376,8 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 		err = s.client.AutoExportToKODO(&pipeline.AutoExportToKODOInput{
 			RepoName:   s.opt.repoName,
 			BucketName: s.opt.bucketName,
+			Prefix:     s.opt.prefix,
+			Format:     s.opt.format,
 			Email:      s.opt.email,
 			Retention:  30, //默认30天
 		})
@@ -368,7 +386,6 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 			err = nil
 		}
 	}
-
 	return
 }
 
@@ -465,14 +482,14 @@ const (
 )
 
 type forceMicrosecondOption struct {
-	microsecond      int64
+	nanosecond       uint64
 	forceMicrosecond bool
 }
 
 //临时方案，转换时间，目前sender这边拿到的都是string，很难确定是什么格式的string
 //microsecond: 表示要在当前时间基础上加多少偏移量,只在forceMicrosecond为true的情况下才有效
 //forceMicrosecond: 表示是否要对当前时间加偏移量
-func convertDate(v interface{}, option forceMicrosecondOption) (interface{}, error) {
+func convertDate(v interface{}, option forceMicrosecondOption) (d interface{}, err error) {
 	var s int64
 	switch newv := v.(type) {
 	case int64:
@@ -488,54 +505,41 @@ func convertDate(v interface{}, option forceMicrosecondOption) (interface{}, err
 		if err != nil {
 			return v, err
 		}
-		rfctime := t.Format(time.RFC3339Nano)
-		if option.forceMicrosecond {
-			news := alignTimestamp(t.UTC().UnixNano(), option.microsecond)
-			rfctime = time.Unix(0, news*int64(time.Microsecond)).Format(time.RFC3339Nano)
-		}
-
-		return rfctime, err
+		s = t.UTC().UnixNano()
 	case json.Number:
-		jsonNumber, err := newv.Int64()
-		if err != nil {
+		if s, err = newv.Int64(); err != nil {
 			return v, err
 		}
-		s = jsonNumber
 	default:
 		return v, fmt.Errorf("can not parse %v type %v as date time", v, reflect.TypeOf(v))
 	}
-	news := s
 	if option.forceMicrosecond {
-		news = alignTimestamp(s, option.microsecond)
+		s = alignTimestamp(s, option.nanosecond)
 	}
-	timestamp := strconv.FormatInt(news, 10)
-	timeSecondPrecision := 16
-	//补齐16位
-	for i := len(timestamp); i < timeSecondPrecision; i++ {
-		timestamp += "0"
+	timestampStr := strconv.FormatInt(s, 10)
+	for i := len(timestampStr); i < timestampPrecision; i++ {
+		timestampStr += "0"
 	}
-	// 取前16位，截取精度 微妙
-	timestamp = timestamp[0:timeSecondPrecision]
-	t, err := strconv.ParseInt(timestamp, 10, 64)
-	if err != nil {
+	timestampStr = timestampStr[0:timestampPrecision]
+	if s, err = strconv.ParseInt(timestampStr, 10, 64); err != nil {
 		return v, err
 	}
-	v = time.Unix(0, t*int64(time.Microsecond)).Format(time.RFC3339Nano)
-	return v, nil
+	d = time.Unix(0, s*int64(time.Nanosecond)).Format(time.RFC3339Nano)
+	return
 }
 
 // alignTimestamp
 // 1. 根据输入时间戳的位数来补齐对应的位数
-// 2. 对于精度不是微妙的数据点，加一个扰动
-func alignTimestamp(t int64, microsecond int64) int64 {
+// 2. 对于精度不是微秒的数据点，加一个扰动
+func alignTimestamp(t int64, nanosecond uint64) int64 {
 	for i := 0; t%10 == 0; i++ {
 		t /= 10
 	}
-	offset := 16 - len(strconv.FormatInt(t, 10))
+	offset := timestampPrecision - len(strconv.FormatInt(t, 10))
 	dividend := int64(math.Pow10(offset))
 	if offset > 0 {
-		t = t * dividend //补齐16位
-		return t + microsecond%dividend
+		t = t * dividend //补齐相应的位数
+		return t + int64(nanosecond%uint64(dividend))
 	}
 	return t
 }
@@ -628,13 +632,13 @@ func (s *PandoraSender) generatePoint(data Data) (point Data) {
 		delete(data, name)
 		if v.ValueType == PandoraTypeDate && s.opt.autoConvertDate {
 			formatTime, err := convertDate(value, forceMicrosecondOption{
-				microsecond:      s.microsecondCounter,
+				nanosecond:       s.microsecondCounter,
 				forceMicrosecond: s.opt.forceMicrosecond})
 			if err != nil {
 				log.Error(err)
 				continue
 			}
-			s.microsecondCounter = (s.microsecondCounter + 1) % (2 << 32)
+			s.microsecondCounter = s.microsecondCounter + 1
 			value = formatTime
 		}
 		if !s.opt.forceDataConvert && s.opt.ignoreInvalidField && !validSchema(v.ValueType, value) {
@@ -690,13 +694,9 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 		}
 		if s.opt.extraInfo {
 			for key, val := range s.extraInfo {
-				suffix := 0
-				keyName := key
-				for _, exist := d[keyName]; exist; suffix++ {
-					keyName = key + strconv.Itoa(suffix)
-					_, exist = d[keyName]
+				if _, exist := d[key]; !exist {
+					d[key] = val
 				}
-				d[keyName] = val
 			}
 		}
 		point := s.generatePoint(d)
@@ -721,11 +721,13 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 				RepoName:   s.opt.repoName,
 				BucketName: s.opt.bucketName,
 				Email:      s.opt.email,
+				Prefix:     s.opt.prefix,
+				Format:     s.opt.format,
 			},
 			ToTSDB: s.opt.enableTsdb,
 			AutoExportToTSDBInput: pipeline.AutoExportToTSDBInput{
 				OmitEmpty:    true,
-				OmitInvalid:  true,
+				OmitInvalid:  false,
 				IsMetric:     s.opt.isMetrics,
 				ExpandAttr:   s.opt.expandAttr,
 				RepoName:     s.opt.repoName,

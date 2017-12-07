@@ -238,6 +238,34 @@ Content-Type: application/json
 ###  Master API -- 获取runner 配置文件
 
 ```
+GET /logkit/cluster/config/<configName>?tag=tagvalue&url=urlvalue
+```
+
+默认返回符合`tag`和`url`的第一个 `slave`  的配置文件, 成功时返回:
+```
+Content-Type: application/json
+
+{
+  "code": "L200",
+  "data": {
+	"name": "xxx",
+	... 此处省略，应为 runner config 具体内容
+  }
+}
+```
+出现错误时，返回:
+```
+Content-Type: application/json
+
+{
+  "code": "<error code>",
+  "message": "<error message>"
+}
+```
+
+###  Master API -- 获取runner 配置文件
+
+```
 GET /logkit/cluster/configs?tag=tagvalue&url=urlvalue
 ```
 

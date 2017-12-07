@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"time"
 
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/utils"
@@ -72,7 +71,7 @@ func (_ *NetIOStats) Config() map[string]interface{} {
 		{
 			KeyName:       "skip_protocols_state",
 			ChooseOnly:    true,
-			ChooseOptions: []string{"true", "false"},
+			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   "是否忽略各个网络协议的状态信息",
@@ -92,7 +91,6 @@ func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 		return nil, fmt.Errorf("error getting net io info: %s", err)
 	}
 
-	now := time.Now().Format(time.RFC3339Nano)
 	for _, io := range netio {
 		if len(s.Interfaces) != 0 {
 			var found bool
@@ -133,7 +131,6 @@ func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 			KeyNetDropOut:     io.Dropout,
 			KeyNetInterface:   io.Name,
 		}
-		fields[TypeMetricNet+"_"+metric.Timestamp] = now
 		datas = append(datas, fields)
 	}
 
@@ -149,7 +146,6 @@ func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 			}
 		}
 		fields[KeyNetInterface] = "all"
-		fields[TypeMetricNet+"_"+metric.Timestamp] = now
 		datas = append(datas, fields)
 	}
 	return

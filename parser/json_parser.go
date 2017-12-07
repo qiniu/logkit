@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
@@ -13,9 +12,8 @@ import (
 )
 
 type JsonParser struct {
-	name      string
-	labels    []Label
-	schemaErr *schemaErr
+	name   string
+	labels []Label
 }
 
 func NewJsonParser(c conf.MapConf) (LogParser, error) {
@@ -27,10 +25,6 @@ func NewJsonParser(c conf.MapConf) (LogParser, error) {
 	return &JsonParser{
 		name:   name,
 		labels: labels,
-		schemaErr: &schemaErr{
-			number: 0,
-			last:   time.Now(),
-		},
 	}, nil
 }
 
@@ -48,9 +42,9 @@ func (im *JsonParser) Parse(lines []string) ([]sender.Data, error) {
 	for idx, line := range lines {
 		data, err := im.parseLine(line)
 		if err != nil {
-			im.schemaErr.Output(err)
 			se.AddErrors()
 			se.ErrorIndex = append(se.ErrorIndex, idx)
+			se.ErrorDetail = err
 			continue
 		}
 		datas = append(datas, data)

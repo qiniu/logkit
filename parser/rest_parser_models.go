@@ -15,6 +15,19 @@ var ModeUsages = []utils.KeyValue{
 	{TypeEmpty, "empty 通过解析清空数据"},
 }
 
+var (
+	OptionTimezoneOffset = utils.Option{
+		KeyName:    KeyTimeZoneOffset,
+		ChooseOnly: true,
+		Default:    "0",
+		ChooseOptions: []interface{}{"0", "-1", "-2", "-3", "-4",
+			"-5", "-6", "-7", "-8", "-9", "-10", "-11", "-12",
+			"1", "2", "3", "4", "5", "6", "7", "8", "9", "11", "12"},
+		DefaultNoUse: false,
+		Description:  "时区偏移量(timezone_offset)",
+	}
+)
+
 var ModeKeyOptions = map[string][]utils.Option{
 	TypeJson: {
 		{
@@ -94,7 +107,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyGrokMode,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"oneline", ModeMulti},
+			ChooseOptions: []interface{}{"oneline", ModeMulti},
 			Default:       "oneline",
 			DefaultNoUse:  false,
 			Description:   "grok单行多行模式(grok_mode)",
@@ -113,16 +126,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse: false,
 			Description:  "自定义 pattern (grok_custom_patterns)",
 		},
-		{
-			KeyName:    KeyTimeZoneOffset,
-			ChooseOnly: true,
-			Default:    "0",
-			ChooseOptions: []string{"0", "-1", "-2", "-3", "-4",
-				"-5", "-6", "-7", "-8", "-9", "-10", "-11", "-12",
-				"1", "2", "3", "4", "5", "6", "7", "8", "9", "11", "12"},
-			DefaultNoUse: false,
-			Description:  "时区偏移量(timezone_offset)",
-		},
+		OptionTimezoneOffset,
 		{
 			KeyName:      KeyLabels,
 			ChooseOnly:   false,
@@ -161,15 +165,14 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse: false,
 			Description:  "额外的标签信息(labels)",
 		},
+		OptionTimezoneOffset,
 		{
-			KeyName:    KeyTimeZoneOffset,
-			ChooseOnly: true,
-			Default:    "0",
-			ChooseOptions: []string{"0", "-1", "-2", "-3", "-4",
-				"-5", "-6", "-7", "-8", "-9", "-10", "-11", "-12",
-				"1", "2", "3", "4", "5", "6", "7", "8", "9", "11", "12"},
-			DefaultNoUse: false,
-			Description:  "时区偏移量(timezone_offset)",
+			KeyName:       KeyAutoRename,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"true", "false"},
+			Default:       "true",
+			DefaultNoUse:  false,
+			Description:   "自动将字段名称中的'-'更改为'_'",
 		},
 	},
 	TypeRaw: {
@@ -183,7 +186,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyTimestamp,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"true", "false"},
+			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   "数据附带时间戳(timestamp)",
@@ -238,7 +241,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			KeyName:       KeyRFCType,
 			ChooseOnly:    true,
 			Default:       "automic",
-			ChooseOptions: []string{"automic", "rfc3164", "rfc5424", "rfc6587"},
+			ChooseOptions: []interface{}{"automic", "rfc3164", "rfc5424", "rfc6587"},
 			DefaultNoUse:  false,
 			Description:   "syslog使用的rfc协议(syslog_rfc)",
 		},

@@ -13,17 +13,15 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
-
-	"github.com/qiniu/logkit/times"
-	"github.com/qiniu/logkit/utils"
-
-	"sync"
 
 	"github.com/labstack/echo"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/times"
+	"github.com/qiniu/logkit/utils"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 	"github.com/stretchr/testify/assert"
@@ -258,9 +256,8 @@ func TestPandoraSender(t *testing.T) {
 		timestr = "Z"
 	}
 	_, zoneValue := times.GetTimeZone()
-	timeVal := int64(1477373632504876)
-	timeexp := time.Unix(0, timeVal*int64(time.Microsecond)).Format(time.RFC3339Nano)
-	exp := "a1=1.2 ab=hh ac=2 d=" + timeexp
+	timeVal := int64(1477373632504876500)
+	exp := "a1=1.2 ab=hh ac=2 d=" + time.Unix(0, timeVal*int64(time.Nanosecond)).Format(time.RFC3339Nano)
 	if pandora.Body != exp {
 		t.Errorf("send data error exp %v but %v", exp, pandora.Body)
 	}
@@ -308,7 +305,7 @@ func TestPandoraSender(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	exptime := time.Unix(0, int64(1477455943186721)*int64(time.Microsecond)).Format(time.RFC3339Nano)
+	exptime := time.Unix(0, int64(1477455943186721500)*int64(time.Nanosecond)).Format(time.RFC3339Nano)
 	exp = "a1=0 ab=REQ ac=200 d=" + exptime
 	if pandora.Body != exp {
 		t.Errorf("send data error exp %v but %v", exp, pandora.Body)
@@ -357,7 +354,7 @@ func TestPandoraSender(t *testing.T) {
 	}
 
 	timeVal = int64(1477373632504888)
-	timeexp = time.Unix(0, timeVal*int64(time.Microsecond)).Format(time.RFC3339Nano)
+	timeexp := time.Unix(0, timeVal*int64(time.Microsecond)).Format(time.RFC3339Nano)
 	exp = "a1=1.1 ab=a ac=0 ax=b d=" + timeexp
 	assert.Equal(t, exp, pandora.Body)
 
@@ -486,16 +483,17 @@ func TestConvertDate(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	ntnow := tnow.UnixNano() / int64(time.Microsecond) * int64(time.Microsecond)
-	exp := time.Unix(0, ntnow).Format(time.RFC3339Nano)
+	exp := tnow.Format(time.RFC3339Nano)
 	if newtime != exp {
 		t.Errorf("convertDate error exp %v,got %v", exp, newtime)
 	}
-	tt = exp
+	ntnow := tnow.UnixNano() / int64(time.Microsecond) * int64(time.Microsecond)
+	tt = time.Unix(0, ntnow).Format(time.RFC3339Nano)
 	newtime, err = convertDate(tt, forceMicrosecondOption{0, true})
 	if err != nil {
 		t.Error(err)
 	}
+	exp = time.Unix(0, ntnow).Format(time.RFC3339Nano)
 	if newtime != exp {
 		t.Errorf("convertDate error exp %v,got %v", exp, newtime)
 	}
@@ -512,41 +510,89 @@ func TestConvertDate(t *testing.T) {
 }
 
 func TestSuppurtedTimeFormat(t *testing.T) {
-	tests := []struct {
-		timeStr string
-		exp     string
-	}{
-		{
-			timeStr: "2017/03/28 15:41:53",
-			exp:     "2017-03-28T15:41:53Z",
-		},
-		{
-			timeStr: "2017/03/28 15:41:53.123456",
-			exp:     "2017-03-28T15:41:53.123456Z",
-		},
-		{
-			timeStr: "2017-03-28 02:31:55.091",
-			exp:     "2017-03-28T02:31:55.091Z",
-		},
-		{
-			timeStr: "2017-03-28 02:31:55",
-			exp:     "2017-03-28T02:31:55Z",
-		},
-		{
-			timeStr: "2017-04-05T18:15:01+08:00",
-			exp:     "2017-04-05T10:15:01Z",
-		},
+	tests := []interface{}{
+		"2017/03/28 15:41:53",
+		"2017-03-28 02:31:55.091",
+		"2017-04-05T18:15:01+08:00",
+		int(1490668315),
+		int64(1490715713123456),
+		int64(1490668315323498123),
+		"1",
+		nil,
 	}
-	for _, ti := range tests {
-		val, err := convertDate(ti.timeStr, forceMicrosecondOption{0, true})
+
+	for i, input := range tests {
+		force := int64(i)
+		gotVal, err := convertDate(input, forceMicrosecondOption{uint64(force), true})
 		if err != nil {
-			t.Error(err)
+			assert.Equal(t, input, gotVal)
+			continue
 		}
-		gotDateStr := val.(string)
-		tt, _ := time.Parse(time.RFC3339Nano, gotDateStr)
-		got := tt.UTC().Format(time.RFC3339Nano)
-		if ti.exp != got {
-			t.Fatalf("TestSuppurtedTimeFormat error exp %v but got %v", ti.exp, got)
+		gotTimeStr, ok := gotVal.(string)
+		if !ok {
+			t.Fatalf("assert error, gotVal is not string, %v", gotVal)
+		}
+		gotTime, err := times.StrToTime(gotTimeStr)
+		assert.NoError(t, err)
+		gotTimeStamp := gotTime.UnixNano()
+		var inputStr string
+		switch input.(type) {
+		case int:
+			var t time.Time
+			in := input.(int)
+			length := len(strconv.FormatInt(int64(in), 10))
+			if length == 10 {
+				t = time.Unix(int64(in), 0)
+			} else if length == 16 {
+				t = time.Unix(0, int64(in)*int64(time.Microsecond))
+			} else if length == 19 {
+				force = int64(0)
+				t = time.Unix(0, int64(in))
+			}
+			inputStr = t.Format(time.RFC3339Nano)
+		case int64:
+			var t time.Time
+			in := input.(int64)
+			length := len(strconv.FormatInt(int64(in), 10))
+			if length == 10 {
+				t = time.Unix(int64(in), 0)
+			} else if length == 16 {
+				t = time.Unix(0, int64(in)*int64(time.Microsecond))
+			} else if length == 19 {
+				force = int64(0)
+				t = time.Unix(0, int64(in))
+			}
+			inputStr = t.Format(time.RFC3339Nano)
+		case string:
+			inputStr = input.(string)
+		default:
+			t.Errorf("unknow type, %v", input)
+		}
+		expTime, err := times.StrToTime(inputStr)
+		assert.NoError(t, err)
+		expTimeStamp := expTime.UnixNano()
+
+		assert.Equal(t, timestampPrecision, len(strconv.FormatInt(gotTimeStamp, 10)))
+		assert.Equal(t, force, gotTimeStamp-expTimeStamp)
+	}
+}
+
+// 修改前: 100000	     10861 ns/op
+// 当前:  100000	     10128 ns/op
+func Benchmark_TimeFormat(b *testing.B) {
+	tests := []interface{}{
+		"2017/03/28 15:41:53",
+		"2017-03-28 02:31:55.091",
+		"2017-04-05T18:15:01+08:00",
+		int(1490668315),
+		int64(1490715713123456),
+		int64(1490668315323498123),
+		"1",
+		nil,
+	}
+	for i := 0; i < b.N; i++ {
+		for i, input := range tests {
+			convertDate(input, forceMicrosecondOption{uint64(i), true})
 		}
 	}
 }
@@ -861,37 +907,37 @@ func TestAlignTimestamp(t *testing.T) {
 		{
 			input:   int64(1),
 			counter: int64(0),
-			output:  int64(1000000000000000),
+			output:  int64(1000000000000000000),
 		},
 		{ //秒 -> 微秒
 			input:   int64(1498720797),
 			counter: int64(0),
-			output:  int64(1498720797000000),
+			output:  int64(1498720797000000000),
 		},
 		{ //秒 + 扰动 -> 微秒
 			input:   int64(1498720797),
 			counter: int64(10000),
-			output:  int64(1498720797010000),
+			output:  int64(1498720797000010000),
 		},
 		{ //毫秒 -> 微秒
 			input:   int64(1498720797123),
 			counter: int64(0),
-			output:  int64(1498720797123000),
+			output:  int64(1498720797123000000),
 		},
 		{ //毫秒 + 扰动 -> 微秒
 			input:   int64(1498720797123),
 			counter: int64(100),
-			output:  int64(1498720797123100),
+			output:  int64(1498720797123000100),
 		},
 		{ //微秒 -> 微秒
 			input:   int64(1498720797123123),
 			counter: int64(0),
-			output:  int64(1498720797123123),
+			output:  int64(1498720797123123000),
 		},
 		{ //微秒 + 扰动 -> 微秒
 			input:   int64(1498720797123123),
 			counter: int64(100),
-			output:  int64(1498720797123123),
+			output:  int64(1498720797123123100),
 		},
 		{ //保留纳秒
 			input:   int64(1498720797123123123),
@@ -899,11 +945,10 @@ func TestAlignTimestamp(t *testing.T) {
 			output:  int64(1498720797123123123),
 		},
 	}
-
 	for _, test := range tests {
-		output := alignTimestamp(test.input, test.counter)
+		output := alignTimestamp(test.input, uint64(test.counter))
 		if output != test.output {
-			t.Errorf("test align timestamp fail\ngot:%v\nexp:%v\n", output, test.output)
+			t.Errorf("input: %v\noutput: %v\nexp: %v\ncounter: %v", test.input, output, test.output, test.counter)
 		}
 	}
 }
@@ -1115,8 +1160,6 @@ func TestPandoraExtraInfo(t *testing.T) {
 	}
 	resp := pandora.Body
 	assert.Equal(t, true, strings.Contains(resp, "core"))
-	assert.Equal(t, true, strings.Contains(resp, "osinfo0"))
-	assert.Equal(t, true, strings.Contains(resp, "hostname3"))
 	assert.Equal(t, true, strings.Contains(resp, "x1=123.2"))
 	assert.Equal(t, true, strings.Contains(resp, "osinfo=123.2"))
 	assert.Equal(t, true, strings.Contains(resp, "hostname=123.2"))

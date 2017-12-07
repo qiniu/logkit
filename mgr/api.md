@@ -1034,6 +1034,53 @@ Content-Type: application/json
 }
 ```
 
+### 尝试转化（解析后的）样例日志
+
+请求
+
+```
+POST /logkit/transformer/transform
+Content-Type: application/json
+{
+    "sampleLog":"my sample log(in json string format)",
+    "type": "<transformerType>",
+    "key2": "value2",
+    "key3": "value3",
+    ...(other k-v params for a exact transformer)
+}
+```
+
+**注意: sampleLog应该是JSON字符串（是经过parser解析后的样例日志）。可以是单条样例日志，可以是JSON Array形式的多条日志**
+
+返回
+
+如果请求成功,返回HTTP状态码200:
+
+```
+{
+    "code": "L200",
+    "data": [
+        {
+            "field1": value1,
+            "field2": value2
+            ...
+        },
+        ...
+    ]
+}
+```
+
+**注意: 无论是单条还是多条样例日志，返回值都是数组，数组的每个元素，对应于一条样例日志的转化结果**
+
+如果请求失败, 返回包含如下内容的JSON字符串（已格式化,便于阅读）:
+
+```
+{
+    "code":   "<error code>",
+    "message": "<error message>"
+}
+```
+
 ## 返回码列表
 #### 一切正常
 
@@ -1053,12 +1100,17 @@ Content-Type: application/json
 
 * `L1101`: 解析字符串出现错误
 
+#### logkit 自身 Transformer 相关
+
+* `L1201`: 转化字段出现错误
+
 #### logkit cluster Master 相关
 
 * `L2001`: 获取 Slaves 列表出现错误
 * `L2002`: 获取 Slaves 状态出现错误
 * `L2003`: 获取 Slaves Configs 出现错误
 * `L2004`: 接受 Slaves 注册时出现错误
+* `L2014`: 获取 Slaves Config 出现错误
 
 #### logkit cluster slave 自身相关
 

@@ -20,6 +20,7 @@ import (
 
 	_ "github.com/denisenkom/go-mssqldb" //mssql 驱动
 	_ "github.com/go-sql-driver/mysql"   //mysql 驱动
+	_ "github.com/lib/pq"                //postgres 驱动
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/utils"
 )
@@ -116,6 +117,49 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (mr *SqlReader, err error) {
 		}
 		cronSchedule, _ = conf.GetStringOr(KeyMssqlCron, "")
 		execOnStart, _ = conf.GetBoolOr(KeyMssqlExecOnStart, true)
+	case ModePG:
+		readBatch, _ = conf.GetIntOr(KeyPGsqlReadBatch, 100)
+		offsetKey, _ = conf.GetStringOr(KeyPGsqlOffsetKey, "")
+		dataSource, err = conf.GetString(KeyPGsqlDataSource)
+		if err != nil {
+			dataSource = logpath
+			if logpath == "" {
+				return nil, err
+			}
+			err = nil
+		}
+		sps := strings.Split(dataSource, " ")
+		for _, v := range sps {
+			v = strings.TrimSpace(v)
+			if v == "" {
+				continue
+			}
+			x1s := strings.Split(v, "=")
+			if len(x1s) != 2 {
+				err = fmt.Errorf("datasource %v is invalid, don't contain space beside symbol '='", dataSource)
+				return
+			}
+		}
+		database, err = conf.GetString(KeyPGsqlDataBase)
+		if err != nil {
+			got := false
+			for _, v := range sps {
+				if strings.Contains(v, "dbname") {
+					database = strings.TrimPrefix(v, "dbname=")
+					got = true
+					break
+				}
+			}
+			if !got {
+				return nil, err
+			}
+		}
+		rawSqls, err = conf.GetString(KeyPGsqlSQL)
+		if err != nil {
+			return nil, err
+		}
+		cronSchedule, _ = conf.GetStringOr(KeyPGsqlCron, "")
+		execOnStart, _ = conf.GetBoolOr(KeyPGsqlExecOnStart, true)
 	default:
 		err = fmt.Errorf("%v mode not support in sql reader", dbtype)
 		return
@@ -301,7 +345,8 @@ func (mr *SqlReader) Status() utils.StatsInfo {
 }
 
 func (mr *SqlReader) Source() string {
-	return mr.datasource + "_" + mr.database
+	//不能把DataSource弄出去，包含密码
+	return mr.dbtype + "_" + mr.database
 }
 
 func (mr *SqlReader) Close() (err error) {
@@ -412,10 +457,23 @@ func (mr *SqlReader) run() {
 
 	var connectStr string
 	switch mr.dbtype {
-	case "mysql":
+	case ModeMysql:
 		connectStr = mr.datasource + "/" + mr.database
-	case "mssql":
+	case ModeMssql:
 		connectStr = mr.datasource + ";database=" + mr.database
+	case ModePG:
+		spls := strings.Split(mr.datasource, " ")
+		contains := false
+		for idx, v := range spls {
+			if strings.Contains(v, "dbname") {
+				contains = true
+				spls[idx] = "dbname=" + mr.database
+			}
+		}
+		if !contains {
+			spls = append(spls, "dbname="+mr.database)
+		}
+		connectStr = strings.Join(spls, " ")
 	}
 	// 开始work逻辑
 	for {
@@ -434,12 +492,53 @@ func (mr *SqlReader) run() {
 	}
 }
 
-func getInitScans(length int) []interface{} {
-	scanArgs := make([]interface{}, length)
+func getInitScans(length int, rows *sql.Rows, sqltype string) (scanArgs []interface{}, nochoiced []bool) {
+	nochoice := make([]interface{}, length)
+	nochoiced = make([]bool, length)
 	for i := range scanArgs {
-		scanArgs[i] = new(interface{})
+		nochoice[i] = new(interface{})
+		nochoiced[i] = true
 	}
-	return scanArgs
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error("Recovered in f", r)
+			scanArgs = nochoice
+			return
+		}
+	}()
+
+	tps, err := rows.ColumnTypes()
+	if err != nil {
+		log.Error(err)
+		scanArgs = nochoice
+	}
+	if len(tps) != length {
+		log.Errorf("getInitScans length is %v not equal to columetypes %v", length, len(tps))
+		scanArgs = nochoice
+	}
+	scanArgs = make([]interface{}, length)
+	for i, v := range tps {
+		nochoiced[i] = false
+		switch v.ScanType().Name() {
+		case "int64", "int32", "int16", "int", "int8":
+			scanArgs[i] = new(int64)
+		case "float32", "float64":
+			scanArgs[i] = new(float64)
+		case "uint", "uint8", "uint16", "uint32", "uint64":
+			scanArgs[i] = new(uint64)
+		case "string", "RawBytes", "time.Time":
+			//时间类型也作为string处理
+			scanArgs[i] = new(interface{})
+		case "bool":
+			scanArgs[i] = new(bool)
+		case "[]uint8":
+			scanArgs[i] = new([]byte)
+		default:
+			scanArgs[i] = new(interface{})
+			nochoiced[i] = true
+		}
+	}
+	return
 }
 
 func (mr *SqlReader) getOffsetIndex(columns []string) int {
@@ -493,9 +592,11 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 				log.Errorf("Runner[%v] %v prepare %v <%v> columns error %v", mr.meta.RunnerName, mr.Name(), mr.dbtype, execSQL, err)
 				continue
 			}
+			rows.ColumnTypes()
 			log.Infof("Runner[%v] SQL ：<%v>, schemas: <%v>", mr.meta.RunnerName, execSQL, strings.Join(columns, ", "))
-			scanArgs := getInitScans(len(columns))
+			scanArgs, nochiced := getInitScans(len(columns), rows, mr.dbtype)
 			offsetKeyIndex := mr.getOffsetIndex(columns)
+
 			// Fetch rows
 			var maxOffset int64 = -1
 			for rows.Next() {
@@ -508,8 +609,11 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 				}
 				data := make(map[string]interface{})
 				for i := 0; i < len(scanArgs); i++ {
-					vtype, ok := mr.schemas[columns[i]]
-					if ok {
+					if nochiced[i] {
+						vtype, ok := mr.schemas[columns[i]]
+						if !ok {
+							vtype = "unknown"
+						}
 						switch vtype {
 						case "long":
 							val, serr := convertLong(scanArgs[i])
@@ -534,11 +638,28 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 							}
 						}
 					} else {
-						val, serr := convertString(scanArgs[i])
-						if serr != nil {
-							log.Errorf("convertString for %v (%v) error %v, ignore this key...", columns[i], scanArgs[i], serr)
+						switch d := scanArgs[i].(type) {
+						case *string:
+							data[columns[i]] = *d
+						case *[]byte:
+							data[columns[i]] = *d
+						case *bool:
+							data[columns[i]] = *d
+						case *interface{}:
+							data[columns[i]] = *d
+						case int64:
+							data[columns[i]] = d
+						case *int64:
+							data[columns[i]] = *d
+						case float64:
+							data[columns[i]] = d
+						case *float64:
+							data[columns[i]] = *d
+						case uint64:
+							data[columns[i]] = d
+						case *uint64:
+							data[columns[i]] = *d
 						}
-						data[columns[i]] = &val
 					}
 				}
 				ret, err := json.Marshal(data)
@@ -805,6 +926,13 @@ func (mr *SqlReader) getSQL(idx int) (sql string, err error) {
 			err = fmt.Errorf("%v dbtype is not support get SQL without id now", mr.dbtype)
 		}
 		return
+	case ModePG:
+		if len(mr.offsetKey) > 0 {
+			sql = fmt.Sprintf("%s WHERE %v >= %d AND %v < %d;", rawSQL, mr.offsetKey, mr.offsets[idx], mr.offsetKey, mr.offsets[idx]+int64(mr.readBatch))
+		} else {
+			err = fmt.Errorf("%v dbtype is not support get SQL without id now", mr.dbtype)
+		}
+		return
 	}
 	err = fmt.Errorf("%v dbtype is not support get SQL now", mr.dbtype)
 	return
@@ -840,7 +968,7 @@ func (mr *SqlReader) checkExit(idx int, db *sql.DB) (bool, int64) {
 		return true, -1
 	}
 
-	scanArgs := getInitScans(len(columns))
+	scanArgs, _ := getInitScans(len(columns), rows, mr.dbtype)
 	offsetKeyIndex := mr.getOffsetIndex(columns)
 	for rows.Next() {
 		err = rows.Scan(scanArgs...)

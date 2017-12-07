@@ -64,6 +64,10 @@ func ParsePriority(buff []byte, cursor *int, l int) (Priority, error) {
 		return pri, ErrPriorityEmpty
 	}
 
+	if *cursor >= l {
+		return pri, ErrPriorityEmpty
+	}
+
 	if buff[*cursor] != PRI_PART_START {
 		return pri, ErrPriorityNoStart
 	}
@@ -181,6 +185,10 @@ func Parse2Digits(buff []byte, cursor *int, l int, min int, max int, e error) (i
 func ParseHostname(buff []byte, cursor *int, l int) (string, error) {
 	from := *cursor
 	var to int
+
+	if *cursor >= l {
+		return "", nil
+	}
 
 	for to = from; to < l; to++ {
 		if buff[to] == ' ' {

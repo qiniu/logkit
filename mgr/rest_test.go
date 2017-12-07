@@ -28,11 +28,6 @@ import (
 
 var TESTContentApplictionJson = "application/json"
 
-type respRunnerConfig struct {
-	Code string       `json:"code"`
-	Data RunnerConfig `json:"data"`
-}
-
 type respModeUsages struct {
 	Code string           `json:"code"`
 	Data []utils.KeyValue `json:"data"`

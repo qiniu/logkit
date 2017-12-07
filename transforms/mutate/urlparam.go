@@ -20,7 +20,7 @@ type UrlParam struct {
 	stats utils.StatsInfo
 }
 
-func (p *UrlParam) transformToMap(strVal string) (map[string]string, error) {
+func (p *UrlParam) transformToMap(strVal string, key string) (map[string]string, error) {
 	resultMap := make(map[string]string)
 	params := strings.Split(strVal, "&")
 	for _, param := range params {
@@ -31,7 +31,7 @@ func (p *UrlParam) transformToMap(strVal string) (map[string]string, error) {
 		if keyVal[0] == "" {
 			return nil, fmt.Errorf("the key value %v is not legal", strVal)
 		}
-		keyName := p.Key + "_" + keyVal[0]
+		keyName := key + "_" + keyVal[0]
 		resultMap[keyName] = keyVal[1]
 	}
 	return resultMap, nil
@@ -44,16 +44,19 @@ func (p *UrlParam) RawTransform(datas []string) ([]string, error) {
 func (p *UrlParam) Transform(datas []sender.Data) ([]sender.Data, error) {
 	var err, pErr error
 	errNums := 0
+	keys := utils.GetKeys(p.Key)
+	newkeys := make([]string, len(keys))
 	for i := range datas {
-		val, ok := datas[i][p.Key]
-		if !ok {
+		copy(newkeys, keys)
+		val, gerr := utils.GetMapValue(datas[i], newkeys...)
+		if gerr != nil {
 			errNums++
 			err = fmt.Errorf("transform key %v not exist in data", p.Key)
 			continue
 		}
 		var res map[string]string
 		if strVal, ok := val.(string); ok {
-			res, err = p.transformToMap(strVal)
+			res, err = p.transformToMap(strVal, newkeys[len(newkeys)-1])
 		} else {
 			err = fmt.Errorf("transform key %v data type is not string", p.Key)
 		}
@@ -61,17 +64,19 @@ func (p *UrlParam) Transform(datas []sender.Data) ([]sender.Data, error) {
 			for key, mapVal := range res {
 				suffix := 1
 				keyName := key
-				_, exist := datas[i][keyName]
-				for ; exist; suffix++ {
+				newkeys[len(newkeys)-1] = keyName
+				_, gerr := utils.GetMapValue(datas[i], newkeys...)
+				for ; gerr == nil; suffix++ {
 					if suffix > 5 {
 						log.Warnf("keys %v -- %v already exist, the item %v will be ignored", key, keyName, key)
 						break
 					}
 					keyName = key + strconv.Itoa(suffix)
-					_, exist = datas[i][keyName]
+					newkeys[len(newkeys)-1] = keyName
+					_, gerr = utils.GetMapValue(datas[i], newkeys...)
 				}
 				if suffix <= 5 {
-					datas[i][keyName] = mapVal
+					utils.SetMapValue(datas[i], mapVal, false, newkeys...)
 				}
 			}
 		} else {

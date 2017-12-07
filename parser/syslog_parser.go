@@ -7,12 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jeromer/syslogparser"
-	"github.com/jeromer/syslogparser/rfc3164"
-	"github.com/jeromer/syslogparser/rfc5424"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/utils"
+
+	"github.com/jeromer/syslogparser"
+	"github.com/jeromer/syslogparser/rfc3164"
+	"github.com/jeromer/syslogparser/rfc5424"
 )
 
 const (
@@ -91,7 +92,6 @@ func GetFormt(format string) Format {
 		return &RFC5424{}
 	case "rfc6587":
 		return &RFC6587{}
-
 	}
 	return &Automatic{}
 }
@@ -130,7 +130,6 @@ func (p *SyslogParser) Type() string {
 }
 
 func (p *SyslogParser) Parse(lines []string) ([]sender.Data, error) {
-
 	se := &utils.StatsError{}
 	datas := []sender.Data{}
 	for idx, line := range lines {

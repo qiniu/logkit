@@ -5,10 +5,11 @@ package rfc5424
 
 import (
 	"fmt"
-	"github.com/jeromer/syslogparser"
 	"math"
 	"strconv"
 	"time"
+
+	"github.com/jeromer/syslogparser"
 )
 
 const (
@@ -16,6 +17,7 @@ const (
 )
 
 var (
+	ErrTimestampInvalid  = &syslogparser.ParserError{"Invalid timestamp"}
 	ErrYearInvalid       = &syslogparser.ParserError{"Invalid year in timestamp"}
 	ErrMonthInvalid      = &syslogparser.ParserError{"Invalid month in timestamp"}
 	ErrDayInvalid        = &syslogparser.ParserError{"Invalid day in timestamp"}
@@ -192,6 +194,10 @@ func (p *Parser) parseVersion() (int, error) {
 func (p *Parser) parseTimestamp() (time.Time, error) {
 	var ts time.Time
 
+	if p.cursor >= p.l {
+		return ts, ErrTimestampInvalid
+	}
+
 	if p.buff[p.cursor] == NILVALUE {
 		p.cursor++
 		return ts, nil
@@ -200,6 +206,10 @@ func (p *Parser) parseTimestamp() (time.Time, error) {
 	fd, err := parseFullDate(p.buff, &p.cursor, p.l)
 	if err != nil {
 		return ts, err
+	}
+
+	if p.cursor >= p.l {
+		return ts, ErrInvalidTimeFormat
 	}
 
 	if p.buff[p.cursor] != 'T' {
@@ -271,6 +281,10 @@ func parseFullDate(buff []byte, cursor *int, l int) (fullDate, error) {
 		return fd, err
 	}
 
+	if *cursor >= l {
+		return fd, syslogparser.ErrTimestampUnknownFormat
+	}
+
 	if buff[*cursor] != '-' {
 		return fd, syslogparser.ErrTimestampUnknownFormat
 	}
@@ -280,6 +294,10 @@ func parseFullDate(buff []byte, cursor *int, l int) (fullDate, error) {
 	month, err := parseMonth(buff, cursor, l)
 	if err != nil {
 		return fd, err
+	}
+
+	if *cursor >= l {
+		return fd, syslogparser.ErrTimestampUnknownFormat
 	}
 
 	if buff[*cursor] != '-' {
@@ -370,6 +388,10 @@ func parsePartialTime(buff []byte, cursor *int, l int) (partialTime, error) {
 		return pt, err
 	}
 
+	if *cursor >= l {
+		return pt, ErrInvalidTimeFormat
+	}
+
 	if buff[*cursor] != ':' {
 		return pt, ErrInvalidTimeFormat
 	}
@@ -391,7 +413,7 @@ func parsePartialTime(buff []byte, cursor *int, l int) (partialTime, error) {
 
 	// ----
 
-	if buff[*cursor] != '.' {
+	if *cursor >= l || buff[*cursor] != '.' {
 		return pt, nil
 	}
 
@@ -457,7 +479,7 @@ func parseSecFrac(buff []byte, cursor *int, l int) (float64, error) {
 // TIME-OFFSET = "Z" / TIME-NUMOFFSET
 func parseTimeOffset(buff []byte, cursor *int, l int) (*time.Location, error) {
 
-	if buff[*cursor] == 'Z' {
+	if *cursor < l && buff[*cursor] == 'Z' {
 		*cursor++
 		return time.UTC, nil
 	}
@@ -468,6 +490,10 @@ func parseTimeOffset(buff []byte, cursor *int, l int) (*time.Location, error) {
 // TIME-NUMOFFSET  = ("+" / "-") TIME-HOUR ":" TIME-MINUTE
 func parseNumericalTimeOffset(buff []byte, cursor *int, l int) (*time.Location, error) {
 	var loc = new(time.Location)
+
+	if *cursor >= l {
+		return loc, ErrTimeZoneInvalid
+	}
 
 	sign := buff[*cursor]
 
@@ -495,6 +521,10 @@ func getHourMinute(buff []byte, cursor *int, l int) (int, int, error) {
 	hour, err := parseHour(buff, cursor, l)
 	if err != nil {
 		return 0, 0, err
+	}
+
+	if *cursor >= l {
+		return 0, 0, ErrInvalidTimeFormat
 	}
 
 	if buff[*cursor] != ':' {
@@ -529,7 +559,9 @@ func toNSec(sec float64) (int, error) {
 func parseStructuredData(buff []byte, cursor *int, l int) (string, error) {
 	var sdData string
 	var found bool
-
+	if *cursor >= l {
+		return "", nil
+	}
 	if buff[*cursor] == NILVALUE {
 		*cursor++
 		return "-", nil
@@ -579,6 +611,10 @@ func parseUpToLen(buff []byte, cursor *int, l int, maxLen int, e error) (string,
 			found = true
 			break
 		}
+	}
+
+	if *cursor != to && to == l {
+		found = true
 	}
 
 	if found {

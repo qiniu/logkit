@@ -306,6 +306,14 @@ func createTransformers(rc RunnerConfig) []transforms.Transformer {
 			log.Errorf("type %v of transformer unmarshal config error %v", strTP, err)
 			continue
 		}
+		//transformer初始化
+		if trans, ok := trans.(transforms.Initialize); ok {
+			err = trans.Init()
+			if err != nil {
+				log.Errorf("type %v of transformer init error %v", strTP, err)
+				continue
+			}
+		}
 		transformers = append(transformers, trans)
 	}
 	return transformers
@@ -316,12 +324,12 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []sender.Data, times in
 	if len(datas) <= 0 {
 		return true
 	}
+	r.rsMutex.Lock()
 	if _, ok := r.rs.SenderStats[s.Name()]; !ok {
 		r.rs.SenderStats[s.Name()] = utils.StatsInfo{}
 	}
-	r.rsMutex.RLock()
 	info := r.rs.SenderStats[s.Name()]
-	r.rsMutex.RUnlock()
+	r.rsMutex.Unlock()
 	cnt := 1
 	for {
 		// 至少尝试一次。如果任务已经停止，那么只尝试一次
@@ -381,6 +389,7 @@ func (r *LogExportRunner) Run() {
 	}
 	defer close(r.exitChan)
 	datasourceTag := r.meta.GetDataSourceTag()
+	schemaErr := utils.SchemaErr{Number: 0, Last: time.Now()}
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
 			log.Debugf("Runner[%v] exited from run", r.Name())
@@ -441,19 +450,24 @@ func (r *LogExportRunner) Run() {
 		}
 
 		// parse data
+		errorCnt := int64(0)
 		datas, err := r.parser.Parse(lines)
 		se, ok := err.(*utils.StatsError)
 		if ok {
+			errorCnt = se.Errors
 			err = se.ErrorDetail
 			r.rs.ParserStats.Errors += se.Errors
 			r.rs.ParserStats.Success += se.Success
 		} else if err != nil {
+			errorCnt = 1
 			r.rs.ParserStats.Errors++
 		} else {
 			r.rs.ParserStats.Success++
 		}
 		if err != nil {
-			log.Errorf("Runner[%v] parser %s error : %v ", r.Name(), r.parser.Name(), err.Error())
+			errMsg := fmt.Sprintf("Runner[%v] parser %s error : %v ", r.Name(), r.parser.Name(), err.Error())
+			log.Debugf(errMsg)
+			schemaErr.Output(errorCnt, errors.New(errMsg))
 		}
 		// send data
 		if len(datas) <= 0 {

@@ -29,10 +29,10 @@
 			"revisionTime": "2016-10-29T20:57:26Z"
 		},
 		{
-			"checksumSHA1": "4cVNmizx7CCB78NvqSHA9unCgC0=",
+			"checksumSHA1": "cu3vGt/MP5WOcnbCzPPzezR6EHo=",
 			"path": "github.com/denisenkom/go-mssqldb",
-			"revision": "e3bd523cf238e14637d0e028becc25651098a138",
-			"revisionTime": "2017-04-23T02:16:35Z"
+			"revision": "8a15d1bb0c8eaa4b870c016b312de5b50b493b4e",
+			"revisionTime": "2017-12-04T17:36:08Z"
 		},
 		{
 			"checksumSHA1": "y2Kh4iPlgCPXSGTCcFpzePYdzzg=",
@@ -101,10 +101,10 @@
 			"revisionTime": "2017-07-01T10:54:10Z"
 		},
 		{
-			"checksumSHA1": "/A5P2s8crcwfDyqHKCh16Yt9jd4=",
+			"checksumSHA1": "Z6rD6bmF8InGLXM7EHr8TMxMXNY=",
 			"path": "github.com/go-sql-driver/mysql",
-			"revision": "382e13d099fcf5f5994290892ab258fbebbdc5e3",
-			"revisionTime": "2017-05-12T15:29:33Z"
+			"revision": "9181e3a86a19bacd63e68d43ae8b7b36320d8092",
+			"revisionTime": "2017-12-04T00:43:26Z"
 		},
 		{
 			"checksumSHA1": "p/8vSviYF91gFflhrt5vkyksroo=",
@@ -117,24 +117,6 @@
 			"path": "github.com/howeyc/fsnotify",
 			"revision": "f0c08ee9c60704c1879025f2ae0ff3e000082c13",
 			"revisionTime": "2015-10-03T19:46:02Z"
-		},
-		{
-			"checksumSHA1": "2jm5p7TKKExCRmt+McpLz0jPg2U=",
-			"path": "github.com/jeromer/syslogparser",
-			"revision": "0e4ae46ea3f08de351074b643d649d5d00661a3c",
-			"revisionTime": "2016-09-06T13:20:35Z"
-		},
-		{
-			"checksumSHA1": "Iqq1ENh1zUfKx1ikawuI7oeLko0=",
-			"path": "github.com/jeromer/syslogparser/rfc3164",
-			"revision": "0e4ae46ea3f08de351074b643d649d5d00661a3c",
-			"revisionTime": "2016-09-06T13:20:35Z"
-		},
-		{
-			"checksumSHA1": "Xfzh6sQV/bWHY6XOFnr8mJ+LfkY=",
-			"path": "github.com/jeromer/syslogparser/rfc5424",
-			"revision": "0e4ae46ea3f08de351074b643d649d5d00661a3c",
-			"revisionTime": "2016-09-06T13:20:35Z"
 		},
 		{
 			"checksumSHA1": "hz/wVE0xwQ+d8aQbX7ApZVj8Hbg=",
@@ -155,6 +137,18 @@
 			"revisionTime": "2017-07-12T19:11:37Z"
 		},
 		{
+			"checksumSHA1": "IfZcD4U1dtllJKlPNeD2aU4Jn98=",
+			"path": "github.com/lib/pq",
+			"revision": "83612a56d3dd153a94a629cd64925371c9adad78",
+			"revisionTime": "2017-11-26T05:04:59Z"
+		},
+		{
+			"checksumSHA1": "AU3fA8Sm33Vj9PBoRPSeYfxLRuE=",
+			"path": "github.com/lib/pq/oid",
+			"revision": "83612a56d3dd153a94a629cd64925371c9adad78",
+			"revisionTime": "2017-11-26T05:04:59Z"
+		},
+		{
 			"checksumSHA1": "VdvWgxaqcC3pKk/6Q7dRfH7THjM=",
 			"path": "github.com/mattn/go-colorable",
 			"revision": "6c0fd4aa6ec5818d5e3ea9e03ae436972a6c5a9a",
@@ -165,6 +159,24 @@
 			"path": "github.com/mattn/go-isatty",
 			"revision": "fc9e8d8ef48496124e79ae0df75490096eccf6fe",
 			"revisionTime": "2017-03-22T23:44:13Z"
+		},
+		{
+			"checksumSHA1": "qyZO6SotinKrz40LxXjw0LtIwA8=",
+			"path": "github.com/olivere/elastic",
+			"revision": "09755b303b32ccae2968681e77473399cb48378c",
+			"revisionTime": "2017-11-17T18:00:47Z"
+		},
+		{
+			"checksumSHA1": "LkxLK7ff1eJbj6Wv9TlLDV96l58=",
+			"path": "github.com/olivere/elastic/config",
+			"revision": "09755b303b32ccae2968681e77473399cb48378c",
+			"revisionTime": "2017-11-17T18:00:47Z"
+		},
+		{
+			"checksumSHA1": "AmcqvKDAUGvVsrf8NDCQ/B8cMj4=",
+			"path": "github.com/olivere/elastic/uritemplates",
+			"revision": "09755b303b32ccae2968681e77473399cb48378c",
+			"revisionTime": "2017-11-17T18:00:47Z"
 		},
 		{
 			"checksumSHA1": "FGg99nQ56Fo3radSCuU1AeEUJug=",
@@ -197,52 +209,52 @@
 			"revisionTime": "2014-07-28T01:09:19Z"
 		},
 		{
-			"checksumSHA1": "2dnkjugBFz5wsaz7jAmRUe7f+qw=",
+			"checksumSHA1": "FD0NPm5c4QKtHCYvITcZEHxLKlU=",
 			"path": "github.com/qiniu/pandora-go-sdk/base",
-			"revision": "ff062862807bc83a0cf52b4acc79b8cdd3dc476a",
-			"revisionTime": "2017-11-19T15:24:26Z"
+			"revision": "ebf3672aa138bb9b04e8c9266d2305fd051b266b",
+			"revisionTime": "2017-11-28T02:41:05Z"
 		},
 		{
 			"checksumSHA1": "zwVutdUGEo/jlq6HpXkGwaoHM6c=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/config",
-			"revision": "d127c49b92732cc96140e9f7102426c6a0688fc7",
-			"revisionTime": "2017-11-02T13:30:44Z"
+			"revision": "b6701f5a7721af43439886e83cbdf3d37ad449d1",
+			"revisionTime": "2017-11-28T11:18:40Z"
 		},
 		{
 			"checksumSHA1": "lV2zb3SZ4BKaa1XpC4Q3ktbVgDo=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/ratelimit",
-			"revision": "d127c49b92732cc96140e9f7102426c6a0688fc7",
-			"revisionTime": "2017-11-02T13:30:44Z"
+			"revision": "b6701f5a7721af43439886e83cbdf3d37ad449d1",
+			"revisionTime": "2017-11-28T11:18:40Z"
 		},
 		{
-			"checksumSHA1": "S2Tgm7uN3NgAZMe/LoDpz4Czwhc=",
+			"checksumSHA1": "OUHulZAgGj1Kgxr/B55+MtZu2sU=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/reqerr",
-			"revision": "ff062862807bc83a0cf52b4acc79b8cdd3dc476a",
-			"revisionTime": "2017-11-19T15:24:26Z"
+			"revision": "85c29796b80bf567b78c96b162e701f163195ea4",
+			"revisionTime": "2017-12-04T15:00:13Z"
 		},
 		{
 			"checksumSHA1": "EU8tbJXzlD16NONu4g6rVdDQQM4=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/request",
-			"revision": "d127c49b92732cc96140e9f7102426c6a0688fc7",
-			"revisionTime": "2017-11-02T13:30:44Z"
+			"revision": "b6701f5a7721af43439886e83cbdf3d37ad449d1",
+			"revisionTime": "2017-11-28T11:18:40Z"
 		},
 		{
-			"checksumSHA1": "Ds7yWuj4XoedOMppU7SanfGcRSs=",
+			"checksumSHA1": "U4dqKoYBYkhkrTeZBsI0WYaPflw=",
 			"path": "github.com/qiniu/pandora-go-sdk/logdb",
-			"revision": "d127c49b92732cc96140e9f7102426c6a0688fc7",
-			"revisionTime": "2017-11-02T13:30:44Z"
+			"revision": "b6701f5a7721af43439886e83cbdf3d37ad449d1",
+			"revisionTime": "2017-11-28T11:18:40Z"
 		},
 		{
-			"checksumSHA1": "O6S1/oAPWHyJe/BbTtpVTsBzi7c=",
+			"checksumSHA1": "O6DQp53plMbJaSOqpspOkNW6eTs=",
 			"path": "github.com/qiniu/pandora-go-sdk/pipeline",
-			"revision": "ebf83bfb9696cd85f4791f7caf524003d09be31e",
-			"revisionTime": "2017-11-22T08:22:52Z"
+			"revision": "85c29796b80bf567b78c96b162e701f163195ea4",
+			"revisionTime": "2017-12-04T15:00:13Z"
 		},
 		{
 			"checksumSHA1": "fjT/MuiyHbBoZ2zjj2kCnpUkYcw=",
 			"path": "github.com/qiniu/pandora-go-sdk/tsdb",
-			"revision": "d127c49b92732cc96140e9f7102426c6a0688fc7",
-			"revisionTime": "2017-11-02T13:30:44Z"
+			"revision": "b6701f5a7721af43439886e83cbdf3d37ad449d1",
+			"revisionTime": "2017-11-28T11:18:40Z"
 		},
 		{
 			"checksumSHA1": "KAzbLjI9MzW2tjfcAsK75lVRp6I=",

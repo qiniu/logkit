@@ -305,7 +305,7 @@ func (sf *SeqFile) nextFile() (fi os.FileInfo, err error) {
 		condition = sf.getIgnoreCondition()
 	} else {
 		newerThanCurrFile := func(f os.FileInfo) bool {
-			return f.ModTime().Unix() > currFi.ModTime().Unix()
+			return f.ModTime().UnixNano() > currFi.ModTime().UnixNano()
 		}
 		condition = andCondition(newerThanCurrFile, sf.getIgnoreCondition())
 	}
@@ -421,11 +421,17 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 		log.Infof("Runner[%v] %s - start tail new file: %s", sf.meta.RunnerName, sf.dir, fname)
 		break
 	}
+	tryTime := 0
 	for {
 		err = sf.meta.AppendDoneFile(doneFile)
 		if err != nil {
-			log.Errorf("Runner[%v] cannot write done file %s, err:%v", sf.meta.RunnerName, doneFile, err)
+			if tryTime > 3 {
+				log.Errorf("Runner[%v] cannot write done file %s, err:%v, ignore this noefi", sf.meta.RunnerName, doneFile, err)
+				break
+			}
+			log.Errorf("Runner[%v] cannot write done file %s, err:%v, will retry after 3s", sf.meta.RunnerName, doneFile, err)
 			time.Sleep(3 * time.Second)
+			tryTime++
 			continue
 		}
 		break

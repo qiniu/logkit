@@ -26,7 +26,7 @@ class List extends Component {
       status: [],
       currentItem: '',
       version: '',
-      collapsed: true,
+      collapsed: false,
       currentMenu: 'runner',
       machines: [],
       currentTagName: '',
@@ -173,16 +173,16 @@ class List extends Component {
             <Menu theme="dark" defaultSelectedKeys={['runner']} mode="inline" onClick={this.changeMenu}>
               {window.isCluster === true ? (<Menu.Item key="tag">
                     <Icon type="tags-o"/>
-                    <span>标签</span>
+                    <span>集群管理</span>
                   </Menu.Item>
               ) : null}
               {window.isCluster === true ? (<Menu.Item key="machine">
                 <Icon type="desktop"/>
-                <span>机器</span>
+                <span>机器管理</span>
               </Menu.Item>) : null}
               <Menu.Item key="runner">
                 <Icon type="file"/>
-                <span>Runner管理</span>
+                <span>收集器(runner)管理</span>
               </Menu.Item>
             </Menu>
           </Sider>
@@ -190,12 +190,14 @@ class List extends Component {
             <Header className="header" style={{background: '#fff', padding: 0}}> 七牛Logkit监控中心{this.state.version} </Header>
             {this.state.currentMenu === 'tag' ? (<Content style={{margin: '0 16px'}}>
               <Breadcrumb style={{margin: '16px 0'}}>
-                <Breadcrumb.Item>标签管理列表</Breadcrumb.Item>
+                <Breadcrumb.Item>集群管理列表</Breadcrumb.Item>
               </Breadcrumb>
               <div style={{padding: 24, background: '#fff', minHeight: 360}}>
                 <div className="content">
                   <TagTable handleAddRunner={this.addLogRunner.bind(this)}
-                            handleAddMetricRunner={this.addMetricRunner.bind(this)}/>
+                            handleAddMetricRunner={this.addMetricRunner.bind(this)}
+                            handleTurnToRunner={this.TurnToLogRunner.bind(this)}
+                            handleTurnToMetricRunner={this.TurnToMetricRunner.bind(this)}/>
                 </div>
 
               </div>
@@ -213,7 +215,7 @@ class List extends Component {
             </Content>) : null}
             {this.state.currentMenu === 'runner' ? (<Content style={{margin: '0 16px'}}>
               <Breadcrumb style={{margin: '16px 0'}}>
-                <Breadcrumb.Item>Runner管理列表</Breadcrumb.Item>
+                <Breadcrumb.Item>收集器(runner)管理列表</Breadcrumb.Item>
               </Breadcrumb>
               <div style={{padding: 24, background: '#fff', minHeight: 360}}>
                 <div className="content">
@@ -228,7 +230,7 @@ class List extends Component {
             </Content>) : null}
             {this.state.currentMenu === 'createLog' ? (<Content style={{margin: '0 16px'}}>
               <Breadcrumb style={{margin: '16px 0'}}>
-                <Breadcrumb.Item>创建runner</Breadcrumb.Item>
+                <Breadcrumb.Item>创建日志收集器</Breadcrumb.Item>
               </Breadcrumb>
               <div style={{padding: 24, background: '#fff', minHeight: 360}}>
                 <div className="content">
@@ -239,7 +241,7 @@ class List extends Component {
             </Content>) : null}
             {this.state.currentMenu === 'createMetricLog' ? (<Content style={{margin: '0 16px'}}>
               <Breadcrumb style={{margin: '16px 0'}}>
-                <Breadcrumb.Item>创建metric runner</Breadcrumb.Item>
+                <Breadcrumb.Item>创建系统信息收集器</Breadcrumb.Item>
               </Breadcrumb>
               <div style={{padding: 24, background: '#fff', minHeight: 360}}>
                 <div className="content">
@@ -251,9 +253,9 @@ class List extends Component {
             <Footer style={{textAlign: 'center'}}>
               更多信息请访问：
               <a target="_blank" href="https://github.com/qiniu/logkit">
-                <Tag color="#108ee9">Logkit</Tag> </a> |
+                <Tag color="#108ee9">logkit</Tag> </a>
               <a target="_blank" href="https://github.com/qiniu/logkit/wiki">
-                <Tag color="#108ee9">帮助文档</Tag> </a> |
+                <Tag color="#108ee9">帮助文档</Tag> </a>
               <a target="_blank" href="https://qiniu.github.io/pandora-docs/#/"><Tag
                   color="#108ee9">Pandora产品</Tag>
               </a>

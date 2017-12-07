@@ -41,6 +41,9 @@ func (rs *RestService) PostParse() echo.HandlerFunc {
 		switch ptp {
 		case parser.TypeCSV, parser.TypeJson, parser.TypeRaw, parser.TypeNginx, parser.TypeEmpty, parser.TypeKafkaRest, parser.TypeLogv1:
 			logs = strings.Split(rawlogs, "\n")
+		case parser.TypeSyslog:
+			logs = strings.Split(rawlogs, "\n")
+			logs = append(logs, parser.SyslogEofLine)
 		case parser.TypeGrok:
 			gm, _ := reqConf.GetString(parser.KeyGrokMode)
 			if gm != parser.ModeMulti {
@@ -58,7 +61,7 @@ func (rs *RestService) PostParse() echo.HandlerFunc {
 			err = se.ErrorDetail
 		}
 		if err != nil {
-			errMsg := fmt.Sprintf("parser type error %v", err)
+			errMsg := fmt.Sprintf("parser error %v", err)
 			return RespError(c, http.StatusBadRequest, utils.ErrParseParse, errMsg)
 		}
 		return RespSuccess(c, PostParseRet{SamplePoints: datas})

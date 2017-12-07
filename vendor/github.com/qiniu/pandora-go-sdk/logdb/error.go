@@ -8,9 +8,9 @@ import (
 
 const errCodePrefixLen = 5
 
-type errBuilder struct{}
+type LogdbErrBuilder struct{}
 
-func (e errBuilder) Build(msg, text, reqId string, code int) error {
+func (e LogdbErrBuilder) Build(msg, text, reqId string, code int) error {
 
 	err := reqerr.New(msg, text, reqId, code)
 	if len(msg) <= errCodePrefixLen {

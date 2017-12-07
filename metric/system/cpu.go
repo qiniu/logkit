@@ -2,7 +2,6 @@ package system
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/utils"
@@ -109,7 +108,7 @@ func (_ *CPUStats) Config() map[string]interface{} {
 		opt := utils.Option{
 			KeyName:       val.Key,
 			ChooseOnly:    true,
-			ChooseOptions: []string{"true", "false"},
+			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   val.Value,
@@ -130,7 +129,6 @@ func (s *CPUStats) Collect() (datas []map[string]interface{}, err error) {
 		return nil, fmt.Errorf("error getting CPU info: %s", err)
 	}
 
-	now := time.Now().Format(time.RFC3339Nano)
 	for _, cts := range times {
 
 		total := totalCpuTime(cts)
@@ -150,7 +148,6 @@ func (s *CPUStats) Collect() (datas []map[string]interface{}, err error) {
 				CpuTimeGuestNice: cts.GuestNice,
 				CpuTimeCPU:       cts.CPU,
 			}
-			fieldsC[TypeMetricCpu+"_"+metric.Timestamp] = now
 			datas = append(datas, fieldsC)
 		}
 
@@ -186,7 +183,6 @@ func (s *CPUStats) Collect() (datas []map[string]interface{}, err error) {
 			CpuUsageGuestNice: 100 * (cts.GuestNice - lastCts.GuestNice) / totalDelta,
 			CpuUsageCPU:       cts.CPU,
 		}
-		fieldsG[TypeMetricCpu+"_"+metric.Timestamp] = now
 		datas = append(datas, fieldsG)
 	}
 

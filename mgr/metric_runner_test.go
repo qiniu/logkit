@@ -122,13 +122,13 @@ func TestMetricRun(t *testing.T) {
 	f, err := os.Open(fileSenderData)
 	assert.NoError(t, err)
 	br := bufio.NewReaderSize(f, bufSize)
-	result := make([]map[string]interface{}, 0)
 	for {
 		str, _, c := br.ReadLine()
 		if c == io.EOF {
 			f.Close()
 			break
 		}
+		result := make([]map[string]interface{}, 0)
 		err = json.Unmarshal([]byte(str), &result)
 		if err != nil {
 			log.Fatalf("Test_Run error unmarshal %v curLine = %v %v", string(str), curLine, err)
@@ -200,13 +200,13 @@ func TestMetricRun(t *testing.T) {
 	f, err = os.Open(fileSenderData1)
 	assert.NoError(t, err)
 	br = bufio.NewReaderSize(f, bufSize)
-	result = make([]map[string]interface{}, 0)
 	for {
 		str, _, c := br.ReadLine()
 		if c == io.EOF {
 			f.Close()
 			break
 		}
+		result := make([]map[string]interface{}, 0)
 		err = json.Unmarshal([]byte(str), &result)
 		if err != nil {
 			log.Fatalf("Test_Run error unmarshal %v curLine = %v %v", string(str), curLine, err)

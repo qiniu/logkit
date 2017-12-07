@@ -11,9 +11,7 @@ import {
   Col,
   Tag,
   Input,
-  Layout,
   Select,
-  Breadcrumb,
   Form
 } from 'antd';
 import {
@@ -29,7 +27,6 @@ import {
   getClusterRunnerConfigs,
   getRunnerStatus,
   getClusterRunnerStatus,
-  getRunnerVersion
 } from '../../services/logkit';
 import {runnerStatu} from './constant'
 import config from '../../store/config'
@@ -367,7 +364,7 @@ class RunnerTable extends Component {
       dataIndex: 'name',
       width: '10%'
     }, {
-      title: '标签',
+      title: '集群',
       dataIndex: 'tag',
       width: '5%',
       className: window.isCluster === true ? '' : 'hide-div'
@@ -452,7 +449,7 @@ class RunnerTable extends Component {
             <a>
               <div className="editable-row-operations">
                 {
-                  <Icon title="查看runner配置" style={{fontSize: 16}} type="eye-o" onClick={() => this.showConfig(record)} />
+                  <Icon title="查看收集器配置" style={{fontSize: 16}} type="eye-o" onClick={() => this.showConfig(record)} />
                 }
               </div>
             </a>
@@ -482,8 +479,8 @@ class RunnerTable extends Component {
             record.isWebFolder === true ? (<a>
               <div className="editable-row-operations">
                 {
-                  <Popconfirm title={"是否" + record.runnerOpt + "该Runner?"} onConfirm={() => this.optRunner(record)}>
-                    <Icon title={record.runnerOpt + "Runner"} style={{fontSize: 16}} type={record.iconType}/>
+                  <Popconfirm title={"是否" + record.runnerOpt + "该收集器?"} onConfirm={() => this.optRunner(record)}>
+                    <Icon title={record.runnerOpt + "收集器"} style={{fontSize: 16}} type={record.iconType}/>
                   </Popconfirm>
                 }
               </div>
@@ -499,9 +496,9 @@ class RunnerTable extends Component {
             record.isWebFolder === true ? (<a>
               <div className="editable-row-operations">
                 {
-                  <Popconfirm title={"重置配置文件会删除meta信息并重启,是否重置该Runner?"}
+                  <Popconfirm title={"重置配置文件会删除meta信息并重启,是否重置该收集器?"}
                               onConfirm={() => this.handleResetConfig(record)}>
-                    <Icon title={"重置Runner"} style={{fontSize: 16}} type='reload'/>
+                    <Icon title={"重置收集器"} style={{fontSize: 16}} type='reload'/>
                   </Popconfirm>
                 }
               </div>
@@ -518,8 +515,8 @@ class RunnerTable extends Component {
             record.isWebFolder === true ? (<a>
               <div className="editable-row-operations">
                 {
-                  <Popconfirm title="是否删除该Runner?" onConfirm={() => this.deleteRunner(record)}>
-                    <Icon title={"删除runner"} style={{fontSize: 16}} type="delete"/>
+                  <Popconfirm title="是否删除该收集器?" onConfirm={() => this.deleteRunner(record)}>
+                    <Icon title={"删除收集器"} style={{fontSize: 16}} type="delete"/>
                   </Popconfirm>
                 }
               </div>
@@ -532,7 +529,7 @@ class RunnerTable extends Component {
     let data = []
     if (runnerList != null) {
       runnerList.map((item) => {
-        let status = '异常'
+        let status = ''
         let createTime = ''
         let parseSuccessNumber = 0
         let parseFailNumber = 0
@@ -625,7 +622,7 @@ class RunnerTable extends Component {
 
     return (<div>
           {window.isCluster === true ? (<Form layout="inline">
-            <FormItem {...formItemLayout} style={{width: '300px'}} label="标签名称">
+            <FormItem {...formItemLayout} style={{width: '300px'}} label="集群名称">
               <Select className="select-field"
                       showSearch
                       defaultValue=''
@@ -661,10 +658,10 @@ class RunnerTable extends Component {
             </FormItem>
           </Form>) : (<div><Button type="primary" style={{marginRight: '50px'}} className="index-btn" ghost
                                    onClick={handleAddRunner}>
-            <Icon type="plus"/> 增加日志采集 Runner
+            <Icon type="plus"/> 增加日志采集收集器
           </Button>
             <Button type="primary" className="index-btn" ghost onClick={handleAddMetricRunner}>
-              <Icon type="plus"/> 增加系统信息采集 Runner
+              <Icon type="plus"/> 增加系统信息采集收集器
             </Button></div>)}
 
           <Table columns={columns} pagination={{size: 'small', pageSize: 20}} dataSource={data} loading={this.state.isLoading} /></div>

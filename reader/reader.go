@@ -91,6 +91,14 @@ const (
 	KeyMssqlCron        = "mssql_cron"
 	KeyMssqlExecOnStart = "mssql_exec_onstart"
 
+	KeyPGsqlOffsetKey   = "postgres_offset_key"
+	KeyPGsqlReadBatch   = "postgres_limit_batch"
+	KeyPGsqlDataSource  = "postgres_datasource"
+	KeyPGsqlDataBase    = "postgres_database"
+	KeyPGsqlSQL         = "postgres_sql"
+	KeyPGsqlCron        = "postgres_cron"
+	KeyPGsqlExecOnStart = "postgres_exec_onstart"
+
 	KeyESReadBatch = "es_limit_batch"
 	KeyESIndex     = "es_index"
 	KeyESType      = "es_type"
@@ -112,8 +120,6 @@ const (
 	KeyKafkaTopic            = "kafka_topic"
 	KeyKafkaZookeeper        = "kafka_zookeeper"
 	KeyKafkaZookeeperTimeout = "kafka_zookeeper_timeout"
-	
-	//KeyRedisKey = "redis_key"
 )
 
 var defaultIgnoreFileSuffix = []string{
@@ -122,16 +128,18 @@ var defaultIgnoreFileSuffix = []string{
 
 // FileReader's modes
 const (
-	ModeDir     = "dir"
-	ModeFile    = "file"
-	ModeTailx   = "tailx"
-	ModeMysql   = "mysql"
-	ModeMssql   = "mssql"
-	ModeElastic = "elastic"
-	ModeMongo   = "mongo"
-	ModeKafka   = "kafka"
-	ModeRedis   = "redis"
-	ModeSocket  = "socket"
+	ModeDir      = "dir"
+	ModeFile     = "file"
+	ModeTailx    = "tailx"
+	ModeFileAuto = "fileauto"
+	ModeMysql    = "mysql"
+	ModeMssql    = "mssql"
+	ModePG       = "postgres"
+	ModeElastic  = "elastic"
+	ModeMongo    = "mongo"
+	ModeKafka    = "kafka"
+	ModeRedis    = "redis"
+	ModeSocket   = "socket"
 )
 
 const (
@@ -185,7 +193,8 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 			return
 		}
 		reader, err = NewReaderSize(fr, meta, bufSize)
-
+	case ModeFileAuto:
+		reader, err = NewFileAutoReader(conf, meta, isFromWeb, bufSize, whence, logpath, fr)
 	case ModeFile:
 		fr, err = NewSingleFile(meta, logpath, whence, isFromWeb)
 		if err != nil {
@@ -201,6 +210,8 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 		reader, err = NewSQLReader(meta, conf)
 	case ModeMssql: // Mssql 模式是启动mssql reader，读取mssql数据表
 		reader, err = NewSQLReader(meta, conf)
+	case ModePG: // postgre 模式是启动PostgreSQL reader，读取postgresql数据表
+		reader, err = NewSQLReader(meta, conf)
 	case ModeElastic:
 		readBatch, _ := conf.GetIntOr(KeyESReadBatch, 100)
 		estype, err := conf.GetString(KeyESType)
@@ -215,7 +226,7 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 		if !strings.HasPrefix(eshost, "http://") && !strings.HasPrefix(eshost, "https://") {
 			eshost = "http://" + eshost
 		}
-		esVersion, _ := conf.GetStringOr(KeyESVersion, ElasticVersion2)
+		esVersion, _ := conf.GetStringOr(KeyESVersion, ElasticVersion3)
 		keepAlive, _ := conf.GetStringOr(KeyESKeepAlive, "6h")
 		reader, err = NewESReader(meta, readBatch, estype, esindex, eshost, esVersion, keepAlive)
 	case ModeMongo:
@@ -249,8 +260,6 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 		zookeepers, err := conf.GetStringList(KeyKafkaZookeeper)
 		reader, err = NewKafkaReader(meta, consumerGroup, topics, zookeepers, time.Duration(zkTimeout)*time.Second, whence)
 	case ModeRedis:
-		//keys, _ := conf.GetStringList(KeyRedisKey)
-		//reader, err = NewRedisReader(meta, conf,keys)
 		reader, err = NewRedisReader(meta, conf)
 	case ModeSocket:
 		reader, err = NewSocketReader(meta, conf)

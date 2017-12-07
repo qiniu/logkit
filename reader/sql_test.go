@@ -7,6 +7,9 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 
+	"fmt"
+	"reflect"
+
 	"github.com/qiniu/logkit/utils"
 	"github.com/stretchr/testify/assert"
 )
@@ -142,7 +145,7 @@ func TestSQLReader(t *testing.T) {
 		offsets:   []int64{123, 456},
 		dbtype:    "mysql",
 	}
-	assert.Equal(t, "_"+database, mr.Source())
+	assert.Equal(t, mr.dbtype+"_"+database, mr.Source())
 
 	// 测试meta备份和恢复
 	mr.SyncMeta()
@@ -176,4 +179,15 @@ func TestUpdateSql(t *testing.T) {
 	syncSQLs := []string{"select * from mysql123", "select * from mysql345"}
 	got := updateSqls(rawsqls, time.Now())
 	assert.EqualValues(t, syncSQLs, got)
+}
+
+func TestReflectTime(t *testing.T) {
+	fmt.Println(reflect.TypeOf(int64(0)))
+	fmt.Println(reflect.TypeOf(int32(0)))
+	fmt.Println(reflect.TypeOf(int16(0)))
+	fmt.Println(reflect.TypeOf(""))
+	fmt.Println(reflect.TypeOf(false))
+	fmt.Println(reflect.TypeOf(time.Time{}))
+	fmt.Println(reflect.TypeOf([]byte{}))
+	fmt.Println(reflect.TypeOf(new(interface{})).Elem())
 }

@@ -16,11 +16,15 @@ const (
 	// parse 相关
 	ErrParseParse = "L1101"
 
+	// transform相关
+	ErrTransformTransform = "L1201"
+
 	// 集群版 master API
 	ErrClusterSlaves   = "L2001"
 	ErrClusterStatus   = "L2002"
 	ErrClusterConfigs  = "L2003"
 	ErrClusterRegister = "L2004"
+	ErrClusterConfig   = "L2014"
 
 	// 集群版 slave API
 	ErrClusterTag = "L2005"
@@ -49,8 +53,11 @@ var ErrorCodeHumanize = map[string]string{
 
 	ErrParseParse: "解析字符串失败",
 
+	ErrTransformTransform: "转化字段失败",
+
 	ErrClusterSlaves:   "获取 Slaves 列表出现错误",
 	ErrClusterStatus:   "获取 Slaves 状态出现错误",
+	ErrClusterConfig:   "获取 Slaves Config 出现错误",
 	ErrClusterConfigs:  "获取 Slaves Configs 出现错误",
 	ErrClusterRegister: "接受 Slaves 注册出现错误",
 

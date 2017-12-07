@@ -16,6 +16,7 @@ import (
 	"sync"
 
 	"errors"
+
 	"github.com/labstack/echo"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
@@ -39,8 +40,8 @@ type RestService struct {
 
 func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 
-	if mgr.Cluster.Enable && !mgr.Cluster.IsMaster {
-		if len(mgr.Cluster.MasterUrl) < 1 {
+	if mgr.Cluster.Enable {
+		if !mgr.Cluster.IsMaster && len(mgr.Cluster.MasterUrl) < 1 {
 			log.Fatalf("cluster is enabled but master url is empty")
 		}
 		for i := range mgr.Cluster.MasterUrl {
@@ -94,6 +95,7 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	router.GET(PREFIX+"/transformer/usages", rs.GetTransformerUsages())
 	router.GET(PREFIX+"/transformer/options", rs.GetTransformerOptions())
 	router.GET(PREFIX+"/transformer/sampleconfigs", rs.GetTransformerSampleConfigs())
+	router.POST(PREFIX+"/transformer/transform", rs.PostTransform())
 
 	//metric API
 	router.GET(PREFIX+"/metric/keys", rs.GetMetricKeys())
@@ -114,6 +116,7 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	router.GET(PREFIX+"/cluster/status", rs.ClusterStatus())
 	router.GET(PREFIX+"/cluster/runners", rs.GetClusterRunners())
 	router.GET(PREFIX+"/cluster/configs", rs.GetClusterConfigs())
+	router.GET(PREFIX+"/cluster/configs/:name", rs.GetClusterConfig())
 	router.POST(PREFIX+"/cluster/configs/:name", rs.PostClusterConfig())
 	router.PUT(PREFIX+"/cluster/configs/:name", rs.PutClusterConfig())
 	router.DELETE(PREFIX+"/cluster/configs/:name", rs.DeleteClusterConfig())
@@ -158,9 +161,11 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	}
 	rs.address = address
 	if rs.cluster.Enable {
-		rs.cluster.myaddress, err = GetMySlaveUrl(address, httpschema)
-		if err != nil {
-			log.Fatalf("get slave url bindaddress[%v] error %v", address, err)
+		if rs.cluster.Address == "" {
+			rs.cluster.Address, err = GetMySlaveUrl(address, httpschema)
+			if err != nil {
+				log.Fatalf("get slave url bindaddress[%v] error %v", address, err)
+			}
 		}
 	}
 	return rs
@@ -222,8 +227,8 @@ func (rs *RestService) Status() echo.HandlerFunc {
 		rss := rs.mgr.Status()
 		if rs.cluster.Enable {
 			for k, v := range rss {
-				v.Tag = rs.cluster.mytag
-				v.Url = rs.cluster.myaddress
+				v.Tag = rs.cluster.Tag
+				v.Url = rs.cluster.Address
 				rss[k] = v
 			}
 		}
@@ -281,6 +286,14 @@ func convertWebParserConfig(conf conf.MapConf) conf.MapConf {
 		}
 		conf[parser.KeyGrokCustomPatterns] = string(CustomPatterns)
 	}
+	return conf
+}
+
+func convertWebTransformerConfig(conf map[string]interface{}) map[string]interface{} {
+	if conf == nil {
+		return conf
+	}
+	//TODO do some pre process
 	return conf
 }
 

@@ -22,4 +22,18 @@ func TestSplitTransformer(t *testing.T) {
 	assert.Equal(t, exp, data)
 
 	assert.Equal(t, gsub.Stage(), transforms.StageAfterParser)
+
+	gsub2 := &Spliter{
+		Key:         "multi.myword",
+		SeperateKey: " ",
+		ArraryName:  "result",
+	}
+	data2, err2 := gsub2.Transform([]sender.Data{{"multi": map[string]interface{}{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}}, {"multi": map[string]interface{}{"myword": "x1x x x11", "abc": "x1"}}})
+	assert.NoError(t, err2)
+	exp2 := []sender.Data{
+		{"multi": map[string]interface{}{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2", "result": []string{"hello", "x1", "y2", "x1nihao"}}},
+		{"multi": map[string]interface{}{"myword": "x1x x x11", "abc": "x1", "result": []string{"x1x", "x", "x11"}}}}
+	assert.Equal(t, exp2, data2)
+
+	assert.Equal(t, gsub2.Stage(), transforms.StageAfterParser)
 }
