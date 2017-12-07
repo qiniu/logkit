@@ -41,17 +41,17 @@ type cleanQueue struct {
 type Manager struct {
 	ManagerConfig
 	DefaultDir   string
-	lock         sync.RWMutex
-	cleanlock    sync.Mutex
+	lock         *sync.RWMutex
+	cleanLock    *sync.RWMutex
+	watcherMux   *sync.RWMutex
 	cleanChan    chan cleaner.CleanSignal
 	cleanQueues  map[string]*cleanQueue
 	runners      map[string]Runner
 	runnerConfig map[string]RunnerConfig
 
-	watchers   map[string]*fsnotify.Watcher // inode到watcher的映射表
-	watcherMux sync.RWMutex
-	pregistry  *parser.ParserRegistry
-	sregistry  *sender.SenderRegistry
+	watchers  map[string]*fsnotify.Watcher // inode到watcher的映射表
+	pregistry *parser.ParserRegistry
+	sregistry *sender.SenderRegistry
 
 	Version    string
 	SystemInfo string
@@ -76,12 +76,14 @@ func NewCustomManager(conf ManagerConfig, pr *parser.ParserRegistry, sr *sender.
 	}
 	m := &Manager{
 		ManagerConfig: conf,
+		lock:          new(sync.RWMutex),
+		cleanLock:     new(sync.RWMutex),
+		watcherMux:    new(sync.RWMutex),
 		cleanChan:     make(chan cleaner.CleanSignal),
 		cleanQueues:   make(map[string]*cleanQueue),
 		runners:       make(map[string]Runner),
 		runnerConfig:  make(map[string]RunnerConfig),
 		watchers:      make(map[string]*fsnotify.Watcher),
-		watcherMux:    sync.RWMutex{},
 		pregistry:     pr,
 		sregistry:     sr,
 		SystemInfo:    utils.GetOSInfo().String(),
@@ -155,8 +157,8 @@ func (m *Manager) addCleanQueue(info CleanInfo) {
 	if !info.enable {
 		return
 	}
-	m.cleanlock.Lock()
-	defer m.cleanlock.Unlock()
+	m.cleanLock.Lock()
+	defer m.cleanLock.Unlock()
 	cq, ok := m.cleanQueues[info.logdir]
 	if ok {
 		cq.cleanerCount++
@@ -175,8 +177,8 @@ func (m *Manager) removeCleanQueue(info CleanInfo) {
 	if !info.enable {
 		return
 	}
-	m.cleanlock.Lock()
-	defer m.cleanlock.Unlock()
+	m.cleanLock.Lock()
+	defer m.cleanLock.Unlock()
 	cq, ok := m.cleanQueues[info.logdir]
 	if !ok {
 		log.Errorf("can't find clean queue %v to remove", info.logdir)
@@ -337,8 +339,8 @@ func (m *Manager) handle(path string, watcher *fsnotify.Watcher) {
 }
 
 func (m *Manager) doClean(sig cleaner.CleanSignal) {
-	m.cleanlock.Lock()
-	defer m.cleanlock.Unlock()
+	m.cleanLock.Lock()
+	defer m.cleanLock.Unlock()
 
 	dir := sig.Logdir
 	dir, err := filepath.Abs(dir)
