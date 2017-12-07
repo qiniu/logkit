@@ -423,7 +423,7 @@ func (m *Meta) GetDoneFiles() (doneFiles []utils.File, err error) {
 	}
 	for _, f := range files {
 		if f.IsDir() {
-			log.Warnf("Runner[%v] search file done skipped dir %v", m.RunnerName, f.Name())
+			log.Debugf("Runner[%v] search file done skipped dir %v", m.RunnerName, f.Name())
 			continue
 		}
 		fname := f.Name()
@@ -498,5 +498,5 @@ func (m *Meta) WriteStatistic(stat *Statistic) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(m.StatisticFile(), statStr, defaultDirPerm)
+	return ioutil.WriteFile(m.StatisticFile(), statStr, defaultFilePerm)
 }

@@ -273,13 +273,13 @@ class Parser extends Component {
                 {...optionFormItemLayout}
             >
               {getFieldDecorator('sampleData', {
-                rules: [{required: true, message: '配置文件不能为空', trigger: 'blur'}]
+                rules: []
               })(
                   <Input type="textarea" rows="8"/>
               )}
             </FormItem>
             <FormItem {...optionFormItemLayout} label="样例日志">
-              <Input type="textarea" value={this.state.parseData} rows="20"></Input>
+              <Input type="textarea" value={this.state.parseData} rows="15"></Input>
             </FormItem>
           </Form>
         </div>

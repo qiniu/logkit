@@ -8,10 +8,10 @@ import (
 
 // ModeUsages 用途说明
 var ModeUsages = []utils.KeyValue{
+	{ModeFileAuto, "从文件读取( fileauto 模式)"},
 	{ModeDir, "从文件读取( dir 模式)"},
 	{ModeFile, "从文件读取( file 模式)"},
 	{ModeTailx, "从文件读取( tailx 模式)"},
-	{ModeFileAuto, "从文件读取( fileauto 模式)"},
 	{ModeMysql, "从 MySQL 读取"},
 	{ModeMssql, "从 MSSQL 读取"},
 	{ModePG, "从 PostgreSQL 读取"},
@@ -35,7 +35,7 @@ var (
 		ChooseOnly:   false,
 		Default:      "datasource",
 		DefaultNoUse: false,
-		Description:  "具体的数据文件路径来源标签(datasource_tag)",
+		Description:  "数据来源标签(datasource_tag)",
 	}
 	OptionBuffSize = utils.Option{
 		KeyName:      KeyBufSize,
@@ -201,7 +201,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:      KeyLogPath,
 			ChooseOnly:   false,
-			Default:      "/your/log/dir/or/path", //TODO 此处前端要做成直接让用户选择文件夹
+			Default:      "/your/log/dir/or/path*.log", //TODO 此处前端要做成直接让用户选择文件夹
 			DefaultNoUse: true,
 			Description:  "日志文件夹路径(log_path)",
 		},
@@ -620,5 +620,6 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse: false,
 			Description:  "连接保持时长(0为关闭)(socket_keep_alive_period)",
 		},
+		OptionDataSourceTag,
 	},
 }
