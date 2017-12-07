@@ -324,12 +324,12 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []sender.Data, times in
 	if len(datas) <= 0 {
 		return true
 	}
+	r.rsMutex.Lock()
 	if _, ok := r.rs.SenderStats[s.Name()]; !ok {
 		r.rs.SenderStats[s.Name()] = utils.StatsInfo{}
 	}
-	r.rsMutex.RLock()
 	info := r.rs.SenderStats[s.Name()]
-	r.rsMutex.RUnlock()
+	r.rsMutex.Unlock()
 	cnt := 1
 	for {
 		// 至少尝试一次。如果任务已经停止，那么只尝试一次
