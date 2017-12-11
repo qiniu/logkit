@@ -57,7 +57,7 @@ func matchMode(logpath string) (mode string, err error) {
 	} else {
 		//for logpath this path to make judgments
 		fileInfo, errStat := os.Stat(logpath)
-		if err != nil {
+		if errStat != nil {
 			err = errStat
 			return
 		}
