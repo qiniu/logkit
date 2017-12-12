@@ -84,6 +84,7 @@ func (g *Replacer) SampleConfig() string {
 		"key":"MyReplaceFieldKey",
 		"old":"myOldString",
 		"new":"myNewString"
+		"regex":"false"
 	}`
 }
 
