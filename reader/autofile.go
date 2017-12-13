@@ -17,11 +17,13 @@ func NewFileAutoReader(conf conf.MapConf, meta *Meta, isFromWeb bool, bufSize in
 	}
 	switch mode {
 	case ModeTailx:
+		meta.mode = ModeTailx
 		expireDur, _ := conf.GetStringOr(KeyExpire, "24h")
 		stateIntervalDur, _ := conf.GetStringOr(KeyStatInterval, "3m")
 		maxOpenFiles, _ := conf.GetIntOr(KeyMaxOpenFiles, 256)
 		reader, err = NewMultiReader(meta, logpath, whence, expireDur, stateIntervalDur, maxOpenFiles)
 	case ModeDir:
+		meta.mode = ModeDir
 		ignoreHidden, _ := conf.GetBoolOr(KeyIgnoreHiddenFile, true)
 		ignoreFileSuffix, _ := conf.GetStringListOr(KeyIgnoreFileSuffix, defaultIgnoreFileSuffix)
 		validFilesRegex, _ := conf.GetStringOr(KeyValidFilePattern, "*")
