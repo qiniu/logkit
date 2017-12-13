@@ -131,7 +131,7 @@ func Test_Run(t *testing.T) {
 	}
 	senders = append(senders, s)
 
-	r, err := NewLogExportRunnerWithService(rinfo, reader, cleaner, pparser, nil, senders, meta)
+	r, err := NewLogExportRunnerWithService(rinfo, reader, cleaner, pparser, nil, senders, nil, meta)
 	if err != nil {
 		t.Error(err)
 	}
@@ -332,7 +332,7 @@ func Test_QiniulogRun(t *testing.T) {
 	}
 	senders = append(senders, s)
 
-	r, err := NewLogExportRunnerWithService(rinfo, reader, nil, pparser, nil, senders, meta)
+	r, err := NewLogExportRunnerWithService(rinfo, reader, nil, pparser, nil, senders, nil, meta)
 	if err != nil {
 		t.Error(err)
 	}
@@ -814,4 +814,63 @@ func TestAddDatasource(t *testing.T) {
 	}
 	gots := addSourceToData(sourceFroms, se, datas, datasourceTagName, runnername)
 	assert.Equal(t, exp, gots)
+}
+
+func TestClassifySenderData(t *testing.T) {
+	senderCnt := 3
+	datas := []sender.Data{
+		sender.Data{
+			"a": "a",
+			"b": "b",
+			"c": "c",
+			"d": "d",
+		},
+		sender.Data{
+			"a": "A",
+			"b": "b",
+			"c": "c",
+			"d": "d",
+		},
+		sender.Data{
+			"a": "B",
+			"b": "b",
+			"c": "c",
+			"d": "d",
+		},
+		sender.Data{
+			"a": "C",
+			"b": "b",
+			"c": "c",
+			"d": "d",
+		},
+	}
+
+	routerConf := sender.RouterConfig{
+		KeyName:      "a",
+		MatchType:    "equal",
+		DefaultIndex: 0,
+		Routes: map[string]int{
+			"a": 2,
+			"A": 1,
+		},
+	}
+
+	r, err := sender.NewSenderRouter(routerConf, senderCnt)
+
+	senderDataList := classifySenderData(datas, r, senderCnt)
+	assert.Equal(t, senderCnt, len(senderDataList))
+	assert.Equal(t, 2, len(senderDataList[0]))
+	assert.Equal(t, 1, len(senderDataList[1]))
+	assert.Equal(t, 1, len(senderDataList[2]))
+
+	// 测试没有配置 router 的情况
+	routerConf.KeyName = ""
+	r, err = sender.NewSenderRouter(routerConf, senderCnt)
+	assert.Nil(t, r)
+	assert.NoError(t, err)
+	senderDataList = classifySenderData(datas, r, senderCnt)
+	assert.Equal(t, senderCnt, len(senderDataList))
+	assert.Equal(t, 4, len(senderDataList[0]))
+	assert.Equal(t, 4, len(senderDataList[1]))
+	assert.Equal(t, 4, len(senderDataList[2]))
 }

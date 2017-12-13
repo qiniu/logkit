@@ -93,6 +93,7 @@ type RunnerConfig struct {
 	ParserConf    conf.MapConf             `json:"parser"`
 	Transforms    []map[string]interface{} `json:"transforms,omitempty"`
 	SenderConfig  []conf.MapConf           `json:"senders"`
+	Router        sender.RouterConfig      `json:"router,omitempty"`
 	IsInWebFolder bool                     `json:"web_folder,omitempty"`
 	IsStopped     bool                     `json:"is_stopped,omitempty"`
 }
@@ -116,6 +117,7 @@ type LogExportRunner struct {
 	cleaner      *cleaner.Cleaner
 	parser       parser.LogParser
 	senders      []sender.Sender
+	router       *sender.Router
 	transformers []transforms.Transformer
 
 	rs      RunnerStatus
@@ -151,11 +153,13 @@ func NewCustomRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, ps *
 	return NewLogExportRunner(rc, cleanChan, ps, sr)
 }
 
-func NewRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.LogParser, transformers []transforms.Transformer, senders []sender.Sender, meta *reader.Meta) (runner Runner, err error) {
-	return NewLogExportRunnerWithService(info, reader, cleaner, parser, transformers, senders, meta)
+func NewRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.LogParser, transformers []transforms.Transformer,
+	senders []sender.Sender, router *sender.Router, meta *reader.Meta) (runner Runner, err error) {
+	return NewLogExportRunnerWithService(info, reader, cleaner, parser, transformers, senders, router, meta)
 }
 
-func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.LogParser, transformers []transforms.Transformer, senders []sender.Sender, meta *reader.Meta) (runner *LogExportRunner, err error) {
+func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.LogParser,
+	transformers []transforms.Transformer, senders []sender.Sender, router *sender.Router, meta *reader.Meta) (runner *LogExportRunner, err error) {
 	if info.MaxBatchSize <= 0 {
 		info.MaxBatchSize = defaultMaxBatchSize
 	}
@@ -207,6 +211,7 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 		return
 	}
 	runner.senders = senders
+	runner.router = router
 	runner.StatusRestore()
 	return runner, nil
 }
@@ -273,7 +278,12 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, p
 		senders = append(senders, s)
 		delete(rc.SenderConfig[i], sender.InnerUserAgent)
 	}
-	return NewLogExportRunnerWithService(runnerInfo, rd, cl, parser, transformers, senders, meta)
+	senderCnt := len(senders)
+	router, err := sender.NewSenderRouter(rc.Router, senderCnt)
+	if err != nil {
+		return nil, fmt.Errorf("runner %v add sender router error, %v", rc.RunnerName, err)
+	}
+	return NewLogExportRunnerWithService(runnerInfo, rd, cl, parser, transformers, senders, router, meta)
 }
 
 func createTransformers(rc RunnerConfig) []transforms.Transformer {
@@ -492,9 +502,11 @@ func (r *LogExportRunner) Run() {
 			}
 		}
 		success := true
+		senderCnt := len(r.senders)
 		log.Debugf("Runner[%v] reader %s start to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
-		for _, s := range r.senders {
-			if !r.trySend(s, datas, r.MaxBatchTryTimes) {
+		senderDataList := classifySenderData(datas, r.router, senderCnt)
+		for index, s := range r.senders {
+			if !r.trySend(s, senderDataList[index], r.MaxBatchTryTimes) {
 				success = false
 				log.Errorf("Runner[%v] failed to send data finally", r.Name())
 				break
@@ -505,6 +517,27 @@ func (r *LogExportRunner) Run() {
 		}
 		log.Debugf("Runner[%v] send %s finish to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
 	}
+}
+
+func classifySenderData(datas []sender.Data, router *sender.Router, senderCnt int) [][]sender.Data {
+	senderDataList := make([][]sender.Data, senderCnt)
+	for i := 0; i < senderCnt; i++ {
+		if router == nil {
+			senderDataList[i] = datas
+		} else {
+			senderDataList[i] = make([]sender.Data, 0)
+		}
+	}
+	if router == nil {
+		return senderDataList
+	}
+	for _, d := range datas {
+		senderIndex := router.GetSenderIndex(d)
+		senderData := senderDataList[senderIndex]
+		senderData = append(senderData, d)
+		senderDataList[senderIndex] = senderData
+	}
+	return senderDataList
 }
 
 func addSourceToData(sourceFroms []string, se *utils.StatsError, datas []sender.Data, datasourceTagName, runnername string) []sender.Data {
