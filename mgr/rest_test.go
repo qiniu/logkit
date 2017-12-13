@@ -1382,3 +1382,177 @@ func TestGetRunners(t *testing.T) {
 	}
 	assert.Equal(t, res, runnerNameList)
 }
+
+func TestSenderRouter(t *testing.T) {
+	var runnerConf = `{
+    "name":"test10.csv",
+    "batch_size": 1000,
+    "batch_interval": 1,
+    "batch_try_times": 3,
+    "reader":{
+        "log_path":"./TestSenderRouter/logdir/log1",
+        "meta_path":"./TestSenderRouter/meta_mock_csv",
+        "mode":"file",
+        "ignore_hidden":"true"
+    },
+    "parser":{
+        "name":         "req_csv",
+		"type":         "json"
+    },
+	"router": {
+		"router_key_name": "a",
+		"router_default_sender": 2,
+		"router_match_type": "equal",
+		"router_routes": {
+			"a": 0,
+			"123": 0,
+			"b": 1
+		}
+	},
+    "senders":[
+		{
+			"name":           "file_sender1",
+			"sender_type":    "file",
+			"file_send_path": "./TestSenderRouter/sender_file1"
+		},
+		{
+			"name":           "file_sender2",
+			"sender_type":    "file",
+			"file_send_path": "./TestSenderRouter/sender_file2"
+		},
+		{
+			"name":           "file_sender3",
+			"sender_type":    "file",
+			"file_send_path": "./TestSenderRouter/sender_file3"
+		}
+	]
+}`
+
+	dir := "TestSenderRouter"
+	os.RemoveAll(dir)
+	if err := os.Mkdir(dir, 0755); err != nil {
+		log.Fatalf("TestSenderRouter error mkdir %v %v", dir, err)
+	}
+	defer os.RemoveAll(dir)
+	pwd, err := os.Getwd()
+	if err != nil {
+		t.Error(err)
+	}
+	confdir := pwd + "/" + dir
+	logpath := dir + "/logdir"
+	metapath := dir + "/meta_mock_csv"
+	logconfs := dir + "/confs"
+	filesenderdata1 := dir + "/sender_file1"
+	filesenderdata2 := dir + "/sender_file2"
+	filesenderdata3 := dir + "/sender_file3"
+	if err := os.Mkdir(logpath, 0755); err != nil {
+		log.Fatalf("TestSenderRouter error mkdir %v %v", logpath, err)
+	}
+	if err := os.Mkdir(metapath, 0755); err != nil {
+		log.Fatalf("TestSenderRouter error mkdir %v %v", metapath, err)
+	}
+	if err := os.Mkdir(logconfs, 0755); err != nil {
+		log.Fatalf("TestSenderRouter error mkdir %v %v", logconfs, err)
+	}
+	log1 := `{"a":1,"b":2}
+{"a": "a", "b": 3}
+{"a": "b", "b": 3}
+{"a": "c", "b": 3}
+{"a": "a", "b": 3}
+{"a": "b", "b": 3}
+{"a": "AAA", "b": 3}
+{"a": 123.21, "b": 3}
+{"a": 123, "b": 3}
+{"a": "123", "b": 3}
+{"a": "a", "b": 3}
+{"a": "a", "b": 3}`
+	file, err := os.OpenFile(filepath.Join(logpath, "log1"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+	if err != nil {
+		log.Fatalf("TestSenderRouter error createfile %v %v", filepath.Join(logpath, "log1"), err)
+	}
+	w := bufio.NewWriter(file)
+	fmt.Fprintln(w, log1)
+	w.Flush()
+	file.Close()
+	time.Sleep(time.Second)
+
+	var conf ManagerConfig
+	conf.RestDir = confdir
+	conf.BindHost = ":6702"
+	m, err := NewManager(conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.NoError(t, err)
+	rs := NewRestService(m, echo.New())
+	defer func() {
+		rs.Stop()
+		os.Remove(StatsShell)
+		os.RemoveAll(".logkitconfs")
+	}()
+
+	resp, err := http.Post("http://127.0.0.1"+rs.address+"/logkit/configs/"+"test10.csv", TESTContentApplictionJson, bytes.NewReader([]byte(runnerConf)))
+	assert.NoError(t, err)
+	content, _ := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		t.Error(string(content))
+	}
+	time.Sleep(5 * time.Second)
+
+	f1, err := os.Open(filesenderdata1)
+	assert.NoError(t, err)
+	defer f1.Close()
+	br := bufio.NewReader(f1)
+	result := make([]map[string]interface{}, 0)
+	dataCnt := 0
+	for {
+		str, _, c := br.ReadLine()
+		if c == io.EOF {
+			break
+		}
+		err = json.Unmarshal([]byte(str), &result)
+		if err != nil {
+			log.Fatalf("TestSenderRouter error unmarshal result curLine = %v %v", dataCnt, err)
+		}
+		dataCnt += len(result)
+	}
+	assert.Equal(t, 6, dataCnt)
+
+	f2, err := os.Open(filesenderdata2)
+	assert.NoError(t, err)
+	defer f2.Close()
+	br = bufio.NewReader(f2)
+	result = make([]map[string]interface{}, 0)
+	dataCnt = 0
+	for {
+		str, _, c := br.ReadLine()
+		if c == io.EOF {
+			break
+		}
+		err = json.Unmarshal([]byte(str), &result)
+		if err != nil {
+			log.Fatalf("TestSenderRouter error unmarshal result curLine = %v %v", dataCnt, err)
+		}
+		dataCnt += len(result)
+	}
+	assert.Equal(t, 2, dataCnt)
+
+	f3, err := os.Open(filesenderdata3)
+	assert.NoError(t, err)
+	defer f3.Close()
+	br = bufio.NewReader(f3)
+	result = make([]map[string]interface{}, 0)
+	dataCnt = 0
+	for {
+		str, _, c := br.ReadLine()
+		if c == io.EOF {
+			break
+		}
+		err = json.Unmarshal([]byte(str), &result)
+		if err != nil {
+			log.Fatalf("TestSenderRouter error unmarshal result curLine = %v %v", dataCnt, err)
+		}
+		dataCnt += len(result)
+	}
+	assert.Equal(t, 4, dataCnt)
+}
