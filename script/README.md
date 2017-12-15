@@ -1,5 +1,5 @@
 # linux 下面将logkit创建为系统服务
-将logkit.sh脚本放在/etc/init.d/下面即可，脚本里面定义的logkit可执行文件路径为：/usr/local/logkit/package/logkit，配置文件路径为/usr/local/logkit/package/logkit.conf 日志文件路径为/usr/local/logkit/package/run/logkit.log，可以编辑脚本修改这些参数，脚本需要有可执行权限。
+将logkit.sh脚本放在/etc/init.d/下面即可，脚本里面定义的logkit可执行文件路径为：/usr/local/logkit/package/logkit，配置文件路径为/usr/local/logkit/package/logkit.conf 日志文件路径为/usr/local/logkit/package/run/logkit.log，可以编辑脚本修改这些参数，脚本需要有可执行权限。  
 启动：service logkit start  
 停止：service logkit stop  
 状态：service logkit status  
