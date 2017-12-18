@@ -58,13 +58,13 @@ func Test_TrimeList(t *testing.T) {
 	}
 }
 
-func Test_GetInode(t *testing.T) {
+/*func Test_GetInode(t *testing.T) {
 	os.Mkdir("abc", 0777)
 	fi, _ := os.Stat("abc")
 	inode := getInode(fi)
 	assert.True(t, inode > 0)
 	os.RemoveAll("abc")
-}
+}*/
 
 func Test_GetLogFiles(t *testing.T) {
 	logfiles := "Test_getLogFiles"
@@ -383,6 +383,17 @@ func TestDeleteMapValue(t *testing.T) {
 	val2, b2 := DeleteMapValue(m1, []string{"m2", "m3", "name", "name2"}...)
 	assert.Equal(t, val2, nil)
 	assert.Equal(t, b2, false)
+}
+
+func TestDeepCopy(t *testing.T) {
+	m := getTestMap()
+	m1 := DeepCopy(m)
+	SetMapValue(m, "value", true, "k13")
+	assert.Equal(t, m1, getTestMap())
+	s1 := []interface{}{getTestMap()}
+	s2 := DeepCopy(s1)
+	s1 = append(s1, m)
+	assert.Equal(t, s2, []interface{}{getTestMap()})
 }
 
 func TestHashSet(t *testing.T) {

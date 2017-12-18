@@ -15,9 +15,9 @@ import (
 )
 
 type Script struct {
-	OldKey  string `json:"oldKey"`
-	NewKey  string `json:"newKey"`
-	Script  string `json:"script"`
+	OldKey  string `json:"oldKey"` //格式为: key1:var1,key2:var2  其中key为待转换的数据中的字段名称,var为script中的变量名称. 可以写多对,用逗号分隔.如果key和var相同,var可省略
+	NewKey  string `json:"newKey"` //格式为: key1:var1,key2:var2  其中key为要向数据中新设置的的字段名称,var为script中的变量名称.
+	Script  string `json:"script"` //要执行的js脚本
 	oldKeys [][]string
 	oldVars []string
 	newKeys [][]string
@@ -27,11 +27,15 @@ type Script struct {
 }
 
 func (g *Script) Init() (err error) {
-	g.oldKeys, g.oldVars, err = parseKey(g.OldKey)
+	if g.OldKey != "" {
+		g.oldKeys, g.oldVars, err = parseKey(g.OldKey)
+	}
 	if err != nil {
 		return err
 	}
-	g.newKeys, g.newVars, err = parseKey(g.NewKey)
+	if g.NewKey != "" {
+		g.newKeys, g.newVars, err = parseKey(g.NewKey)
+	}
 	if err != nil {
 		return err
 	}
@@ -69,11 +73,10 @@ func parseKey(key string) ([][]string, []string, error) {
 }
 
 func (g *Script) Transform(datas []sender.Data) (returnData []sender.Data, ferr error) {
-	fmt.Println(g.Script)
 	var err error
 	errnums := 0
 	vm := otto.New()
-	returnData = datas
+	returnData = utils.DeepCopy(datas).([]sender.Data)
 	vm.Interrupt = make(chan func(), 1) // The buffer prevents blocking
 	halt := errors.New("script time out")
 	defer func() {
@@ -147,7 +150,7 @@ func (g *Script) Transform(datas []sender.Data) (returnData []sender.Data, ferr 
 	}
 	if err != nil {
 		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform replace, last error info is %v", errnums, err)
+		ferr = fmt.Errorf("find total %v erorrs in transform script, last error info is %v", errnums, err)
 	}
 	g.stats.Errors += int64(errnums)
 	g.stats.Success += int64(len(datas) - errnums)

@@ -69,7 +69,7 @@ func TestScriptTransformer(t *testing.T) {
 				l = "warn";
 				break;
 			case "e" :
-				l = "error"
+				l = "error";
 				break;
     		}
 		`,
@@ -86,6 +86,40 @@ func TestScriptTransformer(t *testing.T) {
 			"logLevel": "info",
 			"method":   "GET",
 		}}, datas3)
+
+	g4 := &Script{
+		OldKey: "logLevel:l",
+		NewKey: "logLevel:l, method:m",
+		Script: `
+			switch (l) {
+			case "i" :
+				l = "info";
+				break;
+			case "d" :
+				l = "debug";
+				break;
+			case "w" :
+				l = "warn";
+				break;
+			case "e" :
+				l = "error";
+				break;
+    		}
+		m = "delete";
+		`,
+	}
+	g4.Init()
+	datas4, err4 := g4.Transform(getTestData())
+	assert.NoError(t, err4)
+	assert.Equal(t, []sender.Data{
+		map[string]interface{}{
+			"logLevel": "warn",
+			"method":   "delete",
+		},
+		map[string]interface{}{
+			"logLevel": "info",
+			"method":   "delete",
+		}}, datas4)
 }
 
 func getTestData() []sender.Data {

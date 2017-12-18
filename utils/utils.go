@@ -17,6 +17,7 @@ import (
 	"sync/atomic"
 
 	"github.com/qiniu/log"
+	"gopkg.in/mgo.v2/bson"
 )
 
 const (
@@ -393,6 +394,31 @@ func DeleteMapValue(m map[string]interface{}, keys ...string) (interface{}, bool
 		}
 	}
 	return nil, false
+}
+
+//深度拷贝
+func DeepCopy(value interface{}) interface{} {
+	if valueMap, ok := value.(map[string]interface{}); ok {
+		newMap := make(map[string]interface{})
+		for k, v := range valueMap {
+			newMap[k] = DeepCopy(v)
+		}
+
+		return newMap
+	} else if valueSlice, ok := value.([]interface{}); ok {
+		newSlice := make([]interface{}, len(valueSlice))
+		for k, v := range valueSlice {
+			newSlice[k] = DeepCopy(v)
+		}
+
+		return newSlice
+	} else if valueMap, ok := value.(bson.M); ok {
+		newMap := make(bson.M)
+		for k, v := range valueMap {
+			newMap[k] = DeepCopy(v)
+		}
+	}
+	return value
 }
 
 func AddHttpProtocal(url string) string {
