@@ -590,6 +590,9 @@ func validSchema(valueType string, value interface{}) bool {
 			return false
 		}
 	case PandoraTypeJsonString:
+		if _, ok := value.(map[string]interface{}); ok {
+			return true
+		}
 		vu := reflect.ValueOf(value)
 		var str string
 		if vu.Kind() == reflect.String {
