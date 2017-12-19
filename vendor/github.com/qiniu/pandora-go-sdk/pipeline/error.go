@@ -206,6 +206,10 @@ func (e PipelineErrBuilder) Build(msg, text, reqId string, code int) error {
 		err.ErrorType = reqerr.ErrJobReRunOrCancel
 	case "E18663":
 		err.ErrorType = reqerr.ErrStartOrStopBatchJob
+	case "E18664":
+		err.ErrorType = reqerr.ErrNoSuchResourceOwner
+	case "E18665":
+		err.ErrorType = reqerr.ErrAccessDenied
 	case "E9000":
 		err.ErrorType = reqerr.InternalServerError
 	case "E9001":
