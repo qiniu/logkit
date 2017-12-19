@@ -15,15 +15,16 @@ import (
 )
 
 type Script struct {
-	OldKey  string `json:"oldKey"` //格式为: key1:var1,key2:var2  其中key为待转换的数据中的字段名称,var为script中的变量名称. 可以写多对,用逗号分隔.如果key和var相同,var可省略
-	NewKey  string `json:"newKey"` //格式为: key1:var1,key2:var2  其中key为要向数据中新设置的的字段名称,var为script中的变量名称.
-	Script  string `json:"script"` //要执行的js脚本
-	oldKeys [][]string
-	oldVars []string
-	newKeys [][]string
-	newVars []string
-	vm      *otto.Otto
-	stats   utils.StatsInfo
+	OldKey    string `json:"oldKey"`    //格式为: key1:var1,key2:var2  其中key为待转换的数据中的字段名称,var为script中的变量名称. 可以写多对,用逗号分隔.如果key和var相同,var可省略
+	NewKey    string `json:"newKey"`    //格式为: key1:var1,key2:var2  其中key为要向数据中新设置的的字段名称,var为script中的变量名称.
+	Script    string `json:"script"`    //要执行的js脚本
+	DeleteOld bool   `json:"deleteOld"` //是否删除旧字段
+	oldKeys   [][]string
+	oldVars   []string
+	newKeys   [][]string
+	newVars   []string
+	vm        *otto.Otto
+	stats     utils.StatsInfo
 }
 
 func (g *Script) Init() (err error) {
@@ -109,6 +110,9 @@ func (g *Script) Transform(datas []sender.Data) (returnData []sender.Data, ferr 
 				break
 			}
 			g.vm.Set(g.oldVars[j], val)
+			if g.DeleteOld {
+				utils.DeleteMapValue(datas[i], keys...)
+			}
 		}
 		if err != nil {
 			errnums++
@@ -176,7 +180,8 @@ func (g *Script) SampleConfig() string {
 		"type":"script",
 		"oldKey":"oldKey",
 		"newKey":"newKey",
-		"script":""
+		"script":"",
+		"deleteOld":false
 	}`
 }
 
@@ -205,6 +210,14 @@ func (g *Script) ConfigOptions() []utils.Option {
 			DefaultNoUse: true,
 			Description:  "转换字段的脚本",
 			Type:         transforms.TransformTypeString,
+		},
+		{
+			KeyName:       "deleteOld",
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"false", "true"},
+			Default:       "false",
+			DefaultNoUse:  false,
+			Description:   "是否删除旧字段",
 		},
 	}
 }

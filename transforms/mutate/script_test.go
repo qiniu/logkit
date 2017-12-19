@@ -120,6 +120,25 @@ func TestScriptTransformer(t *testing.T) {
 			"logLevel": "info",
 			"method":   "delete",
 		}}, datas4)
+
+	g5 := &Script{
+		OldKey:    "logLevel",
+		NewKey:    "",
+		Script:    ``,
+		DeleteOld: true,
+	}
+	g5.Init()
+	datas5, err5 := g5.Transform(getTestData())
+	assert.NoError(t, err5)
+	assert.Equal(t, datas5, []sender.Data{
+		map[string]interface{}{
+			"method": "POST",
+		},
+		map[string]interface{}{
+			"method": "GET",
+		},
+	})
+
 }
 
 func getTestData() []sender.Data {
