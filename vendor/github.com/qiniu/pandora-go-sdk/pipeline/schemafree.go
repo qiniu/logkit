@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/qiniu/log"
@@ -302,13 +303,17 @@ func mapDataConvert(mpvalue map[string]interface{}, schemas []RepoSchemaEntry) (
 	return mpvalue
 }
 
-func copyData(d Data) Data {
+func copyAndConvertData(d Data) Data {
 	md := make(Data, len(d))
 	for k, v := range d {
 		if v == nil {
 			continue
 		}
-		md[k] = v
+		nk := strings.Replace(k, "-", "_", -1)
+		if nv, ok := v.(map[string]interface{}); ok {
+			v = map[string]interface{}(copyAndConvertData(nv))
+		}
+		md[nk] = v
 	}
 	return md
 }
@@ -344,8 +349,8 @@ func checkIgnore(value interface{}, schemeType string) bool {
 }
 
 func (c *Pipeline) generatePoint(repoName string, oldData Data, schemaFree bool, option *SchemaFreeOption, repooptions *RepoOptions) (point Point, err error) {
-
-	data := copyData(oldData)
+	// copyAndConvertData 函数会将包含'-'的 key 用 '_' 来代替
+	data := copyAndConvertData(oldData)
 	point = Point{}
 	c.repoSchemaMux.Lock()
 	schemas := c.repoSchemas[repoName]
@@ -408,7 +413,8 @@ func (c *Pipeline) generatePoint(repoName string, oldData Data, schemaFree bool,
 	*/
 	if schemaFree && haveNewData(data) {
 		//defaultAll 为false时，过滤一批不要的
-		valueType := getPandoraKeyValueType(data)
+		// 该函数有两个作用，1. 获取 data 中所有字段的 schema; 2. 将 data 中值为 nil, 无法判断类型的键值对，从 data 中删掉
+		valueType := getTrimedDataSchema(data)
 		if err = c.addRepoSchemas(repoName, valueType, option, repooptions); err != nil {
 			err = fmt.Errorf("schemafree add Repo schema error %v", err)
 			return
@@ -570,7 +576,8 @@ PandoraTypeBool   ：全部支持
 PandoraTypeArray  ：全部支持
 PandoraTypeMap    ：全部支持
 */
-func getPandoraKeyValueType(data Data) (valueType map[string]RepoSchemaEntry) {
+// 该函数有两个作用，1. 获取 data 中所有字段的 schema; 2. 将 data 中值为 nil, 无法判断类型的键值对，从 data 中删掉
+func getTrimedDataSchema(data Data) (valueType map[string]RepoSchemaEntry) {
 	valueType = make(map[string]RepoSchemaEntry)
 	for k, v := range data {
 		switch nv := v.(type) {
@@ -589,7 +596,7 @@ func getPandoraKeyValueType(data Data) (valueType map[string]RepoSchemaEntry) {
 			}
 		case map[string]interface{}:
 			sc := formValueType(k, PandoraTypeMap)
-			follows := getPandoraKeyValueType(Data(nv))
+			follows := getTrimedDataSchema(Data(nv))
 			for _, m := range follows {
 				sc.Schema = append(sc.Schema, m)
 			}
@@ -611,15 +618,23 @@ func getPandoraKeyValueType(data Data) (valueType map[string]RepoSchemaEntry) {
 					} else {
 						sc.ElemType = PandoraTypeFloat
 					}
-				case nil: // 不处理，不加入
+				case nil:
+					// 由于数据为空，且无法判断类型, 所以从数据中将该条键值对删掉
+					if len(nv) == 1 {
+						delete(data, k)
+					} else {
+						sc.ElemType = PandoraTypeString
+					}
 				case string:
 					sc.ElemType = PandoraTypeString
 				default:
 					sc.ElemType = PandoraTypeString
 				}
 				valueType[k] = sc
+			} else {
+				// 由于数据为空，且无法判断类型, 所以从数据中将该条键值对删掉
+				delete(data, k)
 			}
-			//对于里面没有元素的interface，不添加进去，因为无法判断类型
 		case []int, []int8, []int16, []int32, []int64, []uint, []uint8, []uint16, []uint32, []uint64:
 			sc := formValueType(k, PandoraTypeArray)
 			sc.ElemType = PandoraTypeLong
@@ -640,7 +655,9 @@ func getPandoraKeyValueType(data Data) (valueType map[string]RepoSchemaEntry) {
 			sc := formValueType(k, PandoraTypeArray)
 			sc.ElemType = PandoraTypeFloat
 			valueType[k] = sc
-		case nil: // 不处理，不加入
+		case nil:
+			// 由于数据为空，且无法判断类型, 所以从数据中将该条键值对删掉
+			delete(data, k)
 		case string:
 			_, err := time.Parse(time.RFC3339, nv)
 			if err == nil {
