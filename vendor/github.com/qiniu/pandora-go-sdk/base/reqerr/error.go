@@ -123,6 +123,8 @@ const (
 	ErrJobReRunOrCancel
 	ErrStartOrStopBatchJob
 	ErrTimeFormatInvalid
+	ErrNoSuchResourceOwner
+	ErrAccessDenied
 )
 
 type ErrBuilder interface {
