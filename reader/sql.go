@@ -492,7 +492,7 @@ func (mr *SqlReader) run() {
 	}
 }
 
-func getInitScans(length int, rows *sql.Rows, sqltype string) (scanArgs []interface{}, nochoiced []bool) {
+func (mr *SqlReader) getInitScans(length int, rows *sql.Rows, sqltype string) (scanArgs []interface{}, nochoiced []bool) {
 	nochoice := make([]interface{}, length)
 	nochoiced = make([]bool, length)
 	for i := range scanArgs {
@@ -519,24 +519,39 @@ func getInitScans(length int, rows *sql.Rows, sqltype string) (scanArgs []interf
 	scanArgs = make([]interface{}, length)
 	for i, v := range tps {
 		nochoiced[i] = false
-		switch v.ScanType().Name() {
+		scantype := v.ScanType().Name()
+		switch scantype {
 		case "int64", "int32", "int16", "int", "int8":
 			scanArgs[i] = new(int64)
 		case "float32", "float64":
 			scanArgs[i] = new(float64)
 		case "uint", "uint8", "uint16", "uint32", "uint64":
 			scanArgs[i] = new(uint64)
-		case "string", "RawBytes", "time.Time":
-			//时间类型也作为string处理
-			scanArgs[i] = new(interface{})
 		case "bool":
 			scanArgs[i] = new(bool)
 		case "[]uint8":
 			scanArgs[i] = new([]byte)
+		case "string", "RawBytes", "time.Time", "NullTime":
+			//时间类型也作为string处理
+			scanArgs[i] = new(interface{})
+			if _, ok := mr.schemas[v.Name()]; !ok {
+				mr.schemas[v.Name()] = "string"
+			}
+		case "NullInt64":
+			scanArgs[i] = new(interface{})
+			if _, ok := mr.schemas[v.Name()]; !ok {
+				mr.schemas[v.Name()] = "long"
+			}
+		case "NullFloat64":
+			scanArgs[i] = new(interface{})
+			if _, ok := mr.schemas[v.Name()]; !ok {
+				mr.schemas[v.Name()] = "float"
+			}
 		default:
 			scanArgs[i] = new(interface{})
 			nochoiced[i] = true
 		}
+		log.Infof("Init field %v scan type is %v ", v.Name(), scantype)
 	}
 	return
 }
@@ -592,9 +607,8 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 				log.Errorf("Runner[%v] %v prepare %v <%v> columns error %v", mr.meta.RunnerName, mr.Name(), mr.dbtype, execSQL, err)
 				continue
 			}
-			rows.ColumnTypes()
 			log.Infof("Runner[%v] SQL ：<%v>, schemas: <%v>", mr.meta.RunnerName, execSQL, strings.Join(columns, ", "))
-			scanArgs, nochiced := getInitScans(len(columns), rows, mr.dbtype)
+			scanArgs, nochiced := mr.getInitScans(len(columns), rows, mr.dbtype)
 			offsetKeyIndex := mr.getOffsetIndex(columns)
 
 			// Fetch rows
@@ -609,56 +623,68 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 				}
 				data := make(map[string]interface{})
 				for i := 0; i < len(scanArgs); i++ {
-					if nochiced[i] {
-						vtype, ok := mr.schemas[columns[i]]
-						if !ok {
-							vtype = "unknown"
+					vtype, ok := mr.schemas[columns[i]]
+					if !ok {
+						vtype = "unknown"
+					}
+					switch vtype {
+					case "long":
+						val, serr := convertLong(scanArgs[i])
+						if serr != nil {
+							log.Errorf("convertLong for %v (%v) error %v, ignore this key...", columns[i], scanArgs[i], serr)
+						} else {
+							data[columns[i]] = &val
 						}
-						switch vtype {
-						case "long":
-							val, serr := convertLong(scanArgs[i])
-							if serr != nil {
-								log.Errorf("convertLong for %v (%v) error %v, ignore this key...", columns[i], scanArgs[i], serr)
-							} else {
-								data[columns[i]] = &val
+					case "float":
+						val, serr := convertFloat(scanArgs[i])
+						if serr != nil {
+							log.Errorf("convertFloat for %v (%v) error %v, ignore this key...", columns[i], scanArgs[i], serr)
+						} else {
+							data[columns[i]] = &val
+						}
+					case "string":
+						val, serr := convertString(scanArgs[i])
+						if serr != nil {
+							log.Errorf("convertString for %v (%v) error %v, ignore this key...", columns[i], scanArgs[i], serr)
+						} else {
+							data[columns[i]] = &val
+						}
+					default:
+						dealed := false
+						if !nochiced[i] {
+							dealed = true
+							switch d := scanArgs[i].(type) {
+							case *string:
+								data[columns[i]] = *d
+							case *[]byte:
+								data[columns[i]] = string(*d)
+							case *bool:
+								data[columns[i]] = *d
+							case int64:
+								data[columns[i]] = d
+							case *int64:
+								data[columns[i]] = *d
+							case float64:
+								data[columns[i]] = d
+							case *float64:
+								data[columns[i]] = *d
+							case uint64:
+								data[columns[i]] = d
+							case *uint64:
+								data[columns[i]] = *d
+							case *interface{}:
+								dealed = false
+							default:
+								dealed = false
 							}
-						case "float":
-							val, serr := convertFloat(scanArgs[i])
-							if serr != nil {
-								log.Errorf("convertFloat for %v (%v) error %v, ignore this key...", columns[i], scanArgs[i], serr)
-							} else {
-								data[columns[i]] = &val
-							}
-						default:
+						}
+						if !dealed {
 							val, serr := convertString(scanArgs[i])
 							if serr != nil {
 								log.Errorf("convertString for %v (%v) error %v, ignore this key...", columns[i], scanArgs[i], serr)
 							} else {
 								data[columns[i]] = &val
 							}
-						}
-					} else {
-						switch d := scanArgs[i].(type) {
-						case *string:
-							data[columns[i]] = *d
-						case *[]byte:
-							data[columns[i]] = *d
-						case *bool:
-							data[columns[i]] = *d
-						case *interface{}:
-							data[columns[i]] = *d
-						case int64:
-							data[columns[i]] = d
-						case *int64:
-							data[columns[i]] = *d
-						case float64:
-							data[columns[i]] = d
-						case *float64:
-							data[columns[i]] = *d
-						case uint64:
-							data[columns[i]] = d
-						case *uint64:
-							data[columns[i]] = *d
 						}
 					}
 				}
@@ -968,7 +994,7 @@ func (mr *SqlReader) checkExit(idx int, db *sql.DB) (bool, int64) {
 		return true, -1
 	}
 
-	scanArgs, _ := getInitScans(len(columns), rows, mr.dbtype)
+	scanArgs, _ := mr.getInitScans(len(columns), rows, mr.dbtype)
 	offsetKeyIndex := mr.getOffsetIndex(columns)
 	for rows.Next() {
 		err = rows.Scan(scanArgs...)
