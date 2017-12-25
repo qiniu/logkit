@@ -496,15 +496,18 @@ func mergePandoraSchemas(oldScs, addScs []RepoSchemaEntry) (ret []RepoSchemaEntr
 	if oldScs == nil && addScs == nil {
 		return
 	}
+
+	if addScs == nil || len(addScs) == 0 {
+		ret = oldScs
+		return
+	}
+
 	if oldScs == nil {
 		ret = addScs
 		needUpdate = true
 		return
 	}
-	if addScs == nil {
-		ret = oldScs
-		return
-	}
+
 	sOldScs := Schemas(oldScs)
 	sAddScs := Schemas(addScs)
 	sort.Sort(sOldScs)
@@ -631,11 +634,8 @@ func (c *Pipeline) InitOrUpdateWorkflow(input *InitOrUpdateWorkflowInput) error 
 	if err != nil && reqerr.IsNoSuchResourceError(err) {
 		// 如果 repo 不存在
 		var workflow *GetWorkflowOutput
-		if input.SendToDag {
+		if input.WorkflowName != "" {
 			// 如果导出到 dag, 确保 workflow 存在, 不存在时创建
-			if input.WorkflowName == "" {
-				return fmt.Errorf("workflow name can not be empty")
-			}
 			workflow, err = c.GetWorkflow(&GetWorkflowInput{
 				WorkflowName: input.WorkflowName,
 			})
@@ -694,7 +694,7 @@ func (c *Pipeline) InitOrUpdateWorkflow(input *InitOrUpdateWorkflowInput) error 
 				}
 			}
 		}
-		if input.SendToDag {
+		if input.WorkflowName != "" {
 			if err := c.changeWorkflowToStarted(workflow, false); err != nil {
 				if reqerr.IsWorkflowNoExecutableJob(err) {
 					return nil

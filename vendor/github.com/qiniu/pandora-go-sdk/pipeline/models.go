@@ -924,7 +924,6 @@ type SchemaFreeInput struct {
 	PipelineToken
 	Datas        Datas
 	NoUpdate     bool
-	SendToDag    bool
 	Region       string
 	RepoName     string
 	WorkflowName string
@@ -934,7 +933,6 @@ type SchemaFreeInput struct {
 
 type InitOrUpdateWorkflowInput struct {
 	SchemaFree   bool
-	SendToDag    bool
 	Region       string
 	RepoName     string
 	WorkflowName string

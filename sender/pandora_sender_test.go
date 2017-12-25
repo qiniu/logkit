@@ -24,7 +24,6 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
-	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 	"github.com/stretchr/testify/assert"
 )
@@ -205,7 +204,6 @@ func (s *mock_pandora) LetGetRepoError(f bool) {
 
 func TestPandoraSender(t *testing.T) {
 	pandora, pt := NewMockPandoraWithPrefix("/v2")
-	pandora.LetGetRepoError(true)
 	opt := &PandoraOption{
 		name:               "p",
 		repoName:           "TestPandoraSender",
@@ -232,20 +230,6 @@ func TestPandoraSender(t *testing.T) {
 	d["ac"] = 2
 	d["d"] = 14773736325048765
 	err = s.Send([]Data{d})
-	if err == nil {
-		t.Error(fmt.Errorf("should get as send LetGetRepoError error but nil"))
-	}
-	sts, ok := err.(*utils.StatsError)
-	if !ok {
-		t.Error("should pasred as State Error")
-	}
-	err = sts.ErrorDetail
-	se, ok := err.(*reqerr.SendError)
-	if !ok {
-		t.Error("should pasred as Send Error")
-	}
-	pandora.LetGetRepoError(false)
-	err = s.Send(ConvertDatas(se.GetFailDatas()))
 	if st, ok := err.(*utils.StatsError); ok {
 		err = st.ErrorDetail
 	}

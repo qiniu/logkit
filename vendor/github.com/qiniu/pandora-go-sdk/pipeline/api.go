@@ -441,7 +441,6 @@ func (c *Pipeline) unpack(input *SchemaFreeInput) (packages []pointContext, err 
 	for i, d := range input.Datas {
 		point, err := c.generatePoint(d, &InitOrUpdateWorkflowInput{
 			SchemaFree:   !input.NoUpdate,
-			SendToDag:    input.SendToDag,
 			Region:       input.Region,
 			RepoName:     input.RepoName,
 			WorkflowName: input.WorkflowName,
