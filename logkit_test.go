@@ -51,6 +51,7 @@ func Test_RotateClean(t *testing.T) {
 	time.Sleep(time.Second * 2)
 	exitchan <- struct{}{}
 	ch2 <- struct{}{}
+	time.Sleep(time.Millisecond * 100)
 	ch1 <- struct{}{}
 	nn, _ := ioutil.ReadDir(dirp)
 	assert.Equal(t, 3, len(nn))

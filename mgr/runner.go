@@ -175,12 +175,14 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 			TransformStats: make(map[string]utils.StatsInfo),
 			lastState:      time.Now(),
 			Name:           info.RunnerName,
+			RunningStatus:  RunnerRunning,
 		},
 		lastRs: RunnerStatus{
 			SenderStats:    make(map[string]utils.StatsInfo),
 			TransformStats: make(map[string]utils.StatsInfo),
 			lastState:      time.Now(),
 			Name:           info.RunnerName,
+			RunningStatus:  RunnerRunning,
 		},
 		rsMutex: new(sync.RWMutex),
 	}
@@ -350,7 +352,9 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []sender.Data, times in
 		if se, ok := err.(*utils.StatsError); ok {
 			err = se.ErrorDetail
 			if se.Ft {
+				r.rsMutex.Lock()
 				r.rs.Lag.Ftlags = se.Ftlag
+				r.rsMutex.Unlock()
 			} else {
 				if cnt > 1 {
 					info.Errors -= se.Success
@@ -426,8 +430,10 @@ func (r *LogExportRunner) Run() {
 				log.Errorf("Runner[%v] reader %s read lines larger than MaxBatchSize %v, content is %s", r.Name(), r.reader.Name(), r.MaxBatchSize, line)
 				continue
 			}
+			r.rsMutex.Lock()
 			r.rs.ReadDataSize += int64(len(line))
 			r.rs.ReadDataCount++
+			r.rsMutex.Unlock()
 			lines = append(lines, line)
 			if datasourceTag != "" {
 				froms = append(froms, r.reader.Source())
@@ -463,6 +469,7 @@ func (r *LogExportRunner) Run() {
 		errorCnt := int64(0)
 		datas, err := r.parser.Parse(lines)
 		se, ok := err.(*utils.StatsError)
+		r.rsMutex.Lock()
 		if ok {
 			errorCnt = se.Errors
 			err = se.ErrorDetail
@@ -474,6 +481,7 @@ func (r *LogExportRunner) Run() {
 		} else {
 			r.rs.ParserStats.Success++
 		}
+		r.rsMutex.Unlock()
 		if err != nil {
 			errMsg := fmt.Sprintf("Runner[%v] parser %s error : %v ", r.Name(), r.parser.Name(), err.Error())
 			log.Debugf(errMsg)
@@ -716,11 +724,24 @@ func getTrend(old, new float64) string {
 	return SpeedStable
 }
 
+func (r *LogExportRunner) getStatusFrequently(rss *RunnerStatus, now time.Time) (bool, float64) {
+	r.rsMutex.RLock()
+	defer r.rsMutex.RUnlock()
+	elaspedTime := now.Sub(r.rs.lastState).Seconds()
+	if elaspedTime <= 3 {
+		deepCopy(rss, &r.rs)
+		return true, elaspedTime
+	}
+	return false, elaspedTime
+}
+
 func (r *LogExportRunner) Status() RunnerStatus {
+	var isFre bool
+	var elaspedtime float64
+	rss := RunnerStatus{}
 	now := time.Now()
-	elaspedtime := now.Sub(r.rs.lastState).Seconds()
-	if elaspedtime <= 3 {
-		return r.rs
+	if isFre, elaspedtime = r.getStatusFrequently(&rss, now); isFre {
+		return rss
 	}
 	r.rsMutex.Lock()
 	defer r.rsMutex.Unlock()
@@ -775,7 +796,8 @@ func (r *LogExportRunner) Status() RunnerStatus {
 	}
 	r.rs.RunningStatus = RunnerRunning
 	copyRunnerStatus(&r.lastRs, &r.rs)
-	return r.rs
+	deepCopy(&rss, &r.rs)
+	return rss
 }
 
 func calcSpeedTrend(old, new utils.StatsInfo, elaspedtime float64) (speed float64, trend string) {
@@ -786,6 +808,19 @@ func calcSpeedTrend(old, new utils.StatsInfo, elaspedtime float64) (speed float6
 	}
 	trend = getTrend(old.Speed, speed)
 	return
+}
+
+func deepCopy(dst, src interface{}) {
+	var err error
+	var confByte []byte
+	if confByte, err = json.Marshal(src); err != nil {
+		log.Debugf("runner config marshal error %v", err)
+		dst = src
+	}
+	if err = json.Unmarshal(confByte, dst); err != nil {
+		log.Debugf("runner config unmarshal error %v", err)
+		dst = src
+	}
 }
 
 func copyRunnerStatus(dst, src *RunnerStatus) {
