@@ -1,11 +1,15 @@
 package utils
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
 	"database/sql"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"os"
@@ -521,5 +525,93 @@ func LogDirAndPattern(logpath string) (dir, pattern string, err error) {
 		}
 	}
 	pattern = filepath.Base(logpath)
+	return
+}
+
+func DecompressZip(packFilePath, dstDir string) (packDir string, err error) {
+	r, err := zip.OpenReader(packFilePath) //读取zip文件
+	if err != nil {
+		return "", err
+	}
+	defer r.Close()
+	for _, f := range r.File {
+		rc, err := f.Open()
+		if err != nil {
+			return "", err
+		}
+		defer rc.Close()
+
+		fpath := filepath.Join(dstDir, f.Name)
+		if f.FileInfo().IsDir() {
+			if packDir == "" {
+				packDir = fpath
+			}
+			os.MkdirAll(fpath, f.Mode())
+		} else {
+			var fdir string
+			if lastIndex := strings.LastIndex(fpath, string(os.PathSeparator)); lastIndex > -1 {
+				fdir = fpath[:lastIndex]
+			}
+			err = os.MkdirAll(fdir, f.Mode())
+			if err != nil {
+				fmt.Println(err)
+				return "", err
+			}
+			f, err := os.OpenFile(
+				fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+			if err != nil {
+				return "", err
+			}
+			defer f.Close()
+
+			_, err = io.Copy(f, rc)
+			if err != nil {
+				return "", err
+			}
+		}
+	}
+	return
+}
+
+func DecompressGzip(packPath, dstDir string) (packDir string, err error) {
+	srcFile, err := os.Open(packPath)
+	if err != nil {
+		return "", err
+	}
+	defer srcFile.Close()
+	gr, err := gzip.NewReader(srcFile)
+	if err != nil {
+		return "", err
+	}
+	defer gr.Close()
+	tr := tar.NewReader(gr)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return "", err
+		}
+		path := filepath.Join(dstDir, header.Name)
+		info := header.FileInfo()
+		if info.IsDir() {
+			if err = os.MkdirAll(path, info.Mode()); err != nil {
+				return "", err
+			}
+			if packDir == "" {
+				packDir = path
+			}
+			continue
+		}
+		file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
+		if err != nil {
+			return "", err
+		}
+		defer file.Close()
+		_, err = io.Copy(file, tr)
+		if err != nil {
+			return "", err
+		}
+	}
 	return
 }

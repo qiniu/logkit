@@ -11,6 +11,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/cli"
 	config "github.com/qiniu/logkit/conf"
 	_ "github.com/qiniu/logkit/metric/all"
 	"github.com/qiniu/logkit/mgr"
@@ -19,7 +21,6 @@ import (
 	"github.com/qiniu/logkit/utils"
 
 	"github.com/labstack/echo"
-	"github.com/qiniu/log"
 )
 
 //Config of logkit
@@ -56,8 +57,9 @@ Usage:
 
 The commands & flags are:
 
-  -v                 print the version to stdout
+  -v                 print the version to stdout.
   -h                 print logkit usage info to stdout.
+  -upgrade           check and upgrade version.
 
   -f <file>          configuration file to load
 
@@ -68,10 +70,14 @@ Examples:
 
   # check version
   logkit -v
+
+  # checking and upgrade version
+  logkit -upgrade
 `
 
 var (
 	fversion = flag.Bool("v", false, "print the version to stdout")
+	upgrade  = flag.Bool("upgrade", false, "check and upgrade version")
 	confName = flag.String("f", "logkit.conf", "configuration file to load")
 )
 
@@ -220,6 +226,9 @@ func main() {
 		fmt.Println("Core: ", osInfo.Core)
 		fmt.Println("OS: ", osInfo.OS)
 		fmt.Println("Platform: ", osInfo.Platform)
+		return
+	case *upgrade:
+		cli.CheckAndUpgrade(NextVersion)
 		return
 	}
 
