@@ -61,7 +61,7 @@ func Test_CsvParser(t *testing.T) {
 	exp["a"] = int64(123)
 	exp["b"] = "fufu"
 	exp["c"] = 3.14
-	exp["d-x"] = float64(1)
+	exp["d-x"] = json.Number("1")
 	exp["d-y"] = "2"
 	exp["e"] = tmstr
 	for k, v := range datas[0] {
@@ -104,8 +104,8 @@ func Test_Jsonmap(t *testing.T) {
 		t.Error(err)
 	}
 	d := datas[0]
-	if d["f-x"] != 1.0 {
-		t.Errorf("f-x should be float 1 but %v %v", reflect.TypeOf(d["f-x"]), d["f-x"])
+	if d["f-x"] != json.Number("1.0") {
+		t.Errorf("f-x should be json.Number 1.0 but %v %v", reflect.TypeOf(d["f-x"]), d["f-x"])
 	}
 	if d["f-z"] != 3.0 {
 		t.Errorf("f-z should be float 3.0 but type %v %v", reflect.TypeOf(d["f-z"]), d["f-z"])
