@@ -84,3 +84,4 @@ logkitweb/build
 npm-debug.log*
 ./logkitweb/yarn-debug.log*
 ./logkitweb/yarn-error.log*
+logkit.log-*

@@ -1,11 +1,15 @@
 package utils
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
 	"database/sql"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"os"
@@ -15,6 +19,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/qiniu/log"
 	"gopkg.in/mgo.v2/bson"
@@ -22,6 +27,10 @@ import (
 
 const (
 	GlobalKeyName = "name"
+	KeyCore       = "core"
+	KeyHostName   = "hostname"
+	KeyOsInfo     = "osinfo"
+	KeyLocalIp    = "localip"
 )
 
 type File struct {
@@ -128,6 +137,20 @@ func GetLogFiles(doneFilePath string) (files []File) {
 		})
 	}
 	return
+}
+
+type SchemaErr struct {
+	Number int64
+	Last   time.Time
+}
+
+func (s *SchemaErr) Output(count int64, err error) {
+	s.Number += count
+	if time.Now().Sub(s.Last) > 3*time.Second {
+		log.Errorf("%v parse line errors occured, same as %v", s.Number, err)
+		s.Number = 0
+		s.Last = time.Now()
+	}
 }
 
 type StatsError struct {
@@ -263,11 +286,11 @@ func (oi *OSInfo) String() string {
 func GetExtraInfo() map[string]string {
 	osInfo := GetOSInfo()
 	exInfo := make(map[string]string)
-	exInfo["core"] = osInfo.Core
-	exInfo["hostname"] = osInfo.Hostname
-	exInfo["osinfo"] = osInfo.OS + "-" + osInfo.Kernel + "-" + osInfo.Platform
+	exInfo[KeyCore] = osInfo.Core
+	exInfo[KeyHostName] = osInfo.Hostname
+	exInfo[KeyOsInfo] = osInfo.OS + "-" + osInfo.Kernel + "-" + osInfo.Platform
 	if ip, err := GetLocalIP(); err != nil {
-		exInfo["localip"] = ip
+		exInfo[KeyLocalIp] = ip
 	}
 	return exInfo
 }
@@ -524,4 +547,111 @@ func (s *HashSet) Elements() []interface{} {
 		element = append(element, key)
 	}
 	return element
+}
+
+// 创建目录，并返回日志模式
+func LogDirAndPattern(logpath string) (dir, pattern string, err error) {
+	dir, err = filepath.Abs(filepath.Dir(logpath))
+	if err != nil {
+		if !os.IsNotExist(err) {
+			err = fmt.Errorf("get logkit log dir error %v", err)
+			return
+		}
+	}
+	if _, err = os.Stat(dir); os.IsNotExist(err) {
+		if err = os.MkdirAll(dir, 0755); err != nil {
+			err = fmt.Errorf("create logkit log dir error %v", err)
+			return
+		}
+	}
+	pattern = filepath.Base(logpath)
+	return
+}
+
+func DecompressZip(packFilePath, dstDir string) (packDir string, err error) {
+	r, err := zip.OpenReader(packFilePath) //读取zip文件
+	if err != nil {
+		return "", err
+	}
+	defer r.Close()
+	for _, f := range r.File {
+		rc, err := f.Open()
+		if err != nil {
+			return "", err
+		}
+		defer rc.Close()
+
+		fpath := filepath.Join(dstDir, f.Name)
+		if f.FileInfo().IsDir() {
+			if packDir == "" {
+				packDir = fpath
+			}
+			os.MkdirAll(fpath, f.Mode())
+		} else {
+			var fdir string
+			if lastIndex := strings.LastIndex(fpath, string(os.PathSeparator)); lastIndex > -1 {
+				fdir = fpath[:lastIndex]
+			}
+			err = os.MkdirAll(fdir, f.Mode())
+			if err != nil {
+				fmt.Println(err)
+				return "", err
+			}
+			f, err := os.OpenFile(
+				fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+			if err != nil {
+				return "", err
+			}
+			defer f.Close()
+
+			_, err = io.Copy(f, rc)
+			if err != nil {
+				return "", err
+			}
+		}
+	}
+	return
+}
+
+func DecompressGzip(packPath, dstDir string) (packDir string, err error) {
+	srcFile, err := os.Open(packPath)
+	if err != nil {
+		return "", err
+	}
+	defer srcFile.Close()
+	gr, err := gzip.NewReader(srcFile)
+	if err != nil {
+		return "", err
+	}
+	defer gr.Close()
+	tr := tar.NewReader(gr)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return "", err
+		}
+		path := filepath.Join(dstDir, header.Name)
+		info := header.FileInfo()
+		if info.IsDir() {
+			if err = os.MkdirAll(path, info.Mode()); err != nil {
+				return "", err
+			}
+			if packDir == "" {
+				packDir = path
+			}
+			continue
+		}
+		file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
+		if err != nil {
+			return "", err
+		}
+		defer file.Close()
+		_, err = io.Copy(file, tr)
+		if err != nil {
+			return "", err
+		}
+	}
+	return
 }

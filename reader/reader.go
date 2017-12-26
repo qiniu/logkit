@@ -91,6 +91,14 @@ const (
 	KeyMssqlCron        = "mssql_cron"
 	KeyMssqlExecOnStart = "mssql_exec_onstart"
 
+	KeyPGsqlOffsetKey   = "postgres_offset_key"
+	KeyPGsqlReadBatch   = "postgres_limit_batch"
+	KeyPGsqlDataSource  = "postgres_datasource"
+	KeyPGsqlDataBase    = "postgres_database"
+	KeyPGsqlSQL         = "postgres_sql"
+	KeyPGsqlCron        = "postgres_cron"
+	KeyPGsqlExecOnStart = "postgres_exec_onstart"
+
 	KeyESReadBatch = "es_limit_batch"
 	KeyESIndex     = "es_index"
 	KeyESType      = "es_type"
@@ -126,6 +134,7 @@ const (
 	ModeFileAuto = "fileauto"
 	ModeMysql    = "mysql"
 	ModeMssql    = "mssql"
+	ModePG       = "postgres"
 	ModeElastic  = "elastic"
 	ModeMongo    = "mongo"
 	ModeKafka    = "kafka"
@@ -200,6 +209,8 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 	case ModeMysql: // Mysql 模式是启动mysql reader,读取mysql数据表
 		reader, err = NewSQLReader(meta, conf)
 	case ModeMssql: // Mssql 模式是启动mssql reader，读取mssql数据表
+		reader, err = NewSQLReader(meta, conf)
+	case ModePG: // postgre 模式是启动PostgreSQL reader，读取postgresql数据表
 		reader, err = NewSQLReader(meta, conf)
 	case ModeElastic:
 		readBatch, _ := conf.GetIntOr(KeyESReadBatch, 100)

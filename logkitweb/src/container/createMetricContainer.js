@@ -25,7 +25,7 @@ const steps = [{
   title: '配置发送方式',
   content: '配置相关发送方式',
 }, {
-  title: '确认并添加Runner',
+  title: '确认并添加收集器',
   content: '确认并添加',
 }];
 class CreateMetricRunner extends Component {
@@ -167,7 +167,7 @@ class CreateMetricRunner extends Component {
           if (window.isCluster && window.isCluster === true) {
             postClusterConfigData({name: data.name, tag: tag, url: url, body: data}).then(data => {
               if (data && data.code === 'L200') {
-                notification.success({message: "Metric Runner添加成功", duration: 10,})
+                notification.success({message: "系统信息收集器添加成功", duration: 10,})
                 handleTurnToRunner()
               }
 
@@ -175,7 +175,7 @@ class CreateMetricRunner extends Component {
           } else {
             postConfigData({name: data.name, body: data}).then(data => {
               if (data && data.code === 'L200') {
-                notification.success({message: "Metric Runner添加成功", duration: 10,})
+                notification.success({message: "系统信息收集器添加成功", duration: 10,})
                 handleTurnToRunner()
               }
 
@@ -209,7 +209,7 @@ class CreateMetricRunner extends Component {
           if (window.isCluster && window.isCluster === true) {
             putClusterConfigData({name: data.name, tag: tag, url: url, body: data}).then(data => {
               if (data && data.code === 'L200') {
-                notification.success({message: "Runner修改成功", duration: 10,})
+                notification.success({message: "收集器修改成功", duration: 10,})
                 handleTurnToRunner()
               }
 
@@ -217,7 +217,7 @@ class CreateMetricRunner extends Component {
           } else {
             putConfigData({name: data.name, body: data}).then(data => {
               if (data && data.code === 'L200') {
-                notification.success({message: "Runner修改成功", duration: 10,})
+                notification.success({message: "收集器修改成功", duration: 10,})
                 handleTurnToRunner()
               }
 

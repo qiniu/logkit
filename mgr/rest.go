@@ -40,8 +40,8 @@ type RestService struct {
 
 func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 
-	if mgr.Cluster.Enable && !mgr.Cluster.IsMaster {
-		if len(mgr.Cluster.MasterUrl) < 1 {
+	if mgr.Cluster.Enable {
+		if !mgr.Cluster.IsMaster && len(mgr.Cluster.MasterUrl) < 1 {
 			log.Fatalf("cluster is enabled but master url is empty")
 		}
 		for i := range mgr.Cluster.MasterUrl {
@@ -90,6 +90,8 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	router.GET(PREFIX+"/sender/usages", rs.GetSenderUsages())
 	router.GET(PREFIX+"/sender/options", rs.GetSenderKeyOptions())
 	router.POST(PREFIX+"/sender/check", rs.PostSenderCheck())
+	router.GET(PREFIX+"/sender/router/usage", rs.GetSenderRouterUsage())
+	router.GET(PREFIX+"/sender/router/option", rs.GetSenderRouterOption())
 
 	//transformer API
 	router.GET(PREFIX+"/transformer/usages", rs.GetTransformerUsages())
@@ -116,6 +118,7 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	router.GET(PREFIX+"/cluster/status", rs.ClusterStatus())
 	router.GET(PREFIX+"/cluster/runners", rs.GetClusterRunners())
 	router.GET(PREFIX+"/cluster/configs", rs.GetClusterConfigs())
+	router.GET(PREFIX+"/cluster/configs/:name", rs.GetClusterConfig())
 	router.POST(PREFIX+"/cluster/configs/:name", rs.PostClusterConfig())
 	router.PUT(PREFIX+"/cluster/configs/:name", rs.PutClusterConfig())
 	router.DELETE(PREFIX+"/cluster/configs/:name", rs.DeleteClusterConfig())
@@ -254,9 +257,11 @@ func (rs *RestService) GetStatus() echo.HandlerFunc {
 func (rs *RestService) GetRunners() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		runnerNameList := make([]string, 0)
+		rs.mgr.lock.RLock()
 		for _, conf := range rs.mgr.runnerConfig {
 			runnerNameList = append(runnerNameList, conf.RunnerName)
 		}
+		rs.mgr.lock.RUnlock()
 		return RespSuccess(c, runnerNameList)
 	}
 }
@@ -264,15 +269,7 @@ func (rs *RestService) GetRunners() echo.HandlerFunc {
 // get /logkit/configs
 func (rs *RestService) GetConfigs() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		rs.mgr.lock.RLock()
-		defer rs.mgr.lock.RUnlock()
-		rss := make(map[string]RunnerConfig)
-		for k, v := range rs.mgr.runnerConfig {
-			if filepath.Dir(k) == rs.mgr.RestDir {
-				v.IsInWebFolder = true
-			}
-			rss[k] = v
-		}
+		rss := rs.mgr.Configs()
 		return RespSuccess(c, rss)
 	}
 }
@@ -340,13 +337,15 @@ func (rs *RestService) checkNameAndConfig(c echo.Context) (name string, conf Run
 		return
 	}
 	var exist bool
+	var tmpConf RunnerConfig
 	rs.mgr.lock.RLock()
 	defer rs.mgr.lock.RUnlock()
 	file = filepath.Join(rs.mgr.RestDir, name+".conf")
-	if conf, exist = rs.mgr.runnerConfig[file]; !exist {
+	if tmpConf, exist = rs.mgr.runnerConfig[file]; !exist {
 		err = errors.New("config " + name + " is not found")
 		return
 	}
+	deepCopy(&conf, &tmpConf)
 	return
 }
 

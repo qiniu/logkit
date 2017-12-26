@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/qiniu/log"
+	"fmt"
 	"github.com/qiniu/logkit/conf"
 )
 
@@ -40,7 +40,7 @@ func NewFileAutoReader(conf conf.MapConf, meta *Meta, isFromWeb bool, bufSize in
 		}
 		reader, err = NewReaderSize(fr, meta, bufSize)
 	default:
-		log.Error("this mode is invalid")
+		err = fmt.Errorf("can not find property mode for this logpath %v", logpath)
 	}
 	return
 }

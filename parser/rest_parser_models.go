@@ -166,6 +166,14 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "额外的标签信息(labels)",
 		},
 		OptionTimezoneOffset,
+		{
+			KeyName:       KeyAutoRename,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"true", "false"},
+			Default:       "true",
+			DefaultNoUse:  false,
+			Description:   "自动将字段名称中的'-'更改为'_'",
+		},
 	},
 	TypeRaw: {
 		{

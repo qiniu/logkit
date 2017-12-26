@@ -1,13 +1,13 @@
 package mgr
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"encoding/json"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
@@ -36,8 +36,8 @@ type MetricRunner struct {
 	RunnerName string `json:"name"`
 
 	collectors   []metric.Collector
-	transformers []transforms.Transformer
 	senders      []sender.Sender
+	transformers map[string][]transforms.Transformer
 
 	collectInterval time.Duration
 	rs              RunnerStatus
@@ -73,7 +73,7 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 		rc.SenderConfig[i][sender.KeyRunnerName] = rc.RunnerName
 	}
 	collectors := make([]metric.Collector, 0)
-	transformers := make([]transforms.Transformer, 0)
+	transformers := make(map[string][]transforms.Transformer)
 	if len(rc.MetricConfig) == 0 {
 		return nil, fmt.Errorf("Runner " + rc.RunnerName + " has zero metric, ignore it")
 	}
@@ -97,20 +97,23 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 
 		// 配置文件中明确标明 false 的 attr 加入 discard transformer
 		config := c.Config()
+		metricName := c.Name()
+		trans := make([]transforms.Transformer, 0)
 		if attributes, ex := config[metric.AttributesString]; ex {
 			if attrs, ok := attributes.([]utils.KeyValue); ok {
 				for _, attr := range attrs {
 					val, exist := m.Attributes[attr.Key]
 					if exist && !val {
-						trans, err := createDiscardTransformer(attr.Key)
+						DisTrans, err := createDiscardTransformer(attr.Key)
 						if err != nil {
 							return nil, fmt.Errorf("metric %v key %v, transform add failed, %v", tp, attr.Key, err)
 						}
-						transformers = append(transformers, trans)
+						trans = append(trans, DisTrans)
 					}
 				}
 			}
 		}
+		transformers[metricName] = trans
 	}
 	if len(collectors) < 1 {
 		err = errors.New("no collectors were added")
@@ -133,16 +136,18 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 		lastSend:   time.Now(), // 上一次发送时间
 		meta:       meta,
 		rs: RunnerStatus{
-			ReaderStats: utils.StatsInfo{},
-			SenderStats: make(map[string]utils.StatsInfo),
-			lastState:   time.Now(),
-			Name:        rc.RunnerName,
+			ReaderStats:   utils.StatsInfo{},
+			SenderStats:   make(map[string]utils.StatsInfo),
+			lastState:     time.Now(),
+			Name:          rc.RunnerName,
+			RunningStatus: RunnerRunning,
 		},
 		lastRs: RunnerStatus{
-			ReaderStats: utils.StatsInfo{},
-			SenderStats: make(map[string]utils.StatsInfo),
-			lastState:   time.Now(),
-			Name:        rc.RunnerName,
+			ReaderStats:   utils.StatsInfo{},
+			SenderStats:   make(map[string]utils.StatsInfo),
+			lastState:     time.Now(),
+			Name:          rc.RunnerName,
+			RunningStatus: RunnerRunning,
 		},
 		rsMutex:         new(sync.RWMutex),
 		collectInterval: interval,
@@ -166,46 +171,64 @@ func (r *MetricRunner) Run() {
 			r.exitChan <- struct{}{}
 			return
 		}
+		// collect data
 		dataCnt := 0
 		datas := make([]sender.Data, 0)
-		// collect data
+		now := time.Now().Format(time.RFC3339Nano)
 		for _, c := range r.collectors {
+			metricName := c.Name()
 			tmpdatas, err := c.Collect()
 			if err != nil {
 				log.Errorf("collecter <%v> collect data error: %v", c.Name(), err)
 				continue
 			}
-			for i := range tmpdatas {
-				if len(tmpdatas[i]) > 0 {
-					dataCnt++
-					datas = append(datas, tmpdatas[i])
+			dataLen := len(tmpdatas)
+			nameLen := len(metricName)
+			if dataLen == 0 {
+				log.Debugf("MetricRunner %v collect No data", c.Name())
+				continue
+			}
+			tmpDatas := make([]sender.Data, dataLen)
+			for i, d := range tmpdatas {
+				tmpDatas[i] = d
+			}
+			if trans, ok := r.transformers[metricName]; ok {
+				for _, t := range trans {
+					tmpDatas, err = t.Transform(tmpDatas)
+					if err != nil {
+						log.Error(err)
+					}
 				}
 			}
-			if len(tmpdatas) < 1 {
-				log.Debugf("MetricRunner %v collect No data", c.Name())
+			for _, metricData := range tmpDatas {
+				if len(metricData) == 0 {
+					continue
+				}
+				data := sender.Data{
+					metric.Timestamp: now,
+				}
+				// 重命名
+				// cpu_time_user --> cpu__time_user
+				for m, d := range metricData {
+					newName := m
+					if strings.HasPrefix(m, metricName) {
+						newName = metricName + "_" + m[nameLen:]
+					}
+					data[newName] = d
+				}
+				datas = append(datas, data)
+				dataCnt++
 			}
+		}
+		if len(datas) == 0 {
+			log.Warnf("metrics collect no data")
+			time.Sleep(r.collectInterval)
+			continue
 		}
 		r.rsMutex.Lock()
 		r.rs.ReadDataCount += int64(dataCnt)
 		r.rsMutex.Unlock()
 		r.lastSend = time.Now()
-		if len(datas) <= 0 {
-			log.Debug("MetricRunner collect No data")
-			time.Sleep(r.collectInterval)
-			continue
-		}
-		var err error
-		for i := range r.transformers {
-			datas, err = r.transformers[i].Transform(datas)
-			if err != nil {
-				log.Error(err)
-			}
-		}
-		if len(datas) <= 0 {
-			log.Warnf("data has been cleared by transformer")
-			time.Sleep(r.collectInterval)
-			continue
-		}
 		for _, s := range r.senders {
 			if !r.trySend(s, datas, 3) {
 				log.Errorf("failed to send metricData: << %v >>", datas)
@@ -314,9 +337,29 @@ func (_ *MetricRunner) Cleaner() CleanInfo {
 	}
 }
 
+func (mr *MetricRunner) getStatusFrequently(rss *RunnerStatus, now time.Time) (bool, float64) {
+	mr.rsMutex.RLock()
+	defer mr.rsMutex.RUnlock()
+	elaspedTime := now.Sub(mr.rs.lastState).Seconds()
+	if elaspedTime <= 3 {
+		deepCopy(rss, &mr.rs)
+		return true, elaspedTime
+	}
+	return false, elaspedTime
+}
+
 func (mr *MetricRunner) Status() RunnerStatus {
+	var isFre bool
+	var elaspedtime float64
+	rss := RunnerStatus{}
+	now := time.Now()
+	if isFre, elaspedtime = mr.getStatusFrequently(&rss, now); isFre {
+		return rss
+	}
 	mr.rsMutex.Lock()
 	defer mr.rsMutex.Unlock()
+	mr.rs.Elaspedtime += elaspedtime
+	mr.rs.lastState = now
 	durationTime := float64(mr.collectInterval.Seconds())
 	mr.rs.ReadSpeed = float64(mr.rs.ReadDataCount-mr.lastRs.ReadDataCount) / durationTime
 	mr.rs.ReadSpeedTrend = getTrend(mr.lastRs.ReadSpeed, mr.rs.ReadSpeed)
@@ -338,7 +381,8 @@ func (mr *MetricRunner) Status() RunnerStatus {
 	}
 	mr.rs.RunningStatus = RunnerRunning
 	copyRunnerStatus(&mr.lastRs, &mr.rs)
-	return mr.rs
+	deepCopy(&rss, &mr.rs)
+	return rss
 }
 
 func (mr *MetricRunner) StatusRestore() {

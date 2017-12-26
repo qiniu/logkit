@@ -1110,6 +1110,7 @@ Content-Type: application/json
 * `L2002`: 获取 Slaves 状态出现错误
 * `L2003`: 获取 Slaves Configs 出现错误
 * `L2004`: 接受 Slaves 注册时出现错误
+* `L2014`: 获取 Slaves Config 出现错误
 
 #### logkit cluster slave 自身相关
 

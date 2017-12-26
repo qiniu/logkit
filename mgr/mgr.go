@@ -1,6 +1,7 @@
 package mgr
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -14,8 +15,6 @@ import (
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/utils"
-
-	"fmt"
 
 	"github.com/howeyc/fsnotify"
 	"github.com/qiniu/log"
@@ -41,17 +40,17 @@ type cleanQueue struct {
 type Manager struct {
 	ManagerConfig
 	DefaultDir   string
-	lock         sync.RWMutex
-	cleanlock    sync.Mutex
+	lock         *sync.RWMutex
+	cleanLock    *sync.RWMutex
+	watcherMux   *sync.RWMutex
 	cleanChan    chan cleaner.CleanSignal
 	cleanQueues  map[string]*cleanQueue
 	runners      map[string]Runner
 	runnerConfig map[string]RunnerConfig
 
-	watchers   map[string]*fsnotify.Watcher // inode到watcher的映射表
-	watcherMux sync.RWMutex
-	pregistry  *parser.ParserRegistry
-	sregistry  *sender.SenderRegistry
+	watchers  map[string]*fsnotify.Watcher // inode到watcher的映射表
+	pregistry *parser.ParserRegistry
+	sregistry *sender.SenderRegistry
 
 	Version    string
 	SystemInfo string
@@ -76,12 +75,14 @@ func NewCustomManager(conf ManagerConfig, pr *parser.ParserRegistry, sr *sender.
 	}
 	m := &Manager{
 		ManagerConfig: conf,
+		lock:          new(sync.RWMutex),
+		cleanLock:     new(sync.RWMutex),
+		watcherMux:    new(sync.RWMutex),
 		cleanChan:     make(chan cleaner.CleanSignal),
 		cleanQueues:   make(map[string]*cleanQueue),
 		runners:       make(map[string]Runner),
 		runnerConfig:  make(map[string]RunnerConfig),
 		watchers:      make(map[string]*fsnotify.Watcher),
-		watcherMux:    sync.RWMutex{},
 		pregistry:     pr,
 		sregistry:     sr,
 		SystemInfo:    utils.GetOSInfo().String(),
@@ -155,8 +156,8 @@ func (m *Manager) addCleanQueue(info CleanInfo) {
 	if !info.enable {
 		return
 	}
-	m.cleanlock.Lock()
-	defer m.cleanlock.Unlock()
+	m.cleanLock.Lock()
+	defer m.cleanLock.Unlock()
 	cq, ok := m.cleanQueues[info.logdir]
 	if ok {
 		cq.cleanerCount++
@@ -175,8 +176,8 @@ func (m *Manager) removeCleanQueue(info CleanInfo) {
 	if !info.enable {
 		return
 	}
-	m.cleanlock.Lock()
-	defer m.cleanlock.Unlock()
+	m.cleanLock.Lock()
+	defer m.cleanLock.Unlock()
 	cq, ok := m.cleanQueues[info.logdir]
 	if !ok {
 		log.Errorf("can't find clean queue %v to remove", info.logdir)
@@ -337,8 +338,8 @@ func (m *Manager) handle(path string, watcher *fsnotify.Watcher) {
 }
 
 func (m *Manager) doClean(sig cleaner.CleanSignal) {
-	m.cleanlock.Lock()
-	defer m.cleanlock.Unlock()
+	m.cleanLock.Lock()
+	defer m.cleanLock.Unlock()
 
 	dir := sig.Logdir
 	dir, err := filepath.Abs(dir)
@@ -419,7 +420,7 @@ func (m *Manager) addWatchers(confsPath []string) (err error) {
 			log.Warnf("start to add watcher of conf path %v", path)
 			for _, f := range files {
 				if f.IsDir() {
-					log.Warn("skipped dir", f.Name)
+					log.Warn("skipped dir", f.Name())
 					continue
 				}
 				m.Add(filepath.Join(path, f.Name()))
@@ -471,6 +472,8 @@ func (m *Manager) RestoreWebDir() {
 }
 
 func (m *Manager) Status() (rss map[string]RunnerStatus) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 	rss = make(map[string]RunnerStatus)
 	for key, conf := range m.runnerConfig {
 		if r, ex := m.runners[key]; ex {
@@ -512,4 +515,29 @@ func (m *Manager) GetRunnerStatus(runnerName string) (rs RunnerStatus, err error
 	}
 
 	return rs, err
+}
+
+func (m *Manager) Configs() (rss map[string]RunnerConfig) {
+	//var err error
+	//var tmpRssByte []byte
+	rss = make(map[string]RunnerConfig)
+	tmpRss := make(map[string]RunnerConfig)
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	for k, v := range m.runnerConfig {
+		if filepath.Dir(k) == m.RestDir {
+			v.IsInWebFolder = true
+		}
+		tmpRss[k] = v
+	}
+	deepCopy(&rss, &tmpRss)
+	//if tmpRssByte, err = json.Marshal(tmpRss); err != nil {
+	//	log.Debugf("runner configs marshal error %v", err)
+	//	return tmpRss
+	//}
+	//if err = json.Unmarshal(tmpRssByte, &rss); err != nil {
+	//	log.Debugf("runner configs unmarshal error %v", err)
+	//	return tmpRss
+	//}
+	return
 }

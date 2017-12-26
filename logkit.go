@@ -1,12 +1,18 @@
 package main
 
 import (
+	"flag"
+	"fmt"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"path/filepath"
 	"runtime"
 	"sort"
 	"time"
 
+	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/cli"
 	config "github.com/qiniu/logkit/conf"
 	_ "github.com/qiniu/logkit/metric/all"
 	"github.com/qiniu/logkit/mgr"
@@ -14,11 +20,7 @@ import (
 	_ "github.com/qiniu/logkit/transforms/all"
 	"github.com/qiniu/logkit/utils"
 
-	"net/http"
-	_ "net/http/pprof"
-
 	"github.com/labstack/echo"
-	"github.com/qiniu/log"
 )
 
 //Config of logkit
@@ -27,6 +29,7 @@ type Config struct {
 	DebugLevel       int      `json:"debug_level"`
 	ProfileHost      string   `json:"profile_host"`
 	ConfsPath        []string `json:"confs_path"`
+	LogPath          string   `json:"log"`
 	CleanSelfLog     bool     `json:"clean_self_log"`
 	CleanSelfDir     string   `json:"clean_self_dir"`
 	CleanSelfPattern string   `json:"clean_self_pattern"`
@@ -39,10 +42,43 @@ type Config struct {
 var conf Config
 
 const (
-	Version           = "v1.4.0"
+	NextVersion       = "v1.4.2"
 	defaultReserveCnt = 5
 	defaultLogDir     = "./run"
 	defaultLogPattern = "*.log-*"
+	defaultRotateSize = 100 * 1024 * 1024
+)
+
+const usage = `logkit, Very easy-to-use server agent for collecting & sending logs & metrics.
+
+Usage:
+
+  logkit [commands|flags]
+
+The commands & flags are:
+
+  -v                 print the version to stdout.
+  -h                 print logkit usage info to stdout.
+  -upgrade           check and upgrade version.
+
+  -f <file>          configuration file to load
+
+Examples:
+
+  # start logkit
+  logkit -f logkit.conf
+
+  # check version
+  logkit -v
+
+  # checking and upgrade version
+  logkit -upgrade
+`
+
+var (
+	fversion = flag.Bool("v", false, "print the version to stdout")
+	upgrade  = flag.Bool("upgrade", false, "check and upgrade version")
+	confName = flag.String("f", "logkit.conf", "configuration file to load")
 )
 
 func getValidPath(confPaths []string) (paths []string) {
@@ -109,7 +145,7 @@ func cleanLogkitLog(dir, pattern string, reserveCnt int) {
 	return
 }
 
-func loopCleanLogkitLog(dir, pattern string, reserveCnt int, exitchan chan struct{}) {
+func loopCleanLogkitLog(dir, pattern string, reserveCnt int, dur time.Duration, exitchan chan struct{}) {
 	if len(dir) <= 0 {
 		dir = defaultLogDir
 	}
@@ -119,7 +155,7 @@ func loopCleanLogkitLog(dir, pattern string, reserveCnt int, exitchan chan struc
 	if reserveCnt <= 0 {
 		reserveCnt = defaultReserveCnt
 	}
-	ticker := time.NewTicker(time.Minute * 10)
+	ticker := time.NewTicker(dur)
 	for {
 		select {
 		case <-exitchan:
@@ -130,14 +166,75 @@ func loopCleanLogkitLog(dir, pattern string, reserveCnt int, exitchan chan struc
 	}
 }
 
+func rotateLog(path string) (file *os.File, err error) {
+	newfile := path + "-" + time.Now().Format("0102030405")
+	file, err = os.OpenFile(newfile, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
+	if err != nil {
+		err = fmt.Errorf("rotateLog open newfile %v err %v", newfile, err)
+		return
+	}
+	log.SetOutput(file)
+	return
+}
+
+func loopRotateLogs(path string, rotateSize int64, dur time.Duration, exitchan chan struct{}) {
+	file, err := rotateLog(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	ticker := time.NewTicker(dur)
+	for {
+		select {
+		case <-exitchan:
+			return
+		case <-ticker.C:
+			info, err := file.Stat()
+			if err != nil {
+				log.Warnf("stat log error %v", err)
+			} else {
+				if info.Size() >= rotateSize {
+					newfile, err := rotateLog(path)
+					if err != nil {
+						log.Errorf("rotate log %v error %v, use old log to write logkit log", path, err)
+					} else {
+						file.Close()
+						file = newfile
+					}
+				}
+			}
+
+		}
+	}
+}
+
+func usageExit(rc int) {
+	fmt.Println(usage)
+	os.Exit(rc)
+}
+
 //！！！注意： 自动生成 grok pattern代码，下述注释请勿删除！！！
 //go:generate go run generators/grok_pattern_generater.go
 func main() {
-	config.Init("f", "logkit", "logkit.conf")
-	if err := config.Load(&conf); err != nil {
+
+	flag.Usage = func() { usageExit(0) }
+	flag.Parse()
+	switch {
+	case *fversion:
+		fmt.Println("logkit version: ", NextVersion)
+		osInfo := utils.GetOSInfo()
+		fmt.Println("Hostname: ", osInfo.Hostname)
+		fmt.Println("Core: ", osInfo.Core)
+		fmt.Println("OS: ", osInfo.OS)
+		fmt.Println("Platform: ", osInfo.Platform)
+		return
+	case *upgrade:
+		cli.CheckAndUpgrade(NextVersion)
+		return
+	}
+
+	if err := config.LoadEx(&conf, *confName); err != nil {
 		log.Fatal("config.Load failed:", err)
 	}
-	log.Printf("Welcome to use Logkit, Version: %v \n\nConfig: %#v", Version, conf)
 	if conf.TimeLayouts != nil {
 		times.AddLayout(conf.TimeLayouts)
 	}
@@ -147,11 +244,24 @@ func main() {
 	runtime.GOMAXPROCS(conf.MaxProcs)
 	log.SetOutputLevel(conf.DebugLevel)
 
+	stopRotate := make(chan struct{}, 0)
+	defer close(stopRotate)
+	if conf.LogPath != "" {
+		logdir, logpattern, err := utils.LogDirAndPattern(conf.LogPath)
+		if err != nil {
+			log.Fatal(err)
+		}
+		go loopRotateLogs(filepath.Join(logdir, logpattern), defaultRotateSize, 10*time.Second, stopRotate)
+		conf.CleanSelfPattern = logpattern + "-*"
+		conf.CleanSelfDir = logdir
+	}
+
+	log.Infof("Welcome to use Logkit, Version: %v \n\nConfig: %#v", NextVersion, conf)
 	m, err := mgr.NewManager(conf.ManagerConfig)
 	if err != nil {
 		log.Fatalf("NewManager: %v", err)
 	}
-	m.Version = Version
+	m.Version = NextVersion
 
 	paths := getValidPath(conf.ConfsPath)
 	if len(paths) <= 0 {
@@ -165,7 +275,7 @@ func main() {
 	stopClean := make(chan struct{}, 0)
 	defer close(stopClean)
 	if conf.CleanSelfLog {
-		go loopCleanLogkitLog(conf.CleanSelfDir, conf.CleanSelfPattern, conf.CleanSelfLogCnt, stopClean)
+		go loopCleanLogkitLog(conf.CleanSelfDir, conf.CleanSelfPattern, conf.CleanSelfLogCnt, 10*time.Minute, stopClean)
 	}
 	if len(conf.BindHost) > 0 {
 		m.BindHost = conf.BindHost

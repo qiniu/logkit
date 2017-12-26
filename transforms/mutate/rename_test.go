@@ -1,10 +1,11 @@
 package mutate
 
 import (
+	"testing"
+
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestRenameTransformer(t *testing.T) {

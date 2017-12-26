@@ -2,18 +2,17 @@ package mgr
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/labstack/echo"
-	"github.com/qiniu/logkit/utils"
+	"github.com/qiniu/logkit/reader"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,1015 +31,576 @@ type respSlaveConfig struct {
 	Data map[string]SlaveConfig `json:"data"`
 }
 
-func TestClusterApi(t *testing.T) {
-	dir := "TestClusterApi"
-	os.RemoveAll(dir)
-	if err := os.Mkdir(dir, 0755); err != nil {
-		t.Fatalf("TestClusterApi error mkdir %v %v", dir, err)
-	}
-	defer os.RemoveAll(dir)
-	pwd, err := os.Getwd()
-	assert.NoError(t, err)
-	confdir := pwd + "/" + dir
-	logpath := dir + "/logdir"
-	metapath := dir + "/meta_mock_csv"
-	var master_conf, slave_conf ManagerConfig
-	master_conf.RestDir = confdir
-	master_conf.BindHost = ":6349" //master
-	master_conf.Cluster.Enable = true
-	master_conf.Cluster.IsMaster = true
+const (
+	logkitCount = 4
+)
 
-	master, err := NewManager(master_conf)
-	assert.NoError(t, err)
-	master_rs := NewRestService(master, echo.New())
-
-	slave_conf.RestDir = confdir
-	slave_conf.BindHost = ":6350" //slave
-	slave_conf.Cluster.Enable = true
-	slave_conf.Cluster.IsMaster = false
-	slave_conf.Cluster.MasterUrl = []string{master_rs.cluster.Address}
-
-	slave, err := NewManager(slave_conf)
-	assert.NoError(t, err)
-	slave_rs := NewRestService(slave, echo.New())
-
-	defer func() {
-		slave_rs.Stop()
-		master_rs.Stop()
-		os.Remove(StatsShell)
-		os.RemoveAll(".logkitconfs")
-	}()
-
-	err = Register([]string{master_rs.cluster.Address}, slave_rs.cluster.Address, "test")
-	assert.NoError(t, err)
-	master_rs.cluster.slaves[0].LastTouch = time.Time{}
-	assert.Equal(t, []Slave{{Url: slave_rs.cluster.Address, Tag: "test", Status: StatusOK}}, master_rs.cluster.slaves)
-	req := TagReq{Tag: "test_changed"}
-	marshaled, err := json.Marshal(req)
-	assert.NoError(t, err)
-	resp, err := http.Post(slave_rs.cluster.Address+"/logkit/cluster/tag", TESTContentApplictionJson, bytes.NewReader(marshaled))
-	assert.NoError(t, err)
-	content, _ := ioutil.ReadAll(resp.Body)
-	assert.Equal(t, []Slave{{Url: slave_rs.cluster.Address, Tag: "test_changed", Status: StatusOK, LastTouch: master_rs.cluster.slaves[0].LastTouch}}, master_rs.cluster.slaves, string(content))
-	resp.Body.Close()
-
-	slave_conf.BindHost = ":6351"
-	slave2, err := NewManager(slave_conf)
-	assert.NoError(t, err)
-	slave_rs2 := NewRestService(slave2, echo.New())
-	defer slave_rs2.Stop()
-	err = Register([]string{master_rs.cluster.Address}, slave_rs2.cluster.Address, "test")
-	assert.NoError(t, err)
-
-	resp, err = http.Get(slave_rs.cluster.MasterUrl[0] + "/logkit/cluster/slaves?tag=test_changed")
-	assert.NoError(t, err)
-	content, _ = ioutil.ReadAll(resp.Body)
-	var respSlaves respSlave
-	err = json.Unmarshal(content, &respSlaves)
-	assert.NoError(t, err)
-	slaves := respSlaves.Data
-	for i := range slaves {
-		slaves[i].LastTouch = time.Time{}
-	}
-	assert.Equal(t, []Slave{{Url: slave_rs.cluster.Address, Tag: "test_changed", Status: StatusOK}}, slaves, string(content))
-	resp.Body.Close()
-
-	var testClusterApiConf = `{
-    "name":"test1",
-    "batch_len": 1,
-    "batch_size": 20,
-    "batch_interval": 60,
-    "batch_try_times": 3,
-    "reader":{
-        "log_path":"./TestClusterApi/logdir",
-        "meta_path":"./TestClusterApi/meta_mock_csv",
-        "mode":"dir",
-        "read_from":"oldest",
-        "ignore_hidden":"true"
-    },
-    "parser":{
-        "name":         "req_csv",
-		"type":         "csv",
-		"csv_schema":   "logtype string, xx long",
-		"csv_splitter": " "
-    },
-    "senders":[{
-		"name":           "file_sender",
-		"sender_type":    "file",
-		"file_send_path": "./TestClusterApi/filesenderdata"
-    }]
-}`
-
-	if err := os.Mkdir(logpath, 0755); err != nil {
-		assert.NoError(t, err)
-	}
-	if err := os.Mkdir(metapath, 0755); err != nil {
-		assert.NoError(t, err)
-	}
-	log1 := `hello 123
-	xx 1`
-	if err := ioutil.WriteFile(filepath.Join(logpath, "log1"), []byte(log1), 0666); err != nil {
-		assert.NoError(t, err)
-	}
-	time.Sleep(1 * time.Second)
-
-	_, err = http.Post(slave_rs.cluster.Address+"/logkit/configs/"+"test1", TESTContentApplictionJson, bytes.NewReader([]byte(testClusterApiConf)))
-	assert.NoError(t, err)
-	time.Sleep(4 * time.Second)
-
-	resp, err = http.Get(slave_rs.cluster.MasterUrl[0] + "/logkit/cluster/status?tag=test_changed")
-	assert.NoError(t, err)
-	allstdata, err := ioutil.ReadAll(resp.Body)
-	assert.NoError(t, err)
-	var respAllStatus respClusterStatus
-	err = json.Unmarshal(allstdata, &respAllStatus)
-	assert.NoError(t, err, string(allstdata))
-	allstatus := respAllStatus.Data
-	rp, err := filepath.Abs(logpath)
-	if err != nil {
-		t.Error(err)
-	}
-
-	sts := map[string]RunnerStatus{
-		"test1": {
-			Name:             "test1",
-			Logpath:          rp,
-			ReadDataCount:    2,
-			ReadDataSize:     15,
-			ReadSpeedTrend:   SpeedUp,
-			ReadSpeedTrendKb: SpeedUp,
-			Lag: RunnerLag{
-				Size:  0,
-				Files: 0,
-			},
-			ParserStats: utils.StatsInfo{
-				Errors:  0,
-				Success: 2,
-				Trend:   SpeedUp,
-			},
-			TransformStats: make(map[string]utils.StatsInfo),
-			SenderStats: map[string]utils.StatsInfo{
-				"file_sender": {
-					Errors:  0,
-					Success: 2,
-					Trend:   SpeedUp,
-				},
-			},
-			Tag:           "test_changed",
-			Url:           slave_rs.cluster.Address,
-			RunningStatus: RunnerRunning,
-		},
-	}
-
-	gotstatus := make(map[string]ClusterStatus)
-	gotstatus[slave_rs.cluster.Address] = ClusterStatus{
-		Status: sts,
-		Tag:    "test_changed",
-	}
-
-	rs, ok := allstatus[slave_rs.cluster.Address]
-	assert.Equal(t, true, ok, string(allstdata))
-	v, ok := rs.Status["test1"]
-	assert.Equal(t, true, ok, rs.Status)
-	v.Elaspedtime = 0
-	v.ReadSpeed = 0
-	v.ReadSpeedKB = 0
-	v.ParserStats.Speed = 0
-	fs := v.SenderStats["file_sender"]
-	fs.Speed = 0
-	v.SenderStats["file_sender"] = fs
-	rs.Status["test1"] = v
-	allstatus[slave_rs.cluster.Address] = rs
-
-	assert.Equal(t, gotstatus, allstatus)
+type testCluParam struct {
+	rd string
+	t  *testing.T
+	rs [logkitCount]*RestService
 }
 
-func TestClusterUpdate(t *testing.T) {
-	dir := "TestClusterUpdate"
-	os.RemoveAll(dir)
-	if err := os.Mkdir(dir, 0755); err != nil {
-		t.Fatalf("TestClusterUpdate error mkdir %v %v", dir, err)
+func getClusterRunnerStatus(rn, lp, rs string, rdc, rds, pe, ps, se, ss int64, tag, url string) map[string]RunnerStatus {
+	runnerStatus := getRunnerStatus(rn, lp, rs, rdc, rds, pe, ps, se, ss)
+	for k, v := range runnerStatus {
+		v.Tag = tag
+		v.Url = url
+		runnerStatus[k] = v
 	}
-	defer os.RemoveAll(dir)
+	return runnerStatus
+}
+
+func TestClusterRest(t *testing.T) {
 	pwd, err := os.Getwd()
-	assert.NoError(t, err)
-	confdir := pwd + "/" + dir
-	logpath := dir + "/logdir"
-	metapath := dir + "/meta_mock_csv"
-	var master_conf, slave_conf ManagerConfig
-	master_conf.RestDir = confdir
-	master_conf.BindHost = ":6352" //master
-	master_conf.Cluster.Enable = true
-	master_conf.Cluster.IsMaster = true
-
-	master, err := NewManager(master_conf)
-	assert.NoError(t, err)
-	master_rs := NewRestService(master, echo.New())
-
-	slaves := make([]Slave, 0)
-
-	slave_conf.RestDir = confdir
-	slave_conf.BindHost = ":6353" //slave
-	slave_conf.Cluster.Enable = true
-	slave_conf.Cluster.IsMaster = false
-	slave_conf.Cluster.MasterUrl = []string{master_rs.cluster.Address}
-	slave, err := NewManager(slave_conf)
-	assert.NoError(t, err)
-	slave_rs := NewRestService(slave, echo.New())
-	err = Register([]string{master_rs.cluster.Address}, slave_rs.cluster.Address, "test")
-	assert.NoError(t, err)
-	req := TagReq{Tag: "test"}
-	marshaled, err := json.Marshal(req)
-	assert.NoError(t, err)
-	resp, err := http.Post(slave_rs.cluster.Address+"/logkit/cluster/tag", TESTContentApplictionJson, bytes.NewReader(marshaled))
-	assert.NoError(t, err)
-	slaves = append(slaves, Slave{Url: slave_rs.cluster.Address, Tag: "test", Status: StatusOK, LastTouch: master_rs.cluster.slaves[0].LastTouch})
-	content, _ := ioutil.ReadAll(resp.Body)
-	assert.Equal(t, slaves, master_rs.cluster.slaves, string(content))
-	resp.Body.Close()
-
-	slave_conf.BindHost = ":6354" // slave2
-	slave2, err := NewManager(slave_conf)
-	assert.NoError(t, err)
-	slave_rs2 := NewRestService(slave2, echo.New())
-	err = Register([]string{master_rs.cluster.Address}, slave_rs2.cluster.Address, "test")
-	assert.NoError(t, err)
-	resp, err = http.Post(slave_rs2.cluster.Address+"/logkit/cluster/tag", TESTContentApplictionJson, bytes.NewReader(marshaled))
-	assert.NoError(t, err)
-	slaves = append(slaves, Slave{Url: slave_rs2.cluster.Address, Tag: "test", Status: StatusOK, LastTouch: master_rs.cluster.slaves[1].LastTouch})
-	content, _ = ioutil.ReadAll(resp.Body)
-	assert.Equal(t, slaves, master_rs.cluster.slaves, string(content))
-	resp.Body.Close()
-
-	slave_conf.BindHost = ":6355" // slave3
-	slave3, err := NewManager(slave_conf)
-	assert.NoError(t, err)
-	slave_rs3 := NewRestService(slave3, echo.New())
-	err = Register([]string{master_rs.cluster.Address}, slave_rs3.cluster.Address, "test_change")
-	assert.NoError(t, err)
-	req = TagReq{Tag: "test_change"}
-	marshaled, err = json.Marshal(req)
-	resp, err = http.Post(slave_rs3.cluster.Address+"/logkit/cluster/tag", TESTContentApplictionJson, bytes.NewReader(marshaled))
-	assert.NoError(t, err)
-	content, _ = ioutil.ReadAll(resp.Body)
-	assert.Equal(t, []Slave{{Url: slave_rs3.cluster.Address, Tag: "test_change", Status: StatusOK, LastTouch: master_rs.cluster.slaves[2].LastTouch}}, []Slave{master_rs.cluster.slaves[2]}, string(content))
-	resp.Body.Close()
-
-	defer func() {
-		slave_rs.Stop()
-		master_rs.Stop()
-		slave_rs2.Stop()
-		slave_rs3.Stop()
-		os.Remove(StatsShell)
-		os.RemoveAll(".logkitconfs")
-	}()
-
-	var testClusterApiConf = `{
-    "name":"test2",
-    "batch_len": 1,
-    "batch_size": 20,
-    "batch_interval": 60,
-    "batch_try_times": 3,
-    "reader":{
-        "log_path":"./TestClusterUpdate/logdir",
-        "meta_path":"./TestClusterUpdate/meta_mock_csv",
-        "mode":"dir",
-        "read_from":"oldest",
-        "ignore_hidden":"true"
-    },
-    "parser":{
-        "name":         "req_csv",
-		"type":         "csv",
-		"csv_schema":   "logtype string, xx long",
-		"csv_splitter": " "
-    },
-    "senders":[{
-		"name":           "file_sender",
-		"sender_type":    "file",
-		"file_send_path": "./TestClusterUpdate/filesenderdata"
-    }]
-}`
-
-	if err := os.Mkdir(logpath, 0755); err != nil {
-		assert.NoError(t, err)
-	}
-	if err := os.Mkdir(metapath, 0755); err != nil {
-		assert.NoError(t, err)
-	}
-	log1 := `hello 123
-	xx 1`
-	if err := ioutil.WriteFile(filepath.Join(logpath, "log1"), []byte(log1), 0666); err != nil {
-		assert.NoError(t, err)
-	}
-	time.Sleep(1 * time.Second)
-
-	// 测试增加 runner
-	resp, err = http.Post(master_rs.cluster.Address+"/logkit/cluster/configs/test2?tag=test", TESTContentApplictionJson, bytes.NewReader([]byte(testClusterApiConf)))
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
-	assert.NoError(t, err)
-	time.Sleep(4 * time.Second)
-
-	resp, err = http.Post(master_rs.cluster.Address+"/logkit/cluster/configs/test2?tag=test_change", TESTContentApplictionJson, bytes.NewReader([]byte(testClusterApiConf)))
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
-	assert.NoError(t, err)
-	time.Sleep(1 * time.Second)
-
-	resp, err = http.Get(master_rs.cluster.Address + "/logkit/cluster/status?tag=test")
-	assert.NoError(t, err)
-	allStData, err := ioutil.ReadAll(resp.Body)
-	assert.NoError(t, err)
-	var respAllStatus respClusterStatus
-	err = json.Unmarshal(allStData, &respAllStatus)
-	assert.NoError(t, err, string(allStData))
-	allStatus := respAllStatus.Data
-	rp, err := filepath.Abs(logpath)
 	if err != nil {
 		t.Error(err)
 	}
-
-	sts := map[string]RunnerStatus{
-		"test2": {
-			Name:             "test2",
-			Logpath:          rp,
-			ReadDataCount:    2,
-			ReadDataSize:     15,
-			ReadSpeedTrend:   SpeedUp,
-			ReadSpeedTrendKb: SpeedUp,
-			Lag: RunnerLag{
-				Size:  0,
-				Files: 0,
-			},
-			ParserStats: utils.StatsInfo{
-				Errors:  0,
-				Success: 2,
-				Trend:   SpeedUp,
-			},
-			TransformStats: make(map[string]utils.StatsInfo),
-			SenderStats: map[string]utils.StatsInfo{
-				"file_sender": {
-					Errors:  0,
-					Success: 2,
-					Trend:   SpeedUp,
-				},
-			},
-			Tag:           "test",
-			Url:           slave_rs.cluster.Address,
-			RunningStatus: RunnerRunning,
-		},
+	confDirName := "confs"
+	rootDirName := "testClusterRest"
+	testRoot := filepath.Join(pwd, rootDirName)
+	os.RemoveAll(testRoot)
+	if err := mkTestDir(testRoot); err != nil {
+		t.Fatalf("TestClusterRest mkdir error %v", err)
 	}
 
-	sts2 := map[string]RunnerStatus{
-		"test2": {
-			Name:             "test2",
-			Logpath:          rp,
-			ReadDataCount:    2,
-			ReadDataSize:     15,
-			ReadSpeedTrend:   SpeedUp,
-			ReadSpeedTrendKb: SpeedUp,
-			Lag: RunnerLag{
-				Size:  0,
-				Files: 0,
-			},
-			ParserStats: utils.StatsInfo{
-				Errors:  0,
-				Success: 2,
-				Trend:   SpeedUp,
-			},
-			TransformStats: make(map[string]utils.StatsInfo),
-			SenderStats: map[string]utils.StatsInfo{
-				"file_sender": {
-					Errors:  0,
-					Success: 2,
-					Trend:   SpeedUp,
-				},
-			},
-			Tag:           "test",
-			Url:           slave_rs2.cluster.Address,
-			RunningStatus: RunnerRunning,
-		},
+	port := 6201
+	rs := [logkitCount]*RestService{}
+	tag := [logkitCount]string{"test", "test", "test", "test_change"}
+	logkitName := [logkitCount]string{"master", "slave1", "slave2", "slave3"}
+	for i := 0; i < logkitCount; i++ {
+		lName := logkitName[i]
+		rootDir := filepath.Join(testRoot, lName)
+		confDir := filepath.Join(rootDir, confDirName)
+		if err := mkTestDir(rootDir, confDir); err != nil {
+			t.Fatalf("TestClusterRest mkdir error %v", err)
+		}
+		var logkitConf ManagerConfig
+		logkitConf.RestDir = confDir
+		logkitConf.BindHost = ":" + strconv.Itoa(port+i)
+		logkitConf.Cluster.Enable = true
+		if i == 0 {
+			logkitConf.Cluster.IsMaster = true
+		} else {
+			logkitConf.Cluster.MasterUrl = []string{rs[0].address}
+		}
+		m, err := NewManager(logkitConf)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r := NewRestService(m, echo.New())
+		time.Sleep(time.Second)
+		if i != 0 {
+			r.cluster.Tag = tag[i]
+			if err = Register(r.cluster.MasterUrl, r.cluster.Address, tag[i]); err != nil {
+				t.Fatalf("register master failed error is %v", err)
+			}
+		}
+		rs[i] = r
+	}
+	c := make(chan string)
+	defer func() {
+		close(c)
+		os.Remove(StatsShell)
+		os.RemoveAll(testRoot)
+		for _, r := range rs {
+			if r != nil {
+				r.Stop()
+			}
+		}
+	}()
+
+	// 删除 slave
+	clusterSlavesDeleteTest(&testCluParam{testRoot, t, rs})
+	// 重新注册
+	for i := 1; i < logkitCount; i++ {
+		if err = Register(rs[i].cluster.MasterUrl, rs[i].cluster.Address, rs[i].cluster.Tag); err != nil {
+			t.Fatalf("register master failed, error is %v", err)
+		}
+	}
+	// 测试更改 tag
+	changeTagsTest(&testCluParam{testRoot, t, rs})
+	// 重新注册
+	for i := 1; i < logkitCount; i++ {
+		rs[i].cluster.Tag = tag[i]
+		if err = Register(rs[i].cluster.MasterUrl, rs[i].cluster.Address, rs[i].cluster.Tag); err != nil {
+			t.Fatalf("register master failed, error is %v", err)
+		}
 	}
 
-	gotStatus := make(map[string]ClusterStatus)
-	gotStatus[slave_rs.cluster.Address] = ClusterStatus{
-		Status: sts,
-		Tag:    "test",
+	funcMap := map[string]func(*testCluParam){
+		"clusterUpdateTest":       clusterUpdateTest,
+		"clusterStartStopTest":    clusterStartStopTest,
+		"clusterResetDeleteTest":  clusterResetDeleteTest,
+		"clusterSalveConfigsTest": clusterSalveConfigsTest,
+		"getSlavesRunnerTest":     getSlavesRunnerTest,
+		"getSlaveConfigTest":      getSlaveConfigTest,
 	}
-	gotStatus[slave_rs2.cluster.Address] = ClusterStatus{
+
+	for k, f := range funcMap {
+		go func(k string, f func(*testCluParam), c chan string) {
+			f(&testCluParam{t: t, rs: rs, rd: testRoot})
+			c <- k
+		}(k, f, c)
+	}
+	funcCnt := len(funcMap)
+	for i := 0; i < funcCnt; i++ {
+		<-c
+	}
+}
+
+func clusterUpdateTest(p *testCluParam) {
+	t := p.t
+	rs := p.rs
+	rd := p.rd
+	resvName := "sendData"
+	runnerName := "clusterUpdateTest"
+	dir := runnerName + "Dir"
+	rootDir := filepath.Join(rd, dir)
+	metaDir := filepath.Join(rootDir, "meta")
+	logDir := filepath.Join(rootDir, "logdir")
+	logPath := filepath.Join(logDir, "log1")
+	resvDir := filepath.Join(rootDir, "sender")
+	resvPath := filepath.Join(resvDir, resvName)
+	if err := mkTestDir(rootDir, logDir, metaDir, resvDir); err != nil {
+		t.Fatalf("mkdir error %v", err)
+	}
+
+	log1 := `{"a":1,"b":2,"c":"3","d":"4"}`
+	if err := writeLogFile([]string{log1}, logDir); err != nil {
+		t.Fatalf("write log string to file failed error is %v", err)
+	}
+	time.Sleep(1 * time.Second)
+	mode := reader.DirMode
+	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, mode, resvPath)
+	if err != nil {
+		t.Fatalf("get runner config failed error is %v", err)
+	}
+
+	// 测试增加 runner, tag = test
+	url := rs[0].cluster.Address + "/logkit/cluster/configs/" + runnerName
+	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(6 * time.Second)
+
+	// 获取 status , tag = test
+	url = rs[0].cluster.Address + "/logkit/cluster/status?tag=" + rs[1].cluster.Tag
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	var respGotStatus respClusterStatus
+	err = json.Unmarshal(respBody, &respGotStatus)
+	assert.NoError(t, err, string(respBody))
+	gotStatus := respGotStatus.Data
+
+	sts1 := getClusterRunnerStatus(runnerName, logDir, RunnerRunning, 1, 29, 0, 1, 0, 1, rs[1].cluster.Tag, rs[1].cluster.Address)
+	sts2 := getClusterRunnerStatus(runnerName, logDir, RunnerRunning, 1, 29, 0, 1, 0, 1, rs[2].cluster.Tag, rs[2].cluster.Address)
+
+	expStatus := make(map[string]ClusterStatus)
+	expStatus[rs[1].cluster.Address] = ClusterStatus{
+		Status: sts1,
+		Tag:    rs[1].cluster.Tag,
+	}
+	expStatus[rs[2].cluster.Address] = ClusterStatus{
 		Status: sts2,
-		Tag:    "test",
+		Tag:    rs[2].cluster.Tag,
 	}
 
-	rs, ok := allStatus[slave_rs.cluster.Address]
-	assert.Equal(t, true, ok, string(allStData))
-	v, ok := rs.Status["test2"]
-	assert.Equal(t, true, ok, rs.Status)
-	v.Elaspedtime = 0
-	v.ReadSpeed = 0
-	v.ReadSpeedKB = 0
-	v.ParserStats.Speed = 0
-	fs := v.SenderStats["file_sender"]
-	fs.Speed = 0
-	v.SenderStats["file_sender"] = fs
-	rs.Status["test2"] = v
-	allStatus[slave_rs.cluster.Address] = rs
+	actStatus := make(map[string]ClusterStatus)
+	gs, ok := gotStatus[rs[1].cluster.Address]
+	assert.Equal(t, true, ok, string(respBody))
+	v, ok := gs.Status[runnerName]
+	assert.Equal(t, true, ok)
+	clearGotStatus(&v)
+	gs.Status = make(map[string]RunnerStatus)
+	gs.Status[runnerName] = v
+	actStatus[rs[1].cluster.Address] = gs
 
-	rs2, ok := allStatus[slave_rs2.cluster.Address]
-	assert.Equal(t, true, ok, string(allStData))
-	v2, ok := rs2.Status["test2"]
-	assert.Equal(t, true, ok, rs.Status)
-	v2.Elaspedtime = 0
-	v2.ReadSpeed = 0
-	v2.ReadSpeedKB = 0
-	v2.ParserStats.Speed = 0
-	fs2 := v.SenderStats["file_sender"]
-	fs2.Speed = 0
-	v2.SenderStats["file_sender"] = fs2
-	rs2.Status["test2"] = v2
-	allStatus[slave_rs2.cluster.Address] = rs2
-	assert.Equal(t, len(gotStatus), len(allStatus))
-	for key, val := range allStatus {
-		ex, ok := gotStatus[key]
-		assert.Equal(t, ex, val)
+	gs, ok = gotStatus[rs[2].cluster.Address]
+	assert.Equal(t, true, ok, string(respBody))
+	v, ok = gs.Status[runnerName]
+	assert.Equal(t, true, ok)
+	clearGotStatus(&v)
+	gs.Status = make(map[string]RunnerStatus)
+	gs.Status[runnerName] = v
+	actStatus[rs[2].cluster.Address] = gs
+	assert.Equal(t, len(expStatus), len(actStatus))
+	for key, ex := range expStatus {
+		act, ok := actStatus[key]
 		assert.Equal(t, true, ok)
+		assert.Equal(t, ex, act)
 	}
 
 	// 测试 update runner
-	var testClusterApiConf1 = `{
-    "name":"test2",
-    "batch_len": 1,
-    "batch_size": 20,
-    "batch_interval": 60,
-    "batch_try_times": 3,
-    "reader":{
-        "log_path":"./TestClusterUpdate/logdir/log1",
-        "meta_path":"./TestClusterUpdate/meta_mock_csv",
-        "mode":"file",
-        "read_from":"oldest",
-        "ignore_hidden":"true"
-    },
-    "parser":{
-        "name":         "req_csv",
-		"type":         "csv",
-		"csv_schema":   "logtype string, xx long",
-		"csv_splitter": " "
-    },
-    "senders":[{
-		"name":           "file_sender",
-		"sender_type":    "file",
-		"file_send_path": "./TestClusterUpdate/filesenderdata"
-    }]
-}`
-	request, err := http.NewRequest(http.MethodPut, master_rs.cluster.Address+"/logkit/cluster/configs/test2?tag=test", bytes.NewReader([]byte(testClusterApiConf1)))
-	request.Header.Set(ContentType, ApplicationJson)
-	resp, err = http.DefaultClient.Do(request)
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
-	assert.NoError(t, err)
-	time.Sleep(5 * time.Second)
+	mode = reader.FileMode
+	updateConf, err := getRunnerConfig(runnerName, logPath, metaDir, mode, resvPath)
+	if err != nil {
+		t.Fatalf("get runner config failed error is %v", err)
+	}
+
+	// 更新 runner, tag = test
+	url = rs[0].cluster.Address + "/logkit/cluster/configs/" + runnerName + "?tag=" + rs[1].cluster.Tag
+	respCode, respBody, err = makeRequest(url, http.MethodPut, updateConf)
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(10 * time.Second)
 
 	// 尝试更改一个不存在的 slave
-	request, err = http.NewRequest(http.MethodPut, master_rs.cluster.Address+"/logkit/cluster/configs/test2?tag=test&url="+slave_rs3.cluster.Address, bytes.NewReader([]byte(testClusterApiConf1)))
-	request.Header.Set(ContentType, ApplicationJson)
-	resp, err = http.DefaultClient.Do(request)
-	assert.Equal(t, resp.StatusCode, http.StatusBadRequest)
-	assert.NoError(t, err)
+	url = rs[0].cluster.Address + "/logkit/cluster/configs/" + runnerName + "?tag=" + rs[1].cluster.Tag + "&url=" + rs[3].cluster.Address
+	respCode, respBody, err = makeRequest(url, http.MethodPut, updateConf)
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusBadRequest, respCode)
 
-	// 上述配置文件改变了 logpath, 所以下面验证 status 中的 logpath 是否正确
+	// 上述配置文件改变了 logPath, 所以下面验证 status 中的 logPath 是否正确
 	// tag == "" && url == ""
-	resp, err = http.Get(slave_rs.cluster.MasterUrl[0] + "/logkit/cluster/status")
-	assert.NoError(t, err)
-	allStData, err = ioutil.ReadAll(resp.Body)
-	assert.NoError(t, err)
-	respAllStatus = respClusterStatus{}
-	err = json.Unmarshal(allStData, &respAllStatus)
-	assert.NoError(t, err, string(allStData))
-	allStatus = respAllStatus.Data
-	logPath := allStatus[slave_rs.cluster.Address].Status["test2"].Logpath
-	assert.Equal(t, confdir+"/logdir/log1", logPath)
-	logPath = allStatus[slave_rs2.cluster.Address].Status["test2"].Logpath
-	assert.Equal(t, confdir+"/logdir/log1", logPath)
+	url = rs[0].cluster.Address + "/logkit/cluster/status"
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	respGotStatus = respClusterStatus{}
+	err = json.Unmarshal(respBody, &respGotStatus)
+	assert.NoError(t, err, string(respBody))
+	gotStatus = respGotStatus.Data
 
-	// 没有被更改的 slave 3 仍然是原来的 logpath
-	logPath = allStatus[slave_rs3.cluster.Address].Status["test2"].Logpath
-	assert.Equal(t, confdir+"/logdir", logPath)
+	cluStatus, exist := gotStatus[rs[1].cluster.Address]
+	assert.Equal(t, true, exist)
+	runnerStatus, exist := cluStatus.Status[runnerName]
+	assert.Equal(t, true, exist)
+	assert.Equal(t, logPath, runnerStatus.Logpath)
+
+	cluStatus, exist = gotStatus[rs[2].cluster.Address]
+	assert.Equal(t, true, exist)
+	runnerStatus, exist = cluStatus.Status[runnerName]
+	assert.Equal(t, true, exist)
+	assert.Equal(t, logPath, runnerStatus.Logpath)
+
+	// 没有被更改的 slave 3 仍然是原来的 logPath
+	cluStatus, exist = gotStatus[rs[3].cluster.Address]
+	assert.Equal(t, true, exist)
+	runnerStatus, exist = cluStatus.Status[runnerName]
+	assert.Equal(t, true, exist)
+	assert.Equal(t, logDir, runnerStatus.Logpath)
 }
 
-func TestClusterStartStop(t *testing.T) {
-	dir := "TestClusterStartStop"
-	os.RemoveAll(dir)
-	if err := os.Mkdir(dir, 0755); err != nil {
-		t.Fatalf("TestClusterStartStop error mkdir %v %v", dir, err)
+func clusterStartStopTest(p *testCluParam) {
+	t := p.t
+	rs := p.rs
+	rd := p.rd
+	resvName := "sendData"
+	runnerName := "clusterStartStopTest"
+	dir := runnerName + "Dir"
+	rootDir := filepath.Join(rd, dir)
+	metaDir := filepath.Join(rootDir, "meta")
+	logDir := filepath.Join(rootDir, "logdir")
+	resvDir := filepath.Join(rootDir, "sender")
+	resvPath := filepath.Join(resvDir, resvName)
+	if err := mkTestDir(rootDir, logDir, metaDir, resvDir); err != nil {
+		t.Fatalf("mkdir error %v", err)
 	}
-	defer os.RemoveAll(dir)
-	pwd, err := os.Getwd()
-	assert.NoError(t, err)
-	confdir := pwd + "/" + dir
-	logpath := dir + "/logdir"
-	metapath := dir + "/meta_mock_csv"
-	var master_conf, slave_conf ManagerConfig
-	master_conf.RestDir = confdir
-	master_conf.BindHost = ":6356" //master
-	master_conf.Cluster.Enable = true
-	master_conf.Cluster.IsMaster = true
 
-	master, err := NewManager(master_conf)
-	assert.NoError(t, err)
-	master_rs := NewRestService(master, echo.New())
-
-	slaves := make([]Slave, 0)
-
-	slave_conf.RestDir = confdir
-	slave_conf.BindHost = ":6357" //slave
-	slave_conf.Cluster.Enable = true
-	slave_conf.Cluster.IsMaster = false
-	slave_conf.Cluster.MasterUrl = []string{master_rs.cluster.Address}
-	slave, err := NewManager(slave_conf)
-	assert.NoError(t, err)
-	slave_rs := NewRestService(slave, echo.New())
-	err = Register([]string{master_rs.cluster.Address}, slave_rs.cluster.Address, "test")
-	assert.NoError(t, err)
-	req := TagReq{Tag: "test"}
-	marshaled, err := json.Marshal(req)
-	assert.NoError(t, err)
-	resp, err := http.Post(slave_rs.cluster.Address+"/logkit/cluster/tag", TESTContentApplictionJson, bytes.NewReader(marshaled))
-	assert.NoError(t, err)
-	slaves = append(slaves, Slave{Url: slave_rs.cluster.Address, Tag: "test", Status: StatusOK, LastTouch: master_rs.cluster.slaves[0].LastTouch})
-	content, _ := ioutil.ReadAll(resp.Body)
-	assert.Equal(t, slaves, master_rs.cluster.slaves, string(content))
-	resp.Body.Close()
-
-	slave_conf.BindHost = ":6358" // slave2
-	slave2, err := NewManager(slave_conf)
-	assert.NoError(t, err)
-	slave_rs2 := NewRestService(slave2, echo.New())
-	err = Register([]string{master_rs.cluster.Address}, slave_rs2.cluster.Address, "test")
-	assert.NoError(t, err)
-	resp, err = http.Post(slave_rs2.cluster.Address+"/logkit/cluster/tag", TESTContentApplictionJson, bytes.NewReader(marshaled))
-	assert.NoError(t, err)
-	slaves = append(slaves, Slave{Url: slave_rs2.cluster.Address, Tag: "test", Status: StatusOK, LastTouch: master_rs.cluster.slaves[1].LastTouch})
-	content, _ = ioutil.ReadAll(resp.Body)
-	assert.Equal(t, slaves, master_rs.cluster.slaves, string(content))
-	resp.Body.Close()
-
-	slave_conf.BindHost = ":6359" // slave3
-	slave3, err := NewManager(slave_conf)
-	assert.NoError(t, err)
-	slave_rs3 := NewRestService(slave3, echo.New())
-	err = Register([]string{master_rs.cluster.Address}, slave_rs3.cluster.Address, "test_change")
-	assert.NoError(t, err)
-	req = TagReq{Tag: "test_change"}
-	marshaled, err = json.Marshal(req)
-	resp, err = http.Post(slave_rs3.cluster.Address+"/logkit/cluster/tag", TESTContentApplictionJson, bytes.NewReader(marshaled))
-	assert.NoError(t, err)
-	content, _ = ioutil.ReadAll(resp.Body)
-	assert.Equal(t, []Slave{{Url: slave_rs3.cluster.Address, Tag: "test_change", Status: StatusOK, LastTouch: master_rs.cluster.slaves[2].LastTouch}}, []Slave{master_rs.cluster.slaves[2]}, string(content))
-	resp.Body.Close()
-
-	defer func() {
-		slave_rs.Stop()
-		master_rs.Stop()
-		slave_rs2.Stop()
-		slave_rs3.Stop()
-		os.Remove(StatsShell)
-		os.RemoveAll(".logkitconfs")
-	}()
-
-	var testClusterApiConf = `{
-    "name":"test3",
-    "batch_len": 1,
-    "batch_size": 20,
-    "batch_interval": 60,
-    "batch_try_times": 3,
-    "reader":{
-        "log_path":"./TestClusterStartStop/logdir",
-        "meta_path":"./TestClusterStartStop/meta_mock_csv",
-        "mode":"dir",
-        "read_from":"oldest",
-        "ignore_hidden":"true"
-    },
-    "parser":{
-        "name":         "req_csv",
-		"type":         "csv",
-		"csv_schema":   "logtype string, xx long",
-		"csv_splitter": " "
-    },
-    "senders":[{
-		"name":           "file_sender",
-		"sender_type":    "file",
-		"file_send_path": "./TestClusterStartStop/filesenderdata"
-    }]
-}`
-
-	if err := os.Mkdir(logpath, 0755); err != nil {
-		assert.NoError(t, err)
-	}
-	if err := os.Mkdir(metapath, 0755); err != nil {
-		assert.NoError(t, err)
-	}
-	log1 := `hello 123
-	xx 1`
-	if err := ioutil.WriteFile(filepath.Join(logpath, "log1"), []byte(log1), 0666); err != nil {
-		assert.NoError(t, err)
+	log1 := `{"a":1,"b":2,"c":"3","d":"4"}`
+	if err := writeLogFile([]string{log1}, logDir); err != nil {
+		t.Fatalf("write log string to file failed error is %v", err)
 	}
 	time.Sleep(1 * time.Second)
+	mode := reader.DirMode
+	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, mode, resvPath)
+	if err != nil {
+		t.Fatalf("get runner config failed error is %v", err)
+	}
 
-	// 增加 runner
-	resp, err = http.Post(master_rs.cluster.Address+"/logkit/cluster/configs/test3?tag=test", TESTContentApplictionJson, bytes.NewReader([]byte(testClusterApiConf)))
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
-	assert.NoError(t, err)
-	time.Sleep(4 * time.Second)
+	// 测试增加 runner, tag = test
+	url := rs[0].cluster.Address + "/logkit/cluster/configs/" + runnerName
+	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(6 * time.Second)
 
-	resp, err = http.Post(master_rs.cluster.Address+"/logkit/cluster/configs/test3?tag=test_change", TESTContentApplictionJson, bytes.NewReader([]byte(testClusterApiConf)))
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
-	assert.NoError(t, err)
-	time.Sleep(4 * time.Second)
+	// 获取 status , tag = test
+	url = rs[0].cluster.Address + "/logkit/cluster/status?tag=" + rs[1].cluster.Tag
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	var respGotStatus respClusterStatus
+	err = json.Unmarshal(respBody, &respGotStatus)
+	assert.NoError(t, err, string(respBody))
+	gotStatus := respGotStatus.Data
 
-	// 测试 stop runner
-	resp, err = http.Post(master_rs.cluster.Address+"/logkit/cluster/configs/test3/stop?tag=test", TESTContentApplictionJson, bytes.NewReader([]byte(testClusterApiConf)))
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
-	assert.NoError(t, err)
-	time.Sleep(4 * time.Second)
+	sts1 := getClusterRunnerStatus(runnerName, logDir, RunnerRunning, 1, 29, 0, 1, 0, 1, rs[1].cluster.Tag, rs[1].cluster.Address)
+	sts2 := getClusterRunnerStatus(runnerName, logDir, RunnerRunning, 1, 29, 0, 1, 0, 1, rs[2].cluster.Tag, rs[2].cluster.Address)
+	sts3 := getClusterRunnerStatus(runnerName, logDir, RunnerRunning, 1, 29, 0, 1, 0, 1, rs[3].cluster.Tag, rs[3].cluster.Address)
+
+	expStatus := make(map[string]ClusterStatus)
+	expStatus[rs[1].cluster.Address] = ClusterStatus{
+		Status: sts1,
+		Tag:    rs[1].cluster.Tag,
+	}
+	expStatus[rs[2].cluster.Address] = ClusterStatus{
+		Status: sts2,
+		Tag:    rs[2].cluster.Tag,
+	}
+
+	actStatus := make(map[string]ClusterStatus)
+	gs, ok := gotStatus[rs[1].cluster.Address]
+	assert.Equal(t, true, ok, string(respBody))
+	v, ok := gs.Status[runnerName]
+	assert.Equal(t, true, ok)
+	clearGotStatus(&v)
+	gs.Status = make(map[string]RunnerStatus)
+	gs.Status[runnerName] = v
+	actStatus[rs[1].cluster.Address] = gs
+
+	gs, ok = gotStatus[rs[2].cluster.Address]
+	assert.Equal(t, true, ok, string(respBody))
+	v, ok = gs.Status[runnerName]
+	assert.Equal(t, true, ok)
+	clearGotStatus(&v)
+	gs.Status = make(map[string]RunnerStatus)
+	gs.Status[runnerName] = v
+	actStatus[rs[2].cluster.Address] = gs
+	assert.Equal(t, len(expStatus), len(actStatus))
+	for key, ex := range expStatus {
+		act, ok := actStatus[key]
+		assert.Equal(t, true, ok)
+		assert.Equal(t, ex, act)
+	}
+
+	// 测试 stop runner tag=test
+	url = rs[0].cluster.Address + "/logkit/cluster/configs/" + runnerName + "/stop?tag=" + rs[1].cluster.Tag
+	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(3 * time.Second)
 
 	// 停止后，tag == 'test' 的 status runningStatus 为 stopped
-	resp, err = http.Get(slave_rs.cluster.MasterUrl[0] + "/logkit/cluster/status?tag=test")
-	assert.NoError(t, err)
-	allStData, err := ioutil.ReadAll(resp.Body)
-	assert.NoError(t, err)
-	var respAllStatus respClusterStatus
-	err = json.Unmarshal(allStData, &respAllStatus)
-	assert.NoError(t, err, string(allStData))
-	allStatus := respAllStatus.Data
-	assert.Equal(t, map[string]ClusterStatus{
-		slave_rs.cluster.Address: ClusterStatus{
-			Status: map[string]RunnerStatus{
-				"test3": RunnerStatus{
-					Name:           "test3",
-					ReaderStats:    utils.StatsInfo{},
-					ParserStats:    utils.StatsInfo{},
-					TransformStats: make(map[string]utils.StatsInfo),
-					SenderStats:    make(map[string]utils.StatsInfo),
-					RunningStatus:  RunnerStopped,
-					Url:            slave_rs.cluster.Address,
-					Tag:            slave_rs.cluster.Tag,
-				},
-			},
-			Tag: "test",
-		},
-		slave_rs2.cluster.Address: ClusterStatus{
-			Status: map[string]RunnerStatus{
-				"test3": RunnerStatus{
-					Name:           "test3",
-					ReaderStats:    utils.StatsInfo{},
-					ParserStats:    utils.StatsInfo{},
-					TransformStats: make(map[string]utils.StatsInfo),
-					SenderStats:    make(map[string]utils.StatsInfo),
-					RunningStatus:  RunnerStopped,
-					Url:            slave_rs2.cluster.Address,
-					Tag:            slave_rs2.cluster.Tag,
-				},
-			},
-			Tag: "test",
-		},
-	}, allStatus)
+	url = rs[0].cluster.Address + "/logkit/cluster/status?tag=" + rs[1].cluster.Tag
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	respGotStatus = respClusterStatus{}
+	err = json.Unmarshal(respBody, &respGotStatus)
+	assert.NoError(t, err, string(respBody))
+	gotStatus = respGotStatus.Data
+
+	stsStop1 := getClusterRunnerStatus(runnerName, "", RunnerStopped, 0, 0, 0, 0, 0, 0, rs[1].cluster.Tag, rs[1].cluster.Address)
+	stsStop2 := getClusterRunnerStatus(runnerName, "", RunnerStopped, 0, 0, 0, 0, 0, 0, rs[2].cluster.Tag, rs[2].cluster.Address)
+	stsStop3 := getClusterRunnerStatus(runnerName, "", RunnerStopped, 0, 0, 0, 0, 0, 0, rs[3].cluster.Tag, rs[3].cluster.Address)
+
+	delete(stsStop1[runnerName].SenderStats, "file_sender")
+	delete(stsStop2[runnerName].SenderStats, "file_sender")
+	delete(stsStop3[runnerName].SenderStats, "file_sender")
+	expStatus = make(map[string]ClusterStatus)
+	expStatus[rs[1].cluster.Address] = ClusterStatus{
+		Status: stsStop1,
+		Tag:    rs[1].cluster.Tag,
+	}
+	expStatus[rs[2].cluster.Address] = ClusterStatus{
+		Status: stsStop2,
+		Tag:    rs[2].cluster.Tag,
+	}
+
+	actStatus = make(map[string]ClusterStatus)
+	gs, ok = gotStatus[rs[1].cluster.Address]
+	assert.Equal(t, true, ok, string(respBody))
+	v, ok = gs.Status[runnerName]
+	assert.Equal(t, true, ok)
+	clearGotStatus(&v)
+	gs.Status = make(map[string]RunnerStatus)
+	gs.Status[runnerName] = v
+	actStatus[rs[1].cluster.Address] = gs
+
+	gs, ok = gotStatus[rs[2].cluster.Address]
+	assert.Equal(t, true, ok, string(respBody))
+	v, ok = gs.Status[runnerName]
+	assert.Equal(t, true, ok)
+	clearGotStatus(&v)
+	gs.Status = make(map[string]RunnerStatus)
+	gs.Status[runnerName] = v
+	actStatus[rs[2].cluster.Address] = gs
+	assert.Equal(t, len(expStatus), len(actStatus))
+	for key, ex := range expStatus {
+		act, ok := actStatus[key]
+		assert.Equal(t, true, ok)
+		assert.Equal(t, ex, act)
+	}
 
 	// 再次停止会有错误
-	resp, err = http.Post(master_rs.cluster.Address+"/logkit/cluster/configs/test3/stop?tag=test", TESTContentApplictionJson, bytes.NewReader([]byte(testClusterApiConf)))
-	assert.NotEqual(t, resp.StatusCode, http.StatusOK)
+	url = rs[0].cluster.Address + "/logkit/cluster/configs/" + runnerName + "/stop?tag=" + rs[1].cluster.Tag
+	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.NotEqual(t, http.StatusOK, respCode)
 
-	// tag == 'test_changed' 的 status 依然存在
-	resp, err = http.Get(slave_rs.cluster.MasterUrl[0] + "/logkit/cluster/status?tag=test_change")
-	assert.NoError(t, err)
-	allStData, err = ioutil.ReadAll(resp.Body)
-	assert.NoError(t, err)
-	respAllStatus = respClusterStatus{}
-	err = json.Unmarshal(allStData, &respAllStatus)
-	assert.NoError(t, err, string(allStData))
-	allStatus = respAllStatus.Data
-	rs3_CS, ok := allStatus[slave_rs3.cluster.Address]
+	// tag == 'test_changed' 的 status 依然正常
+	url = rs[0].cluster.Address + "/logkit/cluster/status?tag=" + rs[3].cluster.Tag
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	respGotStatus = respClusterStatus{}
+	err = json.Unmarshal(respBody, &respGotStatus)
+	assert.NoError(t, err, string(respBody))
+	gotStatus = respGotStatus.Data
+
+	expStatus = make(map[string]ClusterStatus)
+	expStatus[rs[3].cluster.Address] = ClusterStatus{
+		Status: sts3,
+		Tag:    rs[3].cluster.Tag,
+	}
+
+	actStatus = make(map[string]ClusterStatus)
+	gs, ok = gotStatus[rs[3].cluster.Address]
+	assert.Equal(t, true, ok, string(respBody))
+	v, ok = gs.Status[runnerName]
 	assert.Equal(t, true, ok)
-	_, ok = rs3_CS.Status["test3"]
-	assert.Equal(t, true, ok)
+	clearGotStatus(&v)
+	gs.Status = make(map[string]RunnerStatus)
+	gs.Status[runnerName] = v
+	actStatus[rs[3].cluster.Address] = gs
+
+	assert.Equal(t, len(expStatus), len(actStatus))
+	for key, ex := range expStatus {
+		act, ok := actStatus[key]
+		assert.Equal(t, true, ok)
+		assert.Equal(t, ex, act)
+	}
 
 	// 测试 runner 启动
-	resp, err = http.Post(master_rs.cluster.Address+"/logkit/cluster/configs/test3/start?tag=test", TESTContentApplictionJson, bytes.NewReader([]byte(testClusterApiConf)))
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
-	assert.NoError(t, err)
-	time.Sleep(4 * time.Second)
+	url = rs[0].cluster.Address + "/logkit/cluster/configs/" + runnerName + "/start?tag=" + rs[1].cluster.Tag
+	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(6 * time.Second)
 
-	// status 状态恢复
-	resp, err = http.Get(slave_rs2.cluster.MasterUrl[0] + "/logkit/cluster/status?tag=test")
-	assert.NoError(t, err)
-	allStData, err = ioutil.ReadAll(resp.Body)
-	assert.NoError(t, err)
-	allStatus = make(map[string]ClusterStatus)
-	respAllStatus = respClusterStatus{}
-	err = json.Unmarshal(allStData, &respAllStatus)
-	assert.NoError(t, err, string(allStData))
-	allStatus = respAllStatus.Data
-	rp, err := filepath.Abs(logpath)
-	if err != nil {
-		t.Error(err)
-	}
+	// tag == 'test' 的 status 恢复
+	url = rs[0].cluster.Address + "/logkit/cluster/status?tag=" + rs[1].cluster.Tag
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	respGotStatus = respClusterStatus{}
+	err = json.Unmarshal(respBody, &respGotStatus)
+	assert.NoError(t, err, string(respBody))
+	gotStatus = respGotStatus.Data
 
-	readDataSize := allStatus[slave_rs.cluster.Address].Status["test3"].ReadDataSize
-	readDataSize2 := allStatus[slave_rs2.cluster.Address].Status["test3"].ReadDataSize
-	sts := map[string]RunnerStatus{
-		"test3": {
-			Name:             "test3",
-			Logpath:          rp,
-			ReadDataCount:    2,
-			ReadDataSize:     readDataSize,
-			ReadSpeedTrend:   SpeedStable,
-			ReadSpeedTrendKb: SpeedStable,
-			Lag: RunnerLag{
-				Size:  0,
-				Files: 0,
-			},
-			ParserStats: utils.StatsInfo{
-				Errors:  0,
-				Success: 2,
-				Trend:   SpeedStable,
-			},
-			TransformStats: make(map[string]utils.StatsInfo),
-			SenderStats: map[string]utils.StatsInfo{
-				"file_sender": {
-					Errors:  0,
-					Success: 2,
-					Trend:   SpeedStable,
-				},
-			},
-			Tag:           "test",
-			Url:           slave_rs.cluster.Address,
-			RunningStatus: RunnerRunning,
-		},
+	expStatus = make(map[string]ClusterStatus)
+	expStatus[rs[1].cluster.Address] = ClusterStatus{
+		Status: sts1,
+		Tag:    rs[1].cluster.Tag,
 	}
-
-	sts2 := map[string]RunnerStatus{
-		"test3": {
-			Name:             "test3",
-			Logpath:          rp,
-			ReadDataCount:    2,
-			ReadDataSize:     readDataSize2,
-			ReadSpeedTrend:   SpeedStable,
-			ReadSpeedTrendKb: SpeedStable,
-			Lag: RunnerLag{
-				Size:  0,
-				Files: 0,
-			},
-			ParserStats: utils.StatsInfo{
-				Errors:  0,
-				Success: 2,
-				Trend:   SpeedStable,
-			},
-			TransformStats: make(map[string]utils.StatsInfo),
-			SenderStats: map[string]utils.StatsInfo{
-				"file_sender": {
-					Errors:  0,
-					Success: 2,
-					Trend:   SpeedStable,
-				},
-			},
-			Tag:           "test",
-			Url:           slave_rs2.cluster.Address,
-			RunningStatus: RunnerRunning,
-		},
-	}
-
-	gotStatus := make(map[string]ClusterStatus)
-	gotStatus[slave_rs.cluster.Address] = ClusterStatus{
-		Status: sts,
-		Tag:    "test",
-	}
-	gotStatus[slave_rs2.cluster.Address] = ClusterStatus{
+	expStatus[rs[2].cluster.Address] = ClusterStatus{
 		Status: sts2,
-		Tag:    "test",
+		Tag:    rs[2].cluster.Tag,
 	}
 
-	rs, ok := allStatus[slave_rs.cluster.Address]
-	assert.Equal(t, true, ok, string(allStData))
-	v, ok := rs.Status["test3"]
-	assert.Equal(t, true, ok, rs.Status)
-	v.Elaspedtime = 0
-	v.ReadSpeed = 0
-	v.ReadSpeedKB = 0
-	v.ParserStats.Speed = 0
-	fs := v.SenderStats["file_sender"]
-	fs.Speed = 0
-	v.SenderStats["file_sender"] = fs
-	rs.Status["test3"] = v
-	allStatus[slave_rs.cluster.Address] = rs
+	actStatus = make(map[string]ClusterStatus)
+	gs, ok = gotStatus[rs[1].cluster.Address]
+	assert.Equal(t, true, ok, string(respBody))
+	v, ok = gs.Status[runnerName]
+	assert.Equal(t, true, ok)
+	clearGotStatus(&v)
+	v.ReadDataSize = sts1[runnerName].ReadDataSize
+	gs.Status = make(map[string]RunnerStatus)
+	gs.Status[runnerName] = v
+	actStatus[rs[1].cluster.Address] = gs
 
-	rs2, ok := allStatus[slave_rs2.cluster.Address]
-	assert.Equal(t, true, ok, string(allStData))
-	v2, ok := rs2.Status["test3"]
-	assert.Equal(t, true, ok, rs.Status)
-	v2.Elaspedtime = 0
-	v2.ReadSpeed = 0
-	v2.ReadSpeedKB = 0
-	v2.ParserStats.Speed = 0
-	fs2 := v2.SenderStats["file_sender"]
-	fs2.Speed = 0
-	v2.SenderStats["file_sender"] = fs2
-	rs2.Status["test3"] = v2
-	allStatus[slave_rs2.cluster.Address] = rs2
-	assert.Equal(t, len(gotStatus), len(allStatus))
-	for key, val := range allStatus {
-		ex, ok := gotStatus[key]
-		assert.Equal(t, ex, val)
+	gs, ok = gotStatus[rs[2].cluster.Address]
+	assert.Equal(t, true, ok, string(respBody))
+	v, ok = gs.Status[runnerName]
+	assert.Equal(t, true, ok)
+	clearGotStatus(&v)
+	v.ReadDataSize = sts1[runnerName].ReadDataSize
+	gs.Status = make(map[string]RunnerStatus)
+	gs.Status[runnerName] = v
+	actStatus[rs[2].cluster.Address] = gs
+	assert.Equal(t, len(expStatus), len(actStatus))
+	for key, ex := range expStatus {
+		act, ok := actStatus[key]
 		assert.Equal(t, true, ok)
+		assert.Equal(t, ex, act)
 	}
 	// 再次开启，会报错
-	resp, err = http.Post(master_rs.cluster.Address+"/logkit/cluster/configs/test3/start?tag=test", TESTContentApplictionJson, bytes.NewReader([]byte(testClusterApiConf)))
-	assert.NotEqual(t, resp.StatusCode, http.StatusOK)
+	url = rs[0].cluster.Address + "/logkit/cluster/configs/" + runnerName + "/start?tag=" + rs[1].cluster.Tag
+	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.NotEqual(t, http.StatusOK, respCode)
 
 	// 测试 stop runner url
-	resp, err = http.Post(master_rs.cluster.Address+"/logkit/cluster/configs/test3/stop?url="+slave_rs.cluster.Address, TESTContentApplictionJson, bytes.NewReader([]byte(testClusterApiConf)))
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
-	assert.NoError(t, err)
-	time.Sleep(4 * time.Second)
+	url = rs[0].cluster.Address + "/logkit/cluster/configs/" + runnerName + "/stop?url=" + rs[3].cluster.Address
+	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(2 * time.Second)
 
-	// tag == "test" status 中 slave1 的那个状态为 stopped
-	resp, err = http.Get(slave_rs.cluster.MasterUrl[0] + "/logkit/cluster/status?tag=test")
-	assert.NoError(t, err)
-	allStData, err = ioutil.ReadAll(resp.Body)
-	assert.NoError(t, err)
-	respAllStatus = respClusterStatus{}
-	err = json.Unmarshal(allStData, &respAllStatus)
-	assert.NoError(t, err, string(allStData))
-	allStatus = respAllStatus.Data
-	gotStatus = make(map[string]ClusterStatus)
-	gotStatus[slave_rs.cluster.Address] = ClusterStatus{
-		Status: map[string]RunnerStatus{
-			"test3": RunnerStatus{
-				Name:           "test3",
-				ReaderStats:    utils.StatsInfo{},
-				ParserStats:    utils.StatsInfo{},
-				TransformStats: make(map[string]utils.StatsInfo),
-				SenderStats:    make(map[string]utils.StatsInfo),
-				RunningStatus:  RunnerStopped,
-				Url:            slave_rs.cluster.Address,
-				Tag:            slave_rs.cluster.Tag,
-			},
-		},
-		Tag: "test",
+	// tag == "test_change" status 状态为 stopped
+	url = rs[0].cluster.Address + "/logkit/cluster/status?url=" + rs[3].cluster.Address
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	respGotStatus = respClusterStatus{}
+	err = json.Unmarshal(respBody, &respGotStatus)
+	assert.NoError(t, err, string(respBody))
+	gotStatus = respGotStatus.Data
+
+	expStatus = make(map[string]ClusterStatus)
+	expStatus[rs[3].cluster.Address] = ClusterStatus{
+		Status: stsStop3,
+		Tag:    rs[3].cluster.Tag,
 	}
-	gotStatus[slave_rs2.cluster.Address] = ClusterStatus{
-		Status: sts2,
-		Tag:    "test",
-	}
-	rs3, ok := allStatus[slave_rs2.cluster.Address]
-	assert.Equal(t, true, ok, string(allStData))
-	v3, ok := rs3.Status["test3"]
-	assert.Equal(t, true, ok, rs3.Status)
-	v3.Elaspedtime = 0
-	v3.ReadSpeed = 0
-	v3.ReadSpeedKB = 0
-	v3.ParserStats.Speed = 0
-	fs3 := v3.SenderStats["file_sender"]
-	fs3.Speed = 0
-	v3.SenderStats["file_sender"] = fs3
-	rs3.Status["test3"] = v3
-	allStatus[slave_rs2.cluster.Address] = rs3
-	assert.Equal(t, len(gotStatus), len(allStatus))
-	for key, val := range allStatus {
-		ex, ok := gotStatus[key]
-		assert.Equal(t, ex, val)
+
+	actStatus = make(map[string]ClusterStatus)
+	gs, ok = gotStatus[rs[3].cluster.Address]
+	assert.Equal(t, true, ok, string(respBody))
+	v, ok = gs.Status[runnerName]
+	assert.Equal(t, true, ok)
+	clearGotStatus(&v)
+	gs.Status = make(map[string]RunnerStatus)
+	gs.Status[runnerName] = v
+	actStatus[rs[3].cluster.Address] = gs
+
+	assert.Equal(t, len(expStatus), len(actStatus))
+	for key, ex := range expStatus {
+		act, ok := actStatus[key]
 		assert.Equal(t, true, ok)
+		assert.Equal(t, ex, act)
 	}
 }
 
-func TestClusterResetDelete(t *testing.T) {
-	dir := "TestClusterResetDelete"
-	os.RemoveAll(dir)
-	if err := os.Mkdir(dir, 0755); err != nil {
-		t.Fatalf("TestClusterResetDelete mkdir %v %v", dir, err)
+func clusterResetDeleteTest(p *testCluParam) {
+	t := p.t
+	rs := p.rs
+	rd := p.rd
+	resvName := "sendData"
+	runnerName := "clusterResetDeleteTest"
+	dir := runnerName + "Dir"
+	rootDir := filepath.Join(rd, dir)
+	metaDir := filepath.Join(rootDir, "meta")
+	logDir := filepath.Join(rootDir, "logdir")
+	resvDir := filepath.Join(rootDir, "sender")
+	resvPath := filepath.Join(resvDir, resvName)
+	if err := mkTestDir(rootDir, logDir, metaDir, resvDir); err != nil {
+		t.Fatalf("mkdir error %v", err)
 	}
-	defer os.RemoveAll(dir)
-	pwd, err := os.Getwd()
-	assert.NoError(t, err)
-	confdir := pwd + "/" + dir
-	logpath := dir + "/logdir"
-	metapath := dir + "/meta_mock_csv"
-	filesenderdata := dir + "/filesenderdata"
-	var master_conf, slave_conf ManagerConfig
-	master_conf.RestDir = confdir
-	master_conf.BindHost = ":6360" //master
-	master_conf.Cluster.Enable = true
-	master_conf.Cluster.IsMaster = true
 
-	master, err := NewManager(master_conf)
-	assert.NoError(t, err)
-	master_rs := NewRestService(master, echo.New())
-
-	slaves := make([]Slave, 0)
-
-	slave_conf.RestDir = confdir
-	slave_conf.BindHost = ":6361" //slave
-	slave_conf.Cluster.Enable = true
-	slave_conf.Cluster.IsMaster = false
-	slave_conf.Cluster.MasterUrl = []string{master_rs.cluster.Address}
-	slave, err := NewManager(slave_conf)
-	assert.NoError(t, err)
-	slave_rs := NewRestService(slave, echo.New())
-	err = Register([]string{master_rs.cluster.Address}, slave_rs.cluster.Address, "test")
-	assert.NoError(t, err)
-	req := TagReq{Tag: "test"}
-	marshaled, err := json.Marshal(req)
-	assert.NoError(t, err)
-	resp, err := http.Post(slave_rs.cluster.Address+"/logkit/cluster/tag", TESTContentApplictionJson, bytes.NewReader(marshaled))
-	assert.NoError(t, err)
-	slaves = append(slaves, Slave{Url: slave_rs.cluster.Address, Tag: "test", Status: StatusOK, LastTouch: master_rs.cluster.slaves[0].LastTouch})
-	content, _ := ioutil.ReadAll(resp.Body)
-	assert.Equal(t, slaves, master_rs.cluster.slaves, string(content))
-	resp.Body.Close()
-
-	slave_conf.BindHost = ":6362" // slave2
-	slave2, err := NewManager(slave_conf)
-	assert.NoError(t, err)
-	slave_rs2 := NewRestService(slave2, echo.New())
-	err = Register([]string{master_rs.cluster.Address}, slave_rs2.cluster.Address, "test")
-	assert.NoError(t, err)
-	resp, err = http.Post(slave_rs2.cluster.Address+"/logkit/cluster/tag", TESTContentApplictionJson, bytes.NewReader(marshaled))
-	assert.NoError(t, err)
-	slaves = append(slaves, Slave{Url: slave_rs2.cluster.Address, Tag: "test", Status: StatusOK, LastTouch: master_rs.cluster.slaves[1].LastTouch})
-	content, _ = ioutil.ReadAll(resp.Body)
-	assert.Equal(t, slaves, master_rs.cluster.slaves, string(content))
-	resp.Body.Close()
-
-	slave_conf.BindHost = ":6363" // slave3
-	slave3, err := NewManager(slave_conf)
-	assert.NoError(t, err)
-	slave_rs3 := NewRestService(slave3, echo.New())
-	err = Register([]string{master_rs.cluster.Address}, slave_rs3.cluster.Address, "test_change")
-	assert.NoError(t, err)
-	req = TagReq{Tag: "test_change"}
-	marshaled, err = json.Marshal(req)
-	resp, err = http.Post(slave_rs3.cluster.Address+"/logkit/cluster/tag", TESTContentApplictionJson, bytes.NewReader(marshaled))
-	assert.NoError(t, err)
-	content, _ = ioutil.ReadAll(resp.Body)
-	assert.Equal(t, []Slave{{Url: slave_rs3.cluster.Address, Tag: "test_change", Status: StatusOK, LastTouch: master_rs.cluster.slaves[2].LastTouch}}, []Slave{master_rs.cluster.slaves[2]}, string(content))
-	resp.Body.Close()
-
-	defer func() {
-		slave_rs.Stop()
-		master_rs.Stop()
-		slave_rs2.Stop()
-		slave_rs3.Stop()
-		os.Remove(StatsShell)
-		os.RemoveAll(".logkitconfs")
-	}()
-
-	var testClusterApiConf = `{
-    "name":"test4",
-    "batch_len": 1,
-    "batch_size": 20,
-    "batch_interval": 1,
-    "batch_try_times": 3,
-    "reader":{
-        "log_path":"./TestClusterResetDelete/logdir",
-        "meta_path":"./TestClusterResetDelete/meta_mock_csv",
-        "mode":"dir",
-        "read_from":"oldest",
-        "ignore_hidden":"true"
-    },
-    "parser":{
-        "name":         "req_csv",
-		"type":         "csv",
-		"csv_schema":   "logtype string, xx long",
-		"csv_splitter": " "
-    },
-    "senders":[{
-		"name":           "file_sender",
-		"sender_type":    "file",
-		"file_send_path": "./TestClusterResetDelete/filesenderdata"
-    }]
-}`
-
-	if err := os.Mkdir(logpath, 0755); err != nil {
-		assert.NoError(t, err)
-	}
-	if err := os.Mkdir(metapath, 0755); err != nil {
-		assert.NoError(t, err)
-	}
-	log1 := `hello 123
-	xx 1`
-	if err := ioutil.WriteFile(filepath.Join(logpath, "log1"), []byte(log1), 0666); err != nil {
-		assert.NoError(t, err)
+	log1 := `{"a":1,"b":2,"c":"3","d":"4"}`
+	if err := writeLogFile([]string{log1}, logDir); err != nil {
+		t.Fatalf("write log string to file failed error is %v", err)
 	}
 	time.Sleep(1 * time.Second)
+	mode := reader.DirMode
+	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, mode, resvPath)
+	if err != nil {
+		t.Fatalf("get runner config failed error is %v", err)
+	}
 
-	// 增加 runner
-	resp, err = http.Post(master_rs.cluster.Address+"/logkit/cluster/configs/test4?tag=test", TESTContentApplictionJson, bytes.NewReader([]byte(testClusterApiConf)))
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
-	assert.NoError(t, err)
-
-	resp, err = http.Post(master_rs.cluster.Address+"/logkit/cluster/configs/test4?tag=test_change", TESTContentApplictionJson, bytes.NewReader([]byte(testClusterApiConf)))
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
-	assert.NoError(t, err)
-	time.Sleep(10 * time.Second)
+	// 测试增加 runner, tag = test
+	url := rs[0].cluster.Address + "/logkit/cluster/configs/" + runnerName
+	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(6 * time.Second)
 
 	// 读取日志发送目的文件，记录日志条数
 	dataLine := 0
-	f, err := os.Open(filesenderdata)
+	f, err := os.Open(resvPath)
 	assert.NoError(t, err)
 	br := bufio.NewReader(f)
 	for {
@@ -1053,14 +613,15 @@ func TestClusterResetDelete(t *testing.T) {
 	f.Close()
 
 	// reset tag == 'test' 的 slave
-	resp, err = http.Post(master_rs.cluster.Address+"/logkit/cluster/configs/test4/reset?tag=test", TESTContentApplictionJson, bytes.NewReader([]byte(testClusterApiConf)))
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
-	assert.NoError(t, err)
+	url = rs[0].cluster.Address + "/logkit/cluster/configs/" + runnerName + "/reset?tag=" + rs[1].cluster.Tag
+	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
 	time.Sleep(10 * time.Second)
 
 	// 重置之后, 日志发送目的文件中的日志条数应该增加
 	dataLine1 := 0
-	f, err = os.Open(filesenderdata)
+	f, err = os.Open(resvPath)
 	assert.NoError(t, err)
 	br = bufio.NewReader(f)
 	for {
@@ -1071,382 +632,248 @@ func TestClusterResetDelete(t *testing.T) {
 		dataLine1++
 	}
 	f.Close()
-	assert.Equal(t, dataLine1, dataLine+4)
+	assert.Equal(t, dataLine+2, dataLine1)
 
-	// 测试删除 runner
-	request, err := http.NewRequest(http.MethodDelete, master_rs.cluster.Address+"/logkit/cluster/configs/test4?tag=test", nil)
-	assert.NoError(t, err)
-	resp, err = http.DefaultClient.Do(request)
-	// 此处会有错误返回, 原因是两个 slave 的 conf 放在同一个地方，导致第二个slave删除配置文件的时候返回文件不存在的错误，所以此处不再判断 response code
-	assert.NoError(t, err)
-	time.Sleep(4 * time.Second)
+	// 测试删除 runner tag = test
+	url = rs[0].cluster.Address + "/logkit/cluster/configs/" + runnerName + "?tag=" + rs[1].cluster.Tag
+	respCode, respBody, err = makeRequest(url, http.MethodDelete, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(2 * time.Second)
 
 	// 删除后，status 返回为空
-	resp, err = http.Get(slave_rs.cluster.MasterUrl[0] + "/logkit/cluster/status?tag=test")
-	assert.NoError(t, err)
-	allStData, err := ioutil.ReadAll(resp.Body)
-	assert.NoError(t, err)
-	respAllStatus := respClusterStatus{}
-	err = json.Unmarshal(allStData, &respAllStatus)
-	assert.NoError(t, err, string(allStData))
-	allStatus := respAllStatus.Data
-	assert.Equal(t, map[string]ClusterStatus{
-		slave_rs.cluster.Address:  ClusterStatus{Status: map[string]RunnerStatus{}, Tag: "test"},
-		slave_rs2.cluster.Address: ClusterStatus{Status: map[string]RunnerStatus{}, Tag: "test"},
-	}, allStatus)
+	url = rs[0].cluster.Address + "/logkit/cluster/status?tag=" + rs[1].cluster.Tag
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	respGotStatus := respClusterStatus{}
+	err = json.Unmarshal(respBody, &respGotStatus)
+	assert.NoError(t, err, string(respBody))
+	gotStatus := respGotStatus.Data
+
+	gs, ok := gotStatus[rs[1].cluster.Address]
+	assert.Equal(t, true, ok, string(respBody))
+	_, ok = gs.Status[runnerName]
+	assert.Equal(t, false, ok)
+
+	gs, ok = gotStatus[rs[2].cluster.Address]
+	assert.Equal(t, true, ok, string(respBody))
+	_, ok = gs.Status[runnerName]
+	assert.Equal(t, false, ok)
 
 	// 再次删除会有错误
-	resp, err = http.DefaultClient.Do(request)
-	assert.NotEqual(t, resp.StatusCode, http.StatusOK)
+	url = rs[0].cluster.Address + "/logkit/cluster/configs/" + runnerName + "?tag=" + rs[1].cluster.Tag
+	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.NotEqual(t, http.StatusOK, respCode)
 
-	// tag == 'test_changed' 的 status 依然存在
-	resp, err = http.Get(slave_rs.cluster.MasterUrl[0] + "/logkit/cluster/status?tag=test_change")
-	assert.NoError(t, err)
-	allStData, err = ioutil.ReadAll(resp.Body)
-	assert.NoError(t, err)
-	respAllStatus = respClusterStatus{}
-	err = json.Unmarshal(allStData, &respAllStatus)
-	assert.NoError(t, err, string(allStData))
-	allStatus = respAllStatus.Data
-	rs3_CS, ok := allStatus[slave_rs3.cluster.Address]
-	assert.Equal(t, true, ok)
-	_, ok = rs3_CS.Status["test4"]
+	// 获取 status , tag = test_change
+	url = rs[0].cluster.Address + "/logkit/cluster/status?tag=" + rs[3].cluster.Tag
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	respGotStatus = respClusterStatus{}
+	err = json.Unmarshal(respBody, &respGotStatus)
+	assert.NoError(t, err, string(respBody))
+	gotStatus = respGotStatus.Data
+
+	gs, ok = gotStatus[rs[3].cluster.Address]
+	assert.Equal(t, true, ok, string(respBody))
+	_, ok = gs.Status[runnerName]
 	assert.Equal(t, true, ok)
 }
 
-func TestSalveConfigs(t *testing.T) {
-	dir := "TestSalveConfigs"
-	os.RemoveAll(dir)
-	if err := os.Mkdir(dir, 0755); err != nil {
-		t.Fatalf("TestSlaveConfigs mkdir %v %v", dir, err)
+func clusterSalveConfigsTest(p *testCluParam) {
+	t := p.t
+	rs := p.rs
+	rd := p.rd
+	resvName := "sendData"
+	runnerName := "clusterSalveConfigsTest"
+	dir := runnerName + "Dir"
+	rootDir := filepath.Join(rd, dir)
+	metaDir := filepath.Join(rootDir, "meta")
+	logDir := filepath.Join(rootDir, "logdir")
+	resvDir := filepath.Join(rootDir, "sender")
+	resvPath := filepath.Join(resvDir, resvName)
+	if err := mkTestDir(rootDir, logDir, metaDir, resvDir); err != nil {
+		t.Fatalf("mkdir error %v", err)
 	}
-	defer os.RemoveAll(dir)
-	pwd, err := os.Getwd()
-	assert.NoError(t, err)
-	confdir := pwd + "/" + dir
-	logpath := dir + "/logdir"
-	metapath := dir + "/meta_mock_csv"
-	var master_conf, slave_conf ManagerConfig
-	master_conf.RestDir = confdir
-	master_conf.BindHost = ":6364" //master
-	master_conf.Cluster.Enable = true
-	master_conf.Cluster.IsMaster = true
 
-	master, err := NewManager(master_conf)
-	assert.NoError(t, err)
-	master_rs := NewRestService(master, echo.New())
-
-	slaves := make([]Slave, 0)
-
-	slave_conf.RestDir = confdir
-	slave_conf.BindHost = ":6365" //slave
-	slave_conf.Cluster.Enable = true
-	slave_conf.Cluster.IsMaster = false
-	slave_conf.Cluster.MasterUrl = []string{master_rs.cluster.Address}
-	slave, err := NewManager(slave_conf)
-	assert.NoError(t, err)
-	slave_rs := NewRestService(slave, echo.New())
-	err = Register([]string{master_rs.cluster.Address}, slave_rs.cluster.Address, "test")
-	assert.NoError(t, err)
-	req := TagReq{Tag: "test"}
-	marshaled, err := json.Marshal(req)
-	assert.NoError(t, err)
-	resp, err := http.Post(slave_rs.cluster.Address+"/logkit/cluster/tag", TESTContentApplictionJson, bytes.NewReader(marshaled))
-	assert.NoError(t, err)
-	slaves = append(slaves, Slave{Url: slave_rs.cluster.Address, Tag: "test", Status: StatusOK, LastTouch: master_rs.cluster.slaves[0].LastTouch})
-	content, _ := ioutil.ReadAll(resp.Body)
-	assert.Equal(t, slaves, master_rs.cluster.slaves, string(content))
-	resp.Body.Close()
-
-	slave_conf.BindHost = ":6366" // slave2
-	slave2, err := NewManager(slave_conf)
-	assert.NoError(t, err)
-	slave_rs2 := NewRestService(slave2, echo.New())
-	err = Register([]string{master_rs.cluster.Address}, slave_rs2.cluster.Address, "test")
-	assert.NoError(t, err)
-	resp, err = http.Post(slave_rs2.cluster.Address+"/logkit/cluster/tag", TESTContentApplictionJson, bytes.NewReader(marshaled))
-	assert.NoError(t, err)
-	slaves = append(slaves, Slave{Url: slave_rs2.cluster.Address, Tag: "test", Status: StatusOK, LastTouch: master_rs.cluster.slaves[1].LastTouch})
-	content, _ = ioutil.ReadAll(resp.Body)
-	assert.Equal(t, slaves, master_rs.cluster.slaves, string(content))
-	resp.Body.Close()
-
-	slave_conf.BindHost = ":6367" // slave3
-	slave3, err := NewManager(slave_conf)
-	assert.NoError(t, err)
-	slave_rs3 := NewRestService(slave3, echo.New())
-	err = Register([]string{master_rs.cluster.Address}, slave_rs3.cluster.Address, "test_change")
-	assert.NoError(t, err)
-	req = TagReq{Tag: "test_change"}
-	marshaled, err = json.Marshal(req)
-	resp, err = http.Post(slave_rs3.cluster.Address+"/logkit/cluster/tag", TESTContentApplictionJson, bytes.NewReader(marshaled))
-	assert.NoError(t, err)
-	content, _ = ioutil.ReadAll(resp.Body)
-	assert.Equal(t, []Slave{{Url: slave_rs3.cluster.Address, Tag: "test_change", Status: StatusOK, LastTouch: master_rs.cluster.slaves[2].LastTouch}}, []Slave{master_rs.cluster.slaves[2]}, string(content))
-	resp.Body.Close()
-
-	defer func() {
-		slave_rs.Stop()
-		master_rs.Stop()
-		slave_rs2.Stop()
-		slave_rs3.Stop()
-		os.Remove(StatsShell)
-		os.RemoveAll(".logkitconfs")
-	}()
-
-	var testClusterApiConf = `{
-    "name":"test5",
-    "batch_len": 1,
-    "batch_size": 20,
-    "batch_interval": 1,
-    "batch_try_times": 3,
-    "reader":{
-        "log_path":"./TestSalveConfigs/logdir",
-        "meta_path":"./TestSalveConfigs/meta_mock_csv",
-        "mode":"dir",
-        "read_from":"oldest",
-        "ignore_hidden":"true"
-    },
-    "parser":{
-        "name":         "req_csv",
-		"type":         "csv",
-		"csv_schema":   "logtype string, xx long",
-		"csv_splitter": " "
-    },
-    "senders":[{
-		"name":           "file_sender",
-		"sender_type":    "file",
-		"file_send_path": "./TestSalveConfigs/filesenderdata"
-    }]
-}`
-
-	if err := os.Mkdir(logpath, 0755); err != nil {
-		assert.NoError(t, err)
-	}
-	if err := os.Mkdir(metapath, 0755); err != nil {
-		assert.NoError(t, err)
-	}
-	log1 := `hello 123
-	xx 1`
-	if err := ioutil.WriteFile(filepath.Join(logpath, "log1"), []byte(log1), 0666); err != nil {
-		assert.NoError(t, err)
+	log1 := `{"a":1,"b":2,"c":"3","d":"4"}`
+	if err := writeLogFile([]string{log1}, logDir); err != nil {
+		t.Fatalf("write log string to file failed error is %v", err)
 	}
 	time.Sleep(1 * time.Second)
+	mode := reader.DirMode
+	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, mode, resvPath)
+	if err != nil {
+		t.Fatalf("get runner config failed error is %v", err)
+	}
 
-	// 增加 runner
-	resp, err = http.Post(master_rs.cluster.Address+"/logkit/cluster/configs/test5?tag=test", TESTContentApplictionJson, bytes.NewReader([]byte(testClusterApiConf)))
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
-	assert.NoError(t, err)
+	// 测试增加 runner, tag = test
+	url := rs[0].cluster.Address + "/logkit/cluster/configs/" + runnerName
+	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(6 * time.Second)
 
-	resp, err = http.Post(master_rs.cluster.Address+"/logkit/cluster/configs/test5?tag=test_change", TESTContentApplictionJson, bytes.NewReader([]byte(testClusterApiConf)))
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
-	assert.NoError(t, err)
-	time.Sleep(5 * time.Second)
-
-	// 测试获取 slave configs
-	resp, err = http.Get(master_rs.cluster.Address + "/logkit/cluster/configs?tag=test")
-	assert.NoError(t, err)
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
-	con, err := ioutil.ReadAll(resp.Body)
-	assert.NoError(t, err)
-	respAllConfigs := respSlaveConfig{}
-	err = json.Unmarshal(con, &respAllConfigs)
-	assert.NoError(t, err, string(con))
-	allConfigs := respAllConfigs.Data
+	// 测试获取 slave configs tag = test
+	url = rs[0].cluster.Address + "/logkit/cluster/configs?tag=" + rs[1].cluster.Tag
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	respGotConfigs := respSlaveConfig{}
+	err = json.Unmarshal(respBody, &respGotConfigs)
+	assert.NoError(t, err, string(respBody))
+	gotConfigs := respGotConfigs.Data
 
 	rc := RunnerConfig{}
-	err = json.Unmarshal([]byte(testClusterApiConf), &rc)
+	err = json.Unmarshal([]byte(runnerConf), &rc)
 	assert.NoError(t, err)
-	// 此处无法完全匹配 rc 与 val
-	for _, val := range allConfigs {
-		assert.Equal(t, "test", val.Tag)
-		assert.Equal(t, rc.RunnerName, val.Configs[confdir+"/test5.conf"].RunnerName)
-		assert.Equal(t, rc.MaxBatchLen, val.Configs[confdir+"/test5.conf"].MaxBatchLen)
-		assert.Equal(t, rc.MaxBatchInteval, val.Configs[confdir+"/test5.conf"].MaxBatchInteval)
-	}
-	assert.Equal(t, 2, len(allConfigs))
+
+	sc, ok := gotConfigs[rs[1].cluster.Address]
+	assert.Equal(t, true, ok)
+	scc, ok := sc.Configs[rs[1].mgr.RestDir+"/"+runnerName+".conf"]
+	assert.Equal(t, true, ok)
+	assert.Equal(t, rc.RunnerName, scc.RunnerName)
+	assert.Equal(t, rc.MaxBatchLen, scc.MaxBatchLen)
+	assert.Equal(t, rc.MaxBatchInteval, scc.MaxBatchInteval)
+	assert.Equal(t, rc.SenderConfig[0]["file_send_path"], scc.SenderConfig[0]["file_send_path"])
+
+	sc, ok = gotConfigs[rs[2].cluster.Address]
+	assert.Equal(t, true, ok)
+	scc, ok = sc.Configs[rs[2].mgr.RestDir+"/"+runnerName+".conf"]
+	assert.Equal(t, true, ok)
+	assert.Equal(t, rc.RunnerName, scc.RunnerName)
+	assert.Equal(t, rc.MaxBatchLen, scc.MaxBatchLen)
+	assert.Equal(t, rc.MaxBatchInteval, scc.MaxBatchInteval)
+	assert.Equal(t, rc.SenderConfig[0]["file_send_path"], scc.SenderConfig[0]["file_send_path"])
 
 	// tag 为空
-	resp, err = http.Get(master_rs.cluster.Address + "/logkit/cluster/configs")
-	assert.NoError(t, err)
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
-	con, err = ioutil.ReadAll(resp.Body)
-	assert.NoError(t, err)
-	respAllConfigs = respSlaveConfig{}
-	err = json.Unmarshal(con, &respAllConfigs)
-	assert.NoError(t, err, string(con))
-	allConfigs = respAllConfigs.Data
-	assert.Equal(t, 3, len(allConfigs))
+	url = rs[0].cluster.Address + "/logkit/cluster/configs?tag="
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	respGotConfigs = respSlaveConfig{}
+	err = json.Unmarshal(respBody, &respGotConfigs)
+	assert.NoError(t, err, string(respBody))
+	gotConfigs = respGotConfigs.Data
+	assert.Equal(t, logkitCount-1, len(gotConfigs))
 
 	// url 方式
-	resp, err = http.Get(master_rs.cluster.Address + "/logkit/cluster/configs?url=" + slave_rs3.cluster.Address)
-	assert.NoError(t, err)
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
-	con, err = ioutil.ReadAll(resp.Body)
-	assert.NoError(t, err)
-	respAllConfigs = respSlaveConfig{}
-	err = json.Unmarshal(con, &respAllConfigs)
-	assert.NoError(t, err, string(con))
-	allConfigs = respAllConfigs.Data
+	url = rs[0].cluster.Address + "/logkit/cluster/configs?url=" + rs[3].cluster.Address
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	respGotConfigs = respSlaveConfig{}
+	err = json.Unmarshal(respBody, &respGotConfigs)
+	assert.NoError(t, err, string(respBody))
+	gotConfigs = respGotConfigs.Data
+
 	rc = RunnerConfig{}
-	err = json.Unmarshal([]byte(testClusterApiConf), &rc)
+	err = json.Unmarshal([]byte(runnerConf), &rc)
 	assert.NoError(t, err)
 
-	for _, val := range allConfigs {
-		assert.Equal(t, "test_change", val.Tag)
-		assert.Equal(t, rc.RunnerName, val.Configs[confdir+"/test5.conf"].RunnerName)
-		assert.Equal(t, rc.MaxBatchLen, val.Configs[confdir+"/test5.conf"].MaxBatchLen)
-		assert.Equal(t, rc.MaxBatchInteval, val.Configs[confdir+"/test5.conf"].MaxBatchInteval)
-	}
-	assert.Equal(t, 1, len(allConfigs))
+	sc, ok = gotConfigs[rs[3].cluster.Address]
+	assert.Equal(t, true, ok)
+	scc, ok = sc.Configs[rs[3].mgr.RestDir+"/"+runnerName+".conf"]
+	assert.Equal(t, true, ok)
+	assert.Equal(t, rc.RunnerName, scc.RunnerName)
+	assert.Equal(t, rc.MaxBatchLen, scc.MaxBatchLen)
+	assert.Equal(t, rc.MaxBatchInteval, scc.MaxBatchInteval)
+	assert.Equal(t, rc.SenderConfig[0]["file_send_path"], scc.SenderConfig[0]["file_send_path"])
+
+	sc, ok = gotConfigs[rs[1].cluster.Address]
+	assert.Equal(t, false, ok)
+	sc, ok = gotConfigs[rs[2].cluster.Address]
+	assert.Equal(t, false, ok)
 }
 
-func TestChangeSalveTag(t *testing.T) {
-	dir := "TestChangeSalveTag"
-	os.RemoveAll(dir)
-	if err := os.Mkdir(dir, 0755); err != nil {
-		t.Fatalf("TestChangeSalveTag mkdir %v %v", dir, err)
+func changeTagsTest(p *testCluParam) {
+	t := p.t
+	rs := p.rs
+	rd := p.rd
+	dir := "changeTagsTestDir"
+	rootDir := filepath.Join(rd, dir)
+	if err := mkTestDir(rootDir); err != nil {
+		t.Fatalf("mkdir error %v", err)
 	}
-	defer os.RemoveAll(dir)
-	pwd, err := os.Getwd()
-	assert.NoError(t, err)
-	confdir := pwd + "/" + dir
-	logpath := dir + "/logdir"
-	metapath := dir + "/meta_mock_csv"
-	var master_conf, slave_conf ManagerConfig
-	master_conf.RestDir = confdir
-	master_conf.BindHost = ":6368" //master
-	master_conf.Cluster.Enable = true
-	master_conf.Cluster.IsMaster = true
-
-	master, err := NewManager(master_conf)
-	assert.NoError(t, err)
-	master_rs := NewRestService(master, echo.New())
-
-	slaves := make([]Slave, 0)
-
-	slave_conf.RestDir = confdir
-	slave_conf.BindHost = ":6369" //slave
-	slave_conf.Cluster.Enable = true
-	slave_conf.Cluster.IsMaster = false
-	slave_conf.Cluster.MasterUrl = []string{master_rs.cluster.Address}
-	slave, err := NewManager(slave_conf)
-	assert.NoError(t, err)
-	slave_rs := NewRestService(slave, echo.New())
-	err = Register([]string{master_rs.cluster.Address}, slave_rs.cluster.Address, "test")
-	assert.NoError(t, err)
-	req := TagReq{Tag: "test"}
-	marshaled, err := json.Marshal(req)
-	assert.NoError(t, err)
-	resp, err := http.Post(slave_rs.cluster.Address+"/logkit/cluster/tag", TESTContentApplictionJson, bytes.NewReader(marshaled))
-	assert.NoError(t, err)
-	slaves = append(slaves, Slave{Url: slave_rs.cluster.Address, Tag: "test", Status: StatusOK, LastTouch: master_rs.cluster.slaves[0].LastTouch})
-	content, _ := ioutil.ReadAll(resp.Body)
-	assert.Equal(t, slaves, master_rs.cluster.slaves, string(content))
-	resp.Body.Close()
-
-	slave_conf.BindHost = ":6370" // slave2
-	slave2, err := NewManager(slave_conf)
-	assert.NoError(t, err)
-	slave_rs2 := NewRestService(slave2, echo.New())
-	err = Register([]string{master_rs.cluster.Address}, slave_rs2.cluster.Address, "test")
-	assert.NoError(t, err)
-	resp, err = http.Post(slave_rs2.cluster.Address+"/logkit/cluster/tag", TESTContentApplictionJson, bytes.NewReader(marshaled))
-	assert.NoError(t, err)
-	slaves = append(slaves, Slave{Url: slave_rs2.cluster.Address, Tag: "test", Status: StatusOK, LastTouch: master_rs.cluster.slaves[1].LastTouch})
-	content, _ = ioutil.ReadAll(resp.Body)
-	assert.Equal(t, slaves, master_rs.cluster.slaves, string(content))
-	resp.Body.Close()
-
-	slave_conf.BindHost = ":6371" // slave3
-	slave3, err := NewManager(slave_conf)
-	assert.NoError(t, err)
-	slave_rs3 := NewRestService(slave3, echo.New())
-	err = Register([]string{master_rs.cluster.Address}, slave_rs3.cluster.Address, "test_change")
-	assert.NoError(t, err)
-	req = TagReq{Tag: "test_change"}
-	marshaled, err = json.Marshal(req)
-	resp, err = http.Post(slave_rs3.cluster.Address+"/logkit/cluster/tag", TESTContentApplictionJson, bytes.NewReader(marshaled))
-	assert.NoError(t, err)
-	content, _ = ioutil.ReadAll(resp.Body)
-	assert.Equal(t, []Slave{{Url: slave_rs3.cluster.Address, Tag: "test_change", Status: StatusOK, LastTouch: master_rs.cluster.slaves[2].LastTouch}}, []Slave{master_rs.cluster.slaves[2]}, string(content))
-	resp.Body.Close()
-
-	defer func() {
-		slave_rs.Stop()
-		master_rs.Stop()
-		slave_rs2.Stop()
-		slave_rs3.Stop()
-		os.Remove(StatsShell)
-		os.RemoveAll(".logkitconfs")
-	}()
-
-	var testClusterApiConf = `{
-    "name":"test6",
-    "batch_len": 1,
-    "batch_size": 20,
-    "batch_interval": 1,
-    "batch_try_times": 3,
-    "reader":{
-        "log_path":"./TestChangeSalveTag/logdir",
-        "meta_path":"./TestChangeSalveTag/meta_mock_csv",
-        "mode":"dir",
-        "read_from":"oldest",
-        "ignore_hidden":"true"
-    },
-    "parser":{
-        "name":         "req_csv",
-		"type":         "csv",
-		"csv_schema":   "logtype string, xx long",
-		"csv_splitter": " "
-    },
-    "senders":[{
-		"name":           "file_sender",
-		"sender_type":    "file",
-		"file_send_path": "./TestChangeSalveTag/filesenderdata"
-    }]
-}`
-
-	if err := os.Mkdir(logpath, 0755); err != nil {
-		assert.NoError(t, err)
-	}
-	if err := os.Mkdir(metapath, 0755); err != nil {
-		assert.NoError(t, err)
-	}
-	log1 := `hello 123
-	xx 1`
-	if err := ioutil.WriteFile(filepath.Join(logpath, "log1"), []byte(log1), 0666); err != nil {
-		assert.NoError(t, err)
-	}
-	time.Sleep(1 * time.Second)
-
-	// 增加 runner
-	resp, err = http.Post(master_rs.cluster.Address+"/logkit/cluster/configs/test6?tag=test", TESTContentApplictionJson, bytes.NewReader([]byte(testClusterApiConf)))
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
-	assert.NoError(t, err)
-
-	resp, err = http.Post(master_rs.cluster.Address+"/logkit/cluster/configs/test6?tag=test_change", TESTContentApplictionJson, bytes.NewReader([]byte(testClusterApiConf)))
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
-	assert.NoError(t, err)
-	time.Sleep(3 * time.Second)
 
 	// 测试通过 master 改变 slave tag
-	req = TagReq{Tag: "test-test"}
-	marshaled, err = json.Marshal(req)
+	req := TagReq{Tag: "test-test"}
+	marshaled, err := json.Marshal(req)
 	assert.NoError(t, err)
-	resp, err = http.Post(master_rs.cluster.Address+"/logkit/cluster/slaves/tag?tag=test", TESTContentApplictionJson, bytes.NewReader(marshaled))
-	assert.NoError(t, err)
-	time.Sleep(3 * time.Second)
-	slaves = make([]Slave, 0)
-	slaves = append(slaves, Slave{Url: slave_rs.cluster.Address, Tag: "test-test", Status: StatusOK})
-	slaves = append(slaves, Slave{Url: slave_rs2.cluster.Address, Tag: "test-test", Status: StatusOK})
-	slaves = append(slaves, Slave{Url: slave_rs3.cluster.Address, Tag: "test_change", Status: StatusOK})
+	url := rs[0].cluster.Address + "/logkit/cluster/slaves/tag?tag=" + rs[1].cluster.Tag
+	respCode, respBody, err := makeRequest(url, http.MethodPost, marshaled)
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
 
+	slaves := make([]Slave, 0)
+	slaves = append(slaves, Slave{Url: rs[1].cluster.Address, Tag: "test-test", Status: StatusOK})
+	slaves = append(slaves, Slave{Url: rs[2].cluster.Address, Tag: "test-test", Status: StatusOK})
+	slaves = append(slaves, Slave{Url: rs[3].cluster.Address, Tag: rs[3].cluster.Tag, Status: StatusOK})
+
+	url = rs[0].cluster.Address + "/logkit/cluster/slaves?tag="
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
 	var respGetSlaves respSlave
-	resp, err = http.Get(master_rs.cluster.Address + "/logkit/cluster/slaves?tag=")
+	err = json.Unmarshal(respBody, &respGetSlaves)
 	assert.NoError(t, err)
-	content, _ = ioutil.ReadAll(resp.Body)
-	err = json.Unmarshal(content, &respGetSlaves)
+	getSlaves := respGetSlaves.Data
+	for i, _ := range getSlaves {
+		getSlaves[i].LastTouch = time.Time{}
+	}
+
+	url = rs[0].cluster.Address + "/logkit/cluster/slaves/tag?url=" + rs[3].cluster.Address
+	respCode, respBody, err = makeRequest(url, http.MethodPost, marshaled)
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+
+	slaves = make([]Slave, 0)
+	slaves = append(slaves, Slave{Url: rs[1].cluster.Address, Tag: "test-test", Status: StatusOK})
+	slaves = append(slaves, Slave{Url: rs[2].cluster.Address, Tag: "test-test", Status: StatusOK})
+	slaves = append(slaves, Slave{Url: rs[3].cluster.Address, Tag: "test-test", Status: StatusOK})
+
+	url = rs[0].cluster.Address + "/logkit/cluster/slaves"
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	respGetSlaves = respSlave{}
+	err = json.Unmarshal(respBody, &respGetSlaves)
+	assert.NoError(t, err)
+	getSlaves = respGetSlaves.Data
+	for i := range getSlaves {
+		getSlaves[i].LastTouch = time.Time{}
+	}
+}
+
+func clusterSlavesDeleteTest(p *testCluParam) {
+	t := p.t
+	rs := p.rs
+	rd := p.rd
+	dir := "clusterSlavesDeleteTestDir"
+	rootDir := filepath.Join(rd, dir)
+	if err := mkTestDir(rootDir); err != nil {
+		t.Fatalf("mkdir error %v", err)
+	}
+
+	// 测试删除 master 上的 slave  tag = change_test
+	url := rs[0].cluster.Address + "/logkit/cluster/slaves?tag=" + rs[3].cluster.Tag
+	respCode, respBody, err := makeRequest(url, http.MethodDelete, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+
+	slaves := make([]Slave, 0)
+	slaves = append(slaves, Slave{Url: rs[1].cluster.Address, Tag: rs[1].cluster.Tag, Status: StatusOK})
+	slaves = append(slaves, Slave{Url: rs[2].cluster.Address, Tag: rs[2].cluster.Tag, Status: StatusOK})
+
+	url = rs[0].cluster.Address + "/logkit/cluster/slaves?tag="
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	var respGetSlaves respSlave
+	err = json.Unmarshal(respBody, &respGetSlaves)
 	assert.NoError(t, err)
 	getSlaves := respGetSlaves.Data
 	for i, _ := range getSlaves {
@@ -1454,336 +881,166 @@ func TestChangeSalveTag(t *testing.T) {
 	}
 	assert.Equal(t, slaves, getSlaves)
 
-	resp, err = http.Post(master_rs.cluster.Address+"/logkit/cluster/slaves/tag?url="+slave_rs3.cluster.Address, TESTContentApplictionJson, bytes.NewReader(marshaled))
-	assert.NoError(t, err)
-	time.Sleep(3 * time.Second)
-
-	resp, err = http.Get(master_rs.cluster.Address + "/logkit/cluster/slaves?tag=&url=")
-	assert.NoError(t, err)
-	content, _ = ioutil.ReadAll(resp.Body)
-	respGetSlaves = respSlave{}
-	err = json.Unmarshal(content, &respGetSlaves)
-	assert.NoError(t, err)
-	getSlaves = respGetSlaves.Data
-	for i, _ := range getSlaves {
-		getSlaves[i].LastTouch = time.Time{}
+	// 重新注册所有 slave
+	for i := 1; i < logkitCount; i++ {
+		if err = Register(rs[i].cluster.MasterUrl, rs[i].cluster.Address, rs[i].cluster.Tag); err != nil {
+			t.Fatalf("register master failed error is %v", err)
+		}
 	}
-	slaves[2].Tag = "test-test"
-	assert.Equal(t, slaves, getSlaves)
-}
 
-func TestSlavesDelete(t *testing.T) {
-	dir := "TestSlavesDelete"
-	os.RemoveAll(dir)
-	if err := os.Mkdir(dir, 0755); err != nil {
-		t.Fatalf("TestSlavesDelete mkdir %v %v", dir, err)
-	}
-	defer os.RemoveAll(dir)
-	pwd, err := os.Getwd()
-	assert.NoError(t, err)
-	confdir := pwd + "/" + dir
-	logpath := dir + "/logdir"
-	metapath := dir + "/meta_mock_csv"
-	var master_conf, slave_conf ManagerConfig
-	master_conf.RestDir = confdir
-	master_conf.BindHost = ":6372" //master
-	master_conf.Cluster.Enable = true
-	master_conf.Cluster.IsMaster = true
-
-	master, err := NewManager(master_conf)
-	assert.NoError(t, err)
-	master_rs := NewRestService(master, echo.New())
-
-	slaves := make([]Slave, 0)
-
-	slave_conf.RestDir = confdir
-	slave_conf.BindHost = ":6373" //slave
-	slave_conf.Cluster.Enable = true
-	slave_conf.Cluster.IsMaster = false
-	slave_conf.Cluster.MasterUrl = []string{master_rs.cluster.Address}
-	slave, err := NewManager(slave_conf)
-	assert.NoError(t, err)
-	slave_rs := NewRestService(slave, echo.New())
-	err = Register([]string{master_rs.cluster.Address}, slave_rs.cluster.Address, "test")
-	assert.NoError(t, err)
-	req := TagReq{Tag: "test"}
-	marshaled, err := json.Marshal(req)
-	assert.NoError(t, err)
-	resp, err := http.Post(slave_rs.cluster.Address+"/logkit/cluster/tag", TESTContentApplictionJson, bytes.NewReader(marshaled))
-	assert.NoError(t, err)
-	slaves = append(slaves, Slave{Url: slave_rs.cluster.Address, Tag: "test", Status: StatusOK, LastTouch: master_rs.cluster.slaves[0].LastTouch})
-	content, _ := ioutil.ReadAll(resp.Body)
-	assert.Equal(t, slaves, master_rs.cluster.slaves, string(content))
-	resp.Body.Close()
-
-	slave_conf.BindHost = ":6374" // slave2
-	slave2, err := NewManager(slave_conf)
-	assert.NoError(t, err)
-	slave_rs2 := NewRestService(slave2, echo.New())
-	err = Register([]string{master_rs.cluster.Address}, slave_rs2.cluster.Address, "test")
-	assert.NoError(t, err)
-	resp, err = http.Post(slave_rs2.cluster.Address+"/logkit/cluster/tag", TESTContentApplictionJson, bytes.NewReader(marshaled))
-	assert.NoError(t, err)
-	slaves = append(slaves, Slave{Url: slave_rs2.cluster.Address, Tag: "test", Status: StatusOK, LastTouch: master_rs.cluster.slaves[1].LastTouch})
-	content, _ = ioutil.ReadAll(resp.Body)
-	assert.Equal(t, slaves, master_rs.cluster.slaves, string(content))
-	resp.Body.Close()
-
-	slave_conf.BindHost = ":6375" // slave3
-	slave3, err := NewManager(slave_conf)
-	assert.NoError(t, err)
-	slave_rs3 := NewRestService(slave3, echo.New())
-	err = Register([]string{master_rs.cluster.Address}, slave_rs3.cluster.Address, "test_change")
-	assert.NoError(t, err)
-	req = TagReq{Tag: "test_change"}
-	marshaled, err = json.Marshal(req)
-	resp, err = http.Post(slave_rs3.cluster.Address+"/logkit/cluster/tag", TESTContentApplictionJson, bytes.NewReader(marshaled))
-	assert.NoError(t, err)
-	content, _ = ioutil.ReadAll(resp.Body)
-	assert.Equal(t, []Slave{{Url: slave_rs3.cluster.Address, Tag: "test_change", Status: StatusOK, LastTouch: master_rs.cluster.slaves[2].LastTouch}}, []Slave{master_rs.cluster.slaves[2]}, string(content))
-	resp.Body.Close()
-
-	defer func() {
-		slave_rs.Stop()
-		master_rs.Stop()
-		slave_rs2.Stop()
-		slave_rs3.Stop()
-		os.Remove(StatsShell)
-		os.RemoveAll(".logkitconfs")
-	}()
-
-	var testClusterApiConf = `{
-    "name":"test7",
-    "batch_len": 1,
-    "batch_size": 20,
-    "batch_interval": 1,
-    "batch_try_times": 3,
-    "reader":{
-        "log_path":"./TestSlavesDelete/logdir",
-        "meta_path":"./TestSlavesDelete/meta_mock_csv",
-        "mode":"dir",
-        "read_from":"oldest",
-        "ignore_hidden":"true"
-    },
-    "parser":{
-        "name":         "req_csv",
-		"type":         "csv",
-		"csv_schema":   "logtype string, xx long",
-		"csv_splitter": " "
-    },
-    "senders":[{
-		"name":           "file_sender",
-		"sender_type":    "file",
-		"file_send_path": "./TestSlavesDelete/filesenderdata"
-    }]
-}`
-
-	if err := os.Mkdir(logpath, 0755); err != nil {
-		assert.NoError(t, err)
-	}
-	if err := os.Mkdir(metapath, 0755); err != nil {
-		assert.NoError(t, err)
-	}
-	log1 := `hello 123
-	xx 1`
-	if err := ioutil.WriteFile(filepath.Join(logpath, "log1"), []byte(log1), 0666); err != nil {
-		assert.NoError(t, err)
-	}
-	time.Sleep(1 * time.Second)
-
-	// 增加 runner
-	resp, err = http.Post(master_rs.cluster.Address+"/logkit/cluster/configs/test7?tag=test", TESTContentApplictionJson, bytes.NewReader([]byte(testClusterApiConf)))
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
-	assert.NoError(t, err)
-
-	resp, err = http.Post(master_rs.cluster.Address+"/logkit/cluster/configs/test7?tag=test_change", TESTContentApplictionJson, bytes.NewReader([]byte(testClusterApiConf)))
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
-	assert.NoError(t, err)
-	time.Sleep(3 * time.Second)
-
-	// 测试删除 master 上的 slave
-	request, err := http.NewRequest(http.MethodDelete, master_rs.cluster.Address+"/logkit/cluster/slaves?tag=test_change", nil)
-	assert.NoError(t, err)
-	resp, err = http.DefaultClient.Do(request)
-	assert.NoError(t, err)
-	time.Sleep(3 * time.Second)
+	// 删除 rs[1] url = rs[1]
+	url = rs[0].cluster.Address + "/logkit/cluster/slaves?url=" + rs[1].cluster.Address
+	respCode, respBody, err = makeRequest(url, http.MethodDelete, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
 
 	slaves = make([]Slave, 0)
-	slaves = append(slaves, Slave{Url: slave_rs.cluster.Address, Tag: "test", Status: StatusOK})
-	slaves = append(slaves, Slave{Url: slave_rs2.cluster.Address, Tag: "test", Status: StatusOK})
+	slaves = append(slaves, Slave{Url: rs[2].cluster.Address, Tag: rs[2].cluster.Tag, Status: StatusOK})
+	slaves = append(slaves, Slave{Url: rs[3].cluster.Address, Tag: rs[3].cluster.Tag, Status: StatusOK})
 
-	var respGetSlaves respSlave
-	resp, err = http.Get(master_rs.cluster.Address + "/logkit/cluster/slaves?tag=")
+	url = rs[0].cluster.Address + "/logkit/cluster/slaves"
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	respGetSlaves = respSlave{}
+	err = json.Unmarshal(respBody, &respGetSlaves)
 	assert.NoError(t, err)
-	content, _ = ioutil.ReadAll(resp.Body)
-	err = json.Unmarshal(content, &respGetSlaves)
-	assert.NoError(t, err)
-	getSlaves := respGetSlaves.Data
-	for i, _ := range getSlaves {
+	getSlaves = respGetSlaves.Data
+	for i := range getSlaves {
 		getSlaves[i].LastTouch = time.Time{}
 	}
 	assert.Equal(t, slaves, getSlaves)
-
-	request, err = http.NewRequest(http.MethodDelete, master_rs.cluster.Address+"/logkit/cluster/slaves?url="+slave_rs.cluster.Address, nil)
-	assert.NoError(t, err)
-	resp, err = http.DefaultClient.Do(request)
-	assert.NoError(t, err)
-	time.Sleep(3 * time.Second)
-
-	resp, err = http.Get(master_rs.cluster.Address + "/logkit/cluster/slaves?tag=")
-	assert.NoError(t, err)
-	content, _ = ioutil.ReadAll(resp.Body)
-	respGetSlaves = respSlave{}
-	err = json.Unmarshal(content, &respGetSlaves)
-	assert.NoError(t, err)
-	getSlaves = respGetSlaves.Data
-	for i, _ := range getSlaves {
-		getSlaves[i].LastTouch = time.Time{}
-	}
-	assert.Equal(t, []Slave{{Url: slave_rs2.cluster.Address, Tag: "test", Status: StatusOK}}, getSlaves)
 }
 
-func TestGetSlavesRunner(t *testing.T) {
-	dir := "TestGetSlavesRunner"
-	os.RemoveAll(dir)
-	if err := os.Mkdir(dir, 0755); err != nil {
-		t.Fatalf("TestGetSlavesRunner mkdir %v %v", dir, err)
+func getSlavesRunnerTest(p *testCluParam) {
+	t := p.t
+	rs := p.rs
+	rd := p.rd
+	resvName := "sendData"
+	runnerName := "getSlavesRunnerTest"
+	dir := runnerName + "Dir"
+	rootDir := filepath.Join(rd, dir)
+	metaDir := filepath.Join(rootDir, "meta")
+	logDir := filepath.Join(rootDir, "logdir")
+	resvDir := filepath.Join(rootDir, "sender")
+	resvPath := filepath.Join(resvDir, resvName)
+	if err := mkTestDir(rootDir, logDir, metaDir, resvDir); err != nil {
+		t.Fatalf("mkdir error %v", err)
 	}
-	defer os.RemoveAll(dir)
-	pwd, err := os.Getwd()
-	assert.NoError(t, err)
-	confdir := pwd + "/" + dir
-	logpath := dir + "/logdir"
-	metapath := dir + "/meta_mock_csv"
-	var master_conf, slave_conf ManagerConfig
-	master_conf.RestDir = confdir
-	master_conf.BindHost = ":6376" //master
-	master_conf.Cluster.Enable = true
-	master_conf.Cluster.IsMaster = true
 
-	master, err := NewManager(master_conf)
-	assert.NoError(t, err)
-	master_rs := NewRestService(master, echo.New())
-
-	slaves := make([]Slave, 0)
-
-	slave_conf.RestDir = confdir
-	slave_conf.BindHost = ":6377" //slave
-	slave_conf.Cluster.Enable = true
-	slave_conf.Cluster.IsMaster = false
-	slave_conf.Cluster.MasterUrl = []string{master_rs.cluster.Address}
-	slave, err := NewManager(slave_conf)
-	assert.NoError(t, err)
-	slave_rs := NewRestService(slave, echo.New())
-	err = Register([]string{master_rs.cluster.Address}, slave_rs.cluster.Address, "test")
-	assert.NoError(t, err)
-	req := TagReq{Tag: "test"}
-	marshaled, err := json.Marshal(req)
-	assert.NoError(t, err)
-	resp, err := http.Post(slave_rs.cluster.Address+"/logkit/cluster/tag", TESTContentApplictionJson, bytes.NewReader(marshaled))
-	assert.NoError(t, err)
-	slaves = append(slaves, Slave{Url: slave_rs.cluster.Address, Tag: "test", Status: StatusOK, LastTouch: master_rs.cluster.slaves[0].LastTouch})
-	content, _ := ioutil.ReadAll(resp.Body)
-	assert.Equal(t, slaves, master_rs.cluster.slaves, string(content))
-	resp.Body.Close()
-
-	slave_conf.BindHost = ":6378" // slave2
-	slave2, err := NewManager(slave_conf)
-	assert.NoError(t, err)
-	slave_rs2 := NewRestService(slave2, echo.New())
-	err = Register([]string{master_rs.cluster.Address}, slave_rs2.cluster.Address, "test")
-	assert.NoError(t, err)
-	resp, err = http.Post(slave_rs2.cluster.Address+"/logkit/cluster/tag", TESTContentApplictionJson, bytes.NewReader(marshaled))
-	assert.NoError(t, err)
-	slaves = append(slaves, Slave{Url: slave_rs2.cluster.Address, Tag: "test", Status: StatusOK, LastTouch: master_rs.cluster.slaves[1].LastTouch})
-	content, _ = ioutil.ReadAll(resp.Body)
-	assert.Equal(t, slaves, master_rs.cluster.slaves, string(content))
-	resp.Body.Close()
-
-	slave_conf.BindHost = ":6379" // slave3
-	slave3, err := NewManager(slave_conf)
-	assert.NoError(t, err)
-	slave_rs3 := NewRestService(slave3, echo.New())
-	err = Register([]string{master_rs.cluster.Address}, slave_rs3.cluster.Address, "test_change")
-	assert.NoError(t, err)
-	req = TagReq{Tag: "test_change"}
-	marshaled, err = json.Marshal(req)
-	resp, err = http.Post(slave_rs3.cluster.Address+"/logkit/cluster/tag", TESTContentApplictionJson, bytes.NewReader(marshaled))
-	assert.NoError(t, err)
-	content, _ = ioutil.ReadAll(resp.Body)
-	assert.Equal(t, []Slave{{Url: slave_rs3.cluster.Address, Tag: "test_change", Status: StatusOK, LastTouch: master_rs.cluster.slaves[2].LastTouch}}, []Slave{master_rs.cluster.slaves[2]}, string(content))
-	resp.Body.Close()
-
-	defer func() {
-		slave_rs.Stop()
-		master_rs.Stop()
-		slave_rs2.Stop()
-		slave_rs3.Stop()
-		os.Remove(StatsShell)
-		os.RemoveAll(".logkitconfs")
-	}()
-
-	var testClusterApiConf = `{
-    "name":"test8",
-    "batch_len": 1,
-    "batch_size": 20,
-    "batch_interval": 1,
-    "batch_try_times": 3,
-    "reader":{
-        "log_path":"./TestGetSlavesRunner/logdir",
-        "meta_path":"./TestGetSlavesRunner/meta_mock_csv",
-        "mode":"dir",
-        "read_from":"oldest",
-        "ignore_hidden":"true"
-    },
-    "parser":{
-        "name":         "req_csv",
-		"type":         "csv",
-		"csv_schema":   "logtype string, xx long",
-		"csv_splitter": " "
-    },
-    "senders":[{
-		"name":           "file_sender",
-		"sender_type":    "file",
-		"file_send_path": "./TestGetSlavesRunner/filesenderdata"
-    }]
-}`
-
-	if err := os.Mkdir(logpath, 0755); err != nil {
-		assert.NoError(t, err)
-	}
-	if err := os.Mkdir(metapath, 0755); err != nil {
-		assert.NoError(t, err)
-	}
-	log1 := `hello 123
-	xx 1`
-	if err := ioutil.WriteFile(filepath.Join(logpath, "log1"), []byte(log1), 0666); err != nil {
-		assert.NoError(t, err)
+	log1 := `{"a":1,"b":2,"c":"3","d":"4"}`
+	if err := writeLogFile([]string{log1}, logDir); err != nil {
+		t.Fatalf("write log string to file failed error is %v", err)
 	}
 	time.Sleep(1 * time.Second)
+	mode := reader.DirMode
+	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, mode, resvPath)
+	if err != nil {
+		t.Fatalf("get runner config failed error is %v", err)
+	}
 
-	// 增加 runner
-	resp, err = http.Post(master_rs.cluster.Address+"/logkit/cluster/configs/test8?tag=test", TESTContentApplictionJson, bytes.NewReader([]byte(testClusterApiConf)))
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
-	assert.NoError(t, err)
+	// 测试增加 runner, tag = test
+	url := rs[0].cluster.Address + "/logkit/cluster/configs/" + runnerName + "?tag=" + rs[1].cluster.Tag
+	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(6 * time.Second)
 
 	// 获取 tag = test 的 runner name
+	url = rs[0].cluster.Address + "/logkit/cluster/runners?tag="
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
 	var respRss respRunnersNameList
-	resp, err = http.Get(master_rs.cluster.Address + "/logkit/cluster/runners?tag=")
-	assert.NoError(t, err)
-	content, _ = ioutil.ReadAll(resp.Body)
-	err = json.Unmarshal(content, &respRss)
-	assert.NoError(t, err, string(content))
+	err = json.Unmarshal(respBody, &respRss)
+	assert.NoError(t, err, string(respBody))
 	nameList := respRss.Data
-	assert.Equal(t, []string{"test8"}, nameList)
+	isExist := false
+	for _, n := range nameList {
+		if n == runnerName {
+			isExist = true
+		}
+	}
+	assert.Equal(t, true, isExist)
 
 	// 获取 tag = test_change 的 runner name
-	resp, err = http.Get(master_rs.cluster.Address + "/logkit/cluster/runners?tag=test_change")
+	url = rs[0].cluster.Address + "/logkit/cluster/runners?tag=" + rs[3].cluster.Tag
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
 	respRss = respRunnersNameList{}
-	assert.NoError(t, err)
-	content, _ = ioutil.ReadAll(resp.Body)
-	err = json.Unmarshal(content, &respRss)
-	assert.NoError(t, err, string(content))
+	err = json.Unmarshal(respBody, &respRss)
+	assert.NoError(t, err, string(respBody))
 	nameList = respRss.Data
-	assert.Equal(t, []string{}, nameList)
+	isExist = false
+	for _, n := range nameList {
+		if n == runnerName {
+			isExist = true
+		}
+	}
+	assert.Equal(t, false, isExist)
+}
+
+func getSlaveConfigTest(p *testCluParam) {
+	t := p.t
+	rs := p.rs
+	rd := p.rd
+	resvName := "sendData"
+	runnerName := "getSlaveConfigTest"
+	dir := runnerName + "Dir"
+	rootDir := filepath.Join(rd, dir)
+	metaDir := filepath.Join(rootDir, "meta")
+	logDir := filepath.Join(rootDir, "logdir")
+	resvDir := filepath.Join(rootDir, "sender")
+	resvPath := filepath.Join(resvDir, resvName)
+	if err := mkTestDir(rootDir, logDir, metaDir, resvDir); err != nil {
+		t.Fatalf("mkdir error %v", err)
+	}
+
+	log1 := `{"a":1,"b":2,"c":"3","d":"4"}`
+	if err := writeLogFile([]string{log1}, logDir); err != nil {
+		t.Fatalf("write log string to file failed error is %v", err)
+	}
+	time.Sleep(1 * time.Second)
+	mode := reader.DirMode
+	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, mode, resvPath)
+	if err != nil {
+		t.Fatalf("get runner config failed error is %v", err)
+	}
+
+	// 测试增加 runner, tag = test
+	url := rs[0].cluster.Address + "/logkit/cluster/configs/" + runnerName + "?tag=" + rs[1].cluster.Tag
+	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(6 * time.Second)
+
+	// 获取 tag = test, runner 的 config
+	url = rs[0].cluster.Address + "/logkit/cluster/configs/" + runnerName + "?tag=" + rs[1].cluster.Tag
+	respCode, respBody, err = makeRequest(url, http.MethodGet, runnerConf)
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	var respRss respRunnerConfig
+	err = json.Unmarshal(respBody, &respRss)
+	assert.NoError(t, err, string(respBody))
+	respConfig := respRss.Data
+	respConfig.CreateTime = ""
+
+	expConfig := RunnerConfig{}
+	err = json.Unmarshal([]byte(runnerConf), &expConfig)
+	assert.NoError(t, err, runnerConf)
+
+	expConfig.ReaderConfig["name"] = runnerName
+	expConfig.ReaderConfig["runner_name"] = runnerName
+	expConfig.ParserConf["runner_name"] = runnerName
+	expConfig.SenderConfig[0]["runner_name"] = runnerName
+	expConfig.IsInWebFolder = true
+
+	assert.Equal(t, expConfig, respConfig)
+
+	// 获取 tag = test_change, runner 的 config
+	url = rs[0].cluster.Address + "/logkit/cluster/configs/" + runnerName + "?tag=" + rs[3].cluster.Tag
+	respCode, respBody, err = makeRequest(url, http.MethodGet, runnerConf)
+	assert.NoError(t, err, string(respBody))
+	assert.NotEqual(t, http.StatusOK, respCode)
 }

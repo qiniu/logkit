@@ -273,7 +273,7 @@ func Test_Watch(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	time.Sleep(3 * time.Second)
+	time.Sleep(1 * time.Second)
 	var conf ManagerConfig
 	m, err := NewManager(conf)
 	if err != nil {
@@ -295,7 +295,7 @@ func Test_Watch(t *testing.T) {
 	if len(m.watchers) != 2 {
 		t.Errorf("watchers exp 2 but got %v", len(m.watchers))
 	}
-	time.Sleep(time.Second) //因为使用了异步add runners 有可能还没执行完。
+	time.Sleep(5 * time.Second) //因为使用了异步add runners 有可能还没执行完。
 	var runnerLength int
 	m.lock.Lock()
 	runnerLength = len(m.runners)
@@ -312,14 +312,18 @@ func Test_Watch(t *testing.T) {
 	}
 
 	if !tryTest(10, func() bool {
-		m.lock.Lock()
+		m.lock.RLock()
 		runnerLength = len(m.runners)
-		m.lock.Unlock()
+		m.lock.RUnlock()
 		return runnerLength == 3
 	}) {
 		t.Fatalf("runners exp 3 after add test3.conf but got %v", runnerLength)
 	}
-	if !tryTest(10, func() bool { return m.cleanQueues[realdir].cleanerCount == 2 }) {
+	if !tryTest(10, func() bool {
+		m.cleanLock.RLock()
+		defer m.cleanLock.RUnlock()
+		return m.cleanQueues[realdir].cleanerCount == 2
+	}) {
 		t.Fatalf("cleanerCount exp 2 after add test3.conf  but got %v", m.cleanQueues[realdir].cleanerCount)
 	}
 

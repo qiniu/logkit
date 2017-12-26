@@ -60,7 +60,7 @@ type FtSender struct {
 	runnerName  string
 	opt         *FtOption
 	stats       utils.StatsInfo
-	statsMutex  *sync.Mutex
+	statsMutex  *sync.RWMutex
 }
 
 type FtOption struct {
@@ -130,7 +130,7 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 		procs:       opt.procs,
 		runnerName:  runnerName,
 		opt:         opt,
-		statsMutex:  new(sync.Mutex),
+		statsMutex:  new(sync.RWMutex),
 	}
 	go ftSender.asyncSendLogFromDiskQueue()
 	return &ftSender, nil
@@ -181,10 +181,14 @@ func (ft *FtSender) Send(datas []Data) error {
 }
 
 func (ft *FtSender) Stats() utils.StatsInfo {
+	ft.statsMutex.RLock()
+	defer ft.statsMutex.RUnlock()
 	return ft.stats
 }
 
 func (ft *FtSender) Restore(info *utils.StatsInfo) {
+	ft.statsMutex.Lock()
+	defer ft.statsMutex.Unlock()
 	ft.stats = *info
 }
 

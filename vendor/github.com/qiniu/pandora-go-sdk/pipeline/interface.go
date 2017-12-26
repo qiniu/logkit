@@ -101,10 +101,10 @@ type PipelineAPI interface {
 
 	DeleteJob(*DeleteJobInput) error
 
-	// 启动接口不适用于新版本workflow(2017/12/05), 请使用StopWorkflow来停止当前workflow的jobs
+	// 启动接口不适用于新版本workflow(2017/12/14起), 请使用StopWorkflow来停止当前workflow的jobs
 	StartJob(*StartJobInput) error
 
-	// 停止接口不适用于新版本workflow(2017/12/05)，请使用StartWorkflow来启动当前workflow的jobs
+	// 停止接口不适用于新版本workflow(2017/12/14起)，请使用StartWorkflow来启动当前workflow的jobs
 	StopJob(*StopJobInput) error
 
 	GetJobHistory(*GetJobHistoryInput) (*GetJobHistoryOutput, error)

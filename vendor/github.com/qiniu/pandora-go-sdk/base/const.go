@@ -14,6 +14,7 @@ const (
 	HTTPHeaderContentMD5    string = "Content-MD5"
 	HTTPHeaderRequestId     string = "X-Reqid"
 	HTTPHeaderAuthorization string = "Authorization"
+	HTTPHeaderResourceOwner string = "X-Resource-Owner"
 )
 
 const (
