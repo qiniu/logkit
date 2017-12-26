@@ -63,7 +63,7 @@ var schemaTypes = map[string]bool{
 	TypeGeoPoint: true,
 	TypeObject:   true}
 
-var analyzers = map[string]bool{
+var Analyzers = map[string]bool{
 	StandardAnalyzer:   true,
 	SimpleAnalyzer:     true,
 	WhitespaceAnalyzer: true,
@@ -120,7 +120,7 @@ func (e *RepoSchemaEntry) Validate() (err error) {
 			if e.ValueType != "string" {
 				return reqerr.NewInvalidArgs("Schema", fmt.Sprintf("only string valueType support searchWay, but now is %v", e.ValueType))
 			}
-			if !analyzers[e.Analyzer] {
+			if !Analyzers[e.Analyzer] {
 				return reqerr.NewInvalidArgs("Schema", fmt.Sprintf("invalid Analyzer type: %s", e.SearchWay))
 			}
 		}
@@ -197,7 +197,7 @@ func getField(f string) (key, valueType, analyzer string, primary bool, err erro
 		return
 	}
 	if analyzer != "" {
-		if _, ok := analyzers[analyzer]; !ok {
+		if _, ok := Analyzers[analyzer]; !ok {
 			err = fmt.Errorf("field schema %v key define uknown analyzer %v", f, analyzer)
 			return
 		}

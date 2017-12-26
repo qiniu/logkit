@@ -144,3 +144,13 @@ const (
 const (
 	NestLimit int = 5
 )
+
+const (
+	// workflow 状态
+	WorkflowReady    = "Ready"    // 新建状态
+	WorkflowStarting = "Starting" // 存在任一资源为 Starting
+	WorkflowStarted  = "Started"  // 所有资源为 Started
+	WorkflowStopping = "Stopping" // 存在任一资源为 Stopping
+	WorkflowStopped  = "Stopped"  // 所有资源为 Stopped
+	WorkflowUnknown  = "Unknown"  // 获取状态失败时的异常状态，
+)

@@ -144,7 +144,7 @@ func (rr *RedisReader) ReadLine() (data string, err error) {
 
 }
 func (rr *RedisReader) Close() (err error) {
-	if atomic.CompareAndSwapInt32(&rr.status, StatusRunning, StatusStoping) {
+	if atomic.CompareAndSwapInt32(&rr.status, StatusRunning, StatusStopping) {
 		log.Infof("Runner[%v] %v stopping", rr.meta.RunnerName, rr.Name())
 	} else {
 		close(rr.readChan)
@@ -197,7 +197,7 @@ func (rr *RedisReader) run() (err error) {
 	// running在退出状态改为Init
 	defer func() {
 		atomic.CompareAndSwapInt32(&rr.status, StatusRunning, StatusInit)
-		if atomic.CompareAndSwapInt32(&rr.status, StatusStoping, StatusStopped) {
+		if atomic.CompareAndSwapInt32(&rr.status, StatusStopping, StatusStopped) {
 			close(rr.readChan)
 			rr.client.Close()
 		}
@@ -207,7 +207,7 @@ func (rr *RedisReader) run() (err error) {
 	}()
 	// 开始work逻辑
 	for {
-		if atomic.LoadInt32(&rr.status) == StatusStoping {
+		if atomic.LoadInt32(&rr.status) == StatusStopping {
 			log.Warnf("Runner[%v] %v stopped from running", rr.meta.RunnerName, rr.Name())
 			return
 		}
