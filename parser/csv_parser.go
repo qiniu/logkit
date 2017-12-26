@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -323,7 +324,9 @@ func (f field) ValueParse(value string, timeZoneOffset int) (datas sender.Data, 
 			return
 		}
 		m := make(map[string]interface{})
-		if err = json.Unmarshal([]byte(value), &m); err != nil {
+		d := json.NewDecoder(bytes.NewReader([]byte(value)))
+		d.UseNumber()
+		if err = d.Decode(&m); err != nil {
 			err = fmt.Errorf("unmarshal json map type error: %v", err)
 			return
 		}
