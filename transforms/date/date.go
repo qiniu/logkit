@@ -72,7 +72,7 @@ func (g *DateTrans) convertDate(v interface{}) (interface{}, error) {
 		s = int64(newv)
 	case string:
 		var err error
-		s, err = strconv.ParseInt(newv,10,64)
+		s, err = strconv.ParseInt(newv, 10, 64)
 		if err != nil {
 			if g.LayoutBefore != "" {
 				t, err := time.Parse(g.LayoutBefore, newv)

@@ -12,34 +12,48 @@ import (
 )
 
 type Json struct {
-	Key   string `json:"key"`
-	stats utils.StatsInfo
+	OldKey  string `json:"oldKey"`
+	NewKey  string `json:"newKey"`
+	stats   utils.StatsInfo
+	oldKeys []string
+	newKeys []string
+}
+
+func (g *Json) Init() {
+	g.oldKeys = utils.GetKeys(g.OldKey)
+	g.newKeys = utils.GetKeys(g.NewKey)
 }
 
 func (g *Json) Transform(datas []sender.Data) ([]sender.Data, error) {
 	var err, ferr error
 	errnums := 0
-	keys := utils.GetKeys(g.Key)
+
 	for i := range datas {
-		val, gerr := utils.GetMapValue(datas[i], keys...)
+		val, gerr := utils.GetMapValue(datas[i], g.oldKeys...)
 		if gerr != nil {
 			errnums++
-			err = fmt.Errorf("transform key %v not exist in data", g.Key)
+			err = fmt.Errorf("transform key %v not exist in data", g.OldKey)
 			continue
 		}
 		strval, ok := val.(string)
 		if !ok {
 			errnums++
-			err = fmt.Errorf("transform key %v data type is not string", g.Key)
+			err = fmt.Errorf("transform key %v data type is not string", g.OldKey)
 			continue
 		}
-		val, perr := parseJson(strval)
+		jsonVal, perr := parseJson(strval)
 		if perr != nil {
 			errnums++
 			err = perr
 			continue
 		}
-		utils.SetMapValue(datas[i], val, false, keys...)
+		if len(g.newKeys) > 0 {
+			utils.SetMapValue(datas[i], jsonVal, false, g.newKeys...)
+		} else {
+			for k, v := range jsonVal {
+				utils.SetMapValue(datas[i], v, false, k)
+			}
+		}
 	}
 	if err != nil {
 		g.stats.LastError = err.Error()
@@ -54,7 +68,7 @@ func (g *Json) RawTransform(datas []string) ([]string, error) {
 	return datas, errors.New("json transformer not support rawTransform")
 }
 
-func parseJson(jsonStr string) (data sender.Data, err error) {
+func parseJson(jsonStr string) (data map[string]interface{}, err error) {
 	data = sender.Data{}
 	decoder := json.NewDecoder(bytes.NewReader([]byte(jsonStr)))
 	decoder.UseNumber()
@@ -62,6 +76,7 @@ func parseJson(jsonStr string) (data sender.Data, err error) {
 		err = fmt.Errorf("parse json str error %v, jsonStr is: %v", err, jsonStr)
 		log.Debug(err)
 	}
+
 	return
 }
 
