@@ -12,6 +12,7 @@ import (
 	"github.com/qiniu/logkit/utils"
 
 	"github.com/robertkrimen/otto"
+	"github.com/qiniu/log"
 )
 
 type Script struct {
@@ -40,9 +41,9 @@ func (g *Script) Init() (err error) {
 	if err != nil {
 		return err
 	}
-	vm := otto.New()
-	vm.Interrupt = make(chan func(), 1) // The buffer prevents blocking
-	g.vm = vm
+	//vm := otto.New()
+	//vm.Interrupt = make(chan func(), 1) // The buffer prevents blocking
+	//g.vm = vm
 	return nil
 }
 
@@ -76,23 +77,25 @@ func parseKey(key string) ([][]string, []string, error) {
 func (g *Script) Transform(datas []sender.Data) (returnData []sender.Data, ferr error) {
 	var err error
 	errnums := 0
-	vm := otto.New()
+	g.vm = otto.New()
+	g.vm.Interrupt = make(chan func(), 1) // The buffer prevents blocking
 	returnData = utils.DeepCopy(datas).([]sender.Data)
-	vm.Interrupt = make(chan func(), 1) // The buffer prevents blocking
-	halt := errors.New("script time out")
+	halt := errors.New("script time out of 3 seconds")
+	ctx := context.Background()
+	cancelCtx, cancel := context.WithCancel(ctx)
 	defer func() {
+		cancel()
 		if caught := recover(); caught != nil {
 			if caught == halt {
 				return
 			}
-			panic(caught)
+			//panic(caught)
+			log.Errorf("err : %v", caught)
 		}
 	}()
-	ctx := context.Background()
-	cancelCtx, cancel := context.WithCancel(ctx)
 	go func(ctx context.Context) {
 		//执行超时,则认为全部执行失败,返回原数据
-		time.Sleep(3 * time.Second) // Stop after two seconds
+		time.Sleep(3 * time.Second) // Stop after twok seconds
 		g.stats.LastError = halt.Error()
 		ferr = fmt.Errorf("find total %v erorrs in transform script, last error info is %v", len(returnData), halt)
 		g.stats.Errors += int64(len(datas))
@@ -103,6 +106,7 @@ func (g *Script) Transform(datas []sender.Data) (returnData []sender.Data, ferr 
 	}(cancelCtx)
 
 	for i := range datas {
+		err = nil
 		for j, keys := range g.oldKeys {
 			val, gerr := utils.GetMapValue(datas[i], keys...)
 			if gerr != nil {
@@ -143,7 +147,7 @@ func (g *Script) Transform(datas []sender.Data) (returnData []sender.Data, ferr 
 			}
 			sErr := utils.SetMapValue(datas[i], val, false, keys...)
 			if sErr != nil {
-				err = fmt.Errorf("run script error: %v", scriptErr)
+				err = fmt.Errorf("faild to set mapValue error: %v", sErr)
 				break
 			}
 		}
@@ -155,10 +159,10 @@ func (g *Script) Transform(datas []sender.Data) (returnData []sender.Data, ferr 
 	if err != nil {
 		g.stats.LastError = err.Error()
 		ferr = fmt.Errorf("find total %v erorrs in transform script, last error info is %v", errnums, err)
+		log.Error(ferr)
 	}
 	g.stats.Errors += int64(errnums)
 	g.stats.Success += int64(len(datas) - errnums)
-	cancel()
 	returnData = datas
 	return
 }
@@ -210,14 +214,6 @@ func (g *Script) ConfigOptions() []utils.Option {
 			DefaultNoUse: true,
 			Description:  "转换字段的脚本",
 			Type:         transforms.TransformTypeString,
-		},
-		{
-			KeyName:       "deleteOld",
-			ChooseOnly:    true,
-			ChooseOptions: []interface{}{"false", "true"},
-			Default:       "false",
-			DefaultNoUse:  false,
-			Description:   "是否删除旧字段",
 		},
 	}
 }
