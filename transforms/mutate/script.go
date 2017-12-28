@@ -106,7 +106,7 @@ func (g *Script) Transform(datas []sender.Data) (returnData []sender.Data, ferr 
 	}(cancelCtx)
 
 	for i := range datas {
-		err = nil
+		//向js VM 中设置属性
 		for j, keys := range g.oldKeys {
 			val, gerr := utils.GetMapValue(datas[i], keys...)
 			if gerr != nil {
@@ -120,19 +120,23 @@ func (g *Script) Transform(datas []sender.Data) (returnData []sender.Data, ferr 
 		}
 		if err != nil {
 			errnums++
+			ferr = err
 			continue
 		}
+		//运行脚本
 		_, scriptErr := g.vm.Run(g.Script)
 		if scriptErr != nil {
 			err = fmt.Errorf("run script error: %v", scriptErr)
 			errnums++
+			ferr = err
 			continue
 		}
+		//获取VM环境中的属性值
 		for j, keys := range g.newKeys {
 			value, scriptErr := g.vm.Get(g.newVars[j])
 			if scriptErr != nil {
 				err = fmt.Errorf("can not get script value: %v, :%v", g.newVars[j], scriptErr)
-				continue
+				break
 			}
 			var val interface{}
 			if value.IsNumber() {
@@ -153,12 +157,14 @@ func (g *Script) Transform(datas []sender.Data) (returnData []sender.Data, ferr 
 		}
 		if err != nil {
 			errnums++
+			ferr = err
+			err = nil
 			continue
 		}
 	}
-	if err != nil {
-		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform script, last error info is %v", errnums, err)
+	if ferr != nil {
+		g.stats.LastError = ferr.Error()
+		ferr = fmt.Errorf("find total %v erorrs in transform script, last error info is %v", errnums, ferr)
 		log.Error(ferr)
 	}
 	g.stats.Errors += int64(errnums)
