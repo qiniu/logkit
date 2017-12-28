@@ -596,7 +596,7 @@ func clusterResetDeleteTest(p *testCluParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(6 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	// 读取日志发送目的文件，记录日志条数
 	dataLine := 0
@@ -617,7 +617,7 @@ func clusterResetDeleteTest(p *testCluParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(10 * time.Second)
+	time.Sleep(15 * time.Second)
 
 	// 重置之后, 日志发送目的文件中的日志条数应该增加
 	dataLine1 := 0

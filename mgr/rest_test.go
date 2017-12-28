@@ -1000,7 +1000,7 @@ func senderRouterTest(p *testParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConfBytes)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(6 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	f1, err := os.Open(resvPath1)
 	assert.NoError(t, err)
