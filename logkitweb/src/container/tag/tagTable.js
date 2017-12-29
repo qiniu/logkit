@@ -193,7 +193,7 @@ class TagTable extends Component {
         url: ''
       }).then(item => {
         if (item.code === 'L200') {
-          notification.success({message: '删除成功', duration: 10})
+          notification.success({message: '重置成功', duration: 10})
           this.setState({
             isShowTagModal: false
           })

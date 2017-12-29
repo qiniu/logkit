@@ -113,20 +113,18 @@ func (cc *Cluster) RunRegisterLoop() error {
 }
 
 func (cc *Cluster) AddSlave(url, tag string) {
+	cc.mutex.Lock()
+	defer cc.mutex.Unlock()
 	for idx, v := range cc.slaves {
 		if v.Url == url {
 			v.Tag = tag
 			v.LastTouch = time.Now()
 			v.Status = StatusOK
-			cc.mutex.Lock()
 			cc.slaves[idx] = v
-			cc.mutex.Unlock()
 			return
 		}
 	}
-	cc.mutex.Lock()
 	cc.slaves = append(cc.slaves, Slave{url, tag, StatusOK, time.Now()})
-	cc.mutex.Unlock()
 	return
 }
 
@@ -198,22 +196,32 @@ func (rs *RestService) GetClusterRunners() echo.HandlerFunc {
 		rs.cluster.mutex.RLock()
 		slaves, _ := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
+		mutex := new(sync.Mutex)
+		wg := new(sync.WaitGroup)
 		runnerNameSet := utils.NewHashSet()
 		for _, v := range slaves {
-			var respRss respRunnersNameList
-			url := fmt.Sprintf("%v/logkit/runners", v.Url)
-			respCode, respBody, err := executeToOneCluster(url, http.MethodGet, []byte{})
-			if err != nil || respCode != http.StatusOK {
-				log.Errorf("get slave(tag='%v', url='%v') runner name list failed, resp is %v, error is %v", v.Tag, v.Url, string(respBody), err.Error())
-				continue
-			} else {
-				if err = json.Unmarshal(respBody, &respRss); err != nil {
-					log.Errorf("unmarshal slave(tag='%v', url='%v') runner name list failed, error is %v", v.Tag, v.Url, err.Error())
+			wg.Add(1)
+			go func(v Slave) {
+				defer wg.Done()
+				var respRss respRunnersNameList
+				url := fmt.Sprintf("%v/logkit/runners", v.Url)
+				respCode, respBody, err := executeToOneCluster(url, http.MethodGet, []byte{})
+				if err != nil || respCode != http.StatusOK {
+					log.Errorf("get slave(tag='%v', url='%v') runner name list failed, resp is %v, error is %v", v.Tag, v.Url, string(respBody), err.Error())
+					return
 				} else {
-					runnerNameSet.AddStringArray(respRss.Data)
+					if err = json.Unmarshal(respBody, &respRss); err != nil {
+						log.Errorf("unmarshal slave(tag='%v', url='%v') runner name list failed, error is %v", v.Tag, v.Url, err.Error())
+					} else {
+						mutex.Lock()
+						runnerNameSet.AddStringArray(respRss.Data)
+						mutex.Unlock()
+					}
 				}
-			}
+
+			}(v)
 		}
+		wg.Wait()
 		return RespSuccess(c, runnerNameSet.Elements())
 	}
 }
@@ -229,31 +237,42 @@ func (rs *RestService) ClusterStatus() echo.HandlerFunc {
 		rs.cluster.mutex.RLock()
 		slaves, _ := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
-		allstatus := make(map[string]ClusterStatus)
+		mutex := new(sync.Mutex)
+		wg := new(sync.WaitGroup)
+		allStatus := make(map[string]ClusterStatus)
 		for _, v := range slaves {
-			var cs ClusterStatus
-			cs.Tag = v.Tag
-			var respRss respRunnerStatus
-			if v.Status != StatusOK {
-				cs.Status = map[string]RunnerStatus{}
-				allstatus[v.Url] = cs
-				continue
-			}
-			url := fmt.Sprintf("%v/logkit/status", v.Url)
-			respCode, respBody, err := executeToOneCluster(url, http.MethodGet, []byte{})
-			if err != nil || respCode != http.StatusOK {
-				errInfo := fmt.Errorf("%v %v", string(respBody), err)
-				cs.Err = errInfo
-			} else {
-				if err = json.Unmarshal(respBody, &respRss); err != nil {
-					cs.Err = fmt.Errorf("unmarshal query result error %v, body is %v", err, string(respBody))
-				} else {
-					cs.Status = respRss.Data
+			wg.Add(1)
+			go func(v Slave) {
+				defer wg.Done()
+				var cs ClusterStatus
+				cs.Tag = v.Tag
+				var respRss respRunnerStatus
+				if v.Status != StatusOK {
+					cs.Status = map[string]RunnerStatus{}
+					mutex.Lock()
+					allStatus[v.Url] = cs
+					mutex.Unlock()
+					return
 				}
-			}
-			allstatus[v.Url] = cs
+				url := fmt.Sprintf("%v/logkit/status", v.Url)
+				respCode, respBody, err := executeToOneCluster(url, http.MethodGet, []byte{})
+				if err != nil || respCode != http.StatusOK {
+					errInfo := fmt.Errorf("%v %v", string(respBody), err)
+					cs.Err = errInfo
+				} else {
+					if err = json.Unmarshal(respBody, &respRss); err != nil {
+						cs.Err = fmt.Errorf("unmarshal query result error %v, body is %v", err, string(respBody))
+					} else {
+						cs.Status = respRss.Data
+					}
+				}
+				mutex.Lock()
+				allStatus[v.Url] = cs
+				mutex.Unlock()
+			}(v)
 		}
-		return RespSuccess(c, allstatus)
+		wg.Wait()
+		return RespSuccess(c, allStatus)
 	}
 }
 
@@ -306,30 +325,41 @@ func (rs *RestService) GetClusterConfigs() echo.HandlerFunc {
 		rs.cluster.mutex.RLock()
 		slaves, _ := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
+		mutex := new(sync.Mutex)
+		wg := new(sync.WaitGroup)
 		allConfigs := make(map[string]SlaveConfig)
 		for _, v := range slaves {
-			var sc SlaveConfig
-			sc.Tag = v.Tag
-			var respRss respRunnerConfigs
-			if v.Status != StatusOK {
-				sc.Configs = map[string]RunnerConfig{}
-				allConfigs[v.Url] = sc
-				continue
-			}
-			url := fmt.Sprintf("%v/logkit/configs", v.Url)
-			respCode, respBody, err := executeToOneCluster(url, http.MethodGet, []byte{})
-			if err != nil || respCode != http.StatusOK {
-				errInfo := fmt.Errorf("%v %v", string(respBody), err)
-				sc.Err = errInfo
-			} else {
-				if err = json.Unmarshal(respBody, &respRss); err != nil {
-					sc.Err = fmt.Errorf("unmarshal query result error %v, body is %v", err, string(respBody))
-				} else {
-					sc.Configs = respRss.Data
+			wg.Add(1)
+			go func(v Slave) {
+				defer wg.Done()
+				var sc SlaveConfig
+				sc.Tag = v.Tag
+				var respRss respRunnerConfigs
+				if v.Status != StatusOK {
+					sc.Configs = map[string]RunnerConfig{}
+					mutex.Lock()
+					allConfigs[v.Url] = sc
+					mutex.Unlock()
+					return
 				}
-			}
-			allConfigs[v.Url] = sc
+				url := fmt.Sprintf("%v/logkit/configs", v.Url)
+				respCode, respBody, err := executeToOneCluster(url, http.MethodGet, []byte{})
+				if err != nil || respCode != http.StatusOK {
+					errInfo := fmt.Errorf("%v %v", string(respBody), err)
+					sc.Err = errInfo
+				} else {
+					if err = json.Unmarshal(respBody, &respRss); err != nil {
+						sc.Err = fmt.Errorf("unmarshal query result error %v, body is %v", err, string(respBody))
+					} else {
+						sc.Configs = respRss.Data
+					}
+				}
+				mutex.Lock()
+				allConfigs[v.Url] = sc
+				mutex.Unlock()
+			}(v)
 		}
+		wg.Wait()
 		return RespSuccess(c, allConfigs)
 	}
 }
@@ -613,16 +643,25 @@ func (rs *RestService) checkClusterRequest(c echo.Context) (name, tag, url strin
 }
 
 func executeToClusters(slaves []Slave, urlP, method, mgr string, reqBd []byte) (err error) {
+	mutex := new(sync.Mutex)
+	wg := new(sync.WaitGroup)
 	errInfo := make([]string, 0)
 	for _, v := range slaves {
+		wg.Add(1)
 		url := fmt.Sprintf(urlP, v.Url)
-		respCode, respBody, err := executeToOneCluster(url, method, reqBd)
-		if respCode != http.StatusOK || err != nil {
-			log.Errorf("url %v %v occurred an error, resp is %v, err is %v", v.Url, mgr, string(respBody), err)
-			errMsg := fmt.Sprintf("url %v %v occurred an error, resp is %v, err is %v", v.Url, mgr, string(respBody), err)
-			errInfo = append(errInfo, errMsg)
-		}
+		go func(url string) {
+			defer wg.Done()
+			respCode, respBody, err := executeToOneCluster(url, method, reqBd)
+			if respCode != http.StatusOK || err != nil {
+				log.Errorf("url %v %v occurred an error, resp is %v, err is %v", v.Url, mgr, string(respBody), err)
+				errMsg := fmt.Sprintf("url %v %v occurred an error, resp is %v, err is %v", v.Url, mgr, string(respBody), err)
+				mutex.Lock()
+				errInfo = append(errInfo, errMsg)
+				mutex.Unlock()
+			}
+		}(url)
 	}
+	wg.Wait()
 	if len(errInfo) == 0 {
 		return nil
 	}
