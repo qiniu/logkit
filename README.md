@@ -57,6 +57,8 @@ logkit本身支持多种数据源，并且可以同时发送多个数据源的�
 
 [MacOS 版本下载](https://pandora-dl.qiniu.com/nightly/logkit_mac_nightly.tar.gz)
 
+[Docker image nightly]:  `docker pull  wonderflow/logkit:nightly`
+
 
 ## 安装与使用
 
