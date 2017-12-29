@@ -1,5 +1,5 @@
 FROM buildpack-deps:jessie-curl
-ENV LOGKIT_VERSION v1.4.1
+ENV LOGKIT_VERSION nightly
 RUN wget https://pandora-dl.qiniu.com/logkit_${LOGKIT_VERSION}.tar.gz && tar xvf logkit_${LOGKIT_VERSION}.tar.gz && rm logkit_${LOGKIT_VERSION}.tar.gz
 RUN mkdir /app
 RUN mkdir /logs
