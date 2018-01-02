@@ -10,9 +10,10 @@ const (
 )
 
 const (
-	TransformTypeString = "string"
-	TransformTypeLong   = "long"
-	TransformTypeFloat  = "float"
+	TransformTypeString  = "string"
+	TransformTypeLong    = "long"
+	TransformTypeFloat   = "float"
+	TransformTypeBoolean = "bool"
 )
 
 const (
