@@ -4,11 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"os"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
@@ -355,6 +354,21 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 			newFailCtx.Datas = failCtx.Datas[0:lens]
 			failCtx.Datas = failCtx.Datas[lens:]
 			retDatasContext = append(retDatasContext, newFailCtx)
+		} else if len(failCtx.Datas) == 1 {
+			// 此处将 data 改为 raw 放在 pandora_stash 中
+			if _, ok := failCtx.Datas[0][KeyPandoraStash]; !ok {
+				log.Infof("Runner[%v] Sender[%v] try to convert data to string", ft.runnerName, ft.innerSender.Name())
+				data := make([]Data, 1)
+				byteData, err := json.Marshal(failCtx.Datas[0])
+				if err != nil {
+					log.Warnf("Runner[%v] marshal data to string error %v", ft.runnerName, err)
+				} else {
+					data[0] = Data{
+						KeyPandoraStash: string(byteData),
+					}
+					failCtx.Datas = data
+				}
+			}
 		}
 	}
 	retDatasContext = append(retDatasContext, failCtx)

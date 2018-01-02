@@ -67,6 +67,8 @@ const (
 
 	PandoraUUID = "Pandora_UUID"
 
+	KeyPandoraStash = "pandora_stash" // 当只有一条数据且 sendError 时候，将其转化为 raw 发送到 pandora_stash 这个字段
+
 	timestampPrecision = 19
 )
 
@@ -606,6 +608,15 @@ func validSchema(valueType string, value interface{}) bool {
 		return utils.IsJSON(str)
 	}
 	return true
+}
+
+func deleteExtraAttr(data Data) {
+	// 如果用户数据中本来就含有以下字段，则该函数会造成用户数据残缺
+	delete(data, utils.KeyCore)
+	delete(data, utils.KeyOsInfo)
+	delete(data, utils.KeyLocalIp)
+	delete(data, utils.KeyHostName)
+	delete(data, KeyLogkitSendTime)
 }
 
 func (s *PandoraSender) getSchemasAlias() (map[string]pipeline.RepoSchemaEntry, map[string]string) {

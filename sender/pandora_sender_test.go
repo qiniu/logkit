@@ -19,6 +19,7 @@ import (
 
 	"github.com/labstack/echo"
 	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/cli"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
@@ -31,6 +32,7 @@ type mock_pandora struct {
 	Prefix      string
 	Port        string
 	Body        string
+	BodyMux     *sync.RWMutex
 	Schemas     []pipeline.RepoSchemaEntry
 	GetRepoErr  bool
 	PostSleep   int
@@ -40,7 +42,7 @@ type mock_pandora struct {
 
 //NewMockPandoraWithPrefix 测试的mock pandora server
 func NewMockPandoraWithPrefix(prefix string) (*mock_pandora, string) {
-	pandora := &mock_pandora{Prefix: prefix, SetMux: sync.Mutex{}}
+	pandora := &mock_pandora{Prefix: prefix, SetMux: sync.Mutex{}, BodyMux: new(sync.RWMutex)}
 
 	mux := echo.New()
 	mux.GET(prefix+"/ping", pandora.GetPing())
@@ -141,13 +143,18 @@ func (s *mock_pandora) PostRepos_Data() echo.HandlerFunc {
 			log.Println("post repo readall error")
 			return c.NoContent(http.StatusInternalServerError)
 		}
-		s.Body = string(bytesx)
-		sep := strings.Fields(s.Body)
+		sep := strings.Fields(string(bytesx))
 		sort.Strings(sep)
+		s.BodyMux.Lock()
+		defer s.BodyMux.Unlock()
 		s.Body = strings.Join(sep, " ")
 		log.Println("get datas: ", s.Body)
 		if strings.Contains(s.Body, "E18111") {
 			return c.JSON(http.StatusNotFound, utils.NewErrorResponse(errors.New("E18111 mock_pandora error")))
+		} else if strings.Contains(s.Body, "typeBinaryUnpack") && !strings.Contains(s.Body, KeyPandoraStash) {
+			c.Response().Header().Set(cli.ContentType, cli.ApplicationJson)
+			c.Response().WriteHeader(http.StatusBadRequest)
+			return json.NewEncoder(c.Response()).Encode(map[string]string{"error": "E18111 mock_pandora error"})
 		}
 		s.PostDataNum++
 		return nil
