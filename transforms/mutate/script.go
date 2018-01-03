@@ -11,8 +11,8 @@ import (
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
 
-	"github.com/robertkrimen/otto"
 	"github.com/qiniu/log"
+	"github.com/robertkrimen/otto"
 )
 
 type Script struct {
@@ -80,7 +80,7 @@ func (g *Script) Transform(datas []sender.Data) (returnData []sender.Data, ferr 
 	g.vm = otto.New()
 	g.vm.Interrupt = make(chan func(), 1) // The buffer prevents blocking
 	returnData = utils.DeepCopy(datas).([]sender.Data)
-	halt := errors.New("script time out of 3 seconds")
+	halt := errors.New("script transformer execution timeout")
 	ctx := context.Background()
 	cancelCtx, cancel := context.WithCancel(ctx)
 	defer func() {
@@ -94,10 +94,18 @@ func (g *Script) Transform(datas []sender.Data) (returnData []sender.Data, ferr 
 		}
 	}()
 	go func(ctx context.Context) {
+		for i := 0; i < 10; i++ {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				time.Sleep(100 * time.Millisecond)
+			}
+		}
 		//执行超时,则认为全部执行失败,返回原数据
-		time.Sleep(3 * time.Second) // Stop after twok seconds
 		g.stats.LastError = halt.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform script, last error info is %v", len(returnData), halt)
+		ferr = fmt.Errorf("find total %v erorrs in transform script, last error info is %v,the batch data transform all faield", len(returnData), halt)
+		log.Error(ferr)
 		g.stats.Errors += int64(len(datas))
 		g.stats.Success += 0
 		g.vm.Interrupt <- func() {
