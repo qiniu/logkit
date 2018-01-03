@@ -6,7 +6,6 @@ import (
 	"compress/gzip"
 	"database/sql"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -21,6 +20,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
 )
 
@@ -296,7 +296,7 @@ func GetExtraInfo() map[string]string {
 
 func IsJsonString(s string) bool {
 	var x interface{}
-	if err := json.Unmarshal([]byte(s), &x); err != nil {
+	if err := jsoniter.Unmarshal([]byte(s), &x); err != nil {
 		return false
 	}
 	switch x.(type) {
