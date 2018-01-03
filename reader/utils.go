@@ -85,7 +85,10 @@ func notCondition(f1 func(os.FileInfo) bool) func(os.FileInfo) bool {
 
 // modTimeLater 按最后修改时间进行比较
 func modTimeLater(f1, f2 os.FileInfo) bool {
-	return f1.ModTime().Unix() >= f2.ModTime().Unix()
+	if f1.ModTime().UnixNano() != f2.ModTime().UnixNano() {
+		return f1.ModTime().UnixNano() > f2.ModTime().UnixNano()
+	}
+	return f1.Name() > f2.Name()
 }
 
 func HeadPatternMode(mode string, v interface{}) (reg *regexp.Regexp, err error) {
