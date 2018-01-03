@@ -603,7 +603,7 @@ func validSchema(valueType string, value interface{}) bool {
 		if str == "" {
 			return true
 		}
-		return utils.IsJSON(str)
+		return utils.IsJsonString(str)
 	}
 	return true
 }

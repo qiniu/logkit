@@ -294,9 +294,17 @@ func GetExtraInfo() map[string]string {
 	return exInfo
 }
 
-func IsJSON(str string) bool {
-	var js json.RawMessage
-	return json.Unmarshal([]byte(str), &js) == nil
+func IsJsonString(s string) bool {
+	var x interface{}
+	if err := json.Unmarshal([]byte(s), &x); err != nil {
+		return false
+	}
+	switch x.(type) {
+	case []interface{}, map[string]interface{}:
+		return true
+	default:
+		return false
+	}
 }
 
 func ExtractField(slice []string) ([]string, error) {
