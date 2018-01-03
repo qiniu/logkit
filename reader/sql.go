@@ -2,27 +2,25 @@ package reader
 
 import (
 	"database/sql"
-	"encoding/json"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/qiniu/log"
-	"github.com/robfig/cron"
-
-	"reflect"
-
-	"encoding/binary"
+	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/utils"
 
 	_ "github.com/denisenkom/go-mssqldb" //mssql 驱动
 	_ "github.com/go-sql-driver/mysql"   //mysql 驱动
-	_ "github.com/lib/pq"                //postgres 驱动
-	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
+	"github.com/json-iterator/go"
+	_ "github.com/lib/pq" //postgres 驱动
+	"github.com/qiniu/log"
+	"github.com/robfig/cron"
 )
 
 const (
@@ -688,7 +686,7 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 						}
 					}
 				}
-				ret, err := json.Marshal(data)
+				ret, err := jsoniter.Marshal(data)
 				if err != nil {
 					log.Errorf("Runner[%v] %v unmarshal sql data error %v", mr.meta.RunnerName, mr.Name(), err)
 					continue

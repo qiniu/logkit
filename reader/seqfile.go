@@ -7,11 +7,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
-
-	"sync"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/rateio"

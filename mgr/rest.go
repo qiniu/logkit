@@ -2,7 +2,7 @@ package mgr
 
 import (
 	"encoding/base64"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -11,12 +11,10 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
-	"sync"
-
-	"errors"
-
+	"github.com/json-iterator/go"
 	"github.com/labstack/echo"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
@@ -294,7 +292,7 @@ func convertWebTransformerConfig(conf map[string]interface{}) map[string]interfa
 }
 
 func (rs *RestService) backupRunnerConfig(rconf interface{}, filename string) error {
-	confBytes, err := json.MarshalIndent(rconf, "", "    ")
+	confBytes, err := jsoniter.MarshalIndent(rconf, "", "    ")
 	if err != nil {
 		return fmt.Errorf("runner config %v marshal failed, err is %v", rconf, err)
 	}

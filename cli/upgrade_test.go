@@ -3,7 +3,6 @@ package cli
 import (
 	"archive/tar"
 	"compress/gzip"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -18,6 +17,7 @@ import (
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/utils"
 
+	"github.com/json-iterator/go"
 	"github.com/labstack/echo"
 	"github.com/stretchr/testify/assert"
 )
@@ -355,7 +355,7 @@ func (m *mockGithub) respFunction(c echo.Context, data map[string]interface{}) e
 	c.Response().Header().Set(RateLimitReset, data[RateLimitReset].(string))
 	c.Response().Header().Set(RateLimitRemaining, data[RateLimitRemaining].(string))
 	c.Response().WriteHeader(data["statusCode"].(int))
-	return json.NewEncoder(c.Response()).Encode(data["data"])
+	return jsoniter.NewEncoder(c.Response()).Encode(data["data"])
 }
 
 // 请求含有错误参数，该函数通过错误参数来构造不同的错误

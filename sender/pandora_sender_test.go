@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/json-iterator/go"
 	"github.com/labstack/echo"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/cli"
@@ -154,7 +155,7 @@ func (s *mock_pandora) PostRepos_Data() echo.HandlerFunc {
 		} else if strings.Contains(s.Body, "typeBinaryUnpack") && !strings.Contains(s.Body, KeyPandoraStash) {
 			c.Response().Header().Set(cli.ContentType, cli.ApplicationJson)
 			c.Response().WriteHeader(http.StatusBadRequest)
-			return json.NewEncoder(c.Response()).Encode(map[string]string{"error": "E18111 mock_pandora error"})
+			return jsoniter.NewEncoder(c.Response()).Encode(map[string]string{"error": "E18111 mock_pandora error"})
 		}
 		s.PostDataNum++
 		return nil
@@ -299,7 +300,7 @@ func TestPandoraSender(t *testing.T) {
 	dataJson := `{"ab":"REQ","ac":200,"d":14774559431867215}`
 
 	d = Data{}
-	jsonDecoder := json.NewDecoder(bytes.NewReader([]byte(dataJson)))
+	jsonDecoder := jsoniter.NewDecoder(bytes.NewReader([]byte(dataJson)))
 	jsonDecoder.UseNumber()
 	err = jsonDecoder.Decode(&d)
 	if err != nil {

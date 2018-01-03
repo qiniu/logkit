@@ -1,16 +1,15 @@
 package reader
 
 import (
+	"fmt"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/qiniu/logkit/conf"
-
-	"fmt"
-	"reflect"
-
 	"github.com/qiniu/logkit/utils"
+
 	"github.com/stretchr/testify/assert"
 )
 

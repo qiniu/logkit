@@ -506,13 +506,5 @@ func (m *Manager) Configs() (rss map[string]RunnerConfig) {
 		tmpRss[k] = v
 	}
 	deepCopy(&rss, &tmpRss)
-	//if tmpRssByte, err = json.Marshal(tmpRss); err != nil {
-	//	log.Debugf("runner configs marshal error %v", err)
-	//	return tmpRss
-	//}
-	//if err = json.Unmarshal(tmpRssByte, &rss); err != nil {
-	//	log.Debugf("runner configs unmarshal error %v", err)
-	//	return tmpRss
-	//}
 	return
 }
