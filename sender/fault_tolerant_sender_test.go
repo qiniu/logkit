@@ -283,3 +283,84 @@ func ftSenderConcurrent(b *testing.B, c conf.MapConf) {
 	b.Logf("Benchmark.N: %d", b.N)
 	b.Logf("MockSender.SendCount: %d", ms.SendCount())
 }
+
+func TestFtSenderConvertData(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", fmt.Sprintf("nsq-test-%d", time.Now().UnixNano()))
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(tmpDir)
+	mockP, pt := NewMockPandoraWithPrefix("/v2")
+	opt := &PandoraOption{
+		name:           "p",
+		repoName:       "TestFtSenderConvertData",
+		region:         "nb",
+		endpoint:       "http://127.0.0.1:" + pt,
+		ak:             "ak",
+		sk:             "sk",
+		schemaFree:     true,
+		updateInterval: time.Second,
+		reqRateLimit:   0,
+		flowRateLimit:  0,
+		gzip:           false,
+	}
+	s, err := newPandoraSender(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mockP.SetMux.Lock()
+	mockP.PostSleep = 1
+	mockP.SetMux.Unlock()
+	mp := conf.MapConf{}
+	mp[KeyFtSaveLogPath] = tmpDir
+	mp[KeyFtMemoryChannel] = "false"
+	mp[KeyFtStrategy] = KeyFtStrategyBackupOnly
+	fts, err := NewFtSender(s, mp, tmpDir)
+	assert.NoError(t, err)
+	expStr := []string{"a=typeBinaryUnpack", `pandora_stash={"a":"typeBinaryUnpack"}`, "a=typeBinaryUnpack", `pandora_stash={"a":"typeBinaryUnpack"}`}
+
+	exitChan := make(chan string)
+	go func() {
+		now := time.Now()
+		curIndex := 0
+		for {
+			mockP.BodyMux.RLock()
+			if mockP.Body == expStr[curIndex] {
+				curIndex += 1
+				if curIndex%2 != 0 {
+					exitChan <- mockP.Body
+				}
+			}
+			mockP.BodyMux.RUnlock()
+			if curIndex == 4 {
+				break
+			}
+			if time.Now().Sub(now).Seconds() > 10 {
+				break
+			}
+			time.Sleep(300 * time.Millisecond)
+		}
+		assert.Equal(t, 4, curIndex)
+	}()
+
+	var moreDatas [][]Data
+	for i := 0; i < 2; i++ {
+		err = fts.Send([]Data{
+			{"a": "typeBinaryUnpack"},
+		})
+		se, ok := err.(*utils.StatsError)
+		if !ok {
+			t.Fatal("ft send return error should .(*StatsError)")
+		}
+		if se.ErrorDetail != nil {
+			sx, succ := se.ErrorDetail.(*reqerr.SendError)
+			if succ {
+				datas := ConvertDatas(sx.GetFailDatas())
+				moreDatas = append(moreDatas, datas)
+			} else {
+				t.Fatal("ft send StatsError error should contains send error", se.ErrorDetail)
+			}
+		}
+		<-exitChan
+	}
+}
