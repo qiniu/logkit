@@ -305,7 +305,7 @@ func (sf *SeqFile) nextFile() (fi os.FileInfo, err error) {
 		condition = sf.getIgnoreCondition()
 	} else {
 		newerThanCurrFile := func(f os.FileInfo) bool {
-			return f.ModTime().UnixNano() > currFi.ModTime().UnixNano()
+			return modTimeLater(f, currFi)
 		}
 		condition = andCondition(newerThanCurrFile, sf.getIgnoreCondition())
 	}
