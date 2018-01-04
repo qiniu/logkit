@@ -656,7 +656,7 @@ class RunnerTable extends Component {
                 }
               </Select>
             </FormItem>
-          </Form>) : (<div><Button type="primary" style={{marginRight: '50px'}} className="index-btn" ghost
+          </Form>) : (<div style={{marginBottom: '15px'}}><Button type="primary" style={{marginRight: '50px'}} className="index-btn" ghost
                                    onClick={handleAddRunner}>
             <Icon type="plus"/> 增加日志采集收集器
           </Button>
