@@ -83,6 +83,14 @@ var ModeKeyOptions = map[string][]utils.Option{
 	},
 	TypePandora: {
 		{
+			KeyName:      KeyPandoraWorkflowName,
+			ChooseOnly:   false,
+			Default:      "logkit_default_workflow",
+			DefaultNoUse: true,
+			Description:  "Pandora workflow名称(为空则使用旧版)(pandora_workflow_name)",
+			CheckRegex:   "^[a-zA-Z_][a-zA-Z0-9_]{0,127}$",
+		},
+		{
 			KeyName:      KeyPandoraRepoName,
 			ChooseOnly:   false,
 			Default:      "my_work",
