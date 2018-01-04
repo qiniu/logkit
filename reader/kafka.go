@@ -95,7 +95,7 @@ func (kr *KafkaReader) ReadLine() (data string, err error) {
 }
 
 func (kr *KafkaReader) Close() (err error) {
-	if atomic.CompareAndSwapInt32(&kr.status, StatusRunning, StatusStoping) {
+	if atomic.CompareAndSwapInt32(&kr.status, StatusRunning, StatusStopping) {
 		log.Infof("Runner[%v] %v stopping", kr.meta.RunnerName, kr.Name())
 	} else {
 		close(kr.readChan)
@@ -163,7 +163,7 @@ func (kr *KafkaReader) run() {
 	// stopping时推出改为 stopped，不再运行
 	defer func() {
 		atomic.CompareAndSwapInt32(&kr.status, StatusRunning, StatusInit)
-		if atomic.CompareAndSwapInt32(&kr.status, StatusStoping, StatusStopped) {
+		if atomic.CompareAndSwapInt32(&kr.status, StatusStopping, StatusStopped) {
 			close(kr.readChan)
 			go func() {
 				kr.mux.Lock()
@@ -178,7 +178,7 @@ func (kr *KafkaReader) run() {
 	}()
 	// 开始work逻辑
 	for {
-		if atomic.LoadInt32(&kr.status) == StatusStoping {
+		if atomic.LoadInt32(&kr.status) == StatusStopping {
 			log.Warnf("Runner[%v] %v stopped from running", kr.meta.RunnerName, kr.Name())
 			return
 		}

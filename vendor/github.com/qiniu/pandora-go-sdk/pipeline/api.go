@@ -174,9 +174,13 @@ func (c *Pipeline) UpdateRepoWithLogDB(input *UpdateRepoInput, ex ExportDesc) er
 	if err != nil {
 		return err
 	}
+	analyzers := AnalyzerInfo{}
+	if input.Option != nil {
+		analyzers = input.Option.AutoExportToLogDBInput.AnalyzerInfo
+	}
 	for _, v := range input.Schema {
 		if schemaNotIn(v.Key, repoInfo.Schema) {
-			scs := convertSchema2LogDB([]RepoSchemaEntry{v})
+			scs := convertSchema2LogDB([]RepoSchemaEntry{v}, analyzers)
 			if len(scs) > 0 {
 				repoInfo.Schema = append(repoInfo.Schema, scs[0])
 			}
@@ -232,9 +236,8 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 	if err != nil {
 		return
 	}
-	err = c.updateRepo(input)
-	if err != nil {
-		return
+	if err = c.updateRepo(input); err != nil {
+		return err
 	}
 	if input.Option == nil {
 		return nil
@@ -436,7 +439,15 @@ func (c *Pipeline) unpack(input *SchemaFreeInput) (packages []pointContext, err 
 	var buf bytes.Buffer
 	var start = 0
 	for i, d := range input.Datas {
-		point, err := c.generatePoint(input.RepoName, d, !input.NoUpdate, input.Option, input.RepoOptions)
+		point, err := c.generatePoint(d, &InitOrUpdateWorkflowInput{
+			SchemaFree:   !input.NoUpdate,
+			SendToDag:    input.SendToDag,
+			Region:       input.Region,
+			RepoName:     input.RepoName,
+			WorkflowName: input.WorkflowName,
+			RepoOptions:  input.RepoOptions,
+			Option:       input.Option,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -606,6 +617,9 @@ func (c *Pipeline) ListPlugins(input *ListPluginsInput) (output *ListPluginsOutp
 
 	output = &ListPluginsOutput{}
 	req := c.newRequest(op, input.Token, &output)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	return output, req.Send()
 }
 
@@ -622,6 +636,9 @@ func (c *Pipeline) GetPlugin(input *GetPluginInput) (output *GetPluginOutput, er
 
 	output = &GetPluginOutput{}
 	req := c.newRequest(op, input.Token, output)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	return output, req.Send()
 }
 
@@ -1139,6 +1156,9 @@ func (c *Pipeline) ListUdfs(input *ListUdfsInput) (output *ListUdfsOutput, err e
 
 	output = &ListUdfsOutput{}
 	req := c.newRequest(op, input.Token, output)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	return output, req.Send()
 }
 
@@ -1184,6 +1204,9 @@ func (c *Pipeline) ListUdfFunctions(input *ListUdfFunctionsInput) (output *ListU
 
 	output = &ListUdfFunctionsOutput{}
 	req := c.newRequest(op, input.Token, output)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	return output, req.Send()
 }
 
@@ -1319,6 +1342,9 @@ func (c *Pipeline) SearchWorkflow(input *DagLogSearchInput) (ret *WorkflowSearch
 	if err = req.SetVariantBody(input); err != nil {
 		return
 	}
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	return ret, req.Send()
 }
 
@@ -1425,6 +1451,9 @@ func (c *Pipeline) GetVariable(input *GetVariableInput) (output *GetVariableOutp
 
 	output = &GetVariableOutput{}
 	req := c.newRequest(op, input.Token, output)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	return output, req.Send()
 }
 
@@ -1433,6 +1462,9 @@ func (c *Pipeline) ListUserVariables(input *ListVariablesInput) (output *ListVar
 
 	output = &ListVariablesOutput{}
 	req := c.newRequest(op, input.Token, output)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	return output, req.Send()
 }
 
@@ -1440,5 +1472,8 @@ func (c *Pipeline) ListSystemVariables(input *ListVariablesInput) (output *ListV
 	op := c.newOperation(base.OpListSystemVariables, systemVariableType)
 	output = &ListVariablesOutput{}
 	req := c.newRequest(op, input.Token, output)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	return output, req.Send()
 }

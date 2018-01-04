@@ -16,7 +16,7 @@ func WaitWorkflowStarted(workflowName string, client PipelineAPI, logger base.Lo
 			stats, err := client.GetWorkflowStatus(&GetWorkflowStatusInput{
 				WorkflowName: workflowName,
 			})
-			if err == nil && stats.Status == "Started" {
+			if err == nil && stats.Status == base.WorkflowStarted {
 				return nil
 			}
 			logger.Infof("waiting for workflow: %s to be started", workflowName)
@@ -36,7 +36,7 @@ func WaitWorkflowStopped(workflowName string, client PipelineAPI, logger base.Lo
 			stats, err := client.GetWorkflowStatus(&GetWorkflowStatusInput{
 				WorkflowName: workflowName,
 			})
-			if err == nil && stats.Status == "Stopped" {
+			if err == nil && stats.Status == base.WorkflowStopped {
 				return nil
 			}
 			logger.Infof("waiting for workflow: %s to be stopped", workflowName)

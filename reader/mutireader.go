@@ -99,8 +99,8 @@ func (ar *ActiveReader) Run() {
 	var err error
 	timer := time.NewTicker(time.Second)
 	for {
-		if atomic.LoadInt32(&ar.status) == StatusStopped || atomic.LoadInt32(&ar.status) == StatusStoping {
-			atomic.CompareAndSwapInt32(&ar.status, StatusStoping, StatusStopped)
+		if atomic.LoadInt32(&ar.status) == StatusStopped || atomic.LoadInt32(&ar.status) == StatusStopping {
+			atomic.CompareAndSwapInt32(&ar.status, StatusStopping, StatusStopped)
 			log.Warnf("Runner[%v] ActiveReader %s was stopped", ar.runnerName, ar.originpath)
 			return
 		}
@@ -135,9 +135,9 @@ func (ar *ActiveReader) Run() {
 
 			atomic.StoreInt32(&ar.inactive, 0)
 			//做这一层结构为了快速结束
-			if atomic.LoadInt32(&ar.status) == StatusStopped || atomic.LoadInt32(&ar.status) == StatusStoping {
+			if atomic.LoadInt32(&ar.status) == StatusStopped || atomic.LoadInt32(&ar.status) == StatusStopping {
 				log.Debugf("Runner[%v] %v ActiveReader was stopped when waiting to send data", ar.runnerName, ar.originpath)
-				atomic.CompareAndSwapInt32(&ar.status, StatusStoping, StatusStopped)
+				atomic.CompareAndSwapInt32(&ar.status, StatusStopping, StatusStopped)
 				return
 			}
 			select {
@@ -154,7 +154,7 @@ func (ar *ActiveReader) Close() error {
 	defer log.Warnf("Runner[%v] ActiveReader %s was closed", ar.runnerName, ar.originpath)
 	err := ar.br.Close()
 
-	if atomic.CompareAndSwapInt32(&ar.status, StatusRunning, StatusStoping) {
+	if atomic.CompareAndSwapInt32(&ar.status, StatusRunning, StatusStopping) {
 		log.Warnf("Runner[%v] ActiveReader %s was closing", ar.runnerName, ar.originpath)
 	} else {
 		return err
