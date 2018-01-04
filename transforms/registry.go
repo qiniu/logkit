@@ -80,7 +80,7 @@ var (
 		ChooseOptions: []interface{}{0, -1, -2, -3, -4,
 			-5, -6, -7, -8, -9, -10, -11, -12,
 			1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12},
-		Default:      "0",
+		Default:      0,
 		DefaultNoUse: false,
 		Description:  "时区偏移量(offset)",
 		CheckRegex:   "*",

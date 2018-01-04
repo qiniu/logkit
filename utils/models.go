@@ -4,7 +4,7 @@ type Option struct {
 	KeyName       string
 	ChooseOnly    bool
 	ChooseOptions []interface{}
-	Default       string
+	Default       interface{}
 	DefaultNoUse  bool
 	Description   string
 	CheckRegex    string
