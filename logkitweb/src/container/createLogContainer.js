@@ -96,7 +96,9 @@ class CreateLogRunner extends Component {
         }
       });
     } else if (this.state.current === 2) {
+
 			let formValue = this.refs.initTransform.getFieldsValue()
+
 			if(formValue['请选择需要转化的类型'] == undefined){
 				notification.warning({message: "您当前选择的transform未添加", description: '请点击添加按钮添加', duration: 10})
 				return

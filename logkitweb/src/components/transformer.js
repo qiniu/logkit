@@ -249,7 +249,7 @@ class Transformer extends Component {
   addTag = () => {
     const {getFieldsValue, getFieldDecorator} = this.props.form;
     let data = getFieldsValue();
-		console.log(this.state, this.state.currentOption)
+
     if (this.state.currentOption != '请选择需要转化的类型') {
       this.setState({
         tags: this.state.tags.concat(`uuid${this.schemaUUID}`)
