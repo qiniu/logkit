@@ -302,7 +302,7 @@ class Transformer extends Component {
                   </Select>)}
             </FormItem>
             {this.renderFormItem()}
-            <FormItem label="需要转化的字段和类型" className="inline title"/>
+            {/*<FormItem label="需要转化的字段和类型" className="inline title"/>*/}
             <FormItem>
               <div style={{width: "140px", margin: "0px auto"}}>
                 <button onClick={this.addTag} type="button"
