@@ -12,16 +12,17 @@ import (
 )
 
 type Json struct {
-	OldKey  string `json:"oldKey"`
+	OldKey  string `json:"key"`
 	NewKey  string `json:"newKey"`
 	stats   utils.StatsInfo
 	oldKeys []string
 	newKeys []string
 }
 
-func (g *Json) Init() {
+func (g *Json) Init() error {
 	g.oldKeys = utils.GetKeys(g.OldKey)
 	g.newKeys = utils.GetKeys(g.NewKey)
+	return nil
 }
 
 func (g *Json) Transform(datas []sender.Data) ([]sender.Data, error) {
@@ -57,7 +58,7 @@ func (g *Json) Transform(datas []sender.Data) ([]sender.Data, error) {
 	}
 	if err != nil {
 		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform replace, last error info is %v", errnums, err)
+		ferr = fmt.Errorf("find total %v erorrs in transform json, last error info is %v", errnums, err)
 	}
 	g.stats.Errors += int64(errnums)
 	g.stats.Success += int64(len(datas) - errnums)
@@ -98,6 +99,14 @@ func (g *Json) SampleConfig() string {
 func (g *Json) ConfigOptions() []utils.Option {
 	return []utils.Option{
 		transforms.KeyFieldName,
+		{
+			KeyName:      "newKey",
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: true,
+			Description:  "新的字段名",
+			Type:         transforms.TransformTypeString,
+		},
 	}
 }
 

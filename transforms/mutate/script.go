@@ -205,14 +205,7 @@ func (g *Script) SampleConfig() string {
 
 func (g *Script) ConfigOptions() []utils.Option {
 	return []utils.Option{
-		{
-			KeyName:      "oldKey",
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: true,
-			Description:  "旧的字段名",
-			Type:         transforms.TransformTypeString,
-		},
+		transforms.KeyFieldName,
 		{
 			KeyName:      "newKey",
 			ChooseOnly:   false,
