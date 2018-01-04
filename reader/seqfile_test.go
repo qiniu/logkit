@@ -33,7 +33,7 @@ func Test_Read(t *testing.T) {
 	}
 	absDir, err := filepath.Abs(dir)
 	assert.NoError(t, err)
-	assert.Equal(t, absDir, sf.Source())
+	assert.Equal(t, absDir, filepath.Dir(sf.Source()))
 	assert.NotEmpty(t, sf.Name())
 	buffer := make([]byte, 5)
 	n, err := sf.Read(buffer)

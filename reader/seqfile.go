@@ -180,7 +180,7 @@ func (sf *SeqFile) Name() string {
 }
 
 func (sf *SeqFile) Source() string {
-	return sf.dir
+	return sf.currFile
 }
 
 func (sf *SeqFile) Close() (err error) {
