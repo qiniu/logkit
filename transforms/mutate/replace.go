@@ -83,7 +83,8 @@ func (g *Replacer) SampleConfig() string {
 		"stage":"before_parser",
 		"key":"MyReplaceFieldKey",
 		"old":"myOldString",
-		"new":"myNewString"
+		"new":"myNewString",
+        "regex":"false"
 	}`
 }
 
@@ -110,10 +111,11 @@ func (g *Replacer) ConfigOptions() []utils.Option {
 		{
 			KeyName:       "regex",
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{"false", "true"},
-			Default:       "false",
+			ChooseOptions: []interface{}{false, true},
+			Default:       false,
 			DefaultNoUse:  false,
-			Description:   "是否启用正则匹配",
+			Description:   "是否启用正则匹配(regex)",
+			Type:          transforms.TransformTypeBoolean,
 		},
 	}
 }
