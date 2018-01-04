@@ -200,8 +200,8 @@ var ModeKeyOptions = map[string][]utils.Option{
 	},
 	ModeFileAuto: {
 		{
-			KeyName:      KeyLogPath,
-			ChooseOnly:   false,
+			KeyName:    KeyLogPath,
+			ChooseOnly: false,
 
 			Default:      "/your/log/dir/or/path*.log", //TODO 此处前端要做成直接让用户选择文件夹
 			DefaultNoUse: true,

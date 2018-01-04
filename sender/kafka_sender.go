@@ -147,6 +147,7 @@ func (this *KafkaSender) Send(data []Data) error {
 	err := producer.SendMessages(msgs)
 	if err != nil {
 		errorNum = len(data)
+		se.Errors += int64(errorNum)
 		se.ErrorDetail = err
 		log.Error(err)
 		return se
