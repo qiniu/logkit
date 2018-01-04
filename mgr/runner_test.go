@@ -81,11 +81,12 @@ func Test_Run(t *testing.T) {
 		MaxBatchSize: 2048,
 	}
 	readerConfig := conf.MapConf{
-		"log_path":       logpathLink,
-		"meta_path":      metapath,
-		"mode":           "dir",
-		"read_from":      "oldest",
-		"datasource_tag": "testtag",
+		"log_path":        logpathLink,
+		"meta_path":       metapath,
+		"mode":            "dir",
+		"read_from":       "oldest",
+		"datasource_tag":  "testtag",
+		"reader_buf_size": "16",
 	}
 	meta, err := reader.NewMetaWithConf(readerConfig)
 	if err != nil {
@@ -164,7 +165,7 @@ func Test_Run(t *testing.T) {
 		t.Errorf("got sender data not match error,expect 2 but %v", len(dts))
 	}
 	for _, dt := range dts {
-		assert.Equal(t, absLogpath, dt["testtag"])
+		assert.Equal(t, absLogpath, filepath.Dir(dt["testtag"].(string)))
 	}
 }
 

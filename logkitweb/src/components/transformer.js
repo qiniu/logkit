@@ -234,7 +234,11 @@ class Transformer extends Component {
   renderChooseOption = (items) => {
     let options = []
     items.map((ele) => {
-      options.push(<Option key={ele} value={ele}>{ele}</Option>)
+        let el = ele
+        if(typeof el === 'boolean'){
+           el = String(el)
+        }
+        options.push(<Option key={ele} value={ele}>{el}</Option>)
     })
     return (
         options
@@ -271,6 +275,8 @@ class Transformer extends Component {
       _.set(transforms, key, data[this.state.currentOption]);
       this.setState({
         transforms
+      }, () => {
+        this.handleChange('请选择需要转化的类型')
       })
 
       this.schemaUUID++;
@@ -302,15 +308,16 @@ class Transformer extends Component {
                   </Select>)}
             </FormItem>
             {this.renderFormItem()}
-            <FormItem label="需要转化的字段和类型" className="inline title"/>
-            <FormItem>
-              <div style={{width: "140px", margin: "0px auto"}}>
-                <button onClick={this.addTag} type="button"
-                        className="btn btn-primary btn-add"
-                        style={{width: "140px", marginBottom: "20px", marginTop: "10px"}}>添加
-                </button>
+              <div className="option-add">
+                  <FormItem {...optionFormItemLayout} label={<span style={{display:'none'}}></span>}>
+                      <div className="option-add-btn">
+                          <button onClick={this.addTag} type="button"
+                                  className="btn btn-primary btn-add"
+                                  style={{width: "140px", marginBottom: "20px", marginTop: "10px"}}>添加
+                          </button>
+                      </div>
+                  </FormItem>
               </div>
-            </FormItem>
             {this.renderTags()}
           </Form>
         </div>

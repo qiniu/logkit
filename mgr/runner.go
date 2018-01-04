@@ -624,7 +624,7 @@ func (r *LogExportRunner) Reset() error {
 func (r *LogExportRunner) Cleaner() CleanInfo {
 	ci := CleanInfo{
 		enable: r.cleaner != nil,
-		logdir: r.reader.Source(),
+		logdir: filepath.Dir(r.reader.Source()),
 	}
 	return ci
 }
