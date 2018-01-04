@@ -2,20 +2,18 @@ package reader
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/qiniu/logkit/rateio"
 	"github.com/qiniu/logkit/utils"
-
-	"sync"
-
-	"fmt"
 
 	"github.com/qiniu/log"
 )

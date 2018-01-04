@@ -1,9 +1,9 @@
 package mgr
 
 import (
-	"encoding/json"
 	"net/http"
 
+	"github.com/json-iterator/go"
 	"github.com/qiniu/logkit/sender"
 	"github.com/stretchr/testify/assert"
 )
@@ -18,7 +18,7 @@ func senderAPITest(p *testParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodGet, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	if err = json.Unmarshal(respBody, &got1); err != nil {
+	if err = jsoniter.Unmarshal(respBody, &got1); err != nil {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
 	assert.Equal(t, sender.ModeUsages, got1.Data)
@@ -28,7 +28,7 @@ func senderAPITest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	if err = json.Unmarshal(respBody, &got2); err != nil {
+	if err = jsoniter.Unmarshal(respBody, &got2); err != nil {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
 	assert.Equal(t, sender.ModeKeyOptions, got2.Data)

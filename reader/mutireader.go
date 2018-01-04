@@ -1,7 +1,6 @@
 package reader
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/utils"
 )
@@ -255,7 +255,7 @@ func NewMultiReader(meta *Meta, logPathPattern, whence, expireDur, statIntervalD
 				log.Warnf("Runner[%v] %v read buf error %v, ignore...", mr.meta.RunnerName, mr.Name(), err)
 			}
 		} else {
-			err = json.Unmarshal(buf, &mr.cacheMap)
+			err = jsoniter.Unmarshal(buf, &mr.cacheMap)
 			if err != nil {
 				log.Warnf("Runner[%v] %v Unmarshal read buf error %v, ignore...", mr.meta.RunnerName, mr.Name(), err)
 			}
@@ -482,7 +482,7 @@ func (mr *MultiReader) SyncMeta() {
 		mr.armapmux.Unlock()
 	}
 	mr.armapmux.Lock()
-	buf, err := json.Marshal(mr.cacheMap)
+	buf, err := jsoniter.Marshal(mr.cacheMap)
 	mr.armapmux.Unlock()
 	if err != nil {
 		log.Errorf("%v sync meta error %v, cacheMap %v", mr.Name(), err, mr.cacheMap)

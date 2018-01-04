@@ -3,11 +3,10 @@ package reader
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"strings"
 
 	"github.com/go-redis/redis"
 	"github.com/qiniu/log"

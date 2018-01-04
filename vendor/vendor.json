@@ -119,6 +119,12 @@
 			"revisionTime": "2015-10-03T19:46:02Z"
 		},
 		{
+			"checksumSHA1": "50J+ClsLONoc78uu+sDrdJ6IWPA=",
+			"path": "github.com/json-iterator/go",
+			"revision": "96fcb84835b0447f3de9d7addb313c5487071533",
+			"revisionTime": "2017-12-23T02:52:17Z"
+		},
+		{
 			"checksumSHA1": "hz/wVE0xwQ+d8aQbX7ApZVj8Hbg=",
 			"path": "github.com/labstack/echo",
 			"revision": "70c18060bde41901b2675da5629611f6afc580bc",

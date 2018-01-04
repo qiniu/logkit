@@ -2,11 +2,9 @@ package service
 
 import (
 	"errors"
-	"strings"
-
 	"fmt"
-
 	"path/filepath"
+	"strings"
 
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"

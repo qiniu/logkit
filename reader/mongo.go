@@ -1,7 +1,6 @@
 package reader
 
 import (
-	"encoding/json"
 	"errors"
 	"sync"
 	"sync/atomic"
@@ -11,6 +10,7 @@ import (
 
 	"strings"
 
+	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
 	"github.com/robfig/cron"
 	"gopkg.in/mgo.v2"
@@ -89,7 +89,7 @@ func NewMongoReader(meta *Meta, readBatch int, host, database, collection, offse
 	}
 
 	if filters != "" {
-		if jerr := json.Unmarshal([]byte(filters), &mr.collectionFilters); jerr != nil {
+		if jerr := jsoniter.Unmarshal([]byte(filters), &mr.collectionFilters); jerr != nil {
 			err = errors.New("malformed collection_filters")
 			return
 		}
@@ -273,7 +273,7 @@ func (mr *MongoReader) exec() (err error) {
 		if id, ok := result[mr.offsetkey]; ok {
 			mr.offset = id
 		}
-		bytes, ierr := json.Marshal(result)
+		bytes, ierr := jsoniter.Marshal(result)
 		if ierr != nil {
 			log.Errorf("Runner[%v] %v json marshal inner error %v", mr.meta.RunnerName, result, ierr)
 		}

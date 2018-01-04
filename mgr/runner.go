@@ -1,7 +1,6 @@
 package mgr
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	jsoniter "github.com/json-iterator/go"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/cleaner"
 	"github.com/qiniu/logkit/conf"
@@ -308,12 +308,12 @@ func createTransformers(rc RunnerConfig) []transforms.Transformer {
 			continue
 		}
 		trans := creater()
-		bts, err := json.Marshal(tConf)
+		bts, err := jsoniter.Marshal(tConf)
 		if err != nil {
 			log.Errorf("type %v of transformer marshal config error %v", strTP, err)
 			continue
 		}
-		err = json.Unmarshal(bts, trans)
+		err = jsoniter.Unmarshal(bts, trans)
 		if err != nil {
 			log.Errorf("type %v of transformer unmarshal config error %v", strTP, err)
 			continue
@@ -813,11 +813,11 @@ func calcSpeedTrend(old, new utils.StatsInfo, elaspedtime float64) (speed float6
 func deepCopy(dst, src interface{}) {
 	var err error
 	var confByte []byte
-	if confByte, err = json.Marshal(src); err != nil {
+	if confByte, err = jsoniter.Marshal(src); err != nil {
 		log.Debugf("runner config marshal error %v", err)
 		dst = src
 	}
-	if err = json.Unmarshal(confByte, dst); err != nil {
+	if err = jsoniter.Unmarshal(confByte, dst); err != nil {
 		log.Debugf("runner config unmarshal error %v", err)
 		dst = src
 	}

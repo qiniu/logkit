@@ -1,9 +1,9 @@
 package mgr
 
 import (
-	"encoding/json"
 	"net/http"
 
+	"github.com/json-iterator/go"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	_ "github.com/qiniu/logkit/transforms/date"
@@ -25,7 +25,7 @@ func transformerAPITest(p *testParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodGet, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	if err = json.Unmarshal(respBody, &got1); err != nil {
+	if err = jsoniter.Unmarshal(respBody, &got1); err != nil {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
 	assert.Equal(t, len(transforms.Transformers), len(got1.Data))
@@ -35,7 +35,7 @@ func transformerAPITest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	if err = json.Unmarshal(respBody, &got2); err != nil {
+	if err = jsoniter.Unmarshal(respBody, &got2); err != nil {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
 	assert.Equal(t, len(transforms.Transformers), len(got2.Data))
@@ -54,7 +54,7 @@ func transformerAPITest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte(dateTransformerConfig))
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	if err = json.Unmarshal(respBody, &got3); err != nil {
+	if err = jsoniter.Unmarshal(respBody, &got3); err != nil {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
 	exp := []sender.Data{{"ts": "2006-01-02T14:04:05Z"}}

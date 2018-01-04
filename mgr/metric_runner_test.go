@@ -2,7 +2,6 @@ package mgr
 
 import (
 	"bufio"
-	"encoding/json"
 	"io"
 	"log"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/json-iterator/go"
 	"github.com/labstack/echo"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/metric/system"
@@ -35,7 +35,7 @@ func getMetricRunnerConfig(name string, mc []MetricConfig, senderPath string) ([
 			"file_send_path": senderPath,
 		}},
 	}
-	return json.Marshal(runnerConf)
+	return jsoniter.Marshal(runnerConf)
 }
 
 func TestMetricRunner(t *testing.T) {
@@ -149,7 +149,7 @@ func metricRunTest(p *testParam) {
 			break
 		}
 		result := make([]map[string]interface{}, 0)
-		err = json.Unmarshal([]byte(str), &result)
+		err = jsoniter.Unmarshal([]byte(str), &result)
 		if err != nil {
 			log.Fatalf("metricRunTest error unmarshal %v curLine = %v %v", string(str), curLine, err)
 		}
@@ -206,7 +206,7 @@ func metricRunTest(p *testParam) {
 			break
 		}
 		result := make([]map[string]interface{}, 0)
-		err = json.Unmarshal([]byte(str), &result)
+		err = jsoniter.Unmarshal([]byte(str), &result)
 		if err != nil {
 			log.Fatalf("metricRunTest error unmarshal %v curLine = %v %v", string(str), curLine, err)
 		}
@@ -270,7 +270,7 @@ func metricNetTest(p *testParam) {
 			break
 		}
 		curLine++
-		err = json.Unmarshal([]byte(str), &result)
+		err = jsoniter.Unmarshal([]byte(str), &result)
 		if err != nil {
 			log.Fatalf("metricNetTest error unmarshal %v curLine = %v %v", string(str), curLine, err)
 		}
@@ -335,7 +335,7 @@ func metricDiskioTest(p *testParam) {
 			break
 		}
 		curLine++
-		err = json.Unmarshal([]byte(str), &result)
+		err = jsoniter.Unmarshal([]byte(str), &result)
 		if err != nil {
 			log.Fatalf("metricDiskioTest error unmarshal %v curLine = %v %v", string(str), curLine, err)
 		}
@@ -383,7 +383,7 @@ func metricDiskioTest(p *testParam) {
 			break
 		}
 		curLine++
-		err = json.Unmarshal([]byte(str), &result)
+		err = jsoniter.Unmarshal([]byte(str), &result)
 		if err != nil {
 			log.Fatalf("metricDiskioTest error unmarshal %v curLine = %v %v", string(str), curLine, err)
 		}

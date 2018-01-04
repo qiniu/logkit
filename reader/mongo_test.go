@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/qiniu/logkit/conf"
-
 	"github.com/qiniu/logkit/utils"
+
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/mgo.v2/bson"
 )

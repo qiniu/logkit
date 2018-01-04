@@ -1,23 +1,19 @@
 package mgr
 
 import (
-	"errors"
-	"net/http"
-	"sync"
-
-	"github.com/qiniu/logkit/utils"
-
 	"bytes"
-	"encoding/json"
-	"io/ioutil"
-
+	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"strings"
+	"sync"
 	"time"
 
-	"strings"
-
+	"github.com/json-iterator/go"
 	"github.com/labstack/echo"
 	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/utils"
 )
 
 type ClusterConfig struct {
@@ -45,13 +41,13 @@ type Slave struct {
 type ClusterStatus struct {
 	Status map[string]RunnerStatus `json:"status"`
 	Tag    string                  `json:"tag"`
-	Err    error                   `json:"error"`
+	Err    string                  `json:"error"`
 }
 
 type SlaveConfig struct {
 	Configs map[string]RunnerConfig `json:"configs"`
 	Tag     string                  `json:"tag"`
-	Err     error                   `json:"error"`
+	Err     string                  `json:"error"`
 }
 
 type respRunnersNameList struct {
@@ -210,7 +206,7 @@ func (rs *RestService) GetClusterRunners() echo.HandlerFunc {
 					log.Errorf("get slave(tag='%v', url='%v') runner name list failed, resp is %v, error is %v", v.Tag, v.Url, string(respBody), err.Error())
 					return
 				} else {
-					if err = json.Unmarshal(respBody, &respRss); err != nil {
+					if err = jsoniter.Unmarshal(respBody, &respRss); err != nil {
 						log.Errorf("unmarshal slave(tag='%v', url='%v') runner name list failed, error is %v", v.Tag, v.Url, err.Error())
 					} else {
 						mutex.Lock()
@@ -258,10 +254,10 @@ func (rs *RestService) ClusterStatus() echo.HandlerFunc {
 				respCode, respBody, err := executeToOneCluster(url, http.MethodGet, []byte{})
 				if err != nil || respCode != http.StatusOK {
 					errInfo := fmt.Errorf("%v %v", string(respBody), err)
-					cs.Err = errInfo
+					cs.Err = errInfo.Error()
 				} else {
-					if err = json.Unmarshal(respBody, &respRss); err != nil {
-						cs.Err = fmt.Errorf("unmarshal query result error %v, body is %v", err, string(respBody))
+					if err = jsoniter.Unmarshal(respBody, &respRss); err != nil {
+						cs.Err = fmt.Sprintf("unmarshal query result error %v, body is %v", err, string(respBody))
 					} else {
 						cs.Status = respRss.Data
 					}
@@ -301,7 +297,7 @@ func (rs *RestService) GetClusterConfig() echo.HandlerFunc {
 				lastErrMsg = fmt.Sprintf("get slave(tag = '%v'', url = '%v') config failed resp is %v, error is %v", tag, url, string(respBody), err)
 				continue
 			} else {
-				if err = json.Unmarshal(respBody, &respRss); err != nil {
+				if err = jsoniter.Unmarshal(respBody, &respRss); err != nil {
 					lastErrMsg = fmt.Sprintf("get slave(tag = '%v'', url = '%v') config unmarshal failed, resp is %v, error is %v", tag, url, string(respBody), err)
 					continue
 				} else {
@@ -346,10 +342,10 @@ func (rs *RestService) GetClusterConfigs() echo.HandlerFunc {
 				respCode, respBody, err := executeToOneCluster(url, http.MethodGet, []byte{})
 				if err != nil || respCode != http.StatusOK {
 					errInfo := fmt.Errorf("%v %v", string(respBody), err)
-					sc.Err = errInfo
+					sc.Err = errInfo.Error()
 				} else {
-					if err = json.Unmarshal(respBody, &respRss); err != nil {
-						sc.Err = fmt.Errorf("unmarshal query result error %v, body is %v", err, string(respBody))
+					if err = jsoniter.Unmarshal(respBody, &respRss); err != nil {
+						sc.Err = fmt.Sprintf("unmarshal query result error %v, body is %v", err, string(respBody))
 					} else {
 						sc.Configs = respRss.Data
 					}
@@ -714,7 +710,7 @@ func registerOne(master, myhost, tag string) error {
 		return errors.New("master host is not configed")
 	}
 	req := RegisterReq{Url: myhost, Tag: tag}
-	data, err := json.Marshal(req)
+	data, err := jsoniter.Marshal(req)
 	if err != nil {
 		return err
 	}
