@@ -142,7 +142,7 @@ class Sender extends Component {
                               )}>
           {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
             initialValue: ele.Default,
-            rules: [{required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur'},
+            rules: [{required: (ele.Default == '' || ele.KeyName === 'pandora_workflow_name' ) ? false : true, message: '不能为空', trigger: 'blur'},
               {pattern: ele.CheckRegex, message: '输入不符合规范'},
             ]
           })(
