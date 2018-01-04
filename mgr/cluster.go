@@ -642,11 +642,11 @@ func executeToClusters(slaves []Slave, urlP, method, mgr string, reqBd []byte) (
 	mutex := new(sync.Mutex)
 	wg := new(sync.WaitGroup)
 	errInfo := make([]string, 0)
-	for _, v := range slaves {
+	for _, slave := range slaves {
 		wg.Add(1)
-		url := fmt.Sprintf(urlP, v.Url)
-		go func(url string) {
+		go func(v Slave) {
 			defer wg.Done()
+			url := fmt.Sprintf(urlP, v.Url)
 			respCode, respBody, err := executeToOneCluster(url, method, reqBd)
 			if respCode != http.StatusOK || err != nil {
 				log.Errorf("url %v %v occurred an error, resp is %v, err is %v", v.Url, mgr, string(respBody), err)
@@ -655,7 +655,7 @@ func executeToClusters(slaves []Slave, urlP, method, mgr string, reqBd []byte) (
 				errInfo = append(errInfo, errMsg)
 				mutex.Unlock()
 			}
-		}(url)
+		}(slave)
 	}
 	wg.Wait()
 	if len(errInfo) == 0 {
