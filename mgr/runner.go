@@ -440,6 +440,7 @@ func (r *LogExportRunner) Run() {
 			}
 			r.batchLen++
 			r.batchSize += len(line)
+			r.reader.SyncMeta()
 		}
 		r.batchLen = 0
 		r.batchSize = 0
@@ -509,20 +510,20 @@ func (r *LogExportRunner) Run() {
 				}
 			}
 		}
-		success := true
+		//success := true
 		senderCnt := len(r.senders)
 		log.Debugf("Runner[%v] reader %s start to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
 		senderDataList := classifySenderData(datas, r.router, senderCnt)
 		for index, s := range r.senders {
 			if !r.trySend(s, senderDataList[index], r.MaxBatchTryTimes) {
-				success = false
+				//success = false
 				log.Errorf("Runner[%v] failed to send data finally", r.Name())
 				break
 			}
 		}
-		if success {
-			r.reader.SyncMeta()
-		}
+		//if success {
+			//r.reader.SyncMeta()
+		//}
 		log.Debugf("Runner[%v] send %s finish to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
 	}
 }
