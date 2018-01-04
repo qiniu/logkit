@@ -181,7 +181,7 @@ func (sf *SeqFile) Name() string {
 }
 
 func (sf *SeqFile) Source() string {
-	return sf.dir
+	return sf.currFile
 }
 
 func (sf *SeqFile) Close() (err error) {
@@ -256,35 +256,36 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 		sf.offset += int64(n1)
 		n += n1
 		if err != nil {
-			if err != io.EOF {
+			if err == io.EOF && n > 0{
 				return n, err
-			}
-			fi, err1 := sf.nextFile()
-			if os.IsNotExist(err1) {
-				if nextFileRetry >= 3 {
-					return n, io.EOF
+			}else{
+				fi, err1 := sf.nextFile()
+				if os.IsNotExist(err1) {
+					if nextFileRetry >= 3 {
+						return n, io.EOF
+					}
+					// dir removed or file rotated
+					log.Debugf("Runner[%v] %s - nextFile: %v", sf.meta.RunnerName, sf.dir, err1)
+					time.Sleep(WaitNoSuchFile)
+					nextFileRetry++
+					continue
 				}
-				// dir removed or file rotated
-				log.Debugf("Runner[%v] %s - nextFile: %v", sf.meta.RunnerName, sf.dir, err1)
-				time.Sleep(WaitNoSuchFile)
-				nextFileRetry++
-				continue
-			}
-			if err1 != nil {
-				log.Debugf("Runner[%v] %s - nextFile(file exist) but: %v", sf.meta.RunnerName, sf.dir, err1)
-				return n, err1
-			}
-			if fi != nil {
-				log.Infof("Runner[%v] %s - nextFile: %s", sf.meta.RunnerName, sf.dir, fi.Name())
-				err2 := sf.open(fi)
-				if err2 != nil {
-					return n, err2
+				if err1 != nil {
+					log.Debugf("Runner[%v] %s - nextFile(file exist) but: %v", sf.meta.RunnerName, sf.dir, err1)
+					return n, err1
 				}
-				//已经获得了下一个文件，没有EOF
-				err = nil
-			} else {
-				time.Sleep(time.Millisecond * 500)
-				return 0, io.EOF
+				if fi != nil {
+					log.Infof("Runner[%v] %s - nextFile: %s", sf.meta.RunnerName, sf.dir, fi.Name())
+					err2 := sf.open(fi)
+					if err2 != nil {
+						return n, err2
+					}
+					//已经获得了下一个文件，没有EOF
+					err = nil
+				} else {
+					time.Sleep(time.Millisecond * 500)
+					return 0, io.EOF
+				}
 			}
 		}
 	}
