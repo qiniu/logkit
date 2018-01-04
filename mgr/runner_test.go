@@ -1,10 +1,11 @@
 package mgr
 
 import (
-	"encoding/json"
 	"io/ioutil"
+	"log/syslog"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,13 +15,10 @@ import (
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/sender"
 	_ "github.com/qiniu/logkit/transforms/all"
-
-	"log/syslog"
-
-	"strings"
-
-	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/utils"
+
+	"github.com/json-iterator/go"
+	"github.com/qiniu/log"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -83,11 +81,12 @@ func Test_Run(t *testing.T) {
 		MaxBatchSize: 2048,
 	}
 	readerConfig := conf.MapConf{
-		"log_path":       logpathLink,
-		"meta_path":      metapath,
-		"mode":           "dir",
-		"read_from":      "oldest",
-		"datasource_tag": "testtag",
+		"log_path":        logpathLink,
+		"meta_path":       metapath,
+		"mode":            "dir",
+		"read_from":       "oldest",
+		"datasource_tag":  "testtag",
+		"reader_buf_size": "16",
 	}
 	meta, err := reader.NewMetaWithConf(readerConfig)
 	if err != nil {
@@ -131,7 +130,7 @@ func Test_Run(t *testing.T) {
 	}
 	senders = append(senders, s)
 
-	r, err := NewLogExportRunnerWithService(rinfo, reader, cleaner, pparser, nil, senders, meta)
+	r, err := NewLogExportRunnerWithService(rinfo, reader, cleaner, pparser, nil, senders, nil, meta)
 	if err != nil {
 		t.Error(err)
 	}
@@ -158,7 +157,7 @@ func Test_Run(t *testing.T) {
 	}
 	var dts []sender.Data
 	rawData := r.senders[0].Name()[len("mock_sender "):]
-	err = json.Unmarshal([]byte(rawData), &dts)
+	err = jsoniter.Unmarshal([]byte(rawData), &dts)
 	if err != nil {
 		t.Error(err)
 	}
@@ -166,7 +165,7 @@ func Test_Run(t *testing.T) {
 		t.Errorf("got sender data not match error,expect 2 but %v", len(dts))
 	}
 	for _, dt := range dts {
-		assert.Equal(t, absLogpath, dt["testtag"])
+		assert.Equal(t, absLogpath, filepath.Dir(dt["testtag"].(string)))
 	}
 }
 
@@ -332,7 +331,7 @@ func Test_QiniulogRun(t *testing.T) {
 	}
 	senders = append(senders, s)
 
-	r, err := NewLogExportRunnerWithService(rinfo, reader, nil, pparser, nil, senders, meta)
+	r, err := NewLogExportRunnerWithService(rinfo, reader, nil, pparser, nil, senders, nil, meta)
 	if err != nil {
 		t.Error(err)
 	}
@@ -357,7 +356,7 @@ func Test_QiniulogRun(t *testing.T) {
 	}
 	var dts []sender.Data
 	rawData := r.senders[0].Name()[len("mock_sender "):]
-	err = json.Unmarshal([]byte(rawData), &dts)
+	err = jsoniter.Unmarshal([]byte(rawData), &dts)
 	if err != nil {
 		t.Error(err)
 	}
@@ -396,7 +395,7 @@ func TestCreateTransforms(t *testing.T) {
 	}`
 
 	rc := RunnerConfig{}
-	err := json.Unmarshal([]byte(config1), &rc)
+	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
 	transformers := createTransformers(rc)
 	datas := []sender.Data{{"ip": "111.2.3.4"}}
@@ -439,7 +438,7 @@ func TestReplaceTransforms(t *testing.T) {
 	}`
 	newData := make([]sender.Data, 0)
 	rc := RunnerConfig{}
-	err := json.Unmarshal([]byte(config1), &rc)
+	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
 	transformers := createTransformers(rc)
 	datas := []string{`{"status":"200","request_method":"POST","request_body":"<xml>\x0A","content_type":"text/xml"}`, `{"status":"200","request_method":"POST","request_body":"<xml>x0A","content_type":"text/xml"}`}
@@ -448,7 +447,7 @@ func TestReplaceTransforms(t *testing.T) {
 		assert.NoError(t, err)
 		for i := range datas {
 			var da sender.Data
-			err = json.Unmarshal([]byte(datas[i]), &da)
+			err = jsoniter.Unmarshal([]byte(datas[i]), &da)
 			assert.NoError(t, err)
 			newData = append(newData, da)
 		}
@@ -496,7 +495,7 @@ func TestDateTransforms(t *testing.T) {
 		}]
 	}`
 	rc := RunnerConfig{}
-	err := json.Unmarshal([]byte(config1), &rc)
+	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
 	transformers := createTransformers(rc)
 	datas := []sender.Data{{"status": "02/01/2016--15:04:05"}, {"status": "2006-01-02 15:04:15"}}
@@ -542,7 +541,7 @@ func TestSplitAndConvertTransforms(t *testing.T) {
 		}]
 	}`
 	rc := RunnerConfig{}
-	err := json.Unmarshal([]byte(config1), &rc)
+	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
 	transformers := createTransformers(rc)
 	datas := []sender.Data{{"status": "1,2,3"}, {"status": "4,5,6"}}
@@ -758,7 +757,7 @@ func TestSyslogRunnerX(t *testing.T) {
 	}`
 
 	rc := RunnerConfig{}
-	err := json.Unmarshal([]byte(config1), &rc)
+	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
 	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), parser.NewParserRegistry(), sender.NewSenderRegistry())
 	assert.NoError(t, err)
@@ -815,3 +814,238 @@ func TestAddDatasource(t *testing.T) {
 	gots := addSourceToData(sourceFroms, se, datas, datasourceTagName, runnername)
 	assert.Equal(t, exp, gots)
 }
+
+func TestClassifySenderData(t *testing.T) {
+	senderCnt := 3
+	datas := []sender.Data{
+		sender.Data{
+			"a": "a",
+			"b": "b",
+			"c": "c",
+			"d": "d",
+		},
+		sender.Data{
+			"a": "A",
+			"b": "b",
+			"c": "c",
+			"d": "d",
+		},
+		sender.Data{
+			"a": "B",
+			"b": "b",
+			"c": "c",
+			"d": "d",
+		},
+		sender.Data{
+			"a": "C",
+			"b": "b",
+			"c": "c",
+			"d": "d",
+		},
+	}
+
+	routerConf := sender.RouterConfig{
+		KeyName:      "a",
+		MatchType:    "equal",
+		DefaultIndex: 0,
+		Routes: map[string]int{
+			"a": 2,
+			"A": 1,
+		},
+	}
+
+	r, err := sender.NewSenderRouter(routerConf, senderCnt)
+
+	senderDataList := classifySenderData(datas, r, senderCnt)
+	assert.Equal(t, senderCnt, len(senderDataList))
+	assert.Equal(t, 2, len(senderDataList[0]))
+	assert.Equal(t, 1, len(senderDataList[1]))
+	assert.Equal(t, 1, len(senderDataList[2]))
+
+	// 测试没有配置 router 的情况
+	routerConf.KeyName = ""
+	r, err = sender.NewSenderRouter(routerConf, senderCnt)
+	assert.Nil(t, r)
+	assert.NoError(t, err)
+	senderDataList = classifySenderData(datas, r, senderCnt)
+	assert.Equal(t, senderCnt, len(senderDataList))
+	assert.Equal(t, 4, len(senderDataList[0]))
+	assert.Equal(t, 4, len(senderDataList[1]))
+	assert.Equal(t, 4, len(senderDataList[2]))
+}
+
+// Reponse from Clearbit API. Size: 2.4kb
+var mediumFixture []byte = []byte(`{
+  "person": {
+    "id": "d50887ca-a6ce-4e59-b89f-14f0b5d03b03",
+    "name": {
+      "fullName": "Leonid Bugaev",
+      "givenName": "Leonid",
+      "familyName": "Bugaev"
+    },
+    "email": "leonsbox@gmail.com",
+    "gender": "male",
+    "location": "Saint Petersburg, Saint Petersburg, RU",
+    "geo": {
+      "city": "Saint Petersburg",
+      "state": "Saint Petersburg",
+      "country": "Russia",
+      "lat": 59.9342802,
+      "lng": 30.3350986
+    },
+    "bio": "Senior engineer at Granify.com",
+    "site": "http://flickfaver.com",
+    "avatar": "https://d1ts43dypk8bqh.cloudfront.net/v1/avatars/d50887ca-a6ce-4e59-b89f-14f0b5d03b03",
+    "employment": {
+      "name": "www.latera.ru",
+      "title": "Software Engineer",
+      "domain": "gmail.com"
+    },
+    "facebook": {
+      "handle": "leonid.bugaev"
+    },
+    "github": {
+      "handle": "buger",
+      "id": 14009,
+      "avatar": "https://avatars.githubusercontent.com/u/14009?v=3",
+      "company": "Granify",
+      "blog": "http://leonsbox.com",
+      "followers": 95,
+      "following": 10
+    },
+    "twitter": {
+      "handle": "flickfaver",
+      "id": 77004410,
+      "bio": null,
+      "followers": 2,
+      "following": 1,
+      "statuses": 5,
+      "favorites": 0,
+      "location": "",
+      "site": "http://flickfaver.com",
+      "avatar": null
+    },
+    "linkedin": {
+      "handle": "in/leonidbugaev"
+    },
+    "googleplus": {
+      "handle": null
+    },
+    "angellist": {
+      "handle": "leonid-bugaev",
+      "id": 61541,
+      "bio": "Senior engineer at Granify.com",
+      "blog": "http://buger.github.com",
+      "site": "http://buger.github.com",
+      "followers": 41,
+      "avatar": "https://d1qb2nb5cznatu.cloudfront.net/users/61541-medium_jpg?1405474390"
+    },
+    "klout": {
+      "handle": null,
+      "score": null
+    },
+    "foursquare": {
+      "handle": null
+    },
+    "aboutme": {
+      "handle": "leonid.bugaev",
+      "bio": null,
+      "avatar": null
+    },
+    "gravatar": {
+      "handle": "buger",
+      "urls": [
+      ],
+      "avatar": "http://1.gravatar.com/avatar/f7c8edd577d13b8930d5522f28123510",
+      "avatars": [
+        {
+          "url": "http://1.gravatar.com/avatar/f7c8edd577d13b8930d5522f28123510",
+          "type": "thumbnail"
+        }
+      ]
+    },
+    "fuzzy": false
+  },
+  "company": null
+}`)
+
+type CBAvatar struct {
+	Url string `json:"url"`
+}
+
+type CBGravatar struct {
+	Avatars []*CBAvatar `json:"avatars"`
+}
+
+type CBGithub struct {
+	Followers int `json:"followers"`
+}
+
+type CBName struct {
+	FullName string `json:"fullName"`
+}
+
+type CBPerson struct {
+	Name     *CBName     `json:"name"`
+	Github   *CBGithub   `json:"github"`
+	Gravatar *CBGravatar `json:"gravatar"`
+}
+
+type MediumPayload struct {
+	Person  *CBPerson `json:"person"`
+	Company string    `json:"compnay"`
+}
+
+func BenchmarkDecodeStdStructMedium(b *testing.B) {
+	b.ReportAllocs()
+	var data MediumPayload
+	for i := 0; i < b.N; i++ {
+		jsoniter.Unmarshal(mediumFixture, &data)
+	}
+}
+
+func BenchmarkEncodeStdStructMedium(b *testing.B) {
+	var data MediumPayload
+	jsoniter.Unmarshal(mediumFixture, &data)
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		jsoniter.Marshal(data)
+	}
+}
+
+func BenchmarkDecodeJsoniterStructMedium(b *testing.B) {
+	b.ReportAllocs()
+	var data MediumPayload
+	for i := 0; i < b.N; i++ {
+		jsoniter.Unmarshal(mediumFixture, &data)
+	}
+}
+
+func BenchmarkEncodeJsoniterStructMedium(b *testing.B) {
+	var data MediumPayload
+	jsoniter.Unmarshal(mediumFixture, &data)
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		jsoniter.Marshal(data)
+	}
+}
+
+func BenchmarkEncodeJsoniterCompatibleStructMedium(b *testing.B) {
+	var data MediumPayload
+	jsoniter.Unmarshal(mediumFixture, &data)
+	b.ReportAllocs()
+	jsonc := jsoniter.ConfigCompatibleWithStandardLibrary
+	for i := 0; i < b.N; i++ {
+		jsonc.Marshal(data)
+	}
+}
+
+/*
+BenchmarkDecodeStdStructMedium-4                  	   50000	     39162 ns/op	    1960 B/op	      99 allocs/op
+BenchmarkEncodeStdStructMedium-4                  	 1000000	      2106 ns/op	     712 B/op	       5 allocs/op
+BenchmarkDecodeJsoniterStructMedium-4             	  200000	      7676 ns/op	     320 B/op	      36 allocs/op
+BenchmarkEncodeJsoniterStructMedium-4             	 1000000	      1046 ns/op	     240 B/op	       3 allocs/op
+BenchmarkEncodeJsoniterCompatibleStructMedium-4   	 1000000	      1023 ns/op	     240 B/op	       3 allocs/op
+PASS
+性能明显提升
+*/

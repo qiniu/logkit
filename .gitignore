@@ -29,8 +29,8 @@ hs_err_pid*
 _obj
 _test
 bin/
-!vendor/github.com/pkg
 pkg/
+!vendor/github.com/pkg
 tests
 tests/meta_mock_csv
 .idea/

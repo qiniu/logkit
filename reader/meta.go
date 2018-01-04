@@ -1,7 +1,6 @@
 package reader
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"hash/fnv"
@@ -16,6 +15,7 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/utils"
 
+	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
 )
 
@@ -489,12 +489,12 @@ func (m *Meta) ReadStatistic() (stat Statistic, err error) {
 	if statData == nil || err != nil {
 		return
 	}
-	err = json.Unmarshal(statData, &stat)
+	err = jsoniter.Unmarshal(statData, &stat)
 	return
 }
 
 func (m *Meta) WriteStatistic(stat *Statistic) error {
-	statStr, err := json.Marshal(stat)
+	statStr, err := jsoniter.Marshal(stat)
 	if err != nil {
 		return err
 	}

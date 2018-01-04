@@ -1,15 +1,9 @@
 package mgr
 
 import (
-	"fmt"
-	"os"
-	"testing"
-
-	"encoding/json"
-	"io/ioutil"
 	"net/http"
 
-	"github.com/labstack/echo"
+	"github.com/json-iterator/go"
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/utils"
 	"github.com/stretchr/testify/assert"
@@ -30,72 +24,37 @@ type respMetricOptions struct {
 	Data map[string][]utils.Option `json:"data"`
 }
 
-func TestMetricAPI(t *testing.T) {
-	pwd, err := os.Getwd()
-	if err != nil {
-		t.Error(err)
-	}
-	confdir := pwd + DEFAULT_LOGKIT_REST_DIR
-	defer os.RemoveAll(confdir)
-
-	var conf ManagerConfig
-	conf.BindHost = ":6261"
-	m, err := NewManager(conf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	rs := NewRestService(m, echo.New())
-	defer func() {
-		rs.Stop()
-		os.Remove(StatsShell)
-	}()
-
+func metricAPITest(p *testParam) {
+	t := p.t
+	rs := p.rs
 	var got1 respMetricUsage
 
-	resp, err := http.Get("http://127.0.0.1" + rs.address + "/logkit/metric/usages")
-	if err != nil {
-		t.Error(err)
-	}
-	content, _ := ioutil.ReadAll(resp.Body)
-	if resp.StatusCode != 200 {
-		t.Error(string(content))
-	}
-	err = json.Unmarshal(content, &got1)
-	if err != nil {
-		fmt.Println(string(content))
-		t.Error(err)
+	url := "http://127.0.0.1" + rs.address + "/logkit/metric/usages"
+	respCode, respBody, err := makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	if err = jsoniter.Unmarshal(respBody, &got1); err != nil {
+		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
 	assert.Equal(t, metric.GetMetricUsages(), got1.Data)
 
 	var got2 respMetricOptions
-	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/metric/options")
-	if err != nil {
-		t.Error(err)
-	}
-	content, _ = ioutil.ReadAll(resp.Body)
-	if resp.StatusCode != 200 {
-		t.Error(string(content))
-	}
-	err = json.Unmarshal(content, &got2)
-	if err != nil {
-		fmt.Println(string(content))
-		t.Error(err)
+	url = "http://127.0.0.1" + rs.address + "/logkit/metric/options"
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	if err = jsoniter.Unmarshal(respBody, &got2); err != nil {
+		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
 	assert.Equal(t, metric.GetMetricOptions(), got2.Data)
 
 	var got3 respMetricKeys
-	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/metric/keys")
-	if err != nil {
-		t.Error(err)
-	}
-	content, _ = ioutil.ReadAll(resp.Body)
-	if resp.StatusCode != 200 {
-		t.Error(string(content))
-	}
-	err = json.Unmarshal(content, &got3)
-	if err != nil {
-		fmt.Println(string(content))
-		t.Error(err)
+	url = "http://127.0.0.1" + rs.address + "/logkit/metric/keys"
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	if err = jsoniter.Unmarshal(respBody, &got3); err != nil {
+		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
 	assert.Equal(t, metric.GetMetricTypeKey(), got3.Data)
 }

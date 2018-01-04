@@ -7,11 +7,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
-
-	"sync"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/rateio"
@@ -181,7 +180,7 @@ func (sf *SeqFile) Name() string {
 }
 
 func (sf *SeqFile) Source() string {
-	return sf.dir
+	return sf.currFile
 }
 
 func (sf *SeqFile) Close() (err error) {
@@ -305,7 +304,7 @@ func (sf *SeqFile) nextFile() (fi os.FileInfo, err error) {
 		condition = sf.getIgnoreCondition()
 	} else {
 		newerThanCurrFile := func(f os.FileInfo) bool {
-			return f.ModTime().UnixNano() > currFi.ModTime().UnixNano()
+			return modTimeLater(f, currFi)
 		}
 		condition = andCondition(newerThanCurrFile, sf.getIgnoreCondition())
 	}

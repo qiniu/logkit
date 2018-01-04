@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"fmt"
+
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/utils"
 	"github.com/stretchr/testify/assert"

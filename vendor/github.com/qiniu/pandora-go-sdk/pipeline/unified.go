@@ -127,12 +127,12 @@ func convertCreate2LogDB(input *CreateRepoForLogDBInput) *logdb.CreateRepoInput 
 	return &logdb.CreateRepoInput{
 		Region:    input.Region,
 		RepoName:  input.LogRepoName,
-		Schema:    convertSchema2LogDB(input.Schema),
+		Schema:    convertSchema2LogDB(input.Schema, input.AnalyzerInfo),
 		Retention: input.Retention,
 	}
 }
 
-func convertSchema2LogDB(scs []RepoSchemaEntry) (ret []logdb.RepoSchemaEntry) {
+func convertSchema2LogDB(scs []RepoSchemaEntry, analyzer AnalyzerInfo) (ret []logdb.RepoSchemaEntry) {
 	ret = make([]logdb.RepoSchemaEntry, 0)
 	for _, v := range scs {
 		rp := logdb.RepoSchemaEntry{
@@ -140,7 +140,7 @@ func convertSchema2LogDB(scs []RepoSchemaEntry) (ret []logdb.RepoSchemaEntry) {
 			ValueType: v.ValueType,
 		}
 		if v.ValueType == PandoraTypeMap {
-			rp.Schemas = convertSchema2LogDB(v.Schema)
+			rp.Schemas = convertSchema2LogDB(v.Schema, analyzer)
 			rp.ValueType = logdb.TypeObject
 		}
 		if v.ValueType == PandoraTypeJsonString {
@@ -150,7 +150,21 @@ func convertSchema2LogDB(scs []RepoSchemaEntry) (ret []logdb.RepoSchemaEntry) {
 			rp.ValueType = v.ElemType
 		}
 		if v.ValueType == PandoraTypeString {
-			rp.Analyzer = logdb.StandardAnalyzer
+			// 当 analyzer.Analyzer 这个 map 中有明确的字段分词类型时，按照 map 中的分词类型设置
+			// 否则当 analyzer.Default 不为空时，按照 default 值设置分词类型
+			// 上述两个条件都不符合时，按照标准分词设置
+			exist := false
+			var ana string
+			if analyzer.Analyzer != nil {
+				ana, exist = analyzer.Analyzer[v.Key]
+			}
+			if exist && logdb.Analyzers[ana] {
+				rp.Analyzer = ana
+			} else if logdb.Analyzers[analyzer.Default] {
+				rp.Analyzer = analyzer.Default
+			} else {
+				rp.Analyzer = logdb.StandardAnalyzer
+			}
 		}
 		ret = append(ret, rp)
 	}
@@ -178,7 +192,6 @@ func isInExpandAttr(key string, expandAttr []string) bool {
 	return false
 }
 
-// logkit 开启导出到 tsdb 功能时会调用这个函数，如果不是 metric 信息，走正常的流程，否则根据字段名称前缀 export 到不同的 series 里面
 func (c *Pipeline) AutoExportToTSDB(input *AutoExportToTSDBInput) error {
 	if input.TSDBRepoName == "" {
 		input.TSDBRepoName = input.RepoName
@@ -257,7 +270,6 @@ func (c *Pipeline) AutoExportToTSDB(input *AutoExportToTSDBInput) error {
 	return err
 }
 
-// 这个api在logkit启动的时候调用一次
 func (c *Pipeline) AutoExportToLogDB(input *AutoExportToLogDBInput) error {
 	if input.LogRepoName == "" {
 		input.LogRepoName = input.RepoName
@@ -277,7 +289,7 @@ func (c *Pipeline) AutoExportToLogDB(input *AutoExportToLogDBInput) error {
 	if err != nil {
 		return err
 	}
-	logdbschemas := convertSchema2LogDB(repoInfo.Schema)
+	logdbschemas := convertSchema2LogDB(repoInfo.Schema, input.AnalyzerInfo)
 	logdbrepoinfo, err := logdbapi.GetRepo(&logdb.GetRepoInput{
 		RepoName: input.LogRepoName,
 	})

@@ -1,10 +1,10 @@
 package mgr
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 
+	"github.com/json-iterator/go"
 	"github.com/labstack/echo"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
@@ -93,9 +93,9 @@ func (rs *RestService) PostTransform() echo.HandlerFunc {
 		if rawLogs, ok = (reqConf[KeySampleLog]).(string); !ok {
 			return RespError(c, http.StatusBadRequest, utils.ErrTransformTransform, fmt.Sprintf("missing param %s", KeySampleLog))
 		}
-		if jsonErr = json.Unmarshal([]byte(rawLogs), &singleData); jsonErr != nil {
+		if jsonErr = jsoniter.Unmarshal([]byte(rawLogs), &singleData); jsonErr != nil {
 			// may be multiple sample logs
-			if jsonErr = json.Unmarshal([]byte(rawLogs), &data); jsonErr != nil {
+			if jsonErr = jsoniter.Unmarshal([]byte(rawLogs), &data); jsonErr != nil {
 				// invalid JSON, neither multiple sample logs nor single sample log
 				return RespError(c, http.StatusBadRequest, utils.ErrTransformTransform, jsonErr.Error())
 			}
@@ -107,10 +107,10 @@ func (rs *RestService) PostTransform() echo.HandlerFunc {
 		trans = create()
 		reqConf = convertWebTransformerConfig(reqConf)
 		delete(reqConf, KeySampleLog)
-		if bts, jsonErr = json.Marshal(reqConf); jsonErr != nil {
+		if bts, jsonErr = jsoniter.Marshal(reqConf); jsonErr != nil {
 			return RespError(c, http.StatusBadRequest, utils.ErrTransformTransform, jsonErr.Error())
 		}
-		if jsonErr = json.Unmarshal(bts, trans); jsonErr != nil {
+		if jsonErr = jsoniter.Unmarshal(bts, trans); jsonErr != nil {
 			return RespError(c, http.StatusBadRequest, utils.ErrTransformTransform, jsonErr.Error())
 		}
 		if trans, ok := trans.(transforms.Initialize); ok {

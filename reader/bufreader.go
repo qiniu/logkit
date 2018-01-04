@@ -15,9 +15,8 @@ import (
 	"os"
 	"regexp"
 	"sync"
-	"unsafe"
-
 	"sync/atomic"
+	"unsafe"
 
 	"github.com/axgle/mahonia"
 	"github.com/qiniu/log"

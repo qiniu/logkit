@@ -19,6 +19,22 @@ func (rs *RestService) GetSenderKeyOptions() echo.HandlerFunc {
 	}
 }
 
+// get /logkit/sender/router/option 获取所有sender router的配置项
+func (rs *RestService) GetSenderRouterOption() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		routerOption := sender.GetRouterOption()
+		return RespSuccess(c, routerOption)
+	}
+}
+
+// get /logkit/sender/router/usage 获取所有sender router匹配方式的名字和作用
+func (rs *RestService) GetSenderRouterUsage() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		routerUsage := sender.GetRouterMatchTypeUsage()
+		return RespSuccess(c, routerUsage)
+	}
+}
+
 // POST /logkit/sender/check 请求校验sender配置
 func (rs *RestService) PostSenderCheck() echo.HandlerFunc {
 	return func(c echo.Context) error {

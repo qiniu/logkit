@@ -2,11 +2,9 @@ package service
 
 import (
 	"errors"
-	"strings"
-
 	"fmt"
-
 	"path/filepath"
+	"strings"
 
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
@@ -14,10 +12,11 @@ import (
 )
 
 const (
-	K8sTagType   = "k8stag"
-	K8sPodName   = "k8s_pod_name"
-	K8sNamespace = "k8s_namespace"
-	K8sContainer = "k8s_container"
+	K8sTagType       = "k8stag"
+	K8sPodName       = "k8s_pod_name"
+	K8sNamespace     = "k8s_namespace"
+	K8sContainerName = "k8s_container_name"
+	K8sContainerId   = "k8s_container_id"
 )
 
 type K8sTag struct {
@@ -54,7 +53,10 @@ func (g *K8sTag) Transform(datas []sender.Data) ([]sender.Data, error) {
 		}
 		datas[i][K8sPodName] = splits[0]
 		datas[i][K8sNamespace] = splits[1]
-		datas[i][K8sContainer] = strings.TrimSuffix(strings.Join(splits[2:], "_"), ".log")
+		container_info := strings.TrimSuffix(strings.Join(splits[2:], "_"), ".log")
+		container_info_splits := strings.Split(container_info, "-")
+		datas[i][K8sContainerId] = container_info_splits[len(container_info_splits)-1]
+		datas[i][K8sContainerName] = strings.Join(container_info_splits[0:len(container_info_splits)-1], "-")
 	}
 	if err != nil {
 		g.stats.LastError = err.Error()

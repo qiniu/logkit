@@ -123,6 +123,8 @@ const (
 	ErrJobReRunOrCancel
 	ErrStartOrStopBatchJob
 	ErrTimeFormatInvalid
+	ErrNoSuchResourceOwner
+	ErrAccessDenied
 )
 
 type ErrBuilder interface {
@@ -167,6 +169,39 @@ func IsExistError(err error) bool {
 		return true
 	}
 	if reqErr.ErrorType == ExportAlreadyExistsError {
+		return true
+	}
+	return false
+}
+
+func IsNoSuchWorkflow(err error) bool {
+	reqErr, ok := err.(*RequestError)
+	if !ok {
+		return false
+	}
+	if reqErr.ErrorType == ErrNoSuchWorkflow {
+		return true
+	}
+	return false
+}
+
+func IsWorkflowStatError(err error) bool {
+	reqErr, ok := err.(*RequestError)
+	if !ok {
+		return false
+	}
+	if reqErr.ErrorType == ErrUpdateWorkflow {
+		return true
+	}
+	return false
+}
+
+func IsWorkflowNoExecutableJob(err error) bool {
+	reqErr, ok := err.(*RequestError)
+	if !ok {
+		return false
+	}
+	if reqErr.ErrorType == ErrNoExecutableJob {
 		return true
 	}
 	return false

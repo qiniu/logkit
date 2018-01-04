@@ -1,19 +1,19 @@
 package sender
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"os"
-
-	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/queue"
 	"github.com/qiniu/logkit/utils"
+
+	"github.com/json-iterator/go"
+	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 )
 
@@ -60,7 +60,8 @@ type FtSender struct {
 	runnerName  string
 	opt         *FtOption
 	stats       utils.StatsInfo
-	statsMutex  *sync.Mutex
+	statsMutex  *sync.RWMutex
+	jsontool    jsoniter.API
 }
 
 type FtOption struct {
@@ -130,7 +131,8 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 		procs:       opt.procs,
 		runnerName:  runnerName,
 		opt:         opt,
-		statsMutex:  new(sync.Mutex),
+		statsMutex:  new(sync.RWMutex),
+		jsontool:    jsoniter.Config{EscapeHTML: true, UseNumber: true}.Froze(),
 	}
 	go ftSender.asyncSendLogFromDiskQueue()
 	return &ftSender, nil
@@ -181,10 +183,14 @@ func (ft *FtSender) Send(datas []Data) error {
 }
 
 func (ft *FtSender) Stats() utils.StatsInfo {
+	ft.statsMutex.RLock()
+	defer ft.statsMutex.RUnlock()
 	return ft.stats
 }
 
 func (ft *FtSender) Restore(info *utils.StatsInfo) {
+	ft.statsMutex.Lock()
+	defer ft.statsMutex.Unlock()
 	ft.stats = *info
 }
 
@@ -219,7 +225,7 @@ func (ft *FtSender) Close() error {
 func (ft *FtSender) marshalData(datas []Data) (bs []byte, err error) {
 	ctx := new(datasContext)
 	ctx.Datas = datas
-	bs, err = json.Marshal(ctx)
+	bs, err = jsoniter.Marshal(ctx)
 	if err != nil {
 		err = reqerr.NewSendError("Cannot marshal data :"+err.Error(), ConvertDatasBack(datas), reqerr.TypeDefault)
 		return
@@ -230,9 +236,7 @@ func (ft *FtSender) marshalData(datas []Data) (bs []byte, err error) {
 // unmarshalData 如何将数据从磁盘中反序列化出来
 func (ft *FtSender) unmarshalData(dat []byte) (datas []Data, err error) {
 	ctx := new(datasContext)
-	d := json.NewDecoder(bytes.NewReader(dat))
-	d.UseNumber()
-	err = d.Decode(&ctx)
+	err = ft.jsontool.Unmarshal(dat, &ctx)
 	if err != nil {
 		return
 	}
@@ -313,7 +317,7 @@ func (ft *FtSender) trySendDatas(datas []Data, failSleep int, isRetry bool) (bac
 	if err != nil {
 		retDatasContext := ft.handleSendError(err, datas)
 		for _, v := range retDatasContext {
-			nnBytes, _ := json.Marshal(v)
+			nnBytes, _ := jsoniter.Marshal(v)
 			qErr := ft.backupQueue.Put(nnBytes)
 			if qErr != nil {
 				log.Errorf("Runner[%v] Sender[%v] cannot write points back to queue %v: %v", ft.runnerName, ft.innerSender.Name(), ft.backupQueue.Name(), qErr)
@@ -351,6 +355,21 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 			newFailCtx.Datas = failCtx.Datas[0:lens]
 			failCtx.Datas = failCtx.Datas[lens:]
 			retDatasContext = append(retDatasContext, newFailCtx)
+		} else if len(failCtx.Datas) == 1 {
+			// 此处将 data 改为 raw 放在 pandora_stash 中
+			if _, ok := failCtx.Datas[0][KeyPandoraStash]; !ok {
+				log.Infof("Runner[%v] Sender[%v] try to convert data to string", ft.runnerName, ft.innerSender.Name())
+				data := make([]Data, 1)
+				byteData, err := json.Marshal(failCtx.Datas[0])
+				if err != nil {
+					log.Warnf("Runner[%v] marshal data to string error %v", ft.runnerName, err)
+				} else {
+					data[0] = Data{
+						KeyPandoraStash: string(byteData),
+					}
+					failCtx.Datas = data
+				}
+			}
 		}
 	}
 	retDatasContext = append(retDatasContext, failCtx)

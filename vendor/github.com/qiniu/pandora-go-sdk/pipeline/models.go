@@ -167,10 +167,10 @@ func validateJobexportName(e string) error {
 func validateWorkflowName(r string) error {
 	matched, err := regexp.MatchString(workflowNamePattern, r)
 	if err != nil {
-		return reqerr.NewInvalidArgs("WorkflowName", err.Error())
+		return reqerr.NewInvalidArgs("Workflow", err.Error())
 	}
 	if !matched {
-		return reqerr.NewInvalidArgs("WorkflowName", fmt.Sprintf("invalid workflow name: %s", r))
+		return reqerr.NewInvalidArgs("Workflow", fmt.Sprintf("invalid workflow name: %s", r))
 	}
 	return nil
 }
@@ -195,6 +195,14 @@ func validateVariableName(r string) error {
 		return reqerr.NewInvalidArgs("VariableName", fmt.Sprintf("invalid variable name: %s", r))
 	}
 	return nil
+}
+
+func validateVariableType(varType string) (err error) {
+	if varType != VariableTimeType && varType != VariableStringType {
+		err = reqerr.NewInvalidArgs("type", "variable type must be `time` or `string`")
+		return
+	}
+	return
 }
 
 type Container struct {
@@ -354,7 +362,7 @@ type CreateRepoDSLInput struct {
 	DSL       string       `json:"dsl"`
 	Options   *RepoOptions `json:"options"`
 	GroupName string       `json:"group"`
-	Workflow  string       `json:"workflow"` // 请注意：果此处workflow不指定，默认会创建名称为前缀"streaming_auto_"与实际RepoName拼接的workflow
+	Workflow  string       `json:"workflow"`
 }
 
 /*
@@ -582,12 +590,18 @@ type AutoExportToKODOInput struct {
 	Retention  int //数字，单位为天
 }
 
+type AnalyzerInfo struct {
+	Default  string
+	Analyzer map[string]string
+}
+
 type AutoExportToLogDBInput struct {
 	RepoName    string
 	LogRepoName string
 	Retention   string
 	OmitInvalid bool
 	OmitEmpty   bool
+	AnalyzerInfo
 }
 
 type CreateRepoForLogDBInput struct {
@@ -598,6 +612,7 @@ type CreateRepoForLogDBInput struct {
 	Retention   string
 	OmitInvalid bool
 	OmitEmpty   bool
+	AnalyzerInfo
 }
 
 type CreateRepoForLogDBDSLInput struct {
@@ -686,7 +701,7 @@ type CreateRepoInput struct {
 	Schema    []RepoSchemaEntry `json:"schema"`
 	Options   *RepoOptions      `json:"options"`
 	GroupName string            `json:"group"`
-	Workflow  string            `json:"workflow"` // 请注意：果此处workflow不指定，默认会创建名称为前缀"streaming_auto_"与实际RepoName拼接的workflow
+	Workflow  string            `json:"workflow"`
 }
 
 func (r *CreateRepoInput) Validate() (err error) {
@@ -727,6 +742,7 @@ func (r *CreateRepoInput) Validate() (err error) {
 type UpdateRepoInput struct {
 	PipelineToken
 	RepoName    string
+	workflow    string
 	Schema      []RepoSchemaEntry `json:"schema"`
 	Option      *SchemaFreeOption
 	RepoOptions *RepoOptions `json:"options"`
@@ -899,17 +915,30 @@ func escapeStringField(in string) string {
 
 type PostDataInput struct {
 	PipelineToken
-	RepoName string
-	Points   Points
+	ResourceOwner string
+	RepoName      string
+	Points        Points
 }
 
 type SchemaFreeInput struct {
 	PipelineToken
-	RepoName    string
-	Datas       Datas
-	NoUpdate    bool
-	Option      *SchemaFreeOption
-	RepoOptions *RepoOptions
+	Datas        Datas
+	NoUpdate     bool
+	Region       string
+	RepoName     string
+	WorkflowName string
+	Option       *SchemaFreeOption
+	RepoOptions  *RepoOptions
+}
+
+type InitOrUpdateWorkflowInput struct {
+	SchemaFree   bool
+	Region       string
+	RepoName     string
+	WorkflowName string
+	RepoOptions  *RepoOptions
+	Schema       []RepoSchemaEntry
+	Option       *SchemaFreeOption
 }
 
 type SchemaFreeOption struct {
@@ -943,19 +972,22 @@ type PostDataFromBytesInput struct {
 
 type UploadPluginInput struct {
 	PipelineToken
-	PluginName string
-	Buffer     *bytes.Buffer
+	ResourceOwner string
+	PluginName    string
+	Buffer        *bytes.Buffer
 }
 
 type UploadPluginFromFileInput struct {
 	PipelineToken
-	PluginName string
-	FilePath   string
+	ResourceOwner string
+	PluginName    string
+	FilePath      string
 }
 
 type GetPluginInput struct {
 	PipelineToken
-	PluginName string
+	ResourceOwner string
+	PluginName    string
 }
 
 type PluginDesc struct {
@@ -969,7 +1001,8 @@ type GetPluginOutput struct {
 
 type VerifyPluginInput struct {
 	PipelineToken
-	PluginName string
+	ResourceOwner string
+	PluginName    string
 }
 
 type OutputField struct {
@@ -983,6 +1016,7 @@ type VerifyPluginOutput struct {
 
 type ListPluginsInput struct {
 	PipelineToken
+	ResourceOwner string
 }
 
 type ListPluginsOutput struct {
@@ -991,7 +1025,8 @@ type ListPluginsOutput struct {
 
 type DeletePluginInput struct {
 	PipelineToken
-	PluginName string
+	ResourceOwner string
+	PluginName    string
 }
 
 type TransformPluginOutputEntry struct {
@@ -1504,8 +1539,8 @@ type CreateDatasourceInput struct {
 	Type           string            `json:"type"`
 	Spec           interface{}       `json:"spec"`
 	Schema         []RepoSchemaEntry `json:"schema"`
-	NoVerifySchema bool              `json:"noVerifySchema"`
-	Workflow       string            `json:"workflow"` // 请注意：果此处workflow不指定，默认会创建名称为前缀"batch_auto_"与实际RepoName拼接的workflow
+	NoVerifySchema bool              `json:"noVerifySchema"` // 是否触发推断 schema，可选项，默认值为 false
+	Workflow       string            `json:"workflow"`
 }
 
 func (c *CreateDatasourceInput) Validate() (err error) {
@@ -1745,7 +1780,8 @@ type StopJobInput struct {
 
 type GetJobHistoryInput struct {
 	PipelineToken
-	JobName string
+	ResourceOwner string
+	JobName       string
 }
 
 type JobHistory struct {
@@ -1765,8 +1801,9 @@ type GetJobHistoryOutput struct {
 
 type StopJobBatchInput struct {
 	PipelineToken
-	JobName string `json:"jobName"`
-	RunId   int    `json:"runId"`
+	ResourceOwner string `json:"-"`
+	JobName       string `json:"jobName"`
+	RunId         int    `json:"runId"`
 }
 
 func (s *StopJobBatchInput) Validate() (err error) {
@@ -1783,8 +1820,9 @@ type StopJobBatchOutput struct {
 
 type RerunJobBatchInput struct {
 	PipelineToken
-	JobName string `json:"jobName"`
-	RunId   int    `json:"runId"`
+	ResourceOwner string `json:"-"`
+	JobName       string `json:"jobName"`
+	RunId         int    `json:"runId"`
 }
 
 func (s *RerunJobBatchInput) Validate() (err error) {
@@ -1994,6 +2032,7 @@ type PageRequest struct {
 type ListUdfsInput struct {
 	PipelineToken
 	PageRequest
+	ResourceOwner string
 }
 
 type UdfInfoOutput struct {
@@ -2033,8 +2072,9 @@ type DeregisterUdfFunctionInput struct {
 type ListUdfFunctionsInput struct {
 	PipelineToken
 	PageRequest
-	JarNamesIn  []string
-	FuncNamesIn []string
+	ResourceOwner string
+	JarNamesIn    []string
+	FuncNamesIn   []string
 }
 
 type UdfFunctionInfoOutput struct {
@@ -2081,21 +2121,24 @@ type Node struct {
 
 type CreateWorkflowInput struct {
 	PipelineToken
-	WorkflowName string `json:"name"`
-	Region       string `json:"region"`
-	Comment      string `json:"comment,omitempty"`
+	ResourceOwner string `json:"-"`
+	WorkflowName  string `json:"name"`
+	Region        string `json:"region"`
+	Comment       string `json:"comment,omitempty"`
 }
 
 type UpdateWorkflowInput struct {
 	PipelineToken
-	WorkflowName string           `json:"name"`
-	Region       string           `json:"region"`
-	Nodes        map[string]*Node `json:"nodes"`
+	ResourceOwner string           `json:"-"`
+	WorkflowName  string           `json:"name"`
+	Region        string           `json:"region"`
+	Nodes         map[string]*Node `json:"nodes"`
 }
 
 type DeleteWorkflowInput struct {
 	PipelineToken
-	WorkflowName string `json:"name"`
+	ResourceOwner string `json:"-"`
+	WorkflowName  string `json:"name"`
 }
 
 func (r *DeleteWorkflowInput) Validate() (err error) {
@@ -2107,7 +2150,8 @@ func (r *DeleteWorkflowInput) Validate() (err error) {
 
 type GetWorkflowInput struct {
 	PipelineToken
-	WorkflowName string `json:"name"`
+	ResourceOwner string `json:"-"`
+	WorkflowName  string `json:"name"`
 }
 
 func (r *GetWorkflowInput) Validate() (err error) {
@@ -2153,6 +2197,7 @@ type NodeStatus struct {
 
 type ListWorkflowInput struct {
 	PipelineToken
+	ResourceOwner string
 }
 
 func (c *ListWorkflowInput) Validate() error {
@@ -2195,7 +2240,8 @@ func (r *UpdateWorkflowInput) Validate() (err error) {
 
 type StartWorkflowInput struct {
 	PipelineToken
-	WorkflowName string `json:"name"`
+	ResourceOwner string `json:"-"`
+	WorkflowName  string `json:"name"`
 }
 
 func (r *StartWorkflowInput) Validate() (err error) {
@@ -2216,15 +2262,16 @@ func (r *StopWorkflowInput) Validate() (err error) {
 
 type DagLogSearchInput struct {
 	PipelineToken
-	WorkflowName string `json:"-"`
-	Type         string `json:"type"`
-	Name         string `json:"name"`
-	Repo         string `json:"reponame"`
-	Query        string `json:"query"`
-	Size         int    `json:"size"`
-	Region       string `json:"region"`
-	StartTime    int64  `json:"startTime"`
-	EndTime      int64  `json:"endTime"`
+	ResourceOwner string `json:"-"`
+	WorkflowName  string `json:"-"`
+	Type          string `json:"type"`
+	Name          string `json:"name"`
+	Repo          string `json:"reponame"`
+	Query         string `json:"query"`
+	Size          int    `json:"size"`
+	Region        string `json:"region"`
+	StartTime     int64  `json:"startTime"`
+	EndTime       int64  `json:"endTime"`
 }
 
 func (r *DagLogSearchInput) Validate() (err error) {
@@ -2271,14 +2318,22 @@ type WorkflowSearchRet struct {
 
 type CreateVariableInput struct {
 	PipelineToken
-	Name   string `json:"name"`
-	Type   string `json:"type"`
-	Value  string `json:"value"`
-	Format string `json:"format"`
+	ResourceOwner string `json:"-"`
+	Name          string `json:"name"`
+	Type          string `json:"type"`
+	Value         string `json:"value"`
+	Format        string `json:"format"`
 }
 
 func (r *CreateVariableInput) Validate() (err error) {
+	if r.Type == VariableTimeType && r.Format == "" {
+		err = reqerr.NewInvalidArgs("format", "time variable's format should not be empty")
+		return
+	}
 	if err = validateVariableName(r.Name); err != nil {
+		return
+	}
+	if err = validateVariableType(r.Type); err != nil {
 		return
 	}
 	return
@@ -2287,7 +2342,14 @@ func (r *CreateVariableInput) Validate() (err error) {
 type UpdateVariableInput CreateVariableInput
 
 func (r *UpdateVariableInput) Validate() (err error) {
+	if r.Type == VariableTimeType && r.Format == "" {
+		err = reqerr.NewInvalidArgs("format", "time variable's format should not be empty")
+		return
+	}
 	if err = validateVariableName(r.Name); err != nil {
+		return
+	}
+	if err = validateVariableType(r.Type); err != nil {
 		return
 	}
 	return
@@ -2295,7 +2357,8 @@ func (r *UpdateVariableInput) Validate() (err error) {
 
 type DeleteVariableInput struct {
 	PipelineToken
-	Name string `json:"name"`
+	ResourceOwner string `json:"-"`
+	Name          string `json:"name"`
 }
 
 func (r *DeleteVariableInput) Validate() (err error) {
@@ -2307,7 +2370,8 @@ func (r *DeleteVariableInput) Validate() (err error) {
 
 type GetVariableInput struct {
 	PipelineToken
-	Name string `json:"name"`
+	ResourceOwner string `json:"-"`
+	Name          string `json:"name"`
 }
 
 func (r *GetVariableInput) Validate() (err error) {
@@ -2326,6 +2390,7 @@ type GetVariableOutput struct {
 
 type ListVariablesInput struct {
 	PipelineToken
+	ResourceOwner string
 }
 
 type ListVariablesOutput struct {

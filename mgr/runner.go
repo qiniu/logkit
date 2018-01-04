@@ -1,7 +1,6 @@
 package mgr
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	jsoniter "github.com/json-iterator/go"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/cleaner"
 	"github.com/qiniu/logkit/conf"
@@ -93,6 +93,7 @@ type RunnerConfig struct {
 	ParserConf    conf.MapConf             `json:"parser"`
 	Transforms    []map[string]interface{} `json:"transforms,omitempty"`
 	SenderConfig  []conf.MapConf           `json:"senders"`
+	Router        sender.RouterConfig      `json:"router,omitempty"`
 	IsInWebFolder bool                     `json:"web_folder,omitempty"`
 	IsStopped     bool                     `json:"is_stopped,omitempty"`
 }
@@ -116,6 +117,7 @@ type LogExportRunner struct {
 	cleaner      *cleaner.Cleaner
 	parser       parser.LogParser
 	senders      []sender.Sender
+	router       *sender.Router
 	transformers []transforms.Transformer
 
 	rs      RunnerStatus
@@ -151,11 +153,13 @@ func NewCustomRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, ps *
 	return NewLogExportRunner(rc, cleanChan, ps, sr)
 }
 
-func NewRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.LogParser, transformers []transforms.Transformer, senders []sender.Sender, meta *reader.Meta) (runner Runner, err error) {
-	return NewLogExportRunnerWithService(info, reader, cleaner, parser, transformers, senders, meta)
+func NewRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.LogParser, transformers []transforms.Transformer,
+	senders []sender.Sender, router *sender.Router, meta *reader.Meta) (runner Runner, err error) {
+	return NewLogExportRunnerWithService(info, reader, cleaner, parser, transformers, senders, router, meta)
 }
 
-func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.LogParser, transformers []transforms.Transformer, senders []sender.Sender, meta *reader.Meta) (runner *LogExportRunner, err error) {
+func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.LogParser,
+	transformers []transforms.Transformer, senders []sender.Sender, router *sender.Router, meta *reader.Meta) (runner *LogExportRunner, err error) {
 	if info.MaxBatchSize <= 0 {
 		info.MaxBatchSize = defaultMaxBatchSize
 	}
@@ -171,12 +175,14 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 			TransformStats: make(map[string]utils.StatsInfo),
 			lastState:      time.Now(),
 			Name:           info.RunnerName,
+			RunningStatus:  RunnerRunning,
 		},
 		lastRs: RunnerStatus{
 			SenderStats:    make(map[string]utils.StatsInfo),
 			TransformStats: make(map[string]utils.StatsInfo),
 			lastState:      time.Now(),
 			Name:           info.RunnerName,
+			RunningStatus:  RunnerRunning,
 		},
 		rsMutex: new(sync.RWMutex),
 	}
@@ -207,6 +213,7 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 		return
 	}
 	runner.senders = senders
+	runner.router = router
 	runner.StatusRestore()
 	return runner, nil
 }
@@ -273,7 +280,12 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, p
 		senders = append(senders, s)
 		delete(rc.SenderConfig[i], sender.InnerUserAgent)
 	}
-	return NewLogExportRunnerWithService(runnerInfo, rd, cl, parser, transformers, senders, meta)
+	senderCnt := len(senders)
+	router, err := sender.NewSenderRouter(rc.Router, senderCnt)
+	if err != nil {
+		return nil, fmt.Errorf("runner %v add sender router error, %v", rc.RunnerName, err)
+	}
+	return NewLogExportRunnerWithService(runnerInfo, rd, cl, parser, transformers, senders, router, meta)
 }
 
 func createTransformers(rc RunnerConfig) []transforms.Transformer {
@@ -296,12 +308,12 @@ func createTransformers(rc RunnerConfig) []transforms.Transformer {
 			continue
 		}
 		trans := creater()
-		bts, err := json.Marshal(tConf)
+		bts, err := jsoniter.Marshal(tConf)
 		if err != nil {
 			log.Errorf("type %v of transformer marshal config error %v", strTP, err)
 			continue
 		}
-		err = json.Unmarshal(bts, trans)
+		err = jsoniter.Unmarshal(bts, trans)
 		if err != nil {
 			log.Errorf("type %v of transformer unmarshal config error %v", strTP, err)
 			continue
@@ -340,7 +352,9 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []sender.Data, times in
 		if se, ok := err.(*utils.StatsError); ok {
 			err = se.ErrorDetail
 			if se.Ft {
+				r.rsMutex.Lock()
 				r.rs.Lag.Ftlags = se.Ftlag
+				r.rsMutex.Unlock()
 			} else {
 				if cnt > 1 {
 					info.Errors -= se.Success
@@ -416,8 +430,10 @@ func (r *LogExportRunner) Run() {
 				log.Errorf("Runner[%v] reader %s read lines larger than MaxBatchSize %v, content is %s", r.Name(), r.reader.Name(), r.MaxBatchSize, line)
 				continue
 			}
+			r.rsMutex.Lock()
 			r.rs.ReadDataSize += int64(len(line))
 			r.rs.ReadDataCount++
+			r.rsMutex.Unlock()
 			lines = append(lines, line)
 			if datasourceTag != "" {
 				froms = append(froms, r.reader.Source())
@@ -453,6 +469,7 @@ func (r *LogExportRunner) Run() {
 		errorCnt := int64(0)
 		datas, err := r.parser.Parse(lines)
 		se, ok := err.(*utils.StatsError)
+		r.rsMutex.Lock()
 		if ok {
 			errorCnt = se.Errors
 			err = se.ErrorDetail
@@ -464,6 +481,7 @@ func (r *LogExportRunner) Run() {
 		} else {
 			r.rs.ParserStats.Success++
 		}
+		r.rsMutex.Unlock()
 		if err != nil {
 			errMsg := fmt.Sprintf("Runner[%v] parser %s error : %v ", r.Name(), r.parser.Name(), err.Error())
 			log.Debugf(errMsg)
@@ -492,9 +510,11 @@ func (r *LogExportRunner) Run() {
 			}
 		}
 		success := true
+		senderCnt := len(r.senders)
 		log.Debugf("Runner[%v] reader %s start to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
-		for _, s := range r.senders {
-			if !r.trySend(s, datas, r.MaxBatchTryTimes) {
+		senderDataList := classifySenderData(datas, r.router, senderCnt)
+		for index, s := range r.senders {
+			if !r.trySend(s, senderDataList[index], r.MaxBatchTryTimes) {
 				success = false
 				log.Errorf("Runner[%v] failed to send data finally", r.Name())
 				break
@@ -505,6 +525,27 @@ func (r *LogExportRunner) Run() {
 		}
 		log.Debugf("Runner[%v] send %s finish to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
 	}
+}
+
+func classifySenderData(datas []sender.Data, router *sender.Router, senderCnt int) [][]sender.Data {
+	senderDataList := make([][]sender.Data, senderCnt)
+	for i := 0; i < senderCnt; i++ {
+		if router == nil {
+			senderDataList[i] = datas
+		} else {
+			senderDataList[i] = make([]sender.Data, 0)
+		}
+	}
+	if router == nil {
+		return senderDataList
+	}
+	for _, d := range datas {
+		senderIndex := router.GetSenderIndex(d)
+		senderData := senderDataList[senderIndex]
+		senderData = append(senderData, d)
+		senderDataList[senderIndex] = senderData
+	}
+	return senderDataList
 }
 
 func addSourceToData(sourceFroms []string, se *utils.StatsError, datas []sender.Data, datasourceTagName, runnername string) []sender.Data {
@@ -583,7 +624,7 @@ func (r *LogExportRunner) Reset() error {
 func (r *LogExportRunner) Cleaner() CleanInfo {
 	ci := CleanInfo{
 		enable: r.cleaner != nil,
-		logdir: r.reader.Source(),
+		logdir: filepath.Dir(r.reader.Source()),
 	}
 	return ci
 }
@@ -683,11 +724,24 @@ func getTrend(old, new float64) string {
 	return SpeedStable
 }
 
+func (r *LogExportRunner) getStatusFrequently(rss *RunnerStatus, now time.Time) (bool, float64) {
+	r.rsMutex.RLock()
+	defer r.rsMutex.RUnlock()
+	elaspedTime := now.Sub(r.rs.lastState).Seconds()
+	if elaspedTime <= 3 {
+		deepCopy(rss, &r.rs)
+		return true, elaspedTime
+	}
+	return false, elaspedTime
+}
+
 func (r *LogExportRunner) Status() RunnerStatus {
+	var isFre bool
+	var elaspedtime float64
+	rss := RunnerStatus{}
 	now := time.Now()
-	elaspedtime := now.Sub(r.rs.lastState).Seconds()
-	if elaspedtime <= 3 {
-		return r.rs
+	if isFre, elaspedtime = r.getStatusFrequently(&rss, now); isFre {
+		return rss
 	}
 	r.rsMutex.Lock()
 	defer r.rsMutex.Unlock()
@@ -742,7 +796,8 @@ func (r *LogExportRunner) Status() RunnerStatus {
 	}
 	r.rs.RunningStatus = RunnerRunning
 	copyRunnerStatus(&r.lastRs, &r.rs)
-	return r.rs
+	deepCopy(&rss, &r.rs)
+	return rss
 }
 
 func calcSpeedTrend(old, new utils.StatsInfo, elaspedtime float64) (speed float64, trend string) {
@@ -753,6 +808,19 @@ func calcSpeedTrend(old, new utils.StatsInfo, elaspedtime float64) (speed float6
 	}
 	trend = getTrend(old.Speed, speed)
 	return
+}
+
+func deepCopy(dst, src interface{}) {
+	var err error
+	var confByte []byte
+	if confByte, err = jsoniter.Marshal(src); err != nil {
+		log.Debugf("runner config marshal error %v", err)
+		dst = src
+	}
+	if err = jsoniter.Unmarshal(confByte, dst); err != nil {
+		log.Debugf("runner config unmarshal error %v", err)
+		dst = src
+	}
 }
 
 func copyRunnerStatus(dst, src *RunnerStatus) {

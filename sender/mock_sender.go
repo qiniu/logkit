@@ -1,10 +1,9 @@
 package sender
 
 import (
-	"encoding/json"
-
 	"sync"
 
+	"github.com/json-iterator/go"
 	"github.com/qiniu/logkit/conf"
 )
 
@@ -32,7 +31,7 @@ func NewMockSender(c conf.MapConf) (Sender, error) {
 func (mock *MockSender) Name() string {
 	mock.mux.Lock()
 	defer mock.mux.Unlock()
-	raw, err := json.Marshal(mock.datas)
+	raw, err := jsoniter.Marshal(mock.datas)
 	if err != nil {
 		raw = []byte(err.Error())
 	}

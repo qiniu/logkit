@@ -1,16 +1,9 @@
 package mgr
 
 import (
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
 	"net/http"
-	"os"
-	"testing"
 
-	"bytes"
-
-	"github.com/labstack/echo"
+	"github.com/json-iterator/go"
 	conf2 "github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/sender"
@@ -23,39 +16,24 @@ type respParserRet struct {
 }
 
 // Rest 测试 端口容易冲突导致混淆，62xx
-func TestParserParse(t *testing.T) {
-	pwd, err := os.Getwd()
-	if err != nil {
-		t.Error(err)
-	}
-	confdir := pwd + DEFAULT_LOGKIT_REST_DIR
-	defer os.RemoveAll(confdir)
-
-	var conf ManagerConfig
-	conf.BindHost = ":6240"
-	m, err := NewManager(conf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	rs := NewRestService(m, echo.New())
-	defer func() {
-		rs.Stop()
-		os.Remove(StatsShell)
-	}()
+func parserParseTest(p *testParam) {
+	t := p.t
+	rs := p.rs
 
 	// raw
 	rawConf := conf2.MapConf{}
 	rawConf[KeySampleLog] = parser.SampleLogs[parser.TypeRaw]
 	rawConf[parser.KeyParserType] = parser.TypeRaw
-	rawpst, err := json.Marshal(rawConf)
+	rawpst, err := jsoniter.Marshal(rawConf)
 	assert.NoError(t, err)
-	resp, err := http.Post("http://127.0.0.1"+rs.address+"/logkit/parser/parse", TESTContentApplictionJson, bytes.NewReader(rawpst))
-	assert.NoError(t, err)
-	content, _ := ioutil.ReadAll(resp.Body)
-	assert.Equal(t, 200, resp.StatusCode, string(content))
+	url := "http://127.0.0.1" + rs.address + "/logkit/parser/parse"
+	respCode, respBody, err := makeRequest(url, http.MethodPost, rawpst)
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+
 	var got1 respParserRet
-	err = json.Unmarshal(content, &got1)
-	assert.NoError(t, err, string(content))
+	err = jsoniter.Unmarshal(respBody, &got1)
+	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, 4, len(got1.Data.SamplePoints))
 
 	// json
@@ -63,13 +41,13 @@ func TestParserParse(t *testing.T) {
 	jsonConf := conf2.MapConf{}
 	jsonConf[KeySampleLog] = parser.SampleLogs[parser.TypeJson]
 	jsonConf[parser.KeyParserType] = parser.TypeJson
-	rawpst, err = json.Marshal(jsonConf)
+	rawpst, err = jsoniter.Marshal(jsonConf)
 	assert.NoError(t, err)
-	resp, err = http.Post("http://127.0.0.1"+rs.address+"/logkit/parser/parse", TESTContentApplictionJson, bytes.NewReader(rawpst))
-	assert.NoError(t, err)
-	content, _ = ioutil.ReadAll(resp.Body)
-	assert.Equal(t, 200, resp.StatusCode, string(content))
-	err = json.Unmarshal(content, &got2)
+	url = "http://127.0.0.1" + rs.address + "/logkit/parser/parse"
+	respCode, respBody, err = makeRequest(url, http.MethodPost, rawpst)
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	err = jsoniter.Unmarshal(respBody, &got2)
 	if err != nil {
 		t.Error(err)
 	}
@@ -86,13 +64,13 @@ func TestParserParse(t *testing.T) {
 	grokConf[KeySampleLog] = parser.SampleLogs[parser.TypeGrok]
 	grokConf[parser.KeyParserType] = parser.TypeGrok
 	grokConf[parser.KeyGrokPatterns] = "%{COMMON_LOG_FORMAT}"
-	rawpst, err = json.Marshal(grokConf)
+	rawpst, err = jsoniter.Marshal(grokConf)
 	assert.NoError(t, err)
-	resp, err = http.Post("http://127.0.0.1"+rs.address+"/logkit/parser/parse", TESTContentApplictionJson, bytes.NewReader(rawpst))
-	assert.NoError(t, err)
-	content, _ = ioutil.ReadAll(resp.Body)
-	assert.Equal(t, 200, resp.StatusCode, string(content))
-	err = json.Unmarshal(content, &got3)
+	url = "http://127.0.0.1" + rs.address + "/logkit/parser/parse"
+	respCode, respBody, err = makeRequest(url, http.MethodPost, rawpst)
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	err = jsoniter.Unmarshal(respBody, &got3)
 	if err != nil {
 		t.Error(err)
 	}
@@ -110,72 +88,37 @@ func TestParserParse(t *testing.T) {
 	assert.Equal(t, exp3, got3.Data.SamplePoints[0])
 }
 
-func TestParserAPI(t *testing.T) {
-	pwd, err := os.Getwd()
-	if err != nil {
-		t.Error(err)
-	}
-	confdir := pwd + DEFAULT_LOGKIT_REST_DIR
-	defer os.RemoveAll(confdir)
-
-	var conf ManagerConfig
-	conf.BindHost = ":6241"
-	m, err := NewManager(conf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	rs := NewRestService(m, echo.New())
-	defer func() {
-		rs.Stop()
-		os.Remove(StatsShell)
-	}()
+func parserAPITest(p *testParam) {
+	t := p.t
+	rs := p.rs
 
 	var got1 respModeUsages
-
-	resp, err := http.Get("http://127.0.0.1" + rs.address + "/logkit/parser/usages")
-	if err != nil {
-		t.Error(err)
-	}
-	content, _ := ioutil.ReadAll(resp.Body)
-	if resp.StatusCode != 200 {
-		t.Error(string(content))
-	}
-	err = json.Unmarshal(content, &got1)
-	if err != nil {
-		fmt.Println(string(content))
-		t.Error(err)
+	url := "http://127.0.0.1" + rs.address + "/logkit/parser/usages"
+	respCode, respBody, err := makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	if err = jsoniter.Unmarshal(respBody, &got1); err != nil {
+		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
 	assert.Equal(t, parser.ModeUsages, got1.Data)
 
 	var got2 respModeKeyOptions
-	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/parser/options")
-	if err != nil {
-		t.Error(err)
-	}
-	content, _ = ioutil.ReadAll(resp.Body)
-	if resp.StatusCode != 200 {
-		t.Error(string(content))
-	}
-	err = json.Unmarshal(content, &got2)
-	if err != nil {
-		fmt.Println(string(content))
-		t.Error(err)
+	url = "http://127.0.0.1" + rs.address + "/logkit/parser/options"
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	if err = jsoniter.Unmarshal(respBody, &got2); err != nil {
+		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
 	assert.Equal(t, parser.ModeKeyOptions, got2.Data)
 
 	var got3 respSampleLogs
-	resp, err = http.Get("http://127.0.0.1" + rs.address + "/logkit/parser/samplelogs")
-	if err != nil {
-		t.Error(err)
-	}
-	content, _ = ioutil.ReadAll(resp.Body)
-	if resp.StatusCode != 200 {
-		t.Error(string(content))
-	}
-	err = json.Unmarshal(content, &got3)
-	if err != nil {
-		fmt.Println(string(content))
-		t.Error(err)
+	url = "http://127.0.0.1" + rs.address + "/logkit/parser/samplelogs"
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	if err = jsoniter.Unmarshal(respBody, &got3); err != nil {
+		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
 	assert.Equal(t, parser.SampleLogs, got3.Data)
 }

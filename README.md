@@ -21,6 +21,7 @@ logkit是[七牛Pandora](https://pandora-docs.qiniu.com)开发的一个通用的
 1. Kafka
 1. Redis
 1. TCP/UDP/Unix Socket
+1. Http POST
 
 ## 工作方式
 
@@ -56,6 +57,8 @@ logkit本身支持多种数据源，并且可以同时发送多个数据源的�
 [linux 32位版本下载](https://pandora-dl.qiniu.com/nightly/logkit_linux32_nightly.tar.gz)
 
 [MacOS 版本下载](https://pandora-dl.qiniu.com/nightly/logkit_mac_nightly.tar.gz)
+
+[Docker image nightly]:  `docker pull  wonderflow/logkit:nightly`
 
 
 ## 安装与使用

@@ -3,10 +3,7 @@ package parser
 import (
 	"fmt"
 	"testing"
-
 	"time"
-
-	"log"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
@@ -101,5 +98,4 @@ func Benchmark_BenchNginxParser(b *testing.B) {
 		}
 	}
 	grokBench = m
-	log.Println(m)
 }

@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -9,11 +8,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
+
+	"github.com/json-iterator/go"
+	"github.com/qiniu/log"
 )
 
 // Type 类型常量
@@ -35,6 +36,12 @@ const (
 )
 
 const MaxParserSchemaErrOutput = 5
+
+var jsontool = jsoniter.Config{
+	EscapeHTML:             true,
+	UseNumber:              true,
+	ValidateJsonRawMessage: true,
+}.Froze()
 
 type CsvParser struct {
 	name           string
@@ -323,7 +330,7 @@ func (f field) ValueParse(value string, timeZoneOffset int) (datas sender.Data, 
 			return
 		}
 		m := make(map[string]interface{})
-		if err = json.Unmarshal([]byte(value), &m); err != nil {
+		if err = jsontool.Unmarshal([]byte(value), &m); err != nil {
 			err = fmt.Errorf("unmarshal json map type error: %v", err)
 			return
 		}

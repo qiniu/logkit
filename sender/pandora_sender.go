@@ -13,14 +13,15 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
 
 	pipelinebase "github.com/qiniu/pandora-go-sdk/base"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
+	"github.com/qiniu/pandora-go-sdk/logdb"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 
-	"github.com/qiniu/logkit/metric"
 	gouuid "github.com/satori/go.uuid"
 )
 
@@ -29,6 +30,7 @@ const (
 	KeyPandoraAk                   = "pandora_ak"
 	KeyPandoraSk                   = "pandora_sk"
 	KeyPandoraHost                 = "pandora_host"
+	KeyPandoraWorkflowName         = "pandora_workflow_name"
 	KeyPandoraRepoName             = "pandora_repo_name"
 	KeyPandoraRegion               = "pandora_region"
 	KeyPandoraSchema               = "pandora_schema"
@@ -67,6 +69,8 @@ const (
 
 	PandoraUUID = "Pandora_UUID"
 
+	KeyPandoraStash = "pandora_stash" // 当只有一条数据且 sendError 时候，将其转化为 raw 发送到 pandora_stash 这个字段
+
 	timestampPrecision = 19
 )
 
@@ -95,6 +99,7 @@ type PandoraOption struct {
 	runnerName     string
 	name           string
 	repoName       string
+	workflowName   string
 	region         string
 	endpoint       string
 	ak             string
@@ -113,6 +118,7 @@ type PandoraOption struct {
 	enableLogdb   bool
 	logdbReponame string
 	logdbendpoint string
+	analyzerInfo  pipeline.AnalyzerInfo
 
 	enableTsdb     bool
 	tsdbReponame   string
@@ -175,6 +181,7 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	if err != nil {
 		return
 	}
+	workflowName, _ := conf.GetStringOr(KeyPandoraWorkflowName, "")
 	useragent, _ := conf.GetStringOr(InnerUserAgent, "")
 	schema, _ := conf.GetStringOr(KeyPandoraSchema, "")
 	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("pandoraSender:(%v,repo:%v,region:%v)", host, repoName, region))
@@ -216,6 +223,7 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	opt := &PandoraOption{
 		runnerName:     runnerName,
 		name:           name,
+		workflowName:   workflowName,
 		repoName:       repoName,
 		region:         region,
 		endpoint:       host,
@@ -311,16 +319,15 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 		schemas:    make(map[string]pipeline.RepoSchemaEntry),
 		extraInfo:  utils.GetExtraInfo(),
 	}
-	if createErr := createPandoraRepo(opt, client); createErr != nil {
-		if !strings.Contains(createErr.Error(), "E18101") {
-			log.Errorf("Runner[%v] Sender[%v]: auto create pandora repo error: %v, you can create on pandora portal, ignored...", opt.runnerName, opt.name, createErr)
-		}
-	}
-	// 如果updateSchemas更新schema失败，不会报错，可以正常启动runner，但是在sender时会检查schema是否获取
-	// sender时会尝试不断获取pandora schema，若还是获取失败则返回发送错误。
-	s.UpdateSchemas()
 
 	var osInfo = []string{utils.KeyCore, utils.KeyHostName, utils.KeyOsInfo, utils.KeyLocalIp}
+	analyzerMap := map[string]string{
+		utils.KeyCore:     logdb.KeyWordAnalyzer,
+		utils.KeyOsInfo:   logdb.KeyWordAnalyzer,
+		utils.KeyLocalIp:  logdb.KeyWordAnalyzer,
+		utils.KeyHostName: logdb.KeyWordAnalyzer,
+	}
+	s.opt.analyzerInfo.Analyzer = analyzerMap
 	expandAttr := make([]string, 0)
 	if s.opt.isMetrics {
 		s.opt.tsdbTimestamp = metric.Timestamp
@@ -336,56 +343,60 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 			expandAttr = append(expandAttr, osInfo...)
 		}
 		s.opt.tsdbSeriesTags = metricTags
+		s.opt.analyzerInfo.Default = logdb.KeyWordAnalyzer
 	}
 	s.opt.expandAttr = expandAttr
-	if s.opt.enableLogdb && len(s.schemas) > 0 {
-		log.Infof("Runner[%v] Sender[%v]: auto create export to logdb (%v)", opt.runnerName, opt.name, opt.logdbReponame)
-		err = s.client.AutoExportToLogDB(&pipeline.AutoExportToLogDBInput{
-			OmitEmpty:   true,
-			OmitInvalid: false,
-			RepoName:    s.opt.repoName,
-			LogRepoName: s.opt.logdbReponame,
-		})
-		if err != nil {
-			log.Warnf("Runner[%v] Sender[%v]: AutoExportToLogDB %v error %v", s.opt.runnerName, s.opt.name, s.opt.logdbReponame, err)
-			err = nil
-		}
-	}
 
-	if s.opt.enableTsdb && len(s.schemas) > 0 {
-		log.Infof("Runner[%v] Sender[%v]: auto create export to tsdb (%v)", opt.runnerName, opt.name, opt.tsdbReponame)
-		err = s.client.AutoExportToTSDB(&pipeline.AutoExportToTSDBInput{
-			OmitEmpty:    true,
-			OmitInvalid:  false,
-			SeriesTags:   s.opt.tsdbSeriesTags,
-			IsMetric:     s.opt.isMetrics,
-			ExpandAttr:   s.opt.expandAttr,
-			RepoName:     s.opt.repoName,
-			TSDBRepoName: s.opt.tsdbReponame,
-			SeriesName:   s.opt.tsdbSeriesName,
-			Timestamp:    s.opt.tsdbTimestamp,
-		})
-		if err != nil {
-			log.Warnf("Runner[%v] Sender[%v]: AutoExportLogDataToTSDB %v error %v", s.opt.runnerName, s.opt.name, s.opt.tsdbReponame, err)
-			err = nil
-		}
+	dsl := strings.TrimSpace(opt.autoCreate)
+	schemas, err := pipeline.DSLtoSchema(dsl)
+	if err != nil {
+		log.Errorf("Runner[%v] Sender[%v]: auto create pandora repo error: %v, you can create on pandora portal, ignored...", opt.runnerName, opt.name, err)
 	}
-
-	if s.opt.enableKodo && len(s.schemas) > 0 {
-		log.Infof("Runner[%v] Sender[%v]: auto create export to kodo (%v)", opt.runnerName, opt.name, opt.bucketName)
-		err = s.client.AutoExportToKODO(&pipeline.AutoExportToKODOInput{
-			RepoName:   s.opt.repoName,
-			BucketName: s.opt.bucketName,
-			Prefix:     s.opt.prefix,
-			Format:     s.opt.format,
-			Email:      s.opt.email,
-			Retention:  30, //默认30天
-		})
-		if err != nil {
-			log.Warnf("Runner[%v] Sender[%v]: AutoExportToKODO %v error %v", s.opt.runnerName, s.opt.name, s.opt.bucketName, err)
-			err = nil
-		}
+	if initErr := s.client.InitOrUpdateWorkflow(&pipeline.InitOrUpdateWorkflowInput{
+		// 此处要的 schema 为 autoCreate 中用户指定的，所以 SchemaFree 要恒为 true
+		SchemaFree:   true,
+		Region:       s.opt.region,
+		WorkflowName: s.opt.workflowName,
+		RepoName:     s.opt.repoName,
+		Schema:       schemas,
+		RepoOptions:  &pipeline.RepoOptions{WithIP: s.opt.withip},
+		Option: &pipeline.SchemaFreeOption{
+			ToLogDB: s.opt.enableLogdb,
+			AutoExportToLogDBInput: pipeline.AutoExportToLogDBInput{
+				OmitEmpty:    true,
+				OmitInvalid:  false,
+				RepoName:     s.opt.repoName,
+				LogRepoName:  s.opt.logdbReponame,
+				AnalyzerInfo: s.opt.analyzerInfo,
+			},
+			ToKODO: s.opt.enableKodo,
+			AutoExportToKODOInput: pipeline.AutoExportToKODOInput{
+				Retention:  30,
+				RepoName:   s.opt.repoName,
+				BucketName: s.opt.bucketName,
+				Email:      s.opt.email,
+				Prefix:     s.opt.prefix,
+				Format:     s.opt.format,
+			},
+			ToTSDB: s.opt.enableTsdb,
+			AutoExportToTSDBInput: pipeline.AutoExportToTSDBInput{
+				OmitEmpty:    true,
+				OmitInvalid:  false,
+				IsMetric:     s.opt.isMetrics,
+				ExpandAttr:   s.opt.expandAttr,
+				RepoName:     s.opt.repoName,
+				TSDBRepoName: s.opt.tsdbReponame,
+				SeriesName:   s.opt.tsdbSeriesName,
+				SeriesTags:   s.opt.tsdbSeriesTags,
+				Timestamp:    s.opt.tsdbTimestamp,
+			},
+			ForceDataConvert: s.opt.forceDataConvert,
+		},
+	}); initErr != nil {
+		err = fmt.Errorf("runner[%v] Sender [%v]: init Workflow error %v", opt.runnerName, opt.name, initErr)
+		return
 	}
+	s.UpdateSchemas()
 	return
 }
 
@@ -590,6 +601,9 @@ func validSchema(valueType string, value interface{}) bool {
 			return false
 		}
 	case PandoraTypeJsonString:
+		if _, ok := value.(map[string]interface{}); ok {
+			return true
+		}
 		vu := reflect.ValueOf(value)
 		var str string
 		if vu.Kind() == reflect.String {
@@ -600,9 +614,18 @@ func validSchema(valueType string, value interface{}) bool {
 		if str == "" {
 			return true
 		}
-		return utils.IsJSON(str)
+		return utils.IsJsonString(str)
 	}
 	return true
+}
+
+func deleteExtraAttr(data Data) {
+	// 如果用户数据中本来就含有以下字段，则该函数会造成用户数据残缺
+	delete(data, utils.KeyCore)
+	delete(data, utils.KeyOsInfo)
+	delete(data, utils.KeyLocalIp)
+	delete(data, utils.KeyHostName)
+	delete(data, KeyLogkitSendTime)
 }
 
 func (s *PandoraSender) getSchemasAlias() (map[string]pipeline.RepoSchemaEntry, map[string]string) {
@@ -675,7 +698,7 @@ func (s *PandoraSender) checkSchemaUpdate() {
 func (s *PandoraSender) Send(datas []Data) (se error) {
 	s.checkSchemaUpdate()
 	if !s.opt.schemaFree && (len(s.schemas) <= 0 || len(s.alias2key) <= 0) {
-		se = reqerr.NewSendError("Get pandora schema error, faild to send data", ConvertDatasBack(datas), reqerr.TypeDefault)
+		se = reqerr.NewSendError("Get pandora schema error, failed to send data", ConvertDatasBack(datas), reqerr.TypeDefault)
 		ste := &utils.StatsError{
 			StatsInfo: utils.StatsInfo{
 				Success:   0,
@@ -703,17 +726,19 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 		points = append(points, pipeline.Data(map[string]interface{}(point)))
 	}
 	schemas, se := s.client.PostDataSchemaFree(&pipeline.SchemaFreeInput{
-		RepoName:    s.opt.repoName,
-		NoUpdate:    !s.opt.schemaFree,
-		Datas:       points,
-		RepoOptions: &pipeline.RepoOptions{WithIP: s.opt.withip},
+		WorkflowName: s.opt.workflowName,
+		RepoName:     s.opt.repoName,
+		NoUpdate:     !s.opt.schemaFree,
+		Datas:        points,
+		RepoOptions:  &pipeline.RepoOptions{WithIP: s.opt.withip},
 		Option: &pipeline.SchemaFreeOption{
 			ToLogDB: s.opt.enableLogdb,
 			AutoExportToLogDBInput: pipeline.AutoExportToLogDBInput{
-				OmitEmpty:   true,
-				OmitInvalid: false,
-				RepoName:    s.opt.repoName,
-				LogRepoName: s.opt.logdbReponame,
+				OmitEmpty:    true,
+				OmitInvalid:  false,
+				RepoName:     s.opt.repoName,
+				LogRepoName:  s.opt.logdbReponame,
+				AnalyzerInfo: s.opt.analyzerInfo,
 			},
 			ToKODO: s.opt.enableKodo,
 			AutoExportToKODOInput: pipeline.AutoExportToKODOInput{

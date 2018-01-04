@@ -174,9 +174,13 @@ func (c *Pipeline) UpdateRepoWithLogDB(input *UpdateRepoInput, ex ExportDesc) er
 	if err != nil {
 		return err
 	}
+	analyzers := AnalyzerInfo{}
+	if input.Option != nil {
+		analyzers = input.Option.AutoExportToLogDBInput.AnalyzerInfo
+	}
 	for _, v := range input.Schema {
 		if schemaNotIn(v.Key, repoInfo.Schema) {
-			scs := convertSchema2LogDB([]RepoSchemaEntry{v})
+			scs := convertSchema2LogDB([]RepoSchemaEntry{v}, analyzers)
 			if len(scs) > 0 {
 				repoInfo.Schema = append(repoInfo.Schema, scs[0])
 			}
@@ -232,9 +236,8 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 	if err != nil {
 		return
 	}
-	err = c.updateRepo(input)
-	if err != nil {
-		return
+	if err = c.updateRepo(input); err != nil {
+		return err
 	}
 	if input.Option == nil {
 		return nil
@@ -364,6 +367,9 @@ func (c *Pipeline) PostData(input *PostDataInput) (err error) {
 	req := c.newRequest(op, input.Token, nil)
 	req.SetBufferBody(input.Points.Buffer())
 	req.SetHeader(base.HTTPHeaderContentType, base.ContentTypeText)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	req.SetFlowLimiter(c.flowLimit)
 	req.SetReqLimiter(c.reqLimit)
 	return req.Send()
@@ -433,7 +439,14 @@ func (c *Pipeline) unpack(input *SchemaFreeInput) (packages []pointContext, err 
 	var buf bytes.Buffer
 	var start = 0
 	for i, d := range input.Datas {
-		point, err := c.generatePoint(input.RepoName, d, !input.NoUpdate, input.Option, input.RepoOptions)
+		point, err := c.generatePoint(d, &InitOrUpdateWorkflowInput{
+			SchemaFree:   !input.NoUpdate,
+			Region:       input.Region,
+			RepoName:     input.RepoName,
+			WorkflowName: input.WorkflowName,
+			RepoOptions:  input.RepoOptions,
+			Option:       input.Option,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -603,6 +616,9 @@ func (c *Pipeline) ListPlugins(input *ListPluginsInput) (output *ListPluginsOutp
 
 	output = &ListPluginsOutput{}
 	req := c.newRequest(op, input.Token, &output)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	return output, req.Send()
 }
 
@@ -619,6 +635,9 @@ func (c *Pipeline) GetPlugin(input *GetPluginInput) (output *GetPluginOutput, er
 
 	output = &GetPluginOutput{}
 	req := c.newRequest(op, input.Token, output)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	return output, req.Send()
 }
 
@@ -814,6 +833,9 @@ func (c *Pipeline) GetJobHistory(input *GetJobHistoryInput) (output *GetJobHisto
 
 	output = &GetJobHistoryOutput{}
 	req := c.newRequest(op, input.Token, output)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	return output, req.Send()
 }
 
@@ -833,6 +855,9 @@ func (c *Pipeline) StopJobBatch(input *StopJobBatchInput) (output *StopJobBatchO
 		return
 	}
 	req.SetHeader(base.HTTPHeaderContentType, base.ContentTypeJson)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	return output, req.Send()
 }
 
@@ -845,6 +870,9 @@ func (c *Pipeline) RerunJobBatch(input *RerunJobBatchInput) (output *RerunJobBat
 		return
 	}
 	req.SetHeader(base.HTTPHeaderContentType, base.ContentTypeJson)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	return output, req.Send()
 }
 
@@ -1127,6 +1155,9 @@ func (c *Pipeline) ListUdfs(input *ListUdfsInput) (output *ListUdfsOutput, err e
 
 	output = &ListUdfsOutput{}
 	req := c.newRequest(op, input.Token, output)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	return output, req.Send()
 }
 
@@ -1172,6 +1203,9 @@ func (c *Pipeline) ListUdfFunctions(input *ListUdfFunctionsInput) (output *ListU
 
 	output = &ListUdfFunctionsOutput{}
 	req := c.newRequest(op, input.Token, output)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	return output, req.Send()
 }
 
@@ -1220,6 +1254,9 @@ func (c *Pipeline) UpdateWorkflow(input *UpdateWorkflowInput) (err error) {
 		return
 	}
 	req.SetHeader(base.HTTPHeaderContentType, base.ContentTypeJson)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	return req.Send()
 }
 
@@ -1230,6 +1267,9 @@ func (c *Pipeline) GetWorkflow(input *GetWorkflowInput) (output *GetWorkflowOutp
 	op := c.newOperation(base.OpGetWorkflow, input.WorkflowName)
 	output = &GetWorkflowOutput{}
 	req := c.newRequest(op, input.Token, output)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	return output, req.Send()
 }
 
@@ -1240,6 +1280,9 @@ func (c *Pipeline) GetWorkflowStatus(input *GetWorkflowStatusInput) (output *Get
 	op := c.newOperation(base.OpGetWorkflowStatus, input.WorkflowName)
 	output = &GetWorkflowStatusOutput{}
 	req := c.newRequest(op, input.Token, output)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	return output, req.Send()
 }
 
@@ -1247,6 +1290,9 @@ func (c *Pipeline) DeleteWorkflow(input *DeleteWorkflowInput) (err error) {
 	op := c.newOperation(base.OpDeleteWorkflow, input.WorkflowName)
 
 	req := c.newRequest(op, input.Token, nil)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	return req.Send()
 }
 
@@ -1255,6 +1301,9 @@ func (c *Pipeline) ListWorkflows(input *ListWorkflowInput) (output *ListWorkflow
 
 	output = &ListWorkflowOutput{}
 	req := c.newRequest(op, input.Token, &output)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	return output, req.Send()
 }
 
@@ -1262,6 +1311,9 @@ func (c *Pipeline) StopWorkflow(input *StopWorkflowInput) (err error) {
 	op := c.newOperation(base.OpStopWorkflow, input.WorkflowName)
 
 	req := c.newRequest(op, input.Token, nil)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	if err = req.SetVariantBody(input); err != nil {
 		return
 	}
@@ -1272,6 +1324,9 @@ func (c *Pipeline) StartWorkflow(input *StartWorkflowInput) (err error) {
 	op := c.newOperation(base.OpStartWorkflow, input.WorkflowName)
 
 	req := c.newRequest(op, input.Token, nil)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	if err = req.SetVariantBody(input); err != nil {
 		return
 	}
@@ -1285,6 +1340,9 @@ func (c *Pipeline) SearchWorkflow(input *DagLogSearchInput) (ret *WorkflowSearch
 	req := c.newRequest(op, input.Token, ret)
 	if err = req.SetVariantBody(input); err != nil {
 		return
+	}
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
 	}
 	return ret, req.Send()
 }
@@ -1392,6 +1450,9 @@ func (c *Pipeline) GetVariable(input *GetVariableInput) (output *GetVariableOutp
 
 	output = &GetVariableOutput{}
 	req := c.newRequest(op, input.Token, output)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	return output, req.Send()
 }
 
@@ -1400,6 +1461,9 @@ func (c *Pipeline) ListUserVariables(input *ListVariablesInput) (output *ListVar
 
 	output = &ListVariablesOutput{}
 	req := c.newRequest(op, input.Token, output)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	return output, req.Send()
 }
 
@@ -1407,5 +1471,8 @@ func (c *Pipeline) ListSystemVariables(input *ListVariablesInput) (output *ListV
 	op := c.newOperation(base.OpListSystemVariables, systemVariableType)
 	output = &ListVariablesOutput{}
 	req := c.newRequest(op, input.Token, output)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
 	return output, req.Send()
 }

@@ -2,12 +2,9 @@ package mutate
 
 import (
 	"errors"
-
-	"strings"
-
 	"fmt"
-
 	"strconv"
+	"strings"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/sender"
