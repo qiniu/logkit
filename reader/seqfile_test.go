@@ -176,7 +176,7 @@ func Test_ReadWhenDelete(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	os.Remove(filepath.Join(dir, "f3"))
+	//os.Remove(filepath.Join(dir, "f3"))
 	_, err = sf.Read(buffer)
 	if err != nil {
 		t.Error(err)
