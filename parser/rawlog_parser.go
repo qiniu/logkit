@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"errors"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/utils"
@@ -43,13 +44,14 @@ func (p *RawlogParser) Type() string {
 }
 
 func (p *RawlogParser) Parse(lines []string) ([]sender.Data, error) {
-
+	emptyErr := errors.New("empty line error")
 	se := &utils.StatsError{}
 	datas := []sender.Data{}
 	for idx, line := range lines {
 		line = strings.TrimSpace(line)
 		if len(line) <= 0 {
 			se.AddErrors()
+			se.ErrorDetail = emptyErr
 			se.ErrorIndex = append(se.ErrorIndex, idx)
 			continue
 		}

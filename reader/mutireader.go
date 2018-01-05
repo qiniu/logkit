@@ -177,6 +177,7 @@ func (ar *ActiveReader) Close() error {
 func (ar *ActiveReader) setStatsError(err string) {
 	ar.statsLock.Lock()
 	defer ar.statsLock.Unlock()
+	ar.stats.Errors++
 	ar.stats.LastError = err
 }
 

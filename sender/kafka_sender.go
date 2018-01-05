@@ -130,15 +130,16 @@ func (this *KafkaSender) Name() string {
 }
 
 func (this *KafkaSender) Send(data []Data) error {
+	var errorNum int
 	producer := this.producer
 	var msgs []*sarama.ProducerMessage
-	ss := &utils.StatsError{}
+	se := &utils.StatsError{}
 	var lastErr error
 	for _, doc := range data {
 		message, err := this.getEventMessage(doc)
 		if err != nil {
 			log.Debugf("Dropping event: %v", err)
-			ss.AddErrors()
+			errorNum++
 			lastErr = err
 			continue
 		}
@@ -146,15 +147,18 @@ func (this *KafkaSender) Send(data []Data) error {
 	}
 	err := producer.SendMessages(msgs)
 	if err != nil {
-		ss.AddErrors()
-		ss.ErrorDetail = err
-		return ss
+		errorNum = len(data)
+		se.Errors += int64(errorNum)
+		se.ErrorDetail = err
+		log.Error(err)
+		return se
 	}
-	ss.AddSuccess()
+	se.Errors += int64(errorNum)
+	se.Success += int64(len(data) - errorNum)
 	if lastErr != nil {
-		ss.LastError = lastErr.Error()
+		se.LastError = lastErr.Error()
 	}
-	return ss
+	return se
 }
 
 func (kf *KafkaSender) getEventMessage(event map[string]interface{}) (pm *sarama.ProducerMessage, err error) {

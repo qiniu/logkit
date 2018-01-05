@@ -440,6 +440,7 @@ func (r *LogExportRunner) Run() {
 			}
 			r.batchLen++
 			r.batchSize += len(line)
+			r.reader.SyncMeta()
 		}
 		r.batchLen = 0
 		r.batchSize = 0
@@ -475,9 +476,13 @@ func (r *LogExportRunner) Run() {
 			err = se.ErrorDetail
 			r.rs.ParserStats.Errors += se.Errors
 			r.rs.ParserStats.Success += se.Success
+			if err != nil {
+				r.rs.ParserStats.LastError = err.Error()
+			}
 		} else if err != nil {
 			errorCnt = 1
 			r.rs.ParserStats.Errors++
+			r.rs.ParserStats.LastError = err.Error()
 		} else {
 			r.rs.ParserStats.Success++
 		}
@@ -509,20 +514,20 @@ func (r *LogExportRunner) Run() {
 				}
 			}
 		}
-		success := true
+		//success := true
 		senderCnt := len(r.senders)
 		log.Debugf("Runner[%v] reader %s start to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
 		senderDataList := classifySenderData(datas, r.router, senderCnt)
 		for index, s := range r.senders {
 			if !r.trySend(s, senderDataList[index], r.MaxBatchTryTimes) {
-				success = false
+				//success = false
 				log.Errorf("Runner[%v] failed to send data finally", r.Name())
 				break
 			}
 		}
-		if success {
-			r.reader.SyncMeta()
-		}
+		//if success {
+		//r.reader.SyncMeta()
+		//}
 		log.Debugf("Runner[%v] send %s finish to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
 	}
 }
@@ -770,6 +775,7 @@ func (r *LogExportRunner) Status() RunnerStatus {
 
 	if str, ok := r.reader.(reader.StatsReader); ok {
 		r.rs.ReaderStats = str.Status()
+		r.rs.ReaderStats.Success = r.rs.ReadDataCount
 	}
 
 	r.rs.ReadSpeedKB = float64(r.rs.ReadDataSize-r.lastRs.ReadDataSize) / elaspedtime

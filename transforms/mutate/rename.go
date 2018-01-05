@@ -28,16 +28,11 @@ func (g *Rename) Transform(datas []sender.Data) ([]sender.Data, error) {
 		val, gerr := utils.GetMapValue(datas[i], keySlice...)
 		if gerr != nil {
 			errnums++
-			fmt.Errorf("transform key %v not exist in data", g.Key)
+			err = fmt.Errorf("transform key %v not exist in data", g.Key)
 			continue
 		}
 		utils.DeleteMapValue(datas[i], keySlice...)
-		err = utils.SetMapValue(datas[i], val, false, newKeySlice...)
-		if err != nil {
-			errnums++
-			fmt.Errorf("the new key %v already exists ", g.NewKeyName)
-			continue
-		}
+		utils.SetMapValue(datas[i], val, true, newKeySlice...)
 	}
 	if err != nil {
 		g.stats.LastError = err.Error()
