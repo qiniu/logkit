@@ -256,9 +256,9 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 		sf.offset += int64(n1)
 		n += n1
 		if err != nil {
-			if err == io.EOF && n > 0{
+			if err == io.EOF && n > 0 {
 				return n, err
-			}else{
+			} else {
 				fi, err1 := sf.nextFile()
 				if os.IsNotExist(err1) {
 					if nextFileRetry >= 3 {
