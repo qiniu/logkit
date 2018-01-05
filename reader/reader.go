@@ -140,6 +140,7 @@ const (
 	ModeKafka    = "kafka"
 	ModeRedis    = "redis"
 	ModeSocket   = "socket"
+	ModeHttp     = "http"
 )
 
 const (
@@ -263,6 +264,8 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 		reader, err = NewRedisReader(meta, conf)
 	case ModeSocket:
 		reader, err = NewSocketReader(meta, conf)
+	case ModeHttp:
+		reader, err = NewHttpReader(meta, conf)
 	default:
 		err = fmt.Errorf("mode %v not supported now", mode)
 	}

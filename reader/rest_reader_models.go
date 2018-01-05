@@ -21,6 +21,7 @@ var ModeUsages = []utils.KeyValue{
 	{ModeKafka, "从 Kafka 读取"},
 	{ModeRedis, "从 Redis 读取"},
 	{ModeSocket, "从 Socket 读取"},
+	{ModeHttp, "从 http 请求中读取"},
 }
 
 var (
@@ -623,5 +624,21 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "连接保持时长(0为关闭)(socket_keep_alive_period)",
 		},
 		OptionDataSourceTag,
+	},
+	ModeHttp: {
+		{
+			KeyName:      KeyHttpServiceAddress,
+			ChooseOnly:   false,
+			Default:      DefaultHttpServiceAddress,
+			DefaultNoUse: true,
+			Description:  "监听的地址和端口(<ip 或者 host 或者留空>:port)(http_service_address)",
+		},
+		{
+			KeyName:      KeyHttpServicePath,
+			ChooseOnly:   false,
+			Default:      DefaultHttpServicePath,
+			DefaultNoUse: true,
+			Description:  "监听地址前缀(http_service_path)",
+		},
 	},
 }

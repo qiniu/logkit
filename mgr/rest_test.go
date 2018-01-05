@@ -3,7 +3,6 @@ package mgr
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -18,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/json-iterator/go"
 	"github.com/labstack/echo"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
@@ -80,7 +80,7 @@ func getRunnerConfig(name, logPath, metaPath, mode, senderPath string) ([]byte, 
 			"file_send_path": senderPath,
 		}},
 	}
-	return json.Marshal(runnerConf)
+	return jsoniter.Marshal(runnerConf)
 }
 
 func getRunnerStatus(rn, lp, rs string, rdc, rds, pe, ps, se, ss int64) map[string]RunnerStatus {
@@ -342,7 +342,7 @@ func restGetStatusTest(p *testParam) {
 	}
 	rss := make(map[string]RunnerStatus)
 	var respRss respRunnerStatus
-	err = json.Unmarshal([]byte(out.String()), &respRss)
+	err = jsoniter.Unmarshal([]byte(out.String()), &respRss)
 	assert.NoError(t, err, out.String())
 	rss = respRss.Data
 	exp := getRunnerStatus(runnerName, logDir, RunnerRunning, 1, 29, 0, 1, 0, 1)
@@ -407,7 +407,7 @@ func restCRUDTest(p *testParam) {
 
 	var expconf1, got1 RunnerConfig
 	var respGot1 respRunnerConfig
-	err = json.Unmarshal([]byte(conf1), &expconf1)
+	err = jsoniter.Unmarshal([]byte(conf1), &expconf1)
 	assert.NoError(t, err)
 	expconf1.ReaderConfig[utils.GlobalKeyName] = expconf1.RunnerName
 	expconf1.ReaderConfig[reader.KeyRunnerName] = expconf1.RunnerName
@@ -421,7 +421,7 @@ func restCRUDTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	err = json.Unmarshal(respBody, &respGot1)
+	err = jsoniter.Unmarshal(respBody, &respGot1)
 	if err != nil {
 		fmt.Println(string(respBody))
 		t.Error(err)
@@ -434,7 +434,7 @@ func restCRUDTest(p *testParam) {
 
 	var expconf2, got2 RunnerConfig
 	var respGot2 respRunnerConfig
-	err = json.Unmarshal([]byte(conf2), &expconf2)
+	err = jsoniter.Unmarshal([]byte(conf2), &expconf2)
 	assert.NoError(t, err)
 
 	expconf2.ReaderConfig[utils.GlobalKeyName] = expconf2.RunnerName
@@ -461,7 +461,7 @@ func restCRUDTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	err = json.Unmarshal(respBody, &respGot2)
+	err = jsoniter.Unmarshal(respBody, &respGot2)
 	assert.NoError(t, err)
 	got2 = respGot2.Data
 	got2.CreateTime = ""
@@ -473,7 +473,7 @@ func restCRUDTest(p *testParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	var respGotLists respRunnerConfigs
-	err = json.Unmarshal(respBody, &respGotLists)
+	err = jsoniter.Unmarshal(respBody, &respGotLists)
 	assert.NoError(t, err)
 	gotLists := make(map[string]RunnerConfig)
 	gotLists = respGotLists.Data
@@ -503,7 +503,7 @@ func restCRUDTest(p *testParam) {
 	assert.Equal(t, http.StatusOK, respCode)
 	var gotUpdate RunnerConfig
 	var respGotUpdate respRunnerConfig
-	err = json.Unmarshal(respBody, &respGotUpdate)
+	err = jsoniter.Unmarshal(respBody, &respGotUpdate)
 	assert.NoError(t, err)
 	gotUpdate = respGotUpdate.Data
 	assert.Equal(t, mode, gotUpdate.ReaderConfig["mode"])
@@ -521,7 +521,7 @@ func restCRUDTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusBadRequest, respCode)
-	err = json.Unmarshal(respBody, &respGot2)
+	err = jsoniter.Unmarshal(respBody, &respGot2)
 	assert.NoError(t, err)
 	got2 = respGot2.Data
 	got2.CreateTime = ""
@@ -532,7 +532,7 @@ func restCRUDTest(p *testParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	respGotLists = respRunnerConfigs{}
-	err = json.Unmarshal(respBody, &respGotLists)
+	err = jsoniter.Unmarshal(respBody, &respGotLists)
 	assert.NoError(t, err)
 	gotLists = respGotLists.Data
 	_, ex := gotLists[rs.mgr.RestDir+"/"+runnerName1+".conf"]
@@ -577,7 +577,7 @@ func runnerResetTest(p *testParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	respRss := respRunnerStatus{}
-	if err = json.Unmarshal(respBody, &respRss); err != nil {
+	if err = jsoniter.Unmarshal(respBody, &respRss); err != nil {
 		t.Fatalf("status unmarshal failed error is %v, respBody is %v", err, string(respBody))
 	}
 	rss := respRss.Data
@@ -597,7 +597,7 @@ func runnerResetTest(p *testParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	respRss = respRunnerStatus{}
-	if err = json.Unmarshal(respBody, &respRss); err != nil {
+	if err = jsoniter.Unmarshal(respBody, &respRss); err != nil {
 		t.Fatalf("status unmarshal failed error is %v, respBody is %v", err, string(respBody))
 	}
 	rss = respRss.Data
@@ -644,7 +644,7 @@ func runnerStopStartTest(p *testParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	respRss := respRunnerStatus{}
-	if err = json.Unmarshal(respBody, &respRss); err != nil {
+	if err = jsoniter.Unmarshal(respBody, &respRss); err != nil {
 		t.Fatalf("status unmarshal failed error is %v, respBody is %v", err, string(respBody))
 	}
 	rss := respRss.Data
@@ -665,7 +665,7 @@ func runnerStopStartTest(p *testParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	respRss = respRunnerStatus{}
-	if err = json.Unmarshal(respBody, &respRss); err != nil {
+	if err = jsoniter.Unmarshal(respBody, &respRss); err != nil {
 		t.Fatalf("status unmarshal failed error is %v, respBody is %v", err, string(respBody))
 	}
 	rss = respRss.Data
@@ -688,7 +688,7 @@ func runnerStopStartTest(p *testParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	respRss = respRunnerStatus{}
-	if err = json.Unmarshal(respBody, &respRss); err != nil {
+	if err = jsoniter.Unmarshal(respBody, &respRss); err != nil {
 		t.Fatalf("status unmarshal failed error is %v, respBody is %v", err, string(respBody))
 	}
 	rss = respRss.Data
@@ -778,7 +778,7 @@ func runnerDataIntegrityTest(p *testParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	respRss := respRunnerStatus{}
-	if err = json.Unmarshal(respBody, &respRss); err != nil {
+	if err = jsoniter.Unmarshal(respBody, &respRss); err != nil {
 		t.Fatalf("status unmarshal failed error is %v, respBody is %v", err, string(respBody))
 	}
 	rss := respRss.Data
@@ -796,7 +796,7 @@ func runnerDataIntegrityTest(p *testParam) {
 		if c == io.EOF {
 			break
 		}
-		err = json.Unmarshal([]byte(str), &result)
+		err = jsoniter.Unmarshal([]byte(str), &result)
 		if err != nil {
 			log.Fatalf("Test_Run error unmarshal result curLine = %v %v", curLine, err)
 		}
@@ -830,7 +830,7 @@ func getErrorCodeTest(p *testParam) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, respCode)
 	respCodeMap := respErrorCode{}
-	err = json.Unmarshal(respBody, &respCodeMap)
+	err = jsoniter.Unmarshal(respBody, &respCodeMap)
 	assert.NoError(t, err)
 	codeMap := respCodeMap.Data
 	assert.Equal(t, len(utils.ErrorCodeHumanize), len(codeMap))
@@ -886,7 +886,7 @@ func getRunnersTest(p *testParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	var respRunner respRunnersNameList
-	err = json.Unmarshal(respBody, &respRunner)
+	err = jsoniter.Unmarshal(respBody, &respRunner)
 	assert.NoError(t, err)
 	runnerNameList := respRunner.Data
 	runnerExist := 0
@@ -909,7 +909,7 @@ func getRunnersTest(p *testParam) {
 	assert.Equal(t, http.StatusOK, respCode)
 
 	respRunner = respRunnersNameList{}
-	err = json.Unmarshal(respBody, &respRunner)
+	err = jsoniter.Unmarshal(respBody, &respRunner)
 	assert.NoError(t, err)
 	runnerNameList = respRunner.Data
 	runnerExist = 0
@@ -964,7 +964,7 @@ func senderRouterTest(p *testParam) {
 		t.Fatalf("get runner config failed, error is %v", err)
 	}
 	runnerConf := RunnerConfig{}
-	err = json.Unmarshal(runnerConfBytes, &runnerConf)
+	err = jsoniter.Unmarshal(runnerConfBytes, &runnerConf)
 	assert.NoError(t, err)
 	runnerConf.SenderConfig = []conf.MapConf{
 		conf.MapConf{
@@ -994,13 +994,13 @@ func senderRouterTest(p *testParam) {
 		},
 	}
 
-	runnerConfBytes, err = json.Marshal(runnerConf)
+	runnerConfBytes, err = jsoniter.Marshal(runnerConf)
 	assert.NoError(t, err)
 	url := "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConfBytes)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(6 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	f1, err := os.Open(resvPath1)
 	assert.NoError(t, err)
@@ -1013,7 +1013,7 @@ func senderRouterTest(p *testParam) {
 		if c == io.EOF {
 			break
 		}
-		err = json.Unmarshal([]byte(str), &result)
+		err = jsoniter.Unmarshal([]byte(str), &result)
 		if err != nil {
 			log.Fatalf("TestSenderRouter error unmarshal result curLine = %v %v", dataCnt, err)
 		}
@@ -1032,7 +1032,7 @@ func senderRouterTest(p *testParam) {
 		if c == io.EOF {
 			break
 		}
-		err = json.Unmarshal([]byte(str), &result)
+		err = jsoniter.Unmarshal([]byte(str), &result)
 		if err != nil {
 			log.Fatalf("TestSenderRouter error unmarshal result curLine = %v %v", dataCnt, err)
 		}
@@ -1051,7 +1051,7 @@ func senderRouterTest(p *testParam) {
 		if c == io.EOF {
 			break
 		}
-		err = json.Unmarshal([]byte(str), &result)
+		err = jsoniter.Unmarshal([]byte(str), &result)
 		if err != nil {
 			log.Fatalf("TestSenderRouter error unmarshal result curLine = %v %v", dataCnt, err)
 		}

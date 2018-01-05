@@ -6,7 +6,6 @@ import (
 	"compress/gzip"
 	"database/sql"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -21,6 +20,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -295,9 +295,17 @@ func GetExtraInfo() map[string]string {
 	return exInfo
 }
 
-func IsJSON(str string) bool {
-	var js json.RawMessage
-	return json.Unmarshal([]byte(str), &js) == nil
+func IsJsonString(s string) bool {
+	var x interface{}
+	if err := jsoniter.Unmarshal([]byte(s), &x); err != nil {
+		return false
+	}
+	switch x.(type) {
+	case []interface{}, map[string]interface{}:
+		return true
+	default:
+		return false
+	}
 }
 
 func ExtractField(slice []string) ([]string, error) {

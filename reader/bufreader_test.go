@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/qiniu/logkit/conf"
-
 	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/utils"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -68,6 +68,56 @@ func Test_BuffReader(t *testing.T) {
 	if len(rest) != 12 {
 		t.Errorf("rest should be 12, but got %v", len(rest))
 	}
+	r.Close()
+}
+
+func Test_Datasource(t *testing.T) {
+	testdir := "Test_Datasource1"
+	err := os.Mkdir(testdir, 0755)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	defer os.RemoveAll(testdir)
+
+	for _, f := range []string{"f1", "f2", "f3"} {
+		file, err := os.OpenFile(filepath.Join(testdir, f), os.O_CREATE|os.O_WRONLY, defaultFilePerm)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+
+		file.WriteString("1234567890\nabc123\n")
+		file.Close()
+	}
+	c := conf.MapConf{
+		"log_path":        testdir,
+		"mode":            DirMode,
+		"sync_every":      "1",
+		"ignore_hidden":   "true",
+		"reader_buf_size": "18",
+		"read_from":       "oldest",
+	}
+	isFromWeb := false
+	r, err := NewFileBufReader(c, isFromWeb)
+	if err != nil {
+		t.Error(err)
+	}
+	var rest []string
+	var datasources []string
+	for {
+		line, err := r.ReadLine()
+		if err == nil {
+			rest = append(rest, line)
+		} else {
+			break
+		}
+		datasources = append(datasources, filepath.Base(r.Source()))
+	}
+	if len(rest) != 6 {
+		t.Errorf("rest should be 6, but got %v", len(rest))
+	}
+	assert.Equal(t, []string{"f1", "f1", "f2", "f2", "f3", "f3"}, datasources)
 	r.Close()
 }
 

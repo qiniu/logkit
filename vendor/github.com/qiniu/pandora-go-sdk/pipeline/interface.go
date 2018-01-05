@@ -7,6 +7,8 @@ import (
 )
 
 type PipelineAPI interface {
+	InitOrUpdateWorkflow(input *InitOrUpdateWorkflowInput) error
+
 	AutoExportToLogDB(*AutoExportToLogDBInput) error
 
 	AutoExportToKODO(*AutoExportToKODOInput) error

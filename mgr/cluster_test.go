@@ -2,7 +2,6 @@ package mgr
 
 import (
 	"bufio"
-	"encoding/json"
 	"io"
 	"net/http"
 	"os"
@@ -11,7 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"encoding/json"
+
+	"github.com/json-iterator/go"
 	"github.com/labstack/echo"
+	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
 	"github.com/stretchr/testify/assert"
 )
@@ -190,7 +193,7 @@ func clusterUpdateTest(p *testCluParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	var respGotStatus respClusterStatus
-	err = json.Unmarshal(respBody, &respGotStatus)
+	err = jsoniter.Unmarshal(respBody, &respGotStatus)
 	assert.NoError(t, err, string(respBody))
 	gotStatus := respGotStatus.Data
 
@@ -259,7 +262,7 @@ func clusterUpdateTest(p *testCluParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	respGotStatus = respClusterStatus{}
-	err = json.Unmarshal(respBody, &respGotStatus)
+	err = jsoniter.Unmarshal(respBody, &respGotStatus)
 	assert.NoError(t, err, string(respBody))
 	gotStatus = respGotStatus.Data
 
@@ -323,7 +326,7 @@ func clusterStartStopTest(p *testCluParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	var respGotStatus respClusterStatus
-	err = json.Unmarshal(respBody, &respGotStatus)
+	err = jsoniter.Unmarshal(respBody, &respGotStatus)
 	assert.NoError(t, err, string(respBody))
 	gotStatus := respGotStatus.Data
 
@@ -379,7 +382,7 @@ func clusterStartStopTest(p *testCluParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	respGotStatus = respClusterStatus{}
-	err = json.Unmarshal(respBody, &respGotStatus)
+	err = jsoniter.Unmarshal(respBody, &respGotStatus)
 	assert.NoError(t, err, string(respBody))
 	gotStatus = respGotStatus.Data
 
@@ -437,7 +440,7 @@ func clusterStartStopTest(p *testCluParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	respGotStatus = respClusterStatus{}
-	err = json.Unmarshal(respBody, &respGotStatus)
+	err = jsoniter.Unmarshal(respBody, &respGotStatus)
 	assert.NoError(t, err, string(respBody))
 	gotStatus = respGotStatus.Data
 
@@ -477,7 +480,7 @@ func clusterStartStopTest(p *testCluParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	respGotStatus = respClusterStatus{}
-	err = json.Unmarshal(respBody, &respGotStatus)
+	err = jsoniter.Unmarshal(respBody, &respGotStatus)
 	assert.NoError(t, err, string(respBody))
 	gotStatus = respGotStatus.Data
 
@@ -536,7 +539,7 @@ func clusterStartStopTest(p *testCluParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	respGotStatus = respClusterStatus{}
-	err = json.Unmarshal(respBody, &respGotStatus)
+	err = jsoniter.Unmarshal(respBody, &respGotStatus)
 	assert.NoError(t, err, string(respBody))
 	gotStatus = respGotStatus.Data
 
@@ -596,7 +599,7 @@ func clusterResetDeleteTest(p *testCluParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(6 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	// 读取日志发送目的文件，记录日志条数
 	dataLine := 0
@@ -617,7 +620,7 @@ func clusterResetDeleteTest(p *testCluParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(10 * time.Second)
+	time.Sleep(15 * time.Second)
 
 	// 重置之后, 日志发送目的文件中的日志条数应该增加
 	dataLine1 := 0
@@ -647,7 +650,7 @@ func clusterResetDeleteTest(p *testCluParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	respGotStatus := respClusterStatus{}
-	err = json.Unmarshal(respBody, &respGotStatus)
+	err = jsoniter.Unmarshal(respBody, &respGotStatus)
 	assert.NoError(t, err, string(respBody))
 	gotStatus := respGotStatus.Data
 
@@ -673,7 +676,7 @@ func clusterResetDeleteTest(p *testCluParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	respGotStatus = respClusterStatus{}
-	err = json.Unmarshal(respBody, &respGotStatus)
+	err = jsoniter.Unmarshal(respBody, &respGotStatus)
 	assert.NoError(t, err, string(respBody))
 	gotStatus = respGotStatus.Data
 
@@ -723,12 +726,13 @@ func clusterSalveConfigsTest(p *testCluParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	respGotConfigs := respSlaveConfig{}
-	err = json.Unmarshal(respBody, &respGotConfigs)
+	err = jsoniter.Unmarshal(respBody, &respGotConfigs)
+
 	assert.NoError(t, err, string(respBody))
 	gotConfigs := respGotConfigs.Data
 
 	rc := RunnerConfig{}
-	err = json.Unmarshal([]byte(runnerConf), &rc)
+	err = jsoniter.Unmarshal(runnerConf, &rc)
 	assert.NoError(t, err)
 
 	sc, ok := gotConfigs[rs[1].cluster.Address]
@@ -755,7 +759,7 @@ func clusterSalveConfigsTest(p *testCluParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	respGotConfigs = respSlaveConfig{}
-	err = json.Unmarshal(respBody, &respGotConfigs)
+	err = jsoniter.Unmarshal(respBody, &respGotConfigs)
 	assert.NoError(t, err, string(respBody))
 	gotConfigs = respGotConfigs.Data
 	assert.Equal(t, logkitCount-1, len(gotConfigs))
@@ -766,12 +770,12 @@ func clusterSalveConfigsTest(p *testCluParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	respGotConfigs = respSlaveConfig{}
-	err = json.Unmarshal(respBody, &respGotConfigs)
+	err = jsoniter.Unmarshal(respBody, &respGotConfigs)
 	assert.NoError(t, err, string(respBody))
 	gotConfigs = respGotConfigs.Data
 
 	rc = RunnerConfig{}
-	err = json.Unmarshal([]byte(runnerConf), &rc)
+	err = jsoniter.Unmarshal([]byte(runnerConf), &rc)
 	assert.NoError(t, err)
 
 	sc, ok = gotConfigs[rs[3].cluster.Address]
@@ -801,7 +805,7 @@ func changeTagsTest(p *testCluParam) {
 
 	// 测试通过 master 改变 slave tag
 	req := TagReq{Tag: "test-test"}
-	marshaled, err := json.Marshal(req)
+	marshaled, err := jsoniter.Marshal(req)
 	assert.NoError(t, err)
 	url := rs[0].cluster.Address + "/logkit/cluster/slaves/tag?tag=" + rs[1].cluster.Tag
 	respCode, respBody, err := makeRequest(url, http.MethodPost, marshaled)
@@ -818,7 +822,7 @@ func changeTagsTest(p *testCluParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	var respGetSlaves respSlave
-	err = json.Unmarshal(respBody, &respGetSlaves)
+	err = jsoniter.Unmarshal(respBody, &respGetSlaves)
 	assert.NoError(t, err)
 	getSlaves := respGetSlaves.Data
 	for i, _ := range getSlaves {
@@ -840,7 +844,7 @@ func changeTagsTest(p *testCluParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	respGetSlaves = respSlave{}
-	err = json.Unmarshal(respBody, &respGetSlaves)
+	err = jsoniter.Unmarshal(respBody, &respGetSlaves)
 	assert.NoError(t, err)
 	getSlaves = respGetSlaves.Data
 	for i := range getSlaves {
@@ -873,7 +877,7 @@ func clusterSlavesDeleteTest(p *testCluParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	var respGetSlaves respSlave
-	err = json.Unmarshal(respBody, &respGetSlaves)
+	err = jsoniter.Unmarshal(respBody, &respGetSlaves)
 	assert.NoError(t, err)
 	getSlaves := respGetSlaves.Data
 	for i, _ := range getSlaves {
@@ -903,7 +907,7 @@ func clusterSlavesDeleteTest(p *testCluParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	respGetSlaves = respSlave{}
-	err = json.Unmarshal(respBody, &respGetSlaves)
+	err = jsoniter.Unmarshal(respBody, &respGetSlaves)
 	assert.NoError(t, err)
 	getSlaves = respGetSlaves.Data
 	for i := range getSlaves {
@@ -952,7 +956,7 @@ func getSlavesRunnerTest(p *testCluParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	var respRss respRunnersNameList
-	err = json.Unmarshal(respBody, &respRss)
+	err = jsoniter.Unmarshal(respBody, &respRss)
 	assert.NoError(t, err, string(respBody))
 	nameList := respRss.Data
 	isExist := false
@@ -969,7 +973,7 @@ func getSlavesRunnerTest(p *testCluParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	respRss = respRunnersNameList{}
-	err = json.Unmarshal(respBody, &respRss)
+	err = jsoniter.Unmarshal(respBody, &respRss)
 	assert.NoError(t, err, string(respBody))
 	nameList = respRss.Data
 	isExist = false
@@ -1021,13 +1025,13 @@ func getSlaveConfigTest(p *testCluParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	var respRss respRunnerConfig
-	err = json.Unmarshal(respBody, &respRss)
+	err = jsoniter.Unmarshal(respBody, &respRss)
 	assert.NoError(t, err, string(respBody))
 	respConfig := respRss.Data
 	respConfig.CreateTime = ""
 
 	expConfig := RunnerConfig{}
-	err = json.Unmarshal([]byte(runnerConf), &expConfig)
+	err = jsoniter.Unmarshal([]byte(runnerConf), &expConfig)
 	assert.NoError(t, err, runnerConf)
 
 	expConfig.ReaderConfig["name"] = runnerName
@@ -1043,4 +1047,51 @@ func getSlaveConfigTest(p *testCluParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodGet, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.NotEqual(t, http.StatusOK, respCode)
+}
+
+func TestJsoniterMashalUnmashal(t *testing.T) {
+	runnerConf := RunnerConfig{
+		RunnerInfo: RunnerInfo{
+			RunnerName:       "xxx",
+			MaxBatchLen:      1,
+			MaxBatchSize:     200,
+			CollectInterval:  1,
+			MaxBatchInteval:  1,
+			MaxBatchTryTimes: 3,
+		},
+		ReaderConfig: conf.MapConf{
+			"log_path":      "sx",
+			"meta_path":     "/xs/xs",
+			"mode":          "dir",
+			"read_from":     "oldest",
+			"ignore_hidden": "true",
+		},
+		ParserConf: conf.MapConf{
+			"type": "json",
+			"name": "json_parser",
+		},
+		SenderConfig: []conf.MapConf{{
+			"name":           "file_sender",
+			"sender_type":    "file",
+			"file_send_path": "/xsxs",
+		}},
+	}
+	bt, err := jsoniter.Marshal(runnerConf)
+	assert.NoError(t, err)
+	var rc RunnerConfig
+	err = jsoniter.Unmarshal(bt, &rc)
+	assert.NoError(t, err)
+	assert.Equal(t, runnerConf, rc)
+	assert.Equal(t, "/xsxs", rc.SenderConfig[0]["file_send_path"])
+}
+
+func TestJsoniter(t *testing.T) {
+	respGotConfigs1, respGotConfigs2 := respSlaveConfig{}, respSlaveConfig{}
+	var teststring = `{"code":"L200","data":{"http://192.168.0.106:6202":{"configs":{"/Users/sunjianbo/gopath/src/github.com/qiniu/logkit/mgr/testClusterRest/slave1/confs/clusterSalveConfigsTest.conf":{"name":"clusterSalveConfigsTest","collect_interval":1,"batch_len":1,"batch_size":200,"batch_interval":1,"batch_try_times":3,"createtime":"2018-01-03T22:25:36.497442704+08:00","reader":{"ignore_hidden":"true","log_path":"/Users/sunjianbo/gopath/src/github.com/qiniu/logkit/mgr/testClusterRest/clusterSalveConfigsTestDir/logdir","meta_path":"/Users/sunjianbo/gopath/src/github.com/qiniu/logkit/mgr/testClusterRest/clusterSalveConfigsTestDir/meta","mode":"dir","name":"clusterSalveConfigsTest","read_from":"oldest","runner_name":"clusterSalveConfigsTest"},"parser":{"name":"json_parser","runner_name":"clusterSalveConfigsTest","type":"json"},"senders":[{"file_send_path":"/Users/sunjianbo/gopath/src/github.com/qiniu/logkit/mgr/testClusterRest/clusterSalveConfigsTestDir/sender/sendData","name":"file_sender","runner_name":"clusterSalveConfigsTest","sender_type":"file"}],"router":{"router_key_name":"","router_match_type":"","router_default_sender":0,"router_routes":null},"web_folder":true}},"tag":"test","error":null},"http://192.168.0.106:6203":{"configs":{"/Users/sunjianbo/gopath/src/github.com/qiniu/logkit/mgr/testClusterRest/slave2/confs/clusterSalveConfigsTest.conf":{"name":"clusterSalveConfigsTest","collect_interval":1,"batch_len":1,"batch_size":200,"batch_interval":1,"batch_try_times":3,"createtime":"2018-01-03T22:25:36.497453622+08:00","reader":{"ignore_hidden":"true","log_path":"/Users/sunjianbo/gopath/src/github.com/qiniu/logkit/mgr/testClusterRest/clusterSalveConfigsTestDir/logdir","meta_path":"/Users/sunjianbo/gopath/src/github.com/qiniu/logkit/mgr/testClusterRest/clusterSalveConfigsTestDir/meta","mode":"dir","name":"clusterSalveConfigsTest","read_from":"oldest","runner_name":"clusterSalveConfigsTest"},"parser":{"name":"json_parser","runner_name":"clusterSalveConfigsTest","type":"json"},"senders":[{"file_send_path":"/Users/sunjianbo/gopath/src/github.com/qiniu/logkit/mgr/testClusterRest/clusterSalveConfigsTestDir/sender/sendData","name":"file_sender","runner_name":"clusterSalveConfigsTest","sender_type":"file"}],"router":{"router_key_name":"","router_match_type":"","router_default_sender":0,"router_routes":null},"web_folder":true}},"tag":"test","error":null}}}`
+	err := json.Unmarshal([]byte(teststring), &respGotConfigs1)
+	assert.NoError(t, err)
+	stjson := jsoniter.ConfigCompatibleWithStandardLibrary
+	err = stjson.Unmarshal([]byte(teststring), &respGotConfigs2)
+	assert.NoError(t, err)
+	assert.Equal(t, respGotConfigs1, respGotConfigs2)
 }

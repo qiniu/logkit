@@ -182,9 +182,17 @@ func TestIsJsonString(t *testing.T) {
 			` `,
 			false,
 		},
+		{
+			`null`,
+			false,
+		},
+		{
+			`{"a": null}`,
+			true,
+		},
 	}
 	for _, c := range cases {
-		got := IsJSON(c.c)
+		got := IsJsonString(c.c)
 		assert.Equal(t, c.exp, got)
 	}
 }

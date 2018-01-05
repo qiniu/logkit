@@ -1,7 +1,6 @@
 package reader
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/utils"
 )
@@ -99,8 +99,8 @@ func (ar *ActiveReader) Run() {
 	var err error
 	timer := time.NewTicker(time.Second)
 	for {
-		if atomic.LoadInt32(&ar.status) == StatusStopped || atomic.LoadInt32(&ar.status) == StatusStoping {
-			atomic.CompareAndSwapInt32(&ar.status, StatusStoping, StatusStopped)
+		if atomic.LoadInt32(&ar.status) == StatusStopped || atomic.LoadInt32(&ar.status) == StatusStopping {
+			atomic.CompareAndSwapInt32(&ar.status, StatusStopping, StatusStopped)
 			log.Warnf("Runner[%v] ActiveReader %s was stopped", ar.runnerName, ar.originpath)
 			return
 		}
@@ -135,9 +135,9 @@ func (ar *ActiveReader) Run() {
 
 			atomic.StoreInt32(&ar.inactive, 0)
 			//做这一层结构为了快速结束
-			if atomic.LoadInt32(&ar.status) == StatusStopped || atomic.LoadInt32(&ar.status) == StatusStoping {
+			if atomic.LoadInt32(&ar.status) == StatusStopped || atomic.LoadInt32(&ar.status) == StatusStopping {
 				log.Debugf("Runner[%v] %v ActiveReader was stopped when waiting to send data", ar.runnerName, ar.originpath)
-				atomic.CompareAndSwapInt32(&ar.status, StatusStoping, StatusStopped)
+				atomic.CompareAndSwapInt32(&ar.status, StatusStopping, StatusStopped)
 				return
 			}
 			select {
@@ -154,7 +154,7 @@ func (ar *ActiveReader) Close() error {
 	defer log.Warnf("Runner[%v] ActiveReader %s was closed", ar.runnerName, ar.originpath)
 	err := ar.br.Close()
 
-	if atomic.CompareAndSwapInt32(&ar.status, StatusRunning, StatusStoping) {
+	if atomic.CompareAndSwapInt32(&ar.status, StatusRunning, StatusStopping) {
 		log.Warnf("Runner[%v] ActiveReader %s was closing", ar.runnerName, ar.originpath)
 	} else {
 		return err
@@ -256,7 +256,7 @@ func NewMultiReader(meta *Meta, logPathPattern, whence, expireDur, statIntervalD
 				log.Warnf("Runner[%v] %v read buf error %v, ignore...", mr.meta.RunnerName, mr.Name(), err)
 			}
 		} else {
-			err = json.Unmarshal(buf, &mr.cacheMap)
+			err = jsoniter.Unmarshal(buf, &mr.cacheMap)
 			if err != nil {
 				log.Warnf("Runner[%v] %v Unmarshal read buf error %v, ignore...", mr.meta.RunnerName, mr.Name(), err)
 			}
@@ -483,7 +483,7 @@ func (mr *MultiReader) SyncMeta() {
 		mr.armapmux.Unlock()
 	}
 	mr.armapmux.Lock()
-	buf, err := json.Marshal(mr.cacheMap)
+	buf, err := jsoniter.Marshal(mr.cacheMap)
 	mr.armapmux.Unlock()
 	if err != nil {
 		log.Errorf("%v sync meta error %v, cacheMap %v", mr.Name(), err, mr.cacheMap)

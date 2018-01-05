@@ -167,10 +167,10 @@ func validateJobexportName(e string) error {
 func validateWorkflowName(r string) error {
 	matched, err := regexp.MatchString(workflowNamePattern, r)
 	if err != nil {
-		return reqerr.NewInvalidArgs("WorkflowName", err.Error())
+		return reqerr.NewInvalidArgs("Workflow", err.Error())
 	}
 	if !matched {
-		return reqerr.NewInvalidArgs("WorkflowName", fmt.Sprintf("invalid workflow name: %s", r))
+		return reqerr.NewInvalidArgs("Workflow", fmt.Sprintf("invalid workflow name: %s", r))
 	}
 	return nil
 }
@@ -590,12 +590,18 @@ type AutoExportToKODOInput struct {
 	Retention  int //数字，单位为天
 }
 
+type AnalyzerInfo struct {
+	Default  string
+	Analyzer map[string]string
+}
+
 type AutoExportToLogDBInput struct {
 	RepoName    string
 	LogRepoName string
 	Retention   string
 	OmitInvalid bool
 	OmitEmpty   bool
+	AnalyzerInfo
 }
 
 type CreateRepoForLogDBInput struct {
@@ -606,6 +612,7 @@ type CreateRepoForLogDBInput struct {
 	Retention   string
 	OmitInvalid bool
 	OmitEmpty   bool
+	AnalyzerInfo
 }
 
 type CreateRepoForLogDBDSLInput struct {
@@ -735,6 +742,7 @@ func (r *CreateRepoInput) Validate() (err error) {
 type UpdateRepoInput struct {
 	PipelineToken
 	RepoName    string
+	workflow    string
 	Schema      []RepoSchemaEntry `json:"schema"`
 	Option      *SchemaFreeOption
 	RepoOptions *RepoOptions `json:"options"`
@@ -914,11 +922,23 @@ type PostDataInput struct {
 
 type SchemaFreeInput struct {
 	PipelineToken
-	RepoName    string
-	Datas       Datas
-	NoUpdate    bool
-	Option      *SchemaFreeOption
-	RepoOptions *RepoOptions
+	Datas        Datas
+	NoUpdate     bool
+	Region       string
+	RepoName     string
+	WorkflowName string
+	Option       *SchemaFreeOption
+	RepoOptions  *RepoOptions
+}
+
+type InitOrUpdateWorkflowInput struct {
+	SchemaFree   bool
+	Region       string
+	RepoName     string
+	WorkflowName string
+	RepoOptions  *RepoOptions
+	Schema       []RepoSchemaEntry
+	Option       *SchemaFreeOption
 }
 
 type SchemaFreeOption struct {
@@ -1973,23 +1993,20 @@ type DeleteJobExportInput struct {
 
 type UploadUdfInput struct {
 	PipelineToken
-	ResourceOwner string
-	UdfName       string
-	Buffer        *bytes.Buffer
+	UdfName string
+	Buffer  *bytes.Buffer
 }
 
 type UploadUdfFromFileInput struct {
 	PipelineToken
-	ResourceOwner string
-	UdfName       string
-	FilePath      string
+	UdfName  string
+	FilePath string
 }
 
 type PutUdfMetaInput struct {
 	PipelineToken
-	ResourceOwner string `json:"-"`
-	UdfName       string `json:"-"`
-	Description   string `json:"description"`
+	UdfName     string `json:"-"`
+	Description string `json:"description"`
 }
 
 const MaxDescriptionLen = 1500
@@ -2003,8 +2020,7 @@ func (e *PutUdfMetaInput) Validate() error {
 
 type DeleteUdfInfoInput struct {
 	PipelineToken
-	ResourceOwner string
-	UdfName       string
+	UdfName string
 }
 
 type PageRequest struct {
@@ -2031,7 +2047,6 @@ type ListUdfsOutput struct {
 
 type RegisterUdfFunctionInput struct {
 	PipelineToken
-	ResourceOwner   string `json:"-"`
 	FuncName        string `json:"-"`
 	JarName         string `json:"jarName"`
 	ClassName       string `json:"className"`
@@ -2051,8 +2066,7 @@ func (e *RegisterUdfFunctionInput) Validate() error {
 
 type DeregisterUdfFunctionInput struct {
 	PipelineToken
-	ResourceOwner string
-	FuncName      string
+	FuncName string
 }
 
 type ListUdfFunctionsInput struct {
@@ -2078,8 +2092,7 @@ type ListUdfFunctionsOutput struct {
 type ListBuiltinUdfFunctionsInput struct {
 	PipelineToken
 	PageRequest
-	ResourceOwner string
-	Categories    []string
+	Categories []string
 }
 
 type ListUdfBuiltinFunctionsOutput struct {

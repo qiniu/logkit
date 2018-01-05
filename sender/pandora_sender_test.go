@@ -17,12 +17,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/json-iterator/go"
 	"github.com/labstack/echo"
 	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/cli"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
-	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 	"github.com/stretchr/testify/assert"
 )
@@ -31,6 +32,7 @@ type mock_pandora struct {
 	Prefix      string
 	Port        string
 	Body        string
+	BodyMux     *sync.RWMutex
 	Schemas     []pipeline.RepoSchemaEntry
 	GetRepoErr  bool
 	PostSleep   int
@@ -40,7 +42,7 @@ type mock_pandora struct {
 
 //NewMockPandoraWithPrefix 测试的mock pandora server
 func NewMockPandoraWithPrefix(prefix string) (*mock_pandora, string) {
-	pandora := &mock_pandora{Prefix: prefix, SetMux: sync.Mutex{}}
+	pandora := &mock_pandora{Prefix: prefix, SetMux: sync.Mutex{}, BodyMux: new(sync.RWMutex)}
 
 	mux := echo.New()
 	mux.GET(prefix+"/ping", pandora.GetPing())
@@ -141,13 +143,18 @@ func (s *mock_pandora) PostRepos_Data() echo.HandlerFunc {
 			log.Println("post repo readall error")
 			return c.NoContent(http.StatusInternalServerError)
 		}
-		s.Body = string(bytesx)
-		sep := strings.Fields(s.Body)
+		sep := strings.Fields(string(bytesx))
 		sort.Strings(sep)
+		s.BodyMux.Lock()
+		defer s.BodyMux.Unlock()
 		s.Body = strings.Join(sep, " ")
 		log.Println("get datas: ", s.Body)
 		if strings.Contains(s.Body, "E18111") {
 			return c.JSON(http.StatusNotFound, utils.NewErrorResponse(errors.New("E18111 mock_pandora error")))
+		} else if strings.Contains(s.Body, "typeBinaryUnpack") && !strings.Contains(s.Body, KeyPandoraStash) {
+			c.Response().Header().Set(cli.ContentType, cli.ApplicationJson)
+			c.Response().WriteHeader(http.StatusBadRequest)
+			return jsoniter.NewEncoder(c.Response()).Encode(map[string]string{"error": "E18111 mock_pandora error"})
 		}
 		s.PostDataNum++
 		return nil
@@ -197,7 +204,6 @@ func (s *mock_pandora) LetGetRepoError(f bool) {
 
 func TestPandoraSender(t *testing.T) {
 	pandora, pt := NewMockPandoraWithPrefix("/v2")
-	pandora.LetGetRepoError(true)
 	opt := &PandoraOption{
 		name:               "p",
 		repoName:           "TestPandoraSender",
@@ -224,20 +230,6 @@ func TestPandoraSender(t *testing.T) {
 	d["ac"] = 2
 	d["d"] = 14773736325048765
 	err = s.Send([]Data{d})
-	if err == nil {
-		t.Error(fmt.Errorf("should get as send LetGetRepoError error but nil"))
-	}
-	sts, ok := err.(*utils.StatsError)
-	if !ok {
-		t.Error("should pasred as State Error")
-	}
-	err = sts.ErrorDetail
-	se, ok := err.(*reqerr.SendError)
-	if !ok {
-		t.Error("should pasred as Send Error")
-	}
-	pandora.LetGetRepoError(false)
-	err = s.Send(ConvertDatas(se.GetFailDatas()))
 	if st, ok := err.(*utils.StatsError); ok {
 		err = st.ErrorDetail
 	}
@@ -292,7 +284,7 @@ func TestPandoraSender(t *testing.T) {
 	dataJson := `{"ab":"REQ","ac":200,"d":14774559431867215}`
 
 	d = Data{}
-	jsonDecoder := json.NewDecoder(bytes.NewReader([]byte(dataJson)))
+	jsonDecoder := jsoniter.NewDecoder(bytes.NewReader([]byte(dataJson)))
 	jsonDecoder.UseNumber()
 	err = jsonDecoder.Decode(&d)
 	if err != nil {

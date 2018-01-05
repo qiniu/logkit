@@ -1,7 +1,6 @@
 package reader
 
 import (
-	"encoding/json"
 	"errors"
 	"sync"
 	"sync/atomic"
@@ -11,6 +10,7 @@ import (
 
 	"strings"
 
+	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
 	"github.com/robfig/cron"
 	"gopkg.in/mgo.v2"
@@ -89,7 +89,7 @@ func NewMongoReader(meta *Meta, readBatch int, host, database, collection, offse
 	}
 
 	if filters != "" {
-		if jerr := json.Unmarshal([]byte(filters), &mr.collectionFilters); jerr != nil {
+		if jerr := jsoniter.Unmarshal([]byte(filters), &mr.collectionFilters); jerr != nil {
 			err = errors.New("malformed collection_filters")
 			return
 		}
@@ -141,7 +141,7 @@ func (mr *MongoReader) Close() (err error) {
 	if mr.session != nil {
 		mr.session.Close()
 	}
-	if atomic.CompareAndSwapInt32(&mr.status, StatusRunning, StatusStoping) {
+	if atomic.CompareAndSwapInt32(&mr.status, StatusRunning, StatusStopping) {
 		log.Infof("Runner[%v] %v stopping", mr.meta.RunnerName, mr.Name())
 	} else {
 		close(mr.readChan)
@@ -170,7 +170,7 @@ func (mr *MongoReader) Start() {
 
 func (mr *MongoReader) LoopRun() {
 	for {
-		if atomic.LoadInt32(&mr.status) == StatusStoping {
+		if atomic.LoadInt32(&mr.status) == StatusStopping {
 			log.Warnf("Runner[%v] %v stopped from running", mr.meta.RunnerName, mr.Name())
 			return
 		}
@@ -208,7 +208,7 @@ func (mr *MongoReader) run() {
 	// stopping时推出改为 stopped，不再运行
 	defer func() {
 		atomic.CompareAndSwapInt32(&mr.status, StatusRunning, StatusInit)
-		if atomic.CompareAndSwapInt32(&mr.status, StatusStoping, StatusStopped) {
+		if atomic.CompareAndSwapInt32(&mr.status, StatusStopping, StatusStopped) {
 			close(mr.readChan)
 		}
 		if err == nil {
@@ -218,7 +218,7 @@ func (mr *MongoReader) run() {
 
 	// 开始work逻辑
 	for {
-		if atomic.LoadInt32(&mr.status) == StatusStoping {
+		if atomic.LoadInt32(&mr.status) == StatusStopping {
 			log.Warnf("Runner[%v] %v stopped from running", mr.meta.RunnerName, mr.Name())
 			return
 		}
@@ -267,14 +267,14 @@ func (mr *MongoReader) exec() (err error) {
 
 	var result bson.M
 	for iter.Next(&result) {
-		if atomic.LoadInt32(&mr.status) == StatusStoping {
+		if atomic.LoadInt32(&mr.status) == StatusStopping {
 			log.Warnf("Runner[%v] %v stopped from running", mr.meta.RunnerName, mr.Name())
 			return nil
 		}
 		if id, ok := result[mr.offsetkey]; ok {
 			mr.offset = id
 		}
-		bytes, ierr := json.Marshal(result)
+		bytes, ierr := jsoniter.Marshal(result)
 		if ierr != nil {
 			log.Errorf("Runner[%v] %v json marshal inner error %v", mr.meta.RunnerName, result, ierr)
 		}

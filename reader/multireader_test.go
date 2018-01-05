@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/utils"
 
 	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/utils"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -2,27 +2,25 @@ package reader
 
 import (
 	"database/sql"
-	"encoding/json"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/qiniu/log"
-	"github.com/robfig/cron"
-
-	"reflect"
-
-	"encoding/binary"
+	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/utils"
 
 	_ "github.com/denisenkom/go-mssqldb" //mssql 驱动
 	_ "github.com/go-sql-driver/mysql"   //mysql 驱动
-	_ "github.com/lib/pq"                //postgres 驱动
-	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
+	"github.com/json-iterator/go"
+	_ "github.com/lib/pq" //postgres 驱动
+	"github.com/qiniu/log"
+	"github.com/robfig/cron"
 )
 
 const (
@@ -63,7 +61,7 @@ type SqlReader struct {
 const (
 	StatusInit int32 = iota
 	StatusStopped
-	StatusStoping
+	StatusStopping
 	StatusRunning
 )
 
@@ -352,7 +350,7 @@ func (mr *SqlReader) Source() string {
 
 func (mr *SqlReader) Close() (err error) {
 	mr.Cron.Stop()
-	if atomic.CompareAndSwapInt32(&mr.status, StatusRunning, StatusStoping) {
+	if atomic.CompareAndSwapInt32(&mr.status, StatusRunning, StatusStopping) {
 		log.Infof("Runner[%v] %v stopping", mr.meta.RunnerName, mr.Name())
 	} else {
 		close(mr.readChan)
@@ -448,7 +446,7 @@ func (mr *SqlReader) run() {
 	// stopping时推出改为 stopped，不再运行
 	defer func() {
 		atomic.CompareAndSwapInt32(&mr.status, StatusRunning, StatusInit)
-		if atomic.CompareAndSwapInt32(&mr.status, StatusStoping, StatusStopped) {
+		if atomic.CompareAndSwapInt32(&mr.status, StatusStopping, StatusStopped) {
 			close(mr.readChan)
 		}
 		if err == nil {
@@ -478,7 +476,7 @@ func (mr *SqlReader) run() {
 	}
 	// 开始work逻辑
 	for {
-		if atomic.LoadInt32(&mr.status) == StatusStoping {
+		if atomic.LoadInt32(&mr.status) == StatusStopping {
 			log.Warnf("Runner[%v] %v stopped from running", mr.meta.RunnerName, mr.Name())
 			return
 		}
@@ -689,12 +687,12 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 						}
 					}
 				}
-				ret, err := json.Marshal(data)
+				ret, err := jsoniter.Marshal(data)
 				if err != nil {
 					log.Errorf("Runner[%v] %v unmarshal sql data error %v", mr.meta.RunnerName, mr.Name(), err)
 					continue
 				}
-				if atomic.LoadInt32(&mr.status) == StatusStoping {
+				if atomic.LoadInt32(&mr.status) == StatusStopping {
 					log.Warnf("Runner[%v] %v stopped from running", mr.meta.RunnerName, mr.Name())
 					return nil
 				}

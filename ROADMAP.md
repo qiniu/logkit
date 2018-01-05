@@ -7,10 +7,8 @@
 1. 分布式部署logkit runner
 1. 使用sqlite数据库管理 logkit meta 信息
 1. 更多需要的Transformer
-1. 支持 http sender
-1. 支持http reader
+1. 更多metric支持
 
 # 1.5.X
 
-1. logkit Route 功能，根据匹配导向不同的sender
 1. 其他issue列表的feature requst

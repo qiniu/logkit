@@ -11,6 +11,7 @@ var ModeUsages = []utils.KeyValue{
 	{TypeDiscard, "消费数据但不发送"},
 	{TypeElastic, "发送到Elasticsearch"},
 	{TypeKafka, "发送到Kafka"},
+	{TypeHttp, "通过 Http Post 发送"},
 }
 
 var (
@@ -81,6 +82,14 @@ var ModeKeyOptions = map[string][]utils.Option{
 		},
 	},
 	TypePandora: {
+		{
+			KeyName:      KeyPandoraWorkflowName,
+			ChooseOnly:   false,
+			Default:      "logkit_default_workflow",
+			DefaultNoUse: true,
+			Description:  "Pandora workflow名称(为空则使用旧版)(pandora_workflow_name)",
+			CheckRegex:   "^[a-zA-Z_][a-zA-Z0-9_]{0,127}$",
+		},
 		{
 			KeyName:      KeyPandoraRepoName,
 			ChooseOnly:   false,
@@ -566,6 +575,38 @@ var ModeKeyOptions = map[string][]utils.Option{
 		OptionFtProcs,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
+	},
+	TypeHttp: {
+		{
+			KeyName:      KeyHttpSenderUrl,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: true,
+			Description:  "发送目的url(http_sender_url)",
+		},
+		{
+			KeyName:       KeyHttpSenderProtocol,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"json", "csv"},
+			Default:       "json",
+			DefaultNoUse:  true,
+			Description:   "发送数据时使用的格式(http_sender_protocol)",
+		},
+		{
+			KeyName:      KeyHttpSenderCsvSplit,
+			ChooseOnly:   false,
+			Default:      "\t",
+			DefaultNoUse: true,
+			Description:  "csv分隔符(http_sender_csv_split)",
+		},
+		{
+			KeyName:       KeyHttpSenderGzip,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"true", "false"},
+			Default:       "true",
+			DefaultNoUse:  true,
+			Description:   "是否启用gzip(http_sender_gzip)",
+		},
 	},
 }
 

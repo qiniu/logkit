@@ -69,7 +69,7 @@ func (ssr *streamSocketReader) listen() {
 	ssr.connections = map[string]net.Conn{}
 
 	defer func() {
-		if atomic.CompareAndSwapInt32(&ssr.status, StatusStoping, StatusStopped) {
+		if atomic.CompareAndSwapInt32(&ssr.status, StatusStopping, StatusStopped) {
 			close(ssr.ReadChan)
 		}
 	}()
@@ -160,7 +160,7 @@ func (psr *packetSocketReader) listen() {
 	buf := make([]byte, 64*1024) // 64kb - maximum size of IP packet
 
 	defer func() {
-		if atomic.CompareAndSwapInt32(&psr.status, StatusStoping, StatusStopped) {
+		if atomic.CompareAndSwapInt32(&psr.status, StatusStopping, StatusStopped) {
 			close(psr.ReadChan)
 		}
 	}()
@@ -297,7 +297,7 @@ func (sr *SocketReader) Start() error {
 }
 
 func (sr *SocketReader) Close() (err error) {
-	if atomic.CompareAndSwapInt32(&sr.status, StatusRunning, StatusStoping) {
+	if atomic.CompareAndSwapInt32(&sr.status, StatusRunning, StatusStopping) {
 		log.Infof("Runner[%v] Reader[%v] stopping", sr.meta.RunnerName, sr.Name())
 	} else {
 		close(sr.ReadChan)

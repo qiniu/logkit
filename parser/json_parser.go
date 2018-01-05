@@ -1,19 +1,20 @@
 package parser
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 
-	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/utils"
+
+	"github.com/json-iterator/go"
+	"github.com/qiniu/log"
 )
 
 type JsonParser struct {
-	name   string
-	labels []Label
+	name     string
+	labels   []Label
+	jsontool jsoniter.API
 }
 
 func NewJsonParser(c conf.MapConf) (LogParser, error) {
@@ -21,10 +22,15 @@ func NewJsonParser(c conf.MapConf) (LogParser, error) {
 	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
 	nameMap := map[string]struct{}{}
 	labels := GetLabels(labelList, nameMap)
+	jsontool := jsoniter.Config{
+		EscapeHTML: true,
+		UseNumber:  true,
+	}.Froze()
 
 	return &JsonParser{
-		name:   name,
-		labels: labels,
+		name:     name,
+		labels:   labels,
+		jsontool: jsontool,
 	}, nil
 }
 
@@ -55,9 +61,7 @@ func (im *JsonParser) Parse(lines []string) ([]sender.Data, error) {
 
 func (im *JsonParser) parseLine(line string) (data sender.Data, err error) {
 	data = sender.Data{}
-	decoder := json.NewDecoder(bytes.NewReader([]byte(line)))
-	decoder.UseNumber()
-	if err = decoder.Decode(&data); err != nil {
+	if err = im.jsontool.Unmarshal([]byte(line), &data); err != nil {
 		err = fmt.Errorf("parse json line error %v, raw data is: %v", err, line)
 		log.Debug(err)
 		return

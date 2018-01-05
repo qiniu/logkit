@@ -1,11 +1,11 @@
 package reader
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"fmt"
+	
 	"github.com/qiniu/logkit/conf"
 )
 

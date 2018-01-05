@@ -1,16 +1,17 @@
 package sender
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/Shopify/sarama"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/utils"
+
+	"github.com/Shopify/sarama"
+	"github.com/json-iterator/go"
 )
 
 type KafkaSender struct {
@@ -175,7 +176,7 @@ func (kf *KafkaSender) getEventMessage(event map[string]interface{}) (pm *sarama
 	} else {
 		topic = kf.topic[0]
 	}
-	value, err := json.Marshal(event)
+	value, err := jsoniter.Marshal(event)
 	if err != nil {
 		return
 	}

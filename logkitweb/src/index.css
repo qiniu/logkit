@@ -162,3 +162,16 @@ body {
 .ant-input-number-lg {
   width: 100% !important;
 }
+
+.option-add label:after{
+  display: none;
+}
+
+.option-add .option-add-btn{
+  text-align: right;
+}
+
+.ant-form-item-label{
+    text-overflow:initial;
+    white-space: normal;
+}

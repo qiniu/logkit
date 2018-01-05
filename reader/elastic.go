@@ -90,7 +90,7 @@ func (er *ElasticReader) Status() utils.StatsInfo {
 }
 
 func (er *ElasticReader) Close() (err error) {
-	if atomic.CompareAndSwapInt32(&er.status, StatusRunning, StatusStoping) {
+	if atomic.CompareAndSwapInt32(&er.status, StatusRunning, StatusStopping) {
 		log.Infof("Runner[%v] %v stopping", er.meta.RunnerName, er.Name())
 	} else {
 		close(er.readChan)
@@ -137,7 +137,7 @@ func (er *ElasticReader) run() (err error) {
 	// running在退出状态改为Init
 	defer func() {
 		atomic.CompareAndSwapInt32(&er.status, StatusRunning, StatusInit)
-		if atomic.CompareAndSwapInt32(&er.status, StatusStoping, StatusStopped) {
+		if atomic.CompareAndSwapInt32(&er.status, StatusStopping, StatusStopped) {
 			close(er.readChan)
 		}
 		if err == nil {
@@ -147,7 +147,7 @@ func (er *ElasticReader) run() (err error) {
 
 	// 开始work逻辑
 	for {
-		if atomic.LoadInt32(&er.status) == StatusStoping {
+		if atomic.LoadInt32(&er.status) == StatusStopping {
 			log.Warnf("%v stopped from running", er.Name())
 			return
 		}
@@ -187,7 +187,7 @@ func (er *ElasticReader) exec() (err error) {
 				er.readChan <- *hit.Source
 			}
 			er.offset = results.ScrollId
-			if atomic.LoadInt32(&er.status) == StatusStoping {
+			if atomic.LoadInt32(&er.status) == StatusStopping {
 				log.Warnf("Runner[%v] %v stopped from running", er.meta.RunnerName, er.Name())
 				return nil
 			}
@@ -214,7 +214,7 @@ func (er *ElasticReader) exec() (err error) {
 				er.readChan <- *hit.Source
 			}
 			er.offset = results.ScrollId
-			if atomic.LoadInt32(&er.status) == StatusStoping {
+			if atomic.LoadInt32(&er.status) == StatusStopping {
 				log.Warnf("Runner[%v] %v stopped from running", er.meta.RunnerName, er.Name())
 				return nil
 			}
@@ -240,7 +240,7 @@ func (er *ElasticReader) exec() (err error) {
 				er.readChan <- *hit.Source
 			}
 			er.offset = results.ScrollId
-			if atomic.LoadInt32(&er.status) == StatusStoping {
+			if atomic.LoadInt32(&er.status) == StatusStopping {
 				log.Warnf("Runner[%v] %v stopped from running", er.meta.RunnerName, er.Name())
 				return nil
 			}
