@@ -269,6 +269,12 @@
 			"revisionTime": "2016-11-28T21:05:44Z"
 		},
 		{
+			"checksumSHA1": "tyBNNQgAj92ZnPzYeLvacRW9sjo=",
+			"path": "github.com/robertkrimen/otto",
+			"revision": "3b44b4dcb6c00477273595c312908e2412d07da6",
+			"revisionTime": "2017-11-30T10:32:05Z"
+		},
+		{
 			"checksumSHA1": "7aVQHxIZZYAb+Tq0pbGLL8j+4cM=",
 			"path": "github.com/robfig/cron",
 			"revision": "df38d32658d8788cd446ba74db4bb5375c4b0cb3",
