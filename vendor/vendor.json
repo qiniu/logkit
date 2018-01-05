@@ -119,10 +119,10 @@
 			"revisionTime": "2015-10-03T19:46:02Z"
 		},
 		{
-			"checksumSHA1": "0VLbyUUVAxwHkWZyjSy20rkbNgs=",
+			"checksumSHA1": "fB/x2A9tAUzVbFwUcxchDOEe8Eo=",
 			"path": "github.com/json-iterator/go",
-			"revision": "11c1cce0d8443972af23f9bfc33875374f2153a7",
-			"revisionTime": "2018-01-04T08:19:26Z"
+			"revision": "6dad2de6cca55c8b1f92e413f744a98f279b8a99",
+			"revisionTime": "2018-01-04T09:18:16Z"
 		},
 		{
 			"checksumSHA1": "hz/wVE0xwQ+d8aQbX7ApZVj8Hbg=",
