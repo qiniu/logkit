@@ -132,6 +132,7 @@ func (mr *MongoReader) Status() utils.StatsInfo {
 func (mr *MongoReader) setStatsError(err string) {
 	mr.statsLock.Lock()
 	defer mr.statsLock.Unlock()
+	mr.stats.Errors++
 	mr.stats.LastError = err
 }
 

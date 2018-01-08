@@ -475,9 +475,13 @@ func (r *LogExportRunner) Run() {
 			err = se.ErrorDetail
 			r.rs.ParserStats.Errors += se.Errors
 			r.rs.ParserStats.Success += se.Success
+			if err != nil {
+				r.rs.ParserStats.LastError = err.Error()
+			}
 		} else if err != nil {
 			errorCnt = 1
 			r.rs.ParserStats.Errors++
+			r.rs.ParserStats.LastError = err.Error()
 		} else {
 			r.rs.ParserStats.Success++
 		}
@@ -770,6 +774,7 @@ func (r *LogExportRunner) Status() RunnerStatus {
 
 	if str, ok := r.reader.(reader.StatsReader); ok {
 		r.rs.ReaderStats = str.Status()
+		r.rs.ReaderStats.Success = r.rs.ReadDataCount
 	}
 
 	r.rs.ReadSpeedKB = float64(r.rs.ReadDataSize-r.lastRs.ReadDataSize) / elaspedtime

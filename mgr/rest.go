@@ -55,7 +55,7 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	}
 	rs.cluster.mutex = new(sync.RWMutex)
 	router.GET(PREFIX+"/status", rs.Status())
-
+	router.GET(PREFIX+"/:name/status", rs.GetStatus())
 	// error code humanize
 	router.GET(PREFIX+"/errorcode", rs.GetErrorCodeHumanize())
 
@@ -233,6 +233,21 @@ func (rs *RestService) Status() echo.HandlerFunc {
 			}
 		}
 		return RespSuccess(c, rss)
+	}
+}
+
+// get /logkit/<name>/status
+func (rs *RestService) GetStatus() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		name, _, _, err := rs.checkNameAndConfig(c)
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, utils.ErrConfigName, err.Error())
+		}
+		status, err := rs.mgr.GetRunnerStatus(name)
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, utils.ErrConfigName, err.Error())
+		}
+		return RespSuccess(c, status)
 	}
 }
 

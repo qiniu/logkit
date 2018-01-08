@@ -22,6 +22,7 @@ import (
 
 	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
+	"gopkg.in/mgo.v2/bson"
 )
 
 const (
@@ -330,6 +331,9 @@ func ExtractField(slice []string) ([]string, error) {
 
 //根据key字符串,拆分出层级keys数据
 func GetKeys(keyStr string) []string {
+	if keyStr == "" {
+		return []string{}
+	}
 	separator := "."
 	keys := strings.Split(keyStr, separator)
 	return keys
@@ -363,7 +367,9 @@ func GetMapValue(m map[string]interface{}, keys ...string) (interface{}, error) 
 
 //通过层级key设置value值.
 //如果key不存在,将会自动创建.
-//当coercive为true时,会强制将非map[string]interface{}类型替换为map[string]interface{}类型,有可能导致数据丢失
+//当coercive为true时,将不考虑数据丢弃,强制set数据
+//当coercive为false时,如果操作将造成数据丢失,返回err,且不执行任何操作
+//造成数据丢失的两种情况:1.被替换的value是一个map 2.在设置层级key中(非最后一个)遇到一个非map值
 func SetMapValue(m map[string]interface{}, val interface{}, coercive bool, keys ...string) error {
 	if len(keys) == 0 {
 		return nil
@@ -386,6 +392,15 @@ func SetMapValue(m map[string]interface{}, val interface{}, coercive bool, keys 
 			}
 		}
 		curr = curr[k].(map[string]interface{})
+	}
+	if _, ok := curr[keys[len(keys)-1]].(map[string]interface{}); ok {
+		if coercive {
+			curr[keys[len(keys)-1]] = val
+			return nil
+		} else {
+			err := fmt.Errorf("SetMapValue failed, %v is the type of map[string]interface{}", curr[keys[len(keys)-1]])
+			return err
+		}
 	}
 	curr[keys[len(keys)-1]] = val
 	return nil
@@ -413,6 +428,31 @@ func DeleteMapValue(m map[string]interface{}, keys ...string) (interface{}, bool
 		}
 	}
 	return nil, false
+}
+
+//深度拷贝
+func DeepCopy(value interface{}) interface{} {
+	if valueMap, ok := value.(map[string]interface{}); ok {
+		newMap := make(map[string]interface{})
+		for k, v := range valueMap {
+			newMap[k] = DeepCopy(v)
+		}
+
+		return newMap
+	} else if valueSlice, ok := value.([]interface{}); ok {
+		newSlice := make([]interface{}, len(valueSlice))
+		for k, v := range valueSlice {
+			newSlice[k] = DeepCopy(v)
+		}
+
+		return newSlice
+	} else if valueMap, ok := value.(bson.M); ok {
+		newMap := make(bson.M)
+		for k, v := range valueMap {
+			newMap[k] = DeepCopy(v)
+		}
+	}
+	return value
 }
 
 func AddHttpProtocal(url string) string {

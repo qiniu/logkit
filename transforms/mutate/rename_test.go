@@ -25,9 +25,9 @@ func TestRenameTransformer(t *testing.T) {
 		Key:        "a.ts",
 		NewKeyName: "a.@timestamp",
 	}
-	data2, err := rename2.Transform([]sender.Data{{"a": map[string]interface{}{"ts": "stamp1"}}, {"ts": "stamp2"}})
+	data2, err := rename2.Transform([]sender.Data{{"a": map[string]interface{}{"ts": "stamp1"}}})
 	assert.NoError(t, err)
-	exp2 := []sender.Data{{"a": map[string]interface{}{"@timestamp": "stamp1"}}, {"ts": "stamp2"}}
+	exp2 := []sender.Data{{"a": map[string]interface{}{"@timestamp": "stamp1"}}}
 	assert.Equal(t, exp2, data2)
 
 	// rename nested field to new place
