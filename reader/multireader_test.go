@@ -34,7 +34,7 @@ func createDirWithName(dirx string) {
 func Test_ActiveReader(t *testing.T) {
 	testfile := "Test_ActiveReader"
 	createDir()
-	meta, err := NewMeta(metaDir, metaDir, testfile, ModeDir, defautFileRetention)
+	meta, err := NewMeta(metaDir, metaDir, testfile, ModeDir, "", defautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
