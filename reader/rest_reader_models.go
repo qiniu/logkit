@@ -523,6 +523,13 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse: true,
 			Description:  "Zookeeper地址(kafka_zookeeper)",
 		},
+		{
+			KeyName:      KeyKafkaZookeeperChroot,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "Zookeeper中kafka根地址(kafka_zookeeper_chroot)",
+		},
 		OptionWhence,
 		{
 			KeyName:      KeyKafkaZookeeperTimeout,
