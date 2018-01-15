@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/json-iterator/go"
 )
 
 var ErrStopped = errors.New("runner stopped")
@@ -124,6 +126,20 @@ func parseLoopDuration(cronSched string) (dur time.Duration, err error) {
 	if err != nil {
 		dur = time.Duration(0)
 		err = fmt.Errorf("parse Cron loop duration %v error %v, make duration as 1 second", cronSched, err)
+	}
+	return
+}
+
+func getTags(tagFile string) (tags map[string]interface{}, err error) {
+	if tagFile == "" {
+		return
+	}
+	tagsData, err := ioutil.ReadFile(tagFile)
+	if tagsData == nil || err != nil {
+		return
+	}
+	if jerr := jsoniter.Unmarshal(tagsData, &tags); jerr != nil {
+		return
 	}
 	return
 }

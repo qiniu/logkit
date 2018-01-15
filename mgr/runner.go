@@ -403,6 +403,7 @@ func (r *LogExportRunner) Run() {
 	}
 	defer close(r.exitChan)
 	datasourceTag := r.meta.GetDataSourceTag()
+	tags := r.meta.GetTags()
 	schemaErr := utils.SchemaErr{Number: 0, Last: time.Now()}
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
@@ -492,14 +493,18 @@ func (r *LogExportRunner) Run() {
 			log.Debugf("Runner[%v] received parsed data length = 0", r.Name())
 			continue
 		}
-		//把datasourcetag加到data里，前提是认为[]line变成[]data以后是一一对应的，一旦错位就不加
 
+		//把datasourcetag加到data里，前提是认为[]line变成[]data以后是一一对应的，一旦错位就不加
 		if datasourceTag != "" {
 			if len(datas)+len(se.ErrorIndex) == len(froms) {
 				datas = addSourceToData(froms, se, datas, datasourceTag, r.Name())
 			} else {
 				log.Errorf("Runner[%v] datasourcetag add error, datas %v not match with froms %v", r.Name(), datas, froms)
 			}
+		}
+		//把tagfile加到data里，前提是认为[]line变成[]data以后是一一对应的，一旦错位就不加
+		if tags != nil {
+			datas = addTagsToData(tags, datas, r.Name())
 		}
 		for i := range r.transformers {
 			if r.transformers[i].Stage() == transforms.StageAfterParser {
@@ -563,6 +568,20 @@ func addSourceToData(sourceFroms []string, se *utils.StatsError, datas []sender.
 			datas[j][datasourceTagName] = v
 		}
 		j++
+	}
+	return datas
+}
+
+func addTagsToData(tags map[string]interface{}, datas []sender.Data, runnername string) []sender.Data {
+	for j, data := range datas {
+		for k, v := range tags {
+			if dt, ok := data[k]; ok {
+				log.Debugf("Runner[%v] datasource tag already has data %v, ignore %v", runnername, dt, v)
+			} else {
+				data[k] = v
+			}
+		}
+		datas[j] = data
 	}
 	return datas
 }

@@ -815,6 +815,76 @@ func TestAddDatasource(t *testing.T) {
 	assert.Equal(t, exp, gots)
 }
 
+func TestAddDatatags(t *testing.T) {
+	dir := "TestAddDatatags"
+	metaDir := filepath.Join(dir, "meta")
+	if err := os.Mkdir(dir, 0755); err != nil {
+		log.Fatalf("Test_Run error mkdir %v %v", dir, err)
+	}
+	tagFile := filepath.Join(dir, "tagFile.json")
+	err := ioutil.WriteFile(tagFile, []byte(`{  
+	   	"Title":"tags",
+	    "Author":["john","ada","alice"],
+	    "IsTrue":true,
+	    "Host":99
+	  	}`), 0755)
+	assert.NoError(t, err)
+	logPath := filepath.Join(dir, "test.log")
+	err = ioutil.WriteFile(logPath, []byte(`{"f1": "2","f2": "1","f3": "3"}`), 0755)
+	assert.NoError(t, err)
+
+	defer os.RemoveAll(dir)
+	defer os.RemoveAll(metaDir)
+
+	config1 := `{
+			"name":"TestAddDatatags",
+			"batch_len":1,
+			"reader":{
+				"mode":"file",
+				"meta_path":"./TestAddDatatags/meta",
+				"file_done":"./TestAddDatatags/meta",
+				"log_path":"./TestAddDatatags/test.log",
+				"tag_file":"./TestAddDatatags/tagFile.json"
+			},
+			"parser":{
+				"name":"testjson",
+				"type":"json"
+			},
+			"senders":[{
+				"name":"file_sender",
+				"sender_type":"file",
+				"file_send_path":"./TestAddDatatags/filesend.json"
+			}]
+		}`
+	rc := RunnerConfig{}
+	err = jsoniter.Unmarshal([]byte(config1), &rc)
+	assert.NoError(t, err)
+
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), parser.NewParserRegistry(), sender.NewSenderRegistry())
+	assert.NoError(t, err)
+	go rr.Run()
+
+	time.Sleep(2 * time.Second)
+	data, err := ioutil.ReadFile("./TestAddDatatags/filesend.json")
+	var res []sender.Data
+	err = jsoniter.Unmarshal(data, &res)
+	if err != nil {
+		t.Error(err)
+	}
+	exp := []sender.Data{
+		{
+			"f1":     "2",
+			"f2":     "1",
+			"f3":     "3",
+			"Title":  "tags",
+			"Author": []interface{}{"john", "ada", "alice"},
+			"IsTrue": bool(true),
+			"Host":   float64(99),
+		},
+	}
+	assert.Equal(t, exp, res)
+}
+
 func TestClassifySenderData(t *testing.T) {
 	senderCnt := 3
 	datas := []sender.Data{

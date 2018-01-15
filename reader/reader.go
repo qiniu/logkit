@@ -61,6 +61,7 @@ const (
 	KeyEncoding      = "encoding"
 	KeyReadIOLimit   = "readio_limit"
 	KeyDataSourceTag = "datasource_tag"
+	KeyTagFile       = "tag_file"
 	KeyHeadPattern   = "head_pattern"
 	KeyRunnerName    = "runner_name"
 

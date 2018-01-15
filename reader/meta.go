@@ -58,10 +58,12 @@ type Meta struct {
 	donefileretention int    // done.file保留时间，单位为天
 	encodingWay       string //文件编码格式，默认为utf-8
 	logpath           string
-	dataSourceTag     string //记录文件路径的标签名称
-	readlimit         int    //读取磁盘限速单位 MB/s
-	statisticPath     string // 记录 runner 计数信息
-	ftSaveLogPath     string // 记录 ft_sender 日志信息
+	dataSourceTag     string                 //记录文件路径的标签名称
+	tagFile           string                 //记录tag文件路径的标签名称
+	tags              map[string]interface{} //记录tag文件内容
+	readlimit         int                    //读取磁盘限速单位 MB/s
+	statisticPath     string                 // 记录 runner 计数信息
+	ftSaveLogPath     string                 // 记录 ft_sender 日志信息
 	RunnerName        string
 }
 
@@ -83,7 +85,7 @@ func getValidDir(dir string) (realPath string, err error) {
 	return
 }
 
-func NewMeta(metadir, filedonedir, logpath, mode string, donefileRetention int) (m *Meta, err error) {
+func NewMeta(metadir, filedonedir, logpath, mode, tagfile string, donefileRetention int) (m *Meta, err error) {
 	metadir, err = getValidDir(metadir)
 	if err != nil {
 		//此处的error需要直接返回，后面会根据error类型是否为path error做判断
@@ -98,6 +100,13 @@ func NewMeta(metadir, filedonedir, logpath, mode string, donefileRetention int) 
 			return
 		}
 	}
+
+	tags, err := getTags(tagfile)
+	if err != nil {
+		log.Errorf("failed to get tags from %v error %v", tagfile, err)
+		return m, err
+	}
+
 	return &Meta{
 		dir:               metadir,
 		metaFilePath:      filepath.Join(metadir, metaFileName),
@@ -109,7 +118,9 @@ func NewMeta(metadir, filedonedir, logpath, mode string, donefileRetention int) 
 		ftSaveLogPath:     filepath.Join(metadir, ftSaveLogPath),
 		donefileretention: donefileRetention,
 		logpath:           logpath,
+		tagFile:           tagfile,
 		mode:              mode,
+		tags:              tags,
 		readlimit:         defaultIOLimit * 1024 * 1024,
 	}, nil
 }
@@ -129,6 +140,14 @@ func getLogPathAbs(conf conf.MapConf) (logpath string, err error) {
 	return filepath.Abs(logpath)
 }
 
+func getTagFileAbs(conf conf.MapConf) (tagfile string, err error) {
+	tagfile, _ = conf.GetStringOr(KeyTagFile, "")
+	if tagfile != "" {
+		return filepath.Abs(tagfile)
+	}
+	return
+}
+
 func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 	runnerName, _ := conf.GetStringOr(KeyRunnerName, "UndefinedRunnerName")
 	mode, _ := conf.GetStringOr(KeyMode, ModeDir)
@@ -137,6 +156,10 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 		return
 	}
 	err = nil
+	tagFile, err := getTagFileAbs(conf)
+	if err != nil {
+		return
+	}
 	metapath, _ := conf.GetStringOr(KeyMetaPath, "")
 	if metapath == "" {
 		runnerName, _ := conf.GetString(utils.GlobalKeyName)
@@ -148,7 +171,7 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 	filedonepath, _ := conf.GetStringOr(KeyFileDone, metapath)
 	donefileRetention, _ := conf.GetIntOr(doneFileRetention, defautFileRetention)
 	readlimit, _ := conf.GetIntOr(KeyReadIOLimit, defaultIOLimit)
-	meta, err = NewMeta(metapath, filedonepath, logPath, mode, donefileRetention)
+	meta, err = NewMeta(metapath, filedonepath, logPath, mode, tagFile, donefileRetention)
 	if err != nil {
 		log.Warnf("Runner[%v] %s - newMeta failed, err:%v", runnerName, metapath, err)
 		return
@@ -272,7 +295,7 @@ func (m *Meta) WriteBuf(buf []byte, r, w, bufsize int) (err error) {
 	return os.Rename(tmpBufFileName, bufFileName)
 }
 
-// ReadOffset 读取当前读取的文件和offset
+// 	 读取当前读取的文件和offset
 func (m *Meta) ReadOffset() (currFile string, offset int64, err error) {
 	f, err := os.Open(m.MetaFile())
 	if err != nil {
@@ -460,6 +483,14 @@ func (m *Meta) IsFileMode() bool {
 
 func (m *Meta) GetDataSourceTag() string {
 	return m.dataSourceTag
+}
+
+func (m *Meta) GetTagFile() string {
+	return m.tagFile
+}
+
+func (m *Meta) GetTags() map[string]interface{} {
+	return m.tags
 }
 
 func (b *Meta) Reset() error {

@@ -63,7 +63,7 @@ type Result struct {
 func NewActiveReader(originPath, realPath, whence string, meta *Meta, msgChan chan<- Result) (ar *ActiveReader, err error) {
 	rpath := strings.Replace(realPath, string(os.PathSeparator), "_", -1)
 	subMetaPath := filepath.Join(meta.dir, rpath)
-	subMeta, err := NewMeta(subMetaPath, subMetaPath, realPath, ModeFile, defautFileRetention)
+	subMeta, err := NewMeta(subMetaPath, subMetaPath, realPath, ModeFile, meta.tagFile, defautFileRetention)
 	if err != nil {
 		return nil, err
 	}

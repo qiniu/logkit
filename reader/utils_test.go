@@ -112,3 +112,25 @@ func TestModTimeLater(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "f1", cs.Name())
 }
+
+func TestGetTags(t *testing.T) {
+	tagFile := "./tagFile.json"
+	err := ioutil.WriteFile(tagFile, []byte(`{  
+	   	"Title":"tags",
+	    "Author":["john","ada","alice"],
+	    "IsTrue":true,
+	    "Host":99
+	  	}`), 0644)
+	assert.NoError(t, err)
+	defer os.Remove(tagFile)
+	err = nil
+	exp := map[string]interface{}{
+		"Title":  "tags",
+		"Author": []interface{}{"john", "ada", "alice"},
+		"IsTrue": bool(true),
+		"Host":   float64(99),
+	}
+	tags, err := getTags(tagFile)
+	assert.NoError(t, err)
+	assert.Equal(t, exp, tags)
+}
