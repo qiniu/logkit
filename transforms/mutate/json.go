@@ -14,9 +14,10 @@ import (
 )
 
 type Json struct {
-	Key   string `json:"key"`
-	New   string `json:"new"`
-	stats utils.StatsInfo
+	Key        string `json:"key"`
+	New        string `json:"new"`
+	ReserveTag bool   `json:"reserve_tag"`
+	stats      utils.StatsInfo
 }
 
 func (g *Json) Transform(datas []sender.Data) ([]sender.Data, error) {
@@ -44,15 +45,14 @@ func (g *Json) Transform(datas []sender.Data) ([]sender.Data, error) {
 			continue
 		}
 
-		utils.DeleteMapValue(datas[i], keys...)
-
-		if len(news) > 0 {
-			utils.SetMapValue(datas[i], jsonVal, false, news...)
-		} else {
-			for k, v := range jsonVal {
-				utils.SetMapValue(datas[i], v, false, k)
-			}
+		if !g.ReserveTag {
+			utils.DeleteMapValue(datas[i], keys...)
 		}
+		if len(news) == 0 {
+			news = keys
+		}
+
+		utils.SetMapValue(datas[i], jsonVal, false, news...)
 	}
 
 	if err != nil {
@@ -70,7 +70,11 @@ func (g *Json) RawTransform(datas []string) ([]string, error) {
 
 func parseJson(jsonStr string) (data map[string]interface{}, err error) {
 	data = sender.Data{}
-	decoder := jsoniter.NewDecoder(bytes.NewReader([]byte(jsonStr)))
+	jsonTool := jsoniter.Config{
+		EscapeHTML: true,
+		UseNumber:  true,
+	}.Froze()
+	decoder := jsonTool.NewDecoder(bytes.NewReader([]byte(jsonStr)))
 	decoder.UseNumber()
 	if err = decoder.Decode(&data); err != nil {
 		err = fmt.Errorf("parse json str error %v, jsonStr is: %v", err, jsonStr)

@@ -22,6 +22,7 @@ import (
 
 	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
+	"unicode"
 )
 
 const (
@@ -333,9 +334,12 @@ func GetKeys(keyStr string) []string {
 	if keyStr == "" {
 		return []string{}
 	}
-	separator := "."
-	keys := strings.Split(keyStr, separator)
+	keys := strings.FieldsFunc(keyStr, isSeparator)
 	return keys
+}
+
+func isSeparator(separator rune) bool {
+	return separator == '.' || unicode.IsSpace(separator)
 }
 
 //通过层级key获取value.
