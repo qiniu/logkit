@@ -13,6 +13,10 @@ func TestJsonTransformer(t *testing.T) {
 	jsonConf := &Json{
 		Key: "json",
 		New: "json",
+		jsonTool: jsoniter.Config{
+			EscapeHTML: true,
+			UseNumber:  true,
+		}.Froze(),
 	}
 	data := []sender.Data{{"key1": "value1", "json": `{"name":"小明", "sex":"男"}`}, {"key2": "value2", "json": `{"name":"小红", "sex":"女"}`}}
 	res, err := jsonConf.Transform(data)
@@ -22,6 +26,10 @@ func TestJsonTransformer(t *testing.T) {
 
 	jsonConf2 := &Json{
 		Key: "json",
+		jsonTool: jsoniter.Config{
+			EscapeHTML: true,
+			UseNumber:  true,
+		}.Froze(),
 	}
 	data2 := []sender.Data{{"key1": "value1", "json": `{"json":"小明", "sex":"男"}`}, {"key2": "value2", "json": `{"name":"小红", "sex":"女"}`}}
 	res2, err2 := jsonConf2.Transform(data2)
@@ -32,6 +40,10 @@ func TestJsonTransformer(t *testing.T) {
 	jsonConf3 := &Json{
 		Key: "json",
 		New: "newKey",
+		jsonTool: jsoniter.Config{
+			EscapeHTML: true,
+			UseNumber:  true,
+		}.Froze(),
 	}
 	data3 := []sender.Data{{"key1": "value1", "json": `{"name":"小明", "sex":"男"}`}, {"key2": "value2", "json": `{"name":"小红", "sex":"女"}`}}
 	res3, err3 := jsonConf3.Transform(data3)
@@ -42,6 +54,10 @@ func TestJsonTransformer(t *testing.T) {
 	jsonConf4 := &Json{
 		Key: "json....",
 		New: "newKey....",
+		jsonTool: jsoniter.Config{
+			EscapeHTML: true,
+			UseNumber:  true,
+		}.Froze(),
 	}
 	data4 := []sender.Data{{"key1": "value1", "json": `{"name":"小明", "sex":"男"}`}, {"key2": "value2", "json": `{"name":"小红", "sex":"女"}`}}
 	res4, err4 := jsonConf4.Transform(data4)

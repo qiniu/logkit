@@ -235,6 +235,23 @@ func TestExtractField(t *testing.T) {
 
 }
 
+func TestGetKeys(t *testing.T) {
+	exp := []string{}
+
+	var keyStr string
+	res := GetKeys(keyStr)
+	assert.Equal(t, exp, res)
+
+	keyStr2 := "."
+	res2 := GetKeys(keyStr2)
+	assert.Equal(t, exp, res2)
+
+	keyStr3 := "a..."
+	res3 := GetKeys(keyStr3)
+	exp3 := []string{"a"}
+	assert.Equal(t, exp3, res3)
+}
+
 func TestGetMapValue(t *testing.T) {
 	m3 := map[string]interface{}{"name": "小明"}
 	m2 := map[string]interface{}{"m3": m3}
