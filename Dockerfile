@@ -7,7 +7,6 @@ RUN mkdir /logs
 RUN mv _package_linux64_${LOGKIT_VERSION}/public /app/public
 RUN mv _package_linux64_${LOGKIT_VERSION}/logkit /app/logkit
 RUN mv _package_linux64_${LOGKIT_VERSION}/logkit.conf /app/logkit.conf
-RUN mv _package_linux64_${LOGKIT_VERSION}/confs /app/confs
 
 RUN sed -i -- 's/localhost//g' /app/logkit.conf
 VOLUME /app/confs
