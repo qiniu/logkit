@@ -19,9 +19,11 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode"
+
+	"github.com/qiniu/log"
 
 	"github.com/json-iterator/go"
-	"github.com/qiniu/log"
 )
 
 const (
@@ -330,9 +332,12 @@ func ExtractField(slice []string) ([]string, error) {
 
 //根据key字符串,拆分出层级keys数据
 func GetKeys(keyStr string) []string {
-	separator := "."
-	keys := strings.Split(keyStr, separator)
+	keys := strings.FieldsFunc(keyStr, isSeparator)
 	return keys
+}
+
+func isSeparator(separator rune) bool {
+	return separator == '.' || unicode.IsSpace(separator)
 }
 
 //通过层级key获取value.
