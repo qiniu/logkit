@@ -1,7 +1,6 @@
 package mutate
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 
@@ -16,51 +15,56 @@ import (
 type Json struct {
 	Key        string `json:"key"`
 	New        string `json:"new"`
-	ReserveTag bool   `json:"reserve_tag"`
 	stats      utils.StatsInfo
 }
 
 func (g *Json) Transform(datas []sender.Data) ([]sender.Data, error) {
 	var err, ferr error
-	errnums := 0
+	errCount := 0
 	keys := utils.GetKeys(g.Key)
 	news := utils.GetKeys(g.New)
+	jsonTool := jsoniter.Config{
+		EscapeHTML: true,
+		UseNumber:  true,
+	}.Froze()
+
 	for i := range datas {
 		val, gerr := utils.GetMapValue(datas[i], keys...)
 		if gerr != nil {
-			errnums++
+			errCount++
 			err = fmt.Errorf("transform key %v not exist in data", g.Key)
 			continue
 		}
 		strval, ok := val.(string)
 		if !ok {
-			errnums++
+			errCount++
 			err = fmt.Errorf("transform key %v data type is not string", g.Key)
 			continue
 		}
-		jsonVal, perr := parseJson(strval)
+		jsonVal, perr := parseJson(jsonTool, strval)
 		if perr != nil {
-			errnums++
+			errCount++
 			err = perr
 			continue
 		}
 
-		if !g.ReserveTag {
-			utils.DeleteMapValue(datas[i], keys...)
-		}
 		if len(news) == 0 {
+			utils.DeleteMapValue(datas[i], keys...)
 			news = keys
 		}
-
-		utils.SetMapValue(datas[i], jsonVal, false, news...)
+		serr := utils.SetMapValue(datas[i], jsonVal, false, news...)
+		if serr != nil {
+			errCount++
+			err = fmt.Errorf("the new key %v already exists ", g.New)
+		}
 	}
 
 	if err != nil {
 		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform json, last error info is %v", errnums, err)
+		ferr = fmt.Errorf("find total %v erorrs in transform json, last error info is %v", errCount, err)
 	}
-	g.stats.Errors += int64(errnums)
-	g.stats.Success += int64(len(datas) - errnums)
+	g.stats.Errors += int64(errCount)
+	g.stats.Success += int64(len(datas) - errCount)
 	return datas, ferr
 }
 
@@ -68,15 +72,10 @@ func (g *Json) RawTransform(datas []string) ([]string, error) {
 	return datas, errors.New("json transformer not support rawTransform")
 }
 
-func parseJson(jsonStr string) (data map[string]interface{}, err error) {
+func parseJson(jsonTool jsoniter.API, jsonStr string) (data interface{}, err error) {
 	data = sender.Data{}
-	jsonTool := jsoniter.Config{
-		EscapeHTML: true,
-		UseNumber:  true,
-	}.Froze()
-	decoder := jsonTool.NewDecoder(bytes.NewReader([]byte(jsonStr)))
-	decoder.UseNumber()
-	if err = decoder.Decode(&data); err != nil {
+	err = jsonTool.Unmarshal([]byte(jsonStr), &data)
+	if err != nil {
 		err = fmt.Errorf("parse json str error %v, jsonStr is: %v", err, jsonStr)
 		log.Debug(err)
 	}
@@ -107,7 +106,7 @@ func (g *Json) ConfigOptions() []utils.Option {
 			KeyName:      "new",
 			ChooseOnly:   false,
 			Default:      "",
-			DefaultNoUse: true,
+			DefaultNoUse: false,
 			Description:  "新的字段名",
 			Type:         transforms.TransformTypeString,
 		},

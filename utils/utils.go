@@ -331,9 +331,6 @@ func ExtractField(slice []string) ([]string, error) {
 
 //根据key字符串,拆分出层级keys数据
 func GetKeys(keyStr string) []string {
-	if keyStr == "" {
-		return []string{}
-	}
 	keys := strings.FieldsFunc(keyStr, isSeparator)
 	return keys
 }
