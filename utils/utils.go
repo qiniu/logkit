@@ -290,7 +290,7 @@ func GetExtraInfo() map[string]string {
 	exInfo[KeyCore] = osInfo.Core
 	exInfo[KeyHostName] = osInfo.Hostname
 	exInfo[KeyOsInfo] = osInfo.OS + "-" + osInfo.Kernel + "-" + osInfo.Platform
-	if ip, err := GetLocalIP(); err != nil {
+	if ip, err := GetLocalIP(); err == nil {
 		exInfo[KeyLocalIp] = ip
 	}
 	return exInfo

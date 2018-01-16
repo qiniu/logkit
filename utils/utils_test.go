@@ -377,3 +377,33 @@ func TestLogDirAndPattern(t *testing.T) {
 	defer os.RemoveAll("TestLogDirAndPattern")
 
 }
+
+func TestGetExtraInfo(t *testing.T) {
+	extraInfo := GetExtraInfo()
+	osInfo := GetOSInfo()
+	ip, err := GetLocalIP()
+
+	if core, ok := extraInfo[KeyCore]; !ok {
+		t.Fatalf("core is not found")
+	} else {
+		assert.Equal(t, osInfo.Core, core)
+	}
+
+	if hostname, ok := extraInfo[KeyHostName]; !ok {
+		t.Fatalf("hostname is not found")
+	} else {
+		assert.Equal(t, osInfo.Hostname, hostname)
+	}
+
+	if oi, ok := extraInfo[KeyOsInfo]; !ok {
+		t.Fatalf("osInfo is not found")
+	} else {
+		assert.Equal(t, osInfo.OS+"-"+osInfo.Kernel+"-"+osInfo.Platform, oi)
+	}
+
+	if localIp, ok := extraInfo[KeyLocalIp]; err == nil && !ok {
+		t.Fatalf("local ip is not found")
+	} else if err == nil {
+		assert.Equal(t, ip, localIp)
+	}
+}
