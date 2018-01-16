@@ -81,7 +81,7 @@ func parseJson(jsonTool jsoniter.API, jsonStr string) (data interface{}, err err
 }
 
 func (g *Json) Description() string {
-	return "parse jsonStr to json"
+	return "解析json"
 }
 
 func (g *Json) Type() string {

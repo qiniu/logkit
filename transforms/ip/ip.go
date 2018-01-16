@@ -7,6 +7,7 @@ import (
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+
 	"github.com/wangtuanjie/ip17mon"
 )
 
@@ -73,7 +74,7 @@ func (it *IpTransformer) Transform(datas []sender.Data) ([]sender.Data, error) {
 }
 
 func (it *IpTransformer) Description() string {
-	return "transform ip to country region and isp"
+	return "获取IP的区域、国家、城市和运营商信息"
 }
 
 func (it *IpTransformer) Type() string {

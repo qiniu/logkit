@@ -47,11 +47,11 @@ func (g *Label) Transform(datas []sender.Data) ([]sender.Data, error) {
 }
 
 func (g *Label) Description() string {
-	return "label can add a field"
+	return "增加标签"
 }
 
 func (g *Label) Type() string {
-	return "label"
+	return "标记"
 }
 
 func (g *Label) SampleConfig() string {

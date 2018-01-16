@@ -116,11 +116,11 @@ func (g *DateTrans) formatWithUserOption(t time.Time) interface{} {
 }
 
 func (g *DateTrans) Description() string {
-	return "transform string/long to specified date format"
+	return "针对指定的字段做时间的转换"
 }
 
 func (g *DateTrans) Type() string {
-	return "date"
+	return "时间转换"
 }
 
 func (g *DateTrans) SampleConfig() string {

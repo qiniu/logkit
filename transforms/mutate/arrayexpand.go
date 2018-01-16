@@ -178,11 +178,11 @@ func (p *ArrayExpand) Transform(datas []sender.Data) ([]sender.Data, error) {
 }
 
 func (p *ArrayExpand) Description() string {
-	return "expand an array like arraykey:[a, b, c] into sender.Data map {arraykey0:a,arraykey1:b,arraykey2:c}"
+	return "展开数组，例：arraykey:[a, b, c]展开为map{arraykey0:a,arraykey1:b,arraykey2:c}"
 }
 
 func (p *ArrayExpand) Type() string {
-	return "arrayexpand"
+	return "展开数组"
 }
 
 func (p *ArrayExpand) SampleConfig() string {
