@@ -60,11 +60,11 @@ func (g *Spliter) Transform(datas []sender.Data) ([]sender.Data, error) {
 
 func (g *Spliter) Description() string {
 	//return "split one field into array from data"
-	return "针对指定的字段做数据切割"
+	return "将指定的字段切割成数组"
 }
 
 func (g *Spliter) Type() string {
-	return "切割"
+	return "split"
 }
 
 func (g *Spliter) SampleConfig() string {

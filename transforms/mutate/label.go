@@ -52,7 +52,7 @@ func (g *Label) Description() string {
 }
 
 func (g *Label) Type() string {
-	return "标记"
+	return "label"
 }
 
 func (g *Label) SampleConfig() string {

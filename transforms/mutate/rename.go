@@ -54,7 +54,7 @@ func (g *Rename) Description() string {
 }
 
 func (g *Rename) Type() string {
-	return "重命名"
+	return "rename"
 }
 
 func (g *Rename) SampleConfig() string {

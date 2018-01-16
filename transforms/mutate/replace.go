@@ -75,7 +75,7 @@ func (g *Replacer) Description() string {
 }
 
 func (g *Replacer) Type() string {
-	return "替换"
+	return "replace"
 }
 
 func (g *Replacer) SampleConfig() string {

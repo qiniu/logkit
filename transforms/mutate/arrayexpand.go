@@ -183,7 +183,7 @@ func (p *ArrayExpand) Description() string {
 }
 
 func (p *ArrayExpand) Type() string {
-	return "展开数组"
+	return "arrayexpand"
 }
 
 func (p *ArrayExpand) SampleConfig() string {

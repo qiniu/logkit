@@ -35,7 +35,7 @@ func (g *Discarder) Description() string {
 }
 
 func (g *Discarder) Type() string {
-	return "删除"
+	return "discard"
 }
 
 func (g *Discarder) SampleConfig() string {
