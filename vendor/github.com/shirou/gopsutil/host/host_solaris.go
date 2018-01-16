@@ -2,6 +2,8 @@ package host
 
 import (
 	"bufio"
+	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -16,6 +18,10 @@ import (
 )
 
 func Info() (*InfoStat, error) {
+	return InfoWithContext(context.Background())
+}
+
+func InfoWithContext(ctx context.Context) (*InfoStat, error) {
 	result := &InfoStat{
 		OS: runtime.GOOS,
 	}
@@ -76,6 +82,50 @@ func Info() (*InfoStat, error) {
 		}
 	}
 
+	switch result.Platform {
+	case "SmartOS":
+		// If everything works, use the current zone ID as the HostID if present.
+		zonename, err := exec.LookPath("/usr/bin/zonename")
+		if err == nil {
+			out, err := invoke.Command(zonename)
+			if err == nil {
+				sc := bufio.NewScanner(bytes.NewReader(out))
+				for sc.Scan() {
+					line := sc.Text()
+
+					// If we're in the global zone, rely on the hostname.
+					if line == "global" {
+						hostname, err := os.Hostname()
+						if err == nil {
+							result.HostID = hostname
+						}
+					} else {
+						result.HostID = strings.TrimSpace(line)
+						break
+					}
+				}
+			}
+		}
+	}
+
+	// If HostID is still empty, use hostid(1), which can lie to callers but at
+	// this point there are no hardware facilities available.  This behavior
+	// matches that of other supported OSes.
+	if result.HostID == "" {
+		hostID, err := exec.LookPath("/usr/bin/hostid")
+		if err == nil {
+			out, err := invoke.Command(hostID)
+			if err == nil {
+				sc := bufio.NewScanner(bytes.NewReader(out))
+				for sc.Scan() {
+					line := sc.Text()
+					result.HostID = strings.TrimSpace(line)
+					break
+				}
+			}
+		}
+	}
+
 	// Find the boot time and calculate uptime relative to it
 	bootTime, err := BootTime()
 	if err != nil {
@@ -97,6 +147,10 @@ func Info() (*InfoStat, error) {
 var kstatMatch = regexp.MustCompile(`([^\s]+)[\s]+([^\s]*)`)
 
 func BootTime() (uint64, error) {
+	return BootTimeWithContext(context.Background())
+}
+
+func BootTimeWithContext(ctx context.Context) (uint64, error) {
 	kstat, err := exec.LookPath("/usr/bin/kstat")
 	if err != nil {
 		return 0, err
@@ -116,6 +170,10 @@ func BootTime() (uint64, error) {
 }
 
 func Uptime() (uint64, error) {
+	return UptimeWithContext(context.Background())
+}
+
+func UptimeWithContext(ctx context.Context) (uint64, error) {
 	bootTime, err := BootTime()
 	if err != nil {
 		return 0, err
@@ -128,9 +186,48 @@ func uptimeSince(since uint64) uint64 {
 }
 
 func Users() ([]UserStat, error) {
+	return UsersWithContext(context.Background())
+}
+
+func UsersWithContext(ctx context.Context) ([]UserStat, error) {
 	return []UserStat{}, common.ErrNotImplementedError
 }
 
 func SensorsTemperatures() ([]TemperatureStat, error) {
+	return SensorsTemperaturesWithContext(context.Background())
+}
+
+func SensorsTemperaturesWithContext(ctx context.Context) ([]TemperatureStat, error) {
 	return []TemperatureStat{}, common.ErrNotImplementedError
+}
+
+func Virtualization() (string, string, error) {
+	return VirtualizationWithContext(context.Background())
+}
+
+func VirtualizationWithContext(ctx context.Context) (string, string, error) {
+	return "", "", common.ErrNotImplementedError
+}
+
+func KernelVersion() (string, error) {
+	return KernelVersionWithContext(context.Background())
+}
+
+func KernelVersionWithContext(ctx context.Context) (string, error) {
+	// Parse versions from output of `uname(1)`
+	uname, err := exec.LookPath("/usr/bin/uname")
+	if err != nil {
+		return "", err
+	}
+
+	out, err := invoke.Command(uname, "-srv")
+	if err != nil {
+		return "", err
+	}
+
+	fields := strings.Fields(string(out))
+	if len(fields) >= 2 {
+		return fields[1], nil
+	}
+	return "", fmt.Errorf("could not get kernel version")
 }
