@@ -59,7 +59,8 @@ func (g *Converter) Transform(datas []sender.Data) ([]sender.Data, error) {
 }
 
 func (g *Converter) Description() string {
-	return "convert can use dsl to convert multi-field data to specify data type"
+	//return "convert can use dsl to convert multi-field data to specify data type"
+	return "将dsl指定的多个数据字段和类型转换为指定的数据格式"
 }
 
 func (g *Converter) Type() string {

@@ -49,7 +49,8 @@ func (g *Rename) Transform(datas []sender.Data) ([]sender.Data, error) {
 }
 
 func (g *Rename) Description() string {
-	return "rename can mutate old field name to new field name"
+	//return "rename can mutate old field name to new field name"
+	return "用新的字段重命名旧的字段"
 }
 
 func (g *Rename) Type() string {

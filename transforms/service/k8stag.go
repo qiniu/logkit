@@ -68,7 +68,8 @@ func (g *K8sTag) Transform(datas []sender.Data) ([]sender.Data, error) {
 }
 
 func (g *K8sTag) Description() string {
-	return "k8stag will get kubernetes tags from sourcefile name"
+	//return "k8stag will get kubernetes tags from sourcefile name"
+	return "从sourcefile name中获取kubernetes tags"
 }
 
 func (g *K8sTag) Type() string {
