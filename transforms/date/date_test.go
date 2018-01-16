@@ -1,13 +1,13 @@
 package date
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
-	"fmt"
-
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
+
 	"github.com/stretchr/testify/assert"
 )
 

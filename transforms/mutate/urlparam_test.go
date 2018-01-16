@@ -6,6 +6,7 @@ import (
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+
 	"github.com/stretchr/testify/assert"
 )
 

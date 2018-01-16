@@ -70,11 +70,12 @@ func (g *Replacer) RawTransform(datas []string) ([]string, error) {
 }
 
 func (g *Replacer) Description() string {
-	return "replace old string to new"
+	//return "replace old string to new"
+	return "用新字符串替换旧字符串"
 }
 
 func (g *Replacer) Type() string {
-	return "replace"
+	return "替换"
 }
 
 func (g *Replacer) SampleConfig() string {
