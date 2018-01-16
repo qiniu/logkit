@@ -4,18 +4,19 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/json-iterator/go"
-
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+
+	"github.com/json-iterator/go"
 )
 
 type Json struct {
 	Key        string `json:"key"`
 	New        string `json:"new"`
 	stats      utils.StatsInfo
+	jsonTool   jsoniter.API
 }
 
 func (g *Json) Transform(datas []sender.Data) ([]sender.Data, error) {
@@ -23,10 +24,6 @@ func (g *Json) Transform(datas []sender.Data) ([]sender.Data, error) {
 	errCount := 0
 	keys := utils.GetKeys(g.Key)
 	news := utils.GetKeys(g.New)
-	jsonTool := jsoniter.Config{
-		EscapeHTML: true,
-		UseNumber:  true,
-	}.Froze()
 
 	for i := range datas {
 		val, gerr := utils.GetMapValue(datas[i], keys...)
@@ -41,7 +38,7 @@ func (g *Json) Transform(datas []sender.Data) ([]sender.Data, error) {
 			err = fmt.Errorf("transform key %v data type is not string", g.Key)
 			continue
 		}
-		jsonVal, perr := parseJson(jsonTool, strval)
+		jsonVal, perr := parseJson(g.jsonTool, strval)
 		if perr != nil {
 			errCount++
 			err = perr
@@ -121,8 +118,13 @@ func (g *Json) Stats() utils.StatsInfo {
 	return g.stats
 }
 
-func Init() {
+func init() {
 	transforms.Add("json", func() transforms.Transformer {
-		return &Json{}
+		return &Json{
+			jsonTool: jsoniter.Config{
+				EscapeHTML: true,
+				UseNumber:  true,
+			}.Froze(),
+		}
 	})
 }

@@ -19,10 +19,11 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode"
+
+	"github.com/qiniu/log"
 
 	"github.com/json-iterator/go"
-	"github.com/qiniu/log"
-	"unicode"
 )
 
 const (
