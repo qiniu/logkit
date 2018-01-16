@@ -13,10 +13,10 @@ import (
 )
 
 type Json struct {
-	Key        string `json:"key"`
-	New        string `json:"new"`
-	stats      utils.StatsInfo
-	jsonTool   jsoniter.API
+	Key      string `json:"key"`
+	New      string `json:"new"`
+	stats    utils.StatsInfo
+	jsonTool jsoniter.API
 }
 
 func (g *Json) Transform(datas []sender.Data) ([]sender.Data, error) {
@@ -70,13 +70,11 @@ func (g *Json) RawTransform(datas []string) ([]string, error) {
 }
 
 func parseJson(jsonTool jsoniter.API, jsonStr string) (data interface{}, err error) {
-	data = sender.Data{}
 	err = jsonTool.Unmarshal([]byte(jsonStr), &data)
 	if err != nil {
 		err = fmt.Errorf("parse json str error %v, jsonStr is: %v", err, jsonStr)
 		log.Debug(err)
 	}
-
 	return
 }
 

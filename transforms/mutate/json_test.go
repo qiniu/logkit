@@ -1,13 +1,13 @@
 package mutate
 
 import (
-	"testing"
 	"encoding/json"
+	"testing"
 
 	"github.com/qiniu/logkit/sender"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/json-iterator/go"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestJsonTransformer(t *testing.T) {
@@ -68,13 +68,28 @@ func TestJsonTransformer(t *testing.T) {
 }
 
 func TestParseJson(t *testing.T) {
-	data :=`{"name":"ethancai", "fansCount": 9223372036854775807}`
 	jsonTool := jsoniter.Config{
 		EscapeHTML: true,
 		UseNumber:  true,
 	}.Froze()
+
+	data := `{"name":"ethancai", "fansCount": 9223372036854775807}`
 	res, err := parseJson(jsonTool, data)
 	assert.NoError(t, err)
 	exp := map[string]interface{}{"name": "ethancai", "fansCount": json.Number("9223372036854775807")}
 	assert.Equal(t, exp, res)
+
+	data = `["a","b"]`
+	res, err = parseJson(jsonTool, data)
+	assert.NoError(t, err)
+	exp2 := []interface{}{"a", "b"}
+	assert.Equal(t, exp2, res)
+
+	data = `[{"name":"ethancai", "fansCount": 9223372036854775807}]`
+	res, err = parseJson(jsonTool, data)
+	assert.NoError(t, err)
+	exp3 := []interface{}{
+		map[string]interface{}{"name": "ethancai", "fansCount": json.Number("9223372036854775807")},
+	}
+	assert.Equal(t, exp3, res)
 }
