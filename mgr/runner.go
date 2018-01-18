@@ -148,7 +148,7 @@ func NewCustomRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, ps *
 		sr = sender.NewSenderRegistry()
 	}
 	if rc.MetricConfig != nil {
-		return NewMetricRunner(rc, sender.NewSenderRegistry())
+		return NewMetricRunner(rc, sr)
 	}
 	return NewLogExportRunner(rc, cleanChan, ps, sr)
 }
