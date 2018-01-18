@@ -139,7 +139,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
-			Description:  "根据正则表达式匹配文件(valid_file_pattern)",
+			Description:  "根据linux通配符匹配文件(valid_file_pattern)",
 		},
 	},
 	ModeFile: {
