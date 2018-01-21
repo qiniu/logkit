@@ -9,6 +9,7 @@ type Option struct {
 	Description   string
 	CheckRegex    string
 	Type          string `json:"Type,omitempty"`
+	Secret        bool
 }
 
 type KeyValue struct {
