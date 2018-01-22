@@ -9,6 +9,10 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	config "github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/utils"
+	"github.com/stretchr/testify/assert"
 )
 
 var test1 = `{
@@ -475,4 +479,64 @@ func Test_Watch_LogDir(t *testing.T) {
 		t.Fatal("runner of \"./tests2/confs1/test5.conf\" exp  after add test5.conf but not", m.runners, confPathAbs, time.Now().Format(time.RFC3339Nano))
 	}
 	m.Stop()
+}
+
+func Test_GetRawData(t *testing.T) {
+	var testGetRawData = `{
+    "name":"testGetRawData.csv",
+    "batch_len": 3,
+    "batch_size": 2097152,
+    "batch_interval": 60,
+    "batch_try_times": 3, 
+    "reader":{
+        "log_path":"./Test_GetRawData/logdir",
+        "meta_path":"./Test_GetRawData1/meta_req_csv",
+        "mode":"dir",
+        "read_from":"oldest",
+        "ignore_hidden":"true"
+    }
+}
+`
+	logfile := "./Test_GetRawData/logdir/log1"
+	logdir := "./Test_GetRawData/logdir"
+	if err := os.MkdirAll("./Test_GetRawData/confs1", 0777); err != nil {
+		t.Error(err)
+	}
+	defer os.RemoveAll("./Test_GetRawData")
+
+	if err := os.MkdirAll(logdir, 0777); err != nil {
+		t.Error(err)
+	}
+	err := createFile(logfile, 20000000)
+	if err != nil {
+		t.Error(err)
+	}
+	err = ioutil.WriteFile("./Test_GetRawData/confs1/test1.conf", []byte(testGetRawData), 0666)
+	if err != nil {
+		t.Error(err)
+	}
+	time.Sleep(1 * time.Second)
+	var conf ManagerConfig
+	m, err := NewManager(conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	confPathAbs, _, err := utils.GetRealPath("./Test_GetRawData/confs1/test1.conf")
+	if err != nil {
+		t.Error(err)
+	}
+
+	var runnerConf RunnerConfig
+	err = config.LoadEx(&runnerConf, confPathAbs)
+	if err != nil {
+		t.Error(err)
+	}
+
+	rawData, err := m.GetRawData(runnerConf)
+	if err != nil {
+		t.Error(err)
+	}
+
+	expected := "abc\n"
+	assert.Equal(t, expected, rawData)
 }
