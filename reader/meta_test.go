@@ -25,7 +25,6 @@ func createFile(interval int) {
 	createDir()
 	createOnlyFiles(interval)
 }
-
 func createDir() {
 	err := os.Mkdir(dir, 0755)
 	if err != nil {
@@ -87,7 +86,7 @@ func TestMeta(t *testing.T) {
 	dirToRm := "meta"
 	os.RemoveAll(dirToRm)
 
-	meta, err = NewMeta(metaDir, metaDir, ModeDir, "logpath", 7)
+	meta, err = NewMeta(metaDir, metaDir, ModeDir, "logpath", "", 7)
 	if err != nil {
 		t.Error(err)
 	}

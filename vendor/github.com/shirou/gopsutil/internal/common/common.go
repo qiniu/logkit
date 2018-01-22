@@ -316,6 +316,10 @@ func HostEtc(combineWith ...string) string {
 	return GetEnv("HOST_ETC", "/etc", combineWith...)
 }
 
+func HostVar(combineWith ...string) string {
+	return GetEnv("HOST_VAR", "/var", combineWith...)
+}
+
 // https://gist.github.com/kylelemons/1525278
 func Pipeline(cmds ...*exec.Cmd) ([]byte, []byte, error) {
 	// Require at least one command
@@ -357,4 +361,20 @@ func Pipeline(cmds ...*exec.Cmd) ([]byte, []byte, error) {
 
 	// Return the pipeline output and the collected standard error
 	return output.Bytes(), stderr.Bytes(), nil
+}
+
+// getSysctrlEnv sets LC_ALL=C in a list of env vars for use when running
+// sysctl commands (see DoSysctrl).
+func getSysctrlEnv(env []string) []string {
+	foundLC := false
+	for i, line := range env {
+		if strings.HasPrefix(line, "LC_ALL") {
+			env[i] = "LC_ALL=C"
+			foundLC = true
+		}
+	}
+	if !foundLC {
+		env = append(env, "LC_ALL=C")
+	}
+	return env
 }

@@ -30,7 +30,8 @@ func (g *Discarder) Transform(datas []sender.Data) ([]sender.Data, error) {
 }
 
 func (g *Discarder) Description() string {
-	return "discard onefield from data"
+	//return "discard onefield from data"
+	return "删除指定的数据字段"
 }
 
 func (g *Discarder) Type() string {

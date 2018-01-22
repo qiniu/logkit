@@ -437,7 +437,9 @@ func (rs *RestService) PostConfigReset() echo.HandlerFunc {
 				return RespError(c, http.StatusBadRequest, utils.ErrRunnerReset, errMsg)
 			}
 		}
+		rs.mgr.lock.RLock()
 		runner, runnerOk := rs.mgr.runners[filename]
+		rs.mgr.lock.RUnlock()
 		if !runnerOk {
 			errMsg := "runner " + name + " is not found"
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerReset, errMsg)

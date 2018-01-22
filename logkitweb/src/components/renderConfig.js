@@ -46,6 +46,9 @@ class renderConfig extends Component {
       current: 0,
       machines: []
     };
+    this.notifyJSONError = _.debounce(function(){
+      this.notification = notification.warning({message: "不是一个合法的json对象,请检查", duration: 10,})
+    }, 500)
   }
 
   componentDidMount() {
@@ -89,6 +92,7 @@ class renderConfig extends Component {
   handleIntervalChange = (value) => {
     const {getFieldsValue, getFieldDecorator, resetFields} = this.props.form;
     let data = getFieldsValue();
+    this.closeNotification();
     if (this.isJSON(data.config)) {
       const jsonData = JSON.parse(data.config)
       jsonData.batch_interval = value
@@ -97,13 +101,14 @@ class renderConfig extends Component {
       getFieldDecorator("name", {initialValue: data.name});
       getFieldDecorator("collect_interval", {initialValue: parseInt(data.collect_interval)});
     } else {
-      notification.warning({message: "不是一个合法的json对象,请检查", duration: 10,})
+      this.notifyJSONError();
     }
   }
 
   handleMetricIntervalChange = (value) => {
     const {getFieldsValue, getFieldDecorator, resetFields} = this.props.form;
     let data = getFieldsValue();
+    this.closeNotification();
     if (this.isJSON(data.config)) {
       const jsonData = JSON.parse(data.config)
       jsonData.collect_interval = value
@@ -112,7 +117,7 @@ class renderConfig extends Component {
       getFieldDecorator("name", {initialValue: data.name});
       getFieldDecorator("batch_interval", {initialValue: parseInt(data.batch_interval)});
     } else {
-      notification.warning({message: "不是一个合法的json对象,请检查", duration: 10,})
+      this.notifyJSONError();
     }
 
   }
@@ -120,6 +125,7 @@ class renderConfig extends Component {
   handleNameChange = (e) => {
     const {getFieldsValue, getFieldDecorator, resetFields} = this.props.form;
     let data = getFieldsValue();
+    this.closeNotification();
     if (this.isJSON(data.config)) {
       const jsonData = JSON.parse(data.config)
       jsonData.name = e.target.value
@@ -128,13 +134,14 @@ class renderConfig extends Component {
       getFieldDecorator("batch_interval", {initialValue: parseInt(data.batch_interval)});
       getFieldDecorator("collect_interval", {initialValue: parseInt(data.collect_interval)});
     } else {
-      notification.warning({message: "不是一个合法的json对象,请检查", duration: 10,})
+      this.notifyJSONError();
     }
 
   }
 
   handleConfigChange = (e) => {
     const {getFieldDecorator, resetFields} = this.props.form;
+    this.closeNotification();
     if (this.isJSON(e.target.value)) {
       const jsonData = JSON.parse(e.target.value)
       resetFields()
@@ -142,11 +149,15 @@ class renderConfig extends Component {
       getFieldDecorator("batch_interval", {initialValue: parseInt(jsonData.batch_interval)});
       getFieldDecorator("collect_interval", {initialValue: parseInt(jsonData.collect_interval)});
     } else {
-      notification.warning({message: "不是一个合法的json对象,请检查", duration: 10,})
+      this.notifyJSONError();
     }
 
   }
-
+  
+  closeNotification(){
+    notification.destroy()
+  }
+  
   renderSelectOptions = (items) => {
     let options = []
     if (items != undefined) {

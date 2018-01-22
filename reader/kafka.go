@@ -41,12 +41,13 @@ type KafkaReader struct {
 }
 
 func NewKafkaReader(meta *Meta, consumerGroup string,
-	topics []string, zookeeper []string, zookeeperTimeout time.Duration, whence string) (kr *KafkaReader, err error) {
+	topics []string, zookeeper []string, zkchroot string, zookeeperTimeout time.Duration, whence string) (kr *KafkaReader, err error) {
 	kr = &KafkaReader{
 		meta:             meta,
 		ConsumerGroup:    consumerGroup,
 		ZookeeperPeers:   zookeeper,
 		ZookeeperTimeout: zookeeperTimeout,
+		ZookeeperChroot:  zkchroot,
 		Topics:           topics,
 		Whence:           whence,
 		readChan:         make(chan json.RawMessage),
@@ -120,7 +121,7 @@ func (kr *KafkaReader) Start() {
 		return
 	}
 	config := consumergroup.NewConfig()
-	config.Zookeeper.Chroot = ""
+	config.Zookeeper.Chroot = kr.ZookeeperChroot
 	config.Zookeeper.Timeout = kr.ZookeeperTimeout
 	switch strings.ToLower(kr.Whence) {
 	case "oldest", "":

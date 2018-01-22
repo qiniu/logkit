@@ -61,6 +61,7 @@ const (
 	KeyEncoding      = "encoding"
 	KeyReadIOLimit   = "readio_limit"
 	KeyDataSourceTag = "datasource_tag"
+	KeyTagFile       = "tag_file"
 	KeyHeadPattern   = "head_pattern"
 	KeyRunnerName    = "runner_name"
 
@@ -119,6 +120,7 @@ const (
 	KeyKafkaGroupID          = "kafka_groupid"
 	KeyKafkaTopic            = "kafka_topic"
 	KeyKafkaZookeeper        = "kafka_zookeeper"
+	KeyKafkaZookeeperChroot  = "kafka_zookeeper_chroot"
 	KeyKafkaZookeeperTimeout = "kafka_zookeeper_timeout"
 )
 
@@ -259,7 +261,11 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 		zkTimeout, _ := conf.GetIntOr(KeyKafkaZookeeperTimeout, 1)
 
 		zookeepers, err := conf.GetStringList(KeyKafkaZookeeper)
-		reader, err = NewKafkaReader(meta, consumerGroup, topics, zookeepers, time.Duration(zkTimeout)*time.Second, whence)
+		if err != nil {
+			return nil, err
+		}
+		zkchroot, _ := conf.GetStringOr(KeyKafkaZookeeperChroot, "")
+		reader, err = NewKafkaReader(meta, consumerGroup, topics, zookeepers, zkchroot, time.Duration(zkTimeout)*time.Second, whence)
 	case ModeRedis:
 		reader, err = NewRedisReader(meta, conf)
 	case ModeSocket:

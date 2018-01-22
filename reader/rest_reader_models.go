@@ -140,7 +140,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
-			Description:  "根据正则表达式匹配文件(valid_file_pattern)",
+			Description:  "根据linux通配符匹配文件(valid_file_pattern)",
 		},
 	},
 	ModeFile: {
@@ -524,6 +524,13 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "localhost:2181",
 			DefaultNoUse: true,
 			Description:  "Zookeeper地址(kafka_zookeeper)",
+		},
+		{
+			KeyName:      KeyKafkaZookeeperChroot,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "Zookeeper中kafka根地址(kafka_zookeeper_chroot)",
 		},
 		OptionWhence,
 		{
