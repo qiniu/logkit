@@ -26,10 +26,11 @@ var DEFAULT_LOGKIT_REST_DIR = "/.logkitconfs"
 type ManagerConfig struct {
 	BindHost string `json:"bind_host"`
 
-	Idc     string        `json:"idc"`
-	Zone    string        `json:"zone"`
-	RestDir string        `json:"rest_dir"`
-	Cluster ClusterConfig `json:"cluster"`
+	Idc        string        `json:"idc"`
+	Zone       string        `json:"zone"`
+	RestDir    string        `json:"rest_dir"`
+	Cluster    ClusterConfig `json:"cluster"`
+	DisableWeb bool          `json:"disable_web"`
 }
 
 type cleanQueue struct {

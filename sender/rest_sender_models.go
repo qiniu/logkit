@@ -111,6 +111,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "在此填写您七牛账号的secret_key",
 			DefaultNoUse: true,
 			Description:  "七牛的私钥(secret_key)",
+			Secret:       true,
 		},
 		OptionSaveLogPath,
 		{

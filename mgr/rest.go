@@ -136,6 +136,10 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 		if port > 10000 {
 			log.Fatal("bind port failed too many times, exit...")
 		}
+		if mgr.DisableWeb {
+			break
+		}
+
 		address = ":" + strconv.Itoa(port)
 		if mgr.BindHost != "" {
 			address, httpschema = utils.RemoveHttpProtocal(mgr.BindHost)
@@ -155,9 +159,11 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	}
 	rs.l = listener
 	log.Infof("successfully start RestService and bind address on %v", address)
-	err = generateStatsShell(address, PREFIX)
-	if err != nil {
-		log.Warn(err)
+	if !mgr.DisableWeb {
+		err = generateStatsShell(address, PREFIX)
+		if err != nil {
+			log.Warn(err)
+		}
 	}
 	rs.address = address
 	if rs.cluster.Enable {
@@ -272,6 +278,7 @@ func convertWebParserConfig(conf conf.MapConf) conf.MapConf {
 	if conf == nil {
 		return conf
 	}
+
 	rawCustomPatterns, _ := conf.GetStringOr(parser.KeyGrokCustomPatterns, "")
 	if rawCustomPatterns != "" {
 		CustomPatterns, err := base64.StdEncoding.DecodeString(rawCustomPatterns)
