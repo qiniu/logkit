@@ -623,21 +623,23 @@ func (r *LogExportRunner) Name() string {
 	return r.RunnerName
 }
 
-func (r *LogExportRunner) Reset() error {
-	var errmsg string
-	err := r.meta.Reset()
-	if err != nil {
-		errmsg += err.Error() + "\n"
+func (r *LogExportRunner) Reset() (err error) {
+	var errMsg string
+	if err = r.meta.Reset(); err != nil {
+		errMsg += err.Error() + "\n"
 	}
 	for _, sd := range r.senders {
 		ssd, ok := sd.(Resetable)
 		if ok {
 			if nerr := ssd.Reset(); nerr != nil {
-				errmsg += err.Error() + "\n"
+				errMsg += nerr.Error() + "\n"
 			}
 		}
 	}
-	return errors.New(errmsg)
+	if errMsg != "" {
+		err = errors.New(errMsg)
+	}
+	return nil
 }
 
 func (r *LogExportRunner) Cleaner() CleanInfo {

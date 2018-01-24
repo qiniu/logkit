@@ -315,8 +315,7 @@ func (rs *RestService) backupRunnerConfig(rconf interface{}, filename string) er
 }
 
 func (rs *RestService) checkNameAndConfig(c echo.Context) (name string, conf RunnerConfig, file string, err error) {
-	name = c.Param("name")
-	if name == "" {
+	if name = c.Param("name"); name == "" {
 		err = errors.New("config name is empty")
 		return
 	}
@@ -336,33 +335,18 @@ func (rs *RestService) checkNameAndConfig(c echo.Context) (name string, conf Run
 // post /logkit/configs/<name>
 func (rs *RestService) PostConfig() echo.HandlerFunc {
 	return func(c echo.Context) (err error) {
-		name := c.Param("name")
-		if name == "" {
+		var name string
+		if name = c.Param("name"); name == "" {
 			errMsg := "runner name is empty"
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerAdd, errMsg)
 		}
-
 		var nconf RunnerConfig
 		if err = c.Bind(&nconf); err != nil {
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerAdd, err.Error())
 		}
-		nconf.CreateTime = time.Now().Format(time.RFC3339Nano)
-		nconf.RunnerName = name
-		filename := filepath.Join(rs.mgr.RestDir, nconf.RunnerName+".conf")
-		if rs.mgr.isRunning(filename) {
-			errMsg := "file " + filename + " runner is running"
-			return RespError(c, http.StatusBadRequest, utils.ErrRunnerAdd, errMsg)
-		}
-		nconf.ParserConf = convertWebParserConfig(nconf.ParserConf)
 		nconf.IsInWebFolder = true
-		if err = rs.mgr.ForkRunner(filename, nconf, true); err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrRunnerAdd, err.Error())
-		}
-		if err := rs.backupRunnerConfig(nconf, filename); err != nil {
-			// 回滚, 删除创建的 runner, 备份配置文件失败，所以此处不需要从磁盘删除配置文件
-			if rollBackErr := rs.mgr.Remove(filename); rollBackErr != nil {
-				log.Errorf("runner <%v> backup RunnerConfig error and rollback error %v", rollBackErr)
-			}
+		nconf.ParserConf = convertWebParserConfig(nconf.ParserConf)
+		if err = rs.mgr.AddRunner(name, nconf); err != nil {
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerAdd, err.Error())
 		}
 		return RespSuccess(c, nil)
@@ -372,42 +356,18 @@ func (rs *RestService) PostConfig() echo.HandlerFunc {
 // put /logkit/configs/<name>
 func (rs *RestService) PutConfig() echo.HandlerFunc {
 	return func(c echo.Context) (err error) {
-		name := c.Param("name")
-		if name == "" {
+		var name string
+		if name = c.Param("name"); name == "" {
 			errMsg := "config name is empty"
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerUpdate, errMsg)
 		}
-
 		var nconf RunnerConfig
 		if err = c.Bind(&nconf); err != nil {
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerUpdate, err.Error())
 		}
-		nconf.CreateTime = time.Now().Format(time.RFC3339Nano)
-		nconf.RunnerName = name
-		filename := filepath.Join(rs.mgr.RestDir, nconf.RunnerName+".conf")
-		rs.mgr.lock.RLock()
-		oldConf := rs.mgr.runnerConfig[filename]
-		rs.mgr.lock.RUnlock()
-		if rs.mgr.isRunning(filename) {
-			if subErr := rs.mgr.Remove(filename); subErr != nil {
-				log.Errorf("remove runner %v error %v", filename, subErr)
-			}
-			os.Remove(filename)
-		}
-		nconf.ParserConf = convertWebParserConfig(nconf.ParserConf)
 		nconf.IsInWebFolder = true
-		if err = rs.mgr.ForkRunner(filename, nconf, true); err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrRunnerUpdate, err.Error())
-		}
-		if err = rs.backupRunnerConfig(nconf, filename); err != nil {
-			// 备份配置失败，回滚
-			if subErr := rs.mgr.Remove(filename); subErr != nil {
-				log.Errorf("runner %v update backup config error and rollback error %v", filename, subErr)
-			}
-			os.Remove(filename)
-			if subErr := rs.mgr.ForkRunner(filename, oldConf, true); subErr != nil {
-				log.Errorf("runner %v update backup config error and rollback error %v", filename, subErr)
-			}
+		nconf.ParserConf = convertWebParserConfig(nconf.ParserConf)
+		if err = rs.mgr.UpdateRunner(name, nconf); err != nil {
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerUpdate, err.Error())
 		}
 		return RespSuccess(c, nil)
@@ -416,33 +376,13 @@ func (rs *RestService) PutConfig() echo.HandlerFunc {
 
 // POST /logkit/configs/<name>/reset
 func (rs *RestService) PostConfigReset() echo.HandlerFunc {
-	return func(c echo.Context) error {
-		name, runnerConfig, filename, err := rs.checkNameAndConfig(c)
-		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrRunnerReset, err.Error())
-		}
-		if runnerConfig.IsStopped {
-			runnerConfig.IsStopped = false
-			err = rs.mgr.ForkRunner(filename, runnerConfig, true)
-			if err != nil {
-				errMsg := "runner " + name + " reset failed " + err.Error()
-				return RespError(c, http.StatusBadRequest, utils.ErrRunnerReset, errMsg)
-			}
-		}
-		rs.mgr.lock.RLock()
-		runner, runnerOk := rs.mgr.runners[filename]
-		rs.mgr.lock.RUnlock()
-		if !runnerOk {
-			errMsg := "runner " + name + " is not found"
+	return func(c echo.Context) (err error) {
+		var name string
+		if name = c.Param("name"); name == "" {
+			errMsg := "config name is empty"
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerReset, errMsg)
 		}
-		if subErr := rs.mgr.Remove(filename); subErr != nil {
-			log.Errorf("remove runner %v error %v", filename, subErr)
-		}
-		if runnerReset, ok := runner.(Resetable); ok {
-			err = runnerReset.Reset()
-		}
-		if err = rs.mgr.ForkRunner(filename, runnerConfig, true); err != nil {
+		if err = rs.mgr.ResetRunner(name); err != nil {
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerReset, err.Error())
 		}
 		return RespSuccess(c, nil)
@@ -451,25 +391,13 @@ func (rs *RestService) PostConfigReset() echo.HandlerFunc {
 
 // POST /logkit/configs/<name>/start
 func (rs *RestService) PostConfigStart() echo.HandlerFunc {
-	return func(c echo.Context) error {
-		name, conf, filename, err := rs.checkNameAndConfig(c)
-		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrRunnerStart, err.Error())
+	return func(c echo.Context) (err error) {
+		var name string
+		if name = c.Param("name"); name == "" {
+			errMsg := "config name is empty"
+			return RespError(c, http.StatusBadRequest, utils.ErrRunnerStart, errMsg)
 		}
-		conf.IsStopped = false
-		if err = rs.mgr.ForkRunner(filename, conf, true); err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrRunnerStart, err.Error())
-		}
-		if err = rs.backupRunnerConfig(conf, filename); err != nil {
-			// 备份配置文件失败，回滚
-			if subErr := rs.mgr.RemoveWithConfig(filename, false); subErr != nil {
-				log.Errorf("runner %v start backup config error and rollback error %v", name, subErr)
-			} else {
-				conf.IsStopped = true
-				rs.mgr.lock.Lock()
-				rs.mgr.runnerConfig[filename] = conf
-				rs.mgr.lock.Unlock()
-			}
+		if err = rs.mgr.StartRunner(name); err != nil {
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerStart, err.Error())
 		}
 		return RespSuccess(c, nil)
@@ -478,28 +406,13 @@ func (rs *RestService) PostConfigStart() echo.HandlerFunc {
 
 // POST /logkit/configs/<name>/stop
 func (rs *RestService) PostConfigStop() echo.HandlerFunc {
-	return func(c echo.Context) error {
-		name, runnerConfig, filename, err := rs.checkNameAndConfig(c)
-		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrRunnerStop, err.Error())
-		}
-		if !rs.mgr.isRunning(filename) {
-			errMsg := "the runner " + name + " is not running"
+	return func(c echo.Context) (err error) {
+		var name string
+		if name = c.Param("name"); name == "" {
+			errMsg := "config name is empty"
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerStop, errMsg)
 		}
-		if err = rs.mgr.RemoveWithConfig(filename, false); err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrRunnerStop, err.Error())
-		}
-		runnerConfig.IsStopped = true
-		rs.mgr.lock.Lock()
-		rs.mgr.runnerConfig[filename] = runnerConfig
-		rs.mgr.lock.Unlock()
-		if err = rs.backupRunnerConfig(runnerConfig, filename); err != nil {
-			// 备份配置文件失败，回滚
-			runnerConfig.IsStopped = false
-			if subErr := rs.mgr.ForkRunner(filename, runnerConfig, true); subErr != nil {
-				log.Errorf("runner %v stop backup config error and rollback error %v", name, subErr)
-			}
+		if err = rs.mgr.StopRunner(name); err != nil {
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerStop, err.Error())
 		}
 		return RespSuccess(c, nil)
@@ -508,25 +421,13 @@ func (rs *RestService) PostConfigStop() echo.HandlerFunc {
 
 // delete /logkit/configs/<name>
 func (rs *RestService) DeleteConfig() echo.HandlerFunc {
-	return func(c echo.Context) error {
-		name, runnerConfig, filename, err := rs.checkNameAndConfig(c)
-		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrRunnerDelete, err.Error())
+	return func(c echo.Context) (err error) {
+		var name string
+		if name = c.Param("name"); name == "" {
+			errMsg := "config name is empty"
+			return RespError(c, http.StatusBadRequest, utils.ErrRunnerDelete, errMsg)
 		}
-		if runnerConfig.IsStopped {
-			rs.mgr.lock.Lock()
-			delete(rs.mgr.runnerConfig, filename)
-			rs.mgr.lock.Unlock()
-		} else {
-			if err := rs.mgr.Remove(filename); err != nil {
-				return RespError(c, http.StatusBadRequest, utils.ErrRunnerDelete, err.Error())
-			}
-		}
-		if err = os.Remove(filename); err != nil {
-			// 删除配置文件失败, 回滚
-			if subErr := rs.mgr.ForkRunner(filename, runnerConfig, true); subErr != nil {
-				log.Errorf("runner %v stop backup config error and rollback error %v", name, subErr)
-			}
+		if err = rs.mgr.DeleteRunner(name); err != nil {
 			return RespError(c, http.StatusBadRequest, utils.ErrRunnerDelete, err.Error())
 		}
 		return RespSuccess(c, nil)
