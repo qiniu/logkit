@@ -569,7 +569,6 @@ func (m *Manager) UpdateRunner(name string, conf RunnerConfig) (err error) {
 		if subErr := m.Remove(filename); subErr != nil {
 			return fmt.Errorf("remove runner %v error %v", filename, subErr)
 		}
-		os.Remove(filename)
 	}
 	if err = m.ForkRunner(filename, conf, true); err != nil {
 		if subErr := m.ForkRunner(filename, oldConf, true); subErr != nil {
@@ -582,7 +581,6 @@ func (m *Manager) UpdateRunner(name string, conf RunnerConfig) (err error) {
 		if subErr := m.Remove(filename); subErr != nil {
 			log.Errorf("runner %v update backup config error and rollback error %v", filename, subErr)
 		}
-		os.Remove(filename)
 		if subErr := m.ForkRunner(filename, oldConf, true); subErr != nil {
 			log.Errorf("runner %v update backup config error and rollback error %v", filename, subErr)
 		}
@@ -596,7 +594,7 @@ func (m *Manager) StartRunner(name string) (err error) {
 		return err
 	}
 	if conf.IsStopped == false {
-		return fmt.Errorf("runner %v is already started", filename)
+		return fmt.Errorf("runner %v has already started", filename)
 	}
 	conf.IsStopped = false
 	if err = m.ForkRunner(filename, conf, true); err != nil {
@@ -622,7 +620,7 @@ func (m *Manager) StopRunner(name string) (err error) {
 		return err
 	}
 	if conf.IsStopped == true {
-		return fmt.Errorf("runner %v is already stopped", filename)
+		return fmt.Errorf("runner %v has already stopped", filename)
 	}
 	conf.IsStopped = true
 	if !m.isRunning(filename) {
@@ -683,8 +681,9 @@ func (m *Manager) ResetRunner(name string) (err error) {
 		}
 		return fmt.Errorf("runner %v is not resetable runner", filename)
 	}
+	conf.IsStopped = false
 	if err = m.ForkRunner(filename, conf, true); err != nil {
-		log.Errorf("forkRunner %v error %v", filename, err)
+		return fmt.Errorf("forkRunner %v error %v", filename, err)
 	}
 	return
 }
@@ -698,21 +697,24 @@ func (m *Manager) DeleteRunner(name string) (err error) {
 		m.lock.Lock()
 		delete(m.runnerConfig, filename)
 		m.lock.Unlock()
-	} else {
-		m.lock.RLock()
-		r, runnerOk := m.runners[filename]
-		m.lock.RUnlock()
-		if runnerOk {
-			if runnerReset, ok := r.(Resetable); ok {
-				runnerReset.Reset()
-			}
+	}
+	m.lock.RLock()
+	r, runnerOk := m.runners[filename]
+	m.lock.RUnlock()
+	if runnerOk {
+		if err = m.Remove(filename); err != nil {
+			return fmt.Errorf("remove runner %v error %v", filename, err)
+		}
+		if runnerReset, ok := r.(Resetable); ok {
+			runnerReset.Reset()
 		}
 	}
-	if err = m.Remove(filename); err != nil {
+	if err = os.Remove(filename); err != nil {
 		// 回滚
 		if subErr := m.ForkRunner(filename, conf, true); subErr != nil {
 			log.Errorf("remove runner %v error and rollback error %v", filename, subErr)
 		}
+		return fmt.Errorf("remove runner %v error %v", filename, err)
 	}
 	return
 }
