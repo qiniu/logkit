@@ -625,6 +625,11 @@ func (r *LogExportRunner) Name() string {
 
 func (r *LogExportRunner) Reset() (err error) {
 	var errMsg string
+	if read, ok := r.reader.(Resetable); ok {
+		if subErr := read.Reset(); subErr != nil {
+			errMsg += subErr.Error() + "\n"
+		}
+	}
 	if err = r.meta.Reset(); err != nil {
 		errMsg += err.Error() + "\n"
 	}
