@@ -2,6 +2,7 @@ package mgr
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"github.com/qiniu/logkit/cleaner"
 	config "github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/utils"
 
@@ -714,5 +716,42 @@ func (m *Manager) DeleteRunner(name string) (err error) {
 			log.Errorf("remove runner %v error and rollback error %v", filename, subErr)
 		}
 	}
+	return
+}
+
+//reader模块中各种type的日志都能获取raw_data
+func (m *Manager) GetRawData(nconf RunnerConfig) (rawData string, err error) {
+	if nconf.ReaderConfig == nil {
+		err = fmt.Errorf("reader config cannot be empty")
+		return
+	}
+
+	var (
+		rd reader.Reader
+	)
+	rd, err = reader.NewFileBufReader(nconf.ReaderConfig, nconf.IsInWebFolder)
+	if err != nil {
+		return
+	}
+
+	tryCount := 3
+	for {
+		if tryCount <= 0 {
+			err = fmt.Errorf("get raw data time out, raw data is empty")
+			return
+		}
+		tryCount--
+		rawData, err = rd.ReadLine()
+		if err != nil && err != io.EOF {
+			log.Errorf("reader %s - error: %v", rd.Name(), err)
+			break
+		}
+		if len(rawData) <= 0 {
+			log.Debugf("reader %s no more content fetched sleep 1 second...", rd.Name())
+			continue
+		}
+		return
+	}
+
 	return
 }
