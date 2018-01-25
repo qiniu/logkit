@@ -344,6 +344,9 @@ func copyAndConvertData(d Data, mapLevel int) Data {
 	for k, v := range d {
 		switch nv := v.(type) {
 		case map[string]interface{}:
+			if len(nv) == 0 {
+				continue
+			}
 			if mapLevel >= 5 {
 				str, err := json.Marshal(nv)
 				if err != nil {

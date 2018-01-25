@@ -84,6 +84,8 @@ const (
 	ErrInvalidUdfJarName
 	ErrInvalidUdfFuncName
 	ErrInvalidJavaClassName
+	ErrStartExport
+	ErrStopExport
 	ErrUdfClassTypeError
 	ErrUdfClassNotFound
 	ErrUdfFunctionNotImplement
@@ -125,6 +127,9 @@ const (
 	ErrTimeFormatInvalid
 	ErrNoSuchResourceOwner
 	ErrAccessDenied
+	ErrTransformRepeatRestart
+	ErrTooManySchema
+	ErrSchemaLimitUnderflow
 )
 
 type ErrBuilder interface {
