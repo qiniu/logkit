@@ -493,24 +493,18 @@ func (m *Meta) GetTags() map[string]interface{} {
 	return m.tags
 }
 
-func (b *Meta) Reset() error {
-	if b == nil {
+func (m *Meta) Reset() error {
+	if m == nil {
 		return errors.New("Reset error as meta is nil")
 	}
-	os.RemoveAll(b.statisticPath)
-	if _, err := os.Stat(b.metaFilePath); err != nil {
+	if err := os.RemoveAll(m.statisticPath); err != nil {
 		return err
 	}
-	if err := os.RemoveAll(b.metaFilePath); err != nil {
+	if err := os.RemoveAll(m.metaFilePath); err != nil {
 		return err
 	}
-	if b.doneFilePath != b.metaFilePath {
-		if _, err := os.Stat(b.doneFilePath); err != nil {
-			return err
-		}
-		if err := os.RemoveAll(b.doneFilePath); err != nil {
-			return err
-		}
+	if err := os.RemoveAll(m.doneFilePath); err != nil {
+		return err
 	}
 	return nil
 }

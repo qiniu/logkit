@@ -639,7 +639,7 @@ func (r *LogExportRunner) Reset() (err error) {
 	if errMsg != "" {
 		err = errors.New(errMsg)
 	}
-	return nil
+	return err
 }
 
 func (r *LogExportRunner) Cleaner() CleanInfo {

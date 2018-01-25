@@ -314,21 +314,23 @@ func (mr *MetricRunner) Stop() {
 	}
 }
 
-func (mr *MetricRunner) Reset() error {
+func (mr *MetricRunner) Reset() (err error) {
 	var errMsg string
-	err := mr.meta.Reset()
-	if err != nil {
+	if err = mr.meta.Reset(); err != nil {
 		errMsg += err.Error() + "\n"
 	}
 	for _, sd := range mr.senders {
 		ssd, ok := sd.(Resetable)
 		if ok {
 			if nerr := ssd.Reset(); nerr != nil {
-				errMsg += err.Error() + "\n"
+				errMsg += nerr.Error() + "\n"
 			}
 		}
 	}
-	return errors.New(errMsg)
+	if errMsg != "" {
+		err = errors.New(errMsg)
+	}
+	return err
 }
 
 func (_ *MetricRunner) Cleaner() CleanInfo {
