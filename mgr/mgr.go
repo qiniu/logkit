@@ -1,7 +1,6 @@
 package mgr
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -754,52 +753,6 @@ func GetRawData(readerConfig config.MapConf) (rawData string, err error) {
 			continue
 		}
 		return
-	}
-
-	return
-}
-
-func (m *Manager) GetParserData(rc RunnerConfig, lines []string) (parserData []sender.Data, err error) {
-	if rc.ParserConf == nil {
-		err = fmt.Errorf("reader config cannot be empty")
-		return
-	}
-
-	if len(lines) == 0 {
-		rawData, err := m.GetRawData(rc)
-		if err != nil {
-			errMsg := fmt.Sprintf("parser cannot fetched data from reader, err : %v", err)
-			return nil, errors.New(errMsg)
-		}
-		if rawData != "" {
-			lines = append(lines, rawData)
-		}
-	}
-
-	pr := parser.NewParserRegistry()
-	ps, err := pr.NewLogParser(rc.ParserConf)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(lines) <= 0 {
-		log.Debugf("parser [%v] fetched 0 lines", ps.Name())
-		pt, ok := ps.(parser.ParserType)
-		if ok && pt.Type() == parser.TypeSyslog {
-			lines = []string{parser.SyslogEofLine}
-		} else {
-			err = fmt.Errorf("parser [%v] fetched 0 lines", ps.Name())
-			return nil, err
-		}
-	}
-
-	parserData, err = ps.Parse(lines)
-	se, ok := err.(*utils.StatsError)
-	if ok {
-		err = se.ErrorDetail
-	} else if err != nil {
-		errMsg := fmt.Sprintf("parser %s error : %v ", ps.Name(), err.Error())
-		return nil, errors.New(errMsg)
 	}
 
 	return
