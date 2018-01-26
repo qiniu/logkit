@@ -2,19 +2,18 @@ package parser
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
-	"fmt"
-
-	"github.com/json-iterator/go"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
+	"github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
 )
 
