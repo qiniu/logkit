@@ -8,10 +8,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 type DateTrans struct {
@@ -26,7 +26,7 @@ func (g *DateTrans) RawTransform(datas []string) ([]string, error) {
 	return datas, errors.New("date transformer not support rawTransform")
 }
 
-func (g *DateTrans) Transform(datas []sender.Data) ([]sender.Data, error) {
+func (g *DateTrans) Transform(datas []Data) ([]Data, error) {
 	var err, ferr error
 	errnums := 0
 	keys := utils.GetKeys(g.Key)
@@ -134,8 +134,8 @@ func (g *DateTrans) SampleConfig() string {
 	}`
 }
 
-func (it *DateTrans) ConfigOptions() []utils.Option {
-	return []utils.Option{
+func (it *DateTrans) ConfigOptions() []Option {
+	return []Option{
 		transforms.KeyStageAfterOnly,
 		transforms.KeyFieldName,
 		transforms.KeyTimezoneoffset,

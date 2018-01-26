@@ -12,9 +12,9 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (
@@ -104,8 +104,8 @@ func (p *NginxParser) Type() string {
 	return TypeNginx
 }
 
-func (p *NginxParser) Parse(lines []string) ([]sender.Data, error) {
-	var ret []sender.Data
+func (p *NginxParser) Parse(lines []string) ([]Data, error) {
+	var ret []Data
 	se := &utils.StatsError{}
 	for _, line := range lines {
 		data, err := p.parseline(line)
@@ -126,14 +126,14 @@ func (p *NginxParser) Parse(lines []string) ([]sender.Data, error) {
 	return ret, se
 }
 
-func (p *NginxParser) parseline(line string) (sender.Data, error) {
+func (p *NginxParser) parseline(line string) (Data, error) {
 	line = strings.Trim(line, "\n")
 	re := p.regexp
 	fields := re.FindStringSubmatch(line)
 	if fields == nil {
 		return nil, fmt.Errorf("NginxParser fail to parse log line [%v], given format is [%v]", line, re)
 	}
-	entry := make(sender.Data)
+	entry := make(Data)
 	// Iterate over subexp group and fill the map record
 	for i, name := range re.SubexpNames() {
 		if i == 0 {

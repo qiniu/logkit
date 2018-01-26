@@ -22,16 +22,9 @@ import (
 	"unicode"
 
 	"github.com/qiniu/log"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
-)
-
-const (
-	GlobalKeyName = "name"
-	KeyCore       = "core"
-	KeyHostName   = "hostname"
-	KeyOsInfo     = "osinfo"
-	KeyLocalIp    = "localip"
 )
 
 type File struct {

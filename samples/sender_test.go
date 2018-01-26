@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -15,7 +15,7 @@ func TestMysender(t *testing.T) {
 		"prefix": "test",
 	}
 	s, err := NewMySender(c)
-	datas := []sender.Data{
+	datas := []Data{
 		{
 			"abc": 1,
 			"cde": "testmessage",

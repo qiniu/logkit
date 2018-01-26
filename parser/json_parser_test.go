@@ -1,14 +1,13 @@
 package parser
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/utils"
-
-	"bytes"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
@@ -22,11 +21,11 @@ func TestJsonParser(t *testing.T) {
 	p, _ := NewJsonParser(c)
 	tests := []struct {
 		in  []string
-		exp []sender.Data
+		exp []Data
 	}{
 		{
 			in: []string{`{"a":1,"b":[1.0,2.0,3.0],"c":{"d":"123","g":1.2},"e":"x","f":1.23}`},
-			exp: []sender.Data{sender.Data{
+			exp: []Data{Data{
 				"a": json.Number("1"),
 				"b": []interface{}{json.Number("1.0"), json.Number("2.0"), json.Number("3.0")},
 				"c": map[string]interface{}{
@@ -40,7 +39,7 @@ func TestJsonParser(t *testing.T) {
 		},
 		{
 			in: []string{`{"a":1,"b":[1.0,2.0,3.0],"c":{"d":"123","g":1.2},"e":"x","mm":1.23,"jjj":1493797500346428926}`},
-			exp: []sender.Data{sender.Data{
+			exp: []Data{Data{
 				"a": json.Number("1"),
 				"b": []interface{}{json.Number("1.0"), json.Number("2.0"), json.Number("3.0")},
 				"c": map[string]interface{}{
@@ -168,7 +167,7 @@ func BenchmarkJsoninterParser(b *testing.B) {
 		UseNumber:  true,
 	}.Froze()
 	for i := 0; i < b.N; i++ {
-		data := sender.Data{}
+		data := Data{}
 		if err := jsonnumber.Unmarshal([]byte(testjsonline), &data); err != nil {
 			b.Error(err)
 		}
@@ -178,7 +177,7 @@ func BenchmarkJsoninterParser(b *testing.B) {
 //BenchmarkJsonParser-4                    	  200000	      7767 ns/op
 func BenchmarkJsonParser(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		data := sender.Data{}
+		data := Data{}
 		decoder := json.NewDecoder(bytes.NewReader([]byte(testjsonline)))
 		decoder.UseNumber()
 		if err := decoder.Decode(&data); err != nil {
@@ -190,7 +189,7 @@ func BenchmarkJsonParser(b *testing.B) {
 //BenchmarkJsonMiddlelineParser-4                  	   30000	     58441 ns/op
 func BenchmarkJsonMiddlelineParser(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		data := sender.Data{}
+		data := Data{}
 		decoder := json.NewDecoder(bytes.NewReader([]byte(testmiddleline)))
 		decoder.UseNumber()
 		if err := decoder.Decode(&data); err != nil {
@@ -202,7 +201,7 @@ func BenchmarkJsonMiddlelineParser(b *testing.B) {
 //BenchmarkJsoniterMiddlelineWithDecoderParser-4   	   30000	     41496 ns/op
 func BenchmarkJsoniterMiddlelineWithDecoderParser(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		data := sender.Data{}
+		data := Data{}
 		decoder := jsoniter.NewDecoder(bytes.NewReader([]byte(testmiddleline)))
 		decoder.UseNumber()
 		if err := decoder.Decode(&data); err != nil {
@@ -218,7 +217,7 @@ func BenchmarkMiddlelineWithConfigParser(b *testing.B) {
 		UseNumber:  true,
 	}.Froze()
 	for i := 0; i < b.N; i++ {
-		data := sender.Data{}
+		data := Data{}
 		if err := jsonnumber.Unmarshal([]byte(testmiddleline), &data); err != nil {
 			b.Error(err)
 		}

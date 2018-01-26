@@ -6,7 +6,7 @@ import (
 	"github.com/json-iterator/go"
 	conf2 "github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
-	"github.com/qiniu/logkit/sender"
+	. "github.com/qiniu/logkit/utils/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -51,7 +51,7 @@ func parserParseTest(p *testParam) {
 	if err != nil {
 		t.Error(err)
 	}
-	exp2 := sender.Data{
+	exp2 := Data{
 		"a": "b",
 		"c": 1.0,
 		"d": 1.1,
@@ -75,7 +75,7 @@ func parserParseTest(p *testParam) {
 		t.Error(err)
 	}
 
-	exp3 := sender.Data{
+	exp3 := Data{
 		"ts":           "2000-10-10T13:55:36-07:00",
 		"verb":         "GET",
 		"http_version": 1.0,
