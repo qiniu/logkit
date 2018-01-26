@@ -1,14 +1,14 @@
 package transforms
 
 import (
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
-func GetTransformerUsages() []utils.KeyValue {
-	var ModeUsages []utils.KeyValue
+func GetTransformerUsages() []KeyValue {
+	var ModeUsages []KeyValue
 	for _, v := range Transformers {
 		cr := v()
-		ModeUsages = append(ModeUsages, utils.KeyValue{
+		ModeUsages = append(ModeUsages, KeyValue{
 			Key:   cr.Type(),
 			Value: cr.Description(),
 		})
@@ -16,8 +16,8 @@ func GetTransformerUsages() []utils.KeyValue {
 	return ModeUsages
 }
 
-func GetTransformerOptions() map[string][]utils.Option {
-	ModeKeyOptions := make(map[string][]utils.Option)
+func GetTransformerOptions() map[string][]Option {
+	ModeKeyOptions := make(map[string][]Option)
 	for _, v := range Transformers {
 		cr := v()
 		ModeKeyOptions[cr.Type()] = cr.ConfigOptions()

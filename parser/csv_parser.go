@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
@@ -322,8 +322,8 @@ func convertValue(v interface{}, valueType CsvType) (ret interface{}, err error)
 	return
 }
 
-func (f field) ValueParse(value string, timeZoneOffset int) (datas sender.Data, err error) {
-	datas = sender.Data{}
+func (f field) ValueParse(value string, timeZoneOffset int) (datas Data, err error) {
+	datas = Data{}
 	switch f.dataType {
 	case TypeJsonMap:
 		if value == "" {
@@ -374,8 +374,8 @@ func (p *CsvParser) Type() string {
 	return TypeCSV
 }
 
-func (p *CsvParser) parse(line string) (sender.Data, error) {
-	d := make(sender.Data, len(p.schema)+len(p.labels))
+func (p *CsvParser) parse(line string) (Data, error) {
+	d := make(Data, len(p.schema)+len(p.labels))
 	parts := strings.Split(line, p.delim)
 	if len(parts) != len(p.schema) {
 		return nil, fmt.Errorf("schema length not match: schema %v length %v, actual column %v length %v", p.schema, len(p.schema), parts, len(parts))
@@ -395,10 +395,10 @@ func (p *CsvParser) parse(line string) (sender.Data, error) {
 	return d, nil
 }
 
-func (p *CsvParser) Rename(datas []sender.Data) []sender.Data {
-	newData := make([]sender.Data, 0)
+func (p *CsvParser) Rename(datas []Data) []Data {
+	newData := make([]Data, 0)
 	for _, d := range datas {
-		data := make(sender.Data)
+		data := make(Data)
 		for key, val := range d {
 			newKey := strings.Replace(key, "-", "_", -1)
 			data[newKey] = val
@@ -408,8 +408,8 @@ func (p *CsvParser) Rename(datas []sender.Data) []sender.Data {
 	return newData
 }
 
-func (p *CsvParser) Parse(lines []string) ([]sender.Data, error) {
-	datas := []sender.Data{}
+func (p *CsvParser) Parse(lines []string) ([]Data, error) {
+	datas := []Data{}
 	se := &utils.StatsError{}
 	for idx, line := range lines {
 		d, err := p.parse(line)

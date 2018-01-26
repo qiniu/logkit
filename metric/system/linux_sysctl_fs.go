@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/qiniu/logkit/metric"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 // https://www.kernel.org/doc/Documentation/sysctl/fs.txt
@@ -53,7 +53,7 @@ var KeySysctlFsFieldNameMap = map[string]string{
 	KeyLinuxSysctlFsFileMax:         "linux_sysctl_fs_file_max",
 }
 
-var KeyLinuxSysctlFsUsage = []utils.KeyValue{
+var KeyLinuxSysctlFsUsage = []KeyValue{
 	{KeySysctlFsFieldNameMap[KeyLinuxSysctlFsAioNr], "当前 aio 请求数"},
 	{KeySysctlFsFieldNameMap[KeyLinuxSysctlFsAioMaxNr], "最大允许的 aio 请求"},
 	{KeySysctlFsFieldNameMap[KeyLinuxSysctlFsDquotNr], "分配的磁盘配额项及空余项"},
@@ -85,7 +85,7 @@ func (_ *SysctlFS) Tags() []string {
 
 func (_ *SysctlFS) Config() map[string]interface{} {
 	config := map[string]interface{}{
-		metric.OptionString:     []utils.Option{},
+		metric.OptionString:     []Option{},
 		metric.AttributesString: KeyLinuxSysctlFsUsage,
 	}
 	return config

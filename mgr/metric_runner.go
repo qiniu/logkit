@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/metric"
@@ -16,6 +15,9 @@ import (
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
+
+	"github.com/json-iterator/go"
 )
 
 const (
@@ -62,7 +64,7 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 	}
 	interval := time.Duration(rc.CollectInterval) * time.Second
 	meta, err := reader.NewMetaWithConf(conf.MapConf{
-		utils.GlobalKeyName:  rc.RunnerName,
+		GlobalKeyName:        rc.RunnerName,
 		reader.KeyRunnerName: rc.RunnerName,
 		reader.KeyMode:       reader.ModeMetrics,
 	})
@@ -100,7 +102,7 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 		metricName := c.Name()
 		trans := make([]transforms.Transformer, 0)
 		if attributes, ex := config[metric.AttributesString]; ex {
-			if attrs, ok := attributes.([]utils.KeyValue); ok {
+			if attrs, ok := attributes.([]KeyValue); ok {
 				for _, attr := range attrs {
 					val, exist := m.Attributes[attr.Key]
 					if exist && !val {
@@ -173,7 +175,7 @@ func (r *MetricRunner) Run() {
 		}
 		// collect data
 		dataCnt := 0
-		datas := make([]sender.Data, 0)
+		datas := make([]Data, 0)
 		now := time.Now().Format(time.RFC3339Nano)
 		for _, c := range r.collectors {
 			metricName := c.Name()
@@ -188,7 +190,7 @@ func (r *MetricRunner) Run() {
 				log.Debugf("MetricRunner %v collect No data", c.Name())
 				continue
 			}
-			tmpDatas := make([]sender.Data, dataLen)
+			tmpDatas := make([]Data, dataLen)
 			for i, d := range tmpdatas {
 				tmpDatas[i] = d
 			}
@@ -204,7 +206,7 @@ func (r *MetricRunner) Run() {
 				if len(metricData) == 0 {
 					continue
 				}
-				data := sender.Data{
+				data := Data{
 					metric.Timestamp: now,
 				}
 				// 重命名
@@ -240,7 +242,7 @@ func (r *MetricRunner) Run() {
 }
 
 // trySend 尝试发送数据，如果此时runner退出返回false，其他情况无论是达到最大重试次数还是发送成功，都返回true
-func (r *MetricRunner) trySend(s sender.Sender, datas []sender.Data, times int) bool {
+func (r *MetricRunner) trySend(s sender.Sender, datas []Data, times int) bool {
 	if len(datas) <= 0 {
 		return true
 	}

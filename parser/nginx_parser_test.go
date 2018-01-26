@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -15,12 +15,12 @@ var accLog2 = []string{`110.110.101.101 - - [21/Mar/2017:18:14:17 +0800] "GET /f
 var accLog1 = []string{`111.111.111.101 - - [30/Aug/2016:14:03:37 +0800] "GET /s5/M00/CE/91/xaxsxsxsxs HTTP/1.1" 200 4962 4259 "http://www.abc.cn" "Mozilla/5.0 (Windows NT 6.1; WOW64)" "-" "123.123.123.123" 192.168.41.58:5000 mirror.qiniu.com WEQAAM8htpudgG8U 0.204 0.204 938 - -  -`}
 var accErrLog = []string{`can't work'`}
 var timeformat1 string
-var accLog1Entry sender.Data
+var accLog1Entry Data
 
 func init() {
 	timelocal1, _ := time.Parse(time.RFC3339, "2016-08-30T14:03:37+08:00")
 	timeformat1 = timelocal1.Format(time.RFC3339)
-	accLog1Entry = sender.Data{"request": `GET /s5/M00/CE/91/xaxsxsxsxs HTTP/1.1`,
+	accLog1Entry = Data{"request": `GET /s5/M00/CE/91/xaxsxsxsxs HTTP/1.1`,
 		"sent_http_x_reqid": "WEQAAM8htpudgG8U", "request_length": int64(938),
 		"http_x_from_cdn": "-", "time_local": timeformat1, "status": int64(200), "upstream_addr": "192.168.41.58:5000", "host": "mirror.qiniu.com", "http_x_estat": `-`, "bytes_sent": int64(4962), "http_user_agent": `Mozilla/5.0 (Windows NT 6.1; WOW64)`,
 		"http_x_forwarded_for": "123.123.123.123", "http_x_stat": "-", "http_transfer_encoding": "-", "upstream_response_time": "0.204", "request_time": 0.204, "remote_addr": "111.111.111.101",
@@ -90,7 +90,7 @@ func Benchmark_BenchNginxParser(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	var m sender.Data
+	var m Data
 	for n := 0; n < b.N; n++ {
 		m, err = p.parseline(`123.0.0.1 - - [17/Jul/2017:14:56:24 +0800] "POST /v2/repos/x/data HTTP/1.1" 200 479 2 "-" "QiniuPandoraJava/0.0.1 (Linux amd64 2.6.32-696.1.1.el6.x86_64) Java/1.8.0_131" "-" 192.168.160.75:80 pipeline.qiniu.com abc123bdc 0.072`)
 		if err != nil {

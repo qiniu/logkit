@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -56,7 +56,7 @@ func TestNewHttpReader(t *testing.T) {
 
 	// 测试 gzip 发送
 	req, err = http.NewRequest(http.MethodPost, "http://127.0.0.1:7110/logkit/data", nil)
-	req.Header.Set(ContentTypeHeader, sender.ApplicationGzip)
+	req.Header.Set(ContentTypeHeader, ApplicationGzip)
 	req.Header.Set(ContentEncodingHeader, "gzip")
 	assert.NoError(t, err)
 	for _, val := range testData {

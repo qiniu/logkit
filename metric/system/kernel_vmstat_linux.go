@@ -10,7 +10,7 @@ import (
 	"strconv"
 
 	"github.com/qiniu/logkit/metric"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (
@@ -36,8 +36,8 @@ func (k *KernelVmstat) Tags() []string {
 
 func (k *KernelVmstat) Config() map[string]interface{} {
 	config := map[string]interface{}{
-		metric.OptionString:     []utils.Option{},
-		metric.AttributesString: []utils.KeyValue{},
+		metric.OptionString:     []Option{},
+		metric.AttributesString: []KeyValue{},
 	}
 	return config
 }

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/qiniu/logkit/metric"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (
@@ -31,7 +31,7 @@ const (
 )
 
 // KeyDiskUsages TypeMetricDisk 字段名称
-var KeyDiskUsages = []utils.KeyValue{
+var KeyDiskUsages = []KeyValue{
 	{KeyDiskPath, "磁盘路径"},
 	{KeyDiskDevice, "磁盘设备名"},
 	{KeyDiskFstype, "文件系统类型"},
@@ -45,7 +45,7 @@ var KeyDiskUsages = []utils.KeyValue{
 }
 
 // ConfigDiskUsages TypeMetricDisk config 中的字段描述
-var ConfigDiskUsages = []utils.KeyValue{
+var ConfigDiskUsages = []KeyValue{
 	{ConfigDiskIgnoreFs, "忽略的挂载点,用','分隔(" + ConfigDiskIgnoreFs + ")"},
 	{ConfigDiskMountPoints, "收集特定挂载点信息,默认收集所有挂载点,用','分隔(" + ConfigDiskMountPoints + ")"},
 }
@@ -70,9 +70,9 @@ func (_ *DiskStats) Tags() []string {
 }
 
 func (_ *DiskStats) Config() map[string]interface{} {
-	configOptions := make([]utils.Option, 0)
+	configOptions := make([]Option, 0)
 	for _, val := range ConfigDiskUsages {
-		option := utils.Option{
+		option := Option{
 			KeyName:      val.Key,
 			ChooseOnly:   false,
 			Default:      "",
@@ -147,7 +147,7 @@ const (
 )
 
 // KeyDiskioUsages TypeMetricDiskio 中的字段名称
-var KeyDiskioUsages = []utils.KeyValue{
+var KeyDiskioUsages = []KeyValue{
 	{KeyDiskioReads, "磁盘被读的总次数"},
 	{KeyDiskioWrites, "磁盘被写的总次数"},
 	{KeyDiskioReadBytes, "读取的总数据量"},
@@ -160,7 +160,7 @@ var KeyDiskioUsages = []utils.KeyValue{
 }
 
 // ConfigDiskioUsages TypeMetricDiskio 配置项描述
-var ConfigDiskioUsages = []utils.KeyValue{
+var ConfigDiskioUsages = []KeyValue{
 	{ConfigDiskioDevices, "获取特定设备的信息,用','隔开(" + ConfigDiskioDevices + ")"},
 	{ConfigDiskioDeviceTags, "采集磁盘某些tag的信息,用','隔开(" + ConfigDiskioDeviceTags + ")"},
 	{ConfigDiskioNameTemplates, "一些尝试加入设备的模板列表,用','隔开(" + ConfigDiskioNameTemplates + ")"},
@@ -191,9 +191,9 @@ func (_ *DiskIOStats) Tags() []string {
 }
 
 func (_ *DiskIOStats) Config() map[string]interface{} {
-	configOptions := make([]utils.Option, 0)
+	configOptions := make([]Option, 0)
 	for i := 0; i < 3; i++ {
-		option := utils.Option{
+		option := Option{
 			KeyName:      ConfigDiskioUsages[i].Key,
 			ChooseOnly:   false,
 			Default:      "",
@@ -203,7 +203,7 @@ func (_ *DiskIOStats) Config() map[string]interface{} {
 		}
 		configOptions = append(configOptions, option)
 	}
-	option := utils.Option{
+	option := Option{
 		KeyName:       ConfigDiskioUsages[3].Key,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"true", "false"},

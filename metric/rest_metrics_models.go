@@ -3,16 +3,16 @@ package metric
 import (
 	"sort"
 
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
-func GetMetricTypeKey() map[string][]utils.KeyValue {
-	typeKey := make(map[string][]utils.KeyValue)
+func GetMetricTypeKey() map[string][]KeyValue {
+	typeKey := make(map[string][]KeyValue)
 	for key, collector := range Collectors {
 		coll := collector()
 		config := coll.Config()
 		if attributes, ex := config[AttributesString]; ex {
-			if attr, ok := attributes.([]utils.KeyValue); ok {
+			if attr, ok := attributes.([]KeyValue); ok {
 				typeKey[key] = attr
 			}
 		}
@@ -20,10 +20,10 @@ func GetMetricTypeKey() map[string][]utils.KeyValue {
 	return typeKey
 }
 
-func GetMetricUsages() []utils.Option {
-	metricOptions := make([]utils.Option, 0)
+func GetMetricUsages() []Option {
+	metricOptions := make([]Option, 0)
 	for key, collector := range Collectors {
-		option := utils.Option{
+		option := Option{
 			KeyName:       key,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
@@ -40,13 +40,13 @@ func GetMetricUsages() []utils.Option {
 	return metricOptions
 }
 
-func GetMetricOptions() map[string][]utils.Option {
-	metricOptions := make(map[string][]utils.Option)
+func GetMetricOptions() map[string][]Option {
+	metricOptions := make(map[string][]Option)
 	for key, collector := range Collectors {
 		coll := collector()
 		config := coll.Config()
 		if option, ex := config[OptionString]; ex {
-			if opt, ok := option.([]utils.Option); ok {
+			if opt, ok := option.([]Option); ok {
 				metricOptions[key] = opt
 			}
 		}

@@ -13,6 +13,7 @@ import (
 	"github.com/qiniu/logkit/metric"
 	. "github.com/qiniu/logkit/metric/system/utils"
 	"github.com/qiniu/logkit/utils"
+	"github.com/qiniu/logkit/utils/models"
 
 	"github.com/shirou/gopsutil/process"
 )
@@ -129,10 +130,10 @@ type Procstat struct {
 }
 
 // KeyProcUsages TypeMetricProc 中的字段名称
-var KeyProcUsages = []utils.KeyValue{}
+var KeyProcUsages = []models.KeyValue{}
 
 // ConfigProcUsages TypeMetricProc 配置项的描述
-var ConfigProcUsages = []utils.Option{
+var ConfigProcUsages = []models.Option{
 	{
 		KeyName:       "cpu_usage_related",
 		ChooseOnly:    true,

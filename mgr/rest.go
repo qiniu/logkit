@@ -14,12 +14,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/json-iterator/go"
-	"github.com/labstack/echo"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
+
+	"github.com/json-iterator/go"
+	"github.com/labstack/echo"
 )
 
 var DEFAULT_PORT = 3000
@@ -219,7 +221,7 @@ func RespError(c echo.Context, respCode int, errCode, errMsg string) error {
 
 func RespSuccess(c echo.Context, data interface{}) error {
 	respData := map[string]interface{}{
-		"code": utils.ErrNothing,
+		"code": ErrNothing,
 	}
 	if data != nil {
 		respData["data"] = data
@@ -268,7 +270,7 @@ func (rs *RestService) GetConfig() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		_, runnerConfig, _, err := rs.checkNameAndConfig(c)
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrConfigName, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrConfigName, err.Error())
 		}
 		return RespSuccess(c, runnerConfig)
 	}
@@ -338,16 +340,16 @@ func (rs *RestService) PostConfig() echo.HandlerFunc {
 		var name string
 		if name = c.Param("name"); name == "" {
 			errMsg := "runner name is empty"
-			return RespError(c, http.StatusBadRequest, utils.ErrRunnerAdd, errMsg)
+			return RespError(c, http.StatusBadRequest, ErrRunnerAdd, errMsg)
 		}
 		var nconf RunnerConfig
 		if err = c.Bind(&nconf); err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrRunnerAdd, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrRunnerAdd, err.Error())
 		}
 		nconf.IsInWebFolder = true
 		nconf.ParserConf = convertWebParserConfig(nconf.ParserConf)
 		if err = rs.mgr.AddRunner(name, nconf); err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrRunnerAdd, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrRunnerAdd, err.Error())
 		}
 		return RespSuccess(c, nil)
 	}
@@ -359,16 +361,16 @@ func (rs *RestService) PutConfig() echo.HandlerFunc {
 		var name string
 		if name = c.Param("name"); name == "" {
 			errMsg := "config name is empty"
-			return RespError(c, http.StatusBadRequest, utils.ErrRunnerUpdate, errMsg)
+			return RespError(c, http.StatusBadRequest, ErrRunnerUpdate, errMsg)
 		}
 		var nconf RunnerConfig
 		if err = c.Bind(&nconf); err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrRunnerUpdate, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrRunnerUpdate, err.Error())
 		}
 		nconf.IsInWebFolder = true
 		nconf.ParserConf = convertWebParserConfig(nconf.ParserConf)
 		if err = rs.mgr.UpdateRunner(name, nconf); err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrRunnerUpdate, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrRunnerUpdate, err.Error())
 		}
 		return RespSuccess(c, nil)
 	}
@@ -380,10 +382,10 @@ func (rs *RestService) PostConfigReset() echo.HandlerFunc {
 		var name string
 		if name = c.Param("name"); name == "" {
 			errMsg := "config name is empty"
-			return RespError(c, http.StatusBadRequest, utils.ErrRunnerReset, errMsg)
+			return RespError(c, http.StatusBadRequest, ErrRunnerReset, errMsg)
 		}
 		if err = rs.mgr.ResetRunner(name); err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrRunnerReset, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrRunnerReset, err.Error())
 		}
 		return RespSuccess(c, nil)
 	}
@@ -395,10 +397,10 @@ func (rs *RestService) PostConfigStart() echo.HandlerFunc {
 		var name string
 		if name = c.Param("name"); name == "" {
 			errMsg := "config name is empty"
-			return RespError(c, http.StatusBadRequest, utils.ErrRunnerStart, errMsg)
+			return RespError(c, http.StatusBadRequest, ErrRunnerStart, errMsg)
 		}
 		if err = rs.mgr.StartRunner(name); err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrRunnerStart, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrRunnerStart, err.Error())
 		}
 		return RespSuccess(c, nil)
 	}
@@ -410,10 +412,10 @@ func (rs *RestService) PostConfigStop() echo.HandlerFunc {
 		var name string
 		if name = c.Param("name"); name == "" {
 			errMsg := "config name is empty"
-			return RespError(c, http.StatusBadRequest, utils.ErrRunnerStop, errMsg)
+			return RespError(c, http.StatusBadRequest, ErrRunnerStop, errMsg)
 		}
 		if err = rs.mgr.StopRunner(name); err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrRunnerStop, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrRunnerStop, err.Error())
 		}
 		return RespSuccess(c, nil)
 	}
@@ -425,10 +427,10 @@ func (rs *RestService) DeleteConfig() echo.HandlerFunc {
 		var name string
 		if name = c.Param("name"); name == "" {
 			errMsg := "config name is empty"
-			return RespError(c, http.StatusBadRequest, utils.ErrRunnerDelete, errMsg)
+			return RespError(c, http.StatusBadRequest, ErrRunnerDelete, errMsg)
 		}
 		if err = rs.mgr.DeleteRunner(name); err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrRunnerDelete, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrRunnerDelete, err.Error())
 		}
 		return RespSuccess(c, nil)
 	}
@@ -437,7 +439,7 @@ func (rs *RestService) DeleteConfig() echo.HandlerFunc {
 // get /logkit/errorcode
 func (rs *RestService) GetErrorCodeHumanize() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		return RespSuccess(c, utils.ErrorCodeHumanize)
+		return RespSuccess(c, ErrorCodeHumanize)
 	}
 }
 
