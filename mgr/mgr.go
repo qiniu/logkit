@@ -722,8 +722,8 @@ func (m *Manager) DeleteRunner(name string) (err error) {
 }
 
 //reader模块中各种type的日志都能获取raw_data
-func (m *Manager) GetRawData(nconf RunnerConfig) (rawData string, err error) {
-	if nconf.ReaderConfig == nil {
+func GetRawData(readerConfig config.MapConf) (rawData string, err error) {
+	if readerConfig == nil {
 		err = fmt.Errorf("reader config cannot be empty")
 		return
 	}
@@ -731,7 +731,7 @@ func (m *Manager) GetRawData(nconf RunnerConfig) (rawData string, err error) {
 	var (
 		rd reader.Reader
 	)
-	rd, err = reader.NewFileBufReader(nconf.ReaderConfig, nconf.IsInWebFolder)
+	rd, err = reader.NewFileBufReader(readerConfig, true)
 	if err != nil {
 		return
 	}

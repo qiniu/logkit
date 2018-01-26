@@ -516,8 +516,6 @@ func Test_GetRawData(t *testing.T) {
 		t.Error(err)
 	}
 	time.Sleep(1 * time.Second)
-	var conf ManagerConfig
-	m, err := NewManager(conf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -532,7 +530,7 @@ func Test_GetRawData(t *testing.T) {
 		t.Error(err)
 	}
 
-	rawData, err := m.GetRawData(runnerConf)
+	rawData, err := GetRawData(runnerConf.ReaderConfig)
 	if err != nil {
 		t.Error(err)
 	}
