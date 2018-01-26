@@ -408,6 +408,12 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "数据库名称(influxdb_db)",
 		},
 		{
+			KeyName:       KeyInfluxdbAutoCreate,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"true", "false"},
+			Description:   "自动创建数据库(influxdb_auto_create)",
+		},
+		{
 			KeyName:      KeyInfluxdbMeasurement,
 			ChooseOnly:   false,
 			Default:      "test_table",
@@ -420,6 +426,13 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "",
 			DefaultNoUse: false,
 			Description:  "retention名称(influxdb_retention)",
+		},
+		{
+			KeyName:      KeyInfluxdbRetetionDuration,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "retention时长(influxdb_retention_duration)",
 		},
 		{
 			KeyName:      KeyInfluxdbTags,
