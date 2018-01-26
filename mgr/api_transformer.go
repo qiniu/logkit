@@ -14,27 +14,14 @@ import (
 // GET /logkit/transformer/usages
 func (rs *RestService) GetTransformerUsages() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		var ModeUsages []utils.KeyValue
-		for _, v := range transforms.Transformers {
-			cr := v()
-			ModeUsages = append(ModeUsages, utils.KeyValue{
-				Key:   cr.Type(),
-				Value: cr.Description(),
-			})
-		}
-		return RespSuccess(c, ModeUsages)
+		return RespSuccess(c, transforms.GetTransformerUsages())
 	}
 }
 
 //GET /logkit/transformer/options
 func (rs *RestService) GetTransformerOptions() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		ModeKeyOptions := make(map[string][]utils.Option)
-		for _, v := range transforms.Transformers {
-			cr := v()
-			ModeKeyOptions[cr.Type()] = cr.ConfigOptions()
-		}
-		return RespSuccess(c, ModeKeyOptions)
+		return RespSuccess(c, transforms.GetTransformerOptions())
 	}
 }
 
