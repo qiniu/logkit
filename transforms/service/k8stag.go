@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (
@@ -28,7 +28,7 @@ func (g *K8sTag) RawTransform(datas []string) ([]string, error) {
 	return datas, errors.New("k8stag transformer not support rawTransform")
 }
 
-func (g *K8sTag) Transform(datas []sender.Data) ([]sender.Data, error) {
+func (g *K8sTag) Transform(datas []Data) ([]Data, error) {
 	var err, ferr error
 	errnums := 0
 	for i := range datas {
@@ -83,8 +83,8 @@ func (g *K8sTag) SampleConfig() string {
 	}`
 }
 
-func (g *K8sTag) ConfigOptions() []utils.Option {
-	return []utils.Option{
+func (g *K8sTag) ConfigOptions() []Option {
+	return []Option{
 		transforms.KeyStageAfterOnly,
 		transforms.KeyFieldName,
 	}

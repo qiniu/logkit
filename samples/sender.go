@@ -6,6 +6,7 @@ import (
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 // CustomSender 仅作为示例，什么都不做，只是把数据打印出来而已
@@ -27,7 +28,7 @@ func (c *CustomSender) Name() string {
 	return c.name
 }
 
-func (c *CustomSender) Send(datas []sender.Data) error {
+func (c *CustomSender) Send(datas []Data) error {
 	for _, d := range datas {
 		var line string
 		for k, v := range d {

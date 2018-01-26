@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 type Spliter struct {
@@ -21,7 +21,7 @@ func (g *Spliter) RawTransform(datas []string) ([]string, error) {
 	return datas, errors.New("split transformer not support rawTransform")
 }
 
-func (g *Spliter) Transform(datas []sender.Data) ([]sender.Data, error) {
+func (g *Spliter) Transform(datas []Data) ([]Data, error) {
 	var err, ferr error
 	errnums := 0
 	if g.ArraryName == "" {
@@ -76,8 +76,8 @@ func (g *Spliter) SampleConfig() string {
 	}`
 }
 
-func (g *Spliter) ConfigOptions() []utils.Option {
-	return []utils.Option{
+func (g *Spliter) ConfigOptions() []Option {
+	return []Option{
 		transforms.KeyStageAfterOnly,
 		transforms.KeyFieldName,
 		{

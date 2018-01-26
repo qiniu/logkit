@@ -3,11 +3,11 @@ package reader
 import (
 	"strings"
 
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 // ModeUsages 用途说明
-var ModeUsages = []utils.KeyValue{
+var ModeUsages = []KeyValue{
 	{ModeFileAuto, "从文件读取( fileauto 模式)"},
 	{ModeDir, "从文件读取( dir 模式)"},
 	{ModeFile, "从文件读取( file 模式)"},
@@ -24,21 +24,21 @@ var ModeUsages = []utils.KeyValue{
 }
 
 var (
-	OptionMetaPath = utils.Option{
+	OptionMetaPath = Option{
 		KeyName:      KeyMetaPath,
 		ChooseOnly:   false,
 		Default:      "",
 		DefaultNoUse: false,
 		Description:  "logkit元数据路径(meta_path)",
 	}
-	OptionDataSourceTag = utils.Option{
+	OptionDataSourceTag = Option{
 		KeyName:      KeyDataSourceTag,
 		ChooseOnly:   false,
 		Default:      "datasource",
 		DefaultNoUse: false,
 		Description:  "数据来源标签(datasource_tag)",
 	}
-	OptionBuffSize = utils.Option{
+	OptionBuffSize = Option{
 		KeyName:      KeyBufSize,
 		ChooseOnly:   false,
 		Default:      "",
@@ -46,7 +46,7 @@ var (
 		Description:  "文件缓存数据大小(reader_buf_size)",
 		CheckRegex:   "\\d+",
 	}
-	OptionEncoding = utils.Option{
+	OptionEncoding = Option{
 		KeyName:    KeyEncoding,
 		ChooseOnly: true,
 		ChooseOptions: []interface{}{"UTF-8", "UTF-16", "US-ASCII", "ISO-8859-1",
@@ -65,14 +65,14 @@ var (
 		DefaultNoUse: false,
 		Description:  "编码方式(encoding)",
 	}
-	OptionWhence = utils.Option{
+	OptionWhence = Option{
 		KeyName:       KeyWhence,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{WhenceOldest, WhenceNewest},
 		Default:       WhenceOldest,
 		Description:   "读取的起始位置(read_from)",
 	}
-	OptionReadIoLimit = utils.Option{
+	OptionReadIoLimit = Option{
 		KeyName:      KeyReadIOLimit,
 		ChooseOnly:   false,
 		Default:      "",
@@ -80,14 +80,14 @@ var (
 		Description:  "读取速度限制(MB/s)(readio_limit)",
 		CheckRegex:   "\\d+",
 	}
-	OptionHeadPattern = utils.Option{
+	OptionHeadPattern = Option{
 		KeyName:      KeyHeadPattern,
 		ChooseOnly:   false,
 		Default:      "",
 		DefaultNoUse: false,
 		Description:  "多行读取的起始行正则表达式(head_pattern)",
 	}
-	OptionSQLSchema = utils.Option{
+	OptionSQLSchema = Option{
 		KeyName:      KeySQLSchema,
 		ChooseOnly:   false,
 		Default:      "",
@@ -96,7 +96,7 @@ var (
 	}
 )
 
-var ModeKeyOptions = map[string][]utils.Option{
+var ModeKeyOptions = map[string][]Option{
 	ModeDir: {
 		{
 			KeyName:      KeyLogPath,

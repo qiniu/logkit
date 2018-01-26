@@ -14,6 +14,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
@@ -162,7 +163,7 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 	}
 	metapath, _ := conf.GetStringOr(KeyMetaPath, "")
 	if metapath == "" {
-		runnerName, _ := conf.GetString(utils.GlobalKeyName)
+		runnerName, _ := conf.GetString(GlobalKeyName)
 		base := filepath.Base(logPath)
 		metapath = "meta/" + runnerName + "_" + hash(base)
 		log.Debugf("Runner[%v] Using %s as default metaPath", runnerName, metapath)

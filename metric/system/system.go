@@ -10,7 +10,7 @@ import (
 	"github.com/shirou/gopsutil/load"
 
 	"github.com/qiniu/logkit/metric"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (
@@ -28,7 +28,7 @@ const (
 )
 
 // KeySystemUsages TypeMetricSystem的字段名称
-var KeySystemUsages = []utils.KeyValue{
+var KeySystemUsages = []KeyValue{
 	{KeySystemLoad1, "1分钟平均load值"},
 	{KeySystemLoad5, "5分钟平均load值"},
 	{KeySystemLoad15, "15分钟平均load值"},
@@ -55,7 +55,7 @@ func (_ *SystemStats) Tags() []string {
 
 func (s *SystemStats) Config() map[string]interface{} {
 	config := map[string]interface{}{
-		metric.OptionString:     []utils.Option{},
+		metric.OptionString:     []Option{},
 		metric.AttributesString: KeySystemUsages,
 	}
 	return config

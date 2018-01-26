@@ -7,18 +7,18 @@ import (
 	"testing"
 	"time"
 
+	"fmt"
+
 	"github.com/json-iterator/go"
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
-
-	"fmt"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/stretchr/testify/assert"
 )
 
-var csvBench []sender.Data
+var csvBench []Data
 
 func Benchmark_CsvParseLine(b *testing.B) {
 	c := conf.MapConf{}
@@ -28,7 +28,7 @@ func Benchmark_CsvParseLine(b *testing.B) {
 	c[KeyCSVSplitter] = " "
 	p, _ := NewCsvParser(c)
 
-	var m []sender.Data
+	var m []Data
 	for n := 0; n < b.N; n++ {
 		m, _ = p.Parse([]string{`123 fufu 3.16 {\"x\":1,\"y\":[\"xx:12\"]}`})
 	}
@@ -241,8 +241,8 @@ func TestRename(t *testing.T) {
 		err = c.ErrorDetail
 	}
 	assert.NoError(t, err)
-	expDatas := []sender.Data{
-		sender.Data{
+	expDatas := []Data{
+		Data{
 			"logType":                   "REQ",
 			"service":                   "REPORT",
 			"timestamp":                 "15112467445566096",
@@ -284,8 +284,8 @@ func TestRename(t *testing.T) {
 		err = c.ErrorDetail
 	}
 	assert.NoError(t, err)
-	expDatas = []sender.Data{
-		sender.Data{
+	expDatas = []Data{
+		Data{
 			"logType":                   "REQ",
 			"service":                   "REPORT",
 			"timestamp":                 "15112467445566096",
@@ -328,6 +328,6 @@ func TestJsonMap(t *testing.T) {
 	testx := "999"
 	data, err := fd.ValueParse(testx, 0)
 	assert.Error(t, err)
-	assert.Equal(t, data, sender.Data{})
+	assert.Equal(t, data, Data{})
 
 }

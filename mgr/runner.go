@@ -13,7 +13,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	jsoniter "github.com/json-iterator/go"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/cleaner"
 	"github.com/qiniu/logkit/conf"
@@ -22,7 +21,10 @@ import (
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
+
+	jsoniter "github.com/json-iterator/go"
 )
 
 type CleanInfo struct {
@@ -235,7 +237,7 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, p
 	if rc.ParserConf == nil {
 		return nil, errors.New(rc.RunnerName + " ParserConf is nil")
 	}
-	rc.ReaderConfig[utils.GlobalKeyName] = rc.RunnerName
+	rc.ReaderConfig[GlobalKeyName] = rc.RunnerName
 	rc.ReaderConfig[reader.KeyRunnerName] = rc.RunnerName
 	for i := range rc.SenderConfig {
 		rc.SenderConfig[i][sender.KeyRunnerName] = rc.RunnerName
@@ -332,7 +334,7 @@ func createTransformers(rc RunnerConfig) []transforms.Transformer {
 }
 
 // trySend 尝试发送数据，如果此时runner退出返回false，其他情况无论是达到最大重试次数还是发送成功，都返回true
-func (r *LogExportRunner) trySend(s sender.Sender, datas []sender.Data, times int) bool {
+func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool {
 	if len(datas) <= 0 {
 		return true
 	}
@@ -532,13 +534,13 @@ func (r *LogExportRunner) Run() {
 	}
 }
 
-func classifySenderData(datas []sender.Data, router *sender.Router, senderCnt int) [][]sender.Data {
-	senderDataList := make([][]sender.Data, senderCnt)
+func classifySenderData(datas []Data, router *sender.Router, senderCnt int) [][]Data {
+	senderDataList := make([][]Data, senderCnt)
 	for i := 0; i < senderCnt; i++ {
 		if router == nil {
 			senderDataList[i] = datas
 		} else {
-			senderDataList[i] = make([]sender.Data, 0)
+			senderDataList[i] = make([]Data, 0)
 		}
 	}
 	if router == nil {
@@ -553,7 +555,7 @@ func classifySenderData(datas []sender.Data, router *sender.Router, senderCnt in
 	return senderDataList
 }
 
-func addSourceToData(sourceFroms []string, se *utils.StatsError, datas []sender.Data, datasourceTagName, runnername string) []sender.Data {
+func addSourceToData(sourceFroms []string, se *utils.StatsError, datas []Data, datasourceTagName, runnername string) []Data {
 	var j int = 0
 	for i, v := range sourceFroms {
 		if se.ErrorIndexIn(i) {
@@ -572,7 +574,7 @@ func addSourceToData(sourceFroms []string, se *utils.StatsError, datas []sender.
 	return datas
 }
 
-func addTagsToData(tags map[string]interface{}, datas []sender.Data, runnername string) []sender.Data {
+func addTagsToData(tags map[string]interface{}, datas []Data, runnername string) []Data {
 	for j, data := range datas {
 		for k, v := range tags {
 			if dt, ok := data[k]; ok {

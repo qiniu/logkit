@@ -3,9 +3,9 @@ package mutate
 import (
 	"testing"
 
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -14,12 +14,12 @@ func TestParamTransformer(t *testing.T) {
 	par := &UrlParam{
 		Key: "myword",
 	}
-	data, err := par.Transform([]sender.Data{
+	data, err := par.Transform([]Data{
 		{"myword": "platform=2&vid=372&vu=caea966558&chan=android_sougou&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
 		{"myword": "platform=2&vid=&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
 	})
 	assert.NoError(t, err)
-	exp := []sender.Data{
+	exp := []Data{
 		{
 			"myword":           "platform=2&vid=372&vu=caea966558&chan=android_sougou&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032",
 			"myword_platform":  "2",
@@ -56,12 +56,12 @@ func TestParamTransformerError(t *testing.T) {
 	par := &UrlParam{
 		Key: "myword",
 	}
-	data, err := par.Transform([]sender.Data{
+	data, err := par.Transform([]Data{
 		{"myword": "platform=2=372&vu=caea966558&chan=android_sougou&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
 		{"myword": "platform=2&vid&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
 	})
 	assert.Error(t, err)
-	exp := []sender.Data{
+	exp := []Data{
 		{"myword": "platform=2=372&vu=caea966558&chan=android_sougou&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
 		{"myword": "platform=2&vid&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
 	}
@@ -83,7 +83,7 @@ func TestParamTransformerKeyRepeat(t *testing.T) {
 	par := &UrlParam{
 		Key: "myword",
 	}
-	data, err := par.Transform([]sender.Data{
+	data, err := par.Transform([]Data{
 		{"myword": "a=a&a=b&a=c&a=d"},
 		{
 			"myword":   "a=a&a=b&b=c&b=d&b=e",
@@ -106,7 +106,7 @@ func TestParamTransformerKeyRepeat(t *testing.T) {
 		},
 	})
 	assert.NoError(t, err)
-	exp := []sender.Data{
+	exp := []Data{
 		{
 			"myword":   "a=a&a=b&a=c&a=d",
 			"myword_a": "d",
@@ -152,12 +152,12 @@ func TestParamTransformerMultiKey(t *testing.T) {
 	par := &UrlParam{
 		Key: "multi.myword",
 	}
-	data, err := par.Transform([]sender.Data{
+	data, err := par.Transform([]Data{
 		{"multi": map[string]interface{}{"myword": "platform=2&vid=372&vu=caea966558&chan=android_sougou&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"}},
 		{"multi": map[string]interface{}{"myword": "platform=2&vid=&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"}},
 	})
 	assert.NoError(t, err)
-	exp := []sender.Data{
+	exp := []Data{
 		{
 			"multi": map[string]interface{}{
 				"myword":           "platform=2&vid=372&vu=caea966558&chan=android_sougou&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032",

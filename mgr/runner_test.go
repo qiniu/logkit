@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/cleaner"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
@@ -16,9 +17,9 @@ import (
 	"github.com/qiniu/logkit/sender"
 	_ "github.com/qiniu/logkit/transforms/all"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
-	"github.com/qiniu/log"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -155,7 +156,7 @@ func Test_Run(t *testing.T) {
 			time.Sleep(time.Second)
 		}
 	}
-	var dts []sender.Data
+	var dts []Data
 	rawData := r.senders[0].Name()[len("mock_sender "):]
 	err = jsoniter.Unmarshal([]byte(rawData), &dts)
 	if err != nil {
@@ -354,7 +355,7 @@ func Test_QiniulogRun(t *testing.T) {
 			time.Sleep(time.Second)
 		}
 	}
-	var dts []sender.Data
+	var dts []Data
 	rawData := r.senders[0].Name()[len("mock_sender "):]
 	err = jsoniter.Unmarshal([]byte(rawData), &dts)
 	if err != nil {
@@ -398,8 +399,8 @@ func TestCreateTransforms(t *testing.T) {
 	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
 	transformers := createTransformers(rc)
-	datas := []sender.Data{{"ip": "111.2.3.4"}}
-	exp := []sender.Data{{
+	datas := []Data{{"ip": "111.2.3.4"}}
+	exp := []Data{{
 		"ip":      "111.2.3.4",
 		"Region":  "浙江",
 		"City":    "宁波",
@@ -436,7 +437,7 @@ func TestReplaceTransforms(t *testing.T) {
 			"file_send_path":"./test2/test2_csv_file.txt"
 		}]
 	}`
-	newData := make([]sender.Data, 0)
+	newData := make([]Data, 0)
 	rc := RunnerConfig{}
 	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
@@ -446,13 +447,13 @@ func TestReplaceTransforms(t *testing.T) {
 		datas, err = transformers[k].RawTransform(datas)
 		assert.NoError(t, err)
 		for i := range datas {
-			var da sender.Data
+			var da Data
 			err = jsoniter.Unmarshal([]byte(datas[i]), &da)
 			assert.NoError(t, err)
 			newData = append(newData, da)
 		}
 	}
-	exp := []sender.Data{
+	exp := []Data{
 		{
 			"status":         "200",
 			"request_method": "POST",
@@ -498,11 +499,11 @@ func TestDateTransforms(t *testing.T) {
 	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
 	transformers := createTransformers(rc)
-	datas := []sender.Data{{"status": "02/01/2016--15:04:05"}, {"status": "2006-01-02 15:04:15"}}
+	datas := []Data{{"status": "02/01/2016--15:04:05"}, {"status": "2006-01-02 15:04:15"}}
 	for k := range transformers {
 		datas, err = transformers[k].Transform(datas)
 	}
-	exp := []sender.Data{
+	exp := []Data{
 		{
 			"status": "2016-01-02T16:04:05",
 		},
@@ -544,11 +545,11 @@ func TestSplitAndConvertTransforms(t *testing.T) {
 	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
 	transformers := createTransformers(rc)
-	datas := []sender.Data{{"status": "1,2,3"}, {"status": "4,5,6"}}
+	datas := []Data{{"status": "1,2,3"}, {"status": "4,5,6"}}
 	for k := range transformers {
 		datas, err = transformers[k].Transform(datas)
 	}
-	exp := []sender.Data{
+	exp := []Data{
 		{
 			"status":   "1,2,3",
 			"newarray": []interface{}{int64(1), int64(2), int64(3)},
@@ -784,7 +785,7 @@ func TestAddDatasource(t *testing.T) {
 	se := &utils.StatsError{
 		ErrorIndex: []int{0, 3, 5},
 	}
-	datas := []sender.Data{
+	datas := []Data{
 		{
 			"f1": "2",
 		},
@@ -797,7 +798,7 @@ func TestAddDatasource(t *testing.T) {
 	}
 	datasourceTagName := "source"
 	runnername := "runner1"
-	exp := []sender.Data{
+	exp := []Data{
 		{
 			"f1":     "2",
 			"source": "b",
@@ -866,12 +867,12 @@ func TestAddDatatags(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 	data, err := ioutil.ReadFile("./TestAddDatatags/filesend.json")
-	var res []sender.Data
+	var res []Data
 	err = jsoniter.Unmarshal(data, &res)
 	if err != nil {
 		t.Error(err)
 	}
-	exp := []sender.Data{
+	exp := []Data{
 		{
 			"f1":     "2",
 			"f2":     "1",
@@ -887,26 +888,26 @@ func TestAddDatatags(t *testing.T) {
 
 func TestClassifySenderData(t *testing.T) {
 	senderCnt := 3
-	datas := []sender.Data{
-		sender.Data{
+	datas := []Data{
+		Data{
 			"a": "a",
 			"b": "b",
 			"c": "c",
 			"d": "d",
 		},
-		sender.Data{
+		Data{
 			"a": "A",
 			"b": "b",
 			"c": "c",
 			"d": "d",
 		},
-		sender.Data{
+		Data{
 			"a": "B",
 			"b": "b",
 			"c": "c",
 			"d": "d",
 		},
-		sender.Data{
+		Data{
 			"a": "C",
 			"b": "b",
 			"c": "c",

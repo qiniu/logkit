@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
 )
@@ -19,7 +19,7 @@ type Json struct {
 	jsonTool jsoniter.API
 }
 
-func (g *Json) Transform(datas []sender.Data) ([]sender.Data, error) {
+func (g *Json) Transform(datas []Data) ([]Data, error) {
 	var err, ferr error
 	errCount := 0
 	keys := utils.GetKeys(g.Key)
@@ -95,8 +95,8 @@ func (g *Json) SampleConfig() string {
     }`
 }
 
-func (g *Json) ConfigOptions() []utils.Option {
-	return []utils.Option{
+func (g *Json) ConfigOptions() []Option {
+	return []Option{
 		transforms.KeyFieldName,
 		{
 			KeyName:      "new",

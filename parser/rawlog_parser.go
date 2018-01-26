@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (
@@ -42,10 +42,10 @@ func (p *RawlogParser) Type() string {
 	return TypeRaw
 }
 
-func (p *RawlogParser) Parse(lines []string) ([]sender.Data, error) {
+func (p *RawlogParser) Parse(lines []string) ([]Data, error) {
 
 	se := &utils.StatsError{}
-	datas := []sender.Data{}
+	datas := []Data{}
 	for idx, line := range lines {
 		line = strings.TrimSpace(line)
 		if len(line) <= 0 {
@@ -53,7 +53,7 @@ func (p *RawlogParser) Parse(lines []string) ([]sender.Data, error) {
 			se.ErrorIndex = append(se.ErrorIndex, idx)
 			continue
 		}
-		d := sender.Data{}
+		d := Data{}
 		d[KeyRaw] = line
 		if p.withTimeStamp {
 			d[KeyTimestamp] = time.Now().Format(time.RFC3339Nano)

@@ -3,9 +3,9 @@ package mutate
 import (
 	"testing"
 
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -14,12 +14,12 @@ func TestArrayExpand(t *testing.T) {
 	ae := &ArrayExpand{
 		Key: "myword",
 	}
-	data, err := ae.Transform([]sender.Data{
+	data, err := ae.Transform([]Data{
 		{"myword": []interface{}{"a", "b", "c", "d", "e"}},
 		{"myword": []interface{}{1, 2, 3, 4, 5}},
 	})
 	assert.NoError(t, err)
-	exp := []sender.Data{
+	exp := []Data{
 		{
 			"myword":  []interface{}{"a", "b", "c", "d", "e"},
 			"myword0": "a",
@@ -54,12 +54,12 @@ func TestArrayExpandError(t *testing.T) {
 	ae := &ArrayExpand{
 		Key: "myword",
 	}
-	data, err := ae.Transform([]sender.Data{
+	data, err := ae.Transform([]Data{
 		{"myword": "aaaaaaaaaaaaaaaa"},
 		{"myword": []interface{}{1, 2, 3, 4, 5}},
 	})
 	assert.Error(t, err)
-	exp := []sender.Data{
+	exp := []Data{
 		{
 			"myword": "aaaaaaaaaaaaaaaa",
 		},
@@ -90,7 +90,7 @@ func TestArrayExpandIgnore(t *testing.T) {
 	ae := &ArrayExpand{
 		Key: "myword",
 	}
-	data, err := ae.Transform([]sender.Data{
+	data, err := ae.Transform([]Data{
 		{"myword": "aaaaaaaaaaaaaaaa"},
 		{
 			"myword":  []interface{}{1, 2, 3, 4, 5},
@@ -115,7 +115,7 @@ func TestArrayExpandIgnore(t *testing.T) {
 		},
 	})
 	assert.Error(t, err)
-	exp := []sender.Data{
+	exp := []Data{
 		{
 			"myword": "aaaaaaaaaaaaaaaa",
 		},
@@ -173,7 +173,7 @@ func TestArrayExpandEveryType(t *testing.T) {
 	ae := &ArrayExpand{
 		Key: "myword",
 	}
-	data, err := ae.Transform([]sender.Data{
+	data, err := ae.Transform([]Data{
 		{"myword": "aaaaaaaaaaaaaaaaaa"},
 		{"myword": []int{1, 2, 3, 4, 5}},
 		{"myword": []int8{1, 2, 3, 4, 5}},
@@ -199,7 +199,7 @@ func TestArrayExpandEveryType(t *testing.T) {
 		{"myword": []rune{1, 2, 3, 4, 5}},
 	})
 	assert.Error(t, err)
-	exp := []sender.Data{
+	exp := []Data{
 		{"myword": "aaaaaaaaaaaaaaaaaa"},
 		{
 			"myword":  []int{1, 2, 3, 4, 5},
@@ -396,12 +396,12 @@ func TestArrayExpandMultiKey(t *testing.T) {
 	ae := &ArrayExpand{
 		Key: "multi.myWord",
 	}
-	data, err := ae.Transform([]sender.Data{
+	data, err := ae.Transform([]Data{
 		{"multi": map[string]interface{}{"myWord": []interface{}{"a", "b", "c", "d", "e"}}},
 		{"multi": map[string]interface{}{"myWord": []interface{}{1, 2, 3, 4, 5}}},
 	})
 	assert.NoError(t, err)
-	exp := []sender.Data{
+	exp := []Data{
 		{
 			"multi": map[string]interface{}{
 				"myWord":  []interface{}{"a", "b", "c", "d", "e"},

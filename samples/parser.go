@@ -5,7 +5,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
-	"github.com/qiniu/logkit/sender"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 // 一个自定义parser的示例，将日志放到data中的log字段中
@@ -32,9 +32,9 @@ func (p *CustomParser) Name() string {
 	return p.name
 }
 
-func (p *CustomParser) Parse(lines []string) (datas []sender.Data, err error) {
+func (p *CustomParser) Parse(lines []string) (datas []Data, err error) {
 	for _, l := range lines {
-		d := sender.Data{}
+		d := Data{}
 		line := strings.TrimSpace(l)
 		if len(line) > p.maxLen {
 			line = line[:p.maxLen]
