@@ -3,9 +3,11 @@ package sender
 import (
 	"os"
 
-	"github.com/json-iterator/go"
 	"github.com/qiniu/logkit/conf"
+	. "github.com/qiniu/logkit/utils/models"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
+
+	"github.com/json-iterator/go"
 )
 
 // FileSender write datas into local file

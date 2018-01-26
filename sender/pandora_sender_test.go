@@ -17,14 +17,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/json-iterator/go"
-	"github.com/labstack/echo"
 	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/cli"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
+
+	"github.com/json-iterator/go"
+	"github.com/labstack/echo"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -152,7 +153,7 @@ func (s *mock_pandora) PostRepos_Data() echo.HandlerFunc {
 		if strings.Contains(s.Body, "E18111") {
 			return c.JSON(http.StatusNotFound, utils.NewErrorResponse(errors.New("E18111 mock_pandora error")))
 		} else if strings.Contains(s.Body, "typeBinaryUnpack") && !strings.Contains(s.Body, KeyPandoraStash) {
-			c.Response().Header().Set(cli.ContentType, cli.ApplicationJson)
+			c.Response().Header().Set(ContentTypeHeader, ApplicationJson)
 			c.Response().WriteHeader(http.StatusBadRequest)
 			return jsoniter.NewEncoder(c.Response()).Encode(map[string]string{"error": "E18111 mock_pandora error"})
 		}

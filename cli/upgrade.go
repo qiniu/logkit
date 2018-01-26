@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (
@@ -26,8 +27,6 @@ const (
 	Arch64      = "amd64"
 
 	UserAgent          = "User-Agent"
-	ContentType        = "Content-Type"
-	ApplicationJson    = "application/json"
 	RateLimitReset     = "X-RateLimit-Reset"
 	RateLimitRemaining = "X-RateLimit-Remaining"
 )
@@ -116,7 +115,7 @@ func checkLastVersion(url string) (ReleaseInfo, error) {
 		return releaseInfo, err
 	}
 	req.Header.Set(UserAgent, Logkit)
-	req.Header.Set(ContentType, ApplicationJson)
+	req.Header.Set(ContentTypeHeader, ApplicationJson)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return releaseInfo, err
@@ -211,7 +210,7 @@ func downloadPackage(url, dstPath string) (file *os.File, err error) {
 		return
 	}
 	req.Header.Set(UserAgent, Logkit)
-	req.Header.Set(ContentType, ApplicationJson)
+	req.Header.Set(ContentTypeHeader, ApplicationJson)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return

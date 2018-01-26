@@ -5,6 +5,7 @@ import (
 
 	"github.com/json-iterator/go"
 	"github.com/qiniu/logkit/conf"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 // mock sender is used for debug

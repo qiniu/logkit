@@ -5,23 +5,23 @@ import (
 
 	"github.com/json-iterator/go"
 	"github.com/qiniu/logkit/metric"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 	"github.com/stretchr/testify/assert"
 )
 
 type respMetricUsage struct {
-	Code string         `json:"code"`
-	Data []utils.Option `json:"data"`
+	Code string   `json:"code"`
+	Data []Option `json:"data"`
 }
 
 type respMetricKeys struct {
-	Code string                      `json:"code"`
-	Data map[string][]utils.KeyValue `json:"data"`
+	Code string                `json:"code"`
+	Data map[string][]KeyValue `json:"data"`
 }
 
 type respMetricOptions struct {
-	Code string                    `json:"code"`
-	Data map[string][]utils.Option `json:"data"`
+	Code string              `json:"code"`
+	Data map[string][]Option `json:"data"`
 }
 
 func metricAPITest(p *testParam) {

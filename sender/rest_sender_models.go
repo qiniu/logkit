@@ -1,9 +1,9 @@
 package sender
 
-import "github.com/qiniu/logkit/utils"
+import . "github.com/qiniu/logkit/utils/models"
 
 // ModeUsages 用途说明
-var ModeUsages = []utils.KeyValue{
+var ModeUsages = []KeyValue{
 	{TypePandora, "发送到 Pandora"},
 	{TypeFile, "发送到本地文件"},
 	{TypeMongodbAccumulate, "发送到 mongodb"},
@@ -15,14 +15,14 @@ var ModeUsages = []utils.KeyValue{
 }
 
 var (
-	OptionSaveLogPath = utils.Option{
+	OptionSaveLogPath = Option{
 		KeyName:      KeyFtSaveLogPath,
 		ChooseOnly:   false,
 		Default:      "",
 		DefaultNoUse: false,
 		Description:  "管道本地盘数据保存路径(ft_save_log_path)",
 	}
-	OptionFtWriteLimit = utils.Option{
+	OptionFtWriteLimit = Option{
 		KeyName:      KeyFtWriteLimit,
 		ChooseOnly:   false,
 		Default:      "",
@@ -30,7 +30,7 @@ var (
 		Description:  "磁盘写入限速(MB/s)(ft_write_limit)",
 		CheckRegex:   "\\d+",
 	}
-	OptionFtSyncEvery = utils.Option{
+	OptionFtSyncEvery = Option{
 		KeyName:      KeyFtSyncEvery,
 		ChooseOnly:   false,
 		Default:      "",
@@ -38,7 +38,7 @@ var (
 		Description:  "同步meta的间隔(ft_sync_every)",
 		CheckRegex:   "\\d+",
 	}
-	OptionFtStrategy = utils.Option{
+	OptionFtStrategy = Option{
 		KeyName:       KeyFtStrategy,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{KeyFtStrategyBackupOnly, KeyFtStrategyAlwaysSave, KeyFtStrategyConcurrent},
@@ -46,7 +46,7 @@ var (
 		DefaultNoUse:  false,
 		Description:   "磁盘管道容错策略(仅备份错误|全部数据走管道)(ft_strategy)",
 	}
-	OptionFtProcs = utils.Option{
+	OptionFtProcs = Option{
 		KeyName:      KeyFtProcs,
 		ChooseOnly:   false,
 		Default:      "",
@@ -54,7 +54,7 @@ var (
 		Description:  "发送并发数量(磁盘管道或内存管道 always_save 或 concurrent 模式生效)(ft_procs)",
 		CheckRegex:   "\\d+",
 	}
-	OptionFtMemoryChannel = utils.Option{
+	OptionFtMemoryChannel = Option{
 		KeyName:       KeyFtMemoryChannel,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"false", "true"},
@@ -62,7 +62,7 @@ var (
 		DefaultNoUse:  false,
 		Description:   "使用内存替换磁盘管道(加速)(ft_memory_channel)",
 	}
-	OptionFtMemoryChannelSize = utils.Option{
+	OptionFtMemoryChannelSize = Option{
 		KeyName:      KeyFtMemoryChannelSize,
 		ChooseOnly:   false,
 		Default:      "",
@@ -71,7 +71,7 @@ var (
 		CheckRegex:   "\\d+",
 	}
 )
-var ModeKeyOptions = map[string][]utils.Option{
+var ModeKeyOptions = map[string][]Option{
 	TypeFile: {
 		{
 			KeyName:      KeyFileSenderPath,
@@ -624,12 +624,12 @@ var ModeKeyOptions = map[string][]utils.Option{
 	},
 }
 
-func GetRouterOption() []utils.Option {
+func GetRouterOption() []Option {
 	mTypeNames := make([]interface{}, len(MatchTypeRegistry))
 	for name := range MatchTypeRegistry {
 		mTypeNames = append(mTypeNames, name)
 	}
-	return []utils.Option{
+	return []Option{
 		{
 			KeyName:      RouterKeyName,
 			ChooseOnly:   false,
@@ -655,11 +655,11 @@ func GetRouterOption() []utils.Option {
 	}
 }
 
-func GetRouterMatchTypeUsage() []utils.KeyValue {
-	mTypeUsage := make([]utils.KeyValue, 0)
+func GetRouterMatchTypeUsage() []KeyValue {
+	mTypeUsage := make([]KeyValue, 0)
 	for name, mType := range MatchTypeRegistry {
 		mTypeFunc := mType()
-		mTypeUsage = append(mTypeUsage, utils.KeyValue{
+		mTypeUsage = append(mTypeUsage, KeyValue{
 			Key:   name,
 			Value: mTypeFunc.usage(),
 		})

@@ -9,12 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
-
-	"github.com/qiniu/log"
+	. "github.com/qiniu/logkit/utils/models"
 	"github.com/vjeantet/grok"
 )
 
@@ -196,8 +195,8 @@ func (gp *GrokParser) Type() string {
 	return TypeGrok
 }
 
-func (gp *GrokParser) Parse(lines []string) ([]sender.Data, error) {
-	datas := []sender.Data{}
+func (gp *GrokParser) Parse(lines []string) ([]Data, error) {
+	datas := []Data{}
 	se := &utils.StatsError{}
 	for idx, line := range lines {
 		data, err := gp.parseLine(line)
@@ -217,7 +216,7 @@ func (gp *GrokParser) Parse(lines []string) ([]sender.Data, error) {
 	return datas, se
 }
 
-func (p *GrokParser) parseLine(line string) (sender.Data, error) {
+func (p *GrokParser) parseLine(line string) (Data, error) {
 	if p.mode == ModeMulti {
 		line = strings.Replace(line, "\n", " ", -1)
 	}
@@ -238,7 +237,7 @@ func (p *GrokParser) parseLine(line string) (sender.Data, error) {
 		log.Errorf("%v no value was parsed after grok pattern %v", line, p.Patterns)
 		return nil, fmt.Errorf("%v no value was parsed after grok pattern %v", line, p.Patterns)
 	}
-	data := sender.Data{}
+	data := Data{}
 	for k, v := range values {
 		if k == "" || v == "" {
 			continue

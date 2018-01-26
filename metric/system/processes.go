@@ -15,7 +15,7 @@ import (
 	"syscall"
 
 	"github.com/qiniu/logkit/metric"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (
@@ -38,7 +38,7 @@ const (
 )
 
 // KeyProcessesUsages TypeMetricProcesses 的字段名称
-var KeyProcessesUsages = []utils.KeyValue{
+var KeyProcessesUsages = []KeyValue{
 	{KeyProcessesBlocked, "不可中断的睡眠状态下的进程数('U','D','L')"},
 	{KeyProcessesZombies, "僵尸态进程数('Z')"},
 	{KeyProcessesStopped, "暂停状态进程数('T')"},
@@ -75,7 +75,7 @@ func (_ *Processes) Tags() []string {
 
 func (_ *Processes) Config() map[string]interface{} {
 	config := map[string]interface{}{
-		metric.OptionString:     []utils.Option{},
+		metric.OptionString:     []Option{},
 		metric.AttributesString: KeyProcessesUsages,
 	}
 	return config

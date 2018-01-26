@@ -1,9 +1,11 @@
 package parser
 
-import "github.com/qiniu/logkit/utils"
+import (
+	. "github.com/qiniu/logkit/utils/models"
+)
 
 // ModeUsages 用途说明
-var ModeUsages = []utils.KeyValue{
+var ModeUsages = []KeyValue{
 	{TypeJson, "json 格式解析"},
 	{TypeNginx, "nginx 日志解析"},
 	{TypeGrok, "grok 方式解析"},
@@ -16,7 +18,7 @@ var ModeUsages = []utils.KeyValue{
 }
 
 var (
-	OptionTimezoneOffset = utils.Option{
+	OptionTimezoneOffset = Option{
 		KeyName:    KeyTimeZoneOffset,
 		ChooseOnly: true,
 		Default:    "0",
@@ -28,7 +30,7 @@ var (
 	}
 )
 
-var ModeKeyOptions = map[string][]utils.Option{
+var ModeKeyOptions = map[string][]Option{
 	TypeJson: {
 		{
 			KeyName:      KeyParserName,

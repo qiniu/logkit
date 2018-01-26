@@ -8,8 +8,8 @@ import (
 	"github.com/labstack/echo"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 type Service struct {
@@ -20,7 +20,7 @@ var KeySampleLog = "sampleLog"
 
 // PostParseRet 返回值
 type PostParseRet struct {
-	SamplePoints []sender.Data `json:"SamplePoints"`
+	SamplePoints []Data `json:"SamplePoints"`
 }
 
 // post /logkit/parser/parse 接受解析请求
@@ -28,12 +28,12 @@ func (rs *RestService) PostParse() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		reqConf := conf.MapConf{}
 		if err := c.Bind(&reqConf); err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrParseParse, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrParseParse, err.Error())
 		}
 		reqConf = convertWebParserConfig(reqConf)
 		nparser, err := parser.NewParserRegistry().NewLogParser(reqConf)
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrParseParse, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrParseParse, err.Error())
 		}
 		ptp, _ := reqConf.GetString(parser.KeyParserType)
 		rawlogs, _ := reqConf.GetStringOr(KeySampleLog, "")
@@ -53,7 +53,7 @@ func (rs *RestService) PostParse() echo.HandlerFunc {
 			}
 		default:
 			errMsg := fmt.Sprintf("parser type <%v> is not supported yet", ptp)
-			return RespError(c, http.StatusBadRequest, utils.ErrParseParse, errMsg)
+			return RespError(c, http.StatusBadRequest, ErrParseParse, errMsg)
 		}
 		datas, err := nparser.Parse(logs)
 		se, ok := err.(*utils.StatsError)
@@ -62,7 +62,7 @@ func (rs *RestService) PostParse() echo.HandlerFunc {
 		}
 		if err != nil {
 			errMsg := fmt.Sprintf("parser error %v", err)
-			return RespError(c, http.StatusBadRequest, utils.ErrParseParse, errMsg)
+			return RespError(c, http.StatusBadRequest, ErrParseParse, errMsg)
 		}
 		return RespSuccess(c, PostParseRet{SamplePoints: datas})
 	}
@@ -94,11 +94,11 @@ func (rs *RestService) PostParserCheck() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		reqConf := conf.MapConf{}
 		if err := c.Bind(&reqConf); err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrParseParse, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrParseParse, err.Error())
 		}
 		_, err := parser.NewParserRegistry().NewLogParser(reqConf)
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrParseParse, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrParseParse, err.Error())
 		}
 		return RespSuccess(c, nil)
 	}

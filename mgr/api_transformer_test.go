@@ -4,15 +4,15 @@ import (
 	"net/http"
 
 	"github.com/json-iterator/go"
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	_ "github.com/qiniu/logkit/transforms/date"
+	. "github.com/qiniu/logkit/utils/models"
 	"github.com/stretchr/testify/assert"
 )
 
 type respTransformerRet struct {
-	Code string        `json:"code"`
-	Data []sender.Data `json:"data"`
+	Code string `json:"code"`
+	Data []Data `json:"data"`
 }
 
 // Rest 测试 端口容易冲突导致混淆，63xx
@@ -57,6 +57,6 @@ func transformerAPITest(p *testParam) {
 	if err = jsoniter.Unmarshal(respBody, &got3); err != nil {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
-	exp := []sender.Data{{"ts": "2006-01-02T14:04:05Z"}}
+	exp := []Data{{"ts": "2006-01-02T14:04:05Z"}}
 	assert.Equal(t, exp, got3.Data)
 }

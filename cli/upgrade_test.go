@@ -16,6 +16,7 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
 	"github.com/labstack/echo"
@@ -351,7 +352,7 @@ func (m *mockGithub) getParams(c echo.Context) (errType string, err error) {
 }
 
 func (m *mockGithub) respFunction(c echo.Context, data map[string]interface{}) error {
-	c.Response().Header().Set(ContentType, ApplicationJson)
+	c.Response().Header().Set(ContentTypeHeader, ApplicationJson)
 	c.Response().Header().Set(RateLimitReset, data[RateLimitReset].(string))
 	c.Response().Header().Set(RateLimitRemaining, data[RateLimitRemaining].(string))
 	c.Response().WriteHeader(data["statusCode"].(int))

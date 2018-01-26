@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/jeromer/syslogparser"
 	"github.com/jeromer/syslogparser/rfc3164"
@@ -129,9 +129,9 @@ func (p *SyslogParser) Type() string {
 	return TypeSyslog
 }
 
-func (p *SyslogParser) Parse(lines []string) ([]sender.Data, error) {
+func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 	se := &utils.StatsError{}
-	datas := []sender.Data{}
+	datas := []Data{}
 	for idx, line := range lines {
 		d, err := p.parse(line)
 		if err != nil {
@@ -153,14 +153,14 @@ func (p *SyslogParser) Parse(lines []string) ([]sender.Data, error) {
 	return datas, se
 }
 
-func (p *SyslogParser) parse(line string) (data sender.Data, err error) {
-	data = sender.Data{}
+func (p *SyslogParser) parse(line string) (data Data, err error) {
+	data = Data{}
 	if p.buff.Len() > 0 {
 		if p.format.IsNewLine([]byte(line)) || line == SyslogEofLine {
 			sparser := p.format.GetParser(p.buff.Bytes())
 			err = sparser.Parse()
 			if err == nil || err.Error() == "No structured data" {
-				data = sender.Data(sparser.Dump())
+				data = Data(sparser.Dump())
 				err = nil
 			}
 			p.buff.Reset()

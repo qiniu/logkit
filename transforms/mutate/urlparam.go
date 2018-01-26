@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 type UrlParam struct {
@@ -38,7 +38,7 @@ func (p *UrlParam) RawTransform(datas []string) ([]string, error) {
 	return datas, errors.New("param transformer not support rawTransform")
 }
 
-func (p *UrlParam) Transform(datas []sender.Data) ([]sender.Data, error) {
+func (p *UrlParam) Transform(datas []Data) ([]Data, error) {
 	var err, pErr error
 	errNums := 0
 	keys := utils.GetKeys(p.Key)
@@ -90,7 +90,7 @@ func (p *UrlParam) Transform(datas []sender.Data) ([]sender.Data, error) {
 }
 
 func (p *UrlParam) Description() string {
-	//return "parse url parameters like 'a=a&b=2&c=aa' into sender.Data map {a:a,b:2,c:aa}"
+	//return "parse url parameters like 'a=a&b=2&c=aa' into Data map {a:a,b:2,c:aa}"
 	return "针对指定的字段做url param解析，例：'a=a&b=2&c=aa'解析为map{a:a,b:2,c:aa}"
 }
 
@@ -105,8 +105,8 @@ func (p *UrlParam) SampleConfig() string {
 	}`
 }
 
-func (p *UrlParam) ConfigOptions() []utils.Option {
-	return []utils.Option{
+func (p *UrlParam) ConfigOptions() []Option {
+	return []Option{
 		transforms.KeyStageAfterOnly,
 		transforms.KeyFieldName,
 	}
