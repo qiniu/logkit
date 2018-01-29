@@ -3,10 +3,11 @@ package reader
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMatchMode(t *testing.T) {

@@ -672,7 +672,8 @@ func (s *PandoraSender) generatePoint(data Data) (point Data) {
 		point[k] = value
 	}
 	if s.opt.uuid {
-		point[PandoraUUID] = gouuid.NewV4().String()
+		uuid, _ := gouuid.NewV4()
+		point[PandoraUUID] = uuid.String()
 	}
 	/*
 		data中剩余的值，但是在schema中不存在的，根据defaultAll和schemaFree判断是否增加。
