@@ -104,21 +104,25 @@ func NewSyslogParser(c conf.MapConf) (LogParser, error) {
 	nameMap := make(map[string]struct{})
 	labels := GetLabels(labelList, nameMap)
 
+	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+
 	format := GetFormt(rfctype)
 	buff := bytes.NewBuffer([]byte{})
 	return &SyslogParser{
-		name:   name,
-		labels: labels,
-		buff:   buff,
-		format: format,
+		name:                 name,
+		labels:               labels,
+		buff:                 buff,
+		format:               format,
+		disableRecordErrData: disableRecordErrData,
 	}, nil
 }
 
 type SyslogParser struct {
-	name   string
-	labels []Label
-	buff   *bytes.Buffer
-	format Format
+	name                 string
+	labels               []Label
+	buff                 *bytes.Buffer
+	format               Format
+	disableRecordErrData bool
 }
 
 func (p *SyslogParser) Name() string {
@@ -139,6 +143,11 @@ func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 			se.ErrorIndex = append(se.ErrorIndex, idx)
 			se.ErrorDetail = err
 			se.LastError = err.Error()
+			if !p.disableRecordErrData {
+				errData := make(Data)
+				errData[KeyPandoraStash] = line
+				datas = append(datas, errData)
+			}
 			continue
 		}
 		if len(d) < 1 {

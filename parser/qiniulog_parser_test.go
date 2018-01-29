@@ -108,6 +108,7 @@ func Test_QiniulogParser(t *testing.T) {
 	c := conf.MapConf{}
 	c[KeyParserName] = "qiniulogparser"
 	c[KeyParserType] = "qiniulog"
+	c[KeyDisableRecordErrData] = "true"
 	ps := NewParserRegistry()
 	p, err := ps.NewLogParser(c)
 	if err != nil {
@@ -119,13 +120,12 @@ func Test_QiniulogParser(t *testing.T) {
 		[GE2owHck-Y4IWJHS]{"error":"No 	 such \t entry","reqid":"","details":null,"code":612}`,
 		"2016/10/20 18:20:30.642666 [ERROR] github.com/qiniu/logkit/queue/disk.go:241: DISKQUEUE(stream_local_save): readOne() error",
 		"2016/10/20 17:20:30.642666 [GE2owHck-Y4IWJHS][INFO] disk.go github.com/qiniu/logkit/queue/disk.go:241: hello",
+		"",
 	}
 	dts, err := p.Parse(lines)
 	if c, ok := err.(*utils.StatsError); ok {
 		err = c.ErrorDetail
-	}
-	if err != nil {
-		t.Error(err)
+		assert.Equal(t, int64(1), c.Errors)
 	}
 	if len(dts) != 4 {
 		t.Fatalf("parse lines error expect 4 but %v", len(dts))
@@ -174,6 +174,35 @@ func Test_QiniulogParser(t *testing.T) {
 	}
 	if dts[1]["file"] != "disk.go github.com/qiniu/logkit/queue/disk.go:241:" {
 		t.Errorf("parse level error exp disk.go github.com/qiniu/logkit/queue/disk.go:241: but %v", dts[0]["file"])
+	}
+	assert.EqualValues(t, "qiniulogparser", p.Name())
+}
+
+func Test_QiniulogParserForErrData(t *testing.T) {
+	c := conf.MapConf{}
+	c[KeyParserName] = "qiniulogparser"
+	c[KeyParserType] = "qiniulog"
+	c[KeyDisableRecordErrData] = "false"
+	ps := NewParserRegistry()
+	p, err := ps.NewLogParser(c)
+	if err != nil {
+		t.Error(err)
+	}
+	lines := []string{
+		"2017/03/28 15:41:06 [Wm0AAPg-IUMW-68U][INFO] bdc.go:573: deleted: 67608",
+		"",
+	}
+	dts, err := p.Parse(lines)
+	if c, ok := err.(*utils.StatsError); ok {
+		err = c.ErrorDetail
+		assert.Equal(t, int64(1), c.Errors)
+	}
+	if len(dts) != 2 {
+		t.Fatalf("parse lines error, expect 2 but %v", len(dts))
+	}
+
+	if dts[0]["reqid"] != "Wm0AAPg-IUMW-68U" {
+		t.Errorf("parse reqid error exp Wm0AAPg-IUMW-68U but %v", dts[0]["reqid"])
 	}
 	assert.EqualValues(t, "qiniulogparser", p.Name())
 }

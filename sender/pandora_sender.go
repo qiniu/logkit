@@ -70,8 +70,6 @@ const (
 
 	PandoraUUID = "Pandora_UUID"
 
-	KeyPandoraStash = "pandora_stash" // 当只有一条数据且 sendError 时候，将其转化为 raw 发送到 pandora_stash 这个字段
-
 	timestampPrecision = 19
 )
 

@@ -52,9 +52,10 @@ var (
 )
 
 type GrokParser struct {
-	name   string
-	labels []Label
-	mode   string
+	name                 string
+	labels               []Label
+	mode                 string
+	disableRecordErrData bool
 
 	timeZoneOffset int
 
@@ -125,14 +126,17 @@ func NewGrokParser(c conf.MapConf) (LogParser, error) {
 	customPatterns, _ := c.GetStringOr(KeyGrokCustomPatterns, "")
 	customPatternFiles, _ := c.GetStringListOr(KeyGrokCustomPatternFiles, []string{})
 
+	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+
 	p := &GrokParser{
-		name:               name,
-		labels:             labels,
-		mode:               mode,
-		Patterns:           patterns,
-		CustomPatterns:     customPatterns,
-		CustomPatternFiles: customPatternFiles,
-		timeZoneOffset:     timeZoneOffset,
+		name:                 name,
+		labels:               labels,
+		mode:                 mode,
+		Patterns:             patterns,
+		CustomPatterns:       customPatterns,
+		CustomPatternFiles:   customPatternFiles,
+		timeZoneOffset:       timeZoneOffset,
+		disableRecordErrData: disableRecordErrData,
 	}
 	err = p.compile()
 	if err != nil {
@@ -204,6 +208,11 @@ func (gp *GrokParser) Parse(lines []string) ([]Data, error) {
 			se.AddErrors()
 			se.ErrorIndex = append(se.ErrorIndex, idx)
 			se.ErrorDetail = err
+			if !gp.disableRecordErrData {
+				errData := make(Data)
+				errData[KeyPandoraStash] = line
+				datas = append(datas, errData)
+			}
 			continue
 		}
 		if len(data) < 1 { //数据不为空的时候发送

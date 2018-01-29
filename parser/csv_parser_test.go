@@ -40,6 +40,7 @@ func Test_CsvParser(t *testing.T) {
 	c[KeyParserType] = "csv"
 	c[KeyCSVSchema] = "a long, b string, c float, d jsonmap,e date"
 	c[KeyCSVSplitter] = " "
+	c[KeyDisableRecordErrData] = "true"
 	parser, err := NewCsvParser(c)
 	if err != nil {
 		t.Error(err)
@@ -76,12 +77,59 @@ func Test_CsvParser(t *testing.T) {
 	assert.Equal(t, expNum, len(datas), fmt.Sprintln(datas))
 
 	if datas[0]["a"] != int64(1) {
-		t.Errorf("a should be 1  but got %v", datas[0]["a"])
+		t.Errorf("a should be 1 but got %v", datas[0]["a"])
 	}
 	if "fufu" != datas[0]["b"] {
 		t.Error("b should be fufu")
 	}
 	assert.EqualValues(t, parser.Name(), "testparser")
+}
+
+func Test_CsvParserForErrData(t *testing.T) {
+	c := conf.MapConf{}
+	c[KeyParserName] = "testparser"
+	c[KeyParserType] = "csv"
+	c[KeyCSVSchema] = "a long, b string, c float, d jsonmap,e date"
+	c[KeyCSVSplitter] = " "
+	c[KeyDisableRecordErrData] = "false"
+	parser, err := NewCsvParser(c)
+	if err != nil {
+		t.Error(err)
+	}
+	tmstr := time.Now().Format(time.RFC3339Nano)
+	lines := []string{
+		`1 fufu 3.14 {"x":1,"y":"2"} ` + tmstr,       //correct
+		`cc jj uu {"x":1,"y":"2"} ` + tmstr,          // error => uu 不是float
+		`2 fufu 3.15 999 ` + tmstr,                   //error，999不是jsonmap
+		`3 fufu 3.16 {"x":1,"y":["xx:12"]} ` + tmstr, //correct
+		`   `,
+		`4 fufu 3.17  ` + tmstr, //correct,jsonmap允许为空
+	}
+	datas, err := parser.Parse(lines)
+	if c, ok := err.(*utils.StatsError); ok {
+		err = c.ErrorDetail
+	}
+	assert.Error(t, err)
+
+	exp := make(map[string]interface{})
+	exp["a"] = int64(1)
+	exp["b"] = "fufu"
+	exp["c"] = 3.14
+	exp["d-x"] = json.Number("1")
+	exp["d-y"] = "2"
+	exp["e"] = tmstr
+	for k, v := range datas[0] {
+		if v != exp[k] {
+			t.Errorf("expect %v but got %v", v, exp[k])
+		}
+	}
+
+	if len(datas) != 6 {
+		t.Fatalf("parse lines error, expect 6 lines but got %v lines", len(datas))
+	}
+
+	expErrData := `2 fufu 3.15 999 ` + tmstr
+	assert.Equal(t, expErrData, datas[2]["pandora_stash"])
 }
 
 func Test_Jsonmap(t *testing.T) {
@@ -140,7 +188,7 @@ func Test_CsvParserLabel(t *testing.T) {
 		err = c.ErrorDetail
 	}
 	assert.Error(t, err)
-	if len(datas) != 1 {
+	if len(datas) != 3 {
 		t.Errorf("correct line should be one, but got %v", len(datas))
 	}
 	if datas[0]["a"] != int64(123) {
@@ -152,7 +200,8 @@ func Test_CsvParserLabel(t *testing.T) {
 	if "nb1684" != datas[0]["d"] {
 		t.Error("d should be nb1684")
 	}
-
+	expErrData := "cc jj uu"
+	assert.Equal(t, expErrData, datas[1]["pandora_stash"])
 }
 
 func Test_CsvParserDupColumn1(t *testing.T) {

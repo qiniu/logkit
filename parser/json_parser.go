@@ -11,9 +11,10 @@ import (
 )
 
 type JsonParser struct {
-	name     string
-	labels   []Label
-	jsontool jsoniter.API
+	name                 string
+	labels               []Label
+	disableRecordErrData bool
+	jsontool             jsoniter.API
 }
 
 func NewJsonParser(c conf.MapConf) (LogParser, error) {
@@ -26,10 +27,13 @@ func NewJsonParser(c conf.MapConf) (LogParser, error) {
 		UseNumber:  true,
 	}.Froze()
 
+	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+
 	return &JsonParser{
-		name:     name,
-		labels:   labels,
-		jsontool: jsontool,
+		name:                 name,
+		labels:               labels,
+		jsontool:             jsontool,
+		disableRecordErrData: disableRecordErrData,
 	}, nil
 }
 
@@ -50,6 +54,11 @@ func (im *JsonParser) Parse(lines []string) ([]Data, error) {
 			se.AddErrors()
 			se.ErrorIndex = append(se.ErrorIndex, idx)
 			se.ErrorDetail = err
+			if !im.disableRecordErrData {
+				errData := make(Data)
+				errData[KeyPandoraStash] = line
+				datas = append(datas, errData)
+			}
 			continue
 		}
 		datas = append(datas, data)

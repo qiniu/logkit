@@ -498,8 +498,10 @@ func (r *LogExportRunner) Run() {
 
 		//把datasourcetag加到data里，前提是认为[]line变成[]data以后是一一对应的，一旦错位就不加
 		if datasourceTag != "" {
-			if len(datas)+len(se.ErrorIndex) == len(froms) {
-				datas = addSourceToData(froms, se, datas, datasourceTag, r.Name())
+			if len(datas) == len(froms) {
+				datas = addSourceToData(froms, se, datas, datasourceTag, r.Name(), true)
+			} else if len(datas)+len(se.ErrorIndex) == len(froms) {
+				datas = addSourceToData(froms, se, datas, datasourceTag, r.Name(), false)
 			} else {
 				log.Errorf("Runner[%v] datasourcetag add error, datas %v not match with froms %v", r.Name(), datas, froms)
 			}
@@ -555,15 +557,20 @@ func classifySenderData(datas []Data, router *sender.Router, senderCnt int) [][]
 	return senderDataList
 }
 
-func addSourceToData(sourceFroms []string, se *utils.StatsError, datas []Data, datasourceTagName, runnername string) []Data {
-	var j int = 0
+func addSourceToData(sourceFroms []string, se *utils.StatsError, datas []Data, datasourceTagName, runnername string, recordErrData bool) []Data {
+	j := 0
 	for i, v := range sourceFroms {
-		if se.ErrorIndexIn(i) {
-			continue
+		if recordErrData {
+			j = i
+		} else {
+			if se.ErrorIndexIn(i) {
+				continue
+			}
 		}
 		if j >= len(datas) {
 			continue
 		}
+
 		if dt, ok := datas[j][datasourceTagName]; ok {
 			log.Debugf("Runner[%v] datasource tag already has data %v, ignore %v", runnername, dt, v)
 		} else {

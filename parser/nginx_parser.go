@@ -25,10 +25,11 @@ const (
 )
 
 type NginxParser struct {
-	name   string
-	regexp *regexp.Regexp
-	schema map[string]string
-	labels []Label
+	name                 string
+	regexp               *regexp.Regexp
+	schema               map[string]string
+	labels               []Label
+	disableRecordErrData bool
 }
 
 func NewNginxParser(c conf.MapConf) (LogParser, error) {
@@ -45,9 +46,12 @@ func NewNginxAccParser(c conf.MapConf) (p *NginxParser, err error) {
 	nameMap := make(map[string]struct{})
 	labels := GetLabels(labelList, nameMap)
 
+	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+
 	p = &NginxParser{
-		name:   name,
-		labels: labels,
+		name:                 name,
+		labels:               labels,
+		disableRecordErrData: disableRecordErrData,
 	}
 	p.schema, err = p.parseSchemaFields(schema)
 	if err != nil {
@@ -112,6 +116,11 @@ func (p *NginxParser) Parse(lines []string) ([]Data, error) {
 		if err != nil {
 			se.ErrorDetail = err
 			se.AddErrors()
+			if !p.disableRecordErrData {
+				errData := make(Data)
+				errData[KeyPandoraStash] = line
+				ret = append(ret, errData)
+			}
 			continue
 		}
 		if len(data) < 1 { //数据不为空的时候发送
