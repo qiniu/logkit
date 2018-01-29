@@ -3,13 +3,13 @@ package mgr
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
-	"github.com/labstack/echo"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
+
+	"github.com/labstack/echo"
 )
 
 type Service struct {
@@ -26,36 +26,12 @@ type PostParseRet struct {
 // post /logkit/parser/parse 接受解析请求
 func (rs *RestService) PostParse() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		reqConf := conf.MapConf{}
-		if err := c.Bind(&reqConf); err != nil {
+		parserConfig := conf.MapConf{}
+		if err := c.Bind(&parserConfig); err != nil {
 			return RespError(c, http.StatusBadRequest, ErrParseParse, err.Error())
 		}
-		reqConf = convertWebParserConfig(reqConf)
-		nparser, err := parser.NewParserRegistry().NewLogParser(reqConf)
-		if err != nil {
-			return RespError(c, http.StatusBadRequest, ErrParseParse, err.Error())
-		}
-		ptp, _ := reqConf.GetString(parser.KeyParserType)
-		rawlogs, _ := reqConf.GetStringOr(KeySampleLog, "")
-		var logs []string
-		switch ptp {
-		case parser.TypeCSV, parser.TypeJson, parser.TypeRaw, parser.TypeNginx, parser.TypeEmpty, parser.TypeKafkaRest, parser.TypeLogv1:
-			logs = strings.Split(rawlogs, "\n")
-		case parser.TypeSyslog:
-			logs = strings.Split(rawlogs, "\n")
-			logs = append(logs, parser.SyslogEofLine)
-		case parser.TypeGrok:
-			gm, _ := reqConf.GetString(parser.KeyGrokMode)
-			if gm != parser.ModeMulti {
-				logs = strings.Split(rawlogs, "\n")
-			} else {
-				logs = []string{rawlogs}
-			}
-		default:
-			errMsg := fmt.Sprintf("parser type <%v> is not supported yet", ptp)
-			return RespError(c, http.StatusBadRequest, ErrParseParse, errMsg)
-		}
-		datas, err := nparser.Parse(logs)
+
+		parseData, err := GetParsedData(parserConfig)
 		se, ok := err.(*utils.StatsError)
 		if ok {
 			err = se.ErrorDetail
@@ -64,7 +40,8 @@ func (rs *RestService) PostParse() echo.HandlerFunc {
 			errMsg := fmt.Sprintf("parser error %v", err)
 			return RespError(c, http.StatusBadRequest, ErrParseParse, errMsg)
 		}
-		return RespSuccess(c, PostParseRet{SamplePoints: datas})
+
+		return RespSuccess(c, PostParseRet{SamplePoints: parseData})
 	}
 }
 
