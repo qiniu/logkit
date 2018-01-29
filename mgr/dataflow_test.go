@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
@@ -17,30 +20,30 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_GetRawData(t *testing.T) {
-	var testGetRawData = `{
+func Test_RawData(t *testing.T) {
+	var testRawData = `{
     "name":"testGetRawData.csv",
     "batch_len": 3,
     "batch_size": 2097152,
     "batch_interval": 60,
     "batch_try_times": 3, 
     "reader":{
-        "log_path":"./Test_GetRawData/logdir",
-        "meta_path":"./Test_GetRawData1/meta_req_csv",
+        "log_path":"./Test_RawData/logdir",
+        "meta_path":"./Test_RawData1/meta_req_csv",
         "mode":"dir",
         "read_from":"oldest",
         "ignore_hidden":"true"
     }
 }
 `
-	logfile := "./Test_GetRawData/logdir/log1"
-	logdir := "./Test_GetRawData/logdir"
-	if err := os.MkdirAll("./Test_GetRawData/confs1", 0777); err != nil {
+	logfile := "./Test_RawData/logdir/log1"
+	logdir := "./Test_RawData/logdir"
+	if err := os.MkdirAll("./Test_RawData/confs1", 0777); err != nil {
 		t.Error(err)
 	}
 	defer func() {
-		os.RemoveAll("./Test_GetRawData")
-		os.RemoveAll("./Test_GetRawData1")
+		os.RemoveAll("./Test_RawData")
+		os.RemoveAll("./Test_RawData1")
 	}()
 
 	if err := os.MkdirAll(logdir, 0777); err != nil {
@@ -50,7 +53,7 @@ func Test_GetRawData(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	err = ioutil.WriteFile("./Test_GetRawData/confs1/test1.conf", []byte(testGetRawData), 0666)
+	err = ioutil.WriteFile("./Test_RawData/confs1/test1.conf", []byte(testRawData), 0666)
 	if err != nil {
 		t.Error(err)
 	}
@@ -58,7 +61,7 @@ func Test_GetRawData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	confPathAbs, _, err := utils.GetRealPath("./Test_GetRawData/confs1/test1.conf")
+	confPathAbs, _, err := utils.GetRealPath("./Test_RawData/confs1/test1.conf")
 	if err != nil {
 		t.Error(err)
 	}
@@ -69,7 +72,7 @@ func Test_GetRawData(t *testing.T) {
 		t.Error(err)
 	}
 
-	rawData, err := GetRawData(runnerConf.ReaderConfig)
+	rawData, err := RawData(runnerConf.ReaderConfig)
 	if err != nil {
 		t.Error(err)
 	}
@@ -78,7 +81,7 @@ func Test_GetRawData(t *testing.T) {
 	assert.Equal(t, expected, rawData)
 }
 
-func Test_GetParsedData(t *testing.T) {
+func Test_ParseData(t *testing.T) {
 	c := conf.MapConf{}
 	c[parser.KeyParserName] = "testparser"
 	c[parser.KeyParserType] = "csv"
@@ -92,7 +95,7 @@ func Test_GetParsedData(t *testing.T) {
 	line5 := line4 + `   ` + "\n"
 	line6 := line5 + `4 fufu 3.17  ` + tmstr
 	c[KeySampleLog] = line6
-	parsedData, err := GetParsedData(c)
+	parsedData, err := ParseData(c)
 	if c, ok := err.(*utils.StatsError); ok {
 		err = c.ErrorDetail
 	}
@@ -121,7 +124,7 @@ func Test_GetParsedData(t *testing.T) {
 	}
 }
 
-func TestGetTransformedData(t *testing.T) {
+func Test_TransformData(t *testing.T) {
 	config1 := `{
 			"type":"IP",
 			"key":  "ip",
@@ -133,7 +136,7 @@ func TestGetTransformedData(t *testing.T) {
 	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
 
-	transformData, err := GetTransformedData(rc)
+	transformData, err := TransformData(rc)
 	if err != nil {
 		t.Error(err)
 	}
@@ -214,5 +217,215 @@ func Test_getTransformer(t *testing.T) {
 	}
 	if transformer == nil {
 		t.Error("expect get transformer but is empty")
+	}
+}
+
+func Test_SendData(t *testing.T) {
+	c := conf.MapConf{
+		reader.KeyHttpServiceAddress: ":8000",
+		reader.KeyHttpServicePath:    "/logkit/data",
+	}
+	readConf := conf.MapConf{
+		reader.KeyMetaPath:   "./meta",
+		reader.KeyFileDone:   "./meta",
+		reader.KeyMode:       reader.ModeHttp,
+		sender.KeyRunnerName: "TestNewHttpReader",
+	}
+	meta, err := reader.NewMetaWithConf(readConf)
+	assert.NoError(t, err)
+	defer os.RemoveAll("./meta")
+	httpReader, err := reader.NewHttpReader(meta, c)
+	assert.NoError(t, err)
+	err = httpReader.Start()
+	assert.NoError(t, err)
+	defer httpReader.Close()
+
+	testInput := `[
+		{
+			"a": 1,
+			"b": true,
+			"c": "1",
+			"e": 1.43,
+			"d": {
+				"a1": 1,
+				"b1": true,
+				"c1": "1",
+				"d1": {}
+			}
+		},
+		{
+			"a": 1,
+			"b": true,
+			"c": "1",
+			"d": {
+				"a1": 1,
+				"b1": true,
+				"c1": "1",
+				"d1": {}
+			}
+		}
+	]`
+	testJsonExp := [][]string{
+		{
+			`"a":1`,
+			`"b":true`,
+			`"c":"1"`,
+			`"e":1.43`,
+			`"d":{"`,
+			`"a1":1`,
+			`"b1":true`,
+			`"c1":"1"`,
+			`"d1":{}`,
+		},
+		{
+			`"a":1`,
+			`"b":true`,
+			`"c":"1"`,
+			`"d":{"`,
+			`"a1":1`,
+			`"b1":true`,
+			`"c1":"1"`,
+			`"d1":{}`,
+		},
+	}
+
+	var senders []conf.MapConf
+	senderConf := conf.MapConf{
+		sender.KeySenderType:         sender.TypeHttp,
+		sender.KeyHttpSenderGzip:     "true",
+		sender.KeyHttpSenderCsvSplit: "\t",
+		sender.KeyHttpSenderProtocol: "json",
+		sender.KeyHttpSenderCsvHead:  "false",
+		sender.KeyRunnerName:         "testRunner",
+		sender.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
+	}
+	senders = append(senders, senderConf)
+
+	senderConfig := map[string]interface{}{
+		"sampleLog": testInput,
+		"senders":   senders,
+	}
+
+	err = SendData(senderConfig)
+	if err != nil {
+		t.Error(err)
+	}
+	for _, exp := range testJsonExp {
+		got, err := httpReader.ReadLine()
+		assert.NoError(t, err)
+		for _, e := range exp {
+			if !strings.Contains(got, e) {
+				t.Fatalf("exp: %v contains %v, but not", got, e)
+			}
+		}
+	}
+}
+
+func Test_getSendersConfig(t *testing.T) {
+	testInput := `[
+		{
+			"a": 1,
+			"b": true,
+			"c": "1",
+			"e": 1.43
+		}
+	]`
+
+	var senders []conf.MapConf
+	senderConf := conf.MapConf{
+		sender.KeySenderType:         sender.TypeHttp,
+		sender.KeyHttpSenderGzip:     "true",
+		sender.KeyHttpSenderCsvSplit: "\t",
+		sender.KeyHttpSenderProtocol: "json",
+		sender.KeyHttpSenderCsvHead:  "false",
+		sender.KeyRunnerName:         "testRunner",
+		sender.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
+	}
+	senders = append(senders, senderConf)
+
+	senderConfig := map[string]interface{}{
+		"sampleLog": testInput,
+		"senders":   senders,
+	}
+
+	sendersConfig, err := getSendersConfig(senderConfig)
+	if err != nil {
+		t.Errorf("get senders config fail, error : %v", err.Error())
+	}
+
+	if len(sendersConfig) != 1 {
+		t.Errorf("expect 1 sender config but got %v", len(sendersConfig))
+	}
+
+	for _, val := range sendersConfig {
+		assert.Equal(t, sender.TypeHttp, val[sender.KeySenderType])
+		assert.Equal(t, "true", val[sender.KeyHttpSenderGzip])
+	}
+}
+
+func Test_getDataFromSenderConfig(t *testing.T) {
+	testInput := `[
+		{
+			"a": 1,
+			"b": true,
+			"c": "1",
+			"e": 1.43
+		}
+	]`
+
+	var senders []conf.MapConf
+	senderConf := conf.MapConf{
+		sender.KeySenderType:         sender.TypeHttp,
+		sender.KeyHttpSenderGzip:     "true",
+		sender.KeyHttpSenderCsvSplit: "\t",
+		sender.KeyHttpSenderProtocol: "json",
+		sender.KeyHttpSenderCsvHead:  "false",
+		sender.KeyRunnerName:         "testRunner",
+		sender.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
+	}
+	senders = append(senders, senderConf)
+
+	senderConfig := map[string]interface{}{
+		"sampleLog": testInput,
+		"senders":   senders,
+	}
+
+	data, err := getDataFromSenderConfig(senderConfig)
+	if err != nil {
+		t.Errorf("get data from config fail, error : %v", err.Error())
+	}
+
+	if len(data) != 1 {
+		t.Errorf("expect 1 data but got %v", len(data))
+	}
+
+	for _, val := range data {
+		assert.Equal(t, float64(1), val["a"])
+		assert.Equal(t, true, val["b"])
+		assert.Equal(t, "1", val["c"])
+		assert.Equal(t, float64(1.43), val["e"])
+	}
+}
+
+func Test_getSenders(t *testing.T) {
+	var sendersConfig []conf.MapConf
+	senderConf := conf.MapConf{
+		sender.KeySenderType:         sender.TypeHttp,
+		sender.KeyHttpSenderGzip:     "true",
+		sender.KeyHttpSenderCsvSplit: "\t",
+		sender.KeyHttpSenderProtocol: "json",
+		sender.KeyHttpSenderCsvHead:  "false",
+		sender.KeyRunnerName:         "testRunner",
+		sender.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
+	}
+	sendersConfig = append(sendersConfig, senderConf)
+
+	senders, err := getSenders(sendersConfig)
+	if err != nil {
+		t.Errorf("get senders from config fail, error : %v", err.Error())
+	}
+
+	if len(senders) != 1 {
+		t.Errorf("expect 1 sender but got %v", len(senders))
 	}
 }

@@ -43,15 +43,39 @@ func (rs *RestService) PostTransform() echo.HandlerFunc {
 		var transformerConfig map[string]interface{} // request body params in map format
 		// bind request context onto map[string]string
 		if err := c.Bind(&transformerConfig); err != nil {
-			return err
+			return RespError(c, http.StatusBadRequest, ErrTransformTransform, err.Error())
 		}
 
-		transformData, err := GetTransformedData(transformerConfig)
+		transformData, err := TransformData(transformerConfig)
 		if err != nil {
 			return RespError(c, http.StatusBadRequest, ErrTransformTransform, err.Error())
 		}
 
 		// Transform Success
 		return RespSuccess(c, transformData)
+	}
+}
+
+// POST /logkit/transformer/check
+func (rs *RestService) PostTransformerCheck() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		var transformerConfig map[string]interface{} // request body params in map format
+		// bind request context onto map[string]string
+		if err := c.Bind(&transformerConfig); err != nil {
+			return RespError(c, http.StatusBadRequest, ErrTransformTransform, err.Error())
+		}
+
+		create, err := getTransformerCreator(transformerConfig)
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, ErrTransformTransform, err.Error())
+		}
+		_, err = getTransformer(transformerConfig, create)
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, ErrTransformTransform, err.Error())
+
+		}
+
+		// Check Success
+		return RespSuccess(c, nil)
 	}
 }

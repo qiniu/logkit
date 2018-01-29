@@ -6,17 +6,22 @@ import (
 	"io"
 	"strings"
 
-	"github.com/json-iterator/go"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
+
+	"github.com/json-iterator/go"
 )
 
+const DefaultTryTimes = 3
+
 //reader模块中各种type的日志都能获取raw_data
-func GetRawData(readerConfig conf.MapConf) (rawData string, err error) {
+func RawData(readerConfig conf.MapConf) (rawData string, err error) {
 	if readerConfig == nil {
 		err = fmt.Errorf("reader config cannot be empty")
 		return
@@ -28,7 +33,7 @@ func GetRawData(readerConfig conf.MapConf) (rawData string, err error) {
 		return
 	}
 
-	tryCount := 3
+	tryCount := DefaultTryTimes
 	for {
 		if tryCount <= 0 {
 			err = fmt.Errorf("get raw data time out, raw data is empty")
@@ -39,7 +44,7 @@ func GetRawData(readerConfig conf.MapConf) (rawData string, err error) {
 		if err != nil && err != io.EOF {
 			return "", fmt.Errorf("reader %s - error: %v", rd.Name(), err)
 		}
-		if len(rawData) <= 0 {
+		if rawData == "" {
 			continue
 		}
 		return
@@ -49,7 +54,7 @@ func GetRawData(readerConfig conf.MapConf) (rawData string, err error) {
 }
 
 //parse模块中各种type的日志都能获取解析后的数据
-func GetParsedData(parserConfig conf.MapConf) (parsedData []Data, err error) {
+func ParseData(parserConfig conf.MapConf) (parsedData []Data, err error) {
 	parserConfig = convertWebParserConfig(parserConfig)
 	if parserConfig == nil {
 		err = fmt.Errorf("parser config was empty after web config convet")
@@ -80,7 +85,7 @@ func GetParsedData(parserConfig conf.MapConf) (parsedData []Data, err error) {
 	return
 }
 
-func GetTransformedData(transformerConfig map[string]interface{}) ([]Data, error) {
+func TransformData(transformerConfig map[string]interface{}) ([]Data, error) {
 	if transformerConfig == nil {
 		err := fmt.Errorf("transformer config cannot be empty")
 		return nil, err
@@ -116,6 +121,151 @@ func GetTransformedData(transformerConfig map[string]interface{}) ([]Data, error
 		return nil, err
 	}
 	return transformedData, nil
+}
+
+func SendData(senderConfig map[string]interface{}) error {
+	if senderConfig == nil {
+		return fmt.Errorf("sender config cannot be empty")
+	}
+
+	sendersConf, err := getSendersConfig(senderConfig)
+	if err != nil {
+		return err
+	}
+
+	senders, err := getSenders(sendersConf)
+	if err != nil {
+		return err
+	}
+
+	senderCnt := len(senders)
+	router, err := getRouter(senderConfig, senderCnt)
+	if err != nil {
+		return err
+	}
+
+	datas, err := getDataFromSenderConfig(senderConfig)
+	if err != nil {
+		return err
+	}
+
+	senderDataList := classifySenderData(datas, router, len(senders))
+	for index, s := range senders {
+		if err := trySend(s, senderDataList[index], DefaultTryTimes); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func getSendersConfig(senderConfig map[string]interface{}) ([]conf.MapConf, error) {
+	config := senderConfig[KeySendConfig]
+	byteSendersConfig, err := jsoniter.Marshal(config)
+	if err != nil {
+		return nil, err
+	}
+	var sendersConf []conf.MapConf
+	if jsonErr := jsoniter.Unmarshal(byteSendersConfig, &sendersConf); jsonErr != nil {
+		return nil, jsonErr
+	}
+	if sendersConf == nil {
+		return nil, fmt.Errorf("sender config cannot be empty")
+	}
+	return sendersConf, nil
+}
+
+func getDataFromSenderConfig(senderConfig map[string]interface{}) ([]Data, error) {
+	var datas = []Data{}
+	rawData := senderConfig[KeySampleLog]
+	rawDataStr, ok := rawData.(string)
+	if !ok {
+		err := fmt.Errorf("missing param %s", KeySampleLog)
+		return nil, err
+	}
+	if rawDataStr == "" {
+		err := fmt.Errorf("sender fetched empty sample log")
+		return nil, err
+	}
+
+	if jsonErr := jsoniter.Unmarshal([]byte(rawDataStr), &datas); jsonErr != nil {
+		return nil, jsonErr
+	}
+	return datas, nil
+}
+
+func getSenders(sendersConf []conf.MapConf) ([]sender.Sender, error) {
+	senders := make([]sender.Sender, 0)
+	sr := sender.NewSenderRegistry()
+	for i, senderConfig := range sendersConf {
+		senderConfig[sender.KeyFaultTolerant] = "false"
+		s, err := sr.NewSender(senderConfig, "")
+		if err != nil {
+			return nil, err
+		}
+		senders = append(senders, s)
+		delete(sendersConf[i], sender.InnerUserAgent)
+	}
+	return senders, nil
+}
+
+func getRouter(senderConfig map[string]interface{}, senderCnt int) (*sender.Router, error) {
+	routerConf, err := getRouterConfig(senderConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	router, err := sender.NewSenderRouter(routerConf, senderCnt)
+	if err != nil {
+		return nil, fmt.Errorf("sender router error, %v", err)
+	}
+	return router, nil
+}
+
+func getRouterConfig(senderConfig map[string]interface{}) (sender.RouterConfig, error) {
+	config := senderConfig[KeyRouterConfig]
+	byteRouterConfig, err := jsoniter.Marshal(config)
+	if err != nil {
+		return sender.RouterConfig{}, err
+	}
+
+	var routerConfig sender.RouterConfig
+	if jsonErr := jsoniter.Unmarshal(byteRouterConfig, &routerConfig); jsonErr != nil {
+		return sender.RouterConfig{}, jsonErr
+	}
+	return routerConfig, nil
+}
+
+// trySend 尝试发送数据，如果此时runner退出返回false，其他情况无论是达到最大重试次数还是发送成功，都返回true
+func trySend(s sender.Sender, datas []Data, times int) error {
+	if len(datas) <= 0 {
+		return nil
+	}
+	cnt := 1
+	for {
+		err := s.Send(datas)
+		if se, ok := err.(*utils.StatsError); ok {
+			err = se.ErrorDetail
+		}
+
+		if err != nil {
+			se, ok := err.(*reqerr.SendError)
+			if ok {
+				datas = sender.ConvertDatas(se.GetFailDatas())
+				cnt++
+				continue
+			}
+			if times <= 0 || cnt < times {
+				cnt++
+				continue
+			}
+			err = fmt.Errorf("retry send %v times, but still error %v, discard datas %v ... total %v lines", cnt, err, datas, len(datas))
+			return err
+		}
+		break
+	}
+
+	return nil
 }
 
 func getSampleData(parserConfig conf.MapConf) ([]string, error) {

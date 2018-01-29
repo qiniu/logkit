@@ -3,10 +3,11 @@ package mgr
 import (
 	"net/http"
 
-	"github.com/json-iterator/go"
 	conf2 "github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	. "github.com/qiniu/logkit/utils/models"
+
+	"github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
 )
 
