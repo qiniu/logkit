@@ -6,9 +6,11 @@ import (
 	"io"
 	"strings"
 
+	"github.com/json-iterator/go"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -78,6 +80,44 @@ func GetParsedData(parserConfig conf.MapConf) (parsedData []Data, err error) {
 	return
 }
 
+func GetTransformedData(transformerConfig map[string]interface{}) ([]Data, error) {
+	if transformerConfig == nil {
+		err := fmt.Errorf("transformer config cannot be empty")
+		return nil, err
+	}
+
+	create, err := getTransformerCreator(transformerConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := getDataFromTransformConfig(transformerConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	transformer, err := getTransformer(transformerConfig, create)
+	if err != nil {
+		return nil, err
+	}
+
+	// Transform data
+	transformedData, transErr := transformer.Transform(data)
+	se, ok := transErr.(*utils.StatsError)
+	if ok {
+		transErr = se.ErrorDetail
+	}
+	if transErr != nil {
+		se, ok := transErr.(*utils.StatsError)
+		if ok {
+			transErr = se.ErrorDetail
+		}
+		err := fmt.Errorf("transform processing error %v", transErr)
+		return nil, err
+	}
+	return transformedData, nil
+}
+
 func getSampleData(parserConfig conf.MapConf) ([]string, error) {
 	parserType, _ := parserConfig.GetString(parser.KeyParserType)
 	rawData, _ := parserConfig.GetStringOr(KeySampleLog, "")
@@ -132,4 +172,73 @@ func checkErr(err error, parserName string) error {
 	}
 
 	return err
+}
+
+func getTransformerCreator(transformerConfig map[string]interface{}) (transforms.Creator, error) {
+	transformKeyType, ok := transformerConfig[transforms.KeyType]
+	if !ok {
+		err := fmt.Errorf("missing param %s", transforms.KeyType)
+		return nil, err
+	}
+	transformKeyTypeStr, ok := transformKeyType.(string)
+	if !ok {
+		err := fmt.Errorf("param %s must be of type string", transforms.KeyType)
+		return nil, err
+	}
+
+	create, ok := transforms.Transformers[transformKeyTypeStr]
+	if !ok {
+		err := fmt.Errorf("transformer of type %v not exist", transformKeyTypeStr)
+		return nil, err
+	}
+	return create, nil
+}
+
+func getDataFromTransformConfig(transformerConfig map[string]interface{}) ([]Data, error) {
+	rawData, ok := transformerConfig[KeySampleLog]
+	if !ok {
+		err := fmt.Errorf("missing param %s", KeySampleLog)
+		return nil, err
+	}
+	rawDataStr, ok := rawData.(string)
+	if !ok {
+		err := fmt.Errorf("missing param %s", KeySampleLog)
+		return nil, err
+	}
+	if rawDataStr == "" {
+		err := fmt.Errorf("transformer fetched empty sample log")
+		return nil, err
+	}
+
+	var data = []Data{}
+	var singleData Data
+	if jsonErr := jsoniter.Unmarshal([]byte(rawDataStr), &singleData); jsonErr != nil {
+		if jsonErr = jsoniter.Unmarshal([]byte(rawDataStr), &data); jsonErr != nil {
+			return nil, jsonErr
+		}
+	} else {
+		// is single log, and method transformer.transform(data []sender.Data) accept a param of slice type
+		data = append(data, singleData)
+	}
+	return data, nil
+}
+
+func getTransformer(transConfig map[string]interface{}, create transforms.Creator) (transforms.Transformer, error) {
+	trans := create()
+	transformerConfig := convertWebTransformerConfig(transConfig)
+	delete(transformerConfig, KeySampleLog)
+	bts, jsonErr := jsoniter.Marshal(transformerConfig)
+	if jsonErr != nil {
+		return nil, jsonErr
+	}
+	if jsonErr = jsoniter.Unmarshal(bts, trans); jsonErr != nil {
+		return nil, jsonErr
+	}
+
+	if trans, ok := trans.(transforms.Initialize); ok {
+		if err := trans.Init(); err != nil {
+			return nil, err
+		}
+	}
+	return trans, nil
 }
