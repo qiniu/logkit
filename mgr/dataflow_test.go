@@ -11,7 +11,9 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 
+	"github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -76,7 +78,7 @@ func Test_GetRawData(t *testing.T) {
 	assert.Equal(t, expected, rawData)
 }
 
-func Test_GetParseData(t *testing.T) {
+func Test_GetParsedData(t *testing.T) {
 	c := conf.MapConf{}
 	c[parser.KeyParserName] = "testparser"
 	c[parser.KeyParserType] = "csv"
@@ -116,5 +118,101 @@ func Test_GetParseData(t *testing.T) {
 	}
 	if "fufu" != parsedData[0]["b"] {
 		t.Error("b should be fufu")
+	}
+}
+
+func TestGetTransformedData(t *testing.T) {
+	config1 := `{
+			"type":"IP",
+			"key":  "ip",
+			"data_path": "../transforms/ip/17monipdb.dat",
+			"sampleLog": "{\"ip\": \"111.2.3.4\"}"
+	}`
+
+	var rc map[string]interface{}
+	err := jsoniter.Unmarshal([]byte(config1), &rc)
+	assert.NoError(t, err)
+
+	transformData, err := GetTransformedData(rc)
+	if err != nil {
+		t.Error(err)
+	}
+	exp := []Data{{
+		"ip":      "111.2.3.4",
+		"Region":  "浙江",
+		"City":    "宁波",
+		"Country": "中国",
+		"Isp":     "N/A"}}
+	assert.Equal(t, exp, transformData)
+}
+
+func Test_getTransformerCreator(t *testing.T) {
+	config1 := `{
+			"type":"IP",
+			"key":  "ip",
+			"data_path": "../transforms/ip/17monipdb.dat",
+			"sampleLog": "{\"ip\": \"111.2.3.4\"}"
+	}`
+	var rc map[string]interface{}
+	err := jsoniter.Unmarshal([]byte(config1), &rc)
+	assert.NoError(t, err)
+
+	creator, err := getTransformerCreator(rc)
+	if err != nil {
+		t.Errorf("get transformer creator from transformer config fail, error : %v", err.Error())
+	}
+
+	if creator == nil {
+		t.Errorf("expect get creator, but is nil")
+	}
+}
+
+func Test_getDataFromTransformConfig(t *testing.T) {
+	config1 := `{
+			"type":"IP",
+			"key":  "ip",
+			"data_path": "../transforms/ip/17monipdb.dat",
+			"sampleLog": "{\"ip\": \"111.2.3.4\"}"
+	}`
+	var rc map[string]interface{}
+	err := jsoniter.Unmarshal([]byte(config1), &rc)
+	assert.NoError(t, err)
+
+	data, err := getDataFromTransformConfig(rc)
+	if err != nil {
+		t.Errorf("get data from transfomer config fail, error : %v", err.Error())
+	}
+
+	if len(data) != 1 {
+		t.Errorf("expect 1 data but got %v", len(data))
+	}
+
+	for _, val := range data {
+		assert.Equal(t, "111.2.3.4", val["ip"])
+	}
+}
+
+func Test_getTransformer(t *testing.T) {
+	config1 := `{
+			"type":"IP",
+			"key":  "ip",
+			"data_path": "../transforms/ip/17monipdb.dat",
+			"sampleLog": "{\"ip\": \"111.2.3.4\"}"
+	}`
+	var rc map[string]interface{}
+	err := jsoniter.Unmarshal([]byte(config1), &rc)
+	assert.NoError(t, err)
+
+	creator, err := getTransformerCreator(rc)
+	if err != nil {
+		t.Errorf("get transformer creator from transformer config fail, error : %v", err.Error())
+	}
+
+	transformer, err := getTransformer(rc, creator)
+	if err != nil {
+		t.Errorf("get transformer from transformer config fail, error : %v", err.Error())
+	}
+	if transformer == nil {
+		t.Error("expect get transformer but is empty")
 	}
 }
