@@ -84,6 +84,7 @@ func Test_GetParsedData(t *testing.T) {
 	c[parser.KeyParserType] = "csv"
 	c[parser.KeyCSVSchema] = "a long, b string, c float, d jsonmap,e date"
 	c[parser.KeyCSVSplitter] = " "
+	c[parser.KeyDisableRecordErrData] = "true"
 	tmstr := time.Now().Format(time.RFC3339Nano)
 	line1 := `1 fufu 3.14 {"x":1,"y":"2"} ` + tmstr + "\n"
 	line2 := line1 + `cc jj uu {"x":1,"y":"2"} ` + tmstr + "\n"

@@ -26,8 +26,9 @@ const (
 )
 
 type KafaRestlogParser struct {
-	name   string
-	labels []Label
+	name                 string
+	labels               []Label
+	disableRecordErrData bool
 }
 
 func (krp *KafaRestlogParser) Name() string {
@@ -50,6 +51,12 @@ func (krp *KafaRestlogParser) Parse(lines []string) ([]Data, error) {
 				datas = append(datas, krp.parseRequestLog(fields))
 			} else if (len(fields) > 0 && fields[2] == "ERROR") || (len(fields) > 0 && fields[2] == "WARN") {
 				datas = append(datas, krp.parseAbnormalLog(fields))
+			}
+		} else {
+			if !krp.disableRecordErrData {
+				errData := make(Data)
+				errData[KeyPandoraStash] = line
+				datas = append(datas, errData)
 			}
 		}
 	}
@@ -99,9 +106,12 @@ func NewKafaRestlogParser(c conf.MapConf) (LogParser, error) {
 	}
 	labels := GetLabels(labelList, nameMap)
 
+	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+
 	return &KafaRestlogParser{
-		name:   name,
-		labels: labels,
+		name:                 name,
+		labels:               labels,
+		disableRecordErrData: disableRecordErrData,
 	}, nil
 }
 
@@ -193,5 +203,4 @@ func (krp *KafaRestlogParser) ParseLogTime(fields []string) int64 {
 		return 0
 	}
 	return ts
-
 }

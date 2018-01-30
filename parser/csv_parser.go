@@ -44,12 +44,13 @@ var jsontool = jsoniter.Config{
 }.Froze()
 
 type CsvParser struct {
-	name           string
-	schema         []field
-	labels         []Label
-	delim          string
-	isAutoRename   bool
-	timeZoneOffset int
+	name                 string
+	schema               []field
+	labels               []Label
+	delim                string
+	isAutoRename         bool
+	timeZoneOffset       int
+	disableRecordErrData bool
 }
 
 type field struct {
@@ -93,13 +94,16 @@ func NewCsvParser(c conf.MapConf) (LogParser, error) {
 	}
 	labels := GetLabels(labelList, nameMap)
 
+	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+
 	return &CsvParser{
-		name:           name,
-		schema:         fields,
-		labels:         labels,
-		delim:          splitter,
-		isAutoRename:   isAutoRename,
-		timeZoneOffset: timeZoneOffset,
+		name:                 name,
+		schema:               fields,
+		labels:               labels,
+		delim:                splitter,
+		isAutoRename:         isAutoRename,
+		timeZoneOffset:       timeZoneOffset,
+		disableRecordErrData: disableRecordErrData,
 	}, nil
 }
 
@@ -418,6 +422,11 @@ func (p *CsvParser) Parse(lines []string) ([]Data, error) {
 			se.AddErrors()
 			se.ErrorIndex = append(se.ErrorIndex, idx)
 			se.ErrorDetail = err
+			if !p.disableRecordErrData {
+				errData := make(Data)
+				errData[KeyPandoraStash] = line
+				datas = append(datas, errData)
+			}
 			continue
 		}
 		datas = append(datas, d)

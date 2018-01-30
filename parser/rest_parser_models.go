@@ -28,6 +28,22 @@ var (
 		DefaultNoUse: false,
 		Description:  "时区偏移量(timezone_offset)",
 	}
+
+	OptionLabels = Option{
+		KeyName:      KeyLabels,
+		ChooseOnly:   false,
+		Default:      "",
+		DefaultNoUse: false,
+		Description:  "额外的标签信息(labels)",
+	}
+
+	OptionDisableRecordErrData = Option{
+		KeyName:      KeyDisableRecordErrData,
+		ChooseOnly:   false,
+		Default:      "",
+		DefaultNoUse: false,
+		Description:  "不记录解析失败的数据(disable_record_errdata)",
+	}
 )
 
 var ModeKeyOptions = map[string][]Option{
@@ -39,13 +55,8 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: false,
 			Description:  "parser名称(name)",
 		},
-		{
-			KeyName:      KeyLabels,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "额外的标签信息(labels)",
-		},
+		OptionLabels,
+		OptionDisableRecordErrData,
 	},
 	TypeNginx: {
 		{
@@ -83,13 +94,8 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: false,
 			Description:  "直接通过正则表达式解析(nginx_log_format_regex)",
 		},
-		{
-			KeyName:      KeyLabels,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "额外的标签信息(labels)",
-		},
+		OptionLabels,
+		OptionDisableRecordErrData,
 	},
 	TypeGrok: {
 		{
@@ -129,13 +135,8 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "自定义 pattern (grok_custom_patterns)",
 		},
 		OptionTimezoneOffset,
-		{
-			KeyName:      KeyLabels,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "额外的标签信息(labels)",
-		},
+		OptionLabels,
+		OptionDisableRecordErrData,
 	},
 
 	TypeCSV: {
@@ -160,13 +161,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: false,
 			Description:  "csv分隔符(csv_splitter)",
 		},
-		{
-			KeyName:      KeyLabels,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "额外的标签信息(labels)",
-		},
+		OptionLabels,
 		OptionTimezoneOffset,
 		{
 			KeyName:       KeyAutoRename,
@@ -176,6 +171,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse:  false,
 			Description:   "自动将字段名称中的'-'更改为'_'",
 		},
+		OptionDisableRecordErrData,
 	},
 	TypeRaw: {
 		{
@@ -193,13 +189,8 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse:  false,
 			Description:   "数据附带时间戳(timestamp)",
 		},
-		{
-			KeyName:      KeyLabels,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "额外的标签信息(labels)",
-		},
+		OptionLabels,
+		OptionDisableRecordErrData,
 	},
 	TypeLogv1: {
 		{
@@ -209,13 +200,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: false,
 			Description:  "parser名称(name)",
 		},
-		{
-			KeyName:      KeyLabels,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "额外的标签信息(labels)",
-		},
+		OptionLabels,
 		{
 			KeyName:      KeyQiniulogPrefix,
 			ChooseOnly:   false,
@@ -230,6 +215,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: false,
 			Description:  "七牛日志格式顺序(qiniulog_log_headers)",
 		},
+		OptionDisableRecordErrData,
 	},
 	TypeSyslog: {
 		{
@@ -247,13 +233,8 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse:  false,
 			Description:   "syslog使用的rfc协议(syslog_rfc)",
 		},
-		{
-			KeyName:      KeyLabels,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "额外的标签信息(labels)",
-		},
+		OptionLabels,
+		OptionDisableRecordErrData,
 	},
 	TypeKafkaRest: {
 		{
@@ -263,13 +244,8 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: false,
 			Description:  "parser名称(name)",
 		},
-		{
-			KeyName:      KeyLabels,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "额外的标签信息(labels)",
-		},
+		OptionLabels,
+		OptionDisableRecordErrData,
 	},
 	TypeEmpty: {},
 }

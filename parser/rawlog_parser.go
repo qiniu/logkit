@@ -21,17 +21,21 @@ func NewRawlogParser(c conf.MapConf) (LogParser, error) {
 	nameMap := make(map[string]struct{})
 	labels := GetLabels(labelList, nameMap)
 
+	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+
 	return &RawlogParser{
-		name:          name,
-		labels:        labels,
-		withTimeStamp: withtimestamp,
+		name:                 name,
+		labels:               labels,
+		withTimeStamp:        withtimestamp,
+		disableRecordErrData: disableRecordErrData,
 	}, nil
 }
 
 type RawlogParser struct {
-	name          string
-	labels        []Label
-	withTimeStamp bool
+	name                 string
+	labels               []Label
+	withTimeStamp        bool
+	disableRecordErrData bool
 }
 
 func (p *RawlogParser) Name() string {
@@ -51,6 +55,11 @@ func (p *RawlogParser) Parse(lines []string) ([]Data, error) {
 		if len(line) <= 0 {
 			se.AddErrors()
 			se.ErrorIndex = append(se.ErrorIndex, idx)
+			if !p.disableRecordErrData {
+				errData := make(Data)
+				errData[KeyPandoraStash] = line
+				datas = append(datas, errData)
+			}
 			continue
 		}
 		d := Data{}

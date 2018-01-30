@@ -18,14 +18,15 @@ func TestJsonParser(t *testing.T) {
 	c[KeyParserName] = "testjsonparser"
 	c[KeyParserType] = "json"
 	c[KeyLabels] = "mm abc"
+	c[KeyDisableRecordErrData] = "true"
 	p, _ := NewJsonParser(c)
 	tests := []struct {
 		in  []string
 		exp []Data
 	}{
 		{
-			in: []string{`{"a":1,"b":[1.0,2.0,3.0],"c":{"d":"123","g":1.2},"e":"x","f":1.23}`},
-			exp: []Data{Data{
+			in: []string{`{"a":1,"b":[1.0,2.0,3.0],"c":{"d":"123","g":1.2},"e":"x","f":1.23}`, ""},
+			exp: []Data{{
 				"a": json.Number("1"),
 				"b": []interface{}{json.Number("1.0"), json.Number("2.0"), json.Number("3.0")},
 				"c": map[string]interface{}{
@@ -52,16 +53,59 @@ func TestJsonParser(t *testing.T) {
 			}},
 		},
 	}
-	for _, ti := range tests {
-		m, err := p.Parse(ti.in)
-		if err != nil {
-			errx, _ := err.(*utils.StatsError)
-			if errx.ErrorDetail != nil {
-				t.Error(errx.ErrorDetail)
-			}
-		}
-		assert.EqualValues(t, ti.exp, m)
+
+	m, err := p.Parse(tests[0].in)
+	if err != nil {
+		errx, _ := err.(*utils.StatsError)
+		assert.Equal(t, int64(1), errx.StatsInfo.Errors)
 	}
+	if len(m) != 1 {
+		t.Fatalf("parse lines error, expect 1 line but got %v lines", len(m))
+	}
+	assert.EqualValues(t, tests[0].exp, m)
+
+	m, err = p.Parse(tests[1].in)
+	if err != nil {
+		errx, _ := err.(*utils.StatsError)
+		if errx.ErrorDetail != nil {
+			t.Error(errx.ErrorDetail)
+		}
+	}
+	assert.EqualValues(t, tests[1].exp, m)
+
+	assert.EqualValues(t, "testjsonparser", p.Name())
+}
+
+func TestJsonParserForErrData(t *testing.T) {
+	c := conf.MapConf{}
+	c[KeyParserName] = "testjsonparser"
+	c[KeyParserType] = "json"
+	c[KeyLabels] = "mm abc"
+	c[KeyDisableRecordErrData] = "false"
+	p, _ := NewJsonParser(c)
+	testIn := []string{`{"a":1,"b":[1.0,2.0,3.0],"c":{"d":"123","g":1.2},"e":"x","f":1.23}`, ""}
+	testExp := Data{
+		"a": json.Number("1"),
+		"b": []interface{}{json.Number("1.0"), json.Number("2.0"), json.Number("3.0")},
+		"c": map[string]interface{}{
+			"d": "123",
+			"g": json.Number("1.2"),
+		},
+		"e":  "x",
+		"f":  json.Number("1.23"),
+		"mm": "abc",
+	}
+
+	m, err := p.Parse(testIn)
+	if err != nil {
+		errx, _ := err.(*utils.StatsError)
+		assert.Equal(t, int64(1), errx.StatsInfo.Errors)
+	}
+	if len(m) != 2 {
+		t.Fatalf("parse lines error, expect 2 lines but got %v lines", len(m))
+	}
+	assert.EqualValues(t, testExp, m[0])
+
 	assert.EqualValues(t, "testjsonparser", p.Name())
 }
 
