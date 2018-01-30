@@ -218,7 +218,7 @@ func (m *Manager) Add(confPath string) {
 
 	log.Infof("Start to try add: %v", conf.RunnerName)
 	conf.CreateTime = time.Now().Format(time.RFC3339Nano)
-	go m.ForkRunner(confPath, conf, false)
+	m.ForkRunner(confPath, conf, false)
 	return
 }
 
@@ -325,11 +325,11 @@ func (m *Manager) handle(path string, watcher *fsnotify.Watcher) {
 				m.Remove(ev.Name)
 			}
 			if ev.IsCreate() {
-				m.Add(ev.Name)
+				go m.Add(ev.Name)
 			}
 			if ev.IsModify() && !ev.IsCreate() {
 				m.Remove(ev.Name)
-				m.Add(ev.Name)
+				go m.Add(ev.Name)
 			}
 		case err := <-watcher.Error:
 			if err != nil {
@@ -425,7 +425,7 @@ func (m *Manager) addWatchers(confsPath []string) (err error) {
 					log.Warn("skipped dir", f.Name())
 					continue
 				}
-				m.Add(filepath.Join(path, f.Name()))
+				go m.Add(filepath.Join(path, f.Name()))
 			}
 			watcher, err := fsnotify.NewWatcher()
 			if err != nil {
@@ -461,14 +461,20 @@ func (m *Manager) RestoreWebDir() {
 		return
 	}
 	nums := 0
+	gw := new(sync.WaitGroup)
 	for _, f := range files {
 		if f.IsDir() {
 			log.Warn("skipped dir", f.Name)
 			continue
 		}
-		m.Add(filepath.Join(m.RestDir, f.Name()))
+		gw.Add(1)
+		go func() {
+			defer gw.Done()
+			m.Add(filepath.Join(m.RestDir, f.Name()))
+		}()
 		nums++
 	}
+	gw.Wait()
 	log.Infof("successfully restored %v runners in %v web rest dir", nums, m.RestDir)
 	return
 }
