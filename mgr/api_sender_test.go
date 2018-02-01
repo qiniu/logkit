@@ -3,8 +3,9 @@ package mgr
 import (
 	"net/http"
 
-	"github.com/json-iterator/go"
 	"github.com/qiniu/logkit/sender"
+
+	"github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,4 +33,33 @@ func senderAPITest(p *testParam) {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
 	assert.Equal(t, sender.ModeKeyOptions, got2.Data)
+
+	// Test sender/send with sender config
+	var got3 respDataMessage
+	senderConfig := `{
+		"sampleLog": "[{\"a\": 1}]",
+		"senders": [{
+			"name":        "mock_sender",
+			"sender_type": "mock"
+		}]
+	}`
+	url = "http://127.0.0.1" + rs.address + "/logkit/sender/check"
+	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte(senderConfig))
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	if err = jsoniter.Unmarshal(respBody, &got3); err != nil {
+		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
+	}
+	assert.Equal(t, "", got3.Message)
+
+	// Test sender/send with sender config
+	var got4 respDataMessage
+	url = "http://127.0.0.1" + rs.address + "/logkit/sender/send"
+	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte(senderConfig))
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	if err = jsoniter.Unmarshal(respBody, &got4); err != nil {
+		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
+	}
+	assert.Equal(t, "", got4.Message)
 }

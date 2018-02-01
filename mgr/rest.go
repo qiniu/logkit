@@ -77,6 +77,7 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	//reader API
 	router.GET(PREFIX+"/reader/usages", rs.GetReaderUsages())
 	router.GET(PREFIX+"/reader/options", rs.GetReaderKeyOptions())
+	router.POST(PREFIX+"/reader/read", rs.PostRead())
 	router.POST(PREFIX+"/reader/check", rs.PostReaderCheck())
 
 	//parser API
@@ -86,18 +87,20 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	router.GET(PREFIX+"/parser/samplelogs", rs.GetParserSampleLogs())
 	router.POST(PREFIX+"/parser/check", rs.PostParserCheck())
 
-	//sender API
-	router.GET(PREFIX+"/sender/usages", rs.GetSenderUsages())
-	router.GET(PREFIX+"/sender/options", rs.GetSenderKeyOptions())
-	router.POST(PREFIX+"/sender/check", rs.PostSenderCheck())
-	router.GET(PREFIX+"/sender/router/usage", rs.GetSenderRouterUsage())
-	router.GET(PREFIX+"/sender/router/option", rs.GetSenderRouterOption())
-
 	//transformer API
 	router.GET(PREFIX+"/transformer/usages", rs.GetTransformerUsages())
 	router.GET(PREFIX+"/transformer/options", rs.GetTransformerOptions())
 	router.GET(PREFIX+"/transformer/sampleconfigs", rs.GetTransformerSampleConfigs())
 	router.POST(PREFIX+"/transformer/transform", rs.PostTransform())
+	router.POST(PREFIX+"/transformer/check", rs.PostTransformerCheck())
+
+	//sender API
+	router.GET(PREFIX+"/sender/usages", rs.GetSenderUsages())
+	router.GET(PREFIX+"/sender/options", rs.GetSenderKeyOptions())
+	router.POST(PREFIX+"/sender/send", rs.PostSend())
+	router.POST(PREFIX+"/sender/check", rs.PostSenderCheck())
+	router.GET(PREFIX+"/sender/router/usage", rs.GetSenderRouterUsage())
+	router.GET(PREFIX+"/sender/router/option", rs.GetSenderRouterOption())
 
 	//metric API
 	router.GET(PREFIX+"/metric/keys", rs.GetMetricKeys())

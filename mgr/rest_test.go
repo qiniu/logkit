@@ -49,6 +49,11 @@ type respErrorCode struct {
 	Data map[string]string `json:"data"`
 }
 
+type respDataMessage struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
 type testParam struct {
 	rd string
 	t  *testing.T

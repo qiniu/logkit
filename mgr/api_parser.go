@@ -31,7 +31,7 @@ func (rs *RestService) PostParse() echo.HandlerFunc {
 			return RespError(c, http.StatusBadRequest, ErrParseParse, err.Error())
 		}
 
-		parseData, err := GetParsedData(parserConfig)
+		parseData, err := ParseData(parserConfig)
 		se, ok := err.(*utils.StatsError)
 		if ok {
 			err = se.ErrorDetail
