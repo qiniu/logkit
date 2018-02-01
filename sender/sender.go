@@ -87,12 +87,12 @@ func NewSenderRegistry() *SenderRegistry {
 	return ret
 }
 
-func (registry *SenderRegistry) RegisterSender(senderType string, constructor func(conf.MapConf) (Sender, error)) error {
-	_, exist := registry.senderTypeMap[senderType]
+func (r *SenderRegistry) RegisterSender(senderType string, constructor func(conf.MapConf) (Sender, error)) error {
+	_, exist := r.senderTypeMap[senderType]
 	if exist {
 		return errors.New("senderType " + senderType + " has been existed")
 	}
-	registry.senderTypeMap[senderType] = constructor
+	r.senderTypeMap[senderType] = constructor
 	return nil
 }
 
