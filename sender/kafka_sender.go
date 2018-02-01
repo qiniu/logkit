@@ -125,17 +125,17 @@ func newKafkaSender(name string, hosts []string, topic []string, cfg *sarama.Con
 	return
 }
 
-func (this *KafkaSender) Name() string {
-	return this.name
+func (kf *KafkaSender) Name() string {
+	return kf.name
 }
 
-func (this *KafkaSender) Send(data []Data) error {
-	producer := this.producer
+func (kf *KafkaSender) Send(data []Data) error {
+	producer := kf.producer
 	var msgs []*sarama.ProducerMessage
 	ss := &utils.StatsError{}
 	var lastErr error
 	for _, doc := range data {
-		message, err := this.getEventMessage(doc)
+		message, err := kf.getEventMessage(doc)
 		if err != nil {
 			log.Debugf("Dropping event: %v", err)
 			ss.AddErrors()
@@ -183,9 +183,9 @@ func (kf *KafkaSender) getEventMessage(event map[string]interface{}) (pm *sarama
 	return
 }
 
-func (this *KafkaSender) Close() (err error) {
+func (kf *KafkaSender) Close() (err error) {
 	log.Infof("kafka sender was closed")
-	this.producer.Close()
-	this.producer = nil
+	kf.producer.Close()
+	kf.producer = nil
 	return nil
 }
