@@ -21,6 +21,7 @@ var ModeUsages = []KeyValue{
 	{ModeRedis, "从 Redis 读取"},
 	{ModeSocket, "从 Socket 读取"},
 	{ModeHttp, "从 http 请求中读取"},
+	{ModeScript, "从脚本的执行结果中读取"},
 }
 
 var (
@@ -644,6 +645,37 @@ var ModeKeyOptions = map[string][]Option{
 			Default:      DefaultHttpServicePath,
 			DefaultNoUse: true,
 			Description:  "监听地址前缀(http_service_path)",
+		},
+	},
+	ModeScript: {
+		{
+			KeyName:      KeyExecInterpreter,
+			ChooseOnly:   false,
+			Default:      "/bin/bash",
+			DefaultNoUse: false,
+			Description:  "脚本执行解释器(script_exec_interpreter)",
+		},
+		{
+			KeyName:      KeyLogPath,
+			ChooseOnly:   false,
+			Default:      "/home/users/john/log/my.sh",
+			DefaultNoUse: true,
+			Description:  "脚本路径(log_path)",
+		},
+		{
+			KeyName:      KeyScriptCron,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "定时任务调度Cron(script_cron)",
+		},
+		{
+			KeyName:       KeyScriptExecOnStart,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"true", "false"},
+			Default:       "true",
+			DefaultNoUse:  false,
+			Description:   "启动时立即执行(script_exec_onstart)",
 		},
 	},
 }
