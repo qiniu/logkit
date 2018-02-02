@@ -122,6 +122,10 @@ const (
 	KeyKafkaZookeeper        = "kafka_zookeeper"
 	KeyKafkaZookeeperChroot  = "kafka_zookeeper_chroot"
 	KeyKafkaZookeeperTimeout = "kafka_zookeeper_timeout"
+
+	KeyExecInterpreter   = "script_exec_interprepter"
+	KeyScriptCron        = "script_cron"
+	KeyScriptExecOnStart = "script_exec_onstart"
 )
 
 var defaultIgnoreFileSuffix = []string{
@@ -143,6 +147,7 @@ const (
 	ModeRedis    = "redis"
 	ModeSocket   = "socket"
 	ModeHttp     = "http"
+	ModeScript   = "script"
 )
 
 const (
@@ -272,6 +277,8 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 		reader, err = NewSocketReader(meta, conf)
 	case ModeHttp:
 		reader, err = NewHttpReader(meta, conf)
+	case ModeScript:
+		reader, err = NewScriptReader(meta, conf)
 	default:
 		err = fmt.Errorf("mode %v not supported now", mode)
 	}
