@@ -925,6 +925,7 @@ func TestSyslogRunnerX(t *testing.T) {
 	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), parser.NewParserRegistry(), sender.NewSenderRegistry())
 	assert.NoError(t, err)
 	go rr.Run()
+	time.Sleep(1 * time.Second)
 	sysLog, err := syslog.Dial("tcp", "localhost:5142",
 		syslog.LOG_WARNING|syslog.LOG_DAEMON, "demotag")
 	if err != nil {

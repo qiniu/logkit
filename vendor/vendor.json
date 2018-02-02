@@ -342,6 +342,12 @@
 			"revisionTime": "2016-09-30T03:27:40Z"
 		},
 		{
+			"checksumSHA1": "gDWv2NzXNTPL0U23LAiMg5j5seY=",
+			"path": "github.com/soniah/gosnmp",
+			"revision": "84a3f095f9bfb2ca59aa659e55103cfe89684d4a",
+			"revisionTime": "2017-12-12T11:19:18Z"
+		},
+		{
 			"checksumSHA1": "K0crHygPTP42i1nLKWphSlvOQJw=",
 			"path": "github.com/stretchr/objx",
 			"revision": "1a9d0bb9f541897e62256577b352fdbc1fb4fd94",
