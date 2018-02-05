@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -404,6 +405,15 @@ func (r *LogExportRunner) Run() {
 		go r.cleaner.Run()
 	}
 	defer close(r.exitChan)
+	defer func() {
+		// recover when runner is stopped
+		if atomic.LoadInt32(&r.stopped) <= 0 {
+			return
+		}
+		if r := recover(); r != nil {
+			log.Errorf("recover when runner is stopped\npanic: %v\nstack: %s", r, debug.Stack())
+		}
+	}()
 	datasourceTag := r.meta.GetDataSourceTag()
 	tags := r.meta.GetTags()
 	schemaErr := utils.SchemaErr{Number: 0, Last: time.Now()}
