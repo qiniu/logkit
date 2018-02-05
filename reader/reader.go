@@ -148,6 +148,7 @@ const (
 	ModeSocket   = "socket"
 	ModeHttp     = "http"
 	ModeScript   = "script"
+	ModeSnmp     = "snmp"
 )
 
 const (
@@ -279,6 +280,8 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 		reader, err = NewHttpReader(meta, conf)
 	case ModeScript:
 		reader, err = NewScriptReader(meta, conf)
+	case ModeSnmp:
+		reader, err = NewSnmpReader(meta, conf)
 	default:
 		err = fmt.Errorf("mode %v not supported now", mode)
 	}
