@@ -596,16 +596,20 @@ func TestReadline(t *testing.T) {
 	assert.Equal(t, "baz", m["myfield1"])
 	assert.Equal(t, float64(234), m["myfield2"])
 	assert.Equal(t, "baz", m["myfield3"])
-	assert.True(t, m[KeyTimestamp].(float64) > float64(tstart))
-	assert.True(t, m[KeyTimestamp].(float64) < float64(tstop))
+	timestamp, subErr := time.Parse(time.RFC3339Nano, m[KeyTimestamp].(string))
+	assert.NoError(t, subErr)
+	assert.True(t, timestamp.UnixNano() > tstart)
+	assert.True(t, timestamp.UnixNano() < tstop)
 
 	m2 := data[1]
 	assert.Equal(t, "myOtherTable", m2[KeySnmpTableName])
 	assert.Equal(t, "tsc", m2["agent_host"])
 	assert.Equal(t, "baz", m2["myfield1"])
 	assert.Equal(t, float64(123456), m2["myOtherField"])
-	assert.True(t, m2[KeyTimestamp].(float64) > float64(tstart))
-	assert.True(t, m2[KeyTimestamp].(float64) < float64(tstop))
+	timestamp, subErr = time.Parse(time.RFC3339Nano, m[KeyTimestamp].(string))
+	assert.NoError(t, subErr)
+	assert.True(t, timestamp.UnixNano() > tstart)
+	assert.True(t, timestamp.UnixNano() < tstop)
 }
 
 func TestGather_host(t *testing.T) {
