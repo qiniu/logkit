@@ -32,6 +32,7 @@ var (
 		Default:      "",
 		DefaultNoUse: false,
 		Description:  "logkit元数据路径(meta_path)",
+		Advance:      true,
 	}
 	OptionDataSourceTag = Option{
 		KeyName:      KeyDataSourceTag,
@@ -39,6 +40,7 @@ var (
 		Default:      "datasource",
 		DefaultNoUse: false,
 		Description:  "数据来源标签(datasource_tag)",
+		Advance:      true,
 	}
 	OptionBuffSize = Option{
 		KeyName:      KeyBufSize,
@@ -47,6 +49,7 @@ var (
 		DefaultNoUse: false,
 		Description:  "文件缓存数据大小(reader_buf_size)",
 		CheckRegex:   "\\d+",
+		Advance:      true,
 	}
 	OptionEncoding = Option{
 		KeyName:    KeyEncoding,
@@ -66,6 +69,7 @@ var (
 		Default:      "UTF-8",
 		DefaultNoUse: false,
 		Description:  "编码方式(encoding)",
+		Advance:      true,
 	}
 	OptionWhence = Option{
 		KeyName:       KeyWhence,
@@ -81,6 +85,7 @@ var (
 		DefaultNoUse: false,
 		Description:  "读取速度限制(MB/s)(readio_limit)",
 		CheckRegex:   "\\d+",
+		Advance:      true,
 	}
 	OptionHeadPattern = Option{
 		KeyName:      KeyHeadPattern,
@@ -88,6 +93,7 @@ var (
 		Default:      "",
 		DefaultNoUse: false,
 		Description:  "多行读取的起始行正则表达式(head_pattern)",
+		Advance:      true,
 	}
 	OptionSQLSchema = Option{
 		KeyName:      KeySQLSchema,
@@ -120,6 +126,7 @@ var ModeKeyOptions = map[string][]Option{
 			Default:      "",
 			DefaultNoUse: false,
 			Description:  "读取过的文件信息保存路径(file_done)",
+			Advance:      true,
 		},
 		{
 			KeyName:       KeyIgnoreHiddenFile,
@@ -135,6 +142,7 @@ var ModeKeyOptions = map[string][]Option{
 			Default:      strings.Join(defaultIgnoreFileSuffix, ","),
 			DefaultNoUse: false,
 			Description:  "根据后缀忽略文件(ignore_file_suffix)",
+			Advance:      true,
 		},
 		{
 			KeyName:      KeyValidFilePattern,
@@ -142,6 +150,7 @@ var ModeKeyOptions = map[string][]Option{
 			Default:      "",
 			DefaultNoUse: false,
 			Description:  "根据linux通配符匹配文件(valid_file_pattern)",
+			Advance:      true,
 		},
 	},
 	ModeFile: {
@@ -591,6 +600,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: false,
 			Description:  "单次读取超时时间(m(分)、s(秒))(redis_timeout)",
 			CheckRegex:   "\\d+[ms]",
+			Advance:      true,
 		},
 		OptionDataSourceTag,
 	},
