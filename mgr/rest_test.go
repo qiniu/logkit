@@ -17,24 +17,26 @@ import (
 	"testing"
 	"time"
 
-	"github.com/json-iterator/go"
-	"github.com/labstack/echo"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
+
+	"github.com/json-iterator/go"
+	"github.com/labstack/echo"
 	"github.com/stretchr/testify/assert"
 )
 
 type respModeUsages struct {
-	Code string           `json:"code"`
-	Data []utils.KeyValue `json:"data"`
+	Code string     `json:"code"`
+	Data []KeyValue `json:"data"`
 }
 
 type respModeKeyOptions struct {
-	Code string                    `json:"code"`
-	Data map[string][]utils.Option `json:"data"`
+	Code string              `json:"code"`
+	Data map[string][]Option `json:"data"`
 }
 
 type respSampleLogs struct {
@@ -45,6 +47,11 @@ type respSampleLogs struct {
 type respErrorCode struct {
 	Code string            `json:"code"`
 	Data map[string]string `json:"data"`
+}
+
+type respDataMessage struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
 }
 
 type testParam struct {
@@ -163,7 +170,7 @@ func makeRequest(url, method string, configBytes []byte) (respCode int, respBody
 	if err != nil {
 		return
 	}
-	req.Header.Set(ContentType, ApplicationJson)
+	req.Header.Set(ContentTypeHeader, ApplicationJson)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return
@@ -409,7 +416,7 @@ func restCRUDTest(p *testParam) {
 	var respGot1 respRunnerConfig
 	err = jsoniter.Unmarshal([]byte(conf1), &expconf1)
 	assert.NoError(t, err)
-	expconf1.ReaderConfig[utils.GlobalKeyName] = expconf1.RunnerName
+	expconf1.ReaderConfig[GlobalKeyName] = expconf1.RunnerName
 	expconf1.ReaderConfig[reader.KeyRunnerName] = expconf1.RunnerName
 	expconf1.ParserConf[parser.KeyRunnerName] = expconf1.RunnerName
 	expconf1.IsInWebFolder = true
@@ -437,7 +444,7 @@ func restCRUDTest(p *testParam) {
 	err = jsoniter.Unmarshal([]byte(conf2), &expconf2)
 	assert.NoError(t, err)
 
-	expconf2.ReaderConfig[utils.GlobalKeyName] = expconf2.RunnerName
+	expconf2.ReaderConfig[GlobalKeyName] = expconf2.RunnerName
 	expconf2.ReaderConfig[reader.KeyRunnerName] = expconf2.RunnerName
 	expconf2.ParserConf[parser.KeyRunnerName] = expconf2.RunnerName
 	expconf2.IsInWebFolder = true
@@ -833,8 +840,8 @@ func getErrorCodeTest(p *testParam) {
 	err = jsoniter.Unmarshal(respBody, &respCodeMap)
 	assert.NoError(t, err)
 	codeMap := respCodeMap.Data
-	assert.Equal(t, len(utils.ErrorCodeHumanize), len(codeMap))
-	for key, val := range utils.ErrorCodeHumanize {
+	assert.Equal(t, len(ErrorCodeHumanize), len(codeMap))
+	for key, val := range ErrorCodeHumanize {
 		cm, ok := codeMap[key]
 		assert.Equal(t, true, ok)
 		if ok {

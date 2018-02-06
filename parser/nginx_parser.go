@@ -12,9 +12,9 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (
@@ -25,10 +25,11 @@ const (
 )
 
 type NginxParser struct {
-	name   string
-	regexp *regexp.Regexp
-	schema map[string]string
-	labels []Label
+	name                 string
+	regexp               *regexp.Regexp
+	schema               map[string]string
+	labels               []Label
+	disableRecordErrData bool
 }
 
 func NewNginxParser(c conf.MapConf) (LogParser, error) {
@@ -45,9 +46,12 @@ func NewNginxAccParser(c conf.MapConf) (p *NginxParser, err error) {
 	nameMap := make(map[string]struct{})
 	labels := GetLabels(labelList, nameMap)
 
+	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+
 	p = &NginxParser{
-		name:   name,
-		labels: labels,
+		name:                 name,
+		labels:               labels,
+		disableRecordErrData: disableRecordErrData,
 	}
 	p.schema, err = p.parseSchemaFields(schema)
 	if err != nil {
@@ -104,14 +108,19 @@ func (p *NginxParser) Type() string {
 	return TypeNginx
 }
 
-func (p *NginxParser) Parse(lines []string) ([]sender.Data, error) {
-	var ret []sender.Data
+func (p *NginxParser) Parse(lines []string) ([]Data, error) {
+	var ret []Data
 	se := &utils.StatsError{}
 	for _, line := range lines {
 		data, err := p.parseline(line)
 		if err != nil {
 			se.ErrorDetail = err
 			se.AddErrors()
+			if !p.disableRecordErrData {
+				errData := make(Data)
+				errData[KeyPandoraStash] = line
+				ret = append(ret, errData)
+			}
 			continue
 		}
 		if len(data) < 1 { //数据不为空的时候发送
@@ -126,14 +135,14 @@ func (p *NginxParser) Parse(lines []string) ([]sender.Data, error) {
 	return ret, se
 }
 
-func (p *NginxParser) parseline(line string) (sender.Data, error) {
+func (p *NginxParser) parseline(line string) (Data, error) {
 	line = strings.Trim(line, "\n")
 	re := p.regexp
 	fields := re.FindStringSubmatch(line)
 	if fields == nil {
 		return nil, fmt.Errorf("NginxParser fail to parse log line [%v], given format is [%v]", line, re)
 	}
-	entry := make(sender.Data)
+	entry := make(Data)
 	// Iterate over subexp group and fill the map record
 	for i, name := range re.SubexpNames() {
 		if i == 0 {

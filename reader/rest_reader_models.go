@@ -3,11 +3,11 @@ package reader
 import (
 	"strings"
 
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 // ModeUsages 用途说明
-var ModeUsages = []utils.KeyValue{
+var ModeUsages = []KeyValue{
 	{ModeFileAuto, "从文件读取( fileauto 模式)"},
 	{ModeDir, "从文件读取( dir 模式)"},
 	{ModeFile, "从文件读取( file 模式)"},
@@ -21,24 +21,26 @@ var ModeUsages = []utils.KeyValue{
 	{ModeRedis, "从 Redis 读取"},
 	{ModeSocket, "从 Socket 读取"},
 	{ModeHttp, "从 http 请求中读取"},
+	{ModeScript, "从脚本的执行结果中读取"},
+	{ModeSnmp, "从 snmp 服务中读取"},
 }
 
 var (
-	OptionMetaPath = utils.Option{
+	OptionMetaPath = Option{
 		KeyName:      KeyMetaPath,
 		ChooseOnly:   false,
 		Default:      "",
 		DefaultNoUse: false,
 		Description:  "logkit元数据路径(meta_path)",
 	}
-	OptionDataSourceTag = utils.Option{
+	OptionDataSourceTag = Option{
 		KeyName:      KeyDataSourceTag,
 		ChooseOnly:   false,
 		Default:      "datasource",
 		DefaultNoUse: false,
 		Description:  "数据来源标签(datasource_tag)",
 	}
-	OptionBuffSize = utils.Option{
+	OptionBuffSize = Option{
 		KeyName:      KeyBufSize,
 		ChooseOnly:   false,
 		Default:      "",
@@ -46,7 +48,7 @@ var (
 		Description:  "文件缓存数据大小(reader_buf_size)",
 		CheckRegex:   "\\d+",
 	}
-	OptionEncoding = utils.Option{
+	OptionEncoding = Option{
 		KeyName:    KeyEncoding,
 		ChooseOnly: true,
 		ChooseOptions: []interface{}{"UTF-8", "UTF-16", "US-ASCII", "ISO-8859-1",
@@ -65,14 +67,14 @@ var (
 		DefaultNoUse: false,
 		Description:  "编码方式(encoding)",
 	}
-	OptionWhence = utils.Option{
+	OptionWhence = Option{
 		KeyName:       KeyWhence,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{WhenceOldest, WhenceNewest},
 		Default:       WhenceOldest,
 		Description:   "读取的起始位置(read_from)",
 	}
-	OptionReadIoLimit = utils.Option{
+	OptionReadIoLimit = Option{
 		KeyName:      KeyReadIOLimit,
 		ChooseOnly:   false,
 		Default:      "",
@@ -80,14 +82,14 @@ var (
 		Description:  "读取速度限制(MB/s)(readio_limit)",
 		CheckRegex:   "\\d+",
 	}
-	OptionHeadPattern = utils.Option{
+	OptionHeadPattern = Option{
 		KeyName:      KeyHeadPattern,
 		ChooseOnly:   false,
 		Default:      "",
 		DefaultNoUse: false,
 		Description:  "多行读取的起始行正则表达式(head_pattern)",
 	}
-	OptionSQLSchema = utils.Option{
+	OptionSQLSchema = Option{
 		KeyName:      KeySQLSchema,
 		ChooseOnly:   false,
 		Default:      "",
@@ -96,7 +98,7 @@ var (
 	}
 )
 
-var ModeKeyOptions = map[string][]utils.Option{
+var ModeKeyOptions = map[string][]Option{
 	ModeDir: {
 		{
 			KeyName:      KeyLogPath,
@@ -139,7 +141,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
-			Description:  "根据正则表达式匹配文件(valid_file_pattern)",
+			Description:  "根据linux通配符匹配文件(valid_file_pattern)",
 		},
 	},
 	ModeFile: {
@@ -523,6 +525,13 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse: true,
 			Description:  "Zookeeper地址(kafka_zookeeper)",
 		},
+		{
+			KeyName:      KeyKafkaZookeeperChroot,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "Zookeeper中kafka根地址(kafka_zookeeper_chroot)",
+		},
 		OptionWhence,
 		{
 			KeyName:      KeyKafkaZookeeperTimeout,
@@ -637,6 +646,179 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      DefaultHttpServicePath,
 			DefaultNoUse: true,
 			Description:  "监听地址前缀(http_service_path)",
+		},
+	},
+	ModeScript: {
+		{
+			KeyName:      KeyExecInterpreter,
+			ChooseOnly:   false,
+			Default:      "/bin/bash",
+			DefaultNoUse: false,
+			Description:  "脚本执行解释器(script_exec_interpreter)",
+		},
+		{
+			KeyName:      KeyLogPath,
+			ChooseOnly:   false,
+			Default:      "/home/users/john/log/my.sh",
+			DefaultNoUse: true,
+			Description:  "脚本路径(log_path)",
+		},
+		{
+			KeyName:      KeyScriptCron,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "定时任务调度Cron(script_cron)",
+		},
+		{
+			KeyName:       KeyScriptExecOnStart,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"true", "false"},
+			Default:       "true",
+			DefaultNoUse:  false,
+			Description:   "启动时立即执行(script_exec_onstart)",
+		},
+	},
+	ModeSnmp: {
+		{
+			KeyName:      KeySnmpReaderName,
+			ChooseOnly:   false,
+			Default:      "system",
+			DefaultNoUse: true,
+			Description:  "名称(snmp_reader_name)",
+		},
+		{
+			KeyName:      KeySnmpReaderAgents,
+			ChooseOnly:   false,
+			Default:      "127.0.0.1:161",
+			DefaultNoUse: true,
+			Description:  "agents 列表，多个agents请用','分开(snmp_agents)",
+		},
+		{
+			KeyName:      KeySnmpReaderTables,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: true,
+			Description:  "tables 配置(请填入json数组字符串)(snmp_tables)",
+		},
+		{
+			KeyName:      KeySnmpReaderFields,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: true,
+			Description:  "fields 配置(请填入json数组字符串)(snmp_fields)",
+		},
+		{
+			KeyName:       KeySnmpReaderVersion,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"2", "1", "3"},
+			DefaultNoUse:  true,
+			Description:   "snmp协议版本(snmp_version)",
+		},
+		{
+			KeyName:      KeySnmpReaderTimeOut,
+			ChooseOnly:   false,
+			Default:      "5s",
+			DefaultNoUse: false,
+			Description:  "连接超时时间(snmp_time_out)",
+		},
+		{
+			KeyName:      KeySnmpReaderInterval,
+			ChooseOnly:   false,
+			Default:      "3s",
+			DefaultNoUse: false,
+			Description:  "收集频率(snmp_interval)",
+		},
+		{
+			KeyName:      KeySnmpReaderRetries,
+			ChooseOnly:   false,
+			Default:      "3",
+			DefaultNoUse: false,
+			Description:  "重试次数(snmp_retries)",
+		},
+		{
+			KeyName:      KeySnmpReaderCommunity,
+			ChooseOnly:   false,
+			Default:      "public",
+			DefaultNoUse: false,
+			Description:  "snmp community(版本1/2有效) (snmp_version)",
+		},
+		{
+			KeyName:      KeySnmpReaderMaxRepetitions,
+			ChooseOnly:   false,
+			Default:      "50",
+			DefaultNoUse: false,
+			Description:  "最大迭代次数(版本2/3有效)(snmp_max_repetitions)",
+		},
+		{
+			KeyName:      KeySnmpReaderContextName,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "Context 名称(版本3有效)(snmp_version)",
+		},
+		{
+			KeyName:       KeySnmpReaderSecLevel,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"noAuthNoPriv", "authNoPriv", "authPriv"},
+			DefaultNoUse:  true,
+			Description:   "安全等级(版本3有效)(snmp_sec_level)",
+		},
+		{
+			KeyName:      KeySnmpReaderSecName,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "认证名称(版本3有效)(snmp_sec_name)",
+		},
+		{
+			KeyName:       KeySnmpReaderAuthProtocol,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"md5", "sha", ""},
+			DefaultNoUse:  false,
+			Description:   "认证协议(版本3有效)(snmp_auth_protocol)",
+		},
+		{
+			KeyName:      KeySnmpReaderAuthPassword,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "认证密码(版本3有效)(snmp_auth_password)",
+		},
+		{
+			KeyName:       KeySnmpReaderPrivProtocol,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"des", "aes", ""},
+			DefaultNoUse:  false,
+			Description:   "隐私协议(用于加密, 版本3有效)(snmp_priv_protocol)",
+		},
+		{
+			KeyName:      KeySnmpReaderPrivPassword,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "隐私密码(用于加密, 版本3有效)(snmp_priv_password)",
+		},
+		{
+			KeyName:      KeySnmpReaderEngineID,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "snmp_priv_engine_id(版本3有效)",
+		},
+		{
+			KeyName:      KeySnmpReaderEngineBoots,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "snmp_engine_boots(版本3有效)",
+		},
+		{
+			KeyName:      KeySnmpReaderEngineTime,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "snmp_engine_time(版本3有效)",
 		},
 	},
 }

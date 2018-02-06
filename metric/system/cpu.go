@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/qiniu/logkit/metric"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 	"github.com/shirou/gopsutil/cpu"
 )
 
@@ -46,7 +46,7 @@ const (
 )
 
 // KeyCpuUsages TypeMetricCpu 中的字段名称
-var KeyCpuUsages = []utils.KeyValue{
+var KeyCpuUsages = []KeyValue{
 	// CPU 总量
 	{CpuTimeUser, "用户进程用时"},
 	{CpuTimeSystem, "系统内核用时"},
@@ -75,7 +75,7 @@ var KeyCpuUsages = []utils.KeyValue{
 }
 
 // ConfigCpuUsages TypeMetricCpu 配置项的描述
-var ConfigCpuUsages = []utils.KeyValue{
+var ConfigCpuUsages = []KeyValue{
 	{CpuConfigPerCpu, "是否收集每个 cpu 的统计数据(" + CpuConfigPerCpu + ")"},
 	{CpuConfigTotalCpu, "是否收集整个系统的 cpu 统计信息(" + CpuConfigTotalCpu + ")"},
 	{CpuConfigCollectCpuTime, "是否收集 cpu 时间统计信息(" + CpuConfigCollectCpuTime + ")"},
@@ -103,9 +103,9 @@ func (_ *CPUStats) Tags() []string {
 }
 
 func (_ *CPUStats) Config() map[string]interface{} {
-	cpuConfig := make([]utils.Option, 0)
+	cpuConfig := make([]Option, 0)
 	for _, val := range ConfigCpuUsages {
-		opt := utils.Option{
+		opt := Option{
 			KeyName:       val.Key,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},

@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 )
 
@@ -19,7 +19,7 @@ func (g *Converter) RawTransform(datas []string) ([]string, error) {
 	return datas, errors.New("split transformer not support rawTransform")
 }
 
-func (g *Converter) Transform(datas []sender.Data) ([]sender.Data, error) {
+func (g *Converter) Transform(datas []Data) ([]Data, error) {
 	var err, ferr error
 	errnums := 0
 	schemas, err := pipeline.DSLtoSchema(g.DSL)
@@ -59,7 +59,8 @@ func (g *Converter) Transform(datas []sender.Data) ([]sender.Data, error) {
 }
 
 func (g *Converter) Description() string {
-	return "convert can use dsl to convert multi-field data to specify data type"
+	//return "convert can use dsl to convert multi-field data to specify data type"
+	return "将dsl指定的多个数据字段和类型转换为指定的数据格式"
 }
 
 func (g *Converter) Type() string {
@@ -73,8 +74,8 @@ func (g *Converter) SampleConfig() string {
 	}`
 }
 
-func (g *Converter) ConfigOptions() []utils.Option {
-	return []utils.Option{
+func (g *Converter) ConfigOptions() []Option {
+	return []Option{
 		transforms.KeyStageAfterOnly,
 		transforms.KeyFieldName,
 		{

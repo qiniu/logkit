@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (
@@ -48,10 +48,11 @@ func init() {
 }
 
 type QiniulogParser struct {
-	name    string
-	prefix  string
-	headers []string
-	labels  []Label
+	name                 string
+	prefix               string
+	headers              []string
+	labels               []Label
+	disableRecordErrData bool
 }
 
 func getAllLogv1Heads() map[string]bool {
@@ -85,11 +86,14 @@ func NewQiniulogParser(c conf.MapConf) (LogParser, error) {
 	}
 	labels := GetLabels(labelList, nameMap)
 
+	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+
 	return &QiniulogParser{
-		name:    name,
-		labels:  labels,
-		prefix:  prefix,
-		headers: logHeaders,
+		name:                 name,
+		labels:               labels,
+		prefix:               prefix,
+		headers:              logHeaders,
+		disableRecordErrData: disableRecordErrData,
 	}, nil
 }
 
@@ -223,8 +227,8 @@ func errorCanNotParse(s string, line string, err error) error {
 	return fmt.Errorf("can not parse %v from %v %v", s, line, err)
 }
 
-func (p *QiniulogParser) parse(line string) (d sender.Data, err error) {
-	d = make(sender.Data, len(p.headers)+len(p.labels))
+func (p *QiniulogParser) parse(line string) (d Data, err error) {
+	d = make(Data, len(p.headers)+len(p.labels))
 	line = strings.Replace(line, "\n", " ", -1)
 	line = strings.Replace(line, "\t", "\\t", -1)
 	var result, logdate string
@@ -267,14 +271,20 @@ func (p *QiniulogParser) parse(line string) (d sender.Data, err error) {
 	}
 	return d, nil
 }
-func (p *QiniulogParser) Parse(lines []string) ([]sender.Data, error) {
-	datas := []sender.Data{}
+func (p *QiniulogParser) Parse(lines []string) ([]Data, error) {
+	datas := []Data{}
 	se := &utils.StatsError{}
-	for _, line := range lines {
+	for idx, line := range lines {
 		d, err := p.parse(line)
 		if err != nil {
 			se.AddErrors()
+			se.ErrorIndex = append(se.ErrorIndex, idx)
 			se.ErrorDetail = err
+			if !p.disableRecordErrData {
+				errData := make(Data)
+				errData[KeyPandoraStash] = line
+				datas = append(datas, errData)
+			}
 			continue
 		}
 		se.AddSuccess()

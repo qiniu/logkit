@@ -6,11 +6,8 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
-
-// Data store as use key/value map
-// e.g sum -> 1.2, url -> qiniu.com
-type Data map[string]interface{}
 
 // NotAsyncSender return when sender is not async
 var ErrNotAsyncSender = errors.New("This Sender does not support for Async Push")

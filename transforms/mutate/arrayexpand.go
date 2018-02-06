@@ -6,9 +6,9 @@ import (
 	"strconv"
 
 	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 type ArrayExpand struct {
@@ -130,7 +130,7 @@ func (p *ArrayExpand) RawTransform(datas []string) ([]string, error) {
 	return datas, errors.New("array expand transformer not support rawTransform")
 }
 
-func (p *ArrayExpand) Transform(datas []sender.Data) ([]sender.Data, error) {
+func (p *ArrayExpand) Transform(datas []Data) ([]Data, error) {
 	var err, pErr error
 	errNums := 0
 	keys := utils.GetKeys(p.Key)
@@ -178,7 +178,8 @@ func (p *ArrayExpand) Transform(datas []sender.Data) ([]sender.Data, error) {
 }
 
 func (p *ArrayExpand) Description() string {
-	return "expand an array like arraykey:[a, b, c] into sender.Data map {arraykey0:a,arraykey1:b,arraykey2:c}"
+	//return "expand an array like arraykey:[a, b, c] into Data map {arraykey0:a,arraykey1:b,arraykey2:c}"
+	return "展开数组，例：arraykey:[a, b, c]展开为map{arraykey0:a,arraykey1:b,arraykey2:c}"
 }
 
 func (p *ArrayExpand) Type() string {
@@ -192,8 +193,8 @@ func (p *ArrayExpand) SampleConfig() string {
 	}`
 }
 
-func (p *ArrayExpand) ConfigOptions() []utils.Option {
-	return []utils.Option{
+func (p *ArrayExpand) ConfigOptions() []Option {
+	return []Option{
 		transforms.KeyStageAfterOnly,
 		transforms.KeyFieldName,
 	}

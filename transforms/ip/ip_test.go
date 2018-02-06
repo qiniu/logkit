@@ -3,11 +3,11 @@ package ip
 import (
 	"testing"
 
-	"github.com/qiniu/logkit/sender"
-	"github.com/qiniu/logkit/utils"
-	"github.com/stretchr/testify/assert"
-
 	"github.com/qiniu/logkit/transforms"
+	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestIpTransformer(t *testing.T) {
@@ -15,9 +15,9 @@ func TestIpTransformer(t *testing.T) {
 		Key:      "ip",
 		DataPath: "./17monipdb.dat",
 	}
-	data, err := ipt.Transform([]sender.Data{{"ip": "111.2.3.4"}, {"ip": "x.x.x.x"}})
+	data, err := ipt.Transform([]Data{{"ip": "111.2.3.4"}, {"ip": "x.x.x.x"}})
 	assert.Error(t, err)
-	exp := []sender.Data{{
+	exp := []Data{{
 		"ip":      "111.2.3.4",
 		"Region":  "浙江",
 		"City":    "宁波",
@@ -39,9 +39,9 @@ func TestIpTransformer(t *testing.T) {
 		Key:      "multi.ip",
 		DataPath: "./17monipdb.dat",
 	}
-	data2, err2 := ipt2.Transform([]sender.Data{{"multi": map[string]interface{}{"ip": "111.2.3.4"}}, {"multi": map[string]interface{}{"ip": "x.x.x.x"}}})
+	data2, err2 := ipt2.Transform([]Data{{"multi": map[string]interface{}{"ip": "111.2.3.4"}}, {"multi": map[string]interface{}{"ip": "x.x.x.x"}}})
 	assert.Error(t, err2)
-	exp2 := []sender.Data{{
+	exp2 := []Data{{
 		"multi": map[string]interface{}{
 			"ip":      "111.2.3.4",
 			"Region":  "浙江",

@@ -3,9 +3,9 @@ package mutate
 import (
 	"errors"
 
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 type Discarder struct {
@@ -17,7 +17,7 @@ func (g *Discarder) RawTransform(datas []string) ([]string, error) {
 	return datas, errors.New("discard transformer not support rawTransform")
 }
 
-func (g *Discarder) Transform(datas []sender.Data) ([]sender.Data, error) {
+func (g *Discarder) Transform(datas []Data) ([]Data, error) {
 	var ferr error
 	errnums := 0
 	keys := utils.GetKeys(g.Key)
@@ -30,7 +30,8 @@ func (g *Discarder) Transform(datas []sender.Data) ([]sender.Data, error) {
 }
 
 func (g *Discarder) Description() string {
-	return "discard onefield from data"
+	//return "discard onefield from data"
+	return "删除指定的数据字段"
 }
 
 func (g *Discarder) Type() string {
@@ -44,8 +45,8 @@ func (g *Discarder) SampleConfig() string {
 	}`
 }
 
-func (g *Discarder) ConfigOptions() []utils.Option {
-	return []utils.Option{
+func (g *Discarder) ConfigOptions() []Option {
+	return []Option{
 		transforms.KeyStageAfterOnly,
 		transforms.KeyFieldName,
 	}

@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 type Rename struct {
@@ -19,7 +19,7 @@ func (g *Rename) RawTransform(datas []string) ([]string, error) {
 	return datas, errors.New("rename transformer not support rawTransform")
 }
 
-func (g *Rename) Transform(datas []sender.Data) ([]sender.Data, error) {
+func (g *Rename) Transform(datas []Data) ([]Data, error) {
 	var err, ferr error
 	errnums := 0
 	keySlice := utils.GetKeys(g.Key)
@@ -49,7 +49,8 @@ func (g *Rename) Transform(datas []sender.Data) ([]sender.Data, error) {
 }
 
 func (g *Rename) Description() string {
-	return "rename can mutate old field name to new field name"
+	//return "rename can mutate old field name to new field name"
+	return "用新的字段重命名旧的字段"
 }
 
 func (g *Rename) Type() string {
@@ -64,8 +65,8 @@ func (g *Rename) SampleConfig() string {
 	}`
 }
 
-func (g *Rename) ConfigOptions() []utils.Option {
-	return []utils.Option{
+func (g *Rename) ConfigOptions() []Option {
+	return []Option{
 		transforms.KeyFieldName,
 		transforms.KeyStageAfterOnly,
 		{

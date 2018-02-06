@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/qiniu/log"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (

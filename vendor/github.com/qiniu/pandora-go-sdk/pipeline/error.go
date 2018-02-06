@@ -44,6 +44,10 @@ func (e PipelineErrBuilder) Build(msg, text, reqId string, code int) error {
 		err.ErrorType = reqerr.NoSuchRepoError
 	case "E18101":
 		err.ErrorType = reqerr.RepoAlreadyExistsError
+	case "E18134":
+		err.ErrorType = reqerr.ErrTooManySchema
+	case "E18135":
+		err.ErrorType = reqerr.ErrSchemaLimitUnderflow
 	case "E18202":
 		err.ErrorType = reqerr.NoSuchTransformError
 	case "E18201":
@@ -138,6 +142,10 @@ func (e PipelineErrBuilder) Build(msg, text, reqId string, code int) error {
 		err.ErrorType = reqerr.ErrInvalidUdfFuncName
 	case "E18630":
 		err.ErrorType = reqerr.ErrInvalidJavaClassName
+	case "E18306":
+		err.ErrorType = reqerr.ErrStartExport
+	case "E18307":
+		err.ErrorType = reqerr.ErrStopExport
 	case "E18631":
 		err.ErrorType = reqerr.ErrUdfClassTypeError
 	case "E18632":
@@ -210,6 +218,8 @@ func (e PipelineErrBuilder) Build(msg, text, reqId string, code int) error {
 		err.ErrorType = reqerr.ErrNoSuchResourceOwner
 	case "E18665":
 		err.ErrorType = reqerr.ErrAccessDenied
+	case "E18703":
+		err.ErrorType = reqerr.ErrTransformRepeatRestart
 	case "E9000":
 		err.ErrorType = reqerr.InternalServerError
 	case "E9001":

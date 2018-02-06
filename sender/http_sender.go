@@ -11,6 +11,7 @@ import (
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
@@ -22,11 +23,6 @@ const (
 	KeyHttpSenderProtocol = "http_sender_protocol"
 	KeyHttpSenderCsvHead  = "http_sender_csv_head"
 	KeyHttpSenderCsvSplit = "http_sender_csv_split"
-
-	ContentTypeHeader     = "Content-Type"
-	ContentEncodingHeader = "Content-Encoding"
-	ApplicationJson       = "application/json"
-	ApplicationGzip       = "application/gzip"
 )
 
 type HttpSender struct {

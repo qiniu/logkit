@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/jeromer/syslogparser"
 	"github.com/jeromer/syslogparser/rfc3164"
@@ -104,21 +104,25 @@ func NewSyslogParser(c conf.MapConf) (LogParser, error) {
 	nameMap := make(map[string]struct{})
 	labels := GetLabels(labelList, nameMap)
 
+	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+
 	format := GetFormt(rfctype)
 	buff := bytes.NewBuffer([]byte{})
 	return &SyslogParser{
-		name:   name,
-		labels: labels,
-		buff:   buff,
-		format: format,
+		name:                 name,
+		labels:               labels,
+		buff:                 buff,
+		format:               format,
+		disableRecordErrData: disableRecordErrData,
 	}, nil
 }
 
 type SyslogParser struct {
-	name   string
-	labels []Label
-	buff   *bytes.Buffer
-	format Format
+	name                 string
+	labels               []Label
+	buff                 *bytes.Buffer
+	format               Format
+	disableRecordErrData bool
 }
 
 func (p *SyslogParser) Name() string {
@@ -129,9 +133,9 @@ func (p *SyslogParser) Type() string {
 	return TypeSyslog
 }
 
-func (p *SyslogParser) Parse(lines []string) ([]sender.Data, error) {
+func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 	se := &utils.StatsError{}
-	datas := []sender.Data{}
+	datas := []Data{}
 	for idx, line := range lines {
 		d, err := p.parse(line)
 		if err != nil {
@@ -139,6 +143,11 @@ func (p *SyslogParser) Parse(lines []string) ([]sender.Data, error) {
 			se.ErrorIndex = append(se.ErrorIndex, idx)
 			se.ErrorDetail = err
 			se.LastError = err.Error()
+			if !p.disableRecordErrData {
+				errData := make(Data)
+				errData[KeyPandoraStash] = line
+				datas = append(datas, errData)
+			}
 			continue
 		}
 		if len(d) < 1 {
@@ -153,14 +162,14 @@ func (p *SyslogParser) Parse(lines []string) ([]sender.Data, error) {
 	return datas, se
 }
 
-func (p *SyslogParser) parse(line string) (data sender.Data, err error) {
-	data = sender.Data{}
+func (p *SyslogParser) parse(line string) (data Data, err error) {
+	data = Data{}
 	if p.buff.Len() > 0 {
 		if p.format.IsNewLine([]byte(line)) || line == SyslogEofLine {
 			sparser := p.format.GetParser(p.buff.Bytes())
 			err = sparser.Parse()
 			if err == nil || err.Error() == "No structured data" {
-				data = sender.Data(sparser.Dump())
+				data = Data(sparser.Dump())
 				err = nil
 			}
 			p.buff.Reset()

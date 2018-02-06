@@ -23,7 +23,7 @@ func Test_singleFileRotate(t *testing.T) {
 	createTestFile(fileName, "12345")
 
 	//create sf
-	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeFile, defautFileRetention)
+	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeFile, "", defautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
@@ -78,7 +78,7 @@ func Test_singleFileNotRotate(t *testing.T) {
 	defer deleteTestFile(fileName)
 
 	//create sf
-	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeFile, defautFileRetention)
+	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeFile, "", defautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}

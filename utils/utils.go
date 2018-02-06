@@ -19,17 +19,12 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode"
+
+	"github.com/qiniu/log"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
-	"github.com/qiniu/log"
-)
-
-const (
-	GlobalKeyName = "name"
-	KeyCore       = "core"
-	KeyHostName   = "hostname"
-	KeyOsInfo     = "osinfo"
-	KeyLocalIp    = "localip"
 )
 
 type File struct {
@@ -288,7 +283,7 @@ func GetExtraInfo() map[string]string {
 	exInfo[KeyCore] = osInfo.Core
 	exInfo[KeyHostName] = osInfo.Hostname
 	exInfo[KeyOsInfo] = osInfo.OS + "-" + osInfo.Kernel + "-" + osInfo.Platform
-	if ip, err := GetLocalIP(); err != nil {
+	if ip, err := GetLocalIP(); err == nil {
 		exInfo[KeyLocalIp] = ip
 	}
 	return exInfo
@@ -330,9 +325,12 @@ func ExtractField(slice []string) ([]string, error) {
 
 //根据key字符串,拆分出层级keys数据
 func GetKeys(keyStr string) []string {
-	separator := "."
-	keys := strings.Split(keyStr, separator)
+	keys := strings.FieldsFunc(keyStr, isSeparator)
 	return keys
+}
+
+func isSeparator(separator rune) bool {
+	return separator == '.' || unicode.IsSpace(separator)
 }
 
 //通过层级key获取value.

@@ -3,16 +3,17 @@ package mgr
 import (
 	"net/http"
 
-	"github.com/json-iterator/go"
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	_ "github.com/qiniu/logkit/transforms/date"
+	. "github.com/qiniu/logkit/utils/models"
+
+	"github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
 )
 
 type respTransformerRet struct {
-	Code string        `json:"code"`
-	Data []sender.Data `json:"data"`
+	Code string `json:"code"`
+	Data []Data `json:"data"`
 }
 
 // Rest 测试 端口容易冲突导致混淆，63xx
@@ -57,6 +58,17 @@ func transformerAPITest(p *testParam) {
 	if err = jsoniter.Unmarshal(respBody, &got3); err != nil {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
-	exp := []sender.Data{{"ts": "2006-01-02T14:04:05Z"}}
+	exp := []Data{{"ts": "2006-01-02T14:04:05Z"}}
 	assert.Equal(t, exp, got3.Data)
+
+	// Test transformer/check with date transformer
+	var got4 respDataMessage
+	url = "http://127.0.0.1" + rs.address + "/logkit/transformer/check"
+	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte(dateTransformerConfig))
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	if err = jsoniter.Unmarshal(respBody, &got4); err != nil {
+		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
+	}
+	assert.Equal(t, "", got4.Message)
 }

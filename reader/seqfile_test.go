@@ -23,7 +23,7 @@ func Test_Read(t *testing.T) {
 	createFile(1000)
 	defer destroyFile()
 
-	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, defautFileRetention)
+	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, "", defautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
@@ -96,7 +96,7 @@ func Test_Read(t *testing.T) {
 
 func Test_NewReaderWithoutFile(t *testing.T) {
 	createDir()
-	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, defautFileRetention)
+	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, "", defautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
@@ -118,7 +118,7 @@ func Test_NewReaderWithoutFile(t *testing.T) {
 
 func Test_NewReaderWithQiniuLogFile(t *testing.T) {
 	createDir()
-	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, defautFileRetention)
+	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, "", defautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
@@ -142,7 +142,7 @@ func Test_NewReaderWithQiniuLogFile(t *testing.T) {
 
 func Test_NewReaderWithInvalidFile(t *testing.T) {
 	createDir()
-	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, defautFileRetention)
+	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, "", defautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
@@ -163,7 +163,7 @@ func Test_ReadWhenDelete(t *testing.T) {
 	createFile(1000)
 	defer destroyFile()
 
-	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, defautFileRetention)
+	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, "", defautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
@@ -192,7 +192,7 @@ func Test_ReadNewest(t *testing.T) {
 	createFile(1000)
 	defer destroyFile()
 
-	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, defautFileRetention)
+	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, "", defautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}

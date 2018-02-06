@@ -16,6 +16,7 @@ import (
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 
 	pipelinebase "github.com/qiniu/pandora-go-sdk/base"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
@@ -68,8 +69,6 @@ const (
 	KeyIgnoreInvalidField     = "ignore_invalid_field"
 
 	PandoraUUID = "Pandora_UUID"
-
-	KeyPandoraStash = "pandora_stash" // 当只有一条数据且 sendError 时候，将其转化为 raw 发送到 pandora_stash 这个字段
 
 	timestampPrecision = 19
 )
@@ -320,12 +319,12 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 		extraInfo:  utils.GetExtraInfo(),
 	}
 
-	var osInfo = []string{utils.KeyCore, utils.KeyHostName, utils.KeyOsInfo, utils.KeyLocalIp}
+	var osInfo = []string{KeyCore, KeyHostName, KeyOsInfo, KeyLocalIp}
 	analyzerMap := map[string]string{
-		utils.KeyCore:     logdb.KeyWordAnalyzer,
-		utils.KeyOsInfo:   logdb.KeyWordAnalyzer,
-		utils.KeyLocalIp:  logdb.KeyWordAnalyzer,
-		utils.KeyHostName: logdb.KeyWordAnalyzer,
+		KeyCore:     logdb.KeyWordAnalyzer,
+		KeyOsInfo:   logdb.KeyWordAnalyzer,
+		KeyLocalIp:  logdb.KeyWordAnalyzer,
+		KeyHostName: logdb.KeyWordAnalyzer,
 	}
 	s.opt.analyzerInfo.Analyzer = analyzerMap
 	expandAttr := make([]string, 0)
@@ -621,10 +620,10 @@ func validSchema(valueType string, value interface{}) bool {
 
 func deleteExtraAttr(data Data) {
 	// 如果用户数据中本来就含有以下字段，则该函数会造成用户数据残缺
-	delete(data, utils.KeyCore)
-	delete(data, utils.KeyOsInfo)
-	delete(data, utils.KeyLocalIp)
-	delete(data, utils.KeyHostName)
+	delete(data, KeyCore)
+	delete(data, KeyOsInfo)
+	delete(data, KeyLocalIp)
+	delete(data, KeyHostName)
 	delete(data, KeyLogkitSendTime)
 }
 
@@ -671,7 +670,8 @@ func (s *PandoraSender) generatePoint(data Data) (point Data) {
 		point[k] = value
 	}
 	if s.opt.uuid {
-		point[PandoraUUID] = gouuid.NewV4().String()
+		uuid, _ := gouuid.NewV4()
+		point[PandoraUUID] = uuid.String()
 	}
 	/*
 		data中剩余的值，但是在schema中不存在的，根据defaultAll和schemaFree判断是否增加。

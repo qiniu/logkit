@@ -22,6 +22,7 @@ logkit是[七牛Pandora](https://pandora-docs.qiniu.com)开发的一个通用的
 1. Redis
 1. TCP/UDP/Unix Socket
 1. Http POST
+1. Script
 
 ## 工作方式
 
@@ -46,17 +47,10 @@ logkit本身支持多种数据源，并且可以同时发送多个数据源的�
 
 **历史版本**：请移步至[Releases](https://github.com/qiniu/logkit/releases)
 
-**体验版**：develop 分支每天5点会定时构建最新的logkit体验版，需要使用的用户可以下载(注意，体验版不含前端的构建更新)。
+**体验版**：develop 分支每天5点会定时构建最新的logkit体验版(仅限linux 64位以及docker)，需要使用的用户可以下载(注意，体验版不含前端的构建更新)。
 
-[windows 64位版本下载](https://pandora-dl.qiniu.com/nightly/logkit_windows_nightly.zip)
-
-[windows 32位版本下载](https://pandora-dl.qiniu.com/nightly/logkit_windows32_nightly.zip)
 
 [linux 64位版本下载](https://pandora-dl.qiniu.com/nightly/logkit_nightly.tar.gz)
-
-[linux 32位版本下载](https://pandora-dl.qiniu.com/nightly/logkit_linux32_nightly.tar.gz)
-
-[MacOS 版本下载](https://pandora-dl.qiniu.com/nightly/logkit_mac_nightly.tar.gz)
 
 [Docker image nightly]:  `docker pull  wonderflow/logkit:nightly`
 

@@ -93,11 +93,15 @@ class Sender extends Component {
                     item.data["pandora"][index].ChooseOptions = falseDefault
                   }else if(val.KeyName === "pandora_enable_tsdb") {
                     item.data["pandora"][index].ChooseOptions = trueDefault
+                  } else if(val.KeyName === "pandora_extra_info") {
+                    item.data["pandora"][index].ChooseOptions = trueDefault
                   }
                 }else{
                   if(val.KeyName === "pandora_enable_logdb"){
                     item.data["pandora"][index].ChooseOptions = trueDefault
                   }else if(val.KeyName === "pandora_enable_tsdb") {
+                    item.data["pandora"][index].ChooseOptions = falseDefault
+                  } else if(val.KeyName === "pandora_extra_info") {
                     item.data["pandora"][index].ChooseOptions = falseDefault
                   }
                 }

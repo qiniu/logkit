@@ -2,6 +2,7 @@ package sender
 
 import (
 	"github.com/qiniu/logkit/conf"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 // Discard sender doing nothing

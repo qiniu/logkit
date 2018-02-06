@@ -4,9 +4,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
+
 	"github.com/wangtuanjie/ip17mon"
 )
 
@@ -23,7 +24,7 @@ func (it *IpTransformer) RawTransform(datas []string) ([]string, error) {
 	return datas, errors.New("IP transformer not support rawTransform")
 }
 
-func (it *IpTransformer) Transform(datas []sender.Data) ([]sender.Data, error) {
+func (it *IpTransformer) Transform(datas []Data) ([]Data, error) {
 	var err, ferr error
 	if it.loc == nil {
 		it.loc, err = ip17mon.NewLocator(it.DataPath)
@@ -73,7 +74,8 @@ func (it *IpTransformer) Transform(datas []sender.Data) ([]sender.Data, error) {
 }
 
 func (it *IpTransformer) Description() string {
-	return "transform ip to country region and isp"
+	//return "transform ip to country region and isp"
+	return "获取IP的区域、国家、城市和运营商信息"
 }
 
 func (it *IpTransformer) Type() string {
@@ -89,8 +91,8 @@ func (it *IpTransformer) SampleConfig() string {
 	}`
 }
 
-func (it *IpTransformer) ConfigOptions() []utils.Option {
-	return []utils.Option{
+func (it *IpTransformer) ConfigOptions() []Option {
+	return []Option{
 		transforms.KeyStageAfterOnly,
 		transforms.KeyFieldName,
 		{

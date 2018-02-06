@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 type Replacer struct {
@@ -32,7 +32,7 @@ func (g *Replacer) Init() error {
 	return nil
 }
 
-func (g *Replacer) Transform(datas []sender.Data) ([]sender.Data, error) {
+func (g *Replacer) Transform(datas []Data) ([]Data, error) {
 	var err, ferr error
 	errnums := 0
 	keys := utils.GetKeys(g.Key)
@@ -70,7 +70,8 @@ func (g *Replacer) RawTransform(datas []string) ([]string, error) {
 }
 
 func (g *Replacer) Description() string {
-	return "replace old string to new"
+	//return "replace old string to new"
+	return "用新字符串替换旧字符串"
 }
 
 func (g *Replacer) Type() string {
@@ -88,8 +89,8 @@ func (g *Replacer) SampleConfig() string {
 	}`
 }
 
-func (g *Replacer) ConfigOptions() []utils.Option {
-	return []utils.Option{
+func (g *Replacer) ConfigOptions() []Option {
+	return []Option{
 		transforms.KeyStage,
 		transforms.KeyFieldName,
 		{

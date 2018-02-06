@@ -61,6 +61,7 @@ const (
 	KeyEncoding      = "encoding"
 	KeyReadIOLimit   = "readio_limit"
 	KeyDataSourceTag = "datasource_tag"
+	KeyTagFile       = "tag_file"
 	KeyHeadPattern   = "head_pattern"
 	KeyRunnerName    = "runner_name"
 
@@ -119,7 +120,12 @@ const (
 	KeyKafkaGroupID          = "kafka_groupid"
 	KeyKafkaTopic            = "kafka_topic"
 	KeyKafkaZookeeper        = "kafka_zookeeper"
+	KeyKafkaZookeeperChroot  = "kafka_zookeeper_chroot"
 	KeyKafkaZookeeperTimeout = "kafka_zookeeper_timeout"
+
+	KeyExecInterpreter   = "script_exec_interprepter"
+	KeyScriptCron        = "script_cron"
+	KeyScriptExecOnStart = "script_exec_onstart"
 )
 
 var defaultIgnoreFileSuffix = []string{
@@ -141,6 +147,8 @@ const (
 	ModeRedis    = "redis"
 	ModeSocket   = "socket"
 	ModeHttp     = "http"
+	ModeScript   = "script"
+	ModeSnmp     = "snmp"
 )
 
 const (
@@ -259,13 +267,21 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 		zkTimeout, _ := conf.GetIntOr(KeyKafkaZookeeperTimeout, 1)
 
 		zookeepers, err := conf.GetStringList(KeyKafkaZookeeper)
-		reader, err = NewKafkaReader(meta, consumerGroup, topics, zookeepers, time.Duration(zkTimeout)*time.Second, whence)
+		if err != nil {
+			return nil, err
+		}
+		zkchroot, _ := conf.GetStringOr(KeyKafkaZookeeperChroot, "")
+		reader, err = NewKafkaReader(meta, consumerGroup, topics, zookeepers, zkchroot, time.Duration(zkTimeout)*time.Second, whence)
 	case ModeRedis:
 		reader, err = NewRedisReader(meta, conf)
 	case ModeSocket:
 		reader, err = NewSocketReader(meta, conf)
 	case ModeHttp:
 		reader, err = NewHttpReader(meta, conf)
+	case ModeScript:
+		reader, err = NewScriptReader(meta, conf)
+	case ModeSnmp:
+		reader, err = NewSnmpReader(meta, conf)
 	default:
 		err = fmt.Errorf("mode %v not supported now", mode)
 	}

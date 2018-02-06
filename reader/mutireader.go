@@ -1,6 +1,7 @@
 package reader
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -63,7 +64,7 @@ type Result struct {
 func NewActiveReader(originPath, realPath, whence string, meta *Meta, msgChan chan<- Result) (ar *ActiveReader, err error) {
 	rpath := strings.Replace(realPath, string(os.PathSeparator), "_", -1)
 	subMetaPath := filepath.Join(meta.dir, rpath)
-	subMeta, err := NewMeta(subMetaPath, subMetaPath, realPath, ModeFile, defautFileRetention)
+	subMeta, err := NewMeta(subMetaPath, subMetaPath, realPath, ModeFile, meta.tagFile, defautFileRetention)
 	if err != nil {
 		return nil, err
 	}
@@ -492,6 +493,25 @@ func (mr *MultiReader) SyncMeta() {
 	if err != nil {
 		log.Errorf("%v sync meta WriteBuf error %v, buf %v", mr.Name(), err, string(buf))
 		return
+	}
+	return
+}
+
+func (mr *MultiReader) Reset() (err error) {
+	errMsg := make([]string, 0)
+	if err = mr.meta.Reset(); err != nil {
+		errMsg = append(errMsg, err.Error())
+	}
+	ars := mr.getActiveReaders()
+	for _, ar := range ars {
+		if ar.br != nil {
+			if subErr := ar.br.meta.Reset(); subErr != nil {
+				errMsg = append(errMsg, subErr.Error())
+			}
+		}
+	}
+	if len(errMsg) != 0 {
+		err = errors.New(strings.Join(errMsg, "\n"))
 	}
 	return
 }

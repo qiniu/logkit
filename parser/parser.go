@@ -5,14 +5,13 @@ import (
 	"fmt"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 type LogParser interface {
 	Name() string
 	// parse lines into structured datas
-	Parse(lines []string) (datas []sender.Data, err error)
+	Parse(lines []string) (datas []Data, err error)
 }
 
 type ParserType interface {
@@ -21,10 +20,11 @@ type ParserType interface {
 
 // conf 字段
 const (
-	KeyParserName = utils.GlobalKeyName
-	KeyParserType = "type"
-	KeyRunnerName = "runner_name"
-	KeyLabels     = "labels" // 额外增加的标签信息，比如机器信息等
+	KeyParserName           = GlobalKeyName
+	KeyParserType           = "type"
+	KeyRunnerName           = "runner_name"
+	KeyLabels               = "labels" // 额外增加的标签信息，比如机器信息等
+	KeyDisableRecordErrData = "disable_record_errdata"
 )
 
 // parser 的类型

@@ -1,8 +1,8 @@
 package transforms
 
 import (
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (
@@ -26,9 +26,9 @@ const (
 type Transformer interface {
 	Description() string
 	SampleConfig() string
-	ConfigOptions() []utils.Option
+	ConfigOptions() []Option
 	Type() string
-	Transform([]sender.Data) ([]sender.Data, error)
+	Transform([]Data) ([]Data, error)
 	RawTransform([]string) ([]string, error)
 	Stage() string
 	Stats() utils.StatsInfo
@@ -48,7 +48,7 @@ func Add(name string, creator Creator) {
 }
 
 var (
-	KeyStage = utils.Option{
+	KeyStage = Option{
 		KeyName:       "stage",
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{StageAfterParser, StageBeforeParser},
@@ -57,7 +57,7 @@ var (
 		Description:   "transform运行的阶段(parser前还是parser后)(stage)",
 		Type:          TransformTypeString,
 	}
-	KeyStageAfterOnly = utils.Option{
+	KeyStageAfterOnly = Option{
 		KeyName:       "stage",
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{StageAfterParser},
@@ -66,7 +66,7 @@ var (
 		Description:   "transform运行的阶段(stage)",
 		Type:          TransformTypeString,
 	}
-	KeyFieldName = utils.Option{
+	KeyFieldName = Option{
 		KeyName:      "key",
 		ChooseOnly:   false,
 		Default:      "my_field_keyname",
@@ -74,7 +74,7 @@ var (
 		Description:  "要进行Transform变化的键(key)",
 		Type:         TransformTypeString,
 	}
-	KeyTimezoneoffset = utils.Option{
+	KeyTimezoneoffset = Option{
 		KeyName:    "offset",
 		ChooseOnly: true,
 		ChooseOptions: []interface{}{0, -1, -2, -3, -4,

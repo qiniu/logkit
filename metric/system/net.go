@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/qiniu/logkit/metric"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (
@@ -26,7 +26,7 @@ const (
 )
 
 // KeyNetUsages TypeMetricNet 中的字段名称
-var KeyNetUsages = []utils.KeyValue{
+var KeyNetUsages = []KeyValue{
 	{KeyNetBytesSent, "网卡发包总数(bytes)"},
 	{KeyNetBytesRecv, "网卡收包总数(bytes)"},
 	{KeyNetPacketsSent, "网卡发包数量"},
@@ -59,7 +59,7 @@ func (_ *NetIOStats) Tags() []string {
 }
 
 func (_ *NetIOStats) Config() map[string]interface{} {
-	configOption := []utils.Option{
+	configOption := []Option{
 		{
 			KeyName:      "interfaces",
 			ChooseOnly:   false,

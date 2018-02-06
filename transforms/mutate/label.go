@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 type Label struct {
@@ -20,7 +20,7 @@ func (g *Label) RawTransform(datas []string) ([]string, error) {
 	return datas, errors.New("label transformer not support rawTransform")
 }
 
-func (g *Label) Transform(datas []sender.Data) ([]sender.Data, error) {
+func (g *Label) Transform(datas []Data) ([]Data, error) {
 	var err, ferr error
 	errnums := 0
 	keySlice := utils.GetKeys(g.Key)
@@ -47,7 +47,8 @@ func (g *Label) Transform(datas []sender.Data) ([]sender.Data, error) {
 }
 
 func (g *Label) Description() string {
-	return "label can add a field"
+	//return "label can add a field"
+	return "增加标签"
 }
 
 func (g *Label) Type() string {
@@ -63,8 +64,8 @@ func (g *Label) SampleConfig() string {
 	}`
 }
 
-func (g *Label) ConfigOptions() []utils.Option {
-	return []utils.Option{
+func (g *Label) ConfigOptions() []Option {
+	return []Option{
 		transforms.KeyFieldName,
 		transforms.KeyStageAfterOnly,
 		{

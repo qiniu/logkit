@@ -34,7 +34,7 @@ func createDirWithName(dirx string) {
 func Test_ActiveReader(t *testing.T) {
 	testfile := "Test_ActiveReader"
 	createDir()
-	meta, err := NewMeta(metaDir, metaDir, testfile, ModeDir, defautFileRetention)
+	meta, err := NewMeta(metaDir, metaDir, testfile, ModeDir, "", defautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
@@ -500,4 +500,102 @@ func multiReaderSyncMetaMutilineTest(t *testing.T) {
 	}
 	t.Log("mr finish listen 2 round")
 	assert.EqualValues(t, expresult, resultmap)
+}
+
+func TestMultiReaderReset(t *testing.T) {
+	dirName := "TestMultiReaderReset"
+	dir := filepath.Join(dirName, "abc")
+	metaDir := filepath.Join(dirName, "meta")
+	file1 := filepath.Join(dir, "file1.log")
+	file2 := filepath.Join(dir, "file2.log")
+	file3 := filepath.Join(dir, "file3.log")
+	file4 := filepath.Join(dir, "file4.log")
+
+	createDirWithName(dirName)
+	defer os.RemoveAll(dirName)
+
+	createDirWithName(dir)
+	createFileWithContent(file1, "abc111\nabc112\n")
+	createFileWithContent(file2, "abc121\nabc122\n")
+	createFileWithContent(file3, "abc131\nabc132\n")
+	createFileWithContent(file4, "abc141\nabc142\n")
+	expResult := map[string]int{
+		"abc111\n": 1,
+		"abc112\n": 1,
+		"abc121\n": 1,
+		"abc122\n": 1,
+		"abc131\n": 1,
+		"abc132\n": 1,
+		"abc141\n": 1,
+		"abc142\n": 1,
+	}
+	resultMap := make(map[string]int)
+	logPathPattern := filepath.Join(filepath.Join(dirName, "*"), "*.log")
+	c := conf.MapConf{
+		"log_path":        logPathPattern,
+		"meta_path":       metaDir,
+		"mode":            ModeTailx,
+		"sync_every":      "1",
+		"reader_buf_size": "1024",
+		"read_from":       "oldest",
+	}
+	meta, err := NewMetaWithConf(c)
+	assert.NoError(t, err)
+	mr, err := NewMultiReader(meta, logPathPattern, WhenceOldest, "15s", "1s", 128)
+	mr.Start()
+	t.Log("mr started")
+
+	maxNum := 0
+	spaceNum := 0
+	for {
+		data, err := mr.ReadLine()
+		if data != "" {
+			resultMap[data]++
+			maxNum++
+			t.Log(data, maxNum)
+		} else {
+			spaceNum++
+		}
+		if err == io.EOF {
+			break
+		}
+		if maxNum >= 8 || spaceNum > 100 {
+			break
+		}
+	}
+	t.Log("mr finished read one")
+	err = mr.Close()
+	assert.NoError(t, err)
+	t.Log(">>>>>>>>>>>>>>>>mr Closed")
+	assert.EqualValues(t, expResult, resultMap)
+
+	time.Sleep(500 * time.Millisecond)
+
+	// 重置
+	err = mr.Reset()
+	assert.NoError(t, err)
+	mr, err = NewMultiReader(meta, logPathPattern, WhenceOldest, "15s", "1s", 128)
+	mr.Start()
+	time.Sleep(100 * time.Millisecond)
+	resultMap = make(map[string]int)
+	maxNum = 0
+	spaceNum = 0
+	for {
+		data, err := mr.ReadLine()
+		if data != "" {
+			resultMap[data]++
+			maxNum++
+			t.Log(data, maxNum)
+		} else {
+			spaceNum++
+		}
+		if err == io.EOF {
+			break
+		}
+		if maxNum >= 8 || spaceNum > 100 {
+			break
+		}
+	}
+	t.Log("mr Started again")
+	assert.EqualValues(t, expResult, resultMap)
 }

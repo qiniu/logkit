@@ -8,13 +8,14 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/queue"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
 	"github.com/json-iterator/go"
-	"github.com/qiniu/log"
-	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 )
 
 const (

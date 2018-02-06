@@ -14,6 +14,7 @@ import (
 	"github.com/labstack/echo"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 type ClusterConfig struct {
@@ -76,11 +77,7 @@ const (
 	StatusLost = "lost"
 )
 
-const (
-	DefaultMyTag    = "default"
-	ContentType     = "Content-Type"
-	ApplicationJson = "application/json"
-)
+const DefaultMyTag = "default"
 
 func NewCluster(cc *ClusterConfig) *Cluster {
 	cl := new(Cluster)
@@ -170,7 +167,7 @@ func (rs *RestService) Slaves() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		_, tag, url, _, err := rs.checkClusterRequest(c)
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrClusterSlaves, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrClusterSlaves, err.Error())
 		}
 		rs.cluster.UpdateSlaveStatus()
 		rs.cluster.mutex.RLock()
@@ -186,7 +183,7 @@ func (rs *RestService) GetClusterRunners() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		_, tag, url, _, err := rs.checkClusterRequest(c)
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrClusterSlaves, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrClusterSlaves, err.Error())
 		}
 		rs.cluster.UpdateSlaveStatus()
 		rs.cluster.mutex.RLock()
@@ -228,7 +225,7 @@ func (rs *RestService) ClusterStatus() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		_, tag, url, _, err := rs.checkClusterRequest(c)
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrClusterStatus, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrClusterStatus, err.Error())
 		}
 		rs.cluster.mutex.RLock()
 		slaves, _ := getQualifySlaves(rs.cluster.slaves, tag, url)
@@ -278,7 +275,7 @@ func (rs *RestService) GetClusterConfig() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		runnerName, tag, url, _, err := rs.checkClusterRequest(c)
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrClusterConfig, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrClusterConfig, err.Error())
 		}
 		rs.cluster.mutex.RLock()
 		slaves, _ := getQualifySlaves(rs.cluster.slaves, tag, url)
@@ -306,7 +303,7 @@ func (rs *RestService) GetClusterConfig() echo.HandlerFunc {
 				}
 			}
 		}
-		return RespError(c, http.StatusBadRequest, utils.ErrClusterConfig, lastErrMsg)
+		return RespError(c, http.StatusBadRequest, ErrClusterConfig, lastErrMsg)
 	}
 }
 
@@ -316,7 +313,7 @@ func (rs *RestService) GetClusterConfigs() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		_, tag, url, _, err := rs.checkClusterRequest(c)
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrClusterConfigs, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrClusterConfigs, err.Error())
 		}
 		rs.cluster.mutex.RLock()
 		slaves, _ := getQualifySlaves(rs.cluster.slaves, tag, url)
@@ -371,12 +368,12 @@ func (rs *RestService) PostRegister() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		var req RegisterReq
 		if err := c.Bind(&req); err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrClusterRegister, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrClusterRegister, err.Error())
 		}
 		req.Url = utils.AddHttpProtocal(req.Url)
 		if rs.cluster == nil || !rs.cluster.Enable {
 			errMsg := "this is not master"
-			return RespError(c, http.StatusBadRequest, utils.ErrClusterRegister, errMsg)
+			return RespError(c, http.StatusBadRequest, ErrClusterRegister, errMsg)
 		}
 		rs.cluster.AddSlave(req.Url, req.Tag)
 		return RespSuccess(c, nil)
@@ -393,14 +390,14 @@ func (rs *RestService) PostTag() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		var req TagReq
 		if err := c.Bind(&req); err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrClusterTag, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrClusterTag, err.Error())
 		}
 		if rs.cluster == nil || !rs.cluster.Enable {
 			errMsg := "cluster function not configed"
-			return RespError(c, http.StatusBadRequest, utils.ErrClusterTag, errMsg)
+			return RespError(c, http.StatusBadRequest, ErrClusterTag, errMsg)
 		}
 		if err := Register(rs.cluster.MasterUrl, rs.cluster.Address, req.Tag); err != nil {
-			return RespError(c, http.StatusServiceUnavailable, utils.ErrClusterTag, err.Error())
+			return RespError(c, http.StatusServiceUnavailable, ErrClusterTag, err.Error())
 		}
 		rs.cluster.mutex.Lock()
 		rs.cluster.Tag = req.Tag
@@ -414,19 +411,19 @@ func (rs *RestService) PostClusterConfig() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		configName, tag, url, configBytes, err := rs.checkClusterRequest(c)
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerAdd, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrClusterRunnerAdd, err.Error())
 		}
 		rs.cluster.mutex.RLock()
 		slaves, err := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerAdd, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrClusterRunnerAdd, err.Error())
 		}
 		method := http.MethodPost
 		mgrType := "add runner " + configName
 		urlPattern := "%v" + PREFIX + "/configs/" + configName
 		if err := executeToClusters(slaves, urlPattern, method, mgrType, configBytes); err != nil {
-			return RespError(c, http.StatusServiceUnavailable, utils.ErrClusterRunnerAdd, err.Error())
+			return RespError(c, http.StatusServiceUnavailable, ErrClusterRunnerAdd, err.Error())
 		}
 		return RespSuccess(c, nil)
 	}
@@ -437,19 +434,19 @@ func (rs *RestService) PutClusterConfig() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		configName, tag, url, configBytes, err := rs.checkClusterRequest(c)
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerUpdate, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrClusterRunnerUpdate, err.Error())
 		}
 		rs.cluster.mutex.RLock()
 		slaves, err := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerUpdate, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrClusterRunnerUpdate, err.Error())
 		}
 		method := http.MethodPut
 		mgrType := "update runner " + configName
 		urlPattern := "%v" + PREFIX + "/configs/" + configName
 		if err := executeToClusters(slaves, urlPattern, method, mgrType, configBytes); err != nil {
-			return RespError(c, http.StatusServiceUnavailable, utils.ErrClusterRunnerUpdate, err.Error())
+			return RespError(c, http.StatusServiceUnavailable, ErrClusterRunnerUpdate, err.Error())
 		}
 		return RespSuccess(c, nil)
 	}
@@ -460,19 +457,19 @@ func (rs *RestService) DeleteClusterConfig() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		configName, tag, url, configBytes, err := rs.checkClusterRequest(c)
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerDelete, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrClusterRunnerDelete, err.Error())
 		}
 		rs.cluster.mutex.RLock()
 		slaves, err := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerDelete, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrClusterRunnerDelete, err.Error())
 		}
 		method := http.MethodDelete
 		mgrType := "delete runner " + configName
 		urlPattern := "%v" + PREFIX + "/configs/" + configName
 		if err := executeToClusters(slaves, urlPattern, method, mgrType, configBytes); err != nil {
-			return RespError(c, http.StatusServiceUnavailable, utils.ErrClusterRunnerDelete, err.Error())
+			return RespError(c, http.StatusServiceUnavailable, ErrClusterRunnerDelete, err.Error())
 		}
 		return RespSuccess(c, nil)
 	}
@@ -483,19 +480,19 @@ func (rs *RestService) PostClusterConfigStop() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		configName, tag, url, configBytes, err := rs.checkClusterRequest(c)
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerStop, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrClusterRunnerStop, err.Error())
 		}
 		rs.cluster.mutex.RLock()
 		slaves, err := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerStop, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrClusterRunnerStop, err.Error())
 		}
 		method := http.MethodPost
 		mgrType := "stop runner " + configName
 		urlPattern := "%v" + PREFIX + "/configs/" + configName + "/stop"
 		if err := executeToClusters(slaves, urlPattern, method, mgrType, configBytes); err != nil {
-			return RespError(c, http.StatusServiceUnavailable, utils.ErrClusterRunnerStop, err.Error())
+			return RespError(c, http.StatusServiceUnavailable, ErrClusterRunnerStop, err.Error())
 		}
 		return RespSuccess(c, nil)
 	}
@@ -506,19 +503,19 @@ func (rs *RestService) PostClusterConfigStart() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		configName, tag, url, configBytes, err := rs.checkClusterRequest(c)
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerStart, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrClusterRunnerStart, err.Error())
 		}
 		rs.cluster.mutex.RLock()
 		slaves, err := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerStart, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrClusterRunnerStart, err.Error())
 		}
 		method := http.MethodPost
 		mgrType := "start runner " + configName
 		urlPattern := "%v" + PREFIX + "/configs/" + configName + "/start"
 		if err := executeToClusters(slaves, urlPattern, method, mgrType, configBytes); err != nil {
-			return RespError(c, http.StatusServiceUnavailable, utils.ErrClusterRunnerStart, err.Error())
+			return RespError(c, http.StatusServiceUnavailable, ErrClusterRunnerStart, err.Error())
 		}
 		return RespSuccess(c, nil)
 	}
@@ -529,19 +526,19 @@ func (rs *RestService) PostClusterConfigReset() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		configName, tag, url, configBytes, err := rs.checkClusterRequest(c)
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerReset, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrClusterRunnerReset, err.Error())
 		}
 		rs.cluster.mutex.RLock()
 		slaves, err := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrClusterRunnerReset, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrClusterRunnerReset, err.Error())
 		}
 		method := http.MethodPost
 		mgrType := "reset runner " + configName
 		urlPattern := "%v" + PREFIX + "/configs/" + configName + "/reset"
 		if err := executeToClusters(slaves, urlPattern, method, mgrType, configBytes); err != nil {
-			return RespError(c, http.StatusServiceUnavailable, utils.ErrClusterRunnerReset, err.Error())
+			return RespError(c, http.StatusServiceUnavailable, ErrClusterRunnerReset, err.Error())
 		}
 		return RespSuccess(c, nil)
 	}
@@ -552,7 +549,7 @@ func (rs *RestService) DeleteSlaves() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		_, tag, url, _, err := rs.checkClusterRequest(c)
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrClusterSlavesDelete, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrClusterSlavesDelete, err.Error())
 		}
 		rs.cluster.mutex.RLock()
 		slaves := make([]Slave, 0)
@@ -575,19 +572,19 @@ func (rs *RestService) PostSlaveTag() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		_, tag, url, configBytes, err := rs.checkClusterRequest(c)
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrClusterSlavesTag, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrClusterSlavesTag, err.Error())
 		}
 		rs.cluster.mutex.RLock()
 		slaves, err := getQualifySlaves(rs.cluster.slaves, tag, url)
 		rs.cluster.mutex.RUnlock()
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrClusterSlavesTag, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrClusterSlavesTag, err.Error())
 		}
 		mgrType := "change tag"
 		method := http.MethodPost
 		urlPattern := "%v" + PREFIX + "/cluster/tag"
 		if err := executeToClusters(slaves, urlPattern, method, mgrType, configBytes); err != nil {
-			return RespError(c, http.StatusServiceUnavailable, utils.ErrClusterSlavesTag, err.Error())
+			return RespError(c, http.StatusServiceUnavailable, ErrClusterSlavesTag, err.Error())
 		}
 		return RespSuccess(c, nil)
 	}
@@ -670,7 +667,7 @@ func executeToOneCluster(url, method string, configBytes []byte) (respCode int, 
 	if err != nil {
 		return
 	}
-	req.Header.Set(ContentType, ApplicationJson)
+	req.Header.Set(ContentTypeHeader, ApplicationJson)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return
