@@ -250,7 +250,7 @@ func (f *Field) init() error {
 
 type RTable struct {
 	Name string
-	Time int64
+	Time string
 	Rows []RTableRow
 }
 
@@ -516,8 +516,8 @@ func (t Table) Build(gs snmpConnection, walk bool) (*RTable, error) {
 
 	rt := RTable{
 		Name: t.Name,
-		Time: time.Now().UnixNano(), //TODO record time at start
 		Rows: make([]RTableRow, 0, len(rows)),
+		Time: time.Now().Format(time.RFC3339Nano),
 	}
 	for _, r := range rows {
 		rt.Rows = append(rt.Rows, r)
