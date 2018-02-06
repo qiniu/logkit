@@ -27,6 +27,7 @@ var (
 			"1", "2", "3", "4", "5", "6", "7", "8", "9", "11", "12"},
 		DefaultNoUse: false,
 		Description:  "时区偏移量(timezone_offset)",
+		Advance:      true,
 	}
 
 	OptionLabels = Option{
@@ -35,6 +36,7 @@ var (
 		Default:      "",
 		DefaultNoUse: false,
 		Description:  "额外的标签信息(labels)",
+		Advance:      true,
 	}
 
 	OptionDisableRecordErrData = Option{

@@ -26,6 +26,8 @@ type Option struct {
 	CheckRegex    string
 	Type          string `json:"Type,omitempty"`
 	Secret        bool
+	Advance       bool   `json:"advance,omitempty"`
+	AdvanceDepend string `json:"advance_depend,omitempty"`
 }
 
 type KeyValue struct {
