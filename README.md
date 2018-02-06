@@ -23,6 +23,7 @@ logkit是[七牛Pandora](https://pandora-docs.qiniu.com)开发的一个通用的
 1. TCP/UDP/Unix Socket
 1. Http POST
 1. Script
+1. Snmp
 
 ## 工作方式
 
