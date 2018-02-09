@@ -77,6 +77,7 @@ type SnmpReader struct {
 
 	Meta       *Meta
 	LastGather time.Time
+	StopChan   chan struct{}
 	DataChan   chan interface{}
 }
 
@@ -156,28 +157,30 @@ func NewSnmpReader(meta *Meta, c conf.MapConf) (s *SnmpReader, err error) {
 		}
 	}
 	s = &SnmpReader{
-		Meta:            meta,
-		SnmpName:        name,
-		Agents:          agents,
-		Timeout:         timeOut,
-		Interval:        interval,
-		Retries:         retries,
-		Version:         uint8(version),
-		Community:       community,
-		MaxRepetitions:  uint8(maxRepetitions),
-		ContextName:     contextName,
-		SecLevel:        secLevel,
-		SecName:         secName,
-		AuthProtocol:    authProtocol,
-		AuthPassword:    authPassword,
-		PrivProtocol:    privProtocol,
-		PrivPassword:    privPassword,
-		EngineID:        engineID,
-		EngineBoots:     uint32(engineBoots),
-		EngineTime:      uint32(engineTime),
-		Tables:          tables,
-		Fields:          fields,
+		Meta:           meta,
+		SnmpName:       name,
+		Agents:         agents,
+		Timeout:        timeOut,
+		Interval:       interval,
+		Retries:        retries,
+		Version:        uint8(version),
+		Community:      community,
+		MaxRepetitions: uint8(maxRepetitions),
+		ContextName:    contextName,
+		SecLevel:       secLevel,
+		SecName:        secName,
+		AuthProtocol:   authProtocol,
+		AuthPassword:   authPassword,
+		PrivProtocol:   privProtocol,
+		PrivPassword:   privPassword,
+		EngineID:       engineID,
+		EngineBoots:    uint32(engineBoots),
+		EngineTime:     uint32(engineTime),
+		Tables:         tables,
+		Fields:         fields,
+
 		LastGather:      time.Now(),
+		StopChan:        make(chan struct{}),
 		DataChan:        make(chan interface{}, 1000),
 		ConnectionCache: make([]snmpConnection, len(agents)),
 	}
@@ -284,6 +287,8 @@ func (s *SnmpReader) StoreData(data []map[string]interface{}) (err error) {
 			continue
 		}
 		select {
+		case <-s.StopChan:
+			return
 		case s.DataChan <- d:
 		default:
 			err = fmt.Errorf(ChannelTooShortErr)
@@ -390,6 +395,7 @@ func (s *SnmpReader) ReadLine() (line string, err error) {
 		for subErr != nil && strings.Contains(subErr.Error(), ChannelTooShortErr) {
 			newLen := int(math.Min(float64(cap(s.DataChan)*2), float64(MaxChannelLength)))
 			if newLen == cap(s.DataChan) {
+				subErr = nil
 				log.Warnf("too more data must collect every fetching")
 				break
 			} else {
@@ -421,7 +427,7 @@ func (s *SnmpReader) SetMode(mode string, v interface{}) error {
 }
 
 func (s *SnmpReader) Close() error {
-	close(s.DataChan)
+	close(s.StopChan)
 	return nil
 }
 

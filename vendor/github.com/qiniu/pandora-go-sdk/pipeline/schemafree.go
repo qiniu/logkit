@@ -11,6 +11,7 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base"
+	. "github.com/qiniu/pandora-go-sdk/base/models"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 )
 
@@ -18,9 +19,10 @@ const (
 	maxMapLevel = 5
 )
 
-func (c *Pipeline) getSchemas(repoName string) (schemas map[string]RepoSchemaEntry, err error) {
+func (c *Pipeline) getSchemas(repoName string, token PandoraToken) (schemas map[string]RepoSchemaEntry, err error) {
 	repo, err := c.GetRepo(&GetRepoInput{
-		RepoName: repoName,
+		RepoName:     repoName,
+		PandoraToken: token,
 	})
 	if err != nil {
 		return
@@ -408,7 +410,7 @@ func (c *Pipeline) generatePoint(oldData Data, input *InitOrUpdateWorkflowInput)
 	schemas := c.repoSchemas[input.RepoName]
 	c.repoSchemaMux.Unlock()
 	if schemas == nil {
-		schemas, err = c.getSchemas(input.RepoName)
+		schemas, err = c.getSchemas(input.RepoName, input.PipelineGetRepoToken)
 		if err != nil {
 			reqe, ok := err.(*reqerr.RequestError)
 			if ok && reqe.ErrorType != reqerr.NoSuchRepoError {
@@ -561,18 +563,24 @@ func mergePandoraSchemas(oldScs, addScs []RepoSchemaEntry) (ret []RepoSchemaEntr
 	return
 }
 
-func (c *Pipeline) changeWorkflowToStopped(workflow *GetWorkflowOutput, waitStopped bool) error {
+type WorkflowTokens struct {
+	StartWorkflowToken     PandoraToken
+	StopWorkflowToken      PandoraToken
+	GetWorkflowStatusToken PandoraToken
+}
+
+func (c *Pipeline) changeWorkflowToStopped(workflow *GetWorkflowOutput, waitStopped bool, tokens WorkflowTokens) error {
 	logger := base.NewDefaultLogger()
 	switch workflow.Status {
 	case base.WorkflowStarted:
-		if err := c.StopWorkflow(&StopWorkflowInput{WorkflowName: workflow.Name}); err != nil {
+		if err := c.StopWorkflow(&StopWorkflowInput{WorkflowName: workflow.Name, PandoraToken: tokens.StopWorkflowToken}); err != nil {
 			return err
 		}
 	case base.WorkflowStarting:
-		if err := WaitWorkflowStarted(workflow.Name, c, logger); err != nil {
+		if err := WaitWorkflowStarted(workflow.Name, c, logger, tokens.GetWorkflowStatusToken); err != nil {
 			return err
 		}
-		if err := c.StopWorkflow(&StopWorkflowInput{WorkflowName: workflow.Name}); err != nil {
+		if err := c.StopWorkflow(&StopWorkflowInput{WorkflowName: workflow.Name, PandoraToken: tokens.StopWorkflowToken}); err != nil {
 			return err
 		}
 	case base.WorkflowStopping:
@@ -583,7 +591,7 @@ func (c *Pipeline) changeWorkflowToStopped(workflow *GetWorkflowOutput, waitStop
 		return nil
 	}
 	if waitStopped {
-		if err := WaitWorkflowStopped(workflow.Name, c, logger); err != nil {
+		if err := WaitWorkflowStopped(workflow.Name, c, logger, tokens.GetWorkflowStatusToken); err != nil {
 			return err
 		}
 	}
@@ -591,18 +599,18 @@ func (c *Pipeline) changeWorkflowToStopped(workflow *GetWorkflowOutput, waitStop
 	return nil
 }
 
-func (c *Pipeline) changeWorkflowToStarted(workflow *GetWorkflowOutput, waitStarted bool) error {
+func (c *Pipeline) changeWorkflowToStarted(workflow *GetWorkflowOutput, waitStarted bool, tokens WorkflowTokens) error {
 	logger := base.NewDefaultLogger()
 	switch workflow.Status {
 	case base.WorkflowReady, base.WorkflowStopped:
-		if err := c.StartWorkflow(&StartWorkflowInput{WorkflowName: workflow.Name}); err != nil {
+		if err := c.StartWorkflow(&StartWorkflowInput{WorkflowName: workflow.Name, PandoraToken: tokens.StartWorkflowToken}); err != nil {
 			return err
 		}
 	case base.WorkflowStopping:
-		if err := WaitWorkflowStopped(workflow.Name, c, logger); err != nil {
+		if err := WaitWorkflowStopped(workflow.Name, c, logger, tokens.GetWorkflowStatusToken); err != nil {
 			return err
 		}
-		if err := c.StartWorkflow(&StartWorkflowInput{WorkflowName: workflow.Name}); err != nil {
+		if err := c.StartWorkflow(&StartWorkflowInput{WorkflowName: workflow.Name, PandoraToken: tokens.StartWorkflowToken}); err != nil {
 			return err
 		}
 	case base.WorkflowStarting:
@@ -614,7 +622,7 @@ func (c *Pipeline) changeWorkflowToStarted(workflow *GetWorkflowOutput, waitStar
 	}
 
 	if waitStarted {
-		if err := WaitWorkflowStarted(workflow.Name, c, logger); err != nil {
+		if err := WaitWorkflowStarted(workflow.Name, c, logger, tokens.GetWorkflowStatusToken); err != nil {
 			return err
 		}
 	}
@@ -633,7 +641,10 @@ func (c *Pipeline) InitOrUpdateWorkflow(input *InitOrUpdateWorkflowInput) error 
 		return fmt.Errorf("repo name can not be empty")
 	}
 	// 获取 repo
-	repo, err := c.GetRepo(&GetRepoInput{RepoName: input.RepoName})
+	repo, err := c.GetRepo(&GetRepoInput{
+		RepoName:     input.RepoName,
+		PandoraToken: input.PipelineGetRepoToken,
+	})
 	if err != nil && reqerr.IsNoSuchResourceError(err) {
 		// 如果 repo 不存在
 		var workflow *GetWorkflowOutput
@@ -641,11 +652,13 @@ func (c *Pipeline) InitOrUpdateWorkflow(input *InitOrUpdateWorkflowInput) error 
 			// 如果导出到 dag, 确保 workflow 存在, 不存在时创建
 			workflow, err = c.GetWorkflow(&GetWorkflowInput{
 				WorkflowName: input.WorkflowName,
+				PandoraToken: input.PipelineGetWorkflowToken,
 			})
 			if err != nil && reqerr.IsNoSuchWorkflow(err) {
 				if err = c.CreateWorkflow(&CreateWorkflowInput{
 					WorkflowName: input.WorkflowName,
 					Region:       input.Region,
+					PandoraToken: input.PipelineCreateWorkflowToken,
 				}); err != nil {
 					return err
 				}
@@ -656,24 +669,31 @@ func (c *Pipeline) InitOrUpdateWorkflow(input *InitOrUpdateWorkflowInput) error 
 		if len(input.Schema) != 0 {
 			// repo 不存在且传入了非空的 schema, 此时要新建 repo
 			if err := c.CreateRepo(&CreateRepoInput{
-				RepoName: input.RepoName,
-				Region:   input.Region,
-				Schema:   input.Schema,
-				Options:  input.RepoOptions,
-				Workflow: input.WorkflowName,
+				RepoName:     input.RepoName,
+				Region:       input.Region,
+				Schema:       input.Schema,
+				Options:      input.RepoOptions,
+				Workflow:     input.WorkflowName,
+				PandoraToken: input.PipelineCreateRepoToken,
 			}); err != nil {
 				if reqerr.IsWorkflowStatError(err) {
 					// 如果当前 workflow 的状态不允许更新，则先等待停止 workflow 再更新
-					if subErr := c.changeWorkflowToStopped(workflow, true); subErr != nil {
+					if subErr := c.changeWorkflowToStopped(workflow, true, WorkflowTokens{
+						StartWorkflowToken:     input.PipelineStartWorkflowToken,
+						StopWorkflowToken:      input.PipelineStopWorkflowToken,
+						GetWorkflowStatusToken: input.PipelineGetWorkflowStatusToken,
+					}); subErr != nil {
 						return subErr
 					}
 					if subErr := c.CreateRepo(&CreateRepoInput{
-						RepoName: input.RepoName,
-						Region:   input.Region,
-						Schema:   input.Schema,
-						Options:  input.RepoOptions,
-						Workflow: input.WorkflowName,
+						RepoName:     input.RepoName,
+						Region:       input.Region,
+						Schema:       input.Schema,
+						Options:      input.RepoOptions,
+						Workflow:     input.WorkflowName,
+						PandoraToken: input.PipelineCreateRepoToken,
 					}); subErr != nil {
+						log.Error("Create Pipeline Repo  error", subErr)
 						return subErr
 					}
 				} else {
@@ -683,22 +703,29 @@ func (c *Pipeline) InitOrUpdateWorkflow(input *InitOrUpdateWorkflowInput) error 
 			// 创建、更新各种导出
 			if input.Option != nil && input.Option.ToKODO {
 				if err := c.AutoExportToKODO(&input.Option.AutoExportToKODOInput); err != nil {
+					log.Error("AutoExportToKODO error", err)
 					return err
 				}
 			}
 			if input.Option != nil && input.Option.ToLogDB {
 				if err := c.AutoExportToLogDB(&input.Option.AutoExportToLogDBInput); err != nil {
+					log.Error("AutoExportToLogDB error", err)
 					return err
 				}
 			}
 			if input.Option != nil && input.Option.ToTSDB {
 				if err := c.AutoExportToTSDB(&input.Option.AutoExportToTSDBInput); err != nil {
+					log.Error("AutoExportToTSDB error", err)
 					return err
 				}
 			}
 		}
 		if input.WorkflowName != "" {
-			if err := c.changeWorkflowToStarted(workflow, false); err != nil {
+			if err := c.changeWorkflowToStarted(workflow, false, WorkflowTokens{
+				StartWorkflowToken:     input.PipelineStartWorkflowToken,
+				StopWorkflowToken:      input.PipelineStopWorkflowToken,
+				GetWorkflowStatusToken: input.PipelineGetWorkflowStatusToken,
+			}); err != nil {
 				if reqerr.IsWorkflowNoExecutableJob(err) {
 					return nil
 				}
@@ -715,22 +742,29 @@ func (c *Pipeline) InitOrUpdateWorkflow(input *InitOrUpdateWorkflowInput) error 
 		}
 		if needUpdate && input.SchemaFree {
 			updateRepoInput := &UpdateRepoInput{
-				RepoName:    input.RepoName,
-				Schema:      schemas,
-				Option:      input.Option,
-				workflow:    repo.Workflow,
-				RepoOptions: input.RepoOptions,
+				RepoName:             input.RepoName,
+				Schema:               schemas,
+				Option:               input.Option,
+				workflow:             repo.Workflow,
+				RepoOptions:          input.RepoOptions,
+				PandoraToken:         input.PipelineUpdateRepoToken,
+				PipelineGetRepoToken: input.PipelineGetRepoToken,
 			}
 			if err := c.UpdateRepo(updateRepoInput); err != nil {
 				if reqerr.IsWorkflowStatError(err) {
 					// 如果当前 workflow 的状态不允许更新，则先等待停止 workflow 再更新
 					workflow, subErr := c.GetWorkflow(&GetWorkflowInput{
 						WorkflowName: updateRepoInput.workflow,
+						PandoraToken: input.PipelineGetWorkflowToken,
 					})
 					if subErr != nil {
 						return subErr
 					}
-					if subErr := c.changeWorkflowToStopped(workflow, true); subErr != nil {
+					if subErr := c.changeWorkflowToStopped(workflow, true, WorkflowTokens{
+						StartWorkflowToken:     input.PipelineStartWorkflowToken,
+						StopWorkflowToken:      input.PipelineStopWorkflowToken,
+						GetWorkflowStatusToken: input.PipelineGetWorkflowStatusToken,
+					}); subErr != nil {
 						return subErr
 					}
 					if subErr = c.UpdateRepo(updateRepoInput); subErr != nil {
@@ -745,11 +779,18 @@ func (c *Pipeline) InitOrUpdateWorkflow(input *InitOrUpdateWorkflowInput) error 
 		}
 		// 如果 repo 已经存在, repo 本身的 fromDag 字段就表明了是否来自workflow
 		if repo.FromDag {
-			workflow, err := c.GetWorkflow(&GetWorkflowInput{WorkflowName: repo.Workflow})
+			workflow, err := c.GetWorkflow(&GetWorkflowInput{
+				WorkflowName: repo.Workflow,
+				PandoraToken: input.PipelineGetWorkflowToken,
+			})
 			if err != nil {
 				return err
 			}
-			if err := c.changeWorkflowToStarted(workflow, false); err != nil {
+			if err := c.changeWorkflowToStarted(workflow, false, WorkflowTokens{
+				StartWorkflowToken:     input.PipelineStartWorkflowToken,
+				StopWorkflowToken:      input.PipelineStopWorkflowToken,
+				GetWorkflowStatusToken: input.PipelineGetWorkflowStatusToken,
+			}); err != nil {
 				if reqerr.IsWorkflowNoExecutableJob(err) {
 					return nil
 				}
@@ -928,7 +969,8 @@ func getDefault(t RepoSchemaEntry) (result interface{}) {
 
 func (c *Pipeline) getSchemaSorted(input *UpdateRepoInput) (err error) {
 	repo, err := c.GetRepo(&GetRepoInput{
-		RepoName: input.RepoName,
+		RepoName:     input.RepoName,
+		PandoraToken: input.PipelineGetRepoToken,
 	})
 	if err != nil {
 		return
