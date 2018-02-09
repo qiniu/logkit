@@ -9,12 +9,9 @@ import (
 	"strings"
 
 	"github.com/qiniu/pandora-go-sdk/base"
+	. "github.com/qiniu/pandora-go-sdk/base/models"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 )
-
-type LogdbToken struct {
-	Token string `json:"-"`
-}
 
 const (
 	schemaKeyPattern = "^[a-zA-Z_][a-zA-Z0-9_]{0,127}$"
@@ -130,7 +127,7 @@ func (e *RepoSchemaEntry) Validate() (err error) {
 }
 
 type CreateRepoDSLInput struct {
-	LogdbToken
+	PandoraToken
 	RepoName  string
 	Region    string `json:"region"`
 	Retention string `json:"retention"`
@@ -389,13 +386,19 @@ func getFormatDSL(schemas []RepoSchemaEntry, depth int, indent string) (dsl stri
 	return
 }
 
+type fullText struct {
+	Enabled  bool   `json:"enabled"`
+	Analyzer string `json:"analyzer"`
+}
+
 type CreateRepoInput struct {
-	LogdbToken
+	PandoraToken
 	RepoName     string
 	Region       string            `json:"region"`
 	Retention    string            `json:"retention"`
 	Schema       []RepoSchemaEntry `json:"schema"`
 	PrimaryField string            `json:"primaryField"`
+	FullText     fullText          `json:"fullText"`
 }
 
 func (r *CreateRepoInput) Validate() (err error) {
@@ -438,7 +441,7 @@ func checkRetention(retention string) error {
 }
 
 type UpdateRepoInput struct {
-	LogdbToken
+	PandoraToken
 	RepoName  string
 	Retention string            `json:"retention"`
 	Schema    []RepoSchemaEntry `json:"schema"`
@@ -461,7 +464,7 @@ func (r *UpdateRepoInput) Validate() (err error) {
 }
 
 type GetRepoInput struct {
-	LogdbToken
+	PandoraToken
 	RepoName string
 }
 
@@ -472,19 +475,21 @@ type GetRepoOutput struct {
 	PrimaryField string            `json:"primaryField"`
 	CreateTime   string            `json:"createTime"`
 	UpdateTime   string            `json:"updateTime"`
+	FullText     fullText          `json:"fullText"`
 }
 
 type RepoDesc struct {
-	RepoName     string `json:"name"`
-	Region       string `json:"region"`
-	PrimaryField string `json:"primaryField"`
-	Retention    string `json:"retention"`
-	CreateTime   string `json:"createTime"`
-	UpdateTime   string `json:"updateTime"`
+	RepoName     string   `json:"name"`
+	Region       string   `json:"region"`
+	PrimaryField string   `json:"primaryField"`
+	Retention    string   `json:"retention"`
+	CreateTime   string   `json:"createTime"`
+	UpdateTime   string   `json:"updateTime"`
+	FullText     fullText `json:"fullText"`
 }
 
 type ListReposInput struct {
-	LogdbToken
+	PandoraToken
 }
 
 type ListReposOutput struct {
@@ -492,7 +497,7 @@ type ListReposOutput struct {
 }
 
 type DeleteRepoInput struct {
-	LogdbToken
+	PandoraToken
 	RepoName string
 }
 
@@ -509,7 +514,7 @@ func (ls Logs) Buf() (buf []byte, err error) {
 }
 
 type SendLogInput struct {
-	LogdbToken
+	PandoraToken
 	RepoName       string `json:"-"`
 	OmitInvalidLog bool   `json:"-"`
 	Logs           Logs
@@ -522,7 +527,7 @@ type SendLogOutput struct {
 }
 
 type SchemaRefInput struct {
-	LogdbToken
+	PandoraToken
 	SampleData map[string]interface{} `json:"sample_data"`
 }
 
@@ -549,7 +554,7 @@ func (h *Highlight) Validate() error {
 }
 
 type QueryLogInput struct {
-	LogdbToken
+	PandoraToken
 	RepoName  string
 	Query     string
 	Sort      string
@@ -560,7 +565,7 @@ type QueryLogInput struct {
 }
 
 type QueryScrollInput struct {
-	LogdbToken
+	PandoraToken
 	RepoName string `json:"-"`
 	ScrollId string `json:"scroll_id"`
 	Scroll   string `json:"scroll"`
@@ -582,7 +587,7 @@ type QueryLogOutput struct {
 }
 
 type QueryHistogramLogInput struct {
-	LogdbToken
+	PandoraToken
 	RepoName string
 	Query    string
 	Field    string
@@ -602,7 +607,7 @@ type QueryHistogramLogOutput struct {
 }
 
 type PutRepoConfigInput struct {
-	LogdbToken
+	PandoraToken
 	RepoName      string
 	TimeFieldName string `json:"timeFieldName"`
 }
@@ -612,7 +617,7 @@ func (r *PutRepoConfigInput) Validate() (err error) {
 }
 
 type GetRepoConfigInput struct {
-	LogdbToken
+	PandoraToken
 	RepoName string
 }
 
@@ -621,7 +626,7 @@ type GetRepoConfigOutput struct {
 }
 
 type PartialQueryInput struct {
-	LogdbToken
+	PandoraToken
 	RepoName  string `json:"-"`
 	StartTime int64  `json:"startTime"`
 	EndTime   int64  `json:"endTime"`

@@ -9,7 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"reflect"
+
+	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base"
+	"github.com/qiniu/pandora-go-sdk/base/models"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 	"github.com/qiniu/pandora-go-sdk/base/request"
 	"github.com/qiniu/pandora-go-sdk/logdb"
@@ -22,7 +26,7 @@ const (
 )
 
 func (c *Pipeline) CreateGroup(input *CreateGroupInput) (err error) {
-	op := c.newOperation(base.OpCreateGroup, input.GroupName)
+	op := c.NewOperation(base.OpCreateGroup, input.GroupName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input); err != nil {
@@ -33,7 +37,7 @@ func (c *Pipeline) CreateGroup(input *CreateGroupInput) (err error) {
 }
 
 func (c *Pipeline) UpdateGroup(input *UpdateGroupInput) (err error) {
-	op := c.newOperation(base.OpUpdateGroup, input.GroupName)
+	op := c.NewOperation(base.OpUpdateGroup, input.GroupName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input); err != nil {
@@ -44,21 +48,21 @@ func (c *Pipeline) UpdateGroup(input *UpdateGroupInput) (err error) {
 }
 
 func (c *Pipeline) StartGroupTask(input *StartGroupTaskInput) (err error) {
-	op := c.newOperation(base.OpStartGroupTask, input.GroupName)
+	op := c.NewOperation(base.OpStartGroupTask, input.GroupName)
 
 	req := c.newRequest(op, input.Token, nil)
 	return req.Send()
 }
 
 func (c *Pipeline) StopGroupTask(input *StopGroupTaskInput) (err error) {
-	op := c.newOperation(base.OpStopGroupTask, input.GroupName)
+	op := c.NewOperation(base.OpStopGroupTask, input.GroupName)
 
 	req := c.newRequest(op, input.Token, nil)
 	return req.Send()
 }
 
 func (c *Pipeline) ListGroups(input *ListGroupsInput) (output *ListGroupsOutput, err error) {
-	op := c.newOperation(base.OpListGroups)
+	op := c.NewOperation(base.OpListGroups)
 
 	output = &ListGroupsOutput{}
 	req := c.newRequest(op, input.Token, &output)
@@ -66,7 +70,7 @@ func (c *Pipeline) ListGroups(input *ListGroupsInput) (output *ListGroupsOutput,
 }
 
 func (c *Pipeline) GetGroup(input *GetGroupInput) (output *GetGroupOutput, err error) {
-	op := c.newOperation(base.OpGetGroup, input.GroupName)
+	op := c.NewOperation(base.OpGetGroup, input.GroupName)
 
 	output = &GetGroupOutput{}
 	req := c.newRequest(op, input.Token, &output)
@@ -74,14 +78,14 @@ func (c *Pipeline) GetGroup(input *GetGroupInput) (output *GetGroupOutput, err e
 }
 
 func (c *Pipeline) DeleteGroup(input *DeleteGroupInput) (err error) {
-	op := c.newOperation(base.OpDeleteGroup, input.GroupName)
+	op := c.NewOperation(base.OpDeleteGroup, input.GroupName)
 
 	req := c.newRequest(op, input.Token, nil)
 	return req.Send()
 }
 
 func (c *Pipeline) CreateRepo(input *CreateRepoInput) (err error) {
-	op := c.newOperation(base.OpCreateRepo, input.RepoName)
+	op := c.NewOperation(base.OpCreateRepo, input.RepoName)
 	req := c.newRequest(op, input.Token, nil)
 	if input.Region == "" {
 		input.Region = c.defaultRegion
@@ -99,13 +103,13 @@ func (c *Pipeline) CreateRepoFromDSL(input *CreateRepoDSLInput) (err error) {
 		return
 	}
 	return c.CreateRepo(&CreateRepoInput{
-		PipelineToken: input.PipelineToken,
-		RepoName:      input.RepoName,
-		Region:        input.Region,
-		GroupName:     input.GroupName,
-		Schema:        schemas,
-		Options:       input.Options,
-		Workflow:      input.Workflow,
+		PandoraToken: input.PandoraToken,
+		RepoName:     input.RepoName,
+		Region:       input.Region,
+		GroupName:    input.GroupName,
+		Schema:       schemas,
+		Options:      input.Options,
+		Workflow:     input.Workflow,
 	})
 }
 
@@ -118,26 +122,60 @@ func (c *Pipeline) UpdateRepoWithTSDB(input *UpdateRepoInput, ex ExportDesc) err
 	if !ok {
 		return fmt.Errorf("export tsdb spec series assert error %v is not string", ex.Spec["series"])
 	}
-	tags, ok := ex.Spec["tags"].(map[string]string)
-	if !ok {
-		return fmt.Errorf("export tsdb spec tags assert error %v is not map[string]interface{}", ex.Spec["tags"])
+	tagsi := ex.Spec["tags"]
+	tags, ok := tagsi.(map[string]interface{})
+	if !ok && tagsi != nil {
+		var typeis string
+		if tagsi != nil {
+			typeis = reflect.TypeOf(tagsi).String()
+		} else {
+			typeis = "null"
+		}
+		return fmt.Errorf("export tsdb spec tags assert error %v is not map[string]interface{}, but %v", ex.Spec["tags"], typeis)
 	}
-	fields, ok := ex.Spec["fields"].(map[string]string)
+	newtags := make(map[string]string)
+	for k, v := range tags {
+		nk, ok := v.(string)
+		if ok {
+			newtags[k] = nk
+		} else {
+			newtags[k] = "#" + k
+		}
+	}
+
+	fields, ok := ex.Spec["fields"].(map[string]interface{})
 	if !ok {
 		return fmt.Errorf("export tsdb spec fields assert error %v is not map[string]interface{}", ex.Spec["fields"])
 	}
-	for _, v := range input.Schema {
-		if input.IsTag(v.Key) {
-			tags[v.Key] = v.Key
+	newfields := make(map[string]string)
+	for k, v := range fields {
+		nk, ok := v.(string)
+		if ok {
+			newfields[k] = nk
 		} else {
-			fields[v.Key] = v.Key
+			newfields[k] = "#" + k
 		}
 	}
-	spec := ExportTsdbSpec{DestRepoName: repoName, SeriesName: seriesName, Tags: tags, Fields: fields}
+
+	for _, v := range input.Schema {
+		if input.IsTag(v.Key) {
+			newtags[v.Key] = "#" + v.Key
+		} else {
+			newfields[v.Key] = "#" + v.Key
+		}
+	}
+	spec := &ExportTsdbSpec{DestRepoName: repoName, SeriesName: seriesName, Tags: newtags, Fields: newfields}
+
+	seriesUpdateExportToken, ok := input.Option.AutoExportTSDBTokens.UpdateExportToken[ex.Name]
+	if !ok {
+		seriesUpdateExportToken = models.PandoraToken{}
+	}
+
 	err := c.UpdateExport(&UpdateExportInput{
-		RepoName:   input.RepoName,
-		ExportName: ex.Name,
-		Spec:       spec,
+		RepoName:     input.RepoName,
+		ExportName:   ex.Name,
+		Spec:         spec,
+		PandoraToken: seriesUpdateExportToken,
 	})
 	if reqerr.IsExportRemainUnchanged(err) {
 		err = nil
@@ -170,7 +208,10 @@ func (c *Pipeline) UpdateRepoWithLogDB(input *UpdateRepoInput, ex ExportDesc) er
 	if err != nil {
 		return err
 	}
-	repoInfo, err := logdbAPI.GetRepo(&logdb.GetRepoInput{RepoName: repoName})
+	repoInfo, err := logdbAPI.GetRepo(&logdb.GetRepoInput{
+		RepoName:     repoName,
+		PandoraToken: input.Option.AutoExportLogDBTokens.GetLogDBRepoToken,
+	})
 	if err != nil {
 		return err
 	}
@@ -188,17 +229,19 @@ func (c *Pipeline) UpdateRepoWithLogDB(input *UpdateRepoInput, ex ExportDesc) er
 		}
 	}
 	if err = logdbAPI.UpdateRepo(&logdb.UpdateRepoInput{
-		RepoName:  repoName,
-		Retention: repoInfo.Retention,
-		Schema:    repoInfo.Schema,
+		RepoName:     repoName,
+		Retention:    repoInfo.Retention,
+		Schema:       repoInfo.Schema,
+		PandoraToken: input.Option.AutoExportLogDBTokens.UpdateLogDBRepoToken,
 	}); err != nil {
 		return err
 	}
 	spec := &ExportLogDBSpec{DestRepoName: repoName, Doc: docs}
 	err = c.UpdateExport(&UpdateExportInput{
-		RepoName:   input.RepoName,
-		ExportName: ex.Name,
-		Spec:       spec,
+		RepoName:     input.RepoName,
+		ExportName:   ex.Name,
+		Spec:         spec,
+		PandoraToken: input.Option.AutoExportLogDBTokens.UpdateExportToken,
 	})
 	if reqerr.IsExportRemainUnchanged(err) {
 		err = nil
@@ -207,23 +250,74 @@ func (c *Pipeline) UpdateRepoWithLogDB(input *UpdateRepoInput, ex ExportDesc) er
 }
 
 func (c *Pipeline) UpdateRepoWithKodo(input *UpdateRepoInput, ex ExportDesc) error {
-	repoName, ok := ex.Spec["bucket"].(string)
+	bucketName, ok := ex.Spec["bucket"].(string)
 	if !ok {
-		return fmt.Errorf("export logdb spec destRepoName assert error %v is not string", ex.Spec["destRepoName"])
+		return fmt.Errorf("export kodo spec bucketName assert error %v is not string", ex.Spec["bucket"])
 	}
-	docs, ok := ex.Spec["fields"].(map[string]interface{})
+	fields, ok := ex.Spec["fields"].(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("export logdb spec doc assert error %v is not map[string]interface{}", ex.Spec["doc"])
+		return fmt.Errorf("export kodo spec fields assert error %v is not map[string]interface{}", ex.Spec["fields"])
 	}
-	for _, v := range input.Schema {
-		docs[v.Key] = "#" + v.Key
+	ak, ok := ex.Spec["accessKey"].(string)
+	if !ok {
+		return fmt.Errorf("export kodo spec accessKey assert error %v is not string", ex.Spec["accessKey"])
+	}
+	retention, ok := ex.Spec["retention"].(float64)
+	if !ok {
+		var typeis string
+		if ex.Spec["retention"] != nil {
+			typeis = reflect.TypeOf(ex.Spec["retention"]).Name()
+		} else {
+			typeis = "null"
+		}
+		return fmt.Errorf("export kodo spec retention assert error %v is not int, but %V", ex.Spec["retention"], typeis)
+	}
+	compress, ok := ex.Spec["compress"].(bool)
+	if !ok {
+		return fmt.Errorf("export kodo spec compress assert error %v is not bool", ex.Spec["compress"])
+	}
+	email, ok := ex.Spec["email"].(string)
+	if !ok {
+		return fmt.Errorf("export kodo spec email assert error %v is not string", ex.Spec["email"])
+	}
+	format, ok := ex.Spec["format"].(string)
+	if !ok {
+		return fmt.Errorf("export kodo spec format assert error %v is not string", ex.Spec["format"])
+	}
+	keyPrefix, ok := ex.Spec["keyPrefix"].(string)
+	if !ok {
+		return fmt.Errorf("export kodo spec keyPrefix assert error %v is not string", ex.Spec["keyPrefix"])
 	}
 
-	spec := &ExportLogDBSpec{DestRepoName: repoName, Doc: docs}
+	newfields := make(map[string]string)
+	for k, v := range fields {
+		nk, ok := v.(string)
+		if ok {
+			newfields[k] = nk
+		} else {
+			newfields[k] = "#" + k
+		}
+	}
+
+	for _, v := range input.Schema {
+		newfields[v.Key] = "#" + v.Key
+	}
+
+	spec := &ExportKodoSpec{
+		Bucket:    bucketName,
+		Fields:    newfields,
+		AccessKey: ak,
+		Retention: int(retention),
+		Compress:  compress,
+		Email:     email,
+		Format:    format,
+		KeyPrefix: keyPrefix,
+	}
 	err := c.UpdateExport(&UpdateExportInput{
-		RepoName:   input.RepoName,
-		ExportName: ex.Name,
-		Spec:       spec,
+		RepoName:     input.RepoName,
+		ExportName:   ex.Name,
+		Spec:         spec,
+		PandoraToken: input.Option.AutoExportToKODOInput.UpdateExportToken,
 	})
 	if reqerr.IsExportRemainUnchanged(err) {
 		err = nil
@@ -247,8 +341,19 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 	if !option.ToLogDB && !option.ToTSDB && !option.ToKODO {
 		return nil
 	}
+	var listExportToken models.PandoraToken
+	if option.ToLogDB {
+		listExportToken = option.AutoExportLogDBTokens.ListExportToken
+	}
+	if option.ToTSDB {
+		listExportToken = option.AutoExportTSDBTokens.ListExportToken
+	}
+	if option.ToKODO {
+		listExportToken = option.AutoExportKodoTokens.ListExportToken
+	}
 	exports, err := c.ListExports(&ListExportsInput{
-		RepoName: input.RepoName,
+		RepoName:     input.RepoName,
+		PandoraToken: listExportToken,
 	})
 	if err != nil {
 		return
@@ -303,6 +408,7 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 			}
 			err = c.UpdateRepoWithKodo(input, ex)
 			if err != nil {
+				log.Error("UpdateRepoWithKodo err: ", input, ex, err)
 				return
 			}
 		} else {
@@ -316,7 +422,7 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 }
 
 func (c *Pipeline) updateRepo(input *UpdateRepoInput) (err error) {
-	op := c.newOperation(base.OpUpdateRepo, input.RepoName)
+	op := c.NewOperation(base.OpUpdateRepo, input.RepoName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input); err != nil {
@@ -327,7 +433,7 @@ func (c *Pipeline) updateRepo(input *UpdateRepoInput) (err error) {
 }
 
 func (c *Pipeline) GetRepo(input *GetRepoInput) (output *GetRepoOutput, err error) {
-	op := c.newOperation(base.OpGetRepo, input.RepoName)
+	op := c.NewOperation(base.OpGetRepo, input.RepoName)
 
 	output = &GetRepoOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -335,7 +441,7 @@ func (c *Pipeline) GetRepo(input *GetRepoInput) (output *GetRepoOutput, err erro
 }
 
 func (c *Pipeline) GetSampleData(input *GetSampleDataInput) (output *SampleDataOutput, err error) {
-	op := c.newOperation(base.OpGetSampleData, input.RepoName, input.Count)
+	op := c.NewOperation(base.OpGetSampleData, input.RepoName, input.Count)
 
 	output = &SampleDataOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -345,9 +451,9 @@ func (c *Pipeline) GetSampleData(input *GetSampleDataInput) (output *SampleDataO
 func (c *Pipeline) ListRepos(input *ListReposInput) (output *ListReposOutput, err error) {
 	var op *request.Operation
 	if input.WithDag {
-		op = c.newOperation(base.OpListReposWithDag)
+		op = c.NewOperation(base.OpListReposWithDag)
 	} else {
-		op = c.newOperation(base.OpListRepos)
+		op = c.NewOperation(base.OpListRepos)
 	}
 	output = &ListReposOutput{}
 	req := c.newRequest(op, input.Token, &output)
@@ -355,14 +461,14 @@ func (c *Pipeline) ListRepos(input *ListReposInput) (output *ListReposOutput, er
 }
 
 func (c *Pipeline) DeleteRepo(input *DeleteRepoInput) (err error) {
-	op := c.newOperation(base.OpDeleteRepo, input.RepoName)
+	op := c.NewOperation(base.OpDeleteRepo, input.RepoName)
 
 	req := c.newRequest(op, input.Token, nil)
 	return req.Send()
 }
 
 func (c *Pipeline) PostData(input *PostDataInput) (err error) {
-	op := c.newOperation(base.OpPostData, input.RepoName)
+	op := c.NewOperation(base.OpPostData, input.RepoName)
 
 	req := c.newRequest(op, input.Token, nil)
 	req.SetBufferBody(input.Points.Buffer())
@@ -440,12 +546,13 @@ func (c *Pipeline) unpack(input *SchemaFreeInput) (packages []pointContext, err 
 	var start = 0
 	for i, d := range input.Datas {
 		point, err := c.generatePoint(d, &InitOrUpdateWorkflowInput{
-			SchemaFree:   !input.NoUpdate,
-			Region:       input.Region,
-			RepoName:     input.RepoName,
-			WorkflowName: input.WorkflowName,
-			RepoOptions:  input.RepoOptions,
-			Option:       input.Option,
+			SchemaFree:      !input.NoUpdate,
+			Region:          input.Region,
+			RepoName:        input.RepoName,
+			WorkflowName:    input.WorkflowName,
+			RepoOptions:     input.RepoOptions,
+			Option:          input.Option,
+			SchemaFreeToken: input.SchemaFreeToken,
 		})
 		if err != nil {
 			return nil, err
@@ -472,8 +579,9 @@ func (c *Pipeline) unpack(input *SchemaFreeInput) (packages []pointContext, err 
 	packages = append(packages, pointContext{
 		datas: input.Datas[start:],
 		inputs: &PostDataFromBytesInput{
-			RepoName: input.RepoName,
-			Buffer:   tmpBuff,
+			RepoName:     input.RepoName,
+			Buffer:       tmpBuff,
+			PandoraToken: input.PipelinePostDataToken,
 		},
 	})
 	return
@@ -527,7 +635,7 @@ func (c *Pipeline) PostDataSchemaFree(input *SchemaFreeInput) (newSchemas map[st
 }
 
 func (c *Pipeline) PostDataFromFile(input *PostDataFromFileInput) (err error) {
-	op := c.newOperation(base.OpPostData, input.RepoName)
+	op := c.NewOperation(base.OpPostData, input.RepoName)
 
 	req := c.newRequest(op, input.Token, nil)
 	file, err := os.Open(input.FilePath)
@@ -548,7 +656,7 @@ func (c *Pipeline) PostDataFromFile(input *PostDataFromFileInput) (err error) {
 }
 
 func (c *Pipeline) PostDataFromReader(input *PostDataFromReaderInput) (err error) {
-	op := c.newOperation(base.OpPostData, input.RepoName)
+	op := c.NewOperation(base.OpPostData, input.RepoName)
 
 	req := c.newRequest(op, input.Token, nil)
 	req.SetReaderBody(input.Reader)
@@ -560,7 +668,7 @@ func (c *Pipeline) PostDataFromReader(input *PostDataFromReaderInput) (err error
 }
 
 func (c *Pipeline) PostDataFromBytes(input *PostDataFromBytesInput) (err error) {
-	op := c.newOperation(base.OpPostData, input.RepoName)
+	op := c.NewOperation(base.OpPostData, input.RepoName)
 
 	req := c.newRequest(op, input.Token, nil)
 	req.SetBufferBody(input.Buffer)
@@ -571,7 +679,7 @@ func (c *Pipeline) PostDataFromBytes(input *PostDataFromBytesInput) (err error) 
 }
 
 func (c *Pipeline) PostDataFromBytesWithDeadline(input *PostDataFromBytesInput, deadline time.Time) (err error) {
-	op := c.newOperation(base.OpPostData, input.RepoName)
+	op := c.NewOperation(base.OpPostData, input.RepoName)
 
 	req := c.newRequest(op, input.Token, nil)
 	req.SetBufferBody(input.Buffer)
@@ -586,7 +694,7 @@ func (c *Pipeline) PostDataFromBytesWithDeadline(input *PostDataFromBytesInput, 
 }
 
 func (c *Pipeline) UploadPlugin(input *UploadPluginInput) (err error) {
-	op := c.newOperation(base.OpUploadPlugin, input.PluginName)
+	op := c.NewOperation(base.OpUploadPlugin, input.PluginName)
 
 	req := c.newRequest(op, input.Token, nil)
 	req.EnableContentMD5d()
@@ -596,7 +704,7 @@ func (c *Pipeline) UploadPlugin(input *UploadPluginInput) (err error) {
 }
 
 func (c *Pipeline) UploadPluginFromFile(input *UploadPluginFromFileInput) (err error) {
-	op := c.newOperation(base.OpUploadPlugin, input.PluginName)
+	op := c.NewOperation(base.OpUploadPlugin, input.PluginName)
 
 	req := c.newRequest(op, input.Token, nil)
 	req.EnableContentMD5d()
@@ -612,7 +720,7 @@ func (c *Pipeline) UploadPluginFromFile(input *UploadPluginFromFileInput) (err e
 }
 
 func (c *Pipeline) ListPlugins(input *ListPluginsInput) (output *ListPluginsOutput, err error) {
-	op := c.newOperation(base.OpListPlugins)
+	op := c.NewOperation(base.OpListPlugins)
 
 	output = &ListPluginsOutput{}
 	req := c.newRequest(op, input.Token, &output)
@@ -623,7 +731,7 @@ func (c *Pipeline) ListPlugins(input *ListPluginsInput) (output *ListPluginsOutp
 }
 
 func (c *Pipeline) VerifyPlugin(input *VerifyPluginInput) (output *VerifyPluginOutput, err error) {
-	op := c.newOperation(base.OpVerifyPlugin, input.PluginName)
+	op := c.NewOperation(base.OpVerifyPlugin, input.PluginName)
 
 	output = &VerifyPluginOutput{}
 	req := c.newRequest(op, input.Token, &output)
@@ -631,7 +739,7 @@ func (c *Pipeline) VerifyPlugin(input *VerifyPluginInput) (output *VerifyPluginO
 }
 
 func (c *Pipeline) GetPlugin(input *GetPluginInput) (output *GetPluginOutput, err error) {
-	op := c.newOperation(base.OpGetPlugin, input.PluginName)
+	op := c.NewOperation(base.OpGetPlugin, input.PluginName)
 
 	output = &GetPluginOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -642,14 +750,14 @@ func (c *Pipeline) GetPlugin(input *GetPluginInput) (output *GetPluginOutput, er
 }
 
 func (c *Pipeline) DeletePlugin(input *DeletePluginInput) (err error) {
-	op := c.newOperation(base.OpDeletePlugin, input.PluginName)
+	op := c.NewOperation(base.OpDeletePlugin, input.PluginName)
 
 	req := c.newRequest(op, input.Token, nil)
 	return req.Send()
 }
 
 func (c *Pipeline) CreateTransform(input *CreateTransformInput) (err error) {
-	op := c.newOperation(base.OpCreateTransform, input.SrcRepoName, input.TransformName, input.DestRepoName)
+	op := c.NewOperation(base.OpCreateTransform, input.SrcRepoName, input.TransformName, input.DestRepoName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input.Spec); err != nil {
@@ -660,7 +768,7 @@ func (c *Pipeline) CreateTransform(input *CreateTransformInput) (err error) {
 }
 
 func (c *Pipeline) UpdateTransform(input *UpdateTransformInput) (err error) {
-	op := c.newOperation(base.OpUpdateTransform, input.SrcRepoName, input.TransformName)
+	op := c.NewOperation(base.OpUpdateTransform, input.SrcRepoName, input.TransformName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input.Spec); err != nil {
@@ -671,7 +779,7 @@ func (c *Pipeline) UpdateTransform(input *UpdateTransformInput) (err error) {
 }
 
 func (c *Pipeline) ListTransforms(input *ListTransformsInput) (output *ListTransformsOutput, err error) {
-	op := c.newOperation(base.OpListTransforms, input.RepoName)
+	op := c.NewOperation(base.OpListTransforms, input.RepoName)
 
 	output = &ListTransformsOutput{}
 	req := c.newRequest(op, input.Token, &output)
@@ -679,7 +787,7 @@ func (c *Pipeline) ListTransforms(input *ListTransformsInput) (output *ListTrans
 }
 
 func (c *Pipeline) GetTransform(input *GetTransformInput) (output *GetTransformOutput, err error) {
-	op := c.newOperation(base.OpGetTransform, input.RepoName, input.TransformName)
+	op := c.NewOperation(base.OpGetTransform, input.RepoName, input.TransformName)
 
 	output = &GetTransformOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -687,14 +795,14 @@ func (c *Pipeline) GetTransform(input *GetTransformInput) (output *GetTransformO
 }
 
 func (c *Pipeline) DeleteTransform(input *DeleteTransformInput) (err error) {
-	op := c.newOperation(base.OpDeleteTransform, input.RepoName, input.TransformName)
+	op := c.NewOperation(base.OpDeleteTransform, input.RepoName, input.TransformName)
 
 	req := c.newRequest(op, input.Token, nil)
 	return req.Send()
 }
 
 func (c *Pipeline) CreateExport(input *CreateExportInput) (err error) {
-	op := c.newOperation(base.OpCreateExport, input.RepoName, input.ExportName)
+	op := c.NewOperation(base.OpCreateExport, input.RepoName, input.ExportName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input); err != nil {
@@ -705,7 +813,7 @@ func (c *Pipeline) CreateExport(input *CreateExportInput) (err error) {
 }
 
 func (c *Pipeline) UpdateExport(input *UpdateExportInput) (err error) {
-	op := c.newOperation(base.OpUpdateExport, input.RepoName, input.ExportName)
+	op := c.NewOperation(base.OpUpdateExport, input.RepoName, input.ExportName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input); err != nil {
@@ -716,7 +824,7 @@ func (c *Pipeline) UpdateExport(input *UpdateExportInput) (err error) {
 }
 
 func (c *Pipeline) ListExports(input *ListExportsInput) (output *ListExportsOutput, err error) {
-	op := c.newOperation(base.OpListExports, input.RepoName)
+	op := c.NewOperation(base.OpListExports, input.RepoName)
 
 	output = &ListExportsOutput{}
 	req := c.newRequest(op, input.Token, &output)
@@ -724,7 +832,7 @@ func (c *Pipeline) ListExports(input *ListExportsInput) (output *ListExportsOutp
 }
 
 func (c *Pipeline) GetExport(input *GetExportInput) (output *GetExportOutput, err error) {
-	op := c.newOperation(base.OpGetExport, input.RepoName, input.ExportName)
+	op := c.NewOperation(base.OpGetExport, input.RepoName, input.ExportName)
 
 	output = &GetExportOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -732,14 +840,14 @@ func (c *Pipeline) GetExport(input *GetExportInput) (output *GetExportOutput, er
 }
 
 func (c *Pipeline) DeleteExport(input *DeleteExportInput) (err error) {
-	op := c.newOperation(base.OpDeleteExport, input.RepoName, input.ExportName)
+	op := c.NewOperation(base.OpDeleteExport, input.RepoName, input.ExportName)
 
 	req := c.newRequest(op, input.Token, nil)
 	return req.Send()
 }
 
 func (c *Pipeline) CreateDatasource(input *CreateDatasourceInput) (err error) {
-	op := c.newOperation(base.OpCreateDatasource, input.DatasourceName)
+	op := c.NewOperation(base.OpCreateDatasource, input.DatasourceName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input); err != nil {
@@ -750,7 +858,7 @@ func (c *Pipeline) CreateDatasource(input *CreateDatasourceInput) (err error) {
 }
 
 func (c *Pipeline) ListDatasources() (output *ListDatasourcesOutput, err error) {
-	op := c.newOperation(base.OpListDatasources)
+	op := c.NewOperation(base.OpListDatasources)
 
 	output = &ListDatasourcesOutput{}
 	req := c.newRequest(op, "", &output)
@@ -758,7 +866,7 @@ func (c *Pipeline) ListDatasources() (output *ListDatasourcesOutput, err error) 
 }
 
 func (c *Pipeline) GetDatasource(input *GetDatasourceInput) (output *GetDatasourceOutput, err error) {
-	op := c.newOperation(base.OpGetDatasource, input.DatasourceName)
+	op := c.NewOperation(base.OpGetDatasource, input.DatasourceName)
 
 	output = &GetDatasourceOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -766,14 +874,14 @@ func (c *Pipeline) GetDatasource(input *GetDatasourceInput) (output *GetDatasour
 }
 
 func (c *Pipeline) DeleteDatasource(input *DeleteDatasourceInput) (err error) {
-	op := c.newOperation(base.OpDeleteDatasource, input.DatasourceName)
+	op := c.NewOperation(base.OpDeleteDatasource, input.DatasourceName)
 
 	req := c.newRequest(op, input.Token, nil)
 	return req.Send()
 }
 
 func (c *Pipeline) CreateJob(input *CreateJobInput) (err error) {
-	op := c.newOperation(base.OpCreateJob, input.JobName)
+	op := c.NewOperation(base.OpCreateJob, input.JobName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input); err != nil {
@@ -795,7 +903,7 @@ func (c *Pipeline) ListJobs(input *ListJobsInput) (output *ListJobsOutput, err e
 	if len(values) != 0 {
 		query = "?" + values.Encode()
 	}
-	op := c.newOperation(base.OpListJobs, query)
+	op := c.NewOperation(base.OpListJobs, query)
 
 	output = &ListJobsOutput{}
 	req := c.newRequest(op, "", &output)
@@ -803,7 +911,7 @@ func (c *Pipeline) ListJobs(input *ListJobsInput) (output *ListJobsOutput, err e
 }
 
 func (c *Pipeline) GetJob(input *GetJobInput) (output *GetJobOutput, err error) {
-	op := c.newOperation(base.OpGetJob, input.JobName)
+	op := c.NewOperation(base.OpGetJob, input.JobName)
 
 	output = &GetJobOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -811,14 +919,14 @@ func (c *Pipeline) GetJob(input *GetJobInput) (output *GetJobOutput, err error) 
 }
 
 func (c *Pipeline) DeleteJob(input *DeleteJobInput) (err error) {
-	op := c.newOperation(base.OpDeleteJob, input.JobName)
+	op := c.NewOperation(base.OpDeleteJob, input.JobName)
 
 	req := c.newRequest(op, input.Token, nil)
 	return req.Send()
 }
 
 func (c *Pipeline) StartJob(input *StartJobInput) (err error) {
-	op := c.newOperation(base.OpStartJob, input.JobName)
+	op := c.NewOperation(base.OpStartJob, input.JobName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input); err != nil {
@@ -829,7 +937,7 @@ func (c *Pipeline) StartJob(input *StartJobInput) (err error) {
 }
 
 func (c *Pipeline) GetJobHistory(input *GetJobHistoryInput) (output *GetJobHistoryOutput, err error) {
-	op := c.newOperation(base.OpGetJobHistory, input.JobName)
+	op := c.NewOperation(base.OpGetJobHistory, input.JobName)
 
 	output = &GetJobHistoryOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -840,14 +948,14 @@ func (c *Pipeline) GetJobHistory(input *GetJobHistoryInput) (output *GetJobHisto
 }
 
 func (c *Pipeline) StopJob(input *StopJobInput) (err error) {
-	op := c.newOperation(base.OpStopJob, input.JobName)
+	op := c.NewOperation(base.OpStopJob, input.JobName)
 
 	req := c.newRequest(op, input.Token, nil)
 	return req.Send()
 }
 
 func (c *Pipeline) StopJobBatch(input *StopJobBatchInput) (output *StopJobBatchOutput, err error) {
-	op := c.newOperation(base.OpStopJobBatch)
+	op := c.NewOperation(base.OpStopJobBatch)
 
 	output = &StopJobBatchOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -862,7 +970,7 @@ func (c *Pipeline) StopJobBatch(input *StopJobBatchInput) (output *StopJobBatchO
 }
 
 func (c *Pipeline) RerunJobBatch(input *RerunJobBatchInput) (output *RerunJobBatchOutput, err error) {
-	op := c.newOperation(base.OpRerunJobBatch)
+	op := c.NewOperation(base.OpRerunJobBatch)
 
 	output = &RerunJobBatchOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -877,7 +985,7 @@ func (c *Pipeline) RerunJobBatch(input *RerunJobBatchInput) (output *RerunJobBat
 }
 
 func (c *Pipeline) CreateJobExport(input *CreateJobExportInput) (err error) {
-	op := c.newOperation(base.OpCreateJobExport, input.JobName, input.ExportName)
+	op := c.NewOperation(base.OpCreateJobExport, input.JobName, input.ExportName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input); err != nil {
@@ -888,7 +996,7 @@ func (c *Pipeline) CreateJobExport(input *CreateJobExportInput) (err error) {
 }
 
 func (c *Pipeline) ListJobExports(input *ListJobExportsInput) (output *ListJobExportsOutput, err error) {
-	op := c.newOperation(base.OpListJobExports, input.JobName)
+	op := c.NewOperation(base.OpListJobExports, input.JobName)
 
 	output = &ListJobExportsOutput{}
 	req := c.newRequest(op, input.Token, &output)
@@ -896,7 +1004,7 @@ func (c *Pipeline) ListJobExports(input *ListJobExportsInput) (output *ListJobEx
 }
 
 func (c *Pipeline) GetJobExport(input *GetJobExportInput) (output *GetJobExportOutput, err error) {
-	op := c.newOperation(base.OpGetJobExport, input.JobName, input.ExportName)
+	op := c.NewOperation(base.OpGetJobExport, input.JobName, input.ExportName)
 
 	output = &GetJobExportOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -904,14 +1012,14 @@ func (c *Pipeline) GetJobExport(input *GetJobExportInput) (output *GetJobExportO
 }
 
 func (c *Pipeline) DeleteJobExport(input *DeleteJobExportInput) (err error) {
-	op := c.newOperation(base.OpDeleteJobExport, input.JobName, input.ExportName)
+	op := c.NewOperation(base.OpDeleteJobExport, input.JobName, input.ExportName)
 
 	req := c.newRequest(op, input.Token, nil)
 	return req.Send()
 }
 
 func (c *Pipeline) RetrieveSchema(input *RetrieveSchemaInput) (output *RetrieveSchemaOutput, err error) {
-	op := c.newOperation(base.OpRetrieveSchema)
+	op := c.NewOperation(base.OpRetrieveSchema)
 
 	output = &RetrieveSchemaOutput{}
 	req := c.newRequest(op, input.Token, &output)
@@ -950,6 +1058,7 @@ func (c *Pipeline) GetUpdateSchemas(repoName string) (schemas map[string]RepoSch
 
 func (c *Pipeline) CreateForLogDB(input *CreateRepoForLogDBInput) error {
 	pinput := formPipelineRepoInput(input.RepoName, input.Region, input.Schema)
+	pinput.PandoraToken = input.PipelineCreateRepoToken
 	err := c.CreateRepo(pinput)
 	if err != nil && !reqerr.IsExistError(err) {
 		return err
@@ -959,12 +1068,14 @@ func (c *Pipeline) CreateForLogDB(input *CreateRepoForLogDBInput) error {
 	if err != nil {
 		return err
 	}
+	linput.PandoraToken = input.CreateLogDBRepoToken
 	err = logdbapi.CreateRepo(linput)
 	if err != nil && !reqerr.IsExistError(err) {
 		return err
 	}
 	logDBSpec := c.FormLogDBSpec(input)
 	exportInput := c.FormExportInput(input.RepoName, ExportTypeLogDB, logDBSpec)
+	exportInput.PandoraToken = input.CreateExportToken
 	return c.CreateExport(exportInput)
 }
 
@@ -974,18 +1085,20 @@ func (c *Pipeline) CreateForLogDBDSL(input *CreateRepoForLogDBDSLInput) error {
 		return err
 	}
 	ci := &CreateRepoForLogDBInput{
-		RepoName:    input.RepoName,
-		LogRepoName: input.LogRepoName,
-		Region:      input.Region,
-		Schema:      schemas,
-		Retention:   input.Retention,
+		RepoName:              input.RepoName,
+		LogRepoName:           input.LogRepoName,
+		Region:                input.Region,
+		Schema:                schemas,
+		Retention:             input.Retention,
+		AutoExportLogDBTokens: input.AutoExportLogDBTokens,
 	}
 	return c.CreateForLogDB(ci)
 }
 
 func (c *Pipeline) CreateForTSDB(input *CreateRepoForTSDBInput) error {
 	_, err := c.GetRepo(&GetRepoInput{
-		RepoName: input.RepoName,
+		RepoName:     input.RepoName,
+		PandoraToken: input.PipelineGetRepoToken,
 	})
 	if err != nil {
 		return err
@@ -998,40 +1111,62 @@ func (c *Pipeline) CreateForTSDB(input *CreateRepoForTSDBInput) error {
 		input.TSDBRepoName = input.RepoName
 	}
 	err = tsdbapi.CreateRepo(&tsdb.CreateRepoInput{
-		RepoName: input.TSDBRepoName,
-		Region:   input.Region,
+		RepoName:     input.TSDBRepoName,
+		Region:       input.Region,
+		PandoraToken: input.CreateTSDBRepoToken,
 	})
 	if err != nil && !reqerr.IsExistError(err) {
+		log.Error("create repo error", err)
 		return err
 	}
 	if input.SeriesName == "" {
 		input.SeriesName = input.RepoName
 	}
+	seriesToken, ok := input.CreateTSDBSeriesTokens[input.SeriesName]
+	if !ok {
+		seriesToken = models.PandoraToken{}
+	}
 	err = tsdbapi.CreateSeries(&tsdb.CreateSeriesInput{
-		RepoName:   input.TSDBRepoName,
-		SeriesName: input.SeriesName,
-		Retention:  input.Retention,
+		RepoName:     input.TSDBRepoName,
+		SeriesName:   input.SeriesName,
+		Retention:    input.Retention,
+		PandoraToken: seriesToken,
 	})
 	if err != nil && !reqerr.IsExistError(err) {
+		log.Error("create series error", err)
 		return err
 	}
 	tsdbSpec := c.FormTSDBSpec(input)
 	exportInput := c.FormExportInput(input.RepoName, ExportTypeTSDB, tsdbSpec)
 	exportInput.ExportName = base.FormExportTSDBName(input.RepoName, input.SeriesName, ExportTypeTSDB)
+	createExportToken, ok := input.AutoExportTSDBTokens.CreateExportToken[exportInput.ExportName]
+	if !ok {
+		createExportToken = models.PandoraToken{}
+	}
+	exportInput.PandoraToken = createExportToken
 	err = c.CreateExport(exportInput)
 	if err != nil && reqerr.IsExistError(err) {
+		updateExportToken, ok := input.AutoExportTSDBTokens.UpdateExportToken[exportInput.ExportName]
+		if !ok {
+			updateExportToken = models.PandoraToken{}
+		}
 		err = c.UpdateExport(&UpdateExportInput{
-			RepoName:   exportInput.RepoName,
-			ExportName: exportInput.ExportName,
-			Spec:       exportInput.Spec,
+			RepoName:     exportInput.RepoName,
+			ExportName:   exportInput.ExportName,
+			Spec:         exportInput.Spec,
+			PandoraToken: updateExportToken,
 		})
+		if err != nil {
+			log.Error("update Export error", err)
+		}
 	}
 	return err
 }
 
 func (c *Pipeline) CreateForMutiExportTSDB(input *CreateRepoForMutiExportTSDBInput) error {
 	_, err := c.GetRepo(&GetRepoInput{
-		RepoName: input.RepoName,
+		RepoName:     input.RepoName,
+		PandoraToken: input.PipelineGetRepoToken,
 	})
 	if err != nil {
 		return err
@@ -1044,17 +1179,24 @@ func (c *Pipeline) CreateForMutiExportTSDB(input *CreateRepoForMutiExportTSDBInp
 		input.TSDBRepoName = input.RepoName
 	}
 	err = tsdbapi.CreateRepo(&tsdb.CreateRepoInput{
-		RepoName: input.TSDBRepoName,
-		Region:   input.Region,
+		RepoName:     input.TSDBRepoName,
+		Region:       input.Region,
+		PandoraToken: input.CreateTSDBRepoToken,
 	})
 	if err != nil && !reqerr.IsExistError(err) {
 		return err
 	}
 	for _, series := range input.SeriesMap {
+		seriesToken, ok := input.CreateTSDBSeriesTokens[series.SeriesName]
+		if !ok {
+			seriesToken = models.PandoraToken{}
+		}
+
 		err = tsdbapi.CreateSeries(&tsdb.CreateSeriesInput{
-			RepoName:   input.TSDBRepoName,
-			SeriesName: series.SeriesName,
-			Retention:  input.Retention,
+			RepoName:     input.TSDBRepoName,
+			SeriesName:   series.SeriesName,
+			Retention:    input.Retention,
+			PandoraToken: seriesToken,
 		})
 		if err != nil && !reqerr.IsExistError(err) {
 			return err
@@ -1073,12 +1215,22 @@ func (c *Pipeline) CreateForMutiExportTSDB(input *CreateRepoForMutiExportTSDBInp
 		})
 		exportInput := c.FormExportInput(input.RepoName, ExportTypeTSDB, tsdbSpec)
 		exportInput.ExportName = base.FormExportTSDBName(input.RepoName, series.SeriesName, ExportTypeTSDB)
+		createExportToken, ok := input.AutoExportTSDBTokens.CreateExportToken[exportInput.ExportName]
+		if !ok {
+			createExportToken = models.PandoraToken{}
+		}
+		exportInput.PandoraToken = createExportToken
 		err = c.CreateExport(exportInput)
 		if err != nil && reqerr.IsExistError(err) {
+			updateExportToken, ok := input.AutoExportTSDBTokens.UpdateExportToken[exportInput.ExportName]
+			if !ok {
+				updateExportToken = models.PandoraToken{}
+			}
 			err = c.UpdateExport(&UpdateExportInput{
-				RepoName:   exportInput.RepoName,
-				ExportName: exportInput.ExportName,
-				Spec:       exportInput.Spec,
+				RepoName:     exportInput.RepoName,
+				ExportName:   exportInput.ExportName,
+				Spec:         exportInput.Spec,
+				PandoraToken: updateExportToken,
 			})
 			if err != nil {
 				return err
@@ -1091,7 +1243,7 @@ func (c *Pipeline) CreateForMutiExportTSDB(input *CreateRepoForMutiExportTSDBInp
 }
 
 func (c *Pipeline) UploadUdf(input *UploadUdfInput) (err error) {
-	op := c.newOperation(base.OpUploadUdf, input.UdfName)
+	op := c.NewOperation(base.OpUploadUdf, input.UdfName)
 
 	req := c.newRequest(op, input.Token, nil)
 	req.EnableContentMD5d()
@@ -1101,7 +1253,7 @@ func (c *Pipeline) UploadUdf(input *UploadUdfInput) (err error) {
 }
 
 func (c *Pipeline) UploadUdfFromFile(input *UploadUdfFromFileInput) (err error) {
-	op := c.newOperation(base.OpUploadUdf, input.UdfName)
+	op := c.NewOperation(base.OpUploadUdf, input.UdfName)
 
 	req := c.newRequest(op, input.Token, nil)
 	req.EnableContentMD5d()
@@ -1117,7 +1269,7 @@ func (c *Pipeline) UploadUdfFromFile(input *UploadUdfFromFileInput) (err error) 
 }
 
 func (c *Pipeline) PutUdfMeta(input *PutUdfMetaInput) (err error) {
-	op := c.newOperation(base.OpPutUdfMeta, input.UdfName)
+	op := c.NewOperation(base.OpPutUdfMeta, input.UdfName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input); err != nil {
@@ -1128,7 +1280,7 @@ func (c *Pipeline) PutUdfMeta(input *PutUdfMetaInput) (err error) {
 }
 
 func (c *Pipeline) DeleteUdf(input *DeleteUdfInfoInput) (err error) {
-	op := c.newOperation(base.OpDeleteUdf, input.UdfName)
+	op := c.NewOperation(base.OpDeleteUdf, input.UdfName)
 
 	req := c.newRequest(op, input.Token, nil)
 	return req.Send()
@@ -1151,7 +1303,7 @@ func (c *Pipeline) ListUdfs(input *ListUdfsInput) (output *ListUdfsOutput, err e
 	if len(values) != 0 {
 		query = "?" + values.Encode()
 	}
-	op := c.newOperation(base.OpListUdfs, query)
+	op := c.NewOperation(base.OpListUdfs, query)
 
 	output = &ListUdfsOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -1162,7 +1314,7 @@ func (c *Pipeline) ListUdfs(input *ListUdfsInput) (output *ListUdfsOutput, err e
 }
 
 func (c *Pipeline) RegisterUdfFunction(input *RegisterUdfFunctionInput) (err error) {
-	op := c.newOperation(base.OpRegUdfFunc, input.FuncName)
+	op := c.NewOperation(base.OpRegUdfFunc, input.FuncName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input); err != nil {
@@ -1173,7 +1325,7 @@ func (c *Pipeline) RegisterUdfFunction(input *RegisterUdfFunctionInput) (err err
 }
 
 func (c *Pipeline) DeRegisterUdfFunction(input *DeregisterUdfFunctionInput) (err error) {
-	op := c.newOperation(base.OpDeregUdfFunc, input.FuncName)
+	op := c.NewOperation(base.OpDeregUdfFunc, input.FuncName)
 
 	req := c.newRequest(op, input.Token, nil)
 	req.SetHeader(base.HTTPHeaderContentType, base.ContentTypeJson)
@@ -1199,7 +1351,7 @@ func (c *Pipeline) ListUdfFunctions(input *ListUdfFunctionsInput) (output *ListU
 	if len(values) != 0 {
 		query = "?" + values.Encode()
 	}
-	op := c.newOperation(base.OpListUdfFuncs, query)
+	op := c.NewOperation(base.OpListUdfFuncs, query)
 
 	output = &ListUdfFunctionsOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -1225,7 +1377,7 @@ func (c *Pipeline) ListBuiltinUdfFunctions(input *ListBuiltinUdfFunctionsInput) 
 	if len(values) != 0 {
 		query = "?" + values.Encode()
 	}
-	op := c.newOperation(base.OpListUdfBuiltinFuncs, query)
+	op := c.NewOperation(base.OpListUdfBuiltinFuncs, query)
 
 	output = &ListUdfBuiltinFunctionsOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -1233,7 +1385,7 @@ func (c *Pipeline) ListBuiltinUdfFunctions(input *ListBuiltinUdfFunctionsInput) 
 }
 
 func (c *Pipeline) CreateWorkflow(input *CreateWorkflowInput) (err error) {
-	op := c.newOperation(base.OpCreateWorkflow, input.WorkflowName)
+	op := c.NewOperation(base.OpCreateWorkflow, input.WorkflowName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if input.Region == "" {
@@ -1247,7 +1399,7 @@ func (c *Pipeline) CreateWorkflow(input *CreateWorkflowInput) (err error) {
 }
 
 func (c *Pipeline) UpdateWorkflow(input *UpdateWorkflowInput) (err error) {
-	op := c.newOperation(base.OpUpdateWorkflow, input.WorkflowName)
+	op := c.NewOperation(base.OpUpdateWorkflow, input.WorkflowName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input); err != nil {
@@ -1264,7 +1416,7 @@ func (c *Pipeline) GetWorkflow(input *GetWorkflowInput) (output *GetWorkflowOutp
 	if err = input.Validate(); err != nil {
 		return
 	}
-	op := c.newOperation(base.OpGetWorkflow, input.WorkflowName)
+	op := c.NewOperation(base.OpGetWorkflow, input.WorkflowName)
 	output = &GetWorkflowOutput{}
 	req := c.newRequest(op, input.Token, output)
 	if input.ResourceOwner != "" {
@@ -1277,7 +1429,7 @@ func (c *Pipeline) GetWorkflowStatus(input *GetWorkflowStatusInput) (output *Get
 	if err = input.Validate(); err != nil {
 		return
 	}
-	op := c.newOperation(base.OpGetWorkflowStatus, input.WorkflowName)
+	op := c.NewOperation(base.OpGetWorkflowStatus, input.WorkflowName)
 	output = &GetWorkflowStatusOutput{}
 	req := c.newRequest(op, input.Token, output)
 	if input.ResourceOwner != "" {
@@ -1287,7 +1439,7 @@ func (c *Pipeline) GetWorkflowStatus(input *GetWorkflowStatusInput) (output *Get
 }
 
 func (c *Pipeline) DeleteWorkflow(input *DeleteWorkflowInput) (err error) {
-	op := c.newOperation(base.OpDeleteWorkflow, input.WorkflowName)
+	op := c.NewOperation(base.OpDeleteWorkflow, input.WorkflowName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if input.ResourceOwner != "" {
@@ -1297,7 +1449,7 @@ func (c *Pipeline) DeleteWorkflow(input *DeleteWorkflowInput) (err error) {
 }
 
 func (c *Pipeline) ListWorkflows(input *ListWorkflowInput) (output *ListWorkflowOutput, err error) {
-	op := c.newOperation(base.OpListWorkflows)
+	op := c.NewOperation(base.OpListWorkflows)
 
 	output = &ListWorkflowOutput{}
 	req := c.newRequest(op, input.Token, &output)
@@ -1308,7 +1460,7 @@ func (c *Pipeline) ListWorkflows(input *ListWorkflowInput) (output *ListWorkflow
 }
 
 func (c *Pipeline) StopWorkflow(input *StopWorkflowInput) (err error) {
-	op := c.newOperation(base.OpStopWorkflow, input.WorkflowName)
+	op := c.NewOperation(base.OpStopWorkflow, input.WorkflowName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if input.ResourceOwner != "" {
@@ -1321,7 +1473,7 @@ func (c *Pipeline) StopWorkflow(input *StopWorkflowInput) (err error) {
 }
 
 func (c *Pipeline) StartWorkflow(input *StartWorkflowInput) (err error) {
-	op := c.newOperation(base.OpStartWorkflow, input.WorkflowName)
+	op := c.NewOperation(base.OpStartWorkflow, input.WorkflowName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if input.ResourceOwner != "" {
@@ -1334,7 +1486,7 @@ func (c *Pipeline) StartWorkflow(input *StartWorkflowInput) (err error) {
 }
 
 func (c *Pipeline) SearchWorkflow(input *DagLogSearchInput) (ret *WorkflowSearchRet, err error) {
-	op := c.newOperation(base.OpSearchDAGlog, input.WorkflowName)
+	op := c.NewOperation(base.OpSearchDAGlog, input.WorkflowName)
 
 	ret = &WorkflowSearchRet{}
 	req := c.newRequest(op, input.Token, ret)
@@ -1351,7 +1503,7 @@ func (c *Pipeline) RepoExist(input *RepoExistInput) (output *RepoExistOutput, er
 	if err = input.Validate(); err != nil {
 		return
 	}
-	op := c.newOperation(base.OpRepoExists, input.RepoName)
+	op := c.NewOperation(base.OpRepoExists, input.RepoName)
 
 	output = &RepoExistOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -1362,7 +1514,7 @@ func (c *Pipeline) TransformExist(input *TransformExistInput) (output *Transform
 	if err = input.Validate(); err != nil {
 		return
 	}
-	op := c.newOperation(base.OpTransformExists, input.RepoName, input.TransformName)
+	op := c.NewOperation(base.OpTransformExists, input.RepoName, input.TransformName)
 
 	output = &TransformExistOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -1372,7 +1524,7 @@ func (c *Pipeline) ExportExist(input *ExportExistInput) (output *ExportExistOutp
 	if err = input.Validate(); err != nil {
 		return
 	}
-	op := c.newOperation(base.OpExportExists, input.RepoName, input.ExportName)
+	op := c.NewOperation(base.OpExportExists, input.RepoName, input.ExportName)
 
 	output = &ExportExistOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -1383,7 +1535,7 @@ func (c *Pipeline) DatasourceExist(input *DatasourceExistInput) (output *Datasou
 	if err = input.Validate(); err != nil {
 		return
 	}
-	op := c.newOperation(base.OpDatasourceExists, input.DatasourceName)
+	op := c.NewOperation(base.OpDatasourceExists, input.DatasourceName)
 
 	output = &DatasourceExistOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -1394,7 +1546,7 @@ func (c *Pipeline) JobExist(input *JobExistInput) (output *JobExistOutput, err e
 	if err = input.Validate(); err != nil {
 		return
 	}
-	op := c.newOperation(base.OpJobExists, input.JobName)
+	op := c.NewOperation(base.OpJobExists, input.JobName)
 
 	output = &JobExistOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -1405,7 +1557,7 @@ func (c *Pipeline) JobExportExist(input *JobExportExistInput) (output *JobExport
 	if err = input.Validate(); err != nil {
 		return
 	}
-	op := c.newOperation(base.OpJobExportExists, input.JobName, input.ExportName)
+	op := c.NewOperation(base.OpJobExportExists, input.JobName, input.ExportName)
 
 	output = &JobExportExistOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -1413,7 +1565,7 @@ func (c *Pipeline) JobExportExist(input *JobExportExistInput) (output *JobExport
 }
 
 func (c *Pipeline) CreateVariable(input *CreateVariableInput) (err error) {
-	op := c.newOperation(base.OpCreateVariable, input.Name)
+	op := c.NewOperation(base.OpCreateVariable, input.Name)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input); err != nil {
@@ -1423,7 +1575,7 @@ func (c *Pipeline) CreateVariable(input *CreateVariableInput) (err error) {
 }
 
 func (c *Pipeline) UpdateVariable(input *UpdateVariableInput) (err error) {
-	op := c.newOperation(base.OpUpdateVariable, input.Name)
+	op := c.NewOperation(base.OpUpdateVariable, input.Name)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input); err != nil {
@@ -1433,7 +1585,7 @@ func (c *Pipeline) UpdateVariable(input *UpdateVariableInput) (err error) {
 }
 
 func (c *Pipeline) DeleteVariable(input *DeleteVariableInput) (err error) {
-	op := c.newOperation(base.OpDeleteVariable, input.Name)
+	op := c.NewOperation(base.OpDeleteVariable, input.Name)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input); err != nil {
@@ -1446,7 +1598,7 @@ func (c *Pipeline) GetVariable(input *GetVariableInput) (output *GetVariableOutp
 	if err = input.Validate(); err != nil {
 		return
 	}
-	op := c.newOperation(base.OpGetVariable, input.Name)
+	op := c.NewOperation(base.OpGetVariable, input.Name)
 
 	output = &GetVariableOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -1457,7 +1609,7 @@ func (c *Pipeline) GetVariable(input *GetVariableInput) (output *GetVariableOutp
 }
 
 func (c *Pipeline) ListUserVariables(input *ListVariablesInput) (output *ListVariablesOutput, err error) {
-	op := c.newOperation(base.OpListUserVariables, userVariableType)
+	op := c.NewOperation(base.OpListUserVariables, userVariableType)
 
 	output = &ListVariablesOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -1468,7 +1620,7 @@ func (c *Pipeline) ListUserVariables(input *ListVariablesInput) (output *ListVar
 }
 
 func (c *Pipeline) ListSystemVariables(input *ListVariablesInput) (output *ListVariablesOutput, err error) {
-	op := c.newOperation(base.OpListSystemVariables, systemVariableType)
+	op := c.NewOperation(base.OpListSystemVariables, systemVariableType)
 	output = &ListVariablesOutput{}
 	req := c.newRequest(op, input.Token, output)
 	if input.ResourceOwner != "" {

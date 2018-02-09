@@ -5,9 +5,10 @@ import (
 	"time"
 
 	"github.com/qiniu/pandora-go-sdk/base"
+	. "github.com/qiniu/pandora-go-sdk/base/models"
 )
 
-func WaitWorkflowStarted(workflowName string, client PipelineAPI, logger base.Logger) (err error) {
+func WaitWorkflowStarted(workflowName string, client PipelineAPI, logger base.Logger, getWStatusToken PandoraToken) (err error) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 	for {
@@ -15,6 +16,7 @@ func WaitWorkflowStarted(workflowName string, client PipelineAPI, logger base.Lo
 		case <-ticker.C:
 			stats, err := client.GetWorkflowStatus(&GetWorkflowStatusInput{
 				WorkflowName: workflowName,
+				PandoraToken: getWStatusToken,
 			})
 			if err == nil && stats.Status == base.WorkflowStarted {
 				return nil
@@ -27,7 +29,7 @@ func WaitWorkflowStarted(workflowName string, client PipelineAPI, logger base.Lo
 	return
 }
 
-func WaitWorkflowStopped(workflowName string, client PipelineAPI, logger base.Logger) (err error) {
+func WaitWorkflowStopped(workflowName string, client PipelineAPI, logger base.Logger, getWStatusToken PandoraToken) (err error) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 	for {
@@ -35,6 +37,7 @@ func WaitWorkflowStopped(workflowName string, client PipelineAPI, logger base.Lo
 		case <-ticker.C:
 			stats, err := client.GetWorkflowStatus(&GetWorkflowStatusInput{
 				WorkflowName: workflowName,
+				PandoraToken: getWStatusToken,
 			})
 			if err == nil && stats.Status == base.WorkflowStopped {
 				return nil
