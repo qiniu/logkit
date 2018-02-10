@@ -17,6 +17,7 @@ import (
 	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
 	"github.com/soniah/gosnmp"
+	"sync/atomic"
 )
 
 const (
@@ -43,10 +44,8 @@ const (
 	KeySnmpReaderName         = "snmp_reader_name"
 	KeySnmpReaderFields       = "snmp_fields"
 
-	KeySnmpTableName   = "snmp_table"
-	KeyTimestamp       = "timestamp"
-	MaxChannelLength   = 100000
-	ChannelTooShortErr = "channel is too short"
+	KeySnmpTableName = "snmp_table"
+	KeyTimestamp     = "timestamp"
 )
 
 // SnmpReader holds the configuration for the plugin.
@@ -75,10 +74,10 @@ type SnmpReader struct {
 	Fields          []Field
 	ConnectionCache []snmpConnection
 
-	Meta       *Meta
-	LastGather time.Time
-	StopChan   chan struct{}
-	DataChan   chan interface{}
+	Meta     *Meta
+	Status   int32
+	StopChan chan struct{}
+	DataChan chan interface{}
 }
 
 var execCommand = exec.Command
@@ -179,7 +178,7 @@ func NewSnmpReader(meta *Meta, c conf.MapConf) (s *SnmpReader, err error) {
 		Tables:         tables,
 		Fields:         fields,
 
-		LastGather:      time.Now(),
+		Status:          StatusInit,
 		StopChan:        make(chan struct{}),
 		DataChan:        make(chan interface{}, 1000),
 		ConnectionCache: make([]snmpConnection, len(agents)),
@@ -290,9 +289,6 @@ func (s *SnmpReader) StoreData(data []map[string]interface{}) (err error) {
 		case <-s.StopChan:
 			return
 		case s.DataChan <- d:
-		default:
-			err = fmt.Errorf(ChannelTooShortErr)
-			return
 		}
 	}
 	return
@@ -388,27 +384,31 @@ func (s *SnmpReader) Source() string {
 	return s.SnmpName
 }
 
-func (s *SnmpReader) ReadLine() (line string, err error) {
-	now := time.Now()
-	if now.Sub(s.LastGather).Seconds() > s.Interval.Seconds() {
-		subErr := s.Gather()
-		for subErr != nil && strings.Contains(subErr.Error(), ChannelTooShortErr) {
-			newLen := int(math.Min(float64(cap(s.DataChan)*2), float64(MaxChannelLength)))
-			if newLen == cap(s.DataChan) {
-				subErr = nil
-				log.Warnf("too more data must collect every fetching")
-				break
-			} else {
+func (s *SnmpReader) Start() error {
+	if !atomic.CompareAndSwapInt32(&s.Status, StatusInit, StatusRunning) {
+		return fmt.Errorf("runner[%v] Reader[%v] already started", s.Meta.RunnerName, s.Name())
+	}
+	go func() {
+		ticker := time.NewTicker(s.Interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				s.Gather()
+			case <-s.StopChan:
 				close(s.DataChan)
-				s.DataChan = make(chan interface{}, newLen)
-				subErr = s.Gather()
+				return
 			}
 		}
-		if subErr != nil {
-			err = subErr
-			return
+	}()
+	return nil
+}
+
+func (s *SnmpReader) ReadLine() (line string, err error) {
+	if atomic.LoadInt32(&s.Status) == StatusInit {
+		if err = s.Start(); err != nil {
+			log.Error(err)
 		}
-		s.LastGather = now
 	}
 	select {
 	case d := <-s.DataChan:
