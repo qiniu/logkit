@@ -23,9 +23,9 @@ import (
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
-	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
 	jsoniter "github.com/json-iterator/go"
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 )
 
 type CleanInfo struct {
@@ -106,9 +106,11 @@ type RunnerInfo struct {
 	CollectInterval  int    `json:"collect_interval,omitempty"` // metric runner收集的频率
 	MaxBatchLen      int    `json:"batch_len,omitempty"`        // 每个read batch的行数
 	MaxBatchSize     int    `json:"batch_size,omitempty"`       // 每个read batch的字节数
-	MaxBatchInteval  int    `json:"batch_interval,omitempty"`   // 最大发送时间间隔
+	MaxBatchInterval int    `json:"batch_interval,omitempty"`   // 最大发送时间间隔
 	MaxBatchTryTimes int    `json:"batch_try_times,omitempty"`  // 最大发送次数，小于等于0代表无限重试
 	CreateTime       string `json:"createtime"`
+	EnvTag           string `json:"env_tag,omitempty"`
+	// 用这个字段的值来获取环境变量, 作为 tag 添加到数据中
 }
 
 type LogExportRunner struct {
@@ -166,8 +168,8 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 	if info.MaxBatchSize <= 0 {
 		info.MaxBatchSize = defaultMaxBatchSize
 	}
-	if info.MaxBatchInteval <= 0 {
-		info.MaxBatchInteval = defaultSendIntervalSeconds
+	if info.MaxBatchInterval <= 0 {
+		info.MaxBatchInterval = defaultSendIntervalSeconds
 	}
 	runner = &LogExportRunner{
 		RunnerInfo: info,
@@ -223,10 +225,11 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 
 func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, ps *parser.ParserRegistry, sr *sender.SenderRegistry) (runner *LogExportRunner, err error) {
 	runnerInfo := RunnerInfo{
+		EnvTag:           rc.EnvTag,
 		RunnerName:       rc.RunnerName,
 		MaxBatchSize:     rc.MaxBatchSize,
 		MaxBatchLen:      rc.MaxBatchLen,
-		MaxBatchInteval:  rc.MaxBatchInteval,
+		MaxBatchInterval: rc.MaxBatchInterval,
 		MaxBatchTryTimes: rc.MaxBatchTryTimes,
 	}
 	if rc.ReaderConfig == nil {
@@ -414,9 +417,10 @@ func (r *LogExportRunner) Run() {
 			log.Errorf("recover when runner is stopped\npanic: %v\nstack: %s", r, debug.Stack())
 		}
 	}()
-	datasourceTag := r.meta.GetDataSourceTag()
 	tags := r.meta.GetTags()
+	datasourceTag := r.meta.GetDataSourceTag()
 	schemaErr := utils.SchemaErr{Number: 0, Last: time.Now()}
+	tags = GetEnvTag(r.EnvTag, tags)
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
 			log.Debugf("Runner[%v] exited from run", r.Name())
@@ -686,8 +690,8 @@ func (r *LogExportRunner) batchFullOrTimeout() bool {
 		return true
 	}
 	// 超过最长的发送间隔
-	if time.Now().Sub(r.lastSend).Seconds() >= float64(r.MaxBatchInteval) {
-		log.Debugf("Runner[%v] meet the max batch send interval %v", r.RunnerName, r.MaxBatchInteval)
+	if time.Now().Sub(r.lastSend).Seconds() >= float64(r.MaxBatchInterval) {
+		log.Debugf("Runner[%v] meet the max batch send interval %v", r.RunnerName, r.MaxBatchInterval)
 		return true
 	}
 	// 如果任务已经停止
@@ -977,4 +981,18 @@ func (r *LogExportRunner) StatusBackup() {
 	} else {
 		log.Infof("runner %v, backup status %v", r.RunnerName, bStart)
 	}
+}
+
+func GetEnvTag(name string, tags map[string]interface{}) map[string]interface{} {
+	if name == "" {
+		return tags
+	}
+	if value := os.Getenv(name); value != "" {
+		if tags == nil {
+			tags = make(map[string]interface{})
+		}
+		tags[name] = value
+	} else {
+	}
+	return tags
 }

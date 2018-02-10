@@ -24,9 +24,9 @@ const (
 func getMetricRunnerConfig(name string, mc []MetricConfig, senderPath string) ([]byte, error) {
 	runnerConf := RunnerConfig{
 		RunnerInfo: RunnerInfo{
-			RunnerName:      name,
-			CollectInterval: 1,
-			MaxBatchInteval: 1,
+			RunnerName:       name,
+			CollectInterval:  1,
+			MaxBatchInterval: 1,
 		},
 		MetricConfig: mc,
 		SenderConfig: []conf.MapConf{{
@@ -70,9 +70,10 @@ func TestMetricRunner(t *testing.T) {
 	}()
 
 	funcMap := map[string]func(*testParam){
-		"metricRunTest":    metricRunTest,
-		"metricNetTest":    metricNetTest,
-		"metricDiskioTest": metricDiskioTest,
+		//"metricRunTest":    metricRunTest,
+		//"metricNetTest":    metricNetTest,
+		//"metricDiskioTest": metricDiskioTest,
+		"metricRunEnvTagTest": metricRunEnvTagTest,
 	}
 
 	for k, f := range funcMap {
@@ -388,5 +389,98 @@ func metricDiskioTest(p *testParam) {
 			log.Fatalf("metricDiskioTest error unmarshal %v curLine = %v %v", string(str), curLine, err)
 		}
 		assert.Equal(t, len(diskIoAttr), len(result[0]), string(str))
+	}
+}
+
+func metricRunEnvTagTest(p *testParam) {
+	t := p.t
+	rd := p.rd
+	rs := p.rs
+	resvName1 := "sendData"
+	runnerName := "metricRunEnvTagTest"
+	dir := runnerName + "Dir"
+	testDir := filepath.Join(rd, dir)
+	resvDir := filepath.Join(testDir, "sender")
+	resvPath1 := filepath.Join(resvDir, resvName1)
+	if err := mkTestDir(testDir, resvDir); err != nil {
+		t.Fatalf("mkdir test path error %v", err)
+	}
+	originEnv := os.Getenv(runnerName)
+	defer func() {
+		os.Setenv(runnerName, originEnv)
+	}()
+	if err := os.Setenv(runnerName, "env_value"); err != nil {
+		t.Fatalf("metricRunEnvTagTest set env error %v", err)
+	}
+	time.Sleep(1 * time.Second)
+	mc := []MetricConfig{
+		{
+			MetricType: "cpu",
+			Attributes: map[string]bool{},
+			Config: map[string]interface{}{
+				"total_cpu":        true,
+				"per_cpu":          false,
+				"collect_cpu_time": true,
+			},
+		},
+	}
+	rc := RunnerConfig{
+		RunnerInfo: RunnerInfo{
+			RunnerName:       runnerName,
+			CollectInterval:  1,
+			MaxBatchInterval: 1,
+			EnvTag:           runnerName,
+		},
+		MetricConfig: mc,
+		SenderConfig: []conf.MapConf{{
+			"name":           "file_sender",
+			"sender_type":    "file",
+			"file_send_path": resvPath1,
+		}},
+	}
+	runnerConf, err := jsoniter.Marshal(rc)
+	if err != nil {
+		t.Fatalf("get runner config failed, error is %v", err)
+	}
+
+	// 添加 runner
+	url := "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName
+	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(3 * time.Second)
+
+	// 停止 runner
+	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName + "/stop"
+	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(2 * time.Second)
+
+	// 必须要引入 system 以便执行其中的 init
+	log.Println(system.TypeMetricCpu)
+
+	// 读取发送端文件，
+	f, err := os.Open(resvPath1)
+	assert.NoError(t, err)
+	defer f.Close()
+	br := bufio.NewReaderSize(f, bufSize)
+	for {
+		str, _, c := br.ReadLine()
+		if c == io.EOF {
+			break
+		}
+		result := make([]map[string]interface{}, 0)
+		err = jsoniter.Unmarshal([]byte(str), &result)
+		if err != nil {
+			log.Fatalf("metricRunEnvTagTest error unmarshal %v %v", string(str), err)
+		}
+		for _, d := range result {
+			if v, ok := d[runnerName]; !ok {
+				t.Fatalf("metricRunEnvTagTest error, exp got Test_RunForEnvTag:env_value, but not found")
+			} else {
+				assert.Equal(t, "env_value", v)
+			}
+		}
 	}
 }

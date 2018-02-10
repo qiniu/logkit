@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/reader"
@@ -18,6 +17,7 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
+	"github.com/qiniu/log"
 )
 
 const (
@@ -36,6 +36,7 @@ type MetricConfig struct {
 
 type MetricRunner struct {
 	RunnerName string `json:"name"`
+	envTag     string
 
 	collectors   []metric.Collector
 	senders      []sender.Sender
@@ -156,6 +157,7 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 		collectors:      collectors,
 		transformers:    transformers,
 		senders:         senders,
+		envTag:          rc.EnvTag,
 	}
 	runner.StatusRestore()
 	return
@@ -167,6 +169,11 @@ func (mr *MetricRunner) Name() string {
 
 func (r *MetricRunner) Run() {
 	defer close(r.exitChan)
+
+	tags := map[string]interface{}{
+		metric.Timestamp: nil,
+	}
+	tags = GetEnvTag(r.envTag, tags)
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
 			log.Debugf("runner %v exited from run", r.RunnerName)
@@ -176,7 +183,7 @@ func (r *MetricRunner) Run() {
 		// collect data
 		dataCnt := 0
 		datas := make([]Data, 0)
-		now := time.Now().Format(time.RFC3339Nano)
+		tags[metric.Timestamp] = time.Now().Format(time.RFC3339Nano)
 		for _, c := range r.collectors {
 			metricName := c.Name()
 			tmpdatas, err := c.Collect()
@@ -206,8 +213,9 @@ func (r *MetricRunner) Run() {
 				if len(metricData) == 0 {
 					continue
 				}
-				data := Data{
-					metric.Timestamp: now,
+				data := Data{}
+				for k, v := range tags {
+					data[k] = v
 				}
 				// 重命名
 				// cpu_time_user --> cpu__time_user

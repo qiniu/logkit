@@ -67,7 +67,7 @@ func getRunnerConfig(name, logPath, metaPath, mode, senderPath string) ([]byte, 
 			MaxBatchLen:      1,
 			MaxBatchSize:     200,
 			CollectInterval:  1,
-			MaxBatchInteval:  1,
+			MaxBatchInterval: 1,
 			MaxBatchTryTimes: 3,
 		},
 		ReaderConfig: conf.MapConf{
