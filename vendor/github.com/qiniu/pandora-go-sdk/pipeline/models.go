@@ -645,7 +645,7 @@ type AutoExportTSDBTokens struct {
 	CreateTSDBSeriesTokens map[string]PandoraToken
 	CreateExportToken      map[string]PandoraToken
 	UpdateExportToken      map[string]PandoraToken
-	GetExportToken         PandoraToken
+	GetExportToken         map[string]PandoraToken
 	ListExportToken        PandoraToken
 }
 

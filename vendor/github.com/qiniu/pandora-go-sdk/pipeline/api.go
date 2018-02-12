@@ -1039,9 +1039,11 @@ func (c *Pipeline) GetDefault(entry RepoSchemaEntry) interface{} {
 }
 
 func (c *Pipeline) GetUpdateSchemas(repoName string) (schemas map[string]RepoSchemaEntry, err error) {
-	repo, err := c.GetRepo(&GetRepoInput{
-		RepoName: repoName,
-	})
+	return c.GetUpdateSchemasWithInput(&GetRepoInput{RepoName: repoName})
+}
+
+func (c *Pipeline) GetUpdateSchemasWithInput(input *GetRepoInput) (schemas map[string]RepoSchemaEntry, err error) {
+	repo, err := c.GetRepo(input)
 
 	if err != nil {
 		return
@@ -1051,7 +1053,7 @@ func (c *Pipeline) GetUpdateSchemas(repoName string) (schemas map[string]RepoSch
 		schemas[sc.Key] = sc
 	}
 	c.repoSchemaMux.Lock()
-	c.repoSchemas[repoName] = schemas
+	c.repoSchemas[input.RepoName] = schemas
 	c.repoSchemaMux.Unlock()
 	return
 }
