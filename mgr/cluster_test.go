@@ -741,7 +741,7 @@ func clusterSalveConfigsTest(p *testCluParam) {
 	assert.Equal(t, true, ok)
 	assert.Equal(t, rc.RunnerName, scc.RunnerName)
 	assert.Equal(t, rc.MaxBatchLen, scc.MaxBatchLen)
-	assert.Equal(t, rc.MaxBatchInteval, scc.MaxBatchInteval)
+	assert.Equal(t, rc.MaxBatchInterval, scc.MaxBatchInterval)
 	assert.Equal(t, rc.SenderConfig[0]["file_send_path"], scc.SenderConfig[0]["file_send_path"])
 
 	sc, ok = gotConfigs[rs[2].cluster.Address]
@@ -750,7 +750,7 @@ func clusterSalveConfigsTest(p *testCluParam) {
 	assert.Equal(t, true, ok)
 	assert.Equal(t, rc.RunnerName, scc.RunnerName)
 	assert.Equal(t, rc.MaxBatchLen, scc.MaxBatchLen)
-	assert.Equal(t, rc.MaxBatchInteval, scc.MaxBatchInteval)
+	assert.Equal(t, rc.MaxBatchInterval, scc.MaxBatchInterval)
 	assert.Equal(t, rc.SenderConfig[0]["file_send_path"], scc.SenderConfig[0]["file_send_path"])
 
 	// tag 为空
@@ -784,7 +784,7 @@ func clusterSalveConfigsTest(p *testCluParam) {
 	assert.Equal(t, true, ok)
 	assert.Equal(t, rc.RunnerName, scc.RunnerName)
 	assert.Equal(t, rc.MaxBatchLen, scc.MaxBatchLen)
-	assert.Equal(t, rc.MaxBatchInteval, scc.MaxBatchInteval)
+	assert.Equal(t, rc.MaxBatchInterval, scc.MaxBatchInterval)
 	assert.Equal(t, rc.SenderConfig[0]["file_send_path"], scc.SenderConfig[0]["file_send_path"])
 
 	sc, ok = gotConfigs[rs[1].cluster.Address]
@@ -1056,7 +1056,7 @@ func TestJsoniterMashalUnmashal(t *testing.T) {
 			MaxBatchLen:      1,
 			MaxBatchSize:     200,
 			CollectInterval:  1,
-			MaxBatchInteval:  1,
+			MaxBatchInterval: 1,
 			MaxBatchTryTimes: 3,
 		},
 		ReaderConfig: conf.MapConf{
