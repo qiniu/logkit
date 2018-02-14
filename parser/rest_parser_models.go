@@ -6,15 +6,15 @@ import (
 
 // ModeUsages 用途说明
 var ModeUsages = []KeyValue{
-	{TypeJson, "json 格式解析"},
-	{TypeNginx, "nginx 日志解析"},
-	{TypeGrok, "grok 方式解析"},
-	{TypeCSV, "csv 格式日志解析"},
-	{TypeRaw, "raw 原始日志按行解析"},
-	{TypeSyslog, "syslog 日志解析"},
-	{TypeLogv1, "qiniulog 七牛日志库解析"},
-	{TypeKafkaRest, "kafkarest 日志格式解析"},
-	{TypeEmpty, "empty 通过解析清空数据"},
+	{TypeJson, "按 json 格式解析"},
+	{TypeNginx, "按 nginx 日志解析"},
+	{TypeGrok, "按 grok 格式解析"},
+	{TypeCSV, "按 csv 格式解析"},
+	{TypeRaw, "按原始日志逐行解析"},
+	{TypeSyslog, "按 syslog 格式解析"},
+	{TypeLogv1, "按七牛日志库格式解析"},
+	{TypeKafkaRest, "按 kafkarest 日志解析"},
+	{TypeEmpty, "通过解析清空数据"},
 }
 
 var (

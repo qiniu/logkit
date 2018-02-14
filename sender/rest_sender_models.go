@@ -4,13 +4,13 @@ import . "github.com/qiniu/logkit/utils/models"
 
 // ModeUsages 用途说明
 var ModeUsages = []KeyValue{
-	{TypePandora, "发送到 Pandora"},
+	{TypePandora, "发送到七牛大数据平台(Pandora)"},
 	{TypeFile, "发送到本地文件"},
-	{TypeMongodbAccumulate, "发送到 mongodb"},
-	{TypeInfluxdb, "发送到 influxdb"},
+	{TypeMongodbAccumulate, "发送到 MongoDB 服务"},
+	{TypeInfluxdb, "发送到 InfluxDB 服务"},
 	{TypeDiscard, "消费数据但不发送"},
-	{TypeElastic, "发送到Elasticsearch"},
-	{TypeKafka, "发送到Kafka"},
+	{TypeElastic, "发送到 Elasticsearch 服务"},
+	{TypeKafka, "发送到 Kafka 服务"},
 	{TypeHttp, "通过 Http Post 发送"},
 }
 
