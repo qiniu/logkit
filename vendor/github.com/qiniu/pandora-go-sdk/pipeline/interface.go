@@ -131,6 +131,8 @@ type PipelineAPI interface {
 
 	GetUpdateSchemas(string) (map[string]RepoSchemaEntry, error)
 
+	GetUpdateSchemasWithInput(input *GetRepoInput) (map[string]RepoSchemaEntry, error)
+
 	UploadUdf(input *UploadUdfInput) (err error)
 
 	UploadUdfFromFile(input *UploadUdfFromFileInput) (err error)
