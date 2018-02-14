@@ -14,10 +14,11 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 
+	"sync/atomic"
+
 	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
 	"github.com/soniah/gosnmp"
-	"sync/atomic"
 )
 
 const (
