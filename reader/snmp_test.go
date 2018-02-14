@@ -842,17 +842,20 @@ func TestExpandChannel(t *testing.T) {
 	}
 
 	lines := make([]string, 0)
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 10000; i++ {
 		line, err := s.ReadLine()
 		if err != nil {
 			t.Fatalf("exp no error, but got %v", err)
 		}
 		if line != "" {
 			lines = append(lines, line)
+		} else {
+			time.Sleep(1 * time.Second)
+		}
+		if len(lines) == 3 {
+			break
 		}
 	}
-
-	assert.Equal(t, 4, cap(s.DataChan))
 	assert.Equal(t, 3, len(lines), strings.Join(lines, "\n"))
 }
 
@@ -905,26 +908,37 @@ func TestInterval(t *testing.T) {
 	}
 
 	lines := make([]string, 0)
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 10000; i++ {
 		line, err := s.ReadLine()
 		if err != nil {
 			t.Fatalf("exp no error, but got %v", err)
 		}
 		if line != "" {
 			lines = append(lines, line)
+		} else {
+			time.Sleep(1 * time.Second)
+		}
+		if len(lines) == 3 {
+			break
 		}
 	}
+	assert.Equal(t, 3, len(lines), strings.Join(lines, "\n"))
 	time.Sleep(3 * time.Second)
-	for i := 0; i < 10; i++ {
+
+	lines = make([]string, 0)
+	for i := 0; i < 10000; i++ {
 		line, err := s.ReadLine()
 		if err != nil {
 			t.Fatalf("exp no error, but got %v", err)
 		}
 		if line != "" {
 			lines = append(lines, line)
+		} else {
+			time.Sleep(1 * time.Second)
+		}
+		if len(lines) == 3 {
+			break
 		}
 	}
-
-	assert.Equal(t, 4, cap(s.DataChan))
-	assert.Equal(t, 6, len(lines), strings.Join(lines, "\n"))
+	assert.Equal(t, 3, len(lines), strings.Join(lines, "\n"))
 }
