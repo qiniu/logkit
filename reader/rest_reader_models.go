@@ -22,7 +22,7 @@ var ModeUsages = []KeyValue{
 	{ModeSocket, "从 Socket 读取"},
 	{ModeHttp, "从 http 请求中读取"},
 	{ModeScript, "从脚本的执行结果中读取"},
-	{ModeSnmp, "从 snmp 服务中读取"},
+	{ModeSnmp, "从 SNMP 服务中读取"},
 }
 
 var (
