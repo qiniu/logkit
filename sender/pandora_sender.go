@@ -173,22 +173,16 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	if err != nil {
 		return
 	}
-	ak, err := conf.GetString(KeyPandoraAk)
-	if err != nil {
-		//return
-	}
+	ak, _ := conf.GetString(KeyPandoraAk)
 	akFromEnv := utils.GetEnv(ak)
 	if akFromEnv == "" {
 		akFromEnv = ak
 	}
 
-	sk, err := conf.GetString(KeyPandoraSk)
+	sk, _ := conf.GetString(KeyPandoraSk)
 	skFromEnv := utils.GetEnv(sk)
 	if skFromEnv == "" {
 		skFromEnv = sk
-	}
-	if err != nil {
-		//return
 	}
 	workflowName, _ := conf.GetStringOr(KeyPandoraWorkflowName, "")
 	useragent, _ := conf.GetStringOr(InnerUserAgent, "")
@@ -230,6 +224,12 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	logkitSendTime, _ := conf.GetBoolOr(KeyLogkitSendTime, true)
 	isMetrics, _ := conf.GetBoolOr(KeyIsMetrics, false)
 	tokens := getTokensFromConf(conf)
+
+	if skFromEnv == "" && tokens.SchemaFreeTokens.PipelinePostDataToken.Token == "" {
+		err = fmt.Errorf("your authrization config is empty, need to config ak/sk or tokens")
+		log.Error(err)
+		return
+	}
 
 	opt := &PandoraOption{
 		runnerName:     runnerName,
@@ -528,7 +528,6 @@ func (s *PandoraSender) UpdateSchemas() {
 			PandoraToken: s.opt.tokens.SchemaFreeTokens.PipelineGetRepoToken,
 		})
 	if err != nil && (!s.opt.schemaFree || !reqerr.IsNoSuchResourceError(err)) {
-		fmt.Println("token: ", s.opt.tokens.SchemaFreeTokens.PipelineGetRepoToken)
 		log.Warnf("Runner[%v] Sender[%v]: update pandora repo <%v> schema error %v", s.opt.runnerName, s.opt.name, s.opt.repoName, err)
 		return
 	}
