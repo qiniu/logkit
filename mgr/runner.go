@@ -54,6 +54,10 @@ type Resetable interface {
 	Reset() error
 }
 
+type TokenRefreshable interface {
+	TokenRefresh(AuthTokens) error
+}
+
 type StatusPersistable interface {
 	StatusBackup()
 	StatusRestore()
@@ -915,6 +919,18 @@ func Compatible(rc RunnerConfig) RunnerConfig {
 		rc.ReaderConfig[reader.KeyHeadPattern] = readpattern
 	}
 	return rc
+}
+
+func (r *LogExportRunner) TokenRefresh(tokens AuthTokens) error {
+	if r.RunnerName != tokens.RunnerName {
+		return fmt.Errorf("tokens.RunnerName[%v] is not match %v", tokens.RunnerName, r.RunnerName)
+	}
+	if len(r.senders) > tokens.SenderIndex {
+		if tokenSender, ok := r.senders[tokens.SenderIndex].(sender.TokenRefreshable); ok {
+			return tokenSender.TokenRefresh(tokens.SenderTokens)
+		}
+	}
+	return nil
 }
 
 func (r *LogExportRunner) StatusRestore() {

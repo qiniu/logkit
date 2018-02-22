@@ -1,5 +1,7 @@
 package models
 
+import "github.com/qiniu/logkit/conf"
+
 const (
 	GlobalKeyName = "name"
 	KeyCore       = "core"
@@ -14,6 +16,11 @@ const (
 	ApplicationGzip = "application/gzip"
 
 	KeyPandoraStash = "pandora_stash" // 当只有一条数据且 sendError 时候，将其转化为 raw 发送到 pandora_stash 这个字段
+
+	SchemaFreeTokensPrefix = "schema_free_tokens_"
+	LogDBTokensPrefix      = "logdb_tokens_"
+	TsDBTokensPrefix       = "tsdb_tokens_"
+	KodoTokensPrefix       = "kodo_tokens_"
 )
 
 type Option struct {
@@ -37,3 +44,9 @@ type KeyValue struct {
 
 // Data store as use key/value map
 type Data map[string]interface{}
+
+type AuthTokens struct {
+	RunnerName   string
+	SenderIndex  int
+	SenderTokens conf.MapConf
+}

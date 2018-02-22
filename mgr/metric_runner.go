@@ -397,6 +397,18 @@ func (mr *MetricRunner) Status() RunnerStatus {
 	return rss
 }
 
+func (mr *MetricRunner) TokenRefresh(tokens AuthTokens) error {
+	if mr.RunnerName != tokens.RunnerName {
+		return fmt.Errorf("tokens.RunnerName[%v] is not match %v", tokens.RunnerName, mr.RunnerName)
+	}
+	if len(mr.senders) > tokens.SenderIndex {
+		if tokenSender, ok := mr.senders[tokens.SenderIndex].(sender.TokenRefreshable); ok {
+			return tokenSender.TokenRefresh(tokens.SenderTokens)
+		}
+	}
+	return nil
+}
+
 func (mr *MetricRunner) StatusRestore() {
 	rStat, err := mr.meta.ReadStatistic()
 

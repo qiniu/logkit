@@ -152,7 +152,8 @@ type PandoraOption struct {
 	isMetrics  bool
 	expandAttr []string
 
-	tokens Tokens
+	tokens    Tokens
+	tokenLock *sync.RWMutex
 }
 
 //PandoraMaxBatchSize 发送到Pandora的batch限制
@@ -227,7 +228,11 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	isMetrics, _ := conf.GetBoolOr(KeyIsMetrics, false)
 	unescape, _ := conf.GetBoolOr(KeyPandoraUnescape, false)
 
-	tokens := getTokensFromConf(conf)
+	var subErr error
+	var tokens Tokens
+	if tokens, subErr = getTokensFromConf(conf); subErr != nil {
+		log.Warnf(subErr.Error())
+	}
 
 	if skFromEnv == "" && tokens.SchemaFreeTokens.PipelinePostDataToken.Token == "" {
 		err = fmt.Errorf("your authrization config is empty, need to config ak/sk or tokens")
@@ -280,7 +285,8 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 		isMetrics:          isMetrics,
 		UnescapeLine:       unescape,
 
-		tokens: tokens,
+		tokens:    tokens,
+		tokenLock: new(sync.RWMutex),
 	}
 	if withIp {
 		opt.withip = "logkitIP"
@@ -288,9 +294,9 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	return newPandoraSender(opt)
 }
 
-func getTokensFromConf(conf conf.MapConf) (tokens Tokens) {
+func getTokensFromConf(conf conf.MapConf) (tokens Tokens, err error) {
 	// schema free tokens
-	preFix := "schema_free_tokens_"
+	preFix := SchemaFreeTokensPrefix
 	tokens.SchemaFreeTokens.PipelineGetRepoToken.Token, _ = conf.GetStringOr(preFix+"pipeline_get_repo_token", "")
 	tokens.SchemaFreeTokens.PipelinePostDataToken.Token, _ = conf.GetStringOr(preFix+"pipeline_post_data_token", "")
 	tokens.SchemaFreeTokens.PipelineCreateRepoToken.Token, _ = conf.GetStringOr(preFix+"pipeline_create_repo_token", "")
@@ -302,7 +308,7 @@ func getTokensFromConf(conf conf.MapConf) (tokens Tokens) {
 	tokens.SchemaFreeTokens.PipelineGetWorkflowStatusToken.Token, _ = conf.GetStringOr(preFix+"pipeline_Get_workflow_status_token", "")
 
 	// logDB tokens
-	preFix = "logdb_tokens_"
+	preFix = LogDBTokensPrefix
 	tokens.LogDBTokens.PipelineGetRepoToken.Token, _ = conf.GetStringOr(preFix+"pipeline_get_repo_token", "")
 	tokens.LogDBTokens.PipelineCreateRepoToken.Token, _ = conf.GetStringOr(preFix+"pipeline_create_repo_token", "")
 	tokens.LogDBTokens.CreateLogDBRepoToken.Token, _ = conf.GetStringOr(preFix+"create_logdb_repo_token", "")
@@ -314,7 +320,7 @@ func getTokensFromConf(conf conf.MapConf) (tokens Tokens) {
 	tokens.LogDBTokens.ListExportToken.Token, _ = conf.GetStringOr(preFix+"list_export_token", "")
 
 	// tsDB tokens
-	preFix = "tsdb_tokens_"
+	preFix = TsDBTokensPrefix
 	tokens.TsDBTokens.PipelineGetRepoToken.Token, _ = conf.GetStringOr(preFix+"pipeline_get_repo_token", "")
 	tokens.TsDBTokens.CreateTSDBRepoToken.Token, _ = conf.GetStringOr(preFix+"create_tsdb_repo_token", "")
 	tokens.TsDBTokens.ListExportToken.Token, _ = conf.GetStringOr(preFix+"list_export_token", "")
@@ -328,7 +334,8 @@ func getTokensFromConf(conf conf.MapConf) (tokens Tokens) {
 	for _, v := range strings.Split(createSeriesTokenStr, ",") {
 		tmpArr := strings.Split(strings.TrimSpace(v), " ")
 		if len(tmpArr) < 2 {
-			log.Warnf("parser create series token error, string[%v] is invalid, will not use token", v)
+			err = fmt.Errorf("parser create series token error, string[%v] is invalid, will not use token", v)
+			return
 		} else {
 			tokens.TsDBTokens.CreateTSDBSeriesTokens[tmpArr[0]] = models.PandoraToken{Token: strings.Join(tmpArr[1:], " ")}
 		}
@@ -337,7 +344,8 @@ func getTokensFromConf(conf conf.MapConf) (tokens Tokens) {
 	for _, v := range strings.Split(createExTokenStr, ",") {
 		tmpArr := strings.Split(strings.TrimSpace(v), " ")
 		if len(tmpArr) < 2 {
-			log.Warnf("parser create export token error, string[%v] is invalid, will not use token", v)
+			err = fmt.Errorf("parser create export token error, string[%v] is invalid, will not use token", v)
+			return
 		} else {
 			tokens.TsDBTokens.CreateExportToken[tmpArr[0]] = models.PandoraToken{Token: strings.Join(tmpArr[1:], " ")}
 		}
@@ -346,7 +354,8 @@ func getTokensFromConf(conf conf.MapConf) (tokens Tokens) {
 	for _, v := range strings.Split(updateExTokenStr, ",") {
 		tmpArr := strings.Split(strings.TrimSpace(v), " ")
 		if len(tmpArr) < 2 {
-			log.Warnf("parser update export token error, string[%v] is invalid, will not use token", v)
+			err = fmt.Errorf("parser update export token error, string[%v] is invalid, will not use token", v)
+			return
 		} else {
 			tokens.TsDBTokens.UpdateExportToken[tmpArr[0]] = models.PandoraToken{Token: strings.Join(tmpArr[1:], " ")}
 		}
@@ -355,21 +364,32 @@ func getTokensFromConf(conf conf.MapConf) (tokens Tokens) {
 	for _, v := range strings.Split(getExTokenStr, ",") {
 		tmpArr := strings.Split(strings.TrimSpace(v), " ")
 		if len(tmpArr) <= 2 {
-			log.Warnf("parser get export token error, string[%v] is invalid, will not use token", v)
+			err = fmt.Errorf("parser get export token error, string[%v] is invalid, will not use token", v)
+			return
 		} else {
 			tokens.TsDBTokens.GetExportToken[tmpArr[0]] = models.PandoraToken{Token: strings.Join(tmpArr[1:], " ")}
 		}
 	}
 
 	// kodo tokens
-	preFix = "kodo_tokens_"
+	preFix = KodoTokensPrefix
 	tokens.KodoTokens.PipelineGetRepoToken.Token, _ = conf.GetStringOr(preFix+"pipeline_get_repo_token", "")
 	tokens.KodoTokens.CreateExportToken.Token, _ = conf.GetStringOr(preFix+"create_export_token", "")
 	tokens.KodoTokens.UpdateExportToken.Token, _ = conf.GetStringOr(preFix+"update_export_token", "")
 	tokens.KodoTokens.GetExportToken.Token, _ = conf.GetStringOr(preFix+"get_export_token", "")
 	tokens.KodoTokens.ListExportToken.Token, _ = conf.GetStringOr(preFix+"list_export_token", "")
-
 	return
+}
+
+func (s *PandoraSender) TokenRefresh(mapConf conf.MapConf) error {
+	s.opt.tokenLock.Lock()
+	defer s.opt.tokenLock.Unlock()
+	if tokens, err := getTokensFromConf(mapConf); err != nil {
+		return err
+	} else {
+		s.opt.tokens = tokens
+	}
+	return nil
 }
 
 func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
@@ -714,15 +734,6 @@ func validSchema(valueType string, value interface{}) bool {
 	return true
 }
 
-func deleteExtraAttr(data Data) {
-	// 如果用户数据中本来就含有以下字段，则该函数会造成用户数据残缺
-	delete(data, KeyCore)
-	delete(data, KeyOsInfo)
-	delete(data, KeyLocalIp)
-	delete(data, KeyHostName)
-	delete(data, KeyLogkitSendTime)
-}
-
 func (s *PandoraSender) getSchemasAlias() (map[string]pipeline.RepoSchemaEntry, map[string]string) {
 	s.schemasMux.RLock()
 	defer s.schemasMux.RUnlock()
@@ -821,7 +832,8 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 		point := s.generatePoint(d)
 		points = append(points, pipeline.Data(map[string]interface{}(point)))
 	}
-	schemas, se := s.client.PostDataSchemaFree(&pipeline.SchemaFreeInput{
+	s.opt.tokenLock.RLock()
+	schemaFreeInput := &pipeline.SchemaFreeInput{
 		WorkflowName:    s.opt.workflowName,
 		RepoName:        s.opt.repoName,
 		NoUpdate:        !s.opt.schemaFree,
@@ -863,7 +875,9 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 			},
 			ForceDataConvert: s.opt.forceDataConvert,
 		},
-	})
+	}
+	s.opt.tokenLock.RUnlock()
+	schemas, se := s.client.PostDataSchemaFree(schemaFreeInput)
 	if schemas != nil {
 		s.updateSchemas(schemas)
 	}
