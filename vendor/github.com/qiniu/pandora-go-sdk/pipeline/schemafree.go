@@ -122,6 +122,8 @@ func dataConvert(data interface{}, schema RepoSchemaEntry) (converted interface{
 				return "", err
 			}
 			return string(str), nil
+		case nil:
+			return "", nil
 		default:
 			v := reflect.ValueOf(data)
 			switch v.Kind() {
@@ -740,6 +742,9 @@ func (c *Pipeline) InitOrUpdateWorkflow(input *InitOrUpdateWorkflowInput) error 
 		if err != nil {
 			return err
 		}
+		if !needUpdate && len(schemas) > 0 {
+			needUpdate = isRepoOptionNeedUpdate(repo.Options, input.RepoOptions)
+		}
 		if needUpdate && input.SchemaFree {
 			updateRepoInput := &UpdateRepoInput{
 				RepoName:             input.RepoName,
@@ -799,6 +804,19 @@ func (c *Pipeline) InitOrUpdateWorkflow(input *InitOrUpdateWorkflowInput) error 
 		}
 	}
 	return nil
+}
+
+func isRepoOptionNeedUpdate(old, new *RepoOptions) bool {
+	if new == nil {
+		return false
+	}
+	if old == nil {
+		return true
+	}
+	if old.UnescapeLine == new.UnescapeLine && old.WithTimestamp == new.WithTimestamp && old.WithIP == new.WithIP {
+		return false
+	}
+	return true
 }
 
 func (c *Pipeline) addRepoSchemas(addSchemas map[string]RepoSchemaEntry, input *InitOrUpdateWorkflowInput) (err error) {

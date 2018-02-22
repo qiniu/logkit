@@ -40,11 +40,12 @@ var (
 	}
 
 	OptionDisableRecordErrData = Option{
-		KeyName:      KeyDisableRecordErrData,
-		ChooseOnly:   false,
-		Default:      "",
-		DefaultNoUse: false,
-		Description:  "不记录解析失败的数据(disable_record_errdata)",
+		KeyName:       KeyDisableRecordErrData,
+		ChooseOnly:    true,
+		ChooseOptions: []interface{}{"false", "true"},
+		Default:       "false",
+		DefaultNoUse:  false,
+		Description:   "禁止记录解析失败数据(disable_record_errdata)",
 	}
 )
 

@@ -68,6 +68,7 @@ const (
 	KeyForceDataConvert       = "pandora_force_convert"
 	KeyPandoraAutoConvertDate = "pandora_auto_convert_date"
 	KeyIgnoreInvalidField     = "ignore_invalid_field"
+	KeyPandoraUnescape        = "pandora_unescape"
 
 	PandoraUUID = "Pandora_UUID"
 
@@ -146,6 +147,7 @@ type PandoraOption struct {
 	autoConvertDate    bool
 	useragent          string
 	logkitSendTime     bool
+	UnescapeLine       bool
 
 	isMetrics  bool
 	expandAttr []string
@@ -223,6 +225,8 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	autoconvertDate, _ := conf.GetBoolOr(KeyPandoraAutoConvertDate, true)
 	logkitSendTime, _ := conf.GetBoolOr(KeyLogkitSendTime, true)
 	isMetrics, _ := conf.GetBoolOr(KeyIsMetrics, false)
+	unescape, _ := conf.GetBoolOr(KeyPandoraUnescape, false)
+
 	tokens := getTokensFromConf(conf)
 
 	if skFromEnv == "" && tokens.SchemaFreeTokens.PipelinePostDataToken.Token == "" {
@@ -274,7 +278,9 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 		useragent:          useragent,
 		logkitSendTime:     logkitSendTime,
 		isMetrics:          isMetrics,
-		tokens:             tokens,
+		UnescapeLine:       unescape,
+
+		tokens: tokens,
 	}
 	if withIp {
 		opt.withip = "logkitIP"
@@ -322,7 +328,7 @@ func getTokensFromConf(conf conf.MapConf) (tokens Tokens) {
 	for _, v := range strings.Split(createSeriesTokenStr, ",") {
 		tmpArr := strings.Split(strings.TrimSpace(v), " ")
 		if len(tmpArr) < 2 {
-			log.Errorf("parser create series token error, string[%v] is invalid", v)
+			log.Warnf("parser create series token error, string[%v] is invalid, will not use token", v)
 		} else {
 			tokens.TsDBTokens.CreateTSDBSeriesTokens[tmpArr[0]] = models.PandoraToken{Token: strings.Join(tmpArr[1:], " ")}
 		}
@@ -331,7 +337,7 @@ func getTokensFromConf(conf conf.MapConf) (tokens Tokens) {
 	for _, v := range strings.Split(createExTokenStr, ",") {
 		tmpArr := strings.Split(strings.TrimSpace(v), " ")
 		if len(tmpArr) < 2 {
-			log.Errorf("parser create export token error, string[%v] is invalid", v)
+			log.Warnf("parser create export token error, string[%v] is invalid, will not use token", v)
 		} else {
 			tokens.TsDBTokens.CreateExportToken[tmpArr[0]] = models.PandoraToken{Token: strings.Join(tmpArr[1:], " ")}
 		}
@@ -340,7 +346,7 @@ func getTokensFromConf(conf conf.MapConf) (tokens Tokens) {
 	for _, v := range strings.Split(updateExTokenStr, ",") {
 		tmpArr := strings.Split(strings.TrimSpace(v), " ")
 		if len(tmpArr) < 2 {
-			log.Errorf("parser update export token error, string[%v] is invalid", v)
+			log.Warnf("parser update export token error, string[%v] is invalid, will not use token", v)
 		} else {
 			tokens.TsDBTokens.UpdateExportToken[tmpArr[0]] = models.PandoraToken{Token: strings.Join(tmpArr[1:], " ")}
 		}
@@ -349,7 +355,7 @@ func getTokensFromConf(conf conf.MapConf) (tokens Tokens) {
 	for _, v := range strings.Split(getExTokenStr, ",") {
 		tmpArr := strings.Split(strings.TrimSpace(v), " ")
 		if len(tmpArr) <= 2 {
-			log.Errorf("parser get export token error, string[%v] is invalid", v)
+			log.Warnf("parser get export token error, string[%v] is invalid, will not use token", v)
 		} else {
 			tokens.TsDBTokens.GetExportToken[tmpArr[0]] = models.PandoraToken{Token: strings.Join(tmpArr[1:], " ")}
 		}
@@ -441,7 +447,7 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 		RepoName:        s.opt.repoName,
 		Schema:          schemas,
 		SchemaFreeToken: s.opt.tokens.SchemaFreeTokens,
-		RepoOptions:     &pipeline.RepoOptions{WithIP: s.opt.withip},
+		RepoOptions:     &pipeline.RepoOptions{WithIP: s.opt.withip, UnescapeLine: s.opt.UnescapeLine},
 		Option: &pipeline.SchemaFreeOption{
 			ToLogDB: s.opt.enableLogdb,
 			AutoExportToLogDBInput: pipeline.AutoExportToLogDBInput{
@@ -821,7 +827,7 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 		NoUpdate:        !s.opt.schemaFree,
 		Datas:           points,
 		SchemaFreeToken: s.opt.tokens.SchemaFreeTokens,
-		RepoOptions:     &pipeline.RepoOptions{WithIP: s.opt.withip},
+		RepoOptions:     &pipeline.RepoOptions{WithIP: s.opt.withip, UnescapeLine: s.opt.UnescapeLine},
 		Option: &pipeline.SchemaFreeOption{
 			ToLogDB: s.opt.enableLogdb,
 			AutoExportToLogDBInput: pipeline.AutoExportToLogDBInput{
