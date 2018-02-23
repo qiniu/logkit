@@ -387,6 +387,16 @@ var ModeKeyOptions = map[string][]Option{
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   "时间类型自动转换(pandora_auto_convert_date)",
+			Advance:       true,
+		},
+		{
+			KeyName:       KeyPandoraUnescape,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"true", "false"},
+			Default:       "true",
+			DefaultNoUse:  false,
+			Description:   "服务端反转译换行和制表符(pandora_unescape)",
+			Advance:       true,
 		},
 	},
 	TypeMongodbAccumulate: {

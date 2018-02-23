@@ -141,10 +141,12 @@ func (sf *SeqFile) getIgnoreCondition() func(os.FileInfo) bool {
 		}
 		match, err := filepath.Match(sf.validFilePattern, fi.Name())
 		if err != nil {
-			log.Errorf("Runner[%v] when read dir %s, get not valid file pattern. Error->%v", sf.meta.RunnerName, sf.dir, err)
+			log.Errorf("when read dir %s, get not valid file pattern. Error->%v", sf.dir, err)
 			return false
 		}
-
+		if !match {
+			log.Debugf(" when read dir %s, get no valid file in pattern %v", sf.dir, sf.validFilePattern)
+		}
 		return match
 	}
 }
@@ -300,7 +302,7 @@ func (sf *SeqFile) nextFile() (fi os.FileInfo, err error) {
 			return
 		}
 		// 当前读取的文件已经被删除
-		log.Warnf("Runner[%v] stat current file error %v, start to find the oldest file", sf.meta.RunnerName, err)
+		log.Warnf("Runner[%v] stat current file [%v] error %v, start to find the oldest file", sf.meta.RunnerName, sf.currFile, err)
 		condition = sf.getIgnoreCondition()
 	} else {
 		newerThanCurrFile := func(f os.FileInfo) bool {
@@ -315,6 +317,8 @@ func (sf *SeqFile) nextFile() (fi os.FileInfo, err error) {
 	}
 	if sf.isNewFile(fi, filepath.Join(sf.dir, fi.Name())) {
 		return fi, nil
+	} else {
+		log.Warnf("Runner[%v] %v is not new file", sf.meta.RunnerName, fi.Name())
 	}
 	return nil, nil
 }
