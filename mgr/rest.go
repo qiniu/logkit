@@ -292,6 +292,13 @@ func convertWebParserConfig(conf conf.MapConf) conf.MapConf {
 		}
 		conf[parser.KeyGrokCustomPatterns] = string(CustomPatterns)
 	}
+
+	splitter, _ := conf.GetStringOr(parser.KeyCSVSplitter, "")
+	if splitter != "" {
+		splitter = strings.Replace(splitter, "\\t", "\t", -1)
+		conf[parser.KeyCSVSplitter] = splitter
+	}
+
 	return conf
 }
 

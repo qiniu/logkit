@@ -1066,3 +1066,14 @@ func senderRouterTest(p *testParam) {
 	}
 	assert.Equal(t, 4, dataCnt)
 }
+
+func TestConvertWebParserConfig(t *testing.T) {
+	cf := conf.MapConf{
+		parser.KeyCSVSplitter: "\\t",
+	}
+	newcf := convertWebParserConfig(cf)
+	expcf := conf.MapConf{
+		parser.KeyCSVSplitter: "\t",
+	}
+	assert.Equal(t, expcf, newcf)
+}
