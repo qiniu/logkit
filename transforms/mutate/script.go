@@ -7,9 +7,9 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/qiniu/log"
 	"github.com/robertkrimen/otto"
@@ -77,12 +77,12 @@ func parseKey(key string) ([][]string, []string, error) {
 	return keyss, vars, nil
 }
 
-func (g *Script) Transform(datas []sender.Data) (returnData []sender.Data, ferr error) {
+func (g *Script) Transform(datas []Data) (returnData []Data, ferr error) {
 	var err error
 	errnums := 0
 	g.vm = otto.New()
 	g.vm.Interrupt = make(chan func(), 1) // The buffer prevents blocking
-	returnData = utils.DeepCopy(datas).([]sender.Data)
+	returnData = utils.DeepCopy(datas).([]Data)
 	halt := fmt.Errorf("script transformer execution timeout of %v second, the transform script is: %s , the batch size is %v", int(timeOut), g.Script, len(datas))
 	ctx := context.Background()
 	cancelCtx, cancel := context.WithCancel(ctx)
@@ -207,8 +207,8 @@ func (g *Script) SampleConfig() string {
 	}`
 }
 
-func (g *Script) ConfigOptions() []utils.Option {
-	return []utils.Option{
+func (g *Script) ConfigOptions() []Option {
+	return []Option{
 		transforms.KeyFieldName,
 		{
 			KeyName:      "newKey",

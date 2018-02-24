@@ -252,11 +252,11 @@ func (rs *RestService) GetStatus() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		name, _, _, err := rs.checkNameAndConfig(c)
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrConfigName, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrConfigName, err.Error())
 		}
 		status, err := rs.mgr.GetRunnerStatus(name)
 		if err != nil {
-			return RespError(c, http.StatusBadRequest, utils.ErrConfigName, err.Error())
+			return RespError(c, http.StatusBadRequest, ErrConfigName, err.Error())
 		}
 		return RespSuccess(c, status)
 	}
