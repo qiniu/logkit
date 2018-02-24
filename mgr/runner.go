@@ -419,7 +419,7 @@ func (r *LogExportRunner) Run() {
 	}()
 	tags := r.meta.GetTags()
 	datasourceTag := r.meta.GetDataSourceTag()
-	schemaErr := utils.SchemaErr{Number: 0, Last: time.Now()}
+	schemaErr := utils.SchemaErr{Number: 0, Last: time.Unix(0, 0)}
 	tags = GetEnvTag(r.EnvTag, tags)
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
@@ -497,6 +497,9 @@ func (r *LogExportRunner) Run() {
 			r.rs.ParserStats.Errors++
 		} else {
 			r.rs.ParserStats.Success++
+		}
+		if err != nil {
+			r.rs.ParserStats.LastError = err.Error()
 		}
 		r.rsMutex.Unlock()
 		if err != nil {
