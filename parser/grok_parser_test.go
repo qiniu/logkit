@@ -5,13 +5,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/qiniu/logkit/sender"
 )
 
-var grokBench sender.Data
+var grokBench Data
 
 func Benchmark_GrokParseLine_NGINX(b *testing.B) {
 	p := &GrokParser{
@@ -19,7 +19,7 @@ func Benchmark_GrokParseLine_NGINX(b *testing.B) {
 	}
 	p.compile()
 
-	var m sender.Data
+	var m Data
 	for n := 0; n < b.N; n++ {
 		m, _ = p.parseLine(`127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326`)
 	}
@@ -32,7 +32,7 @@ func Benchmark_GrokParseLine_PANDORANGINX(b *testing.B) {
 	}
 	p.compile()
 
-	var m sender.Data
+	var m Data
 	for n := 0; n < b.N; n++ {
 		m, _ = p.parseLine(`123.0.0.1 - - [17/Jul/2017:14:56:24 +0800] "POST /v2/repos/x/data HTTP/1.1" 200 479 2 "-" "QiniuPandoraJava/0.0.1 (Linux amd64 2.6.32-696.1.1.el6.x86_64) Java/1.8.0_131" "-" 192.168.160.75:80 pipeline.qiniu.com abc123bdc 0.072`)
 	}
@@ -45,7 +45,7 @@ func Benchmark_GrokParseLine_Common(b *testing.B) {
 	}
 	p.compile()
 
-	var m sender.Data
+	var m Data
 	for n := 0; n < b.N; n++ {
 		m, _ = p.parseLine(`127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326`)
 	}
@@ -116,7 +116,7 @@ func TestSimpleParse(t *testing.T) {
 	require.NotNil(t, m)
 
 	assert.Equal(t,
-		sender.Data{
+		Data{
 			"num":    int64(142),
 			"client": "bot",
 		},
@@ -187,7 +187,7 @@ func TestParserName(t *testing.T) {
 	require.NotNil(t, m)
 	assert.NoError(t, err)
 	assert.Equal(t,
-		sender.Data{
+		Data{
 			"resp_bytes":   int64(2326),
 			"auth":         "frank",
 			"client_ip":    "127.0.0.1",
@@ -213,7 +213,7 @@ func TestCLF_IPv6(t *testing.T) {
 	require.NotNil(t, m)
 	assert.NoError(t, err)
 	assert.Equal(t,
-		sender.Data{
+		Data{
 			"client_ip":    "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
 			"ts":           "2000-10-10T13:55:36-07:00",
 			"verb":         "GET",
@@ -231,7 +231,7 @@ func TestCLF_IPv6(t *testing.T) {
 	require.NotNil(t, m)
 	assert.NoError(t, err)
 	assert.Equal(t,
-		sender.Data{
+		Data{
 			"resp_bytes":   int64(2326),
 			"auth":         "frank",
 			"client_ip":    "::1",
@@ -258,7 +258,7 @@ func TestCustomInfluxdbHttpd(t *testing.T) {
 	require.NotNil(t, m)
 	assert.NoError(t, err)
 	assert.Equal(t,
-		sender.Data{
+		Data{
 			"resp_bytes":       int64(0),
 			"auth":             "-",
 			"client_ip":        "::1",
@@ -280,7 +280,7 @@ func TestCustomInfluxdbHttpd(t *testing.T) {
 	require.NotNil(t, m)
 	assert.NoError(t, err)
 	assert.Equal(t,
-		sender.Data{
+		Data{
 			"resp_bytes":       int64(578),
 			"auth":             "-",
 			"client_ip":        "::1",
@@ -311,7 +311,7 @@ func TestBuiltinCommonLogFormat(t *testing.T) {
 	require.NotNil(t, m)
 	assert.NoError(t, err)
 	assert.Equal(t,
-		sender.Data{
+		Data{
 			"resp_bytes":   int64(2326),
 			"auth":         "frank",
 			"client_ip":    "127.0.0.1",
@@ -338,7 +338,7 @@ func TestBuiltinCommonLogFormatWithNumbers(t *testing.T) {
 	require.NotNil(t, m)
 	assert.NoError(t, err)
 	assert.Equal(t,
-		sender.Data{
+		Data{
 			"resp_bytes":   int64(2326),
 			"auth":         "frank1234",
 			"client_ip":    "127.0.0.1",
@@ -365,7 +365,7 @@ func TestBuiltinCombinedLogFormat(t *testing.T) {
 	require.NotNil(t, m)
 	assert.NoError(t, err)
 	assert.Equal(t,
-		sender.Data{
+		Data{
 			"resp_bytes":   int64(2326),
 			"auth":         "frank",
 			"client_ip":    "127.0.0.1",
@@ -397,7 +397,7 @@ func TestCompileStringAndParse(t *testing.T) {
 	require.NotNil(t, metricA)
 	assert.NoError(t, err)
 	assert.Equal(t,
-		sender.Data{
+		Data{
 			"clientip":      "192.168.1.1",
 			"myfloat":       float64(1.25),
 			"response_time": "5.432µs",
@@ -422,7 +422,7 @@ func TestCompileInvalidStringAndParse(t *testing.T) {
 	require.NotNil(t, metricA)
 	assert.NoError(t, err)
 	assert.Equal(t,
-		sender.Data{
+		Data{
 			"clientip":      "192.168.1.1",
 			"myfloat":       float64(1.25),
 			"response_time": "5.432µs",
@@ -457,7 +457,7 @@ func TestParsePatternsWithoutCustom(t *testing.T) {
 	require.NotNil(t, metricA)
 	assert.NoError(t, err)
 	assert.Equal(t,
-		sender.Data{
+		Data{
 			"response_time": int64(20821),
 			"metric":        float64(10890.645),
 			"ts":            int64(1466004605359052000),
@@ -476,7 +476,7 @@ func TestCompileFileAndParse(t *testing.T) {
 	require.NotNil(t, metricA)
 	assert.NoError(t, err)
 	assert.Equal(t,
-		sender.Data{
+		Data{
 			"clientip":      "192.168.1.1",
 			"myfloat":       float64(1.25),
 			"response_time": "5.432µs",
@@ -490,7 +490,7 @@ func TestCompileFileAndParse(t *testing.T) {
 	require.NotNil(t, metricB)
 	assert.NoError(t, err)
 	assert.Equal(t,
-		sender.Data{
+		Data{
 			"myfloat":    1.25,
 			"mystring":   "mystring",
 			"nomodifier": "nomodifier",
@@ -513,7 +513,7 @@ func TestCompileNoModifiersAndParse(t *testing.T) {
 	require.NotNil(t, metricA)
 	assert.NoError(t, err)
 	assert.Equal(t,
-		sender.Data{
+		Data{
 			"clientip": "192.168.1.1",
 			"myfloat":  "1.25",
 			"rt":       "5.432µs",
@@ -650,7 +650,7 @@ func TestParseMultiLine(t *testing.T) {
 	data, err := p.parseLine(strings.Join(lines, "\n"))
 	assert.NoError(t, err)
 	assert.Equal(t,
-		sender.Data{
+		Data{
 			"timestamp": "05-May-2017 13:44:39",
 			"type":      "pool",
 			"message":   "pid 4109 script_filename = /data/html/log.ushengsheng.com/index.php [0x00007fec119d1720] curl_exec() /data/html/xyframework/base/XySoaClient.php:357 [0x00007fec119d1590] request_post() /data/html/xyframework/base/XySoaClient.php:284 [0x00007fff39d538b0] __call() unknown:0 [0x00007fec119d13a8] add() /data/html/log.ushengsheng.com/1/interface/ErrorLogInterface.php:70 [0x00007fec119d1298] log() /data/html/log.ushengsheng.com/1/interface/ErrorLogInterface.php:30 [0x00007fec119d1160] android() /data/html/xyframework/core/x.php:215 [0x00007fec119d0ff8] +++ dump failed",
@@ -772,4 +772,24 @@ func TestAddCustomPatterns(t *testing.T) {
 		`,
 	}
 	assert.Error(t, p.compile())
+}
+
+func TestNginxTimeParseForErrData(t *testing.T) {
+	p := &GrokParser{
+		Patterns: []string{"%{test}"},
+	}
+
+	lines := []string{`192.168.45.53 - - [05/Apr/2017:17:25:06 +0800] "POST /v2/repos/kodo_z0_app_pfdstg/data HTTP/1.1" 200 497 2 "-" "Go 1.1 package http" "-" 192.168.160.1:80 pipeline.qiniu.io KBkAAD7W6-UfdrIU 0.139`}
+	m, err := p.Parse(lines)
+	if err != nil {
+		errx, _ := err.(*utils.StatsError)
+		assert.Equal(t, int64(1), errx.StatsInfo.Errors)
+	}
+	if len(m) != 1 {
+		t.Fatalf("parse lines error, expect 1 line but got %v lines", len(m))
+	}
+
+	for _, v := range m {
+		assert.EqualValues(t, lines[0], v[KeyPandoraStash])
+	}
 }

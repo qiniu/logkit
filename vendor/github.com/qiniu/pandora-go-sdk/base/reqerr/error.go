@@ -49,6 +49,7 @@ const (
 	EntityTooLargeError
 	ErrInvalidVariableType
 	InvalidDataSchemaError
+	ErrIncompatibleRepoSchema
 	ErrDBNameInvalidError
 	ErrInvalidSqlError
 	ErrInternalServerError
@@ -84,6 +85,8 @@ const (
 	ErrInvalidUdfJarName
 	ErrInvalidUdfFuncName
 	ErrInvalidJavaClassName
+	ErrStartExport
+	ErrStopExport
 	ErrUdfClassTypeError
 	ErrUdfClassNotFound
 	ErrUdfFunctionNotImplement
@@ -125,6 +128,11 @@ const (
 	ErrTimeFormatInvalid
 	ErrNoSuchResourceOwner
 	ErrAccessDenied
+	ErrTransformRepeatRestart
+	ErrFusionPathUsedStringVariable
+	ErrFusionPathWithUndefinedVariable
+	ErrTooManySchema
+	ErrSchemaLimitUnderflow
 )
 
 type ErrBuilder interface {

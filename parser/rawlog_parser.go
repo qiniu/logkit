@@ -6,8 +6,8 @@ import (
 
 	"errors"
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (
@@ -22,17 +22,21 @@ func NewRawlogParser(c conf.MapConf) (LogParser, error) {
 	nameMap := make(map[string]struct{})
 	labels := GetLabels(labelList, nameMap)
 
+	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+
 	return &RawlogParser{
-		name:          name,
-		labels:        labels,
-		withTimeStamp: withtimestamp,
+		name:                 name,
+		labels:               labels,
+		withTimeStamp:        withtimestamp,
+		disableRecordErrData: disableRecordErrData,
 	}, nil
 }
 
 type RawlogParser struct {
-	name          string
-	labels        []Label
-	withTimeStamp bool
+	name                 string
+	labels               []Label
+	withTimeStamp        bool
+	disableRecordErrData bool
 }
 
 func (p *RawlogParser) Name() string {
@@ -43,19 +47,24 @@ func (p *RawlogParser) Type() string {
 	return TypeRaw
 }
 
-func (p *RawlogParser) Parse(lines []string) ([]sender.Data, error) {
+func (p *RawlogParser) Parse(lines []string) ([]Data, error) {
 	emptyErr := errors.New("empty line error")
 	se := &utils.StatsError{}
-	datas := []sender.Data{}
+	datas := []Data{}
 	for idx, line := range lines {
 		line = strings.TrimSpace(line)
 		if len(line) <= 0 {
 			se.AddErrors()
 			se.ErrorDetail = emptyErr
 			se.ErrorIndex = append(se.ErrorIndex, idx)
+			if !p.disableRecordErrData {
+				errData := make(Data)
+				errData[KeyPandoraStash] = line
+				datas = append(datas, errData)
+			}
 			continue
 		}
-		d := sender.Data{}
+		d := Data{}
 		d[KeyRaw] = line
 		if p.withTimeStamp {
 			d[KeyTimestamp] = time.Now().Format(time.RFC3339Nano)

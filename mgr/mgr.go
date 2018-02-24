@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/cleaner"
 	config "github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
@@ -17,7 +18,7 @@ import (
 	"github.com/qiniu/logkit/utils"
 
 	"github.com/howeyc/fsnotify"
-	"github.com/qiniu/log"
+	"github.com/json-iterator/go"
 )
 
 var DIR_NOT_EXIST_SLEEP_TIME = "300" //300 s
@@ -26,10 +27,11 @@ var DEFAULT_LOGKIT_REST_DIR = "/.logkitconfs"
 type ManagerConfig struct {
 	BindHost string `json:"bind_host"`
 
-	Idc     string        `json:"idc"`
-	Zone    string        `json:"zone"`
-	RestDir string        `json:"rest_dir"`
-	Cluster ClusterConfig `json:"cluster"`
+	Idc        string        `json:"idc"`
+	Zone       string        `json:"zone"`
+	RestDir    string        `json:"rest_dir"`
+	Cluster    ClusterConfig `json:"cluster"`
+	DisableWeb bool          `json:"disable_web"`
 }
 
 type cleanQueue struct {
@@ -531,5 +533,213 @@ func (m *Manager) Configs() (rss map[string]RunnerConfig) {
 		tmpRss[k] = v
 	}
 	deepCopy(&rss, &tmpRss)
+	return
+}
+
+func (m *Manager) getDeepCopyConfig(name string) (filename string, conf RunnerConfig, err error) {
+	filename = filepath.Join(m.RestDir, name+".conf")
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	if tmpConf, ok := m.runnerConfig[filename]; !ok {
+		err = fmt.Errorf("runner %v is not found", filename)
+	} else {
+		deepCopy(&conf, &tmpConf)
+	}
+	return
+}
+
+func backupRunnerConfig(rootDir, filename string, rconf interface{}) error {
+	confBytes, err := jsoniter.MarshalIndent(rconf, "", "    ")
+	if err != nil {
+		return fmt.Errorf("runner config %v marshal failed, err is %v", rconf, err)
+	}
+	// 判断默认备份文件夹是否存在，不存在就尝试创建
+	if _, err := os.Stat(rootDir); err != nil {
+		if os.IsNotExist(err) {
+			if err = os.Mkdir(rootDir, 0755); err != nil && !os.IsExist(err) {
+				return fmt.Errorf("rest default dir not exists and make dir failed, err is %v", err)
+			}
+		}
+	}
+	return ioutil.WriteFile(filename, confBytes, 0644)
+}
+
+func (m *Manager) AddRunner(name string, conf RunnerConfig) (err error) {
+	conf.RunnerName = name
+	conf.CreateTime = time.Now().Format(time.RFC3339Nano)
+	filename := filepath.Join(m.RestDir, name+".conf")
+	if m.isRunning(filename) {
+		return fmt.Errorf("file %v runner is running", name)
+	}
+	if err = m.ForkRunner(filename, conf, true); err != nil {
+		return fmt.Errorf("forkRunner %v error %v", name, err)
+	}
+	if err = backupRunnerConfig(m.RestDir, filename, conf); err != nil {
+		// 回滚, 删除创建的 runner, 备份配置文件失败，所以此处不需要从磁盘删除配置文件
+		if rollBackErr := m.Remove(filename); rollBackErr != nil {
+			log.Errorf("runner <%v> backup RunnerConfig error and rollback error %v", rollBackErr)
+		}
+	}
+	return
+}
+
+func (m *Manager) UpdateRunner(name string, conf RunnerConfig) (err error) {
+	filename, oldConf, err := m.getDeepCopyConfig(name)
+	if err != nil {
+		return err
+	}
+	conf.RunnerName = name
+	conf.CreateTime = time.Now().Format(time.RFC3339Nano)
+	if m.isRunning(filename) {
+		if subErr := m.Remove(filename); subErr != nil {
+			return fmt.Errorf("remove runner %v error %v", filename, subErr)
+		}
+	}
+	if err = m.ForkRunner(filename, conf, true); err != nil {
+		if subErr := m.ForkRunner(filename, oldConf, true); subErr != nil {
+			log.Errorf("forkRunner error and rollback old runner error %v", subErr)
+		}
+		return fmt.Errorf("forkRunner %v error %v", filename, err)
+	}
+	if err = backupRunnerConfig(m.RestDir, filename, conf); err != nil {
+		// 备份配置失败，回滚
+		if subErr := m.Remove(filename); subErr != nil {
+			log.Errorf("runner %v update backup config error and rollback error %v", filename, subErr)
+		}
+		if subErr := m.ForkRunner(filename, oldConf, true); subErr != nil {
+			log.Errorf("runner %v update backup config error and rollback error %v", filename, subErr)
+		}
+	}
+	return
+}
+
+func (m *Manager) StartRunner(name string) (err error) {
+	filename, conf, err := m.getDeepCopyConfig(name)
+	if err != nil {
+		return err
+	}
+	if conf.IsStopped == false {
+		return fmt.Errorf("runner %v has already started", filename)
+	}
+	conf.IsStopped = false
+	if err = m.ForkRunner(filename, conf, true); err != nil {
+		return fmt.Errorf("forkRunner %v error %v", filename, err)
+	}
+	if err = backupRunnerConfig(m.RestDir, filename, conf); err != nil {
+		// 备份配置文件失败，回滚
+		if subErr := m.RemoveWithConfig(filename, false); subErr != nil {
+			log.Errorf("runner %v start backup config error and rollback error %v", name, subErr)
+		} else {
+			conf.IsStopped = true
+			m.lock.Lock()
+			m.runnerConfig[filename] = conf
+			m.lock.Unlock()
+		}
+	}
+	return
+}
+
+func (m *Manager) StopRunner(name string) (err error) {
+	filename, conf, err := m.getDeepCopyConfig(name)
+	if err != nil {
+		return err
+	}
+	if conf.IsStopped == true {
+		return fmt.Errorf("runner %v has already stopped", filename)
+	}
+	conf.IsStopped = true
+	if !m.isRunning(filename) {
+		m.lock.Lock()
+		m.runnerConfig[filename] = conf
+		m.lock.Unlock()
+		return
+	}
+	if err = m.RemoveWithConfig(filename, false); err != nil {
+		return fmt.Errorf("remove runner %v error %v", filename, err)
+	}
+	m.lock.Lock()
+	m.runnerConfig[filename] = conf
+	m.lock.Unlock()
+	if err = backupRunnerConfig(m.RestDir, filename, conf); err != nil {
+		// 备份配置文件失败，回滚
+		conf.IsStopped = false
+		if subErr := m.ForkRunner(filename, conf, true); subErr != nil {
+			log.Errorf("runner %v stop backup config error and rollback error %v", name, subErr)
+		}
+	}
+	return
+}
+
+func (m *Manager) ResetRunner(name string) (err error) {
+	filename, conf, err := m.getDeepCopyConfig(name)
+	if err != nil {
+		return err
+	}
+	status := conf.IsStopped
+	if conf.IsStopped {
+		conf.IsStopped = false
+		if err = m.ForkRunner(filename, conf, true); err != nil {
+			return fmt.Errorf("forkRunner %v reset error %v", filename, err)
+		}
+	}
+	m.lock.RLock()
+	r, runnerOk := m.runners[filename]
+	m.lock.RUnlock()
+	if !runnerOk {
+		return fmt.Errorf("runner %v is not found", filename)
+	}
+	if subErr := m.Remove(filename); subErr != nil {
+		log.Errorf("remove runner %v error %v", filename, subErr)
+	}
+	conf.IsStopped = status
+	if runnerReset, ok := r.(Resetable); ok {
+		// 出错的话，回滚并报错
+		if err = runnerReset.Reset(); err != nil {
+			if subErr := m.ForkRunner(filename, conf, true); subErr != nil {
+				log.Errorf("reset runner %v error and rollback error %v", filename, subErr)
+			}
+			return fmt.Errorf("runner %v reset error %v", filename, err)
+		}
+	} else {
+		if subErr := m.ForkRunner(filename, conf, true); subErr != nil {
+			log.Errorf("reset runner %v error and rollback error %v", filename, subErr)
+		}
+		return fmt.Errorf("runner %v is not resetable runner", filename)
+	}
+	conf.IsStopped = false
+	if err = m.ForkRunner(filename, conf, true); err != nil {
+		return fmt.Errorf("forkRunner %v error %v", filename, err)
+	}
+	return
+}
+
+func (m *Manager) DeleteRunner(name string) (err error) {
+	filename, conf, err := m.getDeepCopyConfig(name)
+	if err != nil {
+		return err
+	}
+	if conf.IsStopped {
+		m.lock.Lock()
+		delete(m.runnerConfig, filename)
+		m.lock.Unlock()
+	}
+	m.lock.RLock()
+	r, runnerOk := m.runners[filename]
+	m.lock.RUnlock()
+	if runnerOk {
+		if err = m.Remove(filename); err != nil {
+			return fmt.Errorf("remove runner %v error %v", filename, err)
+		}
+		if runnerReset, ok := r.(Resetable); ok {
+			runnerReset.Reset()
+		}
+	}
+	if err = os.Remove(filename); err != nil {
+		// 回滚
+		if subErr := m.ForkRunner(filename, conf, true); subErr != nil {
+			log.Errorf("remove runner %v error and rollback error %v", filename, subErr)
+		}
+		return fmt.Errorf("remove runner %v error %v", filename, err)
+	}
 	return
 }

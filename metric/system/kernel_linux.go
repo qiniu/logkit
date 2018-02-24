@@ -10,7 +10,7 @@ import (
 	"strconv"
 
 	"github.com/qiniu/logkit/metric"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 // /proc/stat file line prefixes to gather stats on:
@@ -36,7 +36,7 @@ const (
 )
 
 // KeyKernelUsages TypeMetricKernel 中的字段名称
-var KeyKernelUsages = []utils.KeyValue{
+var KeyKernelUsages = []KeyValue{
 	{KernelInterrupts, "内核中断次数"},
 	{KernelContextSwitches, "内核上下文切换次数"},
 	{KernelProcessesForked, "fork的进程数"},
@@ -63,7 +63,7 @@ func (_ *Kernel) Tags() []string {
 
 func (k *Kernel) Config() map[string]interface{} {
 	config := map[string]interface{}{
-		metric.OptionString:     []utils.Option{},
+		metric.OptionString:     []Option{},
 		metric.AttributesString: KeyKernelUsages,
 	}
 	return config

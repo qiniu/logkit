@@ -9,6 +9,7 @@ import (
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/Shopify/sarama"
 	"github.com/json-iterator/go"

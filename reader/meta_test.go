@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/qiniu/log"
 	"github.com/stretchr/testify/assert"
@@ -68,9 +68,9 @@ func TestMeta(t *testing.T) {
 	os.RemoveAll(metaDir)
 	// no metaDir conf except work
 	confNoMetaPath := conf.MapConf{
-		KeyLogPath:          dir,
-		utils.GlobalKeyName: "mock_runner_name",
-		KeyMode:             ModeDir,
+		KeyLogPath:    dir,
+		GlobalKeyName: "mock_runner_name",
+		KeyMode:       ModeDir,
 	}
 	meta, err = NewMetaWithConf(confNoMetaPath)
 	if err != nil {

@@ -1,4 +1,4 @@
-package utils
+package models
 
 const (
 	// 一切正常
@@ -13,11 +13,14 @@ const (
 	ErrRunnerReset  = "L1006"
 	ErrRunnerUpdate = "L1007"
 
+	// read 相关
+	ErrReadRead = "L1101"
 	// parse 相关
-	ErrParseParse = "L1101"
-
-	// transform相关
-	ErrTransformTransform = "L1201"
+	ErrParseParse = "L1201"
+	// transform 相关
+	ErrTransformTransform = "L1301"
+	// send 相关
+	ErrSendSend = "L1401"
 
 	// 集群版 master API
 	ErrClusterSlaves   = "L2001"

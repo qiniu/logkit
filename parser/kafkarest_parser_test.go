@@ -13,6 +13,7 @@ func TestKafaRestLogParser(t *testing.T) {
 	c := conf.MapConf{}
 	c[KeyParserName] = "krp-1"
 	c[KeyParserType] = "kafkarest"
+	c[KeyDisableRecordErrData] = "true"
 	ps := NewParserRegistry()
 	p, err := ps.NewLogParser(c)
 	if err != nil {
@@ -25,10 +26,14 @@ func TestKafaRestLogParser(t *testing.T) {
 		`[2016-12-07 07:35:11,009] INFO 192.168.85.32 - - [07/Dec/2016:07:35:10 +0800] "GET /topics/VIP_XfH2Fd3NRCuZpqyP_0000000000/partitions/16/messages?offset=3857621267&count=20000 HTTP/1.1" 200 448238  211 (io.confluent.rest-utils.requests)` + "\n",
 		`a b c d e f g h i j k l m n o p`,
 		`abcd efg Warn hijk`,
+		"",
 	}
 	dts, err := p.Parse(lines)
 	if err != nil {
 		t.Error(err)
+	}
+	if len(dts) != 4 {
+		t.Fatalf("parse lines error, expect 4 lines but got %v lines", len(dts))
 	}
 	expected_result_post := make(map[string]interface{})
 	expected_result_post[KEY_SRC_IP] = "172.16.16.191"
@@ -57,6 +62,44 @@ func TestKafaRestLogParser(t *testing.T) {
 			t.Errorf("unexpected result get of key:%v, %v not equal %v", k, get_line[k], v)
 		}
 	}
+	assert.EqualValues(t, "krp-1", p.Name())
+}
+
+func TestKafaRestLogParserForErrData(t *testing.T) {
+	c := conf.MapConf{}
+	c[KeyParserName] = "krp-1"
+	c[KeyParserType] = "kafkarest"
+	c[KeyDisableRecordErrData] = "false"
+	ps := NewParserRegistry()
+	p, err := ps.NewLogParser(c)
+	if err != nil {
+		t.Error(err)
+	}
+	lines := []string{
+		`[2016-12-05 03:35:20,682] INFO 172.16.16.191 - - [05/Dec/2016:03:35:20 +0000] "POST /topics/VIP_VvBVy0tuMPPspm1A_0000000000 HTTP/1.1" 200 101640  46 (io.confluent.rest-utils.requests)` + "\n",
+		"",
+	}
+	dts, err := p.Parse(lines)
+	if err != nil {
+		t.Error(err)
+	}
+	if len(dts) != 2 {
+		t.Fatalf("parse lines error, expect 2 lines but got %v lines", len(dts))
+	}
+	expected_result_post := make(map[string]interface{})
+	expected_result_post[KEY_SRC_IP] = "172.16.16.191"
+	expected_result_post[KEY_TOPIC] = "VIP_VvBVy0tuMPPspm1A_0000000000"
+	expected_result_post[KEY_METHOD] = "POST"
+	expected_result_post[KEY_CODE] = 200
+	expected_result_post[KEY_DURATION] = 46
+	expected_result_post[KEY_RESP_LEN] = 101640
+	post_line := dts[0]
+	for k, v := range expected_result_post {
+		if v != post_line[k] {
+			t.Errorf("unexpected result get of key:%v, %v not equal %v", k, post_line[k], v)
+		}
+	}
+
 	assert.EqualValues(t, "krp-1", p.Name())
 }
 

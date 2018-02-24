@@ -16,12 +16,14 @@ import (
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 
 	pipelinebase "github.com/qiniu/pandora-go-sdk/base"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 	"github.com/qiniu/pandora-go-sdk/logdb"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 
+	"github.com/qiniu/pandora-go-sdk/base/models"
 	gouuid "github.com/satori/go.uuid"
 )
 
@@ -66,10 +68,9 @@ const (
 	KeyForceDataConvert       = "pandora_force_convert"
 	KeyPandoraAutoConvertDate = "pandora_auto_convert_date"
 	KeyIgnoreInvalidField     = "ignore_invalid_field"
+	KeyPandoraUnescape        = "pandora_unescape"
 
 	PandoraUUID = "Pandora_UUID"
-
-	KeyPandoraStash = "pandora_stash" // 当只有一条数据且 sendError 时候，将其转化为 raw 发送到 pandora_stash 这个字段
 
 	timestampPrecision = 19
 )
@@ -92,6 +93,13 @@ type PandoraSender struct {
 type UserSchema struct {
 	DefaultAll bool
 	Fields     map[string]string
+}
+
+type Tokens struct {
+	LogDBTokens      pipeline.AutoExportLogDBTokens
+	TsDBTokens       pipeline.AutoExportTSDBTokens
+	KodoTokens       pipeline.AutoExportKodoTokens
+	SchemaFreeTokens pipeline.SchemaFreeToken
 }
 
 // PandoraOption 创建Pandora Sender的选项
@@ -139,9 +147,12 @@ type PandoraOption struct {
 	autoConvertDate    bool
 	useragent          string
 	logkitSendTime     bool
+	UnescapeLine       bool
 
 	isMetrics  bool
 	expandAttr []string
+
+	tokens Tokens
 }
 
 //PandoraMaxBatchSize 发送到Pandora的batch限制
@@ -164,22 +175,16 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	if err != nil {
 		return
 	}
-	ak, err := conf.GetString(KeyPandoraAk)
-	if err != nil {
-		return
-	}
+	ak, _ := conf.GetString(KeyPandoraAk)
 	akFromEnv := utils.GetEnv(ak)
 	if akFromEnv == "" {
 		akFromEnv = ak
 	}
 
-	sk, err := conf.GetString(KeyPandoraSk)
+	sk, _ := conf.GetString(KeyPandoraSk)
 	skFromEnv := utils.GetEnv(sk)
 	if skFromEnv == "" {
 		skFromEnv = sk
-	}
-	if err != nil {
-		return
 	}
 	workflowName, _ := conf.GetStringOr(KeyPandoraWorkflowName, "")
 	useragent, _ := conf.GetStringOr(InnerUserAgent, "")
@@ -220,6 +225,16 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	autoconvertDate, _ := conf.GetBoolOr(KeyPandoraAutoConvertDate, true)
 	logkitSendTime, _ := conf.GetBoolOr(KeyLogkitSendTime, true)
 	isMetrics, _ := conf.GetBoolOr(KeyIsMetrics, false)
+	unescape, _ := conf.GetBoolOr(KeyPandoraUnescape, false)
+
+	tokens := getTokensFromConf(conf)
+
+	if skFromEnv == "" && tokens.SchemaFreeTokens.PipelinePostDataToken.Token == "" {
+		err = fmt.Errorf("your authrization config is empty, need to config ak/sk or tokens")
+		log.Error(err)
+		return
+	}
+
 	opt := &PandoraOption{
 		runnerName:     runnerName,
 		name:           name,
@@ -263,6 +278,9 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 		useragent:          useragent,
 		logkitSendTime:     logkitSendTime,
 		isMetrics:          isMetrics,
+		UnescapeLine:       unescape,
+
+		tokens: tokens,
 	}
 	if withIp {
 		opt.withip = "logkitIP"
@@ -270,19 +288,88 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	return newPandoraSender(opt)
 }
 
-func createPandoraRepo(opt *PandoraOption, client pipeline.PipelineAPI) (err error) {
-	dsl := strings.TrimSpace(opt.autoCreate)
-	if dsl == "" {
-		return
-	}
-	input := &pipeline.CreateRepoDSLInput{
-		RepoName: opt.repoName,
-		Region:   opt.region,
-		DSL:      dsl,
-	}
-	input.Options = &pipeline.RepoOptions{WithIP: opt.withip}
+func getTokensFromConf(conf conf.MapConf) (tokens Tokens) {
+	// schema free tokens
+	preFix := "schema_free_tokens_"
+	tokens.SchemaFreeTokens.PipelineGetRepoToken.Token, _ = conf.GetStringOr(preFix+"pipeline_get_repo_token", "")
+	tokens.SchemaFreeTokens.PipelinePostDataToken.Token, _ = conf.GetStringOr(preFix+"pipeline_post_data_token", "")
+	tokens.SchemaFreeTokens.PipelineCreateRepoToken.Token, _ = conf.GetStringOr(preFix+"pipeline_create_repo_token", "")
+	tokens.SchemaFreeTokens.PipelineUpdateRepoToken.Token, _ = conf.GetStringOr(preFix+"pipeline_update_repo_token", "")
+	tokens.SchemaFreeTokens.PipelineGetWorkflowToken.Token, _ = conf.GetStringOr(preFix+"pipeline_get_workflow_token", "")
+	tokens.SchemaFreeTokens.PipelineStopWorkflowToken.Token, _ = conf.GetStringOr(preFix+"pipeline_stop_workflow_token", "")
+	tokens.SchemaFreeTokens.PipelineStartWorkflowToken.Token, _ = conf.GetStringOr(preFix+"pipeline_start_workflow_token", "")
+	tokens.SchemaFreeTokens.PipelineCreateWorkflowToken.Token, _ = conf.GetStringOr(preFix+"pipeline_create_workflow_token", "")
+	tokens.SchemaFreeTokens.PipelineGetWorkflowStatusToken.Token, _ = conf.GetStringOr(preFix+"pipeline_Get_workflow_status_token", "")
 
-	return client.CreateRepoFromDSL(input)
+	// logDB tokens
+	preFix = "logdb_tokens_"
+	tokens.LogDBTokens.PipelineGetRepoToken.Token, _ = conf.GetStringOr(preFix+"pipeline_get_repo_token", "")
+	tokens.LogDBTokens.PipelineCreateRepoToken.Token, _ = conf.GetStringOr(preFix+"pipeline_create_repo_token", "")
+	tokens.LogDBTokens.CreateLogDBRepoToken.Token, _ = conf.GetStringOr(preFix+"create_logdb_repo_token", "")
+	tokens.LogDBTokens.UpdateLogDBRepoToken.Token, _ = conf.GetStringOr(preFix+"update_logdb_repo_token", "")
+	tokens.LogDBTokens.GetLogDBRepoToken.Token, _ = conf.GetStringOr(preFix+"get_logdb_repo_token", "")
+	tokens.LogDBTokens.CreateExportToken.Token, _ = conf.GetStringOr(preFix+"create_export_token", "")
+	tokens.LogDBTokens.UpdateExportToken.Token, _ = conf.GetStringOr(preFix+"update_export_token", "")
+	tokens.LogDBTokens.GetExportToken.Token, _ = conf.GetStringOr(preFix+"get_export_token", "")
+	tokens.LogDBTokens.ListExportToken.Token, _ = conf.GetStringOr(preFix+"list_export_token", "")
+
+	// tsDB tokens
+	preFix = "tsdb_tokens_"
+	tokens.TsDBTokens.PipelineGetRepoToken.Token, _ = conf.GetStringOr(preFix+"pipeline_get_repo_token", "")
+	tokens.TsDBTokens.CreateTSDBRepoToken.Token, _ = conf.GetStringOr(preFix+"create_tsdb_repo_token", "")
+	tokens.TsDBTokens.ListExportToken.Token, _ = conf.GetStringOr(preFix+"list_export_token", "")
+
+	createSeriesTokenStr, _ := conf.GetStringOr(preFix+"create_tsdb_series_token", "")
+	createExTokenStr, _ := conf.GetStringOr(preFix+"create_export_token", "")
+	updateExTokenStr, _ := conf.GetStringOr(preFix+"update_export_token", "")
+	getExTokenStr, _ := conf.GetStringOr(preFix+"get_export_token", "")
+
+	tokens.TsDBTokens.CreateTSDBSeriesTokens = make(map[string]models.PandoraToken)
+	for _, v := range strings.Split(createSeriesTokenStr, ",") {
+		tmpArr := strings.Split(strings.TrimSpace(v), " ")
+		if len(tmpArr) < 2 {
+			log.Warnf("parser create series token error, string[%v] is invalid, will not use token", v)
+		} else {
+			tokens.TsDBTokens.CreateTSDBSeriesTokens[tmpArr[0]] = models.PandoraToken{Token: strings.Join(tmpArr[1:], " ")}
+		}
+	}
+	tokens.TsDBTokens.CreateExportToken = make(map[string]models.PandoraToken)
+	for _, v := range strings.Split(createExTokenStr, ",") {
+		tmpArr := strings.Split(strings.TrimSpace(v), " ")
+		if len(tmpArr) < 2 {
+			log.Warnf("parser create export token error, string[%v] is invalid, will not use token", v)
+		} else {
+			tokens.TsDBTokens.CreateExportToken[tmpArr[0]] = models.PandoraToken{Token: strings.Join(tmpArr[1:], " ")}
+		}
+	}
+	tokens.TsDBTokens.UpdateExportToken = make(map[string]models.PandoraToken)
+	for _, v := range strings.Split(updateExTokenStr, ",") {
+		tmpArr := strings.Split(strings.TrimSpace(v), " ")
+		if len(tmpArr) < 2 {
+			log.Warnf("parser update export token error, string[%v] is invalid, will not use token", v)
+		} else {
+			tokens.TsDBTokens.UpdateExportToken[tmpArr[0]] = models.PandoraToken{Token: strings.Join(tmpArr[1:], " ")}
+		}
+	}
+	tokens.TsDBTokens.GetExportToken = make(map[string]models.PandoraToken)
+	for _, v := range strings.Split(getExTokenStr, ",") {
+		tmpArr := strings.Split(strings.TrimSpace(v), " ")
+		if len(tmpArr) <= 2 {
+			log.Warnf("parser get export token error, string[%v] is invalid, will not use token", v)
+		} else {
+			tokens.TsDBTokens.GetExportToken[tmpArr[0]] = models.PandoraToken{Token: strings.Join(tmpArr[1:], " ")}
+		}
+	}
+
+	// kodo tokens
+	preFix = "kodo_tokens_"
+	tokens.KodoTokens.PipelineGetRepoToken.Token, _ = conf.GetStringOr(preFix+"pipeline_get_repo_token", "")
+	tokens.KodoTokens.CreateExportToken.Token, _ = conf.GetStringOr(preFix+"create_export_token", "")
+	tokens.KodoTokens.UpdateExportToken.Token, _ = conf.GetStringOr(preFix+"update_export_token", "")
+	tokens.KodoTokens.GetExportToken.Token, _ = conf.GetStringOr(preFix+"get_export_token", "")
+	tokens.KodoTokens.ListExportToken.Token, _ = conf.GetStringOr(preFix+"list_export_token", "")
+
+	return
 }
 
 func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
@@ -320,12 +407,12 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 		extraInfo:  utils.GetExtraInfo(),
 	}
 
-	var osInfo = []string{utils.KeyCore, utils.KeyHostName, utils.KeyOsInfo, utils.KeyLocalIp}
+	var osInfo = []string{KeyCore, KeyHostName, KeyOsInfo, KeyLocalIp}
 	analyzerMap := map[string]string{
-		utils.KeyCore:     logdb.KeyWordAnalyzer,
-		utils.KeyOsInfo:   logdb.KeyWordAnalyzer,
-		utils.KeyLocalIp:  logdb.KeyWordAnalyzer,
-		utils.KeyHostName: logdb.KeyWordAnalyzer,
+		KeyCore:     logdb.KeyWordAnalyzer,
+		KeyOsInfo:   logdb.KeyWordAnalyzer,
+		KeyLocalIp:  logdb.KeyWordAnalyzer,
+		KeyHostName: logdb.KeyWordAnalyzer,
 	}
 	s.opt.analyzerInfo.Analyzer = analyzerMap
 	expandAttr := make([]string, 0)
@@ -354,41 +441,45 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 	}
 	if initErr := s.client.InitOrUpdateWorkflow(&pipeline.InitOrUpdateWorkflowInput{
 		// 此处要的 schema 为 autoCreate 中用户指定的，所以 SchemaFree 要恒为 true
-		SchemaFree:   true,
-		Region:       s.opt.region,
-		WorkflowName: s.opt.workflowName,
-		RepoName:     s.opt.repoName,
-		Schema:       schemas,
-		RepoOptions:  &pipeline.RepoOptions{WithIP: s.opt.withip},
+		SchemaFree:      true,
+		Region:          s.opt.region,
+		WorkflowName:    s.opt.workflowName,
+		RepoName:        s.opt.repoName,
+		Schema:          schemas,
+		SchemaFreeToken: s.opt.tokens.SchemaFreeTokens,
+		RepoOptions:     &pipeline.RepoOptions{WithIP: s.opt.withip, UnescapeLine: s.opt.UnescapeLine},
 		Option: &pipeline.SchemaFreeOption{
 			ToLogDB: s.opt.enableLogdb,
 			AutoExportToLogDBInput: pipeline.AutoExportToLogDBInput{
-				OmitEmpty:    true,
-				OmitInvalid:  false,
-				RepoName:     s.opt.repoName,
-				LogRepoName:  s.opt.logdbReponame,
-				AnalyzerInfo: s.opt.analyzerInfo,
+				OmitEmpty:             true,
+				OmitInvalid:           false,
+				RepoName:              s.opt.repoName,
+				LogRepoName:           s.opt.logdbReponame,
+				AnalyzerInfo:          s.opt.analyzerInfo,
+				AutoExportLogDBTokens: s.opt.tokens.LogDBTokens,
 			},
 			ToKODO: s.opt.enableKodo,
 			AutoExportToKODOInput: pipeline.AutoExportToKODOInput{
-				Retention:  30,
-				RepoName:   s.opt.repoName,
-				BucketName: s.opt.bucketName,
-				Email:      s.opt.email,
-				Prefix:     s.opt.prefix,
-				Format:     s.opt.format,
+				Retention:            30,
+				RepoName:             s.opt.repoName,
+				BucketName:           s.opt.bucketName,
+				Email:                s.opt.email,
+				Prefix:               s.opt.prefix,
+				Format:               s.opt.format,
+				AutoExportKodoTokens: s.opt.tokens.KodoTokens,
 			},
 			ToTSDB: s.opt.enableTsdb,
 			AutoExportToTSDBInput: pipeline.AutoExportToTSDBInput{
-				OmitEmpty:    true,
-				OmitInvalid:  false,
-				IsMetric:     s.opt.isMetrics,
-				ExpandAttr:   s.opt.expandAttr,
-				RepoName:     s.opt.repoName,
-				TSDBRepoName: s.opt.tsdbReponame,
-				SeriesName:   s.opt.tsdbSeriesName,
-				SeriesTags:   s.opt.tsdbSeriesTags,
-				Timestamp:    s.opt.tsdbTimestamp,
+				OmitEmpty:            true,
+				OmitInvalid:          false,
+				IsMetric:             s.opt.isMetrics,
+				ExpandAttr:           s.opt.expandAttr,
+				RepoName:             s.opt.repoName,
+				TSDBRepoName:         s.opt.tsdbReponame,
+				SeriesName:           s.opt.tsdbSeriesName,
+				SeriesTags:           s.opt.tsdbSeriesTags,
+				Timestamp:            s.opt.tsdbTimestamp,
+				AutoExportTSDBTokens: s.opt.tokens.TsDBTokens,
 			},
 			ForceDataConvert: s.opt.forceDataConvert,
 		},
@@ -437,7 +528,11 @@ func parseUserSchema(repoName, schema string) (us UserSchema) {
 }
 
 func (s *PandoraSender) UpdateSchemas() {
-	schemas, err := s.client.GetUpdateSchemas(s.opt.repoName)
+	schemas, err := s.client.GetUpdateSchemasWithInput(
+		&pipeline.GetRepoInput{
+			RepoName:     s.opt.repoName,
+			PandoraToken: s.opt.tokens.SchemaFreeTokens.PipelineGetRepoToken,
+		})
 	if err != nil && (!s.opt.schemaFree || !reqerr.IsNoSuchResourceError(err)) {
 		log.Warnf("Runner[%v] Sender[%v]: update pandora repo <%v> schema error %v", s.opt.runnerName, s.opt.name, s.opt.repoName, err)
 		return
@@ -621,10 +716,10 @@ func validSchema(valueType string, value interface{}) bool {
 
 func deleteExtraAttr(data Data) {
 	// 如果用户数据中本来就含有以下字段，则该函数会造成用户数据残缺
-	delete(data, utils.KeyCore)
-	delete(data, utils.KeyOsInfo)
-	delete(data, utils.KeyLocalIp)
-	delete(data, utils.KeyHostName)
+	delete(data, KeyCore)
+	delete(data, KeyOsInfo)
+	delete(data, KeyLocalIp)
+	delete(data, KeyHostName)
 	delete(data, KeyLogkitSendTime)
 }
 
@@ -671,7 +766,8 @@ func (s *PandoraSender) generatePoint(data Data) (point Data) {
 		point[k] = value
 	}
 	if s.opt.uuid {
-		point[PandoraUUID] = gouuid.NewV4().String()
+		uuid, _ := gouuid.NewV4()
+		point[PandoraUUID] = uuid.String()
 	}
 	/*
 		data中剩余的值，但是在schema中不存在的，根据defaultAll和schemaFree判断是否增加。
@@ -726,40 +822,44 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 		points = append(points, pipeline.Data(map[string]interface{}(point)))
 	}
 	schemas, se := s.client.PostDataSchemaFree(&pipeline.SchemaFreeInput{
-		WorkflowName: s.opt.workflowName,
-		RepoName:     s.opt.repoName,
-		NoUpdate:     !s.opt.schemaFree,
-		Datas:        points,
-		RepoOptions:  &pipeline.RepoOptions{WithIP: s.opt.withip},
+		WorkflowName:    s.opt.workflowName,
+		RepoName:        s.opt.repoName,
+		NoUpdate:        !s.opt.schemaFree,
+		Datas:           points,
+		SchemaFreeToken: s.opt.tokens.SchemaFreeTokens,
+		RepoOptions:     &pipeline.RepoOptions{WithIP: s.opt.withip, UnescapeLine: s.opt.UnescapeLine},
 		Option: &pipeline.SchemaFreeOption{
 			ToLogDB: s.opt.enableLogdb,
 			AutoExportToLogDBInput: pipeline.AutoExportToLogDBInput{
-				OmitEmpty:    true,
-				OmitInvalid:  false,
-				RepoName:     s.opt.repoName,
-				LogRepoName:  s.opt.logdbReponame,
-				AnalyzerInfo: s.opt.analyzerInfo,
+				OmitEmpty:             true,
+				OmitInvalid:           false,
+				RepoName:              s.opt.repoName,
+				LogRepoName:           s.opt.logdbReponame,
+				AnalyzerInfo:          s.opt.analyzerInfo,
+				AutoExportLogDBTokens: s.opt.tokens.LogDBTokens,
 			},
 			ToKODO: s.opt.enableKodo,
 			AutoExportToKODOInput: pipeline.AutoExportToKODOInput{
-				Retention:  30,
-				RepoName:   s.opt.repoName,
-				BucketName: s.opt.bucketName,
-				Email:      s.opt.email,
-				Prefix:     s.opt.prefix,
-				Format:     s.opt.format,
+				Retention:            30,
+				RepoName:             s.opt.repoName,
+				BucketName:           s.opt.bucketName,
+				Email:                s.opt.email,
+				Prefix:               s.opt.prefix,
+				Format:               s.opt.format,
+				AutoExportKodoTokens: s.opt.tokens.KodoTokens,
 			},
 			ToTSDB: s.opt.enableTsdb,
 			AutoExportToTSDBInput: pipeline.AutoExportToTSDBInput{
-				OmitEmpty:    true,
-				OmitInvalid:  false,
-				IsMetric:     s.opt.isMetrics,
-				ExpandAttr:   s.opt.expandAttr,
-				RepoName:     s.opt.repoName,
-				TSDBRepoName: s.opt.tsdbReponame,
-				SeriesName:   s.opt.tsdbSeriesName,
-				SeriesTags:   s.opt.tsdbSeriesTags,
-				Timestamp:    s.opt.tsdbTimestamp,
+				OmitEmpty:            true,
+				OmitInvalid:          false,
+				IsMetric:             s.opt.isMetrics,
+				ExpandAttr:           s.opt.expandAttr,
+				RepoName:             s.opt.repoName,
+				TSDBRepoName:         s.opt.tsdbReponame,
+				SeriesName:           s.opt.tsdbSeriesName,
+				SeriesTags:           s.opt.tsdbSeriesTags,
+				Timestamp:            s.opt.tsdbTimestamp,
+				AutoExportTSDBTokens: s.opt.tokens.TsDBTokens,
 			},
 			ForceDataConvert: s.opt.forceDataConvert,
 		},

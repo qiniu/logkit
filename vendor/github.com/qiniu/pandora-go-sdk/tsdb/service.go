@@ -23,10 +23,10 @@ func NewConfig() *config.Config {
 }
 
 func New(c *config.Config) (TsdbAPI, error) {
-	return newClient(c)
+	return NewDefaultClient(c)
 }
 
-func newClient(c *config.Config) (p *Tsdb, err error) {
+func NewDefaultClient(c *config.Config) (p *Tsdb, err error) {
 	if c.TsdbEndpoint == "" {
 		c.TsdbEndpoint = c.Endpoint
 	}
@@ -60,7 +60,7 @@ func (c *Tsdb) newRequest(op *request.Operation, token string, v interface{}) *r
 	return req
 }
 
-func (c *Tsdb) newOperation(opName string, args ...interface{}) *request.Operation {
+func (c *Tsdb) NewOperation(opName string, args ...interface{}) *request.Operation {
 	var method, urlTmpl string
 	switch opName {
 	case base.OpCreateRepo:

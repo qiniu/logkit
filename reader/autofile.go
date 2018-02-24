@@ -9,8 +9,8 @@ import (
 	"github.com/qiniu/logkit/conf"
 )
 
-func NewFileAutoReader(conf conf.MapConf, meta *Meta, isFromWeb bool, bufSize int, whence string, logpath string, fr FileReader) (reader Reader, err error) {
-	mode, errStat := matchMode(logpath)
+func NewFileAutoReader(conf conf.MapConf, meta *Meta, isFromWeb bool, bufSize int, whence string, path string, fr FileReader) (reader Reader, err error) {
+	logpath, mode, errStat := matchMode(path)
 	if errStat != nil {
 		err = errStat
 		return
@@ -45,29 +45,29 @@ func NewFileAutoReader(conf conf.MapConf, meta *Meta, isFromWeb bool, bufSize in
 	return
 }
 
-func matchMode(logpath string) (mode string, err error) {
+func matchMode(logpath string) (path, mode string, err error) {
 	// for example: The path is "/usr/logkit/" or "F:\\user\\logkit\\" after==""
 	// for example: The path is "/usr/logkit" or "F:\\user\\logkit"after==logkit
 	_, after := filepath.Split(logpath)
 	if after == "" {
 		logpath = filepath.Dir(logpath)
 	}
+	path = logpath
 	//path with * matching tailx mode
 	matchTailx := strings.Contains(logpath, "*")
 	if matchTailx == true {
 		mode = ModeTailx
-	} else {
-		//for logpath this path to make judgments
-		fileInfo, errStat := os.Stat(logpath)
-		if errStat != nil {
-			err = errStat
-			return
-		}
-		if fileInfo.IsDir() == true {
-			mode = ModeDir
-		} else {
-			mode = ModeFile
-		}
+		return
+	}
+	//for logpath this path to make judgments
+	fileInfo, err := os.Stat(logpath)
+	if err != nil {
+		return
+	}
+	if fileInfo.IsDir() == true {
+		mode = ModeTailx
+		path = filepath.Join(path, "*")
+		return
 	}
 	return
 }

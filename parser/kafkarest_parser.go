@@ -8,8 +8,8 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/times"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (
@@ -26,8 +26,9 @@ const (
 )
 
 type KafaRestlogParser struct {
-	name   string
-	labels []Label
+	name                 string
+	labels               []Label
+	disableRecordErrData bool
 }
 
 func (krp *KafaRestlogParser) Name() string {
@@ -38,8 +39,8 @@ func (krp *KafaRestlogParser) Type() string {
 	return TypeKafkaRest
 }
 
-func (krp *KafaRestlogParser) Parse(lines []string) ([]sender.Data, error) {
-	datas := []sender.Data{}
+func (krp *KafaRestlogParser) Parse(lines []string) ([]Data, error) {
+	datas := []Data{}
 	for _, line := range lines {
 		line = strings.Replace(line, "\n", " ", -1)
 		line = strings.Replace(line, "\t", "\\t", -1)
@@ -51,13 +52,19 @@ func (krp *KafaRestlogParser) Parse(lines []string) ([]sender.Data, error) {
 			} else if (len(fields) > 0 && fields[2] == "ERROR") || (len(fields) > 0 && fields[2] == "WARN") {
 				datas = append(datas, krp.parseAbnormalLog(fields))
 			}
+		} else {
+			if !krp.disableRecordErrData {
+				errData := make(Data)
+				errData[KeyPandoraStash] = line
+				datas = append(datas, errData)
+			}
 		}
 	}
 	return datas, nil
 }
 
-func (krp *KafaRestlogParser) parseRequestLog(fields []string) sender.Data {
-	d := sender.Data{}
+func (krp *KafaRestlogParser) parseRequestLog(fields []string) Data {
+	d := Data{}
 	d[KEY_SRC_IP] = krp.ParseIp(fields)
 	d[KEY_TOPIC] = krp.ParseTopic(fields)
 	d[KEY_METHOD] = krp.ParseMethod(fields)
@@ -71,8 +78,8 @@ func (krp *KafaRestlogParser) parseRequestLog(fields []string) sender.Data {
 	return d
 }
 
-func (krp *KafaRestlogParser) parseAbnormalLog(fields []string) sender.Data {
-	d := sender.Data{}
+func (krp *KafaRestlogParser) parseAbnormalLog(fields []string) Data {
+	d := Data{}
 	d[KEY_LOG_TIME] = krp.ParseLogTime(fields)
 	if fields[2] == "ERROR" {
 		d[KEY_ERROR] = 1
@@ -99,9 +106,12 @@ func NewKafaRestlogParser(c conf.MapConf) (LogParser, error) {
 	}
 	labels := GetLabels(labelList, nameMap)
 
+	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+
 	return &KafaRestlogParser{
-		name:   name,
-		labels: labels,
+		name:                 name,
+		labels:               labels,
+		disableRecordErrData: disableRecordErrData,
 	}, nil
 }
 
@@ -193,5 +203,4 @@ func (krp *KafaRestlogParser) ParseLogTime(fields []string) int64 {
 		return 0
 	}
 	return ts
-
 }

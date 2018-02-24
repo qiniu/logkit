@@ -15,6 +15,7 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/queue"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/labstack/echo"
 )
@@ -30,9 +31,6 @@ const (
 	DefaultMaxBodySize     = 100 * 1024 * 1024
 	DefaultMaxBytesPerFile = 500 * 1024 * 1024
 	DefaultWriteSpeedLimit = 10 * 1024 * 1024 // 默认写速限制为10MB
-
-	ContentTypeHeader     = "Content-Type"
-	ContentEncodingHeader = "Content-Encoding"
 )
 
 type HttpReader struct {

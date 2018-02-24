@@ -3,6 +3,7 @@ package pipeline
 import (
 	"strings"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 	"github.com/qiniu/pandora-go-sdk/logdb"
@@ -203,7 +204,8 @@ func (c *Pipeline) AutoExportToTSDB(input *AutoExportToTSDBInput) error {
 		input.Retention = "30d"
 	}
 	repoInfo, err := c.GetRepo(&GetRepoInput{
-		RepoName: input.RepoName,
+		RepoName:     input.RepoName,
+		PandoraToken: input.PipelineGetRepoToken,
 	})
 	if err != nil {
 		return err
@@ -214,18 +216,23 @@ func (c *Pipeline) AutoExportToTSDB(input *AutoExportToTSDBInput) error {
 	}
 
 	if !input.IsMetric {
-		return c.CreateForTSDB(&CreateRepoForTSDBInput{
-			Tags:         tags,
-			RepoName:     input.RepoName,
-			TSDBRepoName: input.TSDBRepoName,
-			Region:       repoInfo.Region,
-			Schema:       repoInfo.Schema,
-			Retention:    input.Retention,
-			SeriesName:   input.SeriesName,
-			OmitInvalid:  input.OmitInvalid,
-			OmitEmpty:    input.OmitEmpty,
-			Timestamp:    input.Timestamp,
+		err = c.CreateForTSDB(&CreateRepoForTSDBInput{
+			Tags:                 tags,
+			RepoName:             input.RepoName,
+			TSDBRepoName:         input.TSDBRepoName,
+			Region:               repoInfo.Region,
+			Schema:               repoInfo.Schema,
+			Retention:            input.Retention,
+			SeriesName:           input.SeriesName,
+			OmitInvalid:          input.OmitInvalid,
+			OmitEmpty:            input.OmitEmpty,
+			Timestamp:            input.Timestamp,
+			AutoExportTSDBTokens: input.AutoExportTSDBTokens,
 		})
+		if err != nil {
+			log.Error("create tsdb error", err)
+			return err
+		}
 	}
 
 	// 获取字段，并根据 seriesTag 中的 key 拿到series name
@@ -259,13 +266,14 @@ func (c *Pipeline) AutoExportToTSDB(input *AutoExportToTSDBInput) error {
 	}
 
 	err = c.CreateForMutiExportTSDB(&CreateRepoForMutiExportTSDBInput{
-		RepoName:     input.RepoName,
-		TSDBRepoName: input.TSDBRepoName,
-		Region:       repoInfo.Region,
-		Retention:    input.Retention,
-		OmitInvalid:  input.OmitInvalid,
-		OmitEmpty:    input.OmitEmpty,
-		SeriesMap:    seriesMap,
+		RepoName:             input.RepoName,
+		TSDBRepoName:         input.TSDBRepoName,
+		Region:               repoInfo.Region,
+		Retention:            input.Retention,
+		OmitInvalid:          input.OmitInvalid,
+		OmitEmpty:            input.OmitEmpty,
+		SeriesMap:            seriesMap,
+		AutoExportTSDBTokens: input.AutoExportTSDBTokens,
 	})
 	return err
 }
@@ -279,9 +287,11 @@ func (c *Pipeline) AutoExportToLogDB(input *AutoExportToLogDBInput) error {
 		input.Retention = "30d"
 	}
 	repoInfo, err := c.GetRepo(&GetRepoInput{
-		RepoName: input.RepoName,
+		RepoName:     input.RepoName,
+		PandoraToken: input.PipelineGetRepoToken,
 	})
 	if err != nil {
+		log.Error("AutoExportToLogDB get pipeline repo error", err)
 		return err
 	}
 
@@ -291,19 +301,23 @@ func (c *Pipeline) AutoExportToLogDB(input *AutoExportToLogDBInput) error {
 	}
 	logdbschemas := convertSchema2LogDB(repoInfo.Schema, input.AnalyzerInfo)
 	logdbrepoinfo, err := logdbapi.GetRepo(&logdb.GetRepoInput{
-		RepoName: input.LogRepoName,
+		RepoName:     input.LogRepoName,
+		PandoraToken: input.GetLogDBRepoToken,
 	})
 	if reqerr.IsNoSuchResourceError(err) {
 		err = logdbapi.CreateRepo(&logdb.CreateRepoInput{
-			RepoName:  input.LogRepoName,
-			Region:    repoInfo.Region,
-			Retention: input.Retention,
-			Schema:    logdbschemas,
+			RepoName:     input.LogRepoName,
+			Region:       repoInfo.Region,
+			Retention:    input.Retention,
+			Schema:       logdbschemas,
+			PandoraToken: input.CreateLogDBRepoToken,
 		})
 		if err != nil && !reqerr.IsExistError(err) {
+			log.Error("AutoExportToLogDB create logdb repo error", err)
 			return err
 		}
 	} else if err != nil {
+		log.Error("AutoExportToLogDB get logdb repo error", err)
 		return err
 	} else {
 		//repo 存在，检查是否需要更新
@@ -317,18 +331,21 @@ func (c *Pipeline) AutoExportToLogDB(input *AutoExportToLogDBInput) error {
 		}
 		if needupdate {
 			if err = logdbapi.UpdateRepo(&logdb.UpdateRepoInput{
-				RepoName:  input.LogRepoName,
-				Retention: logdbrepoinfo.Retention,
-				Schema:    logdbrepoinfo.Schema,
+				RepoName:     input.LogRepoName,
+				Retention:    logdbrepoinfo.Retention,
+				Schema:       logdbrepoinfo.Schema,
+				PandoraToken: input.UpdateLogDBRepoToken,
 			}); err != nil {
+				log.Error("AutoExportToLogDB update logdb repo error", err)
 				return err
 			}
 		}
 	}
 
 	_, err = c.GetExport(&GetExportInput{
-		RepoName:   input.RepoName,
-		ExportName: base.FormExportName(input.RepoName, ExportTypeLogDB),
+		RepoName:     input.RepoName,
+		ExportName:   base.FormExportName(input.RepoName, ExportTypeLogDB),
+		PandoraToken: input.GetExportToken,
 	})
 	if reqerr.IsNoSuchResourceError(err) {
 		logDBSpec := c.FormLogDBSpec(&CreateRepoForLogDBInput{
@@ -339,8 +356,10 @@ func (c *Pipeline) AutoExportToLogDB(input *AutoExportToLogDBInput) error {
 			OmitInvalid: input.OmitInvalid,
 		})
 		exportInput := c.FormExportInput(input.RepoName, ExportTypeLogDB, logDBSpec)
+		exportInput.PandoraToken = input.CreateExportToken
 		return c.CreateExport(exportInput)
 	}
+	log.Error("AutoExportToLogDB get export error", err)
 	return err
 }
 
@@ -355,20 +374,32 @@ func (c *Pipeline) AutoExportToKODO(input *AutoExportToKODOInput) error {
 	input.BucketName = strings.Replace(input.BucketName, "_", "-", -1)
 
 	repoInfo, err := c.GetRepo(&GetRepoInput{
-		RepoName: input.RepoName,
+		RepoName:     input.RepoName,
+		PandoraToken: input.PipelineGetRepoToken,
 	})
 	if err != nil {
 		return err
 	}
 
 	_, err = c.GetExport(&GetExportInput{
-		RepoName:   input.RepoName,
-		ExportName: base.FormExportName(input.RepoName, ExportTypeKODO),
+		RepoName:     input.RepoName,
+		ExportName:   base.FormExportName(input.RepoName, ExportTypeKODO),
+		PandoraToken: input.GetExportToken,
 	})
 	if reqerr.IsNoSuchResourceError(err) {
+		var ak string
+		if c.Config.Ak != "" {
+			ak = c.Config.Ak
+		}
+		if ak == "" && input.CreateExportToken.Token != "" {
+			tks := strings.Split(strings.TrimSpace(strings.TrimPrefix(input.CreateExportToken.Token, "Pandora")), ":")
+			if len(tks) > 0 {
+				ak = tks[0]
+			}
+		}
 		kodoSpec := c.FormKodoSpec(&CreateRepoForKodoInput{
 			Retention: input.Retention,
-			Ak:        c.Config.Ak,
+			Ak:        ak,
 			Email:     input.Email,
 			Bucket:    input.BucketName,
 			RepoName:  input.RepoName,
@@ -377,6 +408,7 @@ func (c *Pipeline) AutoExportToKODO(input *AutoExportToKODOInput) error {
 			Format:    input.Format,
 		})
 		exportInput := c.FormExportInput(input.RepoName, ExportTypeKODO, kodoSpec)
+		exportInput.PandoraToken = input.CreateExportToken
 		return c.CreateExport(exportInput)
 	}
 	return err

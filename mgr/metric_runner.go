@@ -8,14 +8,16 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/json-iterator/go"
-	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
+
+	"github.com/json-iterator/go"
+	"github.com/qiniu/log"
 )
 
 const (
@@ -34,6 +36,7 @@ type MetricConfig struct {
 
 type MetricRunner struct {
 	RunnerName string `json:"name"`
+	envTag     string
 
 	collectors   []metric.Collector
 	senders      []sender.Sender
@@ -62,7 +65,7 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 	}
 	interval := time.Duration(rc.CollectInterval) * time.Second
 	meta, err := reader.NewMetaWithConf(conf.MapConf{
-		utils.GlobalKeyName:  rc.RunnerName,
+		GlobalKeyName:        rc.RunnerName,
 		reader.KeyRunnerName: rc.RunnerName,
 		reader.KeyMode:       reader.ModeMetrics,
 	})
@@ -100,7 +103,7 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 		metricName := c.Name()
 		trans := make([]transforms.Transformer, 0)
 		if attributes, ex := config[metric.AttributesString]; ex {
-			if attrs, ok := attributes.([]utils.KeyValue); ok {
+			if attrs, ok := attributes.([]KeyValue); ok {
 				for _, attr := range attrs {
 					val, exist := m.Attributes[attr.Key]
 					if exist && !val {
@@ -154,6 +157,7 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 		collectors:      collectors,
 		transformers:    transformers,
 		senders:         senders,
+		envTag:          rc.EnvTag,
 	}
 	runner.StatusRestore()
 	return
@@ -165,6 +169,11 @@ func (mr *MetricRunner) Name() string {
 
 func (r *MetricRunner) Run() {
 	defer close(r.exitChan)
+
+	tags := map[string]interface{}{
+		metric.Timestamp: nil,
+	}
+	tags = GetEnvTag(r.envTag, tags)
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
 			log.Debugf("runner %v exited from run", r.RunnerName)
@@ -173,8 +182,8 @@ func (r *MetricRunner) Run() {
 		}
 		// collect data
 		dataCnt := 0
-		datas := make([]sender.Data, 0)
-		now := time.Now().Format(time.RFC3339Nano)
+		datas := make([]Data, 0)
+		tags[metric.Timestamp] = time.Now().Format(time.RFC3339Nano)
 		for _, c := range r.collectors {
 			metricName := c.Name()
 			tmpdatas, err := c.Collect()
@@ -188,7 +197,7 @@ func (r *MetricRunner) Run() {
 				log.Debugf("MetricRunner %v collect No data", c.Name())
 				continue
 			}
-			tmpDatas := make([]sender.Data, dataLen)
+			tmpDatas := make([]Data, dataLen)
 			for i, d := range tmpdatas {
 				tmpDatas[i] = d
 			}
@@ -204,8 +213,9 @@ func (r *MetricRunner) Run() {
 				if len(metricData) == 0 {
 					continue
 				}
-				data := sender.Data{
-					metric.Timestamp: now,
+				data := Data{}
+				for k, v := range tags {
+					data[k] = v
 				}
 				// 重命名
 				// cpu_time_user --> cpu__time_user
@@ -240,7 +250,7 @@ func (r *MetricRunner) Run() {
 }
 
 // trySend 尝试发送数据，如果此时runner退出返回false，其他情况无论是达到最大重试次数还是发送成功，都返回true
-func (r *MetricRunner) trySend(s sender.Sender, datas []sender.Data, times int) bool {
+func (r *MetricRunner) trySend(s sender.Sender, datas []Data, times int) bool {
 	if len(datas) <= 0 {
 		return true
 	}
@@ -314,21 +324,23 @@ func (mr *MetricRunner) Stop() {
 	}
 }
 
-func (mr *MetricRunner) Reset() error {
+func (mr *MetricRunner) Reset() (err error) {
 	var errMsg string
-	err := mr.meta.Reset()
-	if err != nil {
+	if err = mr.meta.Reset(); err != nil {
 		errMsg += err.Error() + "\n"
 	}
 	for _, sd := range mr.senders {
 		ssd, ok := sd.(Resetable)
 		if ok {
 			if nerr := ssd.Reset(); nerr != nil {
-				errMsg += err.Error() + "\n"
+				errMsg += nerr.Error() + "\n"
 			}
 		}
 	}
-	return errors.New(errMsg)
+	if errMsg != "" {
+		err = errors.New(errMsg)
+	}
+	return err
 }
 
 func (_ *MetricRunner) Cleaner() CleanInfo {

@@ -5,7 +5,7 @@ import (
 	"syscall"
 
 	"github.com/qiniu/logkit/metric"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (
@@ -29,7 +29,7 @@ const (
 )
 
 // KeyNetStatUsages TypeMetricNetstat 的字段名称
-var KeyNetStatUsages = []utils.KeyValue{
+var KeyNetStatUsages = []KeyValue{
 	{KeyNetstatTcpEstablished, "ESTABLISHED状态的网络链接数"},
 	{KeyNetstatTcpSynSent, "SYN_SENT状态的网络链接数"},
 	{KeyNetstatTcpSynRecv, "SYN_RECV状态的网络链接数"},
@@ -63,7 +63,7 @@ func (_ *NetStats) Tags() []string {
 
 func (_ *NetStats) Config() map[string]interface{} {
 	config := map[string]interface{}{
-		metric.OptionString:     []utils.Option{},
+		metric.OptionString:     []Option{},
 		metric.AttributesString: KeyNetStatUsages,
 	}
 	return config

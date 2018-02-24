@@ -9,12 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
-
-	"github.com/qiniu/log"
+	. "github.com/qiniu/logkit/utils/models"
 	"github.com/vjeantet/grok"
 )
 
@@ -53,9 +52,10 @@ var (
 )
 
 type GrokParser struct {
-	name   string
-	labels []Label
-	mode   string
+	name                 string
+	labels               []Label
+	mode                 string
+	disableRecordErrData bool
 
 	timeZoneOffset int
 
@@ -126,14 +126,17 @@ func NewGrokParser(c conf.MapConf) (LogParser, error) {
 	customPatterns, _ := c.GetStringOr(KeyGrokCustomPatterns, "")
 	customPatternFiles, _ := c.GetStringListOr(KeyGrokCustomPatternFiles, []string{})
 
+	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+
 	p := &GrokParser{
-		name:               name,
-		labels:             labels,
-		mode:               mode,
-		Patterns:           patterns,
-		CustomPatterns:     customPatterns,
-		CustomPatternFiles: customPatternFiles,
-		timeZoneOffset:     timeZoneOffset,
+		name:                 name,
+		labels:               labels,
+		mode:                 mode,
+		Patterns:             patterns,
+		CustomPatterns:       customPatterns,
+		CustomPatternFiles:   customPatternFiles,
+		timeZoneOffset:       timeZoneOffset,
+		disableRecordErrData: disableRecordErrData,
 	}
 	err = p.compile()
 	if err != nil {
@@ -196,8 +199,8 @@ func (gp *GrokParser) Type() string {
 	return TypeGrok
 }
 
-func (gp *GrokParser) Parse(lines []string) ([]sender.Data, error) {
-	datas := []sender.Data{}
+func (gp *GrokParser) Parse(lines []string) ([]Data, error) {
+	datas := []Data{}
 	se := &utils.StatsError{}
 	for idx, line := range lines {
 		data, err := gp.parseLine(line)
@@ -205,6 +208,11 @@ func (gp *GrokParser) Parse(lines []string) ([]sender.Data, error) {
 			se.AddErrors()
 			se.ErrorIndex = append(se.ErrorIndex, idx)
 			se.ErrorDetail = err
+			if !gp.disableRecordErrData {
+				errData := make(Data)
+				errData[KeyPandoraStash] = line
+				datas = append(datas, errData)
+			}
 			continue
 		}
 		if len(data) < 1 { //数据不为空的时候发送
@@ -217,7 +225,7 @@ func (gp *GrokParser) Parse(lines []string) ([]sender.Data, error) {
 	return datas, se
 }
 
-func (p *GrokParser) parseLine(line string) (sender.Data, error) {
+func (p *GrokParser) parseLine(line string) (Data, error) {
 	if p.mode == ModeMulti {
 		line = strings.Replace(line, "\n", " ", -1)
 	}
@@ -238,7 +246,7 @@ func (p *GrokParser) parseLine(line string) (sender.Data, error) {
 		log.Errorf("%v no value was parsed after grok pattern %v", line, p.Patterns)
 		return nil, fmt.Errorf("%v no value was parsed after grok pattern %v", line, p.Patterns)
 	}
-	data := sender.Data{}
+	data := Data{}
 	for k, v := range values {
 		if k == "" || v == "" {
 			continue

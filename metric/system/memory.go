@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/qiniu/logkit/metric"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (
@@ -25,7 +25,7 @@ const (
 )
 
 // KeyMemUsages TypeMetricMem 中的字段名称
-var KeyMemUsages = []utils.KeyValue{
+var KeyMemUsages = []KeyValue{
 	{KeyMemTotal, "内存总数"},
 	{KeyMemAvailable, "可用内存数"},
 	{KeyMemUsed, "已用内存数"},
@@ -56,7 +56,7 @@ func (_ *MemStats) Tags() []string {
 
 func (_ *MemStats) Config() map[string]interface{} {
 	config := map[string]interface{}{
-		metric.OptionString:     []utils.Option{},
+		metric.OptionString:     []Option{},
 		metric.AttributesString: KeyMemUsages,
 	}
 	return config
@@ -98,7 +98,7 @@ const (
 )
 
 // KeySwapUsages TypeMetricSwap 中的字段名称
-var KeySwapUsages = []utils.KeyValue{
+var KeySwapUsages = []KeyValue{
 	{KeySwapTotal, "Swap空间总量"},
 	{KeySwapUsed, "Swap已使用空间"},
 	{KeySwapFree, "Swap空闲空间"},
@@ -125,7 +125,7 @@ func (_ *SwapStats) Tags() []string {
 
 func (_ *SwapStats) Config() map[string]interface{} {
 	config := map[string]interface{}{
-		metric.OptionString:     []utils.Option{},
+		metric.OptionString:     []Option{},
 		metric.AttributesString: KeySwapUsages,
 	}
 	return config

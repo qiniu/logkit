@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	. "github.com/qiniu/logkit/utils/models"
 	"github.com/stretchr/testify/assert"
 )
 

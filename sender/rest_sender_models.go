@@ -1,77 +1,85 @@
 package sender
 
-import "github.com/qiniu/logkit/utils"
+import . "github.com/qiniu/logkit/utils/models"
 
 // ModeUsages 用途说明
-var ModeUsages = []utils.KeyValue{
-	{TypePandora, "发送到 Pandora"},
+var ModeUsages = []KeyValue{
+	{TypePandora, "发送到七牛大数据平台(Pandora)"},
 	{TypeFile, "发送到本地文件"},
-	{TypeMongodbAccumulate, "发送到 mongodb"},
-	{TypeInfluxdb, "发送到 influxdb"},
+	{TypeMongodbAccumulate, "发送到 MongoDB 服务"},
+	{TypeInfluxdb, "发送到 InfluxDB 服务"},
 	{TypeDiscard, "消费数据但不发送"},
-	{TypeElastic, "发送到Elasticsearch"},
-	{TypeKafka, "发送到Kafka"},
+	{TypeElastic, "发送到 Elasticsearch 服务"},
+	{TypeKafka, "发送到 Kafka 服务"},
 	{TypeHttp, "通过 Http Post 发送"},
 }
 
 var (
-	OptionSaveLogPath = utils.Option{
+	OptionSaveLogPath = Option{
 		KeyName:      KeyFtSaveLogPath,
 		ChooseOnly:   false,
 		Default:      "",
 		DefaultNoUse: false,
 		Description:  "管道本地盘数据保存路径(ft_save_log_path)",
+		Advance:      true,
 	}
-	OptionFtWriteLimit = utils.Option{
+	OptionFtWriteLimit = Option{
 		KeyName:      KeyFtWriteLimit,
 		ChooseOnly:   false,
 		Default:      "",
 		DefaultNoUse: false,
 		Description:  "磁盘写入限速(MB/s)(ft_write_limit)",
 		CheckRegex:   "\\d+",
+		Advance:      true,
 	}
-	OptionFtSyncEvery = utils.Option{
+	OptionFtSyncEvery = Option{
 		KeyName:      KeyFtSyncEvery,
 		ChooseOnly:   false,
 		Default:      "",
 		DefaultNoUse: false,
 		Description:  "同步meta的间隔(ft_sync_every)",
 		CheckRegex:   "\\d+",
+		Advance:      true,
 	}
-	OptionFtStrategy = utils.Option{
+	OptionFtStrategy = Option{
 		KeyName:       KeyFtStrategy,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{KeyFtStrategyBackupOnly, KeyFtStrategyAlwaysSave, KeyFtStrategyConcurrent},
 		Default:       KeyFtStrategyBackupOnly,
 		DefaultNoUse:  false,
-		Description:   "磁盘管道容错策略(仅备份错误|全部数据走管道)(ft_strategy)",
+		Description:   "磁盘管道容错策略(仅备份错误|全部数据走管道|仅增加并发)(ft_strategy)",
+		Advance:       true,
 	}
-	OptionFtProcs = utils.Option{
+	OptionFtProcs = Option{
 		KeyName:      KeyFtProcs,
 		ChooseOnly:   false,
 		Default:      "",
 		DefaultNoUse: false,
 		Description:  "发送并发数量(磁盘管道或内存管道 always_save 或 concurrent 模式生效)(ft_procs)",
 		CheckRegex:   "\\d+",
+		Advance:      true,
 	}
-	OptionFtMemoryChannel = utils.Option{
+	OptionFtMemoryChannel = Option{
 		KeyName:       KeyFtMemoryChannel,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"false", "true"},
 		Default:       "false",
 		DefaultNoUse:  false,
 		Description:   "使用内存替换磁盘管道(加速)(ft_memory_channel)",
+		Advance:       true,
 	}
-	OptionFtMemoryChannelSize = utils.Option{
-		KeyName:      KeyFtMemoryChannelSize,
-		ChooseOnly:   false,
-		Default:      "",
-		DefaultNoUse: false,
-		Description:  "内存管道长度(ft_memory_channel_size)",
-		CheckRegex:   "\\d+",
+	OptionFtMemoryChannelSize = Option{
+		KeyName:       KeyFtMemoryChannelSize,
+		ChooseOnly:    false,
+		Default:       "",
+		DefaultNoUse:  false,
+		Description:   "内存管道长度(ft_memory_channel_size)",
+		CheckRegex:    "\\d+",
+		Advance:       true,
+		AdvanceDepend: KeyFtMemoryChannel,
 	}
 )
-var ModeKeyOptions = map[string][]utils.Option{
+var ModeKeyOptions = map[string][]Option{
 	TypeFile: {
 		{
 			KeyName:      KeyFileSenderPath,
@@ -111,6 +119,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "在此填写您七牛账号的secret_key",
 			DefaultNoUse: true,
 			Description:  "七牛的私钥(secret_key)",
+			Secret:       true,
 		},
 		OptionSaveLogPath,
 		{
@@ -124,10 +133,11 @@ var ModeKeyOptions = map[string][]utils.Option{
 		{
 			KeyName:       KeyPandoraExtraInfo,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{"true", "false"},
-			Default:       "true",
+			ChooseOptions: []interface{}{"false", "true"},
+			Default:       "false",
 			DefaultNoUse:  false,
 			Description:   "自动添加额外信息(pandora_extra_info)",
+			Advance:       true,
 		},
 		{
 			KeyName:      KeyPandoraHost,
@@ -135,6 +145,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "https://pipeline.qiniu.com",
 			DefaultNoUse: false,
 			Description:  "Host地址(pandora_host)",
+			Advance:      true,
 		},
 		{
 			KeyName:       KeyPandoraRegion,
@@ -143,6 +154,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:       "nb",
 			DefaultNoUse:  false,
 			Description:   "创建的资源所在区域(pandora_region)",
+			Advance:       true,
 		},
 		{
 			KeyName:       KeyPandoraSchemaFree,
@@ -158,6 +170,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "",
 			DefaultNoUse: false,
 			Description:  "以DSL语法自动创建repo(pandora_auto_create)",
+			Advance:      true,
 		},
 		{
 			KeyName:      KeyPandoraSchema,
@@ -165,6 +178,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "",
 			DefaultNoUse: false,
 			Description:  "仅选择部分字段(重命名)发送(pandora_schema)",
+			Advance:      true,
 		},
 		{
 			KeyName:       KeyPandoraEnableLogDB,
@@ -175,18 +189,22 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:   "是否自动创建并导出到Pandora LogDB(pandora_enable_logdb)",
 		},
 		{
-			KeyName:      KeyPandoraLogDBName,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "导出的 LogDB 仓库名称(pandora_logdb_name)",
+			KeyName:       KeyPandoraLogDBName,
+			ChooseOnly:    false,
+			Default:       "",
+			DefaultNoUse:  false,
+			Description:   "导出的 LogDB 仓库名称(pandora_logdb_name)",
+			Advance:       true,
+			AdvanceDepend: KeyPandoraEnableLogDB,
 		},
 		{
-			KeyName:      KeyPandoraLogDBHost,
-			ChooseOnly:   false,
-			Default:      "https://logdb.qiniu.com",
-			DefaultNoUse: false,
-			Description:  "LogDB host 地址(pandora_logdb_host)",
+			KeyName:       KeyPandoraLogDBHost,
+			ChooseOnly:    false,
+			Default:       "https://logdb.qiniu.com",
+			DefaultNoUse:  false,
+			Description:   "LogDB host 地址(pandora_logdb_host)",
+			Advance:       true,
+			AdvanceDepend: KeyPandoraEnableLogDB,
 		},
 		{
 			KeyName:       KeyPandoraEnableTSDB,
@@ -197,39 +215,49 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:   "是否自动创建并导出到Pandora TSDB(pandora_enable_tsdb)",
 		},
 		{
-			KeyName:      KeyPandoraTSDBName,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "导出的 TSDB 仓库名称(pandora_tsdb_name)",
+			KeyName:       KeyPandoraTSDBName,
+			ChooseOnly:    false,
+			Default:       "",
+			DefaultNoUse:  false,
+			Description:   "导出的 TSDB 仓库名称(pandora_tsdb_name)",
+			Advance:       true,
+			AdvanceDepend: KeyPandoraEnableTSDB,
 		},
 		{
-			KeyName:      KeyPandoraTSDBSeriesName,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "导出的 TSDB 序列名称(pandora_tsdb_series_name)",
+			KeyName:       KeyPandoraTSDBSeriesName,
+			ChooseOnly:    false,
+			Default:       "",
+			DefaultNoUse:  false,
+			Description:   "导出的 TSDB 序列名称(pandora_tsdb_series_name)",
+			Advance:       true,
+			AdvanceDepend: KeyPandoraEnableTSDB,
 		},
 		{
-			KeyName:      KeyPandoraTSDBSeriesTags,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "导出的 TSDB 时需要设置为tag类型的字段列表(pandora_tsdb_series_tags)",
+			KeyName:       KeyPandoraTSDBSeriesTags,
+			ChooseOnly:    false,
+			Default:       "",
+			DefaultNoUse:  false,
+			Description:   "导出的 TSDB 时需要设置为tag类型的字段列表(pandora_tsdb_series_tags)",
+			Advance:       true,
+			AdvanceDepend: KeyPandoraEnableTSDB,
 		},
 		{
-			KeyName:      KeyPandoraTSDBHost,
-			ChooseOnly:   false,
-			Default:      "https://tsdb.qiniu.com",
-			DefaultNoUse: false,
-			Description:  "TSDB host 地址(pandora_tsdb_host)",
+			KeyName:       KeyPandoraTSDBHost,
+			ChooseOnly:    false,
+			Default:       "https://tsdb.qiniu.com",
+			DefaultNoUse:  false,
+			Description:   "TSDB host 地址(pandora_tsdb_host)",
+			Advance:       true,
+			AdvanceDepend: KeyPandoraEnableTSDB,
 		},
 		{
-			KeyName:      KeyPandoraTSDBTimeStamp,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "TSDB 时间戳字段(pandora_tsdb_timestamp)",
+			KeyName:       KeyPandoraTSDBTimeStamp,
+			ChooseOnly:    false,
+			Default:       "",
+			DefaultNoUse:  false,
+			Description:   "TSDB 时间戳字段(pandora_tsdb_timestamp)",
+			Advance:       true,
+			AdvanceDepend: KeyPandoraEnableTSDB,
 		},
 		{
 			KeyName:       KeyPandoraEnableKodo,
@@ -240,25 +268,29 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:   "是否自动导出到七牛云存储(pandora_enable_kodo)",
 		},
 		{
-			KeyName:      KeyPandoraKodoBucketName,
-			ChooseOnly:   false,
-			Default:      "my_bucket_name",
-			DefaultNoUse: true,
-			Description:  "云存储 Bucket 仓库名称(启用自动导出到云存储时必填)(pandora_bucket_name)",
+			KeyName:       KeyPandoraKodoBucketName,
+			ChooseOnly:    false,
+			Default:       "my_bucket_name",
+			DefaultNoUse:  true,
+			Description:   "云存储 Bucket 仓库名称(启用自动导出到云存储时必填)(pandora_bucket_name)",
+			AdvanceDepend: KeyPandoraEnableTSDB,
 		},
 		{
-			KeyName:      KeyPandoraEmail,
-			ChooseOnly:   false,
-			Default:      "my@email.com",
-			DefaultNoUse: true,
-			Description:  "邮箱(启用自动导出到云存储时必填)(qiniu_email)",
+			KeyName:       KeyPandoraEmail,
+			ChooseOnly:    false,
+			Default:       "my@email.com",
+			DefaultNoUse:  true,
+			Description:   "邮箱(启用自动导出到云存储时必填)(qiniu_email)",
+			AdvanceDepend: KeyPandoraEnableTSDB,
 		},
 		{
-			KeyName:      KeyPandoraKodoFilePrefix,
-			ChooseOnly:   false,
-			Default:      "logkitauto/date=$(year)-$(mon)-$(day)/hour=$(hour)/min=$(min)/$(sec)",
-			DefaultNoUse: false,
-			Description:  "云存储文件前缀(pandora_kodo_prefix)",
+			KeyName:       KeyPandoraKodoFilePrefix,
+			ChooseOnly:    false,
+			Default:       "logkitauto/date=$(year)-$(mon)-$(day)/hour=$(hour)/min=$(min)/$(sec)",
+			DefaultNoUse:  false,
+			Description:   "云存储文件前缀(pandora_kodo_prefix)",
+			AdvanceDepend: KeyPandoraEnableTSDB,
+			Advance:       true,
 		},
 		{
 			KeyName:       KeyPandoraKodoCompressPrefix,
@@ -267,6 +299,8 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:       "parquet",
 			DefaultNoUse:  false,
 			Description:   "云存储压缩方式(pandora_kodo_compress)",
+			AdvanceDepend: KeyPandoraEnableTSDB,
+			Advance:       true,
 		},
 		{
 			KeyName:       KeyPandoraGzip,
@@ -275,6 +309,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   "gzip压缩发送(pandora_gzip)",
+			Advance:       true,
 		},
 		{
 			KeyName:      KeyFlowRateLimit,
@@ -283,6 +318,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse: false,
 			Description:  "流量限制(KB/s)(flow_rate_limit)",
 			CheckRegex:   "\\d+",
+			Advance:      true,
 		},
 		{
 			KeyName:      KeyRequestRateLimit,
@@ -291,6 +327,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			DefaultNoUse: false,
 			Description:  "请求限制(次/s)(request_rate_limit)",
 			CheckRegex:   "\\d+",
+			Advance:      true,
 		},
 		{
 			KeyName:       KeyPandoraUUID,
@@ -299,6 +336,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:       "false",
 			DefaultNoUse:  false,
 			Description:   "每条数据植入UUID(pandora_uuid)",
+			Advance:       true,
 		},
 		{
 			KeyName:       KeyPandoraWithIP,
@@ -307,6 +345,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:       "false",
 			DefaultNoUse:  false,
 			Description:   "每条数据植入IP地址(pandora_withip)",
+			Advance:       true,
 		},
 		OptionFtWriteLimit,
 		OptionFtSyncEvery,
@@ -321,6 +360,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:       "false",
 			DefaultNoUse:  false,
 			Description:   "对于数据的时间字段抖动(force_microsecond)",
+			Advance:       true,
 		},
 		{
 			KeyName:       KeyForceDataConvert,
@@ -329,6 +369,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:       "false",
 			DefaultNoUse:  false,
 			Description:   "数据强制类型转换(pandora_force_convert)",
+			Advance:       true,
 		},
 		{
 			KeyName:       KeyIgnoreInvalidField,
@@ -337,6 +378,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   "忽略格式错误的字段(ignore_invalid_field)",
+			Advance:       true,
 		},
 		{
 			KeyName:       KeyPandoraAutoConvertDate,
@@ -345,6 +387,16 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   "时间类型自动转换(pandora_auto_convert_date)",
+			Advance:       true,
+		},
+		{
+			KeyName:       KeyPandoraUnescape,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"true", "false"},
+			Default:       "true",
+			DefaultNoUse:  false,
+			Description:   "服务端反转译换行和制表符(pandora_unescape)",
+			Advance:       true,
 		},
 	},
 	TypeMongodbAccumulate: {
@@ -407,6 +459,12 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Description:  "数据库名称(influxdb_db)",
 		},
 		{
+			KeyName:       KeyInfluxdbAutoCreate,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"true", "false"},
+			Description:   "自动创建数据库(influxdb_auto_create)",
+		},
+		{
 			KeyName:      KeyInfluxdbMeasurement,
 			ChooseOnly:   false,
 			Default:      "test_table",
@@ -419,6 +477,14 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "",
 			DefaultNoUse: false,
 			Description:  "retention名称(influxdb_retention)",
+		},
+		{
+			KeyName:       KeyInfluxdbRetetionDuration,
+			ChooseOnly:    false,
+			Default:       "",
+			DefaultNoUse:  false,
+			Description:   "retention时长(influxdb_retention_duration)",
+			AdvanceDepend: KeyInfluxdbAutoCreate,
 		},
 		{
 			KeyName:      KeyInfluxdbTags,
@@ -447,6 +513,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "100",
 			DefaultNoUse: false,
 			Description:  "时间戳列精度调整(influxdb_timestamp_precision)",
+			Advance:      true,
 		},
 		OptionSaveLogPath,
 		OptionFtWriteLimit,
@@ -553,6 +620,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "3",
 			DefaultNoUse: false,
 			Description:  "kafka最大错误重试次数(kafka_retry_max)",
+			Advance:      true,
 		},
 		{
 			KeyName:      KeyKafkaTimeout,
@@ -560,6 +628,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "30s",
 			DefaultNoUse: false,
 			Description:  "kafka连接超时时间(kafka_timeout)",
+			Advance:      true,
 		},
 		{
 			KeyName:      KeyKafkaKeepAlive,
@@ -567,6 +636,7 @@ var ModeKeyOptions = map[string][]utils.Option{
 			Default:      "0",
 			DefaultNoUse: false,
 			Description:  "kafka的keepalive时间(kafka_keep_alive)",
+			Advance:      true,
 		},
 		OptionSaveLogPath,
 		OptionFtWriteLimit,
@@ -610,12 +680,12 @@ var ModeKeyOptions = map[string][]utils.Option{
 	},
 }
 
-func GetRouterOption() []utils.Option {
+func GetRouterOption() []Option {
 	mTypeNames := make([]interface{}, len(MatchTypeRegistry))
 	for name := range MatchTypeRegistry {
 		mTypeNames = append(mTypeNames, name)
 	}
-	return []utils.Option{
+	return []Option{
 		{
 			KeyName:      RouterKeyName,
 			ChooseOnly:   false,
@@ -641,11 +711,11 @@ func GetRouterOption() []utils.Option {
 	}
 }
 
-func GetRouterMatchTypeUsage() []utils.KeyValue {
-	mTypeUsage := make([]utils.KeyValue, 0)
+func GetRouterMatchTypeUsage() []KeyValue {
+	mTypeUsage := make([]KeyValue, 0)
 	for name, mType := range MatchTypeRegistry {
 		mTypeFunc := mType()
-		mTypeUsage = append(mTypeUsage, utils.KeyValue{
+		mTypeUsage = append(mTypeUsage, KeyValue{
 			Key:   name,
 			Value: mTypeFunc.usage(),
 		})

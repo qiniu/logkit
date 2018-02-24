@@ -7,13 +7,13 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	jsoniter "github.com/json-iterator/go"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/cleaner"
 	"github.com/qiniu/logkit/conf"
@@ -22,6 +22,9 @@ import (
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
+
+	jsoniter "github.com/json-iterator/go"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 )
 
@@ -103,9 +106,11 @@ type RunnerInfo struct {
 	CollectInterval  int    `json:"collect_interval,omitempty"` // metric runner收集的频率
 	MaxBatchLen      int    `json:"batch_len,omitempty"`        // 每个read batch的行数
 	MaxBatchSize     int    `json:"batch_size,omitempty"`       // 每个read batch的字节数
-	MaxBatchInteval  int    `json:"batch_interval,omitempty"`   // 最大发送时间间隔
+	MaxBatchInterval int    `json:"batch_interval,omitempty"`   // 最大发送时间间隔
 	MaxBatchTryTimes int    `json:"batch_try_times,omitempty"`  // 最大发送次数，小于等于0代表无限重试
 	CreateTime       string `json:"createtime"`
+	EnvTag           string `json:"env_tag,omitempty"`
+	// 用这个字段的值来获取环境变量, 作为 tag 添加到数据中
 }
 
 type LogExportRunner struct {
@@ -163,8 +168,8 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 	if info.MaxBatchSize <= 0 {
 		info.MaxBatchSize = defaultMaxBatchSize
 	}
-	if info.MaxBatchInteval <= 0 {
-		info.MaxBatchInteval = defaultSendIntervalSeconds
+	if info.MaxBatchInterval <= 0 {
+		info.MaxBatchInterval = defaultSendIntervalSeconds
 	}
 	runner = &LogExportRunner{
 		RunnerInfo: info,
@@ -220,10 +225,11 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 
 func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, ps *parser.ParserRegistry, sr *sender.SenderRegistry) (runner *LogExportRunner, err error) {
 	runnerInfo := RunnerInfo{
+		EnvTag:           rc.EnvTag,
 		RunnerName:       rc.RunnerName,
 		MaxBatchSize:     rc.MaxBatchSize,
 		MaxBatchLen:      rc.MaxBatchLen,
-		MaxBatchInteval:  rc.MaxBatchInteval,
+		MaxBatchInterval: rc.MaxBatchInterval,
 		MaxBatchTryTimes: rc.MaxBatchTryTimes,
 	}
 	if rc.ReaderConfig == nil {
@@ -235,7 +241,7 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, p
 	if rc.ParserConf == nil {
 		return nil, errors.New(rc.RunnerName + " ParserConf is nil")
 	}
-	rc.ReaderConfig[utils.GlobalKeyName] = rc.RunnerName
+	rc.ReaderConfig[GlobalKeyName] = rc.RunnerName
 	rc.ReaderConfig[reader.KeyRunnerName] = rc.RunnerName
 	for i := range rc.SenderConfig {
 		rc.SenderConfig[i][sender.KeyRunnerName] = rc.RunnerName
@@ -332,7 +338,7 @@ func createTransformers(rc RunnerConfig) []transforms.Transformer {
 }
 
 // trySend 尝试发送数据，如果此时runner退出返回false，其他情况无论是达到最大重试次数还是发送成功，都返回true
-func (r *LogExportRunner) trySend(s sender.Sender, datas []sender.Data, times int) bool {
+func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool {
 	if len(datas) <= 0 {
 		return true
 	}
@@ -402,9 +408,19 @@ func (r *LogExportRunner) Run() {
 		go r.cleaner.Run()
 	}
 	defer close(r.exitChan)
-	datasourceTag := r.meta.GetDataSourceTag()
+	defer func() {
+		// recover when runner is stopped
+		if atomic.LoadInt32(&r.stopped) <= 0 {
+			return
+		}
+		if r := recover(); r != nil {
+			log.Errorf("recover when runner is stopped\npanic: %v\nstack: %s", r, debug.Stack())
+		}
+	}()
 	tags := r.meta.GetTags()
+	datasourceTag := r.meta.GetDataSourceTag()
 	schemaErr := utils.SchemaErr{Number: 0, Last: time.Now()}
+	tags = GetEnvTag(r.EnvTag, tags)
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
 			log.Debugf("Runner[%v] exited from run", r.Name())
@@ -500,8 +516,10 @@ func (r *LogExportRunner) Run() {
 
 		//把datasourcetag加到data里，前提是认为[]line变成[]data以后是一一对应的，一旦错位就不加
 		if datasourceTag != "" {
-			if len(datas)+len(se.ErrorIndex) == len(froms) {
-				datas = addSourceToData(froms, se, datas, datasourceTag, r.Name())
+			if len(datas) == len(froms) {
+				datas = addSourceToData(froms, se, datas, datasourceTag, r.Name(), true)
+			} else if len(datas)+len(se.ErrorIndex) == len(froms) {
+				datas = addSourceToData(froms, se, datas, datasourceTag, r.Name(), false)
 			} else {
 				log.Errorf("Runner[%v] datasourcetag add error, datas %v not match with froms %v", r.Name(), datas, froms)
 			}
@@ -536,13 +554,13 @@ func (r *LogExportRunner) Run() {
 	}
 }
 
-func classifySenderData(datas []sender.Data, router *sender.Router, senderCnt int) [][]sender.Data {
-	senderDataList := make([][]sender.Data, senderCnt)
+func classifySenderData(datas []Data, router *sender.Router, senderCnt int) [][]Data {
+	senderDataList := make([][]Data, senderCnt)
 	for i := 0; i < senderCnt; i++ {
 		if router == nil {
 			senderDataList[i] = datas
 		} else {
-			senderDataList[i] = make([]sender.Data, 0)
+			senderDataList[i] = make([]Data, 0)
 		}
 	}
 	if router == nil {
@@ -557,15 +575,20 @@ func classifySenderData(datas []sender.Data, router *sender.Router, senderCnt in
 	return senderDataList
 }
 
-func addSourceToData(sourceFroms []string, se *utils.StatsError, datas []sender.Data, datasourceTagName, runnername string) []sender.Data {
-	var j int = 0
+func addSourceToData(sourceFroms []string, se *utils.StatsError, datas []Data, datasourceTagName, runnername string, recordErrData bool) []Data {
+	j := 0
 	for i, v := range sourceFroms {
-		if se.ErrorIndexIn(i) {
-			continue
+		if recordErrData {
+			j = i
+		} else {
+			if se.ErrorIndexIn(i) {
+				continue
+			}
 		}
 		if j >= len(datas) {
 			continue
 		}
+
 		if dt, ok := datas[j][datasourceTagName]; ok {
 			log.Debugf("Runner[%v] datasource tag already has data %v, ignore %v", runnername, dt, v)
 		} else {
@@ -576,7 +599,7 @@ func addSourceToData(sourceFroms []string, se *utils.StatsError, datas []sender.
 	return datas
 }
 
-func addTagsToData(tags map[string]interface{}, datas []sender.Data, runnername string) []sender.Data {
+func addTagsToData(tags map[string]interface{}, datas []Data, runnername string) []Data {
 	for j, data := range datas {
 		for k, v := range tags {
 			if dt, ok := data[k]; ok {
@@ -627,21 +650,28 @@ func (r *LogExportRunner) Name() string {
 	return r.RunnerName
 }
 
-func (r *LogExportRunner) Reset() error {
-	var errmsg string
-	err := r.meta.Reset()
-	if err != nil {
-		errmsg += err.Error() + "\n"
+func (r *LogExportRunner) Reset() (err error) {
+	var errMsg string
+	if read, ok := r.reader.(Resetable); ok {
+		if subErr := read.Reset(); subErr != nil {
+			errMsg += subErr.Error() + "\n"
+		}
+	}
+	if err = r.meta.Reset(); err != nil {
+		errMsg += err.Error() + "\n"
 	}
 	for _, sd := range r.senders {
 		ssd, ok := sd.(Resetable)
 		if ok {
 			if nerr := ssd.Reset(); nerr != nil {
-				errmsg += err.Error() + "\n"
+				errMsg += nerr.Error() + "\n"
 			}
 		}
 	}
-	return errors.New(errmsg)
+	if errMsg != "" {
+		err = errors.New(errMsg)
+	}
+	return err
 }
 
 func (r *LogExportRunner) Cleaner() CleanInfo {
@@ -664,8 +694,8 @@ func (r *LogExportRunner) batchFullOrTimeout() bool {
 		return true
 	}
 	// 超过最长的发送间隔
-	if time.Now().Sub(r.lastSend).Seconds() >= float64(r.MaxBatchInteval) {
-		log.Debugf("Runner[%v] meet the max batch send interval %v", r.RunnerName, r.MaxBatchInteval)
+	if time.Now().Sub(r.lastSend).Seconds() >= float64(r.MaxBatchInterval) {
+		log.Debugf("Runner[%v] meet the max batch send interval %v", r.RunnerName, r.MaxBatchInterval)
 		return true
 	}
 	// 如果任务已经停止
@@ -956,4 +986,18 @@ func (r *LogExportRunner) StatusBackup() {
 	} else {
 		log.Infof("runner %v, backup status %v", r.RunnerName, bStart)
 	}
+}
+
+func GetEnvTag(name string, tags map[string]interface{}) map[string]interface{} {
+	if name == "" {
+		return tags
+	}
+	if value := os.Getenv(name); value != "" {
+		if tags == nil {
+			tags = make(map[string]interface{})
+		}
+		tags[name] = value
+	} else {
+	}
+	return tags
 }
