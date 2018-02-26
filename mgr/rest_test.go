@@ -147,7 +147,7 @@ func clearGotStatus(v *RunnerStatus) {
 
 func mkTestDir(mkDir ...string) error {
 	for _, d := range mkDir {
-		if err := os.Mkdir(d, 0755); err != nil {
+		if err := os.Mkdir(d, DefaultDirPerm); err != nil {
 			return err
 		}
 	}
@@ -729,7 +729,7 @@ func runnerDataIntegrityTest(p *testParam) {
 		t.Fatalf("mkdir test path error %v", err)
 	}
 	log1 := `{"a":1,"b":2}`
-	file, err := os.OpenFile(filepath.Join(logDir, "log1"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+	file, err := os.OpenFile(filepath.Join(logDir, "log1"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, DefaultFilePerm)
 	if err != nil {
 		log.Fatalf("Test_Run error createfile %v %v", filepath.Join(logDir, "log1"), err)
 	}
@@ -760,7 +760,7 @@ func runnerDataIntegrityTest(p *testParam) {
 		assert.Equal(t, http.StatusOK, respCode)
 		time.Sleep(2 * time.Second)
 
-		file, err := os.OpenFile(filepath.Join(logDir, "log1"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+		file, err := os.OpenFile(filepath.Join(logDir, "log1"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, DefaultFilePerm)
 		if err != nil {
 			log.Fatalf("Test_Run error createfile %v %v", filepath.Join(logDir, "log1"), err)
 		}

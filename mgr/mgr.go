@@ -73,7 +73,7 @@ func NewCustomManager(conf ManagerConfig, pr *parser.ParserRegistry, sr *sender.
 			return nil, fmt.Errorf("get system current workdir error %v, please set rest_dir config", err)
 		}
 		conf.RestDir = dir + DEFAULT_LOGKIT_REST_DIR
-		if err = os.Mkdir(conf.RestDir, 0755); err != nil && !os.IsExist(err) {
+		if err = os.Mkdir(conf.RestDir, models.DefaultDirPerm); err != nil && !os.IsExist(err) {
 			log.Warnf("make dir for rest default dir error %v", err)
 		}
 	}
@@ -533,7 +533,7 @@ func backupRunnerConfig(rootDir, filename string, rconf interface{}) error {
 	// 判断默认备份文件夹是否存在，不存在就尝试创建
 	if _, err := os.Stat(rootDir); err != nil {
 		if os.IsNotExist(err) {
-			if err = os.Mkdir(rootDir, 0755); err != nil && !os.IsExist(err) {
+			if err = os.Mkdir(rootDir, models.DefaultDirPerm); err != nil && !os.IsExist(err) {
 				return fmt.Errorf("rest default dir not exists and make dir failed, err is %v", err)
 			}
 		}

@@ -225,13 +225,13 @@ func TestMoveFiles(t *testing.T) {
 	filePathDst1 := filepath.Join(dirPath2, fileName1)
 	filePathDst2 := filepath.Join(dirPath2, fileName2)
 	os.RemoveAll(rootDir)
-	if err = os.Mkdir(rootDir, 0755); err != nil {
+	if err = os.Mkdir(rootDir, DefaultDirPerm); err != nil {
 		t.Fatalf("mmake dir %v error, %v", rootDir, err)
 	}
-	if err = os.Mkdir(dirPath1, 0755); err != nil {
+	if err = os.Mkdir(dirPath1, DefaultDirPerm); err != nil {
 		t.Fatalf("mmake dir %v error, %v", rootDir, err)
 	}
-	if err = os.Mkdir(dirPath2, 0755); err != nil {
+	if err = os.Mkdir(dirPath2, DefaultDirPerm); err != nil {
 		t.Fatalf("mmake dir %v error, %v", rootDir, err)
 	}
 	defer os.RemoveAll(rootDir)
@@ -429,7 +429,7 @@ func TestRestRequest(t *testing.T) {
 	dirName := "TestRestRequest"
 	rootDir := filepath.Join(pwd, dirName)
 	os.RemoveAll(rootDir)
-	if err = os.Mkdir(rootDir, 0755); err != nil {
+	if err = os.Mkdir(rootDir, DefaultDirPerm); err != nil {
 		t.Fatalf("mkdir %v error, error is %v", rootDir, err)
 	}
 	defer os.RemoveAll(rootDir)
@@ -441,7 +441,7 @@ func TestRestRequest(t *testing.T) {
 	tarPath := filepath.Join(rootDir, tarDirName)
 	tarfilePath := filepath.Join(rootDir, tarDirName, tarfileName)
 
-	if err = os.Mkdir(tarPath, 0755); err != nil {
+	if err = os.Mkdir(tarPath, DefaultDirPerm); err != nil {
 		t.Fatalf("mkdir %v error, error is %v", tarPath, err)
 	}
 
@@ -449,10 +449,10 @@ func TestRestRequest(t *testing.T) {
 	logkit := "123456789"
 	filePathDir := filepath.Join(rootDir, "_package")
 	filePathDirDir := filepath.Join(filePathDir, "package1")
-	if err = os.Mkdir(filePathDir, 0755); err != nil {
+	if err = os.Mkdir(filePathDir, DefaultDirPerm); err != nil {
 		t.Fatalf("mkdir %v error, error is %v", filePathDir, err)
 	}
-	if err = os.Mkdir(filePathDirDir, 0755); err != nil {
+	if err = os.Mkdir(filePathDirDir, DefaultDirPerm); err != nil {
 		t.Fatalf("mkdir %v error, error is %v", filePathDir, err)
 	}
 	filePath1 := filepath.Join(filePathDir, "file")
@@ -599,7 +599,7 @@ func testCheckLastVersion(t *testing.T, _, url string) {
 func testDownloadPackage(t *testing.T, rtDir, url string) {
 	dirName := "testDownloadPackage"
 	rootDir := filepath.Join(rtDir, dirName)
-	if err := os.Mkdir(rootDir, 0755); err != nil {
+	if err := os.Mkdir(rootDir, DefaultDirPerm); err != nil {
 		t.Fatalf("mkdir %v error, error is %v", rootDir, err)
 	}
 	osInfo := utils.GetOSInfo()
@@ -639,7 +639,7 @@ func testDownloadPackage(t *testing.T, rtDir, url string) {
 func testDecompress(t *testing.T, rtDir, url string) {
 	dirName := "testDecompress"
 	rootDir := filepath.Join(rtDir, dirName)
-	if err := os.Mkdir(rootDir, 0755); err != nil {
+	if err := os.Mkdir(rootDir, DefaultDirPerm); err != nil {
 		t.Fatalf("mkdir %v error, error is %v", rootDir, err)
 	}
 	osInfo := utils.GetOSInfo()
@@ -666,7 +666,7 @@ func testDecompress(t *testing.T, rtDir, url string) {
 	assert.NoError(t, err)
 
 	unpackDir := filepath.Join(rootDir, strconv.FormatInt(time.Now().Unix(), 10))
-	if err := os.Mkdir(unpackDir, 0755); err != nil {
+	if err := os.Mkdir(unpackDir, DefaultDirPerm); err != nil {
 		t.Fatalf("mkdir %v error, error is %v", unpackDir, err)
 	}
 	unpackPath, err := decompress(packageFilePath, unpackDir)

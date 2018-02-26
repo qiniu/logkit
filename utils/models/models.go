@@ -21,6 +21,9 @@ const (
 	LogDBTokensPrefix      = "logdb_tokens_"
 	TsDBTokensPrefix       = "tsdb_tokens_"
 	KodoTokensPrefix       = "kodo_tokens_"
+
+	DefaultDirPerm  = 0755
+	DefaultFilePerm = 0600
 )
 
 type Option struct {

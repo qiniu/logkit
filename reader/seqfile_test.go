@@ -2,13 +2,13 @@ package reader
 
 import (
 	"bufio"
+	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"io/ioutil"
-
-	"fmt"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -207,7 +207,7 @@ func Test_ReadNewest(t *testing.T) {
 }
 
 func createHiddenFile() {
-	f, _ := os.OpenFile(hiddenFile, os.O_CREATE|os.O_WRONLY, defaultFilePerm)
+	f, _ := os.OpenFile(hiddenFile, os.O_CREATE|os.O_WRONLY, DefaultFilePerm)
 	f.WriteString("12345")
 	f.Sync()
 	f.Close()
@@ -218,21 +218,21 @@ func destroyHiddenFile() {
 }
 
 func createPidFile() {
-	f, _ := os.OpenFile(testPidFile, os.O_CREATE|os.O_WRONLY, defaultFilePerm)
+	f, _ := os.OpenFile(testPidFile, os.O_CREATE|os.O_WRONLY, DefaultFilePerm)
 	f.WriteString("12345")
 	f.Sync()
 	f.Close()
 }
 
 func createQiniuLogFile(dirC string) {
-	f, _ := os.OpenFile(dirC+"/"+testQiniuLogFile, os.O_CREATE|os.O_WRONLY, defaultFilePerm)
+	f, _ := os.OpenFile(dirC+"/"+testQiniuLogFile, os.O_CREATE|os.O_WRONLY, DefaultFilePerm)
 	f.WriteString("12345678")
 	f.Sync()
 	f.Close()
 }
 
 func createInvalidSuffixFile(dirC string) {
-	f, _ := os.OpenFile(dirC+"/"+testQiniuLogFileTest, os.O_CREATE|os.O_WRONLY, defaultFilePerm)
+	f, _ := os.OpenFile(dirC+"/"+testQiniuLogFileTest, os.O_CREATE|os.O_WRONLY, DefaultFilePerm)
 	f.WriteString("12345678")
 	f.Sync()
 	f.Close()

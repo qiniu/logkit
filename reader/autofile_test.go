@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	. "github.com/qiniu/logkit/utils/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,7 +21,7 @@ func TestMatchMode(t *testing.T) {
 	rootDir := filepath.Join(pwd, dirName)
 	filePath := filepath.Join(rootDir, fileName)
 	defer os.RemoveAll(rootDir)
-	if err := os.Mkdir(rootDir, 0755); err != nil {
+	if err := os.Mkdir(rootDir, DefaultDirPerm); err != nil {
 		t.Fatalf("mkdir %v error %v", rootDir, err)
 	}
 	if err := ioutil.WriteFile(filePath, []byte("1234567890"), 0666); err != nil {

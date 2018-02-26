@@ -2,8 +2,6 @@ package reader
 
 import (
 	"errors"
-	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -232,23 +230,7 @@ func checkPath(meta *Meta, path string) (string, error) {
 			time.Sleep(time.Minute)
 			continue
 		}
-		checkFileMode(realPath, fileMode)
+		utils.CheckFileMode(realPath, fileMode)
 		return realPath, nil
 	}
-}
-
-func checkFileMode(path string, fileMode os.FileMode) error {
-	perm := fileMode.Perm()
-
-	// 73: 000 001 001 001
-	checkPerm := perm & os.FileMode(73)
-	if uint32(checkPerm) != uint32(73) {
-		changePerm := perm | os.FileMode(73)
-		err := os.Chmod(path, changePerm)
-		if err != nil {
-			err = fmt.Errorf("change mode for %v error %v", path, err)
-			return err
-		}
-	}
-	return nil
 }

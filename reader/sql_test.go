@@ -152,7 +152,7 @@ func TestSQLReader(t *testing.T) {
 	assert.EqualValues(t, mr.offsets, gotoffsets, "got offsets error")
 	assert.EqualValues(t, mr.syncSQLs, gotsqls, "got sqls error")
 	assert.EqualValues(t, false, omit)
-	assert.EqualValues(t, "MYSQL_Reader:"+mr.database+"_"+hash(mr.rawsqls), mr.Name())
+	assert.EqualValues(t, "MYSQL_Reader:"+mr.database+"_"+utils.Hash(mr.rawsqls), mr.Name())
 
 	// 测试更新Offset
 	expoffsets := []int64{123, 0, 0}
