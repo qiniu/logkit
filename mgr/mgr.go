@@ -1,6 +1,7 @@
 package mgr
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/howeyc/fsnotify"
 	"github.com/json-iterator/go"
+	"github.com/qiniu/logkit/utils/models"
 )
 
 var DIR_NOT_EXIST_SLEEP_TIME = "300" //300 s
@@ -537,6 +539,36 @@ func backupRunnerConfig(rootDir, filename string, rconf interface{}) error {
 		}
 	}
 	return ioutil.WriteFile(filename, confBytes, 0644)
+}
+
+func (m *Manager) UpdateToken(tokens []models.AuthTokens) (err error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	errMsg := make([]string, 0)
+	for _, token := range tokens {
+		runnerPath := token.RunnerName
+		if runner, ok := m.runners[runnerPath]; ok {
+			if r, ok := runner.(TokenRefreshable); ok {
+				token.RunnerName = runner.Name()
+				if subErr := r.TokenRefresh(token); subErr != nil {
+					errMsg = append(errMsg, subErr.Error())
+					continue
+				}
+			}
+		}
+		if c, ok := m.runnerConfig[runnerPath]; ok {
+			if len(c.SenderConfig) > token.SenderIndex {
+				for k, t := range token.SenderTokens {
+					c.SenderConfig[token.SenderIndex][k] = t
+				}
+			}
+			m.runnerConfig[runnerPath] = c
+		}
+	}
+	if len(errMsg) != 0 {
+		err = errors.New(strings.Join(errMsg, "\n"))
+	}
+	return
 }
 
 func (m *Manager) AddRunner(name string, conf RunnerConfig) (err error) {

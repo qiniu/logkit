@@ -14,6 +14,7 @@ import (
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
 	"github.com/stretchr/testify/assert"
+	"sync"
 )
 
 const (
@@ -35,6 +36,7 @@ func TestFtSender(t *testing.T) {
 		reqRateLimit:   0,
 		flowRateLimit:  0,
 		gzip:           false,
+		tokenLock:      new(sync.RWMutex),
 	}
 	s, err := newPandoraSender(opt)
 	if err != nil {
@@ -82,6 +84,7 @@ func TestFtMemorySender(t *testing.T) {
 		reqRateLimit:   0,
 		flowRateLimit:  0,
 		gzip:           false,
+		tokenLock:      new(sync.RWMutex),
 	}
 	s, err := newPandoraSender(opt)
 	if err != nil {
@@ -130,6 +133,7 @@ func TestFtChannelFullSender(t *testing.T) {
 		reqRateLimit:   0,
 		flowRateLimit:  0,
 		gzip:           false,
+		tokenLock:      new(sync.RWMutex),
 	}
 	s, err := newPandoraSender(opt)
 	if err != nil {
@@ -304,6 +308,7 @@ func TestFtSenderConvertData(t *testing.T) {
 		reqRateLimit:   0,
 		flowRateLimit:  0,
 		gzip:           false,
+		tokenLock:      new(sync.RWMutex),
 	}
 	s, err := newPandoraSender(opt)
 	if err != nil {

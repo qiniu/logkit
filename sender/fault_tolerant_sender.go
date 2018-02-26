@@ -222,6 +222,13 @@ func (ft *FtSender) Close() error {
 	return ft.innerSender.Close()
 }
 
+func (ft *FtSender) TokenRefresh(mapConf conf.MapConf) (err error) {
+	if tokenSender, ok := ft.innerSender.(TokenRefreshable); ok {
+		err = tokenSender.TokenRefresh(mapConf)
+	}
+	return
+}
+
 // marshalData 将数据序列化
 func (ft *FtSender) marshalData(datas []Data) (bs []byte, err error) {
 	ctx := new(datasContext)
