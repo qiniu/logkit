@@ -678,11 +678,13 @@ func (r *LogExportRunner) Reset() (err error) {
 }
 
 func (r *LogExportRunner) Cleaner() CleanInfo {
-	ci := CleanInfo{
-		enable: r.cleaner != nil,
-		logdir: filepath.Dir(r.reader.Source()),
+	if r.cleaner == nil {
+		return CleanInfo{enable: false}
 	}
-	return ci
+	return CleanInfo{
+		enable: true,
+		logdir: r.cleaner.LogDir(),
+	}
 }
 
 func (r *LogExportRunner) batchFullOrTimeout() bool {
