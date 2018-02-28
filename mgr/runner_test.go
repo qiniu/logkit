@@ -110,7 +110,10 @@ func Test_Run(t *testing.T) {
 		t.Error(err)
 	}
 	cleanChan := make(chan cleaner.CleanSignal)
-	cleaner, err := cleaner.NewCleaner(conf.MapConf{}, meta, cleanChan, readerConfig["log_path"])
+	cleanerConfig := conf.MapConf{
+		"delete_enable": "true",
+	}
+	cleaner, err := cleaner.NewCleaner(cleanerConfig, meta, cleanChan, meta.LogPath())
 	if err != nil {
 		t.Error(err)
 	}
@@ -149,7 +152,7 @@ func Test_Run(t *testing.T) {
 	}
 
 	cleanInfo := CleanInfo{
-		enable: false,
+		enable: true,
 		logdir: absLogpath,
 	}
 	assert.Equal(t, cleanInfo, r.Cleaner())
@@ -258,7 +261,10 @@ func Test_RunForEnvTag(t *testing.T) {
 		t.Error(err)
 	}
 	cleanChan := make(chan cleaner.CleanSignal)
-	cleaner, err := cleaner.NewCleaner(conf.MapConf{}, meta, cleanChan, readerConfig["log_path"])
+	cleanerConfig := conf.MapConf{
+		"delete_enable": "true",
+	}
+	cleaner, err := cleaner.NewCleaner(cleanerConfig, meta, cleanChan, meta.LogPath())
 	if err != nil {
 		t.Error(err)
 	}
@@ -297,7 +303,7 @@ func Test_RunForEnvTag(t *testing.T) {
 	}
 
 	cleanInfo := CleanInfo{
-		enable: false,
+		enable: true,
 		logdir: absLogpath,
 	}
 	assert.Equal(t, cleanInfo, r.Cleaner())
@@ -406,7 +412,10 @@ func Test_RunForErrData(t *testing.T) {
 		t.Error(err)
 	}
 	cleanChan := make(chan cleaner.CleanSignal)
-	cleaner, err := cleaner.NewCleaner(conf.MapConf{}, meta, cleanChan, readerConfig["log_path"])
+	cleanerConfig := conf.MapConf{
+		"delete_enable": "true",
+	}
+	cleaner, err := cleaner.NewCleaner(cleanerConfig, meta, cleanChan, meta.LogPath())
 	if err != nil {
 		t.Error(err)
 	}
@@ -445,7 +454,7 @@ func Test_RunForErrData(t *testing.T) {
 	}
 
 	cleanInfo := CleanInfo{
-		enable: false,
+		enable: true,
 		logdir: absLogpath,
 	}
 	assert.Equal(t, cleanInfo, r.Cleaner())
