@@ -13,6 +13,7 @@ import (
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
+
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
 	"github.com/json-iterator/go"
@@ -46,6 +47,10 @@ func RawData(readerConfig conf.MapConf) (rawData string, err error) {
 		}
 		if rawData == "" {
 			continue
+		}
+		if len(rawData) >= defaultMaxBatchSize {
+			err = errors.New("data size large than 2M and will be discard")
+			return "", fmt.Errorf("reader %s - error: %v", rd.Name(), err)
 		}
 		return
 	}
