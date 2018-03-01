@@ -504,8 +504,21 @@ func (m *Meta) Reset() error {
 	if err := os.RemoveAll(m.metaFilePath); err != nil {
 		return err
 	}
-	if err := os.RemoveAll(m.doneFilePath); err != nil {
+	// doneFilePath 默认为 meta 文件夹，不能直接删除
+	files, err := ioutil.ReadDir(m.doneFilePath)
+	if err != nil && os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
 		return err
+	}
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		} else if strings.HasPrefix(file.Name(), doneFileName) {
+			if err := os.RemoveAll(filepath.Join(m.doneFilePath, file.Name())); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

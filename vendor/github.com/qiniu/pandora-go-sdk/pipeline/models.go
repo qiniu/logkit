@@ -984,13 +984,14 @@ type SchemaFreeToken struct {
 
 type InitOrUpdateWorkflowInput struct {
 	SchemaFreeToken
-	SchemaFree   bool
-	Region       string
-	RepoName     string
-	WorkflowName string
-	RepoOptions  *RepoOptions
-	Schema       []RepoSchemaEntry
-	Option       *SchemaFreeOption
+	InitOptionChange bool
+	SchemaFree       bool
+	Region           string
+	RepoName         string
+	WorkflowName     string
+	RepoOptions      *RepoOptions
+	Schema           []RepoSchemaEntry
+	Option           *SchemaFreeOption
 }
 
 type SchemaFreeOption struct {
