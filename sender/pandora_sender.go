@@ -461,13 +461,14 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 	}
 	if initErr := s.client.InitOrUpdateWorkflow(&pipeline.InitOrUpdateWorkflowInput{
 		// 此处要的 schema 为 autoCreate 中用户指定的，所以 SchemaFree 要恒为 true
-		SchemaFree:      true,
-		Region:          s.opt.region,
-		WorkflowName:    s.opt.workflowName,
-		RepoName:        s.opt.repoName,
-		Schema:          schemas,
-		SchemaFreeToken: s.opt.tokens.SchemaFreeTokens,
-		RepoOptions:     &pipeline.RepoOptions{WithIP: s.opt.withip, UnescapeLine: s.opt.UnescapeLine},
+		InitOptionChange: true,
+		SchemaFree:       true,
+		Region:           s.opt.region,
+		WorkflowName:     s.opt.workflowName,
+		RepoName:         s.opt.repoName,
+		Schema:           schemas,
+		SchemaFreeToken:  s.opt.tokens.SchemaFreeTokens,
+		RepoOptions:      &pipeline.RepoOptions{WithIP: s.opt.withip, UnescapeLine: s.opt.UnescapeLine},
 		Option: &pipeline.SchemaFreeOption{
 			ToLogDB: s.opt.enableLogdb,
 			AutoExportToLogDBInput: pipeline.AutoExportToLogDBInput{
