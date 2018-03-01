@@ -4,11 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
-	"path/filepath"
 	"runtime/debug"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -69,7 +66,7 @@ type RunnerStatus struct {
 	ReadDataSize     int64                      `json:"readDataSize"`
 	ReadDataCount    int64                      `json:"readDataCount"`
 	Elaspedtime      float64                    `json:"elaspedtime"`
-	Lag              RunnerLag                  `json:"lag"`
+	Lag              LagInfo                    `json:"lag"`
 	ReaderStats      utils.StatsInfo            `json:"readerStats"`
 	ParserStats      utils.StatsInfo            `json:"parserStats"`
 	SenderStats      map[string]utils.StatsInfo `json:"senderStats"`
@@ -83,12 +80,6 @@ type RunnerStatus struct {
 	RunningStatus    string  `json:"runningStatus"`
 	Tag              string  `json:"tag,omitempty"`
 	Url              string  `json:"url,omitempty"`
-}
-
-type RunnerLag struct {
-	Size   int64 `json:"size"`
-	Files  int64 `json:"files"`
-	Ftlags int64 `json:"ftlags"`
 }
 
 // RunnerConfig 从多数据源读取，经过解析后，发往多个数据目的地
@@ -711,64 +702,12 @@ func (r *LogExportRunner) batchFullOrTimeout() bool {
 	return false
 }
 
-func (r *LogExportRunner) getReadDoneSize() (size int64, logreading string, err error) {
-	mf := r.meta.MetaFile()
-	bd, err := ioutil.ReadFile(mf)
-	if err != nil {
-		log.Warnf("Runner[%v] Read meta File err %v, can't get stats", r.Name(), err)
-		return 0, "", nil
+func (r *LogExportRunner) LagStats() (rl *LagInfo, err error) {
+	lr, ok := r.reader.(reader.LagReader)
+	if ok {
+		return lr.Lag()
 	}
-	ss := strings.Split(strings.TrimSpace(string(bd)), "\t")
-	if len(ss) != 2 {
-		err = fmt.Errorf("Runner[%v] metafile format err %v, can't get stats", r.Name(), ss)
-		log.Warn(err)
-		return
-	}
-	logreading, logsize := ss[0], ss[1]
-	size, err = strconv.ParseInt(logsize, 10, 64)
-	if err != nil {
-		log.Errorf("Runner[%v] parse log meta error %v, can't get stats", r.Name(), err)
-		return
-	}
-	return
-}
-
-func (r *LogExportRunner) LagStats() (rl RunnerLag, err error) {
-	size, logreading, err := r.getReadDoneSize()
-	if err != nil {
-		return
-	}
-	rl = RunnerLag{Files: 0, Size: -size}
-	logpath := r.meta.LogPath()
-	switch r.meta.GetMode() {
-	case reader.DirMode:
-		logs, serr := utils.ReadDirByTime(logpath)
-		if serr != nil {
-			log.Warnf("Runner[%v] ReadDirByTime err %v, can't get stats", r.Name(), serr)
-			err = serr
-			return
-		}
-		logreading = filepath.Base(logreading)
-		for _, l := range logs {
-			if l.IsDir() {
-				continue
-			}
-			rl.Size += l.Size()
-			if l.Name() == logreading {
-				break
-			}
-			rl.Files++
-		}
-	case reader.FileMode:
-		fi, serr := os.Stat(logpath)
-		if serr != nil {
-			err = serr
-			return
-		}
-		rl.Size += fi.Size()
-	default:
-		err = fmt.Errorf("Runner[%v] readmode %v not support LagStats, can't get stats", r.Name(), r.meta.GetMode())
-	}
+	err = fmt.Errorf("readmode %v not support LagStats, can't get stats", r.meta.GetMode())
 	return
 }
 
@@ -804,14 +743,13 @@ func (r *LogExportRunner) Status() RunnerStatus {
 	r.rsMutex.Lock()
 	defer r.rsMutex.Unlock()
 	r.rs.Error = ""
-	if r.meta.IsFileMode() {
-		r.rs.Logpath = r.meta.LogPath()
-		rl, err := r.LagStats()
-		if err != nil {
-			r.rs.Error = fmt.Sprintf("get lag error %v", err)
-		}
-		r.rs.Lag = rl
+	r.rs.Logpath = r.meta.LogPath()
+	rl, err := r.LagStats()
+	if err != nil {
+		r.rs.Error = fmt.Sprintf("get lag error: %v", err)
+		log.Warn(r.rs.Error)
 	}
+	r.rs.Lag = *rl
 
 	r.rs.Elaspedtime += elaspedtime
 	r.rs.lastState = now

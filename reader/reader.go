@@ -8,6 +8,7 @@ import (
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/utils"
+	"github.com/qiniu/logkit/utils/models"
 )
 
 // Reader 是一个通用的行读取reader接口
@@ -27,6 +28,11 @@ type StatsReader interface {
 	//Name reader名称
 	Name() string
 	Status() utils.StatsInfo
+}
+
+//获取数据lag的接口
+type LagReader interface {
+	Lag() (*models.LagInfo, error)
 }
 
 // FileReader reader 接口方法

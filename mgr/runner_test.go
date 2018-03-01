@@ -691,6 +691,9 @@ func Test_QiniulogRun(t *testing.T) {
 		assert.Equal(t, expfiles[idx], dt["log"], "equl log test")
 		assert.Equal(t, expreqid[idx], dt["reqid"], "equal reqid test")
 	}
+	ls, err := r.LagStats()
+	assert.NoError(t, err)
+	assert.Equal(t, &LagInfo{0, "bytes", 0}, ls)
 }
 
 func TestCreateTransforms(t *testing.T) {
