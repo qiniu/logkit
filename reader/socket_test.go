@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/qiniu/logkit/conf"
+	. "github.com/qiniu/logkit/utils/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -99,7 +100,7 @@ func TestUnixSocketReader(t *testing.T) {
 	assert.NoError(t, err)
 	defer os.RemoveAll(metaDir)
 
-	err = os.Mkdir("TestUnixSocketReader", 0755)
+	err = os.Mkdir("TestUnixSocketReader", DefaultDirPerm)
 	assert.NoError(t, err)
 	defer os.RemoveAll("TestUnixSocketReader")
 

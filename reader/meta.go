@@ -3,7 +3,6 @@ package reader
 import (
 	"errors"
 	"fmt"
-	"hash/fnv"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -33,8 +32,6 @@ const (
 )
 
 const (
-	defaultDirPerm      = 0755
-	defaultFilePerm     = 0600
 	defautFileRetention = 7
 	metaFormat          = "%s\t%d\n"
 	bufMetaFormat       = "read:%d\nwrite:%d\nbufsize:%d\n"
@@ -71,7 +68,7 @@ type Meta struct {
 func getValidDir(dir string) (realPath string, err error) {
 	realPath, fi, err := utils.GetRealPath(dir)
 	if os.IsNotExist(err) {
-		if err = os.MkdirAll(realPath, defaultDirPerm); err != nil {
+		if err = os.MkdirAll(realPath, DefaultDirPerm); err != nil {
 			//此处的error需要直接返回，后面会根据error类型是否为path error做判断
 			log.Errorf("fail to newMeta cannot create %v, err:%v", realPath, err)
 		}
@@ -126,12 +123,6 @@ func NewMeta(metadir, filedonedir, logpath, mode, tagfile string, donefileRetent
 	}, nil
 }
 
-func hash(s string) string {
-	h := fnv.New32a()
-	h.Write([]byte(s))
-	return strconv.Itoa(int(h.Sum32()))
-}
-
 func getLogPathAbs(conf conf.MapConf) (logpath string, err error) {
 	logpath, err = conf.GetString(KeyLogPath)
 	if err != nil {
@@ -165,7 +156,7 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 	if metapath == "" {
 		runnerName, _ := conf.GetString(GlobalKeyName)
 		base := filepath.Base(logPath)
-		metapath = "meta/" + runnerName + "_" + hash(base)
+		metapath = "meta/" + runnerName + "_" + utils.Hash(base)
 		log.Debugf("Runner[%v] Using %s as default metaPath", runnerName, metapath)
 	}
 	datasourceTag, _ := conf.GetStringOr(KeyDataSourceTag, "")
@@ -215,7 +206,7 @@ func (m *Meta) Clear() error {
 		log.Errorf("Runner[%v] remove %v err %v", m.RunnerName, m.dir, err)
 		return err
 	}
-	return os.MkdirAll(m.dir, defaultDirPerm)
+	return os.MkdirAll(m.dir, DefaultDirPerm)
 }
 
 func (m *Meta) CacheLineFile() string {
@@ -227,7 +218,7 @@ func (m *Meta) ReadCacheLine() ([]byte, error) {
 }
 
 func (m *Meta) WriteCacheLine(lines string) error {
-	return ioutil.WriteFile(m.CacheLineFile(), []byte(lines), defaultFilePerm)
+	return ioutil.WriteFile(m.CacheLineFile(), []byte(lines), DefaultFilePerm)
 }
 
 func (m *Meta) ReadBufMeta() (r, w, bufsize int, err error) {
@@ -263,7 +254,7 @@ func (m *Meta) WriteBuf(buf []byte, r, w, bufsize int) (err error) {
 	}()
 
 	// write to tmp file
-	f, err = os.OpenFile(tmpBufMetaFileName, os.O_RDWR|os.O_CREATE, defaultFilePerm)
+	f, err = os.OpenFile(tmpBufMetaFileName, os.O_RDWR|os.O_CREATE, DefaultFilePerm)
 	if err != nil {
 		return
 	}
@@ -276,7 +267,7 @@ func (m *Meta) WriteBuf(buf []byte, r, w, bufsize int) (err error) {
 	f.Close()
 
 	// write to tmp file
-	f, err = os.OpenFile(tmpBufFileName, os.O_RDWR|os.O_CREATE, defaultFilePerm)
+	f, err = os.OpenFile(tmpBufFileName, os.O_RDWR|os.O_CREATE, DefaultFilePerm)
 	if err != nil {
 		return
 	}
@@ -328,7 +319,7 @@ func (m *Meta) WriteOffset(currFile string, offset int64) (err error) {
 	tmpFileName := fmt.Sprintf("%s.%d.tmp", fileName, rand.Int())
 
 	// write to tmp file
-	f, err = os.OpenFile(tmpFileName, os.O_RDWR|os.O_CREATE, defaultFilePerm)
+	f, err = os.OpenFile(tmpFileName, os.O_RDWR|os.O_CREATE, DefaultFilePerm)
 	if err != nil {
 		return err
 	}
@@ -345,7 +336,7 @@ func (m *Meta) WriteOffset(currFile string, offset int64) (err error) {
 
 // AppendDoneFile 将处理完的文件写入doneFile中
 func (m *Meta) AppendDoneFile(path string) (err error) {
-	f, err := os.OpenFile(m.DoneFile(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, defaultFilePerm)
+	f, err := os.OpenFile(m.DoneFile(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, DefaultFilePerm)
 	if err != nil {
 		return
 	}
@@ -368,7 +359,7 @@ func (m *Meta) DeleteFile() string {
 }
 
 func (m *Meta) AppendDeleteFile(path string) (err error) {
-	f, err := os.OpenFile(m.DeleteFile(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, defaultFilePerm)
+	f, err := os.OpenFile(m.DeleteFile(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, DefaultFilePerm)
 	if err != nil {
 		return
 	}
@@ -537,5 +528,5 @@ func (m *Meta) WriteStatistic(stat *Statistic) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(m.StatisticFile(), statStr, defaultFilePerm)
+	return ioutil.WriteFile(m.StatisticFile(), statStr, DefaultFilePerm)
 }

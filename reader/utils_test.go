@@ -2,14 +2,14 @@ package reader
 
 import (
 	"errors"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
 	"testing"
-
 	"time"
 
-	"io/ioutil"
-	"path/filepath"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -98,7 +98,7 @@ func TestParseDuration(t *testing.T) {
 
 func TestModTimeLater(t *testing.T) {
 	dir := "TestModTimeLater"
-	err := os.Mkdir(dir, 0755)
+	err := os.Mkdir(dir, DefaultDirPerm)
 	assert.NoError(t, err)
 	defer os.RemoveAll(dir)
 	for _, v := range []string{"f1", "f2", "f3"} {

@@ -40,14 +40,14 @@ func cleanMetaFolder(path string) {
 
 func Test_Run(t *testing.T) {
 	dir := "Test_RunForErrData"
-	if err := os.Mkdir(dir, 0755); err != nil {
+	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_Run error mkdir %v %v", dir, err)
 	}
 	defer os.RemoveAll(dir)
 	logpath := dir + "/logdir"
 	logpathLink := dir + "/logdirlink"
 	metapath := dir + "/meta_mock_csv"
-	if err := os.Mkdir(logpath, 0755); err != nil {
+	if err := os.Mkdir(logpath, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_Run error mkdir %v %v", logpath, err)
 	}
 	absLogpath, err := filepath.Abs(logpath)
@@ -61,7 +61,7 @@ func Test_Run(t *testing.T) {
 	if err := os.Symlink(absLogpath, absLogpathLink); err != nil {
 		log.Fatalf("Test_Run error symbol link %v to %v: %v", absLogpathLink, logpath, err)
 	}
-	if err := os.Mkdir(metapath, 0755); err != nil {
+	if err := os.Mkdir(metapath, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_Run error mkdir %v %v", metapath, err)
 	}
 	log1 := `hello 123
@@ -187,7 +187,7 @@ func Test_Run(t *testing.T) {
 
 func Test_RunForEnvTag(t *testing.T) {
 	dir := "Test_RunForEnvTag"
-	if err := os.Mkdir(dir, 0755); err != nil {
+	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_RunForEnvTag error mkdir %v %v", dir, err)
 	}
 	defer os.RemoveAll(dir)
@@ -201,7 +201,7 @@ func Test_RunForEnvTag(t *testing.T) {
 	logpath := dir + "/logdir"
 	logpathLink := dir + "/logdirlink"
 	metapath := dir + "/meta_mock_csv"
-	if err := os.Mkdir(logpath, 0755); err != nil {
+	if err := os.Mkdir(logpath, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_RunForEnvTag error mkdir %v %v", logpath, err)
 	}
 	absLogpath, err := filepath.Abs(logpath)
@@ -215,7 +215,7 @@ func Test_RunForEnvTag(t *testing.T) {
 	if err := os.Symlink(absLogpath, absLogpathLink); err != nil {
 		log.Fatalf("Test_Run error symbol link %v to %v: %v", absLogpathLink, logpath, err)
 	}
-	if err := os.Mkdir(metapath, 0755); err != nil {
+	if err := os.Mkdir(metapath, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_Run error mkdir %v %v", metapath, err)
 	}
 	log1 := `hello 123
@@ -342,14 +342,14 @@ func Test_RunForEnvTag(t *testing.T) {
 
 func Test_RunForErrData(t *testing.T) {
 	dir := "Test_Run"
-	if err := os.Mkdir(dir, 0755); err != nil {
+	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_Run error mkdir %v %v", dir, err)
 	}
 	defer os.RemoveAll(dir)
 	logpath := dir + "/logdir"
 	logpathLink := dir + "/logdirlink"
 	metapath := dir + "/meta_mock_csv"
-	if err := os.Mkdir(logpath, 0755); err != nil {
+	if err := os.Mkdir(logpath, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_Run error mkdir %v %v", logpath, err)
 	}
 	absLogpath, err := filepath.Abs(logpath)
@@ -363,7 +363,7 @@ func Test_RunForErrData(t *testing.T) {
 	if err := os.Symlink(absLogpath, absLogpathLink); err != nil {
 		log.Fatalf("Test_Run error symbol link %v to %v: %v", absLogpathLink, logpath, err)
 	}
-	if err := os.Mkdir(metapath, 0755); err != nil {
+	if err := os.Mkdir(metapath, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_Run error mkdir %v %v", metapath, err)
 	}
 	log1 := `hello 123
@@ -554,14 +554,14 @@ func Test_Compatible(t *testing.T) {
 
 func Test_QiniulogRun(t *testing.T) {
 	dir := "Test_QiniulogRun"
-	if err := os.Mkdir(dir, 0755); err != nil {
+	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_Run error mkdir %v %v", dir, err)
 	}
 	defer os.RemoveAll(dir)
 	logpath := dir + "/logdir"
 	logpathLink := dir + "/logdirlink"
 	metapath := dir + "/meta_mock_csv"
-	if err := os.Mkdir(logpath, 0755); err != nil {
+	if err := os.Mkdir(logpath, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_Run error mkdir %v %v", logpath, err)
 	}
 	absLogpath, err := filepath.Abs(logpath)
@@ -575,7 +575,7 @@ func Test_QiniulogRun(t *testing.T) {
 	if err := os.Symlink(absLogpath, absLogpathLink); err != nil {
 		log.Fatalf("Test_Run error symbol link %v to %v: %v", absLogpathLink, logpath, err)
 	}
-	if err := os.Mkdir(metapath, 0755); err != nil {
+	if err := os.Mkdir(metapath, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_Run error mkdir %v %v", metapath, err)
 	}
 	log1 := `2017/01/22 11:16:08.885550 [X-ZsU][INFO] disk.go:123: [REQ_END] 200 0.010k 3.792ms
@@ -1058,7 +1058,7 @@ func TestCopyStats(t *testing.T) {
 func TestSyslogRunnerX(t *testing.T) {
 	metaDir := "TestSyslogRunner"
 
-	os.Mkdir(metaDir, 0755)
+	os.Mkdir(metaDir, DefaultDirPerm)
 	defer os.RemoveAll(metaDir)
 
 	config1 := `{
@@ -1200,7 +1200,7 @@ func TestAddDatasourceForErrData(t *testing.T) {
 func TestAddDatatags(t *testing.T) {
 	dir := "TestAddDatatags"
 	metaDir := filepath.Join(dir, "meta")
-	if err := os.Mkdir(dir, 0755); err != nil {
+	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_Run error mkdir %v %v", dir, err)
 	}
 	tagFile := filepath.Join(dir, "tagFile.json")
@@ -1209,10 +1209,10 @@ func TestAddDatatags(t *testing.T) {
 	    "Author":["john","ada","alice"],
 	    "IsTrue":true,
 	    "Host":99
-	  	}`), 0755)
+	  	}`), DefaultDirPerm)
 	assert.NoError(t, err)
 	logPath := filepath.Join(dir, "test.log")
-	err = ioutil.WriteFile(logPath, []byte(`{"f1": "2","f2": "1","f3": "3"}`), 0755)
+	err = ioutil.WriteFile(logPath, []byte(`{"f1": "2","f2": "1","f3": "3"}`), DefaultDirPerm)
 	assert.NoError(t, err)
 
 	defer os.RemoveAll(dir)

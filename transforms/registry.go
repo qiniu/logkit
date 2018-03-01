@@ -14,6 +14,7 @@ const (
 	TransformTypeLong    = "long"
 	TransformTypeFloat   = "float"
 	TransformTypeBoolean = "bool"
+	TransformTypeByte    = "[]byte"
 )
 
 const (
