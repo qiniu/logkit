@@ -44,7 +44,7 @@ func RawData(readerConfig conf.MapConf) (rawData string, err error) {
 		if err != nil && err != io.EOF {
 			return "", fmt.Errorf("reader %s - error: %v", rd.Name(), err)
 		}
-		if rawData == "" {
+		if rawData == "" || len(rawData) > defaultMaxBatchSize {
 			continue
 		}
 		return
