@@ -53,3 +53,9 @@ type AuthTokens struct {
 	SenderIndex  int
 	SenderTokens conf.MapConf
 }
+
+type LagInfo struct {
+	Size     int64  `json:"size"`
+	SizeUnit string `json:"sizeunit"`
+	Ftlags   int64  `json:"ftlags"`
+}

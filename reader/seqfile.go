@@ -15,6 +15,7 @@ import (
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/rateio"
 	"github.com/qiniu/logkit/utils"
+	"github.com/qiniu/logkit/utils/models"
 )
 
 // FileMode 读取单个文件模式
@@ -452,4 +453,28 @@ func (sf *SeqFile) SyncMeta() (err error) {
 	sf.lastSyncOffset = sf.offset
 	sf.lastSyncPath = sf.currFile
 	return sf.meta.WriteOffset(sf.currFile, sf.offset)
+}
+
+func (sf *SeqFile) Lag() (rl *models.LagInfo, err error) {
+	sf.mux.Lock()
+	rl = &models.LagInfo{Size: -sf.offset}
+	logReading := filepath.Base(sf.currFile)
+	sf.mux.Unlock()
+
+	logs, err := utils.ReadDirByTime(sf.dir)
+	if err != nil {
+		err = fmt.Errorf("ReadDirByTime err %v, can't get stats", err)
+		return
+	}
+	for _, l := range logs {
+		if l.IsDir() {
+			continue
+		}
+		rl.Size += l.Size()
+		if l.Name() == logReading {
+			break
+		}
+	}
+	rl.SizeUnit = "bytes"
+	return
 }

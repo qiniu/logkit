@@ -91,6 +91,10 @@ func getRunnerConfig(name, logPath, metaPath, mode, senderPath string) ([]byte, 
 }
 
 func getRunnerStatus(rn, lp, rs string, rdc, rds, pe, ps, se, ss int64) map[string]RunnerStatus {
+	unit := "bytes"
+	if rs != RunnerRunning {
+		unit = ""
+	}
 	return map[string]RunnerStatus{
 		rn: {
 			Name:             rn,
@@ -100,9 +104,9 @@ func getRunnerStatus(rn, lp, rs string, rdc, rds, pe, ps, se, ss int64) map[stri
 			RunningStatus:    rs,
 			ReadSpeedTrend:   "",
 			ReadSpeedTrendKb: "",
-			Lag: RunnerLag{
-				Size:  0,
-				Files: 0,
+			Lag: LagInfo{
+				Size:     0,
+				SizeUnit: unit,
 			},
 			ParserStats: utils.StatsInfo{
 				Errors:  pe,
