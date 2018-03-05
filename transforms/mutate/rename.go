@@ -41,7 +41,7 @@ func (g *Rename) Transform(datas []Data) ([]Data, error) {
 	}
 	if err != nil {
 		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform replace, last error info is %v", errnums, err)
+		ferr = fmt.Errorf("find total %v erorrs in transform rename, last error info is %v", errnums, err)
 	}
 	g.stats.Errors += int64(errnums)
 	g.stats.Success += int64(len(datas) - errnums)
