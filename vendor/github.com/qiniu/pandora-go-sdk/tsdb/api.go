@@ -7,7 +7,7 @@ import (
 )
 
 func (c *Tsdb) CreateRepo(input *CreateRepoInput) (err error) {
-	op := c.newOperation(OpCreateRepo, input.RepoName)
+	op := c.NewOperation(OpCreateRepo, input.RepoName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input); err != nil {
@@ -18,7 +18,7 @@ func (c *Tsdb) CreateRepo(input *CreateRepoInput) (err error) {
 }
 
 func (c *Tsdb) GetRepo(input *GetRepoInput) (output *GetRepoOutput, err error) {
-	op := c.newOperation(OpGetRepo, input.RepoName)
+	op := c.NewOperation(OpGetRepo, input.RepoName)
 
 	output = &GetRepoOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -26,7 +26,7 @@ func (c *Tsdb) GetRepo(input *GetRepoInput) (output *GetRepoOutput, err error) {
 }
 
 func (c *Tsdb) ListRepos(input *ListReposInput) (output *ListReposOutput, err error) {
-	op := c.newOperation(OpListRepos)
+	op := c.NewOperation(OpListRepos)
 
 	output = &ListReposOutput{}
 	req := c.newRequest(op, input.Token, &output)
@@ -34,7 +34,7 @@ func (c *Tsdb) ListRepos(input *ListReposInput) (output *ListReposOutput, err er
 }
 
 func (c *Tsdb) UpdateRepoMetadata(input *UpdateRepoMetadataInput) (err error) {
-	op := c.newOperation(OpUpdateRepoMetadata, input.RepoName)
+	op := c.NewOperation(OpUpdateRepoMetadata, input.RepoName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input); err != nil {
@@ -45,21 +45,21 @@ func (c *Tsdb) UpdateRepoMetadata(input *UpdateRepoMetadataInput) (err error) {
 }
 
 func (c *Tsdb) DeleteRepoMetadata(input *DeleteRepoMetadataInput) (err error) {
-	op := c.newOperation(OpDeleteRepoMetadata, input.RepoName)
+	op := c.NewOperation(OpDeleteRepoMetadata, input.RepoName)
 
 	req := c.newRequest(op, input.Token, nil)
 	return req.Send()
 }
 
 func (c *Tsdb) DeleteRepo(input *DeleteRepoInput) (err error) {
-	op := c.newOperation(OpDeleteRepo, input.RepoName)
+	op := c.NewOperation(OpDeleteRepo, input.RepoName)
 
 	req := c.newRequest(op, input.Token, nil)
 	return req.Send()
 }
 
 func (c *Tsdb) CreateSeries(input *CreateSeriesInput) (err error) {
-	op := c.newOperation(OpCreateSeries, input.RepoName, input.SeriesName)
+	op := c.NewOperation(OpCreateSeries, input.RepoName, input.SeriesName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input); err != nil {
@@ -70,7 +70,7 @@ func (c *Tsdb) CreateSeries(input *CreateSeriesInput) (err error) {
 }
 
 func (c *Tsdb) ListSeries(input *ListSeriesInput) (output *ListSeriesOutput, err error) {
-	op := c.newOperation(OpListSeries, input.RepoName)
+	op := c.NewOperation(OpListSeries, input.RepoName)
 
 	output = &ListSeriesOutput{}
 	req := c.newRequest(op, input.Token, &output)
@@ -79,7 +79,7 @@ func (c *Tsdb) ListSeries(input *ListSeriesInput) (output *ListSeriesOutput, err
 }
 
 func (c *Tsdb) UpdateSeriesMetadata(input *UpdateSeriesMetadataInput) (err error) {
-	op := c.newOperation(OpUpdateSeriesMetadata, input.RepoName, input.SeriesName)
+	op := c.NewOperation(OpUpdateSeriesMetadata, input.RepoName, input.SeriesName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input); err != nil {
@@ -90,21 +90,21 @@ func (c *Tsdb) UpdateSeriesMetadata(input *UpdateSeriesMetadataInput) (err error
 }
 
 func (c *Tsdb) DeleteSeriesMetadata(input *DeleteSeriesMetadataInput) (err error) {
-	op := c.newOperation(OpDeleteSeriesMetadata, input.RepoName, input.SeriesName)
+	op := c.NewOperation(OpDeleteSeriesMetadata, input.RepoName, input.SeriesName)
 
 	req := c.newRequest(op, input.Token, nil)
 	return req.Send()
 }
 
 func (c *Tsdb) DeleteSeries(input *DeleteSeriesInput) (err error) {
-	op := c.newOperation(OpDeleteSeries, input.RepoName, input.SeriesName)
+	op := c.NewOperation(OpDeleteSeries, input.RepoName, input.SeriesName)
 
 	req := c.newRequest(op, input.Token, nil)
 	return req.Send()
 }
 
 func (c *Tsdb) CreateView(input *CreateViewInput) (err error) {
-	op := c.newOperation(OpCreateView, input.RepoName, input.ViewName)
+	op := c.NewOperation(OpCreateView, input.RepoName, input.ViewName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input); err != nil {
@@ -115,7 +115,7 @@ func (c *Tsdb) CreateView(input *CreateViewInput) (err error) {
 }
 
 func (c *Tsdb) ListView(input *ListViewInput) (output *ListViewOutput, err error) {
-	op := c.newOperation(OpListView, input.RepoName)
+	op := c.NewOperation(OpListView, input.RepoName)
 
 	output = &ListViewOutput{}
 	req := c.newRequest(op, input.Token, &output)
@@ -123,7 +123,7 @@ func (c *Tsdb) ListView(input *ListViewInput) (output *ListViewOutput, err error
 }
 
 func (c *Tsdb) GetView(input *GetViewInput) (output *GetViewOutput, err error) {
-	op := c.newOperation(OpGetView, input.RepoName, input.ViewName)
+	op := c.NewOperation(OpGetView, input.RepoName, input.ViewName)
 
 	output = &GetViewOutput{}
 	req := c.newRequest(op, input.Token, &output)
@@ -131,14 +131,14 @@ func (c *Tsdb) GetView(input *GetViewInput) (output *GetViewOutput, err error) {
 }
 
 func (c *Tsdb) DeleteView(input *DeleteViewInput) (err error) {
-	op := c.newOperation(OpDeleteView, input.RepoName, input.ViewName)
+	op := c.NewOperation(OpDeleteView, input.RepoName, input.ViewName)
 
 	req := c.newRequest(op, input.Token, nil)
 	return req.Send()
 }
 
 func (c *Tsdb) PostPoints(input *PostPointsInput) (err error) {
-	op := c.newOperation(OpWritePoints, input.RepoName)
+	op := c.NewOperation(OpWritePoints, input.RepoName)
 
 	req := c.newRequest(op, input.Token, nil)
 	req.SetBufferBody(input.Points.Buffer())
@@ -147,7 +147,7 @@ func (c *Tsdb) PostPoints(input *PostPointsInput) (err error) {
 }
 
 func (c *Tsdb) QueryPoints(input *QueryInput) (output *QueryOutput, err error) {
-	op := c.newOperation(OpQueryPoints, input.RepoName)
+	op := c.NewOperation(OpQueryPoints, input.RepoName)
 
 	output = &QueryOutput{}
 
@@ -161,7 +161,7 @@ func (c *Tsdb) QueryPoints(input *QueryInput) (output *QueryOutput, err error) {
 }
 
 func (c *Tsdb) PostPointsFromFile(input *PostPointsFromFileInput) (err error) {
-	op := c.newOperation(OpWritePoints, input.RepoName)
+	op := c.NewOperation(OpWritePoints, input.RepoName)
 
 	req := c.newRequest(op, input.Token, nil)
 	file, err := os.Open(input.FilePath)
@@ -175,7 +175,7 @@ func (c *Tsdb) PostPointsFromFile(input *PostPointsFromFileInput) (err error) {
 }
 
 func (c *Tsdb) PostPointsFromReader(input *PostPointsFromReaderInput) (err error) {
-	op := c.newOperation(OpWritePoints, input.RepoName)
+	op := c.NewOperation(OpWritePoints, input.RepoName)
 
 	req := c.newRequest(op, input.Token, nil)
 	req.SetReaderBody(input.Reader)
@@ -184,7 +184,7 @@ func (c *Tsdb) PostPointsFromReader(input *PostPointsFromReaderInput) (err error
 }
 
 func (c *Tsdb) PostPointsFromBytes(input *PostPointsFromBytesInput) (err error) {
-	op := c.newOperation(OpWritePoints, input.RepoName)
+	op := c.NewOperation(OpWritePoints, input.RepoName)
 
 	req := c.newRequest(op, input.Token, nil)
 	req.SetBufferBody(input.Buffer)

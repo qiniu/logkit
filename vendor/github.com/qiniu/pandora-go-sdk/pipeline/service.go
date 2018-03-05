@@ -38,7 +38,7 @@ func NewConfig() *config.Config {
 }
 
 func New(c *config.Config) (PipelineAPI, error) {
-	return newClient(c)
+	return NewDefaultClient(c)
 }
 
 func (c *Pipeline) Close() (err error) {
@@ -57,7 +57,7 @@ func (c *Pipeline) Close() (err error) {
 	return
 }
 
-func newClient(c *config.Config) (p *Pipeline, err error) {
+func NewDefaultClient(c *config.Config) (p *Pipeline, err error) {
 	if c.PipelineEndpoint == "" {
 		c.PipelineEndpoint = c.Endpoint
 	}
@@ -98,7 +98,7 @@ func (c *Pipeline) newRequest(op *request.Operation, token string, v interface{}
 	return req
 }
 
-func (c *Pipeline) newOperation(opName string, args ...interface{}) *request.Operation {
+func (c *Pipeline) NewOperation(opName string, args ...interface{}) *request.Operation {
 	var method, urlTmpl string
 	switch opName {
 	case base.OpCreateGroup:

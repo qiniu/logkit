@@ -7,7 +7,7 @@ import (
 )
 
 func (c *Logdb) CreateRepo(input *CreateRepoInput) (err error) {
-	op := c.newOperation(base.OpCreateRepo, input.RepoName)
+	op := c.NewOperation(base.OpCreateRepo, input.RepoName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input); err != nil {
@@ -23,16 +23,16 @@ func (c *Logdb) CreateRepoFromDSL(input *CreateRepoDSLInput) (err error) {
 		return
 	}
 	return c.CreateRepo(&CreateRepoInput{
-		LogdbToken: input.LogdbToken,
-		RepoName:   input.RepoName,
-		Region:     input.Region,
-		Retention:  input.Retention,
-		Schema:     schemas,
+		PandoraToken: input.PandoraToken,
+		RepoName:     input.RepoName,
+		Region:       input.Region,
+		Retention:    input.Retention,
+		Schema:       schemas,
 	})
 }
 
 func (c *Logdb) UpdateRepo(input *UpdateRepoInput) (err error) {
-	op := c.newOperation(base.OpUpdateRepo, input.RepoName)
+	op := c.NewOperation(base.OpUpdateRepo, input.RepoName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input); err != nil {
@@ -43,7 +43,7 @@ func (c *Logdb) UpdateRepo(input *UpdateRepoInput) (err error) {
 }
 
 func (c *Logdb) GetRepo(input *GetRepoInput) (output *GetRepoOutput, err error) {
-	op := c.newOperation(base.OpGetRepo, input.RepoName)
+	op := c.NewOperation(base.OpGetRepo, input.RepoName)
 
 	output = &GetRepoOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -51,7 +51,7 @@ func (c *Logdb) GetRepo(input *GetRepoInput) (output *GetRepoOutput, err error) 
 }
 
 func (c *Logdb) ListRepos(input *ListReposInput) (output *ListReposOutput, err error) {
-	op := c.newOperation(base.OpListRepos)
+	op := c.NewOperation(base.OpListRepos)
 
 	output = &ListReposOutput{}
 	req := c.newRequest(op, input.Token, &output)
@@ -59,14 +59,14 @@ func (c *Logdb) ListRepos(input *ListReposInput) (output *ListReposOutput, err e
 }
 
 func (c *Logdb) DeleteRepo(input *DeleteRepoInput) (err error) {
-	op := c.newOperation(base.OpDeleteRepo, input.RepoName)
+	op := c.NewOperation(base.OpDeleteRepo, input.RepoName)
 
 	req := c.newRequest(op, input.Token, nil)
 	return req.Send()
 }
 
 func (c *Logdb) SendLog(input *SendLogInput) (output *SendLogOutput, err error) {
-	op := c.newOperation(base.OpSendLog, input.RepoName, input.OmitInvalidLog)
+	op := c.NewOperation(base.OpSendLog, input.RepoName, input.OmitInvalidLog)
 
 	output = &SendLogOutput{}
 	req := c.newRequest(op, input.Token, &output)
@@ -81,7 +81,7 @@ func (c *Logdb) SendLog(input *SendLogInput) (output *SendLogOutput, err error) 
 
 // 输入JSON样例数据，输出对应的LOGDB Schema
 func (c *Logdb) GetSampleDataSchema(input *SchemaRefInput) (output *SchemaRefOut, err error) {
-	op := c.newOperation(base.OpSchemaRef)
+	op := c.NewOperation(base.OpSchemaRef)
 
 	output = &SchemaRefOut{}
 	req := c.newRequest(op, input.Token, &output)
@@ -101,7 +101,7 @@ func (c *Logdb) QueryLog(input *QueryLogInput) (output *QueryLogOutput, err erro
 	if input.Highlight != nil {
 		highlight = true
 	}
-	op := c.newOperation(base.OpQueryLog, input.RepoName, url.QueryEscape(input.Query), input.Sort, input.From, input.Size, input.Scroll, highlight)
+	op := c.NewOperation(base.OpQueryLog, input.RepoName, url.QueryEscape(input.Query), input.Sort, input.From, input.Size, input.Scroll, highlight)
 
 	output = &QueryLogOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -115,7 +115,7 @@ func (c *Logdb) QueryLog(input *QueryLogInput) (output *QueryLogOutput, err erro
 }
 
 func (c *Logdb) QueryScroll(input *QueryScrollInput) (output *QueryLogOutput, err error) {
-	op := c.newOperation(base.OpQueryScroll, input.RepoName)
+	op := c.NewOperation(base.OpQueryScroll, input.RepoName)
 	output = &QueryLogOutput{}
 	req := c.newRequest(op, input.Token, output)
 	buf, err := input.Buf()
@@ -128,7 +128,7 @@ func (c *Logdb) QueryScroll(input *QueryScrollInput) (output *QueryLogOutput, er
 }
 
 func (c *Logdb) QueryHistogramLog(input *QueryHistogramLogInput) (output *QueryHistogramLogOutput, err error) {
-	op := c.newOperation(base.OpQueryHistogramLog, input.RepoName, url.QueryEscape(input.Query), input.From, input.To, input.Field)
+	op := c.NewOperation(base.OpQueryHistogramLog, input.RepoName, url.QueryEscape(input.Query), input.From, input.To, input.Field)
 
 	output = &QueryHistogramLogOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -136,7 +136,7 @@ func (c *Logdb) QueryHistogramLog(input *QueryHistogramLogInput) (output *QueryH
 }
 
 func (c *Logdb) PutRepoConfig(input *PutRepoConfigInput) (err error) {
-	op := c.newOperation(base.OpPutRepoConfig, input.RepoName)
+	op := c.NewOperation(base.OpPutRepoConfig, input.RepoName)
 
 	req := c.newRequest(op, input.Token, nil)
 	if err = req.SetVariantBody(input); err != nil {
@@ -147,7 +147,7 @@ func (c *Logdb) PutRepoConfig(input *PutRepoConfigInput) (err error) {
 }
 
 func (c *Logdb) GetRepoConfig(input *GetRepoConfigInput) (output *GetRepoConfigOutput, err error) {
-	op := c.newOperation(base.OpGetRepoConfig, input.RepoName)
+	op := c.NewOperation(base.OpGetRepoConfig, input.RepoName)
 
 	output = &GetRepoConfigOutput{}
 	req := c.newRequest(op, input.Token, output)
@@ -159,7 +159,7 @@ func (c *Logdb) MakeToken(desc *base.TokenDesc) (string, error) {
 }
 
 func (c *Logdb) PartialQuery(input *PartialQueryInput) (output *PartialQueryOutput, err error) {
-	op := c.newOperation(base.OpPartialQuery, input.RepoName)
+	op := c.NewOperation(base.OpPartialQuery, input.RepoName)
 	output = &PartialQueryOutput{}
 	req := c.newRequest(op, input.Token, output)
 	buf, err := input.Buf()

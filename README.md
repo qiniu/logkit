@@ -10,6 +10,29 @@ logkit是[七牛Pandora](https://pandora-docs.qiniu.com)开发的一个通用的
 ### logkit 详细的文档可以参见[WIKI](https://github.com/qiniu/logkit/wiki)页面
 
 
+## 优势
+
+* GO 语言编写，性能优良，资源消耗低，跨平台支持。
+
+* Web 支持，提供 页面 对数据收集、解析、发送过程可视化
+
+* 插件式架构，扩展性强，使用灵活，易于复用。
+
+* 定制化能力强，可以仅使用部分 logkit 包，以此定制专属收集工具。
+
+* 配置简单，易于上手，可通过 页面 进行操作管理。
+
+* 原生中文支持，没有汉化烦恼。
+
+* 功能全面，涵盖了包括 grok 解析、metric 收集、字段变化 (transform) 在内的多种开源软件特点。
+
+* 生态全面，数据发送到七牛的 Pandora 大数据平台支持包括时序数据库、日志检索以及压缩永久存储等多种数据落地方案。
+
+* 数据收集安全稳定，拥有磁盘队列、内存队列、错误重试、压缩传输、限速限流等多种机制，数据发送不重不漏。
+
+* 集群化，可以通过一个logkit 作为master 在 web 管理众多logkit，对整体集群进行管理。
+
+
 ## 支持的数据源
 
 1. 文件(包括csv格式的文件，kafka-rest日志文件，nginx日志文件等,并支持以[grok](https://www.elastic.co/blog/do-you-grok-grok)的方式解析日志)
@@ -23,6 +46,7 @@ logkit是[七牛Pandora](https://pandora-docs.qiniu.com)开发的一个通用的
 1. TCP/UDP/Unix Socket
 1. Http POST
 1. Script
+1. Snmp
 
 ## 工作方式
 

@@ -14,6 +14,8 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 
+	"sync/atomic"
+
 	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
 	"github.com/soniah/gosnmp"
@@ -43,10 +45,8 @@ const (
 	KeySnmpReaderName         = "snmp_reader_name"
 	KeySnmpReaderFields       = "snmp_fields"
 
-	KeySnmpTableName   = "snmp_table"
-	KeyTimestamp       = "timestamp"
-	MaxChannelLength   = 100000
-	ChannelTooShortErr = "channel is too short"
+	KeySnmpTableName = "snmp_table"
+	KeyTimestamp     = "timestamp"
 )
 
 // SnmpReader holds the configuration for the plugin.
@@ -75,9 +75,10 @@ type SnmpReader struct {
 	Fields          []Field
 	ConnectionCache []snmpConnection
 
-	Meta       *Meta
-	LastGather time.Time
-	DataChan   chan interface{}
+	Meta     *Meta
+	Status   int32
+	StopChan chan struct{}
+	DataChan chan interface{}
 }
 
 var execCommand = exec.Command
@@ -104,7 +105,7 @@ func NewSnmpReader(meta *Meta, c conf.MapConf) (s *SnmpReader, err error) {
 	if timeOut, err = time.ParseDuration(timeStr); err != nil {
 		return
 	}
-	intervalStr, _ := c.GetStringOr(KeySnmpReaderInterval, "3s")
+	intervalStr, _ := c.GetStringOr(KeySnmpReaderInterval, "30s")
 	if interval, err = time.ParseDuration(intervalStr); err != nil {
 		return
 	}
@@ -156,28 +157,30 @@ func NewSnmpReader(meta *Meta, c conf.MapConf) (s *SnmpReader, err error) {
 		}
 	}
 	s = &SnmpReader{
-		Meta:            meta,
-		SnmpName:        name,
-		Agents:          agents,
-		Timeout:         timeOut,
-		Interval:        interval,
-		Retries:         retries,
-		Version:         uint8(version),
-		Community:       community,
-		MaxRepetitions:  uint8(maxRepetitions),
-		ContextName:     contextName,
-		SecLevel:        secLevel,
-		SecName:         secName,
-		AuthProtocol:    authProtocol,
-		AuthPassword:    authPassword,
-		PrivProtocol:    privProtocol,
-		PrivPassword:    privPassword,
-		EngineID:        engineID,
-		EngineBoots:     uint32(engineBoots),
-		EngineTime:      uint32(engineTime),
-		Tables:          tables,
-		Fields:          fields,
-		LastGather:      time.Now(),
+		Meta:           meta,
+		SnmpName:       name,
+		Agents:         agents,
+		Timeout:        timeOut,
+		Interval:       interval,
+		Retries:        retries,
+		Version:        uint8(version),
+		Community:      community,
+		MaxRepetitions: uint8(maxRepetitions),
+		ContextName:    contextName,
+		SecLevel:       secLevel,
+		SecName:        secName,
+		AuthProtocol:   authProtocol,
+		AuthPassword:   authPassword,
+		PrivProtocol:   privProtocol,
+		PrivPassword:   privPassword,
+		EngineID:       engineID,
+		EngineBoots:    uint32(engineBoots),
+		EngineTime:     uint32(engineTime),
+		Tables:         tables,
+		Fields:         fields,
+
+		Status:          StatusInit,
+		StopChan:        make(chan struct{}),
 		DataChan:        make(chan interface{}, 1000),
 		ConnectionCache: make([]snmpConnection, len(agents)),
 	}
@@ -284,10 +287,9 @@ func (s *SnmpReader) StoreData(data []map[string]interface{}) (err error) {
 			continue
 		}
 		select {
-		case s.DataChan <- d:
-		default:
-			err = fmt.Errorf(ChannelTooShortErr)
+		case <-s.StopChan:
 			return
+		case s.DataChan <- d:
 		}
 	}
 	return
@@ -383,26 +385,31 @@ func (s *SnmpReader) Source() string {
 	return s.SnmpName
 }
 
-func (s *SnmpReader) ReadLine() (line string, err error) {
-	now := time.Now()
-	if now.Sub(s.LastGather).Seconds() > s.Interval.Seconds() {
-		subErr := s.Gather()
-		for subErr != nil && strings.Contains(subErr.Error(), ChannelTooShortErr) {
-			newLen := int(math.Min(float64(cap(s.DataChan)*2), float64(MaxChannelLength)))
-			if newLen == cap(s.DataChan) {
-				log.Warnf("too more data must collect every fetching")
-				break
-			} else {
+func (s *SnmpReader) Start() error {
+	if !atomic.CompareAndSwapInt32(&s.Status, StatusInit, StatusRunning) {
+		return fmt.Errorf("runner[%v] Reader[%v] already started", s.Meta.RunnerName, s.Name())
+	}
+	go func() {
+		ticker := time.NewTicker(s.Interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				s.Gather()
+			case <-s.StopChan:
 				close(s.DataChan)
-				s.DataChan = make(chan interface{}, newLen)
-				subErr = s.Gather()
+				return
 			}
 		}
-		if subErr != nil {
-			err = subErr
-			return
+	}()
+	return nil
+}
+
+func (s *SnmpReader) ReadLine() (line string, err error) {
+	if atomic.LoadInt32(&s.Status) == StatusInit {
+		if err = s.Start(); err != nil {
+			log.Error(err)
 		}
-		s.LastGather = now
 	}
 	select {
 	case d := <-s.DataChan:
@@ -421,7 +428,7 @@ func (s *SnmpReader) SetMode(mode string, v interface{}) error {
 }
 
 func (s *SnmpReader) Close() error {
-	close(s.DataChan)
+	close(s.StopChan)
 	return nil
 }
 

@@ -174,3 +174,7 @@ func (c *Cleaner) Clean() (err error) {
 	}
 	return nil
 }
+
+func (c *Cleaner) LogDir() string {
+	return c.logdir
+}

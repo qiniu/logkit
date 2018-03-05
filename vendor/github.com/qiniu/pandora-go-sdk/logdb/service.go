@@ -60,7 +60,7 @@ func (c *Logdb) newRequest(op *request.Operation, token string, v interface{}) *
 	return req
 }
 
-func (c *Logdb) newOperation(opName string, args ...interface{}) *request.Operation {
+func (c *Logdb) NewOperation(opName string, args ...interface{}) *request.Operation {
 	var method, urlTmpl string
 	switch opName {
 	case base.OpCreateRepo:

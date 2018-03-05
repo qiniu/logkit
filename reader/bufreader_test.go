@@ -9,6 +9,7 @@ import (
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -16,13 +17,13 @@ import (
 var lines = "123456789\n123456789\n123456789\n123456789\n"
 
 func createSeqFile(interval int, lines string) {
-	err := os.Mkdir(dir, 0755)
+	err := os.Mkdir(dir, DefaultDirPerm)
 	if err != nil {
 		log.Error(err)
 		return
 	}
 	for _, f := range files {
-		file, err := os.OpenFile(filepath.Join(dir, f), os.O_CREATE|os.O_WRONLY, defaultFilePerm)
+		file, err := os.OpenFile(filepath.Join(dir, f), os.O_CREATE|os.O_WRONLY, DefaultFilePerm)
 		if err != nil {
 			log.Error(err)
 			return
@@ -73,7 +74,7 @@ func Test_BuffReader(t *testing.T) {
 
 func Test_Datasource(t *testing.T) {
 	testdir := "Test_Datasource1"
-	err := os.Mkdir(testdir, 0755)
+	err := os.Mkdir(testdir, DefaultDirPerm)
 	if err != nil {
 		log.Error(err)
 		return
@@ -81,7 +82,7 @@ func Test_Datasource(t *testing.T) {
 	defer os.RemoveAll(testdir)
 
 	for _, f := range []string{"f1", "f2", "f3"} {
-		file, err := os.OpenFile(filepath.Join(testdir, f), os.O_CREATE|os.O_WRONLY, defaultFilePerm)
+		file, err := os.OpenFile(filepath.Join(testdir, f), os.O_CREATE|os.O_WRONLY, DefaultFilePerm)
 		if err != nil {
 			log.Error(err)
 			return

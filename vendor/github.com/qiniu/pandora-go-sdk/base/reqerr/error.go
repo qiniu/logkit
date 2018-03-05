@@ -49,6 +49,7 @@ const (
 	EntityTooLargeError
 	ErrInvalidVariableType
 	InvalidDataSchemaError
+	ErrIncompatibleRepoSchema
 	ErrDBNameInvalidError
 	ErrInvalidSqlError
 	ErrInternalServerError
@@ -128,6 +129,8 @@ const (
 	ErrNoSuchResourceOwner
 	ErrAccessDenied
 	ErrTransformRepeatRestart
+	ErrFusionPathUsedStringVariable
+	ErrFusionPathWithUndefinedVariable
 	ErrTooManySchema
 	ErrSchemaLimitUnderflow
 )

@@ -1,6 +1,7 @@
 package mgr
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/howeyc/fsnotify"
 	"github.com/json-iterator/go"
+	"github.com/qiniu/logkit/utils/models"
 )
 
 var DIR_NOT_EXIST_SLEEP_TIME = "300" //300 s
@@ -71,7 +73,7 @@ func NewCustomManager(conf ManagerConfig, pr *parser.ParserRegistry, sr *sender.
 			return nil, fmt.Errorf("get system current workdir error %v, please set rest_dir config", err)
 		}
 		conf.RestDir = dir + DEFAULT_LOGKIT_REST_DIR
-		if err = os.Mkdir(conf.RestDir, 0755); err != nil && !os.IsExist(err) {
+		if err = os.Mkdir(conf.RestDir, models.DefaultDirPerm); err != nil && !os.IsExist(err) {
 			log.Warnf("make dir for rest default dir error %v", err)
 		}
 	}
@@ -320,6 +322,8 @@ func (m *Manager) handle(path string, watcher *fsnotify.Watcher) {
 					m.watcherMux.Lock()
 					delete(m.watchers, path)
 					m.watcherMux.Unlock()
+					// TODO 此处代表文件夹被删了，只移除一个runner可能不够，文件夹下会有其他runner没有被删除
+					m.Remove(ev.Name)
 					return
 				}
 				m.Remove(ev.Name)
@@ -531,12 +535,42 @@ func backupRunnerConfig(rootDir, filename string, rconf interface{}) error {
 	// 判断默认备份文件夹是否存在，不存在就尝试创建
 	if _, err := os.Stat(rootDir); err != nil {
 		if os.IsNotExist(err) {
-			if err = os.Mkdir(rootDir, 0755); err != nil && !os.IsExist(err) {
+			if err = os.Mkdir(rootDir, models.DefaultDirPerm); err != nil && !os.IsExist(err) {
 				return fmt.Errorf("rest default dir not exists and make dir failed, err is %v", err)
 			}
 		}
 	}
 	return ioutil.WriteFile(filename, confBytes, 0644)
+}
+
+func (m *Manager) UpdateToken(tokens []models.AuthTokens) (err error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	errMsg := make([]string, 0)
+	for _, token := range tokens {
+		runnerPath := token.RunnerName
+		if runner, ok := m.runners[runnerPath]; ok {
+			if r, ok := runner.(TokenRefreshable); ok {
+				token.RunnerName = runner.Name()
+				if subErr := r.TokenRefresh(token); subErr != nil {
+					errMsg = append(errMsg, subErr.Error())
+					continue
+				}
+			}
+		}
+		if c, ok := m.runnerConfig[runnerPath]; ok {
+			if len(c.SenderConfig) > token.SenderIndex {
+				for k, t := range token.SenderTokens {
+					c.SenderConfig[token.SenderIndex][k] = t
+				}
+			}
+			m.runnerConfig[runnerPath] = c
+		}
+	}
+	if len(errMsg) != 0 {
+		err = errors.New(strings.Join(errMsg, "\n"))
+	}
+	return
 }
 
 func (m *Manager) AddRunner(name string, conf RunnerConfig) (err error) {

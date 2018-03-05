@@ -67,7 +67,7 @@ func getRunnerConfig(name, logPath, metaPath, mode, senderPath string) ([]byte, 
 			MaxBatchLen:      1,
 			MaxBatchSize:     200,
 			CollectInterval:  1,
-			MaxBatchInteval:  1,
+			MaxBatchInterval: 1,
 			MaxBatchTryTimes: 3,
 		},
 		ReaderConfig: conf.MapConf{
@@ -91,6 +91,10 @@ func getRunnerConfig(name, logPath, metaPath, mode, senderPath string) ([]byte, 
 }
 
 func getRunnerStatus(rn, lp, rs string, rdc, rds, pe, ps, se, ss int64) map[string]RunnerStatus {
+	unit := "bytes"
+	if rs != RunnerRunning {
+		unit = ""
+	}
 	return map[string]RunnerStatus{
 		rn: {
 			Name:             rn,
@@ -100,9 +104,9 @@ func getRunnerStatus(rn, lp, rs string, rdc, rds, pe, ps, se, ss int64) map[stri
 			RunningStatus:    rs,
 			ReadSpeedTrend:   "",
 			ReadSpeedTrendKb: "",
-			Lag: RunnerLag{
-				Size:  0,
-				Files: 0,
+			Lag: LagInfo{
+				Size:     0,
+				SizeUnit: unit,
 			},
 			ParserStats: utils.StatsInfo{
 				Errors:  pe,
@@ -147,7 +151,7 @@ func clearGotStatus(v *RunnerStatus) {
 
 func mkTestDir(mkDir ...string) error {
 	for _, d := range mkDir {
-		if err := os.Mkdir(d, 0755); err != nil {
+		if err := os.Mkdir(d, DefaultDirPerm); err != nil {
 			return err
 		}
 	}
@@ -729,7 +733,7 @@ func runnerDataIntegrityTest(p *testParam) {
 		t.Fatalf("mkdir test path error %v", err)
 	}
 	log1 := `{"a":1,"b":2}`
-	file, err := os.OpenFile(filepath.Join(logDir, "log1"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+	file, err := os.OpenFile(filepath.Join(logDir, "log1"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, DefaultFilePerm)
 	if err != nil {
 		log.Fatalf("Test_Run error createfile %v %v", filepath.Join(logDir, "log1"), err)
 	}
@@ -760,7 +764,7 @@ func runnerDataIntegrityTest(p *testParam) {
 		assert.Equal(t, http.StatusOK, respCode)
 		time.Sleep(2 * time.Second)
 
-		file, err := os.OpenFile(filepath.Join(logDir, "log1"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+		file, err := os.OpenFile(filepath.Join(logDir, "log1"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, DefaultFilePerm)
 		if err != nil {
 			log.Fatalf("Test_Run error createfile %v %v", filepath.Join(logDir, "log1"), err)
 		}
@@ -1065,4 +1069,15 @@ func senderRouterTest(p *testParam) {
 		dataCnt += len(result)
 	}
 	assert.Equal(t, 4, dataCnt)
+}
+
+func TestConvertWebParserConfig(t *testing.T) {
+	cf := conf.MapConf{
+		parser.KeyCSVSplitter: "\\t",
+	}
+	newcf := convertWebParserConfig(cf)
+	expcf := conf.MapConf{
+		parser.KeyCSVSplitter: "\t",
+	}
+	assert.Equal(t, expcf, newcf)
 }

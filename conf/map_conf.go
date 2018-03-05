@@ -46,7 +46,7 @@ func (conf MapConf) Get(key string) (interface{}, error) {
 
 func (conf MapConf) GetStringOr(key string, deft string) (string, error) {
 	ret, err := conf.GetString(key)
-	if err != nil {
+	if err != nil || ret == "" {
 		return deft, err
 	}
 	return ret, err

@@ -6,15 +6,15 @@ import (
 
 // ModeUsages 用途说明
 var ModeUsages = []KeyValue{
-	{TypeJson, "json 格式解析"},
-	{TypeNginx, "nginx 日志解析"},
-	{TypeGrok, "grok 方式解析"},
-	{TypeCSV, "csv 格式日志解析"},
-	{TypeRaw, "raw 原始日志按行解析"},
-	{TypeSyslog, "syslog 日志解析"},
-	{TypeLogv1, "qiniulog 七牛日志库解析"},
-	{TypeKafkaRest, "kafkarest 日志格式解析"},
-	{TypeEmpty, "empty 通过解析清空数据"},
+	{TypeJson, "按 json 格式解析"},
+	{TypeNginx, "按 nginx 日志解析"},
+	{TypeGrok, "按 grok 格式解析"},
+	{TypeCSV, "按 csv 格式解析"},
+	{TypeRaw, "按原始日志逐行解析"},
+	{TypeSyslog, "按 syslog 格式解析"},
+	{TypeLogv1, "按七牛日志库格式解析"},
+	{TypeKafkaRest, "按 kafkarest 日志解析"},
+	{TypeEmpty, "通过解析清空数据"},
 }
 
 var (
@@ -27,6 +27,7 @@ var (
 			"1", "2", "3", "4", "5", "6", "7", "8", "9", "11", "12"},
 		DefaultNoUse: false,
 		Description:  "时区偏移量(timezone_offset)",
+		Advance:      true,
 	}
 
 	OptionLabels = Option{
@@ -35,14 +36,16 @@ var (
 		Default:      "",
 		DefaultNoUse: false,
 		Description:  "额外的标签信息(labels)",
+		Advance:      true,
 	}
 
 	OptionDisableRecordErrData = Option{
-		KeyName:      KeyDisableRecordErrData,
-		ChooseOnly:   false,
-		Default:      "",
-		DefaultNoUse: false,
-		Description:  "不记录解析失败的数据(disable_record_errdata)",
+		KeyName:       KeyDisableRecordErrData,
+		ChooseOnly:    true,
+		ChooseOptions: []interface{}{"false", "true"},
+		Default:       "false",
+		DefaultNoUse:  false,
+		Description:   "禁止记录解析失败数据(disable_record_errdata)",
 	}
 )
 

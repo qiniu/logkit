@@ -40,14 +40,14 @@ func cleanMetaFolder(path string) {
 
 func Test_Run(t *testing.T) {
 	dir := "Test_RunForErrData"
-	if err := os.Mkdir(dir, 0755); err != nil {
+	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_Run error mkdir %v %v", dir, err)
 	}
 	defer os.RemoveAll(dir)
 	logpath := dir + "/logdir"
 	logpathLink := dir + "/logdirlink"
 	metapath := dir + "/meta_mock_csv"
-	if err := os.Mkdir(logpath, 0755); err != nil {
+	if err := os.Mkdir(logpath, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_Run error mkdir %v %v", logpath, err)
 	}
 	absLogpath, err := filepath.Abs(logpath)
@@ -61,7 +61,7 @@ func Test_Run(t *testing.T) {
 	if err := os.Symlink(absLogpath, absLogpathLink); err != nil {
 		log.Fatalf("Test_Run error symbol link %v to %v: %v", absLogpathLink, logpath, err)
 	}
-	if err := os.Mkdir(metapath, 0755); err != nil {
+	if err := os.Mkdir(metapath, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_Run error mkdir %v %v", metapath, err)
 	}
 	log1 := `hello 123
@@ -110,7 +110,10 @@ func Test_Run(t *testing.T) {
 		t.Error(err)
 	}
 	cleanChan := make(chan cleaner.CleanSignal)
-	cleaner, err := cleaner.NewCleaner(conf.MapConf{}, meta, cleanChan, readerConfig["log_path"])
+	cleanerConfig := conf.MapConf{
+		"delete_enable": "true",
+	}
+	cleaner, err := cleaner.NewCleaner(cleanerConfig, meta, cleanChan, meta.LogPath())
 	if err != nil {
 		t.Error(err)
 	}
@@ -149,7 +152,7 @@ func Test_Run(t *testing.T) {
 	}
 
 	cleanInfo := CleanInfo{
-		enable: false,
+		enable: true,
 		logdir: absLogpath,
 	}
 	assert.Equal(t, cleanInfo, r.Cleaner())
@@ -182,16 +185,171 @@ func Test_Run(t *testing.T) {
 	}
 }
 
+func Test_RunForEnvTag(t *testing.T) {
+	dir := "Test_RunForEnvTag"
+	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
+		log.Fatalf("Test_RunForEnvTag error mkdir %v %v", dir, err)
+	}
+	defer os.RemoveAll(dir)
+	originEnv := os.Getenv("Test_RunForEnvTag")
+	defer func() {
+		os.Setenv("Test_RunForEnvTag", originEnv)
+	}()
+	if err := os.Setenv("Test_RunForEnvTag", "env_value"); err != nil {
+		t.Fatalf("set env %v to %v error %v", "Test_RunForEnvTag", "env_value", err)
+	}
+	logpath := dir + "/logdir"
+	logpathLink := dir + "/logdirlink"
+	metapath := dir + "/meta_mock_csv"
+	if err := os.Mkdir(logpath, DefaultDirPerm); err != nil {
+		log.Fatalf("Test_RunForEnvTag error mkdir %v %v", logpath, err)
+	}
+	absLogpath, err := filepath.Abs(logpath)
+	if err != nil {
+		t.Fatalf("filepath.Abs %v, %v", logpath, err)
+	}
+	absLogpathLink, err := filepath.Abs(logpathLink)
+	if err != nil {
+		t.Fatalf("filepath.Abs %v, %v", logpathLink, err)
+	}
+	if err := os.Symlink(absLogpath, absLogpathLink); err != nil {
+		log.Fatalf("Test_Run error symbol link %v to %v: %v", absLogpathLink, logpath, err)
+	}
+	if err := os.Mkdir(metapath, DefaultDirPerm); err != nil {
+		log.Fatalf("Test_Run error mkdir %v %v", metapath, err)
+	}
+	log1 := `hello 123
+	xx 1
+	`
+	log2 := `
+`
+	log3 := `h 456
+	x 789`
+
+	if err := ioutil.WriteFile(filepath.Join(logpath, "log1"), []byte(log1), 0666); err != nil {
+		log.Fatalf("write log1 fail %v", err)
+	}
+	time.Sleep(time.Second)
+	if err := ioutil.WriteFile(filepath.Join(logpath, "log2"), []byte(log2), 0666); err != nil {
+		log.Fatalf("write log3 fail %v", err)
+	}
+	time.Sleep(time.Second)
+	if err := ioutil.WriteFile(filepath.Join(logpath, "log3"), []byte(log3), 0666); err != nil {
+		log.Fatalf("write log2 fail %v", err)
+	}
+
+	rinfo := RunnerInfo{
+		RunnerName:   "test_runner",
+		MaxBatchLen:  1,
+		MaxBatchSize: 2048,
+		EnvTag:       "Test_RunForEnvTag",
+	}
+	readerConfig := conf.MapConf{
+		"log_path":        logpathLink,
+		"meta_path":       metapath,
+		"mode":            "dir",
+		"read_from":       "oldest",
+		"reader_buf_size": "16",
+	}
+	meta, err := reader.NewMetaWithConf(readerConfig)
+	if err != nil {
+		t.Error(err)
+	}
+	isFromWeb := false
+	reader, err := reader.NewFileBufReader(readerConfig, isFromWeb)
+	if err != nil {
+		t.Error(err)
+	}
+	cleanChan := make(chan cleaner.CleanSignal)
+	cleanerConfig := conf.MapConf{
+		"delete_enable": "true",
+	}
+	cleaner, err := cleaner.NewCleaner(cleanerConfig, meta, cleanChan, meta.LogPath())
+	if err != nil {
+		t.Error(err)
+	}
+	parseConf := conf.MapConf{
+		"name":                   "req_csv",
+		"type":                   "csv",
+		"csv_schema":             "logtype string, xx long",
+		"csv_splitter":           " ",
+		"disable_record_errdata": "true",
+	}
+	ps := parser.NewParserRegistry()
+	pparser, err := ps.NewLogParser(parseConf)
+	if err != nil {
+		t.Error(err)
+	}
+	senderConfigs := []conf.MapConf{
+		conf.MapConf{
+			"name":        "mock_sender",
+			"sender_type": "mock",
+		},
+	}
+	var senders []sender.Sender
+	raws, err := sender.NewMockSender(senderConfigs[0])
+	s, succ := raws.(*sender.MockSender)
+	if !succ {
+		t.Error("sender should be mock sender")
+	}
+	if err != nil {
+		t.Error(err)
+	}
+	senders = append(senders, s)
+
+	r, err := NewLogExportRunnerWithService(rinfo, reader, cleaner, pparser, nil, senders, nil, meta)
+	if err != nil {
+		t.Error(err)
+	}
+
+	cleanInfo := CleanInfo{
+		enable: true,
+		logdir: absLogpath,
+	}
+	assert.Equal(t, cleanInfo, r.Cleaner())
+
+	go r.Run()
+	timer := time.NewTimer(20 * time.Second).C
+	for {
+		if s.SendCount() >= 4 {
+			break
+		}
+		select {
+		case <-timer:
+			t.Error("runner didn't stop within ticker time")
+			return
+		default:
+			time.Sleep(time.Second)
+		}
+	}
+	var dts []Data
+	rawData := r.senders[0].Name()[len("mock_sender "):]
+	err = jsoniter.Unmarshal([]byte(rawData), &dts)
+	if err != nil {
+		t.Error(err)
+	}
+	if len(dts) != 4 {
+		t.Errorf("got sender data not match error,expect 4 but %v", len(dts))
+	}
+	for _, d := range dts {
+		if v, ok := d["Test_RunForEnvTag"]; !ok {
+			t.Fatalf("Test_RunForEnvTag error, exp got Test_RunForEnvTag:env_value, but not found")
+		} else {
+			assert.Equal(t, "env_value", v)
+		}
+	}
+}
+
 func Test_RunForErrData(t *testing.T) {
 	dir := "Test_Run"
-	if err := os.Mkdir(dir, 0755); err != nil {
+	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_Run error mkdir %v %v", dir, err)
 	}
 	defer os.RemoveAll(dir)
 	logpath := dir + "/logdir"
 	logpathLink := dir + "/logdirlink"
 	metapath := dir + "/meta_mock_csv"
-	if err := os.Mkdir(logpath, 0755); err != nil {
+	if err := os.Mkdir(logpath, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_Run error mkdir %v %v", logpath, err)
 	}
 	absLogpath, err := filepath.Abs(logpath)
@@ -205,7 +363,7 @@ func Test_RunForErrData(t *testing.T) {
 	if err := os.Symlink(absLogpath, absLogpathLink); err != nil {
 		log.Fatalf("Test_Run error symbol link %v to %v: %v", absLogpathLink, logpath, err)
 	}
-	if err := os.Mkdir(metapath, 0755); err != nil {
+	if err := os.Mkdir(metapath, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_Run error mkdir %v %v", metapath, err)
 	}
 	log1 := `hello 123
@@ -254,7 +412,10 @@ func Test_RunForErrData(t *testing.T) {
 		t.Error(err)
 	}
 	cleanChan := make(chan cleaner.CleanSignal)
-	cleaner, err := cleaner.NewCleaner(conf.MapConf{}, meta, cleanChan, readerConfig["log_path"])
+	cleanerConfig := conf.MapConf{
+		"delete_enable": "true",
+	}
+	cleaner, err := cleaner.NewCleaner(cleanerConfig, meta, cleanChan, meta.LogPath())
 	if err != nil {
 		t.Error(err)
 	}
@@ -293,7 +454,7 @@ func Test_RunForErrData(t *testing.T) {
 	}
 
 	cleanInfo := CleanInfo{
-		enable: false,
+		enable: true,
 		logdir: absLogpath,
 	}
 	assert.Equal(t, cleanInfo, r.Cleaner())
@@ -393,14 +554,14 @@ func Test_Compatible(t *testing.T) {
 
 func Test_QiniulogRun(t *testing.T) {
 	dir := "Test_QiniulogRun"
-	if err := os.Mkdir(dir, 0755); err != nil {
+	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_Run error mkdir %v %v", dir, err)
 	}
 	defer os.RemoveAll(dir)
 	logpath := dir + "/logdir"
 	logpathLink := dir + "/logdirlink"
 	metapath := dir + "/meta_mock_csv"
-	if err := os.Mkdir(logpath, 0755); err != nil {
+	if err := os.Mkdir(logpath, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_Run error mkdir %v %v", logpath, err)
 	}
 	absLogpath, err := filepath.Abs(logpath)
@@ -414,7 +575,7 @@ func Test_QiniulogRun(t *testing.T) {
 	if err := os.Symlink(absLogpath, absLogpathLink); err != nil {
 		log.Fatalf("Test_Run error symbol link %v to %v: %v", absLogpathLink, logpath, err)
 	}
-	if err := os.Mkdir(metapath, 0755); err != nil {
+	if err := os.Mkdir(metapath, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_Run error mkdir %v %v", metapath, err)
 	}
 	log1 := `2017/01/22 11:16:08.885550 [X-ZsU][INFO] disk.go:123: [REQ_END] 200 0.010k 3.792ms
@@ -530,6 +691,9 @@ func Test_QiniulogRun(t *testing.T) {
 		assert.Equal(t, expfiles[idx], dt["log"], "equl log test")
 		assert.Equal(t, expreqid[idx], dt["reqid"], "equal reqid test")
 	}
+	ls, err := r.LagStats()
+	assert.NoError(t, err)
+	assert.Equal(t, &LagInfo{0, "bytes", 0}, ls)
 }
 
 func TestCreateTransforms(t *testing.T) {
@@ -897,7 +1061,7 @@ func TestCopyStats(t *testing.T) {
 func TestSyslogRunnerX(t *testing.T) {
 	metaDir := "TestSyslogRunner"
 
-	os.Mkdir(metaDir, 0755)
+	os.Mkdir(metaDir, DefaultDirPerm)
 	defer os.RemoveAll(metaDir)
 
 	config1 := `{
@@ -1039,7 +1203,7 @@ func TestAddDatasourceForErrData(t *testing.T) {
 func TestAddDatatags(t *testing.T) {
 	dir := "TestAddDatatags"
 	metaDir := filepath.Join(dir, "meta")
-	if err := os.Mkdir(dir, 0755); err != nil {
+	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_Run error mkdir %v %v", dir, err)
 	}
 	tagFile := filepath.Join(dir, "tagFile.json")
@@ -1048,10 +1212,10 @@ func TestAddDatatags(t *testing.T) {
 	    "Author":["john","ada","alice"],
 	    "IsTrue":true,
 	    "Host":99
-	  	}`), 0755)
+	  	}`), DefaultDirPerm)
 	assert.NoError(t, err)
 	logPath := filepath.Join(dir, "test.log")
-	err = ioutil.WriteFile(logPath, []byte(`{"f1": "2","f2": "1","f3": "3"}`), 0755)
+	err = ioutil.WriteFile(logPath, []byte(`{"f1": "2","f2": "1","f3": "3"}`), DefaultDirPerm)
 	assert.NoError(t, err)
 
 	defer os.RemoveAll(dir)

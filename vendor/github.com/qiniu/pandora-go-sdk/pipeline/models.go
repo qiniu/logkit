@@ -11,12 +11,9 @@ import (
 	"strings"
 
 	"github.com/qiniu/pandora-go-sdk/base"
+	. "github.com/qiniu/pandora-go-sdk/base/models"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 )
-
-type PipelineToken struct {
-	Token string `json:"-"`
-}
 
 const (
 	defaultRegion      = "nb"
@@ -224,7 +221,7 @@ func (c *Container) Validate() (err error) {
 }
 
 type CreateGroupInput struct {
-	PipelineToken
+	PandoraToken
 	GroupName       string     `json:"-"`
 	Region          string     `json:"region"`
 	Container       *Container `json:"container"`
@@ -250,7 +247,7 @@ func (g *CreateGroupInput) Validate() (err error) {
 }
 
 type UpdateGroupInput struct {
-	PipelineToken
+	PandoraToken
 	GroupName string     `json:"-"`
 	Container *Container `json:"container"`
 }
@@ -270,17 +267,17 @@ func (g *UpdateGroupInput) Validate() (err error) {
 }
 
 type StartGroupTaskInput struct {
-	PipelineToken
+	PandoraToken
 	GroupName string
 }
 
 type StopGroupTaskInput struct {
-	PipelineToken
+	PandoraToken
 	GroupName string
 }
 
 type GetGroupInput struct {
-	PipelineToken
+	PandoraToken
 	GroupName string
 }
 
@@ -292,7 +289,7 @@ type GetGroupOutput struct {
 }
 
 type DeleteGroupInput struct {
-	PipelineToken
+	PandoraToken
 	GroupName string
 }
 
@@ -303,7 +300,7 @@ type GroupDesc struct {
 }
 
 type ListGroupsInput struct {
-	PipelineToken
+	PandoraToken
 }
 
 type ListGroupsOutput struct {
@@ -356,7 +353,7 @@ func (e *RepoSchemaEntry) Validate() (err error) {
 }
 
 type CreateRepoDSLInput struct {
-	PipelineToken
+	PandoraToken
 	RepoName  string
 	Region    string       `json:"region"`
 	DSL       string       `json:"dsl"`
@@ -581,15 +578,6 @@ func getFormatDSL(schemas []RepoSchemaEntry, depth int, indent string) (dsl stri
 	return
 }
 
-type AutoExportToKODOInput struct {
-	RepoName   string
-	BucketName string
-	Prefix     string
-	Format     string
-	Email      string
-	Retention  int //数字，单位为天
-}
-
 type AnalyzerInfo struct {
 	Default  string
 	Analyzer map[string]string
@@ -602,6 +590,18 @@ type AutoExportToLogDBInput struct {
 	OmitInvalid bool
 	OmitEmpty   bool
 	AnalyzerInfo
+	AutoExportLogDBTokens
+}
+type AutoExportLogDBTokens struct {
+	PipelineCreateRepoToken PandoraToken
+	PipelineGetRepoToken    PandoraToken
+	CreateLogDBRepoToken    PandoraToken
+	UpdateLogDBRepoToken    PandoraToken
+	GetLogDBRepoToken       PandoraToken
+	CreateExportToken       PandoraToken
+	UpdateExportToken       PandoraToken
+	GetExportToken          PandoraToken
+	ListExportToken         PandoraToken
 }
 
 type CreateRepoForLogDBInput struct {
@@ -613,6 +613,7 @@ type CreateRepoForLogDBInput struct {
 	OmitInvalid bool
 	OmitEmpty   bool
 	AnalyzerInfo
+	AutoExportLogDBTokens
 }
 
 type CreateRepoForLogDBDSLInput struct {
@@ -621,6 +622,7 @@ type CreateRepoForLogDBDSLInput struct {
 	Region      string
 	Schema      string
 	Retention   string
+	AutoExportLogDBTokens
 }
 
 type AutoExportToTSDBInput struct {
@@ -634,6 +636,17 @@ type AutoExportToTSDBInput struct {
 	IsMetric     bool
 	ExpandAttr   []string
 	SeriesTags   map[string][]string
+	AutoExportTSDBTokens
+}
+
+type AutoExportTSDBTokens struct {
+	PipelineGetRepoToken   PandoraToken
+	CreateTSDBRepoToken    PandoraToken
+	CreateTSDBSeriesTokens map[string]PandoraToken
+	CreateExportToken      map[string]PandoraToken
+	UpdateExportToken      map[string]PandoraToken
+	GetExportToken         map[string]PandoraToken
+	ListExportToken        PandoraToken
 }
 
 type CreateRepoForTSDBInput struct {
@@ -647,6 +660,7 @@ type CreateRepoForTSDBInput struct {
 	OmitInvalid  bool
 	OmitEmpty    bool
 	Timestamp    string
+	AutoExportTSDBTokens
 }
 
 type CreateRepoForKodoInput struct {
@@ -657,8 +671,29 @@ type CreateRepoForKodoInput struct {
 	Bucket    string
 	RepoName  string
 	Prefix    string
+	Compress  bool
 	Format    string
 	Schema    []RepoSchemaEntry
+	AutoExportKodoTokens
+}
+
+type AutoExportKodoTokens struct {
+	PipelineGetRepoToken PandoraToken
+	CreateExportToken    PandoraToken
+	UpdateExportToken    PandoraToken
+	GetExportToken       PandoraToken
+	ListExportToken      PandoraToken
+}
+
+type AutoExportToKODOInput struct {
+	RepoName   string
+	BucketName string
+	Prefix     string
+	Compress   bool
+	Format     string
+	Email      string
+	Retention  int //数字，单位为天
+	AutoExportKodoTokens
 }
 
 type SeriesInfo struct {
@@ -676,6 +711,7 @@ type CreateRepoForMutiExportTSDBInput struct {
 	OmitInvalid  bool
 	OmitEmpty    bool
 	SeriesMap    map[string]SeriesInfo
+	AutoExportTSDBTokens
 }
 
 func IsTag(key string, tags []string) bool {
@@ -691,11 +727,13 @@ func IsTag(key string, tags []string) bool {
 }
 
 type RepoOptions struct {
-	WithIP string `json:"withIP"`
+	WithIP        string `json:"withIP"`
+	WithTimestamp string `json:"withTimestamp"`
+	UnescapeLine  bool   `json:"unescapeLine"`
 }
 
 type CreateRepoInput struct {
-	PipelineToken
+	PandoraToken
 	RepoName  string
 	Region    string            `json:"region"`
 	Schema    []RepoSchemaEntry `json:"schema"`
@@ -740,12 +778,13 @@ func (r *CreateRepoInput) Validate() (err error) {
 // ExportType选项表示同时更新的下游export和repo
 // 目前支持 tsdb、logdb、kodo、all
 type UpdateRepoInput struct {
-	PipelineToken
-	RepoName    string
-	workflow    string
-	Schema      []RepoSchemaEntry `json:"schema"`
-	Option      *SchemaFreeOption
-	RepoOptions *RepoOptions `json:"options"`
+	PandoraToken
+	PipelineGetRepoToken PandoraToken
+	RepoName             string
+	workflow             string
+	Schema               []RepoSchemaEntry `json:"schema"`
+	Option               *SchemaFreeOption
+	RepoOptions          *RepoOptions `json:"options"`
 }
 
 func (r *UpdateRepoInput) IsTag(key string) bool {
@@ -779,7 +818,7 @@ func (r *UpdateRepoInput) Validate() (err error) {
 }
 
 type GetRepoInput struct {
-	PipelineToken
+	PandoraToken
 	RepoName string
 }
 
@@ -797,7 +836,7 @@ type RepoExistOutput struct {
 }
 
 type GetSampleDataInput struct {
-	PipelineToken
+	PandoraToken
 	RepoName string
 	Count    int //最多10条
 }
@@ -826,7 +865,7 @@ type RepoDesc struct {
 }
 
 type ListReposInput struct {
-	PipelineToken
+	PandoraToken
 	WithDag bool `json:"-"`
 }
 
@@ -835,7 +874,7 @@ type ListReposOutput struct {
 }
 
 type DeleteRepoInput struct {
-	PipelineToken
+	PandoraToken
 	RepoName string
 }
 
@@ -914,14 +953,14 @@ func escapeStringField(in string) string {
 }
 
 type PostDataInput struct {
-	PipelineToken
+	PandoraToken
 	ResourceOwner string
 	RepoName      string
 	Points        Points
 }
 
 type SchemaFreeInput struct {
-	PipelineToken
+	SchemaFreeToken
 	Datas        Datas
 	NoUpdate     bool
 	Region       string
@@ -931,14 +970,28 @@ type SchemaFreeInput struct {
 	RepoOptions  *RepoOptions
 }
 
+type SchemaFreeToken struct {
+	PipelineCreateRepoToken        PandoraToken
+	PipelinePostDataToken          PandoraToken
+	PipelineGetRepoToken           PandoraToken
+	PipelineUpdateRepoToken        PandoraToken
+	PipelineGetWorkflowToken       PandoraToken
+	PipelineCreateWorkflowToken    PandoraToken
+	PipelineStartWorkflowToken     PandoraToken
+	PipelineStopWorkflowToken      PandoraToken
+	PipelineGetWorkflowStatusToken PandoraToken
+}
+
 type InitOrUpdateWorkflowInput struct {
-	SchemaFree   bool
-	Region       string
-	RepoName     string
-	WorkflowName string
-	RepoOptions  *RepoOptions
-	Schema       []RepoSchemaEntry
-	Option       *SchemaFreeOption
+	SchemaFreeToken
+	InitOptionChange bool
+	SchemaFree       bool
+	Region           string
+	RepoName         string
+	WorkflowName     string
+	RepoOptions      *RepoOptions
+	Schema           []RepoSchemaEntry
+	Option           *SchemaFreeOption
 }
 
 type SchemaFreeOption struct {
@@ -952,40 +1005,40 @@ type SchemaFreeOption struct {
 }
 
 type PostDataFromFileInput struct {
-	PipelineToken
+	PandoraToken
 	RepoName string
 	FilePath string
 }
 
 type PostDataFromReaderInput struct {
-	PipelineToken
+	PandoraToken
 	RepoName   string
 	Reader     io.ReadSeeker
 	BodyLength int64
 }
 
 type PostDataFromBytesInput struct {
-	PipelineToken
+	PandoraToken
 	RepoName string
 	Buffer   []byte
 }
 
 type UploadPluginInput struct {
-	PipelineToken
+	PandoraToken
 	ResourceOwner string
 	PluginName    string
 	Buffer        *bytes.Buffer
 }
 
 type UploadPluginFromFileInput struct {
-	PipelineToken
+	PandoraToken
 	ResourceOwner string
 	PluginName    string
 	FilePath      string
 }
 
 type GetPluginInput struct {
-	PipelineToken
+	PandoraToken
 	ResourceOwner string
 	PluginName    string
 }
@@ -1000,7 +1053,7 @@ type GetPluginOutput struct {
 }
 
 type VerifyPluginInput struct {
-	PipelineToken
+	PandoraToken
 	ResourceOwner string
 	PluginName    string
 }
@@ -1015,7 +1068,7 @@ type VerifyPluginOutput struct {
 }
 
 type ListPluginsInput struct {
-	PipelineToken
+	PandoraToken
 	ResourceOwner string
 }
 
@@ -1024,7 +1077,7 @@ type ListPluginsOutput struct {
 }
 
 type DeletePluginInput struct {
-	PipelineToken
+	PandoraToken
 	ResourceOwner string
 	PluginName    string
 }
@@ -1063,7 +1116,7 @@ func (t *TransformSpec) Validate() (err error) {
 }
 
 type CreateTransformInput struct {
-	PipelineToken
+	PandoraToken
 	SrcRepoName   string
 	TransformName string
 	DestRepoName  string
@@ -1088,7 +1141,7 @@ func (t *CreateTransformInput) Validate() (err error) {
 }
 
 type UpdateTransformInput struct {
-	PipelineToken
+	PandoraToken
 	SrcRepoName   string
 	TransformName string
 	Spec          *TransformSpec
@@ -1112,7 +1165,7 @@ type TransformDesc struct {
 }
 
 type GetTransformInput struct {
-	PipelineToken
+	PandoraToken
 	RepoName      string
 	TransformName string
 }
@@ -1138,13 +1191,13 @@ type GetTransformOutput struct {
 }
 
 type DeleteTransformInput struct {
-	PipelineToken
+	PandoraToken
 	RepoName      string
 	TransformName string
 }
 
 type ListTransformsInput struct {
-	PipelineToken
+	PandoraToken
 	RepoName string
 }
 
@@ -1261,7 +1314,7 @@ func (s *ExportHttpSpec) Validate() (err error) {
 }
 
 type CreateExportInput struct {
-	PipelineToken
+	PandoraToken
 	RepoName   string      `json:"-"`
 	ExportName string      `json:"-"`
 	Type       string      `json:"type"`
@@ -1309,7 +1362,7 @@ func (e *CreateExportInput) Validate() (err error) {
 }
 
 type UpdateExportInput struct {
-	PipelineToken
+	PandoraToken
 	RepoName   string      `json:"-"`
 	ExportName string      `json:"-"`
 	Spec       interface{} `json:"spec"`
@@ -1350,7 +1403,7 @@ type ExportDesc struct {
 }
 
 type GetExportInput struct {
-	PipelineToken
+	PandoraToken
 	RepoName   string
 	ExportName string
 }
@@ -1376,7 +1429,7 @@ type ExportExistOutput struct {
 }
 
 type ListExportsInput struct {
-	PipelineToken
+	PandoraToken
 	RepoName string
 }
 
@@ -1385,13 +1438,13 @@ type ListExportsOutput struct {
 }
 
 type DeleteExportInput struct {
-	PipelineToken
+	PandoraToken
 	RepoName   string
 	ExportName string
 }
 
 type VerifyTransformInput struct {
-	PipelineToken
+	PandoraToken
 	Schema []RepoSchemaEntry `json:"schema"`
 	Spec   *TransformSpec    `json:"spec"`
 }
@@ -1415,7 +1468,7 @@ type VerifyTransformOutput struct {
 }
 
 type VerifyExportInput struct {
-	PipelineToken
+	PandoraToken
 	Schema []RepoSchemaEntry `json:"schema"`
 	Type   string            `json:"type"`
 	Spec   interface{}       `json:"spec"`
@@ -1505,7 +1558,7 @@ func (h *HdfsSourceSpec) Validate() (err error) {
 }
 
 type RetrieveSchemaInput struct {
-	PipelineToken
+	PandoraToken
 	Type string      `json:"type"`
 	Spec interface{} `json:"spec"`
 }
@@ -1533,7 +1586,7 @@ type RetrieveSchemaOutput struct {
 }
 
 type CreateDatasourceInput struct {
-	PipelineToken
+	PandoraToken
 	DatasourceName string            `json:"-"`
 	Region         string            `json:"region"`
 	Type           string            `json:"type"`
@@ -1582,7 +1635,7 @@ func (c *CreateDatasourceInput) Validate() (err error) {
 }
 
 type GetDatasourceInput struct {
-	PipelineToken
+	PandoraToken
 	DatasourceName string
 }
 
@@ -1622,7 +1675,7 @@ type ListDatasourcesOutput struct {
 }
 
 type DeleteDatasourceInput struct {
-	PipelineToken
+	PandoraToken
 	DatasourceName string
 }
 
@@ -1680,7 +1733,7 @@ type Param struct {
 }
 
 type CreateJobInput struct {
-	PipelineToken
+	PandoraToken
 	JobName     string        `json:"-"`
 	Srcs        []JobSrc      `json:"srcs"`
 	Computation Computation   `json:"computation"`
@@ -1709,7 +1762,7 @@ func (c *CreateJobInput) Validate() (err error) {
 }
 
 type GetJobInput struct {
-	PipelineToken
+	PandoraToken
 	JobName string
 }
 
@@ -1745,7 +1798,7 @@ type JobDesc struct {
 }
 
 type ListJobsInput struct {
-	PipelineToken
+	PandoraToken
 	SrcJobName        string
 	SrcDatasourceName string
 }
@@ -1755,12 +1808,12 @@ type ListJobsOutput struct {
 }
 
 type DeleteJobInput struct {
-	PipelineToken
+	PandoraToken
 	JobName string
 }
 
 type StartJobInput struct {
-	PipelineToken
+	PandoraToken
 	JobName string  `json:"-"`
 	Params  []Param `json:"params,omitempty"`
 }
@@ -1774,12 +1827,12 @@ func (s *StartJobInput) Validate() (err error) {
 }
 
 type StopJobInput struct {
-	PipelineToken
+	PandoraToken
 	JobName string
 }
 
 type GetJobHistoryInput struct {
-	PipelineToken
+	PandoraToken
 	ResourceOwner string
 	JobName       string
 }
@@ -1800,7 +1853,7 @@ type GetJobHistoryOutput struct {
 }
 
 type StopJobBatchInput struct {
-	PipelineToken
+	PandoraToken
 	ResourceOwner string `json:"-"`
 	JobName       string `json:"jobName"`
 	RunId         int    `json:"runId"`
@@ -1819,7 +1872,7 @@ type StopJobBatchOutput struct {
 }
 
 type RerunJobBatchInput struct {
-	PipelineToken
+	PandoraToken
 	ResourceOwner string `json:"-"`
 	JobName       string `json:"jobName"`
 	RunId         int    `json:"runId"`
@@ -1906,7 +1959,7 @@ func (e *JobExportTsdbSpec) Validate() (err error) {
 }
 
 type CreateJobExportInput struct {
-	PipelineToken
+	PandoraToken
 	JobName    string      `json:"-"`
 	ExportName string      `json:"-"`
 	Type       string      `json:"type"`
@@ -1943,7 +1996,7 @@ func (e *CreateJobExportInput) Validate() (err error) {
 }
 
 type GetJobExportInput struct {
-	PipelineToken
+	PandoraToken
 	JobName    string
 	ExportName string
 }
@@ -1977,7 +2030,7 @@ type JobExportDesc struct {
 }
 
 type ListJobExportsInput struct {
-	PipelineToken
+	PandoraToken
 	JobName string
 }
 
@@ -1986,25 +2039,25 @@ type ListJobExportsOutput struct {
 }
 
 type DeleteJobExportInput struct {
-	PipelineToken
+	PandoraToken
 	JobName    string
 	ExportName string
 }
 
 type UploadUdfInput struct {
-	PipelineToken
+	PandoraToken
 	UdfName string
 	Buffer  *bytes.Buffer
 }
 
 type UploadUdfFromFileInput struct {
-	PipelineToken
+	PandoraToken
 	UdfName  string
 	FilePath string
 }
 
 type PutUdfMetaInput struct {
-	PipelineToken
+	PandoraToken
 	UdfName     string `json:"-"`
 	Description string `json:"description"`
 }
@@ -2019,7 +2072,7 @@ func (e *PutUdfMetaInput) Validate() error {
 }
 
 type DeleteUdfInfoInput struct {
-	PipelineToken
+	PandoraToken
 	UdfName string
 }
 
@@ -2030,7 +2083,7 @@ type PageRequest struct {
 }
 
 type ListUdfsInput struct {
-	PipelineToken
+	PandoraToken
 	PageRequest
 	ResourceOwner string
 }
@@ -2046,7 +2099,7 @@ type ListUdfsOutput struct {
 }
 
 type RegisterUdfFunctionInput struct {
-	PipelineToken
+	PandoraToken
 	FuncName        string `json:"-"`
 	JarName         string `json:"jarName"`
 	ClassName       string `json:"className"`
@@ -2065,12 +2118,12 @@ func (e *RegisterUdfFunctionInput) Validate() error {
 }
 
 type DeregisterUdfFunctionInput struct {
-	PipelineToken
+	PandoraToken
 	FuncName string
 }
 
 type ListUdfFunctionsInput struct {
-	PipelineToken
+	PandoraToken
 	PageRequest
 	ResourceOwner string
 	JarNamesIn    []string
@@ -2090,7 +2143,7 @@ type ListUdfFunctionsOutput struct {
 }
 
 type ListBuiltinUdfFunctionsInput struct {
-	PipelineToken
+	PandoraToken
 	PageRequest
 	Categories []string
 }
@@ -2120,7 +2173,7 @@ type Node struct {
 }
 
 type CreateWorkflowInput struct {
-	PipelineToken
+	PandoraToken
 	ResourceOwner string `json:"-"`
 	WorkflowName  string `json:"name"`
 	Region        string `json:"region"`
@@ -2128,7 +2181,7 @@ type CreateWorkflowInput struct {
 }
 
 type UpdateWorkflowInput struct {
-	PipelineToken
+	PandoraToken
 	ResourceOwner string           `json:"-"`
 	WorkflowName  string           `json:"name"`
 	Region        string           `json:"region"`
@@ -2136,7 +2189,7 @@ type UpdateWorkflowInput struct {
 }
 
 type DeleteWorkflowInput struct {
-	PipelineToken
+	PandoraToken
 	ResourceOwner string `json:"-"`
 	WorkflowName  string `json:"name"`
 }
@@ -2149,7 +2202,7 @@ func (r *DeleteWorkflowInput) Validate() (err error) {
 }
 
 type GetWorkflowInput struct {
-	PipelineToken
+	PandoraToken
 	ResourceOwner string `json:"-"`
 	WorkflowName  string `json:"name"`
 }
@@ -2196,7 +2249,7 @@ type NodeStatus struct {
 }
 
 type ListWorkflowInput struct {
-	PipelineToken
+	PandoraToken
 	ResourceOwner string
 }
 
@@ -2239,7 +2292,7 @@ func (r *UpdateWorkflowInput) Validate() (err error) {
 }
 
 type StartWorkflowInput struct {
-	PipelineToken
+	PandoraToken
 	ResourceOwner string `json:"-"`
 	WorkflowName  string `json:"name"`
 }
@@ -2261,7 +2314,7 @@ func (r *StopWorkflowInput) Validate() (err error) {
 }
 
 type DagLogSearchInput struct {
-	PipelineToken
+	PandoraToken
 	ResourceOwner string `json:"-"`
 	WorkflowName  string `json:"-"`
 	Type          string `json:"type"`
@@ -2317,7 +2370,7 @@ type WorkflowSearchRet struct {
 }
 
 type CreateVariableInput struct {
-	PipelineToken
+	PandoraToken
 	ResourceOwner string `json:"-"`
 	Name          string `json:"name"`
 	Type          string `json:"type"`
@@ -2356,7 +2409,7 @@ func (r *UpdateVariableInput) Validate() (err error) {
 }
 
 type DeleteVariableInput struct {
-	PipelineToken
+	PandoraToken
 	ResourceOwner string `json:"-"`
 	Name          string `json:"name"`
 }
@@ -2369,7 +2422,7 @@ func (r *DeleteVariableInput) Validate() (err error) {
 }
 
 type GetVariableInput struct {
-	PipelineToken
+	PandoraToken
 	ResourceOwner string `json:"-"`
 	Name          string `json:"name"`
 }
@@ -2389,7 +2442,7 @@ type GetVariableOutput struct {
 }
 
 type ListVariablesInput struct {
-	PipelineToken
+	PandoraToken
 	ResourceOwner string
 }
 

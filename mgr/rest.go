@@ -206,7 +206,7 @@ func generateStatsShell(address, prefix string) (err error) {
 		err = fmt.Errorf("writefile error %v, address: 127.0.0.1%v%v/status", err, address, prefix)
 		return
 	}
-	err = os.Chmod(StatsShell, 0755)
+	err = os.Chmod(StatsShell, DefaultDirPerm)
 	if err != nil {
 		err = fmt.Errorf("change mode for %v error %v", StatsShell, err)
 		return
@@ -292,6 +292,13 @@ func convertWebParserConfig(conf conf.MapConf) conf.MapConf {
 		}
 		conf[parser.KeyGrokCustomPatterns] = string(CustomPatterns)
 	}
+
+	splitter, _ := conf.GetStringOr(parser.KeyCSVSplitter, "")
+	if splitter != "" {
+		splitter = strings.Replace(splitter, "\\t", "\t", -1)
+		conf[parser.KeyCSVSplitter] = splitter
+	}
+
 	return conf
 }
 
@@ -311,7 +318,7 @@ func (rs *RestService) backupRunnerConfig(rconf interface{}, filename string) er
 	// 判断默认备份文件夹是否存在，不存在就尝试创建
 	if _, err := os.Stat(rs.mgr.RestDir); err != nil {
 		if os.IsNotExist(err) {
-			if err = os.Mkdir(rs.mgr.RestDir, 0755); err != nil && !os.IsExist(err) {
+			if err = os.Mkdir(rs.mgr.RestDir, DefaultDirPerm); err != nil && !os.IsExist(err) {
 				return fmt.Errorf("rest default dir not exists and make dir failed, err is %v", err)
 			}
 		}
