@@ -322,6 +322,8 @@ func (m *Manager) handle(path string, watcher *fsnotify.Watcher) {
 					m.watcherMux.Lock()
 					delete(m.watchers, path)
 					m.watcherMux.Unlock()
+					// TODO 此处代表文件夹被删了，只移除一个runner可能不够，文件夹下会有其他runner没有被删除
+					m.Remove(ev.Name)
 					return
 				}
 				m.Remove(ev.Name)
