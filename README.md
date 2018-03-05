@@ -35,18 +35,19 @@ logkit是[七牛Pandora](https://pandora-docs.qiniu.com)开发的一个通用的
 
 ## 支持的数据源
 
-1. 文件(包括csv格式的文件，kafka-rest日志文件，nginx日志文件等,并支持以[grok](https://www.elastic.co/blog/do-you-grok-grok)的方式解析日志)
-1. MySQL
-1. Microsoft SQL Server(MS SQL)
-1. PostgreSQL
-1. Elasticsearch
-1. MongoDB
-1. Kafka
-1. Redis
-1. TCP/UDP/Unix Socket
-1. Http POST
-1. Script
-1. Snmp
+1. [File](https://github.com/qiniu/logkit/wiki/File-Reader): 读取文件中的日志数据，包括csv格式的文件，kafka-rest日志文件，nginx日志文件等,并支持以grok的方式解析日志。
+1. [Elasticsearch](https://github.com/qiniu/logkit/wiki/ElasticSearch-Reader): 读取ElasticSearch中的数据。
+1. [MongoDB](https://github.com/qiniu/logkit/wiki/MongoDB-Reader): 读取MongoDB中的数据。
+1. [MySQL](https://github.com/qiniu/logkit/wiki/MySQL-Reader): 读取MySQL中的数据。
+1. [MicroSoft SQL Server](https://github.com/qiniu/logkit/wiki/MicroSoft-SQL-Server-Reader): 读取Microsoft SQL Server中的数据。
+1. [Postgre SQL](https://github.com/qiniu/logkit/wiki/PostgreSQL-Reader): 读取 PostgreSQL 中的数据。
+1. [Kafka](https://github.com/qiniu/logkit/wiki/Kafka-Reader): 读取Kafka中的数据。
+1. [Redis](https://github.com/qiniu/logkit/wiki/Redis-Reader): 读取Redis中的数据。
+1. [Socket](https://github.com/qiniu/logkit/wiki/Socket-Reader): 读取tcp\udp\unixsocket协议中的数据。
+1. [Http](https://github.com/qiniu/logkit/wiki/Http-Reader): 作为 http 服务端，接受 POST 请求发送过来的数据。
+1. [Script](https://github.com/qiniu/logkit/wiki/Script-Reader): 支持执行脚本，并获得执行结果中的数据。
+1. [Snmp](https://github.com/qiniu/logkit/wiki/Snmp-Reader): 主动抓取 Snmp 服务中的数据。
+
 
 ## 工作方式
 
@@ -100,7 +101,7 @@ wget https://pandora-dl.qiniu.com/logkit_${LOGKIT_VERSION}.tar.gz && tar xvf log
 
 **Windows 版本**
 
-请下载 https://pandora-dl.qiniu.com/logkit_windows_<LOGKIT_VERSION>.zip 并解压缩，进入目录
+请下载 `https://pandora-dl.qiniu.com/logkit_windows_<LOGKIT_VERSION>.zip` 并解压缩，进入目录
 
 2. 修改logkit基本配置
 
