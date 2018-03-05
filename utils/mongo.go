@@ -4,8 +4,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/qiniu/log"
 	"gopkg.in/mgo.v2"
+
+	"github.com/qiniu/log"
 )
 
 var g_modes = map[string]int{

@@ -42,7 +42,7 @@ type Config struct {
 var conf Config
 
 const (
-	NextVersion       = "v1.4.4"
+	NextVersion       = "v1.4.5"
 	defaultReserveCnt = 5
 	defaultLogDir     = "./run"
 	defaultLogPattern = "*.log-*"
