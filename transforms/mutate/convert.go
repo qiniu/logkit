@@ -16,7 +16,7 @@ type Converter struct {
 }
 
 func (g *Converter) RawTransform(datas []string) ([]string, error) {
-	return datas, errors.New("split transformer not support rawTransform")
+	return datas, errors.New("convert transformer not support rawTransform")
 }
 
 func (g *Converter) Transform(datas []Data) ([]Data, error) {
