@@ -27,7 +27,7 @@ func Test_Read(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	sf, err := NewSeqFile(meta, dir, false, []string{".pid"}, "*", WhenceOldest)
+	sf, err := NewSeqFile(meta, dir, false, false, []string{".pid"}, "*", WhenceOldest)
 	if err != nil {
 		t.Error(err)
 	}
@@ -100,7 +100,7 @@ func Test_NewReaderWithoutFile(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	sf, err := NewSeqFile(meta, dir, false, []string{".pid"}, "*", WhenceOldest)
+	sf, err := NewSeqFile(meta, dir, false, false, []string{".pid"}, "*", WhenceOldest)
 	if err != nil {
 		t.Error(err)
 	}
@@ -126,7 +126,7 @@ func Test_NewReaderWithQiniuLogFile(t *testing.T) {
 	createInvalidSuffixFile(dir)
 	defer destroyFile()
 
-	sf, err := NewSeqFile(meta, dir, false, []string{".pid"}, `logkit.log-*`, WhenceOldest)
+	sf, err := NewSeqFile(meta, dir, false, false, []string{".pid"}, `logkit.log-*`, WhenceOldest)
 	if err != nil {
 		t.Error(err)
 	}
@@ -140,6 +140,30 @@ func Test_NewReaderWithQiniuLogFile(t *testing.T) {
 	}
 }
 
+func Test_NewFileNewLine(t *testing.T) {
+	createDir()
+	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, "", defautFileRetention)
+	if err != nil {
+		t.Error(err)
+	}
+	createQiniuLogFile(dir)
+	createInvalidSuffixFile(dir)
+	defer destroyFile()
+
+	sf, err := NewSeqFile(meta, dir, false, true, []string{".pid"}, `*`, WhenceOldest)
+	if err != nil {
+		t.Error(err)
+	}
+	buffer := make([]byte, 17)
+	_, err = sf.Read(buffer)
+	if err != nil {
+		t.Error(err)
+	}
+	if string(buffer) != "12345678\n12345678" {
+		t.Errorf("exp 12345678\n12345678 but got %v", string(buffer))
+	}
+}
+
 func Test_NewReaderWithInvalidFile(t *testing.T) {
 	createDir()
 	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, "", defautFileRetention)
@@ -149,7 +173,7 @@ func Test_NewReaderWithInvalidFile(t *testing.T) {
 	createInvalidSuffixFile(dir)
 	defer destroyFile()
 
-	sf, err := NewSeqFile(meta, dir, false, []string{".pid"}, `test-logkit.log-*ss`, WhenceOldest)
+	sf, err := NewSeqFile(meta, dir, false, false, []string{".pid"}, `test-logkit.log-*ss`, WhenceOldest)
 	if err != nil {
 		t.Error(err)
 	}
@@ -167,7 +191,7 @@ func Test_ReadWhenDelete(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	sf, err := NewSeqFile(meta, dir, false, []string{".pid"}, "*", WhenceOldest)
+	sf, err := NewSeqFile(meta, dir, false, false, []string{".pid"}, "*", WhenceOldest)
 	if err != nil {
 		t.Error(err)
 	}
@@ -196,7 +220,7 @@ func Test_ReadNewest(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	sf, err := NewSeqFile(meta, dir, false, []string{".pid"}, "*", WhenceNewest)
+	sf, err := NewSeqFile(meta, dir, false, false, []string{".pid"}, "*", WhenceNewest)
 	if err != nil {
 		t.Error(err)
 	}

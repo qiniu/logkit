@@ -58,18 +58,19 @@ type ServerReader interface {
 
 // FileReader's conf keys
 const (
-	KeyLogPath       = "log_path"
-	KeyMetaPath      = "meta_path"
-	KeyFileDone      = "file_done"
-	KeyMode          = "mode"
-	KeyBufSize       = "reader_buf_size"
-	KeyWhence        = "read_from"
-	KeyEncoding      = "encoding"
-	KeyReadIOLimit   = "readio_limit"
-	KeyDataSourceTag = "datasource_tag"
-	KeyTagFile       = "tag_file"
-	KeyHeadPattern   = "head_pattern"
-	KeyRunnerName    = "runner_name"
+	KeyLogPath        = "log_path"
+	KeyMetaPath       = "meta_path"
+	KeyFileDone       = "file_done"
+	KeyMode           = "mode"
+	KeyBufSize        = "reader_buf_size"
+	KeyWhence         = "read_from"
+	KeyEncoding       = "encoding"
+	KeyReadIOLimit    = "readio_limit"
+	KeyDataSourceTag  = "datasource_tag"
+	KeyTagFile        = "tag_file"
+	KeyHeadPattern    = "head_pattern"
+	KeyRunnerName     = "runner_name"
+	KeyNewFileNewLine = "newfile_newline"
 
 	// 忽略隐藏文件
 	KeyIgnoreHiddenFile = "ignore_hidden"
@@ -203,7 +204,8 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 		ignoreHidden, _ := conf.GetBoolOr(KeyIgnoreHiddenFile, true)
 		ignoreFileSuffix, _ := conf.GetStringListOr(KeyIgnoreFileSuffix, defaultIgnoreFileSuffix)
 		validFilesRegex, _ := conf.GetStringOr(KeyValidFilePattern, "*")
-		fr, err = NewSeqFile(meta, logpath, ignoreHidden, ignoreFileSuffix, validFilesRegex, whence)
+		newfileNewLine, _ := conf.GetBoolOr(KeyNewFileNewLine, false)
+		fr, err = NewSeqFile(meta, logpath, ignoreHidden, newfileNewLine, ignoreFileSuffix, validFilesRegex, whence)
 		if err != nil {
 			return
 		}
