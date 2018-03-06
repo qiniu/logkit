@@ -749,7 +749,9 @@ func (r *LogExportRunner) Status() RunnerStatus {
 		r.rs.Error = fmt.Sprintf("get lag error: %v", err)
 		log.Warn(r.rs.Error)
 	}
-	r.rs.Lag = *rl
+	if rl != nil {
+		r.rs.Lag = *rl
+	}
 
 	r.rs.Elaspedtime += elaspedtime
 	r.rs.lastState = now
