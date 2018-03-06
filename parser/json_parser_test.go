@@ -25,7 +25,11 @@ func TestJsonParser(t *testing.T) {
 		exp []Data
 	}{
 		{
-			in: []string{`{"a":1,"b":[1.0,2.0,3.0],"c":{"d":"123","g":1.2},"e":"x","f":1.23}`, ""},
+			in: []string{`{
+							"a":1,"b":[1.0,2.0,3.0],
+							"c":{"d":"123","g":1.2},
+							"e":"x","f":1.23
+						}`, ""},
 			exp: []Data{{
 				"a": json.Number("1"),
 				"b": []interface{}{json.Number("1.0"), json.Number("2.0"), json.Number("3.0")},

@@ -35,7 +35,7 @@ func parserParseTest(p *testParam) {
 	var got1 respParserRet
 	err = jsoniter.Unmarshal(respBody, &got1)
 	assert.NoError(t, err, string(respBody))
-	assert.Equal(t, 4, len(got1.Data.SamplePoints))
+	assert.Equal(t, 1, len(got1.Data.SamplePoints))
 
 	// json
 	var got2 respParserRet
