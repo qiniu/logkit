@@ -39,6 +39,7 @@ type SeqFile struct {
 	offset           int64    // 当前处理文件offset
 	ignoreHidden     bool     // 忽略隐藏文件
 	ignoreFileSuffix []string // 忽略文件后缀
+	newFileAsNewLine bool     //新文件自动加换行符
 	validFilePattern string   // 合法的文件名正则表达式
 	stopped          int32    // 停止标志位
 
@@ -91,12 +92,13 @@ func getStartFile(path, whence string, meta *Meta, sf *SeqFile) (f *os.File, dir
 	return
 }
 
-func NewSeqFile(meta *Meta, path string, ignoreHidden bool, suffixes []string, validFileRegex, whence string) (sf *SeqFile, err error) {
+func NewSeqFile(meta *Meta, path string, ignoreHidden, newFileNewLine bool, suffixes []string, validFileRegex, whence string) (sf *SeqFile, err error) {
 	sf = &SeqFile{
 		ignoreFileSuffix: suffixes,
 		ignoreHidden:     ignoreHidden,
 		validFilePattern: validFileRegex,
 		mux:              sync.Mutex{},
+		newFileAsNewLine: newFileNewLine,
 	}
 	//原来的for循环替换成单次执行，启动的时候出错就直接报错给用户即可，不需要等待重试。
 	f, dir, currFile, offset, err := getStartFile(path, whence, meta, sf)
@@ -277,6 +279,10 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 				return n, err1
 			}
 			if fi != nil {
+				if sf.newFileAsNewLine {
+					p[n] = '\n'
+					n++
+				}
 				log.Infof("Runner[%v] %s - nextFile: %s", sf.meta.RunnerName, sf.dir, fi.Name())
 				err2 := sf.open(fi)
 				if err2 != nil {

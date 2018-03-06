@@ -25,7 +25,8 @@ func NewFileAutoReader(conf conf.MapConf, meta *Meta, isFromWeb bool, bufSize in
 		ignoreHidden, _ := conf.GetBoolOr(KeyIgnoreHiddenFile, true)
 		ignoreFileSuffix, _ := conf.GetStringListOr(KeyIgnoreFileSuffix, defaultIgnoreFileSuffix)
 		validFilesRegex, _ := conf.GetStringOr(KeyValidFilePattern, "*")
-		fr, err = NewSeqFile(meta, logpath, ignoreHidden, ignoreFileSuffix, validFilesRegex, whence)
+		newfileNewLine, _ := conf.GetBoolOr(KeyNewFileNewLine, false)
+		fr, err = NewSeqFile(meta, logpath, ignoreHidden, newfileNewLine, ignoreFileSuffix, validFilesRegex, whence)
 		if err != nil {
 			return
 		}

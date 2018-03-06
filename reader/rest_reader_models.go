@@ -102,6 +102,15 @@ var (
 		DefaultNoUse: false,
 		Description:  "SQL字段类型定义(sql_schema)",
 	}
+	OptionKeyNewFileNewLine = Option{
+		KeyName:       KeyNewFileNewLine,
+		ChooseOnly:    true,
+		ChooseOptions: []interface{}{"false", "true"},
+		Default:       "false",
+		DefaultNoUse:  false,
+		Description:   "文件末尾自动换行(newfile_newline)",
+		Advance:       true,
+	}
 )
 
 var ModeKeyOptions = map[string][]Option{
@@ -120,6 +129,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionDataSourceTag,
 		OptionReadIoLimit,
 		OptionHeadPattern,
+		OptionKeyNewFileNewLine,
 		{
 			KeyName:      KeyFileDone,
 			ChooseOnly:   false,
@@ -221,6 +231,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionWhence,
 		OptionEncoding,
 		OptionDataSourceTag,
+		OptionKeyNewFileNewLine,
 		{
 			KeyName:      KeyHeadPattern,
 			ChooseOnly:   false,
