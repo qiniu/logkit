@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
@@ -280,14 +279,14 @@ func getSampleData(parserConfig conf.MapConf) ([]string, error) {
 
 	switch parserType {
 	case parser.TypeCSV, parser.TypeJson, parser.TypeRaw, parser.TypeNginx, parser.TypeEmpty, parser.TypeKafkaRest, parser.TypeLogv1:
-		sampleData = strings.Split(rawData, "\n")
+		sampleData = append(sampleData, rawData)
 	case parser.TypeSyslog:
-		sampleData = strings.Split(rawData, "\n")
+		sampleData = append(sampleData, rawData)
 		sampleData = append(sampleData, parser.SyslogEofLine)
 	case parser.TypeGrok:
 		grokMode, _ := parserConfig.GetString(parser.KeyGrokMode)
 		if grokMode != parser.ModeMulti {
-			sampleData = strings.Split(rawData, "\n")
+			sampleData = append(sampleData, rawData)
 		} else {
 			sampleData = []string{rawData}
 		}
