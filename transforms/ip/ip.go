@@ -11,7 +11,6 @@ import (
 	"github.com/wangtuanjie/ip17mon"
 )
 
-//更全的免费数据可以在ipip.net下载
 type IpTransformer struct {
 	StageTime string `json:"stage"`
 	Key       string `json:"key"`
