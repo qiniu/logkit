@@ -7,13 +7,16 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
+	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/metric/curl"
+	"github.com/qiniu/logkit/metric/system"
+
 	"github.com/json-iterator/go"
 	"github.com/labstack/echo"
-	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/metric/system"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -36,6 +39,19 @@ func getMetricRunnerConfig(name string, mc []MetricConfig, senderPath string) ([
 		}},
 	}
 	return jsoniter.Marshal(runnerConf)
+}
+
+func getVal(result interface{}, curLine int64) map[string]interface{} {
+	val := make(map[string]interface{}, 0)
+	valByte, err := jsoniter.Marshal(result)
+	if err != nil {
+		log.Fatalf("metricHttpTest error marshal %v curLine = %v %v", result, curLine, err)
+	}
+	err = jsoniter.Unmarshal(valByte, &val)
+	if err != nil {
+		log.Fatalf("metricHttpTest error unmarshal %v curLine = %v %v", string(valByte), curLine, err)
+	}
+	return val
 }
 
 func TestMetricRunner(t *testing.T) {
@@ -70,9 +86,10 @@ func TestMetricRunner(t *testing.T) {
 	}()
 
 	funcMap := map[string]func(*testParam){
-		//"metricRunTest":    metricRunTest,
-		//"metricNetTest":    metricNetTest,
-		//"metricDiskioTest": metricDiskioTest,
+		"metricRunTest":       metricRunTest,
+		"metricNetTest":       metricNetTest,
+		"metricDiskioTest":    metricDiskioTest,
+		"metricHttpTest":      metricHttpTest,
 		"metricRunEnvTagTest": metricRunEnvTagTest,
 	}
 
@@ -482,5 +499,134 @@ func metricRunEnvTagTest(p *testParam) {
 				assert.Equal(t, "env_value", v)
 			}
 		}
+	}
+}
+
+func metricHttpTest(p *testParam) {
+	t := p.t
+	rd := p.rd
+	rs := p.rs
+	resvName1 := "sendData1"
+	resvName2 := "sendData2"
+	runnerName := "metricHttpTest"
+	dir := runnerName + "Dir"
+	testDir := filepath.Join(rd, dir)
+	resvDir := filepath.Join(testDir, "sender")
+	resvPath1 := filepath.Join(resvDir, resvName1)
+	resvPath2 := filepath.Join(resvDir, resvName2)
+	if err := mkTestDir(testDir, resvDir); err != nil {
+		t.Fatalf("mkdir test path error %v", err)
+	}
+	time.Sleep(1 * time.Second)
+	mc := []MetricConfig{
+		{
+			MetricType: "http",
+			Attributes: map[string]bool{
+				"http_resp_head": false,
+				"http_data":      false,
+			},
+			Config: map[string]interface{}{
+				"http_datas": `[{"method":"GET", "url":"https://www.qiniu.com", "expect_code":200}]`,
+			},
+		},
+	}
+	runnerConf, err := getMetricRunnerConfig(runnerName, mc, resvPath1)
+	if err != nil {
+		t.Fatalf("get runner config failed, error is %v", err)
+	}
+
+	// 添加 runner
+	url := "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName
+	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(3 * time.Second)
+
+	// 停止 runner
+	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName + "/stop"
+	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(2 * time.Second)
+
+	var curLine int64 = 0
+	httpAttr := curl.KeyHttpUsages
+	f, err := os.Open(resvPath1)
+	assert.NoError(t, err)
+	br := bufio.NewReaderSize(f, bufSize)
+	result := make([]map[string]interface{}, 0)
+	for {
+		str, _, c := br.ReadLine()
+		if c == io.EOF {
+			f.Close()
+			break
+		}
+		curLine++
+		err = jsoniter.Unmarshal(str, &result)
+		if err != nil {
+			log.Fatalf("metricHttpTest error unmarshal %v curLine = %v %v", string(str), curLine, err)
+		}
+
+		val := getVal(result[0][strconv.Itoa(1)], curLine)
+		assert.Equal(t, len(httpAttr)-2, len(val), string(str))
+		assert.Equal(t, float64(200), val["http_status_code"])
+		assert.Equal(t, "https://www.qiniu.com", val["http_target"])
+		assert.Equal(t, "success", val["http_err_state"])
+		assert.Equal(t, "", val["http_err_msg"])
+	}
+
+	mc = []MetricConfig{
+		{
+			MetricType: "http",
+			Attributes: map[string]bool{
+				"http_resp_head": false,
+				"http_data":      false,
+				"http_time_cost": false,
+			},
+			Config: map[string]interface{}{
+				"http_datas": `[{"method":"GET", "url":"https://www.logkit-pandora.com", "expect_code":200}]`,
+			},
+		},
+	}
+	runnerConf, err = getMetricRunnerConfig(runnerName, mc, resvPath2)
+	if err != nil {
+		t.Fatalf("get runner config failed, error is %v", err)
+	}
+
+	// 更新
+	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName
+	respCode, respBody, err = makeRequest(url, http.MethodPut, runnerConf)
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(3 * time.Second)
+
+	// 停止 runner
+	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName + "/stop"
+	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(2 * time.Second)
+
+	curLine = 0
+	f, err = os.Open(resvPath2)
+	assert.NoError(t, err)
+	br = bufio.NewReaderSize(f, bufSize)
+	result = make([]map[string]interface{}, 0)
+	for {
+		str, _, c := br.ReadLine()
+		if c == io.EOF {
+			f.Close()
+			break
+		}
+		curLine++
+		err = jsoniter.Unmarshal([]byte(str), &result)
+		if err != nil {
+			log.Fatalf("metricHttpTest error unmarshal %v curLine = %v %v", string(str), curLine, err)
+		}
+
+		val := getVal(result[0][strconv.Itoa(1)], curLine)
+		assert.Equal(t, float64(-1), val["http__status_code"])
+		assert.Equal(t, "https://www.logkit-pandora.com", val["http__target"])
+		assert.Equal(t, "fail", val["http__err_state"])
 	}
 }
