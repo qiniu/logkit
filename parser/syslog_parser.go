@@ -26,7 +26,7 @@ const (
 const (
 	KeyRFCType = "syslog_rfc"
 
-	SyslogEofLine = "!@#pandora-EOF-line#@!"
+	PandoraParseFlushSignal = "!@#pandora-EOF-line#@!"
 )
 
 type LogParts map[string]interface{}
@@ -135,7 +135,7 @@ func (p *SyslogParser) Type() string {
 
 func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 	se := &utils.StatsError{}
-	datas := []Data{}
+	var datas []Data
 	for idx, line := range lines {
 		d, err := p.parse(line)
 		if err != nil {
@@ -165,7 +165,10 @@ func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 func (p *SyslogParser) parse(line string) (data Data, err error) {
 	data = Data{}
 	if p.buff.Len() > 0 {
-		if p.format.IsNewLine([]byte(line)) || line == SyslogEofLine {
+		if line == PandoraParseFlushSignal {
+			return p.Flush()
+		}
+		if p.format.IsNewLine([]byte(line)) {
 			sparser := p.format.GetParser(p.buff.Bytes())
 			err = sparser.Parse()
 			if err == nil || err.Error() == "No structured data" {
@@ -176,7 +179,7 @@ func (p *SyslogParser) parse(line string) (data Data, err error) {
 		}
 	}
 	var serr error
-	if line != SyslogEofLine {
+	if line != PandoraParseFlushSignal {
 		_, serr = p.buff.Write([]byte(line))
 	}
 	if serr != nil {
@@ -186,6 +189,17 @@ func (p *SyslogParser) parse(line string) (data Data, err error) {
 			err = serr
 		}
 	}
+	return
+}
+
+func (p *SyslogParser) Flush() (data Data, err error) {
+	sparser := p.format.GetParser(p.buff.Bytes())
+	err = sparser.Parse()
+	if err == nil || err.Error() == "No structured data" {
+		data = Data(sparser.Dump())
+		err = nil
+	}
+	p.buff.Reset()
 	return
 }
 
