@@ -298,30 +298,36 @@ func ConvertDatasBack(ins []Data) []map[string]interface{} {
 // trySendDatas 尝试发送数据，如果失败，将失败数据加入backup queue，并睡眠指定时间。返回结果为是否正常发送
 func (ft *FtSender) trySendDatas(datas []Data, failSleep int, isRetry bool) (backDataContext []*datasContext, err error) {
 	err = ft.innerSender.Send(datas)
+	ft.statsMutex.Lock()
 	if c, ok := err.(*utils.StatsError); ok {
 		err = c.ErrorDetail
-		ft.statsMutex.Lock()
 		if isRetry {
 			ft.stats.Errors -= c.Success
 		} else {
 			ft.stats.Errors += c.Errors
 		}
 		ft.stats.Success += c.Success
-		ft.statsMutex.Unlock()
 	} else if err != nil {
 		if !isRetry {
-			ft.statsMutex.Lock()
 			ft.stats.Errors += int64(len(datas))
-			ft.statsMutex.Unlock()
 		}
 	} else {
-		ft.statsMutex.Lock()
 		ft.stats.Success += int64(len(datas))
 		if isRetry {
 			ft.stats.Errors -= int64(len(datas))
 		}
-		ft.statsMutex.Unlock()
 	}
+	if err != nil {
+		se, succ := err.(*reqerr.SendError)
+		if !succ {
+			ft.stats.LastError = err.Error()
+		} else {
+			ft.stats.LastError = se.Error()
+		}
+	} else {
+		ft.stats.LastError = ""
+	}
+	ft.statsMutex.Unlock()
 	if err != nil {
 		retDatasContext := ft.handleSendError(err, datas)
 		for _, v := range retDatasContext {
@@ -346,13 +352,11 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 		// 如果不是SendError 默认所有的数据都发送失败
 		log.Infof("Runner[%v] Sender[%v] error type is not *SendError! reSend all datas by default", ft.runnerName, ft.innerSender.Name())
 		failCtx.Datas = datas
-		ft.stats.LastError = err.Error()
 	} else {
 		failCtx.Datas = ConvertDatas(se.GetFailDatas())
 		if se.ErrorType == reqerr.TypeBinaryUnpack {
 			binaryUnpack = true
 		}
-		ft.stats.LastError = se.Error()
 	}
 	log.Errorf("Runner[%v] Sender[%v] cannot write points: %v, failDatas size: %v", ft.runnerName, ft.innerSender.Name(), err, len(failCtx.Datas))
 	log.Debugf("Runner[%v] Sender[%v] failed datas [[%v]]", ft.runnerName, ft.innerSender.Name(), failCtx.Datas)
