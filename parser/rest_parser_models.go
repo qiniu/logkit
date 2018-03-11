@@ -15,6 +15,7 @@ var ModeUsages = []KeyValue{
 	{TypeLogv1, "按七牛日志库格式解析"},
 	{TypeKafkaRest, "按 kafkarest 日志解析"},
 	{TypeEmpty, "通过解析清空数据"},
+	{TypeMysqlLog, "按 mysql 慢请求日志解析"},
 }
 
 var (
@@ -251,6 +252,17 @@ var ModeKeyOptions = map[string][]Option{
 		OptionDisableRecordErrData,
 	},
 	TypeEmpty: {},
+	TypeMysqlLog: {
+		{
+			KeyName:      KeyParserName,
+			ChooseOnly:   false,
+			Default:      "parser",
+			DefaultNoUse: false,
+			Description:  "parser名称(name)",
+		},
+		OptionLabels,
+		OptionDisableRecordErrData,
+	},
 }
 
 // SampleLogs 样例日志，用于前端界面试玩解析器
@@ -265,4 +277,11 @@ var SampleLogs = map[string]string{
 	TypeLogv1:     `2016/10/20 17:30:21.433423 [GE2owHck-Y4IWJHS][WARN] github.com/qiniu/http/rpcutil.v1/rpc_util.go:203: E18102: The specified repo does not exist under the provided appid ~`,
 	TypeKafkaRest: `[2016-12-05 03:35:20,682] INFO 172.16.16.191 - - [05/Dec/2016:03:35:20 +0000] "POST /topics/VIP_VvBVy0tuMPPspm1A_0000000000 HTTP/1.1" 200 101640  46 (io.confluent.rest-utils.requests)`,
 	TypeEmpty:     "empty 通过解析清空数据",
+	TypeMysqlLog: `# Time: 2017-12-24T02:42:00.126000Z
+# User@Host: rdsadmin[rdsadmin] @ localhost [127.0.0.1]  Id:     3
+# Query_time: 0.020363  Lock_time: 0.018450 Rows_sent: 0  Rows_examined: 1
+SET timestamp=1514083320;
+use foo;
+SELECT count(*) from mysql.rds_replication_status WHERE master_host IS NOT NULL and master_port IS NOT NULL GROUP BY action_timestamp,called_by_user,action,mysql_version,master_host,master_port ORDER BY action_timestamp LIMIT 1;
+#`,
 }

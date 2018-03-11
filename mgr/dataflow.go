@@ -15,6 +15,8 @@ import (
 
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
+	"strings"
+
 	"github.com/json-iterator/go"
 )
 
@@ -281,8 +283,11 @@ func getSampleData(parserConfig conf.MapConf) ([]string, error) {
 	case parser.TypeCSV, parser.TypeJson, parser.TypeRaw, parser.TypeNginx, parser.TypeEmpty, parser.TypeKafkaRest, parser.TypeLogv1:
 		sampleData = append(sampleData, rawData)
 	case parser.TypeSyslog:
-		sampleData = append(sampleData, rawData)
-		sampleData = append(sampleData, parser.SyslogEofLine)
+		sampleData = strings.Split(rawData, "\n")
+		sampleData = append(sampleData, parser.PandoraParseFlushSignal)
+	case parser.TypeMysqlLog:
+		sampleData = strings.Split(rawData, "\n")
+		sampleData = append(sampleData, parser.PandoraParseFlushSignal)
 	case parser.TypeGrok:
 		grokMode, _ := parserConfig.GetString(parser.KeyGrokMode)
 		if grokMode != parser.ModeMulti {
@@ -300,9 +305,9 @@ func getSampleData(parserConfig conf.MapConf) ([]string, error) {
 
 func checkSampleData(sampleData []string, logParser parser.LogParser) ([]string, error) {
 	if len(sampleData) <= 0 {
-		pt, ok := logParser.(parser.ParserType)
-		if ok && pt.Type() == parser.TypeSyslog {
-			sampleData = []string{parser.SyslogEofLine}
+		_, ok := logParser.(parser.Flushable)
+		if ok {
+			sampleData = []string{parser.PandoraParseFlushSignal}
 		} else {
 			err := fmt.Errorf("parser [%v] fetched 0 lines", logParser.Name())
 			return nil, err

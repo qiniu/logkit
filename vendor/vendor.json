@@ -3,6 +3,12 @@
 	"ignore": "test",
 	"package": [
 		{
+			"checksumSHA1": "2BZ8vWKUa6bjjMLdLLK/JufuTVY=",
+			"path": "github.com/Preetam/mysqllog",
+			"revision": "6562e7684c19650afe9b8a0b2b0d9dc90f701a99",
+			"revisionTime": "2017-12-30T20:18:58Z"
+		},
+		{
 			"checksumSHA1": "50/2Bv2EHsoyhrd7ddZKIFMIkoo=",
 			"path": "github.com/Shopify/sarama",
 			"revision": "c01858abb625b73a3af51d0798e4ad42c8147093",

@@ -73,7 +73,7 @@ func Test_SyslogParser(t *testing.T) {
 	if len(dts) != 6 {
 		t.Fatalf("parse lines error expect 6 lines but got %v lines", len(dts))
 	}
-	ndata, err := p.Parse([]string{SyslogEofLine})
+	ndata, err := p.Parse([]string{PandoraParseFlushSignal})
 	if st, ok := err.(*utils.StatsError); ok {
 		err = st.ErrorDetail
 		assert.Equal(t, "", st.LastError, st.LastError)
@@ -123,7 +123,7 @@ func TestSyslogParser_NoPanic(t *testing.T) {
 		lenStr := len(str)
 		for j := 1; j <= lenStr; j++ {
 			dataLine[i] = str[:j]
-			dataLine[i+1] = SyslogEofLine
+			dataLine[i+1] = PandoraParseFlushSignal
 			p.Parse(dataLine)
 		}
 	}

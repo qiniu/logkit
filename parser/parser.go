@@ -18,6 +18,10 @@ type ParserType interface {
 	Type() string
 }
 
+type Flushable interface {
+	Flush() (Data, error)
+}
+
 // conf 字段
 const (
 	KeyParserName           = GlobalKeyName
@@ -40,6 +44,7 @@ const (
 	TypeJson       = "json"
 	TypeNginx      = "nginx"
 	TypeSyslog     = "syslog"
+	TypeMysqlLog   = "mysqllog"
 )
 
 type Label struct {
@@ -66,6 +71,7 @@ func NewParserRegistry() *ParserRegistry {
 	ps.RegisterParser(TypeJson, NewJsonParser)
 	ps.RegisterParser(TypeNginx, NewNginxParser)
 	ps.RegisterParser(TypeSyslog, NewSyslogParser)
+	ps.RegisterParser(TypeMysqlLog, NewMysqllogParser)
 	return ps
 }
 

@@ -469,9 +469,9 @@ func (r *LogExportRunner) Run() {
 
 		if len(lines) <= 0 {
 			log.Debugf("Runner[%v] fetched 0 lines", r.Name())
-			pt, ok := r.parser.(parser.ParserType)
-			if ok && pt.Type() == parser.TypeSyslog {
-				lines = []string{parser.SyslogEofLine}
+			_, ok := r.parser.(parser.Flushable)
+			if ok {
+				lines = []string{parser.PandoraParseFlushSignal}
 			} else {
 				continue
 			}
