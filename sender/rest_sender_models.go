@@ -209,7 +209,7 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:       KeyPandoraEnableTSDB,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{"true", "false"},
+			ChooseOptions: []interface{}{"false", "true"},
 			Default:       "false",
 			DefaultNoUse:  false,
 			Description:   "是否自动创建并导出到Pandora TSDB(pandora_enable_tsdb)",
