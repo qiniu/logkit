@@ -34,6 +34,9 @@ type Option struct {
 	DefaultNoUse  bool
 	Description   string
 	CheckRegex    string
+	Style         string `json:"style"`
+	Required      bool   `json:"required"`
+	Placeholder   string `json:"placeholder"`
 	Type          string `json:"Type,omitempty"`
 	Secret        bool
 	Advance       bool   `json:"advance,omitempty"`

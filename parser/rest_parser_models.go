@@ -48,17 +48,19 @@ var (
 		DefaultNoUse:  false,
 		Description:   "禁止记录解析失败数据(disable_record_errdata)",
 	}
+
+	OptionParserName = Option{
+		KeyName:      KeyParserName,
+		ChooseOnly:   false,
+		Default:      "parser",
+		DefaultNoUse: false,
+		Description:  "parser名称(name)",
+	}
 )
 
 var ModeKeyOptions = map[string][]Option{
 	TypeJson: {
-		{
-			KeyName:      KeyParserName,
-			ChooseOnly:   false,
-			Default:      "parser",
-			DefaultNoUse: false,
-			Description:  "parser名称(name)",
-		},
+		OptionParserName,
 		OptionLabels,
 		OptionDisableRecordErrData,
 	},
@@ -66,7 +68,9 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:      NginxConfPath,
 			ChooseOnly:   false,
-			Default:      "/opt/nginx/conf/nginx.conf",
+			Default:      "",
+			Required:     true,
+			Placeholder:  "/opt/nginx/conf/nginx.conf",
 			DefaultNoUse: true,
 			Description:  "nginx配置路径(nginx_log_format_path)",
 		},
@@ -74,15 +78,9 @@ var ModeKeyOptions = map[string][]Option{
 			KeyName:      NginxLogFormat,
 			ChooseOnly:   false,
 			Default:      "main",
+			Required:     true,
 			DefaultNoUse: true,
 			Description:  "nginx日志格式名称(nginx_log_format_name)",
-		},
-		{
-			KeyName:      KeyParserName,
-			ChooseOnly:   false,
-			Default:      "parser",
-			DefaultNoUse: false,
-			Description:  "parser名称(name)",
 		},
 		{
 			KeyName:      NginxSchema,
@@ -98,6 +96,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: false,
 			Description:  "直接通过正则表达式解析(nginx_log_format_regex)",
 		},
+		OptionParserName,
 		OptionLabels,
 		OptionDisableRecordErrData,
 	},
@@ -106,15 +105,9 @@ var ModeKeyOptions = map[string][]Option{
 			KeyName:      KeyGrokPatterns,
 			ChooseOnly:   false,
 			Default:      "%{COMMON_LOG_FORMAT}",
+			Required:     true,
 			DefaultNoUse: true,
 			Description:  "匹配日志的grok表达式(grok_patterns)",
-		},
-		{
-			KeyName:      KeyParserName,
-			ChooseOnly:   false,
-			Default:      "parser",
-			DefaultNoUse: false,
-			Description:  "parser名称(name)",
 		},
 		{
 			KeyName:       KeyGrokMode,
@@ -138,6 +131,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: false,
 			Description:  "自定义 pattern (grok_custom_patterns)",
 		},
+		OptionParserName,
 		OptionTimezoneOffset,
 		OptionLabels,
 		OptionDisableRecordErrData,
@@ -147,24 +141,21 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:      KeyCSVSchema,
 			ChooseOnly:   false,
-			Default:      "abc string,xyz long,data1 string,data2 float",
+			Default:      "",
+			Required:     true,
+			Placeholder:  "abc string,xyz long,data1 string,data2 float",
 			DefaultNoUse: true,
 			Description:  "csv格式的字段类型(csv_schema)",
-		},
-		{
-			KeyName:      KeyParserName,
-			ChooseOnly:   false,
-			Default:      "parser",
-			DefaultNoUse: false,
-			Description:  "parser名称(name)",
 		},
 		{
 			KeyName:      KeyCSVSplitter,
 			ChooseOnly:   false,
 			Default:      ",",
+			Required:     true,
 			DefaultNoUse: false,
 			Description:  "csv分隔符(csv_splitter)",
 		},
+		OptionParserName,
 		OptionLabels,
 		OptionTimezoneOffset,
 		{
@@ -179,13 +170,6 @@ var ModeKeyOptions = map[string][]Option{
 	},
 	TypeRaw: {
 		{
-			KeyName:      KeyParserName,
-			ChooseOnly:   false,
-			Default:      "parser",
-			DefaultNoUse: false,
-			Description:  "parser名称(name)",
-		},
-		{
 			KeyName:       KeyTimestamp,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
@@ -193,17 +177,11 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse:  false,
 			Description:   "数据附带时间戳(timestamp)",
 		},
+		OptionParserName,
 		OptionLabels,
 		OptionDisableRecordErrData,
 	},
 	TypeLogv1: {
-		{
-			KeyName:      KeyParserName,
-			ChooseOnly:   false,
-			Default:      "parser",
-			DefaultNoUse: false,
-			Description:  "parser名称(name)",
-		},
 		OptionLabels,
 		{
 			KeyName:      KeyQiniulogPrefix,
@@ -219,16 +197,10 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: false,
 			Description:  "七牛日志格式顺序(qiniulog_log_headers)",
 		},
+		OptionParserName,
 		OptionDisableRecordErrData,
 	},
 	TypeSyslog: {
-		{
-			KeyName:      KeyParserName,
-			ChooseOnly:   false,
-			Default:      "parser",
-			DefaultNoUse: false,
-			Description:  "parser名称(name)",
-		},
 		{
 			KeyName:       KeyRFCType,
 			ChooseOnly:    true,
@@ -237,29 +209,18 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse:  false,
 			Description:   "syslog使用的rfc协议(syslog_rfc)",
 		},
+		OptionParserName,
 		OptionLabels,
 		OptionDisableRecordErrData,
 	},
 	TypeKafkaRest: {
-		{
-			KeyName:      KeyParserName,
-			ChooseOnly:   false,
-			Default:      "parser",
-			DefaultNoUse: false,
-			Description:  "parser名称(name)",
-		},
+		OptionParserName,
 		OptionLabels,
 		OptionDisableRecordErrData,
 	},
 	TypeEmpty: {},
 	TypeMysqlLog: {
-		{
-			KeyName:      KeyParserName,
-			ChooseOnly:   false,
-			Default:      "parser",
-			DefaultNoUse: false,
-			Description:  "parser名称(name)",
-		},
+		OptionParserName,
 		OptionLabels,
 		OptionDisableRecordErrData,
 	},

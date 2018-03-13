@@ -70,7 +70,9 @@ var (
 	KeyFieldName = Option{
 		KeyName:      "key",
 		ChooseOnly:   false,
-		Default:      "my_field_keyname",
+		Default:      "",
+		Required:     true,
+		Placeholder:  "my_field_keyname",
 		DefaultNoUse: true,
 		Description:  "要进行Transform变化的键(key)",
 		Type:         TransformTypeString,

@@ -81,7 +81,9 @@ func (g *Converter) ConfigOptions() []Option {
 		{
 			KeyName:      "dsl",
 			ChooseOnly:   false,
-			Default:      "fieldone string",
+			Default:      "",
+			Required:     true,
+			Placeholder:  "fieldone string",
 			DefaultNoUse: true,
 			Description:  "数据转换的dsl描述(dsl)",
 			Type:         transforms.TransformTypeString,

@@ -357,9 +357,12 @@ func (c *Pipeline) AutoExportToLogDB(input *AutoExportToLogDBInput) error {
 		})
 		exportInput := c.FormExportInput(input.RepoName, ExportTypeLogDB, logDBSpec)
 		exportInput.PandoraToken = input.CreateExportToken
-		return c.CreateExport(exportInput)
+		if err = c.CreateExport(exportInput); err != nil && reqerr.IsExistError(err) {
+			err = nil
+		} else if err != nil {
+			log.Error("AutoExportToLogDB get export error", err)
+		}
 	}
-	log.Error("AutoExportToLogDB get export error", err)
 	return err
 }
 
@@ -409,7 +412,11 @@ func (c *Pipeline) AutoExportToKODO(input *AutoExportToKODOInput) error {
 		})
 		exportInput := c.FormExportInput(input.RepoName, ExportTypeKODO, kodoSpec)
 		exportInput.PandoraToken = input.CreateExportToken
-		return c.CreateExport(exportInput)
+		if err = c.CreateExport(exportInput); err != nil && reqerr.IsExistError(err) {
+			err = nil
+		} else if err != nil {
+			log.Error("AutoExportToKodo get export error", err)
+		}
 	}
 	return err
 }

@@ -83,7 +83,9 @@ func (g *Spliter) ConfigOptions() []Option {
 		{
 			KeyName:      "newfield",
 			ChooseOnly:   false,
-			Default:      "newfieldname",
+			Default:      "",
+			Required:     true,
+			Placeholder:  "newfieldname",
 			DefaultNoUse: true,
 			Description:  "split后生成的array字段名称(newfield)",
 			Type:         transforms.TransformTypeString,

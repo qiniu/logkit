@@ -360,10 +360,34 @@ func copyAndConvertData(d Data, mapLevel int) Data {
 			} else {
 				v = map[string]interface{}(copyAndConvertData(nv, mapLevel+1))
 			}
+		case []uint64:
+			if len(nv) == 0 {
+				continue
+			}
+			newArr := make([]int64, 0)
+			for _, value := range nv {
+				newArr = append(newArr, int64(value))
+			}
+			v = newArr
 		case []interface{}:
 			if len(nv) == 0 {
 				continue
 			}
+			switch nv[0].(type) {
+			case uint64:
+				newArr := make([]interface{}, 0)
+				for _, value := range nv {
+					switch newV := value.(type) {
+					case uint64:
+						newArr = append(newArr, int64(newV))
+					default:
+						newArr = append(newArr, newV)
+					}
+				}
+				v = newArr
+			}
+		case uint64:
+			v = int64(nv)
 		case nil:
 			continue
 		}
@@ -656,6 +680,98 @@ func (c *Pipeline) changeWorkflowToStarted(workflow *GetWorkflowOutput, waitStar
 	return nil
 }
 
+// 这边的逻辑判断是:
+//1. 获取 workflow 有错误，并且错误是 workflow 不存在, 创建 workflow:
+//	1) 如果创建 workflow 有错误，并且错误是 workflow 已经存在, 重新获取 workflow(为了拿到其状态信息)
+//	2) 如果创建 workflow 有错误，并且错误不是 workflow 已经存在, 直接返回错误
+//	3) 如果创建 workflow 没有错误，即创建成功，此时记录需要自动启动新建的 workflow, 并填充 workflow 的名称和当前的状态
+//2. 获取 workflow 有错误，并且不是 workflow 不存在的错误, 直接返回错误
+func (c *Pipeline) getOrCreateWorkflow(input *InitOrUpdateWorkflowInput, ns *bool) (workflow *GetWorkflowOutput, err error) {
+	workflow, err = c.GetWorkflow(&GetWorkflowInput{
+		WorkflowName: input.WorkflowName,
+		PandoraToken: input.PipelineGetWorkflowToken,
+	})
+	if err != nil && reqerr.IsNoSuchWorkflow(err) {
+		if err = c.CreateWorkflow(&CreateWorkflowInput{
+			WorkflowName: input.WorkflowName,
+			Region:       input.Region,
+			PandoraToken: input.PipelineCreateWorkflowToken,
+		}); err != nil && reqerr.IsExistError(err) {
+			workflow, err = c.GetWorkflow(&GetWorkflowInput{
+				WorkflowName: input.WorkflowName,
+				PandoraToken: input.PipelineGetWorkflowToken,
+			})
+		} else if err != nil {
+			return
+		} else {
+			*ns = true
+			workflow.Name = input.WorkflowName
+			workflow.Status = base.WorkflowReady
+		}
+	}
+	return
+}
+
+//这边判断的逻辑为: create repo 然后
+//1. 如果有错误, 且错误为 workflow 状态不允许创建: 停止 workflow 停止 workflow 时出现错误直接返回
+//	停止 workflow 后, 重新 create repo, 并在接下来的逻辑中处理可能出现的错误
+//2. 第一次 create 或者重试 create 如果有错误, 且错误为 repo 已经存在: 获取 repo, merge schema, 更新 repo
+func (c *Pipeline) createOrUpdateRepo(input *InitOrUpdateWorkflowInput, workflow *GetWorkflowOutput, ns *bool) (err error) {
+	err = c.CreateRepo(&CreateRepoInput{
+		RepoName:     input.RepoName,
+		Region:       input.Region,
+		Schema:       input.Schema,
+		Options:      input.RepoOptions,
+		Workflow:     input.WorkflowName,
+		PandoraToken: input.PipelineCreateRepoToken,
+	})
+	if err != nil && reqerr.IsWorkflowStatError(err) {
+		// 如果当前 workflow 的状态不允许更新，则先等待停止 workflow 再更新
+		if subErr := c.changeWorkflowToStopped(workflow, true, WorkflowTokens{
+			StartWorkflowToken:     input.PipelineStartWorkflowToken,
+			StopWorkflowToken:      input.PipelineStopWorkflowToken,
+			GetWorkflowStatusToken: input.PipelineGetWorkflowStatusToken,
+		}, ns); subErr != nil {
+			return subErr
+		}
+		err = c.CreateRepo(&CreateRepoInput{
+			RepoName:     input.RepoName,
+			Region:       input.Region,
+			Schema:       input.Schema,
+			Options:      input.RepoOptions,
+			Workflow:     input.WorkflowName,
+			PandoraToken: input.PipelineCreateRepoToken,
+		})
+	}
+	if err != nil && reqerr.IsExistError(err) {
+		repo, subErr := c.GetRepo(&GetRepoInput{
+			RepoName:     input.RepoName,
+			PandoraToken: input.PipelineGetRepoToken,
+		})
+		if subErr != nil {
+			return subErr
+		}
+		schemas, needUpdate, subErr := mergePandoraSchemas(repo.Schema, input.Schema)
+		if subErr != nil {
+			return subErr
+		}
+		if needUpdate {
+			if err = c.updateRepo(&UpdateRepoInput{
+				RepoName:             input.RepoName,
+				Schema:               schemas,
+				Option:               input.Option,
+				workflow:             repo.Workflow,
+				RepoOptions:          input.RepoOptions,
+				PandoraToken:         input.PipelineUpdateRepoToken,
+				PipelineGetRepoToken: input.PipelineGetRepoToken,
+			}); err != nil {
+				return err
+			}
+		}
+	}
+	return
+}
+
 // 初始化/更新 workflow, 有以下几个功能
 // 1. 根据参数确保 workflow 存在(如果是打到 dag 的话)
 // 2. 根据参数创建导出到 logdb, tsdb, kodo 等
@@ -681,57 +797,13 @@ func (c *Pipeline) InitOrUpdateWorkflow(input *InitOrUpdateWorkflowInput) error 
 		var workflow *GetWorkflowOutput
 		if input.WorkflowName != "" {
 			// 如果导出到 dag, 确保 workflow 存在, 不存在时创建
-			workflow, err = c.GetWorkflow(&GetWorkflowInput{
-				WorkflowName: input.WorkflowName,
-				PandoraToken: input.PipelineGetWorkflowToken,
-			})
-			if err != nil && reqerr.IsNoSuchWorkflow(err) {
-				needStartWorkflow = true
-				if err = c.CreateWorkflow(&CreateWorkflowInput{
-					WorkflowName: input.WorkflowName,
-					Region:       input.Region,
-					PandoraToken: input.PipelineCreateWorkflowToken,
-				}); err != nil {
-					return err
-				}
-				workflow.Name = input.WorkflowName
-				workflow.Status = base.WorkflowReady
-			} else if err != nil {
+			if workflow, err = c.getOrCreateWorkflow(input, &needStartWorkflow); err != nil {
 				return err
 			}
 		}
 		// repo 不存在且传入了非空的 schema, 此时要新建 repo
-		if err := c.CreateRepo(&CreateRepoInput{
-			RepoName:     input.RepoName,
-			Region:       input.Region,
-			Schema:       input.Schema,
-			Options:      input.RepoOptions,
-			Workflow:     input.WorkflowName,
-			PandoraToken: input.PipelineCreateRepoToken,
-		}); err != nil {
-			if reqerr.IsWorkflowStatError(err) {
-				// 如果当前 workflow 的状态不允许更新，则先等待停止 workflow 再更新
-				if subErr := c.changeWorkflowToStopped(workflow, true, WorkflowTokens{
-					StartWorkflowToken:     input.PipelineStartWorkflowToken,
-					StopWorkflowToken:      input.PipelineStopWorkflowToken,
-					GetWorkflowStatusToken: input.PipelineGetWorkflowStatusToken,
-				}, &needStartWorkflow); subErr != nil {
-					return subErr
-				}
-				if subErr := c.CreateRepo(&CreateRepoInput{
-					RepoName:     input.RepoName,
-					Region:       input.Region,
-					Schema:       input.Schema,
-					Options:      input.RepoOptions,
-					Workflow:     input.WorkflowName,
-					PandoraToken: input.PipelineCreateRepoToken,
-				}); subErr != nil {
-					log.Error("Create Pipeline Repo error", subErr)
-					return subErr
-				}
-			} else {
-				return err
-			}
+		if err = c.createOrUpdateRepo(input, workflow, &needStartWorkflow); err != nil {
+			return err
 		}
 		// 创建、更新各种导出
 		if input.Option != nil && input.Option.ToKODO {
