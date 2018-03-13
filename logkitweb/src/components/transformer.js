@@ -5,7 +5,8 @@ import {
   Select,
   Icon,
   notification,
-  InputNumber
+  InputNumber,
+  Checkbox
 } from 'antd';
 import {getTransformOptions, getTransformUsages} from '../services/logkit';
 import config from '../store/config'
@@ -166,9 +167,11 @@ class Transformer extends Component {
   };
 
   renderFormItem = () => {
-    const {getFieldDecorator} = this.props.form;
+    const { getFieldDecorator, getFieldValue } = this.props.form;
     let result = []
+    let advancedResults = []
     this.state.currentItem.map((ele, index) => {
+      let formItem = null
       const labelDes = (
         <span>
           {ele.Description.slice(0, ele.Description.indexOf('('))}
@@ -182,39 +185,68 @@ class Transformer extends Component {
         if (ele.KeyName == 'name') {
           ele.Default = "pandora.sender." + moment().format("YYYYMMDDHHmmss");
         }
-        result.push(<FormItem key={index}
-                              {...formItemLayout}
-                              className=""
-                              label={labelDes}>
-          {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
-            initialValue: ele.Default,
-            rules: [{required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur'},
-              {pattern: ele.CheckRegex, message: '输入不符合规范'},
-            ]
-          })(ele.Type === 'string' ? (<Input placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值' } disabled={this.state.isReadonly}/>) :
-              (<InputNumber placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值' } disabled={this.state.isReadonly}  />)
-          )}
-        </FormItem>)
+        formItem = (
+          <FormItem key={index}
+            {...formItemLayout}
+            className=""
+            label={labelDes}>
+            {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
+              initialValue: ele.Default,
+              rules: [{ required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur' },
+              { pattern: ele.CheckRegex, message: '输入不符合规范' },
+              ]
+            })(ele.Type === 'string' ? (<Input placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值'} disabled={this.state.isReadonly} />) :
+              (<InputNumber placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值'} disabled={this.state.isReadonly} />)
+              )}
+          </FormItem>
+        )
+        if (ele.advance_depend && getFieldValue(`${this.state.currentOption}.${ele.advance_depend}`) === 'false') {
+          formItem = null
+        }
       } else {
-        result.push(<FormItem key={index}
-                              {...formItemLayout}
-                              className=""
-                              label={labelDes}>
-          {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
-            initialValue: ele.ChooseOptions[0]
-          })(
+        formItem = (
+          <FormItem key={index}
+            {...formItemLayout}
+            className=""
+            label={labelDes}>
+            {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
+              initialValue: ele.ChooseOptions[0]
+            })(
               <Select>
                 {this.renderChooseOption(ele.ChooseOptions)}
               </Select>
-          )}
-        </FormItem>)
+              )}
+          </FormItem>
+        )
       }
-
+      if (ele && ele.advance) {
+        if (!ele.advance_depend) {
+          advancedResults.push(formItem)
+        } else {
+          const advancedItem = this.getAdvancedConfig(ele)
+          if (advancedItem && advancedItem.advance) {
+            advancedResults.push(formItem)
+          } else {
+            result.push(formItem)
+          }
+        }
+      } else {
+        result.push(formItem)
+      }
     })
     return (
-        result
+      {
+        result,
+        advancedResults
+      }
     )
+  }
 
+  getAdvancedConfig = (ele) => {
+    if (ele.advance_depend) {
+      const dependItem = this.state.currentItem.find((item) => item.KeyName === ele.advance_depend)
+      return dependItem
+    }
   }
 
   handleChange = (option) => {
@@ -300,7 +332,8 @@ class Transformer extends Component {
   };
 
   render() {
-    const {getFieldDecorator} = this.props.form;
+    const {getFieldDecorator} = this.props.form
+    const renderResults = this.renderFormItem()
     return (
         <div >
           <Form className="slide-in text-color">
@@ -313,17 +346,31 @@ class Transformer extends Component {
                   </Select>)}
             </FormItem>
             <div className="form-item-underline"></div>
-            {this.renderFormItem()}
-              <div className="option-add">
-                  <FormItem {...optionFormItemLayout} label={<span style={{display:'none'}}></span>}>
-                      <div className="option-add-btn">
-                          <button onClick={this.addTag} type="button"
-                                  className="btn btn-primary btn-add"
-                                  style={{width: "140px", marginBottom: "20px", marginTop: "10px"}}>添加
-                          </button>
-                      </div>
-                  </FormItem>
-              </div>
+            {renderResults.result}
+            {
+              renderResults.advancedResults.length > 0
+              ? (
+                <div>
+                  <div className="form-item-advance-checkbox">
+                    <div className="form-item-advance-decorator-left"></div>
+                    <Checkbox onChange={(e) => { this.setState({ advanceChecked: e.target.checked }) }}>高级选项</Checkbox>
+                    <div className="form-item-advance-decorator-right"></div>
+                  </div>
+                  {this.state.advanceChecked ? renderResults.advancedResults : null}
+                </div>
+              )
+              : null
+            }
+            <div className="option-add">
+              <FormItem {...optionFormItemLayout} label={<span style={{display:'none'}}></span>}>
+                <div className="option-add-btn">
+                  <button onClick={this.addTag} type="button"
+                    className="btn btn-primary btn-add"
+                    style={{width: "140px", marginBottom: "20px", marginTop: "10px"}}>添加
+                  </button>
+                </div>
+              </FormItem>
+            </div>
             {this.renderTags()}
           </Form>
         </div>

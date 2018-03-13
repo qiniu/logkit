@@ -187,3 +187,22 @@ body {
   margin: 0 150px 30px 70px;
   border-bottom: 1px solid #e9e9e9;
 }
+
+.form-item-advance-checkbox {
+  margin: 0 150px 30px 70px;
+  text-align: left;
+}
+
+.form-item-advance-decorator-left {
+  border-bottom: 1px dashed #e9e9e9;
+  margin-right: 10px;
+  display: inline-block;
+  width: 40%;
+}
+
+.form-item-advance-decorator-right {
+  border-bottom: 1px dashed #e9e9e9;
+  margin-left: 10px;
+  display: inline-block;
+  width: 40%;
+}

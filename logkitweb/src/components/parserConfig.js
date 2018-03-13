@@ -4,6 +4,7 @@ import {
   Input,
   Select,
   Button,
+  Checkbox
 } from 'antd';
 import _ from "lodash";
 import config from '../store/config'
@@ -126,9 +127,11 @@ class Parser extends Component {
   }
 
   renderFormItem = () => {
-    const {getFieldDecorator} = this.props.form;
+    const { getFieldDecorator, getFieldValue } = this.props.form;
     let result = []
+    let advancedResults = []
     this.state.currentItem.map((ele, index) => {
+      let formItem = null
       const labelDes = (
         <span>
           {ele.Description.slice(0, ele.Description.indexOf('('))}
@@ -143,56 +146,86 @@ class Parser extends Component {
           ele.Default = "pandora.parser." + moment().format("YYYYMMDDHHmmss");
         }
         if (ele.KeyName === 'grok_custom_patterns') {
-          result.push(<FormItem key={index}
-                                {...formItemLayout}
-                                label={labelDes}>
-            {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
-              initialValue: !ele.DefaultNoUse ? ele.Default : '',
-              rules: [{required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur'},
-                {pattern: ele.CheckRegex, message: '输入不符合规范'},
-              ]
-            })(
-                <Input type="textarea" rows="6" placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值' }
-                       disabled={this.state.isReadonly}/>
-            )}
-          </FormItem>)
+          formItem = (
+            <FormItem key={index}
+              {...formItemLayout}
+              label={labelDes}>
+              {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
+                initialValue: !ele.DefaultNoUse ? ele.Default : '',
+                rules: [{ required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur' },
+                { pattern: ele.CheckRegex, message: '输入不符合规范' },
+                ]
+              })(
+                <Input type="textarea" rows="6" placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值'}
+                  disabled={this.state.isReadonly} />
+                )}
+            </FormItem>
+          )
         } else {
-          result.push(<FormItem key={index}
-                                {...formItemLayout}
-                                label={labelDes}>
+          formItem = (
+            <FormItem key={index}
+              {...formItemLayout}
+              label={labelDes}>
+              {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
+                initialValue: ele.Default,
+                rules: [{ required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur' },
+                { pattern: ele.CheckRegex, message: '输入不符合规范' },
+                ]
+              })(
+                <Input placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值'} disabled={this.state.isReadonly} />
+                )}
+            </FormItem>
+          )
+        }
+        if (ele.advance_depend && getFieldValue(`${this.state.currentOption}.${ele.advance_depend}`) === 'false') {
+          formItem = null
+        }
+      } else {
+        formItem = (
+          <FormItem key={index}
+            {...formItemLayout}
+            className=""
+            label={labelDes}>
             {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
-              initialValue: ele.Default,
-              rules: [{required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur'},
-                {pattern: ele.CheckRegex, message: '输入不符合规范'},
+              initialValue: ele.ChooseOptions[0],
+              rules: [{ required: true, message: '不能为空', trigger: 'blur' },
               ]
             })(
-                <Input placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值' } disabled={this.state.isReadonly}/>
-            )}
-          </FormItem>)
-        }
-
-      } else {
-        result.push(<FormItem key={index}
-                              {...formItemLayout}
-                              className=""
-                              label={labelDes}>
-          {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
-            initialValue: ele.ChooseOptions[0],
-            rules: [{required: true, message: '不能为空', trigger: 'blur'},
-            ]
-          })(
               <Select>
                 {this.renderChooseOption(ele.ChooseOptions)}
               </Select>
-          )}
-        </FormItem>)
+              )}
+          </FormItem>
+        )
       }
-
+      if (ele && ele.advance) {
+        if (!ele.advance_depend) {
+          advancedResults.push(formItem)
+        } else {
+          const advancedItem = this.getAdvancedConfig(ele)
+          if (advancedItem && advancedItem.advance) {
+            advancedResults.push(formItem)
+          } else {
+            result.push(formItem)
+          }
+        }
+      } else {
+        result.push(formItem)
+      }
     })
     return (
-        result
+      {
+        result,
+        advancedResults
+      }
     )
+  }
 
+  getAdvancedConfig = (ele) => {
+    if (ele.advance_depend) {
+      const dependItem = this.state.currentItem.find((item) => item.KeyName === ele.advance_depend)
+      return dependItem
+    }
   }
 
   handleChange = (option) => {
@@ -253,7 +286,8 @@ class Parser extends Component {
   }
 
   render() {
-    const {getFieldDecorator} = this.props.form;
+    const {getFieldDecorator} = this.props.form
+    const renderResults = this.renderFormItem()
     return (
         <div >
           <Form className="slide-in text-color">
@@ -266,7 +300,21 @@ class Parser extends Component {
                   </Select>)}
             </FormItem>
             <div className="form-item-underline"></div>
-            {this.renderFormItem()}
+            {renderResults.result}
+            {
+              renderResults.advancedResults.length > 0
+              ? (
+                <div>
+                  <div className="form-item-advance-checkbox">
+                    <div className="form-item-advance-decorator-left"></div>
+                    <Checkbox onChange={(e) => { this.setState({ advanceChecked: e.target.checked }) }}>高级选项</Checkbox>
+                    <div className="form-item-advance-decorator-right"></div>
+                  </div>
+                  {this.state.advanceChecked ? renderResults.advancedResults : null}
+                </div>
+              )
+              : null
+            }
             <FormItem {...optionFormItemLayout} >
               <Button type="primary" onClick={this.parseSampleData}>解析样例数据</Button>
             </FormItem>
