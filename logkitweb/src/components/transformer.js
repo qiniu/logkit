@@ -169,6 +169,15 @@ class Transformer extends Component {
     const {getFieldDecorator} = this.props.form;
     let result = []
     this.state.currentItem.map((ele, index) => {
+      const labelDes = (
+        <span>
+          {ele.Description.slice(0, ele.Description.indexOf('('))}
+          <br />
+          <span style={{ color: 'rgba(0,0,0,.43)', float: 'right' }}>
+            {ele.Description.slice(ele.Description.indexOf('('), ele.Description.length)}
+          </span>
+        </span>
+      )
       if (ele.ChooseOnly == false) {
         if (ele.KeyName == 'name') {
           ele.Default = "pandora.sender." + moment().format("YYYYMMDDHHmmss");
@@ -176,11 +185,7 @@ class Transformer extends Component {
         result.push(<FormItem key={index}
                               {...formItemLayout}
                               className=""
-                              label={(
-                                  <span className={ele.DefaultNoUse ? 'warningTip' : '' }>
-                  {ele.Description}
-                </span>
-                              )}>
+                              label={labelDes}>
           {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
             initialValue: ele.Default,
             rules: [{required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur'},
@@ -194,7 +199,7 @@ class Transformer extends Component {
         result.push(<FormItem key={index}
                               {...formItemLayout}
                               className=""
-                              label={ele.Description}>
+                              label={labelDes}>
           {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
             initialValue: ele.ChooseOptions[0]
           })(
@@ -307,6 +312,7 @@ class Transformer extends Component {
                     {this.renderSelectOptions()}
                   </Select>)}
             </FormItem>
+            <div className="form-item-underline"></div>
             {this.renderFormItem()}
               <div className="option-add">
                   <FormItem {...optionFormItemLayout} label={<span style={{display:'none'}}></span>}>

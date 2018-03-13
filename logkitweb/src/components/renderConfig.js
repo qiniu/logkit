@@ -183,7 +183,8 @@ class renderConfig extends Component {
                       <Input onChange={this.handleNameChange} placeholder={'收集器(runner)名称'}/>
                   )}
                 </FormItem>
-                <FormItem {...formItemLayout} label="最长发送间隔(秒)">
+              <FormItem {...formItemLayout} 
+                label={(<span>最长发送间隔<br/><span style={{ color: 'rgba(0,0,0,.43)', float: 'right' }}>(秒)</span></span>)}>
                   {getFieldDecorator('batch_interval', {
                     rules: [{required: true, message: '发送间隔不能为空'},
                       {pattern: /^[0-9]*$/, message: '输入不符合规范,只能为整数'}]
@@ -191,7 +192,8 @@ class renderConfig extends Component {
                       <InputNumber onChange={this.handleIntervalChange} placeholder={'发送间隔单位(秒)'}/>
                   )}
                 </FormItem>
-                <FormItem {...formItemLayout} label="系统信息收集间隔(metric配置专用, 秒)">
+              <FormItem {...formItemLayout} 
+                label={<span>系统信息收集间隔<br /><span style={{ color: 'rgba(0,0,0,.43)', float: 'right' }}>(metric配置专用, 秒)</span></span>}>
                   {getFieldDecorator('collect_interval', {
                     rules: [{required: true, message: '收集间隔不能为空'},
                       {pattern: /^[0-9]*$/, message: '输入不符合规范,只能为整数'}]

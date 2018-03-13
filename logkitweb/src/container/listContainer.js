@@ -192,7 +192,7 @@ class List extends Component {
               <Breadcrumb style={{margin: '16px 0'}}>
                 <Breadcrumb.Item>集群管理列表</Breadcrumb.Item>
               </Breadcrumb>
-              <div style={{padding: 24, background: '#fff', minHeight: 360}}>
+              <div style={{padding: 24, background: '#fff', minHeight: 800}}>
                 <div className="content">
                   <TagTable handleAddRunner={this.addLogRunner.bind(this)}
                             handleAddMetricRunner={this.addMetricRunner.bind(this)}
@@ -206,7 +206,7 @@ class List extends Component {
               <Breadcrumb style={{margin: '16px 0'}}>
                 <Breadcrumb.Item>机器管理列表</Breadcrumb.Item>
               </Breadcrumb>
-              <div style={{padding: 24, background: '#fff', minHeight: 360}}>
+              <div style={{padding: 24, background: '#fff', minHeight: 800}}>
                 <div className="content">
                   <MachineTable handleAddRunner={this.addLogRunner.bind(this)}
                                 handleAddMetricRunner={this.addMetricRunner.bind(this)}/>
@@ -217,7 +217,7 @@ class List extends Component {
               <Breadcrumb style={{margin: '16px 0'}}>
                 <Breadcrumb.Item>收集器(runner)管理列表</Breadcrumb.Item>
               </Breadcrumb>
-              <div style={{padding: 24, background: '#fff', minHeight: 360}}>
+              <div style={{padding: 24, background: '#fff', minHeight: 800}}>
                 <div className="content">
                   <RunnerTable isCluster={this.state.isCluster} handleAddRunner={this.addLogRunner.bind(this)}
                                handleAddMetricRunner={this.addMetricRunner.bind(this)}
@@ -232,7 +232,7 @@ class List extends Component {
               <Breadcrumb style={{margin: '16px 0'}}>
                 <Breadcrumb.Item>创建日志收集器</Breadcrumb.Item>
               </Breadcrumb>
-              <div style={{padding: 24, background: '#fff', minHeight: 360}}>
+              <div style={{padding: 24, background: '#fff', minHeight: 800}}>
                 <div className="content">
                   <CreateLogRunner currentTagName={this.state.currentTagName} currentMachineUrl={this.state.currentMachineUrl} handleTurnToRunner={this.turnToRunnerTab.bind(this)}/>
                 </div>
@@ -243,7 +243,7 @@ class List extends Component {
               <Breadcrumb style={{margin: '16px 0'}}>
                 <Breadcrumb.Item>创建系统信息收集器</Breadcrumb.Item>
               </Breadcrumb>
-              <div style={{padding: 24, background: '#fff', minHeight: 360}}>
+              <div style={{padding: 24, background: '#fff', minHeight: 800}}>
                 <div className="content">
                   <CreateMetricRunner currentTagName={this.state.currentTagName} currentMachineUrl={this.state.currentMachineUrl} handleTurnToRunner={this.turnToRunnerTab.bind(this)}/>
                 </div>

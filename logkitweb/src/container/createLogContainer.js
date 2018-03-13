@@ -245,8 +245,6 @@ class CreateLogRunner extends Component {
             {steps.map(item => <Step key={item.title} title={item.title}/>)}
           </Steps>
           <div className="steps-content">
-            <div><p className={this.state.current <= 3 ? 'show-div info' : 'hide-div'}>注意：黄色字体选框需根据实际情况修改，其他可作为默认值</p>
-            </div>
             <div className={this.state.current === 0 ? 'show-div' : 'hide-div'}>
               <Source ref="checkSourceData"></Source>
             </div>

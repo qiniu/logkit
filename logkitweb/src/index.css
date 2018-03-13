@@ -41,9 +41,7 @@ body {
 }
 
 .steps-content {
-  border: 1px dashed #e9e9e9;
   border-radius: 0px 0px 6px 6px;
-  background-color: #fafafa;
   text-align: center;
   height: 90%;
   overflow: scroll;
@@ -103,11 +101,11 @@ body {
 }
 
 .ant-steps {
-  margin-bottom: 20px;
+  margin-bottom: 40px;
 }
 
 .warningTip {
-  color: #ffbf00;
+  /* color: #ffbf00; */
 }
 
 .ant-form-item-label label {
@@ -130,7 +128,6 @@ body {
   margin-left: 20px;
 }
 .dynamic-delete-button {
-  marginTop: 30px;
   margin-left: 20px;
   cursor: pointer;
   position: relative;
@@ -174,4 +171,19 @@ body {
 .ant-form-item-label{
     text-overflow:initial;
     white-space: normal;
+    margin-right: 25px;
+    line-height: 1.4;
+}
+
+.ant-form-item-label label:after {
+  content: ''
+}
+
+.ant-form-item {
+  margin-bottom: 30px;
+}
+
+.form-item-underline {
+  margin: 0 150px 30px 70px;
+  border-bottom: 1px solid #e9e9e9;
 }
