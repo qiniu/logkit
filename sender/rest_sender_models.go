@@ -128,7 +128,7 @@ var ModeKeyOptions = map[string][]Option{
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  false,
-			Description:   "是否在发送数据时自动添加发送时间(logkit_send_time)",
+			Description:   "添加系统时间(logkit_send_time)",
 		},
 		{
 			KeyName:       KeyPandoraExtraInfo,
