@@ -164,7 +164,7 @@ class Sender extends Component {
             className=""
             label={labelDes}>
             {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
-              initialValue: ele.ChooseOptions[0],
+              initialValue: ele.Default || ele.ChooseOptions[0],
               rules: [{ required: true, message: '不能为空', trigger: 'blur' },
               ]
             })(
