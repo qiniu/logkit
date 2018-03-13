@@ -121,15 +121,14 @@ body {
 }
 
 .fields.key {
-  width: 250px;
+  width: 220px;
 }
 
 .fields.value {
-  width: 250px;
+  width: 220px;
   margin-left: 20px;
 }
 .dynamic-delete-button {
-  margin-left: 20px;
   cursor: pointer;
   position: relative;
   top: 4px;
@@ -166,7 +165,16 @@ body {
 }
 
 .option-add .option-add-btn{
-  text-align: right;
+  text-align: left;
+}
+
+.option-add-tag-btn {
+  width: 80px;
+  margin-bottom: 20px;
+  margin-top: 10px;
+  border-color: #bfd8f7;
+  color: #108ee9;
+  background-color: #f1f7fe;
 }
 
 .ant-form-item-label{
@@ -185,12 +193,12 @@ body {
 }
 
 .form-item-underline {
-  margin: 0 150px 30px 70px;
+  margin: 0 15vw 30px 10vw;
   border-bottom: 1px solid #e9e9e9;
 }
 
 .form-item-advance-checkbox {
-  margin: 0 150px 30px 70px;
+  margin: 0 15vw 30px 10vw;
   text-align: left;
 }
 
@@ -198,12 +206,17 @@ body {
   border-bottom: 1px dashed #e9e9e9;
   margin-right: 10px;
   display: inline-block;
-  width: 40%;
+  width: 18vw;
 }
 
 .form-item-advance-decorator-right {
   border-bottom: 1px dashed #e9e9e9;
   margin-left: 10px;
   display: inline-block;
-  width: 40%;
+  width: 18vw;
+}
+
+.render-tag-container {
+  border: 1px solid #e9e9e9;
+  padding-top: 20px;
 }

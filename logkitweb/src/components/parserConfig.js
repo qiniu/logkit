@@ -315,8 +315,8 @@ class Parser extends Component {
               )
               : null
             }
-            <FormItem {...optionFormItemLayout} >
-              <Button type="primary" onClick={this.parseSampleData}>解析样例数据</Button>
+            <FormItem {...optionFormItemLayout} style={{position: 'absolute', right: 320}}>
+              <Button type="primary" onClick={this.parseSampleData} className="option-add-tag-btn" style={{width: 120}}>解析样例数据</Button>
             </FormItem>
             <FormItem
                 label={'输入样例日志'}
