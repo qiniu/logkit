@@ -152,11 +152,11 @@ class Parser extends Component {
               label={labelDes}>
               {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
                 initialValue: !ele.DefaultNoUse ? ele.Default : '',
-                rules: [{ required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur' },
+                rules: [{ required: ele.required, message: '不能为空', trigger: 'blur' },
                 { pattern: ele.CheckRegex, message: '输入不符合规范' },
                 ]
               })(
-                <Input type="textarea" rows="6" placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值'}
+                <Input type="textarea" rows="6" placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'}
                   disabled={this.state.isReadonly} />
                 )}
             </FormItem>
@@ -168,11 +168,11 @@ class Parser extends Component {
               label={labelDes}>
               {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
                 initialValue: ele.Default,
-                rules: [{ required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur' },
+                rules: [{ required: ele.required, message: '不能为空', trigger: 'blur' },
                 { pattern: ele.CheckRegex, message: '输入不符合规范' },
                 ]
               })(
-                <Input placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值'} disabled={this.state.isReadonly} />
+                <Input placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'} disabled={this.state.isReadonly} />
                 )}
             </FormItem>
           )
@@ -299,21 +299,19 @@ class Parser extends Component {
                     {this.renderSelectOptions()}
                   </Select>)}
             </FormItem>
-            <div className="form-item-underline"></div>
+            <div className="ant-divider ant-divider-horizontal"></div>
             {renderResults.result}
             {
               renderResults.advancedResults.length > 0
-              ? (
-                <div>
-                  <div className="form-item-advance-checkbox">
-                    <div className="form-item-advance-decorator-left"></div>
-                    <Checkbox onChange={(e) => { this.setState({ advanceChecked: e.target.checked }) }}>高级选项</Checkbox>
-                    <div className="form-item-advance-decorator-right"></div>
+                ? (
+                  <div>
+                    <div className="ant-divider ant-divider-horizontal ant-divider-with-text">
+                      <Checkbox onChange={(e) => { this.setState({ advanceChecked: e.target.checked }) }} className="ant-divider-inner-text">高级选项</Checkbox>
+                    </div>
+                    {this.state.advanceChecked ? renderResults.advancedResults : null}
                   </div>
-                  {this.state.advanceChecked ? renderResults.advancedResults : null}
-                </div>
-              )
-              : null
+                )
+                : null
             }
             <FormItem {...optionFormItemLayout} style={{position: 'absolute', right: 320}}>
               <Button type="primary" onClick={this.parseSampleData} className="option-add-tag-btn" style={{width: 120}}>解析样例数据</Button>
