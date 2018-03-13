@@ -25,10 +25,13 @@ const (
 	HttpData       = "http_data"
 	HttpTimeCost   = "http_time_cost"
 	HttpTarget     = "http_target"
-	HttpOrder      = "http_order"
 
 	HttpErrState = "http_err_state"
 	HttpErrMsg   = "http_err_msg"
+
+	HttpTimeCostTotal = "http_time_cost_total"
+	HttpErrStateTotal = "http_err_state_total"
+	HttpErrMsgTotal   = "http_err_msg_total"
 
 	// Config 中的字段
 	ConfigHttpDatas = "http_datas"
@@ -45,7 +48,6 @@ var KeyHttpUsages = []KeyValue{
 	{HttpData, "http响应内容"},
 	{HttpTimeCost, "http响应用时"},
 	{HttpTarget, "http请求地址"},
-	{HttpOrder, "http请求顺序"},
 	{HttpErrState, "http响应状态"},
 	{HttpErrMsg, "http响应错误信息"},
 }
@@ -70,7 +72,7 @@ func (_ *HttpStats) Usages() string {
 }
 
 func (_ *HttpStats) Tags() []string {
-	return []string{HttpStatusCode, HttpRespHead, HttpData, HttpTimeCost, HttpTarget, HttpErrState, HttpErrMsg, HttpOrder}
+	return []string{HttpStatusCode, HttpRespHead, HttpData, HttpTimeCost, HttpTarget, HttpErrState, HttpErrMsg}
 }
 
 func (_ *HttpStats) Config() map[string]interface{} {
@@ -79,7 +81,7 @@ func (_ *HttpStats) Config() map[string]interface{} {
 		option := Option{
 			KeyName:      val.Key,
 			ChooseOnly:   false,
-			Default:      `[{"method":"GET", "url":"https://www.qiniu.com", "expect_code":200}]`,
+			Default:      `[{"method":"GET", "url":"https://www.qiniu.com", "expect_code":200, "expect_data":"七牛云"},{"method":"GET", "url":"https://www.qiniu.com/products/pandora", "expect_code":200, "expect_data":"七牛云"}]`,
 			DefaultNoUse: true,
 			Description:  val.Value,
 			Type:         metric.ConsifTypeString,
@@ -99,7 +101,7 @@ type HttpDataReq struct {
 	Header     map[string]string `json:"header"`
 	Body       string            `json:"body"`
 	ExpectCode int               `json:"expect_code"`
-	ExpectData []byte            `json:"expect_data"`
+	ExpectData string            `json:"expect_data"`
 }
 
 func (s *HttpStats) Collect() (datas []map[string]interface{}, err error) {
@@ -112,103 +114,130 @@ func (s *HttpStats) Collect() (datas []map[string]interface{}, err error) {
 		httpdatas = s.HttpDatas
 	}
 
-	steps := make(map[string]interface{})
-	stepsCreateTime := time.Now()
+	data := make(map[string]interface{})
+	totalCreateTime := time.Now()
 	for idx, httpData := range httpDataArr {
-		var step = make(map[string]interface{})
 		request, err := http.NewRequest(httpData.Method, httpData.Url, bytes.NewBuffer([]byte(httpData.Body)))
 		if err != nil {
 			return nil, fmt.Errorf("erro new http request: %s", err)
 		}
-		//给一个key设定为响应的value.
+		//给一个key设定为响应的value
 		for k, v := range httpData.Header {
 			request.Header.Set(k, v) //必须设定该参数,POST参数才能正常提交
 		}
 
 		createTime := time.Now()
-		http.DefaultClient.Transport = &http.Transport{
-			Dial: (&net.Dialer{
-				Timeout:   DefaultTimeOut,
-				Deadline:  time.Now().Add(DefaultTimeOut),
-				KeepAlive: DefaultTimeOut,
-			}).Dial,
+		client := &http.Client{
+			Transport: &http.Transport{
+				Dial: (&net.Dialer{
+					Timeout:   DefaultTimeOut,
+					Deadline:  time.Now().Add(DefaultTimeOut),
+					KeepAlive: DefaultTimeOut,
+				}).Dial,
+			},
 		}
-		resp, err := http.DefaultClient.Do(request) //发送请求
+		resp, err := client.Do(request) //发送请求
 		completeTime := time.Now()
 		if err != nil {
-			step, _ = setStep(resp, httpData, err, createTime, completeTime, idx+1)
-			steps[HttpErrState] = step[HttpErrState]
-			steps[HttpErrMsg] = step[HttpErrMsg]
-			steps[HttpTimeCost] = completeTime.Sub(stepsCreateTime).Nanoseconds() / int64(time.Millisecond)
+			data, _, _ = setData(data, resp, httpData, err, createTime, completeTime, idx+1)
+			data[HttpErrStateTotal] = StateFail
+			data[HttpErrMsgTotal] = data[HttpErrMsg+"_"+strconv.Itoa(idx+1)]
+			data[HttpTimeCostTotal] =
+				completeTime.Sub(totalCreateTime).Nanoseconds() / int64(time.Millisecond)
 			break
 		}
 
-		step, err = setStep(resp, httpData, err, createTime, completeTime, idx+1)
+		failReason := ""
+		data, failReason, err = setData(data, resp, httpData, err, createTime, completeTime, idx+1)
 		if err != nil {
 			return nil, fmt.Errorf("error getting response body: %s", err)
 		}
-		steps[strconv.Itoa(idx+1)] = step
+		if data[HttpErrState+"_"+strconv.Itoa(idx+1)] == StateFail {
+			data[HttpErrStateTotal] = StateFail
+			data[HttpErrMsgTotal] = failReason
+			data[HttpTimeCostTotal] =
+				completeTime.Sub(totalCreateTime).Nanoseconds() / int64(time.Millisecond)
+			break
+		}
 	}
-	_, ok := steps[HttpErrState]
+	_, ok := data[HttpErrStateTotal]
 	if !ok {
-		steps[HttpErrState] = StateSuccess
-		steps[HttpErrMsg] = ""
-		steps[HttpTimeCost] = time.Now().Sub(stepsCreateTime).Nanoseconds() / int64(time.Millisecond)
+		data[HttpErrStateTotal] = StateSuccess
+		data[HttpErrMsgTotal] = ""
+		data[HttpTimeCostTotal] =
+			time.Now().Sub(totalCreateTime).Nanoseconds() / int64(time.Millisecond)
 	}
-	datas = append(datas, steps)
+	datas = append(datas, data)
 
 	return
 }
 
-func setStep(resp *http.Response, httpData HttpDataReq, err error,
-	createTime, completeTime time.Time, order int) (map[string]interface{}, error) {
+func setData(data map[string]interface{}, resp *http.Response, httpData HttpDataReq, err error,
+	createTime, completeTime time.Time, idx int) (map[string]interface{}, string, error) {
 	if err != nil {
 		resp = &http.Response{
 			StatusCode: -1,
 			Header:     nil,
 		}
-		return setStepValue(resp, httpData, createTime, completeTime, err.Error(), order), nil
+		data, failReason := setDataValue(data, resp, httpData, createTime, completeTime, err.Error(), idx)
+		return data, failReason, nil
 	}
 
 	defer resp.Body.Close()
 	content, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return setStepValue(resp, httpData, createTime, completeTime, string(content), order), nil
+	data, failReason := setDataValue(data, resp, httpData, createTime, completeTime, string(content), idx)
+	return data, failReason, nil
 }
 
-func setStepValue(resp *http.Response, httpData HttpDataReq,
-	createTime, completeTime time.Time, content string, order int) map[string]interface{} {
-	step := map[string]interface{}{
-		HttpData:     content,
-		HttpTimeCost: completeTime.Sub(createTime).Nanoseconds() / int64(time.Millisecond),
-		HttpTarget:   httpData.Url,
-		HttpOrder:    order,
-	}
+func setDataValue(data map[string]interface{}, resp *http.Response, httpData HttpDataReq,
+	createTime, completeTime time.Time, content string, idx int) (map[string]interface{}, string) {
+	failReason := ""
+	// 加上_idx后缀
+	httpDataIdx, httpTimeCostIdx, httpTargetIdx, httpStatusCodeIdx,
+		httpRespHeadIdx, httpErrStateIdx, httpErrMsgIdx := joinIdx(strconv.Itoa(idx))
+	data[httpDataIdx] = content
+	data[httpTimeCostIdx] = completeTime.Sub(createTime).Nanoseconds() / int64(time.Millisecond)
+	data[httpTargetIdx] = httpData.Url
 	if resp != nil {
-		step[HttpStatusCode] = resp.StatusCode
-		step[HttpRespHead] = resp.Header
-		if !compareExpectResult(httpData.ExpectCode, resp.StatusCode,
-			string(httpData.ExpectData), content) {
-			step[HttpErrState] = StateFail
-			step[HttpErrMsg] = content
+		data[httpStatusCodeIdx] = resp.StatusCode
+		data[httpRespHeadIdx] = resp.Header
+		if err, ok := compareExpectResult(httpData.ExpectCode, resp.StatusCode,
+			httpData.ExpectData, content); !ok {
+			data[httpErrStateIdx] = StateFail
+			data[httpErrMsgIdx] = content
+			failReason = err.Error()
 		} else {
-			step[HttpErrState] = StateSuccess
-			step[HttpErrMsg] = ""
+			data[httpErrStateIdx] = StateSuccess
+			data[httpErrMsgIdx] = ""
 		}
 	}
-	return step
+	return data, failReason
 }
 
-func compareExpectResult(expectCode, realCode int, expectData, realData string) bool {
+func compareExpectResult(expectCode, realCode int, expectData, realData string) (error, bool) {
 	if expectCode != realCode {
-		return false
+		return fmt.Errorf("return status code is: %s, expect: %s", realCode, expectCode), false
 	}
 	if expectData != "" && !strings.Contains(realData, expectData) {
-		return false
+		return fmt.Errorf("don't contain: %s", expectData), false
 	}
-	return true
+	return nil, true
+}
+
+func joinIdx(idx string) (string, string, string, string, string, string, string) {
+	httpDataIdx := HttpData + "_" + idx
+	httpTimeCostIdx := HttpTimeCost + "_" + idx
+	httpTargetIdx := HttpTarget + "_" + idx
+	httpStatusCodeIdx := HttpStatusCode + "_" + idx
+	httpRespHeadIdx := HttpRespHead + "_" + idx
+	httpErrStateIdx := HttpErrState + "_" + idx
+	httpErrMsgIdx := HttpErrMsg + "_" + idx
+
+	return httpDataIdx, httpTimeCostIdx, httpTargetIdx,
+		httpStatusCodeIdx, httpRespHeadIdx, httpErrStateIdx, httpErrMsgIdx
 }
 
 func init() {

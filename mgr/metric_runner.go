@@ -123,8 +123,8 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 								}
 								length := len(httpDataArr)
 								for i := 0; i < length; i++ {
-									attr.Key = strconv.Itoa(i+1) + "." + attr.Key
-									DisTrans, err := createDiscardTransformer(attr.Key)
+									key := attr.Key + "_" + strconv.Itoa(i+1)
+									DisTrans, err := createDiscardTransformer(key)
 									if err != nil {
 										return nil, fmt.Errorf("metric %v key %v, transform add failed, %v", tp, attr.Key, err)
 									}
