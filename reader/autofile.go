@@ -2,10 +2,13 @@ package reader
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 )
 
@@ -45,8 +48,6 @@ func NewFileAutoReader(conf conf.MapConf, meta *Meta, isFromWeb bool, bufSize in
 }
 
 func matchMode(logpath string) (path, mode string, err error) {
-	// for example: The path is "/usr/logkit/" or "F:\\user\\logkit\\" after==""
-	// for example: The path is "/usr/logkit" or "F:\\user\\logkit"after==logkit
 	_, after := filepath.Split(logpath)
 	if after == "" {
 		logpath = filepath.Dir(logpath)
@@ -64,10 +65,28 @@ func matchMode(logpath string) (path, mode string, err error) {
 		return
 	}
 	if fileInfo.IsDir() == true {
-		mode = ModeTailx
-		path = filepath.Join(path, "*")
+		if shoudUseModeDir(path) {
+			mode = ModeDir
+		} else {
+			mode = ModeTailx
+			path = filepath.Join(path, "*")
+		}
 		return
 	}
 	mode = ModeFile
 	return
+}
+
+func shoudUseModeDir(logpath string) bool {
+	files, err := ioutil.ReadDir(logpath)
+	if err != nil {
+		log.Warn("read dir %v error %v", logpath, err)
+		return true
+	}
+	for _, f := range files {
+		if f.ModTime().Add(24 * time.Hour).Before(time.Now()) {
+			return true
+		}
+	}
+	return false
 }

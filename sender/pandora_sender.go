@@ -209,7 +209,7 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 
 	enableTsdb, _ := conf.GetBoolOr(KeyPandoraEnableTSDB, false)
 	tsdbReponame, _ := conf.GetStringOr(KeyPandoraTSDBName, repoName)
-	tsdbSeriesName, _ := conf.GetStringOr(KeyPandoraTSDBName, repoName)
+	tsdbSeriesName, _ := conf.GetStringOr(KeyPandoraTSDBSeriesName, tsdbReponame)
 	tsdbHost, _ := conf.GetStringOr(KeyPandoraTSDBHost, "")
 	tsdbTimestamp, _ := conf.GetStringOr(KeyPandoraTSDBTimeStamp, "")
 	seriesTags, _ := conf.GetStringListOr(KeyPandoraTSDBSeriesTags, []string{})

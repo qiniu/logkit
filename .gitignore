@@ -85,3 +85,4 @@ npm-debug.log*
 ./logkitweb/yarn-debug.log*
 ./logkitweb/yarn-error.log*
 logkit.log-*
+logkitweb/package-lock.json

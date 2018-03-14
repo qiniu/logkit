@@ -208,7 +208,6 @@ var ModeKeyOptions = map[string][]Option{
 			Default:       "",
 			DefaultNoUse:  false,
 			Description:   "指定日志分析仓库名称(pandora_logdb_name)",
-			Advance:       true,
 			AdvanceDepend: KeyPandoraEnableLogDB,
 		},
 		{
@@ -234,7 +233,6 @@ var ModeKeyOptions = map[string][]Option{
 			Default:       "",
 			DefaultNoUse:  false,
 			Description:   "指定时序数据库仓库名称(pandora_tsdb_name)",
-			Advance:       true,
 			AdvanceDepend: KeyPandoraEnableTSDB,
 		},
 		{
@@ -243,7 +241,6 @@ var ModeKeyOptions = map[string][]Option{
 			Default:       "",
 			DefaultNoUse:  false,
 			Description:   "指定时序数据库序列名称(pandora_tsdb_series_name)",
-			Advance:       true,
 			AdvanceDepend: KeyPandoraEnableTSDB,
 		},
 		{
@@ -252,7 +249,6 @@ var ModeKeyOptions = map[string][]Option{
 			Default:       "",
 			DefaultNoUse:  false,
 			Description:   "指定时序数据库标签(pandora_tsdb_series_tags)",
-			Advance:       true,
 			AdvanceDepend: KeyPandoraEnableTSDB,
 		},
 		{
