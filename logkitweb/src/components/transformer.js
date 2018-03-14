@@ -49,7 +49,8 @@ class Transformer extends Component {
       currentItem: [],
       tags: [],
       transforms: {},
-      transformerTypes: []
+      transformerTypes: [],
+      advanceChecked: false
     }
 
     this.schemaUUID = 0;
@@ -362,7 +363,9 @@ class Transformer extends Component {
                     <div className="ant-divider ant-divider-horizontal ant-divider-with-text">
                       <Checkbox onChange={(e) => { this.setState({ advanceChecked: e.target.checked }) }} className="ant-divider-inner-text">高级选项</Checkbox>
                     </div>
-                    {this.state.advanceChecked ? renderResults.advancedResults : null}
+                    <div className={this.state.advanceChecked ? 'show-div' : 'hide-div'}>
+                      {renderResults.advancedResults}
+                    </div>
                   </div>
                 )
                 : null
