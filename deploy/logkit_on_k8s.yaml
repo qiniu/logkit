@@ -64,7 +64,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
       - name: logkit
-        image: wonderflow/logkit:v1.4.4
+        image: wonderflow/logkit:v1.4.5
         env:
         - name: QINIU_ACCESS_KEY
           value: change_me_to_your_qiniu_access_key

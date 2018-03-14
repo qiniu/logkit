@@ -164,8 +164,18 @@ logkit.conf是logkit工具基础配置文件，主要用于指定logkit运行时
 
 ![添加runner](https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logkitnewconfig4.png)
 
+## 升级
 
-## 前端代码变动
+### 后端
+
+方法一. 下载并解压logkit包后，将已经在运行的logkit二进制包替换为解压后的logkit二进制包，重启logkit。
+方法二. 停止logkit，执行命令 `logkit -upgrade`，启动logkit。
+
+### 前端
+
+停止运行 logkit，下载并解压 logkit 包后，将 logkit 指定的 public 文件夹替换为解压后的 logkit 二进制包中的 public 文件夹，重新启动 logkit。
+
+## 贡献前端代码
 
 参见前端相关README文件：[logkitweb/README.md](https://github.com/qiniu/logkit/blob/develop/logkitweb/README.md)
 
