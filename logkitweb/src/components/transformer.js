@@ -189,23 +189,24 @@ class Transformer extends Component {
         if (ele.KeyName == 'name') {
           ele.Default = "pandora.sender." + moment().format("YYYYMMDDHHmmss");
         }
-        formItem = (
-          <FormItem key={index}
-            {...formItemLayout}
-            className=""
-            label={labelDes}>
-            {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
-              initialValue: ele.Default,
-              rules: [{ required: ele.required, message: '不能为空', trigger: 'blur' },
-              { pattern: ele.CheckRegex, message: '输入不符合规范' },
-              ]
-            })(ele.Type === 'string' ? (<Input placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'} disabled={this.state.isReadonly} />) :
-              (<InputNumber placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'} disabled={this.state.isReadonly} />)
-              )}
-          </FormItem>
-        )
         if (ele.advance_depend && getFieldValue(`${this.state.currentOption}.${ele.advance_depend}`) === 'false') {
           formItem = null
+        } else {
+          formItem = (
+            <FormItem key={index}
+              {...formItemLayout}
+              className=""
+              label={labelDes}>
+              {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
+                initialValue: ele.Default,
+                rules: [{ required: ele.required, message: '不能为空', trigger: 'blur' },
+                { pattern: ele.CheckRegex, message: '输入不符合规范' },
+                ]
+              })(ele.Type === 'string' ? (<Input placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'} disabled={this.state.isReadonly} />) :
+                (<InputNumber placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'} disabled={this.state.isReadonly} />)
+                )}
+            </FormItem>
+          )
         }
       } else {
         formItem = (
@@ -231,7 +232,9 @@ class Transformer extends Component {
           if (advancedItem && advancedItem.advance) {
             advancedResults.push(formItem)
           } else {
-            result.push(formItem)
+            if (this.state.advanceChecked) {
+              result.push(formItem)
+            }
           }
         }
       } else {

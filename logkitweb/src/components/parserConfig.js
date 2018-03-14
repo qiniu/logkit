@@ -145,40 +145,41 @@ class Parser extends Component {
         if (ele.KeyName == 'name' && window.isCopy != true) {
           ele.Default = "pandora.parser." + moment().format("YYYYMMDDHHmmss");
         }
-        if (ele.KeyName === 'grok_custom_patterns') {
-          formItem = (
-            <FormItem key={index}
-              {...formItemLayout}
-              label={labelDes}>
-              {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
-                initialValue: !ele.DefaultNoUse ? ele.Default : '',
-                rules: [{ required: ele.required, message: '不能为空', trigger: 'blur' },
-                { pattern: ele.CheckRegex, message: '输入不符合规范' },
-                ]
-              })(
-                <Input type="textarea" rows="6" placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'}
-                  disabled={this.state.isReadonly} />
-                )}
-            </FormItem>
-          )
-        } else {
-          formItem = (
-            <FormItem key={index}
-              {...formItemLayout}
-              label={labelDes}>
-              {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
-                initialValue: ele.Default,
-                rules: [{ required: ele.required, message: '不能为空', trigger: 'blur' },
-                { pattern: ele.CheckRegex, message: '输入不符合规范' },
-                ]
-              })(
-                <Input placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'} disabled={this.state.isReadonly} />
-                )}
-            </FormItem>
-          )
-        }
         if (ele.advance_depend && getFieldValue(`${this.state.currentOption}.${ele.advance_depend}`) === 'false') {
           formItem = null
+        } else {
+          if (ele.KeyName === 'grok_custom_patterns') {
+            formItem = (
+              <FormItem key={index}
+                {...formItemLayout}
+                label={labelDes}>
+                {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
+                  initialValue: !ele.DefaultNoUse ? ele.Default : '',
+                  rules: [{ required: ele.required, message: '不能为空', trigger: 'blur' },
+                  { pattern: ele.CheckRegex, message: '输入不符合规范' },
+                  ]
+                })(
+                  <Input type="textarea" rows="6" placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'}
+                    disabled={this.state.isReadonly} />
+                  )}
+              </FormItem>
+            )
+          } else {
+            formItem = (
+              <FormItem key={index}
+                {...formItemLayout}
+                label={labelDes}>
+                {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
+                  initialValue: ele.Default,
+                  rules: [{ required: ele.required, message: '不能为空', trigger: 'blur' },
+                  { pattern: ele.CheckRegex, message: '输入不符合规范' },
+                  ]
+                })(
+                  <Input placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'} disabled={this.state.isReadonly} />
+                  )}
+              </FormItem>
+            )
+          }
         }
       } else {
         formItem = (
@@ -206,7 +207,9 @@ class Parser extends Component {
           if (advancedItem && advancedItem.advance) {
             advancedResults.push(formItem)
           } else {
-            result.push(formItem)
+            if (this.state.advanceChecked) {
+              result.push(formItem)
+            }
           }
         }
       } else {
