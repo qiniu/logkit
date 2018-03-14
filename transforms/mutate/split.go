@@ -78,7 +78,6 @@ func (g *Spliter) SampleConfig() string {
 
 func (g *Spliter) ConfigOptions() []Option {
 	return []Option{
-		transforms.KeyStageAfterOnly,
 		transforms.KeyFieldName,
 		{
 			KeyName:      "newfield",
@@ -93,9 +92,11 @@ func (g *Spliter) ConfigOptions() []Option {
 		{
 			KeyName:      "sep",
 			ChooseOnly:   false,
-			Default:      " ",
+			Default:      "",
+			Placeholder:  ",",
+			Required:     true,
 			DefaultNoUse: true,
-			Description:  "split的分隔符(sep)",
+			Description:  "分隔符(sep)",
 			Type:         transforms.TransformTypeString,
 		},
 	}

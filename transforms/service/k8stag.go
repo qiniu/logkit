@@ -85,7 +85,6 @@ func (g *K8sTag) SampleConfig() string {
 
 func (g *K8sTag) ConfigOptions() []Option {
 	return []Option{
-		transforms.KeyStageAfterOnly,
 		transforms.KeyFieldName,
 	}
 }

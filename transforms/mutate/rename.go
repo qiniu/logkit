@@ -68,7 +68,6 @@ func (g *Rename) SampleConfig() string {
 func (g *Rename) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
-		transforms.KeyStageAfterOnly,
 		{
 			KeyName:      "new_key_name",
 			ChooseOnly:   false,

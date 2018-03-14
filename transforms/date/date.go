@@ -136,7 +136,6 @@ func (g *DateTrans) SampleConfig() string {
 
 func (it *DateTrans) ConfigOptions() []Option {
 	return []Option{
-		transforms.KeyStageAfterOnly,
 		transforms.KeyFieldName,
 		transforms.KeyTimezoneoffset,
 		{
@@ -154,6 +153,7 @@ func (it *DateTrans) ConfigOptions() []Option {
 			DefaultNoUse: false,
 			Description:  "解析后时间样式(不填默认rfc3339)(time_layout_after)",
 			Type:         transforms.TransformTypeString,
+			Advance:      true,
 		},
 	}
 }

@@ -67,13 +67,12 @@ func (g *Label) SampleConfig() string {
 func (g *Label) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
-		transforms.KeyStageAfterOnly,
 		{
 			KeyName:      "value",
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
-			Description:  "要添加的数据值，仅限string类型(value)",
+			Description:  "要添加的数据值[仅限string类型](value)",
 			Type:         transforms.TransformTypeString,
 		},
 		{
@@ -84,6 +83,7 @@ func (g *Label) ConfigOptions() []Option {
 			DefaultNoUse:  false,
 			Description:   "要进行Transform变化的键已存在时，是否覆盖原有的值(override)",
 			Type:          transforms.TransformTypeBoolean,
+			Advance:       true,
 		},
 	}
 }

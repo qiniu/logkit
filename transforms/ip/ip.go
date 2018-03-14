@@ -92,7 +92,6 @@ func (it *IpTransformer) SampleConfig() string {
 
 func (it *IpTransformer) ConfigOptions() []Option {
 	return []Option{
-		transforms.KeyStageAfterOnly,
 		transforms.KeyFieldName,
 		{
 			KeyName:      "data_path",

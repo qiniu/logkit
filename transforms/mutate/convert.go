@@ -76,7 +76,6 @@ func (g *Converter) SampleConfig() string {
 
 func (g *Converter) ConfigOptions() []Option {
 	return []Option{
-		transforms.KeyStageAfterOnly,
 		transforms.KeyFieldName,
 		{
 			KeyName:      "dsl",

@@ -82,9 +82,7 @@ func (g *ClockTrail) SampleConfig() string {
 }
 
 func (g *ClockTrail) ConfigOptions() []Option {
-	return []Option{
-		transforms.KeyStageAfterOnly,
-	}
+	return []Option{}
 }
 
 func (g *ClockTrail) Stage() string {

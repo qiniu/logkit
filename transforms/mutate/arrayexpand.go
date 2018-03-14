@@ -195,7 +195,6 @@ func (p *ArrayExpand) SampleConfig() string {
 
 func (p *ArrayExpand) ConfigOptions() []Option {
 	return []Option{
-		transforms.KeyStageAfterOnly,
 		transforms.KeyFieldName,
 	}
 }
