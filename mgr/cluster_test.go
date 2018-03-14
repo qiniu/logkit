@@ -2,6 +2,7 @@ package mgr
 
 import (
 	"bufio"
+	"encoding/json"
 	"io"
 	"net/http"
 	"os"
@@ -9,8 +10,6 @@ import (
 	"strconv"
 	"testing"
 	"time"
-
-	"encoding/json"
 
 	"github.com/json-iterator/go"
 	"github.com/labstack/echo"

@@ -175,7 +175,8 @@ func makeRequest(url, method string, configBytes []byte) (respCode int, respBody
 		return
 	}
 	req.Header.Set(ContentTypeHeader, ApplicationJson)
-	resp, err := http.DefaultClient.Do(req)
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		return
 	}

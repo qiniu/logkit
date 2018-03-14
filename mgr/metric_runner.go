@@ -3,6 +3,7 @@ package mgr
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -10,14 +11,16 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/metric"
+	"github.com/qiniu/logkit/metric/curl"
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
-	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
+
+	"github.com/json-iterator/go"
 )
 
 const (
@@ -107,11 +110,36 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 				for _, attr := range attrs {
 					val, exist := m.Attributes[attr.Key]
 					if exist && !val {
-						DisTrans, err := createDiscardTransformer(attr.Key)
-						if err != nil {
-							return nil, fmt.Errorf("metric %v key %v, transform add failed, %v", tp, attr.Key, err)
+						if m.MetricType == curl.TypeMetricHttp {
+							var httpDataArr []curl.HttpDataReq
+							if _, ok := m.Config["http_datas"]; !ok {
+								return nil, fmt.Errorf("metric %v http_datas can't be empty", curl.TypeMetricHttp)
+							}
+							httpData, ok := m.Config["http_datas"].(string)
+							if ok {
+								err = jsoniter.Unmarshal([]byte(httpData), &httpDataArr)
+								if err != nil {
+									return nil, fmt.Errorf("metric %v unmarshal config error %v", curl.TypeMetricHttp, err)
+								}
+								length := len(httpDataArr)
+								for i := 0; i < length; i++ {
+									key := attr.Key + "_" + strconv.Itoa(i+1)
+									DisTrans, err := createDiscardTransformer(key)
+									if err != nil {
+										return nil, fmt.Errorf("metric %v key %v, transform add failed, %v", tp, attr.Key, err)
+									}
+									trans = append(trans, DisTrans)
+								}
+							} else {
+								return nil, fmt.Errorf("http_datas need to be string")
+							}
+						} else {
+							DisTrans, err := createDiscardTransformer(attr.Key)
+							if err != nil {
+								return nil, fmt.Errorf("metric %v key %v, transform add failed, %v", tp, attr.Key, err)
+							}
+							trans = append(trans, DisTrans)
 						}
-						trans = append(trans, DisTrans)
 					}
 				}
 			}
