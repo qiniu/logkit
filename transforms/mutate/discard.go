@@ -47,7 +47,6 @@ func (g *Discarder) SampleConfig() string {
 
 func (g *Discarder) ConfigOptions() []Option {
 	return []Option{
-		transforms.KeyStageAfterOnly,
 		transforms.KeyFieldName,
 	}
 }

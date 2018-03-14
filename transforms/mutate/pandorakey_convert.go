@@ -67,9 +67,7 @@ func (g *PandoraKeyConvert) SampleConfig() string {
 }
 
 func (g *PandoraKeyConvert) ConfigOptions() []Option {
-	return []Option{
-		transforms.KeyStageAfterOnly,
-	}
+	return []Option{}
 }
 
 func (g *PandoraKeyConvert) Stage() string {

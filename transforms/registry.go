@@ -58,15 +58,6 @@ var (
 		Description:   "transform运行的阶段(parser前还是parser后)(stage)",
 		Type:          TransformTypeString,
 	}
-	KeyStageAfterOnly = Option{
-		KeyName:       "stage",
-		ChooseOnly:    true,
-		ChooseOptions: []interface{}{StageAfterParser},
-		Default:       StageAfterParser,
-		DefaultNoUse:  false,
-		Description:   "transform运行的阶段(stage)",
-		Type:          TransformTypeString,
-	}
 	KeyFieldName = Option{
 		KeyName:      "key",
 		ChooseOnly:   false,

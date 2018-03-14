@@ -99,7 +99,7 @@ func execCmd(arg0 string, args ...string) ([]byte, error) {
 
 func NewSnmpReader(meta *Meta, c conf.MapConf) (s *SnmpReader, err error) {
 	var timeOut, interval time.Duration
-	name, _ := c.GetStringOr(KeySnmpReaderName, "system")
+	name, _ := c.GetStringOr(KeySnmpReaderName, "logki_default_snmp_name")
 	agents, _ := c.GetStringListOr(KeySnmpReaderAgents, []string{"127.0.0.1:161"})
 	timeStr, _ := c.GetStringOr(KeySnmpReaderTimeOut, "5s")
 	if timeOut, err = time.ParseDuration(timeStr); err != nil {

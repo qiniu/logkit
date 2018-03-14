@@ -107,7 +107,6 @@ func (p *UrlParam) SampleConfig() string {
 
 func (p *UrlParam) ConfigOptions() []Option {
 	return []Option{
-		transforms.KeyStageAfterOnly,
 		transforms.KeyFieldName,
 	}
 }
