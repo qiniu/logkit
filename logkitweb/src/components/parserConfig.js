@@ -52,7 +52,8 @@ class Parser extends Component {
       currentItem: [],
       parseData: '',
       sampleData: [],
-      currentSampleData: ''
+      currentSampleData: '',
+      advanceChecked: false
     };
   }
 
@@ -311,7 +312,9 @@ class Parser extends Component {
                     <div className="ant-divider ant-divider-horizontal ant-divider-with-text">
                       <Checkbox onChange={(e) => { this.setState({ advanceChecked: e.target.checked }) }} className="ant-divider-inner-text">高级选项</Checkbox>
                     </div>
-                    {this.state.advanceChecked ? renderResults.advancedResults : null}
+                    <div className={this.state.advanceChecked ? 'show-div' : 'hide-div'}>
+                      {renderResults.advancedResults}
+                    </div>
                   </div>
                 )
                 : null
