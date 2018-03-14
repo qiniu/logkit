@@ -245,8 +245,6 @@ class CreateLogRunner extends Component {
             {steps.map(item => <Step key={item.title} title={item.title}/>)}
           </Steps>
           <div className="steps-content">
-            <div><p className={this.state.current <= 3 ? 'show-div info' : 'hide-div'}>注意：黄色字体选框需根据实际情况修改，其他可作为默认值</p>
-            </div>
             <div className={this.state.current === 0 ? 'show-div' : 'hide-div'}>
               <Source ref="checkSourceData"></Source>
             </div>
@@ -266,9 +264,16 @@ class CreateLogRunner extends Component {
           </div>
           <div className="steps-action">
             {
+              this.state.current > 0
+              &&
+              <Button onClick={() => this.prev()}>
+                上一步
+                </Button>
+            }
+            {
               this.state.current < steps.length - 1
               &&
-              <Button type="primary" onClick={() => this.next()}>下一步</Button>
+              <Button type="primary" style={{ marginLeft: 8 }} onClick={() => this.next()}>下一步</Button>
             }
             {
               this.state.current === steps.length - 1 && this.state.isCpoyStatus === false
@@ -279,13 +284,6 @@ class CreateLogRunner extends Component {
               this.state.current === steps.length - 1 && this.state.isCpoyStatus === true
               &&
               <Button type="primary" onClick={() => this.updateRunner()}>修改并提交</Button>
-            }
-            {
-              this.state.current > 0
-              &&
-              <Button style={{marginLeft: 8}} onClick={() => this.prev()}>
-                上一步
-              </Button>
             }
           </div>
         </div>

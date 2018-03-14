@@ -5,7 +5,9 @@ import {
   Select,
   Icon,
   notification,
-  InputNumber
+  InputNumber,
+  Checkbox,
+  Button
 } from 'antd';
 import {getTransformOptions, getTransformUsages} from '../services/logkit';
 import config from '../store/config'
@@ -126,37 +128,40 @@ class Transformer extends Component {
 
     return this.state.tags.map((k, index) => {
       return (
-          <div key={`spec.fields.${k}`} style={{position: "relative"}}>
+        <div key={`spec.fields.${k}`} style={{ position: "relative"}}>
             <FormItem
                 label={index === 0 ? '字段' : ''}
-                className="inline fields key">
+                className="inline fields key"
+                style={{textAlign: 'left'}}>
               {getFieldDecorator(`spec.${k}.key`, {
                 rules: [{required: true, message: '字段不能为空'},
                   {min: 1, max: 100, message: '长度在 1 到 100 个字符'}]
-              })(<Input disabled={true}/>)}
+              })(<Input disabled={true} style={{width: 200}}/>)}
             </FormItem>
             <FormItem
                 label={index === 0 ? '类型' : ''}
-                className="inline fields value">
+                className="inline fields value"
+                style={{ textAlign: 'left' }}>
               {getFieldDecorator(`spec.${k}.type`, {
                 rules: [{required: true, message: '字段不能为空'},
                   {min: 1, max: 100, message: '长度在 1 到 100 个字符'}]
-              })(<Input disabled={true}/>)}
+              })(<Input disabled={true} style={{width: 200}}/>)}
             </FormItem>
             <FormItem
                 label={index === 0 ? '转化时机' : ''}
-                className="inline fields value">
+                className="inline fields value"
+                style={{ textAlign: 'left' }}>
               {getFieldDecorator(`spec.${k}.stage`, {
                 rules: [{required: true, message: '字段不能为空'},
                   {min: 1, max: 100, message: '长度在 1 到 100 个字符'}]
-              })(<Input disabled={true}/>)}
+              })(<Input disabled={true} style={{width: 200}}/>)}
             </FormItem>
             {
               this.state.isReadonly ? null :
                   <Icon
-                      style={{marginTop: index === 0 ? "30px" : "0px"}}
+                      style={{marginTop: index === 0 ? "23px" : "0px"}}
                       className="dynamic-delete-button"
-                      type="minus-circle-o"
+                      type="close"
                       onClick={() => this.removeTag(k)}
                   />
             }
@@ -166,50 +171,89 @@ class Transformer extends Component {
   };
 
   renderFormItem = () => {
-    const {getFieldDecorator} = this.props.form;
+    const { getFieldDecorator, getFieldValue } = this.props.form;
     let result = []
+    let advancedResults = []
     this.state.currentItem.map((ele, index) => {
+      let formItem = null
+      const labelDes = (
+        <span>
+          {ele.Description.slice(0, ele.Description.indexOf('('))}
+          <br />
+          <span style={{ color: 'rgba(0,0,0,.43)', float: 'right' }}>
+            {ele.Description.slice(ele.Description.indexOf('('), ele.Description.length)}
+          </span>
+        </span>
+      )
       if (ele.ChooseOnly == false) {
         if (ele.KeyName == 'name') {
           ele.Default = "pandora.sender." + moment().format("YYYYMMDDHHmmss");
         }
-        result.push(<FormItem key={index}
-                              {...formItemLayout}
-                              className=""
-                              label={(
-                                  <span className={ele.DefaultNoUse ? 'warningTip' : '' }>
-                  {ele.Description}
-                </span>
-                              )}>
-          {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
-            initialValue: ele.Default,
-            rules: [{required: ele.Default == '' ? false : true, message: '不能为空', trigger: 'blur'},
-              {pattern: ele.CheckRegex, message: '输入不符合规范'},
-            ]
-          })(ele.Type === 'string' ? (<Input placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值' } disabled={this.state.isReadonly}/>) :
-              (<InputNumber placeholder={ele.DefaultNoUse ? ele.Default : '空值可作为默认值' } disabled={this.state.isReadonly}  />)
-          )}
-        </FormItem>)
+        if (ele.advance_depend && getFieldValue(`${this.state.currentOption}.${ele.advance_depend}`) === 'false') {
+          formItem = null
+        } else {
+          formItem = (
+            <FormItem key={index}
+              {...formItemLayout}
+              className=""
+              label={labelDes}>
+              {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
+                initialValue: ele.Default,
+                rules: [{ required: ele.required, message: '不能为空', trigger: 'blur' },
+                { pattern: ele.CheckRegex, message: '输入不符合规范' },
+                ]
+              })(ele.Type === 'string' ? (<Input placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'} disabled={this.state.isReadonly} />) :
+                (<InputNumber placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'} disabled={this.state.isReadonly} />)
+                )}
+            </FormItem>
+          )
+        }
       } else {
-        result.push(<FormItem key={index}
-                              {...formItemLayout}
-                              className=""
-                              label={ele.Description}>
-          {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
-            initialValue: ele.ChooseOptions[0]
-          })(
+        formItem = (
+          <FormItem key={index}
+            {...formItemLayout}
+            className=""
+            label={labelDes}>
+            {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
+              initialValue: ele.Default || ele.ChooseOptions[0]
+            })(
               <Select>
                 {this.renderChooseOption(ele.ChooseOptions)}
               </Select>
-          )}
-        </FormItem>)
+              )}
+          </FormItem>
+        )
       }
-
+      if (ele && ele.advance) {
+        if (!ele.advance_depend) {
+          advancedResults.push(formItem)
+        } else {
+          const advancedItem = this.getAdvancedConfig(ele)
+          if (advancedItem && advancedItem.advance) {
+            advancedResults.push(formItem)
+          } else {
+            if (this.state.advanceChecked) {
+              result.push(formItem)
+            }
+          }
+        }
+      } else {
+        result.push(formItem)
+      }
     })
     return (
-        result
+      {
+        result,
+        advancedResults
+      }
     )
+  }
 
+  getAdvancedConfig = (ele) => {
+    if (ele.advance_depend) {
+      const dependItem = this.state.currentItem.find((item) => item.KeyName === ele.advance_depend)
+      return dependItem
+    }
   }
 
   handleChange = (option) => {
@@ -235,9 +279,10 @@ class Transformer extends Component {
     let options = []
     items.map((ele) => {
         let el = ele
-        if(typeof el === 'boolean'){
+        if (typeof el === 'boolean'){
            el = String(el)
         }
+
         options.push(<Option key={ele} value={ele}>{el}</Option>)
     })
     return (
@@ -295,7 +340,8 @@ class Transformer extends Component {
   };
 
   render() {
-    const {getFieldDecorator} = this.props.form;
+    const {getFieldDecorator} = this.props.form
+    const renderResults = this.renderFormItem()
     return (
         <div >
           <Form className="slide-in text-color">
@@ -307,18 +353,30 @@ class Transformer extends Component {
                     {this.renderSelectOptions()}
                   </Select>)}
             </FormItem>
-            {this.renderFormItem()}
-              <div className="option-add">
-                  <FormItem {...optionFormItemLayout} label={<span style={{display:'none'}}></span>}>
-                      <div className="option-add-btn">
-                          <button onClick={this.addTag} type="button"
-                                  className="btn btn-primary btn-add"
-                                  style={{width: "140px", marginBottom: "20px", marginTop: "10px"}}>添加
-                          </button>
-                      </div>
-                  </FormItem>
-              </div>
-            {this.renderTags()}
+            <div className="ant-divider ant-divider-horizontal"></div>
+            {renderResults.result}
+            {
+              renderResults.advancedResults.length > 0
+                ? (
+                  <div>
+                    <div className="ant-divider ant-divider-horizontal ant-divider-with-text">
+                      <Checkbox onChange={(e) => { this.setState({ advanceChecked: e.target.checked }) }} className="ant-divider-inner-text">高级选项</Checkbox>
+                    </div>
+                    {this.state.advanceChecked ? renderResults.advancedResults : null}
+                  </div>
+                )
+                : null
+            }
+            <div className="option-add">
+              <FormItem {...optionFormItemLayout} label={<span style={{display:'none'}}></span>}>
+                <div className="option-add-btn">
+                  <Button onClick={this.addTag} type="primary" className="option-add-tag-btn">
+                    添加
+                  </Button>
+                </div>
+              </FormItem>
+            </div>
+          <div className={this.state.tags.length>0 ? 'render-tag-container' : ''}>{this.renderTags()}</div>
           </Form>
         </div>
     );

@@ -280,9 +280,16 @@ class CreateMetricRunner extends Component {
           </div>
           <div className="steps-action">
             {
+              this.state.current > 0
+              &&
+              <Button onClick={() => this.prev()}>
+                上一步
+                </Button>
+            }
+            {
               this.state.current < steps.length - 1
               &&
-              <Button type="primary" onClick={() => this.next()}>下一步</Button>
+              <Button type="primary" style={{ marginLeft: 8 }} onClick={() => this.next()}>下一步</Button>
             }
             {
               this.state.current === steps.length - 1 && this.state.isCopyStatus === false
@@ -293,14 +300,7 @@ class CreateMetricRunner extends Component {
               this.state.current === steps.length - 1 && this.state.isCopyStatus === true
               &&
               <Button type="primary" onClick={() => this.updateRunner()}>修改并提交</Button>
-            }
-            {
-              this.state.current > 0
-              &&
-              <Button style={{marginLeft: 8}} onClick={() => this.prev()}>
-                上一步
-              </Button>
-            }
+            }            
           </div>
         </div>
     );
