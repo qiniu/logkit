@@ -102,6 +102,7 @@ func (g *Json) ConfigOptions() []Option {
 			KeyName:      "new",
 			ChooseOnly:   false,
 			Default:      "",
+			Required:     true,
 			DefaultNoUse: false,
 			Description:  "新的字段名",
 			Type:         transforms.TransformTypeString,

@@ -680,6 +680,9 @@ func (c *Pipeline) PostDataFromFile(input *PostDataFromFileInput) (err error) {
 	return req.Send()
 }
 
+// PostDataFromReader 直接把 reader作为 http 的 body 发送，没有处理用户的数据变为符合 pandora 打点协议的 bytes 过程，
+// 用户如果使用该接口，需要根据 pandora 打点协议将数据转换为bytes数据流，具体的转换方式见文档：
+// https://qiniu.github.io/pandora-docs/#/push_data_api
 func (c *Pipeline) PostDataFromReader(input *PostDataFromReaderInput) (err error) {
 	op := c.NewOperation(base.OpPostData, input.RepoName)
 

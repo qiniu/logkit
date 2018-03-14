@@ -72,7 +72,9 @@ func (g *Rename) ConfigOptions() []Option {
 		{
 			KeyName:      "new_key_name",
 			ChooseOnly:   false,
-			Default:      "new_key_name",
+			Default:      "",
+			Required:     true,
+			Placeholder:  "new_key_name",
 			DefaultNoUse: true,
 			Description:  "修改后的字段名",
 			Type:         transforms.TransformTypeString,

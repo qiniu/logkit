@@ -97,7 +97,9 @@ func (it *IpTransformer) ConfigOptions() []Option {
 		{
 			KeyName:      "data_path",
 			ChooseOnly:   false,
-			Default:      "your/path/to/ip.dat",
+			Default:      "",
+			Required:     true,
+			Placeholder:  "your/path/to/ip.dat",
 			DefaultNoUse: true,
 			Description:  "IP数据库路径(data_path)",
 			Type:         transforms.TransformTypeString,

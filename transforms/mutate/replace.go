@@ -96,7 +96,9 @@ func (g *Replacer) ConfigOptions() []Option {
 		{
 			KeyName:      "old",
 			ChooseOnly:   false,
-			Default:      "myOldString",
+			Default:      "",
+			Required:     true,
+			Placeholder:  "myOldString",
 			DefaultNoUse: true,
 			Description:  "要替换的字符串内容(old)",
 			Type:         transforms.TransformTypeString,
@@ -104,7 +106,9 @@ func (g *Replacer) ConfigOptions() []Option {
 		{
 			KeyName:      "new",
 			ChooseOnly:   false,
-			Default:      "myNewString",
+			Default:      "",
+			Required:     true,
+			Placeholder:  "myNewString",
 			DefaultNoUse: true,
 			Description:  "替换为的字符串内容(new)",
 			Type:         transforms.TransformTypeString,
