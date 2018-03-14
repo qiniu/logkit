@@ -316,7 +316,7 @@ class Parser extends Component {
                 )
                 : null
             }
-            <FormItem {...optionFormItemLayout} style={{position: 'absolute', right: 320}}>
+            <FormItem {...optionFormItemLayout} style={{ transform: 'translate(70%, 100%)' }}>
               <Button type="primary" onClick={this.parseSampleData} className="option-add-tag-btn" style={{width: 120}}>解析样例数据</Button>
             </FormItem>
             <FormItem
