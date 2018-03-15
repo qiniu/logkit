@@ -6,7 +6,6 @@ import (
 	"io"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/sender"
@@ -164,32 +163,6 @@ func SendData(senderConfig map[string]interface{}) error {
 	}
 
 	return nil
-}
-
-func TryAutoTest(metricConfig map[string]interface{}) (map[string]interface{}, error) {
-	if metricConfig == nil {
-		return nil, fmt.Errorf("metric config cannot be empty")
-	}
-
-	metricConf, err := getMetricConfig(metricConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	collector, err := getCollector(metricConf)
-	if err != nil {
-		return nil, err
-	}
-
-	data, err := collector.Collect()
-	if err != nil {
-		return nil, err
-	}
-	if data == nil {
-		return nil, fmt.Errorf("no data collect")
-	}
-
-	return data[0], nil
 }
 
 func getSendersConfig(senderConfig map[string]interface{}) ([]conf.MapConf, error) {
@@ -427,37 +400,4 @@ func getTransformer(transConfig map[string]interface{}, create transforms.Creato
 		}
 	}
 	return trans, nil
-}
-
-func getMetricConfig(metricConfig map[string]interface{}) (MetricConfig, error) {
-	byteMetricConfig, err := jsoniter.Marshal(metricConfig)
-	if err != nil {
-		return MetricConfig{}, fmt.Errorf("get metric config marshal error, %v", err)
-	}
-	var metricConf MetricConfig
-	if jsonErr := jsoniter.Unmarshal(byteMetricConfig, &metricConf); jsonErr != nil {
-		return MetricConfig{}, fmt.Errorf("get metric config unmarshal error, %v", jsonErr)
-	}
-	if metricConf.MetricType == "" {
-		return MetricConfig{}, fmt.Errorf("metric config cannot be empty")
-	}
-	return metricConf, nil
-}
-
-func getCollector(metricConf MetricConfig) (metric.Collector, error) {
-	tp := metricConf.MetricType
-	c, err := NewMetric(tp)
-	if err != nil {
-		return nil, err
-	}
-	configBytes, err := jsoniter.Marshal(metricConf.Config)
-	if err != nil {
-		return nil, fmt.Errorf("get collector marshal error, %v", err)
-	}
-	err = jsoniter.Unmarshal(configBytes, c)
-	if err != nil {
-		return nil, fmt.Errorf("get collector unmarshal error, %v", err)
-	}
-
-	return c, nil
 }

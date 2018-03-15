@@ -37,8 +37,8 @@ const (
 	ConfigHttpDatas = "http_datas"
 
 	DefaultTimeOut = 1 * time.Minute
-	StateSuccess   = "success"
-	StateFail      = "fail"
+	StateSuccess   = float64(1)
+	StateFail      = float64(0)
 )
 
 // KeyHttpUsages TypeMetricHttp 中的字段名称

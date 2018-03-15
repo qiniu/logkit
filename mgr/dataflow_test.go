@@ -17,7 +17,6 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
-	"github.com/qiniu/logkit/metric/curl"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -441,82 +440,4 @@ func Test_getSenders(t *testing.T) {
 	if len(senders) != 1 {
 		t.Errorf("expect 1 sender but got %v", len(senders))
 	}
-}
-
-func Test_TryAutoTest(t *testing.T) {
-	mc1 := map[string]interface{}{
-		"type": "http",
-		"config": map[string]interface{}{
-			"http_datas": `[{"method":"GET", "url":"https://www.qiniu.com", "expect_code":200}]`,
-		},
-	}
-
-	data, err := TryAutoTest(mc1)
-	if err != nil {
-		t.Error(err)
-	}
-	expData := map[string]interface{}{
-		"http_err_state_total": "success",
-		"http_err_msg_total":   "",
-	}
-	assert.Equal(t, expData["http_err_state_total"], data["http_err_state_total"])
-	assert.Equal(t, "https://www.qiniu.com", data["http_target_1"])
-	assert.Equal(t, "success", data["http_err_state_1"])
-	assert.Equal(t, 200, data["http_status_code_1"])
-
-	mc2 := map[string]interface{}{
-		"type": "http",
-		"config": map[string]interface{}{
-			"http_datas": `[{"method":"GET", "url":"https://www.qiniu-pandora.com", "expect_code":200}]`,
-		},
-	}
-
-	data2, err2 := TryAutoTest(mc2)
-	if err2 != nil {
-		t.Error(err2)
-	}
-	expData2 := map[string]interface{}{
-		"http_err_state_total": "fail",
-	}
-	assert.Equal(t, expData2["http_err_state_total"], data2["http_err_state_total"])
-	assert.Equal(t, -1, data2["http_status_code_1"])
-	assert.Equal(t, "https://www.qiniu-pandora.com", data2["http_target_1"])
-}
-
-func Test_getMetricConfig(t *testing.T) {
-	metricConf := map[string]interface{}{
-		"type": "http",
-		"config": map[string]interface{}{
-			"http_datas": `[{"method":"GET", "url":"https://www.qiniu.com", "expect_code":200}]`,
-		},
-	}
-
-	mc, err := getMetricConfig(metricConf)
-	if err != nil {
-		t.Error(err)
-	}
-	expMetric := MetricConfig{
-		MetricType: "http",
-		Config: map[string]interface{}{
-			"http_datas": `[{"method":"GET", "url":"https://www.qiniu.com", "expect_code":200}]`,
-		},
-	}
-	assert.Equal(t, expMetric.MetricType, mc.MetricType)
-	assert.Equal(t, expMetric.Config, mc.Config)
-}
-
-func Test_getCollector(t *testing.T) {
-	mc := MetricConfig{
-		MetricType: "http",
-		Config: map[string]interface{}{
-			"http_datas": `[{"method":"GET", "url":"https://www.qiniu.com", "expect_code":200}]`,
-		},
-	}
-
-	c, err := getCollector(mc)
-	if err != nil {
-		t.Error(err)
-	}
-	assert.Equal(t, curl.TypeMetricHttp, c.Name())
-	assert.Equal(t, len(curl.KeyHttpUsages), len(c.Tags()))
 }
