@@ -195,7 +195,7 @@ func Test_RunForEnvTag(t *testing.T) {
 	defer func() {
 		os.Setenv("Test_RunForEnvTag", originEnv)
 	}()
-	if err := os.Setenv("Test_RunForEnvTag", "env_value"); err != nil {
+	if err := os.Setenv("Test_RunForEnvTag", "{\"Test_RunForEnvTag\":\"env_value\"}"); err != nil {
 		t.Fatalf("set env %v to %v error %v", "Test_RunForEnvTag", "env_value", err)
 	}
 	logpath := dir + "/logdir"

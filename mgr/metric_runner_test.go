@@ -412,7 +412,7 @@ func metricRunEnvTagTest(p *testParam) {
 	defer func() {
 		os.Setenv(runnerName, originEnv)
 	}()
-	if err := os.Setenv(runnerName, "env_value"); err != nil {
+	if err := os.Setenv(runnerName, "{\""+runnerName+"\":\"env_value\"}"); err != nil {
 		t.Fatalf("metricRunEnvTagTest set env error %v", err)
 	}
 	time.Sleep(1 * time.Second)

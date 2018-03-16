@@ -201,7 +201,10 @@ func (r *MetricRunner) Run() {
 	tags := map[string]interface{}{
 		metric.Timestamp: nil,
 	}
-	tags = GetEnvTag(r.envTag, tags)
+	tags, err := GetEnvTag(r.envTag, tags)
+	if err != nil {
+		log.Warnf("get env tags error: %v", err)
+	}
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
 			log.Debugf("runner %v exited from run", r.RunnerName)

@@ -415,7 +415,10 @@ func (r *LogExportRunner) Run() {
 	tags := r.meta.GetTags()
 	datasourceTag := r.meta.GetDataSourceTag()
 	schemaErr := utils.SchemaErr{Number: 0, Last: time.Unix(0, 0)}
-	tags = GetEnvTag(r.EnvTag, tags)
+	tags, err := GetEnvTag(r.EnvTag, tags)
+	if err != nil {
+		log.Warnf("get env tags error: %v", err)
+	}
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
 			log.Debugf("Runner[%v] exited from run", r.Name())
@@ -944,16 +947,25 @@ func (r *LogExportRunner) StatusBackup() {
 	}
 }
 
-func GetEnvTag(name string, tags map[string]interface{}) map[string]interface{} {
+// GetEnvTag 获取环境变量里的内容
+func GetEnvTag(name string, tags map[string]interface{}) (map[string]interface{}, error) {
 	if name == "" {
-		return tags
+		return tags, nil
 	}
+
+	envTags := make(map[string]interface{})
 	if value := os.Getenv(name); value != "" {
-		if tags == nil {
-			tags = make(map[string]interface{})
+		err := jsoniter.Unmarshal([]byte(value), &envTags)
+		if err != nil {
+			return tags, err
 		}
-		tags[name] = value
-	} else {
 	}
-	return tags
+
+	if tags == nil {
+		tags = make(map[string]interface{})
+	}
+	for k, v := range envTags {
+		tags[k] = v
+	}
+	return tags, nil
 }
