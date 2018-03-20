@@ -1,7 +1,7 @@
 
 # logkit [![Build Status](https://api.travis-ci.org/qiniu/logkit.svg)](http://travis-ci.org/qiniu/logkit)
 
-![logkit LOGO](https://raw.githubusercontent.com/qiniu/logkit/master/resources/logo.svg)
+![logkit LOGO](https://raw.githubusercontent.com/qiniu/logkit/master/resources/logo.png)
 
 ## 简介
 
