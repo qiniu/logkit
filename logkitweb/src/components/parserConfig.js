@@ -176,7 +176,24 @@ class Parser extends Component {
                   { pattern: ele.CheckRegex, message: '输入不符合规范' },
                   ]
                 })(
-                  <Input placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'} disabled={this.state.isReadonly} />
+                  ele.KeyName === 'csv_schema'
+                    ? <div>
+                        <Input.TextArea
+                        placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'}
+                        disabled={this.state.isReadonly}
+                        autosize={{ minRows: 1, maxRows: 6 }}/>
+                        {
+                          getFieldValue('csv.csv_schema')
+                            ?
+                            <span style={{float: 'right', color: 'rgb(0,0,0,0.48)', fontSize: 11}}>
+                              {`已有[${getFieldValue('csv.csv_schema').split(
+                              getFieldValue('csv.csv_splitter') || ',').length}]个schema`}
+                            </span>
+                            : null
+                        }
+                        
+                      </div>
+                    : <Input placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'} disabled={this.state.isReadonly} />
                   )}
               </FormItem>
             )

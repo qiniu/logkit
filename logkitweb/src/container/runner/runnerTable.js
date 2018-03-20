@@ -12,7 +12,8 @@ import {
   Tag,
   Input,
   Select,
-  Form
+  Form,
+  AutoComplete
 } from 'antd';
 import {
   deleteConfigData,
@@ -52,7 +53,9 @@ class RunnerTable extends Component {
       tag: '',
       isLoading: false,
       currentTag: '',
-      currentUrl: ''
+      currentUrl: '',
+      filterRunners: [],
+      data: []
     };
 
   }
@@ -525,7 +528,6 @@ class RunnerTable extends Component {
       },
 
     }];
-
     let data = []
     if (runnerList != null) {
       runnerList.map((item) => {
@@ -619,7 +621,7 @@ class RunnerTable extends Component {
         })
       })
     }
-
+    
     return (<div>
           {window.isCluster === true ? (<Form layout="inline">
             <FormItem {...formItemLayout} style={{width: '300px'}} label="集群名称">
@@ -656,15 +658,42 @@ class RunnerTable extends Component {
                 }
               </Select>
             </FormItem>
-          </Form>) : (<div style={{marginBottom: '15px'}}><Button type="primary" style={{marginRight: '50px'}} className="index-btn" ghost
-                                   onClick={handleAddRunner}>
-            <Icon type="plus"/> 增加日志采集收集器
-          </Button>
-            <Button type="primary" className="index-btn" ghost onClick={handleAddMetricRunner}>
-              <Icon type="plus"/> 增加系统信息采集收集器
-            </Button></div>)}
+          </Form>)
+            : (<div style={{marginBottom: '15px'}}>
+                <Button type="primary" style={{marginRight: '50px'}} className="index-btn" ghost onClick={handleAddRunner}>
+                  <Icon type="plus"/> 增加日志采集收集器
+                </Button>
+                <Button type="primary" className="index-btn" ghost onClick={handleAddMetricRunner}>
+                  <Icon type="plus"/> 增加系统信息采集收集器
+                </Button>
+                <AutoComplete
+                  className="certain-category-search"
+                  dropdownMatchSelectWidth={false}
+                  dropdownStyle={{ width: 200 }}
+                  size="large"
+                  style={{ width: '20%', float: 'right' }}
+                  dataSource={this.state.filterRunners.map((item) => item.name)}
+                  placeholder="输入搜索名称"
+                  onSearch={(value) => {
+                    this.setState({
+                      filterRunners: data.filter((item) => item.name.indexOf(value) > 0),
+                      data: data.filter((item) => item.name.indexOf(value) > 0)
+                    })
+                  }}
+                  onSelect={(value) => {
+                    this.setState({
+                      data: data.filter((item) => item.name === value)
+                    })
+                  }}
+                >
+                  <Input suffix={<Icon type="search" className="certain-category-icon" />} />
+                </AutoComplete>
+              </div>)}
+              {this.state.data.length > 0
+                ? <Table columns={columns} pagination={{size: 'small', pageSize: 20}} dataSource={this.state.data} />
+                : <Table columns={columns} pagination={{size: 'small', pageSize: 20}} dataSource={data} loading={this.state.isLoading} />}
 
-          <Table columns={columns} pagination={{size: 'small', pageSize: 20}} dataSource={data} loading={this.state.isLoading} /></div>
+          </div>
     )
   }
 
@@ -700,7 +729,7 @@ class RunnerTable extends Component {
 
           </Modal>
         </div>
-    );
+    )
   }
 }
 export default Form.create()(RunnerTable);

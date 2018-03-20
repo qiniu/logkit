@@ -279,6 +279,7 @@ class CreateMetricRunner extends Component {
 
           </div>
           <div className="steps-action">
+            <a style={{textDecoration: 'underline', marginRight: 15}} href="/">取消</a>
             {
               this.state.current > 0
               &&
