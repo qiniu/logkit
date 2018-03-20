@@ -181,7 +181,7 @@ class Parser extends Component {
                         <Input.TextArea
                         placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'}
                         disabled={this.state.isReadonly}
-                        autosize={{ minRows: 1, maxRows: 6 }}/>
+                        autosize={{ minRows: 3, maxRows: 6 }}/>
                         {
                           getFieldValue('csv.csv_schema')
                             ?
