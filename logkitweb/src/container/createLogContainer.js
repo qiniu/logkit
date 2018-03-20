@@ -264,7 +264,11 @@ class CreateLogRunner extends Component {
 
           </div>
           <div className="steps-action">
-            <a style={{textDecoration: 'underline', marginRight: 15}} href="/">取消</a>
+            <a style={{textDecoration: 'underline', marginRight: 15}}
+               onClick={(e) => {
+              e.preventDefault()
+              this.props.handleTurnToRunner()
+            }}>取消</a>
             {
               this.state.current > 0
               &&
