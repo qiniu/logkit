@@ -23,8 +23,9 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/qiniu/log"
 	. "github.com/qiniu/logkit/utils/models"
+
+	"github.com/qiniu/log"
 
 	"github.com/json-iterator/go"
 )

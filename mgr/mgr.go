@@ -17,10 +17,10 @@ import (
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/utils"
+	"github.com/qiniu/logkit/utils/models"
 
 	"github.com/howeyc/fsnotify"
 	"github.com/json-iterator/go"
-	"github.com/qiniu/logkit/utils/models"
 )
 
 var DIR_NOT_EXIST_SLEEP_TIME = "300" //300 s
@@ -286,7 +286,7 @@ func (m *Manager) ForkRunner(confPath string, nconf RunnerConfig, errReturn bool
 	log.Infof("Runner[%v] added: %#v", nconf.RunnerName, confPath)
 	go runner.Run()
 	m.runners[confPath] = runner
-	m.runnerConfig[confPath] = nconf
+	m.runnerConfig[confPath] = TrimSecretInfo(nconf)
 	log.Infof("new Runner[%v] is added, total %d", nconf.RunnerName, len(m.runners))
 	return nil
 }
@@ -527,7 +527,68 @@ func (m *Manager) getDeepCopyConfig(name string) (filename string, conf RunnerCo
 	return
 }
 
-func backupRunnerConfig(rootDir, filename string, rconf interface{}) error {
+// TrimSecretInfo 将配置文件中的 token 信息去掉
+func TrimSecretInfo(conf RunnerConfig) RunnerConfig {
+	preFix := models.SchemaFreeTokensPrefix
+	keyName := []string{
+		preFix + "pipeline_get_repo_token",
+		preFix + "pipeline_post_data_token",
+		preFix + "pipeline_create_repo_token",
+		preFix + "pipeline_update_repo_token",
+		preFix + "pipeline_get_workflow_token",
+		preFix + "pipeline_stop_workflow_token",
+		preFix + "pipeline_start_workflow_token",
+		preFix + "pipeline_create_workflow_token",
+		preFix + "pipeline_Get_workflow_status_token",
+	}
+
+	// logDB tokens
+	preFix = models.LogDBTokensPrefix
+	keyName = append(keyName, []string{
+		preFix + "pipeline_get_repo_token",
+		preFix + "pipeline_create_repo_token",
+		preFix + "create_logdb_repo_token",
+		preFix + "update_logdb_repo_token",
+		preFix + "get_logdb_repo_token",
+		preFix + "create_export_token",
+		preFix + "update_export_token",
+		preFix + "get_export_token",
+		preFix + "list_export_token",
+	}...)
+
+	// tsDB tokens
+	preFix = models.TsDBTokensPrefix
+	keyName = append(keyName, []string{
+		preFix + "pipeline_get_repo_token",
+		preFix + "create_tsdb_repo_token",
+		preFix + "list_export_token",
+		preFix + "create_tsdb_series_token",
+		preFix + "create_export_token",
+		preFix + "update_export_token",
+		preFix + "get_export_token",
+	}...)
+
+	// kodo tokens
+	preFix = models.KodoTokensPrefix
+	keyName = append(keyName, []string{
+		preFix + "pipeline_get_repo_token",
+		preFix + "create_export_token",
+		preFix + "update_export_token",
+		preFix + "get_export_token",
+		preFix + "list_export_token",
+	}...)
+
+	for i, sc := range conf.SenderConfig {
+		for _, k := range keyName {
+			delete(sc, k)
+		}
+		conf.SenderConfig[i] = sc
+	}
+	return conf
+}
+
+func backupRunnerConfig(rootDir, filename string, rconf RunnerConfig) error {
+	rconf = TrimSecretInfo(rconf)
 	confBytes, err := jsoniter.MarshalIndent(rconf, "", "    ")
 	if err != nil {
 		return fmt.Errorf("runner config %v marshal failed, err is %v", rconf, err)
