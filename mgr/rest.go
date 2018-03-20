@@ -20,7 +20,6 @@ import (
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
-	"github.com/json-iterator/go"
 	"github.com/labstack/echo"
 )
 
@@ -308,22 +307,6 @@ func convertWebTransformerConfig(conf map[string]interface{}) map[string]interfa
 	}
 	//TODO do some pre process
 	return conf
-}
-
-func (rs *RestService) backupRunnerConfig(rconf interface{}, filename string) error {
-	confBytes, err := jsoniter.MarshalIndent(rconf, "", "    ")
-	if err != nil {
-		return fmt.Errorf("runner config %v marshal failed, err is %v", rconf, err)
-	}
-	// 判断默认备份文件夹是否存在，不存在就尝试创建
-	if _, err := os.Stat(rs.mgr.RestDir); err != nil {
-		if os.IsNotExist(err) {
-			if err = os.Mkdir(rs.mgr.RestDir, DefaultDirPerm); err != nil && !os.IsExist(err) {
-				return fmt.Errorf("rest default dir not exists and make dir failed, err is %v", err)
-			}
-		}
-	}
-	return ioutil.WriteFile(filename, confBytes, 0644)
 }
 
 func (rs *RestService) checkNameAndConfig(c echo.Context) (name string, conf RunnerConfig, file string, err error) {
