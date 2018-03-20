@@ -286,7 +286,7 @@ func (m *Manager) ForkRunner(confPath string, nconf RunnerConfig, errReturn bool
 	log.Infof("Runner[%v] added: %#v", nconf.RunnerName, confPath)
 	go runner.Run()
 	m.runners[confPath] = runner
-	m.runnerConfig[confPath] = TrimSecretInfo(nconf)
+	m.runnerConfig[confPath] = nconf
 	log.Infof("new Runner[%v] is added, total %d", nconf.RunnerName, len(m.runners))
 	return nil
 }
@@ -499,12 +499,9 @@ func (m *Manager) Status() (rss map[string]RunnerStatus) {
 }
 
 func (m *Manager) Configs() (rss map[string]RunnerConfig) {
-	//var err error
-	//var tmpRssByte []byte
 	rss = make(map[string]RunnerConfig)
 	tmpRss := make(map[string]RunnerConfig)
 	m.lock.RLock()
-	defer m.lock.RUnlock()
 	for k, v := range m.runnerConfig {
 		if filepath.Dir(k) == m.RestDir {
 			v.IsInWebFolder = true
@@ -512,6 +509,10 @@ func (m *Manager) Configs() (rss map[string]RunnerConfig) {
 		tmpRss[k] = v
 	}
 	deepCopy(&rss, &tmpRss)
+	m.lock.RUnlock()
+	for k, v := range rss {
+		rss[k] = TrimSecretInfo(v)
+	}
 	return
 }
 
@@ -588,7 +589,6 @@ func TrimSecretInfo(conf RunnerConfig) RunnerConfig {
 }
 
 func backupRunnerConfig(rootDir, filename string, rconf RunnerConfig) error {
-	rconf = TrimSecretInfo(rconf)
 	confBytes, err := jsoniter.MarshalIndent(rconf, "", "    ")
 	if err != nil {
 		return fmt.Errorf("runner config %v marshal failed, err is %v", rconf, err)
