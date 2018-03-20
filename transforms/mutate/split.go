@@ -79,16 +79,7 @@ func (g *Spliter) SampleConfig() string {
 func (g *Spliter) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
-		{
-			KeyName:      "newfield",
-			ChooseOnly:   false,
-			Default:      "",
-			Required:     true,
-			Placeholder:  "newfieldname",
-			DefaultNoUse: true,
-			Description:  "split后生成的array字段名称(newfield)",
-			Type:         transforms.TransformTypeString,
-		},
+		transforms.KeyFieldNewRequired,
 		{
 			KeyName:      "sep",
 			ChooseOnly:   false,

@@ -180,16 +180,7 @@ func (g *Script) SampleConfig() string {
 func (g *Script) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
-		{
-			KeyName:      "new",
-			ChooseOnly:   false,
-			Default:      "",
-			Required:     true,
-			Placeholder:  "new_name",
-			DefaultNoUse: false,
-			Description:  "新的字段名",
-			Type:         transforms.TransformTypeString,
-		},
+		transforms.KeyFieldNew,
 		{
 			KeyName:      "interprepter",
 			ChooseOnly:   false,
