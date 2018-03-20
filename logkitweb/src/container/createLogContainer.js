@@ -15,6 +15,7 @@ import {
   putClusterConfigData
 } from '../services/logkit';
 import _ from "lodash";
+import {Link} from 'react-router';
 
 const Step = Steps.Step;
 const {Header, Content, Footer, Sider} = Layout;
@@ -263,6 +264,7 @@ class CreateLogRunner extends Component {
 
           </div>
           <div className="steps-action">
+            <a style={{textDecoration: 'underline', marginRight: 15}} href="/">取消</a>
             {
               this.state.current > 0
               &&

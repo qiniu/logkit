@@ -235,3 +235,9 @@ body {
   -ms-transform: translateY(50%);
   transform: translateY(50%);
 }
+
+.certain-category-icon {
+  color: #6E6E6E;
+  transition: all 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
+  font-size: 16px;
+}
