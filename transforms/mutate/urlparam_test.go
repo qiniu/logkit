@@ -1,13 +1,12 @@
 package mutate
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
-
-	"fmt"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -39,7 +38,6 @@ func TestParamTransformer(t *testing.T) {
 			"myword_nonce_str": "1510555032",
 		},
 	}
-	fmt.Println(data)
 	assert.Equal(t, len(exp), len(data))
 	for i, ex := range exp {
 		da := data[i]
@@ -123,13 +121,13 @@ func TestParamTransformerKeyRepeat(t *testing.T) {
 	exp := []Data{
 		{
 			"myword":   "a=a&a=b&a=c&a=d",
-			"myword_a": []string{"a", "b", "c", "d"},
+			"myword_a": "a&b&c&d",
 		},
 		{
 			"myword":    "a=a&a=b&b=c&b=d&b=e",
 			"myword_a":  "xx",
-			"myword_a1": []string{"a", "b"},
-			"myword_b":  []string{"c", "d", "e"},
+			"myword_a1": "a&b",
+			"myword_b":  "c&d&e",
 		},
 		{
 			"myword":    "a=x",
