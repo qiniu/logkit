@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	"net/url"
+
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
@@ -17,19 +19,20 @@ type UrlParam struct {
 	stats utils.StatsInfo
 }
 
-func (p *UrlParam) transformToMap(strVal string, key string) (map[string]string, error) {
-	resultMap := make(map[string]string)
-	params := strings.Split(strVal, "&")
-	for _, param := range params {
-		keyVal := strings.Split(param, "=")
-		if len(keyVal) != 2 {
-			return nil, fmt.Errorf("the key value %v is not legal", strVal)
+func (p *UrlParam) transformToMap(strVal string, key string) (map[string]interface{}, error) {
+	strVal = strings.TrimPrefix(strVal, "?")
+	resultMap := make(map[string]interface{})
+	values, err := url.ParseQuery(strVal)
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range values {
+		keyName := key + "_" + k
+		if len(v) == 1 && v[0] != "" {
+			resultMap[keyName] = v[0]
+		} else if len(v) > 1 {
+			resultMap[keyName] = v
 		}
-		if keyVal[0] == "" {
-			return nil, fmt.Errorf("the key value %v is not legal", strVal)
-		}
-		keyName := key + "_" + keyVal[0]
-		resultMap[keyName] = keyVal[1]
 	}
 	return resultMap, nil
 }
@@ -51,7 +54,7 @@ func (p *UrlParam) Transform(datas []Data) ([]Data, error) {
 			err = fmt.Errorf("transform key %v not exist in data", p.Key)
 			continue
 		}
-		var res map[string]string
+		var res map[string]interface{}
 		if strVal, ok := val.(string); ok {
 			res, err = p.transformToMap(strVal, newkeys[len(newkeys)-1])
 		} else {
