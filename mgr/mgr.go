@@ -73,9 +73,9 @@ func NewCustomManager(conf ManagerConfig, pr *parser.ParserRegistry, sr *sender.
 			return nil, fmt.Errorf("get system current workdir error %v, please set rest_dir config", err)
 		}
 		conf.RestDir = dir + DEFAULT_LOGKIT_REST_DIR
-		if err = os.Mkdir(conf.RestDir, models.DefaultDirPerm); err != nil && !os.IsExist(err) {
-			log.Warnf("make dir for rest default dir error %v", err)
-		}
+	}
+	if err := os.Mkdir(conf.RestDir, models.DefaultDirPerm); err != nil && !os.IsExist(err) {
+		log.Warnf("make dir for rest default dir error %v", err)
 	}
 	m := &Manager{
 		ManagerConfig: conf,
