@@ -1,7 +1,7 @@
 
 # logkit [![Build Status](https://api.travis-ci.org/qiniu/logkit.svg)](http://travis-ci.org/qiniu/logkit)
 
-![logkit LOGO](https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logkit100.png)
+![logkit LOGO](https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logo.svg)
 
 ## 简介
 
@@ -53,7 +53,7 @@ logkit是[七牛Pandora](https://pandora-docs.qiniu.com)开发的一个通用的
 
 logkit本身支持多种数据源，并且可以同时发送多个数据源的数据到Pandora，每个数据源对应一个逻辑上的runner，一个runner负责一个数据源的数据推送，工作原理如下图所示
 
-![logkit 工作原理图](https://qiniu.github.io/pandora-docs/_media/logkit.png)
+![logkit 工作原理图](https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logkit.png)
 
 ## 参与项目(contributing)
 
@@ -158,7 +158,9 @@ logkit.conf是logkit工具基础配置文件，主要用于指定logkit运行时
 
 * 除了解析以外，您可以可以针对解析出来的某个字段内容做数据变换（Transform），可以像管道一样多个拼接。
 
-![尝试解析](https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logkitnewconfig5.png)
+* 填写必要信息以配置数据发送
+
+![发送](https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logkitnewconfig5.png)
 
 * 最后在确认并添加页面点击生成配置文件，再点击添加Runner即可生效
 
