@@ -48,7 +48,7 @@ func Test_RotateClean(t *testing.T) {
 			i++
 		}
 	}()
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 3)
 	exitchan <- struct{}{}
 	ch2 <- struct{}{}
 	time.Sleep(time.Millisecond * 100)

@@ -3,10 +3,9 @@ package mutate
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
-
-	"net/url"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/transforms"
@@ -31,7 +30,7 @@ func (p *UrlParam) transformToMap(strVal string, key string) (map[string]interfa
 		if len(v) == 1 && v[0] != "" {
 			resultMap[keyName] = v[0]
 		} else if len(v) > 1 {
-			resultMap[keyName] = v
+			resultMap[keyName] = strings.Join(v, "&")
 		}
 	}
 	return resultMap, nil

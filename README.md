@@ -1,7 +1,7 @@
 
 # logkit [![Build Status](https://api.travis-ci.org/qiniu/logkit.svg)](http://travis-ci.org/qiniu/logkit)
 
-![logkit LOGO](https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logo.svg)
+![logkit LOGO](https://raw.githubusercontent.com/qiniu/logkit/master/resources/logo.svg)
 
 ## 简介
 
@@ -53,7 +53,7 @@ logkit是[七牛Pandora](https://pandora-docs.qiniu.com)开发的一个通用的
 
 logkit本身支持多种数据源，并且可以同时发送多个数据源的数据到Pandora，每个数据源对应一个逻辑上的runner，一个runner负责一个数据源的数据推送，工作原理如下图所示
 
-![logkit 工作原理图](https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logkit.png)
+![logkit 工作原理图](https://raw.githubusercontent.com/qiniu/logkit/master/resources/logkit.png)
 
 ## 参与项目(contributing)
 
@@ -64,7 +64,7 @@ logkit本身支持多种数据源，并且可以同时发送多个数据源的�
 * [review 代码](https://github.com/qiniu/logkit/pulls)或[提出功能需求](https://github.com/qiniu/logkit/issues/new)
 * 贡献代码（可以贡献的各类插件模块包括[reader](https://github.com/qiniu/logkit/wiki/Readers)、[parser](https://github.com/qiniu/logkit/wiki/Parsers)、[sender](https://github.com/qiniu/logkit/wiki/Senders)以及[transformer](https://github.com/qiniu/logkit/wiki/Transformers)）
 
-## [计划(Roadmap)](https://github.com/qiniu/logkit/blob/develop/ROADMAP.md)
+## [计划(Roadmap)](https://github.com/qiniu/logkit/blob/master/ROADMAP.md)
 
 ## 下载
 
@@ -72,7 +72,7 @@ logkit本身支持多种数据源，并且可以同时发送多个数据源的�
 
 **历史版本**：请移步至[Releases](https://github.com/qiniu/logkit/releases)
 
-**体验版**：develop 分支每天5点会定时构建最新的logkit体验版(仅限linux 64位以及docker)，需要使用的用户可以下载(注意，体验版不含前端的构建更新)。
+**体验版**：master 分支每天5点会定时构建最新的logkit体验版(仅限linux 64位以及docker)，需要使用的用户可以下载(注意，体验版不含前端的构建更新)。
 
 
 [linux 64位版本下载](https://pandora-dl.qiniu.com/nightly/logkit_nightly.tar.gz)
@@ -146,25 +146,25 @@ logkit.conf是logkit工具基础配置文件，主要用于指定logkit运行时
 
 * 首页查看正在运行的logkit状态，或者添加新的logkit Runner
 
-![查看并添加](https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logkitnewconfig1.png)
+![查看并添加](https://raw.githubusercontent.com/qiniu/logkit/master/resources/logkitnewconfig1.png)
 
 * 根据页面配置数据源、配置解析方式、配置发送方式
 
-![配置数据源](https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logkitnewconfig2.png)
+![配置数据源](https://raw.githubusercontent.com/qiniu/logkit/master/resources/logkitnewconfig2.png)
 
 * 在配置解析方式的页面您还可以根据配置尝试解析您的样例数据
 
-![尝试解析](https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logkitnewconfig3.png)
+![尝试解析](https://raw.githubusercontent.com/qiniu/logkit/master/resources/logkitnewconfig3.png)
 
 * 除了解析以外，您可以可以针对解析出来的某个字段内容做数据变换（Transform），可以像管道一样多个拼接。
 
 * 填写必要信息以配置数据发送
 
-![发送](https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logkitnewconfig5.png)
+![发送](https://raw.githubusercontent.com/qiniu/logkit/master/resources/logkitnewconfig5.png)
 
 * 最后在确认并添加页面点击生成配置文件，再点击添加Runner即可生效
 
-![添加runner](https://raw.githubusercontent.com/qiniu/logkit/develop/resources/logkitnewconfig4.png)
+![添加runner](https://raw.githubusercontent.com/qiniu/logkit/master/resources/logkitnewconfig4.png)
 
 ## 升级
 
@@ -179,7 +179,7 @@ logkit.conf是logkit工具基础配置文件，主要用于指定logkit运行时
 
 ## 贡献前端代码
 
-参见前端相关README文件：[logkitweb/README.md](https://github.com/qiniu/logkit/blob/develop/logkitweb/README.md)
+参见前端相关README文件：[logkitweb/README.md](https://github.com/qiniu/logkit/blob/master/logkitweb/README.md)
 
 ## 从源码安装与启动
 
@@ -206,7 +206,7 @@ docker run -d -p 3000:3000 -v /local/logkit/dataconf:/app/confs -v /local/log/pa
 获取部署到Kubernetes的配置文件。
 
 ```
-curl -L -O https://raw.githubusercontent.com/qiniu/logkit/develop/deploy/logkit_on_k8s.yaml
+curl -L -O https://raw.githubusercontent.com/qiniu/logkit/master/deploy/logkit_on_k8s.yaml
 ```
 
 默认情况下，我们的配置文件会使用 `kube-system` 这个 Kubernetes 的 namespace ，所有的部署仅针对该 namespace 生效。如果你想要使用别的 namespace ，只需要修改配置文件的 namespace 部分，将之改为你的 namespace 名称。
