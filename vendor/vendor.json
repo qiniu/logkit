@@ -29,6 +29,12 @@
 			"revisionTime": "2015-10-19T00:40:08Z"
 		},
 		{
+			"checksumSHA1": "6QgEV/GaLKr87Lr9pDLJoOSpK2I=",
+			"path": "github.com/clbanning/mxj",
+			"revision": "f65883c94005a944be54d391bf15d52b4eb869c9",
+			"revisionTime": "2017-12-12T15:34:21Z"
+		},
+		{
 			"checksumSHA1": "dvabztWVQX8f6oMLRyv4dLH+TGY=",
 			"path": "github.com/davecgh/go-spew/spew",
 			"revision": "346938d642f2ec3594ed81d874461961cd0faa76",
