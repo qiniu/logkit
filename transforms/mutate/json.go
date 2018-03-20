@@ -98,15 +98,7 @@ func (g *Json) SampleConfig() string {
 func (g *Json) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
-		{
-			KeyName:      "new",
-			ChooseOnly:   false,
-			Default:      "",
-			Required:     true,
-			DefaultNoUse: false,
-			Description:  "新的字段名",
-			Type:         transforms.TransformTypeString,
-		},
+		transforms.KeyFieldNewRequired,
 	}
 }
 

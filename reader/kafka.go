@@ -222,6 +222,9 @@ func (kr *KafkaReader) SetMode(mode string, v interface{}) error {
 }
 
 func (kr *KafkaReader) Lag() (rl *models.LagInfo, err error) {
+	if kr.Consumer == nil {
+		return nil, errors.New("kafka consumer is closed")
+	}
 	marks := kr.Consumer.HighWaterMarks()
 	rl = &models.LagInfo{
 		SizeUnit: "records",

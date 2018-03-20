@@ -68,6 +68,26 @@ var (
 		Description:  "要进行Transform变化的键(key)",
 		Type:         TransformTypeString,
 	}
+	KeyFieldNew = Option{
+		KeyName:      "new",
+		ChooseOnly:   false,
+		Default:      "",
+		Required:     false,
+		Placeholder:  "new_field_keyname",
+		DefaultNoUse: false,
+		Description:  "新的字段名",
+		Type:         TransformTypeString,
+	}
+	KeyFieldNewRequired = Option{
+		KeyName:      "new",
+		ChooseOnly:   false,
+		Default:      "",
+		Required:     true,
+		Placeholder:  "new_field_keyname",
+		DefaultNoUse: false,
+		Description:  "解析后数据的字段名",
+		Type:         TransformTypeString,
+	}
 	KeyTimezoneoffset = Option{
 		KeyName:    "offset",
 		ChooseOnly: true,
