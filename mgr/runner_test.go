@@ -16,7 +16,6 @@ import (
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/sender"
 	_ "github.com/qiniu/logkit/transforms/all"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
@@ -897,61 +896,61 @@ func TestGetTrend(t *testing.T) {
 
 func TestSpeedTrend(t *testing.T) {
 	tests := []struct {
-		olds  utils.StatsInfo
-		news  utils.StatsInfo
+		olds  StatsInfo
+		news  StatsInfo
 		etime float64
-		exp   utils.StatsInfo
+		exp   StatsInfo
 	}{
 		{
-			olds: utils.StatsInfo{
+			olds: StatsInfo{
 				Success: 1,
 				Speed:   1.0,
 			},
-			news: utils.StatsInfo{
+			news: StatsInfo{
 				Success: 2,
 			},
 			etime: 1.0,
-			exp: utils.StatsInfo{
+			exp: StatsInfo{
 				Success: 2,
 				Speed:   1.0,
 				Trend:   SpeedStable,
 			},
 		},
 		{
-			olds:  utils.StatsInfo{},
-			news:  utils.StatsInfo{},
+			olds:  StatsInfo{},
+			news:  StatsInfo{},
 			etime: 0,
-			exp: utils.StatsInfo{
+			exp: StatsInfo{
 				Success: 0,
 				Speed:   0,
 				Trend:   SpeedStable,
 			},
 		},
 		{
-			olds: utils.StatsInfo{
+			olds: StatsInfo{
 				Success: 1,
 				Speed:   1.0,
 			},
-			news: utils.StatsInfo{
+			news: StatsInfo{
 				Success: 10,
 			},
 			etime: 1.0,
-			exp: utils.StatsInfo{
+			exp: StatsInfo{
 				Success: 10,
 				Speed:   9.0,
 				Trend:   SpeedUp,
 			},
 		},
 		{
-			olds: utils.StatsInfo{
+			olds: StatsInfo{
 				Success: 10,
 				Speed:   10.0,
 			},
-			news: utils.StatsInfo{
+			news: StatsInfo{
 				Success: 11,
 			},
 			etime: 1.0,
-			exp: utils.StatsInfo{
+			exp: StatsInfo{
 				Success: 11,
 				Speed:   1.0,
 				Trend:   SpeedDown,
@@ -974,7 +973,7 @@ func TestCopyStats(t *testing.T) {
 			src: RunnerStatus{
 				ReadDataSize:  10,
 				ReadDataCount: 10,
-				SenderStats: map[string]utils.StatsInfo{
+				SenderStats: map[string]StatsInfo{
 					"a": {
 						Success: 11,
 						Speed:   1.0,
@@ -986,7 +985,7 @@ func TestCopyStats(t *testing.T) {
 						Trend:   SpeedDown,
 					},
 				},
-				TransformStats: map[string]utils.StatsInfo{
+				TransformStats: map[string]StatsInfo{
 					"x": {
 						Success: 2,
 						Speed:   5.0,
@@ -999,7 +998,7 @@ func TestCopyStats(t *testing.T) {
 			exp: RunnerStatus{
 				ReadDataSize:  10,
 				ReadDataCount: 10,
-				SenderStats: map[string]utils.StatsInfo{
+				SenderStats: map[string]StatsInfo{
 					"a": {
 						Success: 11,
 						Speed:   1.0,
@@ -1011,7 +1010,7 @@ func TestCopyStats(t *testing.T) {
 						Trend:   SpeedDown,
 					},
 				},
-				TransformStats: map[string]utils.StatsInfo{
+				TransformStats: map[string]StatsInfo{
 					"x": {
 						Success: 2,
 						Speed:   5.0,
@@ -1024,7 +1023,7 @@ func TestCopyStats(t *testing.T) {
 			dst: RunnerStatus{
 				ReadDataSize:  5,
 				ReadDataCount: 0,
-				SenderStats: map[string]utils.StatsInfo{
+				SenderStats: map[string]StatsInfo{
 					"x": {
 						Success: 0,
 						Speed:   2.0,
@@ -1036,7 +1035,7 @@ func TestCopyStats(t *testing.T) {
 						Trend:   SpeedDown,
 					},
 				},
-				TransformStats: map[string]utils.StatsInfo{
+				TransformStats: map[string]StatsInfo{
 					"s": {
 						Success: 21,
 						Speed:   50.0,
@@ -1110,7 +1109,7 @@ func TestSyslogRunnerX(t *testing.T) {
 
 func TestAddDatasource(t *testing.T) {
 	sourceFroms := []string{"a", "b", "c", "d", "e", "f"}
-	se := &utils.StatsError{
+	se := &StatsError{
 		ErrorIndex: []int{0, 3, 5},
 	}
 	datas := []Data{
@@ -1146,7 +1145,7 @@ func TestAddDatasource(t *testing.T) {
 
 func TestAddDatasourceForErrData(t *testing.T) {
 	sourceFroms := []string{"a", "b", "c", "d", "e", "f"}
-	se := &utils.StatsError{
+	se := &StatsError{
 		ErrorIndex: []int{0, 3, 5},
 	}
 	datas := []Data{

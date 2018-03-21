@@ -1,5 +1,5 @@
 // +build windows
-package utils
+package os
 
 import (
 	"bytes"

@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
@@ -60,7 +59,7 @@ func TestJsonParser(t *testing.T) {
 
 	m, err := p.Parse(tests[0].in)
 	if err != nil {
-		errx, _ := err.(*utils.StatsError)
+		errx, _ := err.(*StatsError)
 		assert.Equal(t, int64(1), errx.StatsInfo.Errors)
 	}
 	if len(m) != 1 {
@@ -70,7 +69,7 @@ func TestJsonParser(t *testing.T) {
 
 	m, err = p.Parse(tests[1].in)
 	if err != nil {
-		errx, _ := err.(*utils.StatsError)
+		errx, _ := err.(*StatsError)
 		if errx.ErrorDetail != nil {
 			t.Error(errx.ErrorDetail)
 		}
@@ -102,7 +101,7 @@ func TestJsonParserForErrData(t *testing.T) {
 
 	m, err := p.Parse(testIn)
 	if err != nil {
-		errx, _ := err.(*utils.StatsError)
+		errx, _ := err.(*StatsError)
 		assert.Equal(t, int64(1), errx.StatsInfo.Errors)
 	}
 	if len(m) != 2 {

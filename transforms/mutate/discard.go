@@ -4,13 +4,12 @@ import (
 	"errors"
 
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
 type Discarder struct {
 	Key   string `json:"key"`
-	stats utils.StatsInfo
+	stats StatsInfo
 }
 
 func (g *Discarder) RawTransform(datas []string) ([]string, error) {
@@ -20,9 +19,9 @@ func (g *Discarder) RawTransform(datas []string) ([]string, error) {
 func (g *Discarder) Transform(datas []Data) ([]Data, error) {
 	var ferr error
 	errnums := 0
-	keys := utils.GetKeys(g.Key)
+	keys := GetKeys(g.Key)
 	for i := range datas {
-		utils.DeleteMapValue(datas[i], keys...)
+		DeleteMapValue(datas[i], keys...)
 	}
 	g.stats.Errors += int64(errnums)
 	g.stats.Success += int64(len(datas) - errnums)
@@ -55,7 +54,7 @@ func (g *Discarder) Stage() string {
 	return transforms.StageAfterParser
 }
 
-func (g *Discarder) Stats() utils.StatsInfo {
+func (g *Discarder) Stats() StatsInfo {
 	return g.stats
 }
 

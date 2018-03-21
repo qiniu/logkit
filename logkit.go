@@ -11,14 +11,16 @@ import (
 	"sort"
 	"time"
 
-	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/cli"
 	config "github.com/qiniu/logkit/conf"
 	_ "github.com/qiniu/logkit/metric/all"
 	"github.com/qiniu/logkit/mgr"
 	"github.com/qiniu/logkit/times"
 	_ "github.com/qiniu/logkit/transforms/all"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
+	utilsos "github.com/qiniu/logkit/utils/os"
+
+	"github.com/qiniu/log"
 
 	"github.com/labstack/echo"
 )
@@ -221,7 +223,7 @@ func main() {
 	switch {
 	case *fversion:
 		fmt.Println("logkit version: ", NextVersion)
-		osInfo := utils.GetOSInfo()
+		osInfo := utilsos.GetOSInfo()
 		fmt.Println("Hostname: ", osInfo.Hostname)
 		fmt.Println("Core: ", osInfo.Core)
 		fmt.Println("OS: ", osInfo.OS)
@@ -247,7 +249,7 @@ func main() {
 	stopRotate := make(chan struct{}, 0)
 	defer close(stopRotate)
 	if conf.LogPath != "" {
-		logdir, logpattern, err := utils.LogDirAndPattern(conf.LogPath)
+		logdir, logpattern, err := LogDirAndPattern(conf.LogPath)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -294,7 +296,7 @@ func main() {
 	if err = rs.Register(); err != nil {
 		log.Fatalf("register master error %v", err)
 	}
-	utils.WaitForInterrupt(func() {
+	utilsos.WaitForInterrupt(func() {
 		rs.Stop()
 		if conf.CleanSelfLog {
 			stopClean <- struct{}{}

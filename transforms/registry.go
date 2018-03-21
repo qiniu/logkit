@@ -1,7 +1,6 @@
 package transforms
 
 import (
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -32,7 +31,7 @@ type Transformer interface {
 	Transform([]Data) ([]Data, error)
 	RawTransform([]string) ([]string, error)
 	Stage() string
-	Stats() utils.StatsInfo
+	Stats() StatsInfo
 }
 
 //transformer初始化方法接口,err不为空表示初始化失败

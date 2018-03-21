@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/wangtuanjie/ip17mon"
@@ -16,7 +15,7 @@ type IpTransformer struct {
 	Key       string `json:"key"`
 	DataPath  string `json:"data_path"`
 	loc       *ip17mon.Locator
-	stats     utils.StatsInfo
+	stats     StatsInfo
 }
 
 func (it *IpTransformer) RawTransform(datas []string) ([]string, error) {
@@ -32,11 +31,11 @@ func (it *IpTransformer) Transform(datas []Data) ([]Data, error) {
 		}
 	}
 	errnums := 0
-	keys := utils.GetKeys(it.Key)
+	keys := GetKeys(it.Key)
 	newkeys := make([]string, len(keys))
 	for i := range datas {
 		copy(newkeys, keys)
-		val, gerr := utils.GetMapValue(datas[i], keys...)
+		val, gerr := GetMapValue(datas[i], keys...)
 		if gerr != nil {
 			errnums++
 			err = fmt.Errorf("transform key %v not exist in data", it.Key)
@@ -55,13 +54,13 @@ func (it *IpTransformer) Transform(datas []Data) ([]Data, error) {
 			continue
 		}
 		newkeys[len(newkeys)-1] = "Region"
-		utils.SetMapValue(datas[i], info.Region, false, newkeys...)
+		SetMapValue(datas[i], info.Region, false, newkeys...)
 		newkeys[len(newkeys)-1] = "City"
-		utils.SetMapValue(datas[i], info.City, false, newkeys...)
+		SetMapValue(datas[i], info.City, false, newkeys...)
 		newkeys[len(newkeys)-1] = "Country"
-		utils.SetMapValue(datas[i], info.Country, false, newkeys...)
+		SetMapValue(datas[i], info.Country, false, newkeys...)
 		newkeys[len(newkeys)-1] = "Isp"
-		utils.SetMapValue(datas[i], info.Isp, false, newkeys...)
+		SetMapValue(datas[i], info.Isp, false, newkeys...)
 	}
 	if err != nil {
 		it.stats.LastError = err.Error()
@@ -113,7 +112,7 @@ func (it *IpTransformer) Stage() string {
 	return it.StageTime
 }
 
-func (it *IpTransformer) Stats() utils.StatsInfo {
+func (it *IpTransformer) Stats() StatsInfo {
 	return it.stats
 }
 

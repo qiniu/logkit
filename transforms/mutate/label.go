@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -13,7 +12,7 @@ type Label struct {
 	Key      string `json:"key"`
 	Value    string `json:"value"`
 	Override bool   `json:"override"`
-	stats    utils.StatsInfo
+	stats    StatsInfo
 }
 
 func (g *Label) RawTransform(datas []string) ([]string, error) {
@@ -23,15 +22,15 @@ func (g *Label) RawTransform(datas []string) ([]string, error) {
 func (g *Label) Transform(datas []Data) ([]Data, error) {
 	var err, ferr error
 	errnums := 0
-	keySlice := utils.GetKeys(g.Key)
+	keySlice := GetKeys(g.Key)
 	for i := range datas {
-		_, gerr := utils.GetMapValue(datas[i], keySlice...)
+		_, gerr := GetMapValue(datas[i], keySlice...)
 		if gerr == nil && !g.Override {
 			errnums++
 			err = fmt.Errorf("the key %v already exists", g.Key)
 			continue
 		}
-		err = utils.SetMapValue(datas[i], g.Value, false, keySlice...)
+		err = SetMapValue(datas[i], g.Value, false, keySlice...)
 		if err != nil {
 			errnums++
 			continue
@@ -92,7 +91,7 @@ func (g *Label) Stage() string {
 	return transforms.StageAfterParser
 }
 
-func (g *Label) Stats() utils.StatsInfo {
+func (g *Label) Stats() StatsInfo {
 	return g.stats
 }
 

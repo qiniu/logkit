@@ -10,7 +10,6 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/times"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
@@ -55,7 +54,7 @@ func Test_CsvParser(t *testing.T) {
 		`4 fufu 3.17  ` + tmstr, //correct,jsonmap允许为空
 	}
 	datas, err := parser.Parse(lines)
-	if c, ok := err.(*utils.StatsError); ok {
+	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
 	}
 	assert.Error(t, err)
@@ -106,7 +105,7 @@ func Test_CsvParserForErrData(t *testing.T) {
 		`4 fufu 3.17  ` + tmstr, //correct,jsonmap允许为空
 	}
 	datas, err := parser.Parse(lines)
-	if c, ok := err.(*utils.StatsError); ok {
+	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
 	}
 	assert.Error(t, err)
@@ -146,7 +145,7 @@ func Test_Jsonmap(t *testing.T) {
 		"123 {\"x\":1,\"y\":\"2\"} {\"x\":1,\"y\":\"2\",\"z\":\"3\"} {\"x\":1.0,\"y\":\"2\",\"z\":\"3.0\"}",
 	}
 	datas, err := parser.Parse(lines)
-	if c, ok := err.(*utils.StatsError); ok {
+	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
 	}
 	if err != nil {
@@ -184,7 +183,7 @@ func Test_CsvParserLabel(t *testing.T) {
 		"123 fufu 3.14 999",
 	}
 	datas, err := parser.Parse(lines)
-	if c, ok := err.(*utils.StatsError); ok {
+	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
 	}
 	assert.Error(t, err)
@@ -285,7 +284,7 @@ func TestRename(t *testing.T) {
 		`REQ	REPORT	15112467445566096	POST	/v1/activate	{"Accept-Encoding":"gzip","Content-Length":"0","Host":"10.200.20.68:2308","IP":"10.200.20.41","User-Agent":"Go-http-client/1.1"}		200    	{"Content-Length":"55","Content-Type":"application/json","X-Log":["REPORT:1"],"X-Reqid":"pyAAAO0mQ0HoBvkU"}	{"user":"13805xxxx4","password":"abcjofewfj"}	55	14946`,
 	}
 	gotDatas, err := parser.Parse(lines)
-	if c, ok := err.(*utils.StatsError); ok {
+	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
 	}
 	assert.NoError(t, err)
@@ -328,7 +327,7 @@ func TestRename(t *testing.T) {
 	parser, err = NewCsvParser(c)
 	assert.NoError(t, err)
 	gotDatas, err = parser.Parse(lines)
-	if c, ok := err.(*utils.StatsError); ok {
+	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
 	}
 	assert.NoError(t, err)

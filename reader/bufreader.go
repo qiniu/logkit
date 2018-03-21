@@ -20,8 +20,7 @@ import (
 
 	"github.com/axgle/mahonia"
 	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/utils"
-	"github.com/qiniu/logkit/utils/models"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (
@@ -62,7 +61,7 @@ type BufReader struct {
 	meta            *Meta // 存放offset的元信息
 	multiLineRegexp *regexp.Regexp
 
-	stats     utils.StatsInfo
+	stats     StatsInfo
 	statsLock sync.RWMutex
 }
 
@@ -395,7 +394,7 @@ func (b *BufReader) Close() error {
 	return b.rd.Close()
 }
 
-func (b *BufReader) Status() utils.StatsInfo {
+func (b *BufReader) Status() StatsInfo {
 	b.statsLock.RLock()
 	defer b.statsLock.RUnlock()
 	return b.stats
@@ -407,7 +406,7 @@ func (b *BufReader) setStatsError(err string) {
 	b.stats.LastError = err
 }
 
-func (b *BufReader) Lag() (rl *models.LagInfo, err error) {
+func (b *BufReader) Lag() (rl *LagInfo, err error) {
 	lr, ok := b.rd.(LagReader)
 	if ok {
 		return lr.Lag()

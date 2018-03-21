@@ -11,7 +11,6 @@ import (
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/queue"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
@@ -60,7 +59,7 @@ type FtSender struct {
 	procs       int //发送并发数
 	runnerName  string
 	opt         *FtOption
-	stats       utils.StatsInfo
+	stats       StatsInfo
 	statsMutex  *sync.RWMutex
 	jsontool    jsoniter.API
 }
@@ -110,7 +109,7 @@ func NewFtSender(sender Sender, conf conf.MapConf, ftSaveLogPath string) (*FtSen
 
 func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSender, error) {
 	var lq, bq queue.BackendQueue
-	err := utils.CreateDirIfNotExist(opt.saveLogPath)
+	err := CreateDirIfNotExist(opt.saveLogPath)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +143,7 @@ func (ft *FtSender) Name() string {
 }
 
 func (ft *FtSender) Send(datas []Data) error {
-	se := &utils.StatsError{Ft: true}
+	se := &StatsError{Ft: true}
 	if ft.strategy == KeyFtStrategyBackupOnly {
 		// 尝试直接发送数据，当数据失败的时候会加入到本地重试队列。外部不需要重试
 		isRetry := false
@@ -183,13 +182,13 @@ func (ft *FtSender) Send(datas []Data) error {
 	return se
 }
 
-func (ft *FtSender) Stats() utils.StatsInfo {
+func (ft *FtSender) Stats() StatsInfo {
 	ft.statsMutex.RLock()
 	defer ft.statsMutex.RUnlock()
 	return ft.stats
 }
 
-func (ft *FtSender) Restore(info *utils.StatsInfo) {
+func (ft *FtSender) Restore(info *StatsInfo) {
 	ft.statsMutex.Lock()
 	defer ft.statsMutex.Unlock()
 	ft.stats = *info
@@ -299,7 +298,7 @@ func ConvertDatasBack(ins []Data) []map[string]interface{} {
 func (ft *FtSender) trySendDatas(datas []Data, failSleep int, isRetry bool) (backDataContext []*datasContext, err error) {
 	err = ft.innerSender.Send(datas)
 	ft.statsMutex.Lock()
-	if c, ok := err.(*utils.StatsError); ok {
+	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
 		if isRetry {
 			ft.stats.Errors -= c.Success

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 
 	elasticV6 "github.com/olivere/elastic"
 	elasticV3 "gopkg.in/olivere/elastic.v3"
@@ -35,7 +35,7 @@ type ElasticReader struct {
 	meta   *Meta  // 记录offset的元数据
 	offset string // 当前处理es的offset
 
-	stats     utils.StatsInfo
+	stats     StatsInfo
 	statsLock sync.RWMutex
 
 	status  int32
@@ -82,7 +82,7 @@ func (er *ElasticReader) setStatsError(err string) {
 	er.stats.LastError = err
 }
 
-func (er *ElasticReader) Status() utils.StatsInfo {
+func (er *ElasticReader) Status() StatsInfo {
 	er.statsLock.RLock()
 	defer er.statsLock.RUnlock()
 	return er.stats

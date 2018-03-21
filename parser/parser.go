@@ -26,7 +26,6 @@ type Flushable interface {
 const (
 	KeyParserName           = GlobalKeyName
 	KeyParserType           = "type"
-	KeyRunnerName           = "runner_name"
 	KeyLabels               = "labels" // 额外增加的标签信息，比如机器信息等
 	KeyDisableRecordErrData = "disable_record_errdata"
 )

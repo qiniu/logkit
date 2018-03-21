@@ -4,7 +4,8 @@ import (
 	"testing"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,5 +17,5 @@ func TestNewRedisReader(t *testing.T) {
 
 	rr, err := NewRedisReader(nil, myconf)
 	assert.NoError(t, err)
-	assert.Equal(t, utils.StatsInfo{}, rr.Status())
+	assert.Equal(t, StatsInfo{}, rr.Status())
 }

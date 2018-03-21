@@ -10,7 +10,7 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/robfig/cron"
 )
@@ -34,7 +34,7 @@ type ScriptReader struct {
 	loop         bool
 	loopDuration time.Duration
 
-	stats     utils.StatsInfo
+	stats     StatsInfo
 	statsLock sync.RWMutex
 }
 
@@ -218,7 +218,7 @@ func (sr *ScriptReader) setStatsError(err string) {
 
 func checkPath(meta *Meta, path string) (string, error) {
 	for {
-		realPath, fileInfo, err := utils.GetRealPath(path)
+		realPath, fileInfo, err := GetRealPath(path)
 		if err != nil || fileInfo == nil {
 			log.Warnf("Runner[%v] %s - utils.GetRealPath failed, err:%v", meta.RunnerName, path, err)
 			time.Sleep(time.Minute)
@@ -230,7 +230,7 @@ func checkPath(meta *Meta, path string) (string, error) {
 			time.Sleep(time.Minute)
 			continue
 		}
-		utils.CheckFileMode(realPath, fileMode)
+		CheckFileMode(realPath, fileMode)
 		return realPath, nil
 	}
 }

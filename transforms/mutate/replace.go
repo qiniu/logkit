@@ -5,7 +5,6 @@ import (
 	"regexp"
 
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -15,7 +14,7 @@ type Replacer struct {
 	Old       string `json:"old"`
 	New       string `json:"new"`
 	Regex     bool   `json:"regex"`
-	stats     utils.StatsInfo
+	stats     StatsInfo
 	Regexp    *regexp.Regexp
 }
 
@@ -35,9 +34,9 @@ func (g *Replacer) Init() error {
 func (g *Replacer) Transform(datas []Data) ([]Data, error) {
 	var err, ferr error
 	errnums := 0
-	keys := utils.GetKeys(g.Key)
+	keys := GetKeys(g.Key)
 	for i := range datas {
-		val, gerr := utils.GetMapValue(datas[i], keys...)
+		val, gerr := GetMapValue(datas[i], keys...)
 		if gerr != nil {
 			errnums++
 			err = fmt.Errorf("transform key %v not exist in data", g.Key)
@@ -49,7 +48,7 @@ func (g *Replacer) Transform(datas []Data) ([]Data, error) {
 			err = fmt.Errorf("transform key %v data type is not string", g.Key)
 			continue
 		}
-		utils.SetMapValue(datas[i], g.Regexp.ReplaceAllString(strval, g.New), false, keys...)
+		SetMapValue(datas[i], g.Regexp.ReplaceAllString(strval, g.New), false, keys...)
 	}
 
 	if err != nil {
@@ -132,7 +131,7 @@ func (g *Replacer) Stage() string {
 	return g.StageTime
 }
 
-func (g *Replacer) Stats() utils.StatsInfo {
+func (g *Replacer) Stats() StatsInfo {
 	return g.stats
 }
 

@@ -1,6 +1,11 @@
 package models
 
-import "github.com/qiniu/logkit/conf"
+import (
+	"fmt"
+	"sync/atomic"
+
+	"github.com/qiniu/logkit/conf"
+)
 
 const (
 	GlobalKeyName = "name"
@@ -61,4 +66,50 @@ type LagInfo struct {
 	Size     int64  `json:"size"`
 	SizeUnit string `json:"sizeunit"`
 	Ftlags   int64  `json:"ftlags"`
+}
+
+type StatsError struct {
+	StatsInfo
+	ErrorDetail error `json:"error"`
+	Ft          bool  `json:"-"`
+	ErrorIndex  []int
+}
+
+type StatsInfo struct {
+	Errors    int64   `json:"errors"`
+	Success   int64   `json:"success"`
+	Speed     float64 `json:"speed"`
+	Trend     string  `json:"trend"`
+	LastError string  `json:"last_error"`
+	Ftlag     int64   `json:"-"`
+}
+
+func (se *StatsError) AddSuccess() {
+	if se == nil {
+		return
+	}
+	atomic.AddInt64(&se.Success, 1)
+}
+
+func (se *StatsError) AddErrors() {
+	if se == nil {
+		return
+	}
+	atomic.AddInt64(&se.Errors, 1)
+}
+
+func (se *StatsError) Error() string {
+	if se == nil {
+		return ""
+	}
+	return fmt.Sprintf("success %v errors %v errordetail %v", se.Success, se.Errors, se.ErrorDetail)
+}
+
+func (se *StatsError) ErrorIndexIn(idx int) bool {
+	for _, v := range se.ErrorIndex {
+		if v == idx {
+			return true
+		}
+	}
+	return false
 }

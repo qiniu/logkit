@@ -7,7 +7,6 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/times"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -273,7 +272,7 @@ func (p *QiniulogParser) parse(line string) (d Data, err error) {
 }
 func (p *QiniulogParser) Parse(lines []string) ([]Data, error) {
 	datas := []Data{}
-	se := &utils.StatsError{}
+	se := &StatsError{}
 	for idx, line := range lines {
 		d, err := p.parse(line)
 		if err != nil {

@@ -7,7 +7,6 @@ import (
 
 	. "github.com/qiniu/logkit/utils/models"
 
-	"github.com/qiniu/logkit/utils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,7 +23,7 @@ func TestMySqlLogParser1(t *testing.T) {
 	p, err := NewMysqllogParser(nil)
 	assert.NoError(t, err)
 	datas, err := p.Parse(strings.Split(content, "\n"))
-	if st, ok := err.(*utils.StatsError); ok {
+	if st, ok := err.(*StatsError); ok {
 		err = st.ErrorDetail
 		assert.Equal(t, "", st.LastError, st.LastError)
 		assert.Equal(t, int64(0), st.Errors)

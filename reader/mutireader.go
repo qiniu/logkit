@@ -12,10 +12,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/utils"
-	"github.com/qiniu/logkit/utils/models"
+	. "github.com/qiniu/logkit/utils/models"
+
+	"github.com/json-iterator/go"
 )
 
 type MultiReader struct {
@@ -38,7 +38,7 @@ type MultiReader struct {
 	maxOpenFiles   int
 	whence         string
 
-	stats     utils.StatsInfo
+	stats     StatsInfo
 	statsLock sync.RWMutex
 }
 
@@ -53,7 +53,7 @@ type ActiveReader struct {
 	inactive     int32 //当inactive>0 时才会被expire回收
 	runnerName   string
 
-	stats     utils.StatsInfo
+	stats     StatsInfo
 	statsLock sync.RWMutex
 }
 
@@ -182,13 +182,13 @@ func (ar *ActiveReader) setStatsError(err string) {
 	ar.stats.LastError = err
 }
 
-func (ar *ActiveReader) Status() utils.StatsInfo {
+func (ar *ActiveReader) Status() StatsInfo {
 	ar.statsLock.RLock()
 	defer ar.statsLock.RUnlock()
 	return ar.stats
 }
 
-func (ar *ActiveReader) Lag() (rl *models.LagInfo, err error) {
+func (ar *ActiveReader) Lag() (rl *LagInfo, err error) {
 	return ar.br.Lag()
 }
 
@@ -323,7 +323,7 @@ func (mr *MultiReader) StatLogPath() {
 	}
 	var newaddsPath []string
 	for _, mc := range matches {
-		rp, fi, err := utils.GetRealPath(mc)
+		rp, fi, err := GetRealPath(mc)
 		if err != nil {
 			log.Errorf("Runner[%v] file pattern %v match %v stat error %v, ignore this match...", mr.meta.RunnerName, mr.logPathPattern, mc, err)
 			continue
@@ -399,7 +399,7 @@ func (mr *MultiReader) setStatsError(err string) {
 	mr.stats.LastError = err
 }
 
-func (mr *MultiReader) Status() utils.StatsInfo {
+func (mr *MultiReader) Status() StatsInfo {
 	mr.statsLock.RLock()
 	defer mr.statsLock.RUnlock()
 
@@ -502,8 +502,8 @@ func (mr *MultiReader) SyncMeta() {
 	return
 }
 
-func (mr *MultiReader) Lag() (rl *models.LagInfo, err error) {
-	rl = &models.LagInfo{}
+func (mr *MultiReader) Lag() (rl *LagInfo, err error) {
+	rl = &LagInfo{}
 	ars := mr.getActiveReaders()
 	for _, ar := range ars {
 		lg, err := ar.Lag()

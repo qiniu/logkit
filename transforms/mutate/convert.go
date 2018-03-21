@@ -5,14 +5,13 @@ import (
 	"fmt"
 
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 )
 
 type Converter struct {
 	DSL   string `json:"dsl"`
-	stats utils.StatsInfo
+	stats StatsInfo
 }
 
 func (g *Converter) RawTransform(datas []string) ([]string, error) {
@@ -30,12 +29,12 @@ func (g *Converter) Transform(datas []Data) ([]Data, error) {
 	} else {
 		keyss := map[int][]string{}
 		for i, sc := range schemas {
-			keys := utils.GetKeys(sc.Key)
+			keys := GetKeys(sc.Key)
 			keyss[i] = keys
 		}
 		for i := range datas {
 			for k, keys := range keyss {
-				val, gerr := utils.GetMapValue(datas[i], keys...)
+				val, gerr := GetMapValue(datas[i], keys...)
 				if gerr != nil {
 					errnums++
 					err = fmt.Errorf("transform key %v not exist in data", schemas[k].Key)
@@ -45,7 +44,7 @@ func (g *Converter) Transform(datas []Data) ([]Data, error) {
 				if err != nil {
 					errnums++
 				}
-				utils.SetMapValue(datas[i], val, false, keys...)
+				SetMapValue(datas[i], val, false, keys...)
 			}
 		}
 	}
@@ -94,7 +93,7 @@ func (g *Converter) Stage() string {
 	return transforms.StageAfterParser
 }
 
-func (g *Converter) Stats() utils.StatsInfo {
+func (g *Converter) Stats() StatsInfo {
 	return g.stats
 }
 

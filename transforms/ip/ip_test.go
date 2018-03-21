@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/stretchr/testify/assert"
@@ -27,7 +26,7 @@ func TestIpTransformer(t *testing.T) {
 			"ip": "x.x.x.x",
 		}}
 	assert.Equal(t, exp, data)
-	expe := utils.StatsInfo{
+	expe := StatsInfo{
 		Errors:    1,
 		Success:   1,
 		LastError: "invalid ip format",
@@ -55,7 +54,7 @@ func TestIpTransformer(t *testing.T) {
 		},
 	}
 	assert.Equal(t, exp2, data2)
-	expe2 := utils.StatsInfo{
+	expe2 := StatsInfo{
 		Errors:    1,
 		Success:   1,
 		LastError: "invalid ip format",

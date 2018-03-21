@@ -5,12 +5,11 @@ import (
 	"fmt"
 
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
 type ClockTrail struct {
-	stats utils.StatsInfo
+	stats StatsInfo
 }
 
 func (g *ClockTrail) RawTransform(datas []string) ([]string, error) {
@@ -89,7 +88,7 @@ func (g *ClockTrail) Stage() string {
 	return transforms.StageAfterParser
 }
 
-func (g *ClockTrail) Stats() utils.StatsInfo {
+func (g *ClockTrail) Stats() StatsInfo {
 	return g.stats
 }
 

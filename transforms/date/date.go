@@ -10,7 +10,6 @@ import (
 
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -19,7 +18,7 @@ type DateTrans struct {
 	Offset       int    `json:"offset"`
 	LayoutBefore string `json:"time_layout_before"`
 	LayoutAfter  string `json:"time_layout_after"`
-	stats        utils.StatsInfo
+	stats        StatsInfo
 }
 
 func (g *DateTrans) RawTransform(datas []string) ([]string, error) {
@@ -29,9 +28,9 @@ func (g *DateTrans) RawTransform(datas []string) ([]string, error) {
 func (g *DateTrans) Transform(datas []Data) ([]Data, error) {
 	var err, ferr error
 	errnums := 0
-	keys := utils.GetKeys(g.Key)
+	keys := GetKeys(g.Key)
 	for i := range datas {
-		val, err := utils.GetMapValue(datas[i], keys...)
+		val, err := GetMapValue(datas[i], keys...)
 		if err != nil {
 			errnums++
 			err = fmt.Errorf("transform key %v not exist in data", g.Key)
@@ -42,7 +41,7 @@ func (g *DateTrans) Transform(datas []Data) ([]Data, error) {
 			errnums++
 			continue
 		}
-		utils.SetMapValue(datas[i], val, false, keys...)
+		SetMapValue(datas[i], val, false, keys...)
 	}
 	if err != nil {
 		g.stats.LastError = err.Error()
@@ -162,7 +161,7 @@ func (g *DateTrans) Stage() string {
 	return transforms.StageAfterParser
 }
 
-func (g *DateTrans) Stats() utils.StatsInfo {
+func (g *DateTrans) Stats() StatsInfo {
 	return g.stats
 }
 

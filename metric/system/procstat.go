@@ -12,8 +12,8 @@ import (
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/metric"
 	. "github.com/qiniu/logkit/metric/system/utils"
-	"github.com/qiniu/logkit/utils"
 	"github.com/qiniu/logkit/utils/models"
+	utilsos "github.com/qiniu/logkit/utils/os"
 
 	"github.com/shirou/gopsutil/process"
 )
@@ -656,7 +656,7 @@ func runCommand(comm string) (pids []PID, err error) {
 
 func init() {
 	metric.Add(TypeMetricProcstat, func() metric.Collector {
-		osInfo := utils.GetOSInfo()
+		osInfo := utilsos.GetOSInfo()
 		return &Procstat{
 			IoRelated:       true,
 			MemRelated:      true,

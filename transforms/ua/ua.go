@@ -6,7 +6,6 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/ua-parser/uap-go/uaparser"
@@ -15,7 +14,7 @@ import (
 type UATransformer struct {
 	Key              string `json:"key"`
 	RegexYmlFilePath string `json:"regex_yml_path"`
-	stats            utils.StatsInfo
+	stats            StatsInfo
 	uap              *uaparser.Parser
 }
 
@@ -42,11 +41,11 @@ func (it *UATransformer) Transform(datas []Data) ([]Data, error) {
 	}
 	var err, ferr error
 	errnums := 0
-	keys := utils.GetKeys(it.Key)
+	keys := GetKeys(it.Key)
 	newkeys := make([]string, len(keys))
 	for i := range datas {
 		copy(newkeys, keys)
-		val, gerr := utils.GetMapValue(datas[i], keys...)
+		val, gerr := GetMapValue(datas[i], keys...)
 		if gerr != nil {
 			errnums++
 			err = fmt.Errorf("transform key %v not exist in data", it.Key)
@@ -67,51 +66,51 @@ func (it *UATransformer) Transform(datas []Data) ([]Data, error) {
 
 		if client.UserAgent.Family != "" {
 			newkeys[len(newkeys)-1] = "UA_Family"
-			utils.SetMapValue(datas[i], client.UserAgent.Family, false, newkeys...)
+			SetMapValue(datas[i], client.UserAgent.Family, false, newkeys...)
 		}
 		if client.UserAgent.Major != "" {
 			newkeys[len(newkeys)-1] = "UA_Major"
-			utils.SetMapValue(datas[i], client.UserAgent.Major, false, newkeys...)
+			SetMapValue(datas[i], client.UserAgent.Major, false, newkeys...)
 		}
 		if client.UserAgent.Minor != "" {
 			newkeys[len(newkeys)-1] = "UA_Minor"
-			utils.SetMapValue(datas[i], client.UserAgent.Minor, false, newkeys...)
+			SetMapValue(datas[i], client.UserAgent.Minor, false, newkeys...)
 		}
 		if client.UserAgent.Patch != "" {
 			newkeys[len(newkeys)-1] = "UA_Patch"
-			utils.SetMapValue(datas[i], client.UserAgent.Patch, false, newkeys...)
+			SetMapValue(datas[i], client.UserAgent.Patch, false, newkeys...)
 		}
 		if client.Device.Family != "" {
 			newkeys[len(newkeys)-1] = "UA_Device_Family"
-			utils.SetMapValue(datas[i], client.Device.Family, false, newkeys...)
+			SetMapValue(datas[i], client.Device.Family, false, newkeys...)
 		}
 		if client.Device.Brand != "" {
 			newkeys[len(newkeys)-1] = "UA_Device_Brand"
-			utils.SetMapValue(datas[i], client.Device.Brand, false, newkeys...)
+			SetMapValue(datas[i], client.Device.Brand, false, newkeys...)
 		}
 		if client.Device.Model != "" {
 			newkeys[len(newkeys)-1] = "UA_Device_Model"
-			utils.SetMapValue(datas[i], client.Device.Model, false, newkeys...)
+			SetMapValue(datas[i], client.Device.Model, false, newkeys...)
 		}
 		if client.Os.Family != "" {
 			newkeys[len(newkeys)-1] = "UA_OS_Family"
-			utils.SetMapValue(datas[i], client.Os.Family, false, newkeys...)
+			SetMapValue(datas[i], client.Os.Family, false, newkeys...)
 		}
 		if client.Os.Patch != "" {
 			newkeys[len(newkeys)-1] = "UA_OS_Patch"
-			utils.SetMapValue(datas[i], client.Os.Patch, false, newkeys...)
+			SetMapValue(datas[i], client.Os.Patch, false, newkeys...)
 		}
 		if client.Os.Minor != "" {
 			newkeys[len(newkeys)-1] = "UA_OS_Minor"
-			utils.SetMapValue(datas[i], client.Os.Minor, false, newkeys...)
+			SetMapValue(datas[i], client.Os.Minor, false, newkeys...)
 		}
 		if client.Os.Major != "" {
 			newkeys[len(newkeys)-1] = "UA_OS_Major"
-			utils.SetMapValue(datas[i], client.Os.Major, false, newkeys...)
+			SetMapValue(datas[i], client.Os.Major, false, newkeys...)
 		}
 		if client.Os.PatchMinor != "" {
 			newkeys[len(newkeys)-1] = "UA_OS_PatchMinor"
-			utils.SetMapValue(datas[i], client.Os.PatchMinor, false, newkeys...)
+			SetMapValue(datas[i], client.Os.PatchMinor, false, newkeys...)
 		}
 
 	}
@@ -159,7 +158,7 @@ func (it *UATransformer) Stage() string {
 	return transforms.StageAfterParser
 }
 
-func (it *UATransformer) Stats() utils.StatsInfo {
+func (it *UATransformer) Stats() StatsInfo {
 	return it.stats
 }
 

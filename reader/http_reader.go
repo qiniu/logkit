@@ -14,7 +14,6 @@ import (
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/queue"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/labstack/echo"
@@ -48,11 +47,11 @@ type HttpReader struct {
 func NewHttpReader(meta *Meta, conf conf.MapConf) (*HttpReader, error) {
 	address, _ := conf.GetStringOr(KeyHttpServiceAddress, DefaultHttpServiceAddress)
 	path, _ := conf.GetStringOr(KeyHttpServicePath, DefaultHttpServicePath)
-	address, _ = utils.RemoveHttpProtocal(address)
+	address, _ = RemoveHttpProtocal(address)
 
 	bq := queue.NewDiskQueue("HttpReader<"+address+">_buffer", meta.BufFile(), DefaultMaxBytesPerFile, 0,
 		DefaultMaxBytesPerFile, DefaultSyncEvery, DefaultSyncEvery, time.Second*2, DefaultWriteSpeedLimit, false, 0)
-	err := utils.CreateDirIfNotExist(meta.BufFile())
+	err := CreateDirIfNotExist(meta.BufFile())
 	if err != nil {
 		return nil, err
 	}

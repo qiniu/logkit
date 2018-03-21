@@ -5,14 +5,13 @@ import (
 	"fmt"
 
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
 type Rename struct {
 	Key        string `json:"key"`
 	NewKeyName string `json:"new_key_name"`
-	stats      utils.StatsInfo
+	stats      StatsInfo
 }
 
 func (g *Rename) RawTransform(datas []string) ([]string, error) {
@@ -22,17 +21,17 @@ func (g *Rename) RawTransform(datas []string) ([]string, error) {
 func (g *Rename) Transform(datas []Data) ([]Data, error) {
 	var err, ferr error
 	errnums := 0
-	keySlice := utils.GetKeys(g.Key)
-	newKeySlice := utils.GetKeys(g.NewKeyName)
+	keySlice := GetKeys(g.Key)
+	newKeySlice := GetKeys(g.NewKeyName)
 	for i := range datas {
-		val, gerr := utils.GetMapValue(datas[i], keySlice...)
+		val, gerr := GetMapValue(datas[i], keySlice...)
 		if gerr != nil {
 			errnums++
 			fmt.Errorf("transform key %v not exist in data", g.Key)
 			continue
 		}
-		utils.DeleteMapValue(datas[i], keySlice...)
-		err = utils.SetMapValue(datas[i], val, false, newKeySlice...)
+		DeleteMapValue(datas[i], keySlice...)
+		err = SetMapValue(datas[i], val, false, newKeySlice...)
 		if err != nil {
 			errnums++
 			fmt.Errorf("the new key %v already exists ", g.NewKeyName)
@@ -85,7 +84,7 @@ func (g *Rename) Stage() string {
 	return transforms.StageAfterParser
 }
 
-func (g *Rename) Stats() utils.StatsInfo {
+func (g *Rename) Stats() StatsInfo {
 	return g.stats
 }
 
