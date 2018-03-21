@@ -29,11 +29,12 @@ var DEFAULT_LOGKIT_REST_DIR = "/.logkitconfs"
 type ManagerConfig struct {
 	BindHost string `json:"bind_host"`
 
-	Idc        string        `json:"idc"`
-	Zone       string        `json:"zone"`
-	RestDir    string        `json:"rest_dir"`
-	Cluster    ClusterConfig `json:"cluster"`
-	DisableWeb bool          `json:"disable_web"`
+	Idc          string        `json:"idc"`
+	Zone         string        `json:"zone"`
+	RestDir      string        `json:"rest_dir"`
+	Cluster      ClusterConfig `json:"cluster"`
+	DisableWeb   bool          `json:"disable_web"`
+	ServerBackup bool          `json:"-"`
 }
 
 type cleanQueue struct {
@@ -73,9 +74,16 @@ func NewCustomManager(conf ManagerConfig, pr *parser.ParserRegistry, sr *sender.
 			return nil, fmt.Errorf("get system current workdir error %v, please set rest_dir config", err)
 		}
 		conf.RestDir = dir + DEFAULT_LOGKIT_REST_DIR
+	} else {
+		var err error
+		if conf.RestDir, err = filepath.Abs(conf.RestDir); err != nil {
+			return nil, err
+		}
 	}
-	if err := os.Mkdir(conf.RestDir, models.DefaultDirPerm); err != nil && !os.IsExist(err) {
-		log.Warnf("make dir for rest default dir error %v", err)
+	if !conf.ServerBackup {
+		if err := os.MkdirAll(conf.RestDir, models.DefaultDirPerm); err != nil && !os.IsExist(err) {
+			log.Warnf("make dir for rest default dir error %v", err)
+		}
 	}
 	m := &Manager{
 		ManagerConfig: conf,
@@ -588,15 +596,18 @@ func TrimSecretInfo(conf RunnerConfig) RunnerConfig {
 	return conf
 }
 
-func backupRunnerConfig(rootDir, filename string, rconf RunnerConfig) error {
+func (m *Manager) backupRunnerConfig(filename string, rconf RunnerConfig) error {
+	if m.ServerBackup {
+		return nil
+	}
 	confBytes, err := jsoniter.MarshalIndent(rconf, "", "    ")
 	if err != nil {
 		return fmt.Errorf("runner config %v marshal failed, err is %v", rconf, err)
 	}
 	// 判断默认备份文件夹是否存在，不存在就尝试创建
-	if _, err := os.Stat(rootDir); err != nil {
+	if _, err := os.Stat(m.RestDir); err != nil {
 		if os.IsNotExist(err) {
-			if err = os.Mkdir(rootDir, models.DefaultDirPerm); err != nil && !os.IsExist(err) {
+			if err = os.Mkdir(m.RestDir, models.DefaultDirPerm); err != nil && !os.IsExist(err) {
 				return fmt.Errorf("rest default dir not exists and make dir failed, err is %v", err)
 			}
 		}
@@ -644,7 +655,7 @@ func (m *Manager) AddRunner(name string, conf RunnerConfig) (err error) {
 	if err = m.ForkRunner(filename, conf, true); err != nil {
 		return fmt.Errorf("forkRunner %v error %v", name, err)
 	}
-	if err = backupRunnerConfig(m.RestDir, filename, conf); err != nil {
+	if err = m.backupRunnerConfig(filename, conf); err != nil {
 		// 回滚, 删除创建的 runner, 备份配置文件失败，所以此处不需要从磁盘删除配置文件
 		if rollBackErr := m.Remove(filename); rollBackErr != nil {
 			log.Errorf("runner <%v> backup RunnerConfig error and rollback error %v", rollBackErr)
@@ -671,7 +682,7 @@ func (m *Manager) UpdateRunner(name string, conf RunnerConfig) (err error) {
 		}
 		return fmt.Errorf("forkRunner %v error %v", filename, err)
 	}
-	if err = backupRunnerConfig(m.RestDir, filename, conf); err != nil {
+	if err = m.backupRunnerConfig(filename, conf); err != nil {
 		// 备份配置失败，回滚
 		if subErr := m.Remove(filename); subErr != nil {
 			log.Errorf("runner %v update backup config error and rollback error %v", filename, subErr)
@@ -695,7 +706,7 @@ func (m *Manager) StartRunner(name string) (err error) {
 	if err = m.ForkRunner(filename, conf, true); err != nil {
 		return fmt.Errorf("forkRunner %v error %v", filename, err)
 	}
-	if err = backupRunnerConfig(m.RestDir, filename, conf); err != nil {
+	if err = m.backupRunnerConfig(filename, conf); err != nil {
 		// 备份配置文件失败，回滚
 		if subErr := m.RemoveWithConfig(filename, false); subErr != nil {
 			log.Errorf("runner %v start backup config error and rollback error %v", name, subErr)
@@ -730,7 +741,7 @@ func (m *Manager) StopRunner(name string) (err error) {
 	m.lock.Lock()
 	m.runnerConfig[filename] = conf
 	m.lock.Unlock()
-	if err = backupRunnerConfig(m.RestDir, filename, conf); err != nil {
+	if err = m.backupRunnerConfig(filename, conf); err != nil {
 		// 备份配置文件失败，回滚
 		conf.IsStopped = false
 		if subErr := m.ForkRunner(filename, conf, true); subErr != nil {
@@ -805,6 +816,10 @@ func (m *Manager) DeleteRunner(name string) (err error) {
 		}
 	}
 	if err = os.Remove(filename); err != nil {
+		if os.IsNotExist(err) {
+			err = nil
+			return
+		}
 		// 回滚
 		if subErr := m.ForkRunner(filename, conf, true); subErr != nil {
 			log.Errorf("remove runner %v error and rollback error %v", filename, subErr)
