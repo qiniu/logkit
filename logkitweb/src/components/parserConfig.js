@@ -288,7 +288,7 @@ class Parser extends Component {
     let data = getFieldsValue();
     if (this.state.currentOption === 'grok') {
       if (data[this.state.currentOption].grok_custom_patterns != '' && data[this.state.currentOption].grok_custom_patterns != undefined) {
-        data[this.state.currentOption].grok_custom_patterns = window.btoa(data[this.state.currentOption].grok_custom_patterns)
+        data[this.state.currentOption].grok_custom_patterns = window.btoa(encodeURIComponent(data[this.state.currentOption].grok_custom_patterns))
       }
     }
     const requestData = {
