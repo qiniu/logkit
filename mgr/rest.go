@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -19,9 +20,8 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
 
-	"github.com/qiniu/log"
-
 	"github.com/labstack/echo"
+	"github.com/qiniu/log"
 )
 
 var DEFAULT_PORT = 3000
@@ -288,9 +288,15 @@ func convertWebParserConfig(conf conf.MapConf) conf.MapConf {
 	if rawCustomPatterns != "" {
 		CustomPatterns, err := base64.StdEncoding.DecodeString(rawCustomPatterns)
 		if err != nil {
+			log.Errorf("base64 decode %v error: $v", rawCustomPatterns, err)
 			return conf
 		}
-		conf[parser.KeyGrokCustomPatterns] = string(CustomPatterns)
+		realCustomPatterns, err := url.QueryUnescape(string(CustomPatterns))
+		if err != nil {
+			log.Errorf("QueryUnescape %v error: $v", string(CustomPatterns), err)
+			return conf
+		}
+		conf[parser.KeyGrokCustomPatterns] = string(realCustomPatterns)
 	}
 
 	splitter, _ := conf.GetStringOr(parser.KeyCSVSplitter, "")
