@@ -16,6 +16,7 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/router"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
@@ -91,7 +92,7 @@ type RunnerConfig struct {
 	ParserConf    conf.MapConf             `json:"parser"`
 	Transforms    []map[string]interface{} `json:"transforms,omitempty"`
 	SenderConfig  []conf.MapConf           `json:"senders"`
-	Router        sender.RouterConfig      `json:"router,omitempty"`
+	Router        router.RouterConfig      `json:"router,omitempty"`
 	IsInWebFolder bool                     `json:"web_folder,omitempty"`
 	IsStopped     bool                     `json:"is_stopped,omitempty"`
 }
@@ -117,7 +118,7 @@ type LogExportRunner struct {
 	cleaner      *cleaner.Cleaner
 	parser       parser.LogParser
 	senders      []sender.Sender
-	router       *sender.Router
+	router       *router.Router
 	transformers []transforms.Transformer
 
 	rs      RunnerStatus
@@ -154,12 +155,12 @@ func NewCustomRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, ps *
 }
 
 func NewRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.LogParser, transformers []transforms.Transformer,
-	senders []sender.Sender, router *sender.Router, meta *reader.Meta) (runner Runner, err error) {
+	senders []sender.Sender, router *router.Router, meta *reader.Meta) (runner Runner, err error) {
 	return NewLogExportRunnerWithService(info, reader, cleaner, parser, transformers, senders, router, meta)
 }
 
 func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.LogParser,
-	transformers []transforms.Transformer, senders []sender.Sender, router *sender.Router, meta *reader.Meta) (runner *LogExportRunner, err error) {
+	transformers []transforms.Transformer, senders []sender.Sender, router *router.Router, meta *reader.Meta) (runner *LogExportRunner, err error) {
 	if info.MaxBatchSize <= 0 {
 		info.MaxBatchSize = defaultMaxBatchSize
 	}
@@ -282,7 +283,7 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, p
 		delete(rc.SenderConfig[i], sender.InnerUserAgent)
 	}
 	senderCnt := len(senders)
-	router, err := sender.NewSenderRouter(rc.Router, senderCnt)
+	router, err := router.NewSenderRouter(rc.Router, senderCnt)
 	if err != nil {
 		return nil, fmt.Errorf("runner %v add sender router error, %v", rc.RunnerName, err)
 	}
@@ -551,7 +552,7 @@ func (r *LogExportRunner) Run() {
 	}
 }
 
-func classifySenderData(datas []Data, router *sender.Router, senderCnt int) [][]Data {
+func classifySenderData(datas []Data, router *router.Router, senderCnt int) [][]Data {
 	senderDataList := make([][]Data, senderCnt)
 	for i := 0; i < senderCnt; i++ {
 		if router == nil {

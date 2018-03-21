@@ -3,6 +3,7 @@ package mgr
 import (
 	"net/http"
 
+	"github.com/qiniu/logkit/router"
 	"github.com/qiniu/logkit/sender"
 	. "github.com/qiniu/logkit/utils/models"
 
@@ -29,7 +30,7 @@ func (rs *RestService) GetSenderKeyOptions() echo.HandlerFunc {
 // get /logkit/sender/router/option 获取所有sender router的配置项
 func (rs *RestService) GetSenderRouterOption() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		routerOption := sender.GetRouterOption()
+		routerOption := router.GetRouterOption()
 		return RespSuccess(c, routerOption)
 	}
 }
@@ -37,7 +38,7 @@ func (rs *RestService) GetSenderRouterOption() echo.HandlerFunc {
 // get /logkit/sender/router/usage 获取所有sender router匹配方式的名字和作用
 func (rs *RestService) GetSenderRouterUsage() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		routerUsage := sender.GetRouterMatchTypeUsage()
+		routerUsage := router.GetRouterMatchTypeUsage()
 		return RespSuccess(c, routerUsage)
 	}
 }

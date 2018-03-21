@@ -1,4 +1,4 @@
-package sender
+package router
 
 import (
 	"fmt"

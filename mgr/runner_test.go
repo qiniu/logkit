@@ -20,6 +20,7 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
+	"github.com/qiniu/logkit/router"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -1299,7 +1300,7 @@ func TestClassifySenderData(t *testing.T) {
 		},
 	}
 
-	routerConf := sender.RouterConfig{
+	routerConf := router.RouterConfig{
 		KeyName:      "a",
 		MatchType:    "equal",
 		DefaultIndex: 0,
@@ -1309,7 +1310,7 @@ func TestClassifySenderData(t *testing.T) {
 		},
 	}
 
-	r, err := sender.NewSenderRouter(routerConf, senderCnt)
+	r, err := router.NewSenderRouter(routerConf, senderCnt)
 
 	senderDataList := classifySenderData(datas, r, senderCnt)
 	assert.Equal(t, senderCnt, len(senderDataList))
@@ -1319,7 +1320,7 @@ func TestClassifySenderData(t *testing.T) {
 
 	// 测试没有配置 router 的情况
 	routerConf.KeyName = ""
-	r, err = sender.NewSenderRouter(routerConf, senderCnt)
+	r, err = router.NewSenderRouter(routerConf, senderCnt)
 	assert.Nil(t, r)
 	assert.NoError(t, err)
 	senderDataList = classifySenderData(datas, r, senderCnt)
