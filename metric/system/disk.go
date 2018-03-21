@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/qiniu/logkit/metric"
 	. "github.com/qiniu/logkit/utils/models"
@@ -49,6 +50,8 @@ var ConfigDiskUsages = []KeyValue{
 	{ConfigDiskIgnoreFs, "忽略的挂载点,用','分隔(" + ConfigDiskIgnoreFs + ")"},
 	{ConfigDiskMountPoints, "收集特定挂载点信息,默认收集所有挂载点,用','分隔(" + ConfigDiskMountPoints + ")"},
 }
+
+var diskMux sync.Mutex
 
 type DiskStats struct {
 	ps PS
@@ -222,6 +225,10 @@ func (_ *DiskIOStats) Config() map[string]interface{} {
 }
 
 func (s *DiskIOStats) Collect() (datas []map[string]interface{}, err error) {
+	//this lock is for fix panic, as multiple metric runner work here
+	//signal arrived during cgo execution
+	diskMux.Lock()
+	defer diskMux.Unlock()
 	diskio, err := s.ps.DiskIO(s.Devices)
 	if err != nil {
 		return nil, fmt.Errorf("error getting disk io info: %s", err)
@@ -313,12 +320,12 @@ func (s *DiskIOStats) diskTags(devName string) map[string]string {
 }
 
 func init() {
-	ps := newSystemPS()
+	ps1 := newSystemPS()
 	metric.Add(TypeMetricDisk, func() metric.Collector {
-		return &DiskStats{ps: ps}
+		return &DiskStats{ps: ps1}
 	})
-
+	ps2 := newSystemPS()
 	metric.Add(TypeMetricDiskio, func() metric.Collector {
-		return &DiskIOStats{ps: ps, SkipSerialNumber: true}
+		return &DiskIOStats{ps: ps2, SkipSerialNumber: true}
 	})
 }
