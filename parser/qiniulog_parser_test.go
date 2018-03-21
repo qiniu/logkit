@@ -7,7 +7,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/times"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -123,7 +123,7 @@ func Test_QiniulogParser(t *testing.T) {
 		"",
 	}
 	dts, err := p.Parse(lines)
-	if c, ok := err.(*utils.StatsError); ok {
+	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
 		assert.Equal(t, int64(1), c.Errors)
 	}
@@ -157,7 +157,7 @@ func Test_QiniulogParser(t *testing.T) {
 		"2016/10/20 17:20:30.642662 [123][WARN] disk.go github.com/qiniu/logkit/queue/disk.go:241: 1",
 	}
 	dts, err = p.Parse(newlines)
-	if c, ok := err.(*utils.StatsError); ok {
+	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
 	}
 	if err != nil {
@@ -193,7 +193,7 @@ func Test_QiniulogParserForErrData(t *testing.T) {
 		"",
 	}
 	dts, err := p.Parse(lines)
-	if c, ok := err.(*utils.StatsError); ok {
+	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
 		assert.Equal(t, int64(1), c.Errors)
 	}
@@ -225,7 +225,7 @@ func Test_QiniulogParserForTeapot(t *testing.T) {
 	}
 
 	dts, err := p.Parse(lines)
-	if c, ok := err.(*utils.StatsError); ok {
+	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
 	}
 	if err != nil {
@@ -256,7 +256,7 @@ func Test_QiniulogParserForTeapot(t *testing.T) {
 	}
 
 	dts, err = p.Parse(newlines)
-	if c, ok := err.(*utils.StatsError); ok {
+	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
 	}
 	if err != nil {

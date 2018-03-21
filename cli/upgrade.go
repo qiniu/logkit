@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
+	utilsos "github.com/qiniu/logkit/utils/os"
 )
 
 const (
@@ -290,7 +290,7 @@ func restoreFile(backDir string, backupFiles []string, curDir string) error {
 // 即: 解压后有一个文件夹(_package_linux32等), 文件夹里面即为 logkit binary
 // 返回的 string 为文件夹名称(如 _package_linux32, _package_linux64 等)
 func decompress(packFilePath, dstDir string) (string, error) {
-	return utils.DecompressGzip(packFilePath, dstDir)
+	return DecompressGzip(packFilePath, dstDir)
 }
 
 func CheckAndUpgrade(curVersion string) {
@@ -317,7 +317,7 @@ func CheckAndUpgrade(curVersion string) {
 		return
 	}
 
-	osInfo := utils.GetOSInfo()
+	osInfo := utilsos.GetOSInfo()
 	kernel := osInfo.Kernel
 	platform := osInfo.Platform
 

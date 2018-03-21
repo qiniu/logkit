@@ -9,13 +9,12 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
 type UrlParam struct {
 	Key   string `json:"key"`
-	stats utils.StatsInfo
+	stats StatsInfo
 }
 
 func (p *UrlParam) transformToMap(strVal string, key string) (map[string]interface{}, error) {
@@ -43,11 +42,11 @@ func (p *UrlParam) RawTransform(datas []string) ([]string, error) {
 func (p *UrlParam) Transform(datas []Data) ([]Data, error) {
 	var err, pErr error
 	errNums := 0
-	keys := utils.GetKeys(p.Key)
+	keys := GetKeys(p.Key)
 	newkeys := make([]string, len(keys))
 	for i := range datas {
 		copy(newkeys, keys)
-		val, gerr := utils.GetMapValue(datas[i], newkeys...)
+		val, gerr := GetMapValue(datas[i], newkeys...)
 		if gerr != nil {
 			errNums++
 			err = fmt.Errorf("transform key %v not exist in data", p.Key)
@@ -64,7 +63,7 @@ func (p *UrlParam) Transform(datas []Data) ([]Data, error) {
 				suffix := 1
 				keyName := key
 				newkeys[len(newkeys)-1] = keyName
-				_, gerr := utils.GetMapValue(datas[i], newkeys...)
+				_, gerr := GetMapValue(datas[i], newkeys...)
 				for ; gerr == nil; suffix++ {
 					if suffix > 5 {
 						log.Warnf("keys %v -- %v already exist, the item %v will be ignored", key, keyName, key)
@@ -72,10 +71,10 @@ func (p *UrlParam) Transform(datas []Data) ([]Data, error) {
 					}
 					keyName = key + strconv.Itoa(suffix)
 					newkeys[len(newkeys)-1] = keyName
-					_, gerr = utils.GetMapValue(datas[i], newkeys...)
+					_, gerr = GetMapValue(datas[i], newkeys...)
 				}
 				if suffix <= 5 {
-					utils.SetMapValue(datas[i], mapVal, false, newkeys...)
+					SetMapValue(datas[i], mapVal, false, newkeys...)
 				}
 			}
 		} else {
@@ -117,7 +116,7 @@ func (p *UrlParam) Stage() string {
 	return transforms.StageAfterParser
 }
 
-func (p *UrlParam) Stats() utils.StatsInfo {
+func (p *UrlParam) Stats() StatsInfo {
 	return p.stats
 }
 

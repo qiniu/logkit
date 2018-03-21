@@ -15,11 +15,11 @@ import (
 	"time"
 
 	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
 	"github.com/labstack/echo"
+	utilsos "github.com/qiniu/logkit/utils/os"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -434,7 +434,7 @@ func TestRestRequest(t *testing.T) {
 	}
 	defer os.RemoveAll(rootDir)
 
-	osInfo := utils.GetOSInfo()
+	osInfo := utilsos.GetOSInfo()
 	tarDirName := "tarPath"
 	tarfileName, err := getPackNameByKernelPlatform(osInfo.Kernel, osInfo.Platform, "v1.4.1")
 	assert.NoError(t, err)
@@ -539,7 +539,7 @@ func TestRestRequest(t *testing.T) {
 }
 
 func testCheckLastVersion(t *testing.T, _, url string) {
-	osInfo := utils.GetOSInfo()
+	osInfo := utilsos.GetOSInfo()
 	packageName, _ := getPackNameByKernelPlatform(osInfo.Kernel, osInfo.Platform, "v1.4.1")
 	expReleaseInfo := ReleaseInfo{
 		Url:  "https://api.github.com/repos/qiniu/logkit/releases/8810555",
@@ -602,7 +602,7 @@ func testDownloadPackage(t *testing.T, rtDir, url string) {
 	if err := os.Mkdir(rootDir, DefaultDirPerm); err != nil {
 		t.Fatalf("mkdir %v error, error is %v", rootDir, err)
 	}
-	osInfo := utils.GetOSInfo()
+	osInfo := utilsos.GetOSInfo()
 	packageName, _ := getPackNameByKernelPlatform(osInfo.Kernel, osInfo.Platform, "v1.4.1")
 	packageFilePath := filepath.Join(rootDir, packageName)
 
@@ -642,7 +642,7 @@ func testDecompress(t *testing.T, rtDir, url string) {
 	if err := os.Mkdir(rootDir, DefaultDirPerm); err != nil {
 		t.Fatalf("mkdir %v error, error is %v", rootDir, err)
 	}
-	osInfo := utils.GetOSInfo()
+	osInfo := utilsos.GetOSInfo()
 	packageName, _ := getPackNameByKernelPlatform(osInfo.Kernel, osInfo.Platform, "v1.4.1")
 	packageFilePath := filepath.Join(rootDir, packageName)
 

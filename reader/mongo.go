@@ -2,16 +2,17 @@ package reader
 
 import (
 	"errors"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 
-	"strings"
+	"github.com/qiniu/log"
 
 	"github.com/json-iterator/go"
-	"github.com/qiniu/log"
 	"github.com/robfig/cron"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -44,7 +45,7 @@ type MongoReader struct {
 	status      int32
 	started     bool
 	mux         sync.Mutex
-	stats       utils.StatsInfo
+	stats       StatsInfo
 	statsLock   sync.RWMutex
 }
 
@@ -123,7 +124,7 @@ func (mr *MongoReader) Source() string {
 	return mr.host + "_" + mr.database + "_" + mr.collection
 }
 
-func (mr *MongoReader) Status() utils.StatsInfo {
+func (mr *MongoReader) Status() StatsInfo {
 	mr.statsLock.RLock()
 	defer mr.statsLock.RUnlock()
 	return mr.stats

@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
@@ -66,7 +65,7 @@ type Meta struct {
 }
 
 func getValidDir(dir string) (realPath string, err error) {
-	realPath, fi, err := utils.GetRealPath(dir)
+	realPath, fi, err := GetRealPath(dir)
 	if os.IsNotExist(err) {
 		if err = os.MkdirAll(realPath, DefaultDirPerm); err != nil {
 			//此处的error需要直接返回，后面会根据error类型是否为path error做判断
@@ -156,7 +155,7 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 	if metapath == "" {
 		runnerName, _ := conf.GetString(GlobalKeyName)
 		base := filepath.Base(logPath)
-		metapath = "meta/" + runnerName + "_" + utils.Hash(base)
+		metapath = "meta/" + runnerName + "_" + Hash(base)
 		log.Debugf("Runner[%v] Using %s as default metaPath", runnerName, metapath)
 	}
 	datasourceTag, _ := conf.GetStringOr(KeyDataSourceTag, "")
@@ -428,10 +427,10 @@ func (m *Meta) DeleteDoneFile(path string) error {
 	return nil
 }
 
-func (m *Meta) GetDoneFiles() (doneFiles []utils.File, err error) {
+func (m *Meta) GetDoneFiles() (doneFiles []File, err error) {
 	dir := m.doneFilePath
 	// 按文件时间从新到旧排列
-	files, err := utils.ReadDirByTime(dir)
+	files, err := ReadDirByTime(dir)
 	if err != nil {
 		log.Error(files, err)
 		return
@@ -443,7 +442,7 @@ func (m *Meta) GetDoneFiles() (doneFiles []utils.File, err error) {
 		}
 		fname := f.Name()
 		if m.IsDoneFile(fname) {
-			doneFiles = append(doneFiles, utils.File{
+			doneFiles = append(doneFiles, File{
 				Info: f,
 				Path: filepath.Join(dir, fname),
 			})

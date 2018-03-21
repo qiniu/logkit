@@ -11,7 +11,6 @@ import (
 	"github.com/qiniu/logkit/router"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
@@ -115,12 +114,12 @@ func TransformData(transformerConfig map[string]interface{}) ([]Data, error) {
 
 	// Transform data
 	transformedData, transErr := transformer.Transform(data)
-	se, ok := transErr.(*utils.StatsError)
+	se, ok := transErr.(*StatsError)
 	if ok {
 		transErr = se.ErrorDetail
 	}
 	if transErr != nil {
-		se, ok := transErr.(*utils.StatsError)
+		se, ok := transErr.(*StatsError)
 		if ok {
 			transErr = se.ErrorDetail
 		}
@@ -205,13 +204,13 @@ func getSenders(sendersConf []conf.MapConf) ([]sender.Sender, error) {
 	senders := make([]sender.Sender, 0)
 	sr := sender.NewSenderRegistry()
 	for i, senderConfig := range sendersConf {
-		senderConfig[sender.KeyFaultTolerant] = "false"
+		senderConfig[KeyFaultTolerant] = "false"
 		s, err := sr.NewSender(senderConfig, "")
 		if err != nil {
 			return nil, err
 		}
 		senders = append(senders, s)
-		delete(sendersConf[i], sender.InnerUserAgent)
+		delete(sendersConf[i], InnerUserAgent)
 	}
 	return senders, nil
 }
@@ -251,7 +250,7 @@ func trySend(s sender.Sender, datas []Data, times int) error {
 	cnt := 1
 	for {
 		err := s.Send(datas)
-		if se, ok := err.(*utils.StatsError); ok {
+		if se, ok := err.(*StatsError); ok {
 			err = se.ErrorDetail
 		}
 
@@ -318,7 +317,7 @@ func checkSampleData(sampleData []string, logParser parser.LogParser) ([]string,
 }
 
 func checkErr(err error, parserName string) error {
-	se, ok := err.(*utils.StatsError)
+	se, ok := err.(*StatsError)
 	var errorCnt int64
 	if ok {
 		errorCnt = se.Errors

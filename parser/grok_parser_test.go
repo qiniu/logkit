@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -782,7 +781,7 @@ func TestNginxTimeParseForErrData(t *testing.T) {
 	lines := []string{`192.168.45.53 - - [05/Apr/2017:17:25:06 +0800] "POST /v2/repos/kodo_z0_app_pfdstg/data HTTP/1.1" 200 497 2 "-" "Go 1.1 package http" "-" 192.168.160.1:80 pipeline.qiniu.io KBkAAD7W6-UfdrIU 0.139`}
 	m, err := p.Parse(lines)
 	if err != nil {
-		errx, _ := err.(*utils.StatsError)
+		errx, _ := err.(*StatsError)
 		assert.Equal(t, int64(1), errx.StatsInfo.Errors)
 	}
 	if len(m) != 1 {

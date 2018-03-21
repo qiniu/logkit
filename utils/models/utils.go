@@ -1,4 +1,4 @@
-package utils
+package models
 
 import (
 	"archive/tar"
@@ -11,7 +11,6 @@ import (
 	"hash/fnv"
 	"io"
 	"io/ioutil"
-	"net"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -19,11 +18,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 	"unicode"
-
-	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/qiniu/log"
 
@@ -84,29 +80,6 @@ func TrimeList(strs []string) (ret []string) {
 	return
 }
 
-// GetRealPath 处理软链接等，找到文件真实路径
-func GetRealPath(path string) (newPath string, fi os.FileInfo, err error) {
-	newPath = path
-	fi, err = os.Lstat(path)
-	if err != nil {
-		return
-	}
-	if fi.Mode()&os.ModeSymlink != 0 {
-		log.Infof("%s is symbol link", path)
-		newPath, err = filepath.EvalSymlinks(path)
-		if err != nil {
-			return
-		}
-		log.Infof("%s is symbol link to %v", path, newPath)
-		fi, err = os.Lstat(newPath)
-	}
-	newPath, err = filepath.Abs(newPath)
-	if err != nil {
-		return
-	}
-	return
-}
-
 func GetLogFiles(doneFilePath string) (files []File) {
 	body, err := ioutil.ReadFile(doneFilePath)
 	if err != nil {
@@ -150,69 +123,6 @@ func (s *SchemaErr) Output(count int64, err error) {
 	}
 }
 
-type StatsError struct {
-	StatsInfo
-	ErrorDetail error `json:"error"`
-	Ft          bool  `json:"-"`
-	ErrorIndex  []int
-}
-
-type StatsInfo struct {
-	Errors    int64   `json:"errors"`
-	Success   int64   `json:"success"`
-	Speed     float64 `json:"speed"`
-	Trend     string  `json:"trend"`
-	LastError string  `json:"last_error"`
-	Ftlag     int64   `json:"-"`
-}
-
-func (se *StatsError) AddSuccess() {
-	if se == nil {
-		return
-	}
-	atomic.AddInt64(&se.Success, 1)
-}
-
-func (se *StatsError) AddErrors() {
-	if se == nil {
-		return
-	}
-	atomic.AddInt64(&se.Errors, 1)
-}
-
-func (se *StatsError) Error() string {
-	if se == nil {
-		return ""
-	}
-	return fmt.Sprintf("success %v errors %v errordetail %v", se.Success, se.Errors, se.ErrorDetail)
-}
-
-func (se *StatsError) ErrorIndexIn(idx int) bool {
-	for _, v := range se.ErrorIndex {
-		if v == idx {
-			return true
-		}
-	}
-	return false
-}
-
-// parse ${ENV} to ENV
-// get ENV value from os
-func GetEnv(env string) string {
-	var envName string
-	if strings.HasPrefix(env, "${") && strings.HasSuffix(env, "}") {
-		envName = strings.Trim(strings.Trim(strings.Trim(env, "$"), "{"), "}")
-	} else {
-		log.Debug("cannot parse your ak sk as ${YOUR_ENV_NAME} format, use it as raw ak.sk instead")
-		return ""
-	}
-	if osEnv := os.Getenv(envName); osEnv != "" {
-		return osEnv
-	}
-	log.Warnf("cannot find %s in current system env", envName)
-	return ""
-}
-
 //TuoEncode 把[]byte数组按照长度拼接到一起，每个sql.RawBytes之间间隔4个byte用于存储长度。
 func TuoEncode(values []sql.RawBytes) (ret []byte) {
 	ret = make([]byte, 0)
@@ -248,48 +158,12 @@ func TuoDecode(value []byte) (values [][]byte, err error) {
 	return
 }
 
-//CreateDirIfNotExist 检查文件夹，不存在时创建
-func CreateDirIfNotExist(dir string) (err error) {
-	_, err = os.Stat(dir)
-	if os.IsNotExist(err) {
-		err = os.MkdirAll(dir, os.ModeDir|os.ModePerm)
-		if err != nil {
-			return
-		}
-	}
-	return
-}
-
 type ErrorResponse struct {
 	Error error `json:"error"`
 }
 
 func NewErrorResponse(err error) *ErrorResponse {
 	return &ErrorResponse{Error: err}
-}
-
-type OSInfo struct {
-	Kernel   string
-	Core     string
-	Platform string
-	OS       string
-	Hostname string
-}
-
-func (oi *OSInfo) String() string {
-	return fmt.Sprintf("%s; %s; %s; %s %s", oi.Hostname, oi.OS, oi.Core, oi.Kernel, oi.Platform)
-}
-
-func GetExtraInfo() map[string]string {
-	osInfo := GetOSInfo()
-	exInfo := make(map[string]string)
-	exInfo[KeyCore] = osInfo.Core
-	exInfo[KeyHostName] = osInfo.Hostname
-	exInfo[KeyOsInfo] = osInfo.OS + "-" + osInfo.Kernel + "-" + osInfo.Platform
-	if ip, err := GetLocalIP(); err == nil {
-		exInfo[KeyLocalIp] = ip
-	}
-	return exInfo
 }
 
 func IsJsonString(s string) bool {
@@ -326,96 +200,6 @@ func ExtractField(slice []string) ([]string, error) {
 	return nil, err
 }
 
-//根据key字符串,拆分出层级keys数据
-func GetKeys(keyStr string) []string {
-	keys := strings.FieldsFunc(keyStr, isSeparator)
-	return keys
-}
-
-func isSeparator(separator rune) bool {
-	return separator == '.' || unicode.IsSpace(separator)
-}
-
-//通过层级key获取value.
-//所有层级的map必须为 map[string]interface{} 类型.
-//keys为空切片,返回原m
-func GetMapValue(m map[string]interface{}, keys ...string) (interface{}, error) {
-	var err error
-	var val interface{}
-	val = m
-	for i, k := range keys {
-		//判断val是否为map[string]interface{}类型
-		if _, ok := val.(map[string]interface{}); ok {
-			//判断val(k)是否存在
-			if _, ok := val.(map[string]interface{})[k]; ok {
-				val = val.(map[string]interface{})[k]
-			} else {
-				keys = keys[0 : i+1]
-				err = fmt.Errorf("GetMapValue failed, keys %v are non-existent", keys)
-				return nil, err
-			}
-		} else {
-			err = fmt.Errorf("GetMapValue failed, %v is not the type of map[string]interface{}", val)
-			return nil, err
-		}
-	}
-	return val, err
-}
-
-//通过层级key设置value值.
-//如果key不存在,将会自动创建.
-//当coercive为true时,会强制将非map[string]interface{}类型替换为map[string]interface{}类型,有可能导致数据丢失
-func SetMapValue(m map[string]interface{}, val interface{}, coercive bool, keys ...string) error {
-	if len(keys) == 0 {
-		return nil
-	}
-	curr := m
-	for _, k := range keys[0 : len(keys)-1] {
-		if _, ok := curr[k]; !ok {
-			n := make(map[string]interface{})
-			curr[k] = n
-			curr = n
-			continue
-		}
-		if _, ok := curr[k].(map[string]interface{}); !ok {
-			if coercive {
-				n := make(map[string]interface{})
-				curr[k] = n
-			} else {
-				err := fmt.Errorf("SetMapValue failed, %v is not the type of map[string]interface{}", curr[k])
-				return err
-			}
-		}
-		curr = curr[k].(map[string]interface{})
-	}
-	curr[keys[len(keys)-1]] = val
-	return nil
-}
-
-//通过层级key删除key-val,并返回被删除的val,是否删除成功
-//如果key不存在,则返回 nil,false
-func DeleteMapValue(m map[string]interface{}, keys ...string) (interface{}, bool) {
-	var val interface{}
-	val = m
-	for i, k := range keys {
-		if _, ok := val.(map[string]interface{}); ok {
-			if _, ok := val.(map[string]interface{})[k]; ok {
-				if i == len(keys)-1 {
-					delVal := val.(map[string]interface{})[k]
-					delete(val.(map[string]interface{}), keys[len(keys)-1])
-					return delVal, true
-				}
-				val = val.(map[string]interface{})[k]
-			} else {
-				return nil, false
-			}
-		} else {
-			return nil, false
-		}
-	}
-	return nil, false
-}
-
 func AddHttpProtocal(url string) string {
 	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
 		return "http://" + url
@@ -433,22 +217,6 @@ func RemoveHttpProtocal(url string) (hostport, schema string) {
 		return strings.TrimPrefix(url, chttps), chttps
 	}
 	return url, chttp
-}
-
-func GetLocalIP() (string, error) {
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return "127.0.0.1", fmt.Errorf("Get local IP error: %v\n", err)
-	}
-	for _, address := range addrs {
-		// check the address type and if it is not a loopback the display it
-		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To4() != nil {
-				return ipnet.IP.String(), nil
-			}
-		}
-	}
-	return "127.0.0.1", errors.New("no local IP found")
 }
 
 type HashSet struct {
@@ -625,6 +393,119 @@ func DecompressGzip(packPath, dstDir string) (packDir string, err error) {
 	return
 }
 
+//通过层级key设置value值.
+//如果key不存在,将会自动创建.
+//当coercive为true时,会强制将非map[string]interface{}类型替换为map[string]interface{}类型,有可能导致数据丢失
+func SetMapValue(m map[string]interface{}, val interface{}, coercive bool, keys ...string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	curr := m
+	for _, k := range keys[0 : len(keys)-1] {
+		if _, ok := curr[k]; !ok {
+			n := make(map[string]interface{})
+			curr[k] = n
+			curr = n
+			continue
+		}
+		if _, ok := curr[k].(map[string]interface{}); !ok {
+			if coercive {
+				n := make(map[string]interface{})
+				curr[k] = n
+			} else {
+				err := fmt.Errorf("SetMapValue failed, %v is not the type of map[string]interface{}", curr[k])
+				return err
+			}
+		}
+		curr = curr[k].(map[string]interface{})
+	}
+	curr[keys[len(keys)-1]] = val
+	return nil
+}
+
+//通过层级key删除key-val,并返回被删除的val,是否删除成功
+//如果key不存在,则返回 nil,false
+func DeleteMapValue(m map[string]interface{}, keys ...string) (interface{}, bool) {
+	var val interface{}
+	val = m
+	for i, k := range keys {
+		if _, ok := val.(map[string]interface{}); ok {
+			if _, ok := val.(map[string]interface{})[k]; ok {
+				if i == len(keys)-1 {
+					delVal := val.(map[string]interface{})[k]
+					delete(val.(map[string]interface{}), keys[len(keys)-1])
+					return delVal, true
+				}
+				val = val.(map[string]interface{})[k]
+			} else {
+				return nil, false
+			}
+		} else {
+			return nil, false
+		}
+	}
+	return nil, false
+}
+
+//根据key字符串,拆分出层级keys数据
+func GetKeys(keyStr string) []string {
+	keys := strings.FieldsFunc(keyStr, isSeparator)
+	return keys
+}
+
+func isSeparator(separator rune) bool {
+	return separator == '.' || unicode.IsSpace(separator)
+}
+
+//通过层级key获取value.
+//所有层级的map必须为 map[string]interface{} 类型.
+//keys为空切片,返回原m
+func GetMapValue(m map[string]interface{}, keys ...string) (interface{}, error) {
+	var err error
+	var val interface{}
+	val = m
+	for i, k := range keys {
+		//判断val是否为map[string]interface{}类型
+		if _, ok := val.(map[string]interface{}); ok {
+			//判断val(k)是否存在
+			if _, ok := val.(map[string]interface{})[k]; ok {
+				val = val.(map[string]interface{})[k]
+			} else {
+				keys = keys[0 : i+1]
+				err = fmt.Errorf("GetMapValue failed, keys %v are non-existent", keys)
+				return nil, err
+			}
+		} else {
+			err = fmt.Errorf("GetMapValue failed, %v is not the type of map[string]interface{}", val)
+			return nil, err
+		}
+	}
+	return val, err
+}
+
+// GetRealPath 处理软链接等，找到文件真实路径
+func GetRealPath(path string) (newPath string, fi os.FileInfo, err error) {
+	newPath = path
+	fi, err = os.Lstat(path)
+	if err != nil {
+		return
+	}
+	if fi.Mode()&os.ModeSymlink != 0 {
+		log.Infof("%s is symbol link", path)
+		newPath, err = filepath.EvalSymlinks(path)
+		if err != nil {
+			return
+		}
+		log.Infof("%s is symbol link to %v", path, newPath)
+		fi, err = os.Lstat(newPath)
+	}
+	newPath, err = filepath.Abs(newPath)
+	if err != nil {
+		return
+	}
+	return
+}
+
 func CheckFileMode(path string, fileMode os.FileMode) error {
 	perm := fileMode.Perm()
 
@@ -645,4 +526,33 @@ func Hash(s string) string {
 	h := fnv.New32a()
 	h.Write([]byte(s))
 	return strconv.Itoa(int(h.Sum32()))
+}
+
+// parse ${ENV} to ENV
+// get ENV value from os
+func GetEnv(env string) string {
+	var envName string
+	if strings.HasPrefix(env, "${") && strings.HasSuffix(env, "}") {
+		envName = strings.Trim(strings.Trim(strings.Trim(env, "$"), "{"), "}")
+	} else {
+		log.Debug("cannot parse your ak sk as ${YOUR_ENV_NAME} format, use it as raw ak.sk instead")
+		return ""
+	}
+	if osEnv := os.Getenv(envName); osEnv != "" {
+		return osEnv
+	}
+	log.Warnf("cannot find %s in current system env", envName)
+	return ""
+}
+
+//CreateDirIfNotExist 检查文件夹，不存在时创建
+func CreateDirIfNotExist(dir string) (err error) {
+	_, err = os.Stat(dir)
+	if os.IsNotExist(err) {
+		err = os.MkdirAll(dir, os.ModeDir|os.ModePerm)
+		if err != nil {
+			return
+		}
+	}
+	return
 }

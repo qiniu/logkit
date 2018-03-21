@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -21,7 +20,7 @@ const (
 
 type K8sTag struct {
 	SourceFileKey string `json:"sourcefilefield"`
-	stats         utils.StatsInfo
+	stats         StatsInfo
 }
 
 func (g *K8sTag) RawTransform(datas []string) ([]string, error) {
@@ -93,7 +92,7 @@ func (g *K8sTag) Stage() string {
 	return transforms.StageAfterParser
 }
 
-func (g *K8sTag) Stats() utils.StatsInfo {
+func (g *K8sTag) Stats() StatsInfo {
 	return g.stats
 }
 

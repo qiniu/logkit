@@ -12,10 +12,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/rateio"
-	"github.com/qiniu/logkit/utils"
-	"github.com/qiniu/logkit/utils/models"
+	. "github.com/qiniu/logkit/utils/models"
+	utilsos "github.com/qiniu/logkit/utils/os"
+
+	"github.com/qiniu/log"
 )
 
 // FileMode 读取单个文件模式
@@ -49,7 +50,7 @@ type SeqFile struct {
 
 func getStartFile(path, whence string, meta *Meta, sf *SeqFile) (f *os.File, dir, currFile string, offset int64, err error) {
 	var pfi os.FileInfo
-	dir, pfi, err = utils.GetRealPath(path)
+	dir, pfi, err = GetRealPath(path)
 	if err != nil || pfi == nil {
 		log.Errorf("%s - utils.GetRealPath failed, err:%v", path, err)
 		return
@@ -111,7 +112,7 @@ func NewSeqFile(meta *Meta, path string, ignoreHidden, newFileNewLine bool, suff
 			f.Close()
 			return nil, err
 		}
-		sf.inode, err = utils.GetIdentifyIDByPath(currFile)
+		sf.inode, err = utilsos.GetIdentifyIDByPath(currFile)
 		if err != nil {
 			return nil, err
 		}
@@ -219,7 +220,7 @@ func (sf *SeqFile) reopenForESTALE() error {
 		sf.ratereader.Close()
 	}
 	sf.ratereader = rateio.NewRateReader(f, sf.meta.readlimit)
-	ninode, err := utils.GetIdentifyIDByFile(f)
+	ninode, err := utilsos.GetIdentifyIDByFile(f)
 	if err != nil {
 		//为了不影响程序运行
 		log.Errorf("Runner[%v] %v getinode error %v, use old inode", sf.meta.RunnerName, sf.dir, err)
@@ -334,7 +335,7 @@ func (sf *SeqFile) isNewFile(newFileInfo os.FileInfo, filePath string) bool {
 	if newFileInfo == nil {
 		return false
 	}
-	newInode, err := utils.GetIdentifyIDByPath(filePath)
+	newInode, err := utilsos.GetIdentifyIDByPath(filePath)
 	if err != nil {
 		log.Error(err)
 		return false
@@ -386,7 +387,7 @@ func (sf *SeqFile) newOpen() (err error) {
 	sf.ratereader = rateio.NewRateReader(f, sf.meta.readlimit)
 	sf.f = f
 	sf.offset = 0
-	sf.inode, err = utils.GetIdentifyIDByPath(sf.currFile)
+	sf.inode, err = utilsos.GetIdentifyIDByPath(sf.currFile)
 	if err != nil {
 		return
 	}
@@ -424,7 +425,7 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 		}
 		sf.ratereader = rateio.NewRateReader(f, sf.meta.readlimit)
 		sf.offset = 0
-		sf.inode, err = utils.GetIdentifyIDByPath(sf.currFile)
+		sf.inode, err = utilsos.GetIdentifyIDByPath(sf.currFile)
 		if err != nil {
 			return err
 		}
@@ -461,13 +462,13 @@ func (sf *SeqFile) SyncMeta() (err error) {
 	return sf.meta.WriteOffset(sf.currFile, sf.offset)
 }
 
-func (sf *SeqFile) Lag() (rl *models.LagInfo, err error) {
+func (sf *SeqFile) Lag() (rl *LagInfo, err error) {
 	sf.mux.Lock()
-	rl = &models.LagInfo{Size: -sf.offset}
+	rl = &LagInfo{Size: -sf.offset}
 	logReading := filepath.Base(sf.currFile)
 	sf.mux.Unlock()
 
-	logs, err := utils.ReadDirByTime(sf.dir)
+	logs, err := ReadDirByTime(sf.dir)
 	if err != nil {
 		err = fmt.Errorf("ReadDirByTime err %v, can't get stats", err)
 		return

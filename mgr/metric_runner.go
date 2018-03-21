@@ -16,7 +16,6 @@ import (
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/qiniu/log"
@@ -69,15 +68,15 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 	}
 	interval := time.Duration(rc.CollectInterval) * time.Second
 	meta, err := reader.NewMetaWithConf(conf.MapConf{
-		GlobalKeyName:        rc.RunnerName,
-		reader.KeyRunnerName: rc.RunnerName,
-		reader.KeyMode:       reader.ModeMetrics,
+		GlobalKeyName:  rc.RunnerName,
+		KeyRunnerName:  rc.RunnerName,
+		reader.KeyMode: reader.ModeMetrics,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("Runner "+rc.RunnerName+" add failed, err is %v", err)
 	}
 	for i := range rc.SenderConfig {
-		rc.SenderConfig[i][sender.KeyRunnerName] = rc.RunnerName
+		rc.SenderConfig[i][KeyRunnerName] = rc.RunnerName
 	}
 	collectors := make([]metric.Collector, 0)
 	transformers := make(map[string][]transforms.Transformer)
@@ -154,8 +153,8 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 
 	senders := make([]sender.Sender, 0)
 	for _, c := range rc.SenderConfig {
-		c[sender.KeyIsMetrics] = "true"
-		c[sender.KeyPandoraTSDBTimeStamp] = metric.Timestamp
+		c[KeyIsMetrics] = "true"
+		c[KeyPandoraTSDBTimeStamp] = metric.Timestamp
 		s, err := sr.NewSender(c, meta.FtSaveLogPath())
 		if err != nil {
 			return nil, err
@@ -168,15 +167,15 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 		lastSend:   time.Now(), // 上一次发送时间
 		meta:       meta,
 		rs: RunnerStatus{
-			ReaderStats:   utils.StatsInfo{},
-			SenderStats:   make(map[string]utils.StatsInfo),
+			ReaderStats:   StatsInfo{},
+			SenderStats:   make(map[string]StatsInfo),
 			lastState:     time.Now(),
 			Name:          rc.RunnerName,
 			RunningStatus: RunnerRunning,
 		},
 		lastRs: RunnerStatus{
-			ReaderStats:   utils.StatsInfo{},
-			SenderStats:   make(map[string]utils.StatsInfo),
+			ReaderStats:   StatsInfo{},
+			SenderStats:   make(map[string]StatsInfo),
 			lastState:     time.Now(),
 			Name:          rc.RunnerName,
 			RunningStatus: RunnerRunning,
@@ -296,7 +295,7 @@ func (r *MetricRunner) trySend(s sender.Sender, datas []Data, times int) bool {
 		return true
 	}
 	if _, ok := r.rs.SenderStats[s.Name()]; !ok {
-		r.rs.SenderStats[s.Name()] = utils.StatsInfo{}
+		r.rs.SenderStats[s.Name()] = StatsInfo{}
 	}
 	r.rsMutex.RLock()
 	info := r.rs.SenderStats[s.Name()]
@@ -308,7 +307,7 @@ func (r *MetricRunner) trySend(s sender.Sender, datas []Data, times int) bool {
 			return false
 		}
 		err := s.Send(datas)
-		if se, ok := err.(*utils.StatsError); ok {
+		if se, ok := err.(*StatsError); ok {
 			err = se.ErrorDetail
 			if se.Ft {
 				r.rs.Lag.Ftlags = se.Ftlag
@@ -428,7 +427,7 @@ func (mr *MetricRunner) Status() RunnerStatus {
 		if lv, ok := mr.lastRs.SenderStats[k]; ok {
 			v.Speed, v.Trend = calcSpeedTrend(lv, v, durationTime)
 		} else {
-			v.Speed, v.Trend = calcSpeedTrend(utils.StatsInfo{}, v, durationTime)
+			v.Speed, v.Trend = calcSpeedTrend(StatsInfo{}, v, durationTime)
 		}
 		mr.rs.SenderStats[k] = v
 	}
@@ -468,14 +467,14 @@ func (mr *MetricRunner) StatusRestore() {
 		}
 		sStatus, ok := s.(sender.StatsSender)
 		if ok {
-			sStatus.Restore(&utils.StatsInfo{
+			sStatus.Restore(&StatsInfo{
 				Success: info[0],
 				Errors:  info[1],
 			})
 		}
 		status, ext := mr.rs.SenderStats[name]
 		if !ext {
-			status = utils.StatsInfo{}
+			status = StatsInfo{}
 		}
 		status.Success = info[0]
 		status.Errors = info[1]

@@ -1,6 +1,6 @@
 // +build darwin linux
 
-package utils
+package os
 
 import (
 	"fmt"

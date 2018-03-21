@@ -4,7 +4,8 @@ import (
 	"testing"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,7 +23,7 @@ func Test_RawlogParser(t *testing.T) {
 		"",
 	}
 	dts, err := p.Parse(lines)
-	if st, ok := err.(*utils.StatsError); ok {
+	if st, ok := err.(*StatsError); ok {
 		err = st.ErrorDetail
 		assert.Equal(t, int64(1), st.Errors)
 	}
@@ -54,7 +55,7 @@ func Test_RawlogParserForErrData(t *testing.T) {
 		"",
 	}
 	dts, err := p.Parse(lines)
-	if st, ok := err.(*utils.StatsError); ok {
+	if st, ok := err.(*StatsError); ok {
 		err = st.ErrorDetail
 	}
 	if err != nil {

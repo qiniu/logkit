@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -25,44 +24,14 @@ type StatsSender interface {
 	// send data, error if failed
 	Send([]Data) error
 	Close() error
-	Stats() utils.StatsInfo
+	Stats() StatsInfo
 	// 恢复 sender 停止之前的状态
-	Restore(*utils.StatsInfo)
+	Restore(*StatsInfo)
 }
 
 type TokenRefreshable interface {
 	TokenRefresh(conf.MapConf) error
 }
-
-// Sender's conf keys
-const (
-	KeySenderType     = "sender_type"
-	KeyFaultTolerant  = "fault_tolerant"
-	KeyName           = "name"
-	KeyRunnerName     = "runner_name"
-	KeyLogkitSendTime = "logkit_send_time"
-	KeyIsMetrics      = "is_metrics"
-	KeyMetricTime     = "timestamp"
-)
-
-const UnderfinedRunnerName = "UnderfinedRunnerName"
-
-// SenderType 发送类型
-const (
-	TypeFile              = "file"          // 本地文件
-	TypePandora           = "pandora"       // pandora 打点
-	TypeMongodbAccumulate = "mongodb_acc"   // mongodb 并且按字段聚合
-	TypeInfluxdb          = "influxdb"      // influxdb
-	TypeMock              = "mock"          // mock sender
-	TypeDiscard           = "discard"       // discard sender
-	TypeElastic           = "elasticsearch" // elastic
-	TypeKafka             = "kafka"         // kafka
-	TypeHttp              = "http"          // http sender
-)
-
-const (
-	InnerUserAgent = "_useragent"
-)
 
 // Ft sender默认同步一次meta信息的数据次数
 const DefaultFtSyncEvery = 10

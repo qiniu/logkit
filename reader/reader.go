@@ -7,8 +7,7 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
-	"github.com/qiniu/logkit/utils/models"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 // Reader 是一个通用的行读取reader接口
@@ -27,12 +26,12 @@ type Reader interface {
 type StatsReader interface {
 	//Name reader名称
 	Name() string
-	Status() utils.StatsInfo
+	Status() StatsInfo
 }
 
 //获取数据lag的接口
 type LagReader interface {
-	Lag() (*models.LagInfo, error)
+	Lag() (*LagInfo, error)
 }
 
 // FileReader reader 接口方法
@@ -69,7 +68,6 @@ const (
 	KeyDataSourceTag  = "datasource_tag"
 	KeyTagFile        = "tag_file"
 	KeyHeadPattern    = "head_pattern"
-	KeyRunnerName     = "runner_name"
 	KeyNewFileNewLine = "newfile_newline"
 
 	// 忽略隐藏文件

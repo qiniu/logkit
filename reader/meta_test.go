@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/qiniu/log"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -77,11 +77,11 @@ func TestMeta(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	f, err := os.Stat("meta/" + "mock_runner_name_" + utils.Hash(dir))
+	f, err := os.Stat("meta/" + "mock_runner_name_" + Hash(dir))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasSuffix(f.Name(), utils.Hash(dir)) {
+	if !strings.HasSuffix(f.Name(), Hash(dir)) {
 		t.Fatal("not excepted dir")
 	}
 	dirToRm := "meta"

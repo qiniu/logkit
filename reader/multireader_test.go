@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/qiniu/log"
@@ -52,7 +51,7 @@ func Test_ActiveReader(t *testing.T) {
 	data := <-msgchan
 	assert.Equal(t, testContent, data.result)
 
-	assert.Equal(t, utils.StatsInfo{}, ar.Status())
+	assert.Equal(t, StatsInfo{}, ar.Status())
 	ar.Close()
 }
 
@@ -166,7 +165,7 @@ func multiReaderOneLineTest(t *testing.T) {
 
 	assert.EqualValues(t, expresult, resultmap)
 
-	assert.Equal(t, utils.StatsInfo{}, mr.Status())
+	assert.Equal(t, StatsInfo{}, mr.Status())
 }
 
 func multiReaderMultiLineTest(t *testing.T) {

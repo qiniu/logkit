@@ -5,12 +5,11 @@ import (
 	"fmt"
 
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
 type PandoraKeyConvert struct {
-	stats utils.StatsInfo
+	stats StatsInfo
 }
 
 func (g *PandoraKeyConvert) RawTransform(datas []string) ([]string, error) {
@@ -74,7 +73,7 @@ func (g *PandoraKeyConvert) Stage() string {
 	return transforms.StageAfterParser
 }
 
-func (g *PandoraKeyConvert) Stats() utils.StatsInfo {
+func (g *PandoraKeyConvert) Stats() StatsInfo {
 	return g.stats
 }
 

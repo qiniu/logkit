@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/jeromer/syslogparser"
@@ -134,7 +133,7 @@ func (p *SyslogParser) Type() string {
 }
 
 func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
-	se := &utils.StatsError{}
+	se := &StatsError{}
 	var datas []Data
 	for idx, line := range lines {
 		d, err := p.parse(line)

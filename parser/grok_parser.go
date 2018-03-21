@@ -12,7 +12,6 @@ import (
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/times"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 	"github.com/vjeantet/grok"
 )
@@ -201,7 +200,7 @@ func (gp *GrokParser) Type() string {
 
 func (gp *GrokParser) Parse(lines []string) ([]Data, error) {
 	datas := []Data{}
-	se := &utils.StatsError{}
+	se := &StatsError{}
 	for idx, line := range lines {
 		data, err := gp.parseLine(line)
 		if err != nil {

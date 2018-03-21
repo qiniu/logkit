@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/stretchr/testify/assert"
@@ -48,7 +47,7 @@ func TestParamTransformer(t *testing.T) {
 		}
 	}
 	assert.Equal(t, par.Stage(), transforms.StageAfterParser)
-	assert.Equal(t, utils.StatsInfo{Success: 2}, par.stats)
+	assert.Equal(t, StatsInfo{Success: 2}, par.stats)
 }
 
 func TestParamTransformerError(t *testing.T) {
@@ -157,7 +156,7 @@ func TestParamTransformerKeyRepeat(t *testing.T) {
 	}
 	assert.Equal(t, par.Stage(), transforms.StageAfterParser)
 	par.stats.LastError = ""
-	assert.Equal(t, utils.StatsInfo{Success: 4}, par.stats)
+	assert.Equal(t, StatsInfo{Success: 4}, par.stats)
 }
 
 func TestParamTransformerMultiKey(t *testing.T) {
@@ -199,5 +198,5 @@ func TestParamTransformerMultiKey(t *testing.T) {
 		}
 	}
 	assert.Equal(t, par.Stage(), transforms.StageAfterParser)
-	assert.Equal(t, utils.StatsInfo{Success: 2}, par.stats)
+	assert.Equal(t, StatsInfo{Success: 2}, par.stats)
 }

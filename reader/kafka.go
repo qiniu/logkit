@@ -9,10 +9,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Shopify/sarama"
 	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/utils"
-	"github.com/qiniu/logkit/utils/models"
+	. "github.com/qiniu/logkit/utils/models"
+
+	"github.com/Shopify/sarama"
 	"github.com/wvanbergen/kafka/consumergroup"
 )
 
@@ -38,7 +38,7 @@ type KafkaReader struct {
 	started  bool
 
 	curOffsets map[string]map[int32]int64
-	stats      utils.StatsInfo
+	stats      StatsInfo
 	statsLock  *sync.RWMutex
 }
 
@@ -72,7 +72,7 @@ func (kr *KafkaReader) Name() string {
 	return fmt.Sprintf("KafkaReader:[%s],[%s]", strings.Join(kr.Topics, ","), kr.ConsumerGroup)
 }
 
-func (kr *KafkaReader) Status() utils.StatsInfo {
+func (kr *KafkaReader) Status() StatsInfo {
 	kr.statsLock.RLock()
 	defer kr.statsLock.RUnlock()
 	return kr.stats
@@ -221,12 +221,12 @@ func (kr *KafkaReader) SetMode(mode string, v interface{}) error {
 	return errors.New("KafkaReader not support read mode")
 }
 
-func (kr *KafkaReader) Lag() (rl *models.LagInfo, err error) {
+func (kr *KafkaReader) Lag() (rl *LagInfo, err error) {
 	if kr.Consumer == nil {
 		return nil, errors.New("kafka consumer is closed")
 	}
 	marks := kr.Consumer.HighWaterMarks()
-	rl = &models.LagInfo{
+	rl = &LagInfo{
 		SizeUnit: "records",
 		Size:     0,
 	}

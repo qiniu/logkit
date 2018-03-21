@@ -6,7 +6,6 @@ import (
 	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -47,7 +46,7 @@ func (im *JsonParser) Type() string {
 
 func (im *JsonParser) Parse(lines []string) ([]Data, error) {
 	datas := []Data{}
-	se := &utils.StatsError{}
+	se := &StatsError{}
 	for idx, line := range lines {
 		data, err := im.parseLine(line)
 		if err != nil {

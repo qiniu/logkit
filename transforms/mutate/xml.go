@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/clbanning/mxj"
@@ -14,17 +13,17 @@ import (
 type Xml struct {
 	Key   string `json:"key"`
 	New   string `json:"new"`
-	stats utils.StatsInfo
+	stats StatsInfo
 }
 
 func (g *Xml) Transform(datas []Data) ([]Data, error) {
 	var err, ferr error
 	errCount := 0
-	keys := utils.GetKeys(g.Key)
-	news := utils.GetKeys(g.New)
+	keys := GetKeys(g.Key)
+	news := GetKeys(g.New)
 
 	for i := range datas {
-		val, gerr := utils.GetMapValue(datas[i], keys...)
+		val, gerr := GetMapValue(datas[i], keys...)
 		if gerr != nil {
 			errCount++
 			err = fmt.Errorf("transform key %v not exist in data", g.Key)
@@ -43,10 +42,10 @@ func (g *Xml) Transform(datas []Data) ([]Data, error) {
 			continue
 		}
 		if len(news) == 0 {
-			utils.DeleteMapValue(datas[i], keys...)
+			DeleteMapValue(datas[i], keys...)
 			news = keys
 		}
-		serr := utils.SetMapValue(datas[i], xmlVal, false, news...)
+		serr := SetMapValue(datas[i], xmlVal, false, news...)
 		if serr != nil {
 			errCount++
 			err = fmt.Errorf("the new key %v already exists ", g.New)
@@ -98,7 +97,7 @@ func (g *Xml) Stage() string {
 	return transforms.StageAfterParser
 }
 
-func (g *Xml) Stats() utils.StatsInfo {
+func (g *Xml) Stats() StatsInfo {
 	return g.stats
 }
 

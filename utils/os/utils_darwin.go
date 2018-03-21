@@ -1,4 +1,4 @@
-package utils
+package os
 
 import (
 	"bytes"
@@ -25,16 +25,16 @@ func GetOSInfo() *OSInfo {
 	osStr := strings.Replace(out, "\n", "", -1)
 	osStr = strings.Replace(osStr, "\r\n", "", -1)
 	osInfo := strings.Split(osStr, " ")
-	for i := len(osInfo); i < 4; i++ {
+	for i := len(osInfo); i < 3; i++ {
 		osInfo = append(osInfo, "unknown")
 	}
-	gio := &OSInfo{Kernel: osInfo[0], Core: osInfo[1], Platform: runtime.GOARCH, OS: osInfo[3]}
+	gio := &OSInfo{Kernel: osInfo[0], Core: osInfo[1], Platform: runtime.GOARCH, OS: osInfo[0]}
 	gio.Hostname, _ = os.Hostname()
 	return gio
 }
 
 func _getInfo() string {
-	cmd := exec.Command("uname", "-srio")
+	cmd := exec.Command("uname", "-srm")
 	cmd.Stdin = strings.NewReader("some input")
 	var out bytes.Buffer
 	var stderr bytes.Buffer

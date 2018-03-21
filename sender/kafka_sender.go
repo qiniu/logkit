@@ -8,7 +8,6 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/Shopify/sarama"
@@ -60,7 +59,7 @@ func NewKafkaSender(conf conf.MapConf) (sender Sender, err error) {
 	if err != nil {
 		return
 	}
-	topic, err = utils.ExtractField(topic)
+	topic, err = ExtractField(topic)
 	if err != nil {
 		return
 	}
@@ -133,7 +132,7 @@ func (this *KafkaSender) Name() string {
 func (this *KafkaSender) Send(data []Data) error {
 	producer := this.producer
 	var msgs []*sarama.ProducerMessage
-	ss := &utils.StatsError{}
+	ss := &StatsError{}
 	var lastErr error
 	for _, doc := range data {
 		message, err := this.getEventMessage(doc)

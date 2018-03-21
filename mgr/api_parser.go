@@ -6,7 +6,6 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/labstack/echo"
@@ -32,7 +31,7 @@ func (rs *RestService) PostParse() echo.HandlerFunc {
 		}
 
 		parseData, err := ParseData(parserConfig)
-		se, ok := err.(*utils.StatsError)
+		se, ok := err.(*StatsError)
 		if ok {
 			err = se.ErrorDetail
 		}

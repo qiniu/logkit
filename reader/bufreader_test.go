@@ -8,7 +8,6 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/stretchr/testify/assert"
@@ -302,7 +301,7 @@ func Test_BuffReaderStats(t *testing.T) {
 	str, ok := r.(StatsReader)
 	assert.Equal(t, true, ok)
 	stsx := str.Status()
-	expsts := utils.StatsInfo{}
+	expsts := StatsInfo{}
 	assert.Equal(t, expsts, stsx)
 	r.Close()
 }

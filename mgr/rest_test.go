@@ -20,8 +20,6 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/reader"
-	"github.com/qiniu/logkit/sender"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
@@ -109,13 +107,13 @@ func getRunnerStatus(rn, lp, rs string, rdc, rds, pe, ps, se, ss int64) map[stri
 				Size:     0,
 				SizeUnit: unit,
 			},
-			ParserStats: utils.StatsInfo{
+			ParserStats: StatsInfo{
 				Errors:  pe,
 				Success: ps,
 				Trend:   "",
 			},
-			TransformStats: make(map[string]utils.StatsInfo),
-			SenderStats: map[string]utils.StatsInfo{
+			TransformStats: make(map[string]StatsInfo),
+			SenderStats: map[string]StatsInfo{
 				"file_sender": {
 					Errors:  se,
 					Success: ss,
@@ -423,11 +421,11 @@ func restCRUDTest(p *testParam) {
 	err = jsoniter.Unmarshal([]byte(conf1), &expconf1)
 	assert.NoError(t, err)
 	expconf1.ReaderConfig[GlobalKeyName] = expconf1.RunnerName
-	expconf1.ReaderConfig[reader.KeyRunnerName] = expconf1.RunnerName
-	expconf1.ParserConf[parser.KeyRunnerName] = expconf1.RunnerName
+	expconf1.ReaderConfig[KeyRunnerName] = expconf1.RunnerName
+	expconf1.ParserConf[KeyRunnerName] = expconf1.RunnerName
 	expconf1.IsInWebFolder = true
 	for i := range expconf1.SenderConfig {
-		expconf1.SenderConfig[i][sender.KeyRunnerName] = expconf1.RunnerName
+		expconf1.SenderConfig[i][KeyRunnerName] = expconf1.RunnerName
 	}
 
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName1
@@ -451,11 +449,11 @@ func restCRUDTest(p *testParam) {
 	assert.NoError(t, err)
 
 	expconf2.ReaderConfig[GlobalKeyName] = expconf2.RunnerName
-	expconf2.ReaderConfig[reader.KeyRunnerName] = expconf2.RunnerName
-	expconf2.ParserConf[parser.KeyRunnerName] = expconf2.RunnerName
+	expconf2.ReaderConfig[KeyRunnerName] = expconf2.RunnerName
+	expconf2.ParserConf[KeyRunnerName] = expconf2.RunnerName
 	expconf2.IsInWebFolder = true
 	for i := range expconf2.SenderConfig {
-		expconf2.SenderConfig[i][sender.KeyRunnerName] = expconf2.RunnerName
+		expconf2.SenderConfig[i][KeyRunnerName] = expconf2.RunnerName
 	}
 
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName2

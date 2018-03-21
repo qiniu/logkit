@@ -1,4 +1,4 @@
-package utils
+package models
 
 import (
 	"database/sql"
@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/qiniu/logkit/utils/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -57,14 +56,6 @@ func Test_TrimeList(t *testing.T) {
 	if !reflect.DeepEqual(gots, exps) {
 		t.Errorf("Test_TrimeList error exps %v got %v", exps, gots)
 	}
-}
-
-func Test_GetInode(t *testing.T) {
-	os.Mkdir("abc", 0777)
-	fi, _ := os.Stat("abc")
-	inode := getInode(fi)
-	assert.True(t, inode > 0)
-	os.RemoveAll("abc")
 }
 
 func Test_GetLogFiles(t *testing.T) {
@@ -196,12 +187,6 @@ func TestIsJsonString(t *testing.T) {
 		got := IsJsonString(c.c)
 		assert.Equal(t, c.exp, got)
 	}
-}
-
-func TestGetLocalIp(t *testing.T) {
-	ip, err := GetLocalIP()
-	assert.NoError(t, err)
-	fmt.Println(ip)
 }
 
 func TestAddRemoveHttpProc(t *testing.T) {
@@ -377,36 +362,6 @@ func TestLogDirAndPattern(t *testing.T) {
 	assert.Equal(t, pt1, "TestLogDirAndPattern.log")
 	defer os.RemoveAll("TestLogDirAndPattern")
 
-}
-
-func TestGetExtraInfo(t *testing.T) {
-	extraInfo := GetExtraInfo()
-	osInfo := GetOSInfo()
-	ip, err := GetLocalIP()
-
-	if core, ok := extraInfo[KeyCore]; !ok {
-		t.Fatalf("core is not found")
-	} else {
-		assert.Equal(t, osInfo.Core, core)
-	}
-
-	if hostname, ok := extraInfo[KeyHostName]; !ok {
-		t.Fatalf("hostname is not found")
-	} else {
-		assert.Equal(t, osInfo.Hostname, hostname)
-	}
-
-	if oi, ok := extraInfo[KeyOsInfo]; !ok {
-		t.Fatalf("osInfo is not found")
-	} else {
-		assert.Equal(t, osInfo.OS+"-"+osInfo.Kernel+"-"+osInfo.Platform, oi)
-	}
-
-	if localIp, ok := extraInfo[KeyLocalIp]; err == nil && !ok {
-		t.Fatalf("local ip is not found")
-	} else if err == nil {
-		assert.Equal(t, ip, localIp)
-	}
 }
 
 func Test_checkFileMode(t *testing.T) {

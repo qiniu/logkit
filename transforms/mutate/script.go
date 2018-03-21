@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -23,7 +22,7 @@ type Script struct {
 	ScriptPath   string `json:"scriptpath"`
 	Script       []byte `json:"script"`
 	storePath    string
-	stats        utils.StatsInfo
+	stats        StatsInfo
 }
 
 func (g *Script) Init() error {
@@ -35,7 +34,7 @@ func (g *Script) Init() error {
 			return err
 		}
 
-		g.storePath = filepath.Join(realPath, "script_"+utils.Hash(script))
+		g.storePath = filepath.Join(realPath, "script_"+Hash(script))
 		scriptFile, openFileErr := os.OpenFile(g.storePath, os.O_RDWR|os.O_CREATE, DefaultFilePerm)
 		if openFileErr != nil {
 			return openFileErr
@@ -50,8 +49,8 @@ func (g *Script) Init() error {
 func (g *Script) Transform(datas []Data) ([]Data, error) {
 	var err, ferr error
 	errCount := 0
-	keys := utils.GetKeys(g.Key)
-	news := utils.GetKeys(g.New)
+	keys := GetKeys(g.Key)
+	news := GetKeys(g.New)
 	if g.storePath == "" {
 		g.storePath = g.ScriptPath
 	}
@@ -61,7 +60,7 @@ func (g *Script) Transform(datas []Data) ([]Data, error) {
 		var scriptRes string
 		var gerr error
 		if scriptPath == "" {
-			val, gerr := utils.GetMapValue(datas[i], keys...)
+			val, gerr := GetMapValue(datas[i], keys...)
 			if gerr != nil {
 				errCount++
 				err = fmt.Errorf("transform key %v not exist in data", g.Key)
@@ -85,10 +84,10 @@ func (g *Script) Transform(datas []Data) ([]Data, error) {
 		}
 
 		if len(news) == 0 {
-			utils.DeleteMapValue(datas[i], keys...)
+			DeleteMapValue(datas[i], keys...)
 			news = keys
 		}
-		seterr := utils.SetMapValue(datas[i], scriptRes, false, news...)
+		seterr := SetMapValue(datas[i], scriptRes, false, news...)
 		if seterr != nil {
 			errCount++
 			err = fmt.Errorf("the new key %v already exists ", g.New)
@@ -143,16 +142,16 @@ func isSeparator(separator rune) bool {
 }
 
 func checkPath(path string) (string, error) {
-	realPath, fileInfo, err := utils.GetRealPath(path)
+	realPath, fileInfo, err := GetRealPath(path)
 	if err != nil || fileInfo == nil {
-		return "", fmt.Errorf("%s - utils.GetRealPath failed, err:%v", path, err)
+		return "", fmt.Errorf("%s - GetRealPath failed, err:%v", path, err)
 	}
 
 	fileMode := fileInfo.Mode()
 	if !fileMode.IsRegular() {
 		return "", fmt.Errorf("%s - file failed, err: file is not regular", path)
 	}
-	utils.CheckFileMode(realPath, fileMode)
+	CheckFileMode(realPath, fileMode)
 	return realPath, nil
 }
 
@@ -213,7 +212,7 @@ func (g *Script) Stage() string {
 	return transforms.StageAfterParser
 }
 
-func (g *Script) Stats() utils.StatsInfo {
+func (g *Script) Stats() StatsInfo {
 	return g.stats
 }
 
@@ -224,7 +223,7 @@ func init() {
 }
 
 func getValidDir(dir string) (realPath string, err error) {
-	realPath, fi, err := utils.GetRealPath(dir)
+	realPath, fi, err := GetRealPath(dir)
 	if os.IsNotExist(err) {
 		if err = os.MkdirAll(realPath, DefaultDirPerm); err != nil {
 			//此处的error需要直接返回，后面会根据error类型是否为path error做判断

@@ -19,7 +19,6 @@ import (
 	"github.com/qiniu/logkit/router"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	jsoniter "github.com/json-iterator/go"
@@ -62,17 +61,17 @@ type StatusPersistable interface {
 }
 
 type RunnerStatus struct {
-	Name             string                     `json:"name"`
-	Logpath          string                     `json:"logpath"`
-	ReadDataSize     int64                      `json:"readDataSize"`
-	ReadDataCount    int64                      `json:"readDataCount"`
-	Elaspedtime      float64                    `json:"elaspedtime"`
-	Lag              LagInfo                    `json:"lag"`
-	ReaderStats      utils.StatsInfo            `json:"readerStats"`
-	ParserStats      utils.StatsInfo            `json:"parserStats"`
-	SenderStats      map[string]utils.StatsInfo `json:"senderStats"`
-	TransformStats   map[string]utils.StatsInfo `json:"transformStats"`
-	Error            string                     `json:"error,omitempty"`
+	Name             string               `json:"name"`
+	Logpath          string               `json:"logpath"`
+	ReadDataSize     int64                `json:"readDataSize"`
+	ReadDataCount    int64                `json:"readDataCount"`
+	Elaspedtime      float64              `json:"elaspedtime"`
+	Lag              LagInfo              `json:"lag"`
+	ReaderStats      StatsInfo            `json:"readerStats"`
+	ParserStats      StatsInfo            `json:"parserStats"`
+	SenderStats      map[string]StatsInfo `json:"senderStats"`
+	TransformStats   map[string]StatsInfo `json:"transformStats"`
+	Error            string               `json:"error,omitempty"`
 	lastState        time.Time
 	ReadSpeedKB      float64 `json:"readspeed_kb"`
 	ReadSpeed        float64 `json:"readspeed"`
@@ -172,15 +171,15 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 		exitChan:   make(chan struct{}),
 		lastSend:   time.Now(), // 上一次发送时间
 		rs: RunnerStatus{
-			SenderStats:    make(map[string]utils.StatsInfo),
-			TransformStats: make(map[string]utils.StatsInfo),
+			SenderStats:    make(map[string]StatsInfo),
+			TransformStats: make(map[string]StatsInfo),
 			lastState:      time.Now(),
 			Name:           info.RunnerName,
 			RunningStatus:  RunnerRunning,
 		},
 		lastRs: RunnerStatus{
-			SenderStats:    make(map[string]utils.StatsInfo),
-			TransformStats: make(map[string]utils.StatsInfo),
+			SenderStats:    make(map[string]StatsInfo),
+			TransformStats: make(map[string]StatsInfo),
 			lastState:      time.Now(),
 			Name:           info.RunnerName,
 			RunningStatus:  RunnerRunning,
@@ -238,11 +237,11 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, p
 		return nil, errors.New(rc.RunnerName + " ParserConf is nil")
 	}
 	rc.ReaderConfig[GlobalKeyName] = rc.RunnerName
-	rc.ReaderConfig[reader.KeyRunnerName] = rc.RunnerName
+	rc.ReaderConfig[KeyRunnerName] = rc.RunnerName
 	for i := range rc.SenderConfig {
-		rc.SenderConfig[i][sender.KeyRunnerName] = rc.RunnerName
+		rc.SenderConfig[i][KeyRunnerName] = rc.RunnerName
 	}
-	rc.ParserConf[parser.KeyRunnerName] = rc.RunnerName
+	rc.ParserConf[KeyRunnerName] = rc.RunnerName
 	//配置文件适配
 	rc = Compatible(rc)
 	var (
@@ -280,7 +279,7 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, p
 			return nil, err
 		}
 		senders = append(senders, s)
-		delete(rc.SenderConfig[i], sender.InnerUserAgent)
+		delete(rc.SenderConfig[i], InnerUserAgent)
 	}
 	senderCnt := len(senders)
 	router, err := router.NewSenderRouter(rc.Router, senderCnt)
@@ -340,7 +339,7 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 	}
 	r.rsMutex.Lock()
 	if _, ok := r.rs.SenderStats[s.Name()]; !ok {
-		r.rs.SenderStats[s.Name()] = utils.StatsInfo{}
+		r.rs.SenderStats[s.Name()] = StatsInfo{}
 	}
 	info := r.rs.SenderStats[s.Name()]
 	r.rsMutex.Unlock()
@@ -351,7 +350,7 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 			return false
 		}
 		err := s.Send(datas)
-		if se, ok := err.(*utils.StatsError); ok {
+		if se, ok := err.(*StatsError); ok {
 			err = se.ErrorDetail
 			if se.Ft {
 				r.rsMutex.Lock()
@@ -415,7 +414,7 @@ func (r *LogExportRunner) Run() {
 	}()
 	tags := r.meta.GetTags()
 	datasourceTag := r.meta.GetDataSourceTag()
-	schemaErr := utils.SchemaErr{Number: 0, Last: time.Unix(0, 0)}
+	schemaErr := SchemaErr{Number: 0, Last: time.Unix(0, 0)}
 	tags, err := GetEnvTag(r.EnvTag, tags)
 	if err != nil {
 		log.Warnf("get env tags error: %v", err)
@@ -484,7 +483,7 @@ func (r *LogExportRunner) Run() {
 		// parse data
 		errorCnt := int64(0)
 		datas, err := r.parser.Parse(lines)
-		se, ok := err.(*utils.StatsError)
+		se, ok := err.(*StatsError)
 		r.rsMutex.Lock()
 		if ok {
 			errorCnt = se.Errors
@@ -573,7 +572,7 @@ func classifySenderData(datas []Data, router *router.Router, senderCnt int) [][]
 	return senderDataList
 }
 
-func addSourceToData(sourceFroms []string, se *utils.StatsError, datas []Data, datasourceTagName, runnername string, recordErrData bool) []Data {
+func addSourceToData(sourceFroms []string, se *StatsError, datas []Data, datasourceTagName, runnername string, recordErrData bool) []Data {
 	j := 0
 	for i, v := range sourceFroms {
 		if recordErrData {
@@ -765,7 +764,7 @@ func (r *LogExportRunner) Status() RunnerStatus {
 		if oldtsts, ok := r.lastRs.TransformStats[ttp]; ok {
 			newtsts.Speed, newtsts.Trend = calcSpeedTrend(oldtsts, newtsts, elaspedtime)
 		} else {
-			newtsts.Speed, newtsts.Trend = calcSpeedTrend(utils.StatsInfo{}, newtsts, elaspedtime)
+			newtsts.Speed, newtsts.Trend = calcSpeedTrend(StatsInfo{}, newtsts, elaspedtime)
 		}
 		r.rs.TransformStats[ttp] = newtsts
 	}
@@ -792,7 +791,7 @@ func (r *LogExportRunner) Status() RunnerStatus {
 		if lv, ok := r.lastRs.SenderStats[k]; ok {
 			v.Speed, v.Trend = calcSpeedTrend(lv, v, elaspedtime)
 		} else {
-			v.Speed, v.Trend = calcSpeedTrend(utils.StatsInfo{}, v, elaspedtime)
+			v.Speed, v.Trend = calcSpeedTrend(StatsInfo{}, v, elaspedtime)
 		}
 		r.rs.SenderStats[k] = v
 	}
@@ -802,7 +801,7 @@ func (r *LogExportRunner) Status() RunnerStatus {
 	return rss
 }
 
-func calcSpeedTrend(old, new utils.StatsInfo, elaspedtime float64) (speed float64, trend string) {
+func calcSpeedTrend(old, new StatsInfo, elaspedtime float64) (speed float64, trend string) {
 	if elaspedtime < 0.001 {
 		speed = old.Speed
 	} else {
@@ -826,8 +825,8 @@ func deepCopy(dst, src interface{}) {
 }
 
 func copyRunnerStatus(dst, src *RunnerStatus) {
-	dst.TransformStats = make(map[string]utils.StatsInfo, len(src.TransformStats))
-	dst.SenderStats = make(map[string]utils.StatsInfo, len(src.SenderStats))
+	dst.TransformStats = make(map[string]StatsInfo, len(src.TransformStats))
+	dst.SenderStats = make(map[string]StatsInfo, len(src.SenderStats))
 	dst.ReadDataSize = src.ReadDataSize
 	dst.ReadDataCount = src.ReadDataCount
 
@@ -900,14 +899,14 @@ func (r *LogExportRunner) StatusRestore() {
 		}
 		sStatus, ok := s.(sender.StatsSender)
 		if ok {
-			sStatus.Restore(&utils.StatsInfo{
+			sStatus.Restore(&StatsInfo{
 				Success: info[0],
 				Errors:  info[1],
 			})
 		}
 		status, ext := r.rs.SenderStats[name]
 		if !ext {
-			status = utils.StatsInfo{}
+			status = StatsInfo{}
 		}
 		status.Success = info[0]
 		status.Errors = info[1]

@@ -9,7 +9,7 @@ import (
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/samples"
 	"github.com/qiniu/logkit/sender"
-	"github.com/qiniu/logkit/utils"
+	utilsos "github.com/qiniu/logkit/utils/os"
 
 	_ "net/http/pprof"
 
@@ -64,5 +64,5 @@ func main() {
 	if err = m.Watch(paths); err != nil {
 		log.Fatalf("watch path error %v", err)
 	}
-	utils.WaitForInterrupt(func() { m.Stop() })
+	utilsos.WaitForInterrupt(func() { m.Stop() })
 }

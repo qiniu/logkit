@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/qiniu/log"
@@ -53,7 +52,7 @@ func TestFtSender(t *testing.T) {
 		{"ab": "E18111:"},
 	}
 	err = fts.Send(datas)
-	se, ok := err.(*utils.StatsError)
+	se, ok := err.(*StatsError)
 	if !ok {
 		t.Fatal("ft send return error should .(*SendError)")
 	}
@@ -102,7 +101,7 @@ func TestFtMemorySender(t *testing.T) {
 		{"ab": "E18111:"},
 	}
 	err = fts.Send(datas)
-	se, ok := err.(*utils.StatsError)
+	se, ok := err.(*StatsError)
 	if !ok {
 		t.Fatal("ft send return error should .(*SendError)")
 	}
@@ -155,7 +154,7 @@ func TestFtChannelFullSender(t *testing.T) {
 		err = fts.Send([]Data{
 			{"a": i},
 		})
-		se, ok := err.(*utils.StatsError)
+		se, ok := err.(*StatsError)
 		if !ok {
 			t.Fatal("ft send return error should .(*StatsError)")
 		}
@@ -176,7 +175,7 @@ func TestFtChannelFullSender(t *testing.T) {
 		for _, v := range moreDatas {
 			time.Sleep(100 * time.Millisecond)
 			err = fts.Send(v)
-			se, ok := err.(*utils.StatsError)
+			se, ok := err.(*StatsError)
 			if !ok {
 				t.Fatal("ft send return error should .(*SendError)")
 			}
@@ -221,7 +220,7 @@ func TestFtSenderConcurrent(t *testing.T) {
 	}
 	for i := 0; i < 100; i++ {
 		err = fts.Send(datas)
-		se, ok := err.(*utils.StatsError)
+		se, ok := err.(*StatsError)
 		if !ok {
 			t.Fatal("ft send return error should .(*SendError)")
 		}
@@ -276,7 +275,7 @@ func ftSenderConcurrent(b *testing.B, c conf.MapConf) {
 	for i := 0; i < b.N; i++ {
 		for {
 			err = fts.Send(datas)
-			se, _ := err.(*utils.StatsError)
+			se, _ := err.(*StatsError)
 			if se.ErrorDetail == nil {
 				break
 			}
@@ -354,7 +353,7 @@ func TestFtSenderConvertData(t *testing.T) {
 		err = fts.Send([]Data{
 			{"a": "typeBinaryUnpack"},
 		})
-		se, ok := err.(*utils.StatsError)
+		se, ok := err.(*StatsError)
 		if !ok {
 			t.Fatal("ft send return error should .(*StatsError)")
 		}

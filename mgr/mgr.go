@@ -11,13 +11,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/cleaner"
 	config "github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/sender"
-	"github.com/qiniu/logkit/utils"
-	"github.com/qiniu/logkit/utils/models"
+	. "github.com/qiniu/logkit/utils/models"
+	utilsos "github.com/qiniu/logkit/utils/os"
+
+	"github.com/qiniu/log"
 
 	"github.com/howeyc/fsnotify"
 	"github.com/json-iterator/go"
@@ -81,7 +82,7 @@ func NewCustomManager(conf ManagerConfig, pr *parser.ParserRegistry, sr *sender.
 		}
 	}
 	if !conf.ServerBackup {
-		if err := os.MkdirAll(conf.RestDir, models.DefaultDirPerm); err != nil && !os.IsExist(err) {
+		if err := os.MkdirAll(conf.RestDir, DefaultDirPerm); err != nil && !os.IsExist(err) {
 			log.Warnf("make dir for rest default dir error %v", err)
 		}
 	}
@@ -97,7 +98,7 @@ func NewCustomManager(conf ManagerConfig, pr *parser.ParserRegistry, sr *sender.
 		watchers:      make(map[string]*fsnotify.Watcher),
 		pregistry:     pr,
 		sregistry:     sr,
-		SystemInfo:    utils.GetOSInfo().String(),
+		SystemInfo:    utilsos.GetOSInfo().String(),
 	}
 	return m, nil
 }
@@ -209,7 +210,7 @@ func (m *Manager) Add(confPath string) {
 		return
 	}
 	log.Info("try add", confPath)
-	confPathAbs, _, err := utils.GetRealPath(confPath)
+	confPathAbs, _, err := GetRealPath(confPath)
 	if err != nil {
 		log.Warnf("filepath.Abs(%s) failed: %v", confPath)
 		return
@@ -257,7 +258,7 @@ func (m *Manager) ForkRunner(confPath string, nconf RunnerConfig, errReturn bool
 			} else {
 				webornot = "Terminal"
 			}
-			nconf.SenderConfig[k][sender.InnerUserAgent] = "logkit/" + m.Version + " " + m.SystemInfo + " " + webornot
+			nconf.SenderConfig[k][InnerUserAgent] = "logkit/" + m.Version + " " + m.SystemInfo + " " + webornot
 		}
 
 		if runner, err = NewCustomRunner(nconf, m.cleanChan, m.pregistry, m.sregistry); err != nil {
@@ -495,10 +496,10 @@ func (m *Manager) Status() (rss map[string]RunnerStatus) {
 		} else {
 			rss[conf.RunnerName] = RunnerStatus{
 				Name:           conf.RunnerName,
-				ReaderStats:    utils.StatsInfo{},
-				ParserStats:    utils.StatsInfo{},
-				TransformStats: make(map[string]utils.StatsInfo),
-				SenderStats:    make(map[string]utils.StatsInfo),
+				ReaderStats:    StatsInfo{},
+				ParserStats:    StatsInfo{},
+				TransformStats: make(map[string]StatsInfo),
+				SenderStats:    make(map[string]StatsInfo),
 				RunningStatus:  RunnerStopped,
 			}
 		}
@@ -538,7 +539,7 @@ func (m *Manager) getDeepCopyConfig(name string) (filename string, conf RunnerCo
 
 // TrimSecretInfo 将配置文件中的 token 信息去掉
 func TrimSecretInfo(conf RunnerConfig) RunnerConfig {
-	preFix := models.SchemaFreeTokensPrefix
+	preFix := SchemaFreeTokensPrefix
 	keyName := []string{
 		preFix + "pipeline_get_repo_token",
 		preFix + "pipeline_post_data_token",
@@ -552,7 +553,7 @@ func TrimSecretInfo(conf RunnerConfig) RunnerConfig {
 	}
 
 	// logDB tokens
-	preFix = models.LogDBTokensPrefix
+	preFix = LogDBTokensPrefix
 	keyName = append(keyName, []string{
 		preFix + "pipeline_get_repo_token",
 		preFix + "pipeline_create_repo_token",
@@ -566,7 +567,7 @@ func TrimSecretInfo(conf RunnerConfig) RunnerConfig {
 	}...)
 
 	// tsDB tokens
-	preFix = models.TsDBTokensPrefix
+	preFix = TsDBTokensPrefix
 	keyName = append(keyName, []string{
 		preFix + "pipeline_get_repo_token",
 		preFix + "create_tsdb_repo_token",
@@ -578,7 +579,7 @@ func TrimSecretInfo(conf RunnerConfig) RunnerConfig {
 	}...)
 
 	// kodo tokens
-	preFix = models.KodoTokensPrefix
+	preFix = KodoTokensPrefix
 	keyName = append(keyName, []string{
 		preFix + "pipeline_get_repo_token",
 		preFix + "create_export_token",
@@ -607,7 +608,7 @@ func (m *Manager) backupRunnerConfig(filename string, rconf RunnerConfig) error 
 	// 判断默认备份文件夹是否存在，不存在就尝试创建
 	if _, err := os.Stat(m.RestDir); err != nil {
 		if os.IsNotExist(err) {
-			if err = os.Mkdir(m.RestDir, models.DefaultDirPerm); err != nil && !os.IsExist(err) {
+			if err = os.Mkdir(m.RestDir, DefaultDirPerm); err != nil && !os.IsExist(err) {
 				return fmt.Errorf("rest default dir not exists and make dir failed, err is %v", err)
 			}
 		}
@@ -615,7 +616,7 @@ func (m *Manager) backupRunnerConfig(filename string, rconf RunnerConfig) error 
 	return ioutil.WriteFile(filename, confBytes, 0644)
 }
 
-func (m *Manager) UpdateToken(tokens []models.AuthTokens) (err error) {
+func (m *Manager) UpdateToken(tokens []AuthTokens) (err error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	errMsg := make([]string, 0)

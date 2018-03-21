@@ -13,13 +13,14 @@ import (
 	"time"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
+
+	"github.com/qiniu/log"
 
 	_ "github.com/denisenkom/go-mssqldb" //mssql 驱动
 	_ "github.com/go-sql-driver/mysql"   //mysql 驱动
 	"github.com/json-iterator/go"
 	_ "github.com/lib/pq" //postgres 驱动
-	"github.com/qiniu/log"
 	"github.com/robfig/cron"
 )
 
@@ -54,7 +55,7 @@ type SqlReader struct {
 	loop         bool
 	loopDuration time.Duration
 
-	stats     utils.StatsInfo
+	stats     StatsInfo
 	statsLock sync.RWMutex
 }
 
@@ -327,7 +328,7 @@ func goMagic(rawSql string, now time.Time) (ret string) {
 }
 
 func (mr *SqlReader) Name() string {
-	return strings.ToUpper(mr.dbtype) + "_Reader:" + mr.database + "_" + utils.Hash(mr.rawsqls)
+	return strings.ToUpper(mr.dbtype) + "_Reader:" + mr.database + "_" + Hash(mr.rawsqls)
 }
 
 func (mr *SqlReader) setStatsError(err string) {
@@ -336,7 +337,7 @@ func (mr *SqlReader) setStatsError(err string) {
 	mr.stats.LastError = err
 }
 
-func (mr *SqlReader) Status() utils.StatsInfo {
+func (mr *SqlReader) Status() StatsInfo {
 	mr.statsLock.RLock()
 	defer mr.statsLock.RUnlock()
 	return mr.stats

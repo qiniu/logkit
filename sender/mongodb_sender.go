@@ -112,7 +112,7 @@ func (s *MongoAccSender) Send(datas []Data) (se error) {
 	failure := []Data{}
 	var err error
 	var lastErr error
-	ss := &utils.StatsError{}
+	ss := &StatsError{}
 	for _, d := range datas {
 		selector := bson.D{}
 		for _, key := range s.updateKey {

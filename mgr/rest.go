@@ -14,11 +14,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
+	utilsos "github.com/qiniu/logkit/utils/os"
+
+	"github.com/qiniu/log"
 
 	"github.com/labstack/echo"
 )
@@ -146,7 +147,7 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 
 		address = ":" + strconv.Itoa(port)
 		if mgr.BindHost != "" {
-			address, httpschema = utils.RemoveHttpProtocal(mgr.BindHost)
+			address, httpschema = RemoveHttpProtocal(mgr.BindHost)
 		}
 		listener, err = httpserve(address, router)
 		if err != nil {
@@ -187,7 +188,7 @@ func GetMySlaveUrl(address, schema string) (uri string, err error) {
 		return
 	}
 	if host == "" {
-		host, err = utils.GetLocalIP()
+		host, err = utilsos.GetLocalIP()
 		if err != nil {
 			return
 		}
