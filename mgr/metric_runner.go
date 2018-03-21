@@ -3,6 +3,7 @@ package mgr
 import (
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -59,7 +60,7 @@ func NewMetric(tp string) (metric.Collector, error) {
 	if c, ok := metric.Collectors[tp]; ok {
 		return c(), nil
 	}
-	return nil, fmt.Errorf("Metric <%v> is not support now", tp)
+	return nil, fmt.Errorf("metric <%v> is not support now", tp)
 }
 
 func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *MetricRunner, err error) {
@@ -197,6 +198,15 @@ func (mr *MetricRunner) Name() string {
 
 func (r *MetricRunner) Run() {
 	defer close(r.exitChan)
+	defer func() {
+		// recover when runner is stopped
+		if atomic.LoadInt32(&r.stopped) <= 0 {
+			return
+		}
+		if r := recover(); r != nil {
+			log.Errorf("recover when runner is stopped\npanic: %v\nstack: %s", r, debug.Stack())
+		}
+	}()
 
 	tags := map[string]interface{}{
 		metric.Timestamp: nil,
