@@ -26,6 +26,7 @@ import (
 
 	"github.com/json-iterator/go"
 	"github.com/labstack/echo"
+	"github.com/qiniu/logkit/router"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -995,10 +996,10 @@ func senderRouterTest(p *testParam) {
 			"file_send_path": resvPath3,
 		},
 	}
-	runnerConf.Router = sender.RouterConfig{
+	runnerConf.Router = router.RouterConfig{
 		KeyName:      "a",
 		DefaultIndex: 2,
-		MatchType:    sender.MTypeEqualName,
+		MatchType:    router.MTypeEqualName,
 		Routes: map[string]int{
 			"a":   0,
 			"123": 0,

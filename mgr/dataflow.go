@@ -8,6 +8,7 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/router"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
@@ -215,29 +216,29 @@ func getSenders(sendersConf []conf.MapConf) ([]sender.Sender, error) {
 	return senders, nil
 }
 
-func getRouter(senderConfig map[string]interface{}, senderCnt int) (*sender.Router, error) {
+func getRouter(senderConfig map[string]interface{}, senderCnt int) (*router.Router, error) {
 	routerConf, err := getRouterConfig(senderConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	router, err := sender.NewSenderRouter(routerConf, senderCnt)
+	router, err := router.NewSenderRouter(routerConf, senderCnt)
 	if err != nil {
 		return nil, fmt.Errorf("sender router error, %v", err)
 	}
 	return router, nil
 }
 
-func getRouterConfig(senderConfig map[string]interface{}) (sender.RouterConfig, error) {
+func getRouterConfig(senderConfig map[string]interface{}) (router.RouterConfig, error) {
 	config := senderConfig[KeyRouterConfig]
 	byteRouterConfig, err := jsoniter.Marshal(config)
 	if err != nil {
-		return sender.RouterConfig{}, err
+		return router.RouterConfig{}, err
 	}
 
-	var routerConfig sender.RouterConfig
+	var routerConfig router.RouterConfig
 	if jsonErr := jsoniter.Unmarshal(byteRouterConfig, &routerConfig); jsonErr != nil {
-		return sender.RouterConfig{}, jsonErr
+		return router.RouterConfig{}, jsonErr
 	}
 	return routerConfig, nil
 }
