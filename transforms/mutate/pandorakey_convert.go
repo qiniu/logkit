@@ -38,7 +38,7 @@ func deepConvertKey(data map[string]interface{}) map[string]interface{} {
 		for _, c := range k {
 			if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
 				nk = nk + string(c)
-			} else {
+			} else if len(nk) > 0 {
 				nk = nk + "_"
 			}
 		}
