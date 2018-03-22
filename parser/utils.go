@@ -1,8 +1,12 @@
 package parser
 
 import (
+	"encoding/base64"
+	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/qiniu/logkit/conf"
 
 	"github.com/qiniu/log"
 )
@@ -48,4 +52,33 @@ func GetLabels(labelList []string, nameMap map[string]struct{}) (labels []Label)
 		labels = append(labels, l)
 	}
 	return
+}
+
+func ConvertWebParserConfig(conf conf.MapConf) conf.MapConf {
+	if conf == nil {
+		return conf
+	}
+
+	rawCustomPatterns, _ := conf.GetStringOr(KeyGrokCustomPatterns, "")
+	if rawCustomPatterns != "" {
+		CustomPatterns, err := base64.StdEncoding.DecodeString(rawCustomPatterns)
+		if err != nil {
+			log.Errorf("base64 decode %v error: $v", rawCustomPatterns, err)
+			return conf
+		}
+		realCustomPatterns, err := url.QueryUnescape(string(CustomPatterns))
+		if err != nil {
+			log.Errorf("QueryUnescape %v error: $v", string(CustomPatterns), err)
+			return conf
+		}
+		conf[KeyGrokCustomPatterns] = string(realCustomPatterns)
+	}
+
+	splitter, _ := conf.GetStringOr(KeyCSVSplitter, "")
+	if splitter != "" {
+		splitter = strings.Replace(splitter, "\\t", "\t", -1)
+		conf[KeyCSVSplitter] = splitter
+	}
+
+	return conf
 }

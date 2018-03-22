@@ -61,7 +61,7 @@ func RawData(readerConfig conf.MapConf) (rawData string, err error) {
 
 //parse模块中各种type的日志都能获取解析后的数据
 func ParseData(parserConfig conf.MapConf) (parsedData []Data, err error) {
-	parserConfig = convertWebParserConfig(parserConfig)
+	parserConfig = parser.ConvertWebParserConfig(parserConfig)
 	if parserConfig == nil {
 		err = fmt.Errorf("parser config was empty after web config convet")
 		return

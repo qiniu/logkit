@@ -1,13 +1,11 @@
 package mgr
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -15,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
@@ -279,35 +276,6 @@ func (rs *RestService) GetConfig() echo.HandlerFunc {
 	}
 }
 
-func convertWebParserConfig(conf conf.MapConf) conf.MapConf {
-	if conf == nil {
-		return conf
-	}
-
-	rawCustomPatterns, _ := conf.GetStringOr(parser.KeyGrokCustomPatterns, "")
-	if rawCustomPatterns != "" {
-		CustomPatterns, err := base64.StdEncoding.DecodeString(rawCustomPatterns)
-		if err != nil {
-			log.Errorf("base64 decode %v error: $v", rawCustomPatterns, err)
-			return conf
-		}
-		realCustomPatterns, err := url.QueryUnescape(string(CustomPatterns))
-		if err != nil {
-			log.Errorf("QueryUnescape %v error: $v", string(CustomPatterns), err)
-			return conf
-		}
-		conf[parser.KeyGrokCustomPatterns] = string(realCustomPatterns)
-	}
-
-	splitter, _ := conf.GetStringOr(parser.KeyCSVSplitter, "")
-	if splitter != "" {
-		splitter = strings.Replace(splitter, "\\t", "\t", -1)
-		conf[parser.KeyCSVSplitter] = splitter
-	}
-
-	return conf
-}
-
 func convertWebTransformerConfig(conf map[string]interface{}) map[string]interface{} {
 	if conf == nil {
 		return conf
@@ -347,7 +315,7 @@ func (rs *RestService) PostConfig() echo.HandlerFunc {
 			return RespError(c, http.StatusBadRequest, ErrRunnerAdd, err.Error())
 		}
 		nconf.IsInWebFolder = true
-		nconf.ParserConf = convertWebParserConfig(nconf.ParserConf)
+		nconf.ParserConf = parser.ConvertWebParserConfig(nconf.ParserConf)
 		if err = rs.mgr.AddRunner(name, nconf); err != nil {
 			return RespError(c, http.StatusBadRequest, ErrRunnerAdd, err.Error())
 		}
@@ -368,7 +336,7 @@ func (rs *RestService) PutConfig() echo.HandlerFunc {
 			return RespError(c, http.StatusBadRequest, ErrRunnerUpdate, err.Error())
 		}
 		nconf.IsInWebFolder = true
-		nconf.ParserConf = convertWebParserConfig(nconf.ParserConf)
+		nconf.ParserConf = parser.ConvertWebParserConfig(nconf.ParserConf)
 		if err = rs.mgr.UpdateRunner(name, nconf); err != nil {
 			return RespError(c, http.StatusBadRequest, ErrRunnerUpdate, err.Error())
 		}
