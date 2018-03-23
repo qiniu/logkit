@@ -35,6 +35,7 @@ tests
 tests/meta_mock_csv
 .idea/
 .vscode/
+plugins
 
 # Architecture specific extensions/prefixes
 *.[568vq]
