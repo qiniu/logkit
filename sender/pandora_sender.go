@@ -191,6 +191,14 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 		log.Error(err)
 		return
 	}
+	// 当 schema free 为 false 时，需要自动创建 pandora_stash 字段
+	if !schemaFree {
+		if autoCreateSchema == "" {
+			autoCreateSchema = fmt.Sprintf("%v string", KeyPandoraStash)
+		} else {
+			autoCreateSchema += fmt.Sprintf(",%v string", KeyPandoraStash)
+		}
+	}
 
 	opt := &PandoraOption{
 		runnerName:     runnerName,
