@@ -21,6 +21,7 @@ import (
 	"github.com/axgle/mahonia"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/utils"
+	"github.com/qiniu/logkit/utils/models"
 )
 
 const (
@@ -405,6 +406,15 @@ func (b *BufReader) setStatsError(err string) {
 	defer b.statsLock.Unlock()
 	b.stats.Errors++
 	b.stats.LastError = err
+}
+
+func (b *BufReader) Lag() (rl *models.LagInfo, err error) {
+	lr, ok := b.rd.(LagReader)
+	if ok {
+		return lr.Lag()
+	}
+	err = fmt.Errorf("internal reader haven't support lag info yet")
+	return
 }
 
 func (b *BufReader) SyncMeta() {

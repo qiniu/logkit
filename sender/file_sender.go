@@ -39,7 +39,7 @@ func NewFileSender(conf conf.MapConf) (sender Sender, err error) {
 }
 
 func newFileSender(name, path string, marshalFunc func([]Data) ([]byte, error)) (*FileSender, error) {
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, DefaultFilePerm)
 	if err != nil {
 		return nil, err
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/utils"
+	"github.com/qiniu/logkit/utils/models"
 	"github.com/wvanbergen/kafka/consumergroup"
 )
 
@@ -32,16 +33,21 @@ type KafkaReader struct {
 	errs     <-chan error
 
 	status   int32
-	mux      sync.Mutex
-	startMux sync.Mutex
+	mux      *sync.Mutex
+	startMux *sync.Mutex
 	started  bool
 
-	stats     utils.StatsInfo
-	statsLock sync.RWMutex
+	curOffsets map[string]map[int32]int64
+	stats      utils.StatsInfo
+	statsLock  *sync.RWMutex
 }
 
 func NewKafkaReader(meta *Meta, consumerGroup string,
 	topics []string, zookeeper []string, zkchroot string, zookeeperTimeout time.Duration, whence string) (kr *KafkaReader, err error) {
+	offsets := make(map[string]map[int32]int64)
+	for _, v := range topics {
+		offsets[v] = make(map[int32]int64)
+	}
 	kr = &KafkaReader{
 		meta:             meta,
 		ConsumerGroup:    consumerGroup,
@@ -53,9 +59,10 @@ func NewKafkaReader(meta *Meta, consumerGroup string,
 		readChan:         make(chan json.RawMessage),
 		errs:             make(chan error, 1000),
 		status:           StatusInit,
-		mux:              sync.Mutex{},
-		startMux:         sync.Mutex{},
-		statsLock:        sync.RWMutex{},
+		mux:              new(sync.Mutex),
+		startMux:         new(sync.Mutex),
+		statsLock:        new(sync.RWMutex),
+		curOffsets:       offsets,
 		started:          false,
 	}
 	return kr, nil
@@ -130,7 +137,7 @@ func (kr *KafkaReader) Start() {
 		config.Offsets.Initial = sarama.OffsetNewest
 	default:
 		log.Warnf("Runner[%v] WARNING: Kafka consumer invalid offset '%s', using 'oldest'\n", kr.meta.RunnerName, kr.Whence)
-		config.Offsets.Initial = sarama.OffsetNewest
+		config.Offsets.Initial = sarama.OffsetOldest
 	}
 	if kr.Consumer == nil || kr.Consumer.Closed() {
 		var consumerErr error
@@ -194,6 +201,16 @@ func (kr *KafkaReader) run() {
 			if msg != nil && msg.Value != nil && len(msg.Value) > 0 {
 				kr.readChan <- msg.Value
 				kr.curMsg = msg
+				kr.statsLock.Lock()
+				if tp, ok := kr.curOffsets[msg.Topic]; ok {
+					tp[msg.Partition] = msg.Offset
+					kr.curOffsets[msg.Topic] = tp
+				} else {
+					tp := make(map[int32]int64)
+					tp[msg.Partition] = msg.Offset
+					kr.curOffsets[msg.Topic] = tp
+				}
+				kr.statsLock.Unlock()
 			}
 		default:
 			time.Sleep(time.Second)
@@ -203,4 +220,25 @@ func (kr *KafkaReader) run() {
 
 func (kr *KafkaReader) SetMode(mode string, v interface{}) error {
 	return errors.New("KafkaReader not support read mode")
+}
+
+func (kr *KafkaReader) Lag() (rl *models.LagInfo, err error) {
+	marks := kr.Consumer.HighWaterMarks()
+	rl = &models.LagInfo{
+		SizeUnit: "records",
+		Size:     0,
+	}
+	for _, ptv := range marks {
+		for _, v := range ptv {
+			rl.Size += v
+		}
+	}
+	kr.statsLock.RLock()
+	for _, ptv := range kr.curOffsets {
+		for _, v := range ptv {
+			rl.Size -= v
+		}
+	}
+	kr.statsLock.RUnlock()
+	return
 }

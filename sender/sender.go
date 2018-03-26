@@ -30,6 +30,10 @@ type StatsSender interface {
 	Restore(*utils.StatsInfo)
 }
 
+type TokenRefreshable interface {
+	TokenRefresh(conf.MapConf) error
+}
+
 // Sender's conf keys
 const (
 	KeySenderType     = "sender_type"

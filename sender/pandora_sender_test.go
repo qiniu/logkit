@@ -220,6 +220,7 @@ func TestPandoraSender(t *testing.T) {
 		ignoreInvalidField: true,
 		autoConvertDate:    true,
 		gzip:               true,
+		tokenLock:          new(sync.RWMutex),
 	}
 	s, err := newPandoraSender(opt)
 	if err != nil {
@@ -368,6 +369,7 @@ func TestNestPandoraSender(t *testing.T) {
 		reqRateLimit:   0,
 		flowRateLimit:  0,
 		gzip:           false,
+		tokenLock:      new(sync.RWMutex),
 	}
 	s, err := newPandoraSender(opt)
 	if err != nil {
@@ -416,6 +418,7 @@ func TestUUIDPandoraSender(t *testing.T) {
 		gzip:           false,
 		uuid:           true,
 		schemaFree:     true,
+		tokenLock:      new(sync.RWMutex),
 	}
 	s, err := newPandoraSender(opt)
 	if err != nil {
@@ -451,6 +454,7 @@ func TestStatsSender(t *testing.T) {
 		autoCreate:     "x1 s",
 		updateInterval: time.Second,
 		schemaFree:     true,
+		tokenLock:      new(sync.RWMutex),
 	}
 	s, err := newPandoraSender(opt)
 	if err != nil {
@@ -757,6 +761,7 @@ func TestUpdatePandoraSchema(t *testing.T) {
 		schema:         "x3 x3change,x4,...",
 		schemaFree:     true,
 		updateInterval: time.Second,
+		tokenLock:      new(sync.RWMutex),
 	}
 	s, err := newPandoraSender(opt)
 	if err != nil {
@@ -840,6 +845,7 @@ func TestUpdatePandoraSchema(t *testing.T) {
 		schema:         "x3 x3change,x4",
 		schemaFree:     true,
 		updateInterval: time.Second,
+		tokenLock:      new(sync.RWMutex),
 	}
 	s, err = newPandoraSender(opt)
 	if err != nil {
@@ -963,6 +969,7 @@ func TestConvertDataPandoraSender(t *testing.T) {
 		autoCreate:       "x1 long",
 		schemaFree:       true,
 		forceDataConvert: true,
+		tokenLock:        new(sync.RWMutex),
 	}
 	s, err := newPandoraSender(opt)
 	if err != nil {

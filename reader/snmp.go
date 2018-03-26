@@ -105,7 +105,7 @@ func NewSnmpReader(meta *Meta, c conf.MapConf) (s *SnmpReader, err error) {
 	if timeOut, err = time.ParseDuration(timeStr); err != nil {
 		return
 	}
-	intervalStr, _ := c.GetStringOr(KeySnmpReaderInterval, "3s")
+	intervalStr, _ := c.GetStringOr(KeySnmpReaderInterval, "30s")
 	if interval, err = time.ParseDuration(intervalStr); err != nil {
 		return
 	}

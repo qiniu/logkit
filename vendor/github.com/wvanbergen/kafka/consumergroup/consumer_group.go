@@ -250,6 +250,10 @@ func (cg *ConsumerGroup) FlushOffsets() error {
 	return cg.offsetManager.Flush()
 }
 
+func (cg *ConsumerGroup) HighWaterMarks() map[string]map[int32]int64 {
+	return cg.consumer.HighWaterMarks()
+}
+
 func (cg *ConsumerGroup) topicListConsumer(topics []string) {
 	for {
 		select {

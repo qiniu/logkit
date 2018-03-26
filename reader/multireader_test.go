@@ -9,13 +9,14 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/qiniu/log"
 	"github.com/stretchr/testify/assert"
 )
 
 func createFileWithContent(filepathn, lines string) {
-	file, err := os.OpenFile(filepathn, os.O_CREATE|os.O_WRONLY, defaultFilePerm)
+	file, err := os.OpenFile(filepathn, os.O_CREATE|os.O_WRONLY, DefaultFilePerm)
 	if err != nil {
 		log.Error(err)
 		return
@@ -25,7 +26,7 @@ func createFileWithContent(filepathn, lines string) {
 }
 
 func createDirWithName(dirx string) {
-	err := os.Mkdir(dirx, 0755)
+	err := os.Mkdir(dirx, DefaultDirPerm)
 	if err != nil {
 		log.Error(err)
 		return

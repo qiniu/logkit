@@ -123,6 +123,28 @@ func Test_ParseData(t *testing.T) {
 	if "fufu" != parsedData[0]["b"] {
 		t.Error("b should be fufu")
 	}
+
+	jsonConf := conf.MapConf{}
+	jsonConf[parser.KeyParserName] = "jsonparser"
+	jsonConf[parser.KeyParserType] = "json"
+	jsonConf[parser.KeyDisableRecordErrData] = "true"
+	line := "{\"mykey\":\"myvalue\"}\n"
+	jsonConf[KeySampleLog] = line
+	parsedJsonData, jsonErr := ParseData(jsonConf)
+	if c, ok := jsonErr.(*utils.StatsError); ok {
+		jsonErr = c.ErrorDetail
+	}
+	assert.Error(t, jsonErr)
+
+	jsonExp := make(map[string]interface{})
+	jsonExp["mykey"] = "myvalue"
+	for k, v := range parsedData[0] {
+		if v != exp[k] {
+			t.Errorf("expect %v but got %v", v, exp[k])
+		}
+	}
+	jsonExpNum := 1
+	assert.Equal(t, jsonExpNum, len(parsedJsonData), fmt.Sprintln(parsedJsonData))
 }
 
 func Test_TransformData(t *testing.T) {

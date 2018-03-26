@@ -14,6 +14,7 @@ import (
 
 	"github.com/qiniu/logkit/rateio"
 	"github.com/qiniu/logkit/utils"
+	"github.com/qiniu/logkit/utils/models"
 
 	"github.com/qiniu/log"
 )
@@ -324,4 +325,18 @@ func (sf *SingleFile) SyncMeta() error {
 	sf.lastSyncOffset = sf.offset
 	sf.lastSyncPath = sf.originpath
 	return sf.meta.WriteOffset(sf.originpath, sf.offset)
+}
+
+func (sf *SingleFile) Lag() (rl *models.LagInfo, err error) {
+	sf.mux.Lock()
+	rl = &models.LagInfo{Size: -sf.offset}
+	sf.mux.Unlock()
+
+	fi, err := os.Stat(sf.originpath)
+	if err != nil {
+		return
+	}
+	rl.Size += fi.Size()
+	rl.SizeUnit = "bytes"
+	return
 }

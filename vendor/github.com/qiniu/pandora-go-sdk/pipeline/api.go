@@ -544,18 +544,14 @@ func (c *Pipeline) unpack(input *SchemaFreeInput) (packages []pointContext, err 
 	packages = []pointContext{}
 	var buf bytes.Buffer
 	var start = 0
+	repoUpdate := false
 	for i, d := range input.Datas {
-		point, err := c.generatePoint(d, &InitOrUpdateWorkflowInput{
-			SchemaFree:      !input.NoUpdate,
-			Region:          input.Region,
-			RepoName:        input.RepoName,
-			WorkflowName:    input.WorkflowName,
-			RepoOptions:     input.RepoOptions,
-			Option:          input.Option,
-			SchemaFreeToken: input.SchemaFreeToken,
-		})
+		point, update, err := c.generatePoint(d, input)
 		if err != nil {
 			return nil, err
+		}
+		if update {
+			repoUpdate = update
 		}
 		pointString := point.ToString()
 		// 当buf中有数据，并且加入该条数据后就超过了最大的限制，则提交这个input
@@ -584,6 +580,35 @@ func (c *Pipeline) unpack(input *SchemaFreeInput) (packages []pointContext, err 
 			PandoraToken: input.PipelinePostDataToken,
 		},
 	})
+	if repoUpdate {
+		var schemas []RepoSchemaEntry
+		c.repoSchemaMux.Lock()
+		for _, v := range c.repoSchemas[input.RepoName] {
+			schemas = append(schemas, v)
+		}
+		c.repoSchemaMux.Unlock()
+		initOrUpdateInput := &InitOrUpdateWorkflowInput{
+			InitOptionChange: false,
+			Schema:           schemas,
+			SchemaFree:       !input.NoUpdate,
+			Region:           input.Region,
+			RepoName:         input.RepoName,
+			WorkflowName:     input.WorkflowName,
+			RepoOptions:      input.RepoOptions,
+			Option:           input.Option,
+			SchemaFreeToken:  input.SchemaFreeToken,
+		}
+		if err = c.InitOrUpdateWorkflow(initOrUpdateInput); err != nil {
+			return
+		}
+		newSchemas := RepoSchema{}
+		for _, sc := range initOrUpdateInput.Schema {
+			newSchemas[sc.Key] = sc
+		}
+		c.repoSchemaMux.Lock()
+		c.repoSchemas[input.RepoName] = newSchemas
+		c.repoSchemaMux.Unlock()
+	}
 	return
 }
 

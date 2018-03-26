@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"io/ioutil"
 	"net"
@@ -15,6 +16,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -563,7 +565,7 @@ func LogDirAndPattern(logpath string) (dir, pattern string, err error) {
 		}
 	}
 	if _, err = os.Stat(dir); os.IsNotExist(err) {
-		if err = os.MkdirAll(dir, 0755); err != nil {
+		if err = os.MkdirAll(dir, DefaultDirPerm); err != nil {
 			err = fmt.Errorf("create logkit log dir error %v", err)
 			return
 		}
@@ -658,4 +660,26 @@ func DecompressGzip(packPath, dstDir string) (packDir string, err error) {
 		}
 	}
 	return
+}
+
+func CheckFileMode(path string, fileMode os.FileMode) error {
+	perm := fileMode.Perm()
+
+	// 73: 000 001 001 001
+	checkPerm := perm & os.FileMode(73)
+	if uint32(checkPerm) != uint32(73) {
+		changePerm := perm | os.FileMode(73)
+		err := os.Chmod(path, changePerm)
+		if err != nil {
+			err = fmt.Errorf("change mode for %v error %v", path, err)
+			return err
+		}
+	}
+	return nil
+}
+
+func Hash(s string) string {
+	h := fnv.New32a()
+	h.Write([]byte(s))
+	return strconv.Itoa(int(h.Sum32()))
 }

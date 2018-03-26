@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -119,14 +120,14 @@ func Test_singleFileNotRotate(t *testing.T) {
 
 func createTestFile(fileName string, content string) {
 
-	f, _ := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, defaultFilePerm)
+	f, _ := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, DefaultFilePerm)
 	f.WriteString(content)
 	f.Sync()
 	f.Close()
 }
 
 func appendTestFile(fileName, content string) {
-	f, _ := os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY, defaultFilePerm)
+	f, _ := os.OpenFile(fileName, os.O_APPEND|os.O_WRONLY, DefaultFilePerm)
 	f.WriteString(content)
 	f.Sync()
 	f.Close()

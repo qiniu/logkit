@@ -257,10 +257,10 @@
 			"revisionTime": "2018-02-23T01:32:43Z"
 		},
 		{
-			"checksumSHA1": "U8ZeyMiewKqduFAYpdz69bhlbaE=",
+			"checksumSHA1": "x9vyxVxwMO9vzk936cyJ6thSoLo=",
 			"path": "github.com/qiniu/pandora-go-sdk/pipeline",
-			"revision": "0b0f9a2ab3caa06f402c2caa4ad34b6089e386f2",
-			"revisionTime": "2018-02-23T01:32:43Z"
+			"revision": "c22e3dbfe90e7d913b73160a8c589d8bae16592a",
+			"revisionTime": "2018-03-01T08:51:56Z"
 		},
 		{
 			"checksumSHA1": "U+4V8hIGj98b7RlFujFftZeLc9Y=",

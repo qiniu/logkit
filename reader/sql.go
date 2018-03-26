@@ -327,7 +327,7 @@ func goMagic(rawSql string, now time.Time) (ret string) {
 }
 
 func (mr *SqlReader) Name() string {
-	return strings.ToUpper(mr.dbtype) + "_Reader:" + mr.database + "_" + hash(mr.rawsqls)
+	return strings.ToUpper(mr.dbtype) + "_Reader:" + mr.database + "_" + utils.Hash(mr.rawsqls)
 }
 
 func (mr *SqlReader) setStatsError(err string) {

@@ -15,6 +15,7 @@ import (
 	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/utils"
+	"github.com/qiniu/logkit/utils/models"
 )
 
 type MultiReader struct {
@@ -186,6 +187,10 @@ func (ar *ActiveReader) Status() utils.StatsInfo {
 	ar.statsLock.RLock()
 	defer ar.statsLock.RUnlock()
 	return ar.stats
+}
+
+func (ar *ActiveReader) Lag() (rl *models.LagInfo, err error) {
+	return ar.br.Lag()
 }
 
 //除了sync自己的bufreader，还要sync一行linecache
@@ -495,6 +500,21 @@ func (mr *MultiReader) SyncMeta() {
 		log.Errorf("%v sync meta WriteBuf error %v, buf %v", mr.Name(), err, string(buf))
 		return
 	}
+	return
+}
+
+func (mr *MultiReader) Lag() (rl *models.LagInfo, err error) {
+	rl = &models.LagInfo{}
+	ars := mr.getActiveReaders()
+	for _, ar := range ars {
+		lg, err := ar.Lag()
+		if err != nil {
+			log.Warn(err)
+			continue
+		}
+		rl.Size += lg.Size
+	}
+	rl.SizeUnit = "bytes"
 	return
 }
 

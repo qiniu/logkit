@@ -261,7 +261,7 @@ func downloadPackage(url, dstPath string) (file *os.File, err error) {
 // 将 srcDir 中的 fileName 文件/文件夹 移动到 dstDir 文件夹, dstDir 不存在时自动创建
 func moveFile(srcDir string, fileName []string, dstDir string) error {
 	if _, err := os.Stat(dstDir); err != nil {
-		if err := os.Mkdir(dstDir, 0755); err != nil {
+		if err := os.Mkdir(dstDir, DefaultDirPerm); err != nil {
 			return err
 		}
 	}

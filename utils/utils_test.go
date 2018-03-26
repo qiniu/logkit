@@ -500,3 +500,48 @@ func TestGetExtraInfo(t *testing.T) {
 		assert.Equal(t, ip, localIp)
 	}
 }
+
+func Test_checkFileMode(t *testing.T) {
+	fileName := os.TempDir() + "/checkFileMode.sh"
+	//create file & write file
+	createTestFile(fileName, "echo \"hello world\"")
+	defer os.RemoveAll(fileName)
+	err := os.Chmod(fileName, 0666)
+	if err != nil {
+		t.Error(err)
+	}
+
+	realPath, fileInfo, err := GetRealPath(fileName)
+	if err != nil {
+		t.Error(err)
+	}
+	if fileInfo == nil {
+		err = fmt.Errorf("fileInfo of fileName [%v] is nil", fileName)
+		t.Error(err)
+	}
+	fileMode := fileInfo.Mode()
+	assert.Equal(t, os.FileMode(0x1b6), fileMode)
+
+	err = CheckFileMode(realPath, fileMode)
+	if err != nil {
+		t.Error(err)
+	}
+
+	_, fileInfoNew, err := GetRealPath(fileName)
+	if err != nil {
+		t.Error(err)
+	}
+	if fileInfo == nil {
+		err = fmt.Errorf("fileInfo of fileName [%v] is nil", fileName)
+		t.Error(err)
+	}
+	fileModeNew := fileInfoNew.Mode()
+	assert.Equal(t, os.FileMode(0x1ff), fileModeNew)
+}
+
+func createTestFile(fileName string, content string) {
+	f, _ := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, DefaultFilePerm)
+	f.WriteString(content)
+	f.Sync()
+	f.Close()
+}

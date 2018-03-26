@@ -737,7 +737,7 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:      KeySnmpReaderInterval,
 			ChooseOnly:   false,
-			Default:      "3s",
+			Default:      "30s",
 			DefaultNoUse: false,
 			Description:  "收集频率(snmp_interval)",
 		},
