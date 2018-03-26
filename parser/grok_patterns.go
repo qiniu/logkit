@@ -1,6 +1,8 @@
-//!!! Notice This is auto generated file, DO NOT EDIT IT!!!
+//!!! Notice This is auto generated file, DO NOT EDIT IT!!! 
 
-package parser
+
+
+package parser 
 
 const DEFAULT_PATTERNS = `S3_REQUEST_LINE (?:%{WORD:verb} %{NOTSPACE:request}(?: HTTP/%{NUMBER:httpversion})?|%{DATA:rawrequest})
 
@@ -307,6 +309,8 @@ COMBINED_LOG_FORMAT %{COMMON_LOG_FORMAT} %{QS:referrer} %{QS:agent}
 
 HTTPD20_ERRORLOG \[%{HTTPDERROR_DATE:timestamp}\] \[%{LOGLEVEL:loglevel}\] (?:\[client %{IPORHOST:clientip}\] ){0,1}%{GREEDYDATA:errormsg}
 HTTPD24_ERRORLOG \[%{HTTPDERROR_DATE:timestamp}\] \[%{WORD:module}:%{LOGLEVEL:loglevel}\] \[pid %{POSINT:pid:long}:tid %{NUMBER:tid:long}\]( \(%{POSINT:proxy_errorcode:long}\)%{DATA:proxy_errormessage}:)?( \[client %{IPORHOST:client}:%{POSINT:clientport}\])? %{DATA:errorcode}: %{GREEDYDATA:message}
+HTTPD_ERRORLOG %{HTTPD20_ERRORLOG}|%{HTTPD24_ERRORLOG}
+GREEDYDATALINEFEED (.*\n*)*
 MAVEN_VERSION (?:(\d+)\.)?(?:(\d+)\.)?(\*|\d+)(?:[.-](RELEASE|SNAPSHOT))?
 MCOLLECTIVEAUDIT %{TIMESTAMP_ISO8601:timestamp}:
 MCOLLECTIVE ., \[%{TIMESTAMP_ISO8601:timestamp} #%{POSINT:pid}\]%{SPACE}%{LOGLEVEL:event_level}
