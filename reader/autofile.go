@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	
+
 	"github.com/qiniu/logkit/conf"
 )
 

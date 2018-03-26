@@ -4,20 +4,20 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
-	"github.com/json-iterator/go"
 )
 
 type Json struct {
-	OldKey  string `json:"key"`
-	NewKey  string `json:"newKey"`
-	stats   utils.StatsInfo
+	OldKey   string `json:"key"`
+	NewKey   string `json:"newKey"`
+	stats    utils.StatsInfo
 	jsonTool jsoniter.API
-	oldKeys []string
-	newKeys []string
+	oldKeys  []string
+	newKeys  []string
 }
 
 func (g *Json) Init() error {
@@ -69,8 +69,7 @@ func (g *Json) RawTransform(datas []string) ([]string, error) {
 	return datas, errors.New("json transformer not support rawTransform")
 }
 
-
-func parseJson(jsonTool jsoniter.API, jsonStr string) (data map[string]interface {}, err error) {
+func parseJson(jsonTool jsoniter.API, jsonStr string) (data map[string]interface{}, err error) {
 	err = jsonTool.Unmarshal([]byte(jsonStr), &data)
 	if err != nil {
 		err = fmt.Errorf("parse json str error %v, jsonStr is: %v", err, jsonStr)

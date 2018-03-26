@@ -1,11 +1,11 @@
 package mutate
 
 import (
+	"encoding/json"
+	"github.com/json-iterator/go"
 	. "github.com/qiniu/logkit/utils/models"
 	"github.com/stretchr/testify/assert"
 	"testing"
-	"github.com/json-iterator/go"
-	"encoding/json"
 )
 
 /*func TestJsonTransformer(t *testing.T) {
