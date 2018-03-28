@@ -1,12 +1,11 @@
 package parser
 
 import (
-	"encoding/base64"
-	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/qiniu/logkit/conf"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/qiniu/log"
 )
@@ -61,14 +60,9 @@ func ConvertWebParserConfig(conf conf.MapConf) conf.MapConf {
 
 	rawCustomPatterns, _ := conf.GetStringOr(KeyGrokCustomPatterns, "")
 	if rawCustomPatterns != "" {
-		CustomPatterns, err := base64.StdEncoding.DecodeString(rawCustomPatterns)
+		realCustomPatterns, err := DecodeString(rawCustomPatterns)
 		if err != nil {
-			log.Errorf("base64 decode %v error: $v", rawCustomPatterns, err)
-			return conf
-		}
-		realCustomPatterns, err := url.QueryUnescape(string(CustomPatterns))
-		if err != nil {
-			log.Errorf("QueryUnescape %v error: $v", string(CustomPatterns), err)
+			log.Errorf("decode %v error: %v", rawCustomPatterns, err)
 			return conf
 		}
 		conf[KeyGrokCustomPatterns] = string(realCustomPatterns)

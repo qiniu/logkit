@@ -402,6 +402,42 @@ func Test_checkFileMode(t *testing.T) {
 	assert.Equal(t, os.FileMode(0x1ff), fileModeNew)
 }
 
+func Test_EncodeString(t *testing.T) {
+	originEncodeStr1 := "test encode string \n and then decode string"
+	encode1 := EncodeString(originEncodeStr1)
+	decode1, err := DecodeString(encode1)
+	if err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, originEncodeStr1, decode1)
+
+	originEncodeStr2 := "中文加密测试 \n then 解密"
+	encode2 := EncodeString(originEncodeStr2)
+	decode2, err := DecodeString(encode2)
+	if err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, originEncodeStr2, decode2)
+}
+
+func Test_DecodeString(t *testing.T) {
+	originEncodeStr1 := "发送时间[2017-03-29 10:45:12.07],接收时间[20T08:25:59.124345]"
+	encode1 := EncodeString(originEncodeStr1)
+	decode1, err := DecodeString(encode1)
+	if err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, originEncodeStr1, decode1)
+
+	originEncodeStr2 := `<?xml version="1.0" encoding="UTF-8" ?>`
+	encode2 := EncodeString(originEncodeStr2)
+	decode2, err := DecodeString(encode2)
+	if err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, originEncodeStr2, decode2)
+}
+
 func createTestFile(fileName string, content string) {
 	f, _ := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, DefaultFilePerm)
 	f.WriteString(content)
