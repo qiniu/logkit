@@ -109,20 +109,24 @@ class CreateMetricRunner extends Component {
           let batch_interval = that.refs.initConfig.getFieldValue('batch_interval')
           let collect_interval = that.refs.initConfig.getFieldValue('collect_interval')
           let runnerName = that.refs.initConfig.getFieldValue('name')
+          let extra_info = that.refs.initConfig.getFieldValue('extra_info')
           if (window.isCopy && window.nodeCopy) {
             runnerName = window.nodeCopy.name
             batch_interval = window.nodeCopy.batch_interval
             collect_interval = window.nodeCopy.collect_interval
+            extra_info = window.nodeCopy.extra_info
           }
           let data = {
             name: runnerName != undefined ? runnerName : name,
             batch_interval: batch_interval != undefined ? batch_interval : 60,
             collect_interval: collect_interval != undefined ? collect_interval : 3,
+            extra_info: extra_info !=undefined ? extra_info : 'true',
             ...config.getNodeData()
           }
           that.refs.initConfig.setFieldsValue({config: JSON.stringify(data, null, 2)});
           that.refs.initConfig.setFieldsValue({name: runnerName != undefined ? runnerName : name});
           that.refs.initConfig.setFieldsValue({batch_interval: batch_interval != undefined ? batch_interval : 60});
+          that.refs.initConfig.setFieldsValue({extra_info: extra_info !=undefined ? extra_info : 'true'});
           that.refs.initConfig.setFieldsValue({collect_interval: collect_interval != undefined ? collect_interval : 3});
         }
       });
@@ -274,7 +278,7 @@ class CreateMetricRunner extends Component {
               <Sender isMetric="true" ref="checkSenderData"></Sender>
             </div>
             <div className={this.state.current === 4 ? 'show-div' : 'hide-div'}>
-              <RenderConfig ref="initConfig"></RenderConfig>
+              <RenderConfig ref="initConfig" isMetric={true}></RenderConfig>
             </div>
 
           </div>

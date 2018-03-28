@@ -6,7 +6,8 @@ import {
   Col,
   notification,
   InputNumber,
-  Select
+  Select,
+  Radio
 } from 'antd';
 import config from '../store/config'
 import moment from 'moment'
@@ -16,6 +17,7 @@ import {
 import _ from "lodash";
 const Option = Select.Option
 const FormItem = Form.Item;
+const RadioGroup = Radio.Group
 
 const optionFormItemLayout = {
   labelCol: {
@@ -99,6 +101,7 @@ class renderConfig extends Component {
       resetFields()
       getFieldDecorator("config", {initialValue: JSON.stringify(jsonData, null, 2)});
       getFieldDecorator("name", {initialValue: data.name});
+      getFieldDecorator("extra_info", {initialValue: data.extra_info});
       getFieldDecorator("collect_interval", {initialValue: parseInt(data.collect_interval)});
     } else {
       this.notifyJSONError();
@@ -116,6 +119,7 @@ class renderConfig extends Component {
       getFieldDecorator("config", {initialValue: JSON.stringify(jsonData, null, 2)});
       getFieldDecorator("name", {initialValue: data.name});
       getFieldDecorator("batch_interval", {initialValue: parseInt(data.batch_interval)});
+      getFieldDecorator("extra_info", {initialValue: data.extra_info});
     } else {
       this.notifyJSONError();
     }
@@ -133,10 +137,28 @@ class renderConfig extends Component {
       getFieldDecorator("config", {initialValue: JSON.stringify(jsonData, null, 2)});
       getFieldDecorator("batch_interval", {initialValue: parseInt(data.batch_interval)});
       getFieldDecorator("collect_interval", {initialValue: parseInt(data.collect_interval)});
+      getFieldDecorator("extra_info", {initialValue: data.extra_info});
     } else {
       this.notifyJSONError();
     }
 
+  }
+  
+  handleExtraInfoChange = (e) => {
+    const {getFieldsValue, getFieldDecorator, resetFields} = this.props.form;
+    let data = getFieldsValue();
+    this.closeNotification();
+    if (this.isJSON(data.config)) {
+      const jsonData = JSON.parse(data.config)
+      jsonData.extra_info = e.target.value
+      resetFields()
+      getFieldDecorator("config", {initialValue: JSON.stringify(jsonData, null, 2)});
+      getFieldDecorator("batch_interval", {initialValue: parseInt(data.batch_interval)});
+      getFieldDecorator("collect_interval", {initialValue: parseInt(data.collect_interval)});
+      getFieldDecorator("name", {initialValue: data.name});
+    } else {
+      this.notifyJSONError();
+    }
   }
 
   handleConfigChange = (e) => {
@@ -148,6 +170,7 @@ class renderConfig extends Component {
       getFieldDecorator("name", {initialValue: jsonData.name});
       getFieldDecorator("batch_interval", {initialValue: parseInt(jsonData.batch_interval)});
       getFieldDecorator("collect_interval", {initialValue: parseInt(jsonData.collect_interval)});
+      getFieldDecorator("extra_info", {initialValue: jsonData.extra_info});
     } else {
       this.notifyJSONError();
     }
@@ -173,6 +196,7 @@ class renderConfig extends Component {
 
   render() {
     const {getFieldDecorator} = this.props.form;
+    const {isMetric} = this.props
     return (
         <div >
           <div className='logkit-body'>
@@ -181,6 +205,14 @@ class renderConfig extends Component {
                 <FormItem {...formItemLayout} label="名称">
                   {getFieldDecorator('name', {rules: [{required: true, message: '名称不能为空'}]})(
                       <Input onChange={this.handleNameChange} placeholder={'收集器(runner)名称'}/>
+                  )}
+                </FormItem>
+                <FormItem {...formItemLayout} label="额外信息">
+                  {getFieldDecorator('extra_info')(
+                    <RadioGroup onChange={this.handleExtraInfoChange}>
+                      <Radio value="true">true</Radio>
+                      <Radio value="false">false</Radio>
+                    </RadioGroup>
                   )}
                 </FormItem>
               <FormItem {...formItemLayout} 
@@ -192,15 +224,17 @@ class renderConfig extends Component {
                       <InputNumber onChange={this.handleIntervalChange} placeholder={'发送间隔单位(秒)'}/>
                   )}
                 </FormItem>
-              <FormItem {...formItemLayout} 
-                label={<span>系统信息收集间隔<br /><span style={{ color: 'rgba(0,0,0,.43)', float: 'right' }}>(metric配置专用, 秒)</span></span>}>
-                  {getFieldDecorator('collect_interval', {
-                    rules: [{required: true, message: '收集间隔不能为空'},
-                      {pattern: /^[0-9]*$/, message: '输入不符合规范,只能为整数'}]
-                  })(
+                {
+                  isMetric ? <FormItem {...formItemLayout}
+                                                  label={<span>系统信息收集间隔<br /><span style={{ color: 'rgba(0,0,0,.43)', float: 'right' }}>(metric配置专用, 秒)</span></span>}>
+                    {getFieldDecorator('collect_interval', {
+                      rules: [{required: true, message: '收集间隔不能为空'},
+                        {pattern: /^[0-9]*$/, message: '输入不符合规范,只能为整数'}]
+                    })(
                       <InputNumber onChange={this.handleMetricIntervalChange} placeholder={'系统信息收集间隔单位(秒)'}/>
-                  )}
-                </FormItem>
+                    )}
+                  </FormItem> : null
+                }
                 <FormItem
                     {...optionFormItemLayout}
                 >
