@@ -109,6 +109,7 @@ var ModeKeyOptions = map[string][]Option{
 			Default:      "",
 			Placeholder:  "logkit_default_workflow",
 			DefaultNoUse: true,
+			Required:     true,
 			Description:  "工作流名称[留空使用旧版](pandora_workflow_name)",
 			CheckRegex:   "^[a-zA-Z_][a-zA-Z0-9_]{0,127}$",
 		},
@@ -143,15 +144,6 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		OptionSaveLogPath,
 		OptionLogkitSendTime,
-		{
-			KeyName:       KeyPandoraExtraInfo,
-			ChooseOnly:    true,
-			ChooseOptions: []interface{}{"false", "true"},
-			Default:       "false",
-			DefaultNoUse:  false,
-			Description:   "自动添加额外信息(pandora_extra_info)",
-			Advance:       true,
-		},
 		{
 			KeyName:      KeyPandoraHost,
 			ChooseOnly:   false,

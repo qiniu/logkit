@@ -1204,7 +1204,7 @@ func TestAddDatatags(t *testing.T) {
 	dir := "TestAddDatatags"
 	metaDir := filepath.Join(dir, "meta")
 	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
-		log.Fatalf("Test_Run error mkdir %v %v", dir, err)
+		log.Fatalf("TestAddDatatags error mkdir %v %v", dir, err)
 	}
 	tagFile := filepath.Join(dir, "tagFile.json")
 	err := ioutil.WriteFile(tagFile, []byte(`{  
@@ -1268,6 +1268,56 @@ func TestAddDatatags(t *testing.T) {
 		},
 	}
 	assert.Equal(t, exp, res)
+}
+
+func TestRunWithExtra(t *testing.T) {
+	dir := "TestRunWithExtra"
+	metaDir := filepath.Join(dir, "meta")
+	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
+		log.Fatalf("TestRunWithExtra error mkdir %v %v", dir, err)
+	}
+	logPath := filepath.Join(dir, "test.log")
+	err := ioutil.WriteFile(logPath, []byte(`{"f1": "2","f2": "1","f3": "3"}`), DefaultDirPerm)
+	assert.NoError(t, err)
+
+	defer os.RemoveAll(dir)
+	defer os.RemoveAll(metaDir)
+
+	config1 := `{
+			"name":"TestRunWithExtra",
+			"batch_len":1,
+			"extra_info":true,
+			"reader":{
+				"mode":"file",
+				"meta_path":"./TestRunWithExtra/meta",
+				"log_path":"./TestRunWithExtra/test.log"
+			},
+			"parser":{
+				"name":"testjson",
+				"type":"json"
+			},
+			"senders":[{
+				"name":"file_sender",
+				"sender_type":"file",
+				"file_send_path":"./TestRunWithExtra/filesend.json"
+			}]
+		}`
+	rc := RunnerConfig{}
+	err = jsoniter.Unmarshal([]byte(config1), &rc)
+	assert.NoError(t, err)
+
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), parser.NewParserRegistry(), sender.NewSenderRegistry())
+	assert.NoError(t, err)
+	go rr.Run()
+
+	time.Sleep(2 * time.Second)
+	data, err := ioutil.ReadFile("./TestRunWithExtra/filesend.json")
+	var res []Data
+	err = jsoniter.Unmarshal(data, &res)
+	if err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, 7, len(res[0]))
 }
 
 func TestClassifySenderData(t *testing.T) {
@@ -1504,3 +1554,29 @@ BenchmarkEncodeJsoniterCompatibleStructMedium-4   	 1000000	      1023 ns/op	   
 PASS
 性能明显提升
 */
+
+func TestMergeEnvTags(t *testing.T) {
+	key := "TestMergeEnvTags"
+	os.Setenv(key, `{"a":"hello"}`)
+	defer os.Unsetenv(key)
+	tags := MergeEnvTags(key, nil)
+	assert.Equal(t, map[string]interface{}{"a": "hello"}, tags)
+
+	os.Setenv(key, `{"b":"123","c":"nihao"}`)
+	tags = MergeEnvTags(key, tags)
+	assert.Equal(t, map[string]interface{}{"a": "hello", "b": "123", "c": "nihao"}, tags)
+
+}
+
+func TestMergeExtraInfoTags(t *testing.T) {
+	meta, err := reader.NewMetaWithConf(conf.MapConf{
+		ExtraInfo:      "true",
+		reader.KeyMode: reader.ModeMysql,
+	})
+	assert.NoError(t, err)
+	tags := MergeExtraInfoTags(meta, nil)
+	assert.Equal(t, 4, len(tags))
+	//再次写入，应该不会产生变化。
+	tags = MergeExtraInfoTags(meta, tags)
+	assert.Equal(t, 4, len(tags))
+}

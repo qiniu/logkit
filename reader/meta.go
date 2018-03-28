@@ -13,6 +13,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	. "github.com/qiniu/logkit/utils/models"
+	utilsos "github.com/qiniu/logkit/utils/os"
 
 	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
@@ -62,6 +63,7 @@ type Meta struct {
 	statisticPath     string                 // 记录 runner 计数信息
 	ftSaveLogPath     string                 // 记录 ft_sender 日志信息
 	RunnerName        string
+	extrainfo         map[string]string
 }
 
 func getValidDir(dir string) (realPath string, err error) {
@@ -166,6 +168,12 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 	if err != nil {
 		log.Warnf("Runner[%v] %s - newMeta failed, err:%v", runnerName, metapath, err)
 		return
+	}
+	extrainfo, _ := conf.GetBoolOr(ExtraInfo, false)
+	if extrainfo {
+		meta.extrainfo = utilsos.GetExtraInfo()
+	} else {
+		meta.extrainfo = make(map[string]string)
 	}
 	meta.dataSourceTag = datasourceTag
 	meta.readlimit = readlimit * 1024 * 1024 //readlimit*MB
@@ -528,4 +536,8 @@ func (m *Meta) WriteStatistic(stat *Statistic) error {
 		return err
 	}
 	return ioutil.WriteFile(m.StatisticFile(), statStr, DefaultFilePerm)
+}
+
+func (m *Meta) ExtraInfo() map[string]string {
+	return m.extrainfo
 }
