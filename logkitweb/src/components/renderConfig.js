@@ -202,19 +202,11 @@ class renderConfig extends Component {
           <div className='logkit-body'>
             <Row>
               <Form>
-                <FormItem {...formItemLayout} label="名称">
-                  {getFieldDecorator('name', {rules: [{required: true, message: '名称不能为空'}]})(
-                      <Input onChange={this.handleNameChange} placeholder={'收集器(runner)名称'}/>
-                  )}
-                </FormItem>
-                <FormItem {...formItemLayout} label="额外信息">
-                  {getFieldDecorator('extra_info')(
-                    <RadioGroup onChange={this.handleExtraInfoChange}>
-                      <Radio value="true">true</Radio>
-                      <Radio value="false">false</Radio>
-                    </RadioGroup>
-                  )}
-                </FormItem>
+              <FormItem {...formItemLayout} label="名称">
+                {getFieldDecorator('name', {rules: [{required: true, message: '名称不能为空'}]})(
+                    <Input onChange={this.handleNameChange} placeholder={'收集器(runner)名称'}/>
+                )}
+              </FormItem>
               <FormItem {...formItemLayout} 
                 label={(<span>最长发送间隔<br/><span style={{ color: 'rgba(0,0,0,.43)', float: 'right' }}>(秒)</span></span>)}>
                   {getFieldDecorator('batch_interval', {
@@ -226,7 +218,7 @@ class renderConfig extends Component {
                 </FormItem>
                 {
                   isMetric ? <FormItem {...formItemLayout}
-                                                  label={<span>系统信息收集间隔<br /><span style={{ color: 'rgba(0,0,0,.43)', float: 'right' }}>(metric配置专用, 秒)</span></span>}>
+                                                  label={<span>系统信息收集间隔<br /><span style={{ color: 'rgba(0,0,0,.43)', float: 'right' }}>(秒)</span></span>}>
                     {getFieldDecorator('collect_interval', {
                       rules: [{required: true, message: '收集间隔不能为空'},
                         {pattern: /^[0-9]*$/, message: '输入不符合规范,只能为整数'}]
@@ -235,6 +227,14 @@ class renderConfig extends Component {
                     )}
                   </FormItem> : null
                 }
+                <FormItem {...formItemLayout} label="添加额外系统信息">
+                  {getFieldDecorator('extra_info')(
+                    <RadioGroup onChange={this.handleExtraInfoChange} style={{float: 'left'}}>
+                      <Radio value="true">true</Radio>
+                      <Radio value="false">false</Radio>
+                    </RadioGroup>
+                  )}
+                </FormItem>
                 <FormItem
                     {...optionFormItemLayout}
                 >
