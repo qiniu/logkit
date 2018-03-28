@@ -155,6 +155,12 @@
 			"revisionTime": "2017-07-12T19:11:37Z"
 		},
 		{
+			"checksumSHA1": "uPeOtuNC86moJndri53k0VokFWc=",
+			"path": "github.com/lestrrat-go/strftime",
+			"revision": "9948d03c6207ada6a27c7b43405f8dee04a8439e",
+			"revisionTime": "2018-02-20T09:15:53Z"
+		},
+		{
 			"checksumSHA1": "IfZcD4U1dtllJKlPNeD2aU4Jn98=",
 			"path": "github.com/lib/pq",
 			"revision": "83612a56d3dd153a94a629cd64925371c9adad78",
@@ -406,6 +412,12 @@
 			"path": "github.com/ua-parser/uap-go/uaparser",
 			"revision": "3ecf81168f828e6f335fa615097569a5ad3afcdd",
 			"revisionTime": "2018-01-08T17:11:26Z"
+		},
+		{
+			"checksumSHA1": "ZUu/tNw07VWinMKe/4T3ylceyp8=",
+			"path": "github.com/utahta/go-cronowriter",
+			"revision": "4443026afcbf6c4964071a925988edac04af97fb",
+			"revisionTime": "2018-02-21T05:11:55Z"
 		},
 		{
 			"checksumSHA1": "LTOa3BADhwvT0wFCknPueQALm8I=",

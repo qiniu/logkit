@@ -567,7 +567,7 @@ func metricHttpTest(p *testParam) {
 		curLine++
 		err = jsoniter.Unmarshal(str, &result)
 		if err != nil {
-			log.Fatalf("metricHttpTest error unmarshal %v curLine = %v %v", string(str), curLine, err)
+			t.Fatalf("metricHttpTest error unmarshal %v curLine = %v %v", string(str), curLine, err)
 		}
 
 		assert.Equal(t, len(httpAttr)+2, len(result[0]), string(str))
@@ -638,7 +638,7 @@ func metricHttpTest(p *testParam) {
 		curLine++
 		err = jsoniter.Unmarshal(str, &result)
 		if err != nil {
-			log.Fatalf("metricHttpTest error unmarshal %v curLine = %v %v", string(str), curLine, err)
+			t.Fatalf("metricHttpTest error unmarshal %v curLine = %v %v", string(str), curLine, err)
 		}
 
 		assert.Equal(t, float64(200), result[0]["http__status_code_1"])
@@ -711,7 +711,7 @@ func metricHttpTest(p *testParam) {
 		curLine++
 		err = jsoniter.Unmarshal(str, &result)
 		if err != nil {
-			log.Fatalf("metricHttpTest error unmarshal %v curLine = %v %v", string(str), curLine, err)
+			t.Fatalf("metricHttpTest error unmarshal %v curLine = %v %v", string(str), curLine, err)
 		}
 
 		assert.Equal(t, float64(200), result[0]["http__status_code_1"])
