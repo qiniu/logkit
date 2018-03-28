@@ -9,10 +9,13 @@ import (
 
 const (
 	GlobalKeyName = "name"
-	KeyCore       = "core"
-	KeyHostName   = "hostname"
-	KeyOsInfo     = "osinfo"
-	KeyLocalIp    = "localip"
+	ExtraInfo     = "extra_info"
+	/* 该选项兼容如下配置 KeyPandoraExtraInfo */
+
+	KeyCore     = "core"
+	KeyHostName = "hostname"
+	KeyOsInfo   = "osinfo"
+	KeyLocalIp  = "localip"
 
 	ContentTypeHeader     = "Content-Type"
 	ContentEncodingHeader = "Content-Encoding"

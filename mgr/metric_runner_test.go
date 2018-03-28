@@ -13,6 +13,7 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/metric/curl"
 	"github.com/qiniu/logkit/metric/system"
+	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
 	"github.com/labstack/echo"
@@ -718,5 +719,16 @@ func metricHttpTest(p *testParam) {
 		assert.Equal(t, float64(0), result[0]["http__err_state_1"])
 		assert.Equal(t, float64(0), result[0]["http__err_state_total"])
 		assert.Equal(t, "don't contain: 潘多拉", result[0]["http__err_msg_total"])
+	}
+}
+
+func TestSendType(t *testing.T) {
+	abc := make(map[string]string)
+	if abc["abc"] == "hello" {
+		t.Errorf("xx")
+	}
+	abc["type"] = "pandora"
+	if abc[KeySenderType] == TypePandora {
+		t.Errorf("type should equal")
 	}
 }

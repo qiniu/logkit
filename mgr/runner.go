@@ -105,6 +105,7 @@ type RunnerInfo struct {
 	MaxBatchTryTimes int    `json:"batch_try_times,omitempty"`  // 最大发送次数，小于等于0代表无限重试
 	CreateTime       string `json:"createtime"`
 	EnvTag           string `json:"env_tag,omitempty"`
+	ExtraInfo        bool   `json:"extra_info,omitempty"`
 	// 用这个字段的值来获取环境变量, 作为 tag 添加到数据中
 }
 
@@ -238,6 +239,9 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, p
 	}
 	rc.ReaderConfig[GlobalKeyName] = rc.RunnerName
 	rc.ReaderConfig[KeyRunnerName] = rc.RunnerName
+	if rc.ExtraInfo {
+		rc.ReaderConfig[ExtraInfo] = Bool2String(rc.ExtraInfo)
+	}
 	for i := range rc.SenderConfig {
 		rc.SenderConfig[i][KeyRunnerName] = rc.RunnerName
 	}
@@ -274,6 +278,10 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, p
 	transformers := createTransformers(rc)
 	senders := make([]sender.Sender, 0)
 	for i, c := range rc.SenderConfig {
+		if rc.ExtraInfo && c[KeySenderType] == TypePandora {
+			//如果已经开启了，不要重复加
+			c[KeyPandoraExtraInfo] = "false"
+		}
 		s, err := sr.NewSender(c, meta.FtSaveLogPath())
 		if err != nil {
 			return nil, err
@@ -412,13 +420,14 @@ func (r *LogExportRunner) Run() {
 			log.Errorf("recover when runner is stopped\npanic: %v\nstack: %s", r, debug.Stack())
 		}
 	}()
+
 	tags := r.meta.GetTags()
+	tags = MergeEnvTags(r.EnvTag, tags)
+	tags = MergeExtraInfoTags(r.meta, tags)
+
 	datasourceTag := r.meta.GetDataSourceTag()
 	schemaErr := SchemaErr{Number: 0, Last: time.Unix(0, 0)}
-	tags, err := GetEnvTag(r.EnvTag, tags)
-	if err != nil {
-		log.Warnf("get env tags error: %v", err)
-	}
+
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
 			log.Debugf("Runner[%v] exited from run", r.Name())
@@ -521,8 +530,7 @@ func (r *LogExportRunner) Run() {
 				log.Errorf("Runner[%v] datasourcetag add error, datas %v not match with froms %v", r.Name(), datas, froms)
 			}
 		}
-		//把tagfile加到data里，前提是认为[]line变成[]data以后是一一对应的，一旦错位就不加
-		if tags != nil {
+		if len(tags) > 0 {
 			datas = addTagsToData(tags, datas, r.Name())
 		}
 		for i := range r.transformers {
@@ -947,17 +955,18 @@ func (r *LogExportRunner) StatusBackup() {
 	}
 }
 
-// GetEnvTag 获取环境变量里的内容
-func GetEnvTag(name string, tags map[string]interface{}) (map[string]interface{}, error) {
+// MergeEnvTags 获取环境变量里的内容
+func MergeEnvTags(name string, tags map[string]interface{}) map[string]interface{} {
 	if name == "" {
-		return tags, nil
+		return tags
 	}
 
 	envTags := make(map[string]interface{})
 	if value := os.Getenv(name); value != "" {
 		err := jsoniter.Unmarshal([]byte(value), &envTags)
 		if err != nil {
-			return tags, err
+			log.Warnf("get env tags error: %v", err)
+			return tags
 		}
 	}
 
@@ -967,5 +976,17 @@ func GetEnvTag(name string, tags map[string]interface{}) (map[string]interface{}
 	for k, v := range envTags {
 		tags[k] = v
 	}
-	return tags, nil
+	return tags
+}
+
+func MergeExtraInfoTags(meta *reader.Meta, tags map[string]interface{}) map[string]interface{} {
+	if tags == nil {
+		tags = make(map[string]interface{})
+	}
+	for k, v := range meta.ExtraInfo() {
+		if _, ok := tags[k]; !ok {
+			tags[k] = v
+		}
+	}
+	return tags
 }

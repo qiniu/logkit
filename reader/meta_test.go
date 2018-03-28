@@ -207,3 +207,20 @@ func Test_getdonefiles(t *testing.T) {
 		t.Error("get mode error")
 	}
 }
+
+func TestExtraInfo(t *testing.T) {
+	meta, err := NewMetaWithConf(conf.MapConf{
+		ExtraInfo: "true",
+		KeyMode:   ModeMysql,
+	})
+	assert.NoError(t, err)
+	got := meta.ExtraInfo()
+	assert.Equal(t, len(got), 4)
+	meta, err = NewMetaWithConf(conf.MapConf{
+		KeyMode: ModeMysql,
+	})
+	assert.NoError(t, err)
+	got = meta.ExtraInfo()
+	assert.NotNil(t, got)
+	assert.Equal(t, len(got), 0)
+}

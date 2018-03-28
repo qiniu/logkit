@@ -67,11 +67,15 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 		rc.CollectInterval = defaultCollectInterval
 	}
 	interval := time.Duration(rc.CollectInterval) * time.Second
-	meta, err := reader.NewMetaWithConf(conf.MapConf{
+	cf := conf.MapConf{
 		GlobalKeyName:  rc.RunnerName,
 		KeyRunnerName:  rc.RunnerName,
 		reader.KeyMode: reader.ModeMetrics,
-	})
+	}
+	if rc.ExtraInfo {
+		cf[ExtraInfo] = Bool2String(rc.ExtraInfo)
+	}
+	meta, err := reader.NewMetaWithConf(cf)
 	if err != nil {
 		return nil, fmt.Errorf("Runner "+rc.RunnerName+" add failed, err is %v", err)
 	}
@@ -155,6 +159,10 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 	for _, c := range rc.SenderConfig {
 		c[KeyIsMetrics] = "true"
 		c[KeyPandoraTSDBTimeStamp] = metric.Timestamp
+		if rc.ExtraInfo && c[KeySenderType] == TypePandora {
+			//如果已经开启了，不要重复加
+			c[KeyPandoraExtraInfo] = "false"
+		}
 		s, err := sr.NewSender(c, meta.FtSaveLogPath())
 		if err != nil {
 			return nil, err
@@ -207,13 +215,10 @@ func (r *MetricRunner) Run() {
 		}
 	}()
 
-	tags := map[string]interface{}{
-		metric.Timestamp: nil,
-	}
-	tags, err := GetEnvTag(r.envTag, tags)
-	if err != nil {
-		log.Warnf("get env tags error: %v", err)
-	}
+	tags := r.meta.GetTags()
+	tags = MergeEnvTags(r.envTag, tags)
+	tags = MergeExtraInfoTags(r.meta, tags)
+
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
 			log.Debugf("runner %v exited from run", r.RunnerName)
@@ -254,9 +259,6 @@ func (r *MetricRunner) Run() {
 					continue
 				}
 				data := Data{}
-				for k, v := range tags {
-					data[k] = v
-				}
 				// 重命名
 				// cpu_time_user --> cpu__time_user
 				for m, d := range metricData {
@@ -274,6 +276,9 @@ func (r *MetricRunner) Run() {
 			log.Warnf("metrics collect no data")
 			time.Sleep(r.collectInterval)
 			continue
+		}
+		if len(tags) > 0 {
+			datas = addTagsToData(tags, datas, r.Name())
 		}
 		r.rsMutex.Lock()
 		r.rs.ReadDataCount += int64(dataCnt)
@@ -536,4 +541,11 @@ func createDiscardTransformer(key string) (transforms.Transformer, error) {
 		return nil, fmt.Errorf("type %v of transformer unmarshal config error %v", strTP, err)
 	}
 	return trans, nil
+}
+
+func Bool2String(i bool) string {
+	if i {
+		return "true"
+	}
+	return "false"
 }
