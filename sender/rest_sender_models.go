@@ -97,7 +97,7 @@ var ModeKeyOptions = map[string][]Option{
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     true,
-			Placeholder:  "/home/john/mylogs/my.log",
+			Placeholder:  "/home/john/mylogs/my-%Y-%m-%d.log",
 			DefaultNoUse: true,
 			Description:  "发送到指定文件(file_send_path)",
 		},
@@ -110,7 +110,7 @@ var ModeKeyOptions = map[string][]Option{
 			Placeholder:  "logkit_default_workflow",
 			DefaultNoUse: true,
 			Required:     true,
-			Description:  "工作流名称[留空使用旧版](pandora_workflow_name)",
+			Description:  "工作流名称(pandora_workflow_name)",
 			CheckRegex:   "^[a-zA-Z_][a-zA-Z0-9_]{0,127}$",
 		},
 		{
