@@ -418,6 +418,7 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 	schemas, err := pipeline.DSLtoSchema(dsl)
 	if err != nil {
 		log.Errorf("Runner[%v] Sender[%v]: auto create pandora repo error: %v, you can create on pandora portal, ignored...", opt.runnerName, opt.name, err)
+		err = nil
 	}
 	if initErr := s.client.InitOrUpdateWorkflow(&pipeline.InitOrUpdateWorkflowInput{
 		// 此处要的 schema 为 autoCreate 中用户指定的，所以 SchemaFree 要恒为 true
@@ -465,8 +466,7 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 			ForceDataConvert: s.opt.forceDataConvert,
 		},
 	}); initErr != nil {
-		err = fmt.Errorf("runner[%v] Sender [%v]: init Workflow error %v", opt.runnerName, opt.name, initErr)
-		return
+		log.Errorf("runner[%v] Sender [%v]: init Workflow error %v", opt.runnerName, opt.name, initErr)
 	}
 	s.UpdateSchemas()
 	return
