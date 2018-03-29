@@ -120,7 +120,7 @@ class CreateMetricRunner extends Component {
             name: runnerName != undefined ? runnerName : name,
             batch_interval: batch_interval != undefined ? batch_interval : 60,
             collect_interval: collect_interval != undefined ? collect_interval : 3,
-            extra_info: extra_info !=undefined ? extra_info : 'true',
+            extra_info: extra_info !=undefined ? extra_info : true,
             ...config.getNodeData()
           }
           that.refs.initConfig.setFieldsValue({config: JSON.stringify(data, null, 2)});
