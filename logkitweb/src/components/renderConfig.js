@@ -150,7 +150,7 @@ class renderConfig extends Component {
     this.closeNotification();
     if (this.isJSON(data.config)) {
       const jsonData = JSON.parse(data.config)
-      jsonData.extra_info = e.target.value
+      jsonData.extra_info = e.target.value === 'true'
       resetFields()
       getFieldDecorator("config", {initialValue: JSON.stringify(jsonData, null, 2)});
       getFieldDecorator("batch_interval", {initialValue: parseInt(data.batch_interval)});
