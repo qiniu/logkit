@@ -24,24 +24,17 @@ var (
 		DefaultNoUse: false,
 		Description:  "管道磁盘数据保存路径(ft_save_log_path)",
 		Advance:      true,
+		ToolTip:      `指定备份数据的存放路径`,
 	}
 	OptionFtWriteLimit = Option{
 		KeyName:      KeyFtWriteLimit,
 		ChooseOnly:   false,
 		Default:      "",
 		DefaultNoUse: false,
-		Description:  "磁盘写入限速[MB/s](ft_write_limit)",
+		Description:  "磁盘写入限速(ft_write_limit)",
 		CheckRegex:   "\\d+",
 		Advance:      true,
-	}
-	OptionFtSyncEvery = Option{
-		KeyName:      KeyFtSyncEvery,
-		ChooseOnly:   false,
-		Default:      "",
-		DefaultNoUse: false,
-		Description:  "同步间隔(ft_sync_every)",
-		CheckRegex:   "\\d+",
-		Advance:      true,
+		ToolTip:      `为了避免速率太快导致磁盘压力加大，可以根据系统情况自行限定写入本地磁盘的速率，单位MB/s`,
 	}
 	OptionFtStrategy = Option{
 		KeyName:       KeyFtStrategy,
@@ -51,15 +44,17 @@ var (
 		DefaultNoUse:  false,
 		Description:   "磁盘管道容错策略[仅备份错误|全部数据走管道|仅增加并发](ft_strategy)",
 		Advance:       true,
+		ToolTip:       `设置为backup_only的时候，数据不经过本地队列直接发送到下游，设为always_save时则所有数据会先发送到本地队列，选concurrent的时候会直接并发发送，不经过队列。无论该选项设置什么，失败的数据都会加入到重试队列中异步循环重试`,
 	}
 	OptionFtProcs = Option{
 		KeyName:      KeyFtProcs,
 		ChooseOnly:   false,
 		Default:      "",
 		DefaultNoUse: false,
-		Description:  "发送并发数量[always_save/concurrent 模式生效](ft_procs)",
+		Description:  "发送并发数量(ft_procs)",
 		CheckRegex:   "\\d+",
 		Advance:      true,
+		ToolTip:      "并发仅在ft_strateg模式选择 always_save或concurrent 时生效",
 	}
 	OptionFtMemoryChannel = Option{
 		KeyName:       KeyFtMemoryChannel,
@@ -67,8 +62,9 @@ var (
 		ChooseOptions: []interface{}{"false", "true"},
 		Default:       "false",
 		DefaultNoUse:  false,
-		Description:   "用内存管道[可加速](ft_memory_channel)",
+		Description:   "用内存管道(ft_memory_channel)",
 		Advance:       true,
+		ToolTip:       `内存管道替代磁盘管道`,
 	}
 	OptionFtMemoryChannelSize = Option{
 		KeyName:       KeyFtMemoryChannelSize,
@@ -79,6 +75,7 @@ var (
 		CheckRegex:    "\\d+",
 		Advance:       true,
 		AdvanceDepend: KeyFtMemoryChannel,
+		ToolTip:       `默认为"100"，单位为批次，也就是100代表100个待发送的批次，注意：该选项设置的大小表达的是队列中可存储的元素个数，并不是占用的内存大小`,
 	}
 	OptionLogkitSendTime = Option{
 		KeyName:       KeyLogkitSendTime,
@@ -88,6 +85,7 @@ var (
 		DefaultNoUse:  false,
 		Description:   "添加系统时间(logkit_send_time)",
 		Advance:       true,
+		ToolTip:       "在系统中添加数据发送时的当前时间作为时间戳",
 	}
 )
 var ModeKeyOptions = map[string][]Option{
@@ -100,6 +98,7 @@ var ModeKeyOptions = map[string][]Option{
 			Placeholder:  "/home/john/mylogs/my-%Y-%m-%d.log",
 			DefaultNoUse: true,
 			Description:  "发送到指定文件(file_send_path)",
+			ToolTip:      `路径支持魔法变量，例如 "file_send_path":"data-%Y-%m-%d.txt" ，此时数据就会渲染出日期，存放为 data-2018-03-28.txt`,
 		},
 	},
 	TypePandora: {
@@ -112,6 +111,7 @@ var ModeKeyOptions = map[string][]Option{
 			Required:     true,
 			Description:  "工作流名称(pandora_workflow_name)",
 			CheckRegex:   "^[a-zA-Z_][a-zA-Z0-9_]{0,127}$",
+			ToolTip:      "七牛大数据平台工作流名称",
 		},
 		{
 			KeyName:      KeyPandoraRepoName,
@@ -122,6 +122,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: true,
 			Description:  "数据源名称(pandora_repo_name)",
 			CheckRegex:   "^[a-zA-Z][a-zA-Z0-9_]{0,127}$",
+			ToolTip:      "七牛大数据平台工作流中的数据源名称",
 		},
 		{
 			KeyName:      KeyPandoraAk,
@@ -149,8 +150,9 @@ var ModeKeyOptions = map[string][]Option{
 			ChooseOnly:   false,
 			Default:      "https://pipeline.qiniu.com",
 			DefaultNoUse: false,
-			Description:  "大数据平台域名[私有部署才修改](pandora_host)",
+			Description:  "大数据平台域名(pandora_host)",
 			Advance:      true,
+			ToolTip:      "数据发送的目的域名，私有部署请对应修改",
 		},
 		{
 			KeyName:       KeyPandoraRegion,
@@ -160,6 +162,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse:  false,
 			Description:   "创建的资源所在区域(pandora_region)",
 			Advance:       true,
+			ToolTip:       "工作流资源创建所在区域",
 		},
 		{
 			KeyName:       KeyPandoraSchemaFree,
@@ -169,14 +172,17 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse:  false,
 			Description:   "自动创建数据源并更新(pandora_schema_free)",
 			Advance:       true,
+			ToolTip:       "自动根据数据创建工作流、数据源并自动更新",
 		},
 		{
-			KeyName:      KeyPandoraAutoCreate,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "以DSL语法自动创建数据源(pandora_auto_create)",
-			Advance:      true,
+			KeyName:       KeyPandoraAutoCreate,
+			ChooseOnly:    false,
+			Default:       "",
+			DefaultNoUse:  false,
+			Description:   "以DSL语法自动创建数据源(pandora_auto_create)",
+			Advance:       true,
+			ToolTip:       `自动创建数据源，语法为 "f1 date, f2 string, f3 float, f4 map{f5 long}"`,
+			ToolTipActive: true,
 		},
 		{
 			KeyName:      KeyPandoraSchema,
@@ -185,6 +191,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: false,
 			Description:  "筛选字段(重命名)发送(pandora_schema)",
 			Advance:      true,
+			ToolTip:      `将f1重命名为f2: "f1 f2,...", 其他自动不要去掉...`,
 		},
 		{
 			KeyName:       KeyPandoraEnableLogDB,
@@ -201,6 +208,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse:  false,
 			Description:   "指定日志分析仓库名称(pandora_logdb_name)",
 			AdvanceDepend: KeyPandoraEnableLogDB,
+			ToolTip:       "若不指定使用数据源(pandora_repo_name)名称",
 		},
 		{
 			KeyName:       KeyPandoraLogDBHost,
@@ -210,6 +218,7 @@ var ModeKeyOptions = map[string][]Option{
 			Description:   "日志分析域名[私有部署才修改](pandora_logdb_host)",
 			Advance:       true,
 			AdvanceDepend: KeyPandoraEnableLogDB,
+			ToolTip:       "日志分析仓库域名，私有部署请对应修改",
 		},
 		{
 			KeyName:       KeyPandoraEnableTSDB,
@@ -226,6 +235,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse:  false,
 			Description:   "指定时序数据库仓库名称(pandora_tsdb_name)",
 			AdvanceDepend: KeyPandoraEnableTSDB,
+			ToolTip:       "若不指定使用数据源(pandora_repo_name)名称",
 		},
 		{
 			KeyName:       KeyPandoraTSDBSeriesName,
@@ -234,6 +244,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse:  false,
 			Description:   "指定时序数据库序列名称(pandora_tsdb_series_name)",
 			AdvanceDepend: KeyPandoraEnableTSDB,
+			ToolTip:       "若不指定使用仓库(pandora_tsdb_name)名称",
 		},
 		{
 			KeyName:       KeyPandoraTSDBSeriesTags,
@@ -251,6 +262,7 @@ var ModeKeyOptions = map[string][]Option{
 			Description:   "时序数据库域名[私有部署才修改](pandora_tsdb_host)",
 			Advance:       true,
 			AdvanceDepend: KeyPandoraEnableTSDB,
+			ToolTip:       "时序数据库域名，私有部署请对应修改",
 		},
 		{
 			KeyName:       KeyPandoraTSDBTimeStamp,
@@ -316,24 +328,27 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse:  false,
 			Description:   "压缩发送(pandora_gzip)",
 			Advance:       true,
+			ToolTip:       "使用gzip压缩发送",
 		},
 		{
 			KeyName:      KeyFlowRateLimit,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
-			Description:  "流量限制[KB/s](flow_rate_limit)",
+			Description:  "流量限制(flow_rate_limit)",
 			CheckRegex:   "\\d+",
 			Advance:      true,
+			ToolTip:      "对请求流量限制,单位为[KB/s]",
 		},
 		{
 			KeyName:      KeyRequestRateLimit,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
-			Description:  "请求限制[次/s](request_rate_limit)",
+			Description:  "请求限制(request_rate_limit)",
 			CheckRegex:   "\\d+",
 			Advance:      true,
+			ToolTip:      "对请求次数限制,单位为[次/s]",
 		},
 		{
 			KeyName:       KeyPandoraUUID,
@@ -343,6 +358,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse:  false,
 			Description:   "数据植入UUID(pandora_uuid)",
 			Advance:       true,
+			ToolTip:       `该字段保证了发送出去的每一条数据都拥有一个唯一的UUID，可以用于数据去重等需要`,
 		},
 		{
 			KeyName:       KeyPandoraWithIP,
@@ -354,7 +370,6 @@ var ModeKeyOptions = map[string][]Option{
 			Advance:       true,
 		},
 		OptionFtWriteLimit,
-		OptionFtSyncEvery,
 		OptionFtStrategy,
 		OptionFtProcs,
 		OptionFtMemoryChannel,
@@ -376,6 +391,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse:  false,
 			Description:   "自动转换类型(pandora_force_convert)",
 			Advance:       true,
+			ToolTip:       `强制类型转换，如定义的pandora schema为long，而实际的为string，则会尝试将string解析为long类型，若无法解析，则忽略该字段内容`,
 		},
 		{
 			KeyName:       KeyIgnoreInvalidField,
@@ -385,6 +401,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse:  false,
 			Description:   "忽略错误字段(ignore_invalid_field)",
 			Advance:       true,
+			ToolTip:       `进行数据格式校验，并忽略不符合格式的字段数据`,
 		},
 		{
 			KeyName:       KeyPandoraAutoConvertDate,
@@ -394,6 +411,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse:  false,
 			Description:   "自动转换时间类型(pandora_auto_convert_date)",
 			Advance:       true,
+			ToolTip:       `会自动将用户的自动尝试转换为Pandora的时间类型(date)`,
 		},
 		{
 			KeyName:       KeyPandoraUnescape,
@@ -403,6 +421,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse:  false,
 			Description:   "服务端反转译换行/制表符(pandora_unescape)",
 			Advance:       true,
+			ToolTip:       `在pandora服务端反转译\\n=>\n, \\t=>\t; 由于pandora数据上传的编码方式会占用\t和\n这两个符号，所以在sdk中打点时会默认把\t转译为\\t，把\n转译为\\n，开启这个选项就是在服务端把这个反转译回来。开启该选项也会转译数据中原有的这些\\t和\\n符号`,
 		},
 	},
 	TypeMongodbAccumulate: {
@@ -414,6 +433,7 @@ var ModeKeyOptions = map[string][]Option{
 			Placeholder:  "mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]",
 			DefaultNoUse: true,
 			Description:  "数据库地址(mongodb_host)",
+			ToolTip:      `Mongodb的地址: mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]`,
 		},
 		{
 			KeyName:      KeyMongodbDB,
@@ -453,7 +473,6 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		OptionSaveLogPath,
 		OptionFtWriteLimit,
-		OptionFtSyncEvery,
 		OptionFtStrategy,
 		OptionFtProcs,
 		OptionFtMemoryChannel,
@@ -468,6 +487,7 @@ var ModeKeyOptions = map[string][]Option{
 			Placeholder:  "127.0.0.1:8086",
 			DefaultNoUse: true,
 			Description:  "数据库地址(influxdb_host)",
+			ToolTip:      `数据库地址127.0.0.1:8086`,
 		},
 		{
 			KeyName:      KeyInfluxdbDB,
@@ -545,7 +565,6 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		OptionSaveLogPath,
 		OptionFtWriteLimit,
-		OptionFtSyncEvery,
 		OptionFtStrategy,
 		OptionFtProcs,
 		OptionFtMemoryChannel,
@@ -561,6 +580,7 @@ var ModeKeyOptions = map[string][]Option{
 			Placeholder:  "192.168.31.203:9200",
 			DefaultNoUse: false,
 			Description:  "host地址(elastic_host)",
+			ToolTip:      `常用端口9200`,
 		},
 		{
 			KeyName:       KeyElasticVersion,
@@ -607,7 +627,6 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		OptionSaveLogPath,
 		OptionFtWriteLimit,
-		OptionFtSyncEvery,
 		OptionFtStrategy,
 		OptionFtProcs,
 		OptionFtMemoryChannel,
@@ -622,6 +641,7 @@ var ModeKeyOptions = map[string][]Option{
 			Placeholder:  "192.168.31.201:9092",
 			DefaultNoUse: true,
 			Description:  "broker的host地址(kafka_host)",
+			ToolTip:      "常用端口 9092",
 		},
 		{
 			KeyName:      KeyKafkaTopic,
@@ -674,7 +694,6 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		OptionSaveLogPath,
 		OptionFtWriteLimit,
-		OptionFtSyncEvery,
 		OptionFtStrategy,
 		OptionFtProcs,
 		OptionFtMemoryChannel,
@@ -716,7 +735,6 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		OptionSaveLogPath,
 		OptionFtWriteLimit,
-		OptionFtSyncEvery,
 		OptionFtStrategy,
 		OptionFtProcs,
 		OptionFtMemoryChannel,

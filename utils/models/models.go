@@ -49,6 +49,8 @@ type Option struct {
 	Secret        bool
 	Advance       bool   `json:"advance,omitempty"`
 	AdvanceDepend string `json:"advance_depend,omitempty"`
+	ToolTip       string `json:"tooltip,omitempty"`
+	ToolTipActive bool   `json:"tooltip_active,omitempty"`
 }
 
 type KeyValue struct {
