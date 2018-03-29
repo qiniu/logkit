@@ -5,12 +5,14 @@ import (
 	"archive/zip"
 	"compress/gzip"
 	"database/sql"
+	"encoding/base64"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -554,5 +556,30 @@ func CreateDirIfNotExist(dir string) (err error) {
 			return
 		}
 	}
+	return
+}
+
+func DecodeString(target string) (result string, err error) {
+	if target != "" {
+		bytes, err := base64.URLEncoding.DecodeString(target)
+		if err != nil {
+			err = fmt.Errorf("base64 decode %v error: %v", target, err)
+			return "", err
+		}
+		result, err = url.PathUnescape(string(bytes))
+		if err != nil {
+			err = fmt.Errorf("path unescape decode %v error: %v", target, err)
+			return "", err
+		}
+	}
+	return
+}
+
+func EncodeString(target string) (result string) {
+	if target != "" {
+		result = url.PathEscape(target)
+		result = base64.URLEncoding.EncodeToString([]byte(result))
+	}
+
 	return
 }
