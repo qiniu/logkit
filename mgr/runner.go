@@ -534,11 +534,35 @@ func (r *LogExportRunner) Run() {
 			datas = addTagsToData(tags, datas, r.Name())
 		}
 		for i := range r.transformers {
-			if r.transformers[i].Stage() == transforms.StageAfterParser {
-				datas, err = r.transformers[i].Transform(datas)
-				if err != nil {
-					log.Error(err)
-				}
+			if r.transformers[i].Stage() != transforms.StageAfterParser {
+				continue
+			}
+			datas, err = r.transformers[i].Transform(datas)
+			tp := r.transformers[i].Type()
+			r.rsMutex.Lock()
+			tstats, ok := r.rs.TransformStats[tp]
+			if !ok {
+				tstats = StatsInfo{}
+			}
+			se, ok := err.(*StatsError)
+			if ok {
+				errorCnt = se.Errors
+				err = se.ErrorDetail
+				tstats.Errors += se.Errors
+				tstats.Success += se.Success
+			} else if err != nil {
+				errorCnt = 1
+				tstats.Errors++
+			} else {
+				tstats.Success++
+			}
+			if err != nil {
+				tstats.LastError = err.Error()
+			}
+			r.rs.TransformStats[tp] = tstats
+			r.rsMutex.Unlock()
+			if err != nil {
+				log.Error(err)
 			}
 		}
 		success := true
