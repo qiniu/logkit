@@ -75,7 +75,6 @@ func (g *Converter) SampleConfig() string {
 
 func (g *Converter) ConfigOptions() []Option {
 	return []Option{
-		transforms.KeyFieldName,
 		{
 			KeyName:      "dsl",
 			ChooseOnly:   false,
