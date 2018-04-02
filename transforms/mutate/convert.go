@@ -23,8 +23,10 @@ func (g *Converter) Transform(datas []Data) ([]Data, error) {
 	errnums := 0
 	schemas, err := pipeline.DSLtoSchema(g.DSL)
 	if err != nil {
-		ferr = fmt.Errorf("convert typedsl %s to schema error: %v", g.DSL, err)
-		g.stats.LastError = ferr.Error()
+		err = fmt.Errorf("convert typedsl %s to schema error: %v", g.DSL, err)
+		errnums = len(datas)
+	} else if schemas == nil || len(schemas) == 0 {
+		err = fmt.Errorf("no valid dsl[%v] to schema, please enter correct format dsl: \"field type\"", g.DSL)
 		errnums = len(datas)
 	} else {
 		keyss := map[int][]string{}
@@ -48,6 +50,7 @@ func (g *Converter) Transform(datas []Data) ([]Data, error) {
 			}
 		}
 	}
+
 	if err != nil {
 		g.stats.LastError = err.Error()
 		ferr = fmt.Errorf("find total %v erorrs in transform convert, last error info is %v", errnums, err)
