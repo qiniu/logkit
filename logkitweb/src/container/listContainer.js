@@ -241,7 +241,7 @@ class List extends Component {
             </Content>) : null}
             {this.state.currentMenu === 'createLog' ? (<Content style={{margin: '0 16px'}}>
               <Breadcrumb style={{margin: '16px 0'}}>
-                <Breadcrumb.Item>创建日志收集器</Breadcrumb.Item>
+                <Breadcrumb.Item>{window.isCopy ? '修改日志收集器' : '创建日志收集器'}</Breadcrumb.Item>
               </Breadcrumb>
               <div style={{padding: 24, background: '#fff', minHeight: 800}}>
                 <div className="content">
