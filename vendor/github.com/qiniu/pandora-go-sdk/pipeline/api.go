@@ -212,9 +212,36 @@ func (c *Pipeline) UpdateRepoWithLogDB(input *UpdateRepoInput, ex ExportDesc) er
 		RepoName:     repoName,
 		PandoraToken: input.Option.AutoExportLogDBTokens.GetLogDBRepoToken,
 	})
+	if reqerr.IsNoSuchResourceError(err) {
+		logdbschemas := convertSchema2LogDB(input.Schema, input.Option.AutoExportToLogDBInput.AnalyzerInfo)
+		rts := input.Option.AutoExportToLogDBInput.Retention
+		if rts == "" {
+			rts = "30d"
+		}
+		linput := &logdb.CreateRepoInput{
+			RepoName:     repoName,
+			Region:       input.Option.AutoExportToLogDBInput.Region,
+			Retention:    rts,
+			Schema:       logdbschemas,
+			PandoraToken: input.Option.AutoExportLogDBTokens.CreateLogDBRepoToken,
+		}
+		if input.Option.AutoExportToLogDBInput.AnalyzerInfo.FullText {
+			linput.FullText = logdb.NewFullText(logdb.StandardAnalyzer)
+		}
+		err = logdbAPI.CreateRepo(linput)
+		if err != nil && !reqerr.IsExistError(err) {
+			log.Error("UpdateRepoWithLogDB create logdb repo error", err)
+			return err
+		}
+		repoInfo, err = logdbAPI.GetRepo(&logdb.GetRepoInput{
+			RepoName:     repoName,
+			PandoraToken: input.Option.AutoExportLogDBTokens.GetLogDBRepoToken,
+		})
+	}
 	if err != nil {
 		return err
 	}
+
 	analyzers := AnalyzerInfo{}
 	if input.Option != nil {
 		analyzers = input.Option.AutoExportToLogDBInput.AnalyzerInfo

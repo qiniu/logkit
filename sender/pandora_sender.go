@@ -411,6 +411,8 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 		}
 		s.opt.tsdbSeriesTags = metricTags
 		s.opt.analyzerInfo.Default = logdb.KeyWordAnalyzer
+	} else {
+		s.opt.analyzerInfo.FullText = true
 	}
 	s.opt.expandAttr = expandAttr
 

@@ -16,6 +16,7 @@ func (e LogdbErrBuilder) Build(msg, text, reqId string, code int) error {
 	if len(msg) <= errCodePrefixLen {
 		return err
 	}
+	err.Component = "logdb"
 	errId := msg[:errCodePrefixLen]
 
 	switch errId {

@@ -125,12 +125,16 @@ func convertCreate2LogDB(input *CreateRepoForLogDBInput) *logdb.CreateRepoInput 
 	if input.LogRepoName == "" {
 		input.LogRepoName = input.RepoName
 	}
-	return &logdb.CreateRepoInput{
+	linput := &logdb.CreateRepoInput{
 		Region:    input.Region,
 		RepoName:  input.LogRepoName,
 		Schema:    convertSchema2LogDB(input.Schema, input.AnalyzerInfo),
 		Retention: input.Retention,
 	}
+	if input.AnalyzerInfo.FullText {
+		linput.FullText = logdb.NewFullText(logdb.StandardAnalyzer)
+	}
+	return linput
 }
 
 func convertSchema2LogDB(scs []RepoSchemaEntry, analyzer AnalyzerInfo) (ret []logdb.RepoSchemaEntry) {
@@ -150,7 +154,7 @@ func convertSchema2LogDB(scs []RepoSchemaEntry, analyzer AnalyzerInfo) (ret []lo
 		if v.ValueType == PandoraTypeArray {
 			rp.ValueType = v.ElemType
 		}
-		if v.ValueType == PandoraTypeString {
+		if v.ValueType == PandoraTypeString && !analyzer.FullText {
 			// 当 analyzer.Analyzer 这个 map 中有明确的字段分词类型时，按照 map 中的分词类型设置
 			// 否则当 analyzer.Default 不为空时，按照 default 值设置分词类型
 			// 上述两个条件都不符合时，按照标准分词设置
@@ -305,13 +309,17 @@ func (c *Pipeline) AutoExportToLogDB(input *AutoExportToLogDBInput) error {
 		PandoraToken: input.GetLogDBRepoToken,
 	})
 	if reqerr.IsNoSuchResourceError(err) {
-		err = logdbapi.CreateRepo(&logdb.CreateRepoInput{
+		linput := &logdb.CreateRepoInput{
 			RepoName:     input.LogRepoName,
 			Region:       repoInfo.Region,
 			Retention:    input.Retention,
 			Schema:       logdbschemas,
 			PandoraToken: input.CreateLogDBRepoToken,
-		})
+		}
+		if input.AnalyzerInfo.FullText {
+			linput.FullText = logdb.NewFullText(logdb.StandardAnalyzer)
+		}
+		err = logdbapi.CreateRepo(linput)
 		if err != nil && !reqerr.IsExistError(err) {
 			log.Error("AutoExportToLogDB create logdb repo error", err)
 			return err

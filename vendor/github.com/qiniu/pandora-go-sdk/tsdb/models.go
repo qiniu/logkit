@@ -18,10 +18,10 @@ const (
 func validateSeriesName(seriesName string) (err error) {
 	matched, err := regexp.MatchString(seriesNamePattern, seriesName)
 	if err != nil {
-		return reqerr.NewInvalidArgs("SeriesName", err.Error())
+		return reqerr.NewInvalidArgs("SeriesName", err.Error()).WithComponent("tsdb")
 	}
 	if !matched {
-		return reqerr.NewInvalidArgs("SeriesName", fmt.Sprintf("invalid series name: %s", seriesName))
+		return reqerr.NewInvalidArgs("SeriesName", fmt.Sprintf("invalid series name: %s", seriesName)).WithComponent("tsdb")
 	}
 	return
 }
@@ -29,10 +29,10 @@ func validateSeriesName(seriesName string) (err error) {
 func validateRepoName(repoName string) (err error) {
 	matched, err := regexp.MatchString(repoNamePattern, repoName)
 	if err != nil {
-		return reqerr.NewInvalidArgs("RepoName", err.Error())
+		return reqerr.NewInvalidArgs("RepoName", err.Error()).WithComponent("tsdb")
 	}
 	if !matched {
-		return reqerr.NewInvalidArgs("RepoName", fmt.Sprintf("invalid repo name: %s", repoName))
+		return reqerr.NewInvalidArgs("RepoName", fmt.Sprintf("invalid repo name: %s", repoName)).WithComponent("tsdb")
 	}
 	return
 }
@@ -51,7 +51,7 @@ func (r *CreateRepoInput) Validate() (err error) {
 	}
 
 	if r.Region == "" {
-		return reqerr.NewInvalidArgs("Region", "region should not be empty")
+		return reqerr.NewInvalidArgs("Region", "region should not be empty").WithComponent("tsdb")
 	}
 	return
 }
@@ -96,7 +96,7 @@ type UpdateRepoMetadataInput struct {
 
 func (r *UpdateRepoMetadataInput) Validate() (err error) {
 	if r.Metadata == nil {
-		return reqerr.NewInvalidArgs("Metadata", "metadata should not be empty")
+		return reqerr.NewInvalidArgs("Metadata", "metadata should not be empty").WithComponent("tsdb")
 	}
 	return
 }
@@ -132,7 +132,7 @@ type UpdateSeriesMetadataInput struct {
 
 func (s *UpdateSeriesMetadataInput) Validate() (err error) {
 	if s.Metadata == nil {
-		return reqerr.NewInvalidArgs("Metadata", "metadata should not be empty")
+		return reqerr.NewInvalidArgs("Metadata", "metadata should not be empty").WithComponent("tsdb")
 	}
 	return
 }
@@ -270,7 +270,7 @@ type QueryInput struct {
 
 func (q *QueryInput) Validate() (err error) {
 	if q.Sql == "" {
-		return reqerr.NewInvalidArgs("QueryInput", "sql should not be empty")
+		return reqerr.NewInvalidArgs("QueryInput", "sql should not be empty").WithComponent("tsdb")
 	}
 	return
 }
