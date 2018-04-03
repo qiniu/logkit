@@ -76,7 +76,7 @@ var schemaTypes = map[string]bool{
 func validateGroupName(g string) error {
 	matched, err := regexp.MatchString(groupNamePattern, g)
 	if err != nil {
-		return reqerr.NewInvalidArgs("GroupName", err.Error())
+		return reqerr.NewInvalidArgs("GroupName", err.Error()).WithComponent("pipleline")
 	}
 	if !matched {
 		return reqerr.NewInvalidArgs("GroupName", fmt.Sprintf("invalid group name: %s", g))
@@ -87,10 +87,10 @@ func validateGroupName(g string) error {
 func validateRepoName(r string) error {
 	matched, err := regexp.MatchString(repoNamePattern, r)
 	if err != nil {
-		return reqerr.NewInvalidArgs("RepoName", err.Error())
+		return reqerr.NewInvalidArgs("RepoName", err.Error()).WithComponent("pipleline")
 	}
 	if !matched {
-		return reqerr.NewInvalidArgs("RepoName", fmt.Sprintf("invalid repo name: %s", r))
+		return reqerr.NewInvalidArgs("RepoName", fmt.Sprintf("invalid repo name: %s", r)).WithComponent("pipleline")
 	}
 	return nil
 }
@@ -98,10 +98,10 @@ func validateRepoName(r string) error {
 func validateTransformName(t string) error {
 	matched, err := regexp.MatchString(transformNamePattern, t)
 	if err != nil {
-		return reqerr.NewInvalidArgs("TransformName", err.Error())
+		return reqerr.NewInvalidArgs("TransformName", err.Error()).WithComponent("pipleline")
 	}
 	if !matched {
-		return reqerr.NewInvalidArgs("TransformName", fmt.Sprintf("invalid transform name: %s", t))
+		return reqerr.NewInvalidArgs("TransformName", fmt.Sprintf("invalid transform name: %s", t)).WithComponent("pipleline")
 	}
 	return nil
 }
@@ -109,10 +109,10 @@ func validateTransformName(t string) error {
 func validateExportName(e string) error {
 	matched, err := regexp.MatchString(exportNamePattern, e)
 	if err != nil {
-		return reqerr.NewInvalidArgs("ExportName", err.Error())
+		return reqerr.NewInvalidArgs("ExportName", err.Error()).WithComponent("pipleline")
 	}
 	if !matched {
-		return reqerr.NewInvalidArgs("ExportName", fmt.Sprintf("invalid export name: %s", e))
+		return reqerr.NewInvalidArgs("ExportName", fmt.Sprintf("invalid export name: %s", e)).WithComponent("pipleline")
 	}
 	return nil
 }
@@ -120,10 +120,10 @@ func validateExportName(e string) error {
 func validatePluginName(p string) error {
 	matched, err := regexp.MatchString(pluginNamePattern, p)
 	if err != nil {
-		return reqerr.NewInvalidArgs("PluginName", err.Error())
+		return reqerr.NewInvalidArgs("PluginName", err.Error()).WithComponent("pipleline")
 	}
 	if !matched {
-		return reqerr.NewInvalidArgs("PluginName", fmt.Sprintf("invalid plugin name: %s", p))
+		return reqerr.NewInvalidArgs("PluginName", fmt.Sprintf("invalid plugin name: %s", p)).WithComponent("pipleline")
 	}
 	return nil
 }
@@ -131,10 +131,10 @@ func validatePluginName(p string) error {
 func validateDatasouceName(d string) error {
 	matched, err := regexp.MatchString(datasourceNamePattern, d)
 	if err != nil {
-		return reqerr.NewInvalidArgs("DatasourceName", err.Error())
+		return reqerr.NewInvalidArgs("DatasourceName", err.Error()).WithComponent("pipleline")
 	}
 	if !matched {
-		return reqerr.NewInvalidArgs("DatasourceName", fmt.Sprintf("invalid datasource name: %s", d))
+		return reqerr.NewInvalidArgs("DatasourceName", fmt.Sprintf("invalid datasource name: %s", d)).WithComponent("pipleline")
 	}
 	return nil
 }
@@ -142,10 +142,10 @@ func validateDatasouceName(d string) error {
 func validateJobName(j string) error {
 	matched, err := regexp.MatchString(datasourceNamePattern, j)
 	if err != nil {
-		return reqerr.NewInvalidArgs("JobName", err.Error())
+		return reqerr.NewInvalidArgs("JobName", err.Error()).WithComponent("pipleline")
 	}
 	if !matched {
-		return reqerr.NewInvalidArgs("JobName", fmt.Sprintf("invalid job name: %s", j))
+		return reqerr.NewInvalidArgs("JobName", fmt.Sprintf("invalid job name: %s", j)).WithComponent("pipleline")
 	}
 	return nil
 }
@@ -153,10 +153,10 @@ func validateJobName(j string) error {
 func validateJobexportName(e string) error {
 	matched, err := regexp.MatchString(datasourceNamePattern, e)
 	if err != nil {
-		return reqerr.NewInvalidArgs("JobexportName", err.Error())
+		return reqerr.NewInvalidArgs("JobexportName", err.Error()).WithComponent("pipleline")
 	}
 	if !matched {
-		return reqerr.NewInvalidArgs("JobexportName", fmt.Sprintf("invalid job export name: %s", e))
+		return reqerr.NewInvalidArgs("JobexportName", fmt.Sprintf("invalid job export name: %s", e)).WithComponent("pipleline")
 	}
 	return nil
 }
@@ -164,10 +164,10 @@ func validateJobexportName(e string) error {
 func validateWorkflowName(r string) error {
 	matched, err := regexp.MatchString(workflowNamePattern, r)
 	if err != nil {
-		return reqerr.NewInvalidArgs("Workflow", err.Error())
+		return reqerr.NewInvalidArgs("Workflow", err.Error()).WithComponent("pipleline")
 	}
 	if !matched {
-		return reqerr.NewInvalidArgs("Workflow", fmt.Sprintf("invalid workflow name: %s", r))
+		return reqerr.NewInvalidArgs("Workflow", fmt.Sprintf("invalid workflow name: %s", r)).WithComponent("pipleline")
 	}
 	return nil
 }
@@ -175,10 +175,10 @@ func validateWorkflowName(r string) error {
 func validateNodeName(r string) error {
 	matched, err := regexp.MatchString(nodeNamePattern, r)
 	if err != nil {
-		return reqerr.NewInvalidArgs("Workflow NodeName", err.Error())
+		return reqerr.NewInvalidArgs("Workflow NodeName", err.Error()).WithComponent("pipleline")
 	}
 	if !matched {
-		return reqerr.NewInvalidArgs("Workflow NodeName", fmt.Sprintf("invalid workflow node name: %s", r))
+		return reqerr.NewInvalidArgs("Workflow NodeName", fmt.Sprintf("invalid workflow node name: %s", r)).WithComponent("pipleline")
 	}
 	return nil
 }
@@ -186,17 +186,17 @@ func validateNodeName(r string) error {
 func validateVariableName(r string) error {
 	matched, err := regexp.MatchString(variableNameRex, r)
 	if err != nil {
-		return reqerr.NewInvalidArgs("VariableName", err.Error())
+		return reqerr.NewInvalidArgs("VariableName", err.Error()).WithComponent("pipleline")
 	}
 	if !matched {
-		return reqerr.NewInvalidArgs("VariableName", fmt.Sprintf("invalid variable name: %s", r))
+		return reqerr.NewInvalidArgs("VariableName", fmt.Sprintf("invalid variable name: %s", r)).WithComponent("pipleline")
 	}
 	return nil
 }
 
 func validateVariableType(varType string) (err error) {
 	if varType != VariableTimeType && varType != VariableStringType {
-		err = reqerr.NewInvalidArgs("type", "variable type must be `time` or `string`")
+		err = reqerr.NewInvalidArgs("type", "variable type must be `time` or `string`").WithComponent("pipleline")
 		return
 	}
 	return
@@ -210,11 +210,11 @@ type Container struct {
 
 func (c *Container) Validate() (err error) {
 	if c.Type == "" {
-		err = reqerr.NewInvalidArgs("ContainerType", "container type should not be empty")
+		err = reqerr.NewInvalidArgs("ContainerType", "container type should not be empty").WithComponent("pipleline")
 		return
 	}
 	if c.Count < 1 || c.Count > 128 {
-		err = reqerr.NewInvalidArgs("ContainerCount", fmt.Sprintf("invalid container count: %d", c.Count))
+		err = reqerr.NewInvalidArgs("ContainerCount", fmt.Sprintf("invalid container count: %d", c.Count)).WithComponent("pipleline")
 		return
 	}
 	return
@@ -233,11 +233,11 @@ func (g *CreateGroupInput) Validate() (err error) {
 		return
 	}
 	if g.Region == "" {
-		err = reqerr.NewInvalidArgs("Region", "region should not be empty")
+		err = reqerr.NewInvalidArgs("Region", "region should not be empty").WithComponent("pipleline")
 		return
 	}
 	if g.Container == nil {
-		err = reqerr.NewInvalidArgs("Container", "container should not be empty")
+		err = reqerr.NewInvalidArgs("Container", "container should not be empty").WithComponent("pipleline")
 		return
 	}
 	if err = g.Container.Validate(); err != nil {
@@ -257,7 +257,7 @@ func (g *UpdateGroupInput) Validate() (err error) {
 		return
 	}
 	if g.Container == nil {
-		err = reqerr.NewInvalidArgs("Container", "container should not be empty")
+		err = reqerr.NewInvalidArgs("Container", "container should not be empty").WithComponent("pipleline")
 		return
 	}
 	if err = g.Container.Validate(); err != nil {
@@ -323,21 +323,21 @@ func (e RepoSchemaEntry) String() string {
 func (e *RepoSchemaEntry) Validate() (err error) {
 	matched, err := regexp.MatchString(schemaKeyPattern, e.Key)
 	if err != nil {
-		err = reqerr.NewInvalidArgs("Schema", err.Error())
+		err = reqerr.NewInvalidArgs("Schema", err.Error()).WithComponent("pipleline")
 		return
 	}
 	if !matched {
-		err = reqerr.NewInvalidArgs("Schema", fmt.Sprintf("invalid field key: %s", e.Key))
+		err = reqerr.NewInvalidArgs("Schema", fmt.Sprintf("invalid field key: %s", e.Key)).WithComponent("pipleline")
 		return
 
 	}
 	if !schemaTypes[e.ValueType] {
-		err = reqerr.NewInvalidArgs("Schema", fmt.Sprintf("invalid field type: %s, field type should be one of \"float\", \"string\", \"date\", \"long\", \"boolean\", \"array\", \"map\" and \"jsonstring\"", e.ValueType))
+		err = reqerr.NewInvalidArgs("Schema", fmt.Sprintf("invalid field type: %s, field type should be one of \"float\", \"string\", \"date\", \"long\", \"boolean\", \"array\", \"map\" and \"jsonstring\"", e.ValueType)).WithComponent("pipleline")
 		return
 	}
 	if e.ValueType == "array" {
 		if e.ElemType != PandoraTypeFloat && e.ElemType != PandoraTypeLong && e.ElemType != PandoraTypeString {
-			err = reqerr.NewInvalidArgs("Schema", fmt.Sprintf("invalid field type in array: %s, field type should be one of \"float\", \"string\", and \"long\"", e.ValueType))
+			err = reqerr.NewInvalidArgs("Schema", fmt.Sprintf("invalid field type in array: %s, field type should be one of \"float\", \"string\", and \"long\"", e.ValueType)).WithComponent("pipleline")
 			return
 		}
 	}
@@ -458,7 +458,7 @@ func SchemaToDSL(schemas []RepoSchemaEntry, indent string) (dsl string) {
 
 func toSchema(dsl string, depth int) (schemas []RepoSchemaEntry, err error) {
 	if depth > base.NestLimit {
-		err = reqerr.NewInvalidArgs("Schema", fmt.Sprintf("RepoSchemaEntry are nested out of limit %v", base.NestLimit))
+		err = reqerr.NewInvalidArgs("Schema", fmt.Sprintf("RepoSchemaEntry are nested out of limit %v", base.NestLimit)).WithComponent("pipleline")
 		return
 	}
 	schemas = make([]RepoSchemaEntry, 0)
@@ -579,6 +579,7 @@ func getFormatDSL(schemas []RepoSchemaEntry, depth int, indent string) (dsl stri
 }
 
 type AnalyzerInfo struct {
+	FullText bool //fulltext为true的话使用标准分词的全文索引。
 	Default  string
 	Analyzer map[string]string
 }
@@ -587,6 +588,7 @@ type AutoExportToLogDBInput struct {
 	RepoName    string
 	LogRepoName string
 	Retention   string
+	Region      string
 	OmitInvalid bool
 	OmitEmpty   bool
 	AnalyzerInfo
@@ -753,7 +755,7 @@ func (r *CreateRepoInput) Validate() (err error) {
 	}
 
 	if r.Schema == nil || len(r.Schema) == 0 {
-		err = reqerr.NewInvalidArgs("Schema", "schema should not be empty")
+		err = reqerr.NewInvalidArgs("Schema", "schema should not be empty").WithComponent("pipleline")
 		return
 	}
 	for _, schema := range r.Schema {
@@ -769,7 +771,7 @@ func (r *CreateRepoInput) Validate() (err error) {
 	}
 
 	if r.Region == "" {
-		err = reqerr.NewInvalidArgs("Region", "region should not be empty")
+		err = reqerr.NewInvalidArgs("Region", "region should not be empty").WithComponent("pipleline")
 		return
 	}
 	return
@@ -806,7 +808,7 @@ func (r *UpdateRepoInput) Validate() (err error) {
 	}
 
 	if r.Schema == nil || len(r.Schema) == 0 {
-		err = reqerr.NewInvalidArgs("Schema", "schema should not be empty")
+		err = reqerr.NewInvalidArgs("Schema", "schema should not be empty").WithComponent("pipleline")
 		return
 	}
 	for _, schema := range r.Schema {
@@ -1104,7 +1106,7 @@ type TransformSpec struct {
 
 func (t *TransformSpec) Validate() (err error) {
 	if t.Mode == "" && t.Code == "" && t.Plugin == nil {
-		err = reqerr.NewInvalidArgs("TransformSpec", "all mode, code and plugin can not be empty")
+		err = reqerr.NewInvalidArgs("TransformSpec", "all mode, code and plugin can not be empty").WithComponent("pipleline")
 		return
 	}
 	if t.Container != nil {
@@ -1134,7 +1136,7 @@ func (t *CreateTransformInput) Validate() (err error) {
 		return
 	}
 	if t.SrcRepoName == t.DestRepoName {
-		err = reqerr.NewInvalidArgs("DestRepoName", "dest repo name should be different to src repo name")
+		err = reqerr.NewInvalidArgs("DestRepoName", "dest repo name should be different to src repo name").WithComponent("pipleline")
 		return
 	}
 	return t.Spec.Validate()
@@ -1217,11 +1219,11 @@ type ExportTsdbSpec struct {
 
 func (s *ExportTsdbSpec) Validate() (err error) {
 	if s.DestRepoName == "" {
-		err = reqerr.NewInvalidArgs("ExportSpec", "dest repo name should not be empty")
+		err = reqerr.NewInvalidArgs("ExportSpec", "dest repo name should not be empty").WithComponent("pipleline")
 		return
 	}
 	if s.SeriesName == "" {
-		err = reqerr.NewInvalidArgs("ExportSpec", "series name should not be empty")
+		err = reqerr.NewInvalidArgs("ExportSpec", "series name should not be empty").WithComponent("pipleline")
 		return
 	}
 	return
@@ -1239,19 +1241,19 @@ type ExportMongoSpec struct {
 
 func (s *ExportMongoSpec) Validate() (err error) {
 	if s.Host == "" {
-		err = reqerr.NewInvalidArgs("ExportSpec", "host should not be empty")
+		err = reqerr.NewInvalidArgs("ExportSpec", "host should not be empty").WithComponent("pipleline")
 		return
 	}
 	if s.DbName == "" {
-		err = reqerr.NewInvalidArgs("ExportSpec", "dbname should not be empty")
+		err = reqerr.NewInvalidArgs("ExportSpec", "dbname should not be empty").WithComponent("pipleline")
 		return
 	}
 	if s.CollName == "" {
-		err = reqerr.NewInvalidArgs("ExportSpec", "collection name should not be empty")
+		err = reqerr.NewInvalidArgs("ExportSpec", "collection name should not be empty").WithComponent("pipleline")
 		return
 	}
 	if s.Mode != "UPSERT" && s.Mode != "INSERT" && s.Mode != "UPDATE" {
-		err = reqerr.NewInvalidArgs("ExportSpec", fmt.Sprintf("invalid mode: %s, mode should be one of \"UPSERT\", \"INSERT\" and \"UPDATE\"", s.Mode))
+		err = reqerr.NewInvalidArgs("ExportSpec", fmt.Sprintf("invalid mode: %s, mode should be one of \"UPSERT\", \"INSERT\" and \"UPDATE\"", s.Mode)).WithComponent("pipleline")
 		return
 	}
 	return
@@ -1266,7 +1268,7 @@ type ExportLogDBSpec struct {
 
 func (s *ExportLogDBSpec) Validate() (err error) {
 	if s.DestRepoName == "" {
-		err = reqerr.NewInvalidArgs("ExportSpec", "dest repo name should not be empty")
+		err = reqerr.NewInvalidArgs("ExportSpec", "dest repo name should not be empty").WithComponent("pipleline")
 		return
 	}
 	return
@@ -1289,7 +1291,7 @@ type ExportKodoSpec struct {
 
 func (s *ExportKodoSpec) Validate() (err error) {
 	if s.Bucket == "" {
-		err = reqerr.NewInvalidArgs("ExportSpec", "bucket should not be empty")
+		err = reqerr.NewInvalidArgs("ExportSpec", "bucket should not be empty").WithComponent("pipleline")
 		return
 	}
 	return
@@ -1303,11 +1305,11 @@ type ExportHttpSpec struct {
 
 func (s *ExportHttpSpec) Validate() (err error) {
 	if s.Host == "" {
-		err = reqerr.NewInvalidArgs("ExportSpec", "host should not be empty")
+		err = reqerr.NewInvalidArgs("ExportSpec", "host should not be empty").WithComponent("pipleline")
 		return
 	}
 	if s.Uri == "" {
-		err = reqerr.NewInvalidArgs("ExportSpec", "uri should not be empty")
+		err = reqerr.NewInvalidArgs("ExportSpec", "uri should not be empty").WithComponent("pipleline")
 		return
 	}
 	return
@@ -1330,11 +1332,11 @@ func (e *CreateExportInput) Validate() (err error) {
 		return
 	}
 	if e.Spec == nil {
-		err = reqerr.NewInvalidArgs("ExportSpec", "spec should not be nil")
+		err = reqerr.NewInvalidArgs("ExportSpec", "spec should not be nil").WithComponent("pipleline")
 		return
 	}
 	if e.Whence != "" && e.Whence != "oldest" && e.Whence != "newest" {
-		err = reqerr.NewInvalidArgs("ExportSpec", "whence must be empty, \"oldest\" or \"newest\"")
+		err = reqerr.NewInvalidArgs("ExportSpec", "whence must be empty, \"oldest\" or \"newest\"").WithComponent("pipleline")
 		return
 	}
 
@@ -1355,7 +1357,7 @@ func (e *CreateExportInput) Validate() (err error) {
 
 	vv, ok := e.Spec.(base.Validator)
 	if !ok {
-		err = reqerr.NewInvalidArgs("ExportSpec", "export spec cannot cast to validator")
+		err = reqerr.NewInvalidArgs("ExportSpec", "export spec cannot cast to validator").WithComponent("pipleline")
 		return
 	}
 	return vv.Validate()
@@ -1376,7 +1378,7 @@ func (e *UpdateExportInput) Validate() (err error) {
 		return
 	}
 	if e.Spec == nil {
-		err = reqerr.NewInvalidArgs("ExportSpec", "spec should not be nil")
+		err = reqerr.NewInvalidArgs("ExportSpec", "spec should not be nil").WithComponent("pipleline")
 		return
 	}
 	switch e.Spec.(type) {
@@ -1388,7 +1390,7 @@ func (e *UpdateExportInput) Validate() (err error) {
 	}
 	vv, ok := e.Spec.(base.Validator)
 	if !ok {
-		err = reqerr.NewInvalidArgs("ExportSpec", "export spec cannot cast to validator")
+		err = reqerr.NewInvalidArgs("ExportSpec", "export spec cannot cast to validator").WithComponent("pipleline")
 		return
 	}
 	return vv.Validate()
@@ -1451,7 +1453,7 @@ type VerifyTransformInput struct {
 
 func (v *VerifyTransformInput) Validate() (err error) {
 	if v.Schema == nil || len(v.Schema) == 0 {
-		err = reqerr.NewInvalidArgs("Schema", "schema should not be empty")
+		err = reqerr.NewInvalidArgs("Schema", "schema should not be empty").WithComponent("pipleline")
 		return
 	}
 	for _, item := range v.Schema {
@@ -1477,7 +1479,7 @@ type VerifyExportInput struct {
 
 func (v *VerifyExportInput) Validate() (err error) {
 	if v.Schema == nil || len(v.Schema) == 0 {
-		err = reqerr.NewInvalidArgs("VerifyExportSpec", "schema should not be empty")
+		err = reqerr.NewInvalidArgs("VerifyExportSpec", "schema should not be empty").WithComponent("pipleline")
 		return
 	}
 	for _, item := range v.Schema {
@@ -1487,12 +1489,12 @@ func (v *VerifyExportInput) Validate() (err error) {
 	}
 
 	if v.Spec == nil {
-		err = reqerr.NewInvalidArgs("ExportSpec", "spec should not be nil")
+		err = reqerr.NewInvalidArgs("ExportSpec", "spec should not be nil").WithComponent("pipleline")
 		return
 	}
 
 	if v.Whence != "" && v.Whence != "oldest" && v.Whence != "newest" {
-		err = reqerr.NewInvalidArgs("ExportSpec", "whence must be empty, \"oldest\" or \"newest\"")
+		err = reqerr.NewInvalidArgs("ExportSpec", "whence must be empty, \"oldest\" or \"newest\"").WithComponent("pipleline")
 		return
 	}
 
@@ -1513,7 +1515,7 @@ func (v *VerifyExportInput) Validate() (err error) {
 
 	vv, ok := v.Spec.(base.Validator)
 	if !ok {
-		err = reqerr.NewInvalidArgs("ExportSpec", "export spec cannot cast to validator")
+		err = reqerr.NewInvalidArgs("ExportSpec", "export spec cannot cast to validator").WithComponent("pipleline")
 		return
 	}
 	return vv.Validate()
@@ -1527,10 +1529,10 @@ type KodoSourceSpec struct {
 
 func (k *KodoSourceSpec) Validate() (err error) {
 	if k.Bucket == "" {
-		return reqerr.NewInvalidArgs("Bucket", fmt.Sprintf("bucket name should not be empty"))
+		return reqerr.NewInvalidArgs("Bucket", fmt.Sprintf("bucket name should not be empty")).WithComponent("pipleline")
 	}
 	if k.FileType == "" {
-		return reqerr.NewInvalidArgs("FileType", fmt.Sprintf("fileType should not be empty"))
+		return reqerr.NewInvalidArgs("FileType", fmt.Sprintf("fileType should not be empty")).WithComponent("pipleline")
 	}
 
 	return
@@ -1543,15 +1545,15 @@ type HdfsSourceSpec struct {
 
 func (h *HdfsSourceSpec) Validate() (err error) {
 	if len(h.Paths) == 0 {
-		return reqerr.NewInvalidArgs("Paths", fmt.Sprintf("paths should not be empty"))
+		return reqerr.NewInvalidArgs("Paths", fmt.Sprintf("paths should not be empty")).WithComponent("pipleline")
 	}
 	for _, path := range h.Paths {
 		if path == "" {
-			return reqerr.NewInvalidArgs("Path", fmt.Sprintf("path in paths should not be empty"))
+			return reqerr.NewInvalidArgs("Path", fmt.Sprintf("path in paths should not be empty")).WithComponent("pipleline")
 		}
 	}
 	if h.FileType == "" {
-		return reqerr.NewInvalidArgs("FileType", fmt.Sprintf("fileType should not be empty"))
+		return reqerr.NewInvalidArgs("FileType", fmt.Sprintf("fileType should not be empty")).WithComponent("pipleline")
 	}
 
 	return
@@ -1575,7 +1577,7 @@ func (r *RetrieveSchemaInput) Validate() (err error) {
 
 	vv, ok := r.Spec.(base.Validator)
 	if !ok {
-		err = reqerr.NewInvalidArgs("Spec", "data source spec cannot cast to validator")
+		err = reqerr.NewInvalidArgs("Spec", "data source spec cannot cast to validator").WithComponent("pipleline")
 		return
 	}
 	return vv.Validate()
@@ -1598,10 +1600,10 @@ type CreateDatasourceInput struct {
 
 func (c *CreateDatasourceInput) Validate() (err error) {
 	if c.DatasourceName == "" {
-		return reqerr.NewInvalidArgs("DatasourceName", fmt.Sprintf("datasource name should not be empty"))
+		return reqerr.NewInvalidArgs("DatasourceName", fmt.Sprintf("datasource name should not be empty")).WithComponent("pipleline")
 	}
 	if c.Type == "" {
-		return reqerr.NewInvalidArgs("Type", fmt.Sprintf("type of datasource should not be empty"))
+		return reqerr.NewInvalidArgs("Type", fmt.Sprintf("type of datasource should not be empty")).WithComponent("pipleline")
 	}
 	if c.Workflow != "" {
 		if err = validateWorkflowName(c.Workflow); err != nil {
@@ -1609,7 +1611,7 @@ func (c *CreateDatasourceInput) Validate() (err error) {
 		}
 	}
 	if len(c.Schema) == 0 {
-		return reqerr.NewInvalidArgs("Schema", fmt.Sprintf("schema of datasource should not be empty"))
+		return reqerr.NewInvalidArgs("Schema", fmt.Sprintf("schema of datasource should not be empty")).WithComponent("pipleline")
 	}
 	for _, schema := range c.Schema {
 		if err = schema.Validate(); err != nil {
@@ -1628,7 +1630,7 @@ func (c *CreateDatasourceInput) Validate() (err error) {
 
 	vv, ok := c.Spec.(base.Validator)
 	if !ok {
-		err = reqerr.NewInvalidArgs("Spec", "data source spec cannot cast to validator")
+		err = reqerr.NewInvalidArgs("Spec", "data source spec cannot cast to validator").WithComponent("pipleline")
 		return
 	}
 	return vv.Validate()
@@ -1688,13 +1690,13 @@ type JobSrc struct {
 
 func (s *JobSrc) Validate() (err error) {
 	if s.SrcName == "" {
-		return reqerr.NewInvalidArgs("SrcName", fmt.Sprintf("source name should not be empty"))
+		return reqerr.NewInvalidArgs("SrcName", fmt.Sprintf("source name should not be empty")).WithComponent("pipleline")
 	}
 	if s.Type == "" {
-		return reqerr.NewInvalidArgs("Type", fmt.Sprintf("source type should not be empty"))
+		return reqerr.NewInvalidArgs("Type", fmt.Sprintf("source type should not be empty")).WithComponent("pipleline")
 	}
 	if s.TableName == "" {
-		return reqerr.NewInvalidArgs("TableName", fmt.Sprintf("table name should not be empty"))
+		return reqerr.NewInvalidArgs("TableName", fmt.Sprintf("table name should not be empty")).WithComponent("pipleline")
 	}
 
 	return
@@ -1707,10 +1709,10 @@ type Computation struct {
 
 func (c *Computation) Validate() (err error) {
 	if c.Code == "" {
-		return reqerr.NewInvalidArgs("Code", fmt.Sprintf("code in computation should not be empty"))
+		return reqerr.NewInvalidArgs("Code", fmt.Sprintf("code in computation should not be empty")).WithComponent("pipleline")
 	}
 	if c.Type == "" {
-		return reqerr.NewInvalidArgs("Type", fmt.Sprintf("type in computation should not be empty"))
+		return reqerr.NewInvalidArgs("Type", fmt.Sprintf("type in computation should not be empty")).WithComponent("pipleline")
 	}
 
 	return
@@ -1744,10 +1746,10 @@ type CreateJobInput struct {
 
 func (c *CreateJobInput) Validate() (err error) {
 	if c.JobName == "" {
-		return reqerr.NewInvalidArgs("JobName", fmt.Sprintf("job name should not be empty"))
+		return reqerr.NewInvalidArgs("JobName", fmt.Sprintf("job name should not be empty")).WithComponent("pipleline")
 	}
 	if len(c.Srcs) == 0 {
-		return reqerr.NewInvalidArgs("Srcs", fmt.Sprintf("must have at least one src inside the job srcs"))
+		return reqerr.NewInvalidArgs("Srcs", fmt.Sprintf("must have at least one src inside the job srcs")).WithComponent("pipleline")
 	}
 	for _, src := range c.Srcs {
 		if err = src.Validate(); err != nil {
@@ -1820,7 +1822,7 @@ type StartJobInput struct {
 
 func (s *StartJobInput) Validate() (err error) {
 	if s.JobName == "" {
-		return reqerr.NewInvalidArgs("JobName", fmt.Sprintf("job name should not be empty"))
+		return reqerr.NewInvalidArgs("JobName", fmt.Sprintf("job name should not be empty")).WithComponent("pipleline")
 	}
 
 	return
@@ -1861,7 +1863,7 @@ type StopJobBatchInput struct {
 
 func (s *StopJobBatchInput) Validate() (err error) {
 	if s.JobName == "" {
-		return reqerr.NewInvalidArgs("JobName", fmt.Sprintf("job name should not be empty"))
+		return reqerr.NewInvalidArgs("JobName", fmt.Sprintf("job name should not be empty")).WithComponent("pipleline")
 	}
 	return
 }
@@ -1880,7 +1882,7 @@ type RerunJobBatchInput struct {
 
 func (s *RerunJobBatchInput) Validate() (err error) {
 	if s.JobName == "" {
-		return reqerr.NewInvalidArgs("JobName", fmt.Sprintf("job name should not be empty"))
+		return reqerr.NewInvalidArgs("JobName", fmt.Sprintf("job name should not be empty")).WithComponent("pipleline")
 	}
 	return
 }
@@ -1906,18 +1908,18 @@ type JobExportKodoSpec struct {
 
 func (e *JobExportKodoSpec) Validate() (err error) {
 	if e.Bucket == "" {
-		return reqerr.NewInvalidArgs("Bucket", fmt.Sprintf("bucket name should not be empty"))
+		return reqerr.NewInvalidArgs("Bucket", fmt.Sprintf("bucket name should not be empty")).WithComponent("pipleline")
 	}
 	if e.Format == "" {
-		return reqerr.NewInvalidArgs("Format", fmt.Sprintf("format should not be empty"))
+		return reqerr.NewInvalidArgs("Format", fmt.Sprintf("format should not be empty")).WithComponent("pipleline")
 	}
 	if strings.ToLower(e.Format) == "csv" {
 		if e.Delimiter == "" {
-			return reqerr.NewInvalidArgs("Delimiter", fmt.Sprintf("csv's delimiter should not be empty"))
+			return reqerr.NewInvalidArgs("Delimiter", fmt.Sprintf("csv's delimiter should not be empty")).WithComponent("pipleline")
 		}
 	}
 	if e.FileCount <= 0 {
-		return reqerr.NewInvalidArgs("FileCount", fmt.Sprintf("fileCount should be larger than 0"))
+		return reqerr.NewInvalidArgs("FileCount", fmt.Sprintf("fileCount should be larger than 0")).WithComponent("pipleline")
 	}
 	return
 }
@@ -1989,7 +1991,7 @@ func (e *CreateJobExportInput) Validate() (err error) {
 
 	vv, ok := e.Spec.(base.Validator)
 	if !ok {
-		err = reqerr.NewInvalidArgs("JobExportSpec", "job export spec cannot cast to validator")
+		err = reqerr.NewInvalidArgs("JobExportSpec", "job export spec cannot cast to validator").WithComponent("pipleline")
 		return
 	}
 	return vv.Validate()
@@ -2066,7 +2068,7 @@ const MaxDescriptionLen = 1500
 
 func (e *PutUdfMetaInput) Validate() error {
 	if (len(e.Description)) > MaxDescriptionLen {
-		return reqerr.NewInvalidArgs("PutUdfMeta", fmt.Sprintf("udf description must not be larger than %s", MaxDescriptionLen))
+		return reqerr.NewInvalidArgs("PutUdfMeta", fmt.Sprintf("udf description must not be larger than %d", MaxDescriptionLen)).WithComponent("pipleline")
 	}
 	return nil
 }
@@ -2109,10 +2111,10 @@ type RegisterUdfFunctionInput struct {
 
 func (e *RegisterUdfFunctionInput) Validate() error {
 	if (len(e.Description)) > MaxDescriptionLen {
-		return reqerr.NewInvalidArgs("RegisterUdfFunctionInput", fmt.Sprintf("udf function description must not be larger than %s", MaxDescriptionLen))
+		return reqerr.NewInvalidArgs("RegisterUdfFunctionInput", fmt.Sprintf("udf function description must not be larger than %d", MaxDescriptionLen)).WithComponent("pipleline")
 	}
 	if (len(e.FuncDeclaration)) > MaxDescriptionLen {
-		return reqerr.NewInvalidArgs("RegisterUdfFunctionInput", fmt.Sprintf("udf function declaration must not be larger than %s", MaxDescriptionLen))
+		return reqerr.NewInvalidArgs("RegisterUdfFunctionInput", fmt.Sprintf("udf function declaration must not be larger than %d", MaxDescriptionLen)).WithComponent("pipleline")
 	}
 	return nil
 }
@@ -2271,7 +2273,7 @@ func validateWorkflow(name, region string, nodes map[string]*Node) (err error) {
 		}
 	}
 	if region == "" {
-		err = reqerr.NewInvalidArgs("Region", "region should not be empty")
+		err = reqerr.NewInvalidArgs("Region", "region should not be empty").WithComponent("pipleline")
 		return
 	}
 	return
@@ -2380,7 +2382,7 @@ type CreateVariableInput struct {
 
 func (r *CreateVariableInput) Validate() (err error) {
 	if r.Type == VariableTimeType && r.Format == "" {
-		err = reqerr.NewInvalidArgs("format", "time variable's format should not be empty")
+		err = reqerr.NewInvalidArgs("format", "time variable's format should not be empty").WithComponent("pipleline")
 		return
 	}
 	if err = validateVariableName(r.Name); err != nil {
@@ -2396,7 +2398,7 @@ type UpdateVariableInput CreateVariableInput
 
 func (r *UpdateVariableInput) Validate() (err error) {
 	if r.Type == VariableTimeType && r.Format == "" {
-		err = reqerr.NewInvalidArgs("format", "time variable's format should not be empty")
+		err = reqerr.NewInvalidArgs("format", "time variable's format should not be empty").WithComponent("pipleline")
 		return
 	}
 	if err = validateVariableName(r.Name); err != nil {

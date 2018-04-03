@@ -782,6 +782,9 @@ func (c *Pipeline) InitOrUpdateWorkflow(input *InitOrUpdateWorkflowInput) error 
 	if input.RepoName == "" {
 		return fmt.Errorf("repo name can not be empty")
 	}
+	if input.Option != nil && input.Option.ToLogDB {
+		input.Option.AutoExportToLogDBInput.Region = input.Region
+	}
 	// 获取 repo
 	repo, err := c.GetRepo(&GetRepoInput{
 		RepoName:     input.RepoName,

@@ -835,3 +835,26 @@ func TestCompileFileAndParseMultiLine(t *testing.T) {
 		},
 		multiLine)
 }
+
+func TestNagiosLog(t *testing.T) {
+	p := &GrokParser{
+		Patterns: []string{"%{NAGIOSLOGLINE}", "%{NAGIOSLOGOTHER}"},
+	}
+	assert.NoError(t, p.compile())
+	got, err := p.parseLine(`[1473609600] CURRENT HOST STATE: test_zzebgd;UP;HARD;1;PING OK - Packet loss = 0%, RTA = 0.26 ms`)
+	assert.NoError(t, err)
+	assert.Equal(t, Data{
+		"nagios_epoch":     "1473609600",
+		"nagios_type":      "CURRENT HOST STATE",
+		"nagios_hostname":  "test_zzebgd",
+		"nagios_state":     "UP",
+		"nagios_statetype": "HARD",
+		"nagios_statecode": "1",
+		"nagios_message":   "PING OK - Packet loss = 0%, RTA = 0.26 ms",
+	}, got)
+	got, err = p.parseLine(`[1474520444] Auto-save of retention data completed successfully.`)
+	assert.Equal(t, Data{
+		"nagios_epoch": "1474520444",
+		"nagios_log":   "Auto-save of retention data completed successfully.",
+	}, got)
+}

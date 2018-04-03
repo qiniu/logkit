@@ -18,6 +18,7 @@ func (e PipelineErrBuilder) Build(msg, text, reqId string, code int) error {
 	if len(msg) <= errCodePrefixLen {
 		return err
 	}
+	err.Component = "pipeline"
 	errId := msg[:errCodePrefixLen]
 	if strings.Contains(errId, ":") {
 		spls := strings.Split(errId, ":")

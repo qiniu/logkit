@@ -147,7 +147,7 @@ func NewGrokParser(c conf.MapConf) (LogParser, error) {
 func (p *GrokParser) compile() error {
 	p.typeMap = make(map[string]map[string]string)
 	p.patterns = make(map[string]string)
-	gk, err := grok.NewWithConfig(&grok.Config{NamedCapturesOnly: true})
+	gk, err := grok.NewWithConfig(&grok.Config{NamedCapturesOnly: true, RemoveEmptyValues: true})
 	if err != nil {
 		return err
 	}
@@ -236,6 +236,7 @@ func (p *GrokParser) parseLine(line string) (Data, error) {
 			log.Debugf("E! %v", err)
 			return nil, err
 		}
+		//此处匹配到就break的好处时匹配结果唯一，若要改为不break，那要考虑如果有多个串同时满足时，结果如何选取的问题，应该考虑优先选择匹配的结果多的数据。
 		if len(values) != 0 {
 			patternName = pattern
 			break
