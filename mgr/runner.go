@@ -742,7 +742,8 @@ func (r *LogExportRunner) LagStats() (rl *LagInfo, err error) {
 	if ok {
 		return lr.Lag()
 	}
-	err = fmt.Errorf("readmode %v not support LagStats, can't get stats", r.meta.GetMode())
+	//接口不支持，不显示错误比较好，有限reader就是不存在lag的概念的。
+	rl = &LagInfo{}
 	return
 }
 

@@ -53,8 +53,8 @@ type (
 	CloudWatch struct {
 		Region          string
 		CollectInterval time.Duration
-		Period          time.Duration `json:"period"`
-		Delay           time.Duration `json:"delay"`
+		Period          time.Duration
+		Delay           time.Duration
 		Namespace       string
 		Metrics         []*Metric
 		CacheTTL        time.Duration
@@ -68,13 +68,13 @@ type (
 	}
 
 	Metric struct {
-		MetricNames []string     `json:"names"`
-		Dimensions  []*Dimension `json:"dimensions"`
+		MetricNames []string
+		Dimensions  []*Dimension
 	}
 
 	Dimension struct {
-		Name  string `json:"name"`
-		Value string `json:"value"`
+		Name  string
+		Value string
 	}
 
 	MetricCache struct {
@@ -116,9 +116,9 @@ func NewCloudWatchReader(meta *Meta, conf conf.MapConf) (c *CloudWatch, err erro
 	}
 	configProvider, err := credentialConfig.Credentials()
 	if err != nil {
+		log.Errorf("aws Credentials err %v", err)
 		return
 	}
-
 	cacheTTL, _ := conf.GetStringOr(KeyCacheTTL, "1hr")
 	ttl, err := time.ParseDuration(cacheTTL)
 	if err != nil {
@@ -155,18 +155,26 @@ func NewCloudWatchReader(meta *Meta, conf conf.MapConf) (c *CloudWatch, err erro
 		err = fmt.Errorf("parse period %v error %v", periodStr, err)
 		return
 	}
-
+	cfg := aws.NewConfig()
+	if log.GetOutputLevel() == log.Ldebug {
+		cfg.WithLogLevel(aws.LogDebug)
+	}
 	c = &CloudWatch{
 		Region:          region,
 		Namespace:       namespace,
-		client:          cloudwatch.New(configProvider),
+		client:          cloudwatch.New(configProvider, cfg),
 		RateLimit:       ratelimit,
 		CacheTTL:        ttl,
 		Delay:           delay,
 		Period:          period,
 		meta:            meta,
 		CollectInterval: collectInteval,
-		Metrics:         []*Metric{{MetricNames: metrics, Dimensions: dimensions}},
+		status:          StatusInit,
+		StopChan:        make(chan struct{}),
+		DataChan:        make(chan models.Data),
+	}
+	if len(metrics) > 0 {
+		c.Metrics = []*Metric{{MetricNames: metrics, Dimensions: dimensions}}
 	}
 	return
 }
@@ -208,9 +216,8 @@ func (c *CloudWatch) SyncMeta() {}
 
 func SelectMetrics(c *CloudWatch) ([]*cloudwatch.Metric, error) {
 	var metrics []*cloudwatch.Metric
-
 	// check for provided metric filter
-	if c.Metrics != nil {
+	if len(c.Metrics) > 0 {
 		metrics = []*cloudwatch.Metric{}
 		for _, m := range c.Metrics {
 			if !hasWilcard(m.Dimensions) {
@@ -253,6 +260,7 @@ func SelectMetrics(c *CloudWatch) ([]*cloudwatch.Metric, error) {
 			return nil, err
 		}
 	}
+	log.Debugf("get namespace metrics %v", metrics)
 	return metrics, nil
 }
 
@@ -260,7 +268,12 @@ func (c *CloudWatch) Start() error {
 	if !atomic.CompareAndSwapInt32(&c.status, StatusInit, StatusRunning) {
 		return fmt.Errorf("runner[%v] Reader[%v] already started", c.meta.RunnerName, c.Name())
 	}
+	log.Infof("runner[%v] Reader[%v] started", c.meta.RunnerName, c.Name())
 	go func() {
+		err := c.Gather()
+		if err != nil {
+			log.Errorf("runner[%v] Reader[%v] err %v ", c.meta.RunnerName, c.Name(), err)
+		}
 		ticker := time.NewTicker(c.CollectInterval)
 		defer ticker.Stop()
 		for {
@@ -297,8 +310,10 @@ func (c *CloudWatch) Gather() error {
 			defer wg.Done()
 			datas, err := c.gatherMetric(inm, now)
 			if err != nil {
+				log.Errorf("gatherMetric error %v", err)
 				lastErr = err
 			}
+			log.Debugf("successfully gatherMetric %v data %v", *inm.MetricName, len(datas))
 			for _, v := range datas {
 				c.DataChan <- v
 			}
@@ -334,6 +349,7 @@ func (c *CloudWatch) fetchNamespaceMetrics() ([]*cloudwatch.Metric, error) {
 		}
 
 		metrics = append(metrics, resp.Metrics...)
+		log.Debugf("listMetrics: %v", resp.Metrics)
 
 		token = resp.NextToken
 		more = token != nil
@@ -344,7 +360,6 @@ func (c *CloudWatch) fetchNamespaceMetrics() ([]*cloudwatch.Metric, error) {
 		Fetched: time.Now(),
 		TTL:     c.CacheTTL,
 	}
-
 	return metrics, nil
 }
 
@@ -354,11 +369,11 @@ func (c *CloudWatch) gatherMetric(metric *cloudwatch.Metric, now time.Time) (dat
 	if err != nil {
 		return
 	}
+	log.Debugf("gatherMetric resp %v", resp)
 	datas = make([]models.Data, 0, len(resp.Datapoints))
 
 	for _, point := range resp.Datapoints {
-		var data models.Data
-
+		data := make(models.Data)
 		for _, d := range metric.Dimensions {
 			data[snakeCase(*d.Name)] = *d.Value
 		}
@@ -483,7 +498,6 @@ func (c *CredentialConfig) rootCredentials() (client.ConfigProvider, error) {
 	} else if c.Profile != "" || c.Filename != "" {
 		config.Credentials = credentials.NewSharedCredentials(c.Filename, c.Profile)
 	}
-
 	return session.NewSession(config)
 }
 
