@@ -596,9 +596,10 @@ func Benchmark_TimeFormat(b *testing.B) {
 
 func TestValidSchema(t *testing.T) {
 	tests := []struct {
-		v   interface{}
-		t   string
-		exp bool
+		v             interface{}
+		t             string
+		numberAsFloat bool
+		exp           bool
 	}{
 		{
 			v:   1,
@@ -611,9 +612,21 @@ func TestValidSchema(t *testing.T) {
 			exp: false,
 		},
 		{
+			v:             2.1,
+			t:             "long",
+			numberAsFloat: true,
+			exp:           true,
+		},
+		{
 			v:   json.Number("1.0"),
 			t:   "long",
 			exp: false,
+		},
+		{
+			v:             json.Number("1.1"),
+			t:             "long",
+			numberAsFloat: true,
+			exp:           true,
 		},
 		{
 			v:   json.Number("2.0"),
@@ -692,7 +705,7 @@ func TestValidSchema(t *testing.T) {
 		},
 	}
 	for idx, ti := range tests {
-		got := validSchema(ti.t, ti.v)
+		got := validSchema(ti.t, ti.v, ti.numberAsFloat)
 		if got != ti.exp {
 			t.Errorf("case %v %v exp %v but got %v", idx, ti, ti.exp, got)
 		}

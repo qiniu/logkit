@@ -394,6 +394,16 @@ var ModeKeyOptions = map[string][]Option{
 			ToolTip:       `强制类型转换，如定义的pandora schema为long，而实际的为string，则会尝试将string解析为long类型，若无法解析，则忽略该字段内容`,
 		},
 		{
+			KeyName:       KeyNumberUseFloat,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"false", "true"},
+			Default:       "false",
+			DefaultNoUse:  false,
+			Description:   "数字统一为float(number_use_float)",
+			Advance:       true,
+			ToolTip:       `对于整型和浮点型都自动识别为浮点型`,
+		},
+		{
 			KeyName:       KeyIgnoreInvalidField,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
