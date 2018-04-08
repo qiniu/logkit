@@ -395,7 +395,10 @@ func (s *SnmpReader) Start() error {
 		for {
 			select {
 			case <-ticker.C:
-				s.Gather()
+				err := s.Gather()
+				if err != nil {
+					log.Errorf("runner[%v] Reader[%v] gather error %v", s.Meta.RunnerName, s.Name(), err)
+				}
 			case <-s.StopChan:
 				close(s.DataChan)
 				return

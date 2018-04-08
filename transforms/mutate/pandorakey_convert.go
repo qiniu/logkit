@@ -34,14 +34,7 @@ func (g *PandoraKeyConvert) Transform(datas []Data) ([]Data, error) {
 func deepConvertKey(data map[string]interface{}) map[string]interface{} {
 	newData := make(map[string]interface{})
 	for k, v := range data {
-		var nk string
-		for _, c := range k {
-			if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
-				nk = nk + string(c)
-			} else if len(nk) > 0 {
-				nk = nk + "_"
-			}
-		}
+		nk := PandoraKey(k)
 		if nv, ok := v.(map[string]interface{}); ok {
 			v = deepConvertKey(nv)
 		}

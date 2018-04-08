@@ -139,21 +139,22 @@ var defaultIgnoreFileSuffix = []string{
 
 // FileReader's modes
 const (
-	ModeDir      = "dir"
-	ModeFile     = "file"
-	ModeTailx    = "tailx"
-	ModeFileAuto = "fileauto"
-	ModeMysql    = "mysql"
-	ModeMssql    = "mssql"
-	ModePG       = "postgres"
-	ModeElastic  = "elastic"
-	ModeMongo    = "mongo"
-	ModeKafka    = "kafka"
-	ModeRedis    = "redis"
-	ModeSocket   = "socket"
-	ModeHttp     = "http"
-	ModeScript   = "script"
-	ModeSnmp     = "snmp"
+	ModeDir        = "dir"
+	ModeFile       = "file"
+	ModeTailx      = "tailx"
+	ModeFileAuto   = "fileauto"
+	ModeMysql      = "mysql"
+	ModeMssql      = "mssql"
+	ModePG         = "postgres"
+	ModeElastic    = "elastic"
+	ModeMongo      = "mongo"
+	ModeKafka      = "kafka"
+	ModeRedis      = "redis"
+	ModeSocket     = "socket"
+	ModeHttp       = "http"
+	ModeScript     = "script"
+	ModeSnmp       = "snmp"
+	ModeCloudWatch = "cloudwatch"
 )
 
 const (
@@ -288,6 +289,8 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 		reader, err = NewScriptReader(meta, conf)
 	case ModeSnmp:
 		reader, err = NewSnmpReader(meta, conf)
+	case ModeCloudWatch:
+		reader, err = NewCloudWatchReader(meta, conf)
 	default:
 		err = fmt.Errorf("mode %v not supported now", mode)
 	}
