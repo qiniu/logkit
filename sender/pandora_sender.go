@@ -101,8 +101,9 @@ type PandoraOption struct {
 	logkitSendTime     bool
 	UnescapeLine       bool
 
-	isMetrics  bool
-	expandAttr []string
+	isMetrics      bool
+	numberUseFloat bool
+	expandAttr     []string
 
 	tokens    Tokens
 	tokenLock *sync.RWMutex
@@ -178,12 +179,13 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	autoconvertDate, _ := conf.GetBoolOr(KeyPandoraAutoConvertDate, true)
 	logkitSendTime, _ := conf.GetBoolOr(KeyLogkitSendTime, true)
 	isMetrics, _ := conf.GetBoolOr(KeyIsMetrics, false)
+	numberUseFloat, _ := conf.GetBoolOr(KeyNumberUseFloat, false)
 	unescape, _ := conf.GetBoolOr(KeyPandoraUnescape, false)
 
 	var subErr error
 	var tokens Tokens
 	if tokens, subErr = getTokensFromConf(conf); subErr != nil {
-		log.Warnf(subErr.Error())
+		log.Debugf(subErr.Error())
 	}
 
 	if skFromEnv == "" && tokens.SchemaFreeTokens.PipelinePostDataToken.Token == "" {
@@ -242,8 +244,10 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 		autoConvertDate:    autoconvertDate,
 		useragent:          useragent,
 		logkitSendTime:     logkitSendTime,
-		isMetrics:          isMetrics,
-		UnescapeLine:       unescape,
+
+		numberUseFloat: numberUseFloat,
+		isMetrics:      isMetrics,
+		UnescapeLine:   unescape,
 
 		tokens:    tokens,
 		tokenLock: new(sync.RWMutex),
@@ -433,7 +437,8 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 		SchemaFreeToken:  s.opt.tokens.SchemaFreeTokens,
 		RepoOptions:      &pipeline.RepoOptions{WithIP: s.opt.withip, UnescapeLine: s.opt.UnescapeLine},
 		Option: &pipeline.SchemaFreeOption{
-			ToLogDB: s.opt.enableLogdb,
+			NumberUseFloat: s.opt.numberUseFloat,
+			ToLogDB:        s.opt.enableLogdb,
 			AutoExportToLogDBInput: pipeline.AutoExportToLogDBInput{
 				OmitEmpty:             true,
 				OmitInvalid:           false,
@@ -633,15 +638,22 @@ func alignTimestamp(t int64, nanosecond uint64) int64 {
 	return t
 }
 
-func validSchema(valueType string, value interface{}) bool {
+func validSchema(valueType string, value interface{}, numberAsFloat bool) bool {
 	if value == nil {
 		return false
 	}
 	switch valueType {
 	case PandoraTypeLong:
-		v := fmt.Sprintf("%v", value)
-		if _, err := strconv.ParseInt(v, 10, 64); err != nil {
-			return false
+		if numberAsFloat {
+			v := fmt.Sprintf("%v", value)
+			if _, err := strconv.ParseFloat(v, 64); err != nil {
+				return false
+			}
+		} else {
+			v := fmt.Sprintf("%v", value)
+			if _, err := strconv.ParseInt(v, 10, 64); err != nil {
+				return false
+			}
 		}
 	case PandoraTypeFloat:
 		v := fmt.Sprintf("%v", value)
@@ -733,7 +745,7 @@ func (s *PandoraSender) generatePoint(data Data) (point Data) {
 			s.microsecondCounter = s.microsecondCounter + 1
 			value = formatTime
 		}
-		if !s.opt.forceDataConvert && s.opt.ignoreInvalidField && !validSchema(v.ValueType, value) {
+		if !s.opt.forceDataConvert && s.opt.ignoreInvalidField && !validSchema(v.ValueType, value, s.opt.numberUseFloat) {
 			log.Errorf("Runner[%v] Sender[%v]: key <%v> value < %v > not match type %v, from data < %v >, ignored this field", s.opt.runnerName, s.opt.name, name, value, v.ValueType, data)
 			continue
 		}
@@ -804,7 +816,8 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 		SchemaFreeToken: s.opt.tokens.SchemaFreeTokens,
 		RepoOptions:     &pipeline.RepoOptions{WithIP: s.opt.withip, UnescapeLine: s.opt.UnescapeLine},
 		Option: &pipeline.SchemaFreeOption{
-			ToLogDB: s.opt.enableLogdb,
+			NumberUseFloat: s.opt.numberUseFloat,
+			ToLogDB:        s.opt.enableLogdb,
 			AutoExportToLogDBInput: pipeline.AutoExportToLogDBInput{
 				OmitEmpty:             true,
 				OmitInvalid:           false,

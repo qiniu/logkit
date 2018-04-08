@@ -57,6 +57,7 @@ const (
 	ExportTypeKODO  = "kodo"
 	ExportTypeHTTP  = "http"
 	ExportTypeMongo = "mongo"
+	ExportTypeHDFS  = "hdfs"
 )
 
 type Data map[string]interface{}
@@ -1001,6 +1002,7 @@ type SchemaFreeOption struct {
 	ToTSDB           bool
 	ToKODO           bool
 	ForceDataConvert bool
+	NumberUseFloat   bool
 	AutoExportToLogDBInput
 	AutoExportToKODOInput
 	AutoExportToTSDBInput
@@ -1315,6 +1317,34 @@ func (s *ExportHttpSpec) Validate() (err error) {
 	return
 }
 
+type ExportHDFSSpec struct {
+	Path           string            `json:"path"`
+	User           string            `json:"user"`
+	Fields         map[string]string `json:"fields"`
+	RotateStrategy string            `json:"rotateStrategy"`
+	RotateSize     int               `json:"rotateSize"`
+	RotateInterval int               `json:"rotateInterval"`
+	Format         string            `json:"format"`
+	Delimiter      string            `json:"delimiter"`
+	Compress       bool              `json:"compress"`
+}
+
+func (s *ExportHDFSSpec) Validate() (err error) {
+	if s.Path == "" {
+		err = reqerr.NewInvalidArgs("ExportSpec", "path should not be empty").WithComponent("pipleline")
+		return
+	}
+	if s.User == "" {
+		err = reqerr.NewInvalidArgs("ExportSpec", "user should not be empty").WithComponent("pipleline")
+		return
+	}
+	if len(s.Fields) == 0 {
+		err = reqerr.NewInvalidArgs("ExportSpec", "fields should not be empty").WithComponent("pipleline")
+		return
+	}
+	return
+}
+
 type CreateExportInput struct {
 	PandoraToken
 	RepoName   string      `json:"-"`
@@ -1351,6 +1381,8 @@ func (e *CreateExportInput) Validate() (err error) {
 		e.Type = ExportTypeKODO
 	case *ExportHttpSpec, ExportHttpSpec:
 		e.Type = ExportTypeHTTP
+	case *ExportHDFSSpec, ExportHDFSSpec:
+		e.Type = ExportTypeHDFS
 	default:
 		return
 	}
@@ -1384,7 +1416,7 @@ func (e *UpdateExportInput) Validate() (err error) {
 	switch e.Spec.(type) {
 	case *ExportTsdbSpec, ExportTsdbSpec, *ExportMongoSpec, ExportMongoSpec,
 		*ExportLogDBSpec, ExportLogDBSpec, *ExportKodoSpec, ExportKodoSpec,
-		*ExportHttpSpec, ExportHttpSpec:
+		*ExportHttpSpec, ExportHttpSpec, *ExportHDFSSpec, ExportHDFSSpec:
 	default:
 		return
 	}
@@ -1509,6 +1541,8 @@ func (v *VerifyExportInput) Validate() (err error) {
 		v.Type = "kodo"
 	case *ExportHttpSpec, ExportHttpSpec:
 		v.Type = "http"
+	case *ExportHDFSSpec, ExportHDFSSpec:
+		v.Type = "hdfs"
 	default:
 		return
 	}

@@ -39,6 +39,7 @@ const (
 	KeyPandoraWithIP          = "pandora_withip"
 	KeyForceMicrosecond       = "force_microsecond"
 	KeyForceDataConvert       = "pandora_force_convert"
+	KeyNumberUseFloat         = "number_use_float"
 	KeyPandoraAutoConvertDate = "pandora_auto_convert_date"
 	KeyIgnoreInvalidField     = "ignore_invalid_field"
 	KeyPandoraUnescape        = "pandora_unescape"

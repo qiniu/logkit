@@ -220,7 +220,7 @@ func (c *Pipeline) AutoExportToTSDB(input *AutoExportToTSDBInput) error {
 	}
 
 	if !input.IsMetric {
-		err = c.CreateForTSDB(&CreateRepoForTSDBInput{
+		return c.CreateForTSDB(&CreateRepoForTSDBInput{
 			Tags:                 tags,
 			RepoName:             input.RepoName,
 			TSDBRepoName:         input.TSDBRepoName,
@@ -233,10 +233,6 @@ func (c *Pipeline) AutoExportToTSDB(input *AutoExportToTSDBInput) error {
 			Timestamp:            input.Timestamp,
 			AutoExportTSDBTokens: input.AutoExportTSDBTokens,
 		})
-		if err != nil {
-			log.Error("create tsdb error", err)
-			return err
-		}
 	}
 
 	// 获取字段，并根据 seriesTag 中的 key 拿到series name

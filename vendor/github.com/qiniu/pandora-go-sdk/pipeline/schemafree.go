@@ -513,7 +513,7 @@ func (c *Pipeline) generatePoint(oldData Data, input *SchemaFreeInput) (point Po
 		// 该函数有两个作用，1. 获取 data 中所有字段的 schema; 2. 将 data 中值为 nil, 无法判断类型的键值对，从 data 中删掉
 		valueType := getTrimedDataSchema(data)
 		// 将 metric 中的 long 都改成 float
-		if input.Option != nil && input.Option.IsMetric {
+		if input.Option.NumberUseFloat || (input.Option != nil && input.Option.IsMetric) {
 			for key, val := range valueType {
 				valueType[key] = changeElemType(val, PandoraTypeLong, PandoraTypeFloat)
 			}
