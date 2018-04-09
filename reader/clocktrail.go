@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -128,12 +129,15 @@ func buildSyncOptions(conf conf.MapConf) (*syncOptions, error) {
 	if opts.bucket == "" {
 		return nil, emptyConfigError(KeyS3Bucket)
 	}
-	opts.prefix, _ = conf.GetString(KeyS3Prefix)
-	opts.directory, _ = conf.GetString(KeySyncDirectory)
+	opts.prefix, _ = conf.GetStringOr(KeyS3Prefix, "")
+	opts.directory, _ = conf.GetStringOr(KeySyncDirectory, "./logs")
 	if opts.directory == "" {
 		return nil, emptyConfigError(KeySyncDirectory)
 	}
-	opts.metastore, _ = conf.GetString(KeySyncMetastore)
+	if err = os.MkdirAll(opts.directory, 0755); err != nil {
+		return nil, fmt.Errorf("cannot create target directory %q: %v", opts.directory, err)
+	}
+	opts.metastore, _ = conf.GetStringOr(KeySyncMetastore, "./.metastore")
 	if opts.metastore == "" {
 		return nil, emptyConfigError(KeySyncMetastore)
 	}
@@ -142,8 +146,9 @@ func buildSyncOptions(conf conf.MapConf) (*syncOptions, error) {
 	if opts.interval, err = time.ParseDuration(s); err != nil {
 		return nil, invalidConfigError(KeySyncInterval, s, err)
 	}
-	if opts.concurrent, err = conf.GetIntOr(KeySyncConcurrent, 1); err != nil {
-		return nil, err
+	s, _ = conf.GetStringOr(KeySyncConcurrent, "5")
+	if opts.concurrent, err = strconv.Atoi(s); err != nil {
+		return nil, invalidConfigError(KeySyncInterval, s, err)
 	}
 
 	return &opts, nil
