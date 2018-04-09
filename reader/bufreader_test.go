@@ -339,3 +339,64 @@ func Test_FileNotFound(t *testing.T) {
 	}
 	r.Close()
 }
+
+type MockReader struct {
+	num int
+}
+
+func (m *MockReader) Name() string {
+	return "mock"
+}
+func (m *MockReader) Source() string {
+	return "mock"
+}
+
+func (m *MockReader) Read(p []byte) (n int, err error) {
+	if m.num%1000 == 0 {
+		for i, v := range "abchaha\n" {
+			p[i] = byte(v)
+		}
+		m.num++
+		return 8, nil
+	}
+	vv := "abxxxabxxxabxxxabxxxabxxxabxabxxxabxxxabxxxabxxxabxxxabxabxxxabxxxabxxxabxxx\n"
+	vv += vv
+	for i, v := range vv {
+		p[i] = byte(v)
+	}
+	m.num++
+	return len(vv), nil
+}
+func (m *MockReader) SyncMeta() error {
+	return nil
+}
+
+func (m *MockReader) Close() error {
+	return nil
+}
+
+var line string
+
+func BenchmarkReadPattern(b *testing.B) {
+	m := &MockReader{}
+	c := conf.MapConf{}
+	c[KeyLogPath] = "logpath"
+	c[KeyMode] = ModeDir
+	c[KeyDataSourceTag] = "tag1path"
+	ma, err := NewMetaWithConf(c)
+	if err != nil {
+		b.Error(err)
+	}
+	r, err := NewReaderSize(m, ma, 1024)
+	if err != nil {
+		b.Fatal(err)
+	}
+	err = r.SetMode(ReadModeHeadPatternString, "^abc")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	for i := 0; i < b.N; i++ {
+		line, _ = r.ReadPattern()
+	}
+}

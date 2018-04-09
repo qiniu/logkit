@@ -124,7 +124,7 @@ func (ar *ActiveReader) Run() {
 				continue
 			}
 		}
-		log.Debugf("Runner[%v] %v >>>>>>readcache <%v> linecache <%v>", ar.runnerName, ar.originpath, ar.readcache, ar.br.lineCache)
+		log.Debugf("Runner[%v] %v >>>>>>readcache <%v> linecache <%v>", ar.runnerName, ar.originpath, ar.readcache, string(ar.br.formMutiLine()))
 		repeat := 0
 		for {
 			if ar.readcache == "" {
