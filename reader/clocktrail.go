@@ -51,14 +51,9 @@ func NewClockTrailReader(meta *Meta, conf conf.MapConf) (*ClockTrailReader, erro
 	if err != nil {
 		return nil, err
 	}
-
-	ignoreHidden, _ := conf.GetBoolOr(KeyIgnoreHiddenFile, true)
-	newFileNewline, _ := conf.GetBoolOr(KeyNewFileNewLine, false)
-	ignoreFileSuffixes, _ := conf.GetStringListOr(KeyIgnoreFileSuffix, ignoredSuffixes)
 	validFilePattern, _ := conf.GetStringOr(KeyValidFilePattern, "*")
 	bufSize, _ := conf.GetIntOr(KeyBufSize, defaultBufSize)
-	whence, _ := conf.GetStringOr(KeyWhence, WhenceOldest)
-	sf, err := NewSeqFile(meta, opts.directory, ignoreHidden, newFileNewline, ignoreFileSuffixes, validFilePattern, whence)
+	sf, err := NewSeqFile(meta, opts.directory, true, true, ignoredSuffixes, validFilePattern, WhenceOldest)
 	if err != nil {
 		return nil, err
 	}
