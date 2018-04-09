@@ -794,6 +794,9 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 	var points pipeline.Datas
 	now := time.Now().Format(time.RFC3339Nano)
 	for _, d := range datas {
+		if d == nil {
+			continue
+		}
 		if s.opt.logkitSendTime {
 			d[KeyLogkitSendTime] = now
 		}
