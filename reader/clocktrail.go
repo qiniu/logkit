@@ -130,7 +130,7 @@ func buildSyncOptions(conf conf.MapConf) (*syncOptions, error) {
 		return nil, emptyConfigError(KeyS3Bucket)
 	}
 	opts.prefix, _ = conf.GetStringOr(KeyS3Prefix, "")
-	opts.directory, _ = conf.GetStringOr(KeySyncDirectory, "./logs")
+	opts.directory, _ = conf.GetStringOr(KeySyncDirectory, "./data")
 	if opts.directory == "" {
 		return nil, emptyConfigError(KeySyncDirectory)
 	}
