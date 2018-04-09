@@ -355,6 +355,18 @@
 			"revisionTime": "2017-03-22T23:44:13Z"
 		},
 		{
+			"checksumSHA1": "NjuwnT9vODlUoOdFMvTgwUlJFdc=",
+			"path": "github.com/mitchellh/goamz/aws",
+			"revision": "caaaea8b30ee15616494ee68abd5d8ebbbef05cf",
+			"revisionTime": "2015-03-17T17:43:35Z"
+		},
+		{
+			"checksumSHA1": "4J6sW5KD2MFC+ApdGVGyM35ZA1Q=",
+			"path": "github.com/mitchellh/goamz/s3",
+			"revision": "caaaea8b30ee15616494ee68abd5d8ebbbef05cf",
+			"revisionTime": "2015-03-17T17:43:35Z"
+		},
+		{
 			"checksumSHA1": "qyZO6SotinKrz40LxXjw0LtIwA8=",
 			"path": "github.com/olivere/elastic",
 			"revision": "09755b303b32ccae2968681e77473399cb48378c",
@@ -601,6 +613,12 @@
 			"path": "github.com/valyala/fasttemplate",
 			"revision": "dcecefd839c4193db0d35b88ec65b4c12d360ab0",
 			"revisionTime": "2017-02-24T21:24:29Z"
+		},
+		{
+			"checksumSHA1": "sFD8LpJPQtWLwGda3edjf5mNUbs=",
+			"path": "github.com/vaughan0/go-ini",
+			"revision": "a98ad7ee00ec53921f08832bc06ecf7fd600e6a1",
+			"revisionTime": "2013-09-23T14:52:12Z"
 		},
 		{
 			"checksumSHA1": "dSJOKzpGvZzXOMOw2b5xQZuhhc0=",
