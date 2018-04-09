@@ -155,6 +155,7 @@ const (
 	ModeScript     = "script"
 	ModeSnmp       = "snmp"
 	ModeCloudWatch = "cloudwatch"
+	ModeClockTrail = "clocktrail"
 )
 
 const (
@@ -291,6 +292,8 @@ func NewFileBufReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (re
 		reader, err = NewSnmpReader(meta, conf)
 	case ModeCloudWatch:
 		reader, err = NewCloudWatchReader(meta, conf)
+	case ModeClockTrail:
+		reader, err = NewClockTrailReader(meta, conf)
 	default:
 		err = fmt.Errorf("mode %v not supported now", mode)
 	}
