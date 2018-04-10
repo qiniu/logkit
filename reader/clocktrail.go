@@ -32,6 +32,11 @@ const (
 	KeySyncConcurrent = "sync_concurrent"
 )
 
+const (
+	DefaultSyncDirectory = "./data"
+	DefaultSyncMetaStore = "./.metastore"
+)
+
 var (
 	ignoredSuffixes = []string{".json.gz"}
 )
@@ -124,14 +129,14 @@ func buildSyncOptions(conf conf.MapConf) (*syncOptions, error) {
 		return nil, emptyConfigError(KeyS3Bucket)
 	}
 	opts.prefix, _ = conf.GetStringOr(KeyS3Prefix, "")
-	opts.directory, _ = conf.GetStringOr(KeySyncDirectory, "./data")
+	opts.directory, _ = conf.GetStringOr(KeySyncDirectory, DefaultSyncDirectory)
 	if opts.directory == "" {
 		return nil, emptyConfigError(KeySyncDirectory)
 	}
 	if err = os.MkdirAll(opts.directory, 0755); err != nil {
 		return nil, fmt.Errorf("cannot create target directory %q: %v", opts.directory, err)
 	}
-	opts.metastore, _ = conf.GetStringOr(KeySyncMetastore, "./.metastore")
+	opts.metastore, _ = conf.GetStringOr(KeySyncMetastore, DefaultSyncMetaStore)
 	if opts.metastore == "" {
 		return nil, emptyConfigError(KeySyncMetastore)
 	}
