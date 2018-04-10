@@ -2,7 +2,6 @@ package reader
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -331,7 +330,7 @@ func lookupBucket(bucketName string, auth aws.Auth, region string) (*s3.Bucket, 
 		log.Infof("found bucket %q in region %q", bucketName, region)
 		return bucket, nil
 	}
-	return nil, errors.New("bucket not found")
+	return nil, fmt.Errorf("list bucket failed: %v", err)
 }
 
 func loadS3Files(bucket *s3.Bucket, path string, files map[string]bool, marker string) (map[string]bool, error) {
