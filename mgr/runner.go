@@ -252,6 +252,22 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, p
 		rd reader.Reader
 		cl *cleaner.Cleaner
 	)
+	mode := rc.ReaderConfig["mode"]
+	if mode == reader.ModeClockTrail {
+		syncDir := rc.ReaderConfig[reader.KeySyncDirectory]
+		if syncDir == "" {
+			syncDir = reader.DefaultSyncDirectory
+		}
+		rc.ReaderConfig[reader.KeyLogPath] = syncDir
+
+		if len(rc.CleanerConfig) == 0 {
+			rc.CleanerConfig = conf.MapConf{
+				"delete_enable":       "true",
+				"delete_interval":     "60",
+				"reserve_file_number": "50",
+			}
+		}
+	}
 	meta, err := reader.NewMetaWithConf(rc.ReaderConfig)
 	if err != nil {
 		return nil, err

@@ -16,7 +16,6 @@ import (
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
-	"github.com/mitchellh/goamz/aws"
 	"io"
 	"io/ioutil"
 	"log"
@@ -27,6 +26,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/signer/v4"
+	"github.com/mitchellh/goamz/aws"
 )
 
 const debug = false
@@ -649,6 +652,8 @@ type request struct {
 	baseurl  string
 	payload  io.Reader
 	prepared bool
+
+	hreq *http.Request
 }
 
 // amazonShouldEscape returns true if byte should be escaped
@@ -761,16 +766,27 @@ func (s3 *S3) prepare(req *request) error {
 		}
 	}
 
-	// Always sign again as it's not clear how far the
-	// server has handled a previous attempt.
-	u, err := url.Parse(req.baseurl)
+	url, err := req.url(true)
 	if err != nil {
-		return fmt.Errorf("bad S3 endpoint URL %q: %v", req.baseurl, err)
+		return err
 	}
-	req.headers["Host"] = []string{u.Host}
-	req.headers["Date"] = []string{time.Now().In(time.UTC).Format(time.RFC1123)}
-	sign(s3.Auth, req.method, amazonEscape(req.signpath), req.params, req.headers)
-	return nil
+	req.hreq = &http.Request{
+		URL:        url,
+		Method:     req.method,
+		ProtoMajor: 1,
+		ProtoMinor: 1,
+		Close:      true,
+		Header:     req.headers,
+	}
+	signer := s3.buildSigner()
+	_, err = signer.Sign(req.hreq, nil, "s3", s3.Region.Name, time.Now())
+	return err
+}
+
+func (s3 *S3) buildSigner() v4.Signer {
+	return v4.Signer{
+		Credentials: credentials.NewStaticCredentials(s3.AccessKey, s3.SecretKey, ""),
+	}
 }
 
 // run sends req and returns the http response from the server.
@@ -781,29 +797,15 @@ func (s3 *S3) run(req *request, resp interface{}) (*http.Response, error) {
 		log.Printf("Running S3 request: %#v", req)
 	}
 
-	u, err := req.url(false)
-	if err != nil {
-		return nil, err
-	}
-
-	hreq := http.Request{
-		URL:        u,
-		Method:     req.method,
-		ProtoMajor: 1,
-		ProtoMinor: 1,
-		Close:      true,
-		Header:     req.headers,
-	}
-
 	if v, ok := req.headers["Content-Length"]; ok {
-		hreq.ContentLength, _ = strconv.ParseInt(v[0], 10, 64)
+		req.hreq.ContentLength, _ = strconv.ParseInt(v[0], 10, 64)
 		delete(req.headers, "Content-Length")
 	}
 	if req.payload != nil {
-		hreq.Body = ioutil.NopCloser(req.payload)
+		req.hreq.Body = ioutil.NopCloser(req.payload)
 	}
 
-	hresp, err := s3.HTTPClient().Do(&hreq)
+	hresp, err := s3.HTTPClient().Do(req.hreq)
 	if err != nil {
 		return nil, err
 	}
