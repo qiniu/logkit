@@ -32,7 +32,7 @@ const (
 )
 
 // 为了测试，将这个声明为变量，但是不要修改
-var LastVersionUrl = "https://api.github.com/repos/qiniu/logkit/releases/latest"
+var LatestVersionUrl = "https://api.github.com/repos/qiniu/logkit/releases/latest"
 
 type ReleaseInfo struct {
 	Url    string     `json:"url"`  // api 请求地址
@@ -108,7 +108,7 @@ func parseCliVersion(version string) (ret CliVersion, err error) {
 }
 
 // 通过 github 的 api 获取最新版本号
-func checkLastVersion(url string) (ReleaseInfo, error) {
+func checkLatestVersion(url string) (ReleaseInfo, error) {
 	releaseInfo := ReleaseInfo{}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
@@ -160,13 +160,13 @@ func getNeedBackupFiles(kernel string) []string {
 }
 
 // 检查是否需要更新
-func isUpgradeNeeded(curVersionStr, lastVersionStr string) (needUpgrade bool, err error) {
+func isUpgradeNeeded(curVersionStr, latestVersionStr string) (needUpgrade bool, err error) {
 	var curVersion, latestVersion CliVersion
 	if curVersion, err = parseCliVersion(curVersionStr); err != nil {
 		return
 	}
 
-	if latestVersion, err = parseCliVersion(lastVersionStr); err != nil {
+	if latestVersion, err = parseCliVersion(latestVersionStr); err != nil {
 		return
 	}
 
@@ -295,16 +295,16 @@ func decompress(packFilePath, dstDir string) (string, error) {
 
 func CheckAndUpgrade(curVersion string) {
 	fmt.Println("Current version is " + curVersion)
-	fmt.Println("Checking the last version...")
+	fmt.Println("Checking the latest version...")
 
 	// 检查最新版本号
-	releaseInfo, err := checkLastVersion(LastVersionUrl)
+	releaseInfo, err := checkLatestVersion(LatestVersionUrl)
 	if err != nil {
-		fmt.Printf("Automatic upgrade failed, check last version error, %v\n", err)
+		fmt.Printf("Automatic upgrade failed, check latest version error, %v\n", err)
 		return
 	}
 	latestVersion := releaseInfo.Name
-	fmt.Println("The last version is " + latestVersion)
+	fmt.Println("The latest version is " + latestVersion)
 
 	//检查是否需要升级
 	needUpgrade, err := isUpgradeNeeded(curVersion, latestVersion)
