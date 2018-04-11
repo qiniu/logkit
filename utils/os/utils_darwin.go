@@ -18,8 +18,9 @@ func GetOSInfo() *OSInfo {
 		if tryTime > 3 {
 			break
 		}
-		out = _getInfo()
+
 		time.Sleep(500 * time.Millisecond)
+		out = _getInfo()
 		tryTime++
 	}
 	osStr := strings.Replace(out, "\n", "", -1)

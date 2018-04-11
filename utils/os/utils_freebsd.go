@@ -15,11 +15,12 @@ func GetOSInfo() *OSInfo {
 	out := _getInfo()
 	tryTime := 0
 	for strings.Index(out, "broken pipe") != -1 {
-		out = _getInfo()
 		if tryTime > 3 {
 			break
 		}
+
 		time.Sleep(500 * time.Millisecond)
+		out = _getInfo()
 		tryTime++
 	}
 	osStr := strings.Replace(out, "\n", "", -1)
