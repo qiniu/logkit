@@ -13,8 +13,10 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 
 	elasticV6 "github.com/olivere/elastic"
+	"github.com/qiniu/logkit/conf"
 	elasticV3 "gopkg.in/olivere/elastic.v3"
 	elasticV5 "gopkg.in/olivere/elastic.v5"
+	"strings"
 )
 
 var (
@@ -43,7 +45,23 @@ type ElasticReader struct {
 	started bool
 }
 
-func NewESReader(meta *Meta, readBatch int, estype, esindex, eshost, esVersion, keepAlive string) (er *ElasticReader, err error) {
+func NewESReader(meta *Meta, conf conf.MapConf) (er Reader, err error) {
+
+	readBatch, _ := conf.GetIntOr(KeyESReadBatch, 100)
+	estype, err := conf.GetString(KeyESType)
+	if err != nil {
+		return nil, err
+	}
+	esindex, err := conf.GetString(KeyESIndex)
+	if err != nil {
+		return nil, err
+	}
+	eshost, _ := conf.GetStringOr(KeyESHost, "http://localhost:9200")
+	if !strings.HasPrefix(eshost, "http://") && !strings.HasPrefix(eshost, "https://") {
+		eshost = "http://" + eshost
+	}
+	esVersion, _ := conf.GetStringOr(KeyESVersion, ElasticVersion3)
+	keepAlive, _ := conf.GetStringOr(KeyESKeepAlive, "6h")
 
 	offset, _, err := meta.ReadOffset()
 	if err != nil {

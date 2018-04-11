@@ -12,7 +12,12 @@ import (
 	"github.com/qiniu/logkit/conf"
 )
 
-func NewFileAutoReader(conf conf.MapConf, meta *Meta, isFromWeb bool, bufSize int, whence string, path string, fr FileReader) (reader Reader, err error) {
+func NewFileAutoReader(meta *Meta, conf conf.MapConf) (reader Reader, err error) {
+
+	path, err := conf.GetString(KeyLogPath)
+	if err != nil {
+		return
+	}
 	logpath, mode, errStat := matchMode(path)
 	if errStat != nil {
 		err = errStat
@@ -20,27 +25,11 @@ func NewFileAutoReader(conf conf.MapConf, meta *Meta, isFromWeb bool, bufSize in
 	}
 	switch mode {
 	case ModeTailx:
-		expireDur, _ := conf.GetStringOr(KeyExpire, "24h")
-		stateIntervalDur, _ := conf.GetStringOr(KeyStatInterval, "3m")
-		maxOpenFiles, _ := conf.GetIntOr(KeyMaxOpenFiles, 256)
-		reader, err = NewMultiReader(meta, logpath, whence, expireDur, stateIntervalDur, maxOpenFiles)
+		reader, err = NewMultiReader(meta, conf)
 	case ModeDir:
-		ignoreHidden, _ := conf.GetBoolOr(KeyIgnoreHiddenFile, true)
-		ignoreFileSuffix, _ := conf.GetStringListOr(KeyIgnoreFileSuffix, defaultIgnoreFileSuffix)
-		validFilesRegex, _ := conf.GetStringOr(KeyValidFilePattern, "*")
-		newfileNewLine, _ := conf.GetBoolOr(KeyNewFileNewLine, false)
-		fr, err = NewSeqFile(meta, logpath, ignoreHidden, newfileNewLine, ignoreFileSuffix, validFilesRegex, whence)
-		if err != nil {
-			return
-		}
-		reader, err = NewReaderSize(fr, meta, bufSize)
+		reader, err = NewFileDirReader(meta, conf)
 	case ModeFile:
-		meta.mode = ModeFile
-		fr, err = NewSingleFile(meta, logpath, whence, isFromWeb)
-		if err != nil {
-			return
-		}
-		reader, err = NewReaderSize(fr, meta, bufSize)
+		reader, err = NewSingleFileReader(meta, conf)
 	default:
 		err = fmt.Errorf("can not find property mode for this logpath %v", logpath)
 	}

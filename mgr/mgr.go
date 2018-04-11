@@ -22,6 +22,7 @@ import (
 
 	"github.com/howeyc/fsnotify"
 	"github.com/json-iterator/go"
+	"github.com/qiniu/logkit/reader"
 )
 
 var DIR_NOT_EXIST_SLEEP_TIME = "300" //300 s
@@ -57,6 +58,7 @@ type Manager struct {
 	watchers  map[string]*fsnotify.Watcher // inode到watcher的映射表
 	pregistry *parser.ParserRegistry
 	sregistry *sender.SenderRegistry
+	rregistry *reader.ReaderRegistry
 
 	Version    string
 	SystemInfo string
@@ -65,10 +67,11 @@ type Manager struct {
 func NewManager(conf ManagerConfig) (*Manager, error) {
 	ps := parser.NewParserRegistry()
 	sr := sender.NewSenderRegistry()
-	return NewCustomManager(conf, ps, sr)
+	rr := reader.NewReaderRegistry()
+	return NewCustomManager(conf, rr, ps, sr)
 }
 
-func NewCustomManager(conf ManagerConfig, pr *parser.ParserRegistry, sr *sender.SenderRegistry) (*Manager, error) {
+func NewCustomManager(conf ManagerConfig, rr *reader.ReaderRegistry, pr *parser.ParserRegistry, sr *sender.SenderRegistry) (*Manager, error) {
 	if conf.RestDir == "" {
 		dir, err := os.Getwd()
 		if err != nil {
@@ -98,6 +101,7 @@ func NewCustomManager(conf ManagerConfig, pr *parser.ParserRegistry, sr *sender.
 		watchers:      make(map[string]*fsnotify.Watcher),
 		pregistry:     pr,
 		sregistry:     sr,
+		rregistry:rr,
 		SystemInfo:    utilsos.GetOSInfo().String(),
 	}
 	return m, nil
@@ -261,7 +265,7 @@ func (m *Manager) ForkRunner(confPath string, nconf RunnerConfig, errReturn bool
 			nconf.SenderConfig[k][InnerUserAgent] = "logkit/" + m.Version + " " + m.SystemInfo + " " + webornot
 		}
 
-		if runner, err = NewCustomRunner(nconf, m.cleanChan, m.pregistry, m.sregistry); err != nil {
+		if runner, err = NewCustomRunner(nconf, m.cleanChan, m.rregistry, m.pregistry, m.sregistry); err != nil {
 			errVal, ok := err.(*os.PathError)
 			if !ok {
 				err = fmt.Errorf("NewRunner(%v) failed: %v", nconf.RunnerName, err)

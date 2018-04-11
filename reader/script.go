@@ -38,7 +38,7 @@ type ScriptReader struct {
 	statsLock sync.RWMutex
 }
 
-func NewScriptReader(meta *Meta, conf conf.MapConf) (sr *ScriptReader, err error) {
+func NewScriptReader(meta *Meta, conf conf.MapConf) (sr Reader, err error) {
 	path, _ := conf.GetStringOr(KeyLogPath, "")
 	originPath := path
 
@@ -53,7 +53,7 @@ func NewScriptReader(meta *Meta, conf conf.MapConf) (sr *ScriptReader, err error
 	cronSchedule, _ := conf.GetStringOr(KeyScriptCron, "")
 	execOnStart, _ := conf.GetBoolOr(KeyScriptExecOnStart, true)
 	scriptType, _ := conf.GetStringOr(KeyExecInterpreter, "bash")
-	sr = &ScriptReader{
+	ssr := &ScriptReader{
 		originpath:  originPath,
 		realpath:    path,
 		scripttype:  scriptType,
@@ -71,21 +71,21 @@ func NewScriptReader(meta *Meta, conf conf.MapConf) (sr *ScriptReader, err error
 	if len(cronSchedule) > 0 {
 		cronSchedule = strings.ToLower(cronSchedule)
 		if strings.HasPrefix(cronSchedule, Loop) {
-			sr.loop = true
-			sr.loopDuration, err = parseLoopDuration(cronSchedule)
+			ssr.loop = true
+			ssr.loopDuration, err = parseLoopDuration(cronSchedule)
 			if err != nil {
-				log.Errorf("Runner[%v] %v %v", sr.meta.RunnerName, sr.Name(), err)
+				log.Errorf("Runner[%v] %v %v", ssr.meta.RunnerName, sr.Name(), err)
 				err = nil
 			}
 		} else {
-			err = sr.Cron.AddFunc(cronSchedule, sr.run)
+			err = ssr.Cron.AddFunc(cronSchedule, ssr.run)
 			if err != nil {
 				return
 			}
-			log.Infof("Runner[%v] %v Cron job added with schedule <%v>", sr.meta.RunnerName, sr.Name(), cronSchedule)
+			log.Infof("Runner[%v] %v Cron job added with schedule <%v>", ssr.meta.RunnerName, sr.Name(), cronSchedule)
 		}
 	}
-	return sr, nil
+	return ssr, nil
 }
 
 func (sr *ScriptReader) ReadLine() (data string, err error) {

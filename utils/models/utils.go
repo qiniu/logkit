@@ -583,3 +583,10 @@ func EncodeString(target string) (result string) {
 
 	return
 }
+
+func Bool2String(i bool) string {
+	if i {
+		return "true"
+	}
+	return "false"
+}

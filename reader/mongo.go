@@ -13,6 +13,7 @@ import (
 	"github.com/qiniu/log"
 
 	"github.com/json-iterator/go"
+	"github.com/qiniu/logkit/conf"
 	"github.com/robfig/cron"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -49,7 +50,22 @@ type MongoReader struct {
 	statsLock   sync.RWMutex
 }
 
-func NewMongoReader(meta *Meta, readBatch int, host, database, collection, offsetkey, cronSched, filters, certfile string, execOnStart bool) (mr *MongoReader, err error) {
+func NewMongoReader(meta *Meta, conf conf.MapConf) (mr Reader, err error) {
+	readBatch, _ := conf.GetIntOr(KeyMongoReadBatch, 100)
+	database, err := conf.GetString(KeyMongoDatabase)
+	if err != nil {
+		return nil, err
+	}
+	collection, err := conf.GetString(KeyMongoCollection)
+	if err != nil {
+		return nil, err
+	}
+	host, _ := conf.GetStringOr(KeyMongoHost, "localhost:9200")
+	offsetkey, _ := conf.GetStringOr(KeyMongoOffsetKey, MongoDefaultOffsetKey)
+	cronSched, _ := conf.GetStringOr(KeyMongoCron, "")
+	execOnStart, _ := conf.GetBoolOr(KeyMongoExecOnstart, true)
+	filters, _ := conf.GetStringOr(KeyMongoFilters, "")
+	certfile, _ := conf.GetStringOr(KeyMongoCert, "")
 
 	keyOrObj, offset, err := meta.ReadOffset()
 	if err != nil {
@@ -62,7 +78,7 @@ func NewMongoReader(meta *Meta, readBatch int, host, database, collection, offse
 		log.Warnf("Runner[%v] MongoDB reader does not support certfile Now", meta.RunnerName)
 		//TODO mongo鉴权暂时不支持
 	}
-	mr = &MongoReader{
+	mmr := &MongoReader{
 		meta:       meta,
 		host:       host,
 		database:   database,
@@ -81,16 +97,16 @@ func NewMongoReader(meta *Meta, readBatch int, host, database, collection, offse
 	}
 	if offsetkey == MongoDefaultOffsetKey {
 		if bson.IsObjectIdHex(keyOrObj) {
-			mr.offset = bson.ObjectIdHex(keyOrObj)
+			mmr.offset = bson.ObjectIdHex(keyOrObj)
 		} else {
-			mr.offset = nil
+			mmr.offset = nil
 		}
 	} else {
-		mr.offset = offset
+		mmr.offset = offset
 	}
 
 	if filters != "" {
-		if jerr := jsoniter.Unmarshal([]byte(filters), &mr.collectionFilters); jerr != nil {
+		if jerr := jsoniter.Unmarshal([]byte(filters), &mmr.collectionFilters); jerr != nil {
 			err = errors.New("malformed collection_filters")
 			return
 		}
@@ -98,21 +114,21 @@ func NewMongoReader(meta *Meta, readBatch int, host, database, collection, offse
 	if len(cronSched) > 0 {
 		cronSched = strings.ToLower(cronSched)
 		if strings.HasPrefix(cronSched, Loop) {
-			mr.loop = true
-			mr.loopDuration, err = parseLoopDuration(cronSched)
+			mmr.loop = true
+			mmr.loopDuration, err = parseLoopDuration(cronSched)
 			if err != nil {
-				log.Errorf("Runner[%v] %v %v", mr.meta.RunnerName, mr.Name(), err)
+				log.Errorf("Runner[%v] %v %v", mmr.meta.RunnerName, mr.Name(), err)
 				err = nil
 			}
 		} else {
-			err = mr.Cron.AddFunc(cronSched, mr.run)
+			err = mmr.Cron.AddFunc(cronSched, mmr.run)
 			if err != nil {
 				return
 			}
-			log.Infof("Runner[%v] %v Cron added with schedule <%v>", mr.meta.RunnerName, mr.Name(), cronSched)
+			log.Infof("Runner[%v] %v Cron added with schedule <%v>", mmr.meta.RunnerName, mr.Name(), cronSched)
 		}
 	}
-
+	mr = mmr
 	return mr, nil
 }
 

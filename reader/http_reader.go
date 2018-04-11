@@ -44,7 +44,7 @@ type HttpReader struct {
 	readChan <-chan []byte
 }
 
-func NewHttpReader(meta *Meta, conf conf.MapConf) (*HttpReader, error) {
+func NewHttpReader(meta *Meta, conf conf.MapConf) (Reader, error) {
 	address, _ := conf.GetStringOr(KeyHttpServiceAddress, DefaultHttpServiceAddress)
 	path, _ := conf.GetStringOr(KeyHttpServicePath, DefaultHttpServicePath)
 	address, _ = RemoveHttpProtocal(address)

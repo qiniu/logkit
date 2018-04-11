@@ -108,10 +108,14 @@ func multiReaderOneLineTest(t *testing.T) {
 		"sync_every":      "1",
 		"reader_buf_size": "1024",
 		"read_from":       "oldest",
+		"expire":"15s",
+		"stat_interval":"1s",
+		"max_open_files":"128",
 	}
 	meta, err := NewMetaWithConf(c)
 	assert.NoError(t, err)
-	mr, err := NewMultiReader(meta, logPathPattern, WhenceOldest, "15s", "1s", 128)
+	mmr, err := NewMultiReader(meta, c)
+	mr := mmr.(*MultiReader)
 	mr.Start()
 	t.Log("mr started")
 	go func() {
@@ -198,11 +202,15 @@ func multiReaderMultiLineTest(t *testing.T) {
 		"sync_every":      "1",
 		"reader_buf_size": "1024",
 		"read_from":       "oldest",
+		"expire":"15s",
+		"stat_interval":"1s",
+		"max_open_files":"128",
 	}
 	meta, err := NewMetaWithConf(c)
 	assert.NoError(t, err)
-	mr, err := NewMultiReader(meta, logPathPattern, WhenceOldest, "15s", "1s", 128)
-	mr.SetMode(ReadModeHeadPatternString, "^abc*")
+	mmr, err := NewMultiReader(meta, c)
+	mmr.SetMode(ReadModeHeadPatternString, "^abc*")
+	mr := mmr.(*MultiReader)
 	mr.Start()
 	t.Log("mr started")
 	go func() {
@@ -296,10 +304,14 @@ func multiReaderSyncMetaOneLineTest(t *testing.T) {
 		"sync_every":      "1",
 		"reader_buf_size": "1024",
 		"read_from":       "oldest",
+		"expire":"15s",
+		"stat_interval":"1s",
+		"max_open_files":"128",
 	}
 	meta, err := NewMetaWithConf(c)
 	assert.NoError(t, err)
-	mr, err := NewMultiReader(meta, logPathPattern, WhenceOldest, "15s", "1s", 128)
+	mmr, err := NewMultiReader(meta, c)
+	mr := mmr.(*MultiReader)
 	mr.Start()
 	t.Log("mr started")
 	go func() {
@@ -333,7 +345,8 @@ func multiReaderSyncMetaOneLineTest(t *testing.T) {
 
 	assert.NoError(t, err)
 	time.Sleep(500 * time.Millisecond)
-	mr, err = NewMultiReader(meta, logPathPattern, WhenceOldest, "15s", "1s", 128)
+	mmr, err = NewMultiReader(meta,c)
+	mr = mmr.(*MultiReader)
 	mr.Start()
 	time.Sleep(500 * time.Millisecond)
 	for {
@@ -420,11 +433,15 @@ func multiReaderSyncMetaMutilineTest(t *testing.T) {
 		"sync_every":      "1",
 		"reader_buf_size": "1024",
 		"read_from":       "oldest",
+		"expire":"15s",
+		"stat_interval":"1s",
+		"max_open_files":"128",
 	}
 	meta, err := NewMetaWithConf(c)
 	assert.NoError(t, err)
-	mr, err := NewMultiReader(meta, logPathPattern, WhenceOldest, "15s", "1s", 128)
-	mr.SetMode(ReadModeHeadPatternString, "^abc*")
+	mmr, err := NewMultiReader(meta,c)
+	mmr.SetMode(ReadModeHeadPatternString, "^abc*")
+	mr := mmr.(*MultiReader)
 	mr.Start()
 	t.Log("mr started")
 	go func() {
@@ -453,8 +470,9 @@ func multiReaderSyncMetaMutilineTest(t *testing.T) {
 	t.Log(">>>>>>>>>>>>>>>>mr Closed")
 	assert.NoError(t, err)
 	time.Sleep(500 * time.Millisecond)
-	mr, err = NewMultiReader(meta, logPathPattern, WhenceOldest, "15s", "1s", 128)
-	mr.SetMode(ReadModeHeadPatternString, "^abc*")
+	mmr, err = NewMultiReader(meta, c)
+	mmr.SetMode(ReadModeHeadPatternString, "^abc*")
+	mr = mmr.(*MultiReader)
 	mr.Start()
 	time.Sleep(100 * time.Millisecond)
 	for {
@@ -541,7 +559,8 @@ func TestMultiReaderReset(t *testing.T) {
 	}
 	meta, err := NewMetaWithConf(c)
 	assert.NoError(t, err)
-	mr, err := NewMultiReader(meta, logPathPattern, WhenceOldest, "15s", "1s", 128)
+	mmr, err := NewMultiReader(meta, c)
+	mr := mmr.(*MultiReader)
 	mr.Start()
 	t.Log("mr started")
 
@@ -574,7 +593,8 @@ func TestMultiReaderReset(t *testing.T) {
 	// 重置
 	err = mr.Reset()
 	assert.NoError(t, err)
-	mr, err = NewMultiReader(meta, logPathPattern, WhenceOldest, "15s", "1s", 128)
+	mmr, err = NewMultiReader(meta,c)
+	mr = mmr.(*MultiReader)
 	mr.Start()
 	time.Sleep(100 * time.Millisecond)
 	resultMap = make(map[string]int)

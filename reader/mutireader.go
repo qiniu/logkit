@@ -16,6 +16,7 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
+	"github.com/qiniu/logkit/conf"
 )
 
 type MultiReader struct {
@@ -215,7 +216,17 @@ func (ar *ActiveReader) expired(expireDur time.Duration) bool {
 	return false
 }
 
-func NewMultiReader(meta *Meta, logPathPattern, whence, expireDur, statIntervalDur string, maxOpenFiles int) (mr *MultiReader, err error) {
+func NewMultiReader(meta *Meta, conf conf.MapConf) (mr Reader, err error) {
+	logPathPattern, err := conf.GetString(KeyLogPath)
+	if err != nil {
+		return
+	}
+	whence, _ := conf.GetStringOr(KeyWhence, WhenceOldest)
+
+	expireDur, _ := conf.GetStringOr(KeyExpire, "24h")
+	statIntervalDur, _ := conf.GetStringOr(KeyStatInterval, "3m")
+	maxOpenFiles, _ := conf.GetIntOr(KeyMaxOpenFiles, 256)
+
 	expire, err := time.ParseDuration(expireDur)
 	if err != nil {
 		return nil, err
@@ -235,6 +246,24 @@ func NewMultiReader(meta *Meta, logPathPattern, whence, expireDur, statIntervalD
 		err = nil
 	}
 
+	cacheMap := make(map[string]string)
+	buf := make([]byte, bufsize)
+	if bufsize > 0 {
+		if _, err = meta.ReadBuf(buf); err != nil {
+			if os.IsNotExist(err) {
+				log.Debugf("Runner[%v] %v read buf error %v, ignore...", meta.RunnerName, mr.Name(), err)
+			} else {
+				log.Warnf("Runner[%v] %v read buf error %v, ignore...", meta.RunnerName, mr.Name(), err)
+			}
+		} else {
+			err = jsoniter.Unmarshal(buf, &cacheMap)
+			if err != nil {
+				log.Warnf("Runner[%v] %v Unmarshal read buf error %v, ignore...", meta.RunnerName, mr.Name(), err)
+			}
+		}
+		err = nil
+	}
+
 	mr = &MultiReader{
 		meta:           meta,
 		logPathPattern: logPathPattern,
@@ -246,28 +275,12 @@ func NewMultiReader(meta *Meta, logPathPattern, whence, expireDur, statIntervalD
 		startmux:       sync.Mutex{},
 		status:         StatusInit,
 		fileReaders:    make(map[string]*ActiveReader), //armapmux
-		cacheMap:       make(map[string]string),        //armapmux
+		cacheMap:       cacheMap,                       //armapmux
 		armapmux:       sync.Mutex{},
 		msgChan:        make(chan Result),
 		statsLock:      sync.RWMutex{},
 	}
-	buf := make([]byte, bufsize)
-	if bufsize > 0 {
-		_, err = meta.ReadBuf(buf)
-		if err != nil {
-			if os.IsNotExist(err) {
-				log.Debugf("Runner[%v] %v read buf error %v, ignore...", mr.meta.RunnerName, mr.Name(), err)
-			} else {
-				log.Warnf("Runner[%v] %v read buf error %v, ignore...", mr.meta.RunnerName, mr.Name(), err)
-			}
-		} else {
-			err = jsoniter.Unmarshal(buf, &mr.cacheMap)
-			if err != nil {
-				log.Warnf("Runner[%v] %v Unmarshal read buf error %v, ignore...", mr.meta.RunnerName, mr.Name(), err)
-			}
-		}
-		err = nil
-	}
+
 	return
 }
 

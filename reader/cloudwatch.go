@@ -89,7 +89,7 @@ type (
 	}
 )
 
-func NewCloudWatchReader(meta *Meta, conf conf.MapConf) (c *CloudWatch, err error) {
+func NewCloudWatchReader(meta *Meta, conf conf.MapConf) (c Reader, err error) {
 	region, err := conf.GetString(KeyRegion)
 	if err != nil {
 		return
@@ -159,6 +159,11 @@ func NewCloudWatchReader(meta *Meta, conf conf.MapConf) (c *CloudWatch, err erro
 	if log.GetOutputLevel() == log.Ldebug {
 		cfg.WithLogLevel(aws.LogDebug)
 	}
+	var Metrics []*Metric
+	if len(metrics) > 0 {
+		Metrics = []*Metric{{MetricNames: metrics, Dimensions: dimensions}}
+	}
+
 	c = &CloudWatch{
 		Region:          region,
 		Namespace:       namespace,
@@ -172,9 +177,7 @@ func NewCloudWatchReader(meta *Meta, conf conf.MapConf) (c *CloudWatch, err erro
 		status:          StatusInit,
 		StopChan:        make(chan struct{}),
 		DataChan:        make(chan models.Data),
-	}
-	if len(metrics) > 0 {
-		c.Metrics = []*Metric{{MetricNames: metrics, Dimensions: dimensions}}
+		Metrics:         Metrics,
 	}
 	return
 }

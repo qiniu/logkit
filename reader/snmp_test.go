@@ -136,7 +136,8 @@ func TestSnmpInit(t *testing.T) {
 		"snmp_tables": `[{"table_oid": "TEST::testTable"}]`,
 		"snmp_fields": `[{"field_oid": "TEST::hostname"}]`,
 	}
-	s, err := NewSnmpReader(nil, c)
+	ss, err := NewSnmpReader(nil, c)
+	s := ss.(*SnmpReader)
 	assert.NoError(t, err)
 
 	assert.Len(t, s.Tables[0].Fields, 3)
@@ -191,7 +192,8 @@ func TestSnmpInit_noTranslate(t *testing.T) {
 			}
 		]`,
 	}
-	s, err := NewSnmpReader(nil, c)
+	ss, err := NewSnmpReader(nil, c)
+	s := ss.(*SnmpReader)
 	assert.NoError(t, err)
 
 	assert.Equal(t, ".1.1.1.1", s.Fields[0].Oid)
@@ -227,7 +229,8 @@ func TestGetSNMPConnection_v2(t *testing.T) {
 		"snmp_version":   "2",
 		"snmp_community": "foo",
 	}
-	s, err := NewSnmpReader(nil, c)
+	ss, err := NewSnmpReader(nil, c)
+	s := ss.(*SnmpReader)
 	assert.NoError(t, err)
 
 	gsc, err := s.getConnection(0)
@@ -262,11 +265,11 @@ func TestGetSNMPConnection_v3(t *testing.T) {
 		KeySnmpReaderEngineBoots:    "1",
 		KeySnmpReaderEngineTime:     "2",
 	}
-	s, err := NewSnmpReader(nil, c)
+	ss, err := NewSnmpReader(nil, c)
 	if err != nil {
 		t.Fatalf("exp no error, but got %v", err)
 	}
-
+	s := ss.(*SnmpReader)
 	gsc, err := s.getConnection(0)
 	assert.NoError(t, err)
 	gs := gsc.(gosnmpWrapper)
@@ -290,10 +293,11 @@ func TestGetSNMPConnection_caching(t *testing.T) {
 	c := conf.MapConf{
 		KeySnmpReaderAgents: "1.2.3.4, 1.2.3.5, 1.2.3.5",
 	}
-	s, err := NewSnmpReader(nil, c)
+	ss, err := NewSnmpReader(nil, c)
 	if err != nil {
 		t.Fatalf("exp no error, but got %v", err)
 	}
+	s := ss.(*SnmpReader)
 	assert.NoError(t, err)
 	gs1, err := s.getConnection(0)
 	assert.NoError(t, err)

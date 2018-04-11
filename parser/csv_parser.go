@@ -377,11 +377,35 @@ func (p *CsvParser) Type() string {
 	return TypeCSV
 }
 
+func getUnmachedMessage(parts []string, schemas []field) (ret string) {
+	length := len(parts)
+	if length > len(schemas) {
+		length = len(schemas)
+	}
+	ret = "matched: "
+	for i := 0; i < length; i++ {
+		ret += "[" + schemas[i].name + "]=>[" + parts[i] + "],"
+	}
+	ret += "  unmatched "
+	if length < len(parts) {
+		ret += "log: "
+		for i := length; i < len(parts); i++ {
+			ret += "[" + parts[i] + "]"
+		}
+	} else {
+		ret += "schema: "
+		for i := length; i < len(schemas); i++ {
+			ret += "[" + schemas[i].name + "]"
+		}
+	}
+	return
+}
+
 func (p *CsvParser) parse(line string) (Data, error) {
 	d := make(Data, len(p.schema)+len(p.labels))
 	parts := strings.Split(line, p.delim)
 	if len(parts) != len(p.schema) {
-		return nil, fmt.Errorf("schema length not match: schema %v length %v, actual column %v length %v", p.schema, len(p.schema), parts, len(parts))
+		return nil, fmt.Errorf("schema length not match: schema length %v, actual column length %v, %s", len(p.schema), len(parts), getUnmachedMessage(parts, p.schema))
 	}
 	for i, part := range parts {
 		dts, err := p.schema[i].ValueParse(strings.TrimSpace(part), p.timeZoneOffset)
