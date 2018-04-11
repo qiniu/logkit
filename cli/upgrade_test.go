@@ -93,65 +93,65 @@ func TestParseCliVersion(t *testing.T) {
 	}
 }
 
-func TestIsNeedUpgrade(t *testing.T) {
+func TestIsUpgradeNeeded(t *testing.T) {
 	testData := []struct {
-		cur  string
-		last string
-		exp  bool
+		cur    string
+		latest string
+		exp    bool
 	}{
 		{
-			cur:  "v1",
-			last: "v1",
-			exp:  false,
+			cur:    "v1",
+			latest: "v1",
+			exp:    false,
 		},
 		{
-			cur:  "v1.1",
-			last: "v1",
-			exp:  false,
+			cur:    "v1.1",
+			latest: "v1",
+			exp:    false,
 		},
 		{
-			cur:  "v2",
-			last: "v1.1",
-			exp:  false,
+			cur:    "v2",
+			latest: "v1.1",
+			exp:    false,
 		},
 		{
-			cur:  "v1.1.0",
-			last: "v1.1",
-			exp:  false,
+			cur:    "v1.1.0",
+			latest: "v1.1",
+			exp:    false,
 		},
 		{
-			cur:  "v1.2.1",
-			last: "v1.2.2",
-			exp:  true,
+			cur:    "v1.2.1",
+			latest: "v1.2.2",
+			exp:    true,
 		},
 		{
-			cur:  "v1.2.3",
-			last: "v1.2.4",
-			exp:  true,
+			cur:    "v1.2.3",
+			latest: "v1.2.4",
+			exp:    true,
 		},
 		{
-			cur:  "v1.0.1",
-			last: "v1.0",
-			exp:  false,
+			cur:    "v1.0.1",
+			latest: "v1.0",
+			exp:    false,
 		},
 		{
-			cur:  "v1.9.9",
-			last: "v2.0.0",
-			exp:  true,
+			cur:    "v1.9.9",
+			latest: "v2.0.0",
+			exp:    true,
 		},
 		{
-			cur:  "v1.0.2",
-			last: "v1.0.1",
-			exp:  false,
+			cur:    "v1.0.2",
+			latest: "v1.0.1",
+			exp:    false,
 		},
 		{
-			cur:  "v1.0.1",
-			last: "v1.1.0",
-			exp:  true,
+			cur:    "v1.0.1",
+			latest: "v1.1.0",
+			exp:    true,
 		},
 	}
 	for _, val := range testData {
-		got, err := isNeedUpgrade(val.cur, val.last)
+		got, err := isUpgradeNeeded(val.cur, val.latest)
 		assert.NoError(t, err)
 		assert.Equal(t, val.exp, got)
 	}
@@ -170,31 +170,31 @@ func TestGetPackNameByKernelPlatform(t *testing.T) {
 		packName string
 	}{
 		{
-			kernel:   GoosLinux,
+			kernel:   GoOSLinux,
 			platform: Arch386,
 			version:  "v1.3.2",
 			packName: linux32,
 		},
 		{
-			kernel:   GoosLinux,
+			kernel:   GoOSLinux,
 			platform: Arch64,
 			version:  "v1.3.2",
 			packName: linux64,
 		},
 		{
-			kernel:   GoosWindows,
+			kernel:   GoOSWindows,
 			platform: Arch386,
 			version:  "v1.3.2",
 			packName: win32,
 		},
 		{
-			kernel:   GoosWindows,
+			kernel:   GoOSWindows,
 			platform: Arch64,
 			version:  "v1.3.2",
 			packName: win64,
 		},
 		{
-			kernel:   GoosMac,
+			kernel:   GoOSMac,
 			platform: Arch386,
 			version:  "v1.3.2",
 			packName: macName,
@@ -360,7 +360,7 @@ func (m *mockGithub) respFunction(c echo.Context, data map[string]interface{}) e
 }
 
 // 请求含有错误参数，该函数通过错误参数来构造不同的错误
-func (m *mockGithub) getLastRelease() echo.HandlerFunc {
+func (m *mockGithub) getLatestRelease() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		data := map[string]interface{}{
 			"url":  "https://api.github.com/repos/qiniu/logkit/releases/8810555",
@@ -482,7 +482,7 @@ func TestRestRequest(t *testing.T) {
 		packageName: tarfileName,
 	}
 	router := echo.New()
-	router.GET("/test/github/latest", github.getLastRelease())
+	router.GET("/test/github/latest", github.getLatestRelease())
 	router.GET("/test/github/release", github.getReleasePackage())
 
 	var port = 9001
@@ -522,9 +522,9 @@ func TestRestRequest(t *testing.T) {
 
 	c := make(chan string)
 	funcMap := map[string]func(t *testing.T, rootDir, url string){
-		"testCheckLastVersion": testCheckLastVersion,
-		"testDownloadPackage":  testDownloadPackage,
-		"testDecompress":       testDecompress,
+		"testCheckLatestVersion": testCheckLatestVersion,
+		"testDownloadPackage":    testDownloadPackage,
+		"testDecompress":         testDecompress,
 	}
 	for k, f := range funcMap {
 		go func(k string, f func(t *testing.T, rtDir, url string), c chan string) {
@@ -538,7 +538,7 @@ func TestRestRequest(t *testing.T) {
 	}
 }
 
-func testCheckLastVersion(t *testing.T, _, url string) {
+func testCheckLatestVersion(t *testing.T, _, url string) {
 	osInfo := utilsos.GetOSInfo()
 	packageName, _ := getPackNameByKernelPlatform(osInfo.Kernel, osInfo.Platform, "v1.4.1")
 	expReleaseInfo := ReleaseInfo{
@@ -566,33 +566,33 @@ func testCheckLastVersion(t *testing.T, _, url string) {
 
 	// 测试正常情况
 	uri := url + "/test/github/latest"
-	gotReleaseInfo, err := checkLastVersion(uri)
+	gotReleaseInfo, err := checkLatestVersion(uri)
 	assert.NoError(t, err)
 	assert.Equal(t, expReleaseInfo, gotReleaseInfo)
 
 	// 测试服务器出错的情况
 	uri = url + "/test/github/latest?error=statusCode500"
-	gotReleaseInfo, err = checkLastVersion(uri)
+	gotReleaseInfo, err = checkLatestVersion(uri)
 	assert.Error(t, err)
 	assert.Equal(t, true, strings.Contains(err.Error(), "test internal server error"))
 
 	// 测试超过请求次数
 	uri = url + "/test/github/latest?error=remaining0"
-	gotReleaseInfo, err = checkLastVersion(uri)
+	gotReleaseInfo, err = checkLatestVersion(uri)
 	assert.Error(t, err)
 	assert.Equal(t, true, strings.Contains(err.Error(), "please try again after 60 minutes"))
 
 	// 测试返回的 version 有问题
 	uri = url + "/test/github/latest?error=noName"
-	gotReleaseInfo, err = checkLastVersion(uri)
+	gotReleaseInfo, err = checkLatestVersion(uri)
 	assert.NoError(t, err)
-	needUpdate, err := isNeedUpgrade("v1.4.0", gotReleaseInfo.Name)
+	needUpdate, err := isUpgradeNeeded("v1.4.0", gotReleaseInfo.Name)
 	assert.Equal(t, false, needUpdate)
 	assert.Error(t, err)
 
 	// 测试返回的 json 格式有问题
 	uri = url + "/test/github/latest?error=jsonError"
-	gotReleaseInfo, err = checkLastVersion(uri)
+	gotReleaseInfo, err = checkLatestVersion(uri)
 	assert.Error(t, err)
 }
 
@@ -608,7 +608,7 @@ func testDownloadPackage(t *testing.T, rtDir, url string) {
 
 	// 测试正常情况
 	uri := url + "/test/github/latest"
-	releaseInfo, err := checkLastVersion(uri)
+	releaseInfo, err := checkLatestVersion(uri)
 	assert.NoError(t, err)
 	downloadUrl := ""
 	for _, val := range releaseInfo.Assets {
@@ -647,7 +647,7 @@ func testDecompress(t *testing.T, rtDir, url string) {
 	packageFilePath := filepath.Join(rootDir, packageName)
 
 	uri := url + "/test/github/latest"
-	releaseInfo, err := checkLastVersion(uri)
+	releaseInfo, err := checkLatestVersion(uri)
 	assert.NoError(t, err)
 	downloadUrl := ""
 	for _, val := range releaseInfo.Assets {
