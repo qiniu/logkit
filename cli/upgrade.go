@@ -20,9 +20,9 @@ import (
 
 const (
 	Logkit      = "logkit"
-	GoosWindows = "windows"
-	GoosLinux   = "Linux"
-	GoosMac     = "Darwin"
+	GoOSWindows = "windows"
+	GoOSLinux   = "Linux"
+	GoOSMac     = "Darwin"
 	Arch386     = "386"
 	Arch64      = "amd64"
 
@@ -153,24 +153,24 @@ func checkLastVersion(url string) (ReleaseInfo, error) {
 }
 
 func getNeedBackupFiles(kernel string) []string {
-	if kernel == GoosWindows {
+	if kernel == GoOSWindows {
 		return []string{"logkit.exe"}
 	}
 	return []string{"logkit"}
 }
 
 // 检查是否需要更新
-func isNeedUpgrade(curVersionStr, lastVersionStr string) (needUpgrade bool, err error) {
-	var curVersion, lastVersion CliVersion
+func isUpgradeNeeded(curVersionStr, lastVersionStr string) (needUpgrade bool, err error) {
+	var curVersion, latestVersion CliVersion
 	if curVersion, err = parseCliVersion(curVersionStr); err != nil {
 		return
 	}
 
-	if lastVersion, err = parseCliVersion(lastVersionStr); err != nil {
+	if latestVersion, err = parseCliVersion(lastVersionStr); err != nil {
 		return
 	}
 
-	if curVersion.lessThan(lastVersion) {
+	if curVersion.lessThan(latestVersion) {
 		needUpgrade = true
 	}
 	return
@@ -178,7 +178,7 @@ func isNeedUpgrade(curVersionStr, lastVersionStr string) (needUpgrade bool, err 
 
 // 根据 kernel 和 platform 获取安装包的名称
 func getPackNameByKernelPlatform(kernel, platform, version string) (fileName string, err error) {
-	if kernel == GoosLinux {
+	if kernel == GoOSLinux {
 		if platform == Arch386 {
 			fileName = "logkit_linux32_%s.tar.gz"
 		} else if platform == Arch64 {
@@ -186,9 +186,9 @@ func getPackNameByKernelPlatform(kernel, platform, version string) (fileName str
 		} else {
 			err = fmt.Errorf("unknown platform %v", platform)
 		}
-	} else if kernel == GoosMac {
+	} else if kernel == GoOSMac {
 		fileName = "logkit_mac_%s.tar.gz"
-	} else if kernel == GoosWindows {
+	} else if kernel == GoOSWindows {
 		if platform == Arch386 {
 			fileName = "logkit_windows32_%s.zip"
 		} else if platform == Arch64 {
@@ -303,11 +303,11 @@ func CheckAndUpgrade(curVersion string) {
 		fmt.Printf("Automatic upgrade failed, check last version error, %v\n", err)
 		return
 	}
-	lastVersion := releaseInfo.Name
-	fmt.Println("The last version is " + lastVersion)
+	latestVersion := releaseInfo.Name
+	fmt.Println("The last version is " + latestVersion)
 
 	//检查是否需要升级
-	needUpgrade, err := isNeedUpgrade(curVersion, lastVersion)
+	needUpgrade, err := isUpgradeNeeded(curVersion, latestVersion)
 	if err != nil {
 		fmt.Printf("Automatic upgrade failed, check whether the program needs to upgrade error, %v\n", err)
 		return
@@ -322,7 +322,7 @@ func CheckAndUpgrade(curVersion string) {
 	platform := osInfo.Platform
 
 	// 根据 kernel 和 platform 来获取安装包的名称
-	packFileName, err := getPackNameByKernelPlatform(kernel, platform, lastVersion)
+	packFileName, err := getPackNameByKernelPlatform(kernel, platform, latestVersion)
 	if err != nil {
 		fmt.Printf("Automatic upgrade failed, get package name error, %v\n", err)
 		return
@@ -360,7 +360,7 @@ func CheckAndUpgrade(curVersion string) {
 
 	// 获取安装包
 	var tmpFile *os.File
-	fmt.Printf("Begin to download %v package\n", lastVersion)
+	fmt.Printf("Begin to download %v package\n", latestVersion)
 	if tmpFile, err = downloadPackage(downloadUrl, rootDir); err != nil {
 		fmt.Printf("Automatic upgrade failed, download package error, %v\n", err)
 		return

@@ -151,7 +151,7 @@ func TestIsNeedUpgrade(t *testing.T) {
 		},
 	}
 	for _, val := range testData {
-		got, err := isNeedUpgrade(val.cur, val.last)
+		got, err := isUpgradeNeeded(val.cur, val.last)
 		assert.NoError(t, err)
 		assert.Equal(t, val.exp, got)
 	}
@@ -170,31 +170,31 @@ func TestGetPackNameByKernelPlatform(t *testing.T) {
 		packName string
 	}{
 		{
-			kernel:   GoosLinux,
+			kernel:   GoOSLinux,
 			platform: Arch386,
 			version:  "v1.3.2",
 			packName: linux32,
 		},
 		{
-			kernel:   GoosLinux,
+			kernel:   GoOSLinux,
 			platform: Arch64,
 			version:  "v1.3.2",
 			packName: linux64,
 		},
 		{
-			kernel:   GoosWindows,
+			kernel:   GoOSWindows,
 			platform: Arch386,
 			version:  "v1.3.2",
 			packName: win32,
 		},
 		{
-			kernel:   GoosWindows,
+			kernel:   GoOSWindows,
 			platform: Arch64,
 			version:  "v1.3.2",
 			packName: win64,
 		},
 		{
-			kernel:   GoosMac,
+			kernel:   GoOSMac,
 			platform: Arch386,
 			version:  "v1.3.2",
 			packName: macName,
@@ -586,7 +586,7 @@ func testCheckLastVersion(t *testing.T, _, url string) {
 	uri = url + "/test/github/latest?error=noName"
 	gotReleaseInfo, err = checkLastVersion(uri)
 	assert.NoError(t, err)
-	needUpdate, err := isNeedUpgrade("v1.4.0", gotReleaseInfo.Name)
+	needUpdate, err := isUpgradeNeeded("v1.4.0", gotReleaseInfo.Name)
 	assert.Equal(t, false, needUpdate)
 	assert.Error(t, err)
 

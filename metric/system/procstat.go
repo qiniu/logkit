@@ -86,9 +86,9 @@ const (
 )
 
 const (
-	GoosMac     = "Darwin"
-	GoosLinux   = "Linux"
-	GoosWindows = "windows"
+	GoOSMac     = "Darwin"
+	GoOSLinux   = "Linux"
+	GoOSWindows = "windows"
 )
 
 var (
@@ -616,9 +616,9 @@ func (p *Procstat) cgroupPIDs() ([]PID, error) {
 
 func (p *Procstat) PCpuTop10() (pids []PID, err error) {
 	var comm string
-	if p.kernel == GoosMac {
+	if p.kernel == GoOSMac {
 		comm = "ps x -o pid= -r | head -n 10"
-	} else if p.kernel == GoosLinux {
+	} else if p.kernel == GoOSLinux {
 		comm = "ps -Ao pid= --sort=-pcpu | head -n 10"
 	} else {
 		log.Warnf("not support kernel %v, ignored it", p.kernel)
@@ -630,9 +630,9 @@ func (p *Procstat) PCpuTop10() (pids []PID, err error) {
 
 func (p *Procstat) PMemTop10() (pids []PID, err error) {
 	var comm string
-	if p.kernel == GoosMac {
+	if p.kernel == GoOSMac {
 		comm = "ps x -o pid= -m | head -n 10"
-	} else if p.kernel == GoosLinux {
+	} else if p.kernel == GoOSLinux {
 		comm = "ps -Ao pid= --sort=-pmem | head -n 10"
 	} else {
 		log.Warnf("not support kernel %v, ignored it", p.kernel)
