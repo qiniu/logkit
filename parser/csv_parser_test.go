@@ -376,5 +376,4 @@ func TestJsonMap(t *testing.T) {
 	data, err := fd.ValueParse(testx, 0)
 	assert.Error(t, err)
 	assert.Equal(t, data, Data{})
-
 }

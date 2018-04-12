@@ -137,8 +137,8 @@ func TestSnmpInit(t *testing.T) {
 		"snmp_fields": `[{"field_oid": "TEST::hostname"}]`,
 	}
 	ss, err := NewSnmpReader(nil, c)
-	s := ss.(*SnmpReader)
 	assert.NoError(t, err)
+	s := ss.(*SnmpReader)
 
 	assert.Len(t, s.Tables[0].Fields, 3)
 	assert.Contains(t, s.Tables[0].Fields, Field{Oid: ".1.0.0.0.1.1", Name: "server", IsTag: true})

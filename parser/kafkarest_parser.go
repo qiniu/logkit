@@ -193,7 +193,7 @@ func (krp *KafaRestlogParser) ParseLogTime(fields []string) int64 {
 	precesion_str := str[20:len(str)]
 	precesion_int, err := strconv.ParseInt(precesion_str, 10, 64)
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Errorf("KafaRestlogParser parse time err %v", err)
 		return 0
 	}
 	t, err := time.Parse("2006-01-02 15:04:05 -0700", ymdhms)

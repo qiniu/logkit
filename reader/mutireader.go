@@ -54,6 +54,8 @@ type ActiveReader struct {
 	inactive     int32 //当inactive>0 时才会被expire回收
 	runnerName   string
 
+	emptyLineCnt int
+
 	stats     StatsInfo
 	statsLock sync.RWMutex
 }
@@ -86,6 +88,7 @@ func NewActiveReader(originPath, realPath, whence string, meta *Meta, msgChan ch
 		originpath:   originPath,
 		msgchan:      msgChan,
 		inactive:     1,
+		emptyLineCnt: 0,
 		runnerName:   meta.RunnerName,
 		status:       StatusInit,
 		statsLock:    sync.RWMutex{},
@@ -116,11 +119,21 @@ func (ar *ActiveReader) Run() {
 				time.Sleep(3 * time.Second)
 				continue
 			}
-			//文件EOF，同时没有任何内容，代表不是第一次EOF，休息时间设置长一些
-			if ar.readcache == "" && err == io.EOF {
-				atomic.StoreInt32(&ar.inactive, 1)
-				log.Debugf("Runner[%v] %v meet EOF, ActiveReader was inactive now, sleep 5 seconds", ar.runnerName, ar.originpath)
-				time.Sleep(5 * time.Second)
+			if ar.readcache == "" {
+				ar.emptyLineCnt++
+				//文件EOF，同时没有任何内容，代表不是第一次EOF，休息时间设置长一些
+				if err == io.EOF {
+					atomic.StoreInt32(&ar.inactive, 1)
+					log.Debugf("Runner[%v] %v meet EOF, ActiveReader was inactive now, sleep 5 seconds", ar.runnerName, ar.originpath)
+					time.Sleep(5 * time.Second)
+					continue
+				}
+				// 一小时没读到内容，设置为inactive
+				if ar.emptyLineCnt > 60*60 {
+					atomic.StoreInt32(&ar.inactive, 1)
+				}
+				//读取的结果为空，无论如何都sleep 1s
+				time.Sleep(time.Second)
 				continue
 			}
 		}
@@ -136,6 +149,7 @@ func (ar *ActiveReader) Run() {
 			}
 
 			atomic.StoreInt32(&ar.inactive, 0)
+			ar.emptyLineCnt = 0
 			//做这一层结构为了快速结束
 			if atomic.LoadInt32(&ar.status) == StatusStopped || atomic.LoadInt32(&ar.status) == StatusStopping {
 				log.Debugf("Runner[%v] %v ActiveReader was stopped when waiting to send data", ar.runnerName, ar.originpath)

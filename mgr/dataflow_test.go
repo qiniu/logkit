@@ -246,7 +246,7 @@ func Test_SendData(t *testing.T) {
 	assert.NoError(t, err)
 	defer os.RemoveAll("./meta")
 	hhttpReader, err := reader.NewHttpReader(meta, c)
-	httpReader :=hhttpReader.(*reader.HttpReader)
+	httpReader := hhttpReader.(*reader.HttpReader)
 	assert.NoError(t, err)
 	err = httpReader.Start()
 	assert.NoError(t, err)

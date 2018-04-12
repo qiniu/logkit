@@ -101,7 +101,7 @@ func NewCustomManager(conf ManagerConfig, rr *reader.ReaderRegistry, pr *parser.
 		watchers:      make(map[string]*fsnotify.Watcher),
 		pregistry:     pr,
 		sregistry:     sr,
-		rregistry:rr,
+		rregistry:     rr,
 		SystemInfo:    utilsos.GetOSInfo().String(),
 	}
 	return m, nil

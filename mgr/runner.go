@@ -148,7 +148,7 @@ func NewCustomRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *
 	if sr == nil {
 		sr = sender.NewSenderRegistry()
 	}
-	if rr==nil{
+	if rr == nil {
 		rr = reader.NewReaderRegistry()
 	}
 	if rc.MetricConfig != nil {

@@ -12,11 +12,12 @@ import (
 	"github.com/qiniu/log"
 	. "github.com/qiniu/logkit/utils/models"
 
+	"strings"
+
 	elasticV6 "github.com/olivere/elastic"
 	"github.com/qiniu/logkit/conf"
 	elasticV3 "gopkg.in/olivere/elastic.v3"
 	elasticV5 "gopkg.in/olivere/elastic.v5"
-	"strings"
 )
 
 var (

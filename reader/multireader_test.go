@@ -108,9 +108,9 @@ func multiReaderOneLineTest(t *testing.T) {
 		"sync_every":      "1",
 		"reader_buf_size": "1024",
 		"read_from":       "oldest",
-		"expire":"15s",
-		"stat_interval":"1s",
-		"max_open_files":"128",
+		"expire":          "15s",
+		"stat_interval":   "1s",
+		"max_open_files":  "128",
 	}
 	meta, err := NewMetaWithConf(c)
 	assert.NoError(t, err)
@@ -134,7 +134,7 @@ func multiReaderOneLineTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxnum >= 15 || spacenum > 100 {
+		if maxnum >= 15 || spacenum > 20 {
 			break
 		}
 		t.Log(data)
@@ -161,7 +161,7 @@ func multiReaderOneLineTest(t *testing.T) {
 			break
 		}
 		t.Log(data)
-		if maxnum >= 18 || spacenum > 100 {
+		if maxnum >= 18 || spacenum > 20 {
 			break
 		}
 	}
@@ -202,9 +202,9 @@ func multiReaderMultiLineTest(t *testing.T) {
 		"sync_every":      "1",
 		"reader_buf_size": "1024",
 		"read_from":       "oldest",
-		"expire":"15s",
-		"stat_interval":"1s",
-		"max_open_files":"128",
+		"expire":          "15s",
+		"stat_interval":   "1s",
+		"max_open_files":  "128",
 	}
 	meta, err := NewMetaWithConf(c)
 	assert.NoError(t, err)
@@ -229,7 +229,7 @@ func multiReaderMultiLineTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxnum >= 7 || spacenum > 100 {
+		if maxnum >= 7 || spacenum > 20 {
 			break
 		}
 		t.Log(data)
@@ -256,7 +256,7 @@ func multiReaderMultiLineTest(t *testing.T) {
 			break
 		}
 		t.Log(data)
-		if maxnum >= 10 || spacenum > 100 {
+		if maxnum >= 10 || spacenum > 20 {
 			break
 		}
 	}
@@ -304,9 +304,9 @@ func multiReaderSyncMetaOneLineTest(t *testing.T) {
 		"sync_every":      "1",
 		"reader_buf_size": "1024",
 		"read_from":       "oldest",
-		"expire":"15s",
-		"stat_interval":"1s",
-		"max_open_files":"128",
+		"expire":          "15s",
+		"stat_interval":   "1s",
+		"max_open_files":  "128",
 	}
 	meta, err := NewMetaWithConf(c)
 	assert.NoError(t, err)
@@ -331,7 +331,7 @@ func multiReaderSyncMetaOneLineTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxnum >= 2 || spacenum > 100 {
+		if maxnum >= 2 || spacenum > 20 {
 			break
 		}
 	}
@@ -345,7 +345,7 @@ func multiReaderSyncMetaOneLineTest(t *testing.T) {
 
 	assert.NoError(t, err)
 	time.Sleep(500 * time.Millisecond)
-	mmr, err = NewMultiReader(meta,c)
+	mmr, err = NewMultiReader(meta, c)
 	mr = mmr.(*MultiReader)
 	mr.Start()
 	time.Sleep(500 * time.Millisecond)
@@ -361,7 +361,7 @@ func multiReaderSyncMetaOneLineTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxnum >= 9 || spacenum > 100 {
+		if maxnum >= 9 || spacenum > 20 {
 			break
 		}
 	}
@@ -388,7 +388,7 @@ func multiReaderSyncMetaOneLineTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxnum >= 12 || spacenum > 100 {
+		if maxnum >= 12 || spacenum > 20 {
 			break
 		}
 	}
@@ -433,13 +433,13 @@ func multiReaderSyncMetaMutilineTest(t *testing.T) {
 		"sync_every":      "1",
 		"reader_buf_size": "1024",
 		"read_from":       "oldest",
-		"expire":"15s",
-		"stat_interval":"1s",
-		"max_open_files":"128",
+		"expire":          "15s",
+		"stat_interval":   "1s",
+		"max_open_files":  "128",
 	}
 	meta, err := NewMetaWithConf(c)
 	assert.NoError(t, err)
-	mmr, err := NewMultiReader(meta,c)
+	mmr, err := NewMultiReader(meta, c)
 	mmr.SetMode(ReadModeHeadPatternString, "^abc*")
 	mr := mmr.(*MultiReader)
 	mr.Start()
@@ -461,7 +461,7 @@ func multiReaderSyncMetaMutilineTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxnum >= 5 || spacenum > 100 {
+		if maxnum >= 5 || spacenum > 20 {
 			break
 		}
 	}
@@ -487,7 +487,7 @@ func multiReaderSyncMetaMutilineTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxnum >= 7 || spacenum > 100 {
+		if maxnum >= 7 || spacenum > 20 {
 			break
 		}
 	}
@@ -512,7 +512,7 @@ func multiReaderSyncMetaMutilineTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxnum >= 10 || spacenum > 100 {
+		if maxnum >= 10 || spacenum > 20 {
 			break
 		}
 	}
@@ -560,6 +560,7 @@ func TestMultiReaderReset(t *testing.T) {
 	meta, err := NewMetaWithConf(c)
 	assert.NoError(t, err)
 	mmr, err := NewMultiReader(meta, c)
+	assert.NoError(t, err)
 	mr := mmr.(*MultiReader)
 	mr.Start()
 	t.Log("mr started")
@@ -578,7 +579,7 @@ func TestMultiReaderReset(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxNum >= 8 || spaceNum > 100 {
+		if maxNum >= 8 || spaceNum > 20 {
 			break
 		}
 	}
@@ -593,7 +594,7 @@ func TestMultiReaderReset(t *testing.T) {
 	// 重置
 	err = mr.Reset()
 	assert.NoError(t, err)
-	mmr, err = NewMultiReader(meta,c)
+	mmr, err = NewMultiReader(meta, c)
 	mr = mmr.(*MultiReader)
 	mr.Start()
 	time.Sleep(100 * time.Millisecond)
@@ -612,7 +613,7 @@ func TestMultiReaderReset(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxNum >= 8 || spaceNum > 100 {
+		if maxNum >= 8 || spaceNum > 20 {
 			break
 		}
 	}

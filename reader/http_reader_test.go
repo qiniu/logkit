@@ -29,7 +29,7 @@ func TestNewHttpReader(t *testing.T) {
 	assert.NoError(t, err)
 	defer os.RemoveAll("./meta")
 	hhttpReader, err := NewHttpReader(meta, c)
-	httpReader:=hhttpReader.(*HttpReader)
+	httpReader := hhttpReader.(*HttpReader)
 	assert.NoError(t, err)
 	err = httpReader.Start()
 	assert.NoError(t, err)
