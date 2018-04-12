@@ -22,6 +22,8 @@ import (
 	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/utils/models"
 
+	"sync"
+
 	"github.com/json-iterator/go"
 	"github.com/labstack/echo"
 	"github.com/qiniu/logkit/router"
@@ -266,9 +268,7 @@ func TestWebRest(t *testing.T) {
 	}
 	rs := NewRestService(m, echo.New())
 	time.Sleep(2 * time.Second)
-	c := make(chan string)
 	defer func() {
-		close(c)
 		rs.Stop()
 		os.RemoveAll(rootDir)
 		os.Remove(StatsShell)
@@ -284,17 +284,15 @@ func TestWebRest(t *testing.T) {
 		"getRunnersTest":          getRunnersTest,
 		"senderRouterTest":        senderRouterTest,
 	}
-
+	wg := &sync.WaitGroup{}
+	wg.Add(len(funcMap))
 	for k, f := range funcMap {
-		go func(k string, f func(*testParam), c chan string) {
+		go func(k string, f func(*testParam), group *sync.WaitGroup) {
 			f(&testParam{rootDir, t, rs})
-			c <- k
-		}(k, f, c)
+			group.Done()
+		}(k, f, wg)
 	}
-	funcCnt := len(funcMap)
-	for i := 0; i < funcCnt; i++ {
-		<-c
-	}
+	wg.Wait()
 }
 
 func Test_generateStatsShell(t *testing.T) {
@@ -434,8 +432,7 @@ func restCRUDTest(p *testParam) {
 	assert.Equal(t, http.StatusOK, respCode)
 	err = jsoniter.Unmarshal(respBody, &respGot1)
 	if err != nil {
-		fmt.Println(string(respBody))
-		t.Error(err)
+		t.Error(err, string(respBody))
 	}
 
 	// POST的和GET做验证
@@ -821,8 +818,7 @@ func runnerDataIntegrityTest(p *testParam) {
 
 func TestParseUrl(t *testing.T) {
 	host, port, err := net.SplitHostPort(":1234")
-	assert.NoError(t, err)
-	fmt.Println(host, port)
+	assert.NoError(t, err, fmt.Sprintf("%v:%v", host, port))
 }
 
 func TestGetMySlaveUrl(t *testing.T) {

@@ -258,7 +258,6 @@ func TestGetMapValue(t *testing.T) {
 	m4 := map[string]interface{}{"m5": map[string]string{"name": "小明"}}
 	value4, err4 := GetMapValue(m4, []string{"m5", "name"}...)
 	assert.Error(t, err4)
-	fmt.Println(err4)
 	assert.Equal(t, nil, value4)
 }
 

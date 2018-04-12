@@ -46,7 +46,7 @@ type ClockTrailReader struct {
 	syncMgr *syncManager
 }
 
-func NewClockTrailReader(meta *Meta, conf conf.MapConf) (*ClockTrailReader, error) {
+func NewClockTrailReader(meta *Meta, conf conf.MapConf) (Reader, error) {
 	opts, err := buildSyncOptions(conf)
 	if err != nil {
 		return nil, err

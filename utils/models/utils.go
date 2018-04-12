@@ -333,7 +333,7 @@ func DecompressZip(packFilePath, dstDir string) (packDir string, err error) {
 			}
 			err = os.MkdirAll(fdir, f.Mode())
 			if err != nil {
-				fmt.Println(err)
+				log.Error(err)
 				return "", err
 			}
 			f, err := os.OpenFile(
@@ -582,4 +582,11 @@ func EncodeString(target string) (result string) {
 	}
 
 	return
+}
+
+func Bool2String(i bool) string {
+	if i {
+		return "true"
+	}
+	return "false"
 }

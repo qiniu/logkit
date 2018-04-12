@@ -554,15 +554,17 @@ func Test_Compatible(t *testing.T) {
 
 func Test_QiniulogRun(t *testing.T) {
 	dir := "Test_QiniulogRun"
+	//clean dir first
+	os.RemoveAll(dir)
 	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
-		log.Fatalf("Test_Run error mkdir %v %v", dir, err)
+		log.Errorf("Test_Run error mkdir %v %v", dir, err)
 	}
 	defer os.RemoveAll(dir)
 	logpath := dir + "/logdir"
 	logpathLink := dir + "/logdirlink"
 	metapath := dir + "/meta_mock_csv"
 	if err := os.Mkdir(logpath, DefaultDirPerm); err != nil {
-		log.Fatalf("Test_Run error mkdir %v %v", logpath, err)
+		log.Errorf("Test_Run error mkdir %v %v", logpath, err)
 	}
 	absLogpath, err := filepath.Abs(logpath)
 	if err != nil {
@@ -1086,7 +1088,7 @@ func TestSyslogRunnerX(t *testing.T) {
 	rc := RunnerConfig{}
 	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), parser.NewParserRegistry(), sender.NewSenderRegistry())
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewReaderRegistry(), parser.NewParserRegistry(), sender.NewSenderRegistry())
 	assert.NoError(t, err)
 	go rr.Run()
 	time.Sleep(1 * time.Second)
@@ -1245,7 +1247,7 @@ func TestAddDatatags(t *testing.T) {
 	err = jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
 
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), parser.NewParserRegistry(), sender.NewSenderRegistry())
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewReaderRegistry(), parser.NewParserRegistry(), sender.NewSenderRegistry())
 	assert.NoError(t, err)
 	go rr.Run()
 
@@ -1306,7 +1308,7 @@ func TestRunWithExtra(t *testing.T) {
 	err = jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
 
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), parser.NewParserRegistry(), sender.NewSenderRegistry())
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewReaderRegistry(), parser.NewParserRegistry(), sender.NewSenderRegistry())
 	assert.NoError(t, err)
 	go rr.Run()
 

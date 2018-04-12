@@ -18,6 +18,8 @@ import (
 	"sync/atomic"
 	"unsafe"
 
+	"time"
+
 	"github.com/axgle/mahonia"
 	"github.com/qiniu/log"
 	. "github.com/qiniu/logkit/utils/models"
@@ -63,6 +65,8 @@ type BufReader struct {
 
 	stats     StatsInfo
 	statsLock sync.RWMutex
+
+	lastErrShowTime time.Time
 }
 
 const minReadBufferSize = 16
@@ -389,6 +393,13 @@ func (b *BufReader) calcMutiLineCache() (ret int) {
 func (b *BufReader) ReadLine() (ret string, err error) {
 	if b.multiLineRegexp == nil {
 		ret, err = b.ReadString('\n')
+		if os.IsNotExist(err) {
+			if b.lastErrShowTime.Add(5 * time.Second).Before(time.Now()) {
+				log.Errorf("%v ReadLine err %v", b.meta.RunnerName, err)
+				b.lastErrShowTime = time.Now()
+			}
+			err = nil
+		}
 	} else {
 		ret, err = b.ReadPattern()
 	}

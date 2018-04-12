@@ -44,12 +44,12 @@ type HttpReader struct {
 	readChan <-chan []byte
 }
 
-func NewHttpReader(meta *Meta, conf conf.MapConf) (*HttpReader, error) {
+func NewHttpReader(meta *Meta, conf conf.MapConf) (Reader, error) {
 	address, _ := conf.GetStringOr(KeyHttpServiceAddress, DefaultHttpServiceAddress)
 	path, _ := conf.GetStringOr(KeyHttpServicePath, DefaultHttpServicePath)
 	address, _ = RemoveHttpProtocal(address)
 
-	bq := queue.NewDiskQueue("HttpReader<"+address+">_buffer", meta.BufFile(), DefaultMaxBytesPerFile, 0,
+	bq := queue.NewDiskQueue(Hash("HttpReader<"+address+">_buffer"), meta.BufFile(), DefaultMaxBytesPerFile, 0,
 		DefaultMaxBytesPerFile, DefaultSyncEvery, DefaultSyncEvery, time.Second*2, DefaultWriteSpeedLimit, false, 0)
 	err := CreateDirIfNotExist(meta.BufFile())
 	if err != nil {

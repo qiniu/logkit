@@ -74,7 +74,7 @@ var (
 		Required:     false,
 		Placeholder:  "new_field_keyname",
 		DefaultNoUse: false,
-		Description:  "新的字段名",
+		Description:  "新的字段名(new)",
 		Type:         TransformTypeString,
 	}
 	KeyFieldNewRequired = Option{
@@ -84,7 +84,7 @@ var (
 		Required:     true,
 		Placeholder:  "new_field_keyname",
 		DefaultNoUse: false,
-		Description:  "解析后数据的字段名",
+		Description:  "解析后数据的字段名(new)",
 		Type:         TransformTypeString,
 	}
 	KeyTimezoneoffset = Option{

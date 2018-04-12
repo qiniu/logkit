@@ -138,20 +138,23 @@ const qiniulogHeadPatthern = "[1-9]\\d{3}/[0-1]\\d/[0-3]\\d [0-2]\\d:[0-6]\\d:[0
 
 // NewRunner 创建Runner
 func NewRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal) (runner Runner, err error) {
-	return NewLogExportRunner(rc, cleanChan, parser.NewParserRegistry(), sender.NewSenderRegistry())
+	return NewLogExportRunner(rc, cleanChan, reader.NewReaderRegistry(), parser.NewParserRegistry(), sender.NewSenderRegistry())
 }
 
-func NewCustomRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, ps *parser.ParserRegistry, sr *sender.SenderRegistry) (runner Runner, err error) {
+func NewCustomRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *reader.ReaderRegistry, ps *parser.ParserRegistry, sr *sender.SenderRegistry) (runner Runner, err error) {
 	if ps == nil {
 		ps = parser.NewParserRegistry()
 	}
 	if sr == nil {
 		sr = sender.NewSenderRegistry()
 	}
+	if rr == nil {
+		rr = reader.NewReaderRegistry()
+	}
 	if rc.MetricConfig != nil {
 		return NewMetricRunner(rc, sr)
 	}
-	return NewLogExportRunner(rc, cleanChan, ps, sr)
+	return NewLogExportRunner(rc, cleanChan, rr, ps, sr)
 }
 
 func NewRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.LogParser, transformers []transforms.Transformer,
@@ -219,7 +222,7 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 	return runner, nil
 }
 
-func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, ps *parser.ParserRegistry, sr *sender.SenderRegistry) (runner *LogExportRunner, err error) {
+func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *reader.ReaderRegistry, ps *parser.ParserRegistry, sr *sender.SenderRegistry) (runner *LogExportRunner, err error) {
 	runnerInfo := RunnerInfo{
 		EnvTag:           rc.EnvTag,
 		RunnerName:       rc.RunnerName,
@@ -273,7 +276,7 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, p
 		return nil, err
 	}
 	if len(rc.CleanerConfig) > 0 {
-		rd, err = reader.NewFileBufReaderWithMeta(rc.ReaderConfig, meta, rc.IsInWebFolder)
+		rd, err = rr.NewReaderWithMeta(rc.ReaderConfig, meta, false)
 		if err != nil {
 			return nil, err
 		}
@@ -282,7 +285,7 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, p
 			return nil, err
 		}
 	} else {
-		rd, err = reader.NewFileBufReaderWithMeta(rc.ReaderConfig, meta, rc.IsInWebFolder)
+		rd, err = rr.NewReaderWithMeta(rc.ReaderConfig, meta, false)
 		if err != nil {
 			return nil, err
 		}

@@ -66,7 +66,7 @@ const (
 	StatusRunning
 )
 
-func NewSQLReader(meta *Meta, conf conf.MapConf) (mr *SqlReader, err error) {
+func NewSQLReader(meta *Meta, conf conf.MapConf) (ret Reader, err error) {
 	var readBatch int
 	var dbtype, dataSource, database, rawSqls, cronSchedule, offsetKey string
 	var execOnStart bool
@@ -171,7 +171,7 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (mr *SqlReader, err error) {
 
 	offsets, sqls, omitMeta := restoreMeta(meta, rawSqls)
 
-	mr = &SqlReader{
+	mr := &SqlReader{
 		datasource:  dataSource,
 		database:    database,
 		rawsqls:     rawSqls,

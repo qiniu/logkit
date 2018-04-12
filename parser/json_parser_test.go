@@ -60,7 +60,7 @@ func TestJsonParser(t *testing.T) {
 	m, err := p.Parse(tests[0].in)
 	if err != nil {
 		errx, _ := err.(*StatsError)
-		assert.Equal(t, int64(1), errx.StatsInfo.Errors)
+		assert.Equal(t, int64(0), errx.StatsInfo.Errors)
 	}
 	if len(m) != 1 {
 		t.Fatalf("parse lines error, expect 1 line but got %v lines", len(m))
@@ -102,10 +102,10 @@ func TestJsonParserForErrData(t *testing.T) {
 	m, err := p.Parse(testIn)
 	if err != nil {
 		errx, _ := err.(*StatsError)
-		assert.Equal(t, int64(1), errx.StatsInfo.Errors)
+		assert.Equal(t, int64(0), errx.StatsInfo.Errors)
 	}
-	if len(m) != 2 {
-		t.Fatalf("parse lines error, expect 2 lines but got %v lines", len(m))
+	if len(m) != 1 {
+		t.Fatalf("parse lines error, expect 1 lines but got %v lines", len(m))
 	}
 	assert.EqualValues(t, testExp, m[0])
 
@@ -269,4 +269,21 @@ func BenchmarkMiddlelineWithConfigParser(b *testing.B) {
 			b.Error(err)
 		}
 	}
+}
+
+func TestParseMutiLineJson(t *testing.T) {
+
+	c := conf.MapConf{}
+	c[KeyParserName] = "TestParseMutiLineJson"
+	c[KeyParserType] = "json"
+	c[KeyDisableRecordErrData] = "false"
+	p, _ := NewJsonParser(c)
+	data := `[{"name":"ethancai", "fansCount": 9223372036854775807}]`
+	res, err := p.Parse([]string{data})
+	errx, _ := err.(*StatsError)
+	err = errx.ErrorDetail
+	assert.NoError(t, err)
+
+	exp := []Data{{"name": "ethancai", "fansCount": json.Number("9223372036854775807")}}
+	assert.Equal(t, exp, res)
 }

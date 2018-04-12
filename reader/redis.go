@@ -64,7 +64,7 @@ type RedisOptionn struct {
 	timeout time.Duration
 }
 
-func NewRedisReader(meta *Meta, conf conf.MapConf) (rr *RedisReader, err error) {
+func NewRedisReader(meta *Meta, conf conf.MapConf) (rr Reader, err error) {
 	dataType, err := conf.GetString(KeyRedisDataType)
 	if err != nil {
 		return

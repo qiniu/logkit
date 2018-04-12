@@ -51,8 +51,7 @@ func Test_BuffReader(t *testing.T) {
 		"reader_buf_size": "24",
 		"read_from":       "oldest",
 	}
-	isFromWeb := false
-	r, err := NewFileBufReader(c, isFromWeb)
+	r, err := NewFileBufReader(c, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -98,8 +97,7 @@ func Test_Datasource(t *testing.T) {
 		"reader_buf_size": "18",
 		"read_from":       "oldest",
 	}
-	isFromWeb := false
-	r, err := NewFileBufReader(c, isFromWeb)
+	r, err := NewFileBufReader(c, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -133,8 +131,7 @@ func Test_BuffReaderBufSizeLarge(t *testing.T) {
 		"reader_buf_size": "1024",
 		"read_from":       "oldest",
 	}
-	isFromWeb := false
-	r, err := NewFileBufReader(c, isFromWeb)
+	r, err := NewFileBufReader(c, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -168,8 +165,7 @@ func Test_GBKEncoding(t *testing.T) {
 		"read_from":       "oldest",
 		"encoding":        "gb18030",
 	}
-	isFromWeb := false
-	r, err := NewFileBufReader(c, isFromWeb)
+	r, err := NewFileBufReader(c, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -203,8 +199,7 @@ func Test_NoPanicEncoding(t *testing.T) {
 		"read_from":       "oldest",
 		"encoding":        "nopanic",
 	}
-	isFromWeb := false
-	r, err := NewFileBufReader(c, isFromWeb)
+	r, err := NewFileBufReader(c, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -237,8 +232,7 @@ func Test_BuffReaderMultiLine(t *testing.T) {
 		"read_from":       "oldest",
 		"head_pattern":    "^test*",
 	}
-	isFromWeb := false
-	r, err := NewFileBufReader(c, isFromWeb)
+	r, err := NewFileBufReader(c, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -257,7 +251,7 @@ func Test_BuffReaderMultiLine(t *testing.T) {
 		assert.NoError(t, err)
 	}
 	r.Close()
-	r, err = NewFileBufReader(c, isFromWeb)
+	r, err = NewFileBufReader(c, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -291,8 +285,7 @@ func Test_BuffReaderStats(t *testing.T) {
 		"mode":      DirMode,
 		"read_from": "oldest",
 	}
-	isFromWeb := false
-	r, err := NewFileBufReader(c, isFromWeb)
+	r, err := NewFileBufReader(c, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -318,12 +311,11 @@ func Test_FileNotFound(t *testing.T) {
 		"reader_buf_size": "24",
 		"read_from":       "oldest",
 	}
-	isFromWeb := true
-	r, err := NewFileBufReader(c, isFromWeb)
+	r, err := NewFileBufReader(c, true)
 	assert.Error(t, err)
 
 	c["log_path"] = filepath.Join(dir, files[0])
-	r, err = NewFileBufReader(c, isFromWeb)
+	r, err = NewFileBufReader(c, true)
 	assert.NoError(t, err)
 	rest := []string{}
 	for {

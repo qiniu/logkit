@@ -13,6 +13,7 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/Shopify/sarama"
+	"github.com/qiniu/logkit/conf"
 	"github.com/wvanbergen/kafka/consumergroup"
 )
 
@@ -42,8 +43,24 @@ type KafkaReader struct {
 	statsLock  *sync.RWMutex
 }
 
-func NewKafkaReader(meta *Meta, consumerGroup string,
-	topics []string, zookeeper []string, zkchroot string, zookeeperTimeout time.Duration, whence string) (kr *KafkaReader, err error) {
+func NewKafkaReader(meta *Meta, conf conf.MapConf) (kr Reader, err error) {
+
+	whence, _ := conf.GetStringOr(KeyWhence, WhenceOldest)
+	consumerGroup, err := conf.GetString(KeyKafkaGroupID)
+	if err != nil {
+		return nil, err
+	}
+	topics, err := conf.GetStringList(KeyKafkaTopic)
+	if err != nil {
+		return nil, err
+	}
+	zookeeperTimeout, _ := conf.GetIntOr(KeyKafkaZookeeperTimeout, 1)
+
+	zookeeper, err := conf.GetStringList(KeyKafkaZookeeper)
+	if err != nil {
+		return nil, err
+	}
+	zkchroot, _ := conf.GetStringOr(KeyKafkaZookeeperChroot, "")
 	offsets := make(map[string]map[int32]int64)
 	for _, v := range topics {
 		offsets[v] = make(map[int32]int64)
@@ -52,7 +69,7 @@ func NewKafkaReader(meta *Meta, consumerGroup string,
 		meta:             meta,
 		ConsumerGroup:    consumerGroup,
 		ZookeeperPeers:   zookeeper,
-		ZookeeperTimeout: zookeeperTimeout,
+		ZookeeperTimeout: time.Duration(zookeeperTimeout) * time.Second,
 		ZookeeperChroot:  zkchroot,
 		Topics:           topics,
 		Whence:           whence,

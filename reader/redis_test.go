@@ -15,7 +15,8 @@ func TestNewRedisReader(t *testing.T) {
 		KeyRedisKey:      "mykey",
 	}
 
-	rr, err := NewRedisReader(nil, myconf)
+	rrr, err := NewRedisReader(nil, myconf)
+	rr := rrr.(*RedisReader)
 	assert.NoError(t, err)
 	assert.Equal(t, StatsInfo{}, rr.Status())
 }

@@ -310,7 +310,7 @@ func (sf *SeqFile) nextFile() (fi os.FileInfo, err error) {
 			return
 		}
 		// 当前读取的文件已经被删除
-		log.Warnf("Runner[%v] stat current file [%v] error %v, start to find the oldest file", sf.meta.RunnerName, sf.currFile, err)
+		log.Debugf("Runner[%v] stat current file [%v] error %v, start to find the oldest file", sf.meta.RunnerName, sf.currFile, err)
 		condition = sf.getIgnoreCondition()
 	} else {
 		newerThanCurrFile := func(f os.FileInfo) bool {
@@ -364,7 +364,7 @@ func (sf *SeqFile) isNewFile(newFileInfo os.FileInfo, filePath string) bool {
 func (sf *SeqFile) newOpen() (err error) {
 	fi, err1 := sf.nextFile()
 	if os.IsNotExist(err1) {
-		return fmt.Errorf("did'n find any file in dir %s - nextFile: %v", sf.dir, err1)
+		return fmt.Errorf("can not find any file in dir %s - nextFile: %v", sf.dir, err1)
 	}
 	if err1 != nil {
 		return fmt.Errorf("read file in dir %s error - nextFile: %v", sf.dir, err1)

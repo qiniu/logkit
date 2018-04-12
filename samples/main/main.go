@@ -14,6 +14,7 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/reader"
 )
 
 type Config struct {
@@ -45,7 +46,9 @@ func main() {
 	sregistry := sender.NewSenderRegistry()
 	sregistry.RegisterSender("mysender", samples.NewMySender)
 
-	m, err := mgr.NewCustomManager(conf.ManagerConfig, pregistry, sregistry)
+	rr :=reader.NewReaderRegistry()
+
+	m, err := mgr.NewCustomManager(conf.ManagerConfig, rr,pregistry, sregistry)
 	if err != nil {
 		log.Fatalf("NewManager: %v", err)
 	}

@@ -542,10 +542,3 @@ func createDiscardTransformer(key string) (transforms.Transformer, error) {
 	}
 	return trans, nil
 }
-
-func Bool2String(i bool) string {
-	if i {
-		return "true"
-	}
-	return "false"
-}

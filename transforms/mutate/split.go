@@ -78,7 +78,16 @@ func (g *Spliter) SampleConfig() string {
 func (g *Spliter) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
-		transforms.KeyFieldNewRequired,
+		{
+			KeyName:      "newfield",
+			ChooseOnly:   false,
+			Default:      "",
+			Required:     true,
+			Placeholder:  "new_field_keyname",
+			DefaultNoUse: false,
+			Description:  "解析后数据的字段名(newfield)",
+			Type:         transforms.TransformTypeString,
+		},
 		{
 			KeyName:      "sep",
 			ChooseOnly:   false,

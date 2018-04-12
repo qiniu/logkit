@@ -175,6 +175,10 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 	} else {
 		meta.extrainfo = make(map[string]string)
 	}
+	decoder, _ := conf.GetStringOr(KeyEncoding, "")
+	if decoder != "" {
+		meta.SetEncodingWay(strings.ToLower(decoder))
+	}
 	meta.dataSourceTag = datasourceTag
 	meta.readlimit = readlimit * 1024 * 1024 //readlimit*MB
 	meta.RunnerName = runnerName

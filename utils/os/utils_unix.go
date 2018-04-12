@@ -3,7 +3,6 @@
 package os
 
 import (
-	"fmt"
 	"os"
 	"syscall"
 )
@@ -25,7 +24,6 @@ func getInode(f os.FileInfo) uint64 {
 func GetIdentifyIDByPath(path string) (uint64, error) {
 	fi, err := os.Stat(path)
 	if err != nil {
-		err = fmt.Errorf("os.Stat(%v) error %v", path, err)
 		return 0, err
 	}
 	inode := getInode(fi)
