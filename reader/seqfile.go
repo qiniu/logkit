@@ -364,7 +364,7 @@ func (sf *SeqFile) isNewFile(newFileInfo os.FileInfo, filePath string) bool {
 func (sf *SeqFile) newOpen() (err error) {
 	fi, err1 := sf.nextFile()
 	if os.IsNotExist(err1) {
-		return fmt.Errorf("did'n find any file in dir %s - nextFile: %v", sf.dir, err1)
+		return fmt.Errorf("can not find any file in dir %s - nextFile: %v", sf.dir, err1)
 	}
 	if err1 != nil {
 		return fmt.Errorf("read file in dir %s error - nextFile: %v", sf.dir, err1)
