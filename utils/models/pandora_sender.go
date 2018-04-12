@@ -43,6 +43,7 @@ const (
 	KeyPandoraAutoConvertDate = "pandora_auto_convert_date"
 	KeyIgnoreInvalidField     = "ignore_invalid_field"
 	KeyPandoraUnescape        = "pandora_unescape"
+	KeyInsecureServer         = "insecure_server"
 
 	PandoraUUID = "Pandora_UUID"
 
