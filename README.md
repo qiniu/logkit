@@ -1,6 +1,4 @@
-# logkit
-
-[![Build Status](https://api.travis-ci.org/qiniu/logkit.svg)](http://travis-ci.org/qiniu/logkit)
+# logkit [![Build Status](https://api.travis-ci.org/qiniu/logkit.svg)](http://travis-ci.org/qiniu/logkit)
 
 ![logkit LOGO](https://raw.githubusercontent.com/qiniu/logkit/master/resources/logo.png)
 
@@ -111,9 +109,8 @@ logkit.conf是logkit工具基础配置文件，主要用于指定logkit运行时
 1. `bind_host` logkit页面绑定的端口号，启动后可以根据这个页面配置logkit。
 1. `static_root_path` logkit页面的静态资源路径，**强烈建议写成绝对路径** 注意：老版本的移动到了 "public-old"文件夹。
 1. `confs_path` 除了通过页面配置添加以外，logkit还支持直接监控文件夹添加runner。（如果您只通过页面添加logkit runner，那么无需修改此配置）
-  
-    列表中的每一项都是一个runner的配置文件夹，如果每一项中文件夹下配置发生增加、减少或者变更，logkit会相应的增加、减少或者变更runner，配置文件夹中的每个配置文件都代表了一个runner。该指定了一个runner的配置文件夹，这个配置文件夹下面每个以.conf结尾的文件就代表了一个运行的runner，也就代表了一个logkit正在运行的推送数据的线程。
 
+    列表中的每一项都是一个runner的配置文件夹，如果每一项中文件夹下配置发生增加、减少或者变更，logkit会相应的增加、减少或者变更runner，配置文件夹中的每个配置文件都代表了一个runner。该指定了一个runner的配置文件夹，这个配置文件夹下面每个以.conf结尾的文件就代表了一个运行的runner，也就代表了一个logkit正在运行的推送数据的线程。
 
 ### 3. 启动logkit工具
 
