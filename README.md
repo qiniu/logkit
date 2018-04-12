@@ -96,7 +96,7 @@ wget https://pandora-dl.qiniu.com/logkit_${LOGKIT_VERSION}.tar.gz && tar xvf log
 
 ```
 export LOGKIT_VERSION=<version number>
-wget https://pandora-dl.qiniu.com/logkit_${LOGKIT_VERSION}.tar.gz && tar xvf logkit_${LOGKIT_VERSION}.tar.gz && rm logkit_${LOGKIT_VERSION}.tar.gz && cd _package_mac/
+wget https://pandora-dl.qiniu.com/logkit_mac_${LOGKIT_VERSION}.tar.gz && tar xvf logkit_mac_${LOGKIT_VERSION}.tar.gz && rm logkit_mac_${LOGKIT_VERSION}.tar.gz && cd _package_mac/
 ```
 
 **Windows 版本**
