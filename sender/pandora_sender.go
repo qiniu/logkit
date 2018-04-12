@@ -100,6 +100,7 @@ type PandoraOption struct {
 	useragent          string
 	logkitSendTime     bool
 	UnescapeLine       bool
+	insecureServer     bool
 
 	isMetrics      bool
 	numberUseFloat bool
@@ -181,6 +182,7 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	isMetrics, _ := conf.GetBoolOr(KeyIsMetrics, false)
 	numberUseFloat, _ := conf.GetBoolOr(KeyNumberUseFloat, false)
 	unescape, _ := conf.GetBoolOr(KeyPandoraUnescape, false)
+	insecureServer, _ := conf.GetBoolOr(KeyInsecureServer, false)
 
 	var subErr error
 	var tokens Tokens
@@ -248,6 +250,7 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 		numberUseFloat: numberUseFloat,
 		isMetrics:      isMetrics,
 		UnescapeLine:   unescape,
+		insecureServer: insecureServer,
 
 		tokens:    tokens,
 		tokenLock: new(sync.RWMutex),
@@ -366,7 +369,7 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 		WithRequestRateLimit(opt.reqRateLimit).
 		WithFlowRateLimit(opt.flowRateLimit).
 		WithGzipData(opt.gzip).
-		WithHeaderUserAgent(opt.useragent)
+		WithHeaderUserAgent(opt.useragent).WithInsecureServer(opt.insecureServer)
 	if opt.logdbendpoint != "" {
 		config = config.WithLogDBEndpoint(opt.logdbendpoint)
 	}

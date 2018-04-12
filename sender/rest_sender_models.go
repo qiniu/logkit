@@ -433,6 +433,16 @@ var ModeKeyOptions = map[string][]Option{
 			Advance:       true,
 			ToolTip:       `在pandora服务端反转译\\n=>\n, \\t=>\t; 由于pandora数据上传的编码方式会占用\t和\n这两个符号，所以在sdk中打点时会默认把\t转译为\\t，把\n转译为\\n，开启这个选项就是在服务端把这个反转译回来。开启该选项也会转译数据中原有的这些\\t和\\n符号`,
 		},
+		{
+			KeyName:       KeyInsecureServer,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"false", "true"},
+			Default:       "false",
+			DefaultNoUse:  false,
+			Description:   "认证不验证(insecure_server)",
+			Advance:       true,
+			ToolTip:       `对于https等情况不对证书和安全性检验`,
+		},
 	},
 	TypeMongodbAccumulate: {
 		{
