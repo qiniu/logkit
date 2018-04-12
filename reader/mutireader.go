@@ -71,8 +71,7 @@ func NewActiveReader(originPath, realPath, whence string, meta *Meta, msgChan ch
 		return nil, err
 	}
 	subMeta.readlimit = meta.readlimit
-	isFromWeb := false
-	fr, err := NewSingleFile(subMeta, realPath, whence, isFromWeb)
+	fr, err := NewSingleFile(subMeta, realPath, whence, false)
 	if err != nil {
 		return
 	}

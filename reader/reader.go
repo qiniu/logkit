@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"errors"
+
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	. "github.com/qiniu/logkit/utils/models"
@@ -131,7 +132,7 @@ const (
 	KeyScriptCron        = "script_cron"
 	KeyScriptExecOnStart = "script_exec_onstart"
 
-	KeyIsFromWeb = "isFromWeb"
+	KeyErrDirectReturn = "errDirectReturn"
 )
 
 var defaultIgnoreFileSuffix = []string{
@@ -174,9 +175,9 @@ const (
 	Loop = "loop"
 )
 
-func NewFileBufReader(conf conf.MapConf, isFromWeb bool) (reader Reader, err error) {
-	rs:=NewReaderRegistry()
-	return rs.NewReader(conf,isFromWeb)
+func NewFileBufReader(conf conf.MapConf, errDirectReturn bool) (reader Reader, err error) {
+	rs := NewReaderRegistry()
+	return rs.NewReader(conf, errDirectReturn)
 }
 
 // ReaderRegistry reader 的工厂类。可以注册自定义reader
@@ -218,18 +219,19 @@ func (registry *ReaderRegistry) RegisterReader(readerType string, constructor fu
 	return nil
 }
 
-func (r *ReaderRegistry) NewReader(conf conf.MapConf, isFromWeb bool) (reader Reader, err error) {
-
-	conf[KeyIsFromWeb] = Bool2String(isFromWeb)
+func (r *ReaderRegistry) NewReader(conf conf.MapConf, errDirectReturn bool) (reader Reader, err error) {
 	meta, err := NewMetaWithConf(conf)
 	if err != nil {
 		log.Warn(err)
 		return
 	}
-	return r.NewReaderWithMeta(conf, meta, isFromWeb)
+	return r.NewReaderWithMeta(conf, meta, errDirectReturn)
 }
 
-func (r *ReaderRegistry) NewReaderWithMeta(conf conf.MapConf, meta *Meta, isFromWeb bool) (reader Reader, err error) {
+func (r *ReaderRegistry) NewReaderWithMeta(conf conf.MapConf, meta *Meta, errDirectReturn bool) (reader Reader, err error) {
+	if errDirectReturn {
+		conf[KeyErrDirectReturn] = Bool2String(errDirectReturn)
+	}
 	mode, _ := conf.GetStringOr(KeyMode, ModeDir)
 	headPattern, _ := conf.GetStringOr(KeyHeadPattern, "")
 
@@ -269,7 +271,6 @@ func NewFileDirReader(meta *Meta, conf conf.MapConf) (reader Reader, err error) 
 }
 
 func NewSingleFileReader(meta *Meta, conf conf.MapConf) (reader Reader, err error) {
-	isFromWeb, _ := conf.GetBoolOr(KeyIsFromWeb, false)
 
 	logpath, err := conf.GetString(KeyLogPath)
 	if err != nil {
@@ -277,7 +278,9 @@ func NewSingleFileReader(meta *Meta, conf conf.MapConf) (reader Reader, err erro
 	}
 	bufSize, _ := conf.GetIntOr(KeyBufSize, defaultBufSize)
 	whence, _ := conf.GetStringOr(KeyWhence, WhenceOldest)
-	fr, err := NewSingleFile(meta, logpath, whence, isFromWeb)
+	errDirectReturn, _ := conf.GetBoolOr(KeyErrDirectReturn, false)
+
+	fr, err := NewSingleFile(meta, logpath, whence, errDirectReturn)
 	if err != nil {
 		return
 	}

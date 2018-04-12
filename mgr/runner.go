@@ -276,8 +276,7 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 		return nil, err
 	}
 	if len(rc.CleanerConfig) > 0 {
-
-		rd, err = rr.NewReaderWithMeta(rc.ReaderConfig, meta, rc.IsInWebFolder)
+		rd, err = rr.NewReaderWithMeta(rc.ReaderConfig, meta, false)
 		if err != nil {
 			return nil, err
 		}
@@ -286,7 +285,7 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 			return nil, err
 		}
 	} else {
-		rd, err = rr.NewReaderWithMeta(rc.ReaderConfig, meta, rc.IsInWebFolder)
+		rd, err = rr.NewReaderWithMeta(rc.ReaderConfig, meta, false)
 		if err != nil {
 			return nil, err
 		}

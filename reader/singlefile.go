@@ -35,7 +35,7 @@ type SingleFile struct {
 	meta *Meta // 记录offset的元数据
 }
 
-func NewSingleFile(meta *Meta, path, whence string, isFromWeb bool) (sf *SingleFile, err error) {
+func NewSingleFile(meta *Meta, path, whence string, errDirectReturn bool) (sf *SingleFile, err error) {
 	var pfi os.FileInfo
 	var f *os.File
 	originpath := path
@@ -43,7 +43,7 @@ func NewSingleFile(meta *Meta, path, whence string, isFromWeb bool) (sf *SingleF
 	for {
 		path, pfi, err = GetRealPath(path)
 		if err != nil || pfi == nil {
-			if isFromWeb {
+			if errDirectReturn {
 				return sf, fmt.Errorf("runner[%v] %s - utils.GetRealPath failed, err:%v", meta.RunnerName, path, err)
 			}
 			log.Warnf("Runner[%v] %s - utils.GetRealPath failed, err:%v", meta.RunnerName, path, err)
@@ -51,7 +51,7 @@ func NewSingleFile(meta *Meta, path, whence string, isFromWeb bool) (sf *SingleF
 			continue
 		}
 		if !pfi.Mode().IsRegular() {
-			if isFromWeb {
+			if errDirectReturn {
 				return sf, fmt.Errorf("runner[%v] %s - file failed, err: file is not regular", meta.RunnerName, path)
 			}
 			log.Warnf("Runner[%v] %s - file failed, err: file is not regular", meta.RunnerName, path)
@@ -60,7 +60,7 @@ func NewSingleFile(meta *Meta, path, whence string, isFromWeb bool) (sf *SingleF
 		}
 		f, err = os.Open(path)
 		if err != nil {
-			if isFromWeb {
+			if errDirectReturn {
 				return sf, fmt.Errorf("runner[%v] %s - open file err:%v", meta.RunnerName, path, err)
 			}
 			log.Warnf("Runner[%v] %s - open file err:%v", meta.RunnerName, path, err)
