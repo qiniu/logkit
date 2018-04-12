@@ -69,7 +69,7 @@ logkit本身支持多种数据源，并且可以同时发送多个数据源的�
 
 ## 安装与使用
 
-### 下载&解压logkit工具
+### 1. 下载&解压logkit工具
 
 * Linux 版本
 
@@ -89,7 +89,7 @@ wget https://pandora-dl.qiniu.com/logkit_mac_${LOGKIT_VERSION}.tar.gz && tar xvf
 
 请下载 `https://pandora-dl.qiniu.com/logkit_windows_<LOGKIT_VERSION>.zip` 并解压缩，进入目录
 
-### 修改logkit基本配置
+### 2. 修改logkit基本配置
 
 logkit.conf是logkit工具基础配置文件，主要用于指定logkit运行时需要的资源和各个runner配置文件的具体路径。
 
@@ -115,13 +115,13 @@ logkit.conf是logkit工具基础配置文件，主要用于指定logkit运行时
     列表中的每一项都是一个runner的配置文件夹，如果每一项中文件夹下配置发生增加、减少或者变更，logkit会相应的增加、减少或者变更runner，配置文件夹中的每个配置文件都代表了一个runner。该指定了一个runner的配置文件夹，这个配置文件夹下面每个以.conf结尾的文件就代表了一个运行的runner，也就代表了一个logkit正在运行的推送数据的线程。
 
 
-### 启动logkit工具
+### 3. 启动logkit工具
 
 ``` sh
 ./logkit -f logkit.conf
 ```
 
-### 通过浏览器打开logkit配置页面
+### 4. 通过浏览器打开logkit配置页面
 
 浏览器访问的地址就是您在第2步中填写的 `bind_host` 选项地址
 
