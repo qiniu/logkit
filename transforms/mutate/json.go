@@ -37,6 +37,9 @@ func (g *Json) Transform(datas []Data) ([]Data, error) {
 			err = fmt.Errorf("transform key %v data type is not string", g.Key)
 			continue
 		}
+		if strval == "" {
+			continue
+		}
 		jsonVal, perr := parseJson(g.jsonTool, strval)
 		if perr != nil {
 			errCount++
