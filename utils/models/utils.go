@@ -198,7 +198,7 @@ func ExtractField(slice []string) ([]string, error) {
 		}
 	default:
 	}
-	err = fmt.Errorf("parameters error,  you can write two parameters like: %{[type]}, default or only one: default")
+	err = fmt.Errorf("parameters error,  you can write two parameters like: %%{[type]}, default or only one: default")
 	return nil, err
 }
 

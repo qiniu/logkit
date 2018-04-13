@@ -452,7 +452,7 @@ func (mr *MultiReader) Close() (err error) {
 			defer wg.Done()
 			xerr := mar.Close()
 			if xerr != nil {
-				log.Errorf("Runner[%v] Close ActiveReader %v error %v", mr.meta.RunnerName, ar.originpath, xerr)
+				log.Errorf("Runner[%v] Close ActiveReader %v error %v", mr.meta.RunnerName, mar.originpath, xerr)
 			}
 		}(ar)
 	}

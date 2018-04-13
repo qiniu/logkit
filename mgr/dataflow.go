@@ -55,8 +55,6 @@ func RawData(readerConfig conf.MapConf) (rawData string, err error) {
 		}
 		return
 	}
-
-	return
 }
 
 //parse模块中各种type的日志都能获取解析后的数据

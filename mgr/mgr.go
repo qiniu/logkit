@@ -663,7 +663,7 @@ func (m *Manager) AddRunner(name string, conf RunnerConfig) (err error) {
 	if err = m.backupRunnerConfig(filename, conf); err != nil {
 		// 回滚, 删除创建的 runner, 备份配置文件失败，所以此处不需要从磁盘删除配置文件
 		if rollBackErr := m.Remove(filename); rollBackErr != nil {
-			log.Errorf("runner <%v> backup RunnerConfig error and rollback error %v", rollBackErr)
+			log.Errorf("runner <%v> backup RunnerConfig error and rollback error %v", name, rollBackErr)
 		}
 	}
 	return
