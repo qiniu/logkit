@@ -164,7 +164,7 @@ func (h *HttpReader) storageData(r *bufio.Reader) (err error) {
 		line, err := h.readLine(r)
 		if err != nil {
 			if err != io.EOF {
-				fmt.Errorf("runner[%v] Reader[%v] read data from http request error, %v\n", h.meta.RunnerName, h.Name(), err)
+				log.Errorf("runner[%v] Reader[%v] read data from http request error, %v\n", h.meta.RunnerName, h.Name(), err)
 			}
 			break
 		}

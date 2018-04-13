@@ -219,7 +219,7 @@ func setDataValue(data map[string]interface{}, resp *http.Response, httpData Htt
 
 func compareExpectResult(expectCode, realCode int, expectData, realData string) (error, bool) {
 	if expectCode != realCode {
-		return fmt.Errorf("return status code is: %s, expect: %s", realCode, expectCode), false
+		return fmt.Errorf("return status code is: %d, expect: %d", realCode, expectCode), false
 	}
 	if expectData != "" && !strings.Contains(realData, expectData) {
 		return fmt.Errorf("don't contain: %s", expectData), false
