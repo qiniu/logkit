@@ -8,6 +8,8 @@ import (
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 
+	"strings"
+
 	"github.com/json-iterator/go"
 )
 
@@ -37,6 +39,7 @@ func (g *Json) Transform(datas []Data) ([]Data, error) {
 			err = fmt.Errorf("transform key %v data type is not string", g.Key)
 			continue
 		}
+		strval = strings.TrimSpace(strval)
 		if strval == "" {
 			continue
 		}
