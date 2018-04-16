@@ -3,6 +3,7 @@ package mutate
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
@@ -33,6 +34,10 @@ func (g *Xml) Transform(datas []Data) ([]Data, error) {
 		if !ok {
 			errCount++
 			err = fmt.Errorf("transform key %v data type is not string", g.Key)
+			continue
+		}
+		strval = strings.TrimSpace(strval)
+		if len(strval) < 1 {
 			continue
 		}
 		xmlVal, perr := parseXml(strval)
@@ -71,7 +76,7 @@ func parseXml(xmlStr string) (data map[string]interface{}, err error) {
 
 func (g *Xml) Description() string {
 	//return "parse xmlString to xml data"
-	return "解析xml"
+	return "解析xml, 将xml格式转变为map结构"
 }
 
 func (g *Xml) Type() string {

@@ -161,7 +161,7 @@ func (g *Script) RawTransform(datas []string) ([]string, error) {
 
 func (g *Script) Description() string {
 	//return "get script result"
-	return "获取脚本运行结果"
+	return "执行指定的脚本，并将脚本结果加入到数据中"
 }
 
 func (g *Script) Type() string {

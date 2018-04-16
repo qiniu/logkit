@@ -85,7 +85,7 @@ func parseJson(jsonTool jsoniter.API, jsonStr string) (data interface{}, err err
 
 func (g *Json) Description() string {
 	//return "parse jsonStr to json"
-	return "解析json"
+	return `解析json并加入到数据中，如json为 {"a":123}，加入后变为{"myNewKey":{"a":123}}`
 }
 
 func (g *Json) Type() string {

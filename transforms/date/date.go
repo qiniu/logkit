@@ -45,7 +45,7 @@ func (g *DateTrans) Transform(datas []Data) ([]Data, error) {
 	}
 	if err != nil {
 		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform replace, last error info is %v", errnums, err)
+		ferr = fmt.Errorf("find total %v erorrs in transform date, last error info is %v", errnums, err)
 	}
 	g.stats.Errors += int64(errnums)
 	g.stats.Success += int64(len(datas) - errnums)
@@ -116,7 +116,7 @@ func (g *DateTrans) formatWithUserOption(t time.Time) interface{} {
 
 func (g *DateTrans) Description() string {
 	//return "transform string/long to specified date format"
-	return "将string/long数据转换成指定的时间格式"
+	return "将string/long数据转换成指定的时间格式, 如 1523878855 变为 2018-04-16T19:40:55+08:00"
 }
 
 func (g *DateTrans) Type() string {

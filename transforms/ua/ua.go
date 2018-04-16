@@ -116,7 +116,7 @@ func (it *UATransformer) Transform(datas []Data) ([]Data, error) {
 	}
 	if err != nil {
 		it.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform IP, last error info is %v", errnums, err)
+		ferr = fmt.Errorf("find total %v erorrs in transform UserAgent, last error info is %v", errnums, err)
 	}
 	it.stats.Errors += int64(errnums)
 	it.stats.Success += int64(len(datas) - errnums)
@@ -125,7 +125,7 @@ func (it *UATransformer) Transform(datas []Data) ([]Data, error) {
 
 func (it *UATransformer) Description() string {
 	//return "transform UserAgent will parse user_agent string to detail information"
-	return "解析 User Agent 中的用户信息"
+	return "解析 User Agent 中的用户信息，包括浏览器型号、版本、系统信息、设备号等 "
 }
 
 func (it *UATransformer) Type() string {
@@ -146,7 +146,8 @@ func (it *UATransformer) ConfigOptions() []Option {
 		{
 			KeyName:      "regex_yml_path",
 			ChooseOnly:   false,
-			Default:      "/your/path/to/regexes.yaml",
+			Default:      "",
+			Placeholder:  "/your/path/to/regexes.yaml",
 			DefaultNoUse: true,
 			Description:  "UserAgent解析正则表达式文件路径(regex_yml_path)",
 			Type:         transforms.TransformTypeString,

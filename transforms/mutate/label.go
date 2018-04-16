@@ -47,7 +47,7 @@ func (g *Label) Transform(datas []Data) ([]Data, error) {
 
 func (g *Label) Description() string {
 	//return "label can add a field"
-	return "增加标签"
+	return `增加标签, 如设置标签{key:a,value:b}, 则数据中加入 {"a":"b"}`
 }
 
 func (g *Label) Type() string {

@@ -62,7 +62,7 @@ func (g *Converter) Transform(datas []Data) ([]Data, error) {
 
 func (g *Converter) Description() string {
 	//return "convert can use dsl to convert multi-field data to specify data type"
-	return "将dsl指定的多个数据字段和类型转换为指定的数据格式"
+	return `将dsl指定的多个数据字段和类型转换为指定的数据格式, 如将field1转为long则写为 "field1 long"`
 }
 
 func (g *Converter) Type() string {
