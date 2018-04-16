@@ -17,6 +17,7 @@ func TestParamTransformer(t *testing.T) {
 	data, err := par.Transform([]Data{
 		{"myword": "?platform=2&vid=372&vu=caea966558&chan=android_sougou&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
 		{"myword": "platform=2&vid=&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
+		{"myword": "/index/mytest?platform=2&vid=&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
 	})
 	assert.NoError(t, err)
 	exp := []Data{
@@ -36,6 +37,14 @@ func TestParamTransformer(t *testing.T) {
 			"myword_sign":      "ad225ec02942c79bdb710e3ad0cf1b43",
 			"myword_nonce_str": "1510555032",
 		},
+		{
+			"myword":                "/index/mytest?platform=2&vid=&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032",
+			"myword_platform":       "2",
+			"myword_vu":             "caea966558",
+			"myword_sign":           "ad225ec02942c79bdb710e3ad0cf1b43",
+			"myword_nonce_str":      "1510555032",
+			"myword_url_param_path": "/index/mytest",
+		},
 	}
 	assert.Equal(t, len(exp), len(data))
 	for i, ex := range exp {
@@ -47,7 +56,7 @@ func TestParamTransformer(t *testing.T) {
 		}
 	}
 	assert.Equal(t, par.Stage(), transforms.StageAfterParser)
-	assert.Equal(t, StatsInfo{Success: 2}, par.stats)
+	assert.Equal(t, StatsInfo{Success: 3}, par.stats)
 }
 
 func TestParamTransformerError(t *testing.T) {
