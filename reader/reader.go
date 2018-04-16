@@ -157,7 +157,7 @@ const (
 	ModeScript     = "script"
 	ModeSnmp       = "snmp"
 	ModeCloudWatch = "cloudwatch"
-	ModeClockTrail = "clocktrail"
+	ModeCloudTrail = "cloudtrail"
 )
 
 const (
@@ -205,7 +205,7 @@ func NewReaderRegistry() *ReaderRegistry {
 	ret.RegisterReader(ModeScript, NewScriptReader)
 	ret.RegisterReader(ModeSnmp, NewSnmpReader)
 	ret.RegisterReader(ModeCloudWatch, NewCloudWatchReader)
-	ret.RegisterReader(ModeClockTrail, NewClockTrailReader)
+	ret.RegisterReader(ModeCloudTrail, NewCloudTrailReader)
 
 	return ret
 }

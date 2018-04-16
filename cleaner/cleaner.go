@@ -50,7 +50,7 @@ func NewCleaner(conf conf.MapConf, meta *reader.Meta, cleanChan chan<- CleanSign
 		return
 	}
 	mode := meta.GetMode()
-	if mode != reader.ModeDir && mode != reader.ModeFile && mode != reader.ModeClockTrail {
+	if mode != reader.ModeDir && mode != reader.ModeFile && mode != reader.ModeCloudTrail {
 		log.Errorf("cleaner only support reader mode dir|file|clocktrail, now mode is %v, cleaner disabled", meta.GetMode())
 		return
 	}

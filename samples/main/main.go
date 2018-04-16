@@ -46,9 +46,9 @@ func main() {
 	sregistry := sender.NewSenderRegistry()
 	sregistry.RegisterSender("mysender", samples.NewMySender)
 
-	rr :=reader.NewReaderRegistry()
+	rr := reader.NewReaderRegistry()
 
-	m, err := mgr.NewCustomManager(conf.ManagerConfig, rr,pregistry, sregistry)
+	m, err := mgr.NewCustomManager(conf.ManagerConfig, rr, pregistry, sregistry)
 	if err != nil {
 		log.Fatalf("NewManager: %v", err)
 	}
