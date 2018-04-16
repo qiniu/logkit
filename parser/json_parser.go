@@ -3,6 +3,8 @@ package parser
 import (
 	"fmt"
 
+	"strings"
+
 	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
@@ -48,6 +50,7 @@ func (im *JsonParser) Parse(lines []string) ([]Data, error) {
 	datas := []Data{}
 	se := &StatsError{}
 	for idx, line := range lines {
+		line = strings.TrimSpace(line)
 		if len(line) <= 0 {
 			continue
 		}
