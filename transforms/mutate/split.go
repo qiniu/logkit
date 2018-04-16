@@ -59,7 +59,7 @@ func (g *Spliter) Transform(datas []Data) ([]Data, error) {
 
 func (g *Spliter) Description() string {
 	//return "split one field into array from data"
-	return "将指定的字段切割成数组"
+	return `将指定的字段切割成数组, 例如 "a,b,c" 切割为 ["a","b","c"]`
 }
 
 func (g *Spliter) Type() string {

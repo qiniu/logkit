@@ -95,4 +95,5 @@ func TestDateTransformer(t *testing.T) {
 		assert.Equal(t, transforms.StageAfterParser, tis.Stage())
 	}
 
+	fmt.Println(time.Now().Format(time.RFC3339), time.Now().Unix())
 }

@@ -138,10 +138,15 @@ func NewCloudWatchReader(meta *Meta, conf conf.MapConf) (c Reader, err error) {
 	for _, v := range dimensionList {
 		v = strings.TrimSpace(v)
 		sks := strings.Fields(v)
-		if len(sks) != 2 {
+		if len(sks) < 1 {
 			continue
 		}
-		dimensions = append(dimensions, &Dimension{sks[0], sks[1]})
+		var name, value string
+		name = sks[0]
+		if len(sks) > 1 {
+			value = sks[1]
+		}
+		dimensions = append(dimensions, &Dimension{name, value})
 	}
 	delayStr, _ := conf.GetStringOr(KeyDelay, "5m")
 	delay, err := time.ParseDuration(delayStr)
@@ -160,7 +165,7 @@ func NewCloudWatchReader(meta *Meta, conf conf.MapConf) (c Reader, err error) {
 		cfg.WithLogLevel(aws.LogDebug)
 	}
 	var Metrics []*Metric
-	if len(metrics) > 0 {
+	if len(metrics) > 0 || len(dimensions) > 0 {
 		Metrics = []*Metric{{MetricNames: metrics, Dimensions: dimensions}}
 	}
 
@@ -208,13 +213,16 @@ func (c *CloudWatch) ReadLine() (line string, err error) {
 	}
 	return
 }
+
 func (c *CloudWatch) SetMode(mode string, v interface{}) error {
 	return nil
 }
+
 func (c *CloudWatch) Close() error {
 	close(c.StopChan)
 	return nil
 }
+
 func (c *CloudWatch) SyncMeta() {}
 
 func SelectMetrics(c *CloudWatch) ([]*cloudwatch.Metric, error) {
@@ -223,7 +231,7 @@ func SelectMetrics(c *CloudWatch) ([]*cloudwatch.Metric, error) {
 	if len(c.Metrics) > 0 {
 		metrics = []*cloudwatch.Metric{}
 		for _, m := range c.Metrics {
-			if !hasWilcard(m.Dimensions) {
+			if !hasWilcard(m.Dimensions) || len(m.MetricNames) < 1 {
 				dimensions := make([]*cloudwatch.Dimension, len(m.Dimensions))
 				for k, d := range m.Dimensions {
 					dimensions[k] = &cloudwatch.Dimension{
@@ -399,7 +407,6 @@ func (c *CloudWatch) gatherMetric(metric *cloudwatch.Metric, now time.Time) (dat
 		}
 		datas = append(datas, data)
 	}
-
 	return
 }
 
@@ -455,6 +462,10 @@ func hasWilcard(dimensions []*Dimension) bool {
 func isSelected(name string, metric *cloudwatch.Metric, dimensions []*Dimension) bool {
 	if name != *metric.MetricName {
 		return false
+	}
+	// 啥dimension都没写，都选
+	if len(dimensions) < 1 {
+		return true
 	}
 	if len(metric.Dimensions) != len(dimensions) {
 		return false

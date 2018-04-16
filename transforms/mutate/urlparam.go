@@ -83,7 +83,7 @@ func (p *UrlParam) Transform(datas []Data) ([]Data, error) {
 	}
 	if err != nil {
 		p.stats.LastError = err.Error()
-		pErr = fmt.Errorf("find total %v erorrs in transform param, last error info is %v", errNums, err)
+		pErr = fmt.Errorf("find total %v erorrs in transform urlparam, last error info is %v", errNums, err)
 	}
 	p.stats.Errors += int64(errNums)
 	p.stats.Success += int64(len(datas) - errNums)

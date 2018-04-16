@@ -167,7 +167,7 @@ var log2exp2 = `{
 }`
 
 func TestClocktrailTransformer(t *testing.T) {
-	ct := &ClockTrail{}
+	ct := &CloudTrail{}
 	var data1, data1exp Data
 	err := jsoniter.Unmarshal([]byte(log1), &data1)
 	assert.NoError(t, err)
