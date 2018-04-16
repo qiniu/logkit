@@ -256,7 +256,7 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 		cl *cleaner.Cleaner
 	)
 	mode := rc.ReaderConfig["mode"]
-	if mode == reader.ModeClockTrail {
+	if mode == reader.ModeCloudTrail {
 		syncDir := rc.ReaderConfig[reader.KeySyncDirectory]
 		if syncDir == "" {
 			syncDir = reader.DefaultSyncDirectory

@@ -24,7 +24,7 @@ var ModeUsages = []KeyValue{
 	{ModeScript, "从脚本的执行结果中读取"},
 	{ModeSnmp, "从 SNMP 服务中读取"},
 	{ModeCloudWatch, "从 AWS Cloudwatch 中读取"},
-	{ModeClockTrail, "从 AWS ClockTrail 中读取"},
+	{ModeCloudTrail, "从 AWS CloudTrail 中读取"},
 }
 
 var (
@@ -1220,7 +1220,7 @@ var ModeKeyOptions = map[string][]Option{
 			ToolTipActive: true,
 		},
 	},
-	ModeClockTrail: {
+	ModeCloudTrail: {
 		{
 			KeyName:      KeyS3Region,
 			ChooseOnly:   false,

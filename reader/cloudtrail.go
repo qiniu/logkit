@@ -41,12 +41,12 @@ var (
 	ignoredSuffixes = []string{".json.gz"}
 )
 
-type ClockTrailReader struct {
+type CloudTrailReader struct {
 	*BufReader
 	syncMgr *syncManager
 }
 
-func NewClockTrailReader(meta *Meta, conf conf.MapConf) (Reader, error) {
+func NewCloudTrailReader(meta *Meta, conf conf.MapConf) (Reader, error) {
 	opts, err := buildSyncOptions(conf)
 	if err != nil {
 		return nil, err
@@ -66,7 +66,7 @@ func NewClockTrailReader(meta *Meta, conf conf.MapConf) (Reader, error) {
 		return nil, err
 	}
 
-	ctr := &ClockTrailReader{
+	ctr := &CloudTrailReader{
 		BufReader: br,
 		syncMgr:   syncMgr,
 	}
@@ -75,7 +75,7 @@ func NewClockTrailReader(meta *Meta, conf conf.MapConf) (Reader, error) {
 	return ctr, nil
 }
 
-func (ctr *ClockTrailReader) Close() error {
+func (ctr *CloudTrailReader) Close() error {
 	ctr.syncMgr.stopSync()
 	return ctr.BufReader.Close()
 }
