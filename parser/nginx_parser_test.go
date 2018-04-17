@@ -40,7 +40,7 @@ func TestNewNginxParser(t *testing.T) {
 	entry1S, err := p.Parse(accLog1)
 	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
-		assert.Equal(t, int64(1), c.Errors)
+		assert.Equal(t, int64(0), c.Errors)
 	}
 	entry1 := entry1S[0]
 	for k, v := range entry1 {
@@ -76,10 +76,10 @@ func TestNewNginxParserForErrData(t *testing.T) {
 	entry1S, err := p.Parse(accLog1)
 	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
-		assert.Equal(t, int64(1), c.Errors)
+		assert.Equal(t, int64(0), c.Errors)
 	}
-	if len(entry1S) != 2 {
-		t.Fatalf("parse lines error, expect 2 lines but got %v lines", len(entry1S))
+	if len(entry1S) != 1 {
+		t.Fatalf("parse lines error, expect 1 lines but got %v lines", len(entry1S))
 	}
 	entry1 := entry1S[0]
 	for k, v := range entry1 {

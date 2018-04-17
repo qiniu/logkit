@@ -125,7 +125,7 @@ func Test_QiniulogParser(t *testing.T) {
 	dts, err := p.Parse(lines)
 	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
-		assert.Equal(t, int64(1), c.Errors)
+		assert.Equal(t, int64(0), c.Errors)
 	}
 	if len(dts) != 4 {
 		t.Fatalf("parse lines error expect 4 but %v", len(dts))
@@ -195,10 +195,10 @@ func Test_QiniulogParserForErrData(t *testing.T) {
 	dts, err := p.Parse(lines)
 	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
-		assert.Equal(t, int64(1), c.Errors)
+		assert.Equal(t, int64(0), c.Errors)
 	}
-	if len(dts) != 2 {
-		t.Fatalf("parse lines error, expect 2 but %v", len(dts))
+	if len(dts) != 1 {
+		t.Fatalf("parse lines error, expect 1 but %v", len(dts))
 	}
 
 	if dts[0]["reqid"] != "Wm0AAPg-IUMW-68U" {

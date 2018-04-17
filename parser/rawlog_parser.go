@@ -49,16 +49,9 @@ func (p *RawlogParser) Parse(lines []string) ([]Data, error) {
 
 	se := &StatsError{}
 	datas := []Data{}
-	for idx, line := range lines {
+	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if len(line) <= 0 {
-			se.AddErrors()
-			se.ErrorIndex = append(se.ErrorIndex, idx)
-			if !p.disableRecordErrData {
-				errData := make(Data)
-				errData[KeyPandoraStash] = line
-				datas = append(datas, errData)
-			}
 			continue
 		}
 		d := Data{}

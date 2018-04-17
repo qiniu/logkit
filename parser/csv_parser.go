@@ -12,6 +12,8 @@ import (
 	"github.com/qiniu/logkit/times"
 	. "github.com/qiniu/logkit/utils/models"
 
+	"unicode"
+
 	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
 )
@@ -304,7 +306,7 @@ func makeValue(raw string, valueType CsvType, timeZoneOffset int) (interface{}, 
 		}
 		return ts, err
 	case TypeString:
-		return strings.TrimSpace(raw), nil
+		return raw, nil
 	default:
 		// 不应该走到这个分支上
 		return nil, dataTypeNotSupperted(valueType)
@@ -345,6 +347,9 @@ func convertValue(v interface{}, valueType CsvType) (ret interface{}, err error)
 }
 
 func (f field) ValueParse(value string, timeZoneOffset int) (datas Data, err error) {
+	if f.dataType != TypeString {
+		value = strings.TrimSpace(value)
+	}
 	datas = Data{}
 	switch f.dataType {
 	case TypeJsonMap:
@@ -435,7 +440,7 @@ func (p *CsvParser) parse(line string) (d Data, err error) {
 			d[p.allowMoreName+strconv.Itoa(moreNum)] = part
 			moreNum++
 		} else {
-			dts, err := p.schema[i].ValueParse(strings.TrimSpace(part), p.timeZoneOffset)
+			dts, err := p.schema[i].ValueParse(part, p.timeZoneOffset)
 			if err != nil {
 				err = fmt.Errorf("schema [%v] type [%v] value [%v] detail: %v", p.schema[i].name, p.schema[i].dataType, part, err)
 				if p.ignoreInvalid {
@@ -470,10 +475,25 @@ func (p *CsvParser) Rename(datas []Data) []Data {
 	return newData
 }
 
+func HasSpace(spliter string) bool {
+	for _, v := range spliter {
+		if unicode.IsSpace(v) {
+			return true
+		}
+	}
+	return false
+}
+
 func (p *CsvParser) Parse(lines []string) ([]Data, error) {
 	datas := []Data{}
 	se := &StatsError{}
 	for idx, line := range lines {
+		if !HasSpace(p.delim) {
+			line = strings.TrimSpace(line)
+		}
+		if len(line) <= 0 {
+			continue
+		}
 		d, err := p.parse(line)
 		if err != nil {
 			log.Debug(err)

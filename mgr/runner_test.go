@@ -379,11 +379,11 @@ func Test_RunForErrData(t *testing.T) {
 	}
 	time.Sleep(time.Second)
 	if err := ioutil.WriteFile(filepath.Join(logpath, "log2"), []byte(log2), 0666); err != nil {
-		log.Fatalf("write log3 fail %v", err)
+		log.Fatalf("write log2 fail %v", err)
 	}
 	time.Sleep(time.Second)
 	if err := ioutil.WriteFile(filepath.Join(logpath, "log3"), []byte(log3), 0666); err != nil {
-		log.Fatalf("write log2 fail %v", err)
+		log.Fatalf("write log3 fail %v", err)
 	}
 
 	exppath1 := filepath.Join(absLogpath, "log1")
@@ -432,7 +432,7 @@ func Test_RunForErrData(t *testing.T) {
 		t.Error(err)
 	}
 	senderConfigs := []conf.MapConf{
-		conf.MapConf{
+		{
 			"name":        "mock_sender",
 			"sender_type": "mock",
 		},
@@ -479,9 +479,7 @@ func Test_RunForErrData(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if len(dts) != 5 {
-		t.Errorf("got sender data not match error,expect 5 but %v", len(dts))
-	}
+	assert.Equal(t, 5, len(dts), "got sender data not match")
 	for idx, dt := range dts {
 		if _, ok := dt[KeyPandoraStash]; ok {
 			if dt["testtag"] == nil {

@@ -274,6 +274,10 @@ func (p *QiniulogParser) Parse(lines []string) ([]Data, error) {
 	datas := []Data{}
 	se := &StatsError{}
 	for idx, line := range lines {
+		line = strings.TrimSpace(line)
+		if len(line) <= 0 {
+			continue
+		}
 		d, err := p.parse(line)
 		if err != nil {
 			se.AddErrors()
