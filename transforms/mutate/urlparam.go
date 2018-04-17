@@ -12,14 +12,25 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+const urlParamPath = "url_param_path"
+
 type UrlParam struct {
 	Key   string `json:"key"`
 	stats StatsInfo
 }
 
 func (p *UrlParam) transformToMap(strVal string, key string) (map[string]interface{}, error) {
-	strVal = strings.TrimPrefix(strVal, "?")
 	resultMap := make(map[string]interface{})
+	if idx := strings.Index(strVal, "?"); idx != -1 {
+		if len(strVal[:idx]) != 0 {
+			resultMap[key+"_"+urlParamPath] = strVal[:idx]
+		}
+		strVal = strVal[idx+1:]
+	}
+	if len(strVal) < 1 {
+		return resultMap, nil
+	}
+
 	values, err := url.ParseQuery(strVal)
 	if err != nil {
 		return nil, err
