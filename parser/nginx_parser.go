@@ -111,6 +111,10 @@ func (p *NginxParser) Parse(lines []string) ([]Data, error) {
 	var ret []Data
 	se := &StatsError{}
 	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if len(line) <= 0 {
+			continue
+		}
 		data, err := p.parseline(line)
 		if err != nil {
 			se.ErrorDetail = err

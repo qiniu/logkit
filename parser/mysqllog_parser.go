@@ -2,6 +2,7 @@ package parser
 
 import (
 	"regexp"
+	"strings"
 
 	"github.com/Preetam/mysqllog"
 	"github.com/qiniu/logkit/conf"
@@ -69,6 +70,10 @@ func (p *MysqllogParser) Parse(lines []string) ([]Data, error) {
 	var datas []Data
 	se := &StatsError{}
 	for idx, line := range lines {
+		line = strings.TrimSpace(line)
+		if len(line) <= 0 {
+			continue
+		}
 		d, err := p.parse(line)
 		if err != nil {
 			se.AddErrors()

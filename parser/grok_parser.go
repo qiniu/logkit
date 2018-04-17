@@ -202,6 +202,10 @@ func (gp *GrokParser) Parse(lines []string) ([]Data, error) {
 	datas := []Data{}
 	se := &StatsError{}
 	for idx, line := range lines {
+		line = strings.TrimSpace(line)
+		if len(line) <= 0 {
+			continue
+		}
 		data, err := gp.parseLine(line)
 		if err != nil {
 			se.AddErrors()

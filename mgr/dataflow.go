@@ -241,26 +241,31 @@ func getRouterConfig(senderConfig map[string]interface{}) (router.RouterConfig, 
 }
 
 // trySend 尝试发送数据，如果此时runner退出返回false，其他情况无论是达到最大重试次数还是发送成功，都返回true
-func trySend(s sender.Sender, datas []Data, times int) error {
+func trySend(s sender.Sender, datas []Data, times int) (err error) {
+	if times <= 0 {
+		times = DefaultTryTimes
+	}
 	if len(datas) <= 0 {
 		return nil
 	}
-	cnt := 1
+	cnt := 0
 	for {
-		err := s.Send(datas)
+		if cnt >= times {
+			break
+		}
+		err = s.Send(datas)
 		if se, ok := err.(*StatsError); ok {
 			err = se.ErrorDetail
 		}
 
 		if err != nil {
+			cnt++
 			se, ok := err.(*reqerr.SendError)
 			if ok {
 				datas = sender.ConvertDatas(se.GetFailDatas())
-				cnt++
 				continue
 			}
-			if times <= 0 || cnt < times {
-				cnt++
+			if cnt < times {
 				continue
 			}
 			err = fmt.Errorf("retry send %v times, but still error %v, discard datas %v ... total %v lines", cnt, err, datas, len(datas))
@@ -268,8 +273,7 @@ func trySend(s sender.Sender, datas []Data, times int) error {
 		}
 		break
 	}
-
-	return nil
+	return
 }
 
 func getSampleData(parserConfig conf.MapConf) ([]string, error) {

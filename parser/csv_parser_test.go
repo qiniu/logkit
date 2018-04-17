@@ -123,9 +123,7 @@ func Test_CsvParserForErrData(t *testing.T) {
 		}
 	}
 
-	if len(datas) != 6 {
-		t.Fatalf("parse lines error, expect 6 lines but got %v lines", len(datas))
-	}
+	assert.Equal(t, 6, len(datas), "parse lines error")
 
 	expErrData := `2 fufu 3.15 999 ` + tmstr
 	assert.Equal(t, expErrData, datas[2]["pandora_stash"])
@@ -492,5 +490,20 @@ func TestAllowNotMatch(t *testing.T) {
 	}
 	assert.NoError(t, err)
 	assert.Equal(t, []Data{{"logType": "a", "a": int64(1), "b": 1.2}}, datas)
+}
 
+func TestCsvlastempty(t *testing.T) {
+	c := conf.MapConf{}
+	c[KeyParserName] = "TestCsvlastempty"
+	c[KeyParserType] = "csv"
+	c[KeyCSVSchema] = "logType string,a long,b float,c string"
+	c[KeyCSVSplitter] = "\t"
+	pp, err := NewCsvParser(c)
+	assert.NoError(t, err)
+	datas, err := pp.Parse([]string{"a\t1\t1.2\t "})
+	if c, ok := err.(*StatsError); ok {
+		err = c.ErrorDetail
+	}
+	assert.NoError(t, err)
+	assert.Equal(t, []Data{{"logType": "a", "a": int64(1), "b": 1.2, "c": " "}}, datas)
 }
