@@ -200,7 +200,9 @@ func (c *CronoWriter) createSymlink(t time.Time, path string) {
 func (c *CronoWriter) Close() error {
 	c.mux.Lock()
 	defer c.mux.Unlock()
-
+	if c.fp == nil {
+		return nil
+	}
 	return c.fp.Close()
 }
 
