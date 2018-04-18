@@ -225,13 +225,22 @@ func (c *CloudWatch) Close() error {
 
 func (c *CloudWatch) SyncMeta() {}
 
+func isIn(metrics []string, now string) bool {
+	for _, v := range metrics {
+		if now == v {
+			return true
+		}
+	}
+	return false
+}
+
 func SelectMetrics(c *CloudWatch) ([]*cloudwatch.Metric, error) {
 	var metrics []*cloudwatch.Metric
 	// check for provided metric filter
 	if len(c.Metrics) > 0 {
 		metrics = []*cloudwatch.Metric{}
 		for _, m := range c.Metrics {
-			if !hasWilcard(m.Dimensions) || len(m.MetricNames) < 1 {
+			if !hasWilcard(m.Dimensions) && len(m.MetricNames) > 0 {
 				dimensions := make([]*cloudwatch.Dimension, len(m.Dimensions))
 				for k, d := range m.Dimensions {
 					dimensions[k] = &cloudwatch.Dimension{
@@ -250,6 +259,14 @@ func SelectMetrics(c *CloudWatch) ([]*cloudwatch.Metric, error) {
 				allMetrics, err := c.fetchNamespaceMetrics()
 				if err != nil {
 					return nil, err
+				}
+				if len(m.MetricNames) <= 0 {
+					for _, v := range allMetrics {
+						if isIn(m.MetricNames, *v.MetricName) {
+							continue
+						}
+						m.MetricNames = append(m.MetricNames, *v.MetricName)
+					}
 				}
 				for _, name := range m.MetricNames {
 					for _, metric := range allMetrics {
@@ -451,6 +468,9 @@ func (c *MetricCache) IsValid() bool {
 }
 
 func hasWilcard(dimensions []*Dimension) bool {
+	if len(dimensions) <= 0 {
+		return true
+	}
 	for _, d := range dimensions {
 		if d.Value == "" || d.Value == "*" {
 			return true
