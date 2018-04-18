@@ -122,7 +122,12 @@ func (se *StatsError) ErrorIndexIn(idx int) bool {
 func PandoraKey(key string) string {
 	var nk string
 	for _, c := range key {
-		if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+		if c >= '0' && c <= '9' {
+			if len(nk) == 0 {
+				nk = "K"
+			}
+			nk = nk + string(c)
+		} else if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
 			nk = nk + string(c)
 		} else if len(nk) > 0 {
 			nk = nk + "_"
