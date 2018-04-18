@@ -269,6 +269,10 @@ func SelectMetrics(c *CloudWatch) ([]*cloudwatch.Metric, error) {
 					}
 				}
 				for _, name := range m.MetricNames {
+					log.Debugf("select metric: ", name)
+					for _, v := range m.Dimensions {
+						log.Debugf("select dimension: ", *v)
+					}
 					for _, metric := range allMetrics {
 						if isSelected(name, metric, m.Dimensions) {
 							metrics = append(metrics, &cloudwatch.Metric{
@@ -480,15 +484,16 @@ func hasWilcard(dimensions []*Dimension) bool {
 }
 
 func isSelected(name string, metric *cloudwatch.Metric, dimensions []*Dimension) bool {
+	log.Debugf("metcis： %v, select: %v real: %v\n", *metric.MetricName, len(dimensions), len(metric.Dimensions))
+	for _, v := range metric.Dimensions {
+		log.Debugf("dimensions: ", *v)
+	}
 	if name != *metric.MetricName {
 		return false
 	}
 	// 啥dimension都没写，都选
 	if len(dimensions) < 1 {
 		return true
-	}
-	if len(metric.Dimensions) != len(dimensions) {
-		return false
 	}
 	for _, d := range dimensions {
 		selected := false
