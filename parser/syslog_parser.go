@@ -136,8 +136,7 @@ func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 	se := &StatsError{}
 	var datas []Data
 	for idx, line := range lines {
-		line = strings.TrimSpace(line)
-		if len(line) <= 0 {
+		if len(strings.TrimSpace(line)) <= 0 {
 			continue
 		}
 		d, err := p.parse(line)
