@@ -272,7 +272,6 @@ func BenchmarkMiddlelineWithConfigParser(b *testing.B) {
 }
 
 func TestParseMutiLineJson(t *testing.T) {
-
 	c := conf.MapConf{}
 	c[KeyParserName] = "TestParseMutiLineJson"
 	c[KeyParserType] = "json"
@@ -285,5 +284,21 @@ func TestParseMutiLineJson(t *testing.T) {
 	assert.NoError(t, err)
 
 	exp := []Data{{"name": "ethancai", "fansCount": json.Number("9223372036854775807")}}
+	assert.Equal(t, exp, res)
+}
+
+func TestParseSpaceJson(t *testing.T) {
+	c := conf.MapConf{}
+	c[KeyParserName] = "TestParseSpaceJson"
+	c[KeyParserType] = "json"
+	c[KeyDisableRecordErrData] = "false"
+	p, _ := NewJsonParser(c)
+	data := "\n"
+	res, err := p.Parse([]string{data})
+	errx, _ := err.(*StatsError)
+	err = errx.ErrorDetail
+	assert.NoError(t, err)
+
+	exp := []Data{}
 	assert.Equal(t, exp, res)
 }

@@ -50,8 +50,8 @@ func (p *RawlogParser) Parse(lines []string) ([]Data, error) {
 	se := &StatsError{}
 	datas := []Data{}
 	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if len(line) <= 0 {
+		//raw格式的不应该trime空格，只需要判断剔除掉全空就好了
+		if len(strings.TrimSpace(line)) <= 0 {
 			continue
 		}
 		d := Data{}

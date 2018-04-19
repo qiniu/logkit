@@ -202,8 +202,8 @@ func (gp *GrokParser) Parse(lines []string) ([]Data, error) {
 	datas := []Data{}
 	se := &StatsError{}
 	for idx, line := range lines {
-		line = strings.TrimSpace(line)
-		if len(line) <= 0 {
+		//grok不应该踢出掉空格，因为grok的Pattern可能按照空格来配置，只需要判断是不是全空扔掉。
+		if len(strings.TrimSpace(line)) <= 0 {
 			continue
 		}
 		data, err := gp.parseLine(line)
