@@ -426,7 +426,7 @@ func (s *syncRunner) concurrentSyncToDir(s3url s3Url, bucket *s3.Bucket, targetF
 			}
 			<-pool
 
-			log.Infof("starting sync: s3://%s/%s -> %s", bucket.Name, s3file, filePath)
+			log.Debugf("starting sync: s3://%s/%s -> %s", bucket.Name, s3file, filePath)
 
 			wg.Add(1)
 			go func(doneChan chan error, filePath string, bucket *s3.Bucket, s3file string) {
@@ -449,7 +449,7 @@ func syncSingleFile(doneChan chan error, filePath string, bucket *s3.Bucket, fil
 	if err != nil {
 		doneChan <- err
 	}
-	log.Infof("sync completed: s3://%s/%s -> %s", bucket.Name, file, filePath)
+	log.Debugf("sync completed: s3://%s/%s -> %s", bucket.Name, file, filePath)
 	doneChan <- nil
 }
 
