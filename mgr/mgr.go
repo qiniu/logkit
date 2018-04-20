@@ -360,10 +360,9 @@ func (m *Manager) doClean(sig cleaner.CleanSignal) {
 	m.cleanLock.Lock()
 	defer m.cleanLock.Unlock()
 
-	dir := sig.Logdir
-	dir, err := filepath.Abs(dir)
+	dir, _, err := GetRealPath(sig.Logdir)
 	if err != nil {
-		log.Errorf("get abs for %v error %v", dir, err)
+		log.Errorf("get GetRealPath for %v error %v", dir, err)
 		return
 	}
 	file := sig.Filename
