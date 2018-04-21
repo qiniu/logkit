@@ -133,7 +133,10 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 		err        error
 		httpschema = "http://"
 	)
-
+	if mgr.DisableWeb {
+		log.Warn("logkit web service was disabled")
+		return rs
+	}
 	for {
 		if port > 10000 {
 			log.Fatal("bind port failed too many times, exit...")
@@ -430,7 +433,9 @@ func (rs *RestService) Register() error {
 
 // Stop will stop RestService
 func (rs *RestService) Stop() {
-	rs.l.Close()
+	if rs.l != nil {
+		rs.l.Close()
+	}
 }
 
 // tcpKeepAliveListener sets TCP keep-alive timeouts on accepted

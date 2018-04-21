@@ -402,6 +402,13 @@ func (b *BufReader) ReadLine() (ret string, err error) {
 	} else {
 		ret, err = b.ReadPattern()
 	}
+	if skp, ok := b.rd.(LineSkipper); ok {
+		if skp.IsNewOpen() {
+			log.Infof("%v Skip line %v as first line skipper was configured %v", b.meta.RunnerName, ret)
+			ret = ""
+			skp.SetSkipped()
+		}
+	}
 	if err != nil && err != io.EOF {
 		b.setStatsError(err.Error())
 	}

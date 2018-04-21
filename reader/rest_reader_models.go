@@ -123,6 +123,17 @@ var (
 		Advance:       true,
 		ToolTip:       "开启后，不同文件结尾自动添加换行符",
 	}
+	OptionKeySkipFileFirstLine = Option{
+		KeyName:       KeySkipFileFirstLine,
+		ChooseOnly:    true,
+		ChooseOptions: []interface{}{"false", "true"},
+		Default:       "false",
+		DefaultNoUse:  false,
+		Description:   "跳过新文件的第一行(skip_first_line)",
+		Advance:       true,
+		Required:      false,
+		ToolTip:       "常用于带抬头的csv文件，抬头与实际数据类型不一致",
+	}
 	OptionKeyValidFilePattern = Option{
 		KeyName:      KeyValidFilePattern,
 		ChooseOnly:   false,
@@ -154,6 +165,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionReadIoLimit,
 		OptionHeadPattern,
 		OptionKeyNewFileNewLine,
+		OptionKeySkipFileFirstLine,
 		{
 			KeyName:       KeyIgnoreHiddenFile,
 			ChooseOnly:    true,
@@ -1311,5 +1323,7 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "文件同步的并发个数(sync_concurrent)",
 			ToolTip:      "文件同步的最小并发个数(1)",
 		},
+		OptionKeyValidFilePattern,
+		OptionKeySkipFileFirstLine,
 	},
 }

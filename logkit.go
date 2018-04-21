@@ -288,7 +288,7 @@ func main() {
 	// start rest service
 	rs := mgr.NewRestService(m, e)
 	if conf.ProfileHost != "" {
-		log.Infof("profile_host was open at %v", conf.ProfileHost)
+		log.Infof("go profile_host was open at %v", conf.ProfileHost)
 		go func() {
 			log.Info(http.ListenAndServe(conf.ProfileHost, nil))
 		}()

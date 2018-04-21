@@ -864,6 +864,7 @@ func (r *LogExportRunner) Status() RunnerStatus {
 	r.rs.ReadSpeedTrend = getTrend(r.lastRs.ReadSpeed, r.rs.ReadSpeed)
 	r.rs.ReaderStats.Speed = r.rs.ReadSpeed
 	r.rs.ReaderStats.Trend = r.rs.ReadSpeedTrend
+	r.rs.ReaderStats.Success = r.rs.ReadDataCount
 
 	r.rs.ParserStats.Speed, r.rs.ParserStats.Trend = calcSpeedTrend(r.lastRs.ParserStats, r.rs.ParserStats, elaspedtime)
 

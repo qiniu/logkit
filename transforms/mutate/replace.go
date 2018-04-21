@@ -106,7 +106,7 @@ func (g *Replacer) ConfigOptions() []Option {
 			KeyName:      "new",
 			ChooseOnly:   false,
 			Default:      "",
-			Required:     true,
+			Required:     false,
 			Placeholder:  "myNewString",
 			DefaultNoUse: true,
 			Description:  "替换为的字符串内容(new)",

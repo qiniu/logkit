@@ -32,17 +32,19 @@ type SeqFile struct {
 	meta *Meta
 	mux  sync.Mutex
 
-	dir              string   // 文件目录
-	currFile         string   // 当前处理文件名
-	f                *os.File // 当前处理文件
-	ratereader       io.ReadCloser
-	inode            uint64   // 当前文件inode
-	offset           int64    // 当前处理文件offset
-	ignoreHidden     bool     // 忽略隐藏文件
-	ignoreFileSuffix []string // 忽略文件后缀
-	newFileAsNewLine bool     //新文件自动加换行符
-	validFilePattern string   // 合法的文件名正则表达式
-	stopped          int32    // 停止标志位
+	dir               string   // 文件目录
+	currFile          string   // 当前处理文件名
+	f                 *os.File // 当前处理文件
+	ratereader        io.ReadCloser
+	inode             uint64   // 当前文件inode
+	offset            int64    // 当前处理文件offset
+	ignoreHidden      bool     // 忽略隐藏文件
+	ignoreFileSuffix  []string // 忽略文件后缀
+	newFileAsNewLine  bool     //新文件自动加换行符
+	validFilePattern  string   // 合法的文件名正则表达式
+	stopped           int32    // 停止标志位
+	skipFileFirstLine bool     //跳过新文件的第一行，常用于带title的csv文件，title与实际格式不同
+	hasSkiped         bool
 
 	lastSyncPath   string
 	lastSyncOffset int64
@@ -253,6 +255,7 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 				//此处出错了就应该直接return，不然容易陷入死循环，让外面的runner去sleep
 				return
 			}
+			sf.hasSkiped = false
 		}
 		n1, err = sf.ratereader.Read(p[n:])
 		if err != nil && strings.Contains(err.Error(), "stale NFS file handle") {
@@ -490,4 +493,20 @@ func (sf *SeqFile) Lag() (rl *LagInfo, err error) {
 	}
 	rl.SizeUnit = "bytes"
 	return
+}
+
+func (sf *SeqFile) IsNewOpen() bool {
+	if sf.skipFileFirstLine {
+		return !sf.hasSkiped
+	}
+	return false
+}
+
+func (sf *SeqFile) SetSkipped() {
+	sf.hasSkiped = true
+}
+
+type LineSkipper interface {
+	IsNewOpen() bool
+	SetSkipped()
 }

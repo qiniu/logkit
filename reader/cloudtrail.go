@@ -59,10 +59,12 @@ func NewCloudTrailReader(meta *Meta, conf conf.MapConf) (Reader, error) {
 	}
 	validFilePattern, _ := conf.GetStringOr(KeyValidFilePattern, "*")
 	bufSize, _ := conf.GetIntOr(KeyBufSize, defaultBufSize)
+	skipFirstLine, _ := conf.GetBoolOr(KeySkipFileFirstLine, false)
 	sf, err := NewSeqFile(meta, opts.directory, true, true, ignoredSuffixes, validFilePattern, WhenceOldest)
 	if err != nil {
 		return nil, err
 	}
+	sf.skipFileFirstLine = skipFirstLine
 	br, err := NewReaderSize(sf, meta, bufSize)
 	if err != nil {
 		return nil, err
