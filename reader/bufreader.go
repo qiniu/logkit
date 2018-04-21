@@ -398,7 +398,6 @@ func (b *BufReader) ReadLine() (ret string, err error) {
 				log.Errorf("%v ReadLine err %v", b.meta.RunnerName, err)
 				b.lastErrShowTime = time.Now()
 			}
-			err = nil
 		}
 	} else {
 		ret, err = b.ReadPattern()

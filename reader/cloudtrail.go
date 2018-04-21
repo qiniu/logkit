@@ -76,7 +76,9 @@ func NewCloudTrailReader(meta *Meta, conf conf.MapConf) (Reader, error) {
 }
 
 func (ctr *CloudTrailReader) Close() error {
+	log.Debugf("runner[%v] syncMgr.stopSync...", ctr.meta.RunnerName)
 	ctr.syncMgr.stopSync()
+	log.Debugf("runner[%v] syncMgr closed, wait for BufReader closed...", ctr.meta.RunnerName)
 	return ctr.BufReader.Close()
 }
 

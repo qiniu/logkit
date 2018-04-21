@@ -425,6 +425,16 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 	return true
 }
 
+func getSampleContent(line string, maxBatchSize int) string {
+	if len(line) <= maxBatchSize {
+		return line
+	}
+	if maxBatchSize <= 1024 {
+		return line
+	}
+	return line[0:1024]
+}
+
 func (r *LogExportRunner) Run() {
 	if r.cleaner != nil {
 		go r.cleaner.Run()
@@ -457,10 +467,17 @@ func (r *LogExportRunner) Run() {
 		}
 		// read data
 		var lines, froms []string
+		var readErr error
+		var line string
 		for !r.batchFullOrTimeout() {
-			line, err := r.reader.ReadLine()
-			if err != nil && err != io.EOF {
-				log.Errorf("Runner[%v] reader %s - error: %v, sleep 1 second...", r.Name(), r.reader.Name(), err)
+			line, readErr = r.reader.ReadLine()
+			if os.IsNotExist(readErr) {
+				log.Errorf("Runner[%v] reader %s - error: %v, sleep 3 second...", r.Name(), r.reader.Name(), readErr)
+				time.Sleep(3 * time.Second)
+				break
+			}
+			if readErr != nil && readErr != io.EOF {
+				log.Errorf("Runner[%v] reader %s - error: %v, sleep 1 second...", r.Name(), r.reader.Name(), readErr)
 				time.Sleep(time.Second)
 				break
 			}
@@ -470,7 +487,7 @@ func (r *LogExportRunner) Run() {
 				continue
 			}
 			if len(line) >= r.MaxBatchSize {
-				log.Errorf("Runner[%v] reader %s read lines larger than MaxBatchSize %v, content is %s", r.Name(), r.reader.Name(), r.MaxBatchSize, line)
+				log.Errorf("Runner[%v] reader %s read lines larger than MaxBatchSize %v, sample content is %s , ignore it...", r.Name(), r.reader.Name(), r.MaxBatchSize, getSampleContent(line, r.MaxBatchSize))
 				continue
 			}
 			r.rsMutex.Lock()
@@ -484,6 +501,15 @@ func (r *LogExportRunner) Run() {
 			r.batchLen++
 			r.batchSize += len(line)
 		}
+		r.rsMutex.Lock()
+		if readErr != nil && readErr != io.EOF {
+			r.rs.ReaderStats.LastError = readErr.Error()
+		} else {
+			r.rs.ReaderStats.LastError = ""
+		}
+		r.rs.ReaderStats.Success = int64(r.batchLen)
+		r.rsMutex.Unlock()
+
 		r.batchLen = 0
 		r.batchSize = 0
 		r.lastSend = time.Now()

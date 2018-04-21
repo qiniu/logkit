@@ -205,8 +205,11 @@ func (sf *SeqFile) Close() (err error) {
 // 这个函数目前只针对stale NFS file handle的情况，重新打开文件
 func (sf *SeqFile) reopenForESTALE() error {
 	f, err := os.Open(sf.currFile)
+	if os.IsNotExist(err) {
+		return err
+	}
 	if err != nil {
-		return fmt.Errorf("%s -cannot reopen currfile file err:%v", sf.currFile, err)
+		return fmt.Errorf("%s -cannot reopen currfile file for ESTALE err:%v", sf.currFile, err)
 	}
 
 	_, err = f.Seek(sf.offset, io.SeekStart)
@@ -244,9 +247,11 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 			}
 			err = sf.newOpen()
 			if err != nil {
-				log.Warnf("Runner[%v] %v new open error %v, sleep 3s and retry", sf.meta.RunnerName, sf.dir, err)
-				time.Sleep(3 * time.Second)
-				continue
+				if !os.IsNotExist(err) {
+					log.Warnf("Runner[%v] %v new open error %v", sf.meta.RunnerName, sf.dir, err)
+				}
+				//此处出错了就应该直接return，不然容易陷入死循环，让外面的runner去sleep
+				return
 			}
 		}
 		n1, err = sf.ratereader.Read(p[n:])
@@ -254,7 +259,7 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 			nerr := sf.reopenForESTALE()
 			if nerr != nil {
 				log.Errorf("Runner[%v] %v meet eror %v reopen error %v", sf.meta.RunnerName, sf.dir, err, nerr)
-				time.Sleep(time.Second)
+				return
 			}
 			continue
 		}
@@ -364,7 +369,8 @@ func (sf *SeqFile) isNewFile(newFileInfo os.FileInfo, filePath string) bool {
 func (sf *SeqFile) newOpen() (err error) {
 	fi, err1 := sf.nextFile()
 	if os.IsNotExist(err1) {
-		return fmt.Errorf("can not find any file in dir %s - nextFile: %v", sf.dir, err1)
+		log.Errorf("can not find any file in dir %s - nextFile: %v", sf.dir, err1)
+		return err1
 	}
 	if err1 != nil {
 		return fmt.Errorf("read file in dir %s error - nextFile: %v", sf.dir, err1)
