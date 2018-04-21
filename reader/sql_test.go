@@ -148,7 +148,7 @@ func TestSQLReader(t *testing.T) {
 
 	// 测试meta备份和恢复
 	mr.SyncMeta()
-	gotoffsets, gotsqls, omit := restoreMeta(meta, mr.rawsqls)
+	gotoffsets, gotsqls, omit := restoreMeta(meta, mr.rawsqls, 0)
 	assert.EqualValues(t, mr.offsets, gotoffsets, "got offsets error")
 	assert.EqualValues(t, mr.syncSQLs, gotsqls, "got sqls error")
 	assert.EqualValues(t, false, omit)

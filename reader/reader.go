@@ -88,7 +88,8 @@ const (
 	KeyMysqlCron        = "mysql_cron"
 	KeyMysqlExecOnStart = "mysql_exec_onstart"
 
-	KeySQLSchema = "sql_schema"
+	KeySQLSchema        = "sql_schema"
+	KeyMagicLagDuration = "magic_lag_duration"
 
 	KeyMssqlOffsetKey   = "mssql_offset_key"
 	KeyMssqlReadBatch   = "mssql_limit_batch"
