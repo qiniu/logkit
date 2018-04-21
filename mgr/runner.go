@@ -503,7 +503,11 @@ func (r *LogExportRunner) Run() {
 		}
 		r.rsMutex.Lock()
 		if readErr != nil && readErr != io.EOF {
-			r.rs.ReaderStats.LastError = readErr.Error()
+			if os.IsNotExist(readErr) {
+				r.rs.ReaderStats.LastError = "no more file exist to be read"
+			} else {
+				r.rs.ReaderStats.LastError = readErr.Error()
+			}
 		} else {
 			r.rs.ReaderStats.LastError = ""
 		}
@@ -847,14 +851,19 @@ func (r *LogExportRunner) Status() RunnerStatus {
 		r.rs.TransformStats[ttp] = newtsts
 	}
 
-	if str, ok := r.reader.(reader.StatsReader); ok {
-		r.rs.ReaderStats = str.Status()
-	}
+	/*
+		此处先不用reader的status, Run函数本身对这个ReaderStats赋值
+		if str, ok := r.reader.(reader.StatsReader); ok {
+			r.rs.ReaderStats = str.Status()
+		}
+	*/
 
 	r.rs.ReadSpeedKB = float64(r.rs.ReadDataSize-r.lastRs.ReadDataSize) / elaspedtime
 	r.rs.ReadSpeedTrendKb = getTrend(r.lastRs.ReadSpeedKB, r.rs.ReadSpeedKB)
 	r.rs.ReadSpeed = float64(r.rs.ReadDataCount-r.lastRs.ReadDataCount) / elaspedtime
 	r.rs.ReadSpeedTrend = getTrend(r.lastRs.ReadSpeed, r.rs.ReadSpeed)
+	r.rs.ReaderStats.Speed = r.rs.ReadSpeed
+	r.rs.ReaderStats.Trend = r.rs.ReadSpeedTrend
 
 	r.rs.ParserStats.Speed, r.rs.ParserStats.Trend = calcSpeedTrend(r.lastRs.ParserStats, r.rs.ParserStats, elaspedtime)
 

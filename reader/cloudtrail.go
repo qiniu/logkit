@@ -1,7 +1,9 @@
 package reader
 
 import (
+	"archive/zip"
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -38,7 +40,7 @@ const (
 )
 
 var (
-	ignoredSuffixes = []string{".json.gz"}
+	ignoredSuffixes = []string{".json.gz", ".csv.zip"}
 )
 
 type CloudTrailReader struct {
@@ -73,6 +75,21 @@ func NewCloudTrailReader(meta *Meta, conf conf.MapConf) (Reader, error) {
 	go ctr.syncMgr.startSync()
 
 	return ctr, nil
+}
+
+func (ctr *CloudTrailReader) Reset() (err error) {
+	dirErr := os.RemoveAll(ctr.syncMgr.directory)
+	if dirErr != nil && os.IsNotExist(dirErr) {
+		dirErr = nil
+	}
+	metaErr := os.Remove(ctr.syncMgr.metastore)
+	if metaErr != nil && os.IsNotExist(metaErr) {
+		metaErr = nil
+	}
+	if metaErr != nil || dirErr != nil {
+		err = fmt.Errorf("reset remove s3 data dir err %v, remove metafile err %v", dirErr, metaErr)
+	}
+	return
 }
 
 func (ctr *CloudTrailReader) Close() error {
@@ -239,6 +256,7 @@ type syncContext struct {
 
 type syncRunner struct {
 	*syncContext
+	syncedFiles map[string]bool
 }
 
 func newSyncRunner(ctx *syncContext) *syncRunner {
@@ -286,12 +304,14 @@ func (s *syncRunner) syncToDir() error {
 	if err != nil {
 		return err
 	}
-
-	syncedFiles, err := s.loadSyncedFiles()
-	if err != nil {
-		return err
+	if s.syncedFiles == nil {
+		s.syncedFiles, err = s.loadSyncedFiles()
+		if err != nil {
+			return err
+		}
 	}
-	err = s.concurrentSyncToDir(s3url, bucket, syncedFiles, sourceFiles)
+
+	err = s.concurrentSyncToDir(s3url, bucket, sourceFiles)
 	if err != nil {
 		return err
 	}
@@ -386,7 +406,11 @@ func (s *syncRunner) loadSyncedFiles() (map[string]bool, error) {
 }
 
 func (s *syncRunner) storeSyncedFiles(files map[string]bool) error {
-	f, err := os.OpenFile(s.metastore, os.O_WRONLY|os.O_TRUNC, 0644)
+	if len(files) <= 0 {
+		return nil
+	}
+
+	f, err := os.OpenFile(s.metastore, os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return err
 	}
@@ -410,15 +434,20 @@ func relativePath(path string, filePath string) string {
 	return strings.TrimPrefix(strings.TrimPrefix(filePath, path), "/")
 }
 
-func (s *syncRunner) concurrentSyncToDir(s3url s3Url, bucket *s3.Bucket, targetFiles, sourceFiles map[string]bool) error {
+func (s *syncRunner) concurrentSyncToDir(s3url s3Url, bucket *s3.Bucket, sourceFiles map[string]bool) error {
 	doneChan := newDoneChan(s.concurrent)
 	pool := newPool(s.concurrent)
 
 	var wg sync.WaitGroup
 	for s3file := range sourceFiles {
+		//对于目录不同步
+		if strings.HasSuffix(s3file, string(os.PathSeparator)) {
+			delete(sourceFiles, s3file)
+			continue
+		}
 		basename := filepath.Base(s3file)
 		unzipPath := strings.TrimSuffix(basename, ".gz")
-		if !targetFiles[basename] {
+		if !s.syncedFiles[basename] {
 			filePath := strings.Join([]string{s.target, unzipPath}, "/")
 			if filepath.Dir(filePath) != "." {
 				err := os.MkdirAll(filepath.Dir(filePath), 0755)
@@ -427,6 +456,7 @@ func (s *syncRunner) concurrentSyncToDir(s3url s3Url, bucket *s3.Bucket, targetF
 				}
 			}
 			<-pool
+			s.syncedFiles[basename] = true
 
 			log.Debugf("starting sync: s3://%s/%s -> %s", bucket.Name, s3file, filePath)
 
@@ -437,7 +467,8 @@ func (s *syncRunner) concurrentSyncToDir(s3url s3Url, bucket *s3.Bucket, targetF
 				pool <- 1
 			}(doneChan, filePath, bucket, s3file)
 		} else {
-			log.Infof("skip synced %s", unzipPath)
+			delete(sourceFiles, basename)
+			log.Debugf("%s already synced, skip it...", unzipPath)
 		}
 	}
 	wg.Wait()
@@ -455,10 +486,43 @@ func syncSingleFile(doneChan chan error, filePath string, bucket *s3.Bucket, fil
 	doneChan <- nil
 }
 
+func writeToFile(zipf *zip.File, filename string) error {
+	srcF, err := zipf.Open()
+	if err != nil {
+		return err
+	}
+	defer srcF.Close()
+	distF, err := os.OpenFile(filepath.Join(filepath.Dir(filename), zipf.Name), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(0644))
+	if err != nil {
+		return err
+	}
+	defer distF.Close()
+	_, err = io.Copy(distF, srcF)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func writeFile(filename string, bucket *s3.Bucket, path string) error {
 	data, err := bucket.Get(path)
 	if err != nil {
 		return err
+	}
+	if strings.HasSuffix(filename, ".zip") {
+		rd, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+		if err != nil {
+			log.Errorf("reader file %v as zip error %v", filename, err)
+			return ioutil.WriteFile(filename, data, os.FileMode(0644))
+		}
+		var writeErr error
+		for _, f := range rd.File {
+			err = writeToFile(f, filename)
+			if err != nil {
+				writeErr = fmt.Errorf("write to %v err %v; %v", f.Name, err, writeErr)
+			}
+		}
+		return writeErr
 	}
 	return ioutil.WriteFile(filename, data, os.FileMode(0644))
 }

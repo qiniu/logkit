@@ -755,6 +755,8 @@ func (m *Manager) StopRunner(name string) (err error) {
 	return
 }
 
+//ResetRunner 必须在runner实例存在下才可以reset, reset是调用runner本身的方法，
+// 而runner stop实际上是销毁实例，所以先要启动runner
 func (m *Manager) ResetRunner(name string) (err error) {
 	filename, conf, err := m.getDeepCopyConfig(name)
 	if err != nil {
@@ -763,8 +765,9 @@ func (m *Manager) ResetRunner(name string) (err error) {
 	status := conf.IsStopped
 	if conf.IsStopped {
 		conf.IsStopped = false
+		//此处先启动runner
 		if err = m.ForkRunner(filename, conf, true); err != nil {
-			return fmt.Errorf("forkRunner %v reset error %v", filename, err)
+			return fmt.Errorf("start %v for reset error %v, as runner is only resetable for alive", filename, err)
 		}
 	}
 	m.lock.RLock()
@@ -773,27 +776,30 @@ func (m *Manager) ResetRunner(name string) (err error) {
 	if !runnerOk {
 		return fmt.Errorf("runner %v is not found", filename)
 	}
-	if subErr := m.Remove(filename); subErr != nil {
-		log.Errorf("remove runner %v error %v", filename, subErr)
-	}
-	conf.IsStopped = status
-	if runnerReset, ok := r.(Resetable); ok {
-		// 出错的话，回滚并报错
-		if err = runnerReset.Reset(); err != nil {
-			if subErr := m.ForkRunner(filename, conf, true); subErr != nil {
-				log.Errorf("reset runner %v error and rollback error %v", filename, subErr)
-			}
-			return fmt.Errorf("runner %v reset error %v", filename, err)
-		}
-	} else {
-		if subErr := m.ForkRunner(filename, conf, true); subErr != nil {
-			log.Errorf("reset runner %v error and rollback error %v", filename, subErr)
-		}
+
+	runnerReset, ok := r.(Resetable)
+	if !ok {
+		//如果runner不支持reset函数，直接返回
 		return fmt.Errorf("runner %v is not resetable runner", filename)
 	}
+
+	if subErr := m.Remove(filename); subErr != nil {
+		log.Errorf("remove runner %v for reset error %v", filename, subErr)
+	}
+	conf.IsStopped = status
+	// 出错的话，回滚并报错
+	resetErr := runnerReset.Reset()
+	if resetErr != nil {
+		log.Errorf("reset runner %v error %v", filename, resetErr)
+		// 此处就算失败也了不能直接return，需要回滚
+	}
 	conf.IsStopped = false
-	if err = m.ForkRunner(filename, conf, true); err != nil {
-		return fmt.Errorf("forkRunner %v error %v", filename, err)
+	err = m.ForkRunner(filename, conf, true)
+	if err != nil {
+		return fmt.Errorf("forkRunner %v for reset error %v, resetErr is %v", filename, err, resetErr)
+	}
+	if resetErr != nil {
+		err = resetErr
 	}
 	return
 }
