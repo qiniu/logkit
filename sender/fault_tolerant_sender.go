@@ -3,6 +3,7 @@ package sender
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -149,17 +150,20 @@ func (ft *FtSender) Send(datas []Data) error {
 		isRetry := false
 		backDataContext, err := ft.trySendDatas(datas, 1, isRetry)
 		if err != nil {
-			log.Warnf("Runner[%v] Sender[%v] try Send Datas err: %v", ft.runnerName, ft.innerSender.Name(), err)
+			err = fmt.Errorf("Runner[%v] Sender[%v] try Send Datas err: %v, will put to backup queue and retry later...", ft.runnerName, ft.innerSender.Name(), err)
+			log.Error(err)
+			se.FtNotRetry = true
 		}
 		// 容错队列会保证重试，此处不向外部暴露发送错误信息
-		se.ErrorDetail = nil
-		se.Ftlag = ft.backupQueue.Depth()
+		se.ErrorDetail = err
+		se.FtQueueLag = ft.backupQueue.Depth()
 		if backDataContext != nil {
 			var nowDatas []Data
 			for _, v := range backDataContext {
 				nowDatas = append(nowDatas, v.Datas...)
 			}
 			if nowDatas != nil {
+				se.FtNotRetry = false
 				se.ErrorDetail = reqerr.NewSendError("save data to backend queue error", ConvertDatasBack(nowDatas), reqerr.TypeDefault)
 				ft.statsMutex.Lock()
 				ft.stats.LastError = se.ErrorDetail.Error()
@@ -169,6 +173,7 @@ func (ft *FtSender) Send(datas []Data) error {
 	} else {
 		err := ft.saveToFile(datas)
 		if err != nil {
+			se.FtNotRetry = false
 			se.ErrorDetail = err
 			ft.statsMutex.Lock()
 			ft.stats.LastError = err.Error()
@@ -177,7 +182,7 @@ func (ft *FtSender) Send(datas []Data) error {
 		} else {
 			se.ErrorDetail = nil
 		}
-		se.Ftlag = ft.backupQueue.Depth() + ft.logQueue.Depth()
+		se.FtQueueLag = ft.backupQueue.Depth() + ft.logQueue.Depth()
 	}
 	return se
 }

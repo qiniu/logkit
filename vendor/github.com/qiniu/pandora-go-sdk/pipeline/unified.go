@@ -425,6 +425,7 @@ func (c *Pipeline) AutoExportToKODO(input *AutoExportToKODOInput) error {
 			err = nil
 		} else if err != nil {
 			log.Error("AutoExportToKodo create export error", err)
+			return err
 		}
 	}
 	if err != nil {

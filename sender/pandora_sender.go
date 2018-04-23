@@ -537,7 +537,6 @@ func (s *PandoraSender) UpdateSchemas() {
 	if s.lastUpdate.Add(s.opt.updateInterval).After(time.Now()) {
 		return
 	}
-	s.lastUpdate = time.Now()
 
 	s.updateSchemas(schemas)
 }
@@ -547,6 +546,7 @@ func (s *PandoraSender) updateSchemas(schemas map[string]pipeline.RepoSchemaEntr
 	s.schemasMux.Lock()
 	s.schemas = schemas
 	s.alias2key = alias2Key
+	s.lastUpdate = time.Now()
 	s.schemasMux.Unlock()
 	return
 }

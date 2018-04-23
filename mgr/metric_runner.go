@@ -315,7 +315,7 @@ func (r *MetricRunner) trySend(s sender.Sender, datas []Data, times int) bool {
 		if se, ok := err.(*StatsError); ok {
 			err = se.ErrorDetail
 			if se.Ft {
-				r.rs.Lag.Ftlags = se.Ftlag
+				r.rs.Lag.Ftlags = se.FtQueueLag
 			} else {
 				if cnt > 1 {
 					info.Errors -= se.Success

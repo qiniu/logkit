@@ -328,11 +328,12 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 			return false
 		}
 		err := s.Send(datas)
-		if se, ok := err.(*StatsError); ok {
+		se, ok := err.(*StatsError)
+		if ok {
 			err = se.ErrorDetail
 			if se.Ft {
 				r.rsMutex.Lock()
-				r.rs.Lag.Ftlags = se.Ftlag
+				r.rs.Lag.Ftlags = se.FtQueueLag
 				r.rsMutex.Unlock()
 			} else {
 				if cnt > 1 {
@@ -350,6 +351,11 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 			info.Success += int64(len(datas))
 		}
 		if err != nil {
+			info.LastError = err.Error()
+			//FaultTolerant Sender 正常的错误会在backupqueue里面记录，自己重试，此处无需重试
+			if se.Ft && se.FtNotRetry {
+				break
+			}
 			time.Sleep(time.Second)
 			se, succ := err.(*reqerr.SendError)
 			if succ {
