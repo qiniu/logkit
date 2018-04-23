@@ -2,7 +2,6 @@ package mutate
 
 import (
 	"fmt"
-
 	"strings"
 
 	"github.com/qiniu/logkit/transforms"
@@ -16,10 +15,10 @@ const (
 )
 
 type Trim struct {
-	Key       string `json:"key"`
-	Character string `json:"characters"`
-	Place     string `json:"place"`
-	stats     StatsInfo
+	Key        string `json:"key"`
+	Characters string `json:"characters"`
+	Place      string `json:"place"`
+	stats      StatsInfo
 }
 
 func (g *Trim) Transform(datas []Data) ([]Data, error) {
@@ -41,11 +40,11 @@ func (g *Trim) Transform(datas []Data) ([]Data, error) {
 		}
 		switch g.Place {
 		case Prefix:
-			strval = strings.TrimPrefix(strval, g.Character)
+			strval = strings.TrimPrefix(strval, g.Characters)
 		case Suffix:
-			strval = strings.TrimSuffix(strval, g.Character)
+			strval = strings.TrimSuffix(strval, g.Characters)
 		default:
-			strval = strings.Trim(strval, g.Character)
+			strval = strings.Trim(strval, g.Characters)
 		}
 		SetMapValue(datas[i], strval, false, keys...)
 	}

@@ -520,7 +520,7 @@ func (m *Manager) Configs() (rss map[string]RunnerConfig) {
 		}
 		tmpRss[k] = v
 	}
-	deepCopy(&rss, &tmpRss)
+	deepCopyByJson(&rss, &tmpRss)
 	m.lock.RUnlock()
 	for k, v := range rss {
 		rss[k] = TrimSecretInfo(v)
@@ -535,7 +535,7 @@ func (m *Manager) getDeepCopyConfig(name string) (filename string, conf RunnerCo
 	if tmpConf, ok := m.runnerConfig[filename]; !ok {
 		err = fmt.Errorf("runner %v is not found", filename)
 	} else {
-		deepCopy(&conf, &tmpConf)
+		deepCopyByJson(&conf, &tmpConf)
 	}
 	return
 }

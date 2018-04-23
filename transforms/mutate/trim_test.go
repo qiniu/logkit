@@ -10,9 +10,9 @@ import (
 
 func TestTrimTransformer(t *testing.T) {
 	tr := &Trim{
-		Key:       "myword",
-		Character: "1",
-		Place:     Both,
+		Key:        "myword",
+		Characters: "1",
+		Place:      Both,
 	}
 	data, err := tr.Transform([]Data{{"myword": "1hello x1 y2 x1nihao"}, {"myword": "x1x.x.x11"}})
 	assert.NoError(t, err)
@@ -22,9 +22,9 @@ func TestTrimTransformer(t *testing.T) {
 	assert.Equal(t, exp, data)
 
 	tr = &Trim{
-		Key:       "myword",
-		Character: "hello",
-		Place:     Prefix,
+		Key:        "myword",
+		Characters: "hello",
+		Place:      Prefix,
 	}
 	data, err = tr.Transform([]Data{{"myword": "hello x1 y2 x1nihao"}, {"myword": "x1x.x.x11"}})
 	assert.NoError(t, err)
@@ -34,9 +34,9 @@ func TestTrimTransformer(t *testing.T) {
 	assert.Equal(t, exp, data)
 
 	tr = &Trim{
-		Key:       "myword",
-		Character: "\"",
-		Place:     Suffix,
+		Key:        "myword",
+		Characters: "\"",
+		Place:      Suffix,
 	}
 	data, err = tr.Transform([]Data{{"myword": "hello x1 y2 x1nihao"}, {"myword": `x1x.x.x11"`}})
 	assert.NoError(t, err)

@@ -46,8 +46,8 @@ type MetricRunner struct {
 	transformers map[string][]transforms.Transformer
 
 	collectInterval time.Duration
-	rs              RunnerStatus
-	lastRs          RunnerStatus
+	rs              *RunnerStatus
+	lastRs          *RunnerStatus
 	rsMutex         *sync.RWMutex
 	meta            *reader.Meta
 	lastSend        time.Time
@@ -174,14 +174,14 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 		exitChan:   make(chan struct{}),
 		lastSend:   time.Now(), // 上一次发送时间
 		meta:       meta,
-		rs: RunnerStatus{
+		rs: &RunnerStatus{
 			ReaderStats:   StatsInfo{},
 			SenderStats:   make(map[string]StatsInfo),
 			lastState:     time.Now(),
 			Name:          rc.RunnerName,
 			RunningStatus: RunnerRunning,
 		},
-		lastRs: RunnerStatus{
+		lastRs: &RunnerStatus{
 			ReaderStats:   StatsInfo{},
 			SenderStats:   make(map[string]StatsInfo),
 			lastState:     time.Now(),
@@ -394,12 +394,11 @@ func (_ *MetricRunner) Cleaner() CleanInfo {
 	}
 }
 
-func (mr *MetricRunner) getStatusFrequently(rss *RunnerStatus, now time.Time) (bool, float64) {
+func (mr *MetricRunner) getStatusFrequently(now time.Time) (bool, float64) {
 	mr.rsMutex.RLock()
 	defer mr.rsMutex.RUnlock()
 	elaspedTime := now.Sub(mr.rs.lastState).Seconds()
 	if elaspedTime <= 3 {
-		deepCopy(rss, &mr.rs)
 		return true, elaspedTime
 	}
 	return false, elaspedTime
@@ -408,10 +407,9 @@ func (mr *MetricRunner) getStatusFrequently(rss *RunnerStatus, now time.Time) (b
 func (mr *MetricRunner) Status() RunnerStatus {
 	var isFre bool
 	var elaspedtime float64
-	rss := RunnerStatus{}
 	now := time.Now()
-	if isFre, elaspedtime = mr.getStatusFrequently(&rss, now); isFre {
-		return rss
+	if isFre, elaspedtime = mr.getStatusFrequently(now); isFre {
+		return *mr.lastRs
 	}
 	mr.rsMutex.Lock()
 	defer mr.rsMutex.Unlock()
@@ -437,9 +435,8 @@ func (mr *MetricRunner) Status() RunnerStatus {
 		mr.rs.SenderStats[k] = v
 	}
 	mr.rs.RunningStatus = RunnerRunning
-	copyRunnerStatus(&mr.lastRs, &mr.rs)
-	deepCopy(&rss, &mr.rs)
-	return rss
+	*mr.lastRs = mr.rs.Clone()
+	return *mr.lastRs
 }
 
 func (mr *MetricRunner) TokenRefresh(tokens AuthTokens) error {
@@ -485,7 +482,7 @@ func (mr *MetricRunner) StatusRestore() {
 		status.Errors = info[1]
 		mr.rs.SenderStats[name] = status
 	}
-	copyRunnerStatus(&mr.lastRs, &mr.rs)
+	*mr.lastRs = mr.rs.Clone()
 	log.Infof("runner %v restore status %v", mr.RunnerName, rStat)
 }
 
