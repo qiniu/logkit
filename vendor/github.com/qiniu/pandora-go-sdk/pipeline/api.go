@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"reflect"
 	"strings"
 	"time"
-
-	"reflect"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base"
@@ -180,6 +179,9 @@ func (c *Pipeline) UpdateRepoWithTSDB(input *UpdateRepoInput, ex ExportDesc) err
 	if reqerr.IsExportRemainUnchanged(err) {
 		err = nil
 	}
+	if err != nil {
+		log.Errorf("UpdateRepoWithTSDB update export err %v", err)
+	}
 	return err
 }
 
@@ -239,6 +241,7 @@ func (c *Pipeline) UpdateRepoWithLogDB(input *UpdateRepoInput, ex ExportDesc) er
 		})
 	}
 	if err != nil {
+		log.Error("UpdateRepoWithLogDB get logdb repo error", err)
 		return err
 	}
 
@@ -261,6 +264,7 @@ func (c *Pipeline) UpdateRepoWithLogDB(input *UpdateRepoInput, ex ExportDesc) er
 		Schema:       repoInfo.Schema,
 		PandoraToken: input.Option.AutoExportLogDBTokens.UpdateLogDBRepoToken,
 	}); err != nil {
+		log.Error("UpdateRepoWithLogDB update logdb repo error", err)
 		return err
 	}
 	spec := &ExportLogDBSpec{DestRepoName: repoName, Doc: docs}
@@ -272,6 +276,9 @@ func (c *Pipeline) UpdateRepoWithLogDB(input *UpdateRepoInput, ex ExportDesc) er
 	})
 	if reqerr.IsExportRemainUnchanged(err) {
 		err = nil
+	}
+	if err != nil {
+		log.Error("UpdateRepoWithLogDB update export error", err)
 	}
 	return err
 }
@@ -349,6 +356,9 @@ func (c *Pipeline) UpdateRepoWithKodo(input *UpdateRepoInput, ex ExportDesc) err
 	if reqerr.IsExportRemainUnchanged(err) {
 		err = nil
 	}
+	if err != nil {
+		log.Errorf("UpdateRepoWithKodo update export %v err: %v", spec, err)
+	}
 	return err
 }
 
@@ -358,6 +368,7 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 		return
 	}
 	if err = c.updateRepo(input); err != nil {
+		log.Error("update pipeline repo error", err)
 		return err
 	}
 	if input.Option == nil {
@@ -383,6 +394,7 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 		PandoraToken: listExportToken,
 	})
 	if err != nil {
+		log.Error("updateRepo list exports error", err)
 		return
 	}
 	exs := make(map[string]ExportDesc)
@@ -435,7 +447,6 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 			}
 			err = c.UpdateRepoWithKodo(input, ex)
 			if err != nil {
-				log.Error("UpdateRepoWithKodo err: ", input, ex, err)
 				return
 			}
 		} else {
@@ -1173,7 +1184,7 @@ func (c *Pipeline) CreateForTSDB(input *CreateRepoForTSDBInput) error {
 		PandoraToken: input.CreateTSDBRepoToken,
 	})
 	if err != nil && !reqerr.IsExistError(err) {
-		log.Error("create repo error", err)
+		log.Error("create tsdb repo error", err)
 		return err
 	}
 	if input.SeriesName == "" {
@@ -1190,7 +1201,7 @@ func (c *Pipeline) CreateForTSDB(input *CreateRepoForTSDBInput) error {
 		PandoraToken: seriesToken,
 	})
 	if err != nil && !reqerr.IsExistError(err) {
-		log.Error("create series error", err)
+		log.Error("create tsdb series error", err)
 		return err
 	}
 	tsdbSpec := c.FormTSDBSpec(input)
@@ -1214,7 +1225,7 @@ func (c *Pipeline) CreateForTSDB(input *CreateRepoForTSDBInput) error {
 			PandoraToken: updateExportToken,
 		})
 		if err != nil {
-			log.Error("update Export error", err)
+			log.Error("update Export from pipeline error", err)
 		}
 	}
 	return err
@@ -1241,6 +1252,7 @@ func (c *Pipeline) CreateForMutiExportTSDB(input *CreateRepoForMutiExportTSDBInp
 		PandoraToken: input.CreateTSDBRepoToken,
 	})
 	if err != nil && !reqerr.IsExistError(err) {
+		log.Error("create tsdb repo error", err)
 		return err
 	}
 	for _, series := range input.SeriesMap {
@@ -1256,6 +1268,7 @@ func (c *Pipeline) CreateForMutiExportTSDB(input *CreateRepoForMutiExportTSDBInp
 			PandoraToken: seriesToken,
 		})
 		if err != nil && !reqerr.IsExistError(err) {
+			log.Error("create tsdb series error", err)
 			return err
 		}
 		tsdbSpec := c.FormMutiSeriesTSDBSpec(&CreateRepoForTSDBInput{
@@ -1290,9 +1303,11 @@ func (c *Pipeline) CreateForMutiExportTSDB(input *CreateRepoForMutiExportTSDBInp
 				PandoraToken: updateExportToken,
 			})
 			if err != nil {
+				log.Error("update export for tsdb error", err)
 				return err
 			}
 		} else if err != nil {
+			log.Error("create export for tsdb error", err)
 			return err
 		}
 	}

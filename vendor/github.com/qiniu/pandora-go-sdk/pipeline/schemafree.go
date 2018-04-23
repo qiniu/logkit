@@ -586,6 +586,7 @@ func mergePandoraSchemas(oldScs, addScs []RepoSchemaEntry) (ret []RepoSchemaEntr
 		}
 		if sOldScs[i].ValueType != sAddScs[j].ValueType {
 			err = fmt.Errorf("type conflict: key %v old type is <%v> want change to type <%v>", sOldScs[i].Key, sOldScs[i].ValueType, sAddScs[j].ValueType)
+			log.Errorf("mergePandoraSchemas err %v", err)
 			return
 		}
 		if sOldScs[i].ValueType == PandoraTypeMap {
@@ -702,12 +703,16 @@ func (c *Pipeline) getOrCreateWorkflow(input *InitOrUpdateWorkflowInput, ns *boo
 				PandoraToken: input.PipelineGetWorkflowToken,
 			})
 		} else if err != nil {
+			log.Errorf("CreateWorkflow from pipeline err: %v", err)
 			return
 		} else {
 			*ns = true
 			workflow.Name = input.WorkflowName
 			workflow.Status = base.WorkflowReady
 		}
+	}
+	if err != nil {
+		log.Errorf("GetWorkflow  from pipeline err: %v", err)
 	}
 	return
 }
@@ -732,6 +737,7 @@ func (c *Pipeline) createOrUpdateRepo(input *InitOrUpdateWorkflowInput, workflow
 			StopWorkflowToken:      input.PipelineStopWorkflowToken,
 			GetWorkflowStatusToken: input.PipelineGetWorkflowStatusToken,
 		}, ns); subErr != nil {
+			log.Errorf("changeWorkflowToStopped from pipeline err %v", subErr)
 			return subErr
 		}
 		err = c.CreateRepo(&CreateRepoInput{
@@ -749,6 +755,7 @@ func (c *Pipeline) createOrUpdateRepo(input *InitOrUpdateWorkflowInput, workflow
 			PandoraToken: input.PipelineGetRepoToken,
 		})
 		if subErr != nil {
+			log.Errorf("get repo from pipeline err %v", subErr)
 			return subErr
 		}
 		schemas, needUpdate, subErr := mergePandoraSchemas(repo.Schema, input.Schema)
@@ -765,9 +772,13 @@ func (c *Pipeline) createOrUpdateRepo(input *InitOrUpdateWorkflowInput, workflow
 				PandoraToken:         input.PipelineUpdateRepoToken,
 				PipelineGetRepoToken: input.PipelineGetRepoToken,
 			}); err != nil {
+				log.Errorf("update repo from pipeline err %v", err)
 				return err
 			}
 		}
+	}
+	if err != nil {
+		log.Errorf("createOrUpdateRepo err %v", err)
 	}
 	return
 }
@@ -811,19 +822,16 @@ func (c *Pipeline) InitOrUpdateWorkflow(input *InitOrUpdateWorkflowInput) error 
 		// 创建、更新各种导出
 		if input.Option != nil && input.Option.ToKODO {
 			if err := c.AutoExportToKODO(&input.Option.AutoExportToKODOInput); err != nil {
-				log.Error("AutoExportToKODO error", err)
 				return err
 			}
 		}
 		if input.Option != nil && input.Option.ToLogDB {
 			if err := c.AutoExportToLogDB(&input.Option.AutoExportToLogDBInput); err != nil {
-				log.Error("AutoExportToLogDB error", err)
 				return err
 			}
 		}
 		if input.Option != nil && input.Option.ToTSDB {
 			if err := c.AutoExportToTSDB(&input.Option.AutoExportToTSDBInput); err != nil {
-				log.Error("AutoExportToTSDB error", err)
 				return err
 			}
 		}
@@ -836,10 +844,12 @@ func (c *Pipeline) InitOrUpdateWorkflow(input *InitOrUpdateWorkflowInput) error 
 				if reqerr.IsWorkflowNoExecutableJob(err) {
 					return nil
 				}
+				log.Error("change workflow to start error", err)
 				return err
 			}
 		}
 	} else if err != nil {
+		log.Errorf("InitOrUpdateWorkflow get repo from pipeline err: %v", err)
 		return err
 	} else {
 		// 如果 repo 存在, 则要对比下 repo 现有的 schema，是否已经包含参数中的 schema，即是否需要更新 repo
@@ -866,6 +876,7 @@ func (c *Pipeline) InitOrUpdateWorkflow(input *InitOrUpdateWorkflowInput) error 
 						PandoraToken: input.PipelineGetWorkflowToken,
 					})
 					if subErr != nil {
+						log.Errorf("InitOrUpdateWorkflow get workflow from pipeline err: %v", subErr)
 						return subErr
 					}
 					if subErr := c.changeWorkflowToStopped(workflow, true, WorkflowTokens{
@@ -873,6 +884,7 @@ func (c *Pipeline) InitOrUpdateWorkflow(input *InitOrUpdateWorkflowInput) error 
 						StopWorkflowToken:      input.PipelineStopWorkflowToken,
 						GetWorkflowStatusToken: input.PipelineGetWorkflowStatusToken,
 					}, &needStartWorkflow); subErr != nil {
+						log.Errorf("InitOrUpdateWorkflow change workflow to stopped err: %v", err)
 						return subErr
 					}
 					if subErr = c.UpdateRepo(updateRepoInput); subErr != nil {
@@ -892,6 +904,7 @@ func (c *Pipeline) InitOrUpdateWorkflow(input *InitOrUpdateWorkflowInput) error 
 				PandoraToken: input.PipelineGetWorkflowToken,
 			})
 			if err != nil {
+				log.Errorf("InitOrUpdateWorkflow get workflow from pipeline err: %v", err)
 				return err
 			}
 			if err := c.changeWorkflowToStarted(workflow, false, WorkflowTokens{
@@ -902,6 +915,7 @@ func (c *Pipeline) InitOrUpdateWorkflow(input *InitOrUpdateWorkflowInput) error 
 				if reqerr.IsWorkflowNoExecutableJob(err) {
 					return nil
 				}
+				log.Errorf("InitOrUpdateWorkflow change workflow to start err: %v", err)
 				return err
 			}
 		}

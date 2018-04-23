@@ -212,6 +212,7 @@ func (c *Pipeline) AutoExportToTSDB(input *AutoExportToTSDBInput) error {
 		PandoraToken: input.PipelineGetRepoToken,
 	})
 	if err != nil {
+		log.Error("AutoExportToTSDB get repo from pipeline error", err)
 		return err
 	}
 	tags := make([]string, 0)
@@ -367,6 +368,9 @@ func (c *Pipeline) AutoExportToLogDB(input *AutoExportToLogDBInput) error {
 			log.Error("AutoExportToLogDB get export error", err)
 		}
 	}
+	if err != nil {
+		log.Error("AutoExportToLogDB get export error", err)
+	}
 	return err
 }
 
@@ -385,6 +389,7 @@ func (c *Pipeline) AutoExportToKODO(input *AutoExportToKODOInput) error {
 		PandoraToken: input.PipelineGetRepoToken,
 	})
 	if err != nil {
+		log.Error("AutoExportToKodo GetRepo from pipeline error", err)
 		return err
 	}
 
@@ -419,8 +424,11 @@ func (c *Pipeline) AutoExportToKODO(input *AutoExportToKODOInput) error {
 		if err = c.CreateExport(exportInput); err != nil && reqerr.IsExistError(err) {
 			err = nil
 		} else if err != nil {
-			log.Error("AutoExportToKodo get export error", err)
+			log.Error("AutoExportToKodo create export error", err)
 		}
+	}
+	if err != nil {
+		log.Error("AutoExportToKodo get export error", err)
 	}
 	return err
 }
