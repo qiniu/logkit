@@ -743,6 +743,7 @@ type CreateRepoInput struct {
 	Options   *RepoOptions      `json:"options"`
 	GroupName string            `json:"group"`
 	Workflow  string            `json:"workflow"`
+	RuleNames *[]string         `json:"ruleNames"`
 }
 
 func (r *CreateRepoInput) Validate() (err error) {
@@ -788,6 +789,7 @@ type UpdateRepoInput struct {
 	Schema               []RepoSchemaEntry `json:"schema"`
 	Option               *SchemaFreeOption
 	RepoOptions          *RepoOptions `json:"options"`
+	RuleNames            *[]string    `json:"ruleNames"`
 }
 
 func (r *UpdateRepoInput) IsTag(key string) bool {
@@ -852,6 +854,7 @@ type GetRepoOutput struct {
 	DerivedFrom string            `json:"derivedFrom"`
 	FromDag     bool              `json:"fromDag"`
 	Workflow    string            `json:"workflow"`
+	RuleNames   *[]string         `json:"ruleNames"`
 }
 
 type SampleDataOutput struct {
@@ -859,12 +862,13 @@ type SampleDataOutput struct {
 }
 
 type RepoDesc struct {
-	RepoName    string `json:"name"`
-	Region      string `json:"region"`
-	GroupName   string `json:"group"`
-	DerivedFrom string `json:"derivedFrom"`
-	FromDag     bool   `json:"fromDag"`
-	Workflow    string `json:"workflow"`
+	RepoName    string    `json:"name"`
+	Region      string    `json:"region"`
+	GroupName   string    `json:"group"`
+	DerivedFrom string    `json:"derivedFrom"`
+	FromDag     bool      `json:"fromDag"`
+	Workflow    string    `json:"workflow"`
+	RuleNames   *[]string `json:"ruleNames"`
 }
 
 type ListReposInput struct {

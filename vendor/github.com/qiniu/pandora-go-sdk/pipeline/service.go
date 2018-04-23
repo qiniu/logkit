@@ -1,13 +1,12 @@
 package pipeline
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
 	"sync"
 	"time"
-
-	"crypto/tls"
 
 	"github.com/qiniu/pandora-go-sdk/base"
 	"github.com/qiniu/pandora-go-sdk/base/config"
