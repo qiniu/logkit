@@ -77,16 +77,17 @@ type StatsError struct {
 	StatsInfo
 	ErrorDetail error `json:"error"`
 	Ft          bool  `json:"-"`
+	FtNotRetry  bool  `json:"-"`
 	ErrorIndex  []int
 }
 
 type StatsInfo struct {
-	Errors    int64   `json:"errors"`
-	Success   int64   `json:"success"`
-	Speed     float64 `json:"speed"`
-	Trend     string  `json:"trend"`
-	LastError string  `json:"last_error"`
-	Ftlag     int64   `json:"-"`
+	Errors     int64   `json:"errors"`
+	Success    int64   `json:"success"`
+	Speed      float64 `json:"speed"`
+	Trend      string  `json:"trend"`
+	LastError  string  `json:"last_error"`
+	FtQueueLag int64   `json:"-"`
 }
 
 func (se *StatsError) AddSuccess() {

@@ -802,7 +802,8 @@ func (c *Pipeline) InitOrUpdateWorkflow(input *InitOrUpdateWorkflowInput) error 
 		PandoraToken: input.PipelineGetRepoToken,
 	})
 	// 是否由 logkit 启动 workflow
-	needStartWorkflow := false
+	needStartWorkflow := new(bool)
+	*needStartWorkflow = false
 	if err != nil && reqerr.IsNoSuchResourceError(err) {
 		// 如果 repo 不存在
 		if len(input.Schema) == 0 {
@@ -811,47 +812,79 @@ func (c *Pipeline) InitOrUpdateWorkflow(input *InitOrUpdateWorkflowInput) error 
 		var workflow *GetWorkflowOutput
 		if input.WorkflowName != "" {
 			// 如果导出到 dag, 确保 workflow 存在, 不存在时创建
-			if workflow, err = c.getOrCreateWorkflow(input, &needStartWorkflow); err != nil {
+			if workflow, err = c.getOrCreateWorkflow(input, needStartWorkflow); err != nil {
 				return err
 			}
+			defer func() {
+				if *needStartWorkflow {
+					if err := c.changeWorkflowToStarted(workflow, false, WorkflowTokens{
+						StartWorkflowToken:     input.PipelineStartWorkflowToken,
+						StopWorkflowToken:      input.PipelineStopWorkflowToken,
+						GetWorkflowStatusToken: input.PipelineGetWorkflowStatusToken,
+					}); err != nil {
+						if reqerr.IsWorkflowNoExecutableJob(err) {
+							return
+						}
+						log.Error("change workflow to start error", err)
+						return
+					}
+				}
+			}()
 		}
 		// repo 不存在且传入了非空的 schema, 此时要新建 repo
-		if err = c.createOrUpdateRepo(input, workflow, &needStartWorkflow); err != nil {
+		if err = c.createOrUpdateRepo(input, workflow, needStartWorkflow); err != nil {
 			return err
 		}
 		// 创建、更新各种导出
-		if input.Option != nil && input.Option.ToKODO {
-			if err := c.AutoExportToKODO(&input.Option.AutoExportToKODOInput); err != nil {
+		if input.Option != nil && input.Option.ToLogDB {
+			if err := c.AutoExportToLogDB(&input.Option.AutoExportToLogDBInput); err != nil {
+				log.Error("create repo and AutoExportToLogDB err: ", err)
 				return err
 			}
 		}
-		if input.Option != nil && input.Option.ToLogDB {
-			if err := c.AutoExportToLogDB(&input.Option.AutoExportToLogDBInput); err != nil {
+		if input.Option != nil && input.Option.ToKODO {
+			if err := c.AutoExportToKODO(&input.Option.AutoExportToKODOInput); err != nil {
+				log.Error("create repo and AutoExportToKODO err: ", err)
 				return err
 			}
 		}
 		if input.Option != nil && input.Option.ToTSDB {
 			if err := c.AutoExportToTSDB(&input.Option.AutoExportToTSDBInput); err != nil {
+				log.Error("create repo and AutoExportToTSDB err: ", err)
 				return err
 			}
 		}
-		if input.WorkflowName != "" && needStartWorkflow {
-			if err := c.changeWorkflowToStarted(workflow, false, WorkflowTokens{
-				StartWorkflowToken:     input.PipelineStartWorkflowToken,
-				StopWorkflowToken:      input.PipelineStopWorkflowToken,
-				GetWorkflowStatusToken: input.PipelineGetWorkflowStatusToken,
-			}); err != nil {
-				if reqerr.IsWorkflowNoExecutableJob(err) {
-					return nil
-				}
-				log.Error("change workflow to start error", err)
-				return err
-			}
-		}
+
 	} else if err != nil {
 		log.Errorf("InitOrUpdateWorkflow get repo from pipeline err: %v", err)
 		return err
 	} else {
+
+		defer func() {
+			// 如果 repo 已经存在, repo 本身的 fromDag 字段就表明了是否来自workflow
+			if repo.FromDag && *needStartWorkflow {
+				workflow, err := c.GetWorkflow(&GetWorkflowInput{
+					WorkflowName: repo.Workflow,
+					PandoraToken: input.PipelineGetWorkflowToken,
+				})
+				if err != nil {
+					log.Errorf("InitOrUpdateWorkflow get workflow from pipeline err: %v", err)
+					return
+				}
+				if err := c.changeWorkflowToStarted(workflow, false, WorkflowTokens{
+					StartWorkflowToken:     input.PipelineStartWorkflowToken,
+					StopWorkflowToken:      input.PipelineStopWorkflowToken,
+					GetWorkflowStatusToken: input.PipelineGetWorkflowStatusToken,
+				}); err != nil {
+					if reqerr.IsWorkflowNoExecutableJob(err) {
+						return
+					}
+					log.Errorf("InitOrUpdateWorkflow change workflow to start err: %v", err)
+					return
+				}
+			}
+		}()
+
 		// 如果 repo 存在, 则要对比下 repo 现有的 schema，是否已经包含参数中的 schema，即是否需要更新 repo
 		schemas, needUpdate, err := mergePandoraSchemas(repo.Schema, input.Schema)
 		if err != nil {
@@ -883,7 +916,7 @@ func (c *Pipeline) InitOrUpdateWorkflow(input *InitOrUpdateWorkflowInput) error 
 						StartWorkflowToken:     input.PipelineStartWorkflowToken,
 						StopWorkflowToken:      input.PipelineStopWorkflowToken,
 						GetWorkflowStatusToken: input.PipelineGetWorkflowStatusToken,
-					}, &needStartWorkflow); subErr != nil {
+					}, needStartWorkflow); subErr != nil {
 						log.Errorf("InitOrUpdateWorkflow change workflow to stopped err: %v", err)
 						return subErr
 					}
@@ -896,28 +929,6 @@ func (c *Pipeline) InitOrUpdateWorkflow(input *InitOrUpdateWorkflowInput) error 
 			}
 			// 此处的更新是为了调用方可以拿到最新的 schema
 			input.Schema = schemas
-		}
-		// 如果 repo 已经存在, repo 本身的 fromDag 字段就表明了是否来自workflow
-		if repo.FromDag && needStartWorkflow {
-			workflow, err := c.GetWorkflow(&GetWorkflowInput{
-				WorkflowName: repo.Workflow,
-				PandoraToken: input.PipelineGetWorkflowToken,
-			})
-			if err != nil {
-				log.Errorf("InitOrUpdateWorkflow get workflow from pipeline err: %v", err)
-				return err
-			}
-			if err := c.changeWorkflowToStarted(workflow, false, WorkflowTokens{
-				StartWorkflowToken:     input.PipelineStartWorkflowToken,
-				StopWorkflowToken:      input.PipelineStopWorkflowToken,
-				GetWorkflowStatusToken: input.PipelineGetWorkflowStatusToken,
-			}); err != nil {
-				if reqerr.IsWorkflowNoExecutableJob(err) {
-					return nil
-				}
-				log.Errorf("InitOrUpdateWorkflow change workflow to start err: %v", err)
-				return err
-			}
 		}
 	}
 	return nil

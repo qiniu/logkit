@@ -415,6 +415,26 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 		} else {
 			err = c.AutoExportToLogDB(&option.AutoExportToLogDBInput)
 			if err != nil {
+				log.Error("update repo and AutoExportToLogDB err: ", err)
+				return
+			}
+		}
+	}
+	if option.ToKODO {
+		ex, ok := exs[base.FormExportName(input.RepoName, ExportTypeKODO)]
+		if ok {
+			if ex.Type != ExportTypeKODO {
+				err = fmt.Errorf("export name is %v but type is %v not %v", ex.Name, ex.Type, ExportTypeKODO)
+				return
+			}
+			err = c.UpdateRepoWithKodo(input, ex)
+			if err != nil {
+				return
+			}
+		} else {
+			err = c.AutoExportToKODO(&option.AutoExportToKODOInput)
+			if err != nil {
+				log.Error("update repo and AutoExportToKODO err: ", err)
 				return
 			}
 		}
@@ -434,24 +454,7 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 		} else {
 			err = c.AutoExportToTSDB(&option.AutoExportToTSDBInput)
 			if err != nil {
-				return
-			}
-		}
-	}
-	if option.ToKODO {
-		ex, ok := exs[base.FormExportName(input.RepoName, ExportTypeKODO)]
-		if ok {
-			if ex.Type != ExportTypeKODO {
-				err = fmt.Errorf("export name is %v but type is %v not %v", ex.Name, ex.Type, ExportTypeKODO)
-				return
-			}
-			err = c.UpdateRepoWithKodo(input, ex)
-			if err != nil {
-				return
-			}
-		} else {
-			err = c.AutoExportToKODO(&option.AutoExportToKODOInput)
-			if err != nil {
+				log.Error("update repo and AutoExportToTSDB err: ", err)
 				return
 			}
 		}
