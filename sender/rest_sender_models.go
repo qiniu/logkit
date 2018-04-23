@@ -522,6 +522,7 @@ var ModeKeyOptions = map[string][]Option{
 			KeyName:       KeyInfluxdbAutoCreate,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
+			Default:       "true",
 			Description:   "自动创建数据库(influxdb_auto_create)",
 			Advance:       true,
 		},

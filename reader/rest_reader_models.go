@@ -113,6 +113,15 @@ var (
 		Advance:      true,
 		ToolTip:      `默认情况下会自动识别数据字段的类型，当不能识别时，可以sql_schema指定 mysql 数据字段的类型，目前支持string、long、float三种类型，单个字段左边为字段名称，右边为类型，空格分隔 abc float；不同的字段用逗号分隔。支持简写为float=>f，long=>l，string=>s. 如："sql_schema":"abc string,bcd float,xyz long"`,
 	}
+	OptionMagicLagDuration = Option{
+		KeyName:      KeyMagicLagDuration,
+		ChooseOnly:   false,
+		Default:      "",
+		DefaultNoUse: false,
+		Description:  "魔法变量时间延迟(magic_lag_duration)",
+		Advance:      true,
+		ToolTip:      `针对魔法变量进行时间延迟，单位支持h(时)、m(分)、s(秒)，如写24h，则渲染出来的时间魔法变量往前1天`,
+	}
 	OptionKeyNewFileNewLine = Option{
 		KeyName:       KeyNewFileNewLine,
 		ChooseOnly:    true,
@@ -122,6 +131,17 @@ var (
 		Description:   "文件末尾添加换行符(newfile_newline)",
 		Advance:       true,
 		ToolTip:       "开启后，不同文件结尾自动添加换行符",
+	}
+	OptionKeySkipFileFirstLine = Option{
+		KeyName:       KeySkipFileFirstLine,
+		ChooseOnly:    true,
+		ChooseOptions: []interface{}{"false", "true"},
+		Default:       "false",
+		DefaultNoUse:  false,
+		Description:   "跳过新文件的第一行(skip_first_line)",
+		Advance:       true,
+		Required:      false,
+		ToolTip:       "常用于带抬头的csv文件，抬头与实际数据类型不一致",
 	}
 	OptionKeyValidFilePattern = Option{
 		KeyName:      KeyValidFilePattern,
@@ -154,6 +174,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionReadIoLimit,
 		OptionHeadPattern,
 		OptionKeyNewFileNewLine,
+		OptionKeySkipFileFirstLine,
 		{
 			KeyName:       KeyIgnoreHiddenFile,
 			ChooseOnly:    true,
@@ -334,6 +355,7 @@ var ModeKeyOptions = map[string][]Option{
 			ToolTip:       "启动时立即执行一次",
 		},
 		OptionSQLSchema,
+		OptionMagicLagDuration,
 	},
 	ModeMssql: {
 		{
@@ -409,6 +431,7 @@ var ModeKeyOptions = map[string][]Option{
 			ToolTip:       "启动时立即执行一次",
 		},
 		OptionSQLSchema,
+		OptionMagicLagDuration,
 	},
 	ModePG: {
 		{
@@ -484,6 +507,7 @@ var ModeKeyOptions = map[string][]Option{
 			ToolTip:       "启动时立即执行一次",
 		},
 		OptionSQLSchema,
+		OptionMagicLagDuration,
 	},
 	ModeElastic: {
 		{
@@ -1311,5 +1335,7 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "文件同步的并发个数(sync_concurrent)",
 			ToolTip:      "文件同步的最小并发个数(1)",
 		},
+		OptionKeyValidFilePattern,
+		OptionKeySkipFileFirstLine,
 	},
 }

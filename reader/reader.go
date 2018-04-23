@@ -57,18 +57,19 @@ type ServerReader interface {
 
 // FileReader's conf keys
 const (
-	KeyLogPath        = "log_path"
-	KeyMetaPath       = "meta_path"
-	KeyFileDone       = "file_done"
-	KeyMode           = "mode"
-	KeyBufSize        = "reader_buf_size"
-	KeyWhence         = "read_from"
-	KeyEncoding       = "encoding"
-	KeyReadIOLimit    = "readio_limit"
-	KeyDataSourceTag  = "datasource_tag"
-	KeyTagFile        = "tag_file"
-	KeyHeadPattern    = "head_pattern"
-	KeyNewFileNewLine = "newfile_newline"
+	KeyLogPath           = "log_path"
+	KeyMetaPath          = "meta_path"
+	KeyFileDone          = "file_done"
+	KeyMode              = "mode"
+	KeyBufSize           = "reader_buf_size"
+	KeyWhence            = "read_from"
+	KeyEncoding          = "encoding"
+	KeyReadIOLimit       = "readio_limit"
+	KeyDataSourceTag     = "datasource_tag"
+	KeyTagFile           = "tag_file"
+	KeyHeadPattern       = "head_pattern"
+	KeyNewFileNewLine    = "newfile_newline"
+	KeySkipFileFirstLine = "skip_first_line"
 
 	// 忽略隐藏文件
 	KeyIgnoreHiddenFile = "ignore_hidden"
@@ -87,7 +88,8 @@ const (
 	KeyMysqlCron        = "mysql_cron"
 	KeyMysqlExecOnStart = "mysql_exec_onstart"
 
-	KeySQLSchema = "sql_schema"
+	KeySQLSchema        = "sql_schema"
+	KeyMagicLagDuration = "magic_lag_duration"
 
 	KeyMssqlOffsetKey   = "mssql_offset_key"
 	KeyMssqlReadBatch   = "mssql_limit_batch"
@@ -263,10 +265,12 @@ func NewFileDirReader(meta *Meta, conf conf.MapConf) (reader Reader, err error) 
 	ignoreFileSuffix, _ := conf.GetStringListOr(KeyIgnoreFileSuffix, defaultIgnoreFileSuffix)
 	validFilesRegex, _ := conf.GetStringOr(KeyValidFilePattern, "*")
 	newfileNewLine, _ := conf.GetBoolOr(KeyNewFileNewLine, false)
+	skipFirstLine, _ := conf.GetBoolOr(KeySkipFileFirstLine, false)
 	fr, err := NewSeqFile(meta, logpath, ignoreHidden, newfileNewLine, ignoreFileSuffix, validFilesRegex, whence)
 	if err != nil {
 		return
 	}
+	fr.skipFileFirstLine = skipFirstLine
 	return NewReaderSize(fr, meta, bufSize)
 }
 

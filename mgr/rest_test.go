@@ -109,6 +109,9 @@ func getRunnerStatus(rn, lp, rs string, rdc, rds, pe, ps, se, ss int64) map[stri
 				Size:     0,
 				SizeUnit: unit,
 			},
+			ReaderStats: StatsInfo{
+				Success: rdc,
+			},
 			ParserStats: StatsInfo{
 				Errors:  pe,
 				Success: ps,
@@ -133,10 +136,12 @@ func clearGotStatus(v *RunnerStatus) {
 	v.Elaspedtime = 0
 	v.ReadSpeed = 0
 	v.ReadSpeedKB = 0
-	v.ParserStats.Speed = 0
 	v.ReadSpeedTrendKb = ""
 	v.ReadSpeedTrend = ""
 	v.ReaderStats.Trend = ""
+	v.ReaderStats.Speed = 0
+
+	v.ParserStats.Speed = 0
 	v.ParserStats.Trend = ""
 	for k, t := range v.TransformStats {
 		t.Trend = ""

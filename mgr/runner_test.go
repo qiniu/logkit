@@ -1048,7 +1048,7 @@ func TestCopyStats(t *testing.T) {
 		},
 	}
 	for _, ti := range tests {
-		copyRunnerStatus(&ti.dst, &ti.src)
+		ti.dst = (&ti.src).Clone()
 		for i, v := range ti.src.SenderStats {
 			v.Speed = 0
 			v.Success = 0

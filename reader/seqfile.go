@@ -32,17 +32,19 @@ type SeqFile struct {
 	meta *Meta
 	mux  sync.Mutex
 
-	dir              string   // 文件目录
-	currFile         string   // 当前处理文件名
-	f                *os.File // 当前处理文件
-	ratereader       io.ReadCloser
-	inode            uint64   // 当前文件inode
-	offset           int64    // 当前处理文件offset
-	ignoreHidden     bool     // 忽略隐藏文件
-	ignoreFileSuffix []string // 忽略文件后缀
-	newFileAsNewLine bool     //新文件自动加换行符
-	validFilePattern string   // 合法的文件名正则表达式
-	stopped          int32    // 停止标志位
+	dir               string   // 文件目录
+	currFile          string   // 当前处理文件名
+	f                 *os.File // 当前处理文件
+	ratereader        io.ReadCloser
+	inode             uint64   // 当前文件inode
+	offset            int64    // 当前处理文件offset
+	ignoreHidden      bool     // 忽略隐藏文件
+	ignoreFileSuffix  []string // 忽略文件后缀
+	newFileAsNewLine  bool     //新文件自动加换行符
+	validFilePattern  string   // 合法的文件名正则表达式
+	stopped           int32    // 停止标志位
+	skipFileFirstLine bool     //跳过新文件的第一行，常用于带title的csv文件，title与实际格式不同
+	hasSkiped         bool
 
 	lastSyncPath   string
 	lastSyncOffset int64
@@ -205,8 +207,11 @@ func (sf *SeqFile) Close() (err error) {
 // 这个函数目前只针对stale NFS file handle的情况，重新打开文件
 func (sf *SeqFile) reopenForESTALE() error {
 	f, err := os.Open(sf.currFile)
+	if os.IsNotExist(err) {
+		return err
+	}
 	if err != nil {
-		return fmt.Errorf("%s -cannot reopen currfile file err:%v", sf.currFile, err)
+		return fmt.Errorf("%s -cannot reopen currfile file for ESTALE err:%v", sf.currFile, err)
 	}
 
 	_, err = f.Seek(sf.offset, io.SeekStart)
@@ -244,17 +249,20 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 			}
 			err = sf.newOpen()
 			if err != nil {
-				log.Warnf("Runner[%v] %v new open error %v, sleep 3s and retry", sf.meta.RunnerName, sf.dir, err)
-				time.Sleep(3 * time.Second)
-				continue
+				if !os.IsNotExist(err) {
+					log.Warnf("Runner[%v] %v new open error %v", sf.meta.RunnerName, sf.dir, err)
+				}
+				//此处出错了就应该直接return，不然容易陷入死循环，让外面的runner去sleep
+				return
 			}
+			sf.hasSkiped = false
 		}
 		n1, err = sf.ratereader.Read(p[n:])
 		if err != nil && strings.Contains(err.Error(), "stale NFS file handle") {
 			nerr := sf.reopenForESTALE()
 			if nerr != nil {
 				log.Errorf("Runner[%v] %v meet eror %v reopen error %v", sf.meta.RunnerName, sf.dir, err, nerr)
-				time.Sleep(time.Second)
+				return
 			}
 			continue
 		}
@@ -364,7 +372,8 @@ func (sf *SeqFile) isNewFile(newFileInfo os.FileInfo, filePath string) bool {
 func (sf *SeqFile) newOpen() (err error) {
 	fi, err1 := sf.nextFile()
 	if os.IsNotExist(err1) {
-		return fmt.Errorf("can not find any file in dir %s - nextFile: %v", sf.dir, err1)
+		log.Errorf("can not find any file in dir %s - nextFile: %v", sf.dir, err1)
+		return err1
 	}
 	if err1 != nil {
 		return fmt.Errorf("read file in dir %s error - nextFile: %v", sf.dir, err1)
@@ -484,4 +493,20 @@ func (sf *SeqFile) Lag() (rl *LagInfo, err error) {
 	}
 	rl.SizeUnit = "bytes"
 	return
+}
+
+func (sf *SeqFile) IsNewOpen() bool {
+	if sf.skipFileFirstLine {
+		return !sf.hasSkiped
+	}
+	return false
+}
+
+func (sf *SeqFile) SetSkipped() {
+	sf.hasSkiped = true
+}
+
+type LineSkipper interface {
+	IsNewOpen() bool
+	SetSkipped()
 }
