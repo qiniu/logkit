@@ -359,7 +359,20 @@ func lookupBucket(bucketName string, auth aws.Auth, region string) (*s3.Bucket, 
 		log.Infof("found bucket %q in region %q", bucketName, region)
 		return bucket, nil
 	}
+	if bucketRegionError(err) {
+		return nil, fmt.Errorf("bucket %q not in region %q", bucketName, region)
+	}
 	return nil, fmt.Errorf("list bucket failed: %v", err)
+}
+
+func bucketRegionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if strings.Contains(err.Error(), "301 response missing Location header") {
+		return true
+	}
+	return false
 }
 
 func loadS3Files(bucket *s3.Bucket, path string, files map[string]bool, marker string) (map[string]bool, error) {
