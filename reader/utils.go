@@ -131,6 +131,7 @@ func parseLoopDuration(cronSched string) (dur time.Duration, err error) {
 }
 
 func getTags(tagFile string) (tags map[string]interface{}, err error) {
+	tags = make(map[string]interface{})
 	if tagFile == "" {
 		return
 	}

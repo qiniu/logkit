@@ -25,6 +25,8 @@ type Config struct {
 	PipelineEndpoint string
 	ReportEndpoint   string
 	ConfigType       string
+
+	AllowInsecureServer bool
 }
 
 const (
@@ -70,11 +72,18 @@ func (c *Config) Clone() *Config {
 		PipelineEndpoint: c.PipelineEndpoint,
 		ReportEndpoint:   c.ReportEndpoint,
 		ConfigType:       c.ConfigType,
+
+		AllowInsecureServer: false,
 	}
 }
 
 func (c *Config) WithEndpoint(endpoint string) *Config {
 	c.Endpoint = endpoint
+	return c
+}
+
+func (c *Config) WithInsecureServer(allowInsecure bool) *Config {
+	c.AllowInsecureServer = allowInsecure
 	return c
 }
 

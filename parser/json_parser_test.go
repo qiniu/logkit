@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
@@ -25,7 +24,11 @@ func TestJsonParser(t *testing.T) {
 		exp []Data
 	}{
 		{
-			in: []string{`{"a":1,"b":[1.0,2.0,3.0],"c":{"d":"123","g":1.2},"e":"x","f":1.23}`, ""},
+			in: []string{`{
+							"a":1,"b":[1.0,2.0,3.0],
+							"c":{"d":"123","g":1.2},
+							"e":"x","f":1.23
+						}`, ""},
 			exp: []Data{{
 				"a": json.Number("1"),
 				"b": []interface{}{json.Number("1.0"), json.Number("2.0"), json.Number("3.0")},
@@ -56,8 +59,8 @@ func TestJsonParser(t *testing.T) {
 
 	m, err := p.Parse(tests[0].in)
 	if err != nil {
-		errx, _ := err.(*utils.StatsError)
-		assert.Equal(t, int64(1), errx.StatsInfo.Errors)
+		errx, _ := err.(*StatsError)
+		assert.Equal(t, int64(0), errx.StatsInfo.Errors)
 	}
 	if len(m) != 1 {
 		t.Fatalf("parse lines error, expect 1 line but got %v lines", len(m))
@@ -66,7 +69,7 @@ func TestJsonParser(t *testing.T) {
 
 	m, err = p.Parse(tests[1].in)
 	if err != nil {
-		errx, _ := err.(*utils.StatsError)
+		errx, _ := err.(*StatsError)
 		if errx.ErrorDetail != nil {
 			t.Error(errx.ErrorDetail)
 		}
@@ -98,11 +101,11 @@ func TestJsonParserForErrData(t *testing.T) {
 
 	m, err := p.Parse(testIn)
 	if err != nil {
-		errx, _ := err.(*utils.StatsError)
-		assert.Equal(t, int64(1), errx.StatsInfo.Errors)
+		errx, _ := err.(*StatsError)
+		assert.Equal(t, int64(0), errx.StatsInfo.Errors)
 	}
-	if len(m) != 2 {
-		t.Fatalf("parse lines error, expect 2 lines but got %v lines", len(m))
+	if len(m) != 1 {
+		t.Fatalf("parse lines error, expect 1 lines but got %v lines", len(m))
 	}
 	assert.EqualValues(t, testExp, m[0])
 
@@ -266,4 +269,36 @@ func BenchmarkMiddlelineWithConfigParser(b *testing.B) {
 			b.Error(err)
 		}
 	}
+}
+
+func TestParseMutiLineJson(t *testing.T) {
+	c := conf.MapConf{}
+	c[KeyParserName] = "TestParseMutiLineJson"
+	c[KeyParserType] = "json"
+	c[KeyDisableRecordErrData] = "false"
+	p, _ := NewJsonParser(c)
+	data := `[{"name":"ethancai", "fansCount": 9223372036854775807}]`
+	res, err := p.Parse([]string{data})
+	errx, _ := err.(*StatsError)
+	err = errx.ErrorDetail
+	assert.NoError(t, err)
+
+	exp := []Data{{"name": "ethancai", "fansCount": json.Number("9223372036854775807")}}
+	assert.Equal(t, exp, res)
+}
+
+func TestParseSpaceJson(t *testing.T) {
+	c := conf.MapConf{}
+	c[KeyParserName] = "TestParseSpaceJson"
+	c[KeyParserType] = "json"
+	c[KeyDisableRecordErrData] = "false"
+	p, _ := NewJsonParser(c)
+	data := "\n"
+	res, err := p.Parse([]string{data})
+	errx, _ := err.(*StatsError)
+	err = errx.ErrorDetail
+	assert.NoError(t, err)
+
+	exp := []Data{}
+	assert.Equal(t, exp, res)
 }

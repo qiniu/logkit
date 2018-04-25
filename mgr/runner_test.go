@@ -16,10 +16,10 @@ import (
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/sender"
 	_ "github.com/qiniu/logkit/transforms/all"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
+	"github.com/qiniu/logkit/router"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -195,7 +195,7 @@ func Test_RunForEnvTag(t *testing.T) {
 	defer func() {
 		os.Setenv("Test_RunForEnvTag", originEnv)
 	}()
-	if err := os.Setenv("Test_RunForEnvTag", "env_value"); err != nil {
+	if err := os.Setenv("Test_RunForEnvTag", "{\"Test_RunForEnvTag\":\"env_value\"}"); err != nil {
 		t.Fatalf("set env %v to %v error %v", "Test_RunForEnvTag", "env_value", err)
 	}
 	logpath := dir + "/logdir"
@@ -379,11 +379,11 @@ func Test_RunForErrData(t *testing.T) {
 	}
 	time.Sleep(time.Second)
 	if err := ioutil.WriteFile(filepath.Join(logpath, "log2"), []byte(log2), 0666); err != nil {
-		log.Fatalf("write log3 fail %v", err)
+		log.Fatalf("write log2 fail %v", err)
 	}
 	time.Sleep(time.Second)
 	if err := ioutil.WriteFile(filepath.Join(logpath, "log3"), []byte(log3), 0666); err != nil {
-		log.Fatalf("write log2 fail %v", err)
+		log.Fatalf("write log3 fail %v", err)
 	}
 
 	exppath1 := filepath.Join(absLogpath, "log1")
@@ -432,7 +432,7 @@ func Test_RunForErrData(t *testing.T) {
 		t.Error(err)
 	}
 	senderConfigs := []conf.MapConf{
-		conf.MapConf{
+		{
 			"name":        "mock_sender",
 			"sender_type": "mock",
 		},
@@ -479,9 +479,7 @@ func Test_RunForErrData(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if len(dts) != 5 {
-		t.Errorf("got sender data not match error,expect 5 but %v", len(dts))
-	}
+	assert.Equal(t, 5, len(dts), "got sender data not match")
 	for idx, dt := range dts {
 		if _, ok := dt[KeyPandoraStash]; ok {
 			if dt["testtag"] == nil {
@@ -554,15 +552,17 @@ func Test_Compatible(t *testing.T) {
 
 func Test_QiniulogRun(t *testing.T) {
 	dir := "Test_QiniulogRun"
+	//clean dir first
+	os.RemoveAll(dir)
 	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
-		log.Fatalf("Test_Run error mkdir %v %v", dir, err)
+		log.Errorf("Test_Run error mkdir %v %v", dir, err)
 	}
 	defer os.RemoveAll(dir)
 	logpath := dir + "/logdir"
 	logpathLink := dir + "/logdirlink"
 	metapath := dir + "/meta_mock_csv"
 	if err := os.Mkdir(logpath, DefaultDirPerm); err != nil {
-		log.Fatalf("Test_Run error mkdir %v %v", logpath, err)
+		log.Errorf("Test_Run error mkdir %v %v", logpath, err)
 	}
 	absLogpath, err := filepath.Abs(logpath)
 	if err != nil {
@@ -896,61 +896,61 @@ func TestGetTrend(t *testing.T) {
 
 func TestSpeedTrend(t *testing.T) {
 	tests := []struct {
-		olds  utils.StatsInfo
-		news  utils.StatsInfo
+		olds  StatsInfo
+		news  StatsInfo
 		etime float64
-		exp   utils.StatsInfo
+		exp   StatsInfo
 	}{
 		{
-			olds: utils.StatsInfo{
+			olds: StatsInfo{
 				Success: 1,
 				Speed:   1.0,
 			},
-			news: utils.StatsInfo{
+			news: StatsInfo{
 				Success: 2,
 			},
 			etime: 1.0,
-			exp: utils.StatsInfo{
+			exp: StatsInfo{
 				Success: 2,
 				Speed:   1.0,
 				Trend:   SpeedStable,
 			},
 		},
 		{
-			olds:  utils.StatsInfo{},
-			news:  utils.StatsInfo{},
+			olds:  StatsInfo{},
+			news:  StatsInfo{},
 			etime: 0,
-			exp: utils.StatsInfo{
+			exp: StatsInfo{
 				Success: 0,
 				Speed:   0,
 				Trend:   SpeedStable,
 			},
 		},
 		{
-			olds: utils.StatsInfo{
+			olds: StatsInfo{
 				Success: 1,
 				Speed:   1.0,
 			},
-			news: utils.StatsInfo{
+			news: StatsInfo{
 				Success: 10,
 			},
 			etime: 1.0,
-			exp: utils.StatsInfo{
+			exp: StatsInfo{
 				Success: 10,
 				Speed:   9.0,
 				Trend:   SpeedUp,
 			},
 		},
 		{
-			olds: utils.StatsInfo{
+			olds: StatsInfo{
 				Success: 10,
 				Speed:   10.0,
 			},
-			news: utils.StatsInfo{
+			news: StatsInfo{
 				Success: 11,
 			},
 			etime: 1.0,
-			exp: utils.StatsInfo{
+			exp: StatsInfo{
 				Success: 11,
 				Speed:   1.0,
 				Trend:   SpeedDown,
@@ -973,7 +973,7 @@ func TestCopyStats(t *testing.T) {
 			src: RunnerStatus{
 				ReadDataSize:  10,
 				ReadDataCount: 10,
-				SenderStats: map[string]utils.StatsInfo{
+				SenderStats: map[string]StatsInfo{
 					"a": {
 						Success: 11,
 						Speed:   1.0,
@@ -985,7 +985,7 @@ func TestCopyStats(t *testing.T) {
 						Trend:   SpeedDown,
 					},
 				},
-				TransformStats: map[string]utils.StatsInfo{
+				TransformStats: map[string]StatsInfo{
 					"x": {
 						Success: 2,
 						Speed:   5.0,
@@ -998,7 +998,7 @@ func TestCopyStats(t *testing.T) {
 			exp: RunnerStatus{
 				ReadDataSize:  10,
 				ReadDataCount: 10,
-				SenderStats: map[string]utils.StatsInfo{
+				SenderStats: map[string]StatsInfo{
 					"a": {
 						Success: 11,
 						Speed:   1.0,
@@ -1010,7 +1010,7 @@ func TestCopyStats(t *testing.T) {
 						Trend:   SpeedDown,
 					},
 				},
-				TransformStats: map[string]utils.StatsInfo{
+				TransformStats: map[string]StatsInfo{
 					"x": {
 						Success: 2,
 						Speed:   5.0,
@@ -1023,7 +1023,7 @@ func TestCopyStats(t *testing.T) {
 			dst: RunnerStatus{
 				ReadDataSize:  5,
 				ReadDataCount: 0,
-				SenderStats: map[string]utils.StatsInfo{
+				SenderStats: map[string]StatsInfo{
 					"x": {
 						Success: 0,
 						Speed:   2.0,
@@ -1035,7 +1035,7 @@ func TestCopyStats(t *testing.T) {
 						Trend:   SpeedDown,
 					},
 				},
-				TransformStats: map[string]utils.StatsInfo{
+				TransformStats: map[string]StatsInfo{
 					"s": {
 						Success: 21,
 						Speed:   50.0,
@@ -1048,7 +1048,7 @@ func TestCopyStats(t *testing.T) {
 		},
 	}
 	for _, ti := range tests {
-		copyRunnerStatus(&ti.dst, &ti.src)
+		ti.dst = (&ti.src).Clone()
 		for i, v := range ti.src.SenderStats {
 			v.Speed = 0
 			v.Success = 0
@@ -1086,7 +1086,7 @@ func TestSyslogRunnerX(t *testing.T) {
 	rc := RunnerConfig{}
 	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), parser.NewParserRegistry(), sender.NewSenderRegistry())
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewReaderRegistry(), parser.NewParserRegistry(), sender.NewSenderRegistry())
 	assert.NoError(t, err)
 	go rr.Run()
 	time.Sleep(1 * time.Second)
@@ -1109,7 +1109,7 @@ func TestSyslogRunnerX(t *testing.T) {
 
 func TestAddDatasource(t *testing.T) {
 	sourceFroms := []string{"a", "b", "c", "d", "e", "f"}
-	se := &utils.StatsError{
+	se := &StatsError{
 		ErrorIndex: []int{0, 3, 5},
 	}
 	datas := []Data{
@@ -1145,7 +1145,7 @@ func TestAddDatasource(t *testing.T) {
 
 func TestAddDatasourceForErrData(t *testing.T) {
 	sourceFroms := []string{"a", "b", "c", "d", "e", "f"}
-	se := &utils.StatsError{
+	se := &StatsError{
 		ErrorIndex: []int{0, 3, 5},
 	}
 	datas := []Data{
@@ -1204,7 +1204,7 @@ func TestAddDatatags(t *testing.T) {
 	dir := "TestAddDatatags"
 	metaDir := filepath.Join(dir, "meta")
 	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
-		log.Fatalf("Test_Run error mkdir %v %v", dir, err)
+		log.Fatalf("TestAddDatatags error mkdir %v %v", dir, err)
 	}
 	tagFile := filepath.Join(dir, "tagFile.json")
 	err := ioutil.WriteFile(tagFile, []byte(`{  
@@ -1245,7 +1245,7 @@ func TestAddDatatags(t *testing.T) {
 	err = jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
 
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), parser.NewParserRegistry(), sender.NewSenderRegistry())
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewReaderRegistry(), parser.NewParserRegistry(), sender.NewSenderRegistry())
 	assert.NoError(t, err)
 	go rr.Run()
 
@@ -1268,6 +1268,56 @@ func TestAddDatatags(t *testing.T) {
 		},
 	}
 	assert.Equal(t, exp, res)
+}
+
+func TestRunWithExtra(t *testing.T) {
+	dir := "TestRunWithExtra"
+	metaDir := filepath.Join(dir, "meta")
+	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
+		log.Fatalf("TestRunWithExtra error mkdir %v %v", dir, err)
+	}
+	logPath := filepath.Join(dir, "test.log")
+	err := ioutil.WriteFile(logPath, []byte(`{"f1": "2","f2": "1","f3": "3"}`), DefaultDirPerm)
+	assert.NoError(t, err)
+
+	defer os.RemoveAll(dir)
+	defer os.RemoveAll(metaDir)
+
+	config1 := `{
+			"name":"TestRunWithExtra",
+			"batch_len":1,
+			"extra_info":true,
+			"reader":{
+				"mode":"file",
+				"meta_path":"./TestRunWithExtra/meta",
+				"log_path":"./TestRunWithExtra/test.log"
+			},
+			"parser":{
+				"name":"testjson",
+				"type":"json"
+			},
+			"senders":[{
+				"name":"file_sender",
+				"sender_type":"file",
+				"file_send_path":"./TestRunWithExtra/filesend.json"
+			}]
+		}`
+	rc := RunnerConfig{}
+	err = jsoniter.Unmarshal([]byte(config1), &rc)
+	assert.NoError(t, err)
+
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewReaderRegistry(), parser.NewParserRegistry(), sender.NewSenderRegistry())
+	assert.NoError(t, err)
+	go rr.Run()
+
+	time.Sleep(2 * time.Second)
+	data, err := ioutil.ReadFile("./TestRunWithExtra/filesend.json")
+	var res []Data
+	err = jsoniter.Unmarshal(data, &res)
+	if err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, 7, len(res[0]))
 }
 
 func TestClassifySenderData(t *testing.T) {
@@ -1299,7 +1349,7 @@ func TestClassifySenderData(t *testing.T) {
 		},
 	}
 
-	routerConf := sender.RouterConfig{
+	routerConf := router.RouterConfig{
 		KeyName:      "a",
 		MatchType:    "equal",
 		DefaultIndex: 0,
@@ -1309,7 +1359,7 @@ func TestClassifySenderData(t *testing.T) {
 		},
 	}
 
-	r, err := sender.NewSenderRouter(routerConf, senderCnt)
+	r, err := router.NewSenderRouter(routerConf, senderCnt)
 
 	senderDataList := classifySenderData(datas, r, senderCnt)
 	assert.Equal(t, senderCnt, len(senderDataList))
@@ -1319,7 +1369,7 @@ func TestClassifySenderData(t *testing.T) {
 
 	// 测试没有配置 router 的情况
 	routerConf.KeyName = ""
-	r, err = sender.NewSenderRouter(routerConf, senderCnt)
+	r, err = router.NewSenderRouter(routerConf, senderCnt)
 	assert.Nil(t, r)
 	assert.NoError(t, err)
 	senderDataList = classifySenderData(datas, r, senderCnt)
@@ -1504,3 +1554,29 @@ BenchmarkEncodeJsoniterCompatibleStructMedium-4   	 1000000	      1023 ns/op	   
 PASS
 性能明显提升
 */
+
+func TestMergeEnvTags(t *testing.T) {
+	key := "TestMergeEnvTags"
+	os.Setenv(key, `{"a":"hello"}`)
+	defer os.Unsetenv(key)
+	tags := MergeEnvTags(key, nil)
+	assert.Equal(t, map[string]interface{}{"a": "hello"}, tags)
+
+	os.Setenv(key, `{"b":"123","c":"nihao"}`)
+	tags = MergeEnvTags(key, tags)
+	assert.Equal(t, map[string]interface{}{"a": "hello", "b": "123", "c": "nihao"}, tags)
+
+}
+
+func TestMergeExtraInfoTags(t *testing.T) {
+	meta, err := reader.NewMetaWithConf(conf.MapConf{
+		ExtraInfo:      "true",
+		reader.KeyMode: reader.ModeMysql,
+	})
+	assert.NoError(t, err)
+	tags := MergeExtraInfoTags(meta, nil)
+	assert.Equal(t, 4, len(tags))
+	//再次写入，应该不会产生变化。
+	tags = MergeExtraInfoTags(meta, tags)
+	assert.Equal(t, 4, len(tags))
+}

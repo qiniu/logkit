@@ -10,7 +10,6 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
@@ -108,7 +107,7 @@ func (h *HttpSender) convertToJsonBytes(datas []Data) (byteData []byte, err erro
 }
 
 func (h *HttpSender) convertToCsvBytes(datas []Data) (byteData []byte, err error) {
-	keySet := utils.NewHashSet()
+	keySet := NewHashSet()
 	for _, data := range datas {
 		for k := range data {
 			keySet.Add(k)

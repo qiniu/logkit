@@ -4,7 +4,8 @@ import (
 	"testing"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,9 +23,9 @@ func Test_RawlogParser(t *testing.T) {
 		"",
 	}
 	dts, err := p.Parse(lines)
-	if st, ok := err.(*utils.StatsError); ok {
+	if st, ok := err.(*StatsError); ok {
 		err = st.ErrorDetail
-		assert.Equal(t, int64(1), st.Errors)
+		assert.Equal(t, int64(0), st.Errors)
 	}
 	if err != nil {
 		t.Error(err)
@@ -54,15 +55,15 @@ func Test_RawlogParserForErrData(t *testing.T) {
 		"",
 	}
 	dts, err := p.Parse(lines)
-	if st, ok := err.(*utils.StatsError); ok {
+	if st, ok := err.(*StatsError); ok {
 		err = st.ErrorDetail
 	}
 	if err != nil {
 		t.Error(err)
 	}
 
-	if len(dts) != 2 {
-		t.Fatalf("parse lines error, expect 2 lines but got %v lines", len(dts))
+	if len(dts) != 1 {
+		t.Fatalf("parse lines error, expect 1 lines but got %v lines", len(dts))
 	}
 	if dts[0]["machine"] != "nb110" {
 		t.Fatalf("parse label error")

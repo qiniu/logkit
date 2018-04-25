@@ -9,11 +9,12 @@ import (
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/samples"
 	"github.com/qiniu/logkit/sender"
-	"github.com/qiniu/logkit/utils"
+	utilsos "github.com/qiniu/logkit/utils/os"
 
 	_ "net/http/pprof"
 
 	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/reader"
 )
 
 type Config struct {
@@ -45,7 +46,9 @@ func main() {
 	sregistry := sender.NewSenderRegistry()
 	sregistry.RegisterSender("mysender", samples.NewMySender)
 
-	m, err := mgr.NewCustomManager(conf.ManagerConfig, pregistry, sregistry)
+	rr := reader.NewReaderRegistry()
+
+	m, err := mgr.NewCustomManager(conf.ManagerConfig, rr, pregistry, sregistry)
 	if err != nil {
 		log.Fatalf("NewManager: %v", err)
 	}
@@ -64,5 +67,5 @@ func main() {
 	if err = m.Watch(paths); err != nil {
 		log.Fatalf("watch path error %v", err)
 	}
-	utils.WaitForInterrupt(func() { m.Stop() })
+	utilsos.WaitForInterrupt(func() { m.Stop() })
 }

@@ -1,14 +1,16 @@
 package mgr
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 	"reflect"
-	"strconv"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var test1 = `{
@@ -426,7 +428,7 @@ func Test_Watch_LogDir(t *testing.T) {
 		t.Error(err)
 	}
 	defer os.RemoveAll("./tests2")
-	os.Setenv("DIR_NOT_EXIST_SLEEP_TIME", "10")
+	os.Setenv("DIR_NOT_EXIST_SLEEP_TIME", "8")
 	defer func() {
 		os.Setenv("DIR_NOT_EXIST_SLEEP_TIME", DIR_NOT_EXIST_SLEEP_TIME)
 	}()
@@ -462,17 +464,10 @@ func Test_Watch_LogDir(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	sleepTimeStr := os.Getenv("DIR_NOT_EXIST_SLEEP_TIME")
-	if sleepTimeStr == "" {
-		sleepTimeStr = "10"
-	}
-	sleepTime, _ := strconv.ParseInt(sleepTimeStr, 10, 0)
-	time.Sleep(time.Duration(sleepTime) * time.Second)
+	time.Sleep(10 * time.Second)
 	m.lock.Lock()
 	_, ok = m.runners[confPathAbs]
 	m.lock.Unlock()
-	if !ok {
-		t.Fatal("runner of \"./tests2/confs1/test5.conf\" exp  after add test5.conf but not", m.runners, confPathAbs, time.Now().Format(time.RFC3339Nano))
-	}
+	assert.Equal(t, true, ok, fmt.Sprintf("runner of %v exp but not exsit in runners %v", confPathAbs, m.runners))
 	m.Stop()
 }

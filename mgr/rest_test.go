@@ -20,12 +20,13 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/reader"
-	"github.com/qiniu/logkit/sender"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
+
+	"sync"
 
 	"github.com/json-iterator/go"
 	"github.com/labstack/echo"
+	"github.com/qiniu/logkit/router"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -108,13 +109,16 @@ func getRunnerStatus(rn, lp, rs string, rdc, rds, pe, ps, se, ss int64) map[stri
 				Size:     0,
 				SizeUnit: unit,
 			},
-			ParserStats: utils.StatsInfo{
+			ReaderStats: StatsInfo{
+				Success: rdc,
+			},
+			ParserStats: StatsInfo{
 				Errors:  pe,
 				Success: ps,
 				Trend:   "",
 			},
-			TransformStats: make(map[string]utils.StatsInfo),
-			SenderStats: map[string]utils.StatsInfo{
+			TransformStats: make(map[string]StatsInfo),
+			SenderStats: map[string]StatsInfo{
 				"file_sender": {
 					Errors:  se,
 					Success: ss,
@@ -132,10 +136,12 @@ func clearGotStatus(v *RunnerStatus) {
 	v.Elaspedtime = 0
 	v.ReadSpeed = 0
 	v.ReadSpeedKB = 0
-	v.ParserStats.Speed = 0
 	v.ReadSpeedTrendKb = ""
 	v.ReadSpeedTrend = ""
 	v.ReaderStats.Trend = ""
+	v.ReaderStats.Speed = 0
+
+	v.ParserStats.Speed = 0
 	v.ParserStats.Trend = ""
 	for k, t := range v.TransformStats {
 		t.Trend = ""
@@ -175,7 +181,8 @@ func makeRequest(url, method string, configBytes []byte) (respCode int, respBody
 		return
 	}
 	req.Header.Set(ContentTypeHeader, ApplicationJson)
-	resp, err := http.DefaultClient.Do(req)
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		return
 	}
@@ -266,9 +273,7 @@ func TestWebRest(t *testing.T) {
 	}
 	rs := NewRestService(m, echo.New())
 	time.Sleep(2 * time.Second)
-	c := make(chan string)
 	defer func() {
-		close(c)
 		rs.Stop()
 		os.RemoveAll(rootDir)
 		os.Remove(StatsShell)
@@ -284,17 +289,15 @@ func TestWebRest(t *testing.T) {
 		"getRunnersTest":          getRunnersTest,
 		"senderRouterTest":        senderRouterTest,
 	}
-
+	wg := &sync.WaitGroup{}
+	wg.Add(len(funcMap))
 	for k, f := range funcMap {
-		go func(k string, f func(*testParam), c chan string) {
+		go func(k string, f func(*testParam), group *sync.WaitGroup) {
 			f(&testParam{rootDir, t, rs})
-			c <- k
-		}(k, f, c)
+			group.Done()
+		}(k, f, wg)
 	}
-	funcCnt := len(funcMap)
-	for i := 0; i < funcCnt; i++ {
-		<-c
-	}
+	wg.Wait()
 }
 
 func Test_generateStatsShell(t *testing.T) {
@@ -421,11 +424,11 @@ func restCRUDTest(p *testParam) {
 	err = jsoniter.Unmarshal([]byte(conf1), &expconf1)
 	assert.NoError(t, err)
 	expconf1.ReaderConfig[GlobalKeyName] = expconf1.RunnerName
-	expconf1.ReaderConfig[reader.KeyRunnerName] = expconf1.RunnerName
-	expconf1.ParserConf[parser.KeyRunnerName] = expconf1.RunnerName
+	expconf1.ReaderConfig[KeyRunnerName] = expconf1.RunnerName
+	expconf1.ParserConf[KeyRunnerName] = expconf1.RunnerName
 	expconf1.IsInWebFolder = true
 	for i := range expconf1.SenderConfig {
-		expconf1.SenderConfig[i][sender.KeyRunnerName] = expconf1.RunnerName
+		expconf1.SenderConfig[i][KeyRunnerName] = expconf1.RunnerName
 	}
 
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName1
@@ -434,8 +437,7 @@ func restCRUDTest(p *testParam) {
 	assert.Equal(t, http.StatusOK, respCode)
 	err = jsoniter.Unmarshal(respBody, &respGot1)
 	if err != nil {
-		fmt.Println(string(respBody))
-		t.Error(err)
+		t.Error(err, string(respBody))
 	}
 
 	// POST的和GET做验证
@@ -449,11 +451,11 @@ func restCRUDTest(p *testParam) {
 	assert.NoError(t, err)
 
 	expconf2.ReaderConfig[GlobalKeyName] = expconf2.RunnerName
-	expconf2.ReaderConfig[reader.KeyRunnerName] = expconf2.RunnerName
-	expconf2.ParserConf[parser.KeyRunnerName] = expconf2.RunnerName
+	expconf2.ReaderConfig[KeyRunnerName] = expconf2.RunnerName
+	expconf2.ParserConf[KeyRunnerName] = expconf2.RunnerName
 	expconf2.IsInWebFolder = true
 	for i := range expconf2.SenderConfig {
-		expconf2.SenderConfig[i][sender.KeyRunnerName] = expconf2.RunnerName
+		expconf2.SenderConfig[i][KeyRunnerName] = expconf2.RunnerName
 	}
 
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName2
@@ -821,8 +823,7 @@ func runnerDataIntegrityTest(p *testParam) {
 
 func TestParseUrl(t *testing.T) {
 	host, port, err := net.SplitHostPort(":1234")
-	assert.NoError(t, err)
-	fmt.Println(host, port)
+	assert.NoError(t, err, fmt.Sprintf("%v:%v", host, port))
 }
 
 func TestGetMySlaveUrl(t *testing.T) {
@@ -994,10 +995,10 @@ func senderRouterTest(p *testParam) {
 			"file_send_path": resvPath3,
 		},
 	}
-	runnerConf.Router = sender.RouterConfig{
+	runnerConf.Router = router.RouterConfig{
 		KeyName:      "a",
 		DefaultIndex: 2,
-		MatchType:    sender.MTypeEqualName,
+		MatchType:    router.MTypeEqualName,
 		Routes: map[string]int{
 			"a":   0,
 			"123": 0,
@@ -1073,11 +1074,24 @@ func senderRouterTest(p *testParam) {
 
 func TestConvertWebParserConfig(t *testing.T) {
 	cf := conf.MapConf{
-		parser.KeyCSVSplitter: "\\t",
+		parser.KeyCSVSplitter:        "\\t",
+		parser.KeyGrokCustomPatterns: `JUUyJTgyJUFDJTIwJUU0JUJEJUEwJUU1JUE1JUJEJTIwJUMzJUE2JUMzJUI4JUMzJUE1JUMzJTg2JUMzJTk4JUMzJTg1`,
 	}
-	newcf := convertWebParserConfig(cf)
+	newcf := parser.ConvertWebParserConfig(cf)
 	expcf := conf.MapConf{
-		parser.KeyCSVSplitter: "\t",
+		parser.KeyCSVSplitter:        "\t",
+		parser.KeyGrokCustomPatterns: `€ 你好 æøåÆØÅ`,
 	}
 	assert.Equal(t, expcf, newcf)
+
+	cf = conf.MapConf{
+		parser.KeyGrokCustomPatterns: `TkVXREFUQSUyMCguKiU1Q24pJTJCJTBBTVlMT0clMjAlNUMlNUIlMjUlN0JEQVRBJTNBdGltZXN0YW1wJTNBZGF0ZSU3RCU1QyU1RCU1QyU1QiUyNSU3Qk5PVFNQQUNFJTNBdHJhbnNOdW1iZXIlM0Fsb25nJTdEJTVDJTVEJTIwTGV2ZWwlMjAlMjUlN0JOT1RTUEFDRSUzQWxldmVsJTNBbG9uZyU3RCUyMFBNVFNNU0dIREwlM0ElMjAlNUNuJUU1JTg5JThEJUU0JUI4JTgwJUU1JUIxJThBJUU3JTgyJUI5JUU1JThGJTkxJUU5JTgwJTgxJUU2JTk3JUI2JUU5JTk3JUI0JTVDJTVCJTI1JTdCREFUQSUzQXByZXRyYXNuVGltZSUzQWRhdGUlN0QlNUMlNUQlMkMlRTglQjAlODMlRTclOTQlQThEb05leHRNc2clRTYlOTclQjYlRTklOTclQjQlNUMlNUIlMjUlN0JEQVRBJTNBbmV4dFRyYW5UaW1lJTNBZGF0ZSU3RCU1QyU1RCU1Q24lRTYlOUMlQUMlRTUlOUMlQjAlRTklOTglOUYlRTUlODglOTclRTclQUUlQTElRTclOTAlODYlRTUlOTklQTglM0ElNUMlNUIlMjUlN0JOT1RTUEFDRSUzQXF1ZXVlTWFuZ2VyJTdEJTVDJTVEJTJDJUU2JTlDJUFDJUU1JTlDJUIwJUU5JTk4JTlGJUU1JTg4JTk3JTNBJTVDJTVCJTI1JTdCTk9UU1BBQ0UlM0Fsb2NhbFF1ZXVlJTdEJTVDJTVEJTVDbiVFOSVBNiU5NiVFNSU4NSU4OCVFNSU4RiU5MSVFOSU4MCU4MSVFOSU5OCU5RiVFNSU4OCU5NyVFNSU5MCU4RCUzQSU1QyU1QiUyNSU3Qk5PVFNQQUNFJTNBZmlyc3RRdWV1ZU5hbWUlN0QlNUMlNUQlMkMlRTUlQTQlODclRTYlQjMlQTglM0ElNUMlNUIlMjUlN0JEQVRBJTNBbm90ZSU3RCU1QyU1RCU1Q25VJUU1JUE0JUI0JUU0JUJGJUExJUU2JTgxJUFGJTNBJTVDJTVCJTI1JTdCREFUQSUzQXVoZWFkZXIlN0QlNUMlNUQlNUNuJUU2JThBJUE1JUU2JTk2JTg3JUU1JTg2JTg1JUU1JUFFJUI5JTNBJTVDbiU3QkglM0ElMjUlN0JOT1RTUEFDRSUzQWhjb2RlJTdEJTVDdCUyQiUyNSU3Qk5PVFNQQUNFJTNBaGNvZGUyJTdEJTVDdCUyQiUyNSU3Qk5PVFNQQUNFJTNBaGNvZGUzJTdEJTVDdCUyQiUyNSU3Qk5PVFNQQUNFJTNBaGNvZGU0JTdEJTVDdCUyQiU3RCU1Q24oJTdCUyUzQSUyNSU3QkRBVEElM0FzZGF0YSU3RCU3RCU1Q24pJTNGJTI1JTdCTkVXREFUQSUzQXhtbCU3RCU1Q24lNUNuJTVDbg==`,
+	}
+	newcf = parser.ConvertWebParserConfig(cf)
+	expcf = conf.MapConf{
+		parser.KeyGrokCustomPatterns: `NEWDATA (.*\n)+
+MYLOG \[%{DATA:timestamp:date}\]\[%{NOTSPACE:transNumber:long}\] Level %{NOTSPACE:level:long} PMTSMSGHDL: \n前一届点发送时间\[%{DATA:pretrasnTime:date}\],调用DoNextMsg时间\[%{DATA:nextTranTime:date}\]\n本地队列管理器:\[%{NOTSPACE:queueManger}\],本地队列:\[%{NOTSPACE:localQueue}\]\n首先发送队列名:\[%{NOTSPACE:firstQueueName}\],备注:\[%{DATA:note}\]\nU头信息:\[%{DATA:uheader}\]\n报文内容:\n{H:%{NOTSPACE:hcode}\t+%{NOTSPACE:hcode2}\t+%{NOTSPACE:hcode3}\t+%{NOTSPACE:hcode4}\t+}\n({S:%{DATA:sdata}}\n)?%{NEWDATA:xml}\n\n\n`,
+	}
+	assert.Equal(t, expcf, newcf)
+
 }

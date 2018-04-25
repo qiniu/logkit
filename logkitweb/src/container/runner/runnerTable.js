@@ -12,7 +12,8 @@ import {
   Tag,
   Input,
   Select,
-  Form
+  Form,
+  AutoComplete
 } from 'antd';
 import {
   deleteConfigData,
@@ -52,7 +53,9 @@ class RunnerTable extends Component {
       tag: '',
       isLoading: false,
       currentTag: '',
-      currentUrl: ''
+      currentUrl: '',
+      data: [],
+      isFiltered: false
     };
 
   }
@@ -525,7 +528,6 @@ class RunnerTable extends Component {
       },
 
     }];
-
     let data = []
     if (runnerList != null) {
       runnerList.map((item) => {
@@ -619,7 +621,7 @@ class RunnerTable extends Component {
         })
       })
     }
-
+    
     return (<div>
           {window.isCluster === true ? (<Form layout="inline">
             <FormItem {...formItemLayout} style={{width: '300px'}} label="集群名称">
@@ -656,17 +658,33 @@ class RunnerTable extends Component {
                 }
               </Select>
             </FormItem>
-          </Form>) : (<div style={{marginBottom: '15px'}}><Button type="primary" style={{marginRight: '50px'}} className="index-btn" ghost
-                                   onClick={handleAddRunner}>
-            <Icon type="plus"/> 增加日志采集收集器
-          </Button>
-            <Button type="primary" className="index-btn" ghost onClick={handleAddMetricRunner}>
-              <Icon type="plus"/> 增加系统信息采集收集器
-            </Button></div>)}
+          </Form>)
+            : (<div style={{marginBottom: '15px'}}>
+                <Button type="primary" style={{marginRight: '50px'}} className="index-btn" ghost onClick={handleAddRunner}>
+                  <Icon type="plus"/> 增加日志采集收集器
+                </Button>
+                <Button type="primary" className="index-btn" ghost onClick={handleAddMetricRunner}>
+                  <Icon type="plus"/> 增加系统信息采集收集器
+                </Button>
+              <Input suffix={<Icon type="search" className="certain-category-icon" />}
+                     onChange={(e) => {
+                       this.setState({
+                         data: data.filter((item) => item.name.indexOf(e.target.value) > -1),
+                         isFiltered: true
+                       })
+                     }}
+                     placeholder="在此输入名称"
+                      style={{width: 200, float: 'right'}}/>
+              </div>)}
+              {this.state.isFiltered
+                ? <Table columns={columns} pagination={{size: 'small', pageSize: 20}} dataSource={this.state.data} />
+                : <Table columns={columns} pagination={{size: 'small', pageSize: 20}} dataSource={data} />
+              }
 
-          <Table columns={columns} pagination={{size: 'small', pageSize: 20}} dataSource={data} loading={this.state.isLoading} /></div>
+          </div>
     )
   }
+  
 
   render() {
     return (
@@ -700,7 +718,7 @@ class RunnerTable extends Component {
 
           </Modal>
         </div>
-    );
+    )
   }
 }
 export default Form.create()(RunnerTable);

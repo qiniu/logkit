@@ -7,22 +7,21 @@ import (
 	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
 type Json struct {
 	OldKey   string `json:"key"`
 	NewKey   string `json:"newKey"`
-	stats    utils.StatsInfo
+	stats    StatsInfo
 	jsonTool jsoniter.API
 	oldKeys  []string
 	newKeys  []string
 }
 
 func (g *Json) Init() error {
-	g.oldKeys = utils.GetKeys(g.OldKey)
-	g.newKeys = utils.GetKeys(g.NewKey)
+	g.oldKeys = GetKeys(g.OldKey)
+	g.newKeys = GetKeys(g.NewKey)
 	return nil
 }
 
@@ -30,7 +29,7 @@ func (g *Json) Transform(datas []Data) ([]Data, error) {
 	var err, ferr error
 	errnums := 0
 	for i := range datas {
-		val, gerr := utils.GetMapValue(datas[i], g.oldKeys...)
+		val, gerr := GetMapValue(datas[i], g.oldKeys...)
 		if gerr != nil {
 			errnums++
 			err = fmt.Errorf("transform key %v not exist in data", g.OldKey)
@@ -49,10 +48,10 @@ func (g *Json) Transform(datas []Data) ([]Data, error) {
 			continue
 		}
 		if len(g.newKeys) > 0 {
-			utils.SetMapValue(datas[i], jsonVal, false, g.newKeys...)
+			SetMapValue(datas[i], jsonVal, false, g.newKeys...)
 		} else {
 			for k, v := range jsonVal {
-				utils.SetMapValue(datas[i], v, false, k)
+				SetMapValue(datas[i], v, false, k)
 			}
 		}
 	}
@@ -113,7 +112,7 @@ func (g *Json) Stage() string {
 	return transforms.StageAfterParser
 }
 
-func (g *Json) Stats() utils.StatsInfo {
+func (g *Json) Stats() StatsInfo {
 	return g.stats
 }
 

@@ -5,6 +5,7 @@ import (
 
 	"github.com/qiniu/logkit/metric"
 	. "github.com/qiniu/logkit/utils/models"
+
 	"github.com/shirou/gopsutil/cpu"
 )
 

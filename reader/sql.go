@@ -13,13 +13,14 @@ import (
 	"time"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
+
+	"github.com/qiniu/log"
 
 	_ "github.com/denisenkom/go-mssqldb" //mssql 驱动
 	_ "github.com/go-sql-driver/mysql"   //mysql 驱动
 	"github.com/json-iterator/go"
 	_ "github.com/lib/pq" //postgres 驱动
-	"github.com/qiniu/log"
 	"github.com/robfig/cron"
 )
 
@@ -53,8 +54,9 @@ type SqlReader struct {
 	execOnStart  bool
 	loop         bool
 	loopDuration time.Duration
+	magicLagDur  time.Duration
 
-	stats     utils.StatsInfo
+	stats     StatsInfo
 	statsLock sync.RWMutex
 }
 
@@ -65,7 +67,7 @@ const (
 	StatusRunning
 )
 
-func NewSQLReader(meta *Meta, conf conf.MapConf) (mr *SqlReader, err error) {
+func NewSQLReader(meta *Meta, conf conf.MapConf) (ret Reader, err error) {
 	var readBatch int
 	var dbtype, dataSource, database, rawSqls, cronSchedule, offsetKey string
 	var execOnStart bool
@@ -163,14 +165,22 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (mr *SqlReader, err error) {
 		return
 	}
 	rawSchemas, _ := conf.GetStringListOr(KeySQLSchema, []string{})
+	magicLagDur, _ := conf.GetStringOr(KeyMagicLagDuration, "")
+	var mgld time.Duration
+	if magicLagDur != "" {
+		mgld, err = time.ParseDuration(magicLagDur)
+		if err != nil {
+			return nil, err
+		}
+	}
 	schemas, err := schemaCheck(rawSchemas)
 	if err != nil {
 		return
 	}
 
-	offsets, sqls, omitMeta := restoreMeta(meta, rawSqls)
+	offsets, sqls, omitMeta := restoreMeta(meta, rawSqls, mgld)
 
-	mr = &SqlReader{
+	mr := &SqlReader{
 		datasource:  dataSource,
 		database:    database,
 		rawsqls:     rawSqls,
@@ -185,9 +195,11 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (mr *SqlReader, err error) {
 		mux:         sync.Mutex{},
 		started:     false,
 		execOnStart: execOnStart,
+		magicLagDur: mgld,
 		schemas:     schemas,
 		statsLock:   sync.RWMutex{},
 	}
+
 	// 如果meta初始信息损坏
 	if !omitMeta {
 		mr.offsets = offsets
@@ -242,8 +254,8 @@ func schemaCheck(rawSchemas []string) (schemas map[string]string, err error) {
 	return
 }
 
-func restoreMeta(meta *Meta, rawSqls string) (offsets []int64, sqls []string, omitMeta bool) {
-	now := time.Now()
+func restoreMeta(meta *Meta, rawSqls string, magicLagDur time.Duration) (offsets []int64, sqls []string, omitMeta bool) {
+	now := time.Now().Add(-magicLagDur)
 	sqls = updateSqls(rawSqls, now)
 	omitMeta = true
 	sqlAndOffsets, length, err := meta.ReadOffset()
@@ -327,7 +339,7 @@ func goMagic(rawSql string, now time.Time) (ret string) {
 }
 
 func (mr *SqlReader) Name() string {
-	return strings.ToUpper(mr.dbtype) + "_Reader:" + mr.database + "_" + utils.Hash(mr.rawsqls)
+	return strings.ToUpper(mr.dbtype) + "_Reader:" + mr.database + "_" + Hash(mr.rawsqls)
 }
 
 func (mr *SqlReader) setStatsError(err string) {
@@ -337,7 +349,7 @@ func (mr *SqlReader) setStatsError(err string) {
 	mr.stats.LastError = err
 }
 
-func (mr *SqlReader) Status() utils.StatsInfo {
+func (mr *SqlReader) Status() StatsInfo {
 	mr.statsLock.RLock()
 	defer mr.statsLock.RUnlock()
 	return mr.stats
@@ -566,7 +578,8 @@ func (mr *SqlReader) getOffsetIndex(columns []string) int {
 }
 
 func (mr *SqlReader) exec(connectStr string) (err error) {
-	now := time.Now()
+	now := time.Now().Add(-mr.magicLagDur)
+
 	db, err := sql.Open(mr.dbtype, connectStr)
 	if err != nil {
 		return fmt.Errorf("%v open %v failed: %v", mr.Name(), mr.dbtype, err)

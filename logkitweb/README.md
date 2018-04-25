@@ -29,9 +29,8 @@
 │       │   └── main.19bfac5c.css.map
 │       ├── favicon.ico
 │       ├── js
-│       │   ├── main.4905a907.js
-│       │   └── main.4905a907.js.map
-│       └── logkit100.png
+│           ├── main.4905a907.js
+│           └── main.4905a907.js.map
 ├── package.json                         # 项目信息
 ├── public                               # 公共文件夹，编译时copy至build目录
 │   ├── favicon.ico
@@ -40,7 +39,6 @@
 │   └── static
 │       ├── antd.css
 │       ├── favicon.ico
-│       └── logkit100.png
 ├── src                                  # 源码目录
 │   ├── components                       # 配置页 UI 组件
 │   │   ├── metricConfig.js

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 	"github.com/stretchr/testify/assert"
 )
@@ -39,9 +38,9 @@ func TestNewNginxParser(t *testing.T) {
 	}
 	assert.Equal(t, p.Name(), "nginx", "nginx parser name not equal")
 	entry1S, err := p.Parse(accLog1)
-	if c, ok := err.(*utils.StatsError); ok {
+	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
-		assert.Equal(t, int64(1), c.Errors)
+		assert.Equal(t, int64(0), c.Errors)
 	}
 	entry1 := entry1S[0]
 	for k, v := range entry1 {
@@ -49,7 +48,7 @@ func TestNewNginxParser(t *testing.T) {
 	}
 	errFormat := fmt.Errorf("NginxParser fail to parse log line [%v], given format is [%v]", accErrLog[0], p.regexp)
 	_, err = p.Parse(accErrLog)
-	if c, ok := err.(*utils.StatsError); ok {
+	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
 	}
 	assert.Equal(t, err, errFormat, "it should be err format")
@@ -59,7 +58,7 @@ func TestNewNginxParser(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = p2.Parse(accLog2)
-	if c, ok := err.(*utils.StatsError); ok {
+	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
 	}
 	if err != nil {
@@ -75,12 +74,12 @@ func TestNewNginxParserForErrData(t *testing.T) {
 	}
 	assert.Equal(t, p.Name(), "nginx", "nginx parser name not equal")
 	entry1S, err := p.Parse(accLog1)
-	if c, ok := err.(*utils.StatsError); ok {
+	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
-		assert.Equal(t, int64(1), c.Errors)
+		assert.Equal(t, int64(0), c.Errors)
 	}
-	if len(entry1S) != 2 {
-		t.Fatalf("parse lines error, expect 2 lines but got %v lines", len(entry1S))
+	if len(entry1S) != 1 {
+		t.Fatalf("parse lines error, expect 1 lines but got %v lines", len(entry1S))
 	}
 	entry1 := entry1S[0]
 	for k, v := range entry1 {
@@ -95,7 +94,7 @@ func TestNewNginxWithManuelRegex(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = p2.Parse(accLog2)
-	if c, ok := err.(*utils.StatsError); ok {
+	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
 	}
 	if err != nil {

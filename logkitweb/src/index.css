@@ -29,7 +29,7 @@ body {
 }
 
 .header a {
-  margin-left: 100px;
+  margin-left: 1px;
   font-size: 16px;
   color: #fff;
 }
@@ -41,9 +41,7 @@ body {
 }
 
 .steps-content {
-  border: 1px dashed #e9e9e9;
   border-radius: 0px 0px 6px 6px;
-  background-color: #fafafa;
   text-align: center;
   height: 90%;
   overflow: scroll;
@@ -51,6 +49,7 @@ body {
 
 .steps-action {
   margin-top: 24px;
+  text-align: center;
 }
 
 .logkit-create-container {
@@ -103,11 +102,11 @@ body {
 }
 
 .ant-steps {
-  margin-bottom: 20px;
+  margin-bottom: 40px;
 }
 
 .warningTip {
-  color: #ffbf00;
+  /* color: #ffbf00; */
 }
 
 .ant-form-item-label label {
@@ -122,16 +121,14 @@ body {
 }
 
 .fields.key {
-  width: 250px;
+  width: 220px;
 }
 
 .fields.value {
-  width: 250px;
+  width: 220px;
   margin-left: 20px;
 }
 .dynamic-delete-button {
-  marginTop: 30px;
-  margin-left: 20px;
   cursor: pointer;
   position: relative;
   top: 4px;
@@ -168,10 +165,79 @@ body {
 }
 
 .option-add .option-add-btn{
-  text-align: right;
+  text-align: left;
+}
+
+.option-add-tag-btn {
+  width: 80px;
+  margin-bottom: 20px;
+  margin-top: 10px;
+  border-color: #bfd8f7;
+  color: #108ee9;
+  background-color: #f1f7fe;
 }
 
 .ant-form-item-label{
     text-overflow:initial;
     white-space: normal;
+    margin-right: 25px;
+    line-height: 1.4;
+}
+
+.ant-form-item-label label:after {
+  content: ''
+}
+
+.ant-form-item {
+  margin-bottom: 30px;
+}
+
+.render-tag-container {
+  border: 1px solid #e9e9e9;
+  padding-top: 20px;
+}
+
+.ant-divider {
+  background: #e9e9e9;
+}
+
+.ant-divider-horizontal {
+  display: block;
+  height: 1px;
+  width: 80%;
+  margin: 24px auto 35px auto;
+}
+
+.ant-divider-inner-text {
+    display: inline-block;
+    padding: 0 24px;
+}
+
+.ant-divider-with-text {
+  display: table;
+  white-space: nowrap;
+  text-align: center;
+  background: transparent;
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.85);
+  font-size: 16px;
+  margin: 26px auto;
+}
+
+.ant-divider-with-text::before, .ant-divider-with-text::after {
+  content: '';
+  display: table-cell;
+  position: relative;
+  top: 50%;
+  width: 50%;
+  border-top: 1px dashed #e8e8e8;
+  -webkit-transform: translateY(50%);
+  -ms-transform: translateY(50%);
+  transform: translateY(50%);
+}
+
+.certain-category-icon {
+  color: #6E6E6E;
+  transition: all 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
+  font-size: 16px;
 }

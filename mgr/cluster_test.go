@@ -2,6 +2,7 @@ package mgr
 
 import (
 	"bufio"
+	"encoding/json"
 	"io"
 	"net/http"
 	"os"
@@ -9,8 +10,6 @@ import (
 	"strconv"
 	"testing"
 	"time"
-
-	"encoding/json"
 
 	"github.com/json-iterator/go"
 	"github.com/labstack/echo"
@@ -366,6 +365,7 @@ func clusterStartStopTest(p *testCluParam) {
 	for key, ex := range expStatus {
 		act, ok := actStatus[key]
 		assert.Equal(t, true, ok)
+
 		assert.Equal(t, ex, act)
 	}
 

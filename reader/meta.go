@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
+	utilsos "github.com/qiniu/logkit/utils/os"
 
 	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
@@ -63,10 +63,11 @@ type Meta struct {
 	statisticPath     string                 // 记录 runner 计数信息
 	ftSaveLogPath     string                 // 记录 ft_sender 日志信息
 	RunnerName        string
+	extrainfo         map[string]string
 }
 
 func getValidDir(dir string) (realPath string, err error) {
-	realPath, fi, err := utils.GetRealPath(dir)
+	realPath, fi, err := GetRealPath(dir)
 	if os.IsNotExist(err) {
 		if err = os.MkdirAll(realPath, DefaultDirPerm); err != nil {
 			//此处的error需要直接返回，后面会根据error类型是否为path error做判断
@@ -156,7 +157,7 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 	if metapath == "" {
 		runnerName, _ := conf.GetString(GlobalKeyName)
 		base := filepath.Base(logPath)
-		metapath = "meta/" + runnerName + "_" + utils.Hash(base)
+		metapath = "meta/" + runnerName + "_" + Hash(base)
 		log.Debugf("Runner[%v] Using %s as default metaPath", runnerName, metapath)
 	}
 	datasourceTag, _ := conf.GetStringOr(KeyDataSourceTag, "")
@@ -167,6 +168,16 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 	if err != nil {
 		log.Warnf("Runner[%v] %s - newMeta failed, err:%v", runnerName, metapath, err)
 		return
+	}
+	extrainfo, _ := conf.GetBoolOr(ExtraInfo, false)
+	if extrainfo {
+		meta.extrainfo = utilsos.GetExtraInfo()
+	} else {
+		meta.extrainfo = make(map[string]string)
+	}
+	decoder, _ := conf.GetStringOr(KeyEncoding, "")
+	if decoder != "" {
+		meta.SetEncodingWay(strings.ToLower(decoder))
 	}
 	meta.dataSourceTag = datasourceTag
 	meta.readlimit = readlimit * 1024 * 1024 //readlimit*MB
@@ -428,10 +439,10 @@ func (m *Meta) DeleteDoneFile(path string) error {
 	return nil
 }
 
-func (m *Meta) GetDoneFiles() (doneFiles []utils.File, err error) {
+func (m *Meta) GetDoneFiles() (doneFiles []File, err error) {
 	dir := m.doneFilePath
 	// 按文件时间从新到旧排列
-	files, err := utils.ReadDirByTime(dir)
+	files, err := ReadDirByTime(dir)
 	if err != nil {
 		log.Error(files, err)
 		return
@@ -443,7 +454,7 @@ func (m *Meta) GetDoneFiles() (doneFiles []utils.File, err error) {
 		}
 		fname := f.Name()
 		if m.IsDoneFile(fname) {
-			doneFiles = append(doneFiles, utils.File{
+			doneFiles = append(doneFiles, File{
 				Info: f,
 				Path: filepath.Join(dir, fname),
 			})
@@ -529,4 +540,8 @@ func (m *Meta) WriteStatistic(stat *Statistic) error {
 		return err
 	}
 	return ioutil.WriteFile(m.StatisticFile(), statStr, DefaultFilePerm)
+}
+
+func (m *Meta) ExtraInfo() map[string]string {
+	return m.extrainfo
 }

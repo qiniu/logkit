@@ -10,7 +10,6 @@ import (
 
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -19,7 +18,7 @@ type DateTrans struct {
 	Offset       int    `json:"offset"`
 	LayoutBefore string `json:"time_layout_before"`
 	LayoutAfter  string `json:"time_layout_after"`
-	stats        utils.StatsInfo
+	stats        StatsInfo
 }
 
 func (g *DateTrans) RawTransform(datas []string) ([]string, error) {
@@ -29,10 +28,10 @@ func (g *DateTrans) RawTransform(datas []string) ([]string, error) {
 func (g *DateTrans) Transform(datas []Data) ([]Data, error) {
 	var err, ferr error
 	errnums := 0
-	keys := utils.GetKeys(g.Key)
+	keys := GetKeys(g.Key)
 	for i := range datas {
-		val, err := utils.GetMapValue(datas[i], keys...)
-		if err != nil {
+		val, gerr := GetMapValue(datas[i], keys...)
+		if gerr != nil {
 			errnums++
 			err = fmt.Errorf("transform key %v not exist in data", g.Key)
 			continue
@@ -42,11 +41,11 @@ func (g *DateTrans) Transform(datas []Data) ([]Data, error) {
 			errnums++
 			continue
 		}
-		utils.SetMapValue(datas[i], val, false, keys...)
+		SetMapValue(datas[i], val, false, keys...)
 	}
 	if err != nil {
 		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform replace, last error info is %v", errnums, err)
+		ferr = fmt.Errorf("find total %v erorrs in transform date, last error info is %v", errnums, err)
 	}
 	g.stats.Errors += int64(errnums)
 	g.stats.Success += int64(len(datas) - errnums)
@@ -123,7 +122,7 @@ func (g *DateTrans) formatWithUserOption(t time.Time) interface{} {
 
 func (g *DateTrans) Description() string {
 	//return "transform string/long to specified date format"
-	return "将string/long数据转换成指定的时间格式"
+	return "将string/long数据转换成指定的时间格式, 如 1523878855 变为 2018-04-16T19:40:55+08:00"
 }
 
 func (g *DateTrans) Type() string {
@@ -142,7 +141,6 @@ func (g *DateTrans) SampleConfig() string {
 
 func (it *DateTrans) ConfigOptions() []Option {
 	return []Option{
-		transforms.KeyStageAfterOnly,
 		transforms.KeyFieldName,
 		transforms.KeyTimezoneoffset,
 		{
@@ -160,6 +158,7 @@ func (it *DateTrans) ConfigOptions() []Option {
 			DefaultNoUse: false,
 			Description:  "解析后时间样式(不填默认rfc3339)(time_layout_after)",
 			Type:         transforms.TransformTypeString,
+			Advance:      true,
 		},
 	}
 }
@@ -168,7 +167,7 @@ func (g *DateTrans) Stage() string {
 	return transforms.StageAfterParser
 }
 
-func (g *DateTrans) Stats() utils.StatsInfo {
+func (g *DateTrans) Stats() StatsInfo {
 	return g.stats
 }
 

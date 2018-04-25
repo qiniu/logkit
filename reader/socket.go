@@ -311,7 +311,7 @@ func (sr *SocketReader) Close() (err error) {
 	return
 }
 
-func NewSocketReader(meta *Meta, conf conf.MapConf) (*SocketReader, error) {
+func NewSocketReader(meta *Meta, conf conf.MapConf) (Reader, error) {
 	ServiceAddress, err := conf.GetString(KeySocketServiceAddress)
 	if err != nil {
 		return nil, err

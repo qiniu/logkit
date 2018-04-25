@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/qiniu/log"
@@ -25,7 +24,7 @@ type Script struct {
 	newKeys   [][]string
 	newVars   []string
 	vm        *otto.Otto
-	stats     utils.StatsInfo
+	stats     StatsInfo
 }
 
 //每批数据执行script的超时时间---单位是秒
@@ -66,7 +65,7 @@ func parseKey(key string) ([][]string, []string, error) {
 	var vars []string
 	for _, item := range items {
 		pair := regexP.Split(item, -1)
-		keys := utils.GetKeys(pair[0])
+		keys := GetKeys(pair[0])
 		keyss = append(keyss, keys)
 		if len(pair) > 1 {
 			vars = append(vars, pair[1])
@@ -82,7 +81,7 @@ func (g *Script) Transform(datas []Data) (returnData []Data, ferr error) {
 	errnums := 0
 	g.vm = otto.New()
 	g.vm.Interrupt = make(chan func(), 1) // The buffer prevents blocking
-	returnData = utils.DeepCopy(datas).([]Data)
+	returnData = DeepCopy(datas).([]Data)
 	halt := fmt.Errorf("script transformer execution timeout of %v second, the transform script is: %s , the batch size is %v", int(timeOut), g.Script, len(datas))
 	ctx := context.Background()
 	cancelCtx, cancel := context.WithCancel(ctx)
@@ -119,14 +118,14 @@ func (g *Script) Transform(datas []Data) (returnData []Data, ferr error) {
 	for i := range datas {
 		//向js VM 中设置属性
 		for j, keys := range g.oldKeys {
-			val, gerr := utils.GetMapValue(datas[i], keys...)
+			val, gerr := GetMapValue(datas[i], keys...)
 			if gerr != nil {
 				err = fmt.Errorf("transform key %v not exist in data", keys)
 				break
 			}
 			g.vm.Set(g.oldVars[j], val)
 			if g.DeleteOld {
-				utils.DeleteMapValue(datas[i], keys...)
+				DeleteMapValue(datas[i], keys...)
 			}
 		}
 		if err != nil {
@@ -160,7 +159,7 @@ func (g *Script) Transform(datas []Data) (returnData []Data, ferr error) {
 				err = fmt.Errorf("run script error: The value obtained only can be number,string or boolean ")
 				break
 			}
-			sErr := utils.SetMapValue(datas[i], val, false, keys...)
+			sErr := SetMapValue(datas[i], val, false, keys...)
 			if sErr != nil {
 				err = fmt.Errorf("faild to set mapValue error: %v", sErr)
 				break
@@ -233,7 +232,7 @@ func (g *Script) Stage() string {
 	return transforms.StageAfterParser
 }
 
-func (g *Script) Stats() utils.StatsInfo {
+func (g *Script) Stats() StatsInfo {
 	return g.stats
 }
 

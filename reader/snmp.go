@@ -97,9 +97,9 @@ func execCmd(arg0 string, args ...string) ([]byte, error) {
 	return out, nil
 }
 
-func NewSnmpReader(meta *Meta, c conf.MapConf) (s *SnmpReader, err error) {
+func NewSnmpReader(meta *Meta, c conf.MapConf) (s Reader, err error) {
 	var timeOut, interval time.Duration
-	name, _ := c.GetStringOr(KeySnmpReaderName, "system")
+	name, _ := c.GetStringOr(KeySnmpReaderName, "logki_default_snmp_name")
 	agents, _ := c.GetStringListOr(KeySnmpReaderAgents, []string{"127.0.0.1:161"})
 	timeStr, _ := c.GetStringOr(KeySnmpReaderTimeOut, "5s")
 	if timeOut, err = time.ParseDuration(timeStr); err != nil {
@@ -395,7 +395,10 @@ func (s *SnmpReader) Start() error {
 		for {
 			select {
 			case <-ticker.C:
-				s.Gather()
+				err := s.Gather()
+				if err != nil {
+					log.Errorf("runner[%v] Reader[%v] gather error %v", s.Meta.RunnerName, s.Name(), err)
+				}
 			case <-s.StopChan:
 				close(s.DataChan)
 				return

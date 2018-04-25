@@ -8,10 +8,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/qiniu/logkit/conf"
+	. "github.com/qiniu/logkit/utils/models"
+
 	"github.com/go-redis/redis"
 	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
 )
 
 const (
@@ -46,7 +47,7 @@ type RedisReader struct {
 	mux     sync.Mutex
 	started bool
 
-	stats     utils.StatsInfo
+	stats     StatsInfo
 	statsLock sync.RWMutex
 }
 
@@ -63,7 +64,7 @@ type RedisOptionn struct {
 	timeout time.Duration
 }
 
-func NewRedisReader(meta *Meta, conf conf.MapConf) (rr *RedisReader, err error) {
+func NewRedisReader(meta *Meta, conf conf.MapConf) (rr Reader, err error) {
 	dataType, err := conf.GetString(KeyRedisDataType)
 	if err != nil {
 		return
@@ -120,7 +121,7 @@ func (rr *RedisReader) setStatsError(err string) {
 	rr.stats.LastError = err
 }
 
-func (rr *RedisReader) Status() utils.StatsInfo {
+func (rr *RedisReader) Status() StatsInfo {
 	rr.statsLock.RLock()
 	defer rr.statsLock.RUnlock()
 	return rr.stats
