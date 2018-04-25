@@ -156,13 +156,25 @@ func (c *Pipeline) UpdateRepoWithTSDB(input *UpdateRepoInput, ex ExportDesc) err
 		}
 	}
 
+	hasDiff := false
 	for _, v := range input.Schema {
 		if input.IsTag(v.Key) {
+			if val, ok := newtags[v.Key]; ok && val == "#"+v.Key {
+				continue
+			}
 			newtags[v.Key] = "#" + v.Key
 		} else {
+			if val, ok := newfields[v.Key]; ok && val == "#"+v.Key {
+				continue
+			}
 			newfields[v.Key] = "#" + v.Key
 		}
+		hasDiff = true
 	}
+	if !hasDiff {
+		return nil
+	}
+
 	spec := &ExportTsdbSpec{DestRepoName: repoName, SeriesName: seriesName, Tags: newtags, Fields: newfields}
 
 	seriesUpdateExportToken, ok := input.Option.AutoExportTSDBTokens.UpdateExportToken[ex.Name]
@@ -245,6 +257,8 @@ func (c *Pipeline) UpdateRepoWithLogDB(input *UpdateRepoInput, ex ExportDesc) er
 		return err
 	}
 
+	hasDiff := false
+
 	analyzers := AnalyzerInfo{}
 	if input.Option != nil {
 		analyzers = input.Option.AutoExportToLogDBInput.AnalyzerInfo
@@ -256,8 +270,14 @@ func (c *Pipeline) UpdateRepoWithLogDB(input *UpdateRepoInput, ex ExportDesc) er
 				repoInfo.Schema = append(repoInfo.Schema, scs[0])
 			}
 			docs[v.Key] = "#" + v.Key
+			hasDiff = true
 		}
 	}
+	if !hasDiff {
+		// 对于没有变化的就不更新了
+		return nil
+	}
+
 	if err = logdbAPI.UpdateRepo(&logdb.UpdateRepoInput{
 		RepoName:     repoName,
 		Retention:    repoInfo.Retention,
@@ -333,8 +353,16 @@ func (c *Pipeline) UpdateRepoWithKodo(input *UpdateRepoInput, ex ExportDesc) err
 		}
 	}
 
+	hasDiff := false
 	for _, v := range input.Schema {
+		if val, ok := newfields[v.Key]; ok && val == "#"+v.Key {
+			continue
+		}
 		newfields[v.Key] = "#" + v.Key
+		hasDiff = true
+	}
+	if !hasDiff {
+		return nil
 	}
 
 	spec := &ExportKodoSpec{

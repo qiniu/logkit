@@ -362,7 +362,7 @@ func TestFtSenderConvertData(t *testing.T) {
 			if succ {
 				datas := ConvertDatas(sx.GetFailDatas())
 				moreDatas = append(moreDatas, datas)
-			} else if !(se.Ft&&se.FtNotRetry){
+			} else if !(se.Ft && se.FtNotRetry) {
 				t.Fatal("ft send StatsError error should contains send error", se.ErrorDetail)
 			}
 		}
