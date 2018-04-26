@@ -1,12 +1,9 @@
-// +build !windows
-
 package system
 
 import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,8 +11,11 @@ import (
 	"strconv"
 	"syscall"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/metric"
 	. "github.com/qiniu/logkit/utils/models"
+
+	"github.com/shirou/gopsutil/process"
 )
 
 const (
@@ -85,6 +85,14 @@ func (p *Processes) Collect() (datas []map[string]interface{}, err error) {
 	// Get an empty map of metric fields
 	fields := getEmptyFields()
 
+	// Collect windows process info
+	if runtime.GOOS == "windows" {
+		if err := p.getWinStat(fields); err != nil {
+			return nil, fmt.Errorf("collect windows processes error: %v", err.Error())
+		}
+		return append(datas, fields), nil
+	}
+
 	// Decide if we will use 'ps' to get stats (use procfs otherwise)
 	usePS := true
 	if runtime.GOOS == "linux" {
@@ -132,6 +140,8 @@ func getEmptyFields() map[string]interface{} {
 	case "linux":
 		fields[KeyProcessesDead] = int64(0)
 		fields[KeyProcessesPaging] = int64(0)
+		fields[KeyProcessesTotalThreads] = int64(0)
+	case "windows":
 		fields[KeyProcessesTotalThreads] = int64(0)
 	}
 	return fields
@@ -234,6 +244,27 @@ func (p *Processes) gatherFromProc(fields map[string]interface{}) error {
 			continue
 		}
 		fields[KeyProcessesTotalThreads] = fields[KeyProcessesTotalThreads].(int64) + int64(threads)
+	}
+	return nil
+}
+
+//  For windows, get all process states
+func (p *Processes) getWinStat(fields map[string]interface{}) error {
+	pids, err := process.Pids()
+	if err != nil {
+		return fmt.Errorf("Get all processes pids failed, error: %v", err.Error())
+	}
+	// total processes
+	fields[KeyProcessesTotal] = int64(len(pids))
+	for _, pid := range pids {
+		threads := int32(0)
+		p, _ := process.NewProcess(pid)
+		if threads, err = p.NumThreads(); err != nil {
+			log.Errorf("Get process threads failed, error: %v", err.Error())
+			continue
+		}
+		fields[KeyProcessesTotalThreads] = fields[KeyProcessesTotalThreads].(int64) + int64(threads)
+
 	}
 	return nil
 }
