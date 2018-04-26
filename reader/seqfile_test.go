@@ -294,3 +294,33 @@ func Test_SeekUnreachable(t *testing.T) {
 	st, err := f.Stat()
 	fmt.Println(st.Size())
 }
+
+func TestLag(t *testing.T) {
+	createDir()
+	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, "", defautFileRetention)
+	if err != nil {
+		t.Error(err)
+	}
+	createQiniuLogFile(dir)
+	createInvalidSuffixFile(dir)
+	defer destroyFile()
+
+	sf, err := NewSeqFile(meta, dir, false, false, []string{".pid"}, `logkit.log-*`, WhenceOldest)
+	if err != nil {
+		t.Error(err)
+	}
+	buffer := make([]byte, 8)
+	_, err = sf.Read(buffer)
+	if err != nil {
+		t.Error(err)
+	}
+	if string(buffer) != "12345678" {
+		t.Errorf("exp 12345678 but got %v", string(buffer))
+	}
+
+	destroyFile()
+	createDir()
+	rl, err := sf.Lag()
+	assert.NoError(t, err)
+	assert.Equal(t, &LagInfo{0, "bytes", 0}, rl)
+}
