@@ -8,14 +8,27 @@ import (
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 
+	"sync"
+
+	"strconv"
+
 	"github.com/ua-parser/uap-go/uaparser"
 )
 
 type UATransformer struct {
 	Key              string `json:"key"`
 	RegexYmlFilePath string `json:"regex_yml_path"`
+	UA_Device        string `json:"device"`
+	dev              bool
+	UA_OS            string `json:"os"`
+	os               bool
+	UA_Agent         string `json:"agent"`
+	agent            bool
+	MemCache         string `json:"memory_cache"`
+	memcache         bool
 	stats            StatsInfo
 	uap              *uaparser.Parser
+	cache            map[string]*uaparser.Client
 }
 
 func (it *UATransformer) Init() (err error) {
@@ -28,11 +41,62 @@ func (it *UATransformer) Init() (err error) {
 	if it.uap == nil {
 		it.uap = uaparser.NewFromSaved()
 	}
+	it.cache = make(map[string]*uaparser.Client)
+	it.memcache, _ = strconv.ParseBool(it.MemCache)
+	it.agent, _ = strconv.ParseBool(it.UA_Agent)
+	it.dev, _ = strconv.ParseBool(it.UA_Device)
+	it.os, _ = strconv.ParseBool(it.UA_OS)
 	return nil
 }
 
 func (it *UATransformer) RawTransform(datas []string) ([]string, error) {
 	return datas, errors.New("UserAgent transformer not support rawTransform")
+}
+
+func (it *UATransformer) getParsedData(line string) (UserAgent *uaparser.UserAgent, Os *uaparser.Os, Device *uaparser.Device) {
+	if !it.dev && !it.os && !it.agent {
+		return
+	}
+
+	if it.memcache {
+		ag, ok := it.cache[line]
+		if ok {
+			return ag.UserAgent, ag.Os, ag.Device
+		}
+	}
+	var wg sync.WaitGroup
+	if it.agent {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			it.uap.RLock()
+			UserAgent = it.uap.ParseUserAgent(line)
+			it.uap.RUnlock()
+		}()
+	}
+	if it.os {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			it.uap.RLock()
+			Os = it.uap.ParseOs(line)
+			it.uap.RUnlock()
+		}()
+	}
+	if it.dev {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			it.uap.RLock()
+			Device = it.uap.ParseDevice(line)
+			it.uap.RUnlock()
+		}()
+	}
+	wg.Wait()
+	if it.memcache {
+		it.cache[line] = &uaparser.Client{UserAgent, Os, Device}
+	}
+	return
 }
 
 func (it *UATransformer) Transform(datas []Data) ([]Data, error) {
@@ -62,55 +126,65 @@ func (it *UATransformer) Transform(datas []Data) ([]Data, error) {
 			err = fmt.Errorf("transform key %v is empty string", it.Key)
 			continue
 		}
-		client := it.uap.Parse(strval)
 
-		if client.UserAgent.Family != "" {
-			newkeys[len(newkeys)-1] = "UA_Family"
-			SetMapValue(datas[i], client.UserAgent.Family, false, newkeys...)
+		if it.agent {
+			UserAgent := it.uap.ParseUserAgent(strval)
+			if UserAgent.Family != "" {
+				newkeys[len(newkeys)-1] = "UA_Family"
+				SetMapValue(datas[i], UserAgent.Family, false, newkeys...)
+			}
+			if UserAgent.Major != "" {
+				newkeys[len(newkeys)-1] = "UA_Major"
+				SetMapValue(datas[i], UserAgent.Major, false, newkeys...)
+			}
+			if UserAgent.Minor != "" {
+				newkeys[len(newkeys)-1] = "UA_Minor"
+				SetMapValue(datas[i], UserAgent.Minor, false, newkeys...)
+			}
+			if UserAgent.Patch != "" {
+				newkeys[len(newkeys)-1] = "UA_Patch"
+				SetMapValue(datas[i], UserAgent.Patch, false, newkeys...)
+			}
 		}
-		if client.UserAgent.Major != "" {
-			newkeys[len(newkeys)-1] = "UA_Major"
-			SetMapValue(datas[i], client.UserAgent.Major, false, newkeys...)
+		if it.agent {
+			Device := it.uap.ParseDevice(strval)
+			if Device.Family != "" {
+				newkeys[len(newkeys)-1] = "UA_Device_Family"
+				SetMapValue(datas[i], Device.Family, false, newkeys...)
+			}
+			if Device.Brand != "" {
+				newkeys[len(newkeys)-1] = "UA_Device_Brand"
+				SetMapValue(datas[i], Device.Brand, false, newkeys...)
+			}
+			if Device.Model != "" {
+				newkeys[len(newkeys)-1] = "UA_Device_Model"
+				SetMapValue(datas[i], Device.Model, false, newkeys...)
+			}
 		}
-		if client.UserAgent.Minor != "" {
-			newkeys[len(newkeys)-1] = "UA_Minor"
-			SetMapValue(datas[i], client.UserAgent.Minor, false, newkeys...)
-		}
-		if client.UserAgent.Patch != "" {
-			newkeys[len(newkeys)-1] = "UA_Patch"
-			SetMapValue(datas[i], client.UserAgent.Patch, false, newkeys...)
-		}
-		if client.Device.Family != "" {
-			newkeys[len(newkeys)-1] = "UA_Device_Family"
-			SetMapValue(datas[i], client.Device.Family, false, newkeys...)
-		}
-		if client.Device.Brand != "" {
-			newkeys[len(newkeys)-1] = "UA_Device_Brand"
-			SetMapValue(datas[i], client.Device.Brand, false, newkeys...)
-		}
-		if client.Device.Model != "" {
-			newkeys[len(newkeys)-1] = "UA_Device_Model"
-			SetMapValue(datas[i], client.Device.Model, false, newkeys...)
-		}
-		if client.Os.Family != "" {
-			newkeys[len(newkeys)-1] = "UA_OS_Family"
-			SetMapValue(datas[i], client.Os.Family, false, newkeys...)
-		}
-		if client.Os.Patch != "" {
-			newkeys[len(newkeys)-1] = "UA_OS_Patch"
-			SetMapValue(datas[i], client.Os.Patch, false, newkeys...)
-		}
-		if client.Os.Minor != "" {
-			newkeys[len(newkeys)-1] = "UA_OS_Minor"
-			SetMapValue(datas[i], client.Os.Minor, false, newkeys...)
-		}
-		if client.Os.Major != "" {
-			newkeys[len(newkeys)-1] = "UA_OS_Major"
-			SetMapValue(datas[i], client.Os.Major, false, newkeys...)
-		}
-		if client.Os.PatchMinor != "" {
-			newkeys[len(newkeys)-1] = "UA_OS_PatchMinor"
-			SetMapValue(datas[i], client.Os.PatchMinor, false, newkeys...)
+
+		if it.os {
+			Os := it.uap.ParseOs(strval)
+			if Os.Family != "" {
+				newkeys[len(newkeys)-1] = "UA_OS_Family"
+				SetMapValue(datas[i], Os.Family, false, newkeys...)
+			}
+			if Os.Patch != "" {
+				newkeys[len(newkeys)-1] = "UA_OS_Patch"
+				SetMapValue(datas[i], Os.Patch, false, newkeys...)
+			}
+			if Os.Minor != "" {
+				newkeys[len(newkeys)-1] = "UA_OS_Minor"
+				SetMapValue(datas[i], Os.Minor, false, newkeys...)
+			}
+			if Os.Major != "" {
+				newkeys[len(newkeys)-1] = "UA_OS_Major"
+				SetMapValue(datas[i], Os.Major, false, newkeys...)
+			}
+			if Os.PatchMinor != "" {
+				newkeys[len(newkeys)-1] = "UA_OS_PatchMinor"
+				SetMapValue(datas[i], Os.PatchMinor, false, newkeys...)
+			}
+
 		}
 
 	}
@@ -151,6 +225,43 @@ func (it *UATransformer) ConfigOptions() []Option {
 			DefaultNoUse: true,
 			Description:  "UserAgent解析正则表达式文件路径(regex_yml_path)",
 			Type:         transforms.TransformTypeString,
+		},
+		{
+			KeyName:       "device",
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{true, false},
+			Default:       "true",
+			DefaultNoUse:  true,
+			Description:   "解析UserAgent中的设备信息(device)",
+			Type:          transforms.TransformTypeBoolean,
+		},
+		{
+			KeyName:       "os",
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{true, false},
+			Default:       "true",
+			DefaultNoUse:  true,
+			Description:   "解析UserAgent中的操作系统信息(os)",
+			Type:          transforms.TransformTypeBoolean,
+		},
+		{
+			KeyName:       "agent",
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{true, false},
+			Default:       "true",
+			DefaultNoUse:  true,
+			Description:   "解析UserAgent中的agent信息(agent)",
+			Type:          transforms.TransformTypeBoolean,
+		},
+		{
+			KeyName:       "memory_cache",
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{true, false},
+			Default:       "true",
+			DefaultNoUse:  true,
+			Description:   "将解析结果缓存在内存中(memory_cache)",
+			Type:          transforms.TransformTypeBoolean,
+			Advance:       true,
 		},
 	}
 }
