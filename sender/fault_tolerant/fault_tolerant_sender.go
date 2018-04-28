@@ -1,4 +1,4 @@
-package sender
+package fault_tolerant
 
 import (
 	"encoding/json"
@@ -12,7 +12,9 @@ import (
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/queue"
+	"github.com/qiniu/logkit/sender/common"
 	. "github.com/qiniu/logkit/utils/models"
+
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
 	"github.com/json-iterator/go"
@@ -52,7 +54,7 @@ const (
 type FtSender struct {
 	stopped     int32
 	exitChan    chan struct{}
-	innerSender Sender
+	innerSender common.Sender
 	logQueue    queue.BackendQueue
 	backupQueue queue.BackendQueue
 	writeLimit  int // 写入速度限制，单位MB
@@ -80,11 +82,11 @@ type datasContext struct {
 }
 
 // NewFtSender Fault tolerant sender constructor
-func NewFtSender(sender Sender, conf conf.MapConf, ftSaveLogPath string) (*FtSender, error) {
+func NewFtSender(sender common.Sender, conf conf.MapConf, ftSaveLogPath string) (*FtSender, error) {
 	memoryChannel, _ := conf.GetBoolOr(KeyFtMemoryChannel, false)
 	memoryChannelSize, _ := conf.GetIntOr(KeyFtMemoryChannelSize, 100)
 	logPath, _ := conf.GetStringOr(KeyFtSaveLogPath, ftSaveLogPath)
-	syncEvery, _ := conf.GetIntOr(KeyFtSyncEvery, DefaultFtSyncEvery)
+	syncEvery, _ := conf.GetIntOr(KeyFtSyncEvery, common.DefaultFtSyncEvery)
 	writeLimit, _ := conf.GetIntOr(KeyFtWriteLimit, defaultWriteLimit)
 	strategy, _ := conf.GetStringOr(KeyFtStrategy, KeyFtStrategyBackupOnly)
 	switch strategy {
@@ -108,7 +110,7 @@ func NewFtSender(sender Sender, conf conf.MapConf, ftSaveLogPath string) (*FtSen
 	return newFtSender(sender, runnerName, opt)
 }
 
-func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSender, error) {
+func newFtSender(innerSender common.Sender, runnerName string, opt *FtOption) (*FtSender, error) {
 	var lq, bq queue.BackendQueue
 	err := CreateDirIfNotExist(opt.saveLogPath)
 	if err != nil {
@@ -164,7 +166,7 @@ func (ft *FtSender) Send(datas []Data) error {
 			}
 			if nowDatas != nil {
 				se.FtNotRetry = false
-				se.ErrorDetail = reqerr.NewSendError("save data to backend queue error", ConvertDatasBack(nowDatas), reqerr.TypeDefault)
+				se.ErrorDetail = reqerr.NewSendError("save data to backend queue error", common.ConvertDatasBack(nowDatas), reqerr.TypeDefault)
 				ft.statsMutex.Lock()
 				ft.stats.LastError = se.ErrorDetail.Error()
 				ft.statsMutex.Unlock()
@@ -227,7 +229,7 @@ func (ft *FtSender) Close() error {
 }
 
 func (ft *FtSender) TokenRefresh(mapConf conf.MapConf) (err error) {
-	if tokenSender, ok := ft.innerSender.(TokenRefreshable); ok {
+	if tokenSender, ok := ft.innerSender.(common.TokenRefreshable); ok {
 		err = tokenSender.TokenRefresh(mapConf)
 	}
 	return
@@ -239,7 +241,7 @@ func (ft *FtSender) marshalData(datas []Data) (bs []byte, err error) {
 	ctx.Datas = datas
 	bs, err = jsoniter.Marshal(ctx)
 	if err != nil {
-		err = reqerr.NewSendError("Cannot marshal data :"+err.Error(), ConvertDatasBack(datas), reqerr.TypeDefault)
+		err = reqerr.NewSendError("Cannot marshal data :"+err.Error(), common.ConvertDatasBack(datas), reqerr.TypeDefault)
 		return
 	}
 	return
@@ -263,7 +265,7 @@ func (ft *FtSender) saveToFile(datas []Data) error {
 	}
 	err = ft.logQueue.Put(bs)
 	if err != nil {
-		return reqerr.NewSendError(ft.innerSender.Name()+" Cannot put data into backendQueue: "+err.Error(), ConvertDatasBack(datas), reqerr.TypeDefault)
+		return reqerr.NewSendError(ft.innerSender.Name()+" Cannot put data into backendQueue: "+err.Error(), common.ConvertDatasBack(datas), reqerr.TypeDefault)
 	}
 	return nil
 }
@@ -282,21 +284,6 @@ func (ft *FtSender) trySendBytes(dat []byte, failSleep int, isRetry bool) (backD
 		return
 	}
 	return ft.trySendDatas(datas, failSleep, isRetry)
-}
-
-func ConvertDatas(ins []map[string]interface{}) []Data {
-	var datas []Data
-	for _, v := range ins {
-		datas = append(datas, Data(v))
-	}
-	return datas
-}
-func ConvertDatasBack(ins []Data) []map[string]interface{} {
-	var datas []map[string]interface{}
-	for _, v := range ins {
-		datas = append(datas, map[string]interface{}(v))
-	}
-	return datas
 }
 
 // trySendDatas 尝试发送数据，如果失败，将失败数据加入backup queue，并睡眠指定时间。返回结果为是否正常发送
@@ -357,7 +344,7 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 		log.Infof("Runner[%v] Sender[%v] error type is not *SendError! reSend all datas by default", ft.runnerName, ft.innerSender.Name())
 		failCtx.Datas = datas
 	} else {
-		failCtx.Datas = ConvertDatas(se.GetFailDatas())
+		failCtx.Datas = common.ConvertDatas(se.GetFailDatas())
 		if se.ErrorType == reqerr.TypeBinaryUnpack {
 			binaryUnpack = true
 		}

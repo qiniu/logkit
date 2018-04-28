@@ -5,7 +5,7 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
+	"github.com/qiniu/logkit/sender/common"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -15,7 +15,7 @@ type CustomSender struct {
 	prefix string
 }
 
-func NewMySender(c conf.MapConf) (sender.Sender, error) {
+func NewMySender(c conf.MapConf) (common.Sender, error) {
 	name, _ := c.GetStringOr("name", "my_sender_name")
 	prefix, _ := c.GetStringOr("prefix", "")
 	return &CustomSender{

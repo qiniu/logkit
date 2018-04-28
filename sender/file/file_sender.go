@@ -1,8 +1,10 @@
-package sender
+package file
 
 import (
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/sender/common"
 	. "github.com/qiniu/logkit/utils/models"
+
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
 	"github.com/json-iterator/go"
@@ -23,7 +25,7 @@ const (
 )
 
 // NewFileSender construct
-func NewFileSender(conf conf.MapConf) (sender Sender, err error) {
+func NewFileSender(conf conf.MapConf) (sender common.Sender, err error) {
 	var path string
 	path, err = conf.GetString(KeyFileSenderPath)
 	if err != nil {
@@ -53,11 +55,11 @@ func newFileSender(name, path string, marshalFunc func([]Data) ([]byte, error)) 
 func (fs *FileSender) Send(datas []Data) error {
 	bytes, err := fs.marshalFunc(datas)
 	if err != nil {
-		return reqerr.NewSendError(fs.Name()+" Cannot marshal data into file, error is "+err.Error(), ConvertDatasBack(datas), reqerr.TypeDefault)
+		return reqerr.NewSendError(fs.Name()+" Cannot marshal data into file, error is "+err.Error(), common.ConvertDatasBack(datas), reqerr.TypeDefault)
 	}
 	_, err = fs.writer.Write(bytes)
 	if err != nil {
-		return reqerr.NewSendError(fs.Name()+"Cannot write data into file, error is "+err.Error(), ConvertDatasBack(datas), reqerr.TypeDefault)
+		return reqerr.NewSendError(fs.Name()+"Cannot write data into file, error is "+err.Error(), common.ConvertDatasBack(datas), reqerr.TypeDefault)
 	}
 	return nil
 }

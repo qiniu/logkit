@@ -23,6 +23,10 @@ import (
 	"github.com/qiniu/logkit/sender"
 	_ "github.com/qiniu/logkit/transforms/all"
 	. "github.com/qiniu/logkit/utils/models"
+	"github.com/qiniu/logkit/sender/common"
+	"github.com/qiniu/logkit/sender/mock"
+	"github.com/qiniu/logkit/sender/registry"
+	_ "github.com/qiniu/logkit/transforms/all"
 )
 
 func cleanMetaFolder(path string) {
@@ -137,9 +141,9 @@ func Test_Run(t *testing.T) {
 			"sender_type": "mock",
 		},
 	}
-	var senders []sender.Sender
-	raws, err := sender.NewMockSender(senderConfigs[0])
-	s, succ := raws.(*sender.MockSender)
+	var senders []common.Sender
+	raws, err := mock.NewMockSender(senderConfigs[0])
+	s, succ := raws.(*mock.MockSender)
 	if !succ {
 		t.Error("sender should be mock sender")
 	}
@@ -288,9 +292,9 @@ func Test_RunForEnvTag(t *testing.T) {
 			"sender_type": "mock",
 		},
 	}
-	var senders []sender.Sender
-	raws, err := sender.NewMockSender(senderConfigs[0])
-	s, succ := raws.(*sender.MockSender)
+	var senders []common.Sender
+	raws, err := mock.NewMockSender(senderConfigs[0])
+	s, succ := raws.(*mock.MockSender)
 	if !succ {
 		t.Error("sender should be mock sender")
 	}
@@ -439,9 +443,9 @@ func Test_RunForErrData(t *testing.T) {
 			"sender_type": "mock",
 		},
 	}
-	var senders []sender.Sender
-	raws, err := sender.NewMockSender(senderConfigs[0])
-	s, succ := raws.(*sender.MockSender)
+	var senders []common.Sender
+	raws, err := mock.NewMockSender(senderConfigs[0])
+	s, succ := raws.(*mock.MockSender)
 	if !succ {
 		t.Error("sender should be mock sender")
 	}
@@ -647,9 +651,9 @@ func Test_QiniulogRun(t *testing.T) {
 		t.Error(err)
 	}
 
-	var senders []sender.Sender
-	raws, err := sender.NewMockSender(senderConfigs[0])
-	s, succ := raws.(*sender.MockSender)
+	var senders []common.Sender
+	raws, err := mock.NewMockSender(senderConfigs[0])
+	s, succ := raws.(*mock.MockSender)
 	if !succ {
 		t.Error("sender should be mock sender")
 	}
@@ -1089,7 +1093,11 @@ func TestSyslogRunnerX(t *testing.T) {
 	rc := RunnerConfig{}
 	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
+<<<<<<< HEAD
 	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewSenderRegistry())
+=======
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewReaderRegistry(), parser.NewParserRegistry(), registry.NewSenderRegistry())
+>>>>>>> 2fdb015... adjust sender package
 	assert.NoError(t, err)
 	go rr.Run()
 	time.Sleep(1 * time.Second)
@@ -1277,7 +1285,11 @@ func TestAddDatatags(t *testing.T) {
 	err = jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
 
+<<<<<<< HEAD
 	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewSenderRegistry())
+=======
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewReaderRegistry(), parser.NewParserRegistry(), registry.NewSenderRegistry())
+>>>>>>> 2fdb015... adjust sender package
 	assert.NoError(t, err)
 	go rr.Run()
 
@@ -1338,7 +1350,11 @@ func TestRunWithExtra(t *testing.T) {
 	err = jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
 
+<<<<<<< HEAD
 	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewSenderRegistry())
+=======
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewReaderRegistry(), parser.NewParserRegistry(), registry.NewSenderRegistry())
+>>>>>>> 2fdb015... adjust sender package
 	assert.NoError(t, err)
 	go rr.Run()
 

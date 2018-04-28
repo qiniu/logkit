@@ -1,4 +1,4 @@
-package sender
+package pandora
 
 import (
 	"encoding/json"
@@ -14,6 +14,7 @@ import (
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/metric"
+	"github.com/qiniu/logkit/sender/common"
 	"github.com/qiniu/logkit/times"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
@@ -116,7 +117,7 @@ type PandoraOption struct {
 var PandoraMaxBatchSize = 2 * 1024 * 1024
 
 // NewPandoraSender pandora sender constructor
-func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
+func NewPandoraSender(conf conf.MapConf) (sender common.Sender, err error) {
 	repoName, err := conf.GetString(KeyPandoraRepoName)
 	if err != nil {
 		return
@@ -801,7 +802,7 @@ func (s *PandoraSender) checkSchemaUpdate() {
 func (s *PandoraSender) Send(datas []Data) (se error) {
 	s.checkSchemaUpdate()
 	if !s.opt.schemaFree && (len(s.schemas) <= 0 || len(s.alias2key) <= 0) {
-		se = reqerr.NewSendError("Get pandora schema error, failed to send data", ConvertDatasBack(datas), reqerr.TypeDefault)
+		se = reqerr.NewSendError("Get pandora schema error, failed to send data", common.ConvertDatasBack(datas), reqerr.TypeDefault)
 		ste := &StatsError{
 			StatsInfo: StatsInfo{
 				Success:   0,
@@ -916,4 +917,25 @@ func (s *PandoraSender) Name() string {
 
 func (s *PandoraSender) Close() error {
 	return s.client.Close()
+}
+
+// for test
+func SetPandoraSender(name, repoName, region, port, schema, autoCreate string, schemaFree bool) (*PandoraSender, error) {
+	opt := &PandoraOption{
+		name:           name,
+		repoName:       repoName,
+		region:         region,
+		endpoint:       "http://127.0.0.1:" + port,
+		ak:             "ak",
+		sk:             "sk",
+		schema:         schema,
+		autoCreate:     autoCreate,
+		schemaFree:     schemaFree,
+		updateInterval: time.Second,
+		reqRateLimit:   0,
+		flowRateLimit:  0,
+		gzip:           false,
+		tokenLock:      new(sync.RWMutex),
+	}
+	return newPandoraSender(opt)
 }

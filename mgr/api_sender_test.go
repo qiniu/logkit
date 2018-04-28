@@ -3,7 +3,7 @@ package mgr
 import (
 	"net/http"
 
-	"github.com/qiniu/logkit/sender"
+	"github.com/qiniu/logkit/sender/registry"
 
 	"github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
@@ -22,7 +22,7 @@ func senderAPITest(p *testParam) {
 	if err = jsoniter.Unmarshal(respBody, &got1); err != nil {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
-	assert.Equal(t, sender.ModeUsages, got1.Data)
+	assert.Equal(t, registry.ModeUsages, got1.Data)
 
 	var got2 respModeKeyOptions
 	url = "http://127.0.0.1" + rs.address + "/logkit/sender/options"
@@ -32,7 +32,7 @@ func senderAPITest(p *testParam) {
 	if err = jsoniter.Unmarshal(respBody, &got2); err != nil {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
-	assert.Equal(t, sender.ModeKeyOptions, got2.Data)
+	assert.Equal(t, registry.ModeKeyOptions, got2.Data)
 
 	// Test sender/send with sender config
 	var got3 respDataMessage

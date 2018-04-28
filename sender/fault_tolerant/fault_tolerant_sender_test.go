@@ -1,18 +1,21 @@
-package sender
+package fault_tolerant
 
 import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/sender/common"
+	"github.com/qiniu/logkit/sender/mock"
+	"github.com/qiniu/logkit/sender/pandora"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,23 +24,8 @@ const (
 )
 
 func TestFtSender(t *testing.T) {
-	_, pt := NewMockPandoraWithPrefix("/v2")
-	opt := &PandoraOption{
-		name:           "p",
-		repoName:       "TestFtSender",
-		region:         "nb",
-		endpoint:       "http://127.0.0.1:" + pt,
-		ak:             "ak",
-		sk:             "sk",
-		schema:         "ab",
-		autoCreate:     "ab *s",
-		updateInterval: time.Second,
-		reqRateLimit:   0,
-		flowRateLimit:  0,
-		gzip:           false,
-		tokenLock:      new(sync.RWMutex),
-	}
-	s, err := newPandoraSender(opt)
+	_, pt := mock.NewMockPandoraWithPrefix("/v2")
+	s, err := pandora.SetPandoraSender("p", "TestFtSender", "nb", pt, "ab", "ab *s", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,23 +57,8 @@ func TestFtMemorySender(t *testing.T) {
 		panic(err)
 	}
 	defer os.RemoveAll(tmpDir)
-	_, pt := NewMockPandoraWithPrefix("/v2")
-	opt := &PandoraOption{
-		name:           "p",
-		repoName:       "TestFtMemorySender",
-		region:         "nb",
-		endpoint:       "http://127.0.0.1:" + pt,
-		ak:             "ak",
-		sk:             "sk",
-		schema:         "ab",
-		autoCreate:     "ab *s",
-		updateInterval: time.Second,
-		reqRateLimit:   0,
-		flowRateLimit:  0,
-		gzip:           false,
-		tokenLock:      new(sync.RWMutex),
-	}
-	s, err := newPandoraSender(opt)
+	_, pt := mock.NewMockPandoraWithPrefix("/v2")
+	s, err := pandora.SetPandoraSender("p", "TestFtMemorySender", "nb", pt, "ab", "ab *s", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,23 +91,8 @@ func TestFtChannelFullSender(t *testing.T) {
 		panic(err)
 	}
 	defer os.RemoveAll(tmpDir)
-	mockP, pt := NewMockPandoraWithPrefix("/v2")
-	opt := &PandoraOption{
-		name:           "p",
-		repoName:       "TestFtMemorySender",
-		region:         "nb",
-		endpoint:       "http://127.0.0.1:" + pt,
-		ak:             "ak",
-		sk:             "sk",
-		schema:         "a",
-		autoCreate:     "a *s",
-		updateInterval: time.Second,
-		reqRateLimit:   0,
-		flowRateLimit:  0,
-		gzip:           false,
-		tokenLock:      new(sync.RWMutex),
-	}
-	s, err := newPandoraSender(opt)
+	mockP, pt := mock.NewMockPandoraWithPrefix("/v2")
+	s, err := pandora.SetPandoraSender("p", "FtChannelFullSender", "nb", pt, "a", "a *s", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,7 +119,7 @@ func TestFtChannelFullSender(t *testing.T) {
 		if se.ErrorDetail != nil {
 			sx, succ := se.ErrorDetail.(*reqerr.SendError)
 			if succ {
-				datas := ConvertDatas(sx.GetFailDatas())
+				datas := common.ConvertDatas(sx.GetFailDatas())
 				moreDatas = append(moreDatas, datas)
 			} else {
 				t.Fatal("ft send StatsError error should contains send error", se.ErrorDetail)
@@ -182,7 +140,7 @@ func TestFtChannelFullSender(t *testing.T) {
 			if se.ErrorDetail != nil {
 				sx, succ := se.ErrorDetail.(*reqerr.SendError)
 				if succ {
-					datas := ConvertDatas(sx.GetFailDatas())
+					datas := common.ConvertDatas(sx.GetFailDatas())
 					moreAndMoreDatas = append(moreAndMoreDatas, datas)
 				} else {
 					t.Fatal("ft send StatsError error should contains send error", se.ErrorDetail)
@@ -199,7 +157,7 @@ func TestFtChannelFullSender(t *testing.T) {
 }
 
 func TestFtSenderConcurrent(t *testing.T) {
-	s, err := NewMockSender(conf.MapConf{})
+	s, err := mock.NewMockSender(conf.MapConf{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,9 +185,9 @@ func TestFtSenderConcurrent(t *testing.T) {
 		assert.NoError(t, se.ErrorDetail)
 	}
 	fts.Close()
-	ms := s.(*MockSender)
+	ms := s.(*mock.MockSender)
 	assert.Equal(t, 100, ms.SendCount())
-	assert.Equal(t, len(datas)*100, len(ms.datas))
+	assert.Equal(t, len(datas)*100, len(ms.Datas))
 }
 
 func BenchmarkFtSenderConcurrentDirect(b *testing.B) {
@@ -253,7 +211,7 @@ func BenchmarkFtSenderConcurrentMemory(b *testing.B) {
 
 func ftSenderConcurrent(b *testing.B, c conf.MapConf) {
 	log.SetOutputLevel(log.Lerror)
-	s, err := NewMockSender(conf.MapConf{})
+	s, err := mock.NewMockSender(conf.MapConf{})
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -283,7 +241,7 @@ func ftSenderConcurrent(b *testing.B, c conf.MapConf) {
 	}
 	b.StopTimer()
 	fts.Close()
-	ms := s.(*MockSender)
+	ms := s.(*mock.MockSender)
 	b.Logf("Benchmark.N: %d", b.N)
 	b.Logf("MockSender.SendCount: %d", ms.SendCount())
 }
@@ -294,22 +252,8 @@ func TestFtSenderConvertData(t *testing.T) {
 		panic(err)
 	}
 	defer os.RemoveAll(tmpDir)
-	mockP, pt := NewMockPandoraWithPrefix("/v2")
-	opt := &PandoraOption{
-		name:           "p",
-		repoName:       "TestFtSenderConvertData",
-		region:         "nb",
-		endpoint:       "http://127.0.0.1:" + pt,
-		ak:             "ak",
-		sk:             "sk",
-		schemaFree:     true,
-		updateInterval: time.Second,
-		reqRateLimit:   0,
-		flowRateLimit:  0,
-		gzip:           false,
-		tokenLock:      new(sync.RWMutex),
-	}
-	s, err := newPandoraSender(opt)
+	mockP, pt := mock.NewMockPandoraWithPrefix("/v2")
+	s, err := pandora.SetPandoraSender("p", "TestFtSenderConvertData", "nb", pt, "", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -360,7 +304,7 @@ func TestFtSenderConvertData(t *testing.T) {
 		if se.ErrorDetail != nil {
 			sx, succ := se.ErrorDetail.(*reqerr.SendError)
 			if succ {
-				datas := ConvertDatas(sx.GetFailDatas())
+				datas := common.ConvertDatas(sx.GetFailDatas())
 				moreDatas = append(moreDatas, datas)
 			} else if !(se.Ft && se.FtNotRetry) {
 				t.Fatal("ft send StatsError error should contains send error", se.ErrorDetail)

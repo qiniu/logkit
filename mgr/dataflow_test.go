@@ -16,7 +16,7 @@ import (
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/reader/http"
-	"github.com/qiniu/logkit/sender"
+	"github.com/qiniu/logkit/sender/http"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -304,13 +304,13 @@ func Test_SendData(t *testing.T) {
 
 	var senders []conf.MapConf
 	senderConf := conf.MapConf{
-		KeySenderType:                TypeHttp,
-		sender.KeyHttpSenderGzip:     "true",
-		sender.KeyHttpSenderCsvSplit: "\t",
-		sender.KeyHttpSenderProtocol: "json",
-		sender.KeyHttpSenderCsvHead:  "false",
-		KeyRunnerName:                "testRunner",
-		sender.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
+		KeySenderType:              TypeHttp,
+		http.KeyHttpSenderGzip:     "true",
+		http.KeyHttpSenderCsvSplit: "\t",
+		http.KeyHttpSenderProtocol: "json",
+		http.KeyHttpSenderCsvHead:  "false",
+		KeyRunnerName:              "testRunner",
+		http.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
 	}
 	senders = append(senders, senderConf)
 
@@ -346,13 +346,13 @@ func Test_getSendersConfig(t *testing.T) {
 
 	var senders []conf.MapConf
 	senderConf := conf.MapConf{
-		KeySenderType:                TypeHttp,
-		sender.KeyHttpSenderGzip:     "true",
-		sender.KeyHttpSenderCsvSplit: "\t",
-		sender.KeyHttpSenderProtocol: "json",
-		sender.KeyHttpSenderCsvHead:  "false",
-		KeyRunnerName:                "testRunner",
-		sender.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
+		KeySenderType:              TypeHttp,
+		http.KeyHttpSenderGzip:     "true",
+		http.KeyHttpSenderCsvSplit: "\t",
+		http.KeyHttpSenderProtocol: "json",
+		http.KeyHttpSenderCsvHead:  "false",
+		KeyRunnerName:              "testRunner",
+		http.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
 	}
 	senders = append(senders, senderConf)
 
@@ -372,7 +372,7 @@ func Test_getSendersConfig(t *testing.T) {
 
 	for _, val := range sendersConfig {
 		assert.Equal(t, TypeHttp, val[KeySenderType])
-		assert.Equal(t, "true", val[sender.KeyHttpSenderGzip])
+		assert.Equal(t, "true", val[http.KeyHttpSenderGzip])
 	}
 }
 
@@ -388,13 +388,13 @@ func Test_getDataFromSenderConfig(t *testing.T) {
 
 	var senders []conf.MapConf
 	senderConf := conf.MapConf{
-		KeySenderType:                TypeHttp,
-		sender.KeyHttpSenderGzip:     "true",
-		sender.KeyHttpSenderCsvSplit: "\t",
-		sender.KeyHttpSenderProtocol: "json",
-		sender.KeyHttpSenderCsvHead:  "false",
-		KeyRunnerName:                "testRunner",
-		sender.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
+		KeySenderType:              TypeHttp,
+		http.KeyHttpSenderGzip:     "true",
+		http.KeyHttpSenderCsvSplit: "\t",
+		http.KeyHttpSenderProtocol: "json",
+		http.KeyHttpSenderCsvHead:  "false",
+		KeyRunnerName:              "testRunner",
+		http.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
 	}
 	senders = append(senders, senderConf)
 
@@ -423,13 +423,13 @@ func Test_getDataFromSenderConfig(t *testing.T) {
 func Test_getSenders(t *testing.T) {
 	var sendersConfig []conf.MapConf
 	senderConf := conf.MapConf{
-		KeySenderType:                TypeHttp,
-		sender.KeyHttpSenderGzip:     "true",
-		sender.KeyHttpSenderCsvSplit: "\t",
-		sender.KeyHttpSenderProtocol: "json",
-		sender.KeyHttpSenderCsvHead:  "false",
-		KeyRunnerName:                "testRunner",
-		sender.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
+		KeySenderType:              TypeHttp,
+		http.KeyHttpSenderGzip:     "true",
+		http.KeyHttpSenderCsvSplit: "\t",
+		http.KeyHttpSenderProtocol: "json",
+		http.KeyHttpSenderCsvHead:  "false",
+		KeyRunnerName:              "testRunner",
+		http.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
 	}
 	sendersConfig = append(sendersConfig, senderConf)
 

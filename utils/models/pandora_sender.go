@@ -1,7 +1,7 @@
 package models
 
 const (
-	// pandora_sender key, 可选参数 当sender_type 为pandora 的时候，需要必填的字段
+	// pandora key, 可选参数 当sender_type 为pandora 的时候，需要必填的字段
 	KeyPandoraAk                   = "pandora_ak"
 	KeyPandoraSk                   = "pandora_sk"
 	KeyPandoraHost                 = "pandora_host"

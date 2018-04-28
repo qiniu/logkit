@@ -1,4 +1,4 @@
-package sender
+package http
 
 import (
 	"bytes"

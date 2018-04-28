@@ -8,7 +8,7 @@ import (
 	"github.com/qiniu/logkit/mgr"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/samples"
-	"github.com/qiniu/logkit/sender"
+	"github.com/qiniu/logkit/sender/registry"
 	utilsos "github.com/qiniu/logkit/utils/os"
 
 	_ "net/http/pprof"
@@ -43,7 +43,7 @@ func main() {
 	// 注册你自定义的parser
 	pregistry.RegisterParser("myparser", samples.NewMyParser)
 
-	sregistry := sender.NewSenderRegistry()
+	sregistry := registry.NewSenderRegistry()
 	sregistry.RegisterSender("mysender", samples.NewMySender)
 
 	rr := reader.NewRegistry()

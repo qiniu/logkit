@@ -1,4 +1,4 @@
-package sender
+package http
 
 import (
 	"bytes"
@@ -10,10 +10,12 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/sender/common"
 	. "github.com/qiniu/logkit/utils/models"
 
-	"github.com/json-iterator/go"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
+
+	"github.com/json-iterator/go"
 )
 
 const (
@@ -34,7 +36,7 @@ type HttpSender struct {
 	runnerName string
 }
 
-func NewHttpSender(c conf.MapConf) (Sender, error) {
+func NewHttpSender(c conf.MapConf) (common.Sender, error) {
 	url, err := c.GetString(KeyHttpSenderUrl)
 	if err != nil {
 		return nil, err

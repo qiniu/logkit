@@ -14,15 +14,15 @@ import (
 	"github.com/qiniu/logkit/cleaner"
 	config "github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
-	"github.com/qiniu/logkit/sender"
+	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
+	"github.com/qiniu/streaming/src/github.com/qiniu/logkit/sender"
 
 	"github.com/qiniu/log"
 
 	"github.com/howeyc/fsnotify"
 	"github.com/json-iterator/go"
-	"github.com/qiniu/logkit/reader"
 )
 
 var DIR_NOT_EXIST_SLEEP_TIME = "300" //300 s
@@ -56,8 +56,8 @@ type Manager struct {
 	runnerConfig map[string]RunnerConfig
 
 	watchers  map[string]*fsnotify.Watcher // inode到watcher的映射表
-	pregistry *parser.Registry
 	sregistry *sender.SenderRegistry
+	pregistry *parser.Registry
 	rregistry *reader.Registry
 
 	Version    string
@@ -65,8 +65,8 @@ type Manager struct {
 }
 
 func NewManager(conf ManagerConfig) (*Manager, error) {
-	ps := parser.NewRegistry()
 	sr := sender.NewSenderRegistry()
+	ps := parser.NewRegistry()
 	rr := reader.NewRegistry()
 	return NewCustomManager(conf, rr, ps, sr)
 }

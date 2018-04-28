@@ -1,4 +1,4 @@
-package sender
+package mongodb
 
 import (
 	"errors"
@@ -7,11 +7,13 @@ import (
 	"time"
 
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/sender/common"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
-	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
 	"github.com/qiniu/log"
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
+
 	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -44,7 +46,7 @@ const (
 )
 
 // NewMongodbAccSender mongodb accumulate sender constructor
-func NewMongodbAccSender(conf conf.MapConf) (sender Sender, err error) {
+func NewMongodbAccSender(conf conf.MapConf) (sender common.Sender, err error) {
 	host, err := conf.GetString(KeyMongodbHost)
 	if err != nil {
 		return
@@ -142,7 +144,7 @@ func (s *MongoAccSender) Send(datas []Data) (se error) {
 		}
 	}
 	if len(failure) > 0 && lastErr != nil {
-		ss.ErrorDetail = reqerr.NewSendError("Write failure, last err is: "+lastErr.Error(), ConvertDatasBack(failure), reqerr.TypeDefault)
+		ss.ErrorDetail = reqerr.NewSendError("Write failure, last err is: "+lastErr.Error(), common.ConvertDatasBack(failure), reqerr.TypeDefault)
 	}
 	return ss
 }

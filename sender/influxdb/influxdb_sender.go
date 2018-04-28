@@ -1,4 +1,4 @@
-package sender
+package influxdb
 
 import (
 	"bytes"
@@ -15,7 +15,9 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/sender/common"
 	. "github.com/qiniu/logkit/utils/models"
+
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 )
 
@@ -49,7 +51,7 @@ const (
 )
 
 // NewInfluxdbSender 创建Influxdb 的sender
-func NewInfluxdbSender(c conf.MapConf) (s Sender, err error) {
+func NewInfluxdbSender(c conf.MapConf) (s common.Sender, err error) {
 	host, err := c.GetString(KeyInfluxdbHost)
 	if err != nil {
 		return
@@ -120,7 +122,7 @@ func (s *InfluxdbSender) Send(datas []Data) error {
 	}
 	err := s.sendPoints(ps)
 	if err != nil {
-		return reqerr.NewSendError(s.Name()+" Cannot write data into influxdb, error is "+err.Error(), ConvertDatasBack(datas), reqerr.TypeDefault)
+		return reqerr.NewSendError(s.Name()+" Cannot write data into influxdb, error is "+err.Error(), common.ConvertDatasBack(datas), reqerr.TypeDefault)
 	}
 	return nil
 }

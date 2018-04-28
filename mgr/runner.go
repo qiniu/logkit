@@ -15,6 +15,7 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
+	"github.com/qiniu/streaming/src/github.com/qiniu/logkit/sender"
 
 	"github.com/qiniu/logkit/cleaner"
 	"github.com/qiniu/logkit/conf"
@@ -24,7 +25,7 @@ import (
 	_ "github.com/qiniu/logkit/reader/builtin"
 	"github.com/qiniu/logkit/reader/cloudtrail"
 	"github.com/qiniu/logkit/router"
-	"github.com/qiniu/logkit/sender"
+	"github.com/qiniu/logkit/sender/common"
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -119,6 +120,11 @@ func NewRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleane
 
 func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.Parser,
 	transformers []transforms.Transformer, senders []sender.Sender, router *router.Router, meta *reader.Meta) (runner *LogExportRunner, err error) {
+	return NewLogExportRunnerWithService(info, reader, cleaner, parser, transformers, senders, router, meta)
+}
+
+func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.LogParser,
+	transformers []transforms.Transformer, senders []common.Sender, router *router.Router, meta *reader.Meta) (runner *LogExportRunner, err error) {
 	if info.MaxBatchSize <= 0 {
 		info.MaxBatchSize = defaultMaxBatchSize
 	}
@@ -312,7 +318,7 @@ func createTransformers(rc RunnerConfig) ([]transforms.Transformer, error) {
 }
 
 // trySend 尝试发送数据，如果此时runner退出返回false，其他情况无论是达到最大重试次数还是发送成功，都返回true
-func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool {
+func (r *LogExportRunner) trySend(s common.Sender, datas []Data, times int) bool {
 	if len(datas) <= 0 {
 		return true
 	}
@@ -360,7 +366,7 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 			time.Sleep(time.Second)
 			se, succ := err.(*reqerr.SendError)
 			if succ {
-				datas = sender.ConvertDatas(se.GetFailDatas())
+				datas = common.ConvertDatas(se.GetFailDatas())
 				//无限重试的，除非遇到关闭
 				if atomic.LoadInt32(&r.stopped) > 0 {
 					return false
@@ -832,7 +838,7 @@ func (r *LogExportRunner) getRefreshStatus(elaspedtime float64) RunnerStatus {
 	r.rs.ParserStats.Speed, r.rs.ParserStats.Trend = calcSpeedTrend(r.lastRs.ParserStats, r.rs.ParserStats, elaspedtime)
 
 	for i := range r.senders {
-		sts, ok := r.senders[i].(sender.StatsSender)
+		sts, ok := r.senders[i].(common.StatsSender)
 		if ok {
 			r.rs.SenderStats[r.senders[i].Name()] = sts.Stats()
 		}
@@ -910,7 +916,7 @@ func (r *LogExportRunner) TokenRefresh(tokens AuthTokens) error {
 		return fmt.Errorf("tokens.RunnerName[%v] is not match %v", tokens.RunnerName, r.RunnerName)
 	}
 	if len(r.senders) > tokens.SenderIndex {
-		if tokenSender, ok := r.senders[tokens.SenderIndex].(sender.TokenRefreshable); ok {
+		if tokenSender, ok := r.senders[tokens.SenderIndex].(common.TokenRefreshable); ok {
 			return tokenSender.TokenRefresh(tokens.SenderTokens)
 		}
 	}
@@ -933,7 +939,7 @@ func (r *LogExportRunner) StatusRestore() {
 		if !exist {
 			continue
 		}
-		sStatus, ok := s.(sender.StatsSender)
+		sStatus, ok := s.(common.StatsSender)
 		if ok {
 			sStatus.Restore(&StatsInfo{
 				Success: info[0],
@@ -964,7 +970,7 @@ func (r *LogExportRunner) StatusBackup() {
 	}
 	for _, s := range r.senders {
 		name := s.Name()
-		sStatus, ok := s.(sender.StatsSender)
+		sStatus, ok := s.(common.StatsSender)
 		if ok {
 			status.SenderStats[name] = sStatus.Stats()
 		}

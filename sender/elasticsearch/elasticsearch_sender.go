@@ -1,4 +1,4 @@
-package sender
+package elasticsearch
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/sender/common"
 	. "github.com/qiniu/logkit/utils/models"
 
 	elasticV6 "github.com/olivere/elastic"
@@ -73,7 +74,7 @@ const (
 const KeySendTime = "sendTime"
 
 // NewElasticSender New ElasticSender
-func NewElasticSender(conf conf.MapConf) (sender Sender, err error) {
+func NewElasticSender(conf conf.MapConf) (sender common.Sender, err error) {
 	host, err := conf.GetStringList(KeyElasticHost)
 	if err != nil {
 		return

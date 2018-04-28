@@ -1,4 +1,4 @@
-package sender
+package kafka
 
 import (
 	"fmt"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/sender/common"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/Shopify/sarama"
@@ -50,7 +51,7 @@ var (
 	}
 )
 
-func NewKafkaSender(conf conf.MapConf) (sender Sender, err error) {
+func NewKafkaSender(conf conf.MapConf) (sender common.Sender, err error) {
 	hosts, err := conf.GetStringList(KeyKafkaHost)
 	if err != nil {
 		return

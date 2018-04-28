@@ -1,7 +1,8 @@
-package sender
+package discard
 
 import (
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/sender/common"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -13,7 +14,7 @@ type DiscardSender struct {
 }
 
 // NewDiscardSender 仅用于日志清理
-func NewDiscardSender(c conf.MapConf) (Sender, error) {
+func NewDiscardSender(c conf.MapConf) (common.Sender, error) {
 	name, _ := c.GetStringOr(KeyName, "discardSender")
 	s := &DiscardSender{
 		name:  name,
