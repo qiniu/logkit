@@ -16,7 +16,7 @@ func WaitForInterrupt(interrupt func()) {
 	// We must use a buffered channel or risk missing the signal
 	// if we're not ready to receive when the signal is sent.
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGTERM, os.Interrupt, os.Kill)
+	signal.Notify(c, syscall.SIGTERM, os.Interrupt, os.Kill, syscall.SIGQUIT)
 
 	// Block until a signal is received.
 	s := <-c
