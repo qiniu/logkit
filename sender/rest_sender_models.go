@@ -396,8 +396,8 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:       KeyNumberUseFloat,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{"false", "true"},
-			Default:       "false",
+			ChooseOptions: []interface{}{"true", "false"},
+			Default:       "true",
 			DefaultNoUse:  false,
 			Description:   "数字统一为float(number_use_float)",
 			Advance:       true,
