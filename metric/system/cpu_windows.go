@@ -4,11 +4,10 @@ package system
 
 import (
 	"fmt"
-
 )
 
 const (
-	MetricCPUTotalKey = "cpu-total"
+	MetricCPUTotalKey  = "cpu-total"
 	WindowsCPUTotalKey = "_Total"
 )
 
