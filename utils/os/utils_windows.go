@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"runtime"
 	"strings"
 	"syscall"
@@ -36,6 +37,10 @@ func GetIdentifyIDByFile(f *os.File) (uint64, error) {
 }
 
 func GetOSInfo() *OSInfo {
+	// default osInfo
+	osInfo := &OSInfo{Kernel: "windows", Core: "unknown", Platform: runtime.GOARCH, OS: "windows"}
+	osInfo.Hostname, _ = os.Hostname()
+	// call cmd "ver"
 	cmd := exec.Command("cmd", "ver")
 	cmd.Stdin = strings.NewReader("some input")
 	var out bytes.Buffer
@@ -45,19 +50,14 @@ func GetOSInfo() *OSInfo {
 	err := cmd.Run()
 	if err != nil {
 		log.Error(err)
-		return &OSInfo{Kernel: "windows", Core: "unknown", Platform: runtime.GOARCH, OS: "windows"}
+		return osInfo
 	}
 	osStr := strings.Replace(out.String(), "\n", "", -1)
 	osStr = strings.Replace(osStr, "\r\n", "", -1)
-	tmp1 := strings.Index(osStr, "[Version")
-	tmp2 := strings.Index(osStr, "]")
-	var ver string
-	if tmp1 == -1 || tmp2 == -1 || tmp2 <= tmp1 || tmp2 > len(osStr) || tmp1+9 >= tmp2 {
-		ver = "unknown"
-	} else {
-		ver = osStr[tmp1+9 : tmp2]
+	verReg := regexp.MustCompile(`([1-9]\d*\.)(\d*\.){1,2}\d*`) // e.g. 6.3.9600
+	osInfo.Core = verReg.FindString(osStr)
+	if len(osInfo.Core) == 0 {
+		osInfo.Core = "unknown"
 	}
-	gio := &OSInfo{Kernel: "windows", Core: ver, Platform: runtime.GOARCH, OS: "windows"}
-	gio.Hostname, _ = os.Hostname()
-	return gio
+	return osInfo
 }
