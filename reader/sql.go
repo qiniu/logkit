@@ -43,6 +43,7 @@ type SqlReader struct {
 	readChan chan []byte
 
 	meta     *Meta    // 记录offset的元数据
+	encoder  string   // 解码方式
 	offsets  []int64  // 当前处理文件的sql的offset
 	syncSQLs []string // 当前在查询的sqls
 	schemas  map[string]string
@@ -69,7 +70,7 @@ const (
 
 func NewSQLReader(meta *Meta, conf conf.MapConf) (ret Reader, err error) {
 	var readBatch int
-	var dbtype, dataSource, database, rawSqls, cronSchedule, offsetKey string
+	var dbtype, dataSource, database, rawSqls, cronSchedule, offsetKey, encoder string
 	var execOnStart bool
 	dbtype, _ = conf.GetStringOr(KeyMode, ModeMysql)
 	logpath, _ := conf.GetStringOr(KeyLogPath, "")
@@ -96,6 +97,7 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (ret Reader, err error) {
 		}
 		cronSchedule, _ = conf.GetStringOr(KeyMysqlCron, "")
 		execOnStart, _ = conf.GetBoolOr(KeyMysqlExecOnStart, true)
+		encoder, _ = conf.GetStringOr(KeyEncoding, "")
 	case ModeMssql:
 		readBatch, _ = conf.GetIntOr(KeyMssqlReadBatch, 100)
 		offsetKey, _ = conf.GetStringOr(KeyMssqlOffsetKey, "")
@@ -198,6 +200,7 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (ret Reader, err error) {
 		magicLagDur: mgld,
 		schemas:     schemas,
 		statsLock:   sync.RWMutex{},
+		encoder:     encoder,
 	}
 
 	// 如果meta初始信息损坏
@@ -469,6 +472,9 @@ func (mr *SqlReader) run() {
 	switch mr.dbtype {
 	case ModeMysql:
 		connectStr = mr.datasource + "/" + mr.database
+		if mr.encoder != "" {
+			connectStr += "?charset=" + mr.encoder
+		}
 	case ModeMssql:
 		connectStr = mr.datasource + ";database=" + mr.database
 	case ModePG:
