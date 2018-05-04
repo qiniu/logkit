@@ -104,6 +104,8 @@ func NewCustomRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *
 	}
 	if rc.MetricConfig != nil {
 		return NewMetricRunner(rc, sr)
+	} else if rc.PluginConfig != nil {
+		return NewPluginRunner(rc, sr)
 	}
 	return NewLogExportRunner(rc, cleanChan, rr, ps, sr)
 }
