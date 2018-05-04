@@ -33,7 +33,7 @@ type Plugin struct {
 type Config struct {
 	Enabled      bool   `json:"enabled"`      //是否禁用plugin
 	Dir          string `json:"dir"`          //plugin路径
-	remoteSource string `json:"remoteSource"` //plugin 远程地址
+	RemoteSource string `json:"remoteSource"` //plugin 远程地址
 	//LogDir  		string `json:"logs"`	  //plugin日志输出路径
 }
 
