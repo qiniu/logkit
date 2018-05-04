@@ -1,9 +1,10 @@
-// +build !windows
-
 package system
 
 import (
 	"fmt"
+	"os/exec"
+	"runtime"
+	"strings"
 	"syscall"
 
 	"github.com/qiniu/logkit/metric"
@@ -72,6 +73,9 @@ func (_ *NetStats) Config() map[string]interface{} {
 }
 
 func (s *NetStats) Collect() (datas []map[string]interface{}, err error) {
+	if runtime.GOOS == "windows" {
+		return s.winCollect()
+	}
 	netconns, err := s.ps.NetConnections()
 	if err != nil {
 		return nil, fmt.Errorf("error getting net connections info: %s", err)
@@ -110,6 +114,28 @@ func (s *NetStats) Collect() (datas []map[string]interface{}, err error) {
 	}
 	datas = append(datas, fields)
 	return
+}
+func (s *NetStats) winCollect() (datas []map[string]interface{}, err error) {
+	// only TCP here
+	out, err := exec.Command("cmd", "/c", "netstat -anp TCP").Output()
+	if err != nil {
+		return nil, fmt.Errorf("exec cmd failed, error: %v", err.Error())
+	}
+	outStr := string(out)
+	fields := map[string]interface{}{
+		KeyNetstatTcpEstablished: strings.Count(outStr, "ESTABLISHED"),
+		KeyNetstatTcpSynSent:     strings.Count(outStr, "SYN_SENT"),
+		KeyNetstatTcpSynRecv:     strings.Count(outStr, "SYN_RECV"),
+		KeyNetstatTcpFinWait1:    strings.Count(outStr, "FIN_WAIT1"),
+		KeyNetstatTcpFinWait2:    strings.Count(outStr, "FIN_WAIT2"),
+		KeyNetstatTcpTimeWait:    strings.Count(outStr, "TIME_WAIT"),
+		KeyNetstatTcpClose:       strings.Count(outStr, "CLOSE"),
+		KeyNetstatTcpCloseWait:   strings.Count(outStr, "CLOSE_WAIT"),
+		KeyNetstatTcpLastAck:     strings.Count(outStr, "LAST_ACK"),
+		KeyNetstatTcpListen:      strings.Count(outStr, "LISTEN"),
+		KeyNetstatTcpClosing:     strings.Count(outStr, "CLOSING"),
+	}
+	return append(datas, fields), nil
 }
 
 func init() {
