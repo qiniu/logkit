@@ -3,6 +3,8 @@ package mgr
 import (
 	"errors"
 	"fmt"
+	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -10,14 +12,15 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/metric"
+	"github.com/qiniu/logkit/metric/curl"
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
-	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
+
+	"github.com/json-iterator/go"
 )
 
 const (
@@ -43,8 +46,8 @@ type MetricRunner struct {
 	transformers map[string][]transforms.Transformer
 
 	collectInterval time.Duration
-	rs              RunnerStatus
-	lastRs          RunnerStatus
+	rs              *RunnerStatus
+	lastRs          *RunnerStatus
 	rsMutex         *sync.RWMutex
 	meta            *reader.Meta
 	lastSend        time.Time
@@ -56,7 +59,7 @@ func NewMetric(tp string) (metric.Collector, error) {
 	if c, ok := metric.Collectors[tp]; ok {
 		return c(), nil
 	}
-	return nil, fmt.Errorf("Metric <%v> is not support now", tp)
+	return nil, fmt.Errorf("metric <%v> is not support now", tp)
 }
 
 func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *MetricRunner, err error) {
@@ -64,16 +67,20 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 		rc.CollectInterval = defaultCollectInterval
 	}
 	interval := time.Duration(rc.CollectInterval) * time.Second
-	meta, err := reader.NewMetaWithConf(conf.MapConf{
-		GlobalKeyName:        rc.RunnerName,
-		reader.KeyRunnerName: rc.RunnerName,
-		reader.KeyMode:       reader.ModeMetrics,
-	})
+	cf := conf.MapConf{
+		GlobalKeyName:  rc.RunnerName,
+		KeyRunnerName:  rc.RunnerName,
+		reader.KeyMode: reader.ModeMetrics,
+	}
+	if rc.ExtraInfo {
+		cf[ExtraInfo] = Bool2String(rc.ExtraInfo)
+	}
+	meta, err := reader.NewMetaWithConf(cf)
 	if err != nil {
 		return nil, fmt.Errorf("Runner "+rc.RunnerName+" add failed, err is %v", err)
 	}
 	for i := range rc.SenderConfig {
-		rc.SenderConfig[i][sender.KeyRunnerName] = rc.RunnerName
+		rc.SenderConfig[i][KeyRunnerName] = rc.RunnerName
 	}
 	collectors := make([]metric.Collector, 0)
 	transformers := make(map[string][]transforms.Transformer)
@@ -107,11 +114,36 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 				for _, attr := range attrs {
 					val, exist := m.Attributes[attr.Key]
 					if exist && !val {
-						DisTrans, err := createDiscardTransformer(attr.Key)
-						if err != nil {
-							return nil, fmt.Errorf("metric %v key %v, transform add failed, %v", tp, attr.Key, err)
+						if m.MetricType == curl.TypeMetricHttp {
+							var httpDataArr []curl.HttpDataReq
+							if _, ok := m.Config["http_datas"]; !ok {
+								return nil, fmt.Errorf("metric %v http_datas can't be empty", curl.TypeMetricHttp)
+							}
+							httpData, ok := m.Config["http_datas"].(string)
+							if ok {
+								err = jsoniter.Unmarshal([]byte(httpData), &httpDataArr)
+								if err != nil {
+									return nil, fmt.Errorf("metric %v unmarshal config error %v", curl.TypeMetricHttp, err)
+								}
+								length := len(httpDataArr)
+								for i := 0; i < length; i++ {
+									key := attr.Key + "_" + strconv.Itoa(i+1)
+									DisTrans, err := createDiscardTransformer(key)
+									if err != nil {
+										return nil, fmt.Errorf("metric %v key %v, transform add failed, %v", tp, attr.Key, err)
+									}
+									trans = append(trans, DisTrans)
+								}
+							} else {
+								return nil, fmt.Errorf("http_datas need to be string")
+							}
+						} else {
+							DisTrans, err := createDiscardTransformer(attr.Key)
+							if err != nil {
+								return nil, fmt.Errorf("metric %v key %v, transform add failed, %v", tp, attr.Key, err)
+							}
+							trans = append(trans, DisTrans)
 						}
-						trans = append(trans, DisTrans)
 					}
 				}
 			}
@@ -125,8 +157,12 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 
 	senders := make([]sender.Sender, 0)
 	for _, c := range rc.SenderConfig {
-		c[sender.KeyIsMetrics] = "true"
-		c[sender.KeyPandoraTSDBTimeStamp] = metric.Timestamp
+		c[KeyIsMetrics] = "true"
+		c[KeyPandoraTSDBTimeStamp] = metric.Timestamp
+		if rc.ExtraInfo && c[KeySenderType] == TypePandora {
+			//如果已经开启了，不要重复加
+			c[KeyPandoraExtraInfo] = "false"
+		}
 		s, err := sr.NewSender(c, meta.FtSaveLogPath())
 		if err != nil {
 			return nil, err
@@ -138,16 +174,16 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 		exitChan:   make(chan struct{}),
 		lastSend:   time.Now(), // 上一次发送时间
 		meta:       meta,
-		rs: RunnerStatus{
-			ReaderStats:   utils.StatsInfo{},
-			SenderStats:   make(map[string]utils.StatsInfo),
+		rs: &RunnerStatus{
+			ReaderStats:   StatsInfo{},
+			SenderStats:   make(map[string]StatsInfo),
 			lastState:     time.Now(),
 			Name:          rc.RunnerName,
 			RunningStatus: RunnerRunning,
 		},
-		lastRs: RunnerStatus{
-			ReaderStats:   utils.StatsInfo{},
-			SenderStats:   make(map[string]utils.StatsInfo),
+		lastRs: &RunnerStatus{
+			ReaderStats:   StatsInfo{},
+			SenderStats:   make(map[string]StatsInfo),
 			lastState:     time.Now(),
 			Name:          rc.RunnerName,
 			RunningStatus: RunnerRunning,
@@ -169,11 +205,20 @@ func (mr *MetricRunner) Name() string {
 
 func (r *MetricRunner) Run() {
 	defer close(r.exitChan)
+	defer func() {
+		// recover when runner is stopped
+		if atomic.LoadInt32(&r.stopped) <= 0 {
+			return
+		}
+		if r := recover(); r != nil {
+			log.Errorf("recover when runner is stopped\npanic: %v\nstack: %s", r, debug.Stack())
+		}
+	}()
 
-	tags := map[string]interface{}{
-		metric.Timestamp: nil,
-	}
-	tags = GetEnvTag(r.envTag, tags)
+	tags := r.meta.GetTags()
+	tags = MergeEnvTags(r.envTag, tags)
+	tags = MergeExtraInfoTags(r.meta, tags)
+
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
 			log.Debugf("runner %v exited from run", r.RunnerName)
@@ -214,9 +259,6 @@ func (r *MetricRunner) Run() {
 					continue
 				}
 				data := Data{}
-				for k, v := range tags {
-					data[k] = v
-				}
 				// 重命名
 				// cpu_time_user --> cpu__time_user
 				for m, d := range metricData {
@@ -234,6 +276,9 @@ func (r *MetricRunner) Run() {
 			log.Warnf("metrics collect no data")
 			time.Sleep(r.collectInterval)
 			continue
+		}
+		if len(tags) > 0 {
+			datas = addTagsToData(tags, datas, r.Name())
 		}
 		r.rsMutex.Lock()
 		r.rs.ReadDataCount += int64(dataCnt)
@@ -255,7 +300,7 @@ func (r *MetricRunner) trySend(s sender.Sender, datas []Data, times int) bool {
 		return true
 	}
 	if _, ok := r.rs.SenderStats[s.Name()]; !ok {
-		r.rs.SenderStats[s.Name()] = utils.StatsInfo{}
+		r.rs.SenderStats[s.Name()] = StatsInfo{}
 	}
 	r.rsMutex.RLock()
 	info := r.rs.SenderStats[s.Name()]
@@ -267,10 +312,10 @@ func (r *MetricRunner) trySend(s sender.Sender, datas []Data, times int) bool {
 			return false
 		}
 		err := s.Send(datas)
-		if se, ok := err.(*utils.StatsError); ok {
+		if se, ok := err.(*StatsError); ok {
 			err = se.ErrorDetail
 			if se.Ft {
-				r.rs.Lag.Ftlags = se.Ftlag
+				r.rs.Lag.Ftlags = se.FtQueueLag
 			} else {
 				if cnt > 1 {
 					info.Errors -= se.Success
@@ -349,12 +394,11 @@ func (_ *MetricRunner) Cleaner() CleanInfo {
 	}
 }
 
-func (mr *MetricRunner) getStatusFrequently(rss *RunnerStatus, now time.Time) (bool, float64) {
+func (mr *MetricRunner) getStatusFrequently(now time.Time) (bool, float64) {
 	mr.rsMutex.RLock()
 	defer mr.rsMutex.RUnlock()
 	elaspedTime := now.Sub(mr.rs.lastState).Seconds()
 	if elaspedTime <= 3 {
-		deepCopy(rss, &mr.rs)
 		return true, elaspedTime
 	}
 	return false, elaspedTime
@@ -363,10 +407,9 @@ func (mr *MetricRunner) getStatusFrequently(rss *RunnerStatus, now time.Time) (b
 func (mr *MetricRunner) Status() RunnerStatus {
 	var isFre bool
 	var elaspedtime float64
-	rss := RunnerStatus{}
 	now := time.Now()
-	if isFre, elaspedtime = mr.getStatusFrequently(&rss, now); isFre {
-		return rss
+	if isFre, elaspedtime = mr.getStatusFrequently(now); isFre {
+		return *mr.lastRs
 	}
 	mr.rsMutex.Lock()
 	defer mr.rsMutex.Unlock()
@@ -387,14 +430,13 @@ func (mr *MetricRunner) Status() RunnerStatus {
 		if lv, ok := mr.lastRs.SenderStats[k]; ok {
 			v.Speed, v.Trend = calcSpeedTrend(lv, v, durationTime)
 		} else {
-			v.Speed, v.Trend = calcSpeedTrend(utils.StatsInfo{}, v, durationTime)
+			v.Speed, v.Trend = calcSpeedTrend(StatsInfo{}, v, durationTime)
 		}
 		mr.rs.SenderStats[k] = v
 	}
 	mr.rs.RunningStatus = RunnerRunning
-	copyRunnerStatus(&mr.lastRs, &mr.rs)
-	deepCopy(&rss, &mr.rs)
-	return rss
+	*mr.lastRs = mr.rs.Clone()
+	return *mr.lastRs
 }
 
 func (mr *MetricRunner) TokenRefresh(tokens AuthTokens) error {
@@ -427,20 +469,20 @@ func (mr *MetricRunner) StatusRestore() {
 		}
 		sStatus, ok := s.(sender.StatsSender)
 		if ok {
-			sStatus.Restore(&utils.StatsInfo{
+			sStatus.Restore(&StatsInfo{
 				Success: info[0],
 				Errors:  info[1],
 			})
 		}
 		status, ext := mr.rs.SenderStats[name]
 		if !ext {
-			status = utils.StatsInfo{}
+			status = StatsInfo{}
 		}
 		status.Success = info[0]
 		status.Errors = info[1]
 		mr.rs.SenderStats[name] = status
 	}
-	copyRunnerStatus(&mr.lastRs, &mr.rs)
+	*mr.lastRs = mr.rs.Clone()
 	log.Infof("runner %v restore status %v", mr.RunnerName, rStat)
 }
 

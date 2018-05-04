@@ -1,7 +1,6 @@
 package mgr
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -14,14 +13,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
+	utilsos "github.com/qiniu/logkit/utils/os"
 
-	"github.com/json-iterator/go"
 	"github.com/labstack/echo"
+	"github.com/qiniu/log"
 )
 
 var DEFAULT_PORT = 3000
@@ -57,7 +54,7 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	}
 	rs.cluster.mutex = new(sync.RWMutex)
 	router.GET(PREFIX+"/status", rs.Status())
-
+	router.GET(PREFIX+"/:name/status", rs.GetStatus())
 	// error code humanize
 	router.GET(PREFIX+"/errorcode", rs.GetErrorCodeHumanize())
 
@@ -136,7 +133,10 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 		err        error
 		httpschema = "http://"
 	)
-
+	if mgr.DisableWeb {
+		log.Warn("logkit web service was disabled")
+		return rs
+	}
 	for {
 		if port > 10000 {
 			log.Fatal("bind port failed too many times, exit...")
@@ -147,7 +147,7 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 
 		address = ":" + strconv.Itoa(port)
 		if mgr.BindHost != "" {
-			address, httpschema = utils.RemoveHttpProtocal(mgr.BindHost)
+			address, httpschema = RemoveHttpProtocal(mgr.BindHost)
 		}
 		listener, err = httpserve(address, router)
 		if err != nil {
@@ -188,7 +188,7 @@ func GetMySlaveUrl(address, schema string) (uri string, err error) {
 		return
 	}
 	if host == "" {
-		host, err = utils.GetLocalIP()
+		host, err = utilsos.GetLocalIP()
 		if err != nil {
 			return
 		}
@@ -247,6 +247,21 @@ func (rs *RestService) Status() echo.HandlerFunc {
 	}
 }
 
+// get /logkit/<name>/status
+func (rs *RestService) GetStatus() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		name, _, _, err := rs.checkNameAndConfig(c)
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, ErrConfigName, err.Error())
+		}
+		status, err := rs.mgr.GetRunnerStatus(name)
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, ErrConfigName, err.Error())
+		}
+		return RespSuccess(c, status)
+	}
+}
+
 // get /logkit/runners
 func (rs *RestService) GetRunners() echo.HandlerFunc {
 	return func(c echo.Context) error {
@@ -279,51 +294,12 @@ func (rs *RestService) GetConfig() echo.HandlerFunc {
 	}
 }
 
-func convertWebParserConfig(conf conf.MapConf) conf.MapConf {
-	if conf == nil {
-		return conf
-	}
-
-	rawCustomPatterns, _ := conf.GetStringOr(parser.KeyGrokCustomPatterns, "")
-	if rawCustomPatterns != "" {
-		CustomPatterns, err := base64.StdEncoding.DecodeString(rawCustomPatterns)
-		if err != nil {
-			return conf
-		}
-		conf[parser.KeyGrokCustomPatterns] = string(CustomPatterns)
-	}
-
-	splitter, _ := conf.GetStringOr(parser.KeyCSVSplitter, "")
-	if splitter != "" {
-		splitter = strings.Replace(splitter, "\\t", "\t", -1)
-		conf[parser.KeyCSVSplitter] = splitter
-	}
-
-	return conf
-}
-
 func convertWebTransformerConfig(conf map[string]interface{}) map[string]interface{} {
 	if conf == nil {
 		return conf
 	}
 	//TODO do some pre process
 	return conf
-}
-
-func (rs *RestService) backupRunnerConfig(rconf interface{}, filename string) error {
-	confBytes, err := jsoniter.MarshalIndent(rconf, "", "    ")
-	if err != nil {
-		return fmt.Errorf("runner config %v marshal failed, err is %v", rconf, err)
-	}
-	// 判断默认备份文件夹是否存在，不存在就尝试创建
-	if _, err := os.Stat(rs.mgr.RestDir); err != nil {
-		if os.IsNotExist(err) {
-			if err = os.Mkdir(rs.mgr.RestDir, DefaultDirPerm); err != nil && !os.IsExist(err) {
-				return fmt.Errorf("rest default dir not exists and make dir failed, err is %v", err)
-			}
-		}
-	}
-	return ioutil.WriteFile(filename, confBytes, 0644)
 }
 
 func (rs *RestService) checkNameAndConfig(c echo.Context) (name string, conf RunnerConfig, file string, err error) {
@@ -340,7 +316,7 @@ func (rs *RestService) checkNameAndConfig(c echo.Context) (name string, conf Run
 		err = errors.New("config " + name + " is not found")
 		return
 	}
-	deepCopy(&conf, &tmpConf)
+	deepCopyByJson(&conf, &tmpConf)
 	return
 }
 
@@ -357,7 +333,7 @@ func (rs *RestService) PostConfig() echo.HandlerFunc {
 			return RespError(c, http.StatusBadRequest, ErrRunnerAdd, err.Error())
 		}
 		nconf.IsInWebFolder = true
-		nconf.ParserConf = convertWebParserConfig(nconf.ParserConf)
+		nconf.ParserConf = parser.ConvertWebParserConfig(nconf.ParserConf)
 		if err = rs.mgr.AddRunner(name, nconf); err != nil {
 			return RespError(c, http.StatusBadRequest, ErrRunnerAdd, err.Error())
 		}
@@ -378,7 +354,7 @@ func (rs *RestService) PutConfig() echo.HandlerFunc {
 			return RespError(c, http.StatusBadRequest, ErrRunnerUpdate, err.Error())
 		}
 		nconf.IsInWebFolder = true
-		nconf.ParserConf = convertWebParserConfig(nconf.ParserConf)
+		nconf.ParserConf = parser.ConvertWebParserConfig(nconf.ParserConf)
 		if err = rs.mgr.UpdateRunner(name, nconf); err != nil {
 			return RespError(c, http.StatusBadRequest, ErrRunnerUpdate, err.Error())
 		}
@@ -472,7 +448,9 @@ func (rs *RestService) Register() error {
 
 // Stop will stop RestService
 func (rs *RestService) Stop() {
-	rs.l.Close()
+	if rs.l != nil {
+		rs.l.Close()
+	}
 }
 
 // tcpKeepAliveListener sets TCP keep-alive timeouts on accepted

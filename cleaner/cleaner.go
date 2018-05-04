@@ -4,11 +4,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/qiniu/log"
-
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
+
+	"github.com/qiniu/log"
 )
 
 type Cleaner struct {
@@ -49,8 +49,9 @@ func NewCleaner(conf conf.MapConf, meta *reader.Meta, cleanChan chan<- CleanSign
 	if !enable {
 		return
 	}
-	if meta.GetMode() != reader.ModeDir && meta.GetMode() != reader.ModeFile {
-		log.Errorf("cleaner only support reader mode in dir or file, now mode is %v, cleaner disabled", meta.GetMode())
+	mode := meta.GetMode()
+	if mode != reader.ModeDir && mode != reader.ModeFile && mode != reader.ModeCloudTrail {
+		log.Errorf("cleaner only support reader mode dir|file|clocktrail, now mode is %v, cleaner disabled", meta.GetMode())
 		return
 	}
 	interval, _ := conf.GetIntOr(clean_interval, 0) //单位，秒
@@ -65,7 +66,7 @@ func NewCleaner(conf conf.MapConf, meta *reader.Meta, cleanChan chan<- CleanSign
 		reserveSize = default_reserve_file_size
 	}
 	reserveSize = reserveSize * MB
-	logdir, _, err = utils.GetRealPath(logdir)
+	logdir, _, err = GetRealPath(logdir)
 	if err != nil {
 		log.Errorf("GetRealPath for %v error %v", logdir, err)
 		return
@@ -118,7 +119,7 @@ func (c *Cleaner) shoudClean(size, count int64) bool {
 
 func (c *Cleaner) checkBelong(path string) bool {
 	dir := filepath.Dir(path)
-	dir, _, err := utils.GetRealPath(dir)
+	dir, _, err := GetRealPath(dir)
 	if err != nil {
 		log.Errorf("GetRealPath for %v error %v", path, err)
 		return false
@@ -139,7 +140,7 @@ func (c *Cleaner) Clean() (err error) {
 	}
 	checked := make(map[string]struct{})
 	for _, f := range doneFiles {
-		logFiles := utils.GetLogFiles(f.Path)
+		logFiles := GetLogFiles(f.Path)
 		allremoved := true
 		for _, logf := range logFiles {
 			if !c.checkBelong(logf.Path) {

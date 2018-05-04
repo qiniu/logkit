@@ -4,6 +4,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/qiniu/logkit/conf"
+	. "github.com/qiniu/logkit/utils/models"
+
 	"github.com/qiniu/log"
 )
 
@@ -48,4 +51,28 @@ func GetLabels(labelList []string, nameMap map[string]struct{}) (labels []Label)
 		labels = append(labels, l)
 	}
 	return
+}
+
+func ConvertWebParserConfig(conf conf.MapConf) conf.MapConf {
+	if conf == nil {
+		return conf
+	}
+
+	rawCustomPatterns, _ := conf.GetStringOr(KeyGrokCustomPatterns, "")
+	if rawCustomPatterns != "" {
+		realCustomPatterns, err := DecodeString(rawCustomPatterns)
+		if err != nil {
+			log.Errorf("decode %v error: %v", rawCustomPatterns, err)
+			return conf
+		}
+		conf[KeyGrokCustomPatterns] = string(realCustomPatterns)
+	}
+
+	splitter, _ := conf.GetStringOr(KeyCSVSplitter, "")
+	if splitter != "" {
+		splitter = strings.Replace(splitter, "\\t", "\t", -1)
+		conf[KeyCSVSplitter] = splitter
+	}
+
+	return conf
 }

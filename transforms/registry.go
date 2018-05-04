@@ -1,7 +1,6 @@
 package transforms
 
 import (
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -32,7 +31,7 @@ type Transformer interface {
 	Transform([]Data) ([]Data, error)
 	RawTransform([]string) ([]string, error)
 	Stage() string
-	Stats() utils.StatsInfo
+	Stats() StatsInfo
 }
 
 //transformer初始化方法接口,err不为空表示初始化失败
@@ -58,21 +57,34 @@ var (
 		Description:   "transform运行的阶段(parser前还是parser后)(stage)",
 		Type:          TransformTypeString,
 	}
-	KeyStageAfterOnly = Option{
-		KeyName:       "stage",
-		ChooseOnly:    true,
-		ChooseOptions: []interface{}{StageAfterParser},
-		Default:       StageAfterParser,
-		DefaultNoUse:  false,
-		Description:   "transform运行的阶段(stage)",
-		Type:          TransformTypeString,
-	}
 	KeyFieldName = Option{
 		KeyName:      "key",
 		ChooseOnly:   false,
-		Default:      "my_field_keyname",
+		Default:      "",
+		Required:     true,
+		Placeholder:  "my_field_keyname",
 		DefaultNoUse: true,
 		Description:  "要进行Transform变化的键(key)",
+		Type:         TransformTypeString,
+	}
+	KeyFieldNew = Option{
+		KeyName:      "new",
+		ChooseOnly:   false,
+		Default:      "",
+		Required:     false,
+		Placeholder:  "new_field_keyname",
+		DefaultNoUse: false,
+		Description:  "新的字段名(new)",
+		Type:         TransformTypeString,
+	}
+	KeyFieldNewRequired = Option{
+		KeyName:      "new",
+		ChooseOnly:   false,
+		Default:      "",
+		Required:     true,
+		Placeholder:  "new_field_keyname",
+		DefaultNoUse: false,
+		Description:  "解析后数据的字段名(new)",
 		Type:         TransformTypeString,
 	}
 	KeyTimezoneoffset = Option{

@@ -16,12 +16,12 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/router"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
-	jsoniter "github.com/json-iterator/go"
+	"github.com/json-iterator/go"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 )
 
@@ -60,54 +60,6 @@ type StatusPersistable interface {
 	StatusRestore()
 }
 
-type RunnerStatus struct {
-	Name             string                     `json:"name"`
-	Logpath          string                     `json:"logpath"`
-	ReadDataSize     int64                      `json:"readDataSize"`
-	ReadDataCount    int64                      `json:"readDataCount"`
-	Elaspedtime      float64                    `json:"elaspedtime"`
-	Lag              LagInfo                    `json:"lag"`
-	ReaderStats      utils.StatsInfo            `json:"readerStats"`
-	ParserStats      utils.StatsInfo            `json:"parserStats"`
-	SenderStats      map[string]utils.StatsInfo `json:"senderStats"`
-	TransformStats   map[string]utils.StatsInfo `json:"transformStats"`
-	Error            string                     `json:"error,omitempty"`
-	lastState        time.Time
-	ReadSpeedKB      float64 `json:"readspeed_kb"`
-	ReadSpeed        float64 `json:"readspeed"`
-	ReadSpeedTrendKb string  `json:"readspeedtrend_kb"`
-	ReadSpeedTrend   string  `json:"readspeedtrend"`
-	RunningStatus    string  `json:"runningStatus"`
-	Tag              string  `json:"tag,omitempty"`
-	Url              string  `json:"url,omitempty"`
-}
-
-// RunnerConfig 从多数据源读取，经过解析后，发往多个数据目的地
-type RunnerConfig struct {
-	RunnerInfo
-	MetricConfig  []MetricConfig           `json:"metric,omitempty"`
-	ReaderConfig  conf.MapConf             `json:"reader"`
-	CleanerConfig conf.MapConf             `json:"cleaner,omitempty"`
-	ParserConf    conf.MapConf             `json:"parser"`
-	Transforms    []map[string]interface{} `json:"transforms,omitempty"`
-	SenderConfig  []conf.MapConf           `json:"senders"`
-	Router        sender.RouterConfig      `json:"router,omitempty"`
-	IsInWebFolder bool                     `json:"web_folder,omitempty"`
-	IsStopped     bool                     `json:"is_stopped,omitempty"`
-}
-
-type RunnerInfo struct {
-	RunnerName       string `json:"name"`
-	CollectInterval  int    `json:"collect_interval,omitempty"` // metric runner收集的频率
-	MaxBatchLen      int    `json:"batch_len,omitempty"`        // 每个read batch的行数
-	MaxBatchSize     int    `json:"batch_size,omitempty"`       // 每个read batch的字节数
-	MaxBatchInterval int    `json:"batch_interval,omitempty"`   // 最大发送时间间隔
-	MaxBatchTryTimes int    `json:"batch_try_times,omitempty"`  // 最大发送次数，小于等于0代表无限重试
-	CreateTime       string `json:"createtime"`
-	EnvTag           string `json:"env_tag,omitempty"`
-	// 用这个字段的值来获取环境变量, 作为 tag 添加到数据中
-}
-
 type LogExportRunner struct {
 	RunnerInfo
 
@@ -117,11 +69,11 @@ type LogExportRunner struct {
 	cleaner      *cleaner.Cleaner
 	parser       parser.LogParser
 	senders      []sender.Sender
-	router       *sender.Router
+	router       *router.Router
 	transformers []transforms.Transformer
 
-	rs      RunnerStatus
-	lastRs  RunnerStatus
+	rs      *RunnerStatus
+	lastRs  *RunnerStatus
 	rsMutex *sync.RWMutex
 
 	meta *reader.Meta
@@ -137,29 +89,32 @@ const qiniulogHeadPatthern = "[1-9]\\d{3}/[0-1]\\d/[0-3]\\d [0-2]\\d:[0-6]\\d:[0
 
 // NewRunner 创建Runner
 func NewRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal) (runner Runner, err error) {
-	return NewLogExportRunner(rc, cleanChan, parser.NewParserRegistry(), sender.NewSenderRegistry())
+	return NewLogExportRunner(rc, cleanChan, reader.NewReaderRegistry(), parser.NewParserRegistry(), sender.NewSenderRegistry())
 }
 
-func NewCustomRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, ps *parser.ParserRegistry, sr *sender.SenderRegistry) (runner Runner, err error) {
+func NewCustomRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *reader.ReaderRegistry, ps *parser.ParserRegistry, sr *sender.SenderRegistry) (runner Runner, err error) {
 	if ps == nil {
 		ps = parser.NewParserRegistry()
 	}
 	if sr == nil {
 		sr = sender.NewSenderRegistry()
 	}
+	if rr == nil {
+		rr = reader.NewReaderRegistry()
+	}
 	if rc.MetricConfig != nil {
 		return NewMetricRunner(rc, sr)
 	}
-	return NewLogExportRunner(rc, cleanChan, ps, sr)
+	return NewLogExportRunner(rc, cleanChan, rr, ps, sr)
 }
 
 func NewRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.LogParser, transformers []transforms.Transformer,
-	senders []sender.Sender, router *sender.Router, meta *reader.Meta) (runner Runner, err error) {
+	senders []sender.Sender, router *router.Router, meta *reader.Meta) (runner Runner, err error) {
 	return NewLogExportRunnerWithService(info, reader, cleaner, parser, transformers, senders, router, meta)
 }
 
 func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.LogParser,
-	transformers []transforms.Transformer, senders []sender.Sender, router *sender.Router, meta *reader.Meta) (runner *LogExportRunner, err error) {
+	transformers []transforms.Transformer, senders []sender.Sender, router *router.Router, meta *reader.Meta) (runner *LogExportRunner, err error) {
 	if info.MaxBatchSize <= 0 {
 		info.MaxBatchSize = defaultMaxBatchSize
 	}
@@ -170,16 +125,16 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 		RunnerInfo: info,
 		exitChan:   make(chan struct{}),
 		lastSend:   time.Now(), // 上一次发送时间
-		rs: RunnerStatus{
-			SenderStats:    make(map[string]utils.StatsInfo),
-			TransformStats: make(map[string]utils.StatsInfo),
+		rs: &RunnerStatus{
+			SenderStats:    make(map[string]StatsInfo),
+			TransformStats: make(map[string]StatsInfo),
 			lastState:      time.Now(),
 			Name:           info.RunnerName,
 			RunningStatus:  RunnerRunning,
 		},
-		lastRs: RunnerStatus{
-			SenderStats:    make(map[string]utils.StatsInfo),
-			TransformStats: make(map[string]utils.StatsInfo),
+		lastRs: &RunnerStatus{
+			SenderStats:    make(map[string]StatsInfo),
+			TransformStats: make(map[string]StatsInfo),
 			lastState:      time.Now(),
 			Name:           info.RunnerName,
 			RunningStatus:  RunnerRunning,
@@ -218,7 +173,7 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 	return runner, nil
 }
 
-func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, ps *parser.ParserRegistry, sr *sender.SenderRegistry) (runner *LogExportRunner, err error) {
+func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *reader.ReaderRegistry, ps *parser.ParserRegistry, sr *sender.SenderRegistry) (runner *LogExportRunner, err error) {
 	runnerInfo := RunnerInfo{
 		EnvTag:           rc.EnvTag,
 		RunnerName:       rc.RunnerName,
@@ -237,23 +192,42 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, p
 		return nil, errors.New(rc.RunnerName + " ParserConf is nil")
 	}
 	rc.ReaderConfig[GlobalKeyName] = rc.RunnerName
-	rc.ReaderConfig[reader.KeyRunnerName] = rc.RunnerName
-	for i := range rc.SenderConfig {
-		rc.SenderConfig[i][sender.KeyRunnerName] = rc.RunnerName
+	rc.ReaderConfig[KeyRunnerName] = rc.RunnerName
+	if rc.ExtraInfo {
+		rc.ReaderConfig[ExtraInfo] = Bool2String(rc.ExtraInfo)
 	}
-	rc.ParserConf[parser.KeyRunnerName] = rc.RunnerName
+	for i := range rc.SenderConfig {
+		rc.SenderConfig[i][KeyRunnerName] = rc.RunnerName
+	}
+	rc.ParserConf[KeyRunnerName] = rc.RunnerName
 	//配置文件适配
 	rc = Compatible(rc)
 	var (
 		rd reader.Reader
 		cl *cleaner.Cleaner
 	)
+	mode := rc.ReaderConfig["mode"]
+	if mode == reader.ModeCloudTrail {
+		syncDir := rc.ReaderConfig[reader.KeySyncDirectory]
+		if syncDir == "" {
+			syncDir = reader.DefaultSyncDirectory
+		}
+		rc.ReaderConfig[reader.KeyLogPath] = syncDir
+
+		if len(rc.CleanerConfig) == 0 {
+			rc.CleanerConfig = conf.MapConf{
+				"delete_enable":       "true",
+				"delete_interval":     "60",
+				"reserve_file_number": "50",
+			}
+		}
+	}
 	meta, err := reader.NewMetaWithConf(rc.ReaderConfig)
 	if err != nil {
 		return nil, err
 	}
 	if len(rc.CleanerConfig) > 0 {
-		rd, err = reader.NewFileBufReaderWithMeta(rc.ReaderConfig, meta, rc.IsInWebFolder)
+		rd, err = rr.NewReaderWithMeta(rc.ReaderConfig, meta, false)
 		if err != nil {
 			return nil, err
 		}
@@ -262,7 +236,7 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, p
 			return nil, err
 		}
 	} else {
-		rd, err = reader.NewFileBufReaderWithMeta(rc.ReaderConfig, meta, rc.IsInWebFolder)
+		rd, err = rr.NewReaderWithMeta(rc.ReaderConfig, meta, false)
 		if err != nil {
 			return nil, err
 		}
@@ -274,15 +248,19 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, p
 	transformers := createTransformers(rc)
 	senders := make([]sender.Sender, 0)
 	for i, c := range rc.SenderConfig {
+		if rc.ExtraInfo && c[KeySenderType] == TypePandora {
+			//如果已经开启了，不要重复加
+			c[KeyPandoraExtraInfo] = "false"
+		}
 		s, err := sr.NewSender(c, meta.FtSaveLogPath())
 		if err != nil {
 			return nil, err
 		}
 		senders = append(senders, s)
-		delete(rc.SenderConfig[i], sender.InnerUserAgent)
+		delete(rc.SenderConfig[i], InnerUserAgent)
 	}
 	senderCnt := len(senders)
-	router, err := sender.NewSenderRouter(rc.Router, senderCnt)
+	router, err := router.NewSenderRouter(rc.Router, senderCnt)
 	if err != nil {
 		return nil, fmt.Errorf("runner %v add sender router error, %v", rc.RunnerName, err)
 	}
@@ -339,7 +317,7 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 	}
 	r.rsMutex.Lock()
 	if _, ok := r.rs.SenderStats[s.Name()]; !ok {
-		r.rs.SenderStats[s.Name()] = utils.StatsInfo{}
+		r.rs.SenderStats[s.Name()] = StatsInfo{}
 	}
 	info := r.rs.SenderStats[s.Name()]
 	r.rsMutex.Unlock()
@@ -350,11 +328,12 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 			return false
 		}
 		err := s.Send(datas)
-		if se, ok := err.(*utils.StatsError); ok {
+		se, ok := err.(*StatsError)
+		if ok {
 			err = se.ErrorDetail
 			if se.Ft {
 				r.rsMutex.Lock()
-				r.rs.Lag.Ftlags = se.Ftlag
+				r.rs.Lag.Ftlags = se.FtQueueLag
 				r.rsMutex.Unlock()
 			} else {
 				if cnt > 1 {
@@ -372,6 +351,11 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 			info.Success += int64(len(datas))
 		}
 		if err != nil {
+			info.LastError = err.Error()
+			//FaultTolerant Sender 正常的错误会在backupqueue里面记录，自己重试，此处无需重试
+			if se.Ft && se.FtNotRetry {
+				break
+			}
 			time.Sleep(time.Second)
 			se, succ := err.(*reqerr.SendError)
 			if succ {
@@ -398,6 +382,16 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 	return true
 }
 
+func getSampleContent(line string, maxBatchSize int) string {
+	if len(line) <= maxBatchSize {
+		return line
+	}
+	if maxBatchSize <= 1024 {
+		return line
+	}
+	return line[0:1024]
+}
+
 func (r *LogExportRunner) Run() {
 	if r.cleaner != nil {
 		go r.cleaner.Run()
@@ -412,10 +406,14 @@ func (r *LogExportRunner) Run() {
 			log.Errorf("recover when runner is stopped\npanic: %v\nstack: %s", r, debug.Stack())
 		}
 	}()
+
 	tags := r.meta.GetTags()
+	tags = MergeEnvTags(r.EnvTag, tags)
+	tags = MergeExtraInfoTags(r.meta, tags)
+
 	datasourceTag := r.meta.GetDataSourceTag()
-	schemaErr := utils.SchemaErr{Number: 0, Last: time.Unix(0, 0)}
-	tags = GetEnvTag(r.EnvTag, tags)
+	schemaErr := SchemaErr{Number: 0, Last: time.Unix(0, 0)}
+
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
 			log.Debugf("Runner[%v] exited from run", r.Name())
@@ -426,10 +424,17 @@ func (r *LogExportRunner) Run() {
 		}
 		// read data
 		var lines, froms []string
+		var readErr error
+		var line string
 		for !r.batchFullOrTimeout() {
-			line, err := r.reader.ReadLine()
-			if err != nil && err != io.EOF {
-				log.Errorf("Runner[%v] reader %s - error: %v, sleep 1 second...", r.Name(), r.reader.Name(), err)
+			line, readErr = r.reader.ReadLine()
+			if os.IsNotExist(readErr) {
+				log.Errorf("Runner[%v] reader %s - error: %v, sleep 3 second...", r.Name(), r.reader.Name(), readErr)
+				time.Sleep(3 * time.Second)
+				break
+			}
+			if readErr != nil && readErr != io.EOF {
+				log.Errorf("Runner[%v] reader %s - error: %v, sleep 1 second...", r.Name(), r.reader.Name(), readErr)
 				time.Sleep(time.Second)
 				break
 			}
@@ -439,7 +444,7 @@ func (r *LogExportRunner) Run() {
 				continue
 			}
 			if len(line) >= r.MaxBatchSize {
-				log.Errorf("Runner[%v] reader %s read lines larger than MaxBatchSize %v, content is %s", r.Name(), r.reader.Name(), r.MaxBatchSize, line)
+				log.Errorf("Runner[%v] reader %s read lines larger than MaxBatchSize %v, sample content is %s , ignore it...", r.Name(), r.reader.Name(), r.MaxBatchSize, getSampleContent(line, r.MaxBatchSize))
 				continue
 			}
 			r.rsMutex.Lock()
@@ -453,6 +458,19 @@ func (r *LogExportRunner) Run() {
 			r.batchLen++
 			r.batchSize += len(line)
 		}
+		r.rsMutex.Lock()
+		if readErr != nil && readErr != io.EOF {
+			if os.IsNotExist(readErr) {
+				r.rs.ReaderStats.LastError = "no more file exist to be read"
+			} else {
+				r.rs.ReaderStats.LastError = readErr.Error()
+			}
+		} else {
+			r.rs.ReaderStats.LastError = ""
+		}
+		r.rs.ReaderStats.Success = int64(r.batchLen)
+		r.rsMutex.Unlock()
+
 		r.batchLen = 0
 		r.batchSize = 0
 		r.lastSend = time.Now()
@@ -469,9 +487,9 @@ func (r *LogExportRunner) Run() {
 
 		if len(lines) <= 0 {
 			log.Debugf("Runner[%v] fetched 0 lines", r.Name())
-			pt, ok := r.parser.(parser.ParserType)
-			if ok && pt.Type() == parser.TypeSyslog {
-				lines = []string{parser.SyslogEofLine}
+			_, ok := r.parser.(parser.Flushable)
+			if ok {
+				lines = []string{parser.PandoraParseFlushSignal}
 			} else {
 				continue
 			}
@@ -480,16 +498,20 @@ func (r *LogExportRunner) Run() {
 		// parse data
 		errorCnt := int64(0)
 		datas, err := r.parser.Parse(lines)
-		se, ok := err.(*utils.StatsError)
+		se, ok := err.(*StatsError)
 		r.rsMutex.Lock()
 		if ok {
 			errorCnt = se.Errors
 			err = se.ErrorDetail
 			r.rs.ParserStats.Errors += se.Errors
 			r.rs.ParserStats.Success += se.Success
+			if err != nil {
+				r.rs.ParserStats.LastError = err.Error()
+			}
 		} else if err != nil {
 			errorCnt = 1
 			r.rs.ParserStats.Errors++
+			r.rs.ParserStats.LastError = err.Error()
 		} else {
 			r.rs.ParserStats.Success++
 		}
@@ -518,16 +540,39 @@ func (r *LogExportRunner) Run() {
 				log.Errorf("Runner[%v] datasourcetag add error, datas %v not match with froms %v", r.Name(), datas, froms)
 			}
 		}
-		//把tagfile加到data里，前提是认为[]line变成[]data以后是一一对应的，一旦错位就不加
-		if tags != nil {
+		if len(tags) > 0 {
 			datas = addTagsToData(tags, datas, r.Name())
 		}
 		for i := range r.transformers {
-			if r.transformers[i].Stage() == transforms.StageAfterParser {
-				datas, err = r.transformers[i].Transform(datas)
-				if err != nil {
-					log.Error(err)
-				}
+			if r.transformers[i].Stage() != transforms.StageAfterParser {
+				continue
+			}
+			datas, err = r.transformers[i].Transform(datas)
+			tp := r.transformers[i].Type()
+			r.rsMutex.Lock()
+			tstats, ok := r.rs.TransformStats[tp]
+			if !ok {
+				tstats = StatsInfo{}
+			}
+			se, ok := err.(*StatsError)
+			if ok {
+				errorCnt = se.Errors
+				err = se.ErrorDetail
+				tstats.Errors += se.Errors
+				tstats.Success += se.Success
+			} else if err != nil {
+				errorCnt = 1
+				tstats.Errors++
+			} else {
+				tstats.Success++
+			}
+			if err != nil {
+				tstats.LastError = err.Error()
+			}
+			r.rs.TransformStats[tp] = tstats
+			r.rsMutex.Unlock()
+			if err != nil {
+				log.Error(err)
 			}
 		}
 		success := true
@@ -548,7 +593,7 @@ func (r *LogExportRunner) Run() {
 	}
 }
 
-func classifySenderData(datas []Data, router *sender.Router, senderCnt int) [][]Data {
+func classifySenderData(datas []Data, router *router.Router, senderCnt int) [][]Data {
 	senderDataList := make([][]Data, senderCnt)
 	for i := 0; i < senderCnt; i++ {
 		if router == nil {
@@ -569,7 +614,7 @@ func classifySenderData(datas []Data, router *sender.Router, senderCnt int) [][]
 	return senderDataList
 }
 
-func addSourceToData(sourceFroms []string, se *utils.StatsError, datas []Data, datasourceTagName, runnername string, recordErrData bool) []Data {
+func addSourceToData(sourceFroms []string, se *StatsError, datas []Data, datasourceTagName, runnername string, recordErrData bool) []Data {
 	j := 0
 	for i, v := range sourceFroms {
 		if recordErrData {
@@ -707,7 +752,8 @@ func (r *LogExportRunner) LagStats() (rl *LagInfo, err error) {
 	if ok {
 		return lr.Lag()
 	}
-	err = fmt.Errorf("readmode %v not support LagStats, can't get stats", r.meta.GetMode())
+	//接口不支持，不显示错误比较好，有限reader就是不存在lag的概念的。
+	rl = &LagInfo{}
 	return
 }
 
@@ -721,12 +767,11 @@ func getTrend(old, new float64) string {
 	return SpeedStable
 }
 
-func (r *LogExportRunner) getStatusFrequently(rss *RunnerStatus, now time.Time) (bool, float64) {
+func (r *LogExportRunner) getStatusFrequently(now time.Time) (bool, float64) {
 	r.rsMutex.RLock()
 	defer r.rsMutex.RUnlock()
 	elaspedTime := now.Sub(r.rs.lastState).Seconds()
 	if elaspedTime <= 3 {
-		deepCopy(rss, &r.rs)
 		return true, elaspedTime
 	}
 	return false, elaspedTime
@@ -735,10 +780,9 @@ func (r *LogExportRunner) getStatusFrequently(rss *RunnerStatus, now time.Time) 
 func (r *LogExportRunner) Status() RunnerStatus {
 	var isFre bool
 	var elaspedtime float64
-	rss := RunnerStatus{}
 	now := time.Now()
-	if isFre, elaspedtime = r.getStatusFrequently(&rss, now); isFre {
-		return rss
+	if isFre, elaspedtime = r.getStatusFrequently(now); isFre {
+		return *r.lastRs
 	}
 	r.rsMutex.Lock()
 	defer r.rsMutex.Unlock()
@@ -749,7 +793,9 @@ func (r *LogExportRunner) Status() RunnerStatus {
 		r.rs.Error = fmt.Sprintf("get lag error: %v", err)
 		log.Warn(r.rs.Error)
 	}
-	r.rs.Lag = *rl
+	if rl != nil {
+		r.rs.Lag = *rl
+	}
 
 	r.rs.Elaspedtime += elaspedtime
 	r.rs.lastState = now
@@ -759,19 +805,28 @@ func (r *LogExportRunner) Status() RunnerStatus {
 		if oldtsts, ok := r.lastRs.TransformStats[ttp]; ok {
 			newtsts.Speed, newtsts.Trend = calcSpeedTrend(oldtsts, newtsts, elaspedtime)
 		} else {
-			newtsts.Speed, newtsts.Trend = calcSpeedTrend(utils.StatsInfo{}, newtsts, elaspedtime)
+			newtsts.Speed, newtsts.Trend = calcSpeedTrend(StatsInfo{}, newtsts, elaspedtime)
 		}
 		r.rs.TransformStats[ttp] = newtsts
 	}
-
 	if str, ok := r.reader.(reader.StatsReader); ok {
 		r.rs.ReaderStats = str.Status()
+		r.rs.ReaderStats.Success = r.rs.ReadDataCount
 	}
+	/*
+		此处先不用reader的status, Run函数本身对这个ReaderStats赋值
+		if str, ok := r.reader.(reader.StatsReader); ok {
+			r.rs.ReaderStats = str.Status()
+		}
+	*/
 
 	r.rs.ReadSpeedKB = float64(r.rs.ReadDataSize-r.lastRs.ReadDataSize) / elaspedtime
 	r.rs.ReadSpeedTrendKb = getTrend(r.lastRs.ReadSpeedKB, r.rs.ReadSpeedKB)
 	r.rs.ReadSpeed = float64(r.rs.ReadDataCount-r.lastRs.ReadDataCount) / elaspedtime
 	r.rs.ReadSpeedTrend = getTrend(r.lastRs.ReadSpeed, r.rs.ReadSpeed)
+	r.rs.ReaderStats.Speed = r.rs.ReadSpeed
+	r.rs.ReaderStats.Trend = r.rs.ReadSpeedTrend
+	r.rs.ReaderStats.Success = r.rs.ReadDataCount
 
 	r.rs.ParserStats.Speed, r.rs.ParserStats.Trend = calcSpeedTrend(r.lastRs.ParserStats, r.rs.ParserStats, elaspedtime)
 
@@ -786,17 +841,16 @@ func (r *LogExportRunner) Status() RunnerStatus {
 		if lv, ok := r.lastRs.SenderStats[k]; ok {
 			v.Speed, v.Trend = calcSpeedTrend(lv, v, elaspedtime)
 		} else {
-			v.Speed, v.Trend = calcSpeedTrend(utils.StatsInfo{}, v, elaspedtime)
+			v.Speed, v.Trend = calcSpeedTrend(StatsInfo{}, v, elaspedtime)
 		}
 		r.rs.SenderStats[k] = v
 	}
 	r.rs.RunningStatus = RunnerRunning
-	copyRunnerStatus(&r.lastRs, &r.rs)
-	deepCopy(&rss, &r.rs)
-	return rss
+	*r.lastRs = r.rs.Clone()
+	return *r.lastRs
 }
 
-func calcSpeedTrend(old, new utils.StatsInfo, elaspedtime float64) (speed float64, trend string) {
+func calcSpeedTrend(old, new StatsInfo, elaspedtime float64) (speed float64, trend string) {
 	if elaspedtime < 0.001 {
 		speed = old.Speed
 	} else {
@@ -806,34 +860,20 @@ func calcSpeedTrend(old, new utils.StatsInfo, elaspedtime float64) (speed float6
 	return
 }
 
-func deepCopy(dst, src interface{}) {
+func deepCopyByJson(dst, src interface{}) {
 	var err error
 	var confByte []byte
 	if confByte, err = jsoniter.Marshal(src); err != nil {
-		log.Debugf("runner config marshal error %v", err)
+		log.Errorf("deepCopyByJson marshal error %v, use same pointer", err)
 		dst = src
+		return
 	}
 	if err = jsoniter.Unmarshal(confByte, dst); err != nil {
-		log.Debugf("runner config unmarshal error %v", err)
+		log.Errorf("deepCopyByJson unmarshal error %v, use same pointer", err)
 		dst = src
+		return
 	}
-}
-
-func copyRunnerStatus(dst, src *RunnerStatus) {
-	dst.TransformStats = make(map[string]utils.StatsInfo, len(src.TransformStats))
-	dst.SenderStats = make(map[string]utils.StatsInfo, len(src.SenderStats))
-	dst.ReadDataSize = src.ReadDataSize
-	dst.ReadDataCount = src.ReadDataCount
-
-	dst.ParserStats = src.ParserStats
-	for k, v := range src.SenderStats {
-		dst.SenderStats[k] = v
-	}
-	for k, v := range src.TransformStats {
-		dst.TransformStats[k] = v
-	}
-	dst.ReadSpeedKB = src.ReadSpeedKB
-	dst.ReadSpeed = src.ReadSpeed
+	return
 }
 
 //Compatible 用于新老配置的兼容
@@ -894,20 +934,20 @@ func (r *LogExportRunner) StatusRestore() {
 		}
 		sStatus, ok := s.(sender.StatsSender)
 		if ok {
-			sStatus.Restore(&utils.StatsInfo{
+			sStatus.Restore(&StatsInfo{
 				Success: info[0],
 				Errors:  info[1],
 			})
 		}
 		status, ext := r.rs.SenderStats[name]
 		if !ext {
-			status = utils.StatsInfo{}
+			status = StatsInfo{}
 		}
 		status.Success = info[0]
 		status.Errors = info[1]
 		r.rs.SenderStats[name] = status
 	}
-	copyRunnerStatus(&r.lastRs, &r.rs)
+	*r.lastRs = r.rs.Clone()
 	log.Infof("runner %v restore status %v", r.RunnerName, rStat)
 }
 
@@ -942,16 +982,38 @@ func (r *LogExportRunner) StatusBackup() {
 	}
 }
 
-func GetEnvTag(name string, tags map[string]interface{}) map[string]interface{} {
+// MergeEnvTags 获取环境变量里的内容
+func MergeEnvTags(name string, tags map[string]interface{}) map[string]interface{} {
 	if name == "" {
 		return tags
 	}
+
+	envTags := make(map[string]interface{})
 	if value := os.Getenv(name); value != "" {
-		if tags == nil {
-			tags = make(map[string]interface{})
+		err := jsoniter.Unmarshal([]byte(value), &envTags)
+		if err != nil {
+			log.Warnf("get env tags error: %v", err)
+			return tags
 		}
-		tags[name] = value
-	} else {
+	}
+
+	if tags == nil {
+		tags = make(map[string]interface{})
+	}
+	for k, v := range envTags {
+		tags[k] = v
+	}
+	return tags
+}
+
+func MergeExtraInfoTags(meta *reader.Meta, tags map[string]interface{}) map[string]interface{} {
+	if tags == nil {
+		tags = make(map[string]interface{})
+	}
+	for k, v := range meta.ExtraInfo() {
+		if _, ok := tags[k]; !ok {
+			tags[k] = v
+		}
 	}
 	return tags
 }

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -21,7 +20,7 @@ const (
 
 type K8sTag struct {
 	SourceFileKey string `json:"sourcefilefield"`
-	stats         utils.StatsInfo
+	stats         StatsInfo
 }
 
 func (g *K8sTag) RawTransform(datas []string) ([]string, error) {
@@ -69,7 +68,7 @@ func (g *K8sTag) Transform(datas []Data) ([]Data, error) {
 
 func (g *K8sTag) Description() string {
 	//return "k8stag will get kubernetes tags from sourcefile name"
-	return "从sourcefile name中获取kubernetes tags"
+	return "从kubernetes 存储的文件名称中获取pod、containerID之类的tags信息"
 }
 
 func (g *K8sTag) Type() string {
@@ -85,7 +84,6 @@ func (g *K8sTag) SampleConfig() string {
 
 func (g *K8sTag) ConfigOptions() []Option {
 	return []Option{
-		transforms.KeyStageAfterOnly,
 		transforms.KeyFieldName,
 	}
 }
@@ -94,7 +92,7 @@ func (g *K8sTag) Stage() string {
 	return transforms.StageAfterParser
 }
 
-func (g *K8sTag) Stats() utils.StatsInfo {
+func (g *K8sTag) Stats() StatsInfo {
 	return g.stats
 }
 

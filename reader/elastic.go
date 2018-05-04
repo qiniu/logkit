@@ -10,9 +10,12 @@ import (
 	"time"
 
 	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
+
+	"strings"
 
 	elasticV6 "github.com/olivere/elastic"
+	"github.com/qiniu/logkit/conf"
 	elasticV3 "gopkg.in/olivere/elastic.v3"
 	elasticV5 "gopkg.in/olivere/elastic.v5"
 )
@@ -35,7 +38,7 @@ type ElasticReader struct {
 	meta   *Meta  // 记录offset的元数据
 	offset string // 当前处理es的offset
 
-	stats     utils.StatsInfo
+	stats     StatsInfo
 	statsLock sync.RWMutex
 
 	status  int32
@@ -43,7 +46,23 @@ type ElasticReader struct {
 	started bool
 }
 
-func NewESReader(meta *Meta, readBatch int, estype, esindex, eshost, esVersion, keepAlive string) (er *ElasticReader, err error) {
+func NewESReader(meta *Meta, conf conf.MapConf) (er Reader, err error) {
+
+	readBatch, _ := conf.GetIntOr(KeyESReadBatch, 100)
+	estype, err := conf.GetString(KeyESType)
+	if err != nil {
+		return nil, err
+	}
+	esindex, err := conf.GetString(KeyESIndex)
+	if err != nil {
+		return nil, err
+	}
+	eshost, _ := conf.GetStringOr(KeyESHost, "http://localhost:9200")
+	if !strings.HasPrefix(eshost, "http://") && !strings.HasPrefix(eshost, "https://") {
+		eshost = "http://" + eshost
+	}
+	esVersion, _ := conf.GetStringOr(KeyESVersion, ElasticVersion3)
+	keepAlive, _ := conf.GetStringOr(KeyESKeepAlive, "6h")
 
 	offset, _, err := meta.ReadOffset()
 	if err != nil {
@@ -79,10 +98,11 @@ func (er *ElasticReader) Source() string {
 func (er *ElasticReader) setStatsError(err string) {
 	er.statsLock.Lock()
 	defer er.statsLock.Unlock()
+	er.stats.Errors++
 	er.stats.LastError = err
 }
 
-func (er *ElasticReader) Status() utils.StatsInfo {
+func (er *ElasticReader) Status() StatsInfo {
 	er.statsLock.RLock()
 	defer er.statsLock.RUnlock()
 	return er.stats

@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -782,7 +781,7 @@ func TestNginxTimeParseForErrData(t *testing.T) {
 	lines := []string{`192.168.45.53 - - [05/Apr/2017:17:25:06 +0800] "POST /v2/repos/kodo_z0_app_pfdstg/data HTTP/1.1" 200 497 2 "-" "Go 1.1 package http" "-" 192.168.160.1:80 pipeline.qiniu.io KBkAAD7W6-UfdrIU 0.139`}
 	m, err := p.Parse(lines)
 	if err != nil {
-		errx, _ := err.(*utils.StatsError)
+		errx, _ := err.(*StatsError)
 		assert.Equal(t, int64(1), errx.StatsInfo.Errors)
 	}
 	if len(m) != 1 {
@@ -792,4 +791,70 @@ func TestNginxTimeParseForErrData(t *testing.T) {
 	for _, v := range m {
 		assert.EqualValues(t, lines[0], v[KeyPandoraStash])
 	}
+}
+
+func TestCompileFileAndParseMultiLine(t *testing.T) {
+	p := &GrokParser{
+		Patterns:       []string{"%{CUSTOM_GROK_FINAL}"},
+		CustomPatterns: "CUSTOM_GROK_FINAL \\[%{TIMESTAMP_ISO8601:time}\\]\\[12345\\] Level 5:\\n发送时间\\[%{TIMESTAMP_ISO8601:time2}\\],接收时间\\[20T09:57:58\\.123456\\]\\n本地队列名:\\[%{WORD:ok1}\\],\\n报文发送队列名:\\[%{WORD:ok3}\\],\\n报文头部信息:\\[无\\]\\n报文内容:\\n{%{NOTSPACE:a} %{NOTSPACE:b} %{NOTSPACE:c} %{NOTSPACE:d}}\\n%{GREEDYDATALINEFEED:xml}",
+	}
+	assert.NoError(t, p.compile())
+
+	multiLine, err := p.parseLine(`[2017-03-28 12:34:56.123456][12345] Level 5:
+发送时间[2017-03-27 01:23:45.67],接收时间[20T09:57:58.123456]
+本地队列名:[ABCDEFGHIJK],
+报文发送队列名:[ABCDEFGHIJKLMNOPQRST],
+报文头部信息:[无]
+报文内容:
+{H:000000 1234567890 QINIU1234567890XMLQINIU.100.100.01 1234567890QINIU1234567890}
+<?xml version="1.0" encoding="UTF-8" ?>
+<Document xml="urn:123:456:789" xml:test="https://www.qiniu.com">
+
+ <MytestConf>
+  <MytestInfo>
+   <MytestStr></MytestStr>
+   <MytestStatus>400</MytestStatus>
+   <Mytest>mytest.100.10.01</Mytest>
+   <MsgId>123456789<?msgId>
+  </MytestInfo>
+ </MytestConf>
+</Document>`)
+	require.NotNil(t, multiLine)
+	assert.NoError(t, err)
+	assert.Equal(t,
+		Data{
+			"time":  "2017-03-28 12:34:56.123456",
+			"time2": "2017-03-27 01:23:45.67",
+			"ok1":   "ABCDEFGHIJK",
+			"ok3":   "ABCDEFGHIJKLMNOPQRST",
+			"a":     "H:000000",
+			"b":     "1234567890",
+			"c":     "QINIU1234567890XMLQINIU.100.100.01",
+			"d":     "1234567890QINIU1234567890",
+			"xml":   "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<Document xml=\"urn:123:456:789\" xml:test=\"https://www.qiniu.com\">\n\n <MytestConf>\n  <MytestInfo>\n   <MytestStr></MytestStr>\n   <MytestStatus>400</MytestStatus>\n   <Mytest>mytest.100.10.01</Mytest>\n   <MsgId>123456789<?msgId>\n  </MytestInfo>\n </MytestConf>\n</Document>",
+		},
+		multiLine)
+}
+
+func TestNagiosLog(t *testing.T) {
+	p := &GrokParser{
+		Patterns: []string{"%{NAGIOSLOGLINE}", "%{NAGIOSLOGOTHER}"},
+	}
+	assert.NoError(t, p.compile())
+	got, err := p.parseLine(`[1473609600] CURRENT HOST STATE: test_zzebgd;UP;HARD;1;PING OK - Packet loss = 0%, RTA = 0.26 ms`)
+	assert.NoError(t, err)
+	assert.Equal(t, Data{
+		"nagios_epoch":     "1473609600",
+		"nagios_type":      "CURRENT HOST STATE",
+		"nagios_hostname":  "test_zzebgd",
+		"nagios_state":     "UP",
+		"nagios_statetype": "HARD",
+		"nagios_statecode": "1",
+		"nagios_message":   "PING OK - Packet loss = 0%, RTA = 0.26 ms",
+	}, got)
+	got, err = p.parseLine(`[1474520444] Auto-save of retention data completed successfully.`)
+	assert.Equal(t, Data{
+		"nagios_epoch": "1474520444",
+		"nagios_log":   "Auto-save of retention data completed successfully.",
+	}, got)
 }

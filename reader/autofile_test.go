@@ -34,23 +34,23 @@ func TestMatchMode(t *testing.T) {
 	}{
 		{
 			input:   "/usr",
-			expPath: "/usr/*",
-			expMode: ModeTailx,
+			expPath: "/usr",
+			expMode: ModeDir,
 		},
 		{
 			input:   "/usr/",
-			expPath: "/usr/*",
-			expMode: ModeTailx,
+			expPath: "/usr",
+			expMode: ModeDir,
 		},
 		{
 			input:   "/usr/local",
-			expPath: "/usr/local/*",
-			expMode: ModeTailx,
+			expPath: "/usr/local",
+			expMode: ModeDir,
 		},
 		{
 			input:   "/usr/local/",
-			expPath: "/usr/local/*",
-			expMode: ModeTailx,
+			expPath: "/usr/local",
+			expMode: ModeDir,
 		},
 		{
 			input:   filePath,
@@ -63,12 +63,12 @@ func TestMatchMode(t *testing.T) {
 			expMode: "",
 		},
 	}
-	for _, val := range testData {
+	for idx, val := range testData {
 		path, mode, err := matchMode(val.input)
 		if val.expMode == "" {
-			assert.Error(t, err)
+			assert.Error(t, err, idx)
 		} else {
-			assert.NoError(t, err)
+			assert.NoError(t, err, idx)
 		}
 		assert.Equal(t, val.expPath, path)
 		assert.Equal(t, val.expMode, mode)

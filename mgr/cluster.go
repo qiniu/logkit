@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/qiniu/log"
+	. "github.com/qiniu/logkit/utils/models"
+
 	"github.com/json-iterator/go"
 	"github.com/labstack/echo"
-	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/utils"
-	. "github.com/qiniu/logkit/utils/models"
 )
 
 type ClusterConfig struct {
@@ -191,7 +191,7 @@ func (rs *RestService) GetClusterRunners() echo.HandlerFunc {
 		rs.cluster.mutex.RUnlock()
 		mutex := new(sync.Mutex)
 		wg := new(sync.WaitGroup)
-		runnerNameSet := utils.NewHashSet()
+		runnerNameSet := NewHashSet()
 		for _, v := range slaves {
 			wg.Add(1)
 			go func(v Slave) {
@@ -370,7 +370,7 @@ func (rs *RestService) PostRegister() echo.HandlerFunc {
 		if err := c.Bind(&req); err != nil {
 			return RespError(c, http.StatusBadRequest, ErrClusterRegister, err.Error())
 		}
-		req.Url = utils.AddHttpProtocal(req.Url)
+		req.Url = AddHttpProtocal(req.Url)
 		if rs.cluster == nil || !rs.cluster.Enable {
 			errMsg := "this is not master"
 			return RespError(c, http.StatusBadRequest, ErrClusterRegister, errMsg)

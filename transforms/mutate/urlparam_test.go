@@ -1,10 +1,10 @@
 package mutate
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/stretchr/testify/assert"
@@ -15,13 +15,14 @@ func TestParamTransformer(t *testing.T) {
 		Key: "myword",
 	}
 	data, err := par.Transform([]Data{
-		{"myword": "platform=2&vid=372&vu=caea966558&chan=android_sougou&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
+		{"myword": "?platform=2&vid=372&vu=caea966558&chan=android_sougou&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
 		{"myword": "platform=2&vid=&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
+		{"myword": "/index/mytest?platform=2&vid=&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
 	})
 	assert.NoError(t, err)
 	exp := []Data{
 		{
-			"myword":           "platform=2&vid=372&vu=caea966558&chan=android_sougou&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032",
+			"myword":           "?platform=2&vid=372&vu=caea966558&chan=android_sougou&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032",
 			"myword_platform":  "2",
 			"myword_vid":       "372",
 			"myword_vu":        "caea966558",
@@ -32,9 +33,57 @@ func TestParamTransformer(t *testing.T) {
 		{
 			"myword":           "platform=2&vid=&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032",
 			"myword_platform":  "2",
-			"myword_vid":       "",
 			"myword_vu":        "caea966558",
-			"myword_chan":      "",
+			"myword_sign":      "ad225ec02942c79bdb710e3ad0cf1b43",
+			"myword_nonce_str": "1510555032",
+		},
+		{
+			"myword":                "/index/mytest?platform=2&vid=&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032",
+			"myword_platform":       "2",
+			"myword_vu":             "caea966558",
+			"myword_sign":           "ad225ec02942c79bdb710e3ad0cf1b43",
+			"myword_nonce_str":      "1510555032",
+			"myword_url_param_path": "/index/mytest",
+		},
+	}
+	assert.Equal(t, len(exp), len(data))
+	for i, ex := range exp {
+		da := data[i]
+		for k, e := range ex {
+			d, exist := da[k]
+			assert.Equal(t, true, exist)
+			assert.Equal(t, e, d)
+		}
+	}
+	assert.Equal(t, par.Stage(), transforms.StageAfterParser)
+	assert.Equal(t, StatsInfo{Success: 3}, par.stats)
+}
+
+func TestParamTransformerError(t *testing.T) {
+	par := &UrlParam{
+		Key: "myword",
+	}
+	data, err := par.Transform([]Data{
+		{
+			"myword": "platform=2=372&vu=caea966558&chan=android_sougou&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032",
+		},
+		{
+			"myword": "platform=2&vid&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032",
+		},
+	})
+	assert.NoError(t, err)
+	exp := []Data{
+		{"myword": "platform=2=372&vu=caea966558&chan=android_sougou&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032",
+			"myword_platform":  "2=372",
+			"myword_vu":        "caea966558",
+			"myword_chan":      "android_sougou",
+			"myword_sign":      "ad225ec02942c79bdb710e3ad0cf1b43",
+			"myword_nonce_str": "1510555032",
+		},
+		{
+			"myword":           "platform=2&vid&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032",
+			"myword_platform":  "2",
+			"myword_vu":        "caea966558",
 			"myword_sign":      "ad225ec02942c79bdb710e3ad0cf1b43",
 			"myword_nonce_str": "1510555032",
 		},
@@ -48,35 +97,6 @@ func TestParamTransformer(t *testing.T) {
 			assert.Equal(t, e, d)
 		}
 	}
-	assert.Equal(t, par.Stage(), transforms.StageAfterParser)
-	assert.Equal(t, utils.StatsInfo{Success: 2}, par.stats)
-}
-
-func TestParamTransformerError(t *testing.T) {
-	par := &UrlParam{
-		Key: "myword",
-	}
-	data, err := par.Transform([]Data{
-		{"myword": "platform=2=372&vu=caea966558&chan=android_sougou&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
-		{"myword": "platform=2&vid&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
-	})
-	assert.Error(t, err)
-	exp := []Data{
-		{"myword": "platform=2=372&vu=caea966558&chan=android_sougou&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
-		{"myword": "platform=2&vid&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
-	}
-	assert.Equal(t, len(exp), len(data))
-	for i, ex := range exp {
-		da := data[i]
-		for k, e := range ex {
-			d, exist := da[k]
-			assert.Equal(t, true, exist)
-			assert.Equal(t, e, d)
-		}
-	}
-	assert.Equal(t, par.Stage(), transforms.StageAfterParser)
-	par.stats.LastError = ""
-	assert.Equal(t, utils.StatsInfo{Errors: 2}, par.stats)
 }
 
 func TestParamTransformerKeyRepeat(t *testing.T) {
@@ -109,13 +129,13 @@ func TestParamTransformerKeyRepeat(t *testing.T) {
 	exp := []Data{
 		{
 			"myword":   "a=a&a=b&a=c&a=d",
-			"myword_a": "d",
+			"myword_a": "a&b&c&d",
 		},
 		{
 			"myword":    "a=a&a=b&b=c&b=d&b=e",
 			"myword_a":  "xx",
-			"myword_a1": "b",
-			"myword_b":  "e",
+			"myword_a1": "a&b",
+			"myword_b":  "c&d&e",
 		},
 		{
 			"myword":    "a=x",
@@ -145,7 +165,7 @@ func TestParamTransformerKeyRepeat(t *testing.T) {
 	}
 	assert.Equal(t, par.Stage(), transforms.StageAfterParser)
 	par.stats.LastError = ""
-	assert.Equal(t, utils.StatsInfo{Success: 4}, par.stats)
+	assert.Equal(t, StatsInfo{Success: 4}, par.stats)
 }
 
 func TestParamTransformerMultiKey(t *testing.T) {
@@ -172,9 +192,7 @@ func TestParamTransformerMultiKey(t *testing.T) {
 			"multi": map[string]interface{}{
 				"myword":           "platform=2&vid=&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032",
 				"myword_platform":  "2",
-				"myword_vid":       "",
 				"myword_vu":        "caea966558",
-				"myword_chan":      "",
 				"myword_sign":      "ad225ec02942c79bdb710e3ad0cf1b43",
 				"myword_nonce_str": "1510555032",
 			}},
@@ -185,9 +203,9 @@ func TestParamTransformerMultiKey(t *testing.T) {
 		for k, e := range ex["multi"].(map[string]interface{}) {
 			d, exist := da[k]
 			assert.Equal(t, true, exist)
-			assert.Equal(t, e, d)
+			assert.Equal(t, e, d, fmt.Sprintf("case %v %v", i, k))
 		}
 	}
 	assert.Equal(t, par.Stage(), transforms.StageAfterParser)
-	assert.Equal(t, utils.StatsInfo{Success: 2}, par.stats)
+	assert.Equal(t, StatsInfo{Success: 2}, par.stats)
 }

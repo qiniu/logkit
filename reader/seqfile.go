@@ -12,10 +12,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/rateio"
-	"github.com/qiniu/logkit/utils"
-	"github.com/qiniu/logkit/utils/models"
+	. "github.com/qiniu/logkit/utils/models"
+	utilsos "github.com/qiniu/logkit/utils/os"
+
+	"github.com/qiniu/log"
 )
 
 // FileMode 读取单个文件模式
@@ -31,16 +32,19 @@ type SeqFile struct {
 	meta *Meta
 	mux  sync.Mutex
 
-	dir              string   // 文件目录
-	currFile         string   // 当前处理文件名
-	f                *os.File // 当前处理文件
-	ratereader       io.ReadCloser
-	inode            uint64   // 当前文件inode
-	offset           int64    // 当前处理文件offset
-	ignoreHidden     bool     // 忽略隐藏文件
-	ignoreFileSuffix []string // 忽略文件后缀
-	validFilePattern string   // 合法的文件名正则表达式
-	stopped          int32    // 停止标志位
+	dir               string   // 文件目录
+	currFile          string   // 当前处理文件名
+	f                 *os.File // 当前处理文件
+	ratereader        io.ReadCloser
+	inode             uint64   // 当前文件inode
+	offset            int64    // 当前处理文件offset
+	ignoreHidden      bool     // 忽略隐藏文件
+	ignoreFileSuffix  []string // 忽略文件后缀
+	newFileAsNewLine  bool     //新文件自动加换行符
+	validFilePattern  string   // 合法的文件名正则表达式
+	stopped           int32    // 停止标志位
+	skipFileFirstLine bool     //跳过新文件的第一行，常用于带title的csv文件，title与实际格式不同
+	hasSkiped         bool
 
 	lastSyncPath   string
 	lastSyncOffset int64
@@ -48,7 +52,7 @@ type SeqFile struct {
 
 func getStartFile(path, whence string, meta *Meta, sf *SeqFile) (f *os.File, dir, currFile string, offset int64, err error) {
 	var pfi os.FileInfo
-	dir, pfi, err = utils.GetRealPath(path)
+	dir, pfi, err = GetRealPath(path)
 	if err != nil || pfi == nil {
 		log.Errorf("%s - utils.GetRealPath failed, err:%v", path, err)
 		return
@@ -91,12 +95,13 @@ func getStartFile(path, whence string, meta *Meta, sf *SeqFile) (f *os.File, dir
 	return
 }
 
-func NewSeqFile(meta *Meta, path string, ignoreHidden bool, suffixes []string, validFileRegex, whence string) (sf *SeqFile, err error) {
+func NewSeqFile(meta *Meta, path string, ignoreHidden, newFileNewLine bool, suffixes []string, validFileRegex, whence string) (sf *SeqFile, err error) {
 	sf = &SeqFile{
 		ignoreFileSuffix: suffixes,
 		ignoreHidden:     ignoreHidden,
 		validFilePattern: validFileRegex,
 		mux:              sync.Mutex{},
+		newFileAsNewLine: newFileNewLine,
 	}
 	//原来的for循环替换成单次执行，启动的时候出错就直接报错给用户即可，不需要等待重试。
 	f, dir, currFile, offset, err := getStartFile(path, whence, meta, sf)
@@ -109,7 +114,7 @@ func NewSeqFile(meta *Meta, path string, ignoreHidden bool, suffixes []string, v
 			f.Close()
 			return nil, err
 		}
-		sf.inode, err = utils.GetIdentifyIDByPath(currFile)
+		sf.inode, err = utilsos.GetIdentifyIDByPath(currFile)
 		if err != nil {
 			return nil, err
 		}
@@ -202,8 +207,11 @@ func (sf *SeqFile) Close() (err error) {
 // 这个函数目前只针对stale NFS file handle的情况，重新打开文件
 func (sf *SeqFile) reopenForESTALE() error {
 	f, err := os.Open(sf.currFile)
+	if os.IsNotExist(err) {
+		return err
+	}
 	if err != nil {
-		return fmt.Errorf("%s -cannot reopen currfile file err:%v", sf.currFile, err)
+		return fmt.Errorf("%s -cannot reopen currfile file for ESTALE err:%v", sf.currFile, err)
 	}
 
 	_, err = f.Seek(sf.offset, io.SeekStart)
@@ -217,7 +225,7 @@ func (sf *SeqFile) reopenForESTALE() error {
 		sf.ratereader.Close()
 	}
 	sf.ratereader = rateio.NewRateReader(f, sf.meta.readlimit)
-	ninode, err := utils.GetIdentifyIDByFile(f)
+	ninode, err := utilsos.GetIdentifyIDByFile(f)
 	if err != nil {
 		//为了不影响程序运行
 		log.Errorf("Runner[%v] %v getinode error %v, use old inode", sf.meta.RunnerName, sf.dir, err)
@@ -241,17 +249,20 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 			}
 			err = sf.newOpen()
 			if err != nil {
-				log.Warnf("Runner[%v] %v new open error %v, sleep 3s and retry", sf.meta.RunnerName, sf.dir, err)
-				time.Sleep(3 * time.Second)
-				continue
+				if !os.IsNotExist(err) {
+					log.Warnf("Runner[%v] %v new open error %v", sf.meta.RunnerName, sf.dir, err)
+				}
+				//此处出错了就应该直接return，不然容易陷入死循环，让外面的runner去sleep
+				return
 			}
+			sf.hasSkiped = false
 		}
 		n1, err = sf.ratereader.Read(p[n:])
 		if err != nil && strings.Contains(err.Error(), "stale NFS file handle") {
 			nerr := sf.reopenForESTALE()
 			if nerr != nil {
 				log.Errorf("Runner[%v] %v meet eror %v reopen error %v", sf.meta.RunnerName, sf.dir, err, nerr)
-				time.Sleep(time.Second)
+				return
 			}
 			continue
 		}
@@ -277,6 +288,10 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 				return n, err1
 			}
 			if fi != nil {
+				if sf.newFileAsNewLine {
+					p[n] = '\n'
+					n++
+				}
 				log.Infof("Runner[%v] %s - nextFile: %s", sf.meta.RunnerName, sf.dir, fi.Name())
 				err2 := sf.open(fi)
 				if err2 != nil {
@@ -303,7 +318,7 @@ func (sf *SeqFile) nextFile() (fi os.FileInfo, err error) {
 			return
 		}
 		// 当前读取的文件已经被删除
-		log.Warnf("Runner[%v] stat current file [%v] error %v, start to find the oldest file", sf.meta.RunnerName, sf.currFile, err)
+		log.Debugf("Runner[%v] stat current file [%v] error %v, start to find the oldest file", sf.meta.RunnerName, sf.currFile, err)
 		condition = sf.getIgnoreCondition()
 	} else {
 		newerThanCurrFile := func(f os.FileInfo) bool {
@@ -328,7 +343,7 @@ func (sf *SeqFile) isNewFile(newFileInfo os.FileInfo, filePath string) bool {
 	if newFileInfo == nil {
 		return false
 	}
-	newInode, err := utils.GetIdentifyIDByPath(filePath)
+	newInode, err := utilsos.GetIdentifyIDByPath(filePath)
 	if err != nil {
 		log.Error(err)
 		return false
@@ -357,7 +372,8 @@ func (sf *SeqFile) isNewFile(newFileInfo os.FileInfo, filePath string) bool {
 func (sf *SeqFile) newOpen() (err error) {
 	fi, err1 := sf.nextFile()
 	if os.IsNotExist(err1) {
-		return fmt.Errorf("did'n find any file in dir %s - nextFile: %v", sf.dir, err1)
+		log.Errorf("can not find any file in dir %s - nextFile: %v", sf.dir, err1)
+		return err1
 	}
 	if err1 != nil {
 		return fmt.Errorf("read file in dir %s error - nextFile: %v", sf.dir, err1)
@@ -380,7 +396,7 @@ func (sf *SeqFile) newOpen() (err error) {
 	sf.ratereader = rateio.NewRateReader(f, sf.meta.readlimit)
 	sf.f = f
 	sf.offset = 0
-	sf.inode, err = utils.GetIdentifyIDByPath(sf.currFile)
+	sf.inode, err = utilsos.GetIdentifyIDByPath(sf.currFile)
 	if err != nil {
 		return
 	}
@@ -418,7 +434,7 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 		}
 		sf.ratereader = rateio.NewRateReader(f, sf.meta.readlimit)
 		sf.offset = 0
-		sf.inode, err = utils.GetIdentifyIDByPath(sf.currFile)
+		sf.inode, err = utilsos.GetIdentifyIDByPath(sf.currFile)
 		if err != nil {
 			return err
 		}
@@ -455,13 +471,13 @@ func (sf *SeqFile) SyncMeta() (err error) {
 	return sf.meta.WriteOffset(sf.currFile, sf.offset)
 }
 
-func (sf *SeqFile) Lag() (rl *models.LagInfo, err error) {
+func (sf *SeqFile) Lag() (rl *LagInfo, err error) {
 	sf.mux.Lock()
-	rl = &models.LagInfo{Size: -sf.offset}
+	rl = &LagInfo{Size: -sf.offset}
 	logReading := filepath.Base(sf.currFile)
 	sf.mux.Unlock()
 
-	logs, err := utils.ReadDirByTime(sf.dir)
+	logs, err := ReadDirByTime(sf.dir)
 	if err != nil {
 		err = fmt.Errorf("ReadDirByTime err %v, can't get stats", err)
 		return
@@ -477,4 +493,20 @@ func (sf *SeqFile) Lag() (rl *models.LagInfo, err error) {
 	}
 	rl.SizeUnit = "bytes"
 	return
+}
+
+func (sf *SeqFile) IsNewOpen() bool {
+	if sf.skipFileFirstLine {
+		return !sf.hasSkiped
+	}
+	return false
+}
+
+func (sf *SeqFile) SetSkipped() {
+	sf.hasSkiped = true
+}
+
+type LineSkipper interface {
+	IsNewOpen() bool
+	SetSkipped()
 }

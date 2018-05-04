@@ -10,10 +10,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/metric/curl"
+	"github.com/qiniu/logkit/metric/system"
+	. "github.com/qiniu/logkit/utils/models"
+
 	"github.com/json-iterator/go"
 	"github.com/labstack/echo"
-	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/metric/system"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -70,9 +73,10 @@ func TestMetricRunner(t *testing.T) {
 	}()
 
 	funcMap := map[string]func(*testParam){
-		//"metricRunTest":    metricRunTest,
-		//"metricNetTest":    metricNetTest,
-		//"metricDiskioTest": metricDiskioTest,
+		"metricRunTest":       metricRunTest,
+		"metricNetTest":       metricNetTest,
+		"metricDiskioTest":    metricDiskioTest,
+		"metricHttpTest":      metricHttpTest,
 		"metricRunEnvTagTest": metricRunEnvTagTest,
 	}
 
@@ -409,7 +413,7 @@ func metricRunEnvTagTest(p *testParam) {
 	defer func() {
 		os.Setenv(runnerName, originEnv)
 	}()
-	if err := os.Setenv(runnerName, "env_value"); err != nil {
+	if err := os.Setenv(runnerName, "{\""+runnerName+"\":\"env_value\"}"); err != nil {
 		t.Fatalf("metricRunEnvTagTest set env error %v", err)
 	}
 	time.Sleep(1 * time.Second)
@@ -482,5 +486,249 @@ func metricRunEnvTagTest(p *testParam) {
 				assert.Equal(t, "env_value", v)
 			}
 		}
+	}
+}
+
+func metricHttpTest(p *testParam) {
+	t := p.t
+	rd := p.rd
+	rs := p.rs
+	resvName1 := "sendData1"
+	resvName2 := "sendData2"
+	resvName3 := "sendData3"
+	runnerName := "metricHttpTest"
+	dir := runnerName + "Dir"
+	testDir := filepath.Join(rd, dir)
+	resvDir := filepath.Join(testDir, "sender")
+	resvPath1 := filepath.Join(resvDir, resvName1)
+	resvPath2 := filepath.Join(resvDir, resvName2)
+	resvPath3 := filepath.Join(resvDir, resvName3)
+	if err := mkTestDir(testDir, resvDir); err != nil {
+		t.Fatalf("mkdir test path error %v", err)
+	}
+	time.Sleep(1 * time.Second)
+	mc := []MetricConfig{
+		{
+			MetricType: "http",
+			Attributes: map[string]bool{
+				"http_resp_head": false,
+				"http_data":      false,
+			},
+			Config: map[string]interface{}{
+				"http_datas": `[{"method":"GET", "url":"https://www.qiniu.com", "expect_code":200, "expect_data":"七牛云"}]`,
+			},
+		},
+	}
+	rc := RunnerConfig{
+		RunnerInfo: RunnerInfo{
+			RunnerName:       runnerName,
+			CollectInterval:  60,
+			MaxBatchInterval: 60,
+			EnvTag:           runnerName,
+		},
+		MetricConfig: mc,
+		SenderConfig: []conf.MapConf{{
+			"name":           "file_sender",
+			"sender_type":    "file",
+			"file_send_path": resvPath1,
+		}},
+	}
+	runnerConf, err := jsoniter.Marshal(rc)
+	if err != nil {
+		t.Fatalf("get runner config failed, error is %v", err)
+	}
+
+	// 添加 runner
+	url := "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName
+	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(3 * time.Second)
+
+	// 停止 runner
+	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName + "/stop"
+	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(2 * time.Second)
+
+	var curLine int64 = 0
+	httpAttr := curl.KeyHttpUsages
+	f, err := os.Open(resvPath1)
+	assert.NoError(t, err)
+	br := bufio.NewReaderSize(f, bufSize)
+	result := make([]map[string]interface{}, 0)
+	for {
+		str, _, c := br.ReadLine()
+		if c == io.EOF {
+			f.Close()
+			break
+		}
+		curLine++
+		err = jsoniter.Unmarshal(str, &result)
+		if err != nil {
+			t.Fatalf("metricHttpTest error unmarshal %v curLine = %v %v", string(str), curLine, err)
+		}
+
+		assert.Equal(t, len(httpAttr)+2, len(result[0]), string(str))
+		assert.Equal(t, float64(200), result[0]["http__status_code_1"])
+		assert.Equal(t, "https://www.qiniu.com", result[0]["http__target_1"])
+		assert.Equal(t, float64(1), result[0]["http__err_state_total"])
+		assert.Equal(t, "", result[0]["http__err_msg_total"])
+		assert.Equal(t, float64(1), result[0]["http__err_state_total"])
+	}
+
+	mc2 := []MetricConfig{
+		{
+			MetricType: "http",
+			Attributes: map[string]bool{
+				"http_resp_head": false,
+				"http_data":      false,
+				"http_time_cost": false,
+			},
+			Config: map[string]interface{}{
+				"http_datas": `[{"method":"GET", "url":"https://www.qiniu.com", "expect_code":200, "expect_data":"七牛云"},{"method":"GET", "url":"https://www.logkit-pandora.com", "expect_code":200, "expect_data":"七牛云"}]`,
+			},
+		},
+	}
+	rc2 := RunnerConfig{
+		RunnerInfo: RunnerInfo{
+			RunnerName:       runnerName,
+			CollectInterval:  60,
+			MaxBatchInterval: 60,
+			EnvTag:           runnerName,
+		},
+		MetricConfig: mc2,
+		SenderConfig: []conf.MapConf{{
+			"name":           "file_sender",
+			"sender_type":    "file",
+			"file_send_path": resvPath2,
+		}},
+	}
+	runnerConf2, err := jsoniter.Marshal(rc2)
+	if err != nil {
+		t.Fatalf("get runner config failed, error is %v", err)
+	}
+
+	// 更新
+	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName
+	respCode, respBody, err = makeRequest(url, http.MethodPut, runnerConf2)
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(3 * time.Second)
+
+	// 停止 runner
+	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName + "/stop"
+	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(2 * time.Second)
+
+	curLine = 0
+	f, err = os.Open(resvPath2)
+	assert.NoError(t, err)
+	br = bufio.NewReaderSize(f, bufSize)
+	result = make([]map[string]interface{}, 0)
+	for {
+		str, _, c := br.ReadLine()
+		if c == io.EOF {
+			f.Close()
+			break
+		}
+		curLine++
+		err = jsoniter.Unmarshal(str, &result)
+		if err != nil {
+			t.Fatalf("metricHttpTest error unmarshal %v curLine = %v %v", string(str), curLine, err)
+		}
+
+		assert.Equal(t, float64(200), result[0]["http__status_code_1"])
+		assert.Equal(t, "https://www.qiniu.com", result[0]["http__target_1"])
+		assert.Equal(t, float64(1), result[0]["http__err_state_1"])
+		assert.Equal(t, float64(-1), result[0]["http__status_code_2"])
+		assert.Equal(t, "https://www.logkit-pandora.com", result[0]["http__target_2"])
+		assert.Equal(t, float64(0), result[0]["http__err_state_2"])
+		assert.Equal(t, float64(0), result[0]["http__err_state_total"])
+	}
+
+	mc3 := []MetricConfig{
+		{
+			MetricType: "http",
+			Attributes: map[string]bool{
+				"http_resp_head": false,
+				"http_data":      false,
+				"http_time_cost": false,
+				"http_err_msg":   false,
+			},
+			Config: map[string]interface{}{
+				"http_datas": `[{"method":"GET", "url":"https://www.qiniu.com", "expect_code":200, "expect_data":"潘多拉"}]`,
+			},
+		},
+	}
+	rc3 := RunnerConfig{
+		RunnerInfo: RunnerInfo{
+			RunnerName:       runnerName,
+			CollectInterval:  60,
+			MaxBatchInterval: 60,
+			EnvTag:           runnerName,
+		},
+		MetricConfig: mc3,
+		SenderConfig: []conf.MapConf{{
+			"name":           "file_sender",
+			"sender_type":    "file",
+			"file_send_path": resvPath3,
+		}},
+	}
+	runnerConf3, err := jsoniter.Marshal(rc3)
+	if err != nil {
+		t.Fatalf("get runner config failed, error is %v", err)
+	}
+
+	// 更新
+	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName
+	respCode, respBody, err = makeRequest(url, http.MethodPut, runnerConf3)
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(3 * time.Second)
+
+	// 停止 runner
+	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName + "/stop"
+	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(2 * time.Second)
+
+	curLine = 0
+	f, err = os.Open(resvPath3)
+	assert.NoError(t, err)
+	br = bufio.NewReaderSize(f, bufSize)
+	result = make([]map[string]interface{}, 0)
+	for {
+		str, _, c := br.ReadLine()
+		if c == io.EOF {
+			f.Close()
+			break
+		}
+		curLine++
+		err = jsoniter.Unmarshal(str, &result)
+		if err != nil {
+			t.Fatalf("metricHttpTest error unmarshal %v curLine = %v %v", string(str), curLine, err)
+		}
+
+		assert.Equal(t, float64(200), result[0]["http__status_code_1"])
+		assert.Equal(t, "https://www.qiniu.com", result[0]["http__target_1"])
+		assert.Equal(t, float64(0), result[0]["http__err_state_1"])
+		assert.Equal(t, float64(0), result[0]["http__err_state_total"])
+		assert.Equal(t, "don't contain: 潘多拉", result[0]["http__err_msg_total"])
+	}
+}
+
+func TestSendType(t *testing.T) {
+	abc := make(map[string]string)
+	if abc["abc"] == "hello" {
+		t.Errorf("xx")
+	}
+	abc["type"] = "pandora"
+	if abc[KeySenderType] == TypePandora {
+		t.Errorf("type should equal")
 	}
 }

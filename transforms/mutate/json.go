@@ -4,64 +4,63 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
-
-	"github.com/json-iterator/go"
 )
 
 type Json struct {
-	Key      string `json:"key"`
-	New      string `json:"new"`
-	stats    utils.StatsInfo
+	OldKey   string `json:"key"`
+	NewKey   string `json:"newKey"`
+	stats    StatsInfo
 	jsonTool jsoniter.API
+	oldKeys  []string
+	newKeys  []string
+}
+
+func (g *Json) Init() error {
+	g.oldKeys = GetKeys(g.OldKey)
+	g.newKeys = GetKeys(g.NewKey)
+	return nil
 }
 
 func (g *Json) Transform(datas []Data) ([]Data, error) {
 	var err, ferr error
-	errCount := 0
-	keys := utils.GetKeys(g.Key)
-	news := utils.GetKeys(g.New)
-
+	errnums := 0
 	for i := range datas {
-		val, gerr := utils.GetMapValue(datas[i], keys...)
+		val, gerr := GetMapValue(datas[i], g.oldKeys...)
 		if gerr != nil {
-			errCount++
-			err = fmt.Errorf("transform key %v not exist in data", g.Key)
+			errnums++
+			err = fmt.Errorf("transform key %v not exist in data", g.OldKey)
 			continue
 		}
 		strval, ok := val.(string)
 		if !ok {
-			errCount++
-			err = fmt.Errorf("transform key %v data type is not string", g.Key)
+			errnums++
+			err = fmt.Errorf("transform key %v data type is not string", g.OldKey)
 			continue
 		}
 		jsonVal, perr := parseJson(g.jsonTool, strval)
 		if perr != nil {
-			errCount++
+			errnums++
 			err = perr
 			continue
 		}
-
-		if len(news) == 0 {
-			utils.DeleteMapValue(datas[i], keys...)
-			news = keys
-		}
-		serr := utils.SetMapValue(datas[i], jsonVal, false, news...)
-		if serr != nil {
-			errCount++
-			err = fmt.Errorf("the new key %v already exists ", g.New)
+		if len(g.newKeys) > 0 {
+			SetMapValue(datas[i], jsonVal, false, g.newKeys...)
+		} else {
+			for k, v := range jsonVal {
+				SetMapValue(datas[i], v, false, k)
+			}
 		}
 	}
-
 	if err != nil {
 		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform json, last error info is %v", errCount, err)
+		ferr = fmt.Errorf("find total %v erorrs in transform json, last error info is %v", errnums, err)
 	}
-	g.stats.Errors += int64(errCount)
-	g.stats.Success += int64(len(datas) - errCount)
+	g.stats.Errors += int64(errnums)
+	g.stats.Success += int64(len(datas) - errnums)
 	return datas, ferr
 }
 
@@ -69,7 +68,7 @@ func (g *Json) RawTransform(datas []string) ([]string, error) {
 	return datas, errors.New("json transformer not support rawTransform")
 }
 
-func parseJson(jsonTool jsoniter.API, jsonStr string) (data interface{}, err error) {
+func parseJson(jsonTool jsoniter.API, jsonStr string) (data map[string]interface{}, err error) {
 	err = jsonTool.Unmarshal([]byte(jsonStr), &data)
 	if err != nil {
 		err = fmt.Errorf("parse json str error %v, jsonStr is: %v", err, jsonStr)
@@ -91,7 +90,7 @@ func (g *Json) SampleConfig() string {
 	return `{
        "type":"json",
        "key":"myParseKey",
-       "new":"myNewKey"
+       "newKey":"myNewKey"
     }`
 }
 
@@ -99,7 +98,7 @@ func (g *Json) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
 		{
-			KeyName:      "new",
+			KeyName:      "newKey",
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
@@ -113,7 +112,7 @@ func (g *Json) Stage() string {
 	return transforms.StageAfterParser
 }
 
-func (g *Json) Stats() utils.StatsInfo {
+func (g *Json) Stats() StatsInfo {
 	return g.stats
 }
 

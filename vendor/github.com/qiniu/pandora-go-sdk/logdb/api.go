@@ -7,6 +7,13 @@ import (
 )
 
 func (c *Logdb) CreateRepo(input *CreateRepoInput) (err error) {
+	if input.FullText.Enabled {
+		for i, v := range input.Schema {
+			if v.ValueType == TypeString {
+				input.Schema[i].Analyzer = KeyWordAnalyzer
+			}
+		}
+	}
 	op := c.NewOperation(base.OpCreateRepo, input.RepoName)
 
 	req := c.newRequest(op, input.Token, nil)

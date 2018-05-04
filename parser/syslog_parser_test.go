@@ -1,12 +1,12 @@
 package parser
 
 import (
+	"fmt"
 	"testing"
 
-	"fmt"
-
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -61,7 +61,7 @@ func Test_SyslogParser(t *testing.T) {
 		`- BOM'su root' failed for lonvick on /dev/pts/8`,
 	}
 	dts, err := p.Parse(lines)
-	if st, ok := err.(*utils.StatsError); ok {
+	if st, ok := err.(*StatsError); ok {
 		err = st.ErrorDetail
 		assert.Equal(t, "", st.LastError, st.LastError)
 		assert.Equal(t, int64(0), st.Errors)
@@ -73,8 +73,8 @@ func Test_SyslogParser(t *testing.T) {
 	if len(dts) != 6 {
 		t.Fatalf("parse lines error expect 6 lines but got %v lines", len(dts))
 	}
-	ndata, err := p.Parse([]string{SyslogEofLine})
-	if st, ok := err.(*utils.StatsError); ok {
+	ndata, err := p.Parse([]string{PandoraParseFlushSignal})
+	if st, ok := err.(*StatsError); ok {
 		err = st.ErrorDetail
 		assert.Equal(t, "", st.LastError, st.LastError)
 		assert.Equal(t, int64(0), st.Errors)
@@ -123,7 +123,7 @@ func TestSyslogParser_NoPanic(t *testing.T) {
 		lenStr := len(str)
 		for j := 1; j <= lenStr; j++ {
 			dataLine[i] = str[:j]
-			dataLine[i+1] = SyslogEofLine
+			dataLine[i+1] = PandoraParseFlushSignal
 			p.Parse(dataLine)
 		}
 	}

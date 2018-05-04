@@ -4,17 +4,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/router"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
+
+	"strings"
 
 	"github.com/json-iterator/go"
 )
@@ -54,13 +55,11 @@ func RawData(readerConfig conf.MapConf) (rawData string, err error) {
 		}
 		return
 	}
-
-	return
 }
 
 //parse模块中各种type的日志都能获取解析后的数据
 func ParseData(parserConfig conf.MapConf) (parsedData []Data, err error) {
-	parserConfig = convertWebParserConfig(parserConfig)
+	parserConfig = parser.ConvertWebParserConfig(parserConfig)
 	if parserConfig == nil {
 		err = fmt.Errorf("parser config was empty after web config convet")
 		return
@@ -113,12 +112,12 @@ func TransformData(transformerConfig map[string]interface{}) ([]Data, error) {
 
 	// Transform data
 	transformedData, transErr := transformer.Transform(data)
-	se, ok := transErr.(*utils.StatsError)
+	se, ok := transErr.(*StatsError)
 	if ok {
 		transErr = se.ErrorDetail
 	}
 	if transErr != nil {
-		se, ok := transErr.(*utils.StatsError)
+		se, ok := transErr.(*StatsError)
 		if ok {
 			transErr = se.ErrorDetail
 		}
@@ -203,65 +202,70 @@ func getSenders(sendersConf []conf.MapConf) ([]sender.Sender, error) {
 	senders := make([]sender.Sender, 0)
 	sr := sender.NewSenderRegistry()
 	for i, senderConfig := range sendersConf {
-		senderConfig[sender.KeyFaultTolerant] = "false"
+		senderConfig[KeyFaultTolerant] = "false"
 		s, err := sr.NewSender(senderConfig, "")
 		if err != nil {
 			return nil, err
 		}
 		senders = append(senders, s)
-		delete(sendersConf[i], sender.InnerUserAgent)
+		delete(sendersConf[i], InnerUserAgent)
 	}
 	return senders, nil
 }
 
-func getRouter(senderConfig map[string]interface{}, senderCnt int) (*sender.Router, error) {
+func getRouter(senderConfig map[string]interface{}, senderCnt int) (*router.Router, error) {
 	routerConf, err := getRouterConfig(senderConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	router, err := sender.NewSenderRouter(routerConf, senderCnt)
+	router, err := router.NewSenderRouter(routerConf, senderCnt)
 	if err != nil {
 		return nil, fmt.Errorf("sender router error, %v", err)
 	}
 	return router, nil
 }
 
-func getRouterConfig(senderConfig map[string]interface{}) (sender.RouterConfig, error) {
+func getRouterConfig(senderConfig map[string]interface{}) (router.RouterConfig, error) {
 	config := senderConfig[KeyRouterConfig]
 	byteRouterConfig, err := jsoniter.Marshal(config)
 	if err != nil {
-		return sender.RouterConfig{}, err
+		return router.RouterConfig{}, err
 	}
 
-	var routerConfig sender.RouterConfig
+	var routerConfig router.RouterConfig
 	if jsonErr := jsoniter.Unmarshal(byteRouterConfig, &routerConfig); jsonErr != nil {
-		return sender.RouterConfig{}, jsonErr
+		return router.RouterConfig{}, jsonErr
 	}
 	return routerConfig, nil
 }
 
 // trySend 尝试发送数据，如果此时runner退出返回false，其他情况无论是达到最大重试次数还是发送成功，都返回true
-func trySend(s sender.Sender, datas []Data, times int) error {
+func trySend(s sender.Sender, datas []Data, times int) (err error) {
+	if times <= 0 {
+		times = DefaultTryTimes
+	}
 	if len(datas) <= 0 {
 		return nil
 	}
-	cnt := 1
+	cnt := 0
 	for {
-		err := s.Send(datas)
-		if se, ok := err.(*utils.StatsError); ok {
+		if cnt >= times {
+			break
+		}
+		err = s.Send(datas)
+		if se, ok := err.(*StatsError); ok {
 			err = se.ErrorDetail
 		}
 
 		if err != nil {
+			cnt++
 			se, ok := err.(*reqerr.SendError)
 			if ok {
 				datas = sender.ConvertDatas(se.GetFailDatas())
-				cnt++
 				continue
 			}
-			if times <= 0 || cnt < times {
-				cnt++
+			if cnt < times {
 				continue
 			}
 			err = fmt.Errorf("retry send %v times, but still error %v, discard datas %v ... total %v lines", cnt, err, datas, len(datas))
@@ -269,8 +273,7 @@ func trySend(s sender.Sender, datas []Data, times int) error {
 		}
 		break
 	}
-
-	return nil
+	return
 }
 
 func getSampleData(parserConfig conf.MapConf) ([]string, error) {
@@ -280,14 +283,17 @@ func getSampleData(parserConfig conf.MapConf) ([]string, error) {
 
 	switch parserType {
 	case parser.TypeCSV, parser.TypeJson, parser.TypeRaw, parser.TypeNginx, parser.TypeEmpty, parser.TypeKafkaRest, parser.TypeLogv1:
-		sampleData = strings.Split(rawData, "\n")
+		sampleData = append(sampleData, rawData)
 	case parser.TypeSyslog:
 		sampleData = strings.Split(rawData, "\n")
-		sampleData = append(sampleData, parser.SyslogEofLine)
+		sampleData = append(sampleData, parser.PandoraParseFlushSignal)
+	case parser.TypeMysqlLog:
+		sampleData = strings.Split(rawData, "\n")
+		sampleData = append(sampleData, parser.PandoraParseFlushSignal)
 	case parser.TypeGrok:
 		grokMode, _ := parserConfig.GetString(parser.KeyGrokMode)
 		if grokMode != parser.ModeMulti {
-			sampleData = strings.Split(rawData, "\n")
+			sampleData = append(sampleData, rawData)
 		} else {
 			sampleData = []string{rawData}
 		}
@@ -301,9 +307,9 @@ func getSampleData(parserConfig conf.MapConf) ([]string, error) {
 
 func checkSampleData(sampleData []string, logParser parser.LogParser) ([]string, error) {
 	if len(sampleData) <= 0 {
-		pt, ok := logParser.(parser.ParserType)
-		if ok && pt.Type() == parser.TypeSyslog {
-			sampleData = []string{parser.SyslogEofLine}
+		_, ok := logParser.(parser.Flushable)
+		if ok {
+			sampleData = []string{parser.PandoraParseFlushSignal}
 		} else {
 			err := fmt.Errorf("parser [%v] fetched 0 lines", logParser.Name())
 			return nil, err
@@ -313,7 +319,7 @@ func checkSampleData(sampleData []string, logParser parser.LogParser) ([]string,
 }
 
 func checkErr(err error, parserName string) error {
-	se, ok := err.(*utils.StatsError)
+	se, ok := err.(*StatsError)
 	var errorCnt int64
 	if ok {
 		errorCnt = se.Errors

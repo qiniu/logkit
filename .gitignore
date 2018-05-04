@@ -35,6 +35,7 @@ tests
 tests/meta_mock_csv
 .idea/
 .vscode/
+plugins
 
 # Architecture specific extensions/prefixes
 *.[568vq]
@@ -85,3 +86,24 @@ npm-debug.log*
 ./logkitweb/yarn-debug.log*
 ./logkitweb/yarn-error.log*
 logkit.log-*
+logkitweb/package-lock.json
+
+
+# virtualenv
+.venv
+venv/
+ENV/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+.Python
+
+# pyenv
+.python-version
+
+.metastore
+data/

@@ -12,7 +12,6 @@ import (
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/times"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 	"github.com/vjeantet/grok"
 )
@@ -148,7 +147,7 @@ func NewGrokParser(c conf.MapConf) (LogParser, error) {
 func (p *GrokParser) compile() error {
 	p.typeMap = make(map[string]map[string]string)
 	p.patterns = make(map[string]string)
-	gk, err := grok.NewWithConfig(&grok.Config{NamedCapturesOnly: true})
+	gk, err := grok.NewWithConfig(&grok.Config{NamedCapturesOnly: true, RemoveEmptyValues: true})
 	if err != nil {
 		return err
 	}
@@ -201,8 +200,12 @@ func (gp *GrokParser) Type() string {
 
 func (gp *GrokParser) Parse(lines []string) ([]Data, error) {
 	datas := []Data{}
-	se := &utils.StatsError{}
+	se := &StatsError{}
 	for idx, line := range lines {
+		//grok不应该踢出掉空格，因为grok的Pattern可能按照空格来配置，只需要判断是不是全空扔掉。
+		if len(strings.TrimSpace(line)) <= 0 {
+			continue
+		}
 		data, err := gp.parseLine(line)
 		if err != nil {
 			se.AddErrors()
@@ -237,6 +240,7 @@ func (p *GrokParser) parseLine(line string) (Data, error) {
 			log.Debugf("E! %v", err)
 			return nil, err
 		}
+		//此处匹配到就break的好处时匹配结果唯一，若要改为不break，那要考虑如果有多个串同时满足时，结果如何选取的问题，应该考虑优先选择匹配的结果多的数据。
 		if len(values) != 0 {
 			patternName = pattern
 			break

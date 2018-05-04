@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"reflect"
 	"strings"
 	"time"
-
-	"reflect"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base"
@@ -157,13 +156,25 @@ func (c *Pipeline) UpdateRepoWithTSDB(input *UpdateRepoInput, ex ExportDesc) err
 		}
 	}
 
+	hasDiff := false
 	for _, v := range input.Schema {
 		if input.IsTag(v.Key) {
+			if val, ok := newtags[v.Key]; ok && val == "#"+v.Key {
+				continue
+			}
 			newtags[v.Key] = "#" + v.Key
 		} else {
+			if val, ok := newfields[v.Key]; ok && val == "#"+v.Key {
+				continue
+			}
 			newfields[v.Key] = "#" + v.Key
 		}
+		hasDiff = true
 	}
+	if !hasDiff {
+		return nil
+	}
+
 	spec := &ExportTsdbSpec{DestRepoName: repoName, SeriesName: seriesName, Tags: newtags, Fields: newfields}
 
 	seriesUpdateExportToken, ok := input.Option.AutoExportTSDBTokens.UpdateExportToken[ex.Name]
@@ -179,6 +190,9 @@ func (c *Pipeline) UpdateRepoWithTSDB(input *UpdateRepoInput, ex ExportDesc) err
 	})
 	if reqerr.IsExportRemainUnchanged(err) {
 		err = nil
+	}
+	if err != nil {
+		log.Errorf("UpdateRepoWithTSDB update export err %v", err)
 	}
 	return err
 }
@@ -212,9 +226,39 @@ func (c *Pipeline) UpdateRepoWithLogDB(input *UpdateRepoInput, ex ExportDesc) er
 		RepoName:     repoName,
 		PandoraToken: input.Option.AutoExportLogDBTokens.GetLogDBRepoToken,
 	})
+	if reqerr.IsNoSuchResourceError(err) {
+		logdbschemas := convertSchema2LogDB(input.Schema, input.Option.AutoExportToLogDBInput.AnalyzerInfo)
+		rts := input.Option.AutoExportToLogDBInput.Retention
+		if rts == "" {
+			rts = "30d"
+		}
+		linput := &logdb.CreateRepoInput{
+			RepoName:     repoName,
+			Region:       input.Option.AutoExportToLogDBInput.Region,
+			Retention:    rts,
+			Schema:       logdbschemas,
+			PandoraToken: input.Option.AutoExportLogDBTokens.CreateLogDBRepoToken,
+		}
+		if input.Option.AutoExportToLogDBInput.AnalyzerInfo.FullText {
+			linput.FullText = logdb.NewFullText(logdb.StandardAnalyzer)
+		}
+		err = logdbAPI.CreateRepo(linput)
+		if err != nil && !reqerr.IsExistError(err) {
+			log.Error("UpdateRepoWithLogDB create logdb repo error", err)
+			return err
+		}
+		repoInfo, err = logdbAPI.GetRepo(&logdb.GetRepoInput{
+			RepoName:     repoName,
+			PandoraToken: input.Option.AutoExportLogDBTokens.GetLogDBRepoToken,
+		})
+	}
 	if err != nil {
+		log.Error("UpdateRepoWithLogDB get logdb repo error", err)
 		return err
 	}
+
+	hasDiff := false
+
 	analyzers := AnalyzerInfo{}
 	if input.Option != nil {
 		analyzers = input.Option.AutoExportToLogDBInput.AnalyzerInfo
@@ -226,14 +270,21 @@ func (c *Pipeline) UpdateRepoWithLogDB(input *UpdateRepoInput, ex ExportDesc) er
 				repoInfo.Schema = append(repoInfo.Schema, scs[0])
 			}
 			docs[v.Key] = "#" + v.Key
+			hasDiff = true
 		}
 	}
+	if !hasDiff {
+		// 对于没有变化的就不更新了
+		return nil
+	}
+
 	if err = logdbAPI.UpdateRepo(&logdb.UpdateRepoInput{
 		RepoName:     repoName,
 		Retention:    repoInfo.Retention,
 		Schema:       repoInfo.Schema,
 		PandoraToken: input.Option.AutoExportLogDBTokens.UpdateLogDBRepoToken,
 	}); err != nil {
+		log.Error("UpdateRepoWithLogDB update logdb repo error", err)
 		return err
 	}
 	spec := &ExportLogDBSpec{DestRepoName: repoName, Doc: docs}
@@ -245,6 +296,9 @@ func (c *Pipeline) UpdateRepoWithLogDB(input *UpdateRepoInput, ex ExportDesc) er
 	})
 	if reqerr.IsExportRemainUnchanged(err) {
 		err = nil
+	}
+	if err != nil {
+		log.Error("UpdateRepoWithLogDB update export error", err)
 	}
 	return err
 }
@@ -299,8 +353,16 @@ func (c *Pipeline) UpdateRepoWithKodo(input *UpdateRepoInput, ex ExportDesc) err
 		}
 	}
 
+	hasDiff := false
 	for _, v := range input.Schema {
+		if val, ok := newfields[v.Key]; ok && val == "#"+v.Key {
+			continue
+		}
 		newfields[v.Key] = "#" + v.Key
+		hasDiff = true
+	}
+	if !hasDiff {
+		return nil
 	}
 
 	spec := &ExportKodoSpec{
@@ -322,6 +384,9 @@ func (c *Pipeline) UpdateRepoWithKodo(input *UpdateRepoInput, ex ExportDesc) err
 	if reqerr.IsExportRemainUnchanged(err) {
 		err = nil
 	}
+	if err != nil {
+		log.Errorf("UpdateRepoWithKodo update export %v err: %v", spec, err)
+	}
 	return err
 }
 
@@ -331,6 +396,7 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 		return
 	}
 	if err = c.updateRepo(input); err != nil {
+		log.Error("update pipeline repo error", err)
 		return err
 	}
 	if input.Option == nil {
@@ -356,6 +422,7 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 		PandoraToken: listExportToken,
 	})
 	if err != nil {
+		log.Error("updateRepo list exports error", err)
 		return
 	}
 	exs := make(map[string]ExportDesc)
@@ -376,6 +443,26 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 		} else {
 			err = c.AutoExportToLogDB(&option.AutoExportToLogDBInput)
 			if err != nil {
+				log.Error("update repo and AutoExportToLogDB err: ", err)
+				return
+			}
+		}
+	}
+	if option.ToKODO {
+		ex, ok := exs[base.FormExportName(input.RepoName, ExportTypeKODO)]
+		if ok {
+			if ex.Type != ExportTypeKODO {
+				err = fmt.Errorf("export name is %v but type is %v not %v", ex.Name, ex.Type, ExportTypeKODO)
+				return
+			}
+			err = c.UpdateRepoWithKodo(input, ex)
+			if err != nil {
+				return
+			}
+		} else {
+			err = c.AutoExportToKODO(&option.AutoExportToKODOInput)
+			if err != nil {
+				log.Error("update repo and AutoExportToKODO err: ", err)
 				return
 			}
 		}
@@ -395,25 +482,7 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 		} else {
 			err = c.AutoExportToTSDB(&option.AutoExportToTSDBInput)
 			if err != nil {
-				return
-			}
-		}
-	}
-	if option.ToKODO {
-		ex, ok := exs[base.FormExportName(input.RepoName, ExportTypeKODO)]
-		if ok {
-			if ex.Type != ExportTypeKODO {
-				err = fmt.Errorf("export name is %v but type is %v not %v", ex.Name, ex.Type, ExportTypeKODO)
-				return
-			}
-			err = c.UpdateRepoWithKodo(input, ex)
-			if err != nil {
-				log.Error("UpdateRepoWithKodo err: ", input, ex, err)
-				return
-			}
-		} else {
-			err = c.AutoExportToKODO(&option.AutoExportToKODOInput)
-			if err != nil {
+				log.Error("update repo and AutoExportToTSDB err: ", err)
 				return
 			}
 		}
@@ -680,6 +749,9 @@ func (c *Pipeline) PostDataFromFile(input *PostDataFromFileInput) (err error) {
 	return req.Send()
 }
 
+// PostDataFromReader 直接把 reader作为 http 的 body 发送，没有处理用户的数据变为符合 pandora 打点协议的 bytes 过程，
+// 用户如果使用该接口，需要根据 pandora 打点协议将数据转换为bytes数据流，具体的转换方式见文档：
+// https://qiniu.github.io/pandora-docs/#/push_data_api
 func (c *Pipeline) PostDataFromReader(input *PostDataFromReaderInput) (err error) {
 	op := c.NewOperation(base.OpPostData, input.RepoName)
 
@@ -1143,7 +1215,7 @@ func (c *Pipeline) CreateForTSDB(input *CreateRepoForTSDBInput) error {
 		PandoraToken: input.CreateTSDBRepoToken,
 	})
 	if err != nil && !reqerr.IsExistError(err) {
-		log.Error("create repo error", err)
+		log.Error("create tsdb repo error", err)
 		return err
 	}
 	if input.SeriesName == "" {
@@ -1160,7 +1232,7 @@ func (c *Pipeline) CreateForTSDB(input *CreateRepoForTSDBInput) error {
 		PandoraToken: seriesToken,
 	})
 	if err != nil && !reqerr.IsExistError(err) {
-		log.Error("create series error", err)
+		log.Error("create tsdb series error", err)
 		return err
 	}
 	tsdbSpec := c.FormTSDBSpec(input)
@@ -1184,7 +1256,7 @@ func (c *Pipeline) CreateForTSDB(input *CreateRepoForTSDBInput) error {
 			PandoraToken: updateExportToken,
 		})
 		if err != nil {
-			log.Error("update Export error", err)
+			log.Error("update Export from pipeline error", err)
 		}
 	}
 	return err
@@ -1211,6 +1283,7 @@ func (c *Pipeline) CreateForMutiExportTSDB(input *CreateRepoForMutiExportTSDBInp
 		PandoraToken: input.CreateTSDBRepoToken,
 	})
 	if err != nil && !reqerr.IsExistError(err) {
+		log.Error("create tsdb repo error", err)
 		return err
 	}
 	for _, series := range input.SeriesMap {
@@ -1226,6 +1299,7 @@ func (c *Pipeline) CreateForMutiExportTSDB(input *CreateRepoForMutiExportTSDBInp
 			PandoraToken: seriesToken,
 		})
 		if err != nil && !reqerr.IsExistError(err) {
+			log.Error("create tsdb series error", err)
 			return err
 		}
 		tsdbSpec := c.FormMutiSeriesTSDBSpec(&CreateRepoForTSDBInput{
@@ -1260,9 +1334,11 @@ func (c *Pipeline) CreateForMutiExportTSDB(input *CreateRepoForMutiExportTSDBInp
 				PandoraToken: updateExportToken,
 			})
 			if err != nil {
+				log.Error("update export for tsdb error", err)
 				return err
 			}
 		} else if err != nil {
+			log.Error("create export for tsdb error", err)
 			return err
 		}
 	}

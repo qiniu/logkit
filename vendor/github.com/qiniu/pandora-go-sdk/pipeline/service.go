@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -74,8 +75,11 @@ func NewDefaultClient(c *config.Config) (p *Pipeline, err error) {
 			KeepAlive: 30 * time.Second,
 		}).Dial,
 		ResponseHeaderTimeout: c.ResponseTimeout,
+		TLSClientConfig:       &tls.Config{},
 	}
-
+	if c.AllowInsecureServer {
+		t.TLSClientConfig.InsecureSkipVerify = true
+	}
 	p = &Pipeline{
 		Config:        c,
 		HTTPClient:    &http.Client{Transport: t},

@@ -13,7 +13,6 @@ import (
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/times"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -110,8 +109,12 @@ func (p *NginxParser) Type() string {
 
 func (p *NginxParser) Parse(lines []string) ([]Data, error) {
 	var ret []Data
-	se := &utils.StatsError{}
+	se := &StatsError{}
 	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if len(line) <= 0 {
+			continue
+		}
 		data, err := p.parseline(line)
 		if err != nil {
 			se.ErrorDetail = err

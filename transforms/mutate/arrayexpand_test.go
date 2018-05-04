@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/stretchr/testify/assert"
@@ -47,7 +46,7 @@ func TestArrayExpand(t *testing.T) {
 		}
 	}
 	assert.Equal(t, ae.Stage(), transforms.StageAfterParser)
-	assert.Equal(t, utils.StatsInfo{Success: 2}, ae.stats)
+	assert.Equal(t, StatsInfo{Success: 2}, ae.stats)
 }
 
 func TestArrayExpandError(t *testing.T) {
@@ -83,7 +82,7 @@ func TestArrayExpandError(t *testing.T) {
 	}
 	ae.stats.LastError = ""
 	assert.Equal(t, ae.Stage(), transforms.StageAfterParser)
-	assert.Equal(t, utils.StatsInfo{Success: 1, Errors: 1}, ae.stats)
+	assert.Equal(t, StatsInfo{Success: 1, Errors: 1}, ae.stats)
 }
 
 func TestArrayExpandIgnore(t *testing.T) {
@@ -166,7 +165,7 @@ func TestArrayExpandIgnore(t *testing.T) {
 	}
 	ae.stats.LastError = ""
 	assert.Equal(t, ae.Stage(), transforms.StageAfterParser)
-	assert.Equal(t, utils.StatsInfo{Success: 3, Errors: 1}, ae.stats)
+	assert.Equal(t, StatsInfo{Success: 3, Errors: 1}, ae.stats)
 }
 
 func TestArrayExpandEveryType(t *testing.T) {
@@ -389,7 +388,7 @@ func TestArrayExpandEveryType(t *testing.T) {
 	}
 	ae.stats.LastError = ""
 	assert.Equal(t, ae.Stage(), transforms.StageAfterParser)
-	assert.Equal(t, utils.StatsInfo{Success: 22, Errors: 1}, ae.stats)
+	assert.Equal(t, StatsInfo{Success: 22, Errors: 1}, ae.stats)
 }
 
 func TestArrayExpandMultiKey(t *testing.T) {
@@ -433,5 +432,5 @@ func TestArrayExpandMultiKey(t *testing.T) {
 		}
 	}
 	assert.Equal(t, ae.Stage(), transforms.StageAfterParser)
-	assert.Equal(t, utils.StatsInfo{Success: 2}, ae.stats)
+	assert.Equal(t, StatsInfo{Success: 2}, ae.stats)
 }

@@ -2,14 +2,22 @@ package reader
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 )
 
-func NewFileAutoReader(conf conf.MapConf, meta *Meta, isFromWeb bool, bufSize int, whence string, path string, fr FileReader) (reader Reader, err error) {
+func NewFileAutoReader(meta *Meta, conf conf.MapConf) (reader Reader, err error) {
+
+	path, err := conf.GetString(KeyLogPath)
+	if err != nil {
+		return
+	}
 	logpath, mode, errStat := matchMode(path)
 	if errStat != nil {
 		err = errStat
@@ -17,26 +25,11 @@ func NewFileAutoReader(conf conf.MapConf, meta *Meta, isFromWeb bool, bufSize in
 	}
 	switch mode {
 	case ModeTailx:
-		expireDur, _ := conf.GetStringOr(KeyExpire, "24h")
-		stateIntervalDur, _ := conf.GetStringOr(KeyStatInterval, "3m")
-		maxOpenFiles, _ := conf.GetIntOr(KeyMaxOpenFiles, 256)
-		reader, err = NewMultiReader(meta, logpath, whence, expireDur, stateIntervalDur, maxOpenFiles)
+		reader, err = NewMultiReader(meta, conf)
 	case ModeDir:
-		ignoreHidden, _ := conf.GetBoolOr(KeyIgnoreHiddenFile, true)
-		ignoreFileSuffix, _ := conf.GetStringListOr(KeyIgnoreFileSuffix, defaultIgnoreFileSuffix)
-		validFilesRegex, _ := conf.GetStringOr(KeyValidFilePattern, "*")
-		fr, err = NewSeqFile(meta, logpath, ignoreHidden, ignoreFileSuffix, validFilesRegex, whence)
-		if err != nil {
-			return
-		}
-		reader, err = NewReaderSize(fr, meta, bufSize)
+		reader, err = NewFileDirReader(meta, conf)
 	case ModeFile:
-		meta.mode = ModeFile
-		fr, err = NewSingleFile(meta, logpath, whence, isFromWeb)
-		if err != nil {
-			return
-		}
-		reader, err = NewReaderSize(fr, meta, bufSize)
+		reader, err = NewSingleFileReader(meta, conf)
 	default:
 		err = fmt.Errorf("can not find property mode for this logpath %v", logpath)
 	}
@@ -44,8 +37,6 @@ func NewFileAutoReader(conf conf.MapConf, meta *Meta, isFromWeb bool, bufSize in
 }
 
 func matchMode(logpath string) (path, mode string, err error) {
-	// for example: The path is "/usr/logkit/" or "F:\\user\\logkit\\" after==""
-	// for example: The path is "/usr/logkit" or "F:\\user\\logkit"after==logkit
 	_, after := filepath.Split(logpath)
 	if after == "" {
 		logpath = filepath.Dir(logpath)
@@ -63,10 +54,27 @@ func matchMode(logpath string) (path, mode string, err error) {
 		return
 	}
 	if fileInfo.IsDir() == true {
-		mode = ModeTailx
-		path = filepath.Join(path, "*")
+		if shoudUseModeDir(path) {
+			mode = ModeDir
+		} else {
+			mode = ModeTailx
+			path = filepath.Join(path, "*")
+		}
 		return
 	}
-	mode = ModeFile
 	return
+}
+
+func shoudUseModeDir(logpath string) bool {
+	files, err := ioutil.ReadDir(logpath)
+	if err != nil {
+		log.Warn("read dir %v error %v", logpath, err)
+		return true
+	}
+	for _, f := range files {
+		if f.ModTime().Add(24 * time.Hour).Before(time.Now()) {
+			return true
+		}
+	}
+	return false
 }

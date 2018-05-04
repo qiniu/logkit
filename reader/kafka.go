@@ -9,10 +9,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Shopify/sarama"
 	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/utils"
-	"github.com/qiniu/logkit/utils/models"
+	. "github.com/qiniu/logkit/utils/models"
+
+	"github.com/Shopify/sarama"
+	"github.com/qiniu/logkit/conf"
 	"github.com/wvanbergen/kafka/consumergroup"
 )
 
@@ -38,12 +39,28 @@ type KafkaReader struct {
 	started  bool
 
 	curOffsets map[string]map[int32]int64
-	stats      utils.StatsInfo
+	stats      StatsInfo
 	statsLock  *sync.RWMutex
 }
 
-func NewKafkaReader(meta *Meta, consumerGroup string,
-	topics []string, zookeeper []string, zkchroot string, zookeeperTimeout time.Duration, whence string) (kr *KafkaReader, err error) {
+func NewKafkaReader(meta *Meta, conf conf.MapConf) (kr Reader, err error) {
+
+	whence, _ := conf.GetStringOr(KeyWhence, WhenceOldest)
+	consumerGroup, err := conf.GetString(KeyKafkaGroupID)
+	if err != nil {
+		return nil, err
+	}
+	topics, err := conf.GetStringList(KeyKafkaTopic)
+	if err != nil {
+		return nil, err
+	}
+	zookeeperTimeout, _ := conf.GetIntOr(KeyKafkaZookeeperTimeout, 1)
+
+	zookeeper, err := conf.GetStringList(KeyKafkaZookeeper)
+	if err != nil {
+		return nil, err
+	}
+	zkchroot, _ := conf.GetStringOr(KeyKafkaZookeeperChroot, "")
 	offsets := make(map[string]map[int32]int64)
 	for _, v := range topics {
 		offsets[v] = make(map[int32]int64)
@@ -52,7 +69,7 @@ func NewKafkaReader(meta *Meta, consumerGroup string,
 		meta:             meta,
 		ConsumerGroup:    consumerGroup,
 		ZookeeperPeers:   zookeeper,
-		ZookeeperTimeout: zookeeperTimeout,
+		ZookeeperTimeout: time.Duration(zookeeperTimeout) * time.Second,
 		ZookeeperChroot:  zkchroot,
 		Topics:           topics,
 		Whence:           whence,
@@ -72,7 +89,7 @@ func (kr *KafkaReader) Name() string {
 	return fmt.Sprintf("KafkaReader:[%s],[%s]", strings.Join(kr.Topics, ","), kr.ConsumerGroup)
 }
 
-func (kr *KafkaReader) Status() utils.StatsInfo {
+func (kr *KafkaReader) Status() StatsInfo {
 	kr.statsLock.RLock()
 	defer kr.statsLock.RUnlock()
 	return kr.stats
@@ -81,6 +98,7 @@ func (kr *KafkaReader) Status() utils.StatsInfo {
 func (kr *KafkaReader) setStatsError(err string) {
 	kr.statsLock.Lock()
 	defer kr.statsLock.Unlock()
+	kr.stats.Errors++
 	kr.stats.LastError = err
 }
 
@@ -221,9 +239,12 @@ func (kr *KafkaReader) SetMode(mode string, v interface{}) error {
 	return errors.New("KafkaReader not support read mode")
 }
 
-func (kr *KafkaReader) Lag() (rl *models.LagInfo, err error) {
+func (kr *KafkaReader) Lag() (rl *LagInfo, err error) {
+	if kr.Consumer == nil {
+		return nil, errors.New("kafka consumer is closed")
+	}
 	marks := kr.Consumer.HighWaterMarks()
-	rl = &models.LagInfo{
+	rl = &LagInfo{
 		SizeUnit: "records",
 		Size:     0,
 	}

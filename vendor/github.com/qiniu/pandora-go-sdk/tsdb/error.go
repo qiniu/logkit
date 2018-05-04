@@ -16,6 +16,7 @@ func (e errBuilder) Build(msg, text, reqId string, code int) error {
 	if len(msg) <= errCodePrefixLen {
 		return err
 	}
+	err.Component = "tsdb"
 	errId := msg[:errCodePrefixLen]
 
 	switch errId {

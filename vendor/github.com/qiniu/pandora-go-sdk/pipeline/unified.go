@@ -125,12 +125,16 @@ func convertCreate2LogDB(input *CreateRepoForLogDBInput) *logdb.CreateRepoInput 
 	if input.LogRepoName == "" {
 		input.LogRepoName = input.RepoName
 	}
-	return &logdb.CreateRepoInput{
+	linput := &logdb.CreateRepoInput{
 		Region:    input.Region,
 		RepoName:  input.LogRepoName,
 		Schema:    convertSchema2LogDB(input.Schema, input.AnalyzerInfo),
 		Retention: input.Retention,
 	}
+	if input.AnalyzerInfo.FullText {
+		linput.FullText = logdb.NewFullText(logdb.StandardAnalyzer)
+	}
+	return linput
 }
 
 func convertSchema2LogDB(scs []RepoSchemaEntry, analyzer AnalyzerInfo) (ret []logdb.RepoSchemaEntry) {
@@ -150,7 +154,7 @@ func convertSchema2LogDB(scs []RepoSchemaEntry, analyzer AnalyzerInfo) (ret []lo
 		if v.ValueType == PandoraTypeArray {
 			rp.ValueType = v.ElemType
 		}
-		if v.ValueType == PandoraTypeString {
+		if v.ValueType == PandoraTypeString && !analyzer.FullText {
 			// 当 analyzer.Analyzer 这个 map 中有明确的字段分词类型时，按照 map 中的分词类型设置
 			// 否则当 analyzer.Default 不为空时，按照 default 值设置分词类型
 			// 上述两个条件都不符合时，按照标准分词设置
@@ -208,6 +212,7 @@ func (c *Pipeline) AutoExportToTSDB(input *AutoExportToTSDBInput) error {
 		PandoraToken: input.PipelineGetRepoToken,
 	})
 	if err != nil {
+		log.Error("AutoExportToTSDB get repo from pipeline error", err)
 		return err
 	}
 	tags := make([]string, 0)
@@ -216,7 +221,7 @@ func (c *Pipeline) AutoExportToTSDB(input *AutoExportToTSDBInput) error {
 	}
 
 	if !input.IsMetric {
-		err = c.CreateForTSDB(&CreateRepoForTSDBInput{
+		return c.CreateForTSDB(&CreateRepoForTSDBInput{
 			Tags:                 tags,
 			RepoName:             input.RepoName,
 			TSDBRepoName:         input.TSDBRepoName,
@@ -229,10 +234,6 @@ func (c *Pipeline) AutoExportToTSDB(input *AutoExportToTSDBInput) error {
 			Timestamp:            input.Timestamp,
 			AutoExportTSDBTokens: input.AutoExportTSDBTokens,
 		})
-		if err != nil {
-			log.Error("create tsdb error", err)
-			return err
-		}
 	}
 
 	// 获取字段，并根据 seriesTag 中的 key 拿到series name
@@ -305,13 +306,17 @@ func (c *Pipeline) AutoExportToLogDB(input *AutoExportToLogDBInput) error {
 		PandoraToken: input.GetLogDBRepoToken,
 	})
 	if reqerr.IsNoSuchResourceError(err) {
-		err = logdbapi.CreateRepo(&logdb.CreateRepoInput{
+		linput := &logdb.CreateRepoInput{
 			RepoName:     input.LogRepoName,
 			Region:       repoInfo.Region,
 			Retention:    input.Retention,
 			Schema:       logdbschemas,
 			PandoraToken: input.CreateLogDBRepoToken,
-		})
+		}
+		if input.AnalyzerInfo.FullText {
+			linput.FullText = logdb.NewFullText(logdb.StandardAnalyzer)
+		}
+		err = logdbapi.CreateRepo(linput)
 		if err != nil && !reqerr.IsExistError(err) {
 			log.Error("AutoExportToLogDB create logdb repo error", err)
 			return err
@@ -357,9 +362,15 @@ func (c *Pipeline) AutoExportToLogDB(input *AutoExportToLogDBInput) error {
 		})
 		exportInput := c.FormExportInput(input.RepoName, ExportTypeLogDB, logDBSpec)
 		exportInput.PandoraToken = input.CreateExportToken
-		return c.CreateExport(exportInput)
+		if err = c.CreateExport(exportInput); err != nil && reqerr.IsExistError(err) {
+			err = nil
+		} else if err != nil {
+			log.Error("AutoExportToLogDB get export error", err)
+		}
 	}
-	log.Error("AutoExportToLogDB get export error", err)
+	if err != nil {
+		log.Error("AutoExportToLogDB get export error", err)
+	}
 	return err
 }
 
@@ -378,6 +389,7 @@ func (c *Pipeline) AutoExportToKODO(input *AutoExportToKODOInput) error {
 		PandoraToken: input.PipelineGetRepoToken,
 	})
 	if err != nil {
+		log.Error("AutoExportToKodo GetRepo from pipeline error", err)
 		return err
 	}
 
@@ -409,7 +421,15 @@ func (c *Pipeline) AutoExportToKODO(input *AutoExportToKODOInput) error {
 		})
 		exportInput := c.FormExportInput(input.RepoName, ExportTypeKODO, kodoSpec)
 		exportInput.PandoraToken = input.CreateExportToken
-		return c.CreateExport(exportInput)
+		if err = c.CreateExport(exportInput); err != nil && reqerr.IsExistError(err) {
+			err = nil
+		} else if err != nil {
+			log.Error("AutoExportToKodo create export error", err)
+			return err
+		}
+	}
+	if err != nil {
+		log.Error("AutoExportToKodo get export error", err)
 	}
 	return err
 }

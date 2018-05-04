@@ -90,9 +90,6 @@ func TestStrToTime2(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	fmt.Println(tm.String())
-	nt := tm.Format(time.RFC3339)
-	fmt.Println(nt)
 	testcase = "2017-06-05T21:00:18+08:00"
 	tm, err = StrToTime(testcase)
 	if err != nil {

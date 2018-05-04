@@ -125,13 +125,7 @@ func (s *systemPS) NetConnections() ([]net.ConnectionStat, error) {
 }
 
 func (s *systemPS) DiskIO(names []string) (map[string]disk.IOCountersStat, error) {
-	m, err := disk.IOCounters(names...)
-	/*
-		if err == internal.NotImplementedError {
-			return nil, nil
-		}
-	*/
-	return m, err
+	return disk.IOCounters(names...)
 }
 
 func (s *systemPS) VMStat() (*mem.VirtualMemoryStat, error) {

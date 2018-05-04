@@ -1,20 +1,19 @@
 package sender
 
 import (
-	"os"
-
 	"github.com/qiniu/logkit/conf"
 	. "github.com/qiniu/logkit/utils/models"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
 	"github.com/json-iterator/go"
+	"github.com/utahta/go-cronowriter"
 )
 
 // FileSender write datas into local file
 // only for test
 type FileSender struct {
 	name        string
-	file        *os.File
+	writer      *cronowriter.CronoWriter
 	marshalFunc func([]Data) ([]byte, error)
 }
 
@@ -39,13 +38,13 @@ func NewFileSender(conf conf.MapConf) (sender Sender, err error) {
 }
 
 func newFileSender(name, path string, marshalFunc func([]Data) ([]byte, error)) (*FileSender, error) {
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, DefaultFilePerm)
+	f, err := cronowriter.New(path)
 	if err != nil {
 		return nil, err
 	}
 	return &FileSender{
 		name:        name,
-		file:        f,
+		writer:      f,
 		marshalFunc: marshalFunc,
 	}, nil
 }
@@ -56,7 +55,7 @@ func (fs *FileSender) Send(datas []Data) error {
 	if err != nil {
 		return reqerr.NewSendError(fs.Name()+" Cannot marshal data into file, error is "+err.Error(), ConvertDatasBack(datas), reqerr.TypeDefault)
 	}
-	_, err = fs.file.Write(bytes)
+	_, err = fs.writer.Write(bytes)
 	if err != nil {
 		return reqerr.NewSendError(fs.Name()+"Cannot write data into file, error is "+err.Error(), ConvertDatasBack(datas), reqerr.TypeDefault)
 	}
@@ -68,7 +67,7 @@ func (fs *FileSender) Name() string {
 }
 
 func (fs *FileSender) Close() error {
-	return fs.file.Close()
+	return fs.writer.Close()
 }
 
 // JSONLineMarshalFunc  将数据json并且按换行符分隔
