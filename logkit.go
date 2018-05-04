@@ -23,6 +23,7 @@ import (
 	"github.com/qiniu/log"
 
 	"github.com/labstack/echo"
+	"github.com/qiniu/logkit/plugin"
 )
 
 //Config of logkit
@@ -39,6 +40,7 @@ type Config struct {
 	CleanSelfLogCnt  int      `json:"clean_self_cnt"`
 	StaticRootPath   string   `json:"static_root_path"`
 	mgr.ManagerConfig
+	Plugin plugin.Config `json:"plugin"`
 }
 
 var conf Config
@@ -237,6 +239,17 @@ func main() {
 	if err := config.LoadEx(&conf, *confName); err != nil {
 		log.Fatal("config.Load failed:", err)
 	}
+
+	//plugin配置
+	plugin.Conf = &conf.Plugin
+	//同步本地插件
+	if plugin.Conf.Enabled == true {
+		err := plugin.SyncPlugins()
+		if err != nil {
+			log.Fatal("sync plugin failed:", err)
+		}
+	}
+
 	if conf.TimeLayouts != nil {
 		times.AddLayout(conf.TimeLayouts)
 	}
