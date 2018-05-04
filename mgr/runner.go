@@ -104,6 +104,8 @@ func NewCustomRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *
 	}
 	if rc.MetricConfig != nil {
 		return NewMetricRunner(rc, sr)
+	} else if rc.PluginConfig != nil {
+		return NewPluginRunner(rc, sr)
 	}
 	return NewLogExportRunner(rc, cleanChan, rr, ps, sr)
 }
@@ -505,13 +507,9 @@ func (r *LogExportRunner) Run() {
 			err = se.ErrorDetail
 			r.rs.ParserStats.Errors += se.Errors
 			r.rs.ParserStats.Success += se.Success
-			if err != nil {
-				r.rs.ParserStats.LastError = err.Error()
-			}
 		} else if err != nil {
 			errorCnt = 1
 			r.rs.ParserStats.Errors++
-			r.rs.ParserStats.LastError = err.Error()
 		} else {
 			r.rs.ParserStats.Success++
 		}
@@ -809,10 +807,7 @@ func (r *LogExportRunner) Status() RunnerStatus {
 		}
 		r.rs.TransformStats[ttp] = newtsts
 	}
-	if str, ok := r.reader.(reader.StatsReader); ok {
-		r.rs.ReaderStats = str.Status()
-		r.rs.ReaderStats.Success = r.rs.ReadDataCount
-	}
+
 	/*
 		此处先不用reader的status, Run函数本身对这个ReaderStats赋值
 		if str, ok := r.reader.(reader.StatsReader); ok {

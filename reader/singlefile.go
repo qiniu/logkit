@@ -333,7 +333,8 @@ func (sf *SingleFile) Lag() (rl *LagInfo, err error) {
 	sf.mux.Unlock()
 
 	fi, err := os.Stat(sf.originpath)
-	if err != nil {
+	if os.IsNotExist(err) {
+		rl.Size = 0
 		return
 	}
 	rl.Size += fi.Size()

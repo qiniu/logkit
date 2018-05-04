@@ -1,167 +1,109 @@
 package mutate
 
 import (
-	. "github.com/qiniu/logkit/utils/models"
-	"github.com/stretchr/testify/assert"
+	"os"
 	"testing"
+
+	. "github.com/qiniu/logkit/utils/models"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestScriptTransformer(t *testing.T) {
-	g1 := &Script{
-		//OldKey: "key",
-		//NewKey: "key",
-		Script: `
-		var i = 0;
-		while (true) {
-        	// Loop forever
-    	}`,
+	scriptConf := &Script{
+		Key:          "myscript",
+		New:          "myscript",
+		Interprepter: "bash",
 	}
-	g1.Init()
-	datas1, err1 := g1.Transform(getTestData())
-	assert.Error(t, err1)
-	assert.Equal(t, getTestData(), datas1)
+	scriptConf.Init()
+	fileName := os.TempDir() + "/scriptFile.sh"
+	//create file & write file
+	createTestFile(fileName, "echo \"Hello World!\"")
+	defer os.RemoveAll(fileName)
 
-	g2 := &Script{
-		OldKey: "logLevel",
-		NewKey: "logLevel",
-		Script: `
-			switch (logLevel) {
-			case "i" :
-				logLevel = "info";
-				break;
-			case "d" :
-				logLevel = "debug";
-				break;
-			case "w" :
-				logLevel = "warn";
-				break;
-			case "e" :
-				logLevel = "error";
-				break;
-    		}
-		`,
+	data := []Data{{"key1": "value1", "myscript": fileName}, {"key2": "value2", "myscript": fileName}}
+	res, err := scriptConf.Transform(data)
+	assert.NoError(t, err)
+	exp := []Data{{"key1": "value1", "myscript": "Hello World!\n"}, {"key2": "value2", "myscript": "Hello World!\n"}}
+	assert.Equal(t, exp, res)
+
+	scriptConf2 := &Script{
+		Key:          "myscript",
+		Interprepter: "bash",
 	}
-	g2.Init()
-	datas2, err2 := g2.Transform(getTestData())
+	scriptConf2.Init()
+	data2 := []Data{{"key1": "value1", "myscript": fileName}}
+	res2, err2 := scriptConf2.Transform(data2)
 	assert.NoError(t, err2)
-	assert.Equal(t, []Data{
-		map[string]interface{}{
-			"logLevel": "warn",
-			"method":   "POST",
-		},
-		map[string]interface{}{
-			"logLevel": "info",
-			"method":   "GET",
-		}}, datas2)
+	exp2 := []Data{{"key1": "value1", "myscript": "Hello World!\n"}}
+	assert.Equal(t, exp2, res2)
 
-	g3 := &Script{
-		OldKey: "logLevel:l",
-		NewKey: "logLevel:l",
-		Script: `
-			switch (l) {
-			case "i" :
-				l = "info";
-				break;
-			case "d" :
-				l = "debug";
-				break;
-			case "w" :
-				l = "warn";
-				break;
-			case "e" :
-				l = "error";
-				break;
-    		}
-		`,
+	scriptConf3 := &Script{
+		Key:          "myscript",
+		New:          "newKey",
+		Interprepter: "bash",
 	}
-	g3.Init()
-	datas3, err3 := g3.Transform(getTestData())
+	scriptConf3.Init()
+	data3 := []Data{{"key1": "value1", "myscript": fileName}, {"key2": "value2", "myscript": fileName}}
+	res3, err3 := scriptConf3.Transform(data3)
 	assert.NoError(t, err3)
-	assert.Equal(t, []Data{
-		map[string]interface{}{
-			"logLevel": "warn",
-			"method":   "POST",
-		},
-		map[string]interface{}{
-			"logLevel": "info",
-			"method":   "GET",
-		}}, datas3)
+	exp3 := []Data{{"key1": "value1", "myscript": fileName, "newKey": "Hello World!\n"}, {"key2": "value2", "myscript": fileName, "newKey": "Hello World!\n"}}
+	assert.Equal(t, exp3, res3)
 
-	g4 := &Script{
-		OldKey: "logLevel:l",
-		NewKey: "logLevel:l, method:m",
-		Script: `
-			switch (l) {
-			case "i" :
-				l = "info";
-				break;
-			case "d" :
-				l = "debug";
-				break;
-			case "w" :
-				l = "warn";
-				break;
-			case "e" :
-				l = "error";
-				break;
-    		}
-		m = "delete";
-		`,
+	scriptConf4 := &Script{
+		Key:          "myscript...",
+		New:          "newKey...",
+		Interprepter: "bash",
 	}
-	g4.Init()
-	datas4, err4 := g4.Transform(getTestData())
+	scriptConf4.Init()
+	data4 := []Data{{"key1": "value1", "myscript": fileName}}
+	res4, err4 := scriptConf4.Transform(data4)
 	assert.NoError(t, err4)
-	assert.Equal(t, []Data{
-		map[string]interface{}{
-			"logLevel": "warn",
-			"method":   "delete",
-		},
-		map[string]interface{}{
-			"logLevel": "info",
-			"method":   "delete",
-		}}, datas4)
+	exp4 := []Data{{"key1": "value1", "myscript": fileName, "newKey": "Hello World!\n"}}
+	assert.Equal(t, exp4, res4)
 
-	g5 := &Script{
-		OldKey:    "logLevel",
-		NewKey:    "",
-		Script:    ``,
-		DeleteOld: true,
+	scriptConf5 := &Script{
+		Key:          "myscript...",
+		Interprepter: "bash",
+		ScriptPath:   fileName,
 	}
-	g5.Init()
-	datas5, err5 := g5.Transform(getTestData())
+	scriptConf5.Init()
+	data5 := []Data{{"key1": "value1", "myscript": "fileName"}}
+	res5, err5 := scriptConf5.Transform(data5)
 	assert.NoError(t, err5)
-	assert.Equal(t, datas5, []Data{
-		map[string]interface{}{
-			"method": "POST",
-		},
-		map[string]interface{}{
-			"method": "GET",
-		},
-	})
+	exp5 := []Data{{"key1": "value1", "myscript": "Hello World!\n"}}
+	assert.Equal(t, exp5, res5)
 
-	g6 := &Script{
-		OldKey:    "logLevel",
-		NewKey:    "logLevel",
-		Script:    ``,
-		DeleteOld: true,
+	scriptConf6 := &Script{
+		Key:          "myscript...",
+		Interprepter: "bash",
+		Script:       []byte("echo \"hello\""),
 	}
-	g6.Init()
-	datas6, err6 := g6.Transform(getTestData())
+	scriptConf6.Init()
+	data6 := []Data{{"key1": "value1", "myscript": fileName}}
+	res6, err6 := scriptConf6.Transform(data6)
 	assert.NoError(t, err6)
-	assert.Equal(t, datas6, getTestData())
+	exp6 := []Data{{"key1": "value1", "myscript": "hello\n"}}
+	assert.Equal(t, exp6, res6)
 
+	scriptConf7 := &Script{
+		Key:          "myscript...",
+		Interprepter: "bash",
+		ScriptPath:   fileName,
+		Script:       []byte("echo hello"),
+	}
+	scriptConf7.Init()
+	data7 := []Data{{"key1": "value1", "myscript": "fileName"}}
+	res7, err7 := scriptConf7.Transform(data7)
+	assert.NoError(t, err7)
+	exp7 := []Data{{"key1": "value1", "myscript": "hello\n"}}
+	assert.Equal(t, exp7, res7)
+	os.RemoveAll("transformer_scripts")
 }
 
-func getTestData() []Data {
-	testData := []Data{
-		map[string]interface{}{
-			"logLevel": "w",
-			"method":   "POST",
-		},
-		map[string]interface{}{
-			"logLevel": "i",
-			"method":   "GET",
-		},
-	}
-	return testData
+func createTestFile(fileName string, content string) {
+	f, _ := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, DefaultFilePerm)
+	f.WriteString(content)
+	f.Sync()
+	f.Close()
 }

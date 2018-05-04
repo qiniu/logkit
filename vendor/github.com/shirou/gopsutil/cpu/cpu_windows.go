@@ -86,6 +86,22 @@ func Info() ([]InfoStat, error) {
 	return InfoWithContext(context.Background())
 }
 
+func LoadPercentage() (uint16, error) {
+	var dst []Win32_Processor
+	var lp uint16
+	q := wmi.CreateQuery(&dst, "")
+	if err := common.WMIQueryWithContext(context.Background(), q, &dst); err != nil {
+		return lp, err
+	}
+	if len(dst) > 0 {
+		for _, d := range dst {
+			lp = lp + *d.LoadPercentage
+		}
+		return lp, nil
+	}
+	return lp, fmt.Errorf("No Processor LoadPercentage Found.")
+}
+
 func InfoWithContext(ctx context.Context) ([]InfoStat, error) {
 	var ret []InfoStat
 	var dst []Win32_Processor

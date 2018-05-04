@@ -476,6 +476,10 @@ func (sf *SeqFile) Lag() (rl *LagInfo, err error) {
 	rl = &LagInfo{Size: -sf.offset}
 	logReading := filepath.Base(sf.currFile)
 	sf.mux.Unlock()
+	_, err = os.Stat(sf.currFile)
+	if os.IsNotExist(err) {
+		rl.Size = 0
+	}
 
 	logs, err := ReadDirByTime(sf.dir)
 	if err != nil {

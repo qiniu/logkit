@@ -47,22 +47,22 @@ func Test_Read(t *testing.T) {
 		t.Errorf("current file should be f3: but is %v", sf.currFile)
 	}
 	n, err = sf.Read(buffer)
-	if n != 4 {
-		t.Error("return value must be buffer len 4")
+	if n != 5 {
+		t.Error("return value must be buffer len 5")
 	}
 	if err != nil {
-		//t.Error(err)
+		t.Error(err)
 	}
-	if sf.currFile != filepath.Join(sf.dir, "f3") {
-		t.Errorf("current file should be f3, but is %v", sf.currFile)
+	if sf.currFile != filepath.Join(sf.dir, "f2") {
+		t.Errorf("current file should be f2, but is %v", sf.currFile)
 	}
-	if buffer[4] != '2' {
-		//t.Error("the last character should be '2'")
+	if buffer[4] != '1' {
+		t.Error("the last character should be '1'")
 	}
 	donefile := sf.meta.DoneFile()
 	f, err := os.Open(donefile)
 	if err != nil {
-		//t.Error(err)
+		t.Error(err)
 	}
 	defer f.Close()
 
@@ -71,13 +71,13 @@ func Test_Read(t *testing.T) {
 	for scanner.Scan() {
 		lines = append(lines, scanner.Text())
 	}
-	if len(lines) != 3 {
-		//t.Errorf("done files should be 3, but get %v", len(files))
+	if len(lines) != 1 {
+		t.Errorf("done files should be 1, but get %v", len(files))
 	}
-	/*err = scanner.Err()
+	err = scanner.Err()
 	if err != nil {
 		t.Error(err)
-	}*/
+	}
 
 	createPidFile()
 	createHiddenFile()
@@ -200,16 +200,16 @@ func Test_ReadWhenDelete(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	//os.Remove(filepath.Join(dir, "f3"))
+	os.Remove(filepath.Join(dir, "f3"))
 	_, err = sf.Read(buffer)
 	if err != nil {
-		//t.Error(err)
+		t.Error(err)
 	}
 	fi, err := os.Stat(sf.currFile)
 	if err != nil {
-		//t.Error(err)
+		t.Error(err)
 	}
-	assert.Equal(t, fi.Name(), "f3")
+	assert.Equal(t, fi.Name(), "f2")
 }
 
 func Test_ReadNewest(t *testing.T) {
@@ -293,4 +293,34 @@ func Test_SeekUnreachable(t *testing.T) {
 	fmt.Println("x1", x1)
 	st, err := f.Stat()
 	fmt.Println(st.Size())
+}
+
+func TestLag(t *testing.T) {
+	createDir()
+	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, "", defautFileRetention)
+	if err != nil {
+		t.Error(err)
+	}
+	createQiniuLogFile(dir)
+	createInvalidSuffixFile(dir)
+	defer destroyFile()
+
+	sf, err := NewSeqFile(meta, dir, false, false, []string{".pid"}, `logkit.log-*`, WhenceOldest)
+	if err != nil {
+		t.Error(err)
+	}
+	buffer := make([]byte, 8)
+	_, err = sf.Read(buffer)
+	if err != nil {
+		t.Error(err)
+	}
+	if string(buffer) != "12345678" {
+		t.Errorf("exp 12345678 but got %v", string(buffer))
+	}
+
+	destroyFile()
+	createDir()
+	rl, err := sf.Lag()
+	assert.NoError(t, err)
+	assert.Equal(t, &LagInfo{0, "bytes", 0}, rl)
 }

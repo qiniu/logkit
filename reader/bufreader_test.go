@@ -64,8 +64,8 @@ func Test_BuffReader(t *testing.T) {
 			break
 		}
 	}
-	if len(rest) != 4 {
-		t.Errorf("rest should be 4, but got %v", len(rest))
+	if len(rest) != 12 {
+		t.Errorf("rest should be 12, but got %v", len(rest))
 	}
 	r.Close()
 }
@@ -144,8 +144,8 @@ func Test_BuffReaderBufSizeLarge(t *testing.T) {
 			break
 		}
 	}
-	if len(rest) != 4 {
-		t.Errorf("rest should be 4, but got %v", len(rest))
+	if len(rest) != 12 {
+		t.Errorf("rest should be 12, but got %v", len(rest))
 	}
 	r.Close()
 }
@@ -244,11 +244,11 @@ func Test_BuffReaderMultiLine(t *testing.T) {
 		num++
 
 		r.SyncMeta()
-		if num >= 3 {
+		if num > 3 {
 			break
 		}
 		r.SyncMeta()
-		//assert.NoError(t, err)
+		assert.NoError(t, err)
 	}
 	r.Close()
 	r, err = NewFileBufReader(c, false)

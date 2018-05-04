@@ -62,6 +62,7 @@ func matchMode(logpath string) (path, mode string, err error) {
 		}
 		return
 	}
+	mode = ModeFile
 	return
 }
 

@@ -150,8 +150,6 @@ NONNEGINT \b(?:[0-9]+)\b
 WORD \b\w+\b
 NOTSPACE \S+
 SPACE \s*
-COMMA ,
-NOTCOMMA [^,]*
 DATA .*?
 GREEDYDATA .*
 QUOTEDSTRING "([^"\\]*(\\.[^"\\]*)*)"|\'([^\'\\]*(\\.[^\'\\]*)*)\'

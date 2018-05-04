@@ -12,7 +12,6 @@ var ModeUsages = []KeyValue{
 	{ModeDir, "从文件读取( dir 模式)"},
 	{ModeFile, "从文件读取( file 模式)"},
 	{ModeTailx, "从文件读取( tailx 模式)"},
-	{ModeFileAuto, "从文件读取( fileauto 模式)"},
 	{ModeMysql, "从 MySQL 读取"},
 	{ModeMssql, "从 MSSQL 读取"},
 	{ModePG, "从 PostgreSQL 读取"},

@@ -4,10 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"runtime"
-
-	"github.com/shirou/gopsutil/host"
-	"github.com/shirou/gopsutil/load"
 
 	"github.com/qiniu/logkit/metric"
 	. "github.com/qiniu/logkit/utils/models"
@@ -24,7 +20,7 @@ const (
 	KeySystemNUsers       = "system_n_users"
 	KeySystemNCpus        = "system_n_cpus"
 	KeySystemUptime       = "system_uptime"
-	KeySystemUptimeFormat = "system_update_format"
+	KeySystemUptimeFormat = "system_uptime_format"
 )
 
 // KeySystemUsages TypeMetricSystem的字段名称
@@ -61,36 +57,11 @@ func (s *SystemStats) Config() map[string]interface{} {
 	return config
 }
 
-func (_ *SystemStats) Collect() (datas []map[string]interface{}, err error) {
-	loadavg, err := load.Avg()
-	if err != nil {
-		return
-	}
-
-	hostinfo, err := host.Info()
-	if err != nil {
-		return
-	}
-
-	users, err := host.Users()
-	if err != nil {
-		return
-	}
-
-	data := map[string]interface{}{
-		KeySystemLoad1:        loadavg.Load1,
-		KeySystemLoad5:        loadavg.Load5,
-		KeySystemLoad15:       loadavg.Load15,
-		KeySystemNUsers:       len(users),
-		KeySystemNCpus:        runtime.NumCPU(),
-		KeySystemUptime:       hostinfo.Uptime,
-		KeySystemUptimeFormat: format_uptime(hostinfo.Uptime),
-	}
-	datas = append(datas, data)
+func (s *SystemStats) Collect() (datas []map[string]interface{}, err error) {
 	return
 }
 
-func format_uptime(uptime uint64) string {
+func formatUptime(uptime uint64) string {
 	buf := new(bytes.Buffer)
 	w := bufio.NewWriter(buf)
 
@@ -113,10 +84,4 @@ func format_uptime(uptime uint64) string {
 
 	w.Flush()
 	return buf.String()
-}
-
-func init() {
-	metric.Add(TypeMetricSystem, func() metric.Collector {
-		return &SystemStats{}
-	})
 }

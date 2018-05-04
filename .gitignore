@@ -3,6 +3,8 @@
 meta
 ft
 ft_log
+log
+plugins
 
 # Mobile Tools for Java (J2ME)
 .mtj.tmp/
@@ -35,7 +37,6 @@ tests
 tests/meta_mock_csv
 .idea/
 .vscode/
-plugins
 
 # Architecture specific extensions/prefixes
 *.[568vq]

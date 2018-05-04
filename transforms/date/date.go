@@ -67,25 +67,19 @@ func (g *DateTrans) convertDate(v interface{}) (interface{}, error) {
 		s = int64(newv)
 	case uint32:
 		s = int64(newv)
-	case float64:
-		s = int64(newv)
 	case string:
-		var err error
-		s, err = strconv.ParseInt(newv, 10, 64)
-		if err != nil {
-			if g.LayoutBefore != "" {
-				t, err := time.Parse(g.LayoutBefore, newv)
-				if err != nil {
-					return v, fmt.Errorf("can not parse %v with layout %v", newv, g.LayoutBefore)
-				}
-				return g.formatWithUserOption(t), nil
-			}
-			t, err := times.StrToTime(newv)
+		if g.LayoutBefore != "" {
+			t, err := time.Parse(g.LayoutBefore, newv)
 			if err != nil {
-				return v, err
+				return v, fmt.Errorf("can not parse %v with layout %v", newv, g.LayoutBefore)
 			}
 			return g.formatWithUserOption(t), nil
 		}
+		t, err := times.StrToTime(newv)
+		if err != nil {
+			return v, err
+		}
+		return g.formatWithUserOption(t), nil
 	case json.Number:
 		jsonNumber, err := newv.Int64()
 		if err != nil {

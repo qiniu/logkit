@@ -4,7 +4,6 @@ import (
 	"strings"
 	"time"
 
-	"errors"
 	"github.com/qiniu/logkit/conf"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -47,20 +46,12 @@ func (p *RawlogParser) Type() string {
 }
 
 func (p *RawlogParser) Parse(lines []string) ([]Data, error) {
-	emptyErr := errors.New("empty line error")
+
 	se := &StatsError{}
 	datas := []Data{}
-	for idx, line := range lines {
-		line = strings.TrimSpace(line)
-		if len(line) <= 0 {
-			se.AddErrors()
-			se.ErrorDetail = emptyErr
-			se.ErrorIndex = append(se.ErrorIndex, idx)
-			if !p.disableRecordErrData {
-				errData := make(Data)
-				errData[KeyPandoraStash] = line
-				datas = append(datas, errData)
-			}
+	for _, line := range lines {
+		//raw格式的不应该trime空格，只需要判断剔除掉全空就好了
+		if len(strings.TrimSpace(line)) <= 0 {
 			continue
 		}
 		d := Data{}

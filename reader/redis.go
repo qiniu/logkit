@@ -117,7 +117,6 @@ func (rr *RedisReader) Name() string {
 func (rr *RedisReader) setStatsError(err string) {
 	rr.statsLock.Lock()
 	defer rr.statsLock.Unlock()
-	rr.stats.Errors++
 	rr.stats.LastError = err
 }
 

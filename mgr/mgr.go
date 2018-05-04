@@ -510,31 +510,6 @@ func (m *Manager) Status() (rss map[string]RunnerStatus) {
 	return
 }
 
-func (m *Manager) GetRunnerStatus(runnerName string) (rs RunnerStatus, err error) {
-	err = fmt.Errorf("runner %s not exist", runnerName)
-
-	for key, conf := range m.runnerConfig {
-		if conf.RunnerName == runnerName {
-			err = nil
-			if r, ex := m.runners[key]; ex {
-				rs = r.Status()
-			} else {
-				rs = RunnerStatus{
-					Name:           conf.RunnerName,
-					ReaderStats:    StatsInfo{},
-					ParserStats:    StatsInfo{},
-					TransformStats: make(map[string]StatsInfo),
-					SenderStats:    make(map[string]StatsInfo),
-					RunningStatus:  RunnerStopped,
-				}
-			}
-			break
-		}
-	}
-
-	return rs, err
-}
-
 func (m *Manager) Configs() (rss map[string]RunnerConfig) {
 	rss = make(map[string]RunnerConfig)
 	tmpRss := make(map[string]RunnerConfig)
