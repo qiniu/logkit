@@ -142,7 +142,7 @@ func (it *DateTrans) ConfigOptions() []Option {
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
-			Description:  "时间样式(不填自动解析)(time_layout_before)",
+			Description:  "当前时间样式(不填自动解析)(time_layout_before)",
 			Type:         transforms.TransformTypeString,
 		},
 		{
@@ -150,9 +150,8 @@ func (it *DateTrans) ConfigOptions() []Option {
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
-			Description:  "解析后时间样式(不填默认rfc3339)(time_layout_after)",
+			Description:  "期望时间样式(不填默认rfc3339)(time_layout_after)",
 			Type:         transforms.TransformTypeString,
-			Advance:      true,
 		},
 	}
 }
