@@ -91,7 +91,7 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (ret Reader, err error) {
 		if err != nil {
 			return nil, err
 		}
-		rawSqls, err = conf.GetString(KeyMysqlSQL)
+		rawSqls, err = conf.GetStringOr(KeyMysqlSQL, "")
 		if err != nil {
 			return nil, err
 		}
@@ -113,7 +113,7 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (ret Reader, err error) {
 		if err != nil {
 			return nil, err
 		}
-		rawSqls, err = conf.GetString(KeyMssqlSQL)
+		rawSqls, err = conf.GetStringOr(KeyMssqlSQL, "")
 		if err != nil {
 			return nil, err
 		}
@@ -156,7 +156,7 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (ret Reader, err error) {
 				return nil, err
 			}
 		}
-		rawSqls, err = conf.GetString(KeyPGsqlSQL)
+		rawSqls, err = conf.GetStringOr(KeyPGsqlSQL, "")
 		if err != nil {
 			return nil, err
 		}
