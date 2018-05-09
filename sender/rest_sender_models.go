@@ -221,6 +221,16 @@ var ModeKeyOptions = map[string][]Option{
 			ToolTip:       "日志分析仓库域名，私有部署请对应修改",
 		},
 		{
+			KeyName:       KeyPandoraLogDBAnalyzer,
+			ChooseOnly:    false,
+			Default:       "",
+			DefaultNoUse:  false,
+			Description:   "指定字段分词方式(pandora_logdb_analyzer)",
+			Advance:       true,
+			AdvanceDepend: KeyPandoraEnableLogDB,
+			ToolTip:       `指定字段的分词方式，逗号分隔多个，如 "f1 keyword, f2 full_text"`,
+		},
+		{
 			KeyName:       KeyPandoraEnableTSDB,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"false", "true"},

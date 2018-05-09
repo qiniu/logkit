@@ -27,6 +27,8 @@ import (
 	gouuid "github.com/satori/go.uuid"
 )
 
+var osInfo = []string{KeyCore, KeyHostName, KeyOsInfo, KeyLocalIp}
+
 // PandoraSender pandora sender
 type PandoraSender struct {
 	client             pipeline.PipelineAPI
@@ -160,6 +162,8 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	enableLogdb, _ := conf.GetBoolOr(KeyPandoraEnableLogDB, false)
 	logdbreponame, _ := conf.GetStringOr(KeyPandoraLogDBName, repoName)
 	logdbhost, _ := conf.GetStringOr(KeyPandoraLogDBHost, "")
+	logdbAnalyzer, _ := conf.GetStringListOr(KeyPandoraLogDBAnalyzer, []string{})
+	analyzerMap := convertAnalyzerMap(logdbAnalyzer)
 
 	enableTsdb, _ := conf.GetBoolOr(KeyPandoraEnableTSDB, false)
 	tsdbReponame, _ := conf.GetStringOr(KeyPandoraTSDBName, repoName)
@@ -226,6 +230,7 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 		enableLogdb:   enableLogdb,
 		logdbReponame: logdbreponame,
 		logdbendpoint: logdbhost,
+		analyzerInfo:  pipeline.AnalyzerInfo{Analyzer: analyzerMap},
 
 		enableTsdb:     enableTsdb,
 		tsdbReponame:   tsdbReponame,
@@ -259,6 +264,22 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 		opt.withip = "logkitIP"
 	}
 	return newPandoraSender(opt)
+}
+
+func convertAnalyzerMap(analyzerStrs []string) map[string]string {
+	analyzerMap := map[string]string{
+		KeyCore:     logdb.KeyWordAnalyzer,
+		KeyOsInfo:   logdb.KeyWordAnalyzer,
+		KeyLocalIp:  logdb.KeyWordAnalyzer,
+		KeyHostName: logdb.KeyWordAnalyzer,
+	}
+	for _, v := range analyzerStrs {
+		sps := strings.Fields(v)
+		if len(sps) >= 2 {
+			analyzerMap[sps[0]] = sps[1]
+		}
+	}
+	return analyzerMap
 }
 
 func getTokensFromConf(conf conf.MapConf) (tokens Tokens, err error) {
@@ -394,14 +415,6 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 		extraInfo:  utilsos.GetExtraInfo(),
 	}
 
-	var osInfo = []string{KeyCore, KeyHostName, KeyOsInfo, KeyLocalIp}
-	analyzerMap := map[string]string{
-		KeyCore:     logdb.KeyWordAnalyzer,
-		KeyOsInfo:   logdb.KeyWordAnalyzer,
-		KeyLocalIp:  logdb.KeyWordAnalyzer,
-		KeyHostName: logdb.KeyWordAnalyzer,
-	}
-	s.opt.analyzerInfo.Analyzer = analyzerMap
 	expandAttr := make([]string, 0)
 	if s.opt.isMetrics {
 		s.opt.tsdbTimestamp = metric.Timestamp
@@ -418,6 +431,9 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 		}
 		s.opt.tsdbSeriesTags = metricTags
 		s.opt.analyzerInfo.Default = logdb.KeyWordAnalyzer
+	} else if len(s.opt.analyzerInfo.Analyzer) > 4 {
+		//超过4个的情况代表有用户手动输入了字段的分词方式，此时不开启全文索引
+		s.opt.analyzerInfo.FullText = false
 	} else {
 		s.opt.analyzerInfo.FullText = true
 	}
