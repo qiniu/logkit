@@ -323,10 +323,14 @@ func dataConvert(data interface{}, schema RepoSchemaEntry) (converted interface{
 			err = json.Unmarshal([]byte(value), &newdata)
 			if err == nil {
 				return mapDataConvert(newdata, schema.Schema), nil
+			} else {
+				newdata["force_convert_raw_data"] = value
+				newdata["force_convert_error"] = err.Error()
+				return newdata, nil
 			}
 		}
 	}
-	return data, fmt.Errorf("can not convert data[%v] to type(%v), err %v", data, reflect.TypeOf(data), err)
+	return data, fmt.Errorf("can not convert data[%v] type(%v) to pandora type(%v), err %v", data, reflect.TypeOf(data), schema.ValueType, err)
 }
 
 func mapDataConvert(mpvalue map[string]interface{}, schemas []RepoSchemaEntry) (converted interface{}) {

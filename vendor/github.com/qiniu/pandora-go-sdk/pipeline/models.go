@@ -1998,6 +1998,22 @@ func (e *JobExportTsdbSpec) Validate() (err error) {
 	return nil
 }
 
+type JobExportHttpSpec struct {
+	Host   string `json:"host"`
+	Uri    string `json:"uri"`
+	Format string `json:"format,omitempty"`
+}
+
+func (e *JobExportHttpSpec) Validate() (err error) {
+	if e.Host == "" {
+		return reqerr.NewInvalidArgs("Host", fmt.Sprintf("host should not be empty")).WithComponent("pipleline")
+	}
+	if !strings.HasPrefix(e.Uri, "/") {
+		return reqerr.NewInvalidArgs("Uri", fmt.Sprintf("uri should start with '/'")).WithComponent("pipleline")
+	}
+	return nil
+}
+
 type CreateJobExportInput struct {
 	PandoraToken
 	JobName    string      `json:"-"`
@@ -2023,6 +2039,8 @@ func (e *CreateJobExportInput) Validate() (err error) {
 		e.Type = "logdb"
 	case *JobExportTsdbSpec, JobExportTsdbSpec:
 		e.Type = "tsdb"
+	case *JobExportHttpSpec, JobExportHttpSpec:
+		e.Type = "http"
 	default:
 		return
 	}
