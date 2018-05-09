@@ -2,6 +2,9 @@
 
 ![logkit LOGO](https://raw.githubusercontent.com/qiniu/logkit/master/resources/logo.png)
 
+
+## 欢迎大家体验 logkit 的高级版本 [https://logkit-pro.qiniu.com](https://logkit-pro.qiniu.com) , 文档参见： https://qiniu.github.io/pandora-docs/#/logkit-pro
+
 ## 简介
 
 logkit是[七牛Pandora](https://pandora-docs.qiniu.com)开发的一个通用的日志收集工具，可以将不同数据源的数据方便地发送到[Pandora](https://pandora-docs.qiniu.com)进行分析，除了基本的数据发送功能，logkit还有容错、并发、监控、删除等功能。
