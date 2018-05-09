@@ -462,7 +462,7 @@ func Test_ConvertDate(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "2000-08-19T14:47:37-04:00", date)
 
-	date, err = ConvertDate("", "20060102150405", 0, "20180204221045")
+	date, err = ConvertDate("20060102150405", "", 0, "20180204221045")
 	assert.NoError(t, err)
 	assert.Equal(t, "2018-02-04T22:10:45Z", date)
 }
