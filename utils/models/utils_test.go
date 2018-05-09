@@ -7,8 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
+
+	"github.com/qiniu/logkit/times"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -442,4 +445,67 @@ func createTestFile(fileName string, content string) {
 	f.WriteString(content)
 	f.Sync()
 	f.Close()
+}
+
+func Test_ConvertDate(t *testing.T) {
+	date, err := ConvertDate("", "", 0, 1525422699)
+	assert.NoError(t, err)
+	expect, err := getTimeStr(int64(1525422699))
+	assert.NoError(t, err)
+	assert.Equal(t, expect, date)
+
+	date, err = ConvertDate("", "", 0, "Feb 05 01:02:03")
+	assert.NoError(t, err)
+	assert.Equal(t, "0000-02-05T01:02:03Z", date)
+
+	date, err = ConvertDate("", "", 0, "19/Aug/2000:14:47:37 -0400")
+	assert.NoError(t, err)
+	assert.Equal(t, "2000-08-19T14:47:37-04:00", date)
+
+	date, err = ConvertDate("", "20060102150405", 0, "20180204221045")
+	assert.NoError(t, err)
+	assert.Equal(t, "2018-02-04T22:10:45Z", date)
+}
+
+func Test_FormatWithUserOption(t *testing.T) {
+	ti, err := times.StrToTime("Feb 05 01:02:03")
+	assert.NoError(t, err)
+	date := FormatWithUserOption("", 0, ti)
+	assert.Equal(t, "0000-02-05T01:02:03Z", date)
+
+	ti, err = time.Parse("20060102150405", "20180204221045")
+	assert.NoError(t, err)
+	date = FormatWithUserOption("", 0, ti)
+	assert.Equal(t, "2018-02-04T22:10:45Z", date)
+
+	ti, err = getTime(int64(1525422699))
+	assert.NoError(t, err)
+
+	date = FormatWithUserOption("", 0, ti)
+	assert.Equal(t, ti.Format(time.RFC3339Nano), date)
+}
+
+func getTime(tiTmp int64) (ti time.Time, err error) {
+	timestamp := strconv.FormatInt(tiTmp, 10)
+	timeSecondPrecision := 16
+	//补齐16位
+	for i := len(timestamp); i < timeSecondPrecision; i++ {
+		timestamp += "0"
+	}
+	// 取前16位，截取精度 微妙
+	timestamp = timestamp[0:timeSecondPrecision]
+	parseTi, err := strconv.ParseInt(timestamp, 10, 64)
+	if err != nil {
+		return
+	}
+
+	return time.Unix(0, parseTi*int64(time.Microsecond)), nil
+}
+
+func getTimeStr(tiTmp int64) (tiStr string, err error) {
+	ti, err := getTime(tiTmp)
+	if err != nil {
+		return
+	}
+	return ti.Format(time.RFC3339Nano), err
 }
