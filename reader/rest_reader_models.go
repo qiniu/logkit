@@ -1043,6 +1043,7 @@ var ModeKeyOptions = map[string][]Option{
 			Advance:      true,
 			ToolTip:      "从cloudwatch收集数据聚合的间隔",
 		},
+		OptionDataSourceTag,
 	},
 	ModeSnmp: {
 		{
