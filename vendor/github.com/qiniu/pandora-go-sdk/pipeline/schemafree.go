@@ -301,16 +301,18 @@ func dataConvert(data interface{}, schema RepoSchemaEntry) (converted interface{
 		case string:
 			newdata := make([]interface{}, 0)
 			err = json.Unmarshal([]byte(value), &newdata)
-			if err != nil {
-				return
-			}
-			for _, j := range newdata {
-				vi, err := dataConvert(j, RepoSchemaEntry{ValueType: schema.ElemType})
-				if err != nil {
-					log.Error(err)
-					continue
+			if err == nil {
+				for _, j := range newdata {
+					vi, err := dataConvert(j, RepoSchemaEntry{ValueType: schema.ElemType})
+					if err != nil {
+						log.Error(err)
+						continue
+					}
+					ret = append(ret, vi)
 				}
-				ret = append(ret, vi)
+			} else if schema.ElemType == PandoraTypeString {
+				newdata = append(newdata, value)
+				return newdata, nil
 			}
 		}
 		return ret, nil
@@ -481,7 +483,7 @@ func (c *Pipeline) generatePoint(oldData Data, input *SchemaFreeInput) (point Po
 		if input.Option != nil && input.Option.ForceDataConvert {
 			nvalue, err := dataConvert(value, v)
 			if err != nil {
-				log.Errorf("convert value %v to schema %v error %v, ignore this value...", value, v, err)
+				log.Errorf("convert key(%s)value(%v) to schema %v from data (%v) error %v, ignore this key...", name, value, v, oldData, err)
 				continue
 			}
 			value = nvalue
