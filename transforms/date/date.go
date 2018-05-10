@@ -1,14 +1,9 @@
 package date
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"reflect"
-	"strconv"
-	"time"
 
-	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -36,7 +31,7 @@ func (g *DateTrans) Transform(datas []Data) ([]Data, error) {
 			err = fmt.Errorf("transform key %v not exist in data", g.Key)
 			continue
 		}
-		val, err = g.convertDate(val)
+		val, err = ConvertDate(g.LayoutBefore, g.LayoutAfter, g.Offset, val)
 		if err != nil {
 			errnums++
 			continue
@@ -50,68 +45,6 @@ func (g *DateTrans) Transform(datas []Data) ([]Data, error) {
 	g.stats.Errors += int64(errnums)
 	g.stats.Success += int64(len(datas) - errnums)
 	return datas, ferr
-}
-
-func (g *DateTrans) convertDate(v interface{}) (interface{}, error) {
-	var s int64
-	switch newv := v.(type) {
-	case int64:
-		s = newv
-	case int:
-		s = int64(newv)
-	case int32:
-		s = int64(newv)
-	case int16:
-		s = int64(newv)
-	case uint64:
-		s = int64(newv)
-	case uint32:
-		s = int64(newv)
-	case string:
-		if g.LayoutBefore != "" {
-			t, err := time.Parse(g.LayoutBefore, newv)
-			if err != nil {
-				return v, fmt.Errorf("can not parse %v with layout %v", newv, g.LayoutBefore)
-			}
-			return g.formatWithUserOption(t), nil
-		}
-		t, err := times.StrToTime(newv)
-		if err != nil {
-			return v, err
-		}
-		return g.formatWithUserOption(t), nil
-	case json.Number:
-		jsonNumber, err := newv.Int64()
-		if err != nil {
-			return v, err
-		}
-		s = jsonNumber
-	default:
-		return v, fmt.Errorf("can not parse %v type %v as date time", v, reflect.TypeOf(v))
-	}
-	news := s
-	timestamp := strconv.FormatInt(news, 10)
-	timeSecondPrecision := 16
-	//补齐16位
-	for i := len(timestamp); i < timeSecondPrecision; i++ {
-		timestamp += "0"
-	}
-	// 取前16位，截取精度 微妙
-	timestamp = timestamp[0:timeSecondPrecision]
-	t, err := strconv.ParseInt(timestamp, 10, 64)
-	if err != nil {
-		return v, err
-	}
-	tm := time.Unix(0, t*int64(time.Microsecond))
-	return g.formatWithUserOption(tm), nil
-}
-
-func (g *DateTrans) formatWithUserOption(t time.Time) interface{} {
-	t = t.Add(time.Duration(g.Offset) * time.Hour)
-	if g.LayoutAfter != "" {
-		return t.Format(g.LayoutAfter)
-	}
-	return t.Format(time.RFC3339Nano)
 }
 
 func (g *DateTrans) Description() string {

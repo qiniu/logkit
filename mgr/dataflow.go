@@ -46,6 +46,9 @@ func RawData(readerConfig conf.MapConf) (rawData string, err error) {
 		if err != nil && err != io.EOF {
 			return "", fmt.Errorf("reader %s - error: %v", rd.Name(), err)
 		}
+		if err == io.EOF {
+			return rawData, nil
+		}
 		if rawData == "" {
 			continue
 		}
@@ -81,8 +84,7 @@ func ParseData(parserConfig conf.MapConf) (parsedData []Data, err error) {
 
 	parsedData, err = logParser.Parse(sampleData)
 	err = checkErr(err, logParser.Name())
-	if len(parsedData) <= 0 {
-		err = fmt.Errorf("received parsed data length = 0, err : %v", err)
+	if err != nil {
 		return nil, err
 	}
 

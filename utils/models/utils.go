@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"hash/fnv"
@@ -15,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -24,6 +26,7 @@ import (
 	"unicode"
 
 	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/times"
 
 	"github.com/json-iterator/go"
 )
@@ -589,4 +592,66 @@ func Bool2String(i bool) string {
 		return "true"
 	}
 	return "false"
+}
+
+func ConvertDate(layoutBefore, layoutAfter string, offset int, v interface{}) (interface{}, error) {
+	var s int64
+	switch newv := v.(type) {
+	case int64:
+		s = newv
+	case int:
+		s = int64(newv)
+	case int32:
+		s = int64(newv)
+	case int16:
+		s = int64(newv)
+	case uint64:
+		s = int64(newv)
+	case uint32:
+		s = int64(newv)
+	case string:
+		if layoutBefore != "" {
+			t, err := time.Parse(layoutBefore, newv)
+			if err != nil {
+				return v, fmt.Errorf("can not parse %v with layout %v", newv, layoutAfter)
+			}
+			return FormatWithUserOption(layoutAfter, offset, t), nil
+		}
+		t, err := times.StrToTime(newv)
+		if err != nil {
+			return v, err
+		}
+		return FormatWithUserOption(layoutAfter, offset, t), nil
+	case json.Number:
+		jsonNumber, err := newv.Int64()
+		if err != nil {
+			return v, err
+		}
+		s = jsonNumber
+	default:
+		return v, fmt.Errorf("can not parse %v type %v as date time", v, reflect.TypeOf(v))
+	}
+	news := s
+	timestamp := strconv.FormatInt(news, 10)
+	timeSecondPrecision := 16
+	//补齐16位
+	for i := len(timestamp); i < timeSecondPrecision; i++ {
+		timestamp += "0"
+	}
+	// 取前16位，截取精度 微妙
+	timestamp = timestamp[0:timeSecondPrecision]
+	t, err := strconv.ParseInt(timestamp, 10, 64)
+	if err != nil {
+		return v, err
+	}
+	tm := time.Unix(0, t*int64(time.Microsecond))
+	return FormatWithUserOption(layoutAfter, offset, tm), nil
+}
+
+func FormatWithUserOption(layoutAfter string, offset int, t time.Time) interface{} {
+	t = t.Add(time.Duration(offset) * time.Hour)
+	if layoutAfter != "" {
+		return t.Format(layoutAfter)
+	}
+	return t.Format(time.RFC3339Nano)
 }
