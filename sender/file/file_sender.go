@@ -2,7 +2,7 @@ package file
 
 import (
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender/common"
+	"github.com/qiniu/logkit/sender"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
@@ -19,20 +19,15 @@ type FileSender struct {
 	marshalFunc func([]Data) ([]byte, error)
 }
 
-// 可选参数 当sender_type 为file 的时候
-const (
-	KeyFileSenderPath = "file_send_path"
-)
-
 // NewFileSender construct
-func NewFileSender(conf conf.MapConf) (sender common.Sender, err error) {
+func NewFileSender(conf conf.MapConf) (fileSender sender.Sender, err error) {
 	var path string
-	path, err = conf.GetString(KeyFileSenderPath)
+	path, err = conf.GetString(sender.KeyFileSenderPath)
 	if err != nil {
 		return
 	}
-	name, _ := conf.GetStringOr(KeyName, "fileSender:"+path)
-	sender, err = newFileSender(name, path, JSONLineMarshalFunc)
+	name, _ := conf.GetStringOr(sender.KeyName, "fileSender:"+path)
+	fileSender, err = newFileSender(name, path, JSONLineMarshalFunc)
 	if err != nil {
 		return
 	}
@@ -55,11 +50,11 @@ func newFileSender(name, path string, marshalFunc func([]Data) ([]byte, error)) 
 func (fs *FileSender) Send(datas []Data) error {
 	bytes, err := fs.marshalFunc(datas)
 	if err != nil {
-		return reqerr.NewSendError(fs.Name()+" Cannot marshal data into file, error is "+err.Error(), common.ConvertDatasBack(datas), reqerr.TypeDefault)
+		return reqerr.NewSendError(fs.Name()+" Cannot marshal data into file, error is "+err.Error(), sender.ConvertDatasBack(datas), reqerr.TypeDefault)
 	}
 	_, err = fs.writer.Write(bytes)
 	if err != nil {
-		return reqerr.NewSendError(fs.Name()+"Cannot write data into file, error is "+err.Error(), common.ConvertDatasBack(datas), reqerr.TypeDefault)
+		return reqerr.NewSendError(fs.Name()+"Cannot write data into file, error is "+err.Error(), sender.ConvertDatasBack(datas), reqerr.TypeDefault)
 	}
 	return nil
 }
@@ -79,4 +74,8 @@ func JSONLineMarshalFunc(datas []Data) ([]byte, error) {
 		return nil, err
 	}
 	return append(bytes, '\n'), nil
+}
+
+func init() {
+	sender.Add(sender.TypeFile, NewFileSender)
 }

@@ -11,9 +11,9 @@ import (
 	"github.com/qiniu/log"
 )
 
-// Reads all files in the grok_patterns/ folder
+// Reads builtin files in the grok_patterns/ folder
 // and encodes them as const DEFAULT_PATTERNS in parser/grok_patterns.go
-// remove all comment lines
+// remove builtin comment lines
 func main() {
 	files, err := ioutil.ReadDir("grok_patterns")
 	if err != nil {

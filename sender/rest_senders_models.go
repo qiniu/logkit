@@ -1,13 +1,6 @@
-package registry
+package sender
 
 import (
-	"github.com/qiniu/logkit/sender/elasticsearch"
-	"github.com/qiniu/logkit/sender/fault_tolerant"
-	"github.com/qiniu/logkit/sender/file"
-	"github.com/qiniu/logkit/sender/http"
-	"github.com/qiniu/logkit/sender/influxdb"
-	"github.com/qiniu/logkit/sender/kafka"
-	"github.com/qiniu/logkit/sender/mongodb"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -25,7 +18,7 @@ var ModeUsages = []KeyValue{
 
 var (
 	OptionSaveLogPath = Option{
-		KeyName:      fault_tolerant.KeyFtSaveLogPath,
+		KeyName:      KeyFtSaveLogPath,
 		ChooseOnly:   false,
 		Default:      "",
 		DefaultNoUse: false,
@@ -34,7 +27,7 @@ var (
 		ToolTip:      `指定备份数据的存放路径`,
 	}
 	OptionFtWriteLimit = Option{
-		KeyName:      fault_tolerant.KeyFtWriteLimit,
+		KeyName:      KeyFtWriteLimit,
 		ChooseOnly:   false,
 		Default:      "",
 		DefaultNoUse: false,
@@ -44,17 +37,17 @@ var (
 		ToolTip:      `为了避免速率太快导致磁盘压力加大，可以根据系统情况自行限定写入本地磁盘的速率，单位MB/s`,
 	}
 	OptionFtStrategy = Option{
-		KeyName:       fault_tolerant.KeyFtStrategy,
+		KeyName:       KeyFtStrategy,
 		ChooseOnly:    true,
-		ChooseOptions: []interface{}{fault_tolerant.KeyFtStrategyBackupOnly, fault_tolerant.KeyFtStrategyAlwaysSave, fault_tolerant.KeyFtStrategyConcurrent},
-		Default:       fault_tolerant.KeyFtStrategyBackupOnly,
+		ChooseOptions: []interface{}{KeyFtStrategyBackupOnly, KeyFtStrategyAlwaysSave, KeyFtStrategyConcurrent},
+		Default:       KeyFtStrategyBackupOnly,
 		DefaultNoUse:  false,
 		Description:   "磁盘管道容错策略[仅备份错误|全部数据走管道|仅增加并发](ft_strategy)",
 		Advance:       true,
 		ToolTip:       `设置为backup_only的时候，数据不经过本地队列直接发送到下游，设为always_save时则所有数据会先发送到本地队列，选concurrent的时候会直接并发发送，不经过队列。无论该选项设置什么，失败的数据都会加入到重试队列中异步循环重试`,
 	}
 	OptionFtProcs = Option{
-		KeyName:      fault_tolerant.KeyFtProcs,
+		KeyName:      KeyFtProcs,
 		ChooseOnly:   false,
 		Default:      "",
 		DefaultNoUse: false,
@@ -64,7 +57,7 @@ var (
 		ToolTip:      "并发仅在ft_strateg模式选择 always_save或concurrent 时生效",
 	}
 	OptionFtMemoryChannel = Option{
-		KeyName:       fault_tolerant.KeyFtMemoryChannel,
+		KeyName:       KeyFtMemoryChannel,
 		Element:       Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"false", "true"},
@@ -75,14 +68,14 @@ var (
 		ToolTip:       `内存管道替代磁盘管道`,
 	}
 	OptionFtMemoryChannelSize = Option{
-		KeyName:       fault_tolerant.KeyFtMemoryChannelSize,
+		KeyName:       KeyFtMemoryChannelSize,
 		ChooseOnly:    false,
 		Default:       "",
 		DefaultNoUse:  false,
 		Description:   "内存管道长度(ft_memory_channel_size)",
 		CheckRegex:    "\\d+",
 		Advance:       true,
-		AdvanceDepend: fault_tolerant.KeyFtMemoryChannel,
+		AdvanceDepend: KeyFtMemoryChannel,
 		ToolTip:       `默认为"100"，单位为批次，也就是100代表100个待发送的批次，注意：该选项设置的大小表达的是队列中可存储的元素个数，并不是占用的内存大小`,
 	}
 	OptionLogkitSendTime = Option{
@@ -100,7 +93,7 @@ var (
 var ModeKeyOptions = map[string][]Option{
 	TypeFile: {
 		{
-			KeyName:      file.KeyFileSenderPath,
+			KeyName:      KeyFileSenderPath,
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     true,
@@ -478,7 +471,7 @@ var ModeKeyOptions = map[string][]Option{
 	},
 	TypeMongodbAccumulate: {
 		{
-			KeyName:      mongodb.KeyMongodbHost,
+			KeyName:      KeyMongodbHost,
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     true,
@@ -488,7 +481,7 @@ var ModeKeyOptions = map[string][]Option{
 			ToolTip:      `Mongodb的地址: mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]`,
 		},
 		{
-			KeyName:      mongodb.KeyMongodbDB,
+			KeyName:      KeyMongodbDB,
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     true,
@@ -497,7 +490,7 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "数据库名称(mongodb_db)",
 		},
 		{
-			KeyName:      mongodb.KeyMongodbCollection,
+			KeyName:      KeyMongodbCollection,
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     true,
@@ -506,7 +499,7 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "数据表名称(mongodb_collection)",
 		},
 		{
-			KeyName:      mongodb.KeyMongodbUpdateKey,
+			KeyName:      KeyMongodbUpdateKey,
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     true,
@@ -515,7 +508,7 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "聚合条件列(mongodb_acc_updkey)",
 		},
 		{
-			KeyName:      mongodb.KeyMongodbAccKey,
+			KeyName:      KeyMongodbAccKey,
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     true,
@@ -532,7 +525,7 @@ var ModeKeyOptions = map[string][]Option{
 	},
 	TypeInfluxdb: {
 		{
-			KeyName:      influxdb.KeyInfluxdbHost,
+			KeyName:      KeyInfluxdbHost,
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     true,
@@ -542,7 +535,7 @@ var ModeKeyOptions = map[string][]Option{
 			ToolTip:      `数据库地址127.0.0.1:8086`,
 		},
 		{
-			KeyName:      influxdb.KeyInfluxdbDB,
+			KeyName:      KeyInfluxdbDB,
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     true,
@@ -551,7 +544,7 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "数据库名称(influxdb_db)",
 		},
 		{
-			KeyName:       influxdb.KeyInfluxdbAutoCreate,
+			KeyName:       KeyInfluxdbAutoCreate,
 			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
@@ -560,7 +553,7 @@ var ModeKeyOptions = map[string][]Option{
 			Advance:       true,
 		},
 		{
-			KeyName:      influxdb.KeyInfluxdbMeasurement,
+			KeyName:      KeyInfluxdbMeasurement,
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     true,
@@ -569,7 +562,7 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "measurement名称(influxdb_measurement)",
 		},
 		{
-			KeyName:      influxdb.KeyInfluxdbRetetion,
+			KeyName:      KeyInfluxdbRetetion,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
@@ -577,16 +570,16 @@ var ModeKeyOptions = map[string][]Option{
 			Advance:      true,
 		},
 		{
-			KeyName:       influxdb.KeyInfluxdbRetetionDuration,
+			KeyName:       KeyInfluxdbRetetionDuration,
 			ChooseOnly:    false,
 			Default:       "",
 			DefaultNoUse:  false,
 			Description:   "retention时长(influxdb_retention_duration)",
-			AdvanceDepend: influxdb.KeyInfluxdbAutoCreate,
+			AdvanceDepend: KeyInfluxdbAutoCreate,
 			Advance:       true,
 		},
 		{
-			KeyName:      influxdb.KeyInfluxdbTags,
+			KeyName:      KeyInfluxdbTags,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
@@ -594,7 +587,7 @@ var ModeKeyOptions = map[string][]Option{
 			Advance:      true,
 		},
 		{
-			KeyName:      influxdb.KeyInfluxdbFields,
+			KeyName:      KeyInfluxdbFields,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
@@ -602,7 +595,7 @@ var ModeKeyOptions = map[string][]Option{
 			Advance:      true,
 		},
 		{
-			KeyName:      influxdb.KeyInfluxdbTimestamp,
+			KeyName:      KeyInfluxdbTimestamp,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
@@ -610,7 +603,7 @@ var ModeKeyOptions = map[string][]Option{
 			Advance:      true,
 		},
 		{
-			KeyName:      influxdb.KeyInfluxdbTimestampPrecision,
+			KeyName:      KeyInfluxdbTimestampPrecision,
 			ChooseOnly:   false,
 			Default:      "100",
 			DefaultNoUse: false,
@@ -627,7 +620,7 @@ var ModeKeyOptions = map[string][]Option{
 	TypeDiscard: {},
 	TypeElastic: {
 		{
-			KeyName:      elasticsearch.KeyElasticHost,
+			KeyName:      KeyElasticHost,
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     true,
@@ -637,13 +630,13 @@ var ModeKeyOptions = map[string][]Option{
 			ToolTip:      `常用端口9200`,
 		},
 		{
-			KeyName:       elasticsearch.KeyElasticVersion,
+			KeyName:       KeyElasticVersion,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{elasticsearch.ElasticVersion3, elasticsearch.ElasticVersion5, elasticsearch.ElasticVersion6},
+			ChooseOptions: []interface{}{ElasticVersion3, ElasticVersion5, ElasticVersion6},
 			Description:   "ES版本号(es_version)",
 		},
 		{
-			KeyName:      elasticsearch.KeyElasticIndex,
+			KeyName:      KeyElasticIndex,
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     true,
@@ -652,26 +645,26 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "索引名称(elastic_index)",
 		},
 		{
-			KeyName:       elasticsearch.KeyElasticIndexStrategy,
+			KeyName:       KeyElasticIndexStrategy,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{elasticsearch.KeyDefaultIndexStrategy, elasticsearch.KeyYearIndexStrategy, elasticsearch.KeyMonthIndexStrategy, elasticsearch.KeyDayIndexStrategy},
-			Default:       fault_tolerant.KeyFtStrategyBackupOnly,
+			ChooseOptions: []interface{}{KeyDefaultIndexStrategy, KeyYearIndexStrategy, KeyMonthIndexStrategy, KeyDayIndexStrategy},
+			Default:       KeyFtStrategyBackupOnly,
 			DefaultNoUse:  false,
 			Description:   "自动索引模式(默认索引|按年索引|按月索引|按日索引)(index_strategy)",
 			Advance:       true,
 		},
 		{
-			KeyName:       elasticsearch.KeyElasticTimezone,
+			KeyName:       KeyElasticTimezone,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{elasticsearch.KeyUTCTimezone, elasticsearch.KeylocalTimezone, elasticsearch.KeyPRCTimezone},
-			Default:       elasticsearch.KeyUTCTimezone,
+			ChooseOptions: []interface{}{KeyUTCTimezone, KeylocalTimezone, KeyPRCTimezone},
+			Default:       KeyUTCTimezone,
 			DefaultNoUse:  false,
 			Description:   "索引时区(Local(本地)|UTC(标准时间)|PRC(北京时间))(elastic_time_zone)",
 			Advance:       true,
 		},
 		OptionLogkitSendTime,
 		{
-			KeyName:      elasticsearch.KeyElasticType,
+			KeyName:      KeyElasticType,
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     true,
@@ -688,7 +681,7 @@ var ModeKeyOptions = map[string][]Option{
 	},
 	TypeKafka: {
 		{
-			KeyName:      kafka.KeyKafkaHost,
+			KeyName:      KeyKafkaHost,
 			ChooseOnly:   false,
 			Required:     true,
 			Default:      "",
@@ -698,7 +691,7 @@ var ModeKeyOptions = map[string][]Option{
 			ToolTip:      "常用端口 9092",
 		},
 		{
-			KeyName:      kafka.KeyKafkaTopic,
+			KeyName:      KeyKafkaTopic,
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     true,
@@ -707,15 +700,15 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "打点的topic名称(kafka_topic)",
 		},
 		{
-			KeyName:       kafka.KeyKafkaCompression,
+			KeyName:       KeyKafkaCompression,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{kafka.KeyKafkaCompressionNone, kafka.KeyKafkaCompressionGzip, kafka.KeyKafkaCompressionSnappy},
-			Default:       kafka.KeyKafkaCompressionNone,
+			ChooseOptions: []interface{}{KeyKafkaCompressionNone, KeyKafkaCompressionGzip, KeyKafkaCompressionSnappy},
+			Default:       KeyKafkaCompressionNone,
 			DefaultNoUse:  false,
 			Description:   "压缩模式[none不压缩|gzip压缩|snappy压缩](kafka_compression)",
 		},
 		{
-			KeyName:      kafka.KeyKafkaClientId,
+			KeyName:      KeyKafkaClientId,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
@@ -723,7 +716,7 @@ var ModeKeyOptions = map[string][]Option{
 			Advance:      true,
 		},
 		{
-			KeyName:      kafka.KeyKafkaRetryMax,
+			KeyName:      KeyKafkaRetryMax,
 			ChooseOnly:   false,
 			Default:      "3",
 			DefaultNoUse: false,
@@ -731,7 +724,7 @@ var ModeKeyOptions = map[string][]Option{
 			Advance:      true,
 		},
 		{
-			KeyName:      kafka.KeyKafkaTimeout,
+			KeyName:      KeyKafkaTimeout,
 			ChooseOnly:   false,
 			Default:      "30s",
 			DefaultNoUse: false,
@@ -739,7 +732,7 @@ var ModeKeyOptions = map[string][]Option{
 			Advance:      true,
 		},
 		{
-			KeyName:      kafka.KeyKafkaKeepAlive,
+			KeyName:      KeyKafkaKeepAlive,
 			ChooseOnly:   false,
 			Default:      "0",
 			DefaultNoUse: false,
@@ -755,7 +748,7 @@ var ModeKeyOptions = map[string][]Option{
 	},
 	TypeHttp: {
 		{
-			KeyName:      http.KeyHttpSenderUrl,
+			KeyName:      KeyHttpSenderUrl,
 			ChooseOnly:   false,
 			Default:      "",
 			Placeholder:  "http://127.0.0.1/data",
@@ -764,14 +757,14 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "发送目的url(http_sender_url)",
 		},
 		{
-			KeyName:       http.KeyHttpSenderProtocol,
+			KeyName:       KeyHttpSenderProtocol,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"json", "csv"},
 			Default:       "json",
 			Description:   "发送数据时使用的格式(http_sender_protocol)",
 		},
 		{
-			KeyName:      http.KeyHttpSenderCsvSplit,
+			KeyName:      KeyHttpSenderCsvSplit,
 			ChooseOnly:   false,
 			Default:      "",
 			Placeholder:  ",",
@@ -780,7 +773,7 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "csv分隔符(http_sender_csv_split)",
 		},
 		{
-			KeyName:       http.KeyHttpSenderGzip,
+			KeyName:       KeyHttpSenderGzip,
 			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},

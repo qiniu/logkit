@@ -15,7 +15,6 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
-	"github.com/qiniu/streaming/src/github.com/qiniu/logkit/sender"
 
 	"github.com/qiniu/logkit/cleaner"
 	"github.com/qiniu/logkit/conf"
@@ -25,7 +24,7 @@ import (
 	_ "github.com/qiniu/logkit/reader/builtin"
 	"github.com/qiniu/logkit/reader/cloudtrail"
 	"github.com/qiniu/logkit/router"
-	"github.com/qiniu/logkit/sender/common"
+	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -94,37 +93,34 @@ const qiniulogHeadPatthern = "[1-9]\\d{3}/[0-1]\\d/[0-3]\\d [0-2]\\d:[0-6]\\d:[0
 
 // NewRunner 创建Runner
 func NewRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal) (runner Runner, err error) {
-	return NewLogExportRunner(rc, cleanChan, reader.NewRegistry(), parser.NewRegistry(), sender.NewSenderRegistry())
+	return NewLogExportRunner(rc, cleanChan, reader.NewRegistry(), parser.NewRegistry())
 }
 
-func NewCustomRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *reader.Registry, ps *parser.Registry, sr *sender.SenderRegistry) (runner Runner, err error) {
+func NewCustomRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *reader.Registry, ps *parser.Registry) (runner Runner, err error) {
 	if ps == nil {
 		ps = parser.NewRegistry()
-	}
-	if sr == nil {
-		sr = sender.NewSenderRegistry()
 	}
 	if rr == nil {
 		rr = reader.NewRegistry()
 	}
 	if rc.MetricConfig != nil {
-		return NewMetricRunner(rc, sr)
+		return NewMetricRunner(rc)
 	}
-	return NewLogExportRunner(rc, cleanChan, rr, ps, sr)
+	return NewLogExportRunner(rc, cleanChan, rr, ps)
 }
 
 func NewRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.Parser, transformers []transforms.Transformer,
-	senders []sender.Sender, router *router.Router, meta *reader.Meta) (runner Runner, err error) {
-	return NewLogExportRunnerWithService(info, reader, cleaner, parser, transformers, senders, router, meta)
+	router *router.Router, meta *reader.Meta) (runner Runner, err error) {
+	return NewLogExportRunnerWithService(info, reader, cleaner, parser, transformers, router, meta)
 }
 
 func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.Parser,
-	transformers []transforms.Transformer, senders []sender.Sender, router *router.Router, meta *reader.Meta) (runner *LogExportRunner, err error) {
+	transformers []transforms.Transformer, router *router.Router, meta *reader.Meta) (runner *LogExportRunner, err error) {
 	return NewLogExportRunnerWithService(info, reader, cleaner, parser, transformers, senders, router, meta)
 }
 
 func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.LogParser,
-	transformers []transforms.Transformer, senders []common.Sender, router *router.Router, meta *reader.Meta) (runner *LogExportRunner, err error) {
+	transformers []transforms.Transformer, senders []sender.Sender, router *router.Router, meta *reader.Meta) (runner *LogExportRunner, err error) {
 	if info.MaxBatchSize <= 0 {
 		info.MaxBatchSize = defaultMaxBatchSize
 	}
@@ -317,8 +313,35 @@ func createTransformers(rc RunnerConfig) ([]transforms.Transformer, error) {
 	return transformers, nil
 }
 
+func createSenders(sendersConfig []conf.MapConf, extraInfo bool, ftSaveLogPath string) ([]sender.Sender, error) {
+	senders := make([]sender.Sender, 0)
+	for idx, senderConfig := range sendersConfig {
+		s, err := getSender(extraInfo, senderConfig, ftSaveLogPath)
+		if err != nil {
+			return nil, err
+		}
+		senders = append(senders, s)
+		delete(sendersConfig[idx], sender.InnerUserAgent)
+	}
+	return senders, nil
+}
+
+func getSender(extraInfo bool, senderConfig conf.MapConf, ftSaveLogPath string) (sender.Sender, error) {
+	if extraInfo && senderConfig[sender.KeySenderType] == sender.TypePandora {
+		//如果已经开启了，不要重复加
+		senderConfig[sender.KeyPandoraExtraInfo] = "false"
+	}
+	s, err := sender.Senders.NewSender(senderConfig, ftSaveLogPath)
+	if err != nil {
+		log.Errorf("type %v of send init error %v", senderConfig[sender.KeySenderType], err)
+		err = fmt.Errorf("type %v of send init error %v", senderConfig[sender.KeySenderType], err)
+		return nil, err
+	}
+	return s, nil
+}
+
 // trySend 尝试发送数据，如果此时runner退出返回false，其他情况无论是达到最大重试次数还是发送成功，都返回true
-func (r *LogExportRunner) trySend(s common.Sender, datas []Data, times int) bool {
+func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool {
 	if len(datas) <= 0 {
 		return true
 	}
@@ -366,7 +389,7 @@ func (r *LogExportRunner) trySend(s common.Sender, datas []Data, times int) bool
 			time.Sleep(time.Second)
 			se, succ := err.(*reqerr.SendError)
 			if succ {
-				datas = common.ConvertDatas(se.GetFailDatas())
+				datas = sender.ConvertDatas(se.GetFailDatas())
 				//无限重试的，除非遇到关闭
 				if atomic.LoadInt32(&r.stopped) > 0 {
 					return false
@@ -838,7 +861,7 @@ func (r *LogExportRunner) getRefreshStatus(elaspedtime float64) RunnerStatus {
 	r.rs.ParserStats.Speed, r.rs.ParserStats.Trend = calcSpeedTrend(r.lastRs.ParserStats, r.rs.ParserStats, elaspedtime)
 
 	for i := range r.senders {
-		sts, ok := r.senders[i].(common.StatsSender)
+		sts, ok := r.senders[i].(sender.StatsSender)
 		if ok {
 			r.rs.SenderStats[r.senders[i].Name()] = sts.Stats()
 		}
@@ -916,7 +939,7 @@ func (r *LogExportRunner) TokenRefresh(tokens AuthTokens) error {
 		return fmt.Errorf("tokens.RunnerName[%v] is not match %v", tokens.RunnerName, r.RunnerName)
 	}
 	if len(r.senders) > tokens.SenderIndex {
-		if tokenSender, ok := r.senders[tokens.SenderIndex].(common.TokenRefreshable); ok {
+		if tokenSender, ok := r.senders[tokens.SenderIndex].(sender.TokenRefreshable); ok {
 			return tokenSender.TokenRefresh(tokens.SenderTokens)
 		}
 	}
@@ -939,7 +962,7 @@ func (r *LogExportRunner) StatusRestore() {
 		if !exist {
 			continue
 		}
-		sStatus, ok := s.(common.StatsSender)
+		sStatus, ok := s.(sender.StatsSender)
 		if ok {
 			sStatus.Restore(&StatsInfo{
 				Success: info[0],
@@ -970,7 +993,7 @@ func (r *LogExportRunner) StatusBackup() {
 	}
 	for _, s := range r.senders {
 		name := s.Name()
-		sStatus, ok := s.(common.StatsSender)
+		sStatus, ok := s.(sender.StatsSender)
 		if ok {
 			status.SenderStats[name] = sStatus.Stats()
 		}

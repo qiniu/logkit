@@ -11,11 +11,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/json-iterator/go"
-	"github.com/labstack/echo"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/router"
+	_ "github.com/qiniu/logkit/sender/builtin"
+
+	"github.com/json-iterator/go"
+	"github.com/labstack/echo"
 	"github.com/stretchr/testify/assert"
 )
 

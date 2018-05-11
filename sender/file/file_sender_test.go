@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/sender"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/stretchr/testify/assert"
@@ -16,7 +17,7 @@ import (
 func TestFileSender(t *testing.T) {
 	path := "TestFileSender"
 	defer os.RemoveAll(path)
-	fsender, err := NewFileSender(conf.MapConf{KeyFileSenderPath: filepath.Join(path, "%Y%m%d.log")})
+	fsender, err := NewFileSender(conf.MapConf{sender.KeyFileSenderPath: filepath.Join(path, "%Y%m%d.log")})
 	assert.NoError(t, err)
 	err = fsender.Send([]Data{{"abc": 123}})
 	assert.NoError(t, err)

@@ -1,4 +1,4 @@
-package fault_tolerant
+package mock
 
 import (
 	"fmt"
@@ -8,8 +8,7 @@ import (
 	"time"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender/common"
-	"github.com/qiniu/logkit/sender/mock"
+	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/sender/pandora"
 	. "github.com/qiniu/logkit/utils/models"
 
@@ -24,16 +23,16 @@ const (
 )
 
 func TestFtSender(t *testing.T) {
-	_, pt := mock.NewMockPandoraWithPrefix("/v2")
+	_, pt := NewMockPandoraWithPrefix("/v2")
 	s, err := pandora.SetPandoraSender("p", "TestFtSender", "nb", pt, "ab", "ab *s", false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	mp := conf.MapConf{}
-	mp[KeyFtSaveLogPath] = fttestdir
-	mp[KeyFtStrategy] = KeyFtStrategyAlwaysSave
+	mp[sender.KeyFtSaveLogPath] = fttestdir
+	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyAlwaysSave
 	defer os.RemoveAll(fttestdir)
-	fts, err := NewFtSender(s, mp, fttestdir)
+	fts, err := sender.NewFtSender(s, mp, fttestdir)
 	assert.NoError(t, err)
 	datas := []Data{
 		{"ab": "abcccc"},
@@ -46,8 +45,8 @@ func TestFtSender(t *testing.T) {
 	}
 	assert.NoError(t, se.ErrorDetail)
 	time.Sleep(10 * time.Second)
-	if fts.backupQueue.Depth() != 1 {
-		t.Error("Ft sender error exp 1 but got", fts.backupQueue.Depth())
+	if fts.BackupQueue.Depth() != 1 {
+		t.Error("Ft sender error exp 1 but got", fts.BackupQueue.Depth())
 	}
 }
 
@@ -57,17 +56,17 @@ func TestFtMemorySender(t *testing.T) {
 		panic(err)
 	}
 	defer os.RemoveAll(tmpDir)
-	_, pt := mock.NewMockPandoraWithPrefix("/v2")
+	_, pt := NewMockPandoraWithPrefix("/v2")
 	s, err := pandora.SetPandoraSender("p", "TestFtMemorySender", "nb", pt, "ab", "ab *s", false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	mp := conf.MapConf{}
-	mp[KeyFtSaveLogPath] = tmpDir
-	mp[KeyFtMemoryChannel] = "true"
-	mp[KeyFtMemoryChannelSize] = "3"
-	mp[KeyFtStrategy] = KeyFtStrategyAlwaysSave
-	fts, err := NewFtSender(s, mp, tmpDir)
+	mp[sender.KeyFtSaveLogPath] = tmpDir
+	mp[sender.KeyFtMemoryChannel] = "true"
+	mp[sender.KeyFtMemoryChannelSize] = "3"
+	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyAlwaysSave
+	fts, err := sender.NewFtSender(s, mp, tmpDir)
 	assert.NoError(t, err)
 	datas := []Data{
 		{"ab": "abcccc"},
@@ -80,8 +79,8 @@ func TestFtMemorySender(t *testing.T) {
 	}
 	assert.NoError(t, se.ErrorDetail)
 	time.Sleep(10 * time.Second)
-	if fts.backupQueue.Depth() != 1 {
-		t.Error("Ft sender error exp 1 but got", fts.backupQueue.Depth())
+	if fts.BackupQueue.Depth() != 1 {
+		t.Error("Ft sender error exp 1 but got", fts.BackupQueue.Depth())
 	}
 }
 
@@ -91,7 +90,7 @@ func TestFtChannelFullSender(t *testing.T) {
 		panic(err)
 	}
 	defer os.RemoveAll(tmpDir)
-	mockP, pt := mock.NewMockPandoraWithPrefix("/v2")
+	mockP, pt := NewMockPandoraWithPrefix("/v2")
 	s, err := pandora.SetPandoraSender("p", "FtChannelFullSender", "nb", pt, "a", "a *s", false)
 	if err != nil {
 		t.Fatal(err)
@@ -100,11 +99,11 @@ func TestFtChannelFullSender(t *testing.T) {
 	mockP.PostSleep = 1
 	mockP.SetMux.Unlock()
 	mp := conf.MapConf{}
-	mp[KeyFtSaveLogPath] = tmpDir
-	mp[KeyFtMemoryChannel] = "true"
-	mp[KeyFtMemoryChannelSize] = "1"
-	mp[KeyFtStrategy] = KeyFtStrategyAlwaysSave
-	fts, err := NewFtSender(s, mp, tmpDir)
+	mp[sender.KeyFtSaveLogPath] = tmpDir
+	mp[sender.KeyFtMemoryChannel] = "true"
+	mp[sender.KeyFtMemoryChannelSize] = "1"
+	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyAlwaysSave
+	fts, err := sender.NewFtSender(s, mp, tmpDir)
 	assert.NoError(t, err)
 
 	var moreDatas, moreAndMoreDatas [][]Data
@@ -119,7 +118,7 @@ func TestFtChannelFullSender(t *testing.T) {
 		if se.ErrorDetail != nil {
 			sx, succ := se.ErrorDetail.(*reqerr.SendError)
 			if succ {
-				datas := common.ConvertDatas(sx.GetFailDatas())
+				datas := sender.ConvertDatas(sx.GetFailDatas())
 				moreDatas = append(moreDatas, datas)
 			} else {
 				t.Fatal("ft send StatsError error should contains send error", se.ErrorDetail)
@@ -140,7 +139,7 @@ func TestFtChannelFullSender(t *testing.T) {
 			if se.ErrorDetail != nil {
 				sx, succ := se.ErrorDetail.(*reqerr.SendError)
 				if succ {
-					datas := common.ConvertDatas(sx.GetFailDatas())
+					datas := sender.ConvertDatas(sx.GetFailDatas())
 					moreAndMoreDatas = append(moreAndMoreDatas, datas)
 				} else {
 					t.Fatal("ft send StatsError error should contains send error", se.ErrorDetail)
@@ -157,7 +156,7 @@ func TestFtChannelFullSender(t *testing.T) {
 }
 
 func TestFtSenderConcurrent(t *testing.T) {
-	s, err := mock.NewMockSender(conf.MapConf{})
+	s, err := NewMockSender(conf.MapConf{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,10 +166,10 @@ func TestFtSenderConcurrent(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	mp := conf.MapConf{}
-	mp[KeyFtSaveLogPath] = tmpDir
-	mp[KeyFtStrategy] = KeyFtStrategyConcurrent
-	mp[KeyFtProcs] = "3"
-	fts, err := NewFtSender(s, mp, tmpDir)
+	mp[sender.KeyFtSaveLogPath] = tmpDir
+	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyConcurrent
+	mp[sender.KeyFtProcs] = "3"
+	fts, err := sender.NewFtSender(s, mp, tmpDir)
 	assert.NoError(t, err)
 	datas := []Data{
 		{"ab": "ababab"},
@@ -185,33 +184,33 @@ func TestFtSenderConcurrent(t *testing.T) {
 		assert.NoError(t, se.ErrorDetail)
 	}
 	fts.Close()
-	ms := s.(*mock.MockSender)
+	ms := s.(*MockSender)
 	assert.Equal(t, 100, ms.SendCount())
 	assert.Equal(t, len(datas)*100, len(ms.Datas))
 }
 
 func BenchmarkFtSenderConcurrentDirect(b *testing.B) {
 	c := conf.MapConf{}
-	c[KeyFtStrategy] = KeyFtStrategyConcurrent
+	c[sender.KeyFtStrategy] = sender.KeyFtStrategyConcurrent
 	ftSenderConcurrent(b, c)
 }
 
 func BenchmarkFtSenderConcurrentDisk(b *testing.B) {
 	c := conf.MapConf{}
-	c[KeyFtStrategy] = KeyFtStrategyAlwaysSave
+	c[sender.KeyFtStrategy] = sender.KeyFtStrategyAlwaysSave
 	ftSenderConcurrent(b, c)
 }
 
 func BenchmarkFtSenderConcurrentMemory(b *testing.B) {
 	c := conf.MapConf{}
-	c[KeyFtStrategy] = KeyFtStrategyAlwaysSave
-	c[KeyFtMemoryChannel] = "true"
+	c[sender.KeyFtStrategy] = sender.KeyFtStrategyAlwaysSave
+	c[sender.KeyFtMemoryChannel] = "true"
 	ftSenderConcurrent(b, c)
 }
 
 func ftSenderConcurrent(b *testing.B, c conf.MapConf) {
 	log.SetOutputLevel(log.Lerror)
-	s, err := mock.NewMockSender(conf.MapConf{})
+	s, err := NewMockSender(conf.MapConf{})
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -220,9 +219,9 @@ func ftSenderConcurrent(b *testing.B, c conf.MapConf) {
 		panic(err)
 	}
 	defer os.RemoveAll(tmpDir)
-	c[KeyFtSaveLogPath] = tmpDir
-	c[KeyFtProcs] = "3"
-	fts, err := NewFtSender(s, c, tmpDir)
+	c[sender.KeyFtSaveLogPath] = tmpDir
+	c[sender.KeyFtProcs] = "3"
+	fts, err := sender.NewFtSender(s, c, tmpDir)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -241,7 +240,7 @@ func ftSenderConcurrent(b *testing.B, c conf.MapConf) {
 	}
 	b.StopTimer()
 	fts.Close()
-	ms := s.(*mock.MockSender)
+	ms := s.(*MockSender)
 	b.Logf("Benchmark.N: %d", b.N)
 	b.Logf("MockSender.SendCount: %d", ms.SendCount())
 }
@@ -252,7 +251,7 @@ func TestFtSenderConvertData(t *testing.T) {
 		panic(err)
 	}
 	defer os.RemoveAll(tmpDir)
-	mockP, pt := mock.NewMockPandoraWithPrefix("/v2")
+	mockP, pt := NewMockPandoraWithPrefix("/v2")
 	s, err := pandora.SetPandoraSender("p", "TestFtSenderConvertData", "nb", pt, "", "", true)
 	if err != nil {
 		t.Fatal(err)
@@ -261,10 +260,10 @@ func TestFtSenderConvertData(t *testing.T) {
 	mockP.PostSleep = 1
 	mockP.SetMux.Unlock()
 	mp := conf.MapConf{}
-	mp[KeyFtSaveLogPath] = tmpDir
-	mp[KeyFtMemoryChannel] = "false"
-	mp[KeyFtStrategy] = KeyFtStrategyBackupOnly
-	fts, err := NewFtSender(s, mp, tmpDir)
+	mp[sender.KeyFtSaveLogPath] = tmpDir
+	mp[sender.KeyFtMemoryChannel] = "false"
+	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyBackupOnly
+	fts, err := sender.NewFtSender(s, mp, tmpDir)
 	assert.NoError(t, err)
 	expStr := []string{"a=typeBinaryUnpack", `pandora_stash={"a":"typeBinaryUnpack"}`, "a=typeBinaryUnpack", `pandora_stash={"a":"typeBinaryUnpack"}`}
 
@@ -304,7 +303,7 @@ func TestFtSenderConvertData(t *testing.T) {
 		if se.ErrorDetail != nil {
 			sx, succ := se.ErrorDetail.(*reqerr.SendError)
 			if succ {
-				datas := common.ConvertDatas(sx.GetFailDatas())
+				datas := sender.ConvertDatas(sx.GetFailDatas())
 				moreDatas = append(moreDatas, datas)
 			} else if !(se.Ft && se.FtNotRetry) {
 				t.Fatal("ft send StatsError error should contains send error", se.ErrorDetail)

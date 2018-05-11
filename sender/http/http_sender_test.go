@@ -12,7 +12,11 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+<<<<<<< HEAD
 	"github.com/qiniu/logkit/reader/http"
+=======
+	"github.com/qiniu/logkit/sender"
+>>>>>>> ef3ee30... sender change
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -112,12 +116,12 @@ func TestHttpSender(t *testing.T) {
 
 	// gzip = true, protocol = json
 	senderConf := conf.MapConf{
-		KeyHttpSenderGzip:     "true",
-		KeyHttpSenderCsvSplit: "\t",
-		KeyHttpSenderProtocol: "json",
-		KeyHttpSenderCsvHead:  "false",
-		KeyRunnerName:         "testRunner",
-		KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
+		sender.KeyHttpSenderGzip:     "true",
+		sender.KeyHttpSenderCsvSplit: "\t",
+		sender.KeyHttpSenderProtocol: "json",
+		sender.KeyHttpSenderCsvHead:  "false",
+		KeyRunnerName:                "testRunner",
+		sender.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
 	}
 	httpSender, err := NewHttpSender(senderConf)
 	assert.NoError(t, err)
@@ -137,12 +141,12 @@ func TestHttpSender(t *testing.T) {
 
 	// gzip = false, protocol = json
 	senderConf = conf.MapConf{
-		KeyHttpSenderGzip:     "false",
-		KeyHttpSenderCsvSplit: "\t",
-		KeyHttpSenderProtocol: "json",
-		KeyHttpSenderCsvHead:  "false",
-		KeyRunnerName:         "testRunner",
-		KeyHttpSenderUrl:      "127.0.0.1:8000/logkit/data",
+		sender.KeyHttpSenderGzip:     "false",
+		sender.KeyHttpSenderCsvSplit: "\t",
+		sender.KeyHttpSenderProtocol: "json",
+		sender.KeyHttpSenderCsvHead:  "false",
+		KeyRunnerName:                "testRunner",
+		sender.KeyHttpSenderUrl:      "127.0.0.1:8000/logkit/data",
 	}
 	httpSender, err = NewHttpSender(senderConf)
 	assert.NoError(t, err)
@@ -162,12 +166,12 @@ func TestHttpSender(t *testing.T) {
 
 	// gzip = true, protocol = csv, csvHead = true
 	senderConf = conf.MapConf{
-		KeyHttpSenderGzip:     "true",
-		KeyHttpSenderCsvSplit: "\t",
-		KeyHttpSenderProtocol: "csv",
-		KeyHttpSenderCsvHead:  "true",
-		KeyRunnerName:         "testRunner",
-		KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
+		sender.KeyHttpSenderGzip:     "true",
+		sender.KeyHttpSenderCsvSplit: "\t",
+		sender.KeyHttpSenderProtocol: "csv",
+		sender.KeyHttpSenderCsvHead:  "true",
+		KeyRunnerName:                "testRunner",
+		sender.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
 	}
 	httpSender, err = NewHttpSender(senderConf)
 	assert.NoError(t, err)
@@ -197,12 +201,12 @@ func TestHttpSender(t *testing.T) {
 
 	// gzip = false, protocol = csv, csvHead = true
 	senderConf = conf.MapConf{
-		KeyHttpSenderGzip:     "false",
-		KeyHttpSenderCsvSplit: "\t",
-		KeyHttpSenderProtocol: "csv",
-		KeyHttpSenderCsvHead:  "true",
-		KeyRunnerName:         "testRunner",
-		KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
+		sender.KeyHttpSenderGzip:     "false",
+		sender.KeyHttpSenderCsvSplit: "\t",
+		sender.KeyHttpSenderProtocol: "csv",
+		sender.KeyHttpSenderCsvHead:  "true",
+		KeyRunnerName:                "testRunner",
+		sender.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
 	}
 	httpSender, err = NewHttpSender(senderConf)
 	assert.NoError(t, err)
@@ -232,12 +236,12 @@ func TestHttpSender(t *testing.T) {
 
 	// gzip = true, protocol = csv, csvHead = false
 	senderConf = conf.MapConf{
-		KeyHttpSenderGzip:     "true",
-		KeyHttpSenderCsvSplit: "\t",
-		KeyHttpSenderProtocol: "csv",
-		KeyHttpSenderCsvHead:  "false",
-		KeyRunnerName:         "testRunner",
-		KeyHttpSenderUrl:      "127.0.0.1:8000/logkit/data",
+		sender.KeyHttpSenderGzip:     "true",
+		sender.KeyHttpSenderCsvSplit: "\t",
+		sender.KeyHttpSenderProtocol: "csv",
+		sender.KeyHttpSenderCsvHead:  "false",
+		KeyRunnerName:                "testRunner",
+		sender.KeyHttpSenderUrl:      "127.0.0.1:8000/logkit/data",
 	}
 	httpSender, err = NewHttpSender(senderConf)
 	assert.NoError(t, err)

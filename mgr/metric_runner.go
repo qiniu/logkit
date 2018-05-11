@@ -17,8 +17,7 @@ import (
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/metric/curl"
 	"github.com/qiniu/logkit/reader"
-	"github.com/qiniu/logkit/sender/common"
-	"github.com/qiniu/logkit/sender/registry"
+	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -42,7 +41,7 @@ type MetricRunner struct {
 	envTag     string
 
 	collectors   []metric.Collector
-	senders      []common.Sender
+	senders      []sender.Sender
 	transformers map[string][]transforms.Transformer
 
 	collectInterval time.Duration
@@ -62,7 +61,7 @@ func NewMetric(tp string) (metric.Collector, error) {
 	return nil, fmt.Errorf("metric <%v> is not support now", tp)
 }
 
-func NewMetricRunner(rc RunnerConfig, sr *registry.SenderRegistry) (runner *MetricRunner, err error) {
+func NewMetricRunner(rc RunnerConfig) (runner *MetricRunner, err error) {
 	if rc.CollectInterval <= 0 {
 		rc.CollectInterval = defaultCollectInterval
 	}
@@ -165,20 +164,17 @@ func NewMetricRunner(rc RunnerConfig, sr *registry.SenderRegistry) (runner *Metr
 		return
 	}
 
-	senders := make([]common.Sender, 0)
-	for _, c := range rc.SenderConfig {
-		c[KeyIsMetrics] = "true"
-		c[KeyPandoraTSDBTimeStamp] = metric.Timestamp
-		if rc.ExtraInfo && c[KeySenderType] == TypePandora {
-			//如果已经开启了，不要重复加
-			c[KeyPandoraExtraInfo] = "false"
-		}
-		s, err := sr.NewSender(c, meta.FtSaveLogPath())
+	senders := make([]sender.Sender, 0)
+	extraInfo := rc.ExtraInfo
+	ftSaveLogPath := meta.FtSaveLogPath()
+	for _, senderConfig := range rc.SenderConfig {
+		s, err := getSender(extraInfo, senderConfig, ftSaveLogPath)
 		if err != nil {
 			return nil, err
 		}
 		senders = append(senders, s)
 	}
+
 	runner = &MetricRunner{
 		RunnerName: rc.RunnerName,
 		exitChan:   make(chan struct{}),
@@ -305,7 +301,7 @@ func (r *MetricRunner) Run() {
 }
 
 // trySend 尝试发送数据，如果此时runner退出返回false，其他情况无论是达到最大重试次数还是发送成功，都返回true
-func (r *MetricRunner) trySend(s common.Sender, datas []Data, times int) bool {
+func (r *MetricRunner) trySend(s sender.Sender, datas []Data, times int) bool {
 	if len(datas) <= 0 {
 		return true
 	}
@@ -430,7 +426,7 @@ func (mr *MetricRunner) Status() (rs RunnerStatus) {
 	mr.rs.ReadSpeedTrend = getTrend(mr.lastRs.ReadSpeed, mr.rs.ReadSpeed)
 
 	for i := range mr.senders {
-		sts, ok := mr.senders[i].(common.StatsSender)
+		sts, ok := mr.senders[i].(sender.StatsSender)
 		if ok {
 			mr.rs.SenderStats[mr.senders[i].Name()] = sts.Stats()
 		}
@@ -454,7 +450,7 @@ func (mr *MetricRunner) TokenRefresh(tokens AuthTokens) error {
 		return fmt.Errorf("tokens.RunnerName[%v] is not match %v", tokens.RunnerName, mr.RunnerName)
 	}
 	if len(mr.senders) > tokens.SenderIndex {
-		if tokenSender, ok := mr.senders[tokens.SenderIndex].(common.TokenRefreshable); ok {
+		if tokenSender, ok := mr.senders[tokens.SenderIndex].(sender.TokenRefreshable); ok {
 			return tokenSender.TokenRefresh(tokens.SenderTokens)
 		}
 	}
@@ -477,7 +473,7 @@ func (mr *MetricRunner) StatusRestore() {
 		if !exist {
 			continue
 		}
-		sStatus, ok := s.(common.StatsSender)
+		sStatus, ok := s.(sender.StatsSender)
 		if ok {
 			sStatus.Restore(&StatsInfo{
 				Success: info[0],
@@ -508,7 +504,7 @@ func (mr *MetricRunner) StatusBackup() {
 	}
 	for _, s := range mr.senders {
 		name := s.Name()
-		sStatus, ok := s.(common.StatsSender)
+		sStatus, ok := s.(sender.StatsSender)
 		if ok {
 			status.SenderStats[name] = sStatus.Stats()
 		}

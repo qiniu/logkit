@@ -13,7 +13,7 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/metric/curl"
 	"github.com/qiniu/logkit/metric/system"
-	. "github.com/qiniu/logkit/utils/models"
+	"github.com/qiniu/logkit/sender"
 
 	"github.com/json-iterator/go"
 	"github.com/labstack/echo"
@@ -728,7 +728,7 @@ func TestSendType(t *testing.T) {
 		t.Errorf("xx")
 	}
 	abc["type"] = "pandora"
-	if abc[KeySenderType] == TypePandora {
+	if abc[sender.KeySenderType] == sender.TypePandora {
 		t.Errorf("type should equal")
 	}
 }

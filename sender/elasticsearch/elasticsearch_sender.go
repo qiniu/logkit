@@ -9,7 +9,8 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender/common"
+	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/sender"
 	. "github.com/qiniu/logkit/utils/models"
 
 	elasticV6 "github.com/olivere/elastic"
@@ -37,45 +38,9 @@ type ElasticsearchSender struct {
 	logkitSendTime bool
 }
 
-const (
-	KeyElasticHost    = "elastic_host"
-	KeyElasticVersion = "elastic_version"
-	KeyElasticIndex   = "elastic_index"
-	KeyElasticType    = "elastic_type"
-	KeyElasticAlias   = "elastic_keys"
-
-	KeyElasticIndexStrategy = "elastic_index_strategy"
-	KeyElasticTimezone      = "elastic_time_zone"
-)
-
-const (
-	KeyDefaultIndexStrategy = "default"
-	KeyYearIndexStrategy    = "year"
-	KeyMonthIndexStrategy   = "month"
-	KeyDayIndexStrategy     = "day"
-)
-
-var (
-	// ElasticVersion3 v3.x
-	ElasticVersion3 = "3.x"
-	// ElasticVersion5 v5.x
-	ElasticVersion5 = "5.x"
-	// ElasticVersion6 v6.x
-	ElasticVersion6 = "6.x"
-)
-
-//timeZone
-const (
-	KeylocalTimezone = "Local"
-	KeyUTCTimezone   = "UTC"
-	KeyPRCTimezone   = "PRC"
-)
-
-const KeySendTime = "sendTime"
-
 // NewElasticSender New ElasticSender
-func NewElasticSender(conf conf.MapConf) (sender common.Sender, err error) {
-	host, err := conf.GetStringList(KeyElasticHost)
+func NewElasticSender(conf conf.MapConf) (elasticSender sender.Sender, err error) {
+	host, err := conf.GetStringList(sender.KeyElasticHost)
 	if err != nil {
 		return
 	}
@@ -85,25 +50,25 @@ func NewElasticSender(conf conf.MapConf) (sender common.Sender, err error) {
 		}
 	}
 
-	index, err := conf.GetString(KeyElasticIndex)
+	index, err := conf.GetString(sender.KeyElasticIndex)
 	if err != nil {
 		return
 	}
 
 	// 索引后缀模式
-	indexStrategy, _ := conf.GetStringOr(KeyElasticIndexStrategy, KeyDefaultIndexStrategy)
-	timezone, _ := conf.GetStringOr(KeyElasticTimezone, KeyUTCTimezone)
+	indexStrategy, _ := conf.GetStringOr(sender.KeyElasticIndexStrategy, sender.KeyDefaultIndexStrategy)
+	timezone, _ := conf.GetStringOr(sender.KeyElasticTimezone, sender.KeyUTCTimezone)
 	timeZone, err := time.LoadLocation(timezone)
 	if err != nil {
 		return
 	}
-	logkitSendTime, _ := conf.GetBoolOr(KeyLogkitSendTime, true)
-	eType, _ := conf.GetStringOr(KeyElasticType, defaultType)
-	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("elasticSender:(elasticUrl:%s,index:%s,type:%s)", host, index, eType))
-	fields, _ := conf.GetAliasMapOr(KeyElasticAlias, make(map[string]string))
-	eVersion, _ := conf.GetStringOr(KeyElasticVersion, ElasticVersion3)
+	logkitSendTime, _ := conf.GetBoolOr(sender.KeyLogkitSendTime, true)
+	eType, _ := conf.GetStringOr(sender.KeyElasticType, defaultType)
+	name, _ := conf.GetStringOr(sender.KeyName, fmt.Sprintf("elasticSender:(elasticUrl:%s,index:%s,type:%s)", host, index, eType))
+	fields, _ := conf.GetAliasMapOr(sender.KeyElasticAlias, make(map[string]string))
+	eVersion, _ := conf.GetStringOr(sender.KeyElasticVersion, sender.ElasticVersion3)
 
-	strategy := []string{KeyDefaultIndexStrategy, KeyYearIndexStrategy, KeyMonthIndexStrategy, KeyDayIndexStrategy}
+	strategy := []string{sender.KeyDefaultIndexStrategy, sender.KeyYearIndexStrategy, sender.KeyMonthIndexStrategy, sender.KeyDayIndexStrategy}
 
 	i, err := machPattern(indexStrategy, strategy)
 	if err != nil {
@@ -115,7 +80,7 @@ func NewElasticSender(conf conf.MapConf) (sender common.Sender, err error) {
 	var elasticV5Client *elasticV5.Client
 	var elasticV6Client *elasticV6.Client
 	switch eVersion {
-	case ElasticVersion6:
+	case reader.ElasticVersion6:
 		elasticV6Client, err = elasticV6.NewClient(
 			elasticV6.SetSniff(false),
 			elasticV6.SetHealthcheck(false),
@@ -123,7 +88,7 @@ func NewElasticSender(conf conf.MapConf) (sender common.Sender, err error) {
 		if err != nil {
 			return
 		}
-	case ElasticVersion5:
+	case reader.ElasticVersion5:
 		elasticV5Client, err = elasticV5.NewClient(
 			elasticV5.SetSniff(false),
 			elasticV5.SetHealthcheck(false),
@@ -175,7 +140,7 @@ func (ess *ElasticsearchSender) Name() string {
 // Send ElasticSearchSender
 func (ess *ElasticsearchSender) Send(data []Data) (err error) {
 	switch ess.eVersion {
-	case ElasticVersion6:
+	case sender.ElasticVersion6:
 		bulkService := ess.elasticV6Client.Bulk()
 
 		makeDoc := true
@@ -192,7 +157,7 @@ func (ess *ElasticsearchSender) Send(data []Data) (err error) {
 			}
 			//添加发送时间
 			if ess.logkitSendTime {
-				doc[KeySendTime] = time.Now().In(ess.timeZone)
+				doc[sender.KeySendTime] = time.Now().In(ess.timeZone)
 			}
 			doc2 := doc
 			bulkService.Add(elasticV6.NewBulkIndexRequest().Index(indexName).Type(ess.eType).Doc(&doc2))
@@ -202,7 +167,7 @@ func (ess *ElasticsearchSender) Send(data []Data) (err error) {
 		if err != nil {
 			return
 		}
-	case ElasticVersion5:
+	case sender.ElasticVersion5:
 		bulkService := ess.elasticV5Client.Bulk()
 
 		makeDoc := true
@@ -219,7 +184,7 @@ func (ess *ElasticsearchSender) Send(data []Data) (err error) {
 			}
 			//添加发送时间
 			if ess.logkitSendTime {
-				doc[KeySendTime] = time.Now().In(ess.timeZone)
+				doc[sender.KeySendTime] = time.Now().In(ess.timeZone)
 			}
 			doc2 := doc
 			bulkService.Add(elasticV5.NewBulkIndexRequest().Index(indexName).Type(ess.eType).Doc(&doc2))
@@ -246,7 +211,7 @@ func (ess *ElasticsearchSender) Send(data []Data) (err error) {
 			}
 			//添加发送时间
 			if ess.logkitSendTime {
-				doc[KeySendTime] = time.Now().In(ess.timeZone)
+				doc[sender.KeySendTime] = time.Now().In(ess.timeZone)
 			}
 			doc2 := doc
 			bulkService.Add(elasticV3.NewBulkIndexRequest().Index(indexName).Type(ess.eType).Doc(&doc2))
@@ -295,4 +260,8 @@ func (ess *ElasticsearchSender) wrapDoc(doc map[string]interface{}) map[string]i
 	}
 	//return newDoc
 	return doc
+}
+
+func init() {
+	sender.Add(sender.TypeElastic, NewElasticSender)
 }

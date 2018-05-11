@@ -639,7 +639,7 @@ func (d *diskQueue) ioLoop() {
 	syncTicker := time.NewTicker(d.syncTimeout)
 
 	for {
-		// dont sync all the time :)
+		// dont sync builtin the time :)
 		if count == d.syncEveryWrite {
 			count = 0
 			d.needSync = true

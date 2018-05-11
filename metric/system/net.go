@@ -172,7 +172,7 @@ func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 				fields[name] = value
 			}
 		}
-		fields[KeyNetInterface] = "all"
+		fields[KeyNetInterface] = "builtin"
 		datas = append(datas, fields)
 	}
 	return

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender/common"
+	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 
@@ -32,42 +32,29 @@ type MongoAccSender struct {
 	accumulateKey  []conf.AliasKey
 }
 
-// 可选参数 当sender_type 为mongodb_* 的时候，需要必填的字段
-const (
-	KeyMongodbHost       = "mongodb_host"
-	KeyMongodbDB         = "mongodb_db"
-	KeyMongodbCollection = "mongodb_collection"
-)
-
-// 可选参数 当sender_type 为mongodb_acc 的时候，需要必填的字段
-const (
-	KeyMongodbUpdateKey = "mongodb_acc_updkey"
-	KeyMongodbAccKey    = "mongodb_acc_acckey"
-)
-
 // NewMongodbAccSender mongodb accumulate sender constructor
-func NewMongodbAccSender(conf conf.MapConf) (sender common.Sender, err error) {
-	host, err := conf.GetString(KeyMongodbHost)
+func NewMongodbAccSender(conf conf.MapConf) (mongodbSender sender.Sender, err error) {
+	host, err := conf.GetString(sender.KeyMongodbHost)
 	if err != nil {
 		return
 	}
-	dbName, err := conf.GetString(KeyMongodbDB)
+	dbName, err := conf.GetString(sender.KeyMongodbDB)
 	if err != nil {
 		return
 	}
-	updKey, err := conf.GetAliasList(KeyMongodbUpdateKey)
+	updKey, err := conf.GetAliasList(sender.KeyMongodbUpdateKey)
 	if err != nil {
 		return
 	}
-	accKey, err := conf.GetAliasList(KeyMongodbAccKey)
+	accKey, err := conf.GetAliasList(sender.KeyMongodbAccKey)
 	if err != nil {
 		return
 	}
-	collectionName, err := conf.GetString(KeyMongodbCollection)
+	collectionName, err := conf.GetString(sender.KeyMongodbCollection)
 	if err != nil {
 		return
 	}
-	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("mongodb_acc:(%v,db:%v,collection:%v)", host, dbName, collectionName))
+	name, _ := conf.GetStringOr(sender.KeyName, fmt.Sprintf("mongodb_acc:(%v,db:%v,collection:%v)", host, dbName, collectionName))
 	return newMongoAccSender(name, host, dbName, collectionName, updKey, accKey)
 }
 
@@ -144,7 +131,7 @@ func (s *MongoAccSender) Send(datas []Data) (se error) {
 		}
 	}
 	if len(failure) > 0 && lastErr != nil {
-		ss.ErrorDetail = reqerr.NewSendError("Write failure, last err is: "+lastErr.Error(), common.ConvertDatasBack(failure), reqerr.TypeDefault)
+		ss.ErrorDetail = reqerr.NewSendError("Write failure, last err is: "+lastErr.Error(), sender.ConvertDatasBack(failure), reqerr.TypeDefault)
 	}
 	return ss
 }
@@ -183,4 +170,8 @@ func (s *MongoAccSender) mongoSesssionKeeper(session *mgo.Session) {
 			time.Sleep(time.Second * 5)
 		}
 	}
+}
+
+func init() {
+	sender.Add(sender.TypeMongodbAccumulate, NewMongodbAccSender)
 }

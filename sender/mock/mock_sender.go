@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender/common"
+	"github.com/qiniu/logkit/sender"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
@@ -20,8 +20,8 @@ type MockSender struct {
 }
 
 // NewMockSender 测试用sender
-func NewMockSender(c conf.MapConf) (common.Sender, error) {
-	name, _ := c.GetStringOr(KeyName, "mockSender")
+func NewMockSender(c conf.MapConf) (sender.Sender, error) {
+	name, _ := c.GetStringOr(sender.KeyName, "mockSender")
 	ms := &MockSender{
 		name:  name,
 		count: 0,
@@ -56,4 +56,8 @@ func (mock *MockSender) SendCount() int {
 	mock.mux.Lock()
 	defer mock.mux.Unlock()
 	return mock.count
+}
+
+func init() {
+	sender.Add(sender.TypeMock, NewMockSender)
 }

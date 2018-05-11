@@ -14,8 +14,7 @@ import (
 	"github.com/qiniu/logkit/parser/grok"
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/router"
-	"github.com/qiniu/logkit/sender/common"
-	"github.com/qiniu/logkit/sender/registry"
+	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -200,17 +199,16 @@ func getDataFromSenderConfig(senderConfig map[string]interface{}) ([]Data, error
 	return datas, nil
 }
 
-func getSenders(sendersConf []conf.MapConf) ([]common.Sender, error) {
-	senders := make([]common.Sender, 0)
-	sr := registry.NewSenderRegistry()
+func getSenders(sendersConf []conf.MapConf) ([]sender.Sender, error) {
+	senders := make([]sender.Sender, 0)
 	for i, senderConfig := range sendersConf {
-		senderConfig[KeyFaultTolerant] = "false"
-		s, err := sr.NewSender(senderConfig, "")
+		senderConfig[sender.KeyFaultTolerant] = "false"
+		s, err := sender.Senders.NewSender(senderConfig, "")
 		if err != nil {
 			return nil, err
 		}
 		senders = append(senders, s)
-		delete(sendersConf[i], InnerUserAgent)
+		delete(sendersConf[i], sender.InnerUserAgent)
 	}
 	return senders, nil
 }
@@ -243,7 +241,7 @@ func getRouterConfig(senderConfig map[string]interface{}) (router.RouterConfig, 
 }
 
 // trySend 尝试发送数据，如果此时runner退出返回false，其他情况无论是达到最大重试次数还是发送成功，都返回true
-func trySend(s common.Sender, datas []Data, times int) (err error) {
+func trySend(s sender.Sender, datas []Data, times int) (err error) {
 	if times <= 0 {
 		times = DefaultTryTimes
 	}
@@ -264,7 +262,7 @@ func trySend(s common.Sender, datas []Data, times int) (err error) {
 			cnt++
 			se, ok := err.(*reqerr.SendError)
 			if ok {
-				datas = common.ConvertDatas(se.GetFailDatas())
+				datas = sender.ConvertDatas(se.GetFailDatas())
 				continue
 			}
 			if cnt < times {

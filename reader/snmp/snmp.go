@@ -906,7 +906,7 @@ func snmpTranslateCall(oid string) (mibName string, oidNum string, oidText strin
 	if strings.ContainsAny(oid, ":abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") {
 		out, err = execCmd("snmptranslate", "-Td", "-Ob", oid)
 	} else {
-		out, err = execCmd("snmptranslate", "-Td", "-Ob", "-m", "all", oid)
+		out, err = execCmd("snmptranslate", "-Td", "-Ob", "-m", "builtin", oid)
 		if err, ok := err.(*exec.Error); ok && err.Err == exec.ErrNotFound {
 			return "", oid, oid, "", nil
 		}

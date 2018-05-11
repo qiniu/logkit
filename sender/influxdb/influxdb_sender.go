@@ -15,9 +15,9 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender/common"
 	. "github.com/qiniu/logkit/utils/models"
 
+	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 )
 
@@ -36,47 +36,33 @@ type InfluxdbSender struct {
 	timePrec    int64
 }
 
-// Influxdb sender 的可配置字段
-const (
-	KeyInfluxdbHost               = "influxdb_host"
-	KeyInfluxdbDB                 = "influxdb_db"
-	KeyInfluxdbAutoCreate         = "influxdb_autoCreate"
-	KeyInfluxdbRetetion           = "influxdb_retention"
-	KeyInfluxdbRetetionDuration   = "influxdb_retention_duration"
-	KeyInfluxdbMeasurement        = "influxdb_measurement"
-	KeyInfluxdbTags               = "influxdb_tags"
-	KeyInfluxdbFields             = "influxdb_fields"              // influxdb
-	KeyInfluxdbTimestamp          = "influxdb_timestamp"           // 可选 nano时间戳字段
-	KeyInfluxdbTimestampPrecision = "influxdb_timestamp_precision" // 时间戳字段的精度，代表时间戳1个单位代表多少纳秒
-)
-
 // NewInfluxdbSender 创建Influxdb 的sender
-func NewInfluxdbSender(c conf.MapConf) (s common.Sender, err error) {
-	host, err := c.GetString(KeyInfluxdbHost)
+func NewInfluxdbSender(c conf.MapConf) (influxdbSender sender.Sender, err error) {
+	host, err := c.GetString(sender.KeyInfluxdbHost)
 	if err != nil {
 		return
 	}
-	db, err := c.GetString(KeyInfluxdbDB)
+	db, err := c.GetString(sender.KeyInfluxdbDB)
 	if err != nil {
 		return
 	}
-	autoCreate, _ := c.GetBoolOr(KeyInfluxdbAutoCreate, true)
-	measurement, err := c.GetString(KeyInfluxdbMeasurement)
+	autoCreate, _ := c.GetBoolOr(sender.KeyInfluxdbAutoCreate, true)
+	measurement, err := c.GetString(sender.KeyInfluxdbMeasurement)
 	if err != nil {
 		return
 	}
-	fields, err := c.GetAliasMap(KeyInfluxdbFields)
+	fields, err := c.GetAliasMap(sender.KeyInfluxdbFields)
 	if err != nil {
 		return
 	}
-	tags, _ := c.GetAliasMapOr(KeyInfluxdbTags, make(map[string]string))
-	retention, _ := c.GetStringOr(KeyInfluxdbRetetion, "")
-	duration, _ := c.GetStringOr(KeyInfluxdbRetetionDuration, "")
-	timestamp, _ := c.GetStringOr(KeyInfluxdbTimestamp, "")
-	prec, _ := c.GetIntOr(KeyInfluxdbTimestampPrecision, 1)
-	name, _ := c.GetStringOr(KeyName, fmt.Sprintf("influxdbSender:(%v,db:%v,measurement:%v", host, db, measurement))
+	tags, _ := c.GetAliasMapOr(sender.KeyInfluxdbTags, make(map[string]string))
+	retention, _ := c.GetStringOr(sender.KeyInfluxdbRetetion, "")
+	duration, _ := c.GetStringOr(sender.KeyInfluxdbRetetionDuration, "")
+	timestamp, _ := c.GetStringOr(sender.KeyInfluxdbTimestamp, "")
+	prec, _ := c.GetIntOr(sender.KeyInfluxdbTimestampPrecision, 1)
+	name, _ := c.GetStringOr(sender.KeyName, fmt.Sprintf("influxdbSender:(%v,db:%v,measurement:%v", host, db, measurement))
 
-	s = &InfluxdbSender{
+	influxdbSender = &InfluxdbSender{
 		name:        name,
 		host:        host,
 		db:          db,
@@ -122,7 +108,7 @@ func (s *InfluxdbSender) Send(datas []Data) error {
 	}
 	err := s.sendPoints(ps)
 	if err != nil {
-		return reqerr.NewSendError(s.Name()+" Cannot write data into influxdb, error is "+err.Error(), common.ConvertDatasBack(datas), reqerr.TypeDefault)
+		return reqerr.NewSendError(s.Name()+" Cannot write data into influxdb, error is "+err.Error(), sender.ConvertDatasBack(datas), reqerr.TypeDefault)
 	}
 	return nil
 }
@@ -264,7 +250,7 @@ func (ps Points) Buffer() []byte {
 
 type Tags map[string]string
 
-// HashKey hashes all of a tag's keys.
+// HashKey hashes builtin of a tag's keys.
 func (t Tags) HashKey() []byte {
 	// Empty maps marshal to empty bytes.
 	if len(t) == 0 {
@@ -397,6 +383,11 @@ func (p *Point) GetFields() []byte {
 	}
 	return b
 }
+
+func init() {
+	sender.Add(sender.TypeInfluxdb, NewInfluxdbSender)
+}
+
 func escapeStringField(in string) string {
 	var out []byte
 	i := 0

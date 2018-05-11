@@ -10,20 +10,12 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender/common"
+	"github.com/qiniu/logkit/sender"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 
 	"github.com/json-iterator/go"
-)
-
-const (
-	KeyHttpSenderUrl      = "http_sender_url"
-	KeyHttpSenderGzip     = "http_sender_gzip"
-	KeyHttpSenderProtocol = "http_sender_protocol"
-	KeyHttpSenderCsvHead  = "http_sender_csv_head"
-	KeyHttpSenderCsvSplit = "http_sender_csv_split"
 )
 
 type HttpSender struct {
@@ -36,8 +28,8 @@ type HttpSender struct {
 	runnerName string
 }
 
-func NewHttpSender(c conf.MapConf) (common.Sender, error) {
-	url, err := c.GetString(KeyHttpSenderUrl)
+func NewHttpSender(c conf.MapConf) (sender.Sender, error) {
+	url, err := c.GetString(sender.KeyHttpSenderUrl)
 	if err != nil {
 		return nil, err
 	}
@@ -45,11 +37,11 @@ func NewHttpSender(c conf.MapConf) (common.Sender, error) {
 		url = "http://" + url
 	}
 
-	gZip, _ := c.GetBoolOr(KeyHttpSenderGzip, true)
-	csvHead, _ := c.GetBoolOr(KeyHttpSenderCsvHead, true)
-	csvSplit, _ := c.GetStringOr(KeyHttpSenderCsvSplit, "\t")
-	protocol, _ := c.GetStringOr(KeyHttpSenderProtocol, "json")
-	runnerName, _ := c.GetStringOr(KeyRunnerName, UnderfinedRunnerName)
+	gZip, _ := c.GetBoolOr(sender.KeyHttpSenderGzip, true)
+	csvHead, _ := c.GetBoolOr(sender.KeyHttpSenderCsvHead, true)
+	csvSplit, _ := c.GetStringOr(sender.KeyHttpSenderCsvSplit, "\t")
+	protocol, _ := c.GetStringOr(sender.KeyHttpSenderProtocol, "json")
+	runnerName, _ := c.GetStringOr(KeyRunnerName, sender.UnderfinedRunnerName)
 
 	if protocol == "csv" && csvSplit == "" {
 		csvSplit = "\t"
@@ -212,4 +204,8 @@ func (h *HttpSender) interfaceJoin(dataArray []interface{}, sep string) (string,
 		}
 	}
 	return strings.Join(strData, sep), nil
+}
+
+func init() {
+	sender.Add(sender.TypeHttp, NewHttpSender)
 }

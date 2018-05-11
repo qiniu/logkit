@@ -15,9 +15,9 @@ import (
 	config "github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/sender"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
-	"github.com/qiniu/streaming/src/github.com/qiniu/logkit/sender"
 
 	"github.com/qiniu/log"
 
@@ -65,10 +65,9 @@ type Manager struct {
 }
 
 func NewManager(conf ManagerConfig) (*Manager, error) {
-	sr := sender.NewSenderRegistry()
 	ps := parser.NewRegistry()
 	rr := reader.NewRegistry()
-	return NewCustomManager(conf, rr, ps, sr)
+	return NewCustomManager(conf, rr, ps)
 }
 
 func NewCustomManager(conf ManagerConfig, rr *reader.Registry, pr *parser.Registry, sr *sender.SenderRegistry) (*Manager, error) {
@@ -100,9 +99,9 @@ func NewCustomManager(conf ManagerConfig, rr *reader.Registry, pr *parser.Regist
 		runnerConfig:  make(map[string]RunnerConfig),
 		watchers:      make(map[string]*fsnotify.Watcher),
 		pregistry:     pr,
-		sregistry:     sr,
-		rregistry:     rr,
-		SystemInfo:    utilsos.GetOSInfo().String(),
+		//sregistry:     sr,
+		rregistry:  rr,
+		SystemInfo: utilsos.GetOSInfo().String(),
 	}
 	return m, nil
 }
@@ -263,10 +262,10 @@ func (m *Manager) ForkRunner(confPath string, nconf RunnerConfig, errReturn bool
 			} else {
 				webornot = "Terminal"
 			}
-			nconf.SenderConfig[k][InnerUserAgent] = "logkit/" + m.Version + " " + m.SystemInfo + " " + webornot
+			nconf.SenderConfig[k][sender.InnerUserAgent] = "logkit/" + m.Version + " " + m.SystemInfo + " " + webornot
 		}
 
-		if runner, err = NewCustomRunner(nconf, m.cleanChan, m.rregistry, m.pregistry, m.sregistry); err != nil {
+		if runner, err = NewCustomRunner(nconf, m.cleanChan, m.rregistry, m.pregistry); err != nil {
 			errVal, ok := err.(*os.PathError)
 			if !ok {
 				err = fmt.Errorf("NewRunner(%v) failed: %v", nconf.RunnerName, err)

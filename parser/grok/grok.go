@@ -75,7 +75,7 @@ type Parser struct {
 	//       }
 	typeMap map[string]map[string]string
 
-	// patterns is a map of all of the parsed patterns from CustomPatterns
+	// patterns is a map of builtin of the parsed patterns from CustomPatterns
 	// and CustomPatternFiles.
 	//   ie, {
 	//          "DURATION":      "%{NUMBER}[nuµm]?s"
@@ -279,7 +279,7 @@ func (p *Parser) parseLine(line string) (Data, error) {
 	}
 
 	if len(data) <= 0 {
-		return data, fmt.Errorf("all data was ignored in this line? Check WARN log and fix your grok pattern")
+		return data, fmt.Errorf("builtin data was ignored in this line? Check WARN log and fix your grok pattern")
 	}
 
 	for _, l := range p.labels {

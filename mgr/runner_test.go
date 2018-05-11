@@ -21,12 +21,9 @@ import (
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/router"
 	"github.com/qiniu/logkit/sender"
+	"github.com/qiniu/logkit/sender/mock"
 	_ "github.com/qiniu/logkit/transforms/all"
 	. "github.com/qiniu/logkit/utils/models"
-	"github.com/qiniu/logkit/sender/common"
-	"github.com/qiniu/logkit/sender/mock"
-	"github.com/qiniu/logkit/sender/registry"
-	_ "github.com/qiniu/logkit/transforms/all"
 )
 
 func cleanMetaFolder(path string) {
@@ -141,7 +138,7 @@ func Test_Run(t *testing.T) {
 			"sender_type": "mock",
 		},
 	}
-	var senders []common.Sender
+	var senders []sender.Sender
 	raws, err := mock.NewMockSender(senderConfigs[0])
 	s, succ := raws.(*mock.MockSender)
 	if !succ {
@@ -292,7 +289,7 @@ func Test_RunForEnvTag(t *testing.T) {
 			"sender_type": "mock",
 		},
 	}
-	var senders []common.Sender
+	var senders []sender.Sender
 	raws, err := mock.NewMockSender(senderConfigs[0])
 	s, succ := raws.(*mock.MockSender)
 	if !succ {
@@ -443,7 +440,7 @@ func Test_RunForErrData(t *testing.T) {
 			"sender_type": "mock",
 		},
 	}
-	var senders []common.Sender
+	var senders []sender.Sender
 	raws, err := mock.NewMockSender(senderConfigs[0])
 	s, succ := raws.(*mock.MockSender)
 	if !succ {
@@ -651,7 +648,7 @@ func Test_QiniulogRun(t *testing.T) {
 		t.Error(err)
 	}
 
-	var senders []common.Sender
+	var senders []sender.Sender
 	raws, err := mock.NewMockSender(senderConfigs[0])
 	s, succ := raws.(*mock.MockSender)
 	if !succ {
@@ -1093,11 +1090,7 @@ func TestSyslogRunnerX(t *testing.T) {
 	rc := RunnerConfig{}
 	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
-<<<<<<< HEAD
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewSenderRegistry())
-=======
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewReaderRegistry(), parser.NewParserRegistry(), registry.NewSenderRegistry())
->>>>>>> 2fdb015... adjust sender package
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry())
 	assert.NoError(t, err)
 	go rr.Run()
 	time.Sleep(1 * time.Second)
@@ -1285,11 +1278,7 @@ func TestAddDatatags(t *testing.T) {
 	err = jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
 
-<<<<<<< HEAD
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewSenderRegistry())
-=======
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewReaderRegistry(), parser.NewParserRegistry(), registry.NewSenderRegistry())
->>>>>>> 2fdb015... adjust sender package
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry())
 	assert.NoError(t, err)
 	go rr.Run()
 
@@ -1350,11 +1339,7 @@ func TestRunWithExtra(t *testing.T) {
 	err = jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
 
-<<<<<<< HEAD
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewSenderRegistry())
-=======
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewReaderRegistry(), parser.NewParserRegistry(), registry.NewSenderRegistry())
->>>>>>> 2fdb015... adjust sender package
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry())
 	assert.NoError(t, err)
 	go rr.Run()
 
@@ -1407,7 +1392,7 @@ func TestRunWithDataSource(t *testing.T) {
 	rc := RunnerConfig{}
 	err = jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewSenderRegistry())
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry())
 	assert.NoError(t, err)
 	assert.NotNil(t, rr)
 	go rr.Run()
@@ -1474,7 +1459,7 @@ func TestRunWithDataSourceFial(t *testing.T) {
 	rc := RunnerConfig{}
 	err = jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewSenderRegistry())
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry())
 	assert.NoError(t, err)
 	assert.NotNil(t, rr)
 	go rr.Run()

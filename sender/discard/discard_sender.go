@@ -2,7 +2,7 @@ package discard
 
 import (
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender/common"
+	"github.com/qiniu/logkit/sender"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -14,8 +14,8 @@ type DiscardSender struct {
 }
 
 // NewDiscardSender 仅用于日志清理
-func NewDiscardSender(c conf.MapConf) (common.Sender, error) {
-	name, _ := c.GetStringOr(KeyName, "discardSender")
+func NewDiscardSender(c conf.MapConf) (sender.Sender, error) {
+	name, _ := c.GetStringOr(sender.KeyName, "discardSender")
 	s := &DiscardSender{
 		name:  name,
 		count: 0,
@@ -38,4 +38,8 @@ func (s *DiscardSender) Close() error {
 }
 func (s *DiscardSender) SendCount() int {
 	return s.count
+}
+
+func init() {
+	sender.Add(sender.TypeDiscard, NewDiscardSender)
 }

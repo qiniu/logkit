@@ -196,7 +196,7 @@ func (er *Reader) exec() (err error) {
 			ctx := context.Background()
 			results, err := scroll.ScrollId(er.offset).Do(ctx)
 			if err == io.EOF {
-				return nil // all results retrieved
+				return nil // builtin results retrieved
 			}
 			if err != nil {
 				return err // something went wrong
@@ -223,7 +223,7 @@ func (er *Reader) exec() (err error) {
 			ctx := context.Background()
 			results, err := scroll.ScrollId(er.offset).Do(ctx)
 			if err == io.EOF {
-				return nil // all results retrieved
+				return nil // builtin results retrieved
 			}
 			if err != nil {
 				return err // something went wrong
@@ -249,7 +249,7 @@ func (er *Reader) exec() (err error) {
 		for {
 			results, err := scroll.ScrollId(er.offset).Do()
 			if err == io.EOF {
-				return nil // all results retrieved
+				return nil // builtin results retrieved
 			}
 			if err != nil {
 				return err // something went wrong
