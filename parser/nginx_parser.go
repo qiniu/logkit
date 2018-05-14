@@ -120,11 +120,12 @@ func (p *NginxParser) Parse(lines []string) ([]Data, error) {
 		if err != nil {
 			se.ErrorDetail = err
 			se.AddErrors()
-			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			if !p.disableRecordErrData {
 				errData := make(Data)
 				errData[KeyPandoraStash] = line
 				ret = append(ret, errData)
+			} else {
+				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			}
 			continue
 		}

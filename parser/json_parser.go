@@ -68,12 +68,13 @@ func (im *JsonParser) Parse(lines []string) ([]Data, error) {
 			continue
 		}
 		se.AddErrors()
-		se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 		se.ErrorDetail = err1
 		if !im.disableRecordErrData {
 			errData := make(Data)
 			errData[KeyPandoraStash] = line
 			datas = append(datas, errData)
+		} else {
+			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 		}
 	}
 	return datas, se

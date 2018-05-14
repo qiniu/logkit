@@ -499,12 +499,13 @@ func (p *CsvParser) Parse(lines []string) ([]Data, error) {
 		if err != nil {
 			log.Debug(err)
 			se.AddErrors()
-			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			se.ErrorDetail = err
 			if !p.disableRecordErrData {
 				errData := make(Data)
 				errData[KeyPandoraStash] = line
 				datas = append(datas, errData)
+			} else {
+				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			}
 			continue
 		}
