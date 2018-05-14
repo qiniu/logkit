@@ -74,7 +74,7 @@ func NewScriptReader(meta *Meta, conf conf.MapConf) (sr Reader, err error) {
 			ssr.loop = true
 			ssr.loopDuration, err = parseLoopDuration(cronSchedule)
 			if err != nil {
-				log.Errorf("Runner[%v] %v %v", ssr.meta.RunnerName, sr.Name(), err)
+				log.Errorf("Runner[%v] %v %v", ssr.meta.RunnerName, ssr.Name(), err)
 				err = nil
 			}
 		} else {
@@ -82,7 +82,7 @@ func NewScriptReader(meta *Meta, conf conf.MapConf) (sr Reader, err error) {
 			if err != nil {
 				return
 			}
-			log.Infof("Runner[%v] %v Cron job added with schedule <%v>", ssr.meta.RunnerName, sr.Name(), cronSchedule)
+			log.Infof("Runner[%v] %v Cron job added with schedule <%v>", ssr.meta.RunnerName, ssr.Name(), cronSchedule)
 		}
 	}
 	return ssr, nil
