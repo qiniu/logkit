@@ -55,7 +55,8 @@ class RunnerTable extends Component {
       currentTag: '',
       currentUrl: '',
       data: [],
-      isFiltered: false
+      isFiltered: false,
+      isGetStatus: true
     };
 
   }
@@ -122,6 +123,9 @@ class RunnerTable extends Component {
 
   getStatus = (tag, url) => {
     let that = this
+    that.setState({
+      isGetStatus: true
+    })
     if (window.isCluster && window.isCluster === true) {
       getClusterRunnerConfigs({
         tag: tag ? tag : this.state.currentTag,
@@ -140,7 +144,8 @@ class RunnerTable extends Component {
             if (data.code === 'L200') {
               that.setState({
                 runnerStatus: this.transformStatus(data.data),
-                isLoading: false
+                isLoading: false,
+                isGetStatus: false
               })
             }
           })
@@ -156,7 +161,8 @@ class RunnerTable extends Component {
             if (item.code === 'L200') {
               that.setState({
                 runnerStatus: _.values(item.data),
-                isLoading: false
+                isLoading: false,
+                isGetStatus: false
               })
             }
           })
@@ -174,7 +180,9 @@ class RunnerTable extends Component {
     }
 
     window.statusInterval = setInterval(function () {
-      that.getStatus()
+      if (that.state.isGetStatus === false) {
+        that.getStatus()
+      }
     }, 8000)
 
   }
