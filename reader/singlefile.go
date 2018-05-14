@@ -335,6 +335,7 @@ func (sf *SingleFile) Lag() (rl *LagInfo, err error) {
 	fi, err := os.Stat(sf.originpath)
 	if os.IsNotExist(err) {
 		rl.Size = 0
+		err = nil
 		return
 	}
 	rl.Size += fi.Size()
