@@ -210,10 +210,10 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	if mode == reader.ModeCloudTrail {
 		syncDir := rc.ReaderConfig[reader.KeySyncDirectory]
 		if syncDir == "" {
-			syncDir = reader.DefaultSyncDirectory
+			bucket, prefix, region, ak, sk, _ := reader.GetS3UserInfo(rc.ReaderConfig)
+			syncDir = reader.GetDefualtSyncDir(bucket, prefix, region, ak, sk)
 		}
 		rc.ReaderConfig[reader.KeyLogPath] = syncDir
-
 		if len(rc.CleanerConfig) == 0 {
 			rc.CleanerConfig = conf.MapConf{
 				"delete_enable":       "true",

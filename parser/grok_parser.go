@@ -210,12 +210,13 @@ func (gp *GrokParser) Parse(lines []string) ([]Data, error) {
 		data, err := gp.parseLine(line)
 		if err != nil {
 			se.AddErrors()
-			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			se.ErrorDetail = err
 			if !gp.disableRecordErrData {
 				errData := make(Data)
 				errData[KeyPandoraStash] = line
 				datas = append(datas, errData)
+			} else {
+				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			}
 			continue
 		}

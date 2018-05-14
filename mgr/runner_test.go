@@ -1418,6 +1418,65 @@ func TestRunWithDataSource(t *testing.T) {
 	assert.Equal(t, exp, res)
 }
 
+func TestRunWithDataSourceFial(t *testing.T) {
+	cur, err := os.Getwd()
+	assert.NoError(t, err)
+	dir := filepath.Join(cur, "TestRunWithDataSourceFial")
+	metaDir := filepath.Join(dir, "meta")
+	os.RemoveAll(dir)
+	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
+		log.Fatalf("TestRunWithDataSource error mkdir %v %v", dir, err)
+	}
+	logPath := filepath.Join(dir, "test.log")
+	err = ioutil.WriteFile(logPath, []byte("a\n"), DefaultDirPerm)
+	assert.NoError(t, err)
+
+	defer os.RemoveAll(dir)
+	defer os.RemoveAll(metaDir)
+
+	config1 := `{
+			"name":"TestRunWithDataSourceFial",
+			"batch_len":1,
+			"reader":{
+				"mode":"file",
+				"log_path":"` + logPath + `",
+				"meta_path":"./TestRunWithDataSourceFial/meta",
+				"datasource_tag":"datasource"
+			},
+			"parser":{
+				"name":"testjson",
+				"type":"json"
+			},
+			"senders":[{
+				"name":"file_sender",
+				"sender_type":"file",
+				"file_send_path":"./TestRunWithDataSourceFial/filesend.json"
+			}]
+		}`
+	rc := RunnerConfig{}
+	err = jsoniter.Unmarshal([]byte(config1), &rc)
+	assert.NoError(t, err)
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewReaderRegistry(), parser.NewParserRegistry(), sender.NewSenderRegistry())
+	assert.NoError(t, err)
+	assert.NotNil(t, rr)
+	go rr.Run()
+
+	time.Sleep(2 * time.Second)
+	data, err := ioutil.ReadFile("./TestRunWithDataSourceFial/filesend.json")
+	var res []Data
+	err = json.Unmarshal(data, &res)
+	if err != nil {
+		t.Error(err, string(data))
+	}
+	exp := []Data{
+		{
+			"pandora_stash": "a",
+			"datasource":    logPath,
+		},
+	}
+	assert.Equal(t, exp, res)
+}
+
 func TestClassifySenderData(t *testing.T) {
 	senderCnt := 3
 	datas := []Data{

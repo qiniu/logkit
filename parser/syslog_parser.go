@@ -143,13 +143,14 @@ func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 		d, err := p.parse(line)
 		if err != nil {
 			se.AddErrors()
-			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			se.ErrorDetail = err
 			se.LastError = err.Error()
 			if !p.disableRecordErrData {
 				errData := make(Data)
 				errData[KeyPandoraStash] = line
 				datas = append(datas, errData)
+			} else {
+				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			}
 			continue
 		}

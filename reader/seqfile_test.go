@@ -323,4 +323,10 @@ func TestLag(t *testing.T) {
 	rl, err := sf.Lag()
 	assert.NoError(t, err)
 	assert.Equal(t, &LagInfo{0, "bytes", 0}, rl)
+	createQiniuLogFile(dir)
+	createInvalidSuffixFile(dir)
+
+	rl, err = sf.Lag()
+	assert.NoError(t, err)
+	assert.Equal(t, &LagInfo{16, "bytes", 0}, rl)
 }
