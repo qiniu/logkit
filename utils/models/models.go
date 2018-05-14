@@ -75,10 +75,10 @@ type LagInfo struct {
 
 type StatsError struct {
 	StatsInfo
-	ErrorDetail error `json:"error"`
-	Ft          bool  `json:"-"`
-	FtNotRetry  bool  `json:"-"`
-	ErrorIndex  []int
+	ErrorDetail         error `json:"error"`
+	Ft                  bool  `json:"-"`
+	FtNotRetry          bool  `json:"-"`
+	DatasourceSkipIndex []int
 }
 
 type StatsInfo struct {
@@ -112,7 +112,7 @@ func (se *StatsError) Error() string {
 }
 
 func (se *StatsError) ErrorIndexIn(idx int) bool {
-	for _, v := range se.ErrorIndex {
+	for _, v := range se.DatasourceSkipIndex {
 		if v == idx {
 			return true
 		}

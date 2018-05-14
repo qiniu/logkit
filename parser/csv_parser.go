@@ -492,13 +492,14 @@ func (p *CsvParser) Parse(lines []string) ([]Data, error) {
 			line = strings.TrimSpace(line)
 		}
 		if len(line) <= 0 {
+			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			continue
 		}
 		d, err := p.parse(line)
 		if err != nil {
 			log.Debug(err)
 			se.AddErrors()
-			se.ErrorIndex = append(se.ErrorIndex, idx)
+			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			se.ErrorDetail = err
 			if !p.disableRecordErrData {
 				errData := make(Data)

@@ -47,7 +47,7 @@ type cleanQueue struct {
 type Manager struct {
 	ManagerConfig
 	DefaultDir   string
-	lock         *sync.RWMutex
+	lock         *sync.RWMutex // 这个lock锁住runner的状态，即map runners以及 runnerConfig的情况有变动就要锁住
 	cleanLock    *sync.RWMutex
 	watcherMux   *sync.RWMutex
 	cleanChan    chan cleaner.CleanSignal

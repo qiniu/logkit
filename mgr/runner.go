@@ -530,10 +530,15 @@ func (r *LogExportRunner) Run() {
 		if datasourceTag != "" {
 			if len(datas) == len(froms) {
 				datas = addSourceToData(froms, se, datas, datasourceTag, r.Name(), true)
-			} else if len(datas)+len(se.ErrorIndex) == len(froms) {
+			} else if se != nil && len(datas)+len(se.DatasourceSkipIndex) == len(froms) {
 				datas = addSourceToData(froms, se, datas, datasourceTag, r.Name(), false)
 			} else {
-				log.Errorf("Runner[%v] datasourcetag add error, datas %v not match with froms %v", r.Name(), datas, froms)
+				var selen int
+				if se != nil {
+					selen = len(se.DatasourceSkipIndex)
+				}
+				log.Errorf("Runner[%v] datasourcetag add error, datas(TOTAL %v), datasourceSkipIndex(TOTAL %v) not match with froms(TOTAL %v)", r.Name(), len(datas), selen, len(froms))
+				log.Debugf("Runner[%v] datasourcetag add error, datas %v datasourceSkipIndex %v froms %v", datas, se.DatasourceSkipIndex, froms)
 			}
 		}
 		if len(tags) > 0 {
@@ -616,7 +621,7 @@ func addSourceToData(sourceFroms []string, se *StatsError, datas []Data, datasou
 		if recordErrData {
 			j = i
 		} else {
-			if se.ErrorIndexIn(i) {
+			if se != nil && se.ErrorIndexIn(i) {
 				continue
 			}
 		}
@@ -780,6 +785,12 @@ func (r *LogExportRunner) Status() RunnerStatus {
 	if isFre, elaspedtime = r.getStatusFrequently(now); isFre {
 		return *r.lastRs
 	}
+	sts := r.getRefreshStatus(elaspedtime)
+	return sts
+}
+
+func (r *LogExportRunner) getRefreshStatus(elaspedtime float64) RunnerStatus {
+	now := time.Now()
 	r.rsMutex.Lock()
 	defer r.rsMutex.Unlock()
 	r.rs.Error = ""
