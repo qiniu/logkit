@@ -19,6 +19,7 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/utils/models"
 )
 
 const (
@@ -34,10 +35,12 @@ const (
 	KeySyncConcurrent = "sync_concurrent"
 )
 
-const (
-	DefaultSyncDirectory = "./data"
-	DefaultSyncMetaStore = "./.metastore"
-)
+func GetDefualtSyncDir(bucket, prefix, region, ak, sk string) string {
+	return "data" + models.Hash(ak+sk+region+bucket+prefix)
+}
+func GetDefualtMetaStore(bucket, prefix, region, ak, sk string) string {
+	return ".metastore" + models.Hash(ak+sk+region+bucket+prefix)
+}
 
 var (
 	ignoredSuffixes = []string{".json.gz", ".csv.zip"}
@@ -129,37 +132,50 @@ func invalidConfigError(key, value string, err error) error {
 	return configError(fmt.Sprintf("invalid value(%q) for key %q: %v", key, value, err))
 }
 
+func GetS3UserInfo(conf conf.MapConf) (bucket, prefix, region, ak, sk string, err error) {
+	region, _ = conf.GetString(KeyS3Region)
+	if region == "" {
+		err = emptyConfigError(KeyS3Region)
+		return
+	}
+	ak, _ = conf.GetString(KeyS3AccessKey)
+	if ak == "" {
+		err = emptyConfigError(KeyS3AccessKey)
+		return
+	}
+	sk, _ = conf.GetString(KeyS3SecretKey)
+	if sk == "" {
+		err = emptyConfigError(KeyS3SecretKey)
+		return
+	}
+	bucket, _ = conf.GetString(KeyS3Bucket)
+	if bucket == "" {
+		err = emptyConfigError(KeyS3Bucket)
+		return
+	}
+	prefix, _ = conf.GetStringOr(KeyS3Prefix, "")
+	return
+}
+
 func buildSyncOptions(conf conf.MapConf) (*syncOptions, error) {
 	var opts syncOptions
 	var err error
 
-	opts.region, _ = conf.GetString(KeyS3Region)
-	if opts.region == "" {
-		return nil, emptyConfigError(KeyS3Region)
+	opts.bucket, opts.prefix, opts.region, opts.accessKey, opts.secretKey, err = GetS3UserInfo(conf)
+	if err != nil {
+		return nil, err
 	}
-	opts.accessKey, _ = conf.GetString(KeyS3AccessKey)
-	if opts.accessKey == "" {
-		return nil, emptyConfigError(KeyS3AccessKey)
-	}
-	opts.secretKey, _ = conf.GetString(KeyS3SecretKey)
-	if opts.secretKey == "" {
-		return nil, emptyConfigError(KeyS3SecretKey)
-	}
-	opts.bucket, _ = conf.GetString(KeyS3Bucket)
-	if opts.bucket == "" {
-		return nil, emptyConfigError(KeyS3Bucket)
-	}
-	opts.prefix, _ = conf.GetStringOr(KeyS3Prefix, "")
-	opts.directory, _ = conf.GetStringOr(KeySyncDirectory, DefaultSyncDirectory)
+
+	opts.directory, _ = conf.GetStringOr(KeySyncDirectory, "")
 	if opts.directory == "" {
-		return nil, emptyConfigError(KeySyncDirectory)
+		opts.directory = GetDefualtSyncDir(opts.bucket, opts.prefix, opts.region, opts.accessKey, opts.secretKey)
 	}
 	if err = os.MkdirAll(opts.directory, 0755); err != nil {
 		return nil, fmt.Errorf("cannot create target directory %q: %v", opts.directory, err)
 	}
-	opts.metastore, _ = conf.GetStringOr(KeySyncMetastore, DefaultSyncMetaStore)
+	opts.metastore, _ = conf.GetStringOr(KeySyncMetastore, "")
 	if opts.metastore == "" {
-		return nil, emptyConfigError(KeySyncMetastore)
+		opts.metastore = GetDefualtMetaStore(opts.bucket, opts.prefix, opts.region, opts.accessKey, opts.secretKey)
 	}
 
 	s, _ := conf.GetStringOr(KeySyncInterval, "5m")
