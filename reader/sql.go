@@ -28,6 +28,9 @@ const (
 	mb                 = 1024 * 1024 // 1MB
 	sqlOffsetConnector = "##"
 	SQL_SPLITER        = ";"
+	DefaultMySQL       = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA='DATABASE_NAME';"
+	DefaultPGSQL       = "SELECT TABLENAME FROM PG_TABLES WHERE SCHEMANAME='public';"
+	DefaultMsSQL       = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_CATALOG='DATABASE_NAME';"
 )
 
 type SqlReader struct {
@@ -91,10 +94,7 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (ret Reader, err error) {
 		if err != nil {
 			return nil, err
 		}
-		rawSqls, err = conf.GetStringOr(KeyMysqlSQL, "")
-		if err != nil {
-			return nil, err
-		}
+		rawSqls, _ = conf.GetStringOr(KeyMysqlSQL, "")
 		cronSchedule, _ = conf.GetStringOr(KeyMysqlCron, "")
 		execOnStart, _ = conf.GetBoolOr(KeyMysqlExecOnStart, true)
 		encoder, _ = conf.GetStringOr(KeyEncoding, "")
@@ -113,10 +113,7 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (ret Reader, err error) {
 		if err != nil {
 			return nil, err
 		}
-		rawSqls, err = conf.GetStringOr(KeyMssqlSQL, "")
-		if err != nil {
-			return nil, err
-		}
+		rawSqls, _ = conf.GetStringOr(KeyMssqlSQL, "")
 		cronSchedule, _ = conf.GetStringOr(KeyMssqlCron, "")
 		execOnStart, _ = conf.GetBoolOr(KeyMssqlExecOnStart, true)
 	case ModePG:
@@ -156,10 +153,7 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (ret Reader, err error) {
 				return nil, err
 			}
 		}
-		rawSqls, err = conf.GetStringOr(KeyPGsqlSQL, "")
-		if err != nil {
-			return nil, err
-		}
+		rawSqls, _ = conf.GetStringOr(KeyPGsqlSQL, "")
 		cronSchedule, _ = conf.GetStringOr(KeyPGsqlCron, "")
 		execOnStart, _ = conf.GetBoolOr(KeyPGsqlExecOnStart, true)
 	default:
@@ -180,7 +174,12 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (ret Reader, err error) {
 		return
 	}
 
-	offsets, sqls, omitMeta := restoreMeta(meta, rawSqls, mgld)
+	var sqls []string
+	omitMeta := true
+	var offsets []int64
+	if rawSqls != "" {
+		offsets, sqls, omitMeta = restoreMeta(meta, rawSqls, mgld)
+	}
 
 	mr := &SqlReader{
 		datasource:  dataSource,
@@ -594,6 +593,47 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 		return
 	}
 	//更新sqls
+	tables := make([]string, 0)
+	if mr.rawsqls == "" {
+		var defaultSql string
+		switch mr.dbtype {
+		case ModeMysql:
+			defaultSql = strings.Replace(DefaultMySQL, "DATABASE_NAME", mr.database, -1)
+		case ModePG:
+			defaultSql = DefaultPGSQL
+		case ModeMssql:
+			defaultSql = strings.Replace(DefaultMsSQL, "DATABASE_NAME", mr.database, -1)
+		}
+		rows, err := db.Query(defaultSql)
+		if err != nil {
+			log.Errorf("Runner[%v] %v prepare %v <%v> query error %v", mr.meta.RunnerName, mr.Name(), mr.dbtype, defaultSql, err)
+		}
+
+		for rows.Next() {
+			var s string
+			err = rows.Scan(&s)
+			if err != nil {
+				log.Errorf("Runner[%v] %v scan rows error %v", mr.meta.RunnerName, mr.Name(), err)
+				continue
+			}
+			tables = append(tables, s)
+			mr.rawsqls += "Select * From " + s + ";"
+		}
+		rows.Close()
+
+		log.Infof("Runner[%v] %v get tables %v", mr.meta.RunnerName, mr.Name(), tables)
+		log.Debugf("Runner[%v] %v default sqls %v", mr.meta.RunnerName, mr.Name(), mr.rawsqls)
+
+		offsets, sqls, omitMeta := restoreMeta(mr.meta, mr.rawsqls, mr.magicLagDur)
+		// 如果meta初始信息损坏
+		if !omitMeta {
+			mr.offsets = offsets
+		} else {
+			mr.offsets = make([]int64, len(mr.syncSQLs))
+		}
+		mr.syncSQLs = sqls
+	}
+
 	sqls := updateSqls(mr.rawsqls, now)
 	mr.updateOffsets(sqls)
 	mr.syncSQLs = sqls
