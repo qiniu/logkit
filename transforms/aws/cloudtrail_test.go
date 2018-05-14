@@ -35,7 +35,7 @@ var log1 = `{"Records": [{
         "keyFingerprint": "30:1d:46:d0:5b:ad:7e:1b:b6:70:62:8b:ff:38:b5:e9:ab:5d:b8:21",
         "keyMaterial": "\u003csensitiveDataRemoved\u003e"
     }
-}]}`
+}],"Haha":"nihao"}`
 
 var log1exp = `{
     "eventVersion": "1.0",
@@ -62,7 +62,8 @@ var log1exp = `{
         "keyName": "mykeypair",
         "keyFingerprint": "30:1d:46:d0:5b:ad:7e:1b:b6:70:62:8b:ff:38:b5:e9:ab:5d:b8:21",
         "keyMaterial": "\u003csensitiveDataRemoved\u003e"
-    }
+    },
+	"Haha":"nihao"
 }`
 
 var log2 = `{"Records": [{
