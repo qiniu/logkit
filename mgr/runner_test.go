@@ -1140,7 +1140,7 @@ func TestAddDatasource(t *testing.T) {
 			"source": "e",
 		},
 	}
-	gots := addSourceToData(sourceFroms, se, datas, datasourceTagName, runnername, false)
+	gots := addSourceToData(sourceFroms, se, datas, datasourceTagName, runnername)
 	assert.Equal(t, exp, gots)
 	se = nil
 	exp = []Data{
@@ -1168,7 +1168,7 @@ func TestAddDatasource(t *testing.T) {
 			"f3": "3",
 		},
 	}
-	gots = addSourceToData(sourceFroms, se, datas, datasourceTagName, runnername, false)
+	gots = addSourceToData(sourceFroms, se, datas, datasourceTagName, runnername)
 	assert.Equal(t, exp, gots)
 
 }
@@ -1226,7 +1226,7 @@ func TestAddDatasourceForErrData(t *testing.T) {
 			"source":        "f",
 		},
 	}
-	gots := addSourceToData(sourceFroms, se, datas, datasourceTagName, runnername, true)
+	gots := addSourceToData(sourceFroms, se, datas, datasourceTagName, runnername)
 	assert.Equal(t, exp, gots)
 }
 

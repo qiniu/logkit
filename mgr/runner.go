@@ -528,10 +528,9 @@ func (r *LogExportRunner) Run() {
 
 		//把datasourcetag加到data里，前提是认为[]line变成[]data以后是一一对应的，一旦错位就不加
 		if datasourceTag != "" {
-			if len(datas) == len(froms) {
-				datas = addSourceToData(froms, se, datas, datasourceTag, r.Name(), true)
-			} else if se != nil && len(datas)+len(se.DatasourceSkipIndex) == len(froms) {
-				datas = addSourceToData(froms, se, datas, datasourceTag, r.Name(), false)
+			//只要实际解析后数据比froms小就可以填上
+			if len(datas) <= len(froms) {
+				datas = addSourceToData(froms, se, datas, datasourceTag, r.Name())
 			} else {
 				var selen int
 				if se != nil {
@@ -615,10 +614,11 @@ func classifySenderData(datas []Data, router *router.Router, senderCnt int) [][]
 	return senderDataList
 }
 
-func addSourceToData(sourceFroms []string, se *StatsError, datas []Data, datasourceTagName, runnername string, recordErrData bool) []Data {
+func addSourceToData(sourceFroms []string, se *StatsError, datas []Data, datasourceTagName, runnername string) []Data {
 	j := 0
+	eql := len(sourceFroms) == len(datas)
 	for i, v := range sourceFroms {
-		if recordErrData {
+		if eql {
 			j = i
 		} else {
 			if se != nil && se.ErrorIndexIn(i) {
