@@ -137,12 +137,13 @@ func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 	var datas []Data
 	for idx, line := range lines {
 		if len(strings.TrimSpace(line)) <= 0 {
+			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			continue
 		}
 		d, err := p.parse(line)
 		if err != nil {
 			se.AddErrors()
-			se.ErrorIndex = append(se.ErrorIndex, idx)
+			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			se.ErrorDetail = err
 			se.LastError = err.Error()
 			if !p.disableRecordErrData {

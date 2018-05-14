@@ -1339,5 +1339,6 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		OptionKeyValidFilePattern,
 		OptionKeySkipFileFirstLine,
+		OptionDataSourceTag,
 	},
 }
