@@ -36,8 +36,9 @@ const (
 )
 
 func GetDefualtSyncDir(bucket, prefix, region, ak, sk string) string {
-	return "s3data/data" + models.Hash(ak+sk+region+bucket+prefix)
+	return filepath.Join("s3data", "data"+models.Hash(ak+sk+region+bucket+prefix))
 }
+
 func GetDefualtMetaStore(bucket, prefix, region, ak, sk string) string {
 	return ".metastore" + models.Hash(ak+sk+region+bucket+prefix)
 }
