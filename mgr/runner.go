@@ -443,10 +443,6 @@ func (r *LogExportRunner) Run() {
 				time.Sleep(1 * time.Second)
 				continue
 			}
-			if len(line) >= r.MaxBatchSize {
-				log.Errorf("Runner[%v] reader %s read lines larger than MaxBatchSize %v, sample content is %s , ignore it...", r.Name(), r.reader.Name(), r.MaxBatchSize, getSampleContent(line, r.MaxBatchSize))
-				continue
-			}
 			r.rsMutex.Lock()
 			r.rs.ReadDataSize += int64(len(line))
 			r.rs.ReadDataCount++
