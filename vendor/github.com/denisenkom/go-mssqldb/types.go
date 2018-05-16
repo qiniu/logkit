@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"strconv"
 	"time"
+
+	"github.com/denisenkom/go-mssqldb/internal/cp"
 )
 
 // fixed-length data types
@@ -79,7 +81,7 @@ type typeInfo struct {
 	Scale     uint8
 	Prec      uint8
 	Buffer    []byte
-	Collation collation
+	Collation cp.Collation
 	UdtInfo   udtInfo
 	XmlInfo   xmlInfo
 	Reader    func(ti *typeInfo, r *tdsBuffer) (res interface{})
@@ -345,6 +347,10 @@ func readByteLenType(ti *typeInfo, r *tdsBuffer) interface{} {
 		default:
 			badStreamPanicf("Invalid size for MONEYNTYPE")
 		}
+	case typeDateTim4:
+		return decodeDateTim4(buf)
+	case typeDateTime:
+		return decodeDateTime(buf)
 	case typeDateTimeN:
 		switch len(buf) {
 		case 4:
@@ -480,6 +486,20 @@ func writeLongLenType(w io.Writer, ti typeInfo, buf []byte) (err error) {
 		return
 	}
 	_, err = w.Write(buf)
+	return
+}
+
+func readCollation(r *tdsBuffer) (res cp.Collation) {
+	res.LcidAndFlags = r.uint32()
+	res.SortId = r.byte()
+	return
+}
+
+func writeCollation(w io.Writer, col cp.Collation) (err error) {
+	if err = binary.Write(w, binary.LittleEndian, col.LcidAndFlags); err != nil {
+		return
+	}
+	err = binary.Write(w, binary.LittleEndian, col.SortId)
 	return
 }
 
@@ -844,8 +864,8 @@ func dateTime2(t time.Time) (days int32, ns int64) {
 	return
 }
 
-func decodeChar(col collation, buf []byte) string {
-	return charset2utf8(col, buf)
+func decodeChar(col cp.Collation, buf []byte) string {
+	return cp.CharsetToUTF8(col, buf)
 }
 
 func decodeUcs2(buf []byte) string {
@@ -918,7 +938,7 @@ func makeGoLangScanType(ti typeInfo) reflect.Type {
 		return reflect.TypeOf(true)
 	case typeDecimalN, typeNumericN:
 		return reflect.TypeOf([]byte{})
-	case typeMoneyN:
+	case typeMoney, typeMoney4, typeMoneyN:
 		switch ti.Size {
 		case 4:
 			return reflect.TypeOf([]byte{})
@@ -963,6 +983,8 @@ func makeGoLangScanType(ti typeInfo) reflect.Type {
 	case typeNText:
 		return reflect.TypeOf("")
 	case typeImage:
+		return reflect.TypeOf([]byte{})
+	case typeBigBinary:
 		return reflect.TypeOf([]byte{})
 	case typeVariant:
 		return reflect.TypeOf(nil)
@@ -1052,10 +1074,10 @@ func makeDecl(ti typeInfo) string {
 		}
 	case typeBit, typeBitN:
 		return "bit"
-	case typeDateTim4:
-		return "smalldatetime"
 	case typeDateN:
 		return "date"
+	case typeDateTim4:
+		return "smalldatetime"
 	case typeDateTime:
 		return "datetime"
 	case typeDateTimeN:
@@ -1077,6 +1099,8 @@ func makeDecl(ti typeInfo) string {
 		return "ntext"
 	case typeUdt:
 		return ti.UdtInfo.TypeName
+	case typeGuid:
+		return "uniqueidentifier"
 	default:
 		panic(fmt.Sprintf("not implemented makeDecl for type %#x", ti.TypeId))
 	}
@@ -1134,7 +1158,7 @@ func makeGoLangTypeName(ti typeInfo) string {
 		return "BIT"
 	case typeDecimalN, typeNumericN:
 		return "DECIMAL"
-	case typeMoneyN:
+	case typeMoney, typeMoney4, typeMoneyN:
 		switch ti.Size {
 		case 4:
 			return "SMALLMONEY"
@@ -1143,6 +1167,10 @@ func makeGoLangTypeName(ti typeInfo) string {
 		default:
 			panic("invalid size of MONEYN")
 		}
+	case typeDateTim4:
+		return "SMALLDATETIME"
+	case typeDateTime:
+		return "DATETIME"
 	case typeDateTimeN:
 		switch ti.Size {
 		case 4:
@@ -1178,6 +1206,8 @@ func makeGoLangTypeName(ti typeInfo) string {
 		return "IMAGE"
 	case typeVariant:
 		return "SQL_VARIANT"
+	case typeBigBinary:
+		return "BINARY"
 	default:
 		panic(fmt.Sprintf("not implemented makeDecl for type %d", ti.TypeId))
 	}
@@ -1235,7 +1265,7 @@ func makeGoLangTypeLength(ti typeInfo) (int64, bool) {
 		return 0, false
 	case typeDecimalN, typeNumericN:
 		return 0, false
-	case typeMoneyN:
+	case typeMoney, typeMoney4, typeMoneyN:
 		switch ti.Size {
 		case 4:
 			return 0, false
@@ -1244,6 +1274,8 @@ func makeGoLangTypeLength(ti typeInfo) (int64, bool) {
 		default:
 			panic("invalid size of MONEYN")
 		}
+	case typeDateTim4, typeDateTime:
+		return 0, false
 	case typeDateTimeN:
 		switch ti.Size {
 		case 4:
@@ -1296,6 +1328,8 @@ func makeGoLangTypeLength(ti typeInfo) (int64, bool) {
 	case typeImage:
 		return 2147483647, true
 	case typeVariant:
+		return 0, false
+	case typeBigBinary:
 		return 0, false
 	default:
 		panic(fmt.Sprintf("not implemented makeDecl for type %d", ti.TypeId))
@@ -1354,7 +1388,7 @@ func makeGoLangTypePrecisionScale(ti typeInfo) (int64, int64, bool) {
 		return 0, 0, false
 	case typeDecimalN, typeNumericN:
 		return int64(ti.Prec), int64(ti.Scale), true
-	case typeMoneyN:
+	case typeMoney, typeMoney4, typeMoneyN:
 		switch ti.Size {
 		case 4:
 			return 0, 0, false
@@ -1363,6 +1397,8 @@ func makeGoLangTypePrecisionScale(ti typeInfo) (int64, int64, bool) {
 		default:
 			panic("invalid size of MONEYN")
 		}
+	case typeDateTim4, typeDateTime:
+		return 0, 0, false
 	case typeDateTimeN:
 		switch ti.Size {
 		case 4:
@@ -1403,6 +1439,8 @@ func makeGoLangTypePrecisionScale(ti typeInfo) (int64, int64, bool) {
 	case typeImage:
 		return 0, 0, false
 	case typeVariant:
+		return 0, 0, false
+	case typeBigBinary:
 		return 0, 0, false
 	default:
 		panic(fmt.Sprintf("not implemented makeDecl for type %d", ti.TypeId))
