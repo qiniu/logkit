@@ -32,18 +32,21 @@ type SeqFile struct {
 	meta *Meta
 	mux  sync.Mutex
 
-	dir               string   // 文件目录
-	currFile          string   // 当前处理文件名
-	f                 *os.File // 当前处理文件
-	ratereader        io.ReadCloser
-	inode             uint64   // 当前文件inode
-	offset            int64    // 当前处理文件offset
-	ignoreHidden      bool     // 忽略隐藏文件
-	ignoreFileSuffix  []string // 忽略文件后缀
-	newFileAsNewLine  bool     //新文件自动加换行符
-	validFilePattern  string   // 合法的文件名正则表达式
-	stopped           int32    // 停止标志位
-	skipFileFirstLine bool     //跳过新文件的第一行，常用于带title的csv文件，title与实际格式不同
+	dir              string   // 文件目录
+	currFile         string   // 当前处理文件名
+	f                *os.File // 当前处理文件
+	ratereader       io.ReadCloser
+	inode            uint64   // 当前文件inode
+	offset           int64    // 当前处理文件offset
+	ignoreHidden     bool     // 忽略隐藏文件
+	ignoreFileSuffix []string // 忽略文件后缀
+
+	newFileAsNewLine bool //新文件自动加换行符
+	newLineNotAdded  bool //文件最后的部分正好填满buffer，导致\n符号加不上，此时要用这个变量
+
+	validFilePattern  string // 合法的文件名正则表达式
+	stopped           int32  // 停止标志位
+	skipFileFirstLine bool   //跳过新文件的第一行，常用于带title的csv文件，title与实际格式不同
 	hasSkiped         bool
 
 	lastSyncPath   string
@@ -102,11 +105,14 @@ func NewSeqFile(meta *Meta, path string, ignoreHidden, newFileNewLine bool, suff
 		validFilePattern: validFileRegex,
 		mux:              sync.Mutex{},
 		newFileAsNewLine: newFileNewLine,
+		meta:             meta,
 	}
 	//原来的for循环替换成单次执行，启动的时候出错就直接报错给用户即可，不需要等待重试。
 	f, dir, currFile, offset, err := getStartFile(path, whence, meta, sf)
 	if err != nil {
-		return
+		log.Warnf("Runner[%v] NewSeqFile reader getStartFile from dir %v error %v, will find during read...", sf.meta.RunnerName, path, err)
+		err = nil
+		dir = path
 	}
 	if f != nil {
 		_, err = f.Seek(offset, io.SeekStart)
@@ -126,7 +132,6 @@ func NewSeqFile(meta *Meta, path string, ignoreHidden, newFileNewLine bool, suff
 		sf.f = nil
 		sf.offset = 0
 	}
-	sf.meta = meta
 	sf.dir = dir
 	sf.currFile = currFile
 	return sf, nil
@@ -242,6 +247,11 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 	defer sf.mux.Unlock()
 	n = 0
 	for n < len(p) {
+		if sf.newLineNotAdded {
+			p[n] = '\n'
+			n++
+			sf.newLineNotAdded = false
+		}
 		var n1 int
 		if sf.f == nil {
 			if atomic.LoadInt32(&sf.stopped) > 0 {
@@ -289,8 +299,12 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 			}
 			if fi != nil {
 				if sf.newFileAsNewLine {
-					p[n] = '\n'
-					n++
+					if n < len(p) {
+						p[n] = '\n'
+						n++
+					} else {
+						sf.newLineNotAdded = true
+					}
 				}
 				log.Infof("Runner[%v] %s - nextFile: %s", sf.meta.RunnerName, sf.dir, fi.Name())
 				err2 := sf.open(fi)
@@ -308,23 +322,34 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 	return
 }
 
-func (sf *SeqFile) nextFile() (fi os.FileInfo, err error) {
+func (sf *SeqFile) getNextFileCondition() (condition func(os.FileInfo) bool, err error) {
+	condition = sf.getIgnoreCondition()
+	if sf.currFile == "" {
+		return
+	}
 	currFi, err := os.Stat(sf.currFile)
-	var condition func(os.FileInfo) bool
 	if err != nil {
 		if !os.IsNotExist(err) {
 			// 日志读取错误
 			log.Errorf("Runner[%v] stat current file error %v, need retry", sf.meta.RunnerName, err)
 			return
 		}
+		err = nil
 		// 当前读取的文件已经被删除
 		log.Debugf("Runner[%v] stat current file [%v] error %v, start to find the oldest file", sf.meta.RunnerName, sf.currFile, err)
-		condition = sf.getIgnoreCondition()
-	} else {
-		newerThanCurrFile := func(f os.FileInfo) bool {
-			return modTimeLater(f, currFi)
-		}
-		condition = andCondition(newerThanCurrFile, sf.getIgnoreCondition())
+		return
+	}
+	newerThanCurrFile := func(f os.FileInfo) bool {
+		return modTimeLater(f, currFi)
+	}
+	condition = andCondition(newerThanCurrFile, sf.getIgnoreCondition())
+	return
+}
+
+func (sf *SeqFile) nextFile() (fi os.FileInfo, err error) {
+	condition, err := sf.getNextFileCondition()
+	if err != nil {
+		return
 	}
 	fi, err = getMinFile(sf.dir, condition, modTimeLater)
 	if err != nil {
