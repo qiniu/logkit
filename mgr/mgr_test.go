@@ -387,7 +387,7 @@ func Test_Watch(t *testing.T) {
 		t.Error(err)
 	}
 	if !reflect.DeepEqual(gots, exps) {
-		t.Errorf("test cleaner error exps %v but got %v, after add builtin filedones", exps, gots)
+		t.Errorf("test cleaner error exps %v but got %v, after add all filedones", exps, gots)
 	}
 	time.Sleep(2 * time.Second)
 	// 移除一个文件，变成三个runner

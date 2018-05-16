@@ -201,9 +201,10 @@ func getDataFromSenderConfig(senderConfig map[string]interface{}) ([]Data, error
 
 func getSenders(sendersConf []conf.MapConf) ([]sender.Sender, error) {
 	senders := make([]sender.Sender, 0)
+	sr := sender.NewRegistry()
 	for i, senderConfig := range sendersConf {
 		senderConfig[sender.KeyFaultTolerant] = "false"
-		s, err := sender.Senders.NewSender(senderConfig, "")
+		s, err := sr.NewSender(senderConfig, "")
 		if err != nil {
 			return nil, err
 		}

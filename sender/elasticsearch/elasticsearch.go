@@ -7,19 +7,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/reader"
-	"github.com/qiniu/logkit/sender"
-	. "github.com/qiniu/logkit/utils/models"
-
 	elasticV6 "github.com/olivere/elastic"
 	elasticV3 "gopkg.in/olivere/elastic.v3"
 	elasticV5 "gopkg.in/olivere/elastic.v5"
+
+	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/sender"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
-// ElasticsearchSender ElasticSearch sender
-type ElasticsearchSender struct {
+// elasticsearch sender
+type Sender struct {
 	name string
 
 	host            []string
@@ -38,8 +37,12 @@ type ElasticsearchSender struct {
 	logkitSendTime bool
 }
 
-// NewElasticSender New ElasticSender
-func NewElasticSender(conf conf.MapConf) (elasticSender sender.Sender, err error) {
+func init() {
+	sender.RegisterConstructor(sender.TypeElastic, NewSender)
+}
+
+// elasticsearch sender
+func NewSender(conf conf.MapConf) (elasticSender sender.Sender, err error) {
 	host, err := conf.GetStringList(sender.KeyElasticHost)
 	if err != nil {
 		return
@@ -80,7 +83,7 @@ func NewElasticSender(conf conf.MapConf) (elasticSender sender.Sender, err error
 	var elasticV5Client *elasticV5.Client
 	var elasticV6Client *elasticV6.Client
 	switch eVersion {
-	case reader.ElasticVersion6:
+	case sender.ElasticVersion6:
 		elasticV6Client, err = elasticV6.NewClient(
 			elasticV6.SetSniff(false),
 			elasticV6.SetHealthcheck(false),
@@ -88,7 +91,7 @@ func NewElasticSender(conf conf.MapConf) (elasticSender sender.Sender, err error
 		if err != nil {
 			return
 		}
-	case reader.ElasticVersion5:
+	case sender.ElasticVersion5:
 		elasticV5Client, err = elasticV5.NewClient(
 			elasticV5.SetSniff(false),
 			elasticV5.SetHealthcheck(false),
@@ -103,7 +106,7 @@ func NewElasticSender(conf conf.MapConf) (elasticSender sender.Sender, err error
 		}
 	}
 
-	return &ElasticsearchSender{
+	return &Sender{
 		name:            name,
 		host:            host,
 		indexName:       index,
@@ -133,12 +136,12 @@ func machPattern(s string, strategys []string) (i int, err error) {
 }
 
 // Name ElasticSearchSenderName
-func (ess *ElasticsearchSender) Name() string {
+func (ess *Sender) Name() string {
 	return "//" + ess.indexName
 }
 
 // Send ElasticSearchSender
-func (ess *ElasticsearchSender) Send(data []Data) (err error) {
+func (ess *Sender) Send(data []Data) (err error) {
 	switch ess.eVersion {
 	case sender.ElasticVersion6:
 		bulkService := ess.elasticV6Client.Bulk()
@@ -242,11 +245,11 @@ func buildIndexName(indexName string, timeZone *time.Location, size int) string 
 }
 
 // Close ElasticSearch Sender Close
-func (ess *ElasticsearchSender) Close() error {
+func (ess *Sender) Close() error {
 	return nil
 }
 
-func (ess *ElasticsearchSender) wrapDoc(doc map[string]interface{}) map[string]interface{} {
+func (ess *Sender) wrapDoc(doc map[string]interface{}) map[string]interface{} {
 	//newDoc := make(map[string]interface{})
 	for oldKey, newKey := range ess.aliasFields {
 		val, ok := doc[oldKey]
@@ -260,8 +263,4 @@ func (ess *ElasticsearchSender) wrapDoc(doc map[string]interface{}) map[string]i
 	}
 	//return newDoc
 	return doc
-}
-
-func init() {
-	sender.Add(sender.TypeElastic, NewElasticSender)
 }

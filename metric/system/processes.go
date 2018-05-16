@@ -147,7 +147,7 @@ func getEmptyFields() map[string]interface{} {
 	return fields
 }
 
-// exec `ps` to get builtin process states
+// exec `ps` to get all process states
 func (p *Processes) gatherFromPS(fields map[string]interface{}) error {
 	out, err := p.execPS()
 	if err != nil {
@@ -248,11 +248,11 @@ func (p *Processes) gatherFromProc(fields map[string]interface{}) error {
 	return nil
 }
 
-//  For windows, get builtin process states
+//  For windows, get all process states
 func (p *Processes) getWinStat(fields map[string]interface{}) error {
 	pids, err := process.Pids()
 	if err != nil {
-		return fmt.Errorf("Get builtin processes pids failed, error: %v", err.Error())
+		return fmt.Errorf("Get all processes pids failed, error: %v", err.Error())
 	}
 	// total processes
 	fields[KeyProcessesTotal] = int64(len(pids))

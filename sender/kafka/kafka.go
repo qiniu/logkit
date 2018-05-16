@@ -6,17 +6,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
-	. "github.com/qiniu/logkit/utils/models"
+	"github.com/Shopify/sarama"
+	"github.com/json-iterator/go"
 
 	"github.com/qiniu/log"
 
-	"github.com/Shopify/sarama"
-	"github.com/json-iterator/go"
+	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/sender"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
-type KafkaSender struct {
+type Sender struct {
 	name  string
 	hosts []string
 	topic []string
@@ -33,7 +33,12 @@ var (
 	}
 )
 
-func NewKafkaSender(conf conf.MapConf) (kafkaSender sender.Sender, err error) {
+func init() {
+	sender.RegisterConstructor(sender.TypeKafka, NewSender)
+}
+
+// kafka sender
+func NewSender(conf conf.MapConf) (kafkaSender sender.Sender, err error) {
 	hosts, err := conf.GetStringList(sender.KeyKafkaHost)
 	if err != nil {
 		return
@@ -93,12 +98,12 @@ func NewKafkaSender(conf conf.MapConf) (kafkaSender sender.Sender, err error) {
 		return
 	}
 
-	kafkaSender = newKafkaSender(name, hosts, topic, cfg, producer)
+	kafkaSender = newSender(name, hosts, topic, cfg, producer)
 	return
 }
 
-func newKafkaSender(name string, hosts []string, topic []string, cfg *sarama.Config, producer sarama.SyncProducer) (k *KafkaSender) {
-	k = &KafkaSender{
+func newSender(name string, hosts []string, topic []string, cfg *sarama.Config, producer sarama.SyncProducer) (k *Sender) {
+	k = &Sender{
 		name:     name,
 		hosts:    hosts,
 		topic:    topic,
@@ -108,11 +113,11 @@ func newKafkaSender(name string, hosts []string, topic []string, cfg *sarama.Con
 	return
 }
 
-func (this *KafkaSender) Name() string {
+func (this *Sender) Name() string {
 	return this.name
 }
 
-func (this *KafkaSender) Send(data []Data) error {
+func (this *Sender) Send(data []Data) error {
 	producer := this.producer
 	var msgs []*sarama.ProducerMessage
 	ss := &StatsError{}
@@ -140,7 +145,7 @@ func (this *KafkaSender) Send(data []Data) error {
 	return ss
 }
 
-func (kf *KafkaSender) getEventMessage(event map[string]interface{}) (pm *sarama.ProducerMessage, err error) {
+func (kf *Sender) getEventMessage(event map[string]interface{}) (pm *sarama.ProducerMessage, err error) {
 	var topic string
 	if len(kf.topic) == 2 {
 		if event[kf.topic[0]] == nil || event[kf.topic[0]] == "" {
@@ -166,13 +171,9 @@ func (kf *KafkaSender) getEventMessage(event map[string]interface{}) (pm *sarama
 	return
 }
 
-func (this *KafkaSender) Close() (err error) {
+func (this *Sender) Close() (err error) {
 	log.Infof("kafka sender was closed")
 	this.producer.Close()
 	this.producer = nil
 	return nil
-}
-
-func init() {
-	sender.Add(sender.TypeKafka, NewKafkaSender)
 }

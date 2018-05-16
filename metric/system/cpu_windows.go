@@ -41,7 +41,7 @@ func (s *CPUStats) Collect() (datas []map[string]interface{}, err error) {
 			continue
 		}
 		// cpu usage stats
-		// if s.PerCPU == true CPUTimes() return cpu usage pct stats and for builtin cpu core
+		// if s.PerCPU == true CPUTimes() return cpu usage pct stats and for all cpu core
 		// merge "_Total"  to "cpu_total"
 		if isTotalCpuUsageStat(cts.CPU) {
 			cts.CPU = MetricCPUTotalKey

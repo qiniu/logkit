@@ -20,6 +20,7 @@ import (
 	"unsafe"
 
 	"github.com/axgle/mahonia"
+
 	"github.com/qiniu/log"
 
 	. "github.com/qiniu/logkit/utils/models"
@@ -267,7 +268,7 @@ func (b *BufReader) buffered() int { return b.w - b.r }
 // returning a slice pointing at the bytes in the buffer.
 // The bytes stop being valid at the next read.
 // If readSlice encounters an error before finding a delimiter,
-// it returns builtin the data in the buffer and the error itself (often io.EOF).
+// it returns all the data in the buffer and the error itself (often io.EOF).
 // readSlice fails with error ErrBufferFull if the buffer fills without a delim.
 // Because the data returned from readSlice will be overwritten
 // by the next I/O operation, most clients should use

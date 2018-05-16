@@ -1,4 +1,4 @@
-package mock
+package mock_pandora
 
 import (
 	"bufio"
@@ -12,13 +12,13 @@ import (
 	"sync"
 	"time"
 
-	. "github.com/qiniu/logkit/utils/models"
+	"github.com/json-iterator/go"
+	"github.com/labstack/echo"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 
-	jsoniter "github.com/json-iterator/go"
-	"github.com/labstack/echo"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 type mock_pandora struct {

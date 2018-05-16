@@ -12,11 +12,8 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
-<<<<<<< HEAD
 	"github.com/qiniu/logkit/reader/http"
-=======
 	"github.com/qiniu/logkit/sender"
->>>>>>> ef3ee30... sender change
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -123,7 +120,7 @@ func TestHttpSender(t *testing.T) {
 		KeyRunnerName:                "testRunner",
 		sender.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
 	}
-	httpSender, err := NewHttpSender(senderConf)
+	httpSender, err := NewSender(senderConf)
 	assert.NoError(t, err)
 
 	for _, val := range testData {
@@ -148,7 +145,7 @@ func TestHttpSender(t *testing.T) {
 		KeyRunnerName:                "testRunner",
 		sender.KeyHttpSenderUrl:      "127.0.0.1:8000/logkit/data",
 	}
-	httpSender, err = NewHttpSender(senderConf)
+	httpSender, err = NewSender(senderConf)
 	assert.NoError(t, err)
 
 	for _, val := range testData {
@@ -173,7 +170,7 @@ func TestHttpSender(t *testing.T) {
 		KeyRunnerName:                "testRunner",
 		sender.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
 	}
-	httpSender, err = NewHttpSender(senderConf)
+	httpSender, err = NewSender(senderConf)
 	assert.NoError(t, err)
 
 	for _, val := range testData {
@@ -208,7 +205,7 @@ func TestHttpSender(t *testing.T) {
 		KeyRunnerName:                "testRunner",
 		sender.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
 	}
-	httpSender, err = NewHttpSender(senderConf)
+	httpSender, err = NewSender(senderConf)
 	assert.NoError(t, err)
 
 	for _, val := range testData {
@@ -243,7 +240,7 @@ func TestHttpSender(t *testing.T) {
 		KeyRunnerName:                "testRunner",
 		sender.KeyHttpSenderUrl:      "127.0.0.1:8000/logkit/data",
 	}
-	httpSender, err = NewHttpSender(senderConf)
+	httpSender, err = NewSender(senderConf)
 	assert.NoError(t, err)
 
 	for _, val := range testData {

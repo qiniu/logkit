@@ -8,12 +8,13 @@ import (
 	"time"
 
 	"github.com/json-iterator/go"
-	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/conf"
 	"github.com/robfig/cron"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
+	"github.com/qiniu/log"
+
+	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"

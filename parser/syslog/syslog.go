@@ -50,7 +50,7 @@ func (w *parserWrapper) Dump() LogParts {
 }
 
 func DetectType(data []byte) (detected int) {
-	// builtin formats have a sapce somewhere
+	// all formats have a sapce somewhere
 	if i := bytes.IndexByte(data, ' '); i > 0 {
 		pLength := data[0:i]
 		if _, err := strconv.Atoi(string(pLength)); err == nil {
@@ -241,7 +241,7 @@ func (f *RFC5424) GetParser(line []byte) Parser {
 }
 
 func (f *RFC5424) IsNewLine(data []byte) bool {
-	// builtin formats have a sapce somewhere
+	// all formats have a sapce somewhere
 	if i := bytes.IndexByte(data, ' '); i > 0 {
 		if len(data) < 1 || data[0] != '<' {
 			return false

@@ -21,8 +21,9 @@ import (
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/router"
 	"github.com/qiniu/logkit/sender"
+	_ "github.com/qiniu/logkit/sender/builtin"
 	"github.com/qiniu/logkit/sender/mock"
-	_ "github.com/qiniu/logkit/transforms/all"
+	_ "github.com/qiniu/logkit/transforms/builtin"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -139,8 +140,8 @@ func Test_Run(t *testing.T) {
 		},
 	}
 	var senders []sender.Sender
-	raws, err := mock.NewMockSender(senderConfigs[0])
-	s, succ := raws.(*mock.MockSender)
+	raws, err := mock.NewSender(senderConfigs[0])
+	s, succ := raws.(*mock.Sender)
 	if !succ {
 		t.Error("sender should be mock sender")
 	}
@@ -290,8 +291,8 @@ func Test_RunForEnvTag(t *testing.T) {
 		},
 	}
 	var senders []sender.Sender
-	raws, err := mock.NewMockSender(senderConfigs[0])
-	s, succ := raws.(*mock.MockSender)
+	raws, err := mock.NewSender(senderConfigs[0])
+	s, succ := raws.(*mock.Sender)
 	if !succ {
 		t.Error("sender should be mock sender")
 	}
@@ -441,8 +442,8 @@ func Test_RunForErrData(t *testing.T) {
 		},
 	}
 	var senders []sender.Sender
-	raws, err := mock.NewMockSender(senderConfigs[0])
-	s, succ := raws.(*mock.MockSender)
+	raws, err := mock.NewSender(senderConfigs[0])
+	s, succ := raws.(*mock.Sender)
 	if !succ {
 		t.Error("sender should be mock sender")
 	}
@@ -630,7 +631,7 @@ func Test_QiniulogRun(t *testing.T) {
 		RunnerInfo:    rinfo,
 		ReaderConfig:  readerConfig,
 		ParserConf:    parseConf,
-		SenderConfig:  senderConfigs,
+		SendersConfig: senderConfigs,
 		IsInWebFolder: false,
 	}
 	rc = Compatible(rc)
@@ -649,8 +650,8 @@ func Test_QiniulogRun(t *testing.T) {
 	}
 
 	var senders []sender.Sender
-	raws, err := mock.NewMockSender(senderConfigs[0])
-	s, succ := raws.(*mock.MockSender)
+	raws, err := mock.NewSender(senderConfigs[0])
+	s, succ := raws.(*mock.Sender)
 	if !succ {
 		t.Error("sender should be mock sender")
 	}
@@ -1090,7 +1091,7 @@ func TestSyslogRunnerX(t *testing.T) {
 	rc := RunnerConfig{}
 	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry())
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
 	assert.NoError(t, err)
 	go rr.Run()
 	time.Sleep(1 * time.Second)
@@ -1278,7 +1279,7 @@ func TestAddDatatags(t *testing.T) {
 	err = jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
 
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry())
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
 	assert.NoError(t, err)
 	go rr.Run()
 
@@ -1339,7 +1340,7 @@ func TestRunWithExtra(t *testing.T) {
 	err = jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
 
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry())
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
 	assert.NoError(t, err)
 	go rr.Run()
 
@@ -1392,7 +1393,7 @@ func TestRunWithDataSource(t *testing.T) {
 	rc := RunnerConfig{}
 	err = jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry())
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
 	assert.NoError(t, err)
 	assert.NotNil(t, rr)
 	go rr.Run()
@@ -1459,7 +1460,7 @@ func TestRunWithDataSourceFial(t *testing.T) {
 	rc := RunnerConfig{}
 	err = jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry())
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
 	assert.NoError(t, err)
 	assert.NotNil(t, rr)
 	go rr.Run()

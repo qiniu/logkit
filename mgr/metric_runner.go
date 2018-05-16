@@ -61,7 +61,7 @@ func NewMetric(tp string) (metric.Collector, error) {
 	return nil, fmt.Errorf("metric <%v> is not support now", tp)
 }
 
-func NewMetricRunner(rc RunnerConfig) (runner *MetricRunner, err error) {
+func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner, err error) {
 	if rc.CollectInterval <= 0 {
 		rc.CollectInterval = defaultCollectInterval
 	}
@@ -78,8 +78,8 @@ func NewMetricRunner(rc RunnerConfig) (runner *MetricRunner, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("Runner "+rc.RunnerName+" add failed, err is %v", err)
 	}
-	for i := range rc.SenderConfig {
-		rc.SenderConfig[i][KeyRunnerName] = rc.RunnerName
+	for i := range rc.SendersConfig {
+		rc.SendersConfig[i][KeyRunnerName] = rc.RunnerName
 	}
 	collectors := make([]metric.Collector, 0)
 	transformers := make(map[string][]transforms.Transformer)
@@ -165,10 +165,14 @@ func NewMetricRunner(rc RunnerConfig) (runner *MetricRunner, err error) {
 	}
 
 	senders := make([]sender.Sender, 0)
-	extraInfo := rc.ExtraInfo
-	ftSaveLogPath := meta.FtSaveLogPath()
-	for _, senderConfig := range rc.SenderConfig {
-		s, err := getSender(extraInfo, senderConfig, ftSaveLogPath)
+	for _, senderConfig := range rc.SendersConfig {
+		senderConfig[sender.KeyIsMetrics] = "true"
+		senderConfig[sender.KeyPandoraTSDBTimeStamp] = metric.Timestamp
+		if rc.ExtraInfo && senderConfig[sender.KeySenderType] == sender.TypePandora {
+			//如果已经开启了，不要重复加
+			senderConfig[sender.KeyPandoraExtraInfo] = "false"
+		}
+		s, err := sr.NewSender(senderConfig, meta.FtSaveLogPath())
 		if err != nil {
 			return nil, err
 		}

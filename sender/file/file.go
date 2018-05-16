@@ -1,45 +1,49 @@
 package file
 
 import (
-	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
-	. "github.com/qiniu/logkit/utils/models"
+	"github.com/json-iterator/go"
+	"github.com/utahta/go-cronowriter"
 
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
-	"github.com/json-iterator/go"
-	"github.com/utahta/go-cronowriter"
+	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/sender"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
-// FileSender write datas into local file
+// Sender write datas into local file
 // only for test
-type FileSender struct {
+type Sender struct {
 	name        string
 	writer      *cronowriter.CronoWriter
 	marshalFunc func([]Data) ([]byte, error)
 }
 
-// NewFileSender construct
-func NewFileSender(conf conf.MapConf) (fileSender sender.Sender, err error) {
+func init() {
+	sender.RegisterConstructor(sender.TypeFile, NewSender)
+}
+
+// file sender
+func NewSender(conf conf.MapConf) (fileSender sender.Sender, err error) {
 	var path string
 	path, err = conf.GetString(sender.KeyFileSenderPath)
 	if err != nil {
 		return
 	}
 	name, _ := conf.GetStringOr(sender.KeyName, "fileSender:"+path)
-	fileSender, err = newFileSender(name, path, JSONLineMarshalFunc)
+	fileSender, err = newSender(name, path, JSONLineMarshalFunc)
 	if err != nil {
 		return
 	}
 	return
 }
 
-func newFileSender(name, path string, marshalFunc func([]Data) ([]byte, error)) (*FileSender, error) {
+func newSender(name, path string, marshalFunc func([]Data) ([]byte, error)) (*Sender, error) {
 	f, err := cronowriter.New(path)
 	if err != nil {
 		return nil, err
 	}
-	return &FileSender{
+	return &Sender{
 		name:        name,
 		writer:      f,
 		marshalFunc: marshalFunc,
@@ -47,7 +51,7 @@ func newFileSender(name, path string, marshalFunc func([]Data) ([]byte, error)) 
 }
 
 // Send inherit from Sender
-func (fs *FileSender) Send(datas []Data) error {
+func (fs *Sender) Send(datas []Data) error {
 	bytes, err := fs.marshalFunc(datas)
 	if err != nil {
 		return reqerr.NewSendError(fs.Name()+" Cannot marshal data into file, error is "+err.Error(), sender.ConvertDatasBack(datas), reqerr.TypeDefault)
@@ -59,11 +63,11 @@ func (fs *FileSender) Send(datas []Data) error {
 	return nil
 }
 
-func (fs *FileSender) Name() string {
+func (fs *Sender) Name() string {
 	return fs.name
 }
 
-func (fs *FileSender) Close() error {
+func (fs *Sender) Close() error {
 	return fs.writer.Close()
 }
 
@@ -74,8 +78,4 @@ func JSONLineMarshalFunc(datas []Data) ([]byte, error) {
 		return nil, err
 	}
 	return append(bytes, '\n'), nil
-}
-
-func init() {
-	sender.Add(sender.TypeFile, NewFileSender)
 }

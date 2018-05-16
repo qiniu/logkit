@@ -13,16 +13,16 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
+
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
-	. "github.com/qiniu/logkit/utils/models"
-
 	"github.com/qiniu/logkit/sender"
-	"github.com/qiniu/pandora-go-sdk/base/reqerr"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
-// InfluxdbSender write datas into influxdb
-type InfluxdbSender struct {
+// Sender write datas into influxdb
+type Sender struct {
 	name        string
 	host        string
 	db          string
@@ -36,8 +36,12 @@ type InfluxdbSender struct {
 	timePrec    int64
 }
 
-// NewInfluxdbSender 创建Influxdb 的sender
-func NewInfluxdbSender(c conf.MapConf) (influxdbSender sender.Sender, err error) {
+func init() {
+	sender.RegisterConstructor(sender.TypeInfluxdb, NewSender)
+}
+
+// influxdb sender
+func NewSender(c conf.MapConf) (influxdbSender sender.Sender, err error) {
 	host, err := c.GetString(sender.KeyInfluxdbHost)
 	if err != nil {
 		return
@@ -62,7 +66,7 @@ func NewInfluxdbSender(c conf.MapConf) (influxdbSender sender.Sender, err error)
 	prec, _ := c.GetIntOr(sender.KeyInfluxdbTimestampPrecision, 1)
 	name, _ := c.GetStringOr(sender.KeyName, fmt.Sprintf("influxdbSender:(%v,db:%v,measurement:%v", host, db, measurement))
 
-	influxdbSender = &InfluxdbSender{
+	influxdbSender = &Sender{
 		name:        name,
 		host:        host,
 		db:          db,
@@ -88,15 +92,15 @@ func NewInfluxdbSender(c conf.MapConf) (influxdbSender sender.Sender, err error)
 	return
 }
 
-func (s *InfluxdbSender) Name() string {
+func (s *Sender) Name() string {
 	return s.name
 }
 
-func (s *InfluxdbSender) Close() error {
+func (s *Sender) Close() error {
 	return nil
 }
 
-func (s *InfluxdbSender) Send(datas []Data) error {
+func (s *Sender) Send(datas []Data) error {
 	ps := Points{}
 	for _, d := range datas {
 		p, err := s.makePoint(d)
@@ -149,7 +153,7 @@ func CreateInfluxdbRetention(host, database, retention, duration, sender string)
 	return postForm(host, influxdbSql, sender)
 }
 
-func (s *InfluxdbSender) sendPoints(ps Points) (err error) {
+func (s *Sender) sendPoints(ps Points) (err error) {
 	host := s.host
 	if !strings.HasPrefix(host, "http://") {
 		host = "http://" + host
@@ -190,7 +194,7 @@ func (s *InfluxdbSender) sendPoints(ps Points) (err error) {
 	return
 }
 
-func (s *InfluxdbSender) makePoint(d Data) (p Point, err error) {
+func (s *Sender) makePoint(d Data) (p Point, err error) {
 	p.Measurement = s.measurement
 	tags := map[string]string{}
 	for k, t := range s.tags {
@@ -250,7 +254,7 @@ func (ps Points) Buffer() []byte {
 
 type Tags map[string]string
 
-// HashKey hashes builtin of a tag's keys.
+// HashKey hashes all of a tag's keys.
 func (t Tags) HashKey() []byte {
 	// Empty maps marshal to empty bytes.
 	if len(t) == 0 {
@@ -382,10 +386,6 @@ func (p *Point) GetFields() []byte {
 		return b[0 : len(b)-1]
 	}
 	return b
-}
-
-func init() {
-	sender.Add(sender.TypeInfluxdb, NewInfluxdbSender)
 }
 
 func escapeStringField(in string) string {

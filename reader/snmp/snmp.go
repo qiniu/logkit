@@ -14,8 +14,9 @@ import (
 	"time"
 
 	"github.com/json-iterator/go"
-	"github.com/qiniu/log"
 	"github.com/soniah/gosnmp"
+
+	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
@@ -906,7 +907,7 @@ func snmpTranslateCall(oid string) (mibName string, oidNum string, oidText strin
 	if strings.ContainsAny(oid, ":abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") {
 		out, err = execCmd("snmptranslate", "-Td", "-Ob", oid)
 	} else {
-		out, err = execCmd("snmptranslate", "-Td", "-Ob", "-m", "builtin", oid)
+		out, err = execCmd("snmptranslate", "-Td", "-Ob", "-m", "all", oid)
 		if err, ok := err.(*exec.Error); ok && err.Err == exec.ErrNotFound {
 			return "", oid, oid, "", nil
 		}

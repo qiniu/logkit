@@ -25,6 +25,7 @@ import (
 	"github.com/qiniu/logkit/reader/cloudtrail"
 	"github.com/qiniu/logkit/router"
 	"github.com/qiniu/logkit/sender"
+	_ "github.com/qiniu/logkit/sender/builtin"
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -93,33 +94,32 @@ const qiniulogHeadPatthern = "[1-9]\\d{3}/[0-1]\\d/[0-3]\\d [0-2]\\d:[0-6]\\d:[0
 
 // NewRunner 创建Runner
 func NewRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal) (runner Runner, err error) {
-	return NewLogExportRunner(rc, cleanChan, reader.NewRegistry(), parser.NewRegistry())
+	return NewLogExportRunner(rc, cleanChan, reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
 }
 
-func NewCustomRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *reader.Registry, ps *parser.Registry) (runner Runner, err error) {
-	if ps == nil {
-		ps = parser.NewRegistry()
-	}
+func NewCustomRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *reader.Registry, pr *parser.Registry, sr *sender.Registry) (runner Runner, err error) {
 	if rr == nil {
 		rr = reader.NewRegistry()
 	}
-	if rc.MetricConfig != nil {
-		return NewMetricRunner(rc)
+	if pr == nil {
+		pr = parser.NewRegistry()
 	}
-	return NewLogExportRunner(rc, cleanChan, rr, ps)
+	if sr == nil {
+		sr = sender.NewRegistry()
+	}
+
+	if rc.MetricConfig != nil {
+		return NewMetricRunner(rc, sr)
+	}
+	return NewLogExportRunner(rc, cleanChan, rr, pr, sr)
 }
 
 func NewRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.Parser, transformers []transforms.Transformer,
-	router *router.Router, meta *reader.Meta) (runner Runner, err error) {
-	return NewLogExportRunnerWithService(info, reader, cleaner, parser, transformers, router, meta)
-}
-
-func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.Parser,
-	transformers []transforms.Transformer, router *router.Router, meta *reader.Meta) (runner *LogExportRunner, err error) {
+	senders []sender.Sender, router *router.Router, meta *reader.Meta) (runner Runner, err error) {
 	return NewLogExportRunnerWithService(info, reader, cleaner, parser, transformers, senders, router, meta)
 }
 
-func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.LogParser,
+func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.Parser,
 	transformers []transforms.Transformer, senders []sender.Sender, router *router.Router, meta *reader.Meta) (runner *LogExportRunner, err error) {
 	if info.MaxBatchSize <= 0 {
 		info.MaxBatchSize = defaultMaxBatchSize
@@ -179,7 +179,7 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 	return runner, nil
 }
 
-func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *reader.Registry, ps *parser.Registry, sr *sender.SenderRegistry) (runner *LogExportRunner, err error) {
+func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *reader.Registry, pr *parser.Registry, sr *sender.Registry) (runner *LogExportRunner, err error) {
 	runnerInfo := RunnerInfo{
 		EnvTag:           rc.EnvTag,
 		RunnerName:       rc.RunnerName,
@@ -191,8 +191,8 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	if rc.ReaderConfig == nil {
 		return nil, errors.New(rc.RunnerName + " readerConfig is nil")
 	}
-	if rc.SenderConfig == nil {
-		return nil, errors.New(rc.RunnerName + " SenderConfig is nil")
+	if rc.SendersConfig == nil {
+		return nil, errors.New(rc.RunnerName + " SendersConfig is nil")
 	}
 	if rc.ParserConf == nil {
 		return nil, errors.New(rc.RunnerName + " ParserConf is nil")
@@ -202,8 +202,8 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	if rc.ExtraInfo {
 		rc.ReaderConfig[ExtraInfo] = Bool2String(rc.ExtraInfo)
 	}
-	for i := range rc.SenderConfig {
-		rc.SenderConfig[i][KeyRunnerName] = rc.RunnerName
+	for i := range rc.SendersConfig {
+		rc.SendersConfig[i][KeyRunnerName] = rc.RunnerName
 	}
 	rc.ParserConf[KeyRunnerName] = rc.RunnerName
 	//配置文件适配
@@ -247,27 +247,29 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 			return nil, err
 		}
 	}
-	parser, err := ps.NewLogParser(rc.ParserConf)
+	parser, err := pr.NewLogParser(rc.ParserConf)
 	if err != nil {
 		return nil, err
 	}
+
 	transformers, err := createTransformers(rc)
 	if err != nil {
 		return nil, err
 	}
 	senders := make([]sender.Sender, 0)
-	for i, c := range rc.SenderConfig {
-		if rc.ExtraInfo && c[KeySenderType] == TypePandora {
+	for i, senderConfig := range rc.SendersConfig {
+		if rc.ExtraInfo && senderConfig[sender.KeySenderType] == sender.TypePandora {
 			//如果已经开启了，不要重复加
-			c[KeyPandoraExtraInfo] = "false"
+			senderConfig[sender.KeyPandoraExtraInfo] = "false"
 		}
-		s, err := sr.NewSender(c, meta.FtSaveLogPath())
+		s, err := sr.NewSender(senderConfig, meta.FtSaveLogPath())
 		if err != nil {
 			return nil, err
 		}
 		senders = append(senders, s)
-		delete(rc.SenderConfig[i], InnerUserAgent)
+		delete(rc.SendersConfig[i], sender.InnerUserAgent)
 	}
+
 	senderCnt := len(senders)
 	router, err := router.NewSenderRouter(rc.Router, senderCnt)
 	if err != nil {
@@ -311,33 +313,6 @@ func createTransformers(rc RunnerConfig) ([]transforms.Transformer, error) {
 		transformers = append(transformers, trans)
 	}
 	return transformers, nil
-}
-
-func createSenders(sendersConfig []conf.MapConf, extraInfo bool, ftSaveLogPath string) ([]sender.Sender, error) {
-	senders := make([]sender.Sender, 0)
-	for idx, senderConfig := range sendersConfig {
-		s, err := getSender(extraInfo, senderConfig, ftSaveLogPath)
-		if err != nil {
-			return nil, err
-		}
-		senders = append(senders, s)
-		delete(sendersConfig[idx], sender.InnerUserAgent)
-	}
-	return senders, nil
-}
-
-func getSender(extraInfo bool, senderConfig conf.MapConf, ftSaveLogPath string) (sender.Sender, error) {
-	if extraInfo && senderConfig[sender.KeySenderType] == sender.TypePandora {
-		//如果已经开启了，不要重复加
-		senderConfig[sender.KeyPandoraExtraInfo] = "false"
-	}
-	s, err := sender.Senders.NewSender(senderConfig, ftSaveLogPath)
-	if err != nil {
-		log.Errorf("type %v of send init error %v", senderConfig[sender.KeySenderType], err)
-		err = fmt.Errorf("type %v of send init error %v", senderConfig[sender.KeySenderType], err)
-		return nil, err
-	}
-	return s, nil
 }
 
 // trySend 尝试发送数据，如果此时runner退出返回false，其他情况无论是达到最大重试次数还是发送成功，都返回true

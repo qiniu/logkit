@@ -1,4 +1,4 @@
-package all
+package builtin
 
 import (
 	_ "github.com/qiniu/logkit/transforms/aws"

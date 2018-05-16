@@ -32,7 +32,7 @@ func getMetricRunnerConfig(name string, mc []MetricConfig, senderPath string) ([
 			MaxBatchInterval: 1,
 		},
 		MetricConfig: mc,
-		SenderConfig: []conf.MapConf{{
+		SendersConfig: []conf.MapConf{{
 			"name":           "file_sender",
 			"sender_type":    "file",
 			"file_send_path": senderPath,
@@ -436,7 +436,7 @@ func metricRunEnvTagTest(p *testParam) {
 			EnvTag:           runnerName,
 		},
 		MetricConfig: mc,
-		SenderConfig: []conf.MapConf{{
+		SendersConfig: []conf.MapConf{{
 			"name":           "file_sender",
 			"sender_type":    "file",
 			"file_send_path": resvPath1,
@@ -527,7 +527,7 @@ func metricHttpTest(p *testParam) {
 			EnvTag:           runnerName,
 		},
 		MetricConfig: mc,
-		SenderConfig: []conf.MapConf{{
+		SendersConfig: []conf.MapConf{{
 			"name":           "file_sender",
 			"sender_type":    "file",
 			"file_send_path": resvPath1,
@@ -599,7 +599,7 @@ func metricHttpTest(p *testParam) {
 			EnvTag:           runnerName,
 		},
 		MetricConfig: mc2,
-		SenderConfig: []conf.MapConf{{
+		SendersConfig: []conf.MapConf{{
 			"name":           "file_sender",
 			"sender_type":    "file",
 			"file_send_path": resvPath2,
@@ -672,7 +672,7 @@ func metricHttpTest(p *testParam) {
 			EnvTag:           runnerName,
 		},
 		MetricConfig: mc3,
-		SenderConfig: []conf.MapConf{{
+		SendersConfig: []conf.MapConf{{
 			"name":           "file_sender",
 			"sender_type":    "file",
 			"file_send_path": resvPath3,

@@ -9,14 +9,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/queue"
-	. "github.com/qiniu/logkit/utils/models"
+	"github.com/json-iterator/go"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
-	"github.com/json-iterator/go"
+	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/queue"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (
@@ -319,7 +319,7 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 	se, succ := err.(*reqerr.SendError)
 	if !succ {
 		// 如果不是SendError 默认所有的数据都发送失败
-		log.Infof("Runner[%v] Sender[%v] error type is not *SendError! reSend builtin datas by default", ft.runnerName, ft.innerSender.Name())
+		log.Infof("Runner[%v] Sender[%v] error type is not *SendError! reSend all datas by default", ft.runnerName, ft.innerSender.Name())
 		failCtx.Datas = datas
 	} else {
 		failCtx.Datas = ConvertDatas(se.GetFailDatas())

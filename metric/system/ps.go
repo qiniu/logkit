@@ -121,7 +121,7 @@ func (s *systemPS) NetIO() ([]net.IOCountersStat, error) {
 }
 
 func (s *systemPS) NetConnections() ([]net.ConnectionStat, error) {
-	return net.Connections("builtin")
+	return net.Connections("all")
 }
 
 func (s *systemPS) DiskIO(names []string) (map[string]disk.IOCountersStat, error) {

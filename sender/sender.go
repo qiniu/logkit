@@ -203,40 +203,34 @@ type StatsSender interface {
 	Restore(*StatsInfo)
 }
 
-type TokenRefreshable interface {
-	TokenRefresh(conf.MapConf) error
-}
-
 // SenderRegistry sender 的工厂类。可以注册自定义sender
-type SenderRegistry struct {
+type Registry struct {
 	senderTypeMap map[string]func(conf.MapConf) (Sender, error)
 }
 
-var Senders = &SenderRegistry{
-	senderTypeMap: map[string]func(conf.MapConf) (Sender, error){},
+type Constructor func(conf.MapConf) (Sender, error)
+
+// registeredConstructors keeps a list of all available reader constructors can be registered by Registry.
+var registeredConstructors = map[string]Constructor{}
+
+// RegisterConstructor adds a new constructor for a given type of reader.
+func RegisterConstructor(typ string, c Constructor) {
+	registeredConstructors[typ] = c
 }
 
-func Add(senderType string, constructor func(conf.MapConf) (Sender, error)) {
-	Senders.RegisterSender(senderType, constructor)
+func NewRegistry() *Registry {
+	ret := &Registry{
+		senderTypeMap: map[string]func(conf.MapConf) (Sender, error){},
+	}
+
+	for typ, c := range registeredConstructors {
+		ret.RegisterSender(typ, c)
+	}
+
+	return ret
 }
 
-//func NewSenderRegistry() *SenderRegistry {
-//	ret := &SenderRegistry{
-//		senderTypeMap: map[string]func(conf.MapConf) (common.Sender, error){},
-//	}
-//	ret.RegisterSender(TypeFile, NewFileSender)
-//	ret.RegisterSender(TypePandora, pandora.NewPandoraSender)
-//	ret.RegisterSender(TypeMongodbAccumulate, mongodb.NewMongodbAccSender)
-//	ret.RegisterSender(TypeInfluxdb, influxdb.NewInfluxdbSender)
-//	ret.RegisterSender(TypeElastic, elasticsearch.NewElasticSender)
-//	ret.RegisterSender(TypeMock, mock.NewMockSender)
-//	ret.RegisterSender(TypeDiscard, discard.NewDiscardSender)
-//	ret.RegisterSender(TypeKafka, kafka.NewKafkaSender)
-//	ret.RegisterSender(TypeHttp, http.NewHttpSender)
-//	return ret
-//}
-
-func (registry *SenderRegistry) RegisterSender(senderType string, constructor func(conf.MapConf) (Sender, error)) error {
+func (registry *Registry) RegisterSender(senderType string, constructor func(conf.MapConf) (Sender, error)) error {
 	_, exist := registry.senderTypeMap[senderType]
 	if exist {
 		return errors.New("senderType " + senderType + " has been existed")
@@ -245,14 +239,14 @@ func (registry *SenderRegistry) RegisterSender(senderType string, constructor fu
 	return nil
 }
 
-func (r *SenderRegistry) NewSender(conf conf.MapConf, ftSaveLogPath string) (sender Sender, err error) {
+func (r *Registry) NewSender(conf conf.MapConf, ftSaveLogPath string) (sender Sender, err error) {
 	sendType, err := conf.GetString(KeySenderType)
 	if err != nil {
 		return
 	}
 	constructor, exist := r.senderTypeMap[sendType]
 	if !exist {
-		return nil, fmt.Errorf("sender type unsupperted : %v", sendType)
+		return nil, fmt.Errorf("sender type unsupported : %v", sendType)
 	}
 	sender, err = constructor(conf)
 	if err != nil {
@@ -266,6 +260,10 @@ func (r *SenderRegistry) NewSender(conf conf.MapConf, ftSaveLogPath string) (sen
 		}
 	}
 	return sender, nil
+}
+
+type TokenRefreshable interface {
+	TokenRefresh(conf.MapConf) error
 }
 
 func ConvertDatas(ins []map[string]interface{}) []Data {

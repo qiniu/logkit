@@ -11,21 +11,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
-	"github.com/qiniu/logkit/sender/mock"
-	"github.com/qiniu/logkit/times"
-	. "github.com/qiniu/logkit/utils/models"
+	"github.com/json-iterator/go"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 
-	"github.com/json-iterator/go"
-	"github.com/stretchr/testify/assert"
+	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/sender"
+	mockPandora "github.com/qiniu/logkit/sender/mock_pandora"
+	"github.com/qiniu/logkit/times"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 func TestPandoraSender(t *testing.T) {
-	pandora, pt := mock.NewMockPandoraWithPrefix("/v2")
+	pandora, pt := mockPandora.NewMockPandoraWithPrefix("/v2")
 	opt := &PandoraOption{
 		name:               "p",
 		repoName:           "TestPandoraSender",
@@ -176,7 +176,7 @@ func TestPandoraSender(t *testing.T) {
 }
 
 func TestNestPandoraSender(t *testing.T) {
-	pandora, pt := mock.NewMockPandoraWithPrefix("/v2")
+	pandora, pt := mockPandora.NewMockPandoraWithPrefix("/v2")
 	opt := &PandoraOption{
 		name:           "p_TestNestPandoraSender",
 		repoName:       "TestNestPandoraSender",
@@ -223,7 +223,7 @@ func TestNestPandoraSender(t *testing.T) {
 }
 
 func TestUUIDPandoraSender(t *testing.T) {
-	pandora, pt := mock.NewMockPandoraWithPrefix("/v2")
+	pandora, pt := mockPandora.NewMockPandoraWithPrefix("/v2")
 	opt := &PandoraOption{
 		name:           "TestUUIDPandoraSender",
 		repoName:       "TestUUIDPandoraSender",
@@ -263,7 +263,7 @@ func TestUUIDPandoraSender(t *testing.T) {
 }
 
 func TestStatsSender(t *testing.T) {
-	pandora, pt := mock.NewMockPandoraWithPrefix("/v2")
+	pandora, pt := mockPandora.NewMockPandoraWithPrefix("/v2")
 	opt := &PandoraOption{
 		name:           "TestStatsSender",
 		repoName:       "TestStatsSender",
@@ -584,7 +584,7 @@ func TestParseUserSchema(t *testing.T) {
 }
 
 func TestUpdatePandoraSchema(t *testing.T) {
-	pandora, pt := mock.NewMockPandoraWithPrefix("/v2")
+	pandora, pt := mockPandora.NewMockPandoraWithPrefix("/v2")
 	opt := &PandoraOption{
 		name:           "p_TestUpdatePandoraSchema",
 		repoName:       "TestUpdatePandoraSchema",
@@ -787,7 +787,7 @@ func TestAlignTimestamp(t *testing.T) {
 }
 
 func TestConvertDataPandoraSender(t *testing.T) {
-	pandora, pt := mock.NewMockPandoraWithPrefix("/v2")
+	pandora, pt := mockPandora.NewMockPandoraWithPrefix("/v2")
 	opt := &PandoraOption{
 		name:             "TestConvertDataPandoraSender",
 		repoName:         "TestConvertDataPandoraSender",
@@ -824,7 +824,7 @@ func TestConvertDataPandoraSender(t *testing.T) {
 }
 
 func TestPandoraSenderTime(t *testing.T) {
-	pandora, pt := mock.NewMockPandoraWithPrefix("/v2")
+	pandora, pt := mockPandora.NewMockPandoraWithPrefix("/v2")
 	conf1 := conf.MapConf{
 		"force_microsecond":         "false",
 		"ft_memory_channel":         "false",
@@ -845,7 +845,7 @@ func TestPandoraSenderTime(t *testing.T) {
 		"name":                      "TestPandoraSenderTime",
 		"KeyPandoraSchemaUpdateInterval": "1s",
 	}
-	s, err := NewPandoraSender(conf1)
+	s, err := NewSender(conf1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -935,7 +935,7 @@ func TestPandoraSenderTime(t *testing.T) {
 		"name":                      "TestPandoraSenderTime",
 		"KeyPandoraSchemaUpdateInterval": "1s",
 	}
-	s, err = NewPandoraSender(conf2)
+	s, err = NewSender(conf2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -953,7 +953,7 @@ func TestPandoraSenderTime(t *testing.T) {
 }
 
 func TestPandoraExtraInfo(t *testing.T) {
-	pandora, pt := mock.NewMockPandoraWithPrefix("/v2")
+	pandora, pt := mockPandora.NewMockPandoraWithPrefix("/v2")
 	conf1 := conf.MapConf{
 		"force_microsecond":         "false",
 		"ft_memory_channel":         "false",
@@ -974,7 +974,7 @@ func TestPandoraExtraInfo(t *testing.T) {
 		"name":                      "TestPandoraSenderTime",
 		"KeyPandoraSchemaUpdateInterval": "1s",
 	}
-	s, err := NewPandoraSender(conf1)
+	s, err := NewSender(conf1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1021,7 +1021,7 @@ func TestPandoraExtraInfo(t *testing.T) {
 		"name":                      "TestPandoraSenderTime",
 		"KeyPandoraSchemaUpdateInterval": "1s",
 	}
-	s, err = NewPandoraSender(conf2)
+	s, err = NewSender(conf2)
 	if err != nil {
 		t.Fatal(err)
 	}

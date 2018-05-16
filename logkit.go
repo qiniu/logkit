@@ -18,9 +18,8 @@ import (
 	config "github.com/qiniu/logkit/conf"
 	_ "github.com/qiniu/logkit/metric/all"
 	"github.com/qiniu/logkit/mgr"
-	_ "github.com/qiniu/logkit/sender/builtin"
 	"github.com/qiniu/logkit/times"
-	_ "github.com/qiniu/logkit/transforms/all"
+	_ "github.com/qiniu/logkit/transforms/builtin"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
 )

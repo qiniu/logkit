@@ -11,9 +11,10 @@ import (
 	"time"
 
 	elasticV6 "github.com/olivere/elastic"
-	"github.com/qiniu/log"
 	elasticV3 "gopkg.in/olivere/elastic.v3"
 	elasticV5 "gopkg.in/olivere/elastic.v5"
+
+	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
@@ -196,7 +197,7 @@ func (er *Reader) exec() (err error) {
 			ctx := context.Background()
 			results, err := scroll.ScrollId(er.offset).Do(ctx)
 			if err == io.EOF {
-				return nil // builtin results retrieved
+				return nil // all results retrieved
 			}
 			if err != nil {
 				return err // something went wrong
@@ -223,7 +224,7 @@ func (er *Reader) exec() (err error) {
 			ctx := context.Background()
 			results, err := scroll.ScrollId(er.offset).Do(ctx)
 			if err == io.EOF {
-				return nil // builtin results retrieved
+				return nil // all results retrieved
 			}
 			if err != nil {
 				return err // something went wrong
@@ -249,7 +250,7 @@ func (er *Reader) exec() (err error) {
 		for {
 			results, err := scroll.ScrollId(er.offset).Do()
 			if err == io.EOF {
-				return nil // builtin results retrieved
+				return nil // all results retrieved
 			}
 			if err != nil {
 				return err // something went wrong

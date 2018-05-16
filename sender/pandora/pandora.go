@@ -11,27 +11,27 @@ import (
 	"sync"
 	"time"
 
+	gouuid "github.com/satori/go.uuid"
+
 	"github.com/qiniu/log"
+	pipelinebase "github.com/qiniu/pandora-go-sdk/base"
+	"github.com/qiniu/pandora-go-sdk/base/models"
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
+	"github.com/qiniu/pandora-go-sdk/logdb"
+	"github.com/qiniu/pandora-go-sdk/pipeline"
+
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/times"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
-
-	pipelinebase "github.com/qiniu/pandora-go-sdk/base"
-	"github.com/qiniu/pandora-go-sdk/base/reqerr"
-	"github.com/qiniu/pandora-go-sdk/logdb"
-	"github.com/qiniu/pandora-go-sdk/pipeline"
-
-	"github.com/qiniu/pandora-go-sdk/base/models"
-	gouuid "github.com/satori/go.uuid"
 )
 
 var osInfo = []string{KeyCore, KeyHostName, KeyOsInfo, KeyLocalIp}
 
-// PandoraSender pandora sender
-type PandoraSender struct {
+// pandora sender
+type Sender struct {
 	client             pipeline.PipelineAPI
 	schemas            map[string]pipeline.RepoSchemaEntry
 	schemasMux         sync.RWMutex
@@ -116,8 +116,12 @@ type PandoraOption struct {
 //PandoraMaxBatchSize 发送到Pandora的batch限制
 var PandoraMaxBatchSize = 2 * 1024 * 1024
 
-// NewPandoraSender pandora sender constructor
-func NewPandoraSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
+func init() {
+	sender.RegisterConstructor(sender.TypePandora, NewSender)
+}
+
+// pandora sender
+func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
 	repoName, err := conf.GetString(sender.KeyPandoraRepoName)
 	if err != nil {
 		return
@@ -265,6 +269,7 @@ func NewPandoraSender(conf conf.MapConf) (pandoraSender sender.Sender, err error
 	if withIp {
 		opt.withip = "logkitIP"
 	}
+
 	return newPandoraSender(opt)
 }
 
@@ -371,7 +376,7 @@ func getTokensFromConf(conf conf.MapConf) (tokens Tokens, err error) {
 	return
 }
 
-func (s *PandoraSender) TokenRefresh(mapConf conf.MapConf) error {
+func (s *Sender) TokenRefresh(mapConf conf.MapConf) error {
 	s.opt.tokenLock.Lock()
 	defer s.opt.tokenLock.Unlock()
 	if tokens, err := getTokensFromConf(mapConf); err != nil {
@@ -382,7 +387,7 @@ func (s *PandoraSender) TokenRefresh(mapConf conf.MapConf) error {
 	return nil
 }
 
-func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
+func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 	logger := pipelinebase.NewDefaultLogger()
 	config := pipeline.NewConfig().
 		WithPipelineEndpoint(opt.endpoint).
@@ -408,7 +413,7 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 		log.Warnf("Runner[%v] Sender[%v]: you have limited send speed within %v KB/s", opt.runnerName, opt.name, opt.flowRateLimit)
 	}
 	userSchema := parseUserSchema(opt.repoName, opt.schema)
-	s = &PandoraSender{
+	s = &Sender{
 		opt:        *opt,
 		client:     client,
 		alias2key:  make(map[string]string),
@@ -536,7 +541,7 @@ func parseUserSchema(repoName, schema string) (us UserSchema) {
 	return
 }
 
-func (s *PandoraSender) UpdateSchemas() {
+func (s *Sender) UpdateSchemas() {
 	schemas, err := s.client.GetUpdateSchemasWithInput(
 		&pipeline.GetRepoInput{
 			RepoName:     s.opt.repoName,
@@ -559,7 +564,7 @@ func (s *PandoraSender) UpdateSchemas() {
 	s.updateSchemas(schemas)
 }
 
-func (s *PandoraSender) updateSchemas(schemas map[string]pipeline.RepoSchemaEntry) {
+func (s *Sender) updateSchemas(schemas map[string]pipeline.RepoSchemaEntry) {
 	alias2Key := fillAlias2Keys(s.opt.repoName, schemas, s.UserSchema)
 	s.schemasMux.Lock()
 	s.schemas = schemas
@@ -730,13 +735,13 @@ func validSchema(valueType string, value interface{}, numberAsFloat bool) bool {
 	return true
 }
 
-func (s *PandoraSender) getSchemasAlias() (map[string]pipeline.RepoSchemaEntry, map[string]string) {
+func (s *Sender) getSchemasAlias() (map[string]pipeline.RepoSchemaEntry, map[string]string) {
 	s.schemasMux.RLock()
 	defer s.schemasMux.RUnlock()
 	return s.schemas, s.alias2key
 }
 
-func (s *PandoraSender) generatePoint(data Data) (point Data) {
+func (s *Sender) generatePoint(data Data) (point Data) {
 	point = make(Data, len(data))
 	schemas, alias2key := s.getSchemasAlias()
 	for k, v := range schemas {
@@ -793,14 +798,14 @@ func (s *PandoraSender) generatePoint(data Data) (point Data) {
 	return
 }
 
-func (s *PandoraSender) checkSchemaUpdate() {
+func (s *Sender) checkSchemaUpdate() {
 	if s.lastUpdate.Add(s.opt.updateInterval).After(time.Now()) {
 		return
 	}
 	s.UpdateSchemas()
 }
 
-func (s *PandoraSender) Send(datas []Data) (se error) {
+func (s *Sender) Send(datas []Data) (se error) {
 	s.checkSchemaUpdate()
 	if !s.opt.schemaFree && (len(s.schemas) <= 0 || len(s.alias2key) <= 0) {
 		se = reqerr.NewSendError("Get pandora schema error, failed to send data", sender.ConvertDatasBack(datas), reqerr.TypeDefault)
@@ -909,38 +914,13 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 	return ste
 }
 
-func (s *PandoraSender) Name() string {
+func (s *Sender) Name() string {
 	if len(s.opt.name) <= 0 {
 		return "panodra:" + s.opt.repoName
 	}
 	return s.opt.name
 }
 
-func (s *PandoraSender) Close() error {
+func (s *Sender) Close() error {
 	return s.client.Close()
-}
-
-func init() {
-	sender.Add(sender.TypePandora, NewPandoraSender)
-}
-
-// for test
-func SetPandoraSender(name, repoName, region, port, schema, autoCreate string, schemaFree bool) (*PandoraSender, error) {
-	opt := &PandoraOption{
-		name:           name,
-		repoName:       repoName,
-		region:         region,
-		endpoint:       "http://127.0.0.1:" + port,
-		ak:             "ak",
-		sk:             "sk",
-		schema:         schema,
-		autoCreate:     autoCreate,
-		schemaFree:     schemaFree,
-		updateInterval: time.Second,
-		reqRateLimit:   0,
-		flowRateLimit:  0,
-		gzip:           false,
-		tokenLock:      new(sync.RWMutex),
-	}
-	return newPandoraSender(opt)
 }
