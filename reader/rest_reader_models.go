@@ -285,6 +285,7 @@ var ModeKeyOptions = map[string][]Option{
 	ModeMysql: {
 		{
 			KeyName:       KeyMysqlDataSource,
+			Element:       Text,
 			ChooseOnly:    false,
 			Default:       "",
 			Required:      true,
@@ -361,6 +362,7 @@ var ModeKeyOptions = map[string][]Option{
 	ModeMssql: {
 		{
 			KeyName:       KeyMssqlDataSource,
+			Element:       Text,
 			ChooseOnly:    false,
 			Placeholder:   "server=<hostname or instance>;user id=<username>;password=<password>;port=<port>",
 			DefaultNoUse:  true,
@@ -437,6 +439,7 @@ var ModeKeyOptions = map[string][]Option{
 	ModePG: {
 		{
 			KeyName:       KeyPGsqlDataSource,
+			Element:       Text,
 			ChooseOnly:    false,
 			Default:       "",
 			Required:      true,
