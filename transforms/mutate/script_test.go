@@ -77,7 +77,7 @@ func TestScriptTransformer(t *testing.T) {
 	scriptConf6 := &Script{
 		Key:          "myscript...",
 		Interprepter: "bash",
-		Script:       []byte("echo \"hello\""),
+		Script:       EncodeString(`echo "hello"`),
 	}
 	scriptConf6.Init()
 	data6 := []Data{{"key1": "value1", "myscript": fileName}}
@@ -90,7 +90,7 @@ func TestScriptTransformer(t *testing.T) {
 		Key:          "myscript...",
 		Interprepter: "bash",
 		ScriptPath:   fileName,
-		Script:       []byte("echo hello"),
+		Script:       EncodeString(`echo "hello"`),
 	}
 	scriptConf7.Init()
 	data7 := []Data{{"key1": "value1", "myscript": "fileName"}}

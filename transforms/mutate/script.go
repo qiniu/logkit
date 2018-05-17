@@ -11,6 +11,7 @@ import (
 
 	"path/filepath"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -20,13 +21,16 @@ type Script struct {
 	New          string `json:"new"`
 	Interprepter string `json:"interprepter"`
 	ScriptPath   string `json:"scriptpath"`
-	Script       []byte `json:"script"`
+	Script       string `json:"script"`
 	storePath    string
 	stats        StatsInfo
 }
 
 func (g *Script) Init() error {
-	script := string(g.Script)
+	script, err := DecodeString(g.Script)
+	if err != nil {
+		log.Errorf("script transformer decode script string error: %v", err)
+	}
 	if script != "" {
 		scriptsDir := "transformer_scripts"
 		realPath, err := getValidDir(scriptsDir)
@@ -199,6 +203,7 @@ func (g *Script) ConfigOptions() []Option {
 		},
 		{
 			KeyName:      "script",
+			Element:      Text,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
