@@ -61,7 +61,8 @@ func getStartFile(path, whence string, meta *Meta, sf *SeqFile) (f *os.File, dir
 		return
 	}
 	if !pfi.IsDir() {
-		log.Errorf("%s -the path is not directory", dir)
+		err = fmt.Errorf("%s -the path is not directory", dir)
+		log.Error(err)
 		return
 	}
 	currFile, offset, err = meta.ReadOffset()
@@ -72,7 +73,7 @@ func getStartFile(path, whence string, meta *Meta, sf *SeqFile) (f *os.File, dir
 		case WhenceNewest:
 			currFile, offset, err = newestFile(dir, sf.getIgnoreCondition())
 		default:
-			err = errors.New("reader_whence paramter does not support: " + whence)
+			err = errors.New("reader_whence parameter does not support: " + whence)
 			return
 		}
 		if err != nil {
@@ -325,6 +326,19 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 func (sf *SeqFile) getNextFileCondition() (condition func(os.FileInfo) bool, err error) {
 	condition = sf.getIgnoreCondition()
 	if sf.currFile == "" {
+		var pfi os.FileInfo
+		var dir string
+		dir, pfi, err = GetRealPath(sf.dir)
+		if err != nil || pfi == nil {
+			log.Errorf("%s - utils.GetRealPath failed, err:%v", sf.dir, err)
+			return
+		}
+		sf.dir = dir
+		if !pfi.IsDir() {
+			err = fmt.Errorf("%s -the path is not directory", dir)
+			log.Error(err)
+			return
+		}
 		return
 	}
 	currFi, err := os.Stat(sf.currFile)
