@@ -178,13 +178,14 @@ class Transformer extends Component {
     this.state.currentItem.map((ele, index) => {
       let formItem = null
       const labelDes = (
-        <span>
+        ele.Description.indexOf('(') !== -1 ? <span>
           {ele.Description.slice(0, ele.Description.indexOf('('))}
           <br />
           <span style={{ color: 'rgba(0,0,0,.43)', float: 'right' }}>
             {ele.Description.slice(ele.Description.indexOf('('), ele.Description.length)}
           </span>
         </span>
+          : <span>{ele.Description}</span>
       )
       if (ele.ChooseOnly == false) {
         if (ele.KeyName == 'name') {
@@ -294,6 +295,11 @@ class Transformer extends Component {
   addTag = () => {
     const {getFieldsValue, getFieldDecorator} = this.props.form;
     let data = getFieldsValue();
+    if (this.state.currentOption === 'script') {
+      if (data && data[this.state.currentOption] && data[this.state.currentOption]['script']) {
+        data[this.state.currentOption]['script'] = window.btoa(encodeURIComponent(data[this.state.currentOption]['script']))
+      }
+    }
     if (this.state.currentOption != '请选择需要转化的类型') {
       this.setState({
         tags: this.state.tags.concat(`uuid${this.schemaUUID}`)

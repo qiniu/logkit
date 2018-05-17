@@ -125,7 +125,7 @@ class CreateMetricRunner extends Component {
             batch_interval: batch_interval != undefined ? batch_interval : 60,
             batch_size: batch_size != undefined ? batch_size : initBatchSize,
             collect_interval: collect_interval != undefined ? collect_interval : 3,
-            extra_info: extra_info !=undefined ? extra_info : true,
+            extra_info: extra_info !=undefined ? extra_info === 'true' : true,
             ...config.getNodeData()
           }
           that.refs.initConfig.setFieldsValue({config: JSON.stringify(data, null, 2)});
@@ -308,12 +308,12 @@ class CreateMetricRunner extends Component {
             {
               this.state.current === steps.length - 1 && this.state.isCopyStatus === false
               &&
-              <Button type="primary" onClick={() => this.addRunner()}>确认并提交</Button>
+              <Button type="primary" onClick={() => this.addRunner()} style={{ marginLeft: 8 }}>确认并提交</Button>
             }
             {
               this.state.current === steps.length - 1 && this.state.isCopyStatus === true
               &&
-              <Button type="primary" onClick={() => this.updateRunner()}>修改并提交</Button>
+              <Button type="primary" onClick={() => this.updateRunner()} style={{ marginLeft: 8 }}>修改并提交</Button>
             }            
           </div>
         </div>
