@@ -29,11 +29,11 @@ type CleanSignal struct {
 }
 
 const (
-	clean_enable      = "delete_enable"
-	clean_interval    = "delete_interval"
-	clean_name        = "cleaner_name"
-	reservefileNumber = "reserve_file_number"
-	reservefileSize   = "reserve_file_size"
+	KeyCleanEnable       = "delete_enable"
+	KeyCleanInterval     = "delete_interval"
+	KeyReserveFileNumber = "reserve_file_number"
+	KeyReserveFileSize   = "reserve_file_size"
+	clean_name           = "cleaner_name"
 
 	default_delete_interval     = 300  //5分钟
 	default_reserve_file_number = 10   //默认保存是个文件
@@ -45,7 +45,7 @@ const (
 // 删除文件时遍历全部
 // 删除时生成filedeleted文件
 func NewCleaner(conf conf.MapConf, meta *reader.Meta, cleanChan chan<- CleanSignal, logdir string) (c *Cleaner, err error) {
-	enable, _ := conf.GetBoolOr(clean_enable, false)
+	enable, _ := conf.GetBoolOr(KeyCleanEnable, false)
 	if !enable {
 		return
 	}
@@ -54,13 +54,13 @@ func NewCleaner(conf conf.MapConf, meta *reader.Meta, cleanChan chan<- CleanSign
 		log.Errorf("cleaner only support reader mode dir|file|clocktrail, now mode is %v, cleaner disabled", meta.GetMode())
 		return
 	}
-	interval, _ := conf.GetIntOr(clean_interval, 0) //单位，秒
+	interval, _ := conf.GetIntOr(KeyCleanInterval, 0) //单位，秒
 	if interval <= 0 {
 		interval = default_delete_interval
 	}
 	name, _ := conf.GetStringOr(clean_name, "unknow")
-	reserveNumber, _ := conf.GetInt64Or(reservefileNumber, 0)
-	reserveSize, _ := conf.GetInt64Or(reservefileSize, 0)
+	reserveNumber, _ := conf.GetInt64Or(KeyReserveFileNumber, 0)
+	reserveSize, _ := conf.GetInt64Or(KeyReserveFileSize, 0)
 	if reserveNumber <= 0 && reserveSize <= 0 {
 		reserveNumber = default_reserve_file_number
 		reserveSize = default_reserve_file_size
