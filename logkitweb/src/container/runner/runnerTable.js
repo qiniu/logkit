@@ -257,7 +257,6 @@ class RunnerTable extends Component {
   }
 
   setMachine = (machineUrl) => {
-    console.log(machineUrl)
     this.setState({
       currentUrl: machineUrl
     })
