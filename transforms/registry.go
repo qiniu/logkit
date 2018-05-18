@@ -50,6 +50,7 @@ func Add(name string, creator Creator) {
 var (
 	KeyStage = Option{
 		KeyName:       "stage",
+		Element:       Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{StageAfterParser, StageBeforeParser},
 		Default:       StageAfterParser,

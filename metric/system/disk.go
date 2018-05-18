@@ -208,6 +208,7 @@ func (_ *DiskIOStats) Config() map[string]interface{} {
 	}
 	option := Option{
 		KeyName:       ConfigDiskioUsages[3].Key,
+		Element:       Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"true", "false"},
 		Default:       "true",

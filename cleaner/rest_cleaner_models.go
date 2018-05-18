@@ -7,6 +7,7 @@ import (
 var (
 	OptionDeleteEnable = Option{
 		KeyName:       KeyCleanEnable,
+		Element:       Checkbox,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"true", "false"},
 		Default:       "false",

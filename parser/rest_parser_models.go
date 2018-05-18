@@ -45,6 +45,7 @@ var (
 
 	OptionDisableRecordErrData = Option{
 		KeyName:       KeyDisableRecordErrData,
+		Element:       Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"false", "true"},
 		Default:       "false",
@@ -170,6 +171,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyCSVAllowNoMatch,
+			Element:       Radio,
 			ChooseOnly:    true,
 			Advance:       true,
 			ChooseOptions: []interface{}{"false", "true"},
@@ -196,6 +198,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyCSVIgnoreInvalidField,
+			Element:       Radio,
 			ChooseOnly:    true,
 			Advance:       true,
 			ChooseOptions: []interface{}{"false", "true"},
@@ -209,6 +212,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionTimezoneOffset,
 		{
 			KeyName:       KeyAutoRename,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
@@ -221,6 +225,7 @@ var ModeKeyOptions = map[string][]Option{
 	TypeRaw: {
 		{
 			KeyName:       KeyTimestamp,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",

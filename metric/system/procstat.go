@@ -138,6 +138,7 @@ var KeyProcUsages = []models.KeyValue{}
 var ConfigProcUsages = []models.Option{
 	{
 		KeyName:       "cpu_usage_related",
+		Element:       models.Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"true", "false"},
 		Default:       "true",
@@ -146,6 +147,7 @@ var ConfigProcUsages = []models.Option{
 	},
 	{
 		KeyName:       "mem_related",
+		Element:       models.Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"true", "false"},
 		Default:       "true",
@@ -154,6 +156,7 @@ var ConfigProcUsages = []models.Option{
 	},
 	{
 		KeyName:       "cpu_time_related",
+		Element:       models.Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"false", "true"},
 		Default:       "false",
@@ -162,6 +165,7 @@ var ConfigProcUsages = []models.Option{
 	},
 	{
 		KeyName:       "io_related",
+		Element:       models.Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"true", "false"},
 		Default:       "true",
@@ -170,6 +174,7 @@ var ConfigProcUsages = []models.Option{
 	},
 	{
 		KeyName:       "threads_related",
+		Element:       models.Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"false", "true"},
 		Default:       "false",
@@ -178,6 +183,7 @@ var ConfigProcUsages = []models.Option{
 	},
 	{
 		KeyName:       "context_switch_related",
+		Element:       models.Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"false", "true"},
 		Default:       "false",
@@ -186,6 +192,7 @@ var ConfigProcUsages = []models.Option{
 	},
 	{
 		KeyName:       "file_descriptor_related",
+		Element:       models.Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"false", "true"},
 		Default:       "false",
@@ -194,6 +201,7 @@ var ConfigProcUsages = []models.Option{
 	},
 	{
 		KeyName:       "resource_limits",
+		Element:       models.Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"false", "true"},
 		Default:       "false",
@@ -202,6 +210,7 @@ var ConfigProcUsages = []models.Option{
 	},
 	{
 		KeyName:       "cpu_top_10",
+		Element:       models.Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"false", "true"},
 		Default:       "false",
@@ -210,6 +219,7 @@ var ConfigProcUsages = []models.Option{
 	},
 	{
 		KeyName:       "mem_top_10",
+		Element:       models.Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"false", "true"},
 		Default:       "false",
@@ -218,6 +228,7 @@ var ConfigProcUsages = []models.Option{
 	},
 	{
 		KeyName:       "supervisord",
+		Element:       models.Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"false", "true"},
 		Default:       "false",
@@ -226,6 +237,7 @@ var ConfigProcUsages = []models.Option{
 	},
 	{
 		KeyName:       "daemon_tools",
+		Element:       models.Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"false", "true"},
 		Default:       "false",

@@ -106,6 +106,7 @@ func (_ *CPUStats) Config() map[string]interface{} {
 	for _, val := range ConfigCpuUsages {
 		opt := Option{
 			KeyName:       val.Key,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",

@@ -79,6 +79,7 @@ var (
 	}
 	OptionWhence = Option{
 		KeyName:       KeyWhence,
+		Element:       Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{WhenceOldest, WhenceNewest},
 		Default:       WhenceOldest,
@@ -124,6 +125,7 @@ var (
 	}
 	OptionKeyNewFileNewLine = Option{
 		KeyName:       KeyNewFileNewLine,
+		Element:       Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"false", "true"},
 		Default:       "false",
@@ -134,6 +136,7 @@ var (
 	}
 	OptionKeySkipFileFirstLine = Option{
 		KeyName:       KeySkipFileFirstLine,
+		Element:       Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"false", "true"},
 		Default:       "false",
@@ -177,6 +180,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionKeySkipFileFirstLine,
 		{
 			KeyName:       KeyIgnoreHiddenFile,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
@@ -349,6 +353,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyMysqlExecOnStart,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
@@ -426,6 +431,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyMssqlExecOnStart,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
@@ -503,6 +509,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyPGsqlExecOnStart,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
@@ -640,6 +647,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyMongoExecOnstart,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
@@ -889,6 +897,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyScriptExecOnStart,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
