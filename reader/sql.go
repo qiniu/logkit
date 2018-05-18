@@ -37,8 +37,7 @@ const (
 )
 
 type SqlReader struct {
-	dbtype string //数据库类型
-	//host        string //数据库地址
+	dbtype      string //数据库类型
 	datasource  string //数据源
 	database    string //数据库名称
 	rawDatabase string // 记录原始数据库
@@ -103,14 +102,6 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (ret Reader, err error) {
 		cronSchedule, _ = conf.GetStringOr(KeyMysqlCron, "")
 		execOnStart, _ = conf.GetBoolOr(KeyMysqlExecOnStart, true)
 		encoder, _ = conf.GetStringOr(KeyEncoding, "")
-		//dataSourceArr := strings.Split(dataSource, "(")
-		//lenArr := len(dataSourceArr)
-		//if lenArr > 0 {
-		//	tmpStr := dataSourceArr[lenArr-1]
-		//	if len(tmpStr) > 0 {
-		//		host = tmpStr[:len(tmpStr)-1]
-		//	}
-		//}
 	case ModeMssql:
 		readBatch, _ = conf.GetIntOr(KeyMssqlReadBatch, 100)
 		offsetKey, _ = conf.GetStringOr(KeyMssqlOffsetKey, "")
@@ -122,7 +113,6 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (ret Reader, err error) {
 			}
 			err = nil
 		}
-		//host = getHost(dataSource, ";")
 		rawDatabase, err = conf.GetString(KeyMssqlDataBase)
 		if err != nil {
 			return nil, err
@@ -141,15 +131,6 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (ret Reader, err error) {
 			}
 			err = nil
 		}
-		//host = getHost(dataSource, " ")
-		//dataSourceArr := strings.Split(dataSource, " ")
-		//lenArr := len(dataSourceArr)
-		//if lenArr > 1 {
-		//	tmpArr := strings.Split(dataSourceArr[0], "=")
-		//	if len(tmpArr) > 1 {
-		//		host = tmpArr[1]
-		//	}
-		//}
 		sps := strings.Split(dataSource, " ")
 		for _, v := range sps {
 			v = strings.TrimSpace(v)
@@ -205,8 +186,7 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (ret Reader, err error) {
 	}
 
 	mr := &SqlReader{
-		datasource: dataSource,
-		//host:        host,
+		datasource:  dataSource,
 		database:    rawDatabase,
 		rawDatabase: rawDatabase,
 		rawsqls:     rawSqls,
@@ -1189,16 +1169,4 @@ func (mr *SqlReader) SyncMeta() {
 
 func (mr *SqlReader) SetMode(mode string, v interface{}) error {
 	return errors.New("SqlReader not support readmode")
-}
-
-func getHost(datasource, split string) (host string) {
-	dataSourceArr := strings.Split(datasource, split)
-	lenArr := len(dataSourceArr)
-	if lenArr > 1 {
-		tmpArr := strings.Split(dataSourceArr[0], "=")
-		if len(tmpArr) > 1 {
-			host = tmpArr[1]
-		}
-	}
-	return host
 }
