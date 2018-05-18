@@ -34,6 +34,7 @@ const (
 const (
 	defautFileRetention = 7
 	metaFormat          = "%s\t%d\n"
+	tableDoneFormat     = "%s\n"
 	bufMetaFormat       = "read:%d\nwrite:%d\nbufsize:%d\n"
 	defaultIOLimit      = 20 //默认读取速度为20MB/s
 	ModeMetrics         = "metrics"
@@ -316,6 +317,25 @@ func (m *Meta) ReadOffset() (currFile string, offset int64, err error) {
 		if err != nil {
 			if os.IsNotExist(err) {
 				log.Errorf("meta content outdated, the file %v has been deleted", currFile)
+			}
+			return
+		}
+	}
+	return
+}
+
+// 读取当前读取的文件和offset
+func (m *Meta) ReadDoneFile(database string) (content []string, err error) {
+	doneFiles, err := m.GetDoneFiles()
+	if err != nil {
+		return
+	}
+	for _, f := range doneFiles {
+		filename := fmt.Sprintf("%v.%v", doneFileName, database)
+		if filepath.Base(f.Path) == filename {
+			content, err = ReadFileContent(f.Path)
+			if err != nil {
+				return
 			}
 			return
 		}

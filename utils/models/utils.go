@@ -86,16 +86,10 @@ func TrimeList(strs []string) (ret []string) {
 }
 
 func GetLogFiles(doneFilePath string) (files []File) {
-	body, err := ioutil.ReadFile(doneFilePath)
+	readDoneFiles, err := ReadFileContent(doneFilePath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			log.Errorf("file %s not exisit", doneFilePath)
-			return
-		}
-		log.Errorf("read file %s error %v", doneFilePath, err)
 		return
 	}
-	readDoneFiles := TrimeList(strings.Split(string(body), "\n"))
 	for i := len(readDoneFiles) - 1; i >= 0; i-- {
 		df := readDoneFiles[i]
 		dfi, err := os.Stat(df)
@@ -654,4 +648,18 @@ func FormatWithUserOption(layoutAfter string, offset int, t time.Time) interface
 		return t.Format(layoutAfter)
 	}
 	return t.Format(time.RFC3339Nano)
+}
+
+func ReadFileContent(path string) (content []string, err error) {
+	body, err := ioutil.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			log.Errorf("file %s not exisit", path)
+			return
+		}
+		log.Errorf("read file %s error %v", path, err)
+		return
+	}
+	content = TrimeList(strings.Split(string(body), "\n"))
+	return
 }
