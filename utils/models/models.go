@@ -33,7 +33,9 @@ const (
 	DefaultDirPerm  = 0755
 	DefaultFilePerm = 0600
 
-	Text = "text"
+	Text     = "text"
+	Checkbox = "checkbox"
+	Radio    = "radio"
 )
 
 type Option struct {

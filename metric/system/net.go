@@ -70,6 +70,7 @@ func (_ *NetIOStats) Config() map[string]interface{} {
 		},
 		{
 			KeyName:       "skip_protocols_state",
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
