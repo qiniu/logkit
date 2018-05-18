@@ -19,8 +19,14 @@ type KafkaSender struct {
 	hosts []string
 	topic []string
 	cfg   *sarama.Config
+	opt   *KafkaSenderOption
 
-	producer sarama.SyncProducer
+	producer  sarama.SyncProducer
+	extraInfo map[string]string
+}
+
+type KafkaSenderOption struct {
+	extraInfo bool
 }
 
 const (
@@ -40,6 +46,7 @@ const (
 	KeyKafkaTimeout     = "kafka_timeout"     //连接超时时间
 	KeyKafkaKeepAlive   = "kafka_keep_alive"  //保持连接时长
 	KeyMaxMessageBytes  = "max_message_bytes" //每条消息最大字节数
+	KeyKafkaExtraInfo   = "kafka_extra_info"
 )
 
 var (
@@ -76,6 +83,11 @@ func NewKafkaSender(conf conf.MapConf) (sender Sender, err error) {
 	timeout, _ := conf.GetStringOr(KeyKafkaTimeout, "30s")
 	keepAlive, _ := conf.GetStringOr(KeyKafkaKeepAlive, "0")
 	maxMessageBytes, _ := conf.GetIntOr(KeyMaxMessageBytes, 4*1024*1024)
+	extraInfo, _ := conf.GetBoolOr(KeyKafkaExtraInfo, true)
+
+	opt := &KafkaSenderOption{
+		extraInfo: extraInfo,
+	}
 
 	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("kafkaSender:(kafkaUrl:%s,topic:%s)", hosts, topic))
 	cfg := sarama.NewConfig()
@@ -110,17 +122,20 @@ func NewKafkaSender(conf conf.MapConf) (sender Sender, err error) {
 		return
 	}
 
-	sender = newKafkaSender(name, hosts, topic, cfg, producer)
+	sender = newKafkaSender(name, hosts, topic, cfg, producer, opt)
+
 	return
 }
 
-func newKafkaSender(name string, hosts []string, topic []string, cfg *sarama.Config, producer sarama.SyncProducer) (k *KafkaSender) {
+func newKafkaSender(name string, hosts []string, topic []string, cfg *sarama.Config, producer sarama.SyncProducer, opt *KafkaSenderOption) (k *KafkaSender) {
 	k = &KafkaSender{
-		name:     name,
-		hosts:    hosts,
-		topic:    topic,
-		cfg:      cfg,
-		producer: producer,
+		name:      name,
+		hosts:     hosts,
+		topic:     topic,
+		cfg:       cfg,
+		producer:  producer,
+		opt:       opt,
+		extraInfo: utils.GetExtraInfo(),
 	}
 	return
 }
@@ -171,6 +186,11 @@ func (kf *KafkaSender) getEventMessage(event map[string]interface{}) (pm *sarama
 		}
 	} else {
 		topic = kf.topic[0]
+	}
+	if kf.opt.extraInfo {
+		for k, v := range kf.extraInfo {
+			event[k] = v
+		}
 	}
 	value, err := jsoniter.Marshal(event)
 	if err != nil {
