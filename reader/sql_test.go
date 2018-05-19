@@ -168,7 +168,7 @@ func TestSQLReader(t *testing.T) {
 	mr.offsetKey = ""
 	gotSQL, err = mr.getSQL(0)
 	assert.NoError(t, err)
-	assert.EqualValues(t, testsqls[0]+" LIMIT 123,223;", gotSQL)
+	assert.EqualValues(t, testsqls[0]+";", gotSQL)
 
 	assert.Equal(t, StatsInfo{}, mr.Status())
 }
