@@ -34,6 +34,7 @@ type SeqFile struct {
 
 	dir              string   // 文件目录
 	currFile         string   // 当前处理文件名
+	lastFile         string   //上一个处理的文件名
 	f                *os.File // 当前处理文件
 	ratereader       io.ReadCloser
 	inode            uint64   // 当前文件inode
@@ -43,6 +44,9 @@ type SeqFile struct {
 
 	newFileAsNewLine bool //新文件自动加换行符
 	newLineNotAdded  bool //文件最后的部分正好填满buffer，导致\n符号加不上，此时要用这个变量
+
+	newLineBytesSourceIndex []SourceIndex //新文件被读取时的bytes位置
+	justOpenedNewFile       bool          //新文件刚刚打开
 
 	validFilePattern  string // 合法的文件名正则表达式
 	stopped           int32  // 停止标志位
@@ -242,7 +246,16 @@ func (sf *SeqFile) reopenForESTALE() error {
 	return nil
 }
 
+type NewLineBytesRecorder interface {
+	NewLineBytesIndex() []SourceIndex
+}
+
+func (sf *SeqFile) NewLineBytesIndex() []SourceIndex {
+	return sf.newLineBytesSourceIndex
+}
+
 func (sf *SeqFile) Read(p []byte) (n int, err error) {
+	sf.newLineBytesSourceIndex = []SourceIndex{}
 	var nextFileRetry int
 	sf.mux.Lock()
 	defer sf.mux.Unlock()
@@ -276,6 +289,13 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 				return
 			}
 			continue
+		}
+		if n1 > 0 && sf.justOpenedNewFile {
+			sf.justOpenedNewFile = false
+			sf.newLineBytesSourceIndex = append(sf.newLineBytesSourceIndex, SourceIndex{
+				Source: sf.lastFile,
+				Index:  n,
+			})
 		}
 		sf.offset += int64(n1)
 		n += n1
@@ -312,6 +332,7 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 				if err2 != nil {
 					return n, err2
 				}
+				sf.justOpenedNewFile = true
 				//已经获得了下一个文件，没有EOF
 				err = nil
 			} else {
@@ -421,6 +442,7 @@ func (sf *SeqFile) newOpen() (err error) {
 		return fmt.Errorf("nextfile info in dir %v is nil", sf.dir)
 	}
 	fname := fi.Name()
+	sf.lastFile = sf.currFile
 	sf.currFile = filepath.Join(sf.dir, fname)
 	f, err := os.Open(sf.currFile)
 	if os.IsNotExist(err) {
@@ -453,6 +475,7 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 	}
 
 	doneFile := sf.currFile
+	sf.lastFile = doneFile
 	fname := fi.Name()
 	sf.currFile = filepath.Join(sf.dir, fname)
 	for {

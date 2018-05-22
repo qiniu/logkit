@@ -67,6 +67,15 @@ type BufReader struct {
 	statsLock sync.RWMutex
 
 	lastErrShowTime time.Time
+
+	// 这里的变量用于记录buffer中的数据从底层的哪个DataSource出来的，用于精准定位seqfile的DataSource
+	lastRdSource []SourceIndex
+	latestSource string
+}
+
+type SourceIndex struct {
+	Source string
+	Index  int
 }
 
 const minReadBufferSize = 16
@@ -169,17 +178,47 @@ func (b *BufReader) reset(buf []byte, r FileReader) {
 
 var errNegativeRead = errors.New("bufio: reader returned negative count from Read")
 
+//刷新lastRdByteIndex
+func (b *BufReader) updateLastRdSource() {
+	if len(b.lastRdSource) <= 0 {
+		return
+	}
+	for i := range b.lastRdSource {
+		b.lastRdSource[i].Index -= b.r
+	}
+	var idx int
+	for _, v := range b.lastRdSource {
+		if v.Index > 0 {
+			break
+		}
+		idx++
+	}
+	if idx >= len(b.lastRdSource) {
+		b.lastRdSource = []SourceIndex{}
+		return
+	}
+	if idx > 0 {
+		b.lastRdSource = b.lastRdSource[idx:]
+	}
+	return
+}
+
 // fill reads a new chunk into the buffer.
 func (b *BufReader) fill() {
 	// Slide existing data to beginning.
 	if b.r > 0 {
 		copy(b.buf, b.buf[b.r:b.w])
 		b.w -= b.r
+		b.updateLastRdSource()
 		b.r = 0
 	}
 
 	if b.w >= len(b.buf) {
 		panic(fmt.Sprintf("Runner[%v] bufio: tried to fill full buffer", b.meta.RunnerName))
+	}
+	//如果从没出现过，则表示新开始，记录一下
+	if b.latestSource == "" {
+		b.latestSource = b.rd.Source()
 	}
 
 	// Read new data: try a limited number of times.
@@ -188,6 +227,21 @@ func (b *BufReader) fill() {
 		if n < 0 {
 			panic(errNegativeRead)
 		}
+		if b.latestSource != b.rd.Source() {
+			//这个情况表示文件的数据源出现了变化，在buf中已经出现了2个数据源的数据，要定位是哪个位置的数据出现的分隔
+			if rc, ok := b.rd.(NewLineBytesRecorder); ok {
+				SIdx := rc.NewLineBytesIndex()
+				for _, v := range SIdx {
+					// 从 NewLineBytesIndex 函数中返回的index值就是本次读取的批次中上一个DataSource的数据量，加上b.w就是上个DataSource的整体数据
+					b.lastRdSource = append(b.lastRdSource, SourceIndex{
+						Source: v.Source,
+						Index:  b.w + v.Index,
+					})
+				}
+				b.latestSource = b.rd.Source()
+			}
+		}
+
 		b.w += n
 		if err != nil {
 			b.err = err
@@ -434,6 +488,12 @@ func (b *BufReader) Name() string {
 }
 
 func (b *BufReader) Source() string {
+	//如果我当前读取的位置在上个数据源index之前，则返回上个数据源
+	for _, v := range b.lastRdSource {
+		if (b.r < v.Index) || (v.Index > 0 && b.r == v.Index) {
+			return v.Source
+		}
+	}
 	return b.rd.Source()
 }
 

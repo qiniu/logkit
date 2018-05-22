@@ -94,7 +94,105 @@ func Test_Datasource(t *testing.T) {
 		"mode":            DirMode,
 		"sync_every":      "1",
 		"ignore_hidden":   "true",
-		"reader_buf_size": "18",
+		"reader_buf_size": "37",
+		"read_from":       "oldest",
+	}
+	r, err := NewFileBufReader(c, false)
+	if err != nil {
+		t.Error(err)
+	}
+	var rest []string
+	var datasources []string
+	for {
+		line, err := r.ReadLine()
+		if err == nil {
+			rest = append(rest, line)
+		} else {
+			break
+		}
+		datasources = append(datasources, filepath.Base(r.Source()))
+	}
+	if len(rest) != 6 {
+		t.Errorf("rest should be 6, but got %v", len(rest))
+	}
+	assert.Equal(t, []string{"f1", "f1", "f2", "f2", "f3", "f3"}, datasources)
+	r.Close()
+}
+
+func Test_Datasource2(t *testing.T) {
+	testdir := "Test_Datasource2"
+	err := os.Mkdir(testdir, DefaultDirPerm)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	defer os.RemoveAll(testdir)
+
+	for _, f := range []string{"f1", "f2", "f3"} {
+		file, err := os.OpenFile(filepath.Join(testdir, f), os.O_CREATE|os.O_WRONLY, DefaultFilePerm)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+
+		file.WriteString("1234567890\nabc123\n")
+		file.Close()
+	}
+	c := conf.MapConf{
+		"log_path":        testdir,
+		"mode":            DirMode,
+		"sync_every":      "1",
+		"ignore_hidden":   "true",
+		"reader_buf_size": "10",
+		"read_from":       "oldest",
+	}
+	r, err := NewFileBufReader(c, false)
+	if err != nil {
+		t.Error(err)
+	}
+	var rest []string
+	var datasources []string
+	for {
+		line, err := r.ReadLine()
+		if err == nil {
+			rest = append(rest, line)
+		} else {
+			break
+		}
+		datasources = append(datasources, filepath.Base(r.Source()))
+	}
+	if len(rest) != 6 {
+		t.Errorf("rest should be 6, but got %v", len(rest))
+	}
+	assert.Equal(t, []string{"f1", "f1", "f2", "f2", "f3", "f3"}, datasources)
+	r.Close()
+}
+
+func Test_Datasource3(t *testing.T) {
+	testdir := "Test_Datasource3"
+	err := os.Mkdir(testdir, DefaultDirPerm)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	defer os.RemoveAll(testdir)
+
+	for _, f := range []string{"f1", "f2", "f3"} {
+		file, err := os.OpenFile(filepath.Join(testdir, f), os.O_CREATE|os.O_WRONLY, DefaultFilePerm)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+
+		file.WriteString("1234567890\nabc123\n")
+		file.Close()
+	}
+	c := conf.MapConf{
+		"log_path":        testdir,
+		"mode":            DirMode,
+		"sync_every":      "1",
+		"ignore_hidden":   "true",
+		"reader_buf_size": "20",
 		"read_from":       "oldest",
 	}
 	r, err := NewFileBufReader(c, false)
