@@ -53,44 +53,69 @@ func (g *Script) Init() error {
 func (g *Script) Transform(datas []Data) ([]Data, error) {
 	var err, ferr error
 	errCount := 0
-	keys := GetKeys(g.Key)
+	// 获取 keys
+	keysArr := strings.Split(g.Key, ",")
+	keysDetail := make([][]string, 0)
+	for _, key := range keysArr {
+		key = strings.TrimSpace(key)
+		keys := GetKeys(key)
+		if len(keys) <= 0 {
+			continue
+		}
+		keysDetail = append(keysDetail, keys)
+	}
+	// 获取新建keys
 	news := GetKeys(g.New)
+	// 增加error
+	newsErr := g.New + "_error"
+	recordErrs := GetKeys(newsErr)
+
 	if g.storePath == "" {
 		g.storePath = g.ScriptPath
 	}
-	scriptPath := g.storePath
+	scriptPath, err := checkPath(g.storePath)
+	if err != nil {
+		g.stats.LastError = err.Error()
+		ferr = fmt.Errorf("find total %v erorrs in transform script, last error info is %v", errCount, err)
+		return datas, ferr
+	}
 
 	for i := range datas {
 		var scriptRes string
 		var gerr error
-		if scriptPath == "" {
+		params := []string{scriptPath}
+		for _, keys := range keysDetail {
 			val, gerr := GetMapValue(datas[i], keys...)
 			if gerr != nil {
 				errCount++
 				err = fmt.Errorf("transform key %v not exist in data", g.Key)
 				continue
 			}
-			var ok bool
-			if scriptPath, ok = val.(string); !ok {
+
+			valStr, ok := val.(string)
+			if !ok {
 				errCount++
 				err = fmt.Errorf("transform key %v data type is not string", g.Key)
 				continue
 			}
-			g.storePath = scriptPath
+			params = append(params, valStr)
 		}
 
 		gerr = nil
-		scriptRes, gerr = getScriptRes(g.Interprepter, g.storePath)
+		scriptRes, gerr = getScriptRes(g.Interprepter, params)
 		if gerr != nil {
-			errCount++
-			err = gerr
+			if len(gerr.Error()) > 0 {
+				// 设置脚本执行结果的错误信息
+				seterr := SetMapValue(datas[i], gerr.Error(), false, recordErrs...)
+				if seterr != nil {
+					errCount++
+					err = fmt.Errorf("the new key %v already exists ", newsErr)
+				}
+			}
 			continue
 		}
 
-		if len(news) == 0 {
-			DeleteMapValue(datas[i], keys...)
-			news = keys
-		}
+		// 设置脚本执行结果
 		seterr := SetMapValue(datas[i], scriptRes, false, news...)
 		if seterr != nil {
 			errCount++
@@ -107,17 +132,12 @@ func (g *Script) Transform(datas []Data) ([]Data, error) {
 	return datas, ferr
 }
 
-func getScriptRes(interpreter string, path string) (string, error) {
-	path, err := checkPath(path)
-	if err != nil {
-		return "", err
-	}
-
-	command := exec.Command(interpreter, path) //初始化Cmd
+func getScriptRes(interpreter string, params []string) (string, error) {
+	command := exec.Command(interpreter, params...) //初始化Cmd
 
 	res, err := command.Output()
 	if err != nil {
-		return "", fmt.Errorf("%s %s - run script err info is %v", interpreter, path, err)
+		return "", fmt.Errorf("%s %s - run script err info is: %v", interpreter, params, err)
 	}
 
 	return string(res), nil
@@ -183,14 +203,14 @@ func (g *Script) SampleConfig() string {
 func (g *Script) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
-		transforms.KeyFieldNew,
+		transforms.KeyFieldNewRequired,
 		{
 			KeyName:      "interprepter",
 			ChooseOnly:   false,
 			Default:      "bash",
 			Required:     true,
 			DefaultNoUse: false,
-			Description:  "脚本执行解释器",
+			Description:  "脚本执行解释器(interprepter)",
 			Type:         transforms.TransformTypeString,
 		},
 		{
@@ -198,7 +218,7 @@ func (g *Script) ConfigOptions() []Option {
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
-			Description:  "指定脚本路径",
+			Description:  "指定脚本路径(scriptpath)",
 			Type:         transforms.TransformTypeString,
 		},
 		{
@@ -207,7 +227,7 @@ func (g *Script) ConfigOptions() []Option {
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
-			Description:  "指定脚本内容",
+			Description:  "指定脚本内容(script)",
 			Type:         transforms.TransformTypeString,
 		},
 	}
