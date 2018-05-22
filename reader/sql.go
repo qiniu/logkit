@@ -290,7 +290,7 @@ func restoreMeta(meta *Meta, rawSqls string, magicLagDur time.Duration) (offsets
 
 func restoreTableDone(meta *Meta, database string, tables []string) (tableDone []string, omitTableDone bool) {
 	omitTableDone = true
-	tablesDoneRecord, err := meta.ReadDoneFile(database)
+	tablesDoneRecord, err := meta.ReadDBDoneFile(database)
 	if err != nil {
 		log.Errorf("Runner[%v] %v -table done data is corrupted err:%v, omit table done data", meta.RunnerName, meta.doneFilePath, err)
 		return
@@ -842,7 +842,7 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 	if rawsqlsEmpty {
 		if updateTableDone {
 			all := strings.Join(tableDone, "\n")
-			if err := WriteDoneFile(mr.meta.doneFilePath, mr.database, all); err != nil {
+			if err := WriteDBDoneFile(mr.meta.doneFilePath, mr.database, all); err != nil {
 				log.Errorf("Runner[%v] %v write table done file error %v", mr.meta.RunnerName, mr.Name(), err)
 			}
 		}
@@ -852,8 +852,8 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 	return nil
 }
 
-// WriteDoneFile 将当前文件写入donefiel中
-func WriteDoneFile(doneFilePath, database, content string) (err error) {
+// WriteDBDoneFile 将当前文件写入donefiel中
+func WriteDBDoneFile(doneFilePath, database, content string) (err error) {
 	var f *os.File
 	filename := fmt.Sprintf("%v.%v", filepath.Join(doneFilePath, doneFileName), database)
 	// write to tmp file

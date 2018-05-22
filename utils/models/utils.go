@@ -86,10 +86,16 @@ func TrimeList(strs []string) (ret []string) {
 }
 
 func GetLogFiles(doneFilePath string) (files []File) {
-	readDoneFiles, err := ReadFileContent(doneFilePath)
+	readDoneFileLines, err := ReadFileContent(doneFilePath)
 	if err != nil {
 		return
 	}
+	var readDoneFiles []string
+	for _, v := range readDoneFileLines {
+		sps := strings.Split(v, "\t")
+		readDoneFiles = append(readDoneFiles, sps[0])
+	}
+
 	for i := len(readDoneFiles) - 1; i >= 0; i-- {
 		df := readDoneFiles[i]
 		dfi, err := os.Stat(df)

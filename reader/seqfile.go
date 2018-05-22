@@ -53,6 +53,8 @@ type SeqFile struct {
 	skipFileFirstLine bool   //跳过新文件的第一行，常用于带title的csv文件，title与实际格式不同
 	hasSkiped         bool
 
+	inodeDone map[uint64]bool //记录inode是否已经读过
+
 	lastSyncPath   string
 	lastSyncOffset int64
 }
@@ -111,6 +113,7 @@ func NewSeqFile(meta *Meta, path string, ignoreHidden, newFileNewLine bool, suff
 		mux:              sync.Mutex{},
 		newFileAsNewLine: newFileNewLine,
 		meta:             meta,
+		inodeDone:        make(map[uint64]bool),
 	}
 	//原来的for循环替换成单次执行，启动的时候出错就直接报错给用户即可，不需要等待重试。
 	f, dir, currFile, offset, err := getStartFile(path, whence, meta, sf)
@@ -137,6 +140,7 @@ func NewSeqFile(meta *Meta, path string, ignoreHidden, newFileNewLine bool, suff
 		sf.f = nil
 		sf.offset = 0
 	}
+	sf.inodeDone = meta.GetDoneFileInode()
 	sf.dir = dir
 	sf.currFile = currFile
 	return sf, nil
@@ -377,7 +381,23 @@ func (sf *SeqFile) getNextFileCondition() (condition func(os.FileInfo) bool, err
 	newerThanCurrFile := func(f os.FileInfo) bool {
 		return modTimeLater(f, currFi)
 	}
-	condition = andCondition(newerThanCurrFile, sf.getIgnoreCondition())
+	isNewFile := func(f os.FileInfo) bool {
+		inode, err := utilsos.GetIdentifyIDByPath(filepath.Join(sf.dir, f.Name()))
+		if err != nil {
+			log.Errorf("get %v %v inode err %v", sf.dir, f.Name(), err)
+			return false
+		}
+		//与当前的是同一个文件
+		if inode == sf.inode {
+			return false
+		}
+		if len(sf.inodeDone) < 1 {
+			return true
+		}
+		_, ok := sf.inodeDone[inode]
+		return !ok
+	}
+	condition = andCondition(andCondition(newerThanCurrFile, sf.getIgnoreCondition()), isNewFile)
 	return
 }
 
@@ -475,37 +495,34 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 	}
 
 	doneFile := sf.currFile
+	doneFileInode := sf.inode
 	sf.lastFile = doneFile
 	fname := fi.Name()
 	sf.currFile = filepath.Join(sf.dir, fname)
-	for {
-		f, err := os.Open(sf.currFile)
-		if os.IsNotExist(err) {
-			log.Debugf("Runner[%v] os.Open %s: %v", sf.meta.RunnerName, fname, err)
-			time.Sleep(WaitNoSuchFile)
-			continue
-		}
-		if err != nil {
-			log.Warnf("Runner[%v] os.Open %s: %v", sf.meta.RunnerName, fname, err)
-			return err
-		}
-		sf.f = f
-		//开新的之前关掉老的
-		if sf.ratereader != nil {
-			sf.ratereader.Close()
-		}
-		sf.ratereader = rateio.NewRateReader(f, sf.meta.readlimit)
-		sf.offset = 0
-		sf.inode, err = utilsos.GetIdentifyIDByPath(sf.currFile)
-		if err != nil {
-			return err
-		}
-		log.Infof("Runner[%v] %s - start tail new file: %s", sf.meta.RunnerName, sf.dir, fname)
-		break
+	f, err := os.Open(sf.currFile)
+	if err != nil {
+		log.Warnf("Runner[%v] os.Open %s: %v", sf.meta.RunnerName, fname, err)
+		return err
 	}
+	sf.f = f
+	//开新的之前关掉老的
+	if sf.ratereader != nil {
+		sf.ratereader.Close()
+	}
+	sf.ratereader = rateio.NewRateReader(f, sf.meta.readlimit)
+	sf.offset = 0
+	sf.inode, err = utilsos.GetIdentifyIDByPath(sf.currFile)
+	if err != nil {
+		return err
+	}
+	log.Infof("Runner[%v] %s - start tail new file: %s", sf.meta.RunnerName, sf.dir, fname)
+	if sf.inodeDone == nil {
+		sf.inodeDone = make(map[uint64]bool)
+	}
+	sf.inodeDone[doneFileInode] = true
 	tryTime := 0
 	for {
-		err = sf.meta.AppendDoneFile(doneFile)
+		err = sf.meta.AppendDoneFileInode(doneFile, doneFileInode)
 		if err != nil {
 			if tryTime > 3 {
 				log.Errorf("Runner[%v] cannot write done file %s, err:%v, ignore this noefi", sf.meta.RunnerName, doneFile, err)
