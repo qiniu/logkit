@@ -224,3 +224,54 @@ func TestExtraInfo(t *testing.T) {
 	assert.NotNil(t, got)
 	assert.Equal(t, len(got), 0)
 }
+
+func Test_GetLogFiles2(t *testing.T) {
+	logfiles := "Test_GetLogFiles2"
+	os.RemoveAll(logfiles)
+	err := os.Mkdir(logfiles, os.ModePerm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(logfiles)
+
+	log1 := logfiles + "/log1"
+	log2 := logfiles + "/log2"
+	log3 := logfiles + "/log3"
+	_, err = os.Create(log1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Second)
+	_, err = os.Create(log2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	logkitConf := conf.MapConf{
+		"log_path":  logfiles,
+		"meta_path": logfiles,
+		KeyFileDone: filepath.Join(logfiles, "meta"),
+		"mode":      "dir",
+	}
+	meta, err := NewMetaWithConf(logkitConf)
+	if err != nil {
+		t.Error(err)
+	}
+	meta.AppendDoneFileInode(log1, 123)
+	meta.AppendDoneFileInode(log2, 234)
+	meta.AppendDoneFileInode(log3, 456)
+
+	files := GetLogFiles(meta.DoneFile())
+	exps := []string{"log2", "log1"}
+	var gots []string
+	for _, f := range files {
+		gots = append(gots, f.Info.Name())
+	}
+	if !reflect.DeepEqual(exps, gots) {
+		t.Errorf("Test_getLogFiles error exp %v but got %v", exps, gots)
+	}
+	err = os.RemoveAll(logfiles)
+	if err != nil {
+		t.Error(err)
+	}
+}

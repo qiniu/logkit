@@ -299,7 +299,7 @@ func (m *Meta) WriteBuf(buf []byte, r, w, bufsize int) (err error) {
 	return os.Rename(tmpBufFileName, bufFileName)
 }
 
-// 	 读取当前读取的文件和offset
+// ReadOffset 读取当前读取的文件和offset
 func (m *Meta) ReadOffset() (currFile string, offset int64, err error) {
 	f, err := os.Open(m.MetaFile())
 	if err != nil {
@@ -324,8 +324,8 @@ func (m *Meta) ReadOffset() (currFile string, offset int64, err error) {
 	return
 }
 
-// 读取当前读取的文件和offset
-func (m *Meta) ReadDoneFile(database string) (content []string, err error) {
+// ReadDBDoneFile 读取当前Database已经读取的表
+func (m *Meta) ReadDBDoneFile(database string) (content []string, err error) {
 	doneFiles, err := m.GetDoneFiles()
 	if err != nil {
 		return
@@ -375,6 +375,56 @@ func (m *Meta) AppendDoneFile(path string) (err error) {
 
 	_, err = fmt.Fprintf(f, "%s\n", path)
 	return
+}
+
+// AppendDoneFileInode 将处理完的文件路径、inode以及完成时间写入doneFile中
+func (m *Meta) AppendDoneFileInode(path string, inode uint64) (err error) {
+	f, err := os.OpenFile(m.DoneFile(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, DefaultFilePerm)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	_, err = fmt.Fprintf(f, "%s\t%v\t%s\n", path, inode, time.Now().Format(time.RFC3339Nano))
+	return
+}
+
+func (m *Meta) GetDoneFileContent() ([]string, error) {
+	ret := make([]string, 0)
+	files, err := m.GetDoneFiles()
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range files {
+		contents, err := ReadFileContent(f.Path)
+		if err != nil {
+			log.Errorf("read done file %v err %v", f.Path, err)
+			continue
+		}
+		ret = append(ret, contents...)
+	}
+	return ret, nil
+}
+
+func (m *Meta) GetDoneFileInode() map[uint64]bool {
+	inodeMap := make(map[uint64]bool)
+	contents, err := m.GetDoneFileContent()
+	if err != nil {
+		log.Error(err)
+		return inodeMap
+	}
+	for _, v := range contents {
+		sps := strings.Split(v, "\t")
+		if len(sps) >= 2 {
+			inode, err := strconv.ParseUint(sps[1], 10, 64)
+			if err != nil {
+				log.Errorf("parse inode %v err %v", sps[1], err)
+				continue
+			}
+			inodeMap[inode] = true
+		}
+	}
+	return inodeMap
 }
 
 // DoneFile 处理完成文件地址，按日进行rotate

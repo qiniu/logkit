@@ -400,3 +400,71 @@ func Test_NewFileNewLine3(t *testing.T) {
 	assert.Equal(t, io.EOF, err)
 	assert.Equal(t, string(make([]byte, 10)), string(buffer))
 }
+
+func Test_INode(t *testing.T) {
+
+	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, "", defautFileRetention)
+	if err != nil {
+		t.Error(err)
+	}
+	sf, err := NewSeqFile(meta, dir, false, true, []string{".pid"}, "*", WhenceOldest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	createFile(1000)
+	defer destroyFile()
+
+	buffer := make([]byte, 9)
+	_, err = sf.Read(buffer)
+	assert.NoError(t, err)
+	assert.Equal(t, contents[0], string(buffer))
+
+	buffer = make([]byte, 10)
+	_, err = sf.Read(buffer)
+	assert.NoError(t, err)
+	assert.Equal(t, "\n"+contents[1], string(buffer))
+
+	file, err := os.OpenFile(filepath.Join(dir, "f3"), os.O_WRONLY|os.O_APPEND, DefaultFilePerm)
+	assert.NoError(t, err)
+	file.WriteString("hello3")
+	file.Close()
+
+	buffer = make([]byte, 10)
+	_, err = sf.Read(buffer)
+	assert.NoError(t, err)
+	assert.Equal(t, "\n"+contents[2], string(buffer))
+
+	buffer = make([]byte, 10)
+	_, err = sf.Read(buffer)
+	assert.Equal(t, io.EOF, err)
+	assert.Equal(t, string(make([]byte, 10)), string(buffer))
+	err = sf.SyncMeta()
+	assert.NoError(t, err)
+	err = sf.Close()
+	assert.NoError(t, err)
+
+	file, err = os.OpenFile(filepath.Join(dir, "f1"), os.O_WRONLY|os.O_APPEND, DefaultFilePerm)
+	assert.NoError(t, err)
+	file.WriteString("hello1")
+	file.Close()
+
+	file, err = os.OpenFile(filepath.Join(dir, "f2"), os.O_WRONLY|os.O_APPEND, DefaultFilePerm)
+	assert.NoError(t, err)
+	file.WriteString("hello2")
+	file.Close()
+
+	sf, err = NewSeqFile(meta, dir, false, true, []string{".pid"}, "*", WhenceOldest)
+	if err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, 2, len(sf.inodeDone))
+	buffer = make([]byte, 6)
+	_, err = sf.Read(buffer)
+	assert.NoError(t, err)
+	assert.Equal(t, "hello1", string(buffer))
+
+	buffer = make([]byte, 10)
+	_, err = sf.Read(buffer)
+	assert.Equal(t, io.EOF, err)
+}
