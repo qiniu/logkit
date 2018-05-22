@@ -295,16 +295,12 @@ func restoreTableDone(meta *Meta, database string, tables []string) (tableDone [
 		log.Errorf("Runner[%v] %v -table done data is corrupted err:%v, omit table done data", meta.RunnerName, meta.doneFilePath, err)
 		return
 	}
-	if len(tablesDoneRecord) != len(tables) {
-		log.Infof("tablesDoneRecord: %v, tables: %v", tablesDoneRecord, tables)
-		log.Errorf("Runner[%v] %v -table done file is not invalid sql table done file %v， omit table done data", meta.RunnerName, meta.doneFilePath, tablesDoneRecord)
-		return
-	}
+
 	omitTableDone = false
-	tableDone = make([]string, len(tables))
-	for idx, table := range tables {
-		if tablesDoneRecord[idx] == table {
-			tableDone[idx] = tablesDoneRecord[idx]
+	tableDone = make([]string, 0)
+	for _, table := range tables {
+		if contains(tablesDoneRecord, table) {
+			tableDone = append(tableDone, table)
 		}
 	}
 	return
@@ -627,6 +623,7 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 	var rawsqlsEmpty bool
 	var omitTableDone bool
 	var tableDone []string
+	var updateTableDone bool
 	if mr.rawsqls == "" {
 		rawsqlsEmpty = true
 		var defaultSql string
@@ -668,7 +665,7 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 
 		tableDone, omitTableDone = restoreTableDone(mr.meta, mr.database, tables)
 		if omitTableDone {
-			tableDone = make([]string, len(tables))
+			tableDone = make([]string, 0)
 		}
 
 		mr.syncSQLs = sqls
@@ -686,8 +683,8 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 		for !exit {
 			exit = true
 			isRawSQL = false
-			if rawsqlsEmpty && len(tableDone) > idx {
-				if tableDone[idx] == tables[idx] {
+			if rawsqlsEmpty {
+				if contains(tableDone, tables[idx]) {
 					break
 				}
 			}
@@ -815,8 +812,9 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 					mr.offsets[idx]++
 				}
 			}
-			if rawsqlsEmpty && len(tableDone) > idx {
-				tableDone[idx] = tables[idx]
+			if rawsqlsEmpty {
+				tableDone = append(tableDone, tables[idx])
+				updateTableDone = true
 			}
 
 			if maxOffset > 0 {
@@ -842,7 +840,7 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 	}
 
 	if rawsqlsEmpty {
-		if omitTableDone {
+		if updateTableDone {
 			all := strings.Join(tableDone, "\n")
 			if err := WriteDoneFile(mr.meta.doneFilePath, mr.database, all); err != nil {
 				log.Errorf("Runner[%v] %v write table done file error %v", mr.meta.RunnerName, mr.Name(), err)
@@ -1169,4 +1167,13 @@ func (mr *SqlReader) SyncMeta() {
 
 func (mr *SqlReader) SetMode(mode string, v interface{}) error {
 	return errors.New("SqlReader not support readmode")
+}
+
+func contains(slice []string, str string) bool {
+	for _, s := range slice {
+		if s == str {
+			return true
+		}
+	}
+	return false
 }
