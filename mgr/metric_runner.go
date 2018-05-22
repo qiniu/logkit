@@ -394,22 +394,22 @@ func (_ *MetricRunner) Cleaner() CleanInfo {
 	}
 }
 
-func (mr *MetricRunner) getStatusFrequently(now time.Time) (bool, float64) {
+func (mr *MetricRunner) getStatusFrequently(now time.Time) (bool, float64, RunnerStatus) {
 	mr.rsMutex.RLock()
 	defer mr.rsMutex.RUnlock()
 	elaspedTime := now.Sub(mr.rs.lastState).Seconds()
 	if elaspedTime <= 3 {
-		return true, elaspedTime
+		return true, elaspedTime, mr.lastRs.Clone()
 	}
-	return false, elaspedTime
+	return false, elaspedTime, RunnerStatus{}
 }
 
-func (mr *MetricRunner) Status() RunnerStatus {
+func (mr *MetricRunner) Status() (rs RunnerStatus) {
 	var isFre bool
 	var elaspedtime float64
 	now := time.Now()
-	if isFre, elaspedtime = mr.getStatusFrequently(now); isFre {
-		return *mr.lastRs
+	if isFre, elaspedtime, rs = mr.getStatusFrequently(now); isFre {
+		return rs
 	}
 	mr.rsMutex.Lock()
 	defer mr.rsMutex.Unlock()

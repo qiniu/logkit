@@ -764,22 +764,22 @@ func getTrend(old, new float64) string {
 	return SpeedStable
 }
 
-func (r *LogExportRunner) getStatusFrequently(now time.Time) (bool, float64) {
+func (r *LogExportRunner) getStatusFrequently(now time.Time) (bool, float64, RunnerStatus) {
 	r.rsMutex.RLock()
 	defer r.rsMutex.RUnlock()
 	elaspedTime := now.Sub(r.rs.lastState).Seconds()
 	if elaspedTime <= 3 {
-		return true, elaspedTime
+		return true, elaspedTime, r.lastRs.Clone()
 	}
-	return false, elaspedTime
+	return false, elaspedTime, RunnerStatus{}
 }
 
-func (r *LogExportRunner) Status() RunnerStatus {
+func (r *LogExportRunner) Status() (rs RunnerStatus) {
 	var isFre bool
 	var elaspedtime float64
 	now := time.Now()
-	if isFre, elaspedtime = r.getStatusFrequently(now); isFre {
-		return *r.lastRs
+	if isFre, elaspedtime, rs = r.getStatusFrequently(now); isFre {
+		return rs
 	}
 	sts := r.getRefreshStatus(elaspedtime)
 	return sts
