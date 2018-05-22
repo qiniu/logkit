@@ -282,7 +282,7 @@ func NewSingleFileReader(meta *Meta, conf conf.MapConf) (reader Reader, err erro
 	}
 	bufSize, _ := conf.GetIntOr(KeyBufSize, defaultBufSize)
 	whence, _ := conf.GetStringOr(KeyWhence, WhenceOldest)
-	errDirectReturn, _ := conf.GetBoolOr(KeyErrDirectReturn, false)
+	errDirectReturn, _ := conf.GetBoolOr(KeyErrDirectReturn, true)
 
 	fr, err := NewSingleFile(meta, logpath, whence, errDirectReturn)
 	if err != nil {

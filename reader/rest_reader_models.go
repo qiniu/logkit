@@ -79,6 +79,7 @@ var (
 	}
 	OptionWhence = Option{
 		KeyName:       KeyWhence,
+		Element:       Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{WhenceOldest, WhenceNewest},
 		Default:       WhenceOldest,
@@ -124,6 +125,7 @@ var (
 	}
 	OptionKeyNewFileNewLine = Option{
 		KeyName:       KeyNewFileNewLine,
+		Element:       Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"false", "true"},
 		Default:       "false",
@@ -134,6 +136,7 @@ var (
 	}
 	OptionKeySkipFileFirstLine = Option{
 		KeyName:       KeySkipFileFirstLine,
+		Element:       Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"false", "true"},
 		Default:       "false",
@@ -177,6 +180,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionKeySkipFileFirstLine,
 		{
 			KeyName:       KeyIgnoreHiddenFile,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
@@ -285,6 +289,7 @@ var ModeKeyOptions = map[string][]Option{
 	ModeMysql: {
 		{
 			KeyName:       KeyMysqlDataSource,
+			Element:       Text,
 			ChooseOnly:    false,
 			Default:       "",
 			Required:      true,
@@ -307,7 +312,7 @@ var ModeKeyOptions = map[string][]Option{
 			KeyName:      KeyMysqlSQL,
 			ChooseOnly:   false,
 			Default:      "",
-			Required:     true,
+			Required:     false,
 			Placeholder:  "select * from <table>;",
 			DefaultNoUse: true,
 			Description:  "数据查询语句(mysql_sql)",
@@ -348,6 +353,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyMysqlExecOnStart,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
@@ -361,6 +367,7 @@ var ModeKeyOptions = map[string][]Option{
 	ModeMssql: {
 		{
 			KeyName:       KeyMssqlDataSource,
+			Element:       Text,
 			ChooseOnly:    false,
 			Placeholder:   "server=<hostname or instance>;user id=<username>;password=<password>;port=<port>",
 			DefaultNoUse:  true,
@@ -383,7 +390,7 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:      KeyMssqlSQL,
 			Default:      "",
-			Required:     true,
+			Required:     false,
 			ChooseOnly:   false,
 			Placeholder:  "select * from <table>;",
 			DefaultNoUse: true,
@@ -424,6 +431,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyMssqlExecOnStart,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
@@ -437,6 +445,7 @@ var ModeKeyOptions = map[string][]Option{
 	ModePG: {
 		{
 			KeyName:       KeyPGsqlDataSource,
+			Element:       Text,
 			ChooseOnly:    false,
 			Default:       "",
 			Required:      true,
@@ -460,7 +469,7 @@ var ModeKeyOptions = map[string][]Option{
 			KeyName:      KeyPGsqlSQL,
 			ChooseOnly:   false,
 			Default:      "",
-			Required:     true,
+			Required:     false,
 			Placeholder:  "select * from <table>;",
 			DefaultNoUse: true,
 			Description:  "数据查询语句(postgres_sql)",
@@ -500,6 +509,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyPGsqlExecOnStart,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
@@ -637,6 +647,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyMongoExecOnstart,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
@@ -886,6 +897,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyScriptExecOnStart,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
@@ -1300,22 +1312,12 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:      KeySyncDirectory,
 			ChooseOnly:   false,
-			Default:      "./data",
+			Default:      "",
 			Placeholder:  "",
 			DefaultNoUse: false,
 			Advance:      true,
-			Description:  "本地同步目录(sync_directory)",
-			ToolTip:      "本地同步目录",
-		},
-		{
-			KeyName:      KeySyncMetastore,
-			ChooseOnly:   false,
-			Default:      "./.metastore",
-			Placeholder:  "",
-			DefaultNoUse: false,
-			Advance:      true,
-			Description:  "元数据文件路径(sync_metastore)",
-			ToolTip:      "元数据文件路径",
+			Description:  "本地同步目录，不填自动生成(sync_directory)",
+			ToolTip:      "本地同步目录，不填自动生成",
 		},
 		{
 			KeyName:      KeySyncInterval,
@@ -1339,5 +1341,6 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		OptionKeyValidFilePattern,
 		OptionKeySkipFileFirstLine,
+		OptionDataSourceTag,
 	},
 }

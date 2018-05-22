@@ -110,9 +110,10 @@ func (p *NginxParser) Type() string {
 func (p *NginxParser) Parse(lines []string) ([]Data, error) {
 	var ret []Data
 	se := &StatsError{}
-	for _, line := range lines {
+	for idx, line := range lines {
 		line = strings.TrimSpace(line)
 		if len(line) <= 0 {
+			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			continue
 		}
 		data, err := p.parseline(line)
@@ -123,6 +124,8 @@ func (p *NginxParser) Parse(lines []string) ([]Data, error) {
 				errData := make(Data)
 				errData[KeyPandoraStash] = line
 				ret = append(ret, errData)
+			} else {
+				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			}
 			continue
 		}

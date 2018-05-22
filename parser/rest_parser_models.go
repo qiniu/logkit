@@ -45,6 +45,7 @@ var (
 
 	OptionDisableRecordErrData = Option{
 		KeyName:       KeyDisableRecordErrData,
+		Element:       Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"false", "true"},
 		Default:       "false",
@@ -170,6 +171,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyCSVAllowNoMatch,
+			Element:       Radio,
 			ChooseOnly:    true,
 			Advance:       true,
 			ChooseOptions: []interface{}{"false", "true"},
@@ -184,7 +186,7 @@ var ModeKeyOptions = map[string][]Option{
 			Default:      "unknown",
 			DefaultNoUse: false,
 			Description:  "多余字段命名(csv_allow_more)",
-			ToolTip:      `允许日志数量比定义的schema多且命名为该字段后跟数字，如"unknow0, unknow1"`,
+			ToolTip:      `允许日志数量比定义的schema多且命名为该字段后跟数字，如"unknown0, unknown1"`,
 		},
 		{
 			KeyName:      KeyCSVAllowMoreStartNum,
@@ -192,10 +194,11 @@ var ModeKeyOptions = map[string][]Option{
 			Default:      "0",
 			DefaultNoUse: false,
 			Description:  "多余字段开始数字(csv_more_start_number)",
-			ToolTip:      `多余字段命名数字后缀开始数字，默认如"unknow0", 填1则为"unknow1"`,
+			ToolTip:      `多余字段命名数字后缀开始数字，默认如"unknown0", 填1则为"unknown1"`,
 		},
 		{
 			KeyName:       KeyCSVIgnoreInvalidField,
+			Element:       Radio,
 			ChooseOnly:    true,
 			Advance:       true,
 			ChooseOptions: []interface{}{"false", "true"},
@@ -209,6 +212,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionTimezoneOffset,
 		{
 			KeyName:       KeyAutoRename,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
@@ -221,6 +225,7 @@ var ModeKeyOptions = map[string][]Option{
 	TypeRaw: {
 		{
 			KeyName:       KeyTimestamp,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",

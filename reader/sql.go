@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -17,6 +18,8 @@ import (
 
 	"github.com/qiniu/log"
 
+	"path/filepath"
+
 	_ "github.com/denisenkom/go-mssqldb" //mssql 驱动
 	_ "github.com/go-sql-driver/mysql"   //mysql 驱动
 	"github.com/json-iterator/go"
@@ -28,13 +31,17 @@ const (
 	mb                 = 1024 * 1024 // 1MB
 	sqlOffsetConnector = "##"
 	SQL_SPLITER        = ";"
+	DefaultMySQL       = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA='DATABASE_NAME';"
+	DefaultPGSQL       = "SELECT TABLENAME FROM PG_TABLES WHERE SCHEMANAME='public';"
+	DefaultMsSQL       = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_CATALOG='DATABASE_NAME';"
 )
 
 type SqlReader struct {
-	dbtype     string //数据库类型
-	datasource string //数据源
-	database   string //数据库名称
-	rawsqls    string // 原始sql执行列表
+	dbtype      string //数据库类型
+	datasource  string //数据源
+	database    string //数据库名称
+	rawDatabase string // 记录原始数据库
+	rawsqls     string // 原始sql执行列表
 
 	Cron      *cron.Cron //定时任务
 	readBatch int        // 每次读取的数据量
@@ -70,7 +77,7 @@ const (
 
 func NewSQLReader(meta *Meta, conf conf.MapConf) (ret Reader, err error) {
 	var readBatch int
-	var dbtype, dataSource, database, rawSqls, cronSchedule, offsetKey, encoder string
+	var dbtype, dataSource, rawDatabase, rawSqls, cronSchedule, offsetKey, encoder string
 	var execOnStart bool
 	dbtype, _ = conf.GetStringOr(KeyMode, ModeMysql)
 	logpath, _ := conf.GetStringOr(KeyLogPath, "")
@@ -87,14 +94,11 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (ret Reader, err error) {
 			}
 			err = nil
 		}
-		database, err = conf.GetString(KeyMysqlDataBase)
+		rawDatabase, err = conf.GetString(KeyMysqlDataBase)
 		if err != nil {
 			return nil, err
 		}
-		rawSqls, err = conf.GetString(KeyMysqlSQL)
-		if err != nil {
-			return nil, err
-		}
+		rawSqls, _ = conf.GetStringOr(KeyMysqlSQL, "")
 		cronSchedule, _ = conf.GetStringOr(KeyMysqlCron, "")
 		execOnStart, _ = conf.GetBoolOr(KeyMysqlExecOnStart, true)
 		encoder, _ = conf.GetStringOr(KeyEncoding, "")
@@ -109,14 +113,11 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (ret Reader, err error) {
 			}
 			err = nil
 		}
-		database, err = conf.GetString(KeyMssqlDataBase)
+		rawDatabase, err = conf.GetString(KeyMssqlDataBase)
 		if err != nil {
 			return nil, err
 		}
-		rawSqls, err = conf.GetString(KeyMssqlSQL)
-		if err != nil {
-			return nil, err
-		}
+		rawSqls, _ = conf.GetStringOr(KeyMssqlSQL, "")
 		cronSchedule, _ = conf.GetStringOr(KeyMssqlCron, "")
 		execOnStart, _ = conf.GetBoolOr(KeyMssqlExecOnStart, true)
 	case ModePG:
@@ -142,12 +143,12 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (ret Reader, err error) {
 				return
 			}
 		}
-		database, err = conf.GetString(KeyPGsqlDataBase)
+		rawDatabase, err = conf.GetString(KeyPGsqlDataBase)
 		if err != nil {
 			got := false
 			for _, v := range sps {
 				if strings.Contains(v, "dbname") {
-					database = strings.TrimPrefix(v, "dbname=")
+					rawDatabase = strings.TrimPrefix(v, "dbname=")
 					got = true
 					break
 				}
@@ -156,10 +157,7 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (ret Reader, err error) {
 				return nil, err
 			}
 		}
-		rawSqls, err = conf.GetString(KeyPGsqlSQL)
-		if err != nil {
-			return nil, err
-		}
+		rawSqls, _ = conf.GetStringOr(KeyPGsqlSQL, "")
 		cronSchedule, _ = conf.GetStringOr(KeyPGsqlCron, "")
 		execOnStart, _ = conf.GetBoolOr(KeyPGsqlExecOnStart, true)
 	default:
@@ -180,11 +178,17 @@ func NewSQLReader(meta *Meta, conf conf.MapConf) (ret Reader, err error) {
 		return
 	}
 
-	offsets, sqls, omitMeta := restoreMeta(meta, rawSqls, mgld)
+	var sqls []string
+	omitMeta := true
+	var offsets []int64
+	if rawSqls != "" {
+		offsets, sqls, omitMeta = restoreMeta(meta, rawSqls, mgld)
+	}
 
 	mr := &SqlReader{
 		datasource:  dataSource,
-		database:    database,
+		database:    rawDatabase,
+		rawDatabase: rawDatabase,
 		rawsqls:     rawSqls,
 		Cron:        cron.New(),
 		readBatch:   readBatch,
@@ -280,6 +284,24 @@ func restoreMeta(meta *Meta, rawSqls string, magicLagDur time.Duration) (offsets
 			log.Errorf("Runner[%v] %v -meta file sql is out of date %v or parse offset err %v， omit this offset", meta.RunnerName, meta.MetaFile(), syncSQL, err)
 		}
 		offsets[idx] = offset
+	}
+	return
+}
+
+func restoreTableDone(meta *Meta, database string, tables []string) (tableDone []string, omitTableDone bool) {
+	omitTableDone = true
+	tablesDoneRecord, err := meta.ReadDoneFile(database)
+	if err != nil {
+		log.Errorf("Runner[%v] %v -table done data is corrupted err:%v, omit table done data", meta.RunnerName, meta.doneFilePath, err)
+		return
+	}
+
+	omitTableDone = false
+	tableDone = make([]string, 0)
+	for _, table := range tables {
+		if contains(tablesDoneRecord, table) {
+			tableDone = append(tableDone, table)
+		}
 	}
 	return
 }
@@ -468,6 +490,9 @@ func (mr *SqlReader) run() {
 		}
 	}()
 
+	now := time.Now().Add(-mr.magicLagDur)
+	mr.database = goMagic(mr.rawDatabase, now)
+
 	var connectStr string
 	switch mr.dbtype {
 	case ModeMysql:
@@ -594,6 +619,58 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 		return
 	}
 	//更新sqls
+	tables := make([]string, 0)
+	var rawsqlsEmpty bool
+	var omitTableDone bool
+	var tableDone []string
+	var updateTableDone bool
+	if mr.rawsqls == "" {
+		rawsqlsEmpty = true
+		var defaultSql string
+		switch mr.dbtype {
+		case ModeMysql:
+			defaultSql = strings.Replace(DefaultMySQL, "DATABASE_NAME", mr.database, -1)
+		case ModePG:
+			defaultSql = DefaultPGSQL
+		case ModeMssql:
+			defaultSql = strings.Replace(DefaultMsSQL, "DATABASE_NAME", mr.database, -1)
+		}
+		rows, err := db.Query(defaultSql)
+		if err != nil {
+			log.Errorf("Runner[%v] %v prepare %v <%v> query error %v", mr.meta.RunnerName, mr.Name(), mr.dbtype, defaultSql, err)
+		}
+
+		for rows.Next() {
+			var s string
+			err = rows.Scan(&s)
+			if err != nil {
+				log.Errorf("Runner[%v] %v scan rows error %v", mr.meta.RunnerName, mr.Name(), err)
+				continue
+			}
+			tables = append(tables, s)
+			mr.rawsqls += "Select * From " + s + ";"
+		}
+		rows.Close()
+
+		log.Infof("Runner[%v] %v get tables %v", mr.meta.RunnerName, mr.Name(), tables)
+		log.Debugf("Runner[%v] %v default sqls %v", mr.meta.RunnerName, mr.Name(), mr.rawsqls)
+
+		offsets, sqls, omitMeta := restoreMeta(mr.meta, mr.rawsqls, mr.magicLagDur)
+		// 如果meta初始信息损坏
+		if !omitMeta {
+			mr.offsets = offsets
+		} else {
+			mr.offsets = make([]int64, len(mr.syncSQLs))
+		}
+
+		tableDone, omitTableDone = restoreTableDone(mr.meta, mr.database, tables)
+		if omitTableDone {
+			tableDone = make([]string, 0)
+		}
+
+		mr.syncSQLs = sqls
+	}
+
 	sqls := updateSqls(mr.rawsqls, now)
 	mr.updateOffsets(sqls)
 	mr.syncSQLs = sqls
@@ -606,6 +683,12 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 		for !exit {
 			exit = true
 			isRawSQL = false
+			if rawsqlsEmpty {
+				if contains(tableDone, tables[idx]) {
+					break
+				}
+			}
+
 			execSQL, err := mr.getSQL(idx)
 			if err != nil {
 				log.Errorf("Runner[%v] get SQL error %v, use raw SQL", mr.meta.RunnerName, err)
@@ -729,6 +812,11 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 					mr.offsets[idx]++
 				}
 			}
+			if rawsqlsEmpty {
+				tableDone = append(tableDone, tables[idx])
+				updateTableDone = true
+			}
+
 			if maxOffset > 0 {
 				mr.offsets[idx] = maxOffset + 1
 			}
@@ -750,7 +838,38 @@ func (mr *SqlReader) exec(connectStr string) (err error) {
 			}
 		}
 	}
+
+	if rawsqlsEmpty {
+		if updateTableDone {
+			all := strings.Join(tableDone, "\n")
+			if err := WriteDoneFile(mr.meta.doneFilePath, mr.database, all); err != nil {
+				log.Errorf("Runner[%v] %v write table done file error %v", mr.meta.RunnerName, mr.Name(), err)
+			}
+		}
+
+		mr.rawsqls = ""
+	}
 	return nil
+}
+
+// WriteDoneFile 将当前文件写入donefiel中
+func WriteDoneFile(doneFilePath, database, content string) (err error) {
+	var f *os.File
+	filename := fmt.Sprintf("%v.%v", filepath.Join(doneFilePath, doneFileName), database)
+	// write to tmp file
+	f, err = os.OpenFile(filename, os.O_RDWR|os.O_CREATE, DefaultFilePerm)
+	if err != nil {
+		return err
+	}
+	_, err = f.Write([]byte(content))
+	if err != nil {
+		f.Close()
+		return err
+	}
+	f.Sync()
+	f.Close()
+
+	return
 }
 
 func convertLong(v interface{}) (int64, error) {
@@ -959,7 +1078,7 @@ func (mr *SqlReader) getSQL(idx int) (sql string, err error) {
 		if len(mr.offsetKey) > 0 {
 			sql = fmt.Sprintf("%s WHERE %v >= %d AND %v < %d;", rawSQL, mr.offsetKey, mr.offsets[idx], mr.offsetKey, mr.offsets[idx]+int64(mr.readBatch))
 		} else {
-			sql = fmt.Sprintf("%s LIMIT %d,%d;", rawSQL, mr.offsets[idx], mr.offsets[idx]+int64(mr.readBatch))
+			sql = fmt.Sprintf("%s;", rawSQL)
 		}
 		return
 	case ModeMssql:
@@ -1048,4 +1167,13 @@ func (mr *SqlReader) SyncMeta() {
 
 func (mr *SqlReader) SetMode(mode string, v interface{}) error {
 	return errors.New("SqlReader not support readmode")
+}
+
+func contains(slice []string, str string) bool {
+	for _, s := range slice {
+		if s == str {
+			return true
+		}
+	}
+	return false
 }

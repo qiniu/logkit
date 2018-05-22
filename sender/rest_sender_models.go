@@ -58,6 +58,7 @@ var (
 	}
 	OptionFtMemoryChannel = Option{
 		KeyName:       KeyFtMemoryChannel,
+		Element:       Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"false", "true"},
 		Default:       "false",
@@ -79,6 +80,7 @@ var (
 	}
 	OptionLogkitSendTime = Option{
 		KeyName:       KeyLogkitSendTime,
+		Element:       Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"true", "false"},
 		Default:       "true",
@@ -166,6 +168,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyPandoraSchemaFree,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
@@ -195,6 +198,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyPandoraEnableLogDB,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
@@ -232,6 +236,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyPandoraEnableTSDB,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"false", "true"},
 			Default:       "false",
@@ -285,6 +290,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyPandoraEnableKodo,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"false", "true"},
 			Default:       "false",
@@ -332,6 +338,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyPandoraGzip,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
@@ -362,6 +369,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyPandoraUUID,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"false", "true"},
 			Default:       "false",
@@ -386,6 +394,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionFtMemoryChannelSize,
 		{
 			KeyName:       KeyForceMicrosecond,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"false", "true"},
 			Default:       "false",
@@ -395,6 +404,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyForceDataConvert,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"false", "true"},
 			Default:       "false",
@@ -405,6 +415,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyNumberUseFloat,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
@@ -415,6 +426,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyIgnoreInvalidField,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
@@ -425,6 +437,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyPandoraAutoConvertDate,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
@@ -435,6 +448,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyPandoraUnescape,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
@@ -445,6 +459,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyInsecureServer,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"false", "true"},
 			Default:       "false",
@@ -530,6 +545,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyInfluxdbAutoCreate,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
@@ -758,6 +774,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyHttpSenderGzip,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",

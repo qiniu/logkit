@@ -137,18 +137,20 @@ func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 	var datas []Data
 	for idx, line := range lines {
 		if len(strings.TrimSpace(line)) <= 0 {
+			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			continue
 		}
 		d, err := p.parse(line)
 		if err != nil {
 			se.AddErrors()
-			se.ErrorIndex = append(se.ErrorIndex, idx)
 			se.ErrorDetail = err
 			se.LastError = err.Error()
 			if !p.disableRecordErrData {
 				errData := make(Data)
 				errData[KeyPandoraStash] = line
 				datas = append(datas, errData)
+			} else {
+				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			}
 			continue
 		}

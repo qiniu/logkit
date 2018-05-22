@@ -210,10 +210,10 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	if mode == reader.ModeCloudTrail {
 		syncDir := rc.ReaderConfig[reader.KeySyncDirectory]
 		if syncDir == "" {
-			syncDir = reader.DefaultSyncDirectory
+			bucket, prefix, region, ak, sk, _ := reader.GetS3UserInfo(rc.ReaderConfig)
+			syncDir = reader.GetDefualtSyncDir(bucket, prefix, region, ak, sk)
 		}
 		rc.ReaderConfig[reader.KeyLogPath] = syncDir
-
 		if len(rc.CleanerConfig) == 0 {
 			rc.CleanerConfig = conf.MapConf{
 				"delete_enable":       "true",
@@ -443,10 +443,6 @@ func (r *LogExportRunner) Run() {
 				time.Sleep(1 * time.Second)
 				continue
 			}
-			if len(line) >= r.MaxBatchSize {
-				log.Errorf("Runner[%v] reader %s read lines larger than MaxBatchSize %v, sample content is %s , ignore it...", r.Name(), r.reader.Name(), r.MaxBatchSize, getSampleContent(line, r.MaxBatchSize))
-				continue
-			}
 			r.rsMutex.Lock()
 			r.rs.ReadDataSize += int64(len(line))
 			r.rs.ReadDataCount++
@@ -528,12 +524,16 @@ func (r *LogExportRunner) Run() {
 
 		//把datasourcetag加到data里，前提是认为[]line变成[]data以后是一一对应的，一旦错位就不加
 		if datasourceTag != "" {
-			if len(datas) == len(froms) {
-				datas = addSourceToData(froms, se, datas, datasourceTag, r.Name(), true)
-			} else if len(datas)+len(se.ErrorIndex) == len(froms) {
-				datas = addSourceToData(froms, se, datas, datasourceTag, r.Name(), false)
+			//只要实际解析后数据比froms小就可以填上
+			if len(datas) <= len(froms) {
+				datas = addSourceToData(froms, se, datas, datasourceTag, r.Name())
 			} else {
-				log.Errorf("Runner[%v] datasourcetag add error, datas %v not match with froms %v", r.Name(), datas, froms)
+				var selen int
+				if se != nil {
+					selen = len(se.DatasourceSkipIndex)
+				}
+				log.Errorf("Runner[%v] datasourcetag add error, datas(TOTAL %v), datasourceSkipIndex(TOTAL %v) not match with froms(TOTAL %v)", r.Name(), len(datas), selen, len(froms))
+				log.Debugf("Runner[%v] datasourcetag add error, datas %v datasourceSkipIndex %v froms %v", datas, se.DatasourceSkipIndex, froms)
 			}
 		}
 		if len(tags) > 0 {
@@ -610,13 +610,14 @@ func classifySenderData(datas []Data, router *router.Router, senderCnt int) [][]
 	return senderDataList
 }
 
-func addSourceToData(sourceFroms []string, se *StatsError, datas []Data, datasourceTagName, runnername string, recordErrData bool) []Data {
+func addSourceToData(sourceFroms []string, se *StatsError, datas []Data, datasourceTagName, runnername string) []Data {
 	j := 0
+	eql := len(sourceFroms) == len(datas)
 	for i, v := range sourceFroms {
-		if recordErrData {
+		if eql {
 			j = i
 		} else {
-			if se.ErrorIndexIn(i) {
+			if se != nil && se.ErrorIndexIn(i) {
 				continue
 			}
 		}
@@ -780,6 +781,12 @@ func (r *LogExportRunner) Status() RunnerStatus {
 	if isFre, elaspedtime = r.getStatusFrequently(now); isFre {
 		return *r.lastRs
 	}
+	sts := r.getRefreshStatus(elaspedtime)
+	return sts
+}
+
+func (r *LogExportRunner) getRefreshStatus(elaspedtime float64) RunnerStatus {
+	now := time.Now()
 	r.rsMutex.Lock()
 	defer r.rsMutex.Unlock()
 	r.rs.Error = ""

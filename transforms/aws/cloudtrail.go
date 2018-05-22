@@ -8,6 +8,8 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+const cloudTrailRecords = "Records"
+
 type CloudTrail struct {
 	stats StatsInfo
 }
@@ -39,7 +41,7 @@ func (g *CloudTrail) Transform(datas []Data) (retdata []Data, ferr error) {
 
 //如果有错误发生，要把原来的数据给回去
 func getCloudTrailData(data Data) (retdata []Data, err error) {
-	records, ok := data["Records"]
+	records, ok := data[cloudTrailRecords]
 	if !ok {
 		return []Data{data}, fmt.Errorf("data is not valid aws cloudtrail format as Records field is empty")
 	}
@@ -56,6 +58,7 @@ func getCloudTrailData(data Data) (retdata []Data, err error) {
 			failreason = "data in Records can not be assert to map[string]interface"
 			continue
 		}
+		mydata = AddExtraField(data, mydata)
 		retdata = append(retdata, mydata)
 	}
 	if failcnt > 0 {
@@ -63,6 +66,16 @@ func getCloudTrailData(data Data) (retdata []Data, err error) {
 		retdata = append(retdata, data)
 	}
 	return
+}
+
+func AddExtraField(olddata, newData Data) Data {
+	for k, v := range olddata {
+		if k == cloudTrailRecords {
+			continue
+		}
+		newData[k] = v
+	}
+	return newData
 }
 
 func (g *CloudTrail) Description() string {

@@ -110,10 +110,12 @@ class CreateLogRunner extends Component {
           notification.warning({message: "表单校验未通过,请检查", duration: 20,})
         } else {
           const current = this.state.current + 1;
+          const initBatchSize = 2*1024*1024
           this.setState({current});
           let name = "runner." + moment().format("YYYYMMDDHHmmss");
           let batch_interval = that.refs.initConfig.getFieldValue('batch_interval')
           let runnerName = that.refs.initConfig.getFieldValue('name')
+          let batch_size = that.refs.initConfig.getFieldValue('batch_size')
           let extra_info = that.refs.initConfig.getFieldValue('extra_info')
           if (window.isCopy && window.nodeCopy) {
             name = window.nodeCopy.name
@@ -129,18 +131,21 @@ class CreateLogRunner extends Component {
           if (window.isCopy && window.nodeCopy) {
             runnerName = window.nodeCopy.name
             batch_interval = window.nodeCopy.batch_interval
+            batch_size = window.nodeCopy.batch_size
             extra_info = window.nodeCopy.extra_info
           }
           let data = {
             name: runnerName != undefined ? runnerName : name,
             batch_interval: batch_interval != undefined ? batch_interval : 60,
-            extra_info: extra_info !=undefined ? extra_info : true,
+            batch_size: batch_size != undefined ? batch_size : initBatchSize,
+            extra_info: extra_info !=undefined ? extra_info === 'true' : true,
             ...config.getNodeData()
           }
           that.refs.initConfig.setFieldsValue({config: JSON.stringify(data, null, 2)});
           that.refs.initConfig.setFieldsValue({name: runnerName != undefined ? runnerName : name});
           that.refs.initConfig.setFieldsValue({extra_info: extra_info !=undefined ? extra_info.toString() : 'true'});
           that.refs.initConfig.setFieldsValue({batch_interval: batch_interval != undefined ? batch_interval : 60});
+          that.refs.initConfig.setFieldsValue({batch_size: batch_size != undefined ? batch_size : initBatchSize});
         }
       });
     }
@@ -284,12 +289,12 @@ class CreateLogRunner extends Component {
             {
               this.state.current === steps.length - 1 && this.state.isCpoyStatus === false
               &&
-              <Button type="primary" onClick={() => this.addRunner()}>确认并提交</Button>
+              <Button type="primary" onClick={() => this.addRunner()} style={{ marginLeft: 8 }}>确认并提交</Button>
             }
             {
               this.state.current === steps.length - 1 && this.state.isCpoyStatus === true
               &&
-              <Button type="primary" onClick={() => this.updateRunner()}>修改并提交</Button>
+              <Button type="primary" onClick={() => this.updateRunner()} >修改并提交</Button>
             }
           </div>
         </div>

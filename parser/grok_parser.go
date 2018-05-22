@@ -204,17 +204,19 @@ func (gp *GrokParser) Parse(lines []string) ([]Data, error) {
 	for idx, line := range lines {
 		//grok不应该踢出掉空格，因为grok的Pattern可能按照空格来配置，只需要判断是不是全空扔掉。
 		if len(strings.TrimSpace(line)) <= 0 {
+			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			continue
 		}
 		data, err := gp.parseLine(line)
 		if err != nil {
 			se.AddErrors()
-			se.ErrorIndex = append(se.ErrorIndex, idx)
 			se.ErrorDetail = err
 			if !gp.disableRecordErrData {
 				errData := make(Data)
 				errData[KeyPandoraStash] = line
 				datas = append(datas, errData)
+			} else {
+				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			}
 			continue
 		}

@@ -52,6 +52,7 @@ func (im *JsonParser) Parse(lines []string) ([]Data, error) {
 	for idx, line := range lines {
 		line = strings.TrimSpace(line)
 		if len(line) <= 0 {
+			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			continue
 		}
 		data, err1 := im.parseLine(line)
@@ -67,12 +68,13 @@ func (im *JsonParser) Parse(lines []string) ([]Data, error) {
 			continue
 		}
 		se.AddErrors()
-		se.ErrorIndex = append(se.ErrorIndex, idx)
 		se.ErrorDetail = err1
 		if !im.disableRecordErrData {
 			errData := make(Data)
 			errData[KeyPandoraStash] = line
 			datas = append(datas, errData)
+		} else {
+			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 		}
 	}
 	return datas, se

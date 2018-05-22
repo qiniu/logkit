@@ -47,7 +47,7 @@ type cleanQueue struct {
 type Manager struct {
 	ManagerConfig
 	DefaultDir   string
-	lock         *sync.RWMutex
+	lock         *sync.RWMutex // 这个lock锁住runner的状态，即map runners以及 runnerConfig的情况有变动就要锁住
 	cleanLock    *sync.RWMutex
 	watcherMux   *sync.RWMutex
 	cleanChan    chan cleaner.CleanSignal
@@ -109,7 +109,6 @@ func NewCustomManager(conf ManagerConfig, rr *reader.ReaderRegistry, pr *parser.
 
 func (m *Manager) Stop() error {
 	m.lock.Lock()
-	defer m.lock.Unlock()
 	for _, runner := range m.runners {
 		runner.Stop()
 		runnerStatus, ok := runner.(StatusPersistable)
@@ -117,6 +116,8 @@ func (m *Manager) Stop() error {
 			runnerStatus.StatusBackup()
 		}
 	}
+	m.lock.Unlock()
+
 	m.watcherMux.Lock()
 	for _, w := range m.watchers {
 		if w != nil {
@@ -305,9 +306,8 @@ func (m *Manager) ForkRunner(confPath string, nconf RunnerConfig, errReturn bool
 }
 
 func (m *Manager) isRunning(confPath string) bool {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
-	if _, ok := m.runners[confPath]; ok {
+	_, ok := m.readRunners(confPath)
+	if ok {
 		return true
 	}
 	return false
@@ -716,12 +716,16 @@ func (m *Manager) StartRunner(name string) (err error) {
 			log.Errorf("runner %v start backup config error and rollback error %v", name, subErr)
 		} else {
 			conf.IsStopped = true
-			m.lock.Lock()
-			m.runnerConfig[filename] = conf
-			m.lock.Unlock()
+			m.setRunnerConfig(filename, conf)
 		}
 	}
 	return
+}
+
+func (m *Manager) setRunnerConfig(filename string, conf RunnerConfig) {
+	m.lock.Lock()
+	m.runnerConfig[filename] = conf
+	m.lock.Unlock()
 }
 
 func (m *Manager) StopRunner(name string) (err error) {
@@ -734,17 +738,13 @@ func (m *Manager) StopRunner(name string) (err error) {
 	}
 	conf.IsStopped = true
 	if !m.isRunning(filename) {
-		m.lock.Lock()
-		m.runnerConfig[filename] = conf
-		m.lock.Unlock()
+		m.setRunnerConfig(filename, conf)
 		return
 	}
 	if err = m.RemoveWithConfig(filename, false); err != nil {
 		return fmt.Errorf("remove runner %v error %v", filename, err)
 	}
-	m.lock.Lock()
-	m.runnerConfig[filename] = conf
-	m.lock.Unlock()
+	m.setRunnerConfig(filename, conf)
 	if err = m.backupRunnerConfig(filename, conf); err != nil {
 		// 备份配置文件失败，回滚
 		conf.IsStopped = false
@@ -770,9 +770,7 @@ func (m *Manager) ResetRunner(name string) (err error) {
 			return fmt.Errorf("start %v for reset error %v, as runner is only resetable for alive", filename, err)
 		}
 	}
-	m.lock.RLock()
-	r, runnerOk := m.runners[filename]
-	m.lock.RUnlock()
+	r, runnerOk := m.readRunners(filename)
 	if !runnerOk {
 		return fmt.Errorf("runner %v is not found", filename)
 	}
@@ -804,6 +802,13 @@ func (m *Manager) ResetRunner(name string) (err error) {
 	return
 }
 
+func (m *Manager) readRunners(filename string) (Runner, bool) {
+	m.lock.RLock()
+	r, runnerOk := m.runners[filename]
+	m.lock.RUnlock()
+	return r, runnerOk
+}
+
 func (m *Manager) DeleteRunner(name string) (err error) {
 	filename, conf, err := m.getDeepCopyConfig(name)
 	if err != nil {
@@ -814,9 +819,7 @@ func (m *Manager) DeleteRunner(name string) (err error) {
 		delete(m.runnerConfig, filename)
 		m.lock.Unlock()
 	}
-	m.lock.RLock()
-	r, runnerOk := m.runners[filename]
-	m.lock.RUnlock()
+	r, runnerOk := m.readRunners(filename)
 	if runnerOk {
 		if err = m.Remove(filename); err != nil {
 			return fmt.Errorf("remove runner %v error %v", filename, err)

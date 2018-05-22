@@ -1,6 +1,7 @@
 package mgr
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"log/syslog"
 	"os"
@@ -1110,7 +1111,7 @@ func TestSyslogRunnerX(t *testing.T) {
 func TestAddDatasource(t *testing.T) {
 	sourceFroms := []string{"a", "b", "c", "d", "e", "f"}
 	se := &StatsError{
-		ErrorIndex: []int{0, 3, 5},
+		DatasourceSkipIndex: []int{0, 3, 5},
 	}
 	datas := []Data{
 		{
@@ -1139,14 +1140,43 @@ func TestAddDatasource(t *testing.T) {
 			"source": "e",
 		},
 	}
-	gots := addSourceToData(sourceFroms, se, datas, datasourceTagName, runnername, false)
+	gots := addSourceToData(sourceFroms, se, datas, datasourceTagName, runnername)
 	assert.Equal(t, exp, gots)
+	se = nil
+	exp = []Data{
+		{
+			"f1":     "2",
+			"source": "a",
+		},
+		{
+			"f2":     "1",
+			"source": "b",
+		},
+		{
+			"f3":     "3",
+			"source": "c",
+		},
+	}
+	datas = []Data{
+		{
+			"f1": "2",
+		},
+		{
+			"f2": "1",
+		},
+		{
+			"f3": "3",
+		},
+	}
+	gots = addSourceToData(sourceFroms, se, datas, datasourceTagName, runnername)
+	assert.Equal(t, exp, gots)
+
 }
 
 func TestAddDatasourceForErrData(t *testing.T) {
 	sourceFroms := []string{"a", "b", "c", "d", "e", "f"}
 	se := &StatsError{
-		ErrorIndex: []int{0, 3, 5},
+		DatasourceSkipIndex: []int{0, 3, 5},
 	}
 	datas := []Data{
 		{
@@ -1196,7 +1226,7 @@ func TestAddDatasourceForErrData(t *testing.T) {
 			"source":        "f",
 		},
 	}
-	gots := addSourceToData(sourceFroms, se, datas, datasourceTagName, runnername, true)
+	gots := addSourceToData(sourceFroms, se, datas, datasourceTagName, runnername)
 	assert.Equal(t, exp, gots)
 }
 
@@ -1318,6 +1348,133 @@ func TestRunWithExtra(t *testing.T) {
 		t.Error(err)
 	}
 	assert.Equal(t, 7, len(res[0]))
+}
+
+func TestRunWithDataSource(t *testing.T) {
+	cur, err := os.Getwd()
+	assert.NoError(t, err)
+	dir := filepath.Join(cur, "TestRunWithDataSource")
+	os.RemoveAll(dir)
+	metaDir := filepath.Join(dir, "meta")
+	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
+		log.Fatalf("TestRunWithDataSource error mkdir %v %v", dir, err)
+	}
+	logPath := filepath.Join(dir, "test.log")
+	err = ioutil.WriteFile(logPath, []byte("a\nb\n\n\nc\n"), DefaultDirPerm)
+	assert.NoError(t, err)
+
+	defer os.RemoveAll(dir)
+	defer os.RemoveAll(metaDir)
+
+	config1 := `{
+			"name":"TestRunWithDataSource",
+			"batch_len":5,
+			"reader":{
+				"mode":"file",
+				"meta_path":"./TestRunWithDataSource/meta",
+				"log_path":"` + logPath + `",
+				"datasource_tag":"datasource"
+			},
+			"parser":{
+				"name":"testjson",
+				"type":"raw",
+				"timestamp":"false"
+			},
+			"senders":[{
+				"name":"file_sender",
+				"sender_type":"file",
+				"file_send_path":"./TestRunWithDataSource/filesend.json"
+			}]
+		}`
+	rc := RunnerConfig{}
+	err = jsoniter.Unmarshal([]byte(config1), &rc)
+	assert.NoError(t, err)
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewReaderRegistry(), parser.NewParserRegistry(), sender.NewSenderRegistry())
+	assert.NoError(t, err)
+	assert.NotNil(t, rr)
+	go rr.Run()
+
+	time.Sleep(2 * time.Second)
+	data, err := ioutil.ReadFile("./TestRunWithDataSource/filesend.json")
+	var res []Data
+	err = json.Unmarshal(data, &res)
+	if err != nil {
+		t.Error(err, string(data))
+	}
+	exp := []Data{
+		{
+			"raw":        "a\n",
+			"datasource": logPath,
+		},
+		{
+			"raw":        "b\n",
+			"datasource": logPath,
+		},
+		{
+			"raw":        "c\n",
+			"datasource": logPath,
+		},
+	}
+	assert.Equal(t, exp, res)
+}
+
+func TestRunWithDataSourceFial(t *testing.T) {
+	cur, err := os.Getwd()
+	assert.NoError(t, err)
+	dir := filepath.Join(cur, "TestRunWithDataSourceFial")
+	metaDir := filepath.Join(dir, "meta")
+	os.RemoveAll(dir)
+	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
+		log.Fatalf("TestRunWithDataSource error mkdir %v %v", dir, err)
+	}
+	logPath := filepath.Join(dir, "test.log")
+	err = ioutil.WriteFile(logPath, []byte("a\n"), DefaultDirPerm)
+	assert.NoError(t, err)
+
+	defer os.RemoveAll(dir)
+	defer os.RemoveAll(metaDir)
+
+	config1 := `{
+			"name":"TestRunWithDataSourceFial",
+			"batch_len":1,
+			"reader":{
+				"mode":"file",
+				"log_path":"` + logPath + `",
+				"meta_path":"./TestRunWithDataSourceFial/meta",
+				"datasource_tag":"datasource"
+			},
+			"parser":{
+				"name":"testjson",
+				"type":"json"
+			},
+			"senders":[{
+				"name":"file_sender",
+				"sender_type":"file",
+				"file_send_path":"./TestRunWithDataSourceFial/filesend.json"
+			}]
+		}`
+	rc := RunnerConfig{}
+	err = jsoniter.Unmarshal([]byte(config1), &rc)
+	assert.NoError(t, err)
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewReaderRegistry(), parser.NewParserRegistry(), sender.NewSenderRegistry())
+	assert.NoError(t, err)
+	assert.NotNil(t, rr)
+	go rr.Run()
+
+	time.Sleep(2 * time.Second)
+	data, err := ioutil.ReadFile("./TestRunWithDataSourceFial/filesend.json")
+	var res []Data
+	err = json.Unmarshal(data, &res)
+	if err != nil {
+		t.Error(err, string(data))
+	}
+	exp := []Data{
+		{
+			"pandora_stash": "a",
+			"datasource":    logPath,
+		},
+	}
+	assert.Equal(t, exp, res)
 }
 
 func TestClassifySenderData(t *testing.T) {

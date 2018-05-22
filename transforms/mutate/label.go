@@ -76,6 +76,7 @@ func (g *Label) ConfigOptions() []Option {
 		},
 		{
 			KeyName:       "override",
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{false, true},
 			Default:       false,

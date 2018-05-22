@@ -114,6 +114,7 @@ func (g *Replacer) ConfigOptions() []Option {
 		},
 		{
 			KeyName:       "regex",
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{false, true},
 			Default:       false,

@@ -197,10 +197,16 @@
 			"revisionTime": "2016-10-29T20:57:26Z"
 		},
 		{
-			"checksumSHA1": "cu3vGt/MP5WOcnbCzPPzezR6EHo=",
+			"checksumSHA1": "tNgJpfG220WO04zh9W5ajxioHso=",
 			"path": "github.com/denisenkom/go-mssqldb",
-			"revision": "8a15d1bb0c8eaa4b870c016b312de5b50b493b4e",
-			"revisionTime": "2017-12-04T17:36:08Z"
+			"revision": "e32faac87a2220f9342289f2c3b567d1424b8ec5",
+			"revisionTime": "2018-04-16T13:29:13Z"
+		},
+		{
+			"checksumSHA1": "wu8t19t2rmyrrfDfdu9v7f/+iag=",
+			"path": "github.com/denisenkom/go-mssqldb/internal/cp",
+			"revision": "e32faac87a2220f9342289f2c3b567d1424b8ec5",
+			"revisionTime": "2018-04-16T13:29:13Z"
 		},
 		{
 			"checksumSHA1": "y2Kh4iPlgCPXSGTCcFpzePYdzzg=",

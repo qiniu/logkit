@@ -25,6 +25,7 @@ func GetMetricUsages() []Option {
 	for key, collector := range Collectors {
 		option := Option{
 			KeyName:       key,
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",

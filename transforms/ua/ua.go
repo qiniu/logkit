@@ -228,6 +228,7 @@ func (it *UATransformer) ConfigOptions() []Option {
 		},
 		{
 			KeyName:       "device",
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{true, false},
 			Default:       "true",
@@ -237,6 +238,7 @@ func (it *UATransformer) ConfigOptions() []Option {
 		},
 		{
 			KeyName:       "os",
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{true, false},
 			Default:       "true",
@@ -246,6 +248,7 @@ func (it *UATransformer) ConfigOptions() []Option {
 		},
 		{
 			KeyName:       "agent",
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{true, false},
 			Default:       "true",
@@ -255,6 +258,7 @@ func (it *UATransformer) ConfigOptions() []Option {
 		},
 		{
 			KeyName:       "memory_cache",
+			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{true, false},
 			Default:       "true",

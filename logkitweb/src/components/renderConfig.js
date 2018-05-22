@@ -103,6 +103,25 @@ class renderConfig extends Component {
       getFieldDecorator("name", {initialValue: data.name});
       getFieldDecorator("extra_info", {initialValue: data.extra_info});
       getFieldDecorator("collect_interval", {initialValue: parseInt(data.collect_interval)});
+      getFieldDecorator("batch_size", {initialValue: parseInt(data.batch_size)});
+    } else {
+      this.notifyJSONError();
+    }
+  }
+  
+  handleBatchSizeChange = (value) => {
+    const {getFieldsValue, getFieldDecorator, resetFields} = this.props.form;
+    let data = getFieldsValue();
+    this.closeNotification();
+    if (this.isJSON(data.config)) {
+      const jsonData = JSON.parse(data.config)
+      jsonData.batch_size = value
+      resetFields()
+      getFieldDecorator("config", {initialValue: JSON.stringify(jsonData, null, 2)});
+      getFieldDecorator("name", {initialValue: data.name});
+      getFieldDecorator("extra_info", {initialValue: data.extra_info});
+      getFieldDecorator("collect_interval", {initialValue: parseInt(data.collect_interval)});
+      getFieldDecorator("batch_interval", {initialValue: parseInt(data.batch_interval)});
     } else {
       this.notifyJSONError();
     }
@@ -119,6 +138,7 @@ class renderConfig extends Component {
       getFieldDecorator("config", {initialValue: JSON.stringify(jsonData, null, 2)});
       getFieldDecorator("name", {initialValue: data.name});
       getFieldDecorator("batch_interval", {initialValue: parseInt(data.batch_interval)});
+      getFieldDecorator("batch_size", {initialValue: parseInt(data.batch_size)});
       getFieldDecorator("extra_info", {initialValue: data.extra_info});
     } else {
       this.notifyJSONError();
@@ -136,6 +156,7 @@ class renderConfig extends Component {
       resetFields()
       getFieldDecorator("config", {initialValue: JSON.stringify(jsonData, null, 2)});
       getFieldDecorator("batch_interval", {initialValue: parseInt(data.batch_interval)});
+      getFieldDecorator("batch_size", {initialValue: parseInt(data.batch_size)});
       getFieldDecorator("collect_interval", {initialValue: parseInt(data.collect_interval)});
       getFieldDecorator("extra_info", {initialValue: data.extra_info});
     } else {
@@ -154,6 +175,7 @@ class renderConfig extends Component {
       resetFields()
       getFieldDecorator("config", {initialValue: JSON.stringify(jsonData, null, 2)});
       getFieldDecorator("batch_interval", {initialValue: parseInt(data.batch_interval)});
+      getFieldDecorator("batch_size", {initialValue: parseInt(data.batch_size)});
       getFieldDecorator("collect_interval", {initialValue: parseInt(data.collect_interval)});
       getFieldDecorator("name", {initialValue: data.name});
     } else {
@@ -170,7 +192,8 @@ class renderConfig extends Component {
       getFieldDecorator("name", {initialValue: jsonData.name});
       getFieldDecorator("batch_interval", {initialValue: parseInt(jsonData.batch_interval)});
       getFieldDecorator("collect_interval", {initialValue: parseInt(jsonData.collect_interval)});
-      getFieldDecorator("extra_info", {initialValue: jsonData.extra_info});
+      getFieldDecorator("batch_size", {initialValue: parseInt(jsonData.batch_size)});
+      getFieldDecorator("extra_info", {initialValue: jsonData.extra_info.toString()});
     } else {
       this.notifyJSONError();
     }
@@ -227,6 +250,15 @@ class renderConfig extends Component {
                     )}
                   </FormItem> : null
                 }
+                <FormItem {...formItemLayout}
+                          label={(<span>单次读取最大数据量<br/><span style={{ color: 'rgba(0,0,0,.43)', float: 'right' }}>(byte)</span></span>)}>
+                  {getFieldDecorator('batch_size', {
+                    rules: [{required: true, message: '单次读取最大数据量不能为空'},
+                      {pattern: /^[0-9]*$/, message: '输入不符合规范,只能为整数'}]
+                  })(
+                    <InputNumber onChange={this.handleBatchSizeChange} />
+                  )}
+                </FormItem>
                 <FormItem {...formItemLayout} label="添加额外系统信息">
                   {getFieldDecorator('extra_info')(
                     <RadioGroup onChange={this.handleExtraInfoChange} style={{float: 'left'}}>
