@@ -556,7 +556,7 @@ func Test_QiniulogRun(t *testing.T) {
 	//clean dir first
 	os.RemoveAll(dir)
 	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
-		log.Errorf("Test_Run error mkdir %v %v", dir, err)
+		log.Errorf("Test_QiniulogRun error mkdir %v %v", dir, err)
 	}
 	defer os.RemoveAll(dir)
 	logpath := dir + "/logdir"
@@ -587,11 +587,12 @@ func Test_QiniulogRun(t *testing.T) {
 	1234 3243xsaxs
 2016/10/20 17:20:30.642662 [123][WARN] disk.go:241: github.com/qiniu/logkit/queue/disk.go 1
 `
-	log3 := `2016/10/20 17:20:30.642662 [124][WARN] disk.go xxxxxx`
+	log3 := `2016/10/20 17:20:30.642662 [124][WARN] disk.go:456: xxxxxx`
 	expfiles := []string{`[REQ_END] 200 0.010k 3.792ms \t\t[WARN][SLdoIrCDZj7pmZsU] disk.go <job.freezeDeamon> pop() failed: not found`,
 		`Service: POST 10.200.20.25:9100/user/info, Code: 200, Xlog: AC, Time: 1ms`,
-		`github.com/qiniu/logkit/queue/disk.go:241 \t1234 3243xsaxs`, `github.com/qiniu/logkit/queue/disk.go 1`}
-	expreqid := []string{"X-ZsU", "2pyKMukqvwSd-ZsU", "", "123"}
+		`github.com/qiniu/logkit/queue/disk.go:241 \t1234 3243xsaxs`, `github.com/qiniu/logkit/queue/disk.go 1`,
+		`xxxxxx`}
+	expreqid := []string{"X-ZsU", "2pyKMukqvwSd-ZsU", "", "123", "124"}
 	if err := ioutil.WriteFile(filepath.Join(logpath, "log1"), []byte(log1), 0666); err != nil {
 		log.Fatalf("write log1 fail %v", err)
 	}
@@ -666,6 +667,7 @@ func Test_QiniulogRun(t *testing.T) {
 	if err := ioutil.WriteFile(filepath.Join(logpath, "log3"), []byte(log3), 0666); err != nil {
 		log.Fatalf("write log3 fail %v", err)
 	}
+	time.Sleep(time.Second)
 	timer := time.NewTimer(20 * time.Second).C
 	for {
 		if s.SendCount() >= 4 {
@@ -685,8 +687,8 @@ func Test_QiniulogRun(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if len(dts) != 4 {
-		t.Errorf("got sender data not match error,expect 4 but %v", len(dts))
+	if len(dts) != 5 {
+		t.Errorf("got sender data not match error,expect 5 but %v", len(dts))
 	}
 	for idx, dt := range dts {
 		assert.Equal(t, expfiles[idx], dt["log"], "equl log test")
