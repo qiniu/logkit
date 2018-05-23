@@ -87,11 +87,16 @@ class Source extends Component {
   }
 
   submit = () => {
-    const {getFieldsValue} = this.props.form;
+    const {getFieldsValue} = this.props.form
     const cleanerKeys = cleanerConfig.map(item => item.KeyName)
-    let data = getFieldsValue();
+    let data = getFieldsValue()
     let notEmptyKeysReader = []
     let notEmptyKeysCleaner = []
+    for (const item of this.state.currentItem) {
+      if (item.advance_depend && data[this.state.currentOption] && data[this.state.currentOption][item.advance_depend] === 'false') {
+        data[this.state.currentOption][item.KeyName] = ''
+      }
+    }
     _.forIn(data[this.state.currentOption], function (value, key) {
       if (value != "") {
         cleanerKeys.includes(key) ? notEmptyKeysCleaner.push(key) : notEmptyKeysReader.push(key)
@@ -156,27 +161,24 @@ class Source extends Component {
         </span>
       )
       if (ele.ChooseOnly == false) {
-        if (ele.advance_depend && getFieldValue(`${this.state.currentOption}.${ele.advance_depend}`) === 'false') {
-          formItem = null
-        } else {
-          formItem = (
-            <FormItem key={index}
-              {...formItemLayout}
-              className=""
-              label={labelDes}>
-              {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
-                initialValue: ele.Default,
-                rules: [{ required: ele.required, message: '不能为空', trigger: 'blur' },
+        let isAdvanceDependHide = ele.advance_depend && getFieldValue(`${this.state.currentOption}.${ele.advance_depend}`) === 'false'
+        formItem = (
+          <FormItem key={index}
+                    {...formItemLayout}
+                    className={isAdvanceDependHide ? 'hide-div' : 'show-div'}
+                    label={labelDes}>
+            {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
+              initialValue: ele.Default,
+              rules: [{ required: ele.required && !isAdvanceDependHide, message: '不能为空', trigger: 'blur' },
                 { pattern: ele.CheckRegex, message: '输入不符合规范' },
-                ]
-              })(
-                ele.Element === 'text'
+              ]
+            })(
+              ele.Element === 'text'
                 ? <Input.TextArea placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'} disabled={this.state.isReadonly} />
                 : <Input placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'} disabled={this.state.isReadonly} />
-                )}
-            </FormItem>
-          )
-        }
+            )}
+          </FormItem>
+        )
       } else {
         formItem = (
           <FormItem key={index}

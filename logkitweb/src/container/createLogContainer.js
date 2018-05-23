@@ -138,12 +138,12 @@ class CreateLogRunner extends Component {
             name: runnerName != undefined ? runnerName : name,
             batch_interval: batch_interval != undefined ? batch_interval : 60,
             batch_size: batch_size != undefined ? batch_size : initBatchSize,
-            extra_info: extra_info !=undefined ? extra_info === 'true' : true,
+            extra_info: extra_info !=undefined ? extra_info.toString() === 'true' : false,
             ...config.getNodeData()
           }
           that.refs.initConfig.setFieldsValue({config: JSON.stringify(data, null, 2)});
           that.refs.initConfig.setFieldsValue({name: runnerName != undefined ? runnerName : name});
-          that.refs.initConfig.setFieldsValue({extra_info: extra_info !=undefined ? extra_info.toString() : 'true'});
+          that.refs.initConfig.setFieldsValue({extra_info: extra_info !=undefined ? extra_info.toString() : 'false'});
           that.refs.initConfig.setFieldsValue({batch_interval: batch_interval != undefined ? batch_interval : 60});
           that.refs.initConfig.setFieldsValue({batch_size: batch_size != undefined ? batch_size : initBatchSize});
         }

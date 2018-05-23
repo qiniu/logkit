@@ -64,6 +64,11 @@ class Sender extends Component {
     const {getFieldsValue} = this.props.form;
     let data = getFieldsValue();
     data[this.state.currentOption].sender_type = this.state.currentOption
+    for (const item of this.state.currentItem) {
+      if (item.advance_depend && data[this.state.currentOption] && data[this.state.currentOption][item.advance_depend] === 'false') {
+        data[this.state.currentOption][item.KeyName] = ''
+      }
+    }
     let notEmptyKeys = []
     _.forIn(data[this.state.currentOption], function (value, key) {
       if (value != "") {
@@ -113,7 +118,7 @@ class Sender extends Component {
               that.setState({
                 currentOption: window.nodeCopy.senders[0].sender_type
               })
-              setFieldsValue(formData);
+              setFieldsValue(formData)
             }
           }
         })
@@ -140,25 +145,22 @@ class Sender extends Component {
         if (ele.KeyName == 'name' && window.isCopy != true) {
           ele.Default = "pandora.sender." + moment().format("YYYYMMDDHHmmss");
         }
-        if (ele.advance_depend && getFieldValue(`${this.state.currentOption}.${ele.advance_depend}`) === 'false') {
-          formItem = null
-        } else {
-          formItem = (
-            <FormItem key={index}
-              {...formItemLayout}
-              className=""
-              label={labelDes}>
-              {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
-                initialValue: ele.Default,
-                rules: [{ required: ele.required, message: '不能为空', trigger: 'blur' },
+        let isAdvanceDependHide = ele.advance_depend && getFieldValue(`${this.state.currentOption}.${ele.advance_depend}`) === 'false'
+        formItem = (
+          <FormItem key={index}
+                    {...formItemLayout}
+                    className={isAdvanceDependHide ? 'hide-div' : 'show-div'}
+                    label={labelDes}>
+            {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
+              initialValue: ele.Default,
+              rules: [{ required: ele.required && !isAdvanceDependHide , message: '不能为空', trigger: 'blur' },
                 { pattern: ele.CheckRegex, message: '输入不符合规范' },
-                ]
-              })(
-                <Input placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'} disabled={this.state.isReadonly} />
-                )}
-            </FormItem>
-          )
-        }
+              ]
+            })(
+              <Input placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'} disabled={this.state.isReadonly} />
+            )}
+          </FormItem>
+        )
       } else {
         formItem = (
           <FormItem key={index}
