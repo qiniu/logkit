@@ -309,7 +309,7 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 			}
 			fi, err1 := sf.nextFile()
 			if os.IsNotExist(err1) {
-				if nextFileRetry >= 3 {
+				if nextFileRetry >= 1 {
 					return n, io.EOF
 				}
 				// dir removed or file rotated

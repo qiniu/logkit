@@ -18,7 +18,7 @@ var ErrMetaFileRead = errors.New("cannot read meta file")
 var ErrFileNotRegular = errors.New("file is not regular")
 var ErrFileNotDir = errors.New("file is not directory")
 
-var WaitNoSuchFile = time.Second
+var WaitNoSuchFile = 100 * time.Millisecond
 
 // getLatestFile 获得当前文件夹下最新的文件
 func getLatestFile(logdir string) (os.FileInfo, error) {
