@@ -1,5 +1,7 @@
 all:
-	go generate; CGO_ENABLED=1 go build -v -o logkit
+	go generate
+	CGO_ENABLED=1 go install -v
+	mv ${GOPATH}/bin/logkit .
 
 install: all
 	@echo
