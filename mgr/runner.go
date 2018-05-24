@@ -211,7 +211,7 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 		syncDir := rc.ReaderConfig[reader.KeySyncDirectory]
 		if syncDir == "" {
 			bucket, prefix, region, ak, sk, _ := reader.GetS3UserInfo(rc.ReaderConfig)
-			syncDir = reader.GetDefualtSyncDir(bucket, prefix, region, ak, sk)
+			syncDir = reader.GetDefualtSyncDir(bucket, prefix, region, ak, sk, rc.RunnerName)
 		}
 		rc.ReaderConfig[reader.KeyLogPath] = syncDir
 		if len(rc.CleanerConfig) == 0 {

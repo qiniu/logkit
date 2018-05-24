@@ -406,8 +406,12 @@ func (m *Meta) GetDoneFileContent() ([]string, error) {
 	return ret, nil
 }
 
-func (m *Meta) GetDoneFileInode() map[uint64]bool {
-	inodeMap := make(map[uint64]bool)
+func joinFileInode(filename, inode string) string {
+	return filepath.Base(filename) + "_" + inode
+}
+
+func (m *Meta) GetDoneFileInode() map[string]bool {
+	inodeMap := make(map[string]bool)
 	contents, err := m.GetDoneFileContent()
 	if err != nil {
 		log.Error(err)
@@ -416,12 +420,7 @@ func (m *Meta) GetDoneFileInode() map[uint64]bool {
 	for _, v := range contents {
 		sps := strings.Split(v, "\t")
 		if len(sps) >= 2 {
-			inode, err := strconv.ParseUint(sps[1], 10, 64)
-			if err != nil {
-				log.Errorf("parse inode %v err %v", sps[1], err)
-				continue
-			}
-			inodeMap[inode] = true
+			inodeMap[joinFileInode(sps[0], sps[1])] = true
 		}
 	}
 	return inodeMap
