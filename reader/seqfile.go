@@ -220,6 +220,8 @@ func (sf *SeqFile) Close() (err error) {
 
 // 这个函数目前只针对stale NFS file handle的情况，重新打开文件
 func (sf *SeqFile) reopenForESTALE() error {
+	log.Warnf("reopening stale NFS file handle for %q", sf.currFile)
+
 	f, err := os.Open(sf.currFile)
 	if os.IsNotExist(err) {
 		return err
