@@ -35,12 +35,12 @@ const (
 	KeySyncConcurrent = "sync_concurrent"
 )
 
-func GetDefualtSyncDir(bucket, prefix, region, ak, sk string) string {
-	return filepath.Join("s3data", "data"+models.Hash(ak+sk+region+bucket+prefix))
+func GetDefualtSyncDir(bucket, prefix, region, ak, sk, runnerName string) string {
+	return filepath.Join("s3data", "data"+models.Hash(ak+sk+region+bucket+prefix+runnerName))
 }
 
-func GetDefualtMetaStore(bucket, prefix, region, ak, sk string) string {
-	return ".metastore" + models.Hash(ak+sk+region+bucket+prefix)
+func GetDefualtMetaStore(bucket, prefix, region, ak, sk, runnerName string) string {
+	return ".metastore" + models.Hash(ak+sk+region+bucket+prefix+runnerName)
 }
 
 var (
@@ -166,17 +166,20 @@ func buildSyncOptions(conf conf.MapConf) (*syncOptions, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	runnerName, err := conf.GetString(models.KeyRunnerName)
+	if err != nil {
+		return nil, err
+	}
 	opts.directory, _ = conf.GetStringOr(KeySyncDirectory, "")
 	if opts.directory == "" {
-		opts.directory = GetDefualtSyncDir(opts.bucket, opts.prefix, opts.region, opts.accessKey, opts.secretKey)
+		opts.directory = GetDefualtSyncDir(opts.bucket, opts.prefix, opts.region, opts.accessKey, opts.secretKey, runnerName)
 	}
 	if err = os.MkdirAll(opts.directory, 0755); err != nil {
 		return nil, fmt.Errorf("cannot create target directory %q: %v", opts.directory, err)
 	}
 	opts.metastore, _ = conf.GetStringOr(KeySyncMetastore, "")
 	if opts.metastore == "" {
-		opts.metastore = GetDefualtMetaStore(opts.bucket, opts.prefix, opts.region, opts.accessKey, opts.secretKey)
+		opts.metastore = GetDefualtMetaStore(opts.bucket, opts.prefix, opts.region, opts.accessKey, opts.secretKey, runnerName)
 	}
 
 	s, _ := conf.GetStringOr(KeySyncInterval, "5m")
@@ -499,7 +502,7 @@ func (s *syncRunner) concurrentSyncToDir(s3url s3Url, bucket *s3.Bucket, sourceF
 				pool <- 1
 			}(doneChan, filePath, bucket, s3file)
 		} else {
-			delete(sourceFiles, basename)
+			delete(sourceFiles, s3file)
 			log.Debugf("%s already synced, skip it...", unzipPath)
 		}
 	}

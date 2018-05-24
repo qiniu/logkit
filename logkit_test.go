@@ -43,6 +43,7 @@ func Test_RotateClean(t *testing.T) {
 			case <-exitchan:
 				return
 			default:
+				//通过这一行打印日志到文件，生成日志文件，误删
 				log.Info("test output log ", i)
 			}
 			i++
