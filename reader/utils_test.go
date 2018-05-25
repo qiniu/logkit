@@ -9,16 +9,17 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/qiniu/logkit/utils/models"
-
 	"github.com/stretchr/testify/assert"
+
+	. "github.com/qiniu/logkit/reader/test"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 func TestFindFile(t *testing.T) {
 	createFile(1000)
-	defer destroyFile()
+	defer DestroyDir()
 
-	fi, err := getLatestFile(dir)
+	fi, err := getLatestFile(Dir)
 	if err != nil {
 		t.Error(err)
 	}
@@ -26,7 +27,7 @@ func TestFindFile(t *testing.T) {
 		t.Errorf("Latest file is f4, not %v", fi.Name())
 	}
 
-	fi, err = getOldestFile(dir)
+	fi, err = getOldestFile(Dir)
 	if err != nil {
 		t.Error(err)
 	}
@@ -87,11 +88,11 @@ func TestHeadPatternMode(t *testing.T) {
 }
 
 func TestParseDuration(t *testing.T) {
-	dur, err := parseLoopDuration("loop 1s")
+	dur, err := ParseLoopDuration("loop 1s")
 	assert.NoError(t, err)
 	assert.Equal(t, time.Second, dur)
 
-	dur, err = parseLoopDuration("loop 1-")
+	dur, err = ParseLoopDuration("loop 1-")
 	assert.Error(t, err)
 	assert.Equal(t, time.Duration(0), dur)
 }

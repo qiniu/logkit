@@ -120,7 +120,7 @@ func HeadPatternMode(mode string, v interface{}) (reg *regexp.Regexp, err error)
 	}
 }
 
-func parseLoopDuration(cronSched string) (dur time.Duration, err error) {
+func ParseLoopDuration(cronSched string) (dur time.Duration, err error) {
 	cronSched = strings.TrimSpace(strings.TrimPrefix(cronSched, Loop))
 	dur, err = time.ParseDuration(cronSched)
 	if err != nil {

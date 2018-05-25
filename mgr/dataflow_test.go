@@ -9,14 +9,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/json-iterator/go"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/reader/http"
 	"github.com/qiniu/logkit/sender"
 	. "github.com/qiniu/logkit/utils/models"
-
-	"github.com/json-iterator/go"
-	"github.com/stretchr/testify/assert"
 )
 
 func Test_RawData(t *testing.T) {
@@ -233,20 +234,20 @@ func Test_getTransformer(t *testing.T) {
 
 func Test_SendData(t *testing.T) {
 	c := conf.MapConf{
-		reader.KeyHttpServiceAddress: ":8000",
-		reader.KeyHttpServicePath:    "/logkit/data",
+		reader.KeyHTTPServiceAddress: ":8000",
+		reader.KeyHTTPServicePath:    "/logkit/data",
 	}
 	readConf := conf.MapConf{
 		reader.KeyMetaPath: "./meta",
 		reader.KeyFileDone: "./meta",
-		reader.KeyMode:     reader.ModeHttp,
+		reader.KeyMode:     reader.ModeHTTP,
 		KeyRunnerName:      "TestNewHttpReader",
 	}
 	meta, err := reader.NewMetaWithConf(readConf)
 	assert.NoError(t, err)
 	defer os.RemoveAll("./meta")
-	hhttpReader, err := reader.NewHttpReader(meta, c)
-	httpReader := hhttpReader.(*reader.HttpReader)
+	reader, err := http.NewReader(meta, c)
+	httpReader := reader.(*http.Reader)
 	assert.NoError(t, err)
 	err = httpReader.Start()
 	assert.NoError(t, err)

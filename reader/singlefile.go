@@ -12,11 +12,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/qiniu/log"
+
 	"github.com/qiniu/logkit/rateio"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
-
-	"github.com/qiniu/log"
 )
 
 type SingleFile struct {
@@ -91,7 +91,7 @@ func NewSingleFile(meta *Meta, path, whence string, errDirectReturn bool) (sf *S
 		originpath: originpath,
 		pfi:        pfi,
 		f:          f,
-		ratereader: rateio.NewRateReader(f, meta.readlimit),
+		ratereader: rateio.NewRateReader(f, meta.Readlimit),
 		mux:        sync.Mutex{},
 	}
 
@@ -252,7 +252,7 @@ func (sf *SingleFile) Reopen() (err error) {
 	if sf.ratereader != nil {
 		sf.ratereader.Close()
 	}
-	sf.ratereader = rateio.NewRateReader(f, sf.meta.readlimit)
+	sf.ratereader = rateio.NewRateReader(f, sf.meta.Readlimit)
 	sf.offset = 0
 	return
 }
@@ -278,7 +278,7 @@ func (sf *SingleFile) reopenForESTALE() (err error) {
 	if sf.ratereader != nil {
 		sf.ratereader.Close()
 	}
-	sf.ratereader = rateio.NewRateReader(f, sf.meta.readlimit)
+	sf.ratereader = rateio.NewRateReader(f, sf.meta.Readlimit)
 	return
 }
 

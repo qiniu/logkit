@@ -58,7 +58,7 @@ type Manager struct {
 	watchers  map[string]*fsnotify.Watcher // inode到watcher的映射表
 	pregistry *parser.ParserRegistry
 	sregistry *sender.SenderRegistry
-	rregistry *reader.ReaderRegistry
+	rregistry *reader.Registry
 
 	Version    string
 	SystemInfo string
@@ -71,7 +71,7 @@ func NewManager(conf ManagerConfig) (*Manager, error) {
 	return NewCustomManager(conf, rr, ps, sr)
 }
 
-func NewCustomManager(conf ManagerConfig, rr *reader.ReaderRegistry, pr *parser.ParserRegistry, sr *sender.SenderRegistry) (*Manager, error) {
+func NewCustomManager(conf ManagerConfig, rr *reader.Registry, pr *parser.ParserRegistry, sr *sender.SenderRegistry) (*Manager, error) {
 	if conf.RestDir == "" {
 		dir, err := os.Getwd()
 		if err != nil {

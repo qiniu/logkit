@@ -1730,7 +1730,7 @@ func TestMergeEnvTags(t *testing.T) {
 func TestMergeExtraInfoTags(t *testing.T) {
 	meta, err := reader.NewMetaWithConf(conf.MapConf{
 		ExtraInfo:      "true",
-		reader.KeyMode: reader.ModeMysql,
+		reader.KeyMode: reader.ModeMySQL,
 	})
 	assert.NoError(t, err)
 	tags := MergeExtraInfoTags(meta, nil)
