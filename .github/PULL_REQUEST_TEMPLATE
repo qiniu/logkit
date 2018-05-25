@@ -2,23 +2,23 @@
 
 ## Changes
    
-  - [ ] feature1
-  - [ ] feature2 
-  - [ ] fixbug1
-  - [ ] fixbug2
+- [ ] feature1
+- [ ] feature2
+- [ ] fixbug1
+- [ ] fixbug2
  
 ## Reviewers
 
-  - [ ] @[someone] please review
-  - [ ] @[someotherone] please review
+- [ ] @[someone] please review
+- [ ] @[someotherone] please review
 
 ## Wiki Changes
  
-  - options1...
-  - options2...
+- options1...
+- options2...
     
 ## Checklist
    
-   - [ ] Rebased/mergable
-   - [ ] Tests pass
-   - [ ] Wiki updated
+- [ ] Rebased/mergeable
+- [ ] Tests pass
+- [ ] Wiki updated
