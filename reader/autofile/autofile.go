@@ -12,7 +12,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
-	"github.com/qiniu/logkit/reader/multi"
+	"github.com/qiniu/logkit/reader/tailx"
 )
 
 func init() {
@@ -31,7 +31,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (r reader.Reader, err error
 	}
 	switch mode {
 	case reader.ModeTailx:
-		r, err = multi.NewReader(meta, conf)
+		r, err = tailx.NewReader(meta, conf)
 	case reader.ModeDir:
 		r, err = reader.NewFileDirReader(meta, conf)
 	case reader.ModeFile:

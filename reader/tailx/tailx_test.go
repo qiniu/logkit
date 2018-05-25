@@ -1,4 +1,4 @@
-package multi
+package tailx
 
 import (
 	"io"

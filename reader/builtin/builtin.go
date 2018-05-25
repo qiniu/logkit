@@ -9,7 +9,7 @@ import (
 	_ "github.com/qiniu/logkit/reader/http"
 	_ "github.com/qiniu/logkit/reader/kafka"
 	_ "github.com/qiniu/logkit/reader/mongo"
-	_ "github.com/qiniu/logkit/reader/multi"
+	_ "github.com/qiniu/logkit/reader/tailx"
 	_ "github.com/qiniu/logkit/reader/redis"
 	_ "github.com/qiniu/logkit/reader/script"
 	_ "github.com/qiniu/logkit/reader/snmp"
