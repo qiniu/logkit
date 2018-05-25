@@ -6,21 +6,165 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+// Constants for cloudtrail
+const (
+	KeyS3Region    = "s3_region"
+	KeyS3AccessKey = "s3_access_key"
+	KeyS3SecretKey = "s3_secret_key"
+	KeyS3Bucket    = "s3_bucket"
+	KeyS3Prefix    = "s3_prefix"
+
+	KeySyncDirectory  = "sync_directory"
+	KeySyncMetastore  = "sync_metastore"
+	KeySyncInterval   = "sync_interval"
+	KeySyncConcurrent = "sync_concurrent"
+)
+
+// Constants for cloudwatch
+const (
+	KeyRegion = "region"
+
+	/*
+		认证顺序：
+		1. role_arn
+		2. ak,sk
+		3. profile
+		4. 环境变量
+		5. shared_credential_file
+		6. EC2 instance profile
+	*/
+	KeyRoleArn              = "role_arn"
+	KeyAWSAccessKey         = "aws_access_key"
+	KeyAWSSecretKey         = "aws_secret_key"
+	KeyAWSToken             = "aws_token"
+	KeyAWSProfile           = "aws_profile"
+	KeySharedCredentialFile = "shared_credential_file"
+	KeyCollectInterval      = "interval"
+	KeyNamespace            = "namespace"
+	KeyRateLimit            = "ratelimit"
+	KeyMetrics              = "metrics"
+	KeyDimension            = "dimensions"
+	KeyCacheTTL             = "cache_ttl"
+	KeyPeriod               = "period"
+	KeyDelay                = "delay"
+)
+
+// Constants for Elastic
+const (
+	ElasticVersion3 = "3.x"
+	ElasticVersion5 = "5.x"
+	ElasticVersion6 = "6.x"
+)
+
+// Constants for HTTP
+const (
+	KeyHTTPServiceAddress = "http_service_address"
+	KeyHTTPServicePath    = "http_service_path"
+
+	DefaultHTTPServiceAddress = ":4000"
+	DefaultHTTPServicePath    = "/logkit/data"
+)
+
+// Constants for Redis
+const (
+	DateTypeHash          = "hash"
+	DateTypeSortedSet     = "sortedSet"
+	DataTypeSet           = "set"
+	DataTypeString        = "string"
+	DataTypeList          = "list"
+	DataTypeChannel       = "channel"
+	DataTypePatterChannel = "pattern_channel"
+
+	KeyRedisDataType   = "redis_datatype" // 必填
+	KeyRedisDB         = "redis_db"       //默认 是0
+	KeyRedisKey        = "redis_key"      //必填
+	KeyRedisHashArea   = "redisHash_area"
+	KeyRedisAddress    = "redis_address" // 默认127.0.0.1:6379
+	KeyRedisPassword   = "redis_password"
+	KeyTimeoutDuration = "redis_timeout"
+)
+
+// Constants for SNMP
+const (
+	KeySnmpReaderAgents    = "snmp_agents"
+	KeySnmpReaderTimeOut   = "snmp_time_out"
+	KeySnmpReaderInterval  = "snmp_interval"
+	KeySnmpReaderRetries   = "snmp_retries"
+	KeySnmpReaderVersion   = "snmp_version"
+	KeySnmpReaderCommunity = "snmp_community"
+
+	KeySnmpReaderMaxRepetitions = "snmp_max_repetitions"
+
+	KeySnmpReaderContextName  = "snmp_context_name"
+	KeySnmpReaderSecLevel     = "snmp_sec_level"
+	KeySnmpReaderSecName      = "snmp_sec_name"
+	KeySnmpReaderAuthProtocol = "snmp_auth_protocol"
+	KeySnmpReaderAuthPassword = "snmp_auth_password"
+	KeySnmpReaderPrivProtocol = "snmp_priv_protocol"
+	KeySnmpReaderPrivPassword = "snmp_priv_password"
+	KeySnmpReaderEngineID     = "snmp_engine_id"
+	KeySnmpReaderEngineBoots  = "snmp_engine_boots"
+	KeySnmpReaderEngineTime   = "snmp_engine_time"
+	KeySnmpReaderTables       = "snmp_tables"
+	KeySnmpReaderName         = "snmp_reader_name"
+	KeySnmpReaderFields       = "snmp_fields"
+
+	KeySnmpTableName = "snmp_table"
+	KeyTimestamp     = "timestamp"
+)
+
+// Constants for Socket
+const (
+	// 监听的url形式包括：
+	// socket_service_address = "tcp://:3110"
+	// socket_service_address = "tcp://127.0.0.1:http"
+	// socket_service_address = "tcp4://:3110"
+	// socket_service_address = "tcp6://:3110"
+	// socket_service_address = "tcp6://[2001:db8::1]:3110"
+	// socket_service_address = "udp://:3110"
+	// socket_service_address = "udp4://:3110"
+	// socket_service_address = "udp6://:3110"
+	// socket_service_address = "unix:///tmp/sys.sock"
+	// socket_service_address = "unixgram:///tmp/sys.sock"
+	KeySocketServiceAddress = "socket_service_address"
+
+	// 最大并发连接数
+	// 仅用于 stream sockets (e.g. TCP).
+	// 0 (default) 为无限制.
+	// socket_max_connections = 1024
+	KeySocketMaxConnections = "socket_max_connections"
+
+	// 读的超时时间
+	// 仅用于 stream sockets (e.g. TCP).
+	// 0 (default) 为没有超时
+	// socket_read_timeout = "30s"
+	KeySocketReadTimeout = "socket_read_timeout"
+
+	// Socket的Buffer大小，默认65535
+	// socket_read_buffer_size = 65535
+	KeySocketReadBufferSize = "socket_read_buffer_size"
+
+	// TCP连接的keep_alive时长
+	// 0 表示关闭keep_alive
+	// 默认5分钟
+	KeySocketKeepAlivePeriod = "socket_keep_alive_period"
+)
+
 // ModeUsages 用途说明
 var ModeUsages = []KeyValue{
 	{ModeFileAuto, "从文件读取( fileauto 模式)"},
 	{ModeDir, "从文件读取( dir 模式)"},
 	{ModeFile, "从文件读取( file 模式)"},
 	{ModeTailx, "从文件读取( tailx 模式)"},
-	{ModeMysql, "从 MySQL 读取"},
-	{ModeMssql, "从 MSSQL 读取"},
-	{ModePG, "从 PostgreSQL 读取"},
+	{ModeMySQL, "从 MySQL 读取"},
+	{ModeMSSQL, "从 MSSQL 读取"},
+	{ModePostgreSQL, "从 PostgreSQL 读取"},
 	{ModeElastic, "从 Elasticsearch 读取"},
 	{ModeMongo, "从 MongoDB 读取"},
 	{ModeKafka, "从 Kafka 读取"},
 	{ModeRedis, "从 Redis 读取"},
 	{ModeSocket, "从 Socket 读取"},
-	{ModeHttp, "从 http 请求中读取"},
+	{ModeHTTP, "从 http 请求中读取"},
 	{ModeScript, "从脚本的执行结果中读取"},
 	{ModeSnmp, "从 SNMP 服务中读取"},
 	{ModeCloudWatch, "从 AWS Cloudwatch 中读取"},
@@ -286,7 +430,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionKeyNewFileNewLine,
 		OptionHeadPattern,
 	},
-	ModeMysql: {
+	ModeMySQL: {
 		{
 			KeyName:       KeyMysqlDataSource,
 			Element:       Text,
@@ -364,7 +508,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionSQLSchema,
 		OptionMagicLagDuration,
 	},
-	ModeMssql: {
+	ModeMSSQL: {
 		{
 			KeyName:       KeyMssqlDataSource,
 			Element:       Text,
@@ -442,7 +586,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionSQLSchema,
 		OptionMagicLagDuration,
 	},
-	ModePG: {
+	ModePostgreSQL: {
 		{
 			KeyName:       KeyPGsqlDataSource,
 			Element:       Text,
@@ -841,22 +985,22 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		OptionDataSourceTag,
 	},
-	ModeHttp: {
+	ModeHTTP: {
 		{
-			KeyName:      KeyHttpServiceAddress,
+			KeyName:      KeyHTTPServiceAddress,
 			ChooseOnly:   false,
 			Default:      "",
-			Placeholder:  DefaultHttpServiceAddress,
+			Placeholder:  DefaultHTTPServiceAddress,
 			Required:     true,
 			DefaultNoUse: true,
 			Description:  "监听的地址和端口(http_service_address)",
 			ToolTip:      "监听的地址和端口，格式为：[<ip/host/不填>:port]，如 :3000 , 监听3000端口的http请求",
 		},
 		{
-			KeyName:      KeyHttpServicePath,
+			KeyName:      KeyHTTPServiceAddress,
 			ChooseOnly:   false,
 			Default:      "",
-			Placeholder:  DefaultHttpServicePath,
+			Placeholder:  DefaultHTTPServicePath,
 			Required:     true,
 			DefaultNoUse: true,
 			Description:  "监听地址前缀(http_service_path)",

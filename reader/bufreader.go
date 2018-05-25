@@ -16,17 +16,17 @@ import (
 	"regexp"
 	"sync"
 	"sync/atomic"
-	"unsafe"
-
 	"time"
+	"unsafe"
 
 	"github.com/axgle/mahonia"
 	"github.com/qiniu/log"
+
 	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (
-	defaultBufSize           = 4096
+	DefaultBufSize           = 4096
 	MaxHeadPatternBufferSize = 20 * 1024 * 1024
 )
 
@@ -60,7 +60,7 @@ type BufReader struct {
 	mux     sync.Mutex
 	decoder mahonia.Decoder
 
-	meta            *Meta // 存放offset的元信息
+	Meta            *Meta // 存放offset的元信息
 	multiLineRegexp *regexp.Regexp
 
 	stats     StatsInfo
@@ -128,11 +128,11 @@ func NewReaderSize(rd FileReader, meta *Meta, size int) (*BufReader, error) {
 	r.stopped = 0
 	r.reset(make([]byte, size), rd)
 
-	r.meta = meta
-	if r.meta.GetEncodingWay() != "" {
-		r.decoder = mahonia.NewDecoder(r.meta.GetEncodingWay())
+	r.Meta = meta
+	if r.Meta.GetEncodingWay() != "" {
+		r.decoder = mahonia.NewDecoder(r.Meta.GetEncodingWay())
 		if r.decoder == nil {
-			log.Warnf("Encoding Way [%v] is not supported, will read as utf-8", r.meta.GetEncodingWay())
+			log.Warnf("Encoding Way [%v] is not supported, will read as utf-8", r.Meta.GetEncodingWay())
 		}
 	}
 	if meta.IsExist() && meta.IsValid() {
@@ -214,7 +214,7 @@ func (b *BufReader) fill() {
 	}
 
 	if b.w >= len(b.buf) {
-		panic(fmt.Sprintf("Runner[%v] bufio: tried to fill full buffer", b.meta.RunnerName))
+		panic(fmt.Sprintf("Runner[%v] bufio: tried to fill full buffer", b.Meta.RunnerName))
 	}
 	//如果从没出现过，则表示新开始，记录一下
 	if b.latestSource == "" {
@@ -372,7 +372,7 @@ func (b *BufReader) ReadString(delim byte) (ret string, err error) {
 	bytes, err := b.readBytes(delim)
 	ret = *(*string)(unsafe.Pointer(&bytes))
 	//默认都是utf-8
-	if b.meta.GetEncodingWay() != "" && b.meta.GetEncodingWay() != "utf-8" && b.decoder != nil {
+	if b.Meta.GetEncodingWay() != "" && b.Meta.GetEncodingWay() != "utf-8" && b.decoder != nil {
 		ret = b.decoder.ConvertString(ret)
 	}
 	return
@@ -392,7 +392,7 @@ func (b *BufReader) ReadPattern() (string, error) {
 			//匹配行首，成功则返回之前的cache，否则加入到cache，返回空串
 			if b.multiLineRegexp.Match([]byte(line)) {
 				tmp := line
-				line = string(b.formMutiLine())
+				line = string(b.FormMutiLine())
 				b.mutiLineCache = make([]string, 0, 16)
 				b.mutiLineCache = append(b.mutiLineCache, tmp)
 				return line, err
@@ -401,27 +401,27 @@ func (b *BufReader) ReadPattern() (string, error) {
 			maxTimes = 0
 		} else { //读取不到日志
 			if err != nil {
-				line = string(b.formMutiLine())
+				line = string(b.FormMutiLine())
 				b.mutiLineCache = make([]string, 0, 16)
 				return line, err
 			}
 			maxTimes++
 			//对于又没有错误，也读取不到日志的情况，最多允许10次重试
 			if maxTimes > 10 {
-				log.Debugf("Runner[%v] %v read empty line 10 times return empty", b.meta.RunnerName, b.Name())
+				log.Debugf("Runner[%v] %v read empty line 10 times return empty", b.Meta.RunnerName, b.Name())
 				return "", nil
 			}
 		}
 		//对于读取到了Cache的情况，继续循环，直到超过最大限制
 		if b.calcMutiLineCache() > MaxHeadPatternBufferSize {
-			line = string(b.formMutiLine())
+			line = string(b.FormMutiLine())
 			b.mutiLineCache = make([]string, 0, 16)
 			return line, err
 		}
 	}
 }
 
-func (b *BufReader) formMutiLine() []byte {
+func (b *BufReader) FormMutiLine() []byte {
 	if len(b.mutiLineCache) <= 0 {
 		return make([]byte, 0)
 	}
@@ -451,7 +451,7 @@ func (b *BufReader) ReadLine() (ret string, err error) {
 		ret, err = b.ReadString('\n')
 		if os.IsNotExist(err) {
 			if b.lastErrShowTime.Add(5 * time.Second).Before(time.Now()) {
-				log.Errorf("%v ReadLine err %v", b.meta.RunnerName, err)
+				log.Errorf("%v ReadLine err %v", b.Meta.RunnerName, err)
 				b.lastErrShowTime = time.Now()
 			}
 		}
@@ -460,7 +460,7 @@ func (b *BufReader) ReadLine() (ret string, err error) {
 	}
 	if skp, ok := b.rd.(LineSkipper); ok {
 		if skp.IsNewOpen() {
-			log.Infof("%v Skip line %v as first line skipper was configured %v", b.meta.RunnerName, ret)
+			log.Infof("%v Skip line %v as first line skipper was configured %v", b.Meta.RunnerName, ret)
 			ret = ""
 			skp.SetSkipped()
 		}
@@ -526,31 +526,31 @@ func (b *BufReader) Lag() (rl *LagInfo, err error) {
 func (b *BufReader) SyncMeta() {
 	b.mux.Lock()
 	defer b.mux.Unlock()
-	linecache := string(b.formMutiLine())
+	linecache := string(b.FormMutiLine())
 	//把linecache也缓存
 	if b.lastSync.cache != linecache || b.lastSync.buf != string(b.buf) || b.r != b.lastSync.r || b.w != b.lastSync.w {
-		log.Debugf("Runner[%v] %v sync meta started, linecache [%v] buf [%v] （%v %v）", b.meta.RunnerName, b.Name(), linecache, string(b.buf), b.r, b.w)
-		err := b.meta.WriteBuf(b.buf, b.r, b.w, len(b.buf))
+		log.Debugf("Runner[%v] %v sync meta started, linecache [%v] buf [%v] （%v %v）", b.Meta.RunnerName, b.Name(), linecache, string(b.buf), b.r, b.w)
+		err := b.Meta.WriteBuf(b.buf, b.r, b.w, len(b.buf))
 		if err != nil {
-			log.Errorf("Runner[%v] %s cannot write buf, err :%v", b.meta.RunnerName, b.Name(), err)
+			log.Errorf("Runner[%v] %s cannot write buf, err :%v", b.Meta.RunnerName, b.Name(), err)
 			return
 		}
-		err = b.meta.WriteCacheLine(linecache)
+		err = b.Meta.WriteCacheLine(linecache)
 		if err != nil {
-			log.Errorf("Runner[%v] %s cannot write linecache, err :%v", b.meta.RunnerName, b.Name(), err)
+			log.Errorf("Runner[%v] %s cannot write linecache, err :%v", b.Meta.RunnerName, b.Name(), err)
 			return
 		}
 		b.lastSync.cache = linecache
 		b.lastSync.buf = string(b.buf)
 		b.lastSync.r = b.r
 		b.lastSync.w = b.w
-		log.Debugf("Runner[%v] %v sync meta succeed, linecache [%v] buf [%v] （%v %v）", b.meta.RunnerName, b.Name(), linecache, string(b.buf), b.r, b.w)
+		log.Debugf("Runner[%v] %v sync meta succeed, linecache [%v] buf [%v] （%v %v）", b.Meta.RunnerName, b.Name(), linecache, string(b.buf), b.r, b.w)
 	} else {
-		log.Debugf("Runner[%v] %v meta data was just syncd, cache %v, buf %v, r,w =(%v,%v), ignore this sync...", b.meta.RunnerName, b.Name(), linecache, string(b.buf), b.r, b.w)
+		log.Debugf("Runner[%v] %v meta data was just syncd, cache %v, buf %v, r,w =(%v,%v), ignore this sync...", b.Meta.RunnerName, b.Name(), linecache, string(b.buf), b.r, b.w)
 	}
 	err := b.rd.SyncMeta()
 	if err != nil {
-		log.Errorf("Runner[%v] %s cannot write reader %v's meta info, err %v", b.meta.RunnerName, b.Name(), b.rd.Name(), err)
+		log.Errorf("Runner[%v] %s cannot write reader %v's meta info, err %v", b.Meta.RunnerName, b.Name(), b.rd.Name(), err)
 		return
 	}
 }

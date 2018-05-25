@@ -11,17 +11,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/json-iterator/go"
+	"github.com/qiniu/log"
+
 	"github.com/qiniu/logkit/conf"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
-
-	"github.com/json-iterator/go"
-	"github.com/qiniu/log"
 )
 
 const (
 	metaFileName      = "file.meta"
-	doneFileName      = "file.done"
+	DoneFileName      = "file.done"
 	deletedFileName   = "file.deleted"
 	bufMetaFilePath   = "buf.meta"
 	bufFilePath       = "buf.dat"
@@ -32,7 +32,7 @@ const (
 )
 
 const (
-	defautFileRetention = 7
+	DefautFileRetention = 7
 	metaFormat          = "%s\t%d\n"
 	tableDoneFormat     = "%s\n"
 	bufMetaFormat       = "read:%d\nwrite:%d\nbufsize:%d\n"
@@ -48,9 +48,9 @@ type Statistic struct {
 
 type Meta struct {
 	mode              string //reader mode
-	dir               string // 记录文件处理进度的路径
+	Dir               string // 记录文件处理进度的路径
 	metaFilePath      string // 记录当前文件offset文件
-	doneFilePath      string // 记录扫描过文件记录的文件
+	DoneFilePath      string // 记录扫描过文件记录的文件
 	bufMetaFilePath   string // 记录buf的offset数据
 	bufFilePath       string // 记录buf数据
 	lineCacheFile     string //记录多行的缓存line
@@ -58,9 +58,9 @@ type Meta struct {
 	encodingWay       string //文件编码格式，默认为utf-8
 	logpath           string
 	dataSourceTag     string                 //记录文件路径的标签名称
-	tagFile           string                 //记录tag文件路径的标签名称
+	TagFile           string                 //记录tag文件路径的标签名称
 	tags              map[string]interface{} //记录tag文件内容
-	readlimit         int                    //读取磁盘限速单位 MB/s
+	Readlimit         int                    //读取磁盘限速单位 MB/s
 	statisticPath     string                 // 记录 runner 计数信息
 	ftSaveLogPath     string                 // 记录 ft_sender 日志信息
 	RunnerName        string
@@ -108,9 +108,9 @@ func NewMeta(metadir, filedonedir, logpath, mode, tagfile string, donefileRetent
 	}
 
 	return &Meta{
-		dir:               metadir,
+		Dir:               metadir,
 		metaFilePath:      filepath.Join(metadir, metaFileName),
-		doneFilePath:      filedonedir,
+		DoneFilePath:      filedonedir,
 		bufFilePath:       filepath.Join(metadir, bufFilePath),
 		bufMetaFilePath:   filepath.Join(metadir, bufMetaFilePath),
 		lineCacheFile:     filepath.Join(metadir, lineCacheFilePath),
@@ -118,10 +118,10 @@ func NewMeta(metadir, filedonedir, logpath, mode, tagfile string, donefileRetent
 		ftSaveLogPath:     filepath.Join(metadir, ftSaveLogPath),
 		donefileretention: donefileRetention,
 		logpath:           logpath,
-		tagFile:           tagfile,
+		TagFile:           tagfile,
 		mode:              mode,
 		tags:              tags,
-		readlimit:         defaultIOLimit * 1024 * 1024,
+		Readlimit:         defaultIOLimit * 1024 * 1024,
 	}, nil
 }
 
@@ -163,7 +163,7 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 	}
 	datasourceTag, _ := conf.GetStringOr(KeyDataSourceTag, "")
 	filedonepath, _ := conf.GetStringOr(KeyFileDone, metapath)
-	donefileRetention, _ := conf.GetIntOr(doneFileRetention, defautFileRetention)
+	donefileRetention, _ := conf.GetIntOr(doneFileRetention, DefautFileRetention)
 	readlimit, _ := conf.GetIntOr(KeyReadIOLimit, defaultIOLimit)
 	meta, err = NewMeta(metapath, filedonepath, logPath, mode, tagFile, donefileRetention)
 	if err != nil {
@@ -181,7 +181,7 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 		meta.SetEncodingWay(strings.ToLower(decoder))
 	}
 	meta.dataSourceTag = datasourceTag
-	meta.readlimit = readlimit * 1024 * 1024 //readlimit*MB
+	meta.Readlimit = readlimit * 1024 * 1024 //readlimit*MB
 	meta.RunnerName = runnerName
 	return
 }
@@ -213,12 +213,12 @@ func (m *Meta) IsNotValid() bool {
 
 // Clear 删除所有meta信息
 func (m *Meta) Clear() error {
-	err := os.RemoveAll(m.dir)
+	err := os.RemoveAll(m.Dir)
 	if err != nil {
-		log.Errorf("Runner[%v] remove %v err %v", m.RunnerName, m.dir, err)
+		log.Errorf("Runner[%v] remove %v err %v", m.RunnerName, m.Dir, err)
 		return err
 	}
-	return os.MkdirAll(m.dir, DefaultDirPerm)
+	return os.MkdirAll(m.Dir, DefaultDirPerm)
 }
 
 func (m *Meta) CacheLineFile() string {
@@ -331,7 +331,7 @@ func (m *Meta) ReadDBDoneFile(database string) (content []string, err error) {
 		return
 	}
 	for _, f := range doneFiles {
-		filename := fmt.Sprintf("%v.%v", doneFileName, database)
+		filename := fmt.Sprintf("%v.%v", DoneFileName, database)
 		if filepath.Base(f.Path) == filename {
 			content, err = ReadFileContent(f.Path)
 			if err != nil {
@@ -429,13 +429,13 @@ func (m *Meta) GetDoneFileInode() map[string]bool {
 // DoneFile 处理完成文件地址，按日进行rotate
 func (m *Meta) DoneFile() string {
 	now := time.Now()
-	return fmt.Sprintf("%v.%d-%d-%d", filepath.Join(m.doneFilePath, doneFileName), now.Year(), now.Month(), now.Day())
+	return fmt.Sprintf("%v.%d-%d-%d", filepath.Join(m.DoneFilePath, DoneFileName), now.Year(), now.Month(), now.Day())
 }
 
 // DeleteFile 处理完成文件地址，按日进行rotate
 func (m *Meta) DeleteFile() string {
 	now := time.Now()
-	return fmt.Sprintf("%v.%d-%d-%d", filepath.Join(m.doneFilePath, deletedFileName), now.Year(), now.Month(), now.Day())
+	return fmt.Sprintf("%v.%d-%d-%d", filepath.Join(m.DoneFilePath, deletedFileName), now.Year(), now.Month(), now.Day())
 }
 
 func (m *Meta) AppendDeleteFile(path string) (err error) {
@@ -452,7 +452,7 @@ func (m *Meta) AppendDeleteFile(path string) (err error) {
 // IsDoneFile 返回是否是Donefile格式的文件
 func (m *Meta) IsDoneFile(file string) bool {
 	file = filepath.Base(file)
-	return strings.HasPrefix(file, doneFileName)
+	return strings.HasPrefix(file, DoneFileName)
 }
 
 // MetaFile 返回metaFileoffset 的meta文件地址
@@ -475,11 +475,6 @@ func (m *Meta) BufMetaFile() string {
 	return m.bufMetaFilePath
 }
 
-//DoneFilePath 返回meta的filedone文件的存放目录
-func (m *Meta) DoneFilePath() string {
-	return m.doneFilePath
-}
-
 func (m *Meta) LogPath() string {
 	return m.logpath
 }
@@ -491,10 +486,10 @@ func (m *Meta) FtSaveLogPath() string {
 
 func (m *Meta) DeleteDoneFile(path string) error {
 	path = filepath.Base(path)
-	if !strings.HasPrefix(path, doneFileName) {
+	if !strings.HasPrefix(path, DoneFileName) {
 		return fmt.Errorf("%v file was not valid done file format", path)
 	}
-	dates := strings.Split(path[len(doneFileName)+1:], "-")
+	dates := strings.Split(path[len(DoneFileName)+1:], "-")
 	if len(dates) < 3 {
 		return fmt.Errorf("%v file was not valid done file format", path)
 	}
@@ -503,13 +498,13 @@ func (m *Meta) DeleteDoneFile(path string) error {
 	dd, _ := strconv.ParseInt(dates[2], 10, 64)
 	dur := time.Now().Sub(time.Date(int(dy), time.Month(dm), int(dd), 0, 0, 0, 0, time.Local))
 	if float64(m.donefileretention*24) < dur.Hours() {
-		return os.Remove(filepath.Join(m.doneFilePath, path))
+		return os.Remove(filepath.Join(m.DoneFilePath, path))
 	}
 	return nil
 }
 
 func (m *Meta) GetDoneFiles() (doneFiles []File, err error) {
-	dir := m.doneFilePath
+	dir := m.DoneFilePath
 	// 按文件时间从新到旧排列
 	files, err := ReadDirByTime(dir)
 	if err != nil {
@@ -558,7 +553,7 @@ func (m *Meta) GetDataSourceTag() string {
 }
 
 func (m *Meta) GetTagFile() string {
-	return m.tagFile
+	return m.TagFile
 }
 
 func (m *Meta) GetTags() map[string]interface{} {
@@ -575,8 +570,8 @@ func (m *Meta) Reset() error {
 	if err := os.RemoveAll(m.metaFilePath); err != nil {
 		return err
 	}
-	// doneFilePath 默认为 meta 文件夹，不能直接删除
-	files, err := ioutil.ReadDir(m.doneFilePath)
+	// DoneFilePath 默认为 meta 文件夹，不能直接删除
+	files, err := ioutil.ReadDir(m.DoneFilePath)
 	if err != nil && os.IsNotExist(err) {
 		return nil
 	} else if err != nil {
@@ -585,8 +580,8 @@ func (m *Meta) Reset() error {
 	for _, file := range files {
 		if file.IsDir() {
 			continue
-		} else if strings.HasPrefix(file.Name(), doneFileName) {
-			if err := os.RemoveAll(filepath.Join(m.doneFilePath, file.Name())); err != nil {
+		} else if strings.HasPrefix(file.Name(), DoneFileName) {
+			if err := os.RemoveAll(filepath.Join(m.DoneFilePath, file.Name())); err != nil {
 				return err
 			}
 		}

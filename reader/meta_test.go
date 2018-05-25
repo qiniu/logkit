@@ -9,67 +9,35 @@ import (
 	"testing"
 	"time"
 
-	"github.com/qiniu/logkit/conf"
-	. "github.com/qiniu/logkit/utils/models"
-
-	"github.com/qiniu/log"
-
 	"github.com/stretchr/testify/assert"
+
+	"github.com/qiniu/logkit/conf"
+	. "github.com/qiniu/logkit/reader/test"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
-var dir = "logdir"
-var metaDir = "./meta"
-var files = []string{"f3", "f2", "f1"}
-var contents = []string{"223456789", "123456789", "123456789"}
-
 func createFile(interval int) {
-	createDir()
-	createOnlyFiles(interval)
-}
-func createDir() {
-	err := os.Mkdir(dir, DefaultDirPerm)
-	if err != nil {
-		log.Error(err)
-		return
-	}
-}
-
-func createOnlyFiles(interval int) {
-	for i, f := range files {
-		file, err := os.OpenFile(filepath.Join(dir, f), os.O_CREATE|os.O_WRONLY, DefaultFilePerm)
-		if err != nil {
-			log.Error(err)
-			return
-		}
-
-		file.WriteString(contents[i])
-		file.Close()
-		time.Sleep(time.Millisecond * time.Duration(interval))
-	}
-}
-
-func destroyFile() {
-	os.RemoveAll(dir)
-	os.RemoveAll(metaDir)
+	CreateDir()
+	CreateFiles(interval)
 }
 
 func TestMeta(t *testing.T) {
 	createFile(50)
-	defer destroyFile()
+	defer DestroyDir()
 	logkitConf := conf.MapConf{
-		KeyMetaPath: metaDir,
-		KeyFileDone: metaDir,
-		KeyLogPath:  dir,
+		KeyMetaPath: MetaDir,
+		KeyFileDone: MetaDir,
+		KeyLogPath:  Dir,
 		KeyMode:     ModeDir,
 	}
 	meta, err := NewMetaWithConf(logkitConf)
 	if err != nil {
 		t.Error(err)
 	}
-	os.RemoveAll(metaDir)
+	os.RemoveAll(MetaDir)
 	// no metaDir conf except work
 	confNoMetaPath := conf.MapConf{
-		KeyLogPath:    dir,
+		KeyLogPath:    Dir,
 		GlobalKeyName: "mock_runner_name",
 		KeyMode:       ModeDir,
 	}
@@ -77,33 +45,33 @@ func TestMeta(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	f, err := os.Stat("meta/" + "mock_runner_name_" + Hash(dir))
+	f, err := os.Stat("meta/" + "mock_runner_name_" + Hash(Dir))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasSuffix(f.Name(), Hash(dir)) {
+	if !strings.HasSuffix(f.Name(), Hash(Dir)) {
 		t.Fatal("not excepted dir")
 	}
 	dirToRm := "meta"
 	os.RemoveAll(dirToRm)
 
-	meta, err = NewMeta(metaDir, metaDir, ModeDir, "logpath", "", 7)
+	meta, err = NewMeta(MetaDir, MetaDir, ModeDir, "logpath", "", 7)
 	if err != nil {
 		t.Error(err)
 	}
-	defer os.RemoveAll(metaDir)
+	defer os.RemoveAll(MetaDir)
 
 	file, offset, err := meta.ReadOffset()
 	if err == nil {
 		t.Error("offset must be nil")
 	}
-	err = meta.WriteOffset(filepath.Join(dir, "f1"), 2)
+	err = meta.WriteOffset(filepath.Join(Dir, "f1"), 2)
 	if err != nil {
 		t.Error(err)
 	}
 	file, offset, err = meta.ReadOffset()
-	if file != filepath.Join(dir, "f1") {
-		t.Error("file should be " + filepath.Join(dir, "f1"))
+	if file != filepath.Join(Dir, "f1") {
+		t.Error("file should be " + filepath.Join(Dir, "f1"))
 	}
 	if offset != 2 {
 		t.Error("file offset should be 2")
@@ -118,7 +86,7 @@ func TestMeta(t *testing.T) {
 	if meta.IsDoneFile("filedone.11111") != false {
 		t.Error("test is done file error,expect filedone.11111 is done file")
 	}
-	donefile := filepath.Join(metaDir, doneFileName+".2015-11-11")
+	donefile := filepath.Join(MetaDir, DoneFileName+".2015-11-11")
 	_, err = os.Create(donefile)
 	if err != nil {
 		t.Error(err)
@@ -126,12 +94,12 @@ func TestMeta(t *testing.T) {
 	if err = meta.DeleteDoneFile(donefile); err != nil {
 		t.Error(err)
 	}
-	_, err = os.Stat(filepath.Join(metaDir, deletedFileName+".2015-11-11"))
+	_, err = os.Stat(filepath.Join(MetaDir, deletedFileName+".2015-11-11"))
 	if err == nil || !os.IsNotExist(err) {
 		t.Error("not deleted", err)
 	}
 	y, m, d := time.Now().Date()
-	donefile = filepath.Join(metaDir, doneFileName+fmt.Sprintf(".%d-%d-%d", y, m, d))
+	donefile = filepath.Join(MetaDir, DoneFileName+fmt.Sprintf(".%d-%d-%d", y, m, d))
 	if err = meta.DeleteDoneFile(donefile); err != nil {
 		t.Error(err)
 	}
@@ -211,13 +179,13 @@ func Test_getdonefiles(t *testing.T) {
 func TestExtraInfo(t *testing.T) {
 	meta, err := NewMetaWithConf(conf.MapConf{
 		ExtraInfo: "true",
-		KeyMode:   ModeMysql,
+		KeyMode:   ModeMySQL,
 	})
 	assert.NoError(t, err)
 	got := meta.ExtraInfo()
 	assert.Equal(t, len(got), 4)
 	meta, err = NewMetaWithConf(conf.MapConf{
-		KeyMode: ModeMysql,
+		KeyMode: ModeMySQL,
 	})
 	assert.NoError(t, err)
 	got = meta.ExtraInfo()
