@@ -1,19 +1,19 @@
 ################################  以下可以删除  ############################
 
 
-Github的issue主要目的是为了报告bug以及提新功能需求，若您对使用有疑问，请先阅读[logkit wiki文档](https://github.com/qiniu/logkit/wiki)寻找答案。
+GitHub 的 Issue 主要目的是为了报告 Bug 以及提新功能需求，若您对使用有疑问，请先阅读 [logkit Wiki 文档](https://github.com/qiniu/logkit/wiki) 寻找答案。
 
-开启issue前请尝试搜索是否有类似疑问(issues)，如果没有找到类似的，请在模板相应区块(【Bug Report】，【Feature Request】，【Document Improvement】)根据实际情况填写。
+开启 Issue 前请尝试搜索是否有类似疑问（Issues），如果没有找到类似的，请在模板相应区块（【Bug Report】，【Feature Request】，【Document Improvement】）根据实际情况填写。
 
 非常感谢您的配合！
 
-*注意，修复一个bug最快的方法就是提一个PR. :) *
+*注意，修复一个 Bug 最快的方法就是提一个 PR :) *
 
 ############################### 以上可以删除  #############################
 
-## Bug report
+## Bug Report
 
-### logkit 相关配置:
+### logkit 相关配置：
 
 ### 运行环境:
 
@@ -21,25 +21,25 @@ Github的issue主要目的是为了报告bug以及提新功能需求，若您对
 
 #### 操作系统版本：
 
-### 复现过程操作步骤:
+### 复现过程操作步骤：
 
 1. ...
 2. ...
 
-### 预期表现:
+### 预期表现：
 
-### 实际情况:
+### 实际情况：
 
-### 相关日志等其他信息:
+### 相关日志等其他信息：
 
 
 ## Feature Request
 
-### 功能描述:
+### 功能描述：
 
-### 背景及目标:
+### 背景及目标：
 
-### 用户场景: [这个功能重要度、优先级等等]
+### 用户场景：[这个功能重要度、优先级等等]
 
 
 ## Document Improvement
