@@ -6,15 +6,13 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-func GetMetricTypeKey() map[string][]KeyValue {
-	typeKey := make(map[string][]KeyValue)
+func GetMetricTypeKey() map[string]interface{} {
+	typeKey := make(map[string]interface{})
 	for key, collector := range Collectors {
 		coll := collector()
 		config := coll.Config()
 		if attributes, ex := config[AttributesString]; ex {
-			if attr, ok := attributes.([]KeyValue); ok {
-				typeKey[key] = attr
-			}
+			typeKey[key] = attributes
 		}
 	}
 	return typeKey
@@ -41,15 +39,13 @@ func GetMetricUsages() []Option {
 	return metricOptions
 }
 
-func GetMetricOptions() map[string][]Option {
-	metricOptions := make(map[string][]Option)
+func GetMetricOptions() map[string]interface{} {
+	metricOptions := make(map[string]interface{})
 	for key, collector := range Collectors {
 		coll := collector()
 		config := coll.Config()
 		if option, ex := config[OptionString]; ex {
-			if opt, ok := option.([]Option); ok {
-				metricOptions[key] = opt
-			}
+			metricOptions[key] = option
 		}
 	}
 	return metricOptions
