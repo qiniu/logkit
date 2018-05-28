@@ -261,6 +261,13 @@ func (sf *SeqFile) NewLineBytesIndex() []SourceIndex {
 	return sf.newLineBytesSourceIndex
 }
 
+func (sf *SeqFile) handleUnexpectErr(err error) {
+	if err == io.ErrUnexpectedEOF || err == os.ErrClosed || err == os.ErrNotExist {
+		sf.f = nil
+		return
+	}
+}
+
 func (sf *SeqFile) Read(p []byte) (n int, err error) {
 	sf.newLineBytesSourceIndex = []SourceIndex{}
 	var nextFileRetry int
@@ -308,6 +315,7 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 		n += n1
 		if err != nil {
 			if err != io.EOF {
+				sf.handleUnexpectErr(err)
 				return n, err
 			}
 			fi, err1 := sf.nextFile()
@@ -493,7 +501,9 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 	if fi == nil {
 		return
 	}
-	err = sf.f.Close()
+	fc := sf.f
+	sf.f = nil
+	err = fc.Close()
 	if err != nil && err != syscall.EINVAL {
 		log.Warnf("Runner[%v] %s - %s f.Close: %v", sf.meta.RunnerName, sf.dir, sf.currFile)
 		return
