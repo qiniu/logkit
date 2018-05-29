@@ -49,7 +49,7 @@ func (s *CPUStats) Collect() (datas []map[string]interface{}, err error) {
 		totalDelta := total - lastTotal
 
 		if totalDelta < 0 {
-			return nil, fmt.Errorf("Error: current total CPU time is less than previous total CPU time")
+			return nil, fmt.Errorf("error: current total CPU time is %v less than previous total CPU time %v", total, lastTotal)
 		}
 
 		if totalDelta == 0 {
