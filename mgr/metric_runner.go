@@ -95,14 +95,24 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 			err = nil
 			continue
 		}
-		configBytes, err := jsoniter.Marshal(m.Config)
-		if err != nil {
-			return nil, fmt.Errorf("metric %v marshal config error %v", tp, err)
+		// sync config to ExtCollector
+		ec, ok := c.(metric.ExtCollector)
+		if ok {
+			if err := ec.SyncConfig(m.Config); err != nil {
+				return nil, fmt.Errorf("metric %v sync config error %v", tp, err)
+			}
+		} else {
+			// sync config to buildin Collector
+			configBytes, err := jsoniter.Marshal(m.Config)
+			if err != nil {
+				return nil, fmt.Errorf("metric %v marshal config error %v", tp, err)
+			}
+			err = jsoniter.Unmarshal(configBytes, c)
+			if err != nil {
+				return nil, fmt.Errorf("metric %v unmarshal config error %v", tp, err)
+			}
 		}
-		err = jsoniter.Unmarshal(configBytes, c)
-		if err != nil {
-			return nil, fmt.Errorf("metric %v unmarshal config error %v", tp, err)
-		}
+
 		collectors = append(collectors, c)
 
 		// 配置文件中明确标明 false 的 attr 加入 discard transformer

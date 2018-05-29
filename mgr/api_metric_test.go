@@ -46,7 +46,13 @@ func metricAPITest(p *testParam) {
 	if err = jsoniter.Unmarshal(respBody, &got2); err != nil {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
-	assert.Equal(t, metric.GetMetricOptions(), got2.Data)
+	metricOpts := make(map[string][]Option)
+	for key, option := range metric.GetMetricOptions() {
+		if opt, ok := option.([]Option); ok {
+			metricOpts[key] = opt
+		}
+	}
+	assert.Equal(t, metricOpts, got2.Data)
 
 	var got3 respMetricKeys
 	url = "http://127.0.0.1" + rs.address + "/logkit/metric/keys"
@@ -56,5 +62,11 @@ func metricAPITest(p *testParam) {
 	if err = jsoniter.Unmarshal(respBody, &got3); err != nil {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
-	assert.Equal(t, metric.GetMetricTypeKey(), got3.Data)
+	metricKeys := make(map[string][]KeyValue)
+	for key, MKey := range metric.GetMetricTypeKey() {
+		if mkey, ok := MKey.([]KeyValue); ok {
+			metricKeys[key] = mkey
+		}
+	}
+	assert.Equal(t, metricKeys, got3.Data)
 }
