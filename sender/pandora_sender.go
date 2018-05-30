@@ -157,7 +157,7 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	uuid, _ := conf.GetBoolOr(KeyPandoraUUID, false)
 	withIp, _ := conf.GetBoolOr(KeyPandoraWithIP, false)
 	runnerName, _ := conf.GetStringOr(KeyRunnerName, UnderfinedRunnerName)
-	extraInfo, _ := conf.GetBoolOr(KeyPandoraExtraInfo, true)
+	extraInfo, _ := conf.GetBoolOr(KeyPandoraExtraInfo, false)
 
 	enableLogdb, _ := conf.GetBoolOr(KeyPandoraEnableLogDB, false)
 	logdbreponame, _ := conf.GetStringOr(KeyPandoraLogDBName, repoName)

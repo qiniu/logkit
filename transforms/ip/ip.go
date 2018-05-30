@@ -3,6 +3,7 @@ package ip
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
@@ -14,8 +15,62 @@ type IpTransformer struct {
 	StageTime string `json:"stage"`
 	Key       string `json:"key"`
 	DataPath  string `json:"data_path"`
-	loc       *ip17mon.Locator
+	aloc      *AllLocator
 	stats     StatsInfo
+}
+
+type AllLocator struct {
+	v1      *ip17mon.Locator
+	v2      *Locator
+	version string
+}
+
+const (
+	V1 = "v1"
+	V2 = "v2"
+)
+
+func NewAllLocator(dataFile string) (*AllLocator, error) {
+	aloc := &AllLocator{}
+	if strings.HasSuffix(dataFile, ".datx") {
+		loc, err := NewLocator(dataFile)
+		if err != nil {
+			return nil, err
+		}
+		aloc.version = V2
+		aloc.v2 = loc
+		return aloc, nil
+	}
+	aloc.version = V1
+	loc, err := ip17mon.NewLocator(dataFile)
+	if err != nil {
+		return aloc, err
+	}
+	aloc.v1 = loc
+	return aloc, nil
+}
+
+func (aloc *AllLocator) Find(str string) (info *LocationInfo, err error) {
+	switch aloc.version {
+	case V2:
+		return aloc.v2.Find(str)
+	case V1:
+		newInfo, err := aloc.v1.Find(str)
+		if err != nil {
+			return nil, err
+		}
+		info = &LocationInfo{
+			Country: newInfo.Country,
+			Region:  newInfo.Region,
+			City:    newInfo.City,
+			Isp:     newInfo.Isp,
+		}
+		return info, nil
+	default:
+		err = fmt.Errorf("unkonw locator verison %v", aloc.version)
+		return
+	}
+	return
 }
 
 func (it *IpTransformer) RawTransform(datas []string) ([]string, error) {
@@ -24,8 +79,8 @@ func (it *IpTransformer) RawTransform(datas []string) ([]string, error) {
 
 func (it *IpTransformer) Transform(datas []Data) ([]Data, error) {
 	var err, ferr error
-	if it.loc == nil {
-		it.loc, err = ip17mon.NewLocator(it.DataPath)
+	if it.aloc == nil {
+		it.aloc, err = NewAllLocator(it.DataPath)
 		if err != nil {
 			return datas, err
 		}
@@ -47,7 +102,7 @@ func (it *IpTransformer) Transform(datas []Data) ([]Data, error) {
 			err = fmt.Errorf("transform key %v data type is not string", it.Key)
 			continue
 		}
-		info, nerr := it.loc.Find(strval)
+		info, nerr := it.aloc.Find(strval)
 		if nerr != nil {
 			err = nerr
 			errnums++
@@ -61,6 +116,22 @@ func (it *IpTransformer) Transform(datas []Data) ([]Data, error) {
 		SetMapValue(datas[i], info.Country, false, newkeys...)
 		newkeys[len(newkeys)-1] = "Isp"
 		SetMapValue(datas[i], info.Isp, false, newkeys...)
+		if info.CountryCode != "" {
+			newkeys[len(newkeys)-1] = "CountryCode"
+			SetMapValue(datas[i], info.CountryCode, false, newkeys...)
+		}
+		if info.Latitude != "" {
+			newkeys[len(newkeys)-1] = "Latitude"
+			SetMapValue(datas[i], info.Latitude, false, newkeys...)
+		}
+		if info.Longitude != "" {
+			newkeys[len(newkeys)-1] = "Longitude"
+			SetMapValue(datas[i], info.Longitude, false, newkeys...)
+		}
+		if info.DistrictCode != "" {
+			newkeys[len(newkeys)-1] = "DistrictCode"
+			SetMapValue(datas[i], info.DistrictCode, false, newkeys...)
+		}
 	}
 	if err != nil {
 		it.stats.LastError = err.Error()
@@ -97,7 +168,7 @@ func (it *IpTransformer) ConfigOptions() []Option {
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     true,
-			Placeholder:  "your/path/to/ip.dat",
+			Placeholder:  "your/path/to/ip.dat(x)",
 			DefaultNoUse: true,
 			Description:  "IP数据库路径(data_path)",
 			Type:         transforms.TransformTypeString,
