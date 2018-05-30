@@ -1,24 +1,25 @@
-package parser
+package json
 
 import (
 	"bytes"
 	"encoding/json"
 	"testing"
 
-	"github.com/qiniu/logkit/conf"
-	. "github.com/qiniu/logkit/utils/models"
-
 	"github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/parser"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 func TestJsonParser(t *testing.T) {
 	c := conf.MapConf{}
-	c[KeyParserName] = "testjsonparser"
-	c[KeyParserType] = "json"
-	c[KeyLabels] = "mm abc"
-	c[KeyDisableRecordErrData] = "true"
-	p, _ := NewJsonParser(c)
+	c[parser.KeyParserName] = "testjsonparser"
+	c[parser.KeyParserType] = "json"
+	c[parser.KeyLabels] = "mm abc"
+	c[parser.KeyDisableRecordErrData] = "true"
+	p, _ := NewParser(c)
 	tests := []struct {
 		in  []string
 		exp []Data
@@ -81,11 +82,11 @@ func TestJsonParser(t *testing.T) {
 
 func TestJsonParserForErrData(t *testing.T) {
 	c := conf.MapConf{}
-	c[KeyParserName] = "testjsonparser"
-	c[KeyParserType] = "json"
-	c[KeyLabels] = "mm abc"
-	c[KeyDisableRecordErrData] = "false"
-	p, _ := NewJsonParser(c)
+	c[parser.KeyParserName] = "testjsonparser"
+	c[parser.KeyParserType] = "json"
+	c[parser.KeyLabels] = "mm abc"
+	c[parser.KeyDisableRecordErrData] = "false"
+	p, _ := NewParser(c)
 	testIn := []string{`{"a":1,"b":[1.0,2.0,3.0],"c":{"d":"123","g":1.2},"e":"x","f":1.23}`, ""}
 	testExp := Data{
 		"a": json.Number("1"),
@@ -273,10 +274,10 @@ func BenchmarkMiddlelineWithConfigParser(b *testing.B) {
 
 func TestParseMutiLineJson(t *testing.T) {
 	c := conf.MapConf{}
-	c[KeyParserName] = "TestParseMutiLineJson"
-	c[KeyParserType] = "json"
-	c[KeyDisableRecordErrData] = "false"
-	p, _ := NewJsonParser(c)
+	c[parser.KeyParserName] = "TestParseMutiLineJson"
+	c[parser.KeyParserType] = "json"
+	c[parser.KeyDisableRecordErrData] = "false"
+	p, _ := NewParser(c)
 	data := `[{"name":"ethancai", "fansCount": 9223372036854775807}]`
 	res, err := p.Parse([]string{data})
 	errx, _ := err.(*StatsError)
@@ -289,10 +290,10 @@ func TestParseMutiLineJson(t *testing.T) {
 
 func TestParseSpaceJson(t *testing.T) {
 	c := conf.MapConf{}
-	c[KeyParserName] = "TestParseSpaceJson"
-	c[KeyParserType] = "json"
-	c[KeyDisableRecordErrData] = "false"
-	p, _ := NewJsonParser(c)
+	c[parser.KeyParserName] = "TestParseSpaceJson"
+	c[parser.KeyParserType] = "json"
+	c[parser.KeyDisableRecordErrData] = "false"
+	p, _ := NewParser(c)
 	data := "\n"
 	res, err := p.Parse([]string{data})
 	errx, _ := err.(*StatsError)

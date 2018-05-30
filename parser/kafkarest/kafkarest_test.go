@@ -1,20 +1,21 @@
-package parser
+package kafkarest
 
 import (
 	"strings"
 	"testing"
 
-	"github.com/qiniu/logkit/conf"
-
 	"github.com/stretchr/testify/assert"
+
+	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/parser"
 )
 
 func TestKafaRestLogParser(t *testing.T) {
 	c := conf.MapConf{}
-	c[KeyParserName] = "krp-1"
-	c[KeyParserType] = "kafkarest"
-	c[KeyDisableRecordErrData] = "true"
-	ps := NewParserRegistry()
+	c[parser.KeyParserName] = "krp-1"
+	c[parser.KeyParserType] = "kafkarest"
+	c[parser.KeyDisableRecordErrData] = "true"
+	ps := parser.NewRegistry()
 	p, err := ps.NewLogParser(c)
 	if err != nil {
 		t.Error(err)
@@ -67,10 +68,10 @@ func TestKafaRestLogParser(t *testing.T) {
 
 func TestKafaRestLogParserForErrData(t *testing.T) {
 	c := conf.MapConf{}
-	c[KeyParserName] = "krp-1"
-	c[KeyParserType] = "kafkarest"
-	c[KeyDisableRecordErrData] = "false"
-	ps := NewParserRegistry()
+	c[parser.KeyParserName] = "krp-1"
+	c[parser.KeyParserType] = "kafkarest"
+	c[parser.KeyDisableRecordErrData] = "false"
+	ps := parser.NewRegistry()
 	p, err := ps.NewLogParser(c)
 	if err != nil {
 		t.Error(err)
@@ -104,7 +105,7 @@ func TestKafaRestLogParserForErrData(t *testing.T) {
 }
 
 func TestParseField(t *testing.T) {
-	rest_parser := &KafaRestlogParser{}
+	rest_parser := &Parser{}
 	log := `[2016-12-05 03:35:20,682] INFO 172.16.16.191 - - [05/Dec/2016:03:35:20 +0000] "POST /topics/VIP_VvBVy0tuMPPspm1A_0000000000 HTTP/1.1" 200 101640  46 (io.confluent.rest-utils.requests)` + "\n"
 	fields := strings.Split(log, " ")
 	//time := rest_parser.ParseLogTime(fields)

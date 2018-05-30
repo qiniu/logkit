@@ -1,19 +1,20 @@
-package parser
+package grok
 
 import (
 	"regexp"
 	"strings"
 	"testing"
 
-	. "github.com/qiniu/logkit/utils/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 var grokBench Data
 
 func Benchmark_GrokParseLine_NGINX(b *testing.B) {
-	p := &GrokParser{
+	p := &Parser{
 		Patterns: []string{"%{NGINX_LOG}"},
 	}
 	p.compile()
@@ -26,7 +27,7 @@ func Benchmark_GrokParseLine_NGINX(b *testing.B) {
 }
 
 func Benchmark_GrokParseLine_PANDORANGINX(b *testing.B) {
-	p := &GrokParser{
+	p := &Parser{
 		Patterns: []string{"%{PANDORA_NGINX}"},
 	}
 	p.compile()
@@ -39,7 +40,7 @@ func Benchmark_GrokParseLine_PANDORANGINX(b *testing.B) {
 }
 
 func Benchmark_GrokParseLine_Common(b *testing.B) {
-	p := &GrokParser{
+	p := &Parser{
 		Patterns: []string{"%{COMMON_LOG_FORMAT}"},
 	}
 	p.compile()
@@ -60,49 +61,9 @@ func Benchmark_GroktrimInvalidSpace(b *testing.B) {
 
 //100000	     17110 ns/op
 
-func TestParseTimeZoneOffset(t *testing.T) {
-	tests := []struct {
-		s   string
-		exp int
-	}{
-		{
-			s:   "+08",
-			exp: 8,
-		},
-		{
-			s:   "+8",
-			exp: 8,
-		},
-		{
-			s:   "8",
-			exp: 8,
-		},
-		{
-			s:   "-8",
-			exp: -8,
-		},
-		{
-			s:   "-08",
-			exp: -8,
-		},
-		{
-			s:   "-1",
-			exp: -1,
-		},
-		{
-			s:   "0",
-			exp: 0,
-		},
-	}
-	for _, ti := range tests {
-		got := parseTimeZoneOffset(ti.s)
-		assert.Equal(t, ti.exp, got)
-	}
-}
-
 // Test a very simple parse pattern.
 func TestSimpleParse(t *testing.T) {
-	p := &GrokParser{
+	p := &Parser{
 		Patterns: []string{"%{TESTLOG}"},
 		CustomPatterns: `
 			TESTLOG %{NUMBER:num:long} %{WORD:client}
@@ -124,7 +85,7 @@ func TestSimpleParse(t *testing.T) {
 
 // Test a nginx time.
 func TestNginxTimeParse(t *testing.T) {
-	p := &GrokParser{
+	p := &Parser{
 		Patterns: []string{"%{NGINX_LOG}"},
 	}
 	assert.NoError(t, p.compile())
@@ -136,7 +97,7 @@ func TestNginxTimeParse(t *testing.T) {
 }
 
 func TestTimeZoneOffsetParse(t *testing.T) {
-	p := &GrokParser{
+	p := &Parser{
 		Patterns:       []string{"%{NGINX_LOG}"},
 		timeZoneOffset: -3,
 	}
@@ -147,7 +108,7 @@ func TestTimeZoneOffsetParse(t *testing.T) {
 	require.NotNil(t, m)
 	assert.Equal(t, "2017-04-05T14:25:06+08:00", m["ts"])
 
-	p = &GrokParser{
+	p = &Parser{
 		Patterns:       []string{"%{NGINX_LOG}"},
 		timeZoneOffset: 8,
 	}
@@ -161,7 +122,7 @@ func TestTimeZoneOffsetParse(t *testing.T) {
 
 // Verify that patterns with a regex lookahead fail at compile time.
 func TestParsePatternsWithLookahead(t *testing.T) {
-	p := &GrokParser{
+	p := &Parser{
 		Patterns: []string{"%{MYLOG}"},
 		CustomPatterns: `
 			NOBOT ((?!bot|crawl).)*
@@ -175,7 +136,7 @@ func TestParsePatternsWithLookahead(t *testing.T) {
 }
 
 func TestParserName(t *testing.T) {
-	p := &GrokParser{
+	p := &Parser{
 		Patterns: []string{"%{NGINX_LOG}"},
 		name:     "my_web_log",
 	}
@@ -202,7 +163,7 @@ func TestParserName(t *testing.T) {
 }
 
 func TestCLF_IPv6(t *testing.T) {
-	p := &GrokParser{
+	p := &Parser{
 		name:     "my_web_log",
 		Patterns: []string{"%{NGINX_LOG}"},
 	}
@@ -247,7 +208,7 @@ func TestCLF_IPv6(t *testing.T) {
 }
 
 func TestCustomInfluxdbHttpd(t *testing.T) {
-	p := &GrokParser{
+	p := &Parser{
 		Patterns: []string{`\[httpd\] %{COMBINED_LOG_FORMAT} %{UUID:uuid} %{NUMBER:response_time_us:long}`},
 	}
 	assert.NoError(t, p.compile())
@@ -300,7 +261,7 @@ func TestCustomInfluxdbHttpd(t *testing.T) {
 // common log format
 // 127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326
 func TestBuiltinCommonLogFormat(t *testing.T) {
-	p := &GrokParser{
+	p := &Parser{
 		Patterns: []string{"%{NGINX_LOG}"},
 	}
 	assert.NoError(t, p.compile())
@@ -327,7 +288,7 @@ func TestBuiltinCommonLogFormat(t *testing.T) {
 // common log format
 // 127.0.0.1 user1234 frank1234 [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326
 func TestBuiltinCommonLogFormatWithNumbers(t *testing.T) {
-	p := &GrokParser{
+	p := &Parser{
 		Patterns: []string{"%{NGINX_LOG}"},
 	}
 	assert.NoError(t, p.compile())
@@ -354,7 +315,7 @@ func TestBuiltinCommonLogFormatWithNumbers(t *testing.T) {
 // combined log format
 // 127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326 "-" "Mozilla"
 func TestBuiltinCombinedLogFormat(t *testing.T) {
-	p := &GrokParser{
+	p := &Parser{
 		Patterns: []string{"%{COMBINED_LOG_FORMAT}"},
 	}
 	assert.NoError(t, p.compile())
@@ -381,7 +342,7 @@ func TestBuiltinCombinedLogFormat(t *testing.T) {
 }
 
 func TestCompileStringAndParse(t *testing.T) {
-	p := &GrokParser{
+	p := &Parser{
 		Patterns: []string{"%{TEST_LOG_A}"},
 		CustomPatterns: `
 			DURATION %{NUMBER}[nuµm]?s
@@ -406,7 +367,7 @@ func TestCompileStringAndParse(t *testing.T) {
 }
 
 func TestCompileInvalidStringAndParse(t *testing.T) {
-	p := &GrokParser{
+	p := &Parser{
 		Patterns: []string{"%{TEST_LOG_A}"},
 		CustomPatterns: `
 			DURATION %{NUMBER}[nuµm]?s
@@ -431,7 +392,7 @@ func TestCompileInvalidStringAndParse(t *testing.T) {
 }
 
 func TestCompileErrorsOnInvalidPattern(t *testing.T) {
-	p := &GrokParser{
+	p := &Parser{
 		Patterns: []string{"%{TEST_LOG_A}", "%{TEST_LOG_B}"},
 		CustomPatterns: `
 			DURATION %{NUMBER}[nuµm]?s
@@ -447,7 +408,7 @@ func TestCompileErrorsOnInvalidPattern(t *testing.T) {
 }
 
 func TestParsePatternsWithoutCustom(t *testing.T) {
-	p := &GrokParser{
+	p := &Parser{
 		Patterns: []string{"%{POSINT:ts:long} response_time=%{POSINT:response_time:long} mymetric=%{NUMBER:metric:float}"},
 	}
 	assert.NoError(t, p.compile())
@@ -465,9 +426,9 @@ func TestParsePatternsWithoutCustom(t *testing.T) {
 }
 
 func TestCompileFileAndParse(t *testing.T) {
-	p := &GrokParser{
+	p := &Parser{
 		Patterns:           []string{"%{TEST_LOG_A}", "%{TEST_LOG_B}"},
-		CustomPatternFiles: []string{"./grok_test_data/test-patterns"},
+		CustomPatternFiles: []string{"./test_data/test-patterns"},
 	}
 	assert.NoError(t, p.compile())
 
@@ -499,7 +460,7 @@ func TestCompileFileAndParse(t *testing.T) {
 }
 
 func TestCompileNoModifiersAndParse(t *testing.T) {
-	p := &GrokParser{
+	p := &Parser{
 		Patterns: []string{"%{TEST_LOG_C}"},
 		CustomPatterns: `
 			DURATION %{NUMBER}[nuµm]?s
@@ -521,7 +482,7 @@ func TestCompileNoModifiersAndParse(t *testing.T) {
 }
 
 func TestCompileNoNamesAndParse(t *testing.T) {
-	p := &GrokParser{
+	p := &Parser{
 		Patterns: []string{"%{TEST_LOG_C}"},
 		CustomPatterns: `
 			DURATION %{NUMBER}[nuµm]?s
@@ -536,9 +497,9 @@ func TestCompileNoNamesAndParse(t *testing.T) {
 }
 
 func TestParseNoMatch(t *testing.T) {
-	p := &GrokParser{
+	p := &Parser{
 		Patterns:           []string{"%{TEST_LOG_A}", "%{TEST_LOG_B}"},
-		CustomPatternFiles: []string{"./grok_test_data/test-patterns"},
+		CustomPatternFiles: []string{"./test_data/test-patterns"},
 	}
 	assert.NoError(t, p.compile())
 
@@ -549,7 +510,7 @@ func TestParseNoMatch(t *testing.T) {
 
 func TestCompileErrors(t *testing.T) {
 	// compile fails because there are multiple timestamps:
-	p := &GrokParser{
+	p := &Parser{
 		Patterns: []string{"%{TEST_LOG_A}", "%{TEST_LOG_B}"},
 		CustomPatterns: `
 			TEST_LOG_A %{HTTPDATE:ts1:date} %{HTTPDATE:ts2:date} %{NUMBER:mynum:long}
@@ -558,7 +519,7 @@ func TestCompileErrors(t *testing.T) {
 	assert.Error(t, p.compile())
 
 	// compile fails because file doesn't exist:
-	p = &GrokParser{
+	p = &Parser{
 		Patterns:           []string{"%{TEST_LOG_A}", "%{TEST_LOG_B}"},
 		CustomPatternFiles: []string{"/tmp/foo/bar/baz"},
 	}
@@ -567,7 +528,7 @@ func TestCompileErrors(t *testing.T) {
 
 func TestParseErrors(t *testing.T) {
 	// Parse fails because the pattern doesn't exist
-	p := &GrokParser{
+	p := &Parser{
 		Patterns: []string{"%{TEST_LOG_B}"},
 		CustomPatterns: `
 			TEST_LOG_A %{HTTPDATE:ts:date} %{WORD:myword:long} %{}
@@ -578,7 +539,7 @@ func TestParseErrors(t *testing.T) {
 	assert.Error(t, err)
 
 	// Parse fails because myword is not an long
-	p = &GrokParser{
+	p = &Parser{
 		Patterns: []string{"%{TEST_LOG_A}"},
 		CustomPatterns: `
 			TEST_LOG_A %{HTTPDATE:ts:date} %{WORD:myword:long}
@@ -589,7 +550,7 @@ func TestParseErrors(t *testing.T) {
 	assert.NoError(t, err) // 只打日志，不报错
 
 	// Parse fails because myword is not a float
-	p = &GrokParser{
+	p = &Parser{
 		Patterns: []string{"%{TEST_LOG_A}"},
 		CustomPatterns: `
 			TEST_LOG_A %{HTTPDATE:ts:date} %{WORD:myword:float}
@@ -616,7 +577,7 @@ func TestParseMultiLine(t *testing.T) {
 	}
 	assert.Equal(t, false, matched)
 
-	p := &GrokParser{
+	p := &Parser{
 		Patterns: []string{"%{PHP_FPM_SLOW_LOG}"},
 		mode:     "multi",
 		CustomPatterns: `
@@ -761,7 +722,7 @@ func TestTrimInvalidSpace(t *testing.T) {
 }
 
 func TestAddCustomPatterns(t *testing.T) {
-	p := &GrokParser{
+	p := &Parser{
 		Patterns: []string{"%{TEST_LOG_A}"},
 		CustomPatterns: `
 			DURATION
@@ -774,7 +735,7 @@ func TestAddCustomPatterns(t *testing.T) {
 }
 
 func TestNginxTimeParseForErrData(t *testing.T) {
-	p := &GrokParser{
+	p := &Parser{
 		Patterns: []string{"%{test}"},
 	}
 
@@ -794,7 +755,7 @@ func TestNginxTimeParseForErrData(t *testing.T) {
 }
 
 func TestCompileFileAndParseMultiLine(t *testing.T) {
-	p := &GrokParser{
+	p := &Parser{
 		Patterns:       []string{"%{CUSTOM_GROK_FINAL}"},
 		CustomPatterns: "CUSTOM_GROK_FINAL \\[%{TIMESTAMP_ISO8601:time}\\]\\[12345\\] Level 5:\\n发送时间\\[%{TIMESTAMP_ISO8601:time2}\\],接收时间\\[20T09:57:58\\.123456\\]\\n本地队列名:\\[%{WORD:ok1}\\],\\n报文发送队列名:\\[%{WORD:ok3}\\],\\n报文头部信息:\\[无\\]\\n报文内容:\\n{%{NOTSPACE:a} %{NOTSPACE:b} %{NOTSPACE:c} %{NOTSPACE:d}}\\n%{GREEDYDATALINEFEED:xml}",
 	}
@@ -837,7 +798,7 @@ func TestCompileFileAndParseMultiLine(t *testing.T) {
 }
 
 func TestNagiosLog(t *testing.T) {
-	p := &GrokParser{
+	p := &Parser{
 		Patterns: []string{"%{NAGIOSLOGLINE}", "%{NAGIOSLOGOTHER}"},
 	}
 	assert.NoError(t, p.compile())

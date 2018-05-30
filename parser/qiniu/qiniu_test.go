@@ -1,15 +1,16 @@
-package parser
+package qiniu
 
 import (
 	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/times"
 	. "github.com/qiniu/logkit/utils/models"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func Test_QiniuLogRegex(t *testing.T) {
@@ -106,10 +107,10 @@ func Test_QiniuLogRegex(t *testing.T) {
 
 func Test_QiniulogParser(t *testing.T) {
 	c := conf.MapConf{}
-	c[KeyParserName] = "qiniulogparser"
-	c[KeyParserType] = "qiniulog"
-	c[KeyDisableRecordErrData] = "true"
-	ps := NewParserRegistry()
+	c[parser.KeyParserName] = "qiniulogparser"
+	c[parser.KeyParserType] = "qiniulog"
+	c[parser.KeyDisableRecordErrData] = "true"
+	ps := parser.NewRegistry()
 	p, err := ps.NewLogParser(c)
 	if err != nil {
 		t.Error(err)
@@ -180,10 +181,10 @@ func Test_QiniulogParser(t *testing.T) {
 
 func Test_QiniulogParserForErrData(t *testing.T) {
 	c := conf.MapConf{}
-	c[KeyParserName] = "qiniulogparser"
-	c[KeyParserType] = "qiniulog"
-	c[KeyDisableRecordErrData] = "false"
-	ps := NewParserRegistry()
+	c[parser.KeyParserName] = "qiniulogparser"
+	c[parser.KeyParserType] = "qiniulog"
+	c[parser.KeyDisableRecordErrData] = "false"
+	ps := parser.NewRegistry()
 	p, err := ps.NewLogParser(c)
 	if err != nil {
 		t.Error(err)
@@ -209,9 +210,9 @@ func Test_QiniulogParserForErrData(t *testing.T) {
 
 func Test_QiniulogParserForTeapot(t *testing.T) {
 	c := conf.MapConf{}
-	c[KeyParserType] = "qiniulog"
-	c[KeyLogHeaders] = "prefix,date,time,level,reqid,file"
-	ps := NewParserRegistry()
+	c[parser.KeyParserType] = "qiniulog"
+	c[parser.KeyLogHeaders] = "prefix,date,time,level,reqid,file"
+	ps := parser.NewRegistry()
 	p, err := ps.NewLogParser(c)
 	if err != nil {
 		t.Error(err)

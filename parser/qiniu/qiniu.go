@@ -1,4 +1,4 @@
-package parser
+package qiniu
 
 import (
 	"fmt"
@@ -6,24 +6,19 @@ import (
 	"strings"
 
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/times"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (
-	LogHeadPrefix string = "prefix"
-	LogHeadDate   string = "date"
-	LogHeadTime   string = "time"
+	LogHeadPrefix        = "prefix"
+	LogHeadDate          = "date"
+	LogHeadTime          = "time"
+	LogHeadLevel         = "level"
 	LogHeadReqid  string = "reqid"
-	LogHeadLevel  string = "level"
-	LogHeadFile   string = "file"
-	LogHeadLog    string = "log" //默认在最后，不能改变顺序
-)
-
-// conf 字段
-const (
-	KeyQiniulogPrefix = "qiniulog_prefix" //qiniulog的日志前缀
-	KeyLogHeaders     = "qiniulog_log_headers"
+	LogHeadFile          = "file"
+	LogHeadLog           = "log" //默认在最后，不能改变顺序
 )
 
 var (
@@ -44,13 +39,15 @@ func init() {
 		c, _ := regexp.Compile(v)
 		CompliedPatterns[k] = c
 	}
+
+	parser.RegisterConstructor(parser.TypeLogv1, NewParser)
 }
 
-type QiniulogParser struct {
+type Parser struct {
 	name                 string
 	prefix               string
 	headers              []string
-	labels               []Label
+	labels               []parser.Label
 	disableRecordErrData bool
 }
 
@@ -73,21 +70,21 @@ func isExist(source []string, item string) bool {
 	return false
 }
 
-func NewQiniulogParser(c conf.MapConf) (LogParser, error) {
-	name, _ := c.GetStringOr(KeyParserName, "")
-	prefix, _ := c.GetStringOr(KeyQiniulogPrefix, "")
-	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
-	logHeaders, _ := c.GetStringListOr(KeyLogHeaders, defaultLogHeads)
+func NewParser(c conf.MapConf) (parser.Parser, error) {
+	name, _ := c.GetStringOr(parser.KeyParserName, "")
+	prefix, _ := c.GetStringOr(parser.KeyQiniulogPrefix, "")
+	labelList, _ := c.GetStringListOr(parser.KeyLabels, []string{})
+	logHeaders, _ := c.GetStringListOr(parser.KeyLogHeaders, defaultLogHeads)
 
 	nameMap := make(map[string]struct{})
 	for k, _ := range logHeaders {
 		nameMap[string(k)] = struct{}{}
 	}
-	labels := GetLabels(labelList, nameMap)
+	labels := parser.GetLabels(labelList, nameMap)
 
-	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
 
-	return &QiniulogParser{
+	return &Parser{
 		name:                 name,
 		labels:               labels,
 		prefix:               prefix,
@@ -96,15 +93,15 @@ func NewQiniulogParser(c conf.MapConf) (LogParser, error) {
 	}, nil
 }
 
-func (p *QiniulogParser) Name() string {
+func (p *Parser) Name() string {
 	return p.name
 }
 
-func (p *QiniulogParser) Type() string {
-	return TypeLogv1
+func (p *Parser) Type() string {
+	return parser.TypeLogv1
 }
 
-func (p *QiniulogParser) GetParser(head string) (func(string) (string, string, error), error) {
+func (p *Parser) GetParser(head string) (func(string) (string, string, error), error) {
 	switch head {
 	case LogHeadPrefix:
 		return p.parsePrefix, nil
@@ -130,18 +127,18 @@ func getSplitByFirstSpace(line string) (firstPart, left string) {
 	return line[0:space], line[space+1:]
 }
 
-func (p *QiniulogParser) parsePrefix(line string) (leftline, prefix string, err error) {
+func (p *Parser) parsePrefix(line string) (leftline, prefix string, err error) {
 	if !strings.HasPrefix(line, p.prefix) {
 		err = fmt.Errorf("%v can not find prefix %v", line, p.prefix)
 		return
 	}
 	return strings.TrimPrefix(line, p.prefix), p.prefix, nil
 }
-func (p *QiniulogParser) parseDate(line string) (leftline, date string, err error) {
+func (p *Parser) parseDate(line string) (leftline, date string, err error) {
 	date, leftline = getSplitByFirstSpace(line)
 	return
 }
-func (p *QiniulogParser) parseTime(line string) (leftline, time string, err error) {
+func (p *Parser) parseTime(line string) (leftline, time string, err error) {
 	time, leftline = getSplitByFirstSpace(line)
 	return
 }
@@ -165,7 +162,7 @@ func parseFromBracket(line, leftBracket, rightBracket string) (leftline, thing s
 	return
 }
 
-func (p *QiniulogParser) parseReqid(line string) (leftline, reqid string, err error) {
+func (p *Parser) parseReqid(line string) (leftline, reqid string, err error) {
 	req, _ := getSplitByFirstSpace(line)
 	if strings.Count(req, "[") < 2 || strings.Count(req, "]") < 2 {
 		return line, "", nil
@@ -178,7 +175,7 @@ func (p *QiniulogParser) parseReqid(line string) (leftline, reqid string, err er
 	return
 }
 
-func (p *QiniulogParser) parseLogLevel(line string) (leftline, loglevel string, err error) {
+func (p *Parser) parseLogLevel(line string) (leftline, loglevel string, err error) {
 	leftline, loglevel, err = parseFromBracket(line, "[", "]")
 	if err != nil {
 		err = errorCanNotParse(LogHeadLevel, line, err)
@@ -186,7 +183,7 @@ func (p *QiniulogParser) parseLogLevel(line string) (leftline, loglevel string, 
 	}
 	return
 }
-func (p *QiniulogParser) parseLogFile(line string) (leftline, logFile string, err error) {
+func (p *Parser) parseLogFile(line string) (leftline, logFile string, err error) {
 	logFile, leftline = getSplitByFirstSpace(line)
 	if strings.HasPrefix(logFile, "[") {
 		leftline, logFile, err = parseFromBracket(line, "[", "]")
@@ -226,7 +223,7 @@ func errorCanNotParse(s string, line string, err error) error {
 	return fmt.Errorf("can not parse %v from %v %v", s, line, err)
 }
 
-func (p *QiniulogParser) parse(line string) (d Data, err error) {
+func (p *Parser) parse(line string) (d Data, err error) {
 	d = make(Data, len(p.headers)+len(p.labels))
 	line = strings.Replace(line, "\n", " ", -1)
 	line = strings.Replace(line, "\t", "\\t", -1)
@@ -270,7 +267,7 @@ func (p *QiniulogParser) parse(line string) (d Data, err error) {
 	}
 	return d, nil
 }
-func (p *QiniulogParser) Parse(lines []string) ([]Data, error) {
+func (p *Parser) Parse(lines []string) ([]Data, error) {
 	datas := []Data{}
 	se := &StatsError{}
 	for idx, line := range lines {

@@ -186,7 +186,7 @@ const (
 )
 
 func NewFileBufReader(conf conf.MapConf, errDirectReturn bool) (reader Reader, err error) {
-	rs := NewReaderRegistry()
+	rs := NewRegistry()
 	return rs.NewReader(conf, errDirectReturn)
 }
 
@@ -205,7 +205,7 @@ type Registry struct {
 	readerTypeMap map[string]func(*Meta, conf.MapConf) (Reader, error)
 }
 
-func NewReaderRegistry() *Registry {
+func NewRegistry() *Registry {
 	ret := &Registry{
 		readerTypeMap: map[string]func(*Meta, conf.MapConf) (Reader, error){},
 	}

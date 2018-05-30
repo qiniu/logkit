@@ -1,4 +1,4 @@
-package parser
+package syslog
 
 import (
 	"bytes"
@@ -7,12 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/qiniu/logkit/conf"
-	. "github.com/qiniu/logkit/utils/models"
-
 	"github.com/jeromer/syslogparser"
 	"github.com/jeromer/syslogparser/rfc3164"
 	"github.com/jeromer/syslogparser/rfc5424"
+
+	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/parser"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (
@@ -22,22 +23,20 @@ const (
 	detectedLeftLog = iota
 )
 
-const (
-	KeyRFCType = "syslog_rfc"
-
-	PandoraParseFlushSignal = "!@#pandora-EOF-line#@!"
-)
+func init() {
+	parser.RegisterConstructor(parser.TypeSyslog, NewParser)
+}
 
 type LogParts map[string]interface{}
 
-type SysLogParser interface {
+type Parser interface {
 	Parse() error
 	Dump() LogParts
 	Location(*time.Location)
 }
 
 type Format interface {
-	GetParser([]byte) SysLogParser
+	GetParser([]byte) Parser
 	IsNewLine(data []byte) bool
 }
 
@@ -95,15 +94,15 @@ func GetFormt(format string) Format {
 	return &Automatic{}
 }
 
-func NewSyslogParser(c conf.MapConf) (LogParser, error) {
-	name, _ := c.GetStringOr(KeyParserName, "")
-	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
-	rfctype, _ := c.GetStringOr(KeyRFCType, "automic")
+func NewParser(c conf.MapConf) (parser.Parser, error) {
+	name, _ := c.GetStringOr(parser.KeyParserName, "")
+	labelList, _ := c.GetStringListOr(parser.KeyLabels, []string{})
+	rfctype, _ := c.GetStringOr(parser.KeyRFCType, "automic")
 
 	nameMap := make(map[string]struct{})
-	labels := GetLabels(labelList, nameMap)
+	labels := parser.GetLabels(labelList, nameMap)
 
-	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
 
 	format := GetFormt(rfctype)
 	buff := bytes.NewBuffer([]byte{})
@@ -118,7 +117,7 @@ func NewSyslogParser(c conf.MapConf) (LogParser, error) {
 
 type SyslogParser struct {
 	name                 string
-	labels               []Label
+	labels               []parser.Label
 	buff                 *bytes.Buffer
 	format               Format
 	disableRecordErrData bool
@@ -129,7 +128,7 @@ func (p *SyslogParser) Name() string {
 }
 
 func (p *SyslogParser) Type() string {
-	return TypeSyslog
+	return parser.TypeSyslog
 }
 
 func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
@@ -169,7 +168,7 @@ func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 func (p *SyslogParser) parse(line string) (data Data, err error) {
 	data = Data{}
 	if p.buff.Len() > 0 {
-		if line == PandoraParseFlushSignal {
+		if line == parser.PandoraParseFlushSignal {
 			return p.Flush()
 		}
 		if p.format.IsNewLine([]byte(line)) {
@@ -183,7 +182,7 @@ func (p *SyslogParser) parse(line string) (data Data, err error) {
 		}
 	}
 	var serr error
-	if line != PandoraParseFlushSignal {
+	if line != parser.PandoraParseFlushSignal {
 		_, serr = p.buff.Write([]byte(line))
 	}
 	if serr != nil {
@@ -209,7 +208,7 @@ func (p *SyslogParser) Flush() (data Data, err error) {
 
 type RFC6587 struct{}
 
-func (f *RFC6587) GetParser(line []byte) SysLogParser {
+func (f *RFC6587) GetParser(line []byte) Parser {
 	return &parserWrapper{rfc5424.NewParser(line)}
 }
 
@@ -231,7 +230,7 @@ func (f *RFC6587) IsNewLine(data []byte) bool {
 
 type RFC5424 struct{}
 
-func (f *RFC5424) GetParser(line []byte) SysLogParser {
+func (f *RFC5424) GetParser(line []byte) Parser {
 	return &parserWrapper{rfc5424.NewParser(line)}
 }
 
@@ -258,7 +257,7 @@ func (f *RFC5424) IsNewLine(data []byte) bool {
 
 type RFC3164 struct{}
 
-func (f *RFC3164) GetParser(line []byte) SysLogParser {
+func (f *RFC3164) GetParser(line []byte) Parser {
 	return &parserWrapper{rfc3164.NewParser(line)}
 }
 
@@ -274,7 +273,7 @@ func (f *RFC3164) IsNewLine(data []byte) bool {
 
 type Automatic struct{}
 
-func (f *Automatic) GetParser(line []byte) SysLogParser {
+func (f *Automatic) GetParser(line []byte) Parser {
 	switch format := DetectType(line); format {
 	case detectedRFC3164:
 		return &parserWrapper{rfc3164.NewParser(line)}

@@ -1,4 +1,4 @@
-package parser
+package grok
 
 import (
 	"bufio"
@@ -9,20 +9,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vjeantet/grok"
+
 	"github.com/qiniu/log"
+
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/times"
 	. "github.com/qiniu/logkit/utils/models"
-	"github.com/vjeantet/grok"
-)
-
-const (
-	KeyGrokMode               = "grok_mode"     //是否替换\n以匹配多行
-	KeyGrokPatterns           = "grok_patterns" // grok 模式串名
-	KeyGrokCustomPatternFiles = "grok_custom_pattern_files"
-	KeyGrokCustomPatterns     = "grok_custom_patterns"
-
-	KeyTimeZoneOffset = "timezone_offset"
 )
 
 const (
@@ -50,9 +44,13 @@ var (
 	patternOnlyRe = regexp.MustCompile(`%{(\w+)}`)
 )
 
-type GrokParser struct {
+func init() {
+	parser.RegisterConstructor(parser.TypeGrok, NewParser)
+}
+
+type Parser struct {
 	name                 string
-	labels               []Label
+	labels               []parser.Label
 	mode                 string
 	disableRecordErrData bool
 
@@ -87,47 +85,25 @@ type GrokParser struct {
 	g        *grok.Grok
 }
 
-func parseTimeZoneOffset(zoneoffset string) (ret int) {
-	zoneoffset = strings.TrimSpace(zoneoffset)
-	if zoneoffset == "" {
-		return
-	}
-	mi := false
-	if strings.HasPrefix(zoneoffset, "-") {
-		mi = true
-	}
-	zoneoffset = strings.Trim(zoneoffset, "+-")
-	i, err := strconv.ParseInt(zoneoffset, 10, 64)
+func NewParser(c conf.MapConf) (parser.Parser, error) {
+	name, _ := c.GetStringOr(parser.KeyParserName, "")
+	patterns, err := c.GetStringList(parser.KeyGrokPatterns)
 	if err != nil {
-		log.Errorf("parse %v error %v, ignore zoneoffset...", zoneoffset, err)
-		return
+		return nil, fmt.Errorf("parse key %v error %v", parser.KeyGrokPatterns, err)
 	}
-	ret = int(i)
-	if mi {
-		ret = 0 - ret
-	}
-	return
-}
-
-func NewGrokParser(c conf.MapConf) (LogParser, error) {
-	name, _ := c.GetStringOr(KeyParserName, "")
-	patterns, err := c.GetStringList(KeyGrokPatterns)
-	if err != nil {
-		return nil, fmt.Errorf("parse key %v error %v", KeyGrokPatterns, err)
-	}
-	mode, _ := c.GetStringOr(KeyGrokMode, "")
-	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
-	timeZoneOffsetRaw, _ := c.GetStringOr(KeyTimeZoneOffset, "")
-	timeZoneOffset := parseTimeZoneOffset(timeZoneOffsetRaw)
+	mode, _ := c.GetStringOr(parser.KeyGrokMode, "")
+	labelList, _ := c.GetStringListOr(parser.KeyLabels, []string{})
+	timeZoneOffsetRaw, _ := c.GetStringOr(parser.KeyTimeZoneOffset, "")
+	timeZoneOffset := parser.ParseTimeZoneOffset(timeZoneOffsetRaw)
 	nameMap := make(map[string]struct{})
-	labels := GetLabels(labelList, nameMap)
+	labels := parser.GetLabels(labelList, nameMap)
 
-	customPatterns, _ := c.GetStringOr(KeyGrokCustomPatterns, "")
-	customPatternFiles, _ := c.GetStringListOr(KeyGrokCustomPatternFiles, []string{})
+	customPatterns, _ := c.GetStringOr(parser.KeyGrokCustomPatterns, "")
+	customPatternFiles, _ := c.GetStringListOr(parser.KeyGrokCustomPatternFiles, []string{})
 
-	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
 
-	p := &GrokParser{
+	p := &Parser{
 		name:                 name,
 		labels:               labels,
 		mode:                 mode,
@@ -144,7 +120,7 @@ func NewGrokParser(c conf.MapConf) (LogParser, error) {
 	return p, nil
 }
 
-func (p *GrokParser) compile() error {
+func (p *Parser) compile() error {
 	p.typeMap = make(map[string]map[string]string)
 	p.patterns = make(map[string]string)
 	gk, err := grok.NewWithConfig(&grok.Config{NamedCapturesOnly: true, RemoveEmptyValues: true})
@@ -190,15 +166,15 @@ func (p *GrokParser) compile() error {
 	return p.compileCustomPatterns()
 }
 
-func (gp *GrokParser) Name() string {
+func (gp *Parser) Name() string {
 	return gp.name
 }
 
-func (gp *GrokParser) Type() string {
-	return TypeGrok
+func (gp *Parser) Type() string {
+	return parser.TypeGrok
 }
 
-func (gp *GrokParser) Parse(lines []string) ([]Data, error) {
+func (gp *Parser) Parse(lines []string) ([]Data, error) {
 	datas := []Data{}
 	se := &StatsError{}
 	for idx, line := range lines {
@@ -230,7 +206,7 @@ func (gp *GrokParser) Parse(lines []string) ([]Data, error) {
 	return datas, se
 }
 
-func (p *GrokParser) parseLine(line string) (Data, error) {
+func (p *Parser) parseLine(line string) (Data, error) {
 	if p.mode == ModeMulti {
 		line = strings.Replace(line, "\n", " ", -1)
 	}
@@ -312,7 +288,7 @@ func (p *GrokParser) parseLine(line string) (Data, error) {
 	return data, nil
 }
 
-func (p *GrokParser) addCustomPatterns(scanner *bufio.Scanner) error {
+func (p *Parser) addCustomPatterns(scanner *bufio.Scanner) error {
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		line = trimInvalidSpace(line)
@@ -327,7 +303,7 @@ func (p *GrokParser) addCustomPatterns(scanner *bufio.Scanner) error {
 	return nil
 }
 
-func (p *GrokParser) compileCustomPatterns() error {
+func (p *Parser) compileCustomPatterns() error {
 	var err error
 	// check if the pattern contains a subpattern that is already defined
 	// replace it with the subpattern for modifier inheritance.
@@ -388,7 +364,7 @@ func trimInvalidSpace(pattern string) string {
 
 // parseTypedCaptures parses the capture modifiers, and then deletes the
 // modifier from the line so that it is a valid "grok" pattern again.
-func (p *GrokParser) parseTypedCaptures(name, pattern string) (string, error) {
+func (p *Parser) parseTypedCaptures(name, pattern string) (string, error) {
 	matches := modifierRe.FindAllStringSubmatch(pattern, -1)
 
 	// grab the name of the capture pattern

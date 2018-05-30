@@ -39,14 +39,14 @@ func main() {
 	runtime.GOMAXPROCS(conf.MaxProcs)
 	log.SetOutputLevel(conf.DebugLevel)
 
-	pregistry := parser.NewParserRegistry()
+	pregistry := parser.NewRegistry()
 	// 注册你自定义的parser
 	pregistry.RegisterParser("myparser", samples.NewMyParser)
 
 	sregistry := sender.NewSenderRegistry()
 	sregistry.RegisterSender("mysender", samples.NewMySender)
 
-	rr := reader.NewReaderRegistry()
+	rr := reader.NewRegistry()
 
 	m, err := mgr.NewCustomManager(conf.ManagerConfig, rr, pregistry, sregistry)
 	if err != nil {

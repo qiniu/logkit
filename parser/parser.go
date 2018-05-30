@@ -8,7 +8,7 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-type LogParser interface {
+type Parser interface {
 	Name() string
 	// parse lines into structured datas
 	Parse(lines []string) (datas []Data, err error)
@@ -39,11 +39,11 @@ const (
 	TypeEmpty      = "empty"
 	TypeGrok       = "grok"
 	TypeInnerSQL   = "_sql"
-	TypeInnerMysql = "_mysql"
-	TypeJson       = "json"
+	TypeInnerMySQL = "_mysql"
+	TypeJSON       = "json"
 	TypeNginx      = "nginx"
 	TypeSyslog     = "syslog"
-	TypeMysqlLog   = "mysqllog"
+	TypeMySQL      = "mysqllog"
 )
 
 type Label struct {
@@ -51,30 +51,33 @@ type Label struct {
 	Value string
 }
 
-type ParserRegistry struct {
-	parserTypeMap map[string]func(conf.MapConf) (LogParser, error)
+type Constructor func(conf.MapConf) (Parser, error)
+
+// registeredConstructors keeps a list of all available reader constructors can be registered by Registry.
+var registeredConstructors = map[string]Constructor{}
+
+// RegisterConstructor adds a new constructor for a given type of reader.
+func RegisterConstructor(typ string, c Constructor) {
+	registeredConstructors[typ] = c
 }
 
-func NewParserRegistry() *ParserRegistry {
-	ps := &ParserRegistry{
-		parserTypeMap: map[string]func(conf.MapConf) (LogParser, error){},
+type Registry struct {
+	parserTypeMap map[string]func(conf.MapConf) (Parser, error)
+}
+
+func NewRegistry() *Registry {
+	ret := &Registry{
+		parserTypeMap: map[string]func(conf.MapConf) (Parser, error){},
 	}
-	ps.RegisterParser(TypeCSV, NewCsvParser)
-	ps.RegisterParser(TypeLogv1, NewQiniulogParser)
-	ps.RegisterParser(TypeRaw, NewRawlogParser)
-	ps.RegisterParser(TypeKafkaRest, NewKafaRestlogParser)
-	ps.RegisterParser(TypeEmpty, NewEmptyParser)
-	ps.RegisterParser(TypeGrok, NewGrokParser)
-	ps.RegisterParser(TypeInnerSQL, NewJsonParser)   //兼容
-	ps.RegisterParser(TypeInnerMysql, NewJsonParser) //兼容
-	ps.RegisterParser(TypeJson, NewJsonParser)
-	ps.RegisterParser(TypeNginx, NewNginxParser)
-	ps.RegisterParser(TypeSyslog, NewSyslogParser)
-	ps.RegisterParser(TypeMysqlLog, NewMysqllogParser)
-	return ps
+
+	for typ, c := range registeredConstructors {
+		ret.RegisterParser(typ, c)
+	}
+
+	return ret
 }
 
-func (ps *ParserRegistry) RegisterParser(parserType string, constructor func(conf.MapConf) (LogParser, error)) error {
+func (ps *Registry) RegisterParser(parserType string, constructor func(conf.MapConf) (Parser, error)) error {
 	_, exist := ps.parserTypeMap[parserType]
 	if exist {
 		return errors.New("parserType " + parserType + " has been existed")
@@ -83,7 +86,7 @@ func (ps *ParserRegistry) RegisterParser(parserType string, constructor func(con
 	return nil
 }
 
-func (ps *ParserRegistry) NewLogParser(conf conf.MapConf) (p LogParser, err error) {
+func (ps *Registry) NewLogParser(conf conf.MapConf) (p Parser, err error) {
 	t, err := conf.GetString(KeyParserType)
 	if err != nil {
 		return

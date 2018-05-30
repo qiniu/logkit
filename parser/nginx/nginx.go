@@ -1,4 +1,4 @@
-package parser
+package nginx
 
 import (
 	"bufio"
@@ -11,43 +11,43 @@ import (
 	"time"
 
 	"github.com/qiniu/log"
+
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/parser"
+	"github.com/qiniu/logkit/parser/csv"
 	"github.com/qiniu/logkit/times"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-const (
-	NginxSchema      string = "nginx_schema"
-	NginxConfPath           = "nginx_log_format_path"
-	NginxLogFormat          = "nginx_log_format_name"
-	NginxFormatRegex        = "nginx_log_format_regex"
-)
+func init() {
+	parser.RegisterConstructor(parser.TypeNginx, NewParser)
+}
 
-type NginxParser struct {
+type Parser struct {
 	name                 string
 	regexp               *regexp.Regexp
 	schema               map[string]string
-	labels               []Label
+	labels               []parser.Label
 	disableRecordErrData bool
 }
 
-func NewNginxParser(c conf.MapConf) (LogParser, error) {
+func NewParser(c conf.MapConf) (parser.Parser, error) {
 	nginxParser, err := NewNginxAccParser(c)
 	return nginxParser, err
 }
 
-func NewNginxAccParser(c conf.MapConf) (p *NginxParser, err error) {
-	name, _ := c.GetStringOr(KeyParserName, "")
+func NewNginxAccParser(c conf.MapConf) (p *Parser, err error) {
+	name, _ := c.GetStringOr(parser.KeyParserName, "")
 
-	schema, _ := c.GetStringOr(NginxSchema, "")
-	nginxRegexStr, _ := c.GetStringOr(NginxFormatRegex, "")
-	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
+	schema, _ := c.GetStringOr(parser.NginxSchema, "")
+	nginxRegexStr, _ := c.GetStringOr(parser.NginxFormatRegex, "")
+	labelList, _ := c.GetStringListOr(parser.KeyLabels, []string{})
 	nameMap := make(map[string]struct{})
-	labels := GetLabels(labelList, nameMap)
+	labels := parser.GetLabels(labelList, nameMap)
 
-	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
 
-	p = &NginxParser{
+	p = &Parser{
 		name:                 name,
 		labels:               labels,
 		disableRecordErrData: disableRecordErrData,
@@ -57,11 +57,11 @@ func NewNginxAccParser(c conf.MapConf) (p *NginxParser, err error) {
 		return
 	}
 	if nginxRegexStr == "" {
-		nginxConfPath, err := c.GetString(NginxConfPath)
+		nginxConfPath, err := c.GetString(parser.NginxConfPath)
 		if err != nil {
 			return nil, err
 		}
-		formatName, err := c.GetString(NginxLogFormat)
+		formatName, err := c.GetString(parser.NginxLogFormat)
 		if err != nil {
 			return nil, err
 		}
@@ -80,7 +80,7 @@ func NewNginxAccParser(c conf.MapConf) (p *NginxParser, err error) {
 	return p, nil
 }
 
-func (p *NginxParser) parseSchemaFields(schema string) (m map[string]string, err error) {
+func (p *Parser) parseSchemaFields(schema string) (m map[string]string, err error) {
 	fieldMap := make(map[string]string)
 	if schema == "" {
 		return fieldMap, nil
@@ -99,15 +99,15 @@ func (p *NginxParser) parseSchemaFields(schema string) (m map[string]string, err
 	return fieldMap, nil
 }
 
-func (p *NginxParser) Name() string {
+func (p *Parser) Name() string {
 	return p.name
 }
 
-func (p *NginxParser) Type() string {
-	return TypeNginx
+func (p *Parser) Type() string {
+	return parser.TypeNginx
 }
 
-func (p *NginxParser) Parse(lines []string) ([]Data, error) {
+func (p *Parser) Parse(lines []string) ([]Data, error) {
 	var ret []Data
 	se := &StatsError{}
 	for idx, line := range lines {
@@ -141,7 +141,7 @@ func (p *NginxParser) Parse(lines []string) ([]Data, error) {
 	return ret, se
 }
 
-func (p *NginxParser) parseline(line string) (Data, error) {
+func (p *Parser) parseline(line string) (Data, error) {
 	line = strings.Trim(line, "\n")
 	re := p.regexp
 	fields := re.FindStringSubmatch(line)
@@ -167,10 +167,10 @@ func (p *NginxParser) parseline(line string) (Data, error) {
 	return entry, nil
 }
 
-func (p *NginxParser) makeValue(name, raw string) (data interface{}, err error) {
+func (p *Parser) makeValue(name, raw string) (data interface{}, err error) {
 	valueType := p.schema[name]
-	switch CsvType(valueType) {
-	case TypeFloat:
+	switch csv.Type(valueType) {
+	case csv.TypeFloat:
 		if raw == "-" {
 			return 0.0, nil
 		}
@@ -179,7 +179,7 @@ func (p *NginxParser) makeValue(name, raw string) (data interface{}, err error) 
 			err = fmt.Errorf("convet for %q to float64 failed: %q", name, raw)
 		}
 		return v, err
-	case TypeLong:
+	case csv.TypeLong:
 		if raw == "-" {
 			return 0, nil
 		}
@@ -188,9 +188,9 @@ func (p *NginxParser) makeValue(name, raw string) (data interface{}, err error) 
 			err = fmt.Errorf("convet for %q to int64 failed, %q", name, raw)
 		}
 		return v, err
-	case TypeString:
+	case csv.TypeString:
 		return raw, nil
-	case TypeDate:
+	case csv.TypeDate:
 		tm, nerr := times.StrToTime(raw)
 		if nerr != nil {
 			return tm, nerr

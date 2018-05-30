@@ -1,13 +1,14 @@
-package parser
+package syslog
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/qiniu/logkit/conf"
-	. "github.com/qiniu/logkit/utils/models"
-
 	"github.com/stretchr/testify/assert"
+
+	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/parser"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 func TestDetectSyslogType(t *testing.T) {
@@ -36,9 +37,9 @@ func TestDetectSyslogType(t *testing.T) {
 
 func Test_SyslogParser(t *testing.T) {
 	c := conf.MapConf{}
-	c[KeyParserType] = "syslog"
-	c[KeyLabels] = "machine nb110"
-	p, err := NewSyslogParser(c)
+	c[parser.KeyParserType] = "syslog"
+	c[parser.KeyLabels] = "machine nb110"
+	p, err := NewParser(c)
 	lines := []string{
 		`<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47`,
 		`- BOM'su root' failed for lonvick on /dev/pts/8`,
@@ -73,7 +74,7 @@ func Test_SyslogParser(t *testing.T) {
 	if len(dts) != 6 {
 		t.Fatalf("parse lines error expect 6 lines but got %v lines", len(dts))
 	}
-	ndata, err := p.Parse([]string{PandoraParseFlushSignal})
+	ndata, err := p.Parse([]string{parser.PandoraParseFlushSignal})
 	if st, ok := err.(*StatsError); ok {
 		err = st.ErrorDetail
 		assert.Equal(t, "", st.LastError, st.LastError)
@@ -106,8 +107,8 @@ func TestSyslogParser5424(t *testing.T) {
 
 func TestSyslogParser_NoPanic(t *testing.T) {
 	c := conf.MapConf{}
-	c[KeyParserType] = "syslog"
-	p, err := NewSyslogParser(c)
+	c[parser.KeyParserType] = "syslog"
+	p, err := NewParser(c)
 	assert.NoError(t, err)
 	lines := []string{
 		`<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47`,
@@ -123,7 +124,7 @@ func TestSyslogParser_NoPanic(t *testing.T) {
 		lenStr := len(str)
 		for j := 1; j <= lenStr; j++ {
 			dataLine[i] = str[:j]
-			dataLine[i+1] = PandoraParseFlushSignal
+			dataLine[i+1] = parser.PandoraParseFlushSignal
 			p.Parse(dataLine)
 		}
 	}

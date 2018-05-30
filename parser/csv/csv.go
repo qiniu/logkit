@@ -1,4 +1,4 @@
-package parser
+package csv
 
 import (
 	"errors"
@@ -7,37 +7,27 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/times"
-	. "github.com/qiniu/logkit/utils/models"
-
 	"unicode"
 
 	"github.com/json-iterator/go"
+
 	"github.com/qiniu/log"
+
+	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/parser"
+	"github.com/qiniu/logkit/times"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 // Type 类型常量
-type CsvType string
+type Type string
 
 const (
-	TypeFloat   CsvType = "float"
-	TypeLong    CsvType = "long"
-	TypeString  CsvType = "string"
-	TypeDate    CsvType = "date"
-	TypeJsonMap CsvType = "jsonmap"
-)
-
-const (
-	KeyCSVSchema             = "csv_schema"            // csv 每个列的列名和类型 long/string/float/date
-	KeyCSVSplitter           = "csv_splitter"          // csv 的分隔符
-	KeyCSVLabels             = "csv_labels"            // csv 额外增加的标签信息，比如机器信息等
-	KeyAutoRename            = "csv_auto_rename"       // 是否将不合法的字段名称重命名一下, 比如 header-host 重命名为 header_host
-	KeyCSVAllowNoMatch       = "csv_allow_no_match"    // 允许实际分隔的数据和schema不相等，不相等时按顺序赋值
-	KeyCSVAllowMore          = "csv_allow_more"        // 允许实际字段比schema多
-	KeyCSVAllowMoreStartNum  = "csv_more_start_number" // 允许实际字段比schema多，名称开始的数字
-	KeyCSVIgnoreInvalidField = "csv_ignore_invalid"    // 忽略解析错误的字段
+	TypeFloat   Type = "float"
+	TypeLong    Type = "long"
+	TypeString  Type = "string"
+	TypeDate    Type = "date"
+	TypeJsonMap Type = "jsonmap"
 )
 
 const MaxParserSchemaErrOutput = 5
@@ -48,10 +38,10 @@ var jsontool = jsoniter.Config{
 	ValidateJsonRawMessage: true,
 }.Froze()
 
-type CsvParser struct {
+type Parser struct {
 	name                 string
 	schema               []field
-	labels               []Label
+	labels               []parser.Label
 	delim                string
 	isAutoRename         bool
 	timeZoneOffset       int
@@ -64,22 +54,26 @@ type CsvParser struct {
 
 type field struct {
 	name       string
-	dataType   CsvType
-	typeChange map[string]CsvType
+	dataType   Type
+	typeChange map[string]Type
 	allin      bool
 }
 
-func NewCsvParser(c conf.MapConf) (LogParser, error) {
-	name, _ := c.GetStringOr(KeyParserName, "")
-	splitter, _ := c.GetStringOr(KeyCSVSplitter, "\t")
+func init() {
+	parser.RegisterConstructor(parser.TypeCSV, NewParser)
+}
 
-	schema, err := c.GetString(KeyCSVSchema)
+func NewParser(c conf.MapConf) (parser.Parser, error) {
+	name, _ := c.GetStringOr(parser.KeyParserName, "")
+	splitter, _ := c.GetStringOr(parser.KeyCSVSplitter, "\t")
+
+	schema, err := c.GetString(parser.KeyCSVSchema)
 	if err != nil {
 		return nil, err
 	}
-	timeZoneOffsetRaw, _ := c.GetStringOr(KeyTimeZoneOffset, "")
-	timeZoneOffset := parseTimeZoneOffset(timeZoneOffsetRaw)
-	isAutoRename, _ := c.GetBoolOr(KeyAutoRename, false)
+	timeZoneOffsetRaw, _ := c.GetStringOr(parser.KeyTimeZoneOffset, "")
+	timeZoneOffset := parser.ParseTimeZoneOffset(timeZoneOffsetRaw)
+	isAutoRename, _ := c.GetBoolOr(parser.KeyAutoRename, false)
 
 	fieldList, err := parseSchemaFieldList(schema)
 	if err != nil {
@@ -97,22 +91,22 @@ func NewCsvParser(c conf.MapConf) (LogParser, error) {
 		}
 		nameMap[newField.name] = struct{}{}
 	}
-	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
+	labelList, _ := c.GetStringListOr(parser.KeyLabels, []string{})
 	if len(labelList) < 1 {
-		labelList, _ = c.GetStringListOr(KeyCSVLabels, []string{}) //向前兼容老的配置
+		labelList, _ = c.GetStringListOr(parser.KeyCSVLabels, []string{}) //向前兼容老的配置
 	}
-	labels := GetLabels(labelList, nameMap)
+	labels := parser.GetLabels(labelList, nameMap)
 
-	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
 
-	allowNotMatch, _ := c.GetBoolOr(KeyCSVAllowNoMatch, false)
-	allowMoreName, _ := c.GetStringOr(KeyCSVAllowMore, "")
+	allowNotMatch, _ := c.GetBoolOr(parser.KeyCSVAllowNoMatch, false)
+	allowMoreName, _ := c.GetStringOr(parser.KeyCSVAllowMore, "")
 	if allowMoreName != "" {
 		allowNotMatch = true
 	}
-	allmoreStartNumber, _ := c.GetIntOr(KeyCSVAllowMoreStartNum, 0)
-	ignoreInvalid, _ := c.GetBoolOr(KeyCSVIgnoreInvalidField, false)
-	return &CsvParser{
+	allmoreStartNumber, _ := c.GetIntOr(parser.KeyCSVAllowMoreStartNum, 0)
+	ignoreInvalid, _ := c.GetBoolOr(parser.KeyCSVIgnoreInvalidField, false)
+	return &Parser{
 		name:                 name,
 		schema:               fields,
 		labels:               labels,
@@ -185,7 +179,7 @@ func parseSchemaRawField(f string) (newField field, err error) {
 	case "d", "date":
 		dataType = "date"
 	}
-	return newCsvField(columnName, CsvType(dataType))
+	return newCsvField(columnName, Type(dataType))
 }
 func parseSchemaJsonField(f string) (fd field, err error) {
 	splitSpace := strings.IndexByte(f, ' ')
@@ -194,7 +188,7 @@ func parseSchemaJsonField(f string) (fd field, err error) {
 	rawfield = strings.TrimSpace(rawfield[len(TypeJsonMap):])
 	allin := true
 	fields := make([]field, 0)
-	typeChange := make(map[string]CsvType)
+	typeChange := make(map[string]Type)
 	if len(rawfield) > 0 {
 		allin = false
 		if !strings.HasPrefix(rawfield, "{") || !strings.HasSuffix(rawfield, "}") {
@@ -212,7 +206,7 @@ func parseSchemaJsonField(f string) (fd field, err error) {
 			return
 		}
 		for _, f := range fields {
-			typeChange[f.name] = CsvType(f.dataType)
+			typeChange[f.name] = Type(f.dataType)
 		}
 	}
 	fd = field{
@@ -256,18 +250,11 @@ func parseSchemaFields(fieldList []string) (fields []field, err error) {
 	return
 }
 
-func dataTypeNotSupperted(dataType CsvType) error {
+func dataTypeNotSupperted(dataType Type) error {
 	return errors.New("type not supported " + string(dataType) + " csv parser currently support string long float date jsonmap 5 types")
 }
 
-func newLabel(name, dataValue string) Label {
-	return Label{
-		Name:  name,
-		Value: dataValue,
-	}
-}
-
-func newCsvField(name string, dataType CsvType) (f field, err error) {
+func newCsvField(name string, dataType Type) (f field, err error) {
 	switch dataType {
 	case TypeFloat, TypeLong, TypeString, TypeDate:
 		f = field{
@@ -284,7 +271,7 @@ func (f field) MakeValue(raw string, timeZoneOffset int) (interface{}, error) {
 	return makeValue(raw, f.dataType, timeZoneOffset)
 }
 
-func makeValue(raw string, valueType CsvType, timeZoneOffset int) (interface{}, error) {
+func makeValue(raw string, valueType Type, timeZoneOffset int) (interface{}, error) {
 	switch valueType {
 	case TypeFloat:
 		if raw == "" {
@@ -320,14 +307,14 @@ func checkValue(v interface{}) (f interface{}, err error) {
 	default:
 		vtype := reflect.TypeOf(v)
 		if vtype != nil {
-			return nil, dataTypeNotSupperted(CsvType(vtype.Name()))
+			return nil, dataTypeNotSupperted(Type(vtype.Name()))
 		}
-		return nil, dataTypeNotSupperted(CsvType("null"))
+		return nil, dataTypeNotSupperted(Type("null"))
 	}
 	return
 }
 
-func convertValue(v interface{}, valueType CsvType) (ret interface{}, err error) {
+func convertValue(v interface{}, valueType Type) (ret interface{}, err error) {
 	value := fmt.Sprintf("%v", v)
 	switch valueType {
 	case TypeFloat:
@@ -339,9 +326,9 @@ func convertValue(v interface{}, valueType CsvType) (ret interface{}, err error)
 	default:
 		vtype := reflect.TypeOf(v)
 		if vtype != nil {
-			return nil, dataTypeNotSupperted(CsvType(vtype.Name()))
+			return nil, dataTypeNotSupperted(Type(vtype.Name()))
 		}
-		return nil, dataTypeNotSupperted(CsvType("null"))
+		return nil, dataTypeNotSupperted(Type("null"))
 	}
 	return
 }
@@ -393,12 +380,12 @@ func (f field) ValueParse(value string, timeZoneOffset int) (datas Data, err err
 	return
 }
 
-func (p *CsvParser) Name() string {
+func (p *Parser) Name() string {
 	return p.name
 }
 
-func (p *CsvParser) Type() string {
-	return TypeCSV
+func (p *Parser) Type() string {
+	return parser.TypeCSV
 }
 
 func getUnmachedMessage(parts []string, schemas []field) (ret string) {
@@ -425,7 +412,7 @@ func getUnmachedMessage(parts []string, schemas []field) (ret string) {
 	return
 }
 
-func (p *CsvParser) parse(line string) (d Data, err error) {
+func (p *Parser) parse(line string) (d Data, err error) {
 	d = make(Data)
 	parts := strings.Split(line, p.delim)
 	if len(parts) != len(p.schema) && !p.allowNotMatch {
@@ -462,7 +449,7 @@ func (p *CsvParser) parse(line string) (d Data, err error) {
 	return d, nil
 }
 
-func (p *CsvParser) Rename(datas []Data) []Data {
+func (p *Parser) Rename(datas []Data) []Data {
 	newData := make([]Data, 0)
 	for _, d := range datas {
 		data := make(Data)
@@ -484,7 +471,7 @@ func HasSpace(spliter string) bool {
 	return false
 }
 
-func (p *CsvParser) Parse(lines []string) ([]Data, error) {
+func (p *Parser) Parse(lines []string) ([]Data, error) {
 	datas := []Data{}
 	se := &StatsError{}
 	for idx, line := range lines {
