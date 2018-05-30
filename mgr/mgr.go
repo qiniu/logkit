@@ -331,8 +331,8 @@ func (m *Manager) handle(path string, watcher *fsnotify.Watcher) {
 				if os.IsNotExist(err) {
 					// 如果当前监听文件被删除，则不再监听，退出
 					log.Warnf("close file watcher path %v", path)
-					watcher.Close()
 					m.watcherMux.Lock()
+					watcher.Close()
 					delete(m.watchers, path)
 					m.watcherMux.Unlock()
 					// TODO 此处代表文件夹被删了，只移除一个runner可能不够，文件夹下会有其他runner没有被删除
@@ -443,12 +443,15 @@ func (m *Manager) addWatchers(confsPath []string) (err error) {
 				}
 				m.Add(filepath.Join(path, f.Name()))
 			}
+
+			// Note: fsnotify has potential data race when New/Close watchers
+			m.watcherMux.Lock()
 			watcher, err := fsnotify.NewWatcher()
 			if err != nil {
+				m.watcherMux.Unlock()
 				log.Errorf("fsnotify.NewWatcher: %v", err)
 				continue
 			}
-			m.watcherMux.Lock()
 			m.watchers[path] = watcher
 			m.watcherMux.Unlock()
 			go m.handle(path, watcher)
