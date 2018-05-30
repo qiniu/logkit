@@ -428,6 +428,38 @@ func SetMapValue(m map[string]interface{}, val interface{}, coercive bool, keys 
 	return nil
 }
 
+//通过层级key设置value值.
+func SetMapValueWithPrefix(m map[string]interface{}, val interface{}, prefix string, keys ...string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	var curr map[string]interface{}
+	curr = m
+	var exist bool
+	for i, k := range keys {
+		if i < len(keys)-1 {
+			finalVal, ok := curr[k]
+			if !ok {
+				return fmt.Errorf("SetMapValueWithPrefix failed, keys %v are non-existent", val)
+			}
+			//判断val是否为map[string]interface{}类型
+			if curr, ok = finalVal.(map[string]interface{}); ok {
+				continue
+			}
+			return fmt.Errorf("SetMapValueWithPrefix failed, %v is not the type of map[string]interface{}", keys)
+		}
+
+		//判断val(k)是否存在
+		_, exist = curr[k]
+	}
+	if exist {
+		curr[prefix+"_"+keys[len(keys)-1]] = val
+	} else {
+		curr[keys[len(keys)-1]] = val
+	}
+	return nil
+}
+
 //通过层级key删除key-val,并返回被删除的val,是否删除成功
 //如果key不存在,则返回 nil,false
 func DeleteMapValue(m map[string]interface{}, keys ...string) (interface{}, bool) {

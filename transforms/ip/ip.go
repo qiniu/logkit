@@ -108,29 +108,30 @@ func (it *IpTransformer) Transform(datas []Data) ([]Data, error) {
 			errnums++
 			continue
 		}
+
 		newkeys[len(newkeys)-1] = "Region"
-		SetMapValue(datas[i], info.Region, false, newkeys...)
+		SetMapValueWithPrefix(datas[i], info.Region, keys[len(keys)-1], newkeys...)
 		newkeys[len(newkeys)-1] = "City"
-		SetMapValue(datas[i], info.City, false, newkeys...)
+		SetMapValueWithPrefix(datas[i], info.City, keys[len(keys)-1], newkeys...)
 		newkeys[len(newkeys)-1] = "Country"
-		SetMapValue(datas[i], info.Country, false, newkeys...)
+		SetMapValueWithPrefix(datas[i], info.Country, keys[len(keys)-1], newkeys...)
 		newkeys[len(newkeys)-1] = "Isp"
-		SetMapValue(datas[i], info.Isp, false, newkeys...)
+		SetMapValueWithPrefix(datas[i], info.Isp, keys[len(keys)-1], newkeys...)
 		if info.CountryCode != "" {
 			newkeys[len(newkeys)-1] = "CountryCode"
-			SetMapValue(datas[i], info.CountryCode, false, newkeys...)
+			SetMapValueWithPrefix(datas[i], info.CountryCode, keys[len(keys)-1], newkeys...)
 		}
 		if info.Latitude != "" {
 			newkeys[len(newkeys)-1] = "Latitude"
-			SetMapValue(datas[i], info.Latitude, false, newkeys...)
+			SetMapValueWithPrefix(datas[i], info.Latitude, keys[len(keys)-1], newkeys...)
 		}
 		if info.Longitude != "" {
 			newkeys[len(newkeys)-1] = "Longitude"
-			SetMapValue(datas[i], info.Longitude, false, newkeys...)
+			SetMapValueWithPrefix(datas[i], info.Longitude, keys[len(keys)-1], newkeys...)
 		}
 		if info.DistrictCode != "" {
 			newkeys[len(newkeys)-1] = "DistrictCode"
-			SetMapValue(datas[i], info.DistrictCode, false, newkeys...)
+			SetMapValueWithPrefix(datas[i], info.DistrictCode, keys[len(keys)-1], newkeys...)
 		}
 	}
 	if err != nil {

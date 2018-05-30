@@ -646,7 +646,7 @@ func (mr *Reader) exec(connectStr string) (err error) {
 				continue
 			}
 			tables = append(tables, s)
-			mr.rawsqls += "Select * From " + s + ";"
+			mr.rawsqls += "Select * From `" + s + "`;"
 		}
 		rows.Close()
 

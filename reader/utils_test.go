@@ -135,3 +135,48 @@ func TestGetTags(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, exp, tags)
 }
+
+func TestSetMapValueWithPrefix(t *testing.T) {
+	data1 := map[string]interface{}{
+		"a": "b",
+	}
+	err1 := SetMapValueWithPrefix(data1, "newVal", "prefix", "a")
+	assert.NoError(t, err1)
+	exp1 := map[string]interface{}{
+		"a":        "b",
+		"prefix_a": "newVal",
+	}
+	assert.Equal(t, exp1, data1)
+
+	data2 := map[string]interface{}{
+		"a": map[string]interface{}{
+			"name": "qiniu",
+			"age":  45,
+		},
+	}
+	err2 := SetMapValueWithPrefix(data2, "newVal", "prefix", []string{"a", "name"}...)
+	assert.NoError(t, err2)
+	exp2 := map[string]interface{}{
+		"a": map[string]interface{}{
+			"name":        "qiniu",
+			"age":         45,
+			"prefix_name": "newVal",
+		},
+	}
+	assert.Equal(t, exp2, data2)
+
+	err3 := SetMapValueWithPrefix(data2, "newVal", "prefix", []string{"xy", "name"}...)
+	assert.Error(t, err3)
+
+	err4 := SetMapValueWithPrefix(data2, "newVal", "prefix", []string{"a", "hello"}...)
+	assert.NoError(t, err4)
+	exp4 := map[string]interface{}{
+		"a": map[string]interface{}{
+			"name":        "qiniu",
+			"age":         45,
+			"prefix_name": "newVal",
+			"hello":       "newVal",
+		},
+	}
+	assert.Equal(t, exp4, data2)
+}
