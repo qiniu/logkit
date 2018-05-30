@@ -138,6 +138,7 @@ func (psr *packetSocketReader) listen() {
 			}
 			break
 		}
+		// FIXME: "panic: send on closed channel" If client is sending data while exiting the program
 		psr.ReadChan <- string(buf[:n])
 	}
 }
@@ -265,19 +266,23 @@ func (sr *Reader) Start() error {
 	return nil
 }
 
-func (sr *Reader) Close() (err error) {
+func (sr *Reader) Close() error {
 	if atomic.CompareAndSwapInt32(&sr.status, reader.StatusRunning, reader.StatusStopping) {
 		log.Infof("Runner[%v] Reader[%v] stopping", sr.meta.RunnerName, sr.Name())
 	} else {
 		close(sr.ReadChan)
 	}
 
+	var err error
 	if sr.Closer != nil {
 		err = sr.Closer.Close()
 		sr.Closer = nil
+
+		// Make a connection meant to fail but unblock and release the port
+		net.Dial(sr.netproto, sr.ServiceAddress)
 	}
 	log.Infof("Runner[%v] Reader[%v] stopped ", sr.meta.RunnerName, sr.Name())
-	return
+	return err
 }
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
