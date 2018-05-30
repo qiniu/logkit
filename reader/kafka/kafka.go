@@ -128,6 +128,7 @@ func (kr *Reader) Close() (err error) {
 	if atomic.CompareAndSwapInt32(&kr.status, reader.StatusRunning, reader.StatusStopping) {
 		log.Infof("Runner[%v] %v stopping", kr.meta.RunnerName, kr.Name())
 	} else {
+		atomic.CompareAndSwapInt32(&kr.status, reader.StatusInit, reader.StatusStopped)
 		close(kr.readChan)
 	}
 	return
@@ -182,12 +183,16 @@ func (kr *Reader) Start() {
 func (kr *Reader) run() {
 	// 防止并发run
 	for {
-		if atomic.LoadInt32(&kr.status) == reader.StatusStopped {
+		if atomic.LoadInt32(&kr.status) == reader.StatusStopped || atomic.LoadInt32(&kr.status) == reader.StatusStopping {
 			return
 		}
 		if atomic.CompareAndSwapInt32(&kr.status, reader.StatusInit, reader.StatusRunning) {
 			break
 		}
+	}
+	//double check
+	if atomic.LoadInt32(&kr.status) == reader.StatusStopped || atomic.LoadInt32(&kr.status) == reader.StatusStopping {
+		return
 	}
 	// running时退出 状态改为Init，以便 cron 调度下次运行
 	// stopping时推出改为 stopped，不再运行

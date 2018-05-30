@@ -387,6 +387,7 @@ func (mr *Reader) Close() (err error) {
 	if atomic.CompareAndSwapInt32(&mr.status, reader.StatusRunning, reader.StatusStopping) {
 		log.Infof("Runner[%v] %v stopping", mr.meta.RunnerName, mr.Name())
 	} else {
+		atomic.CompareAndSwapInt32(&mr.status, reader.StatusInit, reader.StatusStopped)
 		close(mr.readChan)
 	}
 	return
@@ -408,7 +409,7 @@ func (mr *Reader) Start() {
 		}
 	}
 	mr.started = true
-	log.Infof("Runner[%v] %v pull data deamon started", mr.meta.RunnerName, mr.Name())
+	log.Infof("Runner[%v] %v pull data daemon started", mr.meta.RunnerName, mr.Name())
 }
 
 func (mr *Reader) ReadLine() (data string, err error) {
@@ -456,7 +457,7 @@ func (mr *Reader) updateOffsets(sqls []string) {
 
 func (mr *Reader) LoopRun() {
 	for {
-		if atomic.LoadInt32(&mr.status) == reader.StatusStopped {
+		if atomic.LoadInt32(&mr.status) == reader.StatusStopped || atomic.LoadInt32(&mr.status) == reader.StatusStopping {
 			return
 		}
 		//run 函数里面处理stopping的逻辑
@@ -469,12 +470,16 @@ func (mr *Reader) run() {
 	var err error
 	// 防止并发run
 	for {
-		if atomic.LoadInt32(&mr.status) == reader.StatusStopped {
+		if atomic.LoadInt32(&mr.status) == reader.StatusStopped || atomic.LoadInt32(&mr.status) == reader.StatusStopping {
 			return
 		}
 		if atomic.CompareAndSwapInt32(&mr.status, reader.StatusInit, reader.StatusRunning) {
 			break
 		}
+	}
+	//double check
+	if atomic.LoadInt32(&mr.status) == reader.StatusStopped || atomic.LoadInt32(&mr.status) == reader.StatusStopping {
+		return
 	}
 	// running时退出 状态改为Init，以便 cron 调度下次运行
 	// stopping时推出改为 stopped，不再运行

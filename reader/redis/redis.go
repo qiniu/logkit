@@ -133,6 +133,7 @@ func (rr *Reader) Close() (err error) {
 	if atomic.CompareAndSwapInt32(&rr.status, reader.StatusRunning, reader.StatusStopping) {
 		log.Infof("Runner[%v] %v stopping", rr.meta.RunnerName, rr.Name())
 	} else {
+		atomic.CompareAndSwapInt32(&rr.status, reader.StatusInit, reader.StatusStopped)
 		close(rr.readChan)
 		rr.client.Close()
 	}
@@ -173,12 +174,16 @@ func (rr *Reader) Start() {
 func (rr *Reader) run() (err error) {
 	// 防止并发run
 	for {
-		if atomic.LoadInt32(&rr.status) == reader.StatusStopped {
+		if atomic.LoadInt32(&rr.status) == reader.StatusStopped || atomic.LoadInt32(&rr.status) == reader.StatusStopping {
 			return
 		}
 		if atomic.CompareAndSwapInt32(&rr.status, reader.StatusInit, reader.StatusRunning) {
 			break
 		}
+	}
+	//double check
+	if atomic.LoadInt32(&rr.status) == reader.StatusStopped || atomic.LoadInt32(&rr.status) == reader.StatusStopping {
+		return
 	}
 	// running在退出状态改为Init
 	defer func() {
