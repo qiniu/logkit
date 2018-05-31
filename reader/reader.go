@@ -88,6 +88,8 @@ const (
 	KeyMysqlSQL         = "mysql_sql"
 	KeyMysqlCron        = "mysql_cron"
 	KeyMysqlExecOnStart = "mysql_exec_onstart"
+	KeyMysqlHistoryAll  = "mysql_history_all"
+	KyeMysqlTable       = "mysql_table"
 
 	KeySQLSchema        = "sql_schema"
 	KeyMagicLagDuration = "magic_lag_duration"
