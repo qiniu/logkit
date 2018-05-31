@@ -46,6 +46,17 @@ const (
 	TypeMySQL      = "mysqllog"
 )
 
+// 数据常量类型
+type DataType string
+
+const (
+	TypeFloat   DataType = "float"
+	TypeLong    DataType = "long"
+	TypeString  DataType = "string"
+	TypeDate    DataType = "date"
+	TypeJSONMap DataType = "jsonmap"
+)
+
 type Label struct {
 	Name  string
 	Value string

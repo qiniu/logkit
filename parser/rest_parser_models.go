@@ -9,7 +9,7 @@ const (
 	KeyCSVSchema             = "csv_schema"            // csv 每个列的列名和类型 long/string/float/date
 	KeyCSVSplitter           = "csv_splitter"          // csv 的分隔符
 	KeyCSVLabels             = "csv_labels"            // csv 额外增加的标签信息，比如机器信息等
-	KeyAutoRename            = "csv_auto_rename"       // 是否将不合法的字段名称重命名一下, 比如 header-host 重命名为 header_host
+	KeyCSVAutoRename         = "csv_auto_rename"       // 是否将不合法的字段名称重命名一下, 比如 header-host 重命名为 header_host
 	KeyCSVAllowNoMatch       = "csv_allow_no_match"    // 允许实际分隔的数据和schema不相等，不相等时按顺序赋值
 	KeyCSVAllowMore          = "csv_allow_more"        // 允许实际字段比schema多
 	KeyCSVAllowMoreStartNum  = "csv_more_start_number" // 允许实际字段比schema多，名称开始的数字
@@ -259,7 +259,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionLabels,
 		OptionTimezoneOffset,
 		{
-			KeyName:       KeyAutoRename,
+			KeyName:       KeyCSVAutoRename,
 			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},

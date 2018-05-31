@@ -14,7 +14,6 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
-	"github.com/qiniu/logkit/parser/csv"
 	"github.com/qiniu/logkit/times"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -169,8 +168,8 @@ func (p *Parser) parseline(line string) (Data, error) {
 
 func (p *Parser) makeValue(name, raw string) (data interface{}, err error) {
 	valueType := p.schema[name]
-	switch csv.Type(valueType) {
-	case csv.TypeFloat:
+	switch parser.DataType(valueType) {
+	case parser.TypeFloat:
 		if raw == "-" {
 			return 0.0, nil
 		}
@@ -179,7 +178,7 @@ func (p *Parser) makeValue(name, raw string) (data interface{}, err error) {
 			err = fmt.Errorf("convet for %q to float64 failed: %q", name, raw)
 		}
 		return v, err
-	case csv.TypeLong:
+	case parser.TypeLong:
 		if raw == "-" {
 			return 0, nil
 		}
@@ -188,9 +187,9 @@ func (p *Parser) makeValue(name, raw string) (data interface{}, err error) {
 			err = fmt.Errorf("convet for %q to int64 failed, %q", name, raw)
 		}
 		return v, err
-	case csv.TypeString:
+	case parser.TypeString:
 		return raw, nil
-	case csv.TypeDate:
+	case parser.TypeDate:
 		tm, nerr := times.StrToTime(raw)
 		if nerr != nil {
 			return tm, nerr

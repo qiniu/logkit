@@ -19,17 +19,6 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-// Type 类型常量
-type Type string
-
-const (
-	TypeFloat   Type = "float"
-	TypeLong    Type = "long"
-	TypeString  Type = "string"
-	TypeDate    Type = "date"
-	TypeJsonMap Type = "jsonmap"
-)
-
 const MaxParserSchemaErrOutput = 5
 
 var jsontool = jsoniter.Config{
@@ -54,8 +43,8 @@ type Parser struct {
 
 type field struct {
 	name       string
-	dataType   Type
-	typeChange map[string]Type
+	dataType   parser.DataType
+	typeChange map[string]parser.DataType
 	allin      bool
 }
 
@@ -73,7 +62,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	}
 	timeZoneOffsetRaw, _ := c.GetStringOr(parser.KeyTimeZoneOffset, "")
 	timeZoneOffset := parser.ParseTimeZoneOffset(timeZoneOffsetRaw)
-	isAutoRename, _ := c.GetBoolOr(parser.KeyAutoRename, false)
+	isAutoRename, _ := c.GetBoolOr(parser.KeyCSVAutoRename, false)
 
 	fieldList, err := parseSchemaFieldList(schema)
 	if err != nil {
@@ -179,16 +168,16 @@ func parseSchemaRawField(f string) (newField field, err error) {
 	case "d", "date":
 		dataType = "date"
 	}
-	return newCsvField(columnName, Type(dataType))
+	return newCsvField(columnName, parser.DataType(dataType))
 }
 func parseSchemaJsonField(f string) (fd field, err error) {
 	splitSpace := strings.IndexByte(f, ' ')
 	key := f[:splitSpace]
 	rawfield := strings.TrimSpace(f[splitSpace:])
-	rawfield = strings.TrimSpace(rawfield[len(TypeJsonMap):])
+	rawfield = strings.TrimSpace(rawfield[len(parser.TypeJSONMap):])
 	allin := true
 	fields := make([]field, 0)
-	typeChange := make(map[string]Type)
+	typeChange := make(map[string]parser.DataType)
 	if len(rawfield) > 0 {
 		allin = false
 		if !strings.HasPrefix(rawfield, "{") || !strings.HasSuffix(rawfield, "}") {
@@ -206,12 +195,12 @@ func parseSchemaJsonField(f string) (fd field, err error) {
 			return
 		}
 		for _, f := range fields {
-			typeChange[f.name] = Type(f.dataType)
+			typeChange[f.name] = parser.DataType(f.dataType)
 		}
 	}
 	fd = field{
 		name:       key,
-		dataType:   TypeJsonMap,
+		dataType:   parser.TypeJSONMap,
 		typeChange: typeChange,
 		allin:      allin,
 	}
@@ -227,7 +216,7 @@ func isJsonMap(f string) bool {
 		return false
 	}
 	rawfield := strings.TrimSpace(f[spaceIndex:])
-	return strings.HasPrefix(rawfield, string(TypeJsonMap))
+	return strings.HasPrefix(rawfield, string(parser.TypeJSONMap))
 }
 
 func parseSchemaFields(fieldList []string) (fields []field, err error) {
@@ -250,13 +239,13 @@ func parseSchemaFields(fieldList []string) (fields []field, err error) {
 	return
 }
 
-func dataTypeNotSupperted(dataType Type) error {
+func dataTypeNotSupperted(dataType parser.DataType) error {
 	return errors.New("type not supported " + string(dataType) + " csv parser currently support string long float date jsonmap 5 types")
 }
 
-func newCsvField(name string, dataType Type) (f field, err error) {
+func newCsvField(name string, dataType parser.DataType) (f field, err error) {
 	switch dataType {
-	case TypeFloat, TypeLong, TypeString, TypeDate:
+	case parser.TypeFloat, parser.TypeLong, parser.TypeString, parser.TypeDate:
 		f = field{
 			name:     name,
 			dataType: dataType,
@@ -271,19 +260,19 @@ func (f field) MakeValue(raw string, timeZoneOffset int) (interface{}, error) {
 	return makeValue(raw, f.dataType, timeZoneOffset)
 }
 
-func makeValue(raw string, valueType Type, timeZoneOffset int) (interface{}, error) {
+func makeValue(raw string, valueType parser.DataType, timeZoneOffset int) (interface{}, error) {
 	switch valueType {
-	case TypeFloat:
+	case parser.TypeFloat:
 		if raw == "" {
 			return 0.0, nil
 		}
 		return strconv.ParseFloat(raw, 64)
-	case TypeLong:
+	case parser.TypeLong:
 		if raw == "" {
 			return 0, nil
 		}
 		return strconv.ParseInt(raw, 10, 64)
-	case TypeDate:
+	case parser.TypeDate:
 		if raw == "" {
 			return time.Now(), nil
 		}
@@ -292,7 +281,7 @@ func makeValue(raw string, valueType Type, timeZoneOffset int) (interface{}, err
 			return ts.Add(time.Duration(timeZoneOffset) * time.Hour).Format(time.RFC3339Nano), nil
 		}
 		return ts, err
-	case TypeString:
+	case parser.TypeString:
 		return raw, nil
 	default:
 		// 不应该走到这个分支上
@@ -307,39 +296,39 @@ func checkValue(v interface{}) (f interface{}, err error) {
 	default:
 		vtype := reflect.TypeOf(v)
 		if vtype != nil {
-			return nil, dataTypeNotSupperted(Type(vtype.Name()))
+			return nil, dataTypeNotSupperted(parser.DataType(vtype.Name()))
 		}
-		return nil, dataTypeNotSupperted(Type("null"))
+		return nil, dataTypeNotSupperted(parser.DataType("null"))
 	}
 	return
 }
 
-func convertValue(v interface{}, valueType Type) (ret interface{}, err error) {
+func convertValue(v interface{}, valueType parser.DataType) (ret interface{}, err error) {
 	value := fmt.Sprintf("%v", v)
 	switch valueType {
-	case TypeFloat:
+	case parser.TypeFloat:
 		ret, err = strconv.ParseFloat(value, 64)
-	case TypeLong:
+	case parser.TypeLong:
 		ret, err = strconv.ParseInt(value, 10, 64)
-	case TypeString:
+	case parser.TypeString:
 		ret = value
 	default:
 		vtype := reflect.TypeOf(v)
 		if vtype != nil {
-			return nil, dataTypeNotSupperted(Type(vtype.Name()))
+			return nil, dataTypeNotSupperted(parser.DataType(vtype.Name()))
 		}
-		return nil, dataTypeNotSupperted(Type("null"))
+		return nil, dataTypeNotSupperted(parser.DataType("null"))
 	}
 	return
 }
 
 func (f field) ValueParse(value string, timeZoneOffset int) (datas Data, err error) {
-	if f.dataType != TypeString {
+	if f.dataType != parser.TypeString {
 		value = strings.TrimSpace(value)
 	}
 	datas = Data{}
 	switch f.dataType {
-	case TypeJsonMap:
+	case parser.TypeJSONMap:
 		if value == "" {
 			return
 		}
