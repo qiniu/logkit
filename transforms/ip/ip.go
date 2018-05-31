@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/wangtuanjie/ip17mon"
+
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
-
-	"github.com/wangtuanjie/ip17mon"
 )
+
+const Name = "IP"
 
 type IpTransformer struct {
 	StageTime string `json:"stage"`
@@ -189,7 +191,7 @@ func (it *IpTransformer) Stats() StatsInfo {
 }
 
 func init() {
-	transforms.Add("IP", func() transforms.Transformer {
+	transforms.Add(Name, func() transforms.Transformer {
 		return &IpTransformer{}
 	})
 }
