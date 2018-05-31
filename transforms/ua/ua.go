@@ -3,17 +3,18 @@ package ua
 import (
 	"errors"
 	"fmt"
-
-	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/transforms"
-	. "github.com/qiniu/logkit/utils/models"
-
+	"strconv"
 	"sync"
 
-	"strconv"
-
 	"github.com/ua-parser/uap-go/uaparser"
+
+	"github.com/qiniu/log"
+
+	"github.com/qiniu/logkit/transforms"
+	. "github.com/qiniu/logkit/utils/models"
 )
+
+const Name = "UserAgent"
 
 type UATransformer struct {
 	Key              string `json:"key"`
@@ -279,7 +280,7 @@ func (it *UATransformer) Stats() StatsInfo {
 }
 
 func init() {
-	transforms.Add("UserAgent", func() transforms.Transformer {
+	transforms.Add(Name, func() transforms.Transformer {
 		return &UATransformer{}
 	})
 }
