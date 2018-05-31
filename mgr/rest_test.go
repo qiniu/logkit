@@ -329,8 +329,7 @@ func restGetStatusTest(p *testParam) {
 		t.Fatalf("mkdir test path error %v", err)
 	}
 	time.Sleep(1 * time.Second)
-	mode := reader.ModeDir
-	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, mode, resvPath)
+	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, reader.ModeDir, resvPath)
 	if err != nil {
 		t.Fatalf("get runner config failed, error is %v", err)
 	}

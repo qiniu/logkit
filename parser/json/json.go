@@ -1,4 +1,4 @@
-package parser
+package json
 
 import (
 	"fmt"
@@ -6,31 +6,40 @@ import (
 	"strings"
 
 	"github.com/json-iterator/go"
+
 	"github.com/qiniu/log"
+
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/parser"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-type JsonParser struct {
+func init() {
+	parser.RegisterConstructor(parser.TypeInnerSQL, NewParser)
+	parser.RegisterConstructor(parser.TypeInnerMySQL, NewParser)
+	parser.RegisterConstructor(parser.TypeJSON, NewParser)
+}
+
+type Parser struct {
 	name                 string
-	labels               []Label
+	labels               []parser.Label
 	disableRecordErrData bool
 	jsontool             jsoniter.API
 }
 
-func NewJsonParser(c conf.MapConf) (LogParser, error) {
-	name, _ := c.GetStringOr(KeyParserName, "")
-	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
+func NewParser(c conf.MapConf) (parser.Parser, error) {
+	name, _ := c.GetStringOr(parser.KeyParserName, "")
+	labelList, _ := c.GetStringListOr(parser.KeyLabels, []string{})
 	nameMap := map[string]struct{}{}
-	labels := GetLabels(labelList, nameMap)
+	labels := parser.GetLabels(labelList, nameMap)
 	jsontool := jsoniter.Config{
 		EscapeHTML: true,
 		UseNumber:  true,
 	}.Froze()
 
-	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
 
-	return &JsonParser{
+	return &Parser{
 		name:                 name,
 		labels:               labels,
 		jsontool:             jsontool,
@@ -38,15 +47,15 @@ func NewJsonParser(c conf.MapConf) (LogParser, error) {
 	}, nil
 }
 
-func (im *JsonParser) Name() string {
+func (im *Parser) Name() string {
 	return im.name
 }
 
-func (im *JsonParser) Type() string {
-	return TypeJson
+func (im *Parser) Type() string {
+	return parser.TypeJSON
 }
 
-func (im *JsonParser) Parse(lines []string) ([]Data, error) {
+func (im *Parser) Parse(lines []string) ([]Data, error) {
 	datas := []Data{}
 	se := &StatsError{}
 	for idx, line := range lines {
@@ -80,7 +89,7 @@ func (im *JsonParser) Parse(lines []string) ([]Data, error) {
 	return datas, se
 }
 
-func (im *JsonParser) parseLine(line string) (data Data, err error) {
+func (im *Parser) parseLine(line string) (data Data, err error) {
 	data = make(Data)
 	if err = im.jsontool.Unmarshal([]byte(line), &data); err != nil {
 		err = fmt.Errorf("parse json line error %v, raw data is: %v", err, line)
@@ -97,7 +106,7 @@ func (im *JsonParser) parseLine(line string) (data Data, err error) {
 	return
 }
 
-func (im *JsonParser) parseLineMutiData(line string) (data []Data, err error) {
+func (im *Parser) parseLineMutiData(line string) (data []Data, err error) {
 	data = make([]Data, 0)
 	if err = im.jsontool.Unmarshal([]byte(line), &data); err != nil {
 		err = fmt.Errorf("parse json line error %v, raw data is: %v", err, line)

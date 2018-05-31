@@ -1,13 +1,13 @@
-package parser
+package mysql
 
 import (
 	"strings"
 	"testing"
 	"time"
 
-	. "github.com/qiniu/logkit/utils/models"
-
 	"github.com/stretchr/testify/assert"
+
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 var content = `# Time: 2017-12-24T02:42:00.126000Z
@@ -20,7 +20,7 @@ SELECT count(*) from mysql.rds_replication_status WHERE master_host IS NOT NULL 
 `
 
 func TestMySqlLogParser1(t *testing.T) {
-	p, err := NewMysqllogParser(nil)
+	p, err := NewParser(nil)
 	assert.NoError(t, err)
 	datas, err := p.Parse(strings.Split(content, "\n"))
 	if st, ok := err.(*StatsError); ok {

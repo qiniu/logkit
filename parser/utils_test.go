@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type cmdArgs struct {
@@ -62,5 +64,45 @@ func Test_getLabels(t *testing.T) {
 		if !reflect.DeepEqual(labes, ti.exp) {
 			t.Errorf("Test_getLabels error exp %v but got %v", ti.exp, labes)
 		}
+	}
+}
+
+func TestParseTimeZoneOffset(t *testing.T) {
+	tests := []struct {
+		s   string
+		exp int
+	}{
+		{
+			s:   "+08",
+			exp: 8,
+		},
+		{
+			s:   "+8",
+			exp: 8,
+		},
+		{
+			s:   "8",
+			exp: 8,
+		},
+		{
+			s:   "-8",
+			exp: -8,
+		},
+		{
+			s:   "-08",
+			exp: -8,
+		},
+		{
+			s:   "-1",
+			exp: -1,
+		},
+		{
+			s:   "0",
+			exp: 0,
+		},
+	}
+	for _, ti := range tests {
+		got := ParseTimeZoneOffset(ti.s)
+		assert.Equal(t, ti.exp, got)
 	}
 }

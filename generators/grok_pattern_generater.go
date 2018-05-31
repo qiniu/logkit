@@ -19,8 +19,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	out, _ := os.Create("parser/grok_patterns.go")
-	out.Write([]byte("//!!! Notice This is auto generated file, DO NOT EDIT IT!!! \n\n\n\npackage parser \n\nconst DEFAULT_PATTERNS = `"))
+	out, _ := os.Create("parser/grok/patterns.go")
+	out.Write([]byte("//!!! Notice This is auto generated file, DO NOT EDIT IT!!! \n\npackage grok \n\nconst DEFAULT_PATTERNS = `"))
 	for _, f := range files {
 		f, _ := os.Open(filepath.Join("grok_patterns", f.Name()))
 		rd := bufio.NewReader(f)

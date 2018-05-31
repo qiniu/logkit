@@ -1,4 +1,4 @@
-package parser
+package kafkarest
 
 import (
 	"fmt"
@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/qiniu/log"
+
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/times"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -25,21 +27,25 @@ const (
 	EMPTY_STRING = ""
 )
 
-type KafaRestlogParser struct {
+func init() {
+	parser.RegisterConstructor(parser.TypeKafkaRest, NewParser)
+}
+
+type Parser struct {
 	name                 string
-	labels               []Label
+	labels               []parser.Label
 	disableRecordErrData bool
 }
 
-func (krp *KafaRestlogParser) Name() string {
+func (krp *Parser) Name() string {
 	return krp.name
 }
 
-func (krp *KafaRestlogParser) Type() string {
-	return TypeKafkaRest
+func (krp *Parser) Type() string {
+	return parser.TypeKafkaRest
 }
 
-func (krp *KafaRestlogParser) Parse(lines []string) ([]Data, error) {
+func (krp *Parser) Parse(lines []string) ([]Data, error) {
 	datas := []Data{}
 	for _, line := range lines {
 		line = strings.Replace(line, "\n", " ", -1)
@@ -63,7 +69,7 @@ func (krp *KafaRestlogParser) Parse(lines []string) ([]Data, error) {
 	return datas, nil
 }
 
-func (krp *KafaRestlogParser) parseRequestLog(fields []string) Data {
+func (krp *Parser) parseRequestLog(fields []string) Data {
 	d := Data{}
 	d[KEY_SRC_IP] = krp.ParseIp(fields)
 	d[KEY_TOPIC] = krp.ParseTopic(fields)
@@ -78,7 +84,7 @@ func (krp *KafaRestlogParser) parseRequestLog(fields []string) Data {
 	return d
 }
 
-func (krp *KafaRestlogParser) parseAbnormalLog(fields []string) Data {
+func (krp *Parser) parseAbnormalLog(fields []string) Data {
 	d := Data{}
 	d[KEY_LOG_TIME] = krp.ParseLogTime(fields)
 	if fields[2] == "ERROR" {
@@ -92,9 +98,9 @@ func (krp *KafaRestlogParser) parseAbnormalLog(fields []string) Data {
 	return d
 }
 
-func NewKafaRestlogParser(c conf.MapConf) (LogParser, error) {
-	name, _ := c.GetStringOr(KeyParserName, "")
-	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
+func NewParser(c conf.MapConf) (parser.Parser, error) {
+	name, _ := c.GetStringOr(parser.KeyParserName, "")
+	labelList, _ := c.GetStringListOr(parser.KeyLabels, []string{})
 	nameMap := map[string]struct{}{
 		KEY_SRC_IP:   struct{}{},
 		KEY_METHOD:   struct{}{},
@@ -104,25 +110,25 @@ func NewKafaRestlogParser(c conf.MapConf) (LogParser, error) {
 		KEY_DURATION: struct{}{},
 		KEY_LOG_TIME: struct{}{},
 	}
-	labels := GetLabels(labelList, nameMap)
+	labels := parser.GetLabels(labelList, nameMap)
 
-	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
 
-	return &KafaRestlogParser{
+	return &Parser{
 		name:                 name,
 		labels:               labels,
 		disableRecordErrData: disableRecordErrData,
 	}, nil
 }
 
-func (krp *KafaRestlogParser) ParseIp(fields []string) string {
+func (krp *Parser) ParseIp(fields []string) string {
 	if len(fields) < 1 {
 		return EMPTY_STRING
 	}
 	return fields[3]
 }
 
-func (krp *KafaRestlogParser) ParseMethod(fields []string) string {
+func (krp *Parser) ParseMethod(fields []string) string {
 	if len(fields) < 1 {
 		return EMPTY_STRING
 	}
@@ -130,7 +136,7 @@ func (krp *KafaRestlogParser) ParseMethod(fields []string) string {
 	return strings.TrimPrefix(str, "\"")
 }
 
-func (krp *KafaRestlogParser) ParseTopic(fields []string) string {
+func (krp *Parser) ParseTopic(fields []string) string {
 	if len(fields) < 1 {
 		return EMPTY_STRING
 	}
@@ -145,7 +151,7 @@ func (krp *KafaRestlogParser) ParseTopic(fields []string) string {
 
 }
 
-func (krp *KafaRestlogParser) ParseCode(fields []string) int {
+func (krp *Parser) ParseCode(fields []string) int {
 	if len(fields) < 1 {
 		return 0
 	}
@@ -157,7 +163,7 @@ func (krp *KafaRestlogParser) ParseCode(fields []string) int {
 	return code
 }
 
-func (krp *KafaRestlogParser) ParseDuration(fields []string) int {
+func (krp *Parser) ParseDuration(fields []string) int {
 	if len(fields) < 1 {
 		return 0
 	}
@@ -169,7 +175,7 @@ func (krp *KafaRestlogParser) ParseDuration(fields []string) int {
 	return duration
 }
 
-func (krp *KafaRestlogParser) ParseRespCL(fields []string) int {
+func (krp *Parser) ParseRespCL(fields []string) int {
 	if len(fields) < 1 {
 		return 0
 	}
@@ -181,7 +187,7 @@ func (krp *KafaRestlogParser) ParseRespCL(fields []string) int {
 	return respcl
 }
 
-func (krp *KafaRestlogParser) ParseLogTime(fields []string) int64 {
+func (krp *Parser) ParseLogTime(fields []string) int64 {
 	if len(fields) < 1 {
 		return 0
 	}

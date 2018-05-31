@@ -72,7 +72,7 @@ func (rs *RestService) PostParserCheck() echo.HandlerFunc {
 		if err := c.Bind(&reqConf); err != nil {
 			return RespError(c, http.StatusBadRequest, ErrParseParse, err.Error())
 		}
-		_, err := parser.NewParserRegistry().NewLogParser(reqConf)
+		_, err := parser.NewRegistry().NewLogParser(reqConf)
 		if err != nil {
 			return RespError(c, http.StatusBadRequest, ErrParseParse, err.Error())
 		}

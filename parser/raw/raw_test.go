@@ -1,20 +1,21 @@
-package parser
+package raw
 
 import (
 	"testing"
 
-	"github.com/qiniu/logkit/conf"
-	. "github.com/qiniu/logkit/utils/models"
-
 	"github.com/stretchr/testify/assert"
+
+	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/parser"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 func Test_RawlogParser(t *testing.T) {
 	c := conf.MapConf{}
-	c[KeyParserType] = "raw"
-	c[KeyLabels] = "machine nb110"
-	c[KeyDisableRecordErrData] = "true"
-	p, err := NewRawlogParser(c)
+	c[parser.KeyParserType] = "raw"
+	c[parser.KeyLabels] = "machine nb110"
+	c[parser.KeyDisableRecordErrData] = "true"
+	p, err := NewParser(c)
 	lines := []string{
 		"Oct 31 17:56:02 dell sudo:  boponik : TTY=pts/13 ; PWD=/home/boponik ; USER=root ; COMMAND=/bin/cat /var/log/auth.log",
 		`Oct 31 17:25:01 dell CRON[22418]: pam_unix(cron:session): session opened for user root by (uid=0)`,
@@ -46,10 +47,10 @@ func Test_RawlogParser(t *testing.T) {
 
 func Test_RawlogParserForErrData(t *testing.T) {
 	c := conf.MapConf{}
-	c[KeyParserType] = "raw"
-	c[KeyLabels] = "machine nb110"
-	c[KeyDisableRecordErrData] = "false"
-	p, err := NewRawlogParser(c)
+	c[parser.KeyParserType] = "raw"
+	c[parser.KeyLabels] = "machine nb110"
+	c[parser.KeyDisableRecordErrData] = "false"
+	p, err := NewParser(c)
 	lines := []string{
 		"Oct 31 17:56:02 dell sudo:  boponik : TTY=pts/13 ; PWD=/home/boponik ; USER=root ; COMMAND=/bin/cat /var/log/auth.log",
 		"",

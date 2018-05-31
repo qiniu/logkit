@@ -16,7 +16,7 @@ type CustomParser struct {
 	maxLen int
 }
 
-func NewMyParser(c conf.MapConf) (parser.LogParser, error) {
+func NewMyParser(c conf.MapConf) (parser.Parser, error) {
 	// 获取parser配置中的name项，默认myparser
 	name, _ := c.GetStringOr("name", "myparsername")
 	// 获取parser配置中的max_len选项，默认1000
