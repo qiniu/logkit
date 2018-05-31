@@ -87,6 +87,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (kr reader.Reader, err erro
 		curOffsets:       offsets,
 		started:          false,
 	}
+	sarama.Logger = log.Std
 	return kr, nil
 }
 
@@ -174,6 +175,7 @@ func (kr *Reader) Start() {
 			return
 		}
 		kr.in = kr.Consumer.Messages()
+		kr.errs = kr.Consumer.Errors()
 	}
 	go kr.run()
 	kr.started = true
