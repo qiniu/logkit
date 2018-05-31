@@ -17,9 +17,9 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-var csvBench []Data
+var bench []Data
 
-func Benchmark_CsvParseLine(b *testing.B) {
+func Benchmark_ParseLine(b *testing.B) {
 	c := conf.MapConf{}
 	c[parser.KeyParserName] = "testparser"
 	c[parser.KeyParserType] = "csv"
@@ -31,17 +31,17 @@ func Benchmark_CsvParseLine(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		m, _ = p.Parse([]string{`123 fufu 3.16 {\"x\":1,\"y\":[\"xx:12\"]}`})
 	}
-	csvBench = m
+	bench = m
 }
 
-func Test_CsvParser(t *testing.T) {
+func Test_Parser(t *testing.T) {
 	c := conf.MapConf{}
 	c[parser.KeyParserName] = "testparser"
 	c[parser.KeyParserType] = "csv"
 	c[parser.KeyCSVSchema] = "a long, b string, c float, d jsonmap,e date"
 	c[parser.KeyCSVSplitter] = " "
 	c[parser.KeyDisableRecordErrData] = "true"
-	parser, err := NewParser(c)
+	p, err := NewParser(c)
 	if err != nil {
 		t.Error(err)
 	}
@@ -54,7 +54,7 @@ func Test_CsvParser(t *testing.T) {
 		`   `,
 		`4 fufu 3.17  ` + tmstr, //correct,jsonmap允许为空
 	}
-	datas, err := parser.Parse(lines)
+	datas, err := p.Parse(lines)
 	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
 	}
@@ -82,7 +82,7 @@ func Test_CsvParser(t *testing.T) {
 	if "fufu" != datas[0]["b"] {
 		t.Error("b should be fufu")
 	}
-	assert.EqualValues(t, parser.Name(), "testparser")
+	assert.EqualValues(t, p.Name(), "testparser")
 }
 
 func Test_CsvParserForErrData(t *testing.T) {
@@ -92,7 +92,7 @@ func Test_CsvParserForErrData(t *testing.T) {
 	c[parser.KeyCSVSchema] = "a long, b string, c float, d jsonmap,e date"
 	c[parser.KeyCSVSplitter] = " "
 	c[parser.KeyDisableRecordErrData] = "false"
-	parser, err := NewParser(c)
+	p, err := NewParser(c)
 	if err != nil {
 		t.Error(err)
 	}
@@ -105,7 +105,7 @@ func Test_CsvParserForErrData(t *testing.T) {
 		`   `,
 		`4 fufu 3.17  ` + tmstr, //correct,jsonmap允许为空
 	}
-	datas, err := parser.Parse(lines)
+	datas, err := p.Parse(lines)
 	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
 	}
@@ -136,14 +136,14 @@ func Test_Jsonmap(t *testing.T) {
 	c[parser.KeyParserType] = "csv"
 	c[parser.KeyCSVSchema] = "a long, d jsonmap,e jsonmap{x string,y long},f jsonmap{z float, ...}"
 	c[parser.KeyCSVSplitter] = " "
-	parser, err := NewParser(c)
+	p, err := NewParser(c)
 	if err != nil {
 		t.Fatal(err)
 	}
 	lines := []string{
 		"123 {\"x\":1,\"y\":\"2\"} {\"x\":1,\"y\":\"2\",\"z\":\"3\"} {\"x\":1.0,\"y\":\"2\",\"z\":\"3.0\"}",
 	}
-	datas, err := parser.Parse(lines)
+	datas, err := p.Parse(lines)
 	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
 	}
@@ -172,7 +172,7 @@ func Test_CsvParserLabel(t *testing.T) {
 	c[parser.KeyCSVSchema] = "a long, b string, c float"
 	c[parser.KeyLabels] = "d nb1684"
 	c[parser.KeyCSVSplitter] = " "
-	parser, err := NewParser(c)
+	p, err := NewParser(c)
 	if err != nil {
 		t.Error(err)
 	}
@@ -181,7 +181,7 @@ func Test_CsvParserLabel(t *testing.T) {
 		"cc jj uu",
 		"123 fufu 3.14 999",
 	}
-	datas, err := parser.Parse(lines)
+	datas, err := p.Parse(lines)
 	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
 	}
@@ -260,7 +260,7 @@ func Test_convertValue(t *testing.T) {
 }
 
 func TestField_MakeValue(t *testing.T) {
-	tm, err := makeValue("2017/01/02 15:00:00", TypeDate, 1)
+	tm, err := makeValue("2017/01/02 15:00:00", parser.TypeDate, 1)
 	if err != nil {
 		t.Error(err)
 	}
@@ -288,7 +288,7 @@ func TestRename(t *testing.T) {
 	}
 	assert.NoError(t, err)
 	expDatas := []Data{
-		Data{
+		{
 			"logType":                   "REQ",
 			"service":                   "REPORT",
 			"timestamp":                 "15112467445566096",
@@ -322,7 +322,7 @@ func TestRename(t *testing.T) {
 		}
 	}
 
-	c[parser.KeyAutoRename] = "true"
+	c[parser.KeyCSVAutoRename] = "true"
 	p, err = NewParser(c)
 	assert.NoError(t, err)
 	gotDatas, err = p.Parse(lines)
@@ -331,7 +331,7 @@ func TestRename(t *testing.T) {
 	}
 	assert.NoError(t, err)
 	expDatas = []Data{
-		Data{
+		{
 			"logType":                   "REQ",
 			"service":                   "REPORT",
 			"timestamp":                 "15112467445566096",
@@ -366,10 +366,10 @@ func TestRename(t *testing.T) {
 	}
 }
 
-func TestJsonMap(t *testing.T) {
+func TestJSONMap(t *testing.T) {
 	fd := field{
 		name:     "c",
-		dataType: TypeJsonMap,
+		dataType: parser.TypeJSONMap,
 	}
 	testx := "999"
 	data, err := fd.ValueParse(testx, 0)
