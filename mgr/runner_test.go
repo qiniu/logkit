@@ -727,7 +727,7 @@ func TestCreateTransforms(t *testing.T) {
 	rc := RunnerConfig{}
 	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
-	transformers := createTransformers(rc)
+	transformers, _ := createTransformers(rc)
 	datas := []Data{{"ip": "111.2.3.4"}}
 	exp := []Data{{
 		"ip":      "111.2.3.4",
@@ -770,7 +770,7 @@ func TestReplaceTransforms(t *testing.T) {
 	rc := RunnerConfig{}
 	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
-	transformers := createTransformers(rc)
+	transformers, _ := createTransformers(rc)
 	datas := []string{`{"status":"200","request_method":"POST","request_body":"<xml>\x0A","content_type":"text/xml"}`, `{"status":"200","request_method":"POST","request_body":"<xml>x0A","content_type":"text/xml"}`}
 	for k := range transformers {
 		datas, err = transformers[k].RawTransform(datas)
@@ -827,7 +827,7 @@ func TestDateTransforms(t *testing.T) {
 	rc := RunnerConfig{}
 	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
-	transformers := createTransformers(rc)
+	transformers, _ := createTransformers(rc)
 	datas := []Data{{"status": "02/01/2016--15:04:05"}, {"status": "2006-01-02 15:04:15"}}
 	for k := range transformers {
 		datas, err = transformers[k].Transform(datas)
@@ -873,7 +873,7 @@ func TestSplitAndConvertTransforms(t *testing.T) {
 	rc := RunnerConfig{}
 	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
-	transformers := createTransformers(rc)
+	transformers, _ := createTransformers(rc)
 	datas := []Data{{"status": "1,2,3"}, {"status": "4,5,6"}}
 	for k := range transformers {
 		datas, err = transformers[k].Transform(datas)

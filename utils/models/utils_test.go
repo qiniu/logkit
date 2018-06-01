@@ -509,3 +509,40 @@ func getTimeStr(tiTmp int64) (tiStr string, err error) {
 	}
 	return ti.Format(time.RFC3339Nano), err
 }
+
+func TestGetMapList(t *testing.T) {
+	cases := []struct {
+		c   string
+		exp map[string]string
+	}{
+		{
+			`a b,1,2 c`,
+			map[string]string{
+				"a": "b",
+				"2": "c",
+			},
+		},
+		{
+			`1 abc,2 xyz`,
+			map[string]string{
+				"1": "abc",
+				"2": "xyz",
+			},
+		},
+		{
+			`1 2,3,3,,4 aby`,
+			map[string]string{
+				"1": "2",
+				"4": "aby",
+			},
+		},
+		{
+			``,
+			map[string]string{},
+		},
+	}
+	for _, c := range cases {
+		got := GetMapList(c.c)
+		assert.Equal(t, c.exp, got)
+	}
+}

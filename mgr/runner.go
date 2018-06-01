@@ -249,7 +249,10 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	if err != nil {
 		return nil, err
 	}
-	transformers := createTransformers(rc)
+	transformers, err := createTransformers(rc)
+	if err != nil {
+		return nil, err
+	}
 	senders := make([]sender.Sender, 0)
 	for i, c := range rc.SenderConfig {
 		if rc.ExtraInfo && c[KeySenderType] == TypePandora {
@@ -271,47 +274,41 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	return NewLogExportRunnerWithService(runnerInfo, rd, cl, parser, transformers, senders, router, meta)
 }
 
-func createTransformers(rc RunnerConfig) []transforms.Transformer {
+func createTransformers(rc RunnerConfig) ([]transforms.Transformer, error) {
 	transformers := make([]transforms.Transformer, 0)
 	for idx := range rc.Transforms {
 		tConf := rc.Transforms[idx]
 		tp := tConf[transforms.KeyType]
 		if tp == nil {
-			log.Error("field type is empty")
-			continue
+			return nil, fmt.Errorf("transformer config type is empty %v", tConf)
 		}
 		strTP, ok := tp.(string)
 		if !ok {
-			log.Error("field type is not string")
-			continue
+			return nil, fmt.Errorf("transformer config field type %v is not string", tp)
 		}
 		creater, ok := transforms.Transformers[strTP]
 		if !ok {
-			log.Errorf("type %v of transformer not exist", strTP)
-			continue
+			return nil, fmt.Errorf("transformer type %v not exist", strTP)
 		}
 		trans := creater()
 		bts, err := jsoniter.Marshal(tConf)
 		if err != nil {
-			log.Errorf("type %v of transformer marshal config error %v", strTP, err)
-			continue
+			return nil, fmt.Errorf("type %v of transformer marshal config error %v", strTP, err)
 		}
 		err = jsoniter.Unmarshal(bts, trans)
 		if err != nil {
-			log.Errorf("type %v of transformer unmarshal config error %v", strTP, err)
-			continue
+			return nil, fmt.Errorf("type %v of transformer unmarshal config error %v", strTP, err)
 		}
 		//transformer初始化
 		if trans, ok := trans.(transforms.Initialize); ok {
 			err = trans.Init()
 			if err != nil {
-				log.Errorf("type %v of transformer init error %v", strTP, err)
-				continue
+				return nil, fmt.Errorf("type %v of transformer init error %v", strTP, err)
 			}
 		}
 		transformers = append(transformers, trans)
 	}
-	return transformers
+	return transformers, nil
 }
 
 // trySend 尝试发送数据，如果此时runner退出返回false，其他情况无论是达到最大重试次数还是发送成功，都返回true
