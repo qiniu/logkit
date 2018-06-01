@@ -333,7 +333,7 @@ var ModeKeyOptions = map[string][]Option{
 			Default:       "parquet",
 			DefaultNoUse:  false,
 			Description:   "云存储压缩方式(pandora_kodo_compress)",
-			AdvanceDepend: KeyPandoraEnableTSDB,
+			AdvanceDepend: KeyPandoraEnableKodo,
 			Advance:       true,
 		},
 		{
