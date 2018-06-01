@@ -147,6 +147,8 @@ class Parser extends Component {
           </span>
         </span>
       )
+      let advanceDependValue = ele.advance_depend && getFieldValue(`${this.state.currentOption}.${ele.advance_depend}`)
+      let isAdvanceDependHide = advanceDependValue === 'false' || advanceDependValue === false
       if (ele.ChooseOnly == false) {
         if (ele.KeyName == 'name' && window.isCopy != true) {
           ele.Default = "pandora.parser." + moment().format("YYYYMMDDHHmmss");
@@ -168,7 +170,6 @@ class Parser extends Component {
             </FormItem>
           )
         } else {
-          let isAdvanceDependHide = ele.advance_depend && getFieldValue(`${this.state.currentOption}.${ele.advance_depend}`) === 'false'
           formItem = (
             <FormItem key={index}
                       {...formItemLayout}
@@ -206,11 +207,11 @@ class Parser extends Component {
         formItem = (
           <FormItem key={index}
             {...formItemLayout}
-            className=""
+            className={isAdvanceDependHide ? 'hide-div' : 'show-div'}
             label={labelDes}>
             {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
               initialValue: ele.Default || ele.ChooseOptions[0],
-              rules: [{ required: true, message: '不能为空', trigger: 'blur' },
+              rules: [{ required: ele.required && !isAdvanceDependHide, message: '不能为空', trigger: 'blur' },
               ]
             })(
               <Select>

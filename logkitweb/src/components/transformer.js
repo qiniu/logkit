@@ -187,11 +187,12 @@ class Transformer extends Component {
         </span>
           : <span>{ele.Description}</span>
       )
+      let advanceDependValue = ele.advance_depend && getFieldValue(`${this.state.currentOption}.${ele.advance_depend}`)
+      let isAdvanceDependHide = advanceDependValue === 'false' || advanceDependValue === false
       if (ele.ChooseOnly == false) {
         if (ele.KeyName == 'name') {
           ele.Default = "pandora.sender." + moment().format("YYYYMMDDHHmmss");
         }
-        let isAdvanceDependHide = ele.advance_depend && getFieldValue(`${this.state.currentOption}.${ele.advance_depend}`) === 'false'
         formItem = (
           <FormItem key={index}
                     {...formItemLayout}
@@ -211,7 +212,7 @@ class Transformer extends Component {
         formItem = (
           <FormItem key={index}
             {...formItemLayout}
-            className=""
+            className={isAdvanceDependHide ? 'hide-div' : 'show-div'}
             label={labelDes}>
             {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
               initialValue: ele.Default || ele.ChooseOptions[0]
