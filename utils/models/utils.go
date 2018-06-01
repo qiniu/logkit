@@ -701,3 +701,22 @@ func ReadFileContent(path string) (content []string, err error) {
 	content = TrimeList(strings.Split(string(body), "\n"))
 	return
 }
+
+func GetMapList(data string) map[string]string {
+	v := strings.Split(data, ",")
+	var newV []string
+	for _, i := range v {
+		trimI := strings.TrimSpace(i)
+		if len(trimI) > 0 {
+			newV = append(newV, trimI)
+		}
+	}
+	ret := make(map[string]string)
+	for _, v := range newV {
+		fids := strings.Fields(v)
+		if len(fids) >= 2 {
+			ret[fids[0]] = fids[1]
+		}
+	}
+	return ret
+}
