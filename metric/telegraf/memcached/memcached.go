@@ -69,7 +69,11 @@ func (c *collector) SyncConfig(data map[string]interface{}) error {
 		return errors.New("unexpected telegraf type, want '*memcached.Memcached'")
 	}
 
-	mc.Servers = strings.Split(data["servers"].(string), ",")
+	servers, ok := data["servers"].(string)
+	if ok {
+		mc.Servers = strings.Split(servers, ",")
+	}
+
 	return nil
 }
 
