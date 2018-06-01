@@ -16,7 +16,7 @@ import (
 
 	_ "github.com/denisenkom/go-mssqldb" //mssql 驱动
 	_ "github.com/go-sql-driver/mysql"   //mysql 驱动
-	"github.com/json-iterator/go"
+	jsoniter "github.com/json-iterator/go"
 	_ "github.com/lib/pq" //postgres 驱动
 	"github.com/qiniu/log"
 	"github.com/robfig/cron"
@@ -27,12 +27,25 @@ import (
 )
 
 const (
-	mb                 = 1024 * 1024 // 1MB
-	sqlOffsetConnector = "##"
-	SQL_SPLITER        = ";"
-	DefaultMySQL       = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA='DATABASE_NAME';"
-	DefaultPGSQL       = "SELECT TABLENAME FROM PG_TABLES WHERE SCHEMANAME='public';"
-	DefaultMsSQL       = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_CATALOG='DATABASE_NAME';"
+	mb                   = 1024 * 1024 // 1MB
+	sqlOffsetConnector   = "##"
+	SQL_SPLITER          = ";"
+	DefaultMySQLTable    = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA='DATABASE_NAME';"
+	DefaultMySQLDatabase = "SHOW DATABASES;"
+	DefaultPGSQLTable    = "SELECT TABLENAME FROM PG_TABLES WHERE SCHEMANAME='public';"
+	DefaultMsSQLTable    = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_CATALOG='DATABASE_NAME';"
+
+	SupportReminder = "history all magic only support @(YYYY) @(YY) @(MM) @(DD) @(hh) @(mm) @(ss)"
+	Wildcards       = "*"
+)
+
+const (
+	YEAR = iota
+	MONTH
+	DAY
+	HOUR
+	MINUTE
+	SECOND
 )
 
 func init() {
@@ -47,6 +60,9 @@ type Reader struct {
 	database    string //数据库名称
 	rawDatabase string // 记录原始数据库
 	rawsqls     string // 原始sql执行列表
+	historyAll  bool   // 是否导入历史数据
+	rawTable    string // 记录原始数据库表名
+	table       string // 数据库表名
 
 	Cron      *cron.Cron //定时任务
 	readBatch int        // 每次读取的数据量
@@ -75,8 +91,8 @@ type Reader struct {
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (ret reader.Reader, err error) {
 	var readBatch int
-	var dbtype, dataSource, rawDatabase, rawSqls, cronSchedule, offsetKey, encoder string
-	var execOnStart bool
+	var dbtype, dataSource, rawDatabase, rawSqls, cronSchedule, offsetKey, encoder, table string
+	var execOnStart, historyAll bool
 	dbtype, _ = conf.GetStringOr(reader.KeyMode, reader.ModeMySQL)
 	logpath, _ := conf.GetStringOr(reader.KeyLogPath, "")
 
@@ -100,6 +116,8 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (ret reader.Reader, err err
 		cronSchedule, _ = conf.GetStringOr(reader.KeyMysqlCron, "")
 		execOnStart, _ = conf.GetBoolOr(reader.KeyMysqlExecOnStart, true)
 		encoder, _ = conf.GetStringOr(reader.KeyEncoding, "")
+		historyAll, _ = conf.GetBoolOr(reader.KeyMysqlHistoryAll, false)
+		table, _ = conf.GetStringOr(reader.KyeMysqlTable, "")
 	case reader.ModeMSSQL:
 		readBatch, _ = conf.GetIntOr(reader.KeyMssqlReadBatch, 100)
 		offsetKey, _ = conf.GetStringOr(reader.KeyMssqlOffsetKey, "")
@@ -138,7 +156,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (ret reader.Reader, err err
 			x1s := strings.Split(v, "=")
 			if len(x1s) != 2 {
 				err = fmt.Errorf("datasource %v is invalid, don't contain space beside symbol '='", dataSource)
-				return
+				return nil, err
 			}
 		}
 		rawDatabase, err = conf.GetString(reader.KeyPGsqlDataBase)
@@ -160,7 +178,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (ret reader.Reader, err err
 		execOnStart, _ = conf.GetBoolOr(reader.KeyPGsqlExecOnStart, true)
 	default:
 		err = fmt.Errorf("%v mode not support in sql reader", dbtype)
-		return
+		return nil, err
 	}
 	rawSchemas, _ := conf.GetStringListOr(reader.KeySQLSchema, []string{})
 	magicLagDur, _ := conf.GetStringOr(reader.KeyMagicLagDuration, "")
@@ -173,7 +191,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (ret reader.Reader, err err
 	}
 	schemas, err := schemaCheck(rawSchemas)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	var sqls []string
@@ -199,10 +217,21 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (ret reader.Reader, err err
 		mux:         sync.Mutex{},
 		started:     false,
 		execOnStart: execOnStart,
+		historyAll:  historyAll,
+		rawTable:    table,
+		table:       table,
 		magicLagDur: mgld,
 		schemas:     schemas,
 		statsLock:   sync.RWMutex{},
 		encoder:     encoder,
+	}
+
+	if historyAll {
+		valid := checkMagic(mr.database) && checkMagic(mr.table)
+		if !valid {
+			err = fmt.Errorf(SupportReminder)
+			return nil, err
+		}
 	}
 
 	// 如果meta初始信息损坏
@@ -224,7 +253,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (ret reader.Reader, err err
 		} else {
 			err = mr.Cron.AddFunc(cronSchedule, mr.run)
 			if err != nil {
-				return
+				return nil, err
 			}
 			log.Infof("Runner[%v] %v Cron job added with schedule <%v>", mr.meta.RunnerName, mr.Name(), cronSchedule)
 		}
@@ -341,7 +370,32 @@ func convertMagic(magic string, now time.Time) (ret string) {
 		s := now.Second()
 		return fmt.Sprintf("%d", s)
 	}
-	return
+	return ""
+}
+
+func convertMagicIndex(magic string, now time.Time) (ret string, index int) {
+	switch magic {
+	case "YYYY":
+		return fmt.Sprintf("%d", now.Year()), YEAR
+	case "YY":
+		return fmt.Sprintf("%d", now.Year())[2:], YEAR
+	case "MM":
+		m := int(now.Month())
+		return fmt.Sprintf("%02d", m), MONTH
+	case "DD":
+		d := int(now.Day())
+		return fmt.Sprintf("%02d", d), DAY
+	case "hh":
+		h := now.Hour()
+		return fmt.Sprintf("%02d", h), HOUR
+	case "mm":
+		m := now.Minute()
+		return fmt.Sprintf("%02d", m), MINUTE
+	case "ss":
+		s := now.Second()
+		return fmt.Sprintf("%02d", s), SECOND
+	}
+	return "", -1
 }
 
 // 渲染魔法变量
@@ -358,7 +412,94 @@ func goMagic(rawSql string, now time.Time) (ret string) {
 			ret += sps[idx][idxr+1:]
 		}
 	}
-	return
+
+	return ret
+}
+
+// 渲染魔法变量
+func goMagicIndex(rawSql string, now time.Time) (ret string, startIndex, endIndex, timeIndex []int, err error) {
+	startIndex = []int{-1, -1, -1, -1, -1, -1} // 记录YY,MM,DD,hh,mm,ss位置
+	endIndex = make([]int, 6)                  // 记录YY,MM,DD,hh,mm,ss长度
+	sps := strings.Split(rawSql, "@(")         //@()，对于每个分片找右括号
+	ret = sps[0]
+	recordIndex := len(ret)
+	timeIndex = []int{0}
+
+	if len(sps) < 2 {
+		if strings.Contains(ret, Wildcards) {
+			timeIndex = append(timeIndex, recordIndex-1)
+		} else {
+			timeIndex = append(timeIndex, recordIndex)
+		}
+		return
+	}
+
+	timeIndex = append(timeIndex, recordIndex)
+	for idx := 1; idx < len(sps); idx++ {
+		idxr := strings.Index(sps[idx], ")")
+		if idxr == -1 {
+			return rawSql, startIndex, endIndex, timeIndex, nil
+		}
+		spsStr := sps[idx][0:idxr]
+		if len(spsStr) < 2 {
+			err = fmt.Errorf(SupportReminder)
+			return rawSql, startIndex, endIndex, timeIndex, err
+		}
+		res, index := convertMagicIndex(sps[idx][0:idxr], now)
+		if index == -1 {
+			err = fmt.Errorf(SupportReminder)
+			return rawSql, startIndex, endIndex, timeIndex, err
+		}
+
+		// 记录日期起始位置
+		startIndex[index] = recordIndex
+		ret += res
+		recordIndex = len(ret)
+
+		// 记录日期终止位置
+		endIndex[index] = recordIndex
+
+		if idxr+1 < len(sps[idx]) {
+			spsRemain := sps[idx][idxr+1:]
+			ret += spsRemain
+			if spsRemain == Wildcards {
+				continue
+			}
+			timeIndex = append(timeIndex, recordIndex)
+			if strings.Contains(spsRemain, Wildcards) {
+				timeIndex = append(timeIndex, len(ret)-1)
+			} else {
+				timeIndex = append(timeIndex, len(ret))
+			}
+		}
+	}
+
+	return ret, startIndex, endIndex, timeIndex, nil
+}
+
+func checkMagic(rawSql string) (valid bool) {
+	sps := strings.Split(rawSql, "@(") //@()，对于每个分片找右括号
+	now := time.Now()
+
+	for idx := 1; idx < len(sps); idx++ {
+		idxr := strings.Index(sps[idx], ")")
+		if idxr == -1 {
+			return true
+		}
+		spsStr := sps[idx][0:idxr]
+		if len(spsStr) < 2 {
+			log.Errorf(SupportReminder)
+			return false
+		}
+
+		_, index := convertMagicIndex(sps[idx][0:idxr], now)
+		if index == -1 {
+			log.Errorf(SupportReminder)
+			return false
+		}
+	}
+
+	return true
 }
 
 func (mr *Reader) Name() string {
@@ -390,7 +531,7 @@ func (mr *Reader) Close() (err error) {
 		atomic.CompareAndSwapInt32(&mr.status, reader.StatusInit, reader.StatusStopped)
 		close(mr.readChan)
 	}
-	return
+	return nil
 }
 
 //Start 仅调用一次，借用ReadLine启动，不能在new实例的时候启动，会有并发问题
@@ -423,7 +564,8 @@ func (mr *Reader) ReadLine() (data string, err error) {
 	case <-timer.C:
 	}
 	timer.Stop()
-	return
+
+	return data, nil
 }
 
 func updateSqls(rawsqls string, now time.Time) []string {
@@ -453,6 +595,8 @@ func (mr *Reader) updateOffsets(sqls []string) {
 			mr.offsets[idx] = 0
 		}
 	}
+
+	return
 }
 
 func (mr *Reader) LoopRun() {
@@ -495,14 +639,12 @@ func (mr *Reader) run() {
 
 	now := time.Now().Add(-mr.magicLagDur)
 	mr.database = goMagic(mr.rawDatabase, now)
+	mr.table = goMagic(mr.rawTable, now)
 
 	var connectStr string
 	switch mr.dbtype {
 	case reader.ModeMySQL:
-		connectStr = mr.datasource + "/" + mr.database
-		if mr.encoder != "" {
-			connectStr += "?charset=" + mr.encoder
-		}
+		connectStr = getConnectStr(mr.datasource, "", mr.encoder)
 	case reader.ModeMSSQL:
 		connectStr = mr.datasource + ";database=" + mr.database
 	case reader.ModePostgreSQL:
@@ -557,7 +699,7 @@ func (mr *Reader) getInitScans(length int, rows *sql.Rows, sqltype string) (scan
 		scanArgs = nochoice
 	}
 	if len(tps) != length {
-		log.Errorf("getInitScans length is %v not equal to columetypes %v", length, len(tps))
+		log.Errorf("Runner[%v] %v getInitScans length is %v not equal to columetypes %v", length, len(tps))
 		scanArgs = nochoice
 	}
 	scanArgs = make([]interface{}, length)
@@ -595,9 +737,10 @@ func (mr *Reader) getInitScans(length int, rows *sql.Rows, sqltype string) (scan
 			scanArgs[i] = new(interface{})
 			nochoiced[i] = true
 		}
-		log.Infof("Init field %v scan type is %v ", v.Name(), scantype)
+		log.Infof("Runner[%v] %v Init field %v scan type is %v ", mr.meta.RunnerName, mr.Name(), v.Name(), scantype)
 	}
-	return
+
+	return scanArgs, nochoiced
 }
 
 func (mr *Reader) getOffsetIndex(columns []string) int {
@@ -613,14 +756,62 @@ func (mr *Reader) getOffsetIndex(columns []string) int {
 func (mr *Reader) exec(connectStr string) (err error) {
 	now := time.Now().Add(-mr.magicLagDur)
 
-	db, err := sql.Open(mr.dbtype, connectStr)
+	db, err := openSql(mr.dbtype, connectStr, mr.Name())
 	if err != nil {
-		return fmt.Errorf("%v open %v failed: %v", mr.Name(), mr.dbtype, err)
+		return err
+	}
+	defer db.Close()
+	if err = db.Ping(); err != nil {
+		return err
+	}
+
+	dbs := make([]string, 0)
+	if mr.historyAll {
+		var startIndex, endIndex, timeIndex []int
+		var matchDB string
+		matchDB, startIndex, endIndex, timeIndex, err = goMagicIndex(mr.rawDatabase, now)
+		if err != nil {
+			return err
+		}
+		if matchDB == mr.rawDatabase && !strings.Contains(mr.rawDatabase, Wildcards) {
+			dbs = append(dbs, matchDB)
+		} else {
+			matchStr := getRemainStr(matchDB, timeIndex)
+			dbs, _, err = mr.getValidData(db, matchDB, matchStr, DefaultMySQLDatabase, startIndex, endIndex, timeIndex, false)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		dbs = append(dbs, mr.database)
+	}
+
+	log.Infof("Runner[%v] %v get valid databases: %v", mr.meta.RunnerName, mr.Name(), dbs)
+
+	for _, curDb := range dbs {
+		err = mr.execReadDB(curDb, now)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (mr *Reader) execReadDB(curDb string, now time.Time) (err error) {
+	//var db *sql.DB
+	connectStr := getConnectStr(mr.datasource, curDb, mr.encoder)
+	db, err := openSql(mr.dbtype, connectStr, mr.Name())
+	if err != nil {
+		return
 	}
 	defer db.Close()
 	if err = db.Ping(); err != nil {
 		return
 	}
+	log.Infof("Runner[%v] %v prepare %v change database success, current database is: %v", mr.meta.RunnerName, mr.Name(), mr.dbtype, curDb)
+	mr.database = curDb
+
 	//更新sqls
 	tables := make([]string, 0)
 	var rawsqlsEmpty bool
@@ -632,30 +823,49 @@ func (mr *Reader) exec(connectStr string) (err error) {
 		var defaultSql string
 		switch mr.dbtype {
 		case reader.ModeMySQL:
-			defaultSql = strings.Replace(DefaultMySQL, "DATABASE_NAME", mr.database, -1)
+			defaultSql = strings.Replace(DefaultMySQLTable, "DATABASE_NAME", mr.database, -1)
 		case reader.ModePostgreSQL:
-			defaultSql = DefaultPGSQL
+			defaultSql = DefaultPGSQLTable
 		case reader.ModeMSSQL:
-			defaultSql = strings.Replace(DefaultMsSQL, "DATABASE_NAME", mr.database, -1)
-		}
-		rows, err := db.Query(defaultSql)
-		if err != nil {
-			log.Errorf("Runner[%v] %v prepare %v <%v> query error %v", mr.meta.RunnerName, mr.Name(), mr.dbtype, defaultSql, err)
+			defaultSql = strings.Replace(DefaultMsSQLTable, "DATABASE_NAME", mr.database, -1)
 		}
 
-		for rows.Next() {
-			var s string
-			err = rows.Scan(&s)
+		if mr.historyAll && mr.table != "" && mr.table != "*" {
+			var startIndex, endIndex, timeIndex []int
+			var matchTable string
+			matchTable, startIndex, endIndex, timeIndex, err = goMagicIndex(mr.rawTable, now)
 			if err != nil {
-				log.Errorf("Runner[%v] %v scan rows error %v", mr.meta.RunnerName, mr.Name(), err)
-				continue
+				return err
 			}
-			tables = append(tables, s)
-			mr.rawsqls += "Select * From `" + s + "`;"
-		}
-		rows.Close()
+			if matchTable == mr.rawTable && !strings.Contains(mr.rawTable, Wildcards) {
+				tables = append(tables, matchTable)
+			} else {
+				matchStr := getRemainStr(matchTable, timeIndex)
+				tables, mr.rawsqls, err = mr.getValidData(db, matchTable, matchStr, defaultSql, startIndex, endIndex, timeIndex, true)
+				if err != nil {
+					return err
+				}
+			}
+		} else {
+			rows, err := db.Query(defaultSql)
+			if err != nil {
+				log.Errorf("Runner[%v] %v prepare %v <%v> query error %v", mr.meta.RunnerName, mr.Name(), mr.dbtype, defaultSql, err)
+				return err
+			}
 
-		log.Infof("Runner[%v] %v get tables %v", mr.meta.RunnerName, mr.Name(), tables)
+			for rows.Next() {
+				var s string
+				err = rows.Scan(&s)
+				if err != nil {
+					log.Errorf("Runner[%v] %v scan rows error %v", mr.meta.RunnerName, mr.Name(), err)
+					continue
+				}
+				tables = append(tables, s)
+				mr.rawsqls += "Select * From `" + s + "`;"
+			}
+			rows.Close()
+		}
+
 		log.Debugf("Runner[%v] %v default sqls %v", mr.meta.RunnerName, mr.Name(), mr.rawsqls)
 
 		offsets, sqls, omitMeta := restoreMeta(mr.meta, mr.rawsqls, mr.magicLagDur)
@@ -734,21 +944,21 @@ func (mr *Reader) exec(connectStr string) (err error) {
 					case "long":
 						val, serr := convertLong(scanArgs[i])
 						if serr != nil {
-							log.Errorf("convertLong for %v (%v) error %v, ignore this key...", columns[i], scanArgs[i], serr)
+							log.Errorf("Runner[%v] %v convertLong for %v (%v) error %v, ignore this key...", mr.meta.RunnerName, mr.Name(), columns[i], scanArgs[i], serr)
 						} else {
 							data[columns[i]] = &val
 						}
 					case "float":
 						val, serr := convertFloat(scanArgs[i])
 						if serr != nil {
-							log.Errorf("convertFloat for %v (%v) error %v, ignore this key...", columns[i], scanArgs[i], serr)
+							log.Errorf("Runner[%v] %v convertFloat for %v (%v) error %v, ignore this key...", mr.meta.RunnerName, mr.Name(), columns[i], scanArgs[i], serr)
 						} else {
 							data[columns[i]] = &val
 						}
 					case "string":
 						val, serr := convertString(scanArgs[i])
 						if serr != nil {
-							log.Errorf("convertString for %v (%v) error %v, ignore this key...", columns[i], scanArgs[i], serr)
+							log.Errorf("Runner[%v] %v convertString for %v (%v) error %v, ignore this key...", mr.meta.RunnerName, mr.Name(), columns[i], scanArgs[i], serr)
 						} else {
 							data[columns[i]] = &val
 						}
@@ -784,7 +994,7 @@ func (mr *Reader) exec(connectStr string) (err error) {
 						if !dealed {
 							val, serr := convertString(scanArgs[i])
 							if serr != nil {
-								log.Errorf("convertString for %v (%v) error %v, ignore this key...", columns[i], scanArgs[i], serr)
+								log.Errorf("Runner[%v] %v convertString for %v (%v) error %v, ignore this key...", mr.meta.RunnerName, mr.Name(), columns[i], scanArgs[i], serr)
 							} else {
 								data[columns[i]] = &val
 							}
@@ -852,6 +1062,7 @@ func (mr *Reader) exec(connectStr string) (err error) {
 
 		mr.rawsqls = ""
 	}
+
 	return nil
 }
 
@@ -872,7 +1083,7 @@ func WriteDBDoneFile(doneFilePath, database, content string) (err error) {
 	f.Sync()
 	f.Close()
 
-	return
+	return nil
 }
 
 func convertLong(v interface{}) (int64, error) {
@@ -1083,24 +1294,24 @@ func (mr *Reader) getSQL(idx int) (sql string, err error) {
 		} else {
 			sql = fmt.Sprintf("%s;", rawSQL)
 		}
-		return
+		return sql, nil
 	case reader.ModeMSSQL:
 		if len(mr.offsetKey) > 0 {
 			sql = fmt.Sprintf("%s WHERE CAST(%v AS BIGINT) >= %d AND CAST(%v AS BIGINT) < %d;", rawSQL, mr.offsetKey, mr.offsets[idx], mr.offsetKey, mr.offsets[idx]+int64(mr.readBatch))
 		} else {
 			err = fmt.Errorf("%v dbtype is not support get SQL without id now", mr.dbtype)
 		}
-		return
+		return sql, nil
 	case reader.ModePostgreSQL:
 		if len(mr.offsetKey) > 0 {
 			sql = fmt.Sprintf("%s WHERE %v >= %d AND %v < %d;", rawSQL, mr.offsetKey, mr.offsets[idx], mr.offsetKey, mr.offsets[idx]+int64(mr.readBatch))
 		} else {
 			err = fmt.Errorf("%v dbtype is not support get SQL without id now", mr.dbtype)
 		}
-		return
+		return sql, nil
 	}
 	err = fmt.Errorf("%v dbtype is not support get SQL now", mr.dbtype)
-	return
+	return sql, err
 }
 
 func (mr *Reader) checkExit(idx int, db *sql.DB) (bool, int64) {
@@ -1179,4 +1390,122 @@ func contains(slice []string, str string) bool {
 		}
 	}
 	return false
+}
+
+// 查看时间是否符合
+func validTime(str, match string, startIndex, endIndex []int) (valid bool) {
+	for idx, record := range startIndex {
+		if record == -1 {
+			continue
+		}
+
+		if len(str) < endIndex[idx] {
+			return false
+		}
+
+		// 比较大小
+		curStr := str[record:endIndex[idx]]
+		curInt, err := strconv.Atoi(curStr)
+		if err != nil {
+			return false
+		}
+		matchStr := match[record:endIndex[idx]]
+		matchInt, err := strconv.Atoi(matchStr)
+		if err != nil {
+			return false
+		}
+
+		// 小于
+		if curInt < matchInt {
+			return true
+		}
+
+		if curInt > matchInt {
+			return false
+		}
+
+		// 相等
+		valid = true
+	}
+
+	return true
+}
+
+func (mr *Reader) getValidData(db *sql.DB, matchData, matchStr, query string, startIndex, endIndex, timeIndex []int, tableQuery bool) (validData []string, sqls string, err error) {
+	// get all databases and check validate database
+	rowsDBs, err := db.Query(query)
+	if err != nil {
+		log.Errorf("Runner[%v] %v prepare %v <%v> query error %v", mr.meta.RunnerName, mr.Name(), mr.dbtype, query, err)
+		return validData, sqls, err
+	}
+	defer rowsDBs.Close()
+
+	validData = make([]string, 0)
+	for rowsDBs.Next() {
+		var s string
+		err = rowsDBs.Scan(&s)
+		if err != nil {
+			log.Errorf("Runner[%v] %v scan rows error %v", mr.meta.RunnerName, mr.Name(), err)
+			continue
+		}
+
+		// get valid database
+		// 字符匹配
+		match := matchRemainStr(s, matchStr, timeIndex)
+		log.Infof("Runner[%v] %v current table: %v, current time table: %v, timeIndex: %v, isMatch: %v", mr.meta.RunnerName, mr.Name(), s, matchStr, timeIndex, match)
+		if !match || !validTime(s, matchData, startIndex, endIndex) {
+			continue
+		}
+		if tableQuery {
+			sqls += "Select * From `" + s + "`;"
+		}
+
+		validData = append(validData, s)
+	}
+
+	return validData, sqls, nil
+}
+
+func getConnectStr(datasource, database, encoder string) (connectStr string) {
+	connectStr = datasource + "/" + database
+	if encoder != "" {
+		connectStr += "?charset=" + encoder
+	}
+	return connectStr
+}
+
+func openSql(dbtype, connectStr, name string) (db *sql.DB, err error) {
+	db, err = sql.Open(dbtype, connectStr)
+	if err != nil {
+		err = fmt.Errorf("%v open %v failed: %v", name, dbtype, err)
+		return nil, err
+	}
+	return db, nil
+}
+
+func matchRemainStr(origin, match string, timeIndex []int) bool {
+	if len(timeIndex) > 0 && len(origin) < timeIndex[len(timeIndex)-1] {
+		return false
+	}
+
+	remainStr := getRemainStr(origin, timeIndex)
+	if len(remainStr) < len(match) ||
+		remainStr[:len(match)] != match {
+		return false
+	}
+
+	return true
+}
+
+func getRemainStr(origin string, timeIndex []int) (remainStr string) {
+	if len(timeIndex)%2 != 0 {
+		return origin
+	}
+
+	for idx := 0; idx < len(timeIndex); {
+		remainStr += origin[timeIndex[idx]:timeIndex[idx+1]]
+		idx = idx + 2
+	}
+
+	return remainStr
 }

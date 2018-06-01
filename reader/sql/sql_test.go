@@ -92,6 +92,80 @@ func TestConvertMagic(t *testing.T) {
 	}
 }
 
+func TestConvertMagicIndex(t *testing.T) {
+	now1, _ := time.Parse(time.RFC3339, "2017-04-01T06:06:09+08:00")
+	now2, _ := time.Parse(time.RFC3339, "2017-11-11T16:16:29+08:00")
+	tests := []struct {
+		data      string
+		exp1      string
+		exp2      string
+		exp_index int
+	}{
+		{
+			data:      "YYYY",
+			exp1:      "2017",
+			exp2:      "2017",
+			exp_index: YEAR,
+		},
+		{
+			data:      "YY",
+			exp1:      "17",
+			exp2:      "17",
+			exp_index: YEAR,
+		},
+		{
+			data:      "MM",
+			exp1:      "04",
+			exp2:      "11",
+			exp_index: MONTH,
+		},
+		{
+			data:      "DD",
+			exp1:      "01",
+			exp2:      "11",
+			exp_index: DAY,
+		},
+		{
+			data:      "hh",
+			exp1:      "06",
+			exp2:      "16",
+			exp_index: HOUR,
+		},
+		{
+			data:      "mm",
+			exp1:      "06",
+			exp2:      "16",
+			exp_index: MINUTE,
+		},
+		{
+			data:      "m",
+			exp1:      "",
+			exp2:      "",
+			exp_index: -1,
+		},
+		{
+			data:      "ss",
+			exp1:      "09",
+			exp2:      "29",
+			exp_index: SECOND,
+		},
+		{
+			data:      "s",
+			exp1:      "",
+			exp2:      "",
+			exp_index: -1,
+		},
+	}
+	for _, ti := range tests {
+		got, gotIndex := convertMagicIndex(ti.data, now1)
+		assert.Equal(t, ti.exp1, got)
+		assert.Equal(t, ti.exp_index, gotIndex)
+		got, gotIndex = convertMagicIndex(ti.data, now2)
+		assert.Equal(t, ti.exp2, got)
+		assert.Equal(t, ti.exp_index, gotIndex)
+	}
+}
+
 func TestGoMagic(t *testing.T) {
 	now, _ := time.Parse(time.RFC3339, "2017-02-01T16:06:19+08:00")
 	tests := []struct {
@@ -121,6 +195,253 @@ func TestGoMagic(t *testing.T) {
 	}
 	for _, ti := range tests {
 		got := goMagic(ti.data, now)
+		assert.EqualValues(t, ti.exp, got)
+	}
+}
+
+func TestGoMagicIndex(t *testing.T) {
+	now, _ := time.Parse(time.RFC3339, "2017-02-01T16:06:19+08:00")
+	tests := []struct {
+		data           string
+		exp_ret        string
+		exp_startIndex []int
+		exp_endIndex   []int
+		exp_timeIndex  []int
+	}{
+		{
+			data:           "x@(MM)abc@(DD)def",
+			exp_ret:        "x02abc01def",
+			exp_startIndex: []int{-1, 1, 3, -1, -1, -1},
+			exp_endIndex:   []int{0, 3, 8, 0, 0, 0},
+			exp_timeIndex:  []int{0, 1, 3, 6, 8, 11},
+		},
+		{
+			data:           "x@(MM)abc@(DD)def*",
+			exp_ret:        "x02abc01def*",
+			exp_startIndex: []int{-1, 1, 3, -1, -1, -1},
+			exp_endIndex:   []int{0, 3, 8, 0, 0, 0},
+			exp_timeIndex:  []int{0, 1, 3, 6, 8, 11},
+		},
+		{
+			data:           "x@(MM)abc@(DD)",
+			exp_ret:        "x02abc01",
+			exp_startIndex: []int{-1, 1, 3, -1, -1, -1},
+			exp_endIndex:   []int{0, 3, 8, 0, 0, 0},
+			exp_timeIndex:  []int{0, 1, 3, 6},
+		},
+		{
+			data:           "x@(MM)@(DD)",
+			exp_ret:        "x0201",
+			exp_startIndex: []int{-1, 1, 3, -1, -1, -1},
+			exp_endIndex:   []int{0, 3, 5, 0, 0, 0},
+			exp_timeIndex:  []int{0, 1},
+		},
+		{
+			data:           "x@(DD)@(MM)*",
+			exp_ret:        "x0102*",
+			exp_startIndex: []int{-1, 3, 1, -1, -1, -1},
+			exp_endIndex:   []int{0, 5, 3, 0, 0, 0},
+			exp_timeIndex:  []int{0, 1},
+		},
+		{
+			data:           "@(YY)",
+			exp_ret:        "17",
+			exp_startIndex: []int{0, -1, -1, -1, -1, -1},
+			exp_endIndex:   []int{2, 0, 0, 0, 0, 0},
+			exp_timeIndex:  []int{0, 0},
+		},
+		{
+			data:           "abcd@(YYYY)@(MM)efg*",
+			exp_ret:        "abcd201702efg*",
+			exp_startIndex: []int{4, 8, -1, -1, -1, -1},
+			exp_endIndex:   []int{8, 10, 0, 0, 0, 0},
+			exp_timeIndex:  []int{0, 4, 10, 13},
+		},
+		{
+			data:           "abcd@(YYYY)@(MM)@(DD)@(hh)@(mm)@(ss)*",
+			exp_ret:        "abcd20170201160619*",
+			exp_startIndex: []int{4, 8, 10, 12, 14, 16},
+			exp_endIndex:   []int{8, 10, 12, 14, 16, 18},
+			exp_timeIndex:  []int{0, 4},
+		},
+		{
+			data:           "hhhhh",
+			exp_ret:        "hhhhh",
+			exp_startIndex: []int{-1, -1, -1, -1, -1, -1},
+			exp_endIndex:   []int{0, 0, 0, 0, 0, 0},
+			exp_timeIndex:  []int{0, 5},
+		},
+	}
+	for _, ti := range tests {
+		ret, startIndex, endIndex, timeIndex, err := goMagicIndex(ti.data, now)
+		assert.NoError(t, err)
+		assert.EqualValues(t, ti.exp_ret, ret)
+		assert.EqualValues(t, ti.exp_startIndex, startIndex)
+		assert.EqualValues(t, ti.exp_endIndex, endIndex)
+		assert.EqualValues(t, ti.exp_timeIndex, timeIndex)
+	}
+
+	err_data := "x@(M)@(DD)"
+	exp_ret := "x@(M)@(DD)"
+	ret, _, _, _, err := goMagicIndex(err_data, now)
+	assert.Error(t, err)
+	assert.EqualValues(t, exp_ret, ret)
+}
+
+func Test_getRemainStr(t *testing.T) {
+	tests := []struct {
+		origin        string
+		timeIndex     []int
+		expect_remain string
+	}{
+		{
+			origin:        "x02abc01def",
+			timeIndex:     []int{0, 1, 3, 6, 8, 11},
+			expect_remain: "xabcdef",
+		},
+		{
+			origin:        "x02abc01def*",
+			timeIndex:     []int{0, 1, 3, 6, 8, 12},
+			expect_remain: "xabcdef*",
+		},
+		{
+			origin:        "x02abc01",
+			timeIndex:     []int{0, 1, 3, 6},
+			expect_remain: "xabc",
+		},
+		{
+			origin:        "x0201",
+			timeIndex:     []int{0, 1},
+			expect_remain: "x",
+		},
+		{
+			origin:        "x0102*",
+			timeIndex:     []int{0, 1, 5, 6},
+			expect_remain: "x*",
+		},
+		{
+			origin:        "17",
+			timeIndex:     []int{0, 0},
+			expect_remain: "",
+		},
+		{
+			origin:        "abcd201702efg*",
+			timeIndex:     []int{0, 4, 10, 14},
+			expect_remain: "abcdefg*",
+		},
+		{
+			origin:        "abcd20170201160619*",
+			timeIndex:     []int{0, 4, 18, 19},
+			expect_remain: "abcd*",
+		},
+		{
+			origin:        "hhhhh",
+			timeIndex:     []int{0, 5},
+			expect_remain: "hhhhh",
+		},
+	}
+	for _, ti := range tests {
+		remain := getRemainStr(ti.origin, ti.timeIndex)
+		assert.Equal(t, ti.expect_remain, remain)
+	}
+}
+
+func Test_matchRemainStr(t *testing.T) {
+	tests := []struct {
+		origin     string
+		match      string
+		timeIndex  []int
+		expect_res bool
+	}{
+		{
+			origin:     "x02abc01def",
+			match:      "xabcdef",
+			timeIndex:  []int{0, 1, 3, 6, 8, 11},
+			expect_res: true,
+		},
+		{
+			origin:     "x02abc01def*",
+			match:      "xabcdef*",
+			timeIndex:  []int{0, 1, 3, 6, 8, 12},
+			expect_res: true,
+		},
+		{
+			origin:     "x02abc01",
+			match:      "xabc",
+			timeIndex:  []int{0, 1, 3, 6},
+			expect_res: true,
+		},
+		{
+			origin:     "x0201",
+			match:      "x",
+			timeIndex:  []int{0, 1},
+			expect_res: true,
+		},
+		{
+			origin:     "x0102*",
+			match:      "x*",
+			timeIndex:  []int{0, 1, 5, 6},
+			expect_res: true,
+		},
+		{
+			origin:     "17",
+			match:      "",
+			timeIndex:  []int{0, 0},
+			expect_res: true,
+		},
+		{
+			origin:     "abcd201702efg*",
+			match:      "xabcdef",
+			timeIndex:  []int{0, 4, 10, 14},
+			expect_res: false,
+		},
+		{
+			origin:     "abcd20170201160619*",
+			match:      "xabcdef",
+			timeIndex:  []int{0, 4, 18, 19},
+			expect_res: false,
+		},
+		{
+			origin:     "hhhhh",
+			match:      "hhhhh",
+			timeIndex:  []int{0, 5},
+			expect_res: true,
+		},
+	}
+	for _, ti := range tests {
+		remain := matchRemainStr(ti.origin, ti.match, ti.timeIndex)
+		assert.Equal(t, ti.expect_res, remain)
+	}
+}
+
+func Test_checkMagic(t *testing.T) {
+	tests := []struct {
+		data string
+		exp  bool
+	}{
+		{
+			data: "x@(DD)@(MM)*",
+			exp:  true,
+		},
+		{
+			data: "@(YY)",
+			exp:  true,
+		},
+		{
+			data: "abcd@(YYYY)@(M)efg*",
+			exp:  false,
+		},
+		{
+			data: "abcd@(YYYY)@(MM)@(DD)@(hh)@(mm)@(ss)efg*",
+			exp:  true,
+		},
+		{
+			data: "hhhhh",
+			exp:  true,
+		},
+	}
+	for _, ti := range tests {
+		got := checkMagic(ti.data)
 		assert.EqualValues(t, ti.exp, got)
 	}
 }
