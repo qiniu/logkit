@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/influxdata/telegraf"
+	"github.com/qiniu/log"
 )
 
 // Accumulator implements telegraf.Accumulator.
@@ -54,7 +55,7 @@ func (acc *Accumulator) AddHistogram(measurement string,
 }
 
 func (_ *Accumulator) SetPrecision(precision, interval time.Duration) {
-	panic("not implemented yet")
+	log.Errorf("Unexpected call of Accumulator.SetPrecision: %v, %v", precision, interval)
 }
 
 func (acc *Accumulator) AddError(err error) {
@@ -93,7 +94,23 @@ func GetConfigByName(name string) map[string]interface{} {
 	if has {
 		return config
 	}
-	return map[string]interface{}{"error": "config not found"}
+	return map[string]interface{}{}
+}
+
+var tagsTable = map[string][]string{}
+
+// AddTags adds tags information to data table.
+func AddTags(name string, tags []string) {
+	tagsTable[name] = tags
+}
+
+// GetTagsByName returns tags information specific to logkit.
+func GetTagsByName(name string) []string {
+	tags, has := tagsTable[name]
+	if has {
+		return tags
+	}
+	return []string{}
 }
 
 // Collector converts inputs.Input to logkit format and implements metric.Collector.
@@ -115,7 +132,7 @@ func (c *Collector) Name() string {
 }
 
 func (c *Collector) Tags() []string {
-	return []string{}
+	return GetTagsByName(c.name)
 }
 
 func (c *Collector) Usages() string {
