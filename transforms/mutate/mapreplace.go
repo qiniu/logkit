@@ -130,7 +130,7 @@ func (g *MapReplacer) ConfigOptions() []Option {
 }
 
 func (g *MapReplacer) Stage() string {
-	return transforms.StageBeforeParser
+	return transforms.StageAfterParser
 
 }
 
