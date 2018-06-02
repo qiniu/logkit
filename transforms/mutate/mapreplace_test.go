@@ -1,13 +1,13 @@
 package mutate
 
 import (
-	"testing"
-
 	"encoding/json"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"testing"
 
+	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 	"github.com/stretchr/testify/assert"
 )
@@ -48,4 +48,20 @@ func TestMapReplaceTransformer(t *testing.T) {
 		{"myword": "123"},
 		{"myword": "xyz"}}
 	assert.Equal(t, exp3, data3)
+}
+
+func TestMapReplaceTransformerWithConvert(t *testing.T) {
+	gsub := &MapReplacer{
+		Key: "myword",
+		Map: "1 y1,2 y2",
+	}
+	err := gsub.Init()
+	assert.NoError(t, err)
+	data, err := gsub.Transform([]Data{{"myword": 1}, {"myword": 2}})
+	assert.NoError(t, err)
+	exp := []Data{
+		{"myword": "y1"},
+		{"myword": "y2"}}
+	assert.Equal(t, exp, data)
+	assert.Equal(t, transforms.StageAfterParser, gsub.Stage())
 }

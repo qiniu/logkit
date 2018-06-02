@@ -4,11 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"reflect"
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/json-iterator/go"
+	"github.com/qiniu/pandora-go-sdk/pipeline"
 )
 
 type MapReplacer struct {
@@ -63,9 +65,24 @@ func (g *MapReplacer) Transform(datas []Data) ([]Data, error) {
 		}
 		strval, ok := val.(string)
 		if !ok {
-			errnums++
-			err = fmt.Errorf("transform key %v data type is not string", g.Key)
-			continue
+			newval, suberr := dataConvert(val, DslSchemaEntry{ValueType: pipeline.PandoraTypeString})
+			if suberr != nil {
+				err = fmt.Errorf("transform key %v try to convert data %v to string err %v", g.Key, newval, suberr)
+				errnums++
+				continue
+			}
+			strval, ok = newval.(string)
+			if !ok {
+				errnums++
+				var rtp string
+				if newval == nil {
+					rtp = "nil"
+				} else {
+					rtp = reflect.TypeOf(newval).Name()
+				}
+				err = fmt.Errorf("transform key %v data type is not string, but %s", g.Key, rtp)
+				continue
+			}
 		}
 		SetMapValue(datas[i], g.convert(strval), false, keys...)
 	}
