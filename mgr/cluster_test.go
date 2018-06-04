@@ -15,6 +15,7 @@ import (
 	"github.com/labstack/echo"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/router"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -1075,6 +1076,7 @@ func TestJsoniterMashalUnmashal(t *testing.T) {
 			"sender_type":    "file",
 			"file_send_path": "/xsxs",
 		}},
+		Router: router.RouterConfig{Routes: make(map[string]int)},
 	}
 	bt, err := jsoniter.Marshal(runnerConf)
 	assert.NoError(t, err)

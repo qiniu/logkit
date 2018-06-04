@@ -174,8 +174,10 @@ func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 func (p *SyslogParser) parse(line string) (data Data, err error) {
 	data = Data{}
 	if p.buff.Len() > 0 {
-		if line == parser.PandoraParseFlushSignal || p.curline >= p.maxline || p.format.IsNewLine([]byte(line)) {
+		if line == parser.PandoraParseFlushSignal {
 			return p.Flush()
+		} else if p.curline >= p.maxline || p.format.IsNewLine([]byte(line)) {
+			data, err = p.Flush()
 		} else {
 			p.curline++
 		}
