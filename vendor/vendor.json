@@ -331,10 +331,10 @@
 			"revisionTime": "2018-04-03T20:44:34Z"
 		},
 		{
-			"checksumSHA1": "6L/3XPIhlmbIX4AMgW8UnguuyWo=",
+			"checksumSHA1": "gydhX7ik17tDsfT5t97UDRseQ7g=",
 			"path": "github.com/json-iterator/go",
-			"revision": "bca911dae0735b8220ddb30236e11cff9d959f19",
-			"revisionTime": "2018-01-28T14:27:09Z"
+			"revision": "8744d7c5c7b40a53e018f78d8c508b3315260b96",
+			"revisionTime": "2018-05-26T01:43:29Z"
 		},
 		{
 			"checksumSHA1": "hz/wVE0xwQ+d8aQbX7ApZVj8Hbg=",
@@ -397,6 +397,18 @@
 			"revisionTime": "2015-03-17T17:43:35Z"
 		},
 		{
+			"checksumSHA1": "ZTcgWKWHsrX0RXYVXn5Xeb8Q0go=",
+			"path": "github.com/modern-go/concurrent",
+			"revision": "bacd9c7ef1dd9b15be4a9909b8ac7a4e313eec94",
+			"revisionTime": "2018-03-06T01:26:44Z"
+		},
+		{
+			"checksumSHA1": "ntSr6NgBxGzQG1fgkl5IFgdjCLo=",
+			"path": "github.com/modern-go/reflect2",
+			"revision": "58118c1ea9161250907268a484af4dd6ed314280",
+			"revisionTime": "2018-05-11T05:30:14Z"
+		},
+		{
 			"checksumSHA1": "qyZO6SotinKrz40LxXjw0LtIwA8=",
 			"path": "github.com/olivere/elastic",
 			"revision": "09755b303b32ccae2968681e77473399cb48378c",
@@ -447,56 +459,56 @@
 		{
 			"checksumSHA1": "1mkYZTEUisjhN8MFnjmGltYaMmw=",
 			"path": "github.com/qiniu/pandora-go-sdk/base",
-			"revision": "a568d40013d666d20d2fc28fe92f0206a9d50340",
-			"revisionTime": "2018-05-10T03:32:44Z"
+			"revision": "6f98b08c04252b9c70e9b0684c773227005ee3ed",
+			"revisionTime": "2018-06-04T10:36:44Z"
 		},
 		{
 			"checksumSHA1": "mYYXNq5dDV/EJCbTgeGUsazTW74=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/config",
-			"revision": "a568d40013d666d20d2fc28fe92f0206a9d50340",
-			"revisionTime": "2018-05-10T03:32:44Z"
+			"revision": "6f98b08c04252b9c70e9b0684c773227005ee3ed",
+			"revisionTime": "2018-06-04T10:36:44Z"
 		},
 		{
 			"checksumSHA1": "k5JfcSQ5YsAFd6DSHpSeuNWbql8=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/models",
-			"revision": "a568d40013d666d20d2fc28fe92f0206a9d50340",
-			"revisionTime": "2018-05-10T03:32:44Z"
+			"revision": "6f98b08c04252b9c70e9b0684c773227005ee3ed",
+			"revisionTime": "2018-06-04T10:36:44Z"
 		},
 		{
 			"checksumSHA1": "lV2zb3SZ4BKaa1XpC4Q3ktbVgDo=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/ratelimit",
-			"revision": "a568d40013d666d20d2fc28fe92f0206a9d50340",
-			"revisionTime": "2018-05-10T03:32:44Z"
+			"revision": "6f98b08c04252b9c70e9b0684c773227005ee3ed",
+			"revisionTime": "2018-06-04T10:36:44Z"
 		},
 		{
-			"checksumSHA1": "u7mTthei+THqk9PvFcut0b+HGGw=",
+			"checksumSHA1": "P1yHyN3yvCO9pa2rwOXGY8ReY24=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/reqerr",
-			"revision": "a568d40013d666d20d2fc28fe92f0206a9d50340",
-			"revisionTime": "2018-05-10T03:32:44Z"
+			"revision": "6f98b08c04252b9c70e9b0684c773227005ee3ed",
+			"revisionTime": "2018-06-04T10:36:44Z"
 		},
 		{
 			"checksumSHA1": "EU8tbJXzlD16NONu4g6rVdDQQM4=",
 			"path": "github.com/qiniu/pandora-go-sdk/base/request",
-			"revision": "a568d40013d666d20d2fc28fe92f0206a9d50340",
-			"revisionTime": "2018-05-10T03:32:44Z"
+			"revision": "6f98b08c04252b9c70e9b0684c773227005ee3ed",
+			"revisionTime": "2018-06-04T10:36:44Z"
 		},
 		{
-			"checksumSHA1": "JfJVQ+acWZd9yUDJY/24dimGb3U=",
+			"checksumSHA1": "YQCRmvdcn8/xNyGj67TQNkP7x24=",
 			"path": "github.com/qiniu/pandora-go-sdk/logdb",
-			"revision": "a568d40013d666d20d2fc28fe92f0206a9d50340",
-			"revisionTime": "2018-05-10T03:32:44Z"
+			"revision": "6f98b08c04252b9c70e9b0684c773227005ee3ed",
+			"revisionTime": "2018-06-04T10:36:44Z"
 		},
 		{
-			"checksumSHA1": "mU9neRhYd6SY+qDbLGLX75M3dXQ=",
+			"checksumSHA1": "iMGzIMTP+V7nJL2qm3uzWAwb0PI=",
 			"path": "github.com/qiniu/pandora-go-sdk/pipeline",
-			"revision": "a568d40013d666d20d2fc28fe92f0206a9d50340",
-			"revisionTime": "2018-05-10T03:32:44Z"
+			"revision": "6f98b08c04252b9c70e9b0684c773227005ee3ed",
+			"revisionTime": "2018-06-04T10:36:44Z"
 		},
 		{
 			"checksumSHA1": "YeSUJIE3zLnpjK3g161wiMeIbmk=",
 			"path": "github.com/qiniu/pandora-go-sdk/tsdb",
-			"revision": "a568d40013d666d20d2fc28fe92f0206a9d50340",
-			"revisionTime": "2018-05-10T03:32:44Z"
+			"revision": "6f98b08c04252b9c70e9b0684c773227005ee3ed",
+			"revisionTime": "2018-06-04T10:36:44Z"
 		},
 		{
 			"checksumSHA1": "KAzbLjI9MzW2tjfcAsK75lVRp6I=",

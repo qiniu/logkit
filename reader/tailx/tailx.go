@@ -225,7 +225,7 @@ func (ar *ActiveReader) expired(expireDur time.Duration) bool {
 		if os.IsNotExist(err) {
 			return true
 		}
-		log.Errorf("Runner[%v] stat log %v error %v,will not expire it...", ar.runnerName, ar.originpath, err)
+		log.Errorf("Runner[%v] stat log %v error %v, will not expire it...", ar.runnerName, ar.originpath, err)
 		return false
 	}
 	if fi.ModTime().Add(expireDur).Before(time.Now()) && atomic.LoadInt32(&ar.inactive) > 0 {
@@ -514,6 +514,9 @@ func (mr *Reader) SyncMeta() {
 	ars := mr.getActiveReaders()
 	for _, ar := range ars {
 		readcache := ar.SyncMeta()
+		if readcache == "" {
+			continue
+		}
 		mr.armapmux.Lock()
 		mr.cacheMap[ar.realpath] = readcache
 		mr.armapmux.Unlock()

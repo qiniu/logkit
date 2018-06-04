@@ -86,12 +86,13 @@ func validateRepoName(r string) error {
 }
 
 type RepoSchemaEntry struct {
-	Key       string                 `json:"key"`
-	ValueType string                 `json:"valtype"`
-	Analyzer  string                 `json:"analyzer,omitempty"` //替代SearchWay
-	Primary   bool                   `json:"primary,omitempty"`  //默认值是false
-	Schemas   []RepoSchemaEntry      `json:"nested,omitempty"`
-	Options   map[string]interface{} `json:"options,omitempty"` // 对于一些特殊的类型，比如IP或者geo_point会有一些特殊的属性。
+	Key         string                 `json:"key"`
+	ValueType   string                 `json:"valtype"`
+	Analyzer    string                 `json:"analyzer,omitempty"` //替代SearchWay
+	Primary     bool                   `json:"primary,omitempty"`  //默认值是false
+	Schemas     []RepoSchemaEntry      `json:"nested,omitempty"`
+	Options     map[string]interface{} `json:"options,omitempty"` // 对于一些特殊的类型，比如IP或者geo_point会有一些特殊的属性。
+	Description string                 `json:"description,omitempty"`
 }
 
 func (e RepoSchemaEntry) String() string {
@@ -128,10 +129,11 @@ func (e *RepoSchemaEntry) Validate() (err error) {
 
 type CreateRepoDSLInput struct {
 	PandoraToken
-	RepoName  string
-	Region    string `json:"region"`
-	Retention string `json:"retention"`
-	DSL       string `json:"dsl"`
+	RepoName    string
+	Region      string `json:"region"`
+	Retention   string `json:"retention"`
+	DSL         string `json:"dsl"`
+	Description string `json:"description,omitempty"`
 }
 
 /*
@@ -408,6 +410,7 @@ type CreateRepoInput struct {
 	Schema       []RepoSchemaEntry `json:"schema"`
 	PrimaryField string            `json:"primaryField"`
 	FullText     FullText          `json:"fullText"`
+	Description  string            `json:"description,omitempty"`
 }
 
 func (r *CreateRepoInput) Validate() (err error) {
@@ -451,9 +454,10 @@ func checkRetention(retention string) error {
 
 type UpdateRepoInput struct {
 	PandoraToken
-	RepoName  string
-	Retention string            `json:"retention"`
-	Schema    []RepoSchemaEntry `json:"schema"`
+	RepoName    string
+	Retention   string            `json:"retention"`
+	Schema      []RepoSchemaEntry `json:"schema"`
+	Description string            `json:"description,omitempty"`
 }
 
 func (r *UpdateRepoInput) Validate() (err error) {
@@ -485,6 +489,7 @@ type GetRepoOutput struct {
 	CreateTime   string            `json:"createTime"`
 	UpdateTime   string            `json:"updateTime"`
 	FullText     FullText          `json:"fullText"`
+	Description  string            `json:"description,omitempty"`
 }
 
 type RepoDesc struct {
@@ -495,6 +500,7 @@ type RepoDesc struct {
 	CreateTime   string   `json:"createTime"`
 	UpdateTime   string   `json:"updateTime"`
 	FullText     FullText `json:"fullText"`
+	Description  string   `json:"description,omitempty"`
 }
 
 type ListReposInput struct {

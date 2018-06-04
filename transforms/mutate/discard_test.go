@@ -41,4 +41,12 @@ func TestDiscardTransformer(t *testing.T) {
 	exp = []Data{{"xxx": 123}, {"nihao": "abc"}}
 	assert.Equal(t, exp, data)
 
+	dis = &Discarder{
+		Key:       "myword",
+		StageTime: "before_parser",
+	}
+	datas, err := dis.RawTransform([]string{"mywordxxx", "xxx"})
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"xxx"}, datas)
+	assert.Equal(t, transforms.StageBeforeParser, dis.Stage())
 }

@@ -10,10 +10,22 @@ import (
 
 const Name = "IP"
 
+const (
+	Region       = "Region"
+	City         = "City"
+	Country      = "Country"
+	Isp          = "Isp"
+	CountryCode  = "CountryCode"
+	Latitude     = "Latitude"
+	Longitude    = "Longitude"
+	DistrictCode = "DistrictCode"
+)
+
 type Transformer struct {
-	StageTime string `json:"stage"`
-	Key       string `json:"key"`
-	DataPath  string `json:"data_path"`
+	StageTime   string `json:"stage"`
+	Key         string `json:"key"`
+	DataPath    string `json:"data_path"`
+	KeyAsPrefix bool   `json:"key_as_prefix"`
 
 	loc   Locator
 	stats StatsInfo
@@ -54,30 +66,29 @@ func (t *Transformer) Transform(datas []Data) ([]Data, error) {
 			errnums++
 			continue
 		}
-
-		newkeys[len(newkeys)-1] = "Region"
-		SetMapValueWithPrefix(datas[i], info.Region, keys[len(keys)-1], newkeys...)
-		newkeys[len(newkeys)-1] = "City"
-		SetMapValueWithPrefix(datas[i], info.City, keys[len(keys)-1], newkeys...)
-		newkeys[len(newkeys)-1] = "Country"
-		SetMapValueWithPrefix(datas[i], info.Country, keys[len(keys)-1], newkeys...)
-		newkeys[len(newkeys)-1] = "Isp"
-		SetMapValueWithPrefix(datas[i], info.Isp, keys[len(keys)-1], newkeys...)
+		newkeys[len(newkeys)-1] = Region
+		SetMapValueWithPrefix(datas[i], info.Region, keys[len(keys)-1], t.KeyAsPrefix, newkeys...)
+		newkeys[len(newkeys)-1] = City
+		SetMapValueWithPrefix(datas[i], info.City, keys[len(keys)-1], t.KeyAsPrefix, newkeys...)
+		newkeys[len(newkeys)-1] = Country
+		SetMapValueWithPrefix(datas[i], info.Country, keys[len(keys)-1], t.KeyAsPrefix, newkeys...)
+		newkeys[len(newkeys)-1] = Isp
+		SetMapValueWithPrefix(datas[i], info.Isp, keys[len(keys)-1], t.KeyAsPrefix, newkeys...)
 		if info.CountryCode != "" {
-			newkeys[len(newkeys)-1] = "CountryCode"
-			SetMapValueWithPrefix(datas[i], info.CountryCode, keys[len(keys)-1], newkeys...)
+			newkeys[len(newkeys)-1] = CountryCode
+			SetMapValueWithPrefix(datas[i], info.CountryCode, keys[len(keys)-1], t.KeyAsPrefix, newkeys...)
 		}
 		if info.Latitude != "" {
-			newkeys[len(newkeys)-1] = "Latitude"
-			SetMapValueWithPrefix(datas[i], info.Latitude, keys[len(keys)-1], newkeys...)
+			newkeys[len(newkeys)-1] = Latitude
+			SetMapValueWithPrefix(datas[i], info.Latitude, keys[len(keys)-1], t.KeyAsPrefix, newkeys...)
 		}
 		if info.Longitude != "" {
-			newkeys[len(newkeys)-1] = "Longitude"
-			SetMapValueWithPrefix(datas[i], info.Longitude, keys[len(keys)-1], newkeys...)
+			newkeys[len(newkeys)-1] = Longitude
+			SetMapValueWithPrefix(datas[i], info.Longitude, keys[len(keys)-1], t.KeyAsPrefix, newkeys...)
 		}
 		if info.DistrictCode != "" {
-			newkeys[len(newkeys)-1] = "DistrictCode"
-			SetMapValueWithPrefix(datas[i], info.DistrictCode, keys[len(keys)-1], newkeys...)
+			newkeys[len(newkeys)-1] = DistrictCode
+			SetMapValueWithPrefix(datas[i], info.DistrictCode, keys[len(keys)-1], t.KeyAsPrefix, newkeys...)
 		}
 	}
 	if err != nil {
@@ -120,14 +131,21 @@ func (_ *Transformer) ConfigOptions() []Option {
 			Description:  "IP数据库路径(data_path)",
 			Type:         transforms.TransformTypeString,
 		},
+		{
+			KeyName:       "key_as_prefix",
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{false, true},
+			Required:      false,
+			Default:       false,
+			DefaultNoUse:  false,
+			Description:   "字段名称作为前缀(key_as_prefix)",
+			Type:          transforms.TransformTypeString,
+		},
 	}
 }
 
 func (t *Transformer) Stage() string {
-	if t.StageTime == "" {
-		return transforms.StageAfterParser
-	}
-	return t.StageTime
+	return transforms.StageAfterParser
 }
 
 func (t *Transformer) Stats() StatsInfo {

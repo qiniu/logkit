@@ -49,6 +49,7 @@ const (
 // Constants for syslog
 const (
 	KeyRFCType              = "syslog_rfc"
+	KeySyslogMaxline        = "syslog_maxline"
 	PandoraParseFlushSignal = "!@#pandora-EOF-line#@!"
 )
 
@@ -313,6 +314,14 @@ var ModeKeyOptions = map[string][]Option{
 			ChooseOptions: []interface{}{"automic", "rfc3164", "rfc5424", "rfc6587"},
 			DefaultNoUse:  false,
 			Description:   "rfc协议(syslog_rfc)",
+		},
+		{
+			KeyName:      KeySyslogMaxline,
+			ChooseOnly:   false,
+			Default:      "100",
+			DefaultNoUse: false,
+			Description:  "最大读取行数(syslog_maxline)",
+			Advance:      true,
 		},
 		OptionParserName,
 		OptionLabels,
