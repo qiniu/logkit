@@ -11,6 +11,9 @@ import (
 	"sort"
 	"time"
 
+	"github.com/labstack/echo"
+	"github.com/qiniu/log"
+
 	"github.com/qiniu/logkit/cli"
 	config "github.com/qiniu/logkit/conf"
 	_ "github.com/qiniu/logkit/metric/all"
@@ -19,10 +22,6 @@ import (
 	_ "github.com/qiniu/logkit/transforms/all"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
-
-	"github.com/qiniu/log"
-
-	"github.com/labstack/echo"
 )
 
 //Config of logkit
@@ -217,7 +216,6 @@ func usageExit(rc int) {
 //！！！注意： 自动生成 grok pattern代码，下述注释请勿删除！！！
 //go:generate go run generators/grok_pattern_generater.go
 func main() {
-
 	flag.Usage = func() { usageExit(0) }
 	flag.Parse()
 	switch {

@@ -10,6 +10,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/json-iterator/go"
+	"github.com/qiniu/log"
+
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/metric/curl"
@@ -17,10 +20,6 @@ import (
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
-
-	"github.com/qiniu/log"
-
-	"github.com/json-iterator/go"
 )
 
 const (
