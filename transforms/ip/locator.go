@@ -24,7 +24,7 @@ type Locator interface {
 	Find(string) (*LocationInfo, error)
 }
 
-// NewLocator returns a new IP loc based on extension of given data file.
+// NewLocator returns a new IP locator based on extension of given data file.
 func NewLocator(dataFile string) (Locator, error) {
 	switch {
 	case strings.HasSuffix(dataFile, ".dat"):
