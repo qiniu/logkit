@@ -428,8 +428,8 @@ func SetMapValue(m map[string]interface{}, val interface{}, coercive bool, keys 
 	return nil
 }
 
-//通过层级key设置value值.
-func SetMapValueWithPrefix(m map[string]interface{}, val interface{}, prefix string, keys ...string) error {
+//通过层级key设置value值, 如果keys不存在则不加前缀，否则加前缀，forceSet为true时无论原来的值存不存在，都加前缀.
+func SetMapValueWithPrefix(m map[string]interface{}, val interface{}, prefix string, forceAdd bool, keys ...string) error {
 	if len(keys) == 0 {
 		return nil
 	}
@@ -452,7 +452,7 @@ func SetMapValueWithPrefix(m map[string]interface{}, val interface{}, prefix str
 		//判断val(k)是否存在
 		_, exist = curr[k]
 	}
-	if exist {
+	if exist || forceAdd {
 		curr[prefix+"_"+keys[len(keys)-1]] = val
 	} else {
 		curr[keys[len(keys)-1]] = val
