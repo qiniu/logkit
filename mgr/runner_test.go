@@ -699,7 +699,7 @@ func Test_QiniulogRun(t *testing.T) {
 	}
 	ls, err := runner.LagStats()
 	assert.NoError(t, err)
-	assert.Equal(t, &LagInfo{0, "bytes", 0}, ls)
+	assert.Equal(t, &LagInfo{0, "bytes", 0, 0}, ls)
 }
 
 func TestCreateTransforms(t *testing.T) {

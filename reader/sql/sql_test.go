@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -211,21 +213,21 @@ func TestGoMagicIndex(t *testing.T) {
 		{
 			data:           "x@(MM)abc@(DD)def",
 			exp_ret:        "x02abc01def",
-			exp_startIndex: []int{-1, 1, 3, -1, -1, -1},
+			exp_startIndex: []int{-1, 1, 6, -1, -1, -1},
 			exp_endIndex:   []int{0, 3, 8, 0, 0, 0},
 			exp_timeIndex:  []int{0, 1, 3, 6, 8, 11},
 		},
 		{
 			data:           "x@(MM)abc@(DD)def*",
 			exp_ret:        "x02abc01def*",
-			exp_startIndex: []int{-1, 1, 3, -1, -1, -1},
+			exp_startIndex: []int{-1, 1, 6, -1, -1, -1},
 			exp_endIndex:   []int{0, 3, 8, 0, 0, 0},
 			exp_timeIndex:  []int{0, 1, 3, 6, 8, 11},
 		},
 		{
 			data:           "x@(MM)abc@(DD)",
 			exp_ret:        "x02abc01",
-			exp_startIndex: []int{-1, 1, 3, -1, -1, -1},
+			exp_startIndex: []int{-1, 1, 6, -1, -1, -1},
 			exp_endIndex:   []int{0, 3, 8, 0, 0, 0},
 			exp_timeIndex:  []int{0, 1, 3, 6},
 		},
@@ -512,4 +514,217 @@ func TestReflectTime(t *testing.T) {
 	fmt.Println(reflect.TypeOf(time.Time{}))
 	fmt.Println(reflect.TypeOf([]byte{}))
 	fmt.Println(reflect.TypeOf(new(interface{})).Elem())
+}
+
+func Test_getDefaultSql(t *testing.T) {
+	database := "my_database"
+	actualSql, err := getDefaultSql(database, "mysql")
+	assert.NoError(t, err)
+	expectSql := strings.Replace(DefaultMySQLTable, "DATABASE_NAME", database, -1)
+	assert.Equal(t, actualSql, expectSql)
+
+	actualSql, err = getDefaultSql(database, "postgres")
+	assert.NoError(t, err)
+	expectSql = strings.Replace(DefaultPGSQLTable, "DATABASE_NAME", database, -1)
+	assert.Equal(t, actualSql, expectSql)
+
+	actualSql, err = getDefaultSql(database, "mssql")
+	assert.NoError(t, err)
+	expectSql = strings.Replace(DefaultMsSQLTable, "DATABASE_NAME", database, -1)
+	assert.Equal(t, actualSql, expectSql)
+}
+
+func Test_restoreMeta(t *testing.T) {
+	meta, err := reader.NewMeta(MetaDir, MetaDir, "mysql", "logpath", "", 7)
+	if err != nil {
+		t.Error(err)
+	}
+	defer os.RemoveAll(MetaDir)
+
+	file, offset, err := meta.ReadOffset()
+	if err == nil {
+		t.Error("offset must be nil")
+	}
+	encodeSQLs := make([]string, 0)
+	syncSQLs := []string{"SELECT * FROM A", "SELECT * FROM B", "SELECT * FROM C"}
+	offsets := []int64{1, 2, 3}
+	for _, sql := range syncSQLs {
+		encodeSQLs = append(encodeSQLs, strings.Replace(sql, " ", "@", -1))
+	}
+	for _, offset := range offsets {
+		encodeSQLs = append(encodeSQLs, strconv.FormatInt(offset, 10))
+	}
+	all := strings.Join(encodeSQLs, sqlOffsetConnector)
+	err = meta.WriteOffset(all, int64(len(syncSQLs)))
+	if err != nil {
+		t.Error(err)
+	}
+	file, offset, err = meta.ReadOffset()
+	if file != all {
+		t.Error("sql meta offset should be " + all)
+	}
+	if offset != 3 {
+		t.Error("file offset should be 3")
+	}
+
+	var mgld time.Duration
+	rawSqls := "SELECT * FROM A; SELECT * FROM B; SELECT * FROM C;"
+	actualOffsets, actualSqls, omitMeta := restoreMeta(meta, rawSqls, mgld)
+	assert.EqualValues(t, false, omitMeta)
+	assert.EqualValues(t, offsets, actualOffsets)
+	assert.EqualValues(t, syncSQLs, actualSqls)
+
+	rawSqls = "SELECT * FROM A; SELECT * FROM B; SELECT * FROM D;"
+	actualOffsets, actualSqls, omitMeta = restoreMeta(meta, rawSqls, mgld)
+	assert.EqualValues(t, false, omitMeta)
+	assert.EqualValues(t, offsets, actualOffsets)
+	assert.EqualValues(t, actualSqls, actualSqls)
+
+	rawSqls = "SELECT * FROM A; SELECT * FROM B;"
+	actualOffsets, actualSqls, omitMeta = restoreMeta(meta, rawSqls, mgld)
+	assert.EqualValues(t, true, omitMeta)
+}
+
+func Test_validTime(t *testing.T) {
+	tests := []struct {
+		data       string
+		match      string
+		startIndex []int
+		endIndex   []int
+		exp_res    bool
+	}{
+		{
+			data:       "x02abc01",
+			match:      "x02abc01",
+			startIndex: []int{-1, 1, 6, -1, -1, -1},
+			endIndex:   []int{0, 3, 8, 0, 0, 0},
+			exp_res:    true,
+		},
+		{
+			data:       "hhhhh",
+			match:      "hhhhh",
+			startIndex: []int{-1, -1, -1, -1, -1, -1},
+			endIndex:   []int{0, 0, 0, 0, 0, 0},
+			exp_res:    true,
+		},
+		{
+			data:       "x01abc31def",
+			match:      "x02abc01def",
+			startIndex: []int{-1, 1, 6, -1, -1, -1},
+			endIndex:   []int{0, 3, 8, 0, 0, 0},
+			exp_res:    true,
+		},
+		{
+			data:       "x01abc31def*",
+			match:      "x02abc01def*",
+			startIndex: []int{-1, 1, 6, -1, -1, -1},
+			endIndex:   []int{0, 3, 8, 0, 0, 0},
+			exp_res:    true,
+		},
+		{
+			data:       "x0201",
+			match:      "x0201",
+			startIndex: []int{-1, 1, 3, -1, -1, -1},
+			endIndex:   []int{0, 3, 5, 0, 0, 0},
+			exp_res:    true,
+		},
+		{
+			data:       "x0102abc",
+			match:      "x0102*",
+			startIndex: []int{-1, 3, 1, -1, -1, -1},
+			endIndex:   []int{0, 5, 3, 0, 0, 0},
+			exp_res:    true,
+		},
+		{
+			data:       "x0102",
+			match:      "x0102*",
+			startIndex: []int{-1, 3, 1, -1, -1, -1},
+			endIndex:   []int{0, 5, 3, 0, 0, 0},
+			exp_res:    true,
+		},
+		{
+			data:       "17",
+			match:      "17",
+			startIndex: []int{0, -1, -1, -1, -1, -1},
+			endIndex:   []int{2, 0, 0, 0, 0, 0},
+			exp_res:    true,
+		},
+		{
+			data:       "abcd201703efg*",
+			match:      "abcd201702efg*",
+			startIndex: []int{4, 8, -1, -1, -1, -1},
+			endIndex:   []int{8, 10, 0, 0, 0, 0},
+			exp_res:    false,
+		},
+		{
+			data:       "abcd20170201160618*",
+			match:      "abcd20170201160619*",
+			startIndex: []int{4, 8, 10, 12, 14, 16},
+			endIndex:   []int{8, 10, 12, 14, 16, 18},
+			exp_res:    true,
+		},
+	}
+	for _, ti := range tests {
+		valid := validTime(ti.data, ti.match, ti.startIndex, ti.endIndex)
+		assert.EqualValues(t, ti.exp_res, valid)
+	}
+}
+
+func Test_getCheckHistory(t *testing.T) {
+	mr := &Reader{
+		database:   "Test_getCheckHistory",
+		dbtype:     "mysql",
+		historyAll: true,
+		table:      "",
+	}
+
+	tests := []struct {
+		queryType int
+		exp_res   bool
+	}{
+		{
+			queryType: TABLE,
+			exp_res:   false,
+		},
+		{
+			queryType: COUNT,
+			exp_res:   false,
+		},
+		{
+			queryType: DATABASE,
+			exp_res:   true,
+		},
+	}
+
+	for _, test := range tests {
+		checkHistory, err := mr.getCheckHistory(test.queryType)
+		assert.NoError(t, err)
+		assert.EqualValues(t, test.exp_res, checkHistory)
+	}
+}
+
+func Test_getRawSqls(t *testing.T) {
+	tests := []struct {
+		queryType int
+		exp_sqls  string
+	}{
+		{
+			queryType: TABLE,
+			exp_sqls:  "Select * From `my_table`;",
+		},
+		{
+			queryType: COUNT,
+			exp_sqls:  "Select Count(*) From `my_table`;",
+		},
+		{
+			queryType: DATABASE,
+			exp_sqls:  "",
+		},
+	}
+
+	for _, test := range tests {
+		sqls, err := getRawSqls(test.queryType, "my_table")
+		assert.NoError(t, err)
+		assert.EqualValues(t, test.exp_sqls, sqls)
+	}
 }

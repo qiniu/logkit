@@ -49,6 +49,15 @@ const (
 	SECOND
 )
 
+const (
+	// 获取符合条件的table
+	TABLE = iota
+	// 获取符合条件的database
+	DATABASE
+	// 获取数据库表的总条数
+	COUNT
+)
+
 func init() {
 	reader.RegisterConstructor(reader.ModeMySQL, NewReader)
 	reader.RegisterConstructor(reader.ModeMSSQL, NewReader)
@@ -85,6 +94,8 @@ type Reader struct {
 	loop         bool
 	loopDuration time.Duration
 	magicLagDur  time.Duration
+	count        int64
+	CurrentCount int64
 
 	stats     StatsInfo
 	statsLock sync.RWMutex
@@ -424,15 +435,16 @@ func goMagicIndex(rawSql string, now time.Time) (ret string, startIndex, endInde
 	sps := strings.Split(rawSql, "@(")         //@()，对于每个分片找右括号
 	ret = sps[0]
 	recordIndex := len(ret)
-	timeIndex = []int{0}
+	timeIndex = []int{0} // 按顺序记录时间的开始结束位置
 
+	// 没有魔法变量的情况，例如 mytest*
 	if len(sps) < 2 {
 		if strings.Contains(ret, Wildcards) {
 			timeIndex = append(timeIndex, recordIndex-1)
 		} else {
 			timeIndex = append(timeIndex, recordIndex)
 		}
-		return
+		return ret, startIndex, endIndex, timeIndex, nil
 	}
 
 	timeIndex = append(timeIndex, recordIndex)
@@ -464,6 +476,7 @@ func goMagicIndex(rawSql string, now time.Time) (ret string, startIndex, endInde
 			spsRemain := sps[idx][idxr+1:]
 			ret += spsRemain
 			if spsRemain == Wildcards {
+				recordIndex = len(ret)
 				continue
 			}
 			timeIndex = append(timeIndex, recordIndex)
@@ -472,6 +485,7 @@ func goMagicIndex(rawSql string, now time.Time) (ret string, startIndex, endInde
 			} else {
 				timeIndex = append(timeIndex, len(ret))
 			}
+			recordIndex = len(ret)
 		}
 	}
 
@@ -766,28 +780,21 @@ func (mr *Reader) exec(connectStr string) (err error) {
 		return err
 	}
 
-	dbs := make([]string, 0)
-	if mr.historyAll {
-		var startIndex, endIndex, timeIndex []int
-		var matchDB string
-		matchDB, startIndex, endIndex, timeIndex, err = goMagicIndex(mr.rawDatabase, now)
-		if err != nil {
-			return err
-		}
-		if matchDB == mr.rawDatabase && !strings.Contains(mr.rawDatabase, Wildcards) {
-			dbs = append(dbs, matchDB)
-		} else {
-			matchStr := getRemainStr(matchDB, timeIndex)
-			dbs, _, err = mr.getValidData(db, matchDB, matchStr, DefaultMySQLDatabase, startIndex, endIndex, timeIndex, false)
-			if err != nil {
-				return err
-			}
-		}
-	} else {
-		dbs = append(dbs, mr.database)
+	// 获取符合条件的数据库
+	dbs, err := mr.getDatas(db, mr.rawDatabase, now, DATABASE)
+	if err != nil {
+		return err
 	}
 
 	log.Infof("Runner[%v] %v get valid databases: %v", mr.meta.RunnerName, mr.Name(), dbs)
+
+	// 获取数据库所有条数
+	for _, curDb := range dbs {
+		err = mr.execCountDB(curDb, now)
+		if err != nil {
+			return err
+		}
+	}
 
 	for _, curDb := range dbs {
 		err = mr.execReadDB(curDb, now)
@@ -799,262 +806,154 @@ func (mr *Reader) exec(connectStr string) (err error) {
 	return nil
 }
 
-func (mr *Reader) execReadDB(curDb string, now time.Time) (err error) {
-	//var db *sql.DB
+func (mr *Reader) execCountDB(curDb string, now time.Time) (err error) {
 	connectStr := getConnectStr(mr.datasource, curDb, mr.encoder)
 	db, err := openSql(mr.dbtype, connectStr, mr.Name())
 	if err != nil {
-		return
+		return err
 	}
-	defer db.Close()
+	defer func() {
+		if mr.historyAll {
+			mr.rawsqls = ""
+		}
+		db.Close()
+	}()
 	if err = db.Ping(); err != nil {
-		return
+		return err
 	}
 	log.Infof("Runner[%v] %v prepare %v change database success, current database is: %v", mr.meta.RunnerName, mr.Name(), mr.dbtype, curDb)
 	mr.database = curDb
 
 	//更新sqls
-	tables := make([]string, 0)
-	var rawsqlsEmpty bool
-	var omitTableDone bool
-	var tableDone []string
-	var updateTableDone bool
+	var tables, tableDone []string
+	var isRawsqlsEmpty, omitTableDone bool
 	if mr.rawsqls == "" {
-		rawsqlsEmpty = true
-		var defaultSql string
-		switch mr.dbtype {
-		case reader.ModeMySQL:
-			defaultSql = strings.Replace(DefaultMySQLTable, "DATABASE_NAME", mr.database, -1)
-		case reader.ModePostgreSQL:
-			defaultSql = DefaultPGSQLTable
-		case reader.ModeMSSQL:
-			defaultSql = strings.Replace(DefaultMsSQLTable, "DATABASE_NAME", mr.database, -1)
+		isRawsqlsEmpty = true
+
+		// 获取符合条件的数据表，并且将计算表中记录数的query语句赋给 mr.rawsqls
+		tables, err = mr.getDatas(db, mr.rawTable, now, COUNT)
+		if err != nil {
+			return err
 		}
 
-		if mr.historyAll && mr.table != "" && mr.table != "*" {
-			var startIndex, endIndex, timeIndex []int
-			var matchTable string
-			matchTable, startIndex, endIndex, timeIndex, err = goMagicIndex(mr.rawTable, now)
-			if err != nil {
-				return err
-			}
-			if matchTable == mr.rawTable && !strings.Contains(mr.rawTable, Wildcards) {
-				tables = append(tables, matchTable)
-			} else {
-				matchStr := getRemainStr(matchTable, timeIndex)
-				tables, mr.rawsqls, err = mr.getValidData(db, matchTable, matchStr, defaultSql, startIndex, endIndex, timeIndex, true)
-				if err != nil {
-					return err
-				}
-			}
-		} else {
-			rows, err := db.Query(defaultSql)
-			if err != nil {
-				log.Errorf("Runner[%v] %v prepare %v <%v> query error %v", mr.meta.RunnerName, mr.Name(), mr.dbtype, defaultSql, err)
-				return err
-			}
-
-			for rows.Next() {
-				var s string
-				err = rows.Scan(&s)
-				if err != nil {
-					log.Errorf("Runner[%v] %v scan rows error %v", mr.meta.RunnerName, mr.Name(), err)
-					continue
-				}
-				tables = append(tables, s)
-				mr.rawsqls += "Select * From `" + s + "`;"
-			}
-			rows.Close()
-		}
-
-		log.Debugf("Runner[%v] %v default sqls %v", mr.meta.RunnerName, mr.Name(), mr.rawsqls)
-
-		offsets, sqls, omitMeta := restoreMeta(mr.meta, mr.rawsqls, mr.magicLagDur)
-		// 如果meta初始信息损坏
-		if !omitMeta {
-			mr.offsets = offsets
-		} else {
-			mr.offsets = make([]int64, len(mr.syncSQLs))
-		}
+		log.Debugf("Runner[%v] %v default count sqls %v", mr.meta.RunnerName, mr.Name(), mr.rawsqls)
 
 		tableDone, omitTableDone = restoreTableDone(mr.meta, mr.database, tables)
 		if omitTableDone {
 			tableDone = make([]string, 0)
 		}
-
-		mr.syncSQLs = sqls
 	}
 
 	sqls := updateSqls(mr.rawsqls, now)
-	mr.updateOffsets(sqls)
+	if !isRawsqlsEmpty {
+		mr.updateOffsets(sqls)
+	}
 	mr.syncSQLs = sqls
 	log.Infof("Runner[%v] %v start to work, sqls %v offsets %v", mr.meta.RunnerName, mr.Name(), mr.syncSQLs, mr.offsets)
 
-	for idx, rawSQL := range mr.syncSQLs {
+	for idx, rawSql := range mr.syncSQLs {
 		//分sql执行
+		if isRawsqlsEmpty {
+			if !omitTableDone && contains(tableDone, tables[idx]) {
+				continue
+			}
+		}
+
+		// 每张表的记录数
+		var tableSize int64
+		tableSize, err = mr.execTableCount(db, idx, rawSql)
+		if err != nil {
+			return err
+		}
+
+		// 符合记录的数据库和表的记录总数
+		mr.count += tableSize
+	}
+
+	if isRawsqlsEmpty {
+		mr.rawsqls = ""
+	}
+
+	return nil
+}
+
+func (mr *Reader) execReadDB(curDb string, now time.Time) (err error) {
+	connectStr := getConnectStr(mr.datasource, curDb, mr.encoder)
+	db, err := openSql(mr.dbtype, connectStr, mr.Name())
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if mr.historyAll {
+			mr.rawsqls = ""
+		}
+		db.Close()
+	}()
+	if err = db.Ping(); err != nil {
+		return err
+	}
+	log.Infof("Runner[%v] %v prepare %v change database success, current database is: %v", mr.meta.RunnerName, mr.Name(), mr.dbtype, curDb)
+	mr.database = curDb
+
+	//更新sqls
+	var tables, tableDone []string
+	var isRawSqlsEmpty, omitTableDone bool
+	if mr.rawsqls == "" {
+		isRawSqlsEmpty = true
+
+		// 获取符合条件的数据表，并且将获取表中所有记录的语句赋给 mr.rawsqls
+		tables, err = mr.getDatas(db, mr.rawTable, now, TABLE)
+		if err != nil {
+			return err
+		}
+
+		log.Infof("Runner[%v] %v default sqls %v", mr.meta.RunnerName, mr.Name(), mr.rawsqls)
+
+		tableDone, omitTableDone = restoreTableDone(mr.meta, mr.database, tables)
+		if omitTableDone {
+			tableDone = make([]string, 0)
+		}
+	}
+	log.Infof("Runner[%v] %v get valid tables: %v", mr.meta.RunnerName, mr.Name(), tables)
+
+	rawTableLength := len(tableDone)
+	sqls := updateSqls(mr.rawsqls, now)
+	if !isRawSqlsEmpty {
+		mr.updateOffsets(sqls)
+	}
+	mr.syncSQLs = sqls
+	log.Infof("Runner[%v] %v start to work, sqls %v offsets %v", mr.meta.RunnerName, mr.Name(), mr.syncSQLs, mr.offsets)
+
+	for idx, rawSql := range mr.syncSQLs {
+		//分sql执行
+		var isRawSql, statusStop bool
 		exit := false
-		var isRawSQL bool
 		for !exit {
-			exit = true
-			isRawSQL = false
-			if rawsqlsEmpty {
+			if isRawSqlsEmpty {
 				if contains(tableDone, tables[idx]) {
 					break
 				}
 			}
-
-			execSQL, err := mr.getSQL(idx)
+			// 执行每条 sql 语句
+			exit, isRawSql, statusStop, tableDone, err = mr.execReadSql(db, isRawSqlsEmpty, idx, rawSql, tableDone, tables)
 			if err != nil {
-				log.Errorf("Runner[%v] get SQL error %v, use raw SQL", mr.meta.RunnerName, err)
-				execSQL = rawSQL
-				isRawSQL = true
-			}
-			log.Infof("Runner[%v] reader <%v> exec sql <%v>", mr.meta.RunnerName, mr.Name(), execSQL)
-			rows, err := db.Query(execSQL)
-			if err != nil {
-				log.Errorf("Runner[%v] %v prepare %v <%v> query error %v", mr.meta.RunnerName, mr.Name(), mr.dbtype, execSQL, err)
-				continue
-			}
-			// Get column names
-			columns, err := rows.Columns()
-			if err != nil {
-				log.Errorf("Runner[%v] %v prepare %v <%v> columns error %v", mr.meta.RunnerName, mr.Name(), mr.dbtype, execSQL, err)
-				continue
-			}
-			log.Infof("Runner[%v] SQL ：<%v>, schemas: <%v>", mr.meta.RunnerName, execSQL, strings.Join(columns, ", "))
-			scanArgs, nochiced := mr.getInitScans(len(columns), rows, mr.dbtype)
-			offsetKeyIndex := mr.getOffsetIndex(columns)
-
-			// Fetch rows
-			var maxOffset int64 = -1
-			for rows.Next() {
-				exit = false
-				// get RawBytes from data
-				err = rows.Scan(scanArgs...)
-				if err != nil {
-					log.Errorf("Runner[%v] %v scan rows error %v", mr.meta.RunnerName, mr.Name(), err)
-					continue
-				}
-				data := make(map[string]interface{})
-				for i := 0; i < len(scanArgs); i++ {
-					vtype, ok := mr.schemas[columns[i]]
-					if !ok {
-						vtype = "unknown"
-					}
-					switch vtype {
-					case "long":
-						val, serr := convertLong(scanArgs[i])
-						if serr != nil {
-							log.Errorf("Runner[%v] %v convertLong for %v (%v) error %v, ignore this key...", mr.meta.RunnerName, mr.Name(), columns[i], scanArgs[i], serr)
-						} else {
-							data[columns[i]] = &val
-						}
-					case "float":
-						val, serr := convertFloat(scanArgs[i])
-						if serr != nil {
-							log.Errorf("Runner[%v] %v convertFloat for %v (%v) error %v, ignore this key...", mr.meta.RunnerName, mr.Name(), columns[i], scanArgs[i], serr)
-						} else {
-							data[columns[i]] = &val
-						}
-					case "string":
-						val, serr := convertString(scanArgs[i])
-						if serr != nil {
-							log.Errorf("Runner[%v] %v convertString for %v (%v) error %v, ignore this key...", mr.meta.RunnerName, mr.Name(), columns[i], scanArgs[i], serr)
-						} else {
-							data[columns[i]] = &val
-						}
-					default:
-						dealed := false
-						if !nochiced[i] {
-							dealed = true
-							switch d := scanArgs[i].(type) {
-							case *string:
-								data[columns[i]] = *d
-							case *[]byte:
-								data[columns[i]] = string(*d)
-							case *bool:
-								data[columns[i]] = *d
-							case int64:
-								data[columns[i]] = d
-							case *int64:
-								data[columns[i]] = *d
-							case float64:
-								data[columns[i]] = d
-							case *float64:
-								data[columns[i]] = *d
-							case uint64:
-								data[columns[i]] = d
-							case *uint64:
-								data[columns[i]] = *d
-							case *interface{}:
-								dealed = false
-							default:
-								dealed = false
-							}
-						}
-						if !dealed {
-							val, serr := convertString(scanArgs[i])
-							if serr != nil {
-								log.Errorf("Runner[%v] %v convertString for %v (%v) error %v, ignore this key...", mr.meta.RunnerName, mr.Name(), columns[i], scanArgs[i], serr)
-							} else {
-								data[columns[i]] = &val
-							}
-						}
-					}
-				}
-				ret, err := jsoniter.Marshal(data)
-				if err != nil {
-					log.Errorf("Runner[%v] %v unmarshal sql data error %v", mr.meta.RunnerName, mr.Name(), err)
-					continue
-				}
-				if atomic.LoadInt32(&mr.status) == reader.StatusStopping {
-					log.Warnf("Runner[%v] %v stopped from running", mr.meta.RunnerName, mr.Name())
-					return nil
-				}
-				mr.readChan <- ret
-
-				if offsetKeyIndex >= 0 {
-					var tmpOffsetIndex int64
-					tmpOffsetIndex, err = convertLong(scanArgs[offsetKeyIndex])
-					if err != nil {
-						log.Errorf("Runner[%v] %v offset key value parse error %v, offset was not recorded", mr.meta.RunnerName, mr.Name(), err)
-						err = nil
-					} else if tmpOffsetIndex > maxOffset {
-						maxOffset = tmpOffsetIndex
-					}
-				} else {
-					mr.offsets[idx]++
-				}
-			}
-			if rawsqlsEmpty {
-				tableDone = append(tableDone, tables[idx])
-				updateTableDone = true
+				return err
 			}
 
-			if maxOffset > 0 {
-				mr.offsets[idx] = maxOffset + 1
+			if statusStop {
+				return nil
 			}
-			if exit {
-				var newOffsetIdx int64
-				exit, newOffsetIdx = mr.checkExit(idx, db)
-				if !exit {
-					mr.offsets[idx] += int64(mr.readBatch)
-					if newOffsetIdx > mr.offsets[idx] {
-						mr.offsets[idx] = newOffsetIdx
-					}
-				} else {
-					log.Infof("Runner[%v] %v no data any more, exit...", mr.meta.RunnerName, mr.Name())
-				}
-			}
-			if isRawSQL {
+
+			if isRawSql {
 				log.Infof("Runner[%v] %v is raw SQL, exit after exec once...", mr.meta.RunnerName, mr.Name())
 				break
 			}
 		}
 	}
 
-	if rawsqlsEmpty {
-		if updateTableDone {
+	// 记录已经读过的 数据库表
+	if isRawSqlsEmpty {
+		if rawTableLength != len(tableDone) {
 			all := strings.Join(tableDone, "\n")
 			if err := WriteDBDoneFile(mr.meta.DoneFilePath, mr.database, all); err != nil {
 				log.Errorf("Runner[%v] %v write table done file error %v", mr.meta.RunnerName, mr.Name(), err)
@@ -1076,13 +975,12 @@ func WriteDBDoneFile(doneFilePath, database, content string) (err error) {
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 	_, err = f.Write([]byte(content))
 	if err != nil {
-		f.Close()
 		return err
 	}
 	f.Sync()
-	f.Close()
 
 	return nil
 }
@@ -1295,23 +1193,22 @@ func (mr *Reader) getSQL(idx int) (sql string, err error) {
 		} else {
 			sql = fmt.Sprintf("%s;", rawSQL)
 		}
-		return sql, nil
 	case reader.ModeMSSQL:
 		if len(mr.offsetKey) > 0 {
 			sql = fmt.Sprintf("%s WHERE CAST(%v AS BIGINT) >= %d AND CAST(%v AS BIGINT) < %d;", rawSQL, mr.offsetKey, mr.offsets[idx], mr.offsetKey, mr.offsets[idx]+int64(mr.readBatch))
 		} else {
 			err = fmt.Errorf("%v dbtype is not support get SQL without id now", mr.dbtype)
 		}
-		return sql, nil
 	case reader.ModePostgreSQL:
 		if len(mr.offsetKey) > 0 {
 			sql = fmt.Sprintf("%s WHERE %v >= %d AND %v < %d;", rawSQL, mr.offsetKey, mr.offsets[idx], mr.offsetKey, mr.offsets[idx]+int64(mr.readBatch))
 		} else {
 			err = fmt.Errorf("%v dbtype is not support get SQL without id now", mr.dbtype)
 		}
-		return sql, nil
+	default:
+		err = fmt.Errorf("%v dbtype is not support get SQL now", mr.dbtype)
 	}
-	err = fmt.Errorf("%v dbtype is not support get SQL now", mr.dbtype)
+
 	return sql, err
 }
 
@@ -1432,8 +1329,13 @@ func validTime(str, match string, startIndex, endIndex []int) (valid bool) {
 	return true
 }
 
-func (mr *Reader) getValidData(db *sql.DB, matchData, matchStr, query string, startIndex, endIndex, timeIndex []int, tableQuery bool) (validData []string, sqls string, err error) {
+func (mr *Reader) getValidData(db *sql.DB, matchData, matchStr string, startIndex, endIndex, timeIndex []int, queryType int) (validData []string, sqls string, err error) {
 	// get all databases and check validate database
+	query, err := mr.getQuery(queryType)
+	if err != nil {
+		return validData, sqls, err
+	}
+
 	rowsDBs, err := db.Query(query)
 	if err != nil {
 		log.Errorf("Runner[%v] %v prepare %v <%v> query error %v", mr.meta.RunnerName, mr.Name(), mr.dbtype, query, err)
@@ -1450,16 +1352,20 @@ func (mr *Reader) getValidData(db *sql.DB, matchData, matchStr, query string, st
 			continue
 		}
 
-		// get valid database
-		// 字符匹配
-		match := matchRemainStr(s, matchStr, timeIndex)
-		log.Infof("Runner[%v] %v current table: %v, current time table: %v, timeIndex: %v, isMatch: %v", mr.meta.RunnerName, mr.Name(), s, matchStr, timeIndex, match)
-		if !match || !validTime(s, matchData, startIndex, endIndex) {
-			continue
+		if matchData != "" {
+			// 字符匹配
+			match := matchRemainStr(s, matchStr, timeIndex)
+			log.Infof("Runner[%v] %v current data: %v, current time data: %v, remain str: %v, timeIndex: %v, isMatch: %v", mr.meta.RunnerName, mr.Name(), s, matchData, matchStr, timeIndex, match)
+			if !match || !validTime(s, matchData, startIndex, endIndex) {
+				continue
+			}
 		}
-		if tableQuery {
-			sqls += "Select * From `" + s + "`;"
+
+		rawSql, err := getRawSqls(queryType, s)
+		if err != nil {
+			return validData, sqls, err
 		}
+		sqls += rawSql
 
 		validData = append(validData, s)
 	}
@@ -1509,4 +1415,322 @@ func getRemainStr(origin string, timeIndex []int) (remainStr string) {
 	}
 
 	return remainStr
+}
+
+func (mr *Reader) Lag() (rl *LagInfo, err error) {
+	return &LagInfo{
+		SizeUnit: "records",
+		Size:     mr.count - mr.CurrentCount,
+		Total:    mr.count,
+	}, nil
+}
+
+func getDefaultSql(database, dbtype string) (defaultSql string, err error) {
+	switch dbtype {
+	case reader.ModeMySQL:
+		defaultSql = strings.Replace(DefaultMySQLTable, "DATABASE_NAME", database, -1)
+	case reader.ModePostgreSQL:
+		defaultSql = DefaultPGSQLTable
+	case reader.ModeMSSQL:
+		defaultSql = strings.Replace(DefaultMsSQLTable, "DATABASE_NAME", database, -1)
+	default:
+		return "", fmt.Errorf("not support reader type: %v", dbtype)
+	}
+	return defaultSql, nil
+}
+
+// 根据queryType获取符合要求的数据和需要执行的原始sql语句mr.rawsqls
+// queryType 可以为TABLE DATABASE COUNT
+func (mr *Reader) getDatas(db *sql.DB, rawData string, now time.Time, queryType int) (datas []string, err error) {
+	var startIndex, endIndex, timeIndex []int
+	var matchData string
+	datas = make([]string, 0)
+
+	// 是否导入历史数据
+	checkHistory, err := mr.getCheckHistory(queryType)
+	if err != nil {
+		return datas, err
+	}
+
+	if !checkHistory {
+		// 非导入历史数据，正常情况下获得数据
+		datas, err = mr.getGeneralDatas(db, queryType)
+		if err != nil {
+			return datas, err
+		}
+	}
+
+	// 获取符合条件的历史数据
+	// 先获取 转换magic后的值
+	// 再获取除时间以外剩余的字符串，进行字符串匹配，如果匹配，继续判断时间不符合，不匹配跳过
+	// 最后判断时间是否符合，时间小于等于，则匹配，加入返回数组，不匹配跳过
+	matchData, startIndex, endIndex, timeIndex, err = goMagicIndex(rawData, now)
+	if err != nil {
+		return datas, err
+	}
+	if matchData == rawData && !strings.Contains(rawData, Wildcards) {
+		datas = append(datas, matchData)
+		return datas, nil
+	}
+
+	matchStr := getRemainStr(matchData, timeIndex)
+	datas, mr.rawsqls, err = mr.getValidData(db, matchData, matchStr, startIndex, endIndex, timeIndex, queryType)
+	if err != nil {
+		return datas, err
+	}
+
+	return datas, nil
+}
+
+// 是否拿历史数据
+func (mr *Reader) getCheckHistory(queryType int) (checkHistory bool, err error) {
+	switch queryType {
+	case TABLE, COUNT:
+		checkHistory = mr.historyAll && mr.table != "" && mr.table != "*"
+	case DATABASE:
+		checkHistory = mr.historyAll
+	default:
+		return false, fmt.Errorf("%v queryType is not support get sql now", queryType)
+	}
+
+	return checkHistory, nil
+}
+
+// 根据 queryType 获取表中所有记录或者表中所有数据的条数的sql语句
+func getRawSqls(queryType int, table string) (sqls string, err error) {
+	switch queryType {
+	case TABLE:
+		sqls += "Select * From `" + table + "`;"
+	case COUNT:
+		sqls += "Select Count(*) From `" + table + "`;"
+	case DATABASE:
+	default:
+		return "", fmt.Errorf("%v queryType is not support get sql now", queryType)
+	}
+
+	return sqls, nil
+}
+
+// 根据 queryType 获取query语句
+func (mr *Reader) getQuery(queryType int) (query string, err error) {
+	switch queryType {
+	case TABLE, COUNT:
+		query, err = getDefaultSql(mr.database, mr.dbtype)
+	case DATABASE:
+		query = DefaultMySQLDatabase
+	default:
+		return "", fmt.Errorf("%v queryType is not support get sql now", queryType)
+	}
+
+	return query, nil
+}
+
+// 计算每个table的记录条数
+func (mr *Reader) execTableCount(db *sql.DB, idx int, rawSql string) (tableSize int64, err error) {
+	execSQL, err := mr.getSQL(idx)
+	if err != nil {
+		log.Errorf("Runner[%v] get SQL error %v, use raw SQL", mr.meta.RunnerName, err)
+		execSQL = rawSql
+	}
+	log.Infof("Runner[%v] reader <%v> exec sql <%v>", mr.meta.RunnerName, mr.Name(), execSQL)
+	rows, err := db.Query(execSQL)
+	if err != nil {
+		log.Errorf("Runner[%v] %v prepare %v <%v> query error %v", mr.meta.RunnerName, mr.Name(), mr.dbtype, execSQL, err)
+		return 0, err
+	}
+	defer rows.Close()
+
+	// Fetch rows
+	for rows.Next() {
+		var s string
+		err = rows.Scan(&s)
+		if err != nil {
+			log.Errorf("Runner[%v] %v scan rows error %v", mr.meta.RunnerName, mr.Name(), err)
+			return 0, err
+		}
+
+		tableSize, err = strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			log.Errorf("Runner[%v] %v convert string to int64 error %v", mr.meta.RunnerName, mr.Name(), err)
+			return 0, err
+		}
+	}
+
+	return tableSize, nil
+}
+
+// 执行每条 sql 语句
+func (mr *Reader) execReadSql(db *sql.DB, isRawSqlsEmpty bool, idx int, rawSql string, tableDone, tables []string) (exit bool, isRawSql bool, statusStop bool, tableRecords []string, err error) {
+	exit = true
+
+	execSQL, err := mr.getSQL(idx)
+	if err != nil {
+		log.Errorf("Runner[%v] get SQL error %v, use raw SQL", mr.meta.RunnerName, err)
+		execSQL = rawSql
+		isRawSql = true
+	}
+
+	log.Infof("Runner[%v] reader <%v> exec sql <%v>", mr.meta.RunnerName, mr.Name(), execSQL)
+	rows, err := db.Query(execSQL)
+	if err != nil {
+		log.Errorf("Runner[%v] %v prepare %v <%v> query error %v", mr.meta.RunnerName, mr.Name(), mr.dbtype, execSQL, err)
+		return exit, isRawSql, false, tableDone, nil
+	}
+	defer rows.Close()
+	// Get column names
+	columns, err := rows.Columns()
+	if err != nil {
+		log.Errorf("Runner[%v] %v prepare %v <%v> columns error %v", mr.meta.RunnerName, mr.Name(), mr.dbtype, execSQL, err)
+		return exit, isRawSql, false, tableDone, nil
+	}
+	log.Infof("Runner[%v] SQL ：<%v>, schemas: <%v>", mr.meta.RunnerName, execSQL, strings.Join(columns, ", "))
+	scanArgs, nochiced := mr.getInitScans(len(columns), rows, mr.dbtype)
+	var offsetKeyIndex int
+	if !isRawSqlsEmpty {
+		offsetKeyIndex = mr.getOffsetIndex(columns)
+	}
+
+	// Fetch rows
+	var maxOffset int64 = -1
+	for rows.Next() {
+		exit = false
+		// get RawBytes from data
+		err = rows.Scan(scanArgs...)
+		if err != nil {
+			log.Errorf("Runner[%v] %v scan rows error %v", mr.meta.RunnerName, mr.Name(), err)
+			continue
+		}
+		data := make(map[string]interface{})
+		for i := 0; i < len(scanArgs); i++ {
+			vtype, ok := mr.schemas[columns[i]]
+			if !ok {
+				vtype = "unknown"
+			}
+			switch vtype {
+			case "long":
+				val, serr := convertLong(scanArgs[i])
+				if serr != nil {
+					log.Errorf("Runner[%v] %v convertLong for %v (%v) error %v, ignore this key...", mr.meta.RunnerName, mr.Name(), columns[i], scanArgs[i], serr)
+				} else {
+					data[columns[i]] = &val
+				}
+			case "float":
+				val, serr := convertFloat(scanArgs[i])
+				if serr != nil {
+					log.Errorf("Runner[%v] %v convertFloat for %v (%v) error %v, ignore this key...", mr.meta.RunnerName, mr.Name(), columns[i], scanArgs[i], serr)
+				} else {
+					data[columns[i]] = &val
+				}
+			case "string":
+				val, serr := convertString(scanArgs[i])
+				if serr != nil {
+					log.Errorf("Runner[%v] %v convertString for %v (%v) error %v, ignore this key...", mr.meta.RunnerName, mr.Name(), columns[i], scanArgs[i], serr)
+				} else {
+					data[columns[i]] = &val
+				}
+			default:
+				dealed := false
+				if !nochiced[i] {
+					dealed = true
+					switch d := scanArgs[i].(type) {
+					case *string:
+						data[columns[i]] = *d
+					case *[]byte:
+						data[columns[i]] = string(*d)
+					case *bool:
+						data[columns[i]] = *d
+					case int64:
+						data[columns[i]] = d
+					case *int64:
+						data[columns[i]] = *d
+					case float64:
+						data[columns[i]] = d
+					case *float64:
+						data[columns[i]] = *d
+					case uint64:
+						data[columns[i]] = d
+					case *uint64:
+						data[columns[i]] = *d
+					case *interface{}:
+						dealed = false
+					default:
+						dealed = false
+					}
+				}
+				if !dealed {
+					val, serr := convertString(scanArgs[i])
+					if serr != nil {
+						log.Errorf("Runner[%v] %v convertString for %v (%v) error %v, ignore this key...", mr.meta.RunnerName, mr.Name(), columns[i], scanArgs[i], serr)
+					} else {
+						data[columns[i]] = &val
+					}
+				}
+			}
+		}
+		ret, err := jsoniter.Marshal(data)
+		if err != nil {
+			log.Errorf("Runner[%v] %v unmarshal sql data error %v", mr.meta.RunnerName, mr.Name(), err)
+			continue
+		}
+		if atomic.LoadInt32(&mr.status) == reader.StatusStopping {
+			log.Warnf("Runner[%v] %v stopped from running", mr.meta.RunnerName, mr.Name())
+			return exit, isRawSql, statusStop, tableDone, nil
+		}
+		mr.readChan <- ret
+		mr.CurrentCount++
+
+		if mr.historyAll || isRawSqlsEmpty {
+			continue
+		}
+
+		if offsetKeyIndex >= 0 {
+			var tmpOffsetIndex int64
+			tmpOffsetIndex, err = convertLong(scanArgs[offsetKeyIndex])
+			if err != nil {
+				log.Errorf("Runner[%v] %v offset key value parse error %v, offset was not recorded", mr.meta.RunnerName, mr.Name(), err)
+				err = nil
+			} else if tmpOffsetIndex > maxOffset {
+				maxOffset = tmpOffsetIndex
+			}
+		} else {
+			mr.offsets[idx]++
+		}
+	}
+	if isRawSqlsEmpty {
+		tableDone = append(tableDone, tables[idx])
+	}
+
+	if maxOffset > 0 {
+		mr.offsets[idx] = maxOffset + 1
+	}
+	if exit {
+		var newOffsetIdx int64
+		exit, newOffsetIdx = mr.checkExit(idx, db)
+		if !exit {
+			mr.offsets[idx] += int64(mr.readBatch)
+			if newOffsetIdx > mr.offsets[idx] {
+				mr.offsets[idx] = newOffsetIdx
+			}
+		} else {
+			log.Infof("Runner[%v] %v no data any more, exit...", mr.meta.RunnerName, mr.Name())
+		}
+	}
+
+	return exit, isRawSql, false, tableDone, nil
+}
+
+func (mr *Reader) getGeneralDatas(db *sql.DB, queryType int) (datas []string, err error) {
+	// database 目前不支持不填拿所有的database，或者填写 * 的情况
+	if queryType == DATABASE {
+		datas = append(datas, mr.database)
+		return datas, nil
+	}
+
+	// 拿到数据库中所有表及对应的sql语句
+	datas, mr.rawsqls, err = mr.getValidData(db, "", "", []int{}, []int{}, []int{}, queryType)
+	if err != nil {
+		return datas, err
+	}
+
+	return datas, nil
 }
