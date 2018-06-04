@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net"
 )
@@ -11,17 +12,30 @@ import (
 const Null = "N/A"
 
 var (
-	ErrInvalidIp = errors.New("invalid ip format")
+	ErrInvalidIP = errors.New("invalid IP format")
 	std          *Locator
 )
 
+type ErrInvalidFile struct {
+	Reason string
+}
+
+func (e ErrInvalidFile) Error() string {
+	return fmt.Sprintf("invalid file format: %s", e.Reason)
+}
+
 // Init defaut locator with dataFile
-func Init(dataFile string) (err error) {
+func Init(dataFile string) error {
 	if std != nil {
-		return
+		return nil
 	}
+
+	var err error
 	std, err = NewLocator(dataFile)
-	return
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func Update(dataFile string) (err error) {
@@ -30,12 +44,17 @@ func Update(dataFile string) (err error) {
 }
 
 // Init defaut locator with data
-func InitWithData(data []byte) {
+func InitWithData(data []byte) error {
 	if std != nil {
-		return
+		return nil
 	}
-	std = NewLocatorWithData(data)
-	return
+
+	var err error
+	std, err = NewLocatorWithData(data)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // Find locationInfo by ip string
@@ -52,20 +71,27 @@ func FindByUint(ip uint32) *LocationInfo {
 //-----------------------------------------------------------------------------
 
 // New locator with dataFile
-func NewLocator(dataFile string) (loc *Locator, err error) {
+func NewLocator(dataFile string) (*Locator, error) {
 	data, err := ioutil.ReadFile(dataFile)
 	if err != nil {
-		return
+		return nil, err
 	}
-	loc = NewLocatorWithData(data)
-	return
+
+	loc, err := NewLocatorWithData(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return loc, nil
 }
 
 // New locator with data
-func NewLocatorWithData(data []byte) (loc *Locator) {
-	loc = new(Locator)
-	loc.init(data)
-	return
+func NewLocatorWithData(data []byte) (*Locator, error) {
+	loc := new(Locator)
+	if err := loc.init(data); err != nil {
+		return nil, err
+	}
+	return loc, nil
 }
 
 type Locator struct {
@@ -92,7 +118,7 @@ type LocationInfo struct {
 func (loc *Locator) Find(ipstr string) (info *LocationInfo, err error) {
 	ip := net.ParseIP(ipstr)
 	if ip == nil {
-		err = ErrInvalidIp
+		err = ErrInvalidIP
 		return
 	}
 	info = loc.FindByUint(binary.BigEndian.Uint32([]byte(ip.To4())))
@@ -128,8 +154,11 @@ func (loc *Locator) findIndexOffset(ip uint32, start, end int) int {
 	return start
 }
 
-func (loc *Locator) init(data []byte) {
+func (loc *Locator) init(data []byte) error {
 	textoff := int(binary.BigEndian.Uint32(data[:4]))
+	if textoff < 262144 {
+		return ErrInvalidFile{"textoff is smaller than 262144"}
+	}
 
 	loc.textData = data[textoff-262144:]
 
@@ -151,7 +180,7 @@ func (loc *Locator) init(data []byte) {
 		loc.indexData2[i] = int(uint32(data[off+4]) | uint32(data[off+5])<<8 | uint32(data[off+6])<<16)
 		loc.indexData3[i] = int(uint32(data[off+7])<<8 | uint32(data[off+8]))
 	}
-	return
+	return nil
 }
 
 func newLocationInfo(str []byte) *LocationInfo {
