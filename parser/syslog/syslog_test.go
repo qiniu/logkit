@@ -1,12 +1,11 @@
 package syslog
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"errors"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"

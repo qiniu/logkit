@@ -1,8 +1,6 @@
 package mutate
 
 import (
-	"errors"
-
 	"strings"
 
 	"github.com/qiniu/logkit/transforms"
@@ -10,12 +8,21 @@ import (
 )
 
 type Discarder struct {
-	Key   string `json:"key"`
-	stats StatsInfo
+	Key       string `json:"key"`
+	StageTime string `json:"stage"`
+	stats     StatsInfo
 }
 
 func (g *Discarder) RawTransform(datas []string) ([]string, error) {
-	return datas, errors.New("discard transformer not support rawTransform")
+	var ret []string
+	for i := range datas {
+		if strings.Contains(datas[i], g.Key) {
+			continue
+		}
+		ret = append(ret, datas[i])
+	}
+	g.stats.Success += int64(len(datas))
+	return ret, nil
 }
 
 func (g *Discarder) Transform(datas []Data) ([]Data, error) {
@@ -45,7 +52,8 @@ func (g *Discarder) Type() string {
 func (g *Discarder) SampleConfig() string {
 	return `{
 		"type":"discard",
-		"key":"DiscardFieldKey1,DiscardFieldKey2"
+		"key":"DiscardFieldKey1,DiscardFieldKey2",
+		"stage":"after_parser"
 	}`
 }
 
@@ -56,7 +64,10 @@ func (g *Discarder) ConfigOptions() []Option {
 }
 
 func (g *Discarder) Stage() string {
-	return transforms.StageAfterParser
+	if g.StageTime == "" {
+		return transforms.StageAfterParser
+	}
+	return g.StageTime
 }
 
 func (g *Discarder) Stats() StatsInfo {
