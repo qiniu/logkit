@@ -715,7 +715,7 @@ func TestCreateTransforms(t *testing.T) {
 		"transforms":[{
 			"type":"IP",
 			"key":  "ip",
-			"data_path": "../transforms/ip/17monipdb.dat"
+			"data_path": "../transforms/ip/test_data/17monipdb.dat"
 		}],
 		"senders":[{
 			"name":"file_sender",

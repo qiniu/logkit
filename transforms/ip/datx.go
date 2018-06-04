@@ -40,6 +40,8 @@ func (loc *datxLocator) init(data []byte) error {
 	textoff := int(binary.BigEndian.Uint32(data[:4]))
 	if textoff < 262144 {
 		return ErrInvalidFile{"datx", "textoff is smaller than 262144"}
+	} else if len(data) < textoff-262144 {
+		return ErrInvalidFile{"datx", "data is incomplete < textoff-262144"}
 	}
 	loc.textData = data[textoff-262144:]
 

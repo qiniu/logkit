@@ -140,7 +140,7 @@ func Test_TransformData(t *testing.T) {
 	config1 := `{
 			"type":"IP",
 			"key":  "ip",
-			"data_path": "../transforms/ip/17monipdb.dat",
+			"data_path": "../transforms/ip/test_data/17monipdb.dat",
 			"sampleLog": "{\"ip\": \"111.2.3.4\"}"
 	}`
 
@@ -165,7 +165,7 @@ func Test_getTransformerCreator(t *testing.T) {
 	config1 := `{
 			"type":"IP",
 			"key":  "ip",
-			"data_path": "../transforms/ip/17monipdb.dat",
+			"data_path": "../transforms/ip/test_data/17monipdb.dat",
 			"sampleLog": "{\"ip\": \"111.2.3.4\"}"
 	}`
 	var rc map[string]interface{}
@@ -186,7 +186,7 @@ func Test_getDataFromTransformConfig(t *testing.T) {
 	config1 := `{
 			"type":"IP",
 			"key":  "ip",
-			"data_path": "../transforms/ip/17monipdb.dat",
+			"data_path": "../transforms/ip/test_data/17monipdb.dat",
 			"sampleLog": "{\"ip\": \"111.2.3.4\"}"
 	}`
 	var rc map[string]interface{}
@@ -211,7 +211,7 @@ func Test_getTransformer(t *testing.T) {
 	config1 := `{
 			"type":"IP",
 			"key":  "ip",
-			"data_path": "../transforms/ip/17monipdb.dat",
+			"data_path": "../transforms/ip/test_data/17monipdb.dat",
 			"sampleLog": "{\"ip\": \"111.2.3.4\"}"
 	}`
 	var rc map[string]interface{}

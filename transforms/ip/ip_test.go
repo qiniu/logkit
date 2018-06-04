@@ -12,7 +12,7 @@ import (
 func TestTransformer(t *testing.T) {
 	ipt := &Transformer{
 		Key:      "ip",
-		DataPath: "./17monipdb.dat",
+		DataPath: "./test_data/17monipdb.dat",
 	}
 	data, err := ipt.Transform([]Data{{"ip": "111.2.3.4"}, {"ip": "x.x.x.x"}})
 	assert.Error(t, err)
@@ -36,7 +36,7 @@ func TestTransformer(t *testing.T) {
 
 	ipt2 := &Transformer{
 		Key:      "multi.ip",
-		DataPath: "./17monipdb.dat",
+		DataPath: "./test_data/17monipdb.dat",
 	}
 	data2, err2 := ipt2.Transform([]Data{{"multi": map[string]interface{}{"ip": "111.2.3.4"}}, {"multi": map[string]interface{}{"ip": "x.x.x.x"}}})
 	assert.Error(t, err2)
@@ -64,7 +64,7 @@ func TestTransformer(t *testing.T) {
 
 	ipt3 := &Transformer{
 		Key:      "multi.ip",
-		DataPath: "./17monipdb.datx",
+		DataPath: "./test_data/17monipdb.datx",
 	}
 	data3, err3 := ipt3.Transform([]Data{{"multi": map[string]interface{}{"ip": "111.2.3.4"}}, {"multi": map[string]interface{}{"ip": "x.x.x.x"}}})
 	assert.Error(t, err3)
@@ -92,7 +92,7 @@ func TestTransformer(t *testing.T) {
 
 	ipt4 := &Transformer{
 		Key:      "multi.ip2",
-		DataPath: "./17monipdb.dat",
+		DataPath: "./test_data/17monipdb.dat",
 	}
 
 	multi_ip := []Data{{
@@ -141,4 +141,26 @@ func TestTransformer(t *testing.T) {
 	}
 	assert.Equal(t, expe4, ipt.stats)
 	assert.Equal(t, ipt4.Stage(), transforms.StageAfterParser)
+}
+
+func Test_badData(t *testing.T) {
+	ipt := &Transformer{
+		Key:      "ip",
+		DataPath: "./test_data/bad.dat",
+	}
+	_, err := ipt.Transform([]Data{{"ip": "111.2.3.4"}, {"ip": "x.x.x.x"}})
+	assert.Error(t, err)
+	ierr, ok := err.(ErrInvalidFile)
+	assert.True(t, ok)
+	assert.Equal(t, "dat", ierr.Format)
+
+	ipt = &Transformer{
+		Key:      "ip",
+		DataPath: "./test_data/bad.datx",
+	}
+	_, err = ipt.Transform([]Data{{"ip": "111.2.3.4"}, {"ip": "x.x.x.x"}})
+	assert.Error(t, err)
+	ierr, ok = err.(ErrInvalidFile)
+	assert.True(t, ok)
+	assert.Equal(t, "datx", ierr.Format)
 }
