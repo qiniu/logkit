@@ -7,12 +7,15 @@ import {
   notification,
   InputNumber,
   Checkbox,
-  Button
+  Button,
+  Popover,
+  Tooltip
 } from 'antd';
 import {getTransformOptions, getTransformUsages} from '../services/logkit';
 import config from '../store/config'
 import moment from 'moment'
-import _ from "lodash";
+import _ from "lodash"
+import {CopyToClipboard} from 'react-copy-to-clipboard'
 
 const Option = Select.Option
 const FormItem = Form.Item;
@@ -50,7 +53,10 @@ class Transformer extends Component {
       tags: [],
       transforms: {},
       transformerTypes: [],
-      advanceChecked: false
+      advanceChecked: false,
+      isEdit: false,
+      editTag: '',
+      isViewTag: []
     }
 
     this.schemaUUID = 0;
@@ -88,13 +94,18 @@ class Transformer extends Component {
           let data = {}
           let _key = []
           let transforms = {}
+          let initValue = ''
           data.spec = _.reduce(
               _.map(window.nodeCopy.transforms),
               (result, item) => {
-                result["uuid" + this.schemaUUID] = item;
+                if (item.key) {
+                  initValue = `(${item.key})`
+                }
+                const cItem = {...item, type: `${item.type}${initValue}`}
+                result["uuid" + this.schemaUUID] = cItem;
                 _key.push("uuid" + this.schemaUUID);
                 getFieldDecorator(`spec.${"uuid" + this.schemaUUID}.key`, {initialValue: item.key});
-                getFieldDecorator(`spec.${"uuid" + this.schemaUUID}.type`, {initialValue: item.type});
+                getFieldDecorator(`spec.${"uuid" + this.schemaUUID}.type`, {initialValue: `${item.type}${initValue}`});
                 getFieldDecorator(`spec.${"uuid" + this.schemaUUID}.stage`, {initialValue: item.stage});
                 _.set(transforms, "uuid" + this.schemaUUID, item);
                 this.schemaUUID++;
@@ -123,48 +134,74 @@ class Transformer extends Component {
 
 
   }
+  
+  copyTagConfig = (index) => {
+    const isCopied = []
+    isCopied[index] = true
+    this.setState({
+      isCopied
+    })
+  }
+  
+  onVisibleChange = (index) => {
+    const isCopied = []
+    isCopied[index] = false
+    this.setState({
+      isCopied
+    })
+  }
 
   renderTags = () => {
     const {getFieldDecorator, getFieldValue} = this.props.form;
 
     return this.state.tags.map((k, index) => {
-      return (
+      const tag = this.state.transforms && this.state.transforms[k]
+      const fieldKeyValue = getFieldValue(`spec.${k}.key`)
+        return (
         <div key={`spec.fields.${k}`} style={{ position: "relative"}}>
             <FormItem
-                label={index === 0 ? '字段' : ''}
-                className="inline fields key"
-                style={{textAlign: 'left'}}>
-              {getFieldDecorator(`spec.${k}.key`, {
-                rules: [{required: true, message: '字段不能为空'},
-                  {min: 1, max: 100, message: '长度在 1 到 100 个字符'}]
-              })(<Input disabled={true} style={{width: 200}}/>)}
-            </FormItem>
-            <FormItem
-                label={index === 0 ? '类型' : ''}
                 className="inline fields value"
                 style={{ textAlign: 'left' }}>
               {getFieldDecorator(`spec.${k}.type`, {
                 rules: [{required: true, message: '字段不能为空'},
                   {min: 1, max: 100, message: '长度在 1 到 100 个字符'}]
-              })(<Input disabled={true} style={{width: 200}}/>)}
-            </FormItem>
-            <FormItem
-                label={index === 0 ? '转化时机' : ''}
-                className="inline fields value"
-                style={{ textAlign: 'left' }}>
-              {getFieldDecorator(`spec.${k}.stage`, {
-                rules: [{required: true, message: '字段不能为空'},
-                  {min: 1, max: 100, message: '长度在 1 到 100 个字符'}]
-              })(<Input disabled={true} style={{width: 200}}/>)}
+              })(<Input disabled={true} className="tranformer-tag"/>)}
             </FormItem>
             {
               this.state.isReadonly ? null :
-                  <Icon
-                      style={{marginTop: index === 0 ? "23px" : "0px"}}
+                  <span>
+                    <Icon
+                      style={{marginTop: "23px"}}
                       className="dynamic-delete-button"
-                      type="close"
+                      type="delete"
                       onClick={() => this.removeTag(k)}
-                  />
+                    />
+                    <Icon
+                      style={{marginTop: "23px"}}
+                      className="dynamic-delete-button"
+                      type="edit"
+                      onClick={() => this.editTag(k)}
+                    />
+                    <Popover
+                      trigger="click"
+                      content={
+                        JSON.stringify(tag, null, '\t')} overlayStyle={{whiteSpace: 'pre'}}>
+                      <Icon
+                        style={{marginTop: "23px"}}
+                        className="dynamic-delete-button"
+                        type="eye-o"
+                      />
+                    </Popover>
+                    <CopyToClipboard onCopy={() => this.copyTagConfig(index)} text={JSON.stringify(tag, null, '\t')}>
+                      <Tooltip visible={this.state.isCopied && this.state.isCopied[index]} title="复制成功" onVisibleChange={() => this.onVisibleChange(index)}>
+                        <Icon
+                          style={{marginTop: "23px"}}
+                          className="dynamic-delete-button"
+                          type="copy"
+                        />
+                      </Tooltip>
+                    </CopyToClipboard>
+                  </span>
             }
           </div>
       )
@@ -173,9 +210,10 @@ class Transformer extends Component {
 
   renderFormItem = () => {
     const { getFieldDecorator, getFieldValue } = this.props.form;
+    const currentItem = this.state.currentItem || []
     let result = []
     let advancedResults = []
-    this.state.currentItem.map((ele, index) => {
+    currentItem.map((ele, index) => {
       let formItem = null
       const labelDes = (
         ele.Description.indexOf('(') !== -1 ? <span>
@@ -257,6 +295,7 @@ class Transformer extends Component {
   }
 
   handleChange = (option) => {
+    
     this.setState({
       currentOption: option,
       currentItem: option != '请选择需要转化的类型' ? this.state.items[option] : []
@@ -291,57 +330,90 @@ class Transformer extends Component {
   }
 
   addTag = () => {
-    const {getFieldsValue, getFieldDecorator} = this.props.form;
+    const {getFieldsValue, getFieldDecorator, setFieldsValue} = this.props.form;
     let data = getFieldsValue();
+    let initValue = ''
     if (this.state.currentOption === 'script') {
       if (data && data[this.state.currentOption] && data[this.state.currentOption]['script']) {
         data[this.state.currentOption]['script'] = window.btoa(encodeURIComponent(data[this.state.currentOption]['script']))
       }
     }
-    if (this.state.currentOption != '请选择需要转化的类型') {
-      this.setState({
-        tags: this.state.tags.concat(`uuid${this.schemaUUID}`)
-      });
-
-      getFieldDecorator(`spec.${"uuid" + this.schemaUUID}.key`, {
-        initialValue: data[this.state.currentOption].key,
-        rules: [{required: true, message: '源字段不能为空'},
-          {min: 1, max: 100, message: '长度在 1 到 100 个字符'}]
-      });
-      getFieldDecorator(`spec.${"uuid" + this.schemaUUID}.type`, {
-        initialValue: data[this.state.currentOption].type,
-        rules: [{required: true, message: '源字段不能为空'},
-          {min: 1, max: 100, message: '长度在 1 到 100 个字符'}]
-      });
-
-      getFieldDecorator(`spec.${"uuid" + this.schemaUUID}.stage`, {
-        initialValue: data[this.state.currentOption].stage,
-        rules: [{required: true, message: '源字段不能为空'},
-          {min: 1, max: 100, message: '长度在 1 到 100 个字符'}]
-      });
-
+    if (data[this.state.currentOption].key) {
+      initValue = `(${data[this.state.currentOption].key})`
+    }
+    if (!this.state.isEdit) {
+      if (this.state.currentOption != '请选择需要转化的类型') {
+        this.setState({
+          tags: this.state.tags.concat(`uuid${this.schemaUUID}`)
+        });
+        // getFieldDecorator(`spec.${"uuid" + this.schemaUUID}.key`, {
+        //   initialValue: data[this.state.currentOption].key,
+        //   rules: [{required: true, message: '源字段不能为空'},
+        //     {min: 1, max: 100, message: '长度在 1 到 100 个字符'}]
+        // });
+        getFieldDecorator(`spec.${"uuid" + this.schemaUUID}.type`, {
+          initialValue: `${data[this.state.currentOption].type}${initValue}`,
+          rules: [{required: true, message: '源字段不能为空'},
+            {min: 1, max: 100, message: '长度在 1 到 100 个字符'}]
+        });
+    
+        let transforms = this.state.transforms
+        let key = "uuid" + this.schemaUUID
+        _.set(transforms, key, data[this.state.currentOption]);
+        this.setState({
+          transforms
+        }, () => {
+          this.handleChange('请选择需要转化的类型')
+        })
+    
+        this.schemaUUID++;
+      } else {
+        notification.warning({message: "未选择具体类型", description: '请选择需要转化的类型再添加', duration: 10})
+      }
+    } else {
+      setFieldsValue({
+        [`spec.${this.state.editTag}.type`]: `${data[this.state.currentOption].type}${initValue}`
+      })
       let transforms = this.state.transforms
-      let key = "uuid" + this.schemaUUID
+      let key = this.state.editTag
       _.set(transforms, key, data[this.state.currentOption]);
       this.setState({
-        transforms
+        transforms,
+        isEdit: false
       }, () => {
         this.handleChange('请选择需要转化的类型')
       })
-
-      this.schemaUUID++;
-    } else {
-      notification.warning({message: "未选择具体类型", description: '请选择需要转化的类型再添加', duration: 10})
     }
 
 
   };
+  
+  editTag = (k) => {
+    this.setState({
+      isEdit: true,
+      editTag: k
+    })
+    const {setFieldsValue} = this.props.form
+    const tag = this.state.transforms[k]
+    this.handleChange(tag && tag.type)
+    const data = {}
+    const type = tag.type
+    for (const key in tag) {
+      if (key !== 'type') {
+        data[`${type}.${key}`] = tag[key]
+      }
+    }
+    setTimeout(() => {setFieldsValue(data)}, 0)
+  }
 
   removeTag = (k) => {
     this.setState({
       tags: this.state.tags.filter(key => key !== k),
-      transforms: _.omit(this.state.transforms, k)
-    });
+      transforms: _.omit(this.state.transforms, k),
+      isEdit: false
+    }, () => {
+      this.handleChange('请选择需要转化的类型')
+    })
   };
 
   render() {
@@ -378,7 +450,7 @@ class Transformer extends Component {
               <FormItem {...optionFormItemLayout} label={<span style={{display:'none'}}></span>}>
                 <div className="option-add-btn">
                   <Button onClick={this.addTag} type="primary" className="option-add-tag-btn">
-                    添加
+                    {this.state.isEdit ? '确认' : '添加'}
                   </Button>
                 </div>
               </FormItem>
