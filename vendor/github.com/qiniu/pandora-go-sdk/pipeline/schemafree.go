@@ -517,7 +517,7 @@ func (c *Pipeline) generatePoint(oldData Data, input *SchemaFreeInput) (point Po
 	if !input.NoUpdate && haveNewData(data) {
 		//defaultAll 为false时，过滤一批不要的
 		// 该函数有两个作用，1. 获取 data 中所有字段的 schema; 2. 将 data 中值为 nil, 无法判断类型的键值对，从 data 中删掉
-		valueType := getTrimedDataSchema(data)
+		valueType := GetTrimedDataSchema(data)
 		// 将 metric 中的 long 都改成 float
 		if input.Option.NumberUseFloat || (input.Option != nil && input.Option.IsMetric) {
 			for key, val := range valueType {
@@ -976,7 +976,7 @@ PandoraTypeArray  ：全部支持
 PandoraTypeMap    ：全部支持
 */
 // 该函数有两个作用，1. 获取 data 中所有字段的 schema; 2. 将 data 中值为 nil, 无法判断类型的键值对，从 data 中删掉
-func getTrimedDataSchema(data Data) (valueType map[string]RepoSchemaEntry) {
+func GetTrimedDataSchema(data Data) (valueType map[string]RepoSchemaEntry) {
 	valueType = make(map[string]RepoSchemaEntry)
 	for k, v := range data {
 		switch nv := v.(type) {
@@ -995,7 +995,7 @@ func getTrimedDataSchema(data Data) (valueType map[string]RepoSchemaEntry) {
 			}
 		case map[string]interface{}:
 			sc := formValueType(k, PandoraTypeMap)
-			follows := getTrimedDataSchema(Data(nv))
+			follows := GetTrimedDataSchema(Data(nv))
 			for _, m := range follows {
 				sc.Schema = append(sc.Schema, m)
 			}

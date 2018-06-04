@@ -309,11 +309,12 @@ type ListGroupsOutput struct {
 }
 
 type RepoSchemaEntry struct {
-	Key       string            `json:"key"`
-	ValueType string            `json:"valtype"`
-	Required  bool              `json:"required"`
-	ElemType  string            `json:"elemtype,omitempty"`
-	Schema    []RepoSchemaEntry `json:"schema,omitempty"`
+	Key         string            `json:"key"`
+	ValueType   string            `json:"valtype"`
+	Required    bool              `json:"required"`
+	ElemType    string            `json:"elemtype,omitempty"`
+	Schema      []RepoSchemaEntry `json:"schema,omitempty"`
+	Description string            `json:"description,omitempty"`
 }
 
 func (e RepoSchemaEntry) String() string {
@@ -355,12 +356,13 @@ func (e *RepoSchemaEntry) Validate() (err error) {
 
 type CreateRepoDSLInput struct {
 	PandoraToken
-	RepoName  string
-	Region    string       `json:"region"`
-	DSL       string       `json:"dsl"`
-	Options   *RepoOptions `json:"options"`
-	GroupName string       `json:"group"`
-	Workflow  string       `json:"workflow"`
+	RepoName    string
+	Region      string       `json:"region"`
+	DSL         string       `json:"dsl"`
+	Options     *RepoOptions `json:"options"`
+	GroupName   string       `json:"group"`
+	Workflow    string       `json:"workflow"`
+	Description string       `json:"description,omitempty"`
 }
 
 /*
@@ -592,6 +594,7 @@ type AutoExportToLogDBInput struct {
 	Region      string
 	OmitInvalid bool
 	OmitEmpty   bool
+	Description string
 	AnalyzerInfo
 	AutoExportLogDBTokens
 }
@@ -615,6 +618,7 @@ type CreateRepoForLogDBInput struct {
 	Retention   string
 	OmitInvalid bool
 	OmitEmpty   bool
+	Description string
 	AnalyzerInfo
 	AutoExportLogDBTokens
 }
@@ -625,6 +629,7 @@ type CreateRepoForLogDBDSLInput struct {
 	Region      string
 	Schema      string
 	Retention   string
+	Description string
 	AutoExportLogDBTokens
 }
 
@@ -737,13 +742,14 @@ type RepoOptions struct {
 
 type CreateRepoInput struct {
 	PandoraToken
-	RepoName  string
-	Region    string            `json:"region"`
-	Schema    []RepoSchemaEntry `json:"schema"`
-	Options   *RepoOptions      `json:"options"`
-	GroupName string            `json:"group"`
-	Workflow  string            `json:"workflow"`
-	RuleNames *[]string         `json:"ruleNames"`
+	RepoName    string
+	Region      string            `json:"region"`
+	Schema      []RepoSchemaEntry `json:"schema"`
+	Options     *RepoOptions      `json:"options"`
+	GroupName   string            `json:"group"`
+	Workflow    string            `json:"workflow"`
+	RuleNames   *[]string         `json:"ruleNames"`
+	Description string            `json:"description,omitempty"`
 }
 
 func (r *CreateRepoInput) Validate() (err error) {
@@ -790,6 +796,7 @@ type UpdateRepoInput struct {
 	Option               *SchemaFreeOption
 	RepoOptions          *RepoOptions `json:"options"`
 	RuleNames            *[]string    `json:"ruleNames"`
+	Description          string       `json:"description,omitempty"`
 }
 
 func (r *UpdateRepoInput) IsTag(key string) bool {
@@ -855,6 +862,7 @@ type GetRepoOutput struct {
 	FromDag     bool              `json:"fromDag"`
 	Workflow    string            `json:"workflow"`
 	RuleNames   *[]string         `json:"ruleNames"`
+	Description string            `json:"description,omitempty"`
 }
 
 type SampleDataOutput struct {
@@ -869,6 +877,7 @@ type RepoDesc struct {
 	FromDag     bool      `json:"fromDag"`
 	Workflow    string    `json:"workflow"`
 	RuleNames   *[]string `json:"ruleNames"`
+	Description string    `json:"description,omitempty"`
 }
 
 type ListReposInput struct {
@@ -888,6 +897,27 @@ type DeleteRepoInput struct {
 type PointField struct {
 	Key   string
 	Value interface{}
+}
+
+func (p *PointField) Bytes() []byte {
+	if p == nil || p.Value == nil {
+		return []byte("")
+	}
+	typ := reflect.TypeOf(p.Value).Kind()
+	var value []byte
+	if typ == reflect.Map || typ == reflect.Slice {
+		v, _ := json.Marshal(p.Value)
+		value = escapeBytesField(v)
+	} else if typ == reflect.String {
+		value = escapeBytesField([]byte(reflect.ValueOf(p.Value).String()))
+	} else {
+		value = escapeBytesField([]byte(fmt.Sprintf("%v", p.Value)))
+	}
+	ret := []byte(p.Key)
+	ret = append(ret, '=')
+	ret = append(ret, value...)
+	ret = append(ret, '\t')
+	return ret
 }
 
 func (p *PointField) String() string {
@@ -923,13 +953,25 @@ func (p Point) ToString() (bs string) {
 	return buf.String()
 }
 
+func (p Point) ToBytes() []byte {
+	var buf bytes.Buffer
+	for _, field := range p.Fields {
+		buf.Write(field.Bytes())
+	}
+	if len(p.Fields) > 0 {
+		buf.Truncate(buf.Len() - 1)
+	}
+	buf.WriteByte('\n')
+	return buf.Bytes()
+}
+
 type Points []Point
 
 func (ps Points) Buffer() []byte {
 	var buf bytes.Buffer
 	for _, p := range ps {
 		for _, field := range p.Fields {
-			buf.WriteString(field.String())
+			buf.Write(field.Bytes())
 		}
 		if len(p.Fields) > 0 {
 			buf.Truncate(buf.Len() - 1)
@@ -959,6 +1001,23 @@ func escapeStringField(in string) string {
 	return string(out)
 }
 
+func escapeBytesField(in []byte) []byte {
+	var out []byte
+	for i := 0; i < len(in); i++ {
+		switch in[i] {
+		case '\t': // escape tab
+			out = append(out, '\\')
+			out = append(out, 't')
+		case '\n': // escape new line
+			out = append(out, '\\')
+			out = append(out, 'n')
+		default:
+			out = append(out, in[i])
+		}
+	}
+	return out
+}
+
 type PostDataInput struct {
 	PandoraToken
 	ResourceOwner string
@@ -973,6 +1032,7 @@ type SchemaFreeInput struct {
 	Region       string
 	RepoName     string
 	WorkflowName string
+	Description  string
 	Option       *SchemaFreeOption
 	RepoOptions  *RepoOptions
 }
@@ -999,6 +1059,7 @@ type InitOrUpdateWorkflowInput struct {
 	RepoOptions      *RepoOptions
 	Schema           []RepoSchemaEntry
 	Option           *SchemaFreeOption
+	Description      string
 }
 
 type SchemaFreeOption struct {
@@ -1597,6 +1658,31 @@ func (h *HdfsSourceSpec) Validate() (err error) {
 	return
 }
 
+type FusionSourceSpec struct {
+	Domains    []string `json:"domains"`
+	FileFilter string   `json:"fileFilter,omitempty"`
+}
+
+func (h *FusionSourceSpec) Validate() (err error) {
+	if len(h.Domains) == 0 {
+		return reqerr.NewInvalidArgs("Domains", fmt.Sprintf("domains should not be empty")).WithComponent("pipleline")
+	}
+	// 目前仅支持单域名
+	if len(h.Domains) != 1 {
+		return reqerr.NewInvalidArgs("Domains", fmt.Sprintf("only one domain is supported")).WithComponent("pipleline")
+	}
+	for _, domain := range h.Domains {
+		if domain == "" {
+			return reqerr.NewInvalidArgs("Domain", fmt.Sprintf("domain in domains should not be empty")).WithComponent("pipleline")
+		}
+	}
+	if h.FileFilter == "" {
+		return reqerr.NewInvalidArgs("FileFilter", fmt.Sprintf("fileFilter should not be empty")).WithComponent("pipleline")
+	}
+
+	return
+}
+
 type RetrieveSchemaInput struct {
 	PandoraToken
 	Type string      `json:"type"`
@@ -1609,6 +1695,8 @@ func (r *RetrieveSchemaInput) Validate() (err error) {
 		r.Type = "kodo"
 	case *HdfsSourceSpec, HdfsSourceSpec:
 		r.Type = "hdfs"
+	case *FusionSourceSpec, FusionSourceSpec:
+		r.Type = "fusion"
 	default:
 		return
 	}
@@ -1662,6 +1750,8 @@ func (c *CreateDatasourceInput) Validate() (err error) {
 		c.Type = "kodo"
 	case *HdfsSourceSpec, HdfsSourceSpec:
 		c.Type = "hdfs"
+	case *FusionSourceSpec, FusionSourceSpec:
+		c.Type = "fusion"
 	default:
 		return
 	}
