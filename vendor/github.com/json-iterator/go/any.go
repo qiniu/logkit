@@ -3,8 +3,11 @@ package jsoniter
 import (
 	"errors"
 	"fmt"
+	"github.com/modern-go/reflect2"
 	"io"
 	"reflect"
+	"strconv"
+	"unsafe"
 )
 
 // Any generic object representation.
@@ -25,7 +28,6 @@ type Any interface {
 	ToString() string
 	ToVal(val interface{})
 	Get(path ...interface{}) Any
-	// TODO: add Set
 	Size() int
 	Keys() []string
 	GetInterface() interface{}
@@ -35,7 +37,7 @@ type Any interface {
 type baseAny struct{}
 
 func (any *baseAny) Get(path ...interface{}) Any {
-	return &invalidAny{baseAny{}, fmt.Errorf("Get %v from simple value", path)}
+	return &invalidAny{baseAny{}, fmt.Errorf("GetIndex %v from simple value", path)}
 }
 
 func (any *baseAny) Size() int {
@@ -89,7 +91,7 @@ func Wrap(val interface{}) Any {
 	if isAny {
 		return asAny
 	}
-	typ := reflect.TypeOf(val)
+	typ := reflect2.TypeOf(val)
 	switch typ.Kind() {
 	case reflect.Slice:
 		return wrapArray(val)
@@ -100,6 +102,9 @@ func Wrap(val interface{}) Any {
 	case reflect.String:
 		return WrapString(val.(string))
 	case reflect.Int:
+		if strconv.IntSize == 32 {
+			return WrapInt32(int32(val.(int)))
+		}
 		return WrapInt64(int64(val.(int)))
 	case reflect.Int8:
 		return WrapInt32(int32(val.(int8)))
@@ -110,7 +115,15 @@ func Wrap(val interface{}) Any {
 	case reflect.Int64:
 		return WrapInt64(val.(int64))
 	case reflect.Uint:
+		if strconv.IntSize == 32 {
+			return WrapUint32(uint32(val.(uint)))
+		}
 		return WrapUint64(uint64(val.(uint)))
+	case reflect.Uintptr:
+		if ptrSize == 32 {
+			return WrapUint32(uint32(val.(uintptr)))
+		}
+		return WrapUint64(uint64(val.(uintptr)))
 	case reflect.Uint8:
 		return WrapUint32(uint32(val.(uint8)))
 	case reflect.Uint16:
@@ -242,4 +255,67 @@ func locatePath(iter *Iterator, path []interface{}) Any {
 		return &invalidAny{baseAny{}, iter.Error}
 	}
 	return iter.readAny()
+}
+
+var anyType = reflect2.TypeOfPtr((*Any)(nil)).Elem()
+
+func createDecoderOfAny(ctx *ctx, typ reflect2.Type) ValDecoder {
+	if typ == anyType {
+		return &directAnyCodec{}
+	}
+	if typ.Implements(anyType) {
+		return &anyCodec{
+			valType: typ,
+		}
+	}
+	return nil
+}
+
+func createEncoderOfAny(ctx *ctx, typ reflect2.Type) ValEncoder {
+	if typ == anyType {
+		return &directAnyCodec{}
+	}
+	if typ.Implements(anyType) {
+		return &anyCodec{
+			valType: typ,
+		}
+	}
+	return nil
+}
+
+type anyCodec struct {
+	valType reflect2.Type
+}
+
+func (codec *anyCodec) Decode(ptr unsafe.Pointer, iter *Iterator) {
+	panic("not implemented")
+}
+
+func (codec *anyCodec) Encode(ptr unsafe.Pointer, stream *Stream) {
+	obj := codec.valType.UnsafeIndirect(ptr)
+	any := obj.(Any)
+	any.WriteTo(stream)
+}
+
+func (codec *anyCodec) IsEmpty(ptr unsafe.Pointer) bool {
+	obj := codec.valType.UnsafeIndirect(ptr)
+	any := obj.(Any)
+	return any.Size() == 0
+}
+
+type directAnyCodec struct {
+}
+
+func (codec *directAnyCodec) Decode(ptr unsafe.Pointer, iter *Iterator) {
+	*(*Any)(ptr) = iter.readAny()
+}
+
+func (codec *directAnyCodec) Encode(ptr unsafe.Pointer, stream *Stream) {
+	any := *(*Any)(ptr)
+	any.WriteTo(stream)
+}
+
+func (codec *directAnyCodec) IsEmpty(ptr unsafe.Pointer) bool {
+	any := *(*Any)(ptr)
+	return any.Size() == 0
 }

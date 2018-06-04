@@ -2,20 +2,20 @@ package jsoniter
 
 import (
 	"fmt"
+	"github.com/modern-go/reflect2"
 	"io"
 	"reflect"
-	"strings"
 	"unsafe"
 )
 
-func encoderOfStruct(cfg *frozenConfig, prefix string, typ reflect.Type) ValEncoder {
+func encoderOfStruct(ctx *ctx, typ reflect2.Type) ValEncoder {
 	type bindingTo struct {
 		binding *Binding
 		toName  string
 		ignored bool
 	}
 	orderedBindings := []*bindingTo{}
-	structDescriptor := describeStruct(cfg, prefix, typ)
+	structDescriptor := describeStruct(ctx, typ)
 	for _, binding := range structDescriptor.Fields {
 		for _, toName := range binding.ToNames {
 			new := &bindingTo{
@@ -26,7 +26,7 @@ func encoderOfStruct(cfg *frozenConfig, prefix string, typ reflect.Type) ValEnco
 				if old.toName != toName {
 					continue
 				}
-				old.ignored, new.ignored = resolveConflictBinding(cfg, old.binding, new.binding)
+				old.ignored, new.ignored = resolveConflictBinding(ctx.frozenConfig, old.binding, new.binding)
 			}
 			orderedBindings = append(orderedBindings, new)
 		}
@@ -43,13 +43,36 @@ func encoderOfStruct(cfg *frozenConfig, prefix string, typ reflect.Type) ValEnco
 			})
 		}
 	}
-	return &structEncoder{typ, structDescriptor.onePtrEmbedded,
-		structDescriptor.onePtrOptimization, finalOrderedFields}
+	return &structEncoder{typ, finalOrderedFields}
+}
+
+func createCheckIsEmpty(ctx *ctx, typ reflect2.Type) checkIsEmpty {
+	encoder := createEncoderOfNative(ctx, typ)
+	if encoder != nil {
+		return encoder
+	}
+	kind := typ.Kind()
+	switch kind {
+	case reflect.Interface:
+		return &dynamicEncoder{typ}
+	case reflect.Struct:
+		return &structEncoder{typ: typ}
+	case reflect.Array:
+		return &arrayEncoder{}
+	case reflect.Slice:
+		return &sliceEncoder{}
+	case reflect.Map:
+		return encoderOfMap(ctx, typ)
+	case reflect.Ptr:
+		return &OptionalEncoder{}
+	default:
+		return &lazyErrorEncoder{err: fmt.Errorf("unsupported type: %v", typ)}
+	}
 }
 
 func resolveConflictBinding(cfg *frozenConfig, old, new *Binding) (ignoreOld, ignoreNew bool) {
-	newTagged := new.Field.Tag.Get(cfg.getTagKey()) != ""
-	oldTagged := old.Field.Tag.Get(cfg.getTagKey()) != ""
+	newTagged := new.Field.Tag().Get(cfg.getTagKey()) != ""
+	oldTagged := old.Field.Tag().Get(cfg.getTagKey()) != ""
 	if newTagged {
 		if oldTagged {
 			if len(old.levels) > len(new.levels) {
@@ -76,60 +99,41 @@ func resolveConflictBinding(cfg *frozenConfig, old, new *Binding) (ignoreOld, ig
 	}
 }
 
-func decoderOfStruct(cfg *frozenConfig, prefix string, typ reflect.Type) ValDecoder {
-	bindings := map[string]*Binding{}
-	structDescriptor := describeStruct(cfg, prefix, typ)
-	for _, binding := range structDescriptor.Fields {
-		for _, fromName := range binding.FromNames {
-			old := bindings[fromName]
-			if old == nil {
-				bindings[fromName] = binding
-				continue
-			}
-			ignoreOld, ignoreNew := resolveConflictBinding(cfg, old, binding)
-			if ignoreOld {
-				delete(bindings, fromName)
-			}
-			if !ignoreNew {
-				bindings[fromName] = binding
-			}
-		}
-	}
-	fields := map[string]*structFieldDecoder{}
-	for k, binding := range bindings {
-		fields[strings.ToLower(k)] = binding.Decoder.(*structFieldDecoder)
-	}
-	return createStructDecoder(typ, fields)
-}
-
 type structFieldEncoder struct {
-	field        *reflect.StructField
+	field        reflect2.StructField
 	fieldEncoder ValEncoder
 	omitempty    bool
 }
 
 func (encoder *structFieldEncoder) Encode(ptr unsafe.Pointer, stream *Stream) {
-	fieldPtr := unsafe.Pointer(uintptr(ptr) + encoder.field.Offset)
+	fieldPtr := encoder.field.UnsafeGet(ptr)
 	encoder.fieldEncoder.Encode(fieldPtr, stream)
 	if stream.Error != nil && stream.Error != io.EOF {
-		stream.Error = fmt.Errorf("%s: %s", encoder.field.Name, stream.Error.Error())
+		stream.Error = fmt.Errorf("%s: %s", encoder.field.Name(), stream.Error.Error())
 	}
 }
 
-func (encoder *structFieldEncoder) EncodeInterface(val interface{}, stream *Stream) {
-	WriteToStream(val, stream, encoder)
-}
-
 func (encoder *structFieldEncoder) IsEmpty(ptr unsafe.Pointer) bool {
-	fieldPtr := unsafe.Pointer(uintptr(ptr) + encoder.field.Offset)
+	fieldPtr := encoder.field.UnsafeGet(ptr)
 	return encoder.fieldEncoder.IsEmpty(fieldPtr)
 }
 
+func (encoder *structFieldEncoder) IsEmbeddedPtrNil(ptr unsafe.Pointer) bool {
+	isEmbeddedPtrNil, converted := encoder.fieldEncoder.(IsEmbeddedPtrNil)
+	if !converted {
+		return false
+	}
+	fieldPtr := encoder.field.UnsafeGet(ptr)
+	return isEmbeddedPtrNil.IsEmbeddedPtrNil(fieldPtr)
+}
+
+type IsEmbeddedPtrNil interface {
+	IsEmbeddedPtrNil(ptr unsafe.Pointer) bool
+}
+
 type structEncoder struct {
-	typ                reflect.Type
-	onePtrEmbedded     bool
-	onePtrOptimization bool
-	fields             []structFieldTo
+	typ    reflect2.Type
+	fields []structFieldTo
 }
 
 type structFieldTo struct {
@@ -142,6 +146,9 @@ func (encoder *structEncoder) Encode(ptr unsafe.Pointer, stream *Stream) {
 	isNotFirst := false
 	for _, field := range encoder.fields {
 		if field.encoder.omitempty && field.encoder.IsEmpty(ptr) {
+			continue
+		}
+		if field.encoder.IsEmbeddedPtrNil(ptr) {
 			continue
 		}
 		if isNotFirst {
@@ -157,24 +164,6 @@ func (encoder *structEncoder) Encode(ptr unsafe.Pointer, stream *Stream) {
 	}
 }
 
-func (encoder *structEncoder) EncodeInterface(val interface{}, stream *Stream) {
-	e := (*emptyInterface)(unsafe.Pointer(&val))
-	if encoder.onePtrOptimization {
-		if e.word == nil && encoder.onePtrEmbedded {
-			stream.WriteObjectStart()
-			stream.WriteObjectEnd()
-			return
-		}
-		ptr := uintptr(e.word)
-		e.word = unsafe.Pointer(&ptr)
-	}
-	if reflect.TypeOf(val).Kind() == reflect.Ptr {
-		encoder.Encode(unsafe.Pointer(&e.word), stream)
-	} else {
-		encoder.Encode(e.word, stream)
-	}
-}
-
 func (encoder *structEncoder) IsEmpty(ptr unsafe.Pointer) bool {
 	return false
 }
@@ -186,10 +175,36 @@ func (encoder *emptyStructEncoder) Encode(ptr unsafe.Pointer, stream *Stream) {
 	stream.WriteEmptyObject()
 }
 
-func (encoder *emptyStructEncoder) EncodeInterface(val interface{}, stream *Stream) {
-	WriteToStream(val, stream, encoder)
-}
-
 func (encoder *emptyStructEncoder) IsEmpty(ptr unsafe.Pointer) bool {
 	return false
+}
+
+type stringModeNumberEncoder struct {
+	elemEncoder ValEncoder
+}
+
+func (encoder *stringModeNumberEncoder) Encode(ptr unsafe.Pointer, stream *Stream) {
+	stream.writeByte('"')
+	encoder.elemEncoder.Encode(ptr, stream)
+	stream.writeByte('"')
+}
+
+func (encoder *stringModeNumberEncoder) IsEmpty(ptr unsafe.Pointer) bool {
+	return encoder.elemEncoder.IsEmpty(ptr)
+}
+
+type stringModeStringEncoder struct {
+	elemEncoder ValEncoder
+	cfg         *frozenConfig
+}
+
+func (encoder *stringModeStringEncoder) Encode(ptr unsafe.Pointer, stream *Stream) {
+	tempStream := encoder.cfg.BorrowStream(nil)
+	defer encoder.cfg.ReturnStream(tempStream)
+	encoder.elemEncoder.Encode(ptr, tempStream)
+	stream.WriteString(string(tempStream.Buffer()))
+}
+
+func (encoder *stringModeStringEncoder) IsEmpty(ptr unsafe.Pointer) bool {
+	return encoder.elemEncoder.IsEmpty(ptr)
 }
