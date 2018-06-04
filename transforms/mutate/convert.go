@@ -366,7 +366,7 @@ func dataConvert(data interface{}, schema DslSchemaEntry) (converted interface{}
 	case pipeline.PandoraTypeString:
 		switch value := data.(type) {
 		case json.Number:
-			return value, nil
+			return string(value), nil
 		case map[string]interface{}:
 			str, err := json.Marshal(value)
 			if err == nil {

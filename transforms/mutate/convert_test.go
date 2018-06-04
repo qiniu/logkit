@@ -2,6 +2,7 @@ package mutate
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	"github.com/qiniu/logkit/transforms"
@@ -42,6 +43,24 @@ func TestConvertTransformer(t *testing.T) {
 		{"multi": map[string]interface{}{"myword": []interface{}{int64(321), int64(654)}, "abc": "x1"}},
 	}
 	assert.Equal(t, exp3, data3)
+}
+
+func TestConvertType(t *testing.T) {
+	gsub := &Converter{
+		DSL: "myword string",
+	}
+	data, err := gsub.Transform([]Data{{"myword": json.Number("123")}, {"myword": 456}})
+	assert.NoError(t, err)
+	exp := []Data{
+		{"myword": "123"},
+		{"myword": "456"}}
+	assert.Equal(t, exp, data)
+	dt := data[0]["myword"]
+	assert.Equal(t, "string", reflect.TypeOf(dt).Name())
+	sdt, ok := dt.(string)
+	assert.Equal(t, true, ok)
+	assert.Equal(t, "123", sdt)
+
 }
 
 func TestConvertData(t *testing.T) {
