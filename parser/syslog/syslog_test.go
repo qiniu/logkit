@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"errors"
+
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	. "github.com/qiniu/logkit/utils/models"
@@ -128,4 +130,26 @@ func TestSyslogParser_NoPanic(t *testing.T) {
 			p.Parse(dataLine)
 		}
 	}
+}
+
+func TestSyslogParser_NoMatch(t *testing.T) {
+	c := conf.MapConf{}
+	c[parser.KeyParserType] = "syslog"
+	c[parser.KeySyslogMaxline] = "3"
+	p, err := NewParser(c)
+	assert.NoError(t, err)
+	lines := []string{
+		`003-10-11T22:14:15.003Z mymachine.example.com su - ID47`,
+		`BOM'su root' failed for lonvick on /dev/pts/8`,
+		`01:02:03 abc system[253]: Listening at 0.0.0.0:3000`,
+		`1:02:03 abc system[23]: Listening at 0.0.0.0`,
+		`:3001`,
+		`:3002`,
+		`:3003`,
+	}
+	_, err = p.Parse(lines)
+	if st, ok := err.(*StatsError); ok {
+		err = st.ErrorDetail
+	}
+	assert.Equal(t, errors.New("syslog meet max line 3, try to parse err No start char found for priority, check if this is standard rfc3164/rfc5424 syslog"), err)
 }

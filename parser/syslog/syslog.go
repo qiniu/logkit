@@ -3,6 +3,7 @@ package syslog
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -98,6 +99,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	name, _ := c.GetStringOr(parser.KeyParserName, "")
 	labelList, _ := c.GetStringListOr(parser.KeyLabels, []string{})
 	rfctype, _ := c.GetStringOr(parser.KeyRFCType, "automic")
+	maxline, _ := c.GetIntOr(parser.KeySyslogMaxline, 100)
 
 	nameMap := make(map[string]struct{})
 	labels := parser.GetLabels(labelList, nameMap)
@@ -112,6 +114,8 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		buff:                 buff,
 		format:               format,
 		disableRecordErrData: disableRecordErrData,
+		maxline:              maxline,
+		curline:              0,
 	}, nil
 }
 
@@ -120,6 +124,8 @@ type SyslogParser struct {
 	labels               []parser.Label
 	buff                 *bytes.Buffer
 	format               Format
+	maxline              int
+	curline              int
 	disableRecordErrData bool
 }
 
@@ -168,17 +174,10 @@ func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 func (p *SyslogParser) parse(line string) (data Data, err error) {
 	data = Data{}
 	if p.buff.Len() > 0 {
-		if line == parser.PandoraParseFlushSignal {
+		if line == parser.PandoraParseFlushSignal || p.curline >= p.maxline || p.format.IsNewLine([]byte(line)) {
 			return p.Flush()
-		}
-		if p.format.IsNewLine([]byte(line)) {
-			sparser := p.format.GetParser(p.buff.Bytes())
-			err = sparser.Parse()
-			if err == nil || err.Error() == "No structured data" {
-				data = Data(sparser.Dump())
-				err = nil
-			}
-			p.buff.Reset()
+		} else {
+			p.curline++
 		}
 	}
 	var serr error
@@ -201,7 +200,12 @@ func (p *SyslogParser) Flush() (data Data, err error) {
 	if err == nil || err.Error() == "No structured data" {
 		data = Data(sparser.Dump())
 		err = nil
+	} else {
+		if p.curline == p.maxline {
+			err = fmt.Errorf("syslog meet max line %v, try to parse err %v, check if this is standard rfc3164/rfc5424 syslog", p.maxline, err)
+		}
 	}
+	p.curline = 0
 	p.buff.Reset()
 	return
 }
