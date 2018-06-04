@@ -3,14 +3,14 @@ package ip
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
-
-	"github.com/stretchr/testify/assert"
 )
 
-func TestIpTransformer(t *testing.T) {
-	ipt := &IpTransformer{
+func TestTransformer(t *testing.T) {
+	ipt := &Transformer{
 		Key:      "ip",
 		DataPath: "./17monipdb.dat",
 	}
@@ -29,12 +29,12 @@ func TestIpTransformer(t *testing.T) {
 	expe := StatsInfo{
 		Errors:    1,
 		Success:   1,
-		LastError: "invalid ip format",
+		LastError: "invalid IP format",
 	}
 	assert.Equal(t, expe, ipt.stats)
 	assert.Equal(t, ipt.Stage(), transforms.StageAfterParser)
 
-	ipt2 := &IpTransformer{
+	ipt2 := &Transformer{
 		Key:      "multi.ip",
 		DataPath: "./17monipdb.dat",
 	}
@@ -57,12 +57,12 @@ func TestIpTransformer(t *testing.T) {
 	expe2 := StatsInfo{
 		Errors:    1,
 		Success:   1,
-		LastError: "invalid ip format",
+		LastError: "invalid IP format",
 	}
 	assert.Equal(t, expe2, ipt.stats)
 	assert.Equal(t, ipt2.Stage(), transforms.StageAfterParser)
 
-	ipt3 := &IpTransformer{
+	ipt3 := &Transformer{
 		Key:      "multi.ip",
 		DataPath: "./17monipdb.datx",
 	}
@@ -86,11 +86,11 @@ func TestIpTransformer(t *testing.T) {
 	expe3 := StatsInfo{
 		Errors:    1,
 		Success:   1,
-		LastError: "invalid ip format",
+		LastError: "invalid IP format",
 	}
 	assert.Equal(t, expe3, ipt.stats)
 
-	ipt4 := &IpTransformer{
+	ipt4 := &Transformer{
 		Key:      "multi.ip2",
 		DataPath: "./17monipdb.dat",
 	}
@@ -137,7 +137,7 @@ func TestIpTransformer(t *testing.T) {
 	expe4 := StatsInfo{
 		Errors:    1,
 		Success:   1,
-		LastError: "invalid ip format",
+		LastError: "invalid IP format",
 	}
 	assert.Equal(t, expe4, ipt.stats)
 	assert.Equal(t, ipt4.Stage(), transforms.StageAfterParser)
