@@ -270,14 +270,14 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (mr reader.Reader, err erro
 	if bufsize > 0 {
 		if _, err = meta.ReadBuf(buf); err != nil {
 			if os.IsNotExist(err) {
-				log.Debugf("Runner[%v] %v read buf error %v, ignore...", meta.RunnerName, mr.Name(), err)
+				log.Debugf("Runner[%v] read buf file %v error %v, ignore...", meta.RunnerName, meta.BufFile(), err)
 			} else {
-				log.Warnf("Runner[%v] %v read buf error %v, ignore...", meta.RunnerName, mr.Name(), err)
+				log.Warnf("Runner[%v] read buf file %v error %v, ignore...", meta.RunnerName, meta.BufFile(), err)
 			}
 		} else {
 			err = jsoniter.Unmarshal(buf, &cacheMap)
 			if err != nil {
-				log.Warnf("Runner[%v] %v Unmarshal read buf error %v, ignore...", meta.RunnerName, mr.Name(), err)
+				log.Warnf("Runner[%v] Unmarshal read buf cache error %v, ignore...", meta.RunnerName, err)
 			}
 		}
 		err = nil
