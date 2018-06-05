@@ -326,13 +326,13 @@ func TestLag(t *testing.T) {
 	CreateDir()
 	rl, err := sf.Lag()
 	assert.NoError(t, err)
-	assert.Equal(t, &LagInfo{0, "bytes", 0}, rl)
+	assert.Equal(t, &LagInfo{0, "bytes", 0, 0}, rl)
 	createQiniuLogFile(Dir)
 	createInvalidSuffixFile(Dir)
 
 	rl, err = sf.Lag()
 	assert.NoError(t, err)
-	assert.Equal(t, &LagInfo{16, "bytes", 0}, rl)
+	assert.Equal(t, &LagInfo{16, "bytes", 0, 0}, rl)
 }
 
 func Test_NewFileNewLine2(t *testing.T) {
