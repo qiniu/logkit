@@ -1,51 +1,58 @@
-package sender
+package fault_tolerant
 
 import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"sync"
 	"testing"
 	"time"
 
-	"github.com/qiniu/logkit/conf"
-	. "github.com/qiniu/logkit/utils/models"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
-	"github.com/stretchr/testify/assert"
+
+	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/sender"
+	"github.com/qiniu/logkit/sender/mock"
+	"github.com/qiniu/logkit/sender/mock_pandora"
+	"github.com/qiniu/logkit/sender/pandora"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (
 	fttestdir = "TestFtSender"
 )
 
-func TestFtSender(t *testing.T) {
-	_, pt := NewMockPandoraWithPrefix("/v2")
-	opt := &PandoraOption{
-		name:           "p",
-		repoName:       "TestFtSender",
-		region:         "nb",
-		endpoint:       "http://127.0.0.1:" + pt,
-		ak:             "ak",
-		sk:             "sk",
-		schema:         "ab",
-		autoCreate:     "ab *s",
-		updateInterval: time.Second,
-		reqRateLimit:   0,
-		flowRateLimit:  0,
-		gzip:           false,
-		tokenLock:      new(sync.RWMutex),
+var (
+	mockP, pt           = mock_pandora.NewMockPandoraWithPrefix("/v2")
+	pandoraSenderConfig = conf.MapConf{
+		"name":                           "p",
+		"pandora_region":                 "nb",
+		"pandora_host":                   "http://127.0.0.1:" + pt,
+		"pandora_schema":                 "ab",
+		"pandora_auto_create":            "ab *s",
+		"pandora_schema_free":            "false",
+		"pandora_ak":                     "ak",
+		"pandora_sk":                     "sk",
+		"pandora_schema_update_interval": "1",
+		"pandora_gzip":                   "false",
+
+		"sender_type": "pandora",
 	}
-	s, err := newPandoraSender(opt)
+)
+
+func TestFtSender(t *testing.T) {
+	pandoraSenderConfig["pandora_repo_name"] = "TestFtSender"
+	s, err := pandora.NewSender(pandoraSenderConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
 	mp := conf.MapConf{}
-	mp[KeyFtSaveLogPath] = fttestdir
-	mp[KeyFtStrategy] = KeyFtStrategyAlwaysSave
+	mp[sender.KeyFtSaveLogPath] = fttestdir
+	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyAlwaysSave
 	defer os.RemoveAll(fttestdir)
-	fts, err := NewFtSender(s, mp, fttestdir)
+	fts, err := sender.NewFtSender(s, mp, fttestdir)
 	assert.NoError(t, err)
 	datas := []Data{
 		{"ab": "abcccc"},
@@ -58,8 +65,8 @@ func TestFtSender(t *testing.T) {
 	}
 	assert.NoError(t, se.ErrorDetail)
 	time.Sleep(10 * time.Second)
-	if fts.backupQueue.Depth() != 1 {
-		t.Error("Ft sender error exp 1 but got", fts.backupQueue.Depth())
+	if fts.BackupQueue.Depth() != 1 {
+		t.Error("Ft send error exp 1 but got", fts.BackupQueue.Depth())
 	}
 }
 
@@ -69,32 +76,17 @@ func TestFtMemorySender(t *testing.T) {
 		panic(err)
 	}
 	defer os.RemoveAll(tmpDir)
-	_, pt := NewMockPandoraWithPrefix("/v2")
-	opt := &PandoraOption{
-		name:           "p",
-		repoName:       "TestFtMemorySender",
-		region:         "nb",
-		endpoint:       "http://127.0.0.1:" + pt,
-		ak:             "ak",
-		sk:             "sk",
-		schema:         "ab",
-		autoCreate:     "ab *s",
-		updateInterval: time.Second,
-		reqRateLimit:   0,
-		flowRateLimit:  0,
-		gzip:           false,
-		tokenLock:      new(sync.RWMutex),
-	}
-	s, err := newPandoraSender(opt)
+	pandoraSenderConfig["pandora_repo_name"] = "TestFtMemorySender"
+	s, err := pandora.NewSender(pandoraSenderConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
 	mp := conf.MapConf{}
-	mp[KeyFtSaveLogPath] = tmpDir
-	mp[KeyFtMemoryChannel] = "true"
-	mp[KeyFtMemoryChannelSize] = "3"
-	mp[KeyFtStrategy] = KeyFtStrategyAlwaysSave
-	fts, err := NewFtSender(s, mp, tmpDir)
+	mp[sender.KeyFtSaveLogPath] = tmpDir
+	mp[sender.KeyFtMemoryChannel] = "true"
+	mp[sender.KeyFtMemoryChannelSize] = "3"
+	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyAlwaysSave
+	fts, err := sender.NewFtSender(s, mp, tmpDir)
 	assert.NoError(t, err)
 	datas := []Data{
 		{"ab": "abcccc"},
@@ -107,8 +99,8 @@ func TestFtMemorySender(t *testing.T) {
 	}
 	assert.NoError(t, se.ErrorDetail)
 	time.Sleep(10 * time.Second)
-	if fts.backupQueue.Depth() != 1 {
-		t.Error("Ft sender error exp 1 but got", fts.backupQueue.Depth())
+	if fts.BackupQueue.Depth() != 1 {
+		t.Error("Ft send error exp 1 but got", fts.BackupQueue.Depth())
 	}
 }
 
@@ -118,23 +110,10 @@ func TestFtChannelFullSender(t *testing.T) {
 		panic(err)
 	}
 	defer os.RemoveAll(tmpDir)
-	mockP, pt := NewMockPandoraWithPrefix("/v2")
-	opt := &PandoraOption{
-		name:           "p",
-		repoName:       "TestFtMemorySender",
-		region:         "nb",
-		endpoint:       "http://127.0.0.1:" + pt,
-		ak:             "ak",
-		sk:             "sk",
-		schema:         "a",
-		autoCreate:     "a *s",
-		updateInterval: time.Second,
-		reqRateLimit:   0,
-		flowRateLimit:  0,
-		gzip:           false,
-		tokenLock:      new(sync.RWMutex),
-	}
-	s, err := newPandoraSender(opt)
+	pandoraSenderConfig["pandora_repo_name"] = "TestFtChannelFullSender"
+	pandoraSenderConfig["pandora_schema"] = "a"
+	pandoraSenderConfig["pandora_auto_create"] = "a *s"
+	s, err := pandora.NewSender(pandoraSenderConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,11 +121,11 @@ func TestFtChannelFullSender(t *testing.T) {
 	mockP.PostSleep = 1
 	mockP.SetMux.Unlock()
 	mp := conf.MapConf{}
-	mp[KeyFtSaveLogPath] = tmpDir
-	mp[KeyFtMemoryChannel] = "true"
-	mp[KeyFtMemoryChannelSize] = "1"
-	mp[KeyFtStrategy] = KeyFtStrategyAlwaysSave
-	fts, err := NewFtSender(s, mp, tmpDir)
+	mp[sender.KeyFtSaveLogPath] = tmpDir
+	mp[sender.KeyFtMemoryChannel] = "true"
+	mp[sender.KeyFtMemoryChannelSize] = "1"
+	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyAlwaysSave
+	fts, err := sender.NewFtSender(s, mp, tmpDir)
 	assert.NoError(t, err)
 
 	var moreDatas, moreAndMoreDatas [][]Data
@@ -161,7 +140,7 @@ func TestFtChannelFullSender(t *testing.T) {
 		if se.ErrorDetail != nil {
 			sx, succ := se.ErrorDetail.(*reqerr.SendError)
 			if succ {
-				datas := ConvertDatas(sx.GetFailDatas())
+				datas := sender.ConvertDatas(sx.GetFailDatas())
 				moreDatas = append(moreDatas, datas)
 			} else {
 				t.Fatal("ft send StatsError error should contains send error", se.ErrorDetail)
@@ -182,7 +161,7 @@ func TestFtChannelFullSender(t *testing.T) {
 			if se.ErrorDetail != nil {
 				sx, succ := se.ErrorDetail.(*reqerr.SendError)
 				if succ {
-					datas := ConvertDatas(sx.GetFailDatas())
+					datas := sender.ConvertDatas(sx.GetFailDatas())
 					moreAndMoreDatas = append(moreAndMoreDatas, datas)
 				} else {
 					t.Fatal("ft send StatsError error should contains send error", se.ErrorDetail)
@@ -199,7 +178,7 @@ func TestFtChannelFullSender(t *testing.T) {
 }
 
 func TestFtSenderConcurrent(t *testing.T) {
-	s, err := NewMockSender(conf.MapConf{})
+	s, err := mock.NewSender(conf.MapConf{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,10 +188,10 @@ func TestFtSenderConcurrent(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	mp := conf.MapConf{}
-	mp[KeyFtSaveLogPath] = tmpDir
-	mp[KeyFtStrategy] = KeyFtStrategyConcurrent
-	mp[KeyFtProcs] = "3"
-	fts, err := NewFtSender(s, mp, tmpDir)
+	mp[sender.KeyFtSaveLogPath] = tmpDir
+	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyConcurrent
+	mp[sender.KeyFtProcs] = "3"
+	fts, err := sender.NewFtSender(s, mp, tmpDir)
 	assert.NoError(t, err)
 	datas := []Data{
 		{"ab": "ababab"},
@@ -227,33 +206,33 @@ func TestFtSenderConcurrent(t *testing.T) {
 		assert.NoError(t, se.ErrorDetail)
 	}
 	fts.Close()
-	ms := s.(*MockSender)
+	ms := s.(*mock.Sender)
 	assert.Equal(t, 100, ms.SendCount())
-	assert.Equal(t, len(datas)*100, len(ms.datas))
+	assert.Equal(t, len(datas)*100, len(ms.Datas))
 }
 
 func BenchmarkFtSenderConcurrentDirect(b *testing.B) {
 	c := conf.MapConf{}
-	c[KeyFtStrategy] = KeyFtStrategyConcurrent
+	c[sender.KeyFtStrategy] = sender.KeyFtStrategyConcurrent
 	ftSenderConcurrent(b, c)
 }
 
 func BenchmarkFtSenderConcurrentDisk(b *testing.B) {
 	c := conf.MapConf{}
-	c[KeyFtStrategy] = KeyFtStrategyAlwaysSave
+	c[sender.KeyFtStrategy] = sender.KeyFtStrategyAlwaysSave
 	ftSenderConcurrent(b, c)
 }
 
 func BenchmarkFtSenderConcurrentMemory(b *testing.B) {
 	c := conf.MapConf{}
-	c[KeyFtStrategy] = KeyFtStrategyAlwaysSave
-	c[KeyFtMemoryChannel] = "true"
+	c[sender.KeyFtStrategy] = sender.KeyFtStrategyAlwaysSave
+	c[sender.KeyFtMemoryChannel] = "true"
 	ftSenderConcurrent(b, c)
 }
 
 func ftSenderConcurrent(b *testing.B, c conf.MapConf) {
 	log.SetOutputLevel(log.Lerror)
-	s, err := NewMockSender(conf.MapConf{})
+	s, err := mock.NewSender(conf.MapConf{})
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -262,9 +241,9 @@ func ftSenderConcurrent(b *testing.B, c conf.MapConf) {
 		panic(err)
 	}
 	defer os.RemoveAll(tmpDir)
-	c[KeyFtSaveLogPath] = tmpDir
-	c[KeyFtProcs] = "3"
-	fts, err := NewFtSender(s, c, tmpDir)
+	c[sender.KeyFtSaveLogPath] = tmpDir
+	c[sender.KeyFtProcs] = "3"
+	fts, err := sender.NewFtSender(s, c, tmpDir)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -283,7 +262,7 @@ func ftSenderConcurrent(b *testing.B, c conf.MapConf) {
 	}
 	b.StopTimer()
 	fts.Close()
-	ms := s.(*MockSender)
+	ms := s.(*mock.Sender)
 	b.Logf("Benchmark.N: %d", b.N)
 	b.Logf("MockSender.SendCount: %d", ms.SendCount())
 }
@@ -294,22 +273,26 @@ func TestFtSenderConvertData(t *testing.T) {
 		panic(err)
 	}
 	defer os.RemoveAll(tmpDir)
-	mockP, pt := NewMockPandoraWithPrefix("/v2")
-	opt := &PandoraOption{
-		name:           "p",
-		repoName:       "TestFtSenderConvertData",
-		region:         "nb",
-		endpoint:       "http://127.0.0.1:" + pt,
-		ak:             "ak",
-		sk:             "sk",
-		schemaFree:     true,
-		updateInterval: time.Second,
-		reqRateLimit:   0,
-		flowRateLimit:  0,
-		gzip:           false,
-		tokenLock:      new(sync.RWMutex),
+
+	mockP, pt := mock_pandora.NewMockPandoraWithPrefix("/v2")
+	senderConfig := conf.MapConf{
+		"pandora_repo_name":              "TestFtSenderConvertData",
+		"name":                           "p",
+		"pandora_region":                 "nb",
+		"pandora_host":                   "http://127.0.0.1:" + pt,
+		"pandora_schema":                 "",
+		"pandora_auto_create":            "",
+		"pandora_schema_free":            "true",
+		"pandora_ak":                     "ak",
+		"pandora_sk":                     "sk",
+		"pandora_schema_update_interval": "1",
+		"pandora_gzip":                   "false",
+		"logkit_send_time":               "false",
+
+		"sender_type": "pandora",
 	}
-	s, err := newPandoraSender(opt)
+
+	s, err := pandora.NewSender(senderConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -317,10 +300,10 @@ func TestFtSenderConvertData(t *testing.T) {
 	mockP.PostSleep = 1
 	mockP.SetMux.Unlock()
 	mp := conf.MapConf{}
-	mp[KeyFtSaveLogPath] = tmpDir
-	mp[KeyFtMemoryChannel] = "false"
-	mp[KeyFtStrategy] = KeyFtStrategyBackupOnly
-	fts, err := NewFtSender(s, mp, tmpDir)
+	mp[sender.KeyFtSaveLogPath] = tmpDir
+	mp[sender.KeyFtMemoryChannel] = "false"
+	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyBackupOnly
+	fts, err := sender.NewFtSender(s, mp, tmpDir)
 	assert.NoError(t, err)
 	expStr := []string{"a=typeBinaryUnpack", `pandora_stash={"a":"typeBinaryUnpack"}`, "a=typeBinaryUnpack", `pandora_stash={"a":"typeBinaryUnpack"}`}
 
@@ -360,7 +343,7 @@ func TestFtSenderConvertData(t *testing.T) {
 		if se.ErrorDetail != nil {
 			sx, succ := se.ErrorDetail.(*reqerr.SendError)
 			if succ {
-				datas := ConvertDatas(sx.GetFailDatas())
+				datas := sender.ConvertDatas(sx.GetFailDatas())
 				moreDatas = append(moreDatas, datas)
 			} else if !(se.Ft && se.FtNotRetry) {
 				t.Fatal("ft send StatsError error should contains send error", se.ErrorDetail)

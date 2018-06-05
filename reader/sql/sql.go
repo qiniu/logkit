@@ -18,8 +18,9 @@ import (
 	_ "github.com/go-sql-driver/mysql"   //mysql 驱动
 	jsoniter "github.com/json-iterator/go"
 	_ "github.com/lib/pq" //postgres 驱动
-	"github.com/qiniu/log"
 	"github.com/robfig/cron"
+
+	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"

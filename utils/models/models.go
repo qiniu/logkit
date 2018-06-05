@@ -30,6 +30,8 @@ const (
 	TsDBTokensPrefix       = "tsdb_tokens_"
 	KodoTokensPrefix       = "kodo_tokens_"
 
+	KeyRunnerName = "runner_name"
+
 	DefaultDirPerm  = 0755
 	DefaultFilePerm = 0600
 

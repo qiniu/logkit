@@ -1,14 +1,13 @@
 package reader
 
 import (
+	"errors"
 	"fmt"
 
-	"errors"
+	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/conf"
 	. "github.com/qiniu/logkit/utils/models"
-
-	"github.com/qiniu/log"
 )
 
 // Reader 是一个通用的行读取reader接口

@@ -25,6 +25,7 @@ import (
 	"github.com/qiniu/logkit/reader/cloudtrail"
 	"github.com/qiniu/logkit/router"
 	"github.com/qiniu/logkit/sender"
+	_ "github.com/qiniu/logkit/sender/builtin"
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -93,23 +94,24 @@ const qiniulogHeadPatthern = "[1-9]\\d{3}/[0-1]\\d/[0-3]\\d [0-2]\\d:[0-6]\\d:[0
 
 // NewRunner 创建Runner
 func NewRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal) (runner Runner, err error) {
-	return NewLogExportRunner(rc, cleanChan, reader.NewRegistry(), parser.NewRegistry(), sender.NewSenderRegistry())
+	return NewLogExportRunner(rc, cleanChan, reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
 }
 
-func NewCustomRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *reader.Registry, ps *parser.Registry, sr *sender.SenderRegistry) (runner Runner, err error) {
-	if ps == nil {
-		ps = parser.NewRegistry()
-	}
-	if sr == nil {
-		sr = sender.NewSenderRegistry()
-	}
+func NewCustomRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *reader.Registry, pr *parser.Registry, sr *sender.Registry) (runner Runner, err error) {
 	if rr == nil {
 		rr = reader.NewRegistry()
 	}
+	if pr == nil {
+		pr = parser.NewRegistry()
+	}
+	if sr == nil {
+		sr = sender.NewRegistry()
+	}
+
 	if rc.MetricConfig != nil {
 		return NewMetricRunner(rc, sr)
 	}
-	return NewLogExportRunner(rc, cleanChan, rr, ps, sr)
+	return NewLogExportRunner(rc, cleanChan, rr, pr, sr)
 }
 
 func NewRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.Parser, transformers []transforms.Transformer,
@@ -177,7 +179,7 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 	return runner, nil
 }
 
-func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *reader.Registry, ps *parser.Registry, sr *sender.SenderRegistry) (runner *LogExportRunner, err error) {
+func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *reader.Registry, pr *parser.Registry, sr *sender.Registry) (runner *LogExportRunner, err error) {
 	runnerInfo := RunnerInfo{
 		EnvTag:           rc.EnvTag,
 		RunnerName:       rc.RunnerName,
@@ -189,8 +191,8 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	if rc.ReaderConfig == nil {
 		return nil, errors.New(rc.RunnerName + " readerConfig is nil")
 	}
-	if rc.SenderConfig == nil {
-		return nil, errors.New(rc.RunnerName + " SenderConfig is nil")
+	if rc.SendersConfig == nil {
+		return nil, errors.New(rc.RunnerName + " SendersConfig is nil")
 	}
 	if rc.ParserConf == nil {
 		return nil, errors.New(rc.RunnerName + " ParserConf is nil")
@@ -200,8 +202,8 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	if rc.ExtraInfo {
 		rc.ReaderConfig[ExtraInfo] = Bool2String(rc.ExtraInfo)
 	}
-	for i := range rc.SenderConfig {
-		rc.SenderConfig[i][KeyRunnerName] = rc.RunnerName
+	for i := range rc.SendersConfig {
+		rc.SendersConfig[i][KeyRunnerName] = rc.RunnerName
 	}
 	rc.ParserConf[KeyRunnerName] = rc.RunnerName
 	//配置文件适配
@@ -245,27 +247,29 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 			return nil, err
 		}
 	}
-	parser, err := ps.NewLogParser(rc.ParserConf)
+	parser, err := pr.NewLogParser(rc.ParserConf)
 	if err != nil {
 		return nil, err
 	}
+
 	transformers, err := createTransformers(rc)
 	if err != nil {
 		return nil, err
 	}
 	senders := make([]sender.Sender, 0)
-	for i, c := range rc.SenderConfig {
-		if rc.ExtraInfo && c[KeySenderType] == TypePandora {
+	for i, senderConfig := range rc.SendersConfig {
+		if rc.ExtraInfo && senderConfig[sender.KeySenderType] == sender.TypePandora {
 			//如果已经开启了，不要重复加
-			c[KeyPandoraExtraInfo] = "false"
+			senderConfig[sender.KeyPandoraExtraInfo] = "false"
 		}
-		s, err := sr.NewSender(c, meta.FtSaveLogPath())
+		s, err := sr.NewSender(senderConfig, meta.FtSaveLogPath())
 		if err != nil {
 			return nil, err
 		}
 		senders = append(senders, s)
-		delete(rc.SenderConfig[i], InnerUserAgent)
+		delete(rc.SendersConfig[i], sender.InnerUserAgent)
 	}
+
 	senderCnt := len(senders)
 	router, err := router.NewSenderRouter(rc.Router, senderCnt)
 	if err != nil {

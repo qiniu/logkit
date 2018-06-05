@@ -14,6 +14,7 @@ import (
 	"github.com/qiniu/logkit/cleaner"
 	config "github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/sender"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
@@ -22,7 +23,6 @@ import (
 
 	"github.com/howeyc/fsnotify"
 	"github.com/json-iterator/go"
-	"github.com/qiniu/logkit/reader"
 )
 
 var DIR_NOT_EXIST_SLEEP_TIME = "300" //300 s
@@ -56,22 +56,22 @@ type Manager struct {
 	runnerConfig map[string]RunnerConfig
 
 	watchers  map[string]*fsnotify.Watcher // inode到watcher的映射表
-	pregistry *parser.Registry
-	sregistry *sender.SenderRegistry
 	rregistry *reader.Registry
+	pregistry *parser.Registry
+	sregistry *sender.Registry
 
 	Version    string
 	SystemInfo string
 }
 
 func NewManager(conf ManagerConfig) (*Manager, error) {
-	ps := parser.NewRegistry()
-	sr := sender.NewSenderRegistry()
 	rr := reader.NewRegistry()
-	return NewCustomManager(conf, rr, ps, sr)
+	pr := parser.NewRegistry()
+	sr := sender.NewRegistry()
+	return NewCustomManager(conf, rr, pr, sr)
 }
 
-func NewCustomManager(conf ManagerConfig, rr *reader.Registry, pr *parser.Registry, sr *sender.SenderRegistry) (*Manager, error) {
+func NewCustomManager(conf ManagerConfig, rr *reader.Registry, pr *parser.Registry, sr *sender.Registry) (*Manager, error) {
 	if conf.RestDir == "" {
 		dir, err := os.Getwd()
 		if err != nil {
@@ -99,9 +99,9 @@ func NewCustomManager(conf ManagerConfig, rr *reader.Registry, pr *parser.Regist
 		runners:       make(map[string]Runner),
 		runnerConfig:  make(map[string]RunnerConfig),
 		watchers:      make(map[string]*fsnotify.Watcher),
+		rregistry:     rr,
 		pregistry:     pr,
 		sregistry:     sr,
-		rregistry:     rr,
 		SystemInfo:    utilsos.GetOSInfo().String(),
 	}
 	return m, nil
@@ -256,14 +256,14 @@ func (m *Manager) ForkRunner(confPath string, nconf RunnerConfig, errReturn bool
 			m.lock.Unlock()
 			return nil
 		}
-		for k := range nconf.SenderConfig {
+		for k := range nconf.SendersConfig {
 			var webornot string
 			if nconf.IsInWebFolder {
 				webornot = "Web"
 			} else {
 				webornot = "Terminal"
 			}
-			nconf.SenderConfig[k][InnerUserAgent] = "logkit/" + m.Version + " " + m.SystemInfo + " " + webornot
+			nconf.SendersConfig[k][sender.InnerUserAgent] = "logkit/" + m.Version + " " + m.SystemInfo + " " + webornot
 		}
 
 		if runner, err = NewCustomRunner(nconf, m.cleanChan, m.rregistry, m.pregistry, m.sregistry); err != nil {
@@ -594,11 +594,11 @@ func TrimSecretInfo(conf RunnerConfig) RunnerConfig {
 		preFix + "list_export_token",
 	}...)
 
-	for i, sc := range conf.SenderConfig {
+	for i, sc := range conf.SendersConfig {
 		for _, k := range keyName {
 			delete(sc, k)
 		}
-		conf.SenderConfig[i] = sc
+		conf.SendersConfig[i] = sc
 	}
 	return conf
 }
@@ -638,9 +638,9 @@ func (m *Manager) UpdateToken(tokens []AuthTokens) (err error) {
 			}
 		}
 		if c, ok := m.runnerConfig[runnerPath]; ok {
-			if len(c.SenderConfig) > token.SenderIndex {
+			if len(c.SendersConfig) > token.SenderIndex {
 				for k, t := range token.SenderTokens {
-					c.SenderConfig[token.SenderIndex][k] = t
+					c.SendersConfig[token.SenderIndex][k] = t
 				}
 			}
 			m.runnerConfig[runnerPath] = c

@@ -304,7 +304,7 @@ func Test_SendData(t *testing.T) {
 
 	var senders []conf.MapConf
 	senderConf := conf.MapConf{
-		KeySenderType:                TypeHttp,
+		sender.KeySenderType:         sender.TypeHttp,
 		sender.KeyHttpSenderGzip:     "true",
 		sender.KeyHttpSenderCsvSplit: "\t",
 		sender.KeyHttpSenderProtocol: "json",
@@ -346,7 +346,7 @@ func Test_getSendersConfig(t *testing.T) {
 
 	var senders []conf.MapConf
 	senderConf := conf.MapConf{
-		KeySenderType:                TypeHttp,
+		sender.KeySenderType:         sender.TypeHttp,
 		sender.KeyHttpSenderGzip:     "true",
 		sender.KeyHttpSenderCsvSplit: "\t",
 		sender.KeyHttpSenderProtocol: "json",
@@ -371,7 +371,7 @@ func Test_getSendersConfig(t *testing.T) {
 	}
 
 	for _, val := range sendersConfig {
-		assert.Equal(t, TypeHttp, val[KeySenderType])
+		assert.Equal(t, sender.TypeHttp, val[sender.KeySenderType])
 		assert.Equal(t, "true", val[sender.KeyHttpSenderGzip])
 	}
 }
@@ -388,7 +388,7 @@ func Test_getDataFromSenderConfig(t *testing.T) {
 
 	var senders []conf.MapConf
 	senderConf := conf.MapConf{
-		KeySenderType:                TypeHttp,
+		sender.KeySenderType:         sender.TypeHttp,
 		sender.KeyHttpSenderGzip:     "true",
 		sender.KeyHttpSenderCsvSplit: "\t",
 		sender.KeyHttpSenderProtocol: "json",
@@ -423,7 +423,7 @@ func Test_getDataFromSenderConfig(t *testing.T) {
 func Test_getSenders(t *testing.T) {
 	var sendersConfig []conf.MapConf
 	senderConf := conf.MapConf{
-		KeySenderType:                TypeHttp,
+		sender.KeySenderType:         sender.TypeHttp,
 		sender.KeyHttpSenderGzip:     "true",
 		sender.KeyHttpSenderCsvSplit: "\t",
 		sender.KeyHttpSenderProtocol: "json",

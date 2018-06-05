@@ -13,10 +13,11 @@ import (
 
 	"github.com/json-iterator/go"
 	"github.com/labstack/echo"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/router"
-	"github.com/stretchr/testify/assert"
 )
 
 type respSlave struct {
@@ -743,7 +744,7 @@ func clusterSalveConfigsTest(p *testCluParam) {
 	assert.Equal(t, rc.RunnerName, scc.RunnerName)
 	assert.Equal(t, rc.MaxBatchLen, scc.MaxBatchLen)
 	assert.Equal(t, rc.MaxBatchInterval, scc.MaxBatchInterval)
-	assert.Equal(t, rc.SenderConfig[0]["file_send_path"], scc.SenderConfig[0]["file_send_path"])
+	assert.Equal(t, rc.SendersConfig[0]["file_send_path"], scc.SendersConfig[0]["file_send_path"])
 
 	sc, ok = gotConfigs[rs[2].cluster.Address]
 	assert.Equal(t, true, ok)
@@ -752,7 +753,7 @@ func clusterSalveConfigsTest(p *testCluParam) {
 	assert.Equal(t, rc.RunnerName, scc.RunnerName)
 	assert.Equal(t, rc.MaxBatchLen, scc.MaxBatchLen)
 	assert.Equal(t, rc.MaxBatchInterval, scc.MaxBatchInterval)
-	assert.Equal(t, rc.SenderConfig[0]["file_send_path"], scc.SenderConfig[0]["file_send_path"])
+	assert.Equal(t, rc.SendersConfig[0]["file_send_path"], scc.SendersConfig[0]["file_send_path"])
 
 	// tag 为空
 	url = rs[0].cluster.Address + "/logkit/cluster/configs?tag="
@@ -786,7 +787,7 @@ func clusterSalveConfigsTest(p *testCluParam) {
 	assert.Equal(t, rc.RunnerName, scc.RunnerName)
 	assert.Equal(t, rc.MaxBatchLen, scc.MaxBatchLen)
 	assert.Equal(t, rc.MaxBatchInterval, scc.MaxBatchInterval)
-	assert.Equal(t, rc.SenderConfig[0]["file_send_path"], scc.SenderConfig[0]["file_send_path"])
+	assert.Equal(t, rc.SendersConfig[0]["file_send_path"], scc.SendersConfig[0]["file_send_path"])
 
 	sc, ok = gotConfigs[rs[1].cluster.Address]
 	assert.Equal(t, false, ok)
@@ -1038,7 +1039,7 @@ func getSlaveConfigTest(p *testCluParam) {
 	expConfig.ReaderConfig["name"] = runnerName
 	expConfig.ReaderConfig["runner_name"] = runnerName
 	expConfig.ParserConf["runner_name"] = runnerName
-	expConfig.SenderConfig[0]["runner_name"] = runnerName
+	expConfig.SendersConfig[0]["runner_name"] = runnerName
 	expConfig.IsInWebFolder = true
 
 	assert.Equal(t, expConfig, respConfig)
@@ -1071,7 +1072,7 @@ func TestJsoniterMashalUnmashal(t *testing.T) {
 			"type": "json",
 			"name": "json_parser",
 		},
-		SenderConfig: []conf.MapConf{{
+		SendersConfig: []conf.MapConf{{
 			"name":           "file_sender",
 			"sender_type":    "file",
 			"file_send_path": "/xsxs",
@@ -1084,7 +1085,7 @@ func TestJsoniterMashalUnmashal(t *testing.T) {
 	err = jsoniter.Unmarshal(bt, &rc)
 	assert.NoError(t, err)
 	assert.Equal(t, runnerConf, rc)
-	assert.Equal(t, "/xsxs", rc.SenderConfig[0]["file_send_path"])
+	assert.Equal(t, "/xsxs", rc.SendersConfig[0]["file_send_path"])
 }
 
 func TestJsoniter(t *testing.T) {

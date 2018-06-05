@@ -1,4 +1,4 @@
-package sender
+package pandora
 
 import (
 	"encoding/json"
@@ -11,26 +11,27 @@ import (
 	"sync"
 	"time"
 
-	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/metric"
-	"github.com/qiniu/logkit/times"
-	. "github.com/qiniu/logkit/utils/models"
-	utilsos "github.com/qiniu/logkit/utils/os"
+	gouuid "github.com/satori/go.uuid"
 
+	"github.com/qiniu/log"
 	pipelinebase "github.com/qiniu/pandora-go-sdk/base"
+	"github.com/qiniu/pandora-go-sdk/base/models"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 	"github.com/qiniu/pandora-go-sdk/logdb"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 
-	"github.com/qiniu/pandora-go-sdk/base/models"
-	gouuid "github.com/satori/go.uuid"
+	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/metric"
+	"github.com/qiniu/logkit/sender"
+	"github.com/qiniu/logkit/times"
+	. "github.com/qiniu/logkit/utils/models"
+	utilsos "github.com/qiniu/logkit/utils/os"
 )
 
 var osInfo = []string{KeyCore, KeyHostName, KeyOsInfo, KeyLocalIp}
 
-// PandoraSender pandora sender
-type PandoraSender struct {
+// pandora sender
+type Sender struct {
 	client             pipeline.PipelineAPI
 	schemas            map[string]pipeline.RepoSchemaEntry
 	schemasMux         sync.RWMutex
@@ -115,78 +116,83 @@ type PandoraOption struct {
 //PandoraMaxBatchSize 发送到Pandora的batch限制
 var PandoraMaxBatchSize = 2 * 1024 * 1024
 
-// NewPandoraSender pandora sender constructor
-func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
-	repoName, err := conf.GetString(KeyPandoraRepoName)
+func init() {
+	sender.RegisterConstructor(sender.TypePandora, NewSender)
+}
+
+// pandora sender
+func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
+	repoName, err := conf.GetString(sender.KeyPandoraRepoName)
 	if err != nil {
 		return
 	}
 	if repoName == "" {
 		return nil, errors.New("repoName is empty")
 	}
-	region, err := conf.GetString(KeyPandoraRegion)
+	region, err := conf.GetString(sender.KeyPandoraRegion)
 	if err != nil {
 		return
 	}
-	host, err := conf.GetString(KeyPandoraHost)
+	host, err := conf.GetString(sender.KeyPandoraHost)
 	if err != nil {
 		return
 	}
-	ak, _ := conf.GetString(KeyPandoraAk)
+	ak, _ := conf.GetString(sender.KeyPandoraAk)
 	akFromEnv := GetEnv(ak)
 	if akFromEnv == "" {
 		akFromEnv = ak
 	}
 
-	sk, _ := conf.GetString(KeyPandoraSk)
+	sk, _ := conf.GetString(sender.KeyPandoraSk)
 	skFromEnv := GetEnv(sk)
 	if skFromEnv == "" {
 		skFromEnv = sk
 	}
-	workflowName, _ := conf.GetStringOr(KeyPandoraWorkflowName, "")
-	useragent, _ := conf.GetStringOr(InnerUserAgent, "")
-	schema, _ := conf.GetStringOr(KeyPandoraSchema, "")
-	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("pandoraSender:(%v,repo:%v,region:%v)", host, repoName, region))
-	updateInterval, _ := conf.GetInt64Or(KeyPandoraSchemaUpdateInterval, 300)
-	schemaFree, _ := conf.GetBoolOr(KeyPandoraSchemaFree, false)
-	forceMicrosecond, _ := conf.GetBoolOr(KeyForceMicrosecond, false)
-	autoCreateSchema, _ := conf.GetStringOr(KeyPandoraAutoCreate, "")
-	reqRateLimit, _ := conf.GetInt64Or(KeyRequestRateLimit, 0)
-	flowRateLimit, _ := conf.GetInt64Or(KeyFlowRateLimit, 0)
-	gzip, _ := conf.GetBoolOr(KeyPandoraGzip, false)
-	uuid, _ := conf.GetBoolOr(KeyPandoraUUID, false)
-	withIp, _ := conf.GetBoolOr(KeyPandoraWithIP, false)
-	runnerName, _ := conf.GetStringOr(KeyRunnerName, UnderfinedRunnerName)
-	extraInfo, _ := conf.GetBoolOr(KeyPandoraExtraInfo, false)
 
-	enableLogdb, _ := conf.GetBoolOr(KeyPandoraEnableLogDB, false)
-	logdbreponame, _ := conf.GetStringOr(KeyPandoraLogDBName, repoName)
-	logdbhost, _ := conf.GetStringOr(KeyPandoraLogDBHost, "")
-	logdbAnalyzer, _ := conf.GetStringListOr(KeyPandoraLogDBAnalyzer, []string{})
+	workflowName, _ := conf.GetStringOr(sender.KeyPandoraWorkflowName, "")
+	useragent, _ := conf.GetStringOr(sender.InnerUserAgent, "")
+	schema, _ := conf.GetStringOr(sender.KeyPandoraSchema, "")
+	name, _ := conf.GetStringOr(sender.KeyName, fmt.Sprintf("pandoraSender:(%v,repo:%v,region:%v)", host, repoName, region))
+	updateInterval, _ := conf.GetInt64Or(sender.KeyPandoraSchemaUpdateInterval, 300)
+	schemaFree, _ := conf.GetBoolOr(sender.KeyPandoraSchemaFree, false)
+	forceMicrosecond, _ := conf.GetBoolOr(sender.KeyForceMicrosecond, false)
+	autoCreateSchema, _ := conf.GetStringOr(sender.KeyPandoraAutoCreate, "")
+	reqRateLimit, _ := conf.GetInt64Or(sender.KeyRequestRateLimit, 0)
+	flowRateLimit, _ := conf.GetInt64Or(sender.KeyFlowRateLimit, 0)
+	gzip, _ := conf.GetBoolOr(sender.KeyPandoraGzip, false)
+	uuid, _ := conf.GetBoolOr(sender.KeyPandoraUUID, false)
+	withIp, _ := conf.GetBoolOr(sender.KeyPandoraWithIP, false)
+	runnerName, _ := conf.GetStringOr(KeyRunnerName, sender.UnderfinedRunnerName)
+	extraInfo, _ := conf.GetBoolOr(sender.KeyPandoraExtraInfo, false)
+
+	enableLogdb, _ := conf.GetBoolOr(sender.KeyPandoraEnableLogDB, false)
+	logdbreponame, _ := conf.GetStringOr(sender.KeyPandoraLogDBName, repoName)
+	logdbhost, _ := conf.GetStringOr(sender.KeyPandoraLogDBHost, "")
+	logdbAnalyzer, _ := conf.GetStringListOr(sender.KeyPandoraLogDBAnalyzer, []string{})
 	analyzerMap := convertAnalyzerMap(logdbAnalyzer)
 
-	enableTsdb, _ := conf.GetBoolOr(KeyPandoraEnableTSDB, false)
-	tsdbReponame, _ := conf.GetStringOr(KeyPandoraTSDBName, repoName)
-	tsdbSeriesName, _ := conf.GetStringOr(KeyPandoraTSDBSeriesName, tsdbReponame)
-	tsdbHost, _ := conf.GetStringOr(KeyPandoraTSDBHost, "")
-	tsdbTimestamp, _ := conf.GetStringOr(KeyPandoraTSDBTimeStamp, "")
-	seriesTags, _ := conf.GetStringListOr(KeyPandoraTSDBSeriesTags, []string{})
+	enableTsdb, _ := conf.GetBoolOr(sender.KeyPandoraEnableTSDB, false)
+	tsdbReponame, _ := conf.GetStringOr(sender.KeyPandoraTSDBName, repoName)
+	tsdbSeriesName, _ := conf.GetStringOr(sender.KeyPandoraTSDBSeriesName, tsdbReponame)
+	tsdbHost, _ := conf.GetStringOr(sender.KeyPandoraTSDBHost, "")
+	tsdbTimestamp, _ := conf.GetStringOr(sender.KeyPandoraTSDBTimeStamp, "")
+	seriesTags, _ := conf.GetStringListOr(sender.KeyPandoraTSDBSeriesTags, []string{})
 	tsdbSeriesTags := map[string][]string{tsdbSeriesName: seriesTags}
 
-	enableKodo, _ := conf.GetBoolOr(KeyPandoraEnableKodo, false)
-	kodobucketName, _ := conf.GetStringOr(KeyPandoraKodoBucketName, repoName)
-	email, _ := conf.GetStringOr(KeyPandoraEmail, "")
-	format, _ := conf.GetStringOr(KeyPandoraKodoCompressPrefix, "parquet")
-	prefix, _ := conf.GetStringOr(KeyPandoraKodoFilePrefix, "logkitauto/date=$(year)-$(mon)-$(day)/hour=$(hour)/min=$(min)/$(sec)")
+	enableKodo, _ := conf.GetBoolOr(sender.KeyPandoraEnableKodo, false)
+	kodobucketName, _ := conf.GetStringOr(sender.KeyPandoraKodoBucketName, repoName)
+	email, _ := conf.GetStringOr(sender.KeyPandoraEmail, "")
+	format, _ := conf.GetStringOr(sender.KeyPandoraKodoCompressPrefix, "parquet")
+	prefix, _ := conf.GetStringOr(sender.KeyPandoraKodoFilePrefix, "logkitauto/date=$(year)-$(mon)-$(day)/hour=$(hour)/min=$(min)/$(sec)")
 
-	forceconvert, _ := conf.GetBoolOr(KeyForceDataConvert, false)
-	ignoreInvalidField, _ := conf.GetBoolOr(KeyIgnoreInvalidField, true)
-	autoconvertDate, _ := conf.GetBoolOr(KeyPandoraAutoConvertDate, true)
-	logkitSendTime, _ := conf.GetBoolOr(KeyLogkitSendTime, true)
-	isMetrics, _ := conf.GetBoolOr(KeyIsMetrics, false)
-	numberUseFloat, _ := conf.GetBoolOr(KeyNumberUseFloat, false)
-	unescape, _ := conf.GetBoolOr(KeyPandoraUnescape, false)
-	insecureServer, _ := conf.GetBoolOr(KeyInsecureServer, false)
+	forceconvert, _ := conf.GetBoolOr(sender.KeyForceDataConvert, false)
+	ignoreInvalidField, _ := conf.GetBoolOr(sender.KeyIgnoreInvalidField, true)
+	autoconvertDate, _ := conf.GetBoolOr(sender.KeyPandoraAutoConvertDate, true)
+	logkitSendTime, _ := conf.GetBoolOr(sender.KeyLogkitSendTime, true)
+	isMetrics, _ := conf.GetBoolOr(sender.KeyIsMetrics, false)
+	numberUseFloat, _ := conf.GetBoolOr(sender.KeyNumberUseFloat, false)
+	unescape, _ := conf.GetBoolOr(sender.KeyPandoraUnescape, false)
+	insecureServer, _ := conf.GetBoolOr(sender.KeyInsecureServer, false)
 
 	var subErr error
 	var tokens Tokens
@@ -263,6 +269,7 @@ func NewPandoraSender(conf conf.MapConf) (sender Sender, err error) {
 	if withIp {
 		opt.withip = "logkitIP"
 	}
+
 	return newPandoraSender(opt)
 }
 
@@ -369,7 +376,7 @@ func getTokensFromConf(conf conf.MapConf) (tokens Tokens, err error) {
 	return
 }
 
-func (s *PandoraSender) TokenRefresh(mapConf conf.MapConf) error {
+func (s *Sender) TokenRefresh(mapConf conf.MapConf) error {
 	s.opt.tokenLock.Lock()
 	defer s.opt.tokenLock.Unlock()
 	if tokens, err := getTokensFromConf(mapConf); err != nil {
@@ -380,7 +387,7 @@ func (s *PandoraSender) TokenRefresh(mapConf conf.MapConf) error {
 	return nil
 }
 
-func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
+func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 	logger := pipelinebase.NewDefaultLogger()
 	config := pipeline.NewConfig().
 		WithPipelineEndpoint(opt.endpoint).
@@ -406,7 +413,7 @@ func newPandoraSender(opt *PandoraOption) (s *PandoraSender, err error) {
 		log.Warnf("Runner[%v] Sender[%v]: you have limited send speed within %v KB/s", opt.runnerName, opt.name, opt.flowRateLimit)
 	}
 	userSchema := parseUserSchema(opt.repoName, opt.schema)
-	s = &PandoraSender{
+	s = &Sender{
 		opt:        *opt,
 		client:     client,
 		alias2key:  make(map[string]string),
@@ -534,7 +541,7 @@ func parseUserSchema(repoName, schema string) (us UserSchema) {
 	return
 }
 
-func (s *PandoraSender) UpdateSchemas() {
+func (s *Sender) UpdateSchemas() {
 	schemas, err := s.client.GetUpdateSchemasWithInput(
 		&pipeline.GetRepoInput{
 			RepoName:     s.opt.repoName,
@@ -557,7 +564,7 @@ func (s *PandoraSender) UpdateSchemas() {
 	s.updateSchemas(schemas)
 }
 
-func (s *PandoraSender) updateSchemas(schemas map[string]pipeline.RepoSchemaEntry) {
+func (s *Sender) updateSchemas(schemas map[string]pipeline.RepoSchemaEntry) {
 	alias2Key := fillAlias2Keys(s.opt.repoName, schemas, s.UserSchema)
 	s.schemasMux.Lock()
 	s.schemas = schemas
@@ -630,10 +637,10 @@ func convertDate(v interface{}, option forceMicrosecondOption) (d interface{}, e
 		s = alignTimestamp(s, option.nanosecond)
 	}
 	timestampStr := strconv.FormatInt(s, 10)
-	for i := len(timestampStr); i < TimestampPrecision; i++ {
+	for i := len(timestampStr); i < sender.TimestampPrecision; i++ {
 		timestampStr += "0"
 	}
-	timestampStr = timestampStr[0:TimestampPrecision]
+	timestampStr = timestampStr[0:sender.TimestampPrecision]
 	if s, err = strconv.ParseInt(timestampStr, 10, 64); err != nil {
 		return v, err
 	}
@@ -648,7 +655,7 @@ func alignTimestamp(t int64, nanosecond uint64) int64 {
 	for i := 0; t%10 == 0; i++ {
 		t /= 10
 	}
-	offset := TimestampPrecision - len(strconv.FormatInt(t, 10))
+	offset := sender.TimestampPrecision - len(strconv.FormatInt(t, 10))
 	dividend := int64(math.Pow10(offset))
 	if offset > 0 {
 		t = t * dividend //补齐相应的位数
@@ -728,13 +735,13 @@ func validSchema(valueType string, value interface{}, numberAsFloat bool) bool {
 	return true
 }
 
-func (s *PandoraSender) getSchemasAlias() (map[string]pipeline.RepoSchemaEntry, map[string]string) {
+func (s *Sender) getSchemasAlias() (map[string]pipeline.RepoSchemaEntry, map[string]string) {
 	s.schemasMux.RLock()
 	defer s.schemasMux.RUnlock()
 	return s.schemas, s.alias2key
 }
 
-func (s *PandoraSender) generatePoint(data Data) (point Data) {
+func (s *Sender) generatePoint(data Data) (point Data) {
 	point = make(Data, len(data))
 	schemas, alias2key := s.getSchemasAlias()
 	for k, v := range schemas {
@@ -774,7 +781,7 @@ func (s *PandoraSender) generatePoint(data Data) (point Data) {
 	}
 	if s.opt.uuid {
 		uuid, _ := gouuid.NewV4()
-		point[PandoraUUID] = uuid.String()
+		point[sender.PandoraUUID] = uuid.String()
 	}
 	/*
 		data中剩余的值，但是在schema中不存在的，根据defaultAll和schemaFree判断是否增加。
@@ -791,17 +798,17 @@ func (s *PandoraSender) generatePoint(data Data) (point Data) {
 	return
 }
 
-func (s *PandoraSender) checkSchemaUpdate() {
+func (s *Sender) checkSchemaUpdate() {
 	if s.lastUpdate.Add(s.opt.updateInterval).After(time.Now()) {
 		return
 	}
 	s.UpdateSchemas()
 }
 
-func (s *PandoraSender) Send(datas []Data) (se error) {
+func (s *Sender) Send(datas []Data) (se error) {
 	s.checkSchemaUpdate()
 	if !s.opt.schemaFree && (len(s.schemas) <= 0 || len(s.alias2key) <= 0) {
-		se = reqerr.NewSendError("Get pandora schema error, failed to send data", ConvertDatasBack(datas), reqerr.TypeDefault)
+		se = reqerr.NewSendError("Get pandora schema error, failed to send data", sender.ConvertDatasBack(datas), reqerr.TypeDefault)
 		ste := &StatsError{
 			StatsInfo: StatsInfo{
 				Success:   0,
@@ -819,7 +826,7 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 			continue
 		}
 		if s.opt.logkitSendTime {
-			d[KeyLogkitSendTime] = now
+			d[sender.KeyLogkitSendTime] = now
 		}
 		if s.opt.extraInfo {
 			for key, val := range s.extraInfo {
@@ -907,13 +914,13 @@ func (s *PandoraSender) Send(datas []Data) (se error) {
 	return ste
 }
 
-func (s *PandoraSender) Name() string {
+func (s *Sender) Name() string {
 	if len(s.opt.name) <= 0 {
 		return "panodra:" + s.opt.repoName
 	}
 	return s.opt.name
 }
 
-func (s *PandoraSender) Close() error {
+func (s *Sender) Close() error {
 	return s.client.Close()
 }

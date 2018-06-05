@@ -11,9 +11,10 @@ import (
 	"time"
 
 	elasticV6 "github.com/olivere/elastic"
-	"github.com/qiniu/log"
 	elasticV3 "gopkg.in/olivere/elastic.v3"
 	elasticV5 "gopkg.in/olivere/elastic.v5"
+
+	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"

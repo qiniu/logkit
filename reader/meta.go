@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/json-iterator/go"
+
 	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/conf"

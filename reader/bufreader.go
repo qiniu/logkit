@@ -20,6 +20,7 @@ import (
 	"unsafe"
 
 	"github.com/axgle/mahonia"
+
 	"github.com/qiniu/log"
 
 	. "github.com/qiniu/logkit/utils/models"

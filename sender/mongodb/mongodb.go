@@ -1,4 +1,4 @@
-package sender
+package mongodb
 
 import (
 	"errors"
@@ -6,18 +6,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/utils"
-	. "github.com/qiniu/logkit/utils/models"
-	"github.com/qiniu/pandora-go-sdk/base/reqerr"
-
-	"github.com/qiniu/log"
 	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+
+	"github.com/qiniu/log"
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
+
+	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/sender"
+	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
-// MongoAccSender Mongodb 根据UpdateKey 做对AccumulateKey $inc 累加的Sender
-type MongoAccSender struct {
+// mongo sender Mongodb 根据UpdateKey 做对AccumulateKey $inc 累加的Sender
+type Sender struct {
 	sync.RWMutex
 
 	name           string
@@ -30,46 +32,37 @@ type MongoAccSender struct {
 	accumulateKey  []conf.AliasKey
 }
 
-// 可选参数 当sender_type 为mongodb_* 的时候，需要必填的字段
-const (
-	KeyMongodbHost       = "mongodb_host"
-	KeyMongodbDB         = "mongodb_db"
-	KeyMongodbCollection = "mongodb_collection"
-)
-
-// 可选参数 当sender_type 为mongodb_acc 的时候，需要必填的字段
-const (
-	KeyMongodbUpdateKey = "mongodb_acc_updkey"
-	KeyMongodbAccKey    = "mongodb_acc_acckey"
-)
-
-// NewMongodbAccSender mongodb accumulate sender constructor
-func NewMongodbAccSender(conf conf.MapConf) (sender Sender, err error) {
-	host, err := conf.GetString(KeyMongodbHost)
-	if err != nil {
-		return
-	}
-	dbName, err := conf.GetString(KeyMongodbDB)
-	if err != nil {
-		return
-	}
-	updKey, err := conf.GetAliasList(KeyMongodbUpdateKey)
-	if err != nil {
-		return
-	}
-	accKey, err := conf.GetAliasList(KeyMongodbAccKey)
-	if err != nil {
-		return
-	}
-	collectionName, err := conf.GetString(KeyMongodbCollection)
-	if err != nil {
-		return
-	}
-	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("mongodb_acc:(%v,db:%v,collection:%v)", host, dbName, collectionName))
-	return newMongoAccSender(name, host, dbName, collectionName, updKey, accKey)
+func init() {
+	sender.RegisterConstructor(sender.TypeMongodbAccumulate, NewSender)
 }
 
-func newMongoAccSender(name, host, dbName, collectionName string, updKey, accKey []conf.AliasKey) (s *MongoAccSender, err error) {
+// NewMongodbAccSender mongodb accumulate sender constructor
+func NewSender(conf conf.MapConf) (mongodbSender sender.Sender, err error) {
+	host, err := conf.GetString(sender.KeyMongodbHost)
+	if err != nil {
+		return
+	}
+	dbName, err := conf.GetString(sender.KeyMongodbDB)
+	if err != nil {
+		return
+	}
+	updKey, err := conf.GetAliasList(sender.KeyMongodbUpdateKey)
+	if err != nil {
+		return
+	}
+	accKey, err := conf.GetAliasList(sender.KeyMongodbAccKey)
+	if err != nil {
+		return
+	}
+	collectionName, err := conf.GetString(sender.KeyMongodbCollection)
+	if err != nil {
+		return
+	}
+	name, _ := conf.GetStringOr(sender.KeyName, fmt.Sprintf("mongodb_acc:(%v,db:%v,collection:%v)", host, dbName, collectionName))
+	return newSender(name, host, dbName, collectionName, updKey, accKey)
+}
+
+func newSender(name, host, dbName, collectionName string, updKey, accKey []conf.AliasKey) (s *Sender, err error) {
 	// init mongodb collection
 	cfg := utils.MongoConfig{
 		Host: host,
@@ -92,7 +85,7 @@ func newMongoAccSender(name, host, dbName, collectionName string, updKey, accKey
 	if len(updKey) <= 0 || len(accKey) <= 0 {
 		return nil, errors.New("The updateKey and accumulateKey should not be empty")
 	}
-	s = &MongoAccSender{
+	s = &Sender{
 		name:           name,
 		host:           host,
 		dbName:         dbName,
@@ -108,7 +101,7 @@ func newMongoAccSender(name, host, dbName, collectionName string, updKey, accKey
 // Send 依次尝试发送数据到mongodb，返回错误中包含所有写失败的数据
 // 如果要保证每次send的原子性，必须保证datas长度为1，否则当程序宕机
 // 总会出现丢失数据的问题
-func (s *MongoAccSender) Send(datas []Data) (se error) {
+func (s *Sender) Send(datas []Data) (se error) {
 	failure := []Data{}
 	var err error
 	var lastErr error
@@ -142,26 +135,26 @@ func (s *MongoAccSender) Send(datas []Data) (se error) {
 		}
 	}
 	if len(failure) > 0 && lastErr != nil {
-		ss.ErrorDetail = reqerr.NewSendError("Write failure, last err is: "+lastErr.Error(), ConvertDatasBack(failure), reqerr.TypeDefault)
+		ss.ErrorDetail = reqerr.NewSendError("Write failure, last err is: "+lastErr.Error(), sender.ConvertDatasBack(failure), reqerr.TypeDefault)
 	}
 	return ss
 }
 
-func (s *MongoAccSender) Name() string {
+func (s *Sender) Name() string {
 	if len(s.name) <= 0 {
 		return fmt.Sprintf("mongodb://%s/%s/%s", s.host, s.dbName, s.collectionName)
 	}
 	return s.name
 }
 
-func (s *MongoAccSender) Close() error {
+func (s *Sender) Close() error {
 	s.Lock()
 	s.stopped = true
 	s.Unlock()
 	return s.collection.CloseSession()
 }
 
-func (s *MongoAccSender) mongoSesssionKeeper(session *mgo.Session) {
+func (s *Sender) mongoSesssionKeeper(session *mgo.Session) {
 	session.SetSocketTimeout(time.Second * 5)
 	session.SetSyncTimeout(time.Second * 5)
 	for {

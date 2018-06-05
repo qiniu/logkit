@@ -10,8 +10,9 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
-	"github.com/qiniu/log"
 	"github.com/wvanbergen/kafka/consumergroup"
+
+	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"

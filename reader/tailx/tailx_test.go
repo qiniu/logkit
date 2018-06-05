@@ -7,8 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/qiniu/log"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"

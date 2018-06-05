@@ -75,7 +75,7 @@ type RunnerConfig struct {
 	CleanerConfig conf.MapConf             `json:"cleaner,omitempty"`
 	ParserConf    conf.MapConf             `json:"parser"`
 	Transforms    []map[string]interface{} `json:"transforms,omitempty"`
-	SenderConfig  []conf.MapConf           `json:"senders"`
+	SendersConfig []conf.MapConf           `json:"senders"`
 	Router        router.RouterConfig      `json:"router,omitempty"`
 	IsInWebFolder bool                     `json:"web_folder,omitempty"`
 	IsStopped     bool                     `json:"is_stopped,omitempty"`

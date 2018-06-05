@@ -1,4 +1,4 @@
-package sender
+package http
 
 import (
 	"bytes"
@@ -8,23 +8,17 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/json-iterator/go"
+
+	"github.com/qiniu/pandora-go-sdk/pipeline"
+
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/sender"
 	. "github.com/qiniu/logkit/utils/models"
-
-	"github.com/json-iterator/go"
-	"github.com/qiniu/pandora-go-sdk/pipeline"
 )
 
-const (
-	KeyHttpSenderUrl      = "http_sender_url"
-	KeyHttpSenderGzip     = "http_sender_gzip"
-	KeyHttpSenderProtocol = "http_sender_protocol"
-	KeyHttpSenderCsvHead  = "http_sender_csv_head"
-	KeyHttpSenderCsvSplit = "http_sender_csv_split"
-)
-
-type HttpSender struct {
+type Sender struct {
 	url      string
 	gZip     bool
 	csvHead  bool
@@ -34,8 +28,13 @@ type HttpSender struct {
 	runnerName string
 }
 
-func NewHttpSender(c conf.MapConf) (Sender, error) {
-	url, err := c.GetString(KeyHttpSenderUrl)
+func init() {
+	sender.RegisterConstructor(sender.TypeHttp, NewSender)
+}
+
+// http sender
+func NewSender(c conf.MapConf) (sender.Sender, error) {
+	url, err := c.GetString(sender.KeyHttpSenderUrl)
 	if err != nil {
 		return nil, err
 	}
@@ -43,11 +42,11 @@ func NewHttpSender(c conf.MapConf) (Sender, error) {
 		url = "http://" + url
 	}
 
-	gZip, _ := c.GetBoolOr(KeyHttpSenderGzip, true)
-	csvHead, _ := c.GetBoolOr(KeyHttpSenderCsvHead, true)
-	csvSplit, _ := c.GetStringOr(KeyHttpSenderCsvSplit, "\t")
-	protocol, _ := c.GetStringOr(KeyHttpSenderProtocol, "json")
-	runnerName, _ := c.GetStringOr(KeyRunnerName, UnderfinedRunnerName)
+	gZip, _ := c.GetBoolOr(sender.KeyHttpSenderGzip, true)
+	csvHead, _ := c.GetBoolOr(sender.KeyHttpSenderCsvHead, true)
+	csvSplit, _ := c.GetStringOr(sender.KeyHttpSenderCsvSplit, "\t")
+	protocol, _ := c.GetStringOr(sender.KeyHttpSenderProtocol, "json")
+	runnerName, _ := c.GetStringOr(KeyRunnerName, sender.UnderfinedRunnerName)
 
 	if protocol == "csv" && csvSplit == "" {
 		csvSplit = "\t"
@@ -57,7 +56,7 @@ func NewHttpSender(c conf.MapConf) (Sender, error) {
 		return nil, fmt.Errorf("runner[%v] create sender error, protocol %v is not support", runnerName, protocol)
 	}
 
-	httpSender := &HttpSender{
+	httpSender := &Sender{
 		url:        url,
 		gZip:       gZip,
 		csvHead:    csvHead,
@@ -68,11 +67,11 @@ func NewHttpSender(c conf.MapConf) (Sender, error) {
 	return httpSender, nil
 }
 
-func (h *HttpSender) Name() string {
+func (h *Sender) Name() string {
 	return "httpSender<" + h.url + ">"
 }
 
-func (h *HttpSender) Send(data []Data) (err error) {
+func (h *Sender) Send(data []Data) (err error) {
 	var sendBytes []byte
 	switch h.protocol {
 	case "json":
@@ -89,11 +88,11 @@ func (h *HttpSender) Send(data []Data) (err error) {
 	return h.sendData(sendBytes)
 }
 
-func (h *HttpSender) Close() error {
+func (h *Sender) Close() error {
 	return nil
 }
 
-func (h *HttpSender) convertToJsonBytes(datas []Data) (byteData []byte, err error) {
+func (h *Sender) convertToJsonBytes(datas []Data) (byteData []byte, err error) {
 	dataArray := make([]string, len(datas))
 	for i, data := range datas {
 		db, err := jsoniter.Marshal(data)
@@ -106,7 +105,7 @@ func (h *HttpSender) convertToJsonBytes(datas []Data) (byteData []byte, err erro
 	return byteData, nil
 }
 
-func (h *HttpSender) convertToCsvBytes(datas []Data) (byteData []byte, err error) {
+func (h *Sender) convertToCsvBytes(datas []Data) (byteData []byte, err error) {
 	keySet := NewHashSet()
 	for _, data := range datas {
 		for k := range data {
@@ -146,7 +145,7 @@ func (h *HttpSender) convertToCsvBytes(datas []Data) (byteData []byte, err error
 	return
 }
 
-func (h *HttpSender) sendData(byteData []byte) (err error) {
+func (h *Sender) sendData(byteData []byte) (err error) {
 	if h.gZip {
 		if byteData, err = gzipData(byteData); err != nil {
 			log.Errorf("Runner[%v] Sender[%v] write gzip error %v\n", h.runnerName, h.Name(), err)
@@ -193,7 +192,7 @@ func gzipData(datas []byte) (byteData []byte, err error) {
 	return
 }
 
-func (h *HttpSender) interfaceJoin(dataArray []interface{}, sep string) (string, error) {
+func (h *Sender) interfaceJoin(dataArray []interface{}, sep string) (string, error) {
 	strData := make([]string, len(dataArray))
 	for i, data := range dataArray {
 		str, err := pipeline.DataConvert(data, pipeline.RepoSchemaEntry{

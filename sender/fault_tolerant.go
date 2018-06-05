@@ -9,13 +9,14 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/json-iterator/go"
+
 	"github.com/qiniu/log"
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
+
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/queue"
 	. "github.com/qiniu/logkit/utils/models"
-	"github.com/qiniu/pandora-go-sdk/base/reqerr"
-
-	"github.com/json-iterator/go"
 )
 
 const (
@@ -27,34 +28,13 @@ const (
 	defaultMaxProcs   = 1 // 默认没有并发
 )
 
-// 可选参数 fault_tolerant 为true的话，以下必填
-const (
-	KeyFtSyncEvery         = "ft_sync_every"    // 该参数设置多少次写入会同步一次offset log
-	KeyFtSaveLogPath       = "ft_save_log_path" // disk queue 数据日志路径
-	KeyFtWriteLimit        = "ft_write_limit"   // 写入速度限制，单位MB
-	KeyFtStrategy          = "ft_strategy"      // ft 的策略
-	KeyFtProcs             = "ft_procs"         // ft并发数，当always_save或concurrent策略时启用
-	KeyFtMemoryChannel     = "ft_memory_channel"
-	KeyFtMemoryChannelSize = "ft_memory_channel_size"
-)
-
-// ft 策略
-const (
-	// KeyFtStrategyBackupOnly 只在失败的时候进行容错
-	KeyFtStrategyBackupOnly = "backup_only"
-	// KeyFtStrategyAlwaysSave 所有数据都进行容错
-	KeyFtStrategyAlwaysSave = "always_save"
-	// KeyFtStrategyConcurrent 适合并发发送数据，只在失败的时候进行容错
-	KeyFtStrategyConcurrent = "concurrent"
-)
-
 // FtSender fault tolerance sender wrapper
 type FtSender struct {
 	stopped     int32
 	exitChan    chan struct{}
 	innerSender Sender
 	logQueue    queue.BackendQueue
-	backupQueue queue.BackendQueue
+	BackupQueue queue.BackendQueue
 	writeLimit  int // 写入速度限制，单位MB
 	strategy    string
 	procs       int //发送并发数
@@ -80,7 +60,7 @@ type datasContext struct {
 }
 
 // NewFtSender Fault tolerant sender constructor
-func NewFtSender(sender Sender, conf conf.MapConf, ftSaveLogPath string) (*FtSender, error) {
+func NewFtSender(ftSender Sender, conf conf.MapConf, ftSaveLogPath string) (*FtSender, error) {
 	memoryChannel, _ := conf.GetBoolOr(KeyFtMemoryChannel, false)
 	memoryChannelSize, _ := conf.GetIntOr(KeyFtMemoryChannelSize, 100)
 	logPath, _ := conf.GetStringOr(KeyFtSaveLogPath, ftSaveLogPath)
@@ -105,7 +85,7 @@ func NewFtSender(sender Sender, conf conf.MapConf, ftSaveLogPath string) (*FtSen
 		memoryChannelSize: memoryChannelSize,
 	}
 
-	return newFtSender(sender, runnerName, opt)
+	return newFtSender(ftSender, runnerName, opt)
 }
 
 func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSender, error) {
@@ -126,7 +106,7 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 		exitChan:    make(chan struct{}),
 		innerSender: innerSender,
 		logQueue:    lq,
-		backupQueue: bq,
+		BackupQueue: bq,
 		writeLimit:  opt.writeLimit,
 		strategy:    opt.strategy,
 		procs:       opt.procs,
@@ -156,7 +136,7 @@ func (ft *FtSender) Send(datas []Data) error {
 		}
 		// 容错队列会保证重试，此处不向外部暴露发送错误信息
 		se.ErrorDetail = err
-		se.FtQueueLag = ft.backupQueue.Depth()
+		se.FtQueueLag = ft.BackupQueue.Depth()
 		if backDataContext != nil {
 			var nowDatas []Data
 			for _, v := range backDataContext {
@@ -182,7 +162,7 @@ func (ft *FtSender) Send(datas []Data) error {
 		} else {
 			se.ErrorDetail = nil
 		}
-		se.FtQueueLag = ft.backupQueue.Depth() + ft.logQueue.Depth()
+		se.FtQueueLag = ft.BackupQueue.Depth() + ft.logQueue.Depth()
 	}
 	return se
 }
@@ -221,7 +201,7 @@ func (ft *FtSender) Close() error {
 
 	// persist queue's meta data
 	ft.logQueue.Close()
-	ft.backupQueue.Close()
+	ft.BackupQueue.Close()
 
 	return ft.innerSender.Close()
 }
@@ -272,7 +252,7 @@ func (ft *FtSender) asyncSendLogFromDiskQueue() {
 	for i := 0; i < ft.procs; i++ {
 		go ft.sendFromQueue(ft.logQueue, false)
 	}
-	go ft.sendFromQueue(ft.backupQueue, true)
+	go ft.sendFromQueue(ft.BackupQueue, true)
 }
 
 // trySend 从bytes反序列化数据后尝试发送数据
@@ -282,21 +262,6 @@ func (ft *FtSender) trySendBytes(dat []byte, failSleep int, isRetry bool) (backD
 		return
 	}
 	return ft.trySendDatas(datas, failSleep, isRetry)
-}
-
-func ConvertDatas(ins []map[string]interface{}) []Data {
-	var datas []Data
-	for _, v := range ins {
-		datas = append(datas, Data(v))
-	}
-	return datas
-}
-func ConvertDatasBack(ins []Data) []map[string]interface{} {
-	var datas []map[string]interface{}
-	for _, v := range ins {
-		datas = append(datas, map[string]interface{}(v))
-	}
-	return datas
 }
 
 // trySendDatas 尝试发送数据，如果失败，将失败数据加入backup queue，并睡眠指定时间。返回结果为是否正常发送
@@ -336,9 +301,9 @@ func (ft *FtSender) trySendDatas(datas []Data, failSleep int, isRetry bool) (bac
 		retDatasContext := ft.handleSendError(err, datas)
 		for _, v := range retDatasContext {
 			nnBytes, _ := jsoniter.Marshal(v)
-			qErr := ft.backupQueue.Put(nnBytes)
+			qErr := ft.BackupQueue.Put(nnBytes)
 			if qErr != nil {
-				log.Errorf("Runner[%v] Sender[%v] cannot write points back to queue %v: %v", ft.runnerName, ft.innerSender.Name(), ft.backupQueue.Name(), qErr)
+				log.Errorf("Runner[%v] Sender[%v] cannot write points back to queue %v: %v", ft.runnerName, ft.innerSender.Name(), ft.BackupQueue.Name(), qErr)
 				backDataContext = append(backDataContext, v)
 			}
 		}

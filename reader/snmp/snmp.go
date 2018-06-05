@@ -14,8 +14,9 @@ import (
 	"time"
 
 	"github.com/json-iterator/go"
-	"github.com/qiniu/log"
 	"github.com/soniah/gosnmp"
+
+	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"

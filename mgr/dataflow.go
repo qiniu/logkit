@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/json-iterator/go"
-
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
 	"github.com/qiniu/logkit/conf"
@@ -202,15 +201,15 @@ func getDataFromSenderConfig(senderConfig map[string]interface{}) ([]Data, error
 
 func getSenders(sendersConf []conf.MapConf) ([]sender.Sender, error) {
 	senders := make([]sender.Sender, 0)
-	sr := sender.NewSenderRegistry()
+	sr := sender.NewRegistry()
 	for i, senderConfig := range sendersConf {
-		senderConfig[KeyFaultTolerant] = "false"
+		senderConfig[sender.KeyFaultTolerant] = "false"
 		s, err := sr.NewSender(senderConfig, "")
 		if err != nil {
 			return nil, err
 		}
 		senders = append(senders, s)
-		delete(sendersConf[i], InnerUserAgent)
+		delete(sendersConf[i], sender.InnerUserAgent)
 	}
 	return senders, nil
 }

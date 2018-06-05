@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis"
+
 	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/conf"
