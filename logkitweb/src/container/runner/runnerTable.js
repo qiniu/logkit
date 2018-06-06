@@ -435,7 +435,7 @@ class RunnerTable extends Component {
       dataIndex: 'path',
       width: '8%'
     }, {
-      title: '延迟',
+      title: '待读取数据',
       dataIndex: 'lag',
       render: (text, record, all) => {
         if(text){

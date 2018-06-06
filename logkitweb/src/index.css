@@ -7,6 +7,10 @@ body {
   font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
 }
 
+.fr {
+  float: right;
+}
+
 .logkit-container {
   padding-top: 2%;
   margin: auto;
@@ -135,15 +139,33 @@ body {
   font-size: 18px;
   color: #108ee9;
   transition: all .3s;
-  margin-left: 2px;
+  margin-left: 8px;
 }
 
-.tranformer-tag {
+.transformer-tag {
   font-size: 16px;
   color: black !important;
   background: #f5f7fa !important;
-  width: 310px;
+  width: 350px;
+  height: 58px;
+  border: none;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.transformer-tag-container {
+  position: relative;
+  font-size: 16px;
+  color: black !important;
+  background: #f5f7fa !important;
+  width: 500px;
   height: 60px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  display: flex;
+  justify-content: space-around;
+  margin: 20px auto;
 }
 
 .dynamic-delete-button[disabled] {
@@ -263,4 +285,32 @@ body {
 
 .delete-enable-input-number .ant-form-item-control-wrapper {
   text-align: left;
+}
+
+.save-as-form {
+  width: 350px;
+}
+
+.save-as-form input {
+  width: 80%;
+  margin-left: 20px;
+}
+
+.save-as-form-item {
+  margin-top: 10px;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.save-as-form-item label:after {
+  content: "*";
+  color: #f04134;
+}
+
+.save-as-form-item button {
+  margin-left: 20px;
+}
+
+.error-border {
+  border: 1px solid #f04134;
 }
