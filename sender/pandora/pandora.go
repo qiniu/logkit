@@ -36,7 +36,6 @@ type Sender struct {
 	schemas            map[string]pipeline.RepoSchemaEntry
 	schemasMux         sync.RWMutex
 	lastUpdate         time.Time
-	updateMux          sync.Mutex
 	UserSchema         UserSchema
 	alias2key          map[string]string // map[alias]name
 	opt                PandoraOption
@@ -558,13 +557,6 @@ func (s *Sender) UpdateSchemas() {
 	if schemas == nil {
 		return
 	}
-	s.updateMux.Lock()
-	defer s.updateMux.Unlock()
-	//double check
-	if s.lastUpdate.Add(s.opt.updateInterval).After(time.Now()) {
-		return
-	}
-
 	s.updateSchemas(schemas)
 }
 
@@ -803,7 +795,11 @@ func (s *Sender) generatePoint(data Data) (point Data) {
 }
 
 func (s *Sender) checkSchemaUpdate() {
-	if s.lastUpdate.Add(s.opt.updateInterval).After(time.Now()) {
+	var lastUpdateTime time.Time
+	s.schemasMux.RLock()
+	lastUpdateTime = s.lastUpdate
+	s.schemasMux.RUnlock()
+	if lastUpdateTime.Add(s.opt.updateInterval).After(time.Now()) {
 		return
 	}
 	s.UpdateSchemas()
