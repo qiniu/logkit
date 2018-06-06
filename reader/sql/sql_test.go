@@ -17,6 +17,25 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var readRecords = DBRecords{
+	"db1": {
+		"db1_tb1": TableInfo{size: -1, offset: -1},
+		"db1_tb2": TableInfo{size: -1, offset: -1},
+		"db1_tb3": TableInfo{size: -1, offset: -1},
+	},
+	"db2": {
+		"db2_tb1": TableInfo{size: -1, offset: -1},
+		"db2_tb2": TableInfo{size: -1, offset: -1},
+		"db2_tb3": TableInfo{size: -1, offset: -1},
+		"db2_tb4": TableInfo{size: -1, offset: -1},
+		"db2_tb5": TableInfo{size: -1, offset: -1},
+	},
+	"db3": {
+		"db3_tb1": TableInfo{size: -1, offset: -1},
+		"db3_tb2": TableInfo{size: -1, offset: -1},
+	},
+}
+
 func TestConvertMagic(t *testing.T) {
 	now1, _ := time.Parse(time.RFC3339, "2017-04-01T06:06:09+08:00")
 	now2, _ := time.Parse(time.RFC3339, "2017-11-11T16:16:29+08:00")
@@ -487,13 +506,13 @@ func TestSQLReader(t *testing.T) {
 	mr.syncSQLs = testsqls
 
 	//测试getSQL
-	gotSQL, err := mr.getSQL(2)
+	gotSQL, err := mr.getSQL(2, mr.syncSQLs[2])
 	assert.NoError(t, err)
 	assert.EqualValues(t, testsqls[2]+" WHERE id >= 0 AND id < 100;", gotSQL)
 	mr.offsetKey = ""
-	gotSQL, err = mr.getSQL(0)
+	gotSQL, err = mr.getSQL(0, mr.syncSQLs[0])
 	assert.NoError(t, err)
-	assert.EqualValues(t, testsqls[0]+";", gotSQL)
+	assert.EqualValues(t, testsqls[0], gotSQL)
 
 	assert.Equal(t, StatsInfo{}, mr.Status())
 }
@@ -727,4 +746,186 @@ func Test_getRawSqls(t *testing.T) {
 		assert.NoError(t, err)
 		assert.EqualValues(t, test.exp_sqls, sqls)
 	}
+}
+
+func Test_WriteRecordsFile(t *testing.T) {
+	meta, err := reader.NewMeta(MetaDir, MetaDir, "mysql", "logpath", "", 7)
+	if err != nil {
+		t.Error(err)
+	}
+	defer os.RemoveAll(MetaDir)
+
+	err = WriteRecordsFile(meta.DoneFilePath, getContent(readRecords))
+	assert.NoError(t, err)
+}
+
+func Test_restoreRecordsFile(t *testing.T) {
+	meta, err := reader.NewMeta(MetaDir, MetaDir, "mysql", "logpath", "", 7)
+	if err != nil {
+		t.Error(err)
+	}
+	defer os.RemoveAll(MetaDir)
+
+	tests := []struct {
+		set     DBRecords
+		exp_res DBRecords
+	}{
+		{
+			set:     readRecords,
+			exp_res: readRecords,
+		},
+		{
+			set: DBRecords{
+				"db1": {
+					"db1_tb1":  TableInfo{size: -1, offset: -1},
+					"db1_tb10": TableInfo{size: -1, offset: -1},
+				},
+				"db4": {
+					"db4_tb10": TableInfo{size: -1, offset: -1},
+				},
+			},
+			exp_res: DBRecords{
+				"db1": {
+					"db1_tb1":  TableInfo{size: -1, offset: -1},
+					"db1_tb2":  TableInfo{size: -1, offset: -1},
+					"db1_tb3":  TableInfo{size: -1, offset: -1},
+					"db1_tb10": TableInfo{size: -1, offset: -1},
+				},
+				"db2": {
+					"db2_tb1": TableInfo{size: -1, offset: -1},
+					"db2_tb2": TableInfo{size: -1, offset: -1},
+					"db2_tb3": TableInfo{size: -1, offset: -1},
+					"db2_tb4": TableInfo{size: -1, offset: -1},
+					"db2_tb5": TableInfo{size: -1, offset: -1},
+				},
+				"db3": {
+					"db3_tb1": TableInfo{size: -1, offset: -1},
+					"db3_tb2": TableInfo{size: -1, offset: -1},
+				},
+				"db4": {
+					"db4_tb10": TableInfo{size: -1, offset: -1},
+				},
+			},
+		},
+		{
+			set: DBRecords{
+				"db1": {
+					"db1_tb1":  TableInfo{size: -1, offset: -1},
+					"db1_tb10": TableInfo{size: -1, offset: -1},
+				},
+				"db4": {
+					"db4_tb10": TableInfo{size: -1, offset: -1},
+				},
+			},
+			exp_res: DBRecords{
+				"db1": {
+					"db1_tb1":  TableInfo{size: -1, offset: -1},
+					"db1_tb2":  TableInfo{size: -1, offset: -1},
+					"db1_tb3":  TableInfo{size: -1, offset: -1},
+					"db1_tb10": TableInfo{size: -1, offset: -1},
+				},
+				"db2": {
+					"db2_tb1": TableInfo{size: -1, offset: -1},
+					"db2_tb2": TableInfo{size: -1, offset: -1},
+					"db2_tb3": TableInfo{size: -1, offset: -1},
+					"db2_tb4": TableInfo{size: -1, offset: -1},
+					"db2_tb5": TableInfo{size: -1, offset: -1},
+				},
+				"db3": {
+					"db3_tb1": TableInfo{size: -1, offset: -1},
+					"db3_tb2": TableInfo{size: -1, offset: -1},
+				},
+				"db4": {
+					"db4_tb10": TableInfo{size: -1, offset: -1},
+				},
+			},
+		},
+		{
+			set: DBRecords{
+				"db1": {
+					"db1_tb10": TableInfo{size: -1, offset: -1},
+				},
+				"db3": {
+					"db3_tb10": TableInfo{size: -1, offset: -1},
+				},
+			},
+			exp_res: DBRecords{
+				"db1": {
+					"db1_tb1":  TableInfo{size: -1, offset: -1},
+					"db1_tb2":  TableInfo{size: -1, offset: -1},
+					"db1_tb3":  TableInfo{size: -1, offset: -1},
+					"db1_tb10": TableInfo{size: -1, offset: -1},
+				},
+				"db2": {
+					"db2_tb1": TableInfo{size: -1, offset: -1},
+					"db2_tb2": TableInfo{size: -1, offset: -1},
+					"db2_tb3": TableInfo{size: -1, offset: -1},
+					"db2_tb4": TableInfo{size: -1, offset: -1},
+					"db2_tb5": TableInfo{size: -1, offset: -1},
+				},
+				"db3": {
+					"db3_tb1":  TableInfo{size: -1, offset: -1},
+					"db3_tb2":  TableInfo{size: -1, offset: -1},
+					"db3_tb10": TableInfo{size: -1, offset: -1},
+				},
+				"db4": {
+					"db4_tb10": TableInfo{size: -1, offset: -1},
+				},
+			},
+		},
+		{
+			set: readRecords,
+			exp_res: DBRecords{
+				"db1": {
+					"db1_tb1":  TableInfo{size: -1, offset: -1},
+					"db1_tb2":  TableInfo{size: -1, offset: -1},
+					"db1_tb3":  TableInfo{size: -1, offset: -1},
+					"db1_tb10": TableInfo{size: -1, offset: -1},
+				},
+				"db2": {
+					"db2_tb1": TableInfo{size: -1, offset: -1},
+					"db2_tb2": TableInfo{size: -1, offset: -1},
+					"db2_tb3": TableInfo{size: -1, offset: -1},
+					"db2_tb4": TableInfo{size: -1, offset: -1},
+					"db2_tb5": TableInfo{size: -1, offset: -1},
+				},
+				"db3": {
+					"db3_tb1":  TableInfo{size: -1, offset: -1},
+					"db3_tb2":  TableInfo{size: -1, offset: -1},
+					"db3_tb10": TableInfo{size: -1, offset: -1},
+				},
+				"db4": {
+					"db4_tb10": TableInfo{size: -1, offset: -1},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		err = WriteRecordsFile(meta.DoneFilePath, getContent(test.set))
+		assert.NoError(t, err)
+
+		var records DBRecords
+		omitDoneDBRecords := records.restoreRecordsFile(meta)
+		assert.EqualValues(t, false, omitDoneDBRecords)
+		assert.EqualValues(t, test.exp_res, records)
+	}
+
+}
+
+func getContent(readRecords DBRecords) string {
+	now := time.Now().String()
+	var all string
+	for database, tablesRecord := range readRecords {
+		var tablesRecordStr string
+		for table, tableInfo := range tablesRecord {
+			tablesRecordStr += table + "," +
+				strconv.FormatInt(tableInfo.size, 10) + "," +
+				strconv.FormatInt(tableInfo.size, 10) + "," +
+				now + "@"
+		}
+		all += database + sqlOffsetConnector + tablesRecordStr + "\n"
+	}
+
+	return all
 }

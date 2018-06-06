@@ -331,6 +331,7 @@ func (m *Meta) ReadDBDoneFile(database string) (content []string, err error) {
 	if err != nil {
 		return
 	}
+
 	for _, f := range doneFiles {
 		filename := fmt.Sprintf("%v.%v", DoneFileName, database)
 		if filepath.Base(f.Path) == filename {
@@ -342,6 +343,17 @@ func (m *Meta) ReadDBDoneFile(database string) (content []string, err error) {
 		}
 	}
 	return
+}
+
+// ReadRecordsFile 读取当前runner已经读取的表
+func (m *Meta) ReadRecordsFile(recordsFile string) ([]string, error) {
+	filename := fmt.Sprintf("%v.%v", DoneFileName, recordsFile)
+	content, err := ReadFileContent(filepath.Join(m.DoneFilePath, filename))
+	if err != nil {
+		return content, err
+	}
+
+	return content, nil
 }
 
 // WriteOffset 将当前文件和offset写入meta中
@@ -609,4 +621,15 @@ func (m *Meta) WriteStatistic(stat *Statistic) error {
 
 func (m *Meta) ExtraInfo() map[string]string {
 	return m.extrainfo
+}
+
+func checkRecordsFile(doneFiles []File, recordsFile string) bool {
+	for _, f := range doneFiles {
+		filename := fmt.Sprintf("%v.%v", DoneFileName, recordsFile)
+		if filepath.Base(f.Path) == filename {
+			return true
+		}
+	}
+
+	return false
 }
