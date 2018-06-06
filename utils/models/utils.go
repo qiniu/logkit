@@ -36,31 +36,28 @@ type File struct {
 	Path string
 }
 
-// Int64Slice attaches the methods of Interface to []int64, sorting in decreasing order.
-type Int64Slice []int64
+// FileInfos attaches the methods of Interface to []int64, sorting in decreasing order.
+type FileInfos []os.FileInfo
 
-func (p Int64Slice) Len() int           { return len(p) }
-func (p Int64Slice) Less(i, j int) bool { return p[i] > p[j] }
-func (p Int64Slice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func (p FileInfos) Len() int           { return len(p) }
+func (p FileInfos) Less(i, j int) bool { return ModTimeLater(p[i], p[j]) }
+func (p FileInfos) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 // Sort is a convenience method.
-func (p Int64Slice) Sort() { sort.Sort(p) }
+func (p FileInfos) Sort() { sort.Sort(p) }
 
-// SortFilesByTime 按照文件更新的unixnano从大到小排，即最新的文件在前
-func SortFilesByTime(files []os.FileInfo) (soredfiles []os.FileInfo) {
-	filemap := make(map[int64]os.FileInfo)
-	var times Int64Slice
-	for index, f := range files {
-		// 解决文件的创建时间相同的问题，加一个index
-		nano := f.ModTime().UnixNano() + int64(index)
-		times = append(times, nano)
-		filemap[nano] = f
+// SortFilesByTime 按照文件更新的unixnano从大到小排，即最新的文件在前,相同时间的则按照文件名字典序，字典序在后面的排在前面
+func SortFilesByTime(files FileInfos) (soredfiles []os.FileInfo) {
+	files.Sort()
+	return files
+}
+
+// ModTimeLater 按最后修改时间进行比较
+func ModTimeLater(f1, f2 os.FileInfo) bool {
+	if f1.ModTime().UnixNano() != f2.ModTime().UnixNano() {
+		return f1.ModTime().UnixNano() > f2.ModTime().UnixNano()
 	}
-	times.Sort()
-	for _, t := range times {
-		soredfiles = append(soredfiles, filemap[t])
-	}
-	return
+	return f1.Name() > f2.Name()
 }
 
 // ReadDirByTime 读取文件目录后按时间排序，时间最新的文件在前

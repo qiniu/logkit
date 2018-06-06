@@ -103,6 +103,8 @@ func (s *mock_pandora) PostRepos_() echo.HandlerFunc {
 		if err := c.Bind(&req1); err != nil {
 			return err
 		}
+		s.SetMux.Lock()
+		defer s.SetMux.Unlock()
 		s.Schemas = req1.Schema
 		return nil
 	}
@@ -166,6 +168,8 @@ func (s *mock_pandora) GetRepos_() echo.HandlerFunc {
 		if s.GetRepoErr {
 			return c.String(http.StatusBadRequest, "this is mock_pandora let GetRepo Error")
 		}
+		s.SetMux.Lock()
+		defer s.SetMux.Unlock()
 		ret := GetRepoResult{
 			Schema: s.Schemas,
 		}
@@ -182,12 +186,16 @@ func (s *mock_pandora) PutRepos_() echo.HandlerFunc {
 		if err != nil {
 			return err
 		}
+		s.SetMux.Lock()
+		defer s.SetMux.Unlock()
 		s.Schemas = req1.Schema
 		return nil
 	}
 }
 
 func (s *mock_pandora) ChangeSchema(Schema []pipeline.RepoSchemaEntry) {
+	s.SetMux.Lock()
+	defer s.SetMux.Unlock()
 	s.Schemas = Schema
 }
 
