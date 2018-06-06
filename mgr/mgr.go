@@ -42,6 +42,7 @@ type ManagerConfig struct {
 type cleanQueue struct {
 	cleanerCount int
 	filecount    map[string]int
+	key          string //where this queue is stored
 }
 
 type Manager struct {
@@ -183,6 +184,7 @@ func (m *Manager) addCleanQueue(info CleanInfo) {
 		cq = &cleanQueue{
 			cleanerCount: 1,
 			filecount:    make(map[string]int),
+			key:          info.logdir,
 		}
 	}
 	log.Info(">>>>>>>>>>>> add clean queue", cq.cleanerCount, info.logdir)
@@ -356,23 +358,52 @@ func (m *Manager) handle(path string, watcher *fsnotify.Watcher) {
 	}
 }
 
+func (m *Manager) getCleanQueues(dir, file, mode string) ([]*cleanQueue, error) {
+	if mode != reader.ModeTailx {
+		q, ok := m.cleanQueues[dir]
+		if !ok {
+			return nil, fmt.Errorf("cleaner dir %v not exist but got clean signal for delete file %v", dir, file)
+		}
+		return []*cleanQueue{q}, nil
+	}
+	var cleanQs []*cleanQueue
+	for k, v := range m.cleanQueues {
+		matched, err := filepath.Match(k, filepath.Join(dir, file))
+		if err != nil {
+			log.Errorf("match pattern[%v] to path(%v) err %v", k, filepath.Join(dir, file), err)
+			continue
+		}
+		if matched {
+			cleanQs = append(cleanQs, v)
+		}
+	}
+	return cleanQs, nil
+}
+
 func (m *Manager) doClean(sig cleaner.CleanSignal) {
 	m.cleanLock.Lock()
 	defer m.cleanLock.Unlock()
-
 	dir, _, err := GetRealPath(sig.Logdir)
 	if err != nil {
 		log.Errorf("get GetRealPath for %v error %v", dir, err)
 		return
 	}
 	file := sig.Filename
-	q, ok := m.cleanQueues[dir]
-	if !ok {
-		log.Errorf("%v cleaner dir %v not exist but got clean signal for delete file %v", sig.Cleaner, dir, file)
+	queues, err := m.getCleanQueues(dir, file, sig.ReadMode)
+	if err != nil {
+		log.Error(sig.Cleaner, err)
 		return
 	}
-	count := q.filecount[file] + 1
-	if count >= q.cleanerCount {
+	//check if all queues can be cleaned
+	var canbedelete = true
+	for _, q := range queues {
+		count := q.filecount[file] + 1
+		if count < q.cleanerCount {
+			canbedelete = false
+		}
+		q.filecount[file] = count
+	}
+	if canbedelete {
 		catdir := filepath.Join(dir, file)
 		err := os.Remove(catdir)
 		if err != nil {
@@ -384,10 +415,12 @@ func (m *Manager) doClean(sig cleaner.CleanSignal) {
 		} else {
 			log.Infof("log <%v> was successfully cleaned by cleaner", catdir)
 		}
-		delete(q.filecount, file)
-	} else {
-		q.filecount[file] = count
-		m.cleanQueues[dir] = q
+		for _, q := range queues {
+			delete(q.filecount, file)
+		}
+	}
+	for _, q := range queues {
+		m.cleanQueues[q.key] = q
 	}
 	return
 }

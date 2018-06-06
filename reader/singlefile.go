@@ -236,11 +236,14 @@ func (sf *SingleFile) Reopen() (err error) {
 		return
 	}
 	sf.f.Close()
+	sf.f = nil
 	detectStr := sf.detectMovedName(oldInode)
 	if detectStr != "" {
-		if derr := sf.meta.AppendDoneFile(detectStr); derr != nil {
+		if derr := sf.meta.AppendDoneFileInode(detectStr, oldInode); derr != nil {
 			log.Errorf("Runner[%v] AppendDoneFile %v error %v", sf.meta.RunnerName, detectStr, derr)
 		}
+	} else {
+		detectStr = "not detected"
 	}
 	log.Infof("Runner[%v] rotate %s successfully , rotated file is <%v>", sf.meta.RunnerName, sf.originpath, detectStr)
 	pfi, f, err := sf.openSingleFile(sf.originpath)

@@ -87,7 +87,7 @@ func NewActiveReader(originPath, realPath, whence string, meta *reader.Meta, msg
 	if err != nil {
 		return
 	}
-	ar = &ActiveReader{
+	return &ActiveReader{
 		cacheLineMux: sync.RWMutex{},
 		br:           bf,
 		realpath:     realPath,
@@ -98,8 +98,8 @@ func NewActiveReader(originPath, realPath, whence string, meta *reader.Meta, msg
 		runnerName:   meta.RunnerName,
 		status:       reader.StatusInit,
 		statsLock:    sync.RWMutex{},
-	}
-	return
+	}, nil
+
 }
 
 func (ar *ActiveReader) Run() {
@@ -319,6 +319,7 @@ func (mr *Reader) Expire() {
 			ar.Close()
 			delete(mr.fileReaders, path)
 			delete(mr.cacheMap, path)
+			mr.meta.RemoveSubMeta(path)
 			paths = append(paths, path)
 		}
 	}
@@ -360,6 +361,10 @@ func (mr *Reader) StatLogPath() {
 			log.Errorf("Runner[%v] file pattern %v match %v stat error %v, ignore this match...", mr.meta.RunnerName, mr.logPathPattern, mc, err)
 			continue
 		}
+		if fi.IsDir() {
+			log.Debugf("Runner[%v] %v is dir, mode[tailx] only support read file, ignore this match...", mr.meta.RunnerName, mc)
+			continue
+		}
 		mr.armapmux.Lock()
 		_, ok := mr.fileReaders[rp]
 		mr.armapmux.Unlock()
@@ -391,6 +396,9 @@ func (mr *Reader) StatLogPath() {
 		newaddsPath = append(newaddsPath, rp)
 		mr.armapmux.Lock()
 		if atomic.LoadInt32(&mr.status) != reader.StatusStopped {
+			if err = mr.meta.AddSubMeta(rp, ar.br.Meta); err != nil {
+				log.Errorf("Runner[%v] %v add submeta for %v err %v, but this reader will still working", mr.meta.RunnerName, mc, rp, err)
+			}
 			mr.fileReaders[rp] = ar
 		} else {
 			log.Warnf("Runner[%v] %v NewActiveReader but reader was stopped, ignore this...", mr.meta.RunnerName, mc)

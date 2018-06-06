@@ -1741,3 +1741,111 @@ func TestMergeExtraInfoTags(t *testing.T) {
 	tags = MergeExtraInfoTags(meta, tags)
 	assert.Equal(t, 4, len(tags))
 }
+
+func TestTailxCleaner(t *testing.T) {
+	cur, err := os.Getwd()
+	assert.NoError(t, err)
+	dir := filepath.Join(cur, "TestTailxCleaner")
+	metaDir := filepath.Join(dir, "meta")
+	os.RemoveAll(dir)
+	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
+		log.Fatalf("TestTailxCleaner error mkdir %v %v", dir, err)
+	}
+	defer os.RemoveAll(dir)
+	defer os.RemoveAll(metaDir)
+
+	dira := filepath.Join(dir, "a")
+	os.MkdirAll(dira, DefaultDirPerm)
+	logPatha := filepath.Join(dira, "a.log")
+	err = ioutil.WriteFile(logPatha, []byte("a\n"), 0666)
+	assert.NoError(t, err)
+
+	dirb := filepath.Join(dir, "b")
+	os.MkdirAll(dirb, DefaultDirPerm)
+	logPathb := filepath.Join(dirb, "b.log")
+	err = ioutil.WriteFile(logPathb, []byte("b\n"), 0666)
+	assert.NoError(t, err)
+
+	readfile := filepath.Join(dir, "*", "*.log")
+	config1 := `
+{
+  "name": "TestTailxCleaner",
+  "batch_size": 2097152,
+  "batch_interval": 1,
+  "reader": {
+    "expire": "24h",
+    "log_path": "` + readfile + `",
+	"meta_path":"` + metaDir + `",
+    "mode": "tailx",
+    "read_from": "oldest",
+    "stat_interval": "1s"
+  },
+  "cleaner": {
+    "delete_enable": "true",
+    "delete_interval": "1",
+    "reserve_file_number": "1",
+    "reserve_file_size": "2048"
+  },
+  "parser": {
+    "disable_record_errdata": "false",
+    "timestamp": "true",
+    "type": "raw"
+  },
+  "senders": [
+    {
+      "sender_type": "discard"
+    }
+  ]
+}`
+
+	rc := RunnerConfig{}
+	err = jsoniter.Unmarshal([]byte(config1), &rc)
+	assert.NoError(t, err)
+	cleanChan := make(chan cleaner.CleanSignal)
+	rr, err := NewLogExportRunner(rc, cleanChan, reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
+	assert.NoError(t, err)
+	assert.NotNil(t, rr)
+	go rr.Run()
+
+	time.Sleep(2 * time.Second)
+
+	logPatha1 := filepath.Join(dira, "a.log.1")
+	err = os.Rename(logPatha, logPatha1)
+	assert.NoError(t, err)
+
+	err = ioutil.WriteFile(logPatha, []byte("bbbb\n"), 0666)
+	assert.NoError(t, err)
+
+	time.Sleep(5 * time.Second)
+
+	logPatha2 := filepath.Join(dira, "a.log.2")
+	err = os.Rename(logPatha, logPatha2)
+	assert.NoError(t, err)
+
+	err = ioutil.WriteFile(logPatha, []byte("cccc\n"), 0666)
+	assert.NoError(t, err)
+
+	time.Sleep(2 * time.Second)
+
+	assert.NotNil(t, rr.Cleaner())
+	var ret, dft int
+
+	for {
+		select {
+		case sig := <-cleanChan:
+			ret++
+			assert.Equal(t, "a.log.1", sig.Filename)
+			err = os.Remove(filepath.Join(sig.Logdir, sig.Filename))
+			assert.NoError(t, err)
+			assert.Equal(t, reader.ModeTailx, sig.ReadMode)
+		default:
+			dft++
+		}
+		time.Sleep(50 * time.Millisecond)
+		if dft > 40 {
+			break
+		}
+	}
+	assert.Equal(t, 1, ret)
+
+}

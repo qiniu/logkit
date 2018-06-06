@@ -66,6 +66,8 @@ type Meta struct {
 	ftSaveLogPath     string                 // 记录 ft_sender 日志信息
 	RunnerName        string
 	extrainfo         map[string]string
+
+	subMetas map[string]*Meta //对于tailx模式的情况会有嵌套的meta
 }
 
 func getValidDir(dir string) (realPath string, err error) {
@@ -123,6 +125,7 @@ func NewMeta(metadir, filedonedir, logpath, mode, tagfile string, donefileRetent
 		mode:              mode,
 		tags:              tags,
 		Readlimit:         defaultIOLimit * 1024 * 1024,
+		subMetas:          make(map[string]*Meta),
 	}, nil
 }
 
@@ -184,6 +187,22 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 	meta.dataSourceTag = datasourceTag
 	meta.Readlimit = readlimit * 1024 * 1024 //readlimit*MB
 	meta.RunnerName = runnerName
+	return
+}
+
+func (m *Meta) AddSubMeta(key string, meta *Meta) error {
+	if m.subMetas == nil {
+		m.subMetas = make(map[string]*Meta)
+	}
+	if _, ok := m.subMetas[key]; ok {
+		return fmt.Errorf("subMeta %v is exist", key)
+	}
+	m.subMetas[key] = meta
+	return nil
+}
+
+func (m *Meta) RemoveSubMeta(key string) {
+	delete(m.subMetas, key)
 	return
 }
 
@@ -391,8 +410,12 @@ func (m *Meta) AppendDoneFileInode(path string, inode uint64) (err error) {
 }
 
 func (m *Meta) GetDoneFileContent() ([]string, error) {
+	return m.getDoneFileContent()
+}
+
+func (m *Meta) getDoneFileContent() ([]string, error) {
 	ret := make([]string, 0)
-	files, err := m.GetDoneFiles()
+	files, err := m.getDoneFiles()
 	if err != nil {
 		return nil, err
 	}
@@ -413,7 +436,7 @@ func joinFileInode(filename, inode string) string {
 
 func (m *Meta) GetDoneFileInode() map[string]bool {
 	inodeMap := make(map[string]bool)
-	contents, err := m.GetDoneFileContent()
+	contents, err := m.getDoneFileContent()
 	if err != nil {
 		log.Error(err)
 		return inodeMap
@@ -504,7 +527,23 @@ func (m *Meta) DeleteDoneFile(path string) error {
 	return nil
 }
 
-func (m *Meta) GetDoneFiles() (doneFiles []File, err error) {
+func (m *Meta) GetDoneFiles() ([]File, error) {
+	myfiles, err := m.getDoneFiles()
+	if err != nil {
+		return nil, err
+	}
+	//submeta
+	for _, mv := range m.subMetas {
+		newfiles, err := mv.GetDoneFiles()
+		if err != nil {
+			return nil, err
+		}
+		myfiles = append(myfiles, newfiles...)
+	}
+	return myfiles, nil
+}
+
+func (m *Meta) getDoneFiles() (doneFiles []File, err error) {
 	dir := m.DoneFilePath
 	// 按文件时间从新到旧排列
 	files, err := ReadDirByTime(dir)
@@ -533,6 +572,9 @@ func (m *Meta) SetEncodingWay(e string) {
 	e = strings.ToUpper(e)
 	if e != "UTF-8" {
 		m.encodingWay = e
+	}
+	for _, mv := range m.subMetas {
+		mv.SetEncodingWay(e)
 	}
 }
 
@@ -585,6 +627,14 @@ func (m *Meta) Reset() error {
 			if err := os.RemoveAll(filepath.Join(m.DoneFilePath, file.Name())); err != nil {
 				return err
 			}
+		}
+	}
+	for key, mv := range m.subMetas {
+		err := mv.Reset()
+		if err != nil {
+			log.Errorf("reset sub meta %v err %v", key, err)
+			//出错继续reset
+			continue
 		}
 	}
 	return nil
