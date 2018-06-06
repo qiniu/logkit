@@ -52,6 +52,43 @@ func Test_ReadDirSortByTime(t *testing.T) {
 	}
 }
 
+func Test_SortFilesByTime(t *testing.T) {
+	testreaddir := "../tests/SortFilesByTime/"
+	err := os.MkdirAll(testreaddir, os.ModePerm)
+	if err != nil {
+		t.Error(err)
+	}
+	defer os.RemoveAll(testreaddir)
+	exps := []string{"4", "1", "3", "2"}
+	for i := 0; i < 4; i++ {
+		e := exps[i]
+		if i > 0 {
+			_, err := os.Create(testreaddir + e)
+			if err != nil {
+				t.Error(err)
+			}
+		} else {
+			err := os.Mkdir(testreaddir+e, os.ModePerm)
+			if err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	files, err := ReadDirByTime(testreaddir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	exps = []string{"4", "3", "2", "1"}
+	var gots []string
+	for _, f := range files {
+		gots = append(gots, f.Name())
+	}
+
+	if !reflect.DeepEqual(gots, exps) {
+		t.Fatalf("Test_ReadDirSortByTime error exps %v got %v ", exps, gots)
+	}
+}
+
 func Test_TrimeList(t *testing.T) {
 	s := []string{"1", "  \t \n", " \n ", "2"}
 	exps := []string{"1", "2"}

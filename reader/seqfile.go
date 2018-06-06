@@ -173,7 +173,7 @@ func (sf *SeqFile) getIgnoreCondition() func(os.FileInfo) bool {
 }
 
 func newestFile(logdir string, condition func(os.FileInfo) bool) (currFile string, offset int64, err error) {
-	fi, err := getMaxFile(logdir, condition, modTimeLater)
+	fi, err := getMaxFile(logdir, condition, ModTimeLater)
 	if err != nil {
 		return
 	}
@@ -191,7 +191,7 @@ func newestFile(logdir string, condition func(os.FileInfo) bool) (currFile strin
 }
 
 func oldestFile(logdir string, condition func(os.FileInfo) bool) (currFile string, offset int64, err error) {
-	fi, err := getMinFile(logdir, condition, modTimeLater)
+	fi, err := getMinFile(logdir, condition, ModTimeLater)
 	if err != nil {
 		return
 	}
@@ -390,7 +390,7 @@ func (sf *SeqFile) getNextFileCondition() (condition func(os.FileInfo) bool, err
 		return
 	}
 	newerThanCurrFile := func(f os.FileInfo) bool {
-		return modTimeLater(f, currFi)
+		return ModTimeLater(f, currFi)
 	}
 
 	isNewFile := func(f os.FileInfo) bool {
@@ -419,7 +419,7 @@ func (sf *SeqFile) nextFile() (fi os.FileInfo, err error) {
 	if err != nil {
 		return
 	}
-	fi, err = getMinFile(sf.dir, condition, modTimeLater)
+	fi, err = getMinFile(sf.dir, condition, ModTimeLater)
 	if err != nil {
 		log.Debugf("Runner[%v] getMinFile error %v", sf.meta.RunnerName, err)
 		return nil, err

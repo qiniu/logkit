@@ -106,10 +106,10 @@ func TestModTimeLater(t *testing.T) {
 		err := ioutil.WriteFile(filepath.Join(dir, v), []byte("abc"), 0644)
 		assert.NoError(t, err)
 	}
-	cs, err := getMaxFile(dir, func(info os.FileInfo) bool { return true }, modTimeLater)
+	cs, err := getMaxFile(dir, func(info os.FileInfo) bool { return true }, ModTimeLater)
 	assert.NoError(t, err)
 	assert.Equal(t, "f3", cs.Name())
-	cs, err = getMinFile(dir, func(info os.FileInfo) bool { return true }, modTimeLater)
+	cs, err = getMinFile(dir, func(info os.FileInfo) bool { return true }, ModTimeLater)
 	assert.NoError(t, err)
 	assert.Equal(t, "f1", cs.Name())
 }
