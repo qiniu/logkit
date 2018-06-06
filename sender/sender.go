@@ -39,6 +39,7 @@ const (
 	KeyPandoraKodoBucketName     = "pandora_bucket_name"
 	KeyPandoraKodoFilePrefix     = "pandora_kodo_prefix"
 	KeyPandoraKodoCompressPrefix = "pandora_kodo_compress"
+	KeyPandoraKodoGzip           = "pandora_kodo_gzip"
 
 	KeyPandoraEmail = "qiniu_email"
 

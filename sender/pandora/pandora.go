@@ -90,11 +90,12 @@ type PandoraOption struct {
 	tsdbTimestamp  string
 	tsdbSeriesTags map[string][]string
 
-	enableKodo bool
-	bucketName string
-	email      string
-	prefix     string
-	format     string
+	enableKodo   bool
+	bucketName   string
+	email        string
+	prefix       string
+	format       string
+	kodoCompress bool
 
 	forceMicrosecond   bool
 	forceDataConvert   bool
@@ -184,6 +185,7 @@ func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
 	email, _ := conf.GetStringOr(sender.KeyPandoraEmail, "")
 	format, _ := conf.GetStringOr(sender.KeyPandoraKodoCompressPrefix, "parquet")
 	prefix, _ := conf.GetStringOr(sender.KeyPandoraKodoFilePrefix, "logkitauto/date=$(year)-$(mon)-$(day)/hour=$(hour)/min=$(min)/$(sec)")
+	compress, _ := conf.GetBoolOr(sender.KeyPandoraKodoGzip, false)
 
 	forceconvert, _ := conf.GetBoolOr(sender.KeyForceDataConvert, false)
 	ignoreInvalidField, _ := conf.GetBoolOr(sender.KeyIgnoreInvalidField, true)
@@ -245,11 +247,12 @@ func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
 		tsdbendpoint:   tsdbHost,
 		tsdbTimestamp:  tsdbTimestamp,
 
-		enableKodo: enableKodo,
-		email:      email,
-		bucketName: kodobucketName,
-		format:     format,
-		prefix:     prefix,
+		enableKodo:   enableKodo,
+		email:        email,
+		bucketName:   kodobucketName,
+		format:       format,
+		prefix:       prefix,
+		kodoCompress: compress,
 
 		forceMicrosecond:   forceMicrosecond,
 		forceDataConvert:   forceconvert,
@@ -481,6 +484,7 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 				Email:                s.opt.email,
 				Prefix:               s.opt.prefix,
 				Format:               s.opt.format,
+				Compress:             s.opt.kodoCompress,
 				AutoExportKodoTokens: s.opt.tokens.KodoTokens,
 			},
 			ToTSDB: s.opt.enableTsdb,
@@ -865,6 +869,7 @@ func (s *Sender) Send(datas []Data) (se error) {
 				Email:                s.opt.email,
 				Prefix:               s.opt.prefix,
 				Format:               s.opt.format,
+				Compress:             s.opt.kodoCompress,
 				AutoExportKodoTokens: s.opt.tokens.KodoTokens,
 			},
 			ToTSDB: s.opt.enableTsdb,
