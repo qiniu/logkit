@@ -14,9 +14,9 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-const Name = "UserAgent"
+const Name = "user_agent"
 
-type UATransformer struct {
+type Transformer struct {
 	Key              string `json:"key"`
 	RegexYmlFilePath string `json:"regex_yml_path"`
 	UA_Device        string `json:"device"`
@@ -32,29 +32,29 @@ type UATransformer struct {
 	cache            map[string]*uaparser.Client
 }
 
-func (it *UATransformer) Init() (err error) {
-	if it.RegexYmlFilePath != "" {
-		it.uap, err = uaparser.New(it.RegexYmlFilePath)
+func (t *Transformer) Init() (err error) {
+	if t.RegexYmlFilePath != "" {
+		t.uap, err = uaparser.New(t.RegexYmlFilePath)
 		if err != nil {
 			log.Errorf("load regex yml file error %v, use default one", err)
 		}
 	}
-	if it.uap == nil {
-		it.uap = uaparser.NewFromSaved()
+	if t.uap == nil {
+		t.uap = uaparser.NewFromSaved()
 	}
-	it.cache = make(map[string]*uaparser.Client)
-	it.memcache, _ = strconv.ParseBool(it.MemCache)
-	it.agent, _ = strconv.ParseBool(it.UA_Agent)
-	it.dev, _ = strconv.ParseBool(it.UA_Device)
-	it.os, _ = strconv.ParseBool(it.UA_OS)
+	t.cache = make(map[string]*uaparser.Client)
+	t.memcache, _ = strconv.ParseBool(t.MemCache)
+	t.agent, _ = strconv.ParseBool(t.UA_Agent)
+	t.dev, _ = strconv.ParseBool(t.UA_Device)
+	t.os, _ = strconv.ParseBool(t.UA_OS)
 	return nil
 }
 
-func (it *UATransformer) RawTransform(datas []string) ([]string, error) {
-	return datas, errors.New("UserAgent transformer not support rawTransform")
+func (it *Transformer) RawTransform(datas []string) ([]string, error) {
+	return datas, errors.New("user agent transformer not support rawTransform")
 }
 
-func (it *UATransformer) getParsedData(line string) (UserAgent *uaparser.UserAgent, Os *uaparser.Os, Device *uaparser.Device) {
+func (it *Transformer) getParsedData(line string) (UserAgent *uaparser.UserAgent, Os *uaparser.Os, Device *uaparser.Device) {
 	if !it.dev && !it.os && !it.agent {
 		return
 	}
@@ -100,7 +100,7 @@ func (it *UATransformer) getParsedData(line string) (UserAgent *uaparser.UserAge
 	return
 }
 
-func (it *UATransformer) Transform(datas []Data) ([]Data, error) {
+func (it *Transformer) Transform(datas []Data) ([]Data, error) {
 	if it.uap == nil {
 		it.uap = uaparser.NewFromSaved()
 	}
@@ -198,24 +198,24 @@ func (it *UATransformer) Transform(datas []Data) ([]Data, error) {
 	return datas, ferr
 }
 
-func (it *UATransformer) Description() string {
+func (it *Transformer) Description() string {
 	//return "transform UserAgent will parse user_agent string to detail information"
-	return "解析 User Agent 中的用户信息，包括浏览器型号、版本、系统信息、设备号等 "
+	return "解析 User-Agent 中的用户信息，包括浏览器型号、版本、系统信息、设备号等 "
 }
 
-func (it *UATransformer) Type() string {
-	return "UserAgent"
+func (it *Transformer) Type() string {
+	return Name
 }
 
-func (it *UATransformer) SampleConfig() string {
+func (it *Transformer) SampleConfig() string {
 	return `{
-		"type":"UserAgent",
+		"type":"` + Name + `",
 		"key":"MyUserAgentFieldKey",
 		"regex_yml_path":"/your/path/to/regexes.yaml"
 	}`
 }
 
-func (it *UATransformer) ConfigOptions() []Option {
+func (it *Transformer) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
 		{
@@ -224,7 +224,7 @@ func (it *UATransformer) ConfigOptions() []Option {
 			Default:      "",
 			Placeholder:  "/your/path/to/regexes.yaml",
 			DefaultNoUse: true,
-			Description:  "UserAgent解析正则表达式文件路径(regex_yml_path)",
+			Description:  "User-Agent解析正则表达式文件路径(regex_yml_path)",
 			Type:         transforms.TransformTypeString,
 		},
 		{
@@ -234,7 +234,7 @@ func (it *UATransformer) ConfigOptions() []Option {
 			ChooseOptions: []interface{}{true, false},
 			Default:       "true",
 			DefaultNoUse:  true,
-			Description:   "解析UserAgent中的设备信息(device)",
+			Description:   "解析User-Agent中的设备信息(device)",
 			Type:          transforms.TransformTypeBoolean,
 		},
 		{
@@ -244,7 +244,7 @@ func (it *UATransformer) ConfigOptions() []Option {
 			ChooseOptions: []interface{}{true, false},
 			Default:       "true",
 			DefaultNoUse:  true,
-			Description:   "解析UserAgent中的操作系统信息(os)",
+			Description:   "解析User-Agent中的操作系统信息(os)",
 			Type:          transforms.TransformTypeBoolean,
 		},
 		{
@@ -254,7 +254,7 @@ func (it *UATransformer) ConfigOptions() []Option {
 			ChooseOptions: []interface{}{true, false},
 			Default:       "true",
 			DefaultNoUse:  true,
-			Description:   "解析UserAgent中的agent信息(agent)",
+			Description:   "解析User-Agent中的agent信息(agent)",
 			Type:          transforms.TransformTypeBoolean,
 		},
 		{
@@ -271,16 +271,16 @@ func (it *UATransformer) ConfigOptions() []Option {
 	}
 }
 
-func (it *UATransformer) Stage() string {
+func (it *Transformer) Stage() string {
 	return transforms.StageAfterParser
 }
 
-func (it *UATransformer) Stats() StatsInfo {
+func (it *Transformer) Stats() StatsInfo {
 	return it.stats
 }
 
 func init() {
 	transforms.Add(Name, func() transforms.Transformer {
-		return &UATransformer{}
+		return &Transformer{}
 	})
 }

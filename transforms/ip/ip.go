@@ -8,7 +8,7 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-const Name = "IP"
+const Name = "ip"
 
 const (
 	Region       = "Region"
@@ -106,12 +106,12 @@ func (_ *Transformer) Description() string {
 }
 
 func (_ *Transformer) Type() string {
-	return "IP"
+	return Name
 }
 
 func (_ *Transformer) SampleConfig() string {
 	return `{
-		"type":"IP",
+		"type":"` + Name + `",
 		"stage":"after_parser",
 		"key":"MyIpFieldKey",
 		"data_path":"your/path/to/ip.dat"

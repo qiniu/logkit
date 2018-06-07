@@ -3,15 +3,15 @@ package ua
 import (
 	"testing"
 
-	"github.com/qiniu/logkit/transforms"
-	. "github.com/qiniu/logkit/utils/models"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/ua-parser/uap-go/uaparser"
+
+	"github.com/qiniu/logkit/transforms"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 func TestUaTransformer(t *testing.T) {
-	ipt := &UATransformer{
+	ipt := &Transformer{
 		Key:       "ua",
 		UA_Device: "true",
 		UA_OS:     "true",

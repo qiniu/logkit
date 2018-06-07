@@ -17,6 +17,7 @@ import (
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/reader/http"
 	"github.com/qiniu/logkit/sender"
+	"github.com/qiniu/logkit/transforms/ip"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -138,7 +139,7 @@ func Test_ParseData(t *testing.T) {
 
 func Test_TransformData(t *testing.T) {
 	config1 := `{
-			"type":"IP",
+			"type":"` + ip.Name + `",
 			"key":  "ip",
 			"data_path": "../transforms/ip/test_data/17monipdb.dat",
 			"sampleLog": "{\"ip\": \"111.2.3.4\"}"
@@ -163,7 +164,7 @@ func Test_TransformData(t *testing.T) {
 
 func Test_getTransformerCreator(t *testing.T) {
 	config1 := `{
-			"type":"IP",
+			"type":"` + ip.Name + `",
 			"key":  "ip",
 			"data_path": "../transforms/ip/test_data/17monipdb.dat",
 			"sampleLog": "{\"ip\": \"111.2.3.4\"}"
@@ -184,7 +185,7 @@ func Test_getTransformerCreator(t *testing.T) {
 
 func Test_getDataFromTransformConfig(t *testing.T) {
 	config1 := `{
-			"type":"IP",
+			"type":"` + ip.Name + `",
 			"key":  "ip",
 			"data_path": "../transforms/ip/test_data/17monipdb.dat",
 			"sampleLog": "{\"ip\": \"111.2.3.4\"}"
@@ -209,7 +210,7 @@ func Test_getDataFromTransformConfig(t *testing.T) {
 
 func Test_getTransformer(t *testing.T) {
 	config1 := `{
-			"type":"IP",
+			"type":"` + ip.Name + `",
 			"key":  "ip",
 			"data_path": "../transforms/ip/test_data/17monipdb.dat",
 			"sampleLog": "{\"ip\": \"111.2.3.4\"}"

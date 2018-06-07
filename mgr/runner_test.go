@@ -24,6 +24,7 @@ import (
 	_ "github.com/qiniu/logkit/sender/builtin"
 	"github.com/qiniu/logkit/sender/mock"
 	_ "github.com/qiniu/logkit/transforms/builtin"
+	"github.com/qiniu/logkit/transforms/ip"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -715,7 +716,7 @@ func TestCreateTransforms(t *testing.T) {
 			"csv_schema":"t1 string"
 		},
 		"transforms":[{
-			"type":"IP",
+			"type":"` + ip.Name + `",
 			"key":  "ip",
 			"data_path": "../transforms/ip/test_data/17monipdb.dat"
 		}],
