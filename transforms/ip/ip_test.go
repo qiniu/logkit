@@ -11,7 +11,7 @@ import (
 
 func TestTransformer(t *testing.T) {
 	ipt := &Transformer{
-		Key:      "ip",
+		Key:      Name,
 		DataPath: "./test_data/17monipdb.dat",
 	}
 	data, err := ipt.Transform([]Data{{"ip": "111.2.3.4"}, {"ip": "x.x.x.x"}})
@@ -145,7 +145,7 @@ func TestTransformer(t *testing.T) {
 
 func Test_badData(t *testing.T) {
 	ipt := &Transformer{
-		Key:      "ip",
+		Key:      Name,
 		DataPath: "./test_data/bad.dat",
 	}
 	_, err := ipt.Transform([]Data{{"ip": "111.2.3.4"}, {"ip": "x.x.x.x"}})
@@ -155,7 +155,7 @@ func Test_badData(t *testing.T) {
 	assert.Equal(t, "dat", ierr.Format)
 
 	ipt = &Transformer{
-		Key:      "ip",
+		Key:      Name,
 		DataPath: "./test_data/bad.datx",
 	}
 	_, err = ipt.Transform([]Data{{"ip": "111.2.3.4"}, {"ip": "x.x.x.x"}})
