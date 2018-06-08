@@ -38,10 +38,11 @@ func (_ *Transformer) RawTransform(datas []string) ([]string, error) {
 func (t *Transformer) Transform(datas []Data) ([]Data, error) {
 	var err, ferr error
 	if t.loc == nil {
-		t.loc, err = NewLocator(t.DataPath)
+		loc, err := NewLocator(t.DataPath)
 		if err != nil {
 			return datas, err
 		}
+		t.loc = loc
 	}
 	errnums := 0
 	keys := GetKeys(t.Key)
