@@ -98,11 +98,19 @@ func (ssr *streamSocketReader) read(c net.Conn) {
 
 	scnr := bufio.NewScanner(c)
 	for {
+		if atomic.LoadInt32(&ssr.status) == reader.StatusStopped || atomic.LoadInt32(&ssr.status) == reader.StatusStopping {
+			return
+		}
 		if ssr.ReadTimeout != 0 && ssr.ReadTimeout > 0 {
 			c.SetReadDeadline(time.Now().Add(ssr.ReadTimeout))
 		}
 		if !scnr.Scan() {
 			break
+		}
+
+		//double check
+		if atomic.LoadInt32(&ssr.status) == reader.StatusStopped || atomic.LoadInt32(&ssr.status) == reader.StatusStopping {
+			return
 		}
 		ssr.ReadChan <- string(scnr.Bytes())
 	}
@@ -131,6 +139,9 @@ func (psr *packetSocketReader) listen() {
 	}()
 
 	for {
+		if atomic.LoadInt32(&psr.status) == reader.StatusStopped || atomic.LoadInt32(&psr.status) == reader.StatusStopping {
+			return
+		}
 		n, _, err := psr.PacketConn.ReadFrom(buf)
 		if err != nil {
 			if !strings.HasSuffix(err.Error(), ": use of closed network connection") {
@@ -138,7 +149,10 @@ func (psr *packetSocketReader) listen() {
 			}
 			break
 		}
-		// FIXME: "panic: send on closed channel" If client is sending data while exiting the program
+		// double check
+		if atomic.LoadInt32(&psr.status) == reader.StatusStopped || atomic.LoadInt32(&psr.status) == reader.StatusStopping {
+			return
+		}
 		psr.ReadChan <- string(buf[:n])
 	}
 }
@@ -175,7 +189,7 @@ func (sr *Reader) SetMode(mode string, v interface{}) error {
 }
 
 func (sr *Reader) SyncMeta() {
-	//TODO 网络监听存在丢包可能性，无法保证不丢包
+	//FIXME 网络监听存在丢包可能性，无法保证不丢包
 	return
 }
 
@@ -270,6 +284,7 @@ func (sr *Reader) Close() error {
 	if atomic.CompareAndSwapInt32(&sr.status, reader.StatusRunning, reader.StatusStopping) {
 		log.Infof("Runner[%v] Reader[%v] stopping", sr.meta.RunnerName, sr.Name())
 	} else {
+		atomic.CompareAndSwapInt32(&sr.status, reader.StatusInit, reader.StatusStopped)
 		close(sr.ReadChan)
 	}
 

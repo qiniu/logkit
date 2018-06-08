@@ -26,6 +26,7 @@ type CleanSignal struct {
 	Logdir   string
 	Filename string
 	Cleaner  string
+	ReadMode string
 }
 
 const (
@@ -50,8 +51,8 @@ func NewCleaner(conf conf.MapConf, meta *reader.Meta, cleanChan chan<- CleanSign
 		return
 	}
 	mode := meta.GetMode()
-	if mode != reader.ModeDir && mode != reader.ModeFile && mode != reader.ModeCloudTrail {
-		log.Errorf("cleaner only support reader mode dir|file|clocktrail, now mode is %v, cleaner disabled", meta.GetMode())
+	if mode != reader.ModeDir && mode != reader.ModeFile && mode != reader.ModeCloudTrail && mode != reader.ModeTailx {
+		log.Errorf("cleaner only support reader mode dir|file|clocktrail|tailx, now mode is %v, cleaner disabled", meta.GetMode())
 		return
 	}
 	interval, _ := conf.GetIntOr(KeyCleanInterval, 0) //单位，秒
@@ -66,10 +67,12 @@ func NewCleaner(conf conf.MapConf, meta *reader.Meta, cleanChan chan<- CleanSign
 		reserveSize = default_reserve_file_size
 	}
 	reserveSize = reserveSize * MB
-	logdir, _, err = GetRealPath(logdir)
-	if err != nil {
-		log.Errorf("GetRealPath for %v error %v", logdir, err)
-		return
+	if mode != reader.ModeTailx {
+		logdir, _, err = GetRealPath(logdir)
+		if err != nil {
+			log.Errorf("GetRealPath for %v error %v", logdir, err)
+			return
+		}
 	}
 	c = &Cleaner{
 		cleanTicker:   time.NewTicker(time.Duration(interval) * time.Second).C,
@@ -124,6 +127,14 @@ func (c *Cleaner) checkBelong(path string) bool {
 		log.Errorf("GetRealPath for %v error %v", path, err)
 		return false
 	}
+	if c.meta.GetMode() == reader.ModeTailx {
+		matched, err := filepath.Match(filepath.Dir(c.logdir), filepath.Dir(path))
+		if err != nil {
+			log.Errorf("checkBelong %v %v err ", c.logdir, path, err)
+			return false
+		}
+		return matched
+	}
 	if dir != c.logdir {
 		return false
 	}
@@ -155,11 +166,14 @@ func (c *Cleaner) Clean() (err error) {
 			// 一旦符合条件，更老的文件必然都要删除
 			if beginClean || c.shoudClean(size, count) {
 				beginClean = true
-				c.cleanChan <- CleanSignal{
+				sig := CleanSignal{
 					Logdir:   filepath.Dir(logf.Path),
 					Filename: logf.Info.Name(),
 					Cleaner:  c.name,
+					ReadMode: c.meta.GetMode(),
 				}
+				log.Infof("send clean signal %v", sig)
+				c.cleanChan <- sig
 				if err = c.meta.AppendDeleteFile(logf.Path); err != nil {
 					log.Error(err)
 				}

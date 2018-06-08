@@ -53,26 +53,19 @@ func Test_ReadDirSortByTime(t *testing.T) {
 }
 
 func Test_SortFilesByTime(t *testing.T) {
-	testreaddir := "../tests/SortFilesByTime/"
+	testreaddir := "SortFilesByTime"
 	err := os.MkdirAll(testreaddir, os.ModePerm)
 	if err != nil {
 		t.Error(err)
 	}
 	defer os.RemoveAll(testreaddir)
 	exps := []string{"4", "1", "3", "2"}
+	now := time.Now()
 	for i := 0; i < 4; i++ {
 		e := exps[i]
-		if i > 0 {
-			_, err := os.Create(testreaddir + e)
-			if err != nil {
-				t.Error(err)
-			}
-		} else {
-			err := os.Mkdir(testreaddir+e, os.ModePerm)
-			if err != nil {
-				t.Error(err)
-			}
-		}
+		filename := filepath.Join(testreaddir, e)
+		os.Create(filename)
+		os.Chtimes(filename, now, now)
 	}
 	files, err := ReadDirByTime(testreaddir)
 	if err != nil {

@@ -136,3 +136,49 @@ func TestUnixSocketReader(t *testing.T) {
 	err = sr.Close()
 	assert.NoError(t, err)
 }
+
+func TestSocketReaderClosePanic(t *testing.T) {
+	logkitConf := conf.MapConf{
+		reader.KeyMetaPath:             MetaDir,
+		reader.KeyFileDone:             MetaDir,
+		KeyRunnerName:                  "TestSocketReaderClosePanic",
+		reader.KeyMode:                 reader.ModeSocket,
+		reader.KeySocketServiceAddress: "tcp://:5141",
+	}
+	meta, err := reader.NewMetaWithConf(logkitConf)
+	assert.NoError(t, err)
+	defer os.RemoveAll(MetaDir)
+
+	ssr, err := NewReader(meta, logkitConf)
+	assert.NoError(t, err)
+	sr := ssr.(*Reader)
+	err = sr.Start()
+	assert.NoError(t, err)
+
+	sysLog, err := syslog.Dial("tcp", "127.0.0.1:5141",
+		syslog.LOG_WARNING|syslog.LOG_DAEMON, "demotag")
+	assert.NoError(t, err)
+
+	err = sysLog.Emerg("And this is a daemon emergency with demotag.")
+	assert.NoError(t, err)
+	err = sysLog.Emerg("this is OK")
+	assert.NoError(t, err)
+	time.Sleep(30 * time.Millisecond)
+	line, err := sr.ReadLine()
+	assert.NoError(t, err)
+	assert.Contains(t, line, "And this is a daemon emergency with demotag.")
+	line, err = sr.ReadLine()
+	assert.NoError(t, err)
+	assert.Contains(t, line, "this is OK")
+
+	err = sr.Close()
+	assert.NoError(t, err)
+
+	err = sysLog.Emerg("And this is a daemon emergency with demotag.")
+	assert.NoError(t, err)
+	time.Sleep(30 * time.Millisecond)
+	line, err = sr.ReadLine()
+	assert.NoError(t, err)
+	assert.Equal(t, "", line)
+	sysLog.Emerg("this is OK")
+}
