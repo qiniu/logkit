@@ -1,29 +1,31 @@
 package queue
 
 import (
+	"sync"
 	"testing"
 
-	"sync"
-
 	"github.com/stretchr/testify/assert"
+
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 func TestDirectQueue(t *testing.T) {
 	dq := NewDirectQueue("TestDirectQueue")
 	assert.Equal(t, "TestDirectQueue", dq.Name())
-	ch := dq.ReadChan()
+	ddq := dq.(DataQueue)
+	ch := ddq.ReadDatasChan()
 	var wg sync.WaitGroup
-	puts := []string{"a", "b", "c", "d", "e", "f", "g"}
-	recv := []string{}
+	puts := [][]Data{{Data{"a": 1}}}
+	recv := [][]Data{}
 	wg.Add(1)
 	go func() {
 		for exp := range ch {
-			recv = append(recv, string(exp))
+			recv = append(recv, exp)
 		}
 		wg.Done()
 	}()
 	for _, v := range puts {
-		err := dq.Put([]byte(v))
+		err := ddq.PutDatas(v)
 		if err != nil {
 			t.Error(err)
 		}
@@ -39,19 +41,24 @@ func TestDirectQueue(t *testing.T) {
 func TestDirectQueueEmpty(t *testing.T) {
 	dq := NewDirectQueue("TestDirectQueueEmpty")
 	assert.Equal(t, "TestDirectQueueEmpty", dq.Name())
-	ch := dq.ReadChan()
+	ddq := dq.(DataQueue)
+	ch := ddq.ReadDatasChan()
 	var wg sync.WaitGroup
-	puts := []string{"a", "b", "c", "d", "e", "f", "g"}
-	recv := []string{}
+	puts := [][]Data{
+		{Data{"a": 1}},
+		{Data{"b": 2}},
+		{Data{"c": 3}},
+	}
+	recv := [][]Data{}
 	wg.Add(1)
 	go func() {
 		for exp := range ch {
-			recv = append(recv, string(exp))
+			recv = append(recv, exp)
 		}
 		wg.Done()
 	}()
 	for i := 0; i < 3; i++ {
-		err := dq.Put([]byte(puts[i]))
+		err := ddq.PutDatas(puts[i])
 		if err != nil {
 			t.Error(err)
 		}
@@ -60,7 +67,7 @@ func TestDirectQueueEmpty(t *testing.T) {
 		t.Error(err)
 	}
 	for i := 3; i < len(puts); i++ {
-		err := dq.Put([]byte(puts[i]))
+		err := ddq.PutDatas(puts[i])
 		if err != nil {
 			t.Error(err)
 		}
