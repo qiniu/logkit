@@ -214,15 +214,14 @@ func (ft *FtSender) TokenRefresh(mapConf conf.MapConf) (err error) {
 }
 
 // marshalData 将数据序列化
-func (ft *FtSender) marshalData(datas []Data) (bs []byte, err error) {
-	ctx := new(datasContext)
-	ctx.Datas = datas
-	bs, err = jsoniter.Marshal(ctx)
+func (ft *FtSender) marshalData(datas []Data) ([]byte, error) {
+	bs, err := jsoniter.Marshal(&datasContext{
+		Datas: datas,
+	})
 	if err != nil {
-		err = reqerr.NewSendError("Cannot marshal data :"+err.Error(), ConvertDatasBack(datas), reqerr.TypeDefault)
-		return
+		return nil, reqerr.NewSendError("Cannot marshal data :"+err.Error(), ConvertDatasBack(datas), reqerr.TypeDefault)
 	}
-	return
+	return bs, nil
 }
 
 // unmarshalData 如何将数据从磁盘中反序列化出来
@@ -237,10 +236,15 @@ func (ft *FtSender) unmarshalData(dat []byte) (datas []Data, err error) {
 }
 
 func (ft *FtSender) saveToFile(datas []Data) error {
+	if dqueue, ok := ft.logQueue.(queue.DataQueue); ok {
+		return dqueue.PutDatas(datas)
+	}
+
 	bs, err := ft.marshalData(datas)
 	if err != nil {
 		return err
 	}
+
 	err = ft.logQueue.Put(bs)
 	if err != nil {
 		return reqerr.NewSendError(ft.innerSender.Name()+" Cannot put data into backendQueue: "+err.Error(), ConvertDatasBack(datas), reqerr.TypeDefault)
@@ -250,9 +254,15 @@ func (ft *FtSender) saveToFile(datas []Data) error {
 
 func (ft *FtSender) asyncSendLogFromDiskQueue() {
 	for i := 0; i < ft.procs; i++ {
-		go ft.sendFromQueue(ft.logQueue, false)
+		readDatasChan := make(<-chan []Data)
+		if dqueue, ok := ft.logQueue.(queue.DataQueue); ok {
+			readDatasChan = dqueue.ReadDatasChan()
+		}
+		go ft.sendFromQueue(ft.logQueue.Name(), ft.logQueue.ReadChan(), readDatasChan, false)
 	}
-	go ft.sendFromQueue(ft.BackupQueue, true)
+
+	readDatasChan := make(<-chan []Data)
+	go ft.sendFromQueue(ft.BackupQueue.Name(), ft.BackupQueue.ReadChan(), readDatasChan, true)
 }
 
 // trySend 从bytes反序列化数据后尝试发送数据
@@ -301,9 +311,9 @@ func (ft *FtSender) trySendDatas(datas []Data, failSleep int, isRetry bool) (bac
 		retDatasContext := ft.handleSendError(err, datas)
 		for _, v := range retDatasContext {
 			nnBytes, _ := jsoniter.Marshal(v)
-			qErr := ft.BackupQueue.Put(nnBytes)
-			if qErr != nil {
-				log.Errorf("Runner[%v] Sender[%v] cannot write points back to queue %v: %v", ft.runnerName, ft.innerSender.Name(), ft.BackupQueue.Name(), qErr)
+			err := ft.BackupQueue.Put(nnBytes)
+			if err != nil {
+				log.Errorf("Runner[%v] Sender[%v] cannot write points back to queue %v: %v", ft.runnerName, ft.innerSender.Name(), ft.BackupQueue.Name(), err)
 				backDataContext = append(backDataContext, v)
 			}
 		}
@@ -357,10 +367,9 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 	return
 }
 
-func (ft *FtSender) sendFromQueue(queue queue.BackendQueue, isRetry bool) {
-	readChan := queue.ReadChan()
+func (ft *FtSender) sendFromQueue(queueName string, readChan <-chan []byte, readDatasChan <-chan []Data, isRetry bool) {
 	timer := time.NewTicker(time.Second)
-	waitCnt := 1
+	numWaits := 1
 	var curDataContext, otherDataContext []*datasContext
 	var curIdx int
 	var backDataContext []*datasContext
@@ -371,25 +380,27 @@ func (ft *FtSender) sendFromQueue(queue queue.BackendQueue, isRetry bool) {
 			return
 		}
 		if curIdx < len(curDataContext) {
-			backDataContext, err = ft.trySendDatas(curDataContext[curIdx].Datas, waitCnt, isRetry)
+			backDataContext, err = ft.trySendDatas(curDataContext[curIdx].Datas, numWaits, isRetry)
 			curIdx++
 		} else {
 			select {
-			case dat := <-readChan:
-				backDataContext, err = ft.trySendBytes(dat, waitCnt, isRetry)
+			case bytes := <-readChan:
+				backDataContext, err = ft.trySendBytes(bytes, numWaits, isRetry)
+			case datas := <-readDatasChan:
+				backDataContext, err = ft.trySendDatas(datas, numWaits, isRetry)
 			case <-timer.C:
 				continue
 			}
 		}
 		if err == nil {
-			waitCnt = 1
+			numWaits = 1
 			//此处的成功发送没有被stats统计
 		} else {
-			log.Errorf("Runner[%v] Sender[%v] cannot send points from queue %v, error is %v", ft.runnerName, ft.innerSender.Name(), queue.Name(), err)
+			log.Errorf("Runner[%v] Sender[%v] cannot send points from queue %v, error is %v", ft.runnerName, ft.innerSender.Name(), queueName, err)
 			//此处的发送错误没有被stats统计
-			waitCnt++
-			if waitCnt > 10 {
-				waitCnt = 10
+			numWaits++
+			if numWaits > 10 {
+				numWaits = 10
 			}
 		}
 		if backDataContext != nil {
