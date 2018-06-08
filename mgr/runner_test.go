@@ -1069,7 +1069,7 @@ func TestSyslogRunnerX(t *testing.T) {
 	os.Mkdir(metaDir, DefaultDirPerm)
 	defer os.RemoveAll(metaDir)
 
-	config1 := `{
+	config := `{
 		"name":"TestSyslogRunner",
 		"batch_len":1,
 		"reader":{
@@ -1089,13 +1089,13 @@ func TestSyslogRunnerX(t *testing.T) {
 	}`
 
 	rc := RunnerConfig{}
-	err := jsoniter.Unmarshal([]byte(config1), &rc)
+	err := jsoniter.Unmarshal([]byte(config), &rc)
 	assert.NoError(t, err)
 	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
 	assert.NoError(t, err)
 	go rr.Run()
 	time.Sleep(1 * time.Second)
-	sysLog, err := syslog.Dial("tcp", "localhost:5142",
+	sysLog, err := syslog.Dial("tcp", "127.0.0.1:5142",
 		syslog.LOG_WARNING|syslog.LOG_DAEMON, "demotag")
 	if err != nil {
 		log.Fatal(err)
@@ -1767,7 +1767,7 @@ func TestTailxCleaner(t *testing.T) {
 	assert.NoError(t, err)
 
 	readfile := filepath.Join(dir, "*", "*.log")
-	config1 := `
+	config := `
 {
   "name": "TestTailxCleaner",
   "batch_size": 2097152,
@@ -1799,7 +1799,7 @@ func TestTailxCleaner(t *testing.T) {
 }`
 
 	rc := RunnerConfig{}
-	err = jsoniter.Unmarshal([]byte(config1), &rc)
+	err = jsoniter.Unmarshal([]byte(config), &rc)
 	assert.NoError(t, err)
 	cleanChan := make(chan cleaner.CleanSignal)
 	rr, err := NewLogExportRunner(rc, cleanChan, reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())

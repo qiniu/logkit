@@ -203,7 +203,6 @@ func (m *Meta) AddSubMeta(key string, meta *Meta) error {
 
 func (m *Meta) RemoveSubMeta(key string) {
 	delete(m.subMetas, key)
-	return
 }
 
 func (m *Meta) IsExist() bool {

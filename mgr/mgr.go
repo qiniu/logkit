@@ -359,25 +359,26 @@ func (m *Manager) handle(path string, watcher *fsnotify.Watcher) {
 }
 
 func (m *Manager) getCleanQueues(dir, file, mode string) ([]*cleanQueue, error) {
-	if mode != reader.ModeTailx {
-		q, ok := m.cleanQueues[dir]
-		if !ok {
-			return nil, fmt.Errorf("cleaner dir %v not exist but got clean signal for delete file %v", dir, file)
+	if mode == reader.ModeTailx {
+		cleanQueues := make([]*cleanQueue, 0, len(m.cleanQueues))
+		for k, v := range m.cleanQueues {
+			matched, err := filepath.Match(k, filepath.Join(dir, file))
+			if err != nil {
+				log.Errorf("match pattern[%v] to path(%v) err %v", k, filepath.Join(dir, file), err)
+				continue
+			}
+			if matched {
+				cleanQueues = append(cleanQueues, v)
+			}
 		}
-		return []*cleanQueue{q}, nil
+		return cleanQueues, nil
 	}
-	var cleanQs []*cleanQueue
-	for k, v := range m.cleanQueues {
-		matched, err := filepath.Match(k, filepath.Join(dir, file))
-		if err != nil {
-			log.Errorf("match pattern[%v] to path(%v) err %v", k, filepath.Join(dir, file), err)
-			continue
-		}
-		if matched {
-			cleanQs = append(cleanQs, v)
-		}
+
+	q, ok := m.cleanQueues[dir]
+	if !ok {
+		return nil, fmt.Errorf("cleaner dir %v not exist but got clean signal for delete file %v", dir, file)
 	}
-	return cleanQs, nil
+	return []*cleanQueue{q}, nil
 }
 
 func (m *Manager) doClean(sig cleaner.CleanSignal) {
@@ -395,15 +396,15 @@ func (m *Manager) doClean(sig cleaner.CleanSignal) {
 		return
 	}
 	//check if all queues can be cleaned
-	var canbedelete = true
+	var canBeDeleted = true
 	for _, q := range queues {
 		count := q.filecount[file] + 1
 		if count < q.cleanerCount {
-			canbedelete = false
+			canBeDeleted = false
 		}
 		q.filecount[file] = count
 	}
-	if canbedelete {
+	if canBeDeleted {
 		catdir := filepath.Join(dir, file)
 		err := os.Remove(catdir)
 		if err != nil {
