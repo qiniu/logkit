@@ -9,7 +9,8 @@ import {
   Checkbox,
   Button,
   Popover,
-  Tooltip
+  Tooltip,
+  Popconfirm
 } from 'antd';
 import {getTransformOptions, getTransformUsages} from '../services/logkit';
 import config from '../store/config'
@@ -156,16 +157,14 @@ class Transformer extends Component {
 
     return this.state.tags.map((k, index) => {
       const tag = this.state.transforms && this.state.transforms[k]
-      const fieldKeyValue = getFieldValue(`spec.${k}.key`)
         return (
-        <div key={`spec.fields.${k}`} style={{ position: "relative"}}>
+        <div key={`spec.fields.${k}`} style={{ position: "relative"}} className="transformer-tag-container">
             <FormItem
-                className="inline fields value"
                 style={{ textAlign: 'left' }}>
               {getFieldDecorator(`spec.${k}.type`, {
                 rules: [{required: true, message: '字段不能为空'},
                   {min: 1, max: 100, message: '长度在 1 到 100 个字符'}]
-              })(<Input disabled={true} className="tranformer-tag"/>)}
+              })(<Input disabled={true} className="transformer-tag"/>)}
             </FormItem>
             {
               this.state.isReadonly ? null :
@@ -173,14 +172,9 @@ class Transformer extends Component {
                     <Icon
                       style={{marginTop: "23px"}}
                       className="dynamic-delete-button"
-                      type="delete"
-                      onClick={() => this.removeTag(k)}
-                    />
-                    <Icon
-                      style={{marginTop: "23px"}}
-                      className="dynamic-delete-button"
                       type="edit"
                       onClick={() => this.editTag(k)}
+                      title="编辑"
                     />
                     <Popover
                       trigger="click"
@@ -190,6 +184,7 @@ class Transformer extends Component {
                         style={{marginTop: "23px"}}
                         className="dynamic-delete-button"
                         type="eye-o"
+                        title="查看"
                       />
                     </Popover>
                     <CopyToClipboard onCopy={() => this.copyTagConfig(index)} text={JSON.stringify(tag, null, '\t')}>
@@ -198,9 +193,18 @@ class Transformer extends Component {
                           style={{marginTop: "23px"}}
                           className="dynamic-delete-button"
                           type="copy"
+                          title="复制"
                         />
                       </Tooltip>
                     </CopyToClipboard>
+                    <Popconfirm title={"是否删除该转换器?"} onConfirm={() => this.removeTag(k)}>
+                      <Icon
+                        style={{marginTop: "23px"}}
+                        className="dynamic-delete-button"
+                        type="delete"
+                        title="删除"
+                      />
+                    </Popconfirm>
                   </span>
             }
           </div>

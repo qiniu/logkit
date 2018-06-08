@@ -98,13 +98,18 @@ class Source extends Component {
       }
     }
     _.forIn(data[this.state.currentOption], function (value, key) {
-      if (value != "") {
+      if (value !== "") {
         cleanerKeys.includes(key) ? notEmptyKeysCleaner.push(key) : notEmptyKeysReader.push(key)
       }
     });
     let cleanerData = _.pick(data[this.state.currentOption], notEmptyKeysCleaner)
     if (cleanerData && typeof cleanerData['delete_enable'] === 'boolean') {
-      cleanerData.delete_enable = cleanerData.delete_enable.toString()
+      if (cleanerData.delete_enable) {
+        cleanerData.delete_enable = cleanerData.delete_enable.toString()
+      } else {
+        cleanerData = {}
+      }
+      console.log(cleanerData)
     }
 
     config.set('reader', _.pick(data[this.state.currentOption], notEmptyKeysReader))
@@ -276,26 +281,22 @@ class Source extends Component {
               <Checkbox checked={!!enableDelete}>自动删除</Checkbox>
             )}
           </FormItem>
-          {enableDelete
-            ? (
-              <div>
-                {cleanerChildConfig.map((item) => (
-                  <FormItem
-                    key={item.KeyName}
-                    {...formItemLayout}
-                    className="delete-enable-input-number"
-                    label={<span>{item.Label}<br /></span>}>
-                    {getFieldDecorator(`${this.state.currentOption}.${item.KeyName}`, {
-                      initialValue: item.Default
-                    })(
-                      <Input />
-                    )}
-                    {item.Unit}
-                  </FormItem>
-                ))}
-              </div>
-            )
-          : null}
+          <div className={enableDelete ? 'show-div': 'hide-div'}>
+            {cleanerChildConfig.map((item) => (
+              <FormItem
+                key={item.KeyName}
+                {...formItemLayout}
+                className="delete-enable-input-number"
+                label={<span>{item.Label}<br /></span>}>
+                {getFieldDecorator(`${this.state.currentOption}.${item.KeyName}`, {
+                  initialValue: item.Default
+                })(
+                  <Input />
+                )}
+                {item.Unit}
+              </FormItem>
+            ))}
+          </div>
         </div>
       )
     }

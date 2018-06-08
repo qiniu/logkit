@@ -1,5 +1,5 @@
 import React, {Component} from 'react';
-import {notification, Button, Steps, Icon, Tag, Layout} from 'antd';
+import {notification, Button, Steps, Icon, Dropdown, Modal, Input, Menu} from 'antd';
 import Keys from '../components/metricKeys'
 import Opt from '../components/metricConfig'
 import Usages from '../components/metricUsages'
@@ -159,7 +159,7 @@ class CreateMetricRunner extends Component {
     config.set("metric", configData);
   }
 
-  addRunner = () => {
+  addRunner = (name) => {
     const { currentTagName, currentMachineUrl } = this.props
     const {handleTurnToRunner} = this.props
     let that = this
@@ -172,6 +172,9 @@ class CreateMetricRunner extends Component {
       } else {
         if (isJSON(formData.config)) {
           let data = JSON.parse(formData.config);
+          if (name) {
+            data.name = name
+          }
           let tag = (currentTagName != null && currentTagName != undefined) ? currentTagName : ''
           let url = (currentMachineUrl != null && currentMachineUrl != undefined) ? currentMachineUrl : ''
           if (window.isCluster && window.isCluster === true) {
@@ -197,6 +200,33 @@ class CreateMetricRunner extends Component {
       }
     });
 
+  }
+  
+  handleConfirmSaveAs = () => {
+    const name = this.state.runnerName
+    if (!name) {
+      this.setState({
+        isRunnerNameEmpty: true
+      })
+      return
+    }
+    this.addRunner(name)
+  }
+  
+  getMenu = () =>{
+    return (
+      <Menu onClick={() => this.handleShowAsPopVisible(true)}>
+        <Menu.Item key="save">
+          另存为
+        </Menu.Item>
+      </Menu>
+    )
+  }
+  
+  handleShowAsPopVisible = (visible) => {
+    this.setState({
+      showSaveAsPop: visible
+    })
   }
 
   updateRunner = () => {
@@ -249,6 +279,13 @@ class CreateMetricRunner extends Component {
   turnToIndex() {
     window.nodeCopy = config.getNodeData()
     this.props.router.push({pathname: `/`})
+  }
+  
+  handleRunnerNameChange = (e) => {
+    this.setState({
+      runnerName: e.target.value,
+      isRunnerNameEmpty: false
+    })
   }
 
   render() {
@@ -313,9 +350,29 @@ class CreateMetricRunner extends Component {
             {
               this.state.current === steps.length - 1 && this.state.isCopyStatus === true
               &&
-              <Button type="primary" onClick={() => this.updateRunner()} style={{ marginLeft: 8 }}>修改并提交</Button>
+              <Dropdown overlay={this.getMenu()}>
+                <Button type="primary" onClick={() => this.updateRunner()} style={{ marginLeft: 8 }}>修改并提交<Icon type="down" /></Button>
+              </Dropdown>
             }            
           </div>
+          <Modal
+            width={400}
+            title="另存为收集器"
+            visible={this.state.showSaveAsPop}
+            onOk={this.handleConfirmSaveAs}
+            onCancel={() => {this.handleShowAsPopVisible(false)}}
+          >
+            <div className="save-as-form">
+              <div className="save-as-form-item">
+                <label>名称</label>
+                <Input
+                  onChange={this.handleRunnerNameChange}
+                  value={this.state.runnerName}
+                  className={this.state.isRunnerNameEmpty ? 'error-border' : ''}
+                />
+              </div>
+            </div>
+          </Modal>
         </div>
     );
   }

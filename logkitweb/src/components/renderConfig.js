@@ -227,7 +227,7 @@ class renderConfig extends Component {
               <Form>
               <FormItem {...formItemLayout} label="名称">
                 {getFieldDecorator('name', {rules: [{required: true, message: '名称不能为空'}]})(
-                    <Input onChange={this.handleNameChange} placeholder={'收集器(runner)名称'}/>
+                    <Input onChange={this.handleNameChange} placeholder={'收集器(runner)名称'} disabled={window.isCopy ? true : false}/>
                 )}
               </FormItem>
               <FormItem {...formItemLayout} 
