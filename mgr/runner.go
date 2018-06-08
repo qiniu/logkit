@@ -83,8 +83,8 @@ type LogExportRunner struct {
 
 	meta *reader.Meta
 
-	batchLen  int
-	batchSize int
+	batchLen  int64
+	batchSize int64
 	lastSend  time.Time
 }
 
@@ -397,6 +397,148 @@ func getSampleContent(line string, maxBatchSize int) string {
 	return line[0:1024]
 }
 
+func (r *LogExportRunner) readDatas(dr reader.DataReader, dataSourceTag string) []Data {
+	var (
+		datas []Data
+		err   error
+		bytes int64
+		data  Data
+	)
+	for !r.batchFullOrTimeout() {
+		data, bytes, err = dr.ReadData()
+		if err != nil {
+			log.Errorf("Runner[%v] data reader %s - error: %v, sleep 1 second...", r.Name(), r.reader.Name(), err)
+			time.Sleep(time.Second)
+			break
+		}
+		if len(data) <= 0 {
+			log.Debugf("Runner[%v] data reader %s got empty data", r.Name(), r.reader.Name())
+			continue
+		}
+		if len(dataSourceTag) > 0 {
+			data[dataSourceTag] = r.reader.Source()
+		}
+		datas = append(datas, data)
+		r.batchLen++
+		r.batchSize += bytes
+	}
+	r.rsMutex.Lock()
+	if err != nil {
+		r.rs.ReaderStats.LastError = err.Error()
+	} else {
+		r.rs.ReaderStats.LastError = ""
+	}
+	r.rsMutex.Unlock()
+	return datas
+}
+
+func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
+	var (
+		err          error
+		lines, froms []string
+		line         string
+	)
+	for !r.batchFullOrTimeout() {
+		line, err = r.reader.ReadLine()
+		if os.IsNotExist(err) {
+			log.Errorf("Runner[%v] reader %s - error: %v, sleep 3 second...", r.Name(), r.reader.Name(), err)
+			time.Sleep(3 * time.Second)
+			break
+		}
+		if err != nil && err != io.EOF {
+			log.Errorf("Runner[%v] reader %s - error: %v, sleep 1 second...", r.Name(), r.reader.Name(), err)
+			time.Sleep(time.Second)
+			break
+		}
+		if len(line) <= 0 {
+			log.Debugf("Runner[%v] reader %s no more content fetched sleep 1 second...", r.Name(), r.reader.Name())
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		lines = append(lines, line)
+		if dataSourceTag != "" {
+			froms = append(froms, r.reader.Source())
+		}
+
+		r.batchLen++
+		r.batchSize += int64(len(line))
+	}
+	r.rsMutex.Lock()
+	if err != nil && err != io.EOF {
+		if os.IsNotExist(err) {
+			r.rs.ReaderStats.LastError = "no more file exist to be read"
+		} else {
+			r.rs.ReaderStats.LastError = err.Error()
+		}
+	} else {
+		r.rs.ReaderStats.LastError = ""
+	}
+	r.rsMutex.Unlock()
+
+	for i := range r.transformers {
+		if r.transformers[i].Stage() == transforms.StageBeforeParser {
+			lines, err = r.transformers[i].RawTransform(lines)
+			if err != nil {
+				log.Error(err)
+			}
+		}
+	}
+
+	if len(lines) <= 0 {
+		log.Debugf("Runner[%v] fetched 0 lines", r.Name())
+		_, ok := r.parser.(parser.Flushable)
+		if ok {
+			lines = []string{parser.PandoraParseFlushSignal}
+		} else {
+			return nil
+		}
+	}
+
+	// parse data
+	var numErrs int64
+	datas, err := r.parser.Parse(lines)
+	se, ok := err.(*StatsError)
+	r.rsMutex.Lock()
+	if ok {
+		numErrs = se.Errors
+		err = se.ErrorDetail
+		r.rs.ParserStats.Errors += se.Errors
+		r.rs.ParserStats.Success += se.Success
+		log.Debugf("Runner[%v] stats error, datas %v DatasourceSkipIndex %v", datas, se.DatasourceSkipIndex)
+	} else if err != nil {
+		numErrs = 1
+		r.rs.ParserStats.Errors++
+	} else {
+		r.rs.ParserStats.Success++
+	}
+	if err != nil {
+		r.rs.ParserStats.LastError = err.Error()
+	}
+	r.rsMutex.Unlock()
+	if err != nil {
+		errMsg := fmt.Sprintf("Runner[%v] parser %s error : %v ", r.Name(), r.parser.Name(), err.Error())
+		log.Debugf(errMsg)
+		(&SchemaErr{}).Output(numErrs, errors.New(errMsg))
+	}
+
+	// 把 source 加到 data 里，前提是认为 []line 变成 []data 以后是一一对应的，一旦错位就不加
+	if dataSourceTag != "" {
+		// 只要实际解析后数据不大于 froms 就可以填上
+		if len(datas) <= len(froms) {
+			datas = addSourceToData(froms, se, datas, dataSourceTag, r.Name())
+		} else {
+			var selen int
+			if se != nil {
+				selen = len(se.DatasourceSkipIndex)
+			}
+			log.Errorf("Runner[%v] datasourcetag add error, datas(TOTAL %v), datasourceSkipIndex(TOTAL %v) not match with froms(TOTAL %v)", r.Name(), len(datas), selen, len(froms))
+			log.Debugf("Runner[%v] datasourcetag add error, datas %v datasourceSkipIndex %v froms %v", datas, se.DatasourceSkipIndex, froms)
+		}
+	}
+	return datas
+}
+
 func (r *LogExportRunner) Run() {
 	if r.cleaner != nil {
 		go r.cleaner.Run()
@@ -412,13 +554,6 @@ func (r *LogExportRunner) Run() {
 		}
 	}()
 
-	tags := r.meta.GetTags()
-	tags = MergeEnvTags(r.EnvTag, tags)
-	tags = MergeExtraInfoTags(r.meta, tags)
-
-	datasourceTag := r.meta.GetDataSourceTag()
-	schemaErr := SchemaErr{Number: 0, Last: time.Unix(0, 0)}
-
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
 			log.Debugf("Runner[%v] exited from run", r.Name())
@@ -427,120 +562,35 @@ func (r *LogExportRunner) Run() {
 			}
 			return
 		}
+
 		// read data
-		var lines, froms []string
-		var readErr error
-		var line string
-		for !r.batchFullOrTimeout() {
-			line, readErr = r.reader.ReadLine()
-			if os.IsNotExist(readErr) {
-				log.Errorf("Runner[%v] reader %s - error: %v, sleep 3 second...", r.Name(), r.reader.Name(), readErr)
-				time.Sleep(3 * time.Second)
-				break
-			}
-			if readErr != nil && readErr != io.EOF {
-				log.Errorf("Runner[%v] reader %s - error: %v, sleep 1 second...", r.Name(), r.reader.Name(), readErr)
-				time.Sleep(time.Second)
-				break
-			}
-			if len(line) <= 0 {
-				log.Debugf("Runner[%v] reader %s no more content fetched sleep 1 second...", r.Name(), r.reader.Name())
-				time.Sleep(1 * time.Second)
-				continue
-			}
-			r.rsMutex.Lock()
-			r.rs.ReadDataSize += int64(len(line))
-			r.rs.ReadDataCount++
-			r.rsMutex.Unlock()
-			lines = append(lines, line)
-			if datasourceTag != "" {
-				froms = append(froms, r.reader.Source())
-			}
-			r.batchLen++
-			r.batchSize += len(line)
-		}
-		r.rsMutex.Lock()
-		if readErr != nil && readErr != io.EOF {
-			if os.IsNotExist(readErr) {
-				r.rs.ReaderStats.LastError = "no more file exist to be read"
-			} else {
-				r.rs.ReaderStats.LastError = readErr.Error()
-			}
+		var err error
+		var datas []Data
+		if dr, ok := r.reader.(reader.DataReader); ok {
+			datas = r.readDatas(dr, r.meta.GetDataSourceTag())
 		} else {
-			r.rs.ReaderStats.LastError = ""
+			datas = r.readLines(r.meta.GetDataSourceTag())
 		}
-		r.rs.ReaderStats.Success = int64(r.batchLen)
+
+		r.rsMutex.Lock()
+		r.rs.ReaderStats.Success = r.batchLen
+		r.rs.ReadDataCount += r.batchLen
+		r.rs.ReadDataSize += r.batchSize
 		r.rsMutex.Unlock()
 
 		r.batchLen = 0
 		r.batchSize = 0
 		r.lastSend = time.Now()
 
-		for i := range r.transformers {
-			var err error
-			if r.transformers[i].Stage() == transforms.StageBeforeParser {
-				lines, err = r.transformers[i].RawTransform(lines)
-				if err != nil {
-					log.Error(err)
-				}
-			}
-		}
-
-		if len(lines) <= 0 {
-			log.Debugf("Runner[%v] fetched 0 lines", r.Name())
-			_, ok := r.parser.(parser.Flushable)
-			if ok {
-				lines = []string{parser.PandoraParseFlushSignal}
-			} else {
-				continue
-			}
-		}
-
-		// parse data
-		errorCnt := int64(0)
-		datas, err := r.parser.Parse(lines)
-		se, ok := err.(*StatsError)
-		r.rsMutex.Lock()
-		if ok {
-			errorCnt = se.Errors
-			err = se.ErrorDetail
-			r.rs.ParserStats.Errors += se.Errors
-			r.rs.ParserStats.Success += se.Success
-		} else if err != nil {
-			errorCnt = 1
-			r.rs.ParserStats.Errors++
-		} else {
-			r.rs.ParserStats.Success++
-		}
-		if err != nil {
-			r.rs.ParserStats.LastError = err.Error()
-		}
-		r.rsMutex.Unlock()
-		if err != nil {
-			errMsg := fmt.Sprintf("Runner[%v] parser %s error : %v ", r.Name(), r.parser.Name(), err.Error())
-			log.Debugf(errMsg)
-			schemaErr.Output(errorCnt, errors.New(errMsg))
-		}
 		// send data
 		if len(datas) <= 0 {
 			log.Debugf("Runner[%v] received parsed data length = 0", r.Name())
 			continue
 		}
 
-		//把datasourcetag加到data里，前提是认为[]line变成[]data以后是一一对应的，一旦错位就不加
-		if datasourceTag != "" {
-			//只要实际解析后数据比froms小就可以填上
-			if len(datas) <= len(froms) {
-				datas = addSourceToData(froms, se, datas, datasourceTag, r.Name())
-			} else {
-				var selen int
-				if se != nil {
-					selen = len(se.DatasourceSkipIndex)
-				}
-				log.Errorf("Runner[%v] datasourcetag add error, datas(TOTAL %v), datasourceSkipIndex(TOTAL %v) not match with froms(TOTAL %v)", r.Name(), len(datas), selen, len(froms))
-				log.Debugf("Runner[%v] datasourcetag add error, datas %v datasourceSkipIndex %v froms %v", datas, se.DatasourceSkipIndex, froms)
-			}
-		}
+		tags := r.meta.GetTags()
+		tags = MergeEnvTags(r.EnvTag, tags)
+		tags = MergeExtraInfoTags(r.meta, tags)
 		if len(tags) > 0 {
 			datas = addTagsToData(tags, datas, r.Name())
 		}
@@ -557,12 +607,10 @@ func (r *LogExportRunner) Run() {
 			}
 			se, ok := err.(*StatsError)
 			if ok {
-				errorCnt = se.Errors
 				err = se.ErrorDetail
 				tstats.Errors += se.Errors
 				tstats.Success += se.Success
 			} else if err != nil {
-				errorCnt = 1
 				tstats.Errors++
 			} else {
 				tstats.Success++
@@ -615,7 +663,7 @@ func classifySenderData(datas []Data, router *router.Router, senderCnt int) [][]
 	return senderDataList
 }
 
-func addSourceToData(sourceFroms []string, se *StatsError, datas []Data, datasourceTagName, runnername string) []Data {
+func addSourceToData(sourceFroms []string, se *StatsError, datas []Data, datasourceTagName, runnerName string) []Data {
 	j := 0
 	eql := len(sourceFroms) == len(datas)
 	for i, v := range sourceFroms {
@@ -631,7 +679,7 @@ func addSourceToData(sourceFroms []string, se *StatsError, datas []Data, datasou
 		}
 
 		if dt, ok := datas[j][datasourceTagName]; ok {
-			log.Debugf("Runner[%v] datasource tag already has data %v, ignore %v", runnername, dt, v)
+			log.Debugf("Runner[%v] datasource tag already has data %v, ignore %v", runnerName, dt, v)
 		} else {
 			datas[j][datasourceTagName] = v
 		}
@@ -727,12 +775,12 @@ func (r *LogExportRunner) Cleaner() CleanInfo {
 
 func (r *LogExportRunner) batchFullOrTimeout() bool {
 	// 达到最大行数
-	if r.MaxBatchLen > 0 && r.batchLen >= r.MaxBatchLen {
+	if r.MaxBatchLen > 0 && int(r.batchLen) >= r.MaxBatchLen {
 		log.Debugf("Runner[%v] meet the max batch length %v", r.RunnerName, r.MaxBatchLen)
 		return true
 	}
 	// 达到最大字节数
-	if r.MaxBatchSize > 0 && r.batchSize >= r.MaxBatchSize {
+	if r.MaxBatchSize > 0 && int(r.batchSize) >= r.MaxBatchSize {
 		log.Debugf("Runner[%v] meet the max batch size %v", r.RunnerName, r.MaxBatchSize)
 		return true
 	}

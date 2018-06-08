@@ -10,7 +10,7 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-// Reader 是一个通用的行读取reader接口
+// Reader 代表了一个通用的行读取器
 type Reader interface {
 	//Name reader名称
 	Name() string
@@ -20,6 +20,12 @@ type Reader interface {
 	SetMode(mode string, v interface{}) error
 	Close() error
 	SyncMeta()
+}
+
+// DataReader 代表了一个可直接读取内存数据结构的读取器
+type DataReader interface {
+	// ReadData 用于读取一条数据以及数据的实际读取字节
+	ReadData() (Data, int64, error)
 }
 
 // StatsReader 是一个通用的带有统计接口的reader
