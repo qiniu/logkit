@@ -31,12 +31,7 @@ func newDatLocator(dataFile string) (*datLocator, error) {
 		return nil, err
 	}
 
-	loc, err := newDatLocatorWithData(data)
-	if err != nil {
-		return nil, err
-	}
-
-	return loc, nil
+	return newDatLocatorWithData(data)
 }
 
 func (loc *datLocator) init(data []byte) error {
