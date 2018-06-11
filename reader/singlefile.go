@@ -332,16 +332,20 @@ func (sf *SingleFile) SyncMeta() error {
 
 func (sf *SingleFile) Lag() (rl *LagInfo, err error) {
 	sf.mux.Lock()
-	rl = &LagInfo{Size: -sf.offset}
+	rl = &LagInfo{Size: -sf.offset, SizeUnit: "bytes"}
 	sf.mux.Unlock()
 
 	fi, err := os.Stat(sf.originpath)
 	if os.IsNotExist(err) {
 		rl.Size = 0
-		err = nil
-		return
+		return rl, nil
+	}
+
+	if err != nil {
+		rl.Size = 0
+		return rl, err
 	}
 	rl.Size += fi.Size()
-	rl.SizeUnit = "bytes"
-	return
+
+	return rl, nil
 }

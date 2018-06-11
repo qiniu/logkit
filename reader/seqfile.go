@@ -567,7 +567,7 @@ func (sf *SeqFile) SyncMeta() (err error) {
 
 func (sf *SeqFile) Lag() (rl *LagInfo, err error) {
 	sf.mux.Lock()
-	rl = &LagInfo{Size: -sf.offset}
+	rl = &LagInfo{Size: -sf.offset, SizeUnit: "bytes"}
 	logReading := filepath.Base(sf.currFile)
 	sf.mux.Unlock()
 
@@ -577,13 +577,13 @@ func (sf *SeqFile) Lag() (rl *LagInfo, err error) {
 		err = nil
 	}
 	if err != nil {
-		return
+		rl.Size = 0
+		return rl, err
 	}
 
 	logs, err := ReadDirByTime(sf.dir)
 	if err != nil {
-		err = fmt.Errorf("ReadDirByTime err %v, can't get stats", err)
-		return
+		return rl, fmt.Errorf("ReadDirByTime err %v, can't get stats", err)
 	}
 	for _, l := range logs {
 		if l.IsDir() {
@@ -594,8 +594,8 @@ func (sf *SeqFile) Lag() (rl *LagInfo, err error) {
 			break
 		}
 	}
-	rl.SizeUnit = "bytes"
-	return
+
+	return rl, nil
 }
 
 func (sf *SeqFile) IsNewOpen() bool {
