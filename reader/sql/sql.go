@@ -59,8 +59,12 @@ const (
 	COUNT
 )
 
-var _ reader.DataReader = &Reader{}
-var _ reader.Reader = &Reader{}
+var (
+	_ reader.DataReader = &Reader{}
+	_ reader.Reader     = &Reader{}
+)
+
+var MysqlSystemDB = []string{"information_schema", "performance_schema", "mysql", "sys"}
 
 func init() {
 	reader.RegisterConstructor(reader.ModeMySQL, NewReader)
@@ -193,10 +197,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (ret reader.Reader, err err
 			}
 			err = nil
 		}
-		rawDatabase, err = conf.GetString(reader.KeyMysqlDataBase)
-		if err != nil {
-			return nil, err
-		}
+		rawDatabase, _ = conf.GetStringOr(reader.KeyMysqlDataBase, "")
 		rawSqls, _ = conf.GetStringOr(reader.KeyMysqlSQL, "")
 		cronSchedule, _ = conf.GetStringOr(reader.KeyMysqlCron, "")
 		execOnStart, _ = conf.GetBoolOr(reader.KeyMysqlExecOnStart, true)
@@ -309,6 +310,13 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (ret reader.Reader, err err
 		schemas:     schemas,
 		statsLock:   sync.RWMutex{},
 		encoder:     encoder,
+	}
+
+	if mr.rawDatabase == "" {
+		mr.rawDatabase = "*"
+	}
+	if mr.rawTable == "" {
+		mr.rawTable = "*"
 	}
 
 	if mr.rawsqls == "" {
@@ -913,7 +921,6 @@ func (r *Reader) getOffsetIndex(columns []string) int {
 
 func (r *Reader) exec(connectStr string) (err error) {
 	now := time.Now().Add(-r.magicLagDur)
-
 	db, err := openSql(r.dbtype, connectStr, r.Name())
 	if err != nil {
 		return err
@@ -924,7 +931,7 @@ func (r *Reader) exec(connectStr string) (err error) {
 	}
 
 	// 获取符合条件的数据库
-	dbs, _, err := r.getDatas(db, r.rawDatabase, now, DATABASE)
+	dbs, err := r.getDBs(db, now)
 	if err != nil {
 		return err
 	}
@@ -1545,6 +1552,11 @@ func (r *Reader) getValidData(db *sql.DB, matchData, matchStr string, startIndex
 			continue
 		}
 
+		// 检查是否已经读过
+		if r.checkDoneRecords(queryType, s) {
+			continue
+		}
+
 		if matchData != "" {
 			// 字符匹配
 			match := matchRemainStr(s, matchStr, timeIndex)
@@ -1683,9 +1695,9 @@ func (r *Reader) getDatas(db *sql.DB, rawData string, now time.Time, queryType i
 func (r *Reader) getCheckHistory(queryType int) (checkHistory bool, err error) {
 	switch queryType {
 	case TABLE, COUNT:
-		checkHistory = r.historyAll && r.table != "" && r.table != "*"
+		checkHistory = r.historyAll && r.rawTable != "*"
 	case DATABASE:
-		checkHistory = r.historyAll
+		checkHistory = r.historyAll && r.rawDatabase != "*"
 	default:
 		return false, fmt.Errorf("%v queryType is not support get sql now", queryType)
 	}
@@ -1920,12 +1932,6 @@ func (r *Reader) execReadSql(db *sql.DB, idx int, rawSql string, tables []string
 }
 
 func (r *Reader) getGeneralDatas(db *sql.DB, queryType int) (datas []string, sqls string, err error) {
-	// database 目前不支持不填拿所有的database，或者填写 * 的情况
-	if queryType == DATABASE {
-		datas = append(datas, r.database)
-		return datas, sqls, nil
-	}
-
 	// 拿到数据库中所有表及对应的sql语句
 	datas, sqls, err = r.getValidData(db, "", "", []int{}, []int{}, []int{}, queryType)
 	if err != nil {
@@ -1961,4 +1967,39 @@ func (r *Reader) getCount() int64 {
 	r.countLock.RLock()
 	defer r.countLock.RUnlock()
 	return r.count
+}
+
+func (r *Reader) checkDoneRecords(queryType int, target string) bool {
+	if queryType != TABLE {
+		return false
+	}
+
+	tableDoneRecords := r.doneRecords.GetTableRecords(r.database)
+	if tableDoneRecords == nil {
+		return false
+	}
+
+	tableInfo := tableDoneRecords.GetTableInfo(target)
+	if tableInfo == (TableInfo{}) {
+		return false
+	}
+
+	return true
+}
+
+func (r *Reader) getDBs(db *sql.DB, now time.Time) ([]string, error) {
+	dbsAll, _, err := r.getDatas(db, r.rawDatabase, now, DATABASE)
+	if err != nil {
+		return dbsAll, err
+	}
+
+	dbs := make([]string, 0)
+	for _, db := range dbsAll {
+		if contains(MysqlSystemDB, strings.ToLower(db)) {
+			continue
+		}
+		dbs = append(dbs, db)
+	}
+
+	return dbs, nil
 }
