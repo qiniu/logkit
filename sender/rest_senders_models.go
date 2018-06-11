@@ -6,14 +6,14 @@ import (
 
 // ModeUsages 用途说明
 var ModeUsages = []KeyValue{
-	{TypePandora, "发送到七牛大数据平台(Pandora)"},
-	{TypeFile, "发送到本地文件"},
-	{TypeMongodbAccumulate, "发送到 MongoDB 服务"},
-	{TypeInfluxdb, "发送到 InfluxDB 服务"},
+	{TypePandora, "发送至 七牛云智能日志平台(Pandora)"},
+	{TypeFile, "发送至 本地文件"},
+	{TypeMongodbAccumulate, "发送至 MongoDB 服务"},
+	{TypeInfluxdb, "发送至 InfluxDB 服务"},
 	{TypeDiscard, "消费数据但不发送"},
-	{TypeElastic, "发送到 Elasticsearch 服务"},
-	{TypeKafka, "发送到 Kafka 服务"},
-	{TypeHttp, "通过 Http Post 发送"},
+	{TypeElastic, "发送至 Elasticsearch 服务"},
+	{TypeKafka, "发送至 Kafka 服务"},
+	{TypeHttp, "发送至 HTTP 服务器"},
 }
 
 var (
