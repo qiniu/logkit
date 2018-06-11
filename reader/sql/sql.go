@@ -1611,16 +1611,14 @@ func getRemainStr(origin string, timeIndex []int) (remainStr string) {
 }
 
 func (r *Reader) Lag() (rl *LagInfo, err error) {
+	rl = &LagInfo{SizeUnit: "records"}
 	if r.rawsqls == "" {
 		count := r.getCount()
-		return &LagInfo{
-			SizeUnit: "records",
-			Size:     count - r.CurrentCount,
-			Total:    count,
-		}, nil
+		rl.Size = count - r.CurrentCount
+		rl.Total = count
 	}
 
-	return &LagInfo{}, nil
+	return rl, nil
 }
 
 func getDefaultSql(database, dbtype string) (defaultSql string, err error) {
