@@ -446,11 +446,11 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:      KeyMysqlDataBase,
 			ChooseOnly:   false,
-			Placeholder:  "<database>",
-			DefaultNoUse: true,
+			Placeholder:  "<database>，默认读取所有用户数据库",
+			DefaultNoUse: false,
 			Default:      "",
-			Required:     true,
 			Description:  "数据库名称(mysql_database)",
+			ToolTip:      `mysql数据库名称，不填默认读取所有用户数据库`,
 		},
 		{
 			KeyName:      KeyMysqlSQL,

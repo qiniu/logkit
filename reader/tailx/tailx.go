@@ -546,18 +546,24 @@ func (mr *Reader) SyncMeta() {
 }
 
 func (mr *Reader) Lag() (rl *LagInfo, err error) {
-	rl = &LagInfo{}
+	rl = &LagInfo{SizeUnit: "bytes"}
+	var errStr string
 	ars := mr.getActiveReaders()
+
 	for _, ar := range ars {
-		lg, err := ar.Lag()
-		if err != nil {
-			log.Warn(err)
+		lg, subErr := ar.Lag()
+		if subErr != nil {
+			errStr += subErr.Error()
+			log.Warn(subErr)
 			continue
 		}
 		rl.Size += lg.Size
 	}
-	rl.SizeUnit = "bytes"
-	return
+	if len(errStr) > 0 {
+		err = errors.New(errStr)
+	}
+
+	return rl, err
 }
 
 func (mr *Reader) Reset() (err error) {

@@ -40,6 +40,9 @@ const (
 	KeyPandoraKodoFilePrefix     = "pandora_kodo_prefix"
 	KeyPandoraKodoCompressPrefix = "pandora_kodo_compress"
 	KeyPandoraKodoGzip           = "pandora_kodo_gzip"
+	KeyPandoraKodoRotateStrategy = "pandora_kodo_rotate_strategy"
+	KeyPandoraKodoRotateInterval = "pandora_kodo_rotate_interval"
+	KeyPandoraKodoRotateSize	 = "pandora_kodo_rotate_size"
 
 	KeyPandoraEmail = "qiniu_email"
 
