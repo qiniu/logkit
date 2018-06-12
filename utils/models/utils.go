@@ -481,6 +481,40 @@ func DeleteMapValue(m map[string]interface{}, keys ...string) (interface{}, bool
 	return nil, false
 }
 
+func PickMapValue(m map[string]interface{}, pick map[string]interface{}, keys ...string) {
+	var val interface{}
+	val = m
+	if len(keys) == 0 {
+		return
+	}
+	if _, ok := val.(map[string]interface{}); !ok {
+		return
+	}
+
+	v, ok := val.(map[string]interface{})[keys[0]]
+	if !ok {
+		return
+	}
+
+	if len(keys) == 1 {
+		pick[keys[0]] = v
+		return
+	}
+
+	// 判断keys[0]的值是不是map，如果不是，keys[1]pick的值为空，退出该keys的pick
+	if _, ok := v.(map[string]interface{}); !ok {
+		return
+	}
+
+	if _, ok := pick[keys[0]]; !ok {
+		pick[keys[0]] = map[string]interface{}{}
+	}
+	PickMapValue(v.(map[string]interface{}), pick[keys[0]].(map[string]interface{}), keys[1:]...)
+	if len(pick[keys[0]].(map[string]interface{})) == 0 {
+		delete(pick, keys[0])
+	}
+}
+
 //根据key字符串,拆分出层级keys数据
 func GetKeys(keyStr string) []string {
 	keys := strings.FieldsFunc(keyStr, isSeparator)
