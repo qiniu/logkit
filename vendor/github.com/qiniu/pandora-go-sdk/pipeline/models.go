@@ -1354,6 +1354,8 @@ type ExportKodoSpec struct {
 	RotateStrategy string            `json:"rotateStrategy"`
 	RotateSize     int               `json:"rotateSize"`
 	RotateInterval int               `json:"rotateInterval"`
+	RotateNumber   int               `json:"rotateNumber"`
+	RotateSizeType string            `json:"rotateSizeType"`
 	Email          string            `json:"email"`
 	AccessKey      string            `json:"accessKey"`
 	Format         string            `json:"format"`
