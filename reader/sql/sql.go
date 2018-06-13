@@ -1494,8 +1494,8 @@ func contains(slice []string, str string) bool {
 	return false
 }
 
-// 查看时间是否符合
-func validTime(str, match string, startIndex, endIndex []int) (valid bool) {
+// 查看时间是否符合, min为true则取出来为小于等于，min为false则取出来大于等于
+func validTime(str, match string, startIndex, endIndex []int, min bool) (valid bool) {
 	for idx, record := range startIndex {
 		if record == -1 {
 			continue
@@ -1519,14 +1519,48 @@ func validTime(str, match string, startIndex, endIndex []int) (valid bool) {
 
 		// 小于
 		if curInt < matchInt {
-			return true
+			return min
 		}
 
 		if curInt > matchInt {
-			return false
+			return !min
 		}
 
 		// 相等
+		valid = true
+	}
+
+	return true
+}
+
+// 查看时间是否符合
+func equalTime(str, match string, startIndex, endIndex []int) (valid bool) {
+	for idx, record := range startIndex {
+		if record == -1 {
+			continue
+		}
+
+		if len(str) < endIndex[idx] {
+			return false
+		}
+
+		// 比较大小
+		curStr := str[record:endIndex[idx]]
+		curInt, err := strconv.Atoi(curStr)
+		if err != nil {
+			return false
+		}
+		matchStr := match[record:endIndex[idx]]
+		matchInt, err := strconv.Atoi(matchStr)
+		if err != nil {
+			return false
+		}
+
+		// 等于
+		if curInt != matchInt {
+			return false
+		}
+
 		valid = true
 	}
 
@@ -1566,13 +1600,9 @@ func (r *Reader) getValidData(db *sql.DB, matchData, matchStr string, startIndex
 			continue
 		}
 
-		if matchData != "" {
-			// 字符匹配
-			match := matchRemainStr(s, matchStr, timeIndex)
-			log.Debugf("Runner[%v] %v current data: %v, current time data: %v, remain str: %v, timeIndex: %v, isMatch: %v", r.meta.RunnerName, r.Name(), s, matchData, matchStr, timeIndex, match)
-			if !match || !validTime(s, matchData, startIndex, endIndex) {
-				continue
-			}
+		if !r.isMatchData(queryType, s, matchStr, matchData, timeIndex, startIndex, endIndex) {
+			log.Debugf("Runner[%v] %v current data: %v, current time data: %v, remain str: %v, timeIndex: %v", r.meta.RunnerName, r.Name(), s, matchData, matchStr, timeIndex)
+			continue
 		}
 
 		rawSql, err := getRawSqls(queryType, s)
@@ -1604,15 +1634,21 @@ func openSql(dbtype, connectStr, name string) (db *sql.DB, err error) {
 	return db, nil
 }
 
-func matchRemainStr(origin, match string, timeIndex []int) bool {
+func matchRemainStr(origin, match, matchData string, timeIndex []int) bool {
 	if len(timeIndex) > 0 && len(origin) < timeIndex[len(timeIndex)-1] {
 		return false
 	}
 
 	remainStr := getRemainStr(origin, timeIndex)
-	if len(remainStr) < len(match) ||
-		remainStr[:len(match)] != match {
+	if len(remainStr) < len(match) || remainStr[:len(match)] != match {
 		return false
+	}
+
+	if !strings.HasSuffix(matchData, Wildcards) && len(origin) > len(matchData) {
+		remainStr += origin[len(matchData):]
+		if remainStr != match {
+			return false
+		}
 	}
 
 	return true
@@ -1685,7 +1721,7 @@ func (r *Reader) getDatas(db *sql.DB, rawData string, now time.Time, queryType i
 		return datas, rawsqls, err
 	}
 
-	if r.checkMatchData() {
+	if r.historyAll || r.checkCron() {
 		datas = make([]string, 0)
 		if matchData == rawData && !strings.Contains(rawData, Wildcards) {
 			datas = append(datas, matchData)
@@ -1702,24 +1738,22 @@ func (r *Reader) getDatas(db *sql.DB, rawData string, now time.Time, queryType i
 	return datas, rawsqls, nil
 }
 
-func (r *Reader) checkMatchData() bool {
-	history := r.historyAll
-	recycle := (r.loop || r.cronSchedule) && !r.omitDoneDBRecords
-	return history || recycle
+func (r *Reader) checkCron() bool {
+	return r.loop || r.cronSchedule
 }
 
 // 是否拿历史数据
 func (r *Reader) getCheckAll(queryType int) (checkAll bool, err error) {
 	switch queryType {
 	case TABLE, COUNT:
-		checkAll = r.rawTable == "*"
+		return r.rawTable == "*", nil
 	case DATABASE:
-		checkAll = r.rawDatabase == "*"
+		return r.rawDatabase == "*", nil
 	default:
 		return false, fmt.Errorf("%v queryType is not support get sql now", queryType)
 	}
 
-	return checkAll, nil
+	return true, nil
 }
 
 // 根据 queryType 获取表中所有记录或者表中所有数据的条数的sql语句
@@ -2010,22 +2044,20 @@ func (r *Reader) existTableInfo(target string) (TableInfo, bool) {
 	return tableInfo, true
 }
 
-func (r *Reader) checkLastRecord(queryType int, target string) bool {
+// 取大于等于该记录的数据，true 小于或者不符合, false为大于等于 最后一条记录
+func (r *Reader) compareWithLastRecord(queryType int, target string, timeIndex, startIndex, endIndex []int) bool {
+	log.Debugf("Runner[%v] %v current data: %v, last database record: %v, last table record: %v", r.meta.RunnerName, r.Name(), target, r.lastDatabase, r.lastTabel)
+	var rawData string
 	switch queryType {
 	case DATABASE:
-		// 字符匹配
-		match := matchRemainStr(target, matchStr, timeIndex)
-		log.Debugf("Runner[%v] %v current data: %v, current time data: %v, remain str: %v, timeIndex: %v, isMatch: %v", r.meta.RunnerName, r.Name(), s, matchData, matchStr, timeIndex, match)
-		if !match || !validTime(s, matchData, startIndex, endIndex) {
-			continue
-		}
-	case TABLE:
-
+		rawData = r.lastDatabase
+	case TABLE, COUNT:
+		rawData = r.lastTabel
 	default:
 		return false
 	}
 
-	return false
+	return validTime(target, rawData, startIndex, endIndex, false)
 }
 
 func (r *Reader) getDBs(db *sql.DB, now time.Time) ([]string, error) {
@@ -2043,4 +2075,44 @@ func (r *Reader) getDBs(db *sql.DB, now time.Time) ([]string, error) {
 	}
 
 	return dbs, nil
+}
+
+func (r *Reader) isMatchData(queryType int, s, matchStr, matchData string, timeIndex, startIndex, endIndex []int) bool {
+	if matchData == "" {
+		return true
+	}
+
+	match := matchRemainStr(s, matchStr, matchData, timeIndex)
+	log.Debugf("Runner[%v] %v current data: %v, current time data: %v, remain str: %v, timeIndex: %v, isMatch: %v", r.meta.RunnerName, r.Name(), s, matchData, matchStr, timeIndex, match)
+	if !match {
+		return false
+	}
+
+	if r.historyAll {
+		if validTime(s, matchData, startIndex, endIndex, true) {
+			return true
+		}
+		return false
+	}
+
+	if !r.checkCron() {
+		return false
+	}
+
+	// loop 或者 cron 时
+	if r.omitDoneDBRecords {
+		// loop 或者 cron 的第一次运行
+		if equalTime(s, matchData, startIndex, endIndex) {
+			return true
+		}
+		return false
+	}
+
+	// 取大于等于上一条的和小于等于现有的
+	if validTime(s, matchData, startIndex, endIndex, true) &&
+		r.compareWithLastRecord(queryType, s, timeIndex, startIndex, endIndex) {
+		return true
+	}
+
+	return false
 }
