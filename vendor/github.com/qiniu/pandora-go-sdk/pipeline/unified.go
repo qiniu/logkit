@@ -56,6 +56,8 @@ func (c *Pipeline) FormKodoSpec(input *CreateRepoForKodoInput) *ExportKodoSpec {
 		RotateStrategy: input.RotateStrategy,
 		RotateInterval: input.RotateInterval,
 		RotateSize:	input.RotateSize,
+		RotateSizeType: "KB",
+		RotateNumber:   input.RotateSize / 1024,
 	}
 }
 
