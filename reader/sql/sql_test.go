@@ -691,10 +691,11 @@ func Test_validTime(t *testing.T) {
 
 func Test_getCheckHistory(t *testing.T) {
 	mr := &Reader{
-		database:   "Test_getCheckHistory",
-		dbtype:     "mysql",
-		historyAll: true,
-		table:      "",
+		database:    "Test_getCheckHistory",
+		dbtype:      "mysql",
+		historyAll:  true,
+		rawTable:    "*",
+		rawDatabase: "*",
 	}
 
 	tests := []struct {
@@ -711,7 +712,7 @@ func Test_getCheckHistory(t *testing.T) {
 		},
 		{
 			queryType: DATABASE,
-			exp_res:   true,
+			exp_res:   false,
 		},
 	}
 
