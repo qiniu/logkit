@@ -689,7 +689,7 @@ func Test_validTime(t *testing.T) {
 	}
 }
 
-func Test_getCheckHistory(t *testing.T) {
+func Test_getCheckAll(t *testing.T) {
 	mr := &Reader{
 		database:    "Test_getCheckHistory",
 		dbtype:      "mysql",
@@ -717,7 +717,7 @@ func Test_getCheckHistory(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		checkHistory, err := mr.getCheckHistory(test.queryType)
+		checkHistory, err := mr.getCheckAll(test.queryType)
 		assert.NoError(t, err)
 		assert.EqualValues(t, test.exp_res, checkHistory)
 	}
