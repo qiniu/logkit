@@ -576,3 +576,41 @@ func TestGetMapList(t *testing.T) {
 		assert.Equal(t, c.exp, got)
 	}
 }
+
+func TestPickMapValue(t *testing.T) {
+	var m = map[string]interface{}{"multi": map[string]interface{}{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}}
+
+	var exp = map[string]interface{}{"multi": map[string]interface{}{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}}
+	pick := map[string]interface{}{}
+	PickMapValue(m, pick, "multi")
+	assert.Equal(t, exp, pick)
+
+	exp = map[string]interface{}{"multi": map[string]interface{}{"abc": "x1 y2"}}
+	pick = map[string]interface{}{}
+	PickMapValue(m, pick, "multi", "abc")
+	assert.Equal(t, exp, pick)
+
+	exp = map[string]interface{}{"multi": map[string]interface{}{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}}
+	pick = map[string]interface{}{}
+	PickMapValue(m, pick, "multi", "abc")
+	PickMapValue(m, pick, "multi", "myword")
+	assert.Equal(t, exp, pick)
+
+	exp = map[string]interface{}{"multi": map[string]interface{}{"abc": "x1 y2"}}
+	pick = map[string]interface{}{}
+	PickMapValue(m, pick, "multi", "abc")
+	PickMapValue(m, pick, "multi", "otherword")
+	assert.Equal(t, exp, pick)
+
+	exp = map[string]interface{}{"multi": map[string]interface{}{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}}
+	pick = map[string]interface{}{}
+	PickMapValue(m, pick, "multi")
+	PickMapValue(m, pick, "multi", "otherword")
+	assert.Equal(t, exp, pick)
+
+	exp = map[string]interface{}{"multi": map[string]interface{}{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}}
+	pick = map[string]interface{}{}
+	PickMapValue(m, pick, "multi", "abc", "xxx")
+	PickMapValue(m, pick, "multi", "otherword")
+	assert.NotEqual(t, exp, pick)
+}
