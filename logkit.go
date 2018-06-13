@@ -288,7 +288,7 @@ func main() {
 	if conf.ProfileHost != "" {
 		log.Infof("go profile_host was open at %v", conf.ProfileHost)
 		go func() {
-			log.Info(http.ListenAndServe(conf.ProfileHost, nil))
+			log.Fatal(http.ListenAndServe(conf.ProfileHost, nil))
 		}()
 	}
 	if err = rs.Register(); err != nil {

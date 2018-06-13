@@ -433,7 +433,9 @@ func (rs *RestService) Register() error {
 // Stop will stop RestService
 func (rs *RestService) Stop() {
 	if rs.l != nil {
-		rs.l.Close()
+		if err := rs.l.Close(); err != nil {
+			log.Error("close reset service listener err: ", err)
+		}
 	}
 }
 

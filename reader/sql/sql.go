@@ -786,6 +786,8 @@ func (r *Reader) run() {
 		if atomic.CompareAndSwapInt32(&r.status, reader.StatusInit, reader.StatusRunning) {
 			break
 		}
+		//节省CPU
+		time.Sleep(time.Microsecond)
 	}
 	//double check
 	if atomic.LoadInt32(&r.status) == reader.StatusStopped || atomic.LoadInt32(&r.status) == reader.StatusStopping {
