@@ -109,6 +109,7 @@ func (c *Pipeline) CreateRepoFromDSL(input *CreateRepoDSLInput) (err error) {
 		Schema:       schemas,
 		Options:      input.Options,
 		Workflow:     input.Workflow,
+		Description:  input.Description,
 	})
 }
 
@@ -630,8 +631,9 @@ func (c *Pipeline) unpack(input *SchemaFreeInput) (packages []pointContext, err 
 			packages = append(packages, pointContext{
 				datas: input.Datas[start:i],
 				inputs: &PostDataFromBytesInput{
-					RepoName: input.RepoName,
-					Buffer:   tmpBuff,
+					RepoName:     input.RepoName,
+					Buffer:       tmpBuff,
+					PandoraToken: input.SchemaFreeToken.PipelinePostDataToken,
 				},
 			})
 			buf.Reset()
@@ -646,7 +648,7 @@ func (c *Pipeline) unpack(input *SchemaFreeInput) (packages []pointContext, err 
 		inputs: &PostDataFromBytesInput{
 			RepoName:     input.RepoName,
 			Buffer:       tmpBuff,
-			PandoraToken: input.PipelinePostDataToken,
+			PandoraToken: input.SchemaFreeToken.PipelinePostDataToken,
 		},
 	})
 	if repoUpdate {
