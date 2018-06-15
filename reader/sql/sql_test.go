@@ -322,8 +322,8 @@ func Test_getRemainStr(t *testing.T) {
 		},
 		{
 			origin:        "x02abc01def*",
-			timeIndex:     []int{0, 1, 3, 6, 8, 12},
-			expect_remain: "xabcdef*",
+			timeIndex:     []int{0, 1, 3, 6, 8, 11},
+			expect_remain: "xabcdef",
 		},
 		{
 			origin:        "x02abc01",
@@ -337,8 +337,8 @@ func Test_getRemainStr(t *testing.T) {
 		},
 		{
 			origin:        "x0102*",
-			timeIndex:     []int{0, 1, 5, 6},
-			expect_remain: "x*",
+			timeIndex:     []int{0, 1},
+			expect_remain: "x",
 		},
 		{
 			origin:        "17",
@@ -347,13 +347,13 @@ func Test_getRemainStr(t *testing.T) {
 		},
 		{
 			origin:        "abcd201702efg*",
-			timeIndex:     []int{0, 4, 10, 14},
-			expect_remain: "abcdefg*",
+			timeIndex:     []int{0, 4, 10, 13},
+			expect_remain: "abcdefg",
 		},
 		{
 			origin:        "abcd20170201160619*",
-			timeIndex:     []int{0, 4, 18, 19},
-			expect_remain: "abcd*",
+			timeIndex:     []int{0, 4},
+			expect_remain: "abcd",
 		},
 		{
 			origin:        "hhhhh",
@@ -371,66 +371,90 @@ func Test_matchRemainStr(t *testing.T) {
 	tests := []struct {
 		origin     string
 		match      string
+		matchData  string
 		timeIndex  []int
 		expect_res bool
 	}{
 		{
 			origin:     "x02abc01def",
 			match:      "xabcdef",
+			matchData:  "x02abc01def",
 			timeIndex:  []int{0, 1, 3, 6, 8, 11},
 			expect_res: true,
 		},
 		{
-			origin:     "x02abc01def*",
-			match:      "xabcdef*",
+			origin:     "x02abc01defdef",
+			match:      "xabcdef",
+			matchData:  "x02abc01def*",
 			timeIndex:  []int{0, 1, 3, 6, 8, 12},
 			expect_res: true,
 		},
 		{
 			origin:     "x02abc01",
 			match:      "xabc",
+			matchData:  "x02abc01",
 			timeIndex:  []int{0, 1, 3, 6},
 			expect_res: true,
 		},
 		{
 			origin:     "x0201",
 			match:      "x",
+			matchData:  "x0201",
 			timeIndex:  []int{0, 1},
 			expect_res: true,
 		},
 		{
 			origin:     "x0102*",
 			match:      "x*",
+			matchData:  "x0102*",
 			timeIndex:  []int{0, 1, 5, 6},
 			expect_res: true,
 		},
 		{
 			origin:     "17",
 			match:      "",
+			matchData:  "17",
 			timeIndex:  []int{0, 0},
 			expect_res: true,
 		},
 		{
 			origin:     "abcd201702efg*",
 			match:      "xabcdef",
+			matchData:  "abcd201702efg*",
 			timeIndex:  []int{0, 4, 10, 14},
 			expect_res: false,
 		},
 		{
 			origin:     "abcd20170201160619*",
 			match:      "xabcdef",
+			matchData:  "abcd20170201160619*",
 			timeIndex:  []int{0, 4, 18, 19},
+			expect_res: false,
+		},
+		{
+			origin:     "abcd20170201160619ef",
+			match:      "abcd",
+			matchData:  "abcd20170201160619",
+			timeIndex:  []int{0, 4},
 			expect_res: false,
 		},
 		{
 			origin:     "hhhhh",
 			match:      "hhhhh",
+			matchData:  "hhhhh",
 			timeIndex:  []int{0, 5},
 			expect_res: true,
 		},
+		{
+			origin:     "hhhh",
+			match:      "hhhhh",
+			matchData:  "hhhhh",
+			timeIndex:  []int{0, 5},
+			expect_res: false,
+		},
 	}
 	for _, ti := range tests {
-		remain := matchRemainStr(ti.origin, ti.match, ti.timeIndex)
+		remain := matchRemainStr(ti.origin, ti.match, ti.matchData, ti.timeIndex)
 		assert.Equal(t, ti.expect_res, remain)
 	}
 }
@@ -468,12 +492,7 @@ func Test_checkMagic(t *testing.T) {
 }
 
 func TestSQLReader(t *testing.T) {
-	logkitConf := conf.MapConf{
-		reader.KeyMetaPath: MetaDir,
-		reader.KeyFileDone: MetaDir,
-		reader.KeyMode:     reader.ModeMySQL,
-	}
-	meta, err := reader.NewMetaWithConf(logkitConf)
+	meta, err := getMeta()
 	assert.NoError(t, err)
 	defer os.RemoveAll(MetaDir)
 	database := "TestSQLReaderdatabase"
@@ -684,12 +703,280 @@ func Test_validTime(t *testing.T) {
 		},
 	}
 	for _, ti := range tests {
-		valid := validTime(ti.data, ti.match, ti.startIndex, ti.endIndex)
+		valid := validTime(ti.data, ti.match, ti.startIndex, ti.endIndex, true)
+		assert.EqualValues(t, ti.exp_res, valid)
+	}
+
+	tests2 := []struct {
+		data       string
+		match      string
+		startIndex []int
+		endIndex   []int
+		exp_res    bool
+	}{
+		{
+			data:       "x02abc01",
+			match:      "x02abc01",
+			startIndex: []int{-1, 1, 6, -1, -1, -1},
+			endIndex:   []int{0, 3, 8, 0, 0, 0},
+			exp_res:    true,
+		},
+		{
+			data:       "hhhhh",
+			match:      "hhhhh",
+			startIndex: []int{-1, -1, -1, -1, -1, -1},
+			endIndex:   []int{0, 0, 0, 0, 0, 0},
+			exp_res:    true,
+		},
+		{
+			data:       "x01abc31def",
+			match:      "x02abc01def",
+			startIndex: []int{-1, 1, 6, -1, -1, -1},
+			endIndex:   []int{0, 3, 8, 0, 0, 0},
+			exp_res:    false,
+		},
+		{
+			data:       "x01abc31def*",
+			match:      "x02abc01def*",
+			startIndex: []int{-1, 1, 6, -1, -1, -1},
+			endIndex:   []int{0, 3, 8, 0, 0, 0},
+			exp_res:    false,
+		},
+		{
+			data:       "x0201",
+			match:      "x0201",
+			startIndex: []int{-1, 1, 3, -1, -1, -1},
+			endIndex:   []int{0, 3, 5, 0, 0, 0},
+			exp_res:    true,
+		},
+		{
+			data:       "x0102abc",
+			match:      "x0102*",
+			startIndex: []int{-1, 3, 1, -1, -1, -1},
+			endIndex:   []int{0, 5, 3, 0, 0, 0},
+			exp_res:    true,
+		},
+		{
+			data:       "x0102",
+			match:      "x0102*",
+			startIndex: []int{-1, 3, 1, -1, -1, -1},
+			endIndex:   []int{0, 5, 3, 0, 0, 0},
+			exp_res:    true,
+		},
+		{
+			data:       "17",
+			match:      "17",
+			startIndex: []int{0, -1, -1, -1, -1, -1},
+			endIndex:   []int{2, 0, 0, 0, 0, 0},
+			exp_res:    true,
+		},
+		{
+			data:       "abcd201703efg*",
+			match:      "abcd201702efg*",
+			startIndex: []int{4, 8, -1, -1, -1, -1},
+			endIndex:   []int{8, 10, 0, 0, 0, 0},
+			exp_res:    true,
+		},
+		{
+			data:       "abcd20170201160618*",
+			match:      "abcd20170201160619*",
+			startIndex: []int{4, 8, 10, 12, 14, 16},
+			endIndex:   []int{8, 10, 12, 14, 16, 18},
+			exp_res:    false,
+		},
+	}
+	for _, ti := range tests2 {
+		valid := validTime(ti.data, ti.match, ti.startIndex, ti.endIndex, false)
 		assert.EqualValues(t, ti.exp_res, valid)
 	}
 }
 
-func Test_getCheckHistory(t *testing.T) {
+func Test_equalTime(t *testing.T) {
+	tests := []struct {
+		data       string
+		match      string
+		startIndex []int
+		endIndex   []int
+		exp_res    bool
+	}{
+		{
+			data:       "x02abc01",
+			match:      "x02abc01",
+			startIndex: []int{-1, 1, 6, -1, -1, -1},
+			endIndex:   []int{0, 3, 8, 0, 0, 0},
+			exp_res:    true,
+		},
+		{
+			data:       "hhhhh",
+			match:      "hhhhh",
+			startIndex: []int{-1, -1, -1, -1, -1, -1},
+			endIndex:   []int{0, 0, 0, 0, 0, 0},
+			exp_res:    true,
+		},
+		{
+			data:       "x01abc31def",
+			match:      "x02abc01def",
+			startIndex: []int{-1, 1, 6, -1, -1, -1},
+			endIndex:   []int{0, 3, 8, 0, 0, 0},
+			exp_res:    false,
+		},
+		{
+			data:       "x0201",
+			match:      "x0201",
+			startIndex: []int{-1, 1, 3, -1, -1, -1},
+			endIndex:   []int{0, 3, 5, 0, 0, 0},
+			exp_res:    true,
+		},
+		{
+			data:       "17",
+			match:      "17",
+			startIndex: []int{0, -1, -1, -1, -1, -1},
+			endIndex:   []int{2, 0, 0, 0, 0, 0},
+			exp_res:    true,
+		},
+		{
+			data:       "abcd201703efg*",
+			match:      "abcd201702efg*",
+			startIndex: []int{4, 8, -1, -1, -1, -1},
+			endIndex:   []int{8, 10, 0, 0, 0, 0},
+			exp_res:    false,
+		},
+		{
+			data:       "abcd20170201160618*",
+			match:      "abcd20170201160619*",
+			startIndex: []int{4, 8, 10, 12, 14, 16},
+			endIndex:   []int{8, 10, 12, 14, 16, 18},
+			exp_res:    false,
+		},
+	}
+	for _, ti := range tests {
+		valid := equalTime(ti.data, ti.match, ti.startIndex, ti.endIndex)
+		assert.EqualValues(t, ti.exp_res, valid)
+	}
+}
+
+func Test_isMatchData(t *testing.T) {
+	meta, err := getMeta()
+	assert.NoError(t, err)
+	defer os.RemoveAll(MetaDir)
+	mr := &Reader{
+		readBatch:         100,
+		meta:              meta,
+		status:            reader.StatusInit,
+		dbtype:            "mysql",
+		historyAll:        false,
+		loop:              true,
+		cronSchedule:      false,
+		omitDoneDBRecords: true,
+	}
+
+	tests := []struct {
+		data           string
+		matchData      string
+		matchStr       string
+		exp_ret        bool
+		exp_startIndex []int
+		exp_endIndex   []int
+		exp_timeIndex  []int
+	}{
+		{
+			data:           "x02abc01def",
+			matchData:      "xabcdef",
+			matchStr:       "x02abc01def",
+			exp_ret:        true,
+			exp_startIndex: []int{-1, 1, 6, -1, -1, -1},
+			exp_endIndex:   []int{0, 3, 8, 0, 0, 0},
+			exp_timeIndex:  []int{0, 1, 3, 6, 8, 11},
+		},
+		{
+			data:           "x01abc01def",
+			matchData:      "xabcdef",
+			matchStr:       "x02abc01def",
+			exp_ret:        false,
+			exp_startIndex: []int{-1, 1, 6, -1, -1, -1},
+			exp_endIndex:   []int{0, 3, 8, 0, 0, 0},
+			exp_timeIndex:  []int{0, 1, 3, 6, 8, 11},
+		},
+		{
+			data:           "x02abc01defdef",
+			matchData:      "xabcdef",
+			matchStr:       "x02abc01def*",
+			exp_ret:        true,
+			exp_startIndex: []int{-1, 1, 6, -1, -1, -1},
+			exp_endIndex:   []int{0, 3, 8, 0, 0, 0},
+			exp_timeIndex:  []int{0, 1, 3, 6, 8, 11},
+		},
+		{
+			data:           "abc",
+			matchData:      "xabc",
+			matchStr:       "x02abc01",
+			exp_ret:        false,
+			exp_startIndex: []int{-1, 1, 6, -1, -1, -1},
+			exp_endIndex:   []int{0, 3, 8, 0, 0, 0},
+			exp_timeIndex:  []int{0, 1, 3, 6},
+		},
+		{
+			data:           "x0201",
+			matchData:      "x",
+			matchStr:       "x0201*",
+			exp_ret:        true,
+			exp_startIndex: []int{-1, 1, 3, -1, -1, -1},
+			exp_endIndex:   []int{0, 3, 5, 0, 0, 0},
+			exp_timeIndex:  []int{0, 1},
+		},
+		{
+			data:           "x0102xxxxx",
+			matchData:      "x",
+			matchStr:       "x0102*",
+			exp_ret:        true,
+			exp_startIndex: []int{-1, 3, 1, -1, -1, -1},
+			exp_endIndex:   []int{0, 5, 3, 0, 0, 0},
+			exp_timeIndex:  []int{0, 1},
+		},
+		{
+			data:           "17",
+			matchData:      "",
+			matchStr:       "17",
+			exp_ret:        true,
+			exp_startIndex: []int{0, -1, -1, -1, -1, -1},
+			exp_endIndex:   []int{2, 0, 0, 0, 0, 0},
+			exp_timeIndex:  []int{0, 0},
+		},
+		{
+			data:           "abcd201702efg",
+			matchData:      "abcdefg",
+			matchStr:       "abcd201702efg*",
+			exp_ret:        true,
+			exp_startIndex: []int{4, 8, -1, -1, -1, -1},
+			exp_endIndex:   []int{8, 10, 0, 0, 0, 0},
+			exp_timeIndex:  []int{0, 4, 10, 13},
+		},
+		{
+			data:           "abcd20170201160619abc",
+			matchData:      "abcd",
+			matchStr:       "abcd20170201160619",
+			exp_ret:        false,
+			exp_startIndex: []int{4, 8, 10, 12, 14, 16},
+			exp_endIndex:   []int{8, 10, 12, 14, 16, 18},
+			exp_timeIndex:  []int{0, 4},
+		},
+		{
+			data:           "hhhhh",
+			matchData:      "hhhhh",
+			matchStr:       "hhhhh",
+			exp_ret:        true,
+			exp_startIndex: []int{-1, -1, -1, -1, -1, -1},
+			exp_endIndex:   []int{0, 0, 0, 0, 0, 0},
+			exp_timeIndex:  []int{0, 5},
+		},
+	}
+	for _, ti := range tests {
+		ret := mr.isMatchData(DATABASE, ti.data, ti.matchData, ti.matchStr, ti.exp_timeIndex, ti.exp_startIndex, ti.exp_endIndex)
+		assert.EqualValues(t, ti.exp_ret, ret)
+	}
+}
+
+func Test_getCheckAll(t *testing.T) {
 	mr := &Reader{
 		database:    "Test_getCheckHistory",
 		dbtype:      "mysql",
@@ -704,20 +991,20 @@ func Test_getCheckHistory(t *testing.T) {
 	}{
 		{
 			queryType: TABLE,
-			exp_res:   false,
+			exp_res:   true,
 		},
 		{
 			queryType: COUNT,
-			exp_res:   false,
+			exp_res:   true,
 		},
 		{
 			queryType: DATABASE,
-			exp_res:   false,
+			exp_res:   true,
 		},
 	}
 
 	for _, test := range tests {
-		checkHistory, err := mr.getCheckHistory(test.queryType)
+		checkHistory, err := mr.getCheckAll(test.queryType)
 		assert.NoError(t, err)
 		assert.EqualValues(t, test.exp_res, checkHistory)
 	}
@@ -907,7 +1194,7 @@ func Test_restoreRecordsFile(t *testing.T) {
 		assert.NoError(t, err)
 
 		var records DBRecords
-		omitDoneDBRecords := records.restoreRecordsFile(meta)
+		_, _, omitDoneDBRecords := records.restoreRecordsFile(meta)
 		assert.EqualValues(t, false, omitDoneDBRecords)
 		assert.EqualValues(t, test.exp_res, records)
 	}
@@ -929,4 +1216,13 @@ func getContent(readRecords DBRecords) string {
 	}
 
 	return all
+}
+
+func getMeta() (*reader.Meta, error) {
+	logkitConf := conf.MapConf{
+		reader.KeyMetaPath: MetaDir,
+		reader.KeyFileDone: MetaDir,
+		reader.KeyMode:     reader.ModeMySQL,
+	}
+	return reader.NewMetaWithConf(logkitConf)
 }
