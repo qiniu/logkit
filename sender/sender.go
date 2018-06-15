@@ -86,6 +86,9 @@ const (
 	TypeElastic           = "elasticsearch" // elastic
 	TypeKafka             = "kafka"         // kafka
 	TypeHttp              = "http"          // http sender
+	TypeMySQL             = "mysql"
+	TypeCSV               = "csv"
+	TypeSQLFile           = "sqlfile"
 
 	InnerUserAgent = "_useragent"
 )
@@ -218,6 +221,20 @@ const (
 	// 可选参数 当sender_type 为mongodb_acc 的时候，需要必填的字段
 	KeyMongodbUpdateKey = "mongodb_acc_updkey"
 	KeyMongodbAccKey    = "mongodb_acc_acckey"
+
+	KeyMaxSendRate = "max_send_rate"
+
+	KeyMySQLDataSource = "mysql_datasource"
+	KeyMySQLTable      = "mysql_table"
+
+	KeyCSVFields     = "csv_fields"
+	KeyCSVDelimiter  = "csv_delimiter"
+	KeyCSVRotateSize = "csv_rotate_size"
+	KeyCSVPathPrefix = "csv_path_prefix"
+
+	KeySQLFileRotateSize = "sqlfile_rotate_size"
+	KeySQLFileTable      = "sqlfile_table"
+	KeySQLFilePathPrefix = "sqlfile_path_prefix"
 )
 
 // NotAsyncSender return when sender is not async
