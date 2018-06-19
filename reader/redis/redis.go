@@ -3,7 +3,6 @@ package redis
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -27,6 +26,7 @@ type Reader struct {
 	client *redis.Client
 
 	readChan  chan string
+	errChan   chan error
 	channelIn <-chan *redis.Message
 
 	status  int32
@@ -88,6 +88,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (rr reader.Reader, err erro
 		opts:      opt,
 		client:    client,
 		readChan:  make(chan string),
+		errChan:   make(chan error),
 		status:    reader.StatusInit,
 		mux:       sync.Mutex{},
 		started:   false,
@@ -123,6 +124,7 @@ func (rr *Reader) ReadLine() (data string, err error) {
 	select {
 	case dat := <-rr.readChan:
 		data = string(dat)
+	case err = <-rr.errChan:
 	case <-timer.C:
 	}
 	timer.Stop()
@@ -135,9 +137,22 @@ func (rr *Reader) Close() (err error) {
 	} else {
 		atomic.CompareAndSwapInt32(&rr.status, reader.StatusInit, reader.StatusStopped)
 		close(rr.readChan)
+		close(rr.errChan)
 		rr.client.Close()
 	}
 	return
+}
+
+func (s *Reader) sendError(err error) {
+	if err == nil {
+		return
+	}
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Errorf("Reader %s panic, recovered from %v", s.Name(), rec)
+		}
+	}()
+	s.errChan <- err
 }
 
 func (rr *Reader) SyncMeta() {
@@ -192,6 +207,7 @@ func (rr *Reader) run() (err error) {
 		atomic.CompareAndSwapInt32(&rr.status, reader.StatusRunning, reader.StatusInit)
 		if atomic.CompareAndSwapInt32(&rr.status, reader.StatusStopping, reader.StatusStopped) {
 			close(rr.readChan)
+			close(rr.errChan)
 			rr.client.Close()
 		}
 		if err == nil {
@@ -214,13 +230,17 @@ func (rr *Reader) run() (err error) {
 			for _, key := range rr.opts.key {
 				ans, subErr := rr.client.BLPop(rr.opts.timeout, key).Result()
 				if subErr != nil && subErr != redis.Nil {
-					log.Errorf("Runner[%v] %v BLPop redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
-					rr.setStatsError("Runner[" + rr.meta.RunnerName + "] " + rr.Name() + " BLPop redis error " + subErr.Error())
+					err = fmt.Errorf("runner[%v] %v BLPop redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
+					log.Error(err)
+					rr.setStatsError(err.Error())
+					rr.sendError(err)
 				} else if len(ans) > 1 {
 					rr.readChan <- ans[1]
 				} else if len(ans) == 1 {
-					log.Errorf("Runner[%v] %v list read only one result in arrary %v", rr.meta.RunnerName, rr.Name(), ans)
-					rr.setStatsError("Runner[" + rr.meta.RunnerName + "] " + rr.Name() + " list read only one result in arrary: " + strings.Join(ans, ","))
+					err = fmt.Errorf("runner[%v] %v list read only one result in arrary %v", rr.meta.RunnerName, rr.Name(), ans)
+					log.Error(err)
+					rr.sendError(err)
+					rr.setStatsError(err.Error())
 				}
 			}
 			//Added string support for redis
@@ -228,8 +248,10 @@ func (rr *Reader) run() (err error) {
 			for _, key := range rr.opts.key {
 				anString, subErr := rr.client.Get(key).Result()
 				if subErr != nil && subErr != redis.Nil {
-					log.Errorf("Runner[%v] %v Get redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
-					rr.setStatsError("Runner[" + rr.meta.RunnerName + "] " + rr.Name() + " Get redis error " + subErr.Error())
+					err = fmt.Errorf("runner[%v] %v Get redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
+					log.Error(err)
+					rr.sendError(err)
+					rr.setStatsError(err.Error())
 				} else if anString != "" {
 					//Avoid data duplication
 					rr.client.Del(key)
@@ -241,8 +263,9 @@ func (rr *Reader) run() (err error) {
 			for _, key := range rr.opts.key {
 				anSet, subErr := rr.client.SPop(key).Result()
 				if subErr != nil && subErr != redis.Nil {
-					log.Errorf("Runner[%v] %v SPop redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
-					rr.setStatsError("Runner[" + rr.meta.RunnerName + "] " + rr.Name() + " Get redis error " + subErr.Error())
+					err = fmt.Errorf("runner[%v] %v SPop redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
+					rr.setStatsError(err.Error())
+					rr.sendError(err)
 				} else if anSet != "" {
 					rr.readChan <- anSet
 				}
@@ -252,8 +275,9 @@ func (rr *Reader) run() (err error) {
 			for _, key := range rr.opts.key {
 				anSortedSet, subErr := rr.client.ZRange(key, 0, -1).Result()
 				if subErr != nil && subErr != redis.Nil {
-					log.Errorf("Runner[%v] %v ZRange redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
-					rr.setStatsError("Runner[" + rr.meta.RunnerName + "] " + rr.Name() + " Get redis error " + subErr.Error())
+					err = fmt.Errorf("runner[%v] %v ZRange redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
+					rr.setStatsError(err.Error())
+					rr.sendError(err)
 				} else if len(anSortedSet) > 0 {
 					rr.client.Del(key)
 					rr.readChan <- anSortedSet[0]
@@ -264,8 +288,9 @@ func (rr *Reader) run() (err error) {
 			for _, key := range rr.opts.key {
 				anHash, subErr := rr.client.HGet(key, rr.opts.area).Result() //redis key and area for hash
 				if subErr != nil && subErr != redis.Nil {
-					log.Errorf("Runner[%v] %v HGetAll redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
-					rr.setStatsError("Runner[" + rr.meta.RunnerName + "] " + rr.Name() + " Get redis error " + subErr.Error())
+					err = fmt.Errorf("runner[%v] %v HGetAll redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
+					rr.setStatsError(err.Error())
+					rr.sendError(err)
 				} else if anHash != "" {
 					rr.client.Del(key)
 					rr.readChan <- anHash
@@ -275,6 +300,7 @@ func (rr *Reader) run() (err error) {
 			err = fmt.Errorf("data Type < %v > not exist, exit", rr.opts.dataType)
 			log.Error(err)
 			rr.setStatsError(err.Error())
+			rr.sendError(err)
 			return
 		}
 	}

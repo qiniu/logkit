@@ -410,7 +410,7 @@ func (s *Reader) ReadLine() (line string, err error) {
 	if atomic.LoadInt32(&s.Status) == reader.StatusInit {
 		if err = s.Start(); err != nil {
 			log.Error(err)
-			return
+			return "", err
 		}
 	}
 	select {

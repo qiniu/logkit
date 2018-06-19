@@ -4,14 +4,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/log"
-
-	"strings"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
