@@ -56,6 +56,7 @@ type Reader struct {
 	Status   int32
 	StopChan chan struct{}
 	DataChan chan interface{}
+	errChan  chan error
 }
 
 var execCommand = exec.Command
@@ -159,6 +160,7 @@ func NewReader(meta *reader.Meta, c conf.MapConf) (s reader.Reader, err error) {
 		Status:          reader.StatusInit,
 		StopChan:        make(chan struct{}),
 		DataChan:        make(chan interface{}, 1000),
+		errChan:         make(chan error),
 		ConnectionCache: make([]snmpConnection, len(agents)),
 	}, nil
 }
@@ -280,6 +282,9 @@ func (s *Reader) Gather() (err error) {
 			defer wg.Done()
 			gs, err1 := s.getConnection(i)
 			if err1 != nil {
+				errMux.Lock()
+				err = err1
+				errMux.Unlock()
 				return
 			}
 			t := Table{
@@ -288,6 +293,9 @@ func (s *Reader) Gather() (err error) {
 			}
 			topTags := map[string]string{}
 			if data, err1 = s.gatherTable(gs, t, topTags, false); err1 != nil {
+				errMux.Lock()
+				err = err1
+				errMux.Unlock()
 				return
 			}
 			if err1 := s.StoreData(data); err1 != nil {
@@ -372,10 +380,13 @@ func (s *Reader) Start() error {
 			case <-ticker.C:
 				err := s.Gather()
 				if err != nil {
-					log.Errorf("runner[%v] Reader[%v] gather error %v", s.Meta.RunnerName, s.Name(), err)
+					err = fmt.Errorf("runner[%v] Reader[%v] gather error %v", s.Meta.RunnerName, s.Name(), err)
+					log.Error(err)
+					s.sendError(err)
 				}
 			case <-s.StopChan:
 				close(s.DataChan)
+				close(s.errChan)
 				return
 			}
 		}
@@ -383,10 +394,23 @@ func (s *Reader) Start() error {
 	return nil
 }
 
+func (s *Reader) sendError(err error) {
+	if err == nil {
+		return
+	}
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Errorf("Reader %s panic, recovered from %v", s.Name(), rec)
+		}
+	}()
+	s.errChan <- err
+}
+
 func (s *Reader) ReadLine() (line string, err error) {
 	if atomic.LoadInt32(&s.Status) == reader.StatusInit {
 		if err = s.Start(); err != nil {
 			log.Error(err)
+			return
 		}
 	}
 	select {
@@ -396,6 +420,7 @@ func (s *Reader) ReadLine() (line string, err error) {
 			return
 		}
 		line = string(db)
+	case err = <-s.errChan:
 	default:
 	}
 	return

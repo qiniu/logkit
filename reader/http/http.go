@@ -102,6 +102,7 @@ func (h *Reader) ReadLine() (data string, err error) {
 		err = h.Start()
 		if err != nil {
 			log.Error(err)
+			return
 		}
 	}
 	timer := time.NewTimer(time.Second)
