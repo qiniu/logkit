@@ -273,18 +273,16 @@ func (s *Reader) StoreData(data []map[string]interface{}) (err error) {
 }
 
 func (s *Reader) Gather() (err error) {
-	errMux := new(sync.Mutex)
 	var wg sync.WaitGroup
 	data := make([]map[string]interface{}, 0)
+	errChan := make(chan error, len(s.Agents))
 	for i, agent := range s.Agents {
 		wg.Add(1)
 		go func(i int, agent string) {
 			defer wg.Done()
-			gs, err1 := s.getConnection(i)
-			if err1 != nil {
-				errMux.Lock()
-				err = err1
-				errMux.Unlock()
+			gs, subErr := s.getConnection(i)
+			if subErr != nil {
+				errChan <- subErr
 				return
 			}
 			t := Table{
@@ -292,33 +290,33 @@ func (s *Reader) Gather() (err error) {
 				Fields: s.Fields,
 			}
 			topTags := map[string]string{}
-			if data, err1 = s.gatherTable(gs, t, topTags, false); err1 != nil {
-				errMux.Lock()
-				err = err1
-				errMux.Unlock()
+			if data, subErr = s.gatherTable(gs, t, topTags, false); subErr != nil {
+				errChan <- subErr
 				return
 			}
 			if err1 := s.StoreData(data); err1 != nil {
-				errMux.Lock()
-				err = err1
-				errMux.Unlock()
+				errChan <- err1
 				return
 			}
 			for _, t := range s.Tables {
-				if data, err1 = s.gatherTable(gs, t, topTags, true); err1 != nil {
+				if data, subErr = s.gatherTable(gs, t, topTags, true); subErr != nil {
+					errChan <- subErr
 					return
 				}
 				if err1 := s.StoreData(data); err1 != nil {
-					errMux.Lock()
-					err = err1
-					errMux.Unlock()
+					errChan <- err1
 					return
 				}
 			}
 		}(i, agent)
 	}
 	wg.Wait()
-	return
+	close(errChan)
+	for subErr := range errChan {
+		log.Errorf("gather error: ", subErr)
+		err = subErr
+	}
+	return err
 }
 
 func (s *Reader) gatherTable(gs snmpConnection, t Table, topTags map[string]string, walk bool) (data []map[string]interface{}, err error) {
