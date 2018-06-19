@@ -712,6 +712,7 @@ func (r *Reader) Close() (err error) {
 	} else {
 		atomic.CompareAndSwapInt32(&r.status, reader.StatusInit, reader.StatusStopped)
 		close(r.readChan)
+		close(r.errChan)
 	}
 	return nil
 }
@@ -822,6 +823,7 @@ func (r *Reader) run() {
 		atomic.CompareAndSwapInt32(&r.status, reader.StatusRunning, reader.StatusInit)
 		if atomic.CompareAndSwapInt32(&r.status, reader.StatusStopping, reader.StatusStopped) {
 			close(r.readChan)
+			close(r.errChan)
 		}
 		if err == nil {
 			log.Infof("Runner[%v] %v successfully finished", r.meta.RunnerName, r.Name())
