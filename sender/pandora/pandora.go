@@ -89,15 +89,15 @@ type PandoraOption struct {
 	tsdbTimestamp  string
 	tsdbSeriesTags map[string][]string
 
-	enableKodo   bool
-	bucketName   string
-	email        string
-	prefix       string
-	format       string
-	kodoCompress bool
-	kodoRotateStrategy	string
-	kodoRotateInterval	int
-	kodoRotateSize	int
+	enableKodo         bool
+	bucketName         string
+	email              string
+	prefix             string
+	format             string
+	kodoCompress       bool
+	kodoRotateStrategy string
+	kodoRotateInterval int
+	kodoRotateSize     int
 
 	forceMicrosecond   bool
 	forceDataConvert   bool
@@ -188,10 +188,10 @@ func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
 	format, _ := conf.GetStringOr(sender.KeyPandoraKodoCompressPrefix, "parquet")
 	prefix, _ := conf.GetStringOr(sender.KeyPandoraKodoFilePrefix, "logkitauto/date=$(year)-$(mon)-$(day)/hour=$(hour)/min=$(min)/$(sec)")
 	compress, _ := conf.GetBoolOr(sender.KeyPandoraKodoGzip, false)
-	kodoRotateStrategy, _ :=conf.GetStringOr(sender.KeyPandoraKodoRotateStrategy, "interval")
-	kodoRotateSize, _ := conf.GetIntOr(sender.KeyPandoraKodoRotateSize, 500 * 1024)
+	kodoRotateStrategy, _ := conf.GetStringOr(sender.KeyPandoraKodoRotateStrategy, "interval")
+	kodoRotateSize, _ := conf.GetIntOr(sender.KeyPandoraKodoRotateSize, 500*1024)
 	kodoRotateSize = kodoRotateSize * 1024
-	kodoRotateInterval, _ := conf.GetIntOr(sender.KeyPandoraKodoRotateInterval, 10 * 60)
+	kodoRotateInterval, _ := conf.GetIntOr(sender.KeyPandoraKodoRotateInterval, 10*60)
 
 	forceconvert, _ := conf.GetBoolOr(sender.KeyForceDataConvert, false)
 	ignoreInvalidField, _ := conf.GetBoolOr(sender.KeyIgnoreInvalidField, true)
@@ -253,15 +253,15 @@ func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
 		tsdbendpoint:   tsdbHost,
 		tsdbTimestamp:  tsdbTimestamp,
 
-		enableKodo:   enableKodo,
-		email:        email,
-		bucketName:   kodobucketName,
-		format:       format,
-		prefix:       prefix,
-		kodoCompress: compress,
-		kodoRotateStrategy:	kodoRotateStrategy,
-		kodoRotateInterval:	kodoRotateInterval,
-		kodoRotateSize:	kodoRotateSize,
+		enableKodo:         enableKodo,
+		email:              email,
+		bucketName:         kodobucketName,
+		format:             format,
+		prefix:             prefix,
+		kodoCompress:       compress,
+		kodoRotateStrategy: kodoRotateStrategy,
+		kodoRotateInterval: kodoRotateInterval,
+		kodoRotateSize:     kodoRotateSize,
 
 		forceMicrosecond:   forceMicrosecond,
 		forceDataConvert:   forceconvert,
@@ -876,7 +876,7 @@ func (s *Sender) Send(datas []Data) (se error) {
 				Prefix:               s.opt.prefix,
 				Format:               s.opt.format,
 				Compress:             s.opt.kodoCompress,
-				RotateStrategy:		  s.opt.kodoRotateStrategy,
+				RotateStrategy:       s.opt.kodoRotateStrategy,
 				RotateInterval:       s.opt.kodoRotateInterval,
 				RotateSize:           s.opt.kodoRotateSize,
 				AutoExportKodoTokens: s.opt.tokens.KodoTokens,

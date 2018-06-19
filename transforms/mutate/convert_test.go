@@ -45,6 +45,48 @@ func TestConvertTransformer(t *testing.T) {
 	assert.Equal(t, exp3, data3)
 }
 
+func TestConvert(t *testing.T) {
+	cases := []struct {
+		v   Data
+		DSL string
+		exp Data
+	}{
+		{
+			v:   Data{"abc": ""},
+			DSL: "abc long",
+			exp: Data{},
+		},
+		{
+			v:   Data{"abc": "123"},
+			DSL: "abc long",
+			exp: Data{"abc": int64(123)},
+		},
+		{
+			v:   Data{"abc": "123", "nihao": "true"},
+			DSL: "abc long,nihao bool",
+			exp: Data{"abc": int64(123), "nihao": true},
+		},
+		{
+			v:   Data{"abc": "123", "nihao": "true", "haha": map[string]interface{}{"abc": 123}},
+			DSL: "abc long,nihao bool,haha{abc string}",
+			exp: Data{"abc": int64(123), "nihao": true, "haha": map[string]interface{}{"abc": "123"}},
+		},
+		{
+			v:   Data{"abc": "2018-06-15 15:15:21"},
+			DSL: "abc date",
+			exp: Data{"abc": "2018-06-15T15:15:21Z"},
+		},
+	}
+	for _, ca := range cases {
+		gsub := &Converter{
+			DSL: ca.DSL,
+		}
+		gots, err := gsub.Transform([]Data{ca.v})
+		assert.NoError(t, err)
+		assert.Equal(t, ca.exp, gots[0])
+	}
+}
+
 func TestConvertType(t *testing.T) {
 	gsub := &Converter{
 		DSL: "myword string",
@@ -290,6 +332,13 @@ func TestConvertData(t *testing.T) {
 				Default:   12.1,
 			},
 			exp: 12.1,
+		},
+		{
+			v: "",
+			schema: DslSchemaEntry{
+				ValueType: pipeline.PandoraTypeFloat,
+			},
+			exp: nil,
 		},
 	}
 	for _, ti := range tests {
