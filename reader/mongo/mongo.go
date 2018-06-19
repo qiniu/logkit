@@ -122,7 +122,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (mr reader.Reader, err erro
 			mmr.loop = true
 			mmr.loopDuration, err = reader.ParseLoopDuration(cronSched)
 			if err != nil {
-				log.Errorf("Runner[%v] %v %v", mmr.meta.RunnerName, mr.Name(), err)
+				log.Errorf("Runner[%v] %v %v", mmr.meta.RunnerName, mmr.Name(), err)
 				err = nil
 			}
 		} else {
@@ -130,7 +130,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (mr reader.Reader, err erro
 			if err != nil {
 				return
 			}
-			log.Infof("Runner[%v] %v Cron added with schedule <%v>", mmr.meta.RunnerName, mr.Name(), cronSched)
+			log.Infof("Runner[%v] %v Cron added with schedule <%v>", mmr.meta.RunnerName, mmr.Name(), cronSched)
 		}
 	}
 	mr = mmr
