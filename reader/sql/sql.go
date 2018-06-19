@@ -93,6 +93,7 @@ type Reader struct {
 	offsetKey    string
 
 	readChan chan readInfo
+	errChan  chan error
 
 	meta              *reader.Meta // 记录offset的元数据
 	encoder           string       // 解码方式
@@ -298,6 +299,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (ret reader.Reader, err err
 		Cron:        cron.New(),
 		readBatch:   readBatch,
 		readChan:    make(chan readInfo),
+		errChan:     make(chan error),
 		meta:        meta,
 		status:      reader.StatusInit,
 		offsetKey:   offsetKey,
@@ -680,6 +682,18 @@ func (r *Reader) setStatsError(err string) {
 	r.stats.LastError = err
 }
 
+func (r *Reader) sendError(err error) {
+	if err == nil {
+		return
+	}
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Errorf("Reader %s panic, recovered from %v", r.Name(), rec)
+		}
+	}()
+	r.errChan <- err
+}
+
 func (r *Reader) Status() StatsInfo {
 	r.statsLock.RLock()
 	defer r.statsLock.RUnlock()
@@ -735,6 +749,8 @@ func (r *Reader) ReadData() (Data, int64, error) {
 	select {
 	case info := <-r.readChan:
 		return info.data, info.bytes, nil
+	case err := <-r.errChan:
+		return nil, 0, err
 	case <-timer.C:
 	}
 
@@ -844,11 +860,12 @@ func (r *Reader) run() {
 		}
 		err = r.exec(connectStr)
 		if err == nil {
-			log.Infof("Runner[%v] %v successfully exec", r.meta.RunnerName, r.Name())
+			log.Infof("Runner[%v] %v successfully executed", r.meta.RunnerName, r.Name())
 			return
 		}
 		log.Error(err)
 		r.setStatsError(err.Error())
+		r.sendError(err)
 		time.Sleep(3 * time.Second)
 	}
 }
@@ -1825,7 +1842,7 @@ func (r *Reader) execReadSql(db *sql.DB, idx int, rawSql string, tables []string
 
 	execSQL, err := r.getSQL(idx, r.syncSQLs[idx])
 	if err != nil {
-		log.Errorf("Runner[%v] get SQL error %v, use raw SQL", r.meta.RunnerName, err)
+		log.Warnf("Runner[%v] get SQL error %v, use raw SQL", r.meta.RunnerName, err)
 		execSQL = rawSql
 	}
 
@@ -1836,14 +1853,18 @@ func (r *Reader) execReadSql(db *sql.DB, idx int, rawSql string, tables []string
 	log.Infof("Runner[%v] reader <%v> exec sql <%v>", r.meta.RunnerName, r.Name(), execSQL)
 	rows, err := db.Query(execSQL)
 	if err != nil {
-		log.Errorf("Runner[%v] %v prepare %v <%v> query error %v", r.meta.RunnerName, r.Name(), r.dbtype, execSQL, err)
+		err = fmt.Errorf("runner[%v] %v prepare %v <%v> query error %v", r.meta.RunnerName, r.Name(), r.dbtype, execSQL, err)
+		log.Error(err)
+		r.sendError(err)
 		return exit, isRawSql, readSize
 	}
 	defer rows.Close()
 	// Get column names
 	columns, err := rows.Columns()
 	if err != nil {
-		log.Errorf("Runner[%v] %v prepare %v <%v> columns error %v", r.meta.RunnerName, r.Name(), r.dbtype, execSQL, err)
+		err = fmt.Errorf("runner[%v] %v prepare %v <%v> columns error %v", r.meta.RunnerName, r.Name(), r.dbtype, execSQL, err)
+		log.Error(err)
+		r.sendError(err)
 		return exit, isRawSql, readSize
 	}
 	log.Infof("Runner[%v] SQL ：<%v>, schemas: <%v>", r.meta.RunnerName, execSQL, strings.Join(columns, ", "))
@@ -1860,7 +1881,9 @@ func (r *Reader) execReadSql(db *sql.DB, idx int, rawSql string, tables []string
 		// get RawBytes from data
 		err = rows.Scan(scanArgs...)
 		if err != nil {
-			log.Errorf("Runner[%v] %v scan rows error %v", r.meta.RunnerName, r.Name(), err)
+			err = fmt.Errorf("runner[%v] %v scan rows error %v", r.meta.RunnerName, r.Name(), err)
+			log.Error(err)
+			r.sendError(err)
 			continue
 		}
 
@@ -1876,7 +1899,9 @@ func (r *Reader) execReadSql(db *sql.DB, idx int, rawSql string, tables []string
 			case "long":
 				val, serr := convertLong(scanArgs[i])
 				if serr != nil {
-					log.Errorf("Runner[%v] %v convertLong for %v (%v) error %v, ignore this key...", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
+					serr = fmt.Errorf("runner[%v] %v convertLong for %v (%v) error %v, this key will be ignored", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
+					log.Error(serr)
+					r.sendError(serr)
 				} else {
 					data[columns[i]] = val
 					bytes = 8
@@ -1884,7 +1909,9 @@ func (r *Reader) execReadSql(db *sql.DB, idx int, rawSql string, tables []string
 			case "float":
 				val, serr := convertFloat(scanArgs[i])
 				if serr != nil {
-					log.Errorf("Runner[%v] %v convertFloat for %v (%v) error %v, ignore this key...", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
+					serr = fmt.Errorf("runner[%v] %v convertFloat for %v (%v) error %v, this key will be ignored", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
+					log.Error(serr)
+					r.sendError(serr)
 				} else {
 					data[columns[i]] = val
 					bytes = 8
@@ -1892,7 +1919,9 @@ func (r *Reader) execReadSql(db *sql.DB, idx int, rawSql string, tables []string
 			case "string":
 				val, serr := convertString(scanArgs[i])
 				if serr != nil {
-					log.Errorf("Runner[%v] %v convertString for %v (%v) error %v, ignore this key...", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
+					serr = fmt.Errorf("runner[%v] %v convertString for %v (%v) error %v, this key will be ignored", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
+					log.Error(serr)
+					r.sendError(serr)
 				} else {
 					data[columns[i]] = val
 					bytes = int64(len(val))
@@ -1938,7 +1967,9 @@ func (r *Reader) execReadSql(db *sql.DB, idx int, rawSql string, tables []string
 				if !dealed {
 					val, serr := convertString(scanArgs[i])
 					if serr != nil {
-						log.Errorf("Runner[%v] %v convertString for %v (%v) error %v, ignore this key...", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
+						serr = fmt.Errorf("runner[%v] %v convertString for %v (%v) error %v, this key will be ignored", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
+						log.Error(serr)
+						r.sendError(serr)
 					} else {
 						data[columns[i]] = val
 						bytes = int64(len(val))
