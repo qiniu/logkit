@@ -133,7 +133,7 @@ func NewReader(meta *reader.Meta, c conf.MapConf) (s reader.Reader, err error) {
 			return
 		}
 	}
-	s = &Reader{
+	return &Reader{
 		Meta:           meta,
 		SnmpName:       name,
 		Agents:         agents,
@@ -160,9 +160,7 @@ func NewReader(meta *reader.Meta, c conf.MapConf) (s reader.Reader, err error) {
 		StopChan:        make(chan struct{}),
 		DataChan:        make(chan interface{}, 1000),
 		ConnectionCache: make([]snmpConnection, len(agents)),
-	}
-
-	return
+	}, nil
 }
 
 type Table struct {

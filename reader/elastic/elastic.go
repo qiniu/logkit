@@ -66,7 +66,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (er reader.Reader, err erro
 	if err != nil {
 		log.Errorf("Runner[%v] %v -meta data is corrupted err:%v, omit meta data", meta.RunnerName, meta.MetaFile(), err)
 	}
-	er = &Reader{
+	return &Reader{
 		esindex:   esindex,
 		estype:    estype,
 		eshost:    eshost,
@@ -80,9 +80,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (er reader.Reader, err erro
 		mux:       sync.Mutex{},
 		statsLock: sync.RWMutex{},
 		started:   false,
-	}
-
-	return er, nil
+	}, nil
 }
 
 func (er *Reader) Name() string {

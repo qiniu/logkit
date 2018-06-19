@@ -147,7 +147,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (c reader.Reader, err error
 		Metrics = []*Metric{{MetricNames: metrics, Dimensions: dimensions}}
 	}
 
-	c = &CloudWatch{
+	return &CloudWatch{
 		Region:          region,
 		Namespace:       namespace,
 		client:          cloudwatch.New(configProvider, cfg),
@@ -161,8 +161,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (c reader.Reader, err error
 		StopChan:        make(chan struct{}),
 		DataChan:        make(chan models.Data),
 		Metrics:         Metrics,
-	}
-	return
+	}, nil
 }
 
 func (c *CloudWatch) Name() string {

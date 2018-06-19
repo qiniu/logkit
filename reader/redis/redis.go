@@ -83,7 +83,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (rr reader.Reader, err erro
 		Password: opt.password,
 	})
 
-	rr = &Reader{
+	return &Reader{
 		meta:      meta,
 		opts:      opt,
 		client:    client,
@@ -92,8 +92,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (rr reader.Reader, err erro
 		mux:       sync.Mutex{},
 		started:   false,
 		statsLock: sync.RWMutex{},
-	}
-	return
+	}, nil
 }
 
 func (rr *Reader) Name() string {

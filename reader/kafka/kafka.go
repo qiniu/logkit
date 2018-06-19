@@ -71,7 +71,8 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (kr reader.Reader, err erro
 	for _, v := range topics {
 		offsets[v] = make(map[int32]int64)
 	}
-	kr = &Reader{
+	sarama.Logger = log.Std
+	return &Reader{
 		meta:             meta,
 		ConsumerGroup:    consumerGroup,
 		ZookeeperPeers:   zookeeper,
@@ -87,9 +88,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (kr reader.Reader, err erro
 		statsLock:        new(sync.RWMutex),
 		curOffsets:       offsets,
 		started:          false,
-	}
-	sarama.Logger = log.Std
-	return kr, nil
+	}, nil
 }
 
 func (kr *Reader) Name() string {

@@ -29,15 +29,16 @@ func RawData(readerConfig conf.MapConf) (rawData string, err error) {
 	}
 
 	var rd reader.Reader
-	rd, err = reader.NewFileBufReader(readerConfig, true)
+	rd, err = reader.NewReader(readerConfig, true)
 	if err != nil {
 		return
 	}
+	defer rd.Close()
 
 	tryCount := DefaultTryTimes
 	for {
 		if tryCount <= 0 {
-			err = fmt.Errorf("get raw data time out, raw data is empty")
+			err = fmt.Errorf("get raw data from %s time out, can't get any data", rd.Name())
 			return
 		}
 		tryCount--

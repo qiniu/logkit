@@ -11,6 +11,8 @@ import (
 
 	"github.com/qiniu/log"
 
+	"strings"
+
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/reader/test"
@@ -48,7 +50,8 @@ func Test_ActiveReader(t *testing.T) {
 	ppath, err = filepath.Abs(ppath)
 	assert.NoError(t, err)
 	msgchan := make(chan Result)
-	ar, err := NewActiveReader(ppath, ppath, reader.WhenceOldest, meta, msgchan)
+	errChan := make(chan error)
+	ar, err := NewActiveReader(ppath, ppath, reader.WhenceOldest, meta, msgchan, errChan)
 	assert.NoError(t, err)
 	go ar.Run()
 	data := <-msgchan
@@ -622,4 +625,126 @@ func TestMultiReaderReset(t *testing.T) {
 	}
 	t.Log("mr Started again")
 	assert.EqualValues(t, expResult, resultMap)
+}
+
+func TestReaderErrBegin(t *testing.T) {
+
+	dirName := "TestReaderErr"
+	dir := filepath.Join(dirName, "abc")
+	metaDir := filepath.Join(dirName, "meta")
+	file1 := filepath.Join(dir, "file1.log")
+
+	createDirWithName(dirName)
+	defer os.RemoveAll(dirName)
+
+	createDirWithName(dir)
+
+	file, err := os.OpenFile(file1, os.O_CREATE|os.O_WRONLY, 0200)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	file.WriteString("abc111\nabc112\n")
+	file.Close()
+
+	logPathPattern := filepath.Join(filepath.Join(dirName, "*"), "*.log")
+	c := conf.MapConf{
+		"log_path":        logPathPattern,
+		"meta_path":       metaDir,
+		"mode":            reader.ModeTailx,
+		"sync_every":      "1",
+		"reader_buf_size": "1024",
+		"read_from":       "oldest",
+	}
+	meta, err := reader.NewMetaWithConf(c)
+	assert.NoError(t, err)
+	mmr, err := NewReader(meta, c)
+	assert.NoError(t, err)
+	mr := mmr.(*Reader)
+	mr.Start()
+	maxNum := 0
+	for {
+		_, err = mr.ReadLine()
+		if err != nil {
+			break
+		}
+
+		maxNum++
+		if err == io.EOF {
+			break
+		}
+		if maxNum >= 8 {
+			break
+		}
+	}
+	if !strings.Contains(err.Error(), os.ErrPermission.Error()) {
+		t.Error("no matched error")
+	}
+	err = mr.Close()
+	assert.NoError(t, err)
+
+}
+
+func TestReaderErrMiddle(t *testing.T) {
+
+	dirName := "TestReaderErr"
+	os.RemoveAll(dirName)
+	dir := filepath.Join(dirName, "abc")
+	metaDir := filepath.Join(dirName, "meta")
+	file1 := filepath.Join(dir, "file1.log")
+	file1rename := filepath.Join(dir, "file1.xlog")
+
+	createDirWithName(dirName)
+	defer os.RemoveAll(dirName)
+
+	createDirWithName(dir)
+	createFileWithContent(file1, "abc111\nabc112\n")
+
+	go func() {
+		time.Sleep(time.Second)
+		os.Rename(file1, file1rename)
+		file, err := os.OpenFile(file1, os.O_CREATE|os.O_WRONLY, 0200)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		file.WriteString("abc111\nabc112\n")
+		file.Close()
+	}()
+
+	logPathPattern := filepath.Join(filepath.Join(dirName, "*"), "*.log")
+	c := conf.MapConf{
+		"log_path":        logPathPattern,
+		"meta_path":       metaDir,
+		"mode":            reader.ModeTailx,
+		"sync_every":      "1",
+		"reader_buf_size": "1024",
+		"read_from":       "oldest",
+	}
+	meta, err := reader.NewMetaWithConf(c)
+	assert.NoError(t, err)
+	mmr, err := NewReader(meta, c)
+	assert.NoError(t, err)
+	mr := mmr.(*Reader)
+	mr.Start()
+	maxNum := 0
+	for {
+		_, err = mr.ReadLine()
+		if err != nil {
+			break
+		}
+		maxNum++
+		if err == io.EOF {
+			break
+		}
+		if maxNum >= 8 {
+			break
+		}
+	}
+	if err == nil || !strings.Contains(err.Error(), os.ErrPermission.Error()) {
+		t.Errorf("no matched error %v, expect %v", err, os.ErrPermission)
+	}
+	err = mr.Close()
+	assert.NoError(t, err)
+
 }
