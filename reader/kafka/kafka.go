@@ -1,12 +1,10 @@
 package kafka
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/Shopify/sarama"
@@ -34,12 +32,9 @@ type Reader struct {
 
 	Consumer *consumergroup.ConsumerGroup
 	in       <-chan *sarama.ConsumerMessage
+	errs     <-chan error
 	curMsg   *sarama.ConsumerMessage
 
-	readChan chan json.RawMessage
-	errs     <-chan error
-
-	status   int32
 	mux      *sync.Mutex
 	startMux *sync.Mutex
 	started  bool
@@ -80,9 +75,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (kr reader.Reader, err erro
 		ZookeeperChroot:  zkchroot,
 		Topics:           topics,
 		Whence:           whence,
-		readChan:         make(chan json.RawMessage),
 		errs:             make(chan error, 1000),
-		status:           reader.StatusInit,
 		mux:              new(sync.Mutex),
 		startMux:         new(sync.Mutex),
 		statsLock:        new(sync.RWMutex),
@@ -117,8 +110,26 @@ func (kr *Reader) ReadLine() (data string, err error) {
 	}
 	timer := time.NewTimer(time.Second)
 	select {
-	case dat := <-kr.readChan:
-		data = string(dat)
+	case err = <-kr.errs:
+		if err != nil {
+			log.Errorf("Runner[%v] Consumer Error: %s\n", kr.meta.RunnerName, err)
+			kr.setStatsError("Runner[" + kr.meta.RunnerName + "] Consumer Error: " + err.Error())
+		}
+	case msg := <-kr.in:
+		if msg != nil && msg.Value != nil && len(msg.Value) > 0 {
+			data = string(msg.Value)
+			kr.curMsg = msg
+			kr.statsLock.Lock()
+			if tp, ok := kr.curOffsets[msg.Topic]; ok {
+				tp[msg.Partition] = msg.Offset
+				kr.curOffsets[msg.Topic] = tp
+			} else {
+				tp := make(map[int32]int64)
+				tp[msg.Partition] = msg.Offset
+				kr.curOffsets[msg.Topic] = tp
+			}
+			kr.statsLock.Unlock()
+		}
 	case <-timer.C:
 	}
 	timer.Stop()
@@ -126,12 +137,9 @@ func (kr *Reader) ReadLine() (data string, err error) {
 }
 
 func (kr *Reader) Close() (err error) {
-	if atomic.CompareAndSwapInt32(&kr.status, reader.StatusRunning, reader.StatusStopping) {
-		log.Infof("Runner[%v] %v stopping", kr.meta.RunnerName, kr.Name())
-	} else {
-		atomic.CompareAndSwapInt32(&kr.status, reader.StatusInit, reader.StatusStopped)
-		close(kr.readChan)
-	}
+	kr.mux.Lock()
+	err = kr.Consumer.Close()
+	kr.mux.Unlock()
 	return
 }
 
@@ -177,75 +185,8 @@ func (kr *Reader) Start() {
 		kr.in = kr.Consumer.Messages()
 		kr.errs = kr.Consumer.Errors()
 	}
-	go kr.run()
 	kr.started = true
 	log.Infof("Runner[%v] %v pull data daemon started", kr.meta.RunnerName, kr.Name())
-}
-
-func (kr *Reader) run() {
-	// 防止并发run
-	for {
-		if atomic.LoadInt32(&kr.status) == reader.StatusStopped || atomic.LoadInt32(&kr.status) == reader.StatusStopping {
-			return
-		}
-		if atomic.CompareAndSwapInt32(&kr.status, reader.StatusInit, reader.StatusRunning) {
-			break
-		}
-		//节省CPU
-		time.Sleep(time.Microsecond)
-	}
-	//double check
-	if atomic.LoadInt32(&kr.status) == reader.StatusStopped || atomic.LoadInt32(&kr.status) == reader.StatusStopping {
-		return
-	}
-	// running时退出 状态改为Init，以便 cron 调度下次运行
-	// stopping时推出改为 stopped，不再运行
-	defer func() {
-		atomic.CompareAndSwapInt32(&kr.status, reader.StatusRunning, reader.StatusInit)
-		if atomic.CompareAndSwapInt32(&kr.status, reader.StatusStopping, reader.StatusStopped) {
-			close(kr.readChan)
-			go func() {
-				kr.mux.Lock()
-				defer kr.mux.Unlock()
-				err := kr.Consumer.Close()
-				if err != nil {
-					log.Infof("Runner[%v] %v stop failed error: %v", kr.meta.RunnerName, kr.Name(), err)
-				}
-			}()
-		}
-		log.Infof("Runner[%v] %v successfully finished", kr.meta.RunnerName, kr.Name())
-	}()
-	// 开始work逻辑
-	for {
-		if atomic.LoadInt32(&kr.status) == reader.StatusStopping {
-			log.Warnf("Runner[%v] %v stopped from running", kr.meta.RunnerName, kr.Name())
-			return
-		}
-		select {
-		case err := <-kr.errs:
-			if err != nil {
-				log.Errorf("Runner[%v] Consumer Error: %s\n", kr.meta.RunnerName, err)
-				kr.setStatsError("Runner[" + kr.meta.RunnerName + "] Consumer Error: " + err.Error())
-			}
-		case msg := <-kr.in:
-			if msg != nil && msg.Value != nil && len(msg.Value) > 0 {
-				kr.readChan <- msg.Value
-				kr.curMsg = msg
-				kr.statsLock.Lock()
-				if tp, ok := kr.curOffsets[msg.Topic]; ok {
-					tp[msg.Partition] = msg.Offset
-					kr.curOffsets[msg.Topic] = tp
-				} else {
-					tp := make(map[int32]int64)
-					tp[msg.Partition] = msg.Offset
-					kr.curOffsets[msg.Topic] = tp
-				}
-				kr.statsLock.Unlock()
-			}
-		default:
-			time.Sleep(time.Second)
-		}
-	}
 }
 
 func (kr *Reader) SetMode(mode string, v interface{}) error {
