@@ -32,7 +32,6 @@ func TestKafkaReader(t *testing.T) {
 		Whence:           "oldest",
 		errs:             make(chan error, 1000),
 		mux:              new(sync.Mutex),
-		started:          false,
 		statsLock:        new(sync.RWMutex),
 	}
 	assert.EqualValues(t, "KafkaReader:[topic1],[group1]", er.Name())

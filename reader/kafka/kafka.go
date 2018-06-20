@@ -35,16 +35,14 @@ type Reader struct {
 	errs     <-chan error
 	curMsg   *sarama.ConsumerMessage
 
-	mux      *sync.Mutex
-	startMux *sync.Mutex
-	started  bool
+	mux *sync.Mutex
 
 	curOffsets map[string]map[int32]int64
 	stats      StatsInfo
 	statsLock  *sync.RWMutex
 }
 
-func NewReader(meta *reader.Meta, conf conf.MapConf) (kr reader.Reader, err error) {
+func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 
 	whence, _ := conf.GetStringOr(reader.KeyWhence, reader.WhenceOldest)
 	consumerGroup, err := conf.GetString(reader.KeyKafkaGroupID)
@@ -67,7 +65,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (kr reader.Reader, err erro
 		offsets[v] = make(map[int32]int64)
 	}
 	sarama.Logger = log.Std
-	return &Reader{
+	kr := &Reader{
 		meta:             meta,
 		ConsumerGroup:    consumerGroup,
 		ZookeeperPeers:   zookeeper,
@@ -75,13 +73,44 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (kr reader.Reader, err erro
 		ZookeeperChroot:  zkchroot,
 		Topics:           topics,
 		Whence:           whence,
-		errs:             make(chan error, 1000),
 		mux:              new(sync.Mutex),
-		startMux:         new(sync.Mutex),
 		statsLock:        new(sync.RWMutex),
 		curOffsets:       offsets,
-		started:          false,
-	}, nil
+	}
+
+	config := consumergroup.NewConfig()
+	config.Zookeeper.Chroot = kr.ZookeeperChroot
+	config.Zookeeper.Timeout = kr.ZookeeperTimeout
+
+	/*********************  kafka offset *************************/
+	/* 这里设定的offset不影响原有的offset，因为kafka client会去获取   */
+	/* zk之前的offset node记录，在没有offset node时才选择initial     */
+	switch strings.ToLower(kr.Whence) {
+	case "oldest", "":
+		config.Offsets.Initial = sarama.OffsetOldest
+	case "newest":
+		config.Offsets.Initial = sarama.OffsetNewest
+	default:
+		log.Warnf("Runner[%v] WARNING: Kafka consumer invalid offset '%s', using 'oldest'\n", kr.meta.RunnerName, kr.Whence)
+		config.Offsets.Initial = sarama.OffsetOldest
+	}
+	/*************************************************************/
+
+	var consumerErr error
+	kr.Consumer, consumerErr = consumergroup.JoinConsumerGroup(
+		kr.ConsumerGroup,
+		kr.Topics,
+		kr.ZookeeperPeers,
+		config,
+	)
+	if consumerErr != nil {
+		err = fmt.Errorf("runner[%v] kafka reader join group err: %v", kr.meta.RunnerName, consumerErr)
+		log.Error(err)
+		return nil, err
+	}
+	kr.in = kr.Consumer.Messages()
+	kr.errs = kr.Consumer.Errors()
+	return kr, nil
 }
 
 func (kr *Reader) Name() string {
@@ -105,15 +134,13 @@ func (kr *Reader) Source() string {
 }
 
 func (kr *Reader) ReadLine() (data string, err error) {
-	if !kr.started {
-		kr.Start()
-	}
 	timer := time.NewTimer(time.Second)
 	select {
 	case err = <-kr.errs:
 		if err != nil {
-			log.Errorf("Runner[%v] Consumer Error: %s\n", kr.meta.RunnerName, err)
-			kr.setStatsError("Runner[" + kr.meta.RunnerName + "] Consumer Error: " + err.Error())
+			err = fmt.Errorf("runner[%v] Consumer Error: %s\n", kr.meta.RunnerName, err)
+			log.Error(err)
+			kr.setStatsError(err.Error())
 		}
 	case msg := <-kr.in:
 		if msg != nil && msg.Value != nil && len(msg.Value) > 0 {
@@ -150,43 +177,6 @@ func (kr *Reader) SyncMeta() {
 	}
 	kr.mux.Unlock()
 	return
-}
-
-func (kr *Reader) Start() {
-	kr.startMux.Lock()
-	defer kr.startMux.Unlock()
-	if kr.started {
-		return
-	}
-	config := consumergroup.NewConfig()
-	config.Zookeeper.Chroot = kr.ZookeeperChroot
-	config.Zookeeper.Timeout = kr.ZookeeperTimeout
-	switch strings.ToLower(kr.Whence) {
-	case "oldest", "":
-		config.Offsets.Initial = sarama.OffsetOldest
-	case "newest":
-		config.Offsets.Initial = sarama.OffsetNewest
-	default:
-		log.Warnf("Runner[%v] WARNING: Kafka consumer invalid offset '%s', using 'oldest'\n", kr.meta.RunnerName, kr.Whence)
-		config.Offsets.Initial = sarama.OffsetOldest
-	}
-	if kr.Consumer == nil || kr.Consumer.Closed() {
-		var consumerErr error
-		kr.Consumer, consumerErr = consumergroup.JoinConsumerGroup(
-			kr.ConsumerGroup,
-			kr.Topics,
-			kr.ZookeeperPeers,
-			config,
-		)
-		if consumerErr != nil {
-			log.Errorf("%v", consumerErr)
-			return
-		}
-		kr.in = kr.Consumer.Messages()
-		kr.errs = kr.Consumer.Errors()
-	}
-	kr.started = true
-	log.Infof("Runner[%v] %v pull data daemon started", kr.meta.RunnerName, kr.Name())
 }
 
 func (kr *Reader) SetMode(mode string, v interface{}) error {
