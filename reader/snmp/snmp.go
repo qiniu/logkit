@@ -56,6 +56,7 @@ type Reader struct {
 	Status   int32
 	StopChan chan struct{}
 	DataChan chan interface{}
+	errChan  chan error
 }
 
 var execCommand = exec.Command
@@ -133,7 +134,7 @@ func NewReader(meta *reader.Meta, c conf.MapConf) (s reader.Reader, err error) {
 			return
 		}
 	}
-	s = &Reader{
+	return &Reader{
 		Meta:           meta,
 		SnmpName:       name,
 		Agents:         agents,
@@ -159,10 +160,9 @@ func NewReader(meta *reader.Meta, c conf.MapConf) (s reader.Reader, err error) {
 		Status:          reader.StatusInit,
 		StopChan:        make(chan struct{}),
 		DataChan:        make(chan interface{}, 1000),
+		errChan:         make(chan error),
 		ConnectionCache: make([]snmpConnection, len(agents)),
-	}
-
-	return
+	}, nil
 }
 
 type Table struct {
@@ -273,15 +273,16 @@ func (s *Reader) StoreData(data []map[string]interface{}) (err error) {
 }
 
 func (s *Reader) Gather() (err error) {
-	errMux := new(sync.Mutex)
 	var wg sync.WaitGroup
 	data := make([]map[string]interface{}, 0)
+	errChan := make(chan error, len(s.Agents))
 	for i, agent := range s.Agents {
 		wg.Add(1)
 		go func(i int, agent string) {
 			defer wg.Done()
-			gs, err1 := s.getConnection(i)
-			if err1 != nil {
+			gs, subErr := s.getConnection(i)
+			if subErr != nil {
+				errChan <- subErr
 				return
 			}
 			t := Table{
@@ -289,30 +290,33 @@ func (s *Reader) Gather() (err error) {
 				Fields: s.Fields,
 			}
 			topTags := map[string]string{}
-			if data, err1 = s.gatherTable(gs, t, topTags, false); err1 != nil {
+			if data, subErr = s.gatherTable(gs, t, topTags, false); subErr != nil {
+				errChan <- subErr
 				return
 			}
 			if err1 := s.StoreData(data); err1 != nil {
-				errMux.Lock()
-				err = err1
-				errMux.Unlock()
+				errChan <- err1
 				return
 			}
 			for _, t := range s.Tables {
-				if data, err1 = s.gatherTable(gs, t, topTags, true); err1 != nil {
+				if data, subErr = s.gatherTable(gs, t, topTags, true); subErr != nil {
+					errChan <- subErr
 					return
 				}
 				if err1 := s.StoreData(data); err1 != nil {
-					errMux.Lock()
-					err = err1
-					errMux.Unlock()
+					errChan <- err1
 					return
 				}
 			}
 		}(i, agent)
 	}
 	wg.Wait()
-	return
+	close(errChan)
+	for subErr := range errChan {
+		log.Errorf("gather error: ", subErr)
+		err = subErr
+	}
+	return err
 }
 
 func (s *Reader) gatherTable(gs snmpConnection, t Table, topTags map[string]string, walk bool) (data []map[string]interface{}, err error) {
@@ -374,10 +378,13 @@ func (s *Reader) Start() error {
 			case <-ticker.C:
 				err := s.Gather()
 				if err != nil {
-					log.Errorf("runner[%v] Reader[%v] gather error %v", s.Meta.RunnerName, s.Name(), err)
+					err = fmt.Errorf("runner[%v] Reader[%v] gather error %v", s.Meta.RunnerName, s.Name(), err)
+					log.Error(err)
+					s.sendError(err)
 				}
 			case <-s.StopChan:
 				close(s.DataChan)
+				close(s.errChan)
 				return
 			}
 		}
@@ -385,10 +392,23 @@ func (s *Reader) Start() error {
 	return nil
 }
 
+func (s *Reader) sendError(err error) {
+	if err == nil {
+		return
+	}
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Errorf("Reader %s panic, recovered from %v", s.Name(), rec)
+		}
+	}()
+	s.errChan <- err
+}
+
 func (s *Reader) ReadLine() (line string, err error) {
 	if atomic.LoadInt32(&s.Status) == reader.StatusInit {
 		if err = s.Start(); err != nil {
 			log.Error(err)
+			return "", err
 		}
 	}
 	select {
@@ -398,6 +418,7 @@ func (s *Reader) ReadLine() (line string, err error) {
 			return
 		}
 		line = string(db)
+	case err = <-s.errChan:
 	default:
 	}
 	return

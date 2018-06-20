@@ -42,7 +42,8 @@ type Reader struct {
 	Cron         *cron.Cron //定时任务
 	loop         bool
 	loopDuration time.Duration
-	readChan     chan []byte  //bson
+	readChan     chan []byte //bson
+	errChan      chan error
 	meta         *reader.Meta // 记录offset的元数据
 	session      *mgo.Session
 	offset       interface{} //对于默认的offset_key: "_id", 是objectID作为offset，存储的表现形式是string，其他则是int64
@@ -95,6 +96,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (mr reader.Reader, err erro
 		Cron:              cron.New(),
 		status:            reader.StatusInit,
 		readChan:          make(chan []byte),
+		errChan:           make(chan error),
 		execOnStart:       execOnStart,
 		started:           false,
 		mux:               sync.Mutex{},
@@ -122,7 +124,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (mr reader.Reader, err erro
 			mmr.loop = true
 			mmr.loopDuration, err = reader.ParseLoopDuration(cronSched)
 			if err != nil {
-				log.Errorf("Runner[%v] %v %v", mmr.meta.RunnerName, mr.Name(), err)
+				log.Errorf("Runner[%v] %v %v", mmr.meta.RunnerName, mmr.Name(), err)
 				err = nil
 			}
 		} else {
@@ -130,7 +132,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (mr reader.Reader, err erro
 			if err != nil {
 				return
 			}
-			log.Infof("Runner[%v] %v Cron added with schedule <%v>", mmr.meta.RunnerName, mr.Name(), cronSched)
+			log.Infof("Runner[%v] %v Cron added with schedule <%v>", mmr.meta.RunnerName, mmr.Name(), cronSched)
 		}
 	}
 	mr = mmr
@@ -167,6 +169,7 @@ func (mr *Reader) Close() (err error) {
 	} else {
 		atomic.CompareAndSwapInt32(&mr.status, reader.StatusInit, reader.StatusStopped)
 		close(mr.readChan)
+		close(mr.errChan)
 	}
 	return
 }
@@ -209,6 +212,7 @@ func (mr *Reader) ReadLine() (data string, err error) {
 	select {
 	case dat := <-mr.readChan:
 		data = string(dat)
+	case err = <-mr.errChan:
 	case <-timer.C:
 	}
 	timer.Stop()
@@ -238,6 +242,7 @@ func (mr *Reader) run() {
 		atomic.CompareAndSwapInt32(&mr.status, reader.StatusRunning, reader.StatusInit)
 		if atomic.CompareAndSwapInt32(&mr.status, reader.StatusStopping, reader.StatusStopped) {
 			close(mr.readChan)
+			close(mr.errChan)
 		}
 		if err == nil {
 			log.Infof("Runner[%v] %v successfully finished", mr.meta.RunnerName, mr.Name())
@@ -257,8 +262,21 @@ func (mr *Reader) run() {
 		}
 		log.Error(err)
 		mr.setStatsError(err.Error())
+		mr.sendError(err)
 		time.Sleep(3 * time.Second)
 	}
+}
+
+func (s *Reader) sendError(err error) {
+	if err == nil {
+		return
+	}
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Errorf("Reader %s panic, recovered from %v", s.Name(), rec)
+		}
+	}()
+	s.errChan <- err
 }
 
 func (mr *Reader) catQuery(c string, lastID interface{}, mgoSession *mgo.Session) *mgo.Query {

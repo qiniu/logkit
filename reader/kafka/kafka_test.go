@@ -1,7 +1,6 @@
 package kafka
 
 import (
-	"encoding/json"
 	"os"
 	"sync"
 	"testing"
@@ -31,11 +30,8 @@ func TestKafkaReader(t *testing.T) {
 		ZookeeperPeers:   []string{"localhost:2181"},
 		ZookeeperTimeout: time.Second,
 		Whence:           "oldest",
-		readChan:         make(chan json.RawMessage),
 		errs:             make(chan error, 1000),
-		status:           reader.StatusInit,
 		mux:              new(sync.Mutex),
-		started:          false,
 		statsLock:        new(sync.RWMutex),
 	}
 	assert.EqualValues(t, "KafkaReader:[topic1],[group1]", er.Name())

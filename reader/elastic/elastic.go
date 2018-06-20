@@ -29,6 +29,7 @@ type Reader struct {
 	keepAlive string //scrollID 保留时间
 	esVersion string //ElasticSearch version
 	readChan  chan json.RawMessage
+	errChan   chan error
 
 	meta   *reader.Meta // 记录offset的元数据
 	offset string       // 当前处理es的offset
@@ -66,7 +67,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (er reader.Reader, err erro
 	if err != nil {
 		log.Errorf("Runner[%v] %v -meta data is corrupted err:%v, omit meta data", meta.RunnerName, meta.MetaFile(), err)
 	}
-	er = &Reader{
+	return &Reader{
 		esindex:   esindex,
 		estype:    estype,
 		eshost:    eshost,
@@ -77,12 +78,11 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (er reader.Reader, err erro
 		status:    reader.StatusInit,
 		offset:    offset,
 		readChan:  make(chan json.RawMessage),
+		errChan:   make(chan error),
 		mux:       sync.Mutex{},
 		statsLock: sync.RWMutex{},
 		started:   false,
-	}
-
-	return er, nil
+	}, nil
 }
 
 func (er *Reader) Name() string {
@@ -111,6 +111,7 @@ func (er *Reader) Close() (err error) {
 	} else {
 		atomic.CompareAndSwapInt32(&er.status, reader.StatusInit, reader.StatusStopped)
 		close(er.readChan)
+		close(er.errChan)
 	}
 	return
 }
@@ -135,10 +136,23 @@ func (er *Reader) ReadLine() (data string, err error) {
 	select {
 	case dat := <-er.readChan:
 		data = string(dat)
+	case err = <-er.errChan:
 	case <-timer.C:
 	}
 	timer.Stop()
 	return
+}
+
+func (s *Reader) sendError(err error) {
+	if err == nil {
+		return
+	}
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Errorf("Reader %s panic, recovered from %v", s.Name(), rec)
+		}
+	}()
+	s.errChan <- err
 }
 
 func (er *Reader) run() (err error) {
@@ -162,6 +176,7 @@ func (er *Reader) run() (err error) {
 		atomic.CompareAndSwapInt32(&er.status, reader.StatusRunning, reader.StatusInit)
 		if atomic.CompareAndSwapInt32(&er.status, reader.StatusStopping, reader.StatusStopped) {
 			close(er.readChan)
+			close(er.errChan)
 		}
 		if err == nil {
 			log.Infof("Runner[%v] %v successfully finished", er.meta.RunnerName, er.Name())
@@ -181,6 +196,7 @@ func (er *Reader) run() (err error) {
 		}
 		log.Error(err)
 		er.setStatsError(err.Error())
+		er.sendError(err)
 		time.Sleep(3 * time.Second)
 	}
 }

@@ -36,6 +36,7 @@ type Reader struct {
 	cacheMap    map[string]string
 
 	msgChan chan Result
+	errChan chan error
 
 	//以下为传入参数
 	meta           *reader.Meta
@@ -56,6 +57,7 @@ type ActiveReader struct {
 	originpath   string
 	readcache    string
 	msgchan      chan<- Result
+	errChan      chan<- error
 	status       int32
 	inactive     int32 //当inactive>0 时才会被expire回收
 	runnerName   string
@@ -71,7 +73,7 @@ type Result struct {
 	logpath string
 }
 
-func NewActiveReader(originPath, realPath, whence string, meta *reader.Meta, msgChan chan<- Result) (ar *ActiveReader, err error) {
+func NewActiveReader(originPath, realPath, whence string, meta *reader.Meta, msgChan chan<- Result, errChan chan<- error) (ar *ActiveReader, err error) {
 	rpath := strings.Replace(realPath, string(os.PathSeparator), "_", -1)
 	subMetaPath := filepath.Join(meta.Dir, rpath)
 	subMeta, err := reader.NewMeta(subMetaPath, subMetaPath, realPath, reader.ModeFile, meta.TagFile, reader.DefautFileRetention)
@@ -79,7 +81,8 @@ func NewActiveReader(originPath, realPath, whence string, meta *reader.Meta, msg
 		return nil, err
 	}
 	subMeta.Readlimit = meta.Readlimit
-	fr, err := reader.NewSingleFile(subMeta, realPath, whence, false)
+	//tailx模式下新增runner是因为文件已经感知到了，所以不可能文件不存在，那么如果读取还遇到错误，应该马上返回，所以errDirectReturn=true
+	fr, err := reader.NewSingleFile(subMeta, realPath, whence, true)
 	if err != nil {
 		return
 	}
@@ -93,6 +96,7 @@ func NewActiveReader(originPath, realPath, whence string, meta *reader.Meta, msg
 		realpath:     realPath,
 		originpath:   originPath,
 		msgchan:      msgChan,
+		errChan:      errChan,
 		inactive:     1,
 		emptyLineCnt: 0,
 		runnerName:   meta.RunnerName,
@@ -122,6 +126,7 @@ func (ar *ActiveReader) Run() {
 			if err != nil && err != io.EOF {
 				log.Warnf("Runner[%v] ActiveReader %s read error: %v", ar.runnerName, ar.originpath, err)
 				ar.setStatsError(err.Error())
+				ar.sendError(err)
 				time.Sleep(3 * time.Second)
 				continue
 			}
@@ -175,7 +180,6 @@ func (ar *ActiveReader) Run() {
 func (ar *ActiveReader) Close() error {
 	defer log.Warnf("Runner[%v] ActiveReader %s was closed", ar.runnerName, ar.originpath)
 	err := ar.br.Close()
-
 	if atomic.CompareAndSwapInt32(&ar.status, reader.StatusRunning, reader.StatusStopping) {
 		log.Warnf("Runner[%v] ActiveReader %s was closing", ar.runnerName, ar.originpath)
 	} else {
@@ -200,6 +204,18 @@ func (ar *ActiveReader) setStatsError(err string) {
 	ar.statsLock.Lock()
 	defer ar.statsLock.Unlock()
 	ar.stats.LastError = err
+}
+
+func (ar *ActiveReader) sendError(err error) {
+	if err == nil {
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("Runner[%v] ActiveReader %s Recovered from %v", ar.runnerName, ar.originpath, r)
+		}
+	}()
+	ar.errChan <- err
 }
 
 func (ar *ActiveReader) Status() StatsInfo {
@@ -283,7 +299,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (mr reader.Reader, err erro
 		err = nil
 	}
 
-	mr = &Reader{
+	return &Reader{
 		meta:           meta,
 		logPathPattern: logPathPattern,
 		whence:         whence,
@@ -297,10 +313,10 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (mr reader.Reader, err erro
 		cacheMap:       cacheMap,                       //armapmux
 		armapmux:       sync.Mutex{},
 		msgChan:        make(chan Result),
+		errChan:        make(chan error),
 		statsLock:      sync.RWMutex{},
-	}
+	}, nil
 
-	return
 }
 
 //Expire 函数关闭过期的文件，再更新
@@ -337,6 +353,18 @@ func (mr *Reader) SetMode(mode string, value interface{}) (err error) {
 		mr.headRegexp = reg
 	}
 	return
+}
+
+func (mr *Reader) sendError(err error) {
+	if err == nil {
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("Reader %s Recovered from %v", mr.Name(), r)
+		}
+	}()
+	mr.errChan <- err
 }
 
 func (mr *Reader) StatLogPath() {
@@ -380,9 +408,11 @@ func (mr *Reader) StatLogPath() {
 			log.Debugf("Runner[%v] <%v> is expired, ignore...", mr.meta.RunnerName, mc)
 			continue
 		}
-		ar, err := NewActiveReader(mc, rp, mr.whence, mr.meta, mr.msgChan)
+		ar, err := NewActiveReader(mc, rp, mr.whence, mr.meta, mr.msgChan, mr.errChan)
 		if err != nil {
-			log.Errorf("Runner[%v] NewActiveReader for matches %v error %v, ignore this match...", mr.meta.RunnerName, rp, err)
+			err = fmt.Errorf("runner[%v] NewActiveReader for matches %v error %v", mr.meta.RunnerName, rp, err)
+			mr.sendError(err)
+			log.Error(err, ", ignore this match...")
 			continue
 		}
 		ar.readcache = cacheline
@@ -473,6 +503,7 @@ func (mr *Reader) Close() (err error) {
 	wg.Wait()
 	//在所有 active readers都关闭后再close msgChan
 	close(mr.msgChan)
+	close(mr.errChan)
 	return
 }
 
@@ -512,6 +543,7 @@ func (mr *Reader) ReadLine() (data string, err error) {
 	case result := <-mr.msgChan:
 		mr.curFile = result.logpath
 		data = result.result
+	case err = <-mr.errChan:
 	case <-timer.C:
 	}
 	timer.Stop()

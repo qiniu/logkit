@@ -36,6 +36,7 @@ func (ssr *streamSocketReader) listen() {
 	defer func() {
 		if atomic.CompareAndSwapInt32(&ssr.status, reader.StatusStopping, reader.StatusStopped) {
 			close(ssr.ReadChan)
+			close(ssr.errChan)
 		}
 	}()
 	for {
@@ -112,13 +113,14 @@ func (ssr *streamSocketReader) read(c net.Conn) {
 		if atomic.LoadInt32(&ssr.status) == reader.StatusStopped || atomic.LoadInt32(&ssr.status) == reader.StatusStopping {
 			return
 		}
-		ssr.ReadChan <- string(scnr.Bytes())
+		ssr.ReadChan <- scnr.Bytes()
 	}
 
 	if err := scnr.Err(); err != nil {
 		if err, ok := err.(net.Error); ok && err.Timeout() {
 			log.Debugf("streamSocketReader Timeout : %s", err)
 		} else if !strings.HasSuffix(err.Error(), ": use of closed network connection") {
+			ssr.sendError(err)
 			log.Error(err)
 		}
 	}
@@ -135,6 +137,7 @@ func (psr *packetSocketReader) listen() {
 	defer func() {
 		if atomic.CompareAndSwapInt32(&psr.status, reader.StatusStopping, reader.StatusStopped) {
 			close(psr.ReadChan)
+			close(psr.errChan)
 		}
 	}()
 
@@ -147,13 +150,14 @@ func (psr *packetSocketReader) listen() {
 			if !strings.HasSuffix(err.Error(), ": use of closed network connection") {
 				log.Error(err)
 			}
+			psr.sendError(err)
 			break
 		}
 		// double check
 		if atomic.LoadInt32(&psr.status) == reader.StatusStopped || atomic.LoadInt32(&psr.status) == reader.StatusStopping {
 			return
 		}
-		psr.ReadChan <- string(buf[:n])
+		psr.ReadChan <- buf[:n]
 	}
 }
 
@@ -172,8 +176,21 @@ type Reader struct {
 	meta            *reader.Meta // 记录offset的元数据
 
 	// resource need  close
-	ReadChan chan string
+	ReadChan chan []byte
+	errChan  chan error
 	Closer   io.Closer
+}
+
+func (sr *Reader) sendError(err error) {
+	if err == nil {
+		return
+	}
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Errorf("Reader %s panic, recovered from %v", sr.Name(), rec)
+		}
+	}()
+	sr.errChan <- err
 }
 
 func (sr *Reader) Name() string {
@@ -204,6 +221,7 @@ func (sr *Reader) ReadLine() (data string, err error) {
 	select {
 	case dat := <-sr.ReadChan:
 		data = string(dat)
+	case err = <-sr.errChan:
 	case <-timer.C:
 	}
 	timer.Stop()
@@ -286,6 +304,7 @@ func (sr *Reader) Close() error {
 	} else {
 		atomic.CompareAndSwapInt32(&sr.status, reader.StatusInit, reader.StatusStopped)
 		close(sr.ReadChan)
+		close(sr.errChan)
 	}
 
 	var err error
@@ -325,7 +344,8 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		ReadBufferSize:  ReadBufferSize,
 		ReadTimeout:     ReadTimeoutdur,
 		KeepAlivePeriod: KeepAlivePeriodDur,
-		ReadChan:        make(chan string),
+		ReadChan:        make(chan []byte),
+		errChan:         make(chan error),
 		status:          reader.StatusInit,
 		meta:            meta,
 	}, nil

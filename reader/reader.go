@@ -192,6 +192,12 @@ const (
 	StatusRunning
 )
 
+func NewReader(conf conf.MapConf, errDirectReturn bool) (reader Reader, err error) {
+	rs := NewRegistry()
+	return rs.NewReader(conf, errDirectReturn)
+}
+
+//Deprecated: NewFileBufReader 名字上有歧义，实际上就是NewReader，包括任何类型，保证兼容性，保留
 func NewFileBufReader(conf conf.MapConf, errDirectReturn bool) (reader Reader, err error) {
 	rs := NewRegistry()
 	return rs.NewReader(conf, errDirectReturn)

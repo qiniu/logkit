@@ -29,6 +29,7 @@ type Reader struct {
 	Cron *cron.Cron //定时任务
 
 	readChan chan []byte
+	errChan  chan error
 
 	meta *reader.Meta
 
@@ -65,6 +66,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (sr reader.Reader, err erro
 		scripttype:  scriptType,
 		Cron:        cron.New(),
 		readChan:    make(chan []byte),
+		errChan:     make(chan error),
 		meta:        meta,
 		status:      reader.StatusInit,
 		mux:         sync.Mutex{},
@@ -102,10 +104,23 @@ func (sr *Reader) ReadLine() (data string, err error) {
 	select {
 	case dat := <-sr.readChan:
 		data = string(dat)
+	case err = <-sr.errChan:
 	case <-timer.C:
 	}
 	timer.Stop()
 	return
+}
+
+func (s *Reader) sendError(err error) {
+	if err == nil {
+		return
+	}
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Errorf("Reader %s panic, recovered from %v", s.Name(), rec)
+		}
+	}()
+	s.errChan <- err
 }
 
 //Start 仅调用一次，借用ReadLine启动，不能在new实例的时候启动，会有并发问题
@@ -147,6 +162,7 @@ func (sr *Reader) Close() (err error) {
 		log.Infof("Runner[%v] %v stopping", sr.meta.RunnerName, sr.Name())
 	} else {
 		close(sr.readChan)
+		close(sr.errChan)
 	}
 	return
 }
@@ -180,6 +196,7 @@ func (sr *Reader) run() {
 		atomic.CompareAndSwapInt32(&sr.status, reader.StatusRunning, reader.StatusInit)
 		if atomic.CompareAndSwapInt32(&sr.status, reader.StatusStopping, reader.StatusStopped) {
 			close(sr.readChan)
+			close(sr.errChan)
 		}
 		if err == nil {
 			log.Infof("Runner[%v] %v successfully finished", sr.meta.RunnerName, sr.Name())
@@ -197,8 +214,9 @@ func (sr *Reader) run() {
 			log.Infof("Runner[%v] %v successfully exec", sr.meta.RunnerName, sr.Name())
 			return
 		}
-		log.Error("Runner[%v] %v execute script error [%v]", sr.meta.RunnerName, sr.Name(), err)
+		log.Errorf("Runner[%v] %v execute script error [%v]", sr.meta.RunnerName, sr.Name(), err)
 		sr.setStatsError(err.Error())
+		sr.sendError(err)
 		time.Sleep(3 * time.Second)
 	}
 }

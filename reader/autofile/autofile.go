@@ -31,11 +31,11 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (r reader.Reader, err error
 	}
 	switch mode {
 	case reader.ModeTailx:
-		r, err = tailx.NewReader(meta, conf)
+		return tailx.NewReader(meta, conf)
 	case reader.ModeDir:
-		r, err = reader.NewFileDirReader(meta, conf)
+		return reader.NewFileDirReader(meta, conf)
 	case reader.ModeFile:
-		r, err = reader.NewSingleFileReader(meta, conf)
+		return reader.NewSingleFileReader(meta, conf)
 	default:
 		err = fmt.Errorf("can not find property mode for this logpath %v", logpath)
 	}

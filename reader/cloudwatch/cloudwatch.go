@@ -39,6 +39,7 @@ type (
 		status          int32
 		StopChan        chan struct{}
 		DataChan        chan models.Data
+		errChan         chan error
 	}
 
 	Metric struct {
@@ -147,7 +148,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (c reader.Reader, err error
 		Metrics = []*Metric{{MetricNames: metrics, Dimensions: dimensions}}
 	}
 
-	c = &CloudWatch{
+	return &CloudWatch{
 		Region:          region,
 		Namespace:       namespace,
 		client:          cloudwatch.New(configProvider, cfg),
@@ -160,9 +161,9 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (c reader.Reader, err error
 		status:          reader.StatusInit,
 		StopChan:        make(chan struct{}),
 		DataChan:        make(chan models.Data),
+		errChan:         make(chan error),
 		Metrics:         Metrics,
-	}
-	return
+	}, nil
 }
 
 func (c *CloudWatch) Name() string {
@@ -187,6 +188,7 @@ func (c *CloudWatch) ReadLine() (line string, err error) {
 			return
 		}
 		line = string(db)
+	case err = <-c.errChan:
 	default:
 	}
 	return
@@ -295,11 +297,24 @@ func (c *CloudWatch) Start() error {
 				}
 			case <-c.StopChan:
 				close(c.DataChan)
+				close(c.errChan)
 				return
 			}
 		}
 	}()
 	return nil
+}
+
+func (s *CloudWatch) sendError(err error) {
+	if err == nil {
+		return
+	}
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Errorf("Reader %s panic, recovered from %v", s.Name(), rec)
+		}
+	}()
+	s.errChan <- err
 }
 
 func (c *CloudWatch) Gather() error {
@@ -322,6 +337,7 @@ func (c *CloudWatch) Gather() error {
 			if err != nil {
 				log.Errorf("gatherMetric error %v", err)
 				lastErr = err
+				c.sendError(err)
 			}
 			log.Debugf("successfully gatherMetric %v data %v", *inm.MetricName, len(datas))
 			for _, v := range datas {
