@@ -87,6 +87,7 @@ type StatsError struct {
 	Ft                  bool  `json:"-"`
 	FtNotRetry          bool  `json:"-"`
 	DatasourceSkipIndex []int
+	RemainDatas         []Data
 }
 
 type StatsInfo struct {

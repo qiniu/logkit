@@ -42,7 +42,7 @@ const (
 	KeyPandoraKodoGzip           = "pandora_kodo_gzip"
 	KeyPandoraKodoRotateStrategy = "pandora_kodo_rotate_strategy"
 	KeyPandoraKodoRotateInterval = "pandora_kodo_rotate_interval"
-	KeyPandoraKodoRotateSize	 = "pandora_kodo_rotate_size"
+	KeyPandoraKodoRotateSize     = "pandora_kodo_rotate_size"
 
 	KeyPandoraEmail = "qiniu_email"
 
@@ -57,6 +57,7 @@ const (
 	KeyPandoraAutoConvertDate = "pandora_auto_convert_date"
 	KeyIgnoreInvalidField     = "ignore_invalid_field"
 	KeyPandoraUnescape        = "pandora_unescape"
+	KeyPandoraSendType        = "pandora_send_type"
 	KeyInsecureServer         = "insecure_server"
 
 	PandoraUUID = "Pandora_UUID"
