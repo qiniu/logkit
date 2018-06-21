@@ -505,7 +505,6 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 		err = se.ErrorDetail
 		r.rs.ParserStats.Errors += se.Errors
 		r.rs.ParserStats.Success += se.Success
-		log.Debugf("Runner[%v] stats error, datas %v DatasourceSkipIndex %v", datas, se.DatasourceSkipIndex)
 	} else if err != nil {
 		numErrs = 1
 		r.rs.ParserStats.Errors++

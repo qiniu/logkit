@@ -22,7 +22,8 @@ type Sender struct {
 	topic []string
 	cfg   *sarama.Config
 
-	producer sarama.SyncProducer
+	lastError error //用于防止所有的错误都被 kafka熔断的错误提示刷掉
+	producer  sarama.SyncProducer
 }
 
 var (
@@ -134,14 +135,34 @@ func (this *Sender) Send(data []Data) error {
 	}
 	err := producer.SendMessages(msgs)
 	if err != nil {
-		ss.AddErrors()
-		ss.ErrorDetail = err
+		ss.AddErrorsNum(len(msgs))
+		if pde, ok := err.(sarama.ProducerErrors); ok {
+			var allcir = true
+			for _, v := range pde {
+				//对于熔断的错误提示，没有任何帮助，过滤掉
+				if strings.Contains(v.Error(), "circuit breaker is open") {
+					continue
+				}
+				allcir = false
+				ss.ErrorDetail = fmt.Errorf("%v detail: %v", ss.ErrorDetail, v.Error())
+				this.lastError = v
+				break
+			}
+			if allcir {
+				ss.ErrorDetail = fmt.Errorf("%v, all error is circuit breaker is open , last error %v", err, this.lastError)
+			}
+		} else {
+			ss.ErrorDetail = err
+		}
 		return ss
 	}
-	ss.AddSuccess()
+	ss.AddSuccessNum(len(msgs))
 	if lastErr != nil {
 		ss.LastError = lastErr.Error()
+		return ss
 	}
+	//本次发送成功, lastError 置为 nil
+	this.lastError = nil
 	return ss
 }
 

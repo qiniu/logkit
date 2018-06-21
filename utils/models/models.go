@@ -105,11 +105,25 @@ func (se *StatsError) AddSuccess() {
 	atomic.AddInt64(&se.Success, 1)
 }
 
+func (se *StatsError) AddSuccessNum(n int) {
+	if se == nil {
+		return
+	}
+	atomic.AddInt64(&se.Success, int64(n))
+}
+
 func (se *StatsError) AddErrors() {
 	if se == nil {
 		return
 	}
 	atomic.AddInt64(&se.Errors, 1)
+}
+
+func (se *StatsError) AddErrorsNum(n int) {
+	if se == nil {
+		return
+	}
+	atomic.AddInt64(&se.Errors, int64(n))
 }
 
 func (se *StatsError) Error() string {
