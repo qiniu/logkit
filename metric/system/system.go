@@ -4,11 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"strings"
+	"net"
 
 	"github.com/qiniu/logkit/metric"
 	. "github.com/qiniu/logkit/utils/models"
-	"strings"
-	"net"
 	"github.com/labstack/gommon/log"
 )
 
