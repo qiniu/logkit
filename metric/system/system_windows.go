@@ -2,11 +2,14 @@ package system
 
 import (
 	"runtime"
+	"os/exec"
+	"strings"
 
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/w32"
-
 	"github.com/qiniu/logkit/metric"
+	"github.com/labstack/gommon/log"
+	"github.com/qiniu/logkit/mgr"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -47,6 +50,9 @@ func (_ *WinSystemStats) Collect() (datas []map[string]interface{}, err error) {
 		KeySystemNCpus:        runtime.NumCPU(),
 		KeySystemUptime:       uptime,
 		KeySystemUptimeFormat: formatUptime(uptime),
+		KeySystemNNetCards:    getNumNetCard(),
+		KeySystemNDisks:       getNumDisk(),
+		KeySystemNServices:    getNumService(),
 	}
 	datas = append(datas, data)
 	return
@@ -56,4 +62,24 @@ func init() {
 	metric.Add(TypeMetricSystem, func() metric.Collector {
 		return &WinSystemStats{}
 	})
+}
+
+//若无法获取磁盘个数，返回挂载点的个数
+func getNumDisk() int {
+	diskMetrics, err := mgr.NewMetric("disk")
+	mounts, err := diskMetrics.Collect()
+	mountsNum := len(mounts)
+	out, err := exec.Command("diskpart", "/S", "diskpart.txt").Output()
+	if err != nil {
+		log.Errorf(err.Error())
+		return mountsNum
+	}
+	str := string(out)
+	index := strings.Index(str, "--------  -------------  -------  -------  ---  ---")
+	disks := strings.Split(str[index:], "\n")
+	return len(disks) - 2
+}
+
+func getNumService() int {
+	return -1
 }

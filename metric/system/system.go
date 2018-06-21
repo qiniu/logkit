@@ -7,6 +7,9 @@ import (
 
 	"github.com/qiniu/logkit/metric"
 	. "github.com/qiniu/logkit/utils/models"
+	"strings"
+	"net"
+	"github.com/labstack/gommon/log"
 )
 
 const (
@@ -21,6 +24,9 @@ const (
 	KeySystemNCpus        = "system_n_cpus"
 	KeySystemUptime       = "system_uptime"
 	KeySystemUptimeFormat = "system_uptime_format"
+	KeySystemNNetCards    = "system_n_net_cards"
+	KeySystemNDisks       = "system_n_disks"
+	KeySystemNServices    = "system_n_services"
 )
 
 // KeySystemUsages TypeMetricSystem的字段名称
@@ -32,6 +38,9 @@ var KeySystemUsages = []KeyValue{
 	{KeySystemNCpus, "CPU核数"},
 	{KeySystemUptime, "系统启动时间"},
 	{KeySystemUptimeFormat, "格式化的系统启动时间"},
+	{KeySystemNNetCards, "网卡数"},
+	{KeySystemNDisks, "磁盘数"},
+	{KeySystemNServices, "总服务数"},
 }
 
 type SystemStats struct {
@@ -84,4 +93,20 @@ func formatUptime(uptime uint64) string {
 
 	w.Flush()
 	return buf.String()
+}
+
+func getNumNetCard() int {
+	var macAddress []string
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		log.Errorf("Can not get local interface info:%s", err)
+		return 0
+	}
+	for _, inter := range interfaces {
+		flags := inter.Flags.String()
+		if strings.Contains(flags, "up") && strings.Contains(flags, "broadcast") {
+			macAddress = append(macAddress, inter.HardwareAddr.String())
+		}
+	}
+	return len(macAddress)
 }

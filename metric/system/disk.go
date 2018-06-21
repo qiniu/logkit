@@ -97,7 +97,6 @@ func (s *DiskStats) Collect() (datas []map[string]interface{}, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("error getting disk usage info: %s", err)
 	}
-
 	for i, du := range disks {
 		if du.Total == 0 {
 			// Skip dummy filesystem (procfs, cgroupfs, ...)
