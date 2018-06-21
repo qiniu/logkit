@@ -122,6 +122,10 @@ func (d *diskQueue) Name() string {
 	return d.name
 }
 
+func (d *diskQueue) SyncMeta() {
+	return
+}
+
 // Depth returns the depth of the queue
 func (d *diskQueue) Depth() int64 {
 	d.RLock()

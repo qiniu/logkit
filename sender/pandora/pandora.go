@@ -443,6 +443,7 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 		UserSchema: userSchema,
 		schemas:    make(map[string]pipeline.RepoSchemaEntry),
 		extraInfo:  utilsos.GetExtraInfo(),
+		sendType:   opt.sendType,
 	}
 
 	expandAttr := make([]string, 0)

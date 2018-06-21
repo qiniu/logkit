@@ -78,6 +78,17 @@ var (
 		AdvanceDepend: KeyFtMemoryChannel,
 		ToolTip:       `默认为"100"，单位为批次，也就是100代表100个待发送的批次，注意：该选项设置的大小表达的是队列中可存储的元素个数，并不是占用的内存大小`,
 	}
+	OptionFtKafkaChannel = Option{
+		KeyName:       KeyKafkaQueue,
+		Element:       Radio,
+		ChooseOnly:    true,
+		ChooseOptions: []interface{}{"false", "true"},
+		Default:       "false",
+		DefaultNoUse:  false,
+		Description:   "用kafka队列(kafka_queue)",
+		Advance:       true,
+		ToolTip:       `kafka队列代替磁盘队列`,
+	}
 	OptionLogkitSendTime = Option{
 		KeyName:       KeyLogkitSendTime,
 		Element:       Radio,
