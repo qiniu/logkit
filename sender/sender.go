@@ -266,7 +266,7 @@ func (r *Registry) NewSender(conf conf.MapConf, ftSaveLogPath string) (sender Se
 		}
 	}
 
-	kq, _ := conf.GetBoolOr(KeyFtKafkaQueue, true)
+	kq, _ := conf.GetBoolOr(KeyKafkaQueue, true)
 	if kq {
 		sender, err = NewKQueueSender(sender, conf)
 		if err != nil {

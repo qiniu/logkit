@@ -11,8 +11,8 @@ import (
 
 	"github.com/json-iterator/go"
 	"github.com/qbox/base/com/src/qbox.us/errors"
-	. "github.com/qiniu/logkit/sender/pandora"
 	"sync"
+	"fmt"
 )
 
 // FtSender fault tolerance sender wrapper
@@ -35,7 +35,9 @@ type KqOption struct {
 
 var (
 	Kqs *KQueueSender
-	mtx *sync.RWMutex = new(sync.RWMutex)
+	mtx = new(sync.RWMutex)
+
+	SendTypeRaw    = "raw"
 )
 
 const (
@@ -224,7 +226,14 @@ func (kq *KQueueSender) trySendDatas(datas []Data, failSleep int, isRetry bool) 
 		conf[KeyPandoraRegion] = DEFAULTREGION
 		conf[KeyPandoraHost] = DEFAULTHOST
 
-		sender, err = NewSender(conf)
+		constructor, exist := registeredConstructors[TypePandora]
+		if !exist {
+			return fmt.Errorf("pandora sender type unsupported")
+		}
+		sender, err = constructor(conf)
+		if err != nil {
+			return
+		}
 		kq.innerSenders[ak+repo] = sender
 	}
 	err = sender.Send(datas)
