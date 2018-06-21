@@ -30,6 +30,11 @@ import (
 
 var osInfo = []string{KeyCore, KeyHostName, KeyOsInfo, KeyLocalIp}
 
+const (
+	SendTypeRaw    = "raw"
+	SendTypeNormal = "normal"
+)
+
 // pandora sender
 type Sender struct {
 	client             pipeline.PipelineAPI
@@ -41,6 +46,7 @@ type Sender struct {
 	opt                PandoraOption
 	microsecondCounter uint64
 	extraInfo          map[string]string
+	sendType           string
 }
 
 // UserSchema was parsed pandora schema from user's raw schema
@@ -58,6 +64,8 @@ type Tokens struct {
 
 // PandoraOption 创建Pandora Sender的选项
 type PandoraOption struct {
+	sendType string
+
 	runnerName     string
 	name           string
 	repoName       string
@@ -202,6 +210,8 @@ func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
 	unescape, _ := conf.GetBoolOr(sender.KeyPandoraUnescape, false)
 	insecureServer, _ := conf.GetBoolOr(sender.KeyInsecureServer, false)
 
+	sendType, _ := conf.GetStringOr(sender.KeyPandoraSendType, SendTypeNormal)
+
 	var subErr error
 	var tokens Tokens
 	if tokens, subErr = getTokensFromConf(conf); subErr != nil {
@@ -223,6 +233,7 @@ func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
 	}
 
 	opt := &PandoraOption{
+		sendType:       sendType,
 		runnerName:     runnerName,
 		name:           name,
 		workflowName:   workflowName,
@@ -816,6 +827,75 @@ func (s *Sender) checkSchemaUpdate() {
 }
 
 func (s *Sender) Send(datas []Data) (se error) {
+	switch s.sendType {
+	case SendTypeRaw:
+		return s.rawSend(datas)
+	default:
+		return s.schemaFreeSend(datas)
+	}
+	return nil
+}
+
+func (s *Sender) rawSend(datas []Data) (se error) {
+	for idx, v := range datas {
+		if v["_repo"] == nil || v["_raw"] == nil {
+			return &StatsError{
+				ErrorDetail: errors.New("_repo or _raw not found"),
+				StatsInfo: StatsInfo{
+					Success:   int64(idx),
+					Errors:    int64(len(datas[idx:]) - idx),
+					LastError: "_repo not found",
+				},
+				RemainDatas: datas[idx:],
+			}
+		}
+		repoName, ok := v["_repo"].(string)
+		if !ok {
+			return &StatsError{
+				ErrorDetail: errors.New("_repo not string type"),
+				StatsInfo: StatsInfo{
+					Success:   int64(idx),
+					Errors:    int64(len(datas) - idx),
+					LastError: "_repo not string type",
+				},
+				RemainDatas: datas[idx:],
+			}
+		}
+		raw, ok := v["_raw"].([]byte)
+		if !ok {
+			return &StatsError{
+				ErrorDetail: errors.New("_raw not []byte type"),
+				StatsInfo: StatsInfo{
+					Success:   int64(idx),
+					Errors:    int64(len(datas[idx:])),
+					LastError: "_raw not []byte type",
+				},
+				RemainDatas: datas[idx:],
+			}
+		}
+
+		err := s.client.PostDataFromBytes(&pipeline.PostDataFromBytesInput{RepoName: repoName, Buffer: raw})
+		if err != nil {
+			return &StatsError{
+				ErrorDetail: errors.New("_raw not []byte type"),
+				StatsInfo: StatsInfo{
+					Success:   int64(idx),
+					Errors:    int64(len(datas) - idx),
+					LastError: "_raw not []byte type",
+				},
+				RemainDatas: datas[idx:],
+			}
+		}
+	}
+	return &StatsError{
+		StatsInfo: StatsInfo{
+			Success: int64(len(datas)),
+			Errors:  0,
+		},
+	}
+}
+
+func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 	s.checkSchemaUpdate()
 	if !s.opt.schemaFree && (len(s.schemas) <= 0 || len(s.alias2key) <= 0) {
 		se = reqerr.NewSendError("Get pandora schema error, failed to send data", sender.ConvertDatasBack(datas), reqerr.TypeDefault)
