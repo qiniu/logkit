@@ -68,6 +68,7 @@ const (
 	KeySenderType        = "sender_type"
 	KeyFaultTolerant     = "fault_tolerant"
 	KeyKafkaQueue        = "kafka_queue"
+	KeyKafkaQueueHost    = "kafka_queue_hosts"
 	KeyName              = "name"
 	KeyLogkitSendTime    = "logkit_send_time"
 	KeyIsMetrics         = "is_metrics"

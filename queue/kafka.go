@@ -8,6 +8,7 @@ import (
 	"github.com/wvanbergen/kafka/consumergroup"
 	"github.com/qbox/base/com/src/qbox.us/errors"
 	"qiniupkg.com/x/log.v7"
+	"github.com/wvanbergen/kazoo-go"
 )
 
 const(
@@ -33,13 +34,13 @@ type kafkaQueue struct {
 func NewKafkaQueue(name string, hosts []string, exitChan chan struct{}) BackendQueue {
 	producer, err := createProducer(hosts)
 	if err != nil {
-		log.Error("kafka queue: can not create producer" + err.Error())
+		log.Error("kafka queue: can not create producer, err : " + err.Error())
 		return nil
 	}
 
 	consumer, err := createConsumer(hosts)
 	if err != nil {
-		log.Error("kafka queue: can not create producer")
+		log.Error("kafka queue: can not create consumer, err :" + err.Error())
 		return nil
 	}
 
@@ -60,6 +61,19 @@ func NewKafkaQueue(name string, hosts []string, exitChan chan struct{}) BackendQ
 
 	return kq
 }
+/*
+func createTopic(hosts[] string) {
+	brokers := sarama.NewBroker(hosts)
+
+	brokers.Open(nil)
+
+	ctr := &sarama.CreateTopicsRequest{
+
+	}
+	brokers.CreateTopics(ctr)
+
+	brokers.Close()
+}*/
 
 func createProducer(hosts []string) (sarama.SyncProducer, error) {
 	cfg := sarama.NewConfig()
@@ -74,25 +88,38 @@ func createProducer(hosts []string) (sarama.SyncProducer, error) {
 	cfg.Producer.Retry.Max = 3
 	cfg.Net.DialTimeout, err = time.ParseDuration("30s")
 	if err != nil {
-		return nil, errors.New("kafkaqueue: invalid cfg net diatimeout")
+		return nil, errors.New(" invalid cfg net diatimeout")
 	}
 	cfg.Net.KeepAlive, err = time.ParseDuration("0")
 	if err != nil {
-		return nil, errors.New("kafkaqueue: invalid cfg net keepalive")
+		return nil, errors.New(" invalid cfg net keepalive")
 	}
 	cfg.Producer.MaxMessageBytes = 4*1024*1024
 
-	producer, err := sarama.NewSyncProducer(hosts, cfg)
+	var kz *kazoo.Kazoo
+	if kz, err = kazoo.NewKazoo(hosts, nil); err != nil {
+		return nil, errors.New(" failed to get brokers, err: " + err.Error())
+	}
+
+	brokers, err := kz.BrokerList()
 	if err != nil {
-		return nil, errors.New("kafkaqueue: producer is invalid")
+		kz.Close()
+		return nil, errors.New(" failed to get brokers, err: " + err.Error())
+	}
+
+	log.Info("kafkaqueue: broker list : ", brokers)
+
+	producer, err := sarama.NewSyncProducer(brokers, cfg)
+	if err != nil {
+		return nil, errors.New(" producer is invalid, err: " + err.Error())
 	}
 	return  producer, nil
 }
 
 func createConsumer(hosts []string) (*consumergroup.ConsumerGroup, error) {
 	config := consumergroup.NewConfig()
-	config.Zookeeper.Chroot = "/"
-	config.Zookeeper.Timeout = 30
+	config.Zookeeper.Chroot = ""
+	config.Zookeeper.Timeout = time.Duration(30) * time.Second
 	config.Offsets.Initial = sarama.OffsetOldest
 	topic := []string{Topic,}
 
@@ -102,8 +129,9 @@ func createConsumer(hosts []string) (*consumergroup.ConsumerGroup, error) {
 		hosts,
 		config,
 	)
+
 	if consumerErr != nil {
-		return nil, errors.New("kafkaqueue: can not create consumer")
+		return nil, consumerErr
 	}
 
 	return Consumer, nil

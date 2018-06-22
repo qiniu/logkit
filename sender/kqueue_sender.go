@@ -41,7 +41,7 @@ var (
 )
 
 const (
-	KEYKAFKAQUEUE = "kafka_queue_hosts"
+	KEYKAFKAQUEUEHOST = "kafka_queue_hosts"
 	KeyKAFKAPROCS = "ft_procs"
 	DEFAULTPARTS  = 5
 	DEFAULTPROCS  = 1
@@ -51,7 +51,7 @@ const (
 	DATA_REPO = "_repo"
 
 	DEFAULTREGION = "nb"
-	DEFAULTHOST = "https://pipeline.qiniu.com"
+	DEFAULTHOST = "http://10.200.20.40:9999"
 )
 
 // NewFtSender Fault tolerant sender constructor
@@ -59,9 +59,10 @@ func NewKQueueSender(sender Sender, conf conf.MapConf) (*KQueueSender, error) {
 	mtx.Lock()
 	defer mtx.Unlock()
 	if Kqs == nil {
+		log.Info("start create kqueuesender")
 		runnerName, _ := conf.GetStringOr(KeyRunnerName, UnderfinedRunnerName)
 
-		hosts, err := conf.GetStringList(KEYKAFKAQUEUE)
+		hosts, err := conf.GetStringList(KEYKAFKAQUEUEHOST)
 		if err != nil {
 			return nil, err
 		}
@@ -89,6 +90,9 @@ func newKQueueSender(innerSender Sender, runnerName string, opt *KqOption) (*KQu
 	exitChan := make(chan struct{})
 
 	lq = queue.NewKafkaQueue("stream"+qNameSuffix, opt.hosts, exitChan)
+	if lq == nil {
+		return nil, errors.New("cannot create kafka queue")
+	}
 
 	kqSender := KQueueSender{
 		exitChan:     exitChan,
@@ -168,6 +172,7 @@ func (kq *KQueueSender) unmarshalData(dat []byte) (datas []Data, err error) {
 }
 
 func (kq *KQueueSender) saveToKafka(datas []Data) error {
+	log.Info("KQueueSender: Start to send to kafka")
 	bs, err := kq.marshalData(datas)
 	if err != nil {
 		return err
@@ -215,7 +220,7 @@ func (kq *KQueueSender) trySendDatas(datas []Data, failSleep int, isRetry bool) 
 	} else {
 		return errors.New("The data do not contain repo")
 	}
-
+	log.Info("KQueueSender: call inner sender")
 	sender := kq.innerSenders[ak+repo]
 	if sender == nil {
 		conf := make(conf.MapConf)
@@ -237,6 +242,10 @@ func (kq *KQueueSender) trySendDatas(datas []Data, failSleep int, isRetry bool) 
 		kq.innerSenders[ak+repo] = sender
 	}
 	err = sender.Send(datas)
+
+	if err != nil {
+		log.Info("KQueueSender: inner sender is fail")
+	}
 
 	return
 }
@@ -298,6 +307,7 @@ func (kq *KQueueSender) sendFromQueue(queue queue.BackendQueue, isRetry bool) {
 		}
 		select {
 		case dat := <-readChan:
+			log.Info("KQueueSender: read msg from kafka")
 			err := kq.trySendBytes(dat, waitCnt, isRetry)
 			if err != nil {
 				log.Error()

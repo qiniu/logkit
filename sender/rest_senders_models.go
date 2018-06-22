@@ -89,6 +89,16 @@ var (
 		Advance:       true,
 		ToolTip:       `kafka队列代替磁盘队列`,
 	}
+	OptionFtKafkaQueueHost = Option{
+		KeyName:       KeyKafkaQueueHost,
+		ChooseOnly:    false,
+		Default:       "",
+		DefaultNoUse:  false,
+		Description:   "kafka host 地址",
+		Advance:       true,
+		AdvanceDepend: KeyKafkaQueue,
+		ToolTip:       `使用的内部kafka队列地址`,
+	}
 	OptionLogkitSendTime = Option{
 		KeyName:       KeyLogkitSendTime,
 		Element:       Radio,
@@ -441,6 +451,8 @@ var ModeKeyOptions = map[string][]Option{
 		OptionFtProcs,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
+		OptionFtKafkaChannel,
+		OptionFtKafkaQueueHost,
 		{
 			KeyName:       KeyForceMicrosecond,
 			Element:       Radio,
