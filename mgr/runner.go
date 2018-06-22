@@ -237,6 +237,12 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 		if err != nil {
 			return nil, err
 		}
+		defer func() {
+			if err != nil {
+				rd.Close()
+			}
+		}()
+
 		cl, err = cleaner.NewCleaner(rc.CleanerConfig, meta, cleanChan, meta.LogPath())
 		if err != nil {
 			return nil, err
