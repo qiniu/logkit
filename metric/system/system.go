@@ -5,12 +5,9 @@ import (
 	"bytes"
 	"fmt"
 	"net"
-	"strings"
-	
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/metric"
 	. "github.com/qiniu/logkit/utils/models"
-
 )
 
 const (
@@ -102,10 +99,9 @@ func getNumNetCard() int {
 	if err != nil {
 		log.Errorf("Can not get local interface info:%s", err)
 		return 0
-	}
+	}git 
 	for _, inter := range interfaces {
-		flags := inter.Flags.String()
-		if strings.Contains(flags, net.FlagUp.String()) && strings.Contains(flags, net.FlagBroadcast.String()) {
+		if (inter.Flags&net.FlagUp) > 0 && (inter.Flags&net.FlagBroadcast) > 0 {
 			macAddress = append(macAddress, inter.HardwareAddr.String())
 		}
 	}
