@@ -11,7 +11,6 @@ import (
 	"github.com/shirou/gopsutil/host"
 	"github.com/shirou/gopsutil/load"
 	"github.com/qiniu/logkit/metric"
-	"github.com/qiniu/logkit/mgr"
 )
 
 type LinuxSystemStats struct {
@@ -58,15 +57,19 @@ func init() {
 
 //若无法获取磁盘个数，返回挂载点的个数
 func getNumDisk() int {
-	diskMetrics, err := mgr.NewMetric("disk")
-	mounts, err := diskMetrics.Collect()
+	diskMetrics, ok := metric.Collectors["disk"]
+	if !ok {
+		log.Errorf("metric disk is not support now")
+		return -1
+	}
+	mounts, err := diskMetrics().Collect()
 	mountsNum := len(mounts)
-	fdisk, err := exec.LookPath("/sbin/fdisk")
+	fDisk, err := exec.LookPath("/sbin/fdisk")
 	if err != nil {
 		log.Errorf(err.Error())
 		return mountsNum
 	}
-	out, err := exec.Command(fdisk, "-l").Output()
+	out, err := exec.Command(fDisk, "-l").Output()
 	str := string(out)
 	index := strings.Index(str, "Device     Boot Start      End  Sectors Size Id Type")
 	disks := strings.Split(str[index:], "\n")

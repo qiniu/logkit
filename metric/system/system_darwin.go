@@ -9,7 +9,6 @@ import (
 	"strconv"
 
 	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/mgr"
 	"github.com/shirou/gopsutil/host"
 	"github.com/shirou/gopsutil/load"
 	"github.com/qiniu/logkit/metric"
@@ -59,15 +58,19 @@ func init() {
 
 //若无法获取磁盘个数，返回挂载点的个数
 func getNumDisk() int {
-	diskMetrics, err := mgr.NewMetric("disk")
-	mounts, err := diskMetrics.Collect()
+	diskMetrics, ok := metric.Collectors["disk"]
+	if !ok {
+		log.Errorf("metric disk is not support now")
+		return -1
+	}
+	mounts, err := diskMetrics().Collect()
 	mountsNum := len(mounts)
-	diskutil, err := exec.LookPath("/usr/sbin/diskutil")
+	diskUtil, err := exec.LookPath("/usr/sbin/diskutil")
 	if err != nil {
 		log.Errorf(err.Error())
 		return mountsNum
 	}
-	out, err := exec.Command(diskutil, "apfs", "list").Output()
+	out, err := exec.Command(diskUtil, "apfs", "list").Output()
 	if err != nil {
 		log.Errorf(err.Error())
 		return mountsNum
