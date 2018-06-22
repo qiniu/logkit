@@ -412,23 +412,7 @@ func (s *Sender) TokenRefresh(mapConf conf.MapConf) error {
 
 func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 	logger := pipelinebase.NewDefaultLogger()
-	config := pipeline.NewConfig().
-		WithPipelineEndpoint(opt.endpoint).
-		WithAccessKeySecretKey(opt.ak, opt.sk).
-		WithLogger(logger).
-		WithLoggerLevel(pipelinebase.LogInfo).
-		WithRequestRateLimit(opt.reqRateLimit).
-		WithFlowRateLimit(opt.flowRateLimit).
-		WithGzipData(opt.gzip).
-		WithHeaderUserAgent(opt.useragent).WithInsecureServer(opt.insecureServer)
-	if opt.logdbendpoint != "" {
-		config = config.WithLogDBEndpoint(opt.logdbendpoint)
-	}
-	client, err := pipeline.New(config)
-	if err != nil {
-		err = fmt.Errorf("cannot init pipelineClient %v", err)
-		return
-	}
+
 	if opt.reqRateLimit > 0 {
 		log.Warnf("Runner[%v] Sender[%v]: you have limited send speed within %v requests/s", opt.runnerName, opt.name, opt.reqRateLimit)
 	}
@@ -438,7 +422,6 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 	userSchema := parseUserSchema(opt.repoName, opt.schema)
 	s = &Sender{
 		opt:        *opt,
-		client:     client,
 		alias2key:  make(map[string]string),
 		UserSchema: userSchema,
 		schemas:    make(map[string]pipeline.RepoSchemaEntry),
@@ -468,6 +451,34 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 		s.opt.analyzerInfo.FullText = true
 	}
 	s.opt.expandAttr = expandAttr
+
+	//如果是Raw类型，那么没有固定的ak、sk和repo
+	if opt.sendType == SendTypeRaw {
+		return s, nil
+	}
+
+	/*
+		以下是 repo 创建相关的，raw类型的不需要处理
+	*/
+
+	config := pipeline.NewConfig().
+		WithPipelineEndpoint(opt.endpoint).
+		WithAccessKeySecretKey(opt.ak, opt.sk).
+		WithLogger(logger).
+		WithLoggerLevel(pipelinebase.LogInfo).
+		WithRequestRateLimit(opt.reqRateLimit).
+		WithFlowRateLimit(opt.flowRateLimit).
+		WithGzipData(opt.gzip).
+		WithHeaderUserAgent(opt.useragent).WithInsecureServer(opt.insecureServer)
+	if opt.logdbendpoint != "" {
+		config = config.WithLogDBEndpoint(opt.logdbendpoint)
+	}
+	client, err := pipeline.New(config)
+	if err != nil {
+		err = fmt.Errorf("cannot init pipelineClient %v", err)
+		return
+	}
+	s.client = client
 
 	dsl := strings.TrimSpace(opt.autoCreate)
 	schemas, err := pipeline.DSLtoSchema(dsl)
@@ -566,6 +577,9 @@ func parseUserSchema(repoName, schema string) (us UserSchema) {
 }
 
 func (s *Sender) UpdateSchemas() {
+	if s.opt.sendType == SendTypeRaw {
+		return
+	}
 	schemas, err := s.client.GetUpdateSchemasWithInput(
 		&pipeline.GetRepoInput{
 			RepoName:     s.opt.repoName,
@@ -838,50 +852,102 @@ func (s *Sender) Send(datas []Data) (se error) {
 
 func (s *Sender) rawSend(datas []Data) (se error) {
 	for idx, v := range datas {
-		if v["_repo"] == nil || v["_raw"] == nil {
+		if v["_repo"] == nil || v["_raw"] == nil || v["_ak"] == nil || v["_sk"] == nil {
+			errinfo := "_repo or _raw or _ak or _sk not found"
 			return &StatsError{
-				ErrorDetail: errors.New("_repo or _raw not found"),
+				ErrorDetail: errors.New(errinfo),
 				StatsInfo: StatsInfo{
 					Success:   int64(idx),
 					Errors:    int64(len(datas[idx:]) - idx),
-					LastError: "_repo not found",
+					LastError: errinfo,
 				},
 				RemainDatas: datas[idx:],
 			}
 		}
 		repoName, ok := v["_repo"].(string)
 		if !ok {
+			errinfo := "_repo not string type"
 			return &StatsError{
-				ErrorDetail: errors.New("_repo not string type"),
+				ErrorDetail: errors.New(errinfo),
 				StatsInfo: StatsInfo{
 					Success:   int64(idx),
 					Errors:    int64(len(datas) - idx),
-					LastError: "_repo not string type",
+					LastError: errinfo,
 				},
 				RemainDatas: datas[idx:],
 			}
 		}
 		raw, ok := v["_raw"].([]byte)
 		if !ok {
+			errinfo := "_raw not []byte type"
 			return &StatsError{
-				ErrorDetail: errors.New("_raw not []byte type"),
+				ErrorDetail: errors.New(errinfo),
 				StatsInfo: StatsInfo{
 					Success:   int64(idx),
 					Errors:    int64(len(datas[idx:])),
-					LastError: "_raw not []byte type",
+					LastError: errinfo,
+				},
+				RemainDatas: datas[idx:],
+			}
+		}
+		ak, ok := v["_ak"].(string)
+		if !ok {
+			errinfo := "_ak not string type"
+			return &StatsError{
+				ErrorDetail: errors.New(errinfo),
+				StatsInfo: StatsInfo{
+					Success:   int64(idx),
+					Errors:    int64(len(datas[idx:])),
+					LastError: errinfo,
+				},
+				RemainDatas: datas[idx:],
+			}
+		}
+		sk, ok := v["_sk"].(string)
+		if !ok {
+			errinfo := "_sk not string type"
+			return &StatsError{
+				ErrorDetail: errors.New(errinfo),
+				StatsInfo: StatsInfo{
+					Success:   int64(idx),
+					Errors:    int64(len(datas[idx:])),
+					LastError: errinfo,
 				},
 				RemainDatas: datas[idx:],
 			}
 		}
 
-		err := s.client.PostDataFromBytes(&pipeline.PostDataFromBytesInput{RepoName: repoName, Buffer: raw})
+		config := pipeline.NewConfig().
+			WithPipelineEndpoint(s.opt.endpoint).
+			WithAccessKeySecretKey(ak, sk).
+			WithLogger(pipelinebase.NewDefaultLogger()).
+			WithLoggerLevel(pipelinebase.LogInfo).
+			WithRequestRateLimit(s.opt.reqRateLimit).
+			WithFlowRateLimit(s.opt.flowRateLimit).
+			WithGzipData(s.opt.gzip).
+			WithHeaderUserAgent(s.opt.useragent).WithInsecureServer(s.opt.insecureServer)
+		client, err := pipeline.New(config)
+		if err != nil {
+			err = fmt.Errorf("cannot init pipelineClient %v", err)
+			return &StatsError{
+				ErrorDetail: err,
+				StatsInfo: StatsInfo{
+					Success:   int64(idx),
+					Errors:    int64(len(datas[idx:]) - idx),
+					LastError: err.Error(),
+				},
+				RemainDatas: datas[idx:],
+			}
+		}
+
+		err = client.PostDataFromBytes(&pipeline.PostDataFromBytesInput{RepoName: repoName, Buffer: raw})
 		if err != nil {
 			return &StatsError{
-				ErrorDetail: errors.New("_raw not []byte type"),
+				ErrorDetail: err,
 				StatsInfo: StatsInfo{
 					Success:   int64(idx),
 					Errors:    int64(len(datas) - idx),
-					LastError: "_raw not []byte type",
+					LastError: err.Error(),
 				},
 				RemainDatas: datas[idx:],
 			}
