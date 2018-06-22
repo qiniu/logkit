@@ -5,10 +5,10 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/qiniu/log"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/w32"
 	"github.com/qiniu/logkit/metric"
-	"github.com/labstack/gommon/log"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
