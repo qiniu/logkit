@@ -99,7 +99,7 @@ func getNumNetCard() int {
 	if err != nil {
 		log.Errorf("Can not get local interface info:%s", err)
 		return 0
-	}git 
+	}
 	for _, inter := range interfaces {
 		if (inter.Flags&net.FlagUp) > 0 && (inter.Flags&net.FlagBroadcast) > 0 {
 			macAddress = append(macAddress, inter.HardwareAddr.String())
