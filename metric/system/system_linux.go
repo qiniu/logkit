@@ -45,7 +45,7 @@ func (s *LinuxSystemStats) Collect() (datas []map[string]interface{}, err error)
 		KeySystemNDisks:       getNumDisk(),
 		KeySystemNServices:    getNumService(),
 	}
-	datas = append(datas, data)
+	datas = []map[string]interface{}{data}
 	return
 }
 
@@ -56,18 +56,24 @@ func init() {
 }
 
 //若无法获取磁盘个数，返回挂载点的个数
-func getNumDisk() int {
-	diskMetrics, ok := metric.Collectors["disk"]
-	if !ok {
-		log.Errorf("metric disk is not support now")
-		return -1
-	}
-	mounts, err := diskMetrics().Collect()
-	mountsNum := len(mounts)
+func getNumDisk() (mountsNum int) {
+	defer func() {
+		if mountsNum == -1 {
+			diskMetrics, ok := metric.Collectors["disk"]
+			if !ok {
+				log.Errorf("metric disk is not support now")
+			}
+			mounts, err := diskMetrics().Collect()
+			if err != nil {
+				log.Error("disk metrics collect have error %v", err)
+			}
+			mountsNum = len(mounts)
+		}
+	}()
 	fDisk, err := exec.LookPath("/sbin/fdisk")
 	if err != nil {
-		log.Errorf(err.Error())
-		return mountsNum
+		log.Error("get disk num look /sbin/fdisk have error %v", err)
+		return -1
 	}
 	out, err := exec.Command(fDisk, "-l").Output()
 	str := string(out)
@@ -79,13 +85,13 @@ func getNumDisk() int {
 func getNumService() int {
 	out, err := exec.Command("which", "supervisorctl").Output()
 	if err != nil {
-		log.Errorf(err.Error())
-		return -1
+		log.Errorf("get service number have error %v", err)
+		return 0
 	}
 	out, err = exec.Command("supervisorctl", "status").Output()
 	if err != nil {
-		log.Errorf(err.Error())
-		return -1
+		log.Errorf("get service number have error %v", err)
+		return 0
 	}
 	count := len(strings.Split(string(out), "\n"))
 	return count - 1

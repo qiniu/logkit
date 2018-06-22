@@ -46,7 +46,7 @@ func (s *DarwinSystemStats) Collect() (datas []map[string]interface{}, err error
 		KeySystemNDisks:       getNumDisk(),
 		KeySystemNServices:    getNumService(),
 	}
-	datas = append(datas, data)
+	datas = []map[string]interface{}{data}
 	return
 }
 
@@ -57,37 +57,44 @@ func init() {
 }
 
 //若无法获取磁盘个数，返回挂载点的个数
-func getNumDisk() int {
-	diskMetrics, ok := metric.Collectors["disk"]
-	if !ok {
-		log.Errorf("metric disk is not support now")
-		return -1
-	}
-	mounts, err := diskMetrics().Collect()
-	mountsNum := len(mounts)
+func getNumDisk() (mountsNum int) {
+	defer func() {
+		if mountsNum == -1 {
+			diskMetrics, ok := metric.Collectors["disk"]
+			if !ok {
+				log.Errorf("metric disk is not support now")
+			}
+			mounts, err := diskMetrics().Collect()
+			if err != nil {
+				log.Error("disk metrics collect have error %v", err)
+			}
+			mountsNum = len(mounts)
+		}
+	}()
 	diskUtil, err := exec.LookPath("/usr/sbin/diskutil")
 	if err != nil {
-		log.Errorf(err.Error())
-		return mountsNum
+		log.Error("find diskutil have error %v", err)
+		return -1
 	}
 	out, err := exec.Command(diskUtil, "apfs", "list").Output()
 	if err != nil {
-		log.Errorf(err.Error())
-		return mountsNum
+		log.Error("get disk number have error %v", err)
+		return -1
 	}
 	res := string(out)
 	index := strings.Index(res, "APFS Container")
 	if index < 0 || index+18 > len(res) {
-		return mountsNum
+		log.Error("get disk number can't find enough args")
+		return -1
 	}
-	num, err := strconv.Atoi(res[index+16 : index+17])
+	mountsNum, err = strconv.Atoi(res[index+16 : index+17])
 	if err != nil {
-		log.Errorf(err.Error())
-		return mountsNum
+		log.Errorf("get disk number have error %v", err)
+		return -1
 	}
-	return num
+	return mountsNum
 }
 
 func getNumService() int {
-	return -1
+	return 0
 }

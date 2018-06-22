@@ -4,12 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"strings"
 	"net"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/metric"
 	. "github.com/qiniu/logkit/utils/models"
+	"strings"
 )
 
 const (
@@ -104,7 +104,7 @@ func getNumNetCard() int {
 	}
 	for _, inter := range interfaces {
 		flags := inter.Flags.String()
-		if strings.Contains(flags, "up") && strings.Contains(flags, "broadcast") {
+		if strings.Contains(flags, net.FlagUp.String()) && strings.Contains(flags, net.FlagBroadcast.String()) {
 			macAddress = append(macAddress, inter.HardwareAddr.String())
 		}
 	}
