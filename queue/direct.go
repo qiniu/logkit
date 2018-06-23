@@ -84,3 +84,7 @@ func (dq *directQueue) Depth() int64 {
 func (dq *directQueue) Empty() error {
 	return nil
 }
+
+func (dq *directQueue) SyncMeta() {
+	return
+}

@@ -14,6 +14,7 @@ type BackendQueue interface {
 	Delete() error
 	Depth() int64
 	Empty() error
+	SyncMeta()
 }
 
 // DataQueue 代表了无需编解码可直接放取 Data 的队列

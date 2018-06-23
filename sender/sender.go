@@ -67,6 +67,8 @@ const (
 	// Sender's conf keys
 	KeySenderType        = "sender_type"
 	KeyFaultTolerant     = "fault_tolerant"
+	KeyKafkaQueue        = "kafka_queue"
+	KeyKafkaQueueHost    = "kafka_queue_hosts"
 	KeyName              = "name"
 	KeyLogkitSendTime    = "logkit_send_time"
 	KeyIsMetrics         = "is_metrics"
@@ -260,6 +262,14 @@ func (r *Registry) NewSender(conf conf.MapConf, ftSaveLogPath string) (sender Se
 	faultTolerant, _ := conf.GetBoolOr(KeyFaultTolerant, true)
 	if faultTolerant {
 		sender, err = NewFtSender(sender, conf, ftSaveLogPath)
+		if err != nil {
+			return
+		}
+	}
+
+	kq, _ := conf.GetBoolOr(KeyKafkaQueue, true)
+	if kq {
+		sender, err = NewKQueueSender(sender, conf)
 		if err != nil {
 			return
 		}
