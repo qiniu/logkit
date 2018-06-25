@@ -5,9 +5,9 @@ import (
 	"github.com/Shopify/sarama"
 	"os"
 	"time"
+	"errors"
 	"github.com/wvanbergen/kafka/consumergroup"
-	"github.com/qbox/base/com/src/qbox.us/errors"
-	"qiniupkg.com/x/log.v7"
+	"github.com/qiniu/log"
 	"github.com/wvanbergen/kazoo-go"
 )
 
