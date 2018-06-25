@@ -1,17 +1,17 @@
 package queuev2
 
 import (
-	"sync"
-	"github.com/Shopify/sarama"
-	"os"
-	"time"
 	"errors"
-	"github.com/wvanbergen/kafka/consumergroup"
+	"github.com/Shopify/sarama"
 	"github.com/qiniu/log"
+	"github.com/wvanbergen/kafka/consumergroup"
 	"github.com/wvanbergen/kazoo-go"
+	"os"
+	"sync"
+	"time"
 )
 
-const(
+const (
 	Topic = "edge_topic"
 	Group = "edge_group"
 
@@ -47,8 +47,7 @@ func NewKafkaQueue(name string, hosts []string, exitChan chan struct{}) BackendQ
 		return nil
 	}
 
-
-	kq :=  &kafkaQueue{
+	kq := &kafkaQueue{
 		name:     name,
 		channel:  make(chan []byte),
 		mux:      sync.Mutex{},
@@ -85,7 +84,7 @@ func createProducer(hosts []string) (sarama.SyncProducer, error) {
 	if err != nil {
 		return nil, errors.New(" invalid cfg net keepalive")
 	}
-	cfg.Producer.MaxMessageBytes = 4*1024*1024
+	cfg.Producer.MaxMessageBytes = 4 * 1024 * 1024
 
 	var kz *kazoo.Kazoo
 	if kz, err = kazoo.NewKazoo(hosts, nil); err != nil {
@@ -104,7 +103,7 @@ func createProducer(hosts []string) (sarama.SyncProducer, error) {
 	if err != nil {
 		return nil, errors.New(" producer is invalid, err: " + err.Error())
 	}
-	return  producer, nil
+	return producer, nil
 }
 
 func createConsumer(hosts []string) (*consumergroup.ConsumerGroup, error) {
@@ -112,7 +111,7 @@ func createConsumer(hosts []string) (*consumergroup.ConsumerGroup, error) {
 	config.Zookeeper.Chroot = ""
 	config.Zookeeper.Timeout = time.Duration(30) * time.Second
 	config.Offsets.Initial = sarama.OffsetOldest
-	topic := []string{Topic,}
+	topic := []string{Topic}
 
 	Consumer, consumerErr := consumergroup.JoinConsumerGroup(
 		Group,
@@ -141,7 +140,7 @@ func (kq *kafkaQueue) Put(msg []byte) error {
 		Value: sarama.StringEncoder(msg),
 	}
 
-	_, _ ,err := kq.proudcer.SendMessage(pm)
+	_, _, err := kq.proudcer.SendMessage(pm)
 	if err != nil {
 		return err
 	}
