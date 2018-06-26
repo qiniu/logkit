@@ -1015,7 +1015,7 @@ var ModeKeyOptions = map[string][]Option{
 			ToolTip:      "监听的地址和端口，格式为：[<ip/host/不填>:port]，如 :3000 , 监听3000端口的http请求",
 		},
 		{
-			KeyName:      KeyHTTPServiceAddress,
+			KeyName:      KeyHTTPServicePath,
 			ChooseOnly:   false,
 			Default:      "",
 			Placeholder:  DefaultHTTPServicePath,
