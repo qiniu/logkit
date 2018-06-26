@@ -223,12 +223,12 @@ func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
 		log.Error(err)
 		return
 	}
-	// 当 schema free 为 false 时，需要自动创建 pandora_stash 字段
+	// 当 schema free 为 false 时，需要自动创建 pandora_stash 字段，需要自动创建 pandora_separate_id 字段
 	if !schemaFree {
 		if autoCreateSchema == "" {
-			autoCreateSchema = fmt.Sprintf("%v string", KeyPandoraStash)
+			autoCreateSchema = fmt.Sprintf("%v string,%v string", KeyPandoraStash, KeyPandoraSeparateId)
 		} else {
-			autoCreateSchema += fmt.Sprintf(",%v string", KeyPandoraStash)
+			autoCreateSchema += fmt.Sprintf(",%v string,%v string", KeyPandoraStash, KeyPandoraSeparateId)
 		}
 	}
 
