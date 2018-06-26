@@ -126,9 +126,10 @@ func (_ *CPUStats) Config() map[string]interface{} {
 func init() {
 	metric.Add(TypeMetricCpu, func() metric.Collector {
 		return &CPUStats{
-			PerCPU:   true,
-			TotalCPU: true,
-			ps:       newSystemPS(),
+			PerCPU:         true,
+			TotalCPU:       true,
+			CollectCPUTime: true,
+			ps:             newSystemPS(),
 		}
 	})
 }
