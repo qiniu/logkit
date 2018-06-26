@@ -52,6 +52,12 @@ func (c *Pipeline) FormKodoSpec(input *CreateRepoForKodoInput) *ExportKodoSpec {
 		AccessKey: input.Ak,
 		Format:    input.Format,
 		Retention: input.Retention,
+		Compress:  input.Compress,
+		RotateStrategy: input.RotateStrategy,
+		RotateInterval: input.RotateInterval,
+		RotateSize:	input.RotateSize,
+		RotateSizeType: "KB",
+		RotateNumber:   input.RotateSize / 1024,
 	}
 }
 
@@ -418,6 +424,10 @@ func (c *Pipeline) AutoExportToKODO(input *AutoExportToKODOInput) error {
 			Schema:    repoInfo.Schema,
 			Prefix:    input.Prefix,
 			Format:    input.Format,
+			Compress:  input.Compress,
+			RotateStrategy: input.RotateStrategy,
+			RotateInterval: input.RotateInterval,
+			RotateSize:	input.RotateSize,
 		})
 		exportInput := c.FormExportInput(input.RepoName, ExportTypeKODO, kodoSpec)
 		exportInput.PandoraToken = input.CreateExportToken

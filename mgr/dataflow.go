@@ -4,20 +4,19 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
+
+	"github.com/json-iterator/go"
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	"github.com/qiniu/logkit/parser/grok"
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/router"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
-
-	"github.com/qiniu/pandora-go-sdk/base/reqerr"
-
-	"strings"
-
-	"github.com/json-iterator/go"
 )
 
 const DefaultTryTimes = 3
@@ -30,15 +29,16 @@ func RawData(readerConfig conf.MapConf) (rawData string, err error) {
 	}
 
 	var rd reader.Reader
-	rd, err = reader.NewFileBufReader(readerConfig, true)
+	rd, err = reader.NewReader(readerConfig, true)
 	if err != nil {
 		return
 	}
+	defer rd.Close()
 
 	tryCount := DefaultTryTimes
 	for {
 		if tryCount <= 0 {
-			err = fmt.Errorf("get raw data time out, raw data is empty")
+			err = fmt.Errorf("get raw data from %s time out, can't get any data", rd.Name())
 			return
 		}
 		tryCount--
@@ -72,7 +72,7 @@ func ParseData(parserConfig conf.MapConf) (parsedData []Data, err error) {
 	if err != nil {
 		return nil, err
 	}
-	parserRegistry := parser.NewParserRegistry()
+	parserRegistry := parser.NewRegistry()
 	logParser, err := parserRegistry.NewLogParser(parserConfig)
 	if err != nil {
 		return nil, err
@@ -202,15 +202,15 @@ func getDataFromSenderConfig(senderConfig map[string]interface{}) ([]Data, error
 
 func getSenders(sendersConf []conf.MapConf) ([]sender.Sender, error) {
 	senders := make([]sender.Sender, 0)
-	sr := sender.NewSenderRegistry()
+	sr := sender.NewRegistry()
 	for i, senderConfig := range sendersConf {
-		senderConfig[KeyFaultTolerant] = "false"
+		senderConfig[sender.KeyFaultTolerant] = "false"
 		s, err := sr.NewSender(senderConfig, "")
 		if err != nil {
 			return nil, err
 		}
 		senders = append(senders, s)
-		delete(sendersConf[i], InnerUserAgent)
+		delete(sendersConf[i], sender.InnerUserAgent)
 	}
 	return senders, nil
 }
@@ -284,17 +284,17 @@ func getSampleData(parserConfig conf.MapConf) ([]string, error) {
 	var sampleData []string
 
 	switch parserType {
-	case parser.TypeCSV, parser.TypeJson, parser.TypeRaw, parser.TypeNginx, parser.TypeEmpty, parser.TypeKafkaRest, parser.TypeLogv1:
+	case parser.TypeCSV, parser.TypeJSON, parser.TypeRaw, parser.TypeNginx, parser.TypeEmpty, parser.TypeKafkaRest, parser.TypeLogv1:
 		sampleData = append(sampleData, rawData)
 	case parser.TypeSyslog:
 		sampleData = strings.Split(rawData, "\n")
 		sampleData = append(sampleData, parser.PandoraParseFlushSignal)
-	case parser.TypeMysqlLog:
+	case parser.TypeMySQL:
 		sampleData = strings.Split(rawData, "\n")
 		sampleData = append(sampleData, parser.PandoraParseFlushSignal)
 	case parser.TypeGrok:
 		grokMode, _ := parserConfig.GetString(parser.KeyGrokMode)
-		if grokMode != parser.ModeMulti {
+		if grokMode != grok.ModeMulti {
 			sampleData = append(sampleData, rawData)
 		} else {
 			sampleData = []string{rawData}
@@ -307,7 +307,7 @@ func getSampleData(parserConfig conf.MapConf) ([]string, error) {
 	return sampleData, nil
 }
 
-func checkSampleData(sampleData []string, logParser parser.LogParser) ([]string, error) {
+func checkSampleData(sampleData []string, logParser parser.Parser) ([]string, error) {
 	if len(sampleData) <= 0 {
 		_, ok := logParser.(parser.Flushable)
 		if ok {

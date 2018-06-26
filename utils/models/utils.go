@@ -36,31 +36,28 @@ type File struct {
 	Path string
 }
 
-// Int64Slice attaches the methods of Interface to []int64, sorting in decreasing order.
-type Int64Slice []int64
+// FileInfos attaches the methods of Interface to []int64, sorting in decreasing order.
+type FileInfos []os.FileInfo
 
-func (p Int64Slice) Len() int           { return len(p) }
-func (p Int64Slice) Less(i, j int) bool { return p[i] > p[j] }
-func (p Int64Slice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func (p FileInfos) Len() int           { return len(p) }
+func (p FileInfos) Less(i, j int) bool { return ModTimeLater(p[i], p[j]) }
+func (p FileInfos) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 // Sort is a convenience method.
-func (p Int64Slice) Sort() { sort.Sort(p) }
+func (p FileInfos) Sort() { sort.Sort(p) }
 
-// SortFilesByTime 按照文件更新的unixnano从大到小排，即最新的文件在前
-func SortFilesByTime(files []os.FileInfo) (soredfiles []os.FileInfo) {
-	filemap := make(map[int64]os.FileInfo)
-	var times Int64Slice
-	for index, f := range files {
-		// 解决文件的创建时间相同的问题，加一个index
-		nano := f.ModTime().UnixNano() + int64(index)
-		times = append(times, nano)
-		filemap[nano] = f
+// SortFilesByTime 按照文件更新的unixnano从大到小排，即最新的文件在前,相同时间的则按照文件名字典序，字典序在后面的排在前面
+func SortFilesByTime(files FileInfos) (soredfiles []os.FileInfo) {
+	files.Sort()
+	return files
+}
+
+// ModTimeLater 按最后修改时间进行比较
+func ModTimeLater(f1, f2 os.FileInfo) bool {
+	if f1.ModTime().UnixNano() != f2.ModTime().UnixNano() {
+		return f1.ModTime().UnixNano() > f2.ModTime().UnixNano()
 	}
-	times.Sort()
-	for _, t := range times {
-		soredfiles = append(soredfiles, filemap[t])
-	}
-	return
+	return f1.Name() > f2.Name()
 }
 
 // ReadDirByTime 读取文件目录后按时间排序，时间最新的文件在前
@@ -86,10 +83,16 @@ func TrimeList(strs []string) (ret []string) {
 }
 
 func GetLogFiles(doneFilePath string) (files []File) {
-	readDoneFiles, err := ReadFileContent(doneFilePath)
+	readDoneFileLines, err := ReadFileContent(doneFilePath)
 	if err != nil {
 		return
 	}
+	var readDoneFiles []string
+	for _, v := range readDoneFileLines {
+		sps := strings.Split(v, "\t")
+		readDoneFiles = append(readDoneFiles, sps[0])
+	}
+
 	for i := len(readDoneFiles) - 1; i >= 0; i-- {
 		df := readDoneFiles[i]
 		dfi, err := os.Stat(df)
@@ -422,6 +425,38 @@ func SetMapValue(m map[string]interface{}, val interface{}, coercive bool, keys 
 	return nil
 }
 
+//通过层级key设置value值, 如果keys不存在则不加前缀，否则加前缀，forceSet为true时无论原来的值存不存在，都加前缀.
+func SetMapValueWithPrefix(m map[string]interface{}, val interface{}, prefix string, forceAdd bool, keys ...string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	var curr map[string]interface{}
+	curr = m
+	var exist bool
+	for i, k := range keys {
+		if i < len(keys)-1 {
+			finalVal, ok := curr[k]
+			if !ok {
+				return fmt.Errorf("SetMapValueWithPrefix failed, keys %v are non-existent", val)
+			}
+			//判断val是否为map[string]interface{}类型
+			if curr, ok = finalVal.(map[string]interface{}); ok {
+				continue
+			}
+			return fmt.Errorf("SetMapValueWithPrefix failed, %v is not the type of map[string]interface{}", keys)
+		}
+
+		//判断val(k)是否存在
+		_, exist = curr[k]
+	}
+	if exist || forceAdd {
+		curr[prefix+"_"+keys[len(keys)-1]] = val
+	} else {
+		curr[keys[len(keys)-1]] = val
+	}
+	return nil
+}
+
 //通过层级key删除key-val,并返回被删除的val,是否删除成功
 //如果key不存在,则返回 nil,false
 func DeleteMapValue(m map[string]interface{}, keys ...string) (interface{}, bool) {
@@ -444,6 +479,40 @@ func DeleteMapValue(m map[string]interface{}, keys ...string) (interface{}, bool
 		}
 	}
 	return nil, false
+}
+
+func PickMapValue(m map[string]interface{}, pick map[string]interface{}, keys ...string) {
+	var val interface{}
+	val = m
+	if len(keys) == 0 {
+		return
+	}
+	if _, ok := val.(map[string]interface{}); !ok {
+		return
+	}
+
+	v, ok := val.(map[string]interface{})[keys[0]]
+	if !ok {
+		return
+	}
+
+	if len(keys) == 1 {
+		pick[keys[0]] = v
+		return
+	}
+
+	// 判断keys[0]的值是不是map，如果不是，keys[1]pick的值为空，退出该keys的pick
+	if _, ok := v.(map[string]interface{}); !ok {
+		return
+	}
+
+	if _, ok := pick[keys[0]]; !ok {
+		pick[keys[0]] = map[string]interface{}{}
+	}
+	PickMapValue(v.(map[string]interface{}), pick[keys[0]].(map[string]interface{}), keys[1:]...)
+	if len(pick[keys[0]].(map[string]interface{})) == 0 {
+		delete(pick, keys[0])
+	}
 }
 
 //根据key字符串,拆分出层级keys数据
@@ -662,4 +731,23 @@ func ReadFileContent(path string) (content []string, err error) {
 	}
 	content = TrimeList(strings.Split(string(body), "\n"))
 	return
+}
+
+func GetMapList(data string) map[string]string {
+	v := strings.Split(data, ",")
+	var newV []string
+	for _, i := range v {
+		trimI := strings.TrimSpace(i)
+		if len(trimI) > 0 {
+			newV = append(newV, trimI)
+		}
+	}
+	ret := make(map[string]string)
+	for _, v := range newV {
+		fids := strings.Fields(v)
+		if len(fids) >= 2 {
+			ret[fids[0]] = fids[1]
+		}
+	}
+	return ret
 }

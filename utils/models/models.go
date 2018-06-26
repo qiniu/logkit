@@ -30,6 +30,8 @@ const (
 	TsDBTokensPrefix       = "tsdb_tokens_"
 	KodoTokensPrefix       = "kodo_tokens_"
 
+	KeyRunnerName = "runner_name"
+
 	DefaultDirPerm  = 0755
 	DefaultFilePerm = 0600
 
@@ -76,6 +78,7 @@ type LagInfo struct {
 	Size     int64  `json:"size"`
 	SizeUnit string `json:"sizeunit"`
 	Ftlags   int64  `json:"ftlags"`
+	Total    int64  `json:"total"`
 }
 
 type StatsError struct {
@@ -84,6 +87,7 @@ type StatsError struct {
 	Ft                  bool  `json:"-"`
 	FtNotRetry          bool  `json:"-"`
 	DatasourceSkipIndex []int
+	RemainDatas         []Data
 }
 
 type StatsInfo struct {
@@ -102,11 +106,25 @@ func (se *StatsError) AddSuccess() {
 	atomic.AddInt64(&se.Success, 1)
 }
 
+func (se *StatsError) AddSuccessNum(n int) {
+	if se == nil {
+		return
+	}
+	atomic.AddInt64(&se.Success, int64(n))
+}
+
 func (se *StatsError) AddErrors() {
 	if se == nil {
 		return
 	}
 	atomic.AddInt64(&se.Errors, 1)
+}
+
+func (se *StatsError) AddErrorsNum(n int) {
+	if se == nil {
+		return
+	}
+	atomic.AddInt64(&se.Errors, int64(n))
 }
 
 func (se *StatsError) Error() string {

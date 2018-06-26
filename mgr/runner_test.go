@@ -10,18 +10,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/json-iterator/go"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/qiniu/log"
+
 	"github.com/qiniu/logkit/cleaner"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/reader"
-	"github.com/qiniu/logkit/sender"
-	_ "github.com/qiniu/logkit/transforms/all"
-	. "github.com/qiniu/logkit/utils/models"
-
-	"github.com/json-iterator/go"
 	"github.com/qiniu/logkit/router"
-	"github.com/stretchr/testify/assert"
+	"github.com/qiniu/logkit/sender"
+	_ "github.com/qiniu/logkit/sender/builtin"
+	"github.com/qiniu/logkit/sender/mock"
+	_ "github.com/qiniu/logkit/transforms/builtin"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 func cleanMetaFolder(path string) {
@@ -106,7 +109,7 @@ func Test_Run(t *testing.T) {
 		t.Error(err)
 	}
 	isFromWeb := false
-	reader, err := reader.NewFileBufReader(readerConfig, isFromWeb)
+	r, err := reader.NewFileBufReader(readerConfig, isFromWeb)
 	if err != nil {
 		t.Error(err)
 	}
@@ -114,18 +117,18 @@ func Test_Run(t *testing.T) {
 	cleanerConfig := conf.MapConf{
 		"delete_enable": "true",
 	}
-	cleaner, err := cleaner.NewCleaner(cleanerConfig, meta, cleanChan, meta.LogPath())
+	c, err := cleaner.NewCleaner(cleanerConfig, meta, cleanChan, meta.LogPath())
 	if err != nil {
 		t.Error(err)
 	}
 	parseConf := conf.MapConf{
 		"name":                   "req_csv",
-		"type":                   "csv",
+		"type":                   parser.TypeCSV,
 		"csv_schema":             "logtype string, xx long",
 		"csv_splitter":           " ",
 		"disable_record_errdata": "true",
 	}
-	ps := parser.NewParserRegistry()
+	ps := parser.NewRegistry()
 	pparser, err := ps.NewLogParser(parseConf)
 	if err != nil {
 		t.Error(err)
@@ -137,8 +140,8 @@ func Test_Run(t *testing.T) {
 		},
 	}
 	var senders []sender.Sender
-	raws, err := sender.NewMockSender(senderConfigs[0])
-	s, succ := raws.(*sender.MockSender)
+	raws, err := mock.NewSender(senderConfigs[0])
+	s, succ := raws.(*mock.Sender)
 	if !succ {
 		t.Error("sender should be mock sender")
 	}
@@ -147,7 +150,7 @@ func Test_Run(t *testing.T) {
 	}
 	senders = append(senders, s)
 
-	r, err := NewLogExportRunnerWithService(rinfo, reader, cleaner, pparser, nil, senders, nil, meta)
+	runner, err := NewLogExportRunnerWithService(rinfo, r, c, pparser, nil, senders, nil, meta)
 	if err != nil {
 		t.Error(err)
 	}
@@ -156,9 +159,9 @@ func Test_Run(t *testing.T) {
 		enable: true,
 		logdir: absLogpath,
 	}
-	assert.Equal(t, cleanInfo, r.Cleaner())
+	assert.Equal(t, cleanInfo, runner.Cleaner())
 
-	go r.Run()
+	go runner.Run()
 	timer := time.NewTimer(20 * time.Second).C
 	for {
 		if s.SendCount() >= 4 {
@@ -173,7 +176,7 @@ func Test_Run(t *testing.T) {
 		}
 	}
 	var dts []Data
-	rawData := r.senders[0].Name()[len("mock_sender "):]
+	rawData := runner.senders[0].Name()[len("mock_sender "):]
 	err = jsoniter.Unmarshal([]byte(rawData), &dts)
 	if err != nil {
 		t.Error(err)
@@ -276,7 +279,7 @@ func Test_RunForEnvTag(t *testing.T) {
 		"csv_splitter":           " ",
 		"disable_record_errdata": "true",
 	}
-	ps := parser.NewParserRegistry()
+	ps := parser.NewRegistry()
 	pparser, err := ps.NewLogParser(parseConf)
 	if err != nil {
 		t.Error(err)
@@ -288,8 +291,8 @@ func Test_RunForEnvTag(t *testing.T) {
 		},
 	}
 	var senders []sender.Sender
-	raws, err := sender.NewMockSender(senderConfigs[0])
-	s, succ := raws.(*sender.MockSender)
+	raws, err := mock.NewSender(senderConfigs[0])
+	s, succ := raws.(*mock.Sender)
 	if !succ {
 		t.Error("sender should be mock sender")
 	}
@@ -427,7 +430,7 @@ func Test_RunForErrData(t *testing.T) {
 		"csv_splitter":           " ",
 		"disable_record_errdata": "false",
 	}
-	ps := parser.NewParserRegistry()
+	ps := parser.NewRegistry()
 	pparser, err := ps.NewLogParser(parseConf)
 	if err != nil {
 		t.Error(err)
@@ -439,8 +442,8 @@ func Test_RunForErrData(t *testing.T) {
 		},
 	}
 	var senders []sender.Sender
-	raws, err := sender.NewMockSender(senderConfigs[0])
-	s, succ := raws.(*sender.MockSender)
+	raws, err := mock.NewSender(senderConfigs[0])
+	s, succ := raws.(*mock.Sender)
 	if !succ {
 		t.Error("sender should be mock sender")
 	}
@@ -556,7 +559,7 @@ func Test_QiniulogRun(t *testing.T) {
 	//clean dir first
 	os.RemoveAll(dir)
 	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
-		log.Errorf("Test_Run error mkdir %v %v", dir, err)
+		log.Errorf("Test_QiniulogRun error mkdir %v %v", dir, err)
 	}
 	defer os.RemoveAll(dir)
 	logpath := dir + "/logdir"
@@ -587,11 +590,12 @@ func Test_QiniulogRun(t *testing.T) {
 	1234 3243xsaxs
 2016/10/20 17:20:30.642662 [123][WARN] disk.go:241: github.com/qiniu/logkit/queue/disk.go 1
 `
-	log3 := `2016/10/20 17:20:30.642662 [124][WARN] disk.go xxxxxx`
+	log3 := `2016/10/20 17:20:30.642662 [124][WARN] disk.go:456: xxxxxx`
 	expfiles := []string{`[REQ_END] 200 0.010k 3.792ms \t\t[WARN][SLdoIrCDZj7pmZsU] disk.go <job.freezeDeamon> pop() failed: not found`,
 		`Service: POST 10.200.20.25:9100/user/info, Code: 200, Xlog: AC, Time: 1ms`,
-		`github.com/qiniu/logkit/queue/disk.go:241 \t1234 3243xsaxs`, `github.com/qiniu/logkit/queue/disk.go 1`}
-	expreqid := []string{"X-ZsU", "2pyKMukqvwSd-ZsU", "", "123"}
+		`github.com/qiniu/logkit/queue/disk.go:241 \t1234 3243xsaxs`, `github.com/qiniu/logkit/queue/disk.go 1`,
+		`xxxxxx`}
+	expreqid := []string{"X-ZsU", "2pyKMukqvwSd-ZsU", "", "123", "124"}
 	if err := ioutil.WriteFile(filepath.Join(logpath, "log1"), []byte(log1), 0666); err != nil {
 		log.Fatalf("write log1 fail %v", err)
 	}
@@ -614,10 +618,10 @@ func Test_QiniulogRun(t *testing.T) {
 	}
 	parseConf := conf.MapConf{
 		"name": "qiniu",
-		"type": "qiniulog",
+		"type": parser.TypeLogv1,
 	}
 	senderConfigs := []conf.MapConf{
-		conf.MapConf{
+		{
 			"name":        "mock_sender",
 			"sender_type": "mock",
 		},
@@ -627,7 +631,7 @@ func Test_QiniulogRun(t *testing.T) {
 		RunnerInfo:    rinfo,
 		ReaderConfig:  readerConfig,
 		ParserConf:    parseConf,
-		SenderConfig:  senderConfigs,
+		SendersConfig: senderConfigs,
 		IsInWebFolder: false,
 	}
 	rc = Compatible(rc)
@@ -635,19 +639,19 @@ func Test_QiniulogRun(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	reader, err := reader.NewFileBufReader(rc.ReaderConfig, rc.IsInWebFolder)
+	r, err := reader.NewFileBufReader(rc.ReaderConfig, rc.IsInWebFolder)
 	if err != nil {
 		t.Error(err)
 	}
-	ps := parser.NewParserRegistry()
+	ps := parser.NewRegistry()
 	pparser, err := ps.NewLogParser(parseConf)
 	if err != nil {
 		t.Error(err)
 	}
 
 	var senders []sender.Sender
-	raws, err := sender.NewMockSender(senderConfigs[0])
-	s, succ := raws.(*sender.MockSender)
+	raws, err := mock.NewSender(senderConfigs[0])
+	s, succ := raws.(*mock.Sender)
 	if !succ {
 		t.Error("sender should be mock sender")
 	}
@@ -656,16 +660,17 @@ func Test_QiniulogRun(t *testing.T) {
 	}
 	senders = append(senders, s)
 
-	r, err := NewLogExportRunnerWithService(rinfo, reader, nil, pparser, nil, senders, nil, meta)
+	runner, err := NewLogExportRunnerWithService(rinfo, r, nil, pparser, nil, senders, nil, meta)
 	if err != nil {
 		t.Error(err)
 	}
 
-	go r.Run()
+	go runner.Run()
 	time.Sleep(time.Second)
 	if err := ioutil.WriteFile(filepath.Join(logpath, "log3"), []byte(log3), 0666); err != nil {
 		log.Fatalf("write log3 fail %v", err)
 	}
+	time.Sleep(time.Second)
 	timer := time.NewTimer(20 * time.Second).C
 	for {
 		if s.SendCount() >= 4 {
@@ -680,25 +685,24 @@ func Test_QiniulogRun(t *testing.T) {
 		}
 	}
 	var dts []Data
-	rawData := r.senders[0].Name()[len("mock_sender "):]
+	rawData := runner.senders[0].Name()[len("mock_sender "):]
 	err = jsoniter.Unmarshal([]byte(rawData), &dts)
 	if err != nil {
 		t.Error(err)
 	}
-	if len(dts) != 4 {
-		t.Errorf("got sender data not match error,expect 4 but %v", len(dts))
+	if len(dts) != 5 {
+		t.Errorf("got sender data not match error,expect 5 but %v", len(dts))
 	}
 	for idx, dt := range dts {
 		assert.Equal(t, expfiles[idx], dt["log"], "equl log test")
 		assert.Equal(t, expreqid[idx], dt["reqid"], "equal reqid test")
 	}
-	ls, err := r.LagStats()
+	ls, err := runner.LagStats()
 	assert.NoError(t, err)
-	assert.Equal(t, &LagInfo{0, "bytes", 0}, ls)
+	assert.Equal(t, &LagInfo{0, "bytes", 0, 0}, ls)
 }
 
 func TestCreateTransforms(t *testing.T) {
-
 	config1 := `{
 		"name":"test2.csv",
 		"reader":{
@@ -713,7 +717,7 @@ func TestCreateTransforms(t *testing.T) {
 		"transforms":[{
 			"type":"IP",
 			"key":  "ip",
-			"data_path": "../transforms/ip/17monipdb.dat"
+			"data_path": "../transforms/ip/test_data/17monipdb.dat"
 		}],
 		"senders":[{
 			"name":"file_sender",
@@ -725,7 +729,7 @@ func TestCreateTransforms(t *testing.T) {
 	rc := RunnerConfig{}
 	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
-	transformers := createTransformers(rc)
+	transformers, _ := createTransformers(rc)
 	datas := []Data{{"ip": "111.2.3.4"}}
 	exp := []Data{{
 		"ip":      "111.2.3.4",
@@ -768,7 +772,7 @@ func TestReplaceTransforms(t *testing.T) {
 	rc := RunnerConfig{}
 	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
-	transformers := createTransformers(rc)
+	transformers, _ := createTransformers(rc)
 	datas := []string{`{"status":"200","request_method":"POST","request_body":"<xml>\x0A","content_type":"text/xml"}`, `{"status":"200","request_method":"POST","request_body":"<xml>x0A","content_type":"text/xml"}`}
 	for k := range transformers {
 		datas, err = transformers[k].RawTransform(datas)
@@ -825,7 +829,7 @@ func TestDateTransforms(t *testing.T) {
 	rc := RunnerConfig{}
 	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
-	transformers := createTransformers(rc)
+	transformers, _ := createTransformers(rc)
 	datas := []Data{{"status": "02/01/2016--15:04:05"}, {"status": "2006-01-02 15:04:15"}}
 	for k := range transformers {
 		datas, err = transformers[k].Transform(datas)
@@ -871,7 +875,7 @@ func TestSplitAndConvertTransforms(t *testing.T) {
 	rc := RunnerConfig{}
 	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
-	transformers := createTransformers(rc)
+	transformers, _ := createTransformers(rc)
 	datas := []Data{{"status": "1,2,3"}, {"status": "4,5,6"}}
 	for k := range transformers {
 		datas, err = transformers[k].Transform(datas)
@@ -1065,7 +1069,7 @@ func TestSyslogRunnerX(t *testing.T) {
 	os.Mkdir(metaDir, DefaultDirPerm)
 	defer os.RemoveAll(metaDir)
 
-	config1 := `{
+	config := `{
 		"name":"TestSyslogRunner",
 		"batch_len":1,
 		"reader":{
@@ -1085,13 +1089,13 @@ func TestSyslogRunnerX(t *testing.T) {
 	}`
 
 	rc := RunnerConfig{}
-	err := jsoniter.Unmarshal([]byte(config1), &rc)
+	err := jsoniter.Unmarshal([]byte(config), &rc)
 	assert.NoError(t, err)
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewReaderRegistry(), parser.NewParserRegistry(), sender.NewSenderRegistry())
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
 	assert.NoError(t, err)
 	go rr.Run()
 	time.Sleep(1 * time.Second)
-	sysLog, err := syslog.Dial("tcp", "localhost:5142",
+	sysLog, err := syslog.Dial("tcp", "127.0.0.1:5142",
 		syslog.LOG_WARNING|syslog.LOG_DAEMON, "demotag")
 	if err != nil {
 		log.Fatal(err)
@@ -1275,7 +1279,7 @@ func TestAddDatatags(t *testing.T) {
 	err = jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
 
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewReaderRegistry(), parser.NewParserRegistry(), sender.NewSenderRegistry())
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
 	assert.NoError(t, err)
 	go rr.Run()
 
@@ -1336,7 +1340,7 @@ func TestRunWithExtra(t *testing.T) {
 	err = jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
 
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewReaderRegistry(), parser.NewParserRegistry(), sender.NewSenderRegistry())
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
 	assert.NoError(t, err)
 	go rr.Run()
 
@@ -1389,7 +1393,7 @@ func TestRunWithDataSource(t *testing.T) {
 	rc := RunnerConfig{}
 	err = jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewReaderRegistry(), parser.NewParserRegistry(), sender.NewSenderRegistry())
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
 	assert.NoError(t, err)
 	assert.NotNil(t, rr)
 	go rr.Run()
@@ -1456,7 +1460,7 @@ func TestRunWithDataSourceFial(t *testing.T) {
 	rc := RunnerConfig{}
 	err = jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewReaderRegistry(), parser.NewParserRegistry(), sender.NewSenderRegistry())
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
 	assert.NoError(t, err)
 	assert.NotNil(t, rr)
 	go rr.Run()
@@ -1728,7 +1732,7 @@ func TestMergeEnvTags(t *testing.T) {
 func TestMergeExtraInfoTags(t *testing.T) {
 	meta, err := reader.NewMetaWithConf(conf.MapConf{
 		ExtraInfo:      "true",
-		reader.KeyMode: reader.ModeMysql,
+		reader.KeyMode: reader.ModeMySQL,
 	})
 	assert.NoError(t, err)
 	tags := MergeExtraInfoTags(meta, nil)
@@ -1736,4 +1740,112 @@ func TestMergeExtraInfoTags(t *testing.T) {
 	//再次写入，应该不会产生变化。
 	tags = MergeExtraInfoTags(meta, tags)
 	assert.Equal(t, 4, len(tags))
+}
+
+func TestTailxCleaner(t *testing.T) {
+	cur, err := os.Getwd()
+	assert.NoError(t, err)
+	dir := filepath.Join(cur, "TestTailxCleaner")
+	metaDir := filepath.Join(dir, "meta")
+	os.RemoveAll(dir)
+	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
+		log.Fatalf("TestTailxCleaner error mkdir %v %v", dir, err)
+	}
+	defer os.RemoveAll(dir)
+	defer os.RemoveAll(metaDir)
+
+	dira := filepath.Join(dir, "a")
+	os.MkdirAll(dira, DefaultDirPerm)
+	logPatha := filepath.Join(dira, "a.log")
+	err = ioutil.WriteFile(logPatha, []byte("a\n"), 0666)
+	assert.NoError(t, err)
+
+	dirb := filepath.Join(dir, "b")
+	os.MkdirAll(dirb, DefaultDirPerm)
+	logPathb := filepath.Join(dirb, "b.log")
+	err = ioutil.WriteFile(logPathb, []byte("b\n"), 0666)
+	assert.NoError(t, err)
+
+	readfile := filepath.Join(dir, "*", "*.log")
+	config := `
+{
+  "name": "TestTailxCleaner",
+  "batch_size": 2097152,
+  "batch_interval": 1,
+  "reader": {
+    "expire": "24h",
+    "log_path": "` + readfile + `",
+	"meta_path":"` + metaDir + `",
+    "mode": "tailx",
+    "read_from": "oldest",
+    "stat_interval": "1s"
+  },
+  "cleaner": {
+    "delete_enable": "true",
+    "delete_interval": "1",
+    "reserve_file_number": "1",
+    "reserve_file_size": "2048"
+  },
+  "parser": {
+    "disable_record_errdata": "false",
+    "timestamp": "true",
+    "type": "raw"
+  },
+  "senders": [
+    {
+      "sender_type": "discard"
+    }
+  ]
+}`
+
+	rc := RunnerConfig{}
+	err = jsoniter.Unmarshal([]byte(config), &rc)
+	assert.NoError(t, err)
+	cleanChan := make(chan cleaner.CleanSignal)
+	rr, err := NewLogExportRunner(rc, cleanChan, reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
+	assert.NoError(t, err)
+	assert.NotNil(t, rr)
+	go rr.Run()
+
+	time.Sleep(2 * time.Second)
+
+	logPatha1 := filepath.Join(dira, "a.log.1")
+	err = os.Rename(logPatha, logPatha1)
+	assert.NoError(t, err)
+
+	err = ioutil.WriteFile(logPatha, []byte("bbbb\n"), 0666)
+	assert.NoError(t, err)
+
+	time.Sleep(5 * time.Second)
+
+	logPatha2 := filepath.Join(dira, "a.log.2")
+	err = os.Rename(logPatha, logPatha2)
+	assert.NoError(t, err)
+
+	err = ioutil.WriteFile(logPatha, []byte("cccc\n"), 0666)
+	assert.NoError(t, err)
+
+	time.Sleep(2 * time.Second)
+
+	assert.NotNil(t, rr.Cleaner())
+	var ret, dft int
+
+	for {
+		select {
+		case sig := <-cleanChan:
+			ret++
+			assert.Equal(t, "a.log.1", sig.Filename)
+			err = os.Remove(filepath.Join(sig.Logdir, sig.Filename))
+			assert.NoError(t, err)
+			assert.Equal(t, reader.ModeTailx, sig.ReadMode)
+		default:
+			dft++
+		}
+		time.Sleep(50 * time.Millisecond)
+		if dft > 40 {
+			break
+		}
+	}
+	assert.Equal(t, 1, ret)
+
 }

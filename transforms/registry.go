@@ -72,7 +72,6 @@ var (
 		KeyName:      "new",
 		ChooseOnly:   false,
 		Default:      "",
-		Required:     false,
 		Placeholder:  "new_field_keyname",
 		DefaultNoUse: false,
 		Description:  "新的字段名(new)",
@@ -85,7 +84,7 @@ var (
 		Required:     true,
 		Placeholder:  "new_field_keyname",
 		DefaultNoUse: false,
-		Description:  "解析后数据的字段名(new)",
+		Description:  "新的字段名(new)",
 		Type:         TransformTypeString,
 	}
 	KeyTimezoneoffset = Option{

@@ -229,13 +229,28 @@ func IsNoSuchResourceError(err error) bool {
 	if !ok {
 		return false
 	}
+	if reqErr.ErrorType == ErrNoSuchWorkflow {
+		return true
+	}
 	if reqErr.ErrorType == NoSuchRepoError {
+		return true
+	}
+	if reqErr.ErrorType == NoSuchTransformError {
 		return true
 	}
 	if reqErr.ErrorType == NoSuchExportError {
 		return true
 	}
 	if reqErr.ErrorType == NoSuchSeriesError {
+		return true
+	}
+	if reqErr.ErrorType == ErrDataSourceNotExist {
+		return true
+	}
+	if reqErr.ErrorType == ErrJobNotExist {
+		return true
+	}
+	if reqErr.ErrorType == ErrJobExportNotExist {
 		return true
 	}
 	return false

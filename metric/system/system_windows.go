@@ -2,10 +2,14 @@ package system
 
 import (
 	"runtime"
+	"os/exec"
+	"strings"
+	"os"
+	"io/ioutil"
 
+	"github.com/qiniu/log"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/w32"
-
 	"github.com/qiniu/logkit/metric"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -47,8 +51,11 @@ func (_ *WinSystemStats) Collect() (datas []map[string]interface{}, err error) {
 		KeySystemNCpus:        runtime.NumCPU(),
 		KeySystemUptime:       uptime,
 		KeySystemUptimeFormat: formatUptime(uptime),
+		KeySystemNNetCards:    getNumNetCard(),
+		KeySystemNDisks:       getNumDisk(),
+		KeySystemNServices:    getNumService(),
 	}
-	datas = append(datas, data)
+	datas = []map[string]interface{}{data}
 	return
 }
 
@@ -56,4 +63,38 @@ func init() {
 	metric.Add(TypeMetricSystem, func() metric.Collector {
 		return &WinSystemStats{}
 	})
+}
+
+//若无法获取磁盘个数，返回挂载点的个数
+func getNumDisk() (mountsNum int) {
+	defer func() {
+		if mountsNum == -1 {
+			diskMetrics, ok := metric.Collectors["disk"]
+			if !ok {
+				log.Errorf("metric disk is not support now")
+			}
+			mounts, err := diskMetrics().Collect()
+			if err != nil {
+				log.Error("disk metrics collect have error %v", err)
+			}
+			mountsNum = len(mounts)
+		}
+	}()
+	err := ioutil.WriteFile("diskpart.txt", []byte("list disk"), os.ModeAppend)
+	if err != nil {
+		log.Error("write file diskpart.txt have error %v", err)
+	}
+	out, err := exec.Command("diskpart", "/S", "diskpart.txt").Output()
+	if err != nil {
+		log.Error("get disk number have error %v", err)
+		return -1
+	}
+	str := string(out)
+	index := strings.Index(str, "--------  -------------  -------  -------  ---  ---")
+	disks := strings.Split(str[index:], "\n")
+	return len(disks) - 2
+}
+
+func getNumService() int {
+	return 0
 }

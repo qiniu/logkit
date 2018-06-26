@@ -12,11 +12,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/qiniu/log"
+
 	"github.com/qiniu/logkit/rateio"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
-
-	"github.com/qiniu/log"
 )
 
 type SingleFile struct {
@@ -91,7 +91,7 @@ func NewSingleFile(meta *Meta, path, whence string, errDirectReturn bool) (sf *S
 		originpath: originpath,
 		pfi:        pfi,
 		f:          f,
-		ratereader: rateio.NewRateReader(f, meta.readlimit),
+		ratereader: rateio.NewRateReader(f, meta.Readlimit),
 		mux:        sync.Mutex{},
 	}
 
@@ -139,31 +139,19 @@ func (sf *SingleFile) statFile(path string) (pfi os.FileInfo, err error) {
 }
 
 func (sf *SingleFile) openSingleFile(path string) (pfi os.FileInfo, f *os.File, err error) {
-
-	for {
-		if atomic.LoadInt32(&sf.stopped) > 0 {
-			err = errors.New("reader " + sf.Name() + " has been exited")
-			return
-		}
-
-		path, pfi, err = GetRealPath(path)
-		if err != nil || pfi == nil {
-			log.Warnf("Runner[%v] %s - utils.GetRealPath failed, err:%v", sf.meta.RunnerName, path, err)
-			time.Sleep(time.Minute)
-			continue
-		}
-		if !pfi.Mode().IsRegular() {
-			log.Warnf("Runner[%v] %s - file failed, err: file is not regular", sf.meta.RunnerName, path)
-			time.Sleep(time.Minute)
-			continue
-		}
-		f, err = os.Open(path)
-		if err != nil {
-			log.Warnf("Runner[%v] %s - open file err:%v", sf.meta.RunnerName, path, err)
-			time.Sleep(time.Minute)
-			continue
-		}
-		break
+	path, pfi, err = GetRealPath(path)
+	if err != nil || pfi == nil {
+		err = fmt.Errorf("runner[%v] %s - utils.GetRealPath failed, err:%v", sf.meta.RunnerName, path, err)
+		return
+	}
+	if !pfi.Mode().IsRegular() {
+		err = fmt.Errorf("runner[%v] %s - file failed, err: file is not regular", sf.meta.RunnerName, path)
+		return
+	}
+	f, err = os.Open(path)
+	if err != nil {
+		err = fmt.Errorf("runner[%v] %s - open file err:%v", sf.meta.RunnerName, path, err)
+		return
 	}
 	return
 }
@@ -194,7 +182,10 @@ func (sf *SingleFile) Close() (err error) {
 	if sf.ratereader != nil {
 		sf.ratereader.Close()
 	}
-	return sf.f.Close()
+	if sf.f != nil {
+		return sf.f.Close()
+	}
+	return nil
 }
 
 func (sf *SingleFile) detectMovedName(inode uint64) (name string) {
@@ -236,11 +227,14 @@ func (sf *SingleFile) Reopen() (err error) {
 		return
 	}
 	sf.f.Close()
+	sf.f = nil
 	detectStr := sf.detectMovedName(oldInode)
 	if detectStr != "" {
-		if derr := sf.meta.AppendDoneFile(detectStr); derr != nil {
+		if derr := sf.meta.AppendDoneFileInode(detectStr, oldInode); derr != nil {
 			log.Errorf("Runner[%v] AppendDoneFile %v error %v", sf.meta.RunnerName, detectStr, derr)
 		}
+	} else {
+		detectStr = "not detected"
 	}
 	log.Infof("Runner[%v] rotate %s successfully , rotated file is <%v>", sf.meta.RunnerName, sf.originpath, detectStr)
 	pfi, f, err := sf.openSingleFile(sf.originpath)
@@ -252,7 +246,7 @@ func (sf *SingleFile) Reopen() (err error) {
 	if sf.ratereader != nil {
 		sf.ratereader.Close()
 	}
-	sf.ratereader = rateio.NewRateReader(f, sf.meta.readlimit)
+	sf.ratereader = rateio.NewRateReader(f, sf.meta.Readlimit)
 	sf.offset = 0
 	return
 }
@@ -278,7 +272,7 @@ func (sf *SingleFile) reopenForESTALE() (err error) {
 	if sf.ratereader != nil {
 		sf.ratereader.Close()
 	}
-	sf.ratereader = rateio.NewRateReader(f, sf.meta.readlimit)
+	sf.ratereader = rateio.NewRateReader(f, sf.meta.Readlimit)
 	return
 }
 
@@ -329,16 +323,20 @@ func (sf *SingleFile) SyncMeta() error {
 
 func (sf *SingleFile) Lag() (rl *LagInfo, err error) {
 	sf.mux.Lock()
-	rl = &LagInfo{Size: -sf.offset}
+	rl = &LagInfo{Size: -sf.offset, SizeUnit: "bytes"}
 	sf.mux.Unlock()
 
 	fi, err := os.Stat(sf.originpath)
 	if os.IsNotExist(err) {
 		rl.Size = 0
-		err = nil
-		return
+		return rl, nil
+	}
+
+	if err != nil {
+		rl.Size = 0
+		return rl, err
 	}
 	rl.Size += fi.Size()
-	rl.SizeUnit = "bytes"
-	return
+
+	return rl, nil
 }

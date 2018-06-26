@@ -1,16 +1,16 @@
 package reader
 
 import (
+	"errors"
 	"fmt"
 
-	"errors"
-
 	"github.com/qiniu/log"
+
 	"github.com/qiniu/logkit/conf"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-// Reader 是一个通用的行读取reader接口
+// Reader 代表了一个通用的行读取器
 type Reader interface {
 	//Name reader名称
 	Name() string
@@ -20,6 +20,12 @@ type Reader interface {
 	SetMode(mode string, v interface{}) error
 	Close() error
 	SyncMeta()
+}
+
+// DataReader 代表了一个可直接读取内存数据结构的读取器
+type DataReader interface {
+	// ReadData 用于读取一条数据以及数据的实际读取字节
+	ReadData() (Data, int64, error)
 }
 
 // StatsReader 是一个通用的带有统计接口的reader
@@ -87,6 +93,8 @@ const (
 	KeyMysqlSQL         = "mysql_sql"
 	KeyMysqlCron        = "mysql_cron"
 	KeyMysqlExecOnStart = "mysql_exec_onstart"
+	KeyMysqlHistoryAll  = "mysql_history_all"
+	KyeMysqlTable       = "mysql_table"
 
 	KeySQLSchema        = "sql_schema"
 	KeyMagicLagDuration = "magic_lag_duration"
@@ -147,15 +155,15 @@ const (
 	ModeFile       = "file"
 	ModeTailx      = "tailx"
 	ModeFileAuto   = "fileauto"
-	ModeMysql      = "mysql"
-	ModeMssql      = "mssql"
-	ModePG         = "postgres"
+	ModeMySQL      = "mysql"
+	ModeMSSQL      = "mssql"
+	ModePostgreSQL = "postgres"
 	ModeElastic    = "elastic"
 	ModeMongo      = "mongo"
 	ModeKafka      = "kafka"
 	ModeRedis      = "redis"
 	ModeSocket     = "socket"
-	ModeHttp       = "http"
+	ModeHTTP       = "http"
 	ModeScript     = "script"
 	ModeSnmp       = "snmp"
 	ModeCloudWatch = "cloudwatch"
@@ -177,67 +185,79 @@ const (
 	Loop = "loop"
 )
 
-func NewFileBufReader(conf conf.MapConf, errDirectReturn bool) (reader Reader, err error) {
-	rs := NewReaderRegistry()
+const (
+	StatusInit int32 = iota
+	StatusStopped
+	StatusStopping
+	StatusRunning
+)
+
+func NewReader(conf conf.MapConf, errDirectReturn bool) (reader Reader, err error) {
+	rs := NewRegistry()
 	return rs.NewReader(conf, errDirectReturn)
 }
 
-// ReaderRegistry reader 的工厂类。可以注册自定义reader
-type ReaderRegistry struct {
+//Deprecated: NewFileBufReader 名字上有歧义，实际上就是NewReader，包括任何类型，保证兼容性，保留
+func NewFileBufReader(conf conf.MapConf, errDirectReturn bool) (reader Reader, err error) {
+	rs := NewRegistry()
+	return rs.NewReader(conf, errDirectReturn)
+}
+
+type Constructor func(*Meta, conf.MapConf) (Reader, error)
+
+// registeredConstructors keeps a list of all available reader constructors can be registered by Registry.
+var registeredConstructors = map[string]Constructor{}
+
+// RegisterConstructor adds a new constructor for a given type of reader.
+func RegisterConstructor(typ string, c Constructor) {
+	registeredConstructors[typ] = c
+}
+
+// Registry reader 的工厂类。可以注册自定义reader
+type Registry struct {
 	readerTypeMap map[string]func(*Meta, conf.MapConf) (Reader, error)
 }
 
-func NewReaderRegistry() *ReaderRegistry {
-	ret := &ReaderRegistry{
+func NewRegistry() *Registry {
+	ret := &Registry{
 		readerTypeMap: map[string]func(*Meta, conf.MapConf) (Reader, error){},
 	}
 	ret.RegisterReader(ModeDir, NewFileDirReader)
-	ret.RegisterReader(ModeFileAuto, NewFileAutoReader)
 	ret.RegisterReader(ModeFile, NewSingleFileReader)
-	ret.RegisterReader(ModeTailx, NewMultiReader)
-	ret.RegisterReader(ModeMysql, NewSQLReader)
-	ret.RegisterReader(ModeMssql, NewSQLReader)
-	ret.RegisterReader(ModePG, NewSQLReader)
-	ret.RegisterReader(ModeElastic, NewESReader)
-	ret.RegisterReader(ModeMongo, NewMongoReader)
-	ret.RegisterReader(ModeKafka, NewKafkaReader)
-	ret.RegisterReader(ModeRedis, NewRedisReader)
-	ret.RegisterReader(ModeSocket, NewSocketReader)
-	ret.RegisterReader(ModeHttp, NewHttpReader)
-	ret.RegisterReader(ModeScript, NewScriptReader)
-	ret.RegisterReader(ModeSnmp, NewSnmpReader)
-	ret.RegisterReader(ModeCloudWatch, NewCloudWatchReader)
-	ret.RegisterReader(ModeCloudTrail, NewCloudTrailReader)
+
+	for typ, c := range registeredConstructors {
+		ret.RegisterReader(typ, c)
+	}
 
 	return ret
 }
 
-func (registry *ReaderRegistry) RegisterReader(readerType string, constructor func(*Meta, conf.MapConf) (Reader, error)) error {
-	_, exist := registry.readerTypeMap[readerType]
+func (reg *Registry) RegisterReader(readerType string, constructor Constructor) error {
+	_, exist := reg.readerTypeMap[readerType]
 	if exist {
 		return errors.New("readerType " + readerType + " has been existed")
 	}
-	registry.readerTypeMap[readerType] = constructor
+	reg.readerTypeMap[readerType] = constructor
 	return nil
 }
 
-func (r *ReaderRegistry) NewReader(conf conf.MapConf, errDirectReturn bool) (reader Reader, err error) {
+func (reg *Registry) NewReader(conf conf.MapConf, errDirectReturn bool) (reader Reader, err error) {
 	meta, err := NewMetaWithConf(conf)
 	if err != nil {
 		log.Warn(err)
 		return
 	}
-	return r.NewReaderWithMeta(conf, meta, errDirectReturn)
+	return reg.NewReaderWithMeta(conf, meta, errDirectReturn)
 }
 
-func (r *ReaderRegistry) NewReaderWithMeta(conf conf.MapConf, meta *Meta, errDirectReturn bool) (reader Reader, err error) {
+func (reg *Registry) NewReaderWithMeta(conf conf.MapConf, meta *Meta, errDirectReturn bool) (reader Reader, err error) {
 	if errDirectReturn {
 		conf[KeyErrDirectReturn] = Bool2String(errDirectReturn)
 	}
 	mode, _ := conf.GetStringOr(KeyMode, ModeDir)
 	headPattern, _ := conf.GetStringOr(KeyHeadPattern, "")
 
-	constructor, exist := r.readerTypeMap[mode]
+	constructor, exist := reg.readerTypeMap[mode]
 	if !exist {
 		return nil, fmt.Errorf("reader type unsupperted : %v", mode)
 	}
@@ -258,7 +278,7 @@ func NewFileDirReader(meta *Meta, conf conf.MapConf) (reader Reader, err error) 
 	if err != nil {
 		return
 	}
-	bufSize, _ := conf.GetIntOr(KeyBufSize, defaultBufSize)
+	bufSize, _ := conf.GetIntOr(KeyBufSize, DefaultBufSize)
 
 	// 默认不读取隐藏文件
 	ignoreHidden, _ := conf.GetBoolOr(KeyIgnoreHiddenFile, true)
@@ -270,17 +290,16 @@ func NewFileDirReader(meta *Meta, conf conf.MapConf) (reader Reader, err error) 
 	if err != nil {
 		return
 	}
-	fr.skipFileFirstLine = skipFirstLine
+	fr.SkipFileFirstLine = skipFirstLine
 	return NewReaderSize(fr, meta, bufSize)
 }
 
 func NewSingleFileReader(meta *Meta, conf conf.MapConf) (reader Reader, err error) {
-
 	logpath, err := conf.GetString(KeyLogPath)
 	if err != nil {
 		return
 	}
-	bufSize, _ := conf.GetIntOr(KeyBufSize, defaultBufSize)
+	bufSize, _ := conf.GetIntOr(KeyBufSize, DefaultBufSize)
 	whence, _ := conf.GetStringOr(KeyWhence, WhenceOldest)
 	errDirectReturn, _ := conf.GetBoolOr(KeyErrDirectReturn, true)
 

@@ -14,6 +14,7 @@ import (
 	"github.com/qiniu/logkit/cleaner"
 	config "github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/sender"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
@@ -22,7 +23,6 @@ import (
 
 	"github.com/howeyc/fsnotify"
 	"github.com/json-iterator/go"
-	"github.com/qiniu/logkit/reader"
 )
 
 var DIR_NOT_EXIST_SLEEP_TIME = "300" //300 s
@@ -42,6 +42,7 @@ type ManagerConfig struct {
 type cleanQueue struct {
 	cleanerCount int
 	filecount    map[string]int
+	key          string //where this queue is stored
 }
 
 type Manager struct {
@@ -56,22 +57,22 @@ type Manager struct {
 	runnerConfig map[string]RunnerConfig
 
 	watchers  map[string]*fsnotify.Watcher // inode到watcher的映射表
-	pregistry *parser.ParserRegistry
-	sregistry *sender.SenderRegistry
-	rregistry *reader.ReaderRegistry
+	rregistry *reader.Registry
+	pregistry *parser.Registry
+	sregistry *sender.Registry
 
 	Version    string
 	SystemInfo string
 }
 
 func NewManager(conf ManagerConfig) (*Manager, error) {
-	ps := parser.NewParserRegistry()
-	sr := sender.NewSenderRegistry()
-	rr := reader.NewReaderRegistry()
-	return NewCustomManager(conf, rr, ps, sr)
+	rr := reader.NewRegistry()
+	pr := parser.NewRegistry()
+	sr := sender.NewRegistry()
+	return NewCustomManager(conf, rr, pr, sr)
 }
 
-func NewCustomManager(conf ManagerConfig, rr *reader.ReaderRegistry, pr *parser.ParserRegistry, sr *sender.SenderRegistry) (*Manager, error) {
+func NewCustomManager(conf ManagerConfig, rr *reader.Registry, pr *parser.Registry, sr *sender.Registry) (*Manager, error) {
 	if conf.RestDir == "" {
 		dir, err := os.Getwd()
 		if err != nil {
@@ -99,9 +100,9 @@ func NewCustomManager(conf ManagerConfig, rr *reader.ReaderRegistry, pr *parser.
 		runners:       make(map[string]Runner),
 		runnerConfig:  make(map[string]RunnerConfig),
 		watchers:      make(map[string]*fsnotify.Watcher),
+		rregistry:     rr,
 		pregistry:     pr,
 		sregistry:     sr,
-		rregistry:     rr,
 		SystemInfo:    utilsos.GetOSInfo().String(),
 	}
 	return m, nil
@@ -183,6 +184,7 @@ func (m *Manager) addCleanQueue(info CleanInfo) {
 		cq = &cleanQueue{
 			cleanerCount: 1,
 			filecount:    make(map[string]int),
+			key:          info.logdir,
 		}
 	}
 	log.Info(">>>>>>>>>>>> add clean queue", cq.cleanerCount, info.logdir)
@@ -256,14 +258,14 @@ func (m *Manager) ForkRunner(confPath string, nconf RunnerConfig, errReturn bool
 			m.lock.Unlock()
 			return nil
 		}
-		for k := range nconf.SenderConfig {
+		for k := range nconf.SendersConfig {
 			var webornot string
 			if nconf.IsInWebFolder {
 				webornot = "Web"
 			} else {
 				webornot = "Terminal"
 			}
-			nconf.SenderConfig[k][InnerUserAgent] = "logkit/" + m.Version + " " + m.SystemInfo + " " + webornot
+			nconf.SendersConfig[k][sender.InnerUserAgent] = "logkit/" + m.Version + " " + m.SystemInfo + " " + webornot
 		}
 
 		if runner, err = NewCustomRunner(nconf, m.cleanChan, m.rregistry, m.pregistry, m.sregistry); err != nil {
@@ -331,8 +333,8 @@ func (m *Manager) handle(path string, watcher *fsnotify.Watcher) {
 				if os.IsNotExist(err) {
 					// 如果当前监听文件被删除，则不再监听，退出
 					log.Warnf("close file watcher path %v", path)
-					watcher.Close()
 					m.watcherMux.Lock()
+					watcher.Close()
 					delete(m.watchers, path)
 					m.watcherMux.Unlock()
 					// TODO 此处代表文件夹被删了，只移除一个runner可能不够，文件夹下会有其他runner没有被删除
@@ -356,23 +358,53 @@ func (m *Manager) handle(path string, watcher *fsnotify.Watcher) {
 	}
 }
 
+func (m *Manager) getCleanQueues(dir, file, mode string) ([]*cleanQueue, error) {
+	if mode == reader.ModeTailx {
+		cleanQueues := make([]*cleanQueue, 0, len(m.cleanQueues))
+		for k, v := range m.cleanQueues {
+			matched, err := filepath.Match(k, filepath.Join(dir, file))
+			if err != nil {
+				log.Errorf("match pattern[%v] to path(%v) err %v", k, filepath.Join(dir, file), err)
+				continue
+			}
+			if matched {
+				cleanQueues = append(cleanQueues, v)
+			}
+		}
+		return cleanQueues, nil
+	}
+
+	q, ok := m.cleanQueues[dir]
+	if !ok {
+		return nil, fmt.Errorf("cleaner dir %v not exist but got clean signal for delete file %v", dir, file)
+	}
+	return []*cleanQueue{q}, nil
+}
+
 func (m *Manager) doClean(sig cleaner.CleanSignal) {
 	m.cleanLock.Lock()
 	defer m.cleanLock.Unlock()
-
 	dir, _, err := GetRealPath(sig.Logdir)
 	if err != nil {
 		log.Errorf("get GetRealPath for %v error %v", dir, err)
 		return
 	}
 	file := sig.Filename
-	q, ok := m.cleanQueues[dir]
-	if !ok {
-		log.Errorf("%v cleaner dir %v not exist but got clean signal for delete file %v", sig.Cleaner, dir, file)
+	queues, err := m.getCleanQueues(dir, file, sig.ReadMode)
+	if err != nil {
+		log.Error(sig.Cleaner, err)
 		return
 	}
-	count := q.filecount[file] + 1
-	if count >= q.cleanerCount {
+	//check if all queues can be cleaned
+	var canBeDeleted = true
+	for _, q := range queues {
+		count := q.filecount[file] + 1
+		if count < q.cleanerCount {
+			canBeDeleted = false
+		}
+		q.filecount[file] = count
+	}
+	if canBeDeleted {
 		catdir := filepath.Join(dir, file)
 		err := os.Remove(catdir)
 		if err != nil {
@@ -384,10 +416,12 @@ func (m *Manager) doClean(sig cleaner.CleanSignal) {
 		} else {
 			log.Infof("log <%v> was successfully cleaned by cleaner", catdir)
 		}
-		delete(q.filecount, file)
-	} else {
-		q.filecount[file] = count
-		m.cleanQueues[dir] = q
+		for _, q := range queues {
+			delete(q.filecount, file)
+		}
+	}
+	for _, q := range queues {
+		m.cleanQueues[q.key] = q
 	}
 	return
 }
@@ -443,12 +477,15 @@ func (m *Manager) addWatchers(confsPath []string) (err error) {
 				}
 				m.Add(filepath.Join(path, f.Name()))
 			}
+
+			// Note: fsnotify has potential data race when New/Close watchers
+			m.watcherMux.Lock()
 			watcher, err := fsnotify.NewWatcher()
 			if err != nil {
+				m.watcherMux.Unlock()
 				log.Errorf("fsnotify.NewWatcher: %v", err)
 				continue
 			}
-			m.watcherMux.Lock()
 			m.watchers[path] = watcher
 			m.watcherMux.Unlock()
 			go m.handle(path, watcher)
@@ -591,11 +628,11 @@ func TrimSecretInfo(conf RunnerConfig) RunnerConfig {
 		preFix + "list_export_token",
 	}...)
 
-	for i, sc := range conf.SenderConfig {
+	for i, sc := range conf.SendersConfig {
 		for _, k := range keyName {
 			delete(sc, k)
 		}
-		conf.SenderConfig[i] = sc
+		conf.SendersConfig[i] = sc
 	}
 	return conf
 }
@@ -635,9 +672,9 @@ func (m *Manager) UpdateToken(tokens []AuthTokens) (err error) {
 			}
 		}
 		if c, ok := m.runnerConfig[runnerPath]; ok {
-			if len(c.SenderConfig) > token.SenderIndex {
+			if len(c.SendersConfig) > token.SenderIndex {
 				for k, t := range token.SenderTokens {
-					c.SenderConfig[token.SenderIndex][k] = t
+					c.SendersConfig[token.SenderIndex][k] = t
 				}
 			}
 			m.runnerConfig[runnerPath] = c

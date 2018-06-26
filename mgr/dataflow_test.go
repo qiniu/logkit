@@ -9,14 +9,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/json-iterator/go"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/reader/http"
 	"github.com/qiniu/logkit/sender"
 	. "github.com/qiniu/logkit/utils/models"
-
-	"github.com/json-iterator/go"
-	"github.com/stretchr/testify/assert"
 )
 
 func Test_RawData(t *testing.T) {
@@ -139,7 +140,7 @@ func Test_TransformData(t *testing.T) {
 	config1 := `{
 			"type":"IP",
 			"key":  "ip",
-			"data_path": "../transforms/ip/17monipdb.dat",
+			"data_path": "../transforms/ip/test_data/17monipdb.dat",
 			"sampleLog": "{\"ip\": \"111.2.3.4\"}"
 	}`
 
@@ -164,7 +165,7 @@ func Test_getTransformerCreator(t *testing.T) {
 	config1 := `{
 			"type":"IP",
 			"key":  "ip",
-			"data_path": "../transforms/ip/17monipdb.dat",
+			"data_path": "../transforms/ip/test_data/17monipdb.dat",
 			"sampleLog": "{\"ip\": \"111.2.3.4\"}"
 	}`
 	var rc map[string]interface{}
@@ -185,7 +186,7 @@ func Test_getDataFromTransformConfig(t *testing.T) {
 	config1 := `{
 			"type":"IP",
 			"key":  "ip",
-			"data_path": "../transforms/ip/17monipdb.dat",
+			"data_path": "../transforms/ip/test_data/17monipdb.dat",
 			"sampleLog": "{\"ip\": \"111.2.3.4\"}"
 	}`
 	var rc map[string]interface{}
@@ -210,7 +211,7 @@ func Test_getTransformer(t *testing.T) {
 	config1 := `{
 			"type":"IP",
 			"key":  "ip",
-			"data_path": "../transforms/ip/17monipdb.dat",
+			"data_path": "../transforms/ip/test_data/17monipdb.dat",
 			"sampleLog": "{\"ip\": \"111.2.3.4\"}"
 	}`
 	var rc map[string]interface{}
@@ -233,20 +234,20 @@ func Test_getTransformer(t *testing.T) {
 
 func Test_SendData(t *testing.T) {
 	c := conf.MapConf{
-		reader.KeyHttpServiceAddress: ":8000",
-		reader.KeyHttpServicePath:    "/logkit/data",
+		reader.KeyHTTPServiceAddress: ":8000",
+		reader.KeyHTTPServicePath:    "/logkit/data",
 	}
 	readConf := conf.MapConf{
 		reader.KeyMetaPath: "./meta",
 		reader.KeyFileDone: "./meta",
-		reader.KeyMode:     reader.ModeHttp,
+		reader.KeyMode:     reader.ModeHTTP,
 		KeyRunnerName:      "TestNewHttpReader",
 	}
 	meta, err := reader.NewMetaWithConf(readConf)
 	assert.NoError(t, err)
 	defer os.RemoveAll("./meta")
-	hhttpReader, err := reader.NewHttpReader(meta, c)
-	httpReader := hhttpReader.(*reader.HttpReader)
+	reader, err := http.NewReader(meta, c)
+	httpReader := reader.(*http.Reader)
 	assert.NoError(t, err)
 	err = httpReader.Start()
 	assert.NoError(t, err)
@@ -303,7 +304,7 @@ func Test_SendData(t *testing.T) {
 
 	var senders []conf.MapConf
 	senderConf := conf.MapConf{
-		KeySenderType:                TypeHttp,
+		sender.KeySenderType:         sender.TypeHttp,
 		sender.KeyHttpSenderGzip:     "true",
 		sender.KeyHttpSenderCsvSplit: "\t",
 		sender.KeyHttpSenderProtocol: "json",
@@ -345,7 +346,7 @@ func Test_getSendersConfig(t *testing.T) {
 
 	var senders []conf.MapConf
 	senderConf := conf.MapConf{
-		KeySenderType:                TypeHttp,
+		sender.KeySenderType:         sender.TypeHttp,
 		sender.KeyHttpSenderGzip:     "true",
 		sender.KeyHttpSenderCsvSplit: "\t",
 		sender.KeyHttpSenderProtocol: "json",
@@ -370,7 +371,7 @@ func Test_getSendersConfig(t *testing.T) {
 	}
 
 	for _, val := range sendersConfig {
-		assert.Equal(t, TypeHttp, val[KeySenderType])
+		assert.Equal(t, sender.TypeHttp, val[sender.KeySenderType])
 		assert.Equal(t, "true", val[sender.KeyHttpSenderGzip])
 	}
 }
@@ -387,7 +388,7 @@ func Test_getDataFromSenderConfig(t *testing.T) {
 
 	var senders []conf.MapConf
 	senderConf := conf.MapConf{
-		KeySenderType:                TypeHttp,
+		sender.KeySenderType:         sender.TypeHttp,
 		sender.KeyHttpSenderGzip:     "true",
 		sender.KeyHttpSenderCsvSplit: "\t",
 		sender.KeyHttpSenderProtocol: "json",
@@ -422,7 +423,7 @@ func Test_getDataFromSenderConfig(t *testing.T) {
 func Test_getSenders(t *testing.T) {
 	var sendersConfig []conf.MapConf
 	senderConf := conf.MapConf{
-		KeySenderType:                TypeHttp,
+		sender.KeySenderType:         sender.TypeHttp,
 		sender.KeyHttpSenderGzip:     "true",
 		sender.KeyHttpSenderCsvSplit: "\t",
 		sender.KeyHttpSenderProtocol: "json",

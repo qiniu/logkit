@@ -36,7 +36,6 @@ type RestService struct {
 }
 
 func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
-
 	if mgr.Cluster.Enable {
 		if !mgr.Cluster.IsMaster && len(mgr.Cluster.MasterUrl) < 1 {
 			log.Fatalf("cluster is enabled but master url is empty")
@@ -434,7 +433,9 @@ func (rs *RestService) Register() error {
 // Stop will stop RestService
 func (rs *RestService) Stop() {
 	if rs.l != nil {
-		rs.l.Close()
+		if err := rs.l.Close(); err != nil {
+			log.Error("close reset service listener err: ", err)
+		}
 	}
 }
 

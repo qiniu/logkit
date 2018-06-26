@@ -11,18 +11,23 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/json-iterator/go"
+
 	"github.com/qiniu/log"
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
+
 	"github.com/qiniu/logkit/cleaner"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	_ "github.com/qiniu/logkit/parser/builtin"
 	"github.com/qiniu/logkit/reader"
+	_ "github.com/qiniu/logkit/reader/builtin"
+	"github.com/qiniu/logkit/reader/cloudtrail"
 	"github.com/qiniu/logkit/router"
 	"github.com/qiniu/logkit/sender"
+	_ "github.com/qiniu/logkit/sender/builtin"
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
-
-	"github.com/json-iterator/go"
-	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 )
 
 type CleanInfo struct {
@@ -67,7 +72,7 @@ type LogExportRunner struct {
 	exitChan     chan struct{}
 	reader       reader.Reader
 	cleaner      *cleaner.Cleaner
-	parser       parser.LogParser
+	parser       parser.Parser
 	senders      []sender.Sender
 	router       *router.Router
 	transformers []transforms.Transformer
@@ -78,8 +83,8 @@ type LogExportRunner struct {
 
 	meta *reader.Meta
 
-	batchLen  int
-	batchSize int
+	batchLen  int64
+	batchSize int64
 	lastSend  time.Time
 }
 
@@ -89,31 +94,32 @@ const qiniulogHeadPatthern = "[1-9]\\d{3}/[0-1]\\d/[0-3]\\d [0-2]\\d:[0-6]\\d:[0
 
 // NewRunner 创建Runner
 func NewRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal) (runner Runner, err error) {
-	return NewLogExportRunner(rc, cleanChan, reader.NewReaderRegistry(), parser.NewParserRegistry(), sender.NewSenderRegistry())
+	return NewLogExportRunner(rc, cleanChan, reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
 }
 
-func NewCustomRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *reader.ReaderRegistry, ps *parser.ParserRegistry, sr *sender.SenderRegistry) (runner Runner, err error) {
-	if ps == nil {
-		ps = parser.NewParserRegistry()
+func NewCustomRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *reader.Registry, pr *parser.Registry, sr *sender.Registry) (runner Runner, err error) {
+	if rr == nil {
+		rr = reader.NewRegistry()
+	}
+	if pr == nil {
+		pr = parser.NewRegistry()
 	}
 	if sr == nil {
-		sr = sender.NewSenderRegistry()
+		sr = sender.NewRegistry()
 	}
-	if rr == nil {
-		rr = reader.NewReaderRegistry()
-	}
+
 	if rc.MetricConfig != nil {
 		return NewMetricRunner(rc, sr)
 	}
-	return NewLogExportRunner(rc, cleanChan, rr, ps, sr)
+	return NewLogExportRunner(rc, cleanChan, rr, pr, sr)
 }
 
-func NewRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.LogParser, transformers []transforms.Transformer,
+func NewRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.Parser, transformers []transforms.Transformer,
 	senders []sender.Sender, router *router.Router, meta *reader.Meta) (runner Runner, err error) {
 	return NewLogExportRunnerWithService(info, reader, cleaner, parser, transformers, senders, router, meta)
 }
 
-func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.LogParser,
+func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.Parser,
 	transformers []transforms.Transformer, senders []sender.Sender, router *router.Router, meta *reader.Meta) (runner *LogExportRunner, err error) {
 	if info.MaxBatchSize <= 0 {
 		info.MaxBatchSize = defaultMaxBatchSize
@@ -173,7 +179,7 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 	return runner, nil
 }
 
-func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *reader.ReaderRegistry, ps *parser.ParserRegistry, sr *sender.SenderRegistry) (runner *LogExportRunner, err error) {
+func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *reader.Registry, pr *parser.Registry, sr *sender.Registry) (runner *LogExportRunner, err error) {
 	runnerInfo := RunnerInfo{
 		EnvTag:           rc.EnvTag,
 		RunnerName:       rc.RunnerName,
@@ -185,8 +191,8 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	if rc.ReaderConfig == nil {
 		return nil, errors.New(rc.RunnerName + " readerConfig is nil")
 	}
-	if rc.SenderConfig == nil {
-		return nil, errors.New(rc.RunnerName + " SenderConfig is nil")
+	if rc.SendersConfig == nil {
+		return nil, errors.New(rc.RunnerName + " SendersConfig is nil")
 	}
 	if rc.ParserConf == nil {
 		return nil, errors.New(rc.RunnerName + " ParserConf is nil")
@@ -196,8 +202,8 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	if rc.ExtraInfo {
 		rc.ReaderConfig[ExtraInfo] = Bool2String(rc.ExtraInfo)
 	}
-	for i := range rc.SenderConfig {
-		rc.SenderConfig[i][KeyRunnerName] = rc.RunnerName
+	for i := range rc.SendersConfig {
+		rc.SendersConfig[i][KeyRunnerName] = rc.RunnerName
 	}
 	rc.ParserConf[KeyRunnerName] = rc.RunnerName
 	//配置文件适配
@@ -210,8 +216,8 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	if mode == reader.ModeCloudTrail {
 		syncDir := rc.ReaderConfig[reader.KeySyncDirectory]
 		if syncDir == "" {
-			bucket, prefix, region, ak, sk, _ := reader.GetS3UserInfo(rc.ReaderConfig)
-			syncDir = reader.GetDefualtSyncDir(bucket, prefix, region, ak, sk)
+			bucket, prefix, region, ak, sk, _ := cloudtrail.GetS3UserInfo(rc.ReaderConfig)
+			syncDir = cloudtrail.GetDefaultSyncDir(bucket, prefix, region, ak, sk, rc.RunnerName)
 		}
 		rc.ReaderConfig[reader.KeyLogPath] = syncDir
 		if len(rc.CleanerConfig) == 0 {
@@ -231,6 +237,11 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 		if err != nil {
 			return nil, err
 		}
+		defer func() {
+			if err != nil {
+				rd.Close()
+			}
+		}()
 		cl, err = cleaner.NewCleaner(rc.CleanerConfig, meta, cleanChan, meta.LogPath())
 		if err != nil {
 			return nil, err
@@ -241,24 +252,29 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 			return nil, err
 		}
 	}
-	parser, err := ps.NewLogParser(rc.ParserConf)
+	parser, err := pr.NewLogParser(rc.ParserConf)
 	if err != nil {
 		return nil, err
 	}
-	transformers := createTransformers(rc)
+
+	transformers, err := createTransformers(rc)
+	if err != nil {
+		return nil, err
+	}
 	senders := make([]sender.Sender, 0)
-	for i, c := range rc.SenderConfig {
-		if rc.ExtraInfo && c[KeySenderType] == TypePandora {
+	for i, senderConfig := range rc.SendersConfig {
+		if rc.ExtraInfo && senderConfig[sender.KeySenderType] == sender.TypePandora {
 			//如果已经开启了，不要重复加
-			c[KeyPandoraExtraInfo] = "false"
+			senderConfig[sender.KeyPandoraExtraInfo] = "false"
 		}
-		s, err := sr.NewSender(c, meta.FtSaveLogPath())
+		s, err := sr.NewSender(senderConfig, meta.FtSaveLogPath())
 		if err != nil {
 			return nil, err
 		}
 		senders = append(senders, s)
-		delete(rc.SenderConfig[i], InnerUserAgent)
+		delete(rc.SendersConfig[i], sender.InnerUserAgent)
 	}
+
 	senderCnt := len(senders)
 	router, err := router.NewSenderRouter(rc.Router, senderCnt)
 	if err != nil {
@@ -267,47 +283,41 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	return NewLogExportRunnerWithService(runnerInfo, rd, cl, parser, transformers, senders, router, meta)
 }
 
-func createTransformers(rc RunnerConfig) []transforms.Transformer {
+func createTransformers(rc RunnerConfig) ([]transforms.Transformer, error) {
 	transformers := make([]transforms.Transformer, 0)
 	for idx := range rc.Transforms {
 		tConf := rc.Transforms[idx]
 		tp := tConf[transforms.KeyType]
 		if tp == nil {
-			log.Error("field type is empty")
-			continue
+			return nil, fmt.Errorf("transformer config type is empty %v", tConf)
 		}
 		strTP, ok := tp.(string)
 		if !ok {
-			log.Error("field type is not string")
-			continue
+			return nil, fmt.Errorf("transformer config field type %v is not string", tp)
 		}
 		creater, ok := transforms.Transformers[strTP]
 		if !ok {
-			log.Errorf("type %v of transformer not exist", strTP)
-			continue
+			return nil, fmt.Errorf("transformer type %v not exist", strTP)
 		}
 		trans := creater()
 		bts, err := jsoniter.Marshal(tConf)
 		if err != nil {
-			log.Errorf("type %v of transformer marshal config error %v", strTP, err)
-			continue
+			return nil, fmt.Errorf("type %v of transformer marshal config error %v", strTP, err)
 		}
 		err = jsoniter.Unmarshal(bts, trans)
 		if err != nil {
-			log.Errorf("type %v of transformer unmarshal config error %v", strTP, err)
-			continue
+			return nil, fmt.Errorf("type %v of transformer unmarshal config error %v", strTP, err)
 		}
 		//transformer初始化
 		if trans, ok := trans.(transforms.Initialize); ok {
 			err = trans.Init()
 			if err != nil {
-				log.Errorf("type %v of transformer init error %v", strTP, err)
-				continue
+				return nil, fmt.Errorf("type %v of transformer init error %v", strTP, err)
 			}
 		}
 		transformers = append(transformers, trans)
 	}
-	return transformers
+	return transformers, nil
 }
 
 // trySend 尝试发送数据，如果此时runner退出返回false，其他情况无论是达到最大重试次数还是发送成功，都返回true
@@ -392,6 +402,147 @@ func getSampleContent(line string, maxBatchSize int) string {
 	return line[0:1024]
 }
 
+func (r *LogExportRunner) readDatas(dr reader.DataReader, dataSourceTag string) []Data {
+	var (
+		datas []Data
+		err   error
+		bytes int64
+		data  Data
+	)
+	for !r.batchFullOrTimeout() {
+		data, bytes, err = dr.ReadData()
+		if err != nil {
+			log.Errorf("Runner[%v] data reader %s - error: %v, sleep 1 second...", r.Name(), r.reader.Name(), err)
+			time.Sleep(time.Second)
+			break
+		}
+		if len(data) <= 0 {
+			log.Debugf("Runner[%v] data reader %s got empty data", r.Name(), r.reader.Name())
+			continue
+		}
+		if len(dataSourceTag) > 0 {
+			data[dataSourceTag] = r.reader.Source()
+		}
+		datas = append(datas, data)
+		r.batchLen++
+		r.batchSize += bytes
+	}
+	r.rsMutex.Lock()
+	if err != nil {
+		r.rs.ReaderStats.LastError = err.Error()
+	} else {
+		r.rs.ReaderStats.LastError = ""
+	}
+	r.rsMutex.Unlock()
+	return datas
+}
+
+func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
+	var (
+		err          error
+		lines, froms []string
+		line         string
+	)
+	for !r.batchFullOrTimeout() {
+		line, err = r.reader.ReadLine()
+		if os.IsNotExist(err) {
+			log.Errorf("Runner[%v] reader %s - error: %v, sleep 3 second...", r.Name(), r.reader.Name(), err)
+			time.Sleep(3 * time.Second)
+			break
+		}
+		if err != nil && err != io.EOF {
+			log.Errorf("Runner[%v] reader %s - error: %v, sleep 1 second...", r.Name(), r.reader.Name(), err)
+			time.Sleep(time.Second)
+			break
+		}
+		if len(line) <= 0 {
+			log.Debugf("Runner[%v] reader %s no more content fetched sleep 1 second...", r.Name(), r.reader.Name())
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		lines = append(lines, line)
+		if dataSourceTag != "" {
+			froms = append(froms, r.reader.Source())
+		}
+
+		r.batchLen++
+		r.batchSize += int64(len(line))
+	}
+	r.rsMutex.Lock()
+	if err != nil && err != io.EOF {
+		if os.IsNotExist(err) {
+			r.rs.ReaderStats.LastError = "no more file exist to be read"
+		} else {
+			r.rs.ReaderStats.LastError = err.Error()
+		}
+	} else {
+		r.rs.ReaderStats.LastError = ""
+	}
+	r.rsMutex.Unlock()
+
+	for i := range r.transformers {
+		if r.transformers[i].Stage() == transforms.StageBeforeParser {
+			lines, err = r.transformers[i].RawTransform(lines)
+			if err != nil {
+				log.Error(err)
+			}
+		}
+	}
+
+	if len(lines) <= 0 {
+		log.Debugf("Runner[%v] fetched 0 lines", r.Name())
+		_, ok := r.parser.(parser.Flushable)
+		if ok {
+			lines = []string{parser.PandoraParseFlushSignal}
+		} else {
+			return nil
+		}
+	}
+
+	// parse data
+	var numErrs int64
+	datas, err := r.parser.Parse(lines)
+	se, ok := err.(*StatsError)
+	r.rsMutex.Lock()
+	if ok {
+		numErrs = se.Errors
+		err = se.ErrorDetail
+		r.rs.ParserStats.Errors += se.Errors
+		r.rs.ParserStats.Success += se.Success
+	} else if err != nil {
+		numErrs = 1
+		r.rs.ParserStats.Errors++
+	} else {
+		r.rs.ParserStats.Success++
+	}
+	if err != nil {
+		r.rs.ParserStats.LastError = err.Error()
+	}
+	r.rsMutex.Unlock()
+	if err != nil {
+		errMsg := fmt.Sprintf("Runner[%v] parser %s error : %v ", r.Name(), r.parser.Name(), err.Error())
+		log.Debugf(errMsg)
+		(&SchemaErr{}).Output(numErrs, errors.New(errMsg))
+	}
+
+	// 把 source 加到 data 里，前提是认为 []line 变成 []data 以后是一一对应的，一旦错位就不加
+	if dataSourceTag != "" {
+		// 只要实际解析后数据不大于 froms 就可以填上
+		if len(datas) <= len(froms) {
+			datas = addSourceToData(froms, se, datas, dataSourceTag, r.Name())
+		} else {
+			var selen int
+			if se != nil {
+				selen = len(se.DatasourceSkipIndex)
+			}
+			log.Errorf("Runner[%v] datasourcetag add error, datas(TOTAL %v), datasourceSkipIndex(TOTAL %v) not match with froms(TOTAL %v)", r.Name(), len(datas), selen, len(froms))
+			log.Debugf("Runner[%v] datasourcetag add error, datas %v datasourceSkipIndex %v froms %v", datas, se.DatasourceSkipIndex, froms)
+		}
+	}
+	return datas
+}
+
 func (r *LogExportRunner) Run() {
 	if r.cleaner != nil {
 		go r.cleaner.Run()
@@ -407,13 +558,6 @@ func (r *LogExportRunner) Run() {
 		}
 	}()
 
-	tags := r.meta.GetTags()
-	tags = MergeEnvTags(r.EnvTag, tags)
-	tags = MergeExtraInfoTags(r.meta, tags)
-
-	datasourceTag := r.meta.GetDataSourceTag()
-	schemaErr := SchemaErr{Number: 0, Last: time.Unix(0, 0)}
-
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
 			log.Debugf("Runner[%v] exited from run", r.Name())
@@ -422,120 +566,35 @@ func (r *LogExportRunner) Run() {
 			}
 			return
 		}
+
 		// read data
-		var lines, froms []string
-		var readErr error
-		var line string
-		for !r.batchFullOrTimeout() {
-			line, readErr = r.reader.ReadLine()
-			if os.IsNotExist(readErr) {
-				log.Errorf("Runner[%v] reader %s - error: %v, sleep 3 second...", r.Name(), r.reader.Name(), readErr)
-				time.Sleep(3 * time.Second)
-				break
-			}
-			if readErr != nil && readErr != io.EOF {
-				log.Errorf("Runner[%v] reader %s - error: %v, sleep 1 second...", r.Name(), r.reader.Name(), readErr)
-				time.Sleep(time.Second)
-				break
-			}
-			if len(line) <= 0 {
-				log.Debugf("Runner[%v] reader %s no more content fetched sleep 1 second...", r.Name(), r.reader.Name())
-				time.Sleep(1 * time.Second)
-				continue
-			}
-			r.rsMutex.Lock()
-			r.rs.ReadDataSize += int64(len(line))
-			r.rs.ReadDataCount++
-			r.rsMutex.Unlock()
-			lines = append(lines, line)
-			if datasourceTag != "" {
-				froms = append(froms, r.reader.Source())
-			}
-			r.batchLen++
-			r.batchSize += len(line)
-		}
-		r.rsMutex.Lock()
-		if readErr != nil && readErr != io.EOF {
-			if os.IsNotExist(readErr) {
-				r.rs.ReaderStats.LastError = "no more file exist to be read"
-			} else {
-				r.rs.ReaderStats.LastError = readErr.Error()
-			}
+		var err error
+		var datas []Data
+		if dr, ok := r.reader.(reader.DataReader); ok {
+			datas = r.readDatas(dr, r.meta.GetDataSourceTag())
 		} else {
-			r.rs.ReaderStats.LastError = ""
+			datas = r.readLines(r.meta.GetDataSourceTag())
 		}
-		r.rs.ReaderStats.Success = int64(r.batchLen)
+
+		r.rsMutex.Lock()
+		r.rs.ReaderStats.Success = r.batchLen
+		r.rs.ReadDataCount += r.batchLen
+		r.rs.ReadDataSize += r.batchSize
 		r.rsMutex.Unlock()
 
 		r.batchLen = 0
 		r.batchSize = 0
 		r.lastSend = time.Now()
 
-		for i := range r.transformers {
-			var err error
-			if r.transformers[i].Stage() == transforms.StageBeforeParser {
-				lines, err = r.transformers[i].RawTransform(lines)
-				if err != nil {
-					log.Error(err)
-				}
-			}
-		}
-
-		if len(lines) <= 0 {
-			log.Debugf("Runner[%v] fetched 0 lines", r.Name())
-			_, ok := r.parser.(parser.Flushable)
-			if ok {
-				lines = []string{parser.PandoraParseFlushSignal}
-			} else {
-				continue
-			}
-		}
-
-		// parse data
-		errorCnt := int64(0)
-		datas, err := r.parser.Parse(lines)
-		se, ok := err.(*StatsError)
-		r.rsMutex.Lock()
-		if ok {
-			errorCnt = se.Errors
-			err = se.ErrorDetail
-			r.rs.ParserStats.Errors += se.Errors
-			r.rs.ParserStats.Success += se.Success
-		} else if err != nil {
-			errorCnt = 1
-			r.rs.ParserStats.Errors++
-		} else {
-			r.rs.ParserStats.Success++
-		}
-		if err != nil {
-			r.rs.ParserStats.LastError = err.Error()
-		}
-		r.rsMutex.Unlock()
-		if err != nil {
-			errMsg := fmt.Sprintf("Runner[%v] parser %s error : %v ", r.Name(), r.parser.Name(), err.Error())
-			log.Debugf(errMsg)
-			schemaErr.Output(errorCnt, errors.New(errMsg))
-		}
 		// send data
 		if len(datas) <= 0 {
 			log.Debugf("Runner[%v] received parsed data length = 0", r.Name())
 			continue
 		}
 
-		//把datasourcetag加到data里，前提是认为[]line变成[]data以后是一一对应的，一旦错位就不加
-		if datasourceTag != "" {
-			//只要实际解析后数据比froms小就可以填上
-			if len(datas) <= len(froms) {
-				datas = addSourceToData(froms, se, datas, datasourceTag, r.Name())
-			} else {
-				var selen int
-				if se != nil {
-					selen = len(se.DatasourceSkipIndex)
-				}
-				log.Errorf("Runner[%v] datasourcetag add error, datas(TOTAL %v), datasourceSkipIndex(TOTAL %v) not match with froms(TOTAL %v)", r.Name(), len(datas), selen, len(froms))
-				log.Debugf("Runner[%v] datasourcetag add error, datas %v datasourceSkipIndex %v froms %v", datas, se.DatasourceSkipIndex, froms)
-			}
-		}
+		tags := r.meta.GetTags()
+		tags = MergeEnvTags(r.EnvTag, tags)
+		tags = MergeExtraInfoTags(r.meta, tags)
 		if len(tags) > 0 {
 			datas = addTagsToData(tags, datas, r.Name())
 		}
@@ -552,12 +611,10 @@ func (r *LogExportRunner) Run() {
 			}
 			se, ok := err.(*StatsError)
 			if ok {
-				errorCnt = se.Errors
 				err = se.ErrorDetail
 				tstats.Errors += se.Errors
 				tstats.Success += se.Success
 			} else if err != nil {
-				errorCnt = 1
 				tstats.Errors++
 			} else {
 				tstats.Success++
@@ -610,7 +667,7 @@ func classifySenderData(datas []Data, router *router.Router, senderCnt int) [][]
 	return senderDataList
 }
 
-func addSourceToData(sourceFroms []string, se *StatsError, datas []Data, datasourceTagName, runnername string) []Data {
+func addSourceToData(sourceFroms []string, se *StatsError, datas []Data, datasourceTagName, runnerName string) []Data {
 	j := 0
 	eql := len(sourceFroms) == len(datas)
 	for i, v := range sourceFroms {
@@ -626,7 +683,7 @@ func addSourceToData(sourceFroms []string, se *StatsError, datas []Data, datasou
 		}
 
 		if dt, ok := datas[j][datasourceTagName]; ok {
-			log.Debugf("Runner[%v] datasource tag already has data %v, ignore %v", runnername, dt, v)
+			log.Debugf("Runner[%v] datasource tag already has data %v, ignore %v", runnerName, dt, v)
 		} else {
 			datas[j][datasourceTagName] = v
 		}
@@ -722,12 +779,12 @@ func (r *LogExportRunner) Cleaner() CleanInfo {
 
 func (r *LogExportRunner) batchFullOrTimeout() bool {
 	// 达到最大行数
-	if r.MaxBatchLen > 0 && r.batchLen >= r.MaxBatchLen {
+	if r.MaxBatchLen > 0 && int(r.batchLen) >= r.MaxBatchLen {
 		log.Debugf("Runner[%v] meet the max batch length %v", r.RunnerName, r.MaxBatchLen)
 		return true
 	}
 	// 达到最大字节数
-	if r.MaxBatchSize > 0 && r.batchSize >= r.MaxBatchSize {
+	if r.MaxBatchSize > 0 && int(r.batchSize) >= r.MaxBatchSize {
 		log.Debugf("Runner[%v] meet the max batch size %v", r.RunnerName, r.MaxBatchSize)
 		return true
 	}
@@ -764,22 +821,22 @@ func getTrend(old, new float64) string {
 	return SpeedStable
 }
 
-func (r *LogExportRunner) getStatusFrequently(now time.Time) (bool, float64) {
+func (r *LogExportRunner) getStatusFrequently(now time.Time) (bool, float64, RunnerStatus) {
 	r.rsMutex.RLock()
 	defer r.rsMutex.RUnlock()
 	elaspedTime := now.Sub(r.rs.lastState).Seconds()
 	if elaspedTime <= 3 {
-		return true, elaspedTime
+		return true, elaspedTime, r.lastRs.Clone()
 	}
-	return false, elaspedTime
+	return false, elaspedTime, RunnerStatus{}
 }
 
-func (r *LogExportRunner) Status() RunnerStatus {
+func (r *LogExportRunner) Status() (rs RunnerStatus) {
 	var isFre bool
 	var elaspedtime float64
 	now := time.Now()
-	if isFre, elaspedtime = r.getStatusFrequently(now); isFre {
-		return *r.lastRs
+	if isFre, elaspedtime, rs = r.getStatusFrequently(now); isFre {
+		return rs
 	}
 	sts := r.getRefreshStatus(elaspedtime)
 	return sts

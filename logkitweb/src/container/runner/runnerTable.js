@@ -435,6 +435,15 @@ class RunnerTable extends Component {
       dataIndex: 'path',
       width: '8%'
     }, {
+      title: '待读取数据',
+      dataIndex: 'lag',
+      render: (text, record, all) => {
+        if(text){
+          return <span>{(text.size||0) + (text.sizeunit ? ' ' + text.sizeunit : text.sizeunit)}</span>
+        }
+        return null
+      }
+    }, {
       title: '错误日志',
       dataIndex: 'errorLog',
       width: '3%',
@@ -563,6 +572,7 @@ class RunnerTable extends Component {
         let runnerOpt = '停止'
         let tag = ''
         let machineUrl = ''
+        let lag = {}
 
         if (item["is_stopped"]) {
           status = '关闭'
@@ -595,12 +605,14 @@ class RunnerTable extends Component {
             sendError = _.values(ele.senderStats)[0] == undefined ? '' : _.values(ele.senderStats)[0].last_error
             isWebFolder = item.web_folder
             logkitError = ele.error
+            lag = ele.lag
           }
         })
         data.push({
           key: uuid(),
           name: item.name,
           tag,
+          lag,
           machineUrl,
           createTime,
           status,

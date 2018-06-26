@@ -82,7 +82,7 @@ func getRunnerConfig(name, logPath, metaPath, mode, senderPath string) ([]byte, 
 			"type": "json",
 			"name": "json_parser",
 		},
-		SenderConfig: []conf.MapConf{{
+		SendersConfig: []conf.MapConf{{
 			"name":           "file_sender",
 			"sender_type":    "file",
 			"file_send_path": senderPath,
@@ -329,8 +329,7 @@ func restGetStatusTest(p *testParam) {
 		t.Fatalf("mkdir test path error %v", err)
 	}
 	time.Sleep(1 * time.Second)
-	mode := reader.ModeDir
-	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, mode, resvPath)
+	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, reader.ModeDir, resvPath)
 	if err != nil {
 		t.Fatalf("get runner config failed, error is %v", err)
 	}
@@ -427,8 +426,8 @@ func restCRUDTest(p *testParam) {
 	expconf1.ReaderConfig[KeyRunnerName] = expconf1.RunnerName
 	expconf1.ParserConf[KeyRunnerName] = expconf1.RunnerName
 	expconf1.IsInWebFolder = true
-	for i := range expconf1.SenderConfig {
-		expconf1.SenderConfig[i][KeyRunnerName] = expconf1.RunnerName
+	for i := range expconf1.SendersConfig {
+		expconf1.SendersConfig[i][KeyRunnerName] = expconf1.RunnerName
 	}
 
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName1
@@ -454,8 +453,8 @@ func restCRUDTest(p *testParam) {
 	expconf2.ReaderConfig[KeyRunnerName] = expconf2.RunnerName
 	expconf2.ParserConf[KeyRunnerName] = expconf2.RunnerName
 	expconf2.IsInWebFolder = true
-	for i := range expconf2.SenderConfig {
-		expconf2.SenderConfig[i][KeyRunnerName] = expconf2.RunnerName
+	for i := range expconf2.SendersConfig {
+		expconf2.SendersConfig[i][KeyRunnerName] = expconf2.RunnerName
 	}
 
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName2
@@ -978,7 +977,7 @@ func senderRouterTest(p *testParam) {
 	runnerConf := RunnerConfig{}
 	err = jsoniter.Unmarshal(runnerConfBytes, &runnerConf)
 	assert.NoError(t, err)
-	runnerConf.SenderConfig = []conf.MapConf{
+	runnerConf.SendersConfig = []conf.MapConf{
 		conf.MapConf{
 			"name":           "file_sender1",
 			"sender_type":    "file",

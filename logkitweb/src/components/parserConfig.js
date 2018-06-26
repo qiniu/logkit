@@ -72,6 +72,11 @@ class Parser extends Component {
     const {getFieldsValue} = this.props.form;
     let data = getFieldsValue();
     let notEmptyKeys = []
+    for (const item of this.state.currentItem) {
+      if (item.advance_depend && data[this.state.currentOption] && data[this.state.currentOption][item.advance_depend] === 'false') {
+        data[this.state.currentOption][item.KeyName] = ''
+      }
+    }
     _.forIn(data[this.state.currentOption], function (value, key) {
       if (value !== "") {
         notEmptyKeys.push(key)
@@ -142,72 +147,71 @@ class Parser extends Component {
           </span>
         </span>
       )
+      let advanceDependValue = ele.advance_depend && getFieldValue(`${this.state.currentOption}.${ele.advance_depend}`)
+      let isAdvanceDependHide = advanceDependValue === 'false' || advanceDependValue === false
       if (ele.ChooseOnly == false) {
         if (ele.KeyName == 'name' && window.isCopy != true) {
           ele.Default = "pandora.parser." + moment().format("YYYYMMDDHHmmss");
         }
-        if (ele.advance_depend && getFieldValue(`${this.state.currentOption}.${ele.advance_depend}`) === 'false') {
-          formItem = null
+        if (ele.KeyName === 'grok_custom_patterns') {
+          formItem = (
+            <FormItem key={index}
+                      {...formItemLayout}
+                      label={labelDes}>
+              {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
+                initialValue: !ele.DefaultNoUse ? ele.Default : '',
+                rules: [{ required: ele.required, message: '不能为空', trigger: 'blur' },
+                  { pattern: ele.CheckRegex, message: '输入不符合规范' },
+                ]
+              })(
+                <Input type="textarea" rows="6" placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'}
+                       disabled={this.state.isReadonly} />
+              )}
+            </FormItem>
+          )
         } else {
-          if (ele.KeyName === 'grok_custom_patterns') {
-            formItem = (
-              <FormItem key={index}
-                {...formItemLayout}
-                label={labelDes}>
-                {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
-                  initialValue: !ele.DefaultNoUse ? ele.Default : '',
-                  rules: [{ required: ele.required, message: '不能为空', trigger: 'blur' },
+          formItem = (
+            <FormItem key={index}
+                      {...formItemLayout}
+                      className={isAdvanceDependHide ? 'hide-div' : 'show-div'}
+                      label={labelDes}>
+              {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
+                initialValue: ele.Default,
+                rules: [{ required: ele.required && !isAdvanceDependHide, message: '不能为空', trigger: 'blur' },
                   { pattern: ele.CheckRegex, message: '输入不符合规范' },
-                  ]
-                })(
-                  <Input type="textarea" rows="6" placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'}
-                    disabled={this.state.isReadonly} />
-                  )}
-              </FormItem>
-            )
-          } else {
-            formItem = (
-              <FormItem key={index}
-                {...formItemLayout}
-                label={labelDes}>
-                {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
-                  initialValue: ele.Default,
-                  rules: [{ required: ele.required, message: '不能为空', trigger: 'blur' },
-                  { pattern: ele.CheckRegex, message: '输入不符合规范' },
-                  ]
-                })(
-                  ele.KeyName === 'csv_schema'
-                    ? <div>
-                        <Input.TextArea
-                        placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'}
-                        disabled={this.state.isReadonly}
-                        autosize={{ minRows: 3, maxRows: 6 }}/>
-                        {
-                          getFieldValue('csv.csv_schema')
-                            ?
-                            <span style={{float: 'right', color: 'rgb(0,0,0,0.48)', fontSize: 11}}>
+                ]
+              })(
+                ele.KeyName === 'csv_schema'
+                  ? <div>
+                    <Input.TextArea
+                      placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'}
+                      disabled={this.state.isReadonly}
+                      autosize={{ minRows: 3, maxRows: 6 }}/>
+                    {
+                      getFieldValue('csv.csv_schema')
+                        ?
+                        <span style={{float: 'right', color: 'rgb(0,0,0,0.48)', fontSize: 11}}>
                               {`已有[${getFieldValue('csv.csv_schema').split(
-                              getFieldValue('csv.csv_splitter') || ',').length}]个schema`}
+                                getFieldValue('csv.csv_splitter') || ',').length}]个schema`}
                             </span>
-                            : null
-                        }
-                        
-                      </div>
-                    : <Input placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'} disabled={this.state.isReadonly} />
-                  )}
-              </FormItem>
-            )
-          }
+                        : null
+                    }
+            
+                  </div>
+                  : <Input placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'} disabled={this.state.isReadonly} />
+              )}
+            </FormItem>
+          )
         }
       } else {
         formItem = (
           <FormItem key={index}
             {...formItemLayout}
-            className=""
+            className={isAdvanceDependHide ? 'hide-div' : 'show-div'}
             label={labelDes}>
             {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
               initialValue: ele.Default || ele.ChooseOptions[0],
-              rules: [{ required: true, message: '不能为空', trigger: 'blur' },
+              rules: [{ required: ele.required && !isAdvanceDependHide, message: '不能为空', trigger: 'blur' },
               ]
             })(
               <Select>

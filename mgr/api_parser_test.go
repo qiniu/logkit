@@ -40,8 +40,8 @@ func parserParseTest(p *testParam) {
 	// json
 	var got2 respParserRet
 	jsonConf := conf2.MapConf{}
-	jsonConf[KeySampleLog] = parser.SampleLogs[parser.TypeJson]
-	jsonConf[parser.KeyParserType] = parser.TypeJson
+	jsonConf[KeySampleLog] = parser.SampleLogs[parser.TypeJSON]
+	jsonConf[parser.KeyParserType] = parser.TypeJSON
 	rawpst, err = jsoniter.Marshal(jsonConf)
 	assert.NoError(t, err)
 	url = "http://127.0.0.1" + rs.address + "/logkit/parser/parse"

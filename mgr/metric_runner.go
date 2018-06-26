@@ -10,6 +10,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/json-iterator/go"
+	"github.com/qiniu/log"
+
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/metric/curl"
@@ -17,10 +20,6 @@ import (
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
-
-	"github.com/qiniu/log"
-
-	"github.com/json-iterator/go"
 )
 
 const (
@@ -62,7 +61,7 @@ func NewMetric(tp string) (metric.Collector, error) {
 	return nil, fmt.Errorf("metric <%v> is not support now", tp)
 }
 
-func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *MetricRunner, err error) {
+func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner, err error) {
 	if rc.CollectInterval <= 0 {
 		rc.CollectInterval = defaultCollectInterval
 	}
@@ -79,8 +78,8 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 	if err != nil {
 		return nil, fmt.Errorf("Runner "+rc.RunnerName+" add failed, err is %v", err)
 	}
-	for i := range rc.SenderConfig {
-		rc.SenderConfig[i][KeyRunnerName] = rc.RunnerName
+	for i := range rc.SendersConfig {
+		rc.SendersConfig[i][KeyRunnerName] = rc.RunnerName
 	}
 	collectors := make([]metric.Collector, 0)
 	transformers := make(map[string][]transforms.Transformer)
@@ -95,14 +94,24 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 			err = nil
 			continue
 		}
-		configBytes, err := jsoniter.Marshal(m.Config)
-		if err != nil {
-			return nil, fmt.Errorf("metric %v marshal config error %v", tp, err)
+		// sync config to ExtCollector
+		ec, ok := c.(metric.ExtCollector)
+		if ok {
+			if err := ec.SyncConfig(m.Config); err != nil {
+				return nil, fmt.Errorf("metric %v sync config error %v", tp, err)
+			}
+		} else {
+			// sync config to buildin Collector
+			configBytes, err := jsoniter.Marshal(m.Config)
+			if err != nil {
+				return nil, fmt.Errorf("metric %v marshal config error %v", tp, err)
+			}
+			err = jsoniter.Unmarshal(configBytes, c)
+			if err != nil {
+				return nil, fmt.Errorf("metric %v unmarshal config error %v", tp, err)
+			}
 		}
-		err = jsoniter.Unmarshal(configBytes, c)
-		if err != nil {
-			return nil, fmt.Errorf("metric %v unmarshal config error %v", tp, err)
-		}
+
 		collectors = append(collectors, c)
 
 		// 配置文件中明确标明 false 的 attr 加入 discard transformer
@@ -156,19 +165,20 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.SenderRegistry) (runner *Metric
 	}
 
 	senders := make([]sender.Sender, 0)
-	for _, c := range rc.SenderConfig {
-		c[KeyIsMetrics] = "true"
-		c[KeyPandoraTSDBTimeStamp] = metric.Timestamp
-		if rc.ExtraInfo && c[KeySenderType] == TypePandora {
+	for _, senderConfig := range rc.SendersConfig {
+		senderConfig[sender.KeyIsMetrics] = "true"
+		senderConfig[sender.KeyPandoraTSDBTimeStamp] = metric.Timestamp
+		if rc.ExtraInfo && senderConfig[sender.KeySenderType] == sender.TypePandora {
 			//如果已经开启了，不要重复加
-			c[KeyPandoraExtraInfo] = "false"
+			senderConfig[sender.KeyPandoraExtraInfo] = "false"
 		}
-		s, err := sr.NewSender(c, meta.FtSaveLogPath())
+		s, err := sr.NewSender(senderConfig, meta.FtSaveLogPath())
 		if err != nil {
 			return nil, err
 		}
 		senders = append(senders, s)
 	}
+
 	runner = &MetricRunner{
 		RunnerName: rc.RunnerName,
 		exitChan:   make(chan struct{}),
@@ -394,22 +404,22 @@ func (_ *MetricRunner) Cleaner() CleanInfo {
 	}
 }
 
-func (mr *MetricRunner) getStatusFrequently(now time.Time) (bool, float64) {
+func (mr *MetricRunner) getStatusFrequently(now time.Time) (bool, float64, RunnerStatus) {
 	mr.rsMutex.RLock()
 	defer mr.rsMutex.RUnlock()
 	elaspedTime := now.Sub(mr.rs.lastState).Seconds()
 	if elaspedTime <= 3 {
-		return true, elaspedTime
+		return true, elaspedTime, mr.lastRs.Clone()
 	}
-	return false, elaspedTime
+	return false, elaspedTime, RunnerStatus{}
 }
 
-func (mr *MetricRunner) Status() RunnerStatus {
+func (mr *MetricRunner) Status() (rs RunnerStatus) {
 	var isFre bool
 	var elaspedtime float64
 	now := time.Now()
-	if isFre, elaspedtime = mr.getStatusFrequently(now); isFre {
-		return *mr.lastRs
+	if isFre, elaspedtime, rs = mr.getStatusFrequently(now); isFre {
+		return rs
 	}
 	mr.rsMutex.Lock()
 	defer mr.rsMutex.Unlock()

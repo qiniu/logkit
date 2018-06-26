@@ -4,10 +4,59 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+// Constants for csv
+const (
+	KeyCSVSchema             = "csv_schema"            // csv 每个列的列名和类型 long/string/float/date
+	KeyCSVSplitter           = "csv_splitter"          // csv 的分隔符
+	KeyCSVLabels             = "csv_labels"            // csv 额外增加的标签信息，比如机器信息等
+	KeyCSVAutoRename         = "csv_auto_rename"       // 是否将不合法的字段名称重命名一下, 比如 header-host 重命名为 header_host
+	KeyCSVAllowNoMatch       = "csv_allow_no_match"    // 允许实际分隔的数据和schema不相等，不相等时按顺序赋值
+	KeyCSVAllowMore          = "csv_allow_more"        // 允许实际字段比schema多
+	KeyCSVAllowMoreStartNum  = "csv_more_start_number" // 允许实际字段比schema多，名称开始的数字
+	KeyCSVIgnoreInvalidField = "csv_ignore_invalid"    // 忽略解析错误的字段
+)
+
+// Constants for Grok
+const (
+	KeyGrokMode               = "grok_mode"     //是否替换\n以匹配多行
+	KeyGrokPatterns           = "grok_patterns" // grok 模式串名
+	KeyGrokCustomPatternFiles = "grok_custom_pattern_files"
+	KeyGrokCustomPatterns     = "grok_custom_patterns"
+
+	KeyTimeZoneOffset = "timezone_offset"
+)
+
+// Constants for Nginx
+const (
+	NginxSchema      = "nginx_schema"
+	NginxConfPath    = "nginx_log_format_path"
+	NginxLogFormat   = "nginx_log_format_name"
+	NginxFormatRegex = "nginx_log_format_regex"
+)
+
+// Constants for Qiniu
+const (
+	KeyQiniulogPrefix = "qiniulog_prefix" //qiniulog的日志前缀
+	KeyLogHeaders     = "qiniulog_log_headers"
+)
+
+// Constants for raw
+const (
+	KeyRaw       = "raw"
+	KeyTimestamp = "timestamp"
+)
+
+// Constants for syslog
+const (
+	KeyRFCType              = "syslog_rfc"
+	KeySyslogMaxline        = "syslog_maxline"
+	PandoraParseFlushSignal = "!@#pandora-EOF-line#@!"
+)
+
 // ModeUsages 用途说明
 var ModeUsages = []KeyValue{
 	{TypeRaw, "按原始日志逐行发送"},
-	{TypeJson, "按 json 格式解析"},
+	{TypeJSON, "按 json 格式解析"},
 	{TypeNginx, "按 nginx 日志解析"},
 	{TypeGrok, "按 grok 格式解析"},
 	{TypeCSV, "按 csv 格式解析"},
@@ -15,7 +64,7 @@ var ModeUsages = []KeyValue{
 	{TypeLogv1, "按七牛日志库格式解析"},
 	{TypeKafkaRest, "按 kafkarest 日志解析"},
 	{TypeEmpty, "通过解析清空数据"},
-	{TypeMysqlLog, "按 mysql 慢请求日志解析"},
+	{TypeMySQL, "按 mysql 慢请求日志解析"},
 }
 
 var (
@@ -66,7 +115,7 @@ var (
 )
 
 var ModeKeyOptions = map[string][]Option{
-	TypeJson: {
+	TypeJSON: {
 		OptionParserName,
 		OptionLabels,
 		OptionDisableRecordErrData,
@@ -211,7 +260,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionLabels,
 		OptionTimezoneOffset,
 		{
-			KeyName:       KeyAutoRename,
+			KeyName:       KeyCSVAutoRename,
 			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"true", "false"},
@@ -266,6 +315,14 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse:  false,
 			Description:   "rfc协议(syslog_rfc)",
 		},
+		{
+			KeyName:      KeySyslogMaxline,
+			ChooseOnly:   false,
+			Default:      "100",
+			DefaultNoUse: false,
+			Description:  "最大读取行数(syslog_maxline)",
+			Advance:      true,
+		},
 		OptionParserName,
 		OptionLabels,
 		OptionDisableRecordErrData,
@@ -276,7 +333,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionDisableRecordErrData,
 	},
 	TypeEmpty: {},
-	TypeMysqlLog: {
+	TypeMySQL: {
 		OptionParserName,
 		OptionLabels,
 		OptionDisableRecordErrData,
@@ -288,14 +345,14 @@ var SampleLogs = map[string]string{
 	TypeNginx: `110.110.101.101 - - [21/Mar/2017:18:14:17 +0800] "GET /files/yyyysx HTTP/1.1" 206 607 1 "-" "Apache-HttpClient/4.4.1 (Java/1.7.0_80)" "-" "122.121.111.222, 122.121.111.333, 192.168.90.61" "192.168.42.54:5000" www.qiniu.com llEAAFgmnoIa3q0U "0.040" 0.040 760 "-" "-" - - QCloud`,
 	TypeGrok: `127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326
 123.45.12.1 user-identifier bob [10/Oct/2013:13:55:36 -0700] "GET /hello.gif HTTP/1.0" 200 2326`,
-	TypeJson:      `{"a":"b","c":1,"d":1.1}`,
+	TypeJSON:      `{"a":"b","c":1,"d":1.1}`,
 	TypeCSV:       `a,123,bcd,1.2`,
 	TypeRaw:       `raw log1[05-May-2017 13:44:39]  [pool log] pid 4109`,
 	TypeSyslog:    `<38>Feb 05 01:02:03 abc system[253]: Listening at 0.0.0.0:3000`,
 	TypeLogv1:     `2016/10/20 17:30:21.433423 [GE2owHck-Y4IWJHS][WARN] github.com/qiniu/http/rpcutil.v1/rpc_util.go:203: E18102: The specified repo does not exist under the provided appid ~`,
 	TypeKafkaRest: `[2016-12-05 03:35:20,682] INFO 172.16.16.191 - - [05/Dec/2016:03:35:20 +0000] "POST /topics/VIP_VvBVy0tuMPPspm1A_0000000000 HTTP/1.1" 200 101640  46 (io.confluent.rest-utils.requests)`,
 	TypeEmpty:     "empty 通过解析清空数据",
-	TypeMysqlLog: `# Time: 2017-12-24T02:42:00.126000Z
+	TypeMySQL: `# Time: 2017-12-24T02:42:00.126000Z
 # User@Host: rdsadmin[rdsadmin] @ localhost [127.0.0.1]  Id:     3
 # Query_time: 0.020363  Lock_time: 0.018450 Rows_sent: 0  Rows_examined: 1
 SET timestamp=1514083320;

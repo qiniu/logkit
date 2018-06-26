@@ -33,6 +33,13 @@ func alignTime(t int64, base int64) int64 {
 	return (t / base) * base
 }
 
+func newLabel(name, dataValue string) Label {
+	return Label{
+		Name:  name,
+		Value: dataValue,
+	}
+}
+
 func GetLabels(labelList []string, nameMap map[string]struct{}) (labels []Label) {
 	labels = make([]Label, 0)
 	for _, f := range labelList {
@@ -75,4 +82,26 @@ func ConvertWebParserConfig(conf conf.MapConf) conf.MapConf {
 	}
 
 	return conf
+}
+
+func ParseTimeZoneOffset(zoneoffset string) (ret int) {
+	zoneoffset = strings.TrimSpace(zoneoffset)
+	if zoneoffset == "" {
+		return
+	}
+	mi := false
+	if strings.HasPrefix(zoneoffset, "-") {
+		mi = true
+	}
+	zoneoffset = strings.Trim(zoneoffset, "+-")
+	i, err := strconv.ParseInt(zoneoffset, 10, 64)
+	if err != nil {
+		log.Errorf("parse %v error %v, ignore zoneoffset...", zoneoffset, err)
+		return
+	}
+	ret = int(i)
+	if mi {
+		ret = 0 - ret
+	}
+	return
 }

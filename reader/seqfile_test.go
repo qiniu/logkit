@@ -3,37 +3,39 @@ package reader
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
-	. "github.com/qiniu/logkit/utils/models"
-
-	"io"
-
 	"github.com/stretchr/testify/assert"
+
+	. "github.com/qiniu/logkit/reader/test"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
-const testPidFile = "abc.pid"
-const testQiniuLogFile = "logkit.log-1115120117"
-const testQiniuLogFileTest = "test-logkit.log-1115120117"
-const hiddenFile = ".hidden"
-const testlogpath = "logpath"
+const (
+	testPidFile          = "abc.pid"
+	testQiniuLogFile     = "logkit.log-1115120117"
+	testQiniuLogFileTest = "test-logkit.log-1115120117"
+	hiddenFile           = ".hidden"
+	testlogpath          = "logpath"
+)
 
 func Test_Read(t *testing.T) {
 	createFile(1000)
-	defer destroyFile()
+	defer DestroyDir()
 
-	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, "", defautFileRetention)
+	meta, err := NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
-	sf, err := NewSeqFile(meta, dir, false, false, []string{".pid"}, "*", WhenceOldest)
+	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, "*", WhenceOldest)
 	if err != nil {
 		t.Error(err)
 	}
-	absDir, err := filepath.Abs(dir)
+	absDir, err := filepath.Abs(Dir)
 	assert.NoError(t, err)
 	assert.Equal(t, absDir, filepath.Dir(sf.Source()))
 	assert.NotEmpty(t, sf.Name())
@@ -74,7 +76,7 @@ func Test_Read(t *testing.T) {
 		lines = append(lines, scanner.Text())
 	}
 	if len(lines) != 1 {
-		t.Errorf("done files should be 1, but get %v", len(files))
+		t.Errorf("done files should be 1, but get %v", len(Files))
 	}
 	err = scanner.Err()
 	if err != nil {
@@ -97,17 +99,17 @@ func Test_Read(t *testing.T) {
 }
 
 func Test_NewReaderWithoutFile(t *testing.T) {
-	createDir()
-	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, "", defautFileRetention)
+	CreateDir()
+	meta, err := NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
-	sf, err := NewSeqFile(meta, dir, false, false, []string{".pid"}, "*", WhenceOldest)
+	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, "*", WhenceOldest)
 	if err != nil {
 		t.Error(err)
 	}
-	createOnlyFiles(1000)
-	defer destroyFile()
+	CreateFiles(1000)
+	defer DestroyDir()
 	buffer := make([]byte, 9)
 	_, err = sf.Read(buffer)
 	if err != nil {
@@ -119,16 +121,16 @@ func Test_NewReaderWithoutFile(t *testing.T) {
 }
 
 func Test_NewReaderWithQiniuLogFile(t *testing.T) {
-	createDir()
-	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, "", defautFileRetention)
+	CreateDir()
+	meta, err := NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
-	createQiniuLogFile(dir)
-	createInvalidSuffixFile(dir)
-	defer destroyFile()
+	createQiniuLogFile(Dir)
+	createInvalidSuffixFile(Dir)
+	defer DestroyDir()
 
-	sf, err := NewSeqFile(meta, dir, false, false, []string{".pid"}, `logkit.log-*`, WhenceOldest)
+	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, `logkit.log-*`, WhenceOldest)
 	if err != nil {
 		t.Error(err)
 	}
@@ -143,16 +145,16 @@ func Test_NewReaderWithQiniuLogFile(t *testing.T) {
 }
 
 func Test_NewFileNewLine(t *testing.T) {
-	createDir()
-	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, "", defautFileRetention)
+	CreateDir()
+	meta, err := NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
-	createQiniuLogFile(dir)
-	createInvalidSuffixFile(dir)
-	defer destroyFile()
+	createQiniuLogFile(Dir)
+	createInvalidSuffixFile(Dir)
+	defer DestroyDir()
 
-	sf, err := NewSeqFile(meta, dir, false, true, []string{".pid"}, `*`, WhenceOldest)
+	sf, err := NewSeqFile(meta, Dir, false, true, []string{".pid"}, `*`, WhenceOldest)
 	if err != nil {
 		t.Error(err)
 	}
@@ -167,15 +169,15 @@ func Test_NewFileNewLine(t *testing.T) {
 }
 
 func Test_NewReaderWithInvalidFile(t *testing.T) {
-	createDir()
-	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, "", defautFileRetention)
+	CreateDir()
+	meta, err := NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
-	createInvalidSuffixFile(dir)
-	defer destroyFile()
+	createInvalidSuffixFile(Dir)
+	defer DestroyDir()
 
-	sf, err := NewSeqFile(meta, dir, false, false, []string{".pid"}, `test-logkit.log-*ss`, WhenceOldest)
+	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, `test-logkit.log-*ss`, WhenceOldest)
 	if err != nil {
 		t.Error(err)
 	}
@@ -187,13 +189,13 @@ func Test_NewReaderWithInvalidFile(t *testing.T) {
 
 func Test_ReadWhenDelete(t *testing.T) {
 	createFile(1000)
-	defer destroyFile()
+	defer DestroyDir()
 
-	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, "", defautFileRetention)
+	meta, err := NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
-	sf, err := NewSeqFile(meta, dir, false, false, []string{".pid"}, "*", WhenceOldest)
+	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, "*", WhenceOldest)
 	if err != nil {
 		t.Error(err)
 	}
@@ -202,7 +204,7 @@ func Test_ReadWhenDelete(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	os.Remove(filepath.Join(dir, "f3"))
+	os.Remove(filepath.Join(Dir, "f3"))
 	_, err = sf.Read(buffer)
 	if err != nil {
 		t.Error(err)
@@ -216,13 +218,13 @@ func Test_ReadWhenDelete(t *testing.T) {
 
 func Test_ReadNewest(t *testing.T) {
 	createFile(1000)
-	defer destroyFile()
+	defer DestroyDir()
 
-	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, "", defautFileRetention)
+	meta, err := NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
-	sf, err := NewSeqFile(meta, dir, false, false, []string{".pid"}, "*", WhenceNewest)
+	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, "*", WhenceNewest)
 	if err != nil {
 		t.Error(err)
 	}
@@ -298,16 +300,16 @@ func Test_SeekUnreachable(t *testing.T) {
 }
 
 func TestLag(t *testing.T) {
-	createDir()
-	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, "", defautFileRetention)
+	CreateDir()
+	meta, err := NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
-	createQiniuLogFile(dir)
-	createInvalidSuffixFile(dir)
-	defer destroyFile()
+	createQiniuLogFile(Dir)
+	createInvalidSuffixFile(Dir)
+	defer DestroyDir()
 
-	sf, err := NewSeqFile(meta, dir, false, false, []string{".pid"}, `logkit.log-*`, WhenceOldest)
+	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, `logkit.log-*`, WhenceOldest)
 	if err != nil {
 		t.Error(err)
 	}
@@ -320,45 +322,45 @@ func TestLag(t *testing.T) {
 		t.Errorf("exp 12345678 but got %v", string(buffer))
 	}
 
-	destroyFile()
-	createDir()
+	DestroyDir()
+	CreateDir()
 	rl, err := sf.Lag()
 	assert.NoError(t, err)
-	assert.Equal(t, &LagInfo{0, "bytes", 0}, rl)
-	createQiniuLogFile(dir)
-	createInvalidSuffixFile(dir)
+	assert.Equal(t, &LagInfo{0, "bytes", 0, 0}, rl)
+	createQiniuLogFile(Dir)
+	createInvalidSuffixFile(Dir)
 
 	rl, err = sf.Lag()
 	assert.NoError(t, err)
-	assert.Equal(t, &LagInfo{16, "bytes", 0}, rl)
+	assert.Equal(t, &LagInfo{16, "bytes", 0, 0}, rl)
 }
 
 func Test_NewFileNewLine2(t *testing.T) {
 	createFile(1000)
-	defer destroyFile()
+	defer DestroyDir()
 
-	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, "", defautFileRetention)
+	meta, err := NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
-	sf, err := NewSeqFile(meta, dir, false, true, []string{".pid"}, "*", WhenceOldest)
+	sf, err := NewSeqFile(meta, Dir, false, true, []string{".pid"}, "*", WhenceOldest)
 	if err != nil {
 		t.Error(err)
 	}
 	buffer := make([]byte, 9)
 	_, err = sf.Read(buffer)
 	assert.NoError(t, err)
-	assert.Equal(t, contents[0], string(buffer))
+	assert.Equal(t, Contents[0], string(buffer))
 
 	buffer = make([]byte, 10)
 	_, err = sf.Read(buffer)
 	assert.NoError(t, err)
-	assert.Equal(t, "\n"+contents[1], string(buffer))
+	assert.Equal(t, "\n"+Contents[1], string(buffer))
 
 	buffer = make([]byte, 10)
 	_, err = sf.Read(buffer)
 	assert.NoError(t, err)
-	assert.Equal(t, "\n"+contents[2], string(buffer))
+	assert.Equal(t, "\n"+Contents[2], string(buffer))
 
 	buffer = make([]byte, 10)
 	_, err = sf.Read(buffer)
@@ -368,35 +370,103 @@ func Test_NewFileNewLine2(t *testing.T) {
 
 func Test_NewFileNewLine3(t *testing.T) {
 
-	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeDir, "", defautFileRetention)
+	meta, err := NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
-	sf, err := NewSeqFile(meta, dir, false, true, []string{".pid"}, "*", WhenceOldest)
+	sf, err := NewSeqFile(meta, Dir, false, true, []string{".pid"}, "*", WhenceOldest)
 	if err != nil {
 		t.Error(err)
 	}
 
 	createFile(1000)
-	defer destroyFile()
+	defer DestroyDir()
 
 	buffer := make([]byte, 9)
 	_, err = sf.Read(buffer)
 	assert.NoError(t, err)
-	assert.Equal(t, contents[0], string(buffer))
+	assert.Equal(t, Contents[0], string(buffer))
 
 	buffer = make([]byte, 10)
 	_, err = sf.Read(buffer)
 	assert.NoError(t, err)
-	assert.Equal(t, "\n"+contents[1], string(buffer))
+	assert.Equal(t, "\n"+Contents[1], string(buffer))
 
 	buffer = make([]byte, 10)
 	_, err = sf.Read(buffer)
 	assert.NoError(t, err)
-	assert.Equal(t, "\n"+contents[2], string(buffer))
+	assert.Equal(t, "\n"+Contents[2], string(buffer))
 
 	buffer = make([]byte, 10)
 	_, err = sf.Read(buffer)
 	assert.Equal(t, io.EOF, err)
 	assert.Equal(t, string(make([]byte, 10)), string(buffer))
+}
+
+func Test_INode(t *testing.T) {
+
+	meta, err := NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", DefautFileRetention)
+	if err != nil {
+		t.Error(err)
+	}
+	sf, err := NewSeqFile(meta, Dir, false, true, []string{".pid"}, "*", WhenceOldest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	createFile(1000)
+	defer DestroyDir()
+
+	buffer := make([]byte, 9)
+	_, err = sf.Read(buffer)
+	assert.NoError(t, err)
+	assert.Equal(t, Contents[0], string(buffer))
+
+	buffer = make([]byte, 10)
+	_, err = sf.Read(buffer)
+	assert.NoError(t, err)
+	assert.Equal(t, "\n"+Contents[1], string(buffer))
+
+	file, err := os.OpenFile(filepath.Join(Dir, "f3"), os.O_WRONLY|os.O_APPEND, DefaultFilePerm)
+	assert.NoError(t, err)
+	file.WriteString("hello3")
+	file.Close()
+
+	buffer = make([]byte, 10)
+	_, err = sf.Read(buffer)
+	assert.NoError(t, err)
+	assert.Equal(t, "\n"+Contents[2], string(buffer))
+
+	buffer = make([]byte, 10)
+	_, err = sf.Read(buffer)
+	assert.Equal(t, io.EOF, err)
+	assert.Equal(t, string(make([]byte, 10)), string(buffer))
+	err = sf.SyncMeta()
+	assert.NoError(t, err)
+	err = sf.Close()
+	assert.NoError(t, err)
+
+	file, err = os.OpenFile(filepath.Join(Dir, "f1"), os.O_WRONLY|os.O_APPEND, DefaultFilePerm)
+	assert.NoError(t, err)
+	file.WriteString("hello1")
+	file.Close()
+
+	file, err = os.OpenFile(filepath.Join(Dir, "f2"), os.O_WRONLY|os.O_APPEND, DefaultFilePerm)
+	assert.NoError(t, err)
+	file.WriteString("hello2")
+	file.Close()
+
+	sf, err = NewSeqFile(meta, Dir, false, true, []string{".pid"}, "*", WhenceOldest)
+	if err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, 2, len(sf.inodeDone))
+	buffer = make([]byte, 6)
+	_, err = sf.Read(buffer)
+	assert.NoError(t, err)
+	assert.Equal(t, "hello1", string(buffer))
+
+	buffer = make([]byte, 10)
+	_, err = sf.Read(buffer)
+	assert.Equal(t, io.EOF, err)
 }

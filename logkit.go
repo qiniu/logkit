@@ -11,18 +11,17 @@ import (
 	"sort"
 	"time"
 
+	"github.com/labstack/echo"
+	"github.com/qiniu/log"
+
 	"github.com/qiniu/logkit/cli"
 	config "github.com/qiniu/logkit/conf"
 	_ "github.com/qiniu/logkit/metric/all"
 	"github.com/qiniu/logkit/mgr"
 	"github.com/qiniu/logkit/times"
-	_ "github.com/qiniu/logkit/transforms/all"
+	_ "github.com/qiniu/logkit/transforms/builtin"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
-
-	"github.com/qiniu/log"
-
-	"github.com/labstack/echo"
 )
 
 //Config of logkit
@@ -44,7 +43,7 @@ type Config struct {
 var conf Config
 
 const (
-	NextVersion       = "v1.4.8"
+	NextVersion       = "v1.5.1"
 	defaultReserveCnt = 5
 	defaultLogDir     = "./run"
 	defaultLogPattern = "*.log-*"
@@ -217,7 +216,6 @@ func usageExit(rc int) {
 //！！！注意： 自动生成 grok pattern代码，下述注释请勿删除！！！
 //go:generate go run generators/grok_pattern_generater.go
 func main() {
-
 	flag.Usage = func() { usageExit(0) }
 	flag.Parse()
 	switch {
@@ -290,7 +288,7 @@ func main() {
 	if conf.ProfileHost != "" {
 		log.Infof("go profile_host was open at %v", conf.ProfileHost)
 		go func() {
-			log.Info(http.ListenAndServe(conf.ProfileHost, nil))
+			log.Fatal(http.ListenAndServe(conf.ProfileHost, nil))
 		}()
 	}
 	if err = rs.Register(); err != nil {

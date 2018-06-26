@@ -9,16 +9,17 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/qiniu/logkit/utils/models"
-
 	"github.com/stretchr/testify/assert"
+
+	. "github.com/qiniu/logkit/reader/test"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 func TestFindFile(t *testing.T) {
 	createFile(1000)
-	defer destroyFile()
+	defer DestroyDir()
 
-	fi, err := getLatestFile(dir)
+	fi, err := getLatestFile(Dir)
 	if err != nil {
 		t.Error(err)
 	}
@@ -26,7 +27,7 @@ func TestFindFile(t *testing.T) {
 		t.Errorf("Latest file is f4, not %v", fi.Name())
 	}
 
-	fi, err = getOldestFile(dir)
+	fi, err = getOldestFile(Dir)
 	if err != nil {
 		t.Error(err)
 	}
@@ -87,11 +88,11 @@ func TestHeadPatternMode(t *testing.T) {
 }
 
 func TestParseDuration(t *testing.T) {
-	dur, err := parseLoopDuration("loop 1s")
+	dur, err := ParseLoopDuration("loop 1s")
 	assert.NoError(t, err)
 	assert.Equal(t, time.Second, dur)
 
-	dur, err = parseLoopDuration("loop 1-")
+	dur, err = ParseLoopDuration("loop 1-")
 	assert.Error(t, err)
 	assert.Equal(t, time.Duration(0), dur)
 }
@@ -105,10 +106,10 @@ func TestModTimeLater(t *testing.T) {
 		err := ioutil.WriteFile(filepath.Join(dir, v), []byte("abc"), 0644)
 		assert.NoError(t, err)
 	}
-	cs, err := getMaxFile(dir, func(info os.FileInfo) bool { return true }, modTimeLater)
+	cs, err := getMaxFile(dir, func(info os.FileInfo) bool { return true }, ModTimeLater)
 	assert.NoError(t, err)
 	assert.Equal(t, "f3", cs.Name())
-	cs, err = getMinFile(dir, func(info os.FileInfo) bool { return true }, modTimeLater)
+	cs, err = getMinFile(dir, func(info os.FileInfo) bool { return true }, ModTimeLater)
 	assert.NoError(t, err)
 	assert.Equal(t, "f1", cs.Name())
 }
@@ -133,4 +134,57 @@ func TestGetTags(t *testing.T) {
 	tags, err := getTags(tagFile)
 	assert.NoError(t, err)
 	assert.Equal(t, exp, tags)
+}
+
+func TestSetMapValueWithPrefix(t *testing.T) {
+	data1 := map[string]interface{}{
+		"a": "b",
+	}
+	err1 := SetMapValueWithPrefix(data1, "newVal", "prefix", false, "a")
+	assert.NoError(t, err1)
+	exp1 := map[string]interface{}{
+		"a":        "b",
+		"prefix_a": "newVal",
+	}
+	assert.Equal(t, exp1, data1)
+
+	data2 := map[string]interface{}{
+		"a": map[string]interface{}{
+			"name": "qiniu",
+			"age":  45,
+		},
+	}
+	err2 := SetMapValueWithPrefix(data2, "newVal", "prefix", false, []string{"a", "name"}...)
+	assert.NoError(t, err2)
+	exp2 := map[string]interface{}{
+		"a": map[string]interface{}{
+			"name":        "qiniu",
+			"age":         45,
+			"prefix_name": "newVal",
+		},
+	}
+	assert.Equal(t, exp2, data2)
+
+	err3 := SetMapValueWithPrefix(data2, "newVal", "prefix", false, []string{"xy", "name"}...)
+	assert.Error(t, err3)
+
+	err4 := SetMapValueWithPrefix(data2, "newVal", "prefix", false, []string{"a", "hello"}...)
+	assert.NoError(t, err4)
+	exp4 := map[string]interface{}{
+		"a": map[string]interface{}{
+			"name":        "qiniu",
+			"age":         45,
+			"prefix_name": "newVal",
+			"hello":       "newVal",
+		},
+	}
+	assert.Equal(t, exp4, data2)
+
+	data5 := map[string]interface{}{}
+	err5 := SetMapValueWithPrefix(data5, "newVal", "prefix", true, "a")
+	assert.NoError(t, err5)
+	exp5 := map[string]interface{}{
+		"prefix_a": "newVal",
+	}
+	assert.Equal(t, exp5, data5)
 }

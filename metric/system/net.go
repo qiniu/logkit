@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/qiniu/logkit/metric"
 	. "github.com/qiniu/logkit/utils/models"
@@ -14,15 +15,17 @@ const (
 	MetricNetUsages = "网络设备状态(net)"
 
 	// TypeMetricNet 信息中的字段
-	KeyNetBytesSent   = "net_bytes_sent"
-	KeyNetBytesRecv   = "net_bytes_recv"
-	KeyNetPacketsSent = "net_packets_sent"
-	KeyNetPacketsRecv = "net_packets_recv"
-	KeyNetErrIn       = "net_err_in"
-	KeyNetErrOut      = "net_err_out"
-	KeyNetDropIn      = "net_drop_in"
-	KeyNetDropOut     = "net_drop_out"
-	KeyNetInterface   = "net_interface"
+	KeyNetBytesSent       = "net_bytes_sent"
+	KeyNetBytesSentPerSec = "net_bytes_sent_per_sec"
+	KeyNetBytesRecv       = "net_bytes_recv"
+	KeyNetBytesRecvPerSec = "net_bytes_recv_per_sec"
+	KeyNetPacketsSent     = "net_packets_sent"
+	KeyNetPacketsRecv     = "net_packets_recv"
+	KeyNetErrIn           = "net_err_in"
+	KeyNetErrOut          = "net_err_out"
+	KeyNetDropIn          = "net_drop_in"
+	KeyNetDropOut         = "net_drop_out"
+	KeyNetInterface       = "net_interface"
 )
 
 // KeyNetUsages TypeMetricNet 中的字段名称
@@ -38,8 +41,15 @@ var KeyNetUsages = []KeyValue{
 	{KeyNetInterface, "网卡设备名称"},
 }
 
+type CollectInfo struct {
+	timestamp time.Time
+	BytesSent uint64
+	BytesRecv uint64
+}
+
 type NetIOStats struct {
-	ps PS
+	ps          PS
+	lastCollect map[string]CollectInfo
 
 	skipChecks     bool
 	skipProtoState bool     `json:"skip_protocols_state"`
@@ -132,6 +142,22 @@ func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 			KeyNetDropOut:     io.Dropout,
 			KeyNetInterface:   io.Name,
 		}
+		thisTime := time.Now()
+		if info, ok := s.lastCollect[io.Name]; ok {
+			dur := thisTime.Sub(info.timestamp)
+			sentBytesDur := io.BytesSent - info.BytesSent
+			recvBytesDur := io.BytesRecv - info.BytesRecv
+			secs := float64(dur) / float64(time.Second)
+			if secs > 0 {
+				fields[KeyNetBytesSentPerSec] = uint64(float64(sentBytesDur) / secs)
+				fields[KeyNetBytesRecvPerSec] = uint64(float64(recvBytesDur) / secs)
+			}
+		}
+		s.lastCollect[io.Name] = CollectInfo{
+			timestamp: thisTime,
+			BytesRecv: io.BytesRecv,
+			BytesSent: io.BytesSent,
+		}
 		datas = append(datas, fields)
 	}
 
@@ -154,6 +180,9 @@ func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 
 func init() {
 	metric.Add(TypeMetricNet, func() metric.Collector {
-		return &NetIOStats{ps: newSystemPS()}
+		return &NetIOStats{
+			ps:          newSystemPS(),
+			lastCollect: make(map[string]CollectInfo),
+		}
 	})
 }

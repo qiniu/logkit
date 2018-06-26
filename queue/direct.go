@@ -3,6 +3,8 @@ package queue
 import (
 	"errors"
 	"sync"
+
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (
@@ -10,9 +12,11 @@ const (
 	StatusClosed
 )
 
+var _ DataQueue = &directQueue{}
+
 type directQueue struct {
 	name    string
-	channel chan []byte
+	channel chan []Data
 	mux     sync.Mutex
 	status  int32
 	quit    chan bool
@@ -21,7 +25,7 @@ type directQueue struct {
 func NewDirectQueue(name string) BackendQueue {
 	return &directQueue{
 		name:    name,
-		channel: make(chan []byte),
+		channel: make(chan []Data),
 		mux:     sync.Mutex{},
 		status:  StatusInit,
 		quit:    make(chan bool),
@@ -33,20 +37,29 @@ func (dq *directQueue) Name() string {
 }
 
 func (dq *directQueue) Put(msg []byte) error {
+	return errors.New("method Put is not supported, please use PutData")
+}
+
+func (dq *directQueue) ReadChan() <-chan []byte {
+	return make(chan []byte) // Blocks forever because no inputs
+}
+
+func (dq *directQueue) PutDatas(datas []Data) error {
 	dq.mux.Lock()
 	defer dq.mux.Unlock()
 	if dq.status == StatusClosed {
 		return errors.New("direct queue is closed")
 	}
+
 	select {
-	case dq.channel <- msg:
+	case dq.channel <- datas:
 		return nil
 	case <-dq.quit:
 		return errors.New("direct queue is closed")
 	}
 }
 
-func (dq *directQueue) ReadChan() <-chan []byte {
+func (dq *directQueue) ReadDatasChan() <-chan []Data {
 	return dq.channel
 }
 

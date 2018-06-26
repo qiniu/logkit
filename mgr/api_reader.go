@@ -47,7 +47,7 @@ func (rs *RestService) PostReaderCheck() echo.HandlerFunc {
 		if err := c.Bind(&readerConf); err != nil {
 			return RespError(c, http.StatusBadRequest, ErrReadRead, err.Error())
 		}
-		_, err := reader.NewFileBufReader(readerConf, true)
+		_, err := reader.NewReader(readerConf, true)
 		if err != nil {
 			return RespError(c, http.StatusBadRequest, ErrReadRead, err.Error())
 		}

@@ -109,6 +109,7 @@ func (c *Pipeline) CreateRepoFromDSL(input *CreateRepoDSLInput) (err error) {
 		Schema:       schemas,
 		Options:      input.Options,
 		Workflow:     input.Workflow,
+		Description:  input.Description,
 	})
 }
 
@@ -575,9 +576,9 @@ func unpackPoints(input *PostDataInput) (packages []standardPointContext) {
 	var buf bytes.Buffer
 	var start = 0
 	for i, point := range input.Points {
-		pointString := point.ToString()
+		pointBytes := point.ToBytes()
 		// 当buf中有数据，并且加入该条数据后就超过了最大的限制，则提交这个input
-		if start < i && buf.Len() > 0 && buf.Len()+len(pointString) >= PandoraMaxBatchSize {
+		if start < i && buf.Len() > 0 && buf.Len()+len(pointBytes) >= PandoraMaxBatchSize {
 			tmpBuff := make([]byte, buf.Len())
 			copy(tmpBuff, buf.Bytes())
 			packages = append(packages, standardPointContext{
@@ -590,7 +591,7 @@ func unpackPoints(input *PostDataInput) (packages []standardPointContext) {
 			buf.Reset()
 			start = i
 		}
-		buf.WriteString(pointString)
+		buf.Write(pointBytes)
 	}
 	tmpBuff := make([]byte, buf.Len())
 	copy(tmpBuff, buf.Bytes())
@@ -622,22 +623,23 @@ func (c *Pipeline) unpack(input *SchemaFreeInput) (packages []pointContext, err 
 		if update {
 			repoUpdate = update
 		}
-		pointString := point.ToString()
+		pointBytes := point.ToBytes()
 		// 当buf中有数据，并且加入该条数据后就超过了最大的限制，则提交这个input
-		if start < i && buf.Len() > 0 && buf.Len()+len(pointString) >= PandoraMaxBatchSize {
+		if start < i && buf.Len() > 0 && buf.Len()+len(pointBytes) >= PandoraMaxBatchSize {
 			tmpBuff := make([]byte, buf.Len())
 			copy(tmpBuff, buf.Bytes())
 			packages = append(packages, pointContext{
 				datas: input.Datas[start:i],
 				inputs: &PostDataFromBytesInput{
-					RepoName: input.RepoName,
-					Buffer:   tmpBuff,
+					RepoName:     input.RepoName,
+					Buffer:       tmpBuff,
+					PandoraToken: input.SchemaFreeToken.PipelinePostDataToken,
 				},
 			})
 			buf.Reset()
 			start = i
 		}
-		buf.WriteString(pointString)
+		buf.Write(pointBytes)
 	}
 	tmpBuff := make([]byte, buf.Len())
 	copy(tmpBuff, buf.Bytes())
@@ -646,7 +648,7 @@ func (c *Pipeline) unpack(input *SchemaFreeInput) (packages []pointContext, err 
 		inputs: &PostDataFromBytesInput{
 			RepoName:     input.RepoName,
 			Buffer:       tmpBuff,
-			PandoraToken: input.PipelinePostDataToken,
+			PandoraToken: input.SchemaFreeToken.PipelinePostDataToken,
 		},
 	})
 	if repoUpdate {

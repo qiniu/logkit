@@ -87,19 +87,29 @@ class Source extends Component {
   }
 
   submit = () => {
-    const {getFieldsValue} = this.props.form;
+    const {getFieldsValue} = this.props.form
     const cleanerKeys = cleanerConfig.map(item => item.KeyName)
-    let data = getFieldsValue();
+    let data = getFieldsValue()
     let notEmptyKeysReader = []
     let notEmptyKeysCleaner = []
+    for (const item of this.state.currentItem) {
+      if (item.advance_depend && data[this.state.currentOption] && data[this.state.currentOption][item.advance_depend] === 'false') {
+        data[this.state.currentOption][item.KeyName] = ''
+      }
+    }
     _.forIn(data[this.state.currentOption], function (value, key) {
-      if (value != "") {
+      if (value !== "") {
         cleanerKeys.includes(key) ? notEmptyKeysCleaner.push(key) : notEmptyKeysReader.push(key)
       }
     });
     let cleanerData = _.pick(data[this.state.currentOption], notEmptyKeysCleaner)
     if (cleanerData && typeof cleanerData['delete_enable'] === 'boolean') {
-      cleanerData.delete_enable = cleanerData.delete_enable.toString()
+      if (cleanerData.delete_enable) {
+        cleanerData.delete_enable = cleanerData.delete_enable.toString()
+      } else {
+        cleanerData = {}
+      }
+      console.log(cleanerData)
     }
 
     config.set('reader', _.pick(data[this.state.currentOption], notEmptyKeysReader))
@@ -155,37 +165,35 @@ class Source extends Component {
           </span>
         </span>
       )
+      let advanceDependValue = ele.advance_depend && getFieldValue(`${this.state.currentOption}.${ele.advance_depend}`)
+      let isAdvanceDependHide = advanceDependValue === 'false' || advanceDependValue === false
       if (ele.ChooseOnly == false) {
-        if (ele.advance_depend && getFieldValue(`${this.state.currentOption}.${ele.advance_depend}`) === 'false') {
-          formItem = null
-        } else {
-          formItem = (
-            <FormItem key={index}
-              {...formItemLayout}
-              className=""
-              label={labelDes}>
-              {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
-                initialValue: ele.Default,
-                rules: [{ required: ele.required, message: '不能为空', trigger: 'blur' },
+        formItem = (
+          <FormItem key={index}
+                    {...formItemLayout}
+                    className={isAdvanceDependHide ? 'hide-div' : 'show-div'}
+                    label={labelDes}>
+            {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
+              initialValue: ele.Default,
+              rules: [{ required: ele.required && !isAdvanceDependHide, message: '不能为空', trigger: 'blur' },
                 { pattern: ele.CheckRegex, message: '输入不符合规范' },
-                ]
-              })(
-                ele.Element === 'text'
+              ]
+            })(
+              ele.Element === 'text'
                 ? <Input.TextArea placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'} disabled={this.state.isReadonly} />
                 : <Input placeholder={ele.DefaultNoUse ? ele.placeholder : '空值可作为默认值'} disabled={this.state.isReadonly} />
-                )}
-            </FormItem>
-          )
-        }
+            )}
+          </FormItem>
+        )
       } else {
         formItem = (
           <FormItem key={index}
             {...formItemLayout}
-            className=""
+            className={isAdvanceDependHide ? 'hide-div' : 'show-div'}
             label={labelDes}>
             {getFieldDecorator(`${this.state.currentOption}.${ele.KeyName}`, {
               initialValue: ele.Default || ele.ChooseOptions[0],
-              rules: [{ required: true, message: '不能为空', trigger: 'blur' },
+              rules: [{ required: ele.required && !isAdvanceDependHide, message: '不能为空', trigger: 'blur' },
               ]
             })(
               <Select>
@@ -273,26 +281,22 @@ class Source extends Component {
               <Checkbox checked={!!enableDelete}>自动删除</Checkbox>
             )}
           </FormItem>
-          {enableDelete
-            ? (
-              <div>
-                {cleanerChildConfig.map((item) => (
-                  <FormItem
-                    key={item.KeyName}
-                    {...formItemLayout}
-                    className="delete-enable-input-number"
-                    label={<span>{item.Label}<br /></span>}>
-                    {getFieldDecorator(`${this.state.currentOption}.${item.KeyName}`, {
-                      initialValue: item.Default
-                    })(
-                      <Input />
-                    )}
-                    {item.Unit}
-                  </FormItem>
-                ))}
-              </div>
-            )
-          : null}
+          <div className={enableDelete ? 'show-div': 'hide-div'}>
+            {cleanerChildConfig.map((item) => (
+              <FormItem
+                key={item.KeyName}
+                {...formItemLayout}
+                className="delete-enable-input-number"
+                label={<span>{item.Label}<br /></span>}>
+                {getFieldDecorator(`${this.state.currentOption}.${item.KeyName}`, {
+                  initialValue: item.Default
+                })(
+                  <Input />
+                )}
+                {item.Unit}
+              </FormItem>
+            ))}
+          </div>
         </div>
       )
     }

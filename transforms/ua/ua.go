@@ -3,17 +3,18 @@ package ua
 import (
 	"errors"
 	"fmt"
-
-	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/transforms"
-	. "github.com/qiniu/logkit/utils/models"
-
+	"strconv"
 	"sync"
 
-	"strconv"
-
 	"github.com/ua-parser/uap-go/uaparser"
+
+	"github.com/qiniu/log"
+
+	"github.com/qiniu/logkit/transforms"
+	. "github.com/qiniu/logkit/utils/models"
 )
+
+const Name = "UserAgent"
 
 type UATransformer struct {
 	Key              string `json:"key"`
@@ -230,41 +231,41 @@ func (it *UATransformer) ConfigOptions() []Option {
 			KeyName:       "device",
 			Element:       Radio,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{true, false},
+			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  true,
 			Description:   "解析UserAgent中的设备信息(device)",
-			Type:          transforms.TransformTypeBoolean,
+			Type:          transforms.TransformTypeString,
 		},
 		{
 			KeyName:       "os",
 			Element:       Radio,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{true, false},
+			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  true,
 			Description:   "解析UserAgent中的操作系统信息(os)",
-			Type:          transforms.TransformTypeBoolean,
+			Type:          transforms.TransformTypeString,
 		},
 		{
 			KeyName:       "agent",
 			Element:       Radio,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{true, false},
+			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  true,
 			Description:   "解析UserAgent中的agent信息(agent)",
-			Type:          transforms.TransformTypeBoolean,
+			Type:          transforms.TransformTypeString,
 		},
 		{
 			KeyName:       "memory_cache",
 			Element:       Radio,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{true, false},
+			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  true,
 			Description:   "将解析结果缓存在内存中(memory_cache)",
-			Type:          transforms.TransformTypeBoolean,
+			Type:          transforms.TransformTypeString,
 			Advance:       true,
 		},
 	}
@@ -279,7 +280,7 @@ func (it *UATransformer) Stats() StatsInfo {
 }
 
 func init() {
-	transforms.Add("UserAgent", func() transforms.Transformer {
+	transforms.Add(Name, func() transforms.Transformer {
 		return &UATransformer{}
 	})
 }

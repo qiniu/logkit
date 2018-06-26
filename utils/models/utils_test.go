@@ -52,6 +52,36 @@ func Test_ReadDirSortByTime(t *testing.T) {
 	}
 }
 
+func Test_SortFilesByTime(t *testing.T) {
+	testreaddir := "SortFilesByTime"
+	err := os.MkdirAll(testreaddir, os.ModePerm)
+	if err != nil {
+		t.Error(err)
+	}
+	defer os.RemoveAll(testreaddir)
+	exps := []string{"4", "1", "3", "2"}
+	now := time.Now()
+	for i := 0; i < 4; i++ {
+		e := exps[i]
+		filename := filepath.Join(testreaddir, e)
+		os.Create(filename)
+		os.Chtimes(filename, now, now)
+	}
+	files, err := ReadDirByTime(testreaddir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	exps = []string{"4", "3", "2", "1"}
+	var gots []string
+	for _, f := range files {
+		gots = append(gots, f.Name())
+	}
+
+	if !reflect.DeepEqual(gots, exps) {
+		t.Fatalf("Test_ReadDirSortByTime error exps %v got %v ", exps, gots)
+	}
+}
+
 func Test_TrimeList(t *testing.T) {
 	s := []string{"1", "  \t \n", " \n ", "2"}
 	exps := []string{"1", "2"}
@@ -508,4 +538,79 @@ func getTimeStr(tiTmp int64) (tiStr string, err error) {
 		return
 	}
 	return ti.Format(time.RFC3339Nano), err
+}
+
+func TestGetMapList(t *testing.T) {
+	cases := []struct {
+		c   string
+		exp map[string]string
+	}{
+		{
+			`a b,1,2 c`,
+			map[string]string{
+				"a": "b",
+				"2": "c",
+			},
+		},
+		{
+			`1 abc,2 xyz`,
+			map[string]string{
+				"1": "abc",
+				"2": "xyz",
+			},
+		},
+		{
+			`1 2,3,3,,4 aby`,
+			map[string]string{
+				"1": "2",
+				"4": "aby",
+			},
+		},
+		{
+			``,
+			map[string]string{},
+		},
+	}
+	for _, c := range cases {
+		got := GetMapList(c.c)
+		assert.Equal(t, c.exp, got)
+	}
+}
+
+func TestPickMapValue(t *testing.T) {
+	var m = map[string]interface{}{"multi": map[string]interface{}{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}}
+
+	var exp = map[string]interface{}{"multi": map[string]interface{}{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}}
+	pick := map[string]interface{}{}
+	PickMapValue(m, pick, "multi")
+	assert.Equal(t, exp, pick)
+
+	exp = map[string]interface{}{"multi": map[string]interface{}{"abc": "x1 y2"}}
+	pick = map[string]interface{}{}
+	PickMapValue(m, pick, "multi", "abc")
+	assert.Equal(t, exp, pick)
+
+	exp = map[string]interface{}{"multi": map[string]interface{}{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}}
+	pick = map[string]interface{}{}
+	PickMapValue(m, pick, "multi", "abc")
+	PickMapValue(m, pick, "multi", "myword")
+	assert.Equal(t, exp, pick)
+
+	exp = map[string]interface{}{"multi": map[string]interface{}{"abc": "x1 y2"}}
+	pick = map[string]interface{}{}
+	PickMapValue(m, pick, "multi", "abc")
+	PickMapValue(m, pick, "multi", "otherword")
+	assert.Equal(t, exp, pick)
+
+	exp = map[string]interface{}{"multi": map[string]interface{}{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}}
+	pick = map[string]interface{}{}
+	PickMapValue(m, pick, "multi")
+	PickMapValue(m, pick, "multi", "otherword")
+	assert.Equal(t, exp, pick)
+
+	exp = map[string]interface{}{"multi": map[string]interface{}{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}}
+	pick = map[string]interface{}{}
+	PickMapValue(m, pick, "multi", "abc", "xxx")
+	PickMapValue(m, pick, "multi", "otherword")
+	assert.NotEqual(t, exp, pick)
 }

@@ -18,26 +18,30 @@ func (s *CPUStats) Collect() (datas []map[string]interface{}, err error) {
 	}
 
 	for _, cts := range times {
-
-		// windows cpu time stat only for total
-		if s.CollectCPUTime && isTotalCpuTimeStat(cts.CPU) {
-			// Add cpu time metrics
-			fieldsC := map[string]interface{}{
-				CpuTimeUser:      cts.User,
-				CpuTimeSystem:    cts.System,
-				CpuTimeIdle:      cts.Idle,
-				CpuTimeNice:      cts.Nice,
-				CpuTimeIowait:    cts.Iowait,
-				CpuTimeIrq:       cts.Irq,
-				CpuTimeSoftirq:   cts.Softirq,
-				CpuTimeSteal:     cts.Steal,
-				CpuTimeGuest:     cts.Guest,
-				CpuTimeGuestNice: cts.GuestNice,
-				CpuTimeCPU:       cts.CPU,
+		// cpu time stats
+		// if s.TotalCPU == true CPUTimes() return cpu time count stats and only for cpu-total
+		if isTotalCpuTimeStat(cts.CPU) {
+			if s.CollectCPUTime {
+				// Add cpu time metrics
+				fieldsC := map[string]interface{}{
+					CpuTimeUser:      cts.User,
+					CpuTimeSystem:    cts.System,
+					CpuTimeIdle:      cts.Idle,
+					CpuTimeNice:      cts.Nice,
+					CpuTimeIowait:    cts.Iowait,
+					CpuTimeIrq:       cts.Irq,
+					CpuTimeSoftirq:   cts.Softirq,
+					CpuTimeSteal:     cts.Steal,
+					CpuTimeGuest:     cts.Guest,
+					CpuTimeGuestNice: cts.GuestNice,
+					CpuTimeCPU:       cts.CPU,
+				}
+				datas = append(datas, fieldsC)
 			}
-			datas = append(datas, fieldsC)
 			continue
 		}
+		// cpu usage stats
+		// if s.PerCPU == true CPUTimes() return cpu usage pct stats and for all cpu core
 		// merge "_Total"  to "cpu_total"
 		if isTotalCpuUsageStat(cts.CPU) {
 			cts.CPU = MetricCPUTotalKey
