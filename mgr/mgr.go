@@ -223,7 +223,7 @@ func (m *Manager) Add(confPath string) {
 		return
 	}
 	confPath = confPathAbs
-	if m.isRunning(confPath) {
+	if m.IsRunning(confPath) {
 		log.Errorf("%s already added", confPath)
 		return
 	}
@@ -245,7 +245,7 @@ func (m *Manager) ForkRunner(confPath string, nconf RunnerConfig, errReturn bool
 	var err error
 	i := 0
 	for {
-		if m.isRunning(confPath) {
+		if m.IsRunning(confPath) {
 			err = fmt.Errorf("%s already added - ", confPath)
 			if !errReturn {
 				log.Error(err)
@@ -307,7 +307,7 @@ func (m *Manager) ForkRunner(confPath string, nconf RunnerConfig, errReturn bool
 	return nil
 }
 
-func (m *Manager) isRunning(confPath string) bool {
+func (m *Manager) IsRunning(confPath string) bool {
 	_, ok := m.readRunners(confPath)
 	if ok {
 		return true
@@ -690,7 +690,7 @@ func (m *Manager) AddRunner(name string, conf RunnerConfig) (err error) {
 	conf.RunnerName = name
 	conf.CreateTime = time.Now().Format(time.RFC3339Nano)
 	filename := filepath.Join(m.RestDir, name+".conf")
-	if m.isRunning(filename) {
+	if m.IsRunning(filename) {
 		return fmt.Errorf("file %v runner is running", name)
 	}
 	if err = m.ForkRunner(filename, conf, true); err != nil {
@@ -712,7 +712,7 @@ func (m *Manager) UpdateRunner(name string, conf RunnerConfig) (err error) {
 	}
 	conf.RunnerName = name
 	conf.CreateTime = time.Now().Format(time.RFC3339Nano)
-	if m.isRunning(filename) {
+	if m.IsRunning(filename) {
 		if subErr := m.Remove(filename); subErr != nil {
 			return fmt.Errorf("remove runner %v error %v", filename, subErr)
 		}
@@ -774,7 +774,7 @@ func (m *Manager) StopRunner(name string) (err error) {
 		return fmt.Errorf("runner %v has already stopped", filename)
 	}
 	conf.IsStopped = true
-	if !m.isRunning(filename) {
+	if !m.IsRunning(filename) {
 		m.setRunnerConfig(filename, conf)
 		return
 	}

@@ -83,6 +83,7 @@ type RunnerConfig struct {
 
 type RunnerInfo struct {
 	RunnerName       string `json:"name"`
+	Note             string `json:"note,omitempty"`
 	CollectInterval  int    `json:"collect_interval,omitempty"` // metric runner收集的频率
 	MaxBatchLen      int    `json:"batch_len,omitempty"`        // 每个read batch的行数
 	MaxBatchSize     int    `json:"batch_size,omitempty"`       // 每个read batch的字节数
