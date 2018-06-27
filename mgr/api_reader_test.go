@@ -82,4 +82,14 @@ func readerAPITest(p *testParam) {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
 	assert.Equal(t, "", got4.Message)
+
+	var got5 respModeUsages
+	url = "http://127.0.0.1" + rs.address + "/logkit/reader/tooltips"
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	if err = jsoniter.Unmarshal(respBody, &got5); err != nil {
+		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
+	}
+	assert.Equal(t, reader.ModeToolTips, got5.Data)
 }

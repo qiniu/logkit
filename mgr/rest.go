@@ -72,12 +72,14 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 
 	//reader API
 	router.GET(PREFIX+"/reader/usages", rs.GetReaderUsages())
+	router.GET(PREFIX+"/reader/tooltips", rs.GetReaderTooltips())
 	router.GET(PREFIX+"/reader/options", rs.GetReaderKeyOptions())
 	router.POST(PREFIX+"/reader/read", rs.PostRead())
 	router.POST(PREFIX+"/reader/check", rs.PostReaderCheck())
 
 	//parser API
 	router.GET(PREFIX+"/parser/usages", rs.GetParserUsages())
+	router.GET(PREFIX+"/parser/tooltips", rs.GetParserTooltips())
 	router.GET(PREFIX+"/parser/options", rs.GetParserKeyOptions())
 	router.POST(PREFIX+"/parser/parse", rs.PostParse())
 	router.GET(PREFIX+"/parser/samplelogs", rs.GetParserSampleLogs())
