@@ -880,16 +880,20 @@ func (s *Sender) rawSend(datas []Data) (se error) {
 		}
 		raw, ok := v["_raw"].([]byte)
 		if !ok {
-			errinfo := "_raw not []byte type"
-			return &StatsError{
-				ErrorDetail: errors.New(errinfo),
-				StatsInfo: StatsInfo{
-					Success:   int64(idx),
-					Errors:    int64(len(datas[idx:])),
-					LastError: errinfo,
-				},
-				RemainDatas: datas[idx:],
+			str, sok := v["_raw"].(string)
+			if !sok {
+				errinfo := "_raw not []byte or string type"
+				return &StatsError{
+					ErrorDetail: errors.New(errinfo),
+					StatsInfo: StatsInfo{
+						Success:   int64(idx),
+						Errors:    int64(len(datas[idx:])),
+						LastError: errinfo,
+					},
+					RemainDatas: datas[idx:],
+				}
 			}
+			raw = []byte(str)
 		}
 		ak, ok := v["_ak"].(string)
 		if !ok {
