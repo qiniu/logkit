@@ -26,6 +26,7 @@ import (
 	"github.com/qiniu/logkit/times"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
+	"encoding/base64"
 )
 
 var osInfo = []string{KeyCore, KeyHostName, KeyOsInfo, KeyLocalIp}
@@ -893,7 +894,21 @@ func (s *Sender) rawSend(datas []Data) (se error) {
 					RemainDatas: datas[idx:],
 				}
 			}
-			raw = []byte(str)
+
+			decodeBytes, err := base64.StdEncoding.DecodeString(str)
+			if err != nil {
+				errinfo := "can not unbase 64 raw, err = " + err.Error()
+				return &StatsError{
+					ErrorDetail: errors.New(errinfo),
+					StatsInfo: StatsInfo{
+						Success:   int64(idx),
+						Errors:    int64(len(datas[idx:])),
+						LastError: errinfo,
+					},
+					RemainDatas: datas[idx:],
+				}
+			}
+			raw = decodeBytes
 		}
 		ak, ok := v["_ak"].(string)
 		if !ok {
