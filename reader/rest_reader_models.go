@@ -241,7 +241,7 @@ var (
 		DefaultNoUse: false,
 		Description:  "编码方式(encoding)",
 		Advance:      true,
-		ToolTip:      "读取日志文件的编码方式，默认为utf-8，即按照utf-8的编码方式读取文件",
+		ToolTip:      "读取日志文件的编码方式，默认为UTF-8，即按照UTF-8的编码方式读取文件",
 	}
 	OptionWhence = Option{
 		KeyName:       KeyWhence,
@@ -484,7 +484,21 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "数据查询语句(mysql_sql)",
 			ToolTip:      "填写要执行的sql语句",
 		},
-		OptionEncoding,
+		{
+			KeyName:    KeyMysqlEncoding,
+			ChooseOnly: true,
+			ChooseOptions: []interface{}{"big5", "dec8", "cp850", "hp8", "koi8r",
+				"latin1", "latin2", "swe7", "ascii", "ujis", "sjis", "hebrew", "tis620",
+				"euckr", "koi8u", "gb2312", "greek", "cp1250", "gbk", "latin5", "armscii8",
+				"utf8", "ucs2", "cp866", "keybcs2", "macce", "macroman", "cp852", "latin7",
+				"utf8mb4", "cp1251", "utf16", "utf16le", "cp1256", "cp1257", "utf32",
+				"binary", "geostd8", "cp932", "eucjpms", "gb18030"},
+			Default:      "utf8",
+			DefaultNoUse: false,
+			Description:  "编码方式(encoding)",
+			Advance:      true,
+			ToolTip:      "读取数据库的编码方式，默认为utf8，即按照utf8的编码方式读取数据库",
+		},
 		{
 			KeyName:      KeyMysqlOffsetKey,
 			ChooseOnly:   false,

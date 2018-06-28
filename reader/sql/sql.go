@@ -205,7 +205,10 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (ret reader.Reader, err err
 		rawSqls, _ = conf.GetStringOr(reader.KeyMysqlSQL, "")
 		cronSchedule, _ = conf.GetStringOr(reader.KeyMysqlCron, "")
 		execOnStart, _ = conf.GetBoolOr(reader.KeyMysqlExecOnStart, true)
-		encoder, _ = conf.GetStringOr(reader.KeyEncoding, "")
+		encoder, _ = conf.GetStringOr(reader.KeyMysqlEncoding, "utf8")
+		if strings.Contains(encoder, "-") {
+			encoder = strings.Replace(strings.ToLower(encoder), "-", "", -1)
+		}
 		historyAll, _ = conf.GetBoolOr(reader.KeyMysqlHistoryAll, false)
 		table, _ = conf.GetStringOr(reader.KyeMysqlTable, "")
 	case reader.ModeMSSQL:
@@ -1752,6 +1755,8 @@ func (r *Reader) getDatas(db *sql.DB, rawData string, now time.Time, queryType i
 		if err != nil {
 			return datas, rawsqls, err
 		}
+	} else {
+		datas = append(datas, matchData)
 	}
 
 	return datas, rawsqls, nil

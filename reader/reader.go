@@ -70,6 +70,7 @@ const (
 	KeyBufSize           = "reader_buf_size"
 	KeyWhence            = "read_from"
 	KeyEncoding          = "encoding"
+	KeyMysqlEncoding     = "encoding"
 	KeyReadIOLimit       = "readio_limit"
 	KeyDataSourceTag     = "datasource_tag"
 	KeyTagFile           = "tag_file"
