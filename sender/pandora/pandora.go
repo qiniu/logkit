@@ -2,6 +2,7 @@ package pandora
 
 import (
 	"encoding/json"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"math"
@@ -26,7 +27,6 @@ import (
 	"github.com/qiniu/logkit/times"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
-	"encoding/base64"
 )
 
 var osInfo = []string{KeyCore, KeyHostName, KeyOsInfo, KeyLocalIp}
