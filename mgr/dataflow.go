@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/json-iterator/go"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
@@ -21,43 +22,78 @@ import (
 
 const DefaultTryTimes = 3
 
-//reader模块中各种type的日志都能获取raw_data
-func RawData(readerConfig conf.MapConf) (rawData string, err error) {
+// RawData 从 reader 模块中根据 type 获取字符串形式的样例日志
+func RawData(readerConfig conf.MapConf) (string, error) {
 	if readerConfig == nil {
-		err = fmt.Errorf("reader config cannot be empty")
-		return
+		return "", fmt.Errorf("reader config cannot be empty")
 	}
 
-	var rd reader.Reader
-	rd, err = reader.NewReader(readerConfig, true)
+	rd, err := reader.NewReader(readerConfig, true)
 	if err != nil {
-		return
+		return "", err
 	}
 	defer rd.Close()
 
-	tryCount := DefaultTryTimes
-	for {
-		if tryCount <= 0 {
-			err = fmt.Errorf("get raw data from %s time out, can't get any data", rd.Name())
-			return
+	var rawData string
+
+	// DataReader 设定超时，普通 Reader 设定重试
+	if dr, ok := rd.(reader.DataReader); ok {
+		type dataErr struct {
+			data string
+			err  error
 		}
-		tryCount--
-		rawData, err = rd.ReadLine()
-		if err != nil && err != io.EOF {
-			return "", fmt.Errorf("reader %s - error: %v", rd.Name(), err)
+		// Note: 添加一位缓冲保证 goroutine 在 runner 已经超时的情况下能够正常退出，避免资源泄露
+		readChan := make(chan dataErr, 1)
+		go func() {
+			data, _, err := dr.ReadData()
+			if err != nil && err != io.EOF {
+				readChan <- dataErr{"", err}
+				return
+			}
+
+			p, err := jsoniter.MarshalIndent(data, "", "  ")
+			readChan <- dataErr{string(p), err}
+		}()
+
+		timeout := time.NewTimer(time.Minute)
+		select {
+		case de := <-readChan:
+			rawData, err = de.data, de.err
+			if err != nil {
+				return "", fmt.Errorf("reader %q - error: %v", rd.Name(), err)
+			}
+
+		case <-timeout.C:
+			return "", fmt.Errorf("reader %q read data timeout, no data received", rd.Name())
 		}
-		if err == io.EOF {
-			return rawData, nil
+
+	} else {
+		tryCount := DefaultTryTimes
+		for {
+			if tryCount <= 0 {
+				return "", fmt.Errorf("reader %q read line timeout, no data received", rd.Name())
+			}
+			tryCount--
+
+			rawData, err = rd.ReadLine()
+			if err != nil && err != io.EOF {
+				return "", fmt.Errorf("reader %q - error: %v", rd.Name(), err)
+			}
+			if err == io.EOF {
+				return rawData, nil
+			}
+
+			if len(rawData) > 0 {
+				break
+			}
 		}
-		if rawData == "" {
-			continue
-		}
-		if len(rawData) >= defaultMaxBatchSize {
-			err = errors.New("data size large than 2M and will be discard")
-			return "", fmt.Errorf("reader %s - error: %v", rd.Name(), err)
-		}
-		return
 	}
+
+	if len(rawData) >= defaultMaxBatchSize {
+		err = errors.New("data size large than 2M and will be discard")
+		return "", fmt.Errorf("reader %q - error: %v", rd.Name(), err)
+	}
+	return rawData, nil
 }
 
 //parse模块中各种type的日志都能获取解析后的数据
