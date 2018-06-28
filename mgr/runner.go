@@ -89,7 +89,6 @@ type LogExportRunner struct {
 }
 
 const defaultSendIntervalSeconds = 60
-const defaultMaxBatchSize = 2 * 1024 * 1024
 const qiniulogHeadPatthern = "[1-9]\\d{3}/[0-1]\\d/[0-3]\\d [0-2]\\d:[0-6]\\d:[0-6]\\d(\\.\\d{6})?"
 
 // NewRunner 创建Runner
@@ -122,7 +121,7 @@ func NewRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleane
 func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.Parser,
 	transformers []transforms.Transformer, senders []sender.Sender, router *router.Router, meta *reader.Meta) (runner *LogExportRunner, err error) {
 	if info.MaxBatchSize <= 0 {
-		info.MaxBatchSize = defaultMaxBatchSize
+		info.MaxBatchSize = DefaultMaxBatchSize
 	}
 	if info.MaxBatchInterval <= 0 {
 		info.MaxBatchInterval = defaultSendIntervalSeconds

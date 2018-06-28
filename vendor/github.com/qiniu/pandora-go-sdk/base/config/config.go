@@ -19,11 +19,12 @@ type Config struct {
 
 	HeaderUserAgent string
 
-	//以下是新版本，上面的Endpoint是老版本，都兼容，默认使用新版，新版为空则用老的Endpoint
+	// 以下是新版本，上面的 Endpoint 是老版本，都兼容，默认使用新版，新版为空则用老的 Endpoint
 	LogdbEndpoint    string
 	TsdbEndpoint     string
 	PipelineEndpoint string
 	ReportEndpoint   string
+	LogkitEndpoint   string
 	ConfigType       string
 
 	AllowInsecureServer bool
@@ -34,6 +35,7 @@ const (
 	TypePipeline = "pipeline"
 	TypeTSDB     = "tsdb"
 	TypeReport   = "report"
+	TypeLogkit   = "logkit"
 )
 
 const (
@@ -44,6 +46,7 @@ const (
 	DefaultLogDBEndpoint    = "https://logdb.qiniu.com"
 	DefaultPipelineEndpoint = "https://pipeline.qiniu.com"
 	DefaultReportEndpoint   = "https://report.qiniu.com"
+	DefaultLogkitEndpoint   = "https://logkit-pro.qiniu.com"
 )
 
 func NewConfig() *Config {
@@ -66,11 +69,12 @@ func (c *Config) Clone() *Config {
 		Gzip:             c.Gzip,
 		HeaderUserAgent:  c.HeaderUserAgent,
 
-		//以下是新版本，上面的Endpoint是老版本，都兼容，默认使用新版，新版为空则用老的Endpoint
+		// 以下是新版本，上面的 Endpoint 是老版本，都兼容，默认使用新版，新版为空则用老的 Endpoint
 		LogdbEndpoint:    c.LogdbEndpoint,
 		TsdbEndpoint:     c.TsdbEndpoint,
 		PipelineEndpoint: c.PipelineEndpoint,
 		ReportEndpoint:   c.ReportEndpoint,
+		LogkitEndpoint:   c.LogkitEndpoint,
 		ConfigType:       c.ConfigType,
 
 		AllowInsecureServer: false,
@@ -104,6 +108,11 @@ func (c *Config) WithTSDBEndpoint(endpoint string) *Config {
 
 func (c *Config) WithReportEndpoint(endpoint string) *Config {
 	c.ReportEndpoint = endpoint
+	return c
+}
+
+func (c *Config) WithLogkitEndpoint(endpoint string) *Config {
+	c.LogkitEndpoint = endpoint
 	return c
 }
 

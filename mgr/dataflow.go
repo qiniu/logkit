@@ -89,7 +89,7 @@ func RawData(readerConfig conf.MapConf) (string, error) {
 		}
 	}
 
-	if len(rawData) >= defaultMaxBatchSize {
+	if len(rawData) >= DefaultMaxBatchSize {
 		err = errors.New("data size large than 2M and will be discard")
 		return "", fmt.Errorf("reader %q - error: %v", rd.Name(), err)
 	}
