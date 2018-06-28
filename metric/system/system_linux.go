@@ -3,14 +3,14 @@
 package system
 
 import (
-	"runtime"
 	"os/exec"
+	"runtime"
 	"strings"
 
 	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/metric"
 	"github.com/shirou/gopsutil/host"
 	"github.com/shirou/gopsutil/load"
-	"github.com/qiniu/logkit/metric"
 )
 
 type LinuxSystemStats struct {

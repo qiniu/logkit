@@ -1,17 +1,17 @@
 package system
 
 import (
-	"runtime"
-	"os/exec"
-	"strings"
-	"os"
 	"io/ioutil"
+	"os"
+	"os/exec"
+	"runtime"
+	"strings"
 
 	"github.com/qiniu/log"
-	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/w32"
 	"github.com/qiniu/logkit/metric"
 	. "github.com/qiniu/logkit/utils/models"
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/w32"
 )
 
 // KeySystemUsages TypeMetricSystem的字段名称
