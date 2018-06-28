@@ -438,6 +438,7 @@ func Test_SplitData(t *testing.T) {
 	}
 	valArray := sender.SplitData(maxData, int64(sender.DefaultSplitSize))
 	assert.Equal(t, len(maxData), len(strings.Join(valArray, "")))
+	assert.Equal(t, 24, len(valArray))
 
 	for {
 		if int64(len(maxData)) > 2*DefaultMaxBatchSize {
@@ -448,16 +449,25 @@ func Test_SplitData(t *testing.T) {
 
 	valArray = sender.SplitData(maxData, int64(sender.DefaultSplitSize))
 	assert.Equal(t, len(maxData), len(strings.Join(valArray, "")))
+	assert.Equal(t, 47, len(valArray))
 
 	maxData = "abc"
 	valArray = sender.SplitData(maxData, int64(sender.DefaultSplitSize))
 	assert.Equal(t, len(maxData), len(strings.Join(valArray, "")))
+	assert.Equal(t, 1, len(valArray))
 
 	maxData = ""
 	valArray = sender.SplitData(maxData, int64(sender.DefaultSplitSize))
 	assert.Equal(t, len(maxData), len(strings.Join(valArray, "")))
+	assert.Equal(t, 0, len(valArray))
 
 	maxData = "abc七牛云？？？cde"
 	valArray = sender.SplitData(maxData, int64(sender.DefaultSplitSize))
 	assert.Equal(t, len(maxData), len(strings.Join(valArray, "")))
+	assert.Equal(t, 1, len(valArray))
+
+	maxData = "abcde"
+	valArray = sender.SplitData(maxData, int64(len(maxData)))
+	assert.Equal(t, len(maxData), len(strings.Join(valArray, "")))
+	assert.Equal(t, 1, len(valArray))
 }

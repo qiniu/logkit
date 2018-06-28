@@ -382,44 +382,45 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 			}
 
 			if ft.opt.longDataDiscard {
+				log.Infof("Runner[%v] Sender[%v] discard long data (more than 2M), length: ", ft.runnerName, ft.innerSender.Name(), len(string(dataBytes)))
 				return
 			}
 
 			// 大于 2M 时，切片发送
 			remainData := make(Data, 0)
 			separateData := make(Data, 0)
-			for k, v := range failCtxData {
-				str, ok := v.(string)
+			for failCtxDataKey, failCtxDataVal := range failCtxData {
+				byteVal, err := json.Marshal(failCtxDataVal)
+				if err != nil {
+					log.Warnf("Runner[%v] marshal data to string error %v", ft.runnerName, err)
+				}
+
+				if len(byteVal) < DefaultMaxBatchSize {
+					remainData[failCtxDataKey] = failCtxDataVal
+					continue
+				}
+
+				_, ok := failCtxDataVal.(string)
 				if ok {
-					if int64(len(str)) < DefaultMaxBatchSize {
-						remainData[k] = v
-						continue
-					}
-					separateData[k] = v
+					separateData[failCtxDataKey] = failCtxDataVal
 				}
 			}
 
 			// failCtxData 的 key value 中找到 string 类型的 value 大于 2M，进行切片
-			if separateData != nil {
+			if len(separateData) != 0 {
 				newFailCtx := new(datasContext)
-				for k, v := range separateData {
-					strVal, ok := v.(string)
-					if !ok {
-						return
-					}
+				for separateDataKey, separateDataVal := range separateData {
+					strVal, _ := separateDataVal.(string)
 					valArray := SplitData(strVal, int64(DefaultSplitSize))
-					if len(valArray) == 0 {
-						continue
-					}
 
 					separateId := reqid.Gen()
 					for idx, val := range valArray {
 						retData := make(Data, 0)
-						for k, v := range remainData {
-							retData[k] = v
+						for remainDataKey, remainDataVal := range remainData {
+							retData[remainDataKey] = remainDataVal
 						}
-						retData[KeyPandoraSeparateId] = separateId + "_" + k + "_" + strconv.Itoa(idx)
-						retData[k] = val
+						retData[KeyPandoraSeparateId] = separateId + "_" + separateDataKey + "_" + strconv.Itoa(idx)
+						retData[separateDataKey] = val
 						newFailCtx.Datas = append(newFailCtx.Datas, retData)
 					}
 				}
@@ -431,9 +432,11 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 			// 此时将 failCtxData 进行 Marshal 之后进行切片，放入pandaora_stash中
 			valArray := SplitData(string(dataBytes), int64(DefaultSplitSize))
 			newFailCtx := new(datasContext)
+			separateId := reqid.Gen()
 			for idx, val := range valArray {
 				data := Data{
-					KeyPandoraStash + "_" + strconv.Itoa(idx): val,
+					KeyPandoraStash:      val,
+					KeyPandoraSeparateId: separateId + "_" + strconv.Itoa(idx),
 				}
 				newFailCtx.Datas = append(newFailCtx.Datas, data)
 			}
@@ -496,6 +499,10 @@ func (ft *FtSender) sendFromQueue(queueName string, readChan <-chan []byte, read
 }
 
 func SplitData(data string, splitSize int64) (valArray []string) {
+	if splitSize <= 0 {
+		return []string{data}
+	}
+
 	valArray = make([]string, 0)
 	dataConverse := []rune(data)
 	lenData := int64(len(dataConverse)) / splitSize
@@ -507,6 +514,9 @@ func SplitData(data string, splitSize int64) (valArray []string) {
 	}
 
 	end := lenData * splitSize
-	valArray = append(valArray, string(dataConverse[end:]))
+	remainData := string(dataConverse[end:])
+	if len(remainData) != 0 {
+		valArray = append(valArray, string(dataConverse[end:]))
+	}
 	return valArray
 }

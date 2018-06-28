@@ -78,6 +78,17 @@ var (
 		AdvanceDepend: KeyFtMemoryChannel,
 		ToolTip:       `默认为"100"，单位为批次，也就是100代表100个待发送的批次，注意：该选项设置的大小表达的是队列中可存储的元素个数，并不是占用的内存大小`,
 	}
+	OptionKeyFtLongDataDiscard = Option{
+		KeyName:       KeyFtLongDataDiscard,
+		Element:       Radio,
+		ChooseOnly:    true,
+		ChooseOptions: []interface{}{"false", "true"},
+		Default:       "false",
+		DefaultNoUse:  false,
+		Description:   "丢弃大于2M的数据(ft_long_data_discard)",
+		Advance:       true,
+		ToolTip:       `丢弃大于2M的数据`,
+	}
 	OptionLogkitSendTime = Option{
 		KeyName:       KeyLogkitSendTime,
 		Element:       Radio,
@@ -430,6 +441,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionFtProcs,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
+		OptionKeyFtLongDataDiscard,
 		{
 			KeyName:       KeyForceMicrosecond,
 			Element:       Radio,
@@ -560,6 +572,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionFtProcs,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
+		OptionKeyFtLongDataDiscard,
 	},
 	TypeInfluxdb: {
 		{
@@ -654,6 +667,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionFtProcs,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
+		OptionKeyFtLongDataDiscard,
 	},
 	TypeDiscard: {},
 	TypeElastic: {
@@ -716,6 +730,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionFtProcs,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
+		OptionKeyFtLongDataDiscard,
 	},
 	TypeKafka: {
 		{
@@ -783,6 +798,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionFtProcs,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
+		OptionKeyFtLongDataDiscard,
 	},
 	TypeHttp: {
 		{
@@ -825,5 +841,6 @@ var ModeKeyOptions = map[string][]Option{
 		OptionFtProcs,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
+		OptionKeyFtLongDataDiscard,
 	},
 }
