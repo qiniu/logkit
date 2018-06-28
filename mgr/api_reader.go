@@ -17,6 +17,13 @@ func (rs *RestService) GetReaderUsages() echo.HandlerFunc {
 	}
 }
 
+// get /logkit/reader/tooltips 获取Reader用途提示
+func (rs *RestService) GetReaderTooltips() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		return RespSuccess(c, reader.ModeToolTips)
+	}
+}
+
 // get /logkit/reader/options 获取Reader参数配置
 func (rs *RestService) GetReaderKeyOptions() echo.HandlerFunc {
 	return func(c echo.Context) error {
