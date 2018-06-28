@@ -706,26 +706,31 @@ func addTagsToData(tags map[string]interface{}, datas []Data, runnername string)
 	return datas
 }
 
+// Stop 清理所有使用到的资源, 等待10秒尝试读取完毕
+// 先停Reader，不再读取，然后停Run函数，让读取的都转到发送，最后停Sender结束整个过程。
+// Parser 无状态，无需stop。
 func (r *LogExportRunner) Stop() {
 	atomic.AddInt32(&r.stopped, 1)
 
-	log.Warnf("Runner[%v] waiting for stopped signal", r.Name())
-	timer := time.NewTimer(time.Second * 10)
-	select {
-	case <-r.exitChan:
-		log.Warnf("runner " + r.Name() + " has been stopped ")
-	case <-timer.C:
-		log.Warnf("runner " + r.Name() + " exited timeout ")
-		atomic.AddInt32(&r.stopped, 1)
-	}
-	log.Warnf("Runner[%v] wait for reader %v stopped", r.Name(), r.reader.Name())
-	// 清理所有使用到的资源
+	log.Infof("Runner[%v] wait for reader %v stopped", r.Name(), r.reader.Name())
 	err := r.reader.Close()
 	if err != nil {
 		log.Errorf("Runner[%v] cannot close reader name: %s, err: %v", r.Name(), r.reader.Name(), err)
 	} else {
 		log.Warnf("Runner[%v] reader %v of runner %v closed", r.Name(), r.reader.Name(), r.Name())
 	}
+
+	log.Infof("Runner[%v] waiting for Run() stopped signal", r.Name())
+	timer := time.NewTimer(time.Second * 10)
+	select {
+	case <-r.exitChan:
+		log.Warnf("runner %v has been stopped", r.Name())
+	case <-timer.C:
+		log.Errorf("runner %v exited timeout, start to force stop", r.Name())
+		atomic.AddInt32(&r.stopped, 1)
+	}
+
+	log.Infof("Runner[%v] wait for sender %v stopped", r.Name(), r.reader.Name())
 	for _, s := range r.senders {
 		err := s.Close()
 		if err != nil {
@@ -734,6 +739,7 @@ func (r *LogExportRunner) Stop() {
 			log.Warnf("Runner[%v] sender %v closed", r.Name(), s.Name())
 		}
 	}
+
 	if r.cleaner != nil {
 		r.cleaner.Close()
 	}

@@ -3,15 +3,15 @@
 package system
 
 import (
-	"runtime"
 	"os/exec"
-	"strings"
+	"runtime"
 	"strconv"
+	"strings"
 
 	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/metric"
 	"github.com/shirou/gopsutil/host"
 	"github.com/shirou/gopsutil/load"
-	"github.com/qiniu/logkit/metric"
 )
 
 type DarwinSystemStats struct {
