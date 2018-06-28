@@ -2,6 +2,7 @@ package pandora
 
 import (
 	"encoding/json"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"math"
@@ -880,16 +881,34 @@ func (s *Sender) rawSend(datas []Data) (se error) {
 		}
 		raw, ok := v["_raw"].([]byte)
 		if !ok {
-			errinfo := "_raw not []byte type"
-			return &StatsError{
-				ErrorDetail: errors.New(errinfo),
-				StatsInfo: StatsInfo{
-					Success:   int64(idx),
-					Errors:    int64(len(datas[idx:])),
-					LastError: errinfo,
-				},
-				RemainDatas: datas[idx:],
+			str, sok := v["_raw"].(string)
+			if !sok {
+				errinfo := "_raw not []byte or string type"
+				return &StatsError{
+					ErrorDetail: errors.New(errinfo),
+					StatsInfo: StatsInfo{
+						Success:   int64(idx),
+						Errors:    int64(len(datas[idx:])),
+						LastError: errinfo,
+					},
+					RemainDatas: datas[idx:],
+				}
 			}
+
+			decodeBytes, err := base64.StdEncoding.DecodeString(str)
+			if err != nil {
+				errinfo := "can not unbase 64 raw, err = " + err.Error()
+				return &StatsError{
+					ErrorDetail: errors.New(errinfo),
+					StatsInfo: StatsInfo{
+						Success:   int64(idx),
+						Errors:    int64(len(datas[idx:])),
+						LastError: errinfo,
+					},
+					RemainDatas: datas[idx:],
+				}
+			}
+			raw = decodeBytes
 		}
 		ak, ok := v["_ak"].(string)
 		if !ok {
