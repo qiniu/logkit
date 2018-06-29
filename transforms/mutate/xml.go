@@ -5,10 +5,15 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/clbanning/mxj"
+
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
+)
 
-	"github.com/clbanning/mxj"
+var (
+	_ transforms.StatsTransformer = &Xml{}
+	_ transforms.Transformer      = &Xml{}
 )
 
 type Xml struct {
@@ -18,52 +23,44 @@ type Xml struct {
 }
 
 func (g *Xml) Transform(datas []Data) ([]Data, error) {
-	var err, ferr error
-	errCount := 0
+	var err, fmtErr error
+	errNum := 0
 	keys := GetKeys(g.Key)
 	news := GetKeys(g.New)
 
 	for i := range datas {
-		val, gerr := GetMapValue(datas[i], keys...)
-		if gerr != nil {
-			errCount++
-			err = fmt.Errorf("transform key %v not exist in data", g.Key)
+		val, getErr := GetMapValue(datas[i], keys...)
+		if getErr != nil {
+			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.Key)
 			continue
 		}
-		strval, ok := val.(string)
+		strVal, ok := val.(string)
 		if !ok {
-			errCount++
-			err = fmt.Errorf("transform key %v data type is not string", g.Key)
+			typeErr := fmt.Errorf("transform key %v data type is not string", g.Key)
+			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
 			continue
 		}
-		strval = strings.TrimSpace(strval)
-		if len(strval) < 1 {
+		strVal = strings.TrimSpace(strVal)
+		if len(strVal) < 1 {
 			continue
 		}
-		xmlVal, perr := parseXml(strval)
+		xmlVal, perr := parseXml(strVal)
 		if perr != nil {
-			errCount++
-			err = perr
+			errNum, err = transforms.SetError(errNum, perr, transforms.General, "")
 			continue
 		}
 		if len(news) == 0 {
 			DeleteMapValue(datas[i], keys...)
 			news = keys
 		}
-		serr := SetMapValue(datas[i], xmlVal, false, news...)
-		if serr != nil {
-			errCount++
-			err = fmt.Errorf("the new key %v already exists ", g.New)
+		setErr := SetMapValue(datas[i], xmlVal, false, news...)
+		if setErr != nil {
+			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
 		}
 	}
 
-	if err != nil {
-		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform xml, last error info is %v", errCount, err)
-	}
-	g.stats.Errors += int64(errCount)
-	g.stats.Success += int64(len(datas) - errCount)
-	return datas, ferr
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	return datas, fmtErr
 }
 
 func (g *Xml) RawTransform(datas []string) ([]string, error) {
@@ -103,6 +100,11 @@ func (g *Xml) Stage() string {
 }
 
 func (g *Xml) Stats() StatsInfo {
+	return g.stats
+}
+
+func (g *Xml) SetStats(err string) StatsInfo {
+	g.stats.LastError = err
 	return g.stats
 }
 

@@ -2,10 +2,14 @@ package mutate
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
+)
+
+var (
+	_ transforms.StatsTransformer = &Rename{}
+	_ transforms.Transformer      = &Rename{}
 )
 
 type Rename struct {
@@ -19,32 +23,25 @@ func (g *Rename) RawTransform(datas []string) ([]string, error) {
 }
 
 func (g *Rename) Transform(datas []Data) ([]Data, error) {
-	var err, ferr error
-	errnums := 0
+	var err, fmtErr error
+	errNum := 0
 	keySlice := GetKeys(g.Key)
 	newKeySlice := GetKeys(g.NewKeyName)
 	for i := range datas {
-		val, gerr := GetMapValue(datas[i], keySlice...)
-		if gerr != nil {
-			errnums++
-			err = fmt.Errorf("transform key %v not exist in data", g.Key)
+		val, getErr := GetMapValue(datas[i], keySlice...)
+		if getErr != nil {
+			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.Key)
 			continue
 		}
 		DeleteMapValue(datas[i], keySlice...)
-		err = SetMapValue(datas[i], val, false, newKeySlice...)
-		if err != nil {
-			errnums++
-			err = fmt.Errorf("the new key %v already exists ", g.NewKeyName)
-			continue
+		setErr := SetMapValue(datas[i], val, false, newKeySlice...)
+		if setErr != nil {
+			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.NewKeyName)
 		}
 	}
-	if err != nil {
-		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform rename, last error info is %v", errnums, err)
-	}
-	g.stats.Errors += int64(errnums)
-	g.stats.Success += int64(len(datas) - errnums)
-	return datas, ferr
+
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	return datas, fmtErr
 }
 
 func (g *Rename) Description() string {
@@ -85,6 +82,11 @@ func (g *Rename) Stage() string {
 }
 
 func (g *Rename) Stats() StatsInfo {
+	return g.stats
+}
+
+func (g *Rename) SetStats(err string) StatsInfo {
+	g.stats.LastError = err
 	return g.stats
 }
 

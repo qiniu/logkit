@@ -10,6 +10,11 @@ import (
 
 const cloudTrailRecords = "Records"
 
+var (
+	_ transforms.StatsTransformer = &CloudTrail{}
+	_ transforms.Transformer      = &CloudTrail{}
+)
+
 type CloudTrail struct {
 	stats StatsInfo
 }
@@ -18,25 +23,21 @@ func (g *CloudTrail) RawTransform(datas []string) ([]string, error) {
 	return datas, errors.New("cloudtrail transformer not support rawTransform")
 }
 
-func (g *CloudTrail) Transform(datas []Data) (retdata []Data, ferr error) {
-	var err error
-	errnums := 0
-	var newdata []Data
+func (g *CloudTrail) Transform(datas []Data) (retdata []Data, fmtErr error) {
+	var err, cloudTrailErr error
+	errNum := 0
+	var newData []Data
 	for _, v := range datas {
-		newdata, err = getCloudTrailData(v)
-		if err != nil {
-			errnums++
+		newData, cloudTrailErr = getCloudTrailData(v)
+		if cloudTrailErr != nil {
+			errNum, err = transforms.SetError(errNum, cloudTrailErr, transforms.General, "")
 		}
 		//不管有没有错误发生，都把返回的newdata加进来，让部分成功的情况也能解析出数据，同时也把原来的数据给进来
-		retdata = append(retdata, newdata...)
+		retdata = append(retdata, newData...)
 	}
-	if err != nil {
-		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform cloudtrail, last error info is %v", errnums, err)
-	}
-	g.stats.Errors += int64(errnums)
-	g.stats.Success += int64(len(datas) - errnums)
-	return
+
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	return retdata, fmtErr
 }
 
 //如果有错误发生，要把原来的数据给回去
@@ -102,6 +103,11 @@ func (g *CloudTrail) Stage() string {
 }
 
 func (g *CloudTrail) Stats() StatsInfo {
+	return g.stats
+}
+
+func (g *CloudTrail) SetStats(err string) StatsInfo {
+	g.stats.LastError = err
 	return g.stats
 }
 

@@ -2,10 +2,14 @@ package mutate
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
+)
+
+var (
+	_ transforms.StatsTransformer = &PandoraKeyConvert{}
+	_ transforms.Transformer      = &PandoraKeyConvert{}
 )
 
 type PandoraKeyConvert struct {
@@ -17,18 +21,12 @@ func (g *PandoraKeyConvert) RawTransform(datas []string) ([]string, error) {
 }
 
 func (g *PandoraKeyConvert) Transform(datas []Data) ([]Data, error) {
-	var err, ferr error
-	errnums := 0
 	for i, v := range datas {
 		datas[i] = deepConvertKey(v)
 	}
-	if err != nil {
-		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform pandora_key_convert, last error info is %v", errnums, err)
-	}
-	g.stats.Errors += int64(errnums)
-	g.stats.Success += int64(len(datas) - errnums)
-	return datas, ferr
+
+	g.stats, _ = transforms.SetStatsInfo(nil, g.stats, 0, int64(len(datas)), g.Type())
+	return datas, nil
 }
 
 func deepConvertKey(data map[string]interface{}) map[string]interface{} {
@@ -67,6 +65,11 @@ func (g *PandoraKeyConvert) Stage() string {
 }
 
 func (g *PandoraKeyConvert) Stats() StatsInfo {
+	return g.stats
+}
+
+func (g *PandoraKeyConvert) SetStats(err string) StatsInfo {
+	g.stats.LastError = err
 	return g.stats
 }
 

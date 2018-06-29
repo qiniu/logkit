@@ -619,8 +619,13 @@ func (r *LogExportRunner) Run() {
 				tstats.Success++
 			}
 			if err != nil {
+				statesTransformer, ok := r.transformers[i].(transforms.StatsTransformer)
+				if ok {
+					statesTransformer.SetStats(err.Error())
+				}
 				tstats.LastError = err.Error()
 			}
+
 			r.rs.TransformStats[tp] = tstats
 			r.rsMutex.Unlock()
 			if err != nil {

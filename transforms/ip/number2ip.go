@@ -10,6 +10,11 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var (
+	_ transforms.StatsTransformer = &Number2Ip{}
+	_ transforms.Transformer      = &Number2Ip{}
+)
+
 type Number2Ip struct {
 	Key   string `json:"key"`
 	New   string `json:"new"`
@@ -17,49 +22,48 @@ type Number2Ip struct {
 }
 
 func (g *Number2Ip) Transform(datas []Data) ([]Data, error) {
-	var err, ferr error
-	errCount := 0
+	var err, fmtErr, convertErr error
+	errNum := 0
 	keys := GetKeys(g.Key)
 	news := GetKeys(g.New)
 
 	for i := range datas {
-		val, gerr := GetMapValue(datas[i], keys...)
-		if gerr != nil {
-			errCount++
+		val, getErr := GetMapValue(datas[i], keys...)
+		if getErr != nil {
+			errNum++
 			err = fmt.Errorf("transform key %v not exist in data", g.Key)
 			continue
 		}
 		var number int64
-		switch newv := val.(type) {
+		switch newVal := val.(type) {
 		case int64:
-			number = newv
+			number = newVal
 		case int:
-			number = int64(newv)
+			number = int64(newVal)
 		case int32:
-			number = int64(newv)
+			number = int64(newVal)
 		case int16:
-			number = int64(newv)
+			number = int64(newVal)
 		case uint64:
-			number = int64(newv)
+			number = int64(newVal)
 		case uint32:
-			number = int64(newv)
+			number = int64(newVal)
 		case json.Number:
-			number, err = newv.Int64()
-			if err != nil {
-				errCount++
+			number, convertErr = newVal.Int64()
+			if convertErr != nil {
+				errNum++
 				err = fmt.Errorf("transform key %v data type is not int64", g.Key)
 				continue
 			}
 		case string:
-			number, err = strconv.ParseInt(newv, 10, 64)
-			if err != nil {
-				errCount++
-				err = fmt.Errorf("transform key %v data type is not int64", g.Key)
+			number, convertErr = strconv.ParseInt(newVal, 10, 64)
+			if convertErr != nil {
+				errNum, err = transforms.SetError(errNum, convertErr, transforms.General, "")
 				continue
 			}
 		default:
-			errCount++
-			err = fmt.Errorf("transform key %v data type is not correct", g.Key)
+			typeErr := fmt.Errorf("transform key %v data type is not correct", g.Key)
+			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
 			continue
 		}
 
@@ -68,21 +72,14 @@ func (g *Number2Ip) Transform(datas []Data) ([]Data, error) {
 			DeleteMapValue(datas[i], keys...)
 			news = keys
 		}
-		serr := SetMapValue(datas[i], ipVal, false, news...)
-		if serr != nil {
-			errCount++
-			err = fmt.Errorf("the new key %v already exists ", g.New)
+		setErr := SetMapValue(datas[i], ipVal, false, news...)
+		if setErr != nil {
+			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
 		}
-
 	}
 
-	if err != nil {
-		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform json, last error info is %v", errCount, err)
-	}
-	g.stats.Errors += int64(errCount)
-	g.stats.Success += int64(len(datas) - errCount)
-	return datas, ferr
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	return datas, fmtErr
 }
 
 func (g *Number2Ip) RawTransform(datas []string) ([]string, error) {
@@ -126,6 +123,11 @@ func (g *Number2Ip) Stage() string {
 }
 
 func (g *Number2Ip) Stats() StatsInfo {
+	return g.stats
+}
+
+func (g *Number2Ip) SetStats(err string) StatsInfo {
+	g.stats.LastError = err
 	return g.stats
 }
 

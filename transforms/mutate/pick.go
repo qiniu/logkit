@@ -7,7 +7,13 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-const TYPE  = "pick"
+const TYPE = "pick"
+
+var (
+	_ transforms.StatsTransformer = &Pick{}
+	_ transforms.Transformer      = &Pick{}
+)
+
 type Pick struct {
 	Key       string `json:"key"`
 	StageTime string `json:"stage"`
@@ -27,8 +33,6 @@ func (g *Pick) RawTransform(datas []string) ([]string, error) {
 }
 
 func (g *Pick) Transform(datas []Data) ([]Data, error) {
-	var ferr error = nil
-	errnums := 0
 	pickKeys := strings.Split(g.Key, ",")
 	var retDatas []Data
 	for i := range datas {
@@ -37,13 +41,13 @@ func (g *Pick) Transform(datas []Data) ([]Data, error) {
 			keys := GetKeys(v)
 			PickMapValue(datas[i], data, keys...)
 		}
-		if len(data) != 0{
+		if len(data) != 0 {
 			retDatas = append(retDatas, data)
 		}
 	}
-	g.stats.Errors += int64(errnums)
-	g.stats.Success += int64(len(datas) - errnums)
-	return retDatas, ferr
+
+	g.stats, _ = transforms.SetStatsInfo(nil, g.stats, 0, int64(len(datas)), g.Type())
+	return retDatas, nil
 }
 
 func (g *Pick) Description() string {
@@ -77,6 +81,11 @@ func (g *Pick) Stage() string {
 }
 
 func (g *Pick) Stats() StatsInfo {
+	return g.stats
+}
+
+func (g *Pick) SetStats(err string) StatsInfo {
+	g.stats.LastError = err
 	return g.stats
 }
 
