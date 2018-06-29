@@ -213,29 +213,37 @@ func (m *Manager) removeCleanQueue(info CleanInfo) {
 
 func (m *Manager) Add(confPath string) {
 	if !strings.HasSuffix(confPath, ".conf") {
-		log.Warn(confPath, "not end with .conf, skipped")
+		log.Warnf("Config %q does not end with '.conf', skipped", confPath)
 		return
 	}
-	log.Info("try add", confPath)
+	log.Info("Adding config %q", confPath)
 	confPathAbs, _, err := GetRealPath(confPath)
 	if err != nil {
-		log.Warnf("filepath.Abs(%s) failed: %v", confPath)
+		log.Warnf("Failed to get real path of %q: %v", confPath)
 		return
 	}
 	confPath = confPathAbs
 	if m.IsRunning(confPath) {
-		log.Errorf("%s already added", confPath)
+		log.Errorf("Config %q has already been added", confPath)
 		return
 	}
 	var conf RunnerConfig
 	err = config.LoadEx(&conf, confPath)
 	if err != nil {
-		log.Warnf("config.LoadEx %s failed:%v", confPath, err)
+		log.Warnf("Failed to load config %q: %v", confPath, err)
 		return
 	}
 
-	log.Infof("Start to try add: %v", conf.RunnerName)
-	conf.CreateTime = time.Now().Format(time.RFC3339Nano)
+	modTime := time.Now()
+	fi, err := os.Stat(confPath)
+	if err != nil {
+		log.Warnf("Failed to get config modtime: %v", err)
+	} else {
+		modTime = fi.ModTime()
+	}
+
+	log.Infof("Adding runner %q", conf.RunnerName)
+	conf.CreateTime = modTime.Format(time.RFC3339Nano)
 	go m.ForkRunner(confPath, conf, false)
 	return
 }
@@ -523,7 +531,6 @@ func (m *Manager) RestoreWebDir() {
 		nums++
 	}
 	log.Infof("successfully restored %v runners in %v web rest dir", nums, m.RestDir)
-	return
 }
 
 func (m *Manager) Status() (rss map[string]RunnerStatus) {
@@ -577,55 +584,60 @@ func (m *Manager) getDeepCopyConfig(name string) (filename string, conf RunnerCo
 	return
 }
 
-// TrimSecretInfo 将配置文件中的 token 信息去掉
+// TrimSecretInfo 将配置文件中的 token 等鉴权相关信息去掉
 func TrimSecretInfo(conf RunnerConfig) RunnerConfig {
-	preFix := SchemaFreeTokensPrefix
+	prefix := SchemaFreeTokensPrefix
 	keyName := []string{
-		preFix + "pipeline_get_repo_token",
-		preFix + "pipeline_post_data_token",
-		preFix + "pipeline_create_repo_token",
-		preFix + "pipeline_update_repo_token",
-		preFix + "pipeline_get_workflow_token",
-		preFix + "pipeline_stop_workflow_token",
-		preFix + "pipeline_start_workflow_token",
-		preFix + "pipeline_create_workflow_token",
-		preFix + "pipeline_Get_workflow_status_token",
+		prefix + "pipeline_get_repo_token",
+		prefix + "pipeline_post_data_token",
+		prefix + "pipeline_create_repo_token",
+		prefix + "pipeline_update_repo_token",
+		prefix + "pipeline_get_workflow_token",
+		prefix + "pipeline_stop_workflow_token",
+		prefix + "pipeline_start_workflow_token",
+		prefix + "pipeline_create_workflow_token",
+		prefix + "pipeline_Get_workflow_status_token",
 	}
 
 	// logDB tokens
-	preFix = LogDBTokensPrefix
+	prefix = LogDBTokensPrefix
 	keyName = append(keyName, []string{
-		preFix + "pipeline_get_repo_token",
-		preFix + "pipeline_create_repo_token",
-		preFix + "create_logdb_repo_token",
-		preFix + "update_logdb_repo_token",
-		preFix + "get_logdb_repo_token",
-		preFix + "create_export_token",
-		preFix + "update_export_token",
-		preFix + "get_export_token",
-		preFix + "list_export_token",
+		prefix + "pipeline_get_repo_token",
+		prefix + "pipeline_create_repo_token",
+		prefix + "create_logdb_repo_token",
+		prefix + "update_logdb_repo_token",
+		prefix + "get_logdb_repo_token",
+		prefix + "create_export_token",
+		prefix + "update_export_token",
+		prefix + "get_export_token",
+		prefix + "list_export_token",
 	}...)
 
 	// tsDB tokens
-	preFix = TsDBTokensPrefix
+	prefix = TsDBTokensPrefix
 	keyName = append(keyName, []string{
-		preFix + "pipeline_get_repo_token",
-		preFix + "create_tsdb_repo_token",
-		preFix + "list_export_token",
-		preFix + "create_tsdb_series_token",
-		preFix + "create_export_token",
-		preFix + "update_export_token",
-		preFix + "get_export_token",
+		prefix + "pipeline_get_repo_token",
+		prefix + "create_tsdb_repo_token",
+		prefix + "list_export_token",
+		prefix + "create_tsdb_series_token",
+		prefix + "create_export_token",
+		prefix + "update_export_token",
+		prefix + "get_export_token",
 	}...)
 
 	// kodo tokens
-	preFix = KodoTokensPrefix
+	prefix = KodoTokensPrefix
 	keyName = append(keyName, []string{
-		preFix + "pipeline_get_repo_token",
-		preFix + "create_export_token",
-		preFix + "update_export_token",
-		preFix + "get_export_token",
-		preFix + "list_export_token",
+		prefix + "pipeline_get_repo_token",
+		prefix + "create_export_token",
+		prefix + "update_export_token",
+		prefix + "get_export_token",
+		prefix + "list_export_token",
+	}...)
+
+	// Pandora sk
+	keyName = append(keyName, []string{
+		"pandora_sk",
 	}...)
 
 	for i, sc := range conf.SendersConfig {
