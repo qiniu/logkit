@@ -33,6 +33,7 @@ type SeqFile struct {
 	meta *Meta
 	mux  sync.Mutex
 
+	name             string
 	dir              string   // 文件目录
 	currFile         string   // 当前处理文件名
 	lastFile         string   //上一个处理的文件名
@@ -144,6 +145,7 @@ func NewSeqFile(meta *Meta, path string, ignoreHidden, newFileNewLine bool, suff
 	sf.inodeDone = meta.GetDoneFileInode()
 	sf.dir = dir
 	sf.currFile = currFile
+	sf.name = "SeqFile:" + dir
 	return sf, nil
 }
 
@@ -199,7 +201,7 @@ func oldestFile(logdir string, condition func(os.FileInfo) bool) (currFile strin
 }
 
 func (sf *SeqFile) Name() string {
-	return "SeqFile:" + sf.dir
+	return sf.name
 }
 
 func (sf *SeqFile) Source() string {

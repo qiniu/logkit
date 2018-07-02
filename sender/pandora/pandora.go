@@ -1,8 +1,8 @@
 package pandora
 
 import (
-	"encoding/json"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"

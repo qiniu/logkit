@@ -362,7 +362,7 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 		if err != nil {
 			info.LastError = err.Error()
 			//FaultTolerant Sender 正常的错误会在backupqueue里面记录，自己重试，此处无需重试
-			if se.Ft && se.FtNotRetry {
+			if se != nil && se.Ft && se.FtNotRetry {
 				break
 			}
 			time.Sleep(time.Second)
