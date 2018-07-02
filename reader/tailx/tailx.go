@@ -123,11 +123,11 @@ func (ar *ActiveReader) Run() {
 			ar.cacheLineMux.Lock()
 			ar.readcache, err = ar.br.ReadLine()
 			ar.cacheLineMux.Unlock()
-			if err != nil && err != io.EOF {
+			if err != nil && err != io.EOF && err != os.ErrClosed {
 				log.Warnf("Runner[%v] ActiveReader %s read error: %v", ar.runnerName, ar.originpath, err)
 				ar.setStatsError(err.Error())
 				ar.sendError(err)
-				time.Sleep(3 * time.Second)
+				time.Sleep(2 * time.Second)
 				continue
 			}
 			if ar.readcache == "" {
