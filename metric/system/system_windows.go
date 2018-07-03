@@ -91,6 +91,9 @@ func getNumDisk() (mountsNum int) {
 	}
 	str := string(out)
 	index := strings.Index(str, "--------  -------------  -------  -------  ---  ---")
+	if index < 0 {
+		return -1
+	}
 	disks := strings.Split(str[index:], "\n")
 	return len(disks) - 2
 }

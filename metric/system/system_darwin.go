@@ -5,7 +5,6 @@ package system
 import (
 	"os/exec"
 	"runtime"
-	"strconv"
 	"strings"
 
 	"github.com/qiniu/log"
@@ -73,26 +72,26 @@ func getNumDisk() (mountsNum int) {
 	}()
 	diskUtil, err := exec.LookPath("/usr/sbin/diskutil")
 	if err != nil {
-		log.Error("find diskutil have error %v", err)
+		log.Errorf("find diskutil have error %v", err)
 		return -1
 	}
-	out, err := exec.Command(diskUtil, "apfs", "list").Output()
-	if err != nil {
-		log.Error("get disk number have error %v", err)
-		return -1
-	}
-	res := string(out)
-	index := strings.Index(res, "APFS Container")
-	if index < 0 || index+18 > len(res) {
-		log.Error("get disk number can't find enough args")
-		return -1
-	}
-	mountsNum, err = strconv.Atoi(res[index+16 : index+17])
+	out, err := exec.Command(diskUtil, "list").Output()
 	if err != nil {
 		log.Errorf("get disk number have error %v", err)
 		return -1
 	}
-	return mountsNum
+	return getNumFromOutput(string(out))
+}
+
+func getNumFromOutput(out string) int {
+	num := 0
+	prints := strings.Split(out, "\n")
+	for _, v := range prints {
+		if strings.Contains(v, "/dev/disk") {
+			num++
+		}
+	}
+	return num
 }
 
 func getNumService() int {

@@ -77,9 +77,14 @@ func getNumDisk() (mountsNum int) {
 	}
 	out, err := exec.Command(fDisk, "-l").Output()
 	str := string(out)
-	index := strings.Index(str, "Device     Boot Start      End  Sectors Size Id Type")
-	disks := strings.Split(str[index:], "\n")
-	return len(disks) - 2
+	sps := strings.Split(str, "\n")
+	mountsNum = 0
+	for _, v := range sps {
+		if strings.Contains(v, "Device") && strings.Contains(v, "Boot") && strings.Contains(v, "Start") && strings.Contains(v, "End") {
+			mountsNum++
+		}
+	}
+	return mountsNum
 }
 
 func getNumService() int {
