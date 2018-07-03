@@ -78,6 +78,10 @@ func getNumDisk() (mountsNum int) {
 	out, err := exec.Command(fDisk, "-l").Output()
 	str := string(out)
 	index := strings.Index(str, "Device     Boot Start      End  Sectors Size Id Type")
+	if index < 0 {
+		log.Error("can't find device disk information")
+		return -1
+	}
 	disks := strings.Split(str[index:], "\n")
 	return len(disks) - 2
 }
