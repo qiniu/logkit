@@ -91,6 +91,9 @@ func getNumDisk() (mountsNum int) {
 	}
 	str := string(out)
 	index := strings.Index(str, "--------  -------------  -------  -------  ---  ---")
+	if index < 0 {
+		log.Error("can't find device disk information")
+	}
 	disks := strings.Split(str[index:], "\n")
 	return len(disks) - 2
 }
