@@ -79,6 +79,7 @@ type RunnerConfig struct {
 	Router        router.RouterConfig      `json:"router,omitempty"`
 	IsInWebFolder bool                     `json:"web_folder,omitempty"`
 	IsStopped     bool                     `json:"is_stopped,omitempty"`
+	IsFromServer  bool                     `json:"from_server,omitempty"` // 判读是否从服务器拉取的配置
 }
 
 type RunnerInfo struct {
