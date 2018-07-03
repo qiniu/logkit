@@ -122,6 +122,11 @@ func (ssr *streamSocketReader) read(c net.Conn) {
 		}
 		if !strings.HasSuffix(err.Error(), ": use of closed network connection") {
 			log.Error(err)
+			//可能reader都已经close了，channel也关了，直接return
+			return
+		}
+		if atomic.LoadInt32(&ssr.status) == reader.StatusStopped || atomic.LoadInt32(&ssr.status) == reader.StatusStopping {
+			return
 		}
 		ssr.sendError(err)
 	}
