@@ -117,12 +117,13 @@ func (ssr *streamSocketReader) read(c net.Conn) {
 	}
 
 	if err := scnr.Err(); err != nil {
-		if err, ok := err.(net.Error); ok && err.Timeout() {
-			log.Debugf("streamSocketReader Timeout : %s", err)
-		} else if !strings.HasSuffix(err.Error(), ": use of closed network connection") {
-			ssr.sendError(err)
+		if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
+			log.Errorf("streamSocketReader Timeout : %s", nErr)
+		}
+		if !strings.HasSuffix(err.Error(), ": use of closed network connection") {
 			log.Error(err)
 		}
+		ssr.sendError(err)
 	}
 }
 
