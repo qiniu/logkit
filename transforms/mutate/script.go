@@ -6,24 +6,28 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"unicode"
-
-	"path/filepath"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var (
+	_ transforms.StatsTransformer = &Script{}
+	_ transforms.Transformer      = &Script{}
+)
+
 type Script struct {
-	Key          string `json:"key"`
-	New          string `json:"new"`
-	Interprepter string `json:"interprepter"`
-	ScriptPath   string `json:"scriptpath"`
-	Script       string `json:"script"`
-	storePath    string
-	stats        StatsInfo
+	Key         string `json:"key"`
+	New         string `json:"new"`
+	Interpreter string `json:"interprepter"`
+	ScriptPath  string `json:"scriptpath"`
+	Script      string `json:"script"`
+	storePath   string
+	stats       StatsInfo
 }
 
 func (g *Script) Init() error {
@@ -51,8 +55,8 @@ func (g *Script) Init() error {
 }
 
 func (g *Script) Transform(datas []Data) ([]Data, error) {
-	var err, ferr error
-	errCount := 0
+	var err, fmtErr error
+	errNum := 0
 	// 获取 keys
 	keysArr := strings.Split(g.Key, ",")
 	keysDetail := make([][]string, 0)
@@ -75,61 +79,52 @@ func (g *Script) Transform(datas []Data) ([]Data, error) {
 	}
 	scriptPath, err := checkPath(g.storePath)
 	if err != nil {
-		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform script, last error info is %v", errCount, err)
-		return datas, ferr
+		g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+		return datas, fmtErr
 	}
 
 	for i := range datas {
 		var scriptRes string
-		var gerr error
+		var getErr error
 		params := []string{scriptPath}
 		for _, keys := range keysDetail {
-			val, gerr := GetMapValue(datas[i], keys...)
-			if gerr != nil {
-				errCount++
-				err = fmt.Errorf("transform key %v not exist in data", g.Key)
+			val, getErr := GetMapValue(datas[i], keys...)
+			if getErr != nil {
+				errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.Key)
 				continue
 			}
 
 			valStr, ok := val.(string)
 			if !ok {
-				errCount++
-				err = fmt.Errorf("transform key %v data type is not string", g.Key)
+				typeErr := fmt.Errorf("transform key %v data type is not string", g.Key)
+				errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
 				continue
 			}
 			params = append(params, valStr)
 		}
 
-		gerr = nil
-		scriptRes, gerr = getScriptRes(g.Interprepter, params)
-		if gerr != nil {
-			if len(gerr.Error()) > 0 {
+		getErr = nil
+		scriptRes, getErr = getScriptRes(g.Interpreter, params)
+		if getErr != nil {
+			if len(getErr.Error()) > 0 {
 				// 设置脚本执行结果的错误信息
-				seterr := SetMapValue(datas[i], gerr.Error(), false, recordErrs...)
-				if seterr != nil {
-					errCount++
-					err = fmt.Errorf("the new key %v already exists ", newsErr)
+				setErr := SetMapValue(datas[i], getErr.Error(), false, recordErrs...)
+				if setErr != nil {
+					errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
 				}
 			}
 			continue
 		}
 
 		// 设置脚本执行结果
-		seterr := SetMapValue(datas[i], scriptRes, false, news...)
-		if seterr != nil {
-			errCount++
-			err = fmt.Errorf("the new key %v already exists ", g.New)
+		setErr := SetMapValue(datas[i], scriptRes, false, news...)
+		if setErr != nil {
+			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
 		}
 	}
 
-	if err != nil {
-		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform script, last error info is %v", errCount, err)
-	}
-	g.stats.Errors += int64(errCount)
-	g.stats.Success += int64(len(datas) - errCount)
-	return datas, ferr
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	return datas, fmtErr
 }
 
 func getScriptRes(interpreter string, params []string) (string, error) {
@@ -238,6 +233,11 @@ func (g *Script) Stage() string {
 }
 
 func (g *Script) Stats() StatsInfo {
+	return g.stats
+}
+
+func (g *Script) SetStats(err string) StatsInfo {
+	g.stats.LastError = err
 	return g.stats
 }
 

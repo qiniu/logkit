@@ -2,10 +2,14 @@ package date
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
+)
+
+var (
+	_ transforms.StatsTransformer = &DateTrans{}
+	_ transforms.Transformer      = &DateTrans{}
 )
 
 type DateTrans struct {
@@ -21,30 +25,28 @@ func (g *DateTrans) RawTransform(datas []string) ([]string, error) {
 }
 
 func (g *DateTrans) Transform(datas []Data) ([]Data, error) {
-	var err, ferr error
-	errnums := 0
+	var err, fmtErr error
+	errNum := 0
 	keys := GetKeys(g.Key)
 	for i := range datas {
-		val, gerr := GetMapValue(datas[i], keys...)
-		if gerr != nil {
-			errnums++
-			err = fmt.Errorf("transform key %v not exist in data", g.Key)
+		val, getErr := GetMapValue(datas[i], keys...)
+		if getErr != nil {
+			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.Key)
 			continue
 		}
-		val, err = ConvertDate(g.LayoutBefore, g.LayoutAfter, g.Offset, val)
-		if err != nil {
-			errnums++
+		val, convertErr := ConvertDate(g.LayoutBefore, g.LayoutAfter, g.Offset, val)
+		if convertErr != nil {
+			errNum, err = transforms.SetError(errNum, convertErr, transforms.General, "")
 			continue
 		}
-		SetMapValue(datas[i], val, false, keys...)
+		setErr := SetMapValue(datas[i], val, false, keys...)
+		if setErr != nil {
+			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.Key)
+		}
 	}
-	if err != nil {
-		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform date, last error info is %v", errnums, err)
-	}
-	g.stats.Errors += int64(errnums)
-	g.stats.Success += int64(len(datas) - errnums)
-	return datas, ferr
+
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	return datas, fmtErr
 }
 
 func (g *DateTrans) Description() string {
@@ -94,6 +96,11 @@ func (g *DateTrans) Stage() string {
 }
 
 func (g *DateTrans) Stats() StatsInfo {
+	return g.stats
+}
+
+func (g *DateTrans) SetStats(err string) StatsInfo {
+	g.stats.LastError = err
 	return g.stats
 }
 

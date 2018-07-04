@@ -18,6 +18,11 @@ const (
 	K8sContainerId   = "k8s_container_id"
 )
 
+var (
+	_ transforms.StatsTransformer = &K8sTag{}
+	_ transforms.Transformer      = &K8sTag{}
+)
+
 type K8sTag struct {
 	SourceFileKey string `json:"sourcefilefield"`
 	stats         StatsInfo
@@ -28,42 +33,37 @@ func (g *K8sTag) RawTransform(datas []string) ([]string, error) {
 }
 
 func (g *K8sTag) Transform(datas []Data) ([]Data, error) {
-	var err, ferr error
-	errnums := 0
+	var err, fmtErr error
+	errNum := 0
 	for i := range datas {
 		val, ok := datas[i][g.SourceFileKey]
 		if !ok {
-			errnums++
-			err = fmt.Errorf("transform key %v not exist in data", g.SourceFileKey)
+			errNum, err = transforms.SetError(errNum, nil, transforms.GetErr, g.SourceFileKey)
 			continue
 		}
-		strval, ok := val.(string)
+		strVal, ok := val.(string)
 		if !ok {
-			errnums++
-			err = fmt.Errorf("transform key %v data type is not string", g.SourceFileKey)
+			typeErr := fmt.Errorf("transform key %v data type is not string", g.SourceFileKey)
+			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
 			continue
 		}
-		strval = filepath.Base(strval)
-		splits := strings.Split(strval, "_")
+		strVal = filepath.Base(strVal)
+		splits := strings.Split(strVal, "_")
 		if len(splits) < 3 {
-			errnums++
-			err = fmt.Errorf("k8stag transform sourcefile must has more than 2 sperated field but now only %v fields of %v", len(splits), strval)
+			splitErr := fmt.Errorf("k8stag transform sourcefile must has more than 2 sperated field but now only %v fields of %v", len(splits), strVal)
+			errNum, err = transforms.SetError(errNum, splitErr, transforms.General, "")
 			continue
 		}
 		datas[i][K8sPodName] = splits[0]
 		datas[i][K8sNamespace] = splits[1]
-		container_info := strings.TrimSuffix(strings.Join(splits[2:], "_"), ".log")
-		container_info_splits := strings.Split(container_info, "-")
-		datas[i][K8sContainerId] = container_info_splits[len(container_info_splits)-1]
-		datas[i][K8sContainerName] = strings.Join(container_info_splits[0:len(container_info_splits)-1], "-")
+		containerInfo := strings.TrimSuffix(strings.Join(splits[2:], "_"), ".log")
+		containerInfoSplits := strings.Split(containerInfo, "-")
+		datas[i][K8sContainerId] = containerInfoSplits[len(containerInfoSplits)-1]
+		datas[i][K8sContainerName] = strings.Join(containerInfoSplits[0:len(containerInfoSplits)-1], "-")
 	}
-	if err != nil {
-		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform k8stag, last error info is %v", errnums, err)
-	}
-	g.stats.Errors += int64(errnums)
-	g.stats.Success += int64(len(datas) - errnums)
-	return datas, ferr
+
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	return datas, fmtErr
 }
 
 func (g *K8sTag) Description() string {
@@ -93,6 +93,11 @@ func (g *K8sTag) Stage() string {
 }
 
 func (g *K8sTag) Stats() StatsInfo {
+	return g.stats
+}
+
+func (g *K8sTag) SetStats(err string) StatsInfo {
+	g.stats.LastError = err
 	return g.stats
 }
 

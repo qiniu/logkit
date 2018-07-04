@@ -9,6 +9,11 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var (
+	_ transforms.StatsTransformer = &Spliter{}
+	_ transforms.Transformer      = &Spliter{}
+)
+
 type Spliter struct {
 	Key         string `json:"key"`
 	SeperateKey string `json:"sep"`
@@ -21,40 +26,38 @@ func (g *Spliter) RawTransform(datas []string) ([]string, error) {
 }
 
 func (g *Spliter) Transform(datas []Data) ([]Data, error) {
-	var err, ferr error
-	errnums := 0
+	var err, fmtErr error
+	errNum := 0
 	if g.ArraryName == "" {
-		ferr = errors.New("array name is empty string,can't use as array field key name")
-		g.stats.LastError = ferr.Error()
-		errnums = len(datas)
+		fmtErr = errors.New("array name is empty string,can't use as array field key name")
+		g.stats.LastError = fmtErr.Error()
+		errNum = len(datas)
 	} else {
 		keys := GetKeys(g.Key)
-		newkeys := make([]string, len(keys))
+		newKeys := make([]string, len(keys))
 		for i := range datas {
-			copy(newkeys, keys)
-			val, gerr := GetMapValue(datas[i], newkeys...)
-			if gerr != nil {
-				errnums++
-				err = fmt.Errorf("transform key %v not exist in data", g.Key)
+			copy(newKeys, keys)
+			val, getErr := GetMapValue(datas[i], newKeys...)
+			if getErr != nil {
+				errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.Key)
 				continue
 			}
-			strval, ok := val.(string)
+			strVal, ok := val.(string)
 			if !ok {
-				errnums++
-				err = fmt.Errorf("transform key %v data type is not string", g.Key)
+				typeErr := fmt.Errorf("transform key %v data type is not string", g.Key)
+				errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
 				continue
 			}
-			newkeys[len(newkeys)-1] = g.ArraryName
-			SetMapValue(datas[i], strings.Split(strval, g.SeperateKey), false, newkeys...)
+			newKeys[len(newKeys)-1] = g.ArraryName
+			setErr := SetMapValue(datas[i], strings.Split(strVal, g.SeperateKey), false, newKeys...)
+			if setErr != nil {
+				errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, strings.Join(newKeys, "."))
+			}
 		}
 	}
-	if err != nil {
-		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform split, last error info is %v", errnums, err)
-	}
-	g.stats.Errors += int64(errnums)
-	g.stats.Success += int64(len(datas) - errnums)
-	return datas, ferr
+
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	return datas, fmtErr
 }
 
 func (g *Spliter) Description() string {
@@ -106,6 +109,11 @@ func (g *Spliter) Stage() string {
 }
 
 func (g *Spliter) Stats() StatsInfo {
+	return g.stats
+}
+
+func (g *Spliter) SetStats(err string) StatsInfo {
+	g.stats.LastError = err
 	return g.stats
 }
 

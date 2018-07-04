@@ -13,6 +13,11 @@ import (
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 )
 
+var (
+	_ transforms.StatsTransformer = &MapReplacer{}
+	_ transforms.Transformer      = &MapReplacer{}
+)
+
 type MapReplacer struct {
 	Key     string `json:"key"`
 	Map     string `json:"map"`
@@ -53,47 +58,44 @@ func (g *MapReplacer) convert(value string) string {
 }
 
 func (g *MapReplacer) Transform(datas []Data) ([]Data, error) {
-	var err, ferr error
-	errnums := 0
+	var err, fmtErr error
+	errNum := 0
 	keys := GetKeys(g.Key)
 	for i := range datas {
-		val, gerr := GetMapValue(datas[i], keys...)
-		if gerr != nil {
-			errnums++
-			err = fmt.Errorf("transform key %v not exist in data", g.Key)
+		val, getErr := GetMapValue(datas[i], keys...)
+		if getErr != nil {
+			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.Key)
 			continue
 		}
-		strval, ok := val.(string)
+		strVal, ok := val.(string)
 		if !ok {
-			newval, suberr := dataConvert(val, DslSchemaEntry{ValueType: pipeline.PandoraTypeString})
-			if suberr != nil {
-				err = fmt.Errorf("transform key %v try to convert data %v to string err %v", g.Key, newval, suberr)
-				errnums++
+			newVal, subErr := dataConvert(val, DslSchemaEntry{ValueType: pipeline.PandoraTypeString})
+			if subErr != nil {
+				typeErr := fmt.Errorf("transform key %v try to convert data %v to string err %v", g.Key, newVal, subErr)
+				errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
 				continue
 			}
-			strval, ok = newval.(string)
+			strVal, ok = newVal.(string)
 			if !ok {
-				errnums++
 				var rtp string
-				if newval == nil {
+				if newVal == nil {
 					rtp = "nil"
 				} else {
-					rtp = reflect.TypeOf(newval).Name()
+					rtp = reflect.TypeOf(newVal).Name()
 				}
-				err = fmt.Errorf("transform key %v data type is not string, but %s", g.Key, rtp)
+				typeErr := fmt.Errorf("transform key %v data type is not string, but %s", g.Key, rtp)
+				errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
 				continue
 			}
 		}
-		SetMapValue(datas[i], g.convert(strval), false, keys...)
+		setErr := SetMapValue(datas[i], g.convert(strVal), false, keys...)
+		if setErr != nil {
+			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.Key)
+		}
 	}
 
-	if err != nil {
-		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform mapreplace, last error info is %v", errnums, err)
-	}
-	g.stats.Errors += int64(errnums)
-	g.stats.Success += int64(len(datas) - errnums)
-	return datas, ferr
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	return datas, fmtErr
 }
 
 func (g *MapReplacer) RawTransform(datas []string) ([]string, error) {
@@ -152,6 +154,11 @@ func (g *MapReplacer) Stage() string {
 }
 
 func (g *MapReplacer) Stats() StatsInfo {
+	return g.stats
+}
+
+func (g *MapReplacer) SetStats(err string) StatsInfo {
+	g.stats.LastError = err
 	return g.stats
 }
 

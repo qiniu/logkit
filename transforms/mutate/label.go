@@ -8,6 +8,11 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var (
+	_ transforms.StatsTransformer = &Label{}
+	_ transforms.Transformer      = &Label{}
+)
+
 type Label struct {
 	Key      string `json:"key"`
 	Value    string `json:"value"`
@@ -20,29 +25,24 @@ func (g *Label) RawTransform(datas []string) ([]string, error) {
 }
 
 func (g *Label) Transform(datas []Data) ([]Data, error) {
-	var err, ferr error
-	errnums := 0
+	var err, fmtErr error
+	errNum := 0
 	keySlice := GetKeys(g.Key)
 	for i := range datas {
-		_, gerr := GetMapValue(datas[i], keySlice...)
-		if gerr == nil && !g.Override {
-			errnums++
-			err = fmt.Errorf("the key %v already exists", g.Key)
+		_, getErr := GetMapValue(datas[i], keySlice...)
+		if getErr == nil && !g.Override {
+			existErr := fmt.Errorf("the key %v already exists", g.Key)
+			errNum, err = transforms.SetError(errNum, existErr, transforms.General, "")
 			continue
 		}
-		err = SetMapValue(datas[i], g.Value, false, keySlice...)
-		if err != nil {
-			errnums++
-			continue
+		setErr := SetMapValue(datas[i], g.Value, false, keySlice...)
+		if setErr != nil {
+			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.Key)
 		}
 	}
-	if err != nil {
-		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform label, last error info is %v", errnums, err)
-	}
-	g.stats.Errors += int64(errnums)
-	g.stats.Success += int64(len(datas) - errnums)
-	return datas, ferr
+
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	return datas, fmtErr
 }
 
 func (g *Label) Description() string {
@@ -93,6 +93,11 @@ func (g *Label) Stage() string {
 }
 
 func (g *Label) Stats() StatsInfo {
+	return g.stats
+}
+
+func (g *Label) SetStats(err string) StatsInfo {
+	g.stats.LastError = err
 	return g.stats
 }
 
