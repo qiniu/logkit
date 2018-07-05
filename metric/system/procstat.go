@@ -663,7 +663,7 @@ func (p *Procstat) childProcess(name string) (pids []PID, err error) {
 func runCommand(comm string) (pids []PID, err error) {
 	out, err := exec.Command("bash", "-c", comm).Output()
 	if err != nil {
-		return pids, fmt.Errorf("exec command %v error %v", comm, err)
+		return pids, fmt.Errorf("exec command %v error [%v]: %s", comm, err, string(out))
 	}
 	return ParseOutput(string(out))
 }
