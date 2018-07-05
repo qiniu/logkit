@@ -119,12 +119,12 @@ var ModeKeyOptions = map[string][]Option{
 			KeyName:      KeyPandoraWorkflowName,
 			ChooseOnly:   false,
 			Default:      "",
-			Placeholder:  "logkit_default_workflow",
+			Placeholder:  "logkit_default_pipeline",
 			DefaultNoUse: true,
 			Required:     true,
-			Description:  "工作流名称(pandora_workflow_name)",
+			Description:  "Pipeline名称(pandora_workflow_name)",
 			CheckRegex:   "^[a-zA-Z_][a-zA-Z0-9_]{0,127}$",
-			ToolTip:      "七牛大数据平台工作流名称",
+			ToolTip:      "七牛大数据平台Pipeline名称",
 		},
 		{
 			KeyName:      KeyPandoraRepoName,
@@ -161,7 +161,7 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:      KeyPandoraHost,
 			ChooseOnly:   false,
-			Default:      "https://pipeline.qiniu.com",
+			Default:      "https://pipeline.qiniuapi.com",
 			DefaultNoUse: false,
 			Description:  "大数据平台域名(pandora_host)",
 			Advance:      true,
@@ -228,7 +228,7 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:       KeyPandoraLogDBHost,
 			ChooseOnly:    false,
-			Default:       "https://logdb.qiniu.com",
+			Default:       "https://insight.qiniuapi.com",
 			DefaultNoUse:  false,
 			Description:   "日志分析域名[私有部署才修改](pandora_logdb_host)",
 			Advance:       true,
@@ -283,7 +283,7 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:       KeyPandoraTSDBHost,
 			ChooseOnly:    false,
-			Default:       "https://tsdb.qiniu.com",
+			Default:       "https://tsdb.qiniuapi.com",
 			DefaultNoUse:  false,
 			Description:   "时序数据库域名[私有部署才修改](pandora_tsdb_host)",
 			Advance:       true,
