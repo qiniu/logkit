@@ -55,25 +55,11 @@ func init() {
 	})
 }
 
-//若无法获取磁盘个数，返回挂载点的个数
 func getNumDisk() (mountsNum int) {
-	defer func() {
-		if mountsNum == -1 {
-			diskMetrics, ok := metric.Collectors["disk"]
-			if !ok {
-				log.Errorf("metric disk is not support now")
-			}
-			mounts, err := diskMetrics().Collect()
-			if err != nil {
-				log.Error("disk metrics collect have error %v", err)
-			}
-			mountsNum = len(mounts)
-		}
-	}()
 	fDisk, err := exec.LookPath("/sbin/fdisk")
 	if err != nil {
-		log.Error("get disk num look /sbin/fdisk have error %v", err)
-		return -1
+		log.Warn("can't find /sbin/fdisk on your system PATH, will not collect")
+		return 0
 	}
 	out, err := exec.Command(fDisk, "-l").Output()
 	str := string(out)
@@ -90,14 +76,15 @@ func getNumDisk() (mountsNum int) {
 func getNumService() int {
 	out, err := exec.Command("which", "supervisorctl").Output()
 	if err != nil {
-		log.Errorf("get service number have error %v", err)
+		log.Warn("can't find supervisorctl on your system, will not collect service number")
 		return 0
 	}
 	out, err = exec.Command("supervisorctl", "status").Output()
 	if err != nil {
-		log.Errorf("get service number have error %v", err)
+		log.Warnf("get service number from supervisor error %v", err)
 		return 0
 	}
+	//去掉首行
 	count := len(strings.Split(string(out), "\n"))
 	return count - 1
 }

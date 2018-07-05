@@ -55,30 +55,16 @@ func init() {
 	})
 }
 
-//若无法获取磁盘个数，返回挂载点的个数
 func getNumDisk() (mountsNum int) {
-	defer func() {
-		if mountsNum == -1 {
-			diskMetrics, ok := metric.Collectors["disk"]
-			if !ok {
-				log.Errorf("metric disk is not support now")
-			}
-			mounts, err := diskMetrics().Collect()
-			if err != nil {
-				log.Error("disk metrics collect have error %v", err)
-			}
-			mountsNum = len(mounts)
-		}
-	}()
 	diskUtil, err := exec.LookPath("/usr/sbin/diskutil")
 	if err != nil {
-		log.Errorf("find diskutil have error %v", err)
-		return -1
+		log.Warn("can't find diskutil in your PATH, will not collect disknum")
+		return 0
 	}
 	out, err := exec.Command(diskUtil, "list").Output()
 	if err != nil {
-		log.Errorf("get disk number have error %v", err)
-		return -1
+		log.Warnf("get disk number from diskutil err %v", err)
+		return 0
 	}
 	return getNumFromOutput(string(out))
 }

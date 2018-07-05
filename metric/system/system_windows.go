@@ -67,32 +67,20 @@ func init() {
 
 //若无法获取磁盘个数，返回挂载点的个数
 func getNumDisk() (mountsNum int) {
-	defer func() {
-		if mountsNum == -1 {
-			diskMetrics, ok := metric.Collectors["disk"]
-			if !ok {
-				log.Errorf("metric disk is not support now")
-			}
-			mounts, err := diskMetrics().Collect()
-			if err != nil {
-				log.Error("disk metrics collect have error %v", err)
-			}
-			mountsNum = len(mounts)
-		}
-	}()
 	err := ioutil.WriteFile("diskpart.txt", []byte("list disk"), os.ModeAppend)
 	if err != nil {
-		log.Error("write file diskpart.txt have error %v", err)
+		log.Warnf("write file diskpart.txt failed %v, will not collect disknum", err)
+		return 0
 	}
 	out, err := exec.Command("diskpart", "/S", "diskpart.txt").Output()
 	if err != nil {
-		log.Error("get disk number have error %v", err)
-		return -1
+		log.Warnf("get disk number error %v", err)
+		return 0
 	}
 	str := string(out)
 	index := strings.Index(str, "--------  -------------  -------  -------  ---  ---")
 	if index < 0 {
-		return -1
+		return 0
 	}
 	disks := strings.Split(str[index:], "\n")
 	return len(disks) - 2
