@@ -39,12 +39,12 @@ const (
 )
 
 const (
-	defaultDialTimeout     time.Duration = 10 * time.Second
-	defaultResponseTimeout time.Duration = 30 * time.Second
+	defaultDialTimeout     = 10 * time.Second
+	defaultResponseTimeout = 30 * time.Second
 
-	DefaultTSDBEndpoint     = "https://tsdb.qiniu.com"
-	DefaultLogDBEndpoint    = "https://logdb.qiniu.com"
-	DefaultPipelineEndpoint = "https://pipeline.qiniu.com"
+	DefaultTSDBEndpoint     = "https://tsdb.qiniuapi.com"
+	DefaultLogDBEndpoint    = "https://insight.qiniuapi.com"
+	DefaultPipelineEndpoint = "https://pipeline.qiniuapi.com"
 	DefaultReportEndpoint   = "https://report.qiniu.com"
 	DefaultLogkitEndpoint   = "https://logkit-pro.qiniu.com"
 )
