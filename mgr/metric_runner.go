@@ -243,7 +243,7 @@ func (r *MetricRunner) Run() {
 			metricName := c.Name()
 			tmpdatas, err := c.Collect()
 			if err != nil {
-				log.Warnf("collecter <%v> collect data error: %v", c.Name(), err)
+				log.Debugf("collecter <%v> collect data error: %v", c.Name(), err)
 				continue
 			}
 			dataLen := len(tmpdatas)

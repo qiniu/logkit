@@ -69,12 +69,12 @@ func init() {
 func getNumDisk() (mountsNum int) {
 	err := ioutil.WriteFile("diskpart.txt", []byte("list disk"), os.ModeAppend)
 	if err != nil {
-		log.Warnf("write file diskpart.txt failed %v, will not collect disknum", err)
+		log.Debugf("write file diskpart.txt failed %v, will not collect disknum", err)
 		return 0
 	}
 	out, err := exec.Command("diskpart", "/S", "diskpart.txt").Output()
 	if err != nil {
-		log.Warnf("get disk number error %v", err)
+		log.Debugf("get disk number error %v", err)
 		return 0
 	}
 	str := string(out)

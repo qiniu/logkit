@@ -58,12 +58,12 @@ func init() {
 func getNumDisk() (mountsNum int) {
 	diskUtil, err := exec.LookPath("/usr/sbin/diskutil")
 	if err != nil {
-		log.Warn("can't find diskutil in your PATH, will not collect disknum")
+		log.Debug("can't find diskutil in your PATH, will not collect disknum")
 		return 0
 	}
 	out, err := exec.Command(diskUtil, "list").Output()
 	if err != nil {
-		log.Warnf("get disk number from diskutil err %v", err)
+		log.Debugf("get disk number from diskutil err %v", err)
 		return 0
 	}
 	return getNumFromOutput(string(out))
