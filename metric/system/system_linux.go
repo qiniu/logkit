@@ -58,7 +58,7 @@ func init() {
 func getNumDisk() (mountsNum int) {
 	fDisk, err := exec.LookPath("/sbin/fdisk")
 	if err != nil {
-		log.Warn("can't find /sbin/fdisk on your system PATH, will not collect")
+		log.Debug("can't find /sbin/fdisk on your system PATH, will not collect")
 		return 0
 	}
 	out, err := exec.Command(fDisk, "-l").Output()
@@ -76,12 +76,12 @@ func getNumDisk() (mountsNum int) {
 func getNumService() int {
 	out, err := exec.Command("which", "supervisorctl").Output()
 	if err != nil {
-		log.Warn("can't find supervisorctl on your system, will not collect service number")
+		log.Debug("can't find supervisorctl on your system, will not collect service number")
 		return 0
 	}
 	out, err = exec.Command("supervisorctl", "status").Output()
 	if err != nil {
-		log.Warnf("get service number from supervisor error %v", err)
+		log.Debugf("get service number from supervisor error %v", err)
 		return 0
 	}
 	//去掉首行
