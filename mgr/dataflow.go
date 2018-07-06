@@ -336,8 +336,7 @@ func getSampleData(parserConfig conf.MapConf) ([]string, error) {
 			sampleData = []string{rawData}
 		}
 	default:
-		errMsg := fmt.Sprintf("parser type <%v> is not supported yet", parserType)
-		return nil, errors.New(errMsg)
+		sampleData = append(sampleData, rawData)
 	}
 
 	return sampleData, nil
