@@ -3,15 +3,14 @@
 package system
 
 import (
-	"runtime"
 	"os/exec"
+	"runtime"
 	"strings"
-	"strconv"
 
 	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/metric"
 	"github.com/shirou/gopsutil/host"
 	"github.com/shirou/gopsutil/load"
-	"github.com/qiniu/logkit/metric"
 )
 
 type DarwinSystemStats struct {
@@ -56,43 +55,29 @@ func init() {
 	})
 }
 
-//若无法获取磁盘个数，返回挂载点的个数
 func getNumDisk() (mountsNum int) {
-	defer func() {
-		if mountsNum == -1 {
-			diskMetrics, ok := metric.Collectors["disk"]
-			if !ok {
-				log.Errorf("metric disk is not support now")
-			}
-			mounts, err := diskMetrics().Collect()
-			if err != nil {
-				log.Error("disk metrics collect have error %v", err)
-			}
-			mountsNum = len(mounts)
-		}
-	}()
 	diskUtil, err := exec.LookPath("/usr/sbin/diskutil")
 	if err != nil {
-		log.Error("find diskutil have error %v", err)
-		return -1
+		log.Debug("can't find diskutil in your PATH, will not collect disknum")
+		return 0
 	}
-	out, err := exec.Command(diskUtil, "apfs", "list").Output()
+	out, err := exec.Command(diskUtil, "list").Output()
 	if err != nil {
-		log.Error("get disk number have error %v", err)
-		return -1
+		log.Debugf("get disk number from diskutil err %v", err)
+		return 0
 	}
-	res := string(out)
-	index := strings.Index(res, "APFS Container")
-	if index < 0 || index+18 > len(res) {
-		log.Error("get disk number can't find enough args")
-		return -1
+	return getNumFromOutput(string(out))
+}
+
+func getNumFromOutput(out string) int {
+	num := 0
+	prints := strings.Split(out, "\n")
+	for _, v := range prints {
+		if strings.Contains(v, "/dev/disk") {
+			num++
+		}
 	}
-	mountsNum, err = strconv.Atoi(res[index+16 : index+17])
-	if err != nil {
-		log.Errorf("get disk number have error %v", err)
-		return -1
-	}
-	return mountsNum
+	return num
 }
 
 func getNumService() int {

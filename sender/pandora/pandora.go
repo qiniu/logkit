@@ -1,6 +1,7 @@
 package pandora
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -223,12 +224,12 @@ func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
 		log.Error(err)
 		return
 	}
-	// 当 schema free 为 false 时，需要自动创建 pandora_stash 字段
+	// 当 schema free 为 false 时，需要自动创建 pandora_stash 字段，需要自动创建 pandora_separate_id 字段
 	if !schemaFree {
 		if autoCreateSchema == "" {
-			autoCreateSchema = fmt.Sprintf("%v string", KeyPandoraStash)
+			autoCreateSchema = fmt.Sprintf("%v string,%v string", KeyPandoraStash, KeyPandoraSeparateId)
 		} else {
-			autoCreateSchema += fmt.Sprintf(",%v string", KeyPandoraStash)
+			autoCreateSchema += fmt.Sprintf(",%v string,%v string", KeyPandoraStash, KeyPandoraSeparateId)
 		}
 	}
 
@@ -880,16 +881,34 @@ func (s *Sender) rawSend(datas []Data) (se error) {
 		}
 		raw, ok := v["_raw"].([]byte)
 		if !ok {
-			errinfo := "_raw not []byte type"
-			return &StatsError{
-				ErrorDetail: errors.New(errinfo),
-				StatsInfo: StatsInfo{
-					Success:   int64(idx),
-					Errors:    int64(len(datas[idx:])),
-					LastError: errinfo,
-				},
-				RemainDatas: datas[idx:],
+			str, sok := v["_raw"].(string)
+			if !sok {
+				errinfo := "_raw not []byte or string type"
+				return &StatsError{
+					ErrorDetail: errors.New(errinfo),
+					StatsInfo: StatsInfo{
+						Success:   int64(idx),
+						Errors:    int64(len(datas[idx:])),
+						LastError: errinfo,
+					},
+					RemainDatas: datas[idx:],
+				}
 			}
+
+			decodeBytes, err := base64.StdEncoding.DecodeString(str)
+			if err != nil {
+				errinfo := "can not unbase 64 raw, err = " + err.Error()
+				return &StatsError{
+					ErrorDetail: errors.New(errinfo),
+					StatsInfo: StatsInfo{
+						Success:   int64(idx),
+						Errors:    int64(len(datas[idx:])),
+						LastError: errinfo,
+					},
+					RemainDatas: datas[idx:],
+				}
+			}
+			raw = decodeBytes
 		}
 		ak, ok := v["_ak"].(string)
 		if !ok {

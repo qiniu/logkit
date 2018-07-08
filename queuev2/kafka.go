@@ -2,13 +2,14 @@ package queuev2
 
 import (
 	"errors"
+	"os"
+	"sync"
+	"time"
+
 	"github.com/Shopify/sarama"
 	"github.com/qiniu/log"
 	"github.com/wvanbergen/kafka/consumergroup"
 	"github.com/wvanbergen/kazoo-go"
-	"os"
-	"sync"
-	"time"
 )
 
 const (

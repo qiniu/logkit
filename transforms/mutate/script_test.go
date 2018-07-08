@@ -24,9 +24,9 @@ echo "say: ${word} ${name}"`
 	defer os.RemoveAll(fileName)
 
 	scriptConf := &Script{
-		Key:          "key1",
-		New:          "myscript",
-		Interprepter: "bash",
+		Key:         "key1",
+		New:         "myscript",
+		Interpreter: "bash",
 	}
 	scriptConf.Init()
 	scriptConf.ScriptPath = fileName
@@ -37,9 +37,9 @@ echo "say: ${word} ${name}"`
 	assert.Equal(t, exp, res)
 
 	scriptConf2 := &Script{
-		Key:          "key1, key2",
-		New:          "myscript",
-		Interprepter: "bash",
+		Key:         "key1, key2",
+		New:         "myscript",
+		Interpreter: "bash",
 	}
 	scriptConf2.Init()
 	scriptConf2.ScriptPath = fileName
@@ -50,9 +50,9 @@ echo "say: ${word} ${name}"`
 	assert.Equal(t, exp2, res2)
 
 	scriptConf3 := &Script{
-		Key:          "key1..., key2...",
-		New:          "myscript...",
-		Interprepter: "bash",
+		Key:         "key1..., key2...",
+		New:         "myscript...",
+		Interpreter: "bash",
 	}
 	scriptConf3.Init()
 	scriptConf3.ScriptPath = fileName
@@ -63,9 +63,9 @@ echo "say: ${word} ${name}"`
 	assert.Equal(t, exp3, res3)
 
 	scriptConf5 := &Script{
-		Key:          "key1..., ..., ...",
-		New:          "myscript...",
-		Interprepter: "bash",
+		Key:         "key1..., ..., ...",
+		New:         "myscript...",
+		Interpreter: "bash",
 	}
 	scriptConf5.Init()
 	scriptConf5.ScriptPath = fileName
@@ -82,9 +82,9 @@ echo "say: ${word} ${name}"`
 	createTestFile(fileName, content2)
 
 	scriptConf4 := &Script{
-		Key:          "key1, key2",
-		New:          "myscript",
-		Interprepter: "bash",
+		Key:         "key1, key2",
+		New:         "myscript",
+		Interpreter: "bash",
 	}
 	scriptConf4.Init()
 	scriptConf4.ScriptPath = fileName
@@ -104,11 +104,11 @@ echo "say: ${word} ${name}"`
 	}
 
 	scriptConf7 := &Script{
-		Key:          "myscript...",
-		New:          "res",
-		Interprepter: "bash",
-		ScriptPath:   fileName,
-		Script:       EncodeString(`echo "hello"`),
+		Key:         "myscript...",
+		New:         "res",
+		Interpreter: "bash",
+		ScriptPath:  fileName,
+		Script:      EncodeString(`echo "hello"`),
 	}
 	scriptConf7.Init()
 	data7 := []Data{{"key1": "value1", "myscript": "fileName"}}

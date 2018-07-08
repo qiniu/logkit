@@ -21,6 +21,11 @@ const (
 	DistrictCode = "DistrictCode"
 )
 
+var (
+	_ transforms.StatsTransformer = &Transformer{}
+	_ transforms.Transformer      = &Transformer{}
+)
+
 type Transformer struct {
 	StageTime   string `json:"stage"`
 	Key         string `json:"key"`
@@ -36,69 +41,64 @@ func (_ *Transformer) RawTransform(datas []string) ([]string, error) {
 }
 
 func (t *Transformer) Transform(datas []Data) ([]Data, error) {
-	var err, ferr error
+	var err, fmtErr error
+	errNum := 0
 	if t.loc == nil {
 		loc, err := NewLocator(t.DataPath)
 		if err != nil {
+			t.stats, _ = transforms.SetStatsInfo(err, t.stats, int64(errNum), int64(len(datas)), t.Type())
 			return datas, err
 		}
 		t.loc = loc
 	}
-	errnums := 0
 	keys := GetKeys(t.Key)
-	newkeys := make([]string, len(keys))
+	newKeys := make([]string, len(keys))
 	for i := range datas {
-		copy(newkeys, keys)
-		val, gerr := GetMapValue(datas[i], keys...)
-		if gerr != nil {
-			errnums++
-			err = fmt.Errorf("transform key %v not exist in data", t.Key)
+		copy(newKeys, keys)
+		val, getErr := GetMapValue(datas[i], keys...)
+		if getErr != nil {
+			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, t.Key)
 			continue
 		}
-		strval, ok := val.(string)
+		strVal, ok := val.(string)
 		if !ok {
-			errnums++
-			err = fmt.Errorf("transform key %v data type is not string", t.Key)
+			notStringErr := fmt.Errorf("transform key %v data type is not string", t.Key)
+			errNum, err = transforms.SetError(errNum, notStringErr, transforms.General, "")
 			continue
 		}
-		info, nerr := t.loc.Find(strval)
-		if nerr != nil {
-			err = nerr
-			errnums++
+		info, findErr := t.loc.Find(strVal)
+		if findErr != nil {
+			errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
 			continue
 		}
-		newkeys[len(newkeys)-1] = Region
-		SetMapValueWithPrefix(datas[i], info.Region, keys[len(keys)-1], t.KeyAsPrefix, newkeys...)
-		newkeys[len(newkeys)-1] = City
-		SetMapValueWithPrefix(datas[i], info.City, keys[len(keys)-1], t.KeyAsPrefix, newkeys...)
-		newkeys[len(newkeys)-1] = Country
-		SetMapValueWithPrefix(datas[i], info.Country, keys[len(keys)-1], t.KeyAsPrefix, newkeys...)
-		newkeys[len(newkeys)-1] = Isp
-		SetMapValueWithPrefix(datas[i], info.Isp, keys[len(keys)-1], t.KeyAsPrefix, newkeys...)
+		newKeys[len(newKeys)-1] = Region
+		SetMapValueWithPrefix(datas[i], info.Region, keys[len(keys)-1], t.KeyAsPrefix, newKeys...)
+		newKeys[len(newKeys)-1] = City
+		SetMapValueWithPrefix(datas[i], info.City, keys[len(keys)-1], t.KeyAsPrefix, newKeys...)
+		newKeys[len(newKeys)-1] = Country
+		SetMapValueWithPrefix(datas[i], info.Country, keys[len(keys)-1], t.KeyAsPrefix, newKeys...)
+		newKeys[len(newKeys)-1] = Isp
+		SetMapValueWithPrefix(datas[i], info.Isp, keys[len(keys)-1], t.KeyAsPrefix, newKeys...)
 		if info.CountryCode != "" {
-			newkeys[len(newkeys)-1] = CountryCode
-			SetMapValueWithPrefix(datas[i], info.CountryCode, keys[len(keys)-1], t.KeyAsPrefix, newkeys...)
+			newKeys[len(newKeys)-1] = CountryCode
+			SetMapValueWithPrefix(datas[i], info.CountryCode, keys[len(keys)-1], t.KeyAsPrefix, newKeys...)
 		}
 		if info.Latitude != "" {
-			newkeys[len(newkeys)-1] = Latitude
-			SetMapValueWithPrefix(datas[i], info.Latitude, keys[len(keys)-1], t.KeyAsPrefix, newkeys...)
+			newKeys[len(newKeys)-1] = Latitude
+			SetMapValueWithPrefix(datas[i], info.Latitude, keys[len(keys)-1], t.KeyAsPrefix, newKeys...)
 		}
 		if info.Longitude != "" {
-			newkeys[len(newkeys)-1] = Longitude
-			SetMapValueWithPrefix(datas[i], info.Longitude, keys[len(keys)-1], t.KeyAsPrefix, newkeys...)
+			newKeys[len(newKeys)-1] = Longitude
+			SetMapValueWithPrefix(datas[i], info.Longitude, keys[len(keys)-1], t.KeyAsPrefix, newKeys...)
 		}
 		if info.DistrictCode != "" {
-			newkeys[len(newkeys)-1] = DistrictCode
-			SetMapValueWithPrefix(datas[i], info.DistrictCode, keys[len(keys)-1], t.KeyAsPrefix, newkeys...)
+			newKeys[len(newKeys)-1] = DistrictCode
+			SetMapValueWithPrefix(datas[i], info.DistrictCode, keys[len(keys)-1], t.KeyAsPrefix, newKeys...)
 		}
 	}
-	if err != nil {
-		t.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform IP, last error info is %v", errnums, err)
-	}
-	t.stats.Errors += int64(errnums)
-	t.stats.Success += int64(len(datas) - errnums)
-	return datas, ferr
+
+	t.stats, fmtErr = transforms.SetStatsInfo(err, t.stats, int64(errNum), int64(len(datas)), t.Type())
+	return datas, fmtErr
 }
 
 func (_ *Transformer) Description() string {
@@ -150,6 +150,11 @@ func (t *Transformer) Stage() string {
 }
 
 func (t *Transformer) Stats() StatsInfo {
+	return t.stats
+}
+
+func (t *Transformer) SetStats(err string) StatsInfo {
+	t.stats.LastError = err
 	return t.stats
 }
 

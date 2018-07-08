@@ -89,7 +89,6 @@ type LogExportRunner struct {
 }
 
 const defaultSendIntervalSeconds = 60
-const defaultMaxBatchSize = 2 * 1024 * 1024
 const qiniulogHeadPatthern = "[1-9]\\d{3}/[0-1]\\d/[0-3]\\d [0-2]\\d:[0-6]\\d:[0-6]\\d(\\.\\d{6})?"
 
 // NewRunner 创建Runner
@@ -122,7 +121,7 @@ func NewRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleane
 func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.Parser,
 	transformers []transforms.Transformer, senders []sender.Sender, router *router.Router, meta *reader.Meta) (runner *LogExportRunner, err error) {
 	if info.MaxBatchSize <= 0 {
-		info.MaxBatchSize = defaultMaxBatchSize
+		info.MaxBatchSize = DefaultMaxBatchSize
 	}
 	if info.MaxBatchInterval <= 0 {
 		info.MaxBatchInterval = defaultSendIntervalSeconds
@@ -363,7 +362,7 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 		if err != nil {
 			info.LastError = err.Error()
 			//FaultTolerant Sender 正常的错误会在backupqueue里面记录，自己重试，此处无需重试
-			if se.Ft && se.FtNotRetry {
+			if se != nil && se.Ft && se.FtNotRetry {
 				break
 			}
 			time.Sleep(time.Second)
@@ -620,8 +619,13 @@ func (r *LogExportRunner) Run() {
 				tstats.Success++
 			}
 			if err != nil {
+				statesTransformer, ok := r.transformers[i].(transforms.StatsTransformer)
+				if ok {
+					statesTransformer.SetStats(err.Error())
+				}
 				tstats.LastError = err.Error()
 			}
+
 			r.rs.TransformStats[tp] = tstats
 			r.rsMutex.Unlock()
 			if err != nil {
@@ -706,26 +710,31 @@ func addTagsToData(tags map[string]interface{}, datas []Data, runnername string)
 	return datas
 }
 
+// Stop 清理所有使用到的资源, 等待10秒尝试读取完毕
+// 先停Reader，不再读取，然后停Run函数，让读取的都转到发送，最后停Sender结束整个过程。
+// Parser 无状态，无需stop。
 func (r *LogExportRunner) Stop() {
 	atomic.AddInt32(&r.stopped, 1)
 
-	log.Warnf("Runner[%v] waiting for stopped signal", r.Name())
-	timer := time.NewTimer(time.Second * 10)
-	select {
-	case <-r.exitChan:
-		log.Warnf("runner " + r.Name() + " has been stopped ")
-	case <-timer.C:
-		log.Warnf("runner " + r.Name() + " exited timeout ")
-		atomic.AddInt32(&r.stopped, 1)
-	}
-	log.Warnf("Runner[%v] wait for reader %v stopped", r.Name(), r.reader.Name())
-	// 清理所有使用到的资源
+	log.Infof("Runner[%v] wait for reader %v stopped", r.Name(), r.reader.Name())
 	err := r.reader.Close()
 	if err != nil {
 		log.Errorf("Runner[%v] cannot close reader name: %s, err: %v", r.Name(), r.reader.Name(), err)
 	} else {
 		log.Warnf("Runner[%v] reader %v of runner %v closed", r.Name(), r.reader.Name(), r.Name())
 	}
+
+	log.Infof("Runner[%v] waiting for Run() stopped signal", r.Name())
+	timer := time.NewTimer(time.Second * 10)
+	select {
+	case <-r.exitChan:
+		log.Warnf("runner %v has been stopped", r.Name())
+	case <-timer.C:
+		log.Errorf("runner %v exited timeout, start to force stop", r.Name())
+		atomic.AddInt32(&r.stopped, 1)
+	}
+
+	log.Infof("Runner[%v] wait for sender %v stopped", r.Name(), r.reader.Name())
 	for _, s := range r.senders {
 		err := s.Close()
 		if err != nil {
@@ -734,6 +743,7 @@ func (r *LogExportRunner) Stop() {
 			log.Warnf("Runner[%v] sender %v closed", r.Name(), s.Name())
 		}
 	}
+
 	if r.cleaner != nil {
 		r.cleaner.Close()
 	}

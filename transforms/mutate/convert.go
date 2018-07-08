@@ -15,6 +15,11 @@ import (
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 )
 
+var (
+	_ transforms.StatsTransformer = &Converter{}
+	_ transforms.Transformer      = &Converter{}
+)
+
 type Converter struct {
 	DSL     string `json:"dsl"`
 	stats   StatsInfo
@@ -26,55 +31,55 @@ func (g *Converter) RawTransform(datas []string) ([]string, error) {
 }
 
 func (g *Converter) Transform(datas []Data) ([]Data, error) {
-	var err, ferr error
-	errnums := 0
+	var err, fmtErr error
+	errNum := 0
 	if g.schemas == nil {
 		schemas, err := ParseDsl(g.DSL, 0)
 		if err != nil {
 			err = fmt.Errorf("convert typedsl %s to schema error: %v", g.DSL, err)
-			errnums = len(datas)
+			errNum = len(datas)
 			g.schemas = make([]DslSchemaEntry, 0)
 		} else {
 			g.schemas = schemas
 		}
 	}
+
 	if len(g.schemas) == 0 {
 		err = fmt.Errorf("no valid dsl[%v] to schema, please enter correct format dsl: \"field type\"", g.DSL)
-		errnums = len(datas)
-	} else {
-		keyss := map[int][]string{}
-		for i, sc := range g.schemas {
-			keys := GetKeys(sc.Key)
-			keyss[i] = keys
-		}
-		for i := range datas {
-			for k, keys := range keyss {
-				val, gerr := GetMapValue(datas[i], keys...)
-				if gerr != nil {
-					errnums++
-					err = fmt.Errorf("transform key %v not exist in data", g.schemas[k].Key)
-					continue
-				}
-				val, err = dataConvert(val, g.schemas[k])
-				if err != nil {
-					errnums++
-				}
-				if val == nil {
-					DeleteMapValue(datas[i], keys...)
-					continue
-				}
-				SetMapValue(datas[i], val, false, keys...)
+		errNum = len(datas)
+		g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+		return datas, err
+	}
+
+	keysMap := map[int][]string{}
+	for i, sc := range g.schemas {
+		keys := GetKeys(sc.Key)
+		keysMap[i] = keys
+	}
+	for i := range datas {
+		for k, keys := range keysMap {
+			val, getErr := GetMapValue(datas[i], keys...)
+			if getErr != nil {
+				errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.schemas[k].Key)
+				continue
+			}
+			val, convertErr := dataConvert(val, g.schemas[k])
+			if convertErr != nil {
+				errNum, err = transforms.SetError(errNum, convertErr, transforms.General, "")
+			}
+			if val == nil {
+				DeleteMapValue(datas[i], keys...)
+				continue
+			}
+			setErr := SetMapValue(datas[i], val, false, keys...)
+			if setErr != nil {
+				errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, strings.Join(keys, "."))
 			}
 		}
 	}
 
-	if err != nil {
-		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform convert, last error info is %v", errnums, err)
-	}
-	g.stats.Errors += int64(errnums)
-	g.stats.Success += int64(len(datas) - errnums)
-	return datas, ferr
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	return datas, fmtErr
 }
 
 func (g *Converter) Description() string {
@@ -113,6 +118,11 @@ func (g *Converter) Stage() string {
 }
 
 func (g *Converter) Stats() StatsInfo {
+	return g.stats
+}
+
+func (g *Converter) SetStats(err string) StatsInfo {
+	g.stats.LastError = err
 	return g.stats
 }
 

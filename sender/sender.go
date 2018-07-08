@@ -125,6 +125,7 @@ const (
 	KeyFtProcs             = "ft_procs"         // ft并发数，当always_save或concurrent策略时启用
 	KeyFtMemoryChannel     = "ft_memory_channel"
 	KeyFtMemoryChannelSize = "ft_memory_channel_size"
+	KeyFtLongDataDiscard   = "ft_long_data_discard"
 
 	// ft 策略
 	// KeyFtStrategyBackupOnly 只在失败的时候进行容错

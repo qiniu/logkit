@@ -3,14 +3,18 @@ package mutate
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 
-	"strings"
-
 	"github.com/json-iterator/go"
+)
+
+var (
+	_ transforms.StatsTransformer = &Json{}
+	_ transforms.Transformer      = &Json{}
 )
 
 type Json struct {
@@ -21,32 +25,30 @@ type Json struct {
 }
 
 func (g *Json) Transform(datas []Data) ([]Data, error) {
-	var err, ferr error
-	errCount := 0
+	var err, fmtErr error
+	errNum := 0
 	keys := GetKeys(g.Key)
 	news := GetKeys(g.New)
 
 	for i := range datas {
-		val, gerr := GetMapValue(datas[i], keys...)
-		if gerr != nil {
-			errCount++
-			err = fmt.Errorf("transform key %v not exist in data", g.Key)
+		val, getErr := GetMapValue(datas[i], keys...)
+		if getErr != nil {
+			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.Key)
 			continue
 		}
-		strval, ok := val.(string)
+		strVal, ok := val.(string)
 		if !ok {
-			errCount++
-			err = fmt.Errorf("transform key %v data type is not string", g.Key)
+			typeErr := fmt.Errorf("transform key %v data type is not string", g.Key)
+			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
 			continue
 		}
-		strval = strings.TrimSpace(strval)
-		if strval == "" {
+		strVal = strings.TrimSpace(strVal)
+		if strVal == "" {
 			continue
 		}
-		jsonVal, perr := parseJson(g.jsonTool, strval)
-		if perr != nil {
-			errCount++
-			err = perr
+		jsonVal, parseErr := parseJson(g.jsonTool, strVal)
+		if parseErr != nil {
+			errNum, err = transforms.SetError(errNum, parseErr, transforms.General, "")
 			continue
 		}
 
@@ -54,20 +56,14 @@ func (g *Json) Transform(datas []Data) ([]Data, error) {
 			DeleteMapValue(datas[i], keys...)
 			news = keys
 		}
-		serr := SetMapValue(datas[i], jsonVal, false, news...)
-		if serr != nil {
-			errCount++
-			err = fmt.Errorf("the new key %v already exists ", g.New)
+		setErr := SetMapValue(datas[i], jsonVal, false, news...)
+		if setErr != nil {
+			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
 		}
 	}
 
-	if err != nil {
-		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform json, last error info is %v", errCount, err)
-	}
-	g.stats.Errors += int64(errCount)
-	g.stats.Success += int64(len(datas) - errCount)
-	return datas, ferr
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	return datas, fmtErr
 }
 
 func (g *Json) RawTransform(datas []string) ([]string, error) {
@@ -112,6 +108,11 @@ func (g *Json) Stage() string {
 }
 
 func (g *Json) Stats() StatsInfo {
+	return g.stats
+}
+
+func (g *Json) SetStats(err string) StatsInfo {
+	g.stats.LastError = err
 	return g.stats
 }
 

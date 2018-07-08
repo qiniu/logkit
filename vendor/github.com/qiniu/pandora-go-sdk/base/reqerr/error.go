@@ -3,7 +3,7 @@ package reqerr
 import "fmt"
 
 const (
-	DefaultRequestError int = iota
+	DefaultRequestError = iota
 	InvalidArgs
 	NoSuchRepoError
 	RepoAlreadyExistsError
@@ -133,6 +133,77 @@ const (
 	ErrFusionPathWithUndefinedVariable
 	ErrTooManySchema
 	ErrSchemaLimitUnderflow
+
+	ErrRequestBodyInvalid
+	ErrInvalidArgs
+	ErrJobInfoInvalid
+	ErrAgentRegister
+	ErrAgentReportJobStates
+	ErrUnknownAction
+	ErrGetUserInformation
+	ErrGetPagingInfo
+	ErrGetAgentInfo
+	ErrGetAgentIdList
+	ErrGetRunnerInfo
+	ErrRemoveAgentInfo
+	ErrRemoveRunner
+	ErrRemoveJobStates
+	ErrUpdateAgentInfo
+	ErrAgentReportMetrics
+	ErrGetVersionConfigItem
+	ErrNoValidAgentsFound
+	ErrScheduleAgent
+	ErrNoSuchAgent
+	ErrGetMachineInfo
+	ErrGetAgents
+	ErrDoLogDBMSearch
+	ErrGetJobJnfos
+	ErrGetJobStates
+	ErrGetUserToken
+	ErrSystemNotSupport
+	ErrGetSenderPandora
+	ErrStatusDecodeBase64
+	ErrGetGrokCheck
+	ErrParamsCheck
+	ErrGetTagList
+	ErrGetConfigList
+	ErrInsertConfigs
+	ErrAssignConfigs
+	ErrNoSuchEntry
+	ErrGetRunnerList
+	ErrUpdateAssignConfigs
+	ErrRawDataSize
+	ErrHeadPattern
+	ErrConfig
+	ErrUnmarshal
+	ErrLogParser
+	ErrTransformer
+	ErrSender
+	ErrRouter
+	ErrUpdateTags
+	ErrAgentInfoNotFound
+	ErrGetAgentRelease
+	ErrJobRelease
+	ErrAgentsDisconnect
+	ErrUpdateConfigs
+	ErrRemoveConfigs
+	ErrUpdateRunners
+	ErrAssignTags
+	ErrAddTags
+	ErrRemoveTags
+	ErrNotFoundRecord
+	ErrExistRecord
+	ErrDoLogDBJob
+	ErrDoLogDBAnalysis
+	ErrTimeStamp
+	ErrNoRunnerInfo
+	ErrMachineMetricNotOn
+	ErrDeleteRunner
+	ErrAddRunner
+	ErrDisableDeleteMetrics
+	ErrDisablePostMetrics
+	ErrUnprocessableEntity
+	ErrDisablePostMetricsLogdb
 )
 
 type ErrBuilder interface {

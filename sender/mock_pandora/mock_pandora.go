@@ -112,6 +112,7 @@ func (s *mock_pandora) PostRepos_() echo.HandlerFunc {
 
 func (s *mock_pandora) PostRepos_Data() echo.HandlerFunc {
 	return func(c echo.Context) error {
+		log.Println("PostRepos_Data request")
 		s.SetMux.Lock()
 		defer s.SetMux.Unlock()
 		if s.PostSleep > 0 {
@@ -143,10 +144,24 @@ func (s *mock_pandora) PostRepos_Data() echo.HandlerFunc {
 		s.BodyMux.Lock()
 		defer s.BodyMux.Unlock()
 		s.Body = strings.Join(sep, " ")
-		log.Println("get datas: ", s.Body)
-		if strings.Contains(s.Body, "E18111") {
+		if strings.Contains(s.Body, "E18111:BackupQueue.Depth") {
 			return c.JSON(http.StatusNotFound, NewErrorResponse(errors.New("E18111 mock_pandora error")))
-		} else if strings.Contains(s.Body, "typeBinaryUnpack") && !strings.Contains(s.Body, KeyPandoraStash) {
+		}
+
+		if strings.Contains(s.Body, "E18111") {
+			log.Println("get datas: ", s.Body)
+			c.Response().Header().Set(ContentTypeHeader, ApplicationJson)
+			c.Response().WriteHeader(http.StatusNotFound)
+			return jsoniter.NewEncoder(c.Response()).Encode(map[string]string{"error": "E18111 mock_pandora error"})
+		}
+
+		if len(s.Body) > DefaultMaxBatchSize {
+			c.Response().Header().Set(ContentTypeHeader, ApplicationJson)
+			c.Response().WriteHeader(http.StatusNotFound)
+			return jsoniter.NewEncoder(c.Response()).Encode(map[string]string{"error": "E18005 mock_pandora error"})
+		}
+
+		if strings.Contains(s.Body, "typeBinaryUnpack") && !strings.Contains(s.Body, KeyPandoraStash) {
 			c.Response().Header().Set(ContentTypeHeader, ApplicationJson)
 			c.Response().WriteHeader(http.StatusBadRequest)
 			return jsoniter.NewEncoder(c.Response()).Encode(map[string]string{"error": "E18111 mock_pandora error"})

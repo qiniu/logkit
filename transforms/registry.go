@@ -34,6 +34,12 @@ type Transformer interface {
 	Stats() StatsInfo
 }
 
+// DataReader 代表了一个可直接读取内存数据结构的读取器
+type StatsTransformer interface {
+	// ReadData 用于读取一条数据以及数据的实际读取字节
+	SetStats(string) StatsInfo
+}
+
 //transformer初始化方法接口,err不为空表示初始化失败
 type Initialize interface {
 	Init() error

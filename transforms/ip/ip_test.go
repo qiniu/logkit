@@ -29,7 +29,7 @@ func TestTransformer(t *testing.T) {
 	expe := StatsInfo{
 		Errors:    1,
 		Success:   1,
-		LastError: "invalid IP format",
+		LastError: "find total 1 erorrs in transform IP, last error info is invalid IP format",
 	}
 	assert.Equal(t, expe, ipt.stats)
 	assert.Equal(t, ipt.Stage(), transforms.StageAfterParser)
@@ -57,7 +57,7 @@ func TestTransformer(t *testing.T) {
 	expe2 := StatsInfo{
 		Errors:    1,
 		Success:   1,
-		LastError: "invalid IP format",
+		LastError: "find total 1 erorrs in transform IP, last error info is invalid IP format",
 	}
 	assert.Equal(t, expe2, ipt.stats)
 	assert.Equal(t, ipt2.Stage(), transforms.StageAfterParser)
@@ -86,7 +86,7 @@ func TestTransformer(t *testing.T) {
 	expe3 := StatsInfo{
 		Errors:    1,
 		Success:   1,
-		LastError: "invalid IP format",
+		LastError: "find total 1 erorrs in transform IP, last error info is invalid IP format",
 	}
 	assert.Equal(t, expe3, ipt.stats)
 
@@ -137,7 +137,7 @@ func TestTransformer(t *testing.T) {
 	expe4 := StatsInfo{
 		Errors:    1,
 		Success:   1,
-		LastError: "invalid IP format",
+		LastError: "find total 1 erorrs in transform IP, last error info is invalid IP format",
 	}
 	assert.Equal(t, expe4, ipt.stats)
 	assert.Equal(t, ipt4.Stage(), transforms.StageAfterParser)

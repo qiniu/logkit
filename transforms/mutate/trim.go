@@ -14,6 +14,11 @@ const (
 	Both   = "both"
 )
 
+var (
+	_ transforms.StatsTransformer = &Trim{}
+	_ transforms.Transformer      = &Trim{}
+)
+
 type Trim struct {
 	Key        string `json:"key"`
 	Characters string `json:"characters"`
@@ -22,40 +27,37 @@ type Trim struct {
 }
 
 func (g *Trim) Transform(datas []Data) ([]Data, error) {
-	var err, ferr error
-	errnums := 0
+	var err, fmtErr error
+	errNum := 0
 	keys := GetKeys(g.Key)
 	for i := range datas {
-		val, gerr := GetMapValue(datas[i], keys...)
-		if gerr != nil {
-			errnums++
-			err = fmt.Errorf("transform key %v not exist in data", g.Key)
+		val, getErr := GetMapValue(datas[i], keys...)
+		if getErr != nil {
+			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.Key)
 			continue
 		}
-		strval, ok := val.(string)
+		strVal, ok := val.(string)
 		if !ok {
-			errnums++
-			err = fmt.Errorf("transform key %v data type is not string", g.Key)
+			typeErr := fmt.Errorf("transform key %v data type is not string", g.Key)
+			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
 			continue
 		}
 		switch g.Place {
 		case Prefix:
-			strval = strings.TrimPrefix(strval, g.Characters)
+			strVal = strings.TrimPrefix(strVal, g.Characters)
 		case Suffix:
-			strval = strings.TrimSuffix(strval, g.Characters)
+			strVal = strings.TrimSuffix(strVal, g.Characters)
 		default:
-			strval = strings.Trim(strval, g.Characters)
+			strVal = strings.Trim(strVal, g.Characters)
 		}
-		SetMapValue(datas[i], strval, false, keys...)
+		setErr := SetMapValue(datas[i], strVal, false, keys...)
+		if setErr != nil {
+			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.Key)
+		}
 	}
 
-	if err != nil {
-		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform trim, last error info is %v", errnums, err)
-	}
-	g.stats.Errors += int64(errnums)
-	g.stats.Success += int64(len(datas) - errnums)
-	return datas, ferr
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	return datas, fmtErr
 }
 
 func (g *Trim) RawTransform(datas []string) ([]string, error) {
@@ -109,6 +111,11 @@ func (g *Trim) Stage() string {
 }
 
 func (g *Trim) Stats() StatsInfo {
+	return g.stats
+}
+
+func (g *Trim) SetStats(err string) StatsInfo {
+	g.stats.LastError = err
 	return g.stats
 }
 

@@ -150,26 +150,48 @@ const (
 	KeySocketKeepAlivePeriod = "socket_keep_alive_period"
 )
 
-// ModeUsages 用途说明
-var ModeUsages = []KeyValue{
-	{ModeFileAuto, "从文件读取( fileauto 模式)"},
-	{ModeDir, "从文件读取( dir 模式)"},
-	{ModeFile, "从文件读取( file 模式)"},
-	{ModeTailx, "从文件读取( tailx 模式)"},
-	{ModeMySQL, "从 MySQL 读取"},
-	{ModeMSSQL, "从 MSSQL 读取"},
-	{ModePostgreSQL, "从 PostgreSQL 读取"},
-	{ModeElastic, "从 Elasticsearch 读取"},
-	{ModeMongo, "从 MongoDB 读取"},
-	{ModeKafka, "从 Kafka 读取"},
-	{ModeRedis, "从 Redis 读取"},
-	{ModeSocket, "从 Socket 读取"},
-	{ModeHTTP, "从 http 请求中读取"},
-	{ModeScript, "从脚本的执行结果中读取"},
-	{ModeSnmp, "从 SNMP 服务中读取"},
-	{ModeCloudWatch, "从 AWS Cloudwatch 中读取"},
-	{ModeCloudTrail, "从 AWS CloudTrail 中读取"},
-}
+// ModeUsages 和 ModeTooltips 用途说明
+var (
+	ModeUsages = []KeyValue{
+		{ModeFileAuto, "从文件读取( fileauto 模式)"},
+		{ModeDir, "从文件读取( dir 模式)"},
+		{ModeFile, "从文件读取( file 模式)"},
+		{ModeTailx, "从文件读取( tailx 模式)"},
+		{ModeMySQL, "从 MySQL 读取"},
+		{ModeMSSQL, "从 MSSQL 读取"},
+		{ModePostgreSQL, "从 PostgreSQL 读取"},
+		{ModeElastic, "从 Elasticsearch 读取"},
+		{ModeMongo, "从 MongoDB 读取"},
+		{ModeKafka, "从 Kafka 读取"},
+		{ModeRedis, "从 Redis 读取"},
+		{ModeSocket, "从 Socket 读取"},
+		{ModeHTTP, "从 http 请求中读取"},
+		{ModeScript, "从脚本的执行结果中读取"},
+		{ModeSnmp, "从 SNMP 服务中读取"},
+		{ModeCloudWatch, "从 AWS Cloudwatch 中读取"},
+		{ModeCloudTrail, "从 AWS CloudTrail 中读取"},
+	}
+
+	ModeToolTips = []KeyValue{
+		{ModeFileAuto, "会自动根据路径匹配 dir, file, tailx 三种模式中的一种"},
+		{ModeDir, "logkit会在启动时根据文件夹下文件时间顺序依次读取文件，当读到时间最新的文件时会不断读取追加的数据，直到该文件夹下出现新的文件。该模式的经典日志存储方式为整个文件夹下存储业务日志，文件夹下的日志使用统一前缀，后缀为时间戳，根据日志的大小rotate到新的文件。"},
+		{ModeFile, "logkit会不断读取文件追加的数据。该模式的经典日志存储方式类似于nginx的日志rotate方式，日志名称为固定的名称，如access.log,rotate时直接move成新的文件如access.log.1，新的数据仍然写入到access.log。"},
+		{ModeTailx, "展开并匹配所有符合表达式的文件，并持续读取所有有数据追加的文件。每隔stat_interval的时间，重新刷新一遍logpath模式串，添加新增的文件。该模式比较灵活，几乎可以读取所有日志更新，需要注意的是，使用tailx模式容易导致文件句柄打开过多。tailx模式的文件重复判断标准为文件名称，若使用rename, copy等方式改变日志名称，并且新的名字在logpath模式串的包含范围内，在read_from为oldest的情况下则会导致重复写入数据。"},
+		{ModeMySQL, "MySQL Reader是以定时任务的形式去执行mysql语句，将mysql读取到的内容全部获取则任务结束，等到下一个定时任务的到来，也可以仅执行一次。"},
+		{ModeMSSQL, "Microsoft SQL Server Reader是以定时任务的形式去执行sql语句，将sql读取到的内容全部获取则任务结束，等到下一个定时任务的到来，也可以仅执行一次。"},
+		{ModePostgreSQL, "PostgreSQL Reader是以定时任务的形式去执行 PostgreSQL 查询语句，将 PostgreSQL 读取到的内容全部获取则任务结束，等到下一个定时任务的到来，也可以仅执行一次。"},
+		{ModeElastic, "Elasticsearch Reader 是logkit提供的从Elasticsearch读取日志的配置方式。Elasticsearch Reader输出的是json字符串，需要使用json的parser解析。"},
+		{ModeMongo, "MongoDB reader 是logkit提供的从MongoDB读取数据的配置方式。MongoDB reader 输出的是json字符串，需要使用json的parser解析。"},
+		{ModeKafka, "Kafka reader 是logkit提供的从Kafka读取数据的配置方式。Kafka reader 输出的是raw data，可根据具体情况自定义parser进行解析。"},
+		{ModeRedis, "Redis Reader 是logkit提供的从Redis读取日志的配置方式。Redis Reader 输出的是redis中存储的字符串，具体字符串是什么格式，可以在parser中用对应方式解析。"},
+		{ModeSocket, `Socket Reader 是logkit提供的以端口监听的方式接受并读取日志的形式，主要支持tcp\udp\unix套接字 这三大类协议。`},
+		{ModeHTTP, `Http Reader 是 logkit 提供的以 http post 请求的方式接受并读取日志的形式。该 reader 支持 gzip, 但请在请求头中添加Content-Encoding=gzip 或者 Content-Type=application/gzip，默认接收 request body 中所有的数据作为要读取的日志, 限制 request body 小于 100MB，默认将 request body 中的数据使用 \n 分割, 每行作为一条数据`},
+		{ModeScript, "Script Reader是以定时任务的形式执行脚本，将脚本执行的结果全部获取则任务结束，等到下一个定时任务的到来，也可以仅执行一次。"},
+		{ModeSnmp, "Snmp Reader 可以从 Snmp 服务中收集数据。snmp_fields 和 snmp_tables 这两项配置需要填入符合 json数组 格式的字符串, 字符串内的双引号需要转义。"},
+		{ModeCloudWatch, "CloudWatch Reader 可以从 AWS CloudWatch 服务的接口中获取数据。"},
+		{ModeCloudTrail, "CloudTrail Reader 可以从 AWS CloudTrail 服务的接口中获取数据。"},
+	}
+)
 
 var (
 	OptionMetaPath = Option{
@@ -219,7 +241,7 @@ var (
 		DefaultNoUse: false,
 		Description:  "编码方式(encoding)",
 		Advance:      true,
-		ToolTip:      "读取日志文件的编码方式，默认为utf-8，即按照utf-8的编码方式读取文件",
+		ToolTip:      "读取日志文件的编码方式，默认为UTF-8，即按照UTF-8的编码方式读取文件",
 	}
 	OptionWhence = Option{
 		KeyName:       KeyWhence,
@@ -462,7 +484,21 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "数据查询语句(mysql_sql)",
 			ToolTip:      "填写要执行的sql语句",
 		},
-		OptionEncoding,
+		{
+			KeyName:    KeyMysqlEncoding,
+			ChooseOnly: true,
+			ChooseOptions: []interface{}{"big5", "dec8", "cp850", "hp8", "koi8r",
+				"latin1", "latin2", "swe7", "ascii", "ujis", "sjis", "hebrew", "tis620",
+				"euckr", "koi8u", "gb2312", "greek", "cp1250", "gbk", "latin5", "armscii8",
+				"utf8", "ucs2", "cp866", "keybcs2", "macce", "macroman", "cp852", "latin7",
+				"utf8mb4", "cp1251", "utf16", "utf16le", "cp1256", "cp1257", "utf32",
+				"binary", "geostd8", "cp932", "eucjpms", "gb18030"},
+			Default:      "utf8",
+			DefaultNoUse: false,
+			Description:  "编码方式(encoding)",
+			Advance:      true,
+			ToolTip:      "读取数据库的编码方式，默认为utf8，即按照utf8的编码方式读取数据库",
+		},
 		{
 			KeyName:      KeyMysqlOffsetKey,
 			ChooseOnly:   false,
@@ -1015,7 +1051,7 @@ var ModeKeyOptions = map[string][]Option{
 			ToolTip:      "监听的地址和端口，格式为：[<ip/host/不填>:port]，如 :3000 , 监听3000端口的http请求",
 		},
 		{
-			KeyName:      KeyHTTPServiceAddress,
+			KeyName:      KeyHTTPServicePath,
 			ChooseOnly:   false,
 			Default:      "",
 			Placeholder:  DefaultHTTPServicePath,

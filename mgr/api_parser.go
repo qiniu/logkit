@@ -51,6 +51,13 @@ func (rs *RestService) GetParserUsages() echo.HandlerFunc {
 	}
 }
 
+// get /logkit/parser/tooltips 获取解析用途提示
+func (rs *RestService) GetParserTooltips() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		return RespSuccess(c, parser.ModeToolTips)
+	}
+}
+
 // get /logkit/parser/options 获取解析选项
 func (rs *RestService) GetParserKeyOptions() echo.HandlerFunc {
 	return func(c echo.Context) error {
