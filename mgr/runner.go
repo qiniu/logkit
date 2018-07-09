@@ -188,13 +188,14 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 		MaxBatchTryTimes: rc.MaxBatchTryTimes,
 	}
 	if rc.ReaderConfig == nil {
-		return nil, errors.New(rc.RunnerName + " readerConfig is nil")
+		return nil, errors.New(rc.RunnerName + " reader in config is nil")
 	}
 	if rc.SendersConfig == nil {
-		return nil, errors.New(rc.RunnerName + " SendersConfig is nil")
+		return nil, errors.New(rc.RunnerName + " senders in config is nil")
 	}
 	if rc.ParserConf == nil {
-		return nil, errors.New(rc.RunnerName + " ParserConf is nil")
+		log.Warn(rc.RunnerName + " parser conf is nil, use raw parser as default")
+		rc.ParserConf = conf.MapConf{parser.KeyParserType: parser.TypeRaw}
 	}
 	rc.ReaderConfig[GlobalKeyName] = rc.RunnerName
 	rc.ReaderConfig[KeyRunnerName] = rc.RunnerName
