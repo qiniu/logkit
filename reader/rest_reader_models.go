@@ -169,7 +169,7 @@ var (
 		{ModeScript, "从脚本的执行结果中读取"},
 		{ModeSnmp, "从 SNMP 服务中读取"},
 		{ModeCloudWatch, "从 AWS Cloudwatch 中读取"},
-		{ModeCloudTrail, "从 AWS CloudTrail 中读取"},
+		{ModeCloudTrail, "从 AWS S3（原Cloudtrail） 中读取"},
 	}
 
 	ModeToolTips = []KeyValue{
@@ -189,7 +189,7 @@ var (
 		{ModeScript, "Script Reader是以定时任务的形式执行脚本，将脚本执行的结果全部获取则任务结束，等到下一个定时任务的到来，也可以仅执行一次。"},
 		{ModeSnmp, "Snmp Reader 可以从 Snmp 服务中收集数据。snmp_fields 和 snmp_tables 这两项配置需要填入符合 json数组 格式的字符串, 字符串内的双引号需要转义。"},
 		{ModeCloudWatch, "CloudWatch Reader 可以从 AWS CloudWatch 服务的接口中获取数据。"},
-		{ModeCloudTrail, "CloudTrail Reader 可以从 AWS CloudTrail 服务的接口中获取数据。"},
+		{ModeCloudTrail, "AWS S3（原Cloudtrail） Reader 可以从 AWS S3（原Cloudtrail） 服务的接口中获取数据。"},
 	}
 )
 
