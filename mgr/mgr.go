@@ -566,9 +566,6 @@ func (m *Manager) Configs() (rss map[string]RunnerConfig) {
 	}
 	deepCopyByJson(&rss, &tmpRss)
 	m.lock.RUnlock()
-	for k, v := range rss {
-		rss[k] = TrimSecretInfo(v)
-	}
 	return
 }
 
@@ -585,7 +582,7 @@ func (m *Manager) getDeepCopyConfig(name string) (filename string, conf RunnerCo
 }
 
 // TrimSecretInfo 将配置文件中的 token 等鉴权相关信息去掉
-func TrimSecretInfo(conf RunnerConfig) RunnerConfig {
+func TrimSecretInfo(conf RunnerConfig, trimSk bool) RunnerConfig {
 	prefix := SchemaFreeTokensPrefix
 	keyName := []string{
 		prefix + "pipeline_get_repo_token",
@@ -635,10 +632,12 @@ func TrimSecretInfo(conf RunnerConfig) RunnerConfig {
 		prefix + "list_export_token",
 	}...)
 
-	// Pandora sk
-	keyName = append(keyName, []string{
-		"pandora_sk",
-	}...)
+	if trimSk {
+		// Pandora sk
+		keyName = append(keyName, []string{
+			"pandora_sk",
+		}...)
+	}
 
 	for i, sc := range conf.SendersConfig {
 		for _, k := range keyName {
