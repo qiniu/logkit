@@ -265,6 +265,9 @@ func (rs *RestService) GetRunners() echo.HandlerFunc {
 func (rs *RestService) GetConfigs() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		rss := rs.mgr.Configs()
+		for k, v := range rss {
+			rss[k] = TrimSecretInfo(v, false)
+		}
 		return RespSuccess(c, rss)
 	}
 }
