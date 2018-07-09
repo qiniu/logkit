@@ -971,7 +971,7 @@ func Test_isMatchData(t *testing.T) {
 		},
 	}
 	for _, ti := range tests {
-		ret := mr.isMatchData(DATABASE, ti.data, ti.matchData, ti.matchStr, ti.exp_timeIndex, ti.exp_startIndex, ti.exp_endIndex)
+		ret := mr.isMatchData(DATABASE, "", ti.data, ti.matchData, ti.matchStr, ti.exp_timeIndex, ti.exp_startIndex, ti.exp_endIndex)
 		assert.EqualValues(t, ti.exp_ret, ret)
 	}
 }
