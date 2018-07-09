@@ -1226,3 +1226,53 @@ func getMeta() (*reader.Meta, error) {
 	}
 	return reader.NewMetaWithConf(logkitConf)
 }
+
+var testdbs = []string{"20180101", "20180102", "20180103"}
+var tabse = []string{"0601", "0602", "0603"}
+
+var connectStr = "root:123456@tcp(127.0.0.1:3306)/"
+
+func prepareDBS(t *testing.T) {
+	db, err := openSql("mysql", connectStr, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	for _, v := range testdbs {
+		_, err := db.Exec("create database IF NOT EXISTS `" + v + "`")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+//create tables and insert data
+/*
+func prepareDatas(t *testing.T) {
+	for _, v := range testdbs {
+		newc := connectStr + v
+
+	}
+
+}
+*/
+
+func cleanData(t *testing.T) {
+	db, err := openSql("mysql", connectStr, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	for _, v := range testdbs {
+		_, err := db.Exec("drop database `" + v + "`")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestMysqlRead(t *testing.T) {
+	prepareDBS(t)
+	defer cleanData(t)
+
+}
