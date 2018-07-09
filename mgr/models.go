@@ -70,6 +70,7 @@ func (src *RunnerStatus) Clone() (dst RunnerStatus) {
 // RunnerConfig 从多数据源读取，经过解析后，发往多个数据目的地
 type RunnerConfig struct {
 	RunnerInfo
+	SourceData    string                   `json:"sourceData, omitempty"`
 	MetricConfig  []MetricConfig           `json:"metric,omitempty"`
 	ReaderConfig  conf.MapConf             `json:"reader"`
 	CleanerConfig conf.MapConf             `json:"cleaner,omitempty"`
