@@ -1,15 +1,15 @@
-# logkit [![Build Status](https://api.travis-ci.org/qiniu/logkit.svg)](http://travis-ci.org/qiniu/logkit)
+# logkit-community（社区版） [![Build Status](https://api.travis-ci.org/qiniu/logkit.svg)](http://travis-ci.org/qiniu/logkit)
 
 ![logkit LOGO](https://raw.githubusercontent.com/qiniu/logkit/master/resources/logo.png)
 
 
-## 欢迎大家体验 logkit 的高级版本 [https://logkit-pro.qiniu.com](https://logkit-pro.qiniu.com) , 文档参见： https://qiniu.github.io/pandora-docs/#/logkit-pro
+## 在社区版的基础上，我们开发了体验更好，功能更全的专业版(logkit-pro)，欢迎大家体验 [logkit-pro（专业版）](https://developer.qiniu.com/insight/manual/4738/logkit%20Pro%20%E4%BB%8B%E7%BB%8D)
 
 ## 简介
 
-logkit是[七牛Pandora](https://pandora-docs.qiniu.com)开发的一个通用的日志收集工具，可以将不同数据源的数据方便地发送到[Pandora](https://pandora-docs.qiniu.com)进行分析，除了基本的数据发送功能，logkit还有容错、并发、监控、删除等功能。
+logkit-community（社区版）是[七牛智能日志管理平台](https://www.qiniu.com/products/insight)开发的一个配套的日志收集工具，支持海量的数据源，方便地发送到[七牛智能日志管理平台](https://www.qiniu.com/products/insight)以及其他常见的数据存储服务进行分析，同时也，除了基本的数据发送功能，logkit还有容错、并发、监控、删除等功能。
 
-### logkit 详细的文档可以参见[WIKI](https://github.com/qiniu/logkit/wiki)页面
+### logkit-community（社区版） 详细的文档可以参见[WIKI](https://github.com/qiniu/logkit/wiki)页面
 
 ## 优势
 
@@ -41,7 +41,7 @@ logkit是[七牛Pandora](https://pandora-docs.qiniu.com)开发的一个通用的
 
 ## 工作方式
 
-logkit本身支持多种数据源，并且可以同时发送多个数据源的数据到Pandora，每个数据源对应一个逻辑上的runner，一个runner负责一个数据源的数据推送，工作原理如下图所示
+logkit-community（社区版）本身支持多种数据源，并且可以同时发送多个数据源的数据到Pandora，每个数据源对应一个逻辑上的runner，一个runner负责一个数据源的数据推送，工作原理如下图所示
 
 ![logkit 工作原理图](https://raw.githubusercontent.com/qiniu/logkit/master/resources/logkit.png)
 
@@ -53,8 +53,6 @@ logkit本身支持多种数据源，并且可以同时发送多个数据源的�
 * [提issue](https://github.com/qiniu/logkit/issues/new)改善我们的[wiki文档](https://github.com/qiniu/logkit/wiki)
 * [review 代码](https://github.com/qiniu/logkit/pulls)或[提出功能需求](https://github.com/qiniu/logkit/issues/new)
 * 贡献代码（可以贡献的各类插件模块包括[reader](https://github.com/qiniu/logkit/wiki/Readers)、[parser](https://github.com/qiniu/logkit/wiki/Parsers)、[sender](https://github.com/qiniu/logkit/wiki/Senders)以及[transformer](https://github.com/qiniu/logkit/wiki/Transformers)）
-
-## [计划(Roadmap)](https://github.com/qiniu/logkit/blob/master/ROADMAP.md)
 
 ## 下载
 
@@ -70,7 +68,7 @@ logkit本身支持多种数据源，并且可以同时发送多个数据源的�
 
 ## 安装与使用
 
-### 1. 下载&解压logkit工具
+### 1. 下载&解压logkit-community工具
 
 * Linux 版本
 
@@ -90,9 +88,9 @@ wget https://pandora-dl.qiniu.com/logkit_mac_${LOGKIT_VERSION}.tar.gz && tar xvf
 
 请下载 `https://pandora-dl.qiniu.com/logkit_windows_<LOGKIT_VERSION>.zip` 并解压缩，进入目录
 
-### 2. 修改logkit基本配置
+### 2. 修改logkit-community基本配置
 
-logkit.conf是logkit工具基础配置文件，主要用于指定logkit运行时需要的资源和各个runner配置文件的具体路径。
+logkit.conf是logkit-community工具基础配置文件，主要用于指定logkit-community运行时需要的资源和各个runner配置文件的具体路径。
 
 打开 `logkit.conf`, 典型的配置如下：
 
@@ -115,13 +113,13 @@ logkit.conf是logkit工具基础配置文件，主要用于指定logkit运行时
 
     列表中的每一项都是一个runner的配置文件夹，如果每一项中文件夹下配置发生增加、减少或者变更，logkit会相应的增加、减少或者变更runner，配置文件夹中的每个配置文件都代表了一个runner。该指定了一个runner的配置文件夹，这个配置文件夹下面每个以.conf结尾的文件就代表了一个运行的runner，也就代表了一个logkit正在运行的推送数据的线程。
 
-### 3. 启动logkit工具
+### 3. 启动logkit-community工具
 
 ``` sh
 ./logkit -f logkit.conf
 ```
 
-### 4. 通过浏览器打开logkit配置页面
+### 4. 通过浏览器打开logkit-community配置页面
 
 浏览器访问的地址就是您在第2步中填写的 `bind_host` 选项地址
 
