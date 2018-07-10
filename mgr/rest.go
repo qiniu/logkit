@@ -323,7 +323,7 @@ func (rs *RestService) PostConfig() echo.HandlerFunc {
 		}
 		nconf.IsInWebFolder = true
 		nconf.ParserConf = parser.ConvertWebParserConfig(nconf.ParserConf)
-		if err = rs.mgr.AddRunner(name, nconf); err != nil {
+		if err = rs.mgr.AddRunner(name, nconf, time.Now()); err != nil {
 			return RespError(c, http.StatusBadRequest, ErrRunnerAdd, err.Error())
 		}
 		return RespSuccess(c, nil)

@@ -697,9 +697,9 @@ func (m *Manager) UpdateToken(tokens []AuthTokens) (err error) {
 	return
 }
 
-func (m *Manager) AddRunner(name string, conf RunnerConfig) (err error) {
+func (m *Manager) AddRunner(name string, conf RunnerConfig, createTime time.Time) (err error) {
 	conf.RunnerName = name
-	conf.CreateTime = time.Now().Format(time.RFC3339Nano)
+	conf.CreateTime = createTime.Format(time.RFC3339Nano)
 	filename := filepath.Join(m.RestDir, name+".conf")
 	if m.IsRunning(filename) {
 		return fmt.Errorf("file %v runner is running", name)
