@@ -305,7 +305,7 @@ func (rs *RestService) checkNameAndConfig(c echo.Context) (name string, conf Run
 		err = errors.New("config " + name + " is not found")
 		return
 	}
-	deepCopyByJson(&conf, &tmpConf)
+	deepCopyByJSON(&conf, &tmpConf)
 	return
 }
 

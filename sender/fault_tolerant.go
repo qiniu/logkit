@@ -31,6 +31,8 @@ const (
 	DefaultSplitSize  = 64 * 1024 // 默认分割为 64 kb
 )
 
+var _ SkipDeepCopySender = &FtSender{}
+
 // FtSender fault tolerance sender wrapper
 type FtSender struct {
 	stopped     int32
@@ -497,6 +499,8 @@ func (ft *FtSender) sendFromQueue(queueName string, readChan <-chan []byte, read
 		}
 	}
 }
+
+func (_ *FtSender) SkipDeepCopy() {}
 
 func SplitData(data string, splitSize int64) (valArray []string) {
 	if splitSize <= 0 {

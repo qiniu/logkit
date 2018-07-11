@@ -6,6 +6,8 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var _ sender.SkipDeepCopySender = &Sender{}
+
 // discard sender doing nothing
 type Sender struct {
 	name  string
@@ -42,3 +44,5 @@ func (s *Sender) Close() error {
 func (s *Sender) SendCount() int {
 	return s.count
 }
+
+func (_ *Sender) SkipDeepCopy() {}

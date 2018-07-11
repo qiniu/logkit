@@ -21,6 +21,8 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var _ sender.SkipDeepCopySender = &Sender{}
+
 // Sender write datas into influxdb
 type Sender struct {
 	name        string
@@ -500,3 +502,5 @@ func String(in string) string {
 	}
 	return in
 }
+
+func (_ *Sender) SkipDeepCopy() {}

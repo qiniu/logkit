@@ -189,7 +189,7 @@ const (
 )
 
 // NotAsyncSender return when sender is not async
-var ErrNotAsyncSender = errors.New("This Sender does not support for Async Push")
+var ErrNotAsyncSender = errors.New("sender does not support for Async Push")
 
 // Sender send data to pandora, prometheus such different destinations
 type Sender interface {
@@ -197,6 +197,11 @@ type Sender interface {
 	// send data, error if failed
 	Send([]Data) error
 	Close() error
+}
+
+// SkipDeepCopySender 表示该 sender 不会对传入数据进行污染，凡是有次保证的 sender 需要实现该接口提升发送效率
+type SkipDeepCopySender interface {
+	SkipDeepCopy()
 }
 
 type StatsSender interface {
@@ -236,12 +241,12 @@ func NewRegistry() *Registry {
 	return ret
 }
 
-func (registry *Registry) RegisterSender(senderType string, constructor func(conf.MapConf) (Sender, error)) error {
-	_, exist := registry.senderTypeMap[senderType]
+func (r *Registry) RegisterSender(senderType string, constructor func(conf.MapConf) (Sender, error)) error {
+	_, exist := r.senderTypeMap[senderType]
 	if exist {
 		return errors.New("senderType " + senderType + " has been existed")
 	}
-	registry.senderTypeMap[senderType] = constructor
+	r.senderTypeMap[senderType] = constructor
 	return nil
 }
 

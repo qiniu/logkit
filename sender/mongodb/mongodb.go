@@ -18,6 +18,8 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var _ sender.SkipDeepCopySender = &Sender{}
+
 // mongo sender Mongodb 根据UpdateKey 做对AccumulateKey $inc 累加的Sender
 type Sender struct {
 	sync.RWMutex
@@ -175,3 +177,5 @@ func (s *Sender) mongoSesssionKeeper(session *mgo.Session) {
 		}
 	}
 }
+
+func (_ *Sender) SkipDeepCopy() {}

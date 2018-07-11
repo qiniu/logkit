@@ -180,8 +180,7 @@ func SendData(senderConfig map[string]interface{}) error {
 		return err
 	}
 
-	senderCnt := len(senders)
-	router, err := getRouter(senderConfig, senderCnt)
+	router, err := getRouter(senderConfig, len(senders))
 	if err != nil {
 		return err
 	}
@@ -191,7 +190,7 @@ func SendData(senderConfig map[string]interface{}) error {
 		return err
 	}
 
-	senderDataList := classifySenderData(datas, router, len(senders))
+	senderDataList := classifySenderData(senders, datas, router)
 	for index, s := range senders {
 		if err := trySend(s, senderDataList[index], DefaultTryTimes); err != nil {
 			return err

@@ -11,6 +11,8 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var _ sender.SkipDeepCopySender = &Sender{}
+
 // Sender write datas into local file
 // only for test
 type Sender struct {
@@ -79,3 +81,5 @@ func JSONLineMarshalFunc(datas []Data) ([]byte, error) {
 	}
 	return append(bytes, '\n'), nil
 }
+
+func (_ *Sender) SkipDeepCopy() {}
