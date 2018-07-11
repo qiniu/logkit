@@ -652,15 +652,16 @@ func (r *LogExportRunner) Run() {
 }
 
 func classifySenderData(datas []Data, router *router.Router, senderCnt int) [][]Data {
+	hasRouter := router != nil && router.HasRoutes()
 	senderDataList := make([][]Data, senderCnt)
 	for i := 0; i < senderCnt; i++ {
-		if router == nil {
+		if !hasRouter {
 			senderDataList[i] = datas
 		} else {
 			senderDataList[i] = make([]Data, 0)
 		}
 	}
-	if router == nil {
+	if !hasRouter {
 		return senderDataList
 	}
 	for _, d := range datas {
