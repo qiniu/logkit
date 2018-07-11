@@ -18,6 +18,8 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var _ sender.SkipDeepCopySender = &Sender{}
+
 type Sender struct {
 	url      string
 	gZip     bool
@@ -210,3 +212,5 @@ func (h *Sender) interfaceJoin(dataArray []interface{}, sep string) (string, err
 	}
 	return strings.Join(strData, sep), nil
 }
+
+func (_ *Sender) SkipDeepCopy() {}

@@ -17,6 +17,8 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var _ sender.SkipDeepCopySender = &Sender{}
+
 // elasticsearch sender
 type Sender struct {
 	name string
@@ -264,3 +266,5 @@ func (ess *Sender) wrapDoc(doc map[string]interface{}) map[string]interface{} {
 	//return newDoc
 	return doc
 }
+
+func (_ *Sender) SkipDeepCopy() {}

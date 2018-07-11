@@ -16,6 +16,8 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var _ sender.SkipDeepCopySender = &Sender{}
+
 type Sender struct {
 	name  string
 	hosts []string
@@ -198,3 +200,5 @@ func (this *Sender) Close() (err error) {
 	this.producer = nil
 	return nil
 }
+
+func (_ *Sender) SkipDeepCopy() {}

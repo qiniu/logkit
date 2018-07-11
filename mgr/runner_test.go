@@ -2,6 +2,7 @@ package mgr
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log/syslog"
 	"os"
@@ -23,6 +24,7 @@ import (
 	"github.com/qiniu/logkit/sender"
 	_ "github.com/qiniu/logkit/sender/builtin"
 	"github.com/qiniu/logkit/sender/mock"
+	"github.com/qiniu/logkit/sender/pandora"
 	_ "github.com/qiniu/logkit/transforms/builtin"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -1482,62 +1484,116 @@ func TestRunWithDataSourceFial(t *testing.T) {
 }
 
 func TestClassifySenderData(t *testing.T) {
-	senderCnt := 3
-	datas := []Data{
-		Data{
-			"a": "a",
-			"b": "b",
-			"c": "c",
-			"d": "d",
-		},
-		Data{
-			"a": "A",
-			"b": "b",
-			"c": "c",
-			"d": "d",
-		},
-		Data{
-			"a": "B",
-			"b": "b",
-			"c": "c",
-			"d": "d",
-		},
-		Data{
-			"a": "C",
-			"b": "b",
-			"c": "c",
-			"d": "d",
-		},
+	{
+		senders := []sender.Sender{&mock.Sender{}, &mock.Sender{}, &mock.Sender{}}
+		numSenders := len(senders)
+		datas := []Data{
+			{
+				"a": "a",
+				"b": "b",
+				"c": "c",
+				"d": "d",
+			},
+			{
+				"a": "A",
+				"b": "b",
+				"c": "c",
+				"d": "d",
+			},
+			{
+				"a": "B",
+				"b": "b",
+				"c": "c",
+				"d": "d",
+			},
+			{
+				"a": "C",
+				"b": "b",
+				"c": "c",
+				"d": "d",
+			},
+		}
+
+		routerConf := router.RouterConfig{
+			KeyName:      "a",
+			MatchType:    "equal",
+			DefaultIndex: 0,
+			Routes: map[string]int{
+				"a": 2,
+				"A": 1,
+			},
+		}
+
+		r, err := router.NewSenderRouter(routerConf, numSenders)
+
+		senderDataList := classifySenderData(senders, datas, r)
+		assert.Equal(t, numSenders, len(senderDataList))
+		assert.Equal(t, 2, len(senderDataList[0]))
+		assert.Equal(t, 1, len(senderDataList[1]))
+		assert.Equal(t, 1, len(senderDataList[2]))
+
+		// 测试没有配置 router 的情况
+		routerConf.KeyName = ""
+		r, err = router.NewSenderRouter(routerConf, numSenders)
+		assert.Nil(t, r)
+		assert.NoError(t, err)
+		senderDataList = classifySenderData(senders, datas, r)
+		assert.Equal(t, numSenders, len(senderDataList))
+		assert.Equal(t, 4, len(senderDataList[0]))
+		assert.Equal(t, 4, len(senderDataList[1]))
+		assert.Equal(t, 4, len(senderDataList[2]))
 	}
 
-	routerConf := router.RouterConfig{
-		KeyName:      "a",
-		MatchType:    "equal",
-		DefaultIndex: 0,
-		Routes: map[string]int{
-			"a": 2,
-			"A": 1,
-		},
+	// --> 测试 SkipDeepCopySender 检查是否生效 <--
+
+	// 存在数据改动的 sender 后有其它 sender
+	{
+		senders := []sender.Sender{&mock.Sender{}, &pandora.Sender{}, &mock.Sender{}}
+		datas := []Data{
+			{
+				"a": "a",
+				"b": "b",
+				"c": "c",
+				"d": "d",
+			},
+		}
+		senderDataList := classifySenderData(senders, datas, nil)
+		assert.Len(t, senderDataList, len(senders))
+		assert.True(t, fmt.Sprintf("%p", datas) == fmt.Sprintf("%p", senderDataList[0]))
+		assert.False(t, fmt.Sprintf("%p", datas) == fmt.Sprintf("%p", senderDataList[1]))
+		assert.True(t, fmt.Sprintf("%p", datas) == fmt.Sprintf("%p", senderDataList[2]))
 	}
-
-	r, err := router.NewSenderRouter(routerConf, senderCnt)
-
-	senderDataList := classifySenderData(datas, r, senderCnt)
-	assert.Equal(t, senderCnt, len(senderDataList))
-	assert.Equal(t, 2, len(senderDataList[0]))
-	assert.Equal(t, 1, len(senderDataList[1]))
-	assert.Equal(t, 1, len(senderDataList[2]))
-
-	// 测试没有配置 router 的情况
-	routerConf.KeyName = ""
-	r, err = router.NewSenderRouter(routerConf, senderCnt)
-	assert.Nil(t, r)
-	assert.NoError(t, err)
-	senderDataList = classifySenderData(datas, r, senderCnt)
-	assert.Equal(t, senderCnt, len(senderDataList))
-	assert.Equal(t, 4, len(senderDataList[0]))
-	assert.Equal(t, 4, len(senderDataList[1]))
-	assert.Equal(t, 4, len(senderDataList[2]))
+	// 存在数据改动的 sender 为最后一个
+	{
+		senders := []sender.Sender{&mock.Sender{}, &pandora.Sender{}}
+		datas := []Data{
+			{
+				"a": "a",
+				"b": "b",
+				"c": "c",
+				"d": "d",
+			},
+		}
+		senderDataList := classifySenderData(senders, datas, nil)
+		assert.Len(t, senderDataList, len(senders))
+		assert.True(t, fmt.Sprintf("%p", datas) == fmt.Sprintf("%p", senderDataList[0]))
+		assert.True(t, fmt.Sprintf("%p", datas) == fmt.Sprintf("%p", senderDataList[1]))
+	}
+	// 仅存在数据改动的 sender
+	{
+		senders := []sender.Sender{&pandora.Sender{}}
+		datas := []Data{
+			{
+				"a": "a",
+				"b": "b",
+				"c": "c",
+				"d": "d",
+			},
+		}
+		senderDataList := classifySenderData(senders, datas, nil)
+		assert.Len(t, senderDataList, len(senders))
+		assert.True(t, fmt.Sprintf("%p", datas) == fmt.Sprintf("%p", senderDataList[0]))
+	}
 }
 
 // Reponse from Clearbit API. Size: 2.4kb
