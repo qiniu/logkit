@@ -1055,12 +1055,19 @@ func Test_restoreRecordsFile(t *testing.T) {
 	defer os.RemoveAll(MetaDir)
 
 	tests := []struct {
-		set     DBRecords
-		exp_res DBRecords
+		set                   DBRecords
+		exp_res               DBRecords
+		exp_omitDoneDBRecords bool
 	}{
 		{
-			set:     readRecords,
-			exp_res: readRecords,
+			set:                   DBRecords{},
+			exp_res:               nil,
+			exp_omitDoneDBRecords: true,
+		},
+		{
+			set:                   readRecords,
+			exp_res:               readRecords,
+			exp_omitDoneDBRecords: false,
 		},
 		{
 			set: DBRecords{
@@ -1094,6 +1101,7 @@ func Test_restoreRecordsFile(t *testing.T) {
 					"db4_tb10": TableInfo{size: -1, offset: -1},
 				},
 			},
+			exp_omitDoneDBRecords: false,
 		},
 		{
 			set: DBRecords{
@@ -1127,6 +1135,7 @@ func Test_restoreRecordsFile(t *testing.T) {
 					"db4_tb10": TableInfo{size: -1, offset: -1},
 				},
 			},
+			exp_omitDoneDBRecords: false,
 		},
 		{
 			set: DBRecords{
@@ -1160,6 +1169,7 @@ func Test_restoreRecordsFile(t *testing.T) {
 					"db4_tb10": TableInfo{size: -1, offset: -1},
 				},
 			},
+			exp_omitDoneDBRecords: false,
 		},
 		{
 			set: readRecords,
@@ -1186,6 +1196,7 @@ func Test_restoreRecordsFile(t *testing.T) {
 					"db4_tb10": TableInfo{size: -1, offset: -1},
 				},
 			},
+			exp_omitDoneDBRecords: false,
 		},
 	}
 
@@ -1195,7 +1206,7 @@ func Test_restoreRecordsFile(t *testing.T) {
 
 		var records DBRecords
 		_, _, omitDoneDBRecords := records.restoreRecordsFile(meta)
-		assert.EqualValues(t, false, omitDoneDBRecords)
+		assert.EqualValues(t, test.exp_omitDoneDBRecords, omitDoneDBRecords)
 		assert.EqualValues(t, test.exp_res, records)
 	}
 

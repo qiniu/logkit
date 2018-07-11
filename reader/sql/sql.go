@@ -447,8 +447,12 @@ func (dbRecords *DBRecords) restoreRecordsFile(meta *reader.Meta) (lastDB, lastT
 		return lastDB, lastTable, true
 	}
 
-	omitDoneDBRecords = false
 	recordsDoneLength := len(recordsDone)
+	if recordsDoneLength <= 0 {
+		return lastDB, lastTable, true
+	}
+
+	omitDoneDBRecords = false
 	for idx, record := range recordsDone {
 		tmpDBRecords := TrimeList(strings.Split(record, sqlOffsetConnector))
 		if int64(len(tmpDBRecords)) != 2 {
@@ -1043,7 +1047,7 @@ func (r *Reader) execCountDB(curDB string, now time.Time, recordTablesDone Table
 
 		log.Debugf("Runner[%v] %v default count sqls %v", r.meta.RunnerName, curDB, r.rawsqls)
 
-		if r.omitDoneDBRecords == true {
+		if r.omitDoneDBRecords {
 			// 兼容
 			recordTablesDone.restoreTableDone(r.meta, curDB, tables)
 		}
@@ -1482,11 +1486,15 @@ func (r *Reader) SyncMeta() {
 			all += database + sqlOffsetConnector + tablesRecordStr + "\n"
 		}
 
+		if len(all) <= 0 {
+			r.syncRecords.Reset()
+			return
+		}
+
 		if err := WriteRecordsFile(r.meta.DoneFilePath, all); err != nil {
 			log.Errorf("Runner[%v] %v SyncMeta error %v", r.meta.RunnerName, r.Name(), err)
 			return
 		}
-
 		r.syncRecords.Reset()
 		return
 	}
@@ -1664,7 +1672,6 @@ func matchRemainStr(origin, match, matchData string, timeIndex []int) bool {
 	if len(timeIndex) > 0 && len(origin) < timeIndex[len(timeIndex)-1] {
 		return false
 	}
-
 	remainStr := getRemainStr(origin, timeIndex)
 	if len(remainStr) < len(match) || remainStr[:len(match)] != match {
 		return false
@@ -2096,6 +2103,11 @@ func (r *Reader) compareWithLastRecord(queryType int, curDB, target, matchStr, m
 		return false
 	}
 
+	if len(rawData) == 0 {
+		return true
+	}
+	log.Infof("Runner[%v] %v last %v is: %v", r.meta.RunnerName, curDB, queryType, rawData)
+
 	match := matchRemainStr(rawData, matchStr, matchData, timeIndex)
 	if !match {
 		return false
@@ -2140,18 +2152,16 @@ func (r *Reader) isMatchData(queryType int, curDB, s, matchStr, matchData string
 		return false
 	}
 
-	if !r.checkCron() {
-		return false
+	equal := equalTime(s, matchData, startIndex, endIndex)
+	if !r.checkCron() || r.omitDoneDBRecords {
+		return equal
 	}
 
 	// loop 或者 cron 时
-	if r.omitDoneDBRecords {
-		// loop 或者 cron 的第一次运行
-		if equalTime(s, matchData, startIndex, endIndex) {
-			return true
-		}
+	if !r.checkCron() {
 		return false
 	}
+	log.Infof("Runner[%v] %v omit done records: %v", r.meta.RunnerName, curDB, r.omitDoneDBRecords)
 
 	// 取大于等于上一条的和小于等于现有的
 	if validTime(s, matchData, startIndex, endIndex, true) &&
