@@ -3,6 +3,7 @@ package sql
 import (
 	"fmt"
 	"os"
+	"path"
 	"reflect"
 	"strconv"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/reader/test"
@@ -502,7 +504,6 @@ func TestSQLReader(t *testing.T) {
 		syncSQLs:  []string{"select * from mysql123", "select * from mysql345"},
 		readBatch: 100,
 		meta:      meta,
-		status:    reader.StatusInit,
 		offsetKey: "id",
 		offsets:   []int64{123, 456},
 		dbtype:    "mysql",
@@ -862,7 +863,6 @@ func Test_isMatchData(t *testing.T) {
 	mr := &Reader{
 		readBatch:         100,
 		meta:              meta,
-		status:            reader.StatusInit,
 		dbtype:            "mysql",
 		historyAll:        false,
 		loop:              true,
@@ -1055,12 +1055,19 @@ func Test_restoreRecordsFile(t *testing.T) {
 	defer os.RemoveAll(MetaDir)
 
 	tests := []struct {
-		set     DBRecords
-		exp_res DBRecords
+		set                   DBRecords
+		exp_res               DBRecords
+		exp_omitDoneDBRecords bool
 	}{
 		{
-			set:     readRecords,
-			exp_res: readRecords,
+			set:                   DBRecords{},
+			exp_res:               nil,
+			exp_omitDoneDBRecords: true,
+		},
+		{
+			set:                   readRecords,
+			exp_res:               readRecords,
+			exp_omitDoneDBRecords: false,
 		},
 		{
 			set: DBRecords{
@@ -1094,6 +1101,7 @@ func Test_restoreRecordsFile(t *testing.T) {
 					"db4_tb10": TableInfo{size: -1, offset: -1},
 				},
 			},
+			exp_omitDoneDBRecords: false,
 		},
 		{
 			set: DBRecords{
@@ -1127,6 +1135,7 @@ func Test_restoreRecordsFile(t *testing.T) {
 					"db4_tb10": TableInfo{size: -1, offset: -1},
 				},
 			},
+			exp_omitDoneDBRecords: false,
 		},
 		{
 			set: DBRecords{
@@ -1160,6 +1169,7 @@ func Test_restoreRecordsFile(t *testing.T) {
 					"db4_tb10": TableInfo{size: -1, offset: -1},
 				},
 			},
+			exp_omitDoneDBRecords: false,
 		},
 		{
 			set: readRecords,
@@ -1186,6 +1196,7 @@ func Test_restoreRecordsFile(t *testing.T) {
 					"db4_tb10": TableInfo{size: -1, offset: -1},
 				},
 			},
+			exp_omitDoneDBRecords: false,
 		},
 	}
 
@@ -1195,7 +1206,7 @@ func Test_restoreRecordsFile(t *testing.T) {
 
 		var records DBRecords
 		_, _, omitDoneDBRecords := records.restoreRecordsFile(meta)
-		assert.EqualValues(t, false, omitDoneDBRecords)
+		assert.EqualValues(t, test.exp_omitDoneDBRecords, omitDoneDBRecords)
 		assert.EqualValues(t, test.exp_res, records)
 	}
 
@@ -1225,4 +1236,461 @@ func getMeta() (*reader.Meta, error) {
 		reader.KeyMode:     reader.ModeMySQL,
 	}
 	return reader.NewMetaWithConf(logkitConf)
+}
+
+type DataTest struct {
+	database    string
+	createTable string
+	insertData  []string
+}
+
+type CronInfo struct {
+	cron           bool
+	second         string
+	notExecOnStart bool
+}
+
+var (
+	dbSource   = "root:@tcp(127.0.0.1:3306)"
+	connectStr = dbSource + "/?charset=gbk"
+	now        = time.Now()
+	year       = getDateStr(now.Year())
+	month      = getDateStr(int(now.Month()))
+	day        = getDateStr(now.Day())
+
+	databasesTest = []DataTest{
+		{
+			database:    "Test_MySql20180510",
+			createTable: "CREATE TABLE runoob_tbl20180510est(runoob_id INT NOT NULL AUTO_INCREMENT,runoob_title VARCHAR(100) NOT NULL,runoob_author VARCHAR(40) NOT NULL,submission_date DATE,PRIMARY KEY ( runoob_id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;",
+			insertData:  []string{"INSERT INTO runoob_tbl20180510est (runoob_title, runoob_author, submission_date) VALUES (\"学习 mysql\", \"教程\", NOW());"},
+		},
+		{
+			database:    "Test_MySql20170610",
+			createTable: "CREATE TABLE runoob_tbl20170610est(runoob_id INT NOT NULL AUTO_INCREMENT,runoob_title VARCHAR(100) NOT NULL,runoob_author VARCHAR(40) NOT NULL,submission_date DATE,PRIMARY KEY ( runoob_id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;",
+			insertData:  []string{"INSERT INTO runoob_tbl20170610est (runoob_title, runoob_author, submission_date) VALUES (\"学习 mysql\", \"教程\", NOW());"},
+		},
+		{
+			database:    "Test_MySql20171210",
+			createTable: "CREATE TABLE runoob_tbl20171210est(runoob_id INT NOT NULL AUTO_INCREMENT,runoob_title VARCHAR(100) NOT NULL,runoob_author VARCHAR(40) NOT NULL,submission_date DATE,PRIMARY KEY ( runoob_id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;",
+			insertData:  []string{"INSERT INTO runoob_tbl20171210est (runoob_title, runoob_author, submission_date) VALUES (\"学习 mysql\", \"教程\", NOW());"},
+		},
+		{
+			database:    "Test_MySql20170910",
+			createTable: "CREATE TABLE runoob_tbl20170910est(runoob_id INT NOT NULL AUTO_INCREMENT,runoob_title VARCHAR(100) NOT NULL,runoob_author VARCHAR(40) NOT NULL,submission_date DATE,PRIMARY KEY ( runoob_id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;",
+			insertData:  []string{"INSERT INTO runoob_tbl20170910est (runoob_title, runoob_author, submission_date) VALUES (\"学习 mysql\", \"教程\", NOW());"},
+		},
+		{
+			database:    "Test_MySql20180110",
+			createTable: "CREATE TABLE runoob_tbl20180110est(runoob_id INT NOT NULL AUTO_INCREMENT,runoob_title VARCHAR(100) NOT NULL,runoob_author VARCHAR(40) NOT NULL,submission_date DATE,PRIMARY KEY ( runoob_id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;",
+			insertData:  []string{"INSERT INTO runoob_tbl20180110est (runoob_title, runoob_author, submission_date) VALUES (\"学习 mysql\", \"教程\", NOW());"},
+		},
+	}
+	dayDataTestsLine = len(databasesTest)
+	todayDataTests   = []DataTest{
+		{
+			"Test_MySql" + year + month + day,
+			"CREATE TABLE runoob_tbl" + year + month + day + "est(runoob_id INT NOT NULL AUTO_INCREMENT,runoob_title VARCHAR(100) NOT NULL,runoob_author VARCHAR(40) NOT NULL,submission_date DATE,PRIMARY KEY ( runoob_id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;",
+			[]string{"INSERT INTO runoob_tbl" + year + month + day + "est (runoob_title, runoob_author, submission_date) VALUES (\"学习 mysql\", \"教程\", NOW());"},
+		},
+	}
+	todayDataTestsLine = len(todayDataTests)
+)
+
+func TestMySql(t *testing.T) {
+	databasesTest = append(databasesTest, todayDataTests...)
+	if err := prepareMysql(); err != nil {
+		t.Errorf("prepare mysql database failed: %v", err)
+	}
+	defer func() {
+		if err := cleanMysql(); err != nil {
+			t.Errorf("clean mysql database failed: %v", err)
+		}
+	}()
+	expectData := Data{
+		"runoob_id":       int64(1),
+		"runoob_title":    "学习 mysql",
+		"runoob_author":   "教程",
+		"submission_date": year + "-" + month + "-" + day,
+	}
+
+	// test exec on start
+	runnerName := "mr"
+	mr, err := getMySqlReader(false, false, runnerName, CronInfo{})
+	defer os.RemoveAll(MetaDir)
+	assert.NoError(t, err)
+	mrData, ok := mr.(reader.DataReader)
+	if !ok {
+		t.Error("mysql read should have readdata interface")
+	}
+	dataLine := 0
+	before := time.Now()
+	for !batchTimeout(before, 2) {
+		data, bytes, err := mrData.ReadData()
+		if err != nil {
+			t.Error(err)
+		}
+		if len(data) <= 0 {
+			continue
+		}
+		assert.Equal(t, int64(36), bytes)
+		assert.Equal(t, expectData, data)
+		dataLine++
+	}
+	assert.Equal(t, todayDataTestsLine, dataLine)
+	mr.SyncMeta()
+
+	// test sync records
+	dataLine = 0
+	before = time.Now()
+	for !batchTimeout(before, 2) {
+		data, bytes, err := mrData.ReadData()
+		if err != nil {
+			t.Error(err)
+		}
+		if len(data) <= 0 {
+			continue
+		}
+		assert.Equal(t, int64(36), bytes)
+		assert.Equal(t, expectData, data)
+		dataLine++
+	}
+	assert.Equal(t, 0, dataLine)
+	mr.SyncMeta()
+	mr.Close()
+
+	// test exec on start, sql not empty
+	runnerName = "mrRawSql"
+	mrRawSql, err := getMySqlReader(false, true, runnerName, CronInfo{})
+	assert.NoError(t, err)
+	mrRawSqlData, ok := mrRawSql.(reader.DataReader)
+	if !ok {
+		t.Error("mysql read should have readdata interface")
+	}
+	dataLine = 0
+	before = time.Now()
+	for !batchTimeout(before, 2) {
+		data, bytes, err := mrRawSqlData.ReadData()
+		if err != nil {
+			t.Error(err)
+		}
+		if len(data) <= 0 {
+			continue
+		}
+		assert.Equal(t, int64(36), bytes)
+		assert.Equal(t, expectData, data)
+		dataLine++
+	}
+	assert.Equal(t, todayDataTestsLine, dataLine)
+	mrRawSql.SyncMeta()
+
+	// no sync records when raw sql is not empty
+	dataLine = 0
+	before = time.Now()
+	for !batchTimeout(before, 2) {
+		data, bytes, err := mrRawSqlData.ReadData()
+		if err != nil {
+			t.Error(err)
+		}
+		if len(data) <= 0 {
+			continue
+		}
+		assert.Equal(t, int64(36), bytes)
+		assert.Equal(t, expectData, data)
+		dataLine++
+	}
+	assert.Equal(t, 0, dataLine)
+	mrRawSql.SyncMeta()
+	mrRawSql.Close()
+
+	// test history all
+	runnerName = "mrHistoryAll"
+	mrHistoryAll, err := getMySqlReader(true, false, runnerName, CronInfo{})
+	assert.NoError(t, err)
+	mrHistoryAllData, ok := mrHistoryAll.(reader.DataReader)
+	if !ok {
+		t.Error("mysql read should have readdata interface")
+	}
+	dataLine = 0
+	before = time.Now()
+	for !batchTimeout(before, 2) {
+		data, bytes, err := mrHistoryAllData.ReadData()
+		if err != nil {
+			t.Error(err)
+		}
+		if len(data) <= 0 {
+			continue
+		}
+		assert.Equal(t, int64(36), bytes)
+		assert.Equal(t, expectData, data)
+		dataLine++
+	}
+	assert.Equal(t, dayDataTestsLine+todayDataTestsLine, dataLine)
+	mrHistoryAll.SyncMeta()
+	mrHistoryAll.Close()
+
+	// test file done in meta dir
+	mrHistoryAll2, err := getMySqlReader(true, false, runnerName, CronInfo{})
+	assert.NoError(t, err)
+	mrHistoryAllData2, ok := mrHistoryAll2.(reader.DataReader)
+	if !ok {
+		t.Error("mysql read should have readdata interface")
+	}
+	dataLine = 0
+	before = time.Now()
+	for !batchTimeout(before, 2) {
+		data, _, err := mrHistoryAllData2.ReadData()
+		if err != nil {
+			t.Error(err)
+		}
+		if len(data) <= 0 {
+			continue
+		}
+		dataLine++
+	}
+	assert.Equal(t, 0, dataLine)
+	mrHistoryAll2.SyncMeta()
+	mrHistoryAll2.Close()
+
+	// test cron
+	minDataTestsLine, secondAdd3, err := setMinute()
+	if err != nil {
+		t.Errorf("prepare mysql database failed: %v", err)
+	}
+	// cron task, not exec on start
+	runnerName = "mrCron"
+	mrCron, err := getMySqlReader(false, false, runnerName, CronInfo{true, secondAdd3, true})
+	assert.NoError(t, err)
+	mrCronData, ok := mrCron.(reader.DataReader)
+	if !ok {
+		t.Error("mysql read should have readdata interface")
+	}
+	dataLine = 0
+	before = time.Now()
+	log.Infof("before: %v", before)
+	for !batchTimeout(before, 5) {
+		data, bytes, err := mrCronData.ReadData()
+		if err != nil {
+			t.Error(err)
+		}
+		if len(data) <= 0 {
+			continue
+		}
+		assert.Equal(t, int64(36), bytes)
+		assert.Equal(t, expectData, data)
+		dataLine++
+	}
+	assert.Equal(t, minDataTestsLine, dataLine)
+	mrCron.SyncMeta()
+	mrCron.Close()
+
+	minDataTestsLine, secondAdd3, err = setMinute()
+	if err != nil {
+		t.Errorf("prepare mysql database failed: %v", err)
+	}
+	// cron task, exec on start
+	runnerName = "mrCronExecOnStart"
+	mrCronExecOnStart, err := getMySqlReader(false, false, runnerName, CronInfo{true, secondAdd3, false})
+	assert.NoError(t, err)
+	mrCronExecOnStartData, ok := mrCronExecOnStart.(reader.DataReader)
+	if !ok {
+		t.Error("mysql read should have readdata interface")
+	}
+	dataLine = 0
+	before = time.Now()
+	log.Infof("before: %v", before)
+	for !batchTimeout(before, 5) {
+		data, bytes, err := mrCronExecOnStartData.ReadData()
+		if err != nil {
+			t.Error(err)
+		}
+		if len(data) <= 0 {
+			continue
+		}
+		assert.Equal(t, int64(36), bytes)
+		assert.Equal(t, expectData, data)
+		dataLine++
+	}
+	assert.Equal(t, minDataTestsLine+1, dataLine)
+	mrCronExecOnStart.SyncMeta()
+	mrCronExecOnStart.Close()
+
+	mrCronExecOnStart2, err := getMySqlReader(false, false, runnerName, CronInfo{true, secondAdd3, false})
+	assert.NoError(t, err)
+	mrCronExecOnStartData2, ok := mrCronExecOnStart2.(reader.DataReader)
+	if !ok {
+		t.Error("mysql read should have readdata interface")
+	}
+	dataLine = 0
+	before = time.Now()
+	log.Infof("before: %v", before)
+	for !batchTimeout(before, 5) {
+		data, bytes, err := mrCronExecOnStartData2.ReadData()
+		if err != nil {
+			t.Error(err)
+		}
+		if len(data) <= 0 {
+			continue
+		}
+		assert.Equal(t, int64(36), bytes)
+		assert.Equal(t, expectData, data)
+		dataLine++
+	}
+	assert.Equal(t, 0, dataLine)
+	mrCronExecOnStart2.SyncMeta()
+	mrCronExecOnStart2.Close()
+}
+
+func getMySqlReader(historyAll, rawsql bool, runnerName string, cronInfo CronInfo) (reader.Reader, error) {
+	readerConf := conf.MapConf{
+		"mysql_database":     "Test_MySql@(YYYY)@(MM)@(DD)",
+		"mysql_table":        "runoob_tbl@(YYYY)@(MM)@(DD)est",
+		"mysql_limit_batch":  "100",
+		"mysql_history_all":  "false",
+		"mode":               "mysql",
+		"mysql_exec_onstart": "true",
+		"encoding":           "gbk",
+		"mysql_datasource":   dbSource,
+		"meta_path":          path.Join(MetaDir, runnerName),
+		"file_done":          path.Join(MetaDir, runnerName),
+		"runner_name":        runnerName,
+	}
+	if rawsql {
+		readerConf["mysql_table"] = ""
+		readerConf["mysql_sql"] = "select * from runoob_tbl" + year + month + day + "est"
+	}
+	if historyAll {
+		readerConf["mysql_history_all"] = "true"
+	}
+	if cronInfo.cron {
+		readerConf["mysql_cron"] = cronInfo.second + " * * * * *"
+		readerConf["mysql_database"] = readerConf["mysql_database"] + "@(mm)"
+		readerConf["mysql_table"] = "runoob_tbl@(YYYY)@(MM)@(DD)" + "@(mm)" + "est"
+	}
+	if cronInfo.notExecOnStart {
+		readerConf["mysql_exec_onstart"] = "false"
+	}
+	mr, err := reader.NewReader(readerConf, true)
+	if err != nil {
+		return nil, err
+	}
+	return mr, nil
+}
+
+func prepareMysql() error {
+	db, err := openSql("mysql", connectStr, "")
+	if err != nil {
+		return err
+	}
+
+	defer db.Close()
+	if err = db.Ping(); err != nil {
+		return err
+	}
+
+	rowsDBs, err := db.Query("show databases;")
+	if err != nil {
+		return err
+	}
+	defer rowsDBs.Close()
+
+	databases := make([]string, 0)
+	for rowsDBs.Next() {
+		var s string
+		err = rowsDBs.Scan(&s)
+		if err != nil {
+			continue
+		}
+
+		databases = append(databases, s)
+	}
+
+	for _, dbInfo := range databasesTest {
+		_, err = db.Query("DROP DATABASE IF EXISTS " + dbInfo.database)
+		if err != nil {
+			return err
+		}
+
+		_, err = db.Exec("CREATE DATABASE " + dbInfo.database)
+		if err != nil {
+			return err
+		}
+
+		_, err = db.Exec("USE " + dbInfo.database)
+		if err != nil {
+			return err
+		}
+
+		_, err = db.Exec(dbInfo.createTable)
+		if err != nil {
+			return err
+		}
+
+		for _, data := range dbInfo.insertData {
+			_, err = db.Exec(data)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func cleanMysql() error {
+	db, err := openSql("mysql", connectStr, "")
+	if err != nil {
+		return err
+	}
+	for _, dbInfo := range databasesTest {
+		_, err := db.Query("DROP DATABASE IF EXISTS " + dbInfo.database)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func getDateStr(date int) string {
+	dateStr := strconv.Itoa(date)
+	if date < 10 {
+		return "0" + dateStr
+	}
+	return dateStr
+}
+
+func batchTimeout(before time.Time, interval float64) bool {
+	// 超过最长的发送间隔
+	if time.Now().Sub(before).Seconds() >= interval {
+		return true
+	}
+
+	return false
+}
+
+func setMinute() (int, string, error) {
+	var (
+		nowCron    = time.Now()
+		secondAdd3 = getDateStr((nowCron.Second() + 3) % 60)
+		minute     = getDateStr(nowCron.Minute())
+	)
+	if nowCron.Second() >= 57 {
+		minute = getDateStr(nowCron.Minute() + 1)
+	}
+	var minDataTests = []DataTest{
+		{
+			"Test_MySql" + year + month + day + minute,
+			"CREATE TABLE runoob_tbl" + year + month + day + minute + "est(runoob_id INT NOT NULL AUTO_INCREMENT,runoob_title VARCHAR(100) NOT NULL,runoob_author VARCHAR(40) NOT NULL,submission_date DATE,PRIMARY KEY ( runoob_id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;",
+			[]string{"INSERT INTO runoob_tbl" + year + month + day + minute + "est (runoob_title, runoob_author, submission_date) VALUES (\"学习 mysql\", \"教程\", NOW());"},
+		},
+	}
+	minDataTestsLine := len(minDataTests)
+	log.Infof("time now cron: %v, minute: %v, secondAdd3: %v", nowCron, minute, secondAdd3)
+	databasesTest = append(databasesTest, minDataTests...)
+	if err := cleanMysql(); err != nil {
+		return minDataTestsLine, secondAdd3, err
+	}
+	if err := prepareMysql(); err != nil {
+		return minDataTestsLine, secondAdd3, err
+	}
+	return minDataTestsLine, secondAdd3, nil
 }
