@@ -45,17 +45,17 @@ func (c *Pipeline) FormKodoSpec(input *CreateRepoForKodoInput) *ExportKodoSpec {
 		input.Format = "parquet"
 	}
 	return &ExportKodoSpec{
-		Bucket:    input.Bucket,
-		KeyPrefix: input.Prefix,
-		Fields:    doc,
-		Email:     input.Email,
-		AccessKey: input.Ak,
-		Format:    input.Format,
-		Retention: input.Retention,
-		Compress:  input.Compress,
+		Bucket:         input.Bucket,
+		KeyPrefix:      input.Prefix,
+		Fields:         doc,
+		Email:          input.Email,
+		AccessKey:      input.Ak,
+		Format:         input.Format,
+		Retention:      input.Retention,
+		Compress:       input.Compress,
 		RotateStrategy: input.RotateStrategy,
 		RotateInterval: input.RotateInterval,
-		RotateSize:	input.RotateSize,
+		RotateSize:     input.RotateSize,
 		RotateSizeType: "KB",
 		RotateNumber:   input.RotateSize / 1024,
 	}
@@ -385,8 +385,8 @@ func (c *Pipeline) AutoExportToKODO(input *AutoExportToKODOInput) error {
 	if input.BucketName == "" {
 		input.BucketName = input.RepoName
 	}
-	if input.Retention == 0 {
-		input.Retention = 90
+	if input.Retention <= 0 {
+		input.Retention = 0
 	}
 	input.BucketName = strings.Replace(input.BucketName, "_", "-", -1)
 
@@ -416,18 +416,18 @@ func (c *Pipeline) AutoExportToKODO(input *AutoExportToKODOInput) error {
 			}
 		}
 		kodoSpec := c.FormKodoSpec(&CreateRepoForKodoInput{
-			Retention: input.Retention,
-			Ak:        ak,
-			Email:     input.Email,
-			Bucket:    input.BucketName,
-			RepoName:  input.RepoName,
-			Schema:    repoInfo.Schema,
-			Prefix:    input.Prefix,
-			Format:    input.Format,
-			Compress:  input.Compress,
+			Retention:      input.Retention,
+			Ak:             ak,
+			Email:          input.Email,
+			Bucket:         input.BucketName,
+			RepoName:       input.RepoName,
+			Schema:         repoInfo.Schema,
+			Prefix:         input.Prefix,
+			Format:         input.Format,
+			Compress:       input.Compress,
 			RotateStrategy: input.RotateStrategy,
 			RotateInterval: input.RotateInterval,
-			RotateSize:	input.RotateSize,
+			RotateSize:     input.RotateSize,
 		})
 		exportInput := c.FormExportInput(input.RepoName, ExportTypeKODO, kodoSpec)
 		exportInput.PandoraToken = input.CreateExportToken

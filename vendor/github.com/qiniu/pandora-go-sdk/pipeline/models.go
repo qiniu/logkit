@@ -672,19 +672,19 @@ type CreateRepoForTSDBInput struct {
 }
 
 type CreateRepoForKodoInput struct {
-	Retention int
-	Ak        string
-	Email     string
-	Region    string
-	Bucket    string
-	RepoName  string
-	Prefix    string
-	Compress  bool
+	Retention      int
+	Ak             string
+	Email          string
+	Region         string
+	Bucket         string
+	RepoName       string
+	Prefix         string
+	Compress       bool
 	RotateStrategy string
 	RotateSize     int
 	RotateInterval int
-	Format    string
-	Schema    []RepoSchemaEntry
+	Format         string
+	Schema         []RepoSchemaEntry
 	AutoExportKodoTokens
 }
 
@@ -697,16 +697,16 @@ type AutoExportKodoTokens struct {
 }
 
 type AutoExportToKODOInput struct {
-	RepoName   string
-	BucketName string
-	Prefix     string
-	Compress   bool
+	RepoName       string
+	BucketName     string
+	Prefix         string
+	Compress       bool
 	RotateStrategy string
 	RotateSize     int
 	RotateInterval int
-	Format     string
-	Email      string
-	Retention  int //数字，单位为天
+	Format         string
+	Email          string
+	Retention      int //数字，单位为天
 	AutoExportKodoTokens
 }
 
@@ -1029,6 +1029,13 @@ type PostDataInput struct {
 	ResourceOwner string
 	RepoName      string
 	Points        Points
+}
+
+type PostRawtextDataInput struct {
+	PandoraToken
+	ResourceOwner string
+	RepoName      string
+	Rawtext       []byte
 }
 
 type SchemaFreeInput struct {

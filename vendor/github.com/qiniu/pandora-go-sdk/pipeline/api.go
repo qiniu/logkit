@@ -216,6 +216,15 @@ func (c *Pipeline) UpdateRepoWithLogDB(input *UpdateRepoInput, ex ExportDesc) er
 	if !ok {
 		return fmt.Errorf("export logdb spec doc assert error %v is not map[string]interface{}", ex.Spec["doc"])
 	}
+	omitEmpty, ok := ex.Spec["omitEmpty"].(bool)
+	if !ok {
+		return fmt.Errorf("export logdb spec omitEmpty assert error %v is not bool", ex.Spec["omitEmpty"])
+	}
+	omitInvalid, ok := ex.Spec["omitInvalid"].(bool)
+	if !ok {
+		return fmt.Errorf("export logdb spec omitInvalid assert error %v is not bool", ex.Spec["omitInvalid"])
+	}
+
 	for _, v := range input.Schema {
 		docs[v.Key] = "#" + v.Key
 	}
@@ -288,7 +297,7 @@ func (c *Pipeline) UpdateRepoWithLogDB(input *UpdateRepoInput, ex ExportDesc) er
 		log.Error("UpdateRepoWithLogDB update logdb repo error", err)
 		return err
 	}
-	spec := &ExportLogDBSpec{DestRepoName: repoName, Doc: docs}
+	spec := &ExportLogDBSpec{DestRepoName: repoName, Doc: docs, OmitEmpty: omitEmpty, OmitInvalid: omitInvalid}
 	err = c.UpdateExport(&UpdateExportInput{
 		RepoName:     input.RepoName,
 		ExportName:   ex.Name,
@@ -400,6 +409,8 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 		log.Error("update pipeline repo error", err)
 		return err
 	}
+	//目前由于服务端lc原因，更新不会立即生效，如果sleep 6s后再打点能成功，否则必然失败
+	//time.Sleep(6 * time.Second)
 	if input.Option == nil {
 		return nil
 	}
@@ -542,6 +553,20 @@ func (c *Pipeline) PostData(input *PostDataInput) (err error) {
 
 	req := c.newRequest(op, input.Token, nil)
 	req.SetBufferBody(input.Points.Buffer())
+	req.SetHeader(base.HTTPHeaderContentType, base.ContentTypeText)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
+	req.SetFlowLimiter(c.flowLimit)
+	req.SetReqLimiter(c.reqLimit)
+	return req.Send()
+}
+
+func (c *Pipeline) PostRawtextData(input *PostRawtextDataInput) (err error) {
+	op := c.NewOperation(base.OpPostRawtextData, input.RepoName)
+
+	req := c.newRequest(op, input.Token, nil)
+	req.SetBufferBody(input.Rawtext)
 	req.SetHeader(base.HTTPHeaderContentType, base.ContentTypeText)
 	if input.ResourceOwner != "" {
 		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
@@ -713,6 +738,12 @@ func (c *Pipeline) PostDataSchemaFree(input *SchemaFreeInput) (newSchemas map[st
 				switch reqErr.ErrorType {
 				case reqerr.InvalidDataSchemaError, reqerr.EntityTooLargeError:
 					errType = reqerr.TypeBinaryUnpack
+				case reqerr.ErrSchemaFieldNotExist:
+					if input.NoUpdate {
+						errType = reqerr.TypeBinaryUnpack
+					} else {
+						errType = reqerr.TypeSchemaFreeRetry
+					}
 				case reqerr.NoSuchRepoError:
 					c.repoSchemaMux.Lock()
 					c.repoSchemas[input.RepoName] = make(RepoSchema)
