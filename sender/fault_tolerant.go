@@ -333,18 +333,24 @@ func (ft *FtSender) trySendDatas(datas []Data, failSleep int, isRetry bool) (bac
 func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []*datasContext) {
 	failCtx := new(datasContext)
 	var binaryUnpack bool
+	var errMessage string
 	se, succ := err.(*reqerr.SendError)
 	if !succ {
 		// 如果不是SendError 默认所有的数据都发送失败
-		log.Infof("Runner[%v] Sender[%v] error type is not *SendError! reSend all datas by default", ft.runnerName, ft.innerSender.Name())
+		errMessage = "error type is not *SendError! reSend all datas by default"
 		failCtx.Datas = datas
 	} else {
 		failCtx.Datas = ConvertDatas(se.GetFailDatas())
 		if se.ErrorType == reqerr.TypeBinaryUnpack {
 			binaryUnpack = true
+			errMessage = "error type is binaryUnpack, will divid to 2 parts and retry"
+		} else if se.ErrorType == reqerr.TypeSchemaFreeRetry {
+			errMessage = "maybe this is because of server schema cache, will send all data again"
+		} else {
+			errMessage = "error type is default, will send all data again"
 		}
 	}
-	log.Errorf("Runner[%v] Sender[%v] cannot write points: %v, failDatas size: %v, binaryUnpack: %v", ft.runnerName, ft.innerSender.Name(), err, len(failCtx.Datas), binaryUnpack)
+	log.Errorf("Runner[%v] Sender[%v] cannot write points: %v, failDatas size: %v, %s", ft.runnerName, ft.innerSender.Name(), err, len(failCtx.Datas), errMessage)
 	log.Debugf("Runner[%v] Sender[%v] failed datas [[%v]]", ft.runnerName, ft.innerSender.Name(), failCtx.Datas)
 	if binaryUnpack {
 		lens := len(failCtx.Datas) / 2

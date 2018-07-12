@@ -137,6 +137,8 @@ func (c *Pipeline) NewOperation(opName string, args ...interface{}) *request.Ope
 		method, urlTmpl = base.MethodDelete, "/v2/repos/%s"
 	case base.OpPostData:
 		method, urlTmpl = base.MethodPost, "/v2/repos/%s/data"
+	case base.OpPostRawtextData:
+		method, urlTmpl = base.MethodPost, "/v2/stream/%s/data"
 	case base.OpCreateTransform:
 		method, urlTmpl = base.MethodPost, "/v2/repos/%s/transforms/%s/to/%s"
 	case base.OpUpdateTransform:

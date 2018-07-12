@@ -2,6 +2,7 @@ package sender
 
 import (
 	. "github.com/qiniu/logkit/utils/models"
+	"github.com/qiniu/pandora-go-sdk/base/config"
 )
 
 // ModeUsages 用途说明
@@ -161,7 +162,7 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:      KeyPandoraHost,
 			ChooseOnly:   false,
-			Default:      "https://pipeline.qiniuapi.com",
+			Default:      config.DefaultPipelineEndpoint,
 			DefaultNoUse: false,
 			Description:  "大数据平台域名(pandora_host)",
 			Advance:      true,
@@ -228,7 +229,7 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:       KeyPandoraLogDBHost,
 			ChooseOnly:    false,
-			Default:       "https://insight.qiniuapi.com",
+			Default:       config.DefaultLogDBEndpoint,
 			DefaultNoUse:  false,
 			Description:   "日志分析域名[私有部署才修改](pandora_logdb_host)",
 			Advance:       true,
@@ -283,7 +284,7 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:       KeyPandoraTSDBHost,
 			ChooseOnly:    false,
-			Default:       "https://tsdb.qiniuapi.com",
+			Default:       config.DefaultTSDBEndpoint,
 			DefaultNoUse:  false,
 			Description:   "时序数据库域名[私有部署才修改](pandora_tsdb_host)",
 			Advance:       true,
@@ -382,6 +383,16 @@ var ModeKeyOptions = map[string][]Option{
 			Default:       "512000",
 			DefaultNoUse:  false,
 			Description:   "云存储文件分割文件大小(pandora_kodo_rotate_size)(单位KB)",
+			AdvanceDepend: KeyPandoraEnableKodo,
+			Advance:       true,
+		},
+		{
+			KeyName:       KeyPandoraKodoFileRetention,
+			ChooseOnly:    false,
+			Default:       "0",
+			DefaultNoUse:  false,
+			Description:   "云存储文件保存时间(pandora_kodo_file_retention)(单位天,0为永久保存)",
+			ToolTip:       "导出到云存储的文件保存时间，数字表示存的天数，0为永久保存",
 			AdvanceDepend: KeyPandoraEnableKodo,
 			Advance:       true,
 		},

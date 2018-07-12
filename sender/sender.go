@@ -43,6 +43,7 @@ const (
 	KeyPandoraKodoRotateStrategy = "pandora_kodo_rotate_strategy"
 	KeyPandoraKodoRotateInterval = "pandora_kodo_rotate_interval"
 	KeyPandoraKodoRotateSize     = "pandora_kodo_rotate_size"
+	KeyPandoraKodoFileRetention  = "pandora_kodo_file_retention"
 
 	KeyPandoraEmail = "qiniu_email"
 

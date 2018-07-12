@@ -54,7 +54,7 @@ func TestFtSender(t *testing.T) {
 	assert.NoError(t, err)
 	datas := []Data{
 		{"ab": "abcccc"},
-		{"ab": "E18111:BackupQueue.Depth"},
+		{"ab": "E18110:BackupQueue.Depth"},
 	}
 	err = fts.Send(datas)
 	se, ok := err.(*StatsError)
@@ -101,7 +101,7 @@ func TestFtSender(t *testing.T) {
 	defer os.RemoveAll(ftTestDir3)
 	assert.NoError(t, err)
 	datas3 := []Data{
-		{"ab": "E18111:"},
+		{"ab": "E18110:"},
 	}
 	err = fts3.Send(datas3)
 	se, ok = err.(*StatsError)
@@ -150,12 +150,12 @@ func TestFtMemorySender(t *testing.T) {
 	assert.NoError(t, err)
 	datas := []Data{
 		{"ab": "abcccc"},
-		{"ab": "E18111:BackupQueue.Depth"},
+		{"ab": "E18110:BackupQueue.Depth"},
 	}
 	err = fts.Send(datas)
 	se, ok := err.(*StatsError)
 	if !ok {
-		t.Fatal("ft send return error should .(*SendError)")
+		t.Fatal("ft send return error should .(*StatsError)")
 	}
 	assert.NoError(t, se.ErrorDetail)
 	time.Sleep(10 * time.Second)
@@ -470,4 +470,46 @@ func Test_SplitData(t *testing.T) {
 	valArray = sender.SplitData(maxData, int64(len(maxData)))
 	assert.Equal(t, len(maxData), len(strings.Join(valArray, "")))
 	assert.Equal(t, 1, len(valArray))
+}
+
+func TestTypeSchemaRetry(t *testing.T) {
+	_, pt := mock_pandora.NewMockPandoraWithPrefix("/v2")
+	pandoraSenderConfig := conf.MapConf{
+		"name":                           "p",
+		"pandora_region":                 "nb",
+		"pandora_host":                   "http://127.0.0.1:" + pt,
+		"pandora_schema":                 "ab",
+		"pandora_auto_create":            "ab *s",
+		"pandora_schema_free":            "true",
+		"pandora_ak":                     "ak",
+		"pandora_sk":                     "sk",
+		"pandora_schema_update_interval": "1",
+		"pandora_gzip":                   "false",
+
+		"sender_type": "pandora",
+	}
+	pandoraSenderConfig["pandora_repo_name"] = "TestTypeSchemaRetry"
+	s, err := pandora.NewSender(pandoraSenderConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mp := conf.MapConf{}
+	mp[sender.KeyFtSaveLogPath] = fttestdir
+	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyBackupOnly
+	defer os.RemoveAll(fttestdir)
+	fts, err := sender.NewFtSender(s, mp, fttestdir)
+	assert.NoError(t, err)
+	datas := []Data{
+		{"ab": "abcccc"},
+		{"ab": "E18111:"},
+	}
+	err = fts.Send(datas)
+	_, ok := err.(*StatsError)
+	if !ok {
+		t.Fatal("ft send return error should .(*StatsError)")
+	}
+	time.Sleep(5 * time.Second)
+	if fts.BackupQueue.Depth() != 1 {
+		t.Error("Ft send error exp 1 but got ", fts.BackupQueue.Depth())
+	}
 }
