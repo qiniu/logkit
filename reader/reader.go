@@ -265,12 +265,15 @@ func (reg *Registry) NewReaderWithMeta(conf conf.MapConf, meta *Meta, errDirectR
 
 	reader, err = constructor(meta, conf)
 	if err != nil {
-		return
+		return nil, err
 	}
 	if headPattern != "" {
 		err = reader.SetMode(ReadModeHeadPatternString, headPattern)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return
+	return reader, nil
 }
 
 func NewFileDirReader(meta *Meta, conf conf.MapConf) (reader Reader, err error) {
