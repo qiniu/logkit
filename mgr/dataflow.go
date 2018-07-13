@@ -4,10 +4,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/json-iterator/go"
+
+	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
 	"github.com/qiniu/logkit/conf"
@@ -20,7 +25,10 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-const DefaultTryTimes = 3
+const (
+	DefaultTryTimes = 3
+	MetaTmp         = "meta_tmp/"
+)
 
 // RawData 从 reader 模块中根据 type 获取字符串形式的样例日志
 func RawData(readerConfig conf.MapConf) (string, error) {
@@ -28,11 +36,20 @@ func RawData(readerConfig conf.MapConf) (string, error) {
 		return "", fmt.Errorf("reader config cannot be empty")
 	}
 
+	runnerName, _ := readerConfig.GetString(GlobalKeyName)
+	configMetaPath := runnerName + "_" + Hash(strconv.FormatInt(time.Now().Unix(), 10))
+	metaPath := path.Join(MetaTmp, configMetaPath)
+	log.Debugf("Runner[%v] Using %s as default metaPath", runnerName, metaPath)
+	readerConfig[reader.KeyMetaPath] = metaPath
+
 	rd, err := reader.NewReader(readerConfig, true)
 	if err != nil {
 		return "", err
 	}
-	defer rd.Close()
+	defer func() {
+		rd.Close()
+		os.RemoveAll(metaPath)
+	}()
 
 	var rawData string
 
