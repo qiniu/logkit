@@ -884,7 +884,7 @@ func (r *Reader) run() {
 	var connectStr string
 	switch r.dbtype {
 	case reader.ModeMySQL:
-		connectStr = getConnectStr(r.dbtype,r.datasource, "", r.encoder)
+		connectStr = getConnectStr(r.dbtype, r.datasource, "", r.encoder)
 	case reader.ModeMSSQL:
 		r.database = goMagic(r.rawDatabase, now)
 		connectStr = r.datasource + ";database=" + r.database
@@ -1070,7 +1070,7 @@ func (r *Reader) countDB(dbs []string, now time.Time) {
 }
 
 func (r *Reader) execCountDB(curDB string, now time.Time, recordTablesDone TableRecords) error {
-	connectStr := getConnectStr(r.dbtype,r.datasource, curDB, r.encoder)
+	connectStr := getConnectStr(r.dbtype, r.datasource, curDB, r.encoder)
 	db, err := openSql(r.dbtype, connectStr, curDB)
 	if err != nil {
 		return err
@@ -1136,7 +1136,7 @@ func (r *Reader) execCountDB(curDB string, now time.Time, recordTablesDone Table
 }
 
 func (r *Reader) execReadDB(curDB string, now time.Time, recordTablesDone TableRecords) (err error) {
-	connectStr := getConnectStr(r.dbtype,r.datasource, curDB, r.encoder)
+	connectStr := getConnectStr(r.dbtype, r.datasource, curDB, r.encoder)
 	db, err := openSql(r.dbtype, connectStr, r.Name())
 	if err != nil {
 		return err
@@ -1706,11 +1706,13 @@ func (r *Reader) getValidData(db *sql.DB, curDB, matchData, matchStr string,
 	return validData, sqls, nil
 }
 
-func getConnectStr(dbtype,datasource, database, encoder string) (connectStr string) {
+func getConnectStr(dbtype, datasource, database, encoder string) (connectStr string) {
 
 	switch  dbtype {
 	case reader.ModeMSSQL:
 		connectStr = datasource + ";database=" + database
+	case reader.ModePostgreSQL:
+		connectStr = datasource + "  database=" + database
 	default:
 		connectStr = datasource + "/" + database
 	}
