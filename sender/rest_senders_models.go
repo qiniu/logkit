@@ -2,6 +2,7 @@ package sender
 
 import (
 	. "github.com/qiniu/logkit/utils/models"
+	"github.com/qiniu/pandora-go-sdk/base/config"
 )
 
 // ModeUsages 用途说明
@@ -133,9 +134,9 @@ var ModeKeyOptions = map[string][]Option{
 			Required:     true,
 			Placeholder:  "my_work",
 			DefaultNoUse: true,
-			Description:  "数据源名称(pandora_repo_name)",
+			Description:  "实时仓库名称(pandora_repo_name)",
 			CheckRegex:   "^[a-zA-Z][a-zA-Z0-9_]{0,127}$",
-			ToolTip:      "七牛大数据平台工作流中的数据源名称",
+			ToolTip:      "七牛大数据平台Pipeline中的实时仓库名称",
 		},
 		{
 			KeyName:      KeyPandoraAk,
@@ -161,7 +162,7 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:      KeyPandoraHost,
 			ChooseOnly:   false,
-			Default:      "https://pipeline.qiniuapi.com",
+			Default:      config.DefaultPipelineEndpoint,
 			DefaultNoUse: false,
 			Description:  "大数据平台域名(pandora_host)",
 			Advance:      true,
@@ -184,18 +185,18 @@ var ModeKeyOptions = map[string][]Option{
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  false,
-			Description:   "自动创建数据源并更新(pandora_schema_free)",
+			Description:   "自动创建实时仓库并更新(pandora_schema_free)",
 			Advance:       true,
-			ToolTip:       "自动根据数据创建工作流、数据源并自动更新",
+			ToolTip:       "自动根据数据创建Pipeline、实时仓库并自动更新",
 		},
 		{
 			KeyName:       KeyPandoraAutoCreate,
 			ChooseOnly:    false,
 			Default:       "",
 			DefaultNoUse:  false,
-			Description:   "以DSL语法自动创建数据源(pandora_auto_create)",
+			Description:   "以DSL语法自动创建实时仓库(pandora_auto_create)",
 			Advance:       true,
-			ToolTip:       `自动创建数据源，语法为 "f1 date, f2 string, f3 float, f4 map{f5 long}"`,
+			ToolTip:       `自动创建实时仓库，语法为 "f1 date, f2 string, f3 float, f4 map{f5 long}"`,
 			ToolTipActive: true,
 		},
 		{
@@ -223,12 +224,12 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse:  false,
 			Description:   "指定日志分析仓库名称(pandora_logdb_name)",
 			AdvanceDepend: KeyPandoraEnableLogDB,
-			ToolTip:       "若不指定使用数据源(pandora_repo_name)名称",
+			ToolTip:       "若不指定使用实时仓库(pandora_repo_name)名称",
 		},
 		{
 			KeyName:       KeyPandoraLogDBHost,
 			ChooseOnly:    false,
-			Default:       "https://insight.qiniuapi.com",
+			Default:       config.DefaultLogDBEndpoint,
 			DefaultNoUse:  false,
 			Description:   "日志分析域名[私有部署才修改](pandora_logdb_host)",
 			Advance:       true,
@@ -261,7 +262,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse:  false,
 			Description:   "指定时序数据库仓库名称(pandora_tsdb_name)",
 			AdvanceDepend: KeyPandoraEnableTSDB,
-			ToolTip:       "若不指定使用数据源(pandora_repo_name)名称",
+			ToolTip:       "若不指定使用实时仓库(pandora_repo_name)名称",
 		},
 		{
 			KeyName:       KeyPandoraTSDBSeriesName,
@@ -283,7 +284,7 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:       KeyPandoraTSDBHost,
 			ChooseOnly:    false,
-			Default:       "https://tsdb.qiniuapi.com",
+			Default:       config.DefaultTSDBEndpoint,
 			DefaultNoUse:  false,
 			Description:   "时序数据库域名[私有部署才修改](pandora_tsdb_host)",
 			Advance:       true,
@@ -382,6 +383,16 @@ var ModeKeyOptions = map[string][]Option{
 			Default:       "512000",
 			DefaultNoUse:  false,
 			Description:   "云存储文件分割文件大小(pandora_kodo_rotate_size)(单位KB)",
+			AdvanceDepend: KeyPandoraEnableKodo,
+			Advance:       true,
+		},
+		{
+			KeyName:       KeyPandoraKodoFileRetention,
+			ChooseOnly:    false,
+			Default:       "0",
+			DefaultNoUse:  false,
+			Description:   "云存储文件保存时间(pandora_kodo_file_retention)(单位天,0为永久保存)",
+			ToolTip:       "导出到云存储的文件保存时间，数字表示存的天数，0为永久保存",
 			AdvanceDepend: KeyPandoraEnableKodo,
 			Advance:       true,
 		},

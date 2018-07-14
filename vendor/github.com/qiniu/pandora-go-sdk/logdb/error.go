@@ -30,6 +30,11 @@ func (e LogdbErrBuilder) Build(msg, text, reqId string, code int) error {
 		err.ErrorType = reqerr.InternalServerError
 	case "E8104":
 		err.ErrorType = reqerr.UnmatchedSchemaError
+	case "E8135":
+		err.ErrorType = reqerr.ErrInvalidRepoDescription
+	case "E8136":
+		err.ErrorType = reqerr.ErrInvalidRepoSchemaDescription
+
 	default:
 		if code == 401 {
 			err.Message = fmt.Sprintf("unauthorized: %v. 1. Please check your qiniu access_key and secret_key are both correct and you're authorized qiniu pandora user. 2. Please check the local time to ensure the consistent with the server time. 3. If you are using the token, please make sure that token has not expired.", msg)

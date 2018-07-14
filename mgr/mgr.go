@@ -564,11 +564,8 @@ func (m *Manager) Configs() (rss map[string]RunnerConfig) {
 		}
 		tmpRss[k] = v
 	}
-	deepCopyByJson(&rss, &tmpRss)
+	deepCopyByJSON(&rss, &tmpRss)
 	m.lock.RUnlock()
-	for k, v := range rss {
-		rss[k] = TrimSecretInfo(v)
-	}
 	return
 }
 
@@ -579,13 +576,13 @@ func (m *Manager) getDeepCopyConfig(name string) (filename string, conf RunnerCo
 	if tmpConf, ok := m.runnerConfig[filename]; !ok {
 		err = fmt.Errorf("runner %v is not found", filename)
 	} else {
-		deepCopyByJson(&conf, &tmpConf)
+		deepCopyByJSON(&conf, &tmpConf)
 	}
 	return
 }
 
 // TrimSecretInfo 将配置文件中的 token 等鉴权相关信息去掉
-func TrimSecretInfo(conf RunnerConfig) RunnerConfig {
+func TrimSecretInfo(conf RunnerConfig, trimSk bool) RunnerConfig {
 	prefix := SchemaFreeTokensPrefix
 	keyName := []string{
 		prefix + "pipeline_get_repo_token",
@@ -635,10 +632,12 @@ func TrimSecretInfo(conf RunnerConfig) RunnerConfig {
 		prefix + "list_export_token",
 	}...)
 
-	// Pandora sk
-	keyName = append(keyName, []string{
-		"pandora_sk",
-	}...)
+	if trimSk {
+		// Pandora sk
+		keyName = append(keyName, []string{
+			"pandora_sk",
+		}...)
+	}
 
 	for i, sc := range conf.SendersConfig {
 		for _, k := range keyName {
@@ -698,9 +697,9 @@ func (m *Manager) UpdateToken(tokens []AuthTokens) (err error) {
 	return
 }
 
-func (m *Manager) AddRunner(name string, conf RunnerConfig) (err error) {
+func (m *Manager) AddRunner(name string, conf RunnerConfig, createTime time.Time) (err error) {
 	conf.RunnerName = name
-	conf.CreateTime = time.Now().Format(time.RFC3339Nano)
+	conf.CreateTime = createTime.Format(time.RFC3339Nano)
 	filename := filepath.Join(m.RestDir, name+".conf")
 	if m.IsRunning(filename) {
 		return fmt.Errorf("file %v runner is running", name)

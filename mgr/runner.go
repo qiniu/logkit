@@ -188,13 +188,14 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 		MaxBatchTryTimes: rc.MaxBatchTryTimes,
 	}
 	if rc.ReaderConfig == nil {
-		return nil, errors.New(rc.RunnerName + " readerConfig is nil")
+		return nil, errors.New(rc.RunnerName + " reader in config is nil")
 	}
 	if rc.SendersConfig == nil {
-		return nil, errors.New(rc.RunnerName + " SendersConfig is nil")
+		return nil, errors.New(rc.RunnerName + " senders in config is nil")
 	}
 	if rc.ParserConf == nil {
-		return nil, errors.New(rc.RunnerName + " ParserConf is nil")
+		log.Warn(rc.RunnerName + " parser conf is nil, use raw parser as default")
+		rc.ParserConf = conf.MapConf{parser.KeyParserType: parser.TypeRaw}
 	}
 	rc.ReaderConfig[GlobalKeyName] = rc.RunnerName
 	rc.ReaderConfig[KeyRunnerName] = rc.RunnerName
@@ -231,16 +232,16 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if err != nil && rd != nil {
+			rd.Close()
+		}
+	}()
 	if len(rc.CleanerConfig) > 0 {
 		rd, err = rr.NewReaderWithMeta(rc.ReaderConfig, meta, false)
 		if err != nil {
 			return nil, err
 		}
-		defer func() {
-			if err != nil {
-				rd.Close()
-			}
-		}()
 		cl, err = cleaner.NewCleaner(rc.CleanerConfig, meta, cleanChan, meta.LogPath())
 		if err != nil {
 			return nil, err
@@ -632,10 +633,10 @@ func (r *LogExportRunner) Run() {
 				log.Error(err)
 			}
 		}
-		success := true
-		senderCnt := len(r.senders)
+
 		log.Debugf("Runner[%v] reader %s start to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
-		senderDataList := classifySenderData(datas, r.router, senderCnt)
+		success := true
+		senderDataList := classifySenderData(r.senders, datas, r.router)
 		for index, s := range r.senders {
 			if !r.trySend(s, senderDataList[index], r.MaxBatchTryTimes) {
 				success = false
@@ -650,16 +651,29 @@ func (r *LogExportRunner) Run() {
 	}
 }
 
-func classifySenderData(datas []Data, router *router.Router, senderCnt int) [][]Data {
-	senderDataList := make([][]Data, senderCnt)
-	for i := 0; i < senderCnt; i++ {
-		if router == nil {
+func classifySenderData(senders []sender.Sender, datas []Data, router *router.Router) [][]Data {
+	// 只有一个或是最后一个 sender 的时候无所谓数据污染
+	skipCopyAll := len(senders) <= 1
+	lastIdx := len(senders) - 1
+	hasRouter := router != nil && router.HasRoutes()
+	senderDataList := make([][]Data, len(senders))
+	for i := range senders {
+		if hasRouter {
+			senderDataList[i] = make([]Data, 0)
+			continue
+		}
+
+		_, skip := senders[i].(sender.SkipDeepCopySender)
+		if skip || skipCopyAll || i == lastIdx {
 			senderDataList[i] = datas
 		} else {
-			senderDataList[i] = make([]Data, 0)
+			// 数据进行深度拷贝，防止数据污染
+			var copiedDatas []Data
+			deepCopyByJSON(&copiedDatas, &datas)
+			senderDataList[i] = copiedDatas
 		}
 	}
-	if router == nil {
+	if !hasRouter {
 		return senderDataList
 	}
 	for _, d := range datas {
@@ -927,20 +941,18 @@ func calcSpeedTrend(old, new StatsInfo, elaspedtime float64) (speed float64, tre
 	return
 }
 
-func deepCopyByJson(dst, src interface{}) {
-	var err error
-	var confByte []byte
-	if confByte, err = jsoniter.Marshal(src); err != nil {
-		log.Errorf("deepCopyByJson marshal error %v, use same pointer", err)
+func deepCopyByJSON(dst, src interface{}) {
+	confBytes, err := jsoniter.Marshal(src)
+	if err != nil {
+		log.Errorf("deepCopyByJSON marshal error %v, use same pointer", err)
 		dst = src
 		return
 	}
-	if err = jsoniter.Unmarshal(confByte, dst); err != nil {
-		log.Errorf("deepCopyByJson unmarshal error %v, use same pointer", err)
+	if err = jsoniter.Unmarshal(confBytes, dst); err != nil {
+		log.Errorf("deepCopyByJSON unmarshal error %v, use same pointer", err)
 		dst = src
 		return
 	}
-	return
 }
 
 //Compatible 用于新老配置的兼容

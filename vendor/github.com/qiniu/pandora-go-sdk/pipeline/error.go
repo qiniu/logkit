@@ -49,6 +49,10 @@ func (e PipelineErrBuilder) Build(msg, text, reqId string, code int) error {
 		err.ErrorType = reqerr.ErrTooManySchema
 	case "E18135":
 		err.ErrorType = reqerr.ErrSchemaLimitUnderflow
+	case "E18136":
+		err.ErrorType = reqerr.ErrInvalidRepoDescription
+	case "E18137":
+		err.ErrorType = reqerr.ErrInvalidRepoSchemaDescription
 	case "E18202":
 		err.ErrorType = reqerr.NoSuchTransformError
 	case "E18201":
@@ -79,7 +83,9 @@ func (e PipelineErrBuilder) Build(msg, text, reqId string, code int) error {
 		err.ErrorType = reqerr.ErrDuplicateField
 	case "E18107":
 		err.ErrorType = reqerr.ErrUnsupportedFieldType
-	case "E18125", "E18123", "E18111", "E18110":
+	case "E18111": // StatusCode=404, ErrorMessage=E18111: One or more field keys do not resident in the specified repo schema: no such field key f7  <= 该错误除了正常情况外，也有可能是服务端localcache没更新导致的
+		err.ErrorType = reqerr.ErrSchemaFieldNotExist
+	case "E18125", "E18123", "E18110":
 		err.ErrorType = reqerr.InvalidDataSchemaError
 	case "E18128":
 		err.ErrorType = reqerr.ErrIncompatibleRepoSchema

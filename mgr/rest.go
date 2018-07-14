@@ -265,6 +265,9 @@ func (rs *RestService) GetRunners() echo.HandlerFunc {
 func (rs *RestService) GetConfigs() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		rss := rs.mgr.Configs()
+		for k, v := range rss {
+			rss[k] = TrimSecretInfo(v, false)
+		}
 		return RespSuccess(c, rss)
 	}
 }
@@ -302,7 +305,7 @@ func (rs *RestService) checkNameAndConfig(c echo.Context) (name string, conf Run
 		err = errors.New("config " + name + " is not found")
 		return
 	}
-	deepCopyByJson(&conf, &tmpConf)
+	deepCopyByJSON(&conf, &tmpConf)
 	return
 }
 
@@ -320,7 +323,7 @@ func (rs *RestService) PostConfig() echo.HandlerFunc {
 		}
 		nconf.IsInWebFolder = true
 		nconf.ParserConf = parser.ConvertWebParserConfig(nconf.ParserConf)
-		if err = rs.mgr.AddRunner(name, nconf); err != nil {
+		if err = rs.mgr.AddRunner(name, nconf, time.Now()); err != nil {
 			return RespError(c, http.StatusBadRequest, ErrRunnerAdd, err.Error())
 		}
 		return RespSuccess(c, nil)
