@@ -1036,6 +1036,50 @@ func Test_getRawSqls(t *testing.T) {
 	}
 }
 
+func Test_getConnectStr(t *testing.T) {
+	now := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
+
+	mr := &Reader{
+		database:    "Test_getCheckConnectStr",
+		dbtype:      "mysql",
+		historyAll:  true,
+		rawTable:    "*",
+		rawDatabase: "*",
+		datasource:  "root:@tcp(127.0.0.1:3306)",
+		encoder:     "utf8",
+	}
+	connectStr, err := mr.getConnectStr("", now)
+	assert.NoError(t, err)
+	expectMySql := "root:@tcp(127.0.0.1:3306)/?charset=utf8"
+	assert.Equal(t, expectMySql, connectStr)
+
+	mrMssql := &Reader{
+		database:    "Test_getCheckConnectStr",
+		dbtype:      "mssql",
+		rawTable:    "*",
+		datasource:  `server=localhost\SQLExpress;user id=sa;password=PassWord;port=1433`,
+		encoder:     "utf8",
+		rawDatabase: "Test_getCheckConnectStr",
+	}
+	connectStr, err = mrMssql.getConnectStr("", now)
+	assert.NoError(t, err)
+	expectMsSql := `server=localhost\SQLExpress;user id=sa;password=PassWord;port=1433;database=Test_getCheckConnectStr`
+	assert.Equal(t, expectMsSql, connectStr)
+
+	mrPostgressql := &Reader{
+		database:    "Test_getCheckConnectStr",
+		dbtype:      "postgres",
+		rawTable:    "*",
+		datasource:  "host=localhost port=5432 connect_timeout=10 user=pqgotest password=123456 sslmode=disable",
+		encoder:     "utf8",
+		rawDatabase: "Test_getCheckConnectStr",
+	}
+	connectStr, err = mrPostgressql.getConnectStr("", now)
+	assert.NoError(t, err)
+	expectPostgresSql := "host=localhost port=5432 connect_timeout=10 user=pqgotest password=123456 sslmode=disable dbname=Test_getCheckConnectStr"
+	assert.Equal(t, expectPostgresSql, connectStr)
+}
+
 func Test_WriteRecordsFile(t *testing.T) {
 	meta, err := reader.NewMeta(MetaDir, MetaDir, "mysql", "logpath", "", 7)
 	if err != nil {
