@@ -21,6 +21,7 @@ const (
 	ContentEncodingHeader = "Content-Encoding"
 
 	ApplicationJson = "application/json"
+	TestPlain       = "text/plain"
 	ApplicationGzip = "application/gzip"
 
 	KeyPandoraStash      = "pandora_stash"       // 当只有一条数据且 sendError 时候，将其转化为 raw 发送到 pandora_stash 这个字段

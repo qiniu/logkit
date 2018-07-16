@@ -1708,7 +1708,7 @@ func (r *Reader) getValidData(db *sql.DB, curDB, matchData, matchStr string,
 
 func getConnectStr(dbtype, datasource, database, encoder string) (connectStr string) {
 
-	switch  dbtype {
+	switch dbtype {
 	case reader.ModeMSSQL:
 		connectStr = datasource + ";database=" + database
 	case reader.ModePostgreSQL:
