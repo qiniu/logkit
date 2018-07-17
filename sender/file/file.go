@@ -82,4 +82,4 @@ func JSONLineMarshalFunc(datas []Data) ([]byte, error) {
 	return append(bytes, '\n'), nil
 }
 
-func (_ *Sender) SkipDeepCopy() {}
+func (_ *Sender) SkipDeepCopy() bool { return true }

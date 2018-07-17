@@ -513,3 +513,21 @@ func TestTypeSchemaRetry(t *testing.T) {
 		t.Error("Ft send error exp 1 but got ", fts.BackupQueue.Depth())
 	}
 }
+
+func TestSkipDeepCopySender(t *testing.T) {
+	defer os.RemoveAll("tmp")
+
+	// Skip == false
+	{
+		fs, err := sender.NewFtSender(&pandora.Sender{}, nil, "tmp")
+		assert.Nil(t, err)
+		assert.False(t, fs.SkipDeepCopy())
+	}
+
+	// Skip == true
+	{
+		fs, err := sender.NewFtSender(&mock.Sender{}, nil, "tmp")
+		assert.Nil(t, err)
+		assert.True(t, fs.SkipDeepCopy())
+	}
+}
