@@ -506,7 +506,13 @@ func (ft *FtSender) sendFromQueue(queueName string, readChan <-chan []byte, read
 	}
 }
 
-func (_ *FtSender) SkipDeepCopy() {}
+func (ft *FtSender) SkipDeepCopy() bool {
+	ss, ok := ft.innerSender.(SkipDeepCopySender)
+	if ok {
+		return ss.SkipDeepCopy()
+	}
+	return false
+}
 
 func SplitData(data string, splitSize int64) (valArray []string) {
 	if splitSize <= 0 {

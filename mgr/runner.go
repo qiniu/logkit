@@ -663,7 +663,10 @@ func classifySenderData(senders []sender.Sender, datas []Data, router *router.Ro
 			continue
 		}
 
-		_, skip := senders[i].(sender.SkipDeepCopySender)
+		skip := false
+		if ss, ok := senders[i].(sender.SkipDeepCopySender); ok {
+			skip = ss.SkipDeepCopy()
+		}
 		if skip || skipCopyAll || i == lastIdx {
 			senderDataList[i] = datas
 		} else {

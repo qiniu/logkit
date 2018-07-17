@@ -202,7 +202,8 @@ type Sender interface {
 
 // SkipDeepCopySender 表示该 sender 不会对传入数据进行污染，凡是有次保证的 sender 需要实现该接口提升发送效率
 type SkipDeepCopySender interface {
-	SkipDeepCopy()
+	// SkipDeepCopy 需要返回值是因为如果一个 sender 封装了其它 sender，需要根据实际封装的类型返回是否忽略深度拷贝
+	SkipDeepCopy() bool
 }
 
 type StatsSender interface {

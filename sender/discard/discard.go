@@ -45,4 +45,4 @@ func (s *Sender) SendCount() int {
 	return s.count
 }
 
-func (_ *Sender) SkipDeepCopy() {}
+func (_ *Sender) SkipDeepCopy() bool { return true }
