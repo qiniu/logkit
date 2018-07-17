@@ -824,7 +824,7 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:       KeyHttpSenderProtocol,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{"json", "csv"},
+			ChooseOptions: []interface{}{"json", "csv", "body_json"},
 			Default:       "json",
 			Description:   "发送数据时使用的格式(http_sender_protocol)",
 		},

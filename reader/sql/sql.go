@@ -882,26 +882,10 @@ func (r *Reader) run() {
 	r.table = goMagic(r.rawTable, now)
 
 	var connectStr string
-	switch r.dbtype {
-	case reader.ModeMySQL:
-		connectStr = getConnectStr(r.datasource, "", r.encoder)
-	case reader.ModeMSSQL:
-		r.database = goMagic(r.rawDatabase, now)
-		connectStr = r.datasource + ";database=" + r.database
-	case reader.ModePostgreSQL:
-		r.database = goMagic(r.rawDatabase, now)
-		spls := strings.Split(r.datasource, " ")
-		contains := false
-		for idx, v := range spls {
-			if strings.Contains(v, "dbname") {
-				contains = true
-				spls[idx] = "dbname=" + r.database
-			}
-		}
-		if !contains {
-			spls = append(spls, "dbname="+r.database)
-		}
-		connectStr = strings.Join(spls, " ")
+	connectStr, err = r.getConnectStr("", now)
+	if err != nil {
+		log.Error(err)
+		return
 	}
 	// 开始work逻辑
 	for {
@@ -998,15 +982,6 @@ func (r *Reader) getOffsetIndex(columns []string) int {
 
 func (r *Reader) exec(connectStr string) (err error) {
 	now := time.Now().Add(-r.magicLagDur)
-	db, err := openSql(r.dbtype, connectStr, r.Name())
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-	if err = db.Ping(); err != nil {
-		return err
-	}
-
 	// 获取符合条件的数据库
 	dbs := make([]string, 0)
 	switch r.dbtype {
@@ -1015,7 +990,7 @@ func (r *Reader) exec(connectStr string) (err error) {
 			dbs = append(dbs, goMagic(r.rawDatabase, now))
 		} else {
 			var err error
-			dbs, err = r.getDBs(db, now)
+			dbs, err = r.getDBs(connectStr, now)
 			if err != nil {
 				return err
 			}
@@ -1070,7 +1045,10 @@ func (r *Reader) countDB(dbs []string, now time.Time) {
 }
 
 func (r *Reader) execCountDB(curDB string, now time.Time, recordTablesDone TableRecords) error {
-	connectStr := getConnectStr(r.datasource, curDB, r.encoder)
+	connectStr, err := r.getConnectStr(curDB, now)
+	if err != nil {
+		return err
+	}
 	db, err := openSql(r.dbtype, connectStr, curDB)
 	if err != nil {
 		return err
@@ -1136,7 +1114,10 @@ func (r *Reader) execCountDB(curDB string, now time.Time, recordTablesDone Table
 }
 
 func (r *Reader) execReadDB(curDB string, now time.Time, recordTablesDone TableRecords) (err error) {
-	connectStr := getConnectStr(r.datasource, curDB, r.encoder)
+	connectStr, err := r.getConnectStr(curDB, now)
+	if err != nil {
+		return err
+	}
 	db, err := openSql(r.dbtype, connectStr, r.Name())
 	if err != nil {
 		return err
@@ -1706,12 +1687,34 @@ func (r *Reader) getValidData(db *sql.DB, curDB, matchData, matchStr string,
 	return validData, sqls, nil
 }
 
-func getConnectStr(datasource, database, encoder string) (connectStr string) {
-	connectStr = datasource + "/" + database
-	if encoder != "" {
-		connectStr += "?charset=" + encoder
+func (r *Reader) getConnectStr(database string, now time.Time) (connectStr string, err error) {
+	switch r.dbtype {
+	case reader.ModeMySQL:
+		connectStr = r.datasource + "/" + database
+		if r.encoder != "" {
+			connectStr += "?charset=" + r.encoder
+		}
+	case reader.ModeMSSQL:
+		r.database = goMagic(r.rawDatabase, now)
+		connectStr = r.datasource + ";database=" + r.database
+	case reader.ModePostgreSQL:
+		r.database = goMagic(r.rawDatabase, now)
+		spls := strings.Split(r.datasource, " ")
+		contains := false
+		for idx, v := range spls {
+			if strings.Contains(v, "dbname") {
+				contains = true
+				spls[idx] = "dbname=" + r.database
+			}
+		}
+		if !contains {
+			spls = append(spls, "dbname="+r.database)
+		}
+		connectStr = strings.Join(spls, " ")
+	default:
+		return "", fmt.Errorf("not support reader type: %v", r.dbtype)
 	}
-	return connectStr
+	return connectStr, nil
 }
 
 func openSql(dbtype, connectStr, name string) (db *sql.DB, err error) {
@@ -2173,7 +2176,15 @@ func (r *Reader) compareWithLastRecord(queryType int, curDB, target, matchStr, m
 	return validTime(target, rawData, startIndex, endIndex, false)
 }
 
-func (r *Reader) getDBs(db *sql.DB, now time.Time) ([]string, error) {
+func (r *Reader) getDBs(connectStr string, now time.Time) ([]string, error) {
+	db, err := openSql(r.dbtype, connectStr, r.Name())
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+	if err = db.Ping(); err != nil {
+		return nil, err
+	}
 	dbsAll, _, err := r.getDatas(db, "", r.rawDatabase, now, DATABASE)
 	if err != nil {
 		return dbsAll, err
