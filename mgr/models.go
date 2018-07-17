@@ -91,8 +91,39 @@ type RunnerInfo struct {
 	MaxBatchSize     int    `json:"batch_size,omitempty"`       // 每个read batch的字节数
 	MaxBatchInterval int    `json:"batch_interval,omitempty"`   // 最大发送时间间隔
 	MaxBatchTryTimes int    `json:"batch_try_times,omitempty"`  // 最大发送次数，小于等于0代表无限重试
+	ErrorsListCap    int    `json:"errors_list_cap"`            // 记录错误信息的最大条数
 	CreateTime       string `json:"createtime"`
 	EnvTag           string `json:"env_tag,omitempty"`
 	ExtraInfo        bool   `json:"extra_info,omitempty"`
 	// 用这个字段的值来获取环境变量, 作为 tag 添加到数据中
+}
+
+type ErrorsList struct {
+	ReadErrors      *ErrorQueue
+	ParseErrors     *ErrorQueue
+	TransformErrors map[string]*ErrorQueue
+	SendErrors      map[string]*ErrorQueue
+}
+
+type ErrorsResult struct {
+	ReadErrors      []ErrorInfo            `json:"read_errors"`
+	ParseErrors     []ErrorInfo            `json:"parse_errors"`
+	TransformErrors map[string][]ErrorInfo `json:"transform_errors"`
+	SendErrors      map[string][]ErrorInfo `json:"send_errors"`
+}
+
+//Clone 复制出一个顺序的 Errors
+func (src *ErrorsList) Clone() (dst ErrorsResult) {
+	dst = ErrorsResult{}
+	dst.ReadErrors = src.ReadErrors.Copy()
+	dst.ParseErrors = src.ParseErrors.Copy()
+	dst.TransformErrors = make(map[string][]ErrorInfo)
+	for transform, transformQueue := range src.TransformErrors {
+		dst.TransformErrors[transform] = transformQueue.Copy()
+	}
+	dst.SendErrors = make(map[string][]ErrorInfo)
+	for send, sendQueue := range src.SendErrors {
+		dst.SendErrors[send] = sendQueue.Copy()
+	}
+	return dst
 }

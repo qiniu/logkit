@@ -2,6 +2,8 @@ package models
 
 import (
 	"fmt"
+	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/qiniu/logkit/conf"
@@ -39,9 +41,14 @@ const (
 
 	DefaultMaxBatchSize = 2 * 1024 * 1024
 
-	Text     = "text"
-	Checkbox = "checkbox"
-	Radio    = "radio"
+	DefaultErrorsListCap = 100
+
+	PipeLineError = "ErrorMessage="
+
+	Text        = "text"
+	Checkbox    = "checkbox"
+	Radio       = "radio"
+	InputNumber = "inputNumber"
 )
 
 type Option struct {
@@ -102,6 +109,121 @@ type StatsInfo struct {
 	Trend      string  `json:"trend"`
 	LastError  string  `json:"last_error"`
 	FtQueueLag int64   `json:"-"`
+}
+
+type ErrorQueue struct {
+	ErrorSlice []ErrorInfo
+	Front      int
+	Rear       int
+	maxSize    int
+	mutex      *sync.RWMutex
+}
+
+type ErrorInfo struct {
+	Error        string `json:"error"`
+	UnixNanoTime int64  `json:"unix_nano_time"`
+	Count        int    `json:"count"`
+}
+
+func NewErrorQueue(maxSize int) *ErrorQueue {
+	if maxSize <= 0 {
+		maxSize = DefaultErrorsListCap
+	}
+	return &ErrorQueue{
+		make([]ErrorInfo, maxSize+1), // 多余的1个空间用来判断队列是否满了
+		0,
+		0,
+		maxSize + 1,
+		&sync.RWMutex{},
+	}
+}
+
+//向队列中添加元素
+func (entry *ErrorQueue) Put(e ErrorInfo) {
+	if entry.EqualLast(e) {
+		entry.mutex.Lock()
+		last := (entry.Rear + entry.maxSize - 1) % entry.maxSize
+		entry.ErrorSlice[last].Count++
+		entry.ErrorSlice[last].UnixNanoTime = e.UnixNanoTime
+		entry.mutex.Unlock()
+		return
+	}
+
+	entry.mutex.Lock()
+	if (entry.Rear+1)%entry.maxSize == entry.Front {
+		entry.Front = (entry.Front + 1) % entry.maxSize
+	}
+	entry.ErrorSlice[entry.Rear] = e
+	entry.ErrorSlice[entry.Rear].Count = 1
+	entry.Rear = (entry.Rear + 1) % entry.maxSize
+	entry.mutex.Unlock()
+}
+
+func (entry *ErrorQueue) Clear() {
+	entry.mutex.Lock()
+	entry.ErrorSlice = nil
+	entry.Front = 0
+	entry.Rear = 0
+	entry.mutex.Unlock()
+}
+
+func (entry *ErrorQueue) Size() int {
+	if entry.IsEmpty() {
+		return 0
+	}
+
+	entry.mutex.RLock()
+	size := (entry.Rear - entry.Front + entry.maxSize) % entry.maxSize
+	entry.mutex.RUnlock()
+	return size
+}
+
+func (entry *ErrorQueue) IsEmpty() bool {
+	entry.mutex.RLock()
+	empty := entry.Rear == entry.Front
+	entry.mutex.RUnlock()
+	return empty
+}
+
+// 按进出顺序复制到数组中
+func (entry *ErrorQueue) Copy() []ErrorInfo {
+	if entry.IsEmpty() {
+		return nil
+	}
+
+	var errorInfoList []ErrorInfo
+	entry.mutex.RLock()
+	for i := entry.Front; i != entry.Rear; i = (i + 1) % entry.maxSize {
+		errorInfoList = append(errorInfoList, entry.ErrorSlice[i])
+	}
+	entry.mutex.RUnlock()
+	return errorInfoList
+}
+
+//向队列中添加元素
+func (entry *ErrorQueue) EqualLast(e ErrorInfo) bool {
+	if entry.IsEmpty() {
+		return false
+	}
+	entry.mutex.RLock()
+	defer entry.mutex.RUnlock()
+	last := (entry.Rear + entry.maxSize - 1) % entry.maxSize
+	lastError := entry.ErrorSlice[last].Error
+	current := e.Error
+	if strings.EqualFold(lastError, current) {
+		return true
+	}
+
+	lastErrorIdx := strings.Index(lastError, PipeLineError)
+	currentIdx := strings.Index(current, PipeLineError)
+	if lastErrorIdx != -1 && currentIdx != -1 {
+		currentErrArr := strings.SplitN(current[currentIdx:], ":", 2)
+		lastErrorArr := strings.SplitN(lastError[lastErrorIdx:], ":", 2)
+		if strings.EqualFold(currentErrArr[0], lastErrorArr[0]) {
+			return true
+		}
+	}
+	return false
 }
 
 func (se *StatsError) AddSuccess() {

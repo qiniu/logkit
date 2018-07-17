@@ -52,6 +52,10 @@ type Runner interface {
 	Status() RunnerStatus
 }
 
+type RunnerErrors interface {
+	GetErrors() ErrorsResult
+}
+
 type TokenRefreshable interface {
 	TokenRefresh(AuthTokens) error
 }
@@ -63,6 +67,7 @@ type StatusPersistable interface {
 
 type LogExportRunner struct {
 	RunnerInfo
+	ErrorsList
 
 	stopped      int32
 	exitChan     chan struct{}
@@ -122,10 +127,19 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 	if info.MaxBatchInterval <= 0 {
 		info.MaxBatchInterval = defaultSendIntervalSeconds
 	}
+	if info.ErrorsListCap <= 0 {
+		info.ErrorsListCap = DefaultErrorsListCap
+	}
 	runner = &LogExportRunner{
 		RunnerInfo: info,
-		exitChan:   make(chan struct{}),
-		lastSend:   time.Now(), // 上一次发送时间
+		ErrorsList: ErrorsList{
+			ReadErrors:      NewErrorQueue(info.ErrorsListCap),
+			ParseErrors:     NewErrorQueue(info.ErrorsListCap),
+			TransformErrors: make(map[string]*ErrorQueue),
+			SendErrors:      make(map[string]*ErrorQueue),
+		},
+		exitChan: make(chan struct{}),
+		lastSend: time.Now(), // 上一次发送时间
 		rs: &RunnerStatus{
 			SenderStats:    make(map[string]StatsInfo),
 			TransformStats: make(map[string]StatsInfo),
@@ -182,6 +196,7 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 		MaxBatchLen:      rc.MaxBatchLen,
 		MaxBatchInterval: rc.MaxBatchInterval,
 		MaxBatchTryTimes: rc.MaxBatchTryTimes,
+		ErrorsListCap:    rc.ErrorsListCap,
 	}
 	if rc.ReaderConfig == nil {
 		return nil, errors.New(rc.RunnerName + " reader in config is nil")
@@ -358,6 +373,10 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 		}
 		if err != nil {
 			info.LastError = err.Error()
+			if r.SendErrors[s.Name()] == nil {
+				r.SendErrors[s.Name()] = NewErrorQueue(r.ErrorsListCap)
+			}
+			r.SendErrors[s.Name()].Put(ErrorInfo{err.Error(), time.Now().UnixNano(), 0})
 			//FaultTolerant Sender 正常的错误会在backupqueue里面记录，自己重试，此处无需重试
 			if se != nil && se.Ft && se.FtNotRetry {
 				break
@@ -426,6 +445,7 @@ func (r *LogExportRunner) readDatas(dr reader.DataReader, dataSourceTag string) 
 	r.rsMutex.Lock()
 	if err != nil {
 		r.rs.ReaderStats.LastError = err.Error()
+		r.ReadErrors.Put(ErrorInfo{err.Error(), time.Now().UnixNano(), 0})
 	} else {
 		r.rs.ReaderStats.LastError = ""
 	}
@@ -472,6 +492,7 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 		} else {
 			r.rs.ReaderStats.LastError = err.Error()
 		}
+		r.ReadErrors.Put(ErrorInfo{r.rs.ReaderStats.LastError, time.Now().UnixNano(), 0})
 	} else {
 		r.rs.ReaderStats.LastError = ""
 	}
@@ -514,6 +535,7 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 	}
 	if err != nil {
 		r.rs.ParserStats.LastError = err.Error()
+		r.ParseErrors.Put(ErrorInfo{err.Error(), time.Now().UnixNano(), 0})
 	}
 	r.rsMutex.Unlock()
 	if err != nil {
@@ -626,6 +648,10 @@ func (r *LogExportRunner) Run() {
 					statesTransformer.SetStats(err.Error())
 				}
 				tstats.LastError = err.Error()
+				if r.TransformErrors[tp] == nil {
+					r.TransformErrors[tp] = NewErrorQueue(r.ErrorsListCap)
+				}
+				r.TransformErrors[tp].Put(ErrorInfo{err.Error(), time.Now().UnixNano(), 0})
 			}
 
 			r.rs.TransformStats[tp] = tstats
@@ -847,6 +873,26 @@ func getTrend(old, new float64) string {
 		return SpeedDown
 	}
 	return SpeedStable
+}
+
+func (r *LogExportRunner) GetErrors() (errorsList ErrorsResult) {
+	var isFre bool
+	now := time.Now()
+	if isFre, errorsList = r.getErrorsFrequently(now); isFre {
+		return errorsList
+	}
+	errorsList = r.ErrorsList.Clone()
+	return errorsList
+}
+
+func (r *LogExportRunner) getErrorsFrequently(now time.Time) (bool, ErrorsResult) {
+	r.rsMutex.RLock()
+	defer r.rsMutex.RUnlock()
+	elaspedTime := now.Sub(r.rs.lastState).Seconds()
+	if elaspedTime <= 3 {
+		return true, r.ErrorsList.Clone()
+	}
+	return false, ErrorsResult{}
 }
 
 func (r *LogExportRunner) getStatusFrequently(now time.Time) (bool, float64, RunnerStatus) {
