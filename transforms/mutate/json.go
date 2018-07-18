@@ -53,7 +53,6 @@ func (g *Json) Transform(datas []Data) ([]Data, error) {
 		}
 
 		if len(news) == 0 {
-			DeleteMapValue(datas[i], keys...)
 			news = keys
 		}
 		setErr := SetMapValue(datas[i], jsonVal, false, news...)
