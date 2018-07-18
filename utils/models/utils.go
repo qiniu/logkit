@@ -751,3 +751,32 @@ func GetMapList(data string) map[string]string {
 	}
 	return ret
 }
+
+func PandoraKey(key string) string {
+	var nk string
+	for _, c := range key {
+		if c >= '0' && c <= '9' {
+			if len(nk) == 0 {
+				nk = "K"
+			}
+			nk = nk + string(c)
+		} else if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+			nk = nk + string(c)
+		} else if len(nk) > 0 {
+			nk = nk + "_"
+		}
+	}
+	return nk
+}
+
+func DeepConvertKey(data map[string]interface{}) map[string]interface{} {
+	newData := make(map[string]interface{})
+	for k, v := range data {
+		nk := PandoraKey(k)
+		if nv, ok := v.(map[string]interface{}); ok {
+			v = DeepConvertKey(nv)
+		}
+		newData[nk] = v
+	}
+	return newData
+}

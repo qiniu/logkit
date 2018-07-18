@@ -1025,8 +1025,11 @@ func TestPandoraExtraInfo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d = Data{}
-	d["x1"] = "123.2"
+	d = Data{
+		"*x1":        "123.2",
+		"x2.dot":     "123.2",
+		"@timestamp": "2018-07-18T10:17:36.549054846+08:00",
+	}
 	err = s.Send([]Data{d})
 	if st, ok := err.(*StatsError); ok {
 		err = st.ErrorDetail
@@ -1035,5 +1038,7 @@ func TestPandoraExtraInfo(t *testing.T) {
 		t.Error(err)
 	}
 	resp = pandora.Body
-	assert.Equal(t, resp, "x1=123.2")
+	assert.Equal(t, true, strings.Contains(resp, "x1=123.2"))
+	assert.Equal(t, true, strings.Contains(resp, "x2_dot=123.2"))
+	assert.Equal(t, true, strings.Contains(resp, "timestamp=2018-07-18T10:17:36.549054846+08:00"))
 }

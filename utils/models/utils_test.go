@@ -614,3 +614,47 @@ func TestPickMapValue(t *testing.T) {
 	PickMapValue(m, pick, "multi", "otherword")
 	assert.NotEqual(t, exp, pick)
 }
+
+func TestPandoraKey(t *testing.T) {
+	testKeys := []string{"@timestamp", ".dot", "percent%100", "^^^^^^^^^^", "timestamp"}
+	expectKeys := []string{"timestamp", "dot", "percent_100", "", "timestamp"}
+	for idx, key := range testKeys {
+		actual := PandoraKey(key)
+		assert.Equal(t, expectKeys[idx], actual)
+	}
+}
+
+func TestDeepConvertKey(t *testing.T) {
+	testDatas := []map[string]interface{}{
+		{
+			"@timestamp": "2018-07-18T10:17:36.549054846+08:00",
+			//"timestamp":  "2018-07-19T10:17:36.549054846+08:00",
+		},
+		{
+			".dot": "dot",
+		},
+		{
+			"dot":         "dot",
+			"percent%100": 100,
+			"^^^^^^^^^^":  "mytest",
+		},
+	}
+	expectDatas := []map[string]interface{}{
+		{
+			"timestamp": "2018-07-18T10:17:36.549054846+08:00",
+		},
+		{
+			"dot": "dot",
+		},
+		{
+			"dot":         "dot",
+			"percent_100": 100,
+			"":            "mytest",
+		},
+	}
+
+	for idx, data := range testDatas {
+		actual := DeepConvertKey(data)
+		assert.Equal(t, expectDatas[idx], actual)
+	}
+}
