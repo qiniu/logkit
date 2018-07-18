@@ -162,7 +162,7 @@ var (
 		{ModePostgreSQL, "从 PostgreSQL 读取"},
 		{ModeElastic, "从 Elasticsearch 读取"},
 		{ModeMongo, "从 MongoDB 读取"},
-		{ModeKafka, "从 Kafka 读取"},
+		{ModeKafka, "从 Kafka 读取 (针对0.8及以前版本)"},
 		{ModeRedis, "从 Redis 读取"},
 		{ModeSocket, "从 Socket 读取"},
 		{ModeHTTP, "从 http 请求中读取"},
