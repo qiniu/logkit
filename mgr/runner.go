@@ -52,10 +52,6 @@ type Runner interface {
 	Status() RunnerStatus
 }
 
-type Resetable interface {
-	Reset() error
-}
-
 type TokenRefreshable interface {
 	TokenRefresh(AuthTokens) error
 }
@@ -544,6 +540,11 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 }
 
 func (r *LogExportRunner) Run() {
+	if dr, ok := r.reader.(reader.DaemonReader); ok {
+		if err := dr.Start(); err != nil {
+			log.Errorf("Runner[%v] start reader daemon failed: %v", err)
+		}
+	}
 	if r.cleaner != nil {
 		go r.cleaner.Run()
 	}

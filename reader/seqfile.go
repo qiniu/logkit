@@ -120,6 +120,9 @@ func NewSeqFile(meta *Meta, path string, ignoreHidden, newFileNewLine bool, suff
 	//原来的for循环替换成单次执行，启动的时候出错就直接报错给用户即可，不需要等待重试。
 	f, dir, currFile, offset, err := getStartFile(path, whence, meta, sf)
 	if err != nil {
+		if strings.Contains(err.Error(), os.ErrPermission.Error()) {
+			return nil, err
+		}
 		log.Warnf("Runner[%v] NewSeqFile reader getStartFile from dir %v error %v, will find during read...", sf.meta.RunnerName, path, err)
 		err = nil
 		dir = path

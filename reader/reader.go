@@ -12,14 +12,24 @@ import (
 
 // Reader 代表了一个通用的行读取器
 type Reader interface {
-	//Name reader名称
+	// Name 用于返回读取器的具体名称
 	Name() string
-	//Source 读取的数据源
-	Source() string
-	ReadLine() (string, error)
+	// SetMode 用于设置读取器的匹配模式
 	SetMode(mode string, v interface{}) error
-	Close() error
+	// Source 用于返回当前读取的数据源
+	Source() string
+	// ReadLine 用于向读取器请求返回一行数据
+	ReadLine() (string, error)
+	// SyncMeta 用于通知读取器保存同步相关元数据
 	SyncMeta()
+	// Close 用于关闭读取器
+	Close() error
+}
+
+// DaemonReader 代表了一个需要守护线程的读取器
+type DaemonReader interface {
+	// Start 用于非阻塞的启动读取器对应的守护线程，需要读取器自行负责其生命周期
+	Start() error
 }
 
 // DataReader 代表了一个可直接读取内存数据结构的读取器
@@ -47,18 +57,6 @@ type FileReader interface {
 	Read(p []byte) (n int, err error)
 	Close() error
 	SyncMeta() error
-}
-
-// TODO 构建统一的 Server reader框架， 减少重复的编码
-type ServerReader interface {
-	//Name reader名称
-	Name() string
-	//Source 读取的数据源
-	Source() string
-	Start()
-	ReadLine() (string, error)
-	Close() error
-	SyncMeta()
 }
 
 // FileReader's conf keys
@@ -146,7 +144,7 @@ const (
 	KeyErrDirectReturn = "errDirectReturn"
 )
 
-var defaultIgnoreFileSuffix = []string{
+var DefaultIgnoreFileSuffixes = []string{
 	".pid", ".swap", ".go", ".conf", ".tar.gz", ".tar", ".zip",
 	".a", ".o", ".so"}
 
@@ -156,6 +154,7 @@ const (
 	ModeFile       = "file"
 	ModeTailx      = "tailx"
 	ModeFileAuto   = "fileauto"
+	ModeDirx       = "dirx"
 	ModeMySQL      = "mysql"
 	ModeMSSQL      = "mssql"
 	ModePostgreSQL = "postgres"
@@ -251,7 +250,7 @@ func (reg *Registry) NewReader(conf conf.MapConf, errDirectReturn bool) (reader 
 	return reg.NewReaderWithMeta(conf, meta, errDirectReturn)
 }
 
-func (reg *Registry) NewReaderWithMeta(conf conf.MapConf, meta *Meta, errDirectReturn bool) (reader Reader, err error) {
+func (reg *Registry) NewReaderWithMeta(conf conf.MapConf, meta *Meta, errDirectReturn bool) (Reader, error) {
 	if errDirectReturn {
 		conf[KeyErrDirectReturn] = Bool2String(errDirectReturn)
 	}
@@ -263,7 +262,7 @@ func (reg *Registry) NewReaderWithMeta(conf conf.MapConf, meta *Meta, errDirectR
 		return nil, fmt.Errorf("reader type unsupperted : %v", mode)
 	}
 
-	reader, err = constructor(meta, conf)
+	reader, err := constructor(meta, conf)
 	if err != nil {
 		return nil, err
 	}
@@ -273,6 +272,7 @@ func (reg *Registry) NewReaderWithMeta(conf conf.MapConf, meta *Meta, errDirectR
 			return nil, err
 		}
 	}
+
 	return reader, nil
 }
 
@@ -286,7 +286,7 @@ func NewFileDirReader(meta *Meta, conf conf.MapConf) (reader Reader, err error) 
 
 	// 默认不读取隐藏文件
 	ignoreHidden, _ := conf.GetBoolOr(KeyIgnoreHiddenFile, true)
-	ignoreFileSuffix, _ := conf.GetStringListOr(KeyIgnoreFileSuffix, defaultIgnoreFileSuffix)
+	ignoreFileSuffix, _ := conf.GetStringListOr(KeyIgnoreFileSuffix, DefaultIgnoreFileSuffixes)
 	validFilesRegex, _ := conf.GetStringOr(KeyValidFilePattern, "*")
 	newfileNewLine, _ := conf.GetBoolOr(KeyNewFileNewLine, false)
 	skipFirstLine, _ := conf.GetBoolOr(KeySkipFileFirstLine, false)

@@ -110,7 +110,7 @@ func (c *Cleaner) Name() string {
 	return c.name
 }
 
-func (c *Cleaner) shoudClean(size, count int64) bool {
+func (c *Cleaner) shouldClean(size, count int64) bool {
 	if c.reserveNumber > 0 && count > c.reserveNumber {
 		return true
 	}
@@ -127,14 +127,25 @@ func (c *Cleaner) checkBelong(path string) bool {
 		log.Errorf("GetRealPath for %v error %v", path, err)
 		return false
 	}
-	if c.meta.GetMode() == reader.ModeTailx {
+
+	switch c.meta.GetMode() {
+	case reader.ModeTailx:
 		matched, err := filepath.Match(filepath.Dir(c.logdir), filepath.Dir(path))
 		if err != nil {
-			log.Errorf("checkBelong %v %v err ", c.logdir, path, err)
+			log.Errorf("Failed to check if %q belongs to %q: %v", path, c.logdir, err)
+			return false
+		}
+		return matched
+
+	case reader.ModeDirx:
+		matched, err := filepath.Match(c.logdir, filepath.Dir(path))
+		if err != nil {
+			log.Errorf("Failed to check if %q belongs to %q: %v", path, c.logdir, err)
 			return false
 		}
 		return matched
 	}
+
 	if dir != c.logdir {
 		return false
 	}
@@ -164,7 +175,7 @@ func (c *Cleaner) Clean() (err error) {
 			size += logf.Info.Size()
 			count++
 			// 一旦符合条件，更老的文件必然都要删除
-			if beginClean || c.shoudClean(size, count) {
+			if beginClean || c.shouldClean(size, count) {
 				beginClean = true
 				sig := CleanSignal{
 					Logdir:   filepath.Dir(logf.Path),
