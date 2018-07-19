@@ -22,6 +22,7 @@ type MapReplacer struct {
 	Key     string `json:"key"`
 	Map     string `json:"map"`
 	MapFile string `json:"map_file"`
+	New     string `json:"new"`
 	rp      map[string]string
 	stats   StatsInfo
 }
@@ -49,18 +50,20 @@ func (g *MapReplacer) Init() error {
 	return nil
 }
 
-func (g *MapReplacer) convert(value string) string {
+func (g *MapReplacer) convert(value string) (string, bool) {
 	ret, ok := g.rp[value]
 	if !ok {
-		return value
+		return value, false
 	}
-	return ret
+	return ret, true
 }
 
 func (g *MapReplacer) Transform(datas []Data) ([]Data, error) {
 	var err, fmtErr error
 	errNum := 0
 	keys := GetKeys(g.Key)
+	news := GetKeys(g.New)
+
 	for i := range datas {
 		val, getErr := GetMapValue(datas[i], keys...)
 		if getErr != nil {
@@ -88,7 +91,15 @@ func (g *MapReplacer) Transform(datas []Data) ([]Data, error) {
 				continue
 			}
 		}
-		setErr := SetMapValue(datas[i], g.convert(strVal), false, keys...)
+
+		if len(news) == 0 {
+			news = keys
+		}
+		setVal, set := g.convert(strVal)
+		if !set {
+			continue
+		}
+		setErr := SetMapValue(datas[i], setVal, false, news...)
 		if setErr != nil {
 			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.Key)
 		}
@@ -115,6 +126,7 @@ func (g *MapReplacer) SampleConfig() string {
 	return `{
 		"type":"mapreplace",
 		"key":"MapReplaceFieldKey",
+		"new":"MapReplaceFieldNewKey"
 		"map":"abc 123, xyz nihao",
 		"map_file":"/your/path/to/mapfile"
 	}`
@@ -123,6 +135,7 @@ func (g *MapReplacer) SampleConfig() string {
 func (g *MapReplacer) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
+		transforms.KeyFieldNew,
 		{
 			KeyName:      "map",
 			ChooseOnly:   false,
