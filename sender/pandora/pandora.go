@@ -846,13 +846,13 @@ func (s *Sender) checkSchemaUpdate() {
 }
 
 func (s *Sender) Send(datas []Data) (se error) {
-	for i, v := range datas {
-		datas[i] = DeepConvertKey(v)
-	}
 	switch s.sendType {
 	case SendTypeRaw:
 		return s.rawSend(datas)
 	default:
+		for i, v := range datas {
+			datas[i] = DeepConvertKey(v)
+		}
 		return s.schemaFreeSend(datas)
 	}
 	return nil
