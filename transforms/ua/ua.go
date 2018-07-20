@@ -19,6 +19,7 @@ const Name = "UserAgent"
 var (
 	_ transforms.StatsTransformer = &UATransformer{}
 	_ transforms.Transformer      = &UATransformer{}
+	_ transforms.Initializer      = &UATransformer{}
 )
 
 type UATransformer struct {

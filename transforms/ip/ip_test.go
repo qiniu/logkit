@@ -1,6 +1,8 @@
 package ip
 
 import (
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -33,6 +35,31 @@ func TestTransformer(t *testing.T) {
 	}
 	assert.Equal(t, expe, ipt.stats)
 	assert.Equal(t, ipt.Stage(), transforms.StageAfterParser)
+
+	// 并发查询测试
+	{
+		var wg sync.WaitGroup
+		for i := 1; i <= 100; i++ {
+			wg.Add(1)
+			go func() {
+				info, err := ipt.loc.Find("111.2.3.4")
+				assert.Nil(t, err)
+				exp := &LocationInfo{
+					Country:      "中国",
+					Region:       "浙江",
+					City:         "宁波",
+					Isp:          "N/A",
+					CountryCode:  "",
+					Latitude:     "",
+					Longitude:    "",
+					DistrictCode: "",
+				}
+				assert.Equal(t, exp, info)
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+	}
 
 	ipt2 := &Transformer{
 		Key:      "multi.ip",
@@ -141,6 +168,9 @@ func TestTransformer(t *testing.T) {
 	}
 	assert.Equal(t, expe4, ipt.stats)
 	assert.Equal(t, ipt4.Stage(), transforms.StageAfterParser)
+
+	// 确保多个 transformer 只有两个 Locator 产生
+	assert.Len(t, locatorStore.locators, 2)
 }
 
 func Test_badData(t *testing.T) {
@@ -163,4 +193,12 @@ func Test_badData(t *testing.T) {
 	ierr, ok = err.(ErrInvalidFile)
 	assert.True(t, ok)
 	assert.Equal(t, "datx", ierr.Format)
+
+	ipt = &Transformer{
+		Key:      "ip",
+		DataPath: "./test_data/bad.datn",
+	}
+	_, err = ipt.Transform([]Data{{"ip": "111.2.3.4"}, {"ip": "x.x.x.x"}})
+	assert.Error(t, err)
+	assert.True(t, strings.Contains(err.Error(), "unrecognized data file format"))
 }

@@ -309,7 +309,7 @@ func createTransformers(rc RunnerConfig) ([]transforms.Transformer, error) {
 			return nil, fmt.Errorf("type %v of transformer unmarshal config error %v", strTP, err)
 		}
 		//transformer初始化
-		if trans, ok := trans.(transforms.Initialize); ok {
+		if trans, ok := trans.(transforms.Initializer); ok {
 			err = trans.Init()
 			if err != nil {
 				return nil, fmt.Errorf("type %v of transformer init error %v", strTP, err)

@@ -40,8 +40,8 @@ type StatsTransformer interface {
 	SetStats(string) StatsInfo
 }
 
-//transformer初始化方法接口,err不为空表示初始化失败
-type Initialize interface {
+// transformer 初始化方法接口,err 不为空表示初始化失败
+type Initializer interface {
 	Init() error
 }
 

@@ -449,7 +449,7 @@ func getTransformer(transConfig map[string]interface{}, create transforms.Creato
 		return nil, jsonErr
 	}
 
-	if trans, ok := trans.(transforms.Initialize); ok {
+	if trans, ok := trans.(transforms.Initializer); ok {
 		if err := trans.Init(); err != nil {
 			return nil, err
 		}
