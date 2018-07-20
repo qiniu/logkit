@@ -81,7 +81,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	config := consumergroup.NewConfig()
 	config.Zookeeper.Chroot = kr.ZookeeperChroot
 	config.Zookeeper.Timeout = kr.ZookeeperTimeout
-	config.Consumer.Return.Errors = true
+	//config.Consumer.Return.Errors = true  //怀疑有bug，会block 读取，先注释
 
 	/*********************  kafka offset *************************/
 	/* 这里设定的offset不影响原有的offset，因为kafka client会去获取   */
@@ -157,6 +157,8 @@ func (kr *Reader) ReadLine() (data string, err error) {
 				kr.curOffsets[msg.Topic] = tp
 			}
 			kr.statsLock.Unlock()
+		} else {
+			log.Debugf("runner[%v] Consumer read empty message: %v", kr.meta.RunnerName, msg)
 		}
 	case <-timer.C:
 	}
