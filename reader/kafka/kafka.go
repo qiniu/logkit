@@ -81,7 +81,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	config := consumergroup.NewConfig()
 	config.Zookeeper.Chroot = kr.ZookeeperChroot
 	config.Zookeeper.Timeout = kr.ZookeeperTimeout
-	config.Consumer.Return.Errors = true
+	//config.Consumer.Return.Errors = true
 
 	/*********************  kafka offset *************************/
 	/* 这里设定的offset不影响原有的offset，因为kafka client会去获取   */
