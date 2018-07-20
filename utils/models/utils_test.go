@@ -618,9 +618,44 @@ func TestPickMapValue(t *testing.T) {
 func TestPandoraKey(t *testing.T) {
 	testKeys := []string{"@timestamp", ".dot", "percent%100", "^^^^^^^^^^", "timestamp"}
 	expectKeys := []string{"timestamp", "dot", "percent_100", "", "timestamp"}
+	expectValid := []bool{false, false, false, false, true}
 	for idx, key := range testKeys {
-		actual := PandoraKey(key)
+		actual, valid := PandoraKey(key)
 		assert.Equal(t, expectKeys[idx], actual)
+		assert.Equal(t, expectValid[idx], valid)
+	}
+}
+
+func BenchmarkPandoraKey(b *testing.B) {
+	b.ReportAllocs()
+	testKeys := []string{"@timestamp", ".dot", "percent%100", "^^^^^^^^^^", "timestamp", "aaa"}
+	for i := 0; i < b.N; i++ {
+		for _, key := range testKeys {
+			PandoraKey(key)
+		}
+	}
+}
+
+func BenchmarkDeepConvertKey(b *testing.B) {
+	b.ReportAllocs()
+	testDatas := []map[string]interface{}{
+		{
+			"@timestamp": "2018-07-18T10:17:36.549054846+08:00",
+			//"timestamp":  "2018-07-19T10:17:36.549054846+08:00",
+		},
+		{
+			".dot": map[string]interface{}{".dot2": "dot"},
+		},
+		{
+			"dot":         map[string]interface{}{".dot2": "dot"},
+			"percent%100": 100,
+			"^^^^^^^^^^":  "mytest",
+		},
+	}
+	for i := 0; i < b.N; i++ {
+		for _, data := range testDatas {
+			DeepConvertKey(data)
+		}
 	}
 }
 
@@ -631,10 +666,10 @@ func TestDeepConvertKey(t *testing.T) {
 			//"timestamp":  "2018-07-19T10:17:36.549054846+08:00",
 		},
 		{
-			".dot": "dot",
+			".dot": map[string]interface{}{".dot2": "dot"},
 		},
 		{
-			"dot":         "dot",
+			"dot":         map[string]interface{}{".dot2": "dot"},
 			"percent%100": 100,
 			"^^^^^^^^^^":  "mytest",
 		},
@@ -644,10 +679,10 @@ func TestDeepConvertKey(t *testing.T) {
 			"timestamp": "2018-07-18T10:17:36.549054846+08:00",
 		},
 		{
-			"dot": "dot",
+			"dot": map[string]interface{}{"dot2": "dot"},
 		},
 		{
-			"dot":         "dot",
+			"dot":         map[string]interface{}{"dot2": "dot"},
 			"percent_100": 100,
 			"":            "mytest",
 		},
