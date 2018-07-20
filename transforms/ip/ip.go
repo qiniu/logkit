@@ -24,6 +24,7 @@ const (
 var (
 	_ transforms.StatsTransformer = &Transformer{}
 	_ transforms.Transformer      = &Transformer{}
+	_ transforms.Initializer      = &Transformer{}
 )
 
 type Transformer struct {
@@ -34,6 +35,15 @@ type Transformer struct {
 
 	loc   Locator
 	stats StatsInfo
+}
+
+func (t *Transformer) Init() error {
+	loc, err := NewLocator(t.DataPath)
+	if err != nil {
+		return fmt.Errorf("new locator: %v", err)
+	}
+	t.loc = loc
+	return nil
 }
 
 func (_ *Transformer) RawTransform(datas []string) ([]string, error) {
