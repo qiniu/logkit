@@ -752,31 +752,74 @@ func GetMapList(data string) map[string]string {
 	return ret
 }
 
-func PandoraKey(key string) string {
-	var nk string
-	for _, c := range key {
+// 判断时只有数字和字母为合法字符，规则：
+// 1. 首字符为数字时，增加首字符 "K"
+// 2. 首字符为非法字符时，去掉首字符（例如，如果字符串全为非法字符，则转换后为空）
+// 3. 非首字符并且为非法字符时，使用 "_" 替代非法字符
+func PandoraKey(key string) (string, bool) {
+	// check
+	valid := true
+	size := 0
+	for idx, c := range key {
 		if c >= '0' && c <= '9' {
-			if len(nk) == 0 {
-				nk = "K"
+			size++
+			if idx == 0 {
+				size++
+				valid = false
 			}
-			nk = nk + string(c)
-		} else if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
-			nk = nk + string(c)
-		} else if len(nk) > 0 {
-			nk = nk + "_"
+			continue
+		}
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+			size++
+			continue
+		}
+
+		if idx > 0 && size > 0 {
+			size++
+		}
+		valid = false
+	}
+	if valid {
+		return key, true
+	}
+
+	if size <= 0 {
+		return "", false
+	}
+
+	// set
+	bytes := make([]byte, size)
+	bp := 0
+	for idx, c := range key {
+		if c >= '0' && c <= '9' {
+			if idx == 0 {
+				bp += copy(bytes, "K")
+			}
+			bp += copy(bytes[bp:], string(c))
+			continue
+		}
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+			bp += copy(bytes[bp:], string(c))
+			continue
+		}
+
+		if idx > 0 {
+			bp += copy(bytes[bp:], "_")
 		}
 	}
-	return nk
+	return string(bytes), false
 }
 
 func DeepConvertKey(data map[string]interface{}) map[string]interface{} {
-	newData := make(map[string]interface{})
 	for k, v := range data {
-		nk := PandoraKey(k)
+		nk, valid := PandoraKey(k)
 		if nv, ok := v.(map[string]interface{}); ok {
 			v = DeepConvertKey(nv)
 		}
-		newData[nk] = v
+		if !valid {
+			delete(data, k)
+			data[nk] = v
+		}
 	}
-	return newData
+	return data
 }

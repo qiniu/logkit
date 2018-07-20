@@ -430,7 +430,7 @@ func formatKey(metricName string, statistic string) string {
 }
 
 func snakeCase(s string) string {
-	s = models.PandoraKey(s)
+	s, _ = models.PandoraKey(s)
 	s = strings.Replace(s, "__", "_", -1)
 	return s
 }
