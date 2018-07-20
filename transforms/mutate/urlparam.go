@@ -12,7 +12,10 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-const urlParamPath = "url_param_path"
+const (
+	urlParamPath = "url_param_path"
+	urlParamHost = "url_param_host"
+)
 
 var (
 	_ transforms.StatsTransformer = &UrlParam{}
@@ -26,11 +29,29 @@ type UrlParam struct {
 
 func (p *UrlParam) transformToMap(strVal string, key string) (map[string]interface{}, error) {
 	resultMap := make(map[string]interface{})
+	var urlPath string
 	if idx := strings.Index(strVal, "?"); idx != -1 {
 		if len(strVal[:idx]) != 0 {
-			resultMap[key+"_"+urlParamPath] = strVal[:idx]
+			urlPath = strVal[:idx]
 		}
 		strVal = strVal[idx+1:]
+	} else {
+		urlPath = strVal
+	}
+	if len(urlPath) > 0 {
+		uri, err := url.Parse(urlPath)
+		if err != nil {
+			return nil, err
+		}
+		if len(uri.Path) > 0 {
+			//如果同时满足不包含前缀`/`，还包含`&`，说明是个param
+			if strings.HasPrefix(uri.Path, "/") || !strings.Contains(uri.Path, "&") {
+				resultMap[key+"_"+urlParamPath] = uri.Path
+			}
+		}
+		if len(uri.Host) > 0 {
+			resultMap[key+"_"+urlParamHost] = uri.Host
+		}
 	}
 	if len(strVal) < 1 {
 		return resultMap, nil
