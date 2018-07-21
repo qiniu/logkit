@@ -1249,10 +1249,10 @@ func Test_restoreRecordsFile(t *testing.T) {
 		err = WriteRecordsFile(meta.DoneFilePath, getContent(test.set))
 		assert.NoError(t, err)
 
-		var records DBRecords
+		var records SyncDBRecords
 		_, _, omitDoneDBRecords := records.restoreRecordsFile(meta)
 		assert.EqualValues(t, test.exp_omitDoneDBRecords, omitDoneDBRecords)
-		assert.EqualValues(t, test.exp_res, records)
+		assert.EqualValues(t, test.exp_res, records.GetDBRecords())
 	}
 
 }
@@ -1555,7 +1555,7 @@ func TestMySql(t *testing.T) {
 		assert.Equal(t, expectData, data)
 		dataLine++
 	}
-	assert.Equal(t, minDataTestsLine+1, dataLine)
+	assert.Equal(t, minDataTestsLine, dataLine)
 	mrCronExecOnStart.SyncMeta()
 	mrCronExecOnStart.Close()
 
@@ -1630,23 +1630,6 @@ func prepareMysql() error {
 	defer db.Close()
 	if err = db.Ping(); err != nil {
 		return err
-	}
-
-	rowsDBs, err := db.Query("show databases;")
-	if err != nil {
-		return err
-	}
-	defer rowsDBs.Close()
-
-	databases := make([]string, 0)
-	for rowsDBs.Next() {
-		var s string
-		err = rowsDBs.Scan(&s)
-		if err != nil {
-			continue
-		}
-
-		databases = append(databases, s)
 	}
 
 	for _, dbInfo := range databasesTest {

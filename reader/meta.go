@@ -347,7 +347,7 @@ func (m *Meta) ReadOffset() (currFile string, offset int64, err error) {
 func (m *Meta) ReadDBDoneFile(database string) (content []string, err error) {
 	doneFiles, err := m.GetDoneFiles()
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	for _, f := range doneFiles {
@@ -355,12 +355,12 @@ func (m *Meta) ReadDBDoneFile(database string) (content []string, err error) {
 		if filepath.Base(f.Path) == filename {
 			content, err = ReadFileContent(f.Path)
 			if err != nil {
-				return
+				return nil, err
 			}
-			return
+			return nil, err
 		}
 	}
-	return
+	return content, nil
 }
 
 // ReadRecordsFile 读取当前runner已经读取的表
