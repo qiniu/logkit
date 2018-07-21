@@ -499,14 +499,15 @@ func TestSQLReader(t *testing.T) {
 	defer os.RemoveAll(MetaDir)
 	database := "TestSQLReaderdatabase"
 	mr := &Reader{
-		database:  database,
-		rawsqls:   "select * from mysql123  ;select * from mysql345;",
-		syncSQLs:  []string{"select * from mysql123", "select * from mysql345"},
-		readBatch: 100,
-		meta:      meta,
-		offsetKey: "id",
-		offsets:   []int64{123, 456},
-		dbtype:    "mysql",
+		rawDatabase: database,
+		database:    database,
+		rawsqls:     "select * from mysql123  ;select * from mysql345;",
+		syncSQLs:    []string{"select * from mysql123", "select * from mysql345"},
+		readBatch:   100,
+		meta:        meta,
+		offsetKey:   "id",
+		offsets:     []int64{123, 456},
+		dbtype:      "mysql",
 	}
 	assert.Equal(t, mr.dbtype+"_"+database, mr.Source())
 
