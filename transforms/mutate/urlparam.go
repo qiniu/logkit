@@ -20,11 +20,19 @@ const (
 var (
 	_ transforms.StatsTransformer = &UrlParam{}
 	_ transforms.Transformer      = &UrlParam{}
+	_ transforms.Initializer      = &UrlParam{}
 )
 
 type UrlParam struct {
 	Key   string `json:"key"`
 	stats StatsInfo
+
+	keys []string
+}
+
+func (p *UrlParam) Init() error {
+	p.keys = GetKeys(p.Key)
+	return nil
 }
 
 func (p *UrlParam) transformToMap(strVal string, key string) (map[string]interface{}, error) {
@@ -77,12 +85,14 @@ func (p *UrlParam) RawTransform(datas []string) ([]string, error) {
 }
 
 func (p *UrlParam) Transform(datas []Data) ([]Data, error) {
+	if p.keys == nil {
+		p.Init()
+	}
 	var err, fmtErr, toMapErr error
 	errNum := 0
-	keys := GetKeys(p.Key)
-	newKeys := make([]string, len(keys))
+	newKeys := make([]string, len(p.keys))
 	for i := range datas {
-		copy(newKeys, keys)
+		copy(newKeys, p.keys)
 		val, getErr := GetMapValue(datas[i], newKeys...)
 		if getErr != nil {
 			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, p.Key)

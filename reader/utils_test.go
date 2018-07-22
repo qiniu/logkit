@@ -166,7 +166,7 @@ func TestSetMapValueExistWithPrefix(t *testing.T) {
 	assert.Equal(t, exp2, data2)
 
 	err3 := SetMapValueExistWithPrefix(data2, "newVal", "prefix", []string{"xy", "name"}...)
-	assert.Error(t, err3)
+	assert.NoError(t, err3)
 
 	err4 := SetMapValueExistWithPrefix(data2, "newVal", "prefix", []string{"a", "hello"}...)
 	assert.NoError(t, err4)
@@ -176,6 +176,9 @@ func TestSetMapValueExistWithPrefix(t *testing.T) {
 			"age":         45,
 			"prefix_name": "newVal",
 			"hello":       "newVal",
+		},
+		"xy": map[string]interface{}{
+			"name": "newVal",
 		},
 	}
 	assert.Equal(t, exp4, data2)

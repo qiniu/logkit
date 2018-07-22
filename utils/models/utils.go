@@ -531,14 +531,15 @@ func GetMapValue(m map[string]interface{}, keys ...string) (interface{}, error) 
 	var err error
 	var val interface{}
 	val = m
-	for i, k := range keys {
+	curKeys := keys
+	for i, k := range curKeys {
 		//判断val是否为map[string]interface{}类型
 		if _, ok := val.(map[string]interface{}); ok {
 			//判断val(k)是否存在
 			if _, ok := val.(map[string]interface{})[k]; ok {
 				val = val.(map[string]interface{})[k]
 			} else {
-				keys = keys[0 : i+1]
+				curKeys = curKeys[0 : i+1]
 				err = fmt.Errorf("GetMapValue failed, keys %v are non-existent", keys)
 				return nil, err
 			}

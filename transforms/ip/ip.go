@@ -33,7 +33,10 @@ type Transformer struct {
 	DataPath    string `json:"data_path"`
 	KeyAsPrefix bool   `json:"key_as_prefix"`
 
-	loc              Locator
+	loc   Locator
+	stats StatsInfo
+
+	//为了提升性能提前做处理
 	keys             []string
 	lastEleKey       string
 	keysRegion       []string
@@ -44,13 +47,12 @@ type Transformer struct {
 	keysLatitude     []string
 	keysLongitude    []string
 	keysDistrictCode []string
-	stats            StatsInfo
 }
 
 func (t *Transformer) Init() error {
 	loc, err := NewLocator(t.DataPath)
 	if err != nil {
-		return fmt.Errorf("new locator: %v", err)
+		return err
 	}
 	t.loc = loc
 	t.keys = GetKeys(t.Key)

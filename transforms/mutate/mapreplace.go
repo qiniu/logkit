@@ -25,9 +25,14 @@ type MapReplacer struct {
 	New     string `json:"new"`
 	rp      map[string]string
 	stats   StatsInfo
+
+	keys []string
+	news []string
 }
 
 func (g *MapReplacer) Init() error {
+	g.keys = GetKeys(g.Key)
+	g.news = GetKeys(g.New)
 	if g.Map != "" {
 		g.rp = GetMapList(g.Map)
 		if len(g.rp) < 1 {
@@ -47,6 +52,7 @@ func (g *MapReplacer) Init() error {
 	if err != nil {
 		return fmt.Errorf("read %v as mapdata err %v", g.MapFile, err)
 	}
+
 	return nil
 }
 
@@ -61,11 +67,14 @@ func (g *MapReplacer) convert(value string) (string, bool) {
 func (g *MapReplacer) Transform(datas []Data) ([]Data, error) {
 	var err, fmtErr error
 	errNum := 0
-	keys := GetKeys(g.Key)
-	news := GetKeys(g.New)
-
+	if g.rp == nil {
+		err := g.Init()
+		if err != nil {
+			return datas, err
+		}
+	}
 	for i := range datas {
-		val, getErr := GetMapValue(datas[i], keys...)
+		val, getErr := GetMapValue(datas[i], g.keys...)
 		if getErr != nil {
 			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.Key)
 			continue
@@ -91,15 +100,14 @@ func (g *MapReplacer) Transform(datas []Data) ([]Data, error) {
 				continue
 			}
 		}
-
-		if len(news) == 0 {
-			news = keys
+		if len(g.news) == 0 {
+			g.news = g.keys
 		}
 		setVal, set := g.convert(strVal)
 		if !set {
 			continue
 		}
-		setErr := SetMapValue(datas[i], setVal, false, news...)
+		setErr := SetMapValue(datas[i], setVal, false, g.news...)
 		if setErr != nil {
 			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.Key)
 		}
