@@ -425,31 +425,30 @@ func SetMapValue(m map[string]interface{}, val interface{}, coercive bool, keys 
 	return nil
 }
 
-//通过层级key设置value值, 如果keys不存在则不加前缀，否则加前缀，forceSet为true时无论原来的值存不存在，都加前缀.
-func SetMapValueWithPrefix(m map[string]interface{}, val interface{}, prefix string, forceAdd bool, keys ...string) error {
+//通过层级key设置value值, 如果keys不存在则不加前缀，否则加前缀
+func SetMapValueExistWithPrefix(m map[string]interface{}, val interface{}, prefix string, keys ...string) error {
 	if len(keys) == 0 {
 		return nil
 	}
 	var curr map[string]interface{}
 	curr = m
-	var exist bool
-	for i, k := range keys {
-		if i < len(keys)-1 {
-			finalVal, ok := curr[k]
-			if !ok {
-				return fmt.Errorf("SetMapValueWithPrefix failed, keys %v are non-existent", val)
-			}
-			//判断val是否为map[string]interface{}类型
-			if curr, ok = finalVal.(map[string]interface{}); ok {
-				continue
-			}
-			return fmt.Errorf("SetMapValueWithPrefix failed, %v is not the type of map[string]interface{}", keys)
+	for _, k := range keys[0 : len(keys)-1] {
+		finalVal, ok := curr[k]
+		if !ok {
+			n := make(map[string]interface{})
+			curr[k] = n
+			curr = n
+			continue
 		}
-
-		//判断val(k)是否存在
-		_, exist = curr[k]
+		//判断val是否为map[string]interface{}类型
+		if curr, ok = finalVal.(map[string]interface{}); ok {
+			continue
+		}
+		return fmt.Errorf("SetMapValueWithPrefix failed, %v is not the type of map[string]interface{}", keys)
 	}
-	if exist || forceAdd {
+	//判断val(k)是否存在
+	_, exist := curr[keys[len(keys)-1]]
+	if exist {
 		curr[prefix+"_"+keys[len(keys)-1]] = val
 	} else {
 		curr[keys[len(keys)-1]] = val
@@ -752,6 +751,17 @@ func GetMapList(data string) map[string]string {
 	return ret
 }
 
+//为了提升性能做的一个预先检查，避免CPU浪费
+func CheckPandoraKey(key string) bool {
+	for _, c := range key {
+		if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
 // 判断时只有数字和字母为合法字符，规则：
 // 1. 首字符为数字时，增加首字符 "K"
 // 2. 首字符为非法字符时，去掉首字符（例如，如果字符串全为非法字符，则转换后为空）
@@ -793,33 +803,66 @@ func PandoraKey(key string) (string, bool) {
 	for idx, c := range key {
 		if c >= '0' && c <= '9' {
 			if idx == 0 {
-				bp += copy(bytes, "K")
+				bytes[bp] = 'K'
+				bp++
 			}
-			bp += copy(bytes[bp:], string(c))
+			bytes[bp] = byte(c)
+			bp++
 			continue
 		}
 		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
-			bp += copy(bytes[bp:], string(c))
+			bytes[bp] = byte(c)
+			bp++
 			continue
 		}
 
 		if idx > 0 {
-			bp += copy(bytes[bp:], "_")
+			bytes[bp] = '_'
+			bp++
 		}
 	}
-	return string(bytes), false
+	return string(bytes), valid
 }
 
 func DeepConvertKey(data map[string]interface{}) map[string]interface{} {
 	for k, v := range data {
-		nk, valid := PandoraKey(k)
-		if nv, ok := v.(map[string]interface{}); ok {
+		nv, ok := v.(map[string]interface{})
+		if ok {
 			v = DeepConvertKey(nv)
 		}
+		valid := CheckPandoraKey(k)
 		if !valid {
 			delete(data, k)
-			data[nk] = v
+			k, _ := PandoraKey(k)
+			data[k] = v
 		}
 	}
 	return data
+}
+
+//注意：cache如果是nil，这个函数就完全没有意义，不如调用 DeepConvertKey
+func DeepConvertKeyWithCache(data map[string]interface{}, cache map[string]KeyInfo) map[string]interface{} {
+	for k, v := range data {
+		if nv, ok := v.(map[string]interface{}); ok {
+			v = DeepConvertKeyWithCache(nv, cache)
+		}
+		keyInfo, exist := cache[k]
+		if !exist {
+			keyInfo.NewKey, keyInfo.Valid = PandoraKey(k)
+			if cache == nil {
+				cache = make(map[string]KeyInfo)
+			}
+			cache[k] = keyInfo
+		}
+		if !keyInfo.Valid {
+			delete(data, k)
+			data[keyInfo.NewKey] = v
+		}
+	}
+	return data
+}
+
+type KeyInfo struct {
+	Valid  bool
+	NewKey string
 }

@@ -33,8 +33,18 @@ type Transformer struct {
 	DataPath    string `json:"data_path"`
 	KeyAsPrefix bool   `json:"key_as_prefix"`
 
-	loc   Locator
-	stats StatsInfo
+	loc              Locator
+	keys             []string
+	lastEleKey       string
+	keysRegion       []string
+	keysCity         []string
+	keysCountry      []string
+	keysIsp          []string
+	keysCountryCode  []string
+	keysLatitude     []string
+	keysLongitude    []string
+	keysDistrictCode []string
+	stats            StatsInfo
 }
 
 func (t *Transformer) Init() error {
@@ -43,7 +53,30 @@ func (t *Transformer) Init() error {
 		return fmt.Errorf("new locator: %v", err)
 	}
 	t.loc = loc
+	t.keys = GetKeys(t.Key)
+
+	newKeys := make([]string, len(t.keys))
+	copy(newKeys, t.keys)
+	t.lastEleKey = t.keys[len(t.keys)-1]
+	t.keysRegion = generateKeys(t.keys, Region, t.KeyAsPrefix)
+	t.keysCity = generateKeys(t.keys, City, t.KeyAsPrefix)
+	t.keysCountry = generateKeys(t.keys, Country, t.KeyAsPrefix)
+	t.keysIsp = generateKeys(t.keys, Isp, t.KeyAsPrefix)
+	t.keysCountryCode = generateKeys(t.keys, CountryCode, t.KeyAsPrefix)
+	t.keysLatitude = generateKeys(t.keys, Latitude, t.KeyAsPrefix)
+	t.keysLongitude = generateKeys(t.keys, Longitude, t.KeyAsPrefix)
+	t.keysDistrictCode = generateKeys(t.keys, DistrictCode, t.KeyAsPrefix)
 	return nil
+}
+
+func generateKeys(keys []string, lastEle string, keyAsPrefix bool) []string {
+	newKeys := make([]string, len(keys))
+	copy(newKeys, keys)
+	if keyAsPrefix {
+		lastEle = keys[len(keys)-1] + "_" + lastEle
+	}
+	newKeys[len(keys)-1] = lastEle
+	return newKeys
 }
 
 func (_ *Transformer) RawTransform(datas []string) ([]string, error) {
@@ -54,18 +87,15 @@ func (t *Transformer) Transform(datas []Data) ([]Data, error) {
 	var err, fmtErr error
 	errNum := 0
 	if t.loc == nil {
-		loc, err := NewLocator(t.DataPath)
+		err := t.Init()
 		if err != nil {
-			t.stats, _ = transforms.SetStatsInfo(err, t.stats, int64(errNum), int64(len(datas)), t.Type())
 			return datas, err
 		}
-		t.loc = loc
 	}
-	keys := GetKeys(t.Key)
-	newKeys := make([]string, len(keys))
+	newKeys := make([]string, len(t.keys))
 	for i := range datas {
-		copy(newKeys, keys)
-		val, getErr := GetMapValue(datas[i], keys...)
+		copy(newKeys, t.keys)
+		val, getErr := GetMapValue(datas[i], t.keys...)
 		if getErr != nil {
 			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, t.Key)
 			continue
@@ -81,34 +111,81 @@ func (t *Transformer) Transform(datas []Data) ([]Data, error) {
 			errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
 			continue
 		}
-		newKeys[len(newKeys)-1] = Region
-		SetMapValueWithPrefix(datas[i], info.Region, keys[len(keys)-1], t.KeyAsPrefix, newKeys...)
-		newKeys[len(newKeys)-1] = City
-		SetMapValueWithPrefix(datas[i], info.City, keys[len(keys)-1], t.KeyAsPrefix, newKeys...)
-		newKeys[len(newKeys)-1] = Country
-		SetMapValueWithPrefix(datas[i], info.Country, keys[len(keys)-1], t.KeyAsPrefix, newKeys...)
-		newKeys[len(newKeys)-1] = Isp
-		SetMapValueWithPrefix(datas[i], info.Isp, keys[len(keys)-1], t.KeyAsPrefix, newKeys...)
+		findErr = t.SetMapValue(datas[i], info.Region, t.keysRegion...)
+		if findErr != nil {
+			errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
+		}
+		findErr = t.SetMapValue(datas[i], info.City, t.keysCity...)
+		if findErr != nil {
+			errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
+		}
+		findErr = t.SetMapValue(datas[i], info.Country, t.keysCountry...)
+		if findErr != nil {
+			errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
+		}
+		findErr = t.SetMapValue(datas[i], info.Isp, t.keysIsp...)
+		if findErr != nil {
+			errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
+		}
 		if info.CountryCode != "" {
-			newKeys[len(newKeys)-1] = CountryCode
-			SetMapValueWithPrefix(datas[i], info.CountryCode, keys[len(keys)-1], t.KeyAsPrefix, newKeys...)
+			findErr = t.SetMapValue(datas[i], info.CountryCode, t.keysCountryCode...)
+			if findErr != nil {
+				errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
+			}
 		}
 		if info.Latitude != "" {
-			newKeys[len(newKeys)-1] = Latitude
-			SetMapValueWithPrefix(datas[i], info.Latitude, keys[len(keys)-1], t.KeyAsPrefix, newKeys...)
+			findErr = t.SetMapValue(datas[i], info.Latitude, t.keysLatitude...)
+			if findErr != nil {
+				errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
+			}
 		}
 		if info.Longitude != "" {
-			newKeys[len(newKeys)-1] = Longitude
-			SetMapValueWithPrefix(datas[i], info.Longitude, keys[len(keys)-1], t.KeyAsPrefix, newKeys...)
+			findErr = t.SetMapValue(datas[i], info.Longitude, t.keysLongitude...)
+			if findErr != nil {
+				errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
+			}
 		}
 		if info.DistrictCode != "" {
-			newKeys[len(newKeys)-1] = DistrictCode
-			SetMapValueWithPrefix(datas[i], info.DistrictCode, keys[len(keys)-1], t.KeyAsPrefix, newKeys...)
+			findErr = t.SetMapValue(datas[i], info.DistrictCode, t.keysDistrictCode...)
+			if findErr != nil {
+				errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
+			}
 		}
 	}
 
 	t.stats, fmtErr = transforms.SetStatsInfo(err, t.stats, int64(errNum), int64(len(datas)), t.Type())
 	return datas, fmtErr
+}
+
+//通过层级key设置value值, 如果keys不存在则不加前缀，否则加前缀
+func (t *Transformer) SetMapValue(m map[string]interface{}, val interface{}, keys ...string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	var curr map[string]interface{}
+	curr = m
+	for _, k := range keys[0 : len(keys)-1] {
+		finalVal, ok := curr[k]
+		if !ok {
+			n := make(map[string]interface{})
+			curr[k] = n
+			curr = n
+			continue
+		}
+		//判断val是否为map[string]interface{}类型
+		if curr, ok = finalVal.(map[string]interface{}); ok {
+			continue
+		}
+		return fmt.Errorf("SetMapValueWithPrefix failed, %v is not the type of map[string]interface{}", keys)
+	}
+	//判断val(k)是否存在
+	_, exist := curr[keys[len(keys)-1]]
+	if exist {
+		curr[t.lastEleKey+"_"+keys[len(keys)-1]] = val
+	} else {
+		curr[keys[len(keys)-1]] = val
+	}
+	return nil
 }
 
 func (_ *Transformer) Description() string {

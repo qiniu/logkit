@@ -136,11 +136,11 @@ func TestGetTags(t *testing.T) {
 	assert.Equal(t, exp, tags)
 }
 
-func TestSetMapValueWithPrefix(t *testing.T) {
+func TestSetMapValueExistWithPrefix(t *testing.T) {
 	data1 := map[string]interface{}{
 		"a": "b",
 	}
-	err1 := SetMapValueWithPrefix(data1, "newVal", "prefix", false, "a")
+	err1 := SetMapValueExistWithPrefix(data1, "newVal", "prefix", "a")
 	assert.NoError(t, err1)
 	exp1 := map[string]interface{}{
 		"a":        "b",
@@ -154,7 +154,7 @@ func TestSetMapValueWithPrefix(t *testing.T) {
 			"age":  45,
 		},
 	}
-	err2 := SetMapValueWithPrefix(data2, "newVal", "prefix", false, []string{"a", "name"}...)
+	err2 := SetMapValueExistWithPrefix(data2, "newVal", "prefix", []string{"a", "name"}...)
 	assert.NoError(t, err2)
 	exp2 := map[string]interface{}{
 		"a": map[string]interface{}{
@@ -165,10 +165,10 @@ func TestSetMapValueWithPrefix(t *testing.T) {
 	}
 	assert.Equal(t, exp2, data2)
 
-	err3 := SetMapValueWithPrefix(data2, "newVal", "prefix", false, []string{"xy", "name"}...)
+	err3 := SetMapValueExistWithPrefix(data2, "newVal", "prefix", []string{"xy", "name"}...)
 	assert.Error(t, err3)
 
-	err4 := SetMapValueWithPrefix(data2, "newVal", "prefix", false, []string{"a", "hello"}...)
+	err4 := SetMapValueExistWithPrefix(data2, "newVal", "prefix", []string{"a", "hello"}...)
 	assert.NoError(t, err4)
 	exp4 := map[string]interface{}{
 		"a": map[string]interface{}{
@@ -180,11 +180,4 @@ func TestSetMapValueWithPrefix(t *testing.T) {
 	}
 	assert.Equal(t, exp4, data2)
 
-	data5 := map[string]interface{}{}
-	err5 := SetMapValueWithPrefix(data5, "newVal", "prefix", true, "a")
-	assert.NoError(t, err5)
-	exp5 := map[string]interface{}{
-		"prefix_a": "newVal",
-	}
-	assert.Equal(t, exp5, data5)
 }
