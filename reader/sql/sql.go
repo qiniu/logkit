@@ -143,6 +143,12 @@ func (syncDBRecords *SyncDBRecords) SetTableRecords(db string, tableRecords Tabl
 	syncDBRecords.mutex.Unlock()
 }
 
+func (syncDBRecords *SyncDBRecords) SetTableInfo(db, table string, tableInfo TableInfo) {
+	syncDBRecords.mutex.Lock()
+	syncDBRecords.records.SetTableInfo(db, table, tableInfo)
+	syncDBRecords.mutex.Unlock()
+}
+
 func (syncDBRecords *SyncDBRecords) GetTableRecords(db string) TableRecords {
 	syncDBRecords.mutex.RLock()
 	tableRecords := syncDBRecords.records.GetTableRecords(db)
@@ -174,6 +180,18 @@ func (dbRecords *DBRecords) SetTableRecords(db string, tableRecords TableRecords
 	if *dbRecords == nil {
 		*dbRecords = make(DBRecords)
 	}
+	(*dbRecords)[db] = tableRecords
+}
+
+func (dbRecords *DBRecords) SetTableInfo(db, table string, tableInfo TableInfo) {
+	if *dbRecords == nil {
+		*dbRecords = make(DBRecords)
+	}
+	tableRecords := (*dbRecords)[db]
+	if tableRecords == nil {
+		tableRecords = make(TableRecords)
+	}
+	tableRecords[table] = tableInfo
 	(*dbRecords)[db] = tableRecords
 }
 
@@ -489,17 +507,17 @@ func (dbRecords *SyncDBRecords) restoreRecordsFile(meta *reader.Meta) (lastDB, l
 		return lastDB, lastTable, true
 	}
 
+	omitDoneDBRecords = true
 	recordsDoneLength := len(recordsDone)
 	if recordsDoneLength <= 0 {
 		return lastDB, lastTable, true
 	}
 
-	omitDoneDBRecords = false
 	for idx, record := range recordsDone {
 		tmpDBRecords := TrimeList(strings.Split(record, sqlOffsetConnector))
 		if int64(len(tmpDBRecords)) != 2 {
 			log.Errorf("Runner[%v] %v -meta records done file is not invalid sql records done file %v， omit meta data", meta.RunnerName, meta.MetaFile(), record)
-			return lastDB, lastTable, true
+			continue
 		}
 
 		database := tmpDBRecords[0]
@@ -512,16 +530,17 @@ func (dbRecords *SyncDBRecords) restoreRecordsFile(meta *reader.Meta) (lastDB, l
 		tmpTablesRecords := TrimeList(strings.Split(tmpDBRecords[1], "@"))
 		if int64(len(tmpTablesRecords)) < 1 {
 			log.Errorf("Runner[%v] %v -meta records done file is not invalid sql records done file %v， omit meta data", meta.RunnerName, meta.MetaFile(), tmpDBRecords)
-			return lastDB, lastTable, true
+			continue
 		}
 
 		for idx, tableRecord := range tmpTablesRecords {
 			tableRecordArr := strings.Split(tableRecord, ",")
 			if int64(len(tableRecordArr)) != 4 {
 				log.Errorf("Runner[%v] %v -meta records done file is not invalid sql records done file %v， omit meta data", meta.RunnerName, meta.MetaFile(), tableRecord)
-				return lastDB, lastTable, true
+				continue
 			}
 
+			omitDoneDBRecords = false
 			size, err := strconv.ParseInt(tableRecordArr[1], 10, 64)
 			if err != nil {
 				log.Errorf("Runner[%v] %v -meta file sql is out of date %v or parse size err %v， omit this offset", meta.RunnerName, meta.MetaFile(), tableRecordArr[1], err)
@@ -544,13 +563,15 @@ func (dbRecords *SyncDBRecords) restoreRecordsFile(meta *reader.Meta) (lastDB, l
 			}
 		}
 
-		dbRecords.SetTableRecords(database, tableRecords)
+		if len(tableRecords) != 0 {
+			dbRecords.SetTableRecords(database, tableRecords)
+		}
 		if idx == recordsDoneLength-1 {
 			lastDB = database
 		}
 	}
 
-	return lastDB, lastTable, false
+	return lastDB, lastTable, omitDoneDBRecords
 }
 
 func convertMagic(magic string, now time.Time) (ret string) {
@@ -1159,7 +1180,6 @@ func (r *Reader) execReadDB(curDB string, now time.Time, recordTablesDone TableR
 		exit := false
 		var tableName string
 		var readSize int64
-		tmpTablesRecords := r.syncRecords.GetTableRecords(curDB)
 		for !exit {
 			if r.rawsqls == "" && idx < tablesLen {
 				tableName = tables[idx]
@@ -1174,9 +1194,8 @@ func (r *Reader) execReadDB(curDB string, now time.Time, recordTablesDone TableR
 			}
 
 			if r.rawsqls == "" {
-				tmpTablesRecords.SetTableInfo(tableName, TableInfo{size: readSize, offset: -1})
-				r.syncRecords.SetTableRecords(curDB, tmpTablesRecords)
-				r.doneRecords.SetTableRecords(curDB, tmpTablesRecords)
+				r.syncRecords.SetTableInfo(curDB, tableName, TableInfo{size: readSize, offset: -1})
+				r.doneRecords.SetTableInfo(curDB, tableName, TableInfo{size: readSize, offset: -1})
 				recordTablesDone.SetTableInfo(tableName, TableInfo{size: readSize, offset: -1})
 			}
 
@@ -1498,17 +1517,12 @@ func (r *Reader) SyncMeta() {
 		dbRecords := r.syncRecords.GetDBRecords()
 
 		for database, tablesRecord := range dbRecords {
-			var tablesRecordStr string
 			for table, tableInfo := range tablesRecord {
-				tablesRecordStr += table + "," +
+				all += database + sqlOffsetConnector + table + "," +
 					strconv.FormatInt(tableInfo.size, 10) + "," +
 					strconv.FormatInt(tableInfo.offset, 10) + "," +
-					now + "@"
+					now + "@" + "\n"
 			}
-			if tablesRecordStr == "" {
-				continue
-			}
-			all += database + sqlOffsetConnector + tablesRecordStr + "\n"
 		}
 
 		if len(all) <= 0 {
@@ -1518,7 +1532,6 @@ func (r *Reader) SyncMeta() {
 
 		if err := WriteRecordsFile(r.meta.DoneFilePath, all); err != nil {
 			log.Errorf("Runner[%v] %v SyncMeta error %v", r.meta.RunnerName, r.Name(), err)
-			return
 		}
 		r.syncRecords.Reset()
 		return
