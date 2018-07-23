@@ -18,6 +18,7 @@ import (
 var (
 	_ transforms.StatsTransformer = &Script{}
 	_ transforms.Transformer      = &Script{}
+	_ transforms.Initializer      = &Script{}
 )
 
 type Script struct {

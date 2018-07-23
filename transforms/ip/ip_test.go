@@ -16,6 +16,7 @@ func TestTransformer(t *testing.T) {
 		Key:      "ip",
 		DataPath: "./test_data/17monipdb.dat",
 	}
+	assert.Nil(t, ipt.Init())
 	data, err := ipt.Transform([]Data{{"ip": "111.2.3.4"}, {"ip": "x.x.x.x"}})
 	assert.Error(t, err)
 	exp := []Data{{
@@ -65,6 +66,7 @@ func TestTransformer(t *testing.T) {
 		Key:      "multi.ip",
 		DataPath: "./test_data/17monipdb.dat",
 	}
+	assert.Nil(t, ipt.Init())
 	data2, err2 := ipt2.Transform([]Data{{"multi": map[string]interface{}{"ip": "111.2.3.4"}}, {"multi": map[string]interface{}{"ip": "x.x.x.x"}}})
 	assert.Error(t, err2)
 	exp2 := []Data{{
@@ -171,6 +173,35 @@ func TestTransformer(t *testing.T) {
 
 	// 确保多个 transformer 只有两个 Locator 产生
 	assert.Len(t, locatorStore.locators, 2)
+}
+
+var dttest []Data
+
+//old: 1000000	      1152 ns/op	     432 B/op	      16 allocs/op
+//new: 2000000	       621 ns/op	     232 B/op	       7 allocs/op
+func BenchmarkIpTrans(b *testing.B) {
+	b.ReportAllocs()
+	ipt4 := &Transformer{
+		Key:         "multi.ip2",
+		DataPath:    "./test_data/17monipdb.dat",
+		KeyAsPrefix: true,
+	}
+	ipt4.Init()
+	data := []Data{
+		{
+			"multi": map[string]interface{}{
+				"ip":      "111.2.3.4",
+				"Region":  "浙江",
+				"City":    "宁波",
+				"Country": "中国",
+				"Isp":     "N/A",
+				"ip2":     "183.251.28.250",
+			},
+		},
+	}
+	for i := 0; i < b.N; i++ {
+		dttest, _ = ipt4.Transform(data)
+	}
 }
 
 func Test_badData(t *testing.T) {

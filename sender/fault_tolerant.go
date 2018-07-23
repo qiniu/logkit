@@ -35,19 +35,20 @@ var _ SkipDeepCopySender = &FtSender{}
 
 // FtSender fault tolerance sender wrapper
 type FtSender struct {
-	stopped     int32
-	exitChan    chan struct{}
-	innerSender Sender
-	logQueue    queue.BackendQueue
-	BackupQueue queue.BackendQueue
-	writeLimit  int // 写入速度限制，单位MB
-	strategy    string
-	procs       int //发送并发数
-	runnerName  string
-	opt         *FtOption
-	stats       StatsInfo
-	statsMutex  *sync.RWMutex
-	jsontool    jsoniter.API
+	stopped         int32
+	exitChan        chan struct{}
+	innerSender     Sender
+	logQueue        queue.BackendQueue
+	BackupQueue     queue.BackendQueue
+	writeLimit      int // 写入速度限制，单位MB
+	strategy        string
+	procs           int //发送并发数
+	runnerName      string
+	opt             *FtOption
+	stats           StatsInfo
+	statsMutex      *sync.RWMutex
+	jsontool        jsoniter.API
+	pandoraKeyCache map[string]KeyInfo
 }
 
 type FtOption struct {
@@ -59,6 +60,7 @@ type FtOption struct {
 	memoryChannel     bool
 	memoryChannelSize int
 	longDataDiscard   bool
+	innerSenderType   string
 }
 
 type datasContext struct {
@@ -66,7 +68,7 @@ type datasContext struct {
 }
 
 // NewFtSender Fault tolerant sender constructor
-func NewFtSender(ftSender Sender, conf conf.MapConf, ftSaveLogPath string) (*FtSender, error) {
+func NewFtSender(innerSender Sender, conf conf.MapConf, ftSaveLogPath string) (*FtSender, error) {
 	memoryChannel, _ := conf.GetBoolOr(KeyFtMemoryChannel, false)
 	memoryChannelSize, _ := conf.GetIntOr(KeyFtMemoryChannelSize, 100)
 	logPath, _ := conf.GetStringOr(KeyFtSaveLogPath, ftSaveLogPath)
@@ -74,6 +76,7 @@ func NewFtSender(ftSender Sender, conf conf.MapConf, ftSaveLogPath string) (*FtS
 	writeLimit, _ := conf.GetIntOr(KeyFtWriteLimit, defaultWriteLimit)
 	strategy, _ := conf.GetStringOr(KeyFtStrategy, KeyFtStrategyBackupOnly)
 	longDataDiscard, _ := conf.GetBoolOr(KeyFtLongDataDiscard, false)
+	senderType, _ := conf.GetStringOr(KeySenderType, "") //此处不会没有SenderType，在调用NewFtSender时已经检查
 	switch strategy {
 	case KeyFtStrategyAlwaysSave, KeyFtStrategyBackupOnly, KeyFtStrategyConcurrent:
 	default:
@@ -91,9 +94,10 @@ func NewFtSender(ftSender Sender, conf conf.MapConf, ftSaveLogPath string) (*FtS
 		memoryChannel:     memoryChannel,
 		memoryChannelSize: memoryChannelSize,
 		longDataDiscard:   longDataDiscard,
+		innerSenderType:   senderType,
 	}
 
-	return newFtSender(ftSender, runnerName, opt)
+	return newFtSender(innerSender, runnerName, opt)
 }
 
 func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSender, error) {
@@ -123,6 +127,10 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 		statsMutex:  new(sync.RWMutex),
 		jsontool:    jsoniter.Config{EscapeHTML: true, UseNumber: true}.Froze(),
 	}
+
+	if opt.innerSenderType == TypePandora {
+		ftSender.pandoraKeyCache = make(map[string]KeyInfo)
+	}
 	go ftSender.asyncSendLogFromDiskQueue()
 	return &ftSender, nil
 }
@@ -132,6 +140,15 @@ func (ft *FtSender) Name() string {
 }
 
 func (ft *FtSender) Send(datas []Data) error {
+
+	switch ft.opt.innerSenderType {
+	case TypePandora:
+		for i, v := range datas {
+			datas[i] = DeepConvertKeyWithCache(v, ft.pandoraKeyCache)
+		}
+	default:
+	}
+
 	se := &StatsError{Ft: true}
 	if ft.strategy == KeyFtStrategyBackupOnly {
 		// 尝试直接发送数据，当数据失败的时候会加入到本地重试队列。外部不需要重试
