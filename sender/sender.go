@@ -266,7 +266,9 @@ func (r *Registry) NewSender(conf conf.MapConf, ftSaveLogPath string) (sender Se
 		return
 	}
 	faultTolerant, _ := conf.GetBoolOr(KeyFaultTolerant, true)
-	if faultTolerant {
+
+	//如果是 PandoraSender，目前的依赖必须启用 ftsender,依赖Ftsender做key转换检查
+	if faultTolerant || sendType == TypePandora {
 		sender, err = NewFtSender(sender, conf, ftSaveLogPath)
 		if err != nil {
 			return

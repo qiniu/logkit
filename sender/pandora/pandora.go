@@ -48,7 +48,6 @@ type Sender struct {
 	microsecondCounter uint64
 	extraInfo          map[string]string
 	sendType           string
-	keyCache           map[string]KeyInfo
 }
 
 // UserSchema was parsed pandora schema from user's raw schema
@@ -432,7 +431,6 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 		schemas:    make(map[string]pipeline.RepoSchemaEntry),
 		extraInfo:  utilsos.GetExtraInfo(),
 		sendType:   opt.sendType,
-		keyCache:   make(map[string]KeyInfo),
 	}
 
 	expandAttr := make([]string, 0)
@@ -852,9 +850,6 @@ func (s *Sender) Send(datas []Data) (se error) {
 	case SendTypeRaw:
 		return s.rawSend(datas)
 	default:
-		for i, v := range datas {
-			datas[i] = DeepConvertKeyWithCache(v, s.keyCache)
-		}
 		return s.schemaFreeSend(datas)
 	}
 	return nil
