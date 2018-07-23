@@ -216,15 +216,20 @@ func (c *Pipeline) UpdateRepoWithLogDB(input *UpdateRepoInput, ex ExportDesc) er
 	if !ok {
 		return fmt.Errorf("export logdb spec doc assert error %v is not map[string]interface{}", ex.Spec["doc"])
 	}
-	omitEmpty, ok := ex.Spec["omitEmpty"].(bool)
-	if !ok {
-		return fmt.Errorf("export logdb spec omitEmpty assert error %v is not bool", ex.Spec["omitEmpty"])
-	}
-	omitInvalid, ok := ex.Spec["omitInvalid"].(bool)
-	if !ok {
-		return fmt.Errorf("export logdb spec omitInvalid assert error %v is not bool", ex.Spec["omitInvalid"])
-	}
 
+	var omitEmpty, omitInvalid bool
+	if omitEmptyInter, ok := ex.Spec["omitEmpty"]; ok {
+		omitEmpty, ok = omitEmptyInter.(bool)
+		if !ok {
+			log.Errorf("export logdb spec omitEmpty assert error %v is not bool", ex.Spec["omitEmpty"])
+		}
+	}
+	if omitInvalidInter, ok := ex.Spec["omitInvalid"]; ok {
+		omitInvalid, ok = omitInvalidInter.(bool)
+		if !ok {
+			log.Errorf("export logdb spec omitInvalid assert error %v is not bool", ex.Spec["omitInvalid"])
+		}
+	}
 	for _, v := range input.Schema {
 		docs[v.Key] = "#" + v.Key
 	}
@@ -565,7 +570,12 @@ func (c *Pipeline) PostData(input *PostDataInput) (err error) {
 func (c *Pipeline) PostRawtextData(input *PostRawtextDataInput) (err error) {
 	op := c.NewOperation(base.OpPostRawtextData, input.RepoName)
 
-	req := c.newRequest(op, input.Token, nil)
+	type PortalRet struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	}
+	output := &PortalRet{}
+	req := c.newRequest(op, input.Token, output)
 	req.SetBufferBody(input.Rawtext)
 	req.SetHeader(base.HTTPHeaderContentType, base.ContentTypeText)
 	if input.ResourceOwner != "" {
@@ -573,7 +583,20 @@ func (c *Pipeline) PostRawtextData(input *PostRawtextDataInput) (err error) {
 	}
 	req.SetFlowLimiter(c.flowLimit)
 	req.SetReqLimiter(c.reqLimit)
-	return req.Send()
+
+	err = req.Send()
+	if err != nil {
+		return err
+	}
+	if output.Code != 200 {
+		err = PipelineErrBuilder{}.Build(output.Message,
+			output.Message,
+			req.HTTPResponse.Header.Get(base.HTTPHeaderRequestId),
+			output.Code)
+		return err
+	}
+
+	return nil
 }
 
 func (c *Pipeline) PostLargeData(input *PostDataInput, timeout time.Duration) (datafailed Points, err error) {
