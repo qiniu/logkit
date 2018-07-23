@@ -2,6 +2,7 @@ package script
 
 import (
 	"errors"
+	"fmt"
 	"os/exec"
 	"strings"
 	"sync"
@@ -11,7 +12,6 @@ import (
 	"github.com/robfig/cron"
 
 	"github.com/qiniu/log"
-
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/utils/models"
@@ -49,12 +49,9 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (sr reader.Reader, err erro
 	path, _ := conf.GetStringOr(reader.KeyLogPath, "")
 	originPath := path
 
-	for {
-		path, err = checkPath(meta, path)
-		if err != nil {
-			continue
-		}
-		break
+	path, err = checkPath(meta, path)
+	if err != nil {
+		return nil, err
 	}
 
 	cronSchedule, _ := conf.GetStringOr(reader.KeyScriptCron, "")
@@ -88,7 +85,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (sr reader.Reader, err erro
 		} else {
 			err = ssr.Cron.AddFunc(cronSchedule, ssr.run)
 			if err != nil {
-				return
+				return nil, err
 			}
 			log.Infof("Runner[%v] %v Cron job added with schedule <%v>", ssr.meta.RunnerName, ssr.Name(), cronSchedule)
 		}
@@ -243,18 +240,30 @@ func (sr *Reader) setStatsError(err string) {
 func checkPath(meta *reader.Meta, path string) (string, error) {
 	for {
 		realPath, fileInfo, err := GetRealPath(path)
-		if err != nil || fileInfo == nil {
+		if err != nil {
 			log.Warnf("Runner[%v] %s - utils.GetRealPath failed, err:%v", meta.RunnerName, path, err)
-			time.Sleep(time.Minute)
+			time.Sleep(1 * time.Minute)
+			continue
+		}
+
+		if fileInfo == nil {
+			log.Warnf("Runner[%v] %s - utils.GetRealPath file info nil ", meta.RunnerName, path)
+			time.Sleep(1 * time.Minute)
+			continue
 		}
 
 		fileMode := fileInfo.Mode()
 		if !fileMode.IsRegular() {
-			log.Warnf("Runner[%v] %s - file failed, err: file is not regular", meta.RunnerName, path)
-			time.Sleep(time.Minute)
-			continue
+			err = fmt.Errorf("Runner[%v] %s - file failed, err: file is not regular ", meta.RunnerName, path)
+			return "", err
 		}
-		CheckFileMode(realPath, fileMode)
+
+		err = CheckFileMode(realPath, fileMode)
+		if err != nil {
+			err = fmt.Errorf("Runner[%v] %s - file failed, err: %v ", meta.RunnerName, path, err)
+			return "", err
+		}
+
 		return realPath, nil
 	}
 }
