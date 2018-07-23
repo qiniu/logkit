@@ -780,6 +780,48 @@ func TestDeepConvertKeyWithCache(t *testing.T) {
 	}
 }
 
+func Test_DeepConvertKey(t *testing.T) {
+	testDatas := []Data{
+		{
+			"a.....b": "a.....b",
+			"b":       true,
+		},
+		{
+			"....a+b": []string{"a", "b", "....a+b"},
+			"abc":     "abc",
+		},
+		{
+			"a": Data{"a-=b++": "a-=b++"},
+			"b": Data{"--ab": Data{"abc++": "abc++"}},
+		},
+		{
+			"a": map[string]interface{}{"b:1": 123},
+		},
+	}
+	expectDatas := []map[string]interface{}{
+		{
+			"a_____b": "a.....b",
+			"b":       true,
+		},
+		{
+			"a_b": []string{"a", "b", "....a+b"},
+			"abc": "abc",
+		},
+		{
+			"a": Data{"a__b__": "a-=b++"},
+			"b": Data{"ab": map[string]interface{}{"abc__": "abc++"}},
+		},
+		{
+			"a": map[string]interface{}{"b_1": 123},
+		},
+	}
+
+	for idx, testData := range testDatas {
+		actualData := DeepConvertKey(testData)
+		assert.Equal(t, expectDatas[idx], actualData, fmt.Sprintf("index %v", idx))
+	}
+}
+
 //1000000          1647 ns/op           0 B/op           0 allocs/op
 func BenchmarkDeepConvertKeyWithCache(b *testing.B) {
 	b.ReportAllocs()
