@@ -66,6 +66,54 @@ func TestParamTransformer(t *testing.T) {
 	assert.Equal(t, StatsInfo{Success: 5}, par.stats)
 }
 
+func TestParamTransformerSelectKeys(t *testing.T) {
+	par := &UrlParam{
+		Key:        "myword",
+		SelectKeys: "platform,vid",
+	}
+	assert.Nil(t, par.Init())
+	data, err := par.Transform([]Data{
+		{"myword": "?platform=2&vid=372&vu=caea966558&chan=android_sougou&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
+		{"myword": "platform=2&vid=&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
+		{"myword": "/index/mytest?platform=2&vid=&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
+		{"myword": "/index/mytest1"},
+		{"myword": "http://10.100.0.1/index/mytest"},
+	})
+	assert.NoError(t, err)
+	exp := []Data{
+		{
+			"myword":          "?platform=2&vid=372&vu=caea966558&chan=android_sougou&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032",
+			"myword_platform": "2",
+			"myword_vid":      "372",
+		},
+		{
+			"myword":          "platform=2&vid=&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032",
+			"myword_platform": "2",
+		},
+		{
+			"myword":                "/index/mytest?platform=2&vid=&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032",
+			"myword_platform":       "2",
+			"myword_url_param_path": "/index/mytest",
+		},
+		{
+			"myword":                "/index/mytest1",
+			"myword_url_param_path": "/index/mytest1",
+		},
+		{
+			"myword":                "http://10.100.0.1/index/mytest",
+			"myword_url_param_path": "/index/mytest",
+			"myword_url_param_host": "10.100.0.1",
+		},
+	}
+	assert.Equal(t, len(exp), len(data))
+	for i, ex := range exp {
+		da := data[i]
+		assert.Equal(t, ex, da)
+	}
+	assert.Equal(t, par.Stage(), transforms.StageAfterParser)
+	assert.Equal(t, StatsInfo{Success: 5}, par.stats)
+}
+
 func TestParamTransformerError(t *testing.T) {
 	par := &UrlParam{
 		Key: "myword",

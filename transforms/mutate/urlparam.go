@@ -24,15 +24,38 @@ var (
 )
 
 type UrlParam struct {
-	Key   string `json:"key"`
-	stats StatsInfo
+	Key        string `json:"key"`
+	SelectKeys string `json:"select_keys"`
 
-	keys []string
+	keys          []string
+	selectKeyList []string // slice 形式存放收集的 key 名称
+	stats         StatsInfo
 }
 
 func (p *UrlParam) Init() error {
 	p.keys = GetKeys(p.Key)
+
+	// 获取 keys 并剔除空值
+	selectKeys := strings.Split(p.SelectKeys, ",")
+	p.selectKeyList = make([]string, 0, len(selectKeys))
+	for i := range selectKeys {
+		if len(selectKeys[i]) > 0 {
+			p.selectKeyList = append(p.selectKeyList, selectKeys[i])
+		}
+	}
 	return nil
+}
+
+func (p *UrlParam) isSelectKey(key string) bool {
+	if len(p.selectKeyList) == 0 {
+		return true
+	}
+	for i := range p.selectKeyList {
+		if key == p.selectKeyList[i] {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *UrlParam) transformToMap(strVal string, key string) (map[string]interface{}, error) {
@@ -70,6 +93,10 @@ func (p *UrlParam) transformToMap(strVal string, key string) (map[string]interfa
 		return nil, err
 	}
 	for k, v := range values {
+		if !p.isSelectKey(k) {
+			continue
+		}
+
 		keyName := key + "_" + k
 		if len(v) == 1 && v[0] != "" {
 			resultMap[keyName] = v[0]
@@ -152,13 +179,24 @@ func (p *UrlParam) Type() string {
 func (p *UrlParam) SampleConfig() string {
 	return `{
 		"type":"urlparam",
-		"key":"ParamFieldKey",
+		"key":"ParamFieldKey"
 	}`
 }
 
 func (p *UrlParam) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
+		{
+			KeyName:      "select_keys",
+			ChooseOnly:   false,
+			Default:      "",
+			Required:     false,
+			Placeholder:  "key1,key2,key3",
+			DefaultNoUse: true,
+			Description:  "选中收集的参数名(select_keys)",
+			ToolTip:      "多个参数名之间使用用逗号(,)连接，收集所有参数则留空",
+			Type:         transforms.TransformTypeString,
+		},
 	}
 }
 
