@@ -61,6 +61,7 @@ type FtOption struct {
 	memoryChannelSize int
 	longDataDiscard   bool
 	innerSenderType   string
+	pandoraSenderType string
 }
 
 type datasContext struct {
@@ -77,6 +78,7 @@ func NewFtSender(innerSender Sender, conf conf.MapConf, ftSaveLogPath string) (*
 	strategy, _ := conf.GetStringOr(KeyFtStrategy, KeyFtStrategyBackupOnly)
 	longDataDiscard, _ := conf.GetBoolOr(KeyFtLongDataDiscard, false)
 	senderType, _ := conf.GetStringOr(KeySenderType, "") //此处不会没有SenderType，在调用NewFtSender时已经检查
+	pandoraSendType, _ := conf.GetStringOr(KeyPandoraSendType, "")
 	switch strategy {
 	case KeyFtStrategyAlwaysSave, KeyFtStrategyBackupOnly, KeyFtStrategyConcurrent:
 	default:
@@ -95,6 +97,7 @@ func NewFtSender(innerSender Sender, conf conf.MapConf, ftSaveLogPath string) (*
 		memoryChannelSize: memoryChannelSize,
 		longDataDiscard:   longDataDiscard,
 		innerSenderType:   senderType,
+		pandoraSenderType: pandoraSendType,
 	}
 
 	return newFtSender(innerSender, runnerName, opt)
@@ -143,8 +146,10 @@ func (ft *FtSender) Send(datas []Data) error {
 
 	switch ft.opt.innerSenderType {
 	case TypePandora:
-		for i, v := range datas {
-			datas[i] = DeepConvertKeyWithCache(v, ft.pandoraKeyCache)
+		if ft.opt.pandoraSenderType != "raw" {
+			for i, v := range datas {
+				datas[i] = DeepConvertKeyWithCache(v, ft.pandoraKeyCache)
+			}
 		}
 	default:
 	}
