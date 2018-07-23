@@ -797,7 +797,6 @@ func PandoraKey(key string) (string, bool) {
 	if size <= 0 {
 		return "", false
 	}
-
 	// set
 	bytes := make([]byte, size)
 	bp := 0
@@ -817,7 +816,7 @@ func PandoraKey(key string) (string, bool) {
 			continue
 		}
 
-		if idx > 0 {
+		if bp > 0 {
 			bytes[bp] = '_'
 			bp++
 		}
@@ -827,8 +826,10 @@ func PandoraKey(key string) (string, bool) {
 
 func DeepConvertKey(data map[string]interface{}) map[string]interface{} {
 	for k, v := range data {
-		nv, ok := v.(map[string]interface{})
-		if ok {
+		switch nv := v.(type) {
+		case map[string]interface{}:
+			v = DeepConvertKey(nv)
+		case Data:
 			v = DeepConvertKey(nv)
 		}
 		valid := CheckPandoraKey(k)
