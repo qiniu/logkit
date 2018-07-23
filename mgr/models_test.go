@@ -41,5 +41,4 @@ func TestRSClone(t *testing.T) {
 	rs.ReaderStats.Success = 3
 	rs.SenderStats["hah"] = StatsInfo{Success: 2}
 	assert.Equal(t, exp, got)
-
 }

@@ -112,17 +112,17 @@ type StatsInfo struct {
 }
 
 type ErrorQueue struct {
-	ErrorSlice []ErrorInfo
-	Front      int
-	Rear       int
-	maxSize    int
-	mutex      *sync.RWMutex
+	ErrorSlice []ErrorInfo `json:"error_slice"`
+	Front      int         `json:"front"`
+	Rear       int         `json:"rear"`
+	maxSize    int         `json:"max_size"`
+	mutex      sync.RWMutex
 }
 
 type ErrorInfo struct {
-	Error        string `json:"error"`
-	UnixNanoTime int64  `json:"unix_nano_time"`
-	Count        int    `json:"count"`
+	Error     string `json:"error"`
+	Timestamp int64  `json:"timestamp"`
+	Count     int64  `json:"count"`
 }
 
 func NewErrorQueue(maxSize int) *ErrorQueue {
@@ -134,17 +134,17 @@ func NewErrorQueue(maxSize int) *ErrorQueue {
 		0,
 		0,
 		maxSize + 1,
-		&sync.RWMutex{},
+		sync.RWMutex{},
 	}
 }
 
-//向队列中添加元素
+// 向队列中添加单个元素
 func (entry *ErrorQueue) Put(e ErrorInfo) {
 	if entry.EqualLast(e) {
 		entry.mutex.Lock()
 		last := (entry.Rear + entry.maxSize - 1) % entry.maxSize
 		entry.ErrorSlice[last].Count++
-		entry.ErrorSlice[last].UnixNanoTime = e.UnixNanoTime
+		entry.ErrorSlice[last].Timestamp = e.Timestamp
 		entry.mutex.Unlock()
 		return
 	}
@@ -154,17 +154,33 @@ func (entry *ErrorQueue) Put(e ErrorInfo) {
 		entry.Front = (entry.Front + 1) % entry.maxSize
 	}
 	entry.ErrorSlice[entry.Rear] = e
-	entry.ErrorSlice[entry.Rear].Count = 1
+	entry.ErrorSlice[entry.Rear].Count = 1 // 个数增加 1
 	entry.Rear = (entry.Rear + 1) % entry.maxSize
 	entry.mutex.Unlock()
 }
 
-func (entry *ErrorQueue) Clear() {
+// 向队列中添加元素
+func (entry *ErrorQueue) Append(errors []ErrorInfo) {
 	entry.mutex.Lock()
-	entry.ErrorSlice = nil
-	entry.Front = 0
-	entry.Rear = 0
+	for _, e := range errors {
+		if (entry.Rear+1)%entry.maxSize == entry.Front {
+			entry.Front = (entry.Front + 1) % entry.maxSize
+		}
+		entry.ErrorSlice[entry.Rear] = e
+		entry.Rear = (entry.Rear + 1) % entry.maxSize
+	}
 	entry.mutex.Unlock()
+}
+
+// 获取队列中最后一个元素
+func (entry *ErrorQueue) Get() ErrorInfo {
+	if entry.IsEmpty() {
+		return ErrorInfo{}
+	}
+
+	entry.mutex.Lock()
+	defer entry.mutex.Unlock()
+	return entry.ErrorSlice[(entry.Rear-1+entry.maxSize)%entry.maxSize]
 }
 
 func (entry *ErrorQueue) Size() int {
@@ -173,20 +189,18 @@ func (entry *ErrorQueue) Size() int {
 	}
 
 	entry.mutex.RLock()
-	size := (entry.Rear - entry.Front + entry.maxSize) % entry.maxSize
-	entry.mutex.RUnlock()
-	return size
+	defer entry.mutex.RUnlock()
+	return (entry.Rear - entry.Front + entry.maxSize) % entry.maxSize
 }
 
 func (entry *ErrorQueue) IsEmpty() bool {
 	entry.mutex.RLock()
-	empty := entry.Rear == entry.Front
-	entry.mutex.RUnlock()
-	return empty
+	defer entry.mutex.RUnlock()
+	return entry.Rear == entry.Front
 }
 
 // 按进出顺序复制到数组中
-func (entry *ErrorQueue) Copy() []ErrorInfo {
+func (entry *ErrorQueue) Sort() []ErrorInfo {
 	if entry.IsEmpty() {
 		return nil
 	}
@@ -200,7 +214,76 @@ func (entry *ErrorQueue) Copy() []ErrorInfo {
 	return errorInfoList
 }
 
-//向队列中添加元素
+// 返回队列实际容量
+func (entry *ErrorQueue) GetMaxSize() int {
+	return entry.maxSize - 1
+}
+
+// 将另一个queue复制到当前queue中
+func (entry *ErrorQueue) CopyQueue(src *ErrorQueue) {
+	if src.IsEmpty() {
+		return
+	}
+
+	src.mutex.Lock()
+	for i := src.Front; i != src.Rear; i = (i + 1) % src.maxSize {
+		entry.Copy(src.ErrorSlice[i])
+	}
+	entry.Front = src.Front
+	entry.Rear = src.Rear
+	src.mutex.Unlock()
+}
+
+// 将另一个queue复制到当前queue中
+func (entry *ErrorQueue) Set(index int, e ErrorInfo) {
+	entry.mutex.Lock()
+	if index < entry.Front || index > entry.Rear {
+		return
+	}
+	entry.ErrorSlice[index] = e
+	entry.ErrorSlice[index].Count = e.Count
+	entry.ErrorSlice[index].Timestamp = e.Timestamp
+	if index == entry.Rear {
+		entry.Rear = (entry.Rear + 1) % entry.maxSize
+	}
+	entry.mutex.Unlock()
+}
+
+// 将另一个queue复制到当前queue中
+func (entry *ErrorQueue) Copy(e ErrorInfo) {
+	entry.mutex.Lock()
+	if (entry.Rear+1)%entry.maxSize == entry.Front {
+		entry.Front = (entry.Front + 1) % entry.maxSize
+	}
+	entry.ErrorSlice[entry.Rear] = e
+	entry.Rear = (entry.Rear + 1) % entry.maxSize
+	entry.mutex.Unlock()
+}
+
+// 获取 queue 中 front rear之间的数据
+func (entry *ErrorQueue) GetErrorSlice(front, rear int) []ErrorInfo {
+	if entry.IsEmpty() {
+		return nil
+	}
+
+	var errorInfoArr []ErrorInfo
+	entry.mutex.Lock()
+	if front%entry.maxSize < entry.Front {
+		front = entry.Front
+	}
+	if rear%entry.maxSize > entry.Rear {
+		rear = entry.Rear
+	}
+	for i := front % entry.maxSize; i != rear; i = (i + 1) % entry.maxSize {
+		if entry.ErrorSlice[i].Count != 0 {
+			errorInfoArr = append(errorInfoArr, entry.ErrorSlice[i])
+		}
+	}
+	entry.mutex.Unlock()
+	return errorInfoArr
+}
+
+// 向队列中添加元素
 func (entry *ErrorQueue) EqualLast(e ErrorInfo) bool {
 	if entry.IsEmpty() {
 		return false

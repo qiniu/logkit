@@ -664,7 +664,7 @@ func runnerResetTest(p *testParam) {
 	assert.True(t, rssData[runnerName].ReadErrors[0].Count >= 1)
 	assert.Equal(t, "no more file exist to be read", rssData[runnerName].ReadErrors[0].Error)
 
-	url = "http://127.0.0.1" + rs.address + "/logkit/" + runnerName + "/errors"
+	url = "http://127.0.0.1" + rs.address + "/logkit/errors/" + runnerName
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
@@ -673,10 +673,10 @@ func runnerResetTest(p *testParam) {
 		t.Fatalf("status unmarshal failed error is %v, respBody is %v", err, string(respBody))
 	}
 	rssErrData := respErr.Data
-	assert.NotZero(t, rssErrData.ReadErrors)
+	assert.True(t, len(rssErrData.ReadErrors) != 0)
 	assert.Equal(t, "no more file exist to be read", rssErrData.ReadErrors[0].Error)
 
-	url = "http://127.0.0.1" + rs.address + "/logkit/runnerNotFound/errors"
+	url = "http://127.0.0.1" + rs.address + "/logkit/errors/runnerNotFound"
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusBadRequest, respCode)

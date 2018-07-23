@@ -114,6 +114,8 @@ func TestMeta(t *testing.T) {
 			"aaa": {1, 2},
 			"bbb": {5, 6},
 		},
+		TransformErrors: make(map[string]ErrorQueue),
+		SendErrors:      make(map[string]ErrorQueue),
 	}
 	err = meta.WriteStatistic(stat)
 	assert.NoError(t, err)

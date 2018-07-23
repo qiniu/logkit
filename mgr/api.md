@@ -230,28 +230,28 @@ Content-Type: application/json
       "read_errors":{
         {
             "error":"<read error info>"",
-            "unix_nano_time":<unix nano time>
+            "timestamp":<timestamp>
         },
         ...
       },
       "parse_errors": {
         {
             "error":"<parse error info>"",
-            "unix_nano_time":<unix nano time>
+            "timestamp":<timestamp>
         },
         ...
       },
       "transform_errors": {
         {
             "error":"<transform error info>"",
-            "unix_nano_time":<unix nano time>
+            "timestamp":<timestamp>
         },
         ...
       },
       "send_errors": {
         {
             "error":"<send error info>"",
-            "unix_nano_time":<unix nano time>
+            "timestamp":<timestamp>
         },
         ...
       }
@@ -260,28 +260,28 @@ Content-Type: application/json
       "read_errors":{
         {
             "error":"<read error info>"",
-            "unix_nano_time":<unix nano time>
+            "timestamp":<timestamp>
         },
         ...
       },
       "parse_errors": {
         {
             "error":"<parse error info>"",
-            "unix_nano_time":<unix nano time>
+            "timestamp":<timestamp>
         },
         ...
       },
       "transform_errors": {
         {
             "error":"<transform error info>"",
-            "unix_nano_time":<unix nano time>
+            "timestamp":<timestamp>
         },
         ...
       },
       "send_errors": {
         {
             "error":"<send error info>"",
-            "unix_nano_time":<unix nano time>
+            "timestamp":<timestamp>
         },
         ...
       }
@@ -295,7 +295,7 @@ Content-Type: application/json
 * "transform_errors": transform 历史错误数据
 * "send_errors": send 历史错误数据
 * "error": 具体错误信息
-* "unix_nano_time": 错误发生时间
+* "timestamp": 错误发生时间
 * 默认历史错误信息最多为50条，可以通过"errors_list_cap"设置历史错误信息最大条数，"errors_list_cap"和"batch_interval"在同一个层级
 
 如果请求失败, 返回包含如下内容的JSON字符串（已格式化,便于阅读）:
@@ -326,28 +326,28 @@ Content-Type: application/json
     "read_errors":{
       {
         "error":"<read error info>"",
-        "unix_nano_time":<unix nano time>
+        "timestamp":<timestamp>
       },
       ...
     },
     "parse_errors": {
       {
         "error":"<parse error info>"",
-        "unix_nano_time":<unix nano time>
+        "timestamp":<timestamp>
       },
       ...
     },
     "transform_errors": {
       {
         "error":"<transform error info>"",
-        "unix_nano_time":<unix nano time>
+        "timestamp":<timestamp>
       },
       ...
     },
     "send_errors": {
       {
         "error":"<send error info>"",
-        "unix_nano_time":<unix nano time>
+        "timestamp":<timestamp>
       },
       ...
     }
@@ -359,7 +359,7 @@ Content-Type: application/json
 * "transform_errors": transform 历史错误数据
 * "send_errors": send 历史错误数据
 * "error": 具体错误信息
-* "unix_nano_time": 错误发生时间
+* "timestamp": 错误发生时间
 * 默认历史错误信息最多为50条，可以通过"errors_list_cap"设置历史错误信息最大条数，"errors_list_cap"和"batch_interval"在同一个层级
 
 如果请求失败, 返回包含如下内容的JSON字符串（已格式化,便于阅读）:

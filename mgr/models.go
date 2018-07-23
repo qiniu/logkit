@@ -22,18 +22,19 @@ type RunnerStatus struct {
 	TransformStats   map[string]StatsInfo `json:"transformStats"`
 	Error            string               `json:"error,omitempty"`
 	lastState        time.Time
-	ReadSpeedKB      float64 `json:"readspeed_kb"`
-	ReadSpeed        float64 `json:"readspeed"`
-	ReadSpeedTrendKb string  `json:"readspeedtrend_kb"`
-	ReadSpeedTrend   string  `json:"readspeedtrend"`
-	RunningStatus    string  `json:"runningStatus"`
-	Tag              string  `json:"tag,omitempty"`
-	Url              string  `json:"url,omitempty"`
+	ReadSpeedKB      float64     `json:"readspeed_kb"`
+	ReadSpeed        float64     `json:"readspeed"`
+	ReadSpeedTrendKb string      `json:"readspeedtrend_kb"`
+	ReadSpeedTrend   string      `json:"readspeedtrend"`
+	RunningStatus    string      `json:"runningStatus"`
+	Tag              string      `json:"tag,omitempty"`
+	Url              string      `json:"url,omitempty"`
+	HistoryErrors    *ErrorsList `json:"history_errors"`
 }
 
 //Clone 复制出一个完整的RunnerStatus
-func (src *RunnerStatus) Clone() (dst RunnerStatus) {
-	dst = RunnerStatus{}
+func (src *RunnerStatus) Clone() RunnerStatus {
+	dst := RunnerStatus{}
 	dst.TransformStats = make(map[string]StatsInfo, len(src.TransformStats))
 	dst.SenderStats = make(map[string]StatsInfo, len(src.SenderStats))
 	for k, v := range src.SenderStats {
@@ -63,8 +64,10 @@ func (src *RunnerStatus) Clone() (dst RunnerStatus) {
 	dst.RunningStatus = src.RunningStatus
 	dst.Tag = src.Tag
 	dst.Url = src.Url
-
-	return
+	if src.HistoryErrors != nil {
+		dst.HistoryErrors = src.HistoryErrors.Copy()
+	}
+	return dst
 }
 
 // RunnerConfig 从多数据源读取，经过解析后，发往多个数据目的地
@@ -99,10 +102,10 @@ type RunnerInfo struct {
 }
 
 type ErrorsList struct {
-	ReadErrors      *ErrorQueue
-	ParseErrors     *ErrorQueue
-	TransformErrors map[string]*ErrorQueue
-	SendErrors      map[string]*ErrorQueue
+	ReadErrors      *ErrorQueue            `json:"read_errors"`
+	ParseErrors     *ErrorQueue            `json:"parse_errors"`
+	TransformErrors map[string]*ErrorQueue `json:"transform_errors"`
+	SendErrors      map[string]*ErrorQueue `json:"send_errors"`
 }
 
 type ErrorsResult struct {
@@ -112,18 +115,82 @@ type ErrorsResult struct {
 	SendErrors      map[string][]ErrorInfo `json:"send_errors"`
 }
 
-//Clone 复制出一个顺序的 Errors
-func (src *ErrorsList) Clone() (dst ErrorsResult) {
+// 返回队列实际容量
+func (entry *ErrorsList) Reset() {
+	entry.ReadErrors = nil
+	entry.ParseErrors = nil
+	entry.TransformErrors = nil
+	entry.SendErrors = nil
+}
+
+// 复制出一个顺序的 Errors
+func (src *ErrorsList) Sort() (dst ErrorsResult) {
 	dst = ErrorsResult{}
-	dst.ReadErrors = src.ReadErrors.Copy()
-	dst.ParseErrors = src.ParseErrors.Copy()
-	dst.TransformErrors = make(map[string][]ErrorInfo)
-	for transform, transformQueue := range src.TransformErrors {
-		dst.TransformErrors[transform] = transformQueue.Copy()
+	if src.ReadErrors != nil {
+		dst.ReadErrors = src.ReadErrors.Sort()
 	}
-	dst.SendErrors = make(map[string][]ErrorInfo)
+	if src.ParseErrors != nil {
+		dst.ParseErrors = src.ParseErrors.Sort()
+	}
+	for transform, transformQueue := range src.TransformErrors {
+		if dst.TransformErrors == nil {
+			dst.TransformErrors = make(map[string][]ErrorInfo)
+		}
+		dst.TransformErrors[transform] = transformQueue.Sort()
+	}
 	for send, sendQueue := range src.SendErrors {
-		dst.SendErrors[send] = sendQueue.Copy()
+		if dst.SendErrors == nil {
+			dst.SendErrors = make(map[string][]ErrorInfo)
+		}
+		dst.SendErrors[send] = sendQueue.Sort()
 	}
 	return dst
+}
+
+// 拷贝完整的 ErrorList
+func (src *ErrorsList) Copy() *ErrorsList {
+	var dst ErrorsList
+	isEmpty := true
+	if src.ReadErrors != nil && !src.ReadErrors.IsEmpty() {
+		dst.ReadErrors = NewErrorQueue(src.ReadErrors.GetMaxSize())
+		dst.ReadErrors.CopyQueue(src.ReadErrors)
+		isEmpty = false
+	}
+
+	if src.ParseErrors != nil && !src.ReadErrors.IsEmpty() {
+		dst.ParseErrors = NewErrorQueue(src.ParseErrors.GetMaxSize())
+		dst.ParseErrors.CopyQueue(src.ParseErrors)
+		isEmpty = false
+	}
+
+	if src.TransformErrors != nil {
+		for transform, transformErrors := range src.TransformErrors {
+			if transformErrors != nil && !transformErrors.IsEmpty() {
+				if dst.TransformErrors == nil {
+					dst.TransformErrors = make(map[string]*ErrorQueue)
+				}
+				dst.TransformErrors[transform] = NewErrorQueue(transformErrors.GetMaxSize())
+				dst.TransformErrors[transform].CopyQueue(transformErrors)
+				isEmpty = false
+			}
+		}
+	}
+
+	if src.SendErrors != nil {
+		for send, sendErrors := range src.SendErrors {
+			if sendErrors != nil && !sendErrors.IsEmpty() {
+				if dst.SendErrors == nil {
+					dst.SendErrors = make(map[string]*ErrorQueue)
+				}
+				dst.SendErrors[send] = NewErrorQueue(sendErrors.GetMaxSize())
+				dst.SendErrors[send].CopyQueue(sendErrors)
+				isEmpty = false
+			}
+		}
+	}
+
+	if isEmpty {
+		return nil
+	}
+	return &dst
 }
