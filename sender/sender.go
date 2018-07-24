@@ -141,7 +141,9 @@ const (
 
 	// file
 	// 可选参数 当sender_type 为file 的时候
-	KeyFileSenderPath = "file_send_path"
+	KeyFileSenderPath         = "file_send_path"
+	KeyFileSenderTimestampKey = "file_send_timestamp_key"
+	KeyFileSenderMaxOpenFiles = "file_send_max_open_files"
 
 	// http
 	KeyHttpSenderUrl      = "http_sender_url"
