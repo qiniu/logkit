@@ -37,10 +37,9 @@ type message struct {
 }
 
 type Reader struct {
-	status      int32 // Note: 原子操作
-	headRegexp  *regexp.Regexp
-	currentFile string
-	dirReaders  *dirReaders
+	meta *reader.Meta
+	// Note: 原子操作，用于表示 reader 整体的运行状态
+	status int32
 
 	stopChan chan struct{}
 	msgChan  chan message
@@ -49,8 +48,11 @@ type Reader struct {
 	stats     StatsInfo
 	statsLock sync.RWMutex
 
+	headRegexp  *regexp.Regexp
+	currentFile string
+	dirReaders  *dirReaders
+
 	// 以下为传入参数
-	meta               *reader.Meta
 	logPathPattern     string
 	statInterval       time.Duration
 	maxOpenFiles       int
@@ -118,12 +120,12 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	}
 
 	return &Reader{
+		meta:               meta,
 		status:             reader.StatusInit,
-		dirReaders:         newDirReaders(meta, expire, cachedLines),
 		stopChan:           make(chan struct{}),
 		msgChan:            make(chan message),
 		errChan:            make(chan error),
-		meta:               meta,
+		dirReaders:         newDirReaders(meta, expire, cachedLines),
 		logPathPattern:     strings.TrimSuffix(logPathPattern, "/"),
 		statInterval:       statInterval,
 		maxOpenFiles:       maxOpenFiles,
@@ -171,8 +173,8 @@ func (r *Reader) sendError(err error) {
 		return
 	}
 	defer func() {
-		if err := recover(); err != nil {
-			log.Errorf("Reader %s Recovered from %v", r.Name(), err)
+		if rec := recover(); rec != nil {
+			log.Errorf("Reader %q was panicked and recovered from %v", r.Name(), rec)
 		}
 	}()
 	r.errChan <- err
@@ -330,7 +332,7 @@ func (r *Reader) Status() StatsInfo {
 func (r *Reader) SyncMeta() {
 	data, err := r.dirReaders.SyncMeta()
 	if err != nil {
-		log.Errorf("Runner[%v] sync meta failed: %v", r.meta.RunnerName, err)
+		log.Errorf("Runner[%v] reader %q sync meta failed: %v", r.meta.RunnerName, r.Name(), err)
 		return
 	}
 
