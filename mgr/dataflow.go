@@ -130,12 +130,11 @@ func ParseData(parserConfig conf.MapConf) (parsedData []Data, err error) {
 	}
 
 	parsedData, err = logParser.Parse(sampleData)
-	err = checkErr(err, logParser.Name())
 	if err != nil {
-		return nil, err
+		return parsedData, CheckErr(err)
 	}
 
-	return
+	return parsedData, nil
 }
 
 func TransformData(transformerConfig map[string]interface{}) ([]Data, error) {
@@ -363,23 +362,6 @@ func checkSampleData(sampleData []string, logParser parser.Parser) ([]string, er
 		}
 	}
 	return sampleData, nil
-}
-
-func checkErr(err error, parserName string) error {
-	se, ok := err.(*StatsError)
-	var errorCnt int64
-	if ok {
-		errorCnt = se.Errors
-		err = se.ErrorDetail
-	} else if err != nil {
-		errorCnt = 1
-	}
-	if err != nil {
-		errMsg := fmt.Sprintf("parser %s, error %v ", parserName, err.Error())
-		err = fmt.Errorf("%v parse line errors occured, same as %v", errorCnt, errors.New(errMsg))
-	}
-
-	return err
 }
 
 func getTransformerCreator(transformerConfig map[string]interface{}) (transforms.Creator, error) {

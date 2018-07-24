@@ -864,6 +864,22 @@ func DeepConvertKeyWithCache(data map[string]interface{}, cache map[string]KeyIn
 	return data
 }
 
+func CheckErr(err error) error {
+	se, ok := err.(*StatsError)
+	var errorCnt int64
+	if ok {
+		errorCnt = se.Errors
+		err = se.ErrorDetail
+	} else {
+		errorCnt = 1
+	}
+
+	if err != nil {
+		return fmt.Errorf("%v parse line errors occured, error %v ", errorCnt, err.Error())
+	}
+	return nil
+}
+
 type KeyInfo struct {
 	Valid  bool
 	NewKey string
