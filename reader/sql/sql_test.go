@@ -1498,7 +1498,7 @@ func TestMySql(t *testing.T) {
 	mrHistoryAll2.Close()
 
 	// test cron
-	minDataTestsLine, secondAdd3, err := setMinute()
+	minDataTestsLine, secondAdd3, err := setMinute(time.Now())
 	if err != nil {
 		t.Errorf("prepare mysql database failed: %v", err)
 	}
@@ -1529,9 +1529,13 @@ func TestMySql(t *testing.T) {
 	mrCron.SyncMeta()
 	mrCron.Close()
 
-	minDataTestsLine, secondAdd3, err = setMinute()
+	now := time.Now()
+	minDataTestsLine, secondAdd3, err = setMinute(now)
 	if err != nil {
 		t.Errorf("prepare mysql database failed: %v", err)
+	}
+	if now.Second() >= 57 {
+		minDataTestsLine++
 	}
 	// cron task, exec on start
 	runnerName = "mrCronExecOnStart"
@@ -1748,9 +1752,8 @@ func batchTimeout(before time.Time, interval float64) bool {
 	return false
 }
 
-func setMinute() (int, string, error) {
+func setMinute(nowCron time.Time) (int, string, error) {
 	var (
-		nowCron    = time.Now()
 		secondAdd3 = getDateStr((nowCron.Second() + 3) % 60)
 		minute     = getDateStr(nowCron.Minute())
 	)

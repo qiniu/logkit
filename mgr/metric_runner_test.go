@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -507,6 +508,11 @@ func metricHttpTest(p *testParam) {
 		t.Fatalf("mkdir test path error %v", err)
 	}
 	time.Sleep(1 * time.Second)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		io.WriteString(w, "<html><body>七牛云</body></html>")
+	}))
+	defer ts.Close()
 	mc := []MetricConfig{
 		{
 			MetricType: "http",
@@ -515,7 +521,7 @@ func metricHttpTest(p *testParam) {
 				"http_data":      false,
 			},
 			Config: map[string]interface{}{
-				"http_datas": `[{"method":"GET", "url":"https://www.qiniu.com", "expect_code":200, "expect_data":"七牛云"}]`,
+				"http_datas": `[{"method":"GET", "url":"` + ts.URL + `", "expect_code":200, "expect_data":"七牛云"}]`,
 			},
 		},
 	}
@@ -572,7 +578,7 @@ func metricHttpTest(p *testParam) {
 
 		assert.Equal(t, len(httpAttr)+2, len(result[0]), string(str))
 		assert.Equal(t, float64(200), result[0]["http__status_code_1"])
-		assert.Equal(t, "https://www.qiniu.com", result[0]["http__target_1"])
+		assert.Equal(t, ts.URL, result[0]["http__target_1"])
 		assert.Equal(t, float64(1), result[0]["http__err_state_total"])
 		assert.Equal(t, "", result[0]["http__err_msg_total"])
 		assert.Equal(t, float64(1), result[0]["http__err_state_total"])
@@ -587,7 +593,7 @@ func metricHttpTest(p *testParam) {
 				"http_time_cost": false,
 			},
 			Config: map[string]interface{}{
-				"http_datas": `[{"method":"GET", "url":"https://www.qiniu.com", "expect_code":200, "expect_data":"七牛云"},{"method":"GET", "url":"https://www.logkit-pandora.com", "expect_code":200, "expect_data":"七牛云"}]`,
+				"http_datas": `[{"method":"GET", "url":"` + ts.URL + `", "expect_code":200, "expect_data":"七牛云"},{"method":"GET", "url":"https://www.logkit-pandora.com", "expect_code":200, "expect_data":"七牛云"}]`,
 			},
 		},
 	}
@@ -642,7 +648,7 @@ func metricHttpTest(p *testParam) {
 		}
 
 		assert.Equal(t, float64(200), result[0]["http__status_code_1"])
-		assert.Equal(t, "https://www.qiniu.com", result[0]["http__target_1"])
+		assert.Equal(t, ts.URL, result[0]["http__target_1"])
 		assert.Equal(t, float64(1), result[0]["http__err_state_1"])
 		assert.Equal(t, float64(-1), result[0]["http__status_code_2"])
 		assert.Equal(t, "https://www.logkit-pandora.com", result[0]["http__target_2"])
@@ -660,7 +666,7 @@ func metricHttpTest(p *testParam) {
 				"http_err_msg":   false,
 			},
 			Config: map[string]interface{}{
-				"http_datas": `[{"method":"GET", "url":"https://www.qiniu.com", "expect_code":200, "expect_data":"潘多拉"}]`,
+				"http_datas": `[{"method":"GET", "url":"` + ts.URL + `", "expect_code":200, "expect_data":"潘多拉"}]`,
 			},
 		},
 	}
@@ -715,7 +721,7 @@ func metricHttpTest(p *testParam) {
 		}
 
 		assert.Equal(t, float64(200), result[0]["http__status_code_1"])
-		assert.Equal(t, "https://www.qiniu.com", result[0]["http__target_1"])
+		assert.Equal(t, ts.URL, result[0]["http__target_1"])
 		assert.Equal(t, float64(0), result[0]["http__err_state_1"])
 		assert.Equal(t, float64(0), result[0]["http__err_state_total"])
 		assert.Equal(t, "don't contain: 潘多拉", result[0]["http__err_msg_total"])
