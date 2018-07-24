@@ -126,40 +126,39 @@ func (p *UrlParam) Transform(datas []Data) ([]Data, error) {
 			continue
 		}
 		var res map[string]interface{}
-		if strVal, ok := val.(string); ok {
-			res, toMapErr = p.transformToMap(strVal, newKeys[len(newKeys)-1])
-			if toMapErr != nil {
-				errNum++
-				err = toMapErr
-			}
-		} else {
+		strVal, ok := val.(string)
+		if !ok {
 			typeErr := fmt.Errorf("transform key %v data type is not string", p.Key)
 			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
+			continue
 		}
-		if err == nil {
-			for key, mapVal := range res {
-				suffix := 1
-				keyName := key
-				newKeys[len(newKeys)-1] = keyName
-				_, getErr := GetMapValue(datas[i], newKeys...)
-				for ; getErr == nil; suffix++ {
-					if suffix > 5 {
-						log.Warnf("keys %v -- %v already exist, the item %v will be ignored", key, keyName, key)
-						break
-					}
-					keyName = key + strconv.Itoa(suffix)
-					newKeys[len(newKeys)-1] = keyName
-					_, getErr = GetMapValue(datas[i], newKeys...)
+
+		res, toMapErr = p.transformToMap(strVal, newKeys[len(newKeys)-1])
+		if toMapErr != nil {
+			errNum, err = transforms.SetError(errNum, toMapErr, transforms.General, "")
+			continue
+		}
+
+		for key, mapVal := range res {
+			suffix := 1
+			keyName := key
+			newKeys[len(newKeys)-1] = keyName
+			_, getErr := GetMapValue(datas[i], newKeys...)
+			for ; getErr == nil; suffix++ {
+				if suffix > 5 {
+					log.Warnf("keys %v -- %v already exist, the item %v will be ignored", key, keyName, key)
+					break
 				}
-				if suffix <= 5 {
-					setErr := SetMapValue(datas[i], mapVal, false, newKeys...)
-					if setErr != nil {
-						errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, strings.Join(newKeys, "."))
-					}
+				keyName = key + strconv.Itoa(suffix)
+				newKeys[len(newKeys)-1] = keyName
+				_, getErr = GetMapValue(datas[i], newKeys...)
+			}
+			if suffix <= 5 {
+				setErr := SetMapValue(datas[i], mapVal, false, newKeys...)
+				if setErr != nil {
+					errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, strings.Join(newKeys, "."))
 				}
 			}
-		} else {
-			errNum++
 		}
 	}
 

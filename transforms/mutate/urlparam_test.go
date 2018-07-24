@@ -74,17 +74,23 @@ func TestParamTransformerSelectKeys(t *testing.T) {
 	assert.Nil(t, par.Init())
 	data, err := par.Transform([]Data{
 		{"myword": "?platform=2&vid=372&vu=caea966558&chan=android_sougou&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
+		{"myword2": ""},
 		{"myword": "platform=2&vid=&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
 		{"myword": "/index/mytest?platform=2&vid=&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032"},
 		{"myword": "/index/mytest1"},
 		{"myword": "http://10.100.0.1/index/mytest"},
 	})
-	assert.NoError(t, err)
+	assert.Error(t, err)
+	expectError := "find total 1 erorrs in transform urlparam, last error info is transform key myword not exist in data"
+	assert.Equal(t, expectError, err.Error())
 	exp := []Data{
 		{
 			"myword":          "?platform=2&vid=372&vu=caea966558&chan=android_sougou&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032",
 			"myword_platform": "2",
 			"myword_vid":      "372",
+		},
+		{
+			"myword2": "",
 		},
 		{
 			"myword":          "platform=2&vid=&vu=caea966558&chan=&sign=ad225ec02942c79bdb710e3ad0cf1b43&nonce_str=1510555032",
@@ -111,7 +117,7 @@ func TestParamTransformerSelectKeys(t *testing.T) {
 		assert.Equal(t, ex, da)
 	}
 	assert.Equal(t, par.Stage(), transforms.StageAfterParser)
-	assert.Equal(t, StatsInfo{Success: 5}, par.stats)
+	assert.Equal(t, StatsInfo{Success: 5, Errors: 1, LastError: expectError}, par.stats)
 }
 
 func TestParamTransformerError(t *testing.T) {

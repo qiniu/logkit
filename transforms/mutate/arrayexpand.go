@@ -178,7 +178,6 @@ func (p *ArrayExpand) Transform(datas []Data) ([]Data, error) {
 					}
 				}
 			}
-
 		} else {
 			typeErr := fmt.Errorf("transform key %v data type is not array", p.Key)
 			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
