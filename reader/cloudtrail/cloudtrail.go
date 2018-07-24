@@ -21,15 +21,21 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
-	"github.com/qiniu/logkit/utils/models"
+	. "github.com/qiniu/logkit/utils/models"
+)
+
+var (
+	_ reader.StatsReader = &Reader{}
+	_ reader.Reader      = &Reader{}
+	_ Resetable          = &Reader{}
 )
 
 func GetDefaultSyncDir(bucket, prefix, region, ak, sk, runnerName string) string {
-	return filepath.Join("s3data", "data"+models.Hash(ak+sk+region+bucket+prefix+runnerName))
+	return filepath.Join("s3data", "data"+Hash(ak+sk+region+bucket+prefix+runnerName))
 }
 
 func GetDefaultMetaStore(bucket, prefix, region, ak, sk, runnerName string) string {
-	return ".metastore" + models.Hash(ak+sk+region+bucket+prefix+runnerName)
+	return ".metastore" + Hash(ak+sk+region+bucket+prefix+runnerName)
 }
 
 var (
@@ -159,7 +165,7 @@ func buildSyncOptions(conf conf.MapConf) (*syncOptions, error) {
 	if err != nil {
 		return nil, err
 	}
-	runnerName, err := conf.GetString(models.KeyRunnerName)
+	runnerName, err := conf.GetString(KeyRunnerName)
 	if err != nil {
 		return nil, err
 	}
