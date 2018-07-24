@@ -16,6 +16,7 @@ import (
 	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -139,6 +140,11 @@ func (dr *dirReader) Run() {
 
 // HasDirExpired 当指定目录内的所有文件都超过指定过期时间后返回 true，否则返回 false
 func HasDirExpired(dir string, expire time.Duration) bool {
+	// 如果目录本身已经不存在，则直接认为过期
+	if !utils.IsExist(dir) {
+		return true
+	}
+
 	var latestModTime time.Time
 	if err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
