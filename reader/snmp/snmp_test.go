@@ -5,17 +5,16 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/json-iterator/go"
 	"github.com/soniah/gosnmp"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 type testSNMPConnection struct {
@@ -138,7 +137,7 @@ func TestSnmpInit(t *testing.T) {
 		"snmp_tables": `[{"table_oid": "TEST::testTable"}]`,
 		"snmp_fields": `[{"field_oid": "TEST::hostname"}]`,
 	}
-	ss, err := NewReader(nil, c)
+	ss, err := NewReader(&reader.Meta{RunnerName: "TestSnmpInit"}, c)
 	assert.NoError(t, err)
 	s := ss.(*Reader)
 
@@ -194,7 +193,7 @@ func TestSnmpInit_noTranslate(t *testing.T) {
 			}
 		]`,
 	}
-	ss, err := NewReader(nil, c)
+	ss, err := NewReader(&reader.Meta{RunnerName: "TestSnmpInit_noTranslate"}, c)
 	s := ss.(*Reader)
 	assert.NoError(t, err)
 
@@ -231,7 +230,7 @@ func TestGetSNMPConnection_v2(t *testing.T) {
 		"snmp_version":   "2",
 		"snmp_community": "foo",
 	}
-	ss, err := NewReader(nil, c)
+	ss, err := NewReader(&reader.Meta{RunnerName: "TestGetSNMPConnection_v2"}, c)
 	s := ss.(*Reader)
 	assert.NoError(t, err)
 
@@ -250,7 +249,6 @@ func TestGetSNMPConnection_v2(t *testing.T) {
 	assert.EqualValues(t, 161, gs.Port)
 }
 
-//
 func TestGetSNMPConnection_v3(t *testing.T) {
 	c := conf.MapConf{
 		reader.KeySnmpReaderAgents:         "1.2.3.4",
@@ -267,7 +265,7 @@ func TestGetSNMPConnection_v3(t *testing.T) {
 		reader.KeySnmpReaderEngineBoots:    "1",
 		reader.KeySnmpReaderEngineTime:     "2",
 	}
-	ss, err := NewReader(nil, c)
+	ss, err := NewReader(&reader.Meta{RunnerName: "TestGetSNMPConnection_v3"}, c)
 	if err != nil {
 		t.Fatalf("exp no error, but got %v", err)
 	}
@@ -295,7 +293,7 @@ func TestGetSNMPConnection_caching(t *testing.T) {
 	c := conf.MapConf{
 		reader.KeySnmpReaderAgents: "1.2.3.4, 1.2.3.5, 1.2.3.5",
 	}
-	ss, err := NewReader(nil, c)
+	ss, err := NewReader(&reader.Meta{RunnerName: "TestGetSNMPConnection_caching"}, c)
 	if err != nil {
 		t.Fatalf("exp no error, but got %v", err)
 	}
@@ -531,8 +529,9 @@ func TestTableBuild_noWalk(t *testing.T) {
 	assert.Contains(t, tb.Rows, rtr)
 }
 
-func TestReadline(t *testing.T) {
+func TestReadData(t *testing.T) {
 	s := &Reader{
+		meta:     &reader.Meta{RunnerName: "TestReadData"},
 		Interval: 10 * time.Second,
 		Agents:   []string{"TestGather"},
 		SnmpName: "mytable",
@@ -566,7 +565,7 @@ func TestReadline(t *testing.T) {
 		ConnectionCache: []snmpConnection{
 			tsc,
 		},
-		DataChan: make(chan interface{}, 100),
+		readChan: make(chan readInfo, 100),
 	}
 	tstart := time.Now().UnixNano()
 	err := s.Gather()
@@ -575,43 +574,35 @@ func TestReadline(t *testing.T) {
 	}
 	tstop := time.Now().UnixNano()
 
-	data := make([]map[string]interface{}, 0)
+	datas := make([]Data, 0)
 	for i := 0; i < 10; i++ {
 		select {
-		case d := <-s.DataChan:
-			var m map[string]interface{}
-			if db, subErr := jsoniter.Marshal(d); subErr != nil {
-				t.Fatalf("exp no error, but got %v", subErr)
-			} else {
-				if subErr = jsoniter.Unmarshal(db, &m); subErr != nil {
-					t.Fatalf("exp no error, but got %v", subErr)
-				}
-				data = append(data, m)
-			}
+		case info := <-s.readChan:
+			datas = append(datas, info.data)
 		default:
 		}
 	}
 
-	if !assert.Equal(t, len(data), 2) {
-		t.Fatalf("exp len 2, but got len %v, data is %v", len(data), data)
+	if !assert.Equal(t, len(datas), 2) {
+		t.Fatalf("exp len 2, but got len %v, data is %v", len(datas), datas)
 	}
 
-	m := data[0]
+	m := datas[0]
 	assert.Equal(t, "mytable", m[reader.KeySnmpTableName])
 	assert.Equal(t, "tsc", m["agent_host"])
 	assert.Equal(t, "baz", m["myfield1"])
-	assert.Equal(t, float64(234), m["myfield2"])
+	assert.Equal(t, int(234), m["myfield2"])
 	assert.Equal(t, "baz", m["myfield3"])
 	timestamp, subErr := time.Parse(time.RFC3339Nano, m[reader.KeyTimestamp].(string))
 	assert.NoError(t, subErr)
 	assert.True(t, timestamp.UnixNano() > tstart)
 	assert.True(t, timestamp.UnixNano() < tstop)
 
-	m2 := data[1]
+	m2 := datas[1]
 	assert.Equal(t, "myOtherTable", m2[reader.KeySnmpTableName])
 	assert.Equal(t, "tsc", m2["agent_host"])
 	assert.Equal(t, "baz", m2["myfield1"])
-	assert.Equal(t, float64(123456), m2["myOtherField"])
+	assert.Equal(t, int(123456), m2["myOtherField"])
 	timestamp, subErr = time.Parse(time.RFC3339Nano, m[reader.KeyTimestamp].(string))
 	assert.NoError(t, subErr)
 	assert.True(t, timestamp.UnixNano() > tstart)
@@ -619,7 +610,8 @@ func TestReadline(t *testing.T) {
 }
 
 func TestGather_host(t *testing.T) {
-	s := &Reader{
+	r := &Reader{
+		meta:     &reader.Meta{RunnerName: "TestGather_host"},
 		Agents:   []string{"TestGather"},
 		SnmpName: "mytable",
 		Fields: []Field{
@@ -637,35 +629,20 @@ func TestGather_host(t *testing.T) {
 		ConnectionCache: []snmpConnection{
 			tsc,
 		},
-		DataChan: make(chan interface{}, 100),
+		readChan: make(chan readInfo, 100),
 	}
-	err := s.Gather()
-	if err != nil {
-		t.Fatalf("exp no error, but got %v", err)
-	}
+	assert.NoError(t, r.Gather())
 
-	data := make([]map[string]interface{}, 0)
+	datas := make([]Data, 0)
 	for i := 0; i < 10; i++ {
 		select {
-		case d := <-s.DataChan:
-			var m map[string]interface{}
-			if db, subErr := jsoniter.Marshal(d); subErr != nil {
-				t.Fatalf("exp no error, but got %v", subErr)
-			} else {
-				if subErr = jsoniter.Unmarshal(db, &m); subErr != nil {
-					t.Fatalf("exp no error, but got %v", subErr)
-				}
-				data = append(data, m)
-			}
+		case info := <-r.readChan:
+			datas = append(datas, info.data)
 		default:
 		}
 	}
-
-	if !assert.Equal(t, len(data), 1) {
-		t.Fatalf("exp len 1, but got len %v, data is %v", len(data), data)
-	}
-	m := data[0]
-	assert.Equal(t, "baz", m["host"])
+	assert.Equal(t, len(datas), 1)
+	assert.Equal(t, "baz", datas[0]["host"])
 }
 
 func TestFieldConvert(t *testing.T) {
@@ -737,7 +714,7 @@ func TestSnmpTranslateCache_miss(t *testing.T) {
 
 func TestSnmpTranslateCache_hit(t *testing.T) {
 	snmpTranslateCaches = map[string]snmpTranslateCache{
-		"foo": snmpTranslateCache{
+		"foo": {
 			mibName:    "a",
 			oidNum:     "b",
 			oidText:    "c",
@@ -770,7 +747,7 @@ func TestSnmpTableCache_miss(t *testing.T) {
 
 func TestSnmpTableCache_hit(t *testing.T) {
 	snmpTableCaches = map[string]snmpTableCache{
-		"foo": snmpTableCache{
+		"foo": {
 			mibName: "a",
 			oidNum:  "b",
 			oidText: "c",
@@ -800,7 +777,8 @@ func TestError(t *testing.T) {
 }
 
 func TestExpandChannel(t *testing.T) {
-	s := &Reader{
+	r := &Reader{
+		meta:     &reader.Meta{RunnerName: "TestExpandChannel"},
 		Interval: 10 * time.Second,
 		Agents:   []string{"TestGather"},
 		SnmpName: "mytable1",
@@ -844,29 +822,29 @@ func TestExpandChannel(t *testing.T) {
 		ConnectionCache: []snmpConnection{
 			tsc,
 		},
-		DataChan: make(chan interface{}, 1),
+		readChan: make(chan readInfo, 1),
 	}
+	assert.NoError(t, r.Start())
 
-	lines := make([]string, 0)
-	for i := 0; i < 10000; i++ {
-		line, err := s.ReadLine()
+	datas := make([]Data, 0)
+	for i := 0; i < 100; i++ {
+		data, _, err := r.ReadData()
 		if err != nil {
 			t.Fatalf("exp no error, but got %v", err)
 		}
-		if line != "" {
-			lines = append(lines, line)
-		} else {
-			time.Sleep(1 * time.Second)
+		if len(data) > 0 {
+			datas = append(datas, data)
 		}
-		if len(lines) == 3 {
+		if len(datas) == 3 {
 			break
 		}
 	}
-	assert.Equal(t, 3, len(lines), strings.Join(lines, "\n"))
+	assert.Equal(t, 3, len(datas))
 }
 
 func TestInterval(t *testing.T) {
-	s := &Reader{
+	r := &Reader{
+		meta:     &reader.Meta{RunnerName: "TestInterval"},
 		Interval: 3 * time.Second,
 		Agents:   []string{"TestGather"},
 		SnmpName: "mytable1",
@@ -910,41 +888,38 @@ func TestInterval(t *testing.T) {
 		ConnectionCache: []snmpConnection{
 			tsc,
 		},
-		DataChan: make(chan interface{}, 1),
+		readChan: make(chan readInfo, 1),
 	}
+	assert.NoError(t, r.Start())
 
-	lines := make([]string, 0)
-	for i := 0; i < 10000; i++ {
-		line, err := s.ReadLine()
+	datas := make([]Data, 0)
+	for i := 0; i < 100; i++ {
+		data, _, err := r.ReadData()
 		if err != nil {
 			t.Fatalf("exp no error, but got %v", err)
 		}
-		if line != "" {
-			lines = append(lines, line)
-		} else {
-			time.Sleep(1 * time.Second)
+		if len(data) > 0 {
+			datas = append(datas, data)
 		}
-		if len(lines) == 3 {
+		if len(datas) == 3 {
 			break
 		}
 	}
-	assert.Equal(t, 3, len(lines), strings.Join(lines, "\n"))
+	assert.Equal(t, 3, len(datas))
 	time.Sleep(3 * time.Second)
 
-	lines = make([]string, 0)
-	for i := 0; i < 10000; i++ {
-		line, err := s.ReadLine()
+	datas = make([]Data, 0)
+	for i := 0; i < 100; i++ {
+		data, _, err := r.ReadData()
 		if err != nil {
 			t.Fatalf("exp no error, but got %v", err)
 		}
-		if line != "" {
-			lines = append(lines, line)
-		} else {
-			time.Sleep(1 * time.Second)
+		if len(data) > 0 {
+			datas = append(datas, data)
 		}
-		if len(lines) == 3 {
+		if len(datas) == 3 {
 			break
 		}
 	}
-	assert.Equal(t, 3, len(lines), strings.Join(lines, "\n"))
+	assert.Equal(t, 3, len(datas))
 }

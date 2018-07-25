@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -18,11 +19,7 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-func TestHttpSender(t *testing.T) {
-	c := conf.MapConf{
-		reader.KeyHTTPServiceAddress: ":8000",
-		reader.KeyHTTPServicePath:    "/logkit/data",
-	}
+func TestHTTPSender(t *testing.T) {
 	readConf := conf.MapConf{
 		reader.KeyMetaPath: "./meta",
 		reader.KeyFileDone: "./meta",
@@ -32,18 +29,25 @@ func TestHttpSender(t *testing.T) {
 	meta, err := reader.NewMetaWithConf(readConf)
 	assert.NoError(t, err)
 	defer os.RemoveAll("./meta")
+
+	c := conf.MapConf{
+		reader.KeyHTTPServiceAddress: ":8000",
+		reader.KeyHTTPServicePath:    "/logkit/data",
+	}
 	reader, err := http.NewReader(meta, c)
 	httpReader := reader.(*http.Reader)
 	assert.NoError(t, err)
-	err = httpReader.Start()
-	assert.NoError(t, err)
+	assert.NoError(t, httpReader.Start())
 	defer httpReader.Close()
 
+	// CI 环境启动监听较慢，需要等待几秒
+	time.Sleep(3 * time.Second)
+
 	testData := []struct {
-		input        []Data
-		jsonExp      [][]string
-		csvExp       []map[string]string
-		body_jsonExp string
+		input       []Data
+		jsonExp     [][]string
+		csvExp      []map[string]string
+		bodyJSONExp string
 	}{
 		{
 			input: []Data{
@@ -110,7 +114,7 @@ func TestHttpSender(t *testing.T) {
 					"e": "",
 				},
 			},
-			body_jsonExp: `[{"a":1,"b":true,"c":"1","e":1.43,"d":{"a1":1,"b1":true,"c1":"1","d1":{}}},{"b":true,"c":"1","d":{"b1":true,"c1":"1","d1":{},"a1":1},"a":1}]`,
+			bodyJSONExp: `[{"a":1,"b":true,"c":"1","e":1.43,"d":{"a1":1,"b1":true,"c1":"1","d1":{}}},{"b":true,"c":"1","d":{"b1":true,"c1":"1","d1":{},"a1":1},"a":1}]`,
 		},
 	}
 
@@ -282,7 +286,7 @@ func TestHttpSender(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = jsoniter.Unmarshal([]byte(val.body_jsonExp), &exps)
+		err = jsoniter.Unmarshal([]byte(val.bodyJSONExp), &exps)
 		if err != nil {
 			t.Fatal(err)
 		}
