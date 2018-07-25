@@ -141,3 +141,7 @@ func (loc *datLocator) Find(ipstr string) (info *LocationInfo, err error) {
 	}
 	return loc.FindByUint(binary.BigEndian.Uint32([]byte(ip.To4()))), nil
 }
+
+func (loc *datLocator) Close() error {
+	return nil
+}

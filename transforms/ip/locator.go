@@ -40,6 +40,13 @@ func (s *LocatorStore) Set(fpath string, loc Locator) {
 	s.locators[fpath] = loc
 }
 
+// 将指定路径删除
+func (s *LocatorStore) Remove(fpath string) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	delete(s.locators, fpath)
+}
+
 var locatorStore = &LocatorStore{
 	locators: make(map[string]Locator, 2), // 一般情况下最多就 dat 和 datx 相关的 Locator
 }
@@ -47,10 +54,11 @@ var locatorStore = &LocatorStore{
 // Locator represents an IP information loc.
 type Locator interface {
 	Find(string) (*LocationInfo, error)
+	Close() error
 }
 
 // NewLocator returns a new IP locator based on extension of given data file.
-func NewLocator(dataFile string) (Locator, error) {
+func NewLocator(dataFile, language string) (Locator, error) {
 	loc := locatorStore.Get(dataFile)
 	if loc != nil {
 		return loc, nil
@@ -62,6 +70,8 @@ func NewLocator(dataFile string) (Locator, error) {
 		loc, err = newDatLocator(dataFile)
 	case strings.HasSuffix(dataFile, ".datx"):
 		loc, err = newDatxLocator(dataFile)
+	case strings.HasSuffix(dataFile, ".mmdb"):
+		loc, err = newMmdbLocator(dataFile, language)
 	default:
 		return nil, errors.New("unrecognized data file format")
 	}

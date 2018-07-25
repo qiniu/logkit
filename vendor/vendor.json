@@ -29,6 +29,12 @@
 			"revisionTime": "2017-04-10T19:29:09Z"
 		},
 		{
+			"checksumSHA1": "R9UtTavo38AfFg/T7raVVuQV7Oc=",
+			"path": "github.com/apaxa-go/eval",
+			"revision": "1d18b251d6795e462ef99e1cd2d0c88f64a0918b",
+			"revisionTime": "2017-12-23T18:23:26Z"
+		},
+		{
 			"checksumSHA1": "M+DvK1Y/5n688Cw4/DzjXdtQbSY=",
 			"path": "github.com/aws/aws-sdk-go/aws",
 			"revision": "b72688f15ec0b32551a50dceeeb2bd53f2e0d690",
