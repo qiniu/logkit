@@ -45,6 +45,10 @@ type Initializer interface {
 	Init() error
 }
 
+type Closer interface {
+	Close() error
+}
+
 type Creator func() Transformer
 
 var Transformers = map[string]Creator{}

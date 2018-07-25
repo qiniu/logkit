@@ -32,6 +32,7 @@ type Transformer struct {
 	Key         string `json:"key"`
 	DataPath    string `json:"data_path"`
 	KeyAsPrefix bool   `json:"key_as_prefix"`
+	Language    string `json:"language"`
 
 	loc   Locator
 	stats StatsInfo
@@ -50,7 +51,10 @@ type Transformer struct {
 }
 
 func (t *Transformer) Init() error {
-	loc, err := NewLocator(t.DataPath)
+	if t.Language == "" {
+		t.Language = "zh-CN"
+	}
+	loc, err := NewLocator(t.DataPath, t.Language)
 	if err != nil {
 		return err
 	}
@@ -231,6 +235,17 @@ func (_ *Transformer) ConfigOptions() []Option {
 			Description:   "字段名称作为前缀(key_as_prefix)",
 			Type:          transforms.TransformTypeString,
 		},
+		{
+			KeyName:      "language",
+			ChooseOnly:   false,
+			Default:      "zh-CN",
+			Required:     true,
+			Placeholder:  "zh-CN",
+			DefaultNoUse: true,
+			Description:  "mmdb格式库使用的语种",
+			Advance:      true,
+			Type:         transforms.TransformTypeString,
+		},
 	}
 }
 
@@ -245,6 +260,13 @@ func (t *Transformer) Stats() StatsInfo {
 func (t *Transformer) SetStats(err string) StatsInfo {
 	t.stats.LastError = err
 	return t.stats
+}
+
+func (t *Transformer) Close() error{
+	if t.loc != nil {
+		return t.loc.Close()
+	}
+	return nil
 }
 
 func init() {
