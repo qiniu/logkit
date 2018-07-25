@@ -81,7 +81,7 @@ func (r *Reader) hasStopped() bool {
 }
 
 func (r *Reader) Name() string {
-	return "HTTP<" + r.address + ">"
+	return "HTTPReader<" + r.address + ">"
 }
 
 func (r *Reader) SetMode(_ string, _ interface{}) error {
@@ -104,7 +104,9 @@ func (r *Reader) Start() error {
 		Addr:    r.address,
 	}
 	go func() {
-		r.server.ListenAndServe()
+		if err := r.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Errorf("Runner[%v] %q daemon start HTTP server failed: %v", r.meta.RunnerName, r.Name(), err)
+		}
 	}()
 	log.Infof("Runner[%v] %q daemon has started", r.meta.RunnerName, r.Name())
 	return nil
@@ -136,9 +138,9 @@ func (r *Reader) Close() error {
 	log.Debugf("Runner[%v] %q daemon is stopping", r.meta.RunnerName, r.Name())
 
 	r.server.Shutdown(context.Background())
-	r.bufQueue.Close()
+	err := r.bufQueue.Close()
 	atomic.StoreInt32(&r.status, reader.StatusStopped)
-	return nil
+	return err
 }
 
 func (r *Reader) postData() echo.HandlerFunc {
