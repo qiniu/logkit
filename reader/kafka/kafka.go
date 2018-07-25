@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Shopify/sarama"
@@ -17,29 +18,38 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var (
+	_ reader.StatsReader = &Reader{}
+	_ reader.LagReader   = &Reader{}
+	_ reader.Reader      = &Reader{}
+)
+
 func init() {
 	reader.RegisterConstructor(reader.ModeKafka, NewReader)
 }
 
 type Reader struct {
-	meta             *reader.Meta
+	lock *sync.Mutex
+	meta *reader.Meta
+	// Note: 原子操作，用于表示 reader 整体的运行状态
+	status int32
+
+	readChan <-chan *sarama.ConsumerMessage
+	errChan  <-chan error
+
+	Consumer       *consumergroup.ConsumerGroup
+	currentMsg     *sarama.ConsumerMessage
+	currentOffsets map[string]map[int32]int64
+
+	stats     StatsInfo
+	statsLock *sync.RWMutex
+
 	ConsumerGroup    string
 	Topics           []string
 	ZookeeperPeers   []string
 	ZookeeperChroot  string
 	ZookeeperTimeout time.Duration
 	Whence           string
-
-	Consumer *consumergroup.ConsumerGroup
-	in       <-chan *sarama.ConsumerMessage
-	errs     <-chan error
-	curMsg   *sarama.ConsumerMessage
-
-	mux *sync.Mutex
-
-	curOffsets map[string]map[int32]int64
-	stats      StatsInfo
-	statsLock  *sync.RWMutex
 }
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
@@ -73,9 +83,9 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		ZookeeperChroot:  zkchroot,
 		Topics:           topics,
 		Whence:           whence,
-		mux:              new(sync.Mutex),
+		lock:             new(sync.Mutex),
 		statsLock:        new(sync.RWMutex),
-		curOffsets:       offsets,
+		currentOffsets:   offsets,
 	}
 
 	config := consumergroup.NewConfig()
@@ -109,89 +119,85 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		log.Error(err)
 		return nil, err
 	}
-	kr.in = kr.Consumer.Messages()
-	kr.errs = kr.Consumer.Errors()
+	kr.readChan = kr.Consumer.Messages()
+	kr.errChan = kr.Consumer.Errors()
 	return kr, nil
 }
 
-func (kr *Reader) Name() string {
-	return fmt.Sprintf("KafkaReader:[%s],[%s]", strings.Join(kr.Topics, ","), kr.ConsumerGroup)
+func (r *Reader) isStopping() bool {
+	return atomic.LoadInt32(&r.status) == reader.StatusStopping
 }
 
-func (kr *Reader) Status() StatsInfo {
-	kr.statsLock.RLock()
-	defer kr.statsLock.RUnlock()
-	return kr.stats
+func (r *Reader) hasStopped() bool {
+	return atomic.LoadInt32(&r.status) == reader.StatusStopped
 }
 
-func (kr *Reader) setStatsError(err string) {
-	kr.statsLock.Lock()
-	defer kr.statsLock.Unlock()
-	kr.stats.LastError = err
+func (r *Reader) Name() string {
+	return fmt.Sprintf("KafkaReader:[%s],[%s]", strings.Join(r.Topics, ","), r.ConsumerGroup)
 }
 
-func (kr *Reader) Source() string {
-	return fmt.Sprintf("[%s],[%s]", strings.Join(kr.Topics, ","), kr.ConsumerGroup)
+func (_ *Reader) SetMode(_ string, _ interface{}) error {
+	return errors.New("KafkaReader does not support read mode")
 }
 
-func (kr *Reader) ReadLine() (data string, err error) {
+func (r *Reader) setStatsError(err string) {
+	r.statsLock.Lock()
+	defer r.statsLock.Unlock()
+	r.stats.LastError = err
+}
+
+func (r *Reader) Source() string {
+	return fmt.Sprintf("[%s],[%s]", strings.Join(r.Topics, ","), r.ConsumerGroup)
+}
+
+func (r *Reader) ReadLine() (string, error) {
 	timer := time.NewTimer(time.Second)
+	defer timer.Stop()
 	select {
-	case err = <-kr.errs:
-		if err != nil {
-			err = fmt.Errorf("runner[%v] Consumer Error: %s\n", kr.meta.RunnerName, err)
-			log.Error(err)
-			kr.setStatsError(err.Error())
-		}
-	case msg := <-kr.in:
+	case msg := <-r.readChan:
+		var line string
 		if msg != nil && msg.Value != nil && len(msg.Value) > 0 {
-			data = string(msg.Value)
-			kr.curMsg = msg
-			kr.statsLock.Lock()
-			if tp, ok := kr.curOffsets[msg.Topic]; ok {
+			line = string(msg.Value)
+			r.currentMsg = msg
+			r.statsLock.Lock()
+			if tp, ok := r.currentOffsets[msg.Topic]; ok {
 				tp[msg.Partition] = msg.Offset
-				kr.curOffsets[msg.Topic] = tp
+				r.currentOffsets[msg.Topic] = tp
 			} else {
 				tp := make(map[int32]int64)
 				tp[msg.Partition] = msg.Offset
-				kr.curOffsets[msg.Topic] = tp
+				r.currentOffsets[msg.Topic] = tp
 			}
-			kr.statsLock.Unlock()
+			r.statsLock.Unlock()
 		} else {
-			log.Debugf("runner[%v] Consumer read empty message: %v", kr.meta.RunnerName, msg)
+			log.Debugf("runner[%v] Consumer read empty message: %v", r.meta.RunnerName, msg)
 		}
+		return line, nil
+	case err := <-r.errChan:
+		if err != nil {
+			err = fmt.Errorf("runner[%v] Consumer Error: %s\n", r.meta.RunnerName, err)
+			log.Error(err)
+			r.setStatsError(err.Error())
+		}
+		return "", err
 	case <-timer.C:
 	}
-	timer.Stop()
-	return
+
+	return "", nil
 }
 
-func (kr *Reader) Close() (err error) {
-	kr.mux.Lock()
-	err = kr.Consumer.Close()
-	kr.mux.Unlock()
-	return
+func (r *Reader) Status() StatsInfo {
+	r.statsLock.RLock()
+	defer r.statsLock.RUnlock()
+	return r.stats
 }
 
-func (kr *Reader) SyncMeta() {
-	kr.mux.Lock()
-	if kr.curMsg != nil {
-		kr.Consumer.CommitUpto(kr.curMsg)
-	}
-	kr.mux.Unlock()
-	return
-}
-
-func (kr *Reader) SetMode(mode string, v interface{}) error {
-	return errors.New("KafkaReader not support read mode")
-}
-
-func (kr *Reader) Lag() (rl *LagInfo, err error) {
-	if kr.Consumer == nil {
+func (r *Reader) Lag() (*LagInfo, error) {
+	if r.Consumer == nil {
 		return nil, errors.New("kafka consumer is closed")
 	}
-	marks := kr.Consumer.HighWaterMarks()
-	rl = &LagInfo{
+	marks := r.Consumer.HighWaterMarks()
+	rl := &LagInfo{
 		SizeUnit: "records",
 		Size:     0,
 	}
@@ -200,12 +206,36 @@ func (kr *Reader) Lag() (rl *LagInfo, err error) {
 			rl.Size += v
 		}
 	}
-	kr.statsLock.RLock()
-	for _, ptv := range kr.curOffsets {
+	r.statsLock.RLock()
+	for _, ptv := range r.currentOffsets {
 		for _, v := range ptv {
 			rl.Size -= v
 		}
 	}
-	kr.statsLock.RUnlock()
-	return
+	r.statsLock.RUnlock()
+	return rl, nil
+}
+
+func (r *Reader) SyncMeta() {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	if r.currentMsg != nil {
+		r.Consumer.CommitUpto(r.currentMsg)
+	}
+}
+
+func (r *Reader) Close() error {
+	if !atomic.CompareAndSwapInt32(&r.status, reader.StatusRunning, reader.StatusStopping) {
+		log.Warnf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
+		return nil
+	}
+	log.Debugf("Runner[%v] %q daemon is stopping", r.meta.RunnerName, r.Name())
+
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	err := r.Consumer.Close()
+	atomic.StoreInt32(&r.status, reader.StatusStopped)
+	return err
 }

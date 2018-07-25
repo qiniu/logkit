@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -36,6 +37,9 @@ func TestNewHttpReader(t *testing.T) {
 	httpReader := hhttpReader.(*Reader)
 	assert.NoError(t, httpReader.Start())
 	defer httpReader.Close()
+
+	// CI 环境启动监听较慢，需要等待几秒
+	time.Sleep(3 * time.Second)
 
 	testData := []string{
 		"1234567890987654321",

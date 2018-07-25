@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -38,6 +39,9 @@ func TestHTTPSender(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NoError(t, httpReader.Start())
 	defer httpReader.Close()
+
+	// CI 环境启动监听较慢，需要等待几秒
+	time.Sleep(3 * time.Second)
 
 	testData := []struct {
 		input       []Data
