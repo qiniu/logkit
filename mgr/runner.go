@@ -752,6 +752,14 @@ func (r *LogExportRunner) Stop() {
 		atomic.AddInt32(&r.stopped, 1)
 	}
 
+	for _, t := range r.transformers {
+		if c, ok := t.(io.Closer); ok {
+			if err := c.Close(); err != nil {
+				log.Warnf("Close transform failed, %v", err)
+			}
+		}
+	}
+
 	log.Infof("Runner[%v] wait for sender %v stopped", r.Name(), r.reader.Name())
 	for _, s := range r.senders {
 		err := s.Close()

@@ -29,12 +29,6 @@
 			"revisionTime": "2017-04-10T19:29:09Z"
 		},
 		{
-			"checksumSHA1": "R9UtTavo38AfFg/T7raVVuQV7Oc=",
-			"path": "github.com/apaxa-go/eval",
-			"revision": "1d18b251d6795e462ef99e1cd2d0c88f64a0918b",
-			"revisionTime": "2017-12-23T18:23:26Z"
-		},
-		{
 			"checksumSHA1": "M+DvK1Y/5n688Cw4/DzjXdtQbSY=",
 			"path": "github.com/aws/aws-sdk-go/aws",
 			"revision": "b72688f15ec0b32551a50dceeeb2bd53f2e0d690",
@@ -431,6 +425,18 @@
 			"path": "github.com/olivere/elastic/uritemplates",
 			"revision": "09755b303b32ccae2968681e77473399cb48378c",
 			"revisionTime": "2017-11-17T18:00:47Z"
+		},
+		{
+			"checksumSHA1": "GSadhwjiMi8zISYoyC1arYREbKE=",
+			"path": "github.com/oschwald/geoip2-golang",
+			"revision": "7118115686e16b77967cdbf55d1b944fe14ad312",
+			"revisionTime": "2018-02-22T21:45:52Z"
+		},
+		{
+			"checksumSHA1": "a1WxG0wMDGFnjojQghwu1i1SDhk=",
+			"path": "github.com/oschwald/maxminddb-golang",
+			"revision": "c5bec84d1963260297932a1b7a1753c8420717a7",
+			"revisionTime": "2018-02-25T17:45:17Z"
 		},
 		{
 			"checksumSHA1": "FGg99nQ56Fo3radSCuU1AeEUJug=",
