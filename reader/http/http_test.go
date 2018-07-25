@@ -17,10 +17,8 @@ import (
 )
 
 func TestNewHttpReader(t *testing.T) {
-	c := conf.MapConf{
-		reader.KeyHTTPServiceAddress: ":7110",
-		reader.KeyHTTPServicePath:    "/logkit/data",
-	}
+	defer os.RemoveAll("./meta")
+
 	readConf := conf.MapConf{
 		reader.KeyMetaPath: MetaDir,
 		reader.KeyFileDone: MetaDir,
@@ -29,12 +27,15 @@ func TestNewHttpReader(t *testing.T) {
 	}
 	meta, err := reader.NewMetaWithConf(readConf)
 	assert.NoError(t, err)
-	defer os.RemoveAll("./meta")
+
+	c := conf.MapConf{
+		reader.KeyHTTPServiceAddress: ":7110",
+		reader.KeyHTTPServicePath:    "/logkit/data",
+	}
 	hhttpReader, err := NewReader(meta, c)
+	assert.NoError(t, err)
 	httpReader := hhttpReader.(*Reader)
-	assert.NoError(t, err)
-	err = httpReader.Start()
-	assert.NoError(t, err)
+	assert.NoError(t, httpReader.Start())
 	defer httpReader.Close()
 
 	testData := []string{
