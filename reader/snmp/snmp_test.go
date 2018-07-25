@@ -121,7 +121,7 @@ func TestTableInit(t *testing.T) {
 		Oid:    ".1.0.0.0",
 		Fields: []Field{{Oid: ".999", Name: "foo"}},
 	}
-	err := tbl.init()
+	err := tbl.init("127.0.0.1")
 	assert.NoError(t, err)
 
 	assert.Equal(t, "testTable", tbl.Name)
@@ -757,7 +757,7 @@ func TestSnmpTranslateCache_hit(t *testing.T) {
 func TestSnmpTableCache_miss(t *testing.T) {
 	snmpTableCaches = nil
 	oid := ".1.0.0.0"
-	mibName, oidNum, oidText, fields, err := snmpTable(oid)
+	mibName, oidNum, oidText, fields, err := snmpTable(oid, "127.0.0.1")
 	assert.Len(t, snmpTableCaches, 1)
 	stc := snmpTableCaches[oid]
 	assert.NotNil(t, stc)
@@ -778,7 +778,7 @@ func TestSnmpTableCache_hit(t *testing.T) {
 			err:     fmt.Errorf("e"),
 		},
 	}
-	mibName, oidNum, oidText, fields, err := snmpTable("foo")
+	mibName, oidNum, oidText, fields, err := snmpTable("foo", "127.0.0.1")
 	assert.Equal(t, "a", mibName)
 	assert.Equal(t, "b", oidNum)
 	assert.Equal(t, "c", oidText)

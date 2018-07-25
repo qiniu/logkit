@@ -79,6 +79,7 @@ func NewReader(meta *reader.Meta, c conf.MapConf) (s reader.Reader, err error) {
 	var timeOut, interval time.Duration
 	name, _ := c.GetStringOr(reader.KeySnmpReaderName, "logki_default_snmp_name")
 	agents, _ := c.GetStringListOr(reader.KeySnmpReaderAgents, []string{"127.0.0.1:161"})
+	tableHost, _ := c.GetStringOr(reader.KeySnmpTableInitHost, "127.0.0.1")
 	timeStr, _ := c.GetStringOr(reader.KeySnmpReaderTimeOut, "5s")
 	if timeOut, err = time.ParseDuration(timeStr); err != nil {
 		return
@@ -123,7 +124,7 @@ func NewReader(meta *reader.Meta, c conf.MapConf) (s reader.Reader, err error) {
 	}
 
 	for i := range tables {
-		if subErr := tables[i].init(); subErr != nil {
+		if subErr := tables[i].init(tableHost); subErr != nil {
 			err = Errorf(subErr, "initializing table %s", tables[i].Name)
 			return
 		}
@@ -173,8 +174,8 @@ type Table struct {
 	Oid         string   `json:"table_oid"`
 }
 
-func (t *Table) init() error {
-	if err := t.initBuild(); err != nil {
+func (t *Table) init(host string) error {
+	if err := t.initBuild(host); err != nil {
 		return err
 	}
 	for i := range t.Fields {
@@ -185,12 +186,12 @@ func (t *Table) init() error {
 	return nil
 }
 
-func (t *Table) initBuild() error {
+func (t *Table) initBuild(host string) error {
 	if t.Oid == "" {
 		return nil
 	}
 
-	_, _, oidText, fields, err := snmpTable(t.Oid)
+	_, _, oidText, fields, err := snmpTable(t.Oid, host)
 	if err != nil {
 		return err
 	}
@@ -820,7 +821,7 @@ type snmpTableCache struct {
 var snmpTableCaches map[string]snmpTableCache
 var snmpTableCachesLock sync.Mutex
 
-func snmpTable(oid string) (mibName string, oidNum string, oidText string, fields []Field, err error) {
+func snmpTable(oid, host string) (mibName string, oidNum string, oidText string, fields []Field, err error) {
 	snmpTableCachesLock.Lock()
 	if snmpTableCaches == nil {
 		snmpTableCaches = map[string]snmpTableCache{}
@@ -829,7 +830,7 @@ func snmpTable(oid string) (mibName string, oidNum string, oidText string, field
 	var stc snmpTableCache
 	var ok bool
 	if stc, ok = snmpTableCaches[oid]; !ok {
-		stc.mibName, stc.oidNum, stc.oidText, stc.fields, stc.err = snmpTableCall(oid)
+		stc.mibName, stc.oidNum, stc.oidText, stc.fields, stc.err = snmpTableCall(oid, host)
 		snmpTableCaches[oid] = stc
 	}
 
@@ -837,7 +838,7 @@ func snmpTable(oid string) (mibName string, oidNum string, oidText string, field
 	return stc.mibName, stc.oidNum, stc.oidText, stc.fields, stc.err
 }
 
-func snmpTableCall(oid string) (mibName string, oidNum string, oidText string, fields []Field, err error) {
+func snmpTableCall(oid, host string) (mibName string, oidNum string, oidText string, fields []Field, err error) {
 	mibName, oidNum, oidText, _, err = snmpTranslate(oid)
 	if err != nil {
 		return "", "", "", nil, Errorf(err, "translating")
@@ -872,7 +873,7 @@ func snmpTableCall(oid string) (mibName string, oidNum string, oidText string, f
 		}
 	}
 
-	out, err := execCmd("snmptable", "-Ch", "-Cl", "-c", "public", "127.0.0.1", oidFullName)
+	out, err := execCmd("snmptable", "-Ch", "-Cl", "-c", "public", host, oidFullName)
 	if err != nil {
 		return "", "", "", nil, Errorf(err, "getting table columns")
 	}

@@ -87,6 +87,7 @@ const (
 // Constants for SNMP
 const (
 	KeySnmpReaderAgents    = "snmp_agents"
+	KeySnmpTableInitHost   = "snmp_table_init_host"
 	KeySnmpReaderTimeOut   = "snmp_time_out"
 	KeySnmpReaderInterval  = "snmp_interval"
 	KeySnmpReaderRetries   = "snmp_retries"
@@ -1317,6 +1318,16 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse:  true,
 			Description:   "agents列表(snmp_agents)",
 			ToolTip:       "多个可用逗号','分隔",
+			ToolTipActive: true,
+		},
+		{
+			KeyName:       KeySnmpTableInitHost,
+			ChooseOnly:    false,
+			Default:       "127.0.0.1",
+			Placeholder:   "127.0.0.1",
+			DefaultNoUse:  true,
+			Description:   "tables初始化连的snmpd服务地址(snmp_table_init_host)",
+			ToolTip:       "tables初始化连的snmpd服务地址，默认127.0.0.1",
 			ToolTipActive: true,
 		},
 		{
