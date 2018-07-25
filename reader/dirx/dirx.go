@@ -345,7 +345,8 @@ func (r *Reader) SyncMeta() {
 
 func (r *Reader) Close() error {
 	if !atomic.CompareAndSwapInt32(&r.status, reader.StatusRunning, reader.StatusStopping) {
-		return errors.New("reader is not running")
+		log.Warnf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
+		return nil
 	}
 	log.Debugf("Runner[%v] %q daemon is stopping", r.meta.RunnerName, r.Name())
 	close(r.stopChan)
