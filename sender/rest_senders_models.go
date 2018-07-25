@@ -114,6 +114,16 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "发送到指定文件(file_send_path)",
 			ToolTip:      `路径支持魔法变量，例如 "file_send_path":"data-%Y-%m-%d.txt" ，此时数据就会渲染出日期，存放为 data-2018-03-28.txt`,
 		},
+		{
+			KeyName:      KeyFileSenderTimestampKey,
+			ChooseOnly:   false,
+			Default:      "",
+			Required:     false,
+			Placeholder:  "timestamp",
+			DefaultNoUse: true,
+			Description:  "时间戳键名(file_send_timestamp_key)",
+			ToolTip:      `用于获取时间的时间戳键名，如果该键存在则将替代当前时间渲染路径中的魔法变量，格式必须是 RFC3339Nano`,
+		},
 	},
 	TypePandora: {
 		{
@@ -500,8 +510,8 @@ var ModeKeyOptions = map[string][]Option{
 			KeyName:       KeyPandoraAutoConvertDate,
 			Element:       Radio,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{"true", "false"},
-			Default:       "true",
+			ChooseOptions: []interface{}{"false", "true"},
+			Default:       "false",
 			DefaultNoUse:  false,
 			Description:   "自动转换时间类型(pandora_auto_convert_date)",
 			Advance:       true,

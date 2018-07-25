@@ -14,31 +14,25 @@ var (
 
 type PandoraKeyConvert struct {
 	stats StatsInfo
+	cache map[string]KeyInfo
 }
 
+func (g *PandoraKeyConvert) Init() error {
+	g.cache = make(map[string]KeyInfo)
+	return nil
+}
 func (g *PandoraKeyConvert) RawTransform(datas []string) ([]string, error) {
 	return datas, errors.New("pandora_key_convert transformer not support rawTransform")
 }
 
 func (g *PandoraKeyConvert) Transform(datas []Data) ([]Data, error) {
 	for i, v := range datas {
-		datas[i] = deepConvertKey(v)
+		datas[i] = DeepConvertKeyWithCache(v, g.cache)
+		//datas[i] = DeepConvertKey(v)
 	}
 
 	g.stats, _ = transforms.SetStatsInfo(nil, g.stats, 0, int64(len(datas)), g.Type())
 	return datas, nil
-}
-
-func deepConvertKey(data map[string]interface{}) map[string]interface{} {
-	newData := make(map[string]interface{})
-	for k, v := range data {
-		nk := PandoraKey(k)
-		if nv, ok := v.(map[string]interface{}); ok {
-			v = deepConvertKey(nv)
-		}
-		newData[nk] = v
-	}
-	return newData
 }
 
 func (g *PandoraKeyConvert) Description() string {
@@ -75,6 +69,6 @@ func (g *PandoraKeyConvert) SetStats(err string) StatsInfo {
 
 func init() {
 	transforms.Add("pandora_key_convert", func() transforms.Transformer {
-		return &PandoraKeyConvert{}
+		return &PandoraKeyConvert{cache: make(map[string]KeyInfo)}
 	})
 }

@@ -52,10 +52,6 @@ type Runner interface {
 	Status() RunnerStatus
 }
 
-type Resetable interface {
-	Reset() error
-}
-
 type TokenRefreshable interface {
 	TokenRefresh(AuthTokens) error
 }
@@ -309,7 +305,7 @@ func createTransformers(rc RunnerConfig) ([]transforms.Transformer, error) {
 			return nil, fmt.Errorf("type %v of transformer unmarshal config error %v", strTP, err)
 		}
 		//transformer初始化
-		if trans, ok := trans.(transforms.Initialize); ok {
+		if trans, ok := trans.(transforms.Initializer); ok {
 			err = trans.Init()
 			if err != nil {
 				return nil, fmt.Errorf("type %v of transformer init error %v", strTP, err)
@@ -544,6 +540,11 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 }
 
 func (r *LogExportRunner) Run() {
+	if dr, ok := r.reader.(reader.DaemonReader); ok {
+		if err := dr.Start(); err != nil {
+			log.Errorf("Runner[%v] start reader daemon failed: %v", err)
+		}
+	}
 	if r.cleaner != nil {
 		go r.cleaner.Run()
 	}
@@ -663,7 +664,10 @@ func classifySenderData(senders []sender.Sender, datas []Data, router *router.Ro
 			continue
 		}
 
-		_, skip := senders[i].(sender.SkipDeepCopySender)
+		skip := false
+		if ss, ok := senders[i].(sender.SkipDeepCopySender); ok {
+			skip = ss.SkipDeepCopy()
+		}
 		if skip || skipCopyAll || i == lastIdx {
 			senderDataList[i] = datas
 		} else {

@@ -267,4 +267,4 @@ func (ess *Sender) wrapDoc(doc map[string]interface{}) map[string]interface{} {
 	return doc
 }
 
-func (_ *Sender) SkipDeepCopy() {}
+func (_ *Sender) SkipDeepCopy() bool { return true }

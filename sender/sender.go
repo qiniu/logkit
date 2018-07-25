@@ -141,7 +141,9 @@ const (
 
 	// file
 	// 可选参数 当sender_type 为file 的时候
-	KeyFileSenderPath = "file_send_path"
+	KeyFileSenderPath         = "file_send_path"
+	KeyFileSenderTimestampKey = "file_send_timestamp_key"
+	KeyFileSenderMaxOpenFiles = "file_send_max_open_files"
 
 	// http
 	KeyHttpSenderUrl      = "http_sender_url"
@@ -202,7 +204,8 @@ type Sender interface {
 
 // SkipDeepCopySender 表示该 sender 不会对传入数据进行污染，凡是有次保证的 sender 需要实现该接口提升发送效率
 type SkipDeepCopySender interface {
-	SkipDeepCopy()
+	// SkipDeepCopy 需要返回值是因为如果一个 sender 封装了其它 sender，需要根据实际封装的类型返回是否忽略深度拷贝
+	SkipDeepCopy() bool
 }
 
 type StatsSender interface {
@@ -265,7 +268,9 @@ func (r *Registry) NewSender(conf conf.MapConf, ftSaveLogPath string) (sender Se
 		return
 	}
 	faultTolerant, _ := conf.GetBoolOr(KeyFaultTolerant, true)
-	if faultTolerant {
+
+	//如果是 PandoraSender，目前的依赖必须启用 ftsender,依赖Ftsender做key转换检查
+	if faultTolerant || sendType == TypePandora {
 		sender, err = NewFtSender(sender, conf, ftSaveLogPath)
 		if err != nil {
 			return

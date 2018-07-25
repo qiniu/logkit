@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -494,19 +495,20 @@ func Test_checkMagic(t *testing.T) {
 }
 
 func TestSQLReader(t *testing.T) {
-	meta, err := getMeta()
+	meta, err := getMeta(MetaDir)
 	assert.NoError(t, err)
 	defer os.RemoveAll(MetaDir)
 	database := "TestSQLReaderdatabase"
 	mr := &Reader{
-		database:  database,
-		rawsqls:   "select * from mysql123  ;select * from mysql345;",
-		syncSQLs:  []string{"select * from mysql123", "select * from mysql345"},
-		readBatch: 100,
-		meta:      meta,
-		offsetKey: "id",
-		offsets:   []int64{123, 456},
-		dbtype:    "mysql",
+		rawDatabase: database,
+		database:    database,
+		rawsqls:     "select * from mysql123  ;select * from mysql345;",
+		syncSQLs:    []string{"select * from mysql123", "select * from mysql345"},
+		readBatch:   100,
+		meta:        meta,
+		offsetKey:   "id",
+		offsets:     []int64{123, 456},
+		dbtype:      "mysql",
 	}
 	assert.Equal(t, mr.dbtype+"_"+database, mr.Source())
 
@@ -857,7 +859,7 @@ func Test_equalTime(t *testing.T) {
 }
 
 func Test_isMatchData(t *testing.T) {
-	meta, err := getMeta()
+	meta, err := getMeta(MetaDir)
 	assert.NoError(t, err)
 	defer os.RemoveAll(MetaDir)
 	mr := &Reader{
@@ -1248,10 +1250,10 @@ func Test_restoreRecordsFile(t *testing.T) {
 		err = WriteRecordsFile(meta.DoneFilePath, getContent(test.set))
 		assert.NoError(t, err)
 
-		var records DBRecords
+		var records SyncDBRecords
 		_, _, omitDoneDBRecords := records.restoreRecordsFile(meta)
 		assert.EqualValues(t, test.exp_omitDoneDBRecords, omitDoneDBRecords)
-		assert.EqualValues(t, test.exp_res, records)
+		assert.EqualValues(t, test.exp_res, records.GetDBRecords())
 	}
 
 }
@@ -1273,10 +1275,10 @@ func getContent(readRecords DBRecords) string {
 	return all
 }
 
-func getMeta() (*reader.Meta, error) {
+func getMeta(metaDir string) (*reader.Meta, error) {
 	logkitConf := conf.MapConf{
-		reader.KeyMetaPath: MetaDir,
-		reader.KeyFileDone: MetaDir,
+		reader.KeyMetaPath: metaDir,
+		reader.KeyFileDone: metaDir,
 		reader.KeyMode:     reader.ModeMySQL,
 	}
 	return reader.NewMetaWithConf(logkitConf)
@@ -1284,7 +1286,7 @@ func getMeta() (*reader.Meta, error) {
 
 type DataTest struct {
 	database    string
-	createTable string
+	createTable []string
 	insertData  []string
 }
 
@@ -1305,27 +1307,27 @@ var (
 	databasesTest = []DataTest{
 		{
 			database:    "Test_MySql20180510",
-			createTable: "CREATE TABLE runoob_tbl20180510est(runoob_id INT NOT NULL AUTO_INCREMENT,runoob_title VARCHAR(100) NOT NULL,runoob_author VARCHAR(40) NOT NULL,submission_date DATE,PRIMARY KEY ( runoob_id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;",
+			createTable: []string{"CREATE TABLE runoob_tbl20180510est(runoob_id INT NOT NULL AUTO_INCREMENT,runoob_title VARCHAR(100) NOT NULL,runoob_author VARCHAR(40) NOT NULL,submission_date DATE,PRIMARY KEY ( runoob_id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;"},
 			insertData:  []string{"INSERT INTO runoob_tbl20180510est (runoob_title, runoob_author, submission_date) VALUES (\"学习 mysql\", \"教程\", NOW());"},
 		},
 		{
 			database:    "Test_MySql20170610",
-			createTable: "CREATE TABLE runoob_tbl20170610est(runoob_id INT NOT NULL AUTO_INCREMENT,runoob_title VARCHAR(100) NOT NULL,runoob_author VARCHAR(40) NOT NULL,submission_date DATE,PRIMARY KEY ( runoob_id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;",
+			createTable: []string{"CREATE TABLE runoob_tbl20170610est(runoob_id INT NOT NULL AUTO_INCREMENT,runoob_title VARCHAR(100) NOT NULL,runoob_author VARCHAR(40) NOT NULL,submission_date DATE,PRIMARY KEY ( runoob_id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;"},
 			insertData:  []string{"INSERT INTO runoob_tbl20170610est (runoob_title, runoob_author, submission_date) VALUES (\"学习 mysql\", \"教程\", NOW());"},
 		},
 		{
 			database:    "Test_MySql20171210",
-			createTable: "CREATE TABLE runoob_tbl20171210est(runoob_id INT NOT NULL AUTO_INCREMENT,runoob_title VARCHAR(100) NOT NULL,runoob_author VARCHAR(40) NOT NULL,submission_date DATE,PRIMARY KEY ( runoob_id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;",
+			createTable: []string{"CREATE TABLE runoob_tbl20171210est(runoob_id INT NOT NULL AUTO_INCREMENT,runoob_title VARCHAR(100) NOT NULL,runoob_author VARCHAR(40) NOT NULL,submission_date DATE,PRIMARY KEY ( runoob_id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;"},
 			insertData:  []string{"INSERT INTO runoob_tbl20171210est (runoob_title, runoob_author, submission_date) VALUES (\"学习 mysql\", \"教程\", NOW());"},
 		},
 		{
 			database:    "Test_MySql20170910",
-			createTable: "CREATE TABLE runoob_tbl20170910est(runoob_id INT NOT NULL AUTO_INCREMENT,runoob_title VARCHAR(100) NOT NULL,runoob_author VARCHAR(40) NOT NULL,submission_date DATE,PRIMARY KEY ( runoob_id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;",
+			createTable: []string{"CREATE TABLE runoob_tbl20170910est(runoob_id INT NOT NULL AUTO_INCREMENT,runoob_title VARCHAR(100) NOT NULL,runoob_author VARCHAR(40) NOT NULL,submission_date DATE,PRIMARY KEY ( runoob_id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;"},
 			insertData:  []string{"INSERT INTO runoob_tbl20170910est (runoob_title, runoob_author, submission_date) VALUES (\"学习 mysql\", \"教程\", NOW());"},
 		},
 		{
 			database:    "Test_MySql20180110",
-			createTable: "CREATE TABLE runoob_tbl20180110est(runoob_id INT NOT NULL AUTO_INCREMENT,runoob_title VARCHAR(100) NOT NULL,runoob_author VARCHAR(40) NOT NULL,submission_date DATE,PRIMARY KEY ( runoob_id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;",
+			createTable: []string{"CREATE TABLE runoob_tbl20180110est(runoob_id INT NOT NULL AUTO_INCREMENT,runoob_title VARCHAR(100) NOT NULL,runoob_author VARCHAR(40) NOT NULL,submission_date DATE,PRIMARY KEY ( runoob_id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;"},
 			insertData:  []string{"INSERT INTO runoob_tbl20180110est (runoob_title, runoob_author, submission_date) VALUES (\"学习 mysql\", \"教程\", NOW());"},
 		},
 	}
@@ -1333,7 +1335,7 @@ var (
 	todayDataTests   = []DataTest{
 		{
 			"Test_MySql" + year + month + day,
-			"CREATE TABLE runoob_tbl" + year + month + day + "est(runoob_id INT NOT NULL AUTO_INCREMENT,runoob_title VARCHAR(100) NOT NULL,runoob_author VARCHAR(40) NOT NULL,submission_date DATE,PRIMARY KEY ( runoob_id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;",
+			[]string{"CREATE TABLE runoob_tbl" + year + month + day + "est(runoob_id INT NOT NULL AUTO_INCREMENT,runoob_title VARCHAR(100) NOT NULL,runoob_author VARCHAR(40) NOT NULL,submission_date DATE,PRIMARY KEY ( runoob_id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;"},
 			[]string{"INSERT INTO runoob_tbl" + year + month + day + "est (runoob_title, runoob_author, submission_date) VALUES (\"学习 mysql\", \"教程\", NOW());"},
 		},
 	}
@@ -1359,7 +1361,7 @@ func TestMySql(t *testing.T) {
 
 	// test exec on start
 	runnerName := "mr"
-	mr, err := getMySqlReader(false, false, runnerName, CronInfo{})
+	mr, err := getMySqlReader(false, false, false, runnerName, CronInfo{})
 	defer os.RemoveAll(MetaDir)
 	assert.NoError(t, err)
 	mrData, ok := mr.(reader.DataReader)
@@ -1404,7 +1406,7 @@ func TestMySql(t *testing.T) {
 
 	// test exec on start, sql not empty
 	runnerName = "mrRawSql"
-	mrRawSql, err := getMySqlReader(false, true, runnerName, CronInfo{})
+	mrRawSql, err := getMySqlReader(false, true, false, runnerName, CronInfo{})
 	assert.NoError(t, err)
 	mrRawSqlData, ok := mrRawSql.(reader.DataReader)
 	if !ok {
@@ -1448,7 +1450,7 @@ func TestMySql(t *testing.T) {
 
 	// test history all
 	runnerName = "mrHistoryAll"
-	mrHistoryAll, err := getMySqlReader(true, false, runnerName, CronInfo{})
+	mrHistoryAll, err := getMySqlReader(true, false, false, runnerName, CronInfo{})
 	assert.NoError(t, err)
 	mrHistoryAllData, ok := mrHistoryAll.(reader.DataReader)
 	if !ok {
@@ -1473,7 +1475,7 @@ func TestMySql(t *testing.T) {
 	mrHistoryAll.Close()
 
 	// test file done in meta dir
-	mrHistoryAll2, err := getMySqlReader(true, false, runnerName, CronInfo{})
+	mrHistoryAll2, err := getMySqlReader(true, false, false, runnerName, CronInfo{})
 	assert.NoError(t, err)
 	mrHistoryAllData2, ok := mrHistoryAll2.(reader.DataReader)
 	if !ok {
@@ -1496,13 +1498,13 @@ func TestMySql(t *testing.T) {
 	mrHistoryAll2.Close()
 
 	// test cron
-	minDataTestsLine, secondAdd3, err := setMinute()
+	minDataTestsLine, secondAdd3, err := setMinute(time.Now())
 	if err != nil {
 		t.Errorf("prepare mysql database failed: %v", err)
 	}
 	// cron task, not exec on start
 	runnerName = "mrCron"
-	mrCron, err := getMySqlReader(false, false, runnerName, CronInfo{true, secondAdd3, true})
+	mrCron, err := getMySqlReader(false, false, false, runnerName, CronInfo{true, secondAdd3, true})
 	assert.NoError(t, err)
 	mrCronData, ok := mrCron.(reader.DataReader)
 	if !ok {
@@ -1527,13 +1529,17 @@ func TestMySql(t *testing.T) {
 	mrCron.SyncMeta()
 	mrCron.Close()
 
-	minDataTestsLine, secondAdd3, err = setMinute()
+	now := time.Now()
+	minDataTestsLine, secondAdd3, err = setMinute(now)
 	if err != nil {
 		t.Errorf("prepare mysql database failed: %v", err)
 	}
+	if now.Second() >= 57 {
+		minDataTestsLine++
+	}
 	// cron task, exec on start
 	runnerName = "mrCronExecOnStart"
-	mrCronExecOnStart, err := getMySqlReader(false, false, runnerName, CronInfo{true, secondAdd3, false})
+	mrCronExecOnStart, err := getMySqlReader(false, false, false, runnerName, CronInfo{true, secondAdd3, false})
 	assert.NoError(t, err)
 	mrCronExecOnStartData, ok := mrCronExecOnStart.(reader.DataReader)
 	if !ok {
@@ -1554,11 +1560,11 @@ func TestMySql(t *testing.T) {
 		assert.Equal(t, expectData, data)
 		dataLine++
 	}
-	assert.Equal(t, minDataTestsLine+1, dataLine)
+	assert.Equal(t, minDataTestsLine, dataLine)
 	mrCronExecOnStart.SyncMeta()
 	mrCronExecOnStart.Close()
 
-	mrCronExecOnStart2, err := getMySqlReader(false, false, runnerName, CronInfo{true, secondAdd3, false})
+	mrCronExecOnStart2, err := getMySqlReader(false, false, false, runnerName, CronInfo{true, secondAdd3, false})
 	assert.NoError(t, err)
 	mrCronExecOnStartData2, ok := mrCronExecOnStart2.(reader.DataReader)
 	if !ok {
@@ -1582,9 +1588,55 @@ func TestMySql(t *testing.T) {
 	assert.Equal(t, 0, dataLine)
 	mrCronExecOnStart2.SyncMeta()
 	mrCronExecOnStart2.Close()
+
+	minDataTestsLine, _, err = setSecond()
+	if err != nil {
+		t.Errorf("prepare mysql database failed: %v", err)
+	}
+	// cron task, exec on start
+	runnerName = "mrLoopcOnStart"
+	mrLoopOnStart, err := getMySqlReader(false, false, true, runnerName, CronInfo{false, "", false})
+	assert.NoError(t, err)
+	mrLoopOnStartData, ok := mrLoopOnStart.(reader.DataReader)
+	if !ok {
+		t.Error("mysql read should have readdata interface")
+	}
+	dataLine = 0
+	before = time.Now()
+	log.Infof("before: %v", before)
+	for !batchTimeout(before, 5) {
+		data, bytes, err := mrLoopOnStartData.ReadData()
+		if err != nil {
+			t.Error(err)
+		}
+		if len(data) <= 0 {
+			continue
+		}
+		assert.Equal(t, int64(36), bytes)
+		assert.Equal(t, expectData, data)
+		dataLine++
+	}
+	assert.Equal(t, minDataTestsLine, dataLine)
+	mrLoopOnStart.SyncMeta()
+
+	meta, err := getMeta(path.Join(MetaDir, runnerName))
+	assert.NoError(t, err)
+	var doneRecords = SyncDBRecords{
+		mutex: sync.RWMutex{},
+	}
+	lastDB, lastTable, omitDoneFile := doneRecords.restoreRecordsFile(meta)
+	assert.False(t, omitDoneFile)
+	assert.Equal(t, 1, len(doneRecords.records))
+	expectDB := "Test_MySql" + year + month + day
+	assert.Equal(t, 2, len(doneRecords.records.GetTableRecords(expectDB)))
+	assert.Equal(t, expectDB, lastDB)
+	assert.NotEmpty(t, lastTable)
+
+	mrLoopOnStart.Close()
+
 }
 
-func getMySqlReader(historyAll, rawsql bool, runnerName string, cronInfo CronInfo) (reader.Reader, error) {
+func getMySqlReader(historyAll, rawsql, loop bool, runnerName string, cronInfo CronInfo) (reader.Reader, error) {
 	readerConf := conf.MapConf{
 		"mysql_database":     "Test_MySql@(YYYY)@(MM)@(DD)",
 		"mysql_table":        "runoob_tbl@(YYYY)@(MM)@(DD)est",
@@ -1613,6 +1665,10 @@ func getMySqlReader(historyAll, rawsql bool, runnerName string, cronInfo CronInf
 	if cronInfo.notExecOnStart {
 		readerConf["mysql_exec_onstart"] = "false"
 	}
+	if loop {
+		readerConf["mysql_cron"] = "loop 1s"
+		readerConf["mysql_table"] = "runoob_tbl@(YYYY)@(MM)@(DD)@(ss)est"
+	}
 	mr, err := reader.NewReader(readerConf, true)
 	if err != nil {
 		return nil, err
@@ -1631,23 +1687,6 @@ func prepareMysql() error {
 		return err
 	}
 
-	rowsDBs, err := db.Query("show databases;")
-	if err != nil {
-		return err
-	}
-	defer rowsDBs.Close()
-
-	databases := make([]string, 0)
-	for rowsDBs.Next() {
-		var s string
-		err = rowsDBs.Scan(&s)
-		if err != nil {
-			continue
-		}
-
-		databases = append(databases, s)
-	}
-
 	for _, dbInfo := range databasesTest {
 		_, err = db.Query("DROP DATABASE IF EXISTS " + dbInfo.database)
 		if err != nil {
@@ -1664,9 +1703,11 @@ func prepareMysql() error {
 			return err
 		}
 
-		_, err = db.Exec(dbInfo.createTable)
-		if err != nil {
-			return err
+		for _, createTable := range dbInfo.createTable {
+			_, err = db.Exec(createTable)
+			if err != nil {
+				return err
+			}
 		}
 
 		for _, data := range dbInfo.insertData {
@@ -1711,9 +1752,8 @@ func batchTimeout(before time.Time, interval float64) bool {
 	return false
 }
 
-func setMinute() (int, string, error) {
+func setMinute(nowCron time.Time) (int, string, error) {
 	var (
-		nowCron    = time.Now()
 		secondAdd3 = getDateStr((nowCron.Second() + 3) % 60)
 		minute     = getDateStr(nowCron.Minute())
 	)
@@ -1723,7 +1763,7 @@ func setMinute() (int, string, error) {
 	var minDataTests = []DataTest{
 		{
 			"Test_MySql" + year + month + day + minute,
-			"CREATE TABLE runoob_tbl" + year + month + day + minute + "est(runoob_id INT NOT NULL AUTO_INCREMENT,runoob_title VARCHAR(100) NOT NULL,runoob_author VARCHAR(40) NOT NULL,submission_date DATE,PRIMARY KEY ( runoob_id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;",
+			[]string{"CREATE TABLE runoob_tbl" + year + month + day + minute + "est(runoob_id INT NOT NULL AUTO_INCREMENT,runoob_title VARCHAR(100) NOT NULL,runoob_author VARCHAR(40) NOT NULL,submission_date DATE,PRIMARY KEY ( runoob_id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;"},
 			[]string{"INSERT INTO runoob_tbl" + year + month + day + minute + "est (runoob_title, runoob_author, submission_date) VALUES (\"学习 mysql\", \"教程\", NOW());"},
 		},
 	}
@@ -1737,4 +1777,31 @@ func setMinute() (int, string, error) {
 		return minDataTestsLine, secondAdd3, err
 	}
 	return minDataTestsLine, secondAdd3, nil
+}
+
+func setSecond() (int, string, error) {
+	var (
+		nowCron    = time.Now()
+		secondAdd2 = getDateStr((nowCron.Second() + 2) % 60)
+		secondAdd4 = getDateStr((nowCron.Second() + 4) % 60)
+		minute     = getDateStr(nowCron.Minute())
+	)
+	var minDataTests = []DataTest{
+		{
+			"Test_MySql" + year + month + day,
+			[]string{"CREATE TABLE runoob_tbl" + year + month + day + secondAdd2 + "est(runoob_id INT NOT NULL AUTO_INCREMENT,runoob_title VARCHAR(100) NOT NULL,runoob_author VARCHAR(40) NOT NULL,submission_date DATE,PRIMARY KEY ( runoob_id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;",
+				"CREATE TABLE runoob_tbl" + year + month + day + secondAdd4 + "est(runoob_id INT NOT NULL AUTO_INCREMENT,runoob_title VARCHAR(100) NOT NULL,runoob_author VARCHAR(40) NOT NULL,submission_date DATE,PRIMARY KEY ( runoob_id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;"},
+			[]string{"INSERT INTO runoob_tbl" + year + month + day + secondAdd2 + "est (runoob_title, runoob_author, submission_date) VALUES (\"学习 mysql\", \"教程\", NOW());",
+				"INSERT INTO runoob_tbl" + year + month + day + secondAdd4 + "est (runoob_title, runoob_author, submission_date) VALUES (\"学习 mysql\", \"教程\", NOW());"},
+		},
+	}
+	log.Infof("time now cron: %v, minute: %v, secondAdd2: %v, secondAdd4: %v", nowCron, minute, secondAdd2, secondAdd4)
+	databasesTest = append(databasesTest, minDataTests...)
+	if err := cleanMysql(); err != nil {
+		return 0, "", err
+	}
+	if err := prepareMysql(); err != nil {
+		return 0, "", err
+	}
+	return 2, "", nil
 }

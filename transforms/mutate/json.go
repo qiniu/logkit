@@ -15,6 +15,7 @@ import (
 var (
 	_ transforms.StatsTransformer = &Json{}
 	_ transforms.Transformer      = &Json{}
+	_ transforms.Initializer      = &Json{}
 )
 
 type Json struct {
@@ -22,16 +23,25 @@ type Json struct {
 	New      string `json:"new"`
 	stats    StatsInfo
 	jsonTool jsoniter.API
+
+	keys []string
+	news []string
+}
+
+func (g *Json) Init() error {
+	g.keys = GetKeys(g.Key)
+	g.news = GetKeys(g.New)
+	return nil
 }
 
 func (g *Json) Transform(datas []Data) ([]Data, error) {
 	var err, fmtErr error
 	errNum := 0
-	keys := GetKeys(g.Key)
-	news := GetKeys(g.New)
-
+	if g.keys == nil {
+		g.Init()
+	}
 	for i := range datas {
-		val, getErr := GetMapValue(datas[i], keys...)
+		val, getErr := GetMapValue(datas[i], g.keys...)
 		if getErr != nil {
 			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.Key)
 			continue
@@ -52,11 +62,10 @@ func (g *Json) Transform(datas []Data) ([]Data, error) {
 			continue
 		}
 
-		if len(news) == 0 {
-			DeleteMapValue(datas[i], keys...)
-			news = keys
+		if len(g.news) == 0 {
+			g.news = g.keys
 		}
-		setErr := SetMapValue(datas[i], jsonVal, false, news...)
+		setErr := SetMapValue(datas[i], jsonVal, false, g.news...)
 		if setErr != nil {
 			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
 		}

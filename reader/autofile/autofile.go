@@ -60,7 +60,7 @@ func matchMode(logpath string) (path, mode string, err error) {
 		return
 	}
 	if fileInfo.IsDir() == true {
-		if shoudUseModeDir(path) {
+		if shouldUseModeDir(path) {
 			mode = reader.ModeDir
 		} else {
 			mode = reader.ModeTailx
@@ -72,7 +72,7 @@ func matchMode(logpath string) (path, mode string, err error) {
 	return
 }
 
-func shoudUseModeDir(logpath string) bool {
+func shouldUseModeDir(logpath string) bool {
 	files, err := ioutil.ReadDir(logpath)
 	if err != nil {
 		log.Warn("read dir %v error %v", logpath, err)

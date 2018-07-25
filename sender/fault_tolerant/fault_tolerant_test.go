@@ -513,3 +513,120 @@ func TestTypeSchemaRetry(t *testing.T) {
 		t.Error("Ft send error exp 1 but got ", fts.BackupQueue.Depth())
 	}
 }
+
+func TestSkipDeepCopySender(t *testing.T) {
+	defer os.RemoveAll("tmp")
+
+	// Skip == false
+	{
+		fs, err := sender.NewFtSender(&pandora.Sender{}, nil, "tmp")
+		assert.Nil(t, err)
+		assert.False(t, fs.SkipDeepCopy())
+	}
+
+	// Skip == true
+	{
+		fs, err := sender.NewFtSender(&mock.Sender{}, nil, "tmp")
+		assert.Nil(t, err)
+		assert.True(t, fs.SkipDeepCopy())
+	}
+}
+
+func TestPandoraExtraInfo(t *testing.T) {
+	pandoraServer, pt := mock_pandora.NewMockPandoraWithPrefix("/v2")
+	conf1 := conf.MapConf{
+		"force_microsecond":         "false",
+		"ft_memory_channel":         "false",
+		"ft_strategy":               "backup_only",
+		"ignore_invalid_field":      "true",
+		"logkit_send_time":          "false",
+		"pandora_extra_info":        "true",
+		"pandora_ak":                "ak",
+		"pandora_auto_convert_date": "true",
+		"pandora_gzip":              "true",
+		"pandora_host":              "http://127.0.0.1:" + pt,
+		"pandora_region":            "nb",
+		"pandora_repo_name":         "TestPandoraSenderTime",
+		"pandora_schema_free":       "true",
+		"pandora_sk":                "sk",
+		"runner_name":               "runner.20171117110730",
+		"sender_type":               "pandora",
+		"name":                      "TestPandoraSenderTime",
+		"KeyPandoraSchemaUpdateInterval": "1s",
+	}
+
+	innerSender, err := pandora.NewSender(conf1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := sender.NewFtSender(innerSender, conf1, fttestdir)
+	defer os.RemoveAll(fttestdir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := Data{}
+	d["x1"] = "123.2"
+	d["hostname"] = "123.2"
+	d["hostname0"] = "123.2"
+	d["hostname1"] = "123.2"
+	d["hostname2"] = "123.2"
+	d["osinfo"] = "123.2"
+	err = s.Send([]Data{d})
+	if st, ok := err.(*StatsError); ok {
+		err = st.ErrorDetail
+	}
+	if err != nil {
+		t.Error(err)
+	}
+	resp := pandoraServer.Body
+	assert.Equal(t, true, strings.Contains(resp, "core"))
+	assert.Equal(t, true, strings.Contains(resp, "x1=123.2"))
+	assert.Equal(t, true, strings.Contains(resp, "osinfo=123.2"))
+	assert.Equal(t, true, strings.Contains(resp, "hostname=123.2"))
+	assert.Equal(t, true, strings.Contains(resp, "hostname0=123.2"))
+	assert.Equal(t, true, strings.Contains(resp, "hostname1=123.2"))
+	assert.Equal(t, true, strings.Contains(resp, "hostname2=123.2"))
+
+	conf2 := conf.MapConf{
+		"force_microsecond":         "false",
+		"ft_memory_channel":         "false",
+		"ft_strategy":               "backup_only",
+		"ignore_invalid_field":      "true",
+		"logkit_send_time":          "false",
+		"pandora_extra_info":        "false",
+		"pandora_ak":                "ak",
+		"pandora_auto_convert_date": "true",
+		"pandora_gzip":              "true",
+		"pandora_host":              "http://127.0.0.1:" + pt,
+		"pandora_region":            "nb",
+		"pandora_repo_name":         "TestPandoraSenderTime",
+		"pandora_schema_free":       "true",
+		"pandora_sk":                "sk",
+		"runner_name":               "runner.20171117110730",
+		"sender_type":               "pandora",
+		"name":                      "TestPandoraSenderTime",
+		"KeyPandoraSchemaUpdateInterval": "1s",
+	}
+	innerSender, err = pandora.NewSender(conf2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s, err = sender.NewFtSender(innerSender, conf1, fttestdir)
+	d = Data{
+		"*x1":        "123.2",
+		"x2.dot":     "123.2",
+		"@timestamp": "2018-07-18T10:17:36.549054846+08:00",
+	}
+	err = s.Send([]Data{d})
+	if st, ok := err.(*StatsError); ok {
+		err = st.ErrorDetail
+	}
+	if err != nil {
+		t.Error(err)
+	}
+	resp = pandoraServer.Body
+	assert.Equal(t, true, strings.Contains(resp, "x1=123.2"))
+	assert.Equal(t, true, strings.Contains(resp, "x2_dot=123.2"))
+	assert.Equal(t, true, strings.Contains(resp, "timestamp=2018-07-18T10:17:36.549054846+08:00"))
+}

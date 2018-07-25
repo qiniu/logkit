@@ -88,6 +88,24 @@ func Test_SyslogParser(t *testing.T) {
 	}
 }
 
+func Test_SyslogParserError(t *testing.T) {
+	c := conf.MapConf{}
+	c[parser.KeyParserType] = "syslog"
+	p, err := NewParser(c)
+	line := "Test my syslog CRON[000]: (root) CMD"
+	lines := []string{
+		line,
+		"!@#pandora-EOF-line#@!",
+	}
+	parsedData, err := p.Parse(lines)
+	st, ok := err.(*StatsError)
+	assert.True(t, ok)
+	assert.Equal(t, "No start char found for priority", st.LastError, st.LastError)
+	assert.Equal(t, int64(1), st.Errors)
+	assert.Equal(t, 1, len(parsedData))
+	assert.Equal(t, line, parsedData[0]["pandora_stash"])
+}
+
 func TestSyslogParser5424(t *testing.T) {
 	fpas := &RFC5424{}
 	pas := fpas.GetParser([]byte("<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47\n- BOM'su root' failed for lonvick on /dev/pts/8"))
