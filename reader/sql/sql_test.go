@@ -21,21 +21,30 @@ import (
 )
 
 var readRecords = DBRecords{
-	"db1": {
-		"db1_tb1": TableInfo{size: -1, offset: -1},
-		"db1_tb2": TableInfo{size: -1, offset: -1},
-		"db1_tb3": TableInfo{size: -1, offset: -1},
+	"db1": TableRecords{
+		Table: map[string]TableInfo{
+			"db1_tb1": TableInfo{size: -1, offset: -1},
+			"db1_tb2": TableInfo{size: -1, offset: -1},
+			"db1_tb3": TableInfo{size: -1, offset: -1},
+		},
+		mutex: sync.RWMutex{},
 	},
-	"db2": {
-		"db2_tb1": TableInfo{size: -1, offset: -1},
-		"db2_tb2": TableInfo{size: -1, offset: -1},
-		"db2_tb3": TableInfo{size: -1, offset: -1},
-		"db2_tb4": TableInfo{size: -1, offset: -1},
-		"db2_tb5": TableInfo{size: -1, offset: -1},
+	"db2": TableRecords{
+		Table: map[string]TableInfo{
+			"db2_tb1": TableInfo{size: -1, offset: -1},
+			"db2_tb2": TableInfo{size: -1, offset: -1},
+			"db2_tb3": TableInfo{size: -1, offset: -1},
+			"db2_tb4": TableInfo{size: -1, offset: -1},
+			"db2_tb5": TableInfo{size: -1, offset: -1},
+		},
+		mutex: sync.RWMutex{},
 	},
-	"db3": {
-		"db3_tb1": TableInfo{size: -1, offset: -1},
-		"db3_tb2": TableInfo{size: -1, offset: -1},
+	"db3": TableRecords{
+		Table: map[string]TableInfo{
+			"db3_tb1": TableInfo{size: -1, offset: -1},
+			"db3_tb2": TableInfo{size: -1, offset: -1},
+		},
+		mutex: sync.RWMutex{},
 	},
 }
 
@@ -1117,102 +1126,156 @@ func Test_restoreRecordsFile(t *testing.T) {
 		},
 		{
 			set: DBRecords{
-				"db1": {
-					"db1_tb1":  TableInfo{size: -1, offset: -1},
-					"db1_tb10": TableInfo{size: -1, offset: -1},
+				"db1": TableRecords{
+					Table: map[string]TableInfo{
+						"db1_tb1":  {size: -1, offset: -1},
+						"db1_tb10": {size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
-				"db4": {
-					"db4_tb10": TableInfo{size: -1, offset: -1},
+				"db4": TableRecords{
+					Table: map[string]TableInfo{
+						"db4_tb10": TableInfo{size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
 			},
 			exp_res: DBRecords{
-				"db1": {
-					"db1_tb1":  TableInfo{size: -1, offset: -1},
-					"db1_tb2":  TableInfo{size: -1, offset: -1},
-					"db1_tb3":  TableInfo{size: -1, offset: -1},
-					"db1_tb10": TableInfo{size: -1, offset: -1},
+				"db1": TableRecords{
+					Table: map[string]TableInfo{
+						"db1_tb1":  {size: -1, offset: -1},
+						"db1_tb2":  {size: -1, offset: -1},
+						"db1_tb3":  {size: -1, offset: -1},
+						"db1_tb10": {size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
-				"db2": {
-					"db2_tb1": TableInfo{size: -1, offset: -1},
-					"db2_tb2": TableInfo{size: -1, offset: -1},
-					"db2_tb3": TableInfo{size: -1, offset: -1},
-					"db2_tb4": TableInfo{size: -1, offset: -1},
-					"db2_tb5": TableInfo{size: -1, offset: -1},
+				"db2": TableRecords{
+					Table: map[string]TableInfo{
+						"db2_tb1": TableInfo{size: -1, offset: -1},
+						"db2_tb2": TableInfo{size: -1, offset: -1},
+						"db2_tb3": TableInfo{size: -1, offset: -1},
+						"db2_tb4": TableInfo{size: -1, offset: -1},
+						"db2_tb5": TableInfo{size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
-				"db3": {
-					"db3_tb1": TableInfo{size: -1, offset: -1},
-					"db3_tb2": TableInfo{size: -1, offset: -1},
+				"db3": TableRecords{
+					Table: map[string]TableInfo{
+						"db3_tb1": TableInfo{size: -1, offset: -1},
+						"db3_tb2": TableInfo{size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
-				"db4": {
-					"db4_tb10": TableInfo{size: -1, offset: -1},
+				"db4": TableRecords{
+					Table: map[string]TableInfo{
+						"db4_tb10": TableInfo{size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
 			},
 			exp_omitDoneDBRecords: false,
 		},
 		{
 			set: DBRecords{
-				"db1": {
-					"db1_tb1":  TableInfo{size: -1, offset: -1},
-					"db1_tb10": TableInfo{size: -1, offset: -1},
+				"db1": TableRecords{
+					Table: map[string]TableInfo{
+						"db1_tb1":  TableInfo{size: -1, offset: -1},
+						"db1_tb10": TableInfo{size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
-				"db4": {
-					"db4_tb10": TableInfo{size: -1, offset: -1},
+				"db4": TableRecords{
+					Table: map[string]TableInfo{
+						"db4_tb10": TableInfo{size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
 			},
 			exp_res: DBRecords{
-				"db1": {
-					"db1_tb1":  TableInfo{size: -1, offset: -1},
-					"db1_tb2":  TableInfo{size: -1, offset: -1},
-					"db1_tb3":  TableInfo{size: -1, offset: -1},
-					"db1_tb10": TableInfo{size: -1, offset: -1},
+				"db1": TableRecords{
+					Table: map[string]TableInfo{
+						"db1_tb1":  TableInfo{size: -1, offset: -1},
+						"db1_tb2":  TableInfo{size: -1, offset: -1},
+						"db1_tb3":  TableInfo{size: -1, offset: -1},
+						"db1_tb10": TableInfo{size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
-				"db2": {
-					"db2_tb1": TableInfo{size: -1, offset: -1},
-					"db2_tb2": TableInfo{size: -1, offset: -1},
-					"db2_tb3": TableInfo{size: -1, offset: -1},
-					"db2_tb4": TableInfo{size: -1, offset: -1},
-					"db2_tb5": TableInfo{size: -1, offset: -1},
+				"db2": TableRecords{
+					Table: map[string]TableInfo{
+						"db2_tb1": TableInfo{size: -1, offset: -1},
+						"db2_tb2": TableInfo{size: -1, offset: -1},
+						"db2_tb3": TableInfo{size: -1, offset: -1},
+						"db2_tb4": TableInfo{size: -1, offset: -1},
+						"db2_tb5": TableInfo{size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
-				"db3": {
-					"db3_tb1": TableInfo{size: -1, offset: -1},
-					"db3_tb2": TableInfo{size: -1, offset: -1},
+				"db3": TableRecords{
+					Table: map[string]TableInfo{
+						"db3_tb1": TableInfo{size: -1, offset: -1},
+						"db3_tb2": TableInfo{size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
-				"db4": {
-					"db4_tb10": TableInfo{size: -1, offset: -1},
+				"db4": TableRecords{
+					Table: map[string]TableInfo{
+						"db4_tb10": TableInfo{size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
 			},
 			exp_omitDoneDBRecords: false,
 		},
 		{
 			set: DBRecords{
-				"db1": {
-					"db1_tb10": TableInfo{size: -1, offset: -1},
+				"db1": TableRecords{
+					Table: map[string]TableInfo{
+						"db1_tb10": TableInfo{size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
-				"db3": {
-					"db3_tb10": TableInfo{size: -1, offset: -1},
+				"db3": TableRecords{
+					Table: map[string]TableInfo{
+						"db3_tb10": TableInfo{size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
 			},
 			exp_res: DBRecords{
-				"db1": {
-					"db1_tb1":  TableInfo{size: -1, offset: -1},
-					"db1_tb2":  TableInfo{size: -1, offset: -1},
-					"db1_tb3":  TableInfo{size: -1, offset: -1},
-					"db1_tb10": TableInfo{size: -1, offset: -1},
+				"db1": TableRecords{
+					Table: map[string]TableInfo{
+						"db1_tb1":  TableInfo{size: -1, offset: -1},
+						"db1_tb2":  TableInfo{size: -1, offset: -1},
+						"db1_tb3":  TableInfo{size: -1, offset: -1},
+						"db1_tb10": TableInfo{size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
-				"db2": {
-					"db2_tb1": TableInfo{size: -1, offset: -1},
-					"db2_tb2": TableInfo{size: -1, offset: -1},
-					"db2_tb3": TableInfo{size: -1, offset: -1},
-					"db2_tb4": TableInfo{size: -1, offset: -1},
-					"db2_tb5": TableInfo{size: -1, offset: -1},
+				"db2": TableRecords{
+					Table: map[string]TableInfo{
+						"db2_tb1": TableInfo{size: -1, offset: -1},
+						"db2_tb2": TableInfo{size: -1, offset: -1},
+						"db2_tb3": TableInfo{size: -1, offset: -1},
+						"db2_tb4": TableInfo{size: -1, offset: -1},
+						"db2_tb5": TableInfo{size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
-				"db3": {
-					"db3_tb1":  TableInfo{size: -1, offset: -1},
-					"db3_tb2":  TableInfo{size: -1, offset: -1},
-					"db3_tb10": TableInfo{size: -1, offset: -1},
+				"db3": TableRecords{
+					Table: map[string]TableInfo{
+						"db3_tb1":  TableInfo{size: -1, offset: -1},
+						"db3_tb2":  TableInfo{size: -1, offset: -1},
+						"db3_tb10": TableInfo{size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
-				"db4": {
-					"db4_tb10": TableInfo{size: -1, offset: -1},
+				"db4": TableRecords{
+					Table: map[string]TableInfo{
+						"db4_tb10": TableInfo{size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
 			},
 			exp_omitDoneDBRecords: false,
@@ -1220,26 +1283,38 @@ func Test_restoreRecordsFile(t *testing.T) {
 		{
 			set: readRecords,
 			exp_res: DBRecords{
-				"db1": {
-					"db1_tb1":  TableInfo{size: -1, offset: -1},
-					"db1_tb2":  TableInfo{size: -1, offset: -1},
-					"db1_tb3":  TableInfo{size: -1, offset: -1},
-					"db1_tb10": TableInfo{size: -1, offset: -1},
+				"db1": TableRecords{
+					Table: map[string]TableInfo{
+						"db1_tb1":  TableInfo{size: -1, offset: -1},
+						"db1_tb2":  TableInfo{size: -1, offset: -1},
+						"db1_tb3":  TableInfo{size: -1, offset: -1},
+						"db1_tb10": TableInfo{size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
-				"db2": {
-					"db2_tb1": TableInfo{size: -1, offset: -1},
-					"db2_tb2": TableInfo{size: -1, offset: -1},
-					"db2_tb3": TableInfo{size: -1, offset: -1},
-					"db2_tb4": TableInfo{size: -1, offset: -1},
-					"db2_tb5": TableInfo{size: -1, offset: -1},
+				"db2": TableRecords{
+					Table: map[string]TableInfo{
+						"db2_tb1": TableInfo{size: -1, offset: -1},
+						"db2_tb2": TableInfo{size: -1, offset: -1},
+						"db2_tb3": TableInfo{size: -1, offset: -1},
+						"db2_tb4": TableInfo{size: -1, offset: -1},
+						"db2_tb5": TableInfo{size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
-				"db3": {
-					"db3_tb1":  TableInfo{size: -1, offset: -1},
-					"db3_tb2":  TableInfo{size: -1, offset: -1},
-					"db3_tb10": TableInfo{size: -1, offset: -1},
+				"db3": TableRecords{
+					Table: map[string]TableInfo{
+						"db3_tb1":  TableInfo{size: -1, offset: -1},
+						"db3_tb2":  TableInfo{size: -1, offset: -1},
+						"db3_tb10": TableInfo{size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
-				"db4": {
-					"db4_tb10": TableInfo{size: -1, offset: -1},
+				"db4": TableRecords{
+					Table: map[string]TableInfo{
+						"db4_tb10": TableInfo{size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
 			},
 			exp_omitDoneDBRecords: false,
@@ -1263,7 +1338,7 @@ func getContent(readRecords DBRecords) string {
 	var all string
 	for database, tablesRecord := range readRecords {
 		var tablesRecordStr string
-		for table, tableInfo := range tablesRecord {
+		for table, tableInfo := range tablesRecord.GetTable() {
 			tablesRecordStr += table + "," +
 				strconv.FormatInt(tableInfo.size, 10) + "," +
 				strconv.FormatInt(tableInfo.size, 10) + "," +
@@ -1628,7 +1703,8 @@ func TestMySql(t *testing.T) {
 	assert.False(t, omitDoneFile)
 	assert.Equal(t, 1, len(doneRecords.records))
 	expectDB := "Test_MySql" + year + month + day
-	assert.Equal(t, 2, len(doneRecords.records.GetTableRecords(expectDB)))
+	tableRecords := doneRecords.records.GetTableRecords(expectDB)
+	assert.Equal(t, 2, len(tableRecords.GetTable()))
 	assert.Equal(t, expectDB, lastDB)
 	assert.NotEmpty(t, lastTable)
 
