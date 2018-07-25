@@ -28,7 +28,7 @@ const (
 	KeyNetstatTcpListen      = "netstat_tcp_listen"
 	KeyNetstatTcpClosing     = "netstat_tcp_closing"
 	KeyNetstatTcpNone        = "netstat_tcp_none"
-	KeyNetstatUdpSocket      = "netstat_tcp_socket"
+	KeyNetstatUdpSocket      = "netstat_udp_socket"
 )
 
 // KeyNetStatUsages TypeMetricNetstat 的字段名称

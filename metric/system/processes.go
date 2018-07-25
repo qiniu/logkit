@@ -48,7 +48,7 @@ var KeyProcessesUsages = []KeyValue{
 	{KeyProcessesIdle, "挂起的空闲进程数('I')"},
 	{KeyProcessesWait, "等待中的进程数('W')"},
 	{KeyProcessesDead, "回收中的进程数('X')"},
-	{KeyProcessesPaging, "等待中的进程数('W')"},
+	{KeyProcessesPaging, "分页进程数('P')"},
 	{KeyProcessesTotalThreads, "总线程数"},
 	{KeyProcessesUnknown, "未知状态进程数"},
 }
