@@ -17,8 +17,6 @@ import (
 )
 
 func TestNewHttpReader(t *testing.T) {
-	defer os.RemoveAll("./meta")
-
 	readConf := conf.MapConf{
 		reader.KeyMetaPath: MetaDir,
 		reader.KeyFileDone: MetaDir,
@@ -27,6 +25,7 @@ func TestNewHttpReader(t *testing.T) {
 	}
 	meta, err := reader.NewMetaWithConf(readConf)
 	assert.NoError(t, err)
+	defer os.RemoveAll("./meta")
 
 	c := conf.MapConf{
 		reader.KeyHTTPServiceAddress: ":7110",
