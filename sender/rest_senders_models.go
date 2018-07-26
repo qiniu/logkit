@@ -135,7 +135,7 @@ var ModeKeyOptions = map[string][]Option{
 			Required:     true,
 			Description:  "Pipeline名称(pandora_workflow_name)",
 			CheckRegex:   "^[a-zA-Z_][a-zA-Z0-9_]{0,127}$",
-			ToolTip:      "七牛大数据平台Pipeline名称",
+			ToolTip:      "新增或现有的七牛大数据平台Pipeline名称",
 		},
 		{
 			KeyName:      KeyPandoraRepoName,
@@ -146,7 +146,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: true,
 			Description:  "实时仓库名称(pandora_repo_name)",
 			CheckRegex:   "^[a-zA-Z][a-zA-Z0-9_]{0,127}$",
-			ToolTip:      "七牛大数据平台Pipeline中的实时仓库名称",
+			ToolTip:      "新增或现有的七牛大数据平台Pipeline中的实时仓库名称",
 		},
 		{
 			KeyName:      KeyPandoraAk,
@@ -232,7 +232,8 @@ var ModeKeyOptions = map[string][]Option{
 			ChooseOnly:    false,
 			Default:       "",
 			DefaultNoUse:  false,
-			Description:   "指定日志分析仓库名称(pandora_logdb_name)",
+			Description:   "新增或现有的日志分析仓库名称(pandora_logdb_name)",
+			Advance:       true,
 			AdvanceDepend: KeyPandoraEnableLogDB,
 			ToolTip:       "若不指定使用实时仓库(pandora_repo_name)名称",
 		},
