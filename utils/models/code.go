@@ -5,13 +5,14 @@ const (
 	ErrNothing = "L200"
 
 	// 单机版 Runner 操作
-	ErrConfigName   = "L1001"
-	ErrRunnerAdd    = "L1002"
-	ErrRunnerDelete = "L1003"
-	ErrRunnerStart  = "L1004"
-	ErrRunnerStop   = "L1005"
-	ErrRunnerReset  = "L1006"
-	ErrRunnerUpdate = "L1007"
+	ErrConfigName     = "L1001"
+	ErrRunnerAdd      = "L1002"
+	ErrRunnerDelete   = "L1003"
+	ErrRunnerStart    = "L1004"
+	ErrRunnerStop     = "L1005"
+	ErrRunnerReset    = "L1006"
+	ErrRunnerUpdate   = "L1007"
+	ErrRunnerErrorGet = "L1008"
 
 	// read 相关
 	ErrReadRead = "L1101"

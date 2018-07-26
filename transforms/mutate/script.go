@@ -80,7 +80,7 @@ func (g *Script) Transform(datas []Data) ([]Data, error) {
 	}
 	scriptPath, err := checkPath(g.storePath)
 	if err != nil {
-		g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+		g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(1), int64(len(datas)), g.Type())
 		return datas, fmtErr
 	}
 

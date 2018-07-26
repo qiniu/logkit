@@ -22,18 +22,19 @@ type RunnerStatus struct {
 	TransformStats   map[string]StatsInfo `json:"transformStats"`
 	Error            string               `json:"error,omitempty"`
 	lastState        time.Time
-	ReadSpeedKB      float64 `json:"readspeed_kb"`
-	ReadSpeed        float64 `json:"readspeed"`
-	ReadSpeedTrendKb string  `json:"readspeedtrend_kb"`
-	ReadSpeedTrend   string  `json:"readspeedtrend"`
-	RunningStatus    string  `json:"runningStatus"`
-	Tag              string  `json:"tag,omitempty"`
-	Url              string  `json:"url,omitempty"`
+	ReadSpeedKB      float64     `json:"readspeed_kb"`
+	ReadSpeed        float64     `json:"readspeed"`
+	ReadSpeedTrendKb string      `json:"readspeedtrend_kb"`
+	ReadSpeedTrend   string      `json:"readspeedtrend"`
+	RunningStatus    string      `json:"runningStatus"`
+	Tag              string      `json:"tag,omitempty"`
+	Url              string      `json:"url,omitempty"`
+	HistoryErrors    *ErrorsList `json:"history_errors"`
 }
 
 //Clone 复制出一个完整的RunnerStatus
-func (src *RunnerStatus) Clone() (dst RunnerStatus) {
-	dst = RunnerStatus{}
+func (src *RunnerStatus) Clone() RunnerStatus {
+	dst := RunnerStatus{}
 	dst.TransformStats = make(map[string]StatsInfo, len(src.TransformStats))
 	dst.SenderStats = make(map[string]StatsInfo, len(src.SenderStats))
 	for k, v := range src.SenderStats {
@@ -63,8 +64,10 @@ func (src *RunnerStatus) Clone() (dst RunnerStatus) {
 	dst.RunningStatus = src.RunningStatus
 	dst.Tag = src.Tag
 	dst.Url = src.Url
-
-	return
+	if src.HistoryErrors != nil {
+		dst.HistoryErrors = src.HistoryErrors.Copy()
+	}
+	return dst
 }
 
 // RunnerConfig 从多数据源读取，经过解析后，发往多个数据目的地
@@ -91,8 +94,103 @@ type RunnerInfo struct {
 	MaxBatchSize     int    `json:"batch_size,omitempty"`       // 每个read batch的字节数
 	MaxBatchInterval int    `json:"batch_interval,omitempty"`   // 最大发送时间间隔
 	MaxBatchTryTimes int    `json:"batch_try_times,omitempty"`  // 最大发送次数，小于等于0代表无限重试
+	ErrorsListCap    int    `json:"errors_list_cap"`            // 记录错误信息的最大条数
 	CreateTime       string `json:"createtime"`
 	EnvTag           string `json:"env_tag,omitempty"`
 	ExtraInfo        bool   `json:"extra_info,omitempty"`
 	// 用这个字段的值来获取环境变量, 作为 tag 添加到数据中
+}
+
+type ErrorsList struct {
+	ReadErrors      *ErrorQueue            `json:"read_errors"`
+	ParseErrors     *ErrorQueue            `json:"parse_errors"`
+	TransformErrors map[string]*ErrorQueue `json:"transform_errors"`
+	SendErrors      map[string]*ErrorQueue `json:"send_errors"`
+}
+
+type ErrorsResult struct {
+	ReadErrors      []ErrorInfo            `json:"read_errors"`
+	ParseErrors     []ErrorInfo            `json:"parse_errors"`
+	TransformErrors map[string][]ErrorInfo `json:"transform_errors"`
+	SendErrors      map[string][]ErrorInfo `json:"send_errors"`
+}
+
+// 返回队列实际容量
+func (entry *ErrorsList) Reset() {
+	entry.ReadErrors = nil
+	entry.ParseErrors = nil
+	entry.TransformErrors = nil
+	entry.SendErrors = nil
+}
+
+// 复制出一个顺序的 Errors
+func (src *ErrorsList) Sort() (dst ErrorsResult) {
+	dst = ErrorsResult{}
+	if src.ReadErrors != nil {
+		dst.ReadErrors = src.ReadErrors.Sort()
+	}
+	if src.ParseErrors != nil {
+		dst.ParseErrors = src.ParseErrors.Sort()
+	}
+	for transform, transformQueue := range src.TransformErrors {
+		if dst.TransformErrors == nil {
+			dst.TransformErrors = make(map[string][]ErrorInfo)
+		}
+		dst.TransformErrors[transform] = transformQueue.Sort()
+	}
+	for send, sendQueue := range src.SendErrors {
+		if dst.SendErrors == nil {
+			dst.SendErrors = make(map[string][]ErrorInfo)
+		}
+		dst.SendErrors[send] = sendQueue.Sort()
+	}
+	return dst
+}
+
+// 拷贝完整的 ErrorList
+func (src *ErrorsList) Copy() *ErrorsList {
+	var dst ErrorsList
+	isEmpty := true
+	if src.ReadErrors != nil && !src.ReadErrors.IsEmpty() {
+		dst.ReadErrors = NewErrorQueue(src.ReadErrors.GetMaxSize())
+		dst.ReadErrors.CopyQueue(src.ReadErrors)
+		isEmpty = false
+	}
+
+	if src.ParseErrors != nil && !src.ReadErrors.IsEmpty() {
+		dst.ParseErrors = NewErrorQueue(src.ParseErrors.GetMaxSize())
+		dst.ParseErrors.CopyQueue(src.ParseErrors)
+		isEmpty = false
+	}
+
+	if src.TransformErrors != nil {
+		for transform, transformErrors := range src.TransformErrors {
+			if transformErrors != nil && !transformErrors.IsEmpty() {
+				if dst.TransformErrors == nil {
+					dst.TransformErrors = make(map[string]*ErrorQueue)
+				}
+				dst.TransformErrors[transform] = NewErrorQueue(transformErrors.GetMaxSize())
+				dst.TransformErrors[transform].CopyQueue(transformErrors)
+				isEmpty = false
+			}
+		}
+	}
+
+	if src.SendErrors != nil {
+		for send, sendErrors := range src.SendErrors {
+			if sendErrors != nil && !sendErrors.IsEmpty() {
+				if dst.SendErrors == nil {
+					dst.SendErrors = make(map[string]*ErrorQueue)
+				}
+				dst.SendErrors[send] = NewErrorQueue(sendErrors.GetMaxSize())
+				dst.SendErrors[send].CopyQueue(sendErrors)
+				isEmpty = false
+			}
+		}
+	}
+
+	if isEmpty {
+		return nil
+	}
+	return &dst
 }
