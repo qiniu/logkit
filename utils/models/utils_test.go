@@ -478,21 +478,21 @@ func createTestFile(fileName string, content string) {
 }
 
 func Test_ConvertDate(t *testing.T) {
-	date, err := ConvertDate("", "", 0, 1525422699)
+	date, err := ConvertDate("", "", 0, time.UTC, 1525422699)
 	assert.NoError(t, err)
 	expect, err := getTimeStr(int64(1525422699))
 	assert.NoError(t, err)
 	assert.Equal(t, expect, date)
 
-	date, err = ConvertDate("", "", 0, "Feb 05 01:02:03")
+	date, err = ConvertDate("", "", 0, time.UTC, "Feb 05 01:02:03")
 	assert.NoError(t, err)
 	assert.Equal(t, "0000-02-05T01:02:03Z", date)
 
-	date, err = ConvertDate("", "", 0, "19/Aug/2000:14:47:37 -0400")
+	date, err = ConvertDate("", "", 0, time.UTC, "19/Aug/2000:14:47:37 -0400")
 	assert.NoError(t, err)
 	assert.Equal(t, "2000-08-19T14:47:37-04:00", date)
 
-	date, err = ConvertDate("20060102150405", "", 0, "20180204221045")
+	date, err = ConvertDate("20060102150405", "", 0, time.UTC, "20180204221045")
 	assert.NoError(t, err)
 	assert.Equal(t, "2018-02-04T22:10:45Z", date)
 }
