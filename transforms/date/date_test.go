@@ -111,6 +111,14 @@ func TestTransformerLocal(t *testing.T) {
 			exp:          Data{k: "2017-03-28T15:41:53" + zoneValueRFC3339},
 		},
 		{
+			Offset:       1,
+			LayoutBefore: "",
+			LayoutAfter:  "",
+			Key:          k,
+			data:         Data{k: "2017/03/28 15:41:53"},
+			exp:          Data{k: "2017-03-28T16:41:53Z"},
+		},
+		{
 			Offset:       0,
 			LayoutBefore: "",
 			Key:          k,
@@ -133,6 +141,14 @@ func TestTransformerLocal(t *testing.T) {
 			Key:          k,
 			data:         Data{k: "【2017/09/22/11/07/12】"},
 			exp:          Data{k: "2017-09-22T11:07:12" + zoneValueRFC3339},
+		},
+		{
+			Offset:       -1,
+			LayoutBefore: "【2006/01/02/03/04/05】",
+			LayoutAfter:  "",
+			Key:          k,
+			data:         Data{k: "【2017/09/22/11/07/12】"},
+			exp:          Data{k: "2017-09-22T10:07:12Z"},
 		},
 		{
 			Offset:       0,

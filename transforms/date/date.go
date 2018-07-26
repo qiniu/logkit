@@ -35,7 +35,14 @@ func (t *Transformer) Transform(datas []Data) ([]Data, error) {
 			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, t.Key)
 			continue
 		}
-		val, convertErr := ConvertDate(t.LayoutBefore, t.LayoutAfter, t.Offset, time.Local, val)
+
+		// 如果用户设置了 offset，则不默认使用本地时区
+		loc := time.Local
+		if t.Offset != 0 {
+			loc = time.UTC
+		}
+
+		val, convertErr := ConvertDate(t.LayoutBefore, t.LayoutAfter, t.Offset, loc, val)
 		if convertErr != nil {
 			errNum, err = transforms.SetError(errNum, convertErr, transforms.General, "")
 			continue
