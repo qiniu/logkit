@@ -2,20 +2,17 @@ package mgr
 
 import (
 	"net/http"
-	"sort"
+
+	"github.com/labstack/echo"
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
-
-	"github.com/labstack/echo"
 )
 
 // GET /logkit/transformer/usages
 func (rs *RestService) GetTransformerUsages() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		usages := transforms.GetTransformerUsages()
-		sort.Stable(usages)
-		return RespSuccess(c, usages)
+		return RespSuccess(c, transforms.GetTransformerUsages())
 	}
 }
 
