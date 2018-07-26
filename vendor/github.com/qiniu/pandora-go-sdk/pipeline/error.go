@@ -53,6 +53,8 @@ func (e PipelineErrBuilder) Build(msg, text, reqId string, code int) error {
 		err.ErrorType = reqerr.ErrInvalidRepoDescription
 	case "E18137":
 		err.ErrorType = reqerr.ErrInvalidRepoSchemaDescription
+	case "E18138":
+		err.ErrorType = reqerr.ErrTagsDecodeError
 	case "E18202":
 		err.ErrorType = reqerr.NoSuchTransformError
 	case "E18201":
