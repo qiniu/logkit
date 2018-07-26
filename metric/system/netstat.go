@@ -32,20 +32,20 @@ const (
 )
 
 // KeyNetStatUsages TypeMetricNetstat 的字段名称
-var KeyNetStatUsages = []KeyValue{
-	{KeyNetstatTcpEstablished, "ESTABLISHED状态的网络链接数"},
-	{KeyNetstatTcpSynSent, "SYN_SENT状态的网络链接数"},
-	{KeyNetstatTcpSynRecv, "SYN_RECV状态的网络链接数"},
-	{KeyNetstatTcpFinWait1, "FIN_WAIT1状态的网络链接数"},
-	{KeyNetstatTcpFinWait2, "FIN_WAIT2状态的网络链接数"},
-	{KeyNetstatTcpTimeWait, "TIME_WAIT状态的网络链接数"},
-	{KeyNetstatTcpClose, "CLOSE状态的网络链接数"},
-	{KeyNetstatTcpCloseWait, "CLOSE_WAIT状态的网络链接数"},
-	{KeyNetstatTcpLastAck, "LAST_ACK状态的网络链接数"},
-	{KeyNetstatTcpListen, "LISTEN状态的网络链接数"},
-	{KeyNetstatTcpClosing, "CLOSING状态的网络链接数"},
-	{KeyNetstatTcpNone, "NONE状态的网络链接数"},
-	{KeyNetstatUdpSocket, "UDP状态的网络链接数"},
+var KeyNetStatUsages = KeyValueSlice{
+	{KeyNetstatTcpEstablished, "ESTABLISHED状态的网络链接数", ""},
+	{KeyNetstatTcpSynSent, "SYN_SENT状态的网络链接数", ""},
+	{KeyNetstatTcpSynRecv, "SYN_RECV状态的网络链接数", ""},
+	{KeyNetstatTcpFinWait1, "FIN_WAIT1状态的网络链接数", ""},
+	{KeyNetstatTcpFinWait2, "FIN_WAIT2状态的网络链接数", ""},
+	{KeyNetstatTcpTimeWait, "TIME_WAIT状态的网络链接数", ""},
+	{KeyNetstatTcpClose, "CLOSE状态的网络链接数", ""},
+	{KeyNetstatTcpCloseWait, "CLOSE_WAIT状态的网络链接数", ""},
+	{KeyNetstatTcpLastAck, "LAST_ACK状态的网络链接数", ""},
+	{KeyNetstatTcpListen, "LISTEN状态的网络链接数", ""},
+	{KeyNetstatTcpClosing, "CLOSING状态的网络链接数", ""},
+	{KeyNetstatTcpNone, "NONE状态的网络链接数", ""},
+	{KeyNetstatUdpSocket, "UDP状态的网络链接数", ""},
 }
 
 type NetStats struct {

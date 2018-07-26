@@ -119,7 +119,7 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner
 		metricName := c.Name()
 		trans := make([]transforms.Transformer, 0)
 		if attributes, ex := config[metric.AttributesString]; ex {
-			if attrs, ok := attributes.([]KeyValue); ok {
+			if attrs, ok := attributes.(KeyValueSlice); ok {
 				for _, attr := range attrs {
 					val, exist := m.Attributes[attr.Key]
 					if exist && !val {

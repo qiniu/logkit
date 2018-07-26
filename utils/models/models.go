@@ -65,8 +65,9 @@ type Option struct {
 }
 
 type KeyValue struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
+	Key     string `json:"key"`
+	Value   string `json:"value"`
+	SortKey string `json:"sort_key"`
 }
 
 // Data store as use key/value map
@@ -145,4 +146,20 @@ func (se *StatsError) ErrorIndexIn(idx int) bool {
 		}
 	}
 	return false
+}
+
+type KeyValueSlice []KeyValue
+
+func (slice KeyValueSlice) Len() int {
+	return len(slice)
+}
+
+func (slice KeyValueSlice) Less(i, j int) bool {
+	return slice[i].SortKey < slice[j].SortKey
+}
+
+func (slice KeyValueSlice) Swap(i, j int) {
+	slice[i].Key, slice[j].Key = slice[j].Key, slice[i].Key
+	slice[i].Value, slice[j].Value = slice[j].Value, slice[i].Value
+	slice[i].SortKey, slice[j].SortKey = slice[j].SortKey, slice[i].SortKey
 }

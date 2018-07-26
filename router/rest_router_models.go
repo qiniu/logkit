@@ -38,8 +38,8 @@ func GetRouterOption() []Option {
 	}
 }
 
-func GetRouterMatchTypeUsage() []KeyValue {
-	mTypeUsage := make([]KeyValue, 0)
+func GetRouterMatchTypeUsage() KeyValueSlice {
+	mTypeUsage := make(KeyValueSlice, 0)
 	for name, mType := range MatchTypeRegistry {
 		mTypeFunc := mType()
 		mTypeUsage = append(mTypeUsage, KeyValue{

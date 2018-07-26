@@ -15,8 +15,8 @@ type respMetricUsage struct {
 }
 
 type respMetricKeys struct {
-	Code string                `json:"code"`
-	Data map[string][]KeyValue `json:"data"`
+	Code string                   `json:"code"`
+	Data map[string]KeyValueSlice `json:"data"`
 }
 
 type respMetricOptions struct {
@@ -62,9 +62,9 @@ func metricAPITest(p *testParam) {
 	if err = jsoniter.Unmarshal(respBody, &got3); err != nil {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
-	metricKeys := make(map[string][]KeyValue)
+	metricKeys := make(map[string]KeyValueSlice)
 	for key, MKey := range metric.GetMetricTypeKey() {
-		if mkey, ok := MKey.([]KeyValue); ok {
+		if mkey, ok := MKey.(KeyValueSlice); ok {
 			metricKeys[key] = mkey
 		}
 	}
