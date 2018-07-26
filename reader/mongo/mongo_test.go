@@ -28,14 +28,14 @@ func TestMongoReader(t *testing.T) {
 		host:       "127.0.0.1:12701",
 		database:   "testdb",
 		collection: "coll",
-		offsetkey:  MongoDefaultOffsetKey,
+		offsetkey:  DefaultOffsetKey,
 		offset:     obj,
 
 		collectionFilters: map[string]CollectionFilter{},
 		status:            reader.StatusInit,
 		readChan:          make(chan []byte),
 	}
-	assert.EqualValues(t, "MongoReader:127.0.0.1:12701_testdb_coll", er.Name())
+	assert.EqualValues(t, "MongoReader<127.0.0.1:12701_testdb_coll>", er.Name())
 	er.SyncMeta()
 	got, gotoffset, err := er.meta.ReadOffset()
 	assert.NoError(t, err)
