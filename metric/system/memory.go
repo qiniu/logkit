@@ -86,7 +86,7 @@ func (s *MemStats) Collect() (datas []map[string]interface{}, err error) {
 
 const (
 	TypeMetricSwap   = "swap"
-	MetricSwapUsages = "CPU(Swap)"
+	MetricSwapUsages = "内存(Swap)"
 
 	// TypeMetricSwap 中的字段
 	KeySwapTotal       = "swap_total"
@@ -102,9 +102,9 @@ var KeySwapUsages = []KeyValue{
 	{KeySwapTotal, "Swap空间总量"},
 	{KeySwapUsed, "Swap已使用空间"},
 	{KeySwapFree, "Swap空闲空间"},
-	{KeySwapUsedPercent, "used percent"},
-	{KeySwapIn, "swap in"},
-	{KeySwapOut, "swap out"},
+	{KeySwapUsedPercent, "Swap使用空间占比"},
+	{KeySwapIn, "Swap空间换入数据量"},
+	{KeySwapOut, "Swap空间换出数据量"},
 }
 
 type SwapStats struct {

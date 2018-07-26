@@ -345,14 +345,11 @@ func metricDiskioTest(p *testParam) {
 		if err != nil {
 			log.Fatalf("metricDiskioTest error unmarshal %v curLine = %v %v", string(str), curLine, err)
 		}
-		assert.Equal(t, len(diskIoAttr)+2, len(result[0]), string(str))
+		assert.Equal(t, len(diskIoAttr)+1, len(result[0]), string(str))
 	}
 	mc = []MetricConfig{
 		{
 			MetricType: "diskio",
-			Attributes: map[string]bool{
-				"diskio_write_time": false,
-			},
 			Config: map[string]interface{}{
 				"skip_serial_number": true,
 			},

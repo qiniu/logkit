@@ -43,7 +43,7 @@ var KeySysctlFsFieldNameMap = map[string]string{
 	KeyLinuxSysctlFsDquotNr:         "linux_sysctl_fs_dquot_nr",
 	KeyLinuxSysctlFsDquotMax:        "linux_sysctl_fs_dquot_max",
 	KeyLinuxSysctlFsSuperNr:         "linux_sysctl_fs_super_nr",
-	KeyLinuxSysctlFsSuperMax:        "linux_sysctl_fs_super-max",
+	KeyLinuxSysctlFsSuperMax:        "linux_sysctl_fs_super_max",
 	KeyLinuxSysctlFsInodeNr:         "linux_sysctl_fs_inode_nr",
 	KeyLinuxSysctlFsInodeFreeNr:     "linux_sysctl_fs_inode_free_nr",
 	KeyLinuxSysctlFsInodePreNr:      "linux_sysctl_fs_inode_preshrink_nr",

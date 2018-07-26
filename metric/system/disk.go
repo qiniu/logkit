@@ -42,7 +42,7 @@ var KeyDiskUsages = []KeyValue{
 	{KeyDiskUsedPercent, "磁盘已用百分比"},
 	{KeyDiskInodesTotal, "总inode数量"},
 	{KeyDiskInodesFree, "空闲的inode数量"},
-	{KeyDiskInodesUsed, "适用的inode数量"},
+	{KeyDiskInodesUsed, "使用的inode数量"},
 }
 
 // ConfigDiskUsages TypeMetricDisk config 中的字段描述
@@ -160,6 +160,7 @@ var KeyDiskioUsages = []KeyValue{
 	{KeyDiskioIoTime, "io总时间"},
 	{KeyDiskioIopsInProgress, "运行中的每秒IO数据量"},
 	{KeyDiskioName, "磁盘名称"},
+	{KeyDiskioSerial, "磁盘序列号"},
 }
 
 // ConfigDiskioUsages TypeMetricDiskio 配置项描述

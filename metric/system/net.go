@@ -31,7 +31,9 @@ const (
 // KeyNetUsages TypeMetricNet 中的字段名称
 var KeyNetUsages = []KeyValue{
 	{KeyNetBytesSent, "网卡发包总数(bytes)"},
+	{KeyNetBytesSentPerSec,"网卡发包速率(bytes/s)"},
 	{KeyNetBytesRecv, "网卡收包总数(bytes)"},
+	{KeyNetBytesRecvPerSec,"网卡收包速率(bytes/s)"},
 	{KeyNetPacketsSent, "网卡发包数量"},
 	{KeyNetPacketsRecv, "网卡收包数量"},
 	{KeyNetErrIn, "网卡收包错误数量"},
