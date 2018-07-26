@@ -125,7 +125,10 @@ type Reader struct {
 
 type DBRecords map[string]TableRecords
 
-type TableRecords map[string]TableInfo
+type TableRecords struct {
+	Table map[string]TableInfo
+	mutex sync.RWMutex
+}
 
 type TableInfo struct {
 	size   int64
@@ -188,10 +191,13 @@ func (dbRecords *DBRecords) SetTableInfo(db, table string, tableInfo TableInfo) 
 		*dbRecords = make(DBRecords)
 	}
 	tableRecords := (*dbRecords)[db]
-	if tableRecords == nil {
-		tableRecords = make(TableRecords)
+	if tableRecords.GetTable() == nil {
+		tableRecords = TableRecords{
+			Table: make(map[string]TableInfo),
+			mutex: sync.RWMutex{},
+		}
 	}
-	tableRecords[table] = tableInfo
+	tableRecords.SetTableInfo(table, tableInfo)
 	(*dbRecords)[db] = tableRecords
 }
 
@@ -199,7 +205,7 @@ func (dbRecords *DBRecords) GetTableRecords(db string) TableRecords {
 	if *dbRecords != nil {
 		return (*dbRecords)[db]
 	}
-	return nil
+	return TableRecords{}
 }
 
 func (dbRecords *DBRecords) Reset() {
@@ -207,29 +213,49 @@ func (dbRecords *DBRecords) Reset() {
 }
 
 func (tableRecords *TableRecords) Set(value TableRecords) {
-	if *tableRecords == nil {
-		*tableRecords = make(TableRecords)
+	if tableRecords.GetTable() == nil {
+		*tableRecords = TableRecords{
+			Table: make(map[string]TableInfo),
+			mutex: sync.RWMutex{},
+		}
 	}
-	*tableRecords = value
+
+	tableRecords.mutex.Lock()
+	tableRecords.Table = value.GetTable()
+	tableRecords.mutex.Unlock()
 }
 
 func (tableRecords *TableRecords) SetTableInfo(table string, tableInfo TableInfo) {
-	if *tableRecords == nil {
-		*tableRecords = make(TableRecords)
+	if tableRecords.GetTable() == nil {
+		*tableRecords = TableRecords{
+			Table: make(map[string]TableInfo),
+			mutex: sync.RWMutex{},
+		}
 	}
-	(*tableRecords)[table] = tableInfo
+	tableRecords.mutex.Lock()
+	tableRecords.Table[table] = tableInfo
+	tableRecords.mutex.Unlock()
 }
 
 func (tableRecords *TableRecords) GetTableInfo(table string) TableInfo {
-	var tableInfo TableInfo
-	if *tableRecords != nil {
-		tableInfo = (*tableRecords)[table]
+	tableMap := tableRecords.GetTable()
+	if tableMap != nil {
+		return tableMap[table]
 	}
-	return tableInfo
+	return TableInfo{}
+}
+
+func (tableRecords *TableRecords) GetTable() map[string]TableInfo {
+	tableRecords.mutex.RLock()
+	defer tableRecords.mutex.RUnlock()
+	if tableRecords.Table != nil {
+		return tableRecords.Table
+	}
+	return nil
 }
 
 func (tableRecords *TableRecords) Reset() {
-	*tableRecords = make(TableRecords)
+	*tableRecords = TableRecords{}
 }
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (ret reader.Reader, err error) {
@@ -523,7 +549,7 @@ func (dbRecords *SyncDBRecords) restoreRecordsFile(meta *reader.Meta) (lastDB, l
 		database := tmpDBRecords[0]
 		var tableRecords TableRecords
 		tmpTableRecords := dbRecords.GetTableRecords(database)
-		if tmpTableRecords != nil {
+		if tmpTableRecords.GetTable() != nil {
 			tableRecords.Set(tmpTableRecords)
 		}
 
@@ -563,7 +589,7 @@ func (dbRecords *SyncDBRecords) restoreRecordsFile(meta *reader.Meta) (lastDB, l
 			}
 		}
 
-		if len(tableRecords) != 0 {
+		if len(tableRecords.GetTable()) != 0 {
 			dbRecords.SetTableRecords(database, tableRecords)
 		}
 		if idx == recordsDoneLength-1 {
@@ -1517,7 +1543,7 @@ func (r *Reader) SyncMeta() {
 		dbRecords := r.syncRecords.GetDBRecords()
 
 		for database, tablesRecord := range dbRecords {
-			for table, tableInfo := range tablesRecord {
+			for table, tableInfo := range tablesRecord.GetTable() {
 				all += database + sqlOffsetConnector + table + "," +
 					strconv.FormatInt(tableInfo.size, 10) + "," +
 					strconv.FormatInt(tableInfo.offset, 10) + "," +
@@ -2175,7 +2201,7 @@ func (r *Reader) checkDoneRecords(queryType int, target, curDB string) bool {
 func (r *Reader) existTableInfo(target, curDB string) (TableInfo, bool) {
 	var tableInfo TableInfo
 	tableDoneRecords := r.doneRecords.GetTableRecords(curDB)
-	if tableDoneRecords == nil {
+	if tableDoneRecords.GetTable() == nil {
 		return tableInfo, false
 	}
 
