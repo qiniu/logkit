@@ -453,7 +453,7 @@ func dataConvert(data interface{}, schema DslSchemaEntry) (converted interface{}
 		case time.Time, *time.Time:
 			return value, nil
 		}
-		if converted, err = ConvertDate("", "", 0, data); err == nil {
+		if converted, err = ConvertDate("", "", 0, time.UTC, data); err == nil {
 			return converted, nil
 		}
 	case pipeline.PandoraTypeBool:

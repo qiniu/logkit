@@ -657,7 +657,7 @@ func Bool2String(i bool) string {
 	return "false"
 }
 
-func ConvertDate(layoutBefore, layoutAfter string, offset int, v interface{}) (interface{}, error) {
+func ConvertDate(layoutBefore, layoutAfter string, offset int, loc *time.Location, v interface{}) (interface{}, error) {
 	var s int64
 	switch newv := v.(type) {
 	case int64:
@@ -674,13 +674,13 @@ func ConvertDate(layoutBefore, layoutAfter string, offset int, v interface{}) (i
 		s = int64(newv)
 	case string:
 		if layoutBefore != "" {
-			t, err := time.Parse(layoutBefore, newv)
+			t, err := time.ParseInLocation(layoutBefore, newv, loc)
 			if err != nil {
 				return v, fmt.Errorf("can not parse %v with layout %v", newv, layoutAfter)
 			}
 			return FormatWithUserOption(layoutAfter, offset, t), nil
 		}
-		t, err := times.StrToTime(newv)
+		t, err := times.StrToTimeLocation(newv, loc)
 		if err != nil {
 			return v, err
 		}
