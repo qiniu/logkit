@@ -2,6 +2,7 @@ package transforms
 
 import (
 	"fmt"
+	"sort"
 
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -20,10 +21,12 @@ func GetTransformerUsages() KeyValueSlice {
 	for _, v := range Transformers {
 		cr := v()
 		ModeUsages = append(ModeUsages, KeyValue{
-			Key:   cr.Type(),
-			Value: cr.Description(),
+			Key:     cr.Type(),
+			Value:   cr.Description(),
+			SortKey: cr.Type(),
 		})
 	}
+	sort.Stable(ModeUsages)
 	return ModeUsages
 }
 
