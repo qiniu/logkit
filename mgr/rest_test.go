@@ -31,8 +31,8 @@ import (
 )
 
 type respModeUsages struct {
-	Code string     `json:"code"`
-	Data []KeyValue `json:"data"`
+	Code string        `json:"code"`
+	Data KeyValueSlice `json:"data"`
 }
 
 type respModeKeyOptions struct {

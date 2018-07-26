@@ -29,18 +29,18 @@ const (
 )
 
 // KeyNetUsages TypeMetricNet 中的字段名称
-var KeyNetUsages = []KeyValue{
-	{KeyNetBytesSent, "网卡发包总数(bytes)"},
-	{KeyNetBytesSentPerSec,"网卡发包速率(bytes/s)"},
-	{KeyNetBytesRecv, "网卡收包总数(bytes)"},
-	{KeyNetBytesRecvPerSec,"网卡收包速率(bytes/s)"},
-	{KeyNetPacketsSent, "网卡发包数量"},
-	{KeyNetPacketsRecv, "网卡收包数量"},
-	{KeyNetErrIn, "网卡收包错误数量"},
-	{KeyNetErrOut, "网卡发包错误数量"},
-	{KeyNetDropIn, "网卡收 丢包数量"},
-	{KeyNetDropOut, "网卡发 丢包数量"},
-	{KeyNetInterface, "网卡设备名称"},
+var KeyNetUsages = KeyValueSlice{
+	{KeyNetBytesSent, "网卡发包总数(bytes)", ""},
+	{KeyNetBytesSentPerSec, "网卡发包速率(bytes/s)", ""},
+	{KeyNetBytesRecv, "网卡收包总数(bytes)", ""},
+	{KeyNetBytesRecvPerSec, "网卡收包速率(bytes/s)", ""},
+	{KeyNetPacketsSent, "网卡发包数量", ""},
+	{KeyNetPacketsRecv, "网卡收包数量", ""},
+	{KeyNetErrIn, "网卡收包错误数量", ""},
+	{KeyNetErrOut, "网卡发包错误数量", ""},
+	{KeyNetDropIn, "网卡收 丢包数量", ""},
+	{KeyNetDropOut, "网卡发 丢包数量", ""},
+	{KeyNetInterface, "网卡设备名称", ""},
 }
 
 type CollectInfo struct {

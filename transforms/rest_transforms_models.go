@@ -15,8 +15,8 @@ const (
 	TypeErr     = "value of %v is not the type of map[string]interface{}"
 )
 
-func GetTransformerUsages() []KeyValue {
-	var ModeUsages []KeyValue
+func GetTransformerUsages() KeyValueSlice {
+	var ModeUsages KeyValueSlice
 	for _, v := range Transformers {
 		cr := v()
 		ModeUsages = append(ModeUsages, KeyValue{
