@@ -121,7 +121,7 @@ func multiReaderOneLineTest(t *testing.T) {
 	assert.NoError(t, err)
 	mmr, err := NewReader(meta, c)
 	mr := mmr.(*Reader)
-	mr.Start()
+	assert.NoError(t, mr.Start())
 	t.Log("mr started")
 	go func() {
 		time.Sleep(15 * time.Second)
@@ -216,7 +216,7 @@ func multiReaderMultiLineTest(t *testing.T) {
 	mmr, err := NewReader(meta, c)
 	mmr.SetMode(reader.ReadModeHeadPatternString, "^abc*")
 	mr := mmr.(*Reader)
-	mr.Start()
+	assert.NoError(t, mr.Start())
 	t.Log("mr started")
 	go func() {
 		time.Sleep(15 * time.Second)
@@ -317,7 +317,7 @@ func multiReaderSyncMetaOneLineTest(t *testing.T) {
 	assert.NoError(t, err)
 	mmr, err := NewReader(meta, c)
 	mr := mmr.(*Reader)
-	mr.Start()
+	assert.NoError(t, mr.Start())
 	t.Log("mr started")
 	go func() {
 		time.Sleep(15 * time.Second)
@@ -352,7 +352,7 @@ func multiReaderSyncMetaOneLineTest(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 	mmr, err = NewReader(meta, c)
 	mr = mmr.(*Reader)
-	mr.Start()
+	assert.NoError(t, mr.Start())
 	time.Sleep(500 * time.Millisecond)
 	for {
 		data, err := mr.ReadLine()
@@ -447,7 +447,7 @@ func multiReaderSyncMetaMutilineTest(t *testing.T) {
 	mmr, err := NewReader(meta, c)
 	mmr.SetMode(reader.ReadModeHeadPatternString, "^abc*")
 	mr := mmr.(*Reader)
-	mr.Start()
+	assert.NoError(t, mr.Start())
 	t.Log("mr started")
 	go func() {
 		time.Sleep(15 * time.Second)
@@ -478,7 +478,7 @@ func multiReaderSyncMetaMutilineTest(t *testing.T) {
 	mmr, err = NewReader(meta, c)
 	mmr.SetMode(reader.ReadModeHeadPatternString, "^abc*")
 	mr = mmr.(*Reader)
-	mr.Start()
+	assert.NoError(t, mr.Start())
 	time.Sleep(100 * time.Millisecond)
 	for {
 		data, err := mr.ReadLine()
@@ -567,7 +567,7 @@ func TestMultiReaderReset(t *testing.T) {
 	mmr, err := NewReader(meta, c)
 	assert.NoError(t, err)
 	mr := mmr.(*Reader)
-	mr.Start()
+	assert.NoError(t, mr.Start())
 	t.Log("mr started")
 
 	maxNum := 0
@@ -601,7 +601,7 @@ func TestMultiReaderReset(t *testing.T) {
 	assert.NoError(t, err)
 	mmr, err = NewReader(meta, c)
 	mr = mmr.(*Reader)
-	mr.Start()
+	assert.NoError(t, mr.Start())
 	time.Sleep(100 * time.Millisecond)
 	resultMap = make(map[string]int)
 	maxNum = 0
@@ -660,7 +660,7 @@ func TestReaderErrBegin(t *testing.T) {
 	mmr, err := NewReader(meta, c)
 	assert.NoError(t, err)
 	mr := mmr.(*Reader)
-	mr.Start()
+	assert.NoError(t, mr.Start())
 	maxNum := 0
 	for {
 		_, err = mr.ReadLine()
@@ -725,7 +725,7 @@ func TestReaderErrMiddle(t *testing.T) {
 	mmr, err := NewReader(meta, c)
 	assert.NoError(t, err)
 	mr := mmr.(*Reader)
-	mr.Start()
+	assert.NoError(t, mr.Start())
 	maxNum := 0
 	for {
 		_, err = mr.ReadLine()
