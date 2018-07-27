@@ -83,8 +83,11 @@ func Test_KeyValueSlice(t *testing.T) {
 }
 
 func TestErrorQueue(t *testing.T) {
-	testErrorQueue := NewErrorQueue(DefaultErrorsListCap)
-	assert.Equal(t, DefaultErrorsListCap+1, testErrorQueue.maxSize)
+	var testErrorQueue *ErrorQueue
+	assert.True(t, testErrorQueue.IsEmpty())
+
+	testErrorQueue = NewErrorQueue(DefaultErrorsListCap)
+	assert.Equal(t, DefaultErrorsListCap+1, testErrorQueue.MaxSize)
 	assert.True(t, testErrorQueue.IsEmpty())
 	assert.Equal(t, 0, testErrorQueue.Size())
 	assert.Equal(t, 0, testErrorQueue.Front)
@@ -116,7 +119,7 @@ func TestErrorQueue(t *testing.T) {
 	assert.Equal(t, DefaultErrorsListCap, testErrorQueue.Size())
 	assert.Equal(t, 81, testErrorQueue.Front)
 	assert.Equal(t, 80, testErrorQueue.Rear)
-	assert.Equal(t, testErrorQueue.Front, testErrorQueue.Rear+1%testErrorQueue.maxSize)
+	assert.Equal(t, testErrorQueue.Front, testErrorQueue.Rear+1%testErrorQueue.MaxSize)
 	errorsList = testErrorQueue.Sort()
 	assert.Equal(t, DefaultErrorsListCap, len(errorsList))
 	assert.Equal(t, int64(1), testErrorQueue.ErrorSlice[1].Count)
@@ -132,7 +135,7 @@ func TestErrorQueue(t *testing.T) {
 	assert.Equal(t, DefaultErrorsListCap, testErrorQueue.Size())
 	assert.Equal(t, 82, testErrorQueue.Front)
 	assert.Equal(t, 81, testErrorQueue.Rear)
-	assert.Equal(t, testErrorQueue.Front, testErrorQueue.Rear+1%testErrorQueue.maxSize)
+	assert.Equal(t, testErrorQueue.Front, testErrorQueue.Rear+1%testErrorQueue.MaxSize)
 	errorsList = testErrorQueue.Sort()
 	assert.Equal(t, DefaultErrorsListCap, len(errorsList))
 	assert.Equal(t, int64(10), errorsList[DefaultErrorsListCap-1].Count)
