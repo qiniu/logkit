@@ -65,7 +65,7 @@ func (src *RunnerStatus) Clone() RunnerStatus {
 	dst.Tag = src.Tag
 	dst.Url = src.Url
 	if src.HistoryErrors != nil {
-		dst.HistoryErrors = src.HistoryErrors.Copy()
+		dst.HistoryErrors = src.HistoryErrors.Clone()
 	}
 	return dst
 }
@@ -116,29 +116,29 @@ type ErrorsResult struct {
 }
 
 // 返回队列实际容量
-func (entry *ErrorsList) Reset() {
-	entry.ReadErrors = nil
-	entry.ParseErrors = nil
-	entry.TransformErrors = nil
-	entry.SendErrors = nil
+func (list *ErrorsList) Reset() {
+	list.ReadErrors = nil
+	list.ParseErrors = nil
+	list.TransformErrors = nil
+	list.SendErrors = nil
 }
 
 // 复制出一个顺序的 Errors
-func (src *ErrorsList) Sort() (dst ErrorsResult) {
+func (list *ErrorsList) Sort() (dst ErrorsResult) {
 	dst = ErrorsResult{}
-	if src.ReadErrors != nil {
-		dst.ReadErrors = src.ReadErrors.Sort()
+	if list.ReadErrors != nil {
+		dst.ReadErrors = list.ReadErrors.Sort()
 	}
-	if src.ParseErrors != nil {
-		dst.ParseErrors = src.ParseErrors.Sort()
+	if list.ParseErrors != nil {
+		dst.ParseErrors = list.ParseErrors.Sort()
 	}
-	for transform, transformQueue := range src.TransformErrors {
+	for transform, transformQueue := range list.TransformErrors {
 		if dst.TransformErrors == nil {
 			dst.TransformErrors = make(map[string][]ErrorInfo)
 		}
 		dst.TransformErrors[transform] = transformQueue.Sort()
 	}
-	for send, sendQueue := range src.SendErrors {
+	for send, sendQueue := range list.SendErrors {
 		if dst.SendErrors == nil {
 			dst.SendErrors = make(map[string][]ErrorInfo)
 		}
@@ -147,25 +147,25 @@ func (src *ErrorsList) Sort() (dst ErrorsResult) {
 	return dst
 }
 
-// 拷贝完整的 ErrorList
-func (src *ErrorsList) Copy() *ErrorsList {
+// Clone 返回当前 ErrorList 的完整拷贝，若无数据则会返回 nil
+func (list *ErrorsList) Clone() *ErrorsList {
 	var dst ErrorsList
 	isEmpty := true
-	if src.ReadErrors != nil && !src.ReadErrors.IsEmpty() {
-		dst.ReadErrors = NewErrorQueue(src.ReadErrors.GetMaxSize())
-		dst.ReadErrors.CopyQueue(src.ReadErrors)
+	if !list.ReadErrors.IsEmpty() {
+		dst.ReadErrors = NewErrorQueue(list.ReadErrors.GetMaxSize())
+		dst.ReadErrors.CopyQueue(list.ReadErrors)
 		isEmpty = false
 	}
 
-	if src.ParseErrors != nil && !src.ReadErrors.IsEmpty() {
-		dst.ParseErrors = NewErrorQueue(src.ParseErrors.GetMaxSize())
-		dst.ParseErrors.CopyQueue(src.ParseErrors)
+	if !list.ParseErrors.IsEmpty() {
+		dst.ParseErrors = NewErrorQueue(list.ParseErrors.GetMaxSize())
+		dst.ParseErrors.CopyQueue(list.ParseErrors)
 		isEmpty = false
 	}
 
-	if src.TransformErrors != nil {
-		for transform, transformErrors := range src.TransformErrors {
-			if transformErrors != nil && !transformErrors.IsEmpty() {
+	if list.TransformErrors != nil {
+		for transform, transformErrors := range list.TransformErrors {
+			if !transformErrors.IsEmpty() {
 				if dst.TransformErrors == nil {
 					dst.TransformErrors = make(map[string]*ErrorQueue)
 				}
@@ -176,9 +176,9 @@ func (src *ErrorsList) Copy() *ErrorsList {
 		}
 	}
 
-	if src.SendErrors != nil {
-		for send, sendErrors := range src.SendErrors {
-			if sendErrors != nil && !sendErrors.IsEmpty() {
+	if list.SendErrors != nil {
+		for send, sendErrors := range list.SendErrors {
+			if !sendErrors.IsEmpty() {
 				if dst.SendErrors == nil {
 					dst.SendErrors = make(map[string]*ErrorQueue)
 				}
