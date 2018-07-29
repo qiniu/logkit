@@ -97,7 +97,7 @@ type RunnerInfo struct {
 	ErrorsListCap    int    `json:"errors_list_cap"`            // 记录错误信息的最大条数
 	CreateTime       string `json:"createtime"`
 	EnvTag           string `json:"env_tag,omitempty"`
-	ExtraInfo        bool   `json:"extra_info,omitempty"`
+	ExtraInfo        bool   `json:"extra_info"`
 	// 用这个字段的值来获取环境变量, 作为 tag 添加到数据中
 }
 
