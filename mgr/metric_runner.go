@@ -27,7 +27,7 @@ const (
 )
 
 const (
-	defaultCollectInterval = 3
+	defaultCollectInterval = 30
 )
 
 type MetricConfig struct {
