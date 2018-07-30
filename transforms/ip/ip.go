@@ -262,7 +262,7 @@ func (t *Transformer) SetStats(err string) StatsInfo {
 	return t.stats
 }
 
-func (t *Transformer) Close() error{
+func (t *Transformer) Close() error {
 	if t.loc != nil {
 		return t.loc.Close()
 	}

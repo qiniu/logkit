@@ -2,10 +2,10 @@ package date
 
 import (
 	"errors"
+	"time"
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
-	"time"
 )
 
 var (

@@ -1,8 +1,8 @@
 package ip
 
 import (
-	"net"
 	"fmt"
+	"net"
 
 	"github.com/oschwald/geoip2-golang"
 )
