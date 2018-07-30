@@ -230,8 +230,9 @@ func (_ *Transformer) ConfigOptions() []Option {
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{false, true},
 			Required:      false,
-			Default:       false,
+			Default:       true,
 			DefaultNoUse:  false,
+			Element:       Checkbox,
 			Description:   "字段名称作为前缀(key_as_prefix)",
 			Type:          transforms.TransformTypeString,
 		},
@@ -262,7 +263,7 @@ func (t *Transformer) SetStats(err string) StatsInfo {
 	return t.stats
 }
 
-func (t *Transformer) Close() error{
+func (t *Transformer) Close() error {
 	if t.loc != nil {
 		return t.loc.Close()
 	}

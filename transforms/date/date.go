@@ -2,10 +2,10 @@ package date
 
 import (
 	"errors"
+	"time"
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
-	"time"
 )
 
 var (
@@ -93,6 +93,7 @@ func (t *Transformer) ConfigOptions() []Option {
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
+			Advance:      true,
 			Description:  "期望时间样式(不填默认rfc3339)(time_layout_after)",
 			Type:         transforms.TransformTypeString,
 		},

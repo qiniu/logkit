@@ -81,6 +81,7 @@ var (
 		Placeholder:  "new_field_keyname",
 		DefaultNoUse: false,
 		Description:  "新的字段名(new)",
+		ToolTip:      "生成的字段名称，不改变原有的字段",
 		Type:         TransformTypeString,
 	}
 	KeyFieldNewRequired = Option{
@@ -102,7 +103,9 @@ var (
 		Default:      0,
 		DefaultNoUse: false,
 		Description:  "时区偏移量(offset)",
+		Advance:      true,
 		CheckRegex:   "*",
 		Type:         TransformTypeLong,
+		ToolTip:      "如果key中带有时区信息，则以该时区作为offset的基础时区，否则以UTC时区为基础时区",
 	}
 )
