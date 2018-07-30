@@ -77,7 +77,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		return nil, err
 	}
 
-	expireDur, _ := conf.GetStringOr(reader.KeyExpire, "720h")
+	expireDur, _ := conf.GetStringOr(reader.KeyExpire, "0s")
 	expire, err := time.ParseDuration(expireDur)
 	if err != nil {
 		return nil, err

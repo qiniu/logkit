@@ -145,6 +145,11 @@ func HasDirExpired(dir string, expire time.Duration) bool {
 		return true
 	}
 
+	// 如果过期时间为 0，则永不过期
+	if expire.Nanoseconds() == 0 {
+		return false
+	}
+
 	var latestModTime time.Time
 	if err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
