@@ -1,5 +1,12 @@
 package models
 
+import "errors"
+
+var (
+	ErrNotSupport = errors.New("runner does not support")
+	ErrNotExist   = errors.New("runner does not exist")
+)
+
 const (
 	// 一切正常
 	ErrNothing = "L200"
@@ -75,4 +82,12 @@ var ErrorCodeHumanize = map[string]string{
 	ErrClusterRunnerUpdate: "Slaves 更新 Runner 出现错误",
 	ErrClusterSlavesDelete: "Slaves 从列表中移除时出现错误",
 	ErrClusterSlavesTag:    "Slaves 更改 Tag 出现错误",
+}
+
+func IsNotExist(err error) bool {
+	return err == ErrNotExist
+}
+
+func IsNotSupport(err error) bool {
+	return err == ErrNotSupport
 }

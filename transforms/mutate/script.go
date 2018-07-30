@@ -224,6 +224,7 @@ func (g *Script) ConfigOptions() []Option {
 			Default:      "",
 			DefaultNoUse: false,
 			Description:  "指定脚本内容(script)",
+			Advance:      true,
 			Type:         transforms.TransformTypeString,
 		},
 	}
