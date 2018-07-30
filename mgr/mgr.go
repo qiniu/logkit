@@ -582,10 +582,10 @@ func (m *Manager) Error(name string) (rss ErrorsResult, err error) {
 			if runnerErr, ok := r.(RunnerErrors); ok {
 				return runnerErr.GetErrors(), nil
 			}
-			return rss, fmt.Errorf("runner %v has no RunnerErrors interface", name)
+			return rss, ErrNotSupport
 		}
 	}
-	return rss, fmt.Errorf("runner %v is not found", name)
+	return rss, ErrNotExist
 }
 
 func (m *Manager) Configs() (rss map[string]RunnerConfig) {
