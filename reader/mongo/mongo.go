@@ -68,7 +68,7 @@ type Reader struct {
 
 }
 
-func NewReader(meta *reader.Meta, conf conf.MapConf) (mr reader.Reader, err error) {
+func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	readBatch, _ := conf.GetIntOr(reader.KeyMongoReadBatch, 100)
 	database, err := conf.GetString(reader.KeyMongoDatabase)
 	if err != nil {
@@ -96,7 +96,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (mr reader.Reader, err erro
 		log.Warnf("Runner[%v] MongoDB reader does not support certfile Now", meta.RunnerName)
 		//TODO mongo鉴权暂时不支持
 	}
-	mmr := &Reader{
+	r := &Reader{
 		meta:              meta,
 		status:            reader.StatusInit,
 		routineStatus:     reader.StatusInit,
@@ -114,39 +114,39 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (mr reader.Reader, err erro
 	}
 	if offsetkey == DefaultOffsetKey {
 		if bson.IsObjectIdHex(keyOrObj) {
-			mmr.offset = bson.ObjectIdHex(keyOrObj)
+			r.offset = bson.ObjectIdHex(keyOrObj)
 		} else {
-			mmr.offset = nil
+			r.offset = nil
 		}
 	} else {
-		mmr.offset = offset
+		r.offset = offset
 	}
 
 	if filters != "" {
-		if jerr := jsoniter.Unmarshal([]byte(filters), &mmr.collectionFilters); jerr != nil {
-			err = errors.New("malformed collection_filters")
-			return
+		if jerr := jsoniter.Unmarshal([]byte(filters), &r.collectionFilters); jerr != nil {
+			return nil, errors.New("malformed collection_filters")
 		}
 	}
 	if len(cronSched) > 0 {
 		cronSched = strings.ToLower(cronSched)
 		if strings.HasPrefix(cronSched, reader.Loop) {
-			mmr.isLoop = true
-			mmr.loopDuration, err = reader.ParseLoopDuration(cronSched)
+			r.isLoop = true
+			r.loopDuration, err = reader.ParseLoopDuration(cronSched)
 			if err != nil {
-				log.Errorf("Runner[%v] %v %v", mmr.meta.RunnerName, mmr.Name(), err)
-				err = nil
+				log.Errorf("Runner[%v] %v %v", r.meta.RunnerName, r.Name(), err)
+			}
+			if r.loopDuration.Nanoseconds() <= 0 {
+				r.loopDuration = 1 * time.Second
 			}
 		} else {
-			err = mmr.Cron.AddFunc(cronSched, mmr.run)
+			err = r.Cron.AddFunc(cronSched, r.run)
 			if err != nil {
-				return
+				return nil, err
 			}
-			log.Infof("Runner[%v] %v Cron added with schedule <%v>", mmr.meta.RunnerName, mmr.Name(), cronSched)
+			log.Infof("Runner[%v] %v Cron added with schedule <%v>", r.meta.RunnerName, r.Name(), cronSched)
 		}
 	}
-	mr = mmr
-	return mr, nil
+	return r, nil
 }
 
 func (r *Reader) isStopping() bool {
