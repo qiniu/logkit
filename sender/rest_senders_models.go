@@ -2,18 +2,19 @@ package sender
 
 import (
 	. "github.com/qiniu/logkit/utils/models"
+	"github.com/qiniu/pandora-go-sdk/base/config"
 )
 
 // ModeUsages 用途说明
-var ModeUsages = []KeyValue{
-	{TypePandora, "发送至 七牛云智能日志平台(Pandora)"},
-	{TypeFile, "发送至 本地文件"},
-	{TypeMongodbAccumulate, "发送至 MongoDB 服务"},
-	{TypeInfluxdb, "发送至 InfluxDB 服务"},
-	{TypeDiscard, "消费数据但不发送"},
-	{TypeElastic, "发送至 Elasticsearch 服务"},
-	{TypeKafka, "发送至 Kafka 服务"},
-	{TypeHttp, "发送至 HTTP 服务器"},
+var ModeUsages = KeyValueSlice{
+	{TypePandora, "发送至 七牛云智能日志平台(Pandora)", ""},
+	{TypeFile, "发送至 本地文件", ""},
+	{TypeMongodbAccumulate, "发送至 MongoDB 服务", ""},
+	{TypeInfluxdb, "发送至 InfluxDB 服务", ""},
+	{TypeDiscard, "消费数据但不发送", ""},
+	{TypeElastic, "发送至 Elasticsearch 服务", ""},
+	{TypeKafka, "发送至 Kafka 服务", ""},
+	{TypeHttp, "发送至 HTTP 服务器", ""},
 }
 
 var (
@@ -78,6 +79,17 @@ var (
 		AdvanceDepend: KeyFtMemoryChannel,
 		ToolTip:       `默认为"100"，单位为批次，也就是100代表100个待发送的批次，注意：该选项设置的大小表达的是队列中可存储的元素个数，并不是占用的内存大小`,
 	}
+	OptionKeyFtLongDataDiscard = Option{
+		KeyName:       KeyFtLongDataDiscard,
+		Element:       Radio,
+		ChooseOnly:    true,
+		ChooseOptions: []interface{}{"false", "true"},
+		Default:       "false",
+		DefaultNoUse:  false,
+		Description:   "丢弃大于2M的数据(ft_long_data_discard)",
+		Advance:       true,
+		ToolTip:       `丢弃大于2M的数据`,
+	}
 	OptionLogkitSendTime = Option{
 		KeyName:       KeyLogkitSendTime,
 		Element:       Radio,
@@ -102,18 +114,28 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "发送到指定文件(file_send_path)",
 			ToolTip:      `路径支持魔法变量，例如 "file_send_path":"data-%Y-%m-%d.txt" ，此时数据就会渲染出日期，存放为 data-2018-03-28.txt`,
 		},
+		{
+			KeyName:      KeyFileSenderTimestampKey,
+			ChooseOnly:   false,
+			Default:      "",
+			Required:     false,
+			Placeholder:  "timestamp",
+			DefaultNoUse: true,
+			Description:  "时间戳键名(file_send_timestamp_key)",
+			ToolTip:      `用于获取时间的时间戳键名，如果该键存在则将替代当前时间渲染路径中的魔法变量，格式必须是 RFC3339Nano`,
+		},
 	},
 	TypePandora: {
 		{
 			KeyName:      KeyPandoraWorkflowName,
 			ChooseOnly:   false,
 			Default:      "",
-			Placeholder:  "logkit_default_workflow",
+			Placeholder:  "logkit_default_pipeline",
 			DefaultNoUse: true,
 			Required:     true,
-			Description:  "工作流名称(pandora_workflow_name)",
+			Description:  "新增或现有的Pipeline名称(pandora_workflow_name)",
 			CheckRegex:   "^[a-zA-Z_][a-zA-Z0-9_]{0,127}$",
-			ToolTip:      "七牛大数据平台工作流名称",
+			ToolTip:      "新增或现有的七牛大数据平台Pipeline名称",
 		},
 		{
 			KeyName:      KeyPandoraRepoName,
@@ -122,9 +144,9 @@ var ModeKeyOptions = map[string][]Option{
 			Required:     true,
 			Placeholder:  "my_work",
 			DefaultNoUse: true,
-			Description:  "数据源名称(pandora_repo_name)",
+			Description:  "新增或现有的实时仓库名称(pandora_repo_name)",
 			CheckRegex:   "^[a-zA-Z][a-zA-Z0-9_]{0,127}$",
-			ToolTip:      "七牛大数据平台工作流中的数据源名称",
+			ToolTip:      "新增或现有的七牛大数据平台Pipeline中的实时仓库名称",
 		},
 		{
 			KeyName:      KeyPandoraAk,
@@ -150,7 +172,7 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:      KeyPandoraHost,
 			ChooseOnly:   false,
-			Default:      "https://pipeline.qiniu.com",
+			Default:      config.DefaultPipelineEndpoint,
 			DefaultNoUse: false,
 			Description:  "大数据平台域名(pandora_host)",
 			Advance:      true,
@@ -173,18 +195,18 @@ var ModeKeyOptions = map[string][]Option{
 			ChooseOptions: []interface{}{"true", "false"},
 			Default:       "true",
 			DefaultNoUse:  false,
-			Description:   "自动创建数据源并更新(pandora_schema_free)",
+			Description:   "自动创建实时仓库并更新(pandora_schema_free)",
 			Advance:       true,
-			ToolTip:       "自动根据数据创建工作流、数据源并自动更新",
+			ToolTip:       "自动根据数据创建Pipeline、实时仓库并自动更新",
 		},
 		{
 			KeyName:       KeyPandoraAutoCreate,
 			ChooseOnly:    false,
 			Default:       "",
 			DefaultNoUse:  false,
-			Description:   "以DSL语法自动创建数据源(pandora_auto_create)",
+			Description:   "以DSL语法自动创建实时仓库(pandora_auto_create)",
 			Advance:       true,
-			ToolTip:       `自动创建数据源，语法为 "f1 date, f2 string, f3 float, f4 map{f5 long}"`,
+			ToolTip:       `自动创建实时仓库，语法为 "f1 date, f2 string, f3 float, f4 map{f5 long}"`,
 			ToolTipActive: true,
 		},
 		{
@@ -210,14 +232,15 @@ var ModeKeyOptions = map[string][]Option{
 			ChooseOnly:    false,
 			Default:       "",
 			DefaultNoUse:  false,
-			Description:   "指定日志分析仓库名称(pandora_logdb_name)",
+			Description:   "新增或现有的日志分析仓库名称(pandora_logdb_name)",
+			Advance:       true,
 			AdvanceDepend: KeyPandoraEnableLogDB,
-			ToolTip:       "若不指定使用数据源(pandora_repo_name)名称",
+			ToolTip:       "若不指定使用实时仓库(pandora_repo_name)名称",
 		},
 		{
 			KeyName:       KeyPandoraLogDBHost,
 			ChooseOnly:    false,
-			Default:       "https://logdb.qiniu.com",
+			Default:       config.DefaultLogDBEndpoint,
 			DefaultNoUse:  false,
 			Description:   "日志分析域名[私有部署才修改](pandora_logdb_host)",
 			Advance:       true,
@@ -250,7 +273,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse:  false,
 			Description:   "指定时序数据库仓库名称(pandora_tsdb_name)",
 			AdvanceDepend: KeyPandoraEnableTSDB,
-			ToolTip:       "若不指定使用数据源(pandora_repo_name)名称",
+			ToolTip:       "若不指定使用实时仓库(pandora_repo_name)名称",
 		},
 		{
 			KeyName:       KeyPandoraTSDBSeriesName,
@@ -272,7 +295,7 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:       KeyPandoraTSDBHost,
 			ChooseOnly:    false,
-			Default:       "https://tsdb.qiniu.com",
+			Default:       config.DefaultTSDBEndpoint,
 			DefaultNoUse:  false,
 			Description:   "时序数据库域名[私有部署才修改](pandora_tsdb_host)",
 			Advance:       true,
@@ -347,6 +370,44 @@ var ModeKeyOptions = map[string][]Option{
 			Advance:       true,
 		},
 		{
+			KeyName:       KeyPandoraKodoRotateStrategy,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"interval", "size", "both"},
+			Default:       "interval",
+			DefaultNoUse:  false,
+			Description:   "云存储文件分割策略(pandora_kodo_rotate_strategy)",
+			AdvanceDepend: KeyPandoraEnableKodo,
+			Advance:       true,
+		},
+		{
+			KeyName:       KeyPandoraKodoRotateInterval,
+			ChooseOnly:    false,
+			Default:       "600",
+			DefaultNoUse:  false,
+			Description:   "云存储文件分割间隔时间(pandora_kodo_rotate_interval)(单位秒)",
+			AdvanceDepend: KeyPandoraEnableKodo,
+			Advance:       true,
+		},
+		{
+			KeyName:       KeyPandoraKodoRotateSize,
+			ChooseOnly:    false,
+			Default:       "512000",
+			DefaultNoUse:  false,
+			Description:   "云存储文件分割文件大小(pandora_kodo_rotate_size)(单位KB)",
+			AdvanceDepend: KeyPandoraEnableKodo,
+			Advance:       true,
+		},
+		{
+			KeyName:       KeyPandoraKodoFileRetention,
+			ChooseOnly:    false,
+			Default:       "0",
+			DefaultNoUse:  false,
+			Description:   "云存储文件保存时间(pandora_kodo_file_retention)(单位天,0为永久保存)",
+			ToolTip:       "导出到云存储的文件保存时间，数字表示存的天数，0为永久保存",
+			AdvanceDepend: KeyPandoraEnableKodo,
+			Advance:       true,
+		},
+		{
 			KeyName:       KeyPandoraGzip,
 			Element:       Radio,
 			ChooseOnly:    true,
@@ -402,6 +463,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionFtProcs,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
+		OptionKeyFtLongDataDiscard,
 		{
 			KeyName:       KeyForceMicrosecond,
 			Element:       Radio,
@@ -449,8 +511,8 @@ var ModeKeyOptions = map[string][]Option{
 			KeyName:       KeyPandoraAutoConvertDate,
 			Element:       Radio,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{"true", "false"},
-			Default:       "true",
+			ChooseOptions: []interface{}{"false", "true"},
+			Default:       "false",
 			DefaultNoUse:  false,
 			Description:   "自动转换时间类型(pandora_auto_convert_date)",
 			Advance:       true,
@@ -532,6 +594,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionFtProcs,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
+		OptionKeyFtLongDataDiscard,
 	},
 	TypeInfluxdb: {
 		{
@@ -626,6 +689,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionFtProcs,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
+		OptionKeyFtLongDataDiscard,
 	},
 	TypeDiscard: {},
 	TypeElastic: {
@@ -688,6 +752,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionFtProcs,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
+		OptionKeyFtLongDataDiscard,
 	},
 	TypeKafka: {
 		{
@@ -755,6 +820,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionFtProcs,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
+		OptionKeyFtLongDataDiscard,
 	},
 	TypeHttp: {
 		{
@@ -769,7 +835,7 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:       KeyHttpSenderProtocol,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{"json", "csv"},
+			ChooseOptions: []interface{}{"json", "csv", "body_json"},
 			Default:       "json",
 			Description:   "发送数据时使用的格式(http_sender_protocol)",
 		},
@@ -797,5 +863,6 @@ var ModeKeyOptions = map[string][]Option{
 		OptionFtProcs,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
+		OptionKeyFtLongDataDiscard,
 	},
 }

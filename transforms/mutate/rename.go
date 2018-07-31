@@ -2,49 +2,60 @@ package mutate
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var (
+	_ transforms.StatsTransformer = &Rename{}
+	_ transforms.Transformer      = &Rename{}
+	_ transforms.Initializer      = &Rename{}
+)
+
 type Rename struct {
 	Key        string `json:"key"`
 	NewKeyName string `json:"new_key_name"`
+	NewKey     string `json:"new"`
 	stats      StatsInfo
+
+	keys []string
+	news []string
 }
 
+func (g *Rename) Init() error {
+	g.keys = GetKeys(g.Key)
+	if g.NewKey == "" {
+		g.NewKey = g.NewKeyName
+	}
+	g.news = GetKeys(g.NewKey)
+	return nil
+}
 func (g *Rename) RawTransform(datas []string) ([]string, error) {
 	return datas, errors.New("rename transformer not support rawTransform")
 }
 
 func (g *Rename) Transform(datas []Data) ([]Data, error) {
-	var err, ferr error
-	errnums := 0
-	keySlice := GetKeys(g.Key)
-	newKeySlice := GetKeys(g.NewKeyName)
+	if g.keys == nil {
+		g.Init()
+	}
+	var err, fmtErr error
+	errNum := 0
 	for i := range datas {
-		val, gerr := GetMapValue(datas[i], keySlice...)
-		if gerr != nil {
-			errnums++
-			err = fmt.Errorf("transform key %v not exist in data", g.Key)
+		val, getErr := GetMapValue(datas[i], g.keys...)
+		if getErr != nil {
+			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.Key)
 			continue
 		}
-		DeleteMapValue(datas[i], keySlice...)
-		err = SetMapValue(datas[i], val, false, newKeySlice...)
-		if err != nil {
-			errnums++
-			err = fmt.Errorf("the new key %v already exists ", g.NewKeyName)
-			continue
+		DeleteMapValue(datas[i], g.keys...)
+		setErr := SetMapValue(datas[i], val, false, g.news...)
+		if setErr != nil {
+			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.NewKeyName)
 		}
 	}
-	if err != nil {
-		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform rename, last error info is %v", errnums, err)
-	}
-	g.stats.Errors += int64(errnums)
-	g.stats.Success += int64(len(datas) - errnums)
-	return datas, ferr
+
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	return datas, fmtErr
 }
 
 func (g *Rename) Description() string {
@@ -67,16 +78,7 @@ func (g *Rename) SampleConfig() string {
 func (g *Rename) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
-		{
-			KeyName:      "new_key_name",
-			ChooseOnly:   false,
-			Default:      "",
-			Required:     true,
-			Placeholder:  "new_key_name",
-			DefaultNoUse: true,
-			Description:  "修改后的字段名(new_key_name)",
-			Type:         transforms.TransformTypeString,
-		},
+		transforms.KeyFieldNewRequired,
 	}
 }
 
@@ -85,6 +87,11 @@ func (g *Rename) Stage() string {
 }
 
 func (g *Rename) Stats() StatsInfo {
+	return g.stats
+}
+
+func (g *Rename) SetStats(err string) StatsInfo {
+	g.stats.LastError = err
 	return g.stats
 }
 

@@ -22,7 +22,7 @@ func Sign(ak, sk string, req *http.Request) error {
 		return err
 	}
 
-	auth :="Pandora "+ak+":"+base64.URLEncoding.EncodeToString(sign)
+	auth := "Pandora " + ak + ":" + base64.URLEncoding.EncodeToString(sign)
 	req.Header.Set(HTTPHeaderAuthorization, auth)
 
 	return nil
@@ -43,7 +43,7 @@ func SignQiniuHeader(header http.Header) (out string) {
 		sort.Sort(sortKey(keys))
 	}
 	for _, key := range keys {
-		out += "\n"+strings.ToLower(key)+":"+header.Get(key)
+		out += "\n" + strings.ToLower(key) + ":" + header.Get(key)
 	}
 	return
 }
@@ -64,7 +64,7 @@ func SignQiniuResource(url string, query url.Values) (out string) {
 		if i == 0 {
 			out += "?"
 		}
-		out += k+"="+query.Get(k)
+		out += k + "=" + query.Get(k)
 		if i != len(keys)-1 {
 			out += "&"
 		}

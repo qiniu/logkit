@@ -478,21 +478,21 @@ func createTestFile(fileName string, content string) {
 }
 
 func Test_ConvertDate(t *testing.T) {
-	date, err := ConvertDate("", "", 0, 1525422699)
+	date, err := ConvertDate("", "", 0, time.UTC, 1525422699)
 	assert.NoError(t, err)
 	expect, err := getTimeStr(int64(1525422699))
 	assert.NoError(t, err)
 	assert.Equal(t, expect, date)
 
-	date, err = ConvertDate("", "", 0, "Feb 05 01:02:03")
+	date, err = ConvertDate("", "", 0, time.UTC, "Feb 05 01:02:03")
 	assert.NoError(t, err)
 	assert.Equal(t, "0000-02-05T01:02:03Z", date)
 
-	date, err = ConvertDate("", "", 0, "19/Aug/2000:14:47:37 -0400")
+	date, err = ConvertDate("", "", 0, time.UTC, "19/Aug/2000:14:47:37 -0400")
 	assert.NoError(t, err)
 	assert.Equal(t, "2000-08-19T14:47:37-04:00", date)
 
-	date, err = ConvertDate("20060102150405", "", 0, "20180204221045")
+	date, err = ConvertDate("20060102150405", "", 0, time.UTC, "20180204221045")
 	assert.NoError(t, err)
 	assert.Equal(t, "2018-02-04T22:10:45Z", date)
 }
@@ -574,5 +574,307 @@ func TestGetMapList(t *testing.T) {
 	for _, c := range cases {
 		got := GetMapList(c.c)
 		assert.Equal(t, c.exp, got)
+	}
+}
+
+func TestPickMapValue(t *testing.T) {
+	var m = map[string]interface{}{"multi": map[string]interface{}{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}}
+
+	var exp = map[string]interface{}{"multi": map[string]interface{}{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}}
+	pick := map[string]interface{}{}
+	PickMapValue(m, pick, "multi")
+	assert.Equal(t, exp, pick)
+
+	exp = map[string]interface{}{"multi": map[string]interface{}{"abc": "x1 y2"}}
+	pick = map[string]interface{}{}
+	PickMapValue(m, pick, "multi", "abc")
+	assert.Equal(t, exp, pick)
+
+	exp = map[string]interface{}{"multi": map[string]interface{}{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}}
+	pick = map[string]interface{}{}
+	PickMapValue(m, pick, "multi", "abc")
+	PickMapValue(m, pick, "multi", "myword")
+	assert.Equal(t, exp, pick)
+
+	exp = map[string]interface{}{"multi": map[string]interface{}{"abc": "x1 y2"}}
+	pick = map[string]interface{}{}
+	PickMapValue(m, pick, "multi", "abc")
+	PickMapValue(m, pick, "multi", "otherword")
+	assert.Equal(t, exp, pick)
+
+	exp = map[string]interface{}{"multi": map[string]interface{}{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}}
+	pick = map[string]interface{}{}
+	PickMapValue(m, pick, "multi")
+	PickMapValue(m, pick, "multi", "otherword")
+	assert.Equal(t, exp, pick)
+
+	exp = map[string]interface{}{"multi": map[string]interface{}{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}}
+	pick = map[string]interface{}{}
+	PickMapValue(m, pick, "multi", "abc", "xxx")
+	PickMapValue(m, pick, "multi", "otherword")
+	assert.NotEqual(t, exp, pick)
+}
+
+func TestPandoraKey(t *testing.T) {
+	testKeys := []string{"@timestamp", ".dot", "percent%100", "^^^^^^^^^^", "timestamp"}
+	expectKeys := []string{"timestamp", "dot", "percent_100", "", "timestamp"}
+	expectValid := []bool{false, false, false, false, true}
+	for idx, key := range testKeys {
+		actual, valid := PandoraKey(key)
+		assert.Equal(t, expectKeys[idx], actual)
+		assert.Equal(t, expectValid[idx], valid)
+	}
+}
+
+func TestCheckPandoraKey(t *testing.T) {
+	testKeys := []string{"@timestamp", ".dot", "percent%100", "^^^^^^^^^^", "timestamp"}
+	expectValid := []bool{false, false, false, false, true}
+	for idx, key := range testKeys {
+		valid := CheckPandoraKey(key)
+		assert.Equal(t, expectValid[idx], valid)
+	}
+}
+
+func BenchmarkPandoraKey(b *testing.B) {
+	b.ReportAllocs()
+	testKeys := []string{"@timestamp", ".dot", "percent%100", "^^^^^^^^^^", "timestamp", "aaa"}
+	for i := 0; i < b.N; i++ {
+		for _, key := range testKeys {
+			PandoraKey(key)
+		}
+	}
+}
+
+func BenchmarkCheckPandoraKey(b *testing.B) {
+	b.ReportAllocs()
+	testKeys := []string{"@timestamp", ".dot", "percent%100", "^^^^^^^^^^", "timestamp", "aaa"}
+	for i := 0; i < b.N; i++ {
+		for _, key := range testKeys {
+			CheckPandoraKey(key)
+		}
+	}
+}
+
+//1000000          1493 ns/op          32 B/op           2 allocs/op
+func BenchmarkDeepConvertKey(b *testing.B) {
+	b.ReportAllocs()
+	testDatas := []map[string]interface{}{
+		{
+			"@timestamp": "2018-07-18T10:17:36.549054846+08:00",
+		},
+		{
+			".dot": map[string]interface{}{".dot2": "dot"},
+		},
+		{
+			"dot":         map[string]interface{}{".dot2": "dot"},
+			"percent%100": 100,
+			"^^^^^^^^^^":  "mytest",
+		},
+		{
+			"timestamp": "2018-07-18T10:17:36.549054846+08:00",
+		},
+		{
+			"dot": map[string]interface{}{"dot2": "dot"},
+		},
+		{
+			"dot":        map[string]interface{}{"dot2": "dot"},
+			"percent100": 100,
+			"axsxs":      "mytest",
+		},
+		{
+			"timestamp": "2018-07-18T10:17:36.549054846+08:00",
+			//"timestamp":  "2018-07-19T10:17:36.549054846+08:00",
+		},
+		{
+			"dot": map[string]interface{}{"dot2": "dot"},
+		},
+		{
+			"dot":        map[string]interface{}{"dot2": "dot"},
+			"percent100": 100,
+			"axsxs":      "mytest",
+		},
+		{
+			"timestamp": "2018-07-18T10:17:36.549054846+08:00",
+		},
+		{
+			"dot": map[string]interface{}{"dot2": "dot"},
+		},
+		{
+			"dot":        map[string]interface{}{"dot2": "dot"},
+			"percent100": 100,
+			"axsxs":      "mytest",
+		},
+	}
+	for i := 0; i < b.N; i++ {
+		for _, data := range testDatas {
+			DeepConvertKey(data)
+		}
+	}
+}
+
+func TestDeepConvertKey(t *testing.T) {
+	testDatas := []map[string]interface{}{
+		{
+			"@timestamp": "2018-07-18T10:17:36.549054846+08:00",
+		},
+		{
+			".dot": map[string]interface{}{".dot2": "dot"},
+		},
+		{
+			"dot":         map[string]interface{}{".dot2": "dot"},
+			"percent%100": 100,
+			"^^^^^^^^^^":  "mytest",
+		},
+	}
+	expectDatas := []map[string]interface{}{
+		{
+			"timestamp": "2018-07-18T10:17:36.549054846+08:00",
+		},
+		{
+			"dot": map[string]interface{}{"dot2": "dot"},
+		},
+		{
+			"dot":         map[string]interface{}{"dot2": "dot"},
+			"percent_100": 100,
+			"":            "mytest",
+		},
+	}
+
+	for idx, data := range testDatas {
+		actual := DeepConvertKey(data)
+		assert.Equal(t, expectDatas[idx], actual)
+	}
+}
+
+func TestDeepConvertKeyWithCache(t *testing.T) {
+	testDatas := []map[string]interface{}{
+		{
+			"@timestamp": "2018-07-18T10:17:36.549054846+08:00",
+		},
+		{
+			".dot": map[string]interface{}{".dot2": "dot"},
+		},
+		{
+			"dot":         map[string]interface{}{".dot2": "dot"},
+			"percent%100": 100,
+			"^^^^^^^^^^":  "mytest",
+		},
+	}
+	expectDatas := []map[string]interface{}{
+		{
+			"timestamp": "2018-07-18T10:17:36.549054846+08:00",
+		},
+		{
+			"dot": map[string]interface{}{"dot2": "dot"},
+		},
+		{
+			"dot":         map[string]interface{}{"dot2": "dot"},
+			"percent_100": 100,
+			"":            "mytest",
+		},
+	}
+	cache := make(map[string]KeyInfo)
+	for idx, data := range testDatas {
+		actual := DeepConvertKeyWithCache(data, cache)
+		assert.Equal(t, expectDatas[idx], actual)
+	}
+}
+
+func Test_DeepConvertKey(t *testing.T) {
+	testDatas := []Data{
+		{
+			"a.....b": "a.....b",
+			"b":       true,
+		},
+		{
+			"....a+b": []string{"a", "b", "....a+b"},
+			"abc":     "abc",
+		},
+		{
+			"a": Data{"a-=b++": "a-=b++"},
+			"b": Data{"--ab": Data{"abc++": "abc++"}},
+		},
+		{
+			"a": map[string]interface{}{"b:1": 123},
+		},
+	}
+	expectDatas := []map[string]interface{}{
+		{
+			"a_____b": "a.....b",
+			"b":       true,
+		},
+		{
+			"a_b": []string{"a", "b", "....a+b"},
+			"abc": "abc",
+		},
+		{
+			"a": Data{"a__b__": "a-=b++"},
+			"b": Data{"ab": map[string]interface{}{"abc__": "abc++"}},
+		},
+		{
+			"a": map[string]interface{}{"b_1": 123},
+		},
+	}
+
+	for idx, testData := range testDatas {
+		actualData := DeepConvertKey(testData)
+		assert.Equal(t, expectDatas[idx], actualData, fmt.Sprintf("index %v", idx))
+	}
+}
+
+//1000000          1647 ns/op           0 B/op           0 allocs/op
+func BenchmarkDeepConvertKeyWithCache(b *testing.B) {
+	b.ReportAllocs()
+	testDatas := []map[string]interface{}{
+		{
+			"@timestamp": "2018-07-18T10:17:36.549054846+08:00",
+		},
+		{
+			".dot": map[string]interface{}{".dot2": "dot"},
+		},
+		{
+			"dot":         map[string]interface{}{".dot2": "dot"},
+			"percent%100": 100,
+			"^^^^^^^^^^":  "mytest",
+		},
+		{
+			"timestamp": "2018-07-18T10:17:36.549054846+08:00",
+		},
+		{
+			"dot": map[string]interface{}{"dot2": "dot"},
+		},
+		{
+			"dot":        map[string]interface{}{"dot2": "dot"},
+			"percent100": 100,
+			"axsxs":      "mytest",
+		},
+		{
+			"timestamp": "2018-07-18T10:17:36.549054846+08:00",
+		},
+		{
+			"dot": map[string]interface{}{"dot2": "dot"},
+		},
+		{
+			"dot":        map[string]interface{}{"dot2": "dot"},
+			"percent100": 100,
+			"axsxs":      "mytest",
+		},
+		{
+			"timestamp": "2018-07-18T10:17:36.549054846+08:00",
+		},
+		{
+			"dot": map[string]interface{}{"dot2": "dot"},
+		},
+		{
+			"dot":        map[string]interface{}{"dot2": "dot"},
+			"percent100": 100,
+			"axsxs":      "mytest",
+		},
+	}
+	cache := make(map[string]KeyInfo)
+	for i := 0; i < b.N; i++ {
+		for _, data := range testDatas {
+			DeepConvertKeyWithCache(data, cache)
+		}
 	}
 }

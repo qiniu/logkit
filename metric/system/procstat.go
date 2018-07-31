@@ -132,7 +132,7 @@ type Procstat struct {
 }
 
 // KeyProcUsages TypeMetricProc 中的字段名称
-var KeyProcUsages = []models.KeyValue{}
+var KeyProcUsages = models.KeyValueSlice{}
 
 // ConfigProcUsages TypeMetricProc 配置项的描述
 var ConfigProcUsages = []models.Option{
@@ -663,7 +663,7 @@ func (p *Procstat) childProcess(name string) (pids []PID, err error) {
 func runCommand(comm string) (pids []PID, err error) {
 	out, err := exec.Command("bash", "-c", comm).Output()
 	if err != nil {
-		return pids, fmt.Errorf("exec command %v error %v", comm, err)
+		return pids, fmt.Errorf("exec command %v error [%v]: %s", comm, err, string(out))
 	}
 	return ParseOutput(string(out))
 }

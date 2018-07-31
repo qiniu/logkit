@@ -7,10 +7,27 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var (
+	_ transforms.StatsTransformer = &Discarder{}
+	_ transforms.Transformer      = &Discarder{}
+	_ transforms.Initializer      = &Discarder{}
+)
+
 type Discarder struct {
 	Key       string `json:"key"`
 	StageTime string `json:"stage"`
 	stats     StatsInfo
+
+	discardKeys [][]string
+}
+
+func (g *Discarder) Init() error {
+	discardKeys := strings.Split(g.Key, ",")
+	g.discardKeys = make([][]string, len(discardKeys))
+	for i := range g.discardKeys {
+		g.discardKeys[i] = GetKeys(discardKeys[i])
+	}
+	return nil
 }
 
 func (g *Discarder) RawTransform(datas []string) ([]string, error) {
@@ -21,23 +38,22 @@ func (g *Discarder) RawTransform(datas []string) ([]string, error) {
 		}
 		ret = append(ret, datas[i])
 	}
-	g.stats.Success += int64(len(datas))
+
+	g.stats, _ = transforms.SetStatsInfo(nil, g.stats, 0, int64(len(datas)), g.Type())
 	return ret, nil
 }
 
 func (g *Discarder) Transform(datas []Data) ([]Data, error) {
-	var ferr error
-	errnums := 0
-	discardKeys := strings.Split(g.Key, ",")
-	for _, v := range discardKeys {
-		keys := GetKeys(v)
+	if g.discardKeys == nil {
+		g.Init()
+	}
+	for _, keys := range g.discardKeys {
 		for i := range datas {
 			DeleteMapValue(datas[i], keys...)
 		}
 	}
-	g.stats.Errors += int64(errnums)
-	g.stats.Success += int64(len(datas) - errnums)
-	return datas, ferr
+	g.stats, _ = transforms.SetStatsInfo(nil, g.stats, 0, int64(len(datas)), g.Type())
+	return datas, nil
 }
 
 func (g *Discarder) Description() string {
@@ -71,6 +87,11 @@ func (g *Discarder) Stage() string {
 }
 
 func (g *Discarder) Stats() StatsInfo {
+	return g.stats
+}
+
+func (g *Discarder) SetStats(err string) StatsInfo {
+	g.stats.LastError = err
 	return g.stats
 }
 

@@ -41,7 +41,6 @@ func TestFormat(t *testing.T) {
 }
 
 func TestStrToTime(t *testing.T) {
-
 	zoneName, zoneValue := GetTimeZone()
 	if len(zoneValue) > 0 {
 		zoneValue += " " + zoneName
@@ -74,7 +73,41 @@ func TestStrToTime(t *testing.T) {
 			t.Error(err)
 		}
 		if !time.Equal(testCase.time) {
-			t.Errorf("(expected) %v != %v (actual)", time, testCase.time)
+			t.Errorf("(expected) %v != %v (actual)", testCase.time, time)
+		}
+	}
+}
+
+func TestStrToTimeLocal(t *testing.T) {
+	var testCases = []test{
+		{
+			time.Date(2012, 11, 22, 21, 28, 10, 0, time.Local),
+			"",
+			"2012-11-22 21:28:10",
+		},
+		{
+			time.Date(2012, 11, 22, 0, 0, 0, 0, time.Local),
+			"",
+			"2012/11/22",
+		},
+		{
+			time.Date(2012, 11, 22, 21, 28, 10, 0, time.Local),
+			"",
+			"2012-11-22 21:28:10",
+		},
+		{
+			time.Date(2016, 10, 20, 17, 20, 30, 600000000, time.Local),
+			"",
+			"2016/10/20 17:20:30.600000",
+		},
+	}
+	for _, testCase := range testCases {
+		time, err := StrToTimeLocation(testCase.strTime, time.Local)
+		if err != nil {
+			t.Error(err)
+		}
+		if !time.Equal(testCase.time) {
+			t.Errorf("(expected) %v != %v (actual)", testCase.time, time)
 		}
 	}
 }

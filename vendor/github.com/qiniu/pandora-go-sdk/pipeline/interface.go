@@ -45,6 +45,10 @@ type PipelineAPI interface {
 
 	PostData(*PostDataInput) error
 
+	PostTextData(input *PostTextDataInput) error
+
+	PostRawtextData(input *PostRawtextDataInput) error
+
 	PostLargeData(*PostDataInput, time.Duration) (Points, error)
 
 	PostDataSchemaFree(input *SchemaFreeInput) (map[string]RepoSchemaEntry, error)

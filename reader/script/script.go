@@ -2,6 +2,7 @@ package script
 
 import (
 	"errors"
+	"fmt"
 	"os/exec"
 	"strings"
 	"sync"
@@ -11,10 +12,15 @@ import (
 	"github.com/robfig/cron"
 
 	"github.com/qiniu/log"
-
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/utils/models"
+)
+
+var (
+	_ reader.DaemonReader = &Reader{}
+	_ reader.StatsReader  = &Reader{}
+	_ reader.Reader       = &Reader{}
 )
 
 func init() {
@@ -22,221 +28,274 @@ func init() {
 }
 
 type Reader struct {
+	meta *reader.Meta
+	// Note: 原子操作，用于表示 reader 整体的运行状态
+	status int32
+	// Note: 原子操作，用于表示获取数据的线程运行状态，只可能是 StatusInit 和 StatusRunning
+	routineStatus int32
+
+	stopChan chan struct{}
+	readChan chan []byte
+	errChan  chan error
+
+	stats     StatsInfo
+	statsLock sync.RWMutex
+
 	realpath   string // 处理文件路径
 	originpath string
 	scripttype string
 
-	Cron *cron.Cron //定时任务
-
-	readChan chan []byte
-
-	meta *reader.Meta
-
-	status  int32
-	mux     sync.Mutex
-	started bool
-
-	execOnStart  bool
-	loop         bool
+	isLoop       bool
 	loopDuration time.Duration
-
-	stats     StatsInfo
-	statsLock sync.RWMutex
+	execOnStart  bool
+	Cron         *cron.Cron //定时任务
 }
 
-func NewReader(meta *reader.Meta, conf conf.MapConf) (sr reader.Reader, err error) {
+func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	path, _ := conf.GetStringOr(reader.KeyLogPath, "")
 	originPath := path
 
-	for {
-		path, err = checkPath(meta, path)
-		if err != nil {
-			continue
-		}
-		break
+	var err error
+	path, err = checkPath(meta, path)
+	if err != nil {
+		return nil, err
 	}
 
 	cronSchedule, _ := conf.GetStringOr(reader.KeyScriptCron, "")
 	execOnStart, _ := conf.GetBoolOr(reader.KeyScriptExecOnStart, true)
 	scriptType, _ := conf.GetStringOr(reader.KeyExecInterpreter, "bash")
-	ssr := &Reader{
-		originpath:  originPath,
-		realpath:    path,
-		scripttype:  scriptType,
-		Cron:        cron.New(),
-		readChan:    make(chan []byte),
-		meta:        meta,
-		status:      reader.StatusInit,
-		mux:         sync.Mutex{},
-		started:     false,
-		execOnStart: execOnStart,
-		statsLock:   sync.RWMutex{},
+	r := &Reader{
+		meta:          meta,
+		status:        reader.StatusInit,
+		routineStatus: reader.StatusInit,
+		stopChan:      make(chan struct{}),
+		readChan:      make(chan []byte),
+		errChan:       make(chan error),
+		originpath:    originPath,
+		realpath:      path,
+		scripttype:    scriptType,
+		execOnStart:   execOnStart,
+		Cron:          cron.New(),
 	}
 
-	//schedule    string     //定时任务配置串
+	// 定时任务配置串
 	if len(cronSchedule) > 0 {
 		cronSchedule = strings.ToLower(cronSchedule)
 		if strings.HasPrefix(cronSchedule, reader.Loop) {
-			ssr.loop = true
-			ssr.loopDuration, err = reader.ParseLoopDuration(cronSchedule)
+			r.isLoop = true
+			r.loopDuration, err = reader.ParseLoopDuration(cronSchedule)
 			if err != nil {
-				log.Errorf("Runner[%v] %v %v", ssr.meta.RunnerName, ssr.Name(), err)
-				err = nil
+				log.Errorf("Runner[%v] %v %v", r.meta.RunnerName, r.Name(), err)
+			}
+			if r.loopDuration.Nanoseconds() <= 0 {
+				r.loopDuration = 1 * time.Second
 			}
 		} else {
-			err = ssr.Cron.AddFunc(cronSchedule, ssr.run)
+			err = r.Cron.AddFunc(cronSchedule, r.run)
 			if err != nil {
-				return
+				return nil, err
 			}
-			log.Infof("Runner[%v] %v Cron job added with schedule <%v>", ssr.meta.RunnerName, ssr.Name(), cronSchedule)
+			log.Infof("Runner[%v] %v Cron job added with schedule <%v>", r.meta.RunnerName, r.Name(), cronSchedule)
 		}
 	}
-	return ssr, nil
+	return r, nil
 }
 
-func (sr *Reader) ReadLine() (data string, err error) {
-	if !sr.started {
-		sr.Start()
-	}
-	timer := time.NewTimer(time.Second)
-	select {
-	case dat := <-sr.readChan:
-		data = string(dat)
-	case <-timer.C:
-	}
-	timer.Stop()
-	return
+func (r *Reader) isStopping() bool {
+	return atomic.LoadInt32(&r.status) == reader.StatusStopping
 }
 
-//Start 仅调用一次，借用ReadLine启动，不能在new实例的时候启动，会有并发问题
-func (sr *Reader) Start() {
-	sr.mux.Lock()
-	defer sr.mux.Unlock()
-	if sr.started {
+func (r *Reader) hasStopped() bool {
+	return atomic.LoadInt32(&r.status) == reader.StatusStopped
+}
+
+func (r *Reader) Name() string {
+	return "ScriptFile: " + r.originpath
+}
+
+func (r *Reader) SetMode(mode string, v interface{}) error {
+	return errors.New("script reader does not support read mode")
+}
+
+func (r *Reader) setStatsError(err string) {
+	r.statsLock.Lock()
+	defer r.statsLock.Unlock()
+	r.stats.LastError = err
+}
+
+func (r *Reader) sendError(err error) {
+	if err == nil {
 		return
 	}
-	if sr.loop {
-		go sr.LoopRun()
-	} else {
-		sr.Cron.Start()
-		if sr.execOnStart {
-			go sr.run()
-		}
-	}
-	sr.started = true
-	log.Infof("Runner[%v] %v pull data deamon started", sr.meta.RunnerName, sr.Name())
-}
-
-func (sr *Reader) Name() string {
-	return "ScriptFile:" + sr.originpath
-}
-
-func (sr *Reader) Source() string {
-	return sr.originpath
-}
-
-func (sr *Reader) SetMode(mode string, v interface{}) error {
-	return errors.New("ScriptReader not support readmode")
-}
-
-func (sr *Reader) SyncMeta() {}
-
-func (sr *Reader) Close() (err error) {
-	sr.Cron.Stop()
-	if atomic.CompareAndSwapInt32(&sr.status, reader.StatusRunning, reader.StatusStopping) {
-		log.Infof("Runner[%v] %v stopping", sr.meta.RunnerName, sr.Name())
-	} else {
-		close(sr.readChan)
-	}
-	return
-}
-
-func (sr *Reader) LoopRun() {
-	for {
-		if atomic.LoadInt32(&sr.status) == reader.StatusStopped {
-			return
-		}
-		//run 函数里面处理stopping的逻辑
-		sr.run()
-		time.Sleep(sr.loopDuration)
-	}
-}
-
-func (sr *Reader) run() {
-	var err error
-	// 防止并发run
-	for {
-		if atomic.LoadInt32(&sr.status) == reader.StatusStopped {
-			return
-		}
-		if atomic.CompareAndSwapInt32(&sr.status, reader.StatusInit, reader.StatusRunning) {
-			break
-		}
-	}
-
-	// running时退出 状态改为Init，以便 cron 调度下次运行
-	// stopping时推出改为 stopped，不再运行
 	defer func() {
-		atomic.CompareAndSwapInt32(&sr.status, reader.StatusRunning, reader.StatusInit)
-		if atomic.CompareAndSwapInt32(&sr.status, reader.StatusStopping, reader.StatusStopped) {
-			close(sr.readChan)
-		}
-		if err == nil {
-			log.Infof("Runner[%v] %v successfully finished", sr.meta.RunnerName, sr.Name())
+		if rec := recover(); rec != nil {
+			log.Errorf("Reader %q was panicked and recovered from %v", r.Name(), rec)
 		}
 	}()
-
-	// 开始work逻辑
-	for {
-		if atomic.LoadInt32(&sr.status) == reader.StatusStopping {
-			log.Warnf("Runner[%v] %v stopped from running", sr.meta.RunnerName, sr.Name())
-			return
-		}
-		err = sr.exec()
-		if err == nil {
-			log.Infof("Runner[%v] %v successfully exec", sr.meta.RunnerName, sr.Name())
-			return
-		}
-		log.Error("Runner[%v] %v execute script error [%v]", sr.meta.RunnerName, sr.Name(), err)
-		sr.setStatsError(err.Error())
-		time.Sleep(3 * time.Second)
-	}
+	r.errChan <- err
 }
 
-func (sr *Reader) exec() (err error) {
-	sr.mux.Lock()
-	defer sr.mux.Unlock()
-	command := exec.Command(sr.scripttype, sr.realpath) //初始化Cmd
-
-	res, err := command.Output()
-	if err != nil {
-		return err
+func (r *Reader) Start() error {
+	if r.isStopping() || r.hasStopped() {
+		return errors.New("reader is stopping or has stopped")
+	} else if !atomic.CompareAndSwapInt32(&r.status, reader.StatusInit, reader.StatusRunning) {
+		log.Warnf("Runner[%v] %q daemon has already started and is running", r.meta.RunnerName, r.Name())
+		return nil
 	}
-	sr.readChan <- res
+
+	if r.isLoop {
+		go func() {
+			ticker := time.NewTicker(r.loopDuration)
+			defer ticker.Stop()
+			for {
+				r.run()
+
+				select {
+				case <-r.stopChan:
+					atomic.StoreInt32(&r.status, reader.StatusStopped)
+					log.Infof("Runner[%v] %q daemon has stopped from running", r.meta.RunnerName, r.Name())
+					return
+				case <-ticker.C:
+				}
+			}
+		}()
+
+	} else {
+		if r.execOnStart {
+			go r.run()
+		}
+		r.Cron.Start()
+	}
+	log.Infof("Runner[%v] %q daemon has started", r.meta.RunnerName, r.Name())
 	return nil
 }
 
-func (sr *Reader) setStatsError(err string) {
-	sr.statsLock.Lock()
-	defer sr.statsLock.Unlock()
-	sr.stats.LastError = err
+func (r *Reader) Source() string {
+	return r.originpath
+}
+
+func (r *Reader) ReadLine() (string, error) {
+	timer := time.NewTimer(time.Second)
+	defer timer.Stop()
+	select {
+	case data := <-r.readChan:
+		return string(data), nil
+	case err := <-r.errChan:
+		return "", err
+	case <-timer.C:
+	}
+
+	return "", nil
+}
+
+func (r *Reader) Status() StatsInfo {
+	r.statsLock.RLock()
+	defer r.statsLock.RUnlock()
+	return r.stats
+}
+
+func (r *Reader) SyncMeta() {}
+
+func (r *Reader) Close() error {
+	if !atomic.CompareAndSwapInt32(&r.status, reader.StatusRunning, reader.StatusStopping) {
+		log.Warnf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
+		return nil
+	}
+	log.Debugf("Runner[%v] %q daemon is stopping", r.meta.RunnerName, r.Name())
+	close(r.stopChan)
+
+	r.Cron.Stop()
+
+	// 如果此时没有 routine 正在运行，则在此处关闭数据管道，否则由 routine 在退出时负责关闭
+	if atomic.LoadInt32(&r.routineStatus) != reader.StatusRunning {
+		close(r.readChan)
+		close(r.errChan)
+	}
+	return nil
+}
+
+func (r *Reader) run() {
+	// 当上个任务还未执行完成的时候直接跳过
+	if !atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusInit, reader.StatusRunning) {
+		errMsg := fmt.Sprintf("Runner[%v] %q daemon is still working on last task, this task will not be executed and is skipped this time", r.meta.RunnerName, r.Name())
+		log.Error(errMsg)
+		if !r.isLoop {
+			// 通知上层 Cron 执行间隔可能过短或任务执行时间过长
+			r.sendError(errors.New(errMsg))
+		}
+		return
+	}
+	defer func() {
+		// 如果 reader 在 routine 运行时关闭，则需要此 routine 负责关闭数据管道
+		if r.isStopping() || r.hasStopped() {
+			close(r.readChan)
+			close(r.errChan)
+		}
+		atomic.StoreInt32(&r.routineStatus, reader.StatusInit)
+	}()
+
+	// 如果执行失败，最多重试 10 次
+	for i := 1; i <= 10; i++ {
+		// 判断上层是否已经关闭，先判断 routineStatus 再判断 status 可以保证同时只有一个 r.run 会运行到此处
+		if r.isStopping() || r.hasStopped() {
+			log.Warnf("Runner[%v] %q daemon has stopped, task is interrupted", r.meta.RunnerName, r.Name())
+			return
+		}
+
+		err := r.exec()
+		if err == nil {
+			log.Infof("Runner[%v] %q task has been successfully executed", r.meta.RunnerName, r.Name())
+			return
+		}
+
+		log.Errorf("Runner[%v] %q task execution failed: %v ", r.meta.RunnerName, r.Name(), err)
+		r.setStatsError(err.Error())
+		r.sendError(err)
+
+		if r.isLoop {
+			return // 循环执行的任务上层逻辑已经等同重试
+		}
+		time.Sleep(3 * time.Second)
+	}
+	log.Errorf("Runner[%v] %q task execution failed and gave up after 10 tries", r.meta.RunnerName, r.Name())
+}
+
+func (r *Reader) exec() error {
+	res, err := exec.Command(r.scripttype, r.realpath).Output()
+	if err != nil {
+		return err
+	}
+	r.readChan <- res
+	return nil
 }
 
 func checkPath(meta *reader.Meta, path string) (string, error) {
 	for {
 		realPath, fileInfo, err := GetRealPath(path)
-		if err != nil || fileInfo == nil {
+		if err != nil {
 			log.Warnf("Runner[%v] %s - utils.GetRealPath failed, err:%v", meta.RunnerName, path, err)
-			time.Sleep(time.Minute)
+			time.Sleep(1 * time.Minute)
+			continue
+		}
+
+		if fileInfo == nil {
+			log.Warnf("Runner[%v] %s - utils.GetRealPath file info nil ", meta.RunnerName, path)
+			time.Sleep(1 * time.Minute)
+			continue
 		}
 
 		fileMode := fileInfo.Mode()
 		if !fileMode.IsRegular() {
-			log.Warnf("Runner[%v] %s - file failed, err: file is not regular", meta.RunnerName, path)
-			time.Sleep(time.Minute)
-			continue
+			err = fmt.Errorf("Runner[%v] %s - file failed, err: file is not regular ", meta.RunnerName, path)
+			return "", err
 		}
-		CheckFileMode(realPath, fileMode)
+
+		err = CheckFileMode(realPath, fileMode)
+		if err != nil {
+			err = fmt.Errorf("Runner[%v] %s - file failed, err: %v ", meta.RunnerName, path, err)
+			return "", err
+		}
+
 		return realPath, nil
 	}
 }

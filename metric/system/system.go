@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"net"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/metric"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -21,17 +23,23 @@ const (
 	KeySystemNCpus        = "system_n_cpus"
 	KeySystemUptime       = "system_uptime"
 	KeySystemUptimeFormat = "system_uptime_format"
+	KeySystemNNetCards    = "system_n_net_cards"
+	KeySystemNDisks       = "system_n_disks"
+	KeySystemNServices    = "system_n_services"
 )
 
 // KeySystemUsages TypeMetricSystem的字段名称
-var KeySystemUsages = []KeyValue{
-	{KeySystemLoad1, "1分钟平均load值"},
-	{KeySystemLoad5, "5分钟平均load值"},
-	{KeySystemLoad15, "15分钟平均load值"},
-	{KeySystemNUsers, "用户数"},
-	{KeySystemNCpus, "CPU核数"},
-	{KeySystemUptime, "系统启动时间"},
-	{KeySystemUptimeFormat, "格式化的系统启动时间"},
+var KeySystemUsages = KeyValueSlice{
+	{KeySystemLoad1, "1分钟平均load值", ""},
+	{KeySystemLoad5, "5分钟平均load值", ""},
+	{KeySystemLoad15, "15分钟平均load值", ""},
+	{KeySystemNUsers, "用户数", ""},
+	{KeySystemNCpus, "CPU核数", ""},
+	{KeySystemUptime, "系统启动时间", ""},
+	{KeySystemUptimeFormat, "格式化的系统启动时间", ""},
+	{KeySystemNNetCards, "网卡数", ""},
+	{KeySystemNDisks, "磁盘数", ""},
+	{KeySystemNServices, "总服务数", ""},
 }
 
 type SystemStats struct {
@@ -84,4 +92,19 @@ func formatUptime(uptime uint64) string {
 
 	w.Flush()
 	return buf.String()
+}
+
+func getNumNetCard() int {
+	var macAddress []string
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		log.Errorf("Can not get local interface info:%s", err)
+		return 0
+	}
+	for _, inter := range interfaces {
+		if (inter.Flags&net.FlagUp) > 0 && (inter.Flags&net.FlagBroadcast) > 0 {
+			macAddress = append(macAddress, inter.HardwareAddr.String())
+		}
+	}
+	return len(macAddress)
 }

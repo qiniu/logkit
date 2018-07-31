@@ -7,9 +7,11 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/json-iterator/go"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/reader/http"
@@ -17,11 +19,7 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-func TestHttpSender(t *testing.T) {
-	c := conf.MapConf{
-		reader.KeyHTTPServiceAddress: ":8000",
-		reader.KeyHTTPServicePath:    "/logkit/data",
-	}
+func TestHTTPSender(t *testing.T) {
 	readConf := conf.MapConf{
 		reader.KeyMetaPath: "./meta",
 		reader.KeyFileDone: "./meta",
@@ -31,17 +29,25 @@ func TestHttpSender(t *testing.T) {
 	meta, err := reader.NewMetaWithConf(readConf)
 	assert.NoError(t, err)
 	defer os.RemoveAll("./meta")
+
+	c := conf.MapConf{
+		reader.KeyHTTPServiceAddress: ":8000",
+		reader.KeyHTTPServicePath:    "/logkit/data",
+	}
 	reader, err := http.NewReader(meta, c)
 	httpReader := reader.(*http.Reader)
 	assert.NoError(t, err)
-	err = httpReader.Start()
-	assert.NoError(t, err)
+	assert.NoError(t, httpReader.Start())
 	defer httpReader.Close()
 
+	// CI 环境启动监听较慢，需要等待几秒
+	time.Sleep(3 * time.Second)
+
 	testData := []struct {
-		input   []Data
-		jsonExp [][]string
-		csvExp  []map[string]string
+		input       []Data
+		jsonExp     [][]string
+		csvExp      []map[string]string
+		bodyJSONExp string
 	}{
 		{
 			input: []Data{
@@ -108,6 +114,7 @@ func TestHttpSender(t *testing.T) {
 					"e": "",
 				},
 			},
+			bodyJSONExp: `[{"a":1,"b":true,"c":"1","e":1.43,"d":{"a1":1,"b1":true,"c1":"1","d1":{}}},{"b":true,"c":"1","d":{"b1":true,"c1":"1","d1":{},"a1":1},"a":1}]`,
 		},
 	}
 
@@ -252,6 +259,38 @@ func TestHttpSender(t *testing.T) {
 		got, err := httpReader.ReadLine()
 		assert.NoError(t, err)
 		assert.Equal(t, "", got)
+	}
+
+	// gzip = true, protocol = body_json, csvHead = false
+	senderConf = conf.MapConf{
+		sender.KeyHttpSenderGzip:     "true",
+		sender.KeyHttpSenderCsvSplit: "\t",
+		sender.KeyHttpSenderProtocol: "body_json",
+		sender.KeyHttpSenderCsvHead:  "false",
+		KeyRunnerName:                "testRunner",
+		sender.KeyHttpSenderUrl:      "127.0.0.1:8000/logkit/data",
+	}
+	httpSender, err = NewSender(senderConf)
+	assert.NoError(t, err)
+
+	for _, val := range testData {
+		err = httpSender.Send(val.input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := httpReader.ReadLine()
+		assert.NoError(t, err)
+		var exps, datas []Data
+
+		err = jsoniter.Unmarshal([]byte(got), &datas)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = jsoniter.Unmarshal([]byte(val.bodyJSONExp), &exps)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, exps, datas)
 	}
 }
 

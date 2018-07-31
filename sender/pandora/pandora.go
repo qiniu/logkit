@@ -1,6 +1,7 @@
 package pandora
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -30,6 +31,11 @@ import (
 
 var osInfo = []string{KeyCore, KeyHostName, KeyOsInfo, KeyLocalIp}
 
+const (
+	SendTypeRaw    = "raw"
+	SendTypeNormal = "normal"
+)
+
 // pandora sender
 type Sender struct {
 	client             pipeline.PipelineAPI
@@ -41,6 +47,7 @@ type Sender struct {
 	opt                PandoraOption
 	microsecondCounter uint64
 	extraInfo          map[string]string
+	sendType           string
 }
 
 // UserSchema was parsed pandora schema from user's raw schema
@@ -58,6 +65,8 @@ type Tokens struct {
 
 // PandoraOption 创建Pandora Sender的选项
 type PandoraOption struct {
+	sendType string
+
 	runnerName     string
 	name           string
 	repoName       string
@@ -89,12 +98,16 @@ type PandoraOption struct {
 	tsdbTimestamp  string
 	tsdbSeriesTags map[string][]string
 
-	enableKodo   bool
-	bucketName   string
-	email        string
-	prefix       string
-	format       string
-	kodoCompress bool
+	enableKodo         bool
+	bucketName         string
+	email              string
+	prefix             string
+	format             string
+	kodoCompress       bool
+	kodoRotateStrategy string
+	kodoRotateInterval int
+	kodoRotateSize     int
+	kodoFileRetention  int
 
 	forceMicrosecond   bool
 	forceDataConvert   bool
@@ -185,6 +198,11 @@ func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
 	format, _ := conf.GetStringOr(sender.KeyPandoraKodoCompressPrefix, "parquet")
 	prefix, _ := conf.GetStringOr(sender.KeyPandoraKodoFilePrefix, "logkitauto/date=$(year)-$(mon)-$(day)/hour=$(hour)/min=$(min)/$(sec)")
 	compress, _ := conf.GetBoolOr(sender.KeyPandoraKodoGzip, false)
+	kodoRotateStrategy, _ := conf.GetStringOr(sender.KeyPandoraKodoRotateStrategy, "interval")
+	kodoRotateSize, _ := conf.GetIntOr(sender.KeyPandoraKodoRotateSize, 500*1024)
+	kodoRotateSize = kodoRotateSize * 1024
+	kodoRotateInterval, _ := conf.GetIntOr(sender.KeyPandoraKodoRotateInterval, 10*60)
+	kodoFileRetention, _ := conf.GetIntOr(sender.KeyPandoraKodoFileRetention, 0)
 
 	forceconvert, _ := conf.GetBoolOr(sender.KeyForceDataConvert, false)
 	ignoreInvalidField, _ := conf.GetBoolOr(sender.KeyIgnoreInvalidField, true)
@@ -194,6 +212,8 @@ func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
 	numberUseFloat, _ := conf.GetBoolOr(sender.KeyNumberUseFloat, false)
 	unescape, _ := conf.GetBoolOr(sender.KeyPandoraUnescape, false)
 	insecureServer, _ := conf.GetBoolOr(sender.KeyInsecureServer, false)
+
+	sendType, _ := conf.GetStringOr(sender.KeyPandoraSendType, SendTypeNormal)
 
 	var subErr error
 	var tokens Tokens
@@ -206,16 +226,17 @@ func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
 		log.Error(err)
 		return
 	}
-	// 当 schema free 为 false 时，需要自动创建 pandora_stash 字段
+	// 当 schema free 为 false 时，需要自动创建 pandora_stash 字段，需要自动创建 pandora_separate_id 字段
 	if !schemaFree {
 		if autoCreateSchema == "" {
-			autoCreateSchema = fmt.Sprintf("%v string", KeyPandoraStash)
+			autoCreateSchema = fmt.Sprintf("%v string,%v string", KeyPandoraStash, KeyPandoraSeparateId)
 		} else {
-			autoCreateSchema += fmt.Sprintf(",%v string", KeyPandoraStash)
+			autoCreateSchema += fmt.Sprintf(",%v string,%v string", KeyPandoraStash, KeyPandoraSeparateId)
 		}
 	}
 
 	opt := &PandoraOption{
+		sendType:       sendType,
 		runnerName:     runnerName,
 		name:           name,
 		workflowName:   workflowName,
@@ -246,12 +267,16 @@ func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
 		tsdbendpoint:   tsdbHost,
 		tsdbTimestamp:  tsdbTimestamp,
 
-		enableKodo:   enableKodo,
-		email:        email,
-		bucketName:   kodobucketName,
-		format:       format,
-		prefix:       prefix,
-		kodoCompress: compress,
+		enableKodo:         enableKodo,
+		email:              email,
+		bucketName:         kodobucketName,
+		format:             format,
+		prefix:             prefix,
+		kodoCompress:       compress,
+		kodoRotateStrategy: kodoRotateStrategy,
+		kodoRotateInterval: kodoRotateInterval,
+		kodoRotateSize:     kodoRotateSize,
+		kodoFileRetention:  kodoFileRetention,
 
 		forceMicrosecond:   forceMicrosecond,
 		forceDataConvert:   forceconvert,
@@ -391,23 +416,7 @@ func (s *Sender) TokenRefresh(mapConf conf.MapConf) error {
 
 func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 	logger := pipelinebase.NewDefaultLogger()
-	config := pipeline.NewConfig().
-		WithPipelineEndpoint(opt.endpoint).
-		WithAccessKeySecretKey(opt.ak, opt.sk).
-		WithLogger(logger).
-		WithLoggerLevel(pipelinebase.LogInfo).
-		WithRequestRateLimit(opt.reqRateLimit).
-		WithFlowRateLimit(opt.flowRateLimit).
-		WithGzipData(opt.gzip).
-		WithHeaderUserAgent(opt.useragent).WithInsecureServer(opt.insecureServer)
-	if opt.logdbendpoint != "" {
-		config = config.WithLogDBEndpoint(opt.logdbendpoint)
-	}
-	client, err := pipeline.New(config)
-	if err != nil {
-		err = fmt.Errorf("cannot init pipelineClient %v", err)
-		return
-	}
+
 	if opt.reqRateLimit > 0 {
 		log.Warnf("Runner[%v] Sender[%v]: you have limited send speed within %v requests/s", opt.runnerName, opt.name, opt.reqRateLimit)
 	}
@@ -417,11 +426,11 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 	userSchema := parseUserSchema(opt.repoName, opt.schema)
 	s = &Sender{
 		opt:        *opt,
-		client:     client,
 		alias2key:  make(map[string]string),
 		UserSchema: userSchema,
 		schemas:    make(map[string]pipeline.RepoSchemaEntry),
 		extraInfo:  utilsos.GetExtraInfo(),
+		sendType:   opt.sendType,
 	}
 
 	expandAttr := make([]string, 0)
@@ -447,6 +456,34 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 		s.opt.analyzerInfo.FullText = true
 	}
 	s.opt.expandAttr = expandAttr
+
+	//如果是Raw类型，那么没有固定的ak、sk和repo
+	if opt.sendType == SendTypeRaw {
+		return s, nil
+	}
+
+	/*
+		以下是 repo 创建相关的，raw类型的不需要处理
+	*/
+
+	config := pipeline.NewConfig().
+		WithPipelineEndpoint(opt.endpoint).
+		WithAccessKeySecretKey(opt.ak, opt.sk).
+		WithLogger(logger).
+		WithLoggerLevel(pipelinebase.LogInfo).
+		WithRequestRateLimit(opt.reqRateLimit).
+		WithFlowRateLimit(opt.flowRateLimit).
+		WithGzipData(opt.gzip).
+		WithHeaderUserAgent(opt.useragent).WithInsecureServer(opt.insecureServer)
+	if opt.logdbendpoint != "" {
+		config = config.WithLogDBEndpoint(opt.logdbendpoint)
+	}
+	client, err := pipeline.New(config)
+	if err != nil {
+		err = fmt.Errorf("cannot init pipelineClient %v", err)
+		return
+	}
+	s.client = client
 
 	dsl := strings.TrimSpace(opt.autoCreate)
 	schemas, err := pipeline.DSLtoSchema(dsl)
@@ -477,7 +514,7 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 			},
 			ToKODO: s.opt.enableKodo,
 			AutoExportToKODOInput: pipeline.AutoExportToKODOInput{
-				Retention:            30,
+				Retention:            s.opt.kodoFileRetention,
 				RepoName:             s.opt.repoName,
 				BucketName:           s.opt.bucketName,
 				Email:                s.opt.email,
@@ -545,6 +582,9 @@ func parseUserSchema(repoName, schema string) (us UserSchema) {
 }
 
 func (s *Sender) UpdateSchemas() {
+	if s.opt.sendType == SendTypeRaw {
+		return
+	}
 	schemas, err := s.client.GetUpdateSchemasWithInput(
 		&pipeline.GetRepoInput{
 			RepoName:     s.opt.repoName,
@@ -806,6 +846,145 @@ func (s *Sender) checkSchemaUpdate() {
 }
 
 func (s *Sender) Send(datas []Data) (se error) {
+	switch s.sendType {
+	case SendTypeRaw:
+		return s.rawSend(datas)
+	default:
+		return s.schemaFreeSend(datas)
+	}
+	return nil
+}
+
+func (s *Sender) rawSend(datas []Data) (se error) {
+	for idx, v := range datas {
+		if v["_repo"] == nil || v["_raw"] == nil || v["_ak"] == nil || v["_sk"] == nil {
+			errinfo := "_repo or _raw or _ak or _sk not found"
+			return &StatsError{
+				ErrorDetail: errors.New(errinfo),
+				StatsInfo: StatsInfo{
+					Success:   int64(idx),
+					Errors:    int64(len(datas[idx:]) - idx),
+					LastError: errinfo,
+				},
+				RemainDatas: datas[idx:],
+			}
+		}
+		repoName, ok := v["_repo"].(string)
+		if !ok {
+			errinfo := "_repo not string type"
+			return &StatsError{
+				ErrorDetail: errors.New(errinfo),
+				StatsInfo: StatsInfo{
+					Success:   int64(idx),
+					Errors:    int64(len(datas) - idx),
+					LastError: errinfo,
+				},
+				RemainDatas: datas[idx:],
+			}
+		}
+		raw, ok := v["_raw"].([]byte)
+		if !ok {
+			str, sok := v["_raw"].(string)
+			if !sok {
+				errinfo := "_raw not []byte or string type"
+				return &StatsError{
+					ErrorDetail: errors.New(errinfo),
+					StatsInfo: StatsInfo{
+						Success:   int64(idx),
+						Errors:    int64(len(datas[idx:])),
+						LastError: errinfo,
+					},
+					RemainDatas: datas[idx:],
+				}
+			}
+
+			decodeBytes, err := base64.StdEncoding.DecodeString(str)
+			if err != nil {
+				errinfo := "can not unbase 64 raw, err = " + err.Error()
+				return &StatsError{
+					ErrorDetail: errors.New(errinfo),
+					StatsInfo: StatsInfo{
+						Success:   int64(idx),
+						Errors:    int64(len(datas[idx:])),
+						LastError: errinfo,
+					},
+					RemainDatas: datas[idx:],
+				}
+			}
+			raw = decodeBytes
+		}
+		ak, ok := v["_ak"].(string)
+		if !ok {
+			errinfo := "_ak not string type"
+			return &StatsError{
+				ErrorDetail: errors.New(errinfo),
+				StatsInfo: StatsInfo{
+					Success:   int64(idx),
+					Errors:    int64(len(datas[idx:])),
+					LastError: errinfo,
+				},
+				RemainDatas: datas[idx:],
+			}
+		}
+		sk, ok := v["_sk"].(string)
+		if !ok {
+			errinfo := "_sk not string type"
+			return &StatsError{
+				ErrorDetail: errors.New(errinfo),
+				StatsInfo: StatsInfo{
+					Success:   int64(idx),
+					Errors:    int64(len(datas[idx:])),
+					LastError: errinfo,
+				},
+				RemainDatas: datas[idx:],
+			}
+		}
+
+		config := pipeline.NewConfig().
+			WithPipelineEndpoint(s.opt.endpoint).
+			WithAccessKeySecretKey(ak, sk).
+			WithLogger(pipelinebase.NewDefaultLogger()).
+			WithLoggerLevel(pipelinebase.LogInfo).
+			WithRequestRateLimit(s.opt.reqRateLimit).
+			WithFlowRateLimit(s.opt.flowRateLimit).
+			WithGzipData(s.opt.gzip).
+			WithHeaderUserAgent(s.opt.useragent).WithInsecureServer(s.opt.insecureServer)
+		client, err := pipeline.New(config)
+		if err != nil {
+			err = fmt.Errorf("cannot init pipelineClient %v", err)
+			return &StatsError{
+				ErrorDetail: err,
+				StatsInfo: StatsInfo{
+					Success:   int64(idx),
+					Errors:    int64(len(datas[idx:]) - idx),
+					LastError: err.Error(),
+				},
+				RemainDatas: datas[idx:],
+			}
+		}
+
+		err = client.PostDataFromBytes(&pipeline.PostDataFromBytesInput{RepoName: repoName, Buffer: raw})
+		if err != nil {
+			return &StatsError{
+				ErrorDetail: err,
+				StatsInfo: StatsInfo{
+					Success:   int64(idx),
+					Errors:    int64(len(datas) - idx),
+					LastError: err.Error(),
+				},
+				RemainDatas: datas[idx:],
+			}
+		}
+	}
+	return &StatsError{
+		StatsInfo: StatsInfo{
+			Success: int64(len(datas)),
+			Errors:  0,
+		},
+	}
+}
+
+func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 	s.checkSchemaUpdate()
 	if !s.opt.schemaFree && (len(s.schemas) <= 0 || len(s.alias2key) <= 0) {
 		se = reqerr.NewSendError("Get pandora schema error, failed to send data", sender.ConvertDatasBack(datas), reqerr.TypeDefault)
@@ -859,13 +1038,16 @@ func (s *Sender) Send(datas []Data) (se error) {
 			},
 			ToKODO: s.opt.enableKodo,
 			AutoExportToKODOInput: pipeline.AutoExportToKODOInput{
-				Retention:            30,
+				Retention:            s.opt.kodoFileRetention,
 				RepoName:             s.opt.repoName,
 				BucketName:           s.opt.bucketName,
 				Email:                s.opt.email,
 				Prefix:               s.opt.prefix,
 				Format:               s.opt.format,
 				Compress:             s.opt.kodoCompress,
+				RotateStrategy:       s.opt.kodoRotateStrategy,
+				RotateInterval:       s.opt.kodoRotateInterval,
+				RotateSize:           s.opt.kodoRotateSize,
 				AutoExportKodoTokens: s.opt.tokens.KodoTokens,
 			},
 			ToTSDB: s.opt.enableTsdb,

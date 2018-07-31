@@ -18,6 +18,14 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+const (
+	SendProtocalCSV       = "csv"
+	SendProtocalJson      = "json"
+	SendProtocalWholeJson = "body_json"
+)
+
+var _ sender.SkipDeepCopySender = &Sender{}
+
 type Sender struct {
 	url      string
 	gZip     bool
@@ -45,14 +53,16 @@ func NewSender(c conf.MapConf) (sender.Sender, error) {
 	gZip, _ := c.GetBoolOr(sender.KeyHttpSenderGzip, true)
 	csvHead, _ := c.GetBoolOr(sender.KeyHttpSenderCsvHead, true)
 	csvSplit, _ := c.GetStringOr(sender.KeyHttpSenderCsvSplit, "\t")
-	protocol, _ := c.GetStringOr(sender.KeyHttpSenderProtocol, "json")
+	protocol, _ := c.GetStringOr(sender.KeyHttpSenderProtocol, SendProtocalJson)
 	runnerName, _ := c.GetStringOr(KeyRunnerName, sender.UnderfinedRunnerName)
 
-	if protocol == "csv" && csvSplit == "" {
-		csvSplit = "\t"
-	}
-
-	if protocol != "json" && protocol != "csv" {
+	switch protocol {
+	case SendProtocalCSV:
+		if csvSplit == "" {
+			csvSplit = "\t"
+		}
+	case SendProtocalJson, SendProtocalWholeJson:
+	default:
 		return nil, fmt.Errorf("runner[%v] create sender error, protocol %v is not support", runnerName, protocol)
 	}
 
@@ -68,18 +78,22 @@ func NewSender(c conf.MapConf) (sender.Sender, error) {
 }
 
 func (h *Sender) Name() string {
-	return "httpSender<" + h.url + ">"
+	return "httpSender_" + h.url + "_"
 }
 
 func (h *Sender) Send(data []Data) (err error) {
 	var sendBytes []byte
 	switch h.protocol {
-	case "json":
+	case SendProtocalJson:
 		if sendBytes, err = h.convertToJsonBytes(data); err != nil {
 			return
 		}
-	case "csv":
+	case SendProtocalCSV:
 		if sendBytes, err = h.convertToCsvBytes(data); err != nil {
+			return
+		}
+	case SendProtocalWholeJson:
+		if sendBytes, err = jsoniter.Marshal(data); err != nil {
 			return
 		}
 	default:
@@ -160,8 +174,7 @@ func (h *Sender) sendData(byteData []byte) (err error) {
 		req.Header.Set(ContentTypeHeader, ApplicationGzip)
 		req.Header.Set(ContentEncodingHeader, "gzip")
 	} else {
-		req.Header.Set(ContentTypeHeader, ApplicationJson)
-		req.Header.Set(ContentEncodingHeader, "json")
+		req.Header.Set(ContentTypeHeader, TestPlain)
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -210,3 +223,5 @@ func (h *Sender) interfaceJoin(dataArray []interface{}, sep string) (string, err
 	}
 	return strings.Join(strData, sep), nil
 }
+
+func (_ *Sender) SkipDeepCopy() bool { return true }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/queue"
 	. "github.com/qiniu/logkit/utils/models"
+	"github.com/qiniu/logkit/utils/reqid"
 )
 
 const (
@@ -25,24 +27,28 @@ const (
 	maxBytesPerFile   = 100 * mb
 	qNameSuffix       = "_local_save"
 	directSuffix      = "_direct"
-	defaultMaxProcs   = 1 // 默认没有并发
+	defaultMaxProcs   = 1         // 默认没有并发
+	DefaultSplitSize  = 64 * 1024 // 默认分割为 64 kb
 )
+
+var _ SkipDeepCopySender = &FtSender{}
 
 // FtSender fault tolerance sender wrapper
 type FtSender struct {
-	stopped     int32
-	exitChan    chan struct{}
-	innerSender Sender
-	logQueue    queue.BackendQueue
-	BackupQueue queue.BackendQueue
-	writeLimit  int // 写入速度限制，单位MB
-	strategy    string
-	procs       int //发送并发数
-	runnerName  string
-	opt         *FtOption
-	stats       StatsInfo
-	statsMutex  *sync.RWMutex
-	jsontool    jsoniter.API
+	stopped         int32
+	exitChan        chan struct{}
+	innerSender     Sender
+	logQueue        queue.BackendQueue
+	BackupQueue     queue.BackendQueue
+	writeLimit      int // 写入速度限制，单位MB
+	strategy        string
+	procs           int //发送并发数
+	runnerName      string
+	opt             *FtOption
+	stats           StatsInfo
+	statsMutex      *sync.RWMutex
+	jsontool        jsoniter.API
+	pandoraKeyCache map[string]KeyInfo
 }
 
 type FtOption struct {
@@ -53,6 +59,9 @@ type FtOption struct {
 	procs             int
 	memoryChannel     bool
 	memoryChannelSize int
+	longDataDiscard   bool
+	innerSenderType   string
+	pandoraSenderType string
 }
 
 type datasContext struct {
@@ -60,13 +69,16 @@ type datasContext struct {
 }
 
 // NewFtSender Fault tolerant sender constructor
-func NewFtSender(ftSender Sender, conf conf.MapConf, ftSaveLogPath string) (*FtSender, error) {
+func NewFtSender(innerSender Sender, conf conf.MapConf, ftSaveLogPath string) (*FtSender, error) {
 	memoryChannel, _ := conf.GetBoolOr(KeyFtMemoryChannel, false)
 	memoryChannelSize, _ := conf.GetIntOr(KeyFtMemoryChannelSize, 100)
 	logPath, _ := conf.GetStringOr(KeyFtSaveLogPath, ftSaveLogPath)
 	syncEvery, _ := conf.GetIntOr(KeyFtSyncEvery, DefaultFtSyncEvery)
 	writeLimit, _ := conf.GetIntOr(KeyFtWriteLimit, defaultWriteLimit)
 	strategy, _ := conf.GetStringOr(KeyFtStrategy, KeyFtStrategyBackupOnly)
+	longDataDiscard, _ := conf.GetBoolOr(KeyFtLongDataDiscard, false)
+	senderType, _ := conf.GetStringOr(KeySenderType, "") //此处不会没有SenderType，在调用NewFtSender时已经检查
+	pandoraSendType, _ := conf.GetStringOr(KeyPandoraSendType, "")
 	switch strategy {
 	case KeyFtStrategyAlwaysSave, KeyFtStrategyBackupOnly, KeyFtStrategyConcurrent:
 	default:
@@ -83,9 +95,12 @@ func NewFtSender(ftSender Sender, conf conf.MapConf, ftSaveLogPath string) (*FtS
 		procs:             procs,
 		memoryChannel:     memoryChannel,
 		memoryChannelSize: memoryChannelSize,
+		longDataDiscard:   longDataDiscard,
+		innerSenderType:   senderType,
+		pandoraSenderType: pandoraSendType,
 	}
 
-	return newFtSender(ftSender, runnerName, opt)
+	return newFtSender(innerSender, runnerName, opt)
 }
 
 func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSender, error) {
@@ -115,6 +130,10 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 		statsMutex:  new(sync.RWMutex),
 		jsontool:    jsoniter.Config{EscapeHTML: true, UseNumber: true}.Froze(),
 	}
+
+	if opt.innerSenderType == TypePandora {
+		ftSender.pandoraKeyCache = make(map[string]KeyInfo)
+	}
 	go ftSender.asyncSendLogFromDiskQueue()
 	return &ftSender, nil
 }
@@ -124,6 +143,17 @@ func (ft *FtSender) Name() string {
 }
 
 func (ft *FtSender) Send(datas []Data) error {
+
+	switch ft.opt.innerSenderType {
+	case TypePandora:
+		if ft.opt.pandoraSenderType != "raw" {
+			for i, v := range datas {
+				datas[i] = DeepConvertKeyWithCache(v, ft.pandoraKeyCache)
+			}
+		}
+	default:
+	}
+
 	se := &StatsError{Ft: true}
 	if ft.strategy == KeyFtStrategyBackupOnly {
 		// 尝试直接发送数据，当数据失败的时候会加入到本地重试队列。外部不需要重试
@@ -323,21 +353,26 @@ func (ft *FtSender) trySendDatas(datas []Data, failSleep int, isRetry bool) (bac
 }
 
 func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []*datasContext) {
-
 	failCtx := new(datasContext)
 	var binaryUnpack bool
+	var errMessage string
 	se, succ := err.(*reqerr.SendError)
 	if !succ {
 		// 如果不是SendError 默认所有的数据都发送失败
-		log.Infof("Runner[%v] Sender[%v] error type is not *SendError! reSend all datas by default", ft.runnerName, ft.innerSender.Name())
+		errMessage = "error type is not *SendError! reSend all datas by default"
 		failCtx.Datas = datas
 	} else {
 		failCtx.Datas = ConvertDatas(se.GetFailDatas())
 		if se.ErrorType == reqerr.TypeBinaryUnpack {
 			binaryUnpack = true
+			errMessage = "error type is binaryUnpack, will divid to 2 parts and retry"
+		} else if se.ErrorType == reqerr.TypeSchemaFreeRetry {
+			errMessage = "maybe this is because of server schema cache, will send all data again"
+		} else {
+			errMessage = "error type is default, will send all data again"
 		}
 	}
-	log.Errorf("Runner[%v] Sender[%v] cannot write points: %v, failDatas size: %v", ft.runnerName, ft.innerSender.Name(), err, len(failCtx.Datas))
+	log.Errorf("Runner[%v] Sender[%v] cannot write points: %v, failDatas size: %v, %s", ft.runnerName, ft.innerSender.Name(), err, len(failCtx.Datas), errMessage)
 	log.Debugf("Runner[%v] Sender[%v] failed datas [[%v]]", ft.runnerName, ft.innerSender.Name(), failCtx.Datas)
 	if binaryUnpack {
 		lens := len(failCtx.Datas) / 2
@@ -346,23 +381,102 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 			newFailCtx.Datas = failCtx.Datas[0:lens]
 			failCtx.Datas = failCtx.Datas[lens:]
 			retDatasContext = append(retDatasContext, newFailCtx)
-		} else if len(failCtx.Datas) == 1 {
-			// 此处将 data 改为 raw 放在 pandora_stash 中
-			if _, ok := failCtx.Datas[0][KeyPandoraStash]; !ok {
-				log.Infof("Runner[%v] Sender[%v] try to convert data to string", ft.runnerName, ft.innerSender.Name())
-				data := make([]Data, 1)
-				byteData, err := json.Marshal(failCtx.Datas[0])
+			retDatasContext = append(retDatasContext, failCtx)
+			return
+		}
+		if len(failCtx.Datas) == 1 {
+			failCtxData := failCtx.Datas[0]
+			// 小于 2M 时，放入 pandora_stash中
+			dataBytes, err := jsoniter.Marshal(failCtxData)
+			if err != nil {
+				retDatasContext = append(retDatasContext, failCtx)
+				return
+			}
+			if int64(len(string(dataBytes))) < DefaultMaxBatchSize {
+				// 此处将 data 改为 raw 放在 pandora_stash 中
+				if _, ok := failCtxData[KeyPandoraStash]; !ok {
+					log.Infof("Runner[%v] Sender[%v] try to convert data to string", ft.runnerName, ft.innerSender.Name())
+					byteData, err := json.Marshal(failCtx.Datas[0])
+					if err != nil {
+						log.Warnf("Runner[%v] marshal data to string error %v", ft.runnerName, err)
+					} else {
+						data := make([]Data, 1)
+						data[0] = Data{
+							KeyPandoraStash: string(byteData),
+						}
+						failCtx.Datas = data
+					}
+				}
+				retDatasContext = append(retDatasContext, failCtx)
+				return
+			}
+
+			if ft.opt.longDataDiscard {
+				log.Infof("Runner[%v] Sender[%v] discard long data (more than 2M), length: ", ft.runnerName, ft.innerSender.Name(), len(string(dataBytes)))
+				return
+			}
+
+			// 大于 2M 时，切片发送
+			remainData := make(Data, 0)
+			separateData := make(Data, 0)
+			for failCtxDataKey, failCtxDataVal := range failCtxData {
+				byteVal, err := json.Marshal(failCtxDataVal)
 				if err != nil {
 					log.Warnf("Runner[%v] marshal data to string error %v", ft.runnerName, err)
-				} else {
-					data[0] = Data{
-						KeyPandoraStash: string(byteData),
-					}
-					failCtx.Datas = data
+				}
+
+				if len(byteVal) < DefaultMaxBatchSize {
+					remainData[failCtxDataKey] = failCtxDataVal
+					continue
+				}
+
+				_, ok := failCtxDataVal.(string)
+				if ok {
+					separateData[failCtxDataKey] = failCtxDataVal
 				}
 			}
+
+			// failCtxData 的 key value 中找到 string 类型的 value 大于 2M，进行切片
+			if len(separateData) != 0 {
+				newFailCtx := new(datasContext)
+				for separateDataKey, separateDataVal := range separateData {
+					strVal, _ := separateDataVal.(string)
+					valArray := SplitData(strVal, int64(DefaultSplitSize))
+
+					separateId := reqid.Gen()
+					for idx, val := range valArray {
+						retData := make(Data, 0)
+						for remainDataKey, remainDataVal := range remainData {
+							retData[remainDataKey] = remainDataVal
+						}
+						retData[KeyPandoraSeparateId] = separateId + "_" + separateDataKey + "_" + strconv.Itoa(idx)
+						retData[separateDataKey] = val
+						newFailCtx.Datas = append(newFailCtx.Datas, retData)
+					}
+				}
+				retDatasContext = append(retDatasContext, newFailCtx)
+				return
+			}
+
+			// failCtxData 的 key value 中未找到 string 类型且大于 2M 的 value
+			// 此时将 failCtxData 进行 Marshal 之后进行切片，放入pandaora_stash中
+			valArray := SplitData(string(dataBytes), int64(DefaultSplitSize))
+			newFailCtx := new(datasContext)
+			separateId := reqid.Gen()
+			for idx, val := range valArray {
+				data := Data{
+					KeyPandoraStash:      val,
+					KeyPandoraSeparateId: separateId + "_" + strconv.Itoa(idx),
+				}
+				newFailCtx.Datas = append(newFailCtx.Datas, data)
+			}
+			retDatasContext = append(retDatasContext, newFailCtx)
+			return
 		}
+
+		return
 	}
+
 	retDatasContext = append(retDatasContext, failCtx)
 	return
 }
@@ -412,4 +526,35 @@ func (ft *FtSender) sendFromQueue(queueName string, readChan <-chan []byte, read
 			curIdx = 0
 		}
 	}
+}
+
+func (ft *FtSender) SkipDeepCopy() bool {
+	ss, ok := ft.innerSender.(SkipDeepCopySender)
+	if ok {
+		return ss.SkipDeepCopy()
+	}
+	return false
+}
+
+func SplitData(data string, splitSize int64) (valArray []string) {
+	if splitSize <= 0 {
+		return []string{data}
+	}
+
+	valArray = make([]string, 0)
+	dataConverse := []rune(data)
+	lenData := int64(len(dataConverse)) / splitSize
+
+	for i := int64(1); i <= lenData; i++ {
+		start := (i - 1) * splitSize
+		end := i * splitSize
+		valArray = append(valArray, string(dataConverse[start:end]))
+	}
+
+	end := lenData * splitSize
+	remainData := string(dataConverse[end:])
+	if len(remainData) != 0 {
+		valArray = append(valArray, string(dataConverse[end:]))
+	}
+	return valArray
 }

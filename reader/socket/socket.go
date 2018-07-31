@@ -18,6 +18,11 @@ import (
 	"github.com/qiniu/logkit/reader"
 )
 
+var (
+	_ reader.DaemonReader = &Reader{}
+	_ reader.Reader       = &Reader{}
+)
+
 type setReadBufferer interface {
 	SetReadBuffer(bytes int) error
 }
@@ -35,7 +40,8 @@ func (ssr *streamSocketReader) listen() {
 
 	defer func() {
 		if atomic.CompareAndSwapInt32(&ssr.status, reader.StatusStopping, reader.StatusStopped) {
-			close(ssr.ReadChan)
+			close(ssr.readChan)
+			close(ssr.errChan)
 		}
 	}()
 	for {
@@ -112,15 +118,22 @@ func (ssr *streamSocketReader) read(c net.Conn) {
 		if atomic.LoadInt32(&ssr.status) == reader.StatusStopped || atomic.LoadInt32(&ssr.status) == reader.StatusStopping {
 			return
 		}
-		ssr.ReadChan <- string(scnr.Bytes())
+		ssr.readChan <- scnr.Bytes()
 	}
 
 	if err := scnr.Err(); err != nil {
-		if err, ok := err.(net.Error); ok && err.Timeout() {
-			log.Debugf("streamSocketReader Timeout : %s", err)
-		} else if !strings.HasSuffix(err.Error(), ": use of closed network connection") {
-			log.Error(err)
+		if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
+			log.Errorf("streamSocketReader Timeout : %s", nErr)
 		}
+		if !strings.HasSuffix(err.Error(), ": use of closed network connection") {
+			log.Error(err)
+			//可能reader都已经close了，channel也关了，直接return
+			return
+		}
+		if atomic.LoadInt32(&ssr.status) == reader.StatusStopped || atomic.LoadInt32(&ssr.status) == reader.StatusStopping {
+			return
+		}
+		ssr.sendError(err)
 	}
 }
 
@@ -134,7 +147,8 @@ func (psr *packetSocketReader) listen() {
 
 	defer func() {
 		if atomic.CompareAndSwapInt32(&psr.status, reader.StatusStopping, reader.StatusStopped) {
-			close(psr.ReadChan)
+			close(psr.readChan)
+			close(psr.errChan)
 		}
 	}()
 
@@ -147,13 +161,14 @@ func (psr *packetSocketReader) listen() {
 			if !strings.HasSuffix(err.Error(), ": use of closed network connection") {
 				log.Error(err)
 			}
+			psr.sendError(err)
 			break
 		}
 		// double check
 		if atomic.LoadInt32(&psr.status) == reader.StatusStopped || atomic.LoadInt32(&psr.status) == reader.StatusStopping {
 			return
 		}
-		psr.ReadChan <- string(buf[:n])
+		psr.readChan <- buf[:n]
 	}
 }
 
@@ -162,142 +177,21 @@ func init() {
 }
 
 type Reader struct {
+	meta *reader.Meta
+	// Note: 原子操作，用于表示 reader 整体的运行状态
+	status int32
+
+	readChan chan []byte
+	errChan  chan error
+
 	netproto        string
 	ServiceAddress  string
 	MaxConnections  int
 	ReadBufferSize  int
 	ReadTimeout     time.Duration
 	KeepAlivePeriod time.Duration
-	status          int32
-	meta            *reader.Meta // 记录offset的元数据
 
-	// resource need  close
-	ReadChan chan string
-	Closer   io.Closer
-}
-
-func (sr *Reader) Name() string {
-	return "SocketReader<" + sr.ServiceAddress + ">"
-}
-
-func (sr *Reader) Source() string {
-	return sr.ServiceAddress
-}
-
-func (sr *Reader) SetMode(mode string, v interface{}) error {
-	return errors.New("SocketReader not support readmode")
-}
-
-func (sr *Reader) SyncMeta() {
-	//FIXME 网络监听存在丢包可能性，无法保证不丢包
-	return
-}
-
-func (sr *Reader) ReadLine() (data string, err error) {
-	if atomic.LoadInt32(&sr.status) == reader.StatusInit {
-		err = sr.Start()
-		if err != nil {
-			log.Error(err)
-		}
-	}
-	timer := time.NewTimer(time.Second)
-	select {
-	case dat := <-sr.ReadChan:
-		data = string(dat)
-	case <-timer.C:
-	}
-	timer.Stop()
-	return
-}
-
-func (sr *Reader) Start() error {
-
-	if !atomic.CompareAndSwapInt32(&sr.status, reader.StatusInit, reader.StatusRunning) {
-		return errors.New("socketReader aleady started")
-	}
-
-	spl := strings.SplitN(sr.ServiceAddress, "://", 2)
-	if len(spl) != 2 {
-		return fmt.Errorf("invalid service address: %s", sr.ServiceAddress)
-	}
-	sr.netproto = spl[0]
-	if spl[0] == "unix" || spl[0] == "unixpacket" || spl[0] == "unixgram" {
-		// 通过remove来检测套接字文件是否存在
-		os.Remove(spl[1])
-	}
-
-	switch spl[0] {
-	case "tcp", "tcp4", "tcp6", "unix", "unixpacket":
-		l, err := net.Listen(spl[0], spl[1])
-		if err != nil {
-			return err
-		}
-
-		if sr.ReadBufferSize > 0 {
-			if srb, ok := l.(setReadBufferer); ok {
-				srb.SetReadBuffer(sr.ReadBufferSize)
-			} else {
-				log.Warnf("Unable to set read buffer on a %s socket", spl[0])
-			}
-		}
-
-		ssr := &streamSocketReader{
-			Listener: l,
-			Reader:   sr,
-		}
-
-		sr.Closer = l
-		go ssr.listen()
-	case "udp", "udp4", "udp6", "ip", "ip4", "ip6", "unixgram":
-		pc, err := net.ListenPacket(spl[0], spl[1])
-		if err != nil {
-			return err
-		}
-
-		if sr.ReadBufferSize > 0 {
-			if srb, ok := pc.(setReadBufferer); ok {
-				srb.SetReadBuffer(sr.ReadBufferSize)
-			} else {
-				log.Warnf("Unable to set read buffer on a %s socket", spl[0])
-			}
-		}
-
-		psr := &packetSocketReader{
-			PacketConn: pc,
-			Reader:     sr,
-		}
-
-		sr.Closer = pc
-		go psr.listen()
-	default:
-		return fmt.Errorf("unknown protocol '%s' in '%s'", spl[0], sr.ServiceAddress)
-	}
-
-	if spl[0] == "unix" || spl[0] == "unixpacket" || spl[0] == "unixgram" {
-		sr.Closer = unixCloser{path: spl[1], closer: sr.Closer}
-	}
-
-	return nil
-}
-
-func (sr *Reader) Close() error {
-	if atomic.CompareAndSwapInt32(&sr.status, reader.StatusRunning, reader.StatusStopping) {
-		log.Infof("Runner[%v] Reader[%v] stopping", sr.meta.RunnerName, sr.Name())
-	} else {
-		atomic.CompareAndSwapInt32(&sr.status, reader.StatusInit, reader.StatusStopped)
-		close(sr.ReadChan)
-	}
-
-	var err error
-	if sr.Closer != nil {
-		err = sr.Closer.Close()
-		sr.Closer = nil
-
-		// Make a connection meant to fail but unblock and release the port
-		net.Dial(sr.netproto, sr.ServiceAddress)
-	}
-	log.Infof("Runner[%v] Reader[%v] stopped ", sr.meta.RunnerName, sr.Name())
-	return err
+	closer io.Closer
 }
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
@@ -320,15 +214,156 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		return nil, err
 	}
 	return &Reader{
+		meta:            meta,
+		status:          reader.StatusInit,
+		readChan:        make(chan []byte),
+		errChan:         make(chan error),
 		ServiceAddress:  ServiceAddress,
 		MaxConnections:  MaxConnections,
 		ReadBufferSize:  ReadBufferSize,
 		ReadTimeout:     ReadTimeoutdur,
 		KeepAlivePeriod: KeepAlivePeriodDur,
-		ReadChan:        make(chan string),
-		status:          reader.StatusInit,
-		meta:            meta,
 	}, nil
+}
+
+func (r *Reader) isStopping() bool {
+	return atomic.LoadInt32(&r.status) == reader.StatusStopping
+}
+
+func (r *Reader) hasStopped() bool {
+	return atomic.LoadInt32(&r.status) == reader.StatusStopped
+}
+
+func (r *Reader) Name() string {
+	return "SocketReader<" + r.ServiceAddress + ">"
+}
+
+func (_ *Reader) SetMode(_ string, _ interface{}) error {
+	return errors.New("socket reader does not support read mode")
+}
+
+func (r *Reader) sendError(err error) {
+	if err == nil {
+		return
+	}
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Errorf("Reader %q was panicked and recovered from %v", r.Name(), rec)
+		}
+	}()
+	r.errChan <- err
+}
+
+func (r *Reader) Start() error {
+	if r.isStopping() || r.hasStopped() {
+		return errors.New("reader is stopping or has stopped")
+	} else if !atomic.CompareAndSwapInt32(&r.status, reader.StatusInit, reader.StatusRunning) {
+		log.Warnf("Runner[%v] %q daemon has already started and is running", r.meta.RunnerName, r.Name())
+		return nil
+	}
+
+	spl := strings.SplitN(r.ServiceAddress, "://", 2)
+	if len(spl) != 2 {
+		return fmt.Errorf("invalid service address: %s", r.ServiceAddress)
+	}
+	r.netproto = spl[0]
+	if spl[0] == "unix" || spl[0] == "unixpacket" || spl[0] == "unixgram" {
+		// 通过remove来检测套接字文件是否存在
+		os.Remove(spl[1])
+	}
+
+	switch spl[0] {
+	case "tcp", "tcp4", "tcp6", "unix", "unixpacket":
+		l, err := net.Listen(spl[0], spl[1])
+		if err != nil {
+			return err
+		}
+
+		if r.ReadBufferSize > 0 {
+			if srb, ok := l.(setReadBufferer); ok {
+				srb.SetReadBuffer(r.ReadBufferSize)
+			} else {
+				log.Warnf("Unable to set read buffer on a %s socket", spl[0])
+			}
+		}
+
+		ssr := &streamSocketReader{
+			Listener: l,
+			Reader:   r,
+		}
+
+		r.closer = l
+		go ssr.listen()
+	case "udp", "udp4", "udp6", "ip", "ip4", "ip6", "unixgram":
+		pc, err := net.ListenPacket(spl[0], spl[1])
+		if err != nil {
+			return err
+		}
+
+		if r.ReadBufferSize > 0 {
+			if srb, ok := pc.(setReadBufferer); ok {
+				srb.SetReadBuffer(r.ReadBufferSize)
+			} else {
+				log.Warnf("Unable to set read buffer on a %s socket", spl[0])
+			}
+		}
+
+		psr := &packetSocketReader{
+			PacketConn: pc,
+			Reader:     r,
+		}
+
+		r.closer = pc
+		go psr.listen()
+	default:
+		return fmt.Errorf("unknown protocol '%s' in '%s'", spl[0], r.ServiceAddress)
+	}
+
+	if spl[0] == "unix" || spl[0] == "unixpacket" || spl[0] == "unixgram" {
+		r.closer = unixCloser{path: spl[1], closer: r.closer}
+	}
+
+	return nil
+}
+
+func (r *Reader) Source() string {
+	return r.ServiceAddress
+}
+
+func (r *Reader) ReadLine() (string, error) {
+	timer := time.NewTimer(time.Second)
+	defer timer.Stop()
+	select {
+	case data := <-r.readChan:
+		return string(data), nil
+	case <-timer.C:
+	}
+
+	return "", nil
+}
+
+func (r *Reader) SyncMeta() {
+	//FIXME 网络监听存在丢包可能性，无法保证不丢包
+}
+
+func (r *Reader) Close() error {
+	if !atomic.CompareAndSwapInt32(&r.status, reader.StatusRunning, reader.StatusStopping) {
+		log.Warnf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
+		return nil
+	}
+	log.Debugf("Runner[%v] %q daemon is stopping", r.meta.RunnerName, r.Name())
+
+	var err error
+	if r.closer != nil {
+		err = r.closer.Close()
+		r.closer = nil
+
+		// Make a connection meant to fail but unblock and release the port
+		net.Dial(r.netproto, r.ServiceAddress)
+	}
+	atomic.StoreInt32(&r.status, reader.StatusStopped)
+	log.Infof("Runner[%v] %q daemon has stopped from running", r.meta.RunnerName, r.Name())
+	return err
 }
 
 type unixCloser struct {

@@ -31,11 +31,11 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (r reader.Reader, err error
 	}
 	switch mode {
 	case reader.ModeTailx:
-		r, err = tailx.NewReader(meta, conf)
+		return tailx.NewReader(meta, conf)
 	case reader.ModeDir:
-		r, err = reader.NewFileDirReader(meta, conf)
+		return reader.NewFileDirReader(meta, conf)
 	case reader.ModeFile:
-		r, err = reader.NewSingleFileReader(meta, conf)
+		return reader.NewSingleFileReader(meta, conf)
 	default:
 		err = fmt.Errorf("can not find property mode for this logpath %v", logpath)
 	}
@@ -60,7 +60,7 @@ func matchMode(logpath string) (path, mode string, err error) {
 		return
 	}
 	if fileInfo.IsDir() == true {
-		if shoudUseModeDir(path) {
+		if shouldUseModeDir(path) {
 			mode = reader.ModeDir
 		} else {
 			mode = reader.ModeTailx
@@ -72,7 +72,7 @@ func matchMode(logpath string) (path, mode string, err error) {
 	return
 }
 
-func shoudUseModeDir(logpath string) bool {
+func shouldUseModeDir(logpath string) bool {
 	files, err := ioutil.ReadDir(logpath)
 	if err != nil {
 		log.Warn("read dir %v error %v", logpath, err)

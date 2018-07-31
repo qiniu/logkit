@@ -10,6 +10,8 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var _ sender.SkipDeepCopySender = &Sender{}
+
 // mock sender is used for debug
 type Sender struct {
 	name  string
@@ -60,3 +62,5 @@ func (mock *Sender) SendCount() int {
 	defer mock.mux.Unlock()
 	return mock.count
 }
+
+func (_ *Sender) SkipDeepCopy() bool { return true }

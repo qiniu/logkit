@@ -2,7 +2,6 @@ package syslog
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -150,11 +149,10 @@ func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 			se.AddErrors()
 			se.ErrorDetail = err
 			se.LastError = err.Error()
-			if !p.disableRecordErrData {
-				errData := make(Data)
-				errData[KeyPandoraStash] = line
-				datas = append(datas, errData)
-			} else {
+			if d != nil {
+				datas = append(datas, d)
+			}
+			if p.disableRecordErrData {
 				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			}
 			continue
@@ -176,24 +174,29 @@ func (p *SyslogParser) parse(line string) (data Data, err error) {
 	if p.buff.Len() > 0 {
 		if line == parser.PandoraParseFlushSignal {
 			return p.Flush()
-		} else if p.curline >= p.maxline || p.format.IsNewLine([]byte(line)) {
+		}
+
+		if p.curline >= p.maxline || p.format.IsNewLine([]byte(line)) {
 			data, err = p.Flush()
+			if err != nil {
+				return data, err
+			}
 		} else {
 			p.curline++
 		}
 	}
-	var serr error
+
 	if line != parser.PandoraParseFlushSignal {
-		_, serr = p.buff.Write([]byte(line))
-	}
-	if serr != nil {
+		_, err = p.buff.Write([]byte(line))
 		if err != nil {
-			err = errors.New(err.Error() + serr.Error())
-		} else {
-			err = serr
+			if !p.disableRecordErrData {
+				data = Data{KeyPandoraStash: string(p.buff.Bytes())}
+			}
+			return data, err
 		}
 	}
-	return
+
+	return data, nil
 }
 
 func (p *SyslogParser) Flush() (data Data, err error) {
@@ -206,10 +209,13 @@ func (p *SyslogParser) Flush() (data Data, err error) {
 		if p.curline == p.maxline {
 			err = fmt.Errorf("syslog meet max line %v, try to parse err %v, check if this is standard rfc3164/rfc5424 syslog", p.maxline, err)
 		}
+		if !p.disableRecordErrData {
+			data = Data{KeyPandoraStash: string(p.buff.Bytes())}
+		}
 	}
 	p.curline = 0
 	p.buff.Reset()
-	return
+	return data, err
 }
 
 type RFC6587 struct{}

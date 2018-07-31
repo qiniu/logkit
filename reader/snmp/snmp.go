@@ -3,6 +3,7 @@ package snmp
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"math"
 	"net"
@@ -20,14 +21,36 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/utils/models"
+)
+
+var (
+	_ reader.DaemonReader = &Reader{}
+	_ reader.DataReader   = &Reader{}
+	_ reader.Reader       = &Reader{}
 )
 
 func init() {
 	reader.RegisterConstructor(reader.ModeSnmp, NewReader)
 }
 
+type readInfo struct {
+	data  Data
+	bytes int64
+}
+
 // Reader holds the configuration for the plugin.
 type Reader struct {
+	meta *reader.Meta
+	// Note: 原子操作，用于表示 reader 整体的运行状态
+	status int32
+	// Note: 原子操作，用于表示获取数据的线程运行状态，只可能是 StatusInit 和 StatusRunning
+	routineStatus int32
+
+	stopChan chan struct{}
+	readChan chan readInfo
+	errChan  chan error
+
 	SnmpName       string
 	Agents         []string      // agent address [ip:port]
 	Timeout        time.Duration // 等待回复的时间
@@ -51,11 +74,6 @@ type Reader struct {
 	Tables          []Table
 	Fields          []Field
 	ConnectionCache []snmpConnection
-
-	Meta     *reader.Meta
-	Status   int32
-	StopChan chan struct{}
-	DataChan chan interface{}
 }
 
 var execCommand = exec.Command
@@ -74,17 +92,19 @@ func execCmd(arg0 string, args ...string) ([]byte, error) {
 	return out, nil
 }
 
-func NewReader(meta *reader.Meta, c conf.MapConf) (s reader.Reader, err error) {
-	var timeOut, interval time.Duration
-	name, _ := c.GetStringOr(reader.KeySnmpReaderName, "logki_default_snmp_name")
+func NewReader(meta *reader.Meta, c conf.MapConf) (reader.Reader, error) {
+	name, _ := c.GetStringOr(reader.KeySnmpReaderName, "logkit_default_snmp_name")
 	agents, _ := c.GetStringListOr(reader.KeySnmpReaderAgents, []string{"127.0.0.1:161"})
+	tableHost, _ := c.GetStringOr(reader.KeySnmpTableInitHost, "127.0.0.1")
 	timeStr, _ := c.GetStringOr(reader.KeySnmpReaderTimeOut, "5s")
-	if timeOut, err = time.ParseDuration(timeStr); err != nil {
-		return
+	timeOut, err := time.ParseDuration(timeStr)
+	if err != nil {
+		return nil, err
 	}
 	intervalStr, _ := c.GetStringOr(reader.KeySnmpReaderInterval, "30s")
-	if interval, err = time.ParseDuration(intervalStr); err != nil {
-		return
+	interval, err := time.ParseDuration(intervalStr)
+	if err != nil {
+		return nil, err
 	}
 	retries, _ := c.GetIntOr(reader.KeySnmpReaderRetries, 3)
 	version, _ := c.GetIntOr(reader.KeySnmpReaderVersion, 2)
@@ -115,54 +135,151 @@ func NewReader(meta *reader.Meta, c conf.MapConf) (s reader.Reader, err error) {
 	var fields []Field
 
 	if err = jsoniter.Unmarshal([]byte(tableConf), &tables); err != nil {
-		return
+		return nil, err
 	}
 	if err = jsoniter.Unmarshal([]byte(fieldConf), &fields); err != nil {
-		return
+		return nil, err
 	}
 
 	for i := range tables {
-		if subErr := tables[i].init(); subErr != nil {
-			err = Errorf(subErr, "initializing table %s", tables[i].Name)
-			return
+		if subErr := tables[i].init(tableHost); subErr != nil {
+			return nil, Errorf(subErr, "initializing table %s", tables[i].Name)
 		}
 	}
 	for i := range fields {
 		if subErr := fields[i].init(); subErr != nil {
-			err = Errorf(subErr, "initializing field %s", fields[i].Name)
-			return
+			return nil, Errorf(subErr, "initializing field %s", fields[i].Name)
 		}
 	}
-	s = &Reader{
-		Meta:           meta,
-		SnmpName:       name,
-		Agents:         agents,
-		Timeout:        timeOut,
-		Interval:       interval,
-		Retries:        retries,
-		Version:        uint8(version),
-		Community:      community,
-		MaxRepetitions: uint8(maxRepetitions),
-		ContextName:    contextName,
-		SecLevel:       secLevel,
-		SecName:        secName,
-		AuthProtocol:   authProtocol,
-		AuthPassword:   authPassword,
-		PrivProtocol:   privProtocol,
-		PrivPassword:   privPassword,
-		EngineID:       engineID,
-		EngineBoots:    uint32(engineBoots),
-		EngineTime:     uint32(engineTime),
-		Tables:         tables,
-		Fields:         fields,
-
-		Status:          reader.StatusInit,
-		StopChan:        make(chan struct{}),
-		DataChan:        make(chan interface{}, 1000),
+	return &Reader{
+		meta:            meta,
+		status:          reader.StatusInit,
+		routineStatus:   reader.StatusInit,
+		stopChan:        make(chan struct{}),
+		readChan:        make(chan readInfo, 1000),
+		errChan:         make(chan error),
+		SnmpName:        name,
+		Agents:          agents,
+		Timeout:         timeOut,
+		Interval:        interval,
+		Retries:         retries,
+		Version:         uint8(version),
+		Community:       community,
+		MaxRepetitions:  uint8(maxRepetitions),
+		ContextName:     contextName,
+		SecLevel:        secLevel,
+		SecName:         secName,
+		AuthProtocol:    authProtocol,
+		AuthPassword:    authPassword,
+		PrivProtocol:    privProtocol,
+		PrivPassword:    privPassword,
+		EngineID:        engineID,
+		EngineBoots:     uint32(engineBoots),
+		EngineTime:      uint32(engineTime),
+		Tables:          tables,
+		Fields:          fields,
 		ConnectionCache: make([]snmpConnection, len(agents)),
+	}, nil
+}
+
+func (r *Reader) isStopping() bool {
+	return atomic.LoadInt32(&r.status) == reader.StatusStopping
+}
+
+func (r *Reader) hasStopped() bool {
+	return atomic.LoadInt32(&r.status) == reader.StatusStopped
+}
+
+func (r *Reader) Name() string {
+	return r.SnmpName
+}
+
+func (r *Reader) SetMode(mode string, v interface{}) error {
+	return nil
+}
+
+func (r *Reader) sendError(err error) {
+	if err == nil {
+		return
+	}
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Errorf("Reader %q was panicked and recovered from %v", r.Name(), rec)
+		}
+	}()
+	r.errChan <- err
+}
+
+func (r *Reader) Start() error {
+	if r.isStopping() || r.hasStopped() {
+		return errors.New("reader is stopping or has stopped")
+	} else if !atomic.CompareAndSwapInt32(&r.status, reader.StatusInit, reader.StatusRunning) {
+		log.Warnf("Runner[%v] %q daemon has already started and is running", r.meta.RunnerName, r.Name())
+		return nil
 	}
 
-	return
+	go func() {
+		ticker := time.NewTicker(r.Interval)
+		defer ticker.Stop()
+		for {
+			err := r.Gather()
+			if err != nil {
+				log.Errorf("Runner[%v] %q gather failed: %v ", r.meta.RunnerName, r.Name(), err)
+				log.Error(err)
+				r.sendError(err)
+			}
+
+			select {
+			case <-r.stopChan:
+				atomic.StoreInt32(&r.status, reader.StatusStopped)
+				log.Infof("Runner[%v] %q daemon has stopped from running", r.meta.RunnerName, r.Name())
+				return
+			case <-ticker.C:
+			}
+		}
+	}()
+	log.Infof("Runner[%v] %q daemon has started", r.meta.RunnerName, r.Name())
+	return nil
+}
+
+func (r *Reader) Source() string {
+	return r.SnmpName
+}
+
+func (r *Reader) ReadLine() (string, error) {
+	return "", errors.New("method ReadLine is not supported, please use ReadData")
+}
+
+func (r *Reader) ReadData() (Data, int64, error) {
+	timer := time.NewTimer(time.Second)
+	defer timer.Stop()
+	select {
+	case info := <-r.readChan:
+		return info.data, info.bytes, nil
+	case err := <-r.errChan:
+		return nil, 0, err
+	case <-timer.C:
+	}
+
+	return nil, 0, nil
+}
+
+func (r *Reader) SyncMeta() {}
+
+func (r *Reader) Close() error {
+	if !atomic.CompareAndSwapInt32(&r.status, reader.StatusRunning, reader.StatusStopping) {
+		log.Warnf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
+		return nil
+	}
+	log.Debugf("Runner[%v] %q daemon is stopping", r.meta.RunnerName, r.Name())
+	close(r.stopChan)
+
+	// 如果此时没有 routine 正在运行，则在此处关闭数据管道，否则由 routine 在退出时负责关闭
+	if atomic.LoadInt32(&r.routineStatus) != reader.StatusRunning {
+		close(r.readChan)
+		close(r.errChan)
+	}
+	return nil
 }
 
 type Table struct {
@@ -173,8 +290,8 @@ type Table struct {
 	Oid         string   `json:"table_oid"`
 }
 
-func (t *Table) init() error {
-	if err := t.initBuild(); err != nil {
+func (t *Table) init(host string) error {
+	if err := t.initBuild(host); err != nil {
 		return err
 	}
 	for i := range t.Fields {
@@ -185,12 +302,12 @@ func (t *Table) init() error {
 	return nil
 }
 
-func (t *Table) initBuild() error {
+func (t *Table) initBuild(host string) error {
 	if t.Oid == "" {
 		return nil
 	}
 
-	_, _, oidText, fields, err := snmpTable(t.Oid)
+	_, _, oidText, fields, err := snmpTable(t.Oid, host)
 	if err != nil {
 		return err
 	}
@@ -255,73 +372,93 @@ func Errorf(err error, msg string, format ...interface{}) error {
 	}
 }
 
-func (s *Reader) StoreData(data []map[string]interface{}) (err error) {
-	if data == nil || len(data) == 0 {
+func (r *Reader) StoreData(datas []Data) (err error) {
+	if datas == nil || len(datas) == 0 {
 		return
 	}
-	for _, d := range data {
-		if d == nil || len(d) == 0 {
+	for _, data := range datas {
+		if data == nil || len(data) == 0 {
 			continue
 		}
 		select {
-		case <-s.StopChan:
+		case <-r.stopChan:
 			return
-		case s.DataChan <- d:
+		case r.readChan <- readInfo{data, int64(len(fmt.Sprintf("%s", data)))}:
 		}
 	}
 	return
 }
 
-func (s *Reader) Gather() (err error) {
-	errMux := new(sync.Mutex)
+func (r *Reader) Gather() error {
+	// 当上个任务还未执行完成的时候直接跳过
+	if !atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusInit, reader.StatusRunning) {
+		log.Errorf("Runner[%v] %q daemon is still working on last task, this task will not be executed and is skipped this time", r.meta.RunnerName, r.Name())
+		return nil
+	}
+	defer func() {
+		// 如果 reader 在 routine 运行时关闭，则需要此 routine 负责关闭数据管道
+		if r.isStopping() || r.hasStopped() {
+			close(r.readChan)
+			close(r.errChan)
+		}
+		atomic.StoreInt32(&r.routineStatus, reader.StatusInit)
+	}()
+
 	var wg sync.WaitGroup
-	data := make([]map[string]interface{}, 0)
-	for i, agent := range s.Agents {
+	datas := make([]Data, 0)
+	errChan := make(chan error, len(r.Agents))
+	for i, agent := range r.Agents {
 		wg.Add(1)
 		go func(i int, agent string) {
+			log.Debugf("Runner[%v] %q is reading from agent: %s", r.meta.RunnerName, r.Name(), agent)
 			defer wg.Done()
-			gs, err1 := s.getConnection(i)
-			if err1 != nil {
+
+			conn, err := r.getConnection(i)
+			if err != nil {
+				errChan <- err
 				return
 			}
 			t := Table{
-				Name:   s.SnmpName,
-				Fields: s.Fields,
+				Name:   r.SnmpName,
+				Fields: r.Fields,
 			}
 			topTags := map[string]string{}
-			if data, err1 = s.gatherTable(gs, t, topTags, false); err1 != nil {
+			if datas, err = r.gatherTable(conn, t, topTags, false); err != nil {
+				errChan <- err
 				return
 			}
-			if err1 := s.StoreData(data); err1 != nil {
-				errMux.Lock()
-				err = err1
-				errMux.Unlock()
+			if err = r.StoreData(datas); err != nil {
+				errChan <- err
 				return
 			}
-			for _, t := range s.Tables {
-				if data, err1 = s.gatherTable(gs, t, topTags, true); err1 != nil {
+			for _, t := range r.Tables {
+				if datas, err = r.gatherTable(conn, t, topTags, true); err != nil {
+					errChan <- err
 					return
 				}
-				if err1 := s.StoreData(data); err1 != nil {
-					errMux.Lock()
-					err = err1
-					errMux.Unlock()
+				if err = r.StoreData(datas); err != nil {
+					errChan <- err
 					return
 				}
 			}
 		}(i, agent)
 	}
 	wg.Wait()
-	return
+	close(errChan)
+	var lastErr error
+	for err := range errChan {
+		log.Errorf("gather error: ", err)
+		lastErr = err
+	}
+	return lastErr
 }
 
-func (s *Reader) gatherTable(gs snmpConnection, t Table, topTags map[string]string, walk bool) (data []map[string]interface{}, err error) {
-	var rt *RTable
-	rt, err = t.Build(gs, walk)
+func (r *Reader) gatherTable(gs snmpConnection, t Table, topTags map[string]string, walk bool) ([]Data, error) {
+	rt, err := t.Build(gs, walk)
 	if err != nil {
-		return
+		return nil, err
 	}
-	data = make([]map[string]interface{}, 0)
+	datas := make([]Data, 0, len(rt.Rows))
 	for _, tr := range rt.Rows {
 		if !walk {
 			for k, v := range tr.Tags {
@@ -337,82 +474,19 @@ func (s *Reader) gatherTable(gs snmpConnection, t Table, topTags map[string]stri
 		if _, ok := tr.Tags["agent_host"]; !ok {
 			tr.Tags["agent_host"] = gs.Host()
 		}
-		d := make(map[string]interface{})
+
+		data := make(Data)
 		for k, v := range tr.Fields {
-			d[k] = v
+			data[k] = v
 		}
 		for k, v := range tr.Tags {
-			d[k] = v
+			data[k] = v
 		}
-		d[reader.KeyTimestamp] = rt.Time
-		d[reader.KeySnmpTableName] = t.Name
-		data = append(data, d)
+		data[reader.KeyTimestamp] = rt.Time
+		data[reader.KeySnmpTableName] = t.Name
+		datas = append(datas, data)
 	}
-	return
-
-}
-
-//Name reader名称
-func (s *Reader) Name() string {
-	return s.SnmpName
-}
-
-//Source 读取的数据源
-func (s *Reader) Source() string {
-	return s.SnmpName
-}
-
-func (s *Reader) Start() error {
-	if !atomic.CompareAndSwapInt32(&s.Status, reader.StatusInit, reader.StatusRunning) {
-		return fmt.Errorf("runner[%v] Reader[%v] already started", s.Meta.RunnerName, s.Name())
-	}
-	go func() {
-		ticker := time.NewTicker(s.Interval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				err := s.Gather()
-				if err != nil {
-					log.Errorf("runner[%v] Reader[%v] gather error %v", s.Meta.RunnerName, s.Name(), err)
-				}
-			case <-s.StopChan:
-				close(s.DataChan)
-				return
-			}
-		}
-	}()
-	return nil
-}
-
-func (s *Reader) ReadLine() (line string, err error) {
-	if atomic.LoadInt32(&s.Status) == reader.StatusInit {
-		if err = s.Start(); err != nil {
-			log.Error(err)
-		}
-	}
-	select {
-	case d := <-s.DataChan:
-		var db []byte
-		if db, err = jsoniter.Marshal(d); err != nil {
-			return
-		}
-		line = string(db)
-	default:
-	}
-	return
-}
-
-func (s *Reader) SetMode(mode string, v interface{}) error {
-	return nil
-}
-
-func (s *Reader) Close() error {
-	close(s.StopChan)
-	return nil
-}
-
-func (s *Reader) SyncMeta() {
+	return datas, nil
 }
 
 func (t Table) Build(gs snmpConnection, walk bool) (*RTable, error) {
@@ -561,15 +635,15 @@ func (gsw gosnmpWrapper) Get(oids []string) (*gosnmp.SnmpPacket, error) {
 	return nil, err
 }
 
-func (s *Reader) getConnection(idx int) (snmpConnection, error) {
-	if gs := s.ConnectionCache[idx]; gs != nil {
+func (r *Reader) getConnection(idx int) (snmpConnection, error) {
+	if gs := r.ConnectionCache[idx]; gs != nil {
 		return gs, nil
 	}
 
-	agent := s.Agents[idx]
+	agent := r.Agents[idx]
 
 	gs := gosnmpWrapper{&gosnmp.GoSNMP{}}
-	s.ConnectionCache[idx] = gs
+	r.ConnectionCache[idx] = gs
 
 	host, portStr, err := net.SplitHostPort(agent)
 	if err != nil {
@@ -587,11 +661,11 @@ func (s *Reader) getConnection(idx int) (snmpConnection, error) {
 	}
 	gs.Port = uint16(port)
 
-	gs.Timeout = s.Timeout
+	gs.Timeout = r.Timeout
 
-	gs.Retries = s.Retries
+	gs.Retries = r.Retries
 
-	switch s.Version {
+	switch r.Version {
 	case 3:
 		gs.Version = gosnmp.Version3
 	case 2, 0:
@@ -602,24 +676,24 @@ func (s *Reader) getConnection(idx int) (snmpConnection, error) {
 		return nil, fmt.Errorf("invalid version")
 	}
 
-	if s.Version < 3 {
-		if s.Community == "" {
+	if r.Version < 3 {
+		if r.Community == "" {
 			gs.Community = "public"
 		} else {
-			gs.Community = s.Community
+			gs.Community = r.Community
 		}
 	}
 
-	gs.MaxRepetitions = s.MaxRepetitions
+	gs.MaxRepetitions = r.MaxRepetitions
 
-	if s.Version == 3 {
-		gs.ContextName = s.ContextName
+	if r.Version == 3 {
+		gs.ContextName = r.ContextName
 
 		sp := &gosnmp.UsmSecurityParameters{}
 		gs.SecurityParameters = sp
 		gs.SecurityModel = gosnmp.UserSecurityModel
 
-		switch strings.ToLower(s.SecLevel) {
+		switch strings.ToLower(r.SecLevel) {
 		case "noauthnopriv", "":
 			gs.MsgFlags = gosnmp.NoAuthNoPriv
 		case "authnopriv":
@@ -630,9 +704,9 @@ func (s *Reader) getConnection(idx int) (snmpConnection, error) {
 			return nil, fmt.Errorf("invalid secLevel")
 		}
 
-		sp.UserName = s.SecName
+		sp.UserName = r.SecName
 
-		switch strings.ToLower(s.AuthProtocol) {
+		switch strings.ToLower(r.AuthProtocol) {
 		case "md5":
 			sp.AuthenticationProtocol = gosnmp.MD5
 		case "sha":
@@ -643,9 +717,9 @@ func (s *Reader) getConnection(idx int) (snmpConnection, error) {
 			return nil, fmt.Errorf("invalid authProtocol")
 		}
 
-		sp.AuthenticationPassphrase = s.AuthPassword
+		sp.AuthenticationPassphrase = r.AuthPassword
 
-		switch strings.ToLower(s.PrivProtocol) {
+		switch strings.ToLower(r.PrivProtocol) {
 		case "des":
 			sp.PrivacyProtocol = gosnmp.DES
 		case "aes":
@@ -656,13 +730,13 @@ func (s *Reader) getConnection(idx int) (snmpConnection, error) {
 			return nil, fmt.Errorf("invalid privProtocol")
 		}
 
-		sp.PrivacyPassphrase = s.PrivPassword
+		sp.PrivacyPassphrase = r.PrivPassword
 
-		sp.AuthoritativeEngineID = s.EngineID
+		sp.AuthoritativeEngineID = r.EngineID
 
-		sp.AuthoritativeEngineBoots = s.EngineBoots
+		sp.AuthoritativeEngineBoots = r.EngineBoots
 
-		sp.AuthoritativeEngineTime = s.EngineTime
+		sp.AuthoritativeEngineTime = r.EngineTime
 	}
 
 	if err := gs.Connect(); err != nil {
@@ -799,7 +873,7 @@ type snmpTableCache struct {
 var snmpTableCaches map[string]snmpTableCache
 var snmpTableCachesLock sync.Mutex
 
-func snmpTable(oid string) (mibName string, oidNum string, oidText string, fields []Field, err error) {
+func snmpTable(oid, host string) (mibName string, oidNum string, oidText string, fields []Field, err error) {
 	snmpTableCachesLock.Lock()
 	if snmpTableCaches == nil {
 		snmpTableCaches = map[string]snmpTableCache{}
@@ -808,7 +882,7 @@ func snmpTable(oid string) (mibName string, oidNum string, oidText string, field
 	var stc snmpTableCache
 	var ok bool
 	if stc, ok = snmpTableCaches[oid]; !ok {
-		stc.mibName, stc.oidNum, stc.oidText, stc.fields, stc.err = snmpTableCall(oid)
+		stc.mibName, stc.oidNum, stc.oidText, stc.fields, stc.err = snmpTableCall(oid, host)
 		snmpTableCaches[oid] = stc
 	}
 
@@ -816,7 +890,7 @@ func snmpTable(oid string) (mibName string, oidNum string, oidText string, field
 	return stc.mibName, stc.oidNum, stc.oidText, stc.fields, stc.err
 }
 
-func snmpTableCall(oid string) (mibName string, oidNum string, oidText string, fields []Field, err error) {
+func snmpTableCall(oid, host string) (mibName string, oidNum string, oidText string, fields []Field, err error) {
 	mibName, oidNum, oidText, _, err = snmpTranslate(oid)
 	if err != nil {
 		return "", "", "", nil, Errorf(err, "translating")
@@ -851,7 +925,7 @@ func snmpTableCall(oid string) (mibName string, oidNum string, oidText string, f
 		}
 	}
 
-	out, err := execCmd("snmptable", "-Ch", "-Cl", "-c", "public", "127.0.0.1", oidFullName)
+	out, err := execCmd("snmptable", "-Ch", "-Cl", "-c", "public", host, oidFullName)
 	if err != nil {
 		return "", "", "", nil, Errorf(err, "getting table columns")
 	}

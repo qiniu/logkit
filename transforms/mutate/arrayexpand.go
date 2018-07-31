@@ -10,9 +10,22 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var (
+	_ transforms.StatsTransformer = &ArrayExpand{}
+	_ transforms.Transformer      = &ArrayExpand{}
+	_ transforms.Initializer      = &ArrayExpand{}
+)
+
 type ArrayExpand struct {
 	Key   string `json:"key"`
 	stats StatsInfo
+
+	keys []string
+}
+
+func (p *ArrayExpand) Init() error {
+	p.keys = GetKeys(p.Key)
+	return nil
 }
 
 func (p *ArrayExpand) transformToMap(val interface{}, key string) map[string]interface{} {
@@ -130,50 +143,48 @@ func (p *ArrayExpand) RawTransform(datas []string) ([]string, error) {
 }
 
 func (p *ArrayExpand) Transform(datas []Data) ([]Data, error) {
-	var err, pErr error
-	errNums := 0
-	keys := GetKeys(p.Key)
-	newkeys := make([]string, len(keys))
+	var err, fmtErr error
+	errNum := 0
+	if p.keys == nil {
+		p.Init()
+	}
+	newKeys := make([]string, len(p.keys))
 	for i := range datas {
-		copy(newkeys, keys)
-		val, gerr := GetMapValue(datas[i], keys...)
-		if gerr != nil {
-			errNums++
-			err = fmt.Errorf("transform key %v not exist in data", p.Key)
+		copy(newKeys, p.keys)
+		val, getErr := GetMapValue(datas[i], p.keys...)
+		if getErr != nil {
+			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, p.Key)
 			continue
 		}
-		if resultMap := p.transformToMap(val, newkeys[len(keys)-1]); resultMap != nil {
+		if resultMap := p.transformToMap(val, newKeys[len(p.keys)-1]); resultMap != nil {
 			for key, arrVal := range resultMap {
 				suffix := 0
 				keyName := key
-				newkeys[len(newkeys)-1] = keyName
-				_, gerr := GetMapValue(datas[i], newkeys...)
-				for ; gerr == nil; suffix++ {
+				newKeys[len(newKeys)-1] = keyName
+				_, getErr := GetMapValue(datas[i], newKeys...)
+				for ; getErr == nil; suffix++ {
 					if suffix > 5 {
 						log.Warnf("keys %v -- %v already exist, the key %v will be ignored", key, keyName, key)
 						break
 					}
 					keyName = key + "_" + strconv.Itoa(suffix)
-					newkeys[len(newkeys)-1] = keyName
-					_, gerr = GetMapValue(datas[i], newkeys...)
+					newKeys[len(newKeys)-1] = keyName
+					_, getErr = GetMapValue(datas[i], newKeys...)
 				}
 				if suffix <= 5 {
-					SetMapValue(datas[i], arrVal, false, newkeys...)
+					setErr := SetMapValue(datas[i], arrVal, false, newKeys...)
+					if setErr != nil {
+						errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, p.Key)
+					}
 				}
 			}
-
 		} else {
-			errNums++
-			err = fmt.Errorf("transform key %v data type is not array", p.Key)
+			typeErr := fmt.Errorf("transform key %v data type is not array", p.Key)
+			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
 		}
 	}
-	if err != nil {
-		p.stats.LastError = err.Error()
-		pErr = fmt.Errorf("find total %v erorrs in transform array expand, last error info is %v", errNums, err)
-	}
-	p.stats.Errors += int64(errNums)
-	p.stats.Success += int64(len(datas) - errNums)
-	return datas, pErr
+	p.stats, fmtErr = transforms.SetStatsInfo(err, p.stats, int64(errNum), int64(len(datas)), p.Type())
+	return datas, fmtErr
 }
 
 func (p *ArrayExpand) Description() string {
@@ -203,6 +214,11 @@ func (p *ArrayExpand) Stage() string {
 }
 
 func (p *ArrayExpand) Stats() StatsInfo {
+	return p.stats
+}
+
+func (p *ArrayExpand) SetStats(err string) StatsInfo {
+	p.stats.LastError = err
 	return p.stats
 }
 

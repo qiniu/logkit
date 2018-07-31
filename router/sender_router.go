@@ -81,6 +81,11 @@ func NewSenderRouter(conf RouterConfig, senderCnt int) (*Router, error) {
 	return r, nil
 }
 
+// HasRoutes 当有实际路由时返回 true，否则返回 false
+func (r *Router) HasRoutes() bool {
+	return len(r.routes) > 0
+}
+
 type MatchType func() mType
 
 var MatchTypeRegistry = map[string]MatchType{}

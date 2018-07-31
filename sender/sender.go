@@ -40,6 +40,10 @@ const (
 	KeyPandoraKodoFilePrefix     = "pandora_kodo_prefix"
 	KeyPandoraKodoCompressPrefix = "pandora_kodo_compress"
 	KeyPandoraKodoGzip           = "pandora_kodo_gzip"
+	KeyPandoraKodoRotateStrategy = "pandora_kodo_rotate_strategy"
+	KeyPandoraKodoRotateInterval = "pandora_kodo_rotate_interval"
+	KeyPandoraKodoRotateSize     = "pandora_kodo_rotate_size"
+	KeyPandoraKodoFileRetention  = "pandora_kodo_file_retention"
 
 	KeyPandoraEmail = "qiniu_email"
 
@@ -54,6 +58,7 @@ const (
 	KeyPandoraAutoConvertDate = "pandora_auto_convert_date"
 	KeyIgnoreInvalidField     = "ignore_invalid_field"
 	KeyPandoraUnescape        = "pandora_unescape"
+	KeyPandoraSendType        = "pandora_send_type"
 	KeyInsecureServer         = "insecure_server"
 
 	PandoraUUID = "Pandora_UUID"
@@ -121,6 +126,7 @@ const (
 	KeyFtProcs             = "ft_procs"         // ft并发数，当always_save或concurrent策略时启用
 	KeyFtMemoryChannel     = "ft_memory_channel"
 	KeyFtMemoryChannelSize = "ft_memory_channel_size"
+	KeyFtLongDataDiscard   = "ft_long_data_discard"
 
 	// ft 策略
 	// KeyFtStrategyBackupOnly 只在失败的时候进行容错
@@ -135,7 +141,9 @@ const (
 
 	// file
 	// 可选参数 当sender_type 为file 的时候
-	KeyFileSenderPath = "file_send_path"
+	KeyFileSenderPath         = "file_send_path"
+	KeyFileSenderTimestampKey = "file_send_timestamp_key"
+	KeyFileSenderMaxOpenFiles = "file_send_max_open_files"
 
 	// http
 	KeyHttpSenderUrl      = "http_sender_url"
@@ -184,7 +192,7 @@ const (
 )
 
 // NotAsyncSender return when sender is not async
-var ErrNotAsyncSender = errors.New("This Sender does not support for Async Push")
+var ErrNotAsyncSender = errors.New("sender does not support for Async Push")
 
 // Sender send data to pandora, prometheus such different destinations
 type Sender interface {
@@ -192,6 +200,12 @@ type Sender interface {
 	// send data, error if failed
 	Send([]Data) error
 	Close() error
+}
+
+// SkipDeepCopySender 表示该 sender 不会对传入数据进行污染，凡是有次保证的 sender 需要实现该接口提升发送效率
+type SkipDeepCopySender interface {
+	// SkipDeepCopy 需要返回值是因为如果一个 sender 封装了其它 sender，需要根据实际封装的类型返回是否忽略深度拷贝
+	SkipDeepCopy() bool
 }
 
 type StatsSender interface {
@@ -231,12 +245,12 @@ func NewRegistry() *Registry {
 	return ret
 }
 
-func (registry *Registry) RegisterSender(senderType string, constructor func(conf.MapConf) (Sender, error)) error {
-	_, exist := registry.senderTypeMap[senderType]
+func (r *Registry) RegisterSender(senderType string, constructor func(conf.MapConf) (Sender, error)) error {
+	_, exist := r.senderTypeMap[senderType]
 	if exist {
 		return errors.New("senderType " + senderType + " has been existed")
 	}
-	registry.senderTypeMap[senderType] = constructor
+	r.senderTypeMap[senderType] = constructor
 	return nil
 }
 
@@ -254,7 +268,9 @@ func (r *Registry) NewSender(conf conf.MapConf, ftSaveLogPath string) (sender Se
 		return
 	}
 	faultTolerant, _ := conf.GetBoolOr(KeyFaultTolerant, true)
-	if faultTolerant {
+
+	//如果是 PandoraSender，目前的依赖必须启用 ftsender,依赖Ftsender做key转换检查
+	if faultTolerant || sendType == TypePandora {
 		sender, err = NewFtSender(sender, conf, ftSaveLogPath)
 		if err != nil {
 			return

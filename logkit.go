@@ -43,7 +43,7 @@ type Config struct {
 var conf Config
 
 const (
-	NextVersion       = "v1.5.0"
+	NextVersion       = "v1.5.3"
 	defaultReserveCnt = 5
 	defaultLogDir     = "./run"
 	defaultLogPattern = "*.log-*"
@@ -288,7 +288,7 @@ func main() {
 	if conf.ProfileHost != "" {
 		log.Infof("go profile_host was open at %v", conf.ProfileHost)
 		go func() {
-			log.Info(http.ListenAndServe(conf.ProfileHost, nil))
+			log.Fatal(http.ListenAndServe(conf.ProfileHost, nil))
 		}()
 	}
 	if err = rs.Register(); err != nil {

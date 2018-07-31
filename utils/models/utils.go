@@ -425,31 +425,30 @@ func SetMapValue(m map[string]interface{}, val interface{}, coercive bool, keys 
 	return nil
 }
 
-//通过层级key设置value值, 如果keys不存在则不加前缀，否则加前缀，forceSet为true时无论原来的值存不存在，都加前缀.
-func SetMapValueWithPrefix(m map[string]interface{}, val interface{}, prefix string, forceAdd bool, keys ...string) error {
+//通过层级key设置value值, 如果keys不存在则不加前缀，否则加前缀
+func SetMapValueExistWithPrefix(m map[string]interface{}, val interface{}, prefix string, keys ...string) error {
 	if len(keys) == 0 {
 		return nil
 	}
 	var curr map[string]interface{}
 	curr = m
-	var exist bool
-	for i, k := range keys {
-		if i < len(keys)-1 {
-			finalVal, ok := curr[k]
-			if !ok {
-				return fmt.Errorf("SetMapValueWithPrefix failed, keys %v are non-existent", val)
-			}
-			//判断val是否为map[string]interface{}类型
-			if curr, ok = finalVal.(map[string]interface{}); ok {
-				continue
-			}
-			return fmt.Errorf("SetMapValueWithPrefix failed, %v is not the type of map[string]interface{}", keys)
+	for _, k := range keys[0 : len(keys)-1] {
+		finalVal, ok := curr[k]
+		if !ok {
+			n := make(map[string]interface{})
+			curr[k] = n
+			curr = n
+			continue
 		}
-
-		//判断val(k)是否存在
-		_, exist = curr[k]
+		//判断val是否为map[string]interface{}类型
+		if curr, ok = finalVal.(map[string]interface{}); ok {
+			continue
+		}
+		return fmt.Errorf("SetMapValueWithPrefix failed, %v is not the type of map[string]interface{}", keys)
 	}
-	if exist || forceAdd {
+	//判断val(k)是否存在
+	_, exist := curr[keys[len(keys)-1]]
+	if exist {
 		curr[prefix+"_"+keys[len(keys)-1]] = val
 	} else {
 		curr[keys[len(keys)-1]] = val
@@ -481,6 +480,40 @@ func DeleteMapValue(m map[string]interface{}, keys ...string) (interface{}, bool
 	return nil, false
 }
 
+func PickMapValue(m map[string]interface{}, pick map[string]interface{}, keys ...string) {
+	var val interface{}
+	val = m
+	if len(keys) == 0 {
+		return
+	}
+	if _, ok := val.(map[string]interface{}); !ok {
+		return
+	}
+
+	v, ok := val.(map[string]interface{})[keys[0]]
+	if !ok {
+		return
+	}
+
+	if len(keys) == 1 {
+		pick[keys[0]] = v
+		return
+	}
+
+	// 判断keys[0]的值是不是map，如果不是，keys[1]pick的值为空，退出该keys的pick
+	if _, ok := v.(map[string]interface{}); !ok {
+		return
+	}
+
+	if _, ok := pick[keys[0]]; !ok {
+		pick[keys[0]] = map[string]interface{}{}
+	}
+	PickMapValue(v.(map[string]interface{}), pick[keys[0]].(map[string]interface{}), keys[1:]...)
+	if len(pick[keys[0]].(map[string]interface{})) == 0 {
+		delete(pick, keys[0])
+	}
+}
+
 //根据key字符串,拆分出层级keys数据
 func GetKeys(keyStr string) []string {
 	keys := strings.FieldsFunc(keyStr, isSeparator)
@@ -498,14 +531,15 @@ func GetMapValue(m map[string]interface{}, keys ...string) (interface{}, error) 
 	var err error
 	var val interface{}
 	val = m
-	for i, k := range keys {
+	curKeys := keys
+	for i, k := range curKeys {
 		//判断val是否为map[string]interface{}类型
 		if _, ok := val.(map[string]interface{}); ok {
 			//判断val(k)是否存在
 			if _, ok := val.(map[string]interface{})[k]; ok {
 				val = val.(map[string]interface{})[k]
 			} else {
-				keys = keys[0 : i+1]
+				curKeys = curKeys[0 : i+1]
 				err = fmt.Errorf("GetMapValue failed, keys %v are non-existent", keys)
 				return nil, err
 			}
@@ -623,7 +657,7 @@ func Bool2String(i bool) string {
 	return "false"
 }
 
-func ConvertDate(layoutBefore, layoutAfter string, offset int, v interface{}) (interface{}, error) {
+func ConvertDate(layoutBefore, layoutAfter string, offset int, loc *time.Location, v interface{}) (interface{}, error) {
 	var s int64
 	switch newv := v.(type) {
 	case int64:
@@ -640,13 +674,13 @@ func ConvertDate(layoutBefore, layoutAfter string, offset int, v interface{}) (i
 		s = int64(newv)
 	case string:
 		if layoutBefore != "" {
-			t, err := time.Parse(layoutBefore, newv)
+			t, err := time.ParseInLocation(layoutBefore, newv, loc)
 			if err != nil {
 				return v, fmt.Errorf("can not parse %v with layout %v", newv, layoutAfter)
 			}
 			return FormatWithUserOption(layoutAfter, offset, t), nil
 		}
-		t, err := times.StrToTime(newv)
+		t, err := times.StrToTimeLocation(newv, loc)
 		if err != nil {
 			return v, err
 		}
@@ -716,4 +750,137 @@ func GetMapList(data string) map[string]string {
 		}
 	}
 	return ret
+}
+
+//为了提升性能做的一个预先检查，避免CPU浪费
+func CheckPandoraKey(key string) bool {
+	for _, c := range key {
+		if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+// 判断时只有数字和字母为合法字符，规则：
+// 1. 首字符为数字时，增加首字符 "K"
+// 2. 首字符为非法字符时，去掉首字符（例如，如果字符串全为非法字符，则转换后为空）
+// 3. 非首字符并且为非法字符时，使用 "_" 替代非法字符
+func PandoraKey(key string) (string, bool) {
+	// check
+	valid := true
+	size := 0
+	for idx, c := range key {
+		if c >= '0' && c <= '9' {
+			size++
+			if idx == 0 {
+				size++
+				valid = false
+			}
+			continue
+		}
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+			size++
+			continue
+		}
+
+		if idx > 0 && size > 0 {
+			size++
+		}
+		valid = false
+	}
+	if valid {
+		return key, true
+	}
+
+	if size <= 0 {
+		return "", false
+	}
+	// set
+	bytes := make([]byte, size)
+	bp := 0
+	for idx, c := range key {
+		if c >= '0' && c <= '9' {
+			if idx == 0 {
+				bytes[bp] = 'K'
+				bp++
+			}
+			bytes[bp] = byte(c)
+			bp++
+			continue
+		}
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+			bytes[bp] = byte(c)
+			bp++
+			continue
+		}
+
+		if bp > 0 {
+			bytes[bp] = '_'
+			bp++
+		}
+	}
+	return string(bytes), valid
+}
+
+func DeepConvertKey(data map[string]interface{}) map[string]interface{} {
+	for k, v := range data {
+		switch nv := v.(type) {
+		case map[string]interface{}:
+			v = DeepConvertKey(nv)
+		case Data:
+			v = DeepConvertKey(nv)
+		}
+		valid := CheckPandoraKey(k)
+		if !valid {
+			delete(data, k)
+			k, _ := PandoraKey(k)
+			data[k] = v
+		}
+	}
+	return data
+}
+
+//注意：cache如果是nil，这个函数就完全没有意义，不如调用 DeepConvertKey
+func DeepConvertKeyWithCache(data map[string]interface{}, cache map[string]KeyInfo) map[string]interface{} {
+	for k, v := range data {
+		if nv, ok := v.(map[string]interface{}); ok {
+			v = DeepConvertKeyWithCache(nv, cache)
+		}
+		keyInfo, exist := cache[k]
+		if !exist {
+			keyInfo.NewKey, keyInfo.Valid = PandoraKey(k)
+			if cache == nil {
+				cache = make(map[string]KeyInfo)
+			}
+			cache[k] = keyInfo
+		}
+		if !keyInfo.Valid {
+			delete(data, k)
+			data[keyInfo.NewKey] = v
+		}
+	}
+	return data
+}
+
+func CheckErr(err error) error {
+	se, ok := err.(*StatsError)
+	var errorCnt int64
+	if ok {
+		errorCnt = se.Errors
+		err = se.ErrorDetail
+	} else {
+		errorCnt = 1
+	}
+
+	if err != nil {
+		return fmt.Errorf("%v parse line errors occured, error %v ", errorCnt, err.Error())
+	}
+	return nil
+}
+
+type KeyInfo struct {
+	Valid  bool
+	NewKey string
 }

@@ -2,45 +2,37 @@ package mutate
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var (
+	_ transforms.StatsTransformer = &PandoraKeyConvert{}
+	_ transforms.Transformer      = &PandoraKeyConvert{}
+)
+
 type PandoraKeyConvert struct {
 	stats StatsInfo
+	cache map[string]KeyInfo
 }
 
+func (g *PandoraKeyConvert) Init() error {
+	g.cache = make(map[string]KeyInfo)
+	return nil
+}
 func (g *PandoraKeyConvert) RawTransform(datas []string) ([]string, error) {
 	return datas, errors.New("pandora_key_convert transformer not support rawTransform")
 }
 
 func (g *PandoraKeyConvert) Transform(datas []Data) ([]Data, error) {
-	var err, ferr error
-	errnums := 0
 	for i, v := range datas {
-		datas[i] = deepConvertKey(v)
+		datas[i] = DeepConvertKeyWithCache(v, g.cache)
+		//datas[i] = DeepConvertKey(v)
 	}
-	if err != nil {
-		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform pandora_key_convert, last error info is %v", errnums, err)
-	}
-	g.stats.Errors += int64(errnums)
-	g.stats.Success += int64(len(datas) - errnums)
-	return datas, ferr
-}
 
-func deepConvertKey(data map[string]interface{}) map[string]interface{} {
-	newData := make(map[string]interface{})
-	for k, v := range data {
-		nk := PandoraKey(k)
-		if nv, ok := v.(map[string]interface{}); ok {
-			v = deepConvertKey(nv)
-		}
-		newData[nk] = v
-	}
-	return newData
+	g.stats, _ = transforms.SetStatsInfo(nil, g.stats, 0, int64(len(datas)), g.Type())
+	return datas, nil
 }
 
 func (g *PandoraKeyConvert) Description() string {
@@ -70,8 +62,13 @@ func (g *PandoraKeyConvert) Stats() StatsInfo {
 	return g.stats
 }
 
+func (g *PandoraKeyConvert) SetStats(err string) StatsInfo {
+	g.stats.LastError = err
+	return g.stats
+}
+
 func init() {
 	transforms.Add("pandora_key_convert", func() transforms.Transformer {
-		return &PandoraKeyConvert{}
+		return &PandoraKeyConvert{cache: make(map[string]KeyInfo)}
 	})
 }

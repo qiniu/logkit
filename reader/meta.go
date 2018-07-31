@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/json-iterator/go"
@@ -42,9 +43,13 @@ const (
 )
 
 type Statistic struct {
-	ReaderCnt int64               `json:"reader_count"` // 读取总条数
-	ParserCnt [2]int64            `json:"parser_connt"` // [解析成功, 解析失败]
-	SenderCnt map[string][2]int64 `json:"sender_count"` // [发送成功, 发送失败]
+	ReaderCnt       int64                 `json:"reader_count"` // 读取总条数
+	ParserCnt       [2]int64              `json:"parser_connt"` // [解析成功, 解析失败]
+	SenderCnt       map[string][2]int64   `json:"sender_count"` // [发送成功, 发送失败]
+	ReadErrors      ErrorQueue            `json:"read_errors"`
+	ParseErrors     ErrorQueue            `json:"parse_errors"`
+	TransformErrors map[string]ErrorQueue `json:"transform_errors"`
+	SendErrors      map[string]ErrorQueue `json:"send_errors"`
 }
 
 type Meta struct {
@@ -67,7 +72,8 @@ type Meta struct {
 	RunnerName        string
 	extrainfo         map[string]string
 
-	subMetas map[string]*Meta //对于tailx模式的情况会有嵌套的meta
+	subMetaLock sync.RWMutex
+	subMetas    map[string]*Meta //对于tailx模式的情况会有嵌套的meta
 }
 
 func getValidDir(dir string) (realPath string, err error) {
@@ -191,6 +197,9 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 }
 
 func (m *Meta) AddSubMeta(key string, meta *Meta) error {
+	m.subMetaLock.Lock()
+	defer m.subMetaLock.Unlock()
+
 	if m.subMetas == nil {
 		m.subMetas = make(map[string]*Meta)
 	}
@@ -202,6 +211,9 @@ func (m *Meta) AddSubMeta(key string, meta *Meta) error {
 }
 
 func (m *Meta) RemoveSubMeta(key string) {
+	m.subMetaLock.Lock()
+	defer m.subMetaLock.Unlock()
+
 	delete(m.subMetas, key)
 }
 
@@ -347,7 +359,7 @@ func (m *Meta) ReadOffset() (currFile string, offset int64, err error) {
 func (m *Meta) ReadDBDoneFile(database string) (content []string, err error) {
 	doneFiles, err := m.GetDoneFiles()
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	for _, f := range doneFiles {
@@ -355,12 +367,12 @@ func (m *Meta) ReadDBDoneFile(database string) (content []string, err error) {
 		if filepath.Base(f.Path) == filename {
 			content, err = ReadFileContent(f.Path)
 			if err != nil {
-				return
+				return nil, err
 			}
-			return
+			return nil, err
 		}
 	}
-	return
+	return content, nil
 }
 
 // ReadRecordsFile 读取当前runner已经读取的表
@@ -543,7 +555,11 @@ func (m *Meta) GetDoneFiles() ([]File, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	//submeta
+	m.subMetaLock.RLock()
+	defer m.subMetaLock.RUnlock()
+
 	for _, mv := range m.subMetas {
 		newfiles, err := mv.GetDoneFiles()
 		if err != nil {
@@ -584,6 +600,10 @@ func (m *Meta) SetEncodingWay(e string) {
 	if e != "UTF-8" {
 		m.encodingWay = e
 	}
+
+	m.subMetaLock.RLock()
+	defer m.subMetaLock.RUnlock()
+
 	for _, mv := range m.subMetas {
 		mv.SetEncodingWay(e)
 	}
@@ -640,6 +660,10 @@ func (m *Meta) Reset() error {
 			}
 		}
 	}
+
+	m.subMetaLock.RLock()
+	defer m.subMetaLock.RUnlock()
+
 	for key, mv := range m.subMetas {
 		err := mv.Reset()
 		if err != nil {

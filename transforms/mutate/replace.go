@@ -8,6 +8,12 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var (
+	_ transforms.StatsTransformer = &Replacer{}
+	_ transforms.Transformer      = &Replacer{}
+	_ transforms.Initializer      = &Replacer{}
+)
+
 type Replacer struct {
 	StageTime string `json:"stage"`
 	Key       string `json:"key"`
@@ -16,6 +22,8 @@ type Replacer struct {
 	Regex     bool   `json:"regex"`
 	stats     StatsInfo
 	Regexp    *regexp.Regexp
+
+	keys []string
 }
 
 func (g *Replacer) Init() error {
@@ -28,43 +36,44 @@ func (g *Replacer) Init() error {
 		return err
 	}
 	g.Regexp = rgx
+	g.keys = GetKeys(g.Key)
 	return nil
 }
 
 func (g *Replacer) Transform(datas []Data) ([]Data, error) {
-	var err, ferr error
-	errnums := 0
-	keys := GetKeys(g.Key)
+	var err, fmtErr error
+	errNum := 0
+
 	for i := range datas {
-		val, gerr := GetMapValue(datas[i], keys...)
-		if gerr != nil {
-			errnums++
+		val, getErr := GetMapValue(datas[i], g.keys...)
+		if getErr != nil {
+			errNum++
 			err = fmt.Errorf("transform key %v not exist in data", g.Key)
 			continue
 		}
-		strval, ok := val.(string)
+		strVal, ok := val.(string)
 		if !ok {
-			errnums++
+			errNum++
 			err = fmt.Errorf("transform key %v data type is not string", g.Key)
 			continue
 		}
-		SetMapValue(datas[i], g.Regexp.ReplaceAllString(strval, g.New), false, keys...)
+		setErr := SetMapValue(datas[i], g.Regexp.ReplaceAllString(strVal, g.New), false, g.keys...)
+		if setErr != nil {
+			errNum++
+			err = fmt.Errorf("value of %v is not the type of map[string]interface{}", g.Key)
+		}
 	}
 
-	if err != nil {
-		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform replace, last error info is %v", errnums, err)
-	}
-	g.stats.Errors += int64(errnums)
-	g.stats.Success += int64(len(datas) - errnums)
-	return datas, ferr
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	return datas, fmtErr
 }
 
 func (g *Replacer) RawTransform(datas []string) ([]string, error) {
 	for i := range datas {
 		datas[i] = g.Regexp.ReplaceAllString(datas[i], g.New)
 	}
-	g.stats.Success += int64(len(datas))
+
+	g.stats, _ = transforms.SetStatsInfo(nil, g.stats, 0, int64(len(datas)), g.Type())
 	return datas, nil
 }
 
@@ -133,6 +142,11 @@ func (g *Replacer) Stage() string {
 }
 
 func (g *Replacer) Stats() StatsInfo {
+	return g.stats
+}
+
+func (g *Replacer) SetStats(err string) StatsInfo {
+	g.stats.LastError = err
 	return g.stats
 }
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -24,9 +25,9 @@ const (
 	fttestdir = "TestFtSender"
 )
 
-var (
-	mockP, pt           = mock_pandora.NewMockPandoraWithPrefix("/v2")
-	pandoraSenderConfig = conf.MapConf{
+func TestFtSender(t *testing.T) {
+	_, pt := mock_pandora.NewMockPandoraWithPrefix("/v2")
+	pandoraSenderConfig := conf.MapConf{
 		"name":                           "p",
 		"pandora_region":                 "nb",
 		"pandora_host":                   "http://127.0.0.1:" + pt,
@@ -40,9 +41,6 @@ var (
 
 		"sender_type": "pandora",
 	}
-)
-
-func TestFtSender(t *testing.T) {
 	pandoraSenderConfig["pandora_repo_name"] = "TestFtSender"
 	s, err := pandora.NewSender(pandoraSenderConfig)
 	if err != nil {
@@ -56,7 +54,7 @@ func TestFtSender(t *testing.T) {
 	assert.NoError(t, err)
 	datas := []Data{
 		{"ab": "abcccc"},
-		{"ab": "E18111:"},
+		{"ab": "E18110:BackupQueue.Depth"},
 	}
 	err = fts.Send(datas)
 	se, ok := err.(*StatsError)
@@ -64,13 +62,75 @@ func TestFtSender(t *testing.T) {
 		t.Fatal("ft send return error should .(*SendError)")
 	}
 	assert.NoError(t, se.ErrorDetail)
-	time.Sleep(10 * time.Second)
+	time.Sleep(5 * time.Second)
 	if fts.BackupQueue.Depth() != 1 {
-		t.Error("Ft send error exp 1 but got", fts.BackupQueue.Depth())
+		t.Error("Ft send error exp 1 but got ", fts.BackupQueue.Depth())
+	}
+
+	ftTestDir2 := "TestFtSender2"
+	mp[sender.KeyFtSaveLogPath] = ftTestDir2
+	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyAlwaysSave
+	fts2, err := sender.NewFtSender(s, mp, ftTestDir2)
+	defer os.RemoveAll(ftTestDir2)
+	assert.NoError(t, err)
+	var maxData string
+	for {
+		if int64(len(maxData)) > 2*DefaultMaxBatchSize {
+			break
+		}
+		maxData += "abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789七牛云存储？？？？？？七牛云存储？？？？七牛云存储！！！！！七牛云存储@@@@@七牛云存储&&&&&&七牛云存储…………………………七牛云存储！！！！！！"
+	}
+	datas2 := []Data{
+		{"ab": maxData},
+	}
+	err = fts2.Send(datas2)
+	se, ok = err.(*StatsError)
+	if !ok {
+		t.Fatal("ft send return error should .(*SendError)")
+	}
+	assert.NoError(t, se.ErrorDetail)
+	time.Sleep(5 * time.Second)
+	if fts2.BackupQueue.Depth() != 0 {
+		t.Error("Ft send error exp 0 but got ", fts2.BackupQueue.Depth())
+	}
+
+	ftTestDir3 := "TestFtSender3"
+	mp[sender.KeyFtSaveLogPath] = ftTestDir3
+	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyAlwaysSave
+	fts3, err := sender.NewFtSender(s, mp, ftTestDir3)
+	defer os.RemoveAll(ftTestDir3)
+	assert.NoError(t, err)
+	datas3 := []Data{
+		{"ab": "E18110:"},
+	}
+	err = fts3.Send(datas3)
+	se, ok = err.(*StatsError)
+	if !ok {
+		t.Fatal("ft send return error should .(*SendError)")
+	}
+	assert.NoError(t, se.ErrorDetail)
+	time.Sleep(5 * time.Second)
+	if fts3.BackupQueue.Depth() != 0 {
+		t.Error("Ft send error exp 0 but got ", fts3.BackupQueue.Depth())
 	}
 }
 
 func TestFtMemorySender(t *testing.T) {
+	_, pt := mock_pandora.NewMockPandoraWithPrefix("/v2")
+	pandoraSenderConfig := conf.MapConf{
+		"name":                           "p",
+		"pandora_region":                 "nb",
+		"pandora_host":                   "http://127.0.0.1:" + pt,
+		"pandora_schema":                 "ab",
+		"pandora_auto_create":            "ab *s",
+		"pandora_schema_free":            "false",
+		"pandora_ak":                     "ak",
+		"pandora_sk":                     "sk",
+		"pandora_schema_update_interval": "1",
+		"pandora_gzip":                   "false",
+
+		"sender_type": "pandora",
+	}
 	tmpDir, err := ioutil.TempDir("", fmt.Sprintf("nsq-test-%d", time.Now().UnixNano()))
 	if err != nil {
 		panic(err)
@@ -90,12 +150,12 @@ func TestFtMemorySender(t *testing.T) {
 	assert.NoError(t, err)
 	datas := []Data{
 		{"ab": "abcccc"},
-		{"ab": "E18111:"},
+		{"ab": "E18110:BackupQueue.Depth"},
 	}
 	err = fts.Send(datas)
 	se, ok := err.(*StatsError)
 	if !ok {
-		t.Fatal("ft send return error should .(*SendError)")
+		t.Fatal("ft send return error should .(*StatsError)")
 	}
 	assert.NoError(t, se.ErrorDetail)
 	time.Sleep(10 * time.Second)
@@ -105,6 +165,21 @@ func TestFtMemorySender(t *testing.T) {
 }
 
 func TestFtChannelFullSender(t *testing.T) {
+	mockP, pt := mock_pandora.NewMockPandoraWithPrefix("/v2")
+	pandoraSenderConfig := conf.MapConf{
+		"name":                           "p",
+		"pandora_region":                 "nb",
+		"pandora_host":                   "http://127.0.0.1:" + pt,
+		"pandora_schema":                 "ab",
+		"pandora_auto_create":            "ab *s",
+		"pandora_schema_free":            "false",
+		"pandora_ak":                     "ak",
+		"pandora_sk":                     "sk",
+		"pandora_schema_update_interval": "1",
+		"pandora_gzip":                   "false",
+
+		"sender_type": "pandora",
+	}
 	tmpDir, err := ioutil.TempDir("", fmt.Sprintf("nsq-test-%d", time.Now().UnixNano()))
 	if err != nil {
 		panic(err)
@@ -351,4 +426,207 @@ func TestFtSenderConvertData(t *testing.T) {
 		}
 		<-exitChan
 	}
+}
+
+func Test_SplitData(t *testing.T) {
+	var maxData string
+	for {
+		if int64(len(maxData)) > DefaultMaxBatchSize {
+			break
+		}
+		maxData += "abcdefghijklmnopqrstuvwxyz七牛云？？？********0123456789七牛云？？？********abcdefghijklmnopqrstuvwxyz七牛云？？？********0123456789七牛云？？？********"
+	}
+	valArray := sender.SplitData(maxData, int64(sender.DefaultSplitSize))
+	assert.Equal(t, len(maxData), len(strings.Join(valArray, "")))
+	assert.Equal(t, 24, len(valArray))
+
+	for {
+		if int64(len(maxData)) > 2*DefaultMaxBatchSize {
+			break
+		}
+		maxData += "abcdefghijklmnopqrstuvwxyz七牛云？？？********0123456789七牛云？？？********abcdefghijklmnopqrstuvwxyz七牛云？？？********0123456789七牛云？？？********"
+	}
+
+	valArray = sender.SplitData(maxData, int64(sender.DefaultSplitSize))
+	assert.Equal(t, len(maxData), len(strings.Join(valArray, "")))
+	assert.Equal(t, 47, len(valArray))
+
+	maxData = "abc"
+	valArray = sender.SplitData(maxData, int64(sender.DefaultSplitSize))
+	assert.Equal(t, len(maxData), len(strings.Join(valArray, "")))
+	assert.Equal(t, 1, len(valArray))
+
+	maxData = ""
+	valArray = sender.SplitData(maxData, int64(sender.DefaultSplitSize))
+	assert.Equal(t, len(maxData), len(strings.Join(valArray, "")))
+	assert.Equal(t, 0, len(valArray))
+
+	maxData = "abc七牛云？？？cde"
+	valArray = sender.SplitData(maxData, int64(sender.DefaultSplitSize))
+	assert.Equal(t, len(maxData), len(strings.Join(valArray, "")))
+	assert.Equal(t, 1, len(valArray))
+
+	maxData = "abcde"
+	valArray = sender.SplitData(maxData, int64(len(maxData)))
+	assert.Equal(t, len(maxData), len(strings.Join(valArray, "")))
+	assert.Equal(t, 1, len(valArray))
+}
+
+func TestTypeSchemaRetry(t *testing.T) {
+	_, pt := mock_pandora.NewMockPandoraWithPrefix("/v2")
+	pandoraSenderConfig := conf.MapConf{
+		"name":                           "p",
+		"pandora_region":                 "nb",
+		"pandora_host":                   "http://127.0.0.1:" + pt,
+		"pandora_schema":                 "ab",
+		"pandora_auto_create":            "ab *s",
+		"pandora_schema_free":            "true",
+		"pandora_ak":                     "ak",
+		"pandora_sk":                     "sk",
+		"pandora_schema_update_interval": "1",
+		"pandora_gzip":                   "false",
+
+		"sender_type": "pandora",
+	}
+	pandoraSenderConfig["pandora_repo_name"] = "TestTypeSchemaRetry"
+	s, err := pandora.NewSender(pandoraSenderConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mp := conf.MapConf{}
+	mp[sender.KeyFtSaveLogPath] = fttestdir
+	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyBackupOnly
+	defer os.RemoveAll(fttestdir)
+	fts, err := sender.NewFtSender(s, mp, fttestdir)
+	assert.NoError(t, err)
+	datas := []Data{
+		{"ab": "abcccc"},
+		{"ab": "E18111:"},
+	}
+	err = fts.Send(datas)
+	_, ok := err.(*StatsError)
+	if !ok {
+		t.Fatal("ft send return error should .(*StatsError)")
+	}
+	time.Sleep(5 * time.Second)
+	if fts.BackupQueue.Depth() != 1 {
+		t.Error("Ft send error exp 1 but got ", fts.BackupQueue.Depth())
+	}
+}
+
+func TestSkipDeepCopySender(t *testing.T) {
+	defer os.RemoveAll("tmp")
+
+	// Skip == false
+	{
+		fs, err := sender.NewFtSender(&pandora.Sender{}, nil, "tmp")
+		assert.Nil(t, err)
+		assert.False(t, fs.SkipDeepCopy())
+	}
+
+	// Skip == true
+	{
+		fs, err := sender.NewFtSender(&mock.Sender{}, nil, "tmp")
+		assert.Nil(t, err)
+		assert.True(t, fs.SkipDeepCopy())
+	}
+}
+
+func TestPandoraExtraInfo(t *testing.T) {
+	pandoraServer, pt := mock_pandora.NewMockPandoraWithPrefix("/v2")
+	conf1 := conf.MapConf{
+		"force_microsecond":         "false",
+		"ft_memory_channel":         "false",
+		"ft_strategy":               "backup_only",
+		"ignore_invalid_field":      "true",
+		"logkit_send_time":          "false",
+		"pandora_extra_info":        "true",
+		"pandora_ak":                "ak",
+		"pandora_auto_convert_date": "true",
+		"pandora_gzip":              "true",
+		"pandora_host":              "http://127.0.0.1:" + pt,
+		"pandora_region":            "nb",
+		"pandora_repo_name":         "TestPandoraSenderTime",
+		"pandora_schema_free":       "true",
+		"pandora_sk":                "sk",
+		"runner_name":               "runner.20171117110730",
+		"sender_type":               "pandora",
+		"name":                      "TestPandoraSenderTime",
+		"KeyPandoraSchemaUpdateInterval": "1s",
+	}
+
+	innerSender, err := pandora.NewSender(conf1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := sender.NewFtSender(innerSender, conf1, fttestdir)
+	defer os.RemoveAll(fttestdir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := Data{}
+	d["x1"] = "123.2"
+	d["hostname"] = "123.2"
+	d["hostname0"] = "123.2"
+	d["hostname1"] = "123.2"
+	d["hostname2"] = "123.2"
+	d["osinfo"] = "123.2"
+	err = s.Send([]Data{d})
+	if st, ok := err.(*StatsError); ok {
+		err = st.ErrorDetail
+	}
+	if err != nil {
+		t.Error(err)
+	}
+	resp := pandoraServer.Body
+	assert.Equal(t, true, strings.Contains(resp, "core"))
+	assert.Equal(t, true, strings.Contains(resp, "x1=123.2"))
+	assert.Equal(t, true, strings.Contains(resp, "osinfo=123.2"))
+	assert.Equal(t, true, strings.Contains(resp, "hostname=123.2"))
+	assert.Equal(t, true, strings.Contains(resp, "hostname0=123.2"))
+	assert.Equal(t, true, strings.Contains(resp, "hostname1=123.2"))
+	assert.Equal(t, true, strings.Contains(resp, "hostname2=123.2"))
+
+	conf2 := conf.MapConf{
+		"force_microsecond":         "false",
+		"ft_memory_channel":         "false",
+		"ft_strategy":               "backup_only",
+		"ignore_invalid_field":      "true",
+		"logkit_send_time":          "false",
+		"pandora_extra_info":        "false",
+		"pandora_ak":                "ak",
+		"pandora_auto_convert_date": "true",
+		"pandora_gzip":              "true",
+		"pandora_host":              "http://127.0.0.1:" + pt,
+		"pandora_region":            "nb",
+		"pandora_repo_name":         "TestPandoraSenderTime",
+		"pandora_schema_free":       "true",
+		"pandora_sk":                "sk",
+		"runner_name":               "runner.20171117110730",
+		"sender_type":               "pandora",
+		"name":                      "TestPandoraSenderTime",
+		"KeyPandoraSchemaUpdateInterval": "1s",
+	}
+	innerSender, err = pandora.NewSender(conf2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s, err = sender.NewFtSender(innerSender, conf1, fttestdir)
+	d = Data{
+		"*x1":        "123.2",
+		"x2.dot":     "123.2",
+		"@timestamp": "2018-07-18T10:17:36.549054846+08:00",
+	}
+	err = s.Send([]Data{d})
+	if st, ok := err.(*StatsError); ok {
+		err = st.ErrorDetail
+	}
+	if err != nil {
+		t.Error(err)
+	}
+	resp = pandoraServer.Body
+	assert.Equal(t, true, strings.Contains(resp, "x1=123.2"))
+	assert.Equal(t, true, strings.Contains(resp, "x2_dot=123.2"))
+	assert.Equal(t, true, strings.Contains(resp, "timestamp=2018-07-18T10:17:36.549054846+08:00"))
 }

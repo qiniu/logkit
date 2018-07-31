@@ -3,10 +3,10 @@ package http
 import (
 	"bufio"
 	"compress/gzip"
+	"context"
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"sync/atomic"
 	"time"
@@ -21,6 +21,11 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var (
+	_ reader.DaemonReader = &Reader{}
+	_ reader.Reader       = &Reader{}
+)
+
 const (
 	DefaultSyncEvery       = 10
 	DefaultMaxBodySize     = 100 * 1024 * 1024
@@ -33,15 +38,17 @@ func init() {
 }
 
 type Reader struct {
+	meta *reader.Meta
+	// Note: 原子操作，用于表示 reader 整体的运行状态
+	status int32
+
+	bufQueue queue.BackendQueue
+	readChan <-chan []byte
+
 	address string
 	path    string
 
-	meta   *reader.Meta
-	status int32
-
-	listener net.Listener
-	bufQueue queue.BackendQueue
-	readChan <-chan []byte
+	server *http.Server
 }
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
@@ -55,93 +62,97 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	readChan := bq.ReadChan()
 	return &Reader{
+		meta:     meta,
+		status:   reader.StatusInit,
+		bufQueue: bq,
+		readChan: bq.ReadChan(),
 		address:  address,
 		path:     path,
-		meta:     meta,
-		bufQueue: bq,
-		readChan: readChan,
-		status:   reader.StatusInit,
 	}, nil
 }
 
-func (h *Reader) Name() string {
-	return "Reader<" + h.address + ">"
+func (r *Reader) isStopping() bool {
+	return atomic.LoadInt32(&r.status) == reader.StatusStopping
 }
 
-func (h *Reader) Source() string {
-	return h.address
+func (r *Reader) hasStopped() bool {
+	return atomic.LoadInt32(&r.status) == reader.StatusStopped
 }
 
-func (h *Reader) Start() error {
-	if !atomic.CompareAndSwapInt32(&h.status, reader.StatusInit, reader.StatusRunning) {
-		return fmt.Errorf("runner[%v] Reader[%v] already started", h.meta.RunnerName, h.Name())
-	}
-	var err error
-	r := echo.New()
-	r.POST(h.path, h.postData())
+func (r *Reader) Name() string {
+	return "HTTPReader<" + r.address + ">"
+}
 
-	if h.listener, err = net.Listen("tcp", h.address); err != nil {
-		return err
+func (r *Reader) SetMode(_ string, _ interface{}) error {
+	return fmt.Errorf("reader %q does not support read mode", r.Name())
+}
+
+func (r *Reader) Start() error {
+	if r.isStopping() || r.hasStopped() {
+		return errors.New("reader is stopping or has stopped")
+	} else if !atomic.CompareAndSwapInt32(&r.status, reader.StatusInit, reader.StatusRunning) {
+		log.Warnf("Runner[%v] %q daemon has already started and is running", r.meta.RunnerName, r.Name())
+		return nil
 	}
 
-	server := &http.Server{
-		Handler: r,
-		Addr:    h.address,
+	e := echo.New()
+	e.POST(r.path, r.postData())
+
+	r.server = &http.Server{
+		Handler: e,
+		Addr:    r.address,
 	}
 	go func() {
-		server.Serve(h.listener)
+		if err := r.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Errorf("Runner[%v] %q daemon start HTTP server failed: %v", r.meta.RunnerName, r.Name(), err)
+		}
 	}()
-	log.Infof("runner[%v] Reader[%v] has started and listener service on %v\n", h.meta.RunnerName, h.Name(), h.address)
+	log.Infof("Runner[%v] %q daemon has started", r.meta.RunnerName, r.Name())
 	return nil
 }
 
-func (h *Reader) ReadLine() (data string, err error) {
-	if atomic.LoadInt32(&h.status) == reader.StatusInit {
-		err = h.Start()
-		if err != nil {
-			log.Error(err)
-		}
-	}
+func (r *Reader) Source() string {
+	return r.address
+}
+
+func (r *Reader) ReadLine() (string, error) {
 	timer := time.NewTimer(time.Second)
+	defer timer.Stop()
 	select {
-	case dat := <-h.readChan:
-		data = string(dat)
+	case data := <-r.readChan:
+		return string(data), nil
 	case <-timer.C:
 	}
-	timer.Stop()
-	return
+
+	return "", nil
 }
 
-func (h *Reader) SetMode(mode string, v interface{}) error {
-	return fmt.Errorf("runner[%v] Reader[%v] not support read mode\n", h.meta.RunnerName, h.Name())
-}
+func (_ *Reader) SyncMeta() {}
 
-func (h *Reader) Close() error {
-	if atomic.CompareAndSwapInt32(&h.status, reader.StatusRunning, reader.StatusStopping) {
-		log.Infof("Runner[%v] Reader[%v] stopping", h.meta.RunnerName, h.Name())
-	} else {
-		h.bufQueue.Close()
+func (r *Reader) Close() error {
+	if !atomic.CompareAndSwapInt32(&r.status, reader.StatusRunning, reader.StatusStopping) {
+		log.Warnf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
+		return nil
 	}
-	if h.listener != nil {
-		h.listener.Close()
-	}
-	return nil
+	log.Debugf("Runner[%v] %q daemon is stopping", r.meta.RunnerName, r.Name())
+
+	r.server.Shutdown(context.Background())
+	err := r.bufQueue.Close()
+	atomic.StoreInt32(&r.status, reader.StatusStopped)
+	return err
 }
 
-func (h *Reader) SyncMeta() {}
-
-func (h *Reader) postData() echo.HandlerFunc {
+func (r *Reader) postData() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		if err := h.pickUpData(c.Request()); err != nil {
+		if err := r.pickUpData(c.Request()); err != nil {
 			return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 		}
 		return c.JSON(http.StatusOK, nil)
 	}
 }
 
-func (h *Reader) pickUpData(req *http.Request) (err error) {
+func (r *Reader) pickUpData(req *http.Request) (err error) {
 	if req.ContentLength > DefaultMaxBodySize {
 		return errors.New("the request body is too large")
 	}
@@ -155,32 +166,32 @@ func (h *Reader) pickUpData(req *http.Request) (err error) {
 			return fmt.Errorf("read gzip body error %v", err)
 		}
 	}
-	r := bufio.NewReader(reqBody)
-	return h.storageData(r)
+	br := bufio.NewReader(reqBody)
+	return r.storageData(br)
 }
 
-func (h *Reader) storageData(r *bufio.Reader) (err error) {
+func (r *Reader) storageData(br *bufio.Reader) (err error) {
 	for {
-		line, err := h.readLine(r)
+		line, err := r.readLine(br)
 		if err != nil {
 			if err != io.EOF {
-				log.Errorf("runner[%v] Reader[%v] read data from http request error, %v\n", h.meta.RunnerName, h.Name(), err)
+				log.Errorf("runner[%v] Reader[%v] read data from http request error, %v\n", r.meta.RunnerName, r.Name(), err)
 			}
 			break
 		}
 		if line == "" {
 			continue
 		}
-		h.bufQueue.Put([]byte(line))
+		r.bufQueue.Put([]byte(line))
 	}
 	return
 }
 
-func (h *Reader) readLine(r *bufio.Reader) (str string, err error) {
+func (r *Reader) readLine(br *bufio.Reader) (str string, err error) {
 	isPrefix := true
 	var line, fragment []byte
 	for isPrefix && err == nil {
-		fragment, isPrefix, err = r.ReadLine()
+		fragment, isPrefix, err = br.ReadLine()
 		line = append(line, fragment...)
 	}
 	return string(line), err

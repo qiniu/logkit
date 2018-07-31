@@ -6,14 +6,15 @@ import (
 	"runtime"
 
 	config "github.com/qiniu/logkit/conf"
+	_ "github.com/qiniu/logkit/metric/all"
 	"github.com/qiniu/logkit/mgr"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/samples"
+	"github.com/qiniu/logkit/sender"
 	utilsos "github.com/qiniu/logkit/utils/os"
 
 	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/sender"
 )
 
 type Config struct {
@@ -26,7 +27,7 @@ type Config struct {
 var conf Config
 
 func main() {
-	config.Init("f", "qbox", "qboxlogexporter.conf")
+	config.Init("f", "", "main.conf")
 	if err := config.Load(&conf); err != nil {
 		log.Fatal("config.Load failed:", err)
 	}

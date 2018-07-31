@@ -45,13 +45,19 @@ func (c *Pipeline) FormKodoSpec(input *CreateRepoForKodoInput) *ExportKodoSpec {
 		input.Format = "parquet"
 	}
 	return &ExportKodoSpec{
-		Bucket:    input.Bucket,
-		KeyPrefix: input.Prefix,
-		Fields:    doc,
-		Email:     input.Email,
-		AccessKey: input.Ak,
-		Format:    input.Format,
-		Retention: input.Retention,
+		Bucket:         input.Bucket,
+		KeyPrefix:      input.Prefix,
+		Fields:         doc,
+		Email:          input.Email,
+		AccessKey:      input.Ak,
+		Format:         input.Format,
+		Retention:      input.Retention,
+		Compress:       input.Compress,
+		RotateStrategy: input.RotateStrategy,
+		RotateInterval: input.RotateInterval,
+		RotateSize:     input.RotateSize,
+		RotateSizeType: "KB",
+		RotateNumber:   input.RotateSize / 1024,
 	}
 }
 
@@ -128,7 +134,7 @@ func convertCreate2LogDB(input *CreateRepoForLogDBInput) *logdb.CreateRepoInput 
 	linput := &logdb.CreateRepoInput{
 		Region:    input.Region,
 		RepoName:  input.LogRepoName,
-		Schema:    convertSchema2LogDB(input.Schema, input.AnalyzerInfo),
+		Schema:    convertSchema2LogDB(input.Schema, input.AnalyzerInfo, nil),
 		Retention: input.Retention,
 	}
 	if input.AnalyzerInfo.FullText {
@@ -137,7 +143,7 @@ func convertCreate2LogDB(input *CreateRepoForLogDBInput) *logdb.CreateRepoInput 
 	return linput
 }
 
-func convertSchema2LogDB(scs []RepoSchemaEntry, analyzer AnalyzerInfo) (ret []logdb.RepoSchemaEntry) {
+func convertSchema2LogDB(scs []RepoSchemaEntry, analyzer AnalyzerInfo, prefix []string) (ret []logdb.RepoSchemaEntry) {
 	ret = make([]logdb.RepoSchemaEntry, 0)
 	for _, v := range scs {
 		rp := logdb.RepoSchemaEntry{
@@ -145,7 +151,7 @@ func convertSchema2LogDB(scs []RepoSchemaEntry, analyzer AnalyzerInfo) (ret []lo
 			ValueType: v.ValueType,
 		}
 		if v.ValueType == PandoraTypeMap {
-			rp.Schemas = convertSchema2LogDB(v.Schema, analyzer)
+			rp.Schemas = convertSchema2LogDB(v.Schema, analyzer, append(prefix, v.Key))
 			rp.ValueType = logdb.TypeObject
 		}
 		if v.ValueType == PandoraTypeJsonString {
@@ -161,7 +167,7 @@ func convertSchema2LogDB(scs []RepoSchemaEntry, analyzer AnalyzerInfo) (ret []lo
 			exist := false
 			var ana string
 			if analyzer.Analyzer != nil {
-				ana, exist = analyzer.Analyzer[v.Key]
+				ana, exist = analyzer.Analyzer[strings.Join(append(prefix,v.Key),".")]
 			}
 			if exist && logdb.Analyzers[ana] {
 				rp.Analyzer = ana
@@ -300,7 +306,7 @@ func (c *Pipeline) AutoExportToLogDB(input *AutoExportToLogDBInput) error {
 	if err != nil {
 		return err
 	}
-	logdbschemas := convertSchema2LogDB(repoInfo.Schema, input.AnalyzerInfo)
+	logdbschemas := convertSchema2LogDB(repoInfo.Schema, input.AnalyzerInfo, nil)
 	logdbrepoinfo, err := logdbapi.GetRepo(&logdb.GetRepoInput{
 		RepoName:     input.LogRepoName,
 		PandoraToken: input.GetLogDBRepoToken,
@@ -379,8 +385,8 @@ func (c *Pipeline) AutoExportToKODO(input *AutoExportToKODOInput) error {
 	if input.BucketName == "" {
 		input.BucketName = input.RepoName
 	}
-	if input.Retention == 0 {
-		input.Retention = 90
+	if input.Retention <= 0 {
+		input.Retention = 0
 	}
 	input.BucketName = strings.Replace(input.BucketName, "_", "-", -1)
 
@@ -410,14 +416,18 @@ func (c *Pipeline) AutoExportToKODO(input *AutoExportToKODOInput) error {
 			}
 		}
 		kodoSpec := c.FormKodoSpec(&CreateRepoForKodoInput{
-			Retention: input.Retention,
-			Ak:        ak,
-			Email:     input.Email,
-			Bucket:    input.BucketName,
-			RepoName:  input.RepoName,
-			Schema:    repoInfo.Schema,
-			Prefix:    input.Prefix,
-			Format:    input.Format,
+			Retention:      input.Retention,
+			Ak:             ak,
+			Email:          input.Email,
+			Bucket:         input.BucketName,
+			RepoName:       input.RepoName,
+			Schema:         repoInfo.Schema,
+			Prefix:         input.Prefix,
+			Format:         input.Format,
+			Compress:       input.Compress,
+			RotateStrategy: input.RotateStrategy,
+			RotateInterval: input.RotateInterval,
+			RotateSize:     input.RotateSize,
 		})
 		exportInput := c.FormExportInput(input.RepoName, ExportTypeKODO, kodoSpec)
 		exportInput.PandoraToken = input.CreateExportToken

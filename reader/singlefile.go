@@ -139,31 +139,19 @@ func (sf *SingleFile) statFile(path string) (pfi os.FileInfo, err error) {
 }
 
 func (sf *SingleFile) openSingleFile(path string) (pfi os.FileInfo, f *os.File, err error) {
-
-	for {
-		if atomic.LoadInt32(&sf.stopped) > 0 {
-			err = errors.New("reader " + sf.Name() + " has been exited")
-			return
-		}
-
-		path, pfi, err = GetRealPath(path)
-		if err != nil || pfi == nil {
-			log.Warnf("Runner[%v] %s - utils.GetRealPath failed, err:%v", sf.meta.RunnerName, path, err)
-			time.Sleep(time.Minute)
-			continue
-		}
-		if !pfi.Mode().IsRegular() {
-			log.Warnf("Runner[%v] %s - file failed, err: file is not regular", sf.meta.RunnerName, path)
-			time.Sleep(time.Minute)
-			continue
-		}
-		f, err = os.Open(path)
-		if err != nil {
-			log.Warnf("Runner[%v] %s - open file err:%v", sf.meta.RunnerName, path, err)
-			time.Sleep(time.Minute)
-			continue
-		}
-		break
+	path, pfi, err = GetRealPath(path)
+	if err != nil || pfi == nil {
+		err = fmt.Errorf("runner[%v] %s - utils.GetRealPath failed, err:%v", sf.meta.RunnerName, path, err)
+		return
+	}
+	if !pfi.Mode().IsRegular() {
+		err = fmt.Errorf("runner[%v] %s - file failed, err: file is not regular", sf.meta.RunnerName, path)
+		return
+	}
+	f, err = os.Open(path)
+	if err != nil {
+		err = fmt.Errorf("runner[%v] %s - open file err:%v", sf.meta.RunnerName, path, err)
+		return
 	}
 	return
 }
@@ -194,7 +182,10 @@ func (sf *SingleFile) Close() (err error) {
 	if sf.ratereader != nil {
 		sf.ratereader.Close()
 	}
-	return sf.f.Close()
+	if sf.f != nil {
+		return sf.f.Close()
+	}
+	return nil
 }
 
 func (sf *SingleFile) detectMovedName(inode uint64) (name string) {

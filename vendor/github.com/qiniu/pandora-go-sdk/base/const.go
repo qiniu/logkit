@@ -33,6 +33,8 @@ const (
 	OpDeleteRepo          string = "DeleteRepo"
 	OpRepoExists          string = "RepoExists"
 	OpPostData            string = "PostData"
+	OpPostRawtextData     string = "PostRawtextData"
+	OpPostTextData        string = "PostTextData"
 	OpCreateTransform     string = "CreateTransform"
 	OpUpdateTransform     string = "UpdateTransform"
 	OpGetTransform        string = "GetTransform"

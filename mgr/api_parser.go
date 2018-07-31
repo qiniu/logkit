@@ -3,6 +3,7 @@ package mgr
 import (
 	"fmt"
 	"net/http"
+	"sort"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
@@ -47,7 +48,16 @@ func (rs *RestService) PostParse() echo.HandlerFunc {
 // get /logkit/parser/usages 获得解析用途说明
 func (rs *RestService) GetParserUsages() echo.HandlerFunc {
 	return func(c echo.Context) error {
+		sort.Stable(parser.ModeUsages)
 		return RespSuccess(c, parser.ModeUsages)
+	}
+}
+
+// get /logkit/parser/tooltips 获取解析用途提示
+func (rs *RestService) GetParserTooltips() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		sort.Stable(parser.ModeToolTips)
+		return RespSuccess(c, parser.ModeToolTips)
 	}
 }
 

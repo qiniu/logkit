@@ -122,4 +122,14 @@ func parserAPITest(p *testParam) {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
 	assert.Equal(t, parser.SampleLogs, got3.Data)
+
+	var got4 respModeUsages
+	url = "http://127.0.0.1" + rs.address + "/logkit/parser/tooltips"
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	if err = jsoniter.Unmarshal(respBody, &got4); err != nil {
+		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
+	}
+	assert.Equal(t, parser.ModeToolTips, got4.Data)
 }

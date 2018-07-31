@@ -2,6 +2,7 @@ package mgr
 
 import (
 	"net/http"
+	"sort"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
@@ -13,7 +14,16 @@ import (
 // get /logkit/reader/usages 获取Reader用途
 func (rs *RestService) GetReaderUsages() echo.HandlerFunc {
 	return func(c echo.Context) error {
+		sort.Stable(reader.ModeUsages)
 		return RespSuccess(c, reader.ModeUsages)
+	}
+}
+
+// get /logkit/reader/tooltips 获取Reader用途提示
+func (rs *RestService) GetReaderTooltips() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		sort.Stable(reader.ModeToolTips)
+		return RespSuccess(c, reader.ModeToolTips)
 	}
 }
 
@@ -47,7 +57,7 @@ func (rs *RestService) PostReaderCheck() echo.HandlerFunc {
 		if err := c.Bind(&readerConf); err != nil {
 			return RespError(c, http.StatusBadRequest, ErrReadRead, err.Error())
 		}
-		_, err := reader.NewFileBufReader(readerConf, true)
+		_, err := reader.NewReader(readerConf, true)
 		if err != nil {
 			return RespError(c, http.StatusBadRequest, ErrReadRead, err.Error())
 		}

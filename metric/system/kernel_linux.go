@@ -36,13 +36,13 @@ const (
 )
 
 // KeyKernelUsages TypeMetricKernel 中的字段名称
-var KeyKernelUsages = []KeyValue{
-	{KernelInterrupts, "内核中断次数"},
-	{KernelContextSwitches, "内核上下文切换次数"},
-	{KernelProcessesForked, "fork的进程数"},
-	{KernelBootTime, "内核启动时间"},
-	{KernelDiskPagesIn, "磁盘换入数量"},
-	{KernelDiskPagesOut, "磁盘换出数量"},
+var KeyKernelUsages = KeyValueSlice{
+	{KernelInterrupts, "内核中断次数", ""},
+	{KernelContextSwitches, "内核上下文切换次数", ""},
+	{KernelProcessesForked, "fork的进程数", ""},
+	{KernelBootTime, "内核启动时间", ""},
+	{KernelDiskPagesIn, "磁盘换入数量", ""},
+	{KernelDiskPagesOut, "磁盘换出数量", ""},
 }
 
 type Kernel struct {

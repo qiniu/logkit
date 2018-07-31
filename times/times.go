@@ -101,7 +101,7 @@ func GetTimeZone() (zoneName, zoneValue string) {
 	return
 }
 
-func StrToTime(value string) (time.Time, error) {
+func StrToTimeLocation(value string, loc *time.Location) (time.Time, error) {
 	if value == "" {
 		return time.Now(), errors.New("empty time string")
 	}
@@ -109,10 +109,14 @@ func StrToTime(value string) (time.Time, error) {
 	var t time.Time
 	var err error
 	for _, layout := range layouts {
-		t, err = time.Parse(layout, value)
+		t, err = time.ParseInLocation(layout, value, loc)
 		if err == nil {
 			return t, nil
 		}
 	}
 	return time.Now(), fmt.Errorf("can not find any layout to parse %v", value)
+}
+
+func StrToTime(value string) (time.Time, error) {
+	return StrToTimeLocation(value, time.UTC)
 }

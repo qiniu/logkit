@@ -34,8 +34,14 @@ type Transformer interface {
 	Stats() StatsInfo
 }
 
-//transformer初始化方法接口,err不为空表示初始化失败
-type Initialize interface {
+// DataReader 代表了一个可直接读取内存数据结构的读取器
+type StatsTransformer interface {
+	// ReadData 用于读取一条数据以及数据的实际读取字节
+	SetStats(string) StatsInfo
+}
+
+// transformer 初始化方法接口,err 不为空表示初始化失败
+type Initializer interface {
 	Init() error
 }
 
@@ -75,6 +81,7 @@ var (
 		Placeholder:  "new_field_keyname",
 		DefaultNoUse: false,
 		Description:  "新的字段名(new)",
+		ToolTip:      "生成的字段名称，不改变原有的字段",
 		Type:         TransformTypeString,
 	}
 	KeyFieldNewRequired = Option{
@@ -96,7 +103,9 @@ var (
 		Default:      0,
 		DefaultNoUse: false,
 		Description:  "时区偏移量(offset)",
+		Advance:      true,
 		CheckRegex:   "*",
 		Type:         TransformTypeLong,
+		ToolTip:      "如果key中带有时区信息，则以该时区作为offset的基础时区，否则以UTC时区为基础时区",
 	}
 )

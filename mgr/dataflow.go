@@ -4,9 +4,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path"
+	"strconv"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/json-iterator/go"
+
+	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
 	"github.com/qiniu/logkit/conf"
@@ -19,44 +26,85 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-const DefaultTryTimes = 3
+const (
+	DefaultTryTimes = 3
+	MetaTmp         = "meta_tmp/"
+)
 
-//reader模块中各种type的日志都能获取raw_data
-func RawData(readerConfig conf.MapConf) (rawData string, err error) {
+// RawData 从 reader 模块中根据 type 获取字符串形式的样例日志
+func RawData(readerConfig conf.MapConf) (string, error) {
 	if readerConfig == nil {
-		err = fmt.Errorf("reader config cannot be empty")
-		return
+		return "", fmt.Errorf("reader config cannot be empty")
 	}
 
-	var rd reader.Reader
-	rd, err = reader.NewFileBufReader(readerConfig, true)
+	runnerName, _ := readerConfig.GetString(GlobalKeyName)
+	configMetaPath := runnerName + "_" + Hash(strconv.FormatInt(time.Now().Unix(), 10))
+	metaPath := path.Join(MetaTmp, configMetaPath)
+	log.Debugf("Runner[%v] Using %s as default metaPath", runnerName, metaPath)
+	readerConfig[reader.KeyMetaPath] = metaPath
+
+	rd, err := reader.NewReader(readerConfig, true)
 	if err != nil {
-		return
+		return "", err
 	}
+	defer func() {
+		rd.Close()
+		os.RemoveAll(metaPath)
+	}()
 
-	tryCount := DefaultTryTimes
-	for {
-		if tryCount <= 0 {
-			err = fmt.Errorf("get raw data time out, raw data is empty")
+	var timeoutStatus int32
+	type dataErr struct {
+		data string
+		err  error
+	}
+	// Note: 添加一位缓冲保证 goroutine 在 runner 已经超时的情况下能够正常退出，避免资源泄露
+	readChan := make(chan dataErr, 1)
+	go func() {
+		if dr, ok := rd.(reader.DataReader); ok {
+			data, _, err := dr.ReadData()
+			if err != nil && err != io.EOF {
+				readChan <- dataErr{"", err}
+				return
+			}
+
+			p, err := jsoniter.MarshalIndent(data, "", "  ")
+			readChan <- dataErr{string(p), err}
 			return
 		}
-		tryCount--
-		rawData, err = rd.ReadLine()
-		if err != nil && err != io.EOF {
-			return "", fmt.Errorf("reader %s - error: %v", rd.Name(), err)
+
+		// ReadLine 是可能读到空值的，在接收器宣布超时或读取到数据之前需要不停循环读取
+		for atomic.LoadInt32(&timeoutStatus) == 0 {
+			str, err := rd.ReadLine()
+			if err != nil && err != io.EOF {
+				readChan <- dataErr{"", err}
+				return
+			}
+			if err == io.EOF || len(str) > 0 {
+				readChan <- dataErr{str, nil}
+				return
+			}
 		}
-		if err == io.EOF {
-			return rawData, nil
+	}()
+
+	var rawData string
+	timeout := time.NewTimer(time.Minute)
+	select {
+	case de := <-readChan:
+		rawData, err = de.data, de.err
+		if err != nil {
+			return "", fmt.Errorf("reader %q - error: %v", rd.Name(), err)
 		}
-		if rawData == "" {
-			continue
-		}
-		if len(rawData) >= defaultMaxBatchSize {
-			err = errors.New("data size large than 2M and will be discard")
-			return "", fmt.Errorf("reader %s - error: %v", rd.Name(), err)
-		}
-		return
+
+	case <-timeout.C:
+		atomic.StoreInt32(&timeoutStatus, 1)
+		return "", fmt.Errorf("reader %q read timeout, no data received", rd.Name())
 	}
+
+	if len(rawData) >= DefaultMaxBatchSize {
+		err = errors.New("data size large than 2M and will be discard")
+		return "", fmt.Errorf("reader %q - error: %v", rd.Name(), err)
+	}
+	return rawData, nil
 }
 
 //parse模块中各种type的日志都能获取解析后的数据
@@ -82,12 +130,11 @@ func ParseData(parserConfig conf.MapConf) (parsedData []Data, err error) {
 	}
 
 	parsedData, err = logParser.Parse(sampleData)
-	err = checkErr(err, logParser.Name())
 	if err != nil {
-		return nil, err
+		return parsedData, CheckErr(err)
 	}
 
-	return
+	return parsedData, nil
 }
 
 func TransformData(transformerConfig map[string]interface{}) ([]Data, error) {
@@ -143,8 +190,7 @@ func SendData(senderConfig map[string]interface{}) error {
 		return err
 	}
 
-	senderCnt := len(senders)
-	router, err := getRouter(senderConfig, senderCnt)
+	router, err := getRouter(senderConfig, len(senders))
 	if err != nil {
 		return err
 	}
@@ -154,7 +200,7 @@ func SendData(senderConfig map[string]interface{}) error {
 		return err
 	}
 
-	senderDataList := classifySenderData(datas, router, len(senders))
+	senderDataList := classifySenderData(senders, datas, router)
 	for index, s := range senders {
 		if err := trySend(s, senderDataList[index], DefaultTryTimes); err != nil {
 			return err
@@ -299,8 +345,7 @@ func getSampleData(parserConfig conf.MapConf) ([]string, error) {
 			sampleData = []string{rawData}
 		}
 	default:
-		errMsg := fmt.Sprintf("parser type <%v> is not supported yet", parserType)
-		return nil, errors.New(errMsg)
+		sampleData = append(sampleData, rawData)
 	}
 
 	return sampleData, nil
@@ -317,23 +362,6 @@ func checkSampleData(sampleData []string, logParser parser.Parser) ([]string, er
 		}
 	}
 	return sampleData, nil
-}
-
-func checkErr(err error, parserName string) error {
-	se, ok := err.(*StatsError)
-	var errorCnt int64
-	if ok {
-		errorCnt = se.Errors
-		err = se.ErrorDetail
-	} else if err != nil {
-		errorCnt = 1
-	}
-	if err != nil {
-		errMsg := fmt.Sprintf("parser %s, error %v ", parserName, err.Error())
-		err = fmt.Errorf("%v parse line errors occured, same as %v", errorCnt, errors.New(errMsg))
-	}
-
-	return err
 }
 
 func getTransformerCreator(transformerConfig map[string]interface{}) (transforms.Creator, error) {
@@ -397,7 +425,7 @@ func getTransformer(transConfig map[string]interface{}, create transforms.Creato
 		return nil, jsonErr
 	}
 
-	if trans, ok := trans.(transforms.Initialize); ok {
+	if trans, ok := trans.(transforms.Initializer); ok {
 		if err := trans.Init(); err != nil {
 			return nil, err
 		}

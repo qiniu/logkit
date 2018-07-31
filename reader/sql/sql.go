@@ -27,13 +27,12 @@ import (
 )
 
 const (
-	mb                   = 1024 * 1024 // 1MB
 	sqlOffsetConnector   = "##"
-	SQL_SPLITER          = ";"
+	sqlSpliter           = ";"
 	DefaultMySQLTable    = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA='DATABASE_NAME';"
 	DefaultMySQLDatabase = "SHOW DATABASES;"
 	DefaultPGSQLTable    = "SELECT TABLENAME FROM PG_TABLES WHERE SCHEMANAME='public';"
-	DefaultMsSQLTable    = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_CATALOG='DATABASE_NAME';"
+	DefaultMSSQLTable    = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_CATALOG='DATABASE_NAME';"
 
 	SupportReminder = "history all magic only support @(YYYY) @(YY) @(MM) @(DD) @(hh) @(mm) @(ss)"
 	Wildcards       = "*"
@@ -59,8 +58,14 @@ const (
 	COUNT
 )
 
-var _ reader.DataReader = &Reader{}
-var _ reader.Reader = &Reader{}
+var (
+	_ reader.DaemonReader = &Reader{}
+	_ reader.StatsReader  = &Reader{}
+	_ reader.DataReader   = &Reader{}
+	_ reader.Reader       = &Reader{}
+)
+
+var MysqlSystemDB = []string{"information_schema", "performance_schema", "mysql", "sys"}
 
 func init() {
 	reader.RegisterConstructor(reader.ModeMySQL, NewReader)
@@ -74,113 +79,61 @@ type readInfo struct {
 }
 
 type Reader struct {
+	meta *reader.Meta
+	// Note: 原子操作，用于表示 reader 整体的运行状态
+	status int32
+	// Note: 原子操作，用于表示获取数据的线程运行状态，只可能是 StatusInit 和 StatusRunning
+	routineStatus int32
+
+	stopChan chan struct{}
+	readChan chan readInfo
+	errChan  chan error
+
+	stats     StatsInfo
+	statsLock sync.RWMutex
+
 	dbtype      string //数据库类型
 	datasource  string //数据源
 	database    string //数据库名称
 	rawDatabase string // 记录原始数据库
-	rawsqls     string // 原始sql执行列表
+	rawSQLs     string // 原始sql执行列表
 	historyAll  bool   // 是否导入历史数据
 	rawTable    string // 记录原始数据库表名
 	table       string // 数据库表名
 
-	Cron      *cron.Cron //定时任务
-	readBatch int        // 每次读取的数据量
-	offsetKey string
+	isLoop       bool
+	loopDuration time.Duration
+	cronSchedule bool //是否为定时任务
+	execOnStart  bool
+	Cron         *cron.Cron //定时任务
+	readBatch    int        // 每次读取的数据量
+	offsetKey    string
 
-	readChan chan readInfo
-
-	meta              *reader.Meta // 记录offset的元数据
-	encoder           string       // 解码方式
-	offsets           []int64      // 当前处理文件的sql的offset
-	syncSQLs          []string     // 当前在查询的sqls
-	syncRecords       DBRecords    // 将要append的记录
-	doneRecords       DBRecords    // 已经读过的记录
+	encoder           string  // 解码方式
+	offsets           []int64 // 当前处理文件的sql的offset
+	muxOffsets        sync.RWMutex
+	syncSQLs          []string      // 当前在查询的sqls
+	syncRecords       SyncDBRecords // 将要append的记录
+	doneRecords       SyncDBRecords // 已经读过的记录
+	lastDatabase      string        // 读过的最后一条记录的数据库
+	lastTabel         string        // 读过的最后一条记录的数据表
 	omitDoneDBRecords bool
 	schemas           map[string]string
 
-	status  int32
-	mux     sync.Mutex
-	started bool
-
-	execOnStart  bool
-	loop         bool
-	loopDuration time.Duration
 	magicLagDur  time.Duration
 	count        int64
 	CurrentCount int64
-
-	stats     StatsInfo
-	statsLock sync.RWMutex
-	countLock sync.RWMutex
+	countLock    sync.RWMutex
 }
 
-type DBRecords map[string]TableRecords
-
-type TableRecords map[string]TableInfo
-
-type TableInfo struct {
-	size   int64
-	offset int64
-}
-
-func (dbRecords *DBRecords) Set(value DBRecords) {
-	if *dbRecords == nil {
-		*dbRecords = make(DBRecords)
-	}
-	*dbRecords = value
-}
-
-func (dbRecords *DBRecords) SetTableRecords(db string, tableRecords TableRecords) {
-	if *dbRecords == nil {
-		*dbRecords = make(DBRecords)
-	}
-	(*dbRecords)[db] = tableRecords
-}
-
-func (dbRecords *DBRecords) GetTableRecords(db string) TableRecords {
-	if *dbRecords != nil {
-		return (*dbRecords)[db]
-	}
-	return nil
-}
-
-func (dbRecords *DBRecords) Reset() {
-	*dbRecords = make(DBRecords)
-}
-
-func (tableRecords *TableRecords) Set(value TableRecords) {
-	if *tableRecords == nil {
-		*tableRecords = make(TableRecords)
-	}
-	*tableRecords = value
-}
-
-func (tableRecords *TableRecords) SetTableInfo(table string, tableInfo TableInfo) {
-	if *tableRecords == nil {
-		*tableRecords = make(TableRecords)
-	}
-	(*tableRecords)[table] = tableInfo
-}
-
-func (tableRecords *TableRecords) GetTableInfo(table string) TableInfo {
-	var tableInfo TableInfo
-	if *tableRecords != nil {
-		tableInfo = (*tableRecords)[table]
-	}
-	return tableInfo
-}
-
-func (tableRecords *TableRecords) Reset() {
-	*tableRecords = make(TableRecords)
-}
-
-func NewReader(meta *reader.Meta, conf conf.MapConf) (ret reader.Reader, err error) {
+func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	var readBatch int
-	var dbtype, dataSource, rawDatabase, rawSqls, cronSchedule, offsetKey, encoder, table string
+	var dbtype, dataSource, rawDatabase, rawSQLs, cronSchedule, offsetKey, encoder, table string
 	var execOnStart, historyAll bool
 	dbtype, _ = conf.GetStringOr(reader.KeyMode, reader.ModeMySQL)
 	logpath, _ := conf.GetStringOr(reader.KeyLogPath, "")
 
+	var err error
 	switch dbtype {
 	case reader.ModeMySQL:
 		readBatch, _ = conf.GetIntOr(reader.KeyMysqlReadBatch, 100)
@@ -193,14 +146,14 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (ret reader.Reader, err err
 			}
 			err = nil
 		}
-		rawDatabase, err = conf.GetString(reader.KeyMysqlDataBase)
-		if err != nil {
-			return nil, err
-		}
-		rawSqls, _ = conf.GetStringOr(reader.KeyMysqlSQL, "")
+		rawDatabase, _ = conf.GetStringOr(reader.KeyMysqlDataBase, "")
+		rawSQLs, _ = conf.GetStringOr(reader.KeyMysqlSQL, "")
 		cronSchedule, _ = conf.GetStringOr(reader.KeyMysqlCron, "")
 		execOnStart, _ = conf.GetBoolOr(reader.KeyMysqlExecOnStart, true)
-		encoder, _ = conf.GetStringOr(reader.KeyEncoding, "")
+		encoder, _ = conf.GetStringOr(reader.KeyMysqlEncoding, "utf8")
+		if strings.Contains(encoder, "-") {
+			encoder = strings.Replace(strings.ToLower(encoder), "-", "", -1)
+		}
 		historyAll, _ = conf.GetBoolOr(reader.KeyMysqlHistoryAll, false)
 		table, _ = conf.GetStringOr(reader.KyeMysqlTable, "")
 	case reader.ModeMSSQL:
@@ -218,7 +171,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (ret reader.Reader, err err
 		if err != nil {
 			return nil, err
 		}
-		rawSqls, _ = conf.GetStringOr(reader.KeyMssqlSQL, "")
+		rawSQLs, _ = conf.GetStringOr(reader.KeyMssqlSQL, "")
 		cronSchedule, _ = conf.GetStringOr(reader.KeyMssqlCron, "")
 		execOnStart, _ = conf.GetBoolOr(reader.KeyMssqlExecOnStart, true)
 	case reader.ModePostgreSQL:
@@ -258,7 +211,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (ret reader.Reader, err err
 				return nil, err
 			}
 		}
-		rawSqls, _ = conf.GetStringOr(reader.KeyPGsqlSQL, "")
+		rawSQLs, _ = conf.GetStringOr(reader.KeyPGsqlSQL, "")
 		cronSchedule, _ = conf.GetStringOr(reader.KeyPGsqlCron, "")
 		execOnStart, _ = conf.GetBoolOr(reader.KeyPGsqlExecOnStart, true)
 	default:
@@ -282,72 +235,241 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (ret reader.Reader, err err
 	var sqls []string
 	omitMeta := true
 	var offsets []int64
-	if rawSqls != "" {
-		offsets, sqls, omitMeta = restoreMeta(meta, rawSqls, mgld)
+	if rawSQLs != "" {
+		offsets, sqls, omitMeta = restoreMeta(meta, rawSQLs, mgld)
 	}
 
-	mr := &Reader{
-		datasource:  dataSource,
-		database:    rawDatabase,
-		rawDatabase: rawDatabase,
-		rawsqls:     rawSqls,
-		Cron:        cron.New(),
-		readBatch:   readBatch,
-		readChan:    make(chan readInfo),
-		meta:        meta,
-		status:      reader.StatusInit,
-		offsetKey:   offsetKey,
-		syncSQLs:    sqls,
-		dbtype:      dbtype,
-		mux:         sync.Mutex{},
-		started:     false,
-		execOnStart: execOnStart,
-		historyAll:  historyAll,
-		rawTable:    table,
-		table:       table,
-		magicLagDur: mgld,
-		schemas:     schemas,
-		statsLock:   sync.RWMutex{},
-		encoder:     encoder,
+	r := &Reader{
+		meta:          meta,
+		status:        reader.StatusInit,
+		routineStatus: reader.StatusInit,
+		stopChan:      make(chan struct{}),
+		readChan:      make(chan readInfo),
+		errChan:       make(chan error),
+		datasource:    dataSource,
+		database:      rawDatabase,
+		rawDatabase:   rawDatabase,
+		rawSQLs:       rawSQLs,
+		Cron:          cron.New(),
+		readBatch:     readBatch,
+		offsetKey:     offsetKey,
+		syncSQLs:      sqls,
+		dbtype:        dbtype,
+		execOnStart:   execOnStart,
+		historyAll:    historyAll,
+		rawTable:      table,
+		table:         table,
+		magicLagDur:   mgld,
+		schemas:       schemas,
+		encoder:       encoder,
 	}
 
-	if mr.rawsqls == "" {
-		valid := checkMagic(mr.database) && checkMagic(mr.table)
+	if r.rawDatabase == "" {
+		r.rawDatabase = "*"
+	}
+	if r.rawTable == "" {
+		r.rawTable = "*"
+	}
+
+	if r.rawSQLs == "" {
+		valid := checkMagic(r.database) && checkMagic(r.table)
 		if !valid {
 			err = fmt.Errorf(SupportReminder)
 			return nil, err
 		}
 
-		mr.omitDoneDBRecords = mr.doneRecords.restoreRecordsFile(mr.meta)
+		r.lastDatabase, r.lastTabel, r.omitDoneDBRecords = r.doneRecords.restoreRecordsFile(r.meta)
 	}
 
 	// 如果meta初始信息损坏
 	if !omitMeta {
-		mr.offsets = offsets
+		r.offsets = offsets
 	} else {
-		mr.offsets = make([]int64, len(mr.syncSQLs))
+		r.offsets = make([]int64, len(r.syncSQLs))
 	}
 
-	//schedule    string     //定时任务配置串
+	// 定时任务配置串
 	if len(cronSchedule) > 0 {
 		cronSchedule = strings.ToLower(cronSchedule)
 		if strings.HasPrefix(cronSchedule, reader.Loop) {
-			mr.loop = true
-			mr.loopDuration, err = reader.ParseLoopDuration(cronSchedule)
+			r.isLoop = true
+			r.loopDuration, err = reader.ParseLoopDuration(cronSchedule)
 			if err != nil {
-				log.Errorf("Runner[%v] %v %v", mr.meta.RunnerName, mr.Name(), err)
-				err = nil
+				log.Errorf("Runner[%v] %v %v", r.meta.RunnerName, r.Name(), err)
+			}
+			if r.loopDuration.Nanoseconds() <= 0 {
+				r.loopDuration = 1 * time.Second
 			}
 		} else {
-			err = mr.Cron.AddFunc(cronSchedule, mr.run)
+			r.cronSchedule = true
+			err = r.Cron.AddFunc(cronSchedule, r.run)
 			if err != nil {
 				return nil, err
 			}
-			log.Infof("Runner[%v] %v Cron job added with schedule <%v>", mr.meta.RunnerName, mr.Name(), cronSchedule)
+			log.Infof("Runner[%v] %v Cron job added with schedule <%v>", r.meta.RunnerName, r.Name(), cronSchedule)
+		}
+	}
+	return r, nil
+}
+
+func (r *Reader) isStopping() bool {
+	return atomic.LoadInt32(&r.status) == reader.StatusStopping
+}
+
+func (r *Reader) hasStopped() bool {
+	return atomic.LoadInt32(&r.status) == reader.StatusStopped
+}
+
+func (r *Reader) Name() string {
+	return strings.ToUpper(r.dbtype) + "_Reader:" + r.rawDatabase + "_" + Hash(r.rawSQLs)
+}
+
+func (r *Reader) SetMode(mode string, v interface{}) error {
+	return errors.New("SQL reader does not support read mode")
+}
+
+func (r *Reader) setStatsError(err string) {
+	r.statsLock.Lock()
+	defer r.statsLock.Unlock()
+	r.stats.LastError = err
+}
+
+func (r *Reader) sendError(err error) {
+	if err == nil {
+		return
+	}
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Errorf("Reader %q was panicked and recovered from %v", r.Name(), rec)
+		}
+	}()
+	r.errChan <- err
+}
+
+func (r *Reader) Start() error {
+	if r.isStopping() || r.hasStopped() {
+		return errors.New("reader is stopping or has stopped")
+	} else if !atomic.CompareAndSwapInt32(&r.status, reader.StatusInit, reader.StatusRunning) {
+		log.Warnf("Runner[%v] %q daemon has already started and is running", r.meta.RunnerName, r.Name())
+		return nil
+	}
+
+	if r.isLoop {
+		go func() {
+			ticker := time.NewTicker(r.loopDuration)
+			defer ticker.Stop()
+			for {
+				r.run()
+
+				select {
+				case <-r.stopChan:
+					atomic.StoreInt32(&r.status, reader.StatusStopped)
+					log.Infof("Runner[%v] %q daemon has stopped from running", r.meta.RunnerName, r.Name())
+					return
+				case <-ticker.C:
+				}
+			}
+		}()
+
+	} else {
+		if r.execOnStart {
+			go r.run()
+		}
+		r.Cron.Start()
+	}
+	log.Infof("Runner[%v] %q daemon has started", r.meta.RunnerName, r.Name())
+	return nil
+}
+
+func (r *Reader) Source() string {
+	// 不能把 DataSource 弄出去，包含密码
+	return r.dbtype + "_" + r.database
+}
+
+func (r *Reader) ReadLine() (string, error) {
+	return "", errors.New("method ReadLine is not supported, please use ReadData")
+}
+
+func (r *Reader) ReadData() (Data, int64, error) {
+	timer := time.NewTimer(time.Second)
+	defer timer.Stop()
+	select {
+	case info := <-r.readChan:
+		return info.data, info.bytes, nil
+	case err := <-r.errChan:
+		return nil, 0, err
+	case <-timer.C:
+	}
+
+	return nil, 0, nil
+}
+
+func (r *Reader) Status() StatsInfo {
+	r.statsLock.RLock()
+	defer r.statsLock.RUnlock()
+	return r.stats
+}
+
+// SyncMeta 从队列取数据时同步队列，作用在于保证数据不重复
+func (r *Reader) SyncMeta() {
+	if r.rawSQLs == "" {
+		now := time.Now().String()
+		var all string
+		dbRecords := r.syncRecords.GetDBRecords()
+
+		for database, tablesRecord := range dbRecords {
+			for table, tableInfo := range tablesRecord.GetTable() {
+				all += database + sqlOffsetConnector + table + "," +
+					strconv.FormatInt(tableInfo.size, 10) + "," +
+					strconv.FormatInt(tableInfo.offset, 10) + "," +
+					now + "@" + "\n"
+			}
 		}
 
+		if len(all) <= 0 {
+			r.syncRecords.Reset()
+			return
+		}
+
+		if err := WriteRecordsFile(r.meta.DoneFilePath, all); err != nil {
+			log.Errorf("Runner[%v] %v SyncMeta error %v", r.meta.RunnerName, r.Name(), err)
+		}
+		r.syncRecords.Reset()
+		return
 	}
-	return mr, nil
+
+	encodeSQLs := make([]string, 0)
+	for _, sql := range r.syncSQLs {
+		encodeSQLs = append(encodeSQLs, strings.Replace(sql, " ", "@", -1))
+	}
+	r.muxOffsets.RLock()
+	defer r.muxOffsets.RUnlock()
+	for _, offset := range r.offsets {
+		encodeSQLs = append(encodeSQLs, strconv.FormatInt(offset, 10))
+	}
+	all := strings.Join(encodeSQLs, sqlOffsetConnector)
+	if err := r.meta.WriteOffset(all, int64(len(r.syncSQLs))); err != nil {
+		log.Errorf("Runner[%v] %v SyncMeta error %v", r.meta.RunnerName, r.Name(), err)
+	}
+	return
+}
+
+func (r *Reader) Close() error {
+	if !atomic.CompareAndSwapInt32(&r.status, reader.StatusRunning, reader.StatusStopping) {
+		log.Warnf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
+		return nil
+	}
+	log.Debugf("Runner[%v] %q daemon is stopping", r.meta.RunnerName, r.Name())
+	close(r.stopChan)
+
+	r.Cron.Stop()
+
+	// 如果此时没有 routine 正在运行，则在此处关闭数据管道，否则由 routine 在退出时负责关闭
+	if atomic.LoadInt32(&r.routineStatus) != reader.StatusRunning {
+		close(r.readChan)
+		close(r.errChan)
+	}
+	return nil
 }
 
 func schemaCheck(rawSchemas []string) (schemas map[string]string, err error) {
@@ -401,86 +523,6 @@ func restoreMeta(meta *reader.Meta, rawSqls string, magicLagDur time.Duration) (
 		offsets[idx] = offset
 	}
 	return
-}
-
-func (tableRecords *TableRecords) restoreTableDone(meta *reader.Meta, database string, tables []string) bool {
-	omitTableRecords := true
-	tablesDoneRecord, err := meta.ReadDBDoneFile(database)
-	if err != nil {
-		log.Errorf("Runner[%v] %v -table done data is corrupted err:%v, omit table done data", meta.RunnerName, meta.DoneFilePath, err)
-		return omitTableRecords
-	}
-
-	omitTableRecords = false
-	for _, table := range tables {
-		if contains(tablesDoneRecord, table) {
-			tableRecords.SetTableInfo(table, TableInfo{
-				size:   -1,
-				offset: -1,
-			})
-		}
-	}
-	return omitTableRecords
-}
-
-func (dbRecords *DBRecords) restoreRecordsFile(meta *reader.Meta) bool {
-	omitDoneDBRecords := true
-	recordsDone, err := meta.ReadRecordsFile(DefaultDoneRecordsFile)
-	if err != nil {
-		log.Errorf("Runner[%v] %v -table done data is corrupted err:%v, omit table done data", meta.RunnerName, meta.DoneFilePath, err)
-		return omitDoneDBRecords
-	}
-
-	omitDoneDBRecords = false
-	for _, record := range recordsDone {
-		tmpDBRecords := strings.Split(record, sqlOffsetConnector)
-		if int64(len(tmpDBRecords)) != 2 {
-			log.Errorf("Runner[%v] %v -meta records done file is not invalid sql records done file %v， omit meta data", meta.RunnerName, meta.MetaFile(), record)
-			return omitDoneDBRecords
-		}
-
-		database := tmpDBRecords[0]
-		var tableRecords TableRecords
-		if dbRecords.GetTableRecords(database) != nil {
-			tableRecords.Set((*dbRecords)[database])
-		}
-
-		tmpTablesRecords := TrimeList(strings.Split(tmpDBRecords[1], "@"))
-		if int64(len(tmpTablesRecords)) < 1 {
-			log.Errorf("Runner[%v] %v -meta records done file is not invalid sql records done file %v， omit meta data", meta.RunnerName, meta.MetaFile(), tmpDBRecords)
-			return omitDoneDBRecords
-		}
-
-		for _, tableRecord := range tmpTablesRecords {
-			tableRecordArr := strings.Split(tableRecord, ",")
-			if int64(len(tableRecordArr)) != 4 {
-				log.Errorf("Runner[%v] %v -meta records done file is not invalid sql records done file %v， omit meta data", meta.RunnerName, meta.MetaFile(), tableRecord)
-				return omitDoneDBRecords
-			}
-
-			size, err := strconv.ParseInt(tableRecordArr[1], 10, 64)
-			if err != nil {
-				log.Errorf("Runner[%v] %v -meta file sql is out of date %v or parse size err %v， omit this offset", meta.RunnerName, meta.MetaFile(), tableRecordArr[1], err)
-				size = -1
-			}
-
-			offset, err := strconv.ParseInt(tableRecordArr[1], 10, 64)
-			if err != nil {
-				log.Errorf("Runner[%v] %v -meta file sql is out of date %v or parse offset err %v， omit this offset", meta.RunnerName, meta.MetaFile(), tableRecordArr[1], err)
-				offset = -1
-			}
-
-			tableInfo := TableInfo{
-				size:   size,
-				offset: offset,
-			}
-			tableRecords.SetTableInfo(tableRecordArr[0], tableInfo)
-		}
-
-		dbRecords.SetTableRecords(database, tableRecords)
-	}
-
-	return omitDoneDBRecords
 }
 
 func convertMagic(magic string, now time.Time) (ret string) {
@@ -655,79 +697,8 @@ func checkMagic(rawSql string) (valid bool) {
 	return true
 }
 
-func (r *Reader) Name() string {
-	return strings.ToUpper(r.dbtype) + "_Reader:" + r.database + "_" + Hash(r.rawsqls)
-}
-
-func (r *Reader) setStatsError(err string) {
-	r.statsLock.Lock()
-	defer r.statsLock.Unlock()
-	r.stats.LastError = err
-}
-
-func (r *Reader) Status() StatsInfo {
-	r.statsLock.RLock()
-	defer r.statsLock.RUnlock()
-	return r.stats
-}
-
-func (r *Reader) Source() string {
-	//不能把DataSource弄出去，包含密码
-	return r.dbtype + "_" + r.database
-}
-
-func (r *Reader) Close() (err error) {
-	r.Cron.Stop()
-	if atomic.CompareAndSwapInt32(&r.status, reader.StatusRunning, reader.StatusStopping) {
-		log.Infof("Runner[%v] %v stopping", r.meta.RunnerName, r.Name())
-	} else {
-		atomic.CompareAndSwapInt32(&r.status, reader.StatusInit, reader.StatusStopped)
-		close(r.readChan)
-	}
-	return nil
-}
-
-// Start 仅调用一次，借用 ReadData 启动，不能在 new 实例的时候启动，会有并发问题
-func (r *Reader) Start() {
-	r.mux.Lock()
-	defer r.mux.Unlock()
-	if r.started {
-		return
-	}
-	if r.loop {
-		go r.LoopRun()
-	} else {
-		r.Cron.Start()
-		if r.execOnStart {
-			go r.run()
-		}
-	}
-	r.started = true
-	log.Infof("Runner[%v] %v pull data daemon started", r.meta.RunnerName, r.Name())
-}
-
-func (r *Reader) ReadLine() (string, error) {
-	return "", errors.New("method ReadLine is not supported, please use ReadData")
-}
-
-func (r *Reader) ReadData() (Data, int64, error) {
-	if !r.started {
-		r.Start()
-	}
-
-	timer := time.NewTimer(time.Second)
-	defer timer.Stop()
-	select {
-	case info := <-r.readChan:
-		return info.data, info.bytes, nil
-	case <-timer.C:
-	}
-
-	return nil, 0, nil
-}
-
 func updateSqls(rawsqls string, now time.Time) []string {
-	encodedSQLs := strings.Split(rawsqls, SQL_SPLITER)
+	encodedSQLs := strings.Split(rawsqls, sqlSpliter)
 	sqls := make([]string, 0)
 	for _, esql := range encodedSQLs {
 		magicSQL := strings.TrimSpace(goMagic(esql, now))
@@ -741,6 +712,8 @@ func updateSqls(rawsqls string, now time.Time) []string {
 
 //check if syncSQLs is out of date
 func (r *Reader) updateOffsets(sqls []string) {
+	r.muxOffsets.Lock()
+	defer r.muxOffsets.Unlock()
 	for idx, sql := range sqls {
 		if idx >= len(r.offsets) {
 			r.offsets = append(r.offsets, 0)
@@ -757,83 +730,59 @@ func (r *Reader) updateOffsets(sqls []string) {
 	return
 }
 
-func (r *Reader) LoopRun() {
-	for {
-		if atomic.LoadInt32(&r.status) == reader.StatusStopped || atomic.LoadInt32(&r.status) == reader.StatusStopping {
-			return
-		}
-		//run 函数里面处理stopping的逻辑
-		r.run()
-		time.Sleep(r.loopDuration)
-	}
-}
-
 func (r *Reader) run() {
-	var err error
-	// 防止并发run
-	for {
-		if atomic.LoadInt32(&r.status) == reader.StatusStopped || atomic.LoadInt32(&r.status) == reader.StatusStopping {
-			return
+	// 当上个任务还未执行完成的时候直接跳过
+	if !atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusInit, reader.StatusRunning) {
+		errMsg := fmt.Sprintf("Runner[%v] %q daemon is still working on last task, this task will not be executed and is skipped this time", r.meta.RunnerName, r.Name())
+		log.Error(errMsg)
+		if !r.isLoop {
+			// 通知上层 Cron 执行间隔可能过短或任务执行时间过长
+			r.sendError(errors.New(errMsg))
 		}
-		if atomic.CompareAndSwapInt32(&r.status, reader.StatusInit, reader.StatusRunning) {
-			break
-		}
-	}
-	//double check
-	if atomic.LoadInt32(&r.status) == reader.StatusStopped || atomic.LoadInt32(&r.status) == reader.StatusStopping {
 		return
 	}
-	// running时退出 状态改为Init，以便 cron 调度下次运行
-	// stopping时推出改为 stopped，不再运行
 	defer func() {
-		atomic.CompareAndSwapInt32(&r.status, reader.StatusRunning, reader.StatusInit)
-		if atomic.CompareAndSwapInt32(&r.status, reader.StatusStopping, reader.StatusStopped) {
+		// 如果 reader 在 routine 运行时关闭，则需要此 routine 负责关闭数据管道
+		if r.isStopping() || r.hasStopped() {
 			close(r.readChan)
+			close(r.errChan)
 		}
-		if err == nil {
-			log.Infof("Runner[%v] %v successfully finished", r.meta.RunnerName, r.Name())
-		}
+		atomic.StoreInt32(&r.routineStatus, reader.StatusInit)
 	}()
 
 	now := time.Now().Add(-r.magicLagDur)
-	r.database = goMagic(r.rawDatabase, now)
 	r.table = goMagic(r.rawTable, now)
 
-	var connectStr string
-	switch r.dbtype {
-	case reader.ModeMySQL:
-		connectStr = getConnectStr(r.datasource, "", r.encoder)
-	case reader.ModeMSSQL:
-		connectStr = r.datasource + ";database=" + r.database
-	case reader.ModePostgreSQL:
-		spls := strings.Split(r.datasource, " ")
-		contains := false
-		for idx, v := range spls {
-			if strings.Contains(v, "dbname") {
-				contains = true
-				spls[idx] = "dbname=" + r.database
-			}
-		}
-		if !contains {
-			spls = append(spls, "dbname="+r.database)
-		}
-		connectStr = strings.Join(spls, " ")
+	connectStr, err := r.getConnectStr("", now)
+	if err != nil {
+		log.Error(err)
+		return
 	}
-	// 开始work逻辑
-	for {
-		if atomic.LoadInt32(&r.status) == reader.StatusStopping {
-			log.Warnf("Runner[%v] %v stopped from running", r.meta.RunnerName, r.Name())
+
+	// 如果执行失败，最多重试 10 次
+	for i := 1; i <= 10; i++ {
+		// 判断上层是否已经关闭，先判断 routineStatus 再判断 status 可以保证同时只有一个 r.run 会运行到此处
+		if r.isStopping() || r.hasStopped() {
+			log.Warnf("Runner[%v] %q daemon has stopped, task is interrupted", r.meta.RunnerName, r.Name())
 			return
 		}
+
 		err = r.exec(connectStr)
 		if err == nil {
-			log.Infof("Runner[%v] %v successfully exec", r.meta.RunnerName, r.Name())
+			log.Infof("Runner[%v] %q task has been successfully executed", r.meta.RunnerName, r.Name())
 			return
 		}
+
 		log.Error(err)
 		r.setStatsError(err.Error())
+		r.sendError(err)
+
+		if r.isLoop {
+			return // 循环执行的任务上层逻辑已经等同重试
+		}
 		time.Sleep(3 * time.Second)
 	}
+	log.Errorf("Runner[%v] %q task execution failed and gave up after 10 tries", r.meta.RunnerName, r.Name())
 }
 
 func (r *Reader) getInitScans(length int, rows *sql.Rows, sqltype string) (scanArgs []interface{}, nochoiced []bool) {
@@ -913,44 +862,43 @@ func (r *Reader) getOffsetIndex(columns []string) int {
 
 func (r *Reader) exec(connectStr string) (err error) {
 	now := time.Now().Add(-r.magicLagDur)
-
-	db, err := openSql(r.dbtype, connectStr, r.Name())
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-	if err = db.Ping(); err != nil {
-		return err
-	}
-
 	// 获取符合条件的数据库
-	dbs, _, err := r.getDatas(db, r.rawDatabase, now, DATABASE)
-	if err != nil {
-		return err
-	}
+	dbs := make([]string, 0)
+	switch r.dbtype {
+	case reader.ModeMySQL:
+		if r.rawSQLs != "" {
+			dbs = append(dbs, goMagic(r.rawDatabase, now))
+		} else {
+			var err error
+			dbs, err = r.getDBs(connectStr, now)
+			if err != nil {
+				return err
+			}
 
-	log.Infof("Runner[%v] %v get valid databases: %v", r.meta.RunnerName, r.Name(), dbs)
+			log.Infof("Runner[%v] %v get valid databases: %v", r.meta.RunnerName, r.Name(), dbs)
 
-	if r.rawsqls == "" {
-		go func() {
-			// 获取数据库所有条数
-			r.countDB(dbs, now)
-			return
-		}()
+			go func() {
+				// 获取数据库所有条数
+				r.countDB(dbs, now)
+				return
+			}()
+		}
+	case reader.ModeMSSQL, reader.ModePostgreSQL:
+		dbs = append(dbs, r.database)
 	}
 
 	for _, currentDB := range dbs {
 		var recordTablesDone TableRecords
-		if !r.omitDoneDBRecords {
-			tableRecords := r.doneRecords.GetTableRecords(currentDB)
-			recordTablesDone.Set(tableRecords)
-		}
+		tableRecords := r.doneRecords.GetTableRecords(currentDB)
+		recordTablesDone.Set(tableRecords)
+
 		err = r.execReadDB(currentDB, now, recordTablesDone)
 		if err != nil {
-			log.Errorf("Runner[%v] %v exect read db: %v error: %v", r.meta.RunnerName, r.Name(), currentDB, err)
+			log.Errorf("Runner[%v] %v exect read db: %v error: %v,will retry read it", r.meta.RunnerName, currentDB, currentDB, err)
+			return err
 		}
-		if atomic.LoadInt32(&r.status) == reader.StatusStopping || atomic.LoadInt32(&r.status) == reader.StatusStopped {
-			log.Warnf("Runner[%v] %v stopped from running", r.meta.RunnerName, r.Name())
+		if r.isStopping() || r.hasStopped() {
+			log.Warnf("Runner[%v] %v stopped from running", r.meta.RunnerName, currentDB)
 			return nil
 		}
 	}
@@ -959,66 +907,57 @@ func (r *Reader) exec(connectStr string) (err error) {
 }
 
 func (r *Reader) countDB(dbs []string, now time.Time) {
-	for _, curDb := range dbs {
+	for _, curDB := range dbs {
 		var recordTablesDone TableRecords
-		if !r.omitDoneDBRecords {
-			tableRecords := r.doneRecords.GetTableRecords(curDb)
-			recordTablesDone.Set(tableRecords)
-		}
-		err := r.execCountDB(curDb, now, recordTablesDone)
+		tableRecords := r.doneRecords.GetTableRecords(curDB)
+		recordTablesDone.Set(tableRecords)
+		err := r.execCountDB(curDB, now, recordTablesDone)
 		if err != nil {
-			log.Errorf("Runner[%v] %v get current database: %v count error: %v", r.meta.RunnerName, r.Name(), curDb, err)
+			log.Errorf("Runner[%v] %v get current database: %v count error: %v", r.meta.RunnerName, r.Name(), curDB, err)
 		}
-		if atomic.LoadInt32(&r.status) == reader.StatusStopping || atomic.LoadInt32(&r.status) == reader.StatusStopped {
-			log.Warnf("Runner[%v] %v stopped from running", r.meta.RunnerName, r.Name())
+		if r.isStopping() || r.hasStopped() {
+			log.Warnf("Runner[%v] %v stopped from running", r.meta.RunnerName, curDB)
 			return
 		}
 	}
 }
 
-func (r *Reader) execCountDB(curDb string, now time.Time, recordTablesDone TableRecords) error {
-	connectStr := getConnectStr(r.datasource, curDb, r.encoder)
-	db, err := openSql(r.dbtype, connectStr, r.Name())
+func (r *Reader) execCountDB(curDB string, now time.Time, recordTablesDone TableRecords) error {
+	connectStr, err := r.getConnectStr(curDB, now)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		db.Close()
-	}()
-	if err = db.Ping(); err != nil {
-		return err
-	}
-	log.Infof("Runner[%v] %v prepare %v change database success, current database is: %v", r.meta.RunnerName, r.Name(), r.dbtype, curDb)
-	r.database = curDb
+
+	log.Infof("Runner[%v] prepare %v change database success, current database is: %v", r.meta.RunnerName, r.dbtype, curDB)
 
 	//更新sqls
 	var tables []string
 	var sqls string
-	if r.rawsqls == "" {
+	if r.rawSQLs == "" {
 		// 获取符合条件的数据表，并且将计算表中记录数的query语句赋给 r.rawsqls
-		tables, sqls, err = r.getDatas(db, r.rawTable, now, COUNT)
+		tables, sqls, err = r.getDatas(connectStr, curDB, r.rawTable, now, COUNT)
 		if err != nil {
 			return err
 		}
 
-		log.Debugf("Runner[%v] %v default count sqls %v", r.meta.RunnerName, r.Name(), r.rawsqls)
+		log.Debugf("Runner[%v] %v default count sqls %v", r.meta.RunnerName, curDB, r.rawSQLs)
 
-		if r.omitDoneDBRecords == true {
+		if r.omitDoneDBRecords {
 			// 兼容
-			recordTablesDone.restoreTableDone(r.meta, r.database, tables)
+			recordTablesDone.restoreTableDone(r.meta, curDB, tables)
 		}
 	}
 
-	if r.rawsqls != "" {
-		sqls = r.rawsqls
+	if r.rawSQLs != "" {
+		sqls = r.rawSQLs
 	}
 	sqlsSlice := updateSqls(sqls, now)
-	log.Infof("Runner[%v] %v start to work, sqls %v offsets %v", r.meta.RunnerName, r.Name(), sqlsSlice, r.offsets)
+	log.Infof("Runner[%v] %v start to work, sqls %v offsets %v", r.meta.RunnerName, curDB, sqlsSlice, r.offsets)
 	tablesLen := len(tables)
 
 	for idx, rawSql := range sqlsSlice {
 		//分sql执行
-		if r.rawsqls == "" && idx < tablesLen {
+		if r.rawSQLs == "" && idx < tablesLen {
 			if recordTablesDone.GetTableInfo(tables[idx]) != (TableInfo{}) {
 				continue
 			}
@@ -1026,7 +965,7 @@ func (r *Reader) execCountDB(curDb string, now time.Time, recordTablesDone Table
 
 		// 每张表的记录数
 		var tableSize int64
-		tableSize, err = r.execTableCount(db, idx, rawSql)
+		tableSize, err = r.execTableCount(connectStr, idx, curDB, rawSql)
 		if err != nil {
 			return err
 		}
@@ -1034,8 +973,8 @@ func (r *Reader) execCountDB(curDb string, now time.Time, recordTablesDone Table
 		// 符合记录的数据库和表的记录总数
 		r.addCount(tableSize)
 
-		if atomic.LoadInt32(&r.status) == reader.StatusStopping || atomic.LoadInt32(&r.status) == reader.StatusStopped {
-			log.Warnf("Runner[%v] %v stopped from running", r.meta.RunnerName, r.Name())
+		if r.isStopping() || r.hasStopped() {
+			log.Warnf("Runner[%v] %v stopped from running", r.meta.RunnerName, curDB)
 			return nil
 		}
 	}
@@ -1043,50 +982,46 @@ func (r *Reader) execCountDB(curDb string, now time.Time, recordTablesDone Table
 	return nil
 }
 
-func (r *Reader) execReadDB(curDb string, now time.Time, recordTablesDone TableRecords) (err error) {
-	connectStr := getConnectStr(r.datasource, curDb, r.encoder)
-	db, err := openSql(r.dbtype, connectStr, r.Name())
+func (r *Reader) execReadDB(curDB string, now time.Time, recordTablesDone TableRecords) (err error) {
+	connectStr, err := r.getConnectStr(curDB, now)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		db.Close()
-	}()
-	if err = db.Ping(); err != nil {
-		return err
-	}
-	log.Infof("Runner[%v] %v prepare %v change database success, current database is: %v", r.meta.RunnerName, r.Name(), r.dbtype, curDb)
-	r.database = curDb
+
+	log.Infof("Runner[%v] %v prepare %v change database success", r.meta.RunnerName, curDB, r.dbtype)
+	r.database = curDB
 
 	//更新sqls
 	var tables []string
 	var sqls string
-	if r.rawsqls == "" {
+	if r.rawSQLs == "" {
 		// 获取符合条件的数据表，并且将获取表中所有记录的语句赋给 r.rawsqls
-		tables, sqls, err = r.getDatas(db, r.rawTable, now, TABLE)
+		tables, sqls, err = r.getDatas(connectStr, curDB, r.rawTable, now, TABLE)
 		if err != nil {
-			log.Errorf("Runner[%v] %v db %v rawTable: %v get tables and sqls error %v", r.meta.RunnerName, r.Name(), curDb, r.rawTable, r.rawsqls, err)
+			log.Errorf("Runner[%v] %v rawTable: %v get tables and sqls error %v", r.meta.RunnerName, r.Name(), r.rawTable, r.rawSQLs, err)
 			if len(tables) == 0 && sqls == "" {
 				return err
 			}
 		}
 
-		log.Infof("Runner[%v] %v default sqls %v", r.meta.RunnerName, r.Name(), r.rawsqls)
+		log.Infof("Runner[%v] %v default sqls %v", r.meta.RunnerName, r.Name(), r.rawSQLs)
 
-		if r.omitDoneDBRecords {
+		if r.omitDoneDBRecords && !recordTablesDone.restoreTableDone(r.meta, curDB, tables) {
 			// 兼容
-			recordTablesDone.restoreTableDone(r.meta, r.database, tables)
-			r.syncRecords.SetTableRecords(curDb, recordTablesDone)
+			r.syncRecords.SetTableRecords(curDB, recordTablesDone)
+			r.doneRecords.SetTableRecords(curDB, recordTablesDone)
 		}
 	}
 	log.Infof("Runner[%v] %v get valid tables: %v, recordTablesDone: %v", r.meta.RunnerName, r.Name(), tables, recordTablesDone)
 
 	var sqlsSlice []string
-	sqlsSlice = updateSqls(sqls, now)
-	if r.rawsqls != "" {
-		sqlsSlice = updateSqls(r.rawsqls, now)
+	if r.rawSQLs != "" {
+		sqlsSlice = updateSqls(r.rawSQLs, now)
 		r.updateOffsets(sqlsSlice)
+	} else {
+		sqlsSlice = updateSqls(sqls, now)
 	}
+
 	r.syncSQLs = sqlsSlice
 	tablesLen := len(tables)
 	log.Infof("Runner[%v] %v start to work, sqls %v offsets %v", r.meta.RunnerName, r.Name(), r.syncSQLs, r.offsets)
@@ -1097,24 +1032,26 @@ func (r *Reader) execReadDB(curDb string, now time.Time, recordTablesDone TableR
 		exit := false
 		var tableName string
 		var readSize int64
-		tmpTablesRecords := r.syncRecords.GetTableRecords(curDb)
 		for !exit {
-			if r.rawsqls == "" && idx < tablesLen {
+			if r.rawSQLs == "" && idx < tablesLen {
 				tableName = tables[idx]
 				if recordTablesDone.GetTableInfo(tableName) != (TableInfo{}) {
 					break
 				}
 			}
 			// 执行每条 sql 语句
-			exit, isRawSql, readSize = r.execReadSql(db, idx, rawSql, tables)
+			exit, isRawSql, readSize, err = r.execReadSql(connectStr, curDB, idx, rawSql, tables)
+			if err != nil {
+				return err
+			}
 
-			if r.rawsqls == "" {
-				tmpTablesRecords.SetTableInfo(tableName, TableInfo{size: readSize, offset: -1})
-				r.syncRecords.SetTableRecords(curDb, tmpTablesRecords)
+			if r.rawSQLs == "" {
+				r.syncRecords.SetTableInfo(curDB, tableName, TableInfo{size: readSize, offset: -1})
+				r.doneRecords.SetTableInfo(curDB, tableName, TableInfo{size: readSize, offset: -1})
 				recordTablesDone.SetTableInfo(tableName, TableInfo{size: readSize, offset: -1})
 			}
 
-			if atomic.LoadInt32(&r.status) == reader.StatusStopping || atomic.LoadInt32(&r.status) == reader.StatusStopped {
+			if r.isStopping() || r.hasStopped() {
 				log.Warnf("Runner[%v] %v stopped from running", r.meta.RunnerName, r.Name())
 				return nil
 			}
@@ -1125,7 +1062,6 @@ func (r *Reader) execReadDB(curDb string, now time.Time, recordTablesDone TableR
 			}
 		}
 	}
-
 	return nil
 }
 
@@ -1347,22 +1283,24 @@ func convertString(v interface{}) (string, error) {
 }
 
 func (r *Reader) getSQL(idx int, rawSQL string) (sql string, err error) {
+	r.muxOffsets.RLock()
+	defer r.muxOffsets.RUnlock()
 	rawSQL = strings.TrimSuffix(strings.TrimSpace(rawSQL), ";")
 	switch r.dbtype {
 	case reader.ModeMySQL:
-		if len(r.offsetKey) > 0 {
+		if len(r.offsetKey) > 0 && len(r.offsets) > idx {
 			sql = fmt.Sprintf("%s WHERE %v >= %d AND %v < %d;", rawSQL, r.offsetKey, r.offsets[idx], r.offsetKey, r.offsets[idx]+int64(r.readBatch))
 		} else {
 			sql = fmt.Sprintf("%s", rawSQL)
 		}
 	case reader.ModeMSSQL:
-		if len(r.offsetKey) > 0 {
+		if len(r.offsetKey) > 0 && len(r.offsets) > idx {
 			sql = fmt.Sprintf("%s WHERE CAST(%v AS BIGINT) >= %d AND CAST(%v AS BIGINT) < %d;", rawSQL, r.offsetKey, r.offsets[idx], r.offsetKey, r.offsets[idx]+int64(r.readBatch))
 		} else {
 			err = fmt.Errorf("%v dbtype is not support get SQL without id now", r.dbtype)
 		}
 	case reader.ModePostgreSQL:
-		if len(r.offsetKey) > 0 {
+		if len(r.offsetKey) > 0 && len(r.offsets) > idx {
 			sql = fmt.Sprintf("%s WHERE %v >= %d AND %v < %d;", rawSQL, r.offsetKey, r.offsets[idx], r.offsetKey, r.offsets[idx]+int64(r.readBatch))
 		} else {
 			err = fmt.Errorf("%v dbtype is not support get SQL without id now", r.dbtype)
@@ -1423,52 +1361,6 @@ func (r *Reader) checkExit(idx int, db *sql.DB) (bool, int64) {
 	return true, -1
 }
 
-//SyncMeta 从队列取数据时同步队列，作用在于保证数据不重复。
-func (r *Reader) SyncMeta() {
-	if r.rawsqls == "" {
-		now := time.Now().String()
-		var all string
-		for database, tablesRecord := range r.syncRecords {
-			var tablesRecordStr string
-			for table, tableInfo := range tablesRecord {
-				tablesRecordStr += table + "," +
-					strconv.FormatInt(tableInfo.size, 10) + "," +
-					strconv.FormatInt(tableInfo.offset, 10) + "," +
-					now + "@"
-			}
-			if tablesRecordStr == "" {
-				continue
-			}
-			all += database + sqlOffsetConnector + tablesRecordStr + "\n"
-		}
-
-		if err := WriteRecordsFile(r.meta.DoneFilePath, all); err != nil {
-			log.Errorf("Runner[%v] %v SyncMeta error %v", r.meta.RunnerName, r.Name(), err)
-			return
-		}
-
-		r.syncRecords.Reset()
-		return
-	}
-
-	encodeSQLs := make([]string, 0)
-	for _, sql := range r.syncSQLs {
-		encodeSQLs = append(encodeSQLs, strings.Replace(sql, " ", "@", -1))
-	}
-	for _, offset := range r.offsets {
-		encodeSQLs = append(encodeSQLs, strconv.FormatInt(offset, 10))
-	}
-	all := strings.Join(encodeSQLs, sqlOffsetConnector)
-	if err := r.meta.WriteOffset(all, int64(len(r.syncSQLs))); err != nil {
-		log.Errorf("Runner[%v] %v SyncMeta error %v", r.meta.RunnerName, r.Name(), err)
-	}
-	return
-}
-
-func (r *Reader) SetMode(mode string, v interface{}) error {
-	return errors.New("SqlReader not support readmode")
-}
-
 func contains(slice []string, str string) bool {
 	for _, s := range slice {
 		if s == str {
@@ -1478,8 +1370,47 @@ func contains(slice []string, str string) bool {
 	return false
 }
 
+// 查看时间是否符合, min为true则取出来为小于等于，min为false则取出来大于等于
+func validTime(str, match string, startIndex, endIndex []int, min bool) (valid bool) {
+	for idx, record := range startIndex {
+		if record == -1 {
+			continue
+		}
+
+		if len(str) < endIndex[idx] || len(match) < endIndex[idx] {
+			return false
+		}
+
+		// 比较大小
+		curStr := str[record:endIndex[idx]]
+		curInt, err := strconv.Atoi(curStr)
+		if err != nil {
+			return false
+		}
+		matchStr := match[record:endIndex[idx]]
+		matchInt, err := strconv.Atoi(matchStr)
+		if err != nil {
+			return false
+		}
+
+		// 小于
+		if curInt < matchInt {
+			return min
+		}
+
+		if curInt > matchInt {
+			return !min
+		}
+
+		// 相等
+		valid = true
+	}
+
+	return true
+}
+
 // 查看时间是否符合
-func validTime(str, match string, startIndex, endIndex []int) (valid bool) {
+func equalTime(str, match string, startIndex, endIndex []int) (valid bool) {
 	for idx, record := range startIndex {
 		if record == -1 {
 			continue
@@ -1501,16 +1432,11 @@ func validTime(str, match string, startIndex, endIndex []int) (valid bool) {
 			return false
 		}
 
-		// 小于
-		if curInt < matchInt {
-			return true
-		}
-
-		if curInt > matchInt {
+		// 等于
+		if curInt != matchInt {
 			return false
 		}
 
-		// 相等
 		valid = true
 	}
 
@@ -1522,16 +1448,28 @@ type DataQuery struct {
 	sqls      string
 }
 
-func (r *Reader) getValidData(db *sql.DB, matchData, matchStr string, startIndex, endIndex, timeIndex []int, queryType int) (validData []string, sqls string, err error) {
+func (r *Reader) getValidData(connectStr, curDB, matchData, matchStr string,
+	startIndex, endIndex, timeIndex []int, queryType int) (validData []string, sqls string, err error) {
 	// get all databases and check validate database
-	query, err := r.getQuery(queryType)
+	query, err := r.getQuery(queryType, curDB)
 	if err != nil {
 		return validData, sqls, err
 	}
 
+	db, err := openSql(r.dbtype, connectStr, r.Name())
+	if err != nil {
+		return nil, "", err
+	}
+	defer func() {
+		db.Close()
+	}()
+	if err = db.Ping(); err != nil {
+		return nil, "", err
+	}
+
 	rowsDBs, err := db.Query(query)
 	if err != nil {
-		log.Errorf("Runner[%v] %v prepare %v <%v> query error %v", r.meta.RunnerName, r.Name(), r.dbtype, query, err)
+		log.Errorf("Runner[%v] %v prepare %v <%v> query error %v", r.meta.RunnerName, curDB, r.dbtype, query, err)
 		return validData, sqls, err
 	}
 	defer rowsDBs.Close()
@@ -1541,17 +1479,19 @@ func (r *Reader) getValidData(db *sql.DB, matchData, matchStr string, startIndex
 		var s string
 		err = rowsDBs.Scan(&s)
 		if err != nil {
-			log.Errorf("Runner[%v] %v scan rows error %v", r.meta.RunnerName, r.Name(), err)
+			log.Errorf("Runner[%v] %v scan rows error %v", r.meta.RunnerName, curDB, err)
 			continue
 		}
 
-		if matchData != "" {
-			// 字符匹配
-			match := matchRemainStr(s, matchStr, timeIndex)
-			log.Debugf("Runner[%v] %v current data: %v, current time data: %v, remain str: %v, timeIndex: %v, isMatch: %v", r.meta.RunnerName, r.Name(), s, matchData, matchStr, timeIndex, match)
-			if !match || !validTime(s, matchData, startIndex, endIndex) {
-				continue
-			}
+		// 检查是否已经读过
+		if r.checkDoneRecords(queryType, s, curDB) {
+			continue
+		}
+
+		if !r.isMatchData(queryType, curDB, s, matchStr, matchData,
+			timeIndex, startIndex, endIndex) {
+			log.Debugf("Runner[%v] %v current data: %v, current time data: %v, remain str: %v, timeIndex: %v", r.meta.RunnerName, curDB, s, matchData, matchStr, timeIndex)
+			continue
 		}
 
 		rawSql, err := getRawSqls(queryType, s)
@@ -1566,12 +1506,34 @@ func (r *Reader) getValidData(db *sql.DB, matchData, matchStr string, startIndex
 	return validData, sqls, nil
 }
 
-func getConnectStr(datasource, database, encoder string) (connectStr string) {
-	connectStr = datasource + "/" + database
-	if encoder != "" {
-		connectStr += "?charset=" + encoder
+func (r *Reader) getConnectStr(database string, now time.Time) (connectStr string, err error) {
+	switch r.dbtype {
+	case reader.ModeMySQL:
+		connectStr = r.datasource + "/" + database
+		if r.encoder != "" {
+			connectStr += "?charset=" + r.encoder
+		}
+	case reader.ModeMSSQL:
+		r.database = goMagic(r.rawDatabase, now)
+		connectStr = r.datasource + ";database=" + r.database
+	case reader.ModePostgreSQL:
+		r.database = goMagic(r.rawDatabase, now)
+		spls := strings.Split(r.datasource, " ")
+		contains := false
+		for idx, v := range spls {
+			if strings.Contains(v, "dbname") {
+				contains = true
+				spls[idx] = "dbname=" + r.database
+			}
+		}
+		if !contains {
+			spls = append(spls, "dbname="+r.database)
+		}
+		connectStr = strings.Join(spls, " ")
+	default:
+		return "", fmt.Errorf("not support reader type: %v", r.dbtype)
 	}
-	return connectStr
+	return connectStr, nil
 }
 
 func openSql(dbtype, connectStr, name string) (db *sql.DB, err error) {
@@ -1583,15 +1545,20 @@ func openSql(dbtype, connectStr, name string) (db *sql.DB, err error) {
 	return db, nil
 }
 
-func matchRemainStr(origin, match string, timeIndex []int) bool {
+func matchRemainStr(origin, match, matchData string, timeIndex []int) bool {
 	if len(timeIndex) > 0 && len(origin) < timeIndex[len(timeIndex)-1] {
 		return false
 	}
-
 	remainStr := getRemainStr(origin, timeIndex)
-	if len(remainStr) < len(match) ||
-		remainStr[:len(match)] != match {
+	if len(remainStr) < len(match) || remainStr[:len(match)] != match {
 		return false
+	}
+
+	if !strings.HasSuffix(matchData, Wildcards) && len(origin) > len(matchData) {
+		remainStr += origin[len(matchData):]
+		if remainStr != match {
+			return false
+		}
 	}
 
 	return true
@@ -1612,9 +1579,12 @@ func getRemainStr(origin string, timeIndex []int) (remainStr string) {
 
 func (r *Reader) Lag() (rl *LagInfo, err error) {
 	rl = &LagInfo{SizeUnit: "records"}
-	if r.rawsqls == "" {
+	if r.rawSQLs == "" {
 		count := r.getCount()
 		rl.Size = count - r.CurrentCount
+		if rl.Size < 0 {
+			rl.Size = 0
+		}
 		rl.Total = count
 	}
 
@@ -1624,38 +1594,37 @@ func (r *Reader) Lag() (rl *LagInfo, err error) {
 func getDefaultSql(database, dbtype string) (defaultSql string, err error) {
 	switch dbtype {
 	case reader.ModeMySQL:
-		defaultSql = strings.Replace(DefaultMySQLTable, "DATABASE_NAME", database, -1)
+		return strings.Replace(DefaultMySQLTable, "DATABASE_NAME", database, -1), nil
 	case reader.ModePostgreSQL:
-		defaultSql = DefaultPGSQLTable
+		return DefaultPGSQLTable, nil
 	case reader.ModeMSSQL:
-		defaultSql = strings.Replace(DefaultMsSQLTable, "DATABASE_NAME", database, -1)
+		return strings.Replace(DefaultMSSQLTable, "DATABASE_NAME", database, -1), nil
 	default:
 		return "", fmt.Errorf("not support reader type: %v", dbtype)
 	}
-	return defaultSql, nil
 }
 
 // 根据queryType获取符合要求的数据和需要执行的原始sql语句mr.rawsqls
 // queryType 可以为TABLE DATABASE COUNT
-func (r *Reader) getDatas(db *sql.DB, rawData string, now time.Time, queryType int) (datas []string, rawsqls string, err error) {
+func (r *Reader) getDatas(connectStr, curDB, rawData string, now time.Time, queryType int) (datas []string, rawsqls string, err error) {
 	var startIndex, endIndex, timeIndex []int
 	var matchData string
 
-	// 是否导入历史数据
-	checkHistory, err := r.getCheckHistory(queryType)
+	// 是否导入所有数据
+	checkAll, err := r.getCheckAll(queryType)
 	if err != nil {
 		return datas, rawsqls, err
 	}
-	if !checkHistory {
-		// 非导入历史数据，正常情况下获得数据
-		datas, rawsqls, err = r.getGeneralDatas(db, queryType)
+	if checkAll {
+		// 导入所有数据
+		datas, rawsqls, err = r.getAllDatas(connectStr, curDB, queryType)
 		if err != nil {
 			return datas, rawsqls, err
 		}
 		return datas, rawsqls, nil
 	}
 
-	// 获取符合条件的历史数据
+	// 获取符合条件的数据
 	// 先获取 转换magic后的值
 	// 再获取除时间以外剩余的字符串，进行字符串匹配，如果匹配，继续判断时间不符合，不匹配跳过
 	// 最后判断时间是否符合，时间小于等于，则匹配，加入返回数组，不匹配跳过
@@ -1671,7 +1640,7 @@ func (r *Reader) getDatas(db *sql.DB, rawData string, now time.Time, queryType i
 	}
 
 	matchStr := getRemainStr(matchData, timeIndex)
-	datas, rawsqls, err = r.getValidData(db, matchData, matchStr, startIndex, endIndex, timeIndex, queryType)
+	datas, rawsqls, err = r.getValidData(connectStr, curDB, matchData, matchStr, startIndex, endIndex, timeIndex, queryType)
 	if err != nil {
 		return datas, rawsqls, err
 	}
@@ -1679,18 +1648,22 @@ func (r *Reader) getDatas(db *sql.DB, rawData string, now time.Time, queryType i
 	return datas, rawsqls, nil
 }
 
+func (r *Reader) checkCron() bool {
+	return r.isLoop || r.cronSchedule
+}
+
 // 是否拿历史数据
-func (r *Reader) getCheckHistory(queryType int) (checkHistory bool, err error) {
+func (r *Reader) getCheckAll(queryType int) (checkAll bool, err error) {
 	switch queryType {
 	case TABLE, COUNT:
-		checkHistory = r.historyAll && r.table != "" && r.table != "*"
+		return r.rawTable == "*", nil
 	case DATABASE:
-		checkHistory = r.historyAll
+		return r.rawDatabase == "*", nil
 	default:
 		return false, fmt.Errorf("%v queryType is not support get sql now", queryType)
 	}
 
-	return checkHistory, nil
+	return true, nil
 }
 
 // 根据 queryType 获取表中所有记录或者表中所有数据的条数的sql语句
@@ -1709,30 +1682,40 @@ func getRawSqls(queryType int, table string) (sqls string, err error) {
 }
 
 // 根据 queryType 获取query语句
-func (r *Reader) getQuery(queryType int) (query string, err error) {
+func (r *Reader) getQuery(queryType int, curDB string) (query string, err error) {
 	switch queryType {
 	case TABLE, COUNT:
-		query, err = getDefaultSql(r.database, r.dbtype)
+		return getDefaultSql(curDB, r.dbtype)
 	case DATABASE:
-		query = DefaultMySQLDatabase
+		return DefaultMySQLDatabase, nil
 	default:
 		return "", fmt.Errorf("%v queryType is not support get sql now", queryType)
 	}
-
-	return query, nil
 }
 
 // 计算每个table的记录条数
-func (r *Reader) execTableCount(db *sql.DB, idx int, rawSql string) (tableSize int64, err error) {
+func (r *Reader) execTableCount(connectStr string, idx int, curDB, rawSql string) (tableSize int64, err error) {
 	execSQL, err := r.getSQL(idx, rawSql)
 	if err != nil {
 		log.Errorf("Runner[%v] get SQL error %v, use raw SQL", r.meta.RunnerName, err)
 		execSQL = rawSql
 	}
-	log.Infof("Runner[%v] reader <%v> exec sql <%v>", r.meta.RunnerName, r.Name(), execSQL)
+	log.Infof("Runner[%v] reader <%v> exec sql <%v>", r.meta.RunnerName, curDB, execSQL)
+
+	db, err := openSql(r.dbtype, connectStr, curDB)
+	if err != nil {
+		return 0, err
+	}
+	defer func() {
+		db.Close()
+	}()
+	if err = db.Ping(); err != nil {
+		return 0, err
+	}
+
 	rows, err := db.Query(execSQL)
 	if err != nil {
-		log.Errorf("Runner[%v] %v prepare %v <%v> query error %v", r.meta.RunnerName, r.Name(), r.dbtype, execSQL, err)
+		log.Errorf("Runner[%v] %v prepare %v <%v> query error %v", r.meta.RunnerName, curDB, r.dbtype, execSQL, err)
 		return 0, err
 	}
 	defer rows.Close()
@@ -1742,13 +1725,13 @@ func (r *Reader) execTableCount(db *sql.DB, idx int, rawSql string) (tableSize i
 		var s string
 		err = rows.Scan(&s)
 		if err != nil {
-			log.Errorf("Runner[%v] %v scan rows error %v", r.meta.RunnerName, r.Name(), err)
+			log.Errorf("Runner[%v] %v scan rows error %v", r.meta.RunnerName, curDB, err)
 			return 0, err
 		}
 
 		tableSize, err = strconv.ParseInt(s, 10, 64)
 		if err != nil {
-			log.Errorf("Runner[%v] %v convert string to int64 error %v", r.meta.RunnerName, r.Name(), err)
+			log.Errorf("Runner[%v] %v convert string to int64 error %v", r.meta.RunnerName, curDB, err)
 			return 0, err
 		}
 	}
@@ -1757,12 +1740,12 @@ func (r *Reader) execTableCount(db *sql.DB, idx int, rawSql string) (tableSize i
 }
 
 // 执行每条 sql 语句
-func (r *Reader) execReadSql(db *sql.DB, idx int, rawSql string, tables []string) (exit bool, isRawSql bool, readSize int64) {
+func (r *Reader) execReadSql(connectStr, curDB string, idx int, rawSql string, tables []string) (exit bool, isRawSql bool, readSize int64, err error) {
 	exit = true
 
 	execSQL, err := r.getSQL(idx, r.syncSQLs[idx])
 	if err != nil {
-		log.Errorf("Runner[%v] get SQL error %v, use raw SQL", r.meta.RunnerName, err)
+		log.Warnf("Runner[%v] get SQL error %v, use raw SQL", r.meta.RunnerName, err)
 		execSQL = rawSql
 	}
 
@@ -1770,23 +1753,38 @@ func (r *Reader) execReadSql(db *sql.DB, idx int, rawSql string, tables []string
 		isRawSql = true
 	}
 
+	db, err := openSql(r.dbtype, connectStr, curDB)
+	if err != nil {
+		return exit, isRawSql, 0, err
+	}
+	defer func() {
+		db.Close()
+	}()
+	if err = db.Ping(); err != nil {
+		return exit, isRawSql, 0, err
+	}
+
 	log.Infof("Runner[%v] reader <%v> exec sql <%v>", r.meta.RunnerName, r.Name(), execSQL)
 	rows, err := db.Query(execSQL)
 	if err != nil {
-		log.Errorf("Runner[%v] %v prepare %v <%v> query error %v", r.meta.RunnerName, r.Name(), r.dbtype, execSQL, err)
-		return exit, isRawSql, readSize
+		err = fmt.Errorf("runner[%v] %v prepare %v <%v> query error %v", r.meta.RunnerName, r.Name(), r.dbtype, execSQL, err)
+		log.Error(err)
+		r.sendError(err)
+		return exit, isRawSql, readSize, err
 	}
 	defer rows.Close()
 	// Get column names
 	columns, err := rows.Columns()
 	if err != nil {
-		log.Errorf("Runner[%v] %v prepare %v <%v> columns error %v", r.meta.RunnerName, r.Name(), r.dbtype, execSQL, err)
-		return exit, isRawSql, readSize
+		err = fmt.Errorf("runner[%v] %v prepare %v <%v> columns error %v", r.meta.RunnerName, r.Name(), r.dbtype, execSQL, err)
+		log.Error(err)
+		r.sendError(err)
+		return exit, isRawSql, readSize, err
 	}
 	log.Infof("Runner[%v] SQL ：<%v>, schemas: <%v>", r.meta.RunnerName, execSQL, strings.Join(columns, ", "))
 	scanArgs, nochiced := r.getInitScans(len(columns), rows, r.dbtype)
 	var offsetKeyIndex int
-	if r.rawsqls != "" {
+	if r.rawSQLs != "" {
 		offsetKeyIndex = r.getOffsetIndex(columns)
 	}
 
@@ -1797,7 +1795,9 @@ func (r *Reader) execReadSql(db *sql.DB, idx int, rawSql string, tables []string
 		// get RawBytes from data
 		err = rows.Scan(scanArgs...)
 		if err != nil {
-			log.Errorf("Runner[%v] %v scan rows error %v", r.meta.RunnerName, r.Name(), err)
+			err = fmt.Errorf("runner[%v] %v scan rows error %v", r.meta.RunnerName, r.Name(), err)
+			log.Error(err)
+			r.sendError(err)
 			continue
 		}
 
@@ -1813,7 +1813,9 @@ func (r *Reader) execReadSql(db *sql.DB, idx int, rawSql string, tables []string
 			case "long":
 				val, serr := convertLong(scanArgs[i])
 				if serr != nil {
-					log.Errorf("Runner[%v] %v convertLong for %v (%v) error %v, ignore this key...", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
+					serr = fmt.Errorf("runner[%v] %v convertLong for %v (%v) error %v, this key will be ignored", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
+					log.Error(serr)
+					r.sendError(serr)
 				} else {
 					data[columns[i]] = val
 					bytes = 8
@@ -1821,7 +1823,9 @@ func (r *Reader) execReadSql(db *sql.DB, idx int, rawSql string, tables []string
 			case "float":
 				val, serr := convertFloat(scanArgs[i])
 				if serr != nil {
-					log.Errorf("Runner[%v] %v convertFloat for %v (%v) error %v, ignore this key...", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
+					serr = fmt.Errorf("runner[%v] %v convertFloat for %v (%v) error %v, this key will be ignored", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
+					log.Error(serr)
+					r.sendError(serr)
 				} else {
 					data[columns[i]] = val
 					bytes = 8
@@ -1829,7 +1833,9 @@ func (r *Reader) execReadSql(db *sql.DB, idx int, rawSql string, tables []string
 			case "string":
 				val, serr := convertString(scanArgs[i])
 				if serr != nil {
-					log.Errorf("Runner[%v] %v convertString for %v (%v) error %v, ignore this key...", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
+					serr = fmt.Errorf("runner[%v] %v convertString for %v (%v) error %v, this key will be ignored", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
+					log.Error(serr)
+					r.sendError(serr)
 				} else {
 					data[columns[i]] = val
 					bytes = int64(len(val))
@@ -1875,7 +1881,9 @@ func (r *Reader) execReadSql(db *sql.DB, idx int, rawSql string, tables []string
 				if !dealed {
 					val, serr := convertString(scanArgs[i])
 					if serr != nil {
-						log.Errorf("Runner[%v] %v convertString for %v (%v) error %v, ignore this key...", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
+						serr = fmt.Errorf("runner[%v] %v convertString for %v (%v) error %v, this key will be ignored", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
+						log.Error(serr)
+						r.sendError(serr)
 					} else {
 						data[columns[i]] = val
 						bytes = int64(len(val))
@@ -1885,15 +1893,15 @@ func (r *Reader) execReadSql(db *sql.DB, idx int, rawSql string, tables []string
 
 			totalBytes += bytes
 		}
-		if atomic.LoadInt32(&r.status) == reader.StatusStopping || atomic.LoadInt32(&r.status) == reader.StatusStopped {
+		if r.isStopping() || r.hasStopped() {
 			log.Warnf("Runner[%v] %v stopped from running", r.meta.RunnerName, r.Name())
-			return exit, isRawSql, readSize
+			return exit, isRawSql, readSize, nil
 		}
 		r.readChan <- readInfo{data, totalBytes}
 		r.CurrentCount++
 		readSize++
 
-		if r.historyAll || r.rawsqls == "" {
+		if r.historyAll || r.rawSQLs == "" {
 			continue
 		}
 
@@ -1916,18 +1924,12 @@ func (r *Reader) execReadSql(db *sql.DB, idx int, rawSql string, tables []string
 		}
 	}
 
-	return exit, isRawSql, readSize
+	return exit, isRawSql, readSize, rows.Err()
 }
 
-func (r *Reader) getGeneralDatas(db *sql.DB, queryType int) (datas []string, sqls string, err error) {
-	// database 目前不支持不填拿所有的database，或者填写 * 的情况
-	if queryType == DATABASE {
-		datas = append(datas, r.database)
-		return datas, sqls, nil
-	}
-
+func (r *Reader) getAllDatas(connectStr, curDB string, queryType int) (datas []string, sqls string, err error) {
 	// 拿到数据库中所有表及对应的sql语句
-	datas, sqls, err = r.getValidData(db, "", "", []int{}, []int{}, []int{}, queryType)
+	datas, sqls, err = r.getValidData(connectStr, curDB, "", "", []int{}, []int{}, []int{}, queryType)
 	if err != nil {
 		return datas, sqls, err
 	}
@@ -1945,7 +1947,9 @@ func (r *Reader) updateOffset(idx, offsetKeyIndex int, maxOffset int64, scanArgs
 			maxOffset = tmpOffsetIndex
 		}
 	} else {
+		r.muxOffsets.Lock()
 		r.offsets[idx]++
+		r.muxOffsets.Unlock()
 	}
 
 	return maxOffset
@@ -1961,4 +1965,119 @@ func (r *Reader) getCount() int64 {
 	r.countLock.RLock()
 	defer r.countLock.RUnlock()
 	return r.count
+}
+
+func (r *Reader) checkDoneRecords(queryType int, target, curDB string) bool {
+	if queryType != TABLE {
+		return false
+	}
+
+	_, exist := r.existTableInfo(target, curDB)
+	return exist
+}
+
+func (r *Reader) existTableInfo(target, curDB string) (TableInfo, bool) {
+	var tableInfo TableInfo
+	tableDoneRecords := r.doneRecords.GetTableRecords(curDB)
+	if tableDoneRecords.GetTable() == nil {
+		return tableInfo, false
+	}
+
+	tableInfo = tableDoneRecords.GetTableInfo(target)
+	if tableInfo == (TableInfo{}) {
+		return tableInfo, false
+	}
+
+	return tableInfo, true
+}
+
+// 取大于等于该记录的数据，true 小于或者不符合, false为大于等于 最后一条记录
+func (r *Reader) compareWithLastRecord(queryType int, curDB, target, matchStr, matchData string,
+	timeIndex, startIndex, endIndex []int) bool {
+	log.Debugf("Runner[%v] %v current data: %v, last database record: %v, last table record: %v", r.meta.RunnerName, curDB, target, r.lastDatabase, r.lastTabel)
+	var rawData string
+	switch queryType {
+	case DATABASE:
+		rawData = r.lastDatabase
+	case TABLE, COUNT:
+		rawData = r.lastTabel
+	default:
+		return false
+	}
+
+	if len(rawData) == 0 {
+		return true
+	}
+	log.Infof("Runner[%v] %v last %v is: %v", r.meta.RunnerName, curDB, queryType, rawData)
+
+	match := matchRemainStr(rawData, matchStr, matchData, timeIndex)
+	if !match {
+		return false
+	}
+
+	return validTime(target, rawData, startIndex, endIndex, false)
+}
+
+func (r *Reader) getDBs(connectStr string, now time.Time) ([]string, error) {
+	db, err := openSql(r.dbtype, connectStr, r.Name())
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+	if err = db.Ping(); err != nil {
+		return nil, err
+	}
+	dbsAll, _, err := r.getDatas(connectStr, "", r.rawDatabase, now, DATABASE)
+	if err != nil {
+		return dbsAll, err
+	}
+
+	dbs := make([]string, 0)
+	for _, db := range dbsAll {
+		if contains(MysqlSystemDB, strings.ToLower(db)) {
+			continue
+		}
+		dbs = append(dbs, db)
+	}
+
+	return dbs, nil
+}
+
+func (r *Reader) isMatchData(queryType int, curDB, s, matchStr, matchData string,
+	timeIndex, startIndex, endIndex []int) bool {
+	if matchData == "" {
+		return true
+	}
+
+	match := matchRemainStr(s, matchStr, matchData, timeIndex)
+	log.Debugf("Runner[%v] %v current data: %v, current time data: %v, remain str: %v, timeIndex: %v, isMatch: %v", r.meta.RunnerName, curDB, s, matchData, matchStr, timeIndex, match)
+	if !match {
+		return false
+	}
+
+	if r.historyAll {
+		if validTime(s, matchData, startIndex, endIndex, true) {
+			return true
+		}
+		return false
+	}
+
+	equal := equalTime(s, matchData, startIndex, endIndex)
+	if !r.checkCron() || r.omitDoneDBRecords {
+		return equal
+	}
+
+	// loop 或者 cron 时
+	if !r.checkCron() {
+		return false
+	}
+
+	// 取大于等于上一条的和小于等于现有的
+	if validTime(s, matchData, startIndex, endIndex, true) &&
+		r.compareWithLastRecord(queryType, curDB, s, matchStr, matchData,
+			timeIndex, startIndex, endIndex) {
+		return true
+	}
+
+	return false
 }

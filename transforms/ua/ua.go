@@ -16,6 +16,12 @@ import (
 
 const Name = "UserAgent"
 
+var (
+	_ transforms.StatsTransformer = &UATransformer{}
+	_ transforms.Transformer      = &UATransformer{}
+	_ transforms.Initializer      = &UATransformer{}
+)
+
 type UATransformer struct {
 	Key              string `json:"key"`
 	RegexYmlFilePath string `json:"regex_yml_path"`
@@ -104,98 +110,91 @@ func (it *UATransformer) Transform(datas []Data) ([]Data, error) {
 	if it.uap == nil {
 		it.uap = uaparser.NewFromSaved()
 	}
-	var err, ferr error
-	errnums := 0
+	var err, fmtErr error
+	errNum := 0
 	keys := GetKeys(it.Key)
-	newkeys := make([]string, len(keys))
+	newKeys := make([]string, len(keys))
 	for i := range datas {
-		copy(newkeys, keys)
-		val, gerr := GetMapValue(datas[i], keys...)
-		if gerr != nil {
-			errnums++
-			err = fmt.Errorf("transform key %v not exist in data", it.Key)
+		copy(newKeys, keys)
+		val, getErr := GetMapValue(datas[i], keys...)
+		if getErr != nil {
+			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, it.Key)
 			continue
 		}
-		strval, ok := val.(string)
+		strVal, ok := val.(string)
 		if !ok {
-			errnums++
-			err = fmt.Errorf("transform key %v data type is not string", it.Key)
+			typeErr := fmt.Errorf("transform key %v data type is not string", it.Key)
+			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
 			continue
 		}
-		if strval == "" {
-			errnums++
-			err = fmt.Errorf("transform key %v is empty string", it.Key)
+		if strVal == "" {
+			emptyErr := fmt.Errorf("transform key %v is empty string", it.Key)
+			errNum, err = transforms.SetError(errNum, emptyErr, transforms.General, "")
 			continue
 		}
 
 		if it.agent {
-			UserAgent := it.uap.ParseUserAgent(strval)
+			UserAgent := it.uap.ParseUserAgent(strVal)
 			if UserAgent.Family != "" {
-				newkeys[len(newkeys)-1] = "UA_Family"
-				SetMapValue(datas[i], UserAgent.Family, false, newkeys...)
+				newKeys[len(newKeys)-1] = "UA_Family"
+				SetMapValue(datas[i], UserAgent.Family, false, newKeys...)
 			}
 			if UserAgent.Major != "" {
-				newkeys[len(newkeys)-1] = "UA_Major"
-				SetMapValue(datas[i], UserAgent.Major, false, newkeys...)
+				newKeys[len(newKeys)-1] = "UA_Major"
+				SetMapValue(datas[i], UserAgent.Major, false, newKeys...)
 			}
 			if UserAgent.Minor != "" {
-				newkeys[len(newkeys)-1] = "UA_Minor"
-				SetMapValue(datas[i], UserAgent.Minor, false, newkeys...)
+				newKeys[len(newKeys)-1] = "UA_Minor"
+				SetMapValue(datas[i], UserAgent.Minor, false, newKeys...)
 			}
 			if UserAgent.Patch != "" {
-				newkeys[len(newkeys)-1] = "UA_Patch"
-				SetMapValue(datas[i], UserAgent.Patch, false, newkeys...)
+				newKeys[len(newKeys)-1] = "UA_Patch"
+				SetMapValue(datas[i], UserAgent.Patch, false, newKeys...)
 			}
 		}
 		if it.agent {
-			Device := it.uap.ParseDevice(strval)
+			Device := it.uap.ParseDevice(strVal)
 			if Device.Family != "" {
-				newkeys[len(newkeys)-1] = "UA_Device_Family"
-				SetMapValue(datas[i], Device.Family, false, newkeys...)
+				newKeys[len(newKeys)-1] = "UA_Device_Family"
+				SetMapValue(datas[i], Device.Family, false, newKeys...)
 			}
 			if Device.Brand != "" {
-				newkeys[len(newkeys)-1] = "UA_Device_Brand"
-				SetMapValue(datas[i], Device.Brand, false, newkeys...)
+				newKeys[len(newKeys)-1] = "UA_Device_Brand"
+				SetMapValue(datas[i], Device.Brand, false, newKeys...)
 			}
 			if Device.Model != "" {
-				newkeys[len(newkeys)-1] = "UA_Device_Model"
-				SetMapValue(datas[i], Device.Model, false, newkeys...)
+				newKeys[len(newKeys)-1] = "UA_Device_Model"
+				SetMapValue(datas[i], Device.Model, false, newKeys...)
 			}
 		}
 
 		if it.os {
-			Os := it.uap.ParseOs(strval)
+			Os := it.uap.ParseOs(strVal)
 			if Os.Family != "" {
-				newkeys[len(newkeys)-1] = "UA_OS_Family"
-				SetMapValue(datas[i], Os.Family, false, newkeys...)
+				newKeys[len(newKeys)-1] = "UA_OS_Family"
+				SetMapValue(datas[i], Os.Family, false, newKeys...)
 			}
 			if Os.Patch != "" {
-				newkeys[len(newkeys)-1] = "UA_OS_Patch"
-				SetMapValue(datas[i], Os.Patch, false, newkeys...)
+				newKeys[len(newKeys)-1] = "UA_OS_Patch"
+				SetMapValue(datas[i], Os.Patch, false, newKeys...)
 			}
 			if Os.Minor != "" {
-				newkeys[len(newkeys)-1] = "UA_OS_Minor"
-				SetMapValue(datas[i], Os.Minor, false, newkeys...)
+				newKeys[len(newKeys)-1] = "UA_OS_Minor"
+				SetMapValue(datas[i], Os.Minor, false, newKeys...)
 			}
 			if Os.Major != "" {
-				newkeys[len(newkeys)-1] = "UA_OS_Major"
-				SetMapValue(datas[i], Os.Major, false, newkeys...)
+				newKeys[len(newKeys)-1] = "UA_OS_Major"
+				SetMapValue(datas[i], Os.Major, false, newKeys...)
 			}
 			if Os.PatchMinor != "" {
-				newkeys[len(newkeys)-1] = "UA_OS_PatchMinor"
-				SetMapValue(datas[i], Os.PatchMinor, false, newkeys...)
+				newKeys[len(newKeys)-1] = "UA_OS_PatchMinor"
+				SetMapValue(datas[i], Os.PatchMinor, false, newKeys...)
 			}
-
 		}
+	}
 
-	}
-	if err != nil {
-		it.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform UserAgent, last error info is %v", errnums, err)
-	}
-	it.stats.Errors += int64(errnums)
-	it.stats.Success += int64(len(datas) - errnums)
-	return datas, ferr
+	it.stats, fmtErr = transforms.SetStatsInfo(err, it.stats, int64(errNum), int64(len(datas)), it.Type())
+	return datas, fmtErr
 }
 
 func (it *UATransformer) Description() string {
@@ -276,6 +275,11 @@ func (it *UATransformer) Stage() string {
 }
 
 func (it *UATransformer) Stats() StatsInfo {
+	return it.stats
+}
+
+func (it *UATransformer) SetStats(err string) StatsInfo {
+	it.stats.LastError = err
 	return it.stats
 }
 

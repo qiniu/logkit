@@ -3,6 +3,7 @@ package pipeline
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/url"
 	"os"
@@ -109,6 +110,7 @@ func (c *Pipeline) CreateRepoFromDSL(input *CreateRepoDSLInput) (err error) {
 		Schema:       schemas,
 		Options:      input.Options,
 		Workflow:     input.Workflow,
+		Description:  input.Description,
 	})
 }
 
@@ -215,6 +217,20 @@ func (c *Pipeline) UpdateRepoWithLogDB(input *UpdateRepoInput, ex ExportDesc) er
 	if !ok {
 		return fmt.Errorf("export logdb spec doc assert error %v is not map[string]interface{}", ex.Spec["doc"])
 	}
+
+	var omitEmpty, omitInvalid bool
+	if omitEmptyInter, ok := ex.Spec["omitEmpty"]; ok {
+		omitEmpty, ok = omitEmptyInter.(bool)
+		if !ok {
+			log.Errorf("export logdb spec omitEmpty assert error %v is not bool", ex.Spec["omitEmpty"])
+		}
+	}
+	if omitInvalidInter, ok := ex.Spec["omitInvalid"]; ok {
+		omitInvalid, ok = omitInvalidInter.(bool)
+		if !ok {
+			log.Errorf("export logdb spec omitInvalid assert error %v is not bool", ex.Spec["omitInvalid"])
+		}
+	}
 	for _, v := range input.Schema {
 		docs[v.Key] = "#" + v.Key
 	}
@@ -227,7 +243,7 @@ func (c *Pipeline) UpdateRepoWithLogDB(input *UpdateRepoInput, ex ExportDesc) er
 		PandoraToken: input.Option.AutoExportLogDBTokens.GetLogDBRepoToken,
 	})
 	if reqerr.IsNoSuchResourceError(err) {
-		logdbschemas := convertSchema2LogDB(input.Schema, input.Option.AutoExportToLogDBInput.AnalyzerInfo)
+		logdbschemas := convertSchema2LogDB(input.Schema, input.Option.AutoExportToLogDBInput.AnalyzerInfo, nil)
 		rts := input.Option.AutoExportToLogDBInput.Retention
 		if rts == "" {
 			rts = "30d"
@@ -265,7 +281,7 @@ func (c *Pipeline) UpdateRepoWithLogDB(input *UpdateRepoInput, ex ExportDesc) er
 	}
 	for _, v := range input.Schema {
 		if schemaNotIn(v.Key, repoInfo.Schema) {
-			scs := convertSchema2LogDB([]RepoSchemaEntry{v}, analyzers)
+			scs := convertSchema2LogDB([]RepoSchemaEntry{v}, analyzers, nil)
 			if len(scs) > 0 {
 				repoInfo.Schema = append(repoInfo.Schema, scs[0])
 			}
@@ -287,7 +303,7 @@ func (c *Pipeline) UpdateRepoWithLogDB(input *UpdateRepoInput, ex ExportDesc) er
 		log.Error("UpdateRepoWithLogDB update logdb repo error", err)
 		return err
 	}
-	spec := &ExportLogDBSpec{DestRepoName: repoName, Doc: docs}
+	spec := &ExportLogDBSpec{DestRepoName: repoName, Doc: docs, OmitEmpty: omitEmpty, OmitInvalid: omitInvalid}
 	err = c.UpdateExport(&UpdateExportInput{
 		RepoName:     input.RepoName,
 		ExportName:   ex.Name,
@@ -399,6 +415,8 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 		log.Error("update pipeline repo error", err)
 		return err
 	}
+	//目前由于服务端lc原因，更新不会立即生效，如果sleep 6s后再打点能成功，否则必然失败
+	//time.Sleep(6 * time.Second)
 	if input.Option == nil {
 		return nil
 	}
@@ -535,10 +553,19 @@ func (c *Pipeline) DeleteRepo(input *DeleteRepoInput) (err error) {
 	req := c.newRequest(op, input.Token, nil)
 	return req.Send()
 }
+func getTagStr(tags map[string]interface{}) (tagStr []byte) {
+	tagPoint := Point{}
+	for tagName, tagValue := range tags {
+		tagPoint.Fields = append(tagPoint.Fields, PointField{Key: tagName, Value: tagValue})
+	}
+	tagStr = tagPoint.ToBytes()
+	tagStr = tagStr[:len(tagStr)-1]
+	return
+}
 
 func (c *Pipeline) PostData(input *PostDataInput) (err error) {
-	op := c.NewOperation(base.OpPostData, input.RepoName)
-
+	tagStr := getTagStr(input.Tags)
+	op := c.NewOperation(base.OpPostData, input.RepoName, base64.URLEncoding.EncodeToString(tagStr))
 	req := c.newRequest(op, input.Token, nil)
 	req.SetBufferBody(input.Points.Buffer())
 	req.SetHeader(base.HTTPHeaderContentType, base.ContentTypeText)
@@ -548,6 +575,67 @@ func (c *Pipeline) PostData(input *PostDataInput) (err error) {
 	req.SetFlowLimiter(c.flowLimit)
 	req.SetReqLimiter(c.reqLimit)
 	return req.Send()
+}
+
+func (c *Pipeline) PostTextData(input *PostTextDataInput) error {
+	tagStr := getTagStr(input.Tags)
+	rules := strings.Join(input.Rules, ",")
+	op := c.NewOperation(base.OpPostTextData, input.RepoName, base64.URLEncoding.EncodeToString(tagStr), rules)
+	req := c.newRequest(op, input.Token, nil)
+	req.SetBufferBody(joinStrings(input.Text, '\n'))
+	req.SetHeader(base.HTTPHeaderContentType, base.ContentTypeText)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
+	req.SetFlowLimiter(c.flowLimit)
+	req.SetReqLimiter(c.reqLimit)
+	return req.Send()
+}
+
+func joinStrings(strs []string, sep byte) []byte {
+	var buf bytes.Buffer
+	for _, s := range strs {
+		buf.WriteString(s)
+		buf.WriteByte(sep)
+	}
+	if len(strs) > 0 {
+		buf.Truncate(buf.Len() - 1)
+	}
+	return buf.Bytes()
+}
+
+func (c *Pipeline) PostRawtextData(input *PostRawtextDataInput) (err error) {
+	tagStr := getTagStr(input.Tags)
+	rules := strings.Join(input.Rules, ",")
+	op := c.NewOperation(base.OpPostRawtextData, input.RepoName, base64.URLEncoding.EncodeToString(tagStr), rules)
+
+	type PortalRet struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	}
+	output := &PortalRet{}
+	req := c.newRequest(op, input.Token, output)
+	req.SetBufferBody(input.Rawtext)
+	req.SetHeader(base.HTTPHeaderContentType, base.ContentTypeText)
+	if input.ResourceOwner != "" {
+		req.SetHeader(base.HTTPHeaderResourceOwner, input.ResourceOwner)
+	}
+	req.SetFlowLimiter(c.flowLimit)
+	req.SetReqLimiter(c.reqLimit)
+
+	err = req.Send()
+	if err != nil {
+		return err
+	}
+	if output.Code != 200 {
+		err = PipelineErrBuilder{}.Build(output.Message,
+			output.Message,
+			req.HTTPResponse.Header.Get(base.HTTPHeaderRequestId),
+			output.Code)
+		return err
+	}
+
+	return nil
 }
 
 func (c *Pipeline) PostLargeData(input *PostDataInput, timeout time.Duration) (datafailed Points, err error) {
@@ -599,6 +687,7 @@ func unpackPoints(input *PostDataInput) (packages []standardPointContext) {
 		inputs: &PostDataFromBytesInput{
 			RepoName: input.RepoName,
 			Buffer:   tmpBuff,
+			Tags:     input.Tags,
 		},
 	})
 	return
@@ -630,8 +719,10 @@ func (c *Pipeline) unpack(input *SchemaFreeInput) (packages []pointContext, err 
 			packages = append(packages, pointContext{
 				datas: input.Datas[start:i],
 				inputs: &PostDataFromBytesInput{
-					RepoName: input.RepoName,
-					Buffer:   tmpBuff,
+					RepoName:     input.RepoName,
+					Buffer:       tmpBuff,
+					PandoraToken: input.SchemaFreeToken.PipelinePostDataToken,
+					Tags:         input.Tags,
 				},
 			})
 			buf.Reset()
@@ -646,7 +737,8 @@ func (c *Pipeline) unpack(input *SchemaFreeInput) (packages []pointContext, err 
 		inputs: &PostDataFromBytesInput{
 			RepoName:     input.RepoName,
 			Buffer:       tmpBuff,
-			PandoraToken: input.PipelinePostDataToken,
+			PandoraToken: input.SchemaFreeToken.PipelinePostDataToken,
+			Tags:         input.Tags,
 		},
 	})
 	if repoUpdate {
@@ -711,6 +803,12 @@ func (c *Pipeline) PostDataSchemaFree(input *SchemaFreeInput) (newSchemas map[st
 				switch reqErr.ErrorType {
 				case reqerr.InvalidDataSchemaError, reqerr.EntityTooLargeError:
 					errType = reqerr.TypeBinaryUnpack
+				case reqerr.ErrSchemaFieldNotExist:
+					if input.NoUpdate {
+						errType = reqerr.TypeBinaryUnpack
+					} else {
+						errType = reqerr.TypeSchemaFreeRetry
+					}
 				case reqerr.NoSuchRepoError:
 					c.repoSchemaMux.Lock()
 					c.repoSchemas[input.RepoName] = make(RepoSchema)
@@ -729,7 +827,8 @@ func (c *Pipeline) PostDataSchemaFree(input *SchemaFreeInput) (newSchemas map[st
 }
 
 func (c *Pipeline) PostDataFromFile(input *PostDataFromFileInput) (err error) {
-	op := c.NewOperation(base.OpPostData, input.RepoName)
+	tagStr := getTagStr(input.Tags)
+	op := c.NewOperation(base.OpPostData, input.RepoName, base64.URLEncoding.EncodeToString(tagStr))
 
 	req := c.newRequest(op, input.Token, nil)
 	file, err := os.Open(input.FilePath)
@@ -753,7 +852,8 @@ func (c *Pipeline) PostDataFromFile(input *PostDataFromFileInput) (err error) {
 // 用户如果使用该接口，需要根据 pandora 打点协议将数据转换为bytes数据流，具体的转换方式见文档：
 // https://qiniu.github.io/pandora-docs/#/push_data_api
 func (c *Pipeline) PostDataFromReader(input *PostDataFromReaderInput) (err error) {
-	op := c.NewOperation(base.OpPostData, input.RepoName)
+	tagStr := getTagStr(input.Tags)
+	op := c.NewOperation(base.OpPostData, input.RepoName, base64.URLEncoding.EncodeToString(tagStr))
 
 	req := c.newRequest(op, input.Token, nil)
 	req.SetReaderBody(input.Reader)
@@ -765,7 +865,8 @@ func (c *Pipeline) PostDataFromReader(input *PostDataFromReaderInput) (err error
 }
 
 func (c *Pipeline) PostDataFromBytes(input *PostDataFromBytesInput) (err error) {
-	op := c.NewOperation(base.OpPostData, input.RepoName)
+	tagStr := getTagStr(input.Tags)
+	op := c.NewOperation(base.OpPostData, input.RepoName, base64.URLEncoding.EncodeToString(tagStr))
 
 	req := c.newRequest(op, input.Token, nil)
 	req.SetBufferBody(input.Buffer)
@@ -776,7 +877,8 @@ func (c *Pipeline) PostDataFromBytes(input *PostDataFromBytesInput) (err error) 
 }
 
 func (c *Pipeline) PostDataFromBytesWithDeadline(input *PostDataFromBytesInput, deadline time.Time) (err error) {
-	op := c.NewOperation(base.OpPostData, input.RepoName)
+	tagStr := getTagStr(input.Tags)
+	op := c.NewOperation(base.OpPostData, input.RepoName, base64.URLEncoding.EncodeToString(tagStr))
 
 	req := c.newRequest(op, input.Token, nil)
 	req.SetBufferBody(input.Buffer)

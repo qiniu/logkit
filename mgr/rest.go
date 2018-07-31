@@ -54,6 +54,10 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	rs.cluster.mutex = new(sync.RWMutex)
 	router.GET(PREFIX+"/status", rs.Status())
 
+	// 获取历史 errors API
+	router.GET(PREFIX+"/errors", rs.GetErrors())
+	router.GET(PREFIX+"/errors/:name", rs.GetError())
+
 	// error code humanize
 	router.GET(PREFIX+"/errorcode", rs.GetErrorCodeHumanize())
 
@@ -72,12 +76,14 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 
 	//reader API
 	router.GET(PREFIX+"/reader/usages", rs.GetReaderUsages())
+	router.GET(PREFIX+"/reader/tooltips", rs.GetReaderTooltips())
 	router.GET(PREFIX+"/reader/options", rs.GetReaderKeyOptions())
 	router.POST(PREFIX+"/reader/read", rs.PostRead())
 	router.POST(PREFIX+"/reader/check", rs.PostReaderCheck())
 
 	//parser API
 	router.GET(PREFIX+"/parser/usages", rs.GetParserUsages())
+	router.GET(PREFIX+"/parser/tooltips", rs.GetParserTooltips())
 	router.GET(PREFIX+"/parser/options", rs.GetParserKeyOptions())
 	router.POST(PREFIX+"/parser/parse", rs.PostParse())
 	router.GET(PREFIX+"/parser/samplelogs", rs.GetParserSampleLogs())
@@ -246,6 +252,30 @@ func (rs *RestService) Status() echo.HandlerFunc {
 	}
 }
 
+// get /logkit/errors
+func (rs *RestService) GetErrors() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		return RespSuccess(c, rs.mgr.Errors())
+	}
+}
+
+// get /logkit/errors/<name>
+func (rs *RestService) GetError() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		var name string
+		if name = c.Param("name"); name == "" {
+			errMsg := "runner name is empty"
+			return RespError(c, http.StatusBadRequest, ErrRunnerAdd, errMsg)
+		}
+
+		rss, err := rs.mgr.Error(name)
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, ErrRunnerErrorGet, err.Error())
+		}
+		return RespSuccess(c, rss)
+	}
+}
+
 // get /logkit/runners
 func (rs *RestService) GetRunners() echo.HandlerFunc {
 	return func(c echo.Context) error {
@@ -263,6 +293,9 @@ func (rs *RestService) GetRunners() echo.HandlerFunc {
 func (rs *RestService) GetConfigs() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		rss := rs.mgr.Configs()
+		for k, v := range rss {
+			rss[k] = TrimSecretInfo(v, false)
+		}
 		return RespSuccess(c, rss)
 	}
 }
@@ -300,7 +333,7 @@ func (rs *RestService) checkNameAndConfig(c echo.Context) (name string, conf Run
 		err = errors.New("config " + name + " is not found")
 		return
 	}
-	deepCopyByJson(&conf, &tmpConf)
+	deepCopyByJSON(&conf, &tmpConf)
 	return
 }
 
@@ -318,7 +351,7 @@ func (rs *RestService) PostConfig() echo.HandlerFunc {
 		}
 		nconf.IsInWebFolder = true
 		nconf.ParserConf = parser.ConvertWebParserConfig(nconf.ParserConf)
-		if err = rs.mgr.AddRunner(name, nconf); err != nil {
+		if err = rs.mgr.AddRunner(name, nconf, time.Now()); err != nil {
 			return RespError(c, http.StatusBadRequest, ErrRunnerAdd, err.Error())
 		}
 		return RespSuccess(c, nil)
@@ -433,7 +466,9 @@ func (rs *RestService) Register() error {
 // Stop will stop RestService
 func (rs *RestService) Stop() {
 	if rs.l != nil {
-		rs.l.Close()
+		if err := rs.l.Close(); err != nil {
+			log.Error("close reset service listener err: ", err)
+		}
 	}
 }
 

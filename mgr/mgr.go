@@ -213,29 +213,37 @@ func (m *Manager) removeCleanQueue(info CleanInfo) {
 
 func (m *Manager) Add(confPath string) {
 	if !strings.HasSuffix(confPath, ".conf") {
-		log.Warn(confPath, "not end with .conf, skipped")
+		log.Warnf("Config %q does not end with '.conf', skipped", confPath)
 		return
 	}
-	log.Info("try add", confPath)
+	log.Info("Adding config %q", confPath)
 	confPathAbs, _, err := GetRealPath(confPath)
 	if err != nil {
-		log.Warnf("filepath.Abs(%s) failed: %v", confPath)
+		log.Warnf("Failed to get real path of %q: %v", confPath)
 		return
 	}
 	confPath = confPathAbs
-	if m.isRunning(confPath) {
-		log.Errorf("%s already added", confPath)
+	if m.IsRunning(confPath) {
+		log.Errorf("Config %q has already been added", confPath)
 		return
 	}
 	var conf RunnerConfig
 	err = config.LoadEx(&conf, confPath)
 	if err != nil {
-		log.Warnf("config.LoadEx %s failed:%v", confPath, err)
+		log.Warnf("Failed to load config %q: %v", confPath, err)
 		return
 	}
 
-	log.Infof("Start to try add: %v", conf.RunnerName)
-	conf.CreateTime = time.Now().Format(time.RFC3339Nano)
+	modTime := time.Now()
+	fi, err := os.Stat(confPath)
+	if err != nil {
+		log.Warnf("Failed to get config modtime: %v", err)
+	} else {
+		modTime = fi.ModTime()
+	}
+
+	log.Infof("Adding runner %q", conf.RunnerName)
+	conf.CreateTime = modTime.Format(time.RFC3339Nano)
 	go m.ForkRunner(confPath, conf, false)
 	return
 }
@@ -245,7 +253,7 @@ func (m *Manager) ForkRunner(confPath string, nconf RunnerConfig, errReturn bool
 	var err error
 	i := 0
 	for {
-		if m.isRunning(confPath) {
+		if m.IsRunning(confPath) {
 			err = fmt.Errorf("%s already added - ", confPath)
 			if !errReturn {
 				log.Error(err)
@@ -307,7 +315,7 @@ func (m *Manager) ForkRunner(confPath string, nconf RunnerConfig, errReturn bool
 	return nil
 }
 
-func (m *Manager) isRunning(confPath string) bool {
+func (m *Manager) IsRunning(confPath string) bool {
 	_, ok := m.readRunners(confPath)
 	if ok {
 		return true
@@ -523,7 +531,6 @@ func (m *Manager) RestoreWebDir() {
 		nums++
 	}
 	log.Infof("successfully restored %v runners in %v web rest dir", nums, m.RestDir)
-	return
 }
 
 func (m *Manager) Status() (rss map[string]RunnerStatus) {
@@ -533,18 +540,52 @@ func (m *Manager) Status() (rss map[string]RunnerStatus) {
 	for key, conf := range m.runnerConfig {
 		if r, ex := m.runners[key]; ex {
 			rss[r.Name()] = r.Status()
-		} else {
-			rss[conf.RunnerName] = RunnerStatus{
-				Name:           conf.RunnerName,
-				ReaderStats:    StatsInfo{},
-				ParserStats:    StatsInfo{},
-				TransformStats: make(map[string]StatsInfo),
-				SenderStats:    make(map[string]StatsInfo),
-				RunningStatus:  RunnerStopped,
-			}
+			continue
+		}
+		rss[conf.RunnerName] = RunnerStatus{
+			Name:           conf.RunnerName,
+			ReaderStats:    StatsInfo{},
+			ParserStats:    StatsInfo{},
+			TransformStats: make(map[string]StatsInfo),
+			SenderStats:    make(map[string]StatsInfo),
+			RunningStatus:  RunnerStopped,
 		}
 	}
-	return
+	return rss
+}
+
+func (m *Manager) Errors() (rss map[string]ErrorsResult) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	rss = make(map[string]ErrorsResult)
+	for key, conf := range m.runnerConfig {
+		if r, ex := m.runners[key]; ex {
+			if runnerErr, ok := r.(RunnerErrors); ok {
+				rss[r.Name()] = runnerErr.GetErrors()
+				continue
+			}
+		}
+		rss[conf.RunnerName] = ErrorsResult{}
+	}
+	return rss
+}
+
+func (m *Manager) Error(name string) (rss ErrorsResult, err error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	for key := range m.runnerConfig {
+		if r, ex := m.runners[key]; ex {
+			if r.Name() != name {
+				continue
+			}
+
+			if runnerErr, ok := r.(RunnerErrors); ok {
+				return runnerErr.GetErrors(), nil
+			}
+			return rss, ErrNotSupport
+		}
+	}
+	return rss, ErrNotExist
 }
 
 func (m *Manager) Configs() (rss map[string]RunnerConfig) {
@@ -557,11 +598,8 @@ func (m *Manager) Configs() (rss map[string]RunnerConfig) {
 		}
 		tmpRss[k] = v
 	}
-	deepCopyByJson(&rss, &tmpRss)
+	deepCopyByJSON(&rss, &tmpRss)
 	m.lock.RUnlock()
-	for k, v := range rss {
-		rss[k] = TrimSecretInfo(v)
-	}
 	return
 }
 
@@ -572,61 +610,68 @@ func (m *Manager) getDeepCopyConfig(name string) (filename string, conf RunnerCo
 	if tmpConf, ok := m.runnerConfig[filename]; !ok {
 		err = fmt.Errorf("runner %v is not found", filename)
 	} else {
-		deepCopyByJson(&conf, &tmpConf)
+		deepCopyByJSON(&conf, &tmpConf)
 	}
 	return
 }
 
-// TrimSecretInfo 将配置文件中的 token 信息去掉
-func TrimSecretInfo(conf RunnerConfig) RunnerConfig {
-	preFix := SchemaFreeTokensPrefix
+// TrimSecretInfo 将配置文件中的 token 等鉴权相关信息去掉
+func TrimSecretInfo(conf RunnerConfig, trimSk bool) RunnerConfig {
+	prefix := SchemaFreeTokensPrefix
 	keyName := []string{
-		preFix + "pipeline_get_repo_token",
-		preFix + "pipeline_post_data_token",
-		preFix + "pipeline_create_repo_token",
-		preFix + "pipeline_update_repo_token",
-		preFix + "pipeline_get_workflow_token",
-		preFix + "pipeline_stop_workflow_token",
-		preFix + "pipeline_start_workflow_token",
-		preFix + "pipeline_create_workflow_token",
-		preFix + "pipeline_Get_workflow_status_token",
+		prefix + "pipeline_get_repo_token",
+		prefix + "pipeline_post_data_token",
+		prefix + "pipeline_create_repo_token",
+		prefix + "pipeline_update_repo_token",
+		prefix + "pipeline_get_workflow_token",
+		prefix + "pipeline_stop_workflow_token",
+		prefix + "pipeline_start_workflow_token",
+		prefix + "pipeline_create_workflow_token",
+		prefix + "pipeline_Get_workflow_status_token",
 	}
 
 	// logDB tokens
-	preFix = LogDBTokensPrefix
+	prefix = LogDBTokensPrefix
 	keyName = append(keyName, []string{
-		preFix + "pipeline_get_repo_token",
-		preFix + "pipeline_create_repo_token",
-		preFix + "create_logdb_repo_token",
-		preFix + "update_logdb_repo_token",
-		preFix + "get_logdb_repo_token",
-		preFix + "create_export_token",
-		preFix + "update_export_token",
-		preFix + "get_export_token",
-		preFix + "list_export_token",
+		prefix + "pipeline_get_repo_token",
+		prefix + "pipeline_create_repo_token",
+		prefix + "create_logdb_repo_token",
+		prefix + "update_logdb_repo_token",
+		prefix + "get_logdb_repo_token",
+		prefix + "create_export_token",
+		prefix + "update_export_token",
+		prefix + "get_export_token",
+		prefix + "list_export_token",
 	}...)
 
 	// tsDB tokens
-	preFix = TsDBTokensPrefix
+	prefix = TsDBTokensPrefix
 	keyName = append(keyName, []string{
-		preFix + "pipeline_get_repo_token",
-		preFix + "create_tsdb_repo_token",
-		preFix + "list_export_token",
-		preFix + "create_tsdb_series_token",
-		preFix + "create_export_token",
-		preFix + "update_export_token",
-		preFix + "get_export_token",
+		prefix + "pipeline_get_repo_token",
+		prefix + "create_tsdb_repo_token",
+		prefix + "list_export_token",
+		prefix + "create_tsdb_series_token",
+		prefix + "create_export_token",
+		prefix + "update_export_token",
+		prefix + "get_export_token",
 	}...)
 
 	// kodo tokens
-	preFix = KodoTokensPrefix
+	prefix = KodoTokensPrefix
 	keyName = append(keyName, []string{
-		preFix + "pipeline_get_repo_token",
-		preFix + "create_export_token",
-		preFix + "update_export_token",
-		preFix + "get_export_token",
-		preFix + "list_export_token",
+		prefix + "pipeline_get_repo_token",
+		prefix + "create_export_token",
+		prefix + "update_export_token",
+		prefix + "get_export_token",
+		prefix + "list_export_token",
 	}...)
+
+	if trimSk {
+		// Pandora sk
+		keyName = append(keyName, []string{
+			"pandora_sk",
+		}...)
+	}
 
 	for i, sc := range conf.SendersConfig {
 		for _, k := range keyName {
@@ -686,11 +731,11 @@ func (m *Manager) UpdateToken(tokens []AuthTokens) (err error) {
 	return
 }
 
-func (m *Manager) AddRunner(name string, conf RunnerConfig) (err error) {
+func (m *Manager) AddRunner(name string, conf RunnerConfig, createTime time.Time) (err error) {
 	conf.RunnerName = name
-	conf.CreateTime = time.Now().Format(time.RFC3339Nano)
+	conf.CreateTime = createTime.Format(time.RFC3339Nano)
 	filename := filepath.Join(m.RestDir, name+".conf")
-	if m.isRunning(filename) {
+	if m.IsRunning(filename) {
 		return fmt.Errorf("file %v runner is running", name)
 	}
 	if err = m.ForkRunner(filename, conf, true); err != nil {
@@ -712,7 +757,7 @@ func (m *Manager) UpdateRunner(name string, conf RunnerConfig) (err error) {
 	}
 	conf.RunnerName = name
 	conf.CreateTime = time.Now().Format(time.RFC3339Nano)
-	if m.isRunning(filename) {
+	if m.IsRunning(filename) {
 		if subErr := m.Remove(filename); subErr != nil {
 			return fmt.Errorf("remove runner %v error %v", filename, subErr)
 		}
@@ -774,7 +819,7 @@ func (m *Manager) StopRunner(name string) (err error) {
 		return fmt.Errorf("runner %v has already stopped", filename)
 	}
 	conf.IsStopped = true
-	if !m.isRunning(filename) {
+	if !m.IsRunning(filename) {
 		m.setRunnerConfig(filename, conf)
 		return
 	}

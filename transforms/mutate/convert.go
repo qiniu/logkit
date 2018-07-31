@@ -7,11 +7,17 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
+)
+
+var (
+	_ transforms.StatsTransformer = &Converter{}
+	_ transforms.Transformer      = &Converter{}
 )
 
 type Converter struct {
@@ -25,51 +31,55 @@ func (g *Converter) RawTransform(datas []string) ([]string, error) {
 }
 
 func (g *Converter) Transform(datas []Data) ([]Data, error) {
-	var err, ferr error
-	errnums := 0
+	var err, fmtErr error
+	errNum := 0
 	if g.schemas == nil {
 		schemas, err := ParseDsl(g.DSL, 0)
 		if err != nil {
 			err = fmt.Errorf("convert typedsl %s to schema error: %v", g.DSL, err)
-			errnums = len(datas)
+			errNum = len(datas)
 			g.schemas = make([]DslSchemaEntry, 0)
 		} else {
 			g.schemas = schemas
 		}
 	}
+
 	if len(g.schemas) == 0 {
 		err = fmt.Errorf("no valid dsl[%v] to schema, please enter correct format dsl: \"field type\"", g.DSL)
-		errnums = len(datas)
-	} else {
-		keyss := map[int][]string{}
-		for i, sc := range g.schemas {
-			keys := GetKeys(sc.Key)
-			keyss[i] = keys
-		}
-		for i := range datas {
-			for k, keys := range keyss {
-				val, gerr := GetMapValue(datas[i], keys...)
-				if gerr != nil {
-					errnums++
-					err = fmt.Errorf("transform key %v not exist in data", g.schemas[k].Key)
-					continue
-				}
-				val, err = dataConvert(val, g.schemas[k])
-				if err != nil {
-					errnums++
-				}
-				SetMapValue(datas[i], val, false, keys...)
+		errNum = len(datas)
+		g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+		return datas, err
+	}
+
+	keysMap := map[int][]string{}
+	for i, sc := range g.schemas {
+		keys := GetKeys(sc.Key)
+		keysMap[i] = keys
+	}
+	for i := range datas {
+		for k, keys := range keysMap {
+			val, getErr := GetMapValue(datas[i], keys...)
+			if getErr != nil {
+				errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.schemas[k].Key)
+				continue
+			}
+			val, convertErr := dataConvert(val, g.schemas[k])
+			if convertErr != nil {
+				errNum, err = transforms.SetError(errNum, convertErr, transforms.General, "")
+			}
+			if val == nil {
+				DeleteMapValue(datas[i], keys...)
+				continue
+			}
+			setErr := SetMapValue(datas[i], val, false, keys...)
+			if setErr != nil {
+				errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, strings.Join(keys, "."))
 			}
 		}
 	}
 
-	if err != nil {
-		g.stats.LastError = err.Error()
-		ferr = fmt.Errorf("find total %v erorrs in transform convert, last error info is %v", errnums, err)
-	}
-	g.stats.Errors += int64(errnums)
-	g.stats.Success += int64(len(datas) - errnums)
-	return datas, ferr
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	return datas, fmtErr
 }
 
 func (g *Converter) Description() string {
@@ -108,6 +118,11 @@ func (g *Converter) Stage() string {
 }
 
 func (g *Converter) Stats() StatsInfo {
+	return g.stats
+}
+
+func (g *Converter) SetStats(err string) StatsInfo {
+	g.stats.LastError = err
 	return g.stats
 }
 
@@ -341,13 +356,16 @@ func dataConvert(data interface{}, schema DslSchemaEntry) (converted interface{}
 		case reflect.Float32, reflect.Float64:
 			return int64(value.Float()), nil
 		case reflect.String:
-			if converted, err = strconv.ParseInt(value.String(), 10, 64); err == nil {
-				return
+			val := strings.TrimSpace(value.String())
+			if val == "" {
+				return nil, nil
+			}
+			if converted, err = strconv.ParseInt(val, 10, 64); err == nil {
+				return converted, nil
 			}
 			var floatc float64
-			if floatc, err = strconv.ParseFloat(value.String(), 10); err == nil {
-				converted = int64(floatc)
-				return
+			if floatc, err = strconv.ParseFloat(val, 10); err == nil {
+				return int64(floatc), nil
 			}
 		}
 	case pipeline.PandoraTypeFloat:
@@ -359,8 +377,12 @@ func dataConvert(data interface{}, schema DslSchemaEntry) (converted interface{}
 		case reflect.Float32, reflect.Float64:
 			return data, nil
 		case reflect.String:
-			if converted, err = strconv.ParseFloat(value.String(), 10); err == nil {
-				return
+			val := strings.TrimSpace(value.String())
+			if val == "" {
+				return nil, nil
+			}
+			if converted, err = strconv.ParseFloat(val, 10); err == nil {
+				return converted, nil
 			}
 		}
 	case pipeline.PandoraTypeString:
@@ -403,157 +425,258 @@ func dataConvert(data interface{}, schema DslSchemaEntry) (converted interface{}
 			}
 		}
 	case pipeline.PandoraTypeJsonString:
-		return data, nil
+		switch value := data.(type) {
+		case map[string]interface{}:
+			str, err := json.Marshal(value)
+			if err == nil {
+				return string(str), nil
+			}
+		case []interface{}:
+			str, err := json.Marshal(value)
+			if err == nil {
+				return string(str), nil
+			}
+		case nil:
+			if schema.Default != nil {
+				return schema.Default, nil
+			}
+			return nil, nil
+		default:
+			v := reflect.ValueOf(data)
+			switch v.Kind() {
+			case reflect.String:
+				return v.String(), nil
+			}
+		}
 	case pipeline.PandoraTypeDate:
-		return data, nil
+		switch value := data.(type) {
+		case time.Time, *time.Time:
+			return value, nil
+		}
+		if converted, err = ConvertDate("", "", 0, time.UTC, data); err == nil {
+			return converted, nil
+		}
 	case pipeline.PandoraTypeBool:
-		return data, nil
+		switch value := data.(type) {
+		case bool, *bool:
+			return value, nil
+		case string:
+			if converted, err = strconv.ParseBool(value); err == nil {
+				return converted, nil
+			}
+		}
 	case pipeline.PandoraTypeArray:
 		ret := make([]interface{}, 0)
 		switch value := data.(type) {
 		case []interface{}:
 			for _, j := range value {
-				vi, err := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
-				if err != nil {
-					continue
+				vi, serr := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
+				if serr == nil {
+					ret = append(ret, vi)
+				} else {
+					err = serr
 				}
-				ret = append(ret, vi)
+			}
+			if err == nil {
+				return ret, nil
 			}
 		case []string:
 			for _, j := range value {
-				vi, err := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
-				if err != nil {
-					continue
+				vi, serr := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
+				if serr == nil {
+					ret = append(ret, vi)
+				} else {
+					err = serr
 				}
-				ret = append(ret, vi)
+			}
+			if err == nil {
+				return ret, nil
 			}
 		case []int:
 			for _, j := range value {
-				vi, err := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
-				if err != nil {
-					continue
+				vi, serr := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
+				if serr == nil {
+					ret = append(ret, vi)
+				} else {
+					err = serr
 				}
-				ret = append(ret, vi)
+			}
+			if err == nil {
+				return ret, nil
 			}
 		case []int64:
 			for _, j := range value {
-				vi, err := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
-				if err != nil {
-					continue
+				vi, serr := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
+				if serr == nil {
+					ret = append(ret, vi)
+				} else {
+					err = serr
 				}
-				ret = append(ret, vi)
+			}
+			if err == nil {
+				return ret, nil
 			}
 		case []json.Number:
 			for _, j := range value {
-				vi, err := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
-				if err != nil {
-					continue
+				vi, serr := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
+				if serr == nil {
+					ret = append(ret, vi)
+				} else {
+					err = serr
 				}
-				ret = append(ret, vi)
+			}
+			if err == nil {
+				return ret, nil
 			}
 		case []float64:
 			for _, j := range value {
-				vi, err := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
-				if err != nil {
-					continue
+				vi, serr := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
+				if serr == nil {
+					ret = append(ret, vi)
+				} else {
+					err = serr
 				}
-				ret = append(ret, vi)
+			}
+			if err == nil {
+				return ret, nil
 			}
 		case []bool:
 			for _, j := range value {
-				vi, err := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
-				if err != nil {
-					continue
+				vi, serr := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
+				if serr == nil {
+					ret = append(ret, vi)
+				} else {
+					err = serr
 				}
-				ret = append(ret, vi)
+			}
+			if err == nil {
+				return ret, nil
 			}
 		case []float32:
 			for _, j := range value {
-				vi, err := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
-				if err != nil {
-					continue
+				vi, serr := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
+				if serr == nil {
+					ret = append(ret, vi)
+				} else {
+					err = serr
 				}
-				ret = append(ret, vi)
+			}
+			if err == nil {
+				return ret, nil
 			}
 		case []int8:
 			for _, j := range value {
-				vi, err := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
-				if err != nil {
-					continue
+				vi, serr := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
+				if serr == nil {
+					ret = append(ret, vi)
+				} else {
+					err = serr
 				}
-				ret = append(ret, vi)
+			}
+			if err == nil {
+				return ret, nil
 			}
 		case []int16:
 			for _, j := range value {
-				vi, err := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
-				if err != nil {
-					continue
+				vi, serr := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
+				if serr == nil {
+					ret = append(ret, vi)
+				} else {
+					err = serr
 				}
-				ret = append(ret, vi)
+			}
+			if err == nil {
+				return ret, nil
 			}
 		case []int32:
 			for _, j := range value {
-				vi, err := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
-				if err != nil {
-					continue
+				vi, serr := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
+				if serr == nil {
+					ret = append(ret, vi)
+				} else {
+					err = serr
 				}
-				ret = append(ret, vi)
+			}
+			if err == nil {
+				return ret, nil
 			}
 		case []uint:
 			for _, j := range value {
-				vi, err := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
-				if err != nil {
-					continue
+				vi, serr := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
+				if serr == nil {
+					ret = append(ret, vi)
+				} else {
+					err = serr
 				}
-				ret = append(ret, vi)
+			}
+			if err == nil {
+				return ret, nil
 			}
 		case []uint8:
 			for _, j := range value {
-				vi, err := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
-				if err != nil {
-					continue
+				vi, serr := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
+				if serr == nil {
+					ret = append(ret, vi)
+				} else {
+					err = serr
 				}
-				ret = append(ret, vi)
+			}
+			if err == nil {
+				return ret, nil
 			}
 		case []uint16:
 			for _, j := range value {
-				vi, err := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
-				if err != nil {
-					continue
+				vi, serr := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
+				if serr == nil {
+					ret = append(ret, vi)
+				} else {
+					err = serr
 				}
-				ret = append(ret, vi)
+			}
+			if err == nil {
+				return ret, nil
 			}
 		case []uint32:
 			for _, j := range value {
-				vi, err := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
-				if err != nil {
-					continue
+				vi, serr := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
+				if serr == nil {
+					ret = append(ret, vi)
+				} else {
+					err = serr
 				}
-				ret = append(ret, vi)
+			}
+			if err == nil {
+				return ret, nil
 			}
 		case []uint64:
 			for _, j := range value {
-				vi, err := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
-				if err != nil {
-					continue
+				vi, serr := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
+				if serr == nil {
+					ret = append(ret, vi)
+				} else {
+					err = serr
 				}
-				ret = append(ret, vi)
+			}
+			if err == nil {
+				return ret, nil
 			}
 		case string:
 			newdata := make([]interface{}, 0)
 			err = json.Unmarshal([]byte(value), &newdata)
-			if err != nil {
-				return
-			}
-			for _, j := range newdata {
-				vi, err := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
-				if err != nil {
-					continue
+			if err == nil {
+				for _, j := range newdata {
+					vi, serr := dataConvert(j, DslSchemaEntry{ValueType: schema.ElemType})
+					if serr == nil {
+						ret = append(ret, vi)
+					} else {
+						err = serr
+					}
 				}
-				ret = append(ret, vi)
+				if err == nil {
+					return ret, nil
+				}
 			}
 		}
-		return ret, nil
 	case pipeline.PandoraTypeMap:
 		switch value := data.(type) {
 		case map[string]interface{}:
@@ -569,7 +692,7 @@ func dataConvert(data interface{}, schema DslSchemaEntry) (converted interface{}
 	if schema.Default != nil {
 		return schema.Default, nil
 	}
-	return data, fmt.Errorf("can not convert data[%v] to type(%v), err %v", data, reflect.TypeOf(data), err)
+	return data, fmt.Errorf("can not convert data[%v] type(%v) to type(%v), err %v", data, reflect.TypeOf(data), schema.ValueType, err)
 }
 
 func mapDataConvert(mpvalue map[string]interface{}, schemas []DslSchemaEntry) (converted interface{}) {
