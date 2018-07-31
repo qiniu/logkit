@@ -8,6 +8,8 @@ import (
 	"os"
 	"testing"
 	"time"
+	"strings"
+	"sync"
 
 	"github.com/stretchr/testify/assert"
 
@@ -29,8 +31,8 @@ func TestNewHttpReader(t *testing.T) {
 	defer os.RemoveAll("./meta")
 
 	c := conf.MapConf{
-		reader.KeyHTTPServiceAddress: ":7110",
-		reader.KeyHTTPServicePath:    "/logkit/data",
+		reader.KeyHTTPServiceAddress: "127.0.0.1:7110",
+		reader.KeyHTTPServicePath:    "/logkit/aaa,/logkit/bbb,/logkit/ccc,/logkit/ddd",
 	}
 	hhttpReader, err := NewReader(meta, c)
 	assert.NoError(t, err)
@@ -47,38 +49,52 @@ func TestNewHttpReader(t *testing.T) {
 		"zxcvbnm,./.,mnbvcxz",
 		"asdfghjkl;';lkjhgfdsa",
 	}
+	paths := strings.Split("/logkit/aaa,/logkit/bbb,/logkit/ccc,/logkit/ddd", ",")
 
 	// 测试正常发送
-	req, err := http.NewRequest(http.MethodPost, "http://127.0.0.1:7110/logkit/data", nil)
-	assert.NoError(t, err)
-	for _, val := range testData {
+	var wg sync.WaitGroup
+	for index, val := range testData {
+		req, err := http.NewRequest(http.MethodPost, "http://127.0.0.1:7110"+paths[index], nil)
+		assert.NoError(t, err)
+		wg.Add(1)
+		go func(httpReader *Reader, t *testing.T, index int, val string) {
+			got, err := httpReader.ReadLine()
+			assert.NoError(t, err)
+			assert.Equal(t, val, got)
+			assert.Equal(t, "127.0.0.1:7110"+paths[index], httpReader.Source())
+			wg.Done()
+		}(httpReader, t, index, val)
 		req.Body = ioutil.NopCloser(bytes.NewReader([]byte(val)))
 		resp, err := http.DefaultClient.Do(req)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		got, err := httpReader.ReadLine()
-		assert.NoError(t, err)
-		assert.Equal(t, val, got)
+		wg.Wait()
 	}
 
 	// 测试 gzip 发送
-	req, err = http.NewRequest(http.MethodPost, "http://127.0.0.1:7110/logkit/data", nil)
-	req.Header.Set(ContentTypeHeader, ApplicationGzip)
-	req.Header.Set(ContentEncodingHeader, "gzip")
-	assert.NoError(t, err)
-	for _, val := range testData {
+	for index, val := range testData {
+		req, err := http.NewRequest(http.MethodPost, "http://127.0.0.1:7110"+paths[index], nil)
+		req.Header.Set(ContentTypeHeader, ApplicationGzip)
+		req.Header.Set(ContentEncodingHeader, "gzip")
+		assert.NoError(t, err)
+		wg.Add(1)
 		var buf bytes.Buffer
 		g := gzip.NewWriter(&buf)
-		_, err := g.Write([]byte(val))
+		_, err = g.Write([]byte(val))
 		assert.NoError(t, err)
 		g.Close()
 		byteVal := buf.Bytes()
+		go func(httpReader *Reader, t *testing.T, index int, val string) {
+			got, err := httpReader.ReadLine()
+			assert.NoError(t, err)
+			assert.Equal(t, val, got)
+			assert.Equal(t, "127.0.0.1:7110"+paths[index], httpReader.Source())
+			wg.Done()
+		}(httpReader, t, index, val)
 		req.Body = ioutil.NopCloser(bytes.NewReader(byteVal))
 		resp, err := http.DefaultClient.Do(req)
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		got, err := httpReader.ReadLine()
-		assert.NoError(t, err)
-		assert.Equal(t, val, got)
+		wg.Wait()
 	}
 }

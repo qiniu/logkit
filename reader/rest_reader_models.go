@@ -1103,6 +1103,7 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "监听地址前缀(http_service_path)",
 			ToolTip:      "监听的请求地址，如 /data ",
 		},
+		OptionDataSourceTag,
 	},
 	ModeScript: {
 		{
