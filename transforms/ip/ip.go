@@ -6,6 +6,7 @@ import (
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
+	"strings"
 )
 
 const Name = "IP"
@@ -112,6 +113,7 @@ func (t *Transformer) Transform(datas []Data) ([]Data, error) {
 			errNum, err = transforms.SetError(errNum, notStringErr, transforms.General, "")
 			continue
 		}
+		strVal = strings.TrimSpace(strVal)
 		info, findErr := t.loc.Find(strVal)
 		if findErr != nil {
 			errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
