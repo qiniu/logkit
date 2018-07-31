@@ -1001,7 +1001,7 @@ func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 	var points pipeline.Datas
 	now := time.Now().Format(time.RFC3339Nano)
 	for _, d := range datas {
-		if d == nil {
+		if len(d) < 0 {
 			continue
 		}
 		if s.opt.logkitSendTime {
@@ -1015,6 +1015,9 @@ func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 			}
 		}
 		point := s.generatePoint(d)
+		if len(point) < 1 {
+			continue
+		}
 		points = append(points, pipeline.Data(map[string]interface{}(point)))
 	}
 	s.opt.tokenLock.RLock()
