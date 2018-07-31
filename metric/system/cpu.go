@@ -45,39 +45,39 @@ const (
 )
 
 // KeyCpuUsages TypeMetricCpu 中的字段名称
-var KeyCpuUsages = []KeyValue{
+var KeyCpuUsages = KeyValueSlice{
 	// CPU 总量
-	{CpuTimeUser, "用户进程用时"},
-	{CpuTimeSystem, "系统内核用时"},
-	{CpuTimeIdle, "空闲CPU用时"},
-	{CpuTimeNice, "优先级调度用时"},
-	{CpuTimeIowait, "iowait用时"},
-	{CpuTimeIrq, "中断用时"},
-	{CpuTimeSoftirq, "软中断用时"},
-	{CpuTimeSteal, "Steal用时"},
-	{CpuTimeGuest, "Guest用时"},
-	{CpuTimeGuestNice, "GuestNice用时"},
-	{CpuTimeCPU, "CPU序号名称"},
+	{CpuTimeUser, "用户进程用时", ""},
+	{CpuTimeSystem, "系统内核用时", ""},
+	{CpuTimeIdle, "空闲CPU用时", ""},
+	{CpuTimeNice, "优先级调度用时", ""},
+	{CpuTimeIowait, "iowait用时", ""},
+	{CpuTimeIrq, "中断用时", ""},
+	{CpuTimeSoftirq, "软中断用时", ""},
+	{CpuTimeSteal, "Steal用时", ""},
+	{CpuTimeGuest, "Guest用时", ""},
+	{CpuTimeGuestNice, "GuestNice用时", ""},
+	{CpuTimeCPU, "CPU序号名称", ""},
 
 	// CPU 用量
-	{CpuUsageUser, "用户用量百分比(0~100)"},
-	{CpuUsageSystem, "系统用量百分比(0~100)"},
-	{CpuUsageIdle, "空闲百分比(0~100)"},
-	{CpuUsageNice, "优先级调度程序用量百分比(0~100)"},
-	{CpuUsageIowait, "IOwait时间占比(0~100)"},
-	{CpuUsageIrq, "中断时间占比(0~100)"},
-	{CpuUsageSoftirq, "软中断时间占比(0~100)"},
-	{CpuUsageSteal, "虚拟CPU的竞争等待时间占比(0~100)"},
-	{CpuUsageGuest, "虚拟进程的CPU用时占比(0~100)"},
-	{CpuUsageGuestNice, "虚拟进程CPU调度用时占比(0~100)"},
-	{CpuUsageCPU, "CPU序号名称"},
+	{CpuUsageUser, "用户用量百分比(0~100)", ""},
+	{CpuUsageSystem, "系统用量百分比(0~100)", ""},
+	{CpuUsageIdle, "空闲百分比(0~100)", ""},
+	{CpuUsageNice, "优先级调度程序用量百分比(0~100)", ""},
+	{CpuUsageIowait, "IOwait时间占比(0~100)", ""},
+	{CpuUsageIrq, "中断时间占比(0~100)", ""},
+	{CpuUsageSoftirq, "软中断时间占比(0~100)", ""},
+	{CpuUsageSteal, "虚拟CPU的竞争等待时间占比(0~100)", ""},
+	{CpuUsageGuest, "虚拟进程的CPU用时占比(0~100)", ""},
+	{CpuUsageGuestNice, "虚拟进程CPU调度用时占比(0~100)", ""},
+	{CpuUsageCPU, "CPU序号名称", ""},
 }
 
 // ConfigCpuUsages TypeMetricCpu 配置项的描述
-var ConfigCpuUsages = []KeyValue{
-	{CpuConfigPerCpu, "是否收集每个 cpu 的统计数据(" + CpuConfigPerCpu + ")"},
-	{CpuConfigTotalCpu, "是否收集整个系统的 cpu 统计信息(" + CpuConfigTotalCpu + ")"},
-	{CpuConfigCollectCpuTime, "是否收集 cpu 时间统计信息(" + CpuConfigCollectCpuTime + ")"},
+var ConfigCpuUsages = KeyValueSlice{
+	{CpuConfigPerCpu, "是否收集每个 cpu 的统计数据(" + CpuConfigPerCpu + ")", ""},
+	{CpuConfigTotalCpu, "是否收集整个系统的 cpu 统计信息(" + CpuConfigTotalCpu + ")", ""},
+	{CpuConfigCollectCpuTime, "是否收集 cpu 时间统计信息(" + CpuConfigCollectCpuTime + ")", ""},
 }
 
 type CPUStats struct {

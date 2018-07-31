@@ -6,15 +6,15 @@ import (
 )
 
 // ModeUsages 用途说明
-var ModeUsages = []KeyValue{
-	{TypePandora, "发送至 七牛云智能日志平台(Pandora)"},
-	{TypeFile, "发送至 本地文件"},
-	{TypeMongodbAccumulate, "发送至 MongoDB 服务"},
-	{TypeInfluxdb, "发送至 InfluxDB 服务"},
-	{TypeDiscard, "消费数据但不发送"},
-	{TypeElastic, "发送至 Elasticsearch 服务"},
-	{TypeKafka, "发送至 Kafka 服务"},
-	{TypeHttp, "发送至 HTTP 服务器"},
+var ModeUsages = KeyValueSlice{
+	{TypePandora, "发送至 七牛云智能日志平台(Pandora)", ""},
+	{TypeFile, "发送至 本地文件", ""},
+	{TypeMongodbAccumulate, "发送至 MongoDB 服务", ""},
+	{TypeInfluxdb, "发送至 InfluxDB 服务", ""},
+	{TypeDiscard, "消费数据但不发送", ""},
+	{TypeElastic, "发送至 Elasticsearch 服务", ""},
+	{TypeKafka, "发送至 Kafka 服务", ""},
+	{TypeHttp, "发送至 HTTP 服务器", ""},
 }
 
 var (
@@ -133,9 +133,9 @@ var ModeKeyOptions = map[string][]Option{
 			Placeholder:  "logkit_default_pipeline",
 			DefaultNoUse: true,
 			Required:     true,
-			Description:  "Pipeline名称(pandora_workflow_name)",
+			Description:  "新增或现有的Pipeline名称(pandora_workflow_name)",
 			CheckRegex:   "^[a-zA-Z_][a-zA-Z0-9_]{0,127}$",
-			ToolTip:      "七牛大数据平台Pipeline名称",
+			ToolTip:      "新增或现有的七牛大数据平台Pipeline名称",
 		},
 		{
 			KeyName:      KeyPandoraRepoName,
@@ -144,9 +144,9 @@ var ModeKeyOptions = map[string][]Option{
 			Required:     true,
 			Placeholder:  "my_work",
 			DefaultNoUse: true,
-			Description:  "实时仓库名称(pandora_repo_name)",
+			Description:  "新增或现有的实时仓库名称(pandora_repo_name)",
 			CheckRegex:   "^[a-zA-Z][a-zA-Z0-9_]{0,127}$",
-			ToolTip:      "七牛大数据平台Pipeline中的实时仓库名称",
+			ToolTip:      "新增或现有的七牛大数据平台Pipeline中的实时仓库名称",
 		},
 		{
 			KeyName:      KeyPandoraAk,
@@ -232,7 +232,8 @@ var ModeKeyOptions = map[string][]Option{
 			ChooseOnly:    false,
 			Default:       "",
 			DefaultNoUse:  false,
-			Description:   "指定日志分析仓库名称(pandora_logdb_name)",
+			Description:   "新增或现有的日志分析仓库名称(pandora_logdb_name)",
+			Advance:       true,
 			AdvanceDepend: KeyPandoraEnableLogDB,
 			ToolTip:       "若不指定使用实时仓库(pandora_repo_name)名称",
 		},

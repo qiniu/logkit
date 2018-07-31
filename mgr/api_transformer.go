@@ -3,10 +3,10 @@ package mgr
 import (
 	"net/http"
 
+	"github.com/labstack/echo"
+
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
-
-	"github.com/labstack/echo"
 )
 
 // GET /logkit/transformer/usages

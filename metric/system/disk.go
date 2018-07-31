@@ -32,23 +32,23 @@ const (
 )
 
 // KeyDiskUsages TypeMetricDisk 字段名称
-var KeyDiskUsages = []KeyValue{
-	{KeyDiskPath, "磁盘路径"},
-	{KeyDiskDevice, "磁盘设备名"},
-	{KeyDiskFstype, "文件系统类型"},
-	{KeyDiskTotal, "磁盘总大小"},
-	{KeyDiskFree, "磁盘剩余大小"},
-	{KeyDiskUsed, "磁盘用量"},
-	{KeyDiskUsedPercent, "磁盘已用百分比"},
-	{KeyDiskInodesTotal, "总inode数量"},
-	{KeyDiskInodesFree, "空闲的inode数量"},
-	{KeyDiskInodesUsed, "适用的inode数量"},
+var KeyDiskUsages = KeyValueSlice{
+	{KeyDiskPath, "磁盘路径", ""},
+	{KeyDiskDevice, "磁盘设备名", ""},
+	{KeyDiskFstype, "文件系统类型", ""},
+	{KeyDiskTotal, "磁盘总大小", ""},
+	{KeyDiskFree, "磁盘剩余大小", ""},
+	{KeyDiskUsed, "磁盘用量", ""},
+	{KeyDiskUsedPercent, "磁盘已用百分比", ""},
+	{KeyDiskInodesTotal, "总inode数量", ""},
+	{KeyDiskInodesFree, "空闲的inode数量", ""},
+	{KeyDiskInodesUsed, "使用的inode数量", ""},
 }
 
 // ConfigDiskUsages TypeMetricDisk config 中的字段描述
-var ConfigDiskUsages = []KeyValue{
-	{ConfigDiskIgnoreFs, "忽略的挂载点,用','分隔(" + ConfigDiskIgnoreFs + ")"},
-	{ConfigDiskMountPoints, "收集特定挂载点信息,默认收集所有挂载点,用','分隔(" + ConfigDiskMountPoints + ")"},
+var ConfigDiskUsages = KeyValueSlice{
+	{ConfigDiskIgnoreFs, "忽略的挂载点,用','分隔(" + ConfigDiskIgnoreFs + ")", ""},
+	{ConfigDiskMountPoints, "收集特定挂载点信息,默认收集所有挂载点,用','分隔(" + ConfigDiskMountPoints + ")", ""},
 }
 
 var diskMux sync.Mutex
@@ -150,24 +150,25 @@ const (
 )
 
 // KeyDiskioUsages TypeMetricDiskio 中的字段名称
-var KeyDiskioUsages = []KeyValue{
-	{KeyDiskioReads, "磁盘被读的总次数"},
-	{KeyDiskioWrites, "磁盘被写的总次数"},
-	{KeyDiskioReadBytes, "读取的总数据量"},
-	{KeyDiskioWriteBytes, "写入的总数据量"},
-	{KeyDiskioReadTime, "磁盘读取总用时"},
-	{KeyDiskioWriteTime, "磁盘写入总用时"},
-	{KeyDiskioIoTime, "io总时间"},
-	{KeyDiskioIopsInProgress, "运行中的每秒IO数据量"},
-	{KeyDiskioName, "磁盘名称"},
+var KeyDiskioUsages = KeyValueSlice{
+	{KeyDiskioReads, "磁盘被读的总次数", ""},
+	{KeyDiskioWrites, "磁盘被写的总次数", ""},
+	{KeyDiskioReadBytes, "读取的总数据量", ""},
+	{KeyDiskioWriteBytes, "写入的总数据量", ""},
+	{KeyDiskioReadTime, "磁盘读取总用时", ""},
+	{KeyDiskioWriteTime, "磁盘写入总用时", ""},
+	{KeyDiskioIoTime, "io总时间", ""},
+	{KeyDiskioIopsInProgress, "运行中的每秒IO数据量", ""},
+	{KeyDiskioName, "磁盘名称", ""},
+	{KeyDiskioSerial, "磁盘序列号", ""},
 }
 
 // ConfigDiskioUsages TypeMetricDiskio 配置项描述
-var ConfigDiskioUsages = []KeyValue{
-	{ConfigDiskioDevices, "获取特定设备的信息,用','隔开(" + ConfigDiskioDevices + ")"},
-	{ConfigDiskioDeviceTags, "采集磁盘某些tag的信息,用','隔开(" + ConfigDiskioDeviceTags + ")"},
-	{ConfigDiskioNameTemplates, "一些尝试加入设备的模板列表,用','隔开(" + ConfigDiskioNameTemplates + ")"},
-	{ConfigDiskioSkipSerialNumber, "是否忽略磁盘序列号(" + ConfigDiskioSkipSerialNumber + ")"},
+var ConfigDiskioUsages = KeyValueSlice{
+	{ConfigDiskioDevices, "获取特定设备的信息,用','隔开(" + ConfigDiskioDevices + ")", ""},
+	{ConfigDiskioDeviceTags, "采集磁盘某些tag的信息,用','隔开(" + ConfigDiskioDeviceTags + ")", ""},
+	{ConfigDiskioNameTemplates, "一些尝试加入设备的模板列表,用','隔开(" + ConfigDiskioNameTemplates + ")", ""},
+	{ConfigDiskioSkipSerialNumber, "是否忽略磁盘序列号(" + ConfigDiskioSkipSerialNumber + ")", ""},
 }
 
 type DiskIOStats struct {

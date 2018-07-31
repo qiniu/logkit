@@ -22,19 +22,22 @@ func Test_scriptFile(t *testing.T) {
 		reader.KeyExecInterpreter: "bash",
 		reader.KeyLogPath:         fileName,
 	}
-	//create sf
 	meta, err := reader.NewMetaWithConf(readerConf)
 	if err != nil {
 		t.Error(err)
 	}
+	defer os.RemoveAll("./meta")
 
-	sf, err := NewReader(meta, readerConf)
+	r, err := NewReader(meta, readerConf)
 	if err != nil {
 		t.Error(err)
 	}
 	assert.NoError(t, err)
+	sr := r.(*Reader)
+	assert.NoError(t, sr.Start())
+	defer sr.Close()
 
-	data, err := sf.ReadLine()
+	data, err := r.ReadLine()
 	if err != nil {
 		t.Error(err)
 	}

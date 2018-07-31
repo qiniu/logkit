@@ -37,7 +37,7 @@ func (k *KernelVmstat) Tags() []string {
 func (k *KernelVmstat) Config() map[string]interface{} {
 	config := map[string]interface{}{
 		metric.OptionString:     []Option{},
-		metric.AttributesString: []KeyValue{},
+		metric.AttributesString: KeyValueSlice{},
 	}
 	return config
 }

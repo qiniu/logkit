@@ -134,7 +134,7 @@ func convertCreate2LogDB(input *CreateRepoForLogDBInput) *logdb.CreateRepoInput 
 	linput := &logdb.CreateRepoInput{
 		Region:    input.Region,
 		RepoName:  input.LogRepoName,
-		Schema:    convertSchema2LogDB(input.Schema, input.AnalyzerInfo),
+		Schema:    convertSchema2LogDB(input.Schema, input.AnalyzerInfo, nil),
 		Retention: input.Retention,
 	}
 	if input.AnalyzerInfo.FullText {
@@ -143,7 +143,7 @@ func convertCreate2LogDB(input *CreateRepoForLogDBInput) *logdb.CreateRepoInput 
 	return linput
 }
 
-func convertSchema2LogDB(scs []RepoSchemaEntry, analyzer AnalyzerInfo) (ret []logdb.RepoSchemaEntry) {
+func convertSchema2LogDB(scs []RepoSchemaEntry, analyzer AnalyzerInfo, prefix []string) (ret []logdb.RepoSchemaEntry) {
 	ret = make([]logdb.RepoSchemaEntry, 0)
 	for _, v := range scs {
 		rp := logdb.RepoSchemaEntry{
@@ -151,7 +151,7 @@ func convertSchema2LogDB(scs []RepoSchemaEntry, analyzer AnalyzerInfo) (ret []lo
 			ValueType: v.ValueType,
 		}
 		if v.ValueType == PandoraTypeMap {
-			rp.Schemas = convertSchema2LogDB(v.Schema, analyzer)
+			rp.Schemas = convertSchema2LogDB(v.Schema, analyzer, append(prefix, v.Key))
 			rp.ValueType = logdb.TypeObject
 		}
 		if v.ValueType == PandoraTypeJsonString {
@@ -167,7 +167,7 @@ func convertSchema2LogDB(scs []RepoSchemaEntry, analyzer AnalyzerInfo) (ret []lo
 			exist := false
 			var ana string
 			if analyzer.Analyzer != nil {
-				ana, exist = analyzer.Analyzer[v.Key]
+				ana, exist = analyzer.Analyzer[strings.Join(append(prefix,v.Key),".")]
 			}
 			if exist && logdb.Analyzers[ana] {
 				rp.Analyzer = ana
@@ -306,7 +306,7 @@ func (c *Pipeline) AutoExportToLogDB(input *AutoExportToLogDBInput) error {
 	if err != nil {
 		return err
 	}
-	logdbschemas := convertSchema2LogDB(repoInfo.Schema, input.AnalyzerInfo)
+	logdbschemas := convertSchema2LogDB(repoInfo.Schema, input.AnalyzerInfo, nil)
 	logdbrepoinfo, err := logdbapi.GetRepo(&logdb.GetRepoInput{
 		RepoName:     input.LogRepoName,
 		PandoraToken: input.GetLogDBRepoToken,

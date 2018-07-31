@@ -210,6 +210,167 @@ Content-Type: application/json
 }
 ```
 
+### 获取所有runner的出错历史信息
+
+请求
+
+```
+GET /logkit/errors
+```
+
+返回
+
+```
+Content-Type: application/json
+
+{
+  "code": "L200",
+  "data": {
+    <runner_name1>: {
+      "read_errors":{
+        {
+            "error":"<read error info>"",
+            "timestamp":<timestamp>
+        },
+        ...
+      },
+      "parse_errors": {
+        {
+            "error":"<parse error info>"",
+            "timestamp":<timestamp>
+        },
+        ...
+      },
+      "transform_errors": {
+        {
+            "error":"<transform error info>"",
+            "timestamp":<timestamp>
+        },
+        ...
+      },
+      "send_errors": {
+        {
+            "error":"<send error info>"",
+            "timestamp":<timestamp>
+        },
+        ...
+      }
+    },
+    <runner_name2>: {
+      "read_errors":{
+        {
+            "error":"<read error info>"",
+            "timestamp":<timestamp>
+        },
+        ...
+      },
+      "parse_errors": {
+        {
+            "error":"<parse error info>"",
+            "timestamp":<timestamp>
+        },
+        ...
+      },
+      "transform_errors": {
+        {
+            "error":"<transform error info>"",
+            "timestamp":<timestamp>
+        },
+        ...
+      },
+      "send_errors": {
+        {
+            "error":"<send error info>"",
+            "timestamp":<timestamp>
+        },
+        ...
+      }
+    },
+    ...
+  }
+}
+```
+* "read_errors": read 历史错误数据
+* "parse_errors": parse 历史错误数据
+* "transform_errors": transform 历史错误数据
+* "send_errors": send 历史错误数据
+* "error": 具体错误信息
+* "timestamp": 错误发生时间
+* 默认历史错误信息最多为50条，可以通过"errors_list_cap"设置历史错误信息最大条数，"errors_list_cap"和"batch_interval"在同一个层级
+
+如果请求失败, 返回包含如下内容的JSON字符串（已格式化,便于阅读）:
+
+```
+{
+    "code":   "<error code>",
+    "message": "<error message>"
+}
+```
+
+### 获取指定runner的出错历史信息
+
+请求
+
+```
+GET /logkit/errors/<name>
+```
+
+返回
+
+```
+Content-Type: application/json
+
+{
+  "code": "L200",
+  "data": {
+    "read_errors":{
+      {
+        "error":"<read error info>"",
+        "timestamp":<timestamp>
+      },
+      ...
+    },
+    "parse_errors": {
+      {
+        "error":"<parse error info>"",
+        "timestamp":<timestamp>
+      },
+      ...
+    },
+    "transform_errors": {
+      {
+        "error":"<transform error info>"",
+        "timestamp":<timestamp>
+      },
+      ...
+    },
+    "send_errors": {
+      {
+        "error":"<send error info>"",
+        "timestamp":<timestamp>
+      },
+      ...
+    }
+  }
+}
+```
+* "read_errors": read 历史错误数据
+* "parse_errors": parse 历史错误数据
+* "transform_errors": transform 历史错误数据
+* "send_errors": send 历史错误数据
+* "error": 具体错误信息
+* "timestamp": 错误发生时间
+* 默认历史错误信息最多为50条，可以通过"errors_list_cap"设置历史错误信息最大条数，"errors_list_cap"和"batch_interval"在同一个层级
+
+如果请求失败, 返回包含如下内容的JSON字符串（已格式化,便于阅读）:
+
+```
+{
+    "code":   "<error code>",
+    "message": "<error message>"
+}
+```
+
 ### 获取指定runner运行状态
 
 请求

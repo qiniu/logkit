@@ -21,21 +21,27 @@ import (
 )
 
 var readRecords = DBRecords{
-	"db1": {
-		"db1_tb1": TableInfo{size: -1, offset: -1},
-		"db1_tb2": TableInfo{size: -1, offset: -1},
-		"db1_tb3": TableInfo{size: -1, offset: -1},
+	"db1": TableRecords{
+		Table: map[string]TableInfo{
+			"db1_tb1": {size: -1, offset: -1},
+			"db1_tb2": {size: -1, offset: -1},
+			"db1_tb3": {size: -1, offset: -1},
+		},
 	},
-	"db2": {
-		"db2_tb1": TableInfo{size: -1, offset: -1},
-		"db2_tb2": TableInfo{size: -1, offset: -1},
-		"db2_tb3": TableInfo{size: -1, offset: -1},
-		"db2_tb4": TableInfo{size: -1, offset: -1},
-		"db2_tb5": TableInfo{size: -1, offset: -1},
+	"db2": TableRecords{
+		Table: map[string]TableInfo{
+			"db2_tb1": {size: -1, offset: -1},
+			"db2_tb2": {size: -1, offset: -1},
+			"db2_tb3": {size: -1, offset: -1},
+			"db2_tb4": {size: -1, offset: -1},
+			"db2_tb5": {size: -1, offset: -1},
+		},
 	},
-	"db3": {
-		"db3_tb1": TableInfo{size: -1, offset: -1},
-		"db3_tb2": TableInfo{size: -1, offset: -1},
+	"db3": TableRecords{
+		Table: map[string]TableInfo{
+			"db3_tb1": {size: -1, offset: -1},
+			"db3_tb2": {size: -1, offset: -1},
+		},
 	},
 }
 
@@ -120,73 +126,73 @@ func TestConvertMagicIndex(t *testing.T) {
 	now1, _ := time.Parse(time.RFC3339, "2017-04-01T06:06:09+08:00")
 	now2, _ := time.Parse(time.RFC3339, "2017-11-11T16:16:29+08:00")
 	tests := []struct {
-		data      string
-		exp1      string
-		exp2      string
-		exp_index int
+		data     string
+		exp1     string
+		exp2     string
+		expIndex int
 	}{
 		{
-			data:      "YYYY",
-			exp1:      "2017",
-			exp2:      "2017",
-			exp_index: YEAR,
+			data:     "YYYY",
+			exp1:     "2017",
+			exp2:     "2017",
+			expIndex: YEAR,
 		},
 		{
-			data:      "YY",
-			exp1:      "17",
-			exp2:      "17",
-			exp_index: YEAR,
+			data:     "YY",
+			exp1:     "17",
+			exp2:     "17",
+			expIndex: YEAR,
 		},
 		{
-			data:      "MM",
-			exp1:      "04",
-			exp2:      "11",
-			exp_index: MONTH,
+			data:     "MM",
+			exp1:     "04",
+			exp2:     "11",
+			expIndex: MONTH,
 		},
 		{
-			data:      "DD",
-			exp1:      "01",
-			exp2:      "11",
-			exp_index: DAY,
+			data:     "DD",
+			exp1:     "01",
+			exp2:     "11",
+			expIndex: DAY,
 		},
 		{
-			data:      "hh",
-			exp1:      "06",
-			exp2:      "16",
-			exp_index: HOUR,
+			data:     "hh",
+			exp1:     "06",
+			exp2:     "16",
+			expIndex: HOUR,
 		},
 		{
-			data:      "mm",
-			exp1:      "06",
-			exp2:      "16",
-			exp_index: MINUTE,
+			data:     "mm",
+			exp1:     "06",
+			exp2:     "16",
+			expIndex: MINUTE,
 		},
 		{
-			data:      "m",
-			exp1:      "",
-			exp2:      "",
-			exp_index: -1,
+			data:     "m",
+			exp1:     "",
+			exp2:     "",
+			expIndex: -1,
 		},
 		{
-			data:      "ss",
-			exp1:      "09",
-			exp2:      "29",
-			exp_index: SECOND,
+			data:     "ss",
+			exp1:     "09",
+			exp2:     "29",
+			expIndex: SECOND,
 		},
 		{
-			data:      "s",
-			exp1:      "",
-			exp2:      "",
-			exp_index: -1,
+			data:     "s",
+			exp1:     "",
+			exp2:     "",
+			expIndex: -1,
 		},
 	}
 	for _, ti := range tests {
 		got, gotIndex := convertMagicIndex(ti.data, now1)
 		assert.Equal(t, ti.exp1, got)
-		assert.Equal(t, ti.exp_index, gotIndex)
+		assert.Equal(t, ti.expIndex, gotIndex)
 		got, gotIndex = convertMagicIndex(ti.data, now2)
 		assert.Equal(t, ti.exp2, got)
-		assert.Equal(t, ti.exp_index, gotIndex)
+		assert.Equal(t, ti.expIndex, gotIndex)
 	}
 }
 
@@ -226,239 +232,239 @@ func TestGoMagic(t *testing.T) {
 func TestGoMagicIndex(t *testing.T) {
 	now, _ := time.Parse(time.RFC3339, "2017-02-01T16:06:19+08:00")
 	tests := []struct {
-		data           string
-		exp_ret        string
-		exp_startIndex []int
-		exp_endIndex   []int
-		exp_timeIndex  []int
+		data          string
+		expRet        string
+		expStartIndex []int
+		expEndIndex   []int
+		expTimeIndex  []int
 	}{
 		{
-			data:           "x@(MM)abc@(DD)def",
-			exp_ret:        "x02abc01def",
-			exp_startIndex: []int{-1, 1, 6, -1, -1, -1},
-			exp_endIndex:   []int{0, 3, 8, 0, 0, 0},
-			exp_timeIndex:  []int{0, 1, 3, 6, 8, 11},
+			data:          "x@(MM)abc@(DD)def",
+			expRet:        "x02abc01def",
+			expStartIndex: []int{-1, 1, 6, -1, -1, -1},
+			expEndIndex:   []int{0, 3, 8, 0, 0, 0},
+			expTimeIndex:  []int{0, 1, 3, 6, 8, 11},
 		},
 		{
-			data:           "x@(MM)abc@(DD)def*",
-			exp_ret:        "x02abc01def*",
-			exp_startIndex: []int{-1, 1, 6, -1, -1, -1},
-			exp_endIndex:   []int{0, 3, 8, 0, 0, 0},
-			exp_timeIndex:  []int{0, 1, 3, 6, 8, 11},
+			data:          "x@(MM)abc@(DD)def*",
+			expRet:        "x02abc01def*",
+			expStartIndex: []int{-1, 1, 6, -1, -1, -1},
+			expEndIndex:   []int{0, 3, 8, 0, 0, 0},
+			expTimeIndex:  []int{0, 1, 3, 6, 8, 11},
 		},
 		{
-			data:           "x@(MM)abc@(DD)",
-			exp_ret:        "x02abc01",
-			exp_startIndex: []int{-1, 1, 6, -1, -1, -1},
-			exp_endIndex:   []int{0, 3, 8, 0, 0, 0},
-			exp_timeIndex:  []int{0, 1, 3, 6},
+			data:          "x@(MM)abc@(DD)",
+			expRet:        "x02abc01",
+			expStartIndex: []int{-1, 1, 6, -1, -1, -1},
+			expEndIndex:   []int{0, 3, 8, 0, 0, 0},
+			expTimeIndex:  []int{0, 1, 3, 6},
 		},
 		{
-			data:           "x@(MM)@(DD)",
-			exp_ret:        "x0201",
-			exp_startIndex: []int{-1, 1, 3, -1, -1, -1},
-			exp_endIndex:   []int{0, 3, 5, 0, 0, 0},
-			exp_timeIndex:  []int{0, 1},
+			data:          "x@(MM)@(DD)",
+			expRet:        "x0201",
+			expStartIndex: []int{-1, 1, 3, -1, -1, -1},
+			expEndIndex:   []int{0, 3, 5, 0, 0, 0},
+			expTimeIndex:  []int{0, 1},
 		},
 		{
-			data:           "x@(DD)@(MM)*",
-			exp_ret:        "x0102*",
-			exp_startIndex: []int{-1, 3, 1, -1, -1, -1},
-			exp_endIndex:   []int{0, 5, 3, 0, 0, 0},
-			exp_timeIndex:  []int{0, 1},
+			data:          "x@(DD)@(MM)*",
+			expRet:        "x0102*",
+			expStartIndex: []int{-1, 3, 1, -1, -1, -1},
+			expEndIndex:   []int{0, 5, 3, 0, 0, 0},
+			expTimeIndex:  []int{0, 1},
 		},
 		{
-			data:           "@(YY)",
-			exp_ret:        "17",
-			exp_startIndex: []int{0, -1, -1, -1, -1, -1},
-			exp_endIndex:   []int{2, 0, 0, 0, 0, 0},
-			exp_timeIndex:  []int{0, 0},
+			data:          "@(YY)",
+			expRet:        "17",
+			expStartIndex: []int{0, -1, -1, -1, -1, -1},
+			expEndIndex:   []int{2, 0, 0, 0, 0, 0},
+			expTimeIndex:  []int{0, 0},
 		},
 		{
-			data:           "abcd@(YYYY)@(MM)efg*",
-			exp_ret:        "abcd201702efg*",
-			exp_startIndex: []int{4, 8, -1, -1, -1, -1},
-			exp_endIndex:   []int{8, 10, 0, 0, 0, 0},
-			exp_timeIndex:  []int{0, 4, 10, 13},
+			data:          "abcd@(YYYY)@(MM)efg*",
+			expRet:        "abcd201702efg*",
+			expStartIndex: []int{4, 8, -1, -1, -1, -1},
+			expEndIndex:   []int{8, 10, 0, 0, 0, 0},
+			expTimeIndex:  []int{0, 4, 10, 13},
 		},
 		{
-			data:           "abcd@(YYYY)@(MM)@(DD)@(hh)@(mm)@(ss)*",
-			exp_ret:        "abcd20170201160619*",
-			exp_startIndex: []int{4, 8, 10, 12, 14, 16},
-			exp_endIndex:   []int{8, 10, 12, 14, 16, 18},
-			exp_timeIndex:  []int{0, 4},
+			data:          "abcd@(YYYY)@(MM)@(DD)@(hh)@(mm)@(ss)*",
+			expRet:        "abcd20170201160619*",
+			expStartIndex: []int{4, 8, 10, 12, 14, 16},
+			expEndIndex:   []int{8, 10, 12, 14, 16, 18},
+			expTimeIndex:  []int{0, 4},
 		},
 		{
-			data:           "hhhhh",
-			exp_ret:        "hhhhh",
-			exp_startIndex: []int{-1, -1, -1, -1, -1, -1},
-			exp_endIndex:   []int{0, 0, 0, 0, 0, 0},
-			exp_timeIndex:  []int{0, 5},
+			data:          "hhhhh",
+			expRet:        "hhhhh",
+			expStartIndex: []int{-1, -1, -1, -1, -1, -1},
+			expEndIndex:   []int{0, 0, 0, 0, 0, 0},
+			expTimeIndex:  []int{0, 5},
 		},
 	}
 	for _, ti := range tests {
 		ret, startIndex, endIndex, timeIndex, err := goMagicIndex(ti.data, now)
 		assert.NoError(t, err)
-		assert.EqualValues(t, ti.exp_ret, ret)
-		assert.EqualValues(t, ti.exp_startIndex, startIndex)
-		assert.EqualValues(t, ti.exp_endIndex, endIndex)
-		assert.EqualValues(t, ti.exp_timeIndex, timeIndex)
+		assert.EqualValues(t, ti.expRet, ret)
+		assert.EqualValues(t, ti.expStartIndex, startIndex)
+		assert.EqualValues(t, ti.expEndIndex, endIndex)
+		assert.EqualValues(t, ti.expTimeIndex, timeIndex)
 	}
 
-	err_data := "x@(M)@(DD)"
-	exp_ret := "x@(M)@(DD)"
-	ret, _, _, _, err := goMagicIndex(err_data, now)
+	errData := "x@(M)@(DD)"
+	expRet := "x@(M)@(DD)"
+	ret, _, _, _, err := goMagicIndex(errData, now)
 	assert.Error(t, err)
-	assert.EqualValues(t, exp_ret, ret)
+	assert.EqualValues(t, expRet, ret)
 }
 
 func Test_getRemainStr(t *testing.T) {
 	tests := []struct {
-		origin        string
-		timeIndex     []int
-		expect_remain string
+		origin       string
+		timeIndex    []int
+		expectRemain string
 	}{
 		{
-			origin:        "x02abc01def",
-			timeIndex:     []int{0, 1, 3, 6, 8, 11},
-			expect_remain: "xabcdef",
+			origin:       "x02abc01def",
+			timeIndex:    []int{0, 1, 3, 6, 8, 11},
+			expectRemain: "xabcdef",
 		},
 		{
-			origin:        "x02abc01def*",
-			timeIndex:     []int{0, 1, 3, 6, 8, 11},
-			expect_remain: "xabcdef",
+			origin:       "x02abc01def*",
+			timeIndex:    []int{0, 1, 3, 6, 8, 11},
+			expectRemain: "xabcdef",
 		},
 		{
-			origin:        "x02abc01",
-			timeIndex:     []int{0, 1, 3, 6},
-			expect_remain: "xabc",
+			origin:       "x02abc01",
+			timeIndex:    []int{0, 1, 3, 6},
+			expectRemain: "xabc",
 		},
 		{
-			origin:        "x0201",
-			timeIndex:     []int{0, 1},
-			expect_remain: "x",
+			origin:       "x0201",
+			timeIndex:    []int{0, 1},
+			expectRemain: "x",
 		},
 		{
-			origin:        "x0102*",
-			timeIndex:     []int{0, 1},
-			expect_remain: "x",
+			origin:       "x0102*",
+			timeIndex:    []int{0, 1},
+			expectRemain: "x",
 		},
 		{
-			origin:        "17",
-			timeIndex:     []int{0, 0},
-			expect_remain: "",
+			origin:       "17",
+			timeIndex:    []int{0, 0},
+			expectRemain: "",
 		},
 		{
-			origin:        "abcd201702efg*",
-			timeIndex:     []int{0, 4, 10, 13},
-			expect_remain: "abcdefg",
+			origin:       "abcd201702efg*",
+			timeIndex:    []int{0, 4, 10, 13},
+			expectRemain: "abcdefg",
 		},
 		{
-			origin:        "abcd20170201160619*",
-			timeIndex:     []int{0, 4},
-			expect_remain: "abcd",
+			origin:       "abcd20170201160619*",
+			timeIndex:    []int{0, 4},
+			expectRemain: "abcd",
 		},
 		{
-			origin:        "hhhhh",
-			timeIndex:     []int{0, 5},
-			expect_remain: "hhhhh",
+			origin:       "hhhhh",
+			timeIndex:    []int{0, 5},
+			expectRemain: "hhhhh",
 		},
 	}
 	for _, ti := range tests {
 		remain := getRemainStr(ti.origin, ti.timeIndex)
-		assert.Equal(t, ti.expect_remain, remain)
+		assert.Equal(t, ti.expectRemain, remain)
 	}
 }
 
 func Test_matchRemainStr(t *testing.T) {
 	tests := []struct {
-		origin     string
-		match      string
-		matchData  string
-		timeIndex  []int
-		expect_res bool
+		origin    string
+		match     string
+		matchData string
+		timeIndex []int
+		expectRes bool
 	}{
 		{
-			origin:     "x02abc01def",
-			match:      "xabcdef",
-			matchData:  "x02abc01def",
-			timeIndex:  []int{0, 1, 3, 6, 8, 11},
-			expect_res: true,
+			origin:    "x02abc01def",
+			match:     "xabcdef",
+			matchData: "x02abc01def",
+			timeIndex: []int{0, 1, 3, 6, 8, 11},
+			expectRes: true,
 		},
 		{
-			origin:     "x02abc01defdef",
-			match:      "xabcdef",
-			matchData:  "x02abc01def*",
-			timeIndex:  []int{0, 1, 3, 6, 8, 12},
-			expect_res: true,
+			origin:    "x02abc01defdef",
+			match:     "xabcdef",
+			matchData: "x02abc01def*",
+			timeIndex: []int{0, 1, 3, 6, 8, 12},
+			expectRes: true,
 		},
 		{
-			origin:     "x02abc01",
-			match:      "xabc",
-			matchData:  "x02abc01",
-			timeIndex:  []int{0, 1, 3, 6},
-			expect_res: true,
+			origin:    "x02abc01",
+			match:     "xabc",
+			matchData: "x02abc01",
+			timeIndex: []int{0, 1, 3, 6},
+			expectRes: true,
 		},
 		{
-			origin:     "x0201",
-			match:      "x",
-			matchData:  "x0201",
-			timeIndex:  []int{0, 1},
-			expect_res: true,
+			origin:    "x0201",
+			match:     "x",
+			matchData: "x0201",
+			timeIndex: []int{0, 1},
+			expectRes: true,
 		},
 		{
-			origin:     "x0102*",
-			match:      "x*",
-			matchData:  "x0102*",
-			timeIndex:  []int{0, 1, 5, 6},
-			expect_res: true,
+			origin:    "x0102*",
+			match:     "x*",
+			matchData: "x0102*",
+			timeIndex: []int{0, 1, 5, 6},
+			expectRes: true,
 		},
 		{
-			origin:     "17",
-			match:      "",
-			matchData:  "17",
-			timeIndex:  []int{0, 0},
-			expect_res: true,
+			origin:    "17",
+			match:     "",
+			matchData: "17",
+			timeIndex: []int{0, 0},
+			expectRes: true,
 		},
 		{
-			origin:     "abcd201702efg*",
-			match:      "xabcdef",
-			matchData:  "abcd201702efg*",
-			timeIndex:  []int{0, 4, 10, 14},
-			expect_res: false,
+			origin:    "abcd201702efg*",
+			match:     "xabcdef",
+			matchData: "abcd201702efg*",
+			timeIndex: []int{0, 4, 10, 14},
+			expectRes: false,
 		},
 		{
-			origin:     "abcd20170201160619*",
-			match:      "xabcdef",
-			matchData:  "abcd20170201160619*",
-			timeIndex:  []int{0, 4, 18, 19},
-			expect_res: false,
+			origin:    "abcd20170201160619*",
+			match:     "xabcdef",
+			matchData: "abcd20170201160619*",
+			timeIndex: []int{0, 4, 18, 19},
+			expectRes: false,
 		},
 		{
-			origin:     "abcd20170201160619ef",
-			match:      "abcd",
-			matchData:  "abcd20170201160619",
-			timeIndex:  []int{0, 4},
-			expect_res: false,
+			origin:    "abcd20170201160619ef",
+			match:     "abcd",
+			matchData: "abcd20170201160619",
+			timeIndex: []int{0, 4},
+			expectRes: false,
 		},
 		{
-			origin:     "hhhhh",
-			match:      "hhhhh",
-			matchData:  "hhhhh",
-			timeIndex:  []int{0, 5},
-			expect_res: true,
+			origin:    "hhhhh",
+			match:     "hhhhh",
+			matchData: "hhhhh",
+			timeIndex: []int{0, 5},
+			expectRes: true,
 		},
 		{
-			origin:     "hhhh",
-			match:      "hhhhh",
-			matchData:  "hhhhh",
-			timeIndex:  []int{0, 5},
-			expect_res: false,
+			origin:    "hhhh",
+			match:     "hhhhh",
+			matchData: "hhhhh",
+			timeIndex: []int{0, 5},
+			expectRes: false,
 		},
 	}
 	for _, ti := range tests {
 		remain := matchRemainStr(ti.origin, ti.match, ti.matchData, ti.timeIndex)
-		assert.Equal(t, ti.expect_res, remain)
+		assert.Equal(t, ti.expectRes, remain)
 	}
 }
 
@@ -502,7 +508,7 @@ func TestSQLReader(t *testing.T) {
 	mr := &Reader{
 		rawDatabase: database,
 		database:    database,
-		rawsqls:     "select * from mysql123  ;select * from mysql345;",
+		rawSQLs:     "select * from mysql123  ;select * from mysql345;",
 		syncSQLs:    []string{"select * from mysql123", "select * from mysql345"},
 		readBatch:   100,
 		meta:        meta,
@@ -514,11 +520,11 @@ func TestSQLReader(t *testing.T) {
 
 	// 测试meta备份和恢复
 	mr.SyncMeta()
-	gotoffsets, gotsqls, omit := restoreMeta(meta, mr.rawsqls, 0)
+	gotoffsets, gotsqls, omit := restoreMeta(meta, mr.rawSQLs, 0)
 	assert.EqualValues(t, mr.offsets, gotoffsets, "got offsets error")
 	assert.EqualValues(t, mr.syncSQLs, gotsqls, "got sqls error")
 	assert.EqualValues(t, false, omit)
-	assert.EqualValues(t, "MYSQL_Reader:"+mr.database+"_"+Hash(mr.rawsqls), mr.Name())
+	assert.EqualValues(t, "MYSQL_Reader:"+mr.database+"_"+Hash(mr.rawSQLs), mr.Name())
 
 	// 测试更新Offset
 	expoffsets := []int64{123, 0, 0}
@@ -571,7 +577,7 @@ func Test_getDefaultSql(t *testing.T) {
 
 	actualSql, err = getDefaultSql(database, "mssql")
 	assert.NoError(t, err)
-	expectSql = strings.Replace(DefaultMsSQLTable, "DATABASE_NAME", database, -1)
+	expectSql = strings.Replace(DefaultMSSQLTable, "DATABASE_NAME", database, -1)
 	assert.Equal(t, actualSql, expectSql)
 }
 
@@ -632,82 +638,82 @@ func Test_validTime(t *testing.T) {
 		match      string
 		startIndex []int
 		endIndex   []int
-		exp_res    bool
+		expRes     bool
 	}{
 		{
 			data:       "x02abc01",
 			match:      "x02abc01",
 			startIndex: []int{-1, 1, 6, -1, -1, -1},
 			endIndex:   []int{0, 3, 8, 0, 0, 0},
-			exp_res:    true,
+			expRes:     true,
 		},
 		{
 			data:       "hhhhh",
 			match:      "hhhhh",
 			startIndex: []int{-1, -1, -1, -1, -1, -1},
 			endIndex:   []int{0, 0, 0, 0, 0, 0},
-			exp_res:    true,
+			expRes:     true,
 		},
 		{
 			data:       "x01abc31def",
 			match:      "x02abc01def",
 			startIndex: []int{-1, 1, 6, -1, -1, -1},
 			endIndex:   []int{0, 3, 8, 0, 0, 0},
-			exp_res:    true,
+			expRes:     true,
 		},
 		{
 			data:       "x01abc31def*",
 			match:      "x02abc01def*",
 			startIndex: []int{-1, 1, 6, -1, -1, -1},
 			endIndex:   []int{0, 3, 8, 0, 0, 0},
-			exp_res:    true,
+			expRes:     true,
 		},
 		{
 			data:       "x0201",
 			match:      "x0201",
 			startIndex: []int{-1, 1, 3, -1, -1, -1},
 			endIndex:   []int{0, 3, 5, 0, 0, 0},
-			exp_res:    true,
+			expRes:     true,
 		},
 		{
 			data:       "x0102abc",
 			match:      "x0102*",
 			startIndex: []int{-1, 3, 1, -1, -1, -1},
 			endIndex:   []int{0, 5, 3, 0, 0, 0},
-			exp_res:    true,
+			expRes:     true,
 		},
 		{
 			data:       "x0102",
 			match:      "x0102*",
 			startIndex: []int{-1, 3, 1, -1, -1, -1},
 			endIndex:   []int{0, 5, 3, 0, 0, 0},
-			exp_res:    true,
+			expRes:     true,
 		},
 		{
 			data:       "17",
 			match:      "17",
 			startIndex: []int{0, -1, -1, -1, -1, -1},
 			endIndex:   []int{2, 0, 0, 0, 0, 0},
-			exp_res:    true,
+			expRes:     true,
 		},
 		{
 			data:       "abcd201703efg*",
 			match:      "abcd201702efg*",
 			startIndex: []int{4, 8, -1, -1, -1, -1},
 			endIndex:   []int{8, 10, 0, 0, 0, 0},
-			exp_res:    false,
+			expRes:     false,
 		},
 		{
 			data:       "abcd20170201160618*",
 			match:      "abcd20170201160619*",
 			startIndex: []int{4, 8, 10, 12, 14, 16},
 			endIndex:   []int{8, 10, 12, 14, 16, 18},
-			exp_res:    true,
+			expRes:     true,
 		},
 	}
 	for _, ti := range tests {
 		valid := validTime(ti.data, ti.match, ti.startIndex, ti.endIndex, true)
-		assert.EqualValues(t, ti.exp_res, valid)
+		assert.EqualValues(t, ti.expRes, valid)
 	}
 
 	tests2 := []struct {
@@ -715,82 +721,82 @@ func Test_validTime(t *testing.T) {
 		match      string
 		startIndex []int
 		endIndex   []int
-		exp_res    bool
+		expRes     bool
 	}{
 		{
 			data:       "x02abc01",
 			match:      "x02abc01",
 			startIndex: []int{-1, 1, 6, -1, -1, -1},
 			endIndex:   []int{0, 3, 8, 0, 0, 0},
-			exp_res:    true,
+			expRes:     true,
 		},
 		{
 			data:       "hhhhh",
 			match:      "hhhhh",
 			startIndex: []int{-1, -1, -1, -1, -1, -1},
 			endIndex:   []int{0, 0, 0, 0, 0, 0},
-			exp_res:    true,
+			expRes:     true,
 		},
 		{
 			data:       "x01abc31def",
 			match:      "x02abc01def",
 			startIndex: []int{-1, 1, 6, -1, -1, -1},
 			endIndex:   []int{0, 3, 8, 0, 0, 0},
-			exp_res:    false,
+			expRes:     false,
 		},
 		{
 			data:       "x01abc31def*",
 			match:      "x02abc01def*",
 			startIndex: []int{-1, 1, 6, -1, -1, -1},
 			endIndex:   []int{0, 3, 8, 0, 0, 0},
-			exp_res:    false,
+			expRes:     false,
 		},
 		{
 			data:       "x0201",
 			match:      "x0201",
 			startIndex: []int{-1, 1, 3, -1, -1, -1},
 			endIndex:   []int{0, 3, 5, 0, 0, 0},
-			exp_res:    true,
+			expRes:     true,
 		},
 		{
 			data:       "x0102abc",
 			match:      "x0102*",
 			startIndex: []int{-1, 3, 1, -1, -1, -1},
 			endIndex:   []int{0, 5, 3, 0, 0, 0},
-			exp_res:    true,
+			expRes:     true,
 		},
 		{
 			data:       "x0102",
 			match:      "x0102*",
 			startIndex: []int{-1, 3, 1, -1, -1, -1},
 			endIndex:   []int{0, 5, 3, 0, 0, 0},
-			exp_res:    true,
+			expRes:     true,
 		},
 		{
 			data:       "17",
 			match:      "17",
 			startIndex: []int{0, -1, -1, -1, -1, -1},
 			endIndex:   []int{2, 0, 0, 0, 0, 0},
-			exp_res:    true,
+			expRes:     true,
 		},
 		{
 			data:       "abcd201703efg*",
 			match:      "abcd201702efg*",
 			startIndex: []int{4, 8, -1, -1, -1, -1},
 			endIndex:   []int{8, 10, 0, 0, 0, 0},
-			exp_res:    true,
+			expRes:     true,
 		},
 		{
 			data:       "abcd20170201160618*",
 			match:      "abcd20170201160619*",
 			startIndex: []int{4, 8, 10, 12, 14, 16},
 			endIndex:   []int{8, 10, 12, 14, 16, 18},
-			exp_res:    false,
+			expRes:     false,
 		},
 	}
 	for _, ti := range tests2 {
 		valid := validTime(ti.data, ti.match, ti.startIndex, ti.endIndex, false)
-		assert.EqualValues(t, ti.exp_res, valid)
+		assert.EqualValues(t, ti.expRes, valid)
 	}
 }
 
@@ -800,61 +806,61 @@ func Test_equalTime(t *testing.T) {
 		match      string
 		startIndex []int
 		endIndex   []int
-		exp_res    bool
+		expRes     bool
 	}{
 		{
 			data:       "x02abc01",
 			match:      "x02abc01",
 			startIndex: []int{-1, 1, 6, -1, -1, -1},
 			endIndex:   []int{0, 3, 8, 0, 0, 0},
-			exp_res:    true,
+			expRes:     true,
 		},
 		{
 			data:       "hhhhh",
 			match:      "hhhhh",
 			startIndex: []int{-1, -1, -1, -1, -1, -1},
 			endIndex:   []int{0, 0, 0, 0, 0, 0},
-			exp_res:    true,
+			expRes:     true,
 		},
 		{
 			data:       "x01abc31def",
 			match:      "x02abc01def",
 			startIndex: []int{-1, 1, 6, -1, -1, -1},
 			endIndex:   []int{0, 3, 8, 0, 0, 0},
-			exp_res:    false,
+			expRes:     false,
 		},
 		{
 			data:       "x0201",
 			match:      "x0201",
 			startIndex: []int{-1, 1, 3, -1, -1, -1},
 			endIndex:   []int{0, 3, 5, 0, 0, 0},
-			exp_res:    true,
+			expRes:     true,
 		},
 		{
 			data:       "17",
 			match:      "17",
 			startIndex: []int{0, -1, -1, -1, -1, -1},
 			endIndex:   []int{2, 0, 0, 0, 0, 0},
-			exp_res:    true,
+			expRes:     true,
 		},
 		{
 			data:       "abcd201703efg*",
 			match:      "abcd201702efg*",
 			startIndex: []int{4, 8, -1, -1, -1, -1},
 			endIndex:   []int{8, 10, 0, 0, 0, 0},
-			exp_res:    false,
+			expRes:     false,
 		},
 		{
 			data:       "abcd20170201160618*",
 			match:      "abcd20170201160619*",
 			startIndex: []int{4, 8, 10, 12, 14, 16},
 			endIndex:   []int{8, 10, 12, 14, 16, 18},
-			exp_res:    false,
+			expRes:     false,
 		},
 	}
 	for _, ti := range tests {
 		valid := equalTime(ti.data, ti.match, ti.startIndex, ti.endIndex)
-		assert.EqualValues(t, ti.exp_res, valid)
+		assert.EqualValues(t, ti.expRes, valid)
 	}
 }
 
@@ -867,114 +873,114 @@ func Test_isMatchData(t *testing.T) {
 		meta:              meta,
 		dbtype:            "mysql",
 		historyAll:        false,
-		loop:              true,
+		isLoop:            true,
 		cronSchedule:      false,
 		omitDoneDBRecords: true,
 	}
 
 	tests := []struct {
-		data           string
-		matchData      string
-		matchStr       string
-		exp_ret        bool
-		exp_startIndex []int
-		exp_endIndex   []int
-		exp_timeIndex  []int
+		data          string
+		matchData     string
+		matchStr      string
+		expRet        bool
+		expStartIndex []int
+		expEndIndex   []int
+		expTimeIndex  []int
 	}{
 		{
-			data:           "x02abc01def",
-			matchData:      "xabcdef",
-			matchStr:       "x02abc01def",
-			exp_ret:        true,
-			exp_startIndex: []int{-1, 1, 6, -1, -1, -1},
-			exp_endIndex:   []int{0, 3, 8, 0, 0, 0},
-			exp_timeIndex:  []int{0, 1, 3, 6, 8, 11},
+			data:          "x02abc01def",
+			matchData:     "xabcdef",
+			matchStr:      "x02abc01def",
+			expRet:        true,
+			expStartIndex: []int{-1, 1, 6, -1, -1, -1},
+			expEndIndex:   []int{0, 3, 8, 0, 0, 0},
+			expTimeIndex:  []int{0, 1, 3, 6, 8, 11},
 		},
 		{
-			data:           "x01abc01def",
-			matchData:      "xabcdef",
-			matchStr:       "x02abc01def",
-			exp_ret:        false,
-			exp_startIndex: []int{-1, 1, 6, -1, -1, -1},
-			exp_endIndex:   []int{0, 3, 8, 0, 0, 0},
-			exp_timeIndex:  []int{0, 1, 3, 6, 8, 11},
+			data:          "x01abc01def",
+			matchData:     "xabcdef",
+			matchStr:      "x02abc01def",
+			expRet:        false,
+			expStartIndex: []int{-1, 1, 6, -1, -1, -1},
+			expEndIndex:   []int{0, 3, 8, 0, 0, 0},
+			expTimeIndex:  []int{0, 1, 3, 6, 8, 11},
 		},
 		{
-			data:           "x02abc01defdef",
-			matchData:      "xabcdef",
-			matchStr:       "x02abc01def*",
-			exp_ret:        true,
-			exp_startIndex: []int{-1, 1, 6, -1, -1, -1},
-			exp_endIndex:   []int{0, 3, 8, 0, 0, 0},
-			exp_timeIndex:  []int{0, 1, 3, 6, 8, 11},
+			data:          "x02abc01defdef",
+			matchData:     "xabcdef",
+			matchStr:      "x02abc01def*",
+			expRet:        true,
+			expStartIndex: []int{-1, 1, 6, -1, -1, -1},
+			expEndIndex:   []int{0, 3, 8, 0, 0, 0},
+			expTimeIndex:  []int{0, 1, 3, 6, 8, 11},
 		},
 		{
-			data:           "abc",
-			matchData:      "xabc",
-			matchStr:       "x02abc01",
-			exp_ret:        false,
-			exp_startIndex: []int{-1, 1, 6, -1, -1, -1},
-			exp_endIndex:   []int{0, 3, 8, 0, 0, 0},
-			exp_timeIndex:  []int{0, 1, 3, 6},
+			data:          "abc",
+			matchData:     "xabc",
+			matchStr:      "x02abc01",
+			expRet:        false,
+			expStartIndex: []int{-1, 1, 6, -1, -1, -1},
+			expEndIndex:   []int{0, 3, 8, 0, 0, 0},
+			expTimeIndex:  []int{0, 1, 3, 6},
 		},
 		{
-			data:           "x0201",
-			matchData:      "x",
-			matchStr:       "x0201*",
-			exp_ret:        true,
-			exp_startIndex: []int{-1, 1, 3, -1, -1, -1},
-			exp_endIndex:   []int{0, 3, 5, 0, 0, 0},
-			exp_timeIndex:  []int{0, 1},
+			data:          "x0201",
+			matchData:     "x",
+			matchStr:      "x0201*",
+			expRet:        true,
+			expStartIndex: []int{-1, 1, 3, -1, -1, -1},
+			expEndIndex:   []int{0, 3, 5, 0, 0, 0},
+			expTimeIndex:  []int{0, 1},
 		},
 		{
-			data:           "x0102xxxxx",
-			matchData:      "x",
-			matchStr:       "x0102*",
-			exp_ret:        true,
-			exp_startIndex: []int{-1, 3, 1, -1, -1, -1},
-			exp_endIndex:   []int{0, 5, 3, 0, 0, 0},
-			exp_timeIndex:  []int{0, 1},
+			data:          "x0102xxxxx",
+			matchData:     "x",
+			matchStr:      "x0102*",
+			expRet:        true,
+			expStartIndex: []int{-1, 3, 1, -1, -1, -1},
+			expEndIndex:   []int{0, 5, 3, 0, 0, 0},
+			expTimeIndex:  []int{0, 1},
 		},
 		{
-			data:           "17",
-			matchData:      "",
-			matchStr:       "17",
-			exp_ret:        true,
-			exp_startIndex: []int{0, -1, -1, -1, -1, -1},
-			exp_endIndex:   []int{2, 0, 0, 0, 0, 0},
-			exp_timeIndex:  []int{0, 0},
+			data:          "17",
+			matchData:     "",
+			matchStr:      "17",
+			expRet:        true,
+			expStartIndex: []int{0, -1, -1, -1, -1, -1},
+			expEndIndex:   []int{2, 0, 0, 0, 0, 0},
+			expTimeIndex:  []int{0, 0},
 		},
 		{
-			data:           "abcd201702efg",
-			matchData:      "abcdefg",
-			matchStr:       "abcd201702efg*",
-			exp_ret:        true,
-			exp_startIndex: []int{4, 8, -1, -1, -1, -1},
-			exp_endIndex:   []int{8, 10, 0, 0, 0, 0},
-			exp_timeIndex:  []int{0, 4, 10, 13},
+			data:          "abcd201702efg",
+			matchData:     "abcdefg",
+			matchStr:      "abcd201702efg*",
+			expRet:        true,
+			expStartIndex: []int{4, 8, -1, -1, -1, -1},
+			expEndIndex:   []int{8, 10, 0, 0, 0, 0},
+			expTimeIndex:  []int{0, 4, 10, 13},
 		},
 		{
-			data:           "abcd20170201160619abc",
-			matchData:      "abcd",
-			matchStr:       "abcd20170201160619",
-			exp_ret:        false,
-			exp_startIndex: []int{4, 8, 10, 12, 14, 16},
-			exp_endIndex:   []int{8, 10, 12, 14, 16, 18},
-			exp_timeIndex:  []int{0, 4},
+			data:          "abcd20170201160619abc",
+			matchData:     "abcd",
+			matchStr:      "abcd20170201160619",
+			expRet:        false,
+			expStartIndex: []int{4, 8, 10, 12, 14, 16},
+			expEndIndex:   []int{8, 10, 12, 14, 16, 18},
+			expTimeIndex:  []int{0, 4},
 		},
 		{
-			data:           "hhhhh",
-			matchData:      "hhhhh",
-			matchStr:       "hhhhh",
-			exp_ret:        true,
-			exp_startIndex: []int{-1, -1, -1, -1, -1, -1},
-			exp_endIndex:   []int{0, 0, 0, 0, 0, 0},
-			exp_timeIndex:  []int{0, 5},
+			data:          "hhhhh",
+			matchData:     "hhhhh",
+			matchStr:      "hhhhh",
+			expRet:        true,
+			expStartIndex: []int{-1, -1, -1, -1, -1, -1},
+			expEndIndex:   []int{0, 0, 0, 0, 0, 0},
+			expTimeIndex:  []int{0, 5},
 		},
 	}
 	for _, ti := range tests {
-		ret := mr.isMatchData(DATABASE, "", ti.data, ti.matchData, ti.matchStr, ti.exp_timeIndex, ti.exp_startIndex, ti.exp_endIndex)
-		assert.EqualValues(t, ti.exp_ret, ret)
+		ret := mr.isMatchData(DATABASE, "", ti.data, ti.matchData, ti.matchStr, ti.expTimeIndex, ti.expStartIndex, ti.expEndIndex)
+		assert.EqualValues(t, ti.expRet, ret)
 	}
 }
 
@@ -989,52 +995,52 @@ func Test_getCheckAll(t *testing.T) {
 
 	tests := []struct {
 		queryType int
-		exp_res   bool
+		expRes    bool
 	}{
 		{
 			queryType: TABLE,
-			exp_res:   true,
+			expRes:    true,
 		},
 		{
 			queryType: COUNT,
-			exp_res:   true,
+			expRes:    true,
 		},
 		{
 			queryType: DATABASE,
-			exp_res:   true,
+			expRes:    true,
 		},
 	}
 
 	for _, test := range tests {
 		checkHistory, err := mr.getCheckAll(test.queryType)
 		assert.NoError(t, err)
-		assert.EqualValues(t, test.exp_res, checkHistory)
+		assert.EqualValues(t, test.expRes, checkHistory)
 	}
 }
 
-func Test_getRawSqls(t *testing.T) {
+func Test_getRawSQLs(t *testing.T) {
 	tests := []struct {
 		queryType int
-		exp_sqls  string
+		expSQLs   string
 	}{
 		{
 			queryType: TABLE,
-			exp_sqls:  "Select * From `my_table`;",
+			expSQLs:   "Select * From `my_table`;",
 		},
 		{
 			queryType: COUNT,
-			exp_sqls:  "Select Count(*) From `my_table`;",
+			expSQLs:   "Select Count(*) From `my_table`;",
 		},
 		{
 			queryType: DATABASE,
-			exp_sqls:  "",
+			expSQLs:   "",
 		},
 	}
 
 	for _, test := range tests {
 		sqls, err := getRawSqls(test.queryType, "my_table")
 		assert.NoError(t, err)
-		assert.EqualValues(t, test.exp_sqls, sqls)
+		assert.EqualValues(t, test.expSQLs, sqls)
 	}
 }
 
@@ -1101,148 +1107,214 @@ func Test_restoreRecordsFile(t *testing.T) {
 	defer os.RemoveAll(MetaDir)
 
 	tests := []struct {
-		set                   DBRecords
-		exp_res               DBRecords
-		exp_omitDoneDBRecords bool
+		set                  DBRecords
+		expRes               DBRecords
+		expOmitDoneDBRecords bool
 	}{
 		{
-			set:                   DBRecords{},
-			exp_res:               nil,
-			exp_omitDoneDBRecords: true,
+			set:                  DBRecords{},
+			expRes:               nil,
+			expOmitDoneDBRecords: true,
 		},
 		{
-			set:                   readRecords,
-			exp_res:               readRecords,
-			exp_omitDoneDBRecords: false,
-		},
-		{
-			set: DBRecords{
-				"db1": {
-					"db1_tb1":  TableInfo{size: -1, offset: -1},
-					"db1_tb10": TableInfo{size: -1, offset: -1},
-				},
-				"db4": {
-					"db4_tb10": TableInfo{size: -1, offset: -1},
-				},
-			},
-			exp_res: DBRecords{
-				"db1": {
-					"db1_tb1":  TableInfo{size: -1, offset: -1},
-					"db1_tb2":  TableInfo{size: -1, offset: -1},
-					"db1_tb3":  TableInfo{size: -1, offset: -1},
-					"db1_tb10": TableInfo{size: -1, offset: -1},
-				},
-				"db2": {
-					"db2_tb1": TableInfo{size: -1, offset: -1},
-					"db2_tb2": TableInfo{size: -1, offset: -1},
-					"db2_tb3": TableInfo{size: -1, offset: -1},
-					"db2_tb4": TableInfo{size: -1, offset: -1},
-					"db2_tb5": TableInfo{size: -1, offset: -1},
-				},
-				"db3": {
-					"db3_tb1": TableInfo{size: -1, offset: -1},
-					"db3_tb2": TableInfo{size: -1, offset: -1},
-				},
-				"db4": {
-					"db4_tb10": TableInfo{size: -1, offset: -1},
-				},
-			},
-			exp_omitDoneDBRecords: false,
+			set:                  readRecords,
+			expRes:               readRecords,
+			expOmitDoneDBRecords: false,
 		},
 		{
 			set: DBRecords{
-				"db1": {
-					"db1_tb1":  TableInfo{size: -1, offset: -1},
-					"db1_tb10": TableInfo{size: -1, offset: -1},
+				"db1": TableRecords{
+					Table: map[string]TableInfo{
+						"db1_tb1":  {size: -1, offset: -1},
+						"db1_tb10": {size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
-				"db4": {
-					"db4_tb10": TableInfo{size: -1, offset: -1},
-				},
-			},
-			exp_res: DBRecords{
-				"db1": {
-					"db1_tb1":  TableInfo{size: -1, offset: -1},
-					"db1_tb2":  TableInfo{size: -1, offset: -1},
-					"db1_tb3":  TableInfo{size: -1, offset: -1},
-					"db1_tb10": TableInfo{size: -1, offset: -1},
-				},
-				"db2": {
-					"db2_tb1": TableInfo{size: -1, offset: -1},
-					"db2_tb2": TableInfo{size: -1, offset: -1},
-					"db2_tb3": TableInfo{size: -1, offset: -1},
-					"db2_tb4": TableInfo{size: -1, offset: -1},
-					"db2_tb5": TableInfo{size: -1, offset: -1},
-				},
-				"db3": {
-					"db3_tb1": TableInfo{size: -1, offset: -1},
-					"db3_tb2": TableInfo{size: -1, offset: -1},
-				},
-				"db4": {
-					"db4_tb10": TableInfo{size: -1, offset: -1},
+				"db4": TableRecords{
+					Table: map[string]TableInfo{
+						"db4_tb10": TableInfo{size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
 			},
-			exp_omitDoneDBRecords: false,
+			expRes: DBRecords{
+				"db1": TableRecords{
+					Table: map[string]TableInfo{
+						"db1_tb1":  {size: -1, offset: -1},
+						"db1_tb2":  {size: -1, offset: -1},
+						"db1_tb3":  {size: -1, offset: -1},
+						"db1_tb10": {size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
+				},
+				"db2": TableRecords{
+					Table: map[string]TableInfo{
+						"db2_tb1": {size: -1, offset: -1},
+						"db2_tb2": {size: -1, offset: -1},
+						"db2_tb3": {size: -1, offset: -1},
+						"db2_tb4": {size: -1, offset: -1},
+						"db2_tb5": {size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
+				},
+				"db3": TableRecords{
+					Table: map[string]TableInfo{
+						"db3_tb1": {size: -1, offset: -1},
+						"db3_tb2": {size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
+				},
+				"db4": TableRecords{
+					Table: map[string]TableInfo{
+						"db4_tb10": {size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
+				},
+			},
+			expOmitDoneDBRecords: false,
 		},
 		{
 			set: DBRecords{
-				"db1": {
-					"db1_tb10": TableInfo{size: -1, offset: -1},
+				"db1": TableRecords{
+					Table: map[string]TableInfo{
+						"db1_tb1":  {size: -1, offset: -1},
+						"db1_tb10": {size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
-				"db3": {
-					"db3_tb10": TableInfo{size: -1, offset: -1},
-				},
-			},
-			exp_res: DBRecords{
-				"db1": {
-					"db1_tb1":  TableInfo{size: -1, offset: -1},
-					"db1_tb2":  TableInfo{size: -1, offset: -1},
-					"db1_tb3":  TableInfo{size: -1, offset: -1},
-					"db1_tb10": TableInfo{size: -1, offset: -1},
-				},
-				"db2": {
-					"db2_tb1": TableInfo{size: -1, offset: -1},
-					"db2_tb2": TableInfo{size: -1, offset: -1},
-					"db2_tb3": TableInfo{size: -1, offset: -1},
-					"db2_tb4": TableInfo{size: -1, offset: -1},
-					"db2_tb5": TableInfo{size: -1, offset: -1},
-				},
-				"db3": {
-					"db3_tb1":  TableInfo{size: -1, offset: -1},
-					"db3_tb2":  TableInfo{size: -1, offset: -1},
-					"db3_tb10": TableInfo{size: -1, offset: -1},
-				},
-				"db4": {
-					"db4_tb10": TableInfo{size: -1, offset: -1},
+				"db4": TableRecords{
+					Table: map[string]TableInfo{
+						"db4_tb10": {size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
 			},
-			exp_omitDoneDBRecords: false,
+			expRes: DBRecords{
+				"db1": TableRecords{
+					Table: map[string]TableInfo{
+						"db1_tb1":  {size: -1, offset: -1},
+						"db1_tb2":  {size: -1, offset: -1},
+						"db1_tb3":  {size: -1, offset: -1},
+						"db1_tb10": {size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
+				},
+				"db2": TableRecords{
+					Table: map[string]TableInfo{
+						"db2_tb1": {size: -1, offset: -1},
+						"db2_tb2": {size: -1, offset: -1},
+						"db2_tb3": {size: -1, offset: -1},
+						"db2_tb4": {size: -1, offset: -1},
+						"db2_tb5": {size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
+				},
+				"db3": TableRecords{
+					Table: map[string]TableInfo{
+						"db3_tb1": {size: -1, offset: -1},
+						"db3_tb2": {size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
+				},
+				"db4": TableRecords{
+					Table: map[string]TableInfo{
+						"db4_tb10": {size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
+				},
+			},
+			expOmitDoneDBRecords: false,
+		},
+		{
+			set: DBRecords{
+				"db1": TableRecords{
+					Table: map[string]TableInfo{
+						"db1_tb10": {size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
+				},
+				"db3": TableRecords{
+					Table: map[string]TableInfo{
+						"db3_tb10": {size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
+				},
+			},
+			expRes: DBRecords{
+				"db1": TableRecords{
+					Table: map[string]TableInfo{
+						"db1_tb1":  {size: -1, offset: -1},
+						"db1_tb2":  {size: -1, offset: -1},
+						"db1_tb3":  {size: -1, offset: -1},
+						"db1_tb10": {size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
+				},
+				"db2": TableRecords{
+					Table: map[string]TableInfo{
+						"db2_tb1": {size: -1, offset: -1},
+						"db2_tb2": {size: -1, offset: -1},
+						"db2_tb3": {size: -1, offset: -1},
+						"db2_tb4": {size: -1, offset: -1},
+						"db2_tb5": {size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
+				},
+				"db3": TableRecords{
+					Table: map[string]TableInfo{
+						"db3_tb1":  {size: -1, offset: -1},
+						"db3_tb2":  {size: -1, offset: -1},
+						"db3_tb10": {size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
+				},
+				"db4": TableRecords{
+					Table: map[string]TableInfo{
+						"db4_tb10": {size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
+				},
+			},
+			expOmitDoneDBRecords: false,
 		},
 		{
 			set: readRecords,
-			exp_res: DBRecords{
-				"db1": {
-					"db1_tb1":  TableInfo{size: -1, offset: -1},
-					"db1_tb2":  TableInfo{size: -1, offset: -1},
-					"db1_tb3":  TableInfo{size: -1, offset: -1},
-					"db1_tb10": TableInfo{size: -1, offset: -1},
+			expRes: DBRecords{
+				"db1": TableRecords{
+					Table: map[string]TableInfo{
+						"db1_tb1":  {size: -1, offset: -1},
+						"db1_tb2":  {size: -1, offset: -1},
+						"db1_tb3":  {size: -1, offset: -1},
+						"db1_tb10": {size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
-				"db2": {
-					"db2_tb1": TableInfo{size: -1, offset: -1},
-					"db2_tb2": TableInfo{size: -1, offset: -1},
-					"db2_tb3": TableInfo{size: -1, offset: -1},
-					"db2_tb4": TableInfo{size: -1, offset: -1},
-					"db2_tb5": TableInfo{size: -1, offset: -1},
+				"db2": TableRecords{
+					Table: map[string]TableInfo{
+						"db2_tb1": {size: -1, offset: -1},
+						"db2_tb2": {size: -1, offset: -1},
+						"db2_tb3": {size: -1, offset: -1},
+						"db2_tb4": {size: -1, offset: -1},
+						"db2_tb5": {size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
-				"db3": {
-					"db3_tb1":  TableInfo{size: -1, offset: -1},
-					"db3_tb2":  TableInfo{size: -1, offset: -1},
-					"db3_tb10": TableInfo{size: -1, offset: -1},
+				"db3": TableRecords{
+					Table: map[string]TableInfo{
+						"db3_tb1":  {size: -1, offset: -1},
+						"db3_tb2":  {size: -1, offset: -1},
+						"db3_tb10": {size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
-				"db4": {
-					"db4_tb10": TableInfo{size: -1, offset: -1},
+				"db4": TableRecords{
+					Table: map[string]TableInfo{
+						"db4_tb10": {size: -1, offset: -1},
+					},
+					mutex: sync.RWMutex{},
 				},
 			},
-			exp_omitDoneDBRecords: false,
+			expOmitDoneDBRecords: false,
 		},
 	}
 
@@ -1252,8 +1324,8 @@ func Test_restoreRecordsFile(t *testing.T) {
 
 		var records SyncDBRecords
 		_, _, omitDoneDBRecords := records.restoreRecordsFile(meta)
-		assert.EqualValues(t, test.exp_omitDoneDBRecords, omitDoneDBRecords)
-		assert.EqualValues(t, test.exp_res, records.GetDBRecords())
+		assert.EqualValues(t, test.expOmitDoneDBRecords, omitDoneDBRecords)
+		assert.EqualValues(t, test.expRes, records.GetDBRecords())
 	}
 
 }
@@ -1263,7 +1335,7 @@ func getContent(readRecords DBRecords) string {
 	var all string
 	for database, tablesRecord := range readRecords {
 		var tablesRecordStr string
-		for table, tableInfo := range tablesRecord {
+		for table, tableInfo := range tablesRecord.GetTable() {
 			tablesRecordStr += table + "," +
 				strconv.FormatInt(tableInfo.size, 10) + "," +
 				strconv.FormatInt(tableInfo.size, 10) + "," +
@@ -1364,14 +1436,16 @@ func TestMySql(t *testing.T) {
 	mr, err := getMySqlReader(false, false, false, runnerName, CronInfo{})
 	defer os.RemoveAll(MetaDir)
 	assert.NoError(t, err)
-	mrData, ok := mr.(reader.DataReader)
+	r, ok := mr.(reader.DataReader)
 	if !ok {
 		t.Error("mysql read should have readdata interface")
 	}
+	assert.NoError(t, mr.(*Reader).Start())
+
 	dataLine := 0
 	before := time.Now()
 	for !batchTimeout(before, 2) {
-		data, bytes, err := mrData.ReadData()
+		data, bytes, err := r.ReadData()
 		if err != nil {
 			t.Error(err)
 		}
@@ -1389,7 +1463,7 @@ func TestMySql(t *testing.T) {
 	dataLine = 0
 	before = time.Now()
 	for !batchTimeout(before, 2) {
-		data, bytes, err := mrData.ReadData()
+		data, bytes, err := r.ReadData()
 		if err != nil {
 			t.Error(err)
 		}
@@ -1412,6 +1486,8 @@ func TestMySql(t *testing.T) {
 	if !ok {
 		t.Error("mysql read should have readdata interface")
 	}
+	assert.NoError(t, mrRawSql.(*Reader).Start())
+
 	dataLine = 0
 	before = time.Now()
 	for !batchTimeout(before, 2) {
@@ -1456,6 +1532,8 @@ func TestMySql(t *testing.T) {
 	if !ok {
 		t.Error("mysql read should have readdata interface")
 	}
+	assert.NoError(t, mrHistoryAll.(*Reader).Start())
+
 	dataLine = 0
 	before = time.Now()
 	for !batchTimeout(before, 2) {
@@ -1510,6 +1588,8 @@ func TestMySql(t *testing.T) {
 	if !ok {
 		t.Error("mysql read should have readdata interface")
 	}
+	assert.NoError(t, mrCron.(*Reader).Start())
+
 	dataLine = 0
 	before = time.Now()
 	log.Infof("before: %v", before)
@@ -1545,6 +1625,8 @@ func TestMySql(t *testing.T) {
 	if !ok {
 		t.Error("mysql read should have readdata interface")
 	}
+	assert.NoError(t, mrCronExecOnStart.(*Reader).Start())
+
 	dataLine = 0
 	before = time.Now()
 	log.Infof("before: %v", before)
@@ -1570,6 +1652,8 @@ func TestMySql(t *testing.T) {
 	if !ok {
 		t.Error("mysql read should have readdata interface")
 	}
+	assert.NoError(t, mrCronExecOnStart2.(*Reader).Start())
+
 	dataLine = 0
 	before = time.Now()
 	log.Infof("before: %v", before)
@@ -1601,6 +1685,8 @@ func TestMySql(t *testing.T) {
 	if !ok {
 		t.Error("mysql read should have readdata interface")
 	}
+	assert.NoError(t, mrLoopOnStart.(*Reader).Start())
+
 	dataLine = 0
 	before = time.Now()
 	log.Infof("before: %v", before)
@@ -1628,7 +1714,8 @@ func TestMySql(t *testing.T) {
 	assert.False(t, omitDoneFile)
 	assert.Equal(t, 1, len(doneRecords.records))
 	expectDB := "Test_MySql" + year + month + day
-	assert.Equal(t, 2, len(doneRecords.records.GetTableRecords(expectDB)))
+	tableRecords := doneRecords.records.GetTableRecords(expectDB)
+	assert.Equal(t, 2, len(tableRecords.GetTable()))
 	assert.Equal(t, expectDB, lastDB)
 	assert.NotEmpty(t, lastTable)
 

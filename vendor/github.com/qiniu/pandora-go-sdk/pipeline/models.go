@@ -1029,6 +1029,16 @@ type PostDataInput struct {
 	ResourceOwner string
 	RepoName      string
 	Points        Points
+	Tags          map[string]interface{}
+}
+
+type PostTextDataInput struct {
+	PandoraToken
+	ResourceOwner string
+	RepoName      string
+	Text          []string
+	Tags          map[string]interface{}
+	Rules         []string
 }
 
 type PostRawtextDataInput struct {
@@ -1036,6 +1046,8 @@ type PostRawtextDataInput struct {
 	ResourceOwner string
 	RepoName      string
 	Rawtext       []byte
+	Tags          map[string]interface{}
+	Rules         []string
 }
 
 type SchemaFreeInput struct {
@@ -1048,6 +1060,7 @@ type SchemaFreeInput struct {
 	Description  *string
 	Option       *SchemaFreeOption
 	RepoOptions  *RepoOptions
+	Tags         map[string]interface{}
 }
 
 type SchemaFreeToken struct {
@@ -1090,6 +1103,7 @@ type PostDataFromFileInput struct {
 	PandoraToken
 	RepoName string
 	FilePath string
+	Tags     map[string]interface{}
 }
 
 type PostDataFromReaderInput struct {
@@ -1097,12 +1111,14 @@ type PostDataFromReaderInput struct {
 	RepoName   string
 	Reader     io.ReadSeeker
 	BodyLength int64
+	Tags       map[string]interface{}
 }
 
 type PostDataFromBytesInput struct {
 	PandoraToken
 	RepoName string
 	Buffer   []byte
+	Tags     map[string]interface{}
 }
 
 type UploadPluginInput struct {

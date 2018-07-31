@@ -2,6 +2,8 @@ package models
 
 import (
 	"fmt"
+	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/qiniu/logkit/conf"
@@ -39,9 +41,14 @@ const (
 
 	DefaultMaxBatchSize = 2 * 1024 * 1024
 
-	Text     = "text"
-	Checkbox = "checkbox"
-	Radio    = "radio"
+	DefaultErrorsListCap = 100
+
+	PipeLineError = "ErrorMessage="
+
+	Text        = "text"
+	Checkbox    = "checkbox"
+	Radio       = "radio"
+	InputNumber = "inputNumber"
 )
 
 type Option struct {
@@ -65,8 +72,9 @@ type Option struct {
 }
 
 type KeyValue struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
+	Key     string `json:"key"`
+	Value   string `json:"value"`
+	SortKey string `json:"sort_key"`
 }
 
 // Data store as use key/value map
@@ -101,6 +109,205 @@ type StatsInfo struct {
 	Trend      string  `json:"trend"`
 	LastError  string  `json:"last_error"`
 	FtQueueLag int64   `json:"-"`
+}
+
+type ErrorQueue struct {
+	lock       sync.RWMutex
+	ErrorSlice []ErrorInfo `json:"error_slice"`
+	Front      int         `json:"front"`
+	Rear       int         `json:"rear"`
+	MaxSize    int         `json:"max_size"`
+}
+
+type ErrorInfo struct {
+	Error     string `json:"error"`
+	Timestamp int64  `json:"timestamp"`
+	Count     int64  `json:"count"`
+}
+
+func NewErrorQueue(maxSize int) *ErrorQueue {
+	if maxSize <= 0 {
+		maxSize = DefaultErrorsListCap
+	}
+	return &ErrorQueue{
+		ErrorSlice: make([]ErrorInfo, maxSize+1), // 多余的1个空间用来判断队列是否满了
+		MaxSize:    maxSize + 1,
+	}
+}
+
+// 向队列中添加单个元素
+func (queue *ErrorQueue) Put(e ErrorInfo) {
+	if queue.EqualLast(e) {
+		queue.lock.Lock()
+		last := (queue.Rear + queue.MaxSize - 1) % queue.MaxSize
+		queue.ErrorSlice[last].Count++
+		queue.ErrorSlice[last].Timestamp = e.Timestamp
+		queue.lock.Unlock()
+		return
+	}
+
+	queue.lock.Lock()
+	if (queue.Rear+1)%queue.MaxSize == queue.Front {
+		queue.Front = (queue.Front + 1) % queue.MaxSize
+	}
+	queue.ErrorSlice[queue.Rear] = e
+	queue.ErrorSlice[queue.Rear].Count = 1 // 个数增加 1
+	queue.Rear = (queue.Rear + 1) % queue.MaxSize
+	queue.lock.Unlock()
+}
+
+// 向队列中添加元素
+func (queue *ErrorQueue) Append(errors []ErrorInfo) {
+	queue.lock.Lock()
+	for _, e := range errors {
+		if (queue.Rear+1)%queue.MaxSize == queue.Front {
+			queue.Front = (queue.Front + 1) % queue.MaxSize
+		}
+		queue.ErrorSlice[queue.Rear] = e
+		queue.Rear = (queue.Rear + 1) % queue.MaxSize
+	}
+	queue.lock.Unlock()
+}
+
+// 获取队列中最后一个元素
+func (queue *ErrorQueue) Get() ErrorInfo {
+	if queue.IsEmpty() {
+		return ErrorInfo{}
+	}
+
+	queue.lock.Lock()
+	defer queue.lock.Unlock()
+	return queue.ErrorSlice[(queue.Rear-1+queue.MaxSize)%queue.MaxSize]
+}
+
+func (queue *ErrorQueue) Size() int {
+	if queue.IsEmpty() {
+		return 0
+	}
+
+	queue.lock.RLock()
+	defer queue.lock.RUnlock()
+	return (queue.Rear - queue.Front + queue.MaxSize) % queue.MaxSize
+}
+
+func (queue *ErrorQueue) IsEmpty() bool {
+	if queue == nil {
+		return true
+	}
+
+	queue.lock.RLock()
+	defer queue.lock.RUnlock()
+	return queue.Rear == queue.Front
+}
+
+// 按进出顺序复制到数组中
+func (queue *ErrorQueue) Sort() []ErrorInfo {
+	if queue.IsEmpty() {
+		return nil
+	}
+
+	var errorInfoList []ErrorInfo
+	queue.lock.RLock()
+	for i := queue.Front; i != queue.Rear; i = (i + 1) % queue.MaxSize {
+		errorInfoList = append(errorInfoList, queue.ErrorSlice[i])
+	}
+	queue.lock.RUnlock()
+	return errorInfoList
+}
+
+// 返回队列实际容量
+func (queue *ErrorQueue) GetMaxSize() int {
+	return queue.MaxSize - 1
+}
+
+// 将另一个queue复制到当前queue中
+func (queue *ErrorQueue) CopyQueue(src *ErrorQueue) {
+	if src.IsEmpty() {
+		return
+	}
+
+	src.lock.Lock()
+	for i := src.Front; i != src.Rear; i = (i + 1) % src.MaxSize {
+		queue.Copy(src.ErrorSlice[i])
+	}
+	queue.Front = src.Front
+	queue.Rear = src.Rear
+	src.lock.Unlock()
+}
+
+// 将另一个queue复制到当前queue中
+func (queue *ErrorQueue) Set(index int, e ErrorInfo) {
+	queue.lock.Lock()
+	if index < queue.Front || index > queue.Rear {
+		return
+	}
+	queue.ErrorSlice[index] = e
+	queue.ErrorSlice[index].Count = e.Count
+	queue.ErrorSlice[index].Timestamp = e.Timestamp
+	if index == queue.Rear {
+		queue.Rear = (queue.Rear + 1) % queue.MaxSize
+	}
+	queue.lock.Unlock()
+}
+
+// 将另一个queue复制到当前queue中
+func (queue *ErrorQueue) Copy(e ErrorInfo) {
+	queue.lock.Lock()
+	if (queue.Rear+1)%queue.MaxSize == queue.Front {
+		queue.Front = (queue.Front + 1) % queue.MaxSize
+	}
+	queue.ErrorSlice[queue.Rear] = e
+	queue.Rear = (queue.Rear + 1) % queue.MaxSize
+	queue.lock.Unlock()
+}
+
+// 获取 queue 中 front rear之间的数据
+func (queue *ErrorQueue) GetErrorSlice(front, rear int) []ErrorInfo {
+	if queue.IsEmpty() {
+		return nil
+	}
+
+	var errorInfoArr []ErrorInfo
+	queue.lock.Lock()
+	if front%queue.MaxSize < queue.Front {
+		front = queue.Front
+	}
+	if rear%queue.MaxSize > queue.Rear {
+		rear = queue.Rear
+	}
+	for i := front % queue.MaxSize; i != rear; i = (i + 1) % queue.MaxSize {
+		if queue.ErrorSlice[i].Count != 0 {
+			errorInfoArr = append(errorInfoArr, queue.ErrorSlice[i])
+		}
+	}
+	queue.lock.Unlock()
+	return errorInfoArr
+}
+
+// 向队列中添加元素
+func (queue *ErrorQueue) EqualLast(e ErrorInfo) bool {
+	if queue.IsEmpty() {
+		return false
+	}
+	queue.lock.RLock()
+	defer queue.lock.RUnlock()
+	last := (queue.Rear + queue.MaxSize - 1) % queue.MaxSize
+	lastError := queue.ErrorSlice[last].Error
+	current := e.Error
+	if strings.EqualFold(lastError, current) {
+		return true
+	}
+
+	lastErrorIdx := strings.Index(lastError, PipeLineError)
+	currentIdx := strings.Index(current, PipeLineError)
+	if lastErrorIdx != -1 && currentIdx != -1 {
+		currentErrArr := strings.SplitN(current[currentIdx:], ":", 2)
+		lastErrorArr := strings.SplitN(lastError[lastErrorIdx:], ":", 2)
+		if strings.EqualFold(currentErrArr[0], lastErrorArr[0]) {
+			return true
+		}
+	}
+	return false
 }
 
 func (se *StatsError) AddSuccess() {
@@ -145,4 +352,20 @@ func (se *StatsError) ErrorIndexIn(idx int) bool {
 		}
 	}
 	return false
+}
+
+type KeyValueSlice []KeyValue
+
+func (slice KeyValueSlice) Len() int {
+	return len(slice)
+}
+
+func (slice KeyValueSlice) Less(i, j int) bool {
+	return slice[i].SortKey < slice[j].SortKey
+}
+
+func (slice KeyValueSlice) Swap(i, j int) {
+	slice[i].Key, slice[j].Key = slice[j].Key, slice[i].Key
+	slice[i].Value, slice[j].Value = slice[j].Value, slice[i].Value
+	slice[i].SortKey, slice[j].SortKey = slice[j].SortKey, slice[i].SortKey
 }

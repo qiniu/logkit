@@ -172,7 +172,102 @@ func TestTransformer(t *testing.T) {
 	assert.Equal(t, ipt4.Stage(), transforms.StageAfterParser)
 
 	// 确保多个 transformer 只有两个 Locator 产生
+
+	// mmdb
+	ipt5 := &Transformer{
+		Key:      "multi.ip",
+		DataPath: "./test_data/17monipdb.mmdb",
+		Language: "en",
+	}
+	data5, err5 := ipt5.Transform([]Data{{"multi": map[string]interface{}{"ip": "216.160.83.56"}}, {"multi": map[string]interface{}{"ip": "x.x.x.x"}}})
+	assert.Error(t, err5)
+	exp5 := []Data{{
+		"multi": map[string]interface{}{
+			"ip":           "216.160.83.56",
+			"City":         "Milton",
+			"Isp":          "N/A",
+			"Region":       "Washington",
+			"Country":      "United States",
+			"Latitude":     "47.2513",
+			"Longitude":    "-122.3149",
+			"DistrictCode": "WA",
+			"CountryCode":  "US",
+		},
+	},
+		{"multi": map[string]interface{}{
+			"ip": "x.x.x.x",
+		},
+		},
+	}
+	assert.Equal(t, exp5, data5)
+	expe5 := StatsInfo{
+		Errors:    1,
+		Success:   1,
+		LastError: "find total 1 erorrs in transform IP, last error info is invalid IP format",
+	}
+	assert.Equal(t, expe5, ipt.stats)
+	assert.Len(t, locatorStore.locators, 3)
+
+	ipt6 := &Transformer{
+		Key:      "multi.ip2",
+		DataPath: "./test_data/17monipdb.mmdb",
+		Language: "en",
+	}
+
+	multi_ip2 := []Data{{
+		"multi": map[string]interface{}{
+			"ip":      "111.2.3.4",
+			"Region":  "浙江",
+			"City":    "宁波",
+			"Country": "中国",
+			"Isp":     "N/A",
+			"ip2":     "216.160.83.56",
+		},
+	},
+		{"multi": map[string]interface{}{
+			"ip": "x.x.x.x",
+		},
+		},
+	}
+	data6, err6 := ipt6.Transform(multi_ip2)
+	exp6 := []Data{
+		{
+			"multi": map[string]interface{}{
+				"ip":           "111.2.3.4",
+				"Region":       "浙江",
+				"City":         "宁波",
+				"Country":      "中国",
+				"Isp":          "N/A",
+				"ip2":          "216.160.83.56",
+				"ip2_City":     "Milton",
+				"ip2_Isp":      "N/A",
+				"ip2_Region":   "Washington",
+				"ip2_Country":  "United States",
+				"Latitude":     "47.2513",
+				"Longitude":    "-122.3149",
+				"DistrictCode": "WA",
+				"CountryCode":  "US",
+			},
+		},
+		{
+			"multi": map[string]interface{}{
+				"ip": "x.x.x.x",
+			},
+		},
+	}
+	assert.Error(t, err6)
+	assert.Equal(t, exp6, data6)
+	expe6 := StatsInfo{
+		Errors:    1,
+		Success:   1,
+		LastError: "find total 1 erorrs in transform IP, last error info is invalid IP format",
+	}
+	ipt5.Close()
+	assert.Len(t, locatorStore.locators, 3)
+	ipt6.Close()
 	assert.Len(t, locatorStore.locators, 2)
+	assert.Equal(t, expe6, ipt.stats)
+	assert.Equal(t, ipt.Stage(), transforms.StageAfterParser)
 }
 
 var dttest []Data
@@ -225,6 +320,12 @@ func Test_badData(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, "datx", ierr.Format)
 
+	_, err = ipt.Transform([]Data{{"ip": "111.2.3.4"}, {"ip": "x.x.x.x"}})
+	assert.Error(t, err)
+	ierr, ok = err.(ErrInvalidFile)
+	assert.True(t, ok)
+	assert.Equal(t, "datx", ierr.Format)
+
 	ipt = &Transformer{
 		Key:      "ip",
 		DataPath: "./test_data/bad.datn",
@@ -232,4 +333,20 @@ func Test_badData(t *testing.T) {
 	_, err = ipt.Transform([]Data{{"ip": "111.2.3.4"}, {"ip": "x.x.x.x"}})
 	assert.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "unrecognized data file format"))
+
+	ipt = &Transformer{
+		Key:      "ip",
+		DataPath: "./test_data/bad.mmdb",
+	}
+	_, err = ipt.Transform([]Data{{"ip": "111.2.3.4"}, {"ip": "x.x.x.x"}})
+	assert.Error(t, err)
+	ierr, ok = err.(ErrInvalidFile)
+	assert.True(t, ok)
+	assert.Equal(t, "mmdb", ierr.Format)
+
+	_, err = ipt.Transform([]Data{{"ip": "111.2.3.4"}, {"ip": "x.x.x.x"}})
+	assert.Error(t, err)
+	ierr, ok = err.(ErrInvalidFile)
+	assert.True(t, ok)
+	assert.Equal(t, "mmdb", ierr.Format)
 }

@@ -38,19 +38,19 @@ const (
 )
 
 // KeyProcessesUsages TypeMetricProcesses 的字段名称
-var KeyProcessesUsages = []KeyValue{
-	{KeyProcessesBlocked, "不可中断的睡眠状态下的进程数('U','D','L')"},
-	{KeyProcessesZombies, "僵尸态进程数('Z')"},
-	{KeyProcessesStopped, "暂停状态进程数('T')"},
-	{KeyProcessesRunning, "运行中的进程数('R')"},
-	{KeyProcessesSleeping, "可中断进程数('S')"},
-	{KeyProcessesTotal, "总进程数"},
-	{KeyProcessesIdle, "挂起的空闲进程数('I')"},
-	{KeyProcessesWait, "等待中的进程数('W')"},
-	{KeyProcessesDead, "回收中的进程数('X')"},
-	{KeyProcessesPaging, "等待中的进程数('W')"},
-	{KeyProcessesTotalThreads, "总线程数"},
-	{KeyProcessesUnknown, "未知状态进程数"},
+var KeyProcessesUsages = KeyValueSlice{
+	{KeyProcessesBlocked, "不可中断的睡眠状态下的进程数('U','D','L')", ""},
+	{KeyProcessesZombies, "僵尸态进程数('Z')", ""},
+	{KeyProcessesStopped, "暂停状态进程数('T')", ""},
+	{KeyProcessesRunning, "运行中的进程数('R')", ""},
+	{KeyProcessesSleeping, "可中断进程数('S')", ""},
+	{KeyProcessesTotal, "总进程数", ""},
+	{KeyProcessesIdle, "挂起的空闲进程数('I')", ""},
+	{KeyProcessesWait, "等待中的进程数('W')", ""},
+	{KeyProcessesDead, "回收中的进程数('X')", ""},
+	{KeyProcessesPaging, "分页进程数('P')", ""},
+	{KeyProcessesTotalThreads, "总线程数", ""},
+	{KeyProcessesUnknown, "未知状态进程数", ""},
 }
 
 type Processes struct {

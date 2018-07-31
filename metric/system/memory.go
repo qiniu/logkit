@@ -25,17 +25,17 @@ const (
 )
 
 // KeyMemUsages TypeMetricMem 中的字段名称
-var KeyMemUsages = []KeyValue{
-	{KeyMemTotal, "内存总数"},
-	{KeyMemAvailable, "可用内存数"},
-	{KeyMemUsed, "已用内存数"},
-	{KeyMemFree, "空闲内存"},
-	{KeyMemCached, "用于缓存的内存"},
-	{KeyMemBuffered, "文件buffer内存"},
-	{KeyMemActive, "活跃使用的内存总数(包括cache和buffer内存)"},
-	{KeyMemInactive, "空闲的内存数(包括free和avalible的内存)"},
-	{KeyMemUsedPercent, "内存已用百分比(0~100)"},
-	{KeyMemAvailablePercent, "内存剩余百分比(0~100)"},
+var KeyMemUsages = KeyValueSlice{
+	{KeyMemTotal, "内存总数", ""},
+	{KeyMemAvailable, "可用内存数", ""},
+	{KeyMemUsed, "已用内存数", ""},
+	{KeyMemFree, "空闲内存", ""},
+	{KeyMemCached, "用于缓存的内存", ""},
+	{KeyMemBuffered, "文件buffer内存", ""},
+	{KeyMemActive, "活跃使用的内存总数(包括cache和buffer内存)", ""},
+	{KeyMemInactive, "空闲的内存数(包括free和avalible的内存)", ""},
+	{KeyMemUsedPercent, "内存已用百分比(0~100)", ""},
+	{KeyMemAvailablePercent, "内存剩余百分比(0~100)", ""},
 }
 
 type MemStats struct {
@@ -86,7 +86,7 @@ func (s *MemStats) Collect() (datas []map[string]interface{}, err error) {
 
 const (
 	TypeMetricSwap   = "swap"
-	MetricSwapUsages = "CPU(Swap)"
+	MetricSwapUsages = "内存(Swap)"
 
 	// TypeMetricSwap 中的字段
 	KeySwapTotal       = "swap_total"
@@ -98,13 +98,13 @@ const (
 )
 
 // KeySwapUsages TypeMetricSwap 中的字段名称
-var KeySwapUsages = []KeyValue{
-	{KeySwapTotal, "Swap空间总量"},
-	{KeySwapUsed, "Swap已使用空间"},
-	{KeySwapFree, "Swap空闲空间"},
-	{KeySwapUsedPercent, "used percent"},
-	{KeySwapIn, "swap in"},
-	{KeySwapOut, "swap out"},
+var KeySwapUsages = KeyValueSlice{
+	{KeySwapTotal, "Swap空间总量", ""},
+	{KeySwapUsed, "Swap已使用空间", ""},
+	{KeySwapFree, "Swap空闲空间", ""},
+	{KeySwapUsedPercent, "Swap使用空间占比", ""},
+	{KeySwapIn, "Swap空间换入数据量", ""},
+	{KeySwapOut, "Swap空间换出数据量", ""},
 }
 
 type SwapStats struct {

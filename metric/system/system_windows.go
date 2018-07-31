@@ -15,14 +15,14 @@ import (
 )
 
 // KeySystemUsages TypeMetricSystem的字段名称
-var WinSystemUsages = []KeyValue{
-	{KeySystemLoad1, "1分钟平均load值"},
-	{KeySystemLoad5, "5分钟平均load值"},
-	{KeySystemLoad15, "15分钟平均load值"},
-	//{KeySystemNUsers, "用户数"},
-	{KeySystemNCpus, "CPU核数"},
-	{KeySystemUptime, "系统启动时间"},
-	{KeySystemUptimeFormat, "格式化的系统启动时间"},
+var WinSystemUsages = KeyValueSlice{
+	{KeySystemLoad1, "1分钟平均load值", ""},
+	{KeySystemLoad5, "5分钟平均load值", ""},
+	{KeySystemLoad15, "15分钟平均load值", ""},
+	//{KeySystemNUsers, "用户数", ""},
+	{KeySystemNCpus, "CPU核数", ""},
+	{KeySystemUptime, "系统启动时间", ""},
+	{KeySystemUptimeFormat, "格式化的系统启动时间", ""},
 }
 
 type WinSystemStats struct {

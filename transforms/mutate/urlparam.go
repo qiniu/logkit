@@ -193,7 +193,7 @@ func (p *UrlParam) ConfigOptions() []Option {
 			Placeholder:  "key1,key2,key3",
 			DefaultNoUse: true,
 			Description:  "选中收集的参数名(select_keys)",
-			ToolTip:      "多个参数名之间使用用逗号(,)连接，收集所有参数则留空",
+			ToolTip:      "多个参数名之间使用用逗号(,)连接，收集所有参数则留空，全都不要可以填写一个不存在的key",
 			Type:         transforms.TransformTypeString,
 		},
 	}

@@ -2,6 +2,7 @@ package transforms
 
 import (
 	"fmt"
+	"sort"
 
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -15,15 +16,17 @@ const (
 	TypeErr     = "value of %v is not the type of map[string]interface{}"
 )
 
-func GetTransformerUsages() []KeyValue {
-	var ModeUsages []KeyValue
+func GetTransformerUsages() KeyValueSlice {
+	var ModeUsages KeyValueSlice
 	for _, v := range Transformers {
 		cr := v()
 		ModeUsages = append(ModeUsages, KeyValue{
-			Key:   cr.Type(),
-			Value: cr.Description(),
+			Key:     cr.Type(),
+			Value:   cr.Description(),
+			SortKey: cr.Type(),
 		})
 	}
+	sort.Stable(ModeUsages)
 	return ModeUsages
 }
 

@@ -14,25 +14,24 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/json-iterator/go"
+	"github.com/labstack/echo"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/reader"
-	. "github.com/qiniu/logkit/utils/models"
-
-	"sync"
-
-	"github.com/json-iterator/go"
-	"github.com/labstack/echo"
 	"github.com/qiniu/logkit/router"
-	"github.com/stretchr/testify/assert"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 type respModeUsages struct {
-	Code string     `json:"code"`
-	Data []KeyValue `json:"data"`
+	Code string        `json:"code"`
+	Data KeyValueSlice `json:"data"`
 }
 
 type respModeKeyOptions struct {
@@ -553,6 +552,16 @@ func restCRUDTest(p *testParam) {
 	assert.Equal(t, false, ex)
 }
 
+type respErrors struct {
+	Code string                  `json:"code"`
+	Data map[string]ErrorsResult `json:"data"`
+}
+
+type respError struct {
+	Code string       `json:"code"`
+	Data ErrorsResult `json:"data"`
+}
+
 func runnerResetTest(p *testParam) {
 	t := p.t
 	rd := p.rd
@@ -618,6 +627,59 @@ func runnerResetTest(p *testParam) {
 	clearGotStatus(&v)
 	rss[runnerName] = v
 	assert.Equal(t, exp[runnerName], rss[runnerName])
+
+	expErrors := map[string]ErrorsResult{
+		runnerName: {},
+	}
+	url = "http://127.0.0.1" + rs.address + "/logkit/errors"
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	respErrs := respErrors{}
+	if err = jsoniter.Unmarshal(respBody, &respErrs); err != nil {
+		t.Fatalf("status unmarshal failed error is %v, respBody is %v", err, string(respBody))
+	}
+	rssData := respErrs.Data
+	assert.Equal(t, expErrors[runnerName], rssData[runnerName])
+
+	os.RemoveAll(logDir)
+	os.Mkdir(logDir, os.ModePerm)
+	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName + "/reset"
+	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(5 * time.Second)
+
+	url = "http://127.0.0.1" + rs.address + "/logkit/errors"
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	respErrs = respErrors{}
+	if err = jsoniter.Unmarshal(respBody, &respErrs); err != nil {
+		t.Fatalf("status unmarshal failed error is %v, respBody is %v", err, string(respBody))
+	}
+	rssData = respErrs.Data
+	assert.NotZero(t, rssData[runnerName].ReadErrors)
+	assert.Equal(t, 1, len(rssData[runnerName].ReadErrors))
+	assert.True(t, rssData[runnerName].ReadErrors[0].Count >= 1)
+	assert.Equal(t, "no more file exist to be read", rssData[runnerName].ReadErrors[0].Error)
+
+	url = "http://127.0.0.1" + rs.address + "/logkit/errors/" + runnerName
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	respErr := respError{}
+	if err = jsoniter.Unmarshal(respBody, &respErr); err != nil {
+		t.Fatalf("status unmarshal failed error is %v, respBody is %v", err, string(respBody))
+	}
+	rssErrData := respErr.Data
+	assert.True(t, len(rssErrData.ReadErrors) != 0)
+	assert.Equal(t, "no more file exist to be read", rssErrData.ReadErrors[0].Error)
+
+	url = "http://127.0.0.1" + rs.address + "/logkit/errors/runnerNotFound"
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusBadRequest, respCode)
 }
 
 func runnerStopStartTest(p *testParam) {

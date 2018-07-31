@@ -1898,7 +1898,7 @@ func TestTailxCleaner(t *testing.T) {
 			dft++
 		}
 		time.Sleep(50 * time.Millisecond)
-		if dft > 40 {
+		if dft > 60 {
 			break
 		}
 	}
