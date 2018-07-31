@@ -12,6 +12,7 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
+	"github.com/qiniu/pandora-go-sdk/pipeline"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
@@ -162,6 +163,51 @@ func TestFtMemorySender(t *testing.T) {
 	if fts.BackupQueue.Depth() != 1 {
 		t.Error("Ft send error exp 1 but got", fts.BackupQueue.Depth())
 	}
+}
+
+func TestFtMemoryEmptySender(t *testing.T) {
+	mockPandora, pt := mock_pandora.NewMockPandoraWithPrefix("/v2")
+	pandoraSenderConfig := conf.MapConf{
+		"name":                           "p",
+		"pandora_region":                 "nb",
+		"pandora_host":                   "http://127.0.0.1:" + pt,
+		"pandora_schema":                 "ab a1",
+		"pandora_schema_free":            "true",
+		"pandora_ak":                     "ak",
+		"pandora_sk":                     "sk",
+		"pandora_schema_update_interval": "1",
+		"pandora_gzip":                   "false",
+		"logkit_send_time":               "false",
+
+		"sender_type": "pandora",
+	}
+	mockPandora.Schemas = []pipeline.RepoSchemaEntry{{Key: "a1", ValueType: "string", Required: false}}
+	tmpDir, err := ioutil.TempDir("", fmt.Sprintf("nsq-test-%d", time.Now().UnixNano()))
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(tmpDir)
+	pandoraSenderConfig["pandora_repo_name"] = "TestFtMemoryEmptySender"
+	s, err := pandora.NewSender(pandoraSenderConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mp := conf.MapConf{}
+	mp[sender.KeyFtSaveLogPath] = tmpDir
+	mp[sender.KeyFtMemoryChannel] = "true"
+	mp[sender.KeyFtMemoryChannelSize] = "3"
+	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyAlwaysSave
+	fts, err := sender.NewFtSender(s, mp, tmpDir)
+	assert.NoError(t, err)
+	datas := []Data{{"c": "E18006:BackupQueue.Depth"}}
+	err = fts.Send(datas)
+	se, ok := err.(*StatsError)
+	if !ok {
+		t.Fatal("ft send return error should .(*StatsError)")
+	}
+	assert.NoError(t, se.ErrorDetail)
+	time.Sleep(10 * time.Second)
+	assert.Zero(t, fts.BackupQueue.Depth())
 }
 
 func TestFtChannelFullSender(t *testing.T) {

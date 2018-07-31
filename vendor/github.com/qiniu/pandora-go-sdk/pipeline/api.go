@@ -708,6 +708,9 @@ func (c *Pipeline) unpack(input *SchemaFreeInput) (packages []pointContext, err 
 		if err != nil {
 			return nil, err
 		}
+		if len(point.Fields) < 1 {
+			continue
+		}
 		if update {
 			repoUpdate = update
 		}
@@ -730,17 +733,20 @@ func (c *Pipeline) unpack(input *SchemaFreeInput) (packages []pointContext, err 
 		}
 		buf.Write(pointBytes)
 	}
-	tmpBuff := make([]byte, buf.Len())
-	copy(tmpBuff, buf.Bytes())
-	packages = append(packages, pointContext{
-		datas: input.Datas[start:],
-		inputs: &PostDataFromBytesInput{
-			RepoName:     input.RepoName,
-			Buffer:       tmpBuff,
-			PandoraToken: input.SchemaFreeToken.PipelinePostDataToken,
-			Tags:         input.Tags,
-		},
-	})
+	if buf.Len() > 0 {
+		tmpBuff := make([]byte, buf.Len())
+		copy(tmpBuff, buf.Bytes())
+		packages = append(packages, pointContext{
+			datas: input.Datas[start:],
+			inputs: &PostDataFromBytesInput{
+				RepoName:     input.RepoName,
+				Buffer:       tmpBuff,
+				PandoraToken: input.SchemaFreeToken.PipelinePostDataToken,
+				Tags:         input.Tags,
+			},
+		})
+	}
+
 	if repoUpdate {
 		var schemas []RepoSchemaEntry
 		c.repoSchemaMux.Lock()
