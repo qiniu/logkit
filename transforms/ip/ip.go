@@ -6,6 +6,7 @@ import (
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
+	"strings"
 )
 
 const Name = "IP"
@@ -61,6 +62,7 @@ func (t *Transformer) Transform(datas []Data) ([]Data, error) {
 			err = fmt.Errorf("transform key %v data type is not string", t.Key)
 			continue
 		}
+		strval = strings.TrimSpace(strval)
 		info, nerr := t.loc.Find(strval)
 		if nerr != nil {
 			err = nerr
