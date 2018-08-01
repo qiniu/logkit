@@ -81,6 +81,67 @@ func Test_RawData(t *testing.T) {
 	assert.Equal(t, expected, rawData)
 }
 
+func Test_RawData_DaemonReader(t *testing.T) {
+	var testRawData = `{
+    "name":"testGetRawData.csv",
+    "batch_len": 3,
+    "batch_size": 2097152,
+    "batch_interval": 60,
+    "batch_try_times": 3, 
+    "reader":{
+        "log_path":"./Test_RawData/logdir/*",
+        "meta_path":"./Test_RawData1/meta_req_csv",
+        "mode":"tailx",
+        "read_from":"oldest",
+        "ignore_hidden":"true"
+    }
+}
+`
+	logfile := "./Test_RawData/logdir/log1"
+	logdir := "./Test_RawData/logdir"
+	if err := os.MkdirAll("./Test_RawData/confs1", 0777); err != nil {
+		t.Error(err)
+	}
+	defer func() {
+		os.RemoveAll("./Test_RawData")
+		os.RemoveAll("./Test_RawData1")
+	}()
+
+	if err := os.MkdirAll(logdir, 0777); err != nil {
+		t.Error(err)
+	}
+	err := createFile(logfile, 20000000)
+	if err != nil {
+		t.Error(err)
+	}
+	err = ioutil.WriteFile("./Test_RawData/confs1/test1.conf", []byte(testRawData), 0666)
+	if err != nil {
+		t.Error(err)
+	}
+	time.Sleep(1 * time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	confPathAbs, _, err := GetRealPath("./Test_RawData/confs1/test1.conf")
+	if err != nil {
+		t.Error(err)
+	}
+
+	var runnerConf RunnerConfig
+	err = conf.LoadEx(&runnerConf, confPathAbs)
+	if err != nil {
+		t.Error(err)
+	}
+
+	rawData, err := RawData(runnerConf.ReaderConfig)
+	if err != nil {
+		t.Error(err)
+	}
+
+	expected := "abc\n"
+	assert.Equal(t, expected, rawData)
+}
+
 func Test_ParseData(t *testing.T) {
 	c := conf.MapConf{}
 	c[parser.KeyParserName] = "testparser"
