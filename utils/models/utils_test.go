@@ -292,6 +292,11 @@ func TestGetMapValue(t *testing.T) {
 	value4, err4 := GetMapValue(m4, []string{"m5", "name"}...)
 	assert.Error(t, err4)
 	assert.Equal(t, nil, value4)
+
+	m6 := map[string]interface{}{"m6": Data{"name": "小明"}}
+	value6, err6 := GetMapValue(m6, []string{"m6", "name"}...)
+	assert.NoError(t, err6)
+	assert.Equal(t, "小明", value6)
 }
 
 func TestSetMapValue(t *testing.T) {
@@ -332,6 +337,26 @@ func TestSetMapValue(t *testing.T) {
 	assert.Equal(t, map[string]interface{}{"name1": "name1"}, value41)
 	assert.NoError(t, err43)
 	assert.Equal(t, "name1", value42)
+
+	data := Data{"dkey1": "data1"}
+	err51 := SetMapValue(m1, data, true, []string{"d1", "name1"}...)
+	value51, err52 := GetMapValue(m1, []string{"d1", "name1"}...)
+	value52, err53 := GetMapValue(m1, []string{"d1", "name1", "dkey1"}...)
+	assert.NoError(t, err51)
+	assert.NoError(t, err52)
+	assert.NoError(t, err53)
+	assert.Equal(t, data, value51)
+	assert.Equal(t, "data1", value52)
+
+	err54 := SetMapValue(m1, data, true, []string{"d1", "name1", "dkey2"}...)
+	value53, err55 := GetMapValue(m1, []string{"d1", "name1", "dkey2"}...)
+	value54, err56 := GetMapValue(m1, []string{"d1", "name1", "dkey2", "dkey1"}...)
+	assert.NoError(t, err54)
+	assert.NoError(t, err55)
+	assert.NoError(t, err56)
+	assert.Equal(t, data, value53)
+	assert.Equal(t, "data1", value54)
+
 }
 
 func TestDeleteMapValue(t *testing.T) {
@@ -345,6 +370,11 @@ func TestDeleteMapValue(t *testing.T) {
 	val2, b2 := DeleteMapValue(m1, []string{"m2", "m3", "name", "name2"}...)
 	assert.Equal(t, val2, nil)
 	assert.Equal(t, b2, false)
+
+	m4 := map[string]interface{}{"name": "小明", "data": Data{"name": "Lily"}}
+	val3, b3 := DeleteMapValue(m4, []string{"data", "name"}...)
+	assert.Equal(t, val3, "Lily")
+	assert.Equal(t, b3, true)
 }
 
 func TestHashSet(t *testing.T) {
@@ -609,6 +639,12 @@ func TestPickMapValue(t *testing.T) {
 	assert.Equal(t, exp, pick)
 
 	exp = map[string]interface{}{"multi": map[string]interface{}{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}}
+	pick = map[string]interface{}{}
+	PickMapValue(m, pick, "multi", "abc", "xxx")
+	PickMapValue(m, pick, "multi", "otherword")
+	assert.NotEqual(t, exp, pick)
+
+	exp = map[string]interface{}{"multi": Data{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}}
 	pick = map[string]interface{}{}
 	PickMapValue(m, pick, "multi", "abc", "xxx")
 	PickMapValue(m, pick, "multi", "otherword")

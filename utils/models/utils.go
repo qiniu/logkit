@@ -25,10 +25,9 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/times"
-
-	"github.com/json-iterator/go"
 )
 
 type File struct {
@@ -411,15 +410,21 @@ func SetMapValue(m map[string]interface{}, val interface{}, coercive bool, keys 
 			continue
 		}
 		if _, ok := curr[k].(map[string]interface{}); !ok {
-			if coercive {
-				n := make(map[string]interface{})
-				curr[k] = n
-			} else {
-				err := fmt.Errorf("SetMapValue failed, %v is not the type of map[string]interface{}", curr[k])
-				return err
+			if _, ok := curr[k].(Data); !ok {
+				if coercive {
+					n := make(map[string]interface{})
+					curr[k] = n
+				} else {
+					err := fmt.Errorf("SetMapValue failed, %v is not the type of map[string]interface{}", curr[k])
+					return err
+				}
 			}
 		}
-		curr = curr[k].(map[string]interface{})
+		if m, ok := curr[k].(Data); ok {
+			curr = map[string]interface{}(m)
+		} else {
+			curr = curr[k].(map[string]interface{})
+		}
 	}
 	curr[keys[len(keys)-1]] = val
 	return nil
@@ -444,6 +449,9 @@ func SetMapValueExistWithPrefix(m map[string]interface{}, val interface{}, prefi
 		if curr, ok = finalVal.(map[string]interface{}); ok {
 			continue
 		}
+		if curr, ok = finalVal.(Data); ok {
+			continue
+		}
 		return fmt.Errorf("SetMapValueWithPrefix failed, %v is not the type of map[string]interface{}", keys)
 	}
 	//判断val(k)是否存在
@@ -462,19 +470,19 @@ func DeleteMapValue(m map[string]interface{}, keys ...string) (interface{}, bool
 	var val interface{}
 	val = m
 	for i, k := range keys {
-		if _, ok := val.(map[string]interface{}); ok {
-			if _, ok := val.(map[string]interface{})[k]; ok {
+		if m, ok := val.(Data); ok {
+			val = map[string]interface{}(m)
+		}
+		if m, ok := val.(map[string]interface{}); ok {
+			if temp, ok := m[k]; ok {
 				if i == len(keys)-1 {
-					delVal := val.(map[string]interface{})[k]
-					delete(val.(map[string]interface{}), keys[len(keys)-1])
-					return delVal, true
+					delete(m, keys[len(keys)-1])
+					return temp, true
 				}
-				val = val.(map[string]interface{})[k]
+				val = temp
 			} else {
 				return nil, false
 			}
-		} else {
-			return nil, false
 		}
 	}
 	return nil, false
@@ -486,6 +494,10 @@ func PickMapValue(m map[string]interface{}, pick map[string]interface{}, keys ..
 	if len(keys) == 0 {
 		return
 	}
+	if m, ok := val.(Data); ok {
+		val = map[string]interface{}(m)
+	}
+
 	if _, ok := val.(map[string]interface{}); !ok {
 		return
 	}
@@ -500,6 +512,9 @@ func PickMapValue(m map[string]interface{}, pick map[string]interface{}, keys ..
 		return
 	}
 
+	if m, ok := v.(Data); ok {
+		v = map[string]interface{}(m)
+	}
 	// 判断keys[0]的值是不是map，如果不是，keys[1]pick的值为空，退出该keys的pick
 	if _, ok := v.(map[string]interface{}); !ok {
 		return
@@ -534,6 +549,9 @@ func GetMapValue(m map[string]interface{}, keys ...string) (interface{}, error) 
 	curKeys := keys
 	for i, k := range curKeys {
 		//判断val是否为map[string]interface{}类型
+		if m, ok := val.(Data); ok {
+			val = map[string]interface{}(m)
+		}
 		if _, ok := val.(map[string]interface{}); ok {
 			//判断val(k)是否存在
 			if _, ok := val.(map[string]interface{})[k]; ok {
@@ -846,6 +864,8 @@ func DeepConvertKey(data map[string]interface{}) map[string]interface{} {
 func DeepConvertKeyWithCache(data map[string]interface{}, cache map[string]KeyInfo) map[string]interface{} {
 	for k, v := range data {
 		if nv, ok := v.(map[string]interface{}); ok {
+			v = DeepConvertKeyWithCache(nv, cache)
+		} else if nv, ok := v.(Data); ok {
 			v = DeepConvertKeyWithCache(nv, cache)
 		}
 		keyInfo, exist := cache[k]

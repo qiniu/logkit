@@ -3,10 +3,10 @@ package ip
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
-	"strings"
 )
 
 const Name = "IP"
@@ -182,6 +182,9 @@ func (t *Transformer) SetMapValue(m map[string]interface{}, val interface{}, key
 		}
 		//判断val是否为map[string]interface{}类型
 		if curr, ok = finalVal.(map[string]interface{}); ok {
+			continue
+		}
+		if curr, ok = finalVal.(Data); ok {
 			continue
 		}
 		return fmt.Errorf("SetMapValueWithPrefix failed, %v is not the type of map[string]interface{}", keys)
