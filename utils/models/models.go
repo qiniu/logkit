@@ -77,20 +77,6 @@ type KeyValue struct {
 	SortKey string `json:"sort_key"`
 }
 
-type PandoraRepo struct {
-	Pipeline string   `json:"pipeline,omitempty"`
-	Repo     string   `json:"repo"`
-	Rules    []string `json:"rules,omitempty"`
-}
-
-type PandoraWorkflow struct {
-	Name       string `json:"name"`
-	Status     string `json:"status"`
-	CreateTime string `json:"create_time,omitempty"`
-}
-
-type PandoraWorkflowSlice []PandoraWorkflow
-
 // Data store as use key/value map
 type Data map[string]interface{}
 
@@ -382,18 +368,4 @@ func (slice KeyValueSlice) Swap(i, j int) {
 	slice[i].Key, slice[j].Key = slice[j].Key, slice[i].Key
 	slice[i].Value, slice[j].Value = slice[j].Value, slice[i].Value
 	slice[i].SortKey, slice[j].SortKey = slice[j].SortKey, slice[i].SortKey
-}
-
-func (slice PandoraWorkflowSlice) Len() int {
-	return len(slice)
-}
-
-func (slice PandoraWorkflowSlice) Less(i, j int) bool {
-	return slice[i].CreateTime > slice[j].CreateTime
-}
-
-func (slice PandoraWorkflowSlice) Swap(i, j int) {
-	slice[i].Name, slice[j].Name = slice[j].Name, slice[i].Name
-	slice[i].Status, slice[j].Status = slice[j].Status, slice[i].Status
-	slice[i].CreateTime, slice[j].CreateTime = slice[j].CreateTime, slice[i].CreateTime
 }

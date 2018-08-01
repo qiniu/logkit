@@ -255,7 +255,7 @@ var ModeKeyOptions = map[string][]Option{
 			Description:   "指定字段分词方式(pandora_logdb_analyzer)",
 			Advance:       true,
 			AdvanceDepend: KeyPandoraEnableLogDB,
-			ToolTip:       `指定字段的分词方式，逗号分隔多个，如 "f1 keyword, f2 full_text"`,
+			ToolTip:       `指定字段的分词方式，逗号分隔多个，如 "f1 keyword, f2 full_text"。仅在新建时生效，更改时不生效，请在日志仓库更改。`,
 		},
 		{
 			KeyName:       KeyPandoraEnableTSDB,

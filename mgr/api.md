@@ -1242,82 +1242,6 @@ Content-Type: application/json
 }
 ```
 
-## Pandora
-
-### 获取pandora repos
-
-请求
-```
-GET /logkit/pandora/repos?ak=<accessKey>&sk=<secretKey>&pipeline=<pipelineHost>
-```
-
-返回一个字符串
-
-```
-{
-    "code": "L200",
-    "data": [
-        {
-            "pipeline":"<pipeline>",
-            "repo":"<repo>",
-            "rules":["<rule1>",...]
-        },
-        ...
-    ]
-}
-```
-
-如果请求失败, 返回包含如下内容的JSON字符串（已格式化,便于阅读）:
-
-```
-{
-    "code":   "<error code>",
-    "message": "<error message>"
-}
-```
-
-**说明**
-
-1. 请求参数`ak`和`sk`为必填项。
-2. 请求参数`pipeline`若不填，默认为https://nb-pipeline.qiniuapi.com。
-
-### 获取pandora workflows
-
-请求
-```
-GET /logkit/pandora/workflows?ak=<accessKey>&sk=<secretKey>&pipeline=<pipelineHost>
-```
-
-返回一个字符串
-
-```
-{
-    "code": "L200",
-    "data": [
-        {
-            "name": "<name>",
-            "status": "<status>",
-            "create_time": "<create_time>"
-        },
-        ...
-    ]
-}
-```
-
-如果请求失败, 返回包含如下内容的JSON字符串（已格式化,便于阅读）:
-
-```
-{
-    "code":   "<error code>",
-    "message": "<error message>"
-}
-```
-
-**说明**
-
-1. 请求参数`ak`和`sk`为必填项。
-2. 请求参数`pipeline`若不填，默认为https://nb-pipeline.qiniuapi.com。
-
 ## 返回码列表
 #### 一切正常
 
@@ -1363,10 +1287,3 @@ GET /logkit/pandora/workflows?ak=<accessKey>&sk=<secretKey>&pipeline=<pipelineHo
 * `L2011`: Slaves 更新 Runner 出现错误
 * `L2012`: Slaves 从列表中移除时出现错误
 * `L2013`: Slaves 更改 Tag 出现错误
-
-#### logkit pandora 相关
-
-* `L3000`: pipeline host 出现错误
-* `L3001`: 创建 pipeline api client 出现错误
-* `L3002`: 获取 repos 出现错误
-* `L3003`: 获取 workflows 出现错误

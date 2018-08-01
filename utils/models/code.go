@@ -49,11 +49,6 @@ const (
 	ErrClusterRunnerUpdate = "L2011"
 	ErrClusterSlavesDelete = "L2012"
 	ErrClusterSlavesTag    = "L2013"
-
-	ErrPandoraPipelineConfig    = "L3000"
-	ErrPandoraPipelineAPI       = "L3001"
-	ErrPandoraPipelineRepos     = "L3002"
-	ErrPandoraPipelineWorkflows = "L3003"
 )
 
 var ErrorCodeHumanize = map[string]string{

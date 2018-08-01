@@ -13,12 +13,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/labstack/echo"
+
+	"github.com/qiniu/log"
+
 	"github.com/qiniu/logkit/parser"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
-
-	"github.com/labstack/echo"
-	"github.com/qiniu/log"
 )
 
 var DEFAULT_PORT = 3000
@@ -130,10 +131,6 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	router.POST(PREFIX+"/cluster/configs/:name/stop", rs.PostClusterConfigStop())
 	router.POST(PREFIX+"/cluster/configs/:name/start", rs.PostClusterConfigStart())
 	router.POST(PREFIX+"/cluster/configs/:name/reset", rs.PostClusterConfigReset())
-
-	// 获取pandora信息 API
-	router.GET(PREFIX+"/pandora/repos", rs.GetPandoraRepos())
-	router.GET(PREFIX+"/pandora/workflows", rs.GetPandoraWorkflows())
 
 	var (
 		port       = DEFAULT_PORT
