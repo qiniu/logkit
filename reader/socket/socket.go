@@ -98,6 +98,11 @@ func (ssr *streamSocketReader) removeConnection(c net.Conn) {
 	ssr.connectionsMtx.Unlock()
 }
 
+type socketInfo struct {
+	address string
+	data    []byte
+}
+
 func (ssr *streamSocketReader) read(c net.Conn) {
 	defer ssr.removeConnection(c)
 	defer c.Close()
@@ -118,7 +123,19 @@ func (ssr *streamSocketReader) read(c net.Conn) {
 		if atomic.LoadInt32(&ssr.status) == reader.StatusStopped || atomic.LoadInt32(&ssr.status) == reader.StatusStopping {
 			return
 		}
-		ssr.readChan <- scnr.Bytes()
+
+		var address string
+		// get remote addr
+		if remoteAddr := c.RemoteAddr(); remoteAddr != nil && len(remoteAddr.String()) != 0 {
+			address = remoteAddr.String()
+		}
+		// if remote addr is empty, get local addr
+		if len(address) == 0 {
+			if localAddr := c.LocalAddr(); localAddr != nil {
+				address = localAddr.String()
+			}
+		}
+		ssr.readChan <- socketInfo{address: address, data: scnr.Bytes()}
 	}
 
 	if err := scnr.Err(); err != nil {
@@ -156,7 +173,7 @@ func (psr *packetSocketReader) listen() {
 		if atomic.LoadInt32(&psr.status) == reader.StatusStopped || atomic.LoadInt32(&psr.status) == reader.StatusStopping {
 			return
 		}
-		n, _, err := psr.PacketConn.ReadFrom(buf)
+		n, remoteAddr, err := psr.PacketConn.ReadFrom(buf)
 		if err != nil {
 			if !strings.HasSuffix(err.Error(), ": use of closed network connection") {
 				log.Error(err)
@@ -168,7 +185,20 @@ func (psr *packetSocketReader) listen() {
 		if atomic.LoadInt32(&psr.status) == reader.StatusStopped || atomic.LoadInt32(&psr.status) == reader.StatusStopping {
 			return
 		}
-		psr.readChan <- buf[:n]
+
+		var address string
+		// get remote addr
+		if remoteAddr != nil && len(remoteAddr.String()) != 0 {
+			address = remoteAddr.String()
+		}
+		// if remote addr is empty, get local addr
+		if len(address) == 0 {
+			if localAddr := psr.PacketConn.LocalAddr(); localAddr != nil {
+				address = localAddr.String()
+			}
+		}
+		psr.readChan <- socketInfo{address: address, data: buf[:n]}
+
 	}
 }
 
@@ -181,11 +211,12 @@ type Reader struct {
 	// Note: 原子操作，用于表示 reader 整体的运行状态
 	status int32
 
-	readChan chan []byte
+	readChan chan socketInfo
 	errChan  chan error
 
 	netproto        string
 	ServiceAddress  string
+	sourceIp        string
 	MaxConnections  int
 	ReadBufferSize  int
 	ReadTimeout     time.Duration
@@ -216,7 +247,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	return &Reader{
 		meta:            meta,
 		status:          reader.StatusInit,
-		readChan:        make(chan []byte),
+		readChan:        make(chan socketInfo),
 		errChan:         make(chan error),
 		ServiceAddress:  ServiceAddress,
 		MaxConnections:  MaxConnections,
@@ -327,15 +358,17 @@ func (r *Reader) Start() error {
 }
 
 func (r *Reader) Source() string {
-	return r.ServiceAddress
+	return r.sourceIp
 }
 
+// Note: 对 sourceIp 的操作非线程安全，需由上层逻辑保证同步调用 ReadLine
 func (r *Reader) ReadLine() (string, error) {
 	timer := time.NewTimer(time.Second)
 	defer timer.Stop()
 	select {
-	case data := <-r.readChan:
-		return string(data), nil
+	case info := <-r.readChan:
+		r.sourceIp = info.address
+		return string(info.data), nil
 	case <-timer.C:
 	}
 
