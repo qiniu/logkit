@@ -30,7 +30,13 @@ type Reader struct {
 	meta *reader.Meta
 	// Note: 原子操作，用于表示 reader 整体的运行状态
 	status int32
-	// Note: 原子操作，用于表示获取数据的线程运行状态，只可能是 StatusInit 和 StatusRunning
+	/*
+		Note: 原子操作，用于表示获取数据的线程运行状态
+
+		- StatusInit: 当前没有任务在执行
+		- StatusRunning: 当前有任务正在执行
+		- StatusStopping: 数据管道已经由上层关闭，执行中的任务完成时直接退出无需再处理
+	*/
 	routineStatus int32
 
 	stopChan chan struct{}
@@ -138,17 +144,24 @@ func (r *Reader) sendError(err error) {
 }
 
 func (r *Reader) run() {
-	// 当上个任务还未执行完成的时候直接跳过
+	// 未在准备状态（StatusInit）时无法执行此次任务
 	if !atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusInit, reader.StatusRunning) {
-		log.Errorf("Runner[%v] %q daemon is still working on last task, this task will not be executed and is skipped this time", r.meta.RunnerName, r.Name())
+		if r.isStopping() || r.hasStopped() {
+			log.Warnf("Runner[%v] %q daemon has stopped, this task does not need to be executed and is skipped this time", r.meta.RunnerName, r.Name())
+		} else {
+			log.Errorf("Runner[%v] %q daemon is still working on last task, this task will not be executed and is skipped this time", r.meta.RunnerName, r.Name())
+		}
 		return
 	}
 	defer func() {
 		// 如果 reader 在 routine 运行时关闭，则需要此 routine 负责关闭数据管道
 		if r.isStopping() || r.hasStopped() {
-			close(r.readChan)
-			close(r.errChan)
-			r.client.Close()
+			if atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusRunning, reader.StatusStopping) {
+				close(r.readChan)
+				close(r.errChan)
+				r.client.Close()
+			}
+			return
 		}
 		atomic.StoreInt32(&r.routineStatus, reader.StatusInit)
 	}()
@@ -314,7 +327,7 @@ func (r *Reader) Close() error {
 	close(r.stopChan)
 
 	// 如果此时没有 routine 正在运行，则在此处关闭数据管道，否则由 routine 在退出时负责关闭
-	if atomic.LoadInt32(&r.routineStatus) != reader.StatusRunning {
+	if atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusInit, reader.StatusStopping) {
 		close(r.readChan)
 		close(r.errChan)
 		r.client.Close()
