@@ -52,6 +52,12 @@ func RawData(readerConfig conf.MapConf) (string, error) {
 		os.RemoveAll(metaPath)
 	}()
 
+	if dr, ok := rd.(reader.DaemonReader); ok {
+		if err := dr.Start(); err != nil {
+			return "", err
+		}
+	}
+
 	var timeoutStatus int32
 	type dataErr struct {
 		data string
