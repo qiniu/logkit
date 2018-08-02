@@ -13,12 +13,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/labstack/echo"
+
+	"github.com/qiniu/log"
+
 	"github.com/qiniu/logkit/parser"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
-
-	"github.com/labstack/echo"
-	"github.com/qiniu/log"
 )
 
 var DEFAULT_PORT = 3000
