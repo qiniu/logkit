@@ -100,7 +100,7 @@ func (ssr *streamSocketReader) removeConnection(c net.Conn) {
 
 type socketInfo struct {
 	address string
-	data    []byte
+	data    string
 }
 
 func (ssr *streamSocketReader) read(c net.Conn) {
@@ -135,7 +135,7 @@ func (ssr *streamSocketReader) read(c net.Conn) {
 				address = localAddr.String()
 			}
 		}
-		ssr.readChan <- socketInfo{address: address, data: scnr.Bytes()}
+		ssr.readChan <- socketInfo{address: address, data: string(scnr.Bytes())}
 	}
 
 	if err := scnr.Err(); err != nil {
@@ -197,7 +197,9 @@ func (psr *packetSocketReader) listen() {
 				address = localAddr.String()
 			}
 		}
-		psr.readChan <- socketInfo{address: address, data: buf[:n]}
+		val := string(buf[:n])
+
+		psr.readChan <- socketInfo{address: address, data: val}
 
 	}
 }
@@ -330,6 +332,7 @@ func (r *Reader) Start() error {
 		if err != nil {
 			return err
 		}
+		r.readChan = make(chan socketInfo, 100)
 
 		if r.ReadBufferSize > 0 {
 			if srb, ok := pc.(setReadBufferer); ok {
@@ -368,7 +371,7 @@ func (r *Reader) ReadLine() (string, error) {
 	select {
 	case info := <-r.readChan:
 		r.sourceIp = info.address
-		return string(info.data), nil
+		return info.data, nil
 	case <-timer.C:
 	}
 
