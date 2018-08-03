@@ -153,8 +153,12 @@ func HasDirExpired(dir string, expire time.Duration) bool {
 	var latestModTime time.Time
 	if err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			log.Errorf("Failed to walk directory file[%v]: %v", path, err)
+			log.Errorf("Failed to get directory entry[%v] info: %v", path, err)
 			return nil
+		} else if dir == path {
+			return nil
+		} else if info.IsDir() {
+			return filepath.SkipDir // 过滤子目录
 		}
 
 		if info.ModTime().After(latestModTime) {

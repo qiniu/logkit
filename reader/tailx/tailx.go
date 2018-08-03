@@ -54,6 +54,7 @@ type Reader struct {
 	//以下为传入参数
 	logPathPattern string
 	expire         time.Duration
+	submetaExpire  time.Duration
 	statInterval   time.Duration
 	maxOpenFiles   int
 	whence         string
@@ -245,7 +246,12 @@ func (ar *ActiveReader) SyncMeta() string {
 	return ar.readcache
 }
 
-func (ar *ActiveReader) expired(expireDur time.Duration) bool {
+func (ar *ActiveReader) expired(expire time.Duration) bool {
+	// 如果过期时间为 0，则永不过期
+	if expire.Nanoseconds() == 0 {
+		return false
+	}
+
 	fi, err := os.Stat(ar.realpath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -254,7 +260,7 @@ func (ar *ActiveReader) expired(expireDur time.Duration) bool {
 		log.Errorf("Runner[%v] stat log %v error %v, will not expire it...", ar.runnerName, ar.originpath, err)
 		return false
 	}
-	if fi.ModTime().Add(expireDur).Before(time.Now()) && atomic.LoadInt32(&ar.inactive) > 0 {
+	if fi.ModTime().Add(expire).Before(time.Now()) && atomic.LoadInt32(&ar.inactive) > 0 {
 		return true
 	}
 	return false
@@ -267,14 +273,23 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	}
 	whence, _ := conf.GetStringOr(reader.KeyWhence, reader.WhenceOldest)
 
-	expireDur, _ := conf.GetStringOr(reader.KeyExpire, "24h")
 	statIntervalDur, _ := conf.GetStringOr(reader.KeyStatInterval, "3m")
 	maxOpenFiles, _ := conf.GetIntOr(reader.KeyMaxOpenFiles, 256)
 
+	expireDur, _ := conf.GetStringOr(reader.KeyExpire, "24h")
 	expire, err := time.ParseDuration(expireDur)
 	if err != nil {
 		return nil, err
 	}
+
+	submetaExpireDur, _ := conf.GetStringOr(reader.KeySubmetaExpire, "720h")
+	submetaExpire, err := time.ParseDuration(submetaExpireDur)
+	if err != nil {
+		return nil, err
+	} else if submetaExpire < expire {
+		return nil, fmt.Errorf("%q valus is less than %q", reader.KeySubmetaExpire, reader.KeyExpire)
+	}
+
 	statInterval, err := time.ParseDuration(statIntervalDur)
 	if err != nil {
 		return nil, err
@@ -317,6 +332,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		logPathPattern: logPathPattern,
 		whence:         whence,
 		expire:         expire,
+		submetaExpire:  submetaExpire,
 		statInterval:   statInterval,
 		maxOpenFiles:   maxOpenFiles,
 		fileReaders:    make(map[string]*ActiveReader), //armapmux
@@ -421,8 +437,10 @@ func (r *Reader) statLogPath() {
 		r.armapmux.Lock()
 		cacheline := r.cacheMap[rp]
 		r.armapmux.Unlock()
-		//过期的文件不追踪，除非之前追踪的并且有日志没读完
-		if cacheline == "" && fi.ModTime().Add(r.expire).Before(time.Now()) {
+		// 过期的文件不追踪，除非之前追踪的并且有日志没读完
+		// 如果过期时间为 0，则永不过期
+		if cacheline == "" &&
+			r.expire.Nanoseconds() > 0 && fi.ModTime().Add(r.expire).Before(time.Now()) {
 			log.Debugf("Runner[%v] <%v> is expired, ignore...", r.meta.RunnerName, mc)
 			continue
 		}
@@ -487,6 +505,23 @@ func (r *Reader) Start() error {
 			}
 		}
 	}()
+
+	if r.expire.Nanoseconds() > 0 {
+		go func() {
+			ticker := time.NewTicker(time.Hour)
+			defer ticker.Stop()
+			for {
+				r.meta.CheckExpiredSubMetas(r.submetaExpire)
+
+				select {
+				case <-r.stopChan:
+					return
+				case <-ticker.C:
+				}
+			}
+		}()
+	}
+
 	log.Infof("Runner[%v] %q daemon has started", r.meta.RunnerName, r.Name())
 	return nil
 }
@@ -580,6 +615,10 @@ func (r *Reader) SyncMeta() {
 	if err != nil {
 		log.Errorf("%v sync meta WriteBuf error %v, buf %v", r.Name(), err, string(buf))
 		return
+	}
+
+	if r.expire.Nanoseconds() > 0 {
+		r.meta.CleanExpiredSubMetas(r.submetaExpire)
 	}
 }
 
