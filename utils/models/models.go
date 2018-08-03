@@ -54,21 +54,20 @@ const (
 type Option struct {
 	KeyName       string
 	ChooseOnly    bool
-	Element       string
+	Element       string // 前端显示类型
 	ChooseOptions []interface{}
 	Default       interface{}
-	DefaultNoUse  bool
+	DefaultNoUse  bool // 是否使用默认值，true为不使用默认值，false为使用默认值
 	Description   string
 	CheckRegex    string
 	Style         string `json:"style"`
-	Required      bool   `json:"required"`
+	Required      bool   `json:"required"` // 是否必填
 	Placeholder   string `json:"placeholder"`
 	Type          string `json:"Type,omitempty"`
 	Secret        bool
 	Advance       bool   `json:"advance,omitempty"`
 	AdvanceDepend string `json:"advance_depend,omitempty"`
-	ToolTip       string `json:"tooltip,omitempty"`
-	ToolTipActive bool   `json:"tooltip_active,omitempty"`
+	ToolTip       string `json:"tooltip,omitempty"` // 该选项说明
 }
 
 type KeyValue struct {

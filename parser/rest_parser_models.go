@@ -97,14 +97,13 @@ var (
 	}
 
 	OptionLabels = Option{
-		KeyName:       KeyLabels,
-		ChooseOnly:    false,
-		Default:       "",
-		DefaultNoUse:  false,
-		Description:   "额外的标签信息(labels)",
-		Advance:       true,
-		ToolTip:       `额外的标签信息，同样逗号分隔，如 "app logkit, user pandora"`,
-		ToolTipActive: true,
+		KeyName:      KeyLabels,
+		ChooseOnly:   false,
+		Default:      "",
+		DefaultNoUse: false,
+		Description:  "额外的标签信息(labels)",
+		Advance:      true,
+		ToolTip:      `额外的标签信息，同样逗号分隔，如 "app logkit, user pandora"`,
 	}
 
 	OptionDisableRecordErrData = Option{
@@ -156,14 +155,13 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "nginx日志格式名称(nginx_log_format_name)",
 		},
 		{
-			KeyName:       NginxSchema,
-			ChooseOnly:    false,
-			Default:       "",
-			DefaultNoUse:  false,
-			Description:   "手动指定字段类型(nginx_schema)",
-			Advance:       true,
-			ToolTip:       `nginx日志都被解析为string，指定该格式可以设置为float、long、date三种类型。如 time_local date,bytes_sent long,request_time float`,
-			ToolTipActive: true,
+			KeyName:      NginxSchema,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "手动指定字段类型(nginx_schema)",
+			Advance:      true,
+			ToolTip:      `nginx日志都被解析为string，指定该格式可以设置为float、long、date三种类型。如 time_local date,bytes_sent long,request_time float`,
 		},
 		{
 			KeyName:      NginxFormatRegex,
@@ -180,15 +178,14 @@ var ModeKeyOptions = map[string][]Option{
 	},
 	TypeGrok: {
 		{
-			KeyName:       KeyGrokPatterns,
-			ChooseOnly:    false,
-			Default:       "%{COMMON_LOG_FORMAT}",
-			Placeholder:   "%{COMMON_LOG_FORMAT}",
-			Required:      true,
-			DefaultNoUse:  true,
-			Description:   "匹配日志的grok表达式(grok_patterns)",
-			ToolTip:       `用于匹配日志的grok表达式，多个用逗号分隔，如 "%{COMMON_LOG_FORMAT},%{QINIU_LOG_FORMAT}"`,
-			ToolTipActive: true,
+			KeyName:      KeyGrokPatterns,
+			ChooseOnly:   false,
+			Default:      "%{COMMON_LOG_FORMAT}",
+			Placeholder:  "%{COMMON_LOG_FORMAT}",
+			Required:     true,
+			DefaultNoUse: true,
+			Description:  "匹配日志的grok表达式(grok_patterns)",
+			ToolTip:      `用于匹配日志的grok表达式，多个用逗号分隔，如 "%{COMMON_LOG_FORMAT},%{QINIU_LOG_FORMAT}"`,
 		},
 		{
 			KeyName:      KeyGrokCustomPatterns,

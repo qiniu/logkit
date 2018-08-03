@@ -62,6 +62,7 @@ var (
 		Default:       StageAfterParser,
 		DefaultNoUse:  false,
 		Description:   "transform运行的阶段(parser前还是parser后)(stage)",
+		ToolTip:       "transform在parser前或在parser后进行运行",
 		Type:          TransformTypeString,
 	}
 	KeyFieldName = Option{
@@ -72,6 +73,7 @@ var (
 		Placeholder:  "my_field_keyname",
 		DefaultNoUse: true,
 		Description:  "要进行Transform变化的键(key)",
+		ToolTip:      "对该字段的值进行transform变换",
 		Type:         TransformTypeString,
 	}
 	KeyFieldNew = Option{
@@ -92,6 +94,7 @@ var (
 		Placeholder:  "new_field_keyname",
 		DefaultNoUse: false,
 		Description:  "新的字段名(new)",
+		ToolTip:      "生成的字段名称，不改变原有的字段",
 		Type:         TransformTypeString,
 	}
 	KeyTimezoneoffset = Option{
