@@ -31,6 +31,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (r reader.Reader, err error
 	}
 	switch mode {
 	case reader.ModeTailx:
+		conf[reader.KeyLogPath] = logpath
 		return tailx.NewReader(meta, conf)
 	case reader.ModeDir:
 		return reader.NewFileDirReader(meta, conf)
@@ -72,6 +73,7 @@ func matchMode(logpath string) (path, mode string, err error) {
 	return
 }
 
+// 如果目录中有文件且最后修改时间在tailx的expire之前，则认为是dir模式
 func shouldUseModeDir(logpath string) bool {
 	files, err := ioutil.ReadDir(logpath)
 	if err != nil {
@@ -79,6 +81,7 @@ func shouldUseModeDir(logpath string) bool {
 		return true
 	}
 	for _, f := range files {
+		// 必须和tailx中expire时间一致
 		if f.ModTime().Add(24 * time.Hour).Before(time.Now()) {
 			return true
 		}
