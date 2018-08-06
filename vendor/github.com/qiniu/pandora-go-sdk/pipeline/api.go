@@ -563,9 +563,15 @@ func getTagStr(tags map[string]interface{}) (tagStr []byte) {
 	return
 }
 
+// tags 和 rules 写了if else是为了兼容性，服务端鉴权兼容了请求参数变化可以使用同一个鉴权token后，就可以去掉这个兼容性
 func (c *Pipeline) PostData(input *PostDataInput) (err error) {
-	tagStr := getTagStr(input.Tags)
-	op := c.NewOperation(base.OpPostData, input.RepoName, base64.URLEncoding.EncodeToString(tagStr))
+	var op *request.Operation
+	if len(input.Tags) > 0 {
+		tagStr := getTagStr(input.Tags)
+		op = c.NewOperation(base.OpPostData, input.RepoName, base64.URLEncoding.EncodeToString(tagStr))
+	} else {
+		op = c.NewOperation(base.OpPostData, input.RepoName)
+	}
 	req := c.newRequest(op, input.Token, nil)
 	req.SetBufferBody(input.Points.Buffer())
 	req.SetHeader(base.HTTPHeaderContentType, base.ContentTypeText)
@@ -577,10 +583,16 @@ func (c *Pipeline) PostData(input *PostDataInput) (err error) {
 	return req.Send()
 }
 
+// tags 和 rules 写了if else是为了兼容性，服务端鉴权兼容了请求参数变化可以使用同一个鉴权token后，就可以去掉这个兼容性
 func (c *Pipeline) PostTextData(input *PostTextDataInput) error {
-	tagStr := getTagStr(input.Tags)
-	rules := strings.Join(input.Rules, ",")
-	op := c.NewOperation(base.OpPostTextData, input.RepoName, base64.URLEncoding.EncodeToString(tagStr), rules)
+	var op *request.Operation
+	if len(input.Tags) == 0 && len(input.Rules) == 0 {
+		op = c.NewOperation(base.OpPostTextData, input.RepoName)
+	} else {
+		tagStr := getTagStr(input.Tags)
+		rules := strings.Join(input.Rules, ",")
+		op = c.NewOperation(base.OpPostTextData, input.RepoName, base64.URLEncoding.EncodeToString(tagStr), rules)
+	}
 	req := c.newRequest(op, input.Token, nil)
 	req.SetBufferBody(joinStrings(input.Text, '\n'))
 	req.SetHeader(base.HTTPHeaderContentType, base.ContentTypeText)
@@ -604,10 +616,17 @@ func joinStrings(strs []string, sep byte) []byte {
 	return buf.Bytes()
 }
 
+// tags 和 rules 写了if else是为了兼容性，服务端鉴权兼容了请求参数变化可以使用同一个鉴权token后，就可以去掉这个兼容性
 func (c *Pipeline) PostRawtextData(input *PostRawtextDataInput) (err error) {
-	tagStr := getTagStr(input.Tags)
-	rules := strings.Join(input.Rules, ",")
-	op := c.NewOperation(base.OpPostRawtextData, input.RepoName, base64.URLEncoding.EncodeToString(tagStr), rules)
+
+	var op *request.Operation
+	if len(input.Tags) == 0 && len(input.Rules) == 0 {
+		op = c.NewOperation(base.OpPostRawtextData, input.RepoName)
+	} else {
+		tagStr := getTagStr(input.Tags)
+		rules := strings.Join(input.Rules, ",")
+		op = c.NewOperation(base.OpPostRawtextData, input.RepoName, base64.URLEncoding.EncodeToString(tagStr), rules)
+	}
 
 	type PortalRet struct {
 		Code    int    `json:"code"`

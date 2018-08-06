@@ -102,6 +102,7 @@ func (c *Pipeline) newRequest(op *request.Operation, token string, v interface{}
 	return req
 }
 
+// tags 和 rules 写了if else是为了兼容性，服务端鉴权兼容了请求参数变化可以使用同一个鉴权token后，就可以去掉这个兼容性
 func (c *Pipeline) NewOperation(opName string, args ...interface{}) *request.Operation {
 	var method, urlTmpl string
 	switch opName {
@@ -136,11 +137,23 @@ func (c *Pipeline) NewOperation(opName string, args ...interface{}) *request.Ope
 	case base.OpDeleteRepo:
 		method, urlTmpl = base.MethodDelete, "/v2/repos/%s"
 	case base.OpPostData:
-		method, urlTmpl = base.MethodPost, "/v2/repos/%s/data?tags=%s"
+		if len(args) == 1 {
+			method, urlTmpl = base.MethodPost, "/v2/repos/%s/data"
+		} else {
+			method, urlTmpl = base.MethodPost, "/v2/repos/%s/data?tags=%s"
+		}
 	case base.OpPostTextData:
-		method, urlTmpl = base.MethodPost, "/v2/streams/%s/data?tags=%s&rules=%s"
+		if len(args) == 1 {
+			method, urlTmpl = base.MethodPost, "/v2/streams/%s/data"
+		} else {
+			method, urlTmpl = base.MethodPost, "/v2/streams/%s/data?tags=%s&rules=%s"
+		}
 	case base.OpPostRawtextData:
-		method, urlTmpl = base.MethodPost, "/v2/stream/%s/data?tags=%s&rules=%s"
+		if len(args) == 1 {
+			method, urlTmpl = base.MethodPost, "/v2/stream/%s/data"
+		} else {
+			method, urlTmpl = base.MethodPost, "/v2/stream/%s/data?tags=%s&rules=%s"
+		}
 	case base.OpCreateTransform:
 		method, urlTmpl = base.MethodPost, "/v2/repos/%s/transforms/%s/to/%s"
 	case base.OpUpdateTransform:
