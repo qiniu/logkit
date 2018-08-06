@@ -9,7 +9,7 @@ import (
 	"io"
 	"math/rand"
 	"os"
-	"path"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -510,11 +510,11 @@ func (d *diskQueue) persistMetaData() error {
 }
 
 func (d *diskQueue) metaDataFileName() string {
-	return fmt.Sprintf(path.Join(d.dataPath, "%s.diskqueue.meta.dat"), d.name)
+	return fmt.Sprintf(filepath.Join(d.dataPath, "%s.diskqueue.meta.dat"), d.name)
 }
 
 func (d *diskQueue) fileName(fileNum int64) string {
-	return fmt.Sprintf(path.Join(d.dataPath, "%s.diskqueue.%06d.dat"), d.name, fileNum)
+	return fmt.Sprintf(filepath.Join(d.dataPath, "%s.diskqueue.%06d.dat"), d.name, fileNum)
 }
 
 // 处理各种指针错乱的场景

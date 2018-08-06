@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -39,7 +39,7 @@ func RawData(readerConfig conf.MapConf) (string, error) {
 
 	runnerName, _ := readerConfig.GetString(GlobalKeyName)
 	configMetaPath := runnerName + "_" + Hash(strconv.FormatInt(time.Now().Unix(), 10))
-	metaPath := path.Join(MetaTmp, configMetaPath)
+	metaPath := filepath.Join(MetaTmp, configMetaPath)
 	log.Debugf("Runner[%v] Using %s as default metaPath", runnerName, metaPath)
 	readerConfig[reader.KeyMetaPath] = metaPath
 
@@ -192,6 +192,7 @@ func SendData(senderConfig map[string]interface{}) error {
 	}
 
 	senders, err := getSenders(sendersConf)
+	defer os.RemoveAll(filepath.Join(MetaTmp, reader.FtSaveLogPath))
 	if err != nil {
 		return err
 	}
@@ -254,8 +255,10 @@ func getDataFromSenderConfig(senderConfig map[string]interface{}) ([]Data, error
 func getSenders(sendersConf []conf.MapConf) ([]sender.Sender, error) {
 	senders := make([]sender.Sender, 0)
 	sr := sender.NewRegistry()
+	ftSaveLogPath := filepath.Join(MetaTmp, reader.FtSaveLogPath)
 	for i, senderConfig := range sendersConf {
 		senderConfig[sender.KeyFaultTolerant] = "false"
+		senderConfig[sender.KeyFtSaveLogPath] = ftSaveLogPath
 		s, err := sr.NewSender(senderConfig, "")
 		if err != nil {
 			return nil, err
