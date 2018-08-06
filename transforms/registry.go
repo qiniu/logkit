@@ -64,6 +64,7 @@ var (
 		Description:   "transform运行的阶段(parser前还是parser后)(stage)",
 		ToolTip:       "transform在parser前或在parser后进行运行",
 		Type:          TransformTypeString,
+		Advance:       true,
 	}
 	KeyFieldName = Option{
 		KeyName:      "key",
