@@ -31,7 +31,7 @@ const (
 	lineCacheFilePath = "cache.dat"
 	statisticFileName = "statistic.meta"
 	doneFileRetention = "donefile_retention"
-	ftSaveLogPath     = "ft_log" // ft log 在 meta 中的文件夹名字
+	FtSaveLogPath     = "ft_log" // ft log 在 meta 中的文件夹名字
 )
 
 const (
@@ -127,7 +127,7 @@ func NewMeta(metadir, filedonedir, logpath, mode, tagfile string, donefileRetent
 		bufMetaFilePath:   filepath.Join(metadir, bufMetaFilePath),
 		lineCacheFile:     filepath.Join(metadir, lineCacheFilePath),
 		statisticPath:     filepath.Join(metadir, statisticFileName),
-		ftSaveLogPath:     filepath.Join(metadir, ftSaveLogPath),
+		ftSaveLogPath:     filepath.Join(metadir, FtSaveLogPath),
 		donefileretention: donefileRetention,
 		logpath:           logpath,
 		TagFile:           tagfile,
