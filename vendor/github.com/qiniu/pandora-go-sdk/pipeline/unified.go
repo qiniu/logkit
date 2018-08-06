@@ -167,7 +167,7 @@ func convertSchema2LogDB(scs []RepoSchemaEntry, analyzer AnalyzerInfo, prefix []
 			exist := false
 			var ana string
 			if analyzer.Analyzer != nil {
-				ana, exist = analyzer.Analyzer[strings.Join(append(prefix,v.Key),".")]
+				ana, exist = analyzer.Analyzer[strings.Join(append(prefix, v.Key), ".")]
 			}
 			if exist && logdb.Analyzers[ana] {
 				rp.Analyzer = ana
