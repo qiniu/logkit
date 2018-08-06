@@ -135,7 +135,17 @@ func (ssr *streamSocketReader) read(c net.Conn) {
 				address = localAddr.String()
 			}
 		}
-		ssr.readChan <- socketInfo{address: address, data: string(scnr.Bytes())}
+		val := string(scnr.Bytes())
+		if ssr.IsSplitByLine {
+			vals := strings.Split(val, "\n")
+			for _, value := range vals {
+				if value = strings.TrimSpace(value); value != "" {
+					ssr.readChan <- socketInfo{address: address, data: value}
+				}
+			}
+		} else {
+			ssr.readChan <- socketInfo{address: address, data: val}
+		}
 	}
 
 	if err := scnr.Err(); err != nil {
@@ -199,8 +209,16 @@ func (psr *packetSocketReader) listen() {
 		}
 		val := string(buf[:n])
 
-		psr.readChan <- socketInfo{address: address, data: val}
-
+		if psr.IsSplitByLine {
+			vals := strings.Split(val, "\n")
+			for _, value := range vals {
+				if value = strings.TrimSpace(value); value != "" {
+					psr.readChan <- socketInfo{address: address, data: value}
+				}
+			}
+		} else {
+			psr.readChan <- socketInfo{address: address, data: val}
+		}
 	}
 }
 
@@ -223,6 +241,7 @@ type Reader struct {
 	ReadBufferSize  int
 	ReadTimeout     time.Duration
 	KeepAlivePeriod time.Duration
+	IsSplitByLine   bool
 
 	closer io.Closer
 }
@@ -246,16 +265,18 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
+	IsSplitByLine, _ := conf.GetBoolOr(reader.KeySocketSplitByLine, false)
 	return &Reader{
 		meta:            meta,
 		status:          reader.StatusInit,
-		readChan:        make(chan socketInfo),
+		readChan:        make(chan socketInfo, 2),
 		errChan:         make(chan error),
 		ServiceAddress:  ServiceAddress,
 		MaxConnections:  MaxConnections,
 		ReadBufferSize:  ReadBufferSize,
 		ReadTimeout:     ReadTimeoutdur,
 		KeepAlivePeriod: KeepAlivePeriodDur,
+		IsSplitByLine:   IsSplitByLine,
 	}, nil
 }
 
