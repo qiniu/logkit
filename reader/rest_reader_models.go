@@ -344,6 +344,16 @@ var (
 		Advance:      true,
 		ToolTip:      `针对dir读取模式需要解析的日志文件，可以设置读取的过程中忽略哪些文件后缀名，默认忽略的后缀包括".pid", ".swap", ".go", ".conf", ".tar.gz", ".tar", ".zip",".a", ".o", ".so"`,
 	}
+	OptionKeySubmetaExpire = Option{
+		KeyName:      KeySubmetaExpire,
+		ChooseOnly:   false,
+		Default:      "720h",
+		DefaultNoUse: false,
+		Required:     true,
+		Description:  "清理元数据的过期时间(submeta_expire)",
+		CheckRegex:   "\\d+[hms]",
+		ToolTip:      `当元数据的文件达到expire时间，则对其进行清理操作。写法为：数字加单位符号，组成字符串duration写法，支持时h、分m、秒s为单位，类似3h(3小时)，10m(10分钟)，5s(5秒)，默认的expire时间是720h，即30天。若最大过期时间(expire)为0s，则不会清理元数据`,
+	}
 	OptionKeyMaxOpenFiles = Option{
 		KeyName:      KeyMaxOpenFiles,
 		ChooseOnly:   false,
@@ -436,8 +446,9 @@ var ModeKeyOptions = map[string][]Option{
 			Required:     true,
 			Description:  "忽略文件的最大过期时间(expire)",
 			CheckRegex:   "\\d+[hms]",
-			ToolTip:      `当日志达到expire时间，则放弃追踪。写法为：数字加单位符号，组成字符串duration写法，支持时h、分m、秒s为单位，类似3h(3小时)，10m(10分钟)，5s(5秒)，默认的expire时间是24h`,
+			ToolTip:      `当日志达到expire时间，则放弃追踪。写法为：数字加单位符号，组成字符串duration写法，支持时h、分m、秒s为单位，类似3h(3小时)，10m(10分钟)，5s(5秒)，默认的expire时间是24h，当expire时间是0s时表示永不过期`,
 		},
+		OptionKeySubmetaExpire,
 		OptionKeyMaxOpenFiles,
 		OptionKeyStatInterval,
 	},
@@ -473,6 +484,7 @@ var ModeKeyOptions = map[string][]Option{
 			CheckRegex:   "\\d+[hms]",
 			ToolTip:      `当文件夹内所有的日志达到expire时间，则放弃追踪。写法为：数字加单位符号，组成字符串duration写法，支持时h、分m、秒s为单位，类似3h(3小时)，10m(10分钟)，5s(5秒)，默认的expire时间是0s，即永不过期`,
 		},
+		OptionKeySubmetaExpire,
 		OptionKeyMaxOpenFiles,
 		OptionKeyStatInterval,
 		OptionKeyValidFilePattern,

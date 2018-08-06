@@ -17,6 +17,7 @@ import (
 	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
 )
@@ -72,8 +73,10 @@ type Meta struct {
 	RunnerName        string
 	extrainfo         map[string]string
 
-	subMetaLock sync.RWMutex
-	subMetas    map[string]*Meta //对于tailx模式的情况会有嵌套的meta
+	subMetaLock        sync.RWMutex
+	subMetas           map[string]*Meta // 对于 tailx 和 dirx 模式的情况会有嵌套的 meta
+	subMetaExpiredLock sync.Mutex
+	subMetaExpired     map[string]bool // 上次扫描后已知的过期 submeta
 }
 
 func getValidDir(dir string) (realPath string, err error) {
@@ -132,6 +135,7 @@ func NewMeta(metadir, filedonedir, logpath, mode, tagfile string, donefileRetent
 		tags:              tags,
 		Readlimit:         defaultIOLimit * 1024 * 1024,
 		subMetas:          make(map[string]*Meta),
+		subMetaExpired:    make(map[string]bool),
 	}, nil
 }
 
@@ -215,6 +219,80 @@ func (m *Meta) RemoveSubMeta(key string) {
 	defer m.subMetaLock.Unlock()
 
 	delete(m.subMetas, key)
+}
+
+const (
+	minimumSubMetaExpire          = 24 * time.Hour
+	maximumSubMetaCleanNumOneTime = 5
+)
+
+func hasSubMetaExpired(path string, expire time.Duration) bool {
+	// 为防止用户上层设置不准确导致误删 submeta 重复处理数据，设定一个最小阈值
+	if expire < minimumSubMetaExpire {
+		expire = minimumSubMetaExpire
+	}
+
+	// 只有存在 file.meta 文件的子目录是 submeta
+	fileMetaPath := filepath.Join(path, metaFileName)
+	if !utils.IsExist(fileMetaPath) {
+		return false
+	}
+
+	fi, err := os.Stat(fileMetaPath)
+	if err != nil {
+		log.Errorf("Failed to stat file %q: %v", fileMetaPath, err)
+		return false
+	}
+
+	return fi.ModTime().Add(expire).Before(time.Now())
+}
+
+// CheckExpiredSubMetas 仅用于轮询收集所有过期的 submeta，清理操作应通过调用 CleanExpiredSubMetas 方法完成。
+// 一般情况下，应由 reader 实现启动 goroutine 单独调用以避免 submeta 数量过多导致进程被长时间阻塞。
+// 另外，如果 submeta 没有存放在该 meta 的子目录则调用此方法无效
+func (m *Meta) CheckExpiredSubMetas(expire time.Duration) {
+	if err := filepath.Walk(m.Dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.Errorf("Failed to get directory entry[%v] info: %v", path, err)
+			return nil
+		} else if !info.IsDir() || m.Dir == path {
+			return nil
+		}
+
+		if hasSubMetaExpired(path, expire) {
+			m.subMetaExpiredLock.Lock()
+			m.subMetaExpired[path] = true
+			m.subMetaExpiredLock.Unlock()
+		}
+
+		return filepath.SkipDir
+	}); err != nil {
+		log.Errorf("Failed to walk directory[%v]: %v", m.Dir, err)
+	}
+}
+
+// CleanExpiredSubMetas 清除超过指定过期时长的 submeta 目录，清理数目单次调用存在上限以减少阻塞时间
+func (m *Meta) CleanExpiredSubMetas(expire time.Duration) {
+	m.subMetaExpiredLock.Lock()
+	defer m.subMetaExpiredLock.Unlock()
+
+	numCleaned := 0
+	for path := range m.subMetaExpired {
+		if numCleaned >= maximumSubMetaCleanNumOneTime {
+			log.Infof("Cleaned %d expired submeta of %q, there are %d left and will be cleaned next time", numCleaned, path, len(m.subMetaExpired))
+			break
+		}
+
+		// 二次确认 submeta 目录在删除前的一刻仍旧是过期状态才执行删除操作
+		if hasSubMetaExpired(path, expire) {
+			numCleaned++
+			err := os.RemoveAll(path)
+			log.Infof("Expired submeta %q has been removed with error %v", path, err)
+		}
+		delete(m.subMetaExpired, path)
+	}
+
+	log.Debugf("Meta %q has finished cleaning submetas", m.Dir)
 }
 
 func (m *Meta) IsExist() bool {

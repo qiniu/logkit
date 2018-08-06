@@ -4,11 +4,11 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/qiniu/log"
+
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/utils/models"
-
-	"github.com/qiniu/log"
 )
 
 type Cleaner struct {
@@ -34,47 +34,52 @@ const (
 	KeyCleanInterval     = "delete_interval"
 	KeyReserveFileNumber = "reserve_file_number"
 	KeyReserveFileSize   = "reserve_file_size"
-	clean_name           = "cleaner_name"
+	cleanerName          = "cleaner_name"
 
-	default_delete_interval     = 300  //5分钟
-	default_reserve_file_number = 10   //默认保存是个文件
-	default_reserve_file_size   = 2048 //单位MB，默认删除保存2G
-	MB                          = 1024 * 1024
+	defaultDeleteInterval    = 300  //5分钟
+	defaultReserveFileNumber = 10   //默认保存是个文件
+	defaultReserveFileSize   = 2048 //单位MB，默认删除保存2G
+	MB                       = 1024 * 1024
 	// 如果两项任意一项达到要求，就执行删除；如果两项容易一项有值设置，但是另一项为0，就认为另一项不做限制
 )
 
 // 删除文件时遍历全部
 // 删除时生成filedeleted文件
-func NewCleaner(conf conf.MapConf, meta *reader.Meta, cleanChan chan<- CleanSignal, logdir string) (c *Cleaner, err error) {
+func NewCleaner(conf conf.MapConf, meta *reader.Meta, cleanChan chan<- CleanSignal, logdir string) (*Cleaner, error) {
 	enable, _ := conf.GetBoolOr(KeyCleanEnable, false)
 	if !enable {
-		return
+		return nil, nil
 	}
 	mode := meta.GetMode()
-	if mode != reader.ModeDir && mode != reader.ModeFile && mode != reader.ModeCloudTrail && mode != reader.ModeTailx {
-		log.Errorf("cleaner only support reader mode dir|file|clocktrail|tailx, now mode is %v, cleaner disabled", meta.GetMode())
-		return
+	if mode != reader.ModeDir &&
+		mode != reader.ModeFile &&
+		mode != reader.ModeCloudTrail &&
+		mode != reader.ModeTailx &&
+		mode != reader.ModeDirx {
+		log.Errorf("Cleaner only supports reader mode dir|file|cloudtrail|tailx|dirx, current mode is %v, cleaner disabled", meta.GetMode())
+		return nil, nil
 	}
 	interval, _ := conf.GetIntOr(KeyCleanInterval, 0) //单位，秒
 	if interval <= 0 {
-		interval = default_delete_interval
+		interval = defaultDeleteInterval
 	}
-	name, _ := conf.GetStringOr(clean_name, "unknow")
+	name, _ := conf.GetStringOr(cleanerName, "unknown")
 	reserveNumber, _ := conf.GetInt64Or(KeyReserveFileNumber, 0)
 	reserveSize, _ := conf.GetInt64Or(KeyReserveFileSize, 0)
 	if reserveNumber <= 0 && reserveSize <= 0 {
-		reserveNumber = default_reserve_file_number
-		reserveSize = default_reserve_file_size
+		reserveNumber = defaultReserveFileNumber
+		reserveSize = defaultReserveFileSize
 	}
 	reserveSize = reserveSize * MB
-	if mode != reader.ModeTailx {
+	if mode != reader.ModeTailx && mode != reader.ModeDirx {
+		var err error
 		logdir, _, err = GetRealPath(logdir)
 		if err != nil {
-			log.Errorf("GetRealPath for %v error %v", logdir, err)
-			return
+			log.Errorf("Failed to get real path of %q: %v", logdir, err)
+			return nil, err
 		}
 	}
-	c = &Cleaner{
+	return &Cleaner{
 		cleanTicker:   time.NewTicker(time.Duration(interval) * time.Second).C,
 		reserveNumber: reserveNumber,
 		reserveSize:   reserveSize,
@@ -83,8 +88,7 @@ func NewCleaner(conf conf.MapConf, meta *reader.Meta, cleanChan chan<- CleanSign
 		cleanChan:     cleanChan,
 		name:          name,
 		logdir:        logdir,
-	}
-	return
+	}, nil
 }
 
 func (c *Cleaner) Run() {

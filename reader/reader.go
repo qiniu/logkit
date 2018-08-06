@@ -81,9 +81,10 @@ const (
 	KeyIgnoreFileSuffix = "ignore_file_suffix"
 	KeyValidFilePattern = "valid_file_pattern"
 
-	KeyExpire       = "expire"
-	KeyMaxOpenFiles = "max_open_files"
-	KeyStatInterval = "stat_interval"
+	KeyExpire        = "expire"
+	KeySubmetaExpire = "submeta_expire"
+	KeyMaxOpenFiles  = "max_open_files"
+	KeyStatInterval  = "stat_interval"
 
 	KeyMysqlOffsetKey   = "mysql_offset_key"
 	KeyMysqlReadBatch   = "mysql_limit_batch"

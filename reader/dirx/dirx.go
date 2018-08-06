@@ -55,6 +55,8 @@ type Reader struct {
 	// 以下为传入参数
 	logPathPattern     string
 	statInterval       time.Duration
+	expire             time.Duration
+	submetaExpire      time.Duration
 	maxOpenFiles       int
 	ignoreHidden       bool
 	skipFirstLine      bool
@@ -81,6 +83,14 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	expire, err := time.ParseDuration(expireDur)
 	if err != nil {
 		return nil, err
+	}
+
+	submetaExpireDur, _ := conf.GetStringOr(reader.KeySubmetaExpire, "720h")
+	submetaExpire, err := time.ParseDuration(submetaExpireDur)
+	if err != nil {
+		return nil, err
+	} else if submetaExpire < expire {
+		return nil, fmt.Errorf("%q valus is less than %q", reader.KeySubmetaExpire, reader.KeyExpire)
 	}
 
 	maxOpenFiles, _ := conf.GetIntOr(reader.KeyMaxOpenFiles, 256)
@@ -128,6 +138,8 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		dirReaders:         newDirReaders(meta, expire, cachedLines),
 		logPathPattern:     strings.TrimSuffix(logPathPattern, "/"),
 		statInterval:       statInterval,
+		expire:             expire,
+		submetaExpire:      submetaExpire,
 		maxOpenFiles:       maxOpenFiles,
 		ignoreHidden:       ignoreHidden,
 		skipFirstLine:      skipFirstLine,
@@ -291,6 +303,23 @@ func (r *Reader) Start() error {
 			}
 		}
 	}()
+
+	if r.expire.Nanoseconds() > 0 {
+		go func() {
+			ticker := time.NewTicker(time.Hour)
+			defer ticker.Stop()
+			for {
+				r.meta.CheckExpiredSubMetas(r.submetaExpire)
+
+				select {
+				case <-r.stopChan:
+					return
+				case <-ticker.C:
+				}
+			}
+		}()
+	}
+
 	log.Infof("Runner[%v] %q daemon has started", r.meta.RunnerName, r.Name())
 	return nil
 }
@@ -340,6 +369,10 @@ func (r *Reader) SyncMeta() {
 	if err != nil {
 		log.Errorf("Runner[%v] write meta[%v] failed: %v", r.meta.RunnerName, string(data), err)
 		return
+	}
+
+	if r.expire.Nanoseconds() > 0 {
+		r.meta.CleanExpiredSubMetas(r.submetaExpire)
 	}
 }
 
