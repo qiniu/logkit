@@ -96,7 +96,7 @@ func convertIp(ipInt int64) (ip string) {
 }
 
 func (g *Number2Ip) Description() string {
-	return `将整型数据/字符串转换为ip，如整型数据为为 223556667，转换后变为 13.83.52.59`
+	return `将整型数据/字符串转换为ip, 我们认为该数字为32位2进制数的十进制表示法，如整型数据为为 223556667，转换后变为 13.83.52.59`
 }
 
 func (g *Number2Ip) Type() string {
