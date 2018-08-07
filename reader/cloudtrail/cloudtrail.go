@@ -56,7 +56,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	syncMgr, err := newSyncManager(opts)
+	syncMgr, err := newSyncManager(meta, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -194,24 +194,26 @@ func buildSyncOptions(conf conf.MapConf) (*syncOptions, error) {
 }
 
 type syncManager struct {
+	meta *reader.Meta
 	*syncOptions
 
 	auth   aws.Auth
 	source string
 
-	quit chan struct{}
+	quitChan chan struct{}
 }
 
-func newSyncManager(opts *syncOptions) (*syncManager, error) {
+func newSyncManager(meta *reader.Meta, opts *syncOptions) (*syncManager, error) {
 	auth, err := aws.GetAuth(opts.accessKey, opts.secretKey)
 	if err != nil {
 		return nil, err
 	}
 	mgr := &syncManager{
+		meta:        meta,
 		syncOptions: opts,
 		auth:        auth,
 		source:      makeSyncSource(opts.bucket, opts.prefix),
-		quit:        make(chan struct{}, 0),
+		quitChan:    make(chan struct{}, 0),
 	}
 	return mgr, nil
 }
@@ -241,7 +243,7 @@ Sync:
 			if err := mgr.syncOnce(); err != nil {
 				log.Errorf("sync failed: %v", err)
 			}
-		case <-mgr.quit:
+		case <-mgr.quitChan:
 			break Sync
 		}
 	}
@@ -251,6 +253,7 @@ Sync:
 
 func (mgr *syncManager) syncOnce() error {
 	ctx := &syncContext{
+		meta:       mgr.meta,
 		auth:       mgr.auth,
 		source:     mgr.source,
 		target:     mgr.directory,
@@ -258,15 +261,16 @@ func (mgr *syncManager) syncOnce() error {
 		concurrent: mgr.concurrent,
 		region:     mgr.region,
 	}
-	runner := newSyncRunner(ctx)
+	runner := newSyncRunner(ctx, mgr.quitChan)
 	return runner.Sync()
 }
 
 func (mgr *syncManager) stopSync() {
-	close(mgr.quit)
+	close(mgr.quitChan)
 }
 
 type syncContext struct {
+	meta       *reader.Meta
 	auth       aws.Auth
 	source     string
 	target     string
@@ -278,11 +282,13 @@ type syncContext struct {
 type syncRunner struct {
 	*syncContext
 	syncedFiles map[string]bool
+	quitChan    chan struct{}
 }
 
-func newSyncRunner(ctx *syncContext) *syncRunner {
+func newSyncRunner(ctx *syncContext, quitChan chan struct{}) *syncRunner {
 	return &syncRunner{
 		syncContext: ctx,
+		quitChan:    quitChan,
 	}
 }
 
@@ -474,6 +480,13 @@ func (s *syncRunner) concurrentSyncToDir(s3url s3Url, bucket *s3.Bucket, sourceF
 
 	var wg sync.WaitGroup
 	for s3file := range sourceFiles {
+		select {
+		case <-s.quitChan:
+			log.Warnf("Runner[%v] daemon has stopped, task is interrupted", s.meta.RunnerName)
+			return nil
+		default:
+		}
+
 		//对于目录不同步
 		if strings.HasSuffix(s3file, string(os.PathSeparator)) {
 			delete(sourceFiles, s3file)
