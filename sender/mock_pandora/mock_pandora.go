@@ -139,11 +139,19 @@ func (s *mock_pandora) PostRepos_Data() echo.HandlerFunc {
 			log.Println("post repo readall error")
 			return c.NoContent(http.StatusInternalServerError)
 		}
-		sep := strings.Fields(string(bytesx))
+		strByte := string(bytesx)
+		sep := strings.Fields(strByte)
 		sort.Strings(sep)
 		s.BodyMux.Lock()
 		defer s.BodyMux.Unlock()
 		s.Body = strings.Join(sep, " ")
+
+		if len(strings.TrimSpace(strByte)) < 1 {
+			c.Response().Header().Set(ContentTypeHeader, ApplicationJson)
+			c.Response().WriteHeader(http.StatusNotFound)
+
+			return jsoniter.NewEncoder(c.Response()).Encode(map[string]string{"error": "E18006: empty entity"})
+		}
 
 		if strings.Contains(s.Body, "E18111:") {
 			c.Response().Header().Set(ContentTypeHeader, ApplicationJson)

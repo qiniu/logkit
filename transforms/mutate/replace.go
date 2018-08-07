@@ -11,6 +11,7 @@ import (
 var (
 	_ transforms.StatsTransformer = &Replacer{}
 	_ transforms.Transformer      = &Replacer{}
+	_ transforms.Initializer      = &Replacer{}
 )
 
 type Replacer struct {
@@ -21,6 +22,8 @@ type Replacer struct {
 	Regex     bool   `json:"regex"`
 	stats     StatsInfo
 	Regexp    *regexp.Regexp
+
+	keys []string
 }
 
 func (g *Replacer) Init() error {
@@ -33,15 +36,16 @@ func (g *Replacer) Init() error {
 		return err
 	}
 	g.Regexp = rgx
+	g.keys = GetKeys(g.Key)
 	return nil
 }
 
 func (g *Replacer) Transform(datas []Data) ([]Data, error) {
 	var err, fmtErr error
 	errNum := 0
-	keys := GetKeys(g.Key)
+
 	for i := range datas {
-		val, getErr := GetMapValue(datas[i], keys...)
+		val, getErr := GetMapValue(datas[i], g.keys...)
 		if getErr != nil {
 			errNum++
 			err = fmt.Errorf("transform key %v not exist in data", g.Key)
@@ -53,7 +57,7 @@ func (g *Replacer) Transform(datas []Data) ([]Data, error) {
 			err = fmt.Errorf("transform key %v data type is not string", g.Key)
 			continue
 		}
-		setErr := SetMapValue(datas[i], g.Regexp.ReplaceAllString(strVal, g.New), false, keys...)
+		setErr := SetMapValue(datas[i], g.Regexp.ReplaceAllString(strVal, g.New), false, g.keys...)
 		if setErr != nil {
 			errNum++
 			err = fmt.Errorf("value of %v is not the type of map[string]interface{}", g.Key)

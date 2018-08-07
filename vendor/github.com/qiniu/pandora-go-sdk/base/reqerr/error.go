@@ -209,6 +209,7 @@ const (
 	ErrInvalidRepoSchemaDescription
 
 	ErrSchemaFieldNotExist
+	ErrTagsDecodeError
 )
 
 type ErrBuilder interface {

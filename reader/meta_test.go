@@ -2,6 +2,7 @@ package reader
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	. "github.com/qiniu/logkit/reader/test"
+	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -114,6 +116,8 @@ func TestMeta(t *testing.T) {
 			"aaa": {1, 2},
 			"bbb": {5, 6},
 		},
+		TransformErrors: make(map[string]ErrorQueue),
+		SendErrors:      make(map[string]ErrorQueue),
 	}
 	err = meta.WriteStatistic(stat)
 	assert.NoError(t, err)
@@ -242,4 +246,38 @@ func Test_GetLogFiles2(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+}
+
+func TestMeta_CleanExpiredSubMetas(t *testing.T) {
+	metaDir := "TestMeta_CleanExpiredSubMetas"
+	assert.NoError(t, os.Mkdir(metaDir, os.ModePerm))
+	defer os.RemoveAll(metaDir)
+
+	subMeta1Dir := filepath.Join(metaDir, "submeta1")
+	assert.NoError(t, os.Mkdir(subMeta1Dir, os.ModePerm))
+	subMeta1File := filepath.Join(subMeta1Dir, metaFileName)
+	assert.NoError(t, ioutil.WriteFile(subMeta1File, []byte("submeta1"), 0644))
+
+	subMeta2Dir := filepath.Join(metaDir, "submeta2")
+	assert.NoError(t, os.Mkdir(subMeta2Dir, os.ModePerm))
+	subMeta2File := filepath.Join(subMeta2Dir, metaFileName)
+	assert.NoError(t, ioutil.WriteFile(subMeta2File, []byte("submeta2"), 0644))
+
+	expired := time.Now().Add(-25 * time.Hour)
+	assert.NoError(t, os.Chtimes(subMeta2File, expired, expired))
+
+	m := &Meta{
+		Dir:            metaDir,
+		subMetaExpired: make(map[string]bool),
+	}
+	m.CheckExpiredSubMetas(time.Nanosecond)
+	m.CleanExpiredSubMetas(time.Nanosecond)
+
+	assert.True(t, utils.IsExist(subMeta1File))
+	assert.False(t, utils.IsExist(subMeta2File))
+
+	// 测试 submeta 清理缓存，subMeta1File 虽然过期但此刻不会被清理
+	assert.NoError(t, os.Chtimes(subMeta1File, expired, expired))
+	m.CleanExpiredSubMetas(time.Nanosecond)
+	assert.True(t, utils.IsExist(subMeta1File))
 }

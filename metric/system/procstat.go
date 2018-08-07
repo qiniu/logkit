@@ -132,7 +132,7 @@ type Procstat struct {
 }
 
 // KeyProcUsages TypeMetricProc 中的字段名称
-var KeyProcUsages = []models.KeyValue{}
+var KeyProcUsages = models.KeyValueSlice{}
 
 // ConfigProcUsages TypeMetricProc 配置项的描述
 var ConfigProcUsages = []models.Option{

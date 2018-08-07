@@ -2,17 +2,18 @@ package date
 
 import (
 	"errors"
+	"time"
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
 var (
-	_ transforms.StatsTransformer = &DateTrans{}
-	_ transforms.Transformer      = &DateTrans{}
+	_ transforms.StatsTransformer = &Transformer{}
+	_ transforms.Transformer      = &Transformer{}
 )
 
-type DateTrans struct {
+type Transformer struct {
 	Key          string `json:"key"`
 	Offset       int    `json:"offset"`
 	LayoutBefore string `json:"time_layout_before"`
@@ -20,45 +21,52 @@ type DateTrans struct {
 	stats        StatsInfo
 }
 
-func (g *DateTrans) RawTransform(datas []string) ([]string, error) {
+func (t *Transformer) RawTransform(datas []string) ([]string, error) {
 	return datas, errors.New("date transformer not support rawTransform")
 }
 
-func (g *DateTrans) Transform(datas []Data) ([]Data, error) {
+func (t *Transformer) Transform(datas []Data) ([]Data, error) {
 	var err, fmtErr error
 	errNum := 0
-	keys := GetKeys(g.Key)
+	keys := GetKeys(t.Key)
 	for i := range datas {
 		val, getErr := GetMapValue(datas[i], keys...)
 		if getErr != nil {
-			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.Key)
+			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, t.Key)
 			continue
 		}
-		val, convertErr := ConvertDate(g.LayoutBefore, g.LayoutAfter, g.Offset, val)
+
+		// 如果用户设置了 offset，则不默认使用本地时区
+		loc := time.Local
+		if t.Offset != 0 {
+			loc = time.UTC
+		}
+
+		val, convertErr := ConvertDate(t.LayoutBefore, t.LayoutAfter, t.Offset, loc, val)
 		if convertErr != nil {
 			errNum, err = transforms.SetError(errNum, convertErr, transforms.General, "")
 			continue
 		}
 		setErr := SetMapValue(datas[i], val, false, keys...)
 		if setErr != nil {
-			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.Key)
+			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, t.Key)
 		}
 	}
 
-	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	t.stats, fmtErr = transforms.SetStatsInfo(err, t.stats, int64(errNum), int64(len(datas)), t.Type())
 	return datas, fmtErr
 }
 
-func (g *DateTrans) Description() string {
+func (t *Transformer) Description() string {
 	//return "transform string/long to specified date format"
 	return "将string/long数据转换成指定的时间格式, 如 1523878855 变为 2018-04-16T19:40:55+08:00"
 }
 
-func (g *DateTrans) Type() string {
+func (t *Transformer) Type() string {
 	return "date"
 }
 
-func (g *DateTrans) SampleConfig() string {
+func (t *Transformer) SampleConfig() string {
 	return `{
 		"type":"date",
 		"key":"DateFieldKey",
@@ -68,7 +76,7 @@ func (g *DateTrans) SampleConfig() string {
 	}`
 }
 
-func (it *DateTrans) ConfigOptions() []Option {
+func (t *Transformer) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
 		transforms.KeyTimezoneoffset,
@@ -85,27 +93,28 @@ func (it *DateTrans) ConfigOptions() []Option {
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
+			Advance:      true,
 			Description:  "期望时间样式(不填默认rfc3339)(time_layout_after)",
 			Type:         transforms.TransformTypeString,
 		},
 	}
 }
 
-func (g *DateTrans) Stage() string {
+func (t *Transformer) Stage() string {
 	return transforms.StageAfterParser
 }
 
-func (g *DateTrans) Stats() StatsInfo {
-	return g.stats
+func (t *Transformer) Stats() StatsInfo {
+	return t.stats
 }
 
-func (g *DateTrans) SetStats(err string) StatsInfo {
-	g.stats.LastError = err
-	return g.stats
+func (t *Transformer) SetStats(err string) StatsInfo {
+	t.stats.LastError = err
+	return t.stats
 }
 
 func init() {
 	transforms.Add("date", func() transforms.Transformer {
-		return &DateTrans{}
+		return &Transformer{}
 	})
 }

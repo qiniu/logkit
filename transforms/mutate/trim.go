@@ -102,6 +102,7 @@ func (g *Trim) ConfigOptions() []Option {
 			DefaultNoUse:  false,
 			Description:   "修整位置(place)",
 			Type:          transforms.TransformTypeBoolean,
+			ToolTip:       "前缀后缀都去掉(both)，只去掉前缀(prefix)或者后缀(suffix)",
 		},
 	}
 }

@@ -1,6 +1,7 @@
 package cloudwatch
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -13,18 +14,44 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
-	"github.com/json-iterator/go"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base/ratelimit"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
-	"github.com/qiniu/logkit/utils/models"
+	. "github.com/qiniu/logkit/utils/models"
+)
+
+var (
+	_ reader.DaemonReader = &Reader{}
+	_ reader.DataReader   = &Reader{}
+	_ reader.Reader       = &Reader{}
 )
 
 type (
-	CloudWatch struct {
+	readInfo struct {
+		data  Data
+		bytes int64
+	}
+
+	Reader struct {
+		meta *reader.Meta
+		// Note: 原子操作，用于表示 reader 整体的运行状态
+		status int32
+		/*
+			Note: 原子操作，用于表示获取数据的线程运行状态
+
+			- StatusInit: 当前没有任务在执行
+			- StatusRunning: 当前有任务正在执行
+			- StatusStopping: 数据管道已经由上层关闭，执行中的任务完成时直接退出无需再处理
+		*/
+		routineStatus int32
+
+		stopChan chan struct{} // 用于直接 close 对关闭操作进行广播
+		readChan chan readInfo
+		errChan  chan error
+
 		Region          string
 		CollectInterval time.Duration
 		Period          time.Duration
@@ -35,11 +62,6 @@ type (
 		RateLimit       int64
 		client          cloudwatchClient
 		metricCache     *MetricCache
-		meta            *reader.Meta
-		status          int32
-		StopChan        chan struct{}
-		DataChan        chan models.Data
-		errChan         chan error
 	}
 
 	Metric struct {
@@ -68,19 +90,19 @@ func init() {
 	reader.RegisterConstructor(reader.ModeCloudWatch, NewReader)
 }
 
-func NewReader(meta *reader.Meta, conf conf.MapConf) (c reader.Reader, err error) {
+func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	region, err := conf.GetString(reader.KeyRegion)
 	if err != nil {
-		return
+		return nil, err
 	}
 	namespace, err := conf.GetString(reader.KeyNamespace)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	ak, _ := conf.GetStringOr(reader.KeyAWSAccessKey, "")
 	sk, _ := conf.GetStringOr(reader.KeyAWSSecretKey, "")
-	role_arn, _ := conf.GetStringOr(reader.KeyRoleArn, "")
+	roleARN, _ := conf.GetStringOr(reader.KeyRoleArn, "")
 	token, _ := conf.GetStringOr(reader.KeyAWSToken, "")
 	profile, _ := conf.GetStringOr(reader.KeyAWSProfile, "")
 	sharedCredentialFile, _ := conf.GetStringOr(reader.KeySharedCredentialFile, "")
@@ -88,7 +110,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (c reader.Reader, err error
 		Region:    region,
 		AccessKey: ak,
 		SecretKey: sk,
-		RoleARN:   role_arn,
+		RoleARN:   roleARN,
 		Profile:   profile,
 		Filename:  sharedCredentialFile,
 		Token:     token,
@@ -96,21 +118,19 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (c reader.Reader, err error
 	configProvider, err := credentialConfig.Credentials()
 	if err != nil {
 		log.Errorf("aws Credentials err %v", err)
-		return
+		return nil, err
 	}
 	cacheTTL, _ := conf.GetStringOr(reader.KeyCacheTTL, "1hr")
 	ttl, err := time.ParseDuration(cacheTTL)
 	if err != nil {
-		err = fmt.Errorf("parse cachettl %v error %v", cacheTTL, err)
-		return
+		return nil, fmt.Errorf("parse cachettl %v error %v", cacheTTL, err)
 	}
 	interval, _ := conf.GetStringOr(reader.KeyCollectInterval, "5m")
 	collectInteval, err := time.ParseDuration(interval)
 	if err != nil {
-		err = fmt.Errorf("parse interval %v error %v", interval, err)
-		return
+		return nil, fmt.Errorf("parse interval %v error %v", interval, err)
 	}
-	ratelimit, _ := conf.GetInt64Or(reader.KeyRateLimit, 200)
+	rateLimit, _ := conf.GetInt64Or(reader.KeyRateLimit, 200)
 	metrics, _ := conf.GetStringListOr(reader.KeyMetrics, []string{})
 	var dimensions []*Dimension
 	dimensionList, _ := conf.GetStringListOr(reader.KeyDimension, []string{})
@@ -130,14 +150,12 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (c reader.Reader, err error
 	delayStr, _ := conf.GetStringOr(reader.KeyDelay, "5m")
 	delay, err := time.ParseDuration(delayStr)
 	if err != nil {
-		err = fmt.Errorf("parse delay %v error %v", delayStr, err)
-		return
+		return nil, fmt.Errorf("parse delay %v error %v", delayStr, err)
 	}
 	periodStr, _ := conf.GetStringOr(reader.KeyPeriod, "5m")
 	period, err := time.ParseDuration(periodStr)
 	if err != nil {
-		err = fmt.Errorf("parse period %v error %v", periodStr, err)
-		return
+		return nil, fmt.Errorf("parse period %v error %v", periodStr, err)
 	}
 	cfg := aws.NewConfig()
 	if log.GetOutputLevel() == log.Ldebug {
@@ -148,62 +166,122 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (c reader.Reader, err error
 		Metrics = []*Metric{{MetricNames: metrics, Dimensions: dimensions}}
 	}
 
-	return &CloudWatch{
+	return &Reader{
+		meta:            meta,
+		status:          reader.StatusInit,
+		routineStatus:   reader.StatusInit,
+		stopChan:        make(chan struct{}),
+		readChan:        make(chan readInfo),
+		errChan:         make(chan error),
 		Region:          region,
 		Namespace:       namespace,
 		client:          cloudwatch.New(configProvider, cfg),
-		RateLimit:       ratelimit,
+		RateLimit:       rateLimit,
 		CacheTTL:        ttl,
 		Delay:           delay,
 		Period:          period,
-		meta:            meta,
 		CollectInterval: collectInteval,
-		status:          reader.StatusInit,
-		StopChan:        make(chan struct{}),
-		DataChan:        make(chan models.Data),
-		errChan:         make(chan error),
 		Metrics:         Metrics,
 	}, nil
 }
 
-func (c *CloudWatch) Name() string {
-	return "cloudwatch_" + c.Region + "_" + c.Namespace
+func (r *Reader) isStopping() bool {
+	return atomic.LoadInt32(&r.status) == reader.StatusStopping
 }
 
-func (c *CloudWatch) Source() string {
-	return "cloudwatch_" + c.Region + "_" + c.Namespace
+func (r *Reader) hasStopped() bool {
+	return atomic.LoadInt32(&r.status) == reader.StatusStopped
 }
 
-func (c *CloudWatch) ReadLine() (line string, err error) {
-	if atomic.LoadInt32(&c.status) == reader.StatusInit {
-		if err = c.Start(); err != nil {
-			log.Error(err)
-			return
-		}
+func (r *Reader) Name() string {
+	return "cloudwatch_" + r.Region + "_" + r.Namespace
+}
+
+func (r *Reader) SetMode(mode string, v interface{}) error {
+	return nil
+}
+
+func (r *Reader) sendError(err error) {
+	if err == nil {
+		return
 	}
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Errorf("Reader %q was panicked and recovered from %v", r.Name(), rec)
+		}
+	}()
+	r.errChan <- err
+}
+
+func (r *Reader) Start() error {
+	if r.isStopping() || r.hasStopped() {
+		return errors.New("reader is stopping or has stopped")
+	} else if !atomic.CompareAndSwapInt32(&r.status, reader.StatusInit, reader.StatusRunning) {
+		log.Warnf("Runner[%v] %q daemon has already started and is running", r.meta.RunnerName, r.Name())
+		return nil
+	}
+
+	go func() {
+		ticker := time.NewTicker(r.CollectInterval)
+		defer ticker.Stop()
+		for {
+			err := r.Gather()
+			if err != nil {
+				log.Errorf("Runner[%v] %q gather failed: %v ", r.meta.RunnerName, r.Name(), err)
+			}
+
+			select {
+			case <-r.stopChan:
+				atomic.StoreInt32(&r.status, reader.StatusStopped)
+				log.Infof("Runner[%v] %q daemon has stopped from running", r.meta.RunnerName, r.Name())
+				return
+			case <-ticker.C:
+			}
+		}
+	}()
+	log.Infof("Runner[%v] %q daemon has started", r.meta.RunnerName, r.Name())
+	return nil
+}
+
+func (r *Reader) Source() string {
+	return "cloudwatch_" + r.Region + "_" + r.Namespace
+}
+
+func (r *Reader) ReadLine() (string, error) {
+	return "", errors.New("method ReadLine is not supported, please use ReadData")
+}
+
+func (r *Reader) ReadData() (Data, int64, error) {
+	timer := time.NewTimer(time.Second)
+	defer timer.Stop()
 	select {
-	case d := <-c.DataChan:
-		var db []byte
-		if db, err = jsoniter.Marshal(d); err != nil {
-			return
-		}
-		line = string(db)
-	case err = <-c.errChan:
-	default:
+	case info := <-r.readChan:
+		return info.data, info.bytes, nil
+	case err := <-r.errChan:
+		return nil, 0, err
+	case <-timer.C:
 	}
-	return
+
+	return nil, 0, nil
 }
 
-func (c *CloudWatch) SetMode(mode string, v interface{}) error {
+func (_ *Reader) SyncMeta() {}
+
+func (r *Reader) Close() error {
+	if !atomic.CompareAndSwapInt32(&r.status, reader.StatusRunning, reader.StatusStopping) {
+		log.Warnf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
+		return nil
+	}
+	log.Debugf("Runner[%v] %q daemon is stopping", r.meta.RunnerName, r.Name())
+	close(r.stopChan)
+
+	// 如果此时没有 routine 正在运行，则在此处关闭数据管道，否则由 routine 在退出时负责关闭
+	if atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusInit, reader.StatusStopping) {
+		close(r.readChan)
+		close(r.errChan)
+	}
 	return nil
 }
-
-func (c *CloudWatch) Close() error {
-	close(c.StopChan)
-	return nil
-}
-
-func (c *CloudWatch) SyncMeta() {}
 
 func isIn(metrics []string, now string) bool {
 	for _, v := range metrics {
@@ -214,7 +292,7 @@ func isIn(metrics []string, now string) bool {
 	return false
 }
 
-func SelectMetrics(c *CloudWatch) ([]*cloudwatch.Metric, error) {
+func SelectMetrics(c *Reader) ([]*cloudwatch.Metric, error) {
 	var metrics []*cloudwatch.Metric
 	// check for provided metric filter
 	if len(c.Metrics) > 0 {
@@ -276,56 +354,36 @@ func SelectMetrics(c *CloudWatch) ([]*cloudwatch.Metric, error) {
 	return metrics, nil
 }
 
-func (c *CloudWatch) Start() error {
-	if !atomic.CompareAndSwapInt32(&c.status, reader.StatusInit, reader.StatusRunning) {
-		return fmt.Errorf("runner[%v] Reader[%v] already started", c.meta.RunnerName, c.Name())
-	}
-	log.Infof("runner[%v] Reader[%v] started", c.meta.RunnerName, c.Name())
-	go func() {
-		err := c.Gather()
-		if err != nil {
-			log.Errorf("runner[%v] Reader[%v] err %v ", c.meta.RunnerName, c.Name(), err)
+func (r *Reader) Gather() error {
+	// 未在准备状态（StatusInit）时无法执行此次任务
+	if !atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusInit, reader.StatusRunning) {
+		if r.isStopping() || r.hasStopped() {
+			log.Warnf("Runner[%v] %q daemon has stopped, this task does not need to be executed and is skipped this time", r.meta.RunnerName, r.Name())
+		} else {
+			log.Errorf("Runner[%v] %q daemon is still working on last task, this task will not be executed and is skipped this time", r.meta.RunnerName, r.Name())
 		}
-		ticker := time.NewTicker(c.CollectInterval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				err := c.Gather()
-				if err != nil {
-					log.Errorf("runner[%v] Reader[%v] err %v ", c.meta.RunnerName, c.Name(), err)
-				}
-			case <-c.StopChan:
-				close(c.DataChan)
-				close(c.errChan)
-				return
-			}
-		}
-	}()
-	return nil
-}
-
-func (s *CloudWatch) sendError(err error) {
-	if err == nil {
-		return
+		return nil
 	}
 	defer func() {
-		if rec := recover(); rec != nil {
-			log.Errorf("Reader %s panic, recovered from %v", s.Name(), rec)
+		// 如果 reader 在 routine 运行时关闭，则需要此 routine 负责关闭数据管道
+		if r.isStopping() || r.hasStopped() {
+			if atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusRunning, reader.StatusStopping) {
+				close(r.readChan)
+				close(r.errChan)
+			}
+			return
 		}
+		atomic.StoreInt32(&r.routineStatus, reader.StatusInit)
 	}()
-	s.errChan <- err
-}
 
-func (c *CloudWatch) Gather() error {
-	var lastErr error
-	metrics, err := SelectMetrics(c)
+	metrics, err := SelectMetrics(r)
 	if err != nil {
 		return err
 	}
 
+	var lastErr error
 	now := time.Now()
-	lmtr := ratelimit.NewLimiter(c.RateLimit)
+	lmtr := ratelimit.NewLimiter(r.RateLimit)
 	defer lmtr.Close()
 	var wg sync.WaitGroup
 	wg.Add(len(metrics))
@@ -333,15 +391,15 @@ func (c *CloudWatch) Gather() error {
 		lmtr.Assign(1)
 		go func(inm *cloudwatch.Metric) {
 			defer wg.Done()
-			datas, err := c.gatherMetric(inm, now)
+			datas, err := r.gatherMetric(inm, now)
 			if err != nil {
 				log.Errorf("gatherMetric error %v", err)
 				lastErr = err
-				c.sendError(err)
+				r.sendError(err)
 			}
 			log.Debugf("successfully gatherMetric %v data %v", *inm.MetricName, len(datas))
 			for _, v := range datas {
-				c.DataChan <- v
+				r.readChan <- v
 			}
 		}(m)
 	}
@@ -353,9 +411,9 @@ func (c *CloudWatch) Gather() error {
 /*
  * Fetch available metrics for given CloudWatch Namespace
  */
-func (c *CloudWatch) fetchNamespaceMetrics() ([]*cloudwatch.Metric, error) {
-	if c.metricCache != nil && c.metricCache.IsValid() {
-		return c.metricCache.Metrics, nil
+func (r *Reader) fetchNamespaceMetrics() ([]*cloudwatch.Metric, error) {
+	if r.metricCache != nil && r.metricCache.IsValid() {
+		return r.metricCache.Metrics, nil
 	}
 
 	metrics := []*cloudwatch.Metric{}
@@ -363,13 +421,13 @@ func (c *CloudWatch) fetchNamespaceMetrics() ([]*cloudwatch.Metric, error) {
 	var token *string
 	for more := true; more; {
 		params := &cloudwatch.ListMetricsInput{
-			Namespace:  aws.String(c.Namespace),
+			Namespace:  aws.String(r.Namespace),
 			Dimensions: []*cloudwatch.DimensionFilter{},
 			NextToken:  token,
 			MetricName: nil,
 		}
 
-		resp, err := c.client.ListMetrics(params)
+		resp, err := r.client.ListMetrics(params)
 		if err != nil {
 			return nil, err
 		}
@@ -381,25 +439,25 @@ func (c *CloudWatch) fetchNamespaceMetrics() ([]*cloudwatch.Metric, error) {
 		more = token != nil
 	}
 
-	c.metricCache = &MetricCache{
+	r.metricCache = &MetricCache{
 		Metrics: metrics,
 		Fetched: time.Now(),
-		TTL:     c.CacheTTL,
+		TTL:     r.CacheTTL,
 	}
 	return metrics, nil
 }
 
-func (c *CloudWatch) gatherMetric(metric *cloudwatch.Metric, now time.Time) (datas []models.Data, err error) {
-	params := c.getStatisticsInput(metric, now)
-	resp, err := c.client.GetMetricStatistics(params)
+func (r *Reader) gatherMetric(metric *cloudwatch.Metric, now time.Time) ([]readInfo, error) {
+	params := r.getStatisticsInput(metric, now)
+	resp, err := r.client.GetMetricStatistics(params)
 	if err != nil {
-		return
+		return nil, err
 	}
 	log.Debugf("gatherMetric resp %v", resp)
-	datas = make([]models.Data, 0, len(resp.Datapoints))
 
+	readInfos := make([]readInfo, 0, len(resp.Datapoints))
 	for _, point := range resp.Datapoints {
-		data := make(models.Data)
+		data := make(Data)
 		for _, d := range metric.Dimensions {
 			data[snakeCase(*d.Name)] = *d.Value
 		}
@@ -420,9 +478,9 @@ func (c *CloudWatch) gatherMetric(metric *cloudwatch.Metric, now time.Time) (dat
 		if point.Sum != nil {
 			data[formatKey(*metric.MetricName, cloudwatch.StatisticSum)] = *point.Sum
 		}
-		datas = append(datas, data)
+		readInfos = append(readInfos, readInfo{data, int64(len(point.String()))})
 	}
-	return
+	return readInfos, nil
 }
 
 func formatKey(metricName string, statistic string) string {
@@ -430,7 +488,7 @@ func formatKey(metricName string, statistic string) string {
 }
 
 func snakeCase(s string) string {
-	s = models.PandoraKey(s)
+	s, _ = PandoraKey(s)
 	s = strings.Replace(s, "__", "_", -1)
 	return s
 }
@@ -438,15 +496,15 @@ func snakeCase(s string) string {
 /*
  * Map Metric to *cloudwatch.GetMetricStatisticsInput for given timeframe
  */
-func (c *CloudWatch) getStatisticsInput(metric *cloudwatch.Metric, now time.Time) *cloudwatch.GetMetricStatisticsInput {
-	end := now.Add(-c.Delay)
+func (r *Reader) getStatisticsInput(metric *cloudwatch.Metric, now time.Time) *cloudwatch.GetMetricStatisticsInput {
+	end := now.Add(-r.Delay)
 
 	input := &cloudwatch.GetMetricStatisticsInput{
-		StartTime:  aws.Time(end.Add(-c.Period)),
+		StartTime:  aws.Time(end.Add(-r.Period)),
 		EndTime:    aws.Time(end),
 		MetricName: metric.MetricName,
 		Namespace:  metric.Namespace,
-		Period:     aws.Int64(int64(c.Period.Seconds())),
+		Period:     aws.Int64(int64(r.Period.Seconds())),
 		Dimensions: metric.Dimensions,
 		Statistics: []*string{
 			aws.String(cloudwatch.StatisticAverage),

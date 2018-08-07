@@ -81,7 +81,7 @@ func TestClusterRest(t *testing.T) {
 		}
 		var logkitConf ManagerConfig
 		logkitConf.RestDir = confDir
-		logkitConf.BindHost = ":" + strconv.Itoa(port+i)
+		logkitConf.BindHost = "127.0.0.1:" + strconv.Itoa(port+i)
 		logkitConf.Cluster.Enable = true
 		if i == 0 {
 			logkitConf.Cluster.IsMaster = true

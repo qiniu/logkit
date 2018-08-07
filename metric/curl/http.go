@@ -42,19 +42,19 @@ const (
 )
 
 // KeyHttpUsages TypeMetricHttp 中的字段名称
-var KeyHttpUsages = []KeyValue{
-	{HttpStatusCode, "http响应状态码"},
-	{HttpRespHead, "http响应头部信息"},
-	{HttpData, "http响应内容"},
-	{HttpTimeCost, "http响应用时"},
-	{HttpTarget, "http请求地址"},
-	{HttpErrState, "http响应状态"},
-	{HttpErrMsg, "http响应错误信息"},
+var KeyHttpUsages = KeyValueSlice{
+	{HttpStatusCode, "http响应状态码", ""},
+	{HttpRespHead, "http响应头部信息", ""},
+	{HttpData, "http响应内容", ""},
+	{HttpTimeCost, "http响应用时", ""},
+	{HttpTarget, "http请求地址", ""},
+	{HttpErrState, "http响应状态", ""},
+	{HttpErrMsg, "http响应错误信息", ""},
 }
 
 // ConfigHttpUsages TypeMetricHttp config 中的字段描述
-var ConfigHttpUsages = []KeyValue{
-	{ConfigHttpDatas, "填写(" + ConfigHttpDatas + ")"},
+var ConfigHttpUsages = KeyValueSlice{
+	{ConfigHttpDatas, "填写(" + ConfigHttpDatas + ")", ""},
 }
 
 type HttpStats struct {

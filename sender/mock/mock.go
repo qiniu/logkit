@@ -63,4 +63,4 @@ func (mock *Sender) SendCount() int {
 	return mock.count
 }
 
-func (_ *Sender) SkipDeepCopy() {}
+func (_ *Sender) SkipDeepCopy() bool { return true }

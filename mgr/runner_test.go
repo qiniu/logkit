@@ -1808,19 +1808,16 @@ func TestTailxCleaner(t *testing.T) {
 		log.Fatalf("TestTailxCleaner error mkdir %v %v", dir, err)
 	}
 	defer os.RemoveAll(dir)
-	defer os.RemoveAll(metaDir)
 
 	dira := filepath.Join(dir, "a")
 	os.MkdirAll(dira, DefaultDirPerm)
 	logPatha := filepath.Join(dira, "a.log")
-	err = ioutil.WriteFile(logPatha, []byte("a\n"), 0666)
-	assert.NoError(t, err)
+	assert.NoError(t, ioutil.WriteFile(logPatha, []byte("a\n"), 0666))
 
 	dirb := filepath.Join(dir, "b")
 	os.MkdirAll(dirb, DefaultDirPerm)
 	logPathb := filepath.Join(dirb, "b.log")
-	err = ioutil.WriteFile(logPathb, []byte("b\n"), 0666)
-	assert.NoError(t, err)
+	assert.NoError(t, ioutil.WriteFile(logPathb, []byte("b\n"), 0666))
 
 	readfile := filepath.Join(dir, "*", "*.log")
 	config := `
@@ -1855,8 +1852,7 @@ func TestTailxCleaner(t *testing.T) {
 }`
 
 	rc := RunnerConfig{}
-	err = jsoniter.Unmarshal([]byte(config), &rc)
-	assert.NoError(t, err)
+	assert.NoError(t, jsoniter.Unmarshal([]byte(config), &rc))
 	cleanChan := make(chan cleaner.CleanSignal)
 	rr, err := NewLogExportRunner(rc, cleanChan, reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
 	assert.NoError(t, err)
@@ -1866,39 +1862,36 @@ func TestTailxCleaner(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	logPatha1 := filepath.Join(dira, "a.log.1")
-	err = os.Rename(logPatha, logPatha1)
-	assert.NoError(t, err)
+	assert.NoError(t, os.Rename(logPatha, logPatha1))
 
-	err = ioutil.WriteFile(logPatha, []byte("bbbb\n"), 0666)
-	assert.NoError(t, err)
+	assert.NoError(t, ioutil.WriteFile(logPatha, []byte("bbbb\n"), 0666))
 
 	time.Sleep(5 * time.Second)
 
 	logPatha2 := filepath.Join(dira, "a.log.2")
-	err = os.Rename(logPatha, logPatha2)
-	assert.NoError(t, err)
+	assert.NoError(t, os.Rename(logPatha, logPatha2))
 
-	err = ioutil.WriteFile(logPatha, []byte("cccc\n"), 0666)
-	assert.NoError(t, err)
+	assert.NoError(t, ioutil.WriteFile(logPatha, []byte("cccc\n"), 0666))
 
 	time.Sleep(2 * time.Second)
 
 	assert.NotNil(t, rr.Cleaner())
-	var ret, dft int
 
+	var ret, dft int
+DONE:
 	for {
 		select {
 		case sig := <-cleanChan:
 			ret++
 			assert.Equal(t, "a.log.1", sig.Filename)
-			err = os.Remove(filepath.Join(sig.Logdir, sig.Filename))
-			assert.NoError(t, err)
+			assert.NoError(t, os.Remove(filepath.Join(sig.Logdir, sig.Filename)))
 			assert.Equal(t, reader.ModeTailx, sig.ReadMode)
+			break DONE
 		default:
 			dft++
 		}
 		time.Sleep(50 * time.Millisecond)
-		if dft > 40 {
+		if dft > 60 {
 			break
 		}
 	}

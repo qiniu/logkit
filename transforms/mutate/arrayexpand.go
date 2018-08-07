@@ -13,11 +13,19 @@ import (
 var (
 	_ transforms.StatsTransformer = &ArrayExpand{}
 	_ transforms.Transformer      = &ArrayExpand{}
+	_ transforms.Initializer      = &ArrayExpand{}
 )
 
 type ArrayExpand struct {
 	Key   string `json:"key"`
 	stats StatsInfo
+
+	keys []string
+}
+
+func (p *ArrayExpand) Init() error {
+	p.keys = GetKeys(p.Key)
+	return nil
 }
 
 func (p *ArrayExpand) transformToMap(val interface{}, key string) map[string]interface{} {
@@ -137,16 +145,18 @@ func (p *ArrayExpand) RawTransform(datas []string) ([]string, error) {
 func (p *ArrayExpand) Transform(datas []Data) ([]Data, error) {
 	var err, fmtErr error
 	errNum := 0
-	keys := GetKeys(p.Key)
-	newKeys := make([]string, len(keys))
+	if p.keys == nil {
+		p.Init()
+	}
+	newKeys := make([]string, len(p.keys))
 	for i := range datas {
-		copy(newKeys, keys)
-		val, getErr := GetMapValue(datas[i], keys...)
+		copy(newKeys, p.keys)
+		val, getErr := GetMapValue(datas[i], p.keys...)
 		if getErr != nil {
 			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, p.Key)
 			continue
 		}
-		if resultMap := p.transformToMap(val, newKeys[len(keys)-1]); resultMap != nil {
+		if resultMap := p.transformToMap(val, newKeys[len(p.keys)-1]); resultMap != nil {
 			for key, arrVal := range resultMap {
 				suffix := 0
 				keyName := key
@@ -168,7 +178,6 @@ func (p *ArrayExpand) Transform(datas []Data) ([]Data, error) {
 					}
 				}
 			}
-
 		} else {
 			typeErr := fmt.Errorf("transform key %v data type is not array", p.Key)
 			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")

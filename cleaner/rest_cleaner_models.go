@@ -18,14 +18,13 @@ var (
 	}
 
 	OptionCleanInterval = Option{
-		KeyName:       KeyCleanInterval,
-		ChooseOnly:    false,
-		Default:       "300",
-		DefaultNoUse:  false,
-		Description:   "执行周期,单位为秒(s)(delete_interval)",
-		Advance:       true,
-		ToolTip:       `在每个周期检查是否符合删除的条件"`,
-		ToolTipActive: true,
+		KeyName:      KeyCleanInterval,
+		ChooseOnly:   false,
+		Default:      "300",
+		DefaultNoUse: false,
+		Description:  "执行周期,单位为秒(s)(delete_interval)",
+		Advance:      true,
+		ToolTip:      `在每个周期检查是否符合删除的条件"`,
 	}
 
 	OptionReserveFileNumber = Option{

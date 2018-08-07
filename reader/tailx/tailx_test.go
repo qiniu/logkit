@@ -121,8 +121,12 @@ func multiReaderOneLineTest(t *testing.T) {
 	assert.NoError(t, err)
 	mmr, err := NewReader(meta, c)
 	mr := mmr.(*Reader)
-	mr.Start()
-	t.Log("mr started")
+	assert.NoError(t, mr.Start())
+	t.Log("Reader has started")
+
+	assert.Equal(t, 15*time.Second, mr.expire)
+	assert.Equal(t, 720*time.Hour, mr.submetaExpire)
+
 	go func() {
 		time.Sleep(15 * time.Second)
 		createFileWithContent(dir2file1, "hahaha\nhahaha\nhahaha\n")
@@ -216,8 +220,12 @@ func multiReaderMultiLineTest(t *testing.T) {
 	mmr, err := NewReader(meta, c)
 	mmr.SetMode(reader.ReadModeHeadPatternString, "^abc*")
 	mr := mmr.(*Reader)
-	mr.Start()
-	t.Log("mr started")
+	assert.NoError(t, mr.Start())
+	t.Log("Reader has started")
+
+	assert.Equal(t, 15*time.Second, mr.expire)
+	assert.Equal(t, 720*time.Hour, mr.submetaExpire)
+
 	go func() {
 		time.Sleep(15 * time.Second)
 		createFileWithContent(dir2file1, "abc\nx\nabc\nx\nabc\nx\n")
@@ -317,8 +325,12 @@ func multiReaderSyncMetaOneLineTest(t *testing.T) {
 	assert.NoError(t, err)
 	mmr, err := NewReader(meta, c)
 	mr := mmr.(*Reader)
-	mr.Start()
-	t.Log("mr started")
+	assert.NoError(t, mr.Start())
+	t.Log("Reader has started")
+
+	assert.Equal(t, 15*time.Second, mr.expire)
+	assert.Equal(t, 720*time.Hour, mr.submetaExpire)
+
 	go func() {
 		time.Sleep(15 * time.Second)
 		createFileWithContent(dir2file1, "ab1\nab2\nab3\n")
@@ -352,7 +364,7 @@ func multiReaderSyncMetaOneLineTest(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 	mmr, err = NewReader(meta, c)
 	mr = mmr.(*Reader)
-	mr.Start()
+	assert.NoError(t, mr.Start())
 	time.Sleep(500 * time.Millisecond)
 	for {
 		data, err := mr.ReadLine()
@@ -447,8 +459,12 @@ func multiReaderSyncMetaMutilineTest(t *testing.T) {
 	mmr, err := NewReader(meta, c)
 	mmr.SetMode(reader.ReadModeHeadPatternString, "^abc*")
 	mr := mmr.(*Reader)
-	mr.Start()
-	t.Log("mr started")
+	assert.NoError(t, mr.Start())
+	t.Log("Reader has started")
+
+	assert.Equal(t, 15*time.Second, mr.expire)
+	assert.Equal(t, 720*time.Hour, mr.submetaExpire)
+
 	go func() {
 		time.Sleep(15 * time.Second)
 		createFileWithContent(dir2file1, "abc\nx\nabc\ny\nabc\nz\n")
@@ -478,7 +494,7 @@ func multiReaderSyncMetaMutilineTest(t *testing.T) {
 	mmr, err = NewReader(meta, c)
 	mmr.SetMode(reader.ReadModeHeadPatternString, "^abc*")
 	mr = mmr.(*Reader)
-	mr.Start()
+	assert.NoError(t, mr.Start())
 	time.Sleep(100 * time.Millisecond)
 	for {
 		data, err := mr.ReadLine()
@@ -567,8 +583,11 @@ func TestMultiReaderReset(t *testing.T) {
 	mmr, err := NewReader(meta, c)
 	assert.NoError(t, err)
 	mr := mmr.(*Reader)
-	mr.Start()
-	t.Log("mr started")
+	assert.NoError(t, mr.Start())
+	t.Log("Reader has started")
+
+	assert.Equal(t, 24*time.Hour, mr.expire)
+	assert.Equal(t, 720*time.Hour, mr.submetaExpire)
 
 	maxNum := 0
 	spaceNum := 0
@@ -601,7 +620,7 @@ func TestMultiReaderReset(t *testing.T) {
 	assert.NoError(t, err)
 	mmr, err = NewReader(meta, c)
 	mr = mmr.(*Reader)
-	mr.Start()
+	assert.NoError(t, mr.Start())
 	time.Sleep(100 * time.Millisecond)
 	resultMap = make(map[string]int)
 	maxNum = 0
@@ -627,7 +646,6 @@ func TestMultiReaderReset(t *testing.T) {
 }
 
 func TestReaderErrBegin(t *testing.T) {
-
 	dirName := "TestReaderErr"
 	dir := filepath.Join(dirName, "abc")
 	metaDir := filepath.Join(dirName, "meta")
@@ -660,7 +678,7 @@ func TestReaderErrBegin(t *testing.T) {
 	mmr, err := NewReader(meta, c)
 	assert.NoError(t, err)
 	mr := mmr.(*Reader)
-	mr.Start()
+	assert.NoError(t, mr.Start())
 	maxNum := 0
 	for {
 		_, err = mr.ReadLine()
@@ -685,7 +703,6 @@ func TestReaderErrBegin(t *testing.T) {
 }
 
 func TestReaderErrMiddle(t *testing.T) {
-
 	dirName := "TestReaderErr"
 	os.RemoveAll(dirName)
 	dir := filepath.Join(dirName, "abc")
@@ -725,7 +742,7 @@ func TestReaderErrMiddle(t *testing.T) {
 	mmr, err := NewReader(meta, c)
 	assert.NoError(t, err)
 	mr := mmr.(*Reader)
-	mr.Start()
+	assert.NoError(t, mr.Start())
 	maxNum := 0
 	for {
 		_, err = mr.ReadLine()

@@ -8,20 +8,12 @@ import (
 )
 
 type datLocator struct {
+	path       string
 	textData   []byte
 	indexData1 []uint32
 	indexData2 []int
 	indexData3 []int
 	index      []int
-}
-
-// newDatxLocatorWithData returns a new dat format IP loc with given data.
-func newDatLocatorWithData(data []byte) (*datLocator, error) {
-	loc := new(datLocator)
-	if err := loc.init(data); err != nil {
-		return nil, err
-	}
-	return loc, nil
 }
 
 // newDatxLocator returns a new dat format IP loc with given data file.
@@ -31,7 +23,12 @@ func newDatLocator(dataFile string) (*datLocator, error) {
 		return nil, err
 	}
 
-	return newDatLocatorWithData(data)
+	loc := new(datLocator)
+	loc.path = dataFile
+	if err := loc.init(data); err != nil {
+		return nil, err
+	}
+	return loc, nil
 }
 
 func (loc *datLocator) init(data []byte) error {
@@ -140,4 +137,11 @@ func (loc *datLocator) Find(ipstr string) (info *LocationInfo, err error) {
 		return nil, ErrInvalidIP
 	}
 	return loc.FindByUint(binary.BigEndian.Uint32([]byte(ip.To4()))), nil
+}
+
+func (loc *datLocator) Close() error {
+	if loc.index != nil && len(loc.index) > 0 {
+		locatorStore.Remove(loc.path)
+	}
+	return nil
 }

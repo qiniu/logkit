@@ -22,11 +22,17 @@ type MapReplacer struct {
 	Key     string `json:"key"`
 	Map     string `json:"map"`
 	MapFile string `json:"map_file"`
+	New     string `json:"new"`
 	rp      map[string]string
 	stats   StatsInfo
+
+	keys []string
+	news []string
 }
 
 func (g *MapReplacer) Init() error {
+	g.keys = GetKeys(g.Key)
+	g.news = GetKeys(g.New)
 	if g.Map != "" {
 		g.rp = GetMapList(g.Map)
 		if len(g.rp) < 1 {
@@ -46,23 +52,29 @@ func (g *MapReplacer) Init() error {
 	if err != nil {
 		return fmt.Errorf("read %v as mapdata err %v", g.MapFile, err)
 	}
+
 	return nil
 }
 
-func (g *MapReplacer) convert(value string) string {
+func (g *MapReplacer) convert(value string) (string, bool) {
 	ret, ok := g.rp[value]
 	if !ok {
-		return value
+		return value, false
 	}
-	return ret
+	return ret, true
 }
 
 func (g *MapReplacer) Transform(datas []Data) ([]Data, error) {
 	var err, fmtErr error
 	errNum := 0
-	keys := GetKeys(g.Key)
+	if g.rp == nil {
+		err := g.Init()
+		if err != nil {
+			return datas, err
+		}
+	}
 	for i := range datas {
-		val, getErr := GetMapValue(datas[i], keys...)
+		val, getErr := GetMapValue(datas[i], g.keys...)
 		if getErr != nil {
 			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.Key)
 			continue
@@ -88,7 +100,14 @@ func (g *MapReplacer) Transform(datas []Data) ([]Data, error) {
 				continue
 			}
 		}
-		setErr := SetMapValue(datas[i], g.convert(strVal), false, keys...)
+		if len(g.news) == 0 {
+			g.news = g.keys
+		}
+		setVal, set := g.convert(strVal)
+		if !set {
+			continue
+		}
+		setErr := SetMapValue(datas[i], setVal, false, g.news...)
 		if setErr != nil {
 			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.Key)
 		}
@@ -115,6 +134,7 @@ func (g *MapReplacer) SampleConfig() string {
 	return `{
 		"type":"mapreplace",
 		"key":"MapReplaceFieldKey",
+		"new":"MapReplaceFieldNewKey"
 		"map":"abc 123, xyz nihao",
 		"map_file":"/your/path/to/mapfile"
 	}`
@@ -123,14 +143,16 @@ func (g *MapReplacer) SampleConfig() string {
 func (g *MapReplacer) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
+		transforms.KeyFieldNew,
 		{
 			KeyName:      "map",
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     false,
-			Placeholder:  "映射关系",
+			Placeholder:  "download 下载, upload 上传",
 			DefaultNoUse: true,
 			Description:  "映射关系字符串(map)",
+			Advance:      true,
 			ToolTip:      "key value用空格隔开，中间用逗号(,)连接",
 			Type:         transforms.TransformTypeString,
 		},
@@ -142,7 +164,7 @@ func (g *MapReplacer) ConfigOptions() []Option {
 			Placeholder:  "映射关系文件路径",
 			DefaultNoUse: true,
 			Description:  "映射关系文件路径(map_file)",
-			ToolTip:      "文件是json格式的map,字符串对应字符串",
+			ToolTip:      `从文件中读取映射关系，文件必需为json格式，key value必需都为字符串，例如文件中内容为 {"download":"下载","upload":"上传"}`,
 			Type:         transforms.TransformTypeString,
 		},
 	}

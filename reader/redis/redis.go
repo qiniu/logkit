@@ -16,25 +16,39 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var (
+	_ reader.DaemonReader = &Reader{}
+	_ reader.StatsReader  = &Reader{}
+	_ reader.Reader       = &Reader{}
+)
+
 func init() {
 	reader.RegisterConstructor(reader.ModeRedis, NewReader)
 }
 
 type Reader struct {
-	meta   *reader.Meta
-	opts   Options
-	client *redis.Client
+	meta *reader.Meta
+	// Note: 原子操作，用于表示 reader 整体的运行状态
+	status int32
+	/*
+		Note: 原子操作，用于表示获取数据的线程运行状态
 
-	readChan  chan string
-	errChan   chan error
-	channelIn <-chan *redis.Message
+		- StatusInit: 当前没有任务在执行
+		- StatusRunning: 当前有任务正在执行
+		- StatusStopping: 数据管道已经由上层关闭，执行中的任务完成时直接退出无需再处理
+	*/
+	routineStatus int32
 
-	status  int32
-	mux     sync.Mutex
-	started bool
+	stopChan chan struct{}
+	readChan chan string
+	errChan  chan error
 
 	stats     StatsInfo
 	statsLock sync.RWMutex
+
+	opts      Options
+	client    *redis.Client
+	channelIn <-chan *redis.Message
 }
 
 type Options struct {
@@ -50,15 +64,15 @@ type Options struct {
 	timeout time.Duration
 }
 
-func NewReader(meta *reader.Meta, conf conf.MapConf) (rr reader.Reader, err error) {
+func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	dataType, err := conf.GetString(reader.KeyRedisDataType)
 	if err != nil {
-		return
+		return nil, err
 	}
 	db, _ := conf.GetIntOr(reader.KeyRedisDB, 0)
 	key, _ := conf.GetStringList(reader.KeyRedisKey)
 	if err != nil {
-		return
+		return nil, err
 	}
 	area, err := conf.GetString(reader.KeyRedisHashArea)
 	address, _ := conf.GetStringOr(reader.KeyRedisAddress, "127.0.0.1:6379")
@@ -66,7 +80,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (rr reader.Reader, err erro
 	KeyTimeoutDuration, _ := conf.GetStringOr(reader.KeyTimeoutDuration, "5s")
 	timeout, err := time.ParseDuration(KeyTimeoutDuration)
 	if err != nil {
-		return
+		return nil, err
 	}
 	opt := Options{
 		address:  address,
@@ -84,228 +98,239 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (rr reader.Reader, err erro
 	})
 
 	return &Reader{
-		meta:      meta,
-		opts:      opt,
-		client:    client,
-		readChan:  make(chan string),
-		errChan:   make(chan error),
-		status:    reader.StatusInit,
-		mux:       sync.Mutex{},
-		started:   false,
-		statsLock: sync.RWMutex{},
+		meta:          meta,
+		status:        reader.StatusInit,
+		routineStatus: reader.StatusInit,
+		stopChan:      make(chan struct{}),
+		readChan:      make(chan string),
+		errChan:       make(chan error),
+		opts:          opt,
+		client:        client,
 	}, nil
 }
 
-func (rr *Reader) Name() string {
-	return fmt.Sprintf("[%s],[%v],[%s]", rr.opts.dataType, rr.opts.db, rr.opts.key)
+func (r *Reader) isStopping() bool {
+	return atomic.LoadInt32(&r.status) == reader.StatusStopping
 }
 
-func (rr *Reader) setStatsError(err string) {
-	rr.statsLock.Lock()
-	defer rr.statsLock.Unlock()
-	rr.stats.LastError = err
+func (r *Reader) hasStopped() bool {
+	return atomic.LoadInt32(&r.status) == reader.StatusStopped
 }
 
-func (rr *Reader) Status() StatsInfo {
-	rr.statsLock.RLock()
-	defer rr.statsLock.RUnlock()
-	return rr.stats
+func (r *Reader) Name() string {
+	return fmt.Sprintf("[%s],[%v],[%s]", r.opts.dataType, r.opts.db, r.opts.key)
 }
 
-func (rr *Reader) Source() string {
-	return fmt.Sprintf("[%s],[%v],[%s]", rr.opts.dataType, rr.opts.db, rr.opts.key)
+func (_ *Reader) SetMode(_ string, _ interface{}) error {
+	return errors.New("redis reader does not support read mode")
 }
 
-func (rr *Reader) ReadLine() (data string, err error) {
-	if !rr.started {
-		rr.Start()
-	}
-	timer := time.NewTimer(time.Second)
-	select {
-	case dat := <-rr.readChan:
-		data = string(dat)
-	case err = <-rr.errChan:
-	case <-timer.C:
-	}
-	timer.Stop()
-	return
-
-}
-func (rr *Reader) Close() (err error) {
-	if atomic.CompareAndSwapInt32(&rr.status, reader.StatusRunning, reader.StatusStopping) {
-		log.Infof("Runner[%v] %v stopping", rr.meta.RunnerName, rr.Name())
-	} else {
-		atomic.CompareAndSwapInt32(&rr.status, reader.StatusInit, reader.StatusStopped)
-		close(rr.readChan)
-		close(rr.errChan)
-		rr.client.Close()
-	}
-	return
+func (r *Reader) setStatsError(err string) {
+	r.statsLock.Lock()
+	defer r.statsLock.Unlock()
+	r.stats.LastError = err
 }
 
-func (s *Reader) sendError(err error) {
+func (r *Reader) sendError(err error) {
 	if err == nil {
 		return
 	}
 	defer func() {
 		if rec := recover(); rec != nil {
-			log.Errorf("Reader %s panic, recovered from %v", s.Name(), rec)
+			log.Errorf("Reader %q was panicked and recovered from %v", r.Name(), rec)
 		}
 	}()
-	s.errChan <- err
+	r.errChan <- err
 }
 
-func (rr *Reader) SyncMeta() {
-	log.Debugf("Runner[%v] %v redis reader do not support meta sync", rr.meta.RunnerName, rr.Name())
-	return
-}
-
-func (rr *Reader) Start() {
-	rr.mux.Lock()
-	defer rr.mux.Unlock()
-	if rr.started {
+func (r *Reader) run() {
+	// 未在准备状态（StatusInit）时无法执行此次任务
+	if !atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusInit, reader.StatusRunning) {
+		if r.isStopping() || r.hasStopped() {
+			log.Warnf("Runner[%v] %q daemon has stopped, this task does not need to be executed and is skipped this time", r.meta.RunnerName, r.Name())
+		} else {
+			log.Errorf("Runner[%v] %q daemon is still working on last task, this task will not be executed and is skipped this time", r.meta.RunnerName, r.Name())
+		}
 		return
 	}
-	rr.started = true
-	switch rr.opts.dataType {
+	defer func() {
+		// 如果 reader 在 routine 运行时关闭，则需要此 routine 负责关闭数据管道
+		if r.isStopping() || r.hasStopped() {
+			if atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusRunning, reader.StatusStopping) {
+				close(r.readChan)
+				close(r.errChan)
+				r.client.Close()
+			}
+			return
+		}
+		atomic.StoreInt32(&r.routineStatus, reader.StatusInit)
+	}()
+
+	switch r.opts.dataType {
+	case reader.DataTypeChannel, reader.DataTypePatterChannel:
+		message := <-r.channelIn
+		if message != nil {
+			r.readChan <- message.Payload
+		}
+	case reader.DataTypeList:
+		for _, key := range r.opts.key {
+			ans, subErr := r.client.BLPop(r.opts.timeout, key).Result()
+			if subErr != nil && subErr != redis.Nil {
+				err := fmt.Errorf("runner[%v] %v BLPop redis error %v", r.meta.RunnerName, r.Name(), subErr)
+				log.Error(err)
+				r.setStatsError(err.Error())
+				r.sendError(err)
+			} else if len(ans) > 1 {
+				r.readChan <- ans[1]
+			} else if len(ans) == 1 {
+				err := fmt.Errorf("runner[%v] %v list read only one result in arrary %v", r.meta.RunnerName, r.Name(), ans)
+				log.Error(err)
+				r.sendError(err)
+				r.setStatsError(err.Error())
+			}
+		}
+		//Added string support for redis
+	case reader.DataTypeString:
+		for _, key := range r.opts.key {
+			anString, subErr := r.client.Get(key).Result()
+			if subErr != nil && subErr != redis.Nil {
+				err := fmt.Errorf("runner[%v] %v Get redis error %v", r.meta.RunnerName, r.Name(), subErr)
+				log.Error(err)
+				r.sendError(err)
+				r.setStatsError(err.Error())
+			} else if anString != "" {
+				//Avoid data duplication
+				r.client.Del(key)
+				r.readChan <- anString
+			}
+		}
+		//Added set support for redis
+	case reader.DataTypeSet:
+		for _, key := range r.opts.key {
+			anSet, subErr := r.client.SPop(key).Result()
+			if subErr != nil && subErr != redis.Nil {
+				err := fmt.Errorf("runner[%v] %v SPop redis error %v", r.meta.RunnerName, r.Name(), subErr)
+				r.setStatsError(err.Error())
+				r.sendError(err)
+			} else if anSet != "" {
+				r.readChan <- anSet
+			}
+		}
+		//Added sortedSet support for redis
+	case reader.DateTypeSortedSet:
+		for _, key := range r.opts.key {
+			anSortedSet, subErr := r.client.ZRange(key, 0, -1).Result()
+			if subErr != nil && subErr != redis.Nil {
+				err := fmt.Errorf("runner[%v] %v ZRange redis error %v", r.meta.RunnerName, r.Name(), subErr)
+				r.setStatsError(err.Error())
+				r.sendError(err)
+			} else if len(anSortedSet) > 0 {
+				r.client.Del(key)
+				r.readChan <- anSortedSet[0]
+			}
+		}
+		//Added hash support for redis
+	case reader.DateTypeHash:
+		for _, key := range r.opts.key {
+			anHash, subErr := r.client.HGet(key, r.opts.area).Result() //redis key and area for hash
+			if subErr != nil && subErr != redis.Nil {
+				err := fmt.Errorf("runner[%v] %v HGetAll redis error %v", r.meta.RunnerName, r.Name(), subErr)
+				r.setStatsError(err.Error())
+				r.sendError(err)
+			} else if anHash != "" {
+				r.client.Del(key)
+				r.readChan <- anHash
+			}
+		}
+	default:
+		err := fmt.Errorf("data Type < %v > not exist, exit", r.opts.dataType)
+		log.Error(err)
+		r.setStatsError(err.Error())
+		r.sendError(err)
+		return
+	}
+}
+
+func (r *Reader) Start() error {
+	if r.isStopping() || r.hasStopped() {
+		return errors.New("reader is stopping or has stopped")
+	} else if !atomic.CompareAndSwapInt32(&r.status, reader.StatusInit, reader.StatusRunning) {
+		log.Warnf("Runner[%v] %q daemon has already started and is running", r.meta.RunnerName, r.Name())
+		return nil
+	}
+
+	switch r.opts.dataType {
 	case reader.DataTypeChannel:
-		rr.channelIn = rr.client.Subscribe(rr.opts.key...).Channel()
+		r.channelIn = r.client.Subscribe(r.opts.key...).Channel()
 	case reader.DataTypePatterChannel:
-		rr.channelIn = rr.client.PSubscribe(rr.opts.key...).Channel()
+		r.channelIn = r.client.PSubscribe(r.opts.key...).Channel()
 	case reader.DataTypeList:
 	case reader.DataTypeString:
 	case reader.DataTypeSet:
 	case reader.DateTypeSortedSet:
 	case reader.DateTypeHash:
 	default:
-		err := fmt.Errorf("data Type < %v > not exist, exit", rr.opts.dataType)
+		err := fmt.Errorf("data Type < %v > not exist, exit", r.opts.dataType)
 		log.Error(err)
-		return
+		return err
 	}
-	go rr.run()
-	log.Infof("Runner[%v] %v pull data daemon started", rr.meta.RunnerName, rr.Name())
-}
 
-func (rr *Reader) run() (err error) {
-	// 防止并发run
-	for {
-		if atomic.LoadInt32(&rr.status) == reader.StatusStopped || atomic.LoadInt32(&rr.status) == reader.StatusStopping {
-			return
-		}
-		if atomic.CompareAndSwapInt32(&rr.status, reader.StatusInit, reader.StatusRunning) {
-			break
-		}
-		//节省CPU
-		time.Sleep(time.Microsecond)
-	}
-	//double check
-	if atomic.LoadInt32(&rr.status) == reader.StatusStopped || atomic.LoadInt32(&rr.status) == reader.StatusStopping {
-		return
-	}
-	// running在退出状态改为Init
-	defer func() {
-		atomic.CompareAndSwapInt32(&rr.status, reader.StatusRunning, reader.StatusInit)
-		if atomic.CompareAndSwapInt32(&rr.status, reader.StatusStopping, reader.StatusStopped) {
-			close(rr.readChan)
-			close(rr.errChan)
-			rr.client.Close()
-		}
-		if err == nil {
-			log.Infof("Runner[%v] %v successfully finished", rr.meta.RunnerName, rr.Name())
+	go func() {
+		for {
+			r.run()
+
+			select {
+			case <-r.stopChan:
+				atomic.StoreInt32(&r.status, reader.StatusStopped)
+				log.Infof("Runner[%v] %q daemon has stopped from running", r.meta.RunnerName, r.Name())
+				return
+			default:
+			}
 		}
 	}()
-	// 开始work逻辑
-	for {
-		if atomic.LoadInt32(&rr.status) == reader.StatusStopping {
-			log.Warnf("Runner[%v] %v stopped from running", rr.meta.RunnerName, rr.Name())
-			return
-		}
-		switch rr.opts.dataType {
-		case reader.DataTypeChannel, reader.DataTypePatterChannel:
-			message := <-rr.channelIn
-			if message != nil {
-				rr.readChan <- message.Payload
-			}
-		case reader.DataTypeList:
-			for _, key := range rr.opts.key {
-				ans, subErr := rr.client.BLPop(rr.opts.timeout, key).Result()
-				if subErr != nil && subErr != redis.Nil {
-					err = fmt.Errorf("runner[%v] %v BLPop redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
-					log.Error(err)
-					rr.setStatsError(err.Error())
-					rr.sendError(err)
-				} else if len(ans) > 1 {
-					rr.readChan <- ans[1]
-				} else if len(ans) == 1 {
-					err = fmt.Errorf("runner[%v] %v list read only one result in arrary %v", rr.meta.RunnerName, rr.Name(), ans)
-					log.Error(err)
-					rr.sendError(err)
-					rr.setStatsError(err.Error())
-				}
-			}
-			//Added string support for redis
-		case reader.DataTypeString:
-			for _, key := range rr.opts.key {
-				anString, subErr := rr.client.Get(key).Result()
-				if subErr != nil && subErr != redis.Nil {
-					err = fmt.Errorf("runner[%v] %v Get redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
-					log.Error(err)
-					rr.sendError(err)
-					rr.setStatsError(err.Error())
-				} else if anString != "" {
-					//Avoid data duplication
-					rr.client.Del(key)
-					rr.readChan <- anString
-				}
-			}
-			//Added set support for redis
-		case reader.DataTypeSet:
-			for _, key := range rr.opts.key {
-				anSet, subErr := rr.client.SPop(key).Result()
-				if subErr != nil && subErr != redis.Nil {
-					err = fmt.Errorf("runner[%v] %v SPop redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
-					rr.setStatsError(err.Error())
-					rr.sendError(err)
-				} else if anSet != "" {
-					rr.readChan <- anSet
-				}
-			}
-			//Added sortedSet support for redis
-		case reader.DateTypeSortedSet:
-			for _, key := range rr.opts.key {
-				anSortedSet, subErr := rr.client.ZRange(key, 0, -1).Result()
-				if subErr != nil && subErr != redis.Nil {
-					err = fmt.Errorf("runner[%v] %v ZRange redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
-					rr.setStatsError(err.Error())
-					rr.sendError(err)
-				} else if len(anSortedSet) > 0 {
-					rr.client.Del(key)
-					rr.readChan <- anSortedSet[0]
-				}
-			}
-			//Added hash support for redis
-		case reader.DateTypeHash:
-			for _, key := range rr.opts.key {
-				anHash, subErr := rr.client.HGet(key, rr.opts.area).Result() //redis key and area for hash
-				if subErr != nil && subErr != redis.Nil {
-					err = fmt.Errorf("runner[%v] %v HGetAll redis error %v", rr.meta.RunnerName, rr.Name(), subErr)
-					rr.setStatsError(err.Error())
-					rr.sendError(err)
-				} else if anHash != "" {
-					rr.client.Del(key)
-					rr.readChan <- anHash
-				}
-			}
-		default:
-			err = fmt.Errorf("data Type < %v > not exist, exit", rr.opts.dataType)
-			log.Error(err)
-			rr.setStatsError(err.Error())
-			rr.sendError(err)
-			return
-		}
-	}
+	log.Infof("Runner[%v] %q daemon has started", r.meta.RunnerName, r.Name())
+	return nil
 }
 
-func (rr *Reader) SetMode(mode string, v interface{}) error {
-	return errors.New("RedisReader not support read mode")
+func (r *Reader) Source() string {
+	return fmt.Sprintf("[%s],[%v],[%s]", r.opts.dataType, r.opts.db, r.opts.key)
+}
+
+func (r *Reader) ReadLine() (string, error) {
+	timer := time.NewTimer(time.Second)
+	defer timer.Stop()
+	select {
+	case data := <-r.readChan:
+		return data, nil
+	case err := <-r.errChan:
+		return "", err
+	case <-timer.C:
+	}
+
+	return "", nil
+}
+
+func (r *Reader) Status() StatsInfo {
+	r.statsLock.RLock()
+	defer r.statsLock.RUnlock()
+	return r.stats
+}
+
+func (_ *Reader) SyncMeta() {}
+
+func (r *Reader) Close() error {
+	if !atomic.CompareAndSwapInt32(&r.status, reader.StatusRunning, reader.StatusStopping) {
+		log.Warnf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
+		return nil
+	}
+	log.Debugf("Runner[%v] %q daemon is stopping", r.meta.RunnerName, r.Name())
+	close(r.stopChan)
+
+	// 如果此时没有 routine 正在运行，则在此处关闭数据管道，否则由 routine 在退出时负责关闭
+	if atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusInit, reader.StatusStopping) {
+		close(r.readChan)
+		close(r.errChan)
+		r.client.Close()
+	}
+	return nil
 }

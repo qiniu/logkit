@@ -540,18 +540,52 @@ func (m *Manager) Status() (rss map[string]RunnerStatus) {
 	for key, conf := range m.runnerConfig {
 		if r, ex := m.runners[key]; ex {
 			rss[r.Name()] = r.Status()
-		} else {
-			rss[conf.RunnerName] = RunnerStatus{
-				Name:           conf.RunnerName,
-				ReaderStats:    StatsInfo{},
-				ParserStats:    StatsInfo{},
-				TransformStats: make(map[string]StatsInfo),
-				SenderStats:    make(map[string]StatsInfo),
-				RunningStatus:  RunnerStopped,
-			}
+			continue
+		}
+		rss[conf.RunnerName] = RunnerStatus{
+			Name:           conf.RunnerName,
+			ReaderStats:    StatsInfo{},
+			ParserStats:    StatsInfo{},
+			TransformStats: make(map[string]StatsInfo),
+			SenderStats:    make(map[string]StatsInfo),
+			RunningStatus:  RunnerStopped,
 		}
 	}
-	return
+	return rss
+}
+
+func (m *Manager) Errors() (rss map[string]ErrorsResult) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	rss = make(map[string]ErrorsResult)
+	for key, conf := range m.runnerConfig {
+		if r, ex := m.runners[key]; ex {
+			if runnerErr, ok := r.(RunnerErrors); ok {
+				rss[r.Name()] = runnerErr.GetErrors()
+				continue
+			}
+		}
+		rss[conf.RunnerName] = ErrorsResult{}
+	}
+	return rss
+}
+
+func (m *Manager) Error(name string) (rss ErrorsResult, err error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	for key := range m.runnerConfig {
+		if r, ex := m.runners[key]; ex {
+			if r.Name() != name {
+				continue
+			}
+
+			if runnerErr, ok := r.(RunnerErrors); ok {
+				return runnerErr.GetErrors(), nil
+			}
+			return rss, ErrNotSupport
+		}
+	}
+	return rss, ErrNotExist
 }
 
 func (m *Manager) Configs() (rss map[string]RunnerConfig) {

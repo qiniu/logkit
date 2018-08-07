@@ -55,30 +55,30 @@ const (
 
 // ModeUsages 和 ModeTooltips 用途说明
 var (
-	ModeUsages = []KeyValue{
-		{TypeRaw, "按原始日志逐行发送"},
-		{TypeJSON, "按 json 格式解析"},
-		{TypeNginx, "按 nginx 日志解析"},
-		{TypeGrok, "按 grok 格式解析"},
-		{TypeCSV, "按 csv 格式解析"},
-		{TypeSyslog, "按 syslog 格式解析"},
-		{TypeLogv1, "按七牛日志库格式解析"},
-		{TypeKafkaRest, "按 kafkarest 日志解析"},
-		{TypeEmpty, "通过解析清空数据"},
-		{TypeMySQL, "按 mysql 慢请求日志解析"},
+	ModeUsages = KeyValueSlice{
+		{TypeRaw, "按原始日志逐行发送", ""},
+		{TypeJSON, "按 json 格式解析", ""},
+		{TypeNginx, "按 nginx 日志解析", ""},
+		{TypeGrok, "按 grok 格式解析", ""},
+		{TypeCSV, "按 csv 格式解析", ""},
+		{TypeSyslog, "按 syslog 格式解析", ""},
+		{TypeLogv1, "按七牛日志库格式解析", ""},
+		{TypeKafkaRest, "按 kafkarest 日志解析", ""},
+		{TypeEmpty, "通过解析清空数据", ""},
+		{TypeMySQL, "按 mysql 慢请求日志解析", ""},
 	}
 
-	ModeToolTips = []KeyValue{
-		{TypeRaw, "将日志文件的每一行解析为一条日志，解析后的日志由两个字段，raw和timestamp，前者是日志，后者为解析该条日志的时间戳。"},
-		{TypeJSON, "通过json反序列化解析日志的方式。若日志的json格式不规范，则解析失败，解析失败的数据会被忽略。"},
-		{TypeNginx, "是专门解析Nginx日志的解析器。仅需指定nginx的配置文件地址，即可进行nginx日志解析。"},
-		{TypeGrok, "类似于Logstash Grok Parser一样的解析配置方式，其本质是按照正则表达式匹配解析日志。"},
-		{TypeCSV, "按行读取日志，对于每一行，以分隔符分隔，然后通过csv_schema命名分隔出来的字段名称以及字段类型。默认情况下CSV是按\t分隔日志的，可以配置的分隔符包括但不限于, 各类字母、数字、特殊符号(#、!、*、@、%、^、...)等等。"},
-		{TypeSyslog, " 是直接根据 RFC3164/RFC5424 规则解析syslog数据的解析器，使用该解析器请确保日志数据严格按照RFC协议规则配置，否则该解析器将无法正确解析。该解析器能够自动识别多行构成的同一条日志。"},
-		{TypeLogv1, " 为使用了七牛开源的Golang日志库(https://github.com/qiniu/log) 生成的日志提供的解析方式。"},
-		{TypeKafkaRest, "将Kafka Rest日志文件的每一行解析为一条结构化的日志."},
-		{TypeEmpty, "通过解析清空数据"},
-		{TypeMySQL, "解析mysql的慢请求日志。"},
+	ModeToolTips = KeyValueSlice{
+		{TypeRaw, "将日志文件的每一行解析为一条日志，解析后的日志由两个字段，raw和timestamp，前者是日志，后者为解析该条日志的时间戳。", ""},
+		{TypeJSON, "通过json反序列化解析日志的方式。若日志的json格式不规范，则解析失败，解析失败的数据会被忽略。", ""},
+		{TypeNginx, "是专门解析Nginx日志的解析器。仅需指定nginx的配置文件地址，即可进行nginx日志解析。", ""},
+		{TypeGrok, "类似于Logstash Grok Parser一样的解析配置方式，其本质是按照正则表达式匹配解析日志。", ""},
+		{TypeCSV, "按行读取日志，对于每一行，以分隔符分隔，然后通过csv_schema命名分隔出来的字段名称以及字段类型。默认情况下CSV是按\t分隔日志的，可以配置的分隔符包括但不限于, 各类字母、数字、特殊符号(#、!、*、@、%、^、...)等等。", ""},
+		{TypeSyslog, " 是直接根据 RFC3164/RFC5424 规则解析syslog数据的解析器，使用该解析器请确保日志数据严格按照RFC协议规则配置，否则该解析器将无法正确解析。该解析器能够自动识别多行构成的同一条日志。", ""},
+		{TypeLogv1, " 为使用了七牛开源的Golang日志库(https://github.com/qiniu/log) 生成的日志提供的解析方式。", ""},
+		{TypeKafkaRest, "将Kafka Rest日志文件的每一行解析为一条结构化的日志.", ""},
+		{TypeEmpty, "通过解析清空数据", ""},
+		{TypeMySQL, "解析mysql的慢请求日志。", ""},
 	}
 )
 
@@ -97,14 +97,13 @@ var (
 	}
 
 	OptionLabels = Option{
-		KeyName:       KeyLabels,
-		ChooseOnly:    false,
-		Default:       "",
-		DefaultNoUse:  false,
-		Description:   "额外的标签信息(labels)",
-		Advance:       true,
-		ToolTip:       `额外的标签信息，同样逗号分隔，如 "app logkit, user pandora"`,
-		ToolTipActive: true,
+		KeyName:      KeyLabels,
+		ChooseOnly:   false,
+		Default:      "",
+		DefaultNoUse: false,
+		Description:  "额外的标签信息(labels)",
+		Advance:      true,
+		ToolTip:      `额外的标签信息，同样逗号分隔，如 "app logkit, user pandora"`,
 	}
 
 	OptionDisableRecordErrData = Option{
@@ -156,14 +155,13 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "nginx日志格式名称(nginx_log_format_name)",
 		},
 		{
-			KeyName:       NginxSchema,
-			ChooseOnly:    false,
-			Default:       "",
-			DefaultNoUse:  false,
-			Description:   "手动指定字段类型(nginx_schema)",
-			Advance:       true,
-			ToolTip:       `nginx日志都被解析为string，指定该格式可以设置为float、long、date三种类型。如 time_local date,bytes_sent long,request_time float`,
-			ToolTipActive: true,
+			KeyName:      NginxSchema,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "手动指定字段类型(nginx_schema)",
+			Advance:      true,
+			ToolTip:      `nginx日志都被解析为string，指定该格式可以设置为float、long、date三种类型。如 time_local date,bytes_sent long,request_time float`,
 		},
 		{
 			KeyName:      NginxFormatRegex,
@@ -180,15 +178,14 @@ var ModeKeyOptions = map[string][]Option{
 	},
 	TypeGrok: {
 		{
-			KeyName:       KeyGrokPatterns,
-			ChooseOnly:    false,
-			Default:       "%{COMMON_LOG_FORMAT}",
-			Placeholder:   "%{COMMON_LOG_FORMAT}",
-			Required:      true,
-			DefaultNoUse:  true,
-			Description:   "匹配日志的grok表达式(grok_patterns)",
-			ToolTip:       `用于匹配日志的grok表达式，多个用逗号分隔，如 "%{COMMON_LOG_FORMAT},%{QINIU_LOG_FORMAT}"`,
-			ToolTipActive: true,
+			KeyName:      KeyGrokPatterns,
+			ChooseOnly:   false,
+			Default:      "%{COMMON_LOG_FORMAT}",
+			Placeholder:  "%{COMMON_LOG_FORMAT}",
+			Required:     true,
+			DefaultNoUse: true,
+			Description:  "匹配日志的grok表达式(grok_patterns)",
+			ToolTip:      `用于匹配日志的grok表达式，多个用逗号分隔，如 "%{COMMON_LOG_FORMAT},%{QINIU_LOG_FORMAT}"`,
 		},
 		{
 			KeyName:      KeyGrokCustomPatterns,
@@ -218,7 +215,7 @@ var ModeKeyOptions = map[string][]Option{
 			ChooseOnly:   false,
 			Default:      ",",
 			Placeholder:  ",",
-			Required:     true,
+			Required:     false,
 			DefaultNoUse: false,
 			Description:  "分隔符(csv_splitter)",
 			ToolTip:      `csv_splitter csv文件的分隔符定义，默认为','`,

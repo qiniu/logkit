@@ -10,31 +10,45 @@ import (
 var (
 	_ transforms.StatsTransformer = &Rename{}
 	_ transforms.Transformer      = &Rename{}
+	_ transforms.Initializer      = &Rename{}
 )
 
 type Rename struct {
 	Key        string `json:"key"`
 	NewKeyName string `json:"new_key_name"`
+	NewKey     string `json:"new"`
 	stats      StatsInfo
+
+	keys []string
+	news []string
 }
 
+func (g *Rename) Init() error {
+	g.keys = GetKeys(g.Key)
+	if g.NewKey == "" {
+		g.NewKey = g.NewKeyName
+	}
+	g.news = GetKeys(g.NewKey)
+	return nil
+}
 func (g *Rename) RawTransform(datas []string) ([]string, error) {
 	return datas, errors.New("rename transformer not support rawTransform")
 }
 
 func (g *Rename) Transform(datas []Data) ([]Data, error) {
+	if g.keys == nil {
+		g.Init()
+	}
 	var err, fmtErr error
 	errNum := 0
-	keySlice := GetKeys(g.Key)
-	newKeySlice := GetKeys(g.NewKeyName)
 	for i := range datas {
-		val, getErr := GetMapValue(datas[i], keySlice...)
+		val, getErr := GetMapValue(datas[i], g.keys...)
 		if getErr != nil {
 			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.Key)
 			continue
 		}
-		DeleteMapValue(datas[i], keySlice...)
-		setErr := SetMapValue(datas[i], val, false, newKeySlice...)
+		DeleteMapValue(datas[i], g.keys...)
+		setErr := SetMapValue(datas[i], val, false, g.news...)
 		if setErr != nil {
 			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.NewKeyName)
 		}
@@ -64,16 +78,7 @@ func (g *Rename) SampleConfig() string {
 func (g *Rename) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
-		{
-			KeyName:      "new_key_name",
-			ChooseOnly:   false,
-			Default:      "",
-			Required:     true,
-			Placeholder:  "new_key_name",
-			DefaultNoUse: true,
-			Description:  "修改后的字段名(new_key_name)",
-			Type:         transforms.TransformTypeString,
-		},
+		transforms.KeyFieldNewRequired,
 	}
 }
 

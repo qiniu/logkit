@@ -13,12 +13,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/labstack/echo"
+
+	"github.com/qiniu/log"
+
 	"github.com/qiniu/logkit/parser"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
-
-	"github.com/labstack/echo"
-	"github.com/qiniu/log"
 )
 
 var DEFAULT_PORT = 3000
@@ -53,6 +54,10 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	}
 	rs.cluster.mutex = new(sync.RWMutex)
 	router.GET(PREFIX+"/status", rs.Status())
+
+	// 获取历史 errors API
+	router.GET(PREFIX+"/errors", rs.GetErrors())
+	router.GET(PREFIX+"/errors/:name", rs.GetError())
 
 	// error code humanize
 	router.GET(PREFIX+"/errorcode", rs.GetErrorCodeHumanize())
@@ -243,6 +248,30 @@ func (rs *RestService) Status() echo.HandlerFunc {
 				v.Url = rs.cluster.Address
 				rss[k] = v
 			}
+		}
+		return RespSuccess(c, rss)
+	}
+}
+
+// get /logkit/errors
+func (rs *RestService) GetErrors() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		return RespSuccess(c, rs.mgr.Errors())
+	}
+}
+
+// get /logkit/errors/<name>
+func (rs *RestService) GetError() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		var name string
+		if name = c.Param("name"); name == "" {
+			errMsg := "runner name is empty"
+			return RespError(c, http.StatusBadRequest, ErrRunnerAdd, errMsg)
+		}
+
+		rss, err := rs.mgr.Error(name)
+		if err != nil {
+			return RespError(c, http.StatusBadRequest, ErrRunnerErrorGet, err.Error())
 		}
 		return RespSuccess(c, rss)
 	}

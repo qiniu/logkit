@@ -18,6 +18,7 @@ import (
 var (
 	_ transforms.StatsTransformer = &Script{}
 	_ transforms.Transformer      = &Script{}
+	_ transforms.Initializer      = &Script{}
 )
 
 type Script struct {
@@ -79,7 +80,7 @@ func (g *Script) Transform(datas []Data) ([]Data, error) {
 	}
 	scriptPath, err := checkPath(g.storePath)
 	if err != nil {
-		g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+		g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(1), int64(len(datas)), g.Type())
 		return datas, fmtErr
 	}
 
@@ -223,6 +224,7 @@ func (g *Script) ConfigOptions() []Option {
 			Default:      "",
 			DefaultNoUse: false,
 			Description:  "指定脚本内容(script)",
+			Advance:      true,
 			Type:         transforms.TransformTypeString,
 		},
 	}

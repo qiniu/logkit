@@ -14,22 +14,32 @@ import (
 var (
 	_ transforms.StatsTransformer = &Xml{}
 	_ transforms.Transformer      = &Xml{}
+	_ transforms.Initializer      = &Xml{}
 )
 
 type Xml struct {
 	Key   string `json:"key"`
 	New   string `json:"new"`
 	stats StatsInfo
+
+	keys []string
+	news []string
+}
+
+func (g *Xml) Init() error {
+	g.keys = GetKeys(g.Key)
+	g.news = GetKeys(g.New)
+	return nil
 }
 
 func (g *Xml) Transform(datas []Data) ([]Data, error) {
 	var err, fmtErr error
 	errNum := 0
-	keys := GetKeys(g.Key)
-	news := GetKeys(g.New)
-
+	if g.keys == nil {
+		g.Init()
+	}
 	for i := range datas {
-		val, getErr := GetMapValue(datas[i], keys...)
+		val, getErr := GetMapValue(datas[i], g.keys...)
 		if getErr != nil {
 			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.Key)
 			continue
@@ -49,11 +59,11 @@ func (g *Xml) Transform(datas []Data) ([]Data, error) {
 			errNum, err = transforms.SetError(errNum, perr, transforms.General, "")
 			continue
 		}
-		if len(news) == 0 {
-			DeleteMapValue(datas[i], keys...)
-			news = keys
+		if len(g.news) == 0 {
+			DeleteMapValue(datas[i], g.keys...)
+			g.news = g.keys
 		}
-		setErr := SetMapValue(datas[i], xmlVal, false, news...)
+		setErr := SetMapValue(datas[i], xmlVal, false, g.news...)
 		if setErr != nil {
 			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
 		}

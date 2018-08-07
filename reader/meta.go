@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/json-iterator/go"
@@ -16,6 +17,7 @@ import (
 	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
 )
@@ -29,7 +31,7 @@ const (
 	lineCacheFilePath = "cache.dat"
 	statisticFileName = "statistic.meta"
 	doneFileRetention = "donefile_retention"
-	ftSaveLogPath     = "ft_log" // ft log 在 meta 中的文件夹名字
+	FtSaveLogPath     = "ft_log" // ft log 在 meta 中的文件夹名字
 )
 
 const (
@@ -42,9 +44,13 @@ const (
 )
 
 type Statistic struct {
-	ReaderCnt int64               `json:"reader_count"` // 读取总条数
-	ParserCnt [2]int64            `json:"parser_connt"` // [解析成功, 解析失败]
-	SenderCnt map[string][2]int64 `json:"sender_count"` // [发送成功, 发送失败]
+	ReaderCnt       int64                 `json:"reader_count"` // 读取总条数
+	ParserCnt       [2]int64              `json:"parser_connt"` // [解析成功, 解析失败]
+	SenderCnt       map[string][2]int64   `json:"sender_count"` // [发送成功, 发送失败]
+	ReadErrors      ErrorQueue            `json:"read_errors"`
+	ParseErrors     ErrorQueue            `json:"parse_errors"`
+	TransformErrors map[string]ErrorQueue `json:"transform_errors"`
+	SendErrors      map[string]ErrorQueue `json:"send_errors"`
 }
 
 type Meta struct {
@@ -67,7 +73,10 @@ type Meta struct {
 	RunnerName        string
 	extrainfo         map[string]string
 
-	subMetas map[string]*Meta //对于tailx模式的情况会有嵌套的meta
+	subMetaLock        sync.RWMutex
+	subMetas           map[string]*Meta // 对于 tailx 和 dirx 模式的情况会有嵌套的 meta
+	subMetaExpiredLock sync.Mutex
+	subMetaExpired     map[string]bool // 上次扫描后已知的过期 submeta
 }
 
 func getValidDir(dir string) (realPath string, err error) {
@@ -118,7 +127,7 @@ func NewMeta(metadir, filedonedir, logpath, mode, tagfile string, donefileRetent
 		bufMetaFilePath:   filepath.Join(metadir, bufMetaFilePath),
 		lineCacheFile:     filepath.Join(metadir, lineCacheFilePath),
 		statisticPath:     filepath.Join(metadir, statisticFileName),
-		ftSaveLogPath:     filepath.Join(metadir, ftSaveLogPath),
+		ftSaveLogPath:     filepath.Join(metadir, FtSaveLogPath),
 		donefileretention: donefileRetention,
 		logpath:           logpath,
 		TagFile:           tagfile,
@@ -126,6 +135,7 @@ func NewMeta(metadir, filedonedir, logpath, mode, tagfile string, donefileRetent
 		tags:              tags,
 		Readlimit:         defaultIOLimit * 1024 * 1024,
 		subMetas:          make(map[string]*Meta),
+		subMetaExpired:    make(map[string]bool),
 	}, nil
 }
 
@@ -191,6 +201,9 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 }
 
 func (m *Meta) AddSubMeta(key string, meta *Meta) error {
+	m.subMetaLock.Lock()
+	defer m.subMetaLock.Unlock()
+
 	if m.subMetas == nil {
 		m.subMetas = make(map[string]*Meta)
 	}
@@ -202,7 +215,84 @@ func (m *Meta) AddSubMeta(key string, meta *Meta) error {
 }
 
 func (m *Meta) RemoveSubMeta(key string) {
+	m.subMetaLock.Lock()
+	defer m.subMetaLock.Unlock()
+
 	delete(m.subMetas, key)
+}
+
+const (
+	minimumSubMetaExpire          = 24 * time.Hour
+	maximumSubMetaCleanNumOneTime = 5
+)
+
+func hasSubMetaExpired(path string, expire time.Duration) bool {
+	// 为防止用户上层设置不准确导致误删 submeta 重复处理数据，设定一个最小阈值
+	if expire < minimumSubMetaExpire {
+		expire = minimumSubMetaExpire
+	}
+
+	// 只有存在 file.meta 文件的子目录是 submeta
+	fileMetaPath := filepath.Join(path, metaFileName)
+	if !utils.IsExist(fileMetaPath) {
+		return false
+	}
+
+	fi, err := os.Stat(fileMetaPath)
+	if err != nil {
+		log.Errorf("Failed to stat file %q: %v", fileMetaPath, err)
+		return false
+	}
+
+	return fi.ModTime().Add(expire).Before(time.Now())
+}
+
+// CheckExpiredSubMetas 仅用于轮询收集所有过期的 submeta，清理操作应通过调用 CleanExpiredSubMetas 方法完成。
+// 一般情况下，应由 reader 实现启动 goroutine 单独调用以避免 submeta 数量过多导致进程被长时间阻塞。
+// 另外，如果 submeta 没有存放在该 meta 的子目录则调用此方法无效
+func (m *Meta) CheckExpiredSubMetas(expire time.Duration) {
+	if err := filepath.Walk(m.Dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.Errorf("Failed to get directory entry[%v] info: %v", path, err)
+			return nil
+		} else if !info.IsDir() || m.Dir == path {
+			return nil
+		}
+
+		if hasSubMetaExpired(path, expire) {
+			m.subMetaExpiredLock.Lock()
+			m.subMetaExpired[path] = true
+			m.subMetaExpiredLock.Unlock()
+		}
+
+		return filepath.SkipDir
+	}); err != nil {
+		log.Errorf("Failed to walk directory[%v]: %v", m.Dir, err)
+	}
+}
+
+// CleanExpiredSubMetas 清除超过指定过期时长的 submeta 目录，清理数目单次调用存在上限以减少阻塞时间
+func (m *Meta) CleanExpiredSubMetas(expire time.Duration) {
+	m.subMetaExpiredLock.Lock()
+	defer m.subMetaExpiredLock.Unlock()
+
+	numCleaned := 0
+	for path := range m.subMetaExpired {
+		if numCleaned >= maximumSubMetaCleanNumOneTime {
+			log.Infof("Cleaned %d expired submeta of %q, there are %d left and will be cleaned next time", numCleaned, path, len(m.subMetaExpired))
+			break
+		}
+
+		// 二次确认 submeta 目录在删除前的一刻仍旧是过期状态才执行删除操作
+		if hasSubMetaExpired(path, expire) {
+			numCleaned++
+			err := os.RemoveAll(path)
+			log.Infof("Expired submeta %q has been removed with error %v", path, err)
+		}
+		delete(m.subMetaExpired, path)
+	}
+
+	log.Debugf("Meta %q has finished cleaning submetas", m.Dir)
 }
 
 func (m *Meta) IsExist() bool {
@@ -347,7 +437,7 @@ func (m *Meta) ReadOffset() (currFile string, offset int64, err error) {
 func (m *Meta) ReadDBDoneFile(database string) (content []string, err error) {
 	doneFiles, err := m.GetDoneFiles()
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	for _, f := range doneFiles {
@@ -355,12 +445,12 @@ func (m *Meta) ReadDBDoneFile(database string) (content []string, err error) {
 		if filepath.Base(f.Path) == filename {
 			content, err = ReadFileContent(f.Path)
 			if err != nil {
-				return
+				return nil, err
 			}
-			return
+			return nil, err
 		}
 	}
-	return
+	return content, nil
 }
 
 // ReadRecordsFile 读取当前runner已经读取的表
@@ -543,7 +633,11 @@ func (m *Meta) GetDoneFiles() ([]File, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	//submeta
+	m.subMetaLock.RLock()
+	defer m.subMetaLock.RUnlock()
+
 	for _, mv := range m.subMetas {
 		newfiles, err := mv.GetDoneFiles()
 		if err != nil {
@@ -584,6 +678,10 @@ func (m *Meta) SetEncodingWay(e string) {
 	if e != "UTF-8" {
 		m.encodingWay = e
 	}
+
+	m.subMetaLock.RLock()
+	defer m.subMetaLock.RUnlock()
+
 	for _, mv := range m.subMetas {
 		mv.SetEncodingWay(e)
 	}
@@ -640,6 +738,10 @@ func (m *Meta) Reset() error {
 			}
 		}
 	}
+
+	m.subMetaLock.RLock()
+	defer m.subMetaLock.RUnlock()
+
 	for key, mv := range m.subMetas {
 		err := mv.Reset()
 		if err != nil {

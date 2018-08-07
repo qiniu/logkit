@@ -2,6 +2,7 @@ package mgr
 
 import (
 	"net/http"
+	"sort"
 
 	"github.com/qiniu/logkit/router"
 	"github.com/qiniu/logkit/sender"
@@ -16,6 +17,7 @@ const KeyRouterConfig = "router"
 // get /logkit/sender/usages 获取sender用途说明
 func (rs *RestService) GetSenderUsages() echo.HandlerFunc {
 	return func(c echo.Context) error {
+		sort.Stable(sender.ModeUsages)
 		return RespSuccess(c, sender.ModeUsages)
 	}
 }
