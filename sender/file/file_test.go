@@ -74,7 +74,7 @@ func TestFileSender(t *testing.T) {
 		// 首次写入内容，相同文件的应该写在同一行
 		assert.NoError(t, fsender.Send([]Data{
 			{"abc": 123},
-			{"def": 456, "timestamp": "2018-08-08T15:04:05Z"},
+			{"def": 456, "timestamp": "2018-07-08T15:04:05Z"},
 			{"abc": 789},
 			{"abc": 135},
 		}))
@@ -83,7 +83,7 @@ func TestFileSender(t *testing.T) {
 		time.Sleep(1 * time.Second)
 		// 新开一个文件，应当有一个句柄被自动清理
 		assert.NoError(t, fsender.Send([]Data{
-			{"def": 456, "timestamp": "2018-08-07T15:04:05Z"},
+			{"def": 456, "timestamp": "2018-07-07T15:04:05Z"},
 		}))
 		assert.Len(t, fsender.(*Sender).writers.writers, 2)
 
@@ -101,11 +101,11 @@ func TestFileSender(t *testing.T) {
 [{"abc":123}]
 `, string(body))
 
-		body, err = ioutil.ReadFile(filepath.Join(path, "20180808-3.log"))
+		body, err = ioutil.ReadFile(filepath.Join(path, "20180708-3.log"))
 		assert.NoError(t, err)
 		assert.True(t, strings.Contains(string(body), `"def":456`))
 
-		body, err = ioutil.ReadFile(filepath.Join(path, "20180807-3.log"))
+		body, err = ioutil.ReadFile(filepath.Join(path, "20180707-3.log"))
 		assert.NoError(t, err)
 		assert.True(t, strings.Contains(string(body), `"def":456`))
 	}
