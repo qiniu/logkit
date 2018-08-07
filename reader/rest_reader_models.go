@@ -128,6 +128,7 @@ const (
 	// socket_service_address = "unix:///tmp/sys.sock"
 	// socket_service_address = "unixgram:///tmp/sys.sock"
 	KeySocketServiceAddress = "socket_service_address"
+	KeySocketSplitByLine    = "socket_split_by_line"
 
 	// 最大并发连接数
 	// 仅用于 stream sockets (e.g. TCP).
@@ -1049,6 +1050,16 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "最大并发连接数(socket_max_connections)",
 			Advance:      true,
 			ToolTip:      "仅tcp协议下生效",
+		},
+		{
+			KeyName:       KeySocketSplitByLine,
+			Element:       Radio,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"false", "true"},
+			Default:       "false",
+			Advance:       true,
+			Description:   "是否按行分隔内容(socket_split_by_line)",
+			ToolTip:       "开启后，对socket内容按行进行分隔",
 		},
 		{
 			KeyName:      KeySocketReadTimeout,
