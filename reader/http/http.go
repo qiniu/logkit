@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -16,7 +18,6 @@ import (
 	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/queue"
 	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -37,16 +38,22 @@ func init() {
 	reader.RegisterConstructor(reader.ModeHTTP, NewReader)
 }
 
+type Details struct {
+	Content string
+	Path    string
+}
+
 type Reader struct {
 	meta *reader.Meta
 	// Note: 原子操作，用于表示 reader 整体的运行状态
 	status int32
 
-	bufQueue queue.BackendQueue
-	readChan <-chan []byte
+	readChan chan Details
 
-	address string
-	path    string
+	currentPath string
+	address     string
+	paths       []string
+	wg          sync.WaitGroup
 
 	server *http.Server
 }
@@ -54,10 +61,18 @@ type Reader struct {
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	address, _ := conf.GetStringOr(reader.KeyHTTPServiceAddress, reader.DefaultHTTPServiceAddress)
 	path, _ := conf.GetStringOr(reader.KeyHTTPServicePath, reader.DefaultHTTPServicePath)
+	paths := strings.Split(path, ",")
+	for _, val := range paths {
+		if strings.TrimSpace(val) == "" {
+			log.Infof("path[%v] have space,space have ignored", path)
+			continue
+		}
+		if !strings.HasPrefix(val, "/") {
+			return nil, fmt.Errorf("path[%v] is incorrect,it's beginning must be '/'", val)
+		}
+	}
 	address, _ = RemoveHttpProtocal(address)
 
-	bq := queue.NewDiskQueue(Hash("Reader<"+address+">_buffer"), meta.BufFile(), DefaultMaxBytesPerFile, 0,
-		DefaultMaxBytesPerFile, DefaultSyncEvery, DefaultSyncEvery, time.Second*2, DefaultWriteSpeedLimit, false, 0)
 	err := CreateDirIfNotExist(meta.BufFile())
 	if err != nil {
 		return nil, err
@@ -65,10 +80,9 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	return &Reader{
 		meta:     meta,
 		status:   reader.StatusInit,
-		bufQueue: bq,
-		readChan: bq.ReadChan(),
+		readChan: make(chan Details, len(paths)),
 		address:  address,
-		path:     path,
+		paths:    paths,
 	}, nil
 }
 
@@ -97,7 +111,9 @@ func (r *Reader) Start() error {
 	}
 
 	e := echo.New()
-	e.POST(r.path, r.postData())
+	for _, path := range r.paths {
+		e.POST(path, r.postData())
+	}
 
 	r.server = &http.Server{
 		Handler: e,
@@ -113,15 +129,21 @@ func (r *Reader) Start() error {
 }
 
 func (r *Reader) Source() string {
-	return r.address
+	return r.address + r.currentPath
 }
 
 func (r *Reader) ReadLine() (string, error) {
 	timer := time.NewTimer(time.Second)
 	defer timer.Stop()
 	select {
-	case data := <-r.readChan:
-		return string(data), nil
+	case data, ok := <-r.readChan:
+		// Note:防止waitgroup.wait()已经通过的情况下再次调用waitgroup.done()
+		if ok {
+			//Note：确保所有数据被读取后，再关闭channel
+			r.wg.Done()
+		}
+		r.currentPath = data.Path
+		return data.Content, nil
 	case <-timer.C:
 	}
 
@@ -136,11 +158,12 @@ func (r *Reader) Close() error {
 		return nil
 	}
 	log.Debugf("Runner[%v] %q daemon is stopping", r.meta.RunnerName, r.Name())
-
 	r.server.Shutdown(context.Background())
-	err := r.bufQueue.Close()
+	//Note：确保所有数据被读取后，再关闭channel
+	r.wg.Wait()
+	close(r.readChan)
 	atomic.StoreInt32(&r.status, reader.StatusStopped)
-	return err
+	return nil
 }
 
 func (r *Reader) postData() echo.HandlerFunc {
@@ -167,10 +190,10 @@ func (r *Reader) pickUpData(req *http.Request) (err error) {
 		}
 	}
 	br := bufio.NewReader(reqBody)
-	return r.storageData(br)
+	return r.storageData(br, req.RequestURI)
 }
 
-func (r *Reader) storageData(br *bufio.Reader) (err error) {
+func (r *Reader) storageData(br *bufio.Reader, path string) (err error) {
 	for {
 		line, err := r.readLine(br)
 		if err != nil {
@@ -182,7 +205,14 @@ func (r *Reader) storageData(br *bufio.Reader) (err error) {
 		if line == "" {
 			continue
 		}
-		r.bufQueue.Put([]byte(line))
+		if atomic.LoadInt32(&r.status) == reader.StatusStopped || atomic.LoadInt32(&r.status) == reader.StatusStopping {
+			return err
+		}
+		r.wg.Add(1)
+		r.readChan <- Details{
+			Content: line,
+			Path:    path,
+		}
 	}
 	return
 }
