@@ -621,6 +621,7 @@ func TrimSecretInfo(conf RunnerConfig, trimSk bool) RunnerConfig {
 	keyName := []string{
 		prefix + "pipeline_get_repo_token",
 		prefix + "pipeline_post_data_token",
+		prefix + "pipeline_post_rawtext_data_token",
 		prefix + "pipeline_create_repo_token",
 		prefix + "pipeline_update_repo_token",
 		prefix + "pipeline_get_workflow_token",
