@@ -6,10 +6,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"testing"
-	"time"
 	"strings"
 	"sync"
+	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 

@@ -6,9 +6,9 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
-	"sync"
 
 	"github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"

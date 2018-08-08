@@ -273,6 +273,9 @@ func (m *Manager) ForkRunner(confPath string, nconf RunnerConfig, errReturn bool
 			} else {
 				webornot = "Terminal"
 			}
+			if nconf.SendersConfig[k] == nil {
+				return fmt.Errorf("%s sender config is invalid", confPath)
+			}
 			nconf.SendersConfig[k][sender.InnerUserAgent] = "logkit/" + m.Version + " " + m.SystemInfo + " " + webornot
 		}
 

@@ -5,13 +5,13 @@ import (
 	"compress/gzip"
 	"io/ioutil"
 	"os"
-	"testing"
-	"time"
 	"strings"
 	"sync"
+	"testing"
+	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/json-iterator/go"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
