@@ -374,7 +374,7 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 			info.Success += int64(len(datas))
 		}
 		if err != nil {
-			info.LastError = err.Error()
+			info.LastError = TruncateErrorSize(err.Error())
 			now := time.Now().UnixNano()
 			if r.rs.HistoryErrors.SendErrors == nil {
 				r.rs.HistoryErrors.SendErrors = make(map[string]*ErrorQueue)
@@ -382,7 +382,7 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 			if r.rs.HistoryErrors.SendErrors[s.Name()] == nil {
 				r.rs.HistoryErrors.SendErrors[s.Name()] = NewErrorQueue(r.ErrorsListCap)
 			}
-			r.rs.HistoryErrors.SendErrors[s.Name()].Put(ErrorInfo{err.Error(), now, 0})
+			r.rs.HistoryErrors.SendErrors[s.Name()].Put(ErrorInfo{info.LastError, now, 0})
 			//FaultTolerant Sender 正常的错误会在backupqueue里面记录，自己重试，此处无需重试
 			if se != nil && se.Ft && se.FtNotRetry {
 				break
@@ -450,11 +450,11 @@ func (r *LogExportRunner) readDatas(dr reader.DataReader, dataSourceTag string) 
 	}
 	r.rsMutex.Lock()
 	if err != nil {
-		r.rs.ReaderStats.LastError = err.Error()
+		r.rs.ReaderStats.LastError = TruncateErrorSize(err.Error())
 		if r.rs.HistoryErrors.ReadErrors == nil {
 			r.rs.HistoryErrors.ReadErrors = NewErrorQueue(r.ErrorsListCap)
 		}
-		r.rs.HistoryErrors.ReadErrors.Put(ErrorInfo{err.Error(), time.Now().UnixNano(), 0})
+		r.rs.HistoryErrors.ReadErrors.Put(ErrorInfo{r.rs.ReaderStats.LastError, time.Now().UnixNano(), 0})
 	} else {
 		r.rs.ReaderStats.LastError = ""
 	}
@@ -499,7 +499,7 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 		if os.IsNotExist(err) {
 			r.rs.ReaderStats.LastError = "no more file exist to be read"
 		} else {
-			r.rs.ReaderStats.LastError = err.Error()
+			r.rs.ReaderStats.LastError = TruncateErrorSize(err.Error())
 		}
 		if r.rs.HistoryErrors.ReadErrors == nil {
 			r.rs.HistoryErrors.ReadErrors = NewErrorQueue(r.ErrorsListCap)
@@ -546,11 +546,11 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 		r.rs.ParserStats.Success++
 	}
 	if err != nil {
-		r.rs.ParserStats.LastError = err.Error()
+		r.rs.ParserStats.LastError = TruncateErrorSize(err.Error())
 		if r.rs.HistoryErrors.ParseErrors == nil {
 			r.rs.HistoryErrors.ParseErrors = NewErrorQueue(r.ErrorsListCap)
 		}
-		r.rs.HistoryErrors.ParseErrors.Put(ErrorInfo{err.Error(), time.Now().UnixNano(), 0})
+		r.rs.HistoryErrors.ParseErrors.Put(ErrorInfo{r.rs.ParserStats.LastError, time.Now().UnixNano(), 0})
 	}
 	r.rsMutex.Unlock()
 	if err != nil {
@@ -662,14 +662,14 @@ func (r *LogExportRunner) Run() {
 				if ok {
 					statesTransformer.SetStats(err.Error())
 				}
-				tstats.LastError = err.Error()
+				tstats.LastError = TruncateErrorSize(err.Error())
 				if r.rs.HistoryErrors.TransformErrors == nil {
 					r.rs.HistoryErrors.TransformErrors = make(map[string]*ErrorQueue)
 				}
 				if r.rs.HistoryErrors.TransformErrors[tp] == nil {
 					r.rs.HistoryErrors.TransformErrors[tp] = NewErrorQueue(r.ErrorsListCap)
 				}
-				r.rs.HistoryErrors.TransformErrors[tp].Put(ErrorInfo{err.Error(), time.Now().UnixNano(), 0})
+				r.rs.HistoryErrors.TransformErrors[tp].Put(ErrorInfo{tstats.LastError, time.Now().UnixNano(), 0})
 			}
 
 			r.rs.TransformStats[tp] = tstats
@@ -953,6 +953,7 @@ func (r *LogExportRunner) getRefreshStatus(elaspedtime float64) RunnerStatus {
 		} else {
 			newtsts.Speed, newtsts.Trend = calcSpeedTrend(StatsInfo{}, newtsts, elaspedtime)
 		}
+		newtsts.LastError = TruncateErrorSize(newtsts.LastError)
 		r.rs.TransformStats[ttp] = newtsts
 	}
 
@@ -976,7 +977,9 @@ func (r *LogExportRunner) getRefreshStatus(elaspedtime float64) RunnerStatus {
 	for i := range r.senders {
 		sts, ok := r.senders[i].(sender.StatsSender)
 		if ok {
-			r.rs.SenderStats[r.senders[i].Name()] = sts.Stats()
+			senderStats := sts.Stats()
+			senderStats.LastError = TruncateErrorSize(senderStats.LastError)
+			r.rs.SenderStats[r.senders[i].Name()] = senderStats
 		}
 	}
 
@@ -1178,7 +1181,9 @@ func (r *LogExportRunner) StatusBackup() {
 		name := s.Name()
 		sStatus, ok := s.(sender.StatsSender)
 		if ok {
-			status.SenderStats[name] = sStatus.Stats()
+			senderStats := sStatus.Stats()
+			senderStats.LastError = TruncateErrorSize(senderStats.LastError)
+			status.SenderStats[name] = senderStats
 		}
 		if sta, exist := status.SenderStats[name]; exist {
 			bStart.SenderCnt[name] = [2]int64{
