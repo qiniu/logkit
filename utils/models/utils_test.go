@@ -917,18 +917,18 @@ func BenchmarkDeepConvertKeyWithCache(b *testing.B) {
 
 func Test_CheckErrorSize(t *testing.T) {
 	err := "Test_CheckErrorSize"
-	actualErr := TruncateErrorSize(err)
+	actualErr := TruncateStrSize(err)
 	assert.Equal(t, err, actualErr)
 
 	for {
-		if len(err) > DefaultMaxErrorSize {
+		if len(err) > DefaultTruncateMaxSize {
 			break
 		}
 		err += "Test_CheckErrorSize"
 	}
 
-	actualErr = TruncateErrorSize(err)
-	assert.Equal(t, err[:DefaultMaxErrorSize]+
+	actualErr = TruncateStrSize(err)
+	assert.Equal(t, err[:DefaultTruncateMaxSize]+
 		"......(only show 1024 bytes, remain "+
-		strconv.Itoa(len(err)-DefaultMaxErrorSize)+" bytes)", actualErr)
+		strconv.Itoa(len(err)-DefaultTruncateMaxSize)+" bytes)", actualErr)
 }

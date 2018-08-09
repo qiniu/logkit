@@ -905,12 +905,12 @@ type KeyInfo struct {
 	NewKey string
 }
 
-func TruncateErrorSize(err string) string {
-	if len(err) <= DefaultMaxErrorSize {
+func TruncateStrSize(err string) string {
+	if len(err) <= DefaultTruncateMaxSize {
 		return err
 	}
 
-	return err[:DefaultMaxErrorSize] +
+	return err[:DefaultTruncateMaxSize] +
 		"......(only show 1024 bytes, remain " +
-		strconv.Itoa(len(err)-DefaultMaxErrorSize) + " bytes)"
+		strconv.Itoa(len(err)-DefaultTruncateMaxSize) + " bytes)"
 }
