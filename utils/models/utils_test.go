@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/qiniu/logkit/times"
-
 	"github.com/stretchr/testify/assert"
+
+	"github.com/qiniu/logkit/times"
 )
 
 func Test_ReadDirSortByTime(t *testing.T) {
@@ -37,7 +37,7 @@ func Test_ReadDirSortByTime(t *testing.T) {
 				t.Error(err)
 			}
 		}
-		time.Sleep(time.Second)
+		time.Sleep(100 * time.Millisecond)
 	}
 	files, err := ReadDirByTime(testreaddir)
 	if err != nil {
@@ -106,7 +106,7 @@ func Test_GetLogFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(time.Second)
+	time.Sleep(100 * time.Millisecond)
 	_, err = os.Create(log2)
 	if err != nil {
 		t.Fatal(err)
@@ -423,7 +423,94 @@ func TestLogDirAndPattern(t *testing.T) {
 	assert.Equal(t, absf, dir1)
 	assert.Equal(t, pt1, "TestLogDirAndPattern.log")
 	defer os.RemoveAll("TestLogDirAndPattern")
+}
 
+func TestDecompressZip(t *testing.T) {
+	testdataDir := "testdata"
+	unpackDir := "testout_zip"
+	defer os.RemoveAll(unpackDir)
+
+	tests := []struct {
+		name       string
+		srcPath    string
+		dstPath    string
+		targetFile string
+		targetDir  string
+	}{
+		{
+			"case 1",
+			filepath.Join(testdataDir, "target_in_root.zip"),
+			filepath.Join(unpackDir, "target_in_root"),
+			"logkit",
+			filepath.Join(unpackDir, "target_in_root"),
+		},
+		{
+			"case 2",
+			filepath.Join(testdataDir, "target_in_subdir.zip"),
+			filepath.Join(unpackDir, "target_in_subdir"),
+			"logkit.exe",
+			filepath.Join(unpackDir, "target_in_subdir", "windows"),
+		},
+		{
+			"case 3",
+			filepath.Join(testdataDir, "two_targets.zip"),
+			filepath.Join(unpackDir, "two_targets"),
+			"logkit.exe",
+			filepath.Join(unpackDir, "two_targets"),
+		},
+	}
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			targetDir, err := DecompressZip(tc.srcPath, tc.dstPath, tc.targetFile)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.targetDir, targetDir)
+		})
+	}
+}
+
+func TestDecompressTarGzip(t *testing.T) {
+	testdataDir := "testdata"
+	unpackDir := "testout_targz"
+	defer os.RemoveAll(unpackDir)
+
+	tests := []struct {
+		name       string
+		srcPath    string
+		dstPath    string
+		targetFile string
+		targetDir  string
+	}{
+		{
+			"case 1",
+			filepath.Join(testdataDir, "target_in_root.tar.gz"),
+			filepath.Join(unpackDir, "target_in_root"),
+			"logkit",
+			filepath.Join(unpackDir, "target_in_root"),
+		},
+		{
+			"case 2",
+			filepath.Join(testdataDir, "target_in_subdir.tar.gz"),
+			filepath.Join(unpackDir, "target_in_subdir"),
+			"logkit",
+			filepath.Join(unpackDir, "target_in_subdir", "linux"),
+		},
+		{
+			"case 3",
+			filepath.Join(testdataDir, "two_targets.tar.gz"),
+			filepath.Join(unpackDir, "two_targets"),
+			"logkit",
+			filepath.Join(unpackDir, "two_targets"),
+		},
+	}
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			targetDir, err := DecompressTarGzip(tc.srcPath, tc.dstPath, tc.targetFile)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.targetDir, targetDir)
+		})
+	}
 }
 
 func Test_checkFileMode(t *testing.T) {
