@@ -145,7 +145,7 @@ func (p *Parser) parseline(line string) (Data, error) {
 	re := p.regexp
 	fields := re.FindStringSubmatch(line)
 	if fields == nil {
-		return nil, fmt.Errorf("NginxParser fail to parse log line [%v], given format is [%v]", line, re)
+		return nil, fmt.Errorf("NginxParser fail to parse log line [%v], given format is [%v]", TruncateStrSize(line), re)
 	}
 	entry := make(Data)
 	// Iterate over subexp group and fill the map record

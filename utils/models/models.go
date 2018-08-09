@@ -41,7 +41,7 @@ const (
 
 	DefaultMaxBatchSize = 2 * 1024 * 1024
 
-	DefaultMaxErrorSize = 1024
+	DefaultTruncateMaxSize = 1024
 
 	DefaultErrorsListCap = 100
 
