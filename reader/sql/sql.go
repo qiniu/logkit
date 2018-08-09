@@ -1683,9 +1683,9 @@ func (r *Reader) getCheckAll(queryType int) (checkAll bool, err error) {
 func getRawSqls(queryType int, table string) (sqls string, err error) {
 	switch queryType {
 	case TABLE:
-		sqls += "Select * From `" + table + "`;"
+		sqls += "Select * From " + table + ";"
 	case COUNT:
-		sqls += "Select Count(*) From `" + table + "`;"
+		sqls += "Select Count(*) From " + table + ";"
 	case DATABASE:
 	default:
 		return "", fmt.Errorf("%v queryType is not support get sql now", queryType)
