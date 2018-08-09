@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -295,7 +296,7 @@ func Test_getTransformer(t *testing.T) {
 
 func Test_SendData(t *testing.T) {
 	c := conf.MapConf{
-		reader.KeyHTTPServiceAddress: ":8000",
+		reader.KeyHTTPServiceAddress: "127.0.0.1:8000",
 		reader.KeyHTTPServicePath:    "/logkit/data",
 	}
 	readConf := conf.MapConf{
@@ -379,20 +380,25 @@ func Test_SendData(t *testing.T) {
 		"sampleLog": testInput,
 		"senders":   senders,
 	}
-
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		for _, exp := range testJsonExp {
+			got, err := httpReader.ReadLine()
+			assert.NoError(t, err)
+			for _, e := range exp {
+				if !strings.Contains(got, e) {
+					t.Fatalf("exp: %v contains %v, but not", got, e)
+				}
+			}
+		}
+		wg.Done()
+	}()
 	err = SendData(senderConfig)
 	if err != nil {
 		t.Error(err)
 	}
-	for _, exp := range testJsonExp {
-		got, err := httpReader.ReadLine()
-		assert.NoError(t, err)
-		for _, e := range exp {
-			if !strings.Contains(got, e) {
-				t.Fatalf("exp: %v contains %v, but not", got, e)
-			}
-		}
-	}
+	wg.Wait()
 }
 
 func Test_getSendersConfig(t *testing.T) {

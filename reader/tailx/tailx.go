@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -85,6 +86,9 @@ type Result struct {
 
 func NewActiveReader(originPath, realPath, whence string, meta *reader.Meta, msgChan chan<- Result, errChan chan<- error) (ar *ActiveReader, err error) {
 	rpath := strings.Replace(realPath, string(os.PathSeparator), "_", -1)
+	if runtime.GOOS == "windows" {
+		rpath = strings.Replace(rpath, ":", "_", -1)
+	}
 	subMetaPath := filepath.Join(meta.Dir, rpath)
 	subMeta, err := reader.NewMeta(subMetaPath, subMetaPath, realPath, reader.ModeFile, meta.TagFile, reader.DefautFileRetention)
 	if err != nil {

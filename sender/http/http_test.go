@@ -6,12 +6,13 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/json-iterator/go"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/reader/http"
@@ -31,7 +32,7 @@ func TestHTTPSender(t *testing.T) {
 	defer os.RemoveAll("./meta")
 
 	c := conf.MapConf{
-		reader.KeyHTTPServiceAddress: ":8000",
+		reader.KeyHTTPServiceAddress: "127.0.0.1:8000",
 		reader.KeyHTTPServicePath:    "/logkit/data",
 	}
 	reader, err := http.NewReader(meta, c)
@@ -130,18 +131,29 @@ func TestHTTPSender(t *testing.T) {
 	httpSender, err := NewSender(senderConf)
 	assert.NoError(t, err)
 
+	var wg sync.WaitGroup
 	for _, val := range testData {
-		httpSender.Send(val.input)
-		for _, exp := range val.jsonExp {
-			got, err := httpReader.ReadLine()
-			assert.NoError(t, err)
-			for _, e := range exp {
-				if !strings.Contains(got, e) {
-					t.Fatalf("exp: %v contains %v, but not", got, e)
+		wg.Add(1)
+		go func(httpReader *http.Reader, val struct {
+			input       []Data
+			jsonExp     [][]string
+			csvExp      []map[string]string
+			bodyJSONExp string
+		}, t *testing.T) {
+			for _, exp := range val.jsonExp {
+				got, err := httpReader.ReadLine()
+				assert.NoError(t, err)
+				for _, e := range exp {
+					if !strings.Contains(got, e) {
+						t.Fatalf("exp: %v contains %v, but not", got, e)
+					}
 				}
 			}
-		}
+			wg.Done()
+		}(httpReader, val, t)
+		httpSender.Send(val.input)
 	}
+	wg.Wait()
 
 	// gzip = false, protocol = json
 	senderConf = conf.MapConf{
@@ -156,17 +168,27 @@ func TestHTTPSender(t *testing.T) {
 	assert.NoError(t, err)
 
 	for _, val := range testData {
-		httpSender.Send(val.input)
-		for _, exp := range val.jsonExp {
-			got, err := httpReader.ReadLine()
-			assert.NoError(t, err)
-			for _, e := range exp {
-				if !strings.Contains(got, e) {
-					t.Fatalf("exp: %v contains %v, but not", got, e)
+		wg.Add(1)
+		go func(httpReader *http.Reader, val struct {
+			input       []Data
+			jsonExp     [][]string
+			csvExp      []map[string]string
+			bodyJSONExp string
+		}, t *testing.T) {
+			for _, exp := range val.jsonExp {
+				got, err := httpReader.ReadLine()
+				assert.NoError(t, err)
+				for _, e := range exp {
+					if !strings.Contains(got, e) {
+						t.Fatalf("exp: %v contains %v, but not", got, e)
+					}
 				}
 			}
-		}
+			wg.Done()
+		}(httpReader, val, t)
+		httpSender.Send(val.input)
 	}
+	wg.Wait()
 
 	// gzip = true, protocol = csv, csvHead = true
 	senderConf = conf.MapConf{
@@ -181,27 +203,37 @@ func TestHTTPSender(t *testing.T) {
 	assert.NoError(t, err)
 
 	for _, val := range testData {
-		httpSender.Send(val.input)
-		head, err := httpReader.ReadLine()
-		assert.NoError(t, err)
-		headArray := strings.Split(head, "\t")
-		for _, expMap := range val.csvExp {
-			gotStr, err := httpReader.ReadLine()
+		wg.Add(1)
+		go func(httpReader *http.Reader, val struct {
+			input       []Data
+			jsonExp     [][]string
+			csvExp      []map[string]string
+			bodyJSONExp string
+		}, t *testing.T) {
+			head, err := httpReader.ReadLine()
 			assert.NoError(t, err)
-			gotArray := strings.Split(gotStr, "\t")
-			assert.Equal(t, len(expMap), len(gotArray))
-			assert.Equal(t, len(expMap), len(headArray))
-			for i, head := range headArray {
-				exp, ok := expMap[head]
-				assert.Equal(t, true, ok)
-				if head == "d" && len(exp) != len(gotArray[i]) {
-					t.Fatalf("error: exp %v, but got %v", exp, gotArray[i])
-				} else {
-					assert.Equal(t, exp, gotArray[i])
+			headArray := strings.Split(head, "\t")
+			for _, expMap := range val.csvExp {
+				gotStr, err := httpReader.ReadLine()
+				assert.NoError(t, err)
+				gotArray := strings.Split(gotStr, "\t")
+				assert.Equal(t, len(expMap), len(gotArray))
+				assert.Equal(t, len(expMap), len(headArray))
+				for i, head := range headArray {
+					exp, ok := expMap[head]
+					assert.Equal(t, true, ok)
+					if head == "d" && len(exp) != len(gotArray[i]) {
+						t.Fatalf("error: exp %v, but got %v", exp, gotArray[i])
+					} else {
+						assert.Equal(t, exp, gotArray[i])
+					}
 				}
 			}
-		}
+			wg.Done()
+		}(httpReader, val, t)
+		httpSender.Send(val.input)
 	}
+	wg.Wait()
 
 	// gzip = false, protocol = csv, csvHead = true
 	senderConf = conf.MapConf{
@@ -216,27 +248,37 @@ func TestHTTPSender(t *testing.T) {
 	assert.NoError(t, err)
 
 	for _, val := range testData {
-		httpSender.Send(val.input)
-		head, err := httpReader.ReadLine()
-		assert.NoError(t, err)
-		headArray := strings.Split(head, "\t")
-		for _, expMap := range val.csvExp {
-			gotStr, err := httpReader.ReadLine()
+		wg.Add(1)
+		go func(httpReader *http.Reader, val struct {
+			input       []Data
+			jsonExp     [][]string
+			csvExp      []map[string]string
+			bodyJSONExp string
+		}, t *testing.T) {
+			head, err := httpReader.ReadLine()
 			assert.NoError(t, err)
-			gotArray := strings.Split(gotStr, "\t")
-			assert.Equal(t, len(expMap), len(gotArray))
-			assert.Equal(t, len(expMap), len(headArray))
-			for i, head := range headArray {
-				exp, ok := expMap[head]
-				assert.Equal(t, true, ok)
-				if head == "d" && len(exp) != len(gotArray[i]) {
-					t.Fatalf("error: exp %v, but got %v", exp, gotArray[i])
-				} else {
-					assert.Equal(t, exp, gotArray[i])
+			headArray := strings.Split(head, "\t")
+			for _, expMap := range val.csvExp {
+				gotStr, err := httpReader.ReadLine()
+				assert.NoError(t, err)
+				gotArray := strings.Split(gotStr, "\t")
+				assert.Equal(t, len(expMap), len(gotArray))
+				assert.Equal(t, len(expMap), len(headArray))
+				for i, head := range headArray {
+					exp, ok := expMap[head]
+					assert.Equal(t, true, ok)
+					if head == "d" && len(exp) != len(gotArray[i]) {
+						t.Fatalf("error: exp %v, but got %v", exp, gotArray[i])
+					} else {
+						assert.Equal(t, exp, gotArray[i])
+					}
 				}
 			}
-		}
+			wg.Done()
+		}(httpReader, val, t)
+		httpSender.Send(val.input)
 	}
+	wg.Wait()
 
 	// gzip = true, protocol = csv, csvHead = false
 	senderConf = conf.MapConf{
@@ -251,15 +293,25 @@ func TestHTTPSender(t *testing.T) {
 	assert.NoError(t, err)
 
 	for _, val := range testData {
-		httpSender.Send(val.input)
-		for i := 0; i < len(val.csvExp); i++ {
-			_, err := httpReader.ReadLine()
+		wg.Add(1)
+		go func(httpReader *http.Reader, val struct {
+			input       []Data
+			jsonExp     [][]string
+			csvExp      []map[string]string
+			bodyJSONExp string
+		}, t *testing.T) {
+			for i := 0; i < len(val.input); i++ {
+				_, err := httpReader.ReadLine()
+				assert.NoError(t, err)
+			}
+			got, err := httpReader.ReadLine()
 			assert.NoError(t, err)
-		}
-		got, err := httpReader.ReadLine()
-		assert.NoError(t, err)
-		assert.Equal(t, "", got)
+			assert.Equal(t, "", got)
+			wg.Done()
+		}(httpReader, val, t)
+		httpSender.Send(val.input)
 	}
+	wg.Wait()
 
 	// gzip = true, protocol = body_json, csvHead = false
 	senderConf = conf.MapConf{
@@ -274,24 +326,34 @@ func TestHTTPSender(t *testing.T) {
 	assert.NoError(t, err)
 
 	for _, val := range testData {
+		wg.Add(1)
+		go func(httpReader *http.Reader, val struct {
+			input       []Data
+			jsonExp     [][]string
+			csvExp      []map[string]string
+			bodyJSONExp string
+		}, t *testing.T) {
+			got, err := httpReader.ReadLine()
+			assert.NoError(t, err)
+			var exps, datas []Data
+
+			err = jsoniter.Unmarshal([]byte(got), &datas)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = jsoniter.Unmarshal([]byte(val.bodyJSONExp), &exps)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assert.Equal(t, exps, datas)
+			wg.Done()
+		}(httpReader, val, t)
 		err = httpSender.Send(val.input)
 		if err != nil {
 			t.Fatal(err)
 		}
-		got, err := httpReader.ReadLine()
-		assert.NoError(t, err)
-		var exps, datas []Data
-
-		err = jsoniter.Unmarshal([]byte(got), &datas)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = jsoniter.Unmarshal([]byte(val.bodyJSONExp), &exps)
-		if err != nil {
-			t.Fatal(err)
-		}
-		assert.Equal(t, exps, datas)
 	}
+	wg.Wait()
 }
 
 func TestGzipData(t *testing.T) {

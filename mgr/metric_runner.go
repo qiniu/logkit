@@ -432,7 +432,9 @@ func (mr *MetricRunner) Status() (rs RunnerStatus) {
 	for i := range mr.senders {
 		sts, ok := mr.senders[i].(sender.StatsSender)
 		if ok {
-			mr.rs.SenderStats[mr.senders[i].Name()] = sts.Stats()
+			senderStats := sts.Stats()
+			senderStats.LastError = TruncateErrorSize(senderStats.LastError)
+			mr.rs.SenderStats[mr.senders[i].Name()] = senderStats
 		}
 	}
 
@@ -510,7 +512,9 @@ func (mr *MetricRunner) StatusBackup() {
 		name := s.Name()
 		sStatus, ok := s.(sender.StatsSender)
 		if ok {
-			status.SenderStats[name] = sStatus.Stats()
+			senderStats := sStatus.Stats()
+			senderStats.LastError = TruncateErrorSize(senderStats.LastError)
+			status.SenderStats[name] = senderStats
 		}
 		if sta, exist := status.SenderStats[name]; exist {
 			bStart.SenderCnt[name] = [2]int64{

@@ -273,6 +273,9 @@ func (m *Manager) ForkRunner(confPath string, nconf RunnerConfig, errReturn bool
 			} else {
 				webornot = "Terminal"
 			}
+			if nconf.SendersConfig[k] == nil {
+				return fmt.Errorf("%s sender config is invalid", confPath)
+			}
 			nconf.SendersConfig[k][sender.InnerUserAgent] = "logkit/" + m.Version + " " + m.SystemInfo + " " + webornot
 		}
 
@@ -621,6 +624,7 @@ func TrimSecretInfo(conf RunnerConfig, trimSk bool) RunnerConfig {
 	keyName := []string{
 		prefix + "pipeline_get_repo_token",
 		prefix + "pipeline_post_data_token",
+		prefix + "pipeline_post_rawtext_data_token",
 		prefix + "pipeline_create_repo_token",
 		prefix + "pipeline_update_repo_token",
 		prefix + "pipeline_get_workflow_token",
