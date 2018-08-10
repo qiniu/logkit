@@ -1025,11 +1025,11 @@ func Test_getRawSQLs(t *testing.T) {
 	}{
 		{
 			queryType: TABLE,
-			expSQLs:   "Select * From `my_table`;",
+			expSQLs:   "Select * From my_table;",
 		},
 		{
 			queryType: COUNT,
-			expSQLs:   "Select Count(*) From `my_table`;",
+			expSQLs:   "Select Count(*) From my_table;",
 		},
 		{
 			queryType: DATABASE,
