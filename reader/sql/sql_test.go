@@ -1017,7 +1017,19 @@ func Test_getCheckAll(t *testing.T) {
 		assert.EqualValues(t, test.expRes, checkHistory)
 	}
 }
+func Test_getWrappedTableName(t *testing.T) {
+	dbtype := reader.ModeMySQL
+	tname, err := getWrappedTableName(dbtype, "my_table")
+	expRes := "`my_table`"
+	assert.NoError(t, err)
+	assert.EqualValues(t, expRes, tname)
 
+	dbtype = reader.ModePostgreSQL
+	tname, err = getWrappedTableName(dbtype, "my_table")
+	expRes = "\"my_table\""
+	assert.NoError(t, err)
+	assert.EqualValues(t, expRes, tname)
+}
 func Test_getRawSQLs(t *testing.T) {
 	r := &Reader{
 		dbtype: reader.ModeMySQL,
@@ -1045,7 +1057,7 @@ func Test_getRawSQLs(t *testing.T) {
 		assert.NoError(t, err)
 		assert.EqualValues(t, test.expSQLs, sqls)
 	}
-
+	r.dbtype = reader.ModePostgreSQL
 	pgtests := []struct {
 		queryType int
 		expSQLs   string
@@ -1063,7 +1075,6 @@ func Test_getRawSQLs(t *testing.T) {
 			expSQLs:   "",
 		},
 	}
-	r.dbtype = reader.ModePostgreSQL
 	for _, test := range pgtests {
 		sqls, err := r.getRawSqls(test.queryType, "my_table")
 		assert.NoError(t, err)

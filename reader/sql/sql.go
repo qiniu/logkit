@@ -1678,30 +1678,39 @@ func (r *Reader) getCheckAll(queryType int) (checkAll bool, err error) {
 
 	return true, nil
 }
+func getWrappedTableName(dbtype string, table string) (tableName string, err error) {
+	switch dbtype {
+	case reader.ModeMySQL:
+		tableName = "`" + table + "`"
+	case reader.ModeMSSQL, reader.ModePostgreSQL:
+		tableName = "\"" + table + "\""
+	default:
+		err = fmt.Errorf("%v mode not support in sql reader", dbtype)
+	}
+	return
+}
 
 // 根据 queryType 获取表中所有记录或者表中所有数据的条数的sql语句
 func (r *Reader) getRawSqls(queryType int, table string) (sqls string, err error) {
 	switch queryType {
 	case TABLE:
-		sqls += "Select * From " + getWrappedTableName(r.dbtype, table)
+		tableName, err := getWrappedTableName(r.dbtype, table)
+		if err != nil {
+			return "", err
+		}
+		sqls += "Select * From " + tableName + ";"
 	case COUNT:
-		sqls += "Select Count(*) From " + getWrappedTableName(r.dbtype, table)
+		tableName, err := getWrappedTableName(r.dbtype, table)
+		if err != nil {
+			return "", err
+		}
+		sqls += "Select Count(*) From " + tableName + ";"
 	case DATABASE:
 	default:
 		return "", fmt.Errorf("%v queryType is not support get sql now", queryType)
 	}
 
 	return sqls, nil
-}
-func getWrappedTableName(dbtype string, table string) string {
-	switch dbtype {
-	case reader.ModeMySQL:
-		return "`" + table + "`;"
-	case reader.ModeMSSQL, reader.ModePostgreSQL:
-		return "\"" + table + "\";"
-	default:
-		return table + ";"
-	}
 }
 
 // 根据 queryType 获取query语句
