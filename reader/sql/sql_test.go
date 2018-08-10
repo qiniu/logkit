@@ -1019,17 +1019,20 @@ func Test_getCheckAll(t *testing.T) {
 }
 
 func Test_getRawSQLs(t *testing.T) {
-	tests := []struct {
+	r := &Reader{
+		dbtype: reader.ModeMySQL,
+	}
+	mysqltests := []struct {
 		queryType int
 		expSQLs   string
 	}{
 		{
 			queryType: TABLE,
-			expSQLs:   "Select * From my_table;",
+			expSQLs:   "Select * From `my_table`;",
 		},
 		{
 			queryType: COUNT,
-			expSQLs:   "Select Count(*) From my_table;",
+			expSQLs:   "Select Count(*) From `my_table`;",
 		},
 		{
 			queryType: DATABASE,
@@ -1037,11 +1040,36 @@ func Test_getRawSQLs(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		sqls, err := getRawSqls(test.queryType, "my_table")
+	for _, test := range mysqltests {
+		sqls, err := r.getRawSqls(test.queryType, "my_table")
 		assert.NoError(t, err)
 		assert.EqualValues(t, test.expSQLs, sqls)
 	}
+
+	pgtests := []struct {
+		queryType int
+		expSQLs   string
+	}{
+		{
+			queryType: TABLE,
+			expSQLs:   "Select * From \"my_table\";",
+		},
+		{
+			queryType: COUNT,
+			expSQLs:   "Select Count(*) From \"my_table\";",
+		},
+		{
+			queryType: DATABASE,
+			expSQLs:   "",
+		},
+	}
+	r.dbtype = reader.ModePostgreSQL
+	for _, test := range pgtests {
+		sqls, err := r.getRawSqls(test.queryType, "my_table")
+		assert.NoError(t, err)
+		assert.EqualValues(t, test.expSQLs, sqls)
+	}
+
 }
 
 func Test_getConnectStr(t *testing.T) {
