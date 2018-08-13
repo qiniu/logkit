@@ -3,7 +3,7 @@ package metric
 const (
 	ConfigTypeBool   = "bool"
 	ConfigTypeArray  = "array"
-	ConsifTypeString = "string"
+	ConfigTypeString = "string"
 
 	OptionString     = "options"
 	AttributesString = "attributes"

@@ -84,7 +84,7 @@ func (_ *HttpStats) Config() map[string]interface{} {
 			Default:      `[{"method":"GET", "url":"https://www.qiniu.com", "expect_code":200, "expect_data":"七牛云"},{"method":"GET", "url":"https://www.qiniu.com/products/pandora", "expect_code":200, "expect_data":"七牛云"}]`,
 			DefaultNoUse: true,
 			Description:  val.Value,
-			Type:         metric.ConsifTypeString,
+			Type:         metric.ConfigTypeString,
 		}
 		configOptions = append(configOptions, option)
 	}
