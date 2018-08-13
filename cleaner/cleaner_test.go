@@ -11,6 +11,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 func runCleanChan(c <-chan CleanSignal, t *testing.T) {

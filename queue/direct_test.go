@@ -10,6 +10,7 @@ import (
 )
 
 func TestDirectQueue(t *testing.T) {
+	t.Parallel()
 	dq := NewDirectQueue("TestDirectQueue")
 	assert.Equal(t, "TestDirectQueue", dq.Name())
 	ddq := dq.(DataQueue)
@@ -39,6 +40,7 @@ func TestDirectQueue(t *testing.T) {
 }
 
 func TestDirectQueueEmpty(t *testing.T) {
+	t.Parallel()
 	dq := NewDirectQueue("TestDirectQueueEmpty")
 	assert.Equal(t, "TestDirectQueueEmpty", dq.Name())
 	ddq := dq.(DataQueue)

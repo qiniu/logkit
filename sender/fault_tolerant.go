@@ -112,11 +112,40 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 	if opt.strategy == KeyFtStrategyConcurrent {
 		lq = queue.NewDirectQueue("stream" + directSuffix)
 	} else if !opt.memoryChannel {
-		lq = queue.NewDiskQueue("stream"+qNameSuffix, opt.saveLogPath, maxBytesPerFile, 0, maxBytesPerFile, opt.syncEvery, opt.syncEvery, time.Second*2, opt.writeLimit*mb, false, 0)
+		lq = queue.NewDiskQueue(queue.NewDiskQueueOptions{
+			Name:            "stream" + qNameSuffix,
+			DataPath:        opt.saveLogPath,
+			MaxBytesPerFile: maxBytesPerFile,
+			MaxMsgSize:      maxBytesPerFile,
+			SyncEveryWrite:  opt.syncEvery,
+			SyncEveryRead:   opt.syncEvery,
+			SyncTimeout:     2 * time.Second,
+			WriteRateLimit:  opt.writeLimit * mb,
+		})
 	} else {
-		lq = queue.NewDiskQueue("stream"+qNameSuffix, opt.saveLogPath, maxBytesPerFile, 0, maxBytesPerFile, opt.syncEvery, opt.syncEvery, time.Second*2, opt.writeLimit*mb, true, opt.memoryChannelSize)
+		lq = queue.NewDiskQueue(queue.NewDiskQueueOptions{
+			Name:              "stream" + qNameSuffix,
+			DataPath:          opt.saveLogPath,
+			MaxBytesPerFile:   maxBytesPerFile,
+			MaxMsgSize:        maxBytesPerFile,
+			SyncEveryWrite:    opt.syncEvery,
+			SyncEveryRead:     opt.syncEvery,
+			SyncTimeout:       2 * time.Second,
+			WriteRateLimit:    opt.writeLimit * mb,
+			EnableMemoryQueue: true,
+			MemoryQueueSize:   int64(opt.memoryChannelSize),
+		})
 	}
-	bq = queue.NewDiskQueue("backup"+qNameSuffix, opt.saveLogPath, maxBytesPerFile, 0, maxBytesPerFile, opt.syncEvery, opt.syncEvery, time.Second*2, opt.writeLimit*mb, false, 0)
+	bq = queue.NewDiskQueue(queue.NewDiskQueueOptions{
+		Name:            "backup" + qNameSuffix,
+		DataPath:        opt.saveLogPath,
+		MaxBytesPerFile: maxBytesPerFile,
+		MaxMsgSize:      maxBytesPerFile,
+		SyncEveryWrite:  opt.syncEvery,
+		SyncEveryRead:   opt.syncEvery,
+		SyncTimeout:     2 * time.Second,
+		WriteRateLimit:  opt.writeLimit * mb,
+	})
 	ftSender := FtSender{
 		exitChan:    make(chan struct{}),
 		innerSender: innerSender,

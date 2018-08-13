@@ -1059,9 +1059,8 @@ func (r *LogExportRunner) TokenRefresh(tokens AuthTokens) error {
 
 func (r *LogExportRunner) StatusRestore() {
 	rStat, err := r.meta.ReadStatistic()
-
 	if err != nil {
-		log.Warnf("runner %v, restore status failed", r.RunnerName)
+		log.Warnf("Runner[%v] restore status failed: %v", r.RunnerName, err)
 		return
 	}
 	r.rs.ReadDataCount = rStat.ReaderCnt
