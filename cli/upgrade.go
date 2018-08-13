@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -152,11 +153,15 @@ func checkLatestVersion(url string) (ReleaseInfo, error) {
 	return releaseInfo, nil
 }
 
-func getNeedBackupFiles(kernel string) []string {
-	if kernel == GoOSWindows {
-		return []string{"logkit.exe"}
+func getBinaryName() string {
+	if runtime.GOOS == "windows" {
+		return "logkit.exe"
 	}
-	return []string{"logkit"}
+	return "logkit"
+}
+
+func getNeedBackupFiles() []string {
+	return []string{getBinaryName()}
 }
 
 // 检查是否需要更新
@@ -290,7 +295,7 @@ func restoreFile(backDir string, backupFiles []string, curDir string) error {
 // 即: 解压后有一个文件夹(_package_linux32等), 文件夹里面即为 logkit binary
 // 返回的 string 为文件夹名称(如 _package_linux32, _package_linux64 等)
 func decompress(packFilePath, dstDir string) (string, error) {
-	return DecompressGzip(packFilePath, dstDir)
+	return DecompressTarGzip(packFilePath, dstDir, getBinaryName())
 }
 
 func CheckAndUpgrade(curVersion string) {
@@ -385,7 +390,7 @@ func CheckAndUpgrade(curVersion string) {
 	// 备份现有的文件
 	fmt.Println("Backup old file")
 	backupDir := filepath.Join(rootDir, "logkit_bak_"+strconv.FormatInt(time.Now().Unix(), 10))
-	if err = backupCurFile(rootDir, getNeedBackupFiles(kernel), backupDir); err != nil {
+	if err = backupCurFile(rootDir, getNeedBackupFiles(), backupDir); err != nil {
 		fmt.Println("Automatic upgrade failed, backup old files error,", err)
 		return
 	}
@@ -396,7 +401,7 @@ func CheckAndUpgrade(curVersion string) {
 	var packDir string
 	if packDir, err = decompress(packFilePath, rootDir); err != nil {
 		fmt.Println("Automatic upgrade failed, decompress new package error,", err)
-		restoreFile(backupDir, getNeedBackupFiles(kernel), rootDir)
+		restoreFile(backupDir, getNeedBackupFiles(), rootDir)
 		return
 	}
 	// 如果这个压缩包里面没有任何文件夹
@@ -407,9 +412,9 @@ func CheckAndUpgrade(curVersion string) {
 
 	// 将文件、文件夹从安装包中移动出来
 	fmt.Println("Replace old file")
-	if err = moveFile(packDir, getNeedBackupFiles(kernel), rootDir); err != nil {
+	if err = moveFile(packDir, getNeedBackupFiles(), rootDir); err != nil {
 		fmt.Println("Automatic upgrade failed, copy new file to rootDir error,", err)
-		restoreFile(backupDir, getNeedBackupFiles(kernel), rootDir)
+		restoreFile(backupDir, getNeedBackupFiles(), rootDir)
 		return
 	}
 	fmt.Println("Upgrade successfully, enjoy it!")
