@@ -29,6 +29,8 @@ const (
 	directSuffix      = "_direct"
 	defaultMaxProcs   = 1         // 默认没有并发
 	DefaultSplitSize  = 64 * 1024 // 默认分割为 64 kb
+	// TypeMarshalError 表示marshal出错
+	TypeMarshalError = reqerr.SendErrorType("Data Marshal failed")
 )
 
 var _ SkipDeepCopySender = &FtSender{}
@@ -277,7 +279,7 @@ func (ft *FtSender) saveToFile(datas []Data) error {
 
 	err = ft.logQueue.Put(bs)
 	if err != nil {
-		return reqerr.NewSendError(ft.innerSender.Name()+" Cannot put data into backendQueue: "+err.Error(), ConvertDatasBack(datas), reqerr.TypeDefault)
+		return reqerr.NewSendError(ft.innerSender.Name()+" Cannot put data into backendQueue: "+err.Error(), ConvertDatasBack(datas), TypeMarshalError)
 	}
 	return nil
 }

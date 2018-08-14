@@ -48,14 +48,14 @@ func (dq *directQueue) PutDatas(datas []Data) error {
 	dq.mux.Lock()
 	defer dq.mux.Unlock()
 	if dq.status == StatusClosed {
-		return errors.New("direct queue is closed")
+		return ErrQueueClosed
 	}
 
 	select {
 	case dq.channel <- datas:
 		return nil
 	case <-dq.quit:
-		return errors.New("direct queue is closed")
+		return ErrQueueClosed
 	}
 }
 
