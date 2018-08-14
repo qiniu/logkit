@@ -26,7 +26,7 @@ func init() {
 				Default:      `localhost:11211`,
 				DefaultNoUse: true,
 				Description:  "服务器连接地址(逗号分隔多个)",
-				Type:         metric.ConsifTypeString,
+				Type:         metric.ConfigTypeString,
 			},
 		},
 		metric.AttributesString: KeyValueSlice{
