@@ -537,6 +537,11 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 			}
 			continue
 		}
+		if len(parseResult.Data) < 1 { //数据为空时不发送
+			se.ErrorDetail = fmt.Errorf("parsed no data by line [%v]", parseResult.Line)
+			se.AddErrors()
+			continue
+		}
 		se.AddSuccess()
 		datas = append(datas, parseResult.Data)
 	}

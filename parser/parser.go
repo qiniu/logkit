@@ -71,6 +71,7 @@ type ParseResult struct {
 	Line  string
 	Index int
 	Data  Data
+	Datas []Data
 	Err   error
 }
 

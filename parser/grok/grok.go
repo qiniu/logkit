@@ -242,7 +242,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 			}
 			continue
 		}
-		if len(parseResult.Data) < 1 { //数据不为空的时候发送
+		if len(parseResult.Data) < 1 { //数据为空时候不发送
 			continue
 		}
 		log.Debugf("D! parse result(%v)", parseResult.Data)

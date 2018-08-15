@@ -10,8 +10,30 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
+
+var bench []Data
+
+// old: 20	  86082792 ns/op	routine = 1  (2MB)
+// new: 10	 135893207 ns/op	routine = 1  (2MB)
+// new: 20	  93468900 ns/op	routine = 2  (2MB)
+func Benchmark_JsonParse(b *testing.B) {
+	MaxProcs = 2
+	c := conf.MapConf{}
+	c[parser.KeyParserName] = "testjsonparser"
+	c[parser.KeyParserType] = "json"
+	c[parser.KeyLabels] = "mm abc"
+	c[parser.KeyDisableRecordErrData] = "true"
+	p, _ := NewParser(c)
+
+	var m []Data
+	for n := 0; n < b.N; n++ {
+		m, _ = p.Parse(utils.GetTestData(`{"a":1,"b":[1.0,2.0,3.0],"c":{"d":"123","g":1.2},"e":"x","mm":1.23,"jjj":1493797500346428926}`))
+	}
+	bench = m
+}
 
 func TestJsonParser(t *testing.T) {
 	c := conf.MapConf{}
