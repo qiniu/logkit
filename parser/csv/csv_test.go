@@ -14,11 +14,15 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/times"
+	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
 var bench []Data
 
+// old: 5	 258934606 ns/op routine = 1  lines length = 51151(2MB)
+// now: 3	 356798749 ns/op routine = 1  lines length = 51151
+// now: 5	 224379185 ns/op routine = 2  lines length = 51151
 func Benchmark_ParseLine(b *testing.B) {
 	c := conf.MapConf{}
 	c[parser.KeyParserName] = "testparser"
@@ -29,7 +33,7 @@ func Benchmark_ParseLine(b *testing.B) {
 
 	var m []Data
 	for n := 0; n < b.N; n++ {
-		m, _ = p.Parse([]string{`123 fufu 3.16 {\"x\":1,\"y\":[\"xx:12\"]}`})
+		m, _ = p.Parse(utils.GetTestData(`123 fufu 3.16 {\"x\":1,\"y\":[\"xx:12\"]}`))
 	}
 	bench = m
 }

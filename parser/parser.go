@@ -62,6 +62,32 @@ type Label struct {
 	Value string
 }
 
+type ParseInfo struct {
+	Line  string
+	Index int
+}
+
+type ParseResult struct {
+	Line  string
+	Index int
+	Data  Data
+	Err   error
+}
+
+type ParseResultSlice []ParseResult
+
+func (slice ParseResultSlice) Len() int {
+	return len(slice)
+}
+
+func (slice ParseResultSlice) Less(i, j int) bool {
+	return slice[i].Index < slice[j].Index
+}
+
+func (slice ParseResultSlice) Swap(i, j int) {
+	slice[i], slice[j] = slice[j], slice[i]
+}
+
 type Constructor func(conf.MapConf) (Parser, error)
 
 // registeredConstructors keeps a list of all available reader constructors can be registered by Registry.

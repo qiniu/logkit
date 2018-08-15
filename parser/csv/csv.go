@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -39,6 +41,7 @@ type Parser struct {
 	allmoreStartNUmber   int
 	allowNotMatch        bool
 	ignoreInvalid        bool
+	routineNumber        int
 }
 
 type field struct {
@@ -95,6 +98,10 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	}
 	allmoreStartNumber, _ := c.GetIntOr(parser.KeyCSVAllowMoreStartNum, 0)
 	ignoreInvalid, _ := c.GetBoolOr(parser.KeyCSVIgnoreInvalidField, false)
+	routineNumber := MaxProcs
+	if routineNumber == 0 {
+		routineNumber = NumCpu
+	}
 	return &Parser{
 		name:                 name,
 		schema:               fields,
@@ -107,6 +114,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		allowMoreName:        allowMoreName,
 		ignoreInvalid:        ignoreInvalid,
 		allmoreStartNUmber:   allmoreStartNumber,
+		routineNumber:        routineNumber,
 	}, nil
 }
 
@@ -170,6 +178,7 @@ func parseSchemaRawField(f string) (newField field, err error) {
 	}
 	return newCsvField(columnName, parser.DataType(dataType))
 }
+
 func parseSchemaJsonField(f string) (fd field, err error) {
 	splitSpace := strings.IndexByte(f, ' ')
 	key := f[:splitSpace]
@@ -435,6 +444,9 @@ func (p *Parser) parse(line string) (d Data, err error) {
 			d[l.Name] = l.Value
 		}
 	}
+	if p.isAutoRename {
+		d = p.RenameData(d)
+	}
 	return d, nil
 }
 
@@ -451,6 +463,15 @@ func (p *Parser) Rename(datas []Data) []Data {
 	return newData
 }
 
+func (p *Parser) RenameData(data Data) Data {
+	newData := make(Data)
+	for key, val := range data {
+		newKey := strings.Replace(key, "-", "_", -1)
+		newData[newKey] = val
+	}
+	return newData
+}
+
 func HasSpace(spliter string) bool {
 	for _, v := range spliter {
 		if unicode.IsSpace(v) {
@@ -461,35 +482,111 @@ func HasSpace(spliter string) bool {
 }
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
-	datas := []Data{}
+	datas := make([]Data, 0, len(lines))
 	se := &StatsError{}
-	for idx, line := range lines {
-		if !HasSpace(p.delim) {
-			line = strings.TrimSpace(line)
+	routineNumber := p.routineNumber
+	if len(lines) < routineNumber {
+		routineNumber = len(lines)
+	}
+	sendChan := make(chan parser.ParseInfo)
+	resultChan := make(chan parser.ParseResult)
+
+	wg := new(sync.WaitGroup)
+	for i := 0; i < routineNumber; i++ {
+		wg.Add(1)
+		go p.parseLine(sendChan, resultChan, wg)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, line := range lines {
+			sendChan <- parser.ParseInfo{
+				Line:  line,
+				Index: idx,
+			}
 		}
-		if len(line) <= 0 {
-			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
+		close(sendChan)
+	}()
+
+	//for parseResult := range resultChan {
+	//	if len(parseResult.Line) == 0 {
+	//		se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
+	//		continue
+	//	}
+	//
+	//	if parseResult.Err != nil {
+	//		log.Debug(parseResult.Err)
+	//		se.AddErrors()
+	//		se.ErrorDetail = parseResult.Err
+	//		if !p.disableRecordErrData {
+	//			datas = append(datas, Data{
+	//				KeyPandoraStash: parseResult.Line,
+	//			})
+	//		} else {
+	//			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
+	//		}
+	//		continue
+	//	}
+	//	se.AddSuccess()
+	//	datas = append(datas, parseResult.Data)
+	//}
+
+	var parseResultSlice = make(parser.ParseResultSlice, 0, len(lines))
+	for resultInfo := range resultChan {
+		parseResultSlice = append(parseResultSlice, resultInfo)
+	}
+	sort.Stable(parseResultSlice)
+
+	for _, parseResult := range parseResultSlice {
+		if len(parseResult.Line) == 0 {
+			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
 			continue
 		}
-		d, err := p.parse(line)
-		if err != nil {
-			log.Debug(err)
+
+		if parseResult.Err != nil {
+			log.Debug(parseResult.Err)
 			se.AddErrors()
-			se.ErrorDetail = err
+			se.ErrorDetail = parseResult.Err
 			if !p.disableRecordErrData {
-				errData := make(Data)
-				errData[KeyPandoraStash] = line
-				datas = append(datas, errData)
+				datas = append(datas, Data{
+					KeyPandoraStash: parseResult.Line,
+				})
 			} else {
-				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
+				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
 			}
 			continue
 		}
-		datas = append(datas, d)
 		se.AddSuccess()
+		datas = append(datas, parseResult.Data)
 	}
-	if p.isAutoRename {
-		datas = p.Rename(datas)
-	}
+
 	return datas, se
+}
+
+func (p *Parser) parseLine(sendChan chan parser.ParseInfo, resultChan chan parser.ParseResult, wg *sync.WaitGroup) {
+	for parseInfo := range sendChan {
+		if !HasSpace(p.delim) {
+			parseInfo.Line = strings.TrimSpace(parseInfo.Line)
+		}
+		if len(parseInfo.Line) <= 0 {
+			resultChan <- parser.ParseResult{
+				Line:  parseInfo.Line,
+				Index: parseInfo.Index,
+			}
+			continue
+		}
+
+		data, err := p.parse(parseInfo.Line)
+		resultChan <- parser.ParseResult{
+			Line:  parseInfo.Line,
+			Index: parseInfo.Index,
+			Data:  data,
+			Err:   err,
+		}
+	}
+	wg.Done()
 }

@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -58,6 +59,11 @@ const (
 	Checkbox    = "checkbox"
 	Radio       = "radio"
 	InputNumber = "inputNumber"
+)
+
+var (
+	MaxProcs = 0
+	NumCpu   = runtime.NumCPU()
 )
 
 type Option struct {
