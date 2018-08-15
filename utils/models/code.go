@@ -3,8 +3,9 @@ package models
 import "errors"
 
 var (
-	ErrNotSupport = errors.New("runner does not support")
-	ErrNotExist   = errors.New("runner does not exist")
+	ErrNotSupport  = errors.New("runner does not support")
+	ErrNotExist    = errors.New("runner does not exist")
+	ErrQueueClosed = errors.New("queue is closed")
 )
 
 const (
