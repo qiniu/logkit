@@ -512,29 +512,6 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		close(sendChan)
 	}()
 
-	//for parseResult := range resultChan {
-	//	if len(parseResult.Line) == 0 {
-	//		se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
-	//		continue
-	//	}
-	//
-	//	if parseResult.Err != nil {
-	//		log.Debug(parseResult.Err)
-	//		se.AddErrors()
-	//		se.ErrorDetail = parseResult.Err
-	//		if !p.disableRecordErrData {
-	//			datas = append(datas, Data{
-	//				KeyPandoraStash: parseResult.Line,
-	//			})
-	//		} else {
-	//			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
-	//		}
-	//		continue
-	//	}
-	//	se.AddSuccess()
-	//	datas = append(datas, parseResult.Data)
-	//}
-
 	var parseResultSlice = make(parser.ParseResultSlice, 0, len(lines))
 	for resultInfo := range resultChan {
 		parseResultSlice = append(parseResultSlice, resultInfo)

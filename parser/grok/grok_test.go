@@ -8,10 +8,31 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-var grokBench Data
+var (
+	grokBench Data
+	bench     []Data
+)
+
+// old: 1		4154037708 ns/op 	routine = 1  (2MB)
+// now: 1		4582286082 ns/op 	routine = 1  (2MB)
+// now: 1000	1349395 ns/op 		routine = 2  (2MB)
+func Benchmark_GrokParse_NGINX(b *testing.B) {
+	p := &Parser{
+		Patterns:      []string{"%{NGINX_LOG}"},
+		routineNumber: 2,
+	}
+	p.compile()
+
+	var m []Data
+	for n := 0; n < b.N; n++ {
+		m, _ = p.Parse(utils.GetTestData(`127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326`))
+	}
+	bench = m
+}
 
 func Benchmark_GrokParseLine_NGINX(b *testing.B) {
 	p := &Parser{
@@ -21,7 +42,7 @@ func Benchmark_GrokParseLine_NGINX(b *testing.B) {
 
 	var m Data
 	for n := 0; n < b.N; n++ {
-		m, _ = p.parseLine(`127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326`)
+		m, _ = p.parse(`127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326`)
 	}
 	grokBench = m
 }
@@ -34,7 +55,7 @@ func Benchmark_GrokParseLine_PANDORANGINX(b *testing.B) {
 
 	var m Data
 	for n := 0; n < b.N; n++ {
-		m, _ = p.parseLine(`123.0.0.1 - - [17/Jul/2017:14:56:24 +0800] "POST /v2/repos/x/data HTTP/1.1" 200 479 2 "-" "QiniuPandoraJava/0.0.1 (Linux amd64 2.6.32-696.1.1.el6.x86_64) Java/1.8.0_131" "-" 192.168.160.75:80 pipeline.qiniu.com abc123bdc 0.072`)
+		m, _ = p.parse(`123.0.0.1 - - [17/Jul/2017:14:56:24 +0800] "POST /v2/repos/x/data HTTP/1.1" 200 479 2 "-" "QiniuPandoraJava/0.0.1 (Linux amd64 2.6.32-696.1.1.el6.x86_64) Java/1.8.0_131" "-" 192.168.160.75:80 pipeline.qiniu.com abc123bdc 0.072`)
 	}
 	grokBench = m
 }
@@ -47,7 +68,7 @@ func Benchmark_GrokParseLine_Common(b *testing.B) {
 
 	var m Data
 	for n := 0; n < b.N; n++ {
-		m, _ = p.parseLine(`127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326`)
+		m, _ = p.parse(`127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326`)
 	}
 	grokBench = m
 }
@@ -71,7 +92,7 @@ func TestSimpleParse(t *testing.T) {
 	}
 	assert.NoError(t, p.compile())
 
-	m, err := p.parseLine(`142 bot`)
+	m, err := p.parse(`142 bot`)
 	assert.NoError(t, err)
 	require.NotNil(t, m)
 
@@ -90,7 +111,7 @@ func TestNginxTimeParse(t *testing.T) {
 	}
 	assert.NoError(t, p.compile())
 
-	m, err := p.parseLine(`192.168.45.53 - - [05/Apr/2017:17:25:06 +0800] "POST /v2/repos/kodo_z0_app_pfdstg/data HTTP/1.1" 200 497 2 "-" "Go 1.1 package http" "-" 192.168.160.1:80 pipeline.qiniu.io KBkAAD7W6-UfdrIU 0.139`)
+	m, err := p.parse(`192.168.45.53 - - [05/Apr/2017:17:25:06 +0800] "POST /v2/repos/kodo_z0_app_pfdstg/data HTTP/1.1" 200 497 2 "-" "Go 1.1 package http" "-" 192.168.160.1:80 pipeline.qiniu.io KBkAAD7W6-UfdrIU 0.139`)
 	assert.NoError(t, err)
 	require.NotNil(t, m)
 	assert.Equal(t, "2017-04-05T17:25:06+08:00", m["ts"])
@@ -103,7 +124,7 @@ func TestTimeZoneOffsetParse(t *testing.T) {
 	}
 	assert.NoError(t, p.compile())
 
-	m, err := p.parseLine(`192.168.45.53 - - [05/Apr/2017:17:25:06 +0800] "POST /v2/repos/kodo_z0_app_pfdstg/data HTTP/1.1" 200 497 2 "-" "Go 1.1 package http" "-" 192.168.160.1:80 pipeline.qiniu.io KBkAAD7W6-UfdrIU 0.139`)
+	m, err := p.parse(`192.168.45.53 - - [05/Apr/2017:17:25:06 +0800] "POST /v2/repos/kodo_z0_app_pfdstg/data HTTP/1.1" 200 497 2 "-" "Go 1.1 package http" "-" 192.168.160.1:80 pipeline.qiniu.io KBkAAD7W6-UfdrIU 0.139`)
 	assert.NoError(t, err)
 	require.NotNil(t, m)
 	assert.Equal(t, "2017-04-05T14:25:06+08:00", m["ts"])
@@ -114,7 +135,7 @@ func TestTimeZoneOffsetParse(t *testing.T) {
 	}
 	assert.NoError(t, p.compile())
 
-	m, err = p.parseLine(`192.168.45.53 - - [05/Apr/2017:10:25:06 +0800] "POST /v2/repos/kodo_z0_app_pfdstg/data HTTP/1.1" 200 497 2 "-" "Go 1.1 package http" "-" 192.168.160.1:80 pipeline.qiniu.io KBkAAD7W6-UfdrIU 0.139`)
+	m, err = p.parse(`192.168.45.53 - - [05/Apr/2017:10:25:06 +0800] "POST /v2/repos/kodo_z0_app_pfdstg/data HTTP/1.1" 200 497 2 "-" "Go 1.1 package http" "-" 192.168.160.1:80 pipeline.qiniu.io KBkAAD7W6-UfdrIU 0.139`)
 	assert.NoError(t, err)
 	require.NotNil(t, m)
 	assert.Equal(t, "2017-04-05T18:25:06+08:00", m["ts"])
@@ -131,7 +152,7 @@ func TestParsePatternsWithLookahead(t *testing.T) {
 	}
 	assert.NoError(t, p.compile())
 
-	_, err := p.parseLine(`1466004605359052000 bot`)
+	_, err := p.parse(`1466004605359052000 bot`)
 	assert.Error(t, err)
 }
 
@@ -143,7 +164,7 @@ func TestParserName(t *testing.T) {
 	assert.NoError(t, p.compile())
 
 	// Parse an influxdb POST request
-	m, err := p.parseLine(`127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326`)
+	m, err := p.parse(`127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326`)
 	require.NotNil(t, m)
 	assert.NoError(t, err)
 	assert.Equal(t,
@@ -169,7 +190,7 @@ func TestCLF_IPv6(t *testing.T) {
 	}
 	assert.NoError(t, p.compile())
 
-	m, err := p.parseLine(`2001:0db8:85a3:0000:0000:8a2e:0370:7334 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326`)
+	m, err := p.parse(`2001:0db8:85a3:0000:0000:8a2e:0370:7334 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326`)
 	require.NotNil(t, m)
 	assert.NoError(t, err)
 	assert.Equal(t,
@@ -187,7 +208,7 @@ func TestCLF_IPv6(t *testing.T) {
 		m)
 	assert.Equal(t, "my_web_log", p.Name())
 
-	m, err = p.parseLine(`::1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 400 2326`)
+	m, err = p.parse(`::1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 400 2326`)
 	require.NotNil(t, m)
 	assert.NoError(t, err)
 	assert.Equal(t,
@@ -214,7 +235,7 @@ func TestCustomInfluxdbHttpd(t *testing.T) {
 	assert.NoError(t, p.compile())
 
 	// Parse an influxdb POST request
-	m, err := p.parseLine(`[httpd] ::1 - - [14/Jun/2016:11:33:29 +0100] "POST /write?consistency=any&db=logkit&precision=ns&rp= HTTP/1.1" 204 0 "-" "InfluxDBClient" 6f61bc44-321b-11e6-8050-000000000000 2513`)
+	m, err := p.parse(`[httpd] ::1 - - [14/Jun/2016:11:33:29 +0100] "POST /write?consistency=any&db=logkit&precision=ns&rp= HTTP/1.1" 204 0 "-" "InfluxDBClient" 6f61bc44-321b-11e6-8050-000000000000 2513`)
 	require.NotNil(t, m)
 	assert.NoError(t, err)
 	assert.Equal(t,
@@ -236,7 +257,7 @@ func TestCustomInfluxdbHttpd(t *testing.T) {
 		m)
 
 	// Parse an influxdb GET request
-	m, err = p.parseLine(`[httpd] ::1 - - [14/Jun/2016:12:10:02 +0100] "GET /query?db=logkit&q=SELECT+bytes%2Cresponse_time_us+FROM+logGrokParser_grok+WHERE+http_method+%3D+%27GET%27+AND+response_time_us+%3E+0+AND+time+%3E+now%28%29+-+1h HTTP/1.1" 200 578 "http://localhost:8083/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.84 Safari/537.36" 8a3806f1-3220-11e6-8006-000000000000 988`)
+	m, err = p.parse(`[httpd] ::1 - - [14/Jun/2016:12:10:02 +0100] "GET /query?db=logkit&q=SELECT+bytes%2Cresponse_time_us+FROM+logGrokParser_grok+WHERE+http_method+%3D+%27GET%27+AND+response_time_us+%3E+0+AND+time+%3E+now%28%29+-+1h HTTP/1.1" 200 578 "http://localhost:8083/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.84 Safari/537.36" 8a3806f1-3220-11e6-8006-000000000000 988`)
 	require.NotNil(t, m)
 	assert.NoError(t, err)
 	assert.Equal(t,
@@ -267,7 +288,7 @@ func TestBuiltinCommonLogFormat(t *testing.T) {
 	assert.NoError(t, p.compile())
 
 	// Parse an influxdb POST request
-	m, err := p.parseLine(`127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326`)
+	m, err := p.parse(`127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326`)
 	require.NotNil(t, m)
 	assert.NoError(t, err)
 	assert.Equal(t,
@@ -294,7 +315,7 @@ func TestBuiltinCommonLogFormatWithNumbers(t *testing.T) {
 	assert.NoError(t, p.compile())
 
 	// Parse an influxdb POST request
-	m, err := p.parseLine(`127.0.0.1 user1234 frank1234 [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326`)
+	m, err := p.parse(`127.0.0.1 user1234 frank1234 [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326`)
 	require.NotNil(t, m)
 	assert.NoError(t, err)
 	assert.Equal(t,
@@ -321,7 +342,7 @@ func TestBuiltinCombinedLogFormat(t *testing.T) {
 	assert.NoError(t, p.compile())
 
 	// Parse an influxdb POST request
-	m, err := p.parseLine(`127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326 "-" "Mozilla"`)
+	m, err := p.parse(`127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326 "-" "Mozilla"`)
 	require.NotNil(t, m)
 	assert.NoError(t, err)
 	assert.Equal(t,
@@ -353,7 +374,7 @@ func TestCompileStringAndParse(t *testing.T) {
 	}
 	assert.NoError(t, p.compile())
 
-	metricA, err := p.parseLine(`1.25 200 192.168.1.1 5.432µs`)
+	metricA, err := p.parse(`1.25 200 192.168.1.1 5.432µs`)
 	require.NotNil(t, metricA)
 	assert.NoError(t, err)
 	assert.Equal(t,
@@ -378,7 +399,7 @@ func TestCompileInvalidStringAndParse(t *testing.T) {
 	}
 	assert.NoError(t, p.compile())
 
-	metricA, err := p.parseLine(`1.25 200 192.168.1.1 5.432µs`)
+	metricA, err := p.parse(`1.25 200 192.168.1.1 5.432µs`)
 	require.NotNil(t, metricA)
 	assert.NoError(t, err)
 	assert.Equal(t,
@@ -403,7 +424,7 @@ func TestCompileErrorsOnInvalidPattern(t *testing.T) {
 	}
 	assert.Error(t, p.compile())
 
-	metricA, _ := p.parseLine(`1.25 200 192.168.1.1 5.432µs`)
+	metricA, _ := p.parse(`1.25 200 192.168.1.1 5.432µs`)
 	require.Nil(t, metricA)
 }
 
@@ -413,7 +434,7 @@ func TestParsePatternsWithoutCustom(t *testing.T) {
 	}
 	assert.NoError(t, p.compile())
 
-	metricA, err := p.parseLine(`1466004605359052000 response_time=20821 mymetric=10890.645`)
+	metricA, err := p.parse(`1466004605359052000 response_time=20821 mymetric=10890.645`)
 	require.NotNil(t, metricA)
 	assert.NoError(t, err)
 	assert.Equal(t,
@@ -432,7 +453,7 @@ func TestCompileFileAndParse(t *testing.T) {
 	}
 	assert.NoError(t, p.compile())
 
-	metricA, err := p.parseLine(`[04/Jun/2016:12:41:45 +0100] 1.25 200 192.168.1.1 5.432µs 101`)
+	metricA, err := p.parse(`[04/Jun/2016:12:41:45 +0100] 1.25 200 192.168.1.1 5.432µs 101`)
 	require.NotNil(t, metricA)
 	assert.NoError(t, err)
 	assert.Equal(t,
@@ -446,7 +467,7 @@ func TestCompileFileAndParse(t *testing.T) {
 		},
 		metricA)
 
-	metricB, err := p.parseLine(`[04/06/2016--12:41:45] 1.25 mystring dropme nomodifier`)
+	metricB, err := p.parse(`[04/06/2016--12:41:45] 1.25 mystring dropme nomodifier`)
 	require.NotNil(t, metricB)
 	assert.NoError(t, err)
 	assert.Equal(t,
@@ -469,7 +490,7 @@ func TestCompileNoModifiersAndParse(t *testing.T) {
 	}
 	assert.NoError(t, p.compile())
 
-	metricA, err := p.parseLine(`1.25 200 192.168.1.1 5.432µs`)
+	metricA, err := p.parse(`1.25 200 192.168.1.1 5.432µs`)
 	require.NotNil(t, metricA)
 	assert.NoError(t, err)
 	assert.Equal(t,
@@ -491,7 +512,7 @@ func TestCompileNoNamesAndParse(t *testing.T) {
 	}
 	assert.NoError(t, p.compile())
 
-	metricA, err := p.parseLine(`1.25 200 192.168.1.1 5.432µs`)
+	metricA, err := p.parse(`1.25 200 192.168.1.1 5.432µs`)
 	require.Nil(t, metricA)
 	assert.Error(t, err)
 }
@@ -503,7 +524,7 @@ func TestParseNoMatch(t *testing.T) {
 	}
 	assert.NoError(t, p.compile())
 
-	metricA, err := p.parseLine(`[04/Jun/2016:12:41:45 +0100] notnumber 200 192.168.1.1 5.432µs 101`)
+	metricA, err := p.parse(`[04/Jun/2016:12:41:45 +0100] notnumber 200 192.168.1.1 5.432µs 101`)
 	assert.Error(t, err)
 	assert.Nil(t, metricA)
 }
@@ -535,7 +556,7 @@ func TestParseErrors(t *testing.T) {
 		`,
 	}
 	assert.Error(t, p.compile())
-	_, err := p.parseLine(`[04/Jun/2016:12:41:45 +0100] notnumber 200 192.168.1.1 5.432µs 101`)
+	_, err := p.parse(`[04/Jun/2016:12:41:45 +0100] notnumber 200 192.168.1.1 5.432µs 101`)
 	assert.Error(t, err)
 
 	// Parse fails because myword is not an long
@@ -546,7 +567,7 @@ func TestParseErrors(t *testing.T) {
 		`,
 	}
 	assert.NoError(t, p.compile())
-	_, err = p.parseLine(`04/Jun/2016:12:41:45 +0100 notnumber`)
+	_, err = p.parse(`04/Jun/2016:12:41:45 +0100 notnumber`)
 	assert.NoError(t, err) // 只打日志，不报错
 
 	// Parse fails because myword is not a float
@@ -557,7 +578,7 @@ func TestParseErrors(t *testing.T) {
 		`,
 	}
 	assert.NoError(t, p.compile())
-	_, err = p.parseLine(`04/Jun/2016:12:41:45 +0100 notnumber`)
+	_, err = p.parse(`04/Jun/2016:12:41:45 +0100 notnumber`)
 	assert.NoError(t, err) // 只打日志，不报错
 
 }
@@ -607,7 +628,7 @@ func TestParseMultiLine(t *testing.T) {
 		`[0x00007fec119d0ff8] +++ dump failed`,
 	}
 
-	data, err := p.parseLine(strings.Join(lines, "\n"))
+	data, err := p.parse(strings.Join(lines, "\n"))
 	assert.NoError(t, err)
 	assert.Equal(t,
 		Data{
@@ -761,7 +782,7 @@ func TestCompileFileAndParseMultiLine(t *testing.T) {
 	}
 	assert.NoError(t, p.compile())
 
-	multiLine, err := p.parseLine(`[2017-03-28 12:34:56.123456][12345] Level 5:
+	multiLine, err := p.parse(`[2017-03-28 12:34:56.123456][12345] Level 5:
 发送时间[2017-03-27 01:23:45.67],接收时间[20T09:57:58.123456]
 本地队列名:[ABCDEFGHIJK],
 报文发送队列名:[ABCDEFGHIJKLMNOPQRST],
@@ -802,7 +823,7 @@ func TestNagiosLog(t *testing.T) {
 		Patterns: []string{"%{NAGIOSLOGLINE}", "%{NAGIOSLOGOTHER}"},
 	}
 	assert.NoError(t, p.compile())
-	got, err := p.parseLine(`[1473609600] CURRENT HOST STATE: test_zzebgd;UP;HARD;1;PING OK - Packet loss = 0%, RTA = 0.26 ms`)
+	got, err := p.parse(`[1473609600] CURRENT HOST STATE: test_zzebgd;UP;HARD;1;PING OK - Packet loss = 0%, RTA = 0.26 ms`)
 	assert.NoError(t, err)
 	assert.Equal(t, Data{
 		"nagios_epoch":     "1473609600",
@@ -813,7 +834,7 @@ func TestNagiosLog(t *testing.T) {
 		"nagios_statecode": "1",
 		"nagios_message":   "PING OK - Packet loss = 0%, RTA = 0.26 ms",
 	}, got)
-	got, err = p.parseLine(`[1474520444] Auto-save of retention data completed successfully.`)
+	got, err = p.parse(`[1474520444] Auto-save of retention data completed successfully.`)
 	assert.Equal(t, Data{
 		"nagios_epoch": "1474520444",
 		"nagios_log":   "Auto-save of retention data completed successfully.",

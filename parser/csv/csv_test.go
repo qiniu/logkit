@@ -20,9 +20,9 @@ import (
 
 var bench []Data
 
-// old: 5	 258934606 ns/op routine = 1  lines length = 51151(2MB)
-// now: 3	 356798749 ns/op routine = 1  lines length = 51151
-// now: 5	 224379185 ns/op routine = 2  lines length = 51151
+// old: 5	 258934606 ns/op routine = 1  (2MB)
+// now: 3	 356798749 ns/op routine = 1  (2MB)
+// now: 5	 224379185 ns/op routine = 2  (2MB)
 func Benchmark_ParseLine(b *testing.B) {
 	c := conf.MapConf{}
 	c[parser.KeyParserName] = "testparser"
