@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/qiniu/log"
@@ -28,6 +30,7 @@ type Parser struct {
 	schema               map[string]string
 	labels               []parser.Label
 	disableRecordErrData bool
+	numRoutine           int
 }
 
 func NewParser(c conf.MapConf) (parser.Parser, error) {
@@ -41,6 +44,10 @@ func NewNginxAccParser(c conf.MapConf) (p *Parser, err error) {
 	labelList, _ := c.GetStringListOr(parser.KeyLabels, []string{})
 	nameMap := make(map[string]struct{})
 	labels := parser.GetLabels(labelList, nameMap)
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = NumCPU
+	}
 
 	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
 
@@ -48,6 +55,7 @@ func NewNginxAccParser(c conf.MapConf) (p *Parser, err error) {
 		name:                 name,
 		labels:               labels,
 		disableRecordErrData: disableRecordErrData,
+		numRoutine:           numRoutine,
 	}
 	p.schema, err = p.parseSchemaFields(schema)
 	if err != nil {
@@ -105,40 +113,76 @@ func (p *Parser) Type() string {
 }
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
-	var ret []Data
+	datas := make([]Data, 0, len(lines))
 	se := &StatsError{}
-	for idx, line := range lines {
-		line = strings.TrimSpace(line)
-		if len(line) <= 0 {
-			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
+
+	numRoutine := p.numRoutine
+	if len(lines) < numRoutine {
+		numRoutine = len(lines)
+	}
+	sendChan := make(chan parser.ParseInfo)
+	resultChan := make(chan parser.ParseResult)
+
+	wg := new(sync.WaitGroup)
+	for i := 0; i < numRoutine; i++ {
+		wg.Add(1)
+		go parser.ParseLine(sendChan, resultChan, wg, true, p.parse)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, line := range lines {
+			sendChan <- parser.ParseInfo{
+				Line:  line,
+				Index: idx,
+			}
+		}
+		close(sendChan)
+	}()
+
+	var parseResultSlice = make(parser.ParseResultSlice, 0, len(lines))
+	for resultInfo := range resultChan {
+		parseResultSlice = append(parseResultSlice, resultInfo)
+	}
+	sort.Stable(parseResultSlice)
+
+	for _, parseResult := range parseResultSlice {
+		if len(parseResult.Line) == 0 {
+			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
 			continue
 		}
-		data, err := p.parseline(line)
-		if err != nil {
-			se.ErrorDetail = err
+
+		if parseResult.Err != nil {
+			log.Debug(parseResult.Err)
 			se.AddErrors()
+			se.ErrorDetail = parseResult.Err
 			if !p.disableRecordErrData {
-				errData := make(Data)
-				errData[KeyPandoraStash] = line
-				ret = append(ret, errData)
+				datas = append(datas, Data{
+					KeyPandoraStash: parseResult.Line,
+				})
 			} else {
-				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
+				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
 			}
 			continue
 		}
-		if len(data) < 1 { //数据不为空的时候发送
-			se.ErrorDetail = fmt.Errorf("parsed no data by line [%v]", line)
+		if len(parseResult.Data) < 1 { //数据为空时不发送
+			se.ErrorDetail = fmt.Errorf("parsed no data by line [%v]", parseResult.Line)
 			se.AddErrors()
 			continue
 		}
 		se.AddSuccess()
-		log.Debugf("D! parse result(%v)", data)
-		ret = append(ret, data)
+		log.Debugf("D! parse result(%v)", parseResult.Data)
+		datas = append(datas, parseResult.Data)
 	}
-	return ret, se
+
+	return datas, se
 }
 
-func (p *Parser) parseline(line string) (Data, error) {
+func (p *Parser) parse(line string) (Data, error) {
 	line = strings.Trim(line, "\n")
 	re := p.regexp
 	fields := re.FindStringSubmatch(line)

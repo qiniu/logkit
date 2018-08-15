@@ -2,16 +2,13 @@ package json
 
 import (
 	"fmt"
-
+	"sort"
 	"strings"
+	"sync"
 
 	"github.com/json-iterator/go"
 
 	"github.com/qiniu/log"
-
-	"sync"
-
-	"sort"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
@@ -29,7 +26,7 @@ type Parser struct {
 	labels               []parser.Label
 	disableRecordErrData bool
 	jsontool             jsoniter.API
-	routineNumber        int
+	numRoutine           int
 }
 
 func NewParser(c conf.MapConf) (parser.Parser, error) {
@@ -43,9 +40,9 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	}.Froze()
 
 	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
-	routineNumber := MaxProcs
-	if routineNumber == 0 {
-		routineNumber = NumCpu
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = NumCPU
 	}
 
 	return &Parser{
@@ -53,7 +50,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		labels:               labels,
 		jsontool:             jsontool,
 		disableRecordErrData: disableRecordErrData,
-		routineNumber:        routineNumber,
+		numRoutine:           numRoutine,
 	}, nil
 }
 
@@ -68,15 +65,15 @@ func (p *Parser) Type() string {
 func (p *Parser) Parse(lines []string) ([]Data, error) {
 	datas := make([]Data, 0, len(lines))
 	se := &StatsError{}
-	routineNumber := p.routineNumber
-	if len(lines) < routineNumber {
-		routineNumber = len(lines)
+	numRoutine := p.numRoutine
+	if len(lines) < numRoutine {
+		numRoutine = len(lines)
 	}
 	sendChan := make(chan parser.ParseInfo)
 	resultChan := make(chan parser.ParseResult)
 
 	wg := new(sync.WaitGroup)
-	for i := 0; i < routineNumber; i++ {
+	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
 		go p.parseLine(sendChan, resultChan, wg)
 	}
@@ -120,57 +117,50 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 			}
 			continue
 		}
-		if len(parseResult.Data) < 1 && len(parseResult.Datas) < 1 { //数据为空时不发送
+		if len(parseResult.Datas) == 0 { //数据为空时不发送
 			se.ErrorDetail = fmt.Errorf("parsed no data by line [%v]", parseResult.Line)
 			se.AddErrors()
 			continue
 		}
+
 		se.AddSuccess()
-		if len(parseResult.Data) == 0 {
-			datas = append(datas, parseResult.Datas...)
-			continue
-		}
+		datas = append(datas, parseResult.Datas...)
 	}
 
 	return datas, se
 }
 
-func (p *Parser) parse(line string) (data Data, err error) {
-	data = make(Data)
-	if err = p.jsontool.Unmarshal([]byte(line), &data); err != nil {
-		err = fmt.Errorf("parse json line error %v, raw data is: %v", err, TruncateStrSize(line, DefaultTruncateMaxSize))
-	if err = p.jsontool.Unmarshal([]byte(line), &data); err != nil {
-		err = fmt.Errorf("parse json line error %v, raw data is: %v", err, TruncateStrSize(line, DefaultTruncateMaxSize))
-		log.Debug(err)
-		return
-	}
-	for _, l := range p.labels {
-		// label 不覆盖数据，其他parser不需要这么一步检验，因为Schema固定，json的Schema不固定
-		if _, ok := data[l.Name]; ok {
-			continue
-		}
-		data[l.Name] = l.Value
-	}
-	return
-}
-
-func (p *Parser) parseLineMutiData(line string) (data []Data, err error) {
-	data = make([]Data, 0)
-	if err = p.jsontool.Unmarshal([]byte(line), &data); err != nil {
-		err = fmt.Errorf("parse json line error %v, raw data is: %v", err, line)
-		log.Debug(err)
-		return
-	}
-	for i := range data {
+func (p *Parser) parse(line string) (dataSlice []Data, err error) {
+	data := make(Data)
+	if err = p.jsontool.Unmarshal([]byte(line), &data); err == nil {
 		for _, l := range p.labels {
 			// label 不覆盖数据，其他parser不需要这么一步检验，因为Schema固定，json的Schema不固定
-			if _, ok := data[i][l.Name]; ok {
+			if _, ok := data[l.Name]; ok {
 				continue
 			}
-			data[i][l.Name] = l.Value
+			data[l.Name] = l.Value
+		}
+		return []Data{data}, nil
+	}
+
+	dataSlice = make([]Data, 0)
+	if err = p.jsontool.Unmarshal([]byte(line), &dataSlice); err != nil {
+		err = fmt.Errorf("parse json line error %v, raw data is: %v", err, line)
+		log.Debug(err)
+		return nil, err
+	}
+
+	for i := range dataSlice {
+		for _, l := range p.labels {
+			// label 不覆盖数据，其他parser不需要这么一步检验，因为Schema固定，json的Schema不固定
+			if _, ok := dataSlice[i][l.Name]; ok {
+				continue
+			}
+			dataSlice[i][l.Name] = l.Value
 		}
 	}
-	return
+
+	return dataSlice, nil
 }
 
 func (p *Parser) parseLine(sendChan chan parser.ParseInfo, resultChan chan parser.ParseResult, wg *sync.WaitGroup) {
@@ -184,22 +174,12 @@ func (p *Parser) parseLine(sendChan chan parser.ParseInfo, resultChan chan parse
 			continue
 		}
 
-		data, err1 := p.parse(parseInfo.Line)
-		if err1 == nil {
-			resultChan <- parser.ParseResult{
-				Line:  parseInfo.Line,
-				Index: parseInfo.Index,
-				Data:  data,
-			}
-			continue
-		}
-
-		datas, err2 := p.parseLineMutiData(parseInfo.Line)
+		datas, err := p.parse(parseInfo.Line)
 		resultChan <- parser.ParseResult{
 			Line:  parseInfo.Line,
 			Index: parseInfo.Index,
 			Datas: datas,
-			Err:   err2,
+			Err:   err,
 		}
 	}
 	wg.Done()

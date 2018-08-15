@@ -63,7 +63,7 @@ const (
 
 var (
 	MaxProcs = 0
-	NumCpu   = runtime.NumCPU()
+	NumCPU   = runtime.NumCPU()
 )
 
 type Option struct {

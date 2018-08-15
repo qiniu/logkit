@@ -15,22 +15,21 @@ import (
 var (
 	grokBench Data
 	bench     []Data
+	testData  = utils.GetTestData(`127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326`)
 )
 
 // old: 1		4154037708 ns/op 	routine = 1  (2MB)
 // now: 1		4582286082 ns/op 	routine = 1  (2MB)
-// now: 1000	1349395 ns/op 		routine = 2  (2MB)
+// now: 1		2242491924 ns/op 	routine = 2  (2MB)
 func Benchmark_GrokParse_NGINX(b *testing.B) {
 	p := &Parser{
-		Patterns:      []string{"%{NGINX_LOG}"},
-		routineNumber: 2,
+		Patterns:   []string{"%{NGINX_LOG}"},
+		numRoutine: 2,
 	}
 	p.compile()
 
 	var m []Data
-	for n := 0; n < b.N; n++ {
-		m, _ = p.Parse(utils.GetTestData(`127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326`))
-	}
+	m, _ = p.Parse(testData)
 	bench = m
 }
 
@@ -757,7 +756,8 @@ func TestAddCustomPatterns(t *testing.T) {
 
 func TestNginxTimeParseForErrData(t *testing.T) {
 	p := &Parser{
-		Patterns: []string{"%{test}"},
+		Patterns:   []string{"%{test}"},
+		numRoutine: 2,
 	}
 
 	lines := []string{`192.168.45.53 - - [05/Apr/2017:17:25:06 +0800] "POST /v2/repos/kodo_z0_app_pfdstg/data HTTP/1.1" 200 497 2 "-" "Go 1.1 package http" "-" 192.168.160.1:80 pipeline.qiniu.io KBkAAD7W6-UfdrIU 0.139`}

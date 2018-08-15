@@ -41,7 +41,7 @@ type Parser struct {
 	allmoreStartNUmber   int
 	allowNotMatch        bool
 	ignoreInvalid        bool
-	routineNumber        int
+	numRoutine           int
 }
 
 type field struct {
@@ -98,9 +98,9 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	}
 	allmoreStartNumber, _ := c.GetIntOr(parser.KeyCSVAllowMoreStartNum, 0)
 	ignoreInvalid, _ := c.GetBoolOr(parser.KeyCSVIgnoreInvalidField, false)
-	routineNumber := MaxProcs
-	if routineNumber == 0 {
-		routineNumber = NumCpu
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = NumCPU
 	}
 	return &Parser{
 		name:                 name,
@@ -114,7 +114,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		allowMoreName:        allowMoreName,
 		ignoreInvalid:        ignoreInvalid,
 		allmoreStartNUmber:   allmoreStartNumber,
-		routineNumber:        routineNumber,
+		numRoutine:           numRoutine,
 	}, nil
 }
 
@@ -484,17 +484,17 @@ func HasSpace(spliter string) bool {
 func (p *Parser) Parse(lines []string) ([]Data, error) {
 	datas := make([]Data, 0, len(lines))
 	se := &StatsError{}
-	routineNumber := p.routineNumber
-	if len(lines) < routineNumber {
-		routineNumber = len(lines)
+	numRoutine := p.numRoutine
+	if len(lines) < numRoutine {
+		numRoutine = len(lines)
 	}
 	sendChan := make(chan parser.ParseInfo)
 	resultChan := make(chan parser.ParseResult)
 
 	wg := new(sync.WaitGroup)
-	for i := 0; i < routineNumber; i++ {
+	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
-		go p.parseLine(sendChan, resultChan, wg)
+		go parser.ParseLine(sendChan, resultChan, wg, !HasSpace(p.delim), p.parse)
 	}
 
 	go func() {
@@ -547,28 +547,4 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 	}
 
 	return datas, se
-}
-
-func (p *Parser) parseLine(sendChan chan parser.ParseInfo, resultChan chan parser.ParseResult, wg *sync.WaitGroup) {
-	for parseInfo := range sendChan {
-		if !HasSpace(p.delim) {
-			parseInfo.Line = strings.TrimSpace(parseInfo.Line)
-		}
-		if len(parseInfo.Line) <= 0 {
-			resultChan <- parser.ParseResult{
-				Line:  parseInfo.Line,
-				Index: parseInfo.Index,
-			}
-			continue
-		}
-
-		data, err := p.parse(parseInfo.Line)
-		resultChan <- parser.ParseResult{
-			Line:  parseInfo.Line,
-			Index: parseInfo.Index,
-			Data:  data,
-			Err:   err,
-		}
-	}
-	wg.Done()
 }

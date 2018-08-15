@@ -9,6 +9,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -28,10 +29,28 @@ func init() {
 		"remote_user": "-", "body_bytes_sent": int64(4259), "http_referer": `http://www.abc.cn`}
 }
 
-var cfg = conf.MapConf{"name": "nginx", "disable_record_errdata": "true", parser.NginxConfPath: "test_data/nginx.conf", parser.NginxLogFormat: "main", parser.NginxSchema: "remote_addr:string, remote_user:string, time_local:date, request:string, status:long, bytes_sent:long, body_bytes_sent:long, http_referer:string, http_user_agent:string, http_transfer_encoding:string, http_x_forwarded_for:string, upstream_addr:string, host:string, sent_http_x_reqid:string, upstream_response_time:string, request_time:float, request_length:long, upstream_http_x_tag:string, upstream_http_x_uid:string, http_x_stat:string, http_x_estat:string, http_x_from_cdn:string"}
-var cfg2 = conf.MapConf{"name": "nginx", parser.NginxConfPath: "test_data/nginx.conf", parser.NginxLogFormat: "logkit", parser.NginxSchema: "remote_addr:string, remote_user:string, time_local:date, request:string, status:long, bytes_sent:long, body_bytes_sent:long, http_referer:string, http_user_agent:string, http_transfer_encoding:string, http_x_forwarded_for:string, upstream_addr:string, host:string, sent_http_x_reqid:string, upstream_response_time:string, request_time:float, request_length:long, upstream_http_x_tag:string, upstream_http_x_uid:string, http_x_stat:string, http_x_estat:string, http_x_from_cdn:string"}
-var cfg3 = conf.MapConf{"name": "nginx", parser.NginxConfPath: "test_data/nginx.conf", parser.NginxLogFormat: "testmain", parser.NginxSchema: "remote_addr string, remote_user string, time_local date, request string, status long, bytes_sent long, body_bytes_sent long, http_referer string, http_user_agent string, http_x_forwarded_for string, upstream_addr string, host string, sent_http_x_reqid string, request_time float"}
-var cfg4 = conf.MapConf{"name": "nginx", parser.NginxFormatRegex: `^(?P<remote_addr>[^ ]*) - (?P<remote_user>[^ ]*) \[(?P<time_local>[^]]*)\] "(?P<request>[^"]*)" (?P<status>[^ ]*) (?P<bytes_sent>[^ ]*) (?P<body_bytes_sent>[^ ]*) "(?P<http_referer>[^"]*)" "(?P<http_user_agent>[^"]*)" "(?P<http_transfer_encoding>[^"]*)" "(?P<http_x_forwarded_for>[^"]*)" "(?P<upstream_addr>[^"]*)" (?P<host>[^ ]*) (?P<sent_http_x_reqid>[^ ]*) "(?P<upstream_response_time>[^"]*)" (?P<request_time>[^ ]*) (?P<request_length>[^ ]*) "(?P<upstream_http_x_tag>[^"]*)" "(?P<upstream_http_x_uid>[^"]*)" (?P<http_x_stat>[^ ]*) (?P<http_x_estat>[^ ]*) (?P<http_x_from_cdn>[^ ]*)$`, parser.NginxSchema: "remote_addr string, remote_user string, time_local date, request string, status long, bytes_sent long, body_bytes_sent long, http_referer string, http_user_agent string, http_x_forwarded_for string, upstream_addr string, host string, sent_http_x_reqid string, request_time float"}
+var (
+	cfg  = conf.MapConf{"name": "nginx", "disable_record_errdata": "true", parser.NginxConfPath: "test_data/nginx.conf", parser.NginxLogFormat: "main", parser.NginxSchema: "remote_addr:string, remote_user:string, time_local:date, request:string, status:long, bytes_sent:long, body_bytes_sent:long, http_referer:string, http_user_agent:string, http_transfer_encoding:string, http_x_forwarded_for:string, upstream_addr:string, host:string, sent_http_x_reqid:string, upstream_response_time:string, request_time:float, request_length:long, upstream_http_x_tag:string, upstream_http_x_uid:string, http_x_stat:string, http_x_estat:string, http_x_from_cdn:string"}
+	cfg2 = conf.MapConf{"name": "nginx", parser.NginxConfPath: "test_data/nginx.conf", parser.NginxLogFormat: "logkit", parser.NginxSchema: "remote_addr:string, remote_user:string, time_local:date, request:string, status:long, bytes_sent:long, body_bytes_sent:long, http_referer:string, http_user_agent:string, http_transfer_encoding:string, http_x_forwarded_for:string, upstream_addr:string, host:string, sent_http_x_reqid:string, upstream_response_time:string, request_time:float, request_length:long, upstream_http_x_tag:string, upstream_http_x_uid:string, http_x_stat:string, http_x_estat:string, http_x_from_cdn:string"}
+	cfg3 = conf.MapConf{"name": "nginx", parser.NginxConfPath: "test_data/nginx.conf", parser.NginxLogFormat: "testmain", parser.NginxSchema: "remote_addr string, remote_user string, time_local date, request string, status long, bytes_sent long, body_bytes_sent long, http_referer string, http_user_agent string, http_x_forwarded_for string, upstream_addr string, host string, sent_http_x_reqid string, request_time float"}
+	cfg4 = conf.MapConf{"name": "nginx", parser.NginxFormatRegex: `^(?P<remote_addr>[^ ]*) - (?P<remote_user>[^ ]*) \[(?P<time_local>[^]]*)\] "(?P<request>[^"]*)" (?P<status>[^ ]*) (?P<bytes_sent>[^ ]*) (?P<body_bytes_sent>[^ ]*) "(?P<http_referer>[^"]*)" "(?P<http_user_agent>[^"]*)" "(?P<http_transfer_encoding>[^"]*)" "(?P<http_x_forwarded_for>[^"]*)" "(?P<upstream_addr>[^"]*)" (?P<host>[^ ]*) (?P<sent_http_x_reqid>[^ ]*) "(?P<upstream_response_time>[^"]*)" (?P<request_time>[^ ]*) (?P<request_length>[^ ]*) "(?P<upstream_http_x_tag>[^"]*)" "(?P<upstream_http_x_uid>[^"]*)" (?P<http_x_stat>[^ ]*) (?P<http_x_estat>[^ ]*) (?P<http_x_from_cdn>[^ ]*)$`, parser.NginxSchema: "remote_addr string, remote_user string, time_local date, request string, status long, bytes_sent long, body_bytes_sent long, http_referer string, http_user_agent string, http_x_forwarded_for string, upstream_addr string, host string, sent_http_x_reqid string, request_time float"}
+
+	bench    []Data
+	testData = utils.GetTestData(`111.111.111.101 - - [30/Aug/2016:14:03:37 +0800] "GET /s5/M00/CE/91/xaxsxsxsxs HTTP/1.1" 200 4962 4259 "http://www.abc.cn" "Mozilla/5.0 (Windows NT 6.1; WOW64)" "-" "123.123.123.123" 192.168.41.58:5000 mirror.qiniu.com WEQAAM8htpudgG8U 0.204 0.204 938 - -  -`)
+)
+
+// old: 10	 128034530 ns/op	routine = 1  (2MB)
+// now: 10	 181913631 ns/op	routine = 1  (2MB)
+// now: 20	  79034431 ns/op	routine = 2  (2MB)
+func Benchmark_NginxParse(b *testing.B) {
+	p, _ := NewNginxAccParser(cfg)
+
+	var m []Data
+	for n := 0; n < b.N; n++ {
+		m, _ = p.Parse(testData)
+	}
+	bench = m
+}
 
 func TestNewNginxParser(t *testing.T) {
 	p, err := NewNginxAccParser(cfg)
@@ -143,7 +162,7 @@ func Benchmark_BenchNginxParser(b *testing.B) {
 	}
 	var m Data
 	for n := 0; n < b.N; n++ {
-		m, err = p.parseline(`123.0.0.1 - - [17/Jul/2017:14:56:24 +0800] "POST /v2/repos/x/data HTTP/1.1" 200 479 2 "-" "QiniuPandoraJava/0.0.1 (Linux amd64 2.6.32-696.1.1.el6.x86_64) Java/1.8.0_131" "-" 192.168.160.75:80 pipeline.qiniu.com abc123bdc 0.072`)
+		m, err = p.parse(`123.0.0.1 - - [17/Jul/2017:14:56:24 +0800] "POST /v2/repos/x/data HTTP/1.1" 200 479 2 "-" "QiniuPandoraJava/0.0.1 (Linux amd64 2.6.32-696.1.1.el6.x86_64) Java/1.8.0_131" "-" 192.168.160.75:80 pipeline.qiniu.com abc123bdc 0.072`)
 		if err != nil {
 			b.Fatal(err)
 		}

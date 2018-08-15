@@ -3,6 +3,8 @@ package parser
 import (
 	"errors"
 	"fmt"
+	"strings"
+	"sync"
 
 	"github.com/qiniu/logkit/conf"
 	. "github.com/qiniu/logkit/utils/models"
@@ -134,4 +136,29 @@ func (ps *Registry) NewLogParser(conf conf.MapConf) (p Parser, err error) {
 		return nil, fmt.Errorf("parser type not supported: %v", t)
 	}
 	return f(conf)
+}
+
+func ParseLine(sendChan chan ParseInfo, resultChan chan ParseResult, wg *sync.WaitGroup,
+	trimSpace bool, handlerFunc func(string) (Data, error)) {
+	for parseInfo := range sendChan {
+		if trimSpace {
+			parseInfo.Line = strings.TrimSpace(parseInfo.Line)
+		}
+		if len(parseInfo.Line) <= 0 {
+			resultChan <- ParseResult{
+				Line:  parseInfo.Line,
+				Index: parseInfo.Index,
+			}
+			continue
+		}
+
+		data, err := handlerFunc(parseInfo.Line)
+		resultChan <- ParseResult{
+			Line:  parseInfo.Line,
+			Index: parseInfo.Index,
+			Data:  data,
+			Err:   err,
+		}
+	}
+	wg.Done()
 }

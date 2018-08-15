@@ -5,17 +5,15 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/vjeantet/grok"
 
 	"github.com/qiniu/log"
-
-	"sync"
-
-	"sort"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
@@ -88,7 +86,7 @@ type Parser struct {
 	patterns map[string]string
 	g        *grok.Grok
 
-	routineNumber int
+	numRoutine int
 }
 
 func NewParser(c conf.MapConf) (parser.Parser, error) {
@@ -109,9 +107,9 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 
 	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
 
-	routineNumber := MaxProcs
-	if routineNumber == 0 {
-		routineNumber = NumCpu
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = NumCPU
 	}
 
 	p := &Parser{
@@ -123,7 +121,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		CustomPatternFiles:   customPatternFiles,
 		timeZoneOffset:       timeZoneOffset,
 		disableRecordErrData: disableRecordErrData,
-		routineNumber:        routineNumber,
+		numRoutine:           numRoutine,
 	}
 	err = p.compile()
 	if err != nil {
@@ -189,17 +187,17 @@ func (p *Parser) Type() string {
 func (p *Parser) Parse(lines []string) ([]Data, error) {
 	datas := make([]Data, 0, len(lines))
 	se := &StatsError{}
-	routineNumber := p.routineNumber
-	if len(lines) < routineNumber {
-		routineNumber = len(lines)
+	numRoutine := p.numRoutine
+	if len(lines) < numRoutine {
+		numRoutine = len(lines)
 	}
 	sendChan := make(chan parser.ParseInfo)
 	resultChan := make(chan parser.ParseResult)
 
 	wg := new(sync.WaitGroup)
-	for i := 0; i < routineNumber; i++ {
+	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
-		go p.parseLine(sendChan, resultChan, wg)
+		go parser.ParseLine(sendChan, resultChan, wg, true, p.parse)
 	}
 
 	go func() {
@@ -430,26 +428,4 @@ func (p *Parser) parseTypedCaptures(name, pattern string) (string, error) {
 	}
 
 	return pattern, nil
-}
-
-func (p *Parser) parseLine(sendChan chan parser.ParseInfo, resultChan chan parser.ParseResult, wg *sync.WaitGroup) {
-	for parseInfo := range sendChan {
-		parseInfo.Line = strings.TrimSpace(parseInfo.Line)
-		if len(parseInfo.Line) <= 0 {
-			resultChan <- parser.ParseResult{
-				Line:  parseInfo.Line,
-				Index: parseInfo.Index,
-			}
-			continue
-		}
-
-		data, err := p.parse(parseInfo.Line)
-		resultChan <- parser.ParseResult{
-			Line:  parseInfo.Line,
-			Index: parseInfo.Index,
-			Data:  data,
-			Err:   err,
-		}
-	}
-	wg.Done()
 }
