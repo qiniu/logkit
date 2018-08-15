@@ -1678,6 +1678,7 @@ func (r *Reader) getCheckAll(queryType int) (checkAll bool, err error) {
 
 	return true, nil
 }
+
 //根据数据库类型返回表名
 func getWrappedTableName(dbtype string, table string) (tableName string, err error) {
 	switch dbtype {
