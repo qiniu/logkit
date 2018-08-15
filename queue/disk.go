@@ -15,41 +15,48 @@ import (
 	"time"
 
 	"github.com/qiniu/log"
+
 	"github.com/qiniu/logkit/rateio"
+	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
+
+var _ BackendQueue = &diskQueue{}
 
 // diskQueue implements the BackendQueue interface
 // providing a filesystem backed FIFO queue
 type diskQueue struct {
 	// 64bit atomic vars need to be first for proper alignment on 32bit platforms
 
-	// run-time state (also persisted to disk)
-	readPos      int64
-	writePos     int64
-	readFileNum  int64
-	writeFileNum int64
-	depth        int64
-	depthMemory  int64
+	// 运行状态相关变量（部分会通过元数据文件存取）
+	readFileNum          int64
+	readPos              int64
+	writeFileNum         int64
+	writePos             int64
+	depthMemory          int64
+	depth                int64
+	currentDiskUsedBytes int64
 
 	sync.RWMutex
 
-	// instantiation time metadata
-	name            string
-	dataPath        string
-	maxBytesPerFile int64 // NOTE: currently this cannot change once created
-	minMsgSize      int32
-	maxMsgSize      int32
-	syncEveryWrite  int64         // number of writes per fsync
-	syncEveryRead   int64         // number of reads per fsync
-	syncTimeout     time.Duration // duration of time per fsync
-	exitFlag        int32
-	needSync        bool
-	writeLimit      int // 限速 单位byte
-	enableMemory    bool
-	maxMemoryLength int64
+	// 实例化时获取的配置
+	name                string
+	dataPath            string // 存放文件的目录
+	maxBytesPerFile     int64  // NOTE: currently this cannot change once created
+	minMsgSize          int32
+	maxMsgSize          int32
+	syncEveryWrite      int64         // number of writes per fsync
+	syncEveryRead       int64         // number of reads per fsync
+	syncTimeout         time.Duration // duration of time per fsync
+	exitFlag            int32
+	needSync            bool
+	writeRateLimit      int // 限速 单位byte
+	enableMemoryQueue   bool
+	memoryQueueSize     int64
+	enableDiskUsedLimit bool
+	maxDiskUsedBytes    int64
 
-	// keeps track of the position where we have read
-	// (but not yet sent over readChan)
+	// 尚未通过 readChan 更新的实际最新读取位置
 	nextReadPos     int64
 	nextReadFileNum int64
 
@@ -67,48 +74,70 @@ type diskQueue struct {
 	// internal channels
 	writeChan         chan []byte
 	writeResponseChan chan error
-	emptyChan         chan int
+	emptyChan         chan struct{}
 	emptyResponseChan chan error
-	exitChan          chan int
-	exitSyncChan      chan int
+	exitChan          chan struct{}
+	exitSyncChan      chan struct{}
+}
+
+type NewDiskQueueOptions struct {
+	Name              string
+	DataPath          string
+	MaxBytesPerFile   int64
+	MinMsgSize        int32
+	MaxMsgSize        int32
+	SyncEveryWrite    int64
+	SyncEveryRead     int64
+	SyncTimeout       time.Duration
+	WriteRateLimit    int
+	EnableMemoryQueue bool
+	MemoryQueueSize   int64
+
+	// DisableDiskUsedLimit 指示是否禁用磁盘占用限制，超出限制后数据将不会再写入到文件而被直接丢弃
+	DisableDiskUsedLimit bool
+	MaxDiskUsedBytes     int64
 }
 
 // newDiskQueue instantiates a new instance of diskQueue, retrieving metadata
 // from the filesystem and starting the read ahead goroutine
-func NewDiskQueue(name string, dataPath string, maxBytesPerFile int64,
-	minMsgSize int32, maxMsgSize int32,
-	syncEveryWrite, syncEveryRead int64, syncTimeout time.Duration, writeLimit int,
-	enableMemory bool, maxMemoryLength int) BackendQueue {
-	if !enableMemory {
-		maxMemoryLength = 0
-	} else if enableMemory && maxMemoryLength <= 0 {
-		maxMemoryLength = 100
+func NewDiskQueue(opts NewDiskQueueOptions) BackendQueue {
+	if !opts.EnableMemoryQueue {
+		opts.MemoryQueueSize = 0
+	} else if opts.EnableMemoryQueue && opts.MemoryQueueSize <= 0 {
+		opts.MemoryQueueSize = 100
 	}
+
+	if !opts.DisableDiskUsedLimit && opts.MaxDiskUsedBytes <= 0 {
+		opts.MaxDiskUsedBytes = 32 * GB
+	}
+
 	d := diskQueue{
-		name:              name,
-		dataPath:          dataPath,
-		maxBytesPerFile:   maxBytesPerFile,
-		minMsgSize:        minMsgSize,
-		maxMsgSize:        maxMsgSize,
-		enableMemory:      enableMemory,
-		maxMemoryLength:   int64(maxMemoryLength),
-		readChan:          make(chan []byte),
-		memoryChan:        make(chan []byte, maxMemoryLength),
-		writeChan:         make(chan []byte),
-		writeResponseChan: make(chan error),
-		emptyChan:         make(chan int),
-		emptyResponseChan: make(chan error),
-		exitChan:          make(chan int),
-		exitSyncChan:      make(chan int),
-		syncEveryWrite:    syncEveryWrite,
-		syncEveryRead:     syncEveryRead,
-		syncTimeout:       syncTimeout,
-		writeLimit:        writeLimit,
+		name:                opts.Name,
+		dataPath:            opts.DataPath,
+		maxBytesPerFile:     opts.MaxBytesPerFile,
+		minMsgSize:          opts.MinMsgSize,
+		maxMsgSize:          opts.MaxMsgSize,
+		enableMemoryQueue:   opts.EnableMemoryQueue,
+		memoryQueueSize:     opts.MemoryQueueSize,
+		enableDiskUsedLimit: !opts.DisableDiskUsedLimit,
+		maxDiskUsedBytes:    opts.MaxDiskUsedBytes,
+		readChan:            make(chan []byte),
+		memoryChan:          make(chan []byte, opts.MemoryQueueSize),
+		writeChan:           make(chan []byte),
+		writeResponseChan:   make(chan error),
+		emptyChan:           make(chan struct{}),
+		emptyResponseChan:   make(chan error),
+		exitChan:            make(chan struct{}),
+		exitSyncChan:        make(chan struct{}),
+		syncEveryWrite:      opts.SyncEveryWrite,
+		syncEveryRead:       opts.SyncEveryRead,
+		syncTimeout:         opts.SyncTimeout,
+		writeRateLimit:      opts.WriteRateLimit,
 	}
 
 	// no need to lock here, nothing else could possibly be touching this instance
 	err := d.retrieveMetaData()
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil {
 		log.Warnf("ERROR: diskqueue(%s) failed to retrieveMetaData - %s", d.name, err)
 	}
 
@@ -165,6 +194,9 @@ func (d *diskQueue) exit(deleted bool) error {
 	d.Lock()
 	defer d.Unlock()
 
+	if d.exitFlag == 1 {
+		return nil
+	}
 	d.exitFlag = 1
 
 	if deleted {
@@ -202,7 +234,7 @@ func (d *diskQueue) Empty() error {
 
 	log.Warnf("DISKQUEUE(%s): emptying", d.name)
 
-	d.emptyChan <- 1
+	d.emptyChan <- struct{}{}
 	return <-d.emptyResponseChan
 }
 
@@ -258,6 +290,10 @@ func (d *diskQueue) skipToNextRWFile() error {
 	d.nextReadFileNum = d.writeFileNum
 	d.nextReadPos = 0
 	atomic.StoreInt64(&d.depth, 0)
+
+	if d.enableDiskUsedLimit {
+		atomic.StoreInt64(&d.currentDiskUsedBytes, 0)
+	}
 
 	return err
 }
@@ -322,7 +358,7 @@ func (d *diskQueue) readOne() ([]byte, error) {
 	// as the first 8 bytes (at creation time) ensuring that
 	// the value can change without affecting runtime
 	//
-	// NOTE: 注意这里的逻辑，意味着使用者不能随意更改 maxBytesPerFile 这个值
+	// NOTE: 注意这里的逻辑，意味着使用者不能随意更改 maxBytesPerFile 这个值，可以考虑在切文件的时候拿到当前读文件的 size
 	if d.nextReadPos > d.maxBytesPerFile {
 		if d.readFile != nil {
 			d.readFile.Close()
@@ -339,8 +375,14 @@ func (d *diskQueue) readOne() ([]byte, error) {
 // writeOne performs a low level filesystem write for a single []byte
 // while advancing write positions and rolling files, if necessary
 func (d *diskQueue) writeOne(data []byte) error {
-	var err error
+	dataLen := int32(len(data))
+	totalBytes := int64(4 + dataLen)
 
+	if d.enableDiskUsedLimit && atomic.LoadInt64(&d.currentDiskUsedBytes)+totalBytes > d.maxDiskUsedBytes {
+		return fmt.Errorf("current disk used bytes has exceeded max disk used bytes: %d", d.maxDiskUsedBytes)
+	}
+
+	var err error
 	if d.writeFile == nil {
 		curFileName := d.fileName(d.writeFileNum)
 		d.writeFile, err = os.OpenFile(curFileName, os.O_RDWR|os.O_CREATE, 0600)
@@ -360,8 +402,6 @@ func (d *diskQueue) writeOne(data []byte) error {
 		}
 	}
 
-	dataLen := int32(len(data))
-
 	if dataLen < d.minMsgSize || dataLen > d.maxMsgSize {
 		return fmt.Errorf("invalid message write size (%d)", dataLen)
 	}
@@ -373,7 +413,7 @@ func (d *diskQueue) writeOne(data []byte) error {
 	}
 
 	mr := io.MultiReader(&d.writeBuf, bytes.NewReader(data))
-	writer := rateio.NewRateWriter(d.writeFile, d.writeLimit)
+	writer := rateio.NewRateWriter(d.writeFile, d.writeRateLimit)
 	_, err = io.Copy(writer, mr)
 	if err != nil {
 		log.Warn("io.Copy error -", err)
@@ -384,9 +424,12 @@ func (d *diskQueue) writeOne(data []byte) error {
 	}
 	writer.Close()
 
-	totalBytes := int64(4 + dataLen)
 	d.writePos += totalBytes
 	atomic.AddInt64(&d.depth, 1)
+
+	if d.enableDiskUsedLimit {
+		atomic.AddInt64(&d.currentDiskUsedBytes, totalBytes)
+	}
 
 	// 注意这里是写完这一个消息之后才滚动
 	if d.writePos > d.maxBytesPerFile {
@@ -410,7 +453,7 @@ func (d *diskQueue) writeOne(data []byte) error {
 }
 
 func (d *diskQueue) writeMemory(msg []byte) error {
-	if atomic.LoadInt64(&d.depthMemory) >= d.maxMemoryLength {
+	if atomic.LoadInt64(&d.depthMemory) >= d.memoryQueueSize {
 		return errors.New("memory channel is full")
 	}
 	select {
@@ -426,7 +469,11 @@ func (d *diskQueue) saveToDisk() {
 	for {
 		select {
 		case msg := <-d.memoryChan:
-			d.writeOne(msg)
+			err := d.writeOne(msg)
+			if err != nil {
+				// FIXME: 需要一个合适的方案防止数据丢失
+				log.Errorf("DISKQUEUE(%s): drop one msg from memory chan - %v", d.name, err)
+			}
 		default:
 			return
 		}
@@ -453,13 +500,14 @@ func (d *diskQueue) sync() error {
 	return nil
 }
 
-// retrieveMetaData initializes state from the filesystem
+// retrieveMetaData 从 meta 文件中获取上次保存的状态数据，用于初始化 diskQueue
 func (d *diskQueue) retrieveMetaData() error {
-	var f *os.File
-	var err error
+	metaPath := d.metaDataFileName()
+	if !utils.IsExist(metaPath) {
+		return nil
+	}
 
-	fileName := d.metaDataFileName()
-	f, err = os.OpenFile(fileName, os.O_RDONLY, 0600)
+	f, err := os.OpenFile(metaPath, os.O_RDONLY, 0600)
 	if err != nil {
 		return err
 	}
@@ -477,19 +525,33 @@ func (d *diskQueue) retrieveMetaData() error {
 	d.nextReadFileNum = d.readFileNum
 	d.nextReadPos = d.readPos
 
+	// 如开启磁盘用量限制，则需计算出当前已占用磁盘字节数
+	if !d.enableDiskUsedLimit {
+		return nil
+	}
+	for i := d.readFileNum; i <= d.writeFileNum; i++ {
+		fpath := d.fileName(i)
+		if !utils.IsExist(fpath) {
+			continue
+		}
+
+		fi, err := os.Stat(fpath)
+		if err != nil {
+			return err
+		}
+		atomic.AddInt64(&d.currentDiskUsedBytes, fi.Size())
+	}
 	return nil
 }
 
 // persistMetaData atomically writes state to the filesystem
 func (d *diskQueue) persistMetaData() error {
-	var f *os.File
-	var err error
 
 	fileName := d.metaDataFileName()
 	tmpFileName := fmt.Sprintf("%s.%d.tmp", fileName, rand.Int())
 
 	// write to tmp file
-	f, err = os.OpenFile(tmpFileName, os.O_RDWR|os.O_CREATE, 0600)
+	f, err := os.OpenFile(tmpFileName, os.O_RDWR|os.O_CREATE, 0600)
 	if err != nil {
 		return err
 	}
@@ -574,10 +636,19 @@ func (d *diskQueue) moveForward() {
 		// sync every time we start reading from a new file
 		d.needSync = true
 
-		fn := d.fileName(oldReadFileNum)
-		err := os.Remove(fn)
-		if err != nil {
-			log.Warnf("ERROR: failed to Remove(%s) - %s", fn, err)
+		fpath := d.fileName(oldReadFileNum)
+		if utils.IsExist(fpath) {
+			fi, err := os.Stat(fpath)
+			if err != nil {
+				log.Warnf("ERROR: failed to stat file %q: %s", fpath, err)
+			} else {
+				atomic.AddInt64(&d.currentDiskUsedBytes, -fi.Size())
+			}
+
+			err = os.Remove(fpath)
+			if err != nil {
+				log.Warnf("ERROR: failed to remove file %q: %s", fpath, err)
+			}
 		}
 	}
 
@@ -629,7 +700,7 @@ func (d *diskQueue) handleReadError() {
 //
 // conveniently this also means that we're asynchronously reading from the filesystem
 func (d *diskQueue) ioLoop() {
-	var origin int = FROM_NONE
+	var origin int = FromNone
 	var dataRead []byte
 	var err error
 	var count int64
@@ -638,6 +709,7 @@ func (d *diskQueue) ioLoop() {
 
 	syncTicker := time.NewTicker(d.syncTimeout)
 
+DONE:
 	for {
 		// dont sync all the time :)
 		if count == d.syncEveryWrite {
@@ -657,7 +729,7 @@ func (d *diskQueue) ioLoop() {
 			}
 		}
 
-		if origin == FROM_NONE {
+		if origin == FromNone {
 			if (d.readFileNum < d.writeFileNum) || (d.readPos < d.writePos) {
 				if d.nextReadPos == d.readPos {
 					dataRead, err = d.readOne()
@@ -669,12 +741,12 @@ func (d *diskQueue) ioLoop() {
 						continue
 					}
 				}
-				origin = FROM_DISK
+				origin = FromDisk
 				r = d.readChan
-			} else if d.enableMemory {
+			} else if d.enableMemoryQueue {
 				select {
 				case dataRead = <-d.memoryChan:
-					origin = FROM_MEMORY
+					origin = FromMemory
 					r = d.readChan
 				default:
 					r = nil
@@ -691,23 +763,23 @@ func (d *diskQueue) ioLoop() {
 		// in a select are skipped, we set r to d.readChan only when there is data to read
 		case r <- dataRead:
 			switch origin {
-			case FROM_DISK:
+			case FromDisk:
 				// moveForward sets needSync flag if a file is removed
 				readCount++
 				d.moveForward()
-			case FROM_MEMORY:
+			case FromMemory:
 				atomic.AddInt64(&d.depthMemory, -1)
 			}
-			origin = FROM_NONE
+			origin = FromNone
 		case <-d.emptyChan:
-			if d.enableMemory {
+			if d.enableMemoryQueue {
 				d.deleteAllMemory()
 			}
 			d.emptyResponseChan <- d.deleteAllFiles()
 			count = 0
-			origin = FROM_NONE
+			origin = FromNone
 		case dataWrite := <-d.writeChan:
-			if d.enableMemory {
+			if d.enableMemoryQueue {
 				d.writeResponseChan <- d.writeMemory(dataWrite)
 			} else {
 				count++
@@ -720,21 +792,21 @@ func (d *diskQueue) ioLoop() {
 				d.needSync = true
 			}
 		case <-d.exitChan:
-			if origin == FROM_MEMORY {
+			if origin == FromMemory {
 				err = d.writeOne(dataRead)
 				if err != nil {
-					log.Errorf("DISKQUEUE(%s): drop one msg - %v", d.name, err)
+					// FIXME: 需要一个合适的方案防止数据丢失
+					log.Errorf("DISKQUEUE(%s): drop one msg from memory chan - %v", d.name, err)
 				}
 			}
-			goto exit
+			break DONE
 		}
 	}
 
-exit:
+	syncTicker.Stop()
 	log.Warnf("DISKQUEUE(%s): closing ... ioLoop", d.name)
-	if d.enableMemory {
+	if d.enableMemoryQueue {
 		d.saveToDisk()
 	}
-	syncTicker.Stop()
-	d.exitSyncChan <- 1
+	d.exitSyncChan <- struct{}{}
 }

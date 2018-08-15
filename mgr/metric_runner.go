@@ -467,7 +467,7 @@ func (mr *MetricRunner) StatusRestore() {
 	rStat, err := mr.meta.ReadStatistic()
 
 	if err != nil {
-		log.Warnf("runner %v, restore status failed", mr.RunnerName)
+		log.Warnf("Runner[%v] restore status failed: %v", mr.RunnerName, err)
 		return
 	}
 	mr.rs.ReadDataCount = rStat.ReaderCnt
