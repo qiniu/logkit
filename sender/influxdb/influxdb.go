@@ -48,6 +48,9 @@ func NewSender(c conf.MapConf) (influxdbSender sender.Sender, err error) {
 	if err != nil {
 		return
 	}
+	if !strings.HasPrefix(host, "http://") && !strings.HasSuffix(host, "https://") {
+		host = "http://" + host
+	}
 	db, err := c.GetString(sender.KeyInfluxdbDB)
 	if err != nil {
 		return
