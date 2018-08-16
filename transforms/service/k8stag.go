@@ -85,13 +85,13 @@ func (g *K8sTag) SampleConfig() string {
 func (g *K8sTag) ConfigOptions() []Option {
 	return []Option{
 		{
-			KeyName:      "key",
+			KeyName:      "sourcefilefield",
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     true,
 			Placeholder:  "my_field_keyname",
 			DefaultNoUse: true,
-			Description:  "要进行Transform变化的键(key)",
+			Description:  "要进行Transform变化的键(sourcefilefield)",
 			Type:         transforms.TransformTypeString,
 			ToolTip:      "此处填写 File Reader 中 datasource_tag 选项配置的 key，该选项会记录文件路径",
 		},
