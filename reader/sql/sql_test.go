@@ -565,19 +565,32 @@ func TestReflectTime(t *testing.T) {
 
 func Test_getDefaultSql(t *testing.T) {
 	database := "my_database"
-	actualSql, err := getDefaultSql(database, "mysql")
+	r1:=Reader{
+		dbtype:reader.ModeMySQL,
+	}
+	actualSql, err := r1.getDefaultSql(database)
 	assert.NoError(t, err)
 	expectSql := strings.Replace(DefaultMySQLTable, "DATABASE_NAME", database, -1)
 	assert.Equal(t, actualSql, expectSql)
 
-	actualSql, err = getDefaultSql(database, "postgres")
+	r2:=Reader{
+		dbtype:reader.ModeMSSQL,
+		mssqlSchema:"dbo",
+	}
+	actualSql, err = r2.getDefaultSql(database)
 	assert.NoError(t, err)
-	expectSql = strings.Replace(DefaultPGSQLTable, "DATABASE_NAME", database, -1)
+	sql:=strings.Replace(DefaultMSSQLTable, "DATABASE_NAME", database, -1)
+	expectSql = strings.Replace(sql,"SCHEMA_NAME",r2.mssqlSchema,-1)
 	assert.Equal(t, actualSql, expectSql)
 
-	actualSql, err = getDefaultSql(database, "mssql")
+	r3:=Reader{
+		dbtype:reader.ModePostgreSQL,
+		postgresSchema:"public",
+	}
+	actualSql, err = r3.getDefaultSql(database)
 	assert.NoError(t, err)
-	expectSql = strings.Replace(DefaultMSSQLTable, "DATABASE_NAME", database, -1)
+	sql = strings.Replace(DefaultPGSQLTable, "DATABASE_NAME", database, -1)
+	expectSql = strings.Replace(sql,"SCHEMA_NAME",r3.postgresSchema,-1)
 	assert.Equal(t, actualSql, expectSql)
 }
 
@@ -1018,15 +1031,29 @@ func Test_getCheckAll(t *testing.T) {
 	}
 }
 func Test_getWrappedTableName(t *testing.T) {
-	dbtype := reader.ModeMySQL
-	tname, err := getWrappedTableName(dbtype, "my_table")
+	r1:=Reader{
+		dbtype:reader.ModeMySQL,
+	}
+	tname, err := r1.getWrappedTableName("my_table")
 	expRes := "`my_table`"
 	assert.NoError(t, err)
 	assert.EqualValues(t, expRes, tname)
 
-	dbtype = reader.ModePostgreSQL
-	tname, err = getWrappedTableName(dbtype, "my_table")
-	expRes = "\"my_table\""
+	r2:=Reader{
+		dbtype:reader.ModeMSSQL,
+		mssqlSchema:"dbo",
+	}
+	tname, err = r2.getWrappedTableName("my_table")
+	expRes = "\"dbo\".\"my_table\""
+	assert.NoError(t, err)
+	assert.EqualValues(t, expRes, tname)
+
+	r3:=Reader{
+		dbtype:reader.ModePostgreSQL,
+		postgresSchema:"public",
+	}
+	tname, err = r3.getWrappedTableName("my_table")
+	expRes = "\"public\".\"my_table\""
 	assert.NoError(t, err)
 	assert.EqualValues(t, expRes, tname)
 }
