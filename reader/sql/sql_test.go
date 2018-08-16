@@ -1058,7 +1058,7 @@ func Test_getWrappedTableName(t *testing.T) {
 	assert.EqualValues(t, expRes, tname)
 }
 func Test_getRawSQLs(t *testing.T) {
-	r := &Reader{
+	r1 := &Reader{
 		dbtype: reader.ModeMySQL,
 	}
 	mysqltests := []struct {
@@ -1080,22 +1080,25 @@ func Test_getRawSQLs(t *testing.T) {
 	}
 
 	for _, test := range mysqltests {
-		sqls, err := r.getRawSqls(test.queryType, "my_table")
+		sqls, err := r1.getRawSqls(test.queryType, "my_table")
 		assert.NoError(t, err)
 		assert.EqualValues(t, test.expSQLs, sqls)
 	}
-	r.dbtype = reader.ModePostgreSQL
+	r2:=Reader{
+		dbtype:reader.ModePostgreSQL,
+		postgresSchema:"public",
+	}
 	pgtests := []struct {
 		queryType int
 		expSQLs   string
 	}{
 		{
 			queryType: TABLE,
-			expSQLs:   "Select * From \"my_table\";",
+			expSQLs:   "Select * From \"public\".\"my_table\";",
 		},
 		{
 			queryType: COUNT,
-			expSQLs:   "Select Count(*) From \"my_table\";",
+			expSQLs:   "Select Count(*) From \"public\".\"my_table\";",
 		},
 		{
 			queryType: DATABASE,
@@ -1103,7 +1106,33 @@ func Test_getRawSQLs(t *testing.T) {
 		},
 	}
 	for _, test := range pgtests {
-		sqls, err := r.getRawSqls(test.queryType, "my_table")
+		sqls, err := r2.getRawSqls(test.queryType, "my_table")
+		assert.NoError(t, err)
+		assert.EqualValues(t, test.expSQLs, sqls)
+	}
+	r3:=Reader{
+		dbtype:reader.ModeMSSQL,
+		mssqlSchema:"dbo",
+	}
+	mssqltests := []struct {
+		queryType int
+		expSQLs   string
+	}{
+		{
+			queryType: TABLE,
+			expSQLs:   "Select * From \"dbo\".\"my_table\";",
+		},
+		{
+			queryType: COUNT,
+			expSQLs:   "Select Count(*) From \"dbo\".\"my_table\";",
+		},
+		{
+			queryType: DATABASE,
+			expSQLs:   "",
+		},
+	}
+	for _, test := range mssqltests {
+		sqls, err := r3.getRawSqls(test.queryType, "my_table")
 		assert.NoError(t, err)
 		assert.EqualValues(t, test.expSQLs, sqls)
 	}
