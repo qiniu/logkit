@@ -994,8 +994,14 @@ func GetTrimedDataSchema(data Data) (valueType map[string]RepoSchemaEntry) {
 				valueType[k] = formValueType(k, PandoraTypeFloat)
 			}
 		case map[string]interface{}:
-			sc := formValueType(k, PandoraTypeMap)
 			follows := GetTrimedDataSchema(Data(nv))
+			if len(follows) == 0 {
+				// 由于内层数据为空，所以从数据中将该条键值对删掉
+				delete(data, k)
+				continue
+			}
+
+			sc := formValueType(k, PandoraTypeMap)
 			for _, m := range follows {
 				sc.Schema = append(sc.Schema, m)
 			}
