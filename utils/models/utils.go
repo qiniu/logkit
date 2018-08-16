@@ -306,63 +306,101 @@ func LogDirAndPattern(logpath string) (dir, pattern string, err error) {
 	return
 }
 
-func DecompressZip(packFilePath, dstDir string) (packDir string, err error) {
-	r, err := zip.OpenReader(packFilePath) //读取zip文件
+// extractZipFileToPath 写出 *zip.File 对象的内容到指定路径
+func extractZipFileToPath(f *zip.File, path string) error {
+	r, err := f.Open()
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	w, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+
+	_, err = io.Copy(w, r)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// DecompressZip 将 ZIP 格式的文件解包到指定目录并返回指定文件所在的解包后的目录，
+// 如果存在多个同名指定文件，则返回第一个找到的目录
+func DecompressZip(srcPath, dstPath, targetFile string) (targetDir string, _ error) {
+	if err := os.MkdirAll(dstPath, os.ModePerm); err != nil {
+		return "", err
+	}
+
+	zr, err := zip.OpenReader(srcPath)
 	if err != nil {
 		return "", err
 	}
-	defer r.Close()
-	for _, f := range r.File {
-		rc, err := f.Open()
-		if err != nil {
+	defer zr.Close()
+
+	foundTarget := false
+	for _, f := range zr.File {
+		fpath := filepath.Join(dstPath, f.Name)
+		if f.FileInfo().IsDir() {
+			if err = os.MkdirAll(fpath, f.Mode()); err != nil {
+				return "", err
+			}
+			continue
+		}
+
+		if !foundTarget && strings.HasSuffix(fpath, targetFile) {
+			foundTarget = true
+			targetDir = filepath.Dir(fpath)
+		}
+		if err = extractZipFileToPath(f, fpath); err != nil {
 			return "", err
 		}
-		defer rc.Close()
-
-		fpath := filepath.Join(dstDir, f.Name)
-		if f.FileInfo().IsDir() {
-			if packDir == "" {
-				packDir = fpath
-			}
-			os.MkdirAll(fpath, f.Mode())
-		} else {
-			var fdir string
-			if lastIndex := strings.LastIndex(fpath, string(os.PathSeparator)); lastIndex > -1 {
-				fdir = fpath[:lastIndex]
-			}
-			err = os.MkdirAll(fdir, f.Mode())
-			if err != nil {
-				log.Error(err)
-				return "", err
-			}
-			f, err := os.OpenFile(
-				fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-			if err != nil {
-				return "", err
-			}
-			defer f.Close()
-
-			_, err = io.Copy(f, rc)
-			if err != nil {
-				return "", err
-			}
-		}
 	}
-	return
+
+	if !foundTarget {
+		return "", errors.New("target file does not exist")
+	}
+	return targetDir, nil
 }
 
-func DecompressGzip(packPath, dstDir string) (packDir string, err error) {
-	srcFile, err := os.Open(packPath)
+// extractTarFileToPath 写出 *tar.Reader 对象的内容到指定路径
+func extractTarFileToPath(tr *tar.Reader, info os.FileInfo, path string) error {
+	w, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, info.Mode())
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+
+	_, err = io.Copy(w, tr)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// DecompressTarGzip 将 TAR.GZ 格式的文件解包到指定目录并返回指定文件所在的解包后的目录，
+// 如果存在多个同名指定文件，则返回第一个找到的目录
+func DecompressTarGzip(srcPath, dstPath, targetFile string) (targetDir string, _ error) {
+	if err := os.MkdirAll(dstPath, os.ModePerm); err != nil {
+		return "", err
+	}
+
+	srcFile, err := os.Open(srcPath)
 	if err != nil {
 		return "", err
 	}
 	defer srcFile.Close()
+
 	gr, err := gzip.NewReader(srcFile)
 	if err != nil {
 		return "", err
 	}
 	defer gr.Close()
+
 	tr := tar.NewReader(gr)
+	foundTarget := false
 	for {
 		header, err := tr.Next()
 		if err == io.EOF {
@@ -370,28 +408,30 @@ func DecompressGzip(packPath, dstDir string) (packDir string, err error) {
 		} else if err != nil {
 			return "", err
 		}
-		path := filepath.Join(dstDir, header.Name)
+
+		fpath := filepath.Join(dstPath, header.Name)
 		info := header.FileInfo()
 		if info.IsDir() {
-			if err = os.MkdirAll(path, info.Mode()); err != nil {
+			if err = os.MkdirAll(fpath, info.Mode()); err != nil {
 				return "", err
-			}
-			if packDir == "" {
-				packDir = path
 			}
 			continue
 		}
-		file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
-		if err != nil {
-			return "", err
+
+		if !foundTarget && strings.HasSuffix(fpath, targetFile) {
+			foundTarget = true
+			targetDir = filepath.Dir(fpath)
 		}
-		defer file.Close()
-		_, err = io.Copy(file, tr)
-		if err != nil {
+
+		if err = extractTarFileToPath(tr, info, fpath); err != nil {
 			return "", err
 		}
 	}
-	return
+
+	if !foundTarget {
+		return "", errors.New("target file does not exist")
+	}
+	return targetDir, nil
 }
 
 //通过层级key设置value值.
@@ -905,12 +945,12 @@ type KeyInfo struct {
 	NewKey string
 }
 
-func TruncateErrorSize(err string) string {
-	if len(err) <= DefaultMaxErrorSize {
+func TruncateStrSize(err string) string {
+	if len(err) <= DefaultTruncateMaxSize {
 		return err
 	}
 
-	return err[:DefaultMaxErrorSize] +
+	return err[:DefaultTruncateMaxSize] +
 		"......(only show 1024 bytes, remain " +
-		strconv.Itoa(len(err)-DefaultMaxErrorSize) + " bytes)"
+		strconv.Itoa(len(err)-DefaultTruncateMaxSize) + " bytes)"
 }

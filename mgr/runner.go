@@ -374,7 +374,7 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 			info.Success += int64(len(datas))
 		}
 		if err != nil {
-			info.LastError = TruncateErrorSize(err.Error())
+			info.LastError = TruncateStrSize(err.Error())
 			now := time.Now().UnixNano()
 			if r.rs.HistoryErrors.SendErrors == nil {
 				r.rs.HistoryErrors.SendErrors = make(map[string]*ErrorQueue)
@@ -382,7 +382,7 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 			if r.rs.HistoryErrors.SendErrors[s.Name()] == nil {
 				r.rs.HistoryErrors.SendErrors[s.Name()] = NewErrorQueue(r.ErrorsListCap)
 			}
-			r.rs.HistoryErrors.SendErrors[s.Name()].Put(ErrorInfo{info.LastError, now, 0})
+			r.rs.HistoryErrors.SendErrors[s.Name()].Put(ErrorInfo{Error: info.LastError, Timestamp: now, Count: 0})
 			//FaultTolerant Sender 正常的错误会在backupqueue里面记录，自己重试，此处无需重试
 			if se != nil && se.Ft && se.FtNotRetry {
 				break
@@ -395,9 +395,17 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 				if atomic.LoadInt32(&r.stopped) > 0 {
 					return false
 				}
-				log.Errorf("Runner[%v] send error %v for %v times, failed datas %v will retry send it", r.RunnerName, se.Error(), cnt, len(datas))
+				if se.ErrorType == sender.TypeMarshalError {
+					log.Errorf("Runner[%v] datas marshal failed, discard datas, send error %v, failed datas (length %v): %v", r.RunnerName, se.Error(), cnt, datas)
+					break
+				}
+				log.Errorf("Runner[%v] send error %v for %v times, failed datas length %v will retry send it", r.RunnerName, se.Error(), cnt, len(datas))
 				cnt++
 				continue
+			}
+			if err == ErrQueueClosed {
+				log.Errorf("Runner[%v] send to closed queue, discard datas, send error %v, failed datas (length %v): %v", r.RunnerName, se.Error(), cnt, datas)
+				break
 			}
 			if times <= 0 || cnt < times {
 				cnt++
@@ -450,11 +458,11 @@ func (r *LogExportRunner) readDatas(dr reader.DataReader, dataSourceTag string) 
 	}
 	r.rsMutex.Lock()
 	if err != nil {
-		r.rs.ReaderStats.LastError = TruncateErrorSize(err.Error())
+		r.rs.ReaderStats.LastError = TruncateStrSize(err.Error())
 		if r.rs.HistoryErrors.ReadErrors == nil {
 			r.rs.HistoryErrors.ReadErrors = NewErrorQueue(r.ErrorsListCap)
 		}
-		r.rs.HistoryErrors.ReadErrors.Put(ErrorInfo{r.rs.ReaderStats.LastError, time.Now().UnixNano(), 0})
+		r.rs.HistoryErrors.ReadErrors.Put(ErrorInfo{Error: r.rs.ReaderStats.LastError, Timestamp: time.Now().UnixNano(), Count: 0})
 	} else {
 		r.rs.ReaderStats.LastError = ""
 	}
@@ -499,12 +507,12 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 		if os.IsNotExist(err) {
 			r.rs.ReaderStats.LastError = "no more file exist to be read"
 		} else {
-			r.rs.ReaderStats.LastError = TruncateErrorSize(err.Error())
+			r.rs.ReaderStats.LastError = TruncateStrSize(err.Error())
 		}
 		if r.rs.HistoryErrors.ReadErrors == nil {
 			r.rs.HistoryErrors.ReadErrors = NewErrorQueue(r.ErrorsListCap)
 		}
-		r.rs.HistoryErrors.ReadErrors.Put(ErrorInfo{r.rs.ReaderStats.LastError, time.Now().UnixNano(), 0})
+		r.rs.HistoryErrors.ReadErrors.Put(ErrorInfo{Error: r.rs.ReaderStats.LastError, Timestamp: time.Now().UnixNano(), Count: 0})
 	} else {
 		r.rs.ReaderStats.LastError = ""
 	}
@@ -546,11 +554,11 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 		r.rs.ParserStats.Success++
 	}
 	if err != nil {
-		r.rs.ParserStats.LastError = TruncateErrorSize(err.Error())
+		r.rs.ParserStats.LastError = TruncateStrSize(err.Error())
 		if r.rs.HistoryErrors.ParseErrors == nil {
 			r.rs.HistoryErrors.ParseErrors = NewErrorQueue(r.ErrorsListCap)
 		}
-		r.rs.HistoryErrors.ParseErrors.Put(ErrorInfo{r.rs.ParserStats.LastError, time.Now().UnixNano(), 0})
+		r.rs.HistoryErrors.ParseErrors.Put(ErrorInfo{Error: r.rs.ParserStats.LastError, Timestamp: time.Now().UnixNano(), Count: 0})
 	}
 	r.rsMutex.Unlock()
 	if err != nil {
@@ -579,7 +587,7 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 func (r *LogExportRunner) Run() {
 	if dr, ok := r.reader.(reader.DaemonReader); ok {
 		if err := dr.Start(); err != nil {
-			log.Errorf("Runner[%v] start reader daemon failed: %v", err)
+			log.Errorf("Runner[%v] start reader daemon failed: %v", r.RunnerName, err)
 		}
 	}
 	if r.cleaner != nil {
@@ -662,14 +670,14 @@ func (r *LogExportRunner) Run() {
 				if ok {
 					statesTransformer.SetStats(err.Error())
 				}
-				tstats.LastError = TruncateErrorSize(err.Error())
+				tstats.LastError = TruncateStrSize(err.Error())
 				if r.rs.HistoryErrors.TransformErrors == nil {
 					r.rs.HistoryErrors.TransformErrors = make(map[string]*ErrorQueue)
 				}
 				if r.rs.HistoryErrors.TransformErrors[tp] == nil {
 					r.rs.HistoryErrors.TransformErrors[tp] = NewErrorQueue(r.ErrorsListCap)
 				}
-				r.rs.HistoryErrors.TransformErrors[tp].Put(ErrorInfo{tstats.LastError, time.Now().UnixNano(), 0})
+				r.rs.HistoryErrors.TransformErrors[tp].Put(ErrorInfo{Error: tstats.LastError, Timestamp: time.Now().UnixNano(), Count: 0})
 			}
 
 			r.rs.TransformStats[tp] = tstats
@@ -953,7 +961,7 @@ func (r *LogExportRunner) getRefreshStatus(elaspedtime float64) RunnerStatus {
 		} else {
 			newtsts.Speed, newtsts.Trend = calcSpeedTrend(StatsInfo{}, newtsts, elaspedtime)
 		}
-		newtsts.LastError = TruncateErrorSize(newtsts.LastError)
+		newtsts.LastError = TruncateStrSize(newtsts.LastError)
 		r.rs.TransformStats[ttp] = newtsts
 	}
 
@@ -978,7 +986,7 @@ func (r *LogExportRunner) getRefreshStatus(elaspedtime float64) RunnerStatus {
 		sts, ok := r.senders[i].(sender.StatsSender)
 		if ok {
 			senderStats := sts.Stats()
-			senderStats.LastError = TruncateErrorSize(senderStats.LastError)
+			senderStats.LastError = TruncateStrSize(senderStats.LastError)
 			r.rs.SenderStats[r.senders[i].Name()] = senderStats
 		}
 	}
@@ -1062,9 +1070,8 @@ func (r *LogExportRunner) TokenRefresh(tokens AuthTokens) error {
 
 func (r *LogExportRunner) StatusRestore() {
 	rStat, err := r.meta.ReadStatistic()
-
 	if err != nil {
-		log.Warnf("runner %v, restore status failed", r.RunnerName)
+		log.Warnf("Runner[%v] restore status failed: %v", r.RunnerName, err)
 		return
 	}
 	r.rs.ReadDataCount = rStat.ReaderCnt
@@ -1182,7 +1189,7 @@ func (r *LogExportRunner) StatusBackup() {
 		sStatus, ok := s.(sender.StatsSender)
 		if ok {
 			senderStats := sStatus.Stats()
-			senderStats.LastError = TruncateErrorSize(senderStats.LastError)
+			senderStats.LastError = TruncateStrSize(senderStats.LastError)
 			status.SenderStats[name] = senderStats
 		}
 		if sta, exist := status.SenderStats[name]; exist {
@@ -1201,7 +1208,11 @@ func (r *LogExportRunner) StatusBackup() {
 				if bStart.TransformErrors == nil {
 					bStart.TransformErrors = make(map[string]ErrorQueue)
 				}
-				bStart.TransformErrors[transform] = *queue
+				bStart.TransformErrors[transform] = ErrorQueue{
+					ErrorSlice: queue.ErrorSlice,
+					Front:      queue.Front,
+					Rear:       queue.Rear,
+				}
 			}
 		}
 		for send, sendErrors := range status.HistoryErrors.SendErrors {
@@ -1211,7 +1222,11 @@ func (r *LogExportRunner) StatusBackup() {
 				if bStart.SendErrors == nil {
 					bStart.SendErrors = make(map[string]ErrorQueue)
 				}
-				bStart.SendErrors[send] = *queue
+				bStart.SendErrors[send] = ErrorQueue{
+					ErrorSlice: queue.ErrorSlice,
+					Front:      queue.Front,
+					Rear:       queue.Rear,
+				}
 			}
 		}
 	}

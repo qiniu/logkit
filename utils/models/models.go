@@ -10,6 +10,13 @@ import (
 )
 
 const (
+	B = 1 << (iota * 10)
+	KB
+	MB
+	GB
+)
+
+const (
 	GlobalKeyName = "name"
 	ExtraInfo     = "extra_info"
 	/* 该选项兼容如下配置 KeyPandoraExtraInfo */
@@ -39,9 +46,9 @@ const (
 	DefaultDirPerm  = 0755
 	DefaultFilePerm = 0600
 
-	DefaultMaxBatchSize = 2 * 1024 * 1024
+	DefaultMaxBatchSize = 2 * MB
 
-	DefaultMaxErrorSize = 1024
+	DefaultTruncateMaxSize = 1024
 
 	DefaultErrorsListCap = 100
 

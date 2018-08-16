@@ -29,6 +29,8 @@ const (
 	directSuffix      = "_direct"
 	defaultMaxProcs   = 1         // 默认没有并发
 	DefaultSplitSize  = 64 * 1024 // 默认分割为 64 kb
+	// TypeMarshalError 表示marshal出错
+	TypeMarshalError = reqerr.SendErrorType("Data Marshal failed")
 )
 
 var _ SkipDeepCopySender = &FtSender{}
@@ -112,11 +114,40 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 	if opt.strategy == KeyFtStrategyConcurrent {
 		lq = queue.NewDirectQueue("stream" + directSuffix)
 	} else if !opt.memoryChannel {
-		lq = queue.NewDiskQueue("stream"+qNameSuffix, opt.saveLogPath, maxBytesPerFile, 0, maxBytesPerFile, opt.syncEvery, opt.syncEvery, time.Second*2, opt.writeLimit*mb, false, 0)
+		lq = queue.NewDiskQueue(queue.NewDiskQueueOptions{
+			Name:            "stream" + qNameSuffix,
+			DataPath:        opt.saveLogPath,
+			MaxBytesPerFile: maxBytesPerFile,
+			MaxMsgSize:      maxBytesPerFile,
+			SyncEveryWrite:  opt.syncEvery,
+			SyncEveryRead:   opt.syncEvery,
+			SyncTimeout:     2 * time.Second,
+			WriteRateLimit:  opt.writeLimit * mb,
+		})
 	} else {
-		lq = queue.NewDiskQueue("stream"+qNameSuffix, opt.saveLogPath, maxBytesPerFile, 0, maxBytesPerFile, opt.syncEvery, opt.syncEvery, time.Second*2, opt.writeLimit*mb, true, opt.memoryChannelSize)
+		lq = queue.NewDiskQueue(queue.NewDiskQueueOptions{
+			Name:              "stream" + qNameSuffix,
+			DataPath:          opt.saveLogPath,
+			MaxBytesPerFile:   maxBytesPerFile,
+			MaxMsgSize:        maxBytesPerFile,
+			SyncEveryWrite:    opt.syncEvery,
+			SyncEveryRead:     opt.syncEvery,
+			SyncTimeout:       2 * time.Second,
+			WriteRateLimit:    opt.writeLimit * mb,
+			EnableMemoryQueue: true,
+			MemoryQueueSize:   int64(opt.memoryChannelSize),
+		})
 	}
-	bq = queue.NewDiskQueue("backup"+qNameSuffix, opt.saveLogPath, maxBytesPerFile, 0, maxBytesPerFile, opt.syncEvery, opt.syncEvery, time.Second*2, opt.writeLimit*mb, false, 0)
+	bq = queue.NewDiskQueue(queue.NewDiskQueueOptions{
+		Name:            "backup" + qNameSuffix,
+		DataPath:        opt.saveLogPath,
+		MaxBytesPerFile: maxBytesPerFile,
+		MaxMsgSize:      maxBytesPerFile,
+		SyncEveryWrite:  opt.syncEvery,
+		SyncEveryRead:   opt.syncEvery,
+		SyncTimeout:     2 * time.Second,
+		WriteRateLimit:  opt.writeLimit * mb,
+	})
 	ftSender := FtSender{
 		exitChan:    make(chan struct{}),
 		innerSender: innerSender,
@@ -277,7 +308,7 @@ func (ft *FtSender) saveToFile(datas []Data) error {
 
 	err = ft.logQueue.Put(bs)
 	if err != nil {
-		return reqerr.NewSendError(ft.innerSender.Name()+" Cannot put data into backendQueue: "+err.Error(), ConvertDatasBack(datas), reqerr.TypeDefault)
+		return reqerr.NewSendError(ft.innerSender.Name()+" Cannot put data into backendQueue: "+err.Error(), ConvertDatasBack(datas), TypeMarshalError)
 	}
 	return nil
 }

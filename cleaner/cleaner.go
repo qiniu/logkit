@@ -39,7 +39,6 @@ const (
 	defaultDeleteInterval    = 300  //5分钟
 	defaultReserveFileNumber = 10   //默认保存是个文件
 	defaultReserveFileSize   = 2048 //单位MB，默认删除保存2G
-	MB                       = 1024 * 1024
 	// 如果两项任意一项达到要求，就执行删除；如果两项容易一项有值设置，但是另一项为0，就认为另一项不做限制
 )
 

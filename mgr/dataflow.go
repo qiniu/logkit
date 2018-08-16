@@ -196,6 +196,11 @@ func SendData(senderConfig map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
+	defer func() {
+		for _, s := range senders {
+			s.Close()
+		}
+	}()
 
 	router, err := getRouter(senderConfig, len(senders))
 	if err != nil {
@@ -213,7 +218,6 @@ func SendData(senderConfig map[string]interface{}) error {
 			return err
 		}
 	}
-
 	return nil
 }
 

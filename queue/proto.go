@@ -25,7 +25,7 @@ type DataQueue interface {
 }
 
 const (
-	FROM_NONE = iota
-	FROM_DISK
-	FROM_MEMORY
+	FromNone = iota
+	FromDisk
+	FromMemory
 )

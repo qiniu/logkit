@@ -19,7 +19,9 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-func TestNewHttpReader(t *testing.T) {
+var testData []string
+
+func getHttpReader() (*Reader, error) {
 	readConf := conf.MapConf{
 		reader.KeyMetaPath: MetaDir,
 		reader.KeyFileDone: MetaDir,
@@ -27,28 +29,37 @@ func TestNewHttpReader(t *testing.T) {
 		KeyRunnerName:      "TestNewHttpReader",
 	}
 	meta, err := reader.NewMetaWithConf(readConf)
-	assert.NoError(t, err)
-	defer os.RemoveAll("./meta")
+	if err != nil {
+		return nil, err
+	}
 
 	c := conf.MapConf{
 		reader.KeyHTTPServiceAddress: "127.0.0.1:7110",
 		reader.KeyHTTPServicePath:    "/logkit/aaa,/logkit/bbb,/logkit/ccc,/logkit/ddd",
 	}
-	hhttpReader, err := NewReader(meta, c)
+	reader, err := NewReader(meta, c)
+	httpReader := reader.(*Reader)
+	if err != nil {
+		return nil, err
+	}
+	err = httpReader.Start()
+	if err != nil {
+		return nil, err
+	}
+	return httpReader, nil
+}
+
+func TestNewHttpReader(t *testing.T) {
+	httpReader, err := getHttpReader()
 	assert.NoError(t, err)
-	httpReader := hhttpReader.(*Reader)
-	assert.NoError(t, httpReader.Start())
-	defer httpReader.Close()
+	defer func() {
+		os.RemoveAll("./meta")
+		httpReader.Close()
+	}()
 
 	// CI 环境启动监听较慢，需要等待几秒
 	time.Sleep(3 * time.Second)
 
-	testData := []string{
-		"1234567890987654321",
-		"qwertyuiopoiuytrewq",
-		"zxcvbnm,./.,mnbvcxz",
-		"asdfghjkl;';lkjhgfdsa",
-	}
 	paths := strings.Split("/logkit/aaa,/logkit/bbb,/logkit/ccc,/logkit/ddd", ",")
 
 	// 测试正常发送
@@ -70,8 +81,23 @@ func TestNewHttpReader(t *testing.T) {
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		wg.Wait()
 	}
+}
+
+func TestNewHttpReaderWithGzip(t *testing.T) {
+	httpReader, err := getHttpReader()
+	assert.NoError(t, err)
+	defer func() {
+		os.RemoveAll("./meta")
+		httpReader.Close()
+	}()
+
+	// CI 环境启动监听较慢，需要等待几秒
+	time.Sleep(3 * time.Second)
+
+	paths := strings.Split("/logkit/aaa,/logkit/bbb,/logkit/ccc,/logkit/ddd", ",")
 
 	// 测试 gzip 发送
+	var wg sync.WaitGroup
 	for index, val := range testData {
 		req, err := http.NewRequest(http.MethodPost, "http://127.0.0.1:7110"+paths[index], nil)
 		req.Header.Set(ContentTypeHeader, ApplicationGzip)
@@ -96,5 +122,14 @@ func TestNewHttpReader(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		wg.Wait()
+	}
+}
+
+func init() {
+	testData = []string{
+		"1234567890987654321",
+		"qwertyuiopoiuytrewq",
+		"zxcvbnm,./.,mnbvcxz",
+		"asdfghjkl;';lkjhgfdsa",
 	}
 }
