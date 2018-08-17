@@ -20,6 +20,7 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	_ "github.com/qiniu/logkit/parser/builtin"
+	"github.com/qiniu/logkit/parser/qiniu"
 	"github.com/qiniu/logkit/reader"
 	_ "github.com/qiniu/logkit/reader/builtin"
 	"github.com/qiniu/logkit/reader/cloudtrail"
@@ -89,7 +90,6 @@ type LogExportRunner struct {
 }
 
 const defaultSendIntervalSeconds = 60
-const qiniulogHeadPatthern = "[1-9]\\d{3}/[0-1]\\d/[0-3]\\d [0-2]\\d:[0-6]\\d:[0-6]\\d(\\.\\d{6})?"
 
 // NewRunner 创建Runner
 func NewRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal) (runner Runner, err error) {
@@ -1043,13 +1043,13 @@ func Compatible(rc RunnerConfig) RunnerConfig {
 	}
 	pattern, _ := rc.ReaderConfig.GetStringOr(reader.KeyHeadPattern, "")
 	if parserType == parser.TypeLogv1 && pattern == "" {
-		prefix, _ := rc.ParserConf.GetStringOr(parser.KeyQiniulogPrefix, "")
+		prefix, _ := rc.ParserConf.GetStringOr(qiniu.KeyPrefix, "")
 		prefix = strings.TrimSpace(prefix)
 		var readpattern string
 		if len(prefix) > 0 {
-			readpattern = "^" + prefix + " " + qiniulogHeadPatthern
+			readpattern = "^" + prefix + " " + qiniu.HeadPatthern
 		} else {
-			readpattern = "^" + qiniulogHeadPatthern
+			readpattern = "^" + qiniu.HeadPatthern
 		}
 		rc.ReaderConfig[reader.KeyHeadPattern] = readpattern
 	}
