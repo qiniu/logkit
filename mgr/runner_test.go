@@ -19,6 +19,7 @@ import (
 	"github.com/qiniu/logkit/cleaner"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	"github.com/qiniu/logkit/parser/qiniu"
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/router"
 	"github.com/qiniu/logkit/sender"
@@ -287,7 +288,7 @@ func Test_RunForEnvTag(t *testing.T) {
 		t.Error(err)
 	}
 	senderConfigs := []conf.MapConf{
-		conf.MapConf{
+		{
 			"name":        "mock_sender",
 			"sender_type": "mock",
 		},
@@ -517,7 +518,7 @@ func Test_Compatible(t *testing.T) {
 			"mode":           "dir",
 			"read_from":      "oldest",
 			"datasource_tag": "testtag",
-			"head_pattern":   "^" + qiniulogHeadPatthern,
+			"head_pattern":   "^" + qiniu.HeadPatthern,
 		},
 		ParserConf: conf.MapConf{
 			"type": "qiniulog",
@@ -545,7 +546,7 @@ func Test_Compatible(t *testing.T) {
 			"mode":           "dir",
 			"read_from":      "oldest",
 			"datasource_tag": "testtag",
-			"head_pattern":   "^PREX " + qiniulogHeadPatthern,
+			"head_pattern":   "^PREX " + qiniu.HeadPatthern,
 		},
 		ParserConf: conf.MapConf{
 			"type":            "qiniulog",
@@ -593,9 +594,11 @@ func Test_QiniulogRun(t *testing.T) {
 2016/10/20 17:20:30.642662 [123][WARN] disk.go:241: github.com/qiniu/logkit/queue/disk.go 1
 `
 	log3 := `2016/10/20 17:20:30.642662 [124][WARN] disk.go:456: xxxxxx`
-	expfiles := []string{`[REQ_END] 200 0.010k 3.792ms \t\t[WARN][SLdoIrCDZj7pmZsU] disk.go <job.freezeDeamon> pop() failed: not found`,
+	expfiles := []string{`[REQ_END] 200 0.010k 3.792ms
+		[WARN][SLdoIrCDZj7pmZsU] disk.go <job.freezeDeamon> pop() failed: not found`,
 		`Service: POST 10.200.20.25:9100/user/info, Code: 200, Xlog: AC, Time: 1ms`,
-		`github.com/qiniu/logkit/queue/disk.go:241 \t1234 3243xsaxs`, `github.com/qiniu/logkit/queue/disk.go 1`,
+		`github.com/qiniu/logkit/queue/disk.go:241
+	1234 3243xsaxs`, `github.com/qiniu/logkit/queue/disk.go 1`,
 		`xxxxxx`}
 	expreqid := []string{"X-ZsU", "2pyKMukqvwSd-ZsU", "", "123", "124"}
 	if err := ioutil.WriteFile(filepath.Join(logpath, "log1"), []byte(log1), 0666); err != nil {
@@ -697,7 +700,11 @@ func Test_QiniulogRun(t *testing.T) {
 	}
 	for idx, dt := range dts {
 		assert.Equal(t, expfiles[idx], dt["log"], "equl log test")
-		assert.Equal(t, expreqid[idx], dt["reqid"], "equal reqid test")
+		if expreqid[idx] == "" {
+			assert.Nil(t, dt["reqid"])
+		} else {
+			assert.Equal(t, expreqid[idx], dt["reqid"], "equal reqid test")
+		}
 	}
 	ls, err := runner.LagStats()
 	assert.NoError(t, err)

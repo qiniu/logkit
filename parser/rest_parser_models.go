@@ -36,8 +36,7 @@ const (
 
 // Constants for Qiniu
 const (
-	KeyQiniulogPrefix = "qiniulog_prefix" //qiniulog的日志前缀
-	KeyLogHeaders     = "qiniulog_log_headers"
+	KeyLogHeaders = "qiniulog_log_headers"
 )
 
 // Constants for raw
@@ -300,19 +299,12 @@ var ModeKeyOptions = map[string][]Option{
 	TypeLogv1: {
 		OptionLabels,
 		{
-			KeyName:      KeyQiniulogPrefix,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "日志前缀(qiniulog_prefix)",
-			Advance:      true,
-		},
-		{
 			KeyName:      KeyLogHeaders,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
-			Description:  "日志格式顺序(qiniulog_log_headers)",
+			Description:  "日志字段与顺序(qiniulog_log_headers)",
+			ToolTip:      "用来定义解析的顺序，默认情况下没有prefix，按 date,time,reqid,level,module,file,log的顺序依次解析，可以调换。还可以写 combinedReqidLevel 表示reqid和level组合，代表reqid可能有、可能没有，但是如果都有，前者被认定为一定reqid；combinedModuleFile表示module和file的组合，代表可能有module，可能没有，如果存在中括号开头就认为是module",
 			Advance:      true,
 		},
 		OptionParserName,

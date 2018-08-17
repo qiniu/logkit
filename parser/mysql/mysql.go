@@ -1,24 +1,16 @@
 package mysql
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/Preetam/mysqllog"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
-	"github.com/qiniu/logkit/parser/qiniu"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
 func init() {
-	qiniu.CompliedPatterns = make(map[string]*regexp.Regexp)
-	for k, v := range qiniu.HeaderPattern {
-		c, _ := regexp.Compile(v)
-		qiniu.CompliedPatterns[k] = c
-	}
-
 	parser.RegisterConstructor(parser.TypeMySQL, NewParser)
 }
 

@@ -2,7 +2,6 @@ package qiniu
 
 import (
 	"regexp"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,6 +20,10 @@ func Test_QiniuLogRegex(t *testing.T) {
 	}{
 		{
 			line: "2017/03/28 15:41:06 [Wm0AAPg-IUMW-68U][INFO] bdc.go:573: deleted: 67608",
+			exp:  true,
+		},
+		{
+			line: "2018/08/17 10:49:29 [INFO][github.com/qiniu/logkit/reader] seqfile.go:538: Runner[UndefinedRunnerName] ",
 			exp:  true,
 		},
 		{
@@ -52,7 +55,8 @@ func Test_QiniuLogRegex(t *testing.T) {
 			exp:  false,
 		},
 	}
-	mp := "[1-9]\\d{3}/[0-1]\\d/[0-3]\\d [0-2]\\d:[0-6]\\d:[0-6]\\d(\\.\\d{6})?"
+	mp := `[1-9]\d{3}\/[0-1]\d\/[0-3]\d [0-2]\d:[0-6]\d:[0-6]\d(\.\d{6})? \[`
+	//mp := "[1-9]\\d{3}/[0-1]\\d/[0-3]\\d [0-2]\\d:[0-6]\\d:[0-6]\\d(\\.\\d{6})?"
 	for _, ti := range tests {
 		got, err := regexp.MatchString("^"+mp, ti.line)
 		assert.NoError(t, err)
@@ -138,8 +142,8 @@ func Test_QiniulogParser(t *testing.T) {
 	if dts[1]["reqid"] != "GE2owHck-Y4IWJHS" {
 		t.Errorf("parse reqid error exp GE2owHck-Y4IWJHS but %v", dts[1]["reqid"])
 	}
-	if dts[2]["reqid"] != "" {
-		t.Errorf("parse reqid error exp  but %v", dts[2]["reqid"])
+	if dts[2]["reqid"] != nil {
+		t.Errorf("parse reqid error exp nil but got %v", dts[2]["reqid"])
 	}
 	if dts[3]["reqid"] != "GE2owHck-Y4IWJHS" {
 		t.Errorf("parse reqid error exp GE2owHck-Y4IWJHS but %v", dts[4]["reqid"])
@@ -149,10 +153,7 @@ func Test_QiniulogParser(t *testing.T) {
 	if dts[1]["time"] != exp {
 		t.Errorf("parse time error exp %v but %v", exp, dts[1]["time"])
 	}
-	rawlog := dts[1]["log"].(string)
-	if strings.Contains(rawlog, "\n") || strings.Contains(rawlog, "\t") {
-		t.Error("log should not contain \\n or \\t ")
-	}
+
 	newlines := []string{
 		"2016/10/20 17:20:30.642666 [ERROR] disk.go github.com/qiniu/logkit/queue/disk.go:241: ",
 		"2016/10/20 17:20:30.642662 [123][WARN] disk.go github.com/qiniu/logkit/queue/disk.go:241: 1",
@@ -211,7 +212,7 @@ func Test_QiniulogParserForErrData(t *testing.T) {
 func Test_QiniulogParserForTeapot(t *testing.T) {
 	c := conf.MapConf{}
 	c[parser.KeyParserType] = "qiniulog"
-	c[parser.KeyLogHeaders] = "prefix,date,time,level,reqid,file"
+	c[parser.KeyLogHeaders] = "date,time,level,reqid,file"
 	ps := parser.NewRegistry()
 	p, err := ps.NewLogParser(c)
 	if err != nil {
@@ -241,8 +242,8 @@ func Test_QiniulogParserForTeapot(t *testing.T) {
 		t.Errorf("parse reqid error exp 2pyKMgVp5EKg-ZsU but %v", dts[0]["reqid"])
 	}
 
-	if dts[1]["reqid"] != "" {
-		t.Errorf("parse reqid error exp  but %v", dts[1]["reqid"])
+	if dts[1]["reqid"] != nil {
+		t.Errorf("parse reqid error exp nil but got %v", dts[1]["reqid"])
 	}
 
 	_, zoneValue := times.GetTimeZone()
@@ -272,5 +273,5 @@ func Test_QiniulogParserForTeapot(t *testing.T) {
 	if dts[1]["level"] != "WARN" {
 		t.Errorf("parse level error exp WARN but %v", dts[0]["level"])
 	}
-	assert.Equal(t, `"github.com/teapots/request-logger/logger.go:61"`, dts[0]["file"])
+	assert.Equal(t, `"github.com/teapots/request-logger/logger.go:61"`, dts[0]["module"])
 }
