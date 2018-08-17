@@ -36,7 +36,6 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 
 func NewNginxAccParser(c conf.MapConf) (p *Parser, err error) {
 	name, _ := c.GetStringOr(parser.KeyParserName, "")
-
 	schema, _ := c.GetStringOr(parser.NginxSchema, "")
 	nginxRegexStr, _ := c.GetStringOr(parser.NginxFormatRegex, "")
 	labelList, _ := c.GetStringListOr(parser.KeyLabels, []string{})
