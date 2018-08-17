@@ -125,8 +125,7 @@ type Reader struct {
 	lastTabel         string        // 读过的最后一条记录的数据表
 	omitDoneDBRecords bool
 	schemas           map[string]string
-	postgresSchema    string
-	mssqlSchema       string
+	dbSchema          string
 	magicLagDur       time.Duration
 	count             int64
 	CurrentCount      int64
@@ -135,7 +134,7 @@ type Reader struct {
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	var readBatch int
-	var dbtype, dataSource, rawDatabase, rawSQLs, cronSchedule, offsetKey, encoder, table, pgSchema, mssqlSchema string
+	var dbtype, dataSource, rawDatabase, rawSQLs, cronSchedule, offsetKey, encoder, table,dbSchema string
 	var execOnStart, historyAll bool
 	dbtype, _ = conf.GetStringOr(reader.KeyMode, reader.ModeMySQL)
 	logpath, _ := conf.GetStringOr(reader.KeyLogPath, "")
@@ -167,7 +166,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		readBatch, _ = conf.GetIntOr(reader.KeyMssqlReadBatch, 100)
 		offsetKey, _ = conf.GetStringOr(reader.KeyMssqlOffsetKey, "")
 		dataSource, err = conf.GetString(reader.KeyMssqlDataSource)
-		mssqlSchema, _ = conf.GetStringOr(reader.KeyMssqlSchema, "dbo")
+		dbSchema, _ = conf.GetStringOr(reader.KeyMssqlSchema, "dbo")
 		if err != nil {
 			dataSource = logpath
 			if logpath == "" {
@@ -186,7 +185,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		readBatch, _ = conf.GetIntOr(reader.KeyPGsqlReadBatch, 100)
 		offsetKey, _ = conf.GetStringOr(reader.KeyPGsqlOffsetKey, "")
 		dataSource, err = conf.GetString(reader.KeyPGsqlDataSource)
-		pgSchema, _ = conf.GetStringOr(reader.KeyPGsqlSchema, "public")
+		dbSchema, _ = conf.GetStringOr(reader.KeyPGsqlSchema, "public")
 		if err != nil {
 			dataSource = logpath
 			if logpath == "" {
@@ -271,8 +270,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		magicLagDur:    mgld,
 		schemas:        schemas,
 		encoder:        encoder,
-		postgresSchema: pgSchema,
-		mssqlSchema:    mssqlSchema,
+		dbSchema:       dbSchema,
 	}
 
 	if r.rawDatabase == "" {
@@ -1614,10 +1612,10 @@ func (r *Reader) getDefaultSql(database string) (defaultSql string, err error) {
 	case reader.ModeMySQL:
 		return strings.Replace(DefaultMySQLTable, "DATABASE_NAME", database, -1), nil
 	case reader.ModePostgreSQL:
-		return strings.Replace(DefaultPGSQLTable, "SCHEMA_NAME", r.postgresSchema, -1), nil
+		return strings.Replace(DefaultPGSQLTable, "SCHEMA_NAME", r.dbSchema, -1), nil
 	case reader.ModeMSSQL:
 		sql := strings.Replace(DefaultMSSQLTable, "DATABASE_NAME", database, -1)
-		sql = strings.Replace(sql, "SCHEMA_NAME", r.mssqlSchema, -1)
+		sql = strings.Replace(sql, "SCHEMA_NAME", r.dbSchema, -1)
 		return sql, nil
 	default:
 		return "", fmt.Errorf("not support reader type: %v", r.dbtype)
@@ -1692,9 +1690,9 @@ func (r *Reader) getWrappedTableName(table string) (tableName string, err error)
 	case reader.ModeMySQL:
 		tableName = "`" + table + "`"
 	case reader.ModeMSSQL:
-		tableName = fmt.Sprintf("\"%s\".\"%s\"", r.mssqlSchema, table)
+		tableName = fmt.Sprintf("\"%s\".\"%s\"", r.dbSchema, table)
 	case reader.ModePostgreSQL:
-		tableName = fmt.Sprintf("\"%s\".\"%s\"", r.postgresSchema, table)
+		tableName = fmt.Sprintf("\"%s\".\"%s\"", r.dbSchema, table)
 	default:
 		err = fmt.Errorf("%v mode not support in sql reader", r.dbtype)
 	}

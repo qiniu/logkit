@@ -575,22 +575,22 @@ func Test_getDefaultSql(t *testing.T) {
 
 	r2:=Reader{
 		dbtype:reader.ModeMSSQL,
-		mssqlSchema:"dbo",
+		dbSchema:"dbo",
 	}
 	actualSql, err = r2.getDefaultSql(database)
 	assert.NoError(t, err)
 	sql:=strings.Replace(DefaultMSSQLTable, "DATABASE_NAME", database, -1)
-	expectSql = strings.Replace(sql,"SCHEMA_NAME",r2.mssqlSchema,-1)
+	expectSql = strings.Replace(sql,"SCHEMA_NAME",r2.dbSchema,-1)
 	assert.Equal(t, actualSql, expectSql)
 
 	r3:=Reader{
 		dbtype:reader.ModePostgreSQL,
-		postgresSchema:"public",
+		dbSchema:"public",
 	}
 	actualSql, err = r3.getDefaultSql(database)
 	assert.NoError(t, err)
 	sql = strings.Replace(DefaultPGSQLTable, "DATABASE_NAME", database, -1)
-	expectSql = strings.Replace(sql,"SCHEMA_NAME",r3.postgresSchema,-1)
+	expectSql = strings.Replace(sql,"SCHEMA_NAME",r3.dbSchema,-1)
 	assert.Equal(t, actualSql, expectSql)
 }
 
@@ -1041,7 +1041,7 @@ func Test_getWrappedTableName(t *testing.T) {
 
 	r2:=Reader{
 		dbtype:reader.ModeMSSQL,
-		mssqlSchema:"dbo",
+		dbSchema:"dbo",
 	}
 	tname, err = r2.getWrappedTableName("my_table")
 	expRes = "\"dbo\".\"my_table\""
@@ -1050,7 +1050,7 @@ func Test_getWrappedTableName(t *testing.T) {
 
 	r3:=Reader{
 		dbtype:reader.ModePostgreSQL,
-		postgresSchema:"public",
+		dbSchema:"public",
 	}
 	tname, err = r3.getWrappedTableName("my_table")
 	expRes = "\"public\".\"my_table\""
@@ -1086,7 +1086,7 @@ func Test_getRawSQLs(t *testing.T) {
 	}
 	r2:=Reader{
 		dbtype:reader.ModePostgreSQL,
-		postgresSchema:"public",
+		dbSchema:"public",
 	}
 	pgtests := []struct {
 		queryType int
@@ -1112,7 +1112,7 @@ func Test_getRawSQLs(t *testing.T) {
 	}
 	r3:=Reader{
 		dbtype:reader.ModeMSSQL,
-		mssqlSchema:"dbo",
+		dbSchema:"dbo",
 	}
 	mssqltests := []struct {
 		queryType int
