@@ -25,17 +25,18 @@ var _ sender.SkipDeepCopySender = &Sender{}
 
 // Sender write datas into influxdb
 type Sender struct {
-	name        string
-	host        string
-	db          string
-	autoCreate  bool
-	retention   string
-	duration    string
-	measurement string
-	tags        map[string]string // key为tag的列名,value为alias名
-	fields      map[string]string // key为field的列名，value为alias名
-	timestamp   string            // 时间戳列名
-	timePrec    int64
+	name                  string
+	host                  string
+	db                    string
+	autoCreate            bool
+	retention             string
+	duration              string
+	measurement           string
+	tags                  map[string]string // key为tag的列名,value为alias名
+	fields                map[string]string // key为field的列名，value为alias名
+	timestamp             string            // 时间戳列名
+	timePrec              int64
+	ignoreBeyondRetention bool
 }
 
 func init() {
@@ -69,20 +70,22 @@ func NewSender(c conf.MapConf) (influxdbSender sender.Sender, err error) {
 	duration, _ := c.GetStringOr(sender.KeyInfluxdbRetetionDuration, "")
 	timestamp, _ := c.GetStringOr(sender.KeyInfluxdbTimestamp, "")
 	prec, _ := c.GetIntOr(sender.KeyInfluxdbTimestampPrecision, 1)
+	ignoreBeyRent, _ := c.GetBoolOr(sender.KeyInfluxdbIgnoreBeyondRetention, false)
 	name, _ := c.GetStringOr(sender.KeyName, fmt.Sprintf("influxdbSender:(%v,db:%v,measurement:%v", host, db, measurement))
 
 	influxdbSender = &Sender{
-		name:        name,
-		host:        host,
-		db:          db,
-		autoCreate:  autoCreate,
-		retention:   retention,
-		duration:    duration,
-		measurement: measurement,
-		tags:        tags,
-		fields:      fields,
-		timestamp:   timestamp,
-		timePrec:    int64(prec),
+		name:                  name,
+		host:                  host,
+		db:                    db,
+		autoCreate:            autoCreate,
+		retention:             retention,
+		duration:              duration,
+		measurement:           measurement,
+		tags:                  tags,
+		fields:                fields,
+		timestamp:             timestamp,
+		timePrec:              int64(prec),
+		ignoreBeyondRetention: ignoreBeyRent,
 	}
 	if autoCreate {
 		if err = CreateInfluxdbDatabase(host, db, name); err != nil {
@@ -117,6 +120,10 @@ func (s *Sender) Send(datas []Data) error {
 	}
 	err := s.sendPoints(ps)
 	if err != nil {
+		if s.ignoreBeyondRetention && isBeyondRetentionErr(err) {
+			log.Warnf("ignore_beyond_retention is true and error is %v, ignore it", err)
+			return nil
+		}
 		return reqerr.NewSendError(s.Name()+" Cannot write data into influxdb, error is "+err.Error(), sender.ConvertDatasBack(datas), reqerr.TypeDefault)
 	}
 	return nil
@@ -507,3 +514,10 @@ func String(in string) string {
 }
 
 func (_ *Sender) SkipDeepCopy() bool { return true }
+
+func isBeyondRetentionErr(err error) bool {
+	if err != nil && strings.Contains(err.Error(), "points beyond retention policy") {
+		return true
+	}
+	return false
+}
