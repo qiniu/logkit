@@ -166,7 +166,6 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		readBatch, _ = conf.GetIntOr(reader.KeyMssqlReadBatch, 100)
 		offsetKey, _ = conf.GetStringOr(reader.KeyMssqlOffsetKey, "")
 		dataSource, err = conf.GetString(reader.KeyMssqlDataSource)
-		dbSchema, _ = conf.GetStringOr(reader.KeyMssqlSchema, "dbo")
 		if err != nil {
 			dataSource = logpath
 			if logpath == "" {
@@ -178,6 +177,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		if err != nil {
 			return nil, err
 		}
+		dbSchema, _ = conf.GetStringOr(reader.KeyMssqlSchema, "dbo")
 		rawSQLs, _ = conf.GetStringOr(reader.KeyMssqlSQL, "")
 		cronSchedule, _ = conf.GetStringOr(reader.KeyMssqlCron, "")
 		execOnStart, _ = conf.GetBoolOr(reader.KeyMssqlExecOnStart, true)
@@ -185,7 +185,6 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		readBatch, _ = conf.GetIntOr(reader.KeyPGsqlReadBatch, 100)
 		offsetKey, _ = conf.GetStringOr(reader.KeyPGsqlOffsetKey, "")
 		dataSource, err = conf.GetString(reader.KeyPGsqlDataSource)
-		dbSchema, _ = conf.GetStringOr(reader.KeyPGsqlSchema, "public")
 		if err != nil {
 			dataSource = logpath
 			if logpath == "" {
@@ -219,6 +218,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 				return nil, err
 			}
 		}
+		dbSchema, _ = conf.GetStringOr(reader.KeyPGsqlSchema, "public")
 		rawSQLs, _ = conf.GetStringOr(reader.KeyPGsqlSQL, "")
 		cronSchedule, _ = conf.GetStringOr(reader.KeyPGsqlCron, "")
 		execOnStart, _ = conf.GetBoolOr(reader.KeyPGsqlExecOnStart, true)
