@@ -31,8 +31,8 @@ const (
 	sqlSpliter           = ";"
 	DefaultMySQLTable    = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA='DATABASE_NAME';"
 	DefaultMySQLDatabase = "SHOW DATABASES;"
-	DefaultPGSQLTable    = "SELECT TABLENAME FROM PG_TABLES WHERE SCHEMANAME='public';"
-	DefaultMSSQLTable    = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_CATALOG='DATABASE_NAME';"
+	DefaultPGSQLTable    = "SELECT TABLENAME FROM PG_TABLES WHERE SCHEMANAME='SCHEMA_NAME';"
+	DefaultMSSQLTable    = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_CATALOG='DATABASE_NAME' AND TABLE_SCHEMA='SCHEMA_NAME';"
 
 	SupportReminder = "history all magic only support @(YYYY) @(YY) @(MM) @(DD) @(hh) @(mm) @(ss)"
 	Wildcards       = "*"
@@ -125,16 +125,16 @@ type Reader struct {
 	lastTabel         string        // 读过的最后一条记录的数据表
 	omitDoneDBRecords bool
 	schemas           map[string]string
-
-	magicLagDur  time.Duration
-	count        int64
-	CurrentCount int64
-	countLock    sync.RWMutex
+	dbSchema          string
+	magicLagDur       time.Duration
+	count             int64
+	CurrentCount      int64
+	countLock         sync.RWMutex
 }
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	var readBatch int
-	var dbtype, dataSource, rawDatabase, rawSQLs, cronSchedule, offsetKey, encoder, table string
+	var dbtype, dataSource, rawDatabase, rawSQLs, cronSchedule, offsetKey, encoder, table,dbSchema string
 	var execOnStart, historyAll bool
 	dbtype, _ = conf.GetStringOr(reader.KeyMode, reader.ModeMySQL)
 	logpath, _ := conf.GetStringOr(reader.KeyLogPath, "")
@@ -177,6 +177,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		if err != nil {
 			return nil, err
 		}
+		dbSchema, _ = conf.GetStringOr(reader.KeyMssqlSchema, "dbo")
 		rawSQLs, _ = conf.GetStringOr(reader.KeyMssqlSQL, "")
 		cronSchedule, _ = conf.GetStringOr(reader.KeyMssqlCron, "")
 		execOnStart, _ = conf.GetBoolOr(reader.KeyMssqlExecOnStart, true)
@@ -217,6 +218,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 				return nil, err
 			}
 		}
+		dbSchema, _ = conf.GetStringOr(reader.KeyPGsqlSchema, "public")
 		rawSQLs, _ = conf.GetStringOr(reader.KeyPGsqlSQL, "")
 		cronSchedule, _ = conf.GetStringOr(reader.KeyPGsqlCron, "")
 		execOnStart, _ = conf.GetBoolOr(reader.KeyPGsqlExecOnStart, true)
@@ -246,28 +248,29 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	}
 
 	r := &Reader{
-		meta:          meta,
-		status:        reader.StatusInit,
-		routineStatus: reader.StatusInit,
-		stopChan:      make(chan struct{}),
-		readChan:      make(chan readInfo),
-		errChan:       make(chan error),
-		datasource:    dataSource,
-		database:      rawDatabase,
-		rawDatabase:   rawDatabase,
-		rawSQLs:       rawSQLs,
-		Cron:          cron.New(),
-		readBatch:     readBatch,
-		offsetKey:     offsetKey,
-		syncSQLs:      sqls,
-		dbtype:        dbtype,
-		execOnStart:   execOnStart,
-		historyAll:    historyAll,
-		rawTable:      table,
-		table:         table,
-		magicLagDur:   mgld,
-		schemas:       schemas,
-		encoder:       encoder,
+		meta:           meta,
+		status:         reader.StatusInit,
+		routineStatus:  reader.StatusInit,
+		stopChan:       make(chan struct{}),
+		readChan:       make(chan readInfo),
+		errChan:        make(chan error),
+		datasource:     dataSource,
+		database:       rawDatabase,
+		rawDatabase:    rawDatabase,
+		rawSQLs:        rawSQLs,
+		Cron:           cron.New(),
+		readBatch:      readBatch,
+		offsetKey:      offsetKey,
+		syncSQLs:       sqls,
+		dbtype:         dbtype,
+		execOnStart:    execOnStart,
+		historyAll:     historyAll,
+		rawTable:       table,
+		table:          table,
+		magicLagDur:    mgld,
+		schemas:        schemas,
+		encoder:        encoder,
+		dbSchema:       dbSchema,
 	}
 
 	if r.rawDatabase == "" {
@@ -1604,16 +1607,18 @@ func (r *Reader) Lag() (rl *LagInfo, err error) {
 	return rl, nil
 }
 
-func getDefaultSql(database, dbtype string) (defaultSql string, err error) {
-	switch dbtype {
+func (r *Reader) getDefaultSql(database string) (defaultSql string, err error) {
+	switch r.dbtype {
 	case reader.ModeMySQL:
 		return strings.Replace(DefaultMySQLTable, "DATABASE_NAME", database, -1), nil
 	case reader.ModePostgreSQL:
-		return DefaultPGSQLTable, nil
+		return strings.Replace(DefaultPGSQLTable, "SCHEMA_NAME", r.dbSchema, -1), nil
 	case reader.ModeMSSQL:
-		return strings.Replace(DefaultMSSQLTable, "DATABASE_NAME", database, -1), nil
+		sql := strings.Replace(DefaultMSSQLTable, "DATABASE_NAME", database, -1)
+		sql = strings.Replace(sql, "SCHEMA_NAME", r.dbSchema, -1)
+		return sql, nil
 	default:
-		return "", fmt.Errorf("not support reader type: %v", dbtype)
+		return "", fmt.Errorf("not support reader type: %v", r.dbtype)
 	}
 }
 
@@ -1680,14 +1685,16 @@ func (r *Reader) getCheckAll(queryType int) (checkAll bool, err error) {
 }
 
 //根据数据库类型返回表名
-func getWrappedTableName(dbtype string, table string) (tableName string, err error) {
-	switch dbtype {
+func (r *Reader) getWrappedTableName(table string) (tableName string, err error) {
+	switch r.dbtype {
 	case reader.ModeMySQL:
 		tableName = "`" + table + "`"
-	case reader.ModeMSSQL, reader.ModePostgreSQL:
-		tableName = "\"" + table + "\""
+	case reader.ModeMSSQL:
+		tableName = fmt.Sprintf("\"%s\".\"%s\"", r.dbSchema, table)
+	case reader.ModePostgreSQL:
+		tableName = fmt.Sprintf("\"%s\".\"%s\"", r.dbSchema, table)
 	default:
-		err = fmt.Errorf("%v mode not support in sql reader", dbtype)
+		err = fmt.Errorf("%v mode not support in sql reader", r.dbtype)
 	}
 	return
 }
@@ -1696,13 +1703,13 @@ func getWrappedTableName(dbtype string, table string) (tableName string, err err
 func (r *Reader) getRawSqls(queryType int, table string) (sqls string, err error) {
 	switch queryType {
 	case TABLE:
-		tableName, err := getWrappedTableName(r.dbtype, table)
+		tableName, err := r.getWrappedTableName(table)
 		if err != nil {
 			return "", err
 		}
 		sqls += "Select * From " + tableName + ";"
 	case COUNT:
-		tableName, err := getWrappedTableName(r.dbtype, table)
+		tableName, err := r.getWrappedTableName(table)
 		if err != nil {
 			return "", err
 		}
@@ -1719,7 +1726,7 @@ func (r *Reader) getRawSqls(queryType int, table string) (sqls string, err error
 func (r *Reader) getQuery(queryType int, curDB string) (query string, err error) {
 	switch queryType {
 	case TABLE, COUNT:
-		return getDefaultSql(curDB, r.dbtype)
+		return r.getDefaultSql(curDB)
 	case DATABASE:
 		return DefaultMySQLDatabase, nil
 	default:

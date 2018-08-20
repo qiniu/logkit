@@ -565,19 +565,32 @@ func TestReflectTime(t *testing.T) {
 
 func Test_getDefaultSql(t *testing.T) {
 	database := "my_database"
-	actualSql, err := getDefaultSql(database, "mysql")
+	r1:=Reader{
+		dbtype:reader.ModeMySQL,
+	}
+	actualSql, err := r1.getDefaultSql(database)
 	assert.NoError(t, err)
 	expectSql := strings.Replace(DefaultMySQLTable, "DATABASE_NAME", database, -1)
 	assert.Equal(t, actualSql, expectSql)
 
-	actualSql, err = getDefaultSql(database, "postgres")
+	r2:=Reader{
+		dbtype:reader.ModeMSSQL,
+		dbSchema:"dbo",
+	}
+	actualSql, err = r2.getDefaultSql(database)
 	assert.NoError(t, err)
-	expectSql = strings.Replace(DefaultPGSQLTable, "DATABASE_NAME", database, -1)
+	sql:=strings.Replace(DefaultMSSQLTable, "DATABASE_NAME", database, -1)
+	expectSql = strings.Replace(sql,"SCHEMA_NAME",r2.dbSchema,-1)
 	assert.Equal(t, actualSql, expectSql)
 
-	actualSql, err = getDefaultSql(database, "mssql")
+	r3:=Reader{
+		dbtype:reader.ModePostgreSQL,
+		dbSchema:"public",
+	}
+	actualSql, err = r3.getDefaultSql(database)
 	assert.NoError(t, err)
-	expectSql = strings.Replace(DefaultMSSQLTable, "DATABASE_NAME", database, -1)
+	sql = strings.Replace(DefaultPGSQLTable, "DATABASE_NAME", database, -1)
+	expectSql = strings.Replace(sql,"SCHEMA_NAME",r3.dbSchema,-1)
 	assert.Equal(t, actualSql, expectSql)
 }
 
@@ -1018,20 +1031,34 @@ func Test_getCheckAll(t *testing.T) {
 	}
 }
 func Test_getWrappedTableName(t *testing.T) {
-	dbtype := reader.ModeMySQL
-	tname, err := getWrappedTableName(dbtype, "my_table")
+	r1:=Reader{
+		dbtype:reader.ModeMySQL,
+	}
+	tname, err := r1.getWrappedTableName("my_table")
 	expRes := "`my_table`"
 	assert.NoError(t, err)
 	assert.EqualValues(t, expRes, tname)
 
-	dbtype = reader.ModePostgreSQL
-	tname, err = getWrappedTableName(dbtype, "my_table")
-	expRes = "\"my_table\""
+	r2:=Reader{
+		dbtype:reader.ModeMSSQL,
+		dbSchema:"dbo",
+	}
+	tname, err = r2.getWrappedTableName("my_table")
+	expRes = "\"dbo\".\"my_table\""
+	assert.NoError(t, err)
+	assert.EqualValues(t, expRes, tname)
+
+	r3:=Reader{
+		dbtype:reader.ModePostgreSQL,
+		dbSchema:"public",
+	}
+	tname, err = r3.getWrappedTableName("my_table")
+	expRes = "\"public\".\"my_table\""
 	assert.NoError(t, err)
 	assert.EqualValues(t, expRes, tname)
 }
 func Test_getRawSQLs(t *testing.T) {
-	r := &Reader{
+	r1 := &Reader{
 		dbtype: reader.ModeMySQL,
 	}
 	mysqltests := []struct {
@@ -1053,22 +1080,25 @@ func Test_getRawSQLs(t *testing.T) {
 	}
 
 	for _, test := range mysqltests {
-		sqls, err := r.getRawSqls(test.queryType, "my_table")
+		sqls, err := r1.getRawSqls(test.queryType, "my_table")
 		assert.NoError(t, err)
 		assert.EqualValues(t, test.expSQLs, sqls)
 	}
-	r.dbtype = reader.ModePostgreSQL
+	r2:=Reader{
+		dbtype:reader.ModePostgreSQL,
+		dbSchema:"public",
+	}
 	pgtests := []struct {
 		queryType int
 		expSQLs   string
 	}{
 		{
 			queryType: TABLE,
-			expSQLs:   "Select * From \"my_table\";",
+			expSQLs:   "Select * From \"public\".\"my_table\";",
 		},
 		{
 			queryType: COUNT,
-			expSQLs:   "Select Count(*) From \"my_table\";",
+			expSQLs:   "Select Count(*) From \"public\".\"my_table\";",
 		},
 		{
 			queryType: DATABASE,
@@ -1076,7 +1106,33 @@ func Test_getRawSQLs(t *testing.T) {
 		},
 	}
 	for _, test := range pgtests {
-		sqls, err := r.getRawSqls(test.queryType, "my_table")
+		sqls, err := r2.getRawSqls(test.queryType, "my_table")
+		assert.NoError(t, err)
+		assert.EqualValues(t, test.expSQLs, sqls)
+	}
+	r3:=Reader{
+		dbtype:reader.ModeMSSQL,
+		dbSchema:"dbo",
+	}
+	mssqltests := []struct {
+		queryType int
+		expSQLs   string
+	}{
+		{
+			queryType: TABLE,
+			expSQLs:   "Select * From \"dbo\".\"my_table\";",
+		},
+		{
+			queryType: COUNT,
+			expSQLs:   "Select Count(*) From \"dbo\".\"my_table\";",
+		},
+		{
+			queryType: DATABASE,
+			expSQLs:   "",
+		},
+	}
+	for _, test := range mssqltests {
+		sqls, err := r3.getRawSqls(test.queryType, "my_table")
 		assert.NoError(t, err)
 		assert.EqualValues(t, test.expSQLs, sqls)
 	}
