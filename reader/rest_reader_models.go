@@ -645,8 +645,8 @@ var ModeKeyOptions = map[string][]Option{
 			ChooseOnly:   false,
 			Placeholder:  "<schema>",
 			DefaultNoUse: true,
-			Description:  "数据库架构名称(mssql_schema)",
-			ToolTip:      "数据库架构名称",
+			Description:  "数据库模式名称(mssql_schema)",
+			ToolTip:      "数据库模式名称",
 		},
 		{
 			KeyName:      KeyMssqlSQL,
@@ -731,8 +731,8 @@ var ModeKeyOptions = map[string][]Option{
 			Required:     false,
 			Placeholder:  "<schema>",
 			DefaultNoUse: true,
-			Description:  "数据库架构名称(postgres_schema)",
-			ToolTip:      "数据库架构名称",
+			Description:  "数据库模式名称(postgres_schema)",
+			ToolTip:      "数据库模式名称",
 		},
 		{
 			KeyName:      KeyPGsqlSQL,
