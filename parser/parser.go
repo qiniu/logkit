@@ -138,9 +138,9 @@ func (ps *Registry) NewLogParser(conf conf.MapConf) (p Parser, err error) {
 	return f(conf)
 }
 
-func ParseLine(sendChan chan ParseInfo, resultChan chan ParseResult, wg *sync.WaitGroup,
+func ParseLine(dataPipline <-chan ParseInfo, resultChan chan ParseResult, wg *sync.WaitGroup,
 	trimSpace bool, handlerFunc func(string) (Data, error)) {
-	for parseInfo := range sendChan {
+	for parseInfo := range dataPipline {
 		if trimSpace {
 			parseInfo.Line = strings.TrimSpace(parseInfo.Line)
 		}

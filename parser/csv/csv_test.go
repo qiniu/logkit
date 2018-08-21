@@ -20,7 +20,7 @@ import (
 
 var (
 	bench    []Data
-	testData = utils.GetTestData(`123 fufu 3.16 {\"x\":1,\"y\":[\"xx:12\"]}`)
+	testData = utils.GetParseTestData(`123 fufu 3.16 {\"x\":1,\"y\":[\"xx:12\"]}`, DefaultMaxBatchSize)
 )
 
 // old: 5	 258934606 ns/op routine = 1  (2MB)

@@ -16,7 +16,7 @@ import (
 
 var (
 	bench    []Data
-	testData = utils.GetTestData(`{"a":1,"b":[1.0,2.0,3.0],"c":{"d":"123","g":1.2},"e":"x","mm":1.23,"jjj":1493797500346428926}`)
+	testData = utils.GetParseTestData(`{"a":1,"b":[1.0,2.0,3.0],"c":{"d":"123","g":1.2},"e":"x","mm":1.23,"jjj":1493797500346428926}`, DefaultMaxBatchSize)
 )
 
 // old: 20	  86082792 ns/op	routine = 1  (2MB)

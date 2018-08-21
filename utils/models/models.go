@@ -62,7 +62,7 @@ const (
 )
 
 var (
-	MaxProcs = 0
+	MaxProcs = 1
 	NumCPU   = runtime.NumCPU()
 )
 

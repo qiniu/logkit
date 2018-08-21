@@ -15,7 +15,7 @@ import (
 var (
 	grokBench Data
 	bench     []Data
-	testData  = utils.GetTestData(`127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326`)
+	testData  = utils.GetParseTestData(`127.0.0.1 user-identifier frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326`, DefaultMaxBatchSize)
 )
 
 // old: 1		4154037708 ns/op 	routine = 1  (2MB)

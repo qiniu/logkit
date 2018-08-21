@@ -2,8 +2,6 @@ package utils
 
 import (
 	"os"
-
-	"github.com/qiniu/logkit/utils/models"
 )
 
 // IsExist checks whether a file or directory exists.
@@ -13,11 +11,12 @@ func IsExist(path string) bool {
 	return err == nil || os.IsExist(err)
 }
 
-func GetTestData(line string) []string {
+// 获取测试数据
+func GetParseTestData(line string, size int) []string {
 	testSlice := make([]string, 0)
 	totalSize := 0
 	for {
-		if totalSize > models.DefaultMaxBatchSize {
+		if totalSize > size {
 			return testSlice
 		}
 		testSlice = append(testSlice, line)

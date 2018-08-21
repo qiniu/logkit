@@ -46,7 +46,7 @@ func NewNginxAccParser(c conf.MapConf) (p *Parser, err error) {
 	labels := parser.GetLabels(labelList, nameMap)
 	numRoutine := MaxProcs
 	if numRoutine == 0 {
-		numRoutine = NumCPU
+		numRoutine = 1
 	}
 
 	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
@@ -148,7 +148,9 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 	for resultInfo := range resultChan {
 		parseResultSlice = append(parseResultSlice, resultInfo)
 	}
-	sort.Stable(parseResultSlice)
+	if numRoutine > 1 {
+		sort.Stable(parseResultSlice)
+	}
 
 	for _, parseResult := range parseResultSlice {
 		if len(parseResult.Line) == 0 {
@@ -157,7 +159,6 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		}
 
 		if parseResult.Err != nil {
-			log.Debug(parseResult.Err)
 			se.AddErrors()
 			se.ErrorDetail = parseResult.Err
 			if !p.disableRecordErrData {

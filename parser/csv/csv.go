@@ -100,7 +100,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	ignoreInvalid, _ := c.GetBoolOr(parser.KeyCSVIgnoreInvalidField, false)
 	numRoutine := MaxProcs
 	if numRoutine == 0 {
-		numRoutine = NumCPU
+		numRoutine = 1
 	}
 	return &Parser{
 		name:                 name,
@@ -445,25 +445,20 @@ func (p *Parser) parse(line string) (d Data, err error) {
 		}
 	}
 	if p.isAutoRename {
-		d = p.RenameData(d)
+		d = RenameData(d)
 	}
 	return d, nil
 }
 
-func (p *Parser) Rename(datas []Data) []Data {
+func Rename(datas []Data) []Data {
 	newData := make([]Data, 0)
 	for _, d := range datas {
-		data := make(Data)
-		for key, val := range d {
-			newKey := strings.Replace(key, "-", "_", -1)
-			data[newKey] = val
-		}
-		newData = append(newData, data)
+		newData = append(newData, RenameData(d))
 	}
 	return newData
 }
 
-func (p *Parser) RenameData(data Data) Data {
+func RenameData(data Data) Data {
 	newData := make(Data)
 	for key, val := range data {
 		newKey := strings.Replace(key, "-", "_", -1)
@@ -516,7 +511,9 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 	for resultInfo := range resultChan {
 		parseResultSlice = append(parseResultSlice, resultInfo)
 	}
-	sort.Stable(parseResultSlice)
+	if numRoutine > 1 {
+		sort.Stable(parseResultSlice)
+	}
 
 	for _, parseResult := range parseResultSlice {
 		if len(parseResult.Line) == 0 {
@@ -525,7 +522,6 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		}
 
 		if parseResult.Err != nil {
-			log.Debug(parseResult.Err)
 			se.AddErrors()
 			se.ErrorDetail = parseResult.Err
 			if !p.disableRecordErrData {

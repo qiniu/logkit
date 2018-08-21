@@ -42,7 +42,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
 	numRoutine := MaxProcs
 	if numRoutine == 0 {
-		numRoutine = NumCPU
+		numRoutine = 1
 	}
 
 	return &Parser{
@@ -96,8 +96,10 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 	for resultInfo := range resultChan {
 		parseResultSlice = append(parseResultSlice, resultInfo)
 	}
+	if numRoutine > 1 {
+		sort.Stable(parseResultSlice)
+	}
 
-	sort.Stable(parseResultSlice)
 	for _, parseResult := range parseResultSlice {
 		if len(parseResult.Line) == 0 {
 			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
@@ -105,7 +107,6 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		}
 
 		if parseResult.Err != nil {
-			log.Debug(parseResult.Err)
 			se.AddErrors()
 			se.ErrorDetail = parseResult.Err
 			if !p.disableRecordErrData {
@@ -163,8 +164,8 @@ func (p *Parser) parse(line string) (dataSlice []Data, err error) {
 	return dataSlice, nil
 }
 
-func (p *Parser) parseLine(sendChan chan parser.ParseInfo, resultChan chan parser.ParseResult, wg *sync.WaitGroup) {
-	for parseInfo := range sendChan {
+func (p *Parser) parseLine(dataPipline <-chan parser.ParseInfo, resultChan chan parser.ParseResult, wg *sync.WaitGroup) {
+	for parseInfo := range dataPipline {
 		parseInfo.Line = strings.TrimSpace(parseInfo.Line)
 		if len(parseInfo.Line) <= 0 {
 			resultChan <- parser.ParseResult{

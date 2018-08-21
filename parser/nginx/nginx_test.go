@@ -36,7 +36,7 @@ var (
 	cfg4 = conf.MapConf{"name": "nginx", parser.NginxFormatRegex: `^(?P<remote_addr>[^ ]*) - (?P<remote_user>[^ ]*) \[(?P<time_local>[^]]*)\] "(?P<request>[^"]*)" (?P<status>[^ ]*) (?P<bytes_sent>[^ ]*) (?P<body_bytes_sent>[^ ]*) "(?P<http_referer>[^"]*)" "(?P<http_user_agent>[^"]*)" "(?P<http_transfer_encoding>[^"]*)" "(?P<http_x_forwarded_for>[^"]*)" "(?P<upstream_addr>[^"]*)" (?P<host>[^ ]*) (?P<sent_http_x_reqid>[^ ]*) "(?P<upstream_response_time>[^"]*)" (?P<request_time>[^ ]*) (?P<request_length>[^ ]*) "(?P<upstream_http_x_tag>[^"]*)" "(?P<upstream_http_x_uid>[^"]*)" (?P<http_x_stat>[^ ]*) (?P<http_x_estat>[^ ]*) (?P<http_x_from_cdn>[^ ]*)$`, parser.NginxSchema: "remote_addr string, remote_user string, time_local date, request string, status long, bytes_sent long, body_bytes_sent long, http_referer string, http_user_agent string, http_x_forwarded_for string, upstream_addr string, host string, sent_http_x_reqid string, request_time float"}
 
 	bench    []Data
-	testData = utils.GetTestData(`111.111.111.101 - - [30/Aug/2016:14:03:37 +0800] "GET /s5/M00/CE/91/xaxsxsxsxs HTTP/1.1" 200 4962 4259 "http://www.abc.cn" "Mozilla/5.0 (Windows NT 6.1; WOW64)" "-" "123.123.123.123" 192.168.41.58:5000 mirror.qiniu.com WEQAAM8htpudgG8U 0.204 0.204 938 - -  -`)
+	testData = utils.GetParseTestData(`111.111.111.101 - - [30/Aug/2016:14:03:37 +0800] "GET /s5/M00/CE/91/xaxsxsxsxs HTTP/1.1" 200 4962 4259 "http://www.abc.cn" "Mozilla/5.0 (Windows NT 6.1; WOW64)" "-" "123.123.123.123" 192.168.41.58:5000 mirror.qiniu.com WEQAAM8htpudgG8U 0.204 0.204 938 - -  -`, DefaultMaxBatchSize)
 )
 
 // old: 10	 128034530 ns/op	routine = 1  (2MB)
