@@ -565,32 +565,32 @@ func TestReflectTime(t *testing.T) {
 
 func Test_getDefaultSql(t *testing.T) {
 	database := "my_database"
-	r1:=Reader{
-		dbtype:reader.ModeMySQL,
+	r1 := Reader{
+		dbtype: reader.ModeMySQL,
 	}
 	actualSql, err := r1.getDefaultSql(database)
 	assert.NoError(t, err)
 	expectSql := strings.Replace(DefaultMySQLTable, "DATABASE_NAME", database, -1)
 	assert.Equal(t, actualSql, expectSql)
 
-	r2:=Reader{
-		dbtype:reader.ModeMSSQL,
-		dbSchema:"dbo",
+	r2 := Reader{
+		dbtype:   reader.ModeMSSQL,
+		dbSchema: "dbo",
 	}
 	actualSql, err = r2.getDefaultSql(database)
 	assert.NoError(t, err)
-	sql:=strings.Replace(DefaultMSSQLTable, "DATABASE_NAME", database, -1)
-	expectSql = strings.Replace(sql,"SCHEMA_NAME",r2.dbSchema,-1)
+	sql := strings.Replace(DefaultMSSQLTable, "DATABASE_NAME", database, -1)
+	expectSql = strings.Replace(sql, "SCHEMA_NAME", r2.dbSchema, -1)
 	assert.Equal(t, actualSql, expectSql)
 
-	r3:=Reader{
-		dbtype:reader.ModePostgreSQL,
-		dbSchema:"public",
+	r3 := Reader{
+		dbtype:   reader.ModePostgreSQL,
+		dbSchema: "public",
 	}
 	actualSql, err = r3.getDefaultSql(database)
 	assert.NoError(t, err)
 	sql = strings.Replace(DefaultPGSQLTable, "DATABASE_NAME", database, -1)
-	expectSql = strings.Replace(sql,"SCHEMA_NAME",r3.dbSchema,-1)
+	expectSql = strings.Replace(sql, "SCHEMA_NAME", r3.dbSchema, -1)
 	assert.Equal(t, actualSql, expectSql)
 }
 
@@ -1031,26 +1031,26 @@ func Test_getCheckAll(t *testing.T) {
 	}
 }
 func Test_getWrappedTableName(t *testing.T) {
-	r1:=Reader{
-		dbtype:reader.ModeMySQL,
+	r1 := Reader{
+		dbtype: reader.ModeMySQL,
 	}
 	tname, err := r1.getWrappedTableName("my_table")
 	expRes := "`my_table`"
 	assert.NoError(t, err)
 	assert.EqualValues(t, expRes, tname)
 
-	r2:=Reader{
-		dbtype:reader.ModeMSSQL,
-		dbSchema:"dbo",
+	r2 := Reader{
+		dbtype:   reader.ModeMSSQL,
+		dbSchema: "dbo",
 	}
 	tname, err = r2.getWrappedTableName("my_table")
 	expRes = "\"dbo\".\"my_table\""
 	assert.NoError(t, err)
 	assert.EqualValues(t, expRes, tname)
 
-	r3:=Reader{
-		dbtype:reader.ModePostgreSQL,
-		dbSchema:"public",
+	r3 := Reader{
+		dbtype:   reader.ModePostgreSQL,
+		dbSchema: "public",
 	}
 	tname, err = r3.getWrappedTableName("my_table")
 	expRes = "\"public\".\"my_table\""
@@ -1084,9 +1084,9 @@ func Test_getRawSQLs(t *testing.T) {
 		assert.NoError(t, err)
 		assert.EqualValues(t, test.expSQLs, sqls)
 	}
-	r2:=Reader{
-		dbtype:reader.ModePostgreSQL,
-		dbSchema:"public",
+	r2 := Reader{
+		dbtype:   reader.ModePostgreSQL,
+		dbSchema: "public",
 	}
 	pgtests := []struct {
 		queryType int
@@ -1110,9 +1110,9 @@ func Test_getRawSQLs(t *testing.T) {
 		assert.NoError(t, err)
 		assert.EqualValues(t, test.expSQLs, sqls)
 	}
-	r3:=Reader{
-		dbtype:reader.ModeMSSQL,
-		dbSchema:"dbo",
+	r3 := Reader{
+		dbtype:   reader.ModeMSSQL,
+		dbSchema: "dbo",
 	}
 	mssqltests := []struct {
 		queryType int
