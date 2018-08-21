@@ -90,7 +90,6 @@ func TestNewNginxParserForErrData(t *testing.T) {
 }
 
 func TestNewNginxWithManuelRegex(t *testing.T) {
-
 	p2, err := NewNginxAccParser(cfg4)
 	if err != nil {
 		t.Fatal(err)
@@ -101,6 +100,36 @@ func TestNewNginxWithManuelRegex(t *testing.T) {
 	}
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+func TestFindAllRegexpsFromConf(t *testing.T) {
+	confPath := "test_data/nginx.conf"
+	patterns, err := FindAllRegexpsFromConf(confPath)
+	assert.NoError(t, err)
+
+	{
+		assert.NotNil(t, patterns["main"])
+
+		re, err := ResolveRegexpFromConf(confPath, "main")
+		assert.NoError(t, err)
+		assert.Equal(t, patterns["main"].String(), re.String())
+	}
+
+	{
+		assert.NotNil(t, patterns["logkit"])
+
+		re, err := ResolveRegexpFromConf(confPath, "logkit")
+		assert.NoError(t, err)
+		assert.Equal(t, patterns["logkit"].String(), re.String())
+	}
+
+	{
+		assert.NotNil(t, patterns["testmain"])
+
+		re, err := ResolveRegexpFromConf(confPath, "testmain")
+		assert.NoError(t, err)
+		assert.Equal(t, patterns["testmain"].String(), re.String())
 	}
 }
 
