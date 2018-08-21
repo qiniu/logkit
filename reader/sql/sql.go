@@ -134,7 +134,7 @@ type Reader struct {
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	var readBatch int
-	var dbtype, dataSource, rawDatabase, rawSQLs, cronSchedule, offsetKey, encoder, table,dbSchema string
+	var dbtype, dataSource, rawDatabase, rawSQLs, cronSchedule, offsetKey, encoder, table, dbSchema string
 	var execOnStart, historyAll bool
 	dbtype, _ = conf.GetStringOr(reader.KeyMode, reader.ModeMySQL)
 	logpath, _ := conf.GetStringOr(reader.KeyLogPath, "")
@@ -248,29 +248,29 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	}
 
 	r := &Reader{
-		meta:           meta,
-		status:         reader.StatusInit,
-		routineStatus:  reader.StatusInit,
-		stopChan:       make(chan struct{}),
-		readChan:       make(chan readInfo),
-		errChan:        make(chan error),
-		datasource:     dataSource,
-		database:       rawDatabase,
-		rawDatabase:    rawDatabase,
-		rawSQLs:        rawSQLs,
-		Cron:           cron.New(),
-		readBatch:      readBatch,
-		offsetKey:      offsetKey,
-		syncSQLs:       sqls,
-		dbtype:         dbtype,
-		execOnStart:    execOnStart,
-		historyAll:     historyAll,
-		rawTable:       table,
-		table:          table,
-		magicLagDur:    mgld,
-		schemas:        schemas,
-		encoder:        encoder,
-		dbSchema:       dbSchema,
+		meta:          meta,
+		status:        reader.StatusInit,
+		routineStatus: reader.StatusInit,
+		stopChan:      make(chan struct{}),
+		readChan:      make(chan readInfo),
+		errChan:       make(chan error),
+		datasource:    dataSource,
+		database:      rawDatabase,
+		rawDatabase:   rawDatabase,
+		rawSQLs:       rawSQLs,
+		Cron:          cron.New(),
+		readBatch:     readBatch,
+		offsetKey:     offsetKey,
+		syncSQLs:      sqls,
+		dbtype:        dbtype,
+		execOnStart:   execOnStart,
+		historyAll:    historyAll,
+		rawTable:      table,
+		table:         table,
+		magicLagDur:   mgld,
+		schemas:       schemas,
+		encoder:       encoder,
+		dbSchema:      dbSchema,
 	}
 
 	if r.rawDatabase == "" {
