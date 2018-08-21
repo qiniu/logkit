@@ -21,8 +21,12 @@ import (
 )
 
 const (
-	systemVariableType = "system"
-	userVariableType   = "user"
+	systemVariableType          = "system"
+	userVariableType            = "user"
+	defaultServerRotateInterval = 3600
+	defaultServerRotateSize     = 128 * 1024 * 1024
+	DefaultLogkitRotateSize     = 512000 * 1024
+	DefaultLogkitRotateInterval = 600
 )
 
 func (c *Pipeline) CreateGroup(input *CreateGroupInput) (err error) {
@@ -382,14 +386,19 @@ func (c *Pipeline) UpdateRepoWithKodo(input *UpdateRepoInput, ex ExportDesc) err
 	}
 
 	spec := &ExportKodoSpec{
-		Bucket:    bucketName,
-		Fields:    newfields,
-		AccessKey: ak,
-		Retention: int(retention),
-		Compress:  compress,
-		Email:     email,
-		Format:    format,
-		KeyPrefix: keyPrefix,
+		Bucket:         bucketName,
+		Fields:         newfields,
+		AccessKey:      ak,
+		Retention:      int(retention),
+		Compress:       compress,
+		Email:          email,
+		Format:         format,
+		KeyPrefix:      keyPrefix,
+		RotateInterval: input.Option.RotateInterval,
+		RotateSize:     input.Option.RotateSize,
+		RotateStrategy: input.Option.RotateStrategy,
+		RotateNumber:   input.Option.RotateNumber,
+		RotateSizeType: input.Option.RotateSizeType,
 	}
 	err := c.UpdateExport(&UpdateExportInput{
 		RepoName:     input.RepoName,
@@ -442,6 +451,101 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 	if err != nil {
 		log.Error("updateRepo list exports error", err)
 		return
+	}
+	for _, export := range exports.Exports {
+		if export.Type == "kodo" {
+			if val, ok := export.Spec["rotateStrategy"]; ok {
+				if rotateStrategy, ok := val.(string); ok {
+					input.Option.RotateStrategy = rotateStrategy
+				}
+			}
+			syncServer := false
+			if val, ok := export.Spec["rotateInterval"]; ok {
+				rotateInterval := 0
+				switch val.(type) {
+				case int64:
+					rotateInterval = int(val.(int64))
+				case float64:
+					rotateInterval = int(val.(float64))
+				case float32:
+					rotateInterval = int(val.(float32))
+				}
+				// 服务端为 logkit默认值，且logkit本次设置的值input.Option.RotateInterval不为默认值，则用input.Option.RotateInterval更新服务端的值
+				if (rotateInterval == DefaultLogkitRotateInterval && input.Option.RotateInterval != DefaultLogkitRotateInterval) {
+					// 本次 input.Option.RotateInterval 0,需要设置为默认值
+					if input.Option.RotateInterval == 0 {
+						input.Option.RotateInterval = DefaultLogkitRotateInterval
+						syncServer = true
+					}
+
+				} else {
+					// 服务端不为0和默认值，则使用服务端的值
+					if (rotateInterval != defaultServerRotateInterval && rotateInterval != 0) {
+						input.Option.RotateInterval = rotateInterval
+						syncServer = true
+					} else {
+						// logkit本次设置的为0，则设置为default值
+						if input.Option.RotateInterval == 0 {
+							input.Option.RotateInterval = defaultServerRotateInterval
+							syncServer = true
+						}
+					}
+				}
+			}
+
+			if val, ok := export.Spec["rotateSize"]; ok {
+				rotateSize := 0
+				switch val.(type) {
+				case int64:
+					rotateSize = int(val.(int64))
+				case float64:
+					rotateSize = int(val.(float64))
+				case float32:
+					rotateSize = int(val.(float32))
+				}
+				// 服务端为 logkit默认值，且logkit本次设置的值input.Option.RotateSize不为默认值，则用input.Option.RotateSize更新服务端的值
+				if (rotateSize == DefaultLogkitRotateSize && input.Option.RotateSize != DefaultLogkitRotateSize) {
+					// 本次 input.Option.RotateSize 0,需要设置为默认值
+					if input.Option.RotateSize == 0 {
+						input.Option.RotateSize = DefaultLogkitRotateSize
+						syncServer = true
+					}
+
+				} else {
+					// 服务端不为0和默认值，则使用服务端的值
+					if (rotateSize != defaultServerRotateSize && rotateSize != 0) {
+						input.Option.RotateSize = rotateSize
+						syncServer = true
+					} else {
+						// logkit本次设置的为0，则设置为default值
+						if input.Option.RotateSize == 0 {
+							input.Option.RotateSize = defaultServerRotateSize
+							syncServer = true
+						}
+					}
+				}
+			}
+
+			if syncServer {
+				if val, ok := export.Spec["rotateNumber"]; ok {
+					switch val.(type) {
+					case int64:
+						input.Option.RotateNumber = int(val.(int64))
+					case float64:
+						input.Option.RotateNumber = int(val.(float64))
+					}
+				}
+				if val, ok := export.Spec["rotateSizeType"]; ok {
+					if rotateSizeType, ok := val.(string); ok {
+						input.Option.RotateSizeType = rotateSizeType
+					}
+				}
+			}
+			if input.Option.RotateNumber == 0 {
+				input.Option.RotateNumber = input.Option.RotateSize
+				input.Option.RotateSizeType = "B"
+			}
+		}
 	}
 	exs := make(map[string]ExportDesc)
 	for _, ex := range exports.Exports {
