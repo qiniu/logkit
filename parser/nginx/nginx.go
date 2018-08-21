@@ -62,7 +62,7 @@ func NewNginxAccParser(c conf.MapConf) (p *Parser, err error) {
 		if err != nil {
 			return nil, err
 		}
-		re, err := ResolveRegexFromConf(nginxConfPath, formatName)
+		re, err := ResolveRegexpFromConf(nginxConfPath, formatName)
 		if err != nil {
 			return nil, err
 		}
@@ -199,8 +199,14 @@ func (p *Parser) makeValue(name, raw string) (data interface{}, err error) {
 	}
 }
 
-// ResolveRegexFromConf 根据给定配置文件和日志格式名称返回自动生成的匹配正则表达式
-func ResolveRegexFromConf(confPath, name string) (*regexp.Regexp, error) {
+var (
+	formatRegexp    = regexp.MustCompile(`^\s*log_format\s+(\S+)+\s+(.+)\s*$`)
+	formatEndRegexp = regexp.MustCompile(`^\s*(.*?)\s*(;|$)`)
+	replaceRegexp   = regexp.MustCompile(`\\\$([a-z_]+)(\\?(.))`)
+)
+
+// ResolveRegexpFromConf 根据给定配置文件和日志格式名称返回自动生成的匹配正则表达式
+func ResolveRegexpFromConf(confPath, name string) (*regexp.Regexp, error) {
 	f, err := os.Open(confPath)
 	if err != nil {
 		return nil, fmt.Errorf("open: %v", err)
@@ -216,25 +222,19 @@ func ResolveRegexFromConf(confPath, name string) (*regexp.Regexp, error) {
 	found := false
 	var format string
 	for scanner.Scan() {
-		var line string
+		line := scanner.Text()
 		if !found {
 			// Find a log_format definition
-			line = scanner.Text()
 			formatDef := reTmp.FindStringSubmatch(line)
 			if formatDef == nil {
 				continue
 			}
 			found = true
 			line = formatDef[1]
-		} else {
-			line = scanner.Text()
 		}
+
 		// Look for a definition end
-		reTmp, err = regexp.Compile(`^\s*(.*?)\s*(;|$)`)
-		if err != nil {
-			return nil, fmt.Errorf("compile definition regexp: %v", err)
-		}
-		lineSplit := reTmp.FindStringSubmatch(line)
+		lineSplit := formatEndRegexp.FindStringSubmatch(line)
 		if l := len(lineSplit[1]); l > 2 {
 			format += lineSplit[1][1 : l-1]
 		}
@@ -248,10 +248,54 @@ func ResolveRegexFromConf(confPath, name string) (*regexp.Regexp, error) {
 		return nil, fmt.Errorf("`log_format %v` not found in given config", name)
 	}
 
-	re, err := regexp.Compile(`\\\$([a-z_]+)(\\?(.))`)
-	if err != nil {
-		return nil, fmt.Errorf("compile replace regexp: %v", err)
-	}
-	restr := re.ReplaceAllString(regexp.QuoteMeta(format+" "), "(?P<$1>[^$3]*)$2")
+	restr := replaceRegexp.ReplaceAllString(regexp.QuoteMeta(format+" "), "(?P<$1>[^$3]*)$2")
 	return regexp.Compile(fmt.Sprintf("^%v$", strings.Trim(restr, " ")))
+}
+
+// FindAllRegexpsFromConf 根据给定配置文件返回所有可能的日志格式与匹配正则表达式的组合
+func FindAllRegexpsFromConf(confPath string) (map[string]*regexp.Regexp, error) {
+	f, err := os.Open(confPath)
+	if err != nil {
+		return nil, fmt.Errorf("open: %v", err)
+	}
+	defer f.Close()
+
+	patterns := make(map[string]*regexp.Regexp)
+	found := false
+
+	var name, format string
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// 如果当前并未找到任何匹配，则尝试匹配
+		if !found {
+			formatDef := formatRegexp.FindStringSubmatch(line)
+			if formatDef == nil {
+				continue
+			}
+			found = true
+			name = formatDef[1]
+			line = formatDef[2]
+		}
+
+		lineSplit := formatEndRegexp.FindStringSubmatch(line)
+		if l := len(lineSplit[1]); l > 2 {
+			format += lineSplit[1][1 : l-1]
+		}
+		if lineSplit[2] == ";" {
+			restr := replaceRegexp.ReplaceAllString(regexp.QuoteMeta(format+" "), "(?P<$1>[^$3]*)$2")
+			re, err := regexp.Compile(fmt.Sprintf("^%v$", strings.Trim(restr, " ")))
+			if err != nil {
+				return nil, fmt.Errorf("compile log format regexp: %v", err)
+			}
+			patterns[name] = re
+			found = false
+			name = ""
+			format = ""
+			continue
+		}
+	}
+
+	return patterns, nil
 }
