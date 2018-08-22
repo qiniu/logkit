@@ -47,14 +47,20 @@ type cleanQueue struct {
 
 type Manager struct {
 	ManagerConfig
-	DefaultDir   string
-	lock         *sync.RWMutex // 这个lock锁住runner的状态，即map runners以及 runnerConfig的情况有变动就要锁住
-	cleanLock    *sync.RWMutex
-	watcherMux   *sync.RWMutex
-	cleanChan    chan cleaner.CleanSignal
-	cleanQueues  map[string]*cleanQueue
-	runners      map[string]Runner
-	runnerConfig map[string]RunnerConfig
+	DefaultDir  string
+	cleanLock   *sync.RWMutex
+	watcherMux  *sync.RWMutex
+	cleanChan   chan cleaner.CleanSignal
+	cleanQueues map[string]*cleanQueue
+
+	// runnerLock 锁住runner的状态，即 map runners、runnerNames 和 runnerConfigs 的情况有变动就要锁住
+	runnerLock sync.RWMutex
+	// runners  存储了正在运行的 runner
+	runners map[string]Runner
+	// runnerNames 存储了当前已经被使用的 runner name
+	runnerNames map[string]bool
+	// runnerConfigs 存储了当前每个 runner 对应的 config
+	runnerConfigs map[string]RunnerConfig
 
 	watchers  map[string]*fsnotify.Watcher // inode到watcher的映射表
 	rregistry *reader.Registry
@@ -92,13 +98,13 @@ func NewCustomManager(conf ManagerConfig, rr *reader.Registry, pr *parser.Regist
 	}
 	m := &Manager{
 		ManagerConfig: conf,
-		lock:          new(sync.RWMutex),
 		cleanLock:     new(sync.RWMutex),
 		watcherMux:    new(sync.RWMutex),
 		cleanChan:     make(chan cleaner.CleanSignal),
 		cleanQueues:   make(map[string]*cleanQueue),
 		runners:       make(map[string]Runner),
-		runnerConfig:  make(map[string]RunnerConfig),
+		runnerConfigs: make(map[string]RunnerConfig),
+		runnerNames:   make(map[string]bool),
 		watchers:      make(map[string]*fsnotify.Watcher),
 		rregistry:     rr,
 		pregistry:     pr,
@@ -109,7 +115,7 @@ func NewCustomManager(conf ManagerConfig, rr *reader.Registry, pr *parser.Regist
 }
 
 func (m *Manager) Stop() error {
-	m.lock.Lock()
+	m.runnerLock.Lock()
 	for _, runner := range m.runners {
 		runner.Stop()
 		runnerStatus, ok := runner.(StatusPersistable)
@@ -117,7 +123,7 @@ func (m *Manager) Stop() error {
 			runnerStatus.StatusBackup()
 		}
 	}
-	m.lock.Unlock()
+	m.runnerLock.Unlock()
 
 	m.watcherMux.Lock()
 	for _, w := range m.watchers {
@@ -144,8 +150,8 @@ func (m *Manager) RemoveWithConfig(confPath string, isDelete bool) (err error) {
 		return
 	}
 	confPath = confPathAbs
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.runnerLock.Lock()
+	defer m.runnerLock.Unlock()
 
 	runner, ok := m.runners[confPath]
 	if !ok {
@@ -158,7 +164,8 @@ func (m *Manager) RemoveWithConfig(confPath string, isDelete bool) (err error) {
 	runner.Stop()
 	delete(m.runners, confPath)
 	if isDelete {
-		delete(m.runnerConfig, confPath)
+		delete(m.runnerNames, m.runnerConfigs[confPath].RunnerName)
+		delete(m.runnerConfigs, confPath)
 	}
 	log.Infof("runner %s be removed, total %d", runner.Name(), len(m.runners))
 	if runnerStatus, ok := runner.(StatusPersistable); ok {
@@ -216,7 +223,7 @@ func (m *Manager) Add(confPath string) {
 		log.Warnf("Config %q does not end with '.conf', skipped", confPath)
 		return
 	}
-	log.Info("Adding config %q", confPath)
+	log.Infof("Adding config %q", confPath)
 	confPathAbs, _, err := GetRealPath(confPath)
 	if err != nil {
 		log.Warnf("Failed to get real path of %q: %v", confPath)
@@ -244,52 +251,55 @@ func (m *Manager) Add(confPath string) {
 
 	log.Infof("Adding runner %q", conf.RunnerName)
 	conf.CreateTime = modTime.Format(time.RFC3339Nano)
-	go m.ForkRunner(confPath, conf, false)
-	return
+	go func() {
+		if err := m.ForkRunner(confPath, conf, false); err != nil {
+			log.Errorf("Failed to add runner %q: %v", confPath, err)
+		}
+	}()
 }
 
-func (m *Manager) ForkRunner(confPath string, nconf RunnerConfig, errReturn bool) error {
+func (m *Manager) ForkRunner(confPath string, config RunnerConfig, returnOnErr bool) error {
 	var runner Runner
 	var err error
 	i := 0
 	for {
 		if m.IsRunning(confPath) {
 			err = fmt.Errorf("%s already added - ", confPath)
-			if !errReturn {
+			if !returnOnErr {
 				log.Error(err)
 			}
 			return err
 		}
-		if nconf.IsStopped {
-			m.lock.Lock()
-			m.runnerConfig[confPath] = nconf
-			m.lock.Unlock()
+		if config.IsStopped {
+			m.runnerLock.Lock()
+			m.runnerConfigs[confPath] = config
+			m.runnerLock.Unlock()
 			return nil
 		}
-		for k := range nconf.SendersConfig {
+		for k := range config.SendersConfig {
 			var webornot string
-			if nconf.IsInWebFolder {
+			if config.IsInWebFolder {
 				webornot = "Web"
 			} else {
 				webornot = "Terminal"
 			}
-			if nconf.SendersConfig[k] == nil {
+			if config.SendersConfig[k] == nil {
 				return fmt.Errorf("%s sender config is invalid", confPath)
 			}
-			nconf.SendersConfig[k][sender.InnerUserAgent] = "logkit/" + m.Version + " " + m.SystemInfo + " " + webornot
+			config.SendersConfig[k][sender.InnerUserAgent] = "logkit/" + m.Version + " " + m.SystemInfo + " " + webornot
 		}
 
-		if runner, err = NewCustomRunner(nconf, m.cleanChan, m.rregistry, m.pregistry, m.sregistry); err != nil {
+		if runner, err = NewCustomRunner(config, m.cleanChan, m.rregistry, m.pregistry, m.sregistry); err != nil {
 			errVal, ok := err.(*os.PathError)
 			if !ok {
-				err = fmt.Errorf("NewRunner(%v) failed: %v", nconf.RunnerName, err)
-				if !errReturn {
+				err = fmt.Errorf("NewRunner(%v) failed: %v", config.RunnerName, err)
+				if !returnOnErr {
 					log.Error(err)
 				}
 				return err
 			}
-			if errReturn {
-				return fmt.Errorf("NewRunner(%v) failed: os.PathError %v", nconf.RunnerName, err)
+			if returnOnErr {
+				return fmt.Errorf("NewRunner(%v) failed: os.PathError %v", config.RunnerName, err)
 			}
 			i++
 			log.Warnf("LogDir(%v) does not exsit after %d rounds, sleep 5 minute and try again...", errVal.Path, i)
@@ -303,18 +313,22 @@ func (m *Manager) ForkRunner(confPath string, nconf RunnerConfig, errReturn bool
 		}
 		break
 	}
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	// double check
+	m.runnerLock.Lock()
+	defer m.runnerLock.Unlock()
+	// 确保 config 没有重复添加，且 runner name 没有冲突
 	if _, ok := m.runners[confPath]; ok {
-		return fmt.Errorf("%s already added - ", confPath)
+		return fmt.Errorf("config path %q already added", confPath)
+	} else if m.runnerNames[config.RunnerName] {
+		return fmt.Errorf("runner name %q already used", config.RunnerName)
 	}
+
 	m.addCleanQueue(runner.Cleaner())
-	log.Infof("Runner[%v] added: %#v", nconf.RunnerName, confPath)
+	log.Infof("Runner[%v] added: %#v", config.RunnerName, confPath)
 	go runner.Run()
 	m.runners[confPath] = runner
-	m.runnerConfig[confPath] = nconf
-	log.Infof("new Runner[%v] is added, total %d", nconf.RunnerName, len(m.runners))
+	m.runnerNames[config.RunnerName] = true
+	m.runnerConfigs[confPath] = config
+	log.Infof("new Runner[%v] is added, total %d", config.RunnerName, len(m.runners))
 	return nil
 }
 
@@ -537,10 +551,10 @@ func (m *Manager) RestoreWebDir() {
 }
 
 func (m *Manager) Status() (rss map[string]RunnerStatus) {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.runnerLock.RLock()
+	defer m.runnerLock.RUnlock()
 	rss = make(map[string]RunnerStatus)
-	for key, conf := range m.runnerConfig {
+	for key, conf := range m.runnerConfigs {
 		if r, ex := m.runners[key]; ex {
 			rss[r.Name()] = r.Status()
 			continue
@@ -558,10 +572,10 @@ func (m *Manager) Status() (rss map[string]RunnerStatus) {
 }
 
 func (m *Manager) Errors() (rss map[string]ErrorsResult) {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.runnerLock.RLock()
+	defer m.runnerLock.RUnlock()
 	rss = make(map[string]ErrorsResult)
-	for key, conf := range m.runnerConfig {
+	for key, conf := range m.runnerConfigs {
 		if r, ex := m.runners[key]; ex {
 			if runnerErr, ok := r.(RunnerErrors); ok {
 				rss[r.Name()] = runnerErr.GetErrors()
@@ -574,9 +588,9 @@ func (m *Manager) Errors() (rss map[string]ErrorsResult) {
 }
 
 func (m *Manager) Error(name string) (rss ErrorsResult, err error) {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
-	for key := range m.runnerConfig {
+	m.runnerLock.RLock()
+	defer m.runnerLock.RUnlock()
+	for key := range m.runnerConfigs {
 		if r, ex := m.runners[key]; ex {
 			if r.Name() != name {
 				continue
@@ -594,23 +608,23 @@ func (m *Manager) Error(name string) (rss ErrorsResult, err error) {
 func (m *Manager) Configs() (rss map[string]RunnerConfig) {
 	rss = make(map[string]RunnerConfig)
 	tmpRss := make(map[string]RunnerConfig)
-	m.lock.RLock()
-	for k, v := range m.runnerConfig {
+	m.runnerLock.RLock()
+	for k, v := range m.runnerConfigs {
 		if filepath.Dir(k) == m.RestDir {
 			v.IsInWebFolder = true
 		}
 		tmpRss[k] = v
 	}
 	deepCopyByJSON(&rss, &tmpRss)
-	m.lock.RUnlock()
+	m.runnerLock.RUnlock()
 	return
 }
 
 func (m *Manager) getDeepCopyConfig(name string) (filename string, conf RunnerConfig, err error) {
 	filename = filepath.Join(m.RestDir, name+".conf")
-	m.lock.RLock()
-	defer m.lock.RUnlock()
-	if tmpConf, ok := m.runnerConfig[filename]; !ok {
+	m.runnerLock.RLock()
+	defer m.runnerLock.RUnlock()
+	if tmpConf, ok := m.runnerConfigs[filename]; !ok {
 		err = fmt.Errorf("runner %v is not found", filename)
 	} else {
 		deepCopyByJSON(&conf, &tmpConf)
@@ -706,8 +720,8 @@ func (m *Manager) backupRunnerConfig(filename string, rconf RunnerConfig) error 
 }
 
 func (m *Manager) UpdateToken(tokens []AuthTokens) (err error) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.runnerLock.Lock()
+	defer m.runnerLock.Unlock()
 	errMsg := make([]string, 0)
 	for _, token := range tokens {
 		runnerPath := token.RunnerName
@@ -720,13 +734,13 @@ func (m *Manager) UpdateToken(tokens []AuthTokens) (err error) {
 				}
 			}
 		}
-		if c, ok := m.runnerConfig[runnerPath]; ok {
+		if c, ok := m.runnerConfigs[runnerPath]; ok {
 			if len(c.SendersConfig) > token.SenderIndex {
 				for k, t := range token.SenderTokens {
 					c.SendersConfig[token.SenderIndex][k] = t
 				}
 			}
-			m.runnerConfig[runnerPath] = c
+			m.runnerConfigs[runnerPath] = c
 		}
 	}
 	if len(errMsg) != 0 {
@@ -809,9 +823,9 @@ func (m *Manager) StartRunner(name string) (err error) {
 }
 
 func (m *Manager) setRunnerConfig(filename string, conf RunnerConfig) {
-	m.lock.Lock()
-	m.runnerConfig[filename] = conf
-	m.lock.Unlock()
+	m.runnerLock.Lock()
+	m.runnerConfigs[filename] = conf
+	m.runnerLock.Unlock()
 }
 
 func (m *Manager) StopRunner(name string) (err error) {
@@ -889,10 +903,10 @@ func (m *Manager) ResetRunner(name string) (err error) {
 }
 
 func (m *Manager) readRunners(filename string) (Runner, bool) {
-	m.lock.RLock()
-	r, runnerOk := m.runners[filename]
-	m.lock.RUnlock()
-	return r, runnerOk
+	m.runnerLock.RLock()
+	defer m.runnerLock.RUnlock()
+	r, ok := m.runners[filename]
+	return r, ok
 }
 
 func (m *Manager) DeleteRunner(name string) (err error) {
@@ -901,9 +915,9 @@ func (m *Manager) DeleteRunner(name string) (err error) {
 		return err
 	}
 	if conf.IsStopped {
-		m.lock.Lock()
-		delete(m.runnerConfig, filename)
-		m.lock.Unlock()
+		m.runnerLock.Lock()
+		delete(m.runnerConfigs, filename)
+		m.runnerLock.Unlock()
 	}
 	r, runnerOk := m.readRunners(filename)
 	if runnerOk {
