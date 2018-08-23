@@ -163,8 +163,8 @@ func (m *Manager) RemoveWithConfig(confPath string, isDelete bool) (err error) {
 	m.removeCleanQueue(runner.Cleaner())
 	runner.Stop()
 	delete(m.runners, confPath)
+	delete(m.runnerNames, runner.Name())
 	if isDelete {
-		delete(m.runnerNames, m.runnerConfigs[confPath].RunnerName)
 		delete(m.runnerConfigs, confPath)
 	}
 	log.Infof("runner %s be removed, total %d", runner.Name(), len(m.runners))
