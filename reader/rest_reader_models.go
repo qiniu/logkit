@@ -67,8 +67,8 @@ const (
 
 // Constants for Redis
 const (
-	DateTypeHash          = "hash"
-	DateTypeSortedSet     = "sortedSet"
+	DataTypeHash          = "hash"
+	DataTypeSortedSet     = "zset"
 	DataTypeSet           = "set"
 	DataTypeString        = "string"
 	DataTypeList          = "list"
@@ -987,7 +987,7 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:       KeyRedisDataType,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{DataTypeList, DataTypeChannel, DataTypePatterChannel, DataTypeString, DataTypeSet, DateTypeSortedSet, DateTypeHash},
+			ChooseOptions: []interface{}{DataTypeList, DataTypeChannel, DataTypePatterChannel, DataTypeString, DataTypeSet, DataTypeSortedSet, DataTypeHash},
 			Description:   "数据读取模式(redis_datatype)",
 			ToolTip:       "",
 		},
