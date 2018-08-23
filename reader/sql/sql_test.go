@@ -303,19 +303,19 @@ func TestGoMagicIndex(t *testing.T) {
 		},
 	}
 	for _, ti := range tests {
-		ret, startIndex, endIndex, timeIndex, err := goMagicIndex(ti.data, now)
+		magicRes, err := goMagicIndex(ti.data, now)
 		assert.NoError(t, err)
-		assert.EqualValues(t, ti.expRet, ret)
-		assert.EqualValues(t, ti.expStartIndex, startIndex)
-		assert.EqualValues(t, ti.expEndIndex, endIndex)
-		assert.EqualValues(t, ti.expTimeIndex, timeIndex)
+		assert.EqualValues(t, ti.expRet, magicRes.ret)
+		assert.EqualValues(t, ti.expStartIndex, magicRes.timeStart)
+		assert.EqualValues(t, ti.expEndIndex, magicRes.timeEnd)
+		assert.EqualValues(t, ti.expTimeIndex, magicRes.remainIndex)
 	}
 
 	errData := "x@(M)@(DD)"
 	expRet := "x@(M)@(DD)"
-	ret, _, _, _, err := goMagicIndex(errData, now)
+	magicRes, err := goMagicIndex(errData, now)
 	assert.Error(t, err)
-	assert.EqualValues(t, expRet, ret)
+	assert.EqualValues(t, expRet, magicRes.ret)
 }
 
 func Test_getRemainStr(t *testing.T) {
@@ -463,7 +463,7 @@ func Test_matchRemainStr(t *testing.T) {
 		},
 	}
 	for _, ti := range tests {
-		remain := matchRemainStr(ti.origin, ti.match, ti.matchData, ti.timeIndex)
+		remain := compareRemainStr(ti.origin, ti.match, ti.matchData, ti.timeIndex)
 		assert.Equal(t, ti.expectRes, remain)
 	}
 }
@@ -725,7 +725,7 @@ func Test_validTime(t *testing.T) {
 		},
 	}
 	for _, ti := range tests {
-		valid := validTime(ti.data, ti.match, ti.startIndex, ti.endIndex, true)
+		valid := compareTime(ti.data, ti.match, ti.startIndex, ti.endIndex, true)
 		assert.EqualValues(t, ti.expRes, valid)
 	}
 
@@ -808,7 +808,7 @@ func Test_validTime(t *testing.T) {
 		},
 	}
 	for _, ti := range tests2 {
-		valid := validTime(ti.data, ti.match, ti.startIndex, ti.endIndex, false)
+		valid := compareTime(ti.data, ti.match, ti.startIndex, ti.endIndex, false)
 		assert.EqualValues(t, ti.expRes, valid)
 	}
 }
@@ -892,107 +892,112 @@ func Test_isMatchData(t *testing.T) {
 	}
 
 	tests := []struct {
-		data          string
-		matchData     string
-		matchStr      string
-		expRet        bool
-		expStartIndex []int
-		expEndIndex   []int
-		expTimeIndex  []int
+		data           string
+		magicRemainStr string
+		magicRet       string
+		expRet         bool
+		expTimeStart   []int
+		exptimeEnd     []int
+		expRemainIndex []int
 	}{
 		{
-			data:          "x02abc01def",
-			matchData:     "xabcdef",
-			matchStr:      "x02abc01def",
-			expRet:        true,
-			expStartIndex: []int{-1, 1, 6, -1, -1, -1},
-			expEndIndex:   []int{0, 3, 8, 0, 0, 0},
-			expTimeIndex:  []int{0, 1, 3, 6, 8, 11},
+			data:           "x02abc01def",
+			magicRemainStr: "xabcdef",
+			magicRet:       "x02abc01def",
+			expRet:         true,
+			expTimeStart:   []int{-1, 1, 6, -1, -1, -1},
+			exptimeEnd:     []int{0, 3, 8, 0, 0, 0},
+			expRemainIndex: []int{0, 1, 3, 6, 8, 11},
 		},
 		{
-			data:          "x01abc01def",
-			matchData:     "xabcdef",
-			matchStr:      "x02abc01def",
-			expRet:        false,
-			expStartIndex: []int{-1, 1, 6, -1, -1, -1},
-			expEndIndex:   []int{0, 3, 8, 0, 0, 0},
-			expTimeIndex:  []int{0, 1, 3, 6, 8, 11},
+			data:           "x01abc01def",
+			magicRemainStr: "xabcdef",
+			magicRet:       "x02abc01def",
+			expRet:         true,
+			expTimeStart:   []int{-1, 1, 6, -1, -1, -1},
+			exptimeEnd:     []int{0, 3, 8, 0, 0, 0},
+			expRemainIndex: []int{0, 1, 3, 6, 8, 11},
 		},
 		{
-			data:          "x02abc01defdef",
-			matchData:     "xabcdef",
-			matchStr:      "x02abc01def*",
-			expRet:        true,
-			expStartIndex: []int{-1, 1, 6, -1, -1, -1},
-			expEndIndex:   []int{0, 3, 8, 0, 0, 0},
-			expTimeIndex:  []int{0, 1, 3, 6, 8, 11},
+			data:           "x02abc01defdef",
+			magicRemainStr: "xabcdef",
+			magicRet:       "x02abc01def*",
+			expRet:         true,
+			expTimeStart:   []int{-1, 1, 6, -1, -1, -1},
+			exptimeEnd:     []int{0, 3, 8, 0, 0, 0},
+			expRemainIndex: []int{0, 1, 3, 6, 8, 11},
 		},
 		{
-			data:          "abc",
-			matchData:     "xabc",
-			matchStr:      "x02abc01",
-			expRet:        false,
-			expStartIndex: []int{-1, 1, 6, -1, -1, -1},
-			expEndIndex:   []int{0, 3, 8, 0, 0, 0},
-			expTimeIndex:  []int{0, 1, 3, 6},
+			data:           "abc",
+			magicRemainStr: "xabc",
+			magicRet:       "x02abc01",
+			expRet:         false,
+			expTimeStart:   []int{-1, 1, 6, -1, -1, -1},
+			exptimeEnd:     []int{0, 3, 8, 0, 0, 0},
+			expRemainIndex: []int{0, 1, 3, 6},
 		},
 		{
-			data:          "x0201",
-			matchData:     "x",
-			matchStr:      "x0201*",
-			expRet:        true,
-			expStartIndex: []int{-1, 1, 3, -1, -1, -1},
-			expEndIndex:   []int{0, 3, 5, 0, 0, 0},
-			expTimeIndex:  []int{0, 1},
+			data:           "x0201",
+			magicRemainStr: "x",
+			magicRet:       "x0201*",
+			expRet:         true,
+			expTimeStart:   []int{-1, 1, 3, -1, -1, -1},
+			exptimeEnd:     []int{0, 3, 5, 0, 0, 0},
+			expRemainIndex: []int{0, 1},
 		},
 		{
-			data:          "x0102xxxxx",
-			matchData:     "x",
-			matchStr:      "x0102*",
-			expRet:        true,
-			expStartIndex: []int{-1, 3, 1, -1, -1, -1},
-			expEndIndex:   []int{0, 5, 3, 0, 0, 0},
-			expTimeIndex:  []int{0, 1},
+			data:           "x0102xxxxx",
+			magicRemainStr: "x",
+			magicRet:       "x0102*",
+			expRet:         true,
+			expTimeStart:   []int{-1, 3, 1, -1, -1, -1},
+			exptimeEnd:     []int{0, 5, 3, 0, 0, 0},
+			expRemainIndex: []int{0, 1},
 		},
 		{
-			data:          "17",
-			matchData:     "",
-			matchStr:      "17",
-			expRet:        true,
-			expStartIndex: []int{0, -1, -1, -1, -1, -1},
-			expEndIndex:   []int{2, 0, 0, 0, 0, 0},
-			expTimeIndex:  []int{0, 0},
+			data:           "17",
+			magicRemainStr: "",
+			magicRet:       "17",
+			expRet:         true,
+			expTimeStart:   []int{0, -1, -1, -1, -1, -1},
+			exptimeEnd:     []int{2, 0, 0, 0, 0, 0},
+			expRemainIndex: []int{0, 0},
 		},
 		{
-			data:          "abcd201702efg",
-			matchData:     "abcdefg",
-			matchStr:      "abcd201702efg*",
-			expRet:        true,
-			expStartIndex: []int{4, 8, -1, -1, -1, -1},
-			expEndIndex:   []int{8, 10, 0, 0, 0, 0},
-			expTimeIndex:  []int{0, 4, 10, 13},
+			data:           "abcd201702efg",
+			magicRemainStr: "abcdefg",
+			magicRet:       "abcd201702efg*",
+			expRet:         true,
+			expTimeStart:   []int{4, 8, -1, -1, -1, -1},
+			exptimeEnd:     []int{8, 10, 0, 0, 0, 0},
+			expRemainIndex: []int{0, 4, 10, 13},
 		},
 		{
-			data:          "abcd20170201160619abc",
-			matchData:     "abcd",
-			matchStr:      "abcd20170201160619",
-			expRet:        false,
-			expStartIndex: []int{4, 8, 10, 12, 14, 16},
-			expEndIndex:   []int{8, 10, 12, 14, 16, 18},
-			expTimeIndex:  []int{0, 4},
+			data:           "abcd20170201160619abc",
+			magicRemainStr: "abcd",
+			magicRet:       "abcd20170201160619",
+			expRet:         false,
+			expTimeStart:   []int{4, 8, 10, 12, 14, 16},
+			exptimeEnd:     []int{8, 10, 12, 14, 16, 18},
+			expRemainIndex: []int{0, 4},
 		},
 		{
-			data:          "hhhhh",
-			matchData:     "hhhhh",
-			matchStr:      "hhhhh",
-			expRet:        true,
-			expStartIndex: []int{-1, -1, -1, -1, -1, -1},
-			expEndIndex:   []int{0, 0, 0, 0, 0, 0},
-			expTimeIndex:  []int{0, 5},
+			data:           "hhhhh",
+			magicRemainStr: "hhhhh",
+			magicRet:       "hhhhh",
+			expRet:         true,
+			expTimeStart:   []int{-1, -1, -1, -1, -1, -1},
+			exptimeEnd:     []int{0, 0, 0, 0, 0, 0},
+			expRemainIndex: []int{0, 5},
 		},
 	}
 	for _, ti := range tests {
-		ret := mr.isMatchData(DATABASE, "", ti.data, ti.matchData, ti.matchStr, ti.expTimeIndex, ti.expStartIndex, ti.expEndIndex)
+		ret := mr.compareData(DATABASE, "", ti.data, ti.magicRemainStr, &MagicRes{
+			ret:         ti.magicRet,
+			remainIndex: ti.expRemainIndex,
+			timeStart:   ti.expTimeStart,
+			timeEnd:     ti.exptimeEnd,
+		})
 		assert.EqualValues(t, ti.expRet, ret)
 	}
 }
@@ -1025,7 +1030,7 @@ func Test_getCheckAll(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		checkHistory, err := mr.getCheckAll(test.queryType)
+		checkHistory, err := mr.getAll(test.queryType)
 		assert.NoError(t, err)
 		assert.EqualValues(t, test.expRes, checkHistory)
 	}
@@ -1526,11 +1531,24 @@ func TestMySql(t *testing.T) {
 		"submission_date": year + "-" + month + "-" + day,
 	}
 
-	// test exec on start
-	runnerName := "mr"
-	mr, err := getMySqlReader(false, false, false, runnerName, CronInfo{})
+	runnerName := "mrOnce"
+	mr, err := reader.NewReader(conf.MapConf{
+		"mysql_database":     "Test_MySql20180510",
+		"mysql_table":        "runoob_tbl20180510est",
+		"mysql_limit_batch":  "100",
+		"mysql_history_all":  "true",
+		"mode":               "mysql",
+		"mysql_exec_onstart": "true",
+		"encoding":           "gbk",
+		"mysql_datasource":   dbSource,
+		"meta_path":          path.Join(MetaDir, runnerName),
+		"file_done":          path.Join(MetaDir, runnerName),
+		"runner_name":        runnerName,
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer os.RemoveAll(MetaDir)
-	assert.NoError(t, err)
 	r, ok := mr.(reader.DataReader)
 	if !ok {
 		t.Error("mysql read should have readdata interface")
@@ -1539,6 +1557,32 @@ func TestMySql(t *testing.T) {
 
 	dataLine := 0
 	before := time.Now()
+	for !batchTimeout(before, 2) {
+		data, bytes, err := r.ReadData()
+		if err != nil {
+			t.Error(err)
+		}
+		if len(data) <= 0 {
+			continue
+		}
+		assert.Equal(t, int64(36), bytes)
+		assert.Equal(t, expectData, data)
+		dataLine++
+	}
+	assert.Equal(t, 1, dataLine)
+
+	// test exec on start
+	runnerName = "mr"
+	mr, err = getMySqlReader(false, false, false, runnerName, CronInfo{})
+	assert.NoError(t, err)
+	r, ok = mr.(reader.DataReader)
+	if !ok {
+		t.Error("mysql read should have readdata interface")
+	}
+	assert.NoError(t, mr.(*Reader).Start())
+
+	dataLine = 0
+	before = time.Now()
 	for !batchTimeout(before, 2) {
 		data, bytes, err := r.ReadData()
 		if err != nil {
@@ -1704,6 +1748,7 @@ func TestMySql(t *testing.T) {
 	mrCron.SyncMeta()
 	mrCron.Close()
 
+	// cron task, exec on start
 	now := time.Now()
 	minDataTestsLine, secondAdd3, err = setMinute(now)
 	if err != nil {
@@ -1712,7 +1757,6 @@ func TestMySql(t *testing.T) {
 	if now.Second() >= 57 {
 		minDataTestsLine++
 	}
-	// cron task, exec on start
 	runnerName = "mrCronExecOnStart"
 	mrCronExecOnStart, err := getMySqlReader(false, false, false, runnerName, CronInfo{true, secondAdd3, false})
 	assert.NoError(t, err)
@@ -1768,11 +1812,11 @@ func TestMySql(t *testing.T) {
 	mrCronExecOnStart2.SyncMeta()
 	mrCronExecOnStart2.Close()
 
+	// cron task, exec on start
 	minDataTestsLine, _, err = setSecond()
 	if err != nil {
 		t.Errorf("prepare mysql database failed: %v", err)
 	}
-	// cron task, exec on start
 	runnerName = "mrLoopcOnStart"
 	mrLoopOnStart, err := getMySqlReader(false, false, true, runnerName, CronInfo{false, "", false})
 	assert.NoError(t, err)
@@ -1813,9 +1857,7 @@ func TestMySql(t *testing.T) {
 	assert.Equal(t, 2, len(tableRecords.GetTable()))
 	assert.Equal(t, expectDB, lastDB)
 	assert.NotEmpty(t, lastTable)
-
 	mrLoopOnStart.Close()
-
 }
 
 func getMySqlReader(historyAll, rawsql, loop bool, runnerName string, cronInfo CronInfo) (reader.Reader, error) {
@@ -1859,7 +1901,7 @@ func getMySqlReader(historyAll, rawsql, loop bool, runnerName string, cronInfo C
 }
 
 func prepareMysql() error {
-	db, err := openSql("mysql", connectStr, "")
+	db, err := openSql("mysql", connectStr)
 	if err != nil {
 		return err
 	}
@@ -1904,7 +1946,7 @@ func prepareMysql() error {
 }
 
 func cleanMysql() error {
-	db, err := openSql("mysql", connectStr, "")
+	db, err := openSql("mysql", connectStr)
 	if err != nil {
 		return err
 	}
