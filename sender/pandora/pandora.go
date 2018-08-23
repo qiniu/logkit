@@ -199,7 +199,7 @@ func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
 	prefix, _ := conf.GetStringOr(sender.KeyPandoraKodoFilePrefix, "logkitauto/date=$(year)-$(mon)-$(day)/hour=$(hour)/min=$(min)/$(sec)")
 	compress, _ := conf.GetBoolOr(sender.KeyPandoraKodoGzip, false)
 	kodoRotateStrategy, _ := conf.GetStringOr(sender.KeyPandoraKodoRotateStrategy, "interval")
-	kodoRotateSize, _ := conf.GetIntOr(sender.KeyPandoraKodoRotateSize, 500*1024)
+	kodoRotateSize, _ := conf.GetIntOr(sender.KeyPandoraKodoRotateSize, pipeline.DefaultLogkitRotateSize)
 	kodoRotateSize = kodoRotateSize * 1024
 	kodoRotateInterval, _ := conf.GetIntOr(sender.KeyPandoraKodoRotateInterval, 10*60)
 	kodoFileRetention, _ := conf.GetIntOr(sender.KeyPandoraKodoFileRetention, 0)
@@ -522,6 +522,11 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 				Format:               s.opt.format,
 				Compress:             s.opt.kodoCompress,
 				AutoExportKodoTokens: s.opt.tokens.KodoTokens,
+				RotateStrategy:       s.opt.kodoRotateStrategy,
+				RotateSize:           s.opt.kodoRotateSize,
+				RotateInterval:       s.opt.kodoRotateInterval,
+				RotateSizeType:       "B",
+				RotateNumber:         s.opt.kodoRotateSize,
 			},
 			ToTSDB: s.opt.enableTsdb,
 			AutoExportToTSDBInput: pipeline.AutoExportToTSDBInput{
@@ -1049,8 +1054,10 @@ func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 				Format:               s.opt.format,
 				Compress:             s.opt.kodoCompress,
 				RotateStrategy:       s.opt.kodoRotateStrategy,
-				RotateInterval:       s.opt.kodoRotateInterval,
 				RotateSize:           s.opt.kodoRotateSize,
+				RotateInterval:       s.opt.kodoRotateInterval,
+				RotateSizeType:       "B",
+				RotateNumber:         s.opt.kodoRotateSize,
 				AutoExportKodoTokens: s.opt.tokens.KodoTokens,
 			},
 			ToTSDB: s.opt.enableTsdb,

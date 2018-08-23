@@ -49,6 +49,7 @@ const (
 	PandoraTypeArray      = "array"
 	PandoraTypeMap        = "map"
 	PandoraTypeJsonString = "jsonstring"
+	PandoraTypeIP         = "ip"
 )
 
 const (
@@ -72,6 +73,7 @@ var schemaTypes = map[string]bool{
 	PandoraTypeMap:        true,
 	PandoraTypeBool:       true,
 	PandoraTypeJsonString: true,
+	PandoraTypeIP:         true,
 }
 
 func validateGroupName(g string) error {
@@ -334,7 +336,7 @@ func (e *RepoSchemaEntry) Validate() (err error) {
 
 	}
 	if !schemaTypes[e.ValueType] {
-		err = reqerr.NewInvalidArgs("Schema", fmt.Sprintf("invalid field type: %s, field type should be one of \"float\", \"string\", \"date\", \"long\", \"boolean\", \"array\", \"map\" and \"jsonstring\"", e.ValueType)).WithComponent("pipleline")
+		err = reqerr.NewInvalidArgs("Schema", fmt.Sprintf("invalid field type: %s, field type should be one of \"float\", \"string\", \"date\", \"long\", \"boolean\", \"array\", \"map\", \"jsonstring\", and \"ip\"", e.ValueType)).WithComponent("pipleline")
 		return
 	}
 	if e.ValueType == "array" {
@@ -704,6 +706,8 @@ type AutoExportToKODOInput struct {
 	RotateStrategy string
 	RotateSize     int
 	RotateInterval int
+	RotateSizeType string
+	RotateNumber   int
 	Format         string
 	Email          string
 	Retention      int //数字，单位为天
@@ -1355,11 +1359,52 @@ func (s *ExportMongoSpec) Validate() (err error) {
 	return
 }
 
+/*
+	LocateIPDetails struct is used to config ip locate for a specified ip field
+
+	ShouldLoacteField:
+		should be set to false if do not want this ip field to be located into location info
+
+	WantedFields:
+		WantedFields field is used to define the location wanted
+		Keys should be chosen from following strings:
+			["wantCountry", "wantRegion", "wantCity", "wantIsp"]
+
+	FieldNames:
+		FieldNames field is used to define the fieldname where the location info should be stored in the logdb
+		Keys should be chosen from following strings:
+			["ipCountryFieldName", "ipRegionFieldName", "ipCityFieldName", "ipIspFieldName"]
+
+	NOTE: If FieldNames is not provided or the fieldName is not valid, then default fieldnames will be used
+*/
+type LocateIPDetails struct {
+	ShouldLocateField bool              `json:"shouldLocateField"`
+	WantedFields      map[string]bool   `json:"wantedFields"`
+	FieldNames        map[string]string `json:"fieldNames"`
+}
+
+/*
+	LocateIPConfig struct is used to define the over all ip locating behavior
+
+	ShouldLocateIP:
+		If this field is set to 'false', then no ip field will be located
+
+	Mappings:
+		This mapping is used to define behavior for each ip field (if 'ShouldLcoateIP' is set as true)
+		Mappings field follows the following format:
+			{"ip_field_name_in_repo": locateIPConfig_for_the_field}
+*/
+type LocateIPConfig struct {
+	ShouldLocateIP bool                        `json:"shouldLocateIP"`
+	Mappings       map[string]*LocateIPDetails `json:"mappings"`
+}
+
 type ExportLogDBSpec struct {
-	DestRepoName string                 `json:"destRepoName"`
-	Doc          map[string]interface{} `json:"doc"`
-	OmitInvalid  bool                   `json:"omitInvalid"`
-	OmitEmpty    bool                   `json:"omitEmpty"`
+	DestRepoName   string                 `json:"destRepoName"`
+	Doc            map[string]interface{} `json:"doc"`
+	OmitInvalid    bool                   `json:"omitInvalid"`
+	OmitEmpty      bool                   `json:"omitEmpty"`
+	LocateIPConfig *LocateIPConfig        `json:"locateIPConfig"`
 }
 
 func (s *ExportLogDBSpec) Validate() (err error) {
