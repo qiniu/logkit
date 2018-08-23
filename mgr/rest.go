@@ -281,11 +281,11 @@ func (rs *RestService) GetError() echo.HandlerFunc {
 func (rs *RestService) GetRunners() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		runnerNameList := make([]string, 0)
-		rs.mgr.lock.RLock()
-		for _, conf := range rs.mgr.runnerConfig {
+		rs.mgr.runnerLock.RLock()
+		for _, conf := range rs.mgr.runnerConfigs {
 			runnerNameList = append(runnerNameList, conf.RunnerName)
 		}
-		rs.mgr.lock.RUnlock()
+		rs.mgr.runnerLock.RUnlock()
 		return RespSuccess(c, runnerNameList)
 	}
 }
@@ -327,10 +327,10 @@ func (rs *RestService) checkNameAndConfig(c echo.Context) (name string, conf Run
 	}
 	var exist bool
 	var tmpConf RunnerConfig
-	rs.mgr.lock.RLock()
-	defer rs.mgr.lock.RUnlock()
+	rs.mgr.runnerLock.RLock()
+	defer rs.mgr.runnerLock.RUnlock()
 	file = filepath.Join(rs.mgr.RestDir, name+".conf")
-	if tmpConf, exist = rs.mgr.runnerConfig[file]; !exist {
+	if tmpConf, exist = rs.mgr.runnerConfigs[file]; !exist {
 		err = errors.New("config " + name + " is not found")
 		return
 	}

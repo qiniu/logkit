@@ -299,9 +299,9 @@ func Test_Watch(t *testing.T) {
 	}
 	time.Sleep(5 * time.Second) //因为使用了异步add runners 有可能还没执行完。
 	var runnerLength int
-	m.lock.Lock()
+	m.runnerLock.Lock()
 	runnerLength = len(m.runners)
-	m.lock.Unlock()
+	m.runnerLock.Unlock()
 	if runnerLength != 2 {
 		t.Fatalf("runners exp 2 but got %v", runnerLength)
 	}
@@ -314,9 +314,9 @@ func Test_Watch(t *testing.T) {
 	}
 
 	if !tryTest(10, func() bool {
-		m.lock.RLock()
+		m.runnerLock.RLock()
 		runnerLength = len(m.runners)
-		m.lock.RUnlock()
+		m.runnerLock.RUnlock()
 		return runnerLength == 3
 	}) {
 		t.Fatalf("runners exp 3 after add test3.conf but got %v", runnerLength)
@@ -337,9 +337,9 @@ func Test_Watch(t *testing.T) {
 	}
 
 	if !tryTest(10, func() bool {
-		m.lock.Lock()
+		m.runnerLock.Lock()
 		runnerLength = len(m.runners)
-		m.lock.Unlock()
+		m.runnerLock.Unlock()
 		return runnerLength == 4
 	}) {
 		t.Fatalf("runners exp 4 after add test4.conf but got %v", runnerLength)
@@ -393,9 +393,9 @@ func Test_Watch(t *testing.T) {
 	// 移除一个文件，变成三个runner
 	os.Remove("./tests/confs1/test4.conf")
 	if !tryTest(10, func() bool {
-		m.lock.Lock()
+		m.runnerLock.Lock()
 		runnerLength = len(m.runners)
-		m.lock.Unlock()
+		m.runnerLock.Unlock()
 		return runnerLength == 3
 	}) {
 		t.Fatalf("runners exp 3 after remove test4.conf but got %v", runnerLength)
@@ -408,9 +408,9 @@ func Test_Watch(t *testing.T) {
 	// 移除一个文件，变回两个runner
 	os.Remove("./tests/confs2/test3.conf")
 	if !tryTest(10, func() bool {
-		m.lock.Lock()
+		m.runnerLock.Lock()
 		runnerLength = len(m.runners)
-		m.lock.Unlock()
+		m.runnerLock.Unlock()
 		return runnerLength == 2
 	}) {
 		t.Fatalf("runners exp 2 after remove test3.conf but got %v", runnerLength)
@@ -447,9 +447,9 @@ func Test_Watch_LogDir(t *testing.T) {
 		t.Error(err)
 	}
 	confPathAbs, err := filepath.Abs("./tests2/confs1/test5.conf")
-	m.lock.Lock()
+	m.runnerLock.Lock()
 	_, ok := m.runners[confPathAbs]
-	m.lock.Unlock()
+	m.runnerLock.Unlock()
 	if ok {
 		t.Fatal("not exp, the runner should be not exsit")
 	}
@@ -465,9 +465,9 @@ func Test_Watch_LogDir(t *testing.T) {
 		t.Error(err)
 	}
 	time.Sleep(10 * time.Second)
-	m.lock.Lock()
+	m.runnerLock.Lock()
 	_, ok = m.runners[confPathAbs]
-	m.lock.Unlock()
+	m.runnerLock.Unlock()
 	assert.Equal(t, true, ok, fmt.Sprintf("runner of %v exp but not exsit in runners %v", confPathAbs, m.runners))
 	m.Stop()
 }
