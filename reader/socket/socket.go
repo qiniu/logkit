@@ -2,9 +2,11 @@ package socket
 
 import (
 	"bufio"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"os"
 	"strings"
@@ -12,10 +14,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/json-iterator/go"
+
 	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 var (
@@ -48,7 +53,7 @@ func (ssr *streamSocketReader) listen() {
 		c, err := ssr.Listener.Accept()
 		if err != nil {
 			if !strings.HasSuffix(err.Error(), ": use of closed network connection") {
-				log.Error(err)
+				log.Errorf("runner[%v] Reader %q error: %v", ssr.meta.RunnerName, ssr.Name(), err)
 			}
 			break
 		}
@@ -64,7 +69,7 @@ func (ssr *streamSocketReader) listen() {
 
 		if ssr.netproto == "tcp" || ssr.netproto == "tcp4" || ssr.netproto == "tcp6" {
 			if err := ssr.setKeepAlive(c); err != nil {
-				log.Error(fmt.Errorf("unable to configure keep alive (%s): %s", ssr.ServiceAddress, err))
+				log.Errorf("runner[%v] Reader %q unable to configure keep alive (%s): %s", ssr.meta.RunnerName, ssr.Name(), ssr.ServiceAddress, err)
 			}
 		}
 
@@ -107,6 +112,20 @@ func (ssr *streamSocketReader) read(c net.Conn) {
 	defer ssr.removeConnection(c)
 	defer c.Close()
 
+	if ssr.IsSplitByLine ||
+		ssr.SocketRule == reader.SocketRuleLine ||
+		ssr.SocketRule == reader.SocketRulePacket {
+		ssr.packetAndLineRead(c)
+	} else {
+		ssr.jsonRead(c)
+	}
+
+	return
+}
+
+func (ssr *streamSocketReader) packetAndLineRead(c net.Conn) {
+	var err error
+	defer ssr.sendError(err)
 	scnr := bufio.NewScanner(c)
 	for {
 		if atomic.LoadInt32(&ssr.status) == reader.StatusStopped || atomic.LoadInt32(&ssr.status) == reader.StatusStopping {
@@ -135,8 +154,9 @@ func (ssr *streamSocketReader) read(c net.Conn) {
 				address = localAddr.String()
 			}
 		}
+
 		val := string(scnr.Bytes())
-		if ssr.IsSplitByLine {
+		if ssr.IsSplitByLine || ssr.SocketRule == reader.SocketRuleLine {
 			vals := strings.Split(val, "\n")
 			for _, value := range vals {
 				if value = strings.TrimSpace(value); value != "" {
@@ -148,9 +168,9 @@ func (ssr *streamSocketReader) read(c net.Conn) {
 		}
 	}
 
-	if err := scnr.Err(); err != nil {
+	if err = scnr.Err(); err != nil {
 		if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
-			log.Errorf("streamSocketReader Timeout : %s", nErr)
+			log.Errorf("runner[%v] Reader %q streamSocketReader Timeout : %s", ssr.meta.RunnerName, ssr.Name(), nErr)
 		}
 		if !strings.HasSuffix(err.Error(), ": use of closed network connection") {
 			log.Error(err)
@@ -160,7 +180,73 @@ func (ssr *streamSocketReader) read(c net.Conn) {
 		if atomic.LoadInt32(&ssr.status) == reader.StatusStopped || atomic.LoadInt32(&ssr.status) == reader.StatusStopping {
 			return
 		}
-		ssr.sendError(err)
+	}
+}
+
+func (ssr *streamSocketReader) jsonRead(c net.Conn) {
+	var err error
+	defer ssr.sendError(err)
+	bufioReader := bufio.NewReader(c)
+	decoder := json.NewDecoder(bufioReader)
+
+	for {
+		if atomic.LoadInt32(&ssr.status) == reader.StatusStopped || atomic.LoadInt32(&ssr.status) == reader.StatusStopping {
+			return
+		}
+		if ssr.ReadTimeout != 0 && ssr.ReadTimeout > 0 {
+			c.SetReadDeadline(time.Now().Add(ssr.ReadTimeout))
+		}
+
+		//double check
+		if atomic.LoadInt32(&ssr.status) == reader.StatusStopped || atomic.LoadInt32(&ssr.status) == reader.StatusStopping {
+			return
+		}
+
+		var address string
+		// get remote addr
+		if remoteAddr := c.RemoteAddr(); remoteAddr != nil && len(remoteAddr.String()) != 0 {
+			address = remoteAddr.String()
+		}
+		// if remote addr is empty, get local addr
+		if len(address) == 0 {
+			if localAddr := c.LocalAddr(); localAddr != nil {
+				address = localAddr.String()
+			}
+		}
+
+		var res interface{}
+		err = decoder.Decode(&res)
+		if _, ok := err.(*json.SyntaxError); ok {
+			bufferReader := decoder.Buffered()
+			readBytes, err := ioutil.ReadAll(bufferReader)
+			if err != nil {
+				log.Errorf("runner[%v] Reader %q read decoder buffered error: %v", ssr.meta.RunnerName, ssr.Name(), err)
+			} else {
+				log.Errorf("runner[%v] Reader %q read streaming message: %v", ssr.meta.RunnerName, ssr.Name(), TruncateStrSize(string(readBytes), 2048))
+			}
+			decoder = json.NewDecoder(bufioReader)
+			log.Errorf("runner[%v] Reader %q decode message error %v", ssr.meta.RunnerName, ssr.Name(), err)
+			time.Sleep(time.Second)
+			continue
+		}
+		if err != nil {
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				if !tryDecodeReader(decoder) {
+					decoder = json.NewDecoder(bufioReader)
+				}
+				time.Sleep(time.Second)
+				continue
+			} else {
+				log.Errorf("runner[%v] Reader %q tcp reader error %v", ssr.meta.RunnerName, ssr.Name(), err)
+				return
+			}
+		}
+		bytes, err := jsoniter.Marshal(res)
+		if err != nil {
+			log.Errorf("runner[%v] Reader %q json marshal error %v", ssr.meta.RunnerName, ssr.Name(), err)
+			return
+		}
+		ssr.readChan <- socketInfo{address: address, data: string(bytes)}
 	}
 }
 
@@ -209,7 +295,7 @@ func (psr *packetSocketReader) listen() {
 		}
 		val := string(buf[:n])
 
-		if psr.IsSplitByLine {
+		if psr.IsSplitByLine || psr.SocketRule == reader.SocketRuleLine {
 			vals := strings.Split(val, "\n")
 			for _, value := range vals {
 				if value = strings.TrimSpace(value); value != "" {
@@ -242,6 +328,7 @@ type Reader struct {
 	ReadTimeout     time.Duration
 	KeepAlivePeriod time.Duration
 	IsSplitByLine   bool
+	SocketRule      string
 
 	closer io.Closer
 }
@@ -266,6 +353,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		return nil, err
 	}
 	IsSplitByLine, _ := conf.GetBoolOr(reader.KeySocketSplitByLine, false)
+	socketRule, _ := conf.GetStringOr(reader.KeySocketRule, reader.SocketRulePacket)
 	return &Reader{
 		meta:            meta,
 		status:          reader.StatusInit,
@@ -277,6 +365,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		ReadTimeout:     ReadTimeoutdur,
 		KeepAlivePeriod: KeepAlivePeriodDur,
 		IsSplitByLine:   IsSplitByLine,
+		SocketRule:      socketRule,
 	}, nil
 }
 
@@ -302,7 +391,7 @@ func (r *Reader) sendError(err error) {
 	}
 	defer func() {
 		if rec := recover(); rec != nil {
-			log.Errorf("Reader %q was panicked and recovered from %v", r.Name(), rec)
+			log.Errorf("runner[%v] Reader %q was panicked and recovered from %v", r.meta.RunnerName, r.Name(), rec)
 		}
 	}()
 	r.errChan <- err
@@ -393,6 +482,8 @@ func (r *Reader) ReadLine() (string, error) {
 	case info := <-r.readChan:
 		r.sourceIp = info.address
 		return info.data, nil
+	case err := <-r.errChan:
+		return "", err
 	case <-timer.C:
 	}
 
@@ -432,4 +523,24 @@ func (uc unixCloser) Close() error {
 	err := uc.closer.Close()
 	os.Remove(uc.path) // ignore error
 	return err
+}
+
+func tryDecodeReader(decoder *json.Decoder) bool {
+	bufferReader := decoder.Buffered()
+	readBytes, err := ioutil.ReadAll(bufferReader)
+
+	if err == io.EOF {
+		return false
+	}
+
+	if err != nil {
+		log.Errorf("decode buffered read error: %v", err)
+		return true
+	}
+
+	if len(strings.TrimSpace(string(readBytes))) <= 0 {
+		return false
+	}
+
+	return true
 }

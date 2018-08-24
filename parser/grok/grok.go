@@ -225,8 +225,8 @@ func (p *Parser) parseLine(line string) (Data, error) {
 		}
 	}
 	if len(values) < 1 {
-		log.Errorf("%v no value was parsed after grok pattern %v", TruncateStrSize(line), p.Patterns)
-		return nil, fmt.Errorf("%v no value was parsed after grok pattern %v", TruncateStrSize(line), p.Patterns)
+		log.Errorf("%v no value was parsed after grok pattern %v", TruncateStrSize(line, DefaultTruncateMaxSize), p.Patterns)
+		return nil, fmt.Errorf("%v no value was parsed after grok pattern %v", TruncateStrSize(line, DefaultTruncateMaxSize), p.Patterns)
 	}
 	data := Data{}
 	for k, v := range values {

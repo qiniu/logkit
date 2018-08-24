@@ -1,8 +1,12 @@
 package socket
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"log"
 	"log/syslog"
+	"net"
 	"os"
 	"testing"
 	"time"
@@ -173,6 +177,58 @@ func TestTCPSocketReaderWithSplit(t *testing.T) {
 	line, err = sr.ReadLine()
 	assert.NoError(t, err)
 	assert.Contains(t, line, "this is OK")
+	assert.Contains(t, sr.Source(), "127.0.0.1")
+
+	err = sr.Close()
+	assert.NoError(t, err)
+}
+
+func TestTCPSocketReaderWithJson(t *testing.T) {
+	logkitConf := conf.MapConf{
+		reader.KeyMetaPath:             MetaDir,
+		reader.KeyFileDone:             MetaDir,
+		KeyRunnerName:                  "TestTCPSocketReaderWithJson",
+		reader.KeyMode:                 reader.ModeSocket,
+		reader.KeySocketServiceAddress: "tcp://127.0.0.1:5141",
+		reader.KeySocketRule:           reader.SocketRuleJson,
+	}
+	meta, err := reader.NewMetaWithConf(logkitConf)
+	assert.NoError(t, err)
+	defer os.RemoveAll(MetaDir)
+
+	ssr, err := NewReader(meta, logkitConf)
+	assert.NoError(t, err)
+	sr := ssr.(*Reader)
+	err = sr.Start()
+	assert.NoError(t, err)
+
+	conn, err := net.Dial("tcp", "127.0.0.1:5141")
+	if err != nil {
+		log.Fatal(err)
+	}
+	u := map[string]interface{}{
+		"mykey1": map[string]interface{}{
+			"mykey1_test": map[string]string{
+				"mykey2_test": "And this is a daemon emergency with demotag",
+			},
+		},
+	}
+	b := new(bytes.Buffer)
+	json.NewEncoder(b).Encode(u)
+	fmt.Fprint(conn, b)
+	time.Sleep(30 * time.Millisecond)
+	line, err := sr.ReadLine()
+	assert.NoError(t, err)
+	expected := "{\"mykey1\":{\"mykey1_test\":{\"mykey2_test\":\"And this is a daemon emergency with demotag\"}}}"
+	assert.Equal(t, expected, line)
+	assert.Contains(t, sr.Source(), "127.0.0.1")
+	u = map[string]interface{}{"mykey3": "this is OK"}
+	b = new(bytes.Buffer)
+	json.NewEncoder(b).Encode(u)
+	fmt.Fprint(conn, b)
+	line, err = sr.ReadLine()
+	assert.NoError(t, err)
+	assert.Equal(t, "{\"mykey3\":\"this is OK\"}", line)
 	assert.Contains(t, sr.Source(), "127.0.0.1")
 
 	err = sr.Close()
