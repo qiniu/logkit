@@ -980,7 +980,14 @@ func (r *LogExportRunner) getRefreshStatus(elaspedtime float64) RunnerStatus {
 	r.rs.ReaderStats.Trend = r.rs.ReadSpeedTrend
 	r.rs.ReaderStats.Success = r.rs.ReadDataCount
 
-	r.rs.ParserStats.Speed, r.rs.ParserStats.Trend = calcSpeedTrend(r.lastRs.ParserStats, r.rs.ParserStats, elaspedtime)
+	//对于DataReader，不需要Parser，默认全部成功
+	if _, ok := r.reader.(reader.DataReader); ok {
+		r.rs.ParserStats.Success = r.rs.ReadDataCount
+		r.rs.ParserStats.Speed = r.rs.ReadSpeed
+		r.rs.ParserStats.Trend = r.rs.ReadSpeedTrend
+	} else {
+		r.rs.ParserStats.Speed, r.rs.ParserStats.Trend = calcSpeedTrend(r.lastRs.ParserStats, r.rs.ParserStats, elaspedtime)
+	}
 
 	for i := range r.senders {
 		sts, ok := r.senders[i].(sender.StatsSender)
