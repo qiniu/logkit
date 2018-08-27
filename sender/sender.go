@@ -220,6 +220,10 @@ type StatsSender interface {
 	Restore(*StatsInfo)
 }
 
+type ServerSender interface {
+	SetServer([]map[string]interface{}) error
+}
+
 // SenderRegistry sender 的工厂类。可以注册自定义sender
 type Registry struct {
 	senderTypeMap map[string]func(conf.MapConf) (Sender, error)

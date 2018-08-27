@@ -5,10 +5,6 @@ import (
 )
 
 const (
-	KeyType = "type"
-)
-
-const (
 	TransformTypeString  = "string"
 	TransformTypeLong    = "long"
 	TransformTypeFloat   = "float"
@@ -32,6 +28,10 @@ type Transformer interface {
 	RawTransform([]string) ([]string, error)
 	Stage() string
 	Stats() StatsInfo
+}
+
+type ServerTansformer interface {
+	ServerConfig() map[string]interface{}
 }
 
 // DataReader 代表了一个可直接读取内存数据结构的读取器

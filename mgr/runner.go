@@ -274,6 +274,12 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	if err != nil {
 		return nil, err
 	}
+	var serverConfigs = make([]map[string]interface{}, 0, len(transformers))
+	for _, transform := range transformers {
+		if serverTransformer, ok := transform.(transforms.ServerTansformer); ok {
+			serverConfigs = append(serverConfigs, serverTransformer.ServerConfig())
+		}
+	}
 	senders := make([]sender.Sender, 0)
 	for i, senderConfig := range rc.SendersConfig {
 		if senderConfig[sender.KeySenderType] == sender.TypePandora {
@@ -288,6 +294,11 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 		s, err := sr.NewSender(senderConfig, meta.FtSaveLogPath())
 		if err != nil {
 			return nil, err
+		}
+		if senderConfig[sender.KeySenderType] == sender.TypePandora {
+			if serverSender, ok := s.(sender.ServerSender); ok {
+				serverSender.SetServer(serverConfigs)
+			}
 		}
 		senders = append(senders, s)
 		delete(rc.SendersConfig[i], sender.InnerUserAgent)
@@ -305,7 +316,7 @@ func createTransformers(rc RunnerConfig) ([]transforms.Transformer, error) {
 	transformers := make([]transforms.Transformer, 0)
 	for idx := range rc.Transforms {
 		tConf := rc.Transforms[idx]
-		tp := tConf[transforms.KeyType]
+		tp := tConf[KeyType]
 		if tp == nil {
 			return nil, fmt.Errorf("transformer config type is empty %v", tConf)
 		}

@@ -31,6 +31,8 @@ import (
 
 var osInfo = []string{KeyCore, KeyHostName, KeyOsInfo, KeyLocalIp}
 
+var _ sender.ServerSender = &Sender{}
+
 const (
 	SendTypeRaw    = "raw"
 	SendTypeNormal = "normal"
@@ -48,6 +50,7 @@ type Sender struct {
 	microsecondCounter uint64
 	extraInfo          map[string]string
 	sendType           string
+	EnbleServerIp      bool
 }
 
 // UserSchema was parsed pandora schema from user's raw schema
@@ -1125,4 +1128,15 @@ func (s *Sender) Name() string {
 
 func (s *Sender) Close() error {
 	return s.client.Close()
+}
+
+func (s *Sender) SetServer(serverConfigs []map[string]interface{}) error {
+	for _, serverConfig := range serverConfigs {
+		if transformType, ok := serverConfig[KeyType].(string); ok && transformType == KeyIP {
+			if localEnable, ok := serverConfig[LocalEnable].(bool); ok && !localEnable {
+				s.opt.autoCreate += fmt.Sprintf(",%v ip", KeyIP)
+			}
+		}
+	}
+	return nil
 }

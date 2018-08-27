@@ -36,6 +36,8 @@ const (
 
 	KeyPandoraStash      = "pandora_stash"       // 当只有一条数据且 sendError 时候，将其转化为 raw 发送到 pandora_stash 这个字段
 	KeyPandoraSeparateId = "pandora_separate_id" // 当一条数据大于2M且 sendError 时候，将其切片，切片记录到 pandora_separate_id 这个字段
+	KeyIP                = "ip"                  // schema ip
+	KeyType              = "type"
 
 	SchemaFreeTokensPrefix = "schema_free_tokens_"
 	LogDBTokensPrefix      = "logdb_tokens_"
@@ -59,6 +61,8 @@ const (
 	Checkbox    = "checkbox"
 	Radio       = "radio"
 	InputNumber = "inputNumber"
+
+	LocalEnable = "local_enable"
 )
 
 var (

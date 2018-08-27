@@ -26,12 +26,14 @@ var (
 	_ transforms.StatsTransformer = &Transformer{}
 	_ transforms.Transformer      = &Transformer{}
 	_ transforms.Initializer      = &Transformer{}
+	_ transforms.ServerTansformer = &Transformer{}
 )
 
 type Transformer struct {
 	StageTime   string `json:"stage"`
 	Key         string `json:"key"`
 	DataPath    string `json:"data_path"`
+	LocalEnable bool   `json:"local_enable"`
 	KeyAsPrefix bool   `json:"key_as_prefix"`
 	Language    string `json:"language"`
 
@@ -91,6 +93,9 @@ func (_ *Transformer) RawTransform(datas []string) ([]string, error) {
 }
 
 func (t *Transformer) Transform(datas []Data) ([]Data, error) {
+	if !t.LocalEnable {
+		return datas, nil
+	}
 	var err, fmtErr error
 	errNum := 0
 	if t.loc == nil {
@@ -219,16 +224,28 @@ func (_ *Transformer) SampleConfig() string {
 
 func (_ *Transformer) ConfigOptions() []Option {
 	return []Option{
+		{
+			KeyName:       LocalEnable,
+			Element:       Radio,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{true, false},
+			Default:       false,
+			Required:      true,
+			DefaultNoUse:  false,
+			Description:   "是否使用本地解析，默认为服务端解析",
+			Type:          transforms.TransformTypeBoolean,
+		},
 		transforms.KeyFieldName,
 		{
-			KeyName:      "data_path",
-			ChooseOnly:   false,
-			Default:      "",
-			Required:     true,
-			Placeholder:  "your/path/to/ip.dat(x)",
-			DefaultNoUse: true,
-			Description:  "IP数据库路径(data_path)",
-			Type:         transforms.TransformTypeString,
+			KeyName:       "data_path",
+			ChooseOnly:    false,
+			Default:       "",
+			Required:      true,
+			Placeholder:   "your/path/to/ip.dat(x)",
+			DefaultNoUse:  true,
+			Description:   "IP数据库路径(data_path)",
+			Type:          transforms.TransformTypeString,
+			AdvanceDepend: LocalEnable,
 		},
 		{
 			KeyName:       "key_as_prefix",
@@ -240,17 +257,19 @@ func (_ *Transformer) ConfigOptions() []Option {
 			Element:       Checkbox,
 			Description:   "字段名称作为前缀(key_as_prefix)",
 			Type:          transforms.TransformTypeString,
+			AdvanceDepend: LocalEnable,
 		},
 		{
-			KeyName:      "language",
-			ChooseOnly:   false,
-			Default:      "zh-CN",
-			Required:     true,
-			Placeholder:  "zh-CN",
-			DefaultNoUse: true,
-			Description:  "mmdb格式库使用的语种",
-			Advance:      true,
-			Type:         transforms.TransformTypeString,
+			KeyName:       "language",
+			ChooseOnly:    false,
+			Default:       "zh-CN",
+			Required:      true,
+			Placeholder:   "zh-CN",
+			DefaultNoUse:  true,
+			Description:   "mmdb格式库使用的语种",
+			Advance:       true,
+			Type:          transforms.TransformTypeString,
+			AdvanceDepend: LocalEnable,
 		},
 	}
 }
@@ -273,6 +292,13 @@ func (t *Transformer) Close() error {
 		return t.loc.Close()
 	}
 	return nil
+}
+
+func (t *Transformer) ServerConfig() map[string]interface{} {
+	config := make(map[string]interface{})
+	config[KeyType] = Name
+	config[LocalEnable] = t.LocalEnable
+	return config
 }
 
 func init() {
