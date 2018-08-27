@@ -67,8 +67,8 @@ const (
 
 // Constants for Redis
 const (
-	DateTypeHash          = "hash"
-	DateTypeSortedSet     = "sortedSet"
+	DataTypeHash          = "hash"
+	DataTypeSortedSet     = "zset"
 	DataTypeSet           = "set"
 	DataTypeString        = "string"
 	DataTypeList          = "list"
@@ -639,6 +639,16 @@ var ModeKeyOptions = map[string][]Option{
 			ToolTip:      "数据库名称",
 		},
 		{
+			KeyName:      KeyMssqlSchema,
+			Default:      "",
+			Required:     false,
+			ChooseOnly:   false,
+			Placeholder:  "<schema>",
+			DefaultNoUse: true,
+			Description:  "数据库模式名称(mssql_schema)",
+			ToolTip:      "数据库模式名称",
+		},
+		{
 			KeyName:      KeyMssqlSQL,
 			Default:      "",
 			Required:     false,
@@ -713,6 +723,16 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: true,
 			Description:  "数据库名称(postgres_database)",
 			ToolTip:      "数据库名称",
+		},
+		{
+			KeyName:      KeyPGsqlSchema,
+			ChooseOnly:   false,
+			Default:      "",
+			Required:     false,
+			Placeholder:  "<schema>",
+			DefaultNoUse: true,
+			Description:  "数据库模式名称(postgres_schema)",
+			ToolTip:      "数据库模式名称",
 		},
 		{
 			KeyName:      KeyPGsqlSQL,
@@ -967,7 +987,7 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:       KeyRedisDataType,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{DataTypeList, DataTypeChannel, DataTypePatterChannel, DataTypeString, DataTypeSet, DateTypeSortedSet, DateTypeHash},
+			ChooseOptions: []interface{}{DataTypeList, DataTypeChannel, DataTypePatterChannel, DataTypeString, DataTypeSet, DataTypeSortedSet, DataTypeHash},
 			Description:   "数据读取模式(redis_datatype)",
 			ToolTip:       "",
 		},

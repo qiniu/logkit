@@ -36,8 +36,7 @@ const (
 
 // Constants for Qiniu
 const (
-	KeyQiniulogPrefix = "qiniulog_prefix" //qiniulog的日志前缀
-	KeyLogHeaders     = "qiniulog_log_headers"
+	KeyLogHeaders = "qiniulog_log_headers"
 )
 
 // Constants for raw
@@ -139,7 +138,7 @@ var ModeKeyOptions = map[string][]Option{
 			KeyName:      NginxConfPath,
 			ChooseOnly:   false,
 			Default:      "",
-			Required:     true,
+			Required:     false,
 			Placeholder:  "/opt/nginx/conf/nginx.conf",
 			DefaultNoUse: true,
 			Description:  "nginx配置路径(nginx_log_format_path)",
@@ -150,9 +149,17 @@ var ModeKeyOptions = map[string][]Option{
 			ChooseOnly:   false,
 			Default:      "main",
 			Placeholder:  "main",
-			Required:     true,
+			Required:     false,
 			DefaultNoUse: true,
 			Description:  "nginx日志格式名称(nginx_log_format_name)",
+		},
+		{
+			KeyName:      NginxFormatRegex,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "手动指定正则表达式解析(nginx_log_format_regex)",
+			ToolTip:      "若根据配置文件自动生成的正则表达式无效，可通过此配置手动填写",
 		},
 		{
 			KeyName:      NginxSchema,
@@ -162,15 +169,6 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "手动指定字段类型(nginx_schema)",
 			Advance:      true,
 			ToolTip:      `nginx日志都被解析为string，指定该格式可以设置为float、long、date三种类型。如 time_local date,bytes_sent long,request_time float`,
-		},
-		{
-			KeyName:      NginxFormatRegex,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "手动指定正则表达式解析(nginx_log_format_regex)",
-			Advance:      true,
-			ToolTip:      "若根据配置文件自动生成的正则表达式无效，可通过此配置手动填写",
 		},
 		OptionParserName,
 		OptionLabels,
@@ -300,19 +298,12 @@ var ModeKeyOptions = map[string][]Option{
 	TypeLogv1: {
 		OptionLabels,
 		{
-			KeyName:      KeyQiniulogPrefix,
-			ChooseOnly:   false,
-			Default:      "",
-			DefaultNoUse: false,
-			Description:  "日志前缀(qiniulog_prefix)",
-			Advance:      true,
-		},
-		{
 			KeyName:      KeyLogHeaders,
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
-			Description:  "日志格式顺序(qiniulog_log_headers)",
+			Description:  "日志字段与顺序(qiniulog_log_headers)",
+			ToolTip:      "用来定义解析的顺序，默认情况下没有prefix，按 date,time,reqid,level,module,file,log的顺序依次解析，可以调换。还可以写 combinedReqidLevel 表示reqid和level组合，代表reqid可能有、可能没有，但是如果都有，前者被认定为一定reqid；combinedModuleFile表示module和file的组合，代表可能有module，可能没有，如果存在中括号开头就认为是module",
 			Advance:      true,
 		},
 		OptionParserName,

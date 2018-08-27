@@ -3,6 +3,7 @@ package pipeline
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"reflect"
 	"sort"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/qiniu/log"
+
 	"github.com/qiniu/pandora-go-sdk/base"
 	. "github.com/qiniu/pandora-go-sdk/base/models"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
@@ -331,6 +333,8 @@ func dataConvert(data interface{}, schema RepoSchemaEntry) (converted interface{
 				return newdata, nil
 			}
 		}
+	case PandoraTypeIP:
+		return data, nil
 	}
 	return data, fmt.Errorf("can not convert data[%v] type(%v) to pandora type(%v), err %v", data, reflect.TypeOf(data), schema.ValueType, err)
 }
@@ -425,7 +429,7 @@ func checkIgnore(value interface{}, schemeType string) bool {
 		return false
 	}
 	switch schemeType {
-	case PandoraTypeJsonString, PandoraTypeArray, PandoraTypeMap, PandoraTypeLong, PandoraTypeFloat:
+	case PandoraTypeJsonString, PandoraTypeArray, PandoraTypeMap, PandoraTypeLong, PandoraTypeFloat, PandoraTypeIP:
 		if str == "" {
 			return true
 		}
@@ -976,6 +980,7 @@ PandoraTypeArray  ：全部支持
 PandoraTypeMap    ：全部支持
 */
 // 该函数有两个作用，1. 获取 data 中所有字段的 schema; 2. 将 data 中值为 nil, 无法判断类型的键值对，从 data 中删掉
+// 当值为string的时候，如果数据满足date格式，则推断为PandoraTypeDate，如果数据满足IP格式，则推断为PandoraTypeIP
 func GetTrimedDataSchema(data Data) (valueType map[string]RepoSchemaEntry) {
 	valueType = make(map[string]RepoSchemaEntry)
 	for k, v := range data {
@@ -1064,9 +1069,11 @@ func GetTrimedDataSchema(data Data) (valueType map[string]RepoSchemaEntry) {
 			// 由于数据为空，且无法判断类型, 所以从数据中将该条键值对删掉
 			delete(data, k)
 		case string:
-			_, err := time.Parse(time.RFC3339, nv)
-			if err == nil {
+			// 如果数据满足date格式，则推断为PandoraTypeDate，如果数据满足IP格式，则推断为PandoraTypeIP
+			if _, err := time.Parse(time.RFC3339, nv); err == nil {
 				valueType[k] = formValueType(k, PandoraTypeDate)
+			} else if ipAddr := net.ParseIP(nv); ipAddr != nil {
+				valueType[k] = formValueType(k, PandoraTypeIP)
 			} else {
 				valueType[k] = formValueType(k, PandoraTypeString)
 			}
@@ -1112,6 +1119,8 @@ func getDefault(t RepoSchemaEntry) (result interface{}) {
 		case PandoraTypeBool:
 			result = make([]bool, 0)
 		}
+	case PandoraTypeIP:
+		result = ""
 	}
 	return
 }

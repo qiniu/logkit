@@ -25,17 +25,19 @@ var _ sender.SkipDeepCopySender = &Sender{}
 
 // Sender write datas into influxdb
 type Sender struct {
-	name        string
-	host        string
-	db          string
-	autoCreate  bool
-	retention   string
-	duration    string
-	measurement string
-	tags        map[string]string // key为tag的列名,value为alias名
-	fields      map[string]string // key为field的列名，value为alias名
-	timestamp   string            // 时间戳列名
-	timePrec    int64
+	name                  string
+	runnerName            string
+	host                  string
+	db                    string
+	autoCreate            bool
+	retention             string
+	duration              string
+	measurement           string
+	tags                  map[string]string // key为tag的列名,value为alias名
+	fields                map[string]string // key为field的列名，value为alias名
+	timestamp             string            // 时间戳列名
+	timePrec              int64
+	ignoreBeyondRetention bool
 }
 
 func init() {
@@ -47,6 +49,9 @@ func NewSender(c conf.MapConf) (influxdbSender sender.Sender, err error) {
 	host, err := c.GetString(sender.KeyInfluxdbHost)
 	if err != nil {
 		return
+	}
+	if !strings.HasPrefix(host, "http://") && !strings.HasSuffix(host, "https://") {
+		host = "http://" + host
 	}
 	db, err := c.GetString(sender.KeyInfluxdbDB)
 	if err != nil {
@@ -66,20 +71,23 @@ func NewSender(c conf.MapConf) (influxdbSender sender.Sender, err error) {
 	duration, _ := c.GetStringOr(sender.KeyInfluxdbRetetionDuration, "")
 	timestamp, _ := c.GetStringOr(sender.KeyInfluxdbTimestamp, "")
 	prec, _ := c.GetIntOr(sender.KeyInfluxdbTimestampPrecision, 1)
+	ignoreBeyRent, _ := c.GetBoolOr(sender.KeyInfluxdbIgnoreBeyondRetention, false)
 	name, _ := c.GetStringOr(sender.KeyName, fmt.Sprintf("influxdbSender:(%v,db:%v,measurement:%v", host, db, measurement))
-
+	runnerName, _ := c.GetStringOr(KeyRunnerName, sender.UnderfinedRunnerName)
 	influxdbSender = &Sender{
-		name:        name,
-		host:        host,
-		db:          db,
-		autoCreate:  autoCreate,
-		retention:   retention,
-		duration:    duration,
-		measurement: measurement,
-		tags:        tags,
-		fields:      fields,
-		timestamp:   timestamp,
-		timePrec:    int64(prec),
+		name:                  name,
+		runnerName:            runnerName,
+		host:                  host,
+		db:                    db,
+		autoCreate:            autoCreate,
+		retention:             retention,
+		duration:              duration,
+		measurement:           measurement,
+		tags:                  tags,
+		fields:                fields,
+		timestamp:             timestamp,
+		timePrec:              int64(prec),
+		ignoreBeyondRetention: ignoreBeyRent,
 	}
 	if autoCreate {
 		if err = CreateInfluxdbDatabase(host, db, name); err != nil {
@@ -107,13 +115,24 @@ func (s *Sender) Send(datas []Data) error {
 	for _, d := range datas {
 		p, err := s.makePoint(d)
 		if err != nil {
-			log.Warnf("%s make point format err : %v", s.Name(), err)
+			log.Warnf("Runner[%s] %s make point format err : %v", s.runnerName, s.Name(), err)
 			continue
 		}
 		ps = append(ps, p)
 	}
 	err := s.sendPoints(ps)
 	if err != nil {
+		if s.ignoreBeyondRetention && isBeyondRetentionErr(err) {
+			var partialData string
+			buff := ps.Buffer()
+			if len(buff) > 2048 {
+				partialData = string(buff[:2048])
+			} else {
+				partialData = string(buff)
+			}
+			log.Warnf("Runner[%s] %s data is out of retention and ignore_beyond_retention is true, some of ignored data %s it", s.runnerName, s.Name(), err, partialData)
+			return nil
+		}
 		return reqerr.NewSendError(s.Name()+" Cannot write data into influxdb, error is "+err.Error(), sender.ConvertDatasBack(datas), reqerr.TypeDefault)
 	}
 	return nil
@@ -180,13 +199,13 @@ func (s *Sender) sendPoints(ps Points) (err error) {
 		}()
 	}
 	if err != nil {
-		log.Errorf("%s request influxdb error: %v", s.Name(), err)
+		log.Errorf("Runner[%s] %s request influxdb error: %v", s.runnerName, s.Name(), err)
 		return
 	}
 
 	var b []byte
 	if b, err = ioutil.ReadAll(resp.Body); err != nil {
-		log.Errorf("%s read resp body error: %v", s.Name(), err)
+		log.Errorf("Runner[%s] %s read resp body error: %v", s.runnerName, s.Name(), err)
 		return
 	}
 	if resp.StatusCode != 204 {
@@ -202,7 +221,7 @@ func (s *Sender) makePoint(d Data) (p Point, err error) {
 	for k, t := range s.tags {
 		v, exist := d[k]
 		if !exist {
-			log.Debugf("%s tag %s not exist", s.Name(), t)
+			log.Debugf("Runner[%s] %s tag %s not exist", s.runnerName, s.Name(), t)
 			continue
 		}
 		tags[t] = fmt.Sprintf("%v", v)
@@ -212,7 +231,7 @@ func (s *Sender) makePoint(d Data) (p Point, err error) {
 	for k, f := range s.fields {
 		v, exist := d[k]
 		if !exist {
-			log.Debugf("%s field %s not exist", s.Name(), f)
+			log.Debugf("Runner[%s] %s field %s not exist", s.runnerName, s.Name(), f)
 			continue
 		}
 		fields[f] = v
@@ -504,3 +523,10 @@ func String(in string) string {
 }
 
 func (_ *Sender) SkipDeepCopy() bool { return true }
+
+func isBeyondRetentionErr(err error) bool {
+	if err != nil && strings.Contains(err.Error(), "points beyond retention policy") {
+		return true
+	}
+	return false
+}

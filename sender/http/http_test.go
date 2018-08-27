@@ -20,62 +20,125 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-var testData []struct {
+var testData = []struct {
 	input       []Data
 	jsonExp     [][]string
 	csvExp      []map[string]string
 	bodyJSONExp string
+}{
+	{
+		input: []Data{
+			{
+				"a": 1,
+				"b": true,
+				"c": "1",
+				"e": 1.43,
+				"d": map[string]interface{}{
+					"a1": 1,
+					"b1": true,
+					"c1": "1",
+					"d1": map[string]interface{}{},
+				},
+			},
+			{
+				"a": 1,
+				"b": true,
+				"c": "1",
+				"d": map[string]interface{}{
+					"a1": 1,
+					"b1": true,
+					"c1": "1",
+					"d1": map[string]interface{}{},
+				},
+			},
+		},
+		jsonExp: [][]string{
+			{
+				`"a":1`,
+				`"b":true`,
+				`"c":"1"`,
+				`"e":1.43`,
+				`"d":{"`,
+				`"a1":1`,
+				`"b1":true`,
+				`"c1":"1"`,
+				`"d1":{}`,
+			},
+			{
+				`"a":1`,
+				`"b":true`,
+				`"c":"1"`,
+				`"d":{"`,
+				`"a1":1`,
+				`"b1":true`,
+				`"c1":"1"`,
+				`"d1":{}`,
+			},
+		},
+		csvExp: []map[string]string{
+			{
+				"a": "1",
+				"b": "true",
+				"c": "1",
+				"d": `{"a1":1,"b1":true,"c1":"1","d1":{}}`,
+				"e": "1.43",
+			},
+			{
+				"a": "1",
+				"b": "true",
+				"c": "1",
+				"d": `{"a1":1,"b1":true,"c1":"1","d1":{}}`,
+				"e": "",
+			},
+		},
+		bodyJSONExp: `[{"a":1,"b":true,"c":"1","e":1.43,"d":{"a1":1,"b1":true,"c1":"1","d1":{}}},{"b":true,"c":"1","d":{"b1":true,"c1":"1","d1":{},"a1":1},"a":1}]`,
+	},
 }
 
-func getHttpReader() (*http.Reader, error) {
-	readConf := conf.MapConf{
-		reader.KeyMetaPath: "./meta",
-		reader.KeyFileDone: "./meta",
+func newHTTPReader(runnerName, port string) (*http.Reader, error) {
+	meta, err := reader.NewMetaWithConf(conf.MapConf{
+		reader.KeyMetaPath: "./meta/" + runnerName,
+		reader.KeyFileDone: "./meta/" + runnerName,
 		reader.KeyMode:     reader.ModeHTTP,
-		KeyRunnerName:      "TestNewHttpReader",
-	}
-	meta, err := reader.NewMetaWithConf(readConf)
+		KeyRunnerName:      runnerName,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	c := conf.MapConf{
-		reader.KeyHTTPServiceAddress: "127.0.0.1:8000",
+	reader, err := http.NewReader(meta, conf.MapConf{
+		reader.KeyHTTPServiceAddress: "127.0.0.1:" + port,
 		reader.KeyHTTPServicePath:    "/logkit/data",
-	}
-	reader, err := http.NewReader(meta, c)
+	})
 	httpReader := reader.(*http.Reader)
 	if err != nil {
 		return nil, err
 	}
-	err = httpReader.Start()
-	if err != nil {
-		return nil, err
-	}
-	return httpReader, nil
+	return httpReader, httpReader.Start()
 }
 
-func TestHttpSenderGzipWithJson(t *testing.T) {
-	httpReader, err := getHttpReader()
+func TestHTTPSenderGzipWithJSON(t *testing.T) {
+	t.Parallel()
+	runnerName := "TestHTTPSenderGzipWithJSON"
+	httpReader, err := newHTTPReader(runnerName, "8000")
 	assert.NoError(t, err)
 	defer func() {
-		os.RemoveAll("./meta")
+		os.RemoveAll("./meta/" + runnerName)
 		httpReader.Close()
 	}()
 
 	// CI 环境启动监听较慢，需要等待几秒
-	time.Sleep(3 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// gzip = true, protocol = json
-	senderConf := conf.MapConf{
+	httpSender, err := NewSender(conf.MapConf{
 		sender.KeyHttpSenderGzip:     "true",
 		sender.KeyHttpSenderCsvSplit: "\t",
 		sender.KeyHttpSenderProtocol: "json",
 		sender.KeyHttpSenderCsvHead:  "false",
-		KeyRunnerName:                "testRunner",
+		KeyRunnerName:                runnerName,
 		sender.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
-	}
-	httpSender, err := NewSender(senderConf)
+	})
 	assert.NoError(t, err)
 
 	var wg sync.WaitGroup
@@ -91,39 +154,38 @@ func TestHttpSenderGzipWithJson(t *testing.T) {
 				got, err := httpReader.ReadLine()
 				assert.NoError(t, err)
 				for _, e := range exp {
-					if !strings.Contains(got, e) {
-						t.Fatalf("exp: %v contains %v, but not", got, e)
-					}
+					assert.Contains(t, got, e)
 				}
 			}
 			wg.Done()
 		}(httpReader, val, t)
-		httpSender.Send(val.input)
+		assert.NoError(t, httpSender.Send(val.input))
 	}
 	wg.Wait()
 }
 
-func TestHttpSenderNoGzipWithJson(t *testing.T) {
-	httpReader, err := getHttpReader()
+func TestHTTPSenderNoGzipWithJSON(t *testing.T) {
+	t.Parallel()
+	runnerName := "TestHTTPSenderNoGzipWithJSON"
+	httpReader, err := newHTTPReader(runnerName, "8001")
 	assert.NoError(t, err)
 	defer func() {
-		os.RemoveAll("./meta")
+		os.RemoveAll("./meta/" + runnerName)
 		httpReader.Close()
 	}()
 
 	// CI 环境启动监听较慢，需要等待几秒
-	time.Sleep(3 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// gzip = false, protocol = json
-	senderConf := conf.MapConf{
+	httpSender, err := NewSender(conf.MapConf{
 		sender.KeyHttpSenderGzip:     "false",
 		sender.KeyHttpSenderCsvSplit: "\t",
 		sender.KeyHttpSenderProtocol: "json",
 		sender.KeyHttpSenderCsvHead:  "false",
-		KeyRunnerName:                "testRunner",
-		sender.KeyHttpSenderUrl:      "127.0.0.1:8000/logkit/data",
-	}
-	httpSender, err := NewSender(senderConf)
+		KeyRunnerName:                runnerName,
+		sender.KeyHttpSenderUrl:      "127.0.0.1:8001/logkit/data",
+	})
 	assert.NoError(t, err)
 
 	var wg sync.WaitGroup
@@ -139,39 +201,38 @@ func TestHttpSenderNoGzipWithJson(t *testing.T) {
 				got, err := httpReader.ReadLine()
 				assert.NoError(t, err)
 				for _, e := range exp {
-					if !strings.Contains(got, e) {
-						t.Fatalf("exp: %v contains %v, but not", got, e)
-					}
+					assert.Contains(t, got, e)
 				}
 			}
 			wg.Done()
 		}(httpReader, val, t)
-		httpSender.Send(val.input)
+		assert.NoError(t, httpSender.Send(val.input))
 	}
 	wg.Wait()
 }
 
-func TestHttpSenderGzipAndCsvHeadWithCsv(t *testing.T) {
-	httpReader, err := getHttpReader()
+func TestHTTPSenderGzipAndCSVHeadWithCSV(t *testing.T) {
+	t.Parallel()
+	runnerName := "TestHTTPSenderGzipAndCSVHeadWithCSV"
+	httpReader, err := newHTTPReader(runnerName, "8002")
 	assert.NoError(t, err)
 	defer func() {
-		os.RemoveAll("./meta")
+		os.RemoveAll("./meta/" + runnerName)
 		httpReader.Close()
 	}()
 
 	// CI 环境启动监听较慢，需要等待几秒
-	time.Sleep(3 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// gzip = true, protocol = csv, csvHead = true
-	senderConf := conf.MapConf{
+	httpSender, err := NewSender(conf.MapConf{
 		sender.KeyHttpSenderGzip:     "true",
 		sender.KeyHttpSenderCsvSplit: "\t",
 		sender.KeyHttpSenderProtocol: "csv",
 		sender.KeyHttpSenderCsvHead:  "true",
-		KeyRunnerName:                "testRunner",
-		sender.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
-	}
-	httpSender, err := NewSender(senderConf)
+		KeyRunnerName:                runnerName,
+		sender.KeyHttpSenderUrl:      "http://127.0.0.1:8002/logkit/data",
+	})
 	assert.NoError(t, err)
 
 	var wg sync.WaitGroup
@@ -204,32 +265,33 @@ func TestHttpSenderGzipAndCsvHeadWithCsv(t *testing.T) {
 			}
 			wg.Done()
 		}(httpReader, val, t)
-		httpSender.Send(val.input)
+		assert.NoError(t, httpSender.Send(val.input))
 	}
 	wg.Wait()
 }
 
-func TestHttpSenderNoGzipAndCsvHeadWithCsv(t *testing.T) {
-	httpReader, err := getHttpReader()
+func TestHTTPSenderNoGzipAndCSVHeadWithCSV(t *testing.T) {
+	t.Parallel()
+	runnerName := "TestHTTPSenderNoGzipAndCSVHeadWithCSV"
+	httpReader, err := newHTTPReader(runnerName, "8003")
 	assert.NoError(t, err)
 	defer func() {
-		os.RemoveAll("./meta")
+		os.RemoveAll("./meta/" + runnerName)
 		httpReader.Close()
 	}()
 
 	// CI 环境启动监听较慢，需要等待几秒
-	time.Sleep(3 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// gzip = false, protocol = csv, csvHead = true
-	senderConf := conf.MapConf{
+	httpSender, err := NewSender(conf.MapConf{
 		sender.KeyHttpSenderGzip:     "false",
 		sender.KeyHttpSenderCsvSplit: "\t",
 		sender.KeyHttpSenderProtocol: "csv",
 		sender.KeyHttpSenderCsvHead:  "true",
-		KeyRunnerName:                "testRunner",
-		sender.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
-	}
-	httpSender, err := NewSender(senderConf)
+		KeyRunnerName:                runnerName,
+		sender.KeyHttpSenderUrl:      "http://127.0.0.1:8003/logkit/data",
+	})
 	assert.NoError(t, err)
 
 	var wg sync.WaitGroup
@@ -262,32 +324,33 @@ func TestHttpSenderNoGzipAndCsvHeadWithCsv(t *testing.T) {
 			}
 			wg.Done()
 		}(httpReader, val, t)
-		httpSender.Send(val.input)
+		assert.NoError(t, httpSender.Send(val.input))
 	}
 	wg.Wait()
 }
 
-func TestHttpSenderGzipAndNoCsvHeadWithCsv(t *testing.T) {
-	httpReader, err := getHttpReader()
+func TestHTTPSenderGzipAndNoCSVHeadWithCSV(t *testing.T) {
+	t.Parallel()
+	runnerName := "TestHTTPSenderGzipAndNoCSVHeadWithCSV"
+	httpReader, err := newHTTPReader(runnerName, "8004")
 	assert.NoError(t, err)
 	defer func() {
-		os.RemoveAll("./meta")
+		os.RemoveAll("./meta/" + runnerName)
 		httpReader.Close()
 	}()
 
 	// CI 环境启动监听较慢，需要等待几秒
-	time.Sleep(3 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// gzip = true, protocol = csv, csvHead = false
-	senderConf := conf.MapConf{
+	httpSender, err := NewSender(conf.MapConf{
 		sender.KeyHttpSenderGzip:     "true",
 		sender.KeyHttpSenderCsvSplit: "\t",
 		sender.KeyHttpSenderProtocol: "csv",
 		sender.KeyHttpSenderCsvHead:  "false",
-		KeyRunnerName:                "testRunner",
-		sender.KeyHttpSenderUrl:      "127.0.0.1:8000/logkit/data",
-	}
-	httpSender, err := NewSender(senderConf)
+		KeyRunnerName:                runnerName,
+		sender.KeyHttpSenderUrl:      "127.0.0.1:8004/logkit/data",
+	})
 	assert.NoError(t, err)
 
 	var wg sync.WaitGroup
@@ -308,32 +371,33 @@ func TestHttpSenderGzipAndNoCsvHeadWithCsv(t *testing.T) {
 			assert.Equal(t, "", got)
 			wg.Done()
 		}(httpReader, val, t)
-		httpSender.Send(val.input)
+		assert.NoError(t, httpSender.Send(val.input))
 	}
 	wg.Wait()
 }
 
-func TestHttpSenderGzipAndNoCsvHeadWithBodyJson(t *testing.T) {
-	httpReader, err := getHttpReader()
+func TestHTTPSenderGzipAndNoCSVHeadWithBodyJSON(t *testing.T) {
+	t.Parallel()
+	runnerName := "TestHTTPSenderGzipAndNoCSVHeadWithBodyJSON"
+	httpReader, err := newHTTPReader(runnerName, "8005")
 	assert.NoError(t, err)
 	defer func() {
-		os.RemoveAll("./meta")
+		os.RemoveAll("./meta/" + runnerName)
 		httpReader.Close()
 	}()
 
 	// CI 环境启动监听较慢，需要等待几秒
-	time.Sleep(3 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// gzip = true, protocol = body_json, csvHead = false
-	senderConf := conf.MapConf{
+	httpSender, err := NewSender(conf.MapConf{
 		sender.KeyHttpSenderGzip:     "true",
 		sender.KeyHttpSenderCsvSplit: "\t",
 		sender.KeyHttpSenderProtocol: "body_json",
 		sender.KeyHttpSenderCsvHead:  "false",
-		KeyRunnerName:                "testRunner",
-		sender.KeyHttpSenderUrl:      "127.0.0.1:8000/logkit/data",
-	}
-	httpSender, err := NewSender(senderConf)
+		KeyRunnerName:                runnerName,
+		sender.KeyHttpSenderUrl:      "127.0.0.1:8005/logkit/data",
+	})
 	assert.NoError(t, err)
 
 	var wg sync.WaitGroup
@@ -369,6 +433,7 @@ func TestHttpSenderGzipAndNoCsvHeadWithBodyJson(t *testing.T) {
 }
 
 func TestGzipData(t *testing.T) {
+	t.Parallel()
 	testData := []string{
 		`kjhgfdsdfghjkjhgfdfghjk`,
 		`234567890-[poiuytfrdghjkl;`,
@@ -379,88 +444,10 @@ func TestGzipData(t *testing.T) {
 	for _, val := range testData {
 		gotByte, err := gzipData([]byte(val))
 		assert.NoError(t, err)
-		bytes.NewReader(gotByte)
-		tmpData, err := gzip.NewReader(bytes.NewReader(gotByte))
+		gr, err := gzip.NewReader(bytes.NewReader(gotByte))
 		assert.NoError(t, err)
-		tmpByte, err := ioutil.ReadAll(tmpData)
+		data, err := ioutil.ReadAll(gr)
 		assert.NoError(t, err)
-		assert.Equal(t, val, string(tmpByte))
-	}
-}
-
-func init() {
-	testData = []struct {
-		input       []Data
-		jsonExp     [][]string
-		csvExp      []map[string]string
-		bodyJSONExp string
-	}{
-		{
-			input: []Data{
-				{
-					"a": 1,
-					"b": true,
-					"c": "1",
-					"e": 1.43,
-					"d": map[string]interface{}{
-						"a1": 1,
-						"b1": true,
-						"c1": "1",
-						"d1": map[string]interface{}{},
-					},
-				},
-				{
-					"a": 1,
-					"b": true,
-					"c": "1",
-					"d": map[string]interface{}{
-						"a1": 1,
-						"b1": true,
-						"c1": "1",
-						"d1": map[string]interface{}{},
-					},
-				},
-			},
-			jsonExp: [][]string{
-				{
-					`"a":1`,
-					`"b":true`,
-					`"c":"1"`,
-					`"e":1.43`,
-					`"d":{"`,
-					`"a1":1`,
-					`"b1":true`,
-					`"c1":"1"`,
-					`"d1":{}`,
-				},
-				{
-					`"a":1`,
-					`"b":true`,
-					`"c":"1"`,
-					`"d":{"`,
-					`"a1":1`,
-					`"b1":true`,
-					`"c1":"1"`,
-					`"d1":{}`,
-				},
-			},
-			csvExp: []map[string]string{
-				{
-					"a": "1",
-					"b": "true",
-					"c": "1",
-					"d": `{"a1":1,"b1":true,"c1":"1","d1":{}}`,
-					"e": "1.43",
-				},
-				{
-					"a": "1",
-					"b": "true",
-					"c": "1",
-					"d": `{"a1":1,"b1":true,"c1":"1","d1":{}}`,
-					"e": "",
-				},
-			},
-			bodyJSONExp: `[{"a":1,"b":true,"c":"1","e":1.43,"d":{"a1":1,"b1":true,"c1":"1","d1":{}}},{"b":true,"c":"1","d":{"b1":true,"c1":"1","d1":{},"a1":1},"a":1}]`,
-		},
+		assert.Equal(t, val, string(data))
 	}
 }

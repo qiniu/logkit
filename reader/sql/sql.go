@@ -31,8 +31,8 @@ const (
 	sqlSpliter           = ";"
 	DefaultMySQLTable    = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA='DATABASE_NAME';"
 	DefaultMySQLDatabase = "SHOW DATABASES;"
-	DefaultPGSQLTable    = "SELECT TABLENAME FROM PG_TABLES WHERE SCHEMANAME='public';"
-	DefaultMSSQLTable    = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_CATALOG='DATABASE_NAME';"
+	DefaultPGSQLTable    = "SELECT TABLENAME FROM PG_TABLES WHERE SCHEMANAME='SCHEMA_NAME';"
+	DefaultMSSQLTable    = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE' AND TABLE_CATALOG='DATABASE_NAME' AND TABLE_SCHEMA='SCHEMA_NAME';"
 
 	SupportReminder = "history all magic only support @(YYYY) @(YY) @(MM) @(DD) @(hh) @(mm) @(ss)"
 	Wildcards       = "*"
@@ -56,6 +56,13 @@ const (
 	DATABASE
 	// 获取数据库表的总条数
 	COUNT
+)
+
+const (
+	// 获取数据条数的函数
+	COUNTFUNC = iota
+	// 获取读取数据的函数
+	READFUNC
 )
 
 var (
@@ -125,16 +132,16 @@ type Reader struct {
 	lastTabel         string        // 读过的最后一条记录的数据表
 	omitDoneDBRecords bool
 	schemas           map[string]string
-
-	magicLagDur  time.Duration
-	count        int64
-	CurrentCount int64
-	countLock    sync.RWMutex
+	dbSchema          string
+	magicLagDur       time.Duration
+	count             int64
+	CurrentCount      int64
+	countLock         sync.RWMutex
 }
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	var readBatch int
-	var dbtype, dataSource, rawDatabase, rawSQLs, cronSchedule, offsetKey, encoder, table string
+	var dbtype, dataSource, rawDatabase, rawSQLs, cronSchedule, offsetKey, encoder, table, dbSchema string
 	var execOnStart, historyAll bool
 	dbtype, _ = conf.GetStringOr(reader.KeyMode, reader.ModeMySQL)
 	logpath, _ := conf.GetStringOr(reader.KeyLogPath, "")
@@ -177,6 +184,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		if err != nil {
 			return nil, err
 		}
+		dbSchema, _ = conf.GetStringOr(reader.KeyMssqlSchema, "dbo")
 		rawSQLs, _ = conf.GetStringOr(reader.KeyMssqlSQL, "")
 		cronSchedule, _ = conf.GetStringOr(reader.KeyMssqlCron, "")
 		execOnStart, _ = conf.GetBoolOr(reader.KeyMssqlExecOnStart, true)
@@ -217,6 +225,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 				return nil, err
 			}
 		}
+		dbSchema, _ = conf.GetStringOr(reader.KeyPGsqlSchema, "public")
 		rawSQLs, _ = conf.GetStringOr(reader.KeyPGsqlSQL, "")
 		cronSchedule, _ = conf.GetStringOr(reader.KeyPGsqlCron, "")
 		execOnStart, _ = conf.GetBoolOr(reader.KeyPGsqlExecOnStart, true)
@@ -268,6 +277,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		magicLagDur:   mgld,
 		schemas:       schemas,
 		encoder:       encoder,
+		dbSchema:      dbSchema,
 	}
 
 	if r.rawDatabase == "" {
@@ -531,6 +541,7 @@ func restoreMeta(meta *reader.Meta, rawSqls string, magicLagDur time.Duration) (
 	return
 }
 
+// 支持 YYYY, YY, MM, DD, hh, mm, ss, M, D, h, m, s
 func convertMagic(magic string, now time.Time) (ret string) {
 	switch magic {
 	case "YYYY":
@@ -571,6 +582,7 @@ func convertMagic(magic string, now time.Time) (ret string) {
 	return ""
 }
 
+// 仅支持 YYYY, YY, MM, DD, hh, mm, ss，不支持 M, D, h, m, s
 func convertMagicIndex(magic string, now time.Time) (ret string, index int) {
 	switch magic {
 	case "YYYY":
@@ -596,7 +608,7 @@ func convertMagicIndex(magic string, now time.Time) (ret string, index int) {
 	return "", -1
 }
 
-// 渲染魔法变量
+// 渲染魔法变量，获取渲染结果
 func goMagic(rawSql string, now time.Time) (ret string) {
 	sps := strings.Split(rawSql, "@(") //@()，对于每个分片找右括号
 	ret = sps[0]
@@ -614,68 +626,78 @@ func goMagic(rawSql string, now time.Time) (ret string) {
 	return ret
 }
 
+type MagicRes struct {
+	timeStart   []int  // 按照 YY,MM,DD,hh,mm,ss 顺序记录时间位置
+	timeEnd     []int  // 按照 YY,MM,DD,hh,mm,ss 顺序记录时间长度
+	remainIndex []int  // 按顺序记录非时间字符串开始结束位置，去除 *
+	ret         string // 渲染结果，包含 *
+}
+
 // 渲染魔法变量
-func goMagicIndex(rawSql string, now time.Time) (ret string, startIndex, endIndex, timeIndex []int, err error) {
-	startIndex = []int{-1, -1, -1, -1, -1, -1} // 记录YY,MM,DD,hh,mm,ss位置
-	endIndex = make([]int, 6)                  // 记录YY,MM,DD,hh,mm,ss长度
-	sps := strings.Split(rawSql, "@(")         //@()，对于每个分片找右括号
-	ret = sps[0]
-	recordIndex := len(ret)
-	timeIndex = []int{0} // 按顺序记录时间的开始结束位置
+func goMagicIndex(rawSql string, now time.Time) (MagicRes, error) {
+	sps := strings.Split(rawSql, "@(") //@()，对于每个分片找右括号
+	var magicRes = MagicRes{
+		timeStart:   []int{-1, -1, -1, -1, -1, -1},
+		timeEnd:     make([]int, 6),
+		remainIndex: []int{0},
+		ret:         sps[0],
+	}
+	recordIndex := len(magicRes.ret)
 
 	// 没有魔法变量的情况，例如 mytest*
 	if len(sps) < 2 {
-		if strings.Contains(ret, Wildcards) {
-			timeIndex = append(timeIndex, recordIndex-1)
-		} else {
-			timeIndex = append(timeIndex, recordIndex)
-		}
-		return ret, startIndex, endIndex, timeIndex, nil
+		magicRes.remainIndex = append(magicRes.remainIndex, removeWildcards(magicRes.ret, recordIndex))
+		return magicRes, nil
 	}
 
-	timeIndex = append(timeIndex, recordIndex)
+	magicRes.remainIndex = append(magicRes.remainIndex, recordIndex)
 	for idx := 1; idx < len(sps); idx++ {
 		idxr := strings.Index(sps[idx], ")")
 		if idxr == -1 {
-			return rawSql, startIndex, endIndex, timeIndex, nil
+			magicRes.ret = rawSql
+			return magicRes, nil
 		}
 		spsStr := sps[idx][0:idxr]
 		if len(spsStr) < 2 {
-			err = fmt.Errorf(SupportReminder)
-			return rawSql, startIndex, endIndex, timeIndex, err
+			magicRes.ret = rawSql
+			return magicRes, fmt.Errorf(SupportReminder)
 		}
 		res, index := convertMagicIndex(sps[idx][0:idxr], now)
 		if index == -1 {
-			err = fmt.Errorf(SupportReminder)
-			return rawSql, startIndex, endIndex, timeIndex, err
+			magicRes.ret = rawSql
+			return magicRes, fmt.Errorf(SupportReminder)
 		}
 
 		// 记录日期起始位置
-		startIndex[index] = recordIndex
-		ret += res
-		recordIndex = len(ret)
+		magicRes.timeStart[index] = recordIndex
+		magicRes.ret += res
+		recordIndex = len(magicRes.ret)
 
-		// 记录日期终止位置
-		endIndex[index] = recordIndex
+		// 记录日期长度
+		magicRes.timeEnd[index] = recordIndex
 
 		if idxr+1 < len(sps[idx]) {
 			spsRemain := sps[idx][idxr+1:]
-			ret += spsRemain
+			magicRes.ret += spsRemain
 			if spsRemain == Wildcards {
-				recordIndex = len(ret)
+				recordIndex = len(magicRes.ret)
 				continue
 			}
-			timeIndex = append(timeIndex, recordIndex)
-			if strings.Contains(spsRemain, Wildcards) {
-				timeIndex = append(timeIndex, len(ret)-1)
-			} else {
-				timeIndex = append(timeIndex, len(ret))
-			}
-			recordIndex = len(ret)
+			magicRes.remainIndex = append(magicRes.remainIndex, recordIndex)
+			magicRes.remainIndex = append(magicRes.remainIndex, removeWildcards(spsRemain, len(magicRes.ret)))
+			recordIndex = len(magicRes.ret)
 		}
 	}
 
-	return ret, startIndex, endIndex, timeIndex, nil
+	return magicRes, nil
+}
+
+// 若包含通配符，字段长度相应 - 1
+func removeWildcards(checkWildcards string, length int) int {
+	if strings.Contains(checkWildcards, Wildcards) {
+		return length - 1
+	}
+	return length
 }
 
 func checkMagic(rawSql string) (valid bool) {
@@ -873,6 +895,10 @@ func (r *Reader) getOffsetIndex(columns []string) int {
 	return offsetKeyIndex
 }
 
+// mysql 中 若原始sql语句为空，则根据用户填写的database, table, historyAll获取数据，并且统计数据的条数
+// 1. 若 database 和 table 都为空，则默认使用 *, 即获取所有的数据库和数据表
+// 2. historyAll 为 true 时，获取所有小于渲染结果的数据
+// 3. historyAll 为 false 时，若非定时任务，即只执行一次，获取与渲染结果相匹配的数据，若为定时任务，获取小于等于渲染结果的数据
 func (r *Reader) exec(connectStr string) (err error) {
 	now := time.Now().Add(-r.magicLagDur)
 	// 获取符合条件的数据库
@@ -892,7 +918,7 @@ func (r *Reader) exec(connectStr string) (err error) {
 
 			go func() {
 				// 获取数据库所有条数
-				r.countDB(dbs, now)
+				r.execDB(dbs, now, COUNTFUNC)
 				return
 			}()
 		}
@@ -900,39 +926,40 @@ func (r *Reader) exec(connectStr string) (err error) {
 		dbs = append(dbs, r.database)
 	}
 
-	for _, currentDB := range dbs {
-		var recordTablesDone TableRecords
-		tableRecords := r.doneRecords.GetTableRecords(currentDB)
-		recordTablesDone.Set(tableRecords)
-
-		err = r.execReadDB(currentDB, now, recordTablesDone)
-		if err != nil {
-			log.Errorf("Runner[%v] %v exect read db: %v error: %v,will retry read it", r.meta.RunnerName, currentDB, currentDB, err)
-			return err
-		}
-		if r.isStopping() || r.hasStopped() {
-			log.Warnf("Runner[%v] %v stopped from running", r.meta.RunnerName, currentDB)
-			return nil
-		}
+	err = r.execDB(dbs, now, READFUNC)
+	if err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func (r *Reader) countDB(dbs []string, now time.Time) {
-	for _, curDB := range dbs {
+func (r *Reader) execDB(dbs []string, now time.Time, handlerFunc int) error {
+	for _, currentDB := range dbs {
 		var recordTablesDone TableRecords
-		tableRecords := r.doneRecords.GetTableRecords(curDB)
+		tableRecords := r.doneRecords.GetTableRecords(currentDB)
 		recordTablesDone.Set(tableRecords)
-		err := r.execCountDB(curDB, now, recordTablesDone)
-		if err != nil {
-			log.Errorf("Runner[%v] %v get current database: %v count error: %v", r.meta.RunnerName, r.Name(), curDB, err)
+
+		switch handlerFunc {
+		case COUNTFUNC:
+			err := r.execCountDB(currentDB, now, recordTablesDone)
+			if err != nil {
+				log.Errorf("Runner[%v] %v get current database: %v count error: %v", r.meta.RunnerName, r.Name(), currentDB, err)
+			}
+		case READFUNC:
+			err := r.execReadDB(currentDB, now, recordTablesDone)
+			if err != nil {
+				log.Errorf("Runner[%v] %v exect read db: %v error: %v,will retry read it", r.meta.RunnerName, r.Name(), currentDB, err)
+				return err
+			}
 		}
+
 		if r.isStopping() || r.hasStopped() {
-			log.Warnf("Runner[%v] %v stopped from running", r.meta.RunnerName, curDB)
-			return
+			log.Warnf("Runner[%v] %v stopped from running", r.meta.RunnerName, currentDB)
+			return nil
 		}
 	}
+	return nil
 }
 
 func (r *Reader) execCountDB(curDB string, now time.Time, recordTablesDone TableRecords) error {
@@ -947,8 +974,8 @@ func (r *Reader) execCountDB(curDB string, now time.Time, recordTablesDone Table
 	var tables []string
 	var sqls string
 	if r.rawSQLs == "" {
-		// 获取符合条件的数据表，并且将计算表中记录数的query语句赋给 r.rawsqls
-		tables, sqls, err = r.getDatas(connectStr, curDB, r.rawTable, now, COUNT)
+		// 获取符合条件的数据表和count语句
+		tables, sqls, err = r.getValidData(connectStr, curDB, r.rawTable, now, COUNT)
 		if err != nil {
 			return err
 		}
@@ -1008,8 +1035,8 @@ func (r *Reader) execReadDB(curDB string, now time.Time, recordTablesDone TableR
 	var tables []string
 	var sqls string
 	if r.rawSQLs == "" {
-		// 获取符合条件的数据表，并且将获取表中所有记录的语句赋给 r.rawsqls
-		tables, sqls, err = r.getDatas(connectStr, curDB, r.rawTable, now, TABLE)
+		// 获取符合条件的数据表和获取所有数据的语句
+		tables, sqls, err = r.getValidData(connectStr, curDB, r.rawTable, now, TABLE)
 		if err != nil {
 			log.Errorf("Runner[%v] %v rawTable: %v get tables and sqls error %v", r.meta.RunnerName, r.Name(), r.rawTable, r.rawSQLs, err)
 			if len(tables) == 0 && sqls == "" {
@@ -1017,7 +1044,7 @@ func (r *Reader) execReadDB(curDB string, now time.Time, recordTablesDone TableR
 			}
 		}
 
-		log.Infof("Runner[%v] %v default sqls %v", r.meta.RunnerName, r.Name(), r.rawSQLs)
+		log.Infof("Runner[%v] %v default sqls %v", r.meta.RunnerName, r.Name(), sqls)
 
 		if r.omitDoneDBRecords && !recordTablesDone.restoreTableDone(r.meta, curDB, tables) {
 			// 兼容
@@ -1384,23 +1411,23 @@ func contains(slice []string, str string) bool {
 }
 
 // 查看时间是否符合, min为true则取出来为小于等于，min为false则取出来大于等于
-func validTime(str, match string, startIndex, endIndex []int, min bool) (valid bool) {
-	for idx, record := range startIndex {
+func compareTime(target, match string, timeStart, timeEnd []int, min bool) (valid bool) {
+	for idx, record := range timeStart {
 		if record == -1 {
 			continue
 		}
 
-		if len(str) < endIndex[idx] || len(match) < endIndex[idx] {
+		if len(target) < timeEnd[idx] || len(match) < timeEnd[idx] {
 			return false
 		}
 
 		// 比较大小
-		curStr := str[record:endIndex[idx]]
+		curStr := target[record:timeEnd[idx]]
 		curInt, err := strconv.Atoi(curStr)
 		if err != nil {
 			return false
 		}
-		matchStr := match[record:endIndex[idx]]
+		matchStr := match[record:timeEnd[idx]]
 		matchInt, err := strconv.Atoi(matchStr)
 		if err != nil {
 			return false
@@ -1422,24 +1449,24 @@ func validTime(str, match string, startIndex, endIndex []int, min bool) (valid b
 	return true
 }
 
-// 查看时间是否符合
-func equalTime(str, match string, startIndex, endIndex []int) (valid bool) {
-	for idx, record := range startIndex {
+// 查看时间是否相等
+func equalTime(target, magicRet string, timeStart, timeEnd []int) (valid bool) {
+	for idx, record := range timeStart {
 		if record == -1 {
 			continue
 		}
 
-		if len(str) < endIndex[idx] {
+		if len(target) < timeEnd[idx] {
 			return false
 		}
 
 		// 比较大小
-		curStr := str[record:endIndex[idx]]
+		curStr := target[record:timeEnd[idx]]
 		curInt, err := strconv.Atoi(curStr)
 		if err != nil {
 			return false
 		}
-		matchStr := match[record:endIndex[idx]]
+		matchStr := magicRet[record:timeEnd[idx]]
 		matchInt, err := strconv.Atoi(matchStr)
 		if err != nil {
 			return false
@@ -1456,20 +1483,21 @@ func equalTime(str, match string, startIndex, endIndex []int) (valid bool) {
 	return true
 }
 
-type DataQuery struct {
-	validData []string
-	sqls      string
-}
+// 获取有效数据
+func (r *Reader) getValidData(connectStr, curDB, rawData string, now time.Time, queryType int) (validData []string, sqls string, err error) {
+	// 是否导入所有数据
+	getAll, err := r.getAll(queryType)
+	if err != nil {
+		return nil, "", err
+	}
 
-func (r *Reader) getValidData(connectStr, curDB, matchData, matchStr string,
-	startIndex, endIndex, timeIndex []int, queryType int) (validData []string, sqls string, err error) {
 	// get all databases and check validate database
 	query, err := r.getQuery(queryType, curDB)
 	if err != nil {
-		return validData, sqls, err
+		return nil, "", err
 	}
 
-	db, err := openSql(r.dbtype, connectStr, r.Name())
+	db, err := openSql(r.dbtype, connectStr)
 	if err != nil {
 		return nil, "", err
 	}
@@ -1483,7 +1511,7 @@ func (r *Reader) getValidData(connectStr, curDB, matchData, matchStr string,
 	rowsDBs, err := db.Query(query)
 	if err != nil {
 		log.Errorf("Runner[%v] %v prepare %v <%v> query error %v", r.meta.RunnerName, curDB, r.dbtype, query, err)
-		return validData, sqls, err
+		return nil, "", err
 	}
 	defer rowsDBs.Close()
 
@@ -1496,15 +1524,23 @@ func (r *Reader) getValidData(connectStr, curDB, matchData, matchStr string,
 			continue
 		}
 
-		// 检查是否已经读过
-		if r.checkDoneRecords(queryType, s, curDB) {
+		// queryType == TABLE时，检查是否已经读过，DATABASE 和 COUNT 不需要check
+		if queryType == TABLE && r.checkDoneRecords(s, curDB) {
 			continue
 		}
 
-		if !r.isMatchData(queryType, curDB, s, matchStr, matchData,
-			timeIndex, startIndex, endIndex) {
-			log.Debugf("Runner[%v] %v current data: %v, current time data: %v, remain str: %v, timeIndex: %v", r.meta.RunnerName, curDB, s, matchData, matchStr, timeIndex)
-			continue
+		// 不导入所有数据时，需要进行匹配
+		if !getAll {
+			magicRes, err := goMagicIndex(rawData, now)
+			if err != nil {
+				return nil, "", err
+			}
+
+			magicRemainStr := getRemainStr(magicRes.ret, magicRes.remainIndex)
+			if !r.compareData(queryType, curDB, s, magicRemainStr, &magicRes) {
+				log.Debugf("Runner[%v] %v current data: %v, current time data: %v, remain str: %v, timeIndex: %v", r.meta.RunnerName, curDB, s, magicRes.ret, magicRemainStr, magicRes.remainIndex)
+				continue
+			}
 		}
 
 		rawSql, err := r.getRawSqls(queryType, s)
@@ -1549,27 +1585,36 @@ func (r *Reader) getConnectStr(database string, now time.Time) (connectStr strin
 	return connectStr, nil
 }
 
-func openSql(dbtype, connectStr, name string) (db *sql.DB, err error) {
+func openSql(dbtype, connectStr string) (db *sql.DB, err error) {
 	db, err = sql.Open(dbtype, connectStr)
 	if err != nil {
-		err = fmt.Errorf("%v open %v failed: %v", name, dbtype, err)
-		return nil, err
+		return nil, fmt.Errorf("open %v failed: %v", dbtype, err)
 	}
 	return db, nil
 }
 
-func matchRemainStr(origin, match, matchData string, timeIndex []int) bool {
-	if len(timeIndex) > 0 && len(origin) < timeIndex[len(timeIndex)-1] {
+func compareRemainStr(target, magicRemainStr, magicRet string, magicRemainIndex []int) bool {
+	if len(magicRemainIndex) > 0 && len(target) < magicRemainIndex[len(magicRemainIndex)-1] {
 		return false
 	}
-	remainStr := getRemainStr(origin, timeIndex)
-	if len(remainStr) < len(match) || remainStr[:len(match)] != match {
+	targetRemainStr := getRemainStr(target, magicRemainIndex)
+	if len(targetRemainStr) < len(magicRemainStr) {
 		return false
 	}
 
-	if !strings.HasSuffix(matchData, Wildcards) && len(origin) > len(matchData) {
-		remainStr += origin[len(matchData):]
-		if remainStr != match {
+	// magicRet 中如果含有通配符，则只需剩余字符匹配即可
+	if targetRemainStr[:len(magicRemainStr)] != magicRemainStr {
+		return false
+	}
+
+	// matchData中有通配符
+	if strings.HasSuffix(magicRet, Wildcards) {
+		return true
+	}
+
+	if len(target) > len(magicRet) {
+		targetRemainStr += target[len(magicRet):]
+		if targetRemainStr != magicRemainStr {
 			return false
 		}
 	}
@@ -1577,13 +1622,13 @@ func matchRemainStr(origin, match, matchData string, timeIndex []int) bool {
 	return true
 }
 
-func getRemainStr(origin string, timeIndex []int) (remainStr string) {
-	if len(timeIndex)%2 != 0 {
+func getRemainStr(origin string, magicRemainIndex []int) (remainStr string) {
+	if len(magicRemainIndex)%2 != 0 {
 		return origin
 	}
 
-	for idx := 0; idx < len(timeIndex); {
-		remainStr += origin[timeIndex[idx]:timeIndex[idx+1]]
+	for idx := 0; idx < len(magicRemainIndex); {
+		remainStr += origin[magicRemainIndex[idx]:magicRemainIndex[idx+1]]
 		idx = idx + 2
 	}
 
@@ -1604,69 +1649,27 @@ func (r *Reader) Lag() (rl *LagInfo, err error) {
 	return rl, nil
 }
 
-func getDefaultSql(database, dbtype string) (defaultSql string, err error) {
-	switch dbtype {
+func (r *Reader) getDefaultSql(database string) (defaultSql string, err error) {
+	switch r.dbtype {
 	case reader.ModeMySQL:
 		return strings.Replace(DefaultMySQLTable, "DATABASE_NAME", database, -1), nil
 	case reader.ModePostgreSQL:
-		return DefaultPGSQLTable, nil
+		return strings.Replace(DefaultPGSQLTable, "SCHEMA_NAME", r.dbSchema, -1), nil
 	case reader.ModeMSSQL:
-		return strings.Replace(DefaultMSSQLTable, "DATABASE_NAME", database, -1), nil
+		sql := strings.Replace(DefaultMSSQLTable, "DATABASE_NAME", database, -1)
+		sql = strings.Replace(sql, "SCHEMA_NAME", r.dbSchema, -1)
+		return sql, nil
 	default:
-		return "", fmt.Errorf("not support reader type: %v", dbtype)
+		return "", fmt.Errorf("not support reader type: %v", r.dbtype)
 	}
-}
-
-// 根据queryType获取符合要求的数据和需要执行的原始sql语句mr.rawsqls
-// queryType 可以为TABLE DATABASE COUNT
-func (r *Reader) getDatas(connectStr, curDB, rawData string, now time.Time, queryType int) (datas []string, rawsqls string, err error) {
-	var startIndex, endIndex, timeIndex []int
-	var matchData string
-
-	// 是否导入所有数据
-	checkAll, err := r.getCheckAll(queryType)
-	if err != nil {
-		return datas, rawsqls, err
-	}
-	if checkAll {
-		// 导入所有数据
-		datas, rawsqls, err = r.getAllDatas(connectStr, curDB, queryType)
-		if err != nil {
-			return datas, rawsqls, err
-		}
-		return datas, rawsqls, nil
-	}
-
-	// 获取符合条件的数据
-	// 先获取 转换magic后的值
-	// 再获取除时间以外剩余的字符串，进行字符串匹配，如果匹配，继续判断时间不符合，不匹配跳过
-	// 最后判断时间是否符合，时间小于等于，则匹配，加入返回数组，不匹配跳过
-	matchData, startIndex, endIndex, timeIndex, err = goMagicIndex(rawData, now)
-	if err != nil {
-		return datas, rawsqls, err
-	}
-
-	datas = make([]string, 0)
-	if matchData == rawData && !strings.Contains(rawData, Wildcards) {
-		datas = append(datas, matchData)
-		return datas, rawsqls, nil
-	}
-
-	matchStr := getRemainStr(matchData, timeIndex)
-	datas, rawsqls, err = r.getValidData(connectStr, curDB, matchData, matchStr, startIndex, endIndex, timeIndex, queryType)
-	if err != nil {
-		return datas, rawsqls, err
-	}
-
-	return datas, rawsqls, nil
 }
 
 func (r *Reader) checkCron() bool {
 	return r.isLoop || r.cronSchedule
 }
 
-// 是否拿历史数据
-func (r *Reader) getCheckAll(queryType int) (checkAll bool, err error) {
+// 是否获取所有数据
+func (r *Reader) getAll(queryType int) (getAll bool, err error) {
 	switch queryType {
 	case TABLE, COUNT:
 		return r.rawTable == "*", nil
@@ -1680,29 +1683,31 @@ func (r *Reader) getCheckAll(queryType int) (checkAll bool, err error) {
 }
 
 //根据数据库类型返回表名
-func getWrappedTableName(dbtype string, table string) (tableName string, err error) {
-	switch dbtype {
+func (r *Reader) getWrappedTableName(table string) (tableName string, err error) {
+	switch r.dbtype {
 	case reader.ModeMySQL:
 		tableName = "`" + table + "`"
-	case reader.ModeMSSQL, reader.ModePostgreSQL:
-		tableName = "\"" + table + "\""
+	case reader.ModeMSSQL:
+		tableName = fmt.Sprintf("\"%s\".\"%s\"", r.dbSchema, table)
+	case reader.ModePostgreSQL:
+		tableName = fmt.Sprintf("\"%s\".\"%s\"", r.dbSchema, table)
 	default:
-		err = fmt.Errorf("%v mode not support in sql reader", dbtype)
+		err = fmt.Errorf("%v mode not support in sql reader", r.dbtype)
 	}
-	return
+	return tableName, nil
 }
 
-// 根据 queryType 获取表中所有记录或者表中所有数据的条数的sql语句
+// 根据 queryType 获取 table 中所有记录或者表中所有数据的条数的sql语句
 func (r *Reader) getRawSqls(queryType int, table string) (sqls string, err error) {
 	switch queryType {
 	case TABLE:
-		tableName, err := getWrappedTableName(r.dbtype, table)
+		tableName, err := r.getWrappedTableName(table)
 		if err != nil {
 			return "", err
 		}
 		sqls += "Select * From " + tableName + ";"
 	case COUNT:
-		tableName, err := getWrappedTableName(r.dbtype, table)
+		tableName, err := r.getWrappedTableName(table)
 		if err != nil {
 			return "", err
 		}
@@ -1719,7 +1724,7 @@ func (r *Reader) getRawSqls(queryType int, table string) (sqls string, err error
 func (r *Reader) getQuery(queryType int, curDB string) (query string, err error) {
 	switch queryType {
 	case TABLE, COUNT:
-		return getDefaultSql(curDB, r.dbtype)
+		return r.getDefaultSql(curDB)
 	case DATABASE:
 		return DefaultMySQLDatabase, nil
 	default:
@@ -1736,7 +1741,7 @@ func (r *Reader) execTableCount(connectStr string, idx int, curDB, rawSql string
 	}
 	log.Infof("Runner[%v] reader <%v> exec sql <%v>", r.meta.RunnerName, curDB, execSQL)
 
-	db, err := openSql(r.dbtype, connectStr, curDB)
+	db, err := openSql(r.dbtype, connectStr)
 	if err != nil {
 		return 0, err
 	}
@@ -1787,7 +1792,7 @@ func (r *Reader) execReadSql(connectStr, curDB string, idx int, rawSql string, t
 		isRawSql = true
 	}
 
-	db, err := openSql(r.dbtype, connectStr, curDB)
+	db, err := openSql(r.dbtype, connectStr)
 	if err != nil {
 		return exit, isRawSql, 0, err
 	}
@@ -1961,16 +1966,6 @@ func (r *Reader) execReadSql(connectStr, curDB string, idx int, rawSql string, t
 	return exit, isRawSql, readSize, rows.Err()
 }
 
-func (r *Reader) getAllDatas(connectStr, curDB string, queryType int) (datas []string, sqls string, err error) {
-	// 拿到数据库中所有表及对应的sql语句
-	datas, sqls, err = r.getValidData(connectStr, curDB, "", "", []int{}, []int{}, []int{}, queryType)
-	if err != nil {
-		return datas, sqls, err
-	}
-
-	return datas, sqls, nil
-}
-
 func (r *Reader) updateOffset(idx, offsetKeyIndex int, maxOffset int64, scanArgs []interface{}) int64 {
 	if offsetKeyIndex >= 0 {
 		var tmpOffsetIndex int64
@@ -2001,34 +1996,27 @@ func (r *Reader) getCount() int64 {
 	return r.count
 }
 
-func (r *Reader) checkDoneRecords(queryType int, target, curDB string) bool {
-	if queryType != TABLE {
-		return false
-	}
-
-	_, exist := r.existTableInfo(target, curDB)
-	return exist
-}
-
-func (r *Reader) existTableInfo(target, curDB string) (TableInfo, bool) {
+func (r *Reader) checkDoneRecords(target, curDB string) bool {
 	var tableInfo TableInfo
 	tableDoneRecords := r.doneRecords.GetTableRecords(curDB)
 	if tableDoneRecords.GetTable() == nil {
-		return tableInfo, false
+		return false
 	}
 
 	tableInfo = tableDoneRecords.GetTableInfo(target)
 	if tableInfo == (TableInfo{}) {
-		return tableInfo, false
+		return false
 	}
 
-	return tableInfo, true
+	return true
 }
 
-// 取大于等于该记录的数据，true 小于或者不符合, false为大于等于 最后一条记录
-func (r *Reader) compareWithLastRecord(queryType int, curDB, target, matchStr, matchData string,
-	timeIndex, startIndex, endIndex []int) bool {
-	log.Debugf("Runner[%v] %v current data: %v, last database record: %v, last table record: %v", r.meta.RunnerName, curDB, target, r.lastDatabase, r.lastTabel)
+// 取大于等于 最后一条记录 的数据，结果为 true 为小于或者不符合, false 为大于等于
+func (r *Reader) greaterThanLastRecord(queryType int, target, magicRemainStr string, magicRes *MagicRes) bool {
+	log.Debugf("Runner[%v] current data: %v, last database record: %v, last table record: %v", r.meta.RunnerName, target, r.lastDatabase, r.lastTabel)
+	if magicRes == nil {
+		return true
+	}
 	var rawData string
 	switch queryType {
 	case DATABASE:
@@ -2042,18 +2030,18 @@ func (r *Reader) compareWithLastRecord(queryType int, curDB, target, matchStr, m
 	if len(rawData) == 0 {
 		return true
 	}
-	log.Infof("Runner[%v] %v last %v is: %v", r.meta.RunnerName, curDB, queryType, rawData)
+	log.Infof("Runner[%v] last %v is: %v, target: %v, magicRes: %v", r.meta.RunnerName, queryType, rawData, target, magicRes)
 
-	match := matchRemainStr(rawData, matchStr, matchData, timeIndex)
+	match := compareRemainStr(rawData, magicRemainStr, magicRes.ret, magicRes.remainIndex)
 	if !match {
 		return false
 	}
 
-	return validTime(target, rawData, startIndex, endIndex, false)
+	return compareTime(target, rawData, magicRes.timeStart, magicRes.timeEnd, false)
 }
 
 func (r *Reader) getDBs(connectStr string, now time.Time) ([]string, error) {
-	db, err := openSql(r.dbtype, connectStr, r.Name())
+	db, err := openSql(r.dbtype, connectStr)
 	if err != nil {
 		return nil, err
 	}
@@ -2061,7 +2049,8 @@ func (r *Reader) getDBs(connectStr string, now time.Time) ([]string, error) {
 	if err = db.Ping(); err != nil {
 		return nil, err
 	}
-	dbsAll, _, err := r.getDatas(connectStr, "", r.rawDatabase, now, DATABASE)
+	// 获取所有符合条件的数据库
+	dbsAll, _, err := r.getValidData(connectStr, "", r.rawDatabase, now, DATABASE)
 	if err != nil {
 		return dbsAll, err
 	}
@@ -2077,40 +2066,35 @@ func (r *Reader) getDBs(connectStr string, now time.Time) ([]string, error) {
 	return dbs, nil
 }
 
-func (r *Reader) isMatchData(queryType int, curDB, s, matchStr, matchData string,
-	timeIndex, startIndex, endIndex []int) bool {
-	if matchData == "" {
+// 不为 * 时，进行匹配
+func (r *Reader) compareData(queryType int, curDB, target, magicRemainStr string, magicRes *MagicRes) bool {
+	if magicRes == nil {
 		return true
 	}
 
-	match := matchRemainStr(s, matchStr, matchData, timeIndex)
-	log.Debugf("Runner[%v] %v current data: %v, current time data: %v, remain str: %v, timeIndex: %v, isMatch: %v", r.meta.RunnerName, curDB, s, matchData, matchStr, timeIndex, match)
+	match := compareRemainStr(target, magicRemainStr, magicRes.ret, magicRes.remainIndex)
+	log.Debugf("Runner[%v] %v current data: %v, current time data: %v, remain str: %v, magicRemainIndex: %v, isMatch: %v", r.meta.RunnerName, curDB, target, magicRes.ret, magicRemainStr, magicRes.remainIndex, match)
 	if !match {
 		return false
 	}
 
 	if r.historyAll {
-		if validTime(s, matchData, startIndex, endIndex, true) {
+		// 取大于等于上一条的和小于等于现有的
+		if compareTime(target, magicRes.ret, magicRes.timeStart, magicRes.timeEnd, true) &&
+			r.greaterThanLastRecord(queryType, target, magicRemainStr, magicRes) {
 			return true
 		}
-		return false
-	}
+	} else {
+		// 执行一次，应符合渲染结果
+		if !r.checkCron() {
+			return equalTime(target, magicRes.ret, magicRes.timeStart, magicRes.timeEnd)
+		}
 
-	equal := equalTime(s, matchData, startIndex, endIndex)
-	if !r.checkCron() || r.omitDoneDBRecords {
-		return equal
-	}
-
-	// loop 或者 cron 时
-	if !r.checkCron() {
-		return false
-	}
-
-	// 取大于等于上一条的和小于等于现有的
-	if validTime(s, matchData, startIndex, endIndex, true) &&
-		r.compareWithLastRecord(queryType, curDB, s, matchStr, matchData,
-			timeIndex, startIndex, endIndex) {
-		return true
+		// 取大于等于上一条的和小于等于现有的
+		if compareTime(target, magicRes.ret, magicRes.timeStart, magicRes.timeEnd, true) &&
+			r.greaterThanLastRecord(queryType, target, magicRemainStr, magicRes) {
+			return true
+		}
 	}
 
 	return false

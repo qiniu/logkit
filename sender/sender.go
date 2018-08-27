@@ -153,16 +153,17 @@ const (
 	KeyHttpSenderCsvSplit = "http_sender_csv_split"
 
 	// Influxdb sender 的可配置字段
-	KeyInfluxdbHost               = "influxdb_host"
-	KeyInfluxdbDB                 = "influxdb_db"
-	KeyInfluxdbAutoCreate         = "influxdb_autoCreate"
-	KeyInfluxdbRetetion           = "influxdb_retention"
-	KeyInfluxdbRetetionDuration   = "influxdb_retention_duration"
-	KeyInfluxdbMeasurement        = "influxdb_measurement"
-	KeyInfluxdbTags               = "influxdb_tags"
-	KeyInfluxdbFields             = "influxdb_fields"              // influxdb
-	KeyInfluxdbTimestamp          = "influxdb_timestamp"           // 可选 nano时间戳字段
-	KeyInfluxdbTimestampPrecision = "influxdb_timestamp_precision" // 时间戳字段的精度，代表时间戳1个单位代表多少纳秒
+	KeyInfluxdbHost                  = "influxdb_host"
+	KeyInfluxdbDB                    = "influxdb_db"
+	KeyInfluxdbAutoCreate            = "influxdb_autoCreate"
+	KeyInfluxdbRetetion              = "influxdb_retention"
+	KeyInfluxdbRetetionDuration      = "influxdb_retention_duration"
+	KeyInfluxdbMeasurement           = "influxdb_measurement"
+	KeyInfluxdbTags                  = "influxdb_tags"
+	KeyInfluxdbFields                = "influxdb_fields"                  // influxdb
+	KeyInfluxdbTimestamp             = "influxdb_timestamp"               // 可选 nano时间戳字段
+	KeyInfluxdbTimestampPrecision    = "influxdb_timestamp_precision"     // 时间戳字段的精度，代表时间戳1个单位代表多少纳秒
+	KeyInfluxdbIgnoreBeyondRetention = "influxdb_ignore_beyond_retention" // 开启后将忽略超出 retention 时间的点
 
 	// Kafka
 	KeyKafkaCompressionNone   = "none"
