@@ -1328,6 +1328,10 @@ func convertString(v interface{}) (string, error) {
 		if ret, ok := idv.([]byte); ok {
 			return string(ret), nil
 		}
+		//Postgres的时间类型为time.Time
+		if ret, ok := idv.(time.Time); ok {
+			return ret.Format(time.RFC3339), nil
+		}
 		if idv == nil {
 			return "", nil
 		}
