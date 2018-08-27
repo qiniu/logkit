@@ -66,7 +66,7 @@ func TestTransformer(t *testing.T) {
 		Key:      "multi.ip",
 		DataPath: "./test_data/17monipdb.dat",
 	}
-	assert.Nil(t, ipt.Init())
+	assert.Nil(t, ipt2.Init())
 	data2, err2 := ipt2.Transform([]Data{{"multi": map[string]interface{}{"ip": "111.2.3.4"}}, {"multi": map[string]interface{}{"ip": "x.x.x.x"}}})
 	assert.Error(t, err2)
 	exp2 := []Data{{
@@ -95,6 +95,7 @@ func TestTransformer(t *testing.T) {
 		Key:      "multi.ip",
 		DataPath: "./test_data/17monipdb.datx",
 	}
+	assert.Nil(t, ipt3.Init())
 	data3, err3 := ipt3.Transform([]Data{{"multi": map[string]interface{}{"ip": "111.2.3.4"}}, {"multi": map[string]interface{}{"ip": "x.x.x.x"}}})
 	assert.Error(t, err3)
 	exp3 := []Data{{
@@ -139,6 +140,7 @@ func TestTransformer(t *testing.T) {
 		},
 		},
 	}
+	assert.Nil(t, ipt4.Init())
 	data4, err4 := ipt4.Transform(multi_ip)
 	exp4 := []Data{
 		{
@@ -179,6 +181,7 @@ func TestTransformer(t *testing.T) {
 		DataPath: "./test_data/17monipdb.mmdb",
 		Language: "en",
 	}
+	assert.Nil(t, ipt5.Init())
 	data5, err5 := ipt5.Transform([]Data{{"multi": map[string]interface{}{"ip": "216.160.83.56"}}, {"multi": map[string]interface{}{"ip": "x.x.x.x"}}})
 	assert.Error(t, err5)
 	exp5 := []Data{{
@@ -229,6 +232,7 @@ func TestTransformer(t *testing.T) {
 		},
 		},
 	}
+	assert.Nil(t, ipt6.Init())
 	data6, err6 := ipt6.Transform(multi_ip2)
 	exp6 := []Data{
 		{
@@ -276,12 +280,12 @@ var dttest []Data
 //new: 2000000	       621 ns/op	     232 B/op	       7 allocs/op
 func BenchmarkIpTrans(b *testing.B) {
 	b.ReportAllocs()
-	ipt4 := &Transformer{
+	ipt := &Transformer{
 		Key:         "multi.ip2",
 		DataPath:    "./test_data/17monipdb.dat",
 		KeyAsPrefix: true,
 	}
-	ipt4.Init()
+	ipt.Init()
 	data := []Data{
 		{
 			"multi": map[string]interface{}{
@@ -295,14 +299,15 @@ func BenchmarkIpTrans(b *testing.B) {
 		},
 	}
 	for i := 0; i < b.N; i++ {
-		dttest, _ = ipt4.Transform(data)
+		dttest, _ = ipt.Transform(data)
 	}
 }
 
 func Test_badData(t *testing.T) {
 	ipt := &Transformer{
-		Key:      "ip",
-		DataPath: "./test_data/bad.dat",
+		Key:         "ip",
+		DataPath:    "./test_data/bad.dat",
+		LocalEnable: true,
 	}
 	_, err := ipt.Transform([]Data{{"ip": "111.2.3.4"}, {"ip": "x.x.x.x"}})
 	assert.Error(t, err)
@@ -311,8 +316,9 @@ func Test_badData(t *testing.T) {
 	assert.Equal(t, "dat", ierr.Format)
 
 	ipt = &Transformer{
-		Key:      "ip",
-		DataPath: "./test_data/bad.datx",
+		Key:         "ip",
+		DataPath:    "./test_data/bad.datx",
+		LocalEnable: true,
 	}
 	_, err = ipt.Transform([]Data{{"ip": "111.2.3.4"}, {"ip": "x.x.x.x"}})
 	assert.Error(t, err)
@@ -327,16 +333,18 @@ func Test_badData(t *testing.T) {
 	assert.Equal(t, "datx", ierr.Format)
 
 	ipt = &Transformer{
-		Key:      "ip",
-		DataPath: "./test_data/bad.datn",
+		Key:         "ip",
+		DataPath:    "./test_data/bad.datn",
+		LocalEnable: true,
 	}
 	_, err = ipt.Transform([]Data{{"ip": "111.2.3.4"}, {"ip": "x.x.x.x"}})
 	assert.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "unrecognized data file format"))
 
 	ipt = &Transformer{
-		Key:      "ip",
-		DataPath: "./test_data/bad.mmdb",
+		Key:         "ip",
+		DataPath:    "./test_data/bad.mmdb",
+		LocalEnable: true,
 	}
 	_, err = ipt.Transform([]Data{{"ip": "111.2.3.4"}, {"ip": "x.x.x.x"}})
 	assert.Error(t, err)

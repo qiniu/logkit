@@ -54,6 +54,13 @@ type Transformer struct {
 }
 
 func (t *Transformer) Init() error {
+	if t.Key != "" {
+		t.LocalEnable = true
+	}
+
+	if !t.LocalEnable {
+		return nil
+	}
 	if t.Language == "" {
 		t.Language = "zh-CN"
 	}
@@ -232,10 +239,21 @@ func (_ *Transformer) ConfigOptions() []Option {
 			Default:       false,
 			Required:      true,
 			DefaultNoUse:  false,
-			Description:   "是否使用本地解析，默认为服务端解析",
+			Description:   "使用本地解析",
 			Type:          transforms.TransformTypeBoolean,
 		},
-		transforms.KeyFieldName,
+		{
+			KeyName:       "key",
+			ChooseOnly:    false,
+			Default:       "",
+			Required:      true,
+			Placeholder:   "my_field_keyname",
+			DefaultNoUse:  true,
+			Description:   "要进行Transform变化的键(key)",
+			ToolTip:       "对该字段的值进行transform变换",
+			Type:          transforms.TransformTypeString,
+			AdvanceDepend: LocalEnable,
+		},
 		{
 			KeyName:       "data_path",
 			ChooseOnly:    false,

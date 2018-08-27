@@ -31,8 +31,6 @@ import (
 
 var osInfo = []string{KeyCore, KeyHostName, KeyOsInfo, KeyLocalIp}
 
-var _ sender.ServerSender = &Sender{}
-
 const (
 	SendTypeRaw    = "raw"
 	SendTypeNormal = "normal"
@@ -499,6 +497,7 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 		log.Errorf("Runner[%v] Sender[%v]: auto create pandora repo error: %v, you can create on pandora portal, ignored...", opt.runnerName, opt.name, err)
 		err = nil
 	}
+	log.Infof("`````````````````````````````dsl: %v, schemas: %v, opt.autoCreate: %v", dsl, schemas, opt.autoCreate)
 	if initErr := s.client.InitOrUpdateWorkflow(&pipeline.InitOrUpdateWorkflowInput{
 		// 此处要的 schema 为 autoCreate 中用户指定的，所以 SchemaFree 要恒为 true
 		InitOptionChange: true,
@@ -1128,15 +1127,4 @@ func (s *Sender) Name() string {
 
 func (s *Sender) Close() error {
 	return s.client.Close()
-}
-
-func (s *Sender) SetServer(serverConfigs []map[string]interface{}) error {
-	for _, serverConfig := range serverConfigs {
-		if transformType, ok := serverConfig[KeyType].(string); ok && transformType == KeyIP {
-			if localEnable, ok := serverConfig[LocalEnable].(bool); ok && !localEnable {
-				s.opt.autoCreate += fmt.Sprintf(",%v ip", KeyIP)
-			}
-		}
-	}
-	return nil
 }

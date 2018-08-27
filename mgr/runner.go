@@ -291,14 +291,12 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 				senderConfig[sender.KeyPandoraDescription] = LogkitAutoCreateDescription
 			}
 		}
+		if senderConfig[sender.KeySenderType] == sender.TypePandora {
+			senderConfig = setSenderConfig(senderConfig, serverConfigs)
+		}
 		s, err := sr.NewSender(senderConfig, meta.FtSaveLogPath())
 		if err != nil {
 			return nil, err
-		}
-		if senderConfig[sender.KeySenderType] == sender.TypePandora {
-			if serverSender, ok := s.(sender.ServerSender); ok {
-				serverSender.SetServer(serverConfigs)
-			}
 		}
 		senders = append(senders, s)
 		delete(rc.SendersConfig[i], sender.InnerUserAgent)
@@ -1296,4 +1294,40 @@ func MergeExtraInfoTags(meta *reader.Meta, tags map[string]interface{}) map[stri
 		}
 	}
 	return tags
+}
+
+func setSenderConfig(senderConfig conf.MapConf, serverConfigs []map[string]interface{}) conf.MapConf {
+	for _, serverConfig := range serverConfigs {
+		keyType, ok := serverConfig[KeyType].(string)
+		if !ok || keyType != KeyIP {
+			continue
+		}
+		localEnable, ok := serverConfig[LocalEnable].(bool)
+		if !ok {
+			continue
+		}
+
+		autoCreate := senderConfig[sender.KeyPandoraAutoCreate]
+		if localEnable {
+			schema := fmt.Sprintf(",%v ip", KeyIP)
+			if autoCreate == fmt.Sprintf("%v ip", KeyIP) {
+				autoCreate = ""
+			} else if index := strings.Index(autoCreate, schema); index != -1 {
+				autoCreate = autoCreate[:index] + autoCreate[index+len(schema):]
+			}
+			senderConfig[sender.KeyPandoraAutoCreate] = autoCreate
+			continue
+		}
+
+		if autoCreate == "" {
+			senderConfig[sender.KeyPandoraAutoCreate] = fmt.Sprintf("%v ip", KeyIP)
+			continue
+		}
+
+		if !strings.Contains(autoCreate, KeyIP) {
+			senderConfig[sender.KeyPandoraAutoCreate] += fmt.Sprintf(",%v ip", KeyIP)
+		}
+	}
+
+	return senderConfig
 }
