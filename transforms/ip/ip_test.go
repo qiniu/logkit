@@ -307,7 +307,7 @@ func Test_badData(t *testing.T) {
 	ipt := &Transformer{
 		Key:         "ip",
 		DataPath:    "./test_data/bad.dat",
-		LocalEnable: true,
+		TransformAt: Local,
 	}
 	_, err := ipt.Transform([]Data{{"ip": "111.2.3.4"}, {"ip": "x.x.x.x"}})
 	assert.Error(t, err)
@@ -318,7 +318,7 @@ func Test_badData(t *testing.T) {
 	ipt = &Transformer{
 		Key:         "ip",
 		DataPath:    "./test_data/bad.datx",
-		LocalEnable: true,
+		TransformAt: Local,
 	}
 	_, err = ipt.Transform([]Data{{"ip": "111.2.3.4"}, {"ip": "x.x.x.x"}})
 	assert.Error(t, err)
@@ -335,7 +335,7 @@ func Test_badData(t *testing.T) {
 	ipt = &Transformer{
 		Key:         "ip",
 		DataPath:    "./test_data/bad.datn",
-		LocalEnable: true,
+		TransformAt: Local,
 	}
 	_, err = ipt.Transform([]Data{{"ip": "111.2.3.4"}, {"ip": "x.x.x.x"}})
 	assert.Error(t, err)
@@ -344,7 +344,7 @@ func Test_badData(t *testing.T) {
 	ipt = &Transformer{
 		Key:         "ip",
 		DataPath:    "./test_data/bad.mmdb",
-		LocalEnable: true,
+		TransformAt: Local,
 	}
 	_, err = ipt.Transform([]Data{{"ip": "111.2.3.4"}, {"ip": "x.x.x.x"}})
 	assert.Error(t, err)

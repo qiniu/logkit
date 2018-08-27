@@ -28,6 +28,7 @@ import (
 	"github.com/qiniu/logkit/sender"
 	_ "github.com/qiniu/logkit/sender/builtin"
 	"github.com/qiniu/logkit/transforms"
+	"github.com/qiniu/logkit/transforms/ip"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -291,8 +292,9 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 				senderConfig[sender.KeyPandoraDescription] = LogkitAutoCreateDescription
 			}
 		}
-		if senderConfig[sender.KeySenderType] == sender.TypePandora {
-			senderConfig = setSenderConfig(senderConfig, serverConfigs)
+		senderConfig, err := setPandoraServerConfig(senderConfig, serverConfigs)
+		if err != nil {
+			return nil, err
 		}
 		s, err := sr.NewSender(senderConfig, meta.FtSaveLogPath())
 		if err != nil {
@@ -300,6 +302,7 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 		}
 		senders = append(senders, s)
 		delete(rc.SendersConfig[i], sender.InnerUserAgent)
+		delete(rc.SendersConfig[i], sender.KeyPandoraDescription)
 	}
 
 	senderCnt := len(senders)
@@ -314,7 +317,7 @@ func createTransformers(rc RunnerConfig) ([]transforms.Transformer, error) {
 	transformers := make([]transforms.Transformer, 0)
 	for idx := range rc.Transforms {
 		tConf := rc.Transforms[idx]
-		tp := tConf[KeyType]
+		tp := tConf[transforms.KeyType]
 		if tp == nil {
 			return nil, fmt.Errorf("transformer config type is empty %v", tConf)
 		}
@@ -1296,38 +1299,59 @@ func MergeExtraInfoTags(meta *reader.Meta, tags map[string]interface{}) map[stri
 	return tags
 }
 
-func setSenderConfig(senderConfig conf.MapConf, serverConfigs []map[string]interface{}) conf.MapConf {
+func setPandoraServerConfig(senderConfig conf.MapConf, serverConfigs []map[string]interface{}) (conf.MapConf, error) {
+	if senderConfig[sender.KeySenderType] != sender.TypePandora {
+		return senderConfig, nil
+	}
+
+	var err error
 	for _, serverConfig := range serverConfigs {
-		keyType, ok := serverConfig[KeyType].(string)
-		if !ok || keyType != KeyIP {
-			continue
-		}
-		localEnable, ok := serverConfig[LocalEnable].(bool)
+		keyType, ok := serverConfig[transforms.KeyType].(string)
 		if !ok {
 			continue
 		}
-
-		autoCreate := senderConfig[sender.KeyPandoraAutoCreate]
-		if localEnable {
-			schema := fmt.Sprintf(",%v ip", KeyIP)
-			if autoCreate == fmt.Sprintf("%v ip", KeyIP) {
-				autoCreate = ""
-			} else if index := strings.Index(autoCreate, schema); index != -1 {
-				autoCreate = autoCreate[:index] + autoCreate[index+len(schema):]
+		switch keyType {
+		case ip.Name:
+			if senderConfig, err = setIPConfig(senderConfig, serverConfig); err != nil {
+				return senderConfig, err
 			}
-			senderConfig[sender.KeyPandoraAutoCreate] = autoCreate
-			continue
 		}
 
-		if autoCreate == "" {
-			senderConfig[sender.KeyPandoraAutoCreate] = fmt.Sprintf("%v ip", KeyIP)
-			continue
-		}
-
-		if !strings.Contains(autoCreate, KeyIP) {
-			senderConfig[sender.KeyPandoraAutoCreate] += fmt.Sprintf(",%v ip", KeyIP)
-		}
 	}
 
-	return senderConfig
+	return senderConfig, nil
+}
+
+func setIPConfig(senderConfig conf.MapConf, serverConfig map[string]interface{}) (conf.MapConf, error) {
+	key, keyOk := serverConfig["key"].(string)
+	if !keyOk {
+		return senderConfig, nil
+	}
+
+	if len(GetKeys(key)) > 1 {
+		return senderConfig, fmt.Errorf("key: %v ip transform key in server doesn't support dot(.)", key)
+	}
+	autoCreate := senderConfig[sender.KeyPandoraAutoCreate]
+	transformAt, transformAtOk := serverConfig[transforms.TransformAt].(string)
+	if !transformAtOk {
+		return senderConfig, nil
+	}
+	if transformAt == ip.Local {
+		schema := fmt.Sprintf(",%v ip", key)
+		if autoCreate == fmt.Sprintf("%v ip", key) {
+			autoCreate = ""
+		} else if index := strings.Index(autoCreate, schema); index != -1 {
+			autoCreate = autoCreate[:index] + autoCreate[index+len(schema):]
+		}
+		senderConfig[sender.KeyPandoraAutoCreate] = autoCreate
+		return senderConfig, nil
+	}
+
+	if autoCreate == "" {
+		senderConfig[sender.KeyPandoraAutoCreate] = fmt.Sprintf("%s %s", key, TypeIP)
+		return senderConfig, nil
+	}
+
+	senderConfig[sender.KeyPandoraAutoCreate] += fmt.Sprintf(",%s %s", key, TypeIP)
+	return senderConfig, nil
 }

@@ -36,8 +36,7 @@ const (
 
 	KeyPandoraStash      = "pandora_stash"       // 当只有一条数据且 sendError 时候，将其转化为 raw 发送到 pandora_stash 这个字段
 	KeyPandoraSeparateId = "pandora_separate_id" // 当一条数据大于2M且 sendError 时候，将其切片，切片记录到 pandora_separate_id 这个字段
-	KeyIP                = "ip"                  // schema ip
-	KeyType              = "type"
+	TypeIP               = "ip"                  // schema ip
 
 	SchemaFreeTokensPrefix = "schema_free_tokens_"
 	LogDBTokensPrefix      = "logdb_tokens_"
@@ -61,8 +60,6 @@ const (
 	Checkbox    = "checkbox"
 	Radio       = "radio"
 	InputNumber = "inputNumber"
-
-	LocalEnable = "local_enable"
 )
 
 var (
@@ -73,22 +70,23 @@ var (
 )
 
 type Option struct {
-	KeyName       string
-	ChooseOnly    bool
-	Element       string // 前端显示类型
-	ChooseOptions []interface{}
-	Default       interface{}
-	DefaultNoUse  bool // 是否使用默认值，true为不使用默认值，false为使用默认值
-	Description   string
-	CheckRegex    string
-	Style         string `json:"style"`
-	Required      bool   `json:"required"` // 是否必填
-	Placeholder   string `json:"placeholder"`
-	Type          string `json:"Type,omitempty"`
-	Secret        bool
-	Advance       bool   `json:"advance,omitempty"`
-	AdvanceDepend string `json:"advance_depend,omitempty"`
-	ToolTip       string `json:"tooltip,omitempty"` // 该选项说明
+	KeyName            string
+	ChooseOnly         bool
+	Element            string // 前端显示类型
+	ChooseOptions      []interface{}
+	Default            interface{}
+	DefaultNoUse       bool // 是否使用默认值，true为不使用默认值，false为使用默认值
+	Description        string
+	CheckRegex         string
+	Style              string `json:"style"`
+	Required           bool   `json:"required"` // 是否必填
+	Placeholder        string `json:"placeholder"`
+	Type               string `json:"Type,omitempty"`
+	Secret             bool
+	Advance            bool        `json:"advance,omitempty"`
+	AdvanceDepend      string      `json:"advance_depend,omitempty"`
+	AdvanceDependValue interface{} `json:"advance_depend_value,omitempty"`
+	ToolTip            string      `json:"tooltip,omitempty"` // 该选项说明
 }
 
 type KeyValue struct {

@@ -5,6 +5,12 @@ import (
 )
 
 const (
+	KeyType = "type"
+
+	TransformAt = "transform_at"
+)
+
+const (
 	TransformTypeString  = "string"
 	TransformTypeLong    = "long"
 	TransformTypeFloat   = "float"

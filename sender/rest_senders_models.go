@@ -185,7 +185,6 @@ var ModeKeyOptions = map[string][]Option{
 			Default:       "nb",
 			DefaultNoUse:  false,
 			Description:   "创建的资源所在区域(pandora_region)",
-			Advance:       true,
 			ToolTip:       "工作流资源创建所在区域",
 		},
 		{

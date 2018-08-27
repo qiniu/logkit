@@ -20,6 +20,9 @@ const (
 	Latitude     = "Latitude"
 	Longitude    = "Longitude"
 	DistrictCode = "DistrictCode"
+
+	Local  = "本地"
+	Server = "服务端"
 )
 
 var (
@@ -33,7 +36,7 @@ type Transformer struct {
 	StageTime   string `json:"stage"`
 	Key         string `json:"key"`
 	DataPath    string `json:"data_path"`
-	LocalEnable bool   `json:"local_enable"`
+	TransformAt string `json:"transform_at"`
 	KeyAsPrefix bool   `json:"key_as_prefix"`
 	Language    string `json:"language"`
 
@@ -54,13 +57,13 @@ type Transformer struct {
 }
 
 func (t *Transformer) Init() error {
-	if t.Key != "" {
-		t.LocalEnable = true
+	if t.TransformAt == "" {
+		t.TransformAt = Local
 	}
-
-	if !t.LocalEnable {
+	if t.TransformAt != Local {
 		return nil
 	}
+
 	if t.Language == "" {
 		t.Language = "zh-CN"
 	}
@@ -100,9 +103,10 @@ func (_ *Transformer) RawTransform(datas []string) ([]string, error) {
 }
 
 func (t *Transformer) Transform(datas []Data) ([]Data, error) {
-	if !t.LocalEnable {
+	if t.TransformAt != Local {
 		return datas, nil
 	}
+
 	var err, fmtErr error
 	errNum := 0
 	if t.loc == nil {
@@ -232,62 +236,65 @@ func (_ *Transformer) SampleConfig() string {
 func (_ *Transformer) ConfigOptions() []Option {
 	return []Option{
 		{
-			KeyName:       LocalEnable,
+			KeyName:       transforms.TransformAt,
 			Element:       Radio,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{true, false},
-			Default:       false,
+			ChooseOptions: []interface{}{Local, Server},
+			Default:       Local,
 			Required:      true,
 			DefaultNoUse:  false,
-			Description:   "使用本地解析",
-			Type:          transforms.TransformTypeBoolean,
+			Description:   "运行方式",
+			Type:          transforms.TransformTypeString,
+			ToolTip:       "本地运行使用客户自己的IP库，更为灵活。服务端运行固定使用七牛IP库，用户无需提供IP库",
 		},
 		{
-			KeyName:       "key",
-			ChooseOnly:    false,
-			Default:       "",
-			Required:      true,
-			Placeholder:   "my_field_keyname",
-			DefaultNoUse:  true,
-			Description:   "要进行Transform变化的键(key)",
-			ToolTip:       "对该字段的值进行transform变换",
-			Type:          transforms.TransformTypeString,
-			AdvanceDepend: LocalEnable,
+			KeyName:      "key",
+			ChooseOnly:   false,
+			Default:      "",
+			Required:     true,
+			Placeholder:  "my_field_keyname",
+			DefaultNoUse: true,
+			Description:  "要进行Transform变化的键(key)",
+			ToolTip:      "对该字段的值进行transform变换, 服务端运行不支持嵌套(.)，请先使用rename，本地运行支持",
+			Type:         transforms.TransformTypeString,
 		},
 		{
-			KeyName:       "data_path",
-			ChooseOnly:    false,
-			Default:       "",
-			Required:      true,
-			Placeholder:   "your/path/to/ip.dat(x)",
-			DefaultNoUse:  true,
-			Description:   "IP数据库路径(data_path)",
-			Type:          transforms.TransformTypeString,
-			AdvanceDepend: LocalEnable,
+			KeyName:            "data_path",
+			ChooseOnly:         false,
+			Default:            "",
+			Required:           true,
+			Placeholder:        "your/path/to/ip.dat(x)",
+			DefaultNoUse:       true,
+			Description:        "IP数据库路径(data_path)",
+			Type:               transforms.TransformTypeString,
+			AdvanceDepend:      transforms.TransformAt,
+			AdvanceDependValue: Local,
 		},
 		{
-			KeyName:       "key_as_prefix",
-			ChooseOnly:    true,
-			ChooseOptions: []interface{}{false, true},
-			Required:      false,
-			Default:       true,
-			DefaultNoUse:  false,
-			Element:       Checkbox,
-			Description:   "字段名称作为前缀(key_as_prefix)",
-			Type:          transforms.TransformTypeString,
-			AdvanceDepend: LocalEnable,
+			KeyName:            "key_as_prefix",
+			ChooseOnly:         true,
+			ChooseOptions:      []interface{}{false, true},
+			Required:           false,
+			Default:            true,
+			DefaultNoUse:       false,
+			Element:            Checkbox,
+			Description:        "字段名称作为前缀(key_as_prefix)",
+			Type:               transforms.TransformTypeString,
+			AdvanceDepend:      transforms.TransformAt,
+			AdvanceDependValue: Local,
 		},
 		{
-			KeyName:       "language",
-			ChooseOnly:    false,
-			Default:       "zh-CN",
-			Required:      true,
-			Placeholder:   "zh-CN",
-			DefaultNoUse:  true,
-			Description:   "mmdb格式库使用的语种",
-			Advance:       true,
-			Type:          transforms.TransformTypeString,
-			AdvanceDepend: LocalEnable,
+			KeyName:            "language",
+			ChooseOnly:         false,
+			Default:            "zh-CN",
+			Required:           true,
+			Placeholder:        "zh-CN",
+			DefaultNoUse:       true,
+			Description:        "mmdb格式库使用的语种",
+			Advance:            true,
+			Type:               transforms.TransformTypeString,
+			AdvanceDepend:      transforms.TransformAt,
+			AdvanceDependValue: Local,
 		},
 	}
 }
@@ -314,8 +321,10 @@ func (t *Transformer) Close() error {
 
 func (t *Transformer) ServerConfig() map[string]interface{} {
 	config := make(map[string]interface{})
-	config[KeyType] = Name
-	config[LocalEnable] = t.LocalEnable
+	config[transforms.KeyType] = Name
+	config[transforms.TransformAt] = t.TransformAt
+	config["key"] = t.Key
+
 	return config
 }
 
