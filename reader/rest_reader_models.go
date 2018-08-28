@@ -67,8 +67,8 @@ const (
 
 // Constants for Redis
 const (
-	DateTypeHash          = "hash"
-	DateTypeSortedSet     = "sortedSet"
+	DataTypeHash          = "hash"
+	DataTypeSortedSet     = "zset"
 	DataTypeSet           = "set"
 	DataTypeString        = "string"
 	DataTypeList          = "list"
@@ -82,6 +82,12 @@ const (
 	KeyRedisAddress    = "redis_address" // 默认127.0.0.1:6379
 	KeyRedisPassword   = "redis_password"
 	KeyTimeoutDuration = "redis_timeout"
+)
+
+const (
+	SocketRulePacket = "按原始包读取"
+	SocketRuleJson   = "按json格式读取"
+	SocketRuleLine   = "按换行符读取"
 )
 
 // Constants for SNMP
@@ -129,6 +135,7 @@ const (
 	// socket_service_address = "unixgram:///tmp/sys.sock"
 	KeySocketServiceAddress = "socket_service_address"
 	KeySocketSplitByLine    = "socket_split_by_line"
+	KeySocketRule           = "socket_rule"
 
 	// 最大并发连接数
 	// 仅用于 stream sockets (e.g. TCP).
@@ -987,7 +994,7 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:       KeyRedisDataType,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{DataTypeList, DataTypeChannel, DataTypePatterChannel, DataTypeString, DataTypeSet, DateTypeSortedSet, DateTypeHash},
+			ChooseOptions: []interface{}{DataTypeList, DataTypeChannel, DataTypePatterChannel, DataTypeString, DataTypeSet, DataTypeSortedSet, DataTypeHash},
 			Description:   "数据读取模式(redis_datatype)",
 			ToolTip:       "",
 		},
@@ -1080,6 +1087,15 @@ var ModeKeyOptions = map[string][]Option{
 			Advance:       true,
 			Description:   "是否按行分隔内容(socket_split_by_line)",
 			ToolTip:       "开启后，对socket内容按行进行分隔",
+		},
+		{
+			KeyName:       KeySocketRule,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{SocketRulePacket, SocketRuleLine, SocketRuleJson},
+			Default:       "false",
+			Advance:       true,
+			Description:   "获取方式(socket_rule)",
+			ToolTip:       "默认对socket内容按包获取, json仅对tcp有效",
 		},
 		{
 			KeyName:      KeySocketReadTimeout,

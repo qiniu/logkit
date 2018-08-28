@@ -945,12 +945,11 @@ type KeyInfo struct {
 	NewKey string
 }
 
-func TruncateStrSize(err string) string {
-	if len(err) <= DefaultTruncateMaxSize {
+func TruncateStrSize(err string, size int) string {
+	if len(err) <= size {
 		return err
 	}
 
-	return err[:DefaultTruncateMaxSize] +
-		"......(only show 1024 bytes, remain " +
-		strconv.Itoa(len(err)-DefaultTruncateMaxSize) + " bytes)"
+	return fmt.Sprintf(err[:size]+"......(only show %d bytes, remain %d bytes)",
+		size, len(err)-size)
 }

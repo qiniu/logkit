@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -58,6 +59,11 @@ const (
 	Checkbox    = "checkbox"
 	Radio       = "radio"
 	InputNumber = "inputNumber"
+)
+
+var (
+	MaxProcs = 1
+	NumCPU   = runtime.NumCPU()
 )
 
 type Option struct {
@@ -373,7 +379,5 @@ func (slice KeyValueSlice) Less(i, j int) bool {
 }
 
 func (slice KeyValueSlice) Swap(i, j int) {
-	slice[i].Key, slice[j].Key = slice[j].Key, slice[i].Key
-	slice[i].Value, slice[j].Value = slice[j].Value, slice[i].Value
-	slice[i].SortKey, slice[j].SortKey = slice[j].SortKey, slice[i].SortKey
+	slice[i], slice[j] = slice[j], slice[i]
 }

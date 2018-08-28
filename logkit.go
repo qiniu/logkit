@@ -239,8 +239,9 @@ func main() {
 		times.AddLayout(conf.TimeLayouts)
 	}
 	if conf.MaxProcs == 0 {
-		conf.MaxProcs = runtime.NumCPU()
+		conf.MaxProcs = NumCPU
 	}
+	MaxProcs = conf.MaxProcs
 	runtime.GOMAXPROCS(conf.MaxProcs)
 	log.SetOutputLevel(conf.DebugLevel)
 
