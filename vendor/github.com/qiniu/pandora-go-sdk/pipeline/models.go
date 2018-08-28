@@ -399,6 +399,8 @@ func getRawType(tp string) (schemaType string, err error) {
 		schemaType = PandoraTypeBool
 	case "j", "json", "jsonstring":
 		schemaType = PandoraTypeJsonString
+	case "i", "ip":
+		schemaType = PandoraTypeIP
 	case "": //这个是一种缺省
 	default:
 		err = fmt.Errorf("schema type %v not supperted", schemaType)
@@ -679,6 +681,7 @@ type CreateRepoForKodoInput struct {
 	Email          string
 	Region         string
 	Bucket         string
+	KodoFileType   int
 	RepoName       string
 	Prefix         string
 	Compress       bool
@@ -702,6 +705,7 @@ type AutoExportToKODOInput struct {
 	RepoName       string
 	BucketName     string
 	Prefix         string
+	KodoFileType   int
 	Compress       bool
 	RotateStrategy string
 	RotateSize     int
@@ -1430,6 +1434,7 @@ type ExportKodoSpec struct {
 	Delimiter      string            `json:"delimiter,omitempty"`
 	Compress       bool              `json:"compress"`
 	Retention      int               `json:"retention"`
+	KodoFileType   int               `json:"kodo_file_type"`
 }
 
 func (s *ExportKodoSpec) Validate() (err error) {

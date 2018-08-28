@@ -400,6 +400,9 @@ func (c *Pipeline) UpdateRepoWithKodo(input *UpdateRepoInput, ex ExportDesc) err
 		RotateNumber:   input.Option.RotateNumber,
 		RotateSizeType: input.Option.RotateSizeType,
 	}
+	if input.Option.KodoFileType == 1 {
+		spec.KodoFileType = 1
+	}
 	err := c.UpdateExport(&UpdateExportInput{
 		RepoName:     input.RepoName,
 		ExportName:   ex.Name,
@@ -465,17 +468,13 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 				switch val.(type) {
 				case int64:
 					rotateInterval = int(val.(int64))
-				case int32:
-					rotateInterval = int(val.(int32))
-				case int:
-					rotateInterval = val.(int)
 				case float64:
 					rotateInterval = int(val.(float64))
 				case float32:
 					rotateInterval = int(val.(float32))
 				}
 				// 服务端为 logkit默认值，且logkit本次设置的值input.Option.RotateInterval不为默认值，则用input.Option.RotateInterval更新服务端的值
-				if (rotateInterval == DefaultLogkitRotateInterval && input.Option.RotateInterval != DefaultLogkitRotateInterval) {
+				if rotateInterval == DefaultLogkitRotateInterval && input.Option.RotateInterval != DefaultLogkitRotateInterval {
 					// 本次 input.Option.RotateInterval 0,需要设置为默认值
 					if input.Option.RotateInterval == 0 {
 						input.Option.RotateInterval = DefaultLogkitRotateInterval
@@ -484,7 +483,7 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 
 				} else {
 					// 服务端不为0和默认值，则使用服务端的值
-					if (rotateInterval != defaultServerRotateInterval && rotateInterval != 0) {
+					if rotateInterval != defaultServerRotateInterval && rotateInterval != 0 {
 						input.Option.RotateInterval = rotateInterval
 						syncServer = true
 					} else {
@@ -502,17 +501,13 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 				switch val.(type) {
 				case int64:
 					rotateSize = int(val.(int64))
-				case int32:
-					rotateSize = int(val.(int32))
-				case int:
-					rotateSize = val.(int)
 				case float64:
 					rotateSize = int(val.(float64))
 				case float32:
 					rotateSize = int(val.(float32))
 				}
 				// 服务端为 logkit默认值，且logkit本次设置的值input.Option.RotateSize不为默认值，则用input.Option.RotateSize更新服务端的值
-				if (rotateSize == DefaultLogkitRotateSize && input.Option.RotateSize != DefaultLogkitRotateSize) {
+				if rotateSize == DefaultLogkitRotateSize && input.Option.RotateSize != DefaultLogkitRotateSize {
 					// 本次 input.Option.RotateSize 0,需要设置为默认值
 					if input.Option.RotateSize == 0 {
 						input.Option.RotateSize = DefaultLogkitRotateSize
@@ -521,7 +516,7 @@ func (c *Pipeline) UpdateRepo(input *UpdateRepoInput) (err error) {
 
 				} else {
 					// 服务端不为0和默认值，则使用服务端的值
-					if (rotateSize != defaultServerRotateSize && rotateSize != 0) {
+					if rotateSize != defaultServerRotateSize && rotateSize != 0 {
 						input.Option.RotateSize = rotateSize
 						syncServer = true
 					} else {
@@ -895,6 +890,7 @@ func (c *Pipeline) unpack(input *SchemaFreeInput) (packages []pointContext, err 
 			RepoOptions:      input.RepoOptions,
 			Option:           input.Option,
 			SchemaFreeToken:  input.SchemaFreeToken,
+			Description:      input.Description,
 		}
 		if err = c.InitOrUpdateWorkflow(initOrUpdateInput); err != nil {
 			return

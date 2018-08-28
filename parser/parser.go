@@ -3,6 +3,8 @@ package parser
 import (
 	"errors"
 	"fmt"
+	"strings"
+	"sync"
 
 	"github.com/qiniu/logkit/conf"
 	. "github.com/qiniu/logkit/utils/models"
@@ -62,6 +64,33 @@ type Label struct {
 	Value string
 }
 
+type ParseInfo struct {
+	Line  string
+	Index int
+}
+
+type ParseResult struct {
+	Line  string
+	Index int
+	Data  Data
+	Datas []Data
+	Err   error
+}
+
+type ParseResultSlice []ParseResult
+
+func (slice ParseResultSlice) Len() int {
+	return len(slice)
+}
+
+func (slice ParseResultSlice) Less(i, j int) bool {
+	return slice[i].Index < slice[j].Index
+}
+
+func (slice ParseResultSlice) Swap(i, j int) {
+	slice[i], slice[j] = slice[j], slice[i]
+}
+
 type Constructor func(conf.MapConf) (Parser, error)
 
 // registeredConstructors keeps a list of all available reader constructors can be registered by Registry.
@@ -107,4 +136,29 @@ func (ps *Registry) NewLogParser(conf conf.MapConf) (p Parser, err error) {
 		return nil, fmt.Errorf("parser type not supported: %v", t)
 	}
 	return f(conf)
+}
+
+func ParseLine(dataPipline <-chan ParseInfo, resultChan chan ParseResult, wg *sync.WaitGroup,
+	trimSpace bool, handlerFunc func(string) (Data, error)) {
+	for parseInfo := range dataPipline {
+		if trimSpace {
+			parseInfo.Line = strings.TrimSpace(parseInfo.Line)
+		}
+		if len(parseInfo.Line) <= 0 {
+			resultChan <- ParseResult{
+				Line:  parseInfo.Line,
+				Index: parseInfo.Index,
+			}
+			continue
+		}
+
+		data, err := handlerFunc(parseInfo.Line)
+		resultChan <- ParseResult{
+			Line:  parseInfo.Line,
+			Index: parseInfo.Index,
+			Data:  data,
+			Err:   err,
+		}
+	}
+	wg.Done()
 }

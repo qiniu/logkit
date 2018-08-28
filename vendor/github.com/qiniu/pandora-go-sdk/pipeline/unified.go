@@ -58,6 +58,7 @@ func (c *Pipeline) FormKodoSpec(input *CreateRepoForKodoInput) *ExportKodoSpec {
 		RotateSize:     input.RotateSize,
 		RotateSizeType: "KB",
 		RotateNumber:   input.RotateSize / 1024,
+		KodoFileType:   input.KodoFileType,
 	}
 }
 
@@ -318,6 +319,7 @@ func (c *Pipeline) AutoExportToLogDB(input *AutoExportToLogDBInput) error {
 			Retention:    input.Retention,
 			Schema:       logdbschemas,
 			PandoraToken: input.CreateLogDBRepoToken,
+			Description:  input.Description,
 		}
 		if input.AnalyzerInfo.FullText {
 			linput.FullText = logdb.NewFullText(logdb.StandardAnalyzer)
@@ -428,6 +430,7 @@ func (c *Pipeline) AutoExportToKODO(input *AutoExportToKODOInput) error {
 			RotateStrategy: input.RotateStrategy,
 			RotateInterval: input.RotateInterval,
 			RotateSize:     input.RotateSize,
+			KodoFileType:   input.KodoFileType,
 		})
 		exportInput := c.FormExportInput(input.RepoName, ExportTypeKODO, kodoSpec)
 		exportInput.PandoraToken = input.CreateExportToken

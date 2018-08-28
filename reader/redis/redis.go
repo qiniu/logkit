@@ -97,6 +97,13 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		Password: opt.password,
 	})
 
+	for _, val := range opt.key {
+		keyType, _ := client.Type(val).Result()
+		if dataType != keyType {
+			return nil, fmt.Errorf("key[%v]'s type expect as %v,actual get %v", val, dataType, keyType)
+		}
+	}
+
 	return &Reader{
 		meta:          meta,
 		status:        reader.StatusInit,
@@ -217,7 +224,7 @@ func (r *Reader) run() {
 			}
 		}
 		//Added sortedSet support for redis
-	case reader.DateTypeSortedSet:
+	case reader.DataTypeSortedSet:
 		for _, key := range r.opts.key {
 			anSortedSet, subErr := r.client.ZRange(key, 0, -1).Result()
 			if subErr != nil && subErr != redis.Nil {
@@ -226,11 +233,13 @@ func (r *Reader) run() {
 				r.sendError(err)
 			} else if len(anSortedSet) > 0 {
 				r.client.Del(key)
-				r.readChan <- anSortedSet[0]
+				for _, val := range anSortedSet {
+					r.readChan <- val
+				}
 			}
 		}
 		//Added hash support for redis
-	case reader.DateTypeHash:
+	case reader.DataTypeHash:
 		for _, key := range r.opts.key {
 			anHash, subErr := r.client.HGet(key, r.opts.area).Result() //redis key and area for hash
 			if subErr != nil && subErr != redis.Nil {
@@ -267,8 +276,8 @@ func (r *Reader) Start() error {
 	case reader.DataTypeList:
 	case reader.DataTypeString:
 	case reader.DataTypeSet:
-	case reader.DateTypeSortedSet:
-	case reader.DateTypeHash:
+	case reader.DataTypeSortedSet:
+	case reader.DataTypeHash:
 	default:
 		err := fmt.Errorf("data Type < %v > not exist, exit", r.opts.dataType)
 		log.Error(err)

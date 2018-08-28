@@ -15,6 +15,7 @@ import (
 	utilsos "github.com/qiniu/logkit/utils/os"
 
 	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/utils/models"
 )
 
 type Config struct {
@@ -36,6 +37,7 @@ func main() {
 	if conf.MaxProcs == 0 {
 		conf.MaxProcs = runtime.NumCPU()
 	}
+	models.MaxProcs = conf.MaxProcs
 	runtime.GOMAXPROCS(conf.MaxProcs)
 	log.SetOutputLevel(conf.DebugLevel)
 

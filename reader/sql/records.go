@@ -32,7 +32,15 @@ func (tableRecords *TableRecords) Set(value TableRecords) {
 	}
 
 	tableRecords.mutex.Lock()
-	tableRecords.Table = value.GetTable()
+
+	valueTable := value.GetTable()
+	value.mutex.RLock()
+	if valueTable != nil {
+		for key, value := range valueTable {
+			tableRecords.Table[key] = value
+		}
+	}
+	value.mutex.RUnlock()
 	tableRecords.mutex.Unlock()
 }
 
@@ -49,9 +57,10 @@ func (tableRecords *TableRecords) SetTableInfo(table string, tableInfo TableInfo
 }
 
 func (tableRecords *TableRecords) GetTableInfo(table string) TableInfo {
-	tableMap := tableRecords.GetTable()
-	if tableMap != nil {
-		return tableMap[table]
+	tableRecords.mutex.RLock()
+	defer tableRecords.mutex.RUnlock()
+	if tableRecords.Table != nil {
+		return tableRecords.Table[table]
 	}
 	return TableInfo{}
 }
