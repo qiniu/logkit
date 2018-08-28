@@ -44,6 +44,7 @@ const (
 
 	RunnerRunning = "running"
 	RunnerStopped = "stopped"
+	RunnerError   = "error"
 )
 
 type Runner interface {

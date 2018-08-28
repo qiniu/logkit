@@ -261,10 +261,16 @@ func (m *Manager) Add(confPath string) {
 func (m *Manager) ForkRunner(confPath string, config RunnerConfig, returnOnErr bool) error {
 	var runner Runner
 	var err error
+	defer func() {
+		if err == nil {
+			return
+		}
+		m.setFailedRunner(confPath, config, err)
+	}()
 	i := 0
 	for {
 		if m.IsRunning(confPath) {
-			err = fmt.Errorf("%s already added - ", confPath)
+			err = ErrRunnerFileAdded(confPath)
 			if !returnOnErr {
 				log.Error(err)
 			}
@@ -317,9 +323,9 @@ func (m *Manager) ForkRunner(confPath string, config RunnerConfig, returnOnErr b
 	defer m.runnerLock.Unlock()
 	// 确保 config 没有重复添加，且 runner name 没有冲突
 	if _, ok := m.runners[confPath]; ok {
-		return fmt.Errorf("config path %q already added", confPath)
+		return ErrRunnerFileAdded(confPath)
 	} else if m.runnerNames[config.RunnerName] {
-		return fmt.Errorf("runner name %q already used", config.RunnerName)
+		return ErrRunnerNameAdded(config.RunnerName)
 	}
 
 	m.addCleanQueue(runner.Cleaner())
@@ -377,7 +383,7 @@ func (m *Manager) handle(path string, watcher *fsnotify.Watcher) {
 			}
 		case err := <-watcher.Error:
 			if err != nil {
-				log.Error("error:", err)
+				log.Errorf("error: %v", err)
 			}
 		}
 	}
@@ -559,13 +565,25 @@ func (m *Manager) Status() (rss map[string]RunnerStatus) {
 			rss[r.Name()] = r.Status()
 			continue
 		}
-		rss[conf.RunnerName] = RunnerStatus{
-			Name:           conf.RunnerName,
-			ReaderStats:    StatsInfo{},
-			ParserStats:    StatsInfo{},
-			TransformStats: make(map[string]StatsInfo),
-			SenderStats:    make(map[string]StatsInfo),
-			RunningStatus:  RunnerStopped,
+		if conf.ErrorInfo == "" {
+			rss[conf.RunnerName] = RunnerStatus{
+				Name:           conf.RunnerName,
+				ReaderStats:    StatsInfo{},
+				ParserStats:    StatsInfo{},
+				TransformStats: make(map[string]StatsInfo),
+				SenderStats:    make(map[string]StatsInfo),
+				RunningStatus:  RunnerStopped,
+			}
+		} else {
+			rss[conf.RunnerName] = RunnerStatus{
+				Name:           conf.RunnerName,
+				ReaderStats:    StatsInfo{},
+				ParserStats:    StatsInfo{},
+				TransformStats: make(map[string]StatsInfo),
+				SenderStats:    make(map[string]StatsInfo),
+				RunningStatus:  RunnerError,
+				RunningError:   conf.ErrorInfo,
+			}
 		}
 	}
 	return rss
@@ -940,4 +958,23 @@ func (m *Manager) DeleteRunner(name string) (err error) {
 		return fmt.Errorf("remove runner %v error %v", filename, err)
 	}
 	return
+}
+
+func (m *Manager) IsRunnerExistError(err error, filename, name string) bool {
+	if _, ok := m.runners[filename]; ok {
+		return true
+	}
+	if m.runnerNames[name] {
+		return true
+	}
+	return false
+}
+
+func (m *Manager) setFailedRunner(filename string, conf RunnerConfig, err error) {
+	if err == nil || m.IsRunnerExistError(err, filename, conf.RunnerName) {
+		return
+	}
+
+	conf.ErrorInfo = err.Error()
+	m.setRunnerConfig(filename, conf)
 }
