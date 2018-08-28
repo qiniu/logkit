@@ -399,6 +399,8 @@ func getRawType(tp string) (schemaType string, err error) {
 		schemaType = PandoraTypeBool
 	case "j", "json", "jsonstring":
 		schemaType = PandoraTypeJsonString
+	case "i", "ip":
+		schemaType = PandoraTypeIP
 	case "": //这个是一种缺省
 	default:
 		err = fmt.Errorf("schema type %v not supperted", schemaType)

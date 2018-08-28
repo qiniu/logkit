@@ -276,9 +276,14 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	}
 	senders := make([]sender.Sender, 0)
 	for i, senderConfig := range rc.SendersConfig {
-		if rc.ExtraInfo && senderConfig[sender.KeySenderType] == sender.TypePandora {
-			//如果已经开启了，不要重复加
-			senderConfig[sender.KeyPandoraExtraInfo] = "false"
+		if senderConfig[sender.KeySenderType] == sender.TypePandora {
+			if rc.ExtraInfo {
+				//如果已经开启了，不要重复加
+				senderConfig[sender.KeyPandoraExtraInfo] = "false"
+			}
+			if senderConfig[sender.KeyPandoraDescription] == "" {
+				senderConfig[sender.KeyPandoraDescription] = LogkitAutoCreateDescription
+			}
 		}
 		s, err := sr.NewSender(senderConfig, meta.FtSaveLogPath())
 		if err != nil {

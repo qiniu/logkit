@@ -318,6 +318,7 @@ func (c *Pipeline) AutoExportToLogDB(input *AutoExportToLogDBInput) error {
 			Retention:    input.Retention,
 			Schema:       logdbschemas,
 			PandoraToken: input.CreateLogDBRepoToken,
+			Description:  input.Description,
 		}
 		if input.AnalyzerInfo.FullText {
 			linput.FullText = logdb.NewFullText(logdb.StandardAnalyzer)

@@ -168,9 +168,14 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner
 	for _, senderConfig := range rc.SendersConfig {
 		senderConfig[sender.KeyIsMetrics] = "true"
 		senderConfig[sender.KeyPandoraTSDBTimeStamp] = metric.Timestamp
-		if rc.ExtraInfo && senderConfig[sender.KeySenderType] == sender.TypePandora {
-			//如果已经开启了，不要重复加
-			senderConfig[sender.KeyPandoraExtraInfo] = "false"
+		if senderConfig[sender.KeySenderType] == sender.TypePandora {
+			if rc.ExtraInfo {
+				//如果已经开启了，不要重复加
+				senderConfig[sender.KeyPandoraExtraInfo] = "false"
+			}
+			if senderConfig[sender.KeyPandoraDescription] == "" {
+				senderConfig[sender.KeyPandoraDescription] = MetricAutoCreateDescription
+			}
 		}
 		s, err := sr.NewSender(senderConfig, meta.FtSaveLogPath())
 		if err != nil {
