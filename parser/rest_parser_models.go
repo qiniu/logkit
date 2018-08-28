@@ -65,6 +65,7 @@ var (
 		{TypeKafkaRest, "按 kafkarest 日志解析", ""},
 		{TypeEmpty, "通过解析清空数据", ""},
 		{TypeMySQL, "按 mysql 慢请求日志解析", ""},
+		{TypeLogfmt, "logfmt 日志解析", ""},
 	}
 
 	ModeToolTips = KeyValueSlice{
@@ -78,6 +79,7 @@ var (
 		{TypeKafkaRest, "将Kafka Rest日志文件的每一行解析为一条结构化的日志.", ""},
 		{TypeEmpty, "通过解析清空数据", ""},
 		{TypeMySQL, "解析mysql的慢请求日志。", ""},
+		{TypeLogfmt, "解析 logfmt 日志", ""},
 	}
 )
 
@@ -341,6 +343,10 @@ var ModeKeyOptions = map[string][]Option{
 		OptionLabels,
 		OptionDisableRecordErrData,
 	},
+	TypeLogfmt: {
+		OptionParserName,
+		OptionDisableRecordErrData,
+	},
 }
 
 // SampleLogs 样例日志，用于前端界面试玩解析器
@@ -362,4 +368,6 @@ SET timestamp=1514083320;
 use foo;
 SELECT count(*) from mysql.rds_replication_status WHERE master_host IS NOT NULL and master_port IS NOT NULL GROUP BY action_timestamp,called_by_user,action,mysql_version,master_host,master_port ORDER BY action_timestamp LIMIT 1;
 #`,
+	TypeLogfmt: `ts=2018-01-02T03:04:05.123Z lvl=5 msg="error" log_id=123456abc
+method=PUT duration=1.23 log_id=123456abc`,
 }

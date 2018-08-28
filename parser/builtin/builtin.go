@@ -7,6 +7,7 @@ import (
 	_ "github.com/qiniu/logkit/parser/grok"
 	_ "github.com/qiniu/logkit/parser/json"
 	_ "github.com/qiniu/logkit/parser/kafkarest"
+	_ "github.com/qiniu/logkit/parser/logfmt"
 	_ "github.com/qiniu/logkit/parser/mysql"
 	_ "github.com/qiniu/logkit/parser/nginx"
 	_ "github.com/qiniu/logkit/parser/qiniu"
