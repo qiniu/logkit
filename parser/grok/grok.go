@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/vjeantet/grok"
@@ -83,6 +85,8 @@ type Parser struct {
 	//       }
 	patterns map[string]string
 	g        *grok.Grok
+
+	numRoutine int
 }
 
 func NewParser(c conf.MapConf) (parser.Parser, error) {
@@ -103,6 +107,11 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 
 	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
 
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = 1
+	}
+
 	p := &Parser{
 		name:                 name,
 		labels:               labels,
@@ -112,6 +121,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		CustomPatternFiles:   customPatternFiles,
 		timeZoneOffset:       timeZoneOffset,
 		disableRecordErrData: disableRecordErrData,
+		numRoutine:           numRoutine,
 	}
 	err = p.compile()
 	if err != nil {
@@ -166,47 +176,83 @@ func (p *Parser) compile() error {
 	return p.compileCustomPatterns()
 }
 
-func (gp *Parser) Name() string {
-	return gp.name
+func (p *Parser) Name() string {
+	return p.name
 }
 
-func (gp *Parser) Type() string {
+func (p *Parser) Type() string {
 	return parser.TypeGrok
 }
 
-func (gp *Parser) Parse(lines []string) ([]Data, error) {
-	datas := []Data{}
+func (p *Parser) Parse(lines []string) ([]Data, error) {
+	datas := make([]Data, 0, len(lines))
 	se := &StatsError{}
-	for idx, line := range lines {
-		//grok不应该踢出掉空格，因为grok的Pattern可能按照空格来配置，只需要判断是不是全空扔掉。
-		if len(strings.TrimSpace(line)) <= 0 {
-			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
+	numRoutine := p.numRoutine
+	if len(lines) < numRoutine {
+		numRoutine = len(lines)
+	}
+	sendChan := make(chan parser.ParseInfo)
+	resultChan := make(chan parser.ParseResult)
+
+	wg := new(sync.WaitGroup)
+	for i := 0; i < numRoutine; i++ {
+		wg.Add(1)
+		go parser.ParseLine(sendChan, resultChan, wg, true, p.parse)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, line := range lines {
+			sendChan <- parser.ParseInfo{
+				Line:  line,
+				Index: idx,
+			}
+		}
+		close(sendChan)
+	}()
+
+	var parseResultSlice = make(parser.ParseResultSlice, 0, len(lines))
+	for resultInfo := range resultChan {
+		parseResultSlice = append(parseResultSlice, resultInfo)
+	}
+	if numRoutine > 1 {
+		sort.Stable(parseResultSlice)
+	}
+
+	for _, parseResult := range parseResultSlice {
+		if len(parseResult.Line) == 0 {
+			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
 			continue
 		}
-		data, err := gp.parseLine(line)
-		if err != nil {
+
+		if parseResult.Err != nil {
 			se.AddErrors()
-			se.ErrorDetail = err
-			if !gp.disableRecordErrData {
-				errData := make(Data)
-				errData[KeyPandoraStash] = line
-				datas = append(datas, errData)
+			se.ErrorDetail = parseResult.Err
+			if !p.disableRecordErrData {
+				datas = append(datas, Data{
+					KeyPandoraStash: parseResult.Line,
+				})
 			} else {
-				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
+				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
 			}
 			continue
 		}
-		if len(data) < 1 { //数据不为空的时候发送
+		if len(parseResult.Data) < 1 { //数据为空时候不发送
 			continue
 		}
-		log.Debugf("D! parse result(%v)", data)
-		datas = append(datas, data)
+		log.Debugf("D! parse result(%v)", parseResult.Data)
 		se.AddSuccess()
+		datas = append(datas, parseResult.Data)
 	}
+
 	return datas, se
 }
 
-func (p *Parser) parseLine(line string) (Data, error) {
+func (p *Parser) parse(line string) (Data, error) {
 	if p.mode == ModeMulti {
 		line = strings.Replace(line, "\n", " ", -1)
 	}

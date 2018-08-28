@@ -2,8 +2,9 @@ package json
 
 import (
 	"fmt"
-
+	"sort"
 	"strings"
+	"sync"
 
 	"github.com/json-iterator/go"
 
@@ -25,6 +26,7 @@ type Parser struct {
 	labels               []parser.Label
 	disableRecordErrData bool
 	jsontool             jsoniter.API
+	numRoutine           int
 }
 
 func NewParser(c conf.MapConf) (parser.Parser, error) {
@@ -38,89 +40,148 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	}.Froze()
 
 	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = 1
+	}
 
 	return &Parser{
 		name:                 name,
 		labels:               labels,
 		jsontool:             jsontool,
 		disableRecordErrData: disableRecordErrData,
+		numRoutine:           numRoutine,
 	}, nil
 }
 
-func (im *Parser) Name() string {
-	return im.name
+func (p *Parser) Name() string {
+	return p.name
 }
 
-func (im *Parser) Type() string {
+func (p *Parser) Type() string {
 	return parser.TypeJSON
 }
 
-func (im *Parser) Parse(lines []string) ([]Data, error) {
-	datas := []Data{}
+func (p *Parser) Parse(lines []string) ([]Data, error) {
+	datas := make([]Data, 0, len(lines))
 	se := &StatsError{}
-	for idx, line := range lines {
-		line = strings.TrimSpace(line)
-		if len(line) <= 0 {
-			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
-			continue
-		}
-		data, err1 := im.parseLine(line)
-		if err1 == nil {
-			datas = append(datas, data)
-			se.AddSuccess()
-			continue
-		}
-		mutiData, err2 := im.parseLineMutiData(line)
-		if err2 == nil {
-			datas = append(datas, mutiData...)
-			se.AddSuccess()
-			continue
-		}
-		se.AddErrors()
-		se.ErrorDetail = err1
-		if !im.disableRecordErrData {
-			errData := make(Data)
-			errData[KeyPandoraStash] = line
-			datas = append(datas, errData)
-		} else {
-			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
-		}
+	numRoutine := p.numRoutine
+	if len(lines) < numRoutine {
+		numRoutine = len(lines)
 	}
+	sendChan := make(chan parser.ParseInfo)
+	resultChan := make(chan parser.ParseResult)
+
+	wg := new(sync.WaitGroup)
+	for i := 0; i < numRoutine; i++ {
+		wg.Add(1)
+		go p.parseLine(sendChan, resultChan, wg)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, line := range lines {
+			sendChan <- parser.ParseInfo{
+				Line:  line,
+				Index: idx,
+			}
+		}
+		close(sendChan)
+	}()
+	var parseResultSlice = make(parser.ParseResultSlice, 0, len(lines))
+	for resultInfo := range resultChan {
+		parseResultSlice = append(parseResultSlice, resultInfo)
+	}
+	if numRoutine > 1 {
+		sort.Stable(parseResultSlice)
+	}
+
+	for _, parseResult := range parseResultSlice {
+		if len(parseResult.Line) == 0 {
+			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
+			continue
+		}
+
+		if parseResult.Err != nil {
+			se.AddErrors()
+			se.ErrorDetail = parseResult.Err
+			if !p.disableRecordErrData {
+				datas = append(datas, Data{
+					KeyPandoraStash: parseResult.Line,
+				})
+			} else {
+				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
+			}
+			continue
+		}
+		if len(parseResult.Datas) == 0 { //数据为空时不发送
+			se.ErrorDetail = fmt.Errorf("parsed no data by line [%v]", parseResult.Line)
+			se.AddErrors()
+			continue
+		}
+
+		se.AddSuccess()
+		datas = append(datas, parseResult.Datas...)
+	}
+
 	return datas, se
 }
 
-func (im *Parser) parseLine(line string) (data Data, err error) {
-	data = make(Data)
-	if err = im.jsontool.Unmarshal([]byte(line), &data); err != nil {
-		err = fmt.Errorf("parse json line error %v, raw data is: %v", err, TruncateStrSize(line, DefaultTruncateMaxSize))
-		log.Debug(err)
-		return
-	}
-	for _, l := range im.labels {
-		// label 不覆盖数据，其他parser不需要这么一步检验，因为Schema固定，json的Schema不固定
-		if _, ok := data[l.Name]; ok {
-			continue
-		}
-		data[l.Name] = l.Value
-	}
-	return
-}
-
-func (im *Parser) parseLineMutiData(line string) (data []Data, err error) {
-	data = make([]Data, 0)
-	if err = im.jsontool.Unmarshal([]byte(line), &data); err != nil {
-		err = fmt.Errorf("parse json line error %v, raw data is: %v", err, line)
-		log.Debug(err)
-		return
-	}
-	for i := range data {
-		for _, l := range im.labels {
+func (p *Parser) parse(line string) (dataSlice []Data, err error) {
+	data := make(Data)
+	if err = p.jsontool.Unmarshal([]byte(line), &data); err == nil {
+		for _, l := range p.labels {
 			// label 不覆盖数据，其他parser不需要这么一步检验，因为Schema固定，json的Schema不固定
-			if _, ok := data[i][l.Name]; ok {
+			if _, ok := data[l.Name]; ok {
 				continue
 			}
-			data[i][l.Name] = l.Value
+			data[l.Name] = l.Value
+		}
+		return []Data{data}, nil
+	}
+
+	dataSlice = make([]Data, 0)
+	if err = p.jsontool.Unmarshal([]byte(line), &dataSlice); err != nil {
+		err = fmt.Errorf("parse json line error %v, raw data is: %v", err, line)
+		log.Debug(err)
+		return nil, err
+	}
+
+	for i := range dataSlice {
+		for _, l := range p.labels {
+			// label 不覆盖数据，其他parser不需要这么一步检验，因为Schema固定，json的Schema不固定
+			if _, ok := dataSlice[i][l.Name]; ok {
+				continue
+			}
+			dataSlice[i][l.Name] = l.Value
 		}
 	}
-	return
+
+	return dataSlice, nil
+}
+
+func (p *Parser) parseLine(dataPipline <-chan parser.ParseInfo, resultChan chan parser.ParseResult, wg *sync.WaitGroup) {
+	for parseInfo := range dataPipline {
+		parseInfo.Line = strings.TrimSpace(parseInfo.Line)
+		if len(parseInfo.Line) <= 0 {
+			resultChan <- parser.ParseResult{
+				Line:  parseInfo.Line,
+				Index: parseInfo.Index,
+			}
+			continue
+		}
+
+		datas, err := p.parse(parseInfo.Line)
+		resultChan <- parser.ParseResult{
+			Line:  parseInfo.Line,
+			Index: parseInfo.Index,
+			Datas: datas,
+			Err:   err,
+		}
+	}
+	wg.Done()
 }

@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -39,6 +41,7 @@ type Parser struct {
 	allmoreStartNUmber   int
 	allowNotMatch        bool
 	ignoreInvalid        bool
+	numRoutine           int
 }
 
 type field struct {
@@ -95,6 +98,10 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	}
 	allmoreStartNumber, _ := c.GetIntOr(parser.KeyCSVAllowMoreStartNum, 0)
 	ignoreInvalid, _ := c.GetBoolOr(parser.KeyCSVIgnoreInvalidField, false)
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = 1
+	}
 	return &Parser{
 		name:                 name,
 		schema:               fields,
@@ -107,6 +114,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		allowMoreName:        allowMoreName,
 		ignoreInvalid:        ignoreInvalid,
 		allmoreStartNUmber:   allmoreStartNumber,
+		numRoutine:           numRoutine,
 	}, nil
 }
 
@@ -170,6 +178,7 @@ func parseSchemaRawField(f string) (newField field, err error) {
 	}
 	return newCsvField(columnName, parser.DataType(dataType))
 }
+
 func parseSchemaJsonField(f string) (fd field, err error) {
 	splitSpace := strings.IndexByte(f, ' ')
 	key := f[:splitSpace]
@@ -435,18 +444,25 @@ func (p *Parser) parse(line string) (d Data, err error) {
 			d[l.Name] = l.Value
 		}
 	}
+	if p.isAutoRename {
+		d = RenameData(d)
+	}
 	return d, nil
 }
 
-func (p *Parser) Rename(datas []Data) []Data {
+func Rename(datas []Data) []Data {
 	newData := make([]Data, 0)
 	for _, d := range datas {
-		data := make(Data)
-		for key, val := range d {
-			newKey := strings.Replace(key, "-", "_", -1)
-			data[newKey] = val
-		}
-		newData = append(newData, data)
+		newData = append(newData, RenameData(d))
+	}
+	return newData
+}
+
+func RenameData(data Data) Data {
+	newData := make(Data)
+	for key, val := range data {
+		newKey := strings.Replace(key, "-", "_", -1)
+		newData[newKey] = val
 	}
 	return newData
 }
@@ -461,35 +477,70 @@ func HasSpace(spliter string) bool {
 }
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
-	datas := []Data{}
+	datas := make([]Data, 0, len(lines))
 	se := &StatsError{}
-	for idx, line := range lines {
-		if !HasSpace(p.delim) {
-			line = strings.TrimSpace(line)
+	numRoutine := p.numRoutine
+	if len(lines) < numRoutine {
+		numRoutine = len(lines)
+	}
+	sendChan := make(chan parser.ParseInfo)
+	resultChan := make(chan parser.ParseResult)
+
+	wg := new(sync.WaitGroup)
+	for i := 0; i < numRoutine; i++ {
+		wg.Add(1)
+		go parser.ParseLine(sendChan, resultChan, wg, !HasSpace(p.delim), p.parse)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, line := range lines {
+			sendChan <- parser.ParseInfo{
+				Line:  line,
+				Index: idx,
+			}
 		}
-		if len(line) <= 0 {
-			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
+		close(sendChan)
+	}()
+
+	var parseResultSlice = make(parser.ParseResultSlice, 0, len(lines))
+	for resultInfo := range resultChan {
+		parseResultSlice = append(parseResultSlice, resultInfo)
+	}
+	if numRoutine > 1 {
+		sort.Stable(parseResultSlice)
+	}
+
+	for _, parseResult := range parseResultSlice {
+		if len(parseResult.Line) == 0 {
+			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
 			continue
 		}
-		d, err := p.parse(line)
-		if err != nil {
-			log.Debug(err)
+
+		if parseResult.Err != nil {
 			se.AddErrors()
-			se.ErrorDetail = err
+			se.ErrorDetail = parseResult.Err
 			if !p.disableRecordErrData {
-				errData := make(Data)
-				errData[KeyPandoraStash] = line
-				datas = append(datas, errData)
+				datas = append(datas, Data{
+					KeyPandoraStash: parseResult.Line,
+				})
 			} else {
-				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
+				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
 			}
 			continue
 		}
-		datas = append(datas, d)
+		if len(parseResult.Data) < 1 { //数据为空时不发送
+			se.ErrorDetail = fmt.Errorf("parsed no data by line [%v]", parseResult.Line)
+			se.AddErrors()
+			continue
+		}
 		se.AddSuccess()
+		datas = append(datas, parseResult.Data)
 	}
-	if p.isAutoRename {
-		datas = p.Rename(datas)
-	}
+
 	return datas, se
 }
