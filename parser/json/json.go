@@ -92,7 +92,7 @@ func (im *Parser) Parse(lines []string) ([]Data, error) {
 func (im *Parser) parseLine(line string) (data Data, err error) {
 	data = make(Data)
 	if err = im.jsontool.Unmarshal([]byte(line), &data); err != nil {
-		err = fmt.Errorf("parse json line error %v, raw data is: %v", err, TruncateStrSize(line))
+		err = fmt.Errorf("parse json line error %v, raw data is: %v", err, TruncateStrSize(line, DefaultTruncateMaxSize))
 		log.Debug(err)
 		return
 	}

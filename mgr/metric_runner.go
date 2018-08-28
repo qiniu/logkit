@@ -433,7 +433,7 @@ func (mr *MetricRunner) Status() (rs RunnerStatus) {
 		sts, ok := mr.senders[i].(sender.StatsSender)
 		if ok {
 			senderStats := sts.Stats()
-			senderStats.LastError = TruncateStrSize(senderStats.LastError)
+			senderStats.LastError = TruncateStrSize(senderStats.LastError, DefaultTruncateMaxSize)
 			mr.rs.SenderStats[mr.senders[i].Name()] = senderStats
 		}
 	}
@@ -513,7 +513,7 @@ func (mr *MetricRunner) StatusBackup() {
 		sStatus, ok := s.(sender.StatsSender)
 		if ok {
 			senderStats := sStatus.Stats()
-			senderStats.LastError = TruncateStrSize(senderStats.LastError)
+			senderStats.LastError = TruncateStrSize(senderStats.LastError, DefaultTruncateMaxSize)
 			status.SenderStats[name] = senderStats
 		}
 		if sta, exist := status.SenderStats[name]; exist {
