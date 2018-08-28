@@ -62,8 +62,10 @@ const (
 )
 
 var (
-	MaxProcs = 1
-	NumCPU   = runtime.NumCPU()
+	MaxProcs                    = 1
+	NumCPU                      = runtime.NumCPU()
+	LogkitAutoCreateDescription = "由logkit日志收集自动创建"
+	MetricAutoCreateDescription = "由logkit监控收集自动创建"
 )
 
 type Option struct {

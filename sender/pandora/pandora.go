@@ -124,6 +124,8 @@ type PandoraOption struct {
 
 	tokens    Tokens
 	tokenLock *sync.RWMutex
+
+	autoCreateDescription string
 }
 
 //PandoraMaxBatchSize 发送到Pandora的batch限制
@@ -214,6 +216,7 @@ func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
 	insecureServer, _ := conf.GetBoolOr(sender.KeyInsecureServer, false)
 
 	sendType, _ := conf.GetStringOr(sender.KeyPandoraSendType, SendTypeNormal)
+	description, _ := conf.GetStringOr(sender.KeyPandoraDescription, "")
 
 	var subErr error
 	var tokens Tokens
@@ -292,6 +295,8 @@ func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
 
 		tokens:    tokens,
 		tokenLock: new(sync.RWMutex),
+
+		autoCreateDescription: description,
 	}
 	if withIp {
 		opt.withip = "logkitIP"
@@ -497,6 +502,7 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 		SchemaFree:       true,
 		Region:           s.opt.region,
 		WorkflowName:     s.opt.workflowName,
+		Description:      &s.opt.autoCreateDescription,
 		RepoName:         s.opt.repoName,
 		Schema:           schemas,
 		SchemaFreeToken:  s.opt.tokens.SchemaFreeTokens,
@@ -511,6 +517,7 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 				LogRepoName:           s.opt.logdbReponame,
 				AnalyzerInfo:          s.opt.analyzerInfo,
 				AutoExportLogDBTokens: s.opt.tokens.LogDBTokens,
+				Description:           &s.opt.autoCreateDescription,
 			},
 			ToKODO: s.opt.enableKodo,
 			AutoExportToKODOInput: pipeline.AutoExportToKODOInput{
@@ -1028,6 +1035,7 @@ func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 	s.opt.tokenLock.RLock()
 	schemaFreeInput := &pipeline.SchemaFreeInput{
 		WorkflowName:    s.opt.workflowName,
+		Description:     &s.opt.autoCreateDescription,
 		RepoName:        s.opt.repoName,
 		NoUpdate:        !s.opt.schemaFree,
 		Datas:           points,
@@ -1043,6 +1051,7 @@ func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 				LogRepoName:           s.opt.logdbReponame,
 				AnalyzerInfo:          s.opt.analyzerInfo,
 				AutoExportLogDBTokens: s.opt.tokens.LogDBTokens,
+				Description:           &s.opt.autoCreateDescription,
 			},
 			ToKODO: s.opt.enableKodo,
 			AutoExportToKODOInput: pipeline.AutoExportToKODOInput{
