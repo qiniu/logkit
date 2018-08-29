@@ -710,7 +710,6 @@ func (c *Pipeline) getOrCreateWorkflow(input *InitOrUpdateWorkflowInput, ns *boo
 		if input.Description != nil {
 			createWorkflowInput.Comment = *input.Description
 		}
-		log.Infof("`````````````````createWorkflowInput: %v", createWorkflowInput)
 		if err = c.CreateWorkflow(createWorkflowInput); err != nil && reqerr.IsExistError(err) {
 			workflow, err = c.GetWorkflow(&GetWorkflowInput{
 				WorkflowName: input.WorkflowName,
