@@ -1901,7 +1901,7 @@ DONE:
 
 		}
 		time.Sleep(50 * time.Millisecond)
-		if dft > 60 {
+		if dft > 100 {
 			break
 		}
 	}
