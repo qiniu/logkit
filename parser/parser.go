@@ -46,6 +46,7 @@ const (
 	TypeNginx      = "nginx"
 	TypeSyslog     = "syslog"
 	TypeMySQL      = "mysqllog"
+	TypeLogfmt     = "logfmt"
 )
 
 // 数据常量类型
@@ -157,6 +158,31 @@ func ParseLine(dataPipline <-chan ParseInfo, resultChan chan ParseResult, wg *sy
 			Line:  parseInfo.Line,
 			Index: parseInfo.Index,
 			Data:  data,
+			Err:   err,
+		}
+	}
+	wg.Done()
+}
+
+func ParseLineDataSlice(dataPipline <-chan ParseInfo, resultChan chan ParseResult, wg *sync.WaitGroup,
+	trimSpace bool, handlerFunc func(string) ([]Data, error)) {
+	for parseInfo := range dataPipline {
+		if trimSpace {
+			parseInfo.Line = strings.TrimSpace(parseInfo.Line)
+		}
+		if len(parseInfo.Line) <= 0 {
+			resultChan <- ParseResult{
+				Line:  parseInfo.Line,
+				Index: parseInfo.Index,
+			}
+			continue
+		}
+
+		datas, err := handlerFunc(parseInfo.Line)
+		resultChan <- ParseResult{
+			Line:  parseInfo.Line,
+			Index: parseInfo.Index,
+			Datas: datas,
 			Err:   err,
 		}
 	}

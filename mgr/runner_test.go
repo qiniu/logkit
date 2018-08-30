@@ -26,7 +26,9 @@ import (
 	_ "github.com/qiniu/logkit/sender/builtin"
 	"github.com/qiniu/logkit/sender/mock"
 	"github.com/qiniu/logkit/sender/pandora"
+	"github.com/qiniu/logkit/transforms"
 	_ "github.com/qiniu/logkit/transforms/builtin"
+	"github.com/qiniu/logkit/transforms/ip"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -1896,12 +1898,71 @@ DONE:
 			break DONE
 		default:
 			dft++
+
 		}
 		time.Sleep(50 * time.Millisecond)
-		if dft > 60 {
+		if dft > 100 {
 			break
 		}
 	}
 	assert.Equal(t, 1, ret)
+}
 
+func Test_setSenderConfig(t *testing.T) {
+	senderConfig := conf.MapConf{
+		sender.KeySenderType: sender.TypePandora,
+	}
+
+	serverConfigs := []map[string]interface{}{
+		{
+			transforms.KeyType:     ip.Name,
+			transforms.TransformAt: ip.Server,
+		},
+	}
+	actualConfig, err := setPandoraServerConfig(senderConfig, serverConfigs)
+	assert.NoError(t, err)
+	assert.Equal(t, "", actualConfig[sender.KeyPandoraAutoCreate])
+
+	serverConfigs = []map[string]interface{}{
+		{
+			transforms.KeyType:     ip.Name,
+			transforms.TransformAt: ip.Server,
+			"key": "ip",
+		},
+	}
+	actualConfig, err = setPandoraServerConfig(senderConfig, serverConfigs)
+	assert.NoError(t, err)
+	assert.Equal(t, "ip ip", actualConfig[sender.KeyPandoraAutoCreate])
+
+	senderConfig = conf.MapConf{
+		sender.KeySenderType: sender.TypePandora,
+	}
+	serverConfigs = []map[string]interface{}{
+		{
+			transforms.KeyType:     ip.Name,
+			transforms.TransformAt: ip.Local,
+		},
+	}
+	actualConfig, err = setPandoraServerConfig(senderConfig, serverConfigs)
+	assert.NoError(t, err)
+	assert.Equal(t, "", actualConfig[sender.KeyPandoraAutoCreate])
+
+	serverConfigs = []map[string]interface{}{
+		{
+			transforms.KeyType: "other",
+		},
+	}
+	actualConfig, err = setPandoraServerConfig(senderConfig, serverConfigs)
+	assert.NoError(t, err)
+	assert.Equal(t, "", actualConfig[sender.KeyPandoraAutoCreate])
+
+	serverConfigs = []map[string]interface{}{
+		{
+			transforms.KeyType:     ip.Name,
+			transforms.TransformAt: ip.Server,
+			"key": "ip.ip",
+		},
+	}
+	actualConfig, err = setPandoraServerConfig(senderConfig, serverConfigs)
+	assert.Error(t, err)
 }
