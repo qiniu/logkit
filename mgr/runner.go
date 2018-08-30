@@ -801,8 +801,6 @@ func addTagsToData(tags map[string]interface{}, datas []Data, runnername string)
 // 先停Reader，不再读取，然后停Run函数，让读取的都转到发送，最后停Sender结束整个过程。
 // Parser 无状态，无需stop。
 func (r *LogExportRunner) Stop() {
-	atomic.AddInt32(&r.stopped, 1)
-
 	log.Infof("Runner[%v] wait for reader %v stopped", r.Name(), r.reader.Name())
 	err := r.reader.Close()
 	if err != nil {
@@ -820,6 +818,7 @@ func (r *LogExportRunner) Stop() {
 		log.Errorf("runner %v exited timeout, start to force stop", r.Name())
 		atomic.AddInt32(&r.stopped, 1)
 	}
+	atomic.AddInt32(&r.stopped, 1)
 
 	for _, t := range r.transformers {
 		if c, ok := t.(io.Closer); ok {
