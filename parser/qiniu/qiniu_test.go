@@ -23,6 +23,10 @@ func Test_QiniuLogRegex(t *testing.T) {
 			exp:  true,
 		},
 		{
+			line: `2018/08/30 11:45:00.386289 [INFO][gRI0EyK7amyzjE8V]["github.com/teapots/request-logger/logger.go:75"] [REQ_END] 200 0.010k 183.637ms`,
+			exp:  true,
+		},
+		{
 			line: "2018/08/17 10:49:29 [INFO][github.com/qiniu/logkit/reader] seqfile.go:538: Runner[UndefinedRunnerName] ",
 			exp:  true,
 		},
@@ -238,13 +242,16 @@ func Test_QiniulogParserForTeapot(t *testing.T) {
 		t.Fatalf("parse lines error expect 3 but %v", len(dts))
 	}
 
-	if dts[0]["reqid"] != "2pyKMgVp5EKg-ZsU" {
-		t.Errorf("parse reqid error exp 2pyKMgVp5EKg-ZsU but %v", dts[0]["reqid"])
-	}
+	assert.Equal(t, dts[0]["reqid"], "2pyKMgVp5EKg-ZsU")
+	assert.Equal(t, dts[0]["file"], "github.com/teapots/request-logger/logger.go:75")
 
-	if dts[1]["reqid"] != nil {
-		t.Errorf("parse reqid error exp nil but got %v", dts[1]["reqid"])
-	}
+	assert.Equal(t, dts[1]["reqid"], nil)
+	assert.Equal(t, dts[1]["level"], "ERROR")
+	assert.Equal(t, dts[1]["file"], "qiniu.io/gaea/app/providers/admin_login/admin_login.go:29")
+
+	assert.Equal(t, dts[2]["reqid"], "2pyKMukqvwSd-ZsU")
+	assert.Equal(t, dts[2]["file"], "qbox.us/biz/component/client/transport.go:109")
+	assert.Equal(t, dts[2]["log"], "Service: POST 10.200.20.25:9100/user/info, Code: 200, Xlog: AC, Time: 1ms")
 
 	_, zoneValue := times.GetTimeZone()
 	exp := "2017/01/22 11:16:08.885550" + zoneValue
@@ -261,17 +268,71 @@ func Test_QiniulogParserForTeapot(t *testing.T) {
 	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
 	}
+	assert.NoError(t, err)
+	assert.Equal(t, len(dts), 2)
+	assert.Equal(t, dts[0]["level"], "ERROR")
+	assert.Equal(t, dts[1]["level"], "WARN")
+	assert.Equal(t, `github.com/teapots/request-logger/logger.go:61`, dts[0]["file"])
+}
+
+func Test_QiniulogParserForChange(t *testing.T) {
+	c := conf.MapConf{}
+	c[parser.KeyParserType] = "qiniulog"
+	c[parser.KeyLogHeaders] = "date,time,reqid,level,file"
+	ps := parser.NewRegistry()
+	p, err := ps.NewLogParser(c)
 	if err != nil {
 		t.Error(err)
 	}
-	if len(dts) != 2 {
-		t.Fatalf("parse lines error expect 2 but %v", len(dts))
+
+	lines := []string{
+		`2017/01/22 11:16:08.885550 [2pyKMgVp5EKg-ZsU][INFO]["github.com/teapots/request-logger/logger.go:75"] [REQ_END] 200 0.010k 3.792ms
+		[WARN][SLdoIrCDZj7pmZsU]["qiniu.io/gaea/app/job/freeze.go:37"] <job.freezeDeamon> pop() failed: not found`,
+		`2017/01/22 11:16:08.883870 [ERROR]["qiniu.io/gaea/app/providers/admin_login/admin_login.go:29"] current uid: 74121669`,
+		`2017/01/22 11:15:54.947217 [2pyKMukqvwSd-ZsU][INFO]["qbox.us/biz/component/client/transport.go:109"] Service: POST 10.200.20.25:9100/user/info, Code: 200, Xlog: AC, Time: 1ms`,
 	}
-	if dts[0]["level"] != "ERROR" {
-		t.Errorf("parse level error exp ERROR but %v", dts[0]["level"])
+
+	dts, err := p.Parse(lines)
+	if c, ok := err.(*StatsError); ok {
+		err = c.ErrorDetail
 	}
-	if dts[1]["level"] != "WARN" {
-		t.Errorf("parse level error exp WARN but %v", dts[0]["level"])
+	if err != nil {
+		t.Error(err)
 	}
-	assert.Equal(t, `"github.com/teapots/request-logger/logger.go:61"`, dts[0]["module"])
+
+	if len(dts) != 3 {
+		t.Fatalf("parse lines error expect 3 but %v", len(dts))
+	}
+
+	assert.Equal(t, dts[0]["reqid"], "2pyKMgVp5EKg-ZsU")
+	assert.Equal(t, dts[0]["file"], "github.com/teapots/request-logger/logger.go:75")
+
+	assert.Equal(t, dts[1]["reqid"], nil)
+	assert.Equal(t, dts[1]["level"], "ERROR")
+	assert.Equal(t, dts[1]["file"], "qiniu.io/gaea/app/providers/admin_login/admin_login.go:29")
+
+	assert.Equal(t, dts[2]["reqid"], "2pyKMukqvwSd-ZsU")
+	assert.Equal(t, dts[2]["file"], "qbox.us/biz/component/client/transport.go:109")
+	assert.Equal(t, dts[2]["log"], "Service: POST 10.200.20.25:9100/user/info, Code: 200, Xlog: AC, Time: 1ms")
+
+	_, zoneValue := times.GetTimeZone()
+	exp := "2017/01/22 11:16:08.885550" + zoneValue
+	if dts[0]["time"] != exp {
+		t.Errorf("parse time error exp %v but %v", exp, dts[0]["time"])
+	}
+
+	newlines := []string{
+		`2017/01/22 12:14:14.072180 [SLdoIlbiqLnL_JsU][ERROR]["github.com/teapots/request-logger/logger.go:61"] hello`,
+		`2017/01/22 12:12:10.065824 [SLdoIrCDZj7pmZsU][WARN]["qiniu.io/gaea/app/job/freeze.go:37"] <job.freezeDeamon> pop() failed: not found`,
+	}
+
+	dts, err = p.Parse(newlines)
+	if c, ok := err.(*StatsError); ok {
+		err = c.ErrorDetail
+	}
+	assert.NoError(t, err)
+	assert.Equal(t, len(dts), 2)
+	assert.Equal(t, dts[0]["level"], "ERROR")
+	assert.Equal(t, dts[1]["level"], "WARN")
+	assert.Equal(t, `github.com/teapots/request-logger/logger.go:61`, dts[0]["file"])
 }

@@ -52,6 +52,15 @@ type Parser struct {
 	disableRecordErrData bool
 }
 
+func checkLevel(str string) bool {
+	str = strings.ToUpper(str)
+	switch str {
+	case "INFO", "DEBUG", "WARN", "ERROR", "PANIC", "FATAL":
+		return true
+	}
+	return false
+}
+
 func NewParser(c conf.MapConf) (parser.Parser, error) {
 	name, _ := c.GetStringOr(parser.KeyParserName, "")
 	labelList, _ := c.GetStringListOr(parser.KeyLabels, []string{})
@@ -169,15 +178,20 @@ func (p *Parser) parseReqid(line string) (string, map[string]string, error) {
 	if !strings.HasPrefix(line, "[") {
 		return line, nil, nil
 	}
+	//reqid不含双引号，是teapot的file
+	if strings.HasPrefix(line, `["`) {
+		return line, nil, nil
+	}
 	leftline, reqid, err := parseFromBracket(line, "[", "]")
 	if err != nil {
 		err = errorCanNotParse(LogHeadReqid, line, err)
 		return line, nil, err
 	}
-	//中括号里面可能不是reqid，可能是file，兼容teapot
-	if strings.Contains(reqid, `"`) {
+	//确保不是level
+	if checkLevel(reqid) {
 		return line, nil, nil
 	}
+
 	result := map[string]string{LogHeadReqid: reqid}
 	return leftline, result, nil
 }
@@ -235,7 +249,7 @@ func (p *Parser) parseLogFile(line string) (string, map[string]string, error) {
 		return leftline, result, nil
 	}
 	if len(leftline) < 1 {
-		err := errorCanNotParse(LogHeadFile, line, fmt.Errorf("no left to parse"))
+		err := errorCanNotParse(LogHeadFile, line, fmt.Errorf("no left log to parse"))
 		return line, nil, err
 	}
 	leftline = strings.TrimSpace(leftline)
@@ -258,7 +272,14 @@ func (p *Parser) parseCombinedModuleFile(line string) (string, map[string]string
 			return leftLine, result, err
 		}
 		line = strings.TrimSpace(leftLine)
-		result[LogHeadModule] = moduleResult[LogHeadModule]
+		module := moduleResult[LogHeadModule]
+		if strings.HasPrefix(module, `"`) && strings.HasSuffix(module, `"`) {
+			//适配teapot日志
+			result[LogHeadFile] = strings.Trim(module, `"`)
+			return line, result, nil
+		} else {
+			result[LogHeadModule] = module
+		}
 	}
 	leftLine, logRes, err := p.parseLogFile(line)
 	if err != nil {
@@ -275,10 +296,6 @@ func isMatch(pattern *regexp.Regexp, raw string) bool {
 	return pattern.MatchString(raw)
 }
 
-func errorNothingParse(s string, d string) error {
-	return fmt.Errorf("there is no left log to parse %v, have parsed %v", s, d)
-}
-
 func errorCanNotParse(s string, line string, err error) error {
 	return fmt.Errorf("can not parse %v from %v %v", s, line, err)
 }
@@ -293,7 +310,7 @@ func (p *Parser) parse(line string) (d Data, err error) {
 	for _, head := range p.headers {
 		line = strings.TrimSpace(line)
 		if len(line) < 1 {
-			return nil, errorNothingParse(head, line)
+			break
 		}
 		// LogHeadLog不需要使用解析器，最后剩下的就是
 		if line == LogHeadLog {
