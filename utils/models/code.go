@@ -1,11 +1,20 @@
 package models
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 var (
-	ErrNotSupport  = errors.New("runner does not support")
-	ErrNotExist    = errors.New("runner does not exist")
-	ErrQueueClosed = errors.New("queue is closed")
+	ErrNotSupport      = errors.New("runner does not support")
+	ErrNotExist        = errors.New("runner does not exist")
+	ErrQueueClosed     = errors.New("queue is closed")
+	ErrRunnerFileAdded = func(confPath interface{}) error {
+		return errors.New(fmt.Sprintf("%s already added - ", confPath))
+	}
+	ErrRunnerNameAdded = func(name interface{}) error {
+		return errors.New(fmt.Sprintf("runner name %s already used", name))
+	}
 )
 
 const (

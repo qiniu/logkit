@@ -30,6 +30,7 @@ type RunnerStatus struct {
 	Tag              string      `json:"tag,omitempty"`
 	Url              string      `json:"url,omitempty"`
 	HistoryErrors    *ErrorsList `json:"history_errors"`
+	RunningError     string      `json:"runningError"`
 }
 
 //Clone 复制出一个完整的RunnerStatus
@@ -84,6 +85,7 @@ type RunnerConfig struct {
 	IsInWebFolder bool                     `json:"web_folder,omitempty"`
 	IsStopped     bool                     `json:"is_stopped,omitempty"`
 	IsFromServer  bool                     `json:"from_server,omitempty"` // 判读是否从服务器拉取的配置
+	ErrorInfo     string                   `json:"error_info"`
 }
 
 type RunnerInfo struct {
