@@ -348,6 +348,17 @@ var ModeKeyOptions = map[string][]Option{
 			Advance:       true,
 		},
 		{
+			KeyName:       KeyPandoraKodoLowFreqFile,
+			Element:       Radio,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"false", "true"},
+			Default:       "false",
+			DefaultNoUse:  false,
+			Description:   "存储为低频文件(pandora_kodo_low_frequency_file)",
+			AdvanceDepend: KeyPandoraEnableKodo,
+			Advance:       true,
+		},
+		{
 			KeyName:       KeyPandoraKodoCompressPrefix,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"parquet", "json", "text", "csv"},

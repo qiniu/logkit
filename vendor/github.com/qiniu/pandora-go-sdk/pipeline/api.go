@@ -400,6 +400,9 @@ func (c *Pipeline) UpdateRepoWithKodo(input *UpdateRepoInput, ex ExportDesc) err
 		RotateNumber:   input.Option.RotateNumber,
 		RotateSizeType: input.Option.RotateSizeType,
 	}
+	if input.Option.KodoFileType == 1 {
+		spec.KodoFileType = 1
+	}
 	err := c.UpdateExport(&UpdateExportInput{
 		RepoName:     input.RepoName,
 		ExportName:   ex.Name,

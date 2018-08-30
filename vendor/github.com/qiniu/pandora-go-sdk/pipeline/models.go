@@ -681,6 +681,7 @@ type CreateRepoForKodoInput struct {
 	Email          string
 	Region         string
 	Bucket         string
+	KodoFileType   int
 	RepoName       string
 	Prefix         string
 	Compress       bool
@@ -704,6 +705,7 @@ type AutoExportToKODOInput struct {
 	RepoName       string
 	BucketName     string
 	Prefix         string
+	KodoFileType   int
 	Compress       bool
 	RotateStrategy string
 	RotateSize     int
@@ -1432,6 +1434,7 @@ type ExportKodoSpec struct {
 	Delimiter      string            `json:"delimiter,omitempty"`
 	Compress       bool              `json:"compress"`
 	Retention      int               `json:"retention"`
+	KodoFileType   int               `json:"kodo_file_type"`
 }
 
 func (s *ExportKodoSpec) Validate() (err error) {

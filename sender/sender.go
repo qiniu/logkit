@@ -38,6 +38,7 @@ const (
 	KeyPandoraEnableKodo         = "pandora_enable_kodo"
 	KeyPandoraKodoBucketName     = "pandora_bucket_name"
 	KeyPandoraKodoFilePrefix     = "pandora_kodo_prefix"
+	KeyPandoraKodoLowFreqFile    = "pandora_kodo_low_frequency_file"
 	KeyPandoraKodoCompressPrefix = "pandora_kodo_compress"
 	KeyPandoraKodoGzip           = "pandora_kodo_gzip"
 	KeyPandoraKodoRotateStrategy = "pandora_kodo_rotate_strategy"

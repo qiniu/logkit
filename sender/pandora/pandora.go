@@ -108,6 +108,7 @@ type PandoraOption struct {
 	kodoRotateInterval int
 	kodoRotateSize     int
 	kodoFileRetention  int
+	kodoFileType       int
 
 	forceMicrosecond   bool
 	forceDataConvert   bool
@@ -205,6 +206,10 @@ func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
 	kodoRotateSize = kodoRotateSize * 1024
 	kodoRotateInterval, _ := conf.GetIntOr(sender.KeyPandoraKodoRotateInterval, 10*60)
 	kodoFileRetention, _ := conf.GetIntOr(sender.KeyPandoraKodoFileRetention, 0)
+	kodoFileType := 0
+	if v, err := conf.GetBoolOr(sender.KeyPandoraKodoLowFreqFile, false); err == nil && v {
+		kodoFileType = 1
+	}
 
 	forceconvert, _ := conf.GetBoolOr(sender.KeyForceDataConvert, false)
 	ignoreInvalidField, _ := conf.GetBoolOr(sender.KeyIgnoreInvalidField, true)
@@ -280,6 +285,7 @@ func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
 		kodoRotateInterval: kodoRotateInterval,
 		kodoRotateSize:     kodoRotateSize,
 		kodoFileRetention:  kodoFileRetention,
+		kodoFileType:       kodoFileType,
 
 		forceMicrosecond:   forceMicrosecond,
 		forceDataConvert:   forceconvert,
@@ -534,6 +540,7 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 				RotateInterval:       s.opt.kodoRotateInterval,
 				RotateSizeType:       "B",
 				RotateNumber:         s.opt.kodoRotateSize,
+				KodoFileType:         s.opt.kodoFileType,
 			},
 			ToTSDB: s.opt.enableTsdb,
 			AutoExportToTSDBInput: pipeline.AutoExportToTSDBInput{
@@ -1058,6 +1065,7 @@ func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 				Retention:            s.opt.kodoFileRetention,
 				RepoName:             s.opt.repoName,
 				BucketName:           s.opt.bucketName,
+				KodoFileType:         s.opt.kodoFileType,
 				Email:                s.opt.email,
 				Prefix:               s.opt.prefix,
 				Format:               s.opt.format,
