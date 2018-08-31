@@ -130,6 +130,10 @@ const (
 	KeyFtMemoryChannelSize = "ft_memory_channel_size"
 	KeyFtLongDataDiscard   = "ft_long_data_discard"
 
+	// queue
+	KeyMaxDiskUsedBytes = "max_disk_used_bytes"
+	KeyMaxSizePerFile   = "max_size_per_file"
+
 	// ft 策略
 	// KeyFtStrategyBackupOnly 只在失败的时候进行容错
 	KeyFtStrategyBackupOnly = "backup_only"

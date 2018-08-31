@@ -25,6 +25,7 @@ const (
 	mb                = 1024 * 1024 // 1MB
 	defaultWriteLimit = 10          // 默认写速限制为10MB
 	maxBytesPerFile   = 100 * mb
+	maxDiskUsedBytes  = 32 * GB
 	qNameSuffix       = "_local_save"
 	directSuffix      = "_direct"
 	defaultMaxProcs   = 1         // 默认没有并发
@@ -64,6 +65,8 @@ type FtOption struct {
 	longDataDiscard   bool
 	innerSenderType   string
 	pandoraSenderType string
+	maxDiskUsedBytes  int64
+	maxSizePerFile    int32
 }
 
 type datasContext struct {
@@ -88,6 +91,8 @@ func NewFtSender(innerSender Sender, conf conf.MapConf, ftSaveLogPath string) (*
 	}
 	procs, _ := conf.GetIntOr(KeyFtProcs, defaultMaxProcs)
 	runnerName, _ := conf.GetStringOr(KeyRunnerName, UnderfinedRunnerName)
+	maxDiskUsedBytes, _ := conf.GetInt64Or(KeyMaxDiskUsedBytes, maxDiskUsedBytes)
+	maxSizePerFile, _ := conf.GetInt32Or(KeyMaxSizePerFile, maxBytesPerFile)
 
 	opt := &FtOption{
 		saveLogPath:       logPath,
@@ -100,6 +105,8 @@ func NewFtSender(innerSender Sender, conf conf.MapConf, ftSaveLogPath string) (*
 		longDataDiscard:   longDataDiscard,
 		innerSenderType:   senderType,
 		pandoraSenderType: pandoraSendType,
+		maxDiskUsedBytes:  maxDiskUsedBytes,
+		maxSizePerFile:    maxSizePerFile,
 	}
 
 	return newFtSender(innerSender, runnerName, opt)
@@ -115,38 +122,41 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 		lq = queue.NewDirectQueue("stream" + directSuffix)
 	} else if !opt.memoryChannel {
 		lq = queue.NewDiskQueue(queue.NewDiskQueueOptions{
-			Name:            "stream" + qNameSuffix,
-			DataPath:        opt.saveLogPath,
-			MaxBytesPerFile: maxBytesPerFile,
-			MaxMsgSize:      maxBytesPerFile,
-			SyncEveryWrite:  opt.syncEvery,
-			SyncEveryRead:   opt.syncEvery,
-			SyncTimeout:     2 * time.Second,
-			WriteRateLimit:  opt.writeLimit * mb,
+			Name:             "stream" + qNameSuffix,
+			DataPath:         opt.saveLogPath,
+			MaxBytesPerFile:  int64(opt.maxSizePerFile),
+			MaxMsgSize:       opt.maxSizePerFile,
+			SyncEveryWrite:   opt.syncEvery,
+			SyncEveryRead:    opt.syncEvery,
+			SyncTimeout:      2 * time.Second,
+			WriteRateLimit:   opt.writeLimit * mb,
+			MaxDiskUsedBytes: opt.maxDiskUsedBytes,
 		})
 	} else {
 		lq = queue.NewDiskQueue(queue.NewDiskQueueOptions{
 			Name:              "stream" + qNameSuffix,
 			DataPath:          opt.saveLogPath,
-			MaxBytesPerFile:   maxBytesPerFile,
-			MaxMsgSize:        maxBytesPerFile,
+			MaxBytesPerFile:   int64(opt.maxSizePerFile),
+			MaxMsgSize:        opt.maxSizePerFile,
 			SyncEveryWrite:    opt.syncEvery,
 			SyncEveryRead:     opt.syncEvery,
 			SyncTimeout:       2 * time.Second,
 			WriteRateLimit:    opt.writeLimit * mb,
 			EnableMemoryQueue: true,
 			MemoryQueueSize:   int64(opt.memoryChannelSize),
+			MaxDiskUsedBytes:  opt.maxDiskUsedBytes,
 		})
 	}
 	bq = queue.NewDiskQueue(queue.NewDiskQueueOptions{
-		Name:            "backup" + qNameSuffix,
-		DataPath:        opt.saveLogPath,
-		MaxBytesPerFile: maxBytesPerFile,
-		MaxMsgSize:      maxBytesPerFile,
-		SyncEveryWrite:  opt.syncEvery,
-		SyncEveryRead:   opt.syncEvery,
-		SyncTimeout:     2 * time.Second,
-		WriteRateLimit:  opt.writeLimit * mb,
+		Name:             "backup" + qNameSuffix,
+		DataPath:         opt.saveLogPath,
+		MaxBytesPerFile:  int64(opt.maxSizePerFile),
+		MaxMsgSize:       opt.maxSizePerFile,
+		SyncEveryWrite:   opt.syncEvery,
+		SyncEveryRead:    opt.syncEvery,
+		SyncTimeout:      2 * time.Second,
+		WriteRateLimit:   opt.writeLimit * mb,
+		MaxDiskUsedBytes: opt.maxDiskUsedBytes,
 	})
 	ftSender := FtSender{
 		exitChan:    make(chan struct{}),

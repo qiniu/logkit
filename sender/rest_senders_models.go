@@ -1,6 +1,8 @@
 package sender
 
 import (
+	"strconv"
+
 	. "github.com/qiniu/logkit/utils/models"
 	"github.com/qiniu/pandora-go-sdk/base/config"
 )
@@ -89,6 +91,24 @@ var (
 		Description:   "丢弃大于2M的数据(ft_long_data_discard)",
 		Advance:       true,
 		ToolTip:       `丢弃大于2M的数据`,
+	}
+	OptionMaxDiskUsedBytes = Option{
+		KeyName:      KeyMaxDiskUsedBytes,
+		ChooseOnly:   false,
+		Default:      strconv.Itoa(maxDiskUsedBytes),
+		DefaultNoUse: false,
+		Description:  "磁盘使用总大小限制(max_disk_used_bytes)",
+		Advance:      true,
+		ToolTip:      `磁盘使用总大小限制`,
+	}
+	OptionMaxSizePerSize = Option{
+		KeyName:      KeyMaxSizePerFile,
+		ChooseOnly:   false,
+		Default:      strconv.Itoa(maxBytesPerFile),
+		DefaultNoUse: false,
+		Description:  "磁盘队列单个文件最大字节(max_size_per_file)",
+		Advance:      true,
+		ToolTip:      `磁盘队列单个文件最大字节, 也是单个消息的最大字节。最大不超过2GB`,
 	}
 	OptionLogkitSendTime = Option{
 		KeyName:       KeyLogkitSendTime,
@@ -473,6 +493,8 @@ var ModeKeyOptions = map[string][]Option{
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
 		OptionKeyFtLongDataDiscard,
+		OptionMaxDiskUsedBytes,
+		OptionMaxSizePerSize,
 		{
 			KeyName:       KeyForceMicrosecond,
 			Element:       Radio,
@@ -604,6 +626,8 @@ var ModeKeyOptions = map[string][]Option{
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
 		OptionKeyFtLongDataDiscard,
+		OptionMaxDiskUsedBytes,
+		OptionMaxSizePerSize,
 	},
 	TypeInfluxdb: {
 		{
@@ -708,6 +732,8 @@ var ModeKeyOptions = map[string][]Option{
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
 		OptionKeyFtLongDataDiscard,
+		OptionMaxDiskUsedBytes,
+		OptionMaxSizePerSize,
 	},
 	TypeDiscard: {},
 	TypeElastic: {
@@ -771,6 +797,8 @@ var ModeKeyOptions = map[string][]Option{
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
 		OptionKeyFtLongDataDiscard,
+		OptionMaxDiskUsedBytes,
+		OptionMaxSizePerSize,
 	},
 	TypeKafka: {
 		{
@@ -839,6 +867,8 @@ var ModeKeyOptions = map[string][]Option{
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
 		OptionKeyFtLongDataDiscard,
+		OptionMaxDiskUsedBytes,
+		OptionMaxSizePerSize,
 	},
 	TypeHttp: {
 		{
@@ -882,5 +912,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
 		OptionKeyFtLongDataDiscard,
+		OptionMaxDiskUsedBytes,
+		OptionMaxSizePerSize,
 	},
 }

@@ -11,6 +11,7 @@ const (
 	StringType     = "string"
 	IntType        = "int"
 	Int64Type      = "int64"
+	Int32Type      = "int32"
 	BoolType       = "bool"
 	StringListType = "[]string"
 	AliasMapType   = "[string string, string]"
@@ -78,6 +79,26 @@ func (conf MapConf) GetInt(key string) (int, error) {
 		return 0, ErrConfKeyType(key, IntType)
 	}
 	return v, nil
+}
+
+func (conf MapConf) GetInt32Or(key string, deft int32) (int32, error) {
+	ret, err := conf.GetInt32(key)
+	if err != nil {
+		return deft, err
+	}
+	return ret, nil
+}
+
+func (conf MapConf) GetInt32(key string) (int32, error) {
+	value, exist := conf[key]
+	if !exist {
+		return 0, ErrConfMissingKey(key, Int32Type)
+	}
+	v, err := strconv.ParseInt(value, 10, 32)
+	if err != nil {
+		return 0, ErrConfKeyType(key, Int32Type)
+	}
+	return int32(v), nil
 }
 
 func (conf MapConf) GetInt64Or(key string, deft int64) (int64, error) {
