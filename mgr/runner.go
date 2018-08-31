@@ -809,6 +809,8 @@ func (r *LogExportRunner) Stop() {
 		log.Warnf("Runner[%v] reader %v of runner %v closed", r.Name(), r.reader.Name(), r.Name())
 	}
 
+	atomic.AddInt32(&r.stopped, 1)
+
 	log.Infof("Runner[%v] waiting for Run() stopped signal", r.Name())
 	timer := time.NewTimer(time.Second * 10)
 	select {
@@ -818,7 +820,6 @@ func (r *LogExportRunner) Stop() {
 		log.Errorf("runner %v exited timeout, start to force stop", r.Name())
 		atomic.AddInt32(&r.stopped, 1)
 	}
-	atomic.AddInt32(&r.stopped, 1)
 
 	for _, t := range r.transformers {
 		if c, ok := t.(io.Closer); ok {
