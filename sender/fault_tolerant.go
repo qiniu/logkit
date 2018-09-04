@@ -25,7 +25,6 @@ const (
 	mb                = 1024 * 1024 // 1MB
 	defaultWriteLimit = 10          // 默认写速限制为10MB
 	maxBytesPerFile   = 100 * mb
-	maxDiskUsedBytes  = 32 * GB
 	qNameSuffix       = "_local_save"
 	directSuffix      = "_direct"
 	defaultMaxProcs   = 1         // 默认没有并发
