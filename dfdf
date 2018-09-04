@@ -1,0 +1,13 @@
+  add_database_schema_option[m
+  fix_mode_http_key[m
+  fix_path_err[m
+  fix_sql_bug[m
+* [32mmaster[m
+  [31mremotes/origin/HEAD[m -> origin/master
+  [31mremotes/origin/add_database_schema_option[m
+  [31mremotes/origin/bugfix-script-reader[m
+  [31mremotes/origin/develop[m
+  [31mremotes/origin/fix_mode_http_key[m
+  [31mremotes/origin/fix_path_err[m
+  [31mremotes/origin/fix_sql_bug[m
+  [31mremotes/origin/master[m
