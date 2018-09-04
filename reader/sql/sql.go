@@ -1350,52 +1350,10 @@ func convertBool(v interface{}) (bool, error) {
 	}
 	dv := reflect.Indirect(dpv)
 	switch dv.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return int(dv.Int()) == 0, nil
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return int(dv.Uint()) == 0, nil
-	case reflect.String:
-		return dv.String() == "true", nil
 	case reflect.Interface:
 		idv := dv.Interface()
 		if ret, ok := idv.(bool); ok {
 			return bool(ret), nil
-		}
-		if ret, ok := idv.(int64); ok {
-			return int(ret) == 0, nil
-		}
-		if ret, ok := idv.(int); ok {
-			return int(ret) == 0, nil
-		}
-		if ret, ok := idv.(uint); ok {
-			return int(ret) == 0, nil
-		}
-		if ret, ok := idv.(uint64); ok {
-			return int(ret) == 0, nil
-		}
-		if ret, ok := idv.(string); ok {
-			return ret == "true", nil
-		}
-		if ret, ok := idv.(int8); ok {
-			return int(ret) == 0, nil
-		}
-		if ret, ok := idv.(int16); ok {
-			return int(ret) == 0, nil
-		}
-		if ret, ok := idv.(int32); ok {
-			return int(ret) == 0, nil
-		}
-		if ret, ok := idv.(uint8); ok {
-			return int(ret) == 0, nil
-		}
-		if ret, ok := idv.(uint16); ok {
-			return int(ret) == 0, nil
-		}
-		if ret, ok := idv.(uint32); ok {
-			return int(ret) == 0, nil
-		}
-		if ret, ok := idv.([]byte); ok {
-			return string(ret) == "true", nil
 		}
 		if idv == nil {
 			return false, nil
