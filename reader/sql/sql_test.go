@@ -1471,7 +1471,7 @@ type CronInfo struct {
 
 var (
 	dbSource   = "root:@tcp(127.0.0.1:3306)"
-	pgDbSource = "host=127.0.0.1 port=5432 connect_timeout=10 user=postgres password=postgres sslmode=disable"
+	pgDbSource = "host=127.0.0.1 port=5432 connect_timeout=10 user=postgres password=  sslmode=disable"
 	connectStr = dbSource + "/?charset=gbk"
 	now        = time.Now()
 	year       = getDateStr(now.Year())
