@@ -163,9 +163,9 @@ const (
 var (
 	ModeUsages = KeyValueSlice{
 		{ModeFileAuto, "从文件读取( fileauto 模式)", ""},
-		{ModeDir, "从文件读取( dir 模式)", ""},
 		{ModeFile, "从文件读取( file 模式)", ""},
 		{ModeTailx, "从文件读取( tailx 模式)", ""},
+		{ModeDir, "从文件读取( dir 模式)", ""},
 		{ModeDirx, "从文件读取( dirx 模式)", ""},
 		{ModeMySQL, "从 MySQL 读取", ""},
 		{ModeMSSQL, "从 MSSQL 读取", ""},
