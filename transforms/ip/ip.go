@@ -21,8 +21,8 @@ const (
 	Longitude    = "Longitude"
 	DistrictCode = "DistrictCode"
 
-	Local  = "本地"
-	Server = "服务端"
+	Local  = "local"
+	Server = "server"
 )
 
 var (
