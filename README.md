@@ -3,7 +3,7 @@
 ![logkit LOGO](https://raw.githubusercontent.com/qiniu/logkit/master/resources/logo.png)
 
 
-## 在社区版的基础上，我们开发了体验更好，功能更全的专业版(logkit-pro)，欢迎大家体验 [logkit-pro（专业版）](https://developer.qiniu.com/insight/manual/4738/logkit%20Pro%20%E4%BB%8B%E7%BB%8D)
+## 在社区版的基础上，我们正式推出了体验更好，功能更全的产品[logkit-pro专业版](https://logkit-pro.qiniu.com/)，欢迎大家体验 [logkit-pro（专业版）](https://developer.qiniu.com/insight/manual/4738/logkit-pro-induction)
 
 ## 简介
 
