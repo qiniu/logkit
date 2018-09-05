@@ -278,7 +278,9 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	var serverConfigs = make([]map[string]interface{}, 0, len(transformers))
 	for _, transform := range transformers {
 		if serverTransformer, ok := transform.(transforms.ServerTansformer); ok {
-			serverConfigs = append(serverConfigs, serverTransformer.ServerConfig())
+			if serverTransformer.ServerConfig() != nil {
+				serverConfigs = append(serverConfigs, serverTransformer.ServerConfig())
+			}
 		}
 	}
 	senders := make([]sender.Sender, 0)
@@ -1328,23 +1330,23 @@ func setIPConfig(senderConfig conf.MapConf, serverConfig map[string]interface{})
 		return senderConfig, nil
 	}
 
-	if len(GetKeys(key)) > 1 {
-		return senderConfig, fmt.Errorf("key: %v ip transform key in server doesn't support dot(.)", key)
-	}
 	autoCreate := senderConfig[sender.KeyPandoraAutoCreate]
 	transformAt, transformAtOk := serverConfig[transforms.TransformAt].(string)
 	if !transformAtOk {
 		return senderConfig, nil
 	}
 	if transformAt == ip.Local {
-		schema := fmt.Sprintf(",%v ip", key)
-		if autoCreate == fmt.Sprintf("%v ip", key) {
+		schema := fmt.Sprintf(",%s %s", key, TypeIP)
+		if autoCreate == fmt.Sprintf("%s %s", key, TypeIP) {
 			autoCreate = ""
 		} else if index := strings.Index(autoCreate, schema); index != -1 {
 			autoCreate = autoCreate[:index] + autoCreate[index+len(schema):]
 		}
 		senderConfig[sender.KeyPandoraAutoCreate] = autoCreate
 		return senderConfig, nil
+	}
+	if len(GetKeys(key)) > 1 {
+		return senderConfig, fmt.Errorf("key: %v ip transform key in server doesn't support dot(.)", key)
 	}
 
 	if autoCreate == "" {

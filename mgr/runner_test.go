@@ -1941,6 +1941,7 @@ func Test_setSenderConfig(t *testing.T) {
 		{
 			transforms.KeyType:     ip.Name,
 			transforms.TransformAt: ip.Local,
+			"key": "a.b",
 		},
 	}
 	actualConfig, err = setPandoraServerConfig(senderConfig, serverConfigs)

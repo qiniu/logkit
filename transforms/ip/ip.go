@@ -57,8 +57,11 @@ type Transformer struct {
 }
 
 func (t *Transformer) Init() error {
-	if t.TransformAt == "" {
+	if t.TransformAt == "" || t.TransformAt == "本地" {
 		t.TransformAt = Local
+	}
+	if t.TransformAt == "服务端" {
+		t.TransformAt = Server
 	}
 	if t.TransformAt != Local {
 		return nil
