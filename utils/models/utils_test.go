@@ -739,9 +739,9 @@ func TestPickMapValue(t *testing.T) {
 }
 
 func TestPandoraKey(t *testing.T) {
-	testKeys := []string{"@timestamp", ".dot", "percent%100", "^^^^^^^^^^", "timestamp"}
-	expectKeys := []string{"timestamp", "dot", "percent_100", "", "timestamp"}
-	expectValid := []bool{false, false, false, false, true}
+	testKeys := []string{"", "@timestamp", ".dot", "percent%100", "^^^^^^^^^^", "timestamp"}
+	expectKeys := []string{"KEmptyPandoraAutoAdd", "timestamp", "dot", "percent_100", "", "timestamp"}
+	expectValid := []bool{false, false, false, false, false, true}
 	for idx, key := range testKeys {
 		actual, valid := PandoraKey(key)
 		assert.Equal(t, expectKeys[idx], actual)
