@@ -766,7 +766,7 @@ var ModeKeyOptions = map[string][]Option{
 			KeyName:       KeyElasticIndexStrategy,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{KeyDefaultIndexStrategy, KeyYearIndexStrategy, KeyMonthIndexStrategy, KeyDayIndexStrategy},
-			Default:       KeyFtStrategyBackupOnly,
+			Default:       KeyDefaultIndexStrategy,
 			DefaultNoUse:  false,
 			Description:   "自动索引模式(默认索引|按年索引|按月索引|按日索引)(index_strategy)",
 			Advance:       true,
