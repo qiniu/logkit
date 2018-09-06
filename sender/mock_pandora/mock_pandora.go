@@ -31,6 +31,7 @@ type mock_pandora struct {
 	PostSleep   int
 	SetMux      sync.Mutex
 	PostDataNum int
+	DumpDataNum int
 }
 
 //NewMockPandoraWithPrefix 测试的mock pandora server
@@ -164,6 +165,13 @@ func (s *mock_pandora) PostRepos_Data() echo.HandlerFunc {
 			return c.JSON(http.StatusNotFound, NewErrorResponse(errors.New("E18110: mock_pandora error")))
 		}
 
+		if strings.Contains(s.Body, "It's-an-error") && !strings.Contains(s.Body, KeyPandoraStash) {
+			c.Response().Header().Set(ContentTypeHeader, ApplicationJson)
+			c.Response().WriteHeader(http.StatusNotFound)
+
+			return jsoniter.NewEncoder(c.Response()).Encode(map[string]string{"error": "E18125: invalid DataSchema"})
+		}
+
 		if strings.Contains(s.Body, "E18110") {
 			log.Println("get datas: ", s.Body)
 			c.Response().Header().Set(ContentTypeHeader, ApplicationJson)
@@ -183,6 +191,7 @@ func (s *mock_pandora) PostRepos_Data() echo.HandlerFunc {
 			return jsoniter.NewEncoder(c.Response()).Encode(map[string]string{"error": "E18110: mock_pandora error"})
 		}
 		s.PostDataNum++
+		s.DumpDataNum += len(strings.Split(strings.TrimSpace(strByte), "\n"))
 		return nil
 	}
 }

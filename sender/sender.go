@@ -121,11 +121,12 @@ const (
 
 	// fault_tolerant
 	// 可选参数 fault_tolerant 为true的话，以下必填
-	KeyFtSyncEvery         = "ft_sync_every"    // 该参数设置多少次写入会同步一次offset log
-	KeyFtSaveLogPath       = "ft_save_log_path" // disk queue 数据日志路径
-	KeyFtWriteLimit        = "ft_write_limit"   // 写入速度限制，单位MB
-	KeyFtStrategy          = "ft_strategy"      // ft 的策略
-	KeyFtProcs             = "ft_procs"         // ft并发数，当always_save或concurrent策略时启用
+	KeyFtSyncEvery         = "ft_sync_every"          // 该参数设置多少次写入会同步一次offset log
+	KeyFtSaveLogPath       = "ft_save_log_path"       // disk queue 数据日志路径
+	KeyFtWriteLimit        = "ft_write_limit"         // 写入速度限制，单位MB
+	KeyFtStrategy          = "ft_strategy"            // ft 的策略
+	KeyFtProcs             = "ft_procs"               // ft并发数，当always_save或concurrent策略时启用
+	KeyFtDiscardErr        = "ft_discard_failed_data" //是否丢弃错误数据
 	KeyFtMemoryChannel     = "ft_memory_channel"
 	KeyFtMemoryChannelSize = "ft_memory_channel_size"
 	KeyFtLongDataDiscard   = "ft_long_data_discard"
