@@ -1245,6 +1245,94 @@ func TestAddDatasourceForErrData(t *testing.T) {
 	assert.Equal(t, exp, gots)
 }
 
+func TestAddDatasourceForRawData(t *testing.T) {
+	dir := "TestAddDatasource"
+	metaDir := filepath.Join(dir, "meta")
+	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
+		log.Fatalf("TestAddDatasource error mkdir %v %v", dir, err)
+	}
+	filename := []string{"test1.log", "test2.log", "test3.log", "test4.log"}
+	content := []string{"1 fufu 3.14\n", "3 fufu 3.16\n", "hfdjsak,dadiajd,dsaud\n", "4 fufu 3.17\n"}
+	var realPaths []string
+	for i := range filename {
+		logPath := filepath.Join(dir, filename[i])
+		readPath, err := filepath.Abs(logPath)
+		assert.NoError(t, err)
+		realPaths = append(realPaths, readPath)
+		err = ioutil.WriteFile(logPath, []byte(content[i]), DefaultDirPerm)
+		assert.NoError(t, err)
+	}
+
+	defer os.RemoveAll(dir)
+	defer os.RemoveAll(metaDir)
+
+	config1 := `{
+			"name":"TestAddDatasource",
+			"batch_len":4,
+			"reader":{
+				"mode":"dir",
+				"log_path":"./TestAddDatasource/",
+				"datasource_tag":"datasource"
+			},
+			"parser":{
+				"name":"testcsv",
+				"type":"csv",
+				"csv_schema":"a long,b string,c float",
+				"csv_splitter":" ",
+				"disable_record_errdata":"true",
+				"keep_raw_data":"true"
+			},
+			"senders":[{
+				"name":"file_sender",
+				"sender_type":"file",
+				"file_send_path":"./TestAddDatasource/filesend.csv"
+			}]
+		}`
+	rc := RunnerConfig{}
+	err := jsoniter.Unmarshal([]byte(config1), &rc)
+	assert.NoError(t, err)
+
+	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
+	assert.NoError(t, err)
+	go rr.Run()
+
+	time.Sleep(2 * time.Second)
+	data, err := ioutil.ReadFile("./TestAddDatasource/filesend.csv")
+	var res []Data
+	err = jsoniter.Unmarshal(data, &res)
+	if err != nil {
+		t.Error(err)
+	}
+	exp := []Data{
+		{
+			"c":          float64(3.14),
+			"raw_data":   content[0],
+			"datasource": realPaths[0],
+			"a":          float64(1),
+			"b":          "fufu",
+		},
+		{
+			"a":          float64(3),
+			"b":          "fufu",
+			"c":          float64(3.16),
+			"raw_data":   content[1],
+			"datasource": realPaths[1],
+		},
+		{
+			"raw_data":   content[2],
+			"datasource": realPaths[2],
+		},
+		{
+			"b":          "fufu",
+			"c":          float64(3.17),
+			"raw_data":   content[3],
+			"datasource": realPaths[3],
+			"a":          float64(4),
+		},
+	}
+	assert.Equal(t, exp, res)
+}
+
 func TestAddDatatags(t *testing.T) {
 	dir := "TestAddDatatags"
 	metaDir := filepath.Join(dir, "meta")

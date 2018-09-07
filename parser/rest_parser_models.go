@@ -107,6 +107,18 @@ var (
 		ToolTip:      `额外的标签信息，同样逗号分隔，如 "app logkit, user pandora"`,
 	}
 
+	OptionKeepRawData = Option{
+		KeyName:       KeyKeepRawData,
+		Element:       Radio,
+		ChooseOnly:    true,
+		ChooseOptions: []interface{}{"false", "true"},
+		Default:       "false",
+		DefaultNoUse:  false,
+		Description:   "是否保留原始数据(" + KeyKeepRawData + ")",
+		Advance:       true,
+		ToolTip:       `默认不保留，保留后会在每条记录中新增"raw_data"字段，用以保存每条记录的原始数据`,
+	}
+
 	OptionDisableRecordErrData = Option{
 		KeyName:       KeyDisableRecordErrData,
 		Element:       Radio,
@@ -175,6 +187,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionParserName,
 		OptionLabels,
 		OptionDisableRecordErrData,
+		OptionKeepRawData,
 	},
 	TypeGrok: {
 		{
@@ -207,6 +220,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionTimezoneOffset,
 		OptionLabels,
 		OptionDisableRecordErrData,
+		OptionKeepRawData,
 	},
 
 	TypeCSV: {
@@ -282,6 +296,7 @@ var ModeKeyOptions = map[string][]Option{
 			Advance:       true,
 		},
 		OptionDisableRecordErrData,
+		OptionKeepRawData,
 	},
 	TypeRaw: {
 		{
@@ -310,6 +325,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		OptionParserName,
 		OptionDisableRecordErrData,
+		OptionKeepRawData,
 	},
 	TypeSyslog: {
 		{
@@ -331,17 +347,20 @@ var ModeKeyOptions = map[string][]Option{
 		OptionParserName,
 		OptionLabels,
 		OptionDisableRecordErrData,
+		OptionKeepRawData,
 	},
 	TypeKafkaRest: {
 		OptionParserName,
 		OptionLabels,
 		OptionDisableRecordErrData,
+		OptionKeepRawData,
 	},
 	TypeEmpty: {},
 	TypeMySQL: {
 		OptionParserName,
 		OptionLabels,
 		OptionDisableRecordErrData,
+		OptionKeepRawData,
 	},
 	TypeLogfmt: {
 		OptionParserName,

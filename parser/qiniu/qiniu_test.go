@@ -118,6 +118,7 @@ func Test_QiniulogParser(t *testing.T) {
 	c[parser.KeyParserName] = "qiniulogparser"
 	c[parser.KeyParserType] = "qiniulog"
 	c[parser.KeyDisableRecordErrData] = "true"
+	c[parser.KeyKeepRawData] = "true"
 	ps := parser.NewRegistry()
 	p, err := ps.NewLogParser(c)
 	if err != nil {
@@ -157,6 +158,9 @@ func Test_QiniulogParser(t *testing.T) {
 	if dts[1]["time"] != exp {
 		t.Errorf("parse time error exp %v but %v", exp, dts[1]["time"])
 	}
+	for i := range dts {
+		assert.Equal(t, lines[i], dts[i][parser.KeyRawData])
+	}
 
 	newlines := []string{
 		"2016/10/20 17:20:30.642666 [ERROR] disk.go github.com/qiniu/logkit/queue/disk.go:241: ",
@@ -180,6 +184,10 @@ func Test_QiniulogParser(t *testing.T) {
 	}
 	if dts[1]["file"] != "disk.go github.com/qiniu/logkit/queue/disk.go:241:" {
 		t.Errorf("parse level error exp disk.go github.com/qiniu/logkit/queue/disk.go:241: but %v", dts[0]["file"])
+	}
+
+	for i := range dts {
+		assert.Equal(t, newlines[i], dts[i][parser.KeyRawData])
 	}
 	assert.EqualValues(t, "qiniulogparser", p.Name())
 }

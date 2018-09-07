@@ -31,6 +31,7 @@ type Parser struct {
 	labels               []parser.Label
 	disableRecordErrData bool
 	numRoutine           int
+	keepRawData          bool
 }
 
 func NewParser(c conf.MapConf) (parser.Parser, error) {
@@ -42,6 +43,7 @@ func NewNginxAccParser(c conf.MapConf) (p *Parser, err error) {
 	schema, _ := c.GetStringOr(parser.NginxSchema, "")
 	nginxRegexStr, _ := c.GetStringOr(parser.NginxFormatRegex, "")
 	labelList, _ := c.GetStringListOr(parser.KeyLabels, []string{})
+	keepRawData, _ := c.GetBoolOr(parser.KeyKeepRawData, false)
 	nameMap := make(map[string]struct{})
 	labels := parser.GetLabels(labelList, nameMap)
 	numRoutine := MaxProcs
@@ -56,6 +58,7 @@ func NewNginxAccParser(c conf.MapConf) (p *Parser, err error) {
 		labels:               labels,
 		disableRecordErrData: disableRecordErrData,
 		numRoutine:           numRoutine,
+		keepRawData:          keepRawData,
 	}
 	p.schema, err = p.parseSchemaFields(schema)
 	if err != nil {
@@ -161,12 +164,17 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		if parseResult.Err != nil {
 			se.AddErrors()
 			se.ErrorDetail = parseResult.Err
+			errData := make(Data)
 			if !p.disableRecordErrData {
-				datas = append(datas, Data{
-					KeyPandoraStash: parseResult.Line,
-				})
-			} else {
+				errData[KeyPandoraStash] = parseResult.Line
+			} else if !p.keepRawData {
 				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
+			}
+			if p.keepRawData {
+				errData[parser.KeyRawData] = parseResult.Line
+			}
+			if !p.disableRecordErrData || p.keepRawData {
+				datas = append(datas, errData)
 			}
 			continue
 		}
@@ -177,6 +185,9 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		}
 		se.AddSuccess()
 		log.Debugf("D! parse result(%v)", parseResult.Data)
+		if p.keepRawData {
+			parseResult.Data[parser.KeyRawData] = parseResult.Line
+		}
 		datas = append(datas, parseResult.Data)
 	}
 

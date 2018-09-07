@@ -50,6 +50,7 @@ type Parser struct {
 	headers              []string
 	labels               []parser.Label
 	disableRecordErrData bool
+	keepRawData          bool
 }
 
 func checkLevel(str string) bool {
@@ -65,6 +66,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	name, _ := c.GetStringOr(parser.KeyParserName, "")
 	labelList, _ := c.GetStringListOr(parser.KeyLabels, []string{})
 	logHeaders, _ := c.GetStringListOr(parser.KeyLogHeaders, defaultLogHeads)
+	keepRawData, _ := c.GetBoolOr(parser.KeyKeepRawData, false)
 	if len(logHeaders) < 1 {
 		return nil, fmt.Errorf("no log headers was configured to parse")
 	}
@@ -90,6 +92,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		labels:               labels,
 		headers:              logHeaders,
 		disableRecordErrData: disableRecordErrData,
+		keepRawData:          keepRawData,
 	}, nil
 }
 
@@ -359,16 +362,24 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		if err != nil {
 			se.AddErrors()
 			se.ErrorDetail = err
+			errData := make(Data)
 			if !p.disableRecordErrData {
-				errData := make(Data)
 				errData[KeyPandoraStash] = line
-				datas = append(datas, errData)
-			} else {
+			} else if !p.keepRawData {
 				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
+			}
+			if p.keepRawData {
+				errData[parser.KeyRawData] = line
+			}
+			if !p.disableRecordErrData || p.keepRawData {
+				datas = append(datas, errData)
 			}
 			continue
 		}
 		se.AddSuccess()
+		if p.keepRawData {
+			d[parser.KeyRawData] = line
+		}
 		datas = append(datas, d)
 	}
 	return datas, se

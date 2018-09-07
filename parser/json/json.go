@@ -26,6 +26,7 @@ type Parser struct {
 	disableRecordErrData bool
 	jsontool             jsoniter.API
 	numRoutine           int
+	keepRawData          bool
 }
 
 func NewParser(c conf.MapConf) (parser.Parser, error) {
@@ -39,6 +40,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	}.Froze()
 
 	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
+	keepRawData, _ := c.GetBoolOr(parser.KeyKeepRawData, false)
 	numRoutine := MaxProcs
 	if numRoutine == 0 {
 		numRoutine = 1
@@ -50,6 +52,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		jsontool:             jsontool,
 		disableRecordErrData: disableRecordErrData,
 		numRoutine:           numRoutine,
+		keepRawData:          keepRawData,
 	}, nil
 }
 
@@ -108,12 +111,17 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		if parseResult.Err != nil {
 			se.AddErrors()
 			se.ErrorDetail = parseResult.Err
+			errData := make(Data)
 			if !p.disableRecordErrData {
-				datas = append(datas, Data{
-					KeyPandoraStash: parseResult.Line,
-				})
-			} else {
+				errData[KeyPandoraStash] = parseResult.Line
+			} else if !p.keepRawData {
 				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
+			}
+			if p.keepRawData {
+				errData[parser.KeyRawData] = parseResult.Line
+			}
+			if !p.disableRecordErrData || p.keepRawData {
+				datas = append(datas, errData)
 			}
 			continue
 		}
@@ -124,6 +132,10 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		}
 
 		se.AddSuccess()
+		//一条Json格式的数据可能返回多个Data，只有当返回Data数组长度为1是raw_data才会生效
+		if p.keepRawData && len(parseResult.Datas) == 1 {
+			parseResult.Datas[0][parser.KeyRawData] = parseResult.Line
+		}
 		datas = append(datas, parseResult.Datas...)
 	}
 
