@@ -343,7 +343,7 @@ func mapDataConvert(mpvalue map[string]interface{}, schemas []RepoSchemaEntry) (
 		if subv, ok := mpvalue[v.Key]; ok {
 			subconverted, err := dataConvert(subv, v)
 			if err != nil {
-				log.Error(err)
+				log.Warnf("ignore key %s as %v", v.Key, err)
 				continue
 			}
 			mpvalue[v.Key] = subconverted
@@ -397,6 +397,10 @@ func copyAndConvertData(d Data, mapLevel int) Data {
 			}
 		case uint64:
 			v = int64(nv)
+		case string:
+			if len(nv) == 0 {
+				continue
+			}
 		case nil:
 			continue
 		}

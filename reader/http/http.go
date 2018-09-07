@@ -171,7 +171,7 @@ func (r *Reader) postData() echo.HandlerFunc {
 		if err := r.pickUpData(c.Request()); err != nil {
 			return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 		}
-		return c.JSON(http.StatusOK, nil)
+		return c.JSON(http.StatusOK, map[string]string{})
 	}
 }
 

@@ -358,7 +358,7 @@ func dataConvert(data interface{}, schema DslSchemaEntry) (converted interface{}
 		case reflect.String:
 			val := strings.TrimSpace(value.String())
 			if val == "" {
-				return nil, nil
+				return schema.Default, nil
 			}
 			if converted, err = strconv.ParseInt(val, 10, 64); err == nil {
 				return converted, nil
@@ -379,7 +379,7 @@ func dataConvert(data interface{}, schema DslSchemaEntry) (converted interface{}
 		case reflect.String:
 			val := strings.TrimSpace(value.String())
 			if val == "" {
-				return nil, nil
+				return schema.Default, nil
 			}
 			if converted, err = strconv.ParseFloat(val, 10); err == nil {
 				return converted, nil
