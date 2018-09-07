@@ -127,27 +127,27 @@ func TestPandoraSender(t *testing.T) {
 		t.Errorf("send data error exp %v but %v", exp, pandora.Body)
 	}
 	pandora.ChangeSchema([]pipeline.RepoSchemaEntry{
-		pipeline.RepoSchemaEntry{
+		{
 			Key:       "ab",
 			ValueType: "string",
 			Required:  true,
 		},
-		pipeline.RepoSchemaEntry{
+		{
 			Key:       "a1",
 			ValueType: "float",
 			Required:  true,
 		},
-		pipeline.RepoSchemaEntry{
+		{
 			Key:       "ac",
 			ValueType: "long",
 			Required:  true,
 		},
-		pipeline.RepoSchemaEntry{
+		{
 			Key:       "d",
 			ValueType: "date",
 			Required:  true,
 		},
-		pipeline.RepoSchemaEntry{
+		{
 			Key:       "ax",
 			ValueType: "string",
 			Required:  false,
@@ -1000,4 +1000,64 @@ func TestErrPandoraSender(t *testing.T) {
 	assert.Equal(t, []map[string]interface{}{{"PointFailedSendx1": "x1Val"}}, sendError.GetFailDatas())
 	assert.Equal(t, int64(1), st.Errors)
 	assert.Equal(t, int64(2), st.Success)
+}
+
+func TestAliasPandoraSender(t *testing.T) {
+	_, pt := mockPandora.NewMockPandoraWithPrefix("/v2")
+	opt := &PandoraOption{
+		name:           "p_TestErrPandoraSender",
+		repoName:       "TestErrPandoraSender",
+		region:         "nb",
+		endpoint:       "http://127.0.0.1:" + pt,
+		ak:             "ak",
+		sk:             "sk",
+		schema:         "x1 PointFailedSendx1",
+		autoCreate:     "PointFailedSendx1 s",
+		updateInterval: time.Second,
+		reqRateLimit:   0,
+		flowRateLimit:  0,
+		gzip:           false,
+		tokenLock:      new(sync.RWMutex),
+	}
+	s, err := newPandoraSender(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dataSlice := []struct {
+		data   Data
+		expect int
+	}{
+		{
+			Data{"x2": 1.2},
+			1,
+		},
+		{
+			Data{
+				"x3": 2,
+				"x4": []float64{1.1, 2.2, 3.3},
+				"x5": map[string]interface{}{
+					"x6": 123,
+					"x7": map[string]interface{}{
+						"x8": []string{"abc"},
+						"x9": true,
+					},
+				},
+			},
+			3,
+		},
+		{
+			Data{"x1": "x1Val"},
+			1,
+		},
+	}
+	var datas []Data
+	for _, d := range dataSlice {
+		datas = append(datas, d.data)
+	}
+	err = s.Send(datas)
+	assert.Error(t, err)
+	assert.Equal(t, 3, len(datas))
+	for idx, data := range datas {
+		assert.Equal(t, dataSlice[idx].expect, len(data))
+	}
 }
