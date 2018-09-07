@@ -340,6 +340,22 @@ func TestConvertData(t *testing.T) {
 			},
 			exp: nil,
 		},
+		{
+			v: "",
+			schema: DslSchemaEntry{
+				ValueType: pipeline.PandoraTypeFloat,
+				Default:   float64(1.0),
+			},
+			exp: float64(1.0),
+		},
+		{
+			v: "",
+			schema: DslSchemaEntry{
+				ValueType: pipeline.PandoraTypeLong,
+				Default:   int64(2),
+			},
+			exp: int64(2),
+		},
 	}
 	for _, ti := range tests {
 		got, err := dataConvert(ti.v, ti.schema)
