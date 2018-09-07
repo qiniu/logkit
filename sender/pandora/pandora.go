@@ -833,6 +833,7 @@ func (s *Sender) generatePoint(data Data) (point Data) {
 			continue
 		}
 		point[k] = value
+		data[k] = value
 	}
 	if s.opt.uuid {
 		uuid, _ := gouuid.NewV4()

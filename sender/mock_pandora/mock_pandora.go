@@ -146,11 +146,19 @@ func (s *mock_pandora) PostRepos_Data() echo.HandlerFunc {
 		defer s.BodyMux.Unlock()
 		s.Body = strings.Join(sep, " ")
 
-		if len(strings.TrimSpace(strByte)) < 1 {
+		strByte = strings.TrimSpace(strByte)
+		if len(strByte) < 1 {
 			c.Response().Header().Set(ContentTypeHeader, ApplicationJson)
 			c.Response().WriteHeader(http.StatusNotFound)
 
 			return jsoniter.NewEncoder(c.Response()).Encode(map[string]string{"error": "E18006: empty entity"})
+		}
+
+		if strings.HasPrefix(strByte, "PointFailedSend") {
+			c.Response().Header().Set(ContentTypeHeader, ApplicationJson)
+			c.Response().WriteHeader(http.StatusNotFound)
+
+			return jsoniter.NewEncoder(c.Response()).Encode(errors.New("pandora send points error"))
 		}
 
 		if strings.Contains(s.Body, "E18111:") {

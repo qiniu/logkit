@@ -377,13 +377,6 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 				r.rsMutex.Lock()
 				r.rs.Lag.Ftlags = se.FtQueueLag
 				r.rsMutex.Unlock()
-			} else {
-				if cnt > 1 {
-					info.Errors -= se.Success
-				} else {
-					info.Errors += se.Errors
-				}
-				info.Success += se.Success
 			}
 		} else if err != nil {
 			if cnt <= 1 {
@@ -391,6 +384,9 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 			}
 		} else {
 			info.Success += int64(len(datas))
+			if cnt > 1 {
+				info.Errors -= int64(len(datas))
+			}
 		}
 		if err != nil {
 			info.LastError = TruncateStrSize(err.Error(), DefaultTruncateMaxSize)
