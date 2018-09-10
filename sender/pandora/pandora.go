@@ -48,6 +48,7 @@ type Sender struct {
 	microsecondCounter uint64
 	extraInfo          map[string]string
 	sendType           string
+	ipConfig           *pipeline.LocateIPConfig
 }
 
 // UserSchema was parsed pandora schema from user's raw schema
@@ -502,6 +503,20 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 		log.Errorf("Runner[%v] Sender[%v]: auto create pandora repo error: %v, you can create on pandora portal, ignored...", opt.runnerName, opt.name, err)
 		err = nil
 	}
+
+	var ipConfig *pipeline.LocateIPConfig
+	for _, schema := range schemas {
+		if strings.ToLower(schema.ValueType) == "ip" || strings.ToLower(schema.ValueType) == "i" {
+			if ipConfig == nil {
+				ipConfig = &pipeline.LocateIPConfig{
+					ShouldLocateIP: true,
+					Mappings:       make(map[string]*pipeline.LocateIPDetails),
+				}
+			}
+			ipConfig.Mappings[schema.Key] = getDefaultLocateIPDetails(schema.Key)
+		}
+	}
+	s.ipConfig = ipConfig
 	if initErr := s.client.InitOrUpdateWorkflow(&pipeline.InitOrUpdateWorkflowInput{
 		// 此处要的 schema 为 autoCreate 中用户指定的，所以 SchemaFree 要恒为 true
 		InitOptionChange: true,
@@ -524,6 +539,7 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 				AnalyzerInfo:          s.opt.analyzerInfo,
 				AutoExportLogDBTokens: s.opt.tokens.LogDBTokens,
 				Description:           &s.opt.autoCreateDescription,
+				IPConfig:              ipConfig,
 			},
 			ToKODO: s.opt.enableKodo,
 			AutoExportToKODOInput: pipeline.AutoExportToKODOInput{
@@ -1060,6 +1076,7 @@ func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 				AnalyzerInfo:          s.opt.analyzerInfo,
 				AutoExportLogDBTokens: s.opt.tokens.LogDBTokens,
 				Description:           &s.opt.autoCreateDescription,
+				IPConfig:              s.ipConfig,
 			},
 			ToKODO: s.opt.enableKodo,
 			AutoExportToKODOInput: pipeline.AutoExportToKODOInput{
@@ -1134,4 +1151,22 @@ func (s *Sender) Name() string {
 
 func (s *Sender) Close() error {
 	return s.client.Close()
+}
+
+func getDefaultLocateIPDetails(key string) *pipeline.LocateIPDetails {
+	return &pipeline.LocateIPDetails{
+		ShouldLocateField: true,
+		WantedFields: map[string]bool{
+			pipeline.IPWantCountry: true,
+			pipeline.IPWantRegion:  true,
+			pipeline.IPWantCity:    true,
+			pipeline.IPWantIsp:     true,
+		},
+		FieldNames: map[string]string{
+			pipeline.IPFieldNameCountry: key + pipeline.IPFiledSuffixCountry,
+			pipeline.IPFieldNameRegion:  key + pipeline.IPFiledSuffixRegion,
+			pipeline.IPFieldNameCity:    key + pipeline.IPFiledSuffixCity,
+			pipeline.IPFieldNameIsp:     key + pipeline.IPFiledSuffixIsp,
+		},
+	}
 }

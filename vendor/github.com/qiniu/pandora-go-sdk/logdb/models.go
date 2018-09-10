@@ -446,7 +446,7 @@ func checkRetention(retention string) error {
 		return reqerr.NewInvalidArgs("Retention", "invalid retention time format")
 	}
 
-	if retentionInt > maxRetentionDay || retentionInt < minRetentionDay {
+	if retentionInt < minRetentionDay {
 		return reqerr.NewInvalidArgs("Retention", "invalid retention range")
 	}
 	return nil

@@ -1423,13 +1423,6 @@ type LocateIPConfig struct {
 	Mappings       map[string]*LocateIPDetails `json:"mappings"`
 }
 
-func NewLocateIPConfig() LocateIPConfig {
-	return LocateIPConfig{
-		ShouldLocateIP: true,
-		Mappings:       make(map[string]*LocateIPDetails, 0),
-	}
-}
-
 type ExportLogDBSpec struct {
 	DestRepoName   string                 `json:"destRepoName"`
 	Doc            map[string]interface{} `json:"doc"`
