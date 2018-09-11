@@ -414,7 +414,7 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 		} else if se.ErrorType == reqerr.TypeSchemaFreeRetry {
 			errMessage = "maybe this is because of server schema cache, will send all data again"
 		} else {
-			errMessage = "error type is default, will send all data again"
+			errMessage = "error type is default, will send all failed data again"
 		}
 	}
 	log.Errorf("Runner[%v] Sender[%v] cannot write points: %v, failDatas size: %v, %s", ft.runnerName, ft.innerSender.Name(), err, len(failCtx.Datas), errMessage)
