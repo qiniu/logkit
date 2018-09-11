@@ -51,6 +51,7 @@ type FtSender struct {
 	statsMutex      *sync.RWMutex
 	jsontool        jsoniter.API
 	pandoraKeyCache map[string]KeyInfo
+	discardErr      bool
 }
 
 type FtOption struct {
@@ -66,6 +67,7 @@ type FtOption struct {
 	pandoraSenderType string
 	maxDiskUsedBytes  int64
 	maxSizePerFile    int32
+	discardErr        bool
 }
 
 type datasContext struct {
@@ -92,6 +94,7 @@ func NewFtSender(innerSender Sender, conf conf.MapConf, ftSaveLogPath string) (*
 	runnerName, _ := conf.GetStringOr(KeyRunnerName, UnderfinedRunnerName)
 	maxDiskUsedBytes, _ := conf.GetInt64Or(KeyMaxDiskUsedBytes, maxDiskUsedBytes)
 	maxSizePerFile, _ := conf.GetInt32Or(KeyMaxSizePerFile, maxBytesPerFile)
+	discardErr, _ := conf.GetBoolOr(KeyFtDiscardErr, false)
 
 	opt := &FtOption{
 		saveLogPath:       logPath,
@@ -106,6 +109,7 @@ func NewFtSender(innerSender Sender, conf conf.MapConf, ftSaveLogPath string) (*
 		pandoraSenderType: pandoraSendType,
 		maxDiskUsedBytes:  maxDiskUsedBytes,
 		maxSizePerFile:    maxSizePerFile,
+		discardErr:        discardErr,
 	}
 
 	return newFtSender(innerSender, runnerName, opt)
@@ -169,6 +173,7 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 		opt:         opt,
 		statsMutex:  new(sync.RWMutex),
 		jsontool:    jsoniter.Config{EscapeHTML: true, UseNumber: true}.Froze(),
+		discardErr:  opt.discardErr,
 	}
 
 	if opt.innerSenderType == TypePandora {
@@ -405,7 +410,7 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 		failCtx.Datas = ConvertDatas(se.GetFailDatas())
 		if se.ErrorType == reqerr.TypeBinaryUnpack {
 			binaryUnpack = true
-			errMessage = "error type is binaryUnpack, will divid to 2 parts and retry"
+			errMessage = "error type is binaryUnpack, will be divided to 2 parts and retry"
 		} else if se.ErrorType == reqerr.TypeSchemaFreeRetry {
 			errMessage = "maybe this is because of server schema cache, will send all data again"
 		} else {
@@ -425,6 +430,10 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 			return
 		}
 		if len(failCtx.Datas) == 1 {
+			//当数据仅有一条且discardErr为true时，丢弃数据
+			if ft.discardErr {
+				return nil
+			}
 			failCtxData := failCtx.Datas[0]
 			// 小于 2M 时，放入 pandora_stash中
 			dataBytes, err := jsoniter.Marshal(failCtxData)

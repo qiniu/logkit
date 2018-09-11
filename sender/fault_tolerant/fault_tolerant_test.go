@@ -116,6 +116,70 @@ func TestFtSender(t *testing.T) {
 	}
 }
 
+func TestFtDiscardLast(t *testing.T) {
+	p, pt := mock_pandora.NewMockPandoraWithPrefix("/v2")
+	pandoraSenderConfig := conf.MapConf{
+		"name":                           "p",
+		"pandora_region":                 "nb",
+		"pandora_host":                   "http://127.0.0.1:" + pt,
+		"pandora_schema":                 "",
+		"pandora_auto_create":            "",
+		"pandora_schema_free":            "true",
+		"pandora_ak":                     "ak",
+		"pandora_sk":                     "sk",
+		"pandora_schema_update_interval": "1",
+		"pandora_gzip":                   "false",
+
+		"sender_type": "pandora",
+	}
+	pandoraSenderConfig["pandora_repo_name"] = "TestFtSender"
+	s, err := pandora.NewSender(pandoraSenderConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mp := conf.MapConf{}
+	mp[sender.KeyFtSaveLogPath] = fttestdir
+	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyBackupOnly
+	mp[sender.KeyFtDiscardErr] = "true"
+	defer os.RemoveAll(fttestdir)
+	fts, err := sender.NewFtSender(s, mp, fttestdir)
+	assert.NoError(t, err)
+	datas := []Data{
+		{"a": "11111"},
+		{"b": "22222"},
+		{"c": "33333"},
+		{"d": "It's-an-error"},
+	}
+	err = fts.Send(datas)
+	se, ok := err.(*StatsError)
+	if !ok {
+		t.Fatal("ft send return error should .(*SendError)")
+	}
+	assert.Error(t, se.ErrorDetail)
+	time.Sleep(5 * time.Second)
+	//get three records
+	p.SetMux.Lock()
+	assert.Equal(t, 3, p.DumpDataNum)
+	p.SetMux.Unlock()
+
+	mp2 := conf.MapConf{}
+	mp2[sender.KeyFtSaveLogPath] = fttestdir
+	mp2[sender.KeyFtStrategy] = sender.KeyFtStrategyBackupOnly
+	mp2[sender.KeyFtDiscardErr] = "false"
+	fts2, err := sender.NewFtSender(s, mp2, fttestdir)
+	err = fts2.Send(datas)
+	se, ok = err.(*StatsError)
+	if !ok {
+		t.Fatal("ft send return error should .(*SendError)")
+	}
+	assert.Error(t, se.ErrorDetail)
+	time.Sleep(5 * time.Second)
+	//get four records
+	p.SetMux.Lock()
+	assert.Equal(t, 7, p.DumpDataNum)
+	p.SetMux.Unlock()
+}
+
 func TestFtMemorySender(t *testing.T) {
 	_, pt := mock_pandora.NewMockPandoraWithPrefix("/v2")
 	pandoraSenderConfig := conf.MapConf{
