@@ -1,6 +1,7 @@
 package conf
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -108,5 +109,117 @@ func TestGet(t *testing.T) {
 	_, err := c.Get("k1")
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+func TestGetPasswordEnvString(t *testing.T) {
+	err := os.Setenv("TestGetPasswordString", "testPassordString")
+	assert.NoError(t, err)
+	defer os.Unsetenv("TestGetPasswordString")
+
+	c := MapConf{
+		"a": "TestGetPasswordString",
+		"b": "${TestGetPasswordString}",
+	}
+
+	actual, err := c.GetPasswordEnvString("a")
+	assert.NoError(t, err)
+	assert.Equal(t, c["a"], actual)
+
+	actual, err = c.GetPasswordEnvString("b")
+	assert.NoError(t, err)
+	assert.Equal(t, "testPassordString", actual)
+}
+
+func TestGetPasswordEnvStringOr(t *testing.T) {
+	err := os.Setenv("TestGetPasswordString", "testPassordString")
+	assert.NoError(t, err)
+	defer os.Unsetenv("TestGetPasswordString")
+
+	c := MapConf{
+		"b": "${TestGetPasswordString}",
+		"c": "TestGetPasswordString",
+	}
+
+	actual, err := c.GetPasswordEnvStringOr("a", "TestGetPasswordString")
+	assert.NoError(t, err)
+	assert.Equal(t, "TestGetPasswordString", actual)
+
+	actual, err = c.GetPasswordEnvStringOr("a", "${TestGetPasswordString}")
+	assert.NoError(t, err)
+	assert.Equal(t, "testPassordString", actual)
+
+	actual, err = c.GetPasswordEnvStringOr("b", "${TestGetPasswordStringDeft}")
+	assert.NoError(t, err)
+	assert.Equal(t, "testPassordString", actual)
+
+	actual, err = c.GetPasswordEnvStringOr("c", "TestGetPasswordStringDeft")
+	assert.NoError(t, err)
+	assert.Equal(t, c["c"], actual)
+}
+
+func TestGetEnv(t *testing.T) {
+	var exceptedValue = "mockEnv"
+	err := os.Setenv("test", exceptedValue)
+	if err != nil {
+		t.Error(err)
+	}
+
+	defer os.Clearenv()
+
+	assert.Equal(t, exceptedValue, GetEnv("${test}"))
+	assert.Equal(t, exceptedValue, GetEnv("  ${test} "))
+}
+
+func TestGetEnvValue(t *testing.T) {
+	var exceptedValue = "mockEnv"
+	err := os.Setenv("test", exceptedValue)
+	if err != nil {
+		t.Error(err)
+	}
+
+	defer os.Clearenv()
+
+	value, err := GetEnvValue("test")
+	assert.NoError(t, err)
+	assert.Equal(t, exceptedValue, value)
+
+	value, err = GetEnvValue("  test ")
+	assert.NoError(t, err)
+	assert.Equal(t, exceptedValue, value)
+
+	value, err = GetEnvValue("tes")
+	assert.Error(t, err)
+
+	value, err = GetEnvValue("")
+	assert.Error(t, err)
+}
+
+func TestIsEnv(t *testing.T) {
+	tests := []struct {
+		data          string
+		expectIsEnv   bool
+		expectEnvName string
+	}{
+		{},
+		{
+			data:        "${}",
+			expectIsEnv: true,
+		},
+		{
+			data:          "${test1}",
+			expectIsEnv:   true,
+			expectEnvName: "test1",
+		},
+		{
+			data:          " ${ test1 }",
+			expectIsEnv:   true,
+			expectEnvName: "test1",
+		},
+	}
+	for _, test := range tests {
+		envName, isEnv := IsEnv(test.data)
+		assert.Equal(t, test.expectIsEnv, isEnv)
+		assert.Equal(t, test.expectEnvName, envName)
 	}
 }

@@ -130,21 +130,6 @@ func Test_GetLogFiles(t *testing.T) {
 	}
 }
 
-func TestParseSystemEnv(t *testing.T) {
-	var exceptedValue string = "mockEnv"
-	err := os.Setenv("test", exceptedValue)
-	if err != nil {
-		t.Error(err)
-	}
-
-	defer os.Clearenv()
-
-	var envOr string = "${test}"
-	result := GetEnv(envOr)
-
-	assert.Equal(t, exceptedValue, result)
-}
-
 func TestTuoEncodeDecode(t *testing.T) {
 	tests := []struct {
 		exp []string

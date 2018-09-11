@@ -1543,6 +1543,9 @@ func TestMySql(t *testing.T) {
 	}
 
 	runnerName := "mrOnce"
+	err := os.Setenv("TestMySql_dbSource", dbSource)
+	assert.NoError(t, err)
+	defer os.Unsetenv("TestMySql_dbSource")
 	mr, err := reader.NewReader(conf.MapConf{
 		"mysql_database":     "Test_MySql20180510",
 		"mysql_table":        "runoob_tbl20180510est",
@@ -1551,7 +1554,7 @@ func TestMySql(t *testing.T) {
 		"mode":               "mysql",
 		"mysql_exec_onstart": "true",
 		"encoding":           "gbk",
-		"mysql_datasource":   dbSource,
+		"mysql_datasource":   "${TestMySql_dbSource}",
 		"meta_path":          path.Join(MetaDir, runnerName),
 		"file_done":          path.Join(MetaDir, runnerName),
 		"runner_name":        runnerName,

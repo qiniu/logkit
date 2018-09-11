@@ -127,7 +127,7 @@ func NewReader(meta *reader.Meta, c conf.MapConf) (reader.Reader, error) {
 		secLevel, _ = c.GetStringOr(reader.KeySnmpReaderSecLevel, "noAuthNoPriv")
 		secName, _ = c.GetStringOr(reader.KeySnmpReaderSecName, "user")
 		authProtocol, _ = c.GetStringOr(reader.KeySnmpReaderAuthProtocol, "MD5")
-		authPassword, _ = c.GetStringOr(reader.KeySnmpReaderAuthPassword, "pass")
+		authPassword, _ = c.GetPasswordEnvStringOr(reader.KeySnmpReaderAuthPassword, "")
 		privProtocol, _ = c.GetStringOr(reader.KeySnmpReaderPrivProtocol, "DES")
 		privPassword, _ = c.GetStringOr(reader.KeySnmpReaderPrivPassword, "mypass")
 		engineID, _ = c.GetString(reader.KeySnmpReaderEngineID)

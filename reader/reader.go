@@ -61,6 +61,10 @@ type FileReader interface {
 
 // FileReader's conf keys
 const (
+	// General
+	KeyAuthUsername = "auth_username"
+	KeyAuthPassword = "auth_password"
+
 	KeyLogPath           = "log_path"
 	KeyMetaPath          = "meta_path"
 	KeyFileDone          = "file_done"

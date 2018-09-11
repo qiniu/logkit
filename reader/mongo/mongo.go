@@ -84,7 +84,10 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	host, _ := conf.GetStringOr(reader.KeyMongoHost, "localhost:9200")
+	host, err := conf.GetPasswordEnvString(reader.KeyMongoHost)
+	if err != nil {
+		return nil, err
+	}
 	offsetkey, _ := conf.GetStringOr(reader.KeyMongoOffsetKey, DefaultOffsetKey)
 	cronSched, _ := conf.GetStringOr(reader.KeyMongoCron, "")
 	execOnStart, _ := conf.GetBoolOr(reader.KeyMongoExecOnstart, true)

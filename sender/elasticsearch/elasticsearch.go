@@ -74,7 +74,7 @@ func NewSender(conf conf.MapConf) (elasticSender sender.Sender, err error) {
 	eType, _ := conf.GetStringOr(sender.KeyElasticType, defaultType)
 	name, _ := conf.GetStringOr(sender.KeyName, fmt.Sprintf("elasticSender:(elasticUrl:%s,index:%s,type:%s)", host, index, eType))
 	fields, _ := conf.GetAliasMapOr(sender.KeyElasticAlias, make(map[string]string))
-	eVersion, _ := conf.GetStringOr(sender.KeyElasticVersion, sender.ElasticVersion3)
+	eVersion, _ := conf.GetStringOr(sender.KeyElasticVersion, sender.ElasticVersion5)
 
 	strategy := []string{sender.KeyDefaultIndexStrategy, sender.KeyYearIndexStrategy, sender.KeyMonthIndexStrategy, sender.KeyDayIndexStrategy}
 
@@ -84,7 +84,7 @@ func NewSender(conf conf.MapConf) (elasticSender sender.Sender, err error) {
 	}
 
 	authUsername, _ := conf.GetStringOr(sender.KeyAuthUsername, "")
-	authPassword, _ := conf.GetStringOr(sender.KeyAuthPassword, "")
+	authPassword, _ := conf.GetPasswordEnvStringOr(sender.KeyAuthPassword, "")
 	enableGzip, _ := conf.GetBoolOr(sender.KeyEnableGzip, false)
 
 	// 初始化 client
@@ -106,25 +106,9 @@ func NewSender(conf conf.MapConf) (elasticSender sender.Sender, err error) {
 
 		elasticV6Client, err = elasticV6.NewClient(optFns...)
 		if err != nil {
-			return
+			return nil, err
 		}
-	case sender.ElasticVersion5:
-		optFns := []elasticV5.ClientOptionFunc{
-			elasticV5.SetSniff(false),
-			elasticV5.SetHealthcheck(false),
-			elasticV5.SetURL(host...),
-			elasticV5.SetGzip(enableGzip),
-		}
-
-		if len(authUsername) > 0 && len(authPassword) > 0 {
-			optFns = append(optFns, elasticV5.SetBasicAuth(authUsername, authPassword))
-		}
-
-		elasticV5Client, err = elasticV5.NewClient(optFns...)
-		if err != nil {
-			return
-		}
-	default:
+	case sender.ElasticVersion3:
 		optFns := []elasticV3.ClientOptionFunc{
 			elasticV3.SetSniff(false),
 			elasticV3.SetHealthcheck(false),
@@ -138,7 +122,23 @@ func NewSender(conf conf.MapConf) (elasticSender sender.Sender, err error) {
 
 		elasticV3Client, err = elasticV3.NewClient(optFns...)
 		if err != nil {
-			return
+			return nil, err
+		}
+	default:
+		optFns := []elasticV5.ClientOptionFunc{
+			elasticV5.SetSniff(false),
+			elasticV5.SetHealthcheck(false),
+			elasticV5.SetURL(host...),
+			elasticV5.SetGzip(enableGzip),
+		}
+
+		if len(authUsername) > 0 && len(authPassword) > 0 {
+			optFns = append(optFns, elasticV5.SetBasicAuth(authUsername, authPassword))
+		}
+
+		elasticV5Client, err = elasticV5.NewClient(optFns...)
+		if err != nil {
+			return nil, err
 		}
 	}
 
