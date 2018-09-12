@@ -26,10 +26,11 @@ func (c *Pipeline) FormLogDBSpec(input *CreateRepoForLogDBInput) *ExportLogDBSpe
 		doc[v.Key] = "#" + v.Key
 	}
 	return &ExportLogDBSpec{
-		DestRepoName: input.LogRepoName,
-		Doc:          doc,
-		OmitInvalid:  input.OmitInvalid,
-		OmitEmpty:    input.OmitEmpty,
+		DestRepoName:   input.LogRepoName,
+		Doc:            doc,
+		OmitInvalid:    input.OmitInvalid,
+		OmitEmpty:      input.OmitEmpty,
+		LocateIPConfig: input.IPConfig,
 	}
 }
 
@@ -367,6 +368,7 @@ func (c *Pipeline) AutoExportToLogDB(input *AutoExportToLogDBInput) error {
 			Schema:      repoInfo.Schema,
 			OmitEmpty:   input.OmitEmpty,
 			OmitInvalid: input.OmitInvalid,
+			IPConfig:    input.IPConfig,
 		})
 		exportInput := c.FormExportInput(input.RepoName, ExportTypeLogDB, logDBSpec)
 		exportInput.PandoraToken = input.CreateExportToken

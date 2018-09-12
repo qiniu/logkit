@@ -293,6 +293,7 @@ func (c *Pipeline) UpdateRepoWithLogDB(input *UpdateRepoInput, ex ExportDesc) er
 			hasDiff = true
 		}
 	}
+
 	if !hasDiff {
 		// 对于没有变化的就不更新了
 		return nil
@@ -307,7 +308,12 @@ func (c *Pipeline) UpdateRepoWithLogDB(input *UpdateRepoInput, ex ExportDesc) er
 		log.Error("UpdateRepoWithLogDB update logdb repo error", err)
 		return err
 	}
-	spec := &ExportLogDBSpec{DestRepoName: repoName, Doc: docs, OmitEmpty: omitEmpty, OmitInvalid: omitInvalid}
+
+	var ipConfig *LocateIPConfig
+	if input.Option != nil {
+		ipConfig = input.Option.IPConfig
+	}
+	spec := &ExportLogDBSpec{DestRepoName: repoName, Doc: docs, OmitEmpty: omitEmpty, OmitInvalid: omitInvalid, LocateIPConfig: ipConfig}
 	err = c.UpdateExport(&UpdateExportInput{
 		RepoName:     input.RepoName,
 		ExportName:   ex.Name,

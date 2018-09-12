@@ -601,6 +601,7 @@ type AutoExportToLogDBInput struct {
 	Description *string
 	AnalyzerInfo
 	AutoExportLogDBTokens
+	IPConfig *LocateIPConfig
 }
 type AutoExportLogDBTokens struct {
 	PipelineCreateRepoToken PandoraToken
@@ -625,6 +626,7 @@ type CreateRepoForLogDBInput struct {
 	Description *string
 	AnalyzerInfo
 	AutoExportLogDBTokens
+	IPConfig *LocateIPConfig
 }
 
 type CreateRepoForLogDBDSLInput struct {
@@ -1381,6 +1383,24 @@ func (s *ExportMongoSpec) Validate() (err error) {
 
 	NOTE: If FieldNames is not provided or the fieldName is not valid, then default fieldnames will be used
 */
+
+const (
+	IPWantCountry = "wantCountry"
+	IPWantRegion  = "wantRegion"
+	IPWantCity    = "wantCity"
+	IPWantIsp     = "wantIsp"
+
+	IPFieldNameCountry = "ipCountryFieldName"
+	IPFieldNameRegion  = "ipRegionFieldName"
+	IPFieldNameCity    = "ipCityFieldName"
+	IPFieldNameIsp     = "ipIspFieldName"
+
+	IPFiledSuffixCountry = "_country"
+	IPFiledSuffixRegion  = "_region"
+	IPFiledSuffixCity    = "_city"
+	IPFiledSuffixIsp     = "_isp"
+)
+
 type LocateIPDetails struct {
 	ShouldLocateField bool              `json:"shouldLocateField"`
 	WantedFields      map[string]bool   `json:"wantedFields"`

@@ -1314,7 +1314,6 @@ func setPandoraServerConfig(senderConfig conf.MapConf, serverConfigs []map[strin
 				return senderConfig, err
 			}
 		}
-
 	}
 
 	return senderConfig, nil
@@ -1331,16 +1330,12 @@ func setIPConfig(senderConfig conf.MapConf, serverConfig map[string]interface{})
 	if !transformAtOk {
 		return senderConfig, nil
 	}
+
+	senderConfig[sender.KeyPandoraAutoCreate] = removeServerIPSchema(senderConfig[sender.KeyPandoraAutoCreate], key)
 	if transformAt == ip.Local {
-		schema := fmt.Sprintf(",%s %s", key, TypeIP)
-		if autoCreate == fmt.Sprintf("%s %s", key, TypeIP) {
-			autoCreate = ""
-		} else if index := strings.Index(autoCreate, schema); index != -1 {
-			autoCreate = autoCreate[:index] + autoCreate[index+len(schema):]
-		}
-		senderConfig[sender.KeyPandoraAutoCreate] = autoCreate
 		return senderConfig, nil
 	}
+
 	if len(GetKeys(key)) > 1 {
 		return senderConfig, fmt.Errorf("key: %v ip transform key in server doesn't support dot(.)", key)
 	}
@@ -1350,6 +1345,39 @@ func setIPConfig(senderConfig conf.MapConf, serverConfig map[string]interface{})
 		return senderConfig, nil
 	}
 
-	senderConfig[sender.KeyPandoraAutoCreate] += fmt.Sprintf(",%s %s", key, TypeIP)
+	if !strings.Contains(senderConfig[sender.KeyPandoraAutoCreate], fmt.Sprintf("%s %s", key, TypeIP)) {
+		senderConfig[sender.KeyPandoraAutoCreate] += fmt.Sprintf(",%s %s", key, TypeIP)
+	}
 	return senderConfig, nil
+}
+
+func removeServerIPSchema(autoCreate, key string) string {
+	if len(GetKeys(key)) > 1 {
+		return autoCreate
+	}
+
+	if autoCreate == "" {
+		return ""
+	}
+
+	ipSchemaWithComma := fmt.Sprintf("%s %s", key, TypeIP)
+	index := strings.Index(autoCreate, ipSchemaWithComma)
+	var splitEnd, splitStart int
+	for ; index != -1; index = strings.Index(autoCreate, ipSchemaWithComma) {
+		splitEnd = index
+		splitStart = index + len(ipSchemaWithComma)
+		if splitEnd != 0 {
+			// 不是开头，则为(,%s %s)
+			splitEnd -= 1
+		} else {
+			if splitStart != len(autoCreate) {
+				// 开头非结尾，则为(%s %s,)
+				splitStart += 1
+			}
+		}
+
+		autoCreate = autoCreate[:splitEnd] + autoCreate[splitStart:]
+	}
+
+	return autoCreate
 }

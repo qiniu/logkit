@@ -1967,3 +1967,41 @@ func Test_setSenderConfig(t *testing.T) {
 	actualConfig, err = setPandoraServerConfig(senderConfig, serverConfigs)
 	assert.Error(t, err)
 }
+
+func Test_removeServerIPSchema(t *testing.T) {
+	tests := []struct {
+		autoCreate string
+		key        string
+		expect     string
+	}{
+		{
+			autoCreate: "a ip,a ip",
+			key:        "a",
+			expect:     "",
+		},
+		{
+			autoCreate: "pandora_stash string,a ip,b string",
+			key:        "a",
+			expect:     "pandora_stash string,b string",
+		},
+		{
+			autoCreate: "",
+			key:        "a",
+			expect:     "",
+		},
+		{
+			autoCreate: "a ip,b string",
+			key:        "a",
+			expect:     "b string",
+		},
+		{
+			autoCreate: "a ip",
+			key:        "a",
+			expect:     "",
+		},
+	}
+	for _, test := range tests {
+		res := removeServerIPSchema(test.autoCreate, test.key)
+		assert.Equal(t, test.expect, res)
+	}
+}
