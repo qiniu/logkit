@@ -86,7 +86,8 @@ type Parser struct {
 	patterns map[string]string
 	g        *grok.Grok
 
-	numRoutine int
+	numRoutine  int
+	keepRawData bool
 }
 
 func NewParser(c conf.MapConf) (parser.Parser, error) {
@@ -106,6 +107,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	customPatternFiles, _ := c.GetStringListOr(parser.KeyGrokCustomPatternFiles, []string{})
 
 	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
+	keepRawData, _ := c.GetBoolOr(parser.KeyKeepRawData, false)
 
 	numRoutine := MaxProcs
 	if numRoutine == 0 {
@@ -122,6 +124,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		timeZoneOffset:       timeZoneOffset,
 		disableRecordErrData: disableRecordErrData,
 		numRoutine:           numRoutine,
+		keepRawData:          keepRawData,
 	}
 	err = p.compile()
 	if err != nil {
@@ -232,12 +235,17 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		if parseResult.Err != nil {
 			se.AddErrors()
 			se.ErrorDetail = parseResult.Err
+			errData := make(Data)
 			if !p.disableRecordErrData {
-				datas = append(datas, Data{
-					KeyPandoraStash: parseResult.Line,
-				})
-			} else {
+				errData[KeyPandoraStash] = parseResult.Line
+			} else if !p.keepRawData {
 				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
+			}
+			if p.keepRawData {
+				errData[parser.KeyRawData] = parseResult.Line
+			}
+			if !p.disableRecordErrData || p.keepRawData {
+				datas = append(datas, errData)
 			}
 			continue
 		}
@@ -246,6 +254,9 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		}
 		log.Debugf("D! parse result(%v)", parseResult.Data)
 		se.AddSuccess()
+		if p.keepRawData {
+			parseResult.Data[parser.KeyRawData] = parseResult.Line
+		}
 		datas = append(datas, parseResult.Data)
 	}
 
@@ -318,7 +329,7 @@ func (p *Parser) parse(line string) (Data, error) {
 			}
 
 		case DROP:
-		// goodbye!
+			// goodbye!
 		default: //default is STRING
 			data[k] = strings.TrimSpace(strings.Trim(v, `"`))
 		}

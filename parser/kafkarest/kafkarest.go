@@ -35,6 +35,7 @@ type Parser struct {
 	name                 string
 	labels               []parser.Label
 	disableRecordErrData bool
+	keepRawData          bool
 }
 
 func (krp *Parser) Name() string {
@@ -47,26 +48,45 @@ func (krp *Parser) Type() string {
 
 func (krp *Parser) Parse(lines []string) ([]Data, error) {
 	datas := []Data{}
-	for _, line := range lines {
+	se := &StatsError{}
+	for idx, line := range lines {
 		line = strings.Replace(line, "\n", " ", -1)
 		line = strings.Replace(line, "\t", "\\t", -1)
 		line = strings.Trim(line, " ")
 		fields := strings.Split(line, " ")
 		if len(fields) >= 3 {
 			if len(fields) == 16 && fields[2] == "INFO" {
-				datas = append(datas, krp.parseRequestLog(fields))
+				data := krp.parseRequestLog(fields)
+				if krp.keepRawData {
+					data[parser.KeyRawData] = line
+				}
+				datas = append(datas, data)
 			} else if (len(fields) > 0 && fields[2] == "ERROR") || (len(fields) > 0 && fields[2] == "WARN") {
-				datas = append(datas, krp.parseAbnormalLog(fields))
+				data := krp.parseAbnormalLog(fields)
+				if krp.keepRawData {
+					data[parser.KeyRawData] = line
+				}
+				datas = append(datas, data)
 			}
+			se.AddSuccess()
 		} else {
+			errData := make(Data)
 			if !krp.disableRecordErrData {
-				errData := make(Data)
 				errData[KeyPandoraStash] = line
+			} else if !krp.keepRawData {
+				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
+			}
+			if krp.keepRawData {
+				errData[parser.KeyRawData] = line
+			}
+			if !krp.disableRecordErrData || krp.keepRawData {
 				datas = append(datas, errData)
 			}
+			se.ErrorDetail = fmt.Errorf("kafka parser need data fields at least 3,acutal get %v", len(fields))
+			se.AddErrors()
 		}
 	}
-	return datas, nil
+	return datas, se
 }
 
 func (krp *Parser) parseRequestLog(fields []string) Data {
@@ -101,6 +121,7 @@ func (krp *Parser) parseAbnormalLog(fields []string) Data {
 func NewParser(c conf.MapConf) (parser.Parser, error) {
 	name, _ := c.GetStringOr(parser.KeyParserName, "")
 	labelList, _ := c.GetStringListOr(parser.KeyLabels, []string{})
+	keepRawData, _ := c.GetBoolOr(parser.KeyKeepRawData, false)
 	nameMap := map[string]struct{}{
 		KEY_SRC_IP:   struct{}{},
 		KEY_METHOD:   struct{}{},
@@ -118,6 +139,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		name:                 name,
 		labels:               labels,
 		disableRecordErrData: disableRecordErrData,
+		keepRawData:          keepRawData,
 	}, nil
 }
 

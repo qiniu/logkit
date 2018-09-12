@@ -103,6 +103,30 @@ func TestSimpleParse(t *testing.T) {
 		m)
 }
 
+func TestKeepRawData(t *testing.T) {
+	p := &Parser{
+		Patterns: []string{"%{TESTLOG}"},
+		CustomPatterns: `
+			TESTLOG %{NUMBER:num:long} %{WORD:client}
+		`,
+		keepRawData: true,
+		numRoutine:  1,
+	}
+	assert.NoError(t, p.compile())
+
+	m, err := p.Parse([]string{"142 bot"})
+	assert.Error(t, err)
+	require.NotNil(t, m)
+
+	assert.Equal(t, []Data{
+		{
+			"num":      int64(142),
+			"client":   "bot",
+			"raw_data": `142 bot`,
+		},
+	}, m)
+}
+
 // Test a nginx time.
 func TestNginxTimeParse(t *testing.T) {
 	p := &Parser{

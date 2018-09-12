@@ -19,6 +19,8 @@ type Parser struct {
 	ps                   *mysqllog.Parser
 	labels               []parser.Label
 	disableRecordErrData bool
+	keepRawData          bool
+	rawDatas             []string
 }
 
 func NewParser(c conf.MapConf) (parser.Parser, error) {
@@ -29,12 +31,14 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	labels := parser.GetLabels(labelList, nameMap)
 
 	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
+	keepRawData, _ := c.GetBoolOr(parser.KeyKeepRawData, false)
 
 	return &Parser{
 		name:                 name,
 		labels:               labels,
 		disableRecordErrData: disableRecordErrData,
 		ps:                   &mysqllog.Parser{},
+		keepRawData:          keepRawData,
 	}, nil
 }
 
@@ -50,16 +54,23 @@ func (p *Parser) parse(line string) (d Data, err error) {
 	if line == parser.PandoraParseFlushSignal {
 		return p.Flush()
 	}
+	if p.keepRawData {
+		p.rawDatas = append(p.rawDatas, line)
+	}
 	event := p.ps.ConsumeLine(line)
 	if event == nil {
 		return
 	}
-	d = make(Data, len(event)+len(p.labels))
+	d = make(Data, len(event)+len(p.labels)+1)
 	for k, v := range event {
 		d[k] = v
 	}
 	for _, l := range p.labels {
 		d[l.Name] = l.Value
+	}
+	if p.keepRawData {
+		d[parser.KeyRawData] = strings.Join(p.rawDatas, "\n")
+		p.rawDatas = p.rawDatas[:0:0]
 	}
 	return d, nil
 }
@@ -76,12 +87,17 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		if err != nil {
 			se.AddErrors()
 			se.ErrorDetail = err
+			errData := make(Data)
 			if !p.disableRecordErrData {
-				errData := make(Data)
 				errData[KeyPandoraStash] = line
-				datas = append(datas, errData)
-			} else {
+			} else if !p.keepRawData {
 				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
+			}
+			if p.keepRawData {
+				errData[parser.KeyRawData] = line
+			}
+			if !p.disableRecordErrData || p.keepRawData {
+				datas = append(datas, errData)
 			}
 			continue
 		}

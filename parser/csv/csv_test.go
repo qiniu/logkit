@@ -137,6 +137,58 @@ func Test_CsvParserForErrData(t *testing.T) {
 	assert.Equal(t, expErrData, datas[2]["pandora_stash"])
 }
 
+func Test_CsvParserKeepRawData(t *testing.T) {
+	c := conf.MapConf{}
+	c[parser.KeyParserName] = "testparser"
+	c[parser.KeyParserType] = "csv"
+	c[parser.KeyCSVSchema] = "a long, b string, c float, d jsonmap,e date"
+	c[parser.KeyCSVSplitter] = " "
+	c[parser.KeyDisableRecordErrData] = "false"
+	c[parser.KeyKeepRawData] = "true"
+	p, err := NewParser(c)
+	if err != nil {
+		t.Error(err)
+	}
+	tmstr := time.Now().Format(time.RFC3339Nano)
+	lines := []string{
+		`1 fufu 3.14 {"x":"1","y":"2"} ` + tmstr,       //correct
+		`3 fufu 3.16 {"x":"1","y":["xx:12"]} ` + tmstr, //correct
+		`4 fufu 3.17  ` + tmstr,                        //correct,jsonmap允许为空
+	}
+	datas, err := p.Parse(lines)
+	if c, ok := err.(*StatsError); ok {
+		err = c.ErrorDetail
+	}
+	assert.NoError(t, err)
+	assert.Equal(t, []Data{
+		{
+			"e":        tmstr,
+			"raw_data": `1 fufu 3.14 {"x":"1","y":"2"} ` + tmstr,
+			"a":        int64(1),
+			"b":        "fufu",
+			"c":        float64(3.14),
+			"d-x":      "1",
+			"d-y":      "2",
+		},
+		{
+			"e":        tmstr,
+			"raw_data": `3 fufu 3.16 {"x":"1","y":["xx:12"]} ` + tmstr,
+			"a":        int64(3),
+			"b":        "fufu",
+			"c":        float64(3.16),
+			"d-x":      "1",
+			"d-y":      []interface{}{"xx:12"},
+		},
+		{
+			"e":        tmstr,
+			"raw_data": `4 fufu 3.17  ` + tmstr,
+			"a":        int64(4),
+			"b":        "fufu",
+			"c":        float64(3.17),
+		},
+	}, datas)
+}
+
 func Test_Jsonmap(t *testing.T) {
 	c := conf.MapConf{}
 	c[parser.KeyParserName] = "testjsonmap"
