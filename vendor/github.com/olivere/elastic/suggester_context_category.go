@@ -7,7 +7,7 @@ package elastic
 // -- SuggesterCategoryMapping --
 
 // SuggesterCategoryMapping provides a mapping for a category context in a suggester.
-// See https://www.elastic.co/guide/en/elasticsearch/reference/6.0/suggester-context.html#_category_mapping.
+// See https://www.elastic.co/guide/en/elasticsearch/reference/6.2/suggester-context.html#_category_mapping.
 type SuggesterCategoryMapping struct {
 	name          string
 	fieldName     string
@@ -59,7 +59,7 @@ func (q *SuggesterCategoryMapping) Source() (interface{}, error) {
 // -- SuggesterCategoryQuery --
 
 // SuggesterCategoryQuery provides querying a category context in a suggester.
-// See https://www.elastic.co/guide/en/elasticsearch/reference/6.0/suggester-context.html#_category_query.
+// See https://www.elastic.co/guide/en/elasticsearch/reference/6.2/suggester-context.html#_category_query.
 type SuggesterCategoryQuery struct {
 	name   string
 	values map[string]*int
@@ -113,6 +113,41 @@ func (q *SuggesterCategoryQuery) Source() (interface{}, error) {
 			contexts = append(contexts, context)
 		}
 		source[q.name] = contexts
+	}
+
+	return source, nil
+}
+
+type SuggesterCategoryIndex struct {
+	name   string
+	values []string
+}
+
+// NewSuggesterCategoryIndex creates a new SuggesterCategoryIndex.
+func NewSuggesterCategoryIndex(name string, values ...string) *SuggesterCategoryIndex {
+	q := &SuggesterCategoryIndex{
+		name:   name,
+		values: values,
+	}
+	return q
+}
+
+func (q *SuggesterCategoryIndex) Values(values ...string) *SuggesterCategoryIndex {
+	q.values = append(q.values, values...)
+	return q
+}
+
+// Source returns a map that will be used to serialize the context query as JSON.
+func (q *SuggesterCategoryIndex) Source() (interface{}, error) {
+	source := make(map[string]interface{})
+
+	switch len(q.values) {
+	case 0:
+		source[q.name] = make([]string, 0)
+	case 1:
+		source[q.name] = q.values[0]
+	default:
+		source[q.name] = q.values
 	}
 
 	return source, nil

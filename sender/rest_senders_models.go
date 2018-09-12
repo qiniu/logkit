@@ -131,7 +131,30 @@ var (
 		Advance:       true,
 		ToolTip:       "在系统中添加数据发送时的当前时间作为时间戳",
 	}
+	OptionAuthUsername = Option{
+		KeyName:     KeyAuthUsername,
+		Description: "认证用户名(auth_username)",
+		Advance:     true,
+	}
+	OptionAuthPassword = Option{
+		KeyName:     KeyAuthPassword,
+		Description: "认证用户密码(auth_password)",
+		Secret:      true,
+		Advance:     true,
+	}
+	OptionEnableGzip = Option{
+		KeyName:       KeyEnableGzip,
+		Element:       Radio,
+		ChooseOnly:    true,
+		ChooseOptions: []interface{}{"true", "false"},
+		Default:       "false",
+		DefaultNoUse:  false,
+		Description:   "开启Gzip压缩(enable_gzip)",
+		Secret:        true,
+		Advance:       true,
+	}
 )
+
 var ModeKeyOptions = map[string][]Option{
 	TypeFile: {
 		{
@@ -763,6 +786,7 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:       KeyElasticVersion,
 			ChooseOnly:    true,
+			Default:       ElasticVersion5,
 			ChooseOptions: []interface{}{ElasticVersion3, ElasticVersion5, ElasticVersion6},
 			Description:   "ES版本号(es_version)",
 		},
@@ -775,6 +799,17 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: true,
 			Description:  "索引名称(elastic_index)",
 		},
+		{
+			KeyName:      KeyElasticType,
+			ChooseOnly:   false,
+			Default:      "",
+			Required:     true,
+			Placeholder:  "app",
+			DefaultNoUse: true,
+			Description:  "索引类型名称(elastic_type)",
+		},
+		OptionAuthUsername,
+		OptionAuthPassword,
 		{
 			KeyName:       KeyElasticIndexStrategy,
 			ChooseOnly:    true,
@@ -793,16 +828,8 @@ var ModeKeyOptions = map[string][]Option{
 			Description:   "索引时区(Local(本地)|UTC(标准时间)|PRC(北京时间))(elastic_time_zone)",
 			Advance:       true,
 		},
+		OptionEnableGzip,
 		OptionLogkitSendTime,
-		{
-			KeyName:      KeyElasticType,
-			ChooseOnly:   false,
-			Default:      "",
-			Required:     true,
-			Placeholder:  "app",
-			DefaultNoUse: true,
-			Description:  "索引类型名称(elastic_type)",
-		},
 		OptionSaveLogPath,
 		OptionFtWriteLimit,
 		OptionFtStrategy,

@@ -379,6 +379,30 @@
 			"revisionTime": "2017-11-26T05:04:59Z"
 		},
 		{
+			"checksumSHA1": "Ckkk75h7Xhrc3b+QJ3oqbIrGsaY=",
+			"path": "github.com/mailru/easyjson",
+			"revision": "60711f1a8329503b04e1c88535f419d0bb440bff",
+			"revisionTime": "2018-08-23T13:54:43Z"
+		},
+		{
+			"checksumSHA1": "T8soMJArSZrYnhmdpAnq1bVxQ6Q=",
+			"path": "github.com/mailru/easyjson/buffer",
+			"revision": "60711f1a8329503b04e1c88535f419d0bb440bff",
+			"revisionTime": "2018-08-23T13:54:43Z"
+		},
+		{
+			"checksumSHA1": "zErZOOMVWCO/Z1WGWBAG9VdccQc=",
+			"path": "github.com/mailru/easyjson/jlexer",
+			"revision": "60711f1a8329503b04e1c88535f419d0bb440bff",
+			"revisionTime": "2018-08-23T13:54:43Z"
+		},
+		{
+			"checksumSHA1": "4BAeeJ7JywEQyR6GqRrxfSfN2/Q=",
+			"path": "github.com/mailru/easyjson/jwriter",
+			"revision": "60711f1a8329503b04e1c88535f419d0bb440bff",
+			"revisionTime": "2018-08-23T13:54:43Z"
+		},
+		{
 			"checksumSHA1": "VdvWgxaqcC3pKk/6Q7dRfH7THjM=",
 			"path": "github.com/mattn/go-colorable",
 			"revision": "6c0fd4aa6ec5818d5e3ea9e03ae436972a6c5a9a",
@@ -415,10 +439,10 @@
 			"revisionTime": "2018-05-11T05:30:14Z"
 		},
 		{
-			"checksumSHA1": "qyZO6SotinKrz40LxXjw0LtIwA8=",
+			"checksumSHA1": "PN52707Xhef0esSFmjbPo/IR5pI=",
 			"path": "github.com/olivere/elastic",
-			"revision": "09755b303b32ccae2968681e77473399cb48378c",
-			"revisionTime": "2017-11-17T18:00:47Z"
+			"revision": "e6cae211ee802eab70248a68fe2cb03b616744c9",
+			"revisionTime": "2018-08-31T17:57:14Z"
 		},
 		{
 			"checksumSHA1": "LkxLK7ff1eJbj6Wv9TlLDV96l58=",
@@ -521,6 +545,12 @@
 			"path": "github.com/qiniu/pandora-go-sdk/pipeline",
 			"revision": "72b58aec1c1f7a09892e95ec25e0540ee8f0ad41",
 			"revisionTime": "2018-09-12T01:51:56Z"
+		},
+		{
+			"checksumSHA1": "t3I2Q8ZZIou0okPMTvwZyTEHCbY=",
+			"path": "github.com/qiniu/pandora-go-sdk/pipeline",
+			"revision": "11b3cf1376e84367662ad8342b0409809c0f13f4",
+			"revisionTime": "2018-09-07T03:53:57Z"
 		},
 		{
 			"checksumSHA1": "YeSUJIE3zLnpjK3g161wiMeIbmk=",

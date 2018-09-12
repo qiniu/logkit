@@ -5,10 +5,14 @@
 package elastic
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
+
+	"github.com/pkg/errors"
 )
 
 // checkResponse will return an error if the request/response indicates
@@ -84,9 +88,30 @@ type ErrorDetails struct {
 func (e *Error) Error() string {
 	if e.Details != nil && e.Details.Reason != "" {
 		return fmt.Sprintf("elastic: Error %d (%s): %s [type=%s]", e.Status, http.StatusText(e.Status), e.Details.Reason, e.Details.Type)
-	} else {
-		return fmt.Sprintf("elastic: Error %d (%s)", e.Status, http.StatusText(e.Status))
 	}
+	return fmt.Sprintf("elastic: Error %d (%s)", e.Status, http.StatusText(e.Status))
+}
+
+// IsContextErr returns true if the error is from a context that was canceled or deadline exceeded
+func IsContextErr(err error) bool {
+	if err == context.Canceled || err == context.DeadlineExceeded {
+		return true
+	}
+	// This happens e.g. on redirect errors, see https://golang.org/src/net/http/client_test.go#L329
+	if ue, ok := err.(*url.Error); ok {
+		if ue.Temporary() {
+			return true
+		}
+		// Use of an AWS Signing Transport can result in a wrapped url.Error
+		return IsContextErr(ue.Err)
+	}
+	return false
+}
+
+// IsConnErr returns true if the error indicates that Elastic could not
+// find an Elasticsearch host to connect to.
+func IsConnErr(err error) bool {
+	return err == ErrNoClient || errors.Cause(err) == ErrNoClient
 }
 
 // IsNotFound returns true if the given error indicates that Elasticsearch
@@ -110,6 +135,14 @@ func IsTimeout(err interface{}) bool {
 // HTTP status code).
 func IsConflict(err interface{}) bool {
 	return IsStatusCode(err, http.StatusConflict)
+}
+
+// IsForbidden returns true if the given error indicates that Elasticsearch
+// returned HTTP status 403. This happens e.g. due to a missing license.
+// The err parameter can be of type *elastic.Error, elastic.Error,
+// *http.Response or int (indicating the HTTP status code).
+func IsForbidden(err interface{}) bool {
+	return IsStatusCode(err, http.StatusForbidden)
 }
 
 // IsStatusCode returns true if the given error indicates that the Elasticsearch

@@ -23,10 +23,11 @@ import (
 // reuse BulkService to send many batches. You do not have to create a new
 // BulkService for each batch.
 //
-// See https://www.elastic.co/guide/en/elasticsearch/reference/6.0/docs-bulk.html
+// See https://www.elastic.co/guide/en/elasticsearch/reference/6.2/docs-bulk.html
 // for more details.
 type BulkService struct {
-	client *Client
+	client  *Client
+	retrier Retrier
 
 	index               string
 	typ                 string
@@ -51,10 +52,18 @@ func NewBulkService(client *Client) *BulkService {
 	return builder
 }
 
-func (s *BulkService) reset() {
+// Reset cleans up the request queue
+func (s *BulkService) Reset() {
 	s.requests = make([]BulkableRequest, 0)
 	s.sizeInBytes = 0
 	s.sizeInBytesCursor = 0
+}
+
+// Retrier allows to set specific retry logic for this BulkService.
+// If not specified, it will use the client's default retrier.
+func (s *BulkService) Retrier(retrier Retrier) *BulkService {
+	s.retrier = retrier
+	return s
 }
 
 // Index specifies the index to use for all batches. You may also leave
@@ -82,8 +91,11 @@ func (s *BulkService) Timeout(timeout string) *BulkService {
 // Refresh controls when changes made by this request are made visible
 // to search. The allowed values are: "true" (refresh the relevant
 // primary and replica shards immediately), "wait_for" (wait for the
-// changes to be made visible by a refresh before applying), or "false"
-// (no refresh related actions).
+// changes to be made visible by a refresh before reying), or "false"
+// (no refresh related actions). The default value is "false".
+//
+// See https://www.elastic.co/guide/en/elasticsearch/reference/6.2/docs-refresh.html
+// for details.
 func (s *BulkService) Refresh(refresh string) *BulkService {
 	s.refresh = refresh
 	return s
@@ -159,7 +171,8 @@ func (s *BulkService) NumberOfActions() int {
 }
 
 func (s *BulkService) bodyAsString() (string, error) {
-	var buf bytes.Buffer
+	// Pre-allocate to reduce allocs
+	buf := bytes.NewBuffer(make([]byte, 0, s.EstimatedSizeInBytes()))
 
 	for _, req := range s.requests {
 		source, err := req.Source()
@@ -240,6 +253,7 @@ func (s *BulkService) Do(ctx context.Context) (*BulkResponse, error) {
 		Params:      params,
 		Body:        body,
 		ContentType: "application/x-ndjson",
+		Retrier:     s.retrier,
 	})
 	if err != nil {
 		return nil, err
@@ -252,7 +266,7 @@ func (s *BulkService) Do(ctx context.Context) (*BulkResponse, error) {
 	}
 
 	// Reset so the request can be reused
-	s.reset()
+	s.Reset()
 
 	return ret, nil
 }
@@ -317,6 +331,7 @@ type BulkResponseItem struct {
 	Status        int           `json:"status,omitempty"`
 	ForcedRefresh bool          `json:"forced_refresh,omitempty"`
 	Error         *ErrorDetails `json:"error,omitempty"`
+	GetResult     *GetResult    `json:"get,omitempty"`
 }
 
 // Indexed returns all bulk request results of "index" actions.

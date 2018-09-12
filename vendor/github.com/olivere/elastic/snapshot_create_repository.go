@@ -14,7 +14,7 @@ import (
 )
 
 // SnapshotCreateRepositoryService creates a snapshot repository.
-// See https://www.elastic.co/guide/en/elasticsearch/reference/6.0/modules-snapshots.html
+// See https://www.elastic.co/guide/en/elasticsearch/reference/6.2/modules-snapshots.html
 // for details.
 type SnapshotCreateRepositoryService struct {
 	client        *Client
@@ -150,7 +150,7 @@ func (s *SnapshotCreateRepositoryService) Validate() error {
 	if s.repository == "" {
 		invalid = append(invalid, "Repository")
 	}
-	if s.bodyString == "" && s.bodyJson == nil {
+	if s.bodyString == "" && s.bodyJson == nil && len(s.settings) == 0 {
 		invalid = append(invalid, "BodyJson")
 	}
 	if len(invalid) > 0 {

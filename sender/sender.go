@@ -91,6 +91,11 @@ const (
 )
 
 const (
+	// General
+	KeyAuthUsername = "auth_username"
+	KeyAuthPassword = "auth_password"
+	KeyEnableGzip   = "enable_gzip"
+
 	// Elastic
 	KeyElasticHost          = "elastic_host"
 	KeyElasticVersion       = "elastic_version"
