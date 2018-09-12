@@ -122,16 +122,19 @@ func (this *Sender) Name() string {
 }
 
 func (this *Sender) Send(data []Data) error {
-	producer := this.producer
-	var msgs []*sarama.ProducerMessage
-	ss := &StatsError{}
-	var lastErr error
+	var (
+		producer        = this.producer
+		msgs            []*sarama.ProducerMessage
+		ss              = &StatsError{}
+		ignoreDataCount int
+	)
 	for _, doc := range data {
 		message, err := this.getEventMessage(doc)
 		if err != nil {
 			log.Debugf("Dropping event: %v", err)
 			ss.AddErrors()
-			lastErr = err
+			ss.LastError = err.Error()
+			ignoreDataCount++
 			continue
 		}
 		msgs = append(msgs, message)
@@ -139,35 +142,42 @@ func (this *Sender) Send(data []Data) error {
 	err := producer.SendMessages(msgs)
 	if err != nil {
 		ss.AddErrorsNum(len(msgs))
-		if pde, ok := err.(sarama.ProducerErrors); ok {
-			var allcir = true
-			for _, v := range pde {
-				//对于熔断的错误提示，没有任何帮助，过滤掉
-				if strings.Contains(v.Error(), "circuit breaker is open") {
-					continue
-				}
-				allcir = false
-				ss.ErrorDetail = fmt.Errorf("%v detail: %v", ss.ErrorDetail, v.Error())
-				this.lastError = v
-				//发送错误为message too large时，启用二分策略重新发送
-				if v.Err == sarama.ErrMessageSizeTooLarge {
-					ss.ErrorDetail = reqerr.NewSendError("Sender[Kafka]:Message was too large, server rejected it to avoid allocation error", sender.ConvertDatasBack(data), reqerr.TypeBinaryUnpack)
-				}
-				break
+		pde, ok := err.(sarama.ProducerErrors)
+		if !ok {
+			if ss.LastError != "" {
+				ss.LastError = fmt.Sprintf("ignore %d datas, last error: %s", ignoreDataCount, ss.LastError) + "\n"
 			}
-			if allcir {
-				ss.ErrorDetail = fmt.Errorf("%v, all error is circuit breaker is open , last error %v", err, this.lastError)
-			}
-		} else {
+			ss.LastError += err.Error()
 			ss.ErrorDetail = err
+			return ss
 		}
+
+		var allcir = true
+		for _, v := range pde {
+			//对于熔断的错误提示，没有任何帮助，过滤掉
+			if strings.Contains(v.Error(), "circuit breaker is open") {
+				continue
+			}
+			allcir = false
+			ss.ErrorDetail = fmt.Errorf("%v detail: %v", ss.ErrorDetail, v.Error())
+			this.lastError = v
+			//发送错误为message too large时，启用二分策略重新发送
+			if v.Err == sarama.ErrMessageSizeTooLarge {
+				ss.ErrorDetail = reqerr.NewSendError("Sender[Kafka]:Message was too large, server rejected it to avoid allocation error", sender.ConvertDatasBack(data), reqerr.TypeBinaryUnpack)
+			}
+			break
+		}
+
+		if allcir {
+			ss.ErrorDetail = fmt.Errorf("%v, all error is circuit breaker is open , last error %v", err, this.lastError)
+		}
+		if ss.LastError != "" {
+			ss.LastError = fmt.Sprintf("ignore %d datas, last error: %s", ignoreDataCount, ss.LastError) + "\n"
+		}
+		ss.LastError = ss.ErrorDetail.Error()
 		return ss
 	}
 	ss.AddSuccessNum(len(msgs))
-	if lastErr != nil {
-		ss.LastError = lastErr.Error()
-		return ss
-	}
 	//本次发送成功, lastError 置为 nil
 	this.lastError = nil
 	return ss

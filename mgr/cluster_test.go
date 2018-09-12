@@ -46,7 +46,7 @@ type testCluParam struct {
 }
 
 func getClusterRunnerStatus(rn, lp, rs string, rdc, rds, pe, ps, se, ss int64, tag, url string) map[string]RunnerStatus {
-	runnerStatus := getRunnerStatus(rn, lp, rs, rdc, rds, pe, ps, se, ss)
+	runnerStatus := getRunnerStatus(rn, lp, rs, "file_sender", "", rdc, rds, pe, ps, se, ss)
 	for k, v := range runnerStatus {
 		v.Tag = tag
 		v.Url = url

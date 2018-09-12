@@ -204,11 +204,21 @@ func (ft *FtSender) Send(datas []Data) error {
 		// 尝试直接发送数据，当数据失败的时候会加入到本地重试队列。外部不需要重试
 		isRetry := false
 		backDataContext, err := ft.trySendDatas(datas, 1, isRetry)
-		if err != nil {
-			err = fmt.Errorf("Runner[%v] Sender[%v] try Send Datas err: %v, will put to backup queue and retry later...", ft.runnerName, ft.innerSender.Name(), err)
-			log.Error(err)
-			se.FtNotRetry = true
+		if err == nil {
+			se.AddSuccessNum(len(datas))
+			return se
 		}
+
+		if ste, ok := err.(*StatsError); ok {
+			se.Success = ste.Success
+			se.Errors = ste.Errors
+		} else {
+			se.AddErrorsNum(len(datas))
+		}
+
+		err = fmt.Errorf("Runner[%v] Sender[%v] try Send Datas err: %v, will put to backup queue and retry later... ", ft.runnerName, ft.innerSender.Name(), err)
+		log.Error(err)
+		se.FtNotRetry = true
 		// 容错队列会保证重试，此处不向外部暴露发送错误信息
 		se.ErrorDetail = err
 		se.FtQueueLag = ft.BackupQueue.Depth()
@@ -220,6 +230,7 @@ func (ft *FtSender) Send(datas []Data) error {
 			if nowDatas != nil {
 				se.FtNotRetry = false
 				se.ErrorDetail = reqerr.NewSendError("save data to backend queue error", ConvertDatasBack(nowDatas), reqerr.TypeDefault)
+				se.LastError = se.ErrorDetail.Error()
 				ft.statsMutex.Lock()
 				ft.stats.LastError = se.ErrorDetail.Error()
 				ft.statsMutex.Unlock()
@@ -228,6 +239,7 @@ func (ft *FtSender) Send(datas []Data) error {
 	} else {
 		err := ft.saveToFile(datas)
 		if err != nil {
+			se.AddErrorsNum(len(datas))
 			se.FtNotRetry = false
 			se.ErrorDetail = err
 			ft.statsMutex.Lock()
@@ -235,7 +247,7 @@ func (ft *FtSender) Send(datas []Data) error {
 			ft.stats.Errors += int64(len(datas))
 			ft.statsMutex.Unlock()
 		} else {
-			se.ErrorDetail = nil
+			se.AddSuccessNum(len(datas))
 		}
 		se.FtQueueLag = ft.BackupQueue.Depth() + ft.logQueue.Depth()
 	}
@@ -352,49 +364,66 @@ func (ft *FtSender) trySendBytes(dat []byte, failSleep int, isRetry bool) (backD
 // trySendDatas 尝试发送数据，如果失败，将失败数据加入backup queue，并睡眠指定时间。返回结果为是否正常发送
 func (ft *FtSender) trySendDatas(datas []Data, failSleep int, isRetry bool) (backDataContext []*datasContext, err error) {
 	err = ft.innerSender.Send(datas)
+	defer func() {
+		if err != nil {
+			return
+		}
+
+		ft.statsMutex.Lock()
+		ft.stats.LastError = ""
+		ft.stats.Success += int64(len(datas))
+		if isRetry {
+			ft.stats.Errors -= int64(len(datas))
+		}
+		ft.statsMutex.Unlock()
+	}()
+	if err == nil {
+		return nil, nil
+	}
+
 	ft.statsMutex.Lock()
 	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
+		if err == nil {
+			return nil, nil
+		}
 		if isRetry {
 			ft.stats.Errors -= c.Success
 		} else {
 			ft.stats.Errors += c.Errors
 		}
 		ft.stats.Success += c.Success
-	} else if err != nil {
+	} else {
 		if !isRetry {
 			ft.stats.Errors += int64(len(datas))
 		}
-	} else {
-		ft.stats.Success += int64(len(datas))
-		if isRetry {
-			ft.stats.Errors -= int64(len(datas))
-		}
 	}
-	if err != nil {
-		se, succ := err.(*reqerr.SendError)
-		if !succ {
-			ft.stats.LastError = err.Error()
-		} else {
-			ft.stats.LastError = se.Error()
-		}
+
+	se, succ := err.(*reqerr.SendError)
+	if !succ {
+		ft.stats.LastError = err.Error()
 	} else {
-		ft.stats.LastError = ""
+		ft.stats.LastError = se.Error()
 	}
 	ft.statsMutex.Unlock()
-	if err != nil {
-		retDatasContext := ft.handleSendError(err, datas)
-		for _, v := range retDatasContext {
-			nnBytes, _ := jsoniter.Marshal(v)
-			err := ft.BackupQueue.Put(nnBytes)
-			if err != nil {
-				log.Errorf("Runner[%v] Sender[%v] cannot write points back to queue %v: %v", ft.runnerName, ft.innerSender.Name(), ft.BackupQueue.Name(), err)
-				backDataContext = append(backDataContext, v)
-			}
+
+	retDatasContext := ft.handleSendError(err, datas)
+	for _, v := range retDatasContext {
+		nnBytes, err := jsoniter.Marshal(v)
+		if err != nil {
+			log.Errorf("Runner[%v] Sender[%v] marshal %v failed: %v", ft.runnerName, ft.innerSender.Name(), *v, err)
+			continue
 		}
-		time.Sleep(time.Second * time.Duration(failSleep))
+
+		err = ft.BackupQueue.Put(nnBytes)
+		if err != nil {
+			log.Errorf("Runner[%v] Sender[%v] cannot write points back to queue %v: %v", ft.runnerName, ft.innerSender.Name(), ft.BackupQueue.Name(), err)
+			backDataContext = append(backDataContext, v)
+		}
 	}
-	return
+	time.Sleep(time.Second * time.Duration(failSleep))
+
+	return backDataContext, err
 }
 
 func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []*datasContext) {

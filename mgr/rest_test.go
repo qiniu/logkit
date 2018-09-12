@@ -60,6 +60,35 @@ type testParam struct {
 	rs *RestService
 }
 
+func getMockSenderRunnerConfig(name, logPath, metaPath, mode string) ([]byte, error) {
+	runnerConf := RunnerConfig{
+		RunnerInfo: RunnerInfo{
+			RunnerName:       name,
+			MaxBatchLen:      5,
+			MaxBatchSize:     200,
+			CollectInterval:  1,
+			MaxBatchInterval: 1,
+			MaxBatchTryTimes: 3,
+		},
+		ReaderConfig: conf.MapConf{
+			"log_path":      logPath,
+			"meta_path":     metaPath,
+			"mode":          mode,
+			"read_from":     "oldest",
+			"ignore_hidden": "true",
+		},
+		ParserConf: conf.MapConf{
+			"type": "json",
+			"name": "json_parser",
+		},
+		SendersConfig: []conf.MapConf{{
+			"sender_type": "mock",
+			"is_req_err":  "true",
+		}},
+	}
+	return jsoniter.Marshal(runnerConf)
+}
+
 func getRunnerConfig(name, logPath, metaPath, mode, senderPath string) ([]byte, error) {
 	runnerConf := RunnerConfig{
 		RunnerInfo: RunnerInfo{
@@ -90,7 +119,7 @@ func getRunnerConfig(name, logPath, metaPath, mode, senderPath string) ([]byte, 
 	return jsoniter.Marshal(runnerConf)
 }
 
-func getRunnerStatus(rn, lp, rs string, rdc, rds, pe, ps, se, ss int64) map[string]RunnerStatus {
+func getRunnerStatus(rn, lp, rs, sender, lastError string, rdc, rds, pe, ps, se, ss int64) map[string]RunnerStatus {
 	unit := "bytes"
 	if rs != RunnerRunning {
 		unit = ""
@@ -118,10 +147,11 @@ func getRunnerStatus(rn, lp, rs string, rdc, rds, pe, ps, se, ss int64) map[stri
 			},
 			TransformStats: make(map[string]StatsInfo),
 			SenderStats: map[string]StatsInfo{
-				"file_sender": {
-					Errors:  se,
-					Success: ss,
-					Trend:   "",
+				sender: {
+					Errors:    se,
+					Success:   ss,
+					Trend:     "",
+					LastError: lastError,
 				},
 			},
 		},
@@ -279,14 +309,15 @@ func TestWebRest(t *testing.T) {
 	}()
 
 	funcMap := map[string]func(*testParam){
-		"restGetStatusTest":       restGetStatusTest,
-		"runnerResetTest":         runnerResetTest,
-		"restCRUDTest":            restCRUDTest,
-		"runnerStopStartTest":     runnerStopStartTest,
-		"runnerDataIntegrityTest": runnerDataIntegrityTest,
-		"getErrorCodeTest":        getErrorCodeTest,
-		"getRunnersTest":          getRunnersTest,
-		"senderRouterTest":        senderRouterTest,
+		"restGetFailedDataStatusTest": restGetFailedDataStatusTest,
+		"restGetStatusTest":           restGetStatusTest,
+		"runnerResetTest":             runnerResetTest,
+		"restCRUDTest":                restCRUDTest,
+		"runnerStopStartTest":         runnerStopStartTest,
+		"runnerDataIntegrityTest":     runnerDataIntegrityTest,
+		"getErrorCodeTest":            getErrorCodeTest,
+		"getRunnersTest":              getRunnersTest,
+		"senderRouterTest":            senderRouterTest,
 	}
 	wg := &sync.WaitGroup{}
 	wg.Add(len(funcMap))
@@ -311,6 +342,64 @@ func Test_generateStatsShell(t *testing.T) {
 	os.Remove(StatsShell)
 }
 
+func restGetFailedDataStatusTest(p *testParam) {
+	t := p.t
+	rd := p.rd
+	rs := p.rs
+	runnerName := "restGetFailedDataStatusTest"
+	dir := runnerName + "Dir"
+	testDir := filepath.Join(rd, dir)
+	logDir := filepath.Join(testDir, "logdir")
+	metaDir := filepath.Join(testDir, "meta")
+	resvDir := filepath.Join(testDir, "sender")
+	if err := mkTestDir(testDir, logDir, metaDir, resvDir); err != nil {
+		t.Fatalf("mkdir test path error %v", err)
+	}
+	time.Sleep(1 * time.Second)
+	runnerConf, err := getMockSenderRunnerConfig(runnerName, logDir, metaDir, reader.ModeDir)
+	if err != nil {
+		t.Fatalf("get mock sender runner config failed, error is %v", err)
+	}
+	for k := range rs.mgr.watchers {
+		if err = ioutil.WriteFile(k+"/"+runnerName+".conf", runnerConf, 0666); err != nil {
+			t.Error(err)
+		} else {
+			break
+		}
+	}
+	log1 := `{"a":1,"b":2,"c":"3","d":"4"}
+{"a1":1,"b1":2,"c1":"3","d1":"4"}
+{"a2":1,"b2":2,"c2":"3","d2":"4"}
+{"a3":1,"b3":2,"c3":"3","d3":"4"}
+{"a4":1,"b4":2,"c4":"3","d4":"4"}`
+	if err := writeLogFile([]string{log1}, logDir); err != nil {
+		t.Fatalf("write log data error %v", err)
+	}
+	time.Sleep(20 * time.Second)
+	cmd := exec.Command("./stats")
+	cmd.Stdin = strings.NewReader("some input")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err = cmd.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rss := make(map[string]RunnerStatus)
+	var respRss respRunnerStatus
+	err = jsoniter.Unmarshal([]byte(out.String()), &respRss)
+	assert.NoError(t, err, out.String())
+	rss = respRss.Data
+	exp := getRunnerStatus(runnerName, logDir, RunnerRunning, "mockSender", "SendError: mock failed, failDatas size : 1", 5, 29*5, 0, 5, 1, 4)
+
+	v, ex := rss[runnerName]
+	assert.Equal(t, true, ex)
+	clearGotStatus(&v)
+	v.ReadDataSize = exp[runnerName].ReadDataSize
+	v.HistoryErrors = nil
+	rss[runnerName] = v
+	assert.Equal(t, exp[runnerName], rss[runnerName], out.String())
+}
+
 // 测试 status/stats/confs watcher
 func restGetStatusTest(p *testParam) {
 	t := p.t
@@ -332,7 +421,7 @@ func restGetStatusTest(p *testParam) {
 	if err != nil {
 		t.Fatalf("get runner config failed, error is %v", err)
 	}
-	for k, _ := range rs.mgr.watchers {
+	for k := range rs.mgr.watchers {
 		if err = ioutil.WriteFile(k+"/"+runnerName+".conf", runnerConf, 0666); err != nil {
 			t.Error(err)
 		} else {
@@ -357,7 +446,7 @@ func restGetStatusTest(p *testParam) {
 	err = jsoniter.Unmarshal([]byte(out.String()), &respRss)
 	assert.NoError(t, err, out.String())
 	rss = respRss.Data
-	exp := getRunnerStatus(runnerName, logDir, RunnerRunning, 1, 29, 0, 1, 0, 1)
+	exp := getRunnerStatus(runnerName, logDir, RunnerRunning, "file_sender", "", 1, 29, 0, 1, 0, 1)
 
 	v, ex := rss[runnerName]
 	assert.Equal(t, true, ex)
@@ -592,7 +681,7 @@ func runnerResetTest(p *testParam) {
 	assert.Equal(t, http.StatusOK, respCode)
 	time.Sleep(6 * time.Second)
 
-	exp := getRunnerStatus(runnerName, logDir, RunnerRunning, 1, 29, 0, 1, 0, 1)
+	exp := getRunnerStatus(runnerName, logDir, RunnerRunning, "file_sender", "", 1, 29, 0, 1, 0, 1)
 	url = "http://127.0.0.1" + rs.address + "/logkit/status"
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
 	assert.NoError(t, err, string(respBody))
@@ -712,7 +801,7 @@ func runnerStopStartTest(p *testParam) {
 	assert.Equal(t, http.StatusOK, respCode)
 	time.Sleep(10 * time.Second)
 
-	exp := getRunnerStatus(runnerName, logDir, RunnerRunning, 1, 29, 0, 1, 0, 1)
+	exp := getRunnerStatus(runnerName, logDir, RunnerRunning, "file_sender", "", 1, 29, 0, 1, 0, 1)
 	url = "http://127.0.0.1" + rs.address + "/logkit/status"
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
 	assert.NoError(t, err, string(respBody))
@@ -733,7 +822,7 @@ func runnerStopStartTest(p *testParam) {
 	assert.Equal(t, http.StatusOK, respCode)
 	time.Sleep(3 * time.Second)
 
-	expStopped := getRunnerStatus(runnerName, "", RunnerStopped, 0, 0, 0, 0, 0, 0)
+	expStopped := getRunnerStatus(runnerName, "", RunnerStopped, "file_sender", "", 0, 0, 0, 0, 0, 0)
 	url = "http://127.0.0.1" + rs.address + "/logkit/status"
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
 	assert.NoError(t, err, string(respBody))
@@ -769,7 +858,7 @@ func runnerStopStartTest(p *testParam) {
 	v = rss[runnerName]
 	clearGotStatus(&v)
 	rss[runnerName] = v
-	exp = getRunnerStatus(runnerName, logDir, RunnerRunning, 1, 0, 0, 1, 0, 1)
+	exp = getRunnerStatus(runnerName, logDir, RunnerRunning, "file_sender", "", 1, 0, 0, 1, 0, 1)
 	assert.Equal(t, exp[runnerName], rss[runnerName])
 
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName + "/start"
