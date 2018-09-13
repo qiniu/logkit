@@ -10,6 +10,7 @@ import (
 	"github.com/json-iterator/go"
 
 	"github.com/qiniu/log"
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
@@ -148,6 +149,10 @@ func (this *Sender) Send(data []Data) error {
 				allcir = false
 				ss.ErrorDetail = fmt.Errorf("%v detail: %v", ss.ErrorDetail, v.Error())
 				this.lastError = v
+				//发送错误为message too large时，启用二分策略重新发送
+				if v.Err == sarama.ErrMessageSizeTooLarge {
+					ss.ErrorDetail = reqerr.NewSendError("Sender[Kafka]:Message was too large, server rejected it to avoid allocation error", sender.ConvertDatasBack(data), reqerr.TypeBinaryUnpack)
+				}
 				break
 			}
 			if allcir {
