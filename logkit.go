@@ -36,6 +36,7 @@ type Config struct {
 	TimeLayouts      []string `json:"timeformat_layouts"`
 	CleanSelfLogCnt  int      `json:"clean_self_cnt"`
 	StaticRootPath   string   `json:"static_root_path"`
+	StaticBasePath   string   `json:"static_base_path"`
 	mgr.ManagerConfig
 }
 
@@ -47,6 +48,7 @@ const (
 	defaultLogDir     = "./run"
 	defaultLogPattern = "*.log-*"
 	defaultRotateSize = 100 * 1024 * 1024
+	defaultBasePath   = "/"
 )
 
 const usage = `logkit, Very easy-to-use server agent for collecting & sending logs & metrics.
@@ -281,7 +283,10 @@ func main() {
 		m.BindHost = conf.BindHost
 	}
 	e := echo.New()
-	e.Static("/", conf.StaticRootPath)
+	if conf.StaticBasePath == "" {
+		conf.StaticBasePath = defaultBasePath
+	}
+	e.Static(conf.StaticBasePath, conf.StaticRootPath)
 
 	// start rest service
 	rs := mgr.NewRestService(m, e)
