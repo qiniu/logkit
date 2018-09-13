@@ -67,15 +67,20 @@ func RawData(readerConfig conf.MapConf) (string, error) {
 	readChan := make(chan dataErr, 1)
 	go func() {
 		if dr, ok := rd.(reader.DataReader); ok {
-			data, _, err := dr.ReadData()
-			if err != nil && err != io.EOF {
-				readChan <- dataErr{"", err}
+			// ReadData 是可能读到nil的，在接收器宣布超时或读取到数据之前需要不停循环读取
+			for atomic.LoadInt32(&timeoutStatus) == 0 {
+				data, _, err := dr.ReadData()
+				if err != nil && err != io.EOF {
+					readChan <- dataErr{"", err}
+					return
+				}
+				if len(data) < 1 {
+					continue
+				}
+				p, err := jsoniter.MarshalIndent(data, "", "  ")
+				readChan <- dataErr{string(p), err}
 				return
 			}
-
-			p, err := jsoniter.MarshalIndent(data, "", "  ")
-			readChan <- dataErr{string(p), err}
-			return
 		}
 
 		// ReadLine 是可能读到空值的，在接收器宣布超时或读取到数据之前需要不停循环读取

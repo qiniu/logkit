@@ -9,6 +9,7 @@ import (
 	_ "github.com/qiniu/logkit/reader/elastic"
 	_ "github.com/qiniu/logkit/reader/http"
 	_ "github.com/qiniu/logkit/reader/kafka"
+	_ "github.com/qiniu/logkit/reader/mockreader"
 	_ "github.com/qiniu/logkit/reader/mongo"
 	_ "github.com/qiniu/logkit/reader/redis"
 	_ "github.com/qiniu/logkit/reader/script"
