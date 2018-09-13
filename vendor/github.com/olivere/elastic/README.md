@@ -1,6 +1,6 @@
 # Elastic
 
-**This is a development branch that is actively being worked on. DO NOT USE IN PRODUCTION!**
+**This is a development branch that is actively being worked on. DO NOT USE IN PRODUCTION! If you want to use stable versions of Elastic, please use a dependency manager like [dep](https://github.com/golang/dep).**
 
 Elastic is an [Elasticsearch](http://www.elasticsearch.org/) client for the
 [Go](http://www.golang.org/) programming language.
@@ -10,6 +10,8 @@ Elastic is an [Elasticsearch](http://www.elasticsearch.org/) client for the
 [![license](http://img.shields.io/badge/license-MIT-red.svg?style=flat)](https://raw.githubusercontent.com/olivere/elastic/master/LICENSE)
 
 See the [wiki](https://github.com/olivere/elastic/wiki) for additional information about Elastic.
+
+<a href="https://www.buymeacoffee.com/Bjd96U8fm" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
 
 
 ## Releases
@@ -22,7 +24,7 @@ Here's the version matrix:
 
 Elasticsearch version | Elastic version  | Package URL | Remarks |
 ----------------------|------------------|-------------|---------|
-6.x                   | 6.0              | [`github.com/olivere/elastic`](github.com/olivere/elastic) ([source](https://github.com/olivere/elastic/tree/release-branch.v6) [doc](http://godoc.org/github.com/olivere/elastic)) | Use a dependency manager (see below).
+6.x                   | 6.0              | [`github.com/olivere/elastic`](https://github.com/olivere/elastic) ([source](https://github.com/olivere/elastic/tree/release-branch.v6) [doc](http://godoc.org/github.com/olivere/elastic)) | Use a dependency manager (see below).
 5.x                   | 5.0              | [`gopkg.in/olivere/elastic.v5`](https://gopkg.in/olivere/elastic.v5) ([source](https://github.com/olivere/elastic/tree/release-branch.v5) [doc](http://godoc.org/gopkg.in/olivere/elastic.v5)) | Actively maintained.
 2.x                   | 3.0              | [`gopkg.in/olivere/elastic.v3`](https://gopkg.in/olivere/elastic.v3) ([source](https://github.com/olivere/elastic/tree/release-branch.v3) [doc](http://godoc.org/gopkg.in/olivere/elastic.v3)) | Deprecated. Please update.
 1.x                   | 2.0              | [`gopkg.in/olivere/elastic.v2`](https://gopkg.in/olivere/elastic.v2) ([source](https://github.com/olivere/elastic/tree/release-branch.v2) [doc](http://godoc.org/gopkg.in/olivere/elastic.v2)) | Deprecated. Please update.
@@ -37,10 +39,10 @@ To use the required version of Elastic in your application, it is strongly
 advised to use a tool like
 [dep](https://github.com/golang/dep)
 or
-[Glide](https://glide.sh/)
-to manage that dependency. Make sure to use a version such as `^6.0.0`.
+[Go modules](https://github.com/golang/go/wiki/Modules)
+to manage dependencies. Make sure to use a version such as `^6.0.0`.
 
-To use Elastic, simply import:
+To use Elastic, import:
 
 ```go
 import "github.com/olivere/elastic"
@@ -48,12 +50,9 @@ import "github.com/olivere/elastic"
 
 ### Elastic 6.0
 
-Elastic 6.0 targets Elasticsearch 6.0.0 and later. Elasticsearch 6.0.0 isn't released
-yet, but we have
-[6.0.0-rc2](https://www.elastic.co/downloads/elasticsearch#preview-release)
-at the time of writing this ([docs and breaking changes](https://www.elastic.co/guide/en/elasticsearch/reference/6.0/release-notes-6.0.0-rc2.html)).
+Elastic 6.0 targets Elasticsearch 6.x which was [released on 14th November 2017](https://www.elastic.co/blog/elasticsearch-6-0-0-released).
 
-Notice that there are will be a lot of [breaking changes in Elasticsearch 6.0](https://www.elastic.co/guide/en/elasticsearch/reference/6.0/breaking-changes-6.0.html)
+Notice that there are a lot of [breaking changes in Elasticsearch 6.0](https://www.elastic.co/guide/en/elasticsearch/reference/6.2/breaking-changes-6.0.html)
 and we used this as an opportunity to [clean up and refactor Elastic](https://github.com/olivere/elastic/blob/release-branch.v6/CHANGELOG-6.0.md)
 as we did in the transition from earlier versions of Elastic.
 
@@ -101,8 +100,8 @@ Having said that, there have been no big API changes that required you
 to rewrite your application big time. More often than not it's renaming APIs
 and adding/removing features so that Elastic is in sync with Elasticsearch.
 
-Elastic has been used in production with the following Elasticsearch versions:
-0.90, 1.0-1.7, and 2.0-2.4.1. Furthermore, we use [Travis CI](https://travis-ci.org/)
+Elastic has been used in production starting with Elasticsearch 0.90 up to recent 6.x
+versions. Furthermore, we use [Travis CI](https://travis-ci.org/)
 to test Elastic with the most recent versions of Elasticsearch and Go.
 See the [.travis.yml](https://github.com/olivere/elastic/blob/master/.travis.yml)
 file for the exact matrix and [Travis](https://travis-ci.org/olivere/elastic)
@@ -125,9 +124,17 @@ creating a client, creating an index, adding a document, executing a search etc.
 
 An example is available [here](https://olivere.github.io/elastic/).
 
-Here's a [link to a complete working example for v3](https://gist.github.com/olivere/114347ff9d9cfdca7bdc0ecea8b82263).
+Here's a [link to a complete working example for v6](https://gist.github.com/olivere/e4a376b4783c0914e44ea4f745ce2ebf).
 
-See the [wiki](https://github.com/olivere/elastic/wiki) for more details.
+Here are a few tips on how to get used to Elastic:
+
+1. Head over to the [Wiki](https://github.com/olivere/elastic/wiki) for detailed information and
+   topics like e.g. [how to add a middleware](/olivere/elastic/wiki/HttpTransport)
+   or how to [connect to AWS](/olivere/elastic/wiki/Using-with-AWS-Elasticsearch-Service).
+2. If you are unsure how to implement something, read the tests (all `_test.go` files).
+   They not only serve as a guard against changes, but also as a reference.
+3. The [recipes](https://github.com/olivere/elastic/tree/release-branch.v6/recipes)
+   contains small examples on how to implement something, e.g. bulk indexing, scrolling etc.
 
 
 ## API Status
@@ -151,7 +158,7 @@ See the [wiki](https://github.com/olivere/elastic/wiki) for more details.
 - [x] Search
 - [x] Search Template
 - [ ] Multi Search Template
-- [ ] Search Shards API
+- [x] Search Shards API
 - [x] Suggesters
   - [x] Term Suggester
   - [x] Phrase Suggester
@@ -159,7 +166,7 @@ See the [wiki](https://github.com/olivere/elastic/wiki) for more details.
   - [x] Context Suggester
 - [x] Multi Search API
 - [x] Count API
-- [ ] Validate API
+- [x] Validate API
 - [x] Explain API
 - [x] Profile API
 - [x] Field Capabilities API
@@ -171,7 +178,7 @@ See the [wiki](https://github.com/olivere/elastic/wiki) for more details.
   - [x] Cardinality
   - [x] Extended Stats
   - [x] Geo Bounds
-  - [ ] Geo Centroid
+  - [x] Geo Centroid
   - [x] Max
   - [x] Min
   - [x] Percentiles
@@ -182,11 +189,11 @@ See the [wiki](https://github.com/olivere/elastic/wiki) for more details.
   - [x] Top Hits
   - [x] Value Count
 - Bucket Aggregations
-  - [ ] Adjacency Matrix
+  - [x] Adjacency Matrix
   - [x] Children
   - [x] Date Histogram
   - [x] Date Range
-  - [ ] Diversified Sampler
+  - [x] Diversified Sampler
   - [x] Filter
   - [x] Filters
   - [x] Geo Distance
@@ -202,6 +209,7 @@ See the [wiki](https://github.com/olivere/elastic/wiki) for more details.
   - [x] Significant Terms
   - [x] Significant Text
   - [x] Terms
+  - [x] Composite
 - Pipeline Aggregations
   - [x] Avg Bucket
   - [x] Derivative
@@ -215,6 +223,7 @@ See the [wiki](https://github.com/olivere/elastic/wiki) for more details.
   - [x] Cumulative Sum
   - [x] Bucket Script
   - [x] Bucket Selector
+  - [x] Bucket Sort
   - [x] Serial Differencing
 - [x] Matrix Aggregations
   - [x] Matrix Stats
@@ -237,17 +246,17 @@ See the [wiki](https://github.com/olivere/elastic/wiki) for more details.
 - [x] Update Indices Settings
 - [x] Get Settings
 - [x] Analyze
+  - [x] Explain Analyze
 - [x] Index Templates
-- [ ] Shadow Replica Indices
 - [x] Indices Stats
-- [ ] Indices Segments
+- [x] Indices Segments
 - [ ] Indices Recovery
 - [ ] Indices Shard Stores
 - [ ] Clear Cache
 - [x] Flush
+  - [x] Synced Flush
 - [x] Refresh
 - [x] Force Merge
-- [ ] Upgrade
 
 ### cat APIs
 
@@ -270,6 +279,7 @@ The cat APIs are not implemented as of now. We think they are better suited for 
 - [ ] cat shards
 - [ ] cat segments
 - [ ] cat snapshots
+- [ ] cat templates
 
 ### Cluster APIs
 
@@ -281,6 +291,8 @@ The cat APIs are not implemented as of now. We think they are better suited for 
 - [ ] Cluster Update Settings
 - [x] Nodes Stats
 - [x] Nodes Info
+- [ ] Nodes Feature Usage
+- [ ] Remote Cluster Info
 - [x] Task Management API
 - [ ] Nodes hot_threads
 - [ ] Cluster Allocation Explain API
@@ -300,6 +312,7 @@ The cat APIs are not implemented as of now. We think they are better suited for 
 - Term level queries
   - [x] Term Query
   - [x] Terms Query
+  - [x] Terms Set Query
   - [x] Range Query
   - [x] Exists Query
   - [x] Prefix Query
@@ -314,7 +327,6 @@ The cat APIs are not implemented as of now. We think they are better suited for 
   - [x] Dis Max Query
   - [x] Function Score Query
   - [x] Boosting Query
-  - [x] Indices Query
 - Joining queries
   - [x] Nested Query
   - [x] Has Child Query
@@ -324,12 +336,9 @@ The cat APIs are not implemented as of now. We think they are better suited for 
   - [ ] GeoShape Query
   - [x] Geo Bounding Box Query
   - [x] Geo Distance Query
-  - [ ] Geo Distance Range Query
   - [x] Geo Polygon Query
-  - [ ] Geohash Cell Query
 - Specialized queries
   - [x] More Like This Query
-  - [x] Template Query
   - [x] Script Query
   - [x] Percolate Query
 - Span queries
@@ -349,11 +358,15 @@ The cat APIs are not implemented as of now. We think they are better suited for 
 
 - Snapshot and Restore
   - [x] Repositories
-  - [ ] Snapshot
+  - [x] Snapshot
   - [ ] Restore
   - [ ] Snapshot status
   - [ ] Monitoring snapshot/restore status
   - [ ] Stopping currently running snapshot and restore
+- Scripting
+  - [x] GetScript
+  - [x] PutScript
+  - [x] DeleteScript
 
 ### Sorting
 

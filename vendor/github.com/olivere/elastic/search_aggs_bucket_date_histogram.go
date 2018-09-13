@@ -6,7 +6,7 @@ package elastic
 
 // DateHistogramAggregation is a multi-bucket aggregation similar to the
 // histogram except it can only be applied on date values.
-// See: https://www.elastic.co/guide/en/elasticsearch/reference/6.0/search-aggregations-bucket-datehistogram-aggregation.html
+// See: https://www.elastic.co/guide/en/elasticsearch/reference/6.2/search-aggregations-bucket-datehistogram-aggregation.html
 type DateHistogramAggregation struct {
 	field           string
 	script          *Script
@@ -23,6 +23,7 @@ type DateHistogramAggregation struct {
 	timeZone          string
 	format            string
 	offset            string
+	keyed             *bool
 }
 
 // NewDateHistogramAggregation creates a new DateHistogramAggregation.
@@ -196,6 +197,14 @@ func (a *DateHistogramAggregation) ExtendedBoundsMax(max interface{}) *DateHisto
 	return a
 }
 
+// Keyed specifies whether to return the results with a keyed response (or not).
+//
+// See https://www.elastic.co/guide/en/elasticsearch/reference/6.4/search-aggregations-bucket-datehistogram-aggregation.html#_keyed_response_3.
+func (a *DateHistogramAggregation) Keyed(keyed bool) *DateHistogramAggregation {
+	a.keyed = &keyed
+	return a
+}
+
 func (a *DateHistogramAggregation) Source() (interface{}, error) {
 	// Example:
 	// {
@@ -261,6 +270,9 @@ func (a *DateHistogramAggregation) Source() (interface{}, error) {
 			bounds["max"] = a.extendedBoundsMax
 		}
 		opts["extended_bounds"] = bounds
+	}
+	if a.keyed != nil {
+		opts["keyed"] = *a.keyed
 	}
 
 	// AggregationBuilder (SubAggregations)
