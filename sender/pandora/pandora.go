@@ -21,7 +21,7 @@ import (
 	"github.com/qiniu/pandora-go-sdk/logdb"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 
-	"github.com/qiniu/logkit/conf"
+	logkitconf "github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/times"
@@ -138,7 +138,7 @@ func init() {
 }
 
 // pandora sender
-func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
+func NewSender(conf logkitconf.MapConf) (pandoraSender sender.Sender, err error) {
 	repoName, err := conf.GetString(sender.KeyPandoraRepoName)
 	if err != nil {
 		return
@@ -155,13 +155,13 @@ func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
 		return
 	}
 	ak, _ := conf.GetString(sender.KeyPandoraAk)
-	akFromEnv := GetEnv(ak)
+	akFromEnv := logkitconf.GetEnv(ak)
 	if akFromEnv == "" {
 		akFromEnv = ak
 	}
 
 	sk, _ := conf.GetString(sender.KeyPandoraSk)
-	skFromEnv := GetEnv(sk)
+	skFromEnv := logkitconf.GetEnv(sk)
 	if skFromEnv == "" {
 		skFromEnv = sk
 	}
@@ -328,7 +328,7 @@ func convertAnalyzerMap(analyzerStrs []string) map[string]string {
 	return analyzerMap
 }
 
-func getTokensFromConf(conf conf.MapConf) (tokens Tokens, err error) {
+func getTokensFromConf(conf logkitconf.MapConf) (tokens Tokens, err error) {
 	// schema free tokens
 	preFix := SchemaFreeTokensPrefix
 	tokens.SchemaFreeTokens.PipelineGetRepoToken.Token, _ = conf.GetStringOr(preFix+"pipeline_get_repo_token", "")
@@ -415,7 +415,7 @@ func getTokensFromConf(conf conf.MapConf) (tokens Tokens, err error) {
 	return
 }
 
-func (s *Sender) TokenRefresh(mapConf conf.MapConf) error {
+func (s *Sender) TokenRefresh(mapConf logkitconf.MapConf) error {
 	s.opt.tokenLock.Lock()
 	defer s.opt.tokenLock.Unlock()
 	if tokens, err := getTokensFromConf(mapConf); err != nil {

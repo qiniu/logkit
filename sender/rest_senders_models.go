@@ -132,15 +132,20 @@ var (
 		ToolTip:       "在系统中添加数据发送时的当前时间作为时间戳",
 	}
 	OptionAuthUsername = Option{
-		KeyName:     KeyAuthUsername,
-		Description: "认证用户名(auth_username)",
-		Advance:     true,
+		KeyName:      KeyAuthUsername,
+		Default:      "",
+		DefaultNoUse: false,
+		Description:  "认证用户名(auth_username)",
+		Advance:      true,
 	}
 	OptionAuthPassword = Option{
-		KeyName:     KeyAuthPassword,
-		Description: "认证用户密码(auth_password)",
-		Secret:      true,
-		Advance:     true,
+		KeyName:      KeyAuthPassword,
+		Description:  "认证用户密码(auth_password)",
+		Default:      "",
+		DefaultNoUse: false,
+		Secret:       true,
+		Advance:      true,
+		ToolTip:      `支持从自定义环境变量（如 YOUR_AUTH_PASSWORD_ENV）里读取对应值，填写方式为 ${YOUR_AUTH_PASSWORD_ENV}`,
 	}
 	OptionEnableGzip = Option{
 		KeyName:       KeyEnableGzip,
@@ -612,10 +617,10 @@ var ModeKeyOptions = map[string][]Option{
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     true,
-			Placeholder:  "mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]",
+			Placeholder:  "${YOUR_MONGODB_HOST_ENV}",
 			DefaultNoUse: true,
 			Description:  "数据库地址(mongodb_host)",
-			ToolTip:      `Mongodb的地址: mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]`,
+			ToolTip:      `Mongodb的地址: mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]，支持从自定义环境变量（如YOUR_MONGODB_HOST_ENV）里读取对应值`,
 		},
 		{
 			KeyName:      KeyMongodbDB,
@@ -776,10 +781,9 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:      KeyElasticHost,
 			ChooseOnly:   false,
-			Default:      "",
 			Required:     true,
 			Placeholder:  "192.168.31.203:9200",
-			DefaultNoUse: false,
+			DefaultNoUse: true,
 			Description:  "host地址(elastic_host)",
 			ToolTip:      `常用端口9200`,
 		},

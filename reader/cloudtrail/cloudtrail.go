@@ -138,12 +138,12 @@ func GetS3UserInfo(conf conf.MapConf) (bucket, prefix, region, ak, sk string, er
 		err = emptyConfigError(reader.KeyS3Region)
 		return
 	}
-	ak, _ = conf.GetString(reader.KeyS3AccessKey)
+	ak, _ = conf.GetPasswordEnvString(reader.KeyS3AccessKey)
 	if ak == "" {
 		err = emptyConfigError(reader.KeyS3AccessKey)
 		return
 	}
-	sk, _ = conf.GetString(reader.KeyS3SecretKey)
+	sk, _ = conf.GetPasswordEnvString(reader.KeyS3SecretKey)
 	if sk == "" {
 		err = emptyConfigError(reader.KeyS3SecretKey)
 		return

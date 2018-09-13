@@ -40,25 +40,26 @@ func init() {
 
 // NewMongodbAccSender mongodb accumulate sender constructor
 func NewSender(conf conf.MapConf) (mongodbSender sender.Sender, err error) {
-	host, err := conf.GetString(sender.KeyMongodbHost)
+	host, err := conf.GetPasswordEnvString(sender.KeyMongodbHost)
 	if err != nil {
-		return
+		return nil, err
 	}
+
 	dbName, err := conf.GetString(sender.KeyMongodbDB)
 	if err != nil {
-		return
+		return nil, err
 	}
 	updKey, err := conf.GetAliasList(sender.KeyMongodbUpdateKey)
 	if err != nil {
-		return
+		return nil, err
 	}
 	accKey, err := conf.GetAliasList(sender.KeyMongodbAccKey)
 	if err != nil {
-		return
+		return nil, err
 	}
 	collectionName, err := conf.GetString(sender.KeyMongodbCollection)
 	if err != nil {
-		return
+		return nil, err
 	}
 	name, _ := conf.GetStringOr(sender.KeyName, fmt.Sprintf("mongodb_acc:(%v,db:%v,collection:%v)", host, dbName, collectionName))
 	return newSender(name, host, dbName, collectionName, updKey, accKey)

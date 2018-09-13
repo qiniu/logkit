@@ -151,13 +151,13 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	case reader.ModeMySQL:
 		readBatch, _ = conf.GetIntOr(reader.KeyMysqlReadBatch, 100)
 		offsetKey, _ = conf.GetStringOr(reader.KeyMysqlOffsetKey, "")
-		dataSource, err = conf.GetString(reader.KeyMysqlDataSource)
+		if logpath == "" {
+			dataSource, err = conf.GetPasswordEnvString(reader.KeyMysqlDataSource)
+		} else {
+			dataSource, err = conf.GetPasswordEnvStringOr(reader.KeyMysqlDataSource, logpath)
+		}
 		if err != nil {
-			dataSource = logpath
-			if logpath == "" {
-				return nil, err
-			}
-			err = nil
+			return nil, err
 		}
 		rawDatabase, _ = conf.GetStringOr(reader.KeyMysqlDataBase, "")
 		rawSQLs, _ = conf.GetStringOr(reader.KeyMysqlSQL, "")
@@ -172,13 +172,13 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	case reader.ModeMSSQL:
 		readBatch, _ = conf.GetIntOr(reader.KeyMssqlReadBatch, 100)
 		offsetKey, _ = conf.GetStringOr(reader.KeyMssqlOffsetKey, "")
-		dataSource, err = conf.GetString(reader.KeyMssqlDataSource)
+		if logpath == "" {
+			dataSource, err = conf.GetPasswordEnvString(reader.KeyMssqlDataSource)
+		} else {
+			dataSource, err = conf.GetPasswordEnvStringOr(reader.KeyMssqlDataSource, logpath)
+		}
 		if err != nil {
-			dataSource = logpath
-			if logpath == "" {
-				return nil, err
-			}
-			err = nil
+			return nil, err
 		}
 		rawDatabase, err = conf.GetString(reader.KeyMssqlDataBase)
 		if err != nil {
@@ -191,13 +191,13 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	case reader.ModePostgreSQL:
 		readBatch, _ = conf.GetIntOr(reader.KeyPGsqlReadBatch, 100)
 		offsetKey, _ = conf.GetStringOr(reader.KeyPGsqlOffsetKey, "")
-		dataSource, err = conf.GetString(reader.KeyPGsqlDataSource)
+		if logpath == "" {
+			dataSource, err = conf.GetPasswordEnvString(reader.KeyPGsqlDataSource)
+		} else {
+			dataSource, err = conf.GetPasswordEnvStringOr(reader.KeyPGsqlDataSource, logpath)
+		}
 		if err != nil {
-			dataSource = logpath
-			if logpath == "" {
-				return nil, err
-			}
-			err = nil
+			return nil, err
 		}
 		sps := strings.Split(dataSource, " ")
 		for _, v := range sps {

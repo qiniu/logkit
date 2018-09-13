@@ -382,6 +382,22 @@ var (
 		Advance:      true,
 		ToolTip:      `感知新增日志的定时检查时间`,
 	}
+	OptionAuthUsername = Option{
+		KeyName:      KeyAuthUsername,
+		Default:      "",
+		DefaultNoUse: false,
+		Description:  "认证用户名(auth_username)",
+		Advance:      true,
+	}
+	OptionAuthPassword = Option{
+		KeyName:      KeyAuthPassword,
+		Description:  "认证用户密码(auth_password)",
+		Default:      "",
+		DefaultNoUse: false,
+		Secret:       true,
+		Advance:      true,
+		ToolTip:      `支持从自定义环境变量（如 YOUR_AUTH_PASSWORD_ENV）里读取对应值，填写方式为 ${YOUR_AUTH_PASSWORD_ENV}`,
+	}
 )
 
 var ModeKeyOptions = map[string][]Option{
@@ -520,12 +536,11 @@ var ModeKeyOptions = map[string][]Option{
 			KeyName:      KeyMysqlDataSource,
 			Element:      Text,
 			ChooseOnly:   false,
-			Default:      "",
 			Required:     true,
-			Placeholder:  "<username>:<password>@tcp(<hostname>:<port>)",
+			Placeholder:  "${YOUR_MYSQL_SOURCE_ENV}",
 			DefaultNoUse: true,
 			Description:  "数据库地址(mysql_datasource)",
-			ToolTip:      `mysql数据源所需信息: username: 用户名, password: 用户密码, hostname: mysql地址, port: mysql端口, 示例：一个填写完整的字段类似于:"admin:123456@tcp(10.101.111.1:3306)"`,
+			ToolTip:      `mysql数据源所需信息，<username>:<password>@tcp(<hostname>:<port>)，其中 username: 用户名, password: 用户密码, hostname: mysql地址, port: mysql端口, 示例：一个填写完整的字段类似于:"admin:123456@tcp(10.101.111.1:3306)"，支持从自定义环境变量（如 YOUR_MYSQL_SOURCE_ENV）里读取对应值`,
 		},
 		{
 			KeyName:      KeyMysqlDataBase,
@@ -628,12 +643,11 @@ var ModeKeyOptions = map[string][]Option{
 			KeyName:      KeyMssqlDataSource,
 			Element:      Text,
 			ChooseOnly:   false,
-			Placeholder:  "server=<hostname or instance>;user id=<username>;password=<password>;port=<port>",
+			Placeholder:  "${YOUR_MSSQL_SOURCE_ENV}",
 			DefaultNoUse: true,
-			Default:      "",
 			Required:     true,
 			Description:  "数据库地址(mssql_datasource)",
-			ToolTip:      `mssql数据源所需信息, username: 用户名, password: 用户密码, hostname: mssql地址,实例,port: mssql端口,默认1433, 示例：一个填写完整的mssql_datasource字段类似于:"server=localhost\SQLExpress;user id=sa;password=PassWord;port=1433"`,
+			ToolTip:      `mssql数据源所需信息，server=<hostname or instance>;user id=<username>;password=<password>;port=<port>，其中username: 用户名, password: 用户密码, hostname: mssql地址,实例,port: mssql端口,默认1433, 示例：一个填写完整的mssql_datasource字段类似于:"server=localhost\SQLExpress;user id=sa;password=PassWord;port=1433"，支持从自定义环境变量（如 YOUR_MSSQL_SOURCE_ENV）里读取对应值`,
 		},
 		{
 			KeyName:      KeyMssqlDataBase,
@@ -714,12 +728,11 @@ var ModeKeyOptions = map[string][]Option{
 			KeyName:      KeyPGsqlDataSource,
 			Element:      Text,
 			ChooseOnly:   false,
-			Default:      "",
 			Required:     true,
-			Placeholder:  "host=localhost port=5432 connect_timeout=10 user=pqgotest password=123456 sslmode=disable",
+			Placeholder:  "${YOUR_PGSQL_SOURCE_ENV}",
 			DefaultNoUse: true,
 			Description:  "数据库地址(postgres_datasource)",
-			ToolTip:      `PostgreSQL数据源所需信息，填写的形式如 host=localhost port=5432, 属性和实际的值用=(等于)符号连接，中间不要有空格，不同的属性用(空格)隔开，一个填写完整的 postgres_datasource 字段类似于:"host=localhost port=5432 connect_timeout=10 user=pqgotest password=123456 sslmode=disable"`,
+			ToolTip:      `PostgreSQL数据源所需信息，host=localhost port=5432 connect_timeout=10 user=pqgotest password=123456 sslmode=disable 填写的形式如 host=localhost port=5432, 属性和实际的值用=(等于)符号连接，中间不要有空格，不同的属性用(空格)隔开，一个填写完整的 postgres_datasource 字段类似于:"host=localhost port=5432 connect_timeout=10 user=pqgotest password=123456 sslmode=disable"，支持从自定义环境变量（如 YOUR_PGSQL_SOURCE_ENV）里读取对应值`,
 		},
 		{
 			KeyName:      KeyPGsqlDataBase,
@@ -808,6 +821,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:       KeyESVersion,
+			Default:       ElasticVersion5,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{ElasticVersion3, ElasticVersion5, ElasticVersion6},
 			Description:   "版本(es_version)",
@@ -831,6 +845,8 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: true,
 			Description:  "app名称(es_type)",
 		},
+		OptionAuthUsername,
+		OptionAuthPassword,
 		OptionMetaPath,
 		OptionDataSourceTag,
 		{
@@ -859,12 +875,11 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:      KeyMongoHost,
 			ChooseOnly:   false,
-			Default:      "",
 			Required:     true,
-			Placeholder:  "mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]",
+			Placeholder:  "${YOUR_MONGODB_HOST_ENV}",
 			DefaultNoUse: true,
 			Description:  "数据库地址(mongo_host)",
-			ToolTip:      `mongodb的url地址，基础的是mongo的host地址以及端口，默认是localhost:9200，扩展形式可以写为： mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]`,
+			ToolTip:      `mongodb的url地址，基础的是mongo的host地址以及端口，可以写为： mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]，支持从自定义环境变量（如 YOUR_MONGODB_HOST_ENV）里读取对应值`,
 		},
 		{
 			KeyName:      KeyMongoDatabase,
@@ -1229,7 +1244,7 @@ var ModeKeyOptions = map[string][]Option{
 			Placeholder:  "选填一种方式鉴权",
 			DefaultNoUse: true,
 			Description:  "AK(aws_access_key)",
-			ToolTip:      "AWS的access_key(鉴权第二优先)",
+			ToolTip:      "AWS的access_key(鉴权第二优先), 支持从自定义环境变量（如 YOUR_AWS_AK_ENV）里读取对应值，填写方式为 ${YOUR_AWS_AK_ENV}",
 		},
 		{
 			KeyName:      KeyAWSSecretKey,
@@ -1238,7 +1253,7 @@ var ModeKeyOptions = map[string][]Option{
 			Placeholder:  "选填一种方式鉴权",
 			DefaultNoUse: true,
 			Description:  "SK(aws_secret_key)",
-			ToolTip:      "AWS的secret_key(鉴权第二优先)",
+			ToolTip:      "AWS的secret_key(鉴权第二优先), 支持从自定义环境变量（如 YOUR_AWS_SK_ENV）里读取对应值，填写方式为 ${YOUR_AWS_SK_ENV}",
 		},
 		{
 			KeyName:      KeyAWSToken,
@@ -1247,7 +1262,7 @@ var ModeKeyOptions = map[string][]Option{
 			Placeholder:  "选填一种方式鉴权",
 			DefaultNoUse: true,
 			Description:  "鉴权token(aws_token)",
-			ToolTip:      "AWS的鉴权token",
+			ToolTip:      "AWS的鉴权token, 支持从自定义环境变量（如 YOUR_AWS_TOKEN_ENV）里读取对应值，填写方式为 ${YOUR_AWS_TOKEN_ENV}",
 		},
 		{
 			KeyName:      KeyAWSProfile,
@@ -1256,7 +1271,7 @@ var ModeKeyOptions = map[string][]Option{
 			Placeholder:  "选填一种方式鉴权",
 			DefaultNoUse: true,
 			Description:  "共享profile(aws_profile)",
-			ToolTip:      "鉴权第三优先",
+			ToolTip:      "鉴权第三优先, 支持从自定义环境变量（如 YOUR_AWS_PROFILE_ENV）里读取对应值，填写方式为 ${YOUR_AWS_PROFILE_ENV}",
 		},
 		{
 			KeyName:      KeySharedCredentialFile,
@@ -1487,7 +1502,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: false,
 			Description:  "认证密码(snmp_auth_password)",
 			Advance:      true,
-			ToolTip:      "版本3有效",
+			ToolTip:      "版本3有效，支持从自定义环境变量（如 YOUR_AUTH_PASSWORD_ENV）里读取对应值，填写方式为 ${YOUR_AUTH_PASSWORD_ENV}",
 		},
 		{
 			KeyName:       KeySnmpReaderPrivProtocol,
@@ -1539,7 +1554,6 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:      KeyS3Region,
 			ChooseOnly:   false,
-			Default:      "",
 			Placeholder:  "us-east-1",
 			DefaultNoUse: false,
 			Required:     true,
@@ -1549,27 +1563,24 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:      KeyS3AccessKey,
 			ChooseOnly:   false,
-			Default:      "",
-			Placeholder:  "访问密钥",
+			Placeholder:  "访问密钥 ${YOUR_S3_AK_ENV}",
 			DefaultNoUse: false,
 			Required:     true,
 			Description:  "AK(s3_access_key)",
-			ToolTip:      "访问密钥ID(AK)",
+			ToolTip:      "访问密钥ID(AK), 支持从自定义环境变量（如 YOUR_S3_AK_ENV）里读取对应值",
 		},
 		{
 			KeyName:      KeyS3SecretKey,
 			ChooseOnly:   false,
-			Default:      "",
-			Placeholder:  "访问密钥",
+			Placeholder:  "访问密钥 ${YOUR_S3_SK_ENV}",
 			DefaultNoUse: false,
 			Required:     true,
 			Description:  "SK(s3_secret_key)",
-			ToolTip:      "与访问密钥ID结合使用的密钥(SK)",
+			ToolTip:      "与访问密钥ID结合使用的密钥(SK), 支持从自定义环境变量（如 YOUR_S3_SK_ENV）里读取对应值",
 		},
 		{
 			KeyName:      KeyS3Bucket,
 			ChooseOnly:   false,
-			Default:      "",
 			Placeholder:  "",
 			DefaultNoUse: false,
 			Required:     true,

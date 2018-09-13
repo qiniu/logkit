@@ -26,6 +26,7 @@ import (
 	"unicode"
 
 	"github.com/json-iterator/go"
+
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/times"
 )
@@ -652,23 +653,6 @@ func Hash(s string) string {
 	h := fnv.New32a()
 	h.Write([]byte(s))
 	return strconv.Itoa(int(h.Sum32()))
-}
-
-// parse ${ENV} to ENV
-// get ENV value from os
-func GetEnv(env string) string {
-	var envName string
-	if strings.HasPrefix(env, "${") && strings.HasSuffix(env, "}") {
-		envName = strings.Trim(strings.Trim(strings.Trim(env, "$"), "{"), "}")
-	} else {
-		log.Debug("cannot parse your ak sk as ${YOUR_ENV_NAME} format, use it as raw ak.sk instead")
-		return ""
-	}
-	if osEnv := os.Getenv(envName); osEnv != "" {
-		return osEnv
-	}
-	log.Warnf("cannot find %s in current system env", envName)
-	return ""
 }
 
 //CreateDirIfNotExist 检查文件夹，不存在时创建
