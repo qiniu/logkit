@@ -82,6 +82,54 @@ func Test_RawData(t *testing.T) {
 	assert.Equal(t, expected, rawData)
 }
 
+func Test_RawDataWithReadData(t *testing.T) {
+	var testRawData = `{
+    "name":"testReadData",
+    "batch_len": 3,
+    "batch_size": 2097152,
+    "batch_interval": 60,
+    "batch_try_times": 3, 
+    "reader":{
+        "mode":"mockreader"
+    }
+}
+`
+	if err := os.MkdirAll("./Test_RawDataWithReadData/confs", 0777); err != nil {
+		t.Error(err)
+	}
+	defer func() {
+		os.RemoveAll("./Test_RawDataWithReadData")
+	}()
+
+	err := ioutil.WriteFile("./Test_RawDataWithReadData/confs/test1.conf", []byte(testRawData), 0666)
+	if err != nil {
+		t.Error(err)
+	}
+
+	time.Sleep(1 * time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	confPathAbs, _, err := GetRealPath("./Test_RawDataWithReadData/confs/test1.conf")
+	if err != nil {
+		t.Error(err)
+	}
+
+	var runnerConf RunnerConfig
+	err = conf.LoadEx(&runnerConf, confPathAbs)
+	if err != nil {
+		t.Error(err)
+	}
+
+	rawData, err := RawData(runnerConf.ReaderConfig)
+	if err != nil {
+		t.Error(err)
+	}
+
+	expected := string("{\n  \"logkit\": \"logkit\"\n}")
+	assert.Equal(t, expected, rawData)
+}
+
 func Test_RawData_DaemonReader(t *testing.T) {
 	var testRawData = `{
     "name":"testGetRawData.csv",
