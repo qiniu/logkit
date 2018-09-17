@@ -1,6 +1,7 @@
 package kafka
 
 import (
+	"compress/gzip"
 	"fmt"
 	"os"
 	"strings"
@@ -34,6 +35,15 @@ var (
 		sender.KeyKafkaCompressionNone:   sarama.CompressionNone,
 		sender.KeyKafkaCompressionGzip:   sarama.CompressionGZIP,
 		sender.KeyKafkaCompressionSnappy: sarama.CompressionSnappy,
+		sender.KeyKafkaCompressionLZ4:    sarama.CompressionLZ4,
+	}
+
+	compressionLevelModes = map[string]int{
+		sender.KeyGZIPCompressionNo:              gzip.NoCompression,
+		sender.KeyGZIPCompressionBestSpeed:       gzip.BestSpeed,
+		sender.KeyGZIPCompressionBestCompression: gzip.BestCompression,
+		sender.KeyGZIPCompressionDefault:         gzip.DefaultCompression,
+		sender.KeyGZIPCompressionHuffmanOnly:     gzip.HuffmanOnly,
 	}
 )
 
@@ -68,6 +78,7 @@ func NewSender(conf conf.MapConf) (kafkaSender sender.Sender, err error) {
 	timeout, _ := conf.GetStringOr(sender.KeyKafkaTimeout, "30s")
 	keepAlive, _ := conf.GetStringOr(sender.KeyKafkaKeepAlive, "0")
 	maxMessageBytes, _ := conf.GetIntOr(sender.KeyMaxMessageBytes, 4*1024*1024)
+	gzipCompressionLevel, _ := conf.GetStringOr(sender.KeyGZIPCompressionLevel, sender.KeyGZIPCompressionDefault)
 
 	name, _ := conf.GetStringOr(sender.KeyName, fmt.Sprintf("kafkaSender:(kafkaUrl:%s,topic:%s)", hosts, topic))
 	cfg := sarama.NewConfig()
@@ -86,6 +97,9 @@ func NewSender(conf conf.MapConf) (kafkaSender sender.Sender, err error) {
 	if !ok {
 		return nil, fmt.Errorf("unknown compression mode: '%v'", compression)
 	}
+	if compressionMode == sarama.CompressionLZ4 {
+		cfg.Version = sarama.V0_10_0_0
+	}
 	cfg.Producer.Compression = compressionMode
 	cfg.Net.DialTimeout, err = time.ParseDuration(timeout)
 	if err != nil {
@@ -96,6 +110,12 @@ func NewSender(conf conf.MapConf) (kafkaSender sender.Sender, err error) {
 		return
 	}
 	cfg.Producer.MaxMessageBytes = maxMessageBytes
+	compressionLevelMode, ok := compressionLevelModes[gzipCompressionLevel]
+	if !ok {
+		compressionLevelMode = gzip.DefaultCompression
+		log.Warnf("unknown gzip compression level: '%v',use default level", gzipCompressionLevel)
+	}
+	cfg.Producer.CompressionLevel = compressionLevelMode
 
 	producer, err := sarama.NewSyncProducer(hosts, cfg)
 	if err != nil {
