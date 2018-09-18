@@ -100,7 +100,6 @@ func (s *Sender) Send(datas []Data) error {
 			if ok {
 				t, err := time.Parse(time.RFC3339Nano, key)
 				if err != nil {
-					ste.Errors++
 					ste.LastError = fmt.Sprintf("%s parse timestamp key %q failed: %v", s.Name(), key, err)
 					t = time.Now()
 				}
@@ -117,23 +116,28 @@ func (s *Sender) Send(datas []Data) error {
 	for filename := range batchDatas {
 		bytes, err := s.marshalFunc(batchDatas[filename])
 		if err != nil {
-			return reqerr.NewSendError(
+			ste.ErrorDetail = reqerr.NewSendError(
 				fmt.Sprintf("%s marshal data failed: %v", s.Name(), err),
 				sender.ConvertDatasBack(datas),
 				reqerr.TypeDefault,
 			)
+			ste.LastError = err.Error()
+			ste.Errors += int64(len(batchDatas[filename]))
+			return ste
 		}
 
 		_, err = s.writers.Write(filename, bytes)
 		if err != nil {
-			return reqerr.NewSendError(
+			ste.ErrorDetail = reqerr.NewSendError(
 				fmt.Sprintf("%s write data to file failed: %v", s.Name(), err),
 				sender.ConvertDatasBack(datas),
 				reqerr.TypeDefault,
 			)
+			ste.LastError = err.Error()
+			ste.Errors += int64(len(batchDatas[filename]))
+			return ste
 		}
 	}
-
 	if ste.Errors > 0 {
 		return ste
 	}

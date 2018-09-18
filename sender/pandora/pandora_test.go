@@ -285,10 +285,7 @@ func TestStatsSender(t *testing.T) {
 	d := Data{}
 	d["x1"] = "hh"
 	err = s.Send([]Data{d})
-	st, ok := err.(*StatsError)
-	assert.Equal(t, true, ok)
-	assert.NoError(t, st.ErrorDetail)
-	assert.Equal(t, st.Success, int64(1))
+	assert.NoError(t, err)
 	if !strings.Contains(pandora.Body, "x1=hh") {
 		t.Error("not x1 find error")
 	}

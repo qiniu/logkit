@@ -1023,16 +1023,18 @@ func (s *Sender) rawSend(datas []Data) (se error) {
 func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 	s.checkSchemaUpdate()
 	if !s.opt.schemaFree && (len(s.schemas) <= 0 || len(s.alias2key) <= 0) {
-		se = reqerr.NewSendError("Get pandora schema error, failed to send data", sender.ConvertDatasBack(datas), reqerr.TypeDefault)
-		ste := &StatsError{
+		return &StatsError{
 			StatsInfo: StatsInfo{
 				Success:   0,
 				Errors:    int64(len(datas)),
 				LastError: "Get pandora schema error or repo not exist",
 			},
-			ErrorDetail: se,
+			ErrorDetail: reqerr.NewSendError(
+				"Get pandora schema error, failed to send data",
+				sender.ConvertDatasBack(datas),
+				reqerr.TypeDefault,
+			),
 		}
-		return ste
 	}
 	var points pipeline.Datas
 	now := time.Now().Format(time.RFC3339Nano)
@@ -1118,28 +1120,27 @@ func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 	}
 
 	if se != nil {
-		nse, ok := se.(*reqerr.SendError)
-		ste := &StatsError{
+		if nse, ok := se.(*reqerr.SendError); ok {
+			return &StatsError{
+				StatsInfo: StatsInfo{
+					Errors:    int64(len(nse.GetFailDatas())),
+					Success:   int64(len(datas) - len(nse.GetFailDatas())),
+					LastError: nse.Error(),
+				},
+				ErrorDetail: se,
+			}
+		}
+
+		return &StatsError{
+			StatsInfo: StatsInfo{
+				Errors:    int64(len(datas)),
+				LastError: se.Error(),
+			},
 			ErrorDetail: se,
 		}
-		if ok {
-			ste.LastError = nse.Error()
-			ste.Errors = int64(len(nse.GetFailDatas()))
-			ste.Success = int64(len(datas)) - ste.Errors
-		} else {
-			ste.LastError = se.Error()
-			ste.Errors = int64(len(datas))
-		}
-		return ste
 	}
-	ste := &StatsError{
-		ErrorDetail: se,
-		StatsInfo: StatsInfo{
-			Success:   int64(len(datas)),
-			LastError: "",
-		},
-	}
-	return ste
+
+	return nil
 }
 
 func (s *Sender) Name() string {

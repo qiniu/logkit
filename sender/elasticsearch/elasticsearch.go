@@ -223,13 +223,21 @@ func (s *Sender) Send(datas []Data) error {
 		}
 		lastError, err := jsoniter.MarshalToString(lastFailedResult)
 		if err != nil {
-			lastError = fmt.Sprintf("%v", lastFailedResult)
+			lastError = fmt.Sprintf("marshal to string failed: %v", lastFailedResult)
 		}
-		return reqerr.NewSendError(
-			fmt.Sprintf("bulk failed with last error: %s", lastError),
-			failedDatas,
-			reqerr.TypeBinaryUnpack,
-		)
+
+		return &StatsError{
+			StatsInfo: StatsInfo{
+				Success:   int64(len(datas) - len(failedDatas)),
+				Errors:    int64(len(failedDatas)),
+				LastError: lastError,
+			},
+			ErrorDetail: reqerr.NewSendError(
+				fmt.Sprintf("bulk failed with last error: %s", lastError),
+				failedDatas,
+				reqerr.TypeBinaryUnpack,
+			),
+		}
 
 	case sender.ElasticVersion5:
 		bulkService := s.elasticV5Client.Bulk()
@@ -276,13 +284,20 @@ func (s *Sender) Send(datas []Data) error {
 		}
 		lastError, err := jsoniter.MarshalToString(lastFailedResult)
 		if err != nil {
-			lastError = fmt.Sprintf("%v", lastFailedResult)
+			lastError = fmt.Sprintf("marshal to string failed: %v", lastFailedResult)
 		}
-		return reqerr.NewSendError(
-			fmt.Sprintf("bulk failed with last error: %s", lastError),
-			failedDatas,
-			reqerr.TypeBinaryUnpack,
-		)
+		return &StatsError{
+			StatsInfo: StatsInfo{
+				Success:   int64(len(datas) - len(failedDatas)),
+				Errors:    int64(len(failedDatas)),
+				LastError: lastError,
+			},
+			ErrorDetail: reqerr.NewSendError(
+				fmt.Sprintf("bulk failed with last error: %s", lastError),
+				failedDatas,
+				reqerr.TypeBinaryUnpack,
+			),
+		}
 
 	default:
 		bulkService := s.elasticV3Client.Bulk()
@@ -329,13 +344,20 @@ func (s *Sender) Send(datas []Data) error {
 		}
 		lastError, err := jsoniter.MarshalToString(lastFailedResult)
 		if err != nil {
-			lastError = fmt.Sprintf("%v", lastFailedResult)
+			lastError = fmt.Sprintf("marshal to string failed: %v", lastFailedResult)
 		}
-		return reqerr.NewSendError(
-			fmt.Sprintf("bulk failed with last error: %s", lastError),
-			failedDatas,
-			reqerr.TypeBinaryUnpack,
-		)
+		return &StatsError{
+			StatsInfo: StatsInfo{
+				Success:   int64(len(datas) - len(failedDatas)),
+				Errors:    int64(len(failedDatas)),
+				LastError: lastError,
+			},
+			ErrorDetail: reqerr.NewSendError(
+				fmt.Sprintf("bulk failed with last error: %s", lastError),
+				failedDatas,
+				reqerr.TypeBinaryUnpack,
+			),
+		}
 	}
 	return nil
 }

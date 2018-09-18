@@ -363,73 +363,86 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 	}
 	info := r.rs.SenderStats[s.Name()]
 	r.rsMutex.Unlock()
-	cnt := 1
+
+	var (
+		err             error
+		successDatasLen int64
+		originDatasLen  = int64(len(datas))
+		cnt             = 1
+	)
+
 	for {
 		// 至少尝试一次。如果任务已经停止，那么只尝试一次
 		if cnt > 1 && atomic.LoadInt32(&r.stopped) > 0 {
 			return false
 		}
-		err := s.Send(datas)
+		err = s.Send(datas)
+		if err == nil {
+			successDatasLen += int64(len(datas))
+			break
+		}
+
 		se, ok := err.(*StatsError)
 		if ok {
+			// se.ErrorDetail == nil 为了兼容，一般情况下不应该出现se.ErrorDetail == nil
+			if se.Errors == 0 || se.ErrorDetail == nil {
+				successDatasLen += int64(len(datas))
+				break
+			}
 			err = se.ErrorDetail
 			if se.Ft {
 				r.rsMutex.Lock()
 				r.rs.Lag.Ftlags = se.FtQueueLag
 				r.rsMutex.Unlock()
 			}
-		} else if err != nil {
-			if cnt <= 1 {
-				info.Errors += int64(len(datas))
-			}
-		} else {
-			info.Success += int64(len(datas))
-			if cnt > 1 {
-				info.Errors -= int64(len(datas))
+			if sendErrors, ok := err.(*reqerr.SendError); ok {
+				successDatasLen += int64(len(datas) - len(sendErrors.GetFailDatas()))
 			}
 		}
-		if err != nil {
-			info.LastError = TruncateStrSize(err.Error(), DefaultTruncateMaxSize)
-			now := time.Now().UnixNano()
-			if r.rs.HistoryErrors.SendErrors == nil {
-				r.rs.HistoryErrors.SendErrors = make(map[string]*ErrorQueue)
-			}
-			if r.rs.HistoryErrors.SendErrors[s.Name()] == nil {
-				r.rs.HistoryErrors.SendErrors[s.Name()] = NewErrorQueue(r.ErrorsListCap)
-			}
-			r.rs.HistoryErrors.SendErrors[s.Name()].Put(ErrorInfo{Error: info.LastError, Timestamp: now, Count: 0})
-			//FaultTolerant Sender 正常的错误会在backupqueue里面记录，自己重试，此处无需重试
-			if se != nil && se.Ft && se.FtNotRetry {
-				break
-			}
-			time.Sleep(time.Second)
-			se, succ := err.(*reqerr.SendError)
-			if succ {
-				datas = sender.ConvertDatas(se.GetFailDatas())
-				//无限重试的，除非遇到关闭
-				if atomic.LoadInt32(&r.stopped) > 0 {
-					return false
-				}
-				if se.ErrorType == sender.TypeMarshalError {
-					log.Errorf("Runner[%v] datas marshal failed, discard datas, send error %v, failed datas (length %v): %v", r.RunnerName, se.Error(), cnt, datas)
-					break
-				}
-				log.Errorf("Runner[%v] send error %v for %v times, failed datas length %v will retry send it", r.RunnerName, se.Error(), cnt, len(datas))
-				cnt++
-				continue
-			}
-			if err == ErrQueueClosed {
-				log.Errorf("Runner[%v] send to closed queue, discard datas, send error %v, failed datas (length %v): %v", r.RunnerName, se.Error(), cnt, datas)
-				break
-			}
-			if times <= 0 || cnt < times {
-				cnt++
-				continue
-			}
-			log.Errorf("Runner[%v] retry send %v times, but still error %v, discard datas %v ... total %v lines", r.RunnerName, cnt, err, datas, len(datas))
+
+		info.LastError = TruncateStrSize(err.Error(), DefaultTruncateMaxSize)
+		if r.rs.HistoryErrors.SendErrors == nil {
+			r.rs.HistoryErrors.SendErrors = make(map[string]*ErrorQueue)
 		}
-		break
+		if r.rs.HistoryErrors.SendErrors[s.Name()] == nil {
+			r.rs.HistoryErrors.SendErrors[s.Name()] = NewErrorQueue(r.ErrorsListCap)
+		}
+		r.rs.HistoryErrors.SendErrors[s.Name()].Put(ErrorInfo{Error: info.LastError, Timestamp: time.Now().UnixNano(), Count: 0})
+
+		//FaultTolerant Sender 正常的错误会在backupqueue里面记录，自己重试，此处无需重试
+		if se != nil && se.Ft && se.FtNotRetry {
+			break
+		}
+		time.Sleep(time.Second)
+		sendError, ok := err.(*reqerr.SendError)
+		if ok {
+			datas = sender.ConvertDatas(sendError.GetFailDatas())
+			//无限重试的，除非遇到关闭
+			if atomic.LoadInt32(&r.stopped) > 0 {
+				return false
+			}
+			if sendError.ErrorType == sender.TypeMarshalError {
+				log.Errorf("Runner[%v] datas marshal failed, discard datas, send error %v, failed datas (length %v): %v", r.RunnerName, se.Error(), cnt, datas)
+				break
+			}
+			log.Errorf("Runner[%v] send error %v for %v times, failed datas length %v will retry send it", r.RunnerName, se.Error(), cnt, len(datas))
+			cnt++
+			continue
+		}
+
+		if err == ErrQueueClosed {
+			log.Errorf("Runner[%v] send to closed queue, discard datas, send error %v, failed datas (length %v): %v", r.RunnerName, se.Error(), cnt, datas)
+			break
+		}
+		if times <= 0 || cnt < times {
+			cnt++
+			continue
+		}
+		log.Errorf("Runner[%v] retry send %v times, but still error %v, discard datas %v ... total %v lines", r.RunnerName, cnt, err, datas, len(datas))
 	}
+
+	info.Errors += originDatasLen - successDatasLen
+	info.Success += successDatasLen
 	r.rsMutex.Lock()
 	r.rs.SenderStats[s.Name()] = info
 	r.rsMutex.Unlock()

@@ -86,15 +86,15 @@ func (h *Sender) Send(data []Data) (err error) {
 	switch h.protocol {
 	case SendProtocalJson:
 		if sendBytes, err = h.convertToJsonBytes(data); err != nil {
-			return
+			return err
 		}
 	case SendProtocalCSV:
 		if sendBytes, err = h.convertToCsvBytes(data); err != nil {
-			return
+			return err
 		}
 	case SendProtocalWholeJson:
 		if sendBytes, err = jsoniter.Marshal(data); err != nil {
-			return
+			return err
 		}
 	default:
 		return fmt.Errorf("runner[%v] Sender[%v] send data error, protocol %v is not support", h.runnerName, h.Name(), h.protocol)
