@@ -534,6 +534,7 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 			AutoExportToLogDBInput: pipeline.AutoExportToLogDBInput{
 				OmitEmpty:             true,
 				OmitInvalid:           false,
+				Region:                s.opt.region,
 				RepoName:              s.opt.repoName,
 				LogRepoName:           s.opt.logdbReponame,
 				AnalyzerInfo:          s.opt.analyzerInfo,
@@ -1062,6 +1063,7 @@ func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 	schemaFreeInput := &pipeline.SchemaFreeInput{
 		WorkflowName:    s.opt.workflowName,
 		Description:     &s.opt.autoCreateDescription,
+		Region:          s.opt.region,
 		RepoName:        s.opt.repoName,
 		NoUpdate:        !s.opt.schemaFree,
 		Datas:           points,
@@ -1073,6 +1075,7 @@ func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 			AutoExportToLogDBInput: pipeline.AutoExportToLogDBInput{
 				OmitEmpty:             true,
 				OmitInvalid:           false,
+				Region:                s.opt.region,
 				RepoName:              s.opt.repoName,
 				LogRepoName:           s.opt.logdbReponame,
 				AnalyzerInfo:          s.opt.analyzerInfo,
