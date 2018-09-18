@@ -31,17 +31,14 @@ func (tableRecords *TableRecords) Set(value TableRecords) {
 		}
 	}
 
-	tableRecords.mutex.Lock()
-
 	valueTable := value.GetTable()
 	value.mutex.RLock()
 	if valueTable != nil {
-		for key, value := range valueTable {
-			tableRecords.Table[key] = value
+		for key, tableInfo := range valueTable {
+			tableRecords.SetTableInfo(key, tableInfo)
 		}
 	}
 	value.mutex.RUnlock()
-	tableRecords.mutex.Unlock()
 }
 
 func (tableRecords *TableRecords) SetTableInfo(table string, tableInfo TableInfo) {

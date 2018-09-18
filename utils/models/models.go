@@ -83,10 +83,12 @@ type Option struct {
 	Placeholder        string `json:"placeholder"`
 	Type               string `json:"Type,omitempty"`
 	Secret             bool
-	Advance            bool        `json:"advance,omitempty"`
-	AdvanceDepend      string      `json:"advance_depend,omitempty"`
-	AdvanceDependValue interface{} `json:"advance_depend_value,omitempty"`
-	ToolTip            string      `json:"tooltip,omitempty"` // 该选项说明
+	Advance            bool                   `json:"advance,omitempty"`
+	AdvanceDepend      string                 `json:"advance_depend,omitempty"`
+	AdvanceDependValue interface{}            `json:"advance_depend_value,omitempty"`
+	ToolTip            string                 `json:"tooltip,omitempty"` // 该选项说明
+	MultiDefault       map[string]interface{} `json:"multi_default,omitempty"`
+	MultiDefaultDepend string                 `json:"multi_default_depend,omitempty"`
 }
 
 type KeyValue struct {
