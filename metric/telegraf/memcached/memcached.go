@@ -11,6 +11,7 @@ import (
 	"github.com/influxdata/telegraf/plugins/inputs/memcached"
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/metric/telegraf"
+	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -63,7 +64,7 @@ type collector struct {
 	*telegraf.Collector
 }
 
-func (c *collector) SyncConfig(data map[string]interface{}) error {
+func (c *collector) SyncConfig(data map[string]interface{}, meta *reader.Meta) error {
 	mc, ok := c.Input.(*memcached.Memcached)
 	if !ok {
 		return errors.New("unexpected telegraf type, want '*memcached.Memcached'")

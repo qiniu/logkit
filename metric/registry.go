@@ -1,5 +1,9 @@
 package metric
 
+import (
+	"github.com/qiniu/logkit/reader"
+)
+
 const (
 	ConfigTypeBool   = "bool"
 	ConfigTypeArray  = "array"
@@ -29,7 +33,7 @@ type Collector interface {
 type ExtCollector interface {
 	Collector
 	// SyncConfig updates config options specifically for external metrics.
-	SyncConfig(map[string]interface{}) error
+	SyncConfig(map[string]interface{}, *reader.Meta) error
 }
 
 type Creator func() Collector
