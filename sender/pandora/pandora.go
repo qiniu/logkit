@@ -486,7 +486,8 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 		WithRequestRateLimit(opt.reqRateLimit).
 		WithFlowRateLimit(opt.flowRateLimit).
 		WithGzipData(opt.gzip).
-		WithHeaderUserAgent(opt.useragent).WithInsecureServer(opt.insecureServer)
+		WithHeaderUserAgent(opt.useragent).WithInsecureServer(opt.insecureServer).
+		WithDefaultRegion(s.opt.region)
 	if opt.logdbendpoint != "" {
 		config = config.WithLogDBEndpoint(opt.logdbendpoint)
 	}
