@@ -80,13 +80,19 @@ func NewDefaultClient(c *config.Config) (p *Pipeline, err error) {
 	if c.AllowInsecureServer {
 		t.TLSClientConfig.InsecureSkipVerify = true
 	}
+
+	region := defaultRegion
+	if c.DefaultRegion != "" {
+		region = c.DefaultRegion
+	}
 	p = &Pipeline{
 		Config:        c,
 		HTTPClient:    &http.Client{Transport: t},
 		repoSchemas:   make(map[string]RepoSchema),
 		repoSchemaMux: sync.Mutex{},
-		defaultRegion: defaultRegion,
+		defaultRegion: region,
 	}
+
 	if c.RequestRateLimit > 0 {
 		p.reqLimit = ratelimit.NewLimiter(c.RequestRateLimit)
 	}

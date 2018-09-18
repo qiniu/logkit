@@ -16,6 +16,7 @@ type Config struct {
 	RequestRateLimit int64 //每秒请求数限制
 	FlowRateLimit    int64 //每秒流量限制(kb),若FlowRateLimit为100，则表示限速100KB/s
 	Gzip             bool
+	DefaultRegion    string
 
 	HeaderUserAgent string
 
@@ -158,5 +159,10 @@ func (c *Config) WithGzipData(enable bool) *Config {
 
 func (c *Config) WithHeaderUserAgent(userAgent string) *Config {
 	c.HeaderUserAgent = userAgent
+	return c
+}
+
+func (c *Config) WithDefaultRegion(region string) *Config {
+	c.DefaultRegion = region
 	return c
 }
