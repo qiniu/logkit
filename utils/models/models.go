@@ -86,6 +86,7 @@ type Option struct {
 	AdvanceDepend      string                 `json:"advance_depend,omitempty"`
 	AdvanceDependValue interface{}            `json:"advance_depend_value,omitempty"`
 	ToolTip            string                 `json:"tooltip,omitempty"` // 该选项说明
+	MutiDefaultSource  bool                   `json:"muti_default_source"`
 	MultiDefault       map[string]interface{} `json:"multi_default,omitempty"`
 	MultiDefaultDepend string                 `json:"multi_default_depend,omitempty"`
 }
