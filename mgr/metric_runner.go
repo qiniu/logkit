@@ -97,7 +97,7 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner
 		// sync config to ExtCollector
 		ec, ok := c.(metric.ExtCollector)
 		if ok {
-			if err := ec.SyncConfig(m.Config); err != nil {
+			if err := ec.SyncConfig(m.Config, meta); err != nil {
 				return nil, fmt.Errorf("metric %v sync config error %v", tp, err)
 			}
 		} else {
