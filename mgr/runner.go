@@ -820,6 +820,11 @@ func (r *LogExportRunner) Stop() {
 		log.Warnf("Runner[%v] reader %v of runner %v closed", r.Name(), r.reader.Name(), r.Name())
 	}
 
+	if r.RunnerInfo.MaxReaderCloseWaitTime > 0 {
+		log.Infof("Runner[%v] wait for reader close %ds", r.Name(), r.RunnerInfo.MaxReaderCloseWaitTime)
+		time.Sleep(time.Second * time.Duration(r.RunnerInfo.MaxReaderCloseWaitTime))
+	}
+
 	atomic.AddInt32(&r.stopped, 1)
 
 	log.Infof("Runner[%v] waiting for Run() stopped signal", r.Name())
