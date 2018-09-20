@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 	"path"
@@ -1470,6 +1471,7 @@ type CronInfo struct {
 
 var (
 	dbSource   = "root:@tcp(127.0.0.1:3306)"
+	pgDbSource = "host=127.0.0.1 port=5432 connect_timeout=10 user=postgres password=  sslmode=disable"
 	connectStr = dbSource + "/?charset=gbk"
 	now        = time.Now()
 	year       = getDateStr(now.Year())
@@ -1511,6 +1513,15 @@ var (
 			[]string{"INSERT INTO runoob_tbl" + year + month + day + "est (runoob_title, runoob_author, submission_date) VALUES (\"学习 mysql\", \"教程\", NOW());"},
 		},
 	}
+	pgDatabaseTest = DataTest{
+		database:    "test_postgresdb",
+		createTable: []string{"CREATE TABLE person (id int4,name varchar,age int4,salary float4,delete  bool,create_time timestamp(6))WITH (OIDS=FALSE);"},
+		insertData: []string{
+			"INSERT INTO person VALUES ('1', '小王', null, '5000.3', 't', '2017-09-04 11:26:17');",  //test integer null
+			"INSERT INTO person VALUES ('2', '小明', '28',  null, 'f', '2018-03-20 11:22:17');",     //test float  null
+			"INSERT INTO person VALUES ('3', '小张', '28', '5000.5', null, '2018-10-10 11:23:17');", //test bool null
+		},
+	}
 	todayDataTestsLine = len(todayDataTests)
 )
 
@@ -1532,6 +1543,9 @@ func TestMySql(t *testing.T) {
 	}
 
 	runnerName := "mrOnce"
+	err := os.Setenv("TestMySql_dbSource", dbSource)
+	assert.NoError(t, err)
+	defer os.Unsetenv("TestMySql_dbSource")
 	mr, err := reader.NewReader(conf.MapConf{
 		"mysql_database":     "Test_MySql20180510",
 		"mysql_table":        "runoob_tbl20180510est",
@@ -1540,7 +1554,7 @@ func TestMySql(t *testing.T) {
 		"mode":               "mysql",
 		"mysql_exec_onstart": "true",
 		"encoding":           "gbk",
-		"mysql_datasource":   dbSource,
+		"mysql_datasource":   "${TestMySql_dbSource}",
 		"meta_path":          path.Join(MetaDir, runnerName),
 		"file_done":          path.Join(MetaDir, runnerName),
 		"runner_name":        runnerName,
@@ -2028,4 +2042,126 @@ func setSecond() (int, string, error) {
 		return 0, "", err
 	}
 	return 2, "", nil
+}
+
+//for postgres
+
+func TestPostgres(t *testing.T) {
+	if err := preparePostgres(); err != nil {
+		t.Fatalf("prepare postgres database failed: %v", err)
+	}
+	expectDatas := []Data{
+		{
+			"id":          int64(1),
+			"name":        "小王",
+			"age":         int64(0),
+			"salary":      5000.2998046875,
+			"delete":      true,
+			"create_time": "2017-09-04T11:26:17Z",
+		},
+		{
+			"id":          int64(2),
+			"name":        "小明",
+			"age":         int64(28),
+			"salary":      float64(0),
+			"delete":      false,
+			"create_time": "2018-03-20T11:22:17Z",
+		},
+		{
+			"id":          int64(3),
+			"name":        "小张",
+			"age":         int64(28),
+			"salary":      5000.5,
+			"delete":      false,
+			"create_time": "2018-10-10T11:23:17Z",
+		},
+	}
+
+	runnerName := "TestPostgres"
+	mr, err := reader.NewReader(conf.MapConf{
+		"postgres_database":     pgDatabaseTest.database,
+		"postgres_limit_batch":  "100",
+		"mode":                  "postgres",
+		"postgres_exec_onstart": "true",
+		"postgres_datasource":   pgDbSource,
+		"postgres_sql":          "select * from person",
+		"meta_path":             path.Join(MetaDir, runnerName),
+		"file_done":             path.Join(MetaDir, runnerName),
+		"runner_name":           runnerName,
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(MetaDir)
+	r, ok := mr.(reader.DataReader)
+	if !ok {
+		t.Error("postgres read should have readdata interface")
+	}
+	assert.NoError(t, mr.(*Reader).Start())
+
+	dataLine := 0
+	before := time.Now()
+	var actualData []Data
+	for !batchTimeout(before, 2) {
+		data, _, err := r.ReadData()
+		if err != nil {
+			t.Error(err)
+		}
+		if len(data) <= 0 {
+			continue
+		}
+		actualData = append(actualData, data)
+		dataLine++
+
+	}
+	assert.Equal(t, 3, dataLine)
+
+	for k, v := range actualData {
+		assert.Equal(t, expectDatas[k], v)
+	}
+}
+
+func getPostgresDb(dbsource string) (db *sql.DB, err error) {
+	db, err = openSql("postgres", dbsource)
+	if err != nil {
+		return nil, err
+	}
+	if err = db.Ping(); err != nil {
+		return nil, err
+	}
+	return db, nil
+}
+func preparePostgres() error {
+	db, err := getPostgresDb(pgDbSource)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	_, err = db.Query("DROP DATABASE IF EXISTS " + pgDatabaseTest.database)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec("CREATE DATABASE " + pgDatabaseTest.database)
+	if err != nil {
+		return err
+	}
+	db.Close()
+
+	db, err = getPostgresDb(pgDbSource + " dbname=" + pgDatabaseTest.database)
+	if err != nil {
+		return err
+	}
+	for _, createTable := range pgDatabaseTest.createTable {
+		_, err = db.Exec(createTable)
+		if err != nil {
+			return err
+		}
+	}
+	for _, data := range pgDatabaseTest.insertData {
+		_, err = db.Exec(data)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

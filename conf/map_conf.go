@@ -2,8 +2,11 @@ package conf
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
+
+	"github.com/qiniu/log"
 )
 
 // conf types
@@ -11,6 +14,7 @@ const (
 	StringType     = "string"
 	IntType        = "int"
 	Int64Type      = "int64"
+	Int32Type      = "int32"
 	BoolType       = "bool"
 	StringListType = "[]string"
 	AliasMapType   = "[string string, string]"
@@ -78,6 +82,26 @@ func (conf MapConf) GetInt(key string) (int, error) {
 		return 0, ErrConfKeyType(key, IntType)
 	}
 	return v, nil
+}
+
+func (conf MapConf) GetInt32Or(key string, deft int32) (int32, error) {
+	ret, err := conf.GetInt32(key)
+	if err != nil {
+		return deft, err
+	}
+	return ret, nil
+}
+
+func (conf MapConf) GetInt32(key string) (int32, error) {
+	value, exist := conf[key]
+	if !exist {
+		return 0, ErrConfMissingKey(key, Int32Type)
+	}
+	v, err := strconv.ParseInt(value, 10, 32)
+	if err != nil {
+		return 0, ErrConfKeyType(key, Int32Type)
+	}
+	return int32(v), nil
 }
 
 func (conf MapConf) GetInt64Or(key string, deft int64) (int64, error) {
@@ -206,4 +230,80 @@ func (conf MapConf) GetAliasMap(key string) (map[string]string, error) {
 		return make(map[string]string), ErrConfKeyType(key, AliasMapType)
 	}
 	return newV, nil
+}
+
+func (conf MapConf) GetPasswordEnvString(key string) (string, error) {
+	value, err := conf.GetString(key)
+	if err != nil {
+		return "", err
+	}
+
+	envName, isEnv := IsEnv(value)
+	if isEnv {
+		valueFromEnv, err := GetEnvValue(envName)
+		if err != nil {
+			return "", err
+		}
+		return valueFromEnv, nil
+	}
+
+	return value, nil
+}
+
+func (conf MapConf) GetPasswordEnvStringOr(key, deft string) (string, error) {
+	value, err := conf.GetString(key)
+	if err != nil {
+		value = deft
+		err = nil
+	}
+
+	envName, isEnv := IsEnv(value)
+	if isEnv {
+		valueFromEnv, err := GetEnvValue(envName)
+		if err != nil {
+			return "", err
+		}
+		return valueFromEnv, nil
+	}
+
+	return value, nil
+}
+
+// parse ${ENV} to ENV
+// get ENV value from os
+func GetEnv(env string) string {
+	env = strings.TrimSpace(env)
+	var envName string
+	envName, isEnv := IsEnv(env)
+	if !isEnv {
+		log.Debug("cannot parse your ak sk as ${YOUR_ENV_NAME} format, use it as raw ak.sk instead")
+		return ""
+	}
+
+	if osEnv := os.Getenv(envName); osEnv != "" {
+		return osEnv
+	}
+	log.Warnf("cannot find %s in current system env", envName)
+	return ""
+}
+
+func GetEnvValue(envName string) (string, error) {
+	envName = strings.TrimSpace(envName)
+	if envName == "" {
+		return "", fmt.Errorf("environment name is empty")
+	}
+	if osEnv := os.Getenv(envName); osEnv != "" {
+		return osEnv, nil
+	} else {
+		return "", fmt.Errorf("value of environment %s is empty", envName)
+	}
+}
+
+func IsEnv(env string) (string, bool) {
+	env = strings.TrimSpace(env)
+	if strings.HasPrefix(env, "${") && strings.HasSuffix(env, "}") {
+		envName := strings.Trim(strings.Trim(strings.Trim(env, "$"), "{"), "}")
+		return strings.TrimSpace(envName), true
+	}
+	return "", false
 }

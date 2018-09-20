@@ -1,20 +1,22 @@
 package sender
 
 import (
+	"strconv"
+
 	. "github.com/qiniu/logkit/utils/models"
 	"github.com/qiniu/pandora-go-sdk/base/config"
 )
 
 // ModeUsages 用途说明
 var ModeUsages = KeyValueSlice{
-	{TypePandora, "发送至 七牛云智能日志平台(Pandora)", ""},
-	{TypeFile, "发送至 本地文件", ""},
-	{TypeMongodbAccumulate, "发送至 MongoDB 服务", ""},
-	{TypeInfluxdb, "发送至 InfluxDB 服务", ""},
+	{TypePandora, "七牛云智能日志平台(Pandora)", ""},
+	{TypeFile, "本地文件", ""},
+	{TypeMongodbAccumulate, "MongoDB 服务", ""},
+	{TypeInfluxdb, "InfluxDB 服务", ""},
 	{TypeDiscard, "消费数据但不发送", ""},
-	{TypeElastic, "发送至 Elasticsearch 服务", ""},
-	{TypeKafka, "发送至 Kafka 服务", ""},
-	{TypeHttp, "发送至 HTTP 服务器", ""},
+	{TypeElastic, "Elasticsearch 服务", ""},
+	{TypeKafka, "Kafka 服务", ""},
+	{TypeHttp, "HTTP 服务器", ""},
 }
 
 var (
@@ -46,6 +48,16 @@ var (
 		Description:   "磁盘管道容错策略[仅备份错误|全部数据走管道|仅增加并发](ft_strategy)",
 		Advance:       true,
 		ToolTip:       `设置为backup_only的时候，数据不经过本地队列直接发送到下游，设为always_save时则所有数据会先发送到本地队列，选concurrent的时候会直接并发发送，不经过队列。无论该选项设置什么，失败的数据都会加入到重试队列中异步循环重试`,
+	}
+	OptionFtDiscardErr = Option{
+		KeyName:       KeyFtDiscardErr,
+		ChooseOnly:    true,
+		ChooseOptions: []interface{}{"true", "false"},
+		Default:       "false",
+		DefaultNoUse:  false,
+		Description:   "是否丢弃发送出错数据(ft_discard_failed_data)",
+		Advance:       true,
+		ToolTip:       `默认不丢弃，设置此选项后会丢弃发送错误的数据，仅在数据只有一条时才会丢弃，多余一条会不断二分。`,
 	}
 	OptionFtProcs = Option{
 		KeyName:      KeyFtProcs,
@@ -90,6 +102,24 @@ var (
 		Advance:       true,
 		ToolTip:       `丢弃大于2M的数据`,
 	}
+	OptionMaxDiskUsedBytes = Option{
+		KeyName:      KeyMaxDiskUsedBytes,
+		ChooseOnly:   false,
+		Default:      strconv.Itoa(maxDiskUsedBytes),
+		DefaultNoUse: false,
+		Description:  "磁盘使用总大小限制(max_disk_used_bytes)",
+		Advance:      true,
+		ToolTip:      `磁盘使用总大小限制`,
+	}
+	OptionMaxSizePerSize = Option{
+		KeyName:      KeyMaxSizePerFile,
+		ChooseOnly:   false,
+		Default:      strconv.Itoa(maxBytesPerFile),
+		DefaultNoUse: false,
+		Description:  "磁盘队列单个文件最大字节(max_size_per_file)",
+		Advance:      true,
+		ToolTip:      `磁盘队列单个文件最大字节, 也是单个消息的最大字节。最大不超过2GB`,
+	}
 	OptionLogkitSendTime = Option{
 		KeyName:       KeyLogkitSendTime,
 		Element:       Radio,
@@ -101,7 +131,35 @@ var (
 		Advance:       true,
 		ToolTip:       "在系统中添加数据发送时的当前时间作为时间戳",
 	}
+	OptionAuthUsername = Option{
+		KeyName:      KeyAuthUsername,
+		Default:      "",
+		DefaultNoUse: false,
+		Description:  "认证用户名(auth_username)",
+		Advance:      true,
+	}
+	OptionAuthPassword = Option{
+		KeyName:      KeyAuthPassword,
+		Description:  "认证用户密码(auth_password)",
+		Default:      "",
+		DefaultNoUse: false,
+		Secret:       true,
+		Advance:      true,
+		ToolTip:      `支持从自定义环境变量（如 YOUR_AUTH_PASSWORD_ENV）里读取对应值，填写方式为 ${YOUR_AUTH_PASSWORD_ENV}`,
+	}
+	OptionEnableGzip = Option{
+		KeyName:       KeyEnableGzip,
+		Element:       Radio,
+		ChooseOnly:    true,
+		ChooseOptions: []interface{}{"true", "false"},
+		Default:       "false",
+		DefaultNoUse:  false,
+		Description:   "开启Gzip压缩(enable_gzip)",
+		Secret:        true,
+		Advance:       true,
+	}
 )
+
 var ModeKeyOptions = map[string][]Option{
 	TypeFile: {
 		{
@@ -185,7 +243,6 @@ var ModeKeyOptions = map[string][]Option{
 			Default:       "nb",
 			DefaultNoUse:  false,
 			Description:   "创建的资源所在区域(pandora_region)",
-			Advance:       true,
 			ToolTip:       "工作流资源创建所在区域",
 		},
 		{
@@ -349,6 +406,17 @@ var ModeKeyOptions = map[string][]Option{
 			Advance:       true,
 		},
 		{
+			KeyName:       KeyPandoraKodoLowFreqFile,
+			Element:       Radio,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"false", "true"},
+			Default:       "false",
+			DefaultNoUse:  false,
+			Description:   "存储为低频文件(pandora_kodo_low_frequency_file)",
+			AdvanceDepend: KeyPandoraEnableKodo,
+			Advance:       true,
+		},
+		{
 			KeyName:       KeyPandoraKodoCompressPrefix,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{"parquet", "json", "text", "csv"},
@@ -459,10 +527,13 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		OptionFtWriteLimit,
 		OptionFtStrategy,
+		OptionFtDiscardErr,
 		OptionFtProcs,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
 		OptionKeyFtLongDataDiscard,
+		OptionMaxDiskUsedBytes,
+		OptionMaxSizePerSize,
 		{
 			KeyName:       KeyForceMicrosecond,
 			Element:       Radio,
@@ -546,10 +617,10 @@ var ModeKeyOptions = map[string][]Option{
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     true,
-			Placeholder:  "mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]",
+			Placeholder:  "${YOUR_MONGODB_HOST_ENV}",
 			DefaultNoUse: true,
 			Description:  "数据库地址(mongodb_host)",
-			ToolTip:      `Mongodb的地址: mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]`,
+			ToolTip:      `Mongodb的地址: mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]，支持从自定义环境变量（如YOUR_MONGODB_HOST_ENV）里读取对应值`,
 		},
 		{
 			KeyName:      KeyMongodbDB,
@@ -590,10 +661,13 @@ var ModeKeyOptions = map[string][]Option{
 		OptionSaveLogPath,
 		OptionFtWriteLimit,
 		OptionFtStrategy,
+		OptionFtDiscardErr,
 		OptionFtProcs,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
 		OptionKeyFtLongDataDiscard,
+		OptionMaxDiskUsedBytes,
+		OptionMaxSizePerSize,
 	},
 	TypeInfluxdb: {
 		{
@@ -694,26 +768,29 @@ var ModeKeyOptions = map[string][]Option{
 		OptionSaveLogPath,
 		OptionFtWriteLimit,
 		OptionFtStrategy,
+		OptionFtDiscardErr,
 		OptionFtProcs,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
 		OptionKeyFtLongDataDiscard,
+		OptionMaxDiskUsedBytes,
+		OptionMaxSizePerSize,
 	},
 	TypeDiscard: {},
 	TypeElastic: {
 		{
 			KeyName:      KeyElasticHost,
 			ChooseOnly:   false,
-			Default:      "",
 			Required:     true,
 			Placeholder:  "192.168.31.203:9200",
-			DefaultNoUse: false,
+			DefaultNoUse: true,
 			Description:  "host地址(elastic_host)",
 			ToolTip:      `常用端口9200`,
 		},
 		{
 			KeyName:       KeyElasticVersion,
 			ChooseOnly:    true,
+			Default:       ElasticVersion5,
 			ChooseOptions: []interface{}{ElasticVersion3, ElasticVersion5, ElasticVersion6},
 			Description:   "ES版本号(es_version)",
 		},
@@ -727,10 +804,21 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "索引名称(elastic_index)",
 		},
 		{
+			KeyName:      KeyElasticType,
+			ChooseOnly:   false,
+			Default:      "",
+			Required:     true,
+			Placeholder:  "app",
+			DefaultNoUse: true,
+			Description:  "索引类型名称(elastic_type)",
+		},
+		OptionAuthUsername,
+		OptionAuthPassword,
+		{
 			KeyName:       KeyElasticIndexStrategy,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{KeyDefaultIndexStrategy, KeyYearIndexStrategy, KeyMonthIndexStrategy, KeyDayIndexStrategy},
-			Default:       KeyFtStrategyBackupOnly,
+			Default:       KeyDefaultIndexStrategy,
 			DefaultNoUse:  false,
 			Description:   "自动索引模式(默认索引|按年索引|按月索引|按日索引)(index_strategy)",
 			Advance:       true,
@@ -744,23 +832,18 @@ var ModeKeyOptions = map[string][]Option{
 			Description:   "索引时区(Local(本地)|UTC(标准时间)|PRC(北京时间))(elastic_time_zone)",
 			Advance:       true,
 		},
+		OptionEnableGzip,
 		OptionLogkitSendTime,
-		{
-			KeyName:      KeyElasticType,
-			ChooseOnly:   false,
-			Default:      "",
-			Required:     true,
-			Placeholder:  "app",
-			DefaultNoUse: true,
-			Description:  "索引类型名称(elastic_type)",
-		},
 		OptionSaveLogPath,
 		OptionFtWriteLimit,
 		OptionFtStrategy,
+		OptionFtDiscardErr,
 		OptionFtProcs,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
 		OptionKeyFtLongDataDiscard,
+		OptionMaxDiskUsedBytes,
+		OptionMaxSizePerSize,
 	},
 	TypeKafka: {
 		{
@@ -785,10 +868,11 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:       KeyKafkaCompression,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{KeyKafkaCompressionNone, KeyKafkaCompressionGzip, KeyKafkaCompressionSnappy},
+			ChooseOptions: []interface{}{KeyKafkaCompressionNone, KeyKafkaCompressionGzip, KeyKafkaCompressionSnappy, KeyKafkaCompressionLZ4},
 			Default:       KeyKafkaCompressionNone,
 			DefaultNoUse:  false,
-			Description:   "压缩模式[none不压缩|gzip压缩|snappy压缩](kafka_compression)",
+			Description:   "压缩模式[none不压缩|gzip压缩|snappy压缩|lz4压缩](kafka_compression)",
+			ToolTip:       "lz4压缩方式要求kafka版本在V0.10.0.0及以上",
 		},
 		{
 			KeyName:      KeyKafkaClientId,
@@ -822,13 +906,26 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "kafka的keepalive时间(kafka_keep_alive)",
 			Advance:      true,
 		},
+		{
+			KeyName:            KeyGZIPCompressionLevel,
+			ChooseOnly:         true,
+			ChooseOptions:      []interface{}{KeyGZIPCompressionNo, KeyGZIPCompressionBestSpeed, KeyGZIPCompressionBestCompression, KeyGZIPCompressionDefault, KeyGZIPCompressionHuffmanOnly},
+			Default:            KeyGZIPCompressionDefault,
+			DefaultNoUse:       false,
+			Description:        "gzip压缩策略",
+			AdvanceDepend:      KeyKafkaCompression,
+			AdvanceDependValue: KeyKafkaCompressionGzip,
+		},
 		OptionSaveLogPath,
 		OptionFtWriteLimit,
 		OptionFtStrategy,
+		OptionFtDiscardErr,
 		OptionFtProcs,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
 		OptionKeyFtLongDataDiscard,
+		OptionMaxDiskUsedBytes,
+		OptionMaxSizePerSize,
 	},
 	TypeHttp: {
 		{
@@ -868,9 +965,12 @@ var ModeKeyOptions = map[string][]Option{
 		OptionSaveLogPath,
 		OptionFtWriteLimit,
 		OptionFtStrategy,
+		OptionFtDiscardErr,
 		OptionFtProcs,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
 		OptionKeyFtLongDataDiscard,
+		OptionMaxDiskUsedBytes,
+		OptionMaxSizePerSize,
 	},
 }

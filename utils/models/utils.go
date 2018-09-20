@@ -26,6 +26,7 @@ import (
 	"unicode"
 
 	"github.com/json-iterator/go"
+
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/times"
 )
@@ -654,23 +655,6 @@ func Hash(s string) string {
 	return strconv.Itoa(int(h.Sum32()))
 }
 
-// parse ${ENV} to ENV
-// get ENV value from os
-func GetEnv(env string) string {
-	var envName string
-	if strings.HasPrefix(env, "${") && strings.HasSuffix(env, "}") {
-		envName = strings.Trim(strings.Trim(strings.Trim(env, "$"), "{"), "}")
-	} else {
-		log.Debug("cannot parse your ak sk as ${YOUR_ENV_NAME} format, use it as raw ak.sk instead")
-		return ""
-	}
-	if osEnv := os.Getenv(envName); osEnv != "" {
-		return osEnv
-	}
-	log.Warnf("cannot find %s in current system env", envName)
-	return ""
-}
-
 //CreateDirIfNotExist 检查文件夹，不存在时创建
 func CreateDirIfNotExist(dir string) (err error) {
 	_, err = os.Stat(dir)
@@ -825,10 +809,15 @@ func CheckPandoraKey(key string) bool {
 // 1. 首字符为数字时，增加首字符 "K"
 // 2. 首字符为非法字符时，去掉首字符（例如，如果字符串全为非法字符，则转换后为空）
 // 3. 非首字符并且为非法字符时，使用 "_" 替代非法字符
+// 返回key，以及原始key是否合法，如果不合法，则后续需要用转换后的key进行替换
 func PandoraKey(key string) (string, bool) {
 	// check
 	valid := true
 	size := 0
+	if key == "" {
+		return "KEmptyPandoraAutoAdd", false
+	}
+
 	for idx, c := range key {
 		if c >= '0' && c <= '9' {
 			size++

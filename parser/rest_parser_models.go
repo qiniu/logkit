@@ -65,6 +65,7 @@ var (
 		{TypeKafkaRest, "按 kafkarest 日志解析", ""},
 		{TypeEmpty, "通过解析清空数据", ""},
 		{TypeMySQL, "按 mysql 慢请求日志解析", ""},
+		{TypeLogfmt, "logfmt 日志解析", ""},
 	}
 
 	ModeToolTips = KeyValueSlice{
@@ -78,6 +79,7 @@ var (
 		{TypeKafkaRest, "将Kafka Rest日志文件的每一行解析为一条结构化的日志.", ""},
 		{TypeEmpty, "通过解析清空数据", ""},
 		{TypeMySQL, "解析mysql的慢请求日志。", ""},
+		{TypeLogfmt, "解析 logfmt 日志", ""},
 	}
 )
 
@@ -103,6 +105,18 @@ var (
 		Description:  "额外的标签信息(labels)",
 		Advance:      true,
 		ToolTip:      `额外的标签信息，同样逗号分隔，如 "app logkit, user pandora"`,
+	}
+
+	OptionKeepRawData = Option{
+		KeyName:       KeyKeepRawData,
+		Element:       Radio,
+		ChooseOnly:    true,
+		ChooseOptions: []interface{}{"false", "true"},
+		Default:       "false",
+		DefaultNoUse:  false,
+		Description:   "是否保留原始数据(" + KeyKeepRawData + ")",
+		Advance:       true,
+		ToolTip:       `默认不保留，保留后会在每条记录中新增"raw_data"字段，用以保存每条记录的原始数据`,
 	}
 
 	OptionDisableRecordErrData = Option{
@@ -173,6 +187,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionParserName,
 		OptionLabels,
 		OptionDisableRecordErrData,
+		OptionKeepRawData,
 	},
 	TypeGrok: {
 		{
@@ -205,6 +220,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionTimezoneOffset,
 		OptionLabels,
 		OptionDisableRecordErrData,
+		OptionKeepRawData,
 	},
 
 	TypeCSV: {
@@ -280,6 +296,7 @@ var ModeKeyOptions = map[string][]Option{
 			Advance:       true,
 		},
 		OptionDisableRecordErrData,
+		OptionKeepRawData,
 	},
 	TypeRaw: {
 		{
@@ -308,6 +325,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		OptionParserName,
 		OptionDisableRecordErrData,
+		OptionKeepRawData,
 	},
 	TypeSyslog: {
 		{
@@ -329,16 +347,23 @@ var ModeKeyOptions = map[string][]Option{
 		OptionParserName,
 		OptionLabels,
 		OptionDisableRecordErrData,
+		OptionKeepRawData,
 	},
 	TypeKafkaRest: {
 		OptionParserName,
 		OptionLabels,
 		OptionDisableRecordErrData,
+		OptionKeepRawData,
 	},
 	TypeEmpty: {},
 	TypeMySQL: {
 		OptionParserName,
 		OptionLabels,
+		OptionDisableRecordErrData,
+		OptionKeepRawData,
+	},
+	TypeLogfmt: {
+		OptionParserName,
 		OptionDisableRecordErrData,
 	},
 }
@@ -362,4 +387,6 @@ SET timestamp=1514083320;
 use foo;
 SELECT count(*) from mysql.rds_replication_status WHERE master_host IS NOT NULL and master_port IS NOT NULL GROUP BY action_timestamp,called_by_user,action,mysql_version,master_host,master_port ORDER BY action_timestamp LIMIT 1;
 #`,
+	TypeLogfmt: `ts=2018-01-02T03:04:05.123Z lvl=5 msg="error" log_id=123456abc
+method=PUT duration=1.23 log_id=123456abc`,
 }

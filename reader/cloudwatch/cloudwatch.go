@@ -100,11 +100,11 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		return nil, err
 	}
 
-	ak, _ := conf.GetStringOr(reader.KeyAWSAccessKey, "")
-	sk, _ := conf.GetStringOr(reader.KeyAWSSecretKey, "")
+	ak, _ := conf.GetPasswordEnvStringOr(reader.KeyAWSAccessKey, "")
+	sk, _ := conf.GetPasswordEnvStringOr(reader.KeyAWSSecretKey, "")
 	roleARN, _ := conf.GetStringOr(reader.KeyRoleArn, "")
-	token, _ := conf.GetStringOr(reader.KeyAWSToken, "")
-	profile, _ := conf.GetStringOr(reader.KeyAWSProfile, "")
+	token, _ := conf.GetPasswordEnvStringOr(reader.KeyAWSToken, "")
+	profile, _ := conf.GetPasswordEnvStringOr(reader.KeyAWSProfile, "")
 	sharedCredentialFile, _ := conf.GetStringOr(reader.KeySharedCredentialFile, "")
 	credentialConfig := &CredentialConfig{
 		Region:    region,

@@ -6,6 +6,8 @@ import (
 
 const (
 	KeyType = "type"
+
+	TransformAt = "transform_at"
 )
 
 const (
@@ -34,9 +36,12 @@ type Transformer interface {
 	Stats() StatsInfo
 }
 
-// DataReader 代表了一个可直接读取内存数据结构的读取器
+type ServerTansformer interface {
+	ServerConfig() map[string]interface{}
+}
+
+// StatsTransformer 代表了一个带有统计功能的转换器
 type StatsTransformer interface {
-	// ReadData 用于读取一条数据以及数据的实际读取字节
 	SetStats(string) StatsInfo
 }
 

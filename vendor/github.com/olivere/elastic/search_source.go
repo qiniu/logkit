@@ -19,7 +19,8 @@ type SearchSource struct {
 	explain                  *bool
 	version                  *bool
 	sorters                  []Sorter
-	trackScores              bool
+	trackScores              *bool
+	trackTotalHits           *bool
 	searchAfterSortValues    []interface{}
 	minScore                 *float64
 	timeout                  string
@@ -39,6 +40,7 @@ type SearchSource struct {
 	innerHits                map[string]*InnerHit
 	collapse                 *CollapseBuilder
 	profile                  bool
+	// TODO extBuilders []SearchExtBuilder
 }
 
 // NewSearchSource initializes a new SearchSource.
@@ -46,7 +48,6 @@ func NewSearchSource() *SearchSource {
 	return &SearchSource{
 		from:         -1,
 		size:         -1,
-		trackScores:  false,
 		aggregations: make(map[string]Aggregation),
 		indexBoosts:  make(map[string]float64),
 		innerHits:    make(map[string]*InnerHit),
@@ -77,7 +78,7 @@ func (s *SearchSource) PostFilter(postFilter Query) *SearchSource {
 // Slice allows partitioning the documents in multiple slices.
 // It is e.g. used to slice a scroll operation, supported in
 // Elasticsearch 5.0 or later.
-// See https://www.elastic.co/guide/en/elasticsearch/reference/6.0/search-request-scroll.html#sliced-scroll
+// See https://www.elastic.co/guide/en/elasticsearch/reference/6.2/search-request-scroll.html#sliced-scroll
 // for details.
 func (s *SearchSource) Slice(sliceQuery Query) *SearchSource {
 	s.sliceQuery = sliceQuery
@@ -129,8 +130,8 @@ func (s *SearchSource) TimeoutInMillis(timeoutInMillis int) *SearchSource {
 	return s
 }
 
-// TerminateAfter allows the request to stop after the given number
-// of search hits are collected.
+// TerminateAfter specifies the maximum number of documents to collect for
+// each shard, upon reaching which the query execution will terminate early.
 func (s *SearchSource) TerminateAfter(terminateAfter int) *SearchSource {
 	s.terminateAfter = &terminateAfter
 	return s
@@ -161,14 +162,24 @@ func (s *SearchSource) hasSort() bool {
 // TrackScores is applied when sorting and controls if scores will be
 // tracked as well. Defaults to false.
 func (s *SearchSource) TrackScores(trackScores bool) *SearchSource {
-	s.trackScores = trackScores
+	s.trackScores = &trackScores
+	return s
+}
+
+// TrackTotalHits indicates if the total hit count for the query should be tracked.
+// Defaults to true.
+//
+// See https://www.elastic.co/guide/en/elasticsearch/reference/6.3/index-modules-index-sorting.html#early-terminate
+// for details.
+func (s *SearchSource) TrackTotalHits(trackTotalHits bool) *SearchSource {
+	s.trackTotalHits = &trackTotalHits
 	return s
 }
 
 // SearchAfter allows a different form of pagination by using a live cursor,
 // using the results of the previous page to help the retrieval of the next.
 //
-// See https://www.elastic.co/guide/en/elasticsearch/reference/6.0/search-request-search-after.html
+// See https://www.elastic.co/guide/en/elasticsearch/reference/6.2/search-request-search-after.html
 func (s *SearchSource) SearchAfter(sortValues ...interface{}) *SearchSource {
 	s.searchAfterSortValues = append(s.searchAfterSortValues, sortValues...)
 	return s
@@ -417,14 +428,15 @@ func (s *SearchSource) Source() (interface{}, error) {
 		source["sort"] = sortarr
 	}
 
-	if s.trackScores {
-		source["track_scores"] = s.trackScores
+	if v := s.trackScores; v != nil {
+		source["track_scores"] = *v
 	}
-
+	if v := s.trackTotalHits; v != nil {
+		source["track_total_hits"] = *v
+	}
 	if len(s.searchAfterSortValues) > 0 {
 		source["search_after"] = s.searchAfterSortValues
 	}
-
 	if len(s.indexBoosts) > 0 {
 		source["indices_boost"] = s.indexBoosts
 	}

@@ -3,7 +3,6 @@ package pipeline
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"reflect"
 	"sort"
 	"strconv"
@@ -344,7 +343,7 @@ func mapDataConvert(mpvalue map[string]interface{}, schemas []RepoSchemaEntry) (
 		if subv, ok := mpvalue[v.Key]; ok {
 			subconverted, err := dataConvert(subv, v)
 			if err != nil {
-				log.Error(err)
+				log.Warnf("ignore key %s as %v", v.Key, err)
 				continue
 			}
 			mpvalue[v.Key] = subconverted
@@ -398,6 +397,10 @@ func copyAndConvertData(d Data, mapLevel int) Data {
 			}
 		case uint64:
 			v = int64(nv)
+		case string:
+			if len(nv) == 0 {
+				continue
+			}
 		case nil:
 			continue
 		}
@@ -703,11 +706,15 @@ func (c *Pipeline) getOrCreateWorkflow(input *InitOrUpdateWorkflowInput, ns *boo
 		PandoraToken: input.PipelineGetWorkflowToken,
 	})
 	if err != nil && reqerr.IsNoSuchWorkflow(err) {
-		if err = c.CreateWorkflow(&CreateWorkflowInput{
+		createWorkflowInput := &CreateWorkflowInput{
 			WorkflowName: input.WorkflowName,
 			Region:       input.Region,
 			PandoraToken: input.PipelineCreateWorkflowToken,
-		}); err != nil && reqerr.IsExistError(err) {
+		}
+		if input.Description != nil {
+			createWorkflowInput.Comment = *input.Description
+		}
+		if err = c.CreateWorkflow(createWorkflowInput); err != nil && reqerr.IsExistError(err) {
 			workflow, err = c.GetWorkflow(&GetWorkflowInput{
 				WorkflowName: input.WorkflowName,
 				PandoraToken: input.PipelineGetWorkflowToken,
@@ -739,6 +746,7 @@ func (c *Pipeline) createOrUpdateRepo(input *InitOrUpdateWorkflowInput, workflow
 		Options:      input.RepoOptions,
 		Workflow:     input.WorkflowName,
 		PandoraToken: input.PipelineCreateRepoToken,
+		Description:  input.Description,
 	})
 	if err != nil && reqerr.IsWorkflowStatError(err) {
 		// 如果当前 workflow 的状态不允许更新，则先等待停止 workflow 再更新
@@ -757,6 +765,7 @@ func (c *Pipeline) createOrUpdateRepo(input *InitOrUpdateWorkflowInput, workflow
 			Options:      input.RepoOptions,
 			Workflow:     input.WorkflowName,
 			PandoraToken: input.PipelineCreateRepoToken,
+			Description:  input.Description,
 		})
 	}
 	if err != nil && reqerr.IsExistError(err) {
@@ -1069,11 +1078,9 @@ func GetTrimedDataSchema(data Data) (valueType map[string]RepoSchemaEntry) {
 			// 由于数据为空，且无法判断类型, 所以从数据中将该条键值对删掉
 			delete(data, k)
 		case string:
-			// 如果数据满足date格式，则推断为PandoraTypeDate，如果数据满足IP格式，则推断为PandoraTypeIP
+			// 如果数据满足date格式，则推断为PandoraTypeDate
 			if _, err := time.Parse(time.RFC3339, nv); err == nil {
 				valueType[k] = formValueType(k, PandoraTypeDate)
-			} else if ipAddr := net.ParseIP(nv); ipAddr != nil {
-				valueType[k] = formValueType(k, PandoraTypeIP)
 			} else {
 				valueType[k] = formValueType(k, PandoraTypeString)
 			}

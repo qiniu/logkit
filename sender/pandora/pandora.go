@@ -21,7 +21,7 @@ import (
 	"github.com/qiniu/pandora-go-sdk/logdb"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 
-	"github.com/qiniu/logkit/conf"
+	logkitconf "github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/times"
@@ -48,6 +48,7 @@ type Sender struct {
 	microsecondCounter uint64
 	extraInfo          map[string]string
 	sendType           string
+	ipConfig           *pipeline.LocateIPConfig
 }
 
 // UserSchema was parsed pandora schema from user's raw schema
@@ -108,6 +109,7 @@ type PandoraOption struct {
 	kodoRotateInterval int
 	kodoRotateSize     int
 	kodoFileRetention  int
+	kodoFileType       int
 
 	forceMicrosecond   bool
 	forceDataConvert   bool
@@ -124,6 +126,8 @@ type PandoraOption struct {
 
 	tokens    Tokens
 	tokenLock *sync.RWMutex
+
+	autoCreateDescription string
 }
 
 //PandoraMaxBatchSize 发送到Pandora的batch限制
@@ -134,7 +138,7 @@ func init() {
 }
 
 // pandora sender
-func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
+func NewSender(conf logkitconf.MapConf) (pandoraSender sender.Sender, err error) {
 	repoName, err := conf.GetString(sender.KeyPandoraRepoName)
 	if err != nil {
 		return
@@ -151,13 +155,13 @@ func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
 		return
 	}
 	ak, _ := conf.GetString(sender.KeyPandoraAk)
-	akFromEnv := GetEnv(ak)
+	akFromEnv := logkitconf.GetEnv(ak)
 	if akFromEnv == "" {
 		akFromEnv = ak
 	}
 
 	sk, _ := conf.GetString(sender.KeyPandoraSk)
-	skFromEnv := GetEnv(sk)
+	skFromEnv := logkitconf.GetEnv(sk)
 	if skFromEnv == "" {
 		skFromEnv = sk
 	}
@@ -203,6 +207,10 @@ func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
 	kodoRotateSize = kodoRotateSize * 1024
 	kodoRotateInterval, _ := conf.GetIntOr(sender.KeyPandoraKodoRotateInterval, 10*60)
 	kodoFileRetention, _ := conf.GetIntOr(sender.KeyPandoraKodoFileRetention, 0)
+	kodoFileType := 0
+	if v, err := conf.GetBoolOr(sender.KeyPandoraKodoLowFreqFile, false); err == nil && v {
+		kodoFileType = 1
+	}
 
 	forceconvert, _ := conf.GetBoolOr(sender.KeyForceDataConvert, false)
 	ignoreInvalidField, _ := conf.GetBoolOr(sender.KeyIgnoreInvalidField, true)
@@ -214,6 +222,7 @@ func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
 	insecureServer, _ := conf.GetBoolOr(sender.KeyInsecureServer, false)
 
 	sendType, _ := conf.GetStringOr(sender.KeyPandoraSendType, SendTypeNormal)
+	description, _ := conf.GetStringOr(sender.KeyPandoraDescription, "")
 
 	var subErr error
 	var tokens Tokens
@@ -277,6 +286,7 @@ func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
 		kodoRotateInterval: kodoRotateInterval,
 		kodoRotateSize:     kodoRotateSize,
 		kodoFileRetention:  kodoFileRetention,
+		kodoFileType:       kodoFileType,
 
 		forceMicrosecond:   forceMicrosecond,
 		forceDataConvert:   forceconvert,
@@ -292,6 +302,8 @@ func NewSender(conf conf.MapConf) (pandoraSender sender.Sender, err error) {
 
 		tokens:    tokens,
 		tokenLock: new(sync.RWMutex),
+
+		autoCreateDescription: description,
 	}
 	if withIp {
 		opt.withip = "logkitIP"
@@ -316,7 +328,7 @@ func convertAnalyzerMap(analyzerStrs []string) map[string]string {
 	return analyzerMap
 }
 
-func getTokensFromConf(conf conf.MapConf) (tokens Tokens, err error) {
+func getTokensFromConf(conf logkitconf.MapConf) (tokens Tokens, err error) {
 	// schema free tokens
 	preFix := SchemaFreeTokensPrefix
 	tokens.SchemaFreeTokens.PipelineGetRepoToken.Token, _ = conf.GetStringOr(preFix+"pipeline_get_repo_token", "")
@@ -403,7 +415,7 @@ func getTokensFromConf(conf conf.MapConf) (tokens Tokens, err error) {
 	return
 }
 
-func (s *Sender) TokenRefresh(mapConf conf.MapConf) error {
+func (s *Sender) TokenRefresh(mapConf logkitconf.MapConf) error {
 	s.opt.tokenLock.Lock()
 	defer s.opt.tokenLock.Unlock()
 	if tokens, err := getTokensFromConf(mapConf); err != nil {
@@ -474,7 +486,8 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 		WithRequestRateLimit(opt.reqRateLimit).
 		WithFlowRateLimit(opt.flowRateLimit).
 		WithGzipData(opt.gzip).
-		WithHeaderUserAgent(opt.useragent).WithInsecureServer(opt.insecureServer)
+		WithHeaderUserAgent(opt.useragent).WithInsecureServer(opt.insecureServer).
+		WithDefaultRegion(s.opt.region)
 	if opt.logdbendpoint != "" {
 		config = config.WithLogDBEndpoint(opt.logdbendpoint)
 	}
@@ -491,12 +504,27 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 		log.Errorf("Runner[%v] Sender[%v]: auto create pandora repo error: %v, you can create on pandora portal, ignored...", opt.runnerName, opt.name, err)
 		err = nil
 	}
+
+	var ipConfig *pipeline.LocateIPConfig
+	for _, schema := range schemas {
+		if strings.ToLower(schema.ValueType) == "ip" || strings.ToLower(schema.ValueType) == "i" {
+			if ipConfig == nil {
+				ipConfig = &pipeline.LocateIPConfig{
+					ShouldLocateIP: true,
+					Mappings:       make(map[string]*pipeline.LocateIPDetails),
+				}
+			}
+			ipConfig.Mappings[schema.Key] = getDefaultLocateIPDetails(schema.Key)
+		}
+	}
+	s.ipConfig = ipConfig
 	if initErr := s.client.InitOrUpdateWorkflow(&pipeline.InitOrUpdateWorkflowInput{
 		// 此处要的 schema 为 autoCreate 中用户指定的，所以 SchemaFree 要恒为 true
 		InitOptionChange: true,
 		SchemaFree:       true,
 		Region:           s.opt.region,
 		WorkflowName:     s.opt.workflowName,
+		Description:      &s.opt.autoCreateDescription,
 		RepoName:         s.opt.repoName,
 		Schema:           schemas,
 		SchemaFreeToken:  s.opt.tokens.SchemaFreeTokens,
@@ -507,10 +535,13 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 			AutoExportToLogDBInput: pipeline.AutoExportToLogDBInput{
 				OmitEmpty:             true,
 				OmitInvalid:           false,
+				Region:                s.opt.region,
 				RepoName:              s.opt.repoName,
 				LogRepoName:           s.opt.logdbReponame,
 				AnalyzerInfo:          s.opt.analyzerInfo,
 				AutoExportLogDBTokens: s.opt.tokens.LogDBTokens,
+				Description:           &s.opt.autoCreateDescription,
+				IPConfig:              ipConfig,
 			},
 			ToKODO: s.opt.enableKodo,
 			AutoExportToKODOInput: pipeline.AutoExportToKODOInput{
@@ -527,6 +558,7 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 				RotateInterval:       s.opt.kodoRotateInterval,
 				RotateSizeType:       "B",
 				RotateNumber:         s.opt.kodoRotateSize,
+				KodoFileType:         s.opt.kodoFileType,
 			},
 			ToTSDB: s.opt.enableTsdb,
 			AutoExportToTSDBInput: pipeline.AutoExportToTSDBInput{
@@ -814,11 +846,12 @@ func (s *Sender) generatePoint(data Data) (point Data) {
 		}
 		if !s.opt.forceDataConvert && s.opt.ignoreInvalidField && !validSchema(v.ValueType, value, s.opt.numberUseFloat) {
 			if value != nil {
-				log.Errorf("Runner[%v] Sender[%v]: key <%v> value < %v > not match type %v, from data < %v >, ignored this field", s.opt.runnerName, s.opt.name, name, value, v.ValueType, data)
+				log.Warnf("Runner[%v] Sender[%v]: key <%v> value < %v > not match type %v, from data < %v >, ignored this field", s.opt.runnerName, s.opt.name, name, value, v.ValueType, data)
 			}
 			continue
 		}
 		point[k] = value
+		data[k] = value
 	}
 	if s.opt.uuid {
 		uuid, _ := gouuid.NewV4()
@@ -992,16 +1025,18 @@ func (s *Sender) rawSend(datas []Data) (se error) {
 func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 	s.checkSchemaUpdate()
 	if !s.opt.schemaFree && (len(s.schemas) <= 0 || len(s.alias2key) <= 0) {
-		se = reqerr.NewSendError("Get pandora schema error, failed to send data", sender.ConvertDatasBack(datas), reqerr.TypeDefault)
-		ste := &StatsError{
+		return &StatsError{
 			StatsInfo: StatsInfo{
 				Success:   0,
 				Errors:    int64(len(datas)),
 				LastError: "Get pandora schema error or repo not exist",
 			},
-			ErrorDetail: se,
+			ErrorDetail: reqerr.NewSendError(
+				"Get pandora schema error, failed to send data",
+				sender.ConvertDatasBack(datas),
+				reqerr.TypeDefault,
+			),
 		}
-		return ste
 	}
 	var points pipeline.Datas
 	now := time.Now().Format(time.RFC3339Nano)
@@ -1028,6 +1063,8 @@ func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 	s.opt.tokenLock.RLock()
 	schemaFreeInput := &pipeline.SchemaFreeInput{
 		WorkflowName:    s.opt.workflowName,
+		Description:     &s.opt.autoCreateDescription,
+		Region:          s.opt.region,
 		RepoName:        s.opt.repoName,
 		NoUpdate:        !s.opt.schemaFree,
 		Datas:           points,
@@ -1039,16 +1076,20 @@ func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 			AutoExportToLogDBInput: pipeline.AutoExportToLogDBInput{
 				OmitEmpty:             true,
 				OmitInvalid:           false,
+				Region:                s.opt.region,
 				RepoName:              s.opt.repoName,
 				LogRepoName:           s.opt.logdbReponame,
 				AnalyzerInfo:          s.opt.analyzerInfo,
 				AutoExportLogDBTokens: s.opt.tokens.LogDBTokens,
+				Description:           &s.opt.autoCreateDescription,
+				IPConfig:              s.ipConfig,
 			},
 			ToKODO: s.opt.enableKodo,
 			AutoExportToKODOInput: pipeline.AutoExportToKODOInput{
 				Retention:            s.opt.kodoFileRetention,
 				RepoName:             s.opt.repoName,
 				BucketName:           s.opt.bucketName,
+				KodoFileType:         s.opt.kodoFileType,
 				Email:                s.opt.email,
 				Prefix:               s.opt.prefix,
 				Format:               s.opt.format,
@@ -1083,28 +1124,27 @@ func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 	}
 
 	if se != nil {
-		nse, ok := se.(*reqerr.SendError)
-		ste := &StatsError{
+		if nse, ok := se.(*reqerr.SendError); ok {
+			return &StatsError{
+				StatsInfo: StatsInfo{
+					Errors:    int64(len(nse.GetFailDatas())),
+					Success:   int64(len(datas) - len(nse.GetFailDatas())),
+					LastError: nse.Error(),
+				},
+				ErrorDetail: se,
+			}
+		}
+
+		return &StatsError{
+			StatsInfo: StatsInfo{
+				Errors:    int64(len(datas)),
+				LastError: se.Error(),
+			},
 			ErrorDetail: se,
 		}
-		if ok {
-			ste.LastError = nse.Error()
-			ste.Errors = int64(len(nse.GetFailDatas()))
-			ste.Success = int64(len(datas)) - ste.Errors
-		} else {
-			ste.LastError = se.Error()
-			ste.Errors = int64(len(datas))
-		}
-		return ste
 	}
-	ste := &StatsError{
-		ErrorDetail: se,
-		StatsInfo: StatsInfo{
-			Success:   int64(len(datas)),
-			LastError: "",
-		},
-	}
-	return ste
+
+	return nil
 }
 
 func (s *Sender) Name() string {
@@ -1116,4 +1156,22 @@ func (s *Sender) Name() string {
 
 func (s *Sender) Close() error {
 	return s.client.Close()
+}
+
+func getDefaultLocateIPDetails(key string) *pipeline.LocateIPDetails {
+	return &pipeline.LocateIPDetails{
+		ShouldLocateField: true,
+		WantedFields: map[string]bool{
+			pipeline.IPWantCountry: true,
+			pipeline.IPWantRegion:  true,
+			pipeline.IPWantCity:    true,
+			pipeline.IPWantIsp:     true,
+		},
+		FieldNames: map[string]string{
+			pipeline.IPFieldNameCountry: key + pipeline.IPFiledSuffixCountry,
+			pipeline.IPFieldNameRegion:  key + pipeline.IPFiledSuffixRegion,
+			pipeline.IPFieldNameCity:    key + pipeline.IPFiledSuffixCity,
+			pipeline.IPFieldNameIsp:     key + pipeline.IPFiledSuffixIsp,
+		},
+	}
 }

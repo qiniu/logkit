@@ -31,6 +31,7 @@ type mock_pandora struct {
 	PostSleep   int
 	SetMux      sync.Mutex
 	PostDataNum int
+	DumpDataNum int
 }
 
 //NewMockPandoraWithPrefix 测试的mock pandora server
@@ -146,11 +147,19 @@ func (s *mock_pandora) PostRepos_Data() echo.HandlerFunc {
 		defer s.BodyMux.Unlock()
 		s.Body = strings.Join(sep, " ")
 
-		if len(strings.TrimSpace(strByte)) < 1 {
+		strByte = strings.TrimSpace(strByte)
+		if len(strByte) < 1 {
 			c.Response().Header().Set(ContentTypeHeader, ApplicationJson)
 			c.Response().WriteHeader(http.StatusNotFound)
 
 			return jsoniter.NewEncoder(c.Response()).Encode(map[string]string{"error": "E18006: empty entity"})
+		}
+
+		if strings.HasPrefix(strByte, "PointFailedSend") {
+			c.Response().Header().Set(ContentTypeHeader, ApplicationJson)
+			c.Response().WriteHeader(http.StatusNotFound)
+
+			return jsoniter.NewEncoder(c.Response()).Encode(errors.New("pandora send points error"))
 		}
 
 		if strings.Contains(s.Body, "E18111:") {
@@ -162,6 +171,13 @@ func (s *mock_pandora) PostRepos_Data() echo.HandlerFunc {
 
 		if strings.Contains(s.Body, "E18110:BackupQueue.Depth") {
 			return c.JSON(http.StatusNotFound, NewErrorResponse(errors.New("E18110: mock_pandora error")))
+		}
+
+		if strings.Contains(s.Body, "It's-an-error") && !strings.Contains(s.Body, KeyPandoraStash) {
+			c.Response().Header().Set(ContentTypeHeader, ApplicationJson)
+			c.Response().WriteHeader(http.StatusNotFound)
+
+			return jsoniter.NewEncoder(c.Response()).Encode(map[string]string{"error": "E18125: invalid DataSchema"})
 		}
 
 		if strings.Contains(s.Body, "E18110") {
@@ -183,6 +199,7 @@ func (s *mock_pandora) PostRepos_Data() echo.HandlerFunc {
 			return jsoniter.NewEncoder(c.Response()).Encode(map[string]string{"error": "E18110: mock_pandora error"})
 		}
 		s.PostDataNum++
+		s.DumpDataNum += len(strings.Split(strings.TrimSpace(strByte), "\n"))
 		return nil
 	}
 }

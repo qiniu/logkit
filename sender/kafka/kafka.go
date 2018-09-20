@@ -1,6 +1,7 @@
 package kafka
 
 import (
+	"compress/gzip"
 	"fmt"
 	"os"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/json-iterator/go"
 
 	"github.com/qiniu/log"
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
@@ -33,6 +35,15 @@ var (
 		sender.KeyKafkaCompressionNone:   sarama.CompressionNone,
 		sender.KeyKafkaCompressionGzip:   sarama.CompressionGZIP,
 		sender.KeyKafkaCompressionSnappy: sarama.CompressionSnappy,
+		sender.KeyKafkaCompressionLZ4:    sarama.CompressionLZ4,
+	}
+
+	compressionLevelModes = map[string]int{
+		sender.KeyGZIPCompressionNo:              gzip.NoCompression,
+		sender.KeyGZIPCompressionBestSpeed:       gzip.BestSpeed,
+		sender.KeyGZIPCompressionBestCompression: gzip.BestCompression,
+		sender.KeyGZIPCompressionDefault:         gzip.DefaultCompression,
+		sender.KeyGZIPCompressionHuffmanOnly:     gzip.HuffmanOnly,
 	}
 )
 
@@ -67,6 +78,7 @@ func NewSender(conf conf.MapConf) (kafkaSender sender.Sender, err error) {
 	timeout, _ := conf.GetStringOr(sender.KeyKafkaTimeout, "30s")
 	keepAlive, _ := conf.GetStringOr(sender.KeyKafkaKeepAlive, "0")
 	maxMessageBytes, _ := conf.GetIntOr(sender.KeyMaxMessageBytes, 4*1024*1024)
+	gzipCompressionLevel, _ := conf.GetStringOr(sender.KeyGZIPCompressionLevel, sender.KeyGZIPCompressionDefault)
 
 	name, _ := conf.GetStringOr(sender.KeyName, fmt.Sprintf("kafkaSender:(kafkaUrl:%s,topic:%s)", hosts, topic))
 	cfg := sarama.NewConfig()
@@ -85,6 +97,9 @@ func NewSender(conf conf.MapConf) (kafkaSender sender.Sender, err error) {
 	if !ok {
 		return nil, fmt.Errorf("unknown compression mode: '%v'", compression)
 	}
+	if compressionMode == sarama.CompressionLZ4 {
+		cfg.Version = sarama.V0_10_0_0
+	}
 	cfg.Producer.Compression = compressionMode
 	cfg.Net.DialTimeout, err = time.ParseDuration(timeout)
 	if err != nil {
@@ -95,6 +110,12 @@ func NewSender(conf conf.MapConf) (kafkaSender sender.Sender, err error) {
 		return
 	}
 	cfg.Producer.MaxMessageBytes = maxMessageBytes
+	compressionLevelMode, ok := compressionLevelModes[gzipCompressionLevel]
+	if !ok {
+		compressionLevelMode = gzip.DefaultCompression
+		log.Warnf("unknown gzip compression level: '%v',use default level", gzipCompressionLevel)
+	}
+	cfg.Producer.CompressionLevel = compressionLevelMode
 
 	producer, err := sarama.NewSyncProducer(hosts, cfg)
 	if err != nil {
@@ -121,16 +142,19 @@ func (this *Sender) Name() string {
 }
 
 func (this *Sender) Send(data []Data) error {
-	producer := this.producer
-	var msgs []*sarama.ProducerMessage
-	ss := &StatsError{}
-	var lastErr error
+	var (
+		producer        = this.producer
+		msgs            []*sarama.ProducerMessage
+		ss              = &StatsError{}
+		ignoreDataCount int
+	)
 	for _, doc := range data {
 		message, err := this.getEventMessage(doc)
 		if err != nil {
 			log.Debugf("Dropping event: %v", err)
 			ss.AddErrors()
-			lastErr = err
+			ss.LastError = err.Error()
+			ignoreDataCount++
 			continue
 		}
 		msgs = append(msgs, message)
@@ -138,31 +162,42 @@ func (this *Sender) Send(data []Data) error {
 	err := producer.SendMessages(msgs)
 	if err != nil {
 		ss.AddErrorsNum(len(msgs))
-		if pde, ok := err.(sarama.ProducerErrors); ok {
-			var allcir = true
-			for _, v := range pde {
-				//对于熔断的错误提示，没有任何帮助，过滤掉
-				if strings.Contains(v.Error(), "circuit breaker is open") {
-					continue
-				}
-				allcir = false
-				ss.ErrorDetail = fmt.Errorf("%v detail: %v", ss.ErrorDetail, v.Error())
-				this.lastError = v
-				break
+		pde, ok := err.(sarama.ProducerErrors)
+		if !ok {
+			if ss.LastError != "" {
+				ss.LastError = fmt.Sprintf("ignore %d datas, last error: %s", ignoreDataCount, ss.LastError) + "\n"
 			}
-			if allcir {
-				ss.ErrorDetail = fmt.Errorf("%v, all error is circuit breaker is open , last error %v", err, this.lastError)
-			}
-		} else {
+			ss.LastError += err.Error()
 			ss.ErrorDetail = err
+			return ss
 		}
+
+		var allcir = true
+		for _, v := range pde {
+			//对于熔断的错误提示，没有任何帮助，过滤掉
+			if strings.Contains(v.Error(), "circuit breaker is open") {
+				continue
+			}
+			allcir = false
+			ss.ErrorDetail = fmt.Errorf("%v detail: %v", ss.ErrorDetail, v.Error())
+			this.lastError = v
+			//发送错误为message too large时，启用二分策略重新发送
+			if v.Err == sarama.ErrMessageSizeTooLarge {
+				ss.ErrorDetail = reqerr.NewSendError("Sender[Kafka]:Message was too large, server rejected it to avoid allocation error", sender.ConvertDatasBack(data), reqerr.TypeBinaryUnpack)
+			}
+			break
+		}
+
+		if allcir {
+			ss.ErrorDetail = fmt.Errorf("%v, all error is circuit breaker is open , last error %v", err, this.lastError)
+		}
+		if ss.LastError != "" {
+			ss.LastError = fmt.Sprintf("ignore %d datas, last error: %s", ignoreDataCount, ss.LastError) + "\n"
+		}
+		ss.LastError = ss.ErrorDetail.Error()
 		return ss
 	}
 	ss.AddSuccessNum(len(msgs))
-	if lastErr != nil {
-		ss.LastError = lastErr.Error()
-		return ss
-	}
 	//本次发送成功, lastError 置为 nil
 	this.lastError = nil
 	return ss

@@ -28,6 +28,7 @@ import (
 	"github.com/qiniu/logkit/sender"
 	_ "github.com/qiniu/logkit/sender/builtin"
 	"github.com/qiniu/logkit/transforms"
+	"github.com/qiniu/logkit/transforms/ip"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -274,11 +275,28 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	if err != nil {
 		return nil, err
 	}
+	var serverConfigs = make([]map[string]interface{}, 0, len(transformers))
+	for _, transform := range transformers {
+		if serverTransformer, ok := transform.(transforms.ServerTansformer); ok {
+			if serverTransformer.ServerConfig() != nil {
+				serverConfigs = append(serverConfigs, serverTransformer.ServerConfig())
+			}
+		}
+	}
 	senders := make([]sender.Sender, 0)
 	for i, senderConfig := range rc.SendersConfig {
-		if rc.ExtraInfo && senderConfig[sender.KeySenderType] == sender.TypePandora {
-			//如果已经开启了，不要重复加
-			senderConfig[sender.KeyPandoraExtraInfo] = "false"
+		if senderConfig[sender.KeySenderType] == sender.TypePandora {
+			if rc.ExtraInfo {
+				//如果已经开启了，不要重复加
+				senderConfig[sender.KeyPandoraExtraInfo] = "false"
+			}
+			if senderConfig[sender.KeyPandoraDescription] == "" {
+				senderConfig[sender.KeyPandoraDescription] = LogkitAutoCreateDescription
+			}
+		}
+		senderConfig, err := setPandoraServerConfig(senderConfig, serverConfigs)
+		if err != nil {
+			return nil, err
 		}
 		s, err := sr.NewSender(senderConfig, meta.FtSaveLogPath())
 		if err != nil {
@@ -286,6 +304,7 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 		}
 		senders = append(senders, s)
 		delete(rc.SendersConfig[i], sender.InnerUserAgent)
+		delete(rc.SendersConfig[i], sender.KeyPandoraDescription)
 	}
 
 	senderCnt := len(senders)
@@ -344,77 +363,86 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 	}
 	info := r.rs.SenderStats[s.Name()]
 	r.rsMutex.Unlock()
-	cnt := 1
+
+	var (
+		err             error
+		successDatasLen int64
+		originDatasLen  = int64(len(datas))
+		cnt             = 1
+	)
+
 	for {
 		// 至少尝试一次。如果任务已经停止，那么只尝试一次
 		if cnt > 1 && atomic.LoadInt32(&r.stopped) > 0 {
 			return false
 		}
-		err := s.Send(datas)
+		err = s.Send(datas)
+		if err == nil {
+			successDatasLen += int64(len(datas))
+			break
+		}
+
 		se, ok := err.(*StatsError)
 		if ok {
+			// se.ErrorDetail == nil 为了兼容，一般情况下不应该出现se.ErrorDetail == nil
+			if se.Errors == 0 || se.ErrorDetail == nil {
+				successDatasLen += int64(len(datas))
+				break
+			}
 			err = se.ErrorDetail
 			if se.Ft {
 				r.rsMutex.Lock()
 				r.rs.Lag.Ftlags = se.FtQueueLag
 				r.rsMutex.Unlock()
-			} else {
-				if cnt > 1 {
-					info.Errors -= se.Success
-				} else {
-					info.Errors += se.Errors
-				}
-				info.Success += se.Success
 			}
-		} else if err != nil {
-			if cnt <= 1 {
-				info.Errors += int64(len(datas))
+			if sendErrors, ok := err.(*reqerr.SendError); ok {
+				successDatasLen += int64(len(datas) - len(sendErrors.GetFailDatas()))
 			}
-		} else {
-			info.Success += int64(len(datas))
 		}
-		if err != nil {
-			info.LastError = TruncateStrSize(err.Error(), DefaultTruncateMaxSize)
-			now := time.Now().UnixNano()
-			if r.rs.HistoryErrors.SendErrors == nil {
-				r.rs.HistoryErrors.SendErrors = make(map[string]*ErrorQueue)
+
+		info.LastError = TruncateStrSize(err.Error(), DefaultTruncateMaxSize)
+		if r.rs.HistoryErrors.SendErrors == nil {
+			r.rs.HistoryErrors.SendErrors = make(map[string]*ErrorQueue)
+		}
+		if r.rs.HistoryErrors.SendErrors[s.Name()] == nil {
+			r.rs.HistoryErrors.SendErrors[s.Name()] = NewErrorQueue(r.ErrorsListCap)
+		}
+		r.rs.HistoryErrors.SendErrors[s.Name()].Put(ErrorInfo{Error: info.LastError, Timestamp: time.Now().UnixNano(), Count: 0})
+
+		//FaultTolerant Sender 正常的错误会在backupqueue里面记录，自己重试，此处无需重试
+		if se != nil && se.Ft && se.FtNotRetry {
+			break
+		}
+		time.Sleep(time.Second)
+		sendError, ok := err.(*reqerr.SendError)
+		if ok {
+			datas = sender.ConvertDatas(sendError.GetFailDatas())
+			//无限重试的，除非遇到关闭
+			if atomic.LoadInt32(&r.stopped) > 0 {
+				return false
 			}
-			if r.rs.HistoryErrors.SendErrors[s.Name()] == nil {
-				r.rs.HistoryErrors.SendErrors[s.Name()] = NewErrorQueue(r.ErrorsListCap)
-			}
-			r.rs.HistoryErrors.SendErrors[s.Name()].Put(ErrorInfo{Error: info.LastError, Timestamp: now, Count: 0})
-			//FaultTolerant Sender 正常的错误会在backupqueue里面记录，自己重试，此处无需重试
-			if se != nil && se.Ft && se.FtNotRetry {
+			if sendError.ErrorType == sender.TypeMarshalError {
+				log.Errorf("Runner[%v] datas marshal failed, discard datas, send error %v, failed datas (length %v): %v", r.RunnerName, se.Error(), cnt, datas)
 				break
 			}
-			time.Sleep(time.Second)
-			se, succ := err.(*reqerr.SendError)
-			if succ {
-				datas = sender.ConvertDatas(se.GetFailDatas())
-				//无限重试的，除非遇到关闭
-				if atomic.LoadInt32(&r.stopped) > 0 {
-					return false
-				}
-				if se.ErrorType == sender.TypeMarshalError {
-					log.Errorf("Runner[%v] datas marshal failed, discard datas, send error %v, failed datas (length %v): %v", r.RunnerName, se.Error(), cnt, datas)
-					break
-				}
-				log.Errorf("Runner[%v] send error %v for %v times, failed datas length %v will retry send it", r.RunnerName, se.Error(), cnt, len(datas))
-				cnt++
-				continue
-			}
-			if err == ErrQueueClosed {
-				log.Errorf("Runner[%v] send to closed queue, discard datas, send error %v, failed datas (length %v): %v", r.RunnerName, se.Error(), cnt, datas)
-				break
-			}
-			if times <= 0 || cnt < times {
-				cnt++
-				continue
-			}
-			log.Errorf("Runner[%v] retry send %v times, but still error %v, discard datas %v ... total %v lines", r.RunnerName, cnt, err, datas, len(datas))
+			log.Errorf("Runner[%v] send error %v for %v times, failed datas length %v will retry send it", r.RunnerName, se.Error(), cnt, len(datas))
+			cnt++
+			continue
 		}
-		break
+
+		if err == ErrQueueClosed {
+			log.Errorf("Runner[%v] send to closed queue, discard datas, send error %v, failed datas (length %v): %v", r.RunnerName, se.Error(), cnt, datas)
+			break
+		}
+		if times <= 0 || cnt < times {
+			cnt++
+			continue
+		}
+		log.Errorf("Runner[%v] retry send %v times, but still error %v, discard datas %v ... total %v lines", r.RunnerName, cnt, err, datas, len(datas))
 	}
+
+	info.Errors += originDatasLen - successDatasLen
+	info.Success += successDatasLen
 	r.rsMutex.Lock()
 	r.rs.SenderStats[s.Name()] = info
 	r.rsMutex.Unlock()
@@ -784,8 +812,6 @@ func addTagsToData(tags map[string]interface{}, datas []Data, runnername string)
 // 先停Reader，不再读取，然后停Run函数，让读取的都转到发送，最后停Sender结束整个过程。
 // Parser 无状态，无需stop。
 func (r *LogExportRunner) Stop() {
-	atomic.AddInt32(&r.stopped, 1)
-
 	log.Infof("Runner[%v] wait for reader %v stopped", r.Name(), r.reader.Name())
 	err := r.reader.Close()
 	if err != nil {
@@ -793,6 +819,8 @@ func (r *LogExportRunner) Stop() {
 	} else {
 		log.Warnf("Runner[%v] reader %v of runner %v closed", r.Name(), r.reader.Name(), r.Name())
 	}
+
+	atomic.AddInt32(&r.stopped, 1)
 
 	log.Infof("Runner[%v] waiting for Run() stopped signal", r.Name())
 	timer := time.NewTimer(time.Second * 10)
@@ -1280,4 +1308,89 @@ func MergeExtraInfoTags(meta *reader.Meta, tags map[string]interface{}) map[stri
 		}
 	}
 	return tags
+}
+
+func setPandoraServerConfig(senderConfig conf.MapConf, serverConfigs []map[string]interface{}) (conf.MapConf, error) {
+	if senderConfig[sender.KeySenderType] != sender.TypePandora {
+		return senderConfig, nil
+	}
+
+	var err error
+	for _, serverConfig := range serverConfigs {
+		keyType, ok := serverConfig[transforms.KeyType].(string)
+		if !ok {
+			continue
+		}
+		switch keyType {
+		case ip.Name:
+			if senderConfig, err = setIPConfig(senderConfig, serverConfig); err != nil {
+				return senderConfig, err
+			}
+		}
+	}
+
+	return senderConfig, nil
+}
+
+func setIPConfig(senderConfig conf.MapConf, serverConfig map[string]interface{}) (conf.MapConf, error) {
+	key, keyOk := serverConfig["key"].(string)
+	if !keyOk {
+		return senderConfig, nil
+	}
+
+	autoCreate := senderConfig[sender.KeyPandoraAutoCreate]
+	transformAt, transformAtOk := serverConfig[transforms.TransformAt].(string)
+	if !transformAtOk {
+		return senderConfig, nil
+	}
+
+	senderConfig[sender.KeyPandoraAutoCreate] = removeServerIPSchema(senderConfig[sender.KeyPandoraAutoCreate], key)
+	if transformAt == ip.Local {
+		return senderConfig, nil
+	}
+
+	if len(GetKeys(key)) > 1 {
+		return senderConfig, fmt.Errorf("key: %v ip transform key in server doesn't support dot(.)", key)
+	}
+
+	if autoCreate == "" {
+		senderConfig[sender.KeyPandoraAutoCreate] = fmt.Sprintf("%s %s", key, TypeIP)
+		return senderConfig, nil
+	}
+
+	if !strings.Contains(senderConfig[sender.KeyPandoraAutoCreate], fmt.Sprintf("%s %s", key, TypeIP)) {
+		senderConfig[sender.KeyPandoraAutoCreate] += fmt.Sprintf(",%s %s", key, TypeIP)
+	}
+	return senderConfig, nil
+}
+
+func removeServerIPSchema(autoCreate, key string) string {
+	if len(GetKeys(key)) > 1 {
+		return autoCreate
+	}
+
+	if autoCreate == "" {
+		return ""
+	}
+
+	ipSchemaWithComma := fmt.Sprintf("%s %s", key, TypeIP)
+	index := strings.Index(autoCreate, ipSchemaWithComma)
+	var splitEnd, splitStart int
+	for ; index != -1; index = strings.Index(autoCreate, ipSchemaWithComma) {
+		splitEnd = index
+		splitStart = index + len(ipSchemaWithComma)
+		if splitEnd != 0 {
+			// 不是开头，则为(,%s %s)
+			splitEnd -= 1
+		} else {
+			if splitStart != len(autoCreate) {
+				// 开头非结尾，则为(%s %s,)
+				splitStart += 1
+			}
+		}
+
+		autoCreate = autoCreate[:splitEnd] + autoCreate[splitStart:]
+	}
+
+	return autoCreate
 }

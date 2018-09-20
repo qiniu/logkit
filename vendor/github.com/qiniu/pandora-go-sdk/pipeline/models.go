@@ -399,6 +399,8 @@ func getRawType(tp string) (schemaType string, err error) {
 		schemaType = PandoraTypeBool
 	case "j", "json", "jsonstring":
 		schemaType = PandoraTypeJsonString
+	case "i", "ip":
+		schemaType = PandoraTypeIP
 	case "": //这个是一种缺省
 	default:
 		err = fmt.Errorf("schema type %v not supperted", schemaType)
@@ -599,6 +601,7 @@ type AutoExportToLogDBInput struct {
 	Description *string
 	AnalyzerInfo
 	AutoExportLogDBTokens
+	IPConfig *LocateIPConfig
 }
 type AutoExportLogDBTokens struct {
 	PipelineCreateRepoToken PandoraToken
@@ -623,6 +626,7 @@ type CreateRepoForLogDBInput struct {
 	Description *string
 	AnalyzerInfo
 	AutoExportLogDBTokens
+	IPConfig *LocateIPConfig
 }
 
 type CreateRepoForLogDBDSLInput struct {
@@ -679,6 +683,7 @@ type CreateRepoForKodoInput struct {
 	Email          string
 	Region         string
 	Bucket         string
+	KodoFileType   int
 	RepoName       string
 	Prefix         string
 	Compress       bool
@@ -702,6 +707,7 @@ type AutoExportToKODOInput struct {
 	RepoName       string
 	BucketName     string
 	Prefix         string
+	KodoFileType   int
 	Compress       bool
 	RotateStrategy string
 	RotateSize     int
@@ -1377,6 +1383,24 @@ func (s *ExportMongoSpec) Validate() (err error) {
 
 	NOTE: If FieldNames is not provided or the fieldName is not valid, then default fieldnames will be used
 */
+
+const (
+	IPWantCountry = "wantCountry"
+	IPWantRegion  = "wantRegion"
+	IPWantCity    = "wantCity"
+	IPWantIsp     = "wantIsp"
+
+	IPFieldNameCountry = "ipCountryFieldName"
+	IPFieldNameRegion  = "ipRegionFieldName"
+	IPFieldNameCity    = "ipCityFieldName"
+	IPFieldNameIsp     = "ipIspFieldName"
+
+	IPFiledSuffixCountry = "_country"
+	IPFiledSuffixRegion  = "_region"
+	IPFiledSuffixCity    = "_city"
+	IPFiledSuffixIsp     = "_isp"
+)
+
 type LocateIPDetails struct {
 	ShouldLocateField bool              `json:"shouldLocateField"`
 	WantedFields      map[string]bool   `json:"wantedFields"`
@@ -1430,6 +1454,7 @@ type ExportKodoSpec struct {
 	Delimiter      string            `json:"delimiter,omitempty"`
 	Compress       bool              `json:"compress"`
 	Retention      int               `json:"retention"`
+	KodoFileType   int               `json:"kodo_file_type"`
 }
 
 func (s *ExportKodoSpec) Validate() (err error) {

@@ -51,6 +51,7 @@ type FtSender struct {
 	statsMutex      *sync.RWMutex
 	jsontool        jsoniter.API
 	pandoraKeyCache map[string]KeyInfo
+	discardErr      bool
 }
 
 type FtOption struct {
@@ -64,6 +65,9 @@ type FtOption struct {
 	longDataDiscard   bool
 	innerSenderType   string
 	pandoraSenderType string
+	maxDiskUsedBytes  int64
+	maxSizePerFile    int32
+	discardErr        bool
 }
 
 type datasContext struct {
@@ -88,6 +92,9 @@ func NewFtSender(innerSender Sender, conf conf.MapConf, ftSaveLogPath string) (*
 	}
 	procs, _ := conf.GetIntOr(KeyFtProcs, defaultMaxProcs)
 	runnerName, _ := conf.GetStringOr(KeyRunnerName, UnderfinedRunnerName)
+	maxDiskUsedBytes, _ := conf.GetInt64Or(KeyMaxDiskUsedBytes, maxDiskUsedBytes)
+	maxSizePerFile, _ := conf.GetInt32Or(KeyMaxSizePerFile, maxBytesPerFile)
+	discardErr, _ := conf.GetBoolOr(KeyFtDiscardErr, false)
 
 	opt := &FtOption{
 		saveLogPath:       logPath,
@@ -100,6 +107,9 @@ func NewFtSender(innerSender Sender, conf conf.MapConf, ftSaveLogPath string) (*
 		longDataDiscard:   longDataDiscard,
 		innerSenderType:   senderType,
 		pandoraSenderType: pandoraSendType,
+		maxDiskUsedBytes:  maxDiskUsedBytes,
+		maxSizePerFile:    maxSizePerFile,
+		discardErr:        discardErr,
 	}
 
 	return newFtSender(innerSender, runnerName, opt)
@@ -115,38 +125,41 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 		lq = queue.NewDirectQueue("stream" + directSuffix)
 	} else if !opt.memoryChannel {
 		lq = queue.NewDiskQueue(queue.NewDiskQueueOptions{
-			Name:            "stream" + qNameSuffix,
-			DataPath:        opt.saveLogPath,
-			MaxBytesPerFile: maxBytesPerFile,
-			MaxMsgSize:      maxBytesPerFile,
-			SyncEveryWrite:  opt.syncEvery,
-			SyncEveryRead:   opt.syncEvery,
-			SyncTimeout:     2 * time.Second,
-			WriteRateLimit:  opt.writeLimit * mb,
+			Name:             "stream" + qNameSuffix,
+			DataPath:         opt.saveLogPath,
+			MaxBytesPerFile:  int64(opt.maxSizePerFile),
+			MaxMsgSize:       opt.maxSizePerFile,
+			SyncEveryWrite:   opt.syncEvery,
+			SyncEveryRead:    opt.syncEvery,
+			SyncTimeout:      2 * time.Second,
+			WriteRateLimit:   opt.writeLimit * mb,
+			MaxDiskUsedBytes: opt.maxDiskUsedBytes,
 		})
 	} else {
 		lq = queue.NewDiskQueue(queue.NewDiskQueueOptions{
 			Name:              "stream" + qNameSuffix,
 			DataPath:          opt.saveLogPath,
-			MaxBytesPerFile:   maxBytesPerFile,
-			MaxMsgSize:        maxBytesPerFile,
+			MaxBytesPerFile:   int64(opt.maxSizePerFile),
+			MaxMsgSize:        opt.maxSizePerFile,
 			SyncEveryWrite:    opt.syncEvery,
 			SyncEveryRead:     opt.syncEvery,
 			SyncTimeout:       2 * time.Second,
 			WriteRateLimit:    opt.writeLimit * mb,
 			EnableMemoryQueue: true,
 			MemoryQueueSize:   int64(opt.memoryChannelSize),
+			MaxDiskUsedBytes:  opt.maxDiskUsedBytes,
 		})
 	}
 	bq = queue.NewDiskQueue(queue.NewDiskQueueOptions{
-		Name:            "backup" + qNameSuffix,
-		DataPath:        opt.saveLogPath,
-		MaxBytesPerFile: maxBytesPerFile,
-		MaxMsgSize:      maxBytesPerFile,
-		SyncEveryWrite:  opt.syncEvery,
-		SyncEveryRead:   opt.syncEvery,
-		SyncTimeout:     2 * time.Second,
-		WriteRateLimit:  opt.writeLimit * mb,
+		Name:             "backup" + qNameSuffix,
+		DataPath:         opt.saveLogPath,
+		MaxBytesPerFile:  int64(opt.maxSizePerFile),
+		MaxMsgSize:       opt.maxSizePerFile,
+		SyncEveryWrite:   opt.syncEvery,
+		SyncEveryRead:    opt.syncEvery,
+		SyncTimeout:      2 * time.Second,
+		WriteRateLimit:   opt.writeLimit * mb,
+		MaxDiskUsedBytes: opt.maxDiskUsedBytes,
 	})
 	ftSender := FtSender{
 		exitChan:    make(chan struct{}),
@@ -160,6 +173,7 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 		opt:         opt,
 		statsMutex:  new(sync.RWMutex),
 		jsontool:    jsoniter.Config{EscapeHTML: true, UseNumber: true}.Froze(),
+		discardErr:  opt.discardErr,
 	}
 
 	if opt.innerSenderType == TypePandora {
@@ -190,11 +204,21 @@ func (ft *FtSender) Send(datas []Data) error {
 		// 尝试直接发送数据，当数据失败的时候会加入到本地重试队列。外部不需要重试
 		isRetry := false
 		backDataContext, err := ft.trySendDatas(datas, 1, isRetry)
-		if err != nil {
-			err = fmt.Errorf("Runner[%v] Sender[%v] try Send Datas err: %v, will put to backup queue and retry later...", ft.runnerName, ft.innerSender.Name(), err)
-			log.Error(err)
-			se.FtNotRetry = true
+		if err == nil {
+			se.AddSuccessNum(len(datas))
+			return se
 		}
+
+		if ste, ok := err.(*StatsError); ok {
+			se.Success = ste.Success
+			se.Errors = ste.Errors
+		} else {
+			se.AddErrorsNum(len(datas))
+		}
+
+		err = fmt.Errorf("Runner[%v] Sender[%v] try Send Datas err: %v, will put to backup queue and retry later... ", ft.runnerName, ft.innerSender.Name(), err)
+		log.Error(err)
+		se.FtNotRetry = true
 		// 容错队列会保证重试，此处不向外部暴露发送错误信息
 		se.ErrorDetail = err
 		se.FtQueueLag = ft.BackupQueue.Depth()
@@ -206,6 +230,7 @@ func (ft *FtSender) Send(datas []Data) error {
 			if nowDatas != nil {
 				se.FtNotRetry = false
 				se.ErrorDetail = reqerr.NewSendError("save data to backend queue error", ConvertDatasBack(nowDatas), reqerr.TypeDefault)
+				se.LastError = se.ErrorDetail.Error()
 				ft.statsMutex.Lock()
 				ft.stats.LastError = se.ErrorDetail.Error()
 				ft.statsMutex.Unlock()
@@ -214,6 +239,7 @@ func (ft *FtSender) Send(datas []Data) error {
 	} else {
 		err := ft.saveToFile(datas)
 		if err != nil {
+			se.AddErrorsNum(len(datas))
 			se.FtNotRetry = false
 			se.ErrorDetail = err
 			ft.statsMutex.Lock()
@@ -221,7 +247,7 @@ func (ft *FtSender) Send(datas []Data) error {
 			ft.stats.Errors += int64(len(datas))
 			ft.statsMutex.Unlock()
 		} else {
-			se.ErrorDetail = nil
+			se.AddSuccessNum(len(datas))
 		}
 		se.FtQueueLag = ft.BackupQueue.Depth() + ft.logQueue.Depth()
 	}
@@ -338,49 +364,66 @@ func (ft *FtSender) trySendBytes(dat []byte, failSleep int, isRetry bool) (backD
 // trySendDatas 尝试发送数据，如果失败，将失败数据加入backup queue，并睡眠指定时间。返回结果为是否正常发送
 func (ft *FtSender) trySendDatas(datas []Data, failSleep int, isRetry bool) (backDataContext []*datasContext, err error) {
 	err = ft.innerSender.Send(datas)
+	defer func() {
+		if err != nil {
+			return
+		}
+
+		ft.statsMutex.Lock()
+		ft.stats.LastError = ""
+		ft.stats.Success += int64(len(datas))
+		if isRetry {
+			ft.stats.Errors -= int64(len(datas))
+		}
+		ft.statsMutex.Unlock()
+	}()
+	if err == nil {
+		return nil, nil
+	}
+
 	ft.statsMutex.Lock()
 	if c, ok := err.(*StatsError); ok {
 		err = c.ErrorDetail
+		if err == nil {
+			return nil, nil
+		}
 		if isRetry {
 			ft.stats.Errors -= c.Success
 		} else {
 			ft.stats.Errors += c.Errors
 		}
 		ft.stats.Success += c.Success
-	} else if err != nil {
+	} else {
 		if !isRetry {
 			ft.stats.Errors += int64(len(datas))
 		}
-	} else {
-		ft.stats.Success += int64(len(datas))
-		if isRetry {
-			ft.stats.Errors -= int64(len(datas))
-		}
 	}
-	if err != nil {
-		se, succ := err.(*reqerr.SendError)
-		if !succ {
-			ft.stats.LastError = err.Error()
-		} else {
-			ft.stats.LastError = se.Error()
-		}
+
+	se, succ := err.(*reqerr.SendError)
+	if !succ {
+		ft.stats.LastError = err.Error()
 	} else {
-		ft.stats.LastError = ""
+		ft.stats.LastError = se.Error()
 	}
 	ft.statsMutex.Unlock()
-	if err != nil {
-		retDatasContext := ft.handleSendError(err, datas)
-		for _, v := range retDatasContext {
-			nnBytes, _ := jsoniter.Marshal(v)
-			err := ft.BackupQueue.Put(nnBytes)
-			if err != nil {
-				log.Errorf("Runner[%v] Sender[%v] cannot write points back to queue %v: %v", ft.runnerName, ft.innerSender.Name(), ft.BackupQueue.Name(), err)
-				backDataContext = append(backDataContext, v)
-			}
+
+	retDatasContext := ft.handleSendError(err, datas)
+	for _, v := range retDatasContext {
+		nnBytes, err := jsoniter.Marshal(v)
+		if err != nil {
+			log.Errorf("Runner[%v] Sender[%v] marshal %v failed: %v", ft.runnerName, ft.innerSender.Name(), *v, err)
+			continue
 		}
-		time.Sleep(time.Second * time.Duration(failSleep))
+
+		err = ft.BackupQueue.Put(nnBytes)
+		if err != nil {
+			log.Errorf("Runner[%v] Sender[%v] cannot write points back to queue %v: %v", ft.runnerName, ft.innerSender.Name(), ft.BackupQueue.Name(), err)
+			backDataContext = append(backDataContext, v)
+		}
 	}
-	return
+	time.Sleep(time.Second * time.Duration(failSleep))
+
+	return backDataContext, err
 }
 
 func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []*datasContext) {
@@ -396,11 +439,11 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 		failCtx.Datas = ConvertDatas(se.GetFailDatas())
 		if se.ErrorType == reqerr.TypeBinaryUnpack {
 			binaryUnpack = true
-			errMessage = "error type is binaryUnpack, will divid to 2 parts and retry"
+			errMessage = "error type is binaryUnpack, will be divided to 2 parts and retry"
 		} else if se.ErrorType == reqerr.TypeSchemaFreeRetry {
 			errMessage = "maybe this is because of server schema cache, will send all data again"
 		} else {
-			errMessage = "error type is default, will send all data again"
+			errMessage = "error type is default, will send all failed data again"
 		}
 	}
 	log.Errorf("Runner[%v] Sender[%v] cannot write points: %v, failDatas size: %v, %s", ft.runnerName, ft.innerSender.Name(), err, len(failCtx.Datas), errMessage)
@@ -416,6 +459,10 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 			return
 		}
 		if len(failCtx.Datas) == 1 {
+			//当数据仅有一条且discardErr为true时，丢弃数据
+			if ft.discardErr {
+				return nil
+			}
 			failCtxData := failCtx.Datas[0]
 			// 小于 2M 时，放入 pandora_stash中
 			dataBytes, err := jsoniter.Marshal(failCtxData)

@@ -15,7 +15,7 @@ import (
 
 // ClusterStateService allows to get a comprehensive state information of the whole cluster.
 //
-// See https://www.elastic.co/guide/en/elasticsearch/reference/6.0/cluster-state.html
+// See https://www.elastic.co/guide/en/elasticsearch/reference/6.2/cluster-state.html
 // for details.
 type ClusterStateService struct {
 	client            *Client
@@ -239,10 +239,10 @@ type clusterStateRoutingNode struct {
 }
 
 type indexTemplateMetaData struct {
-	Template string                 `json:"template"` // e.g. "store-*"
-	Order    int                    `json:"order"`
-	Settings map[string]interface{} `json:"settings"` // index settings
-	Mappings map[string]interface{} `json:"mappings"` // type name -> mapping
+	IndexPatterns []string               `json:"index_patterns"` // e.g. ["store-*"]
+	Order         int                    `json:"order"`
+	Settings      map[string]interface{} `json:"settings"` // index settings
+	Mappings      map[string]interface{} `json:"mappings"` // type name -> mapping
 }
 
 type indexMetaData struct {

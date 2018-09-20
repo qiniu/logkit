@@ -47,13 +47,15 @@ type Reader struct {
 	stats     StatsInfo
 	statsLock sync.RWMutex
 
-	esindex   string //es索引
-	estype    string //es type
-	eshost    string //eshost+port
-	readBatch int    // 每次读取的数据量
-	keepAlive string //scrollID 保留时间
-	esVersion string //ElasticSearch version
-	offset    string // 当前处理es的offset
+	esindex      string //es索引
+	estype       string //es type
+	eshost       string //eshost+port
+	authUsername string
+	authPassword string
+	readBatch    int    // 每次读取的数据量
+	keepAlive    string //scrollID 保留时间
+	esVersion    string //ElasticSearch version
+	offset       string // 当前处理es的offset
 }
 
 func init() {
@@ -74,7 +76,9 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	if !strings.HasPrefix(eshost, "http://") && !strings.HasPrefix(eshost, "https://") {
 		eshost = "http://" + eshost
 	}
-	esVersion, _ := conf.GetStringOr(reader.KeyESVersion, reader.ElasticVersion3)
+	esVersion, _ := conf.GetStringOr(reader.KeyESVersion, reader.ElasticVersion5)
+	authUsername, _ := conf.GetStringOr(reader.KeyAuthUsername, "")
+	authPassword, _ := conf.GetPasswordEnvStringOr(reader.KeyAuthPassword, "")
 	keepAlive, _ := conf.GetStringOr(reader.KeyESKeepAlive, "6h")
 
 	offset, _, err := meta.ReadOffset()
@@ -91,6 +95,8 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		esindex:       esindex,
 		estype:        estype,
 		eshost:        eshost,
+		authUsername:  authUsername,
+		authPassword:  authPassword,
 		esVersion:     esVersion,
 		readBatch:     readBatch,
 		keepAlive:     keepAlive,
@@ -157,7 +163,14 @@ func (r *Reader) exec() error {
 	// Create a client
 	switch r.esVersion {
 	case reader.ElasticVersion6:
-		client, err := elasticV6.NewClient(elasticV6.SetURL(r.eshost))
+		optFns := []elasticV6.ClientOptionFunc{
+			elasticV6.SetURL(r.eshost),
+		}
+
+		if len(r.authUsername) > 0 && len(r.authPassword) > 0 {
+			optFns = append(optFns, elasticV6.SetBasicAuth(r.authUsername, r.authPassword))
+		}
+		client, err := elasticV6.NewClient(optFns...)
 		if err != nil {
 			return err
 		}
@@ -181,33 +194,15 @@ func (r *Reader) exec() error {
 				return nil
 			}
 		}
-	case reader.ElasticVersion5:
-		client, err := elasticV5.NewClient(elasticV5.SetURL(r.eshost))
-		if err != nil {
-			return err
+	case reader.ElasticVersion3:
+		optFns := []elasticV3.ClientOptionFunc{
+			elasticV3.SetURL(r.eshost),
 		}
-		scroll := client.Scroll(r.esindex).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
-		for {
-			ctx := context.Background()
-			results, err := scroll.ScrollId(r.offset).Do(ctx)
-			if err == io.EOF {
-				return nil // all results retrieved
-			}
-			if err != nil {
-				return err // something went wrong
-			}
 
-			// Send the hits to the hits channel
-			for _, hit := range results.Hits.Hits {
-				r.readChan <- *hit.Source
-			}
-			r.offset = results.ScrollId
-			if r.isStopping() || r.hasStopped() {
-				return nil
-			}
+		if len(r.authUsername) > 0 && len(r.authPassword) > 0 {
+			optFns = append(optFns, elasticV3.SetBasicAuth(r.authUsername, r.authPassword))
 		}
-	default:
-		client, err := elasticV3.NewClient(elasticV3.SetURL(r.eshost))
+		client, err := elasticV3.NewClient(optFns...)
 		if err != nil {
 			return err
 		}
@@ -230,7 +225,38 @@ func (r *Reader) exec() error {
 				return nil
 			}
 		}
+	default:
+		optFns := []elasticV5.ClientOptionFunc{
+			elasticV5.SetURL(r.eshost),
+		}
 
+		if len(r.authUsername) > 0 && len(r.authPassword) > 0 {
+			optFns = append(optFns, elasticV5.SetBasicAuth(r.authUsername, r.authPassword))
+		}
+		client, err := elasticV5.NewClient(optFns...)
+		if err != nil {
+			return err
+		}
+		scroll := client.Scroll(r.esindex).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
+		for {
+			ctx := context.Background()
+			results, err := scroll.ScrollId(r.offset).Do(ctx)
+			if err == io.EOF {
+				return nil // all results retrieved
+			}
+			if err != nil {
+				return err // something went wrong
+			}
+
+			// Send the hits to the hits channel
+			for _, hit := range results.Hits.Hits {
+				r.readChan <- *hit.Source
+			}
+			r.offset = results.ScrollId
+			if r.isStopping() || r.hasStopped() {
+				return nil
+			}
+		}
 	}
 }
 

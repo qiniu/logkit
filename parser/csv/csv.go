@@ -42,6 +42,7 @@ type Parser struct {
 	allowNotMatch        bool
 	ignoreInvalid        bool
 	numRoutine           int
+	keepRawData          bool
 }
 
 type field struct {
@@ -98,6 +99,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	}
 	allmoreStartNumber, _ := c.GetIntOr(parser.KeyCSVAllowMoreStartNum, 0)
 	ignoreInvalid, _ := c.GetBoolOr(parser.KeyCSVIgnoreInvalidField, false)
+	keepRawData, _ := c.GetBoolOr(parser.KeyKeepRawData, false)
 	numRoutine := MaxProcs
 	if numRoutine == 0 {
 		numRoutine = 1
@@ -115,6 +117,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		ignoreInvalid:        ignoreInvalid,
 		allmoreStartNUmber:   allmoreStartNumber,
 		numRoutine:           numRoutine,
+		keepRawData:          keepRawData,
 	}, nil
 }
 
@@ -524,12 +527,17 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		if parseResult.Err != nil {
 			se.AddErrors()
 			se.ErrorDetail = parseResult.Err
+			errData := make(Data)
 			if !p.disableRecordErrData {
-				datas = append(datas, Data{
-					KeyPandoraStash: parseResult.Line,
-				})
-			} else {
+				errData[KeyPandoraStash] = parseResult.Line
+			} else if !p.keepRawData {
 				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
+			}
+			if p.keepRawData {
+				errData[parser.KeyRawData] = parseResult.Line
+			}
+			if !p.disableRecordErrData || p.keepRawData {
+				datas = append(datas, errData)
 			}
 			continue
 		}
@@ -539,6 +547,9 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 			continue
 		}
 		se.AddSuccess()
+		if p.keepRawData {
+			parseResult.Data[parser.KeyRawData] = parseResult.Line
+		}
 		datas = append(datas, parseResult.Data)
 	}
 

@@ -151,13 +151,13 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	case reader.ModeMySQL:
 		readBatch, _ = conf.GetIntOr(reader.KeyMysqlReadBatch, 100)
 		offsetKey, _ = conf.GetStringOr(reader.KeyMysqlOffsetKey, "")
-		dataSource, err = conf.GetString(reader.KeyMysqlDataSource)
+		if logpath == "" {
+			dataSource, err = conf.GetPasswordEnvString(reader.KeyMysqlDataSource)
+		} else {
+			dataSource, err = conf.GetPasswordEnvStringOr(reader.KeyMysqlDataSource, logpath)
+		}
 		if err != nil {
-			dataSource = logpath
-			if logpath == "" {
-				return nil, err
-			}
-			err = nil
+			return nil, err
 		}
 		rawDatabase, _ = conf.GetStringOr(reader.KeyMysqlDataBase, "")
 		rawSQLs, _ = conf.GetStringOr(reader.KeyMysqlSQL, "")
@@ -172,13 +172,13 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	case reader.ModeMSSQL:
 		readBatch, _ = conf.GetIntOr(reader.KeyMssqlReadBatch, 100)
 		offsetKey, _ = conf.GetStringOr(reader.KeyMssqlOffsetKey, "")
-		dataSource, err = conf.GetString(reader.KeyMssqlDataSource)
+		if logpath == "" {
+			dataSource, err = conf.GetPasswordEnvString(reader.KeyMssqlDataSource)
+		} else {
+			dataSource, err = conf.GetPasswordEnvStringOr(reader.KeyMssqlDataSource, logpath)
+		}
 		if err != nil {
-			dataSource = logpath
-			if logpath == "" {
-				return nil, err
-			}
-			err = nil
+			return nil, err
 		}
 		rawDatabase, err = conf.GetString(reader.KeyMssqlDataBase)
 		if err != nil {
@@ -191,13 +191,13 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	case reader.ModePostgreSQL:
 		readBatch, _ = conf.GetIntOr(reader.KeyPGsqlReadBatch, 100)
 		offsetKey, _ = conf.GetStringOr(reader.KeyPGsqlOffsetKey, "")
-		dataSource, err = conf.GetString(reader.KeyPGsqlDataSource)
+		if logpath == "" {
+			dataSource, err = conf.GetPasswordEnvString(reader.KeyPGsqlDataSource)
+		} else {
+			dataSource, err = conf.GetPasswordEnvStringOr(reader.KeyPGsqlDataSource, logpath)
+		}
 		if err != nil {
-			dataSource = logpath
-			if logpath == "" {
-				return nil, err
-			}
-			err = nil
+			return nil, err
 		}
 		sps := strings.Split(dataSource, " ")
 		for _, v := range sps {
@@ -847,16 +847,23 @@ func (r *Reader) getInitScans(length int, rows *sql.Rows, sqltype string) (scanA
 	scanArgs = make([]interface{}, length)
 	for i, v := range tps {
 		nochoiced[i] = false
-		scantype := v.ScanType().Name()
+		scantype := v.ScanType().String()
+		dataBaseType := v.DatabaseTypeName()
 		switch scantype {
 		case "int64", "int32", "int16", "int", "int8":
-			scanArgs[i] = new(int64)
+			scanArgs[i] = new(interface{})
+			if _, ok := r.schemas[v.Name()]; !ok {
+				r.schemas[v.Name()] = "long"
+			}
 		case "float32", "float64":
 			scanArgs[i] = new(float64)
 		case "uint", "uint8", "uint16", "uint32", "uint64":
 			scanArgs[i] = new(uint64)
 		case "bool":
-			scanArgs[i] = new(bool)
+			scanArgs[i] = new(interface{})
+			if _, ok := r.schemas[v.Name()]; !ok {
+				r.schemas[v.Name()] = "bool"
+			}
 		case "[]uint8":
 			scanArgs[i] = new([]byte)
 		case "string", "RawBytes", "time.Time", "NullTime":
@@ -865,19 +872,26 @@ func (r *Reader) getInitScans(length int, rows *sql.Rows, sqltype string) (scanA
 			if _, ok := r.schemas[v.Name()]; !ok {
 				r.schemas[v.Name()] = "string"
 			}
-		case "NullInt64":
+		case "sql.NullInt64":
 			scanArgs[i] = new(interface{})
 			if _, ok := r.schemas[v.Name()]; !ok {
 				r.schemas[v.Name()] = "long"
 			}
-		case "NullFloat64":
+		case "sql.NullFloat64":
 			scanArgs[i] = new(interface{})
 			if _, ok := r.schemas[v.Name()]; !ok {
 				r.schemas[v.Name()] = "float"
 			}
 		default:
 			scanArgs[i] = new(interface{})
-			nochoiced[i] = true
+			//Postgres Float的ScanType为interface,使用dataBaseType进一步判断
+			if strings.Contains(dataBaseType, "FLOAT") {
+				if _, ok := r.schemas[v.Name()]; !ok {
+					r.schemas[v.Name()] = "float"
+				}
+			} else {
+				nochoiced[i] = true
+			}
 		}
 		log.Infof("Runner[%v] %v Init field %v scan type is %v ", r.meta.RunnerName, r.Name(), v.Name(), scantype)
 	}
@@ -1314,12 +1328,39 @@ func convertString(v interface{}) (string, error) {
 		if ret, ok := idv.([]byte); ok {
 			return string(ret), nil
 		}
+		//Postgres的时间类型为time.Time
+		if ret, ok := idv.(time.Time); ok {
+			return ret.Format(time.RFC3339), nil
+		}
 		if idv == nil {
 			return "", nil
 		}
 		log.Errorf("sql reader convertString for type %v is not supported", reflect.TypeOf(idv))
 	}
 	return "", fmt.Errorf("%v type can not convert to string", dv.Kind())
+}
+
+func convertBool(v interface{}) (bool, error) {
+	dpv := reflect.ValueOf(v)
+	if dpv.Kind() != reflect.Ptr {
+		return false, errors.New("scanArgs not a pointer")
+	}
+	if dpv.IsNil() {
+		return false, errors.New("scanArgs is a nil pointer")
+	}
+	dv := reflect.Indirect(dpv)
+	switch dv.Kind() {
+	case reflect.Interface:
+		idv := dv.Interface()
+		if ret, ok := idv.(bool); ok {
+			return bool(ret), nil
+		}
+		if idv == nil {
+			return false, nil
+		}
+		log.Errorf("sql reader convertBool for type %v is not supported", reflect.TypeOf(idv))
+	}
+	return false, fmt.Errorf("%v type can not convert to Bool", dv.Kind())
 }
 
 func (r *Reader) getSQL(idx int, rawSQL string) (sql string, err error) {
@@ -1878,6 +1919,16 @@ func (r *Reader) execReadSql(connectStr, curDB string, idx int, rawSql string, t
 				} else {
 					data[columns[i]] = val
 					bytes = int64(len(val))
+				}
+			case "bool":
+				val, serr := convertBool(scanArgs[i])
+				if serr != nil {
+					serr = fmt.Errorf("runner[%v] %v convertBool for %v (%v) error %v, this key will be ignored", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
+					log.Error(serr)
+					r.sendError(serr)
+				} else {
+					data[columns[i]] = val
+					bytes = 4
 				}
 			default:
 				dealed := false

@@ -104,6 +104,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	labels := parser.GetLabels(labelList, nameMap)
 
 	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
+	keepRawData, _ := c.GetBoolOr(parser.KeyKeepRawData, false)
 
 	format := GetFormt(rfctype)
 	buff := bytes.NewBuffer([]byte{})
@@ -115,6 +116,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		disableRecordErrData: disableRecordErrData,
 		maxline:              maxline,
 		curline:              0,
+		keepRawData:          keepRawData,
 	}, nil
 }
 
@@ -126,6 +128,7 @@ type SyslogParser struct {
 	maxline              int
 	curline              int
 	disableRecordErrData bool
+	keepRawData          bool
 }
 
 func (p *SyslogParser) Name() string {
@@ -152,7 +155,7 @@ func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 			if d != nil {
 				datas = append(datas, d)
 			}
-			if p.disableRecordErrData {
+			if p.disableRecordErrData && !p.keepRawData {
 				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			}
 			continue
@@ -163,6 +166,9 @@ func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 		for _, label := range p.labels {
 			d[label.Name] = label.Value
 		}
+		if p.keepRawData {
+			d[parser.KeyRawData] = line
+		}
 		datas = append(datas, d)
 		se.AddSuccess()
 	}
@@ -170,7 +176,6 @@ func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 }
 
 func (p *SyslogParser) parse(line string) (data Data, err error) {
-	data = Data{}
 	if p.buff.Len() > 0 {
 		if line == parser.PandoraParseFlushSignal {
 			return p.Flush()
@@ -189,13 +194,18 @@ func (p *SyslogParser) parse(line string) (data Data, err error) {
 	if line != parser.PandoraParseFlushSignal {
 		_, err = p.buff.Write([]byte(line))
 		if err != nil {
-			if !p.disableRecordErrData {
-				data = Data{KeyPandoraStash: string(p.buff.Bytes())}
+			if !p.disableRecordErrData || p.keepRawData {
+				data = make(Data)
 			}
-			return data, err
+			if !p.disableRecordErrData {
+				data[KeyPandoraStash] = string(p.buff.Bytes())
+			}
+			if p.keepRawData {
+				data[parser.KeyRawData] = string(p.buff.Bytes())
+			}
 		}
+		return data, err
 	}
-
 	return data, nil
 }
 
@@ -209,8 +219,14 @@ func (p *SyslogParser) Flush() (data Data, err error) {
 		if p.curline == p.maxline {
 			err = fmt.Errorf("syslog meet max line %v, try to parse err %v, check if this is standard rfc3164/rfc5424 syslog", p.maxline, err)
 		}
+		if !p.disableRecordErrData || p.keepRawData {
+			data = make(Data)
+		}
 		if !p.disableRecordErrData {
-			data = Data{KeyPandoraStash: string(p.buff.Bytes())}
+			data[KeyPandoraStash] = string(p.buff.Bytes())
+		}
+		if p.keepRawData {
+			data[parser.KeyRawData] = string(p.buff.Bytes())
 		}
 	}
 	p.curline = 0

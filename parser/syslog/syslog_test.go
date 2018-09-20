@@ -40,6 +40,7 @@ func Test_SyslogParser(t *testing.T) {
 	c := conf.MapConf{}
 	c[parser.KeyParserType] = "syslog"
 	c[parser.KeyLabels] = "machine nb110"
+	c[parser.KeyKeepRawData] = "true"
 	p, err := NewParser(c)
 	lines := []string{
 		`<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47`,
@@ -63,6 +64,10 @@ func Test_SyslogParser(t *testing.T) {
 		`- BOM'su root' failed for lonvick on /dev/pts/8`,
 	}
 	dts, err := p.Parse(lines)
+	indexes := []int{2, 3, 5, 9, 13, 15}
+	for i := range dts {
+		assert.Equal(t, lines[indexes[i]], dts[i][parser.KeyRawData])
+	}
 	if st, ok := err.(*StatsError); ok {
 		err = st.ErrorDetail
 		assert.Equal(t, "", st.LastError, st.LastError)

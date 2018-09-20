@@ -200,19 +200,19 @@ func (s *Sender) sendPoints(ps Points) (err error) {
 	}
 	if err != nil {
 		log.Errorf("Runner[%s] %s request influxdb error: %v", s.runnerName, s.Name(), err)
-		return
+		return err
 	}
 
 	var b []byte
 	if b, err = ioutil.ReadAll(resp.Body); err != nil {
 		log.Errorf("Runner[%s] %s read resp body error: %v", s.runnerName, s.Name(), err)
-		return
+		return err
 	}
 	if resp.StatusCode != 204 {
-		err = fmt.Errorf(strings.Replace(string(b), "\\", "", -1))
-		return
+		return fmt.Errorf(strings.Replace(string(b), "\\", "", -1))
 	}
-	return
+
+	return nil
 }
 
 func (s *Sender) makePoint(d Data) (p Point, err error) {
