@@ -87,17 +87,18 @@ type RunnerConfig struct {
 }
 
 type RunnerInfo struct {
-	RunnerName       string `json:"name"`
-	Note             string `json:"note,omitempty"`
-	CollectInterval  int    `json:"collect_interval,omitempty"` // metric runner收集的频率
-	MaxBatchLen      int    `json:"batch_len,omitempty"`        // 每个read batch的行数
-	MaxBatchSize     int    `json:"batch_size,omitempty"`       // 每个read batch的字节数
-	MaxBatchInterval int    `json:"batch_interval,omitempty"`   // 最大发送时间间隔
-	MaxBatchTryTimes int    `json:"batch_try_times,omitempty"`  // 最大发送次数，小于等于0代表无限重试
-	ErrorsListCap    int    `json:"errors_list_cap"`            // 记录错误信息的最大条数
-	CreateTime       string `json:"createtime"`
-	EnvTag           string `json:"env_tag,omitempty"`
-	ExtraInfo        bool   `json:"extra_info"`
+	RunnerName             string `json:"name"`
+	Note                   string `json:"note,omitempty"`
+	CollectInterval        int    `json:"collect_interval,omitempty"` // metric runner收集的频率
+	MaxBatchLen            int    `json:"batch_len,omitempty"`        // 每个read batch的行数
+	MaxBatchSize           int    `json:"batch_size,omitempty"`       // 每个read batch的字节数
+	MaxBatchInterval       int    `json:"batch_interval,omitempty"`   // 最大发送时间间隔
+	MaxBatchTryTimes       int    `json:"batch_try_times,omitempty"`  // 最大发送次数，小于等于0代表无限重试
+	MaxReaderCloseWaitTime int    `json:"max_reader_close_wait_time,omitempty"` // runner 等待reader close时间，
+	ErrorsListCap          int    `json:"errors_list_cap"` // 记录错误信息的最大条数
+	CreateTime             string `json:"createtime"`
+	EnvTag                 string `json:"env_tag,omitempty"`
+	ExtraInfo              bool   `json:"extra_info"`
 	// 用这个字段的值来获取环境变量, 作为 tag 添加到数据中
 }
 
