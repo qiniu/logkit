@@ -432,6 +432,58 @@ func TestHTTPSenderGzipAndNoCSVHeadWithBodyJSON(t *testing.T) {
 	wg.Wait()
 }
 
+func TestHTTPSenderNoGzipWithRaw(t *testing.T) {
+	testData := []Data{
+		{
+			"raw": "aaaa",
+		},
+		{
+			"raw": "If newbie have bad time,it's a bug on logkit!!!",
+		},
+	}
+	t.Parallel()
+	runnerName := "TestHTTPSenderNoGzipWithRaw"
+	httpReader, err := newHTTPReader(runnerName, "8006")
+	assert.NoError(t, err)
+	defer func() {
+		os.RemoveAll("./meta/" + runnerName)
+		httpReader.Close()
+	}()
+
+	// CI 环境启动监听较慢，需要等待几秒
+	time.Sleep(2 * time.Second)
+
+	// gzip = false, protocol = json
+	httpSender, err := NewSender(conf.MapConf{
+		sender.KeyHttpSenderGzip:     "false",
+		sender.KeyHttpSenderProtocol: "raw",
+		sender.KeyHttpSenderCsvHead:  "false",
+		KeyRunnerName:                runnerName,
+		sender.KeyHttpSenderUrl:      "127.0.0.1:8006/logkit/data",
+	})
+	assert.NoError(t, err)
+
+	var (
+		res string
+		wg  sync.WaitGroup
+	)
+	wg.Add(1)
+	go func(httpReader *http.Reader, val []Data, t *testing.T) {
+		for {
+			got, err := httpReader.ReadLine()
+			assert.NoError(t, err)
+			if got == "" {
+				break
+			}
+			res += got
+		}
+		wg.Done()
+	}(httpReader, testData, t)
+	assert.NoError(t, httpSender.Send(testData))
+	wg.Wait()
+	assert.Equal(t, "aaaaIf newbie have bad time,it's a bug on logkit!!!", res)
+}
+
 func TestGzipData(t *testing.T) {
 	t.Parallel()
 	testData := []string{
