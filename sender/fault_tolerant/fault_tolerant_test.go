@@ -546,9 +546,9 @@ func Test_SplitData(t *testing.T) {
 		}
 		maxData += "abcdefghijklmnopqrstuvwxyz七牛云？？？********0123456789七牛云？？？********abcdefghijklmnopqrstuvwxyz七牛云？？？********0123456789七牛云？？？********"
 	}
-	valArray := sender.SplitData(maxData, int64(sender.DefaultSplitSize))
+	valArray := sender.SplitData(maxData)
 	assert.Equal(t, len(maxData), len(strings.Join(valArray, "")))
-	assert.Equal(t, 24, len(valArray))
+	assert.Equal(t, 2, len(valArray))
 
 	for {
 		if int64(len(maxData)) > 2*DefaultMaxBatchSize {
@@ -557,27 +557,41 @@ func Test_SplitData(t *testing.T) {
 		maxData += "abcdefghijklmnopqrstuvwxyz七牛云？？？********0123456789七牛云？？？********abcdefghijklmnopqrstuvwxyz七牛云？？？********0123456789七牛云？？？********"
 	}
 
-	valArray = sender.SplitData(maxData, int64(sender.DefaultSplitSize))
+	valArray = sender.SplitData(maxData)
 	assert.Equal(t, len(maxData), len(strings.Join(valArray, "")))
-	assert.Equal(t, 47, len(valArray))
+	assert.Equal(t, 3, len(valArray))
+
+	maxData += "\n"
+	for {
+		if int64(len(maxData)) > 3*DefaultMaxBatchSize {
+			break
+		}
+		maxData += "abcdefghijklmnopqrstuvwxyz七牛云？？？********0123456789七牛云？？？********abcdefghijklmnopqrstuvwxyz七牛云？？？********0123456789七牛云？？？********\n"
+	}
+	valArray = sender.SplitData(maxData)
+	assert.Equal(t, 4, len(valArray))
+	assert.Equal(t, 1441792, len(valArray[0]))
+	assert.Equal(t, 1441792, len(valArray[1]))
+	assert.Equal(t, 1310849, len(valArray[2]))
+	assert.Equal(t, 2097096, len(valArray[3]))
 
 	maxData = "abc"
-	valArray = sender.SplitData(maxData, int64(sender.DefaultSplitSize))
+	valArray = sender.SplitData(maxData)
 	assert.Equal(t, len(maxData), len(strings.Join(valArray, "")))
 	assert.Equal(t, 1, len(valArray))
 
 	maxData = ""
-	valArray = sender.SplitData(maxData, int64(sender.DefaultSplitSize))
+	valArray = sender.SplitData(maxData)
 	assert.Equal(t, len(maxData), len(strings.Join(valArray, "")))
 	assert.Equal(t, 0, len(valArray))
 
 	maxData = "abc七牛云？？？cde"
-	valArray = sender.SplitData(maxData, int64(sender.DefaultSplitSize))
+	valArray = sender.SplitData(maxData)
 	assert.Equal(t, len(maxData), len(strings.Join(valArray, "")))
 	assert.Equal(t, 1, len(valArray))
 
 	maxData = "abcde"
-	valArray = sender.SplitData(maxData, int64(len(maxData)))
+	valArray = sender.SplitData(maxData)
 	assert.Equal(t, len(maxData), len(strings.Join(valArray, "")))
 	assert.Equal(t, 1, len(valArray))
 }

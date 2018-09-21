@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -517,28 +518,25 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 			// failCtxData 的 key value 中找到 string 类型的 value 大于 2M，进行切片
 			if len(separateData) != 0 {
 				newFailCtx := new(datasContext)
+				newFailCtx.Datas = append(newFailCtx.Datas, remainData)
 				for separateDataKey, separateDataVal := range separateData {
 					strVal, _ := separateDataVal.(string)
-					valArray := SplitData(strVal, int64(DefaultSplitSize))
-
+					valArray := SplitData(strVal)
 					separateId := reqid.Gen()
 					for idx, val := range valArray {
 						retData := make(Data, 0)
-						for remainDataKey, remainDataVal := range remainData {
-							retData[remainDataKey] = remainDataVal
-						}
 						retData[KeyPandoraSeparateId] = separateId + "_" + separateDataKey + "_" + strconv.Itoa(idx)
 						retData[separateDataKey] = val
 						newFailCtx.Datas = append(newFailCtx.Datas, retData)
 					}
 				}
 				retDatasContext = append(retDatasContext, newFailCtx)
-				return
+				return retDatasContext
 			}
 
 			// failCtxData 的 key value 中未找到 string 类型且大于 2M 的 value
 			// 此时将 failCtxData 进行 Marshal 之后进行切片，放入pandaora_stash中
-			valArray := SplitData(string(dataBytes), int64(DefaultSplitSize))
+			valArray := SplitData(string(dataBytes))
 			newFailCtx := new(datasContext)
 			separateId := reqid.Gen()
 			for idx, val := range valArray {
@@ -549,7 +547,7 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 				newFailCtx.Datas = append(newFailCtx.Datas, data)
 			}
 			retDatasContext = append(retDatasContext, newFailCtx)
-			return
+			return retDatasContext
 		}
 
 		return
@@ -614,10 +612,42 @@ func (ft *FtSender) SkipDeepCopy() bool {
 	return false
 }
 
-func SplitData(data string, splitSize int64) (valArray []string) {
+//优先使用'\n'对数据进行切分，切分后单个分片仍大于batchsize再按指定大小进行切分
+func SplitData(data string) (valArray []string) {
+	start := 0
+	last := 0
+	offset := start
+	for index := 0; index != -1 && index+1 < len(data); {
+		if offset-start < DefaultMaxBatchSize {
+			last = offset
+			index = strings.IndexByte(data[offset:], '\n')
+			offset += index + 1
+			continue
+		}
+		//单个slice大于2M
+		if start == last {
+			valArray = append(valArray, SplitDataWithSplitSize(data[start:offset], DefaultMaxBatchSize)...)
+			start = offset
+			continue
+		}
+		valArray = append(valArray, data[start:last])
+		start = last
+	}
+	if start != last {
+		valArray = append(valArray, data[start:last])
+	}
+	//防止加上最后一个slice后大于2M
+	valArray = append(valArray, SplitDataWithSplitSize(data[last:], DefaultMaxBatchSize)...)
+	return valArray
+}
+
+func SplitDataWithSplitSize(data string, splitSize int64) (valArray []string) {
 	if splitSize <= 0 {
 		return []string{data}
 	}
+
+	//一个中文字符在rune中只占一位，但实际的大小可能是2个byte，对rune的split只有实际传入大小的1/2
+	splitSize /= 2
 
 	valArray = make([]string, 0)
 	dataConverse := []rune(data)
