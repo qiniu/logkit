@@ -14,7 +14,7 @@ func TestErrorQueue(t *testing.T) {
 	assert.True(t, testErrorQueue.Empty())
 
 	testErrorQueue = New(DefaultErrorsListCap)
-	assert.Equal(t, DefaultErrorsListCap, testErrorQueue.maxSize)
+	assert.Equal(t, DefaultErrorsListCap, testErrorQueue.capacity)
 	assert.True(t, testErrorQueue.Empty())
 	assert.Equal(t, 0, testErrorQueue.Size())
 
@@ -23,17 +23,17 @@ func TestErrorQueue(t *testing.T) {
 	assert.Equal(t, 1, testErrorQueue.Size())
 	errorsList := testErrorQueue.List()
 	assert.Equal(t, 1, len(errorsList))
-	assert.Equal(t, int64(1), testErrorQueue.GetFirst().Count)
+	assert.Equal(t, int64(1), testErrorQueue.Front().Count)
 
 	for i := 0; i < 80; i++ {
 		testErrorQueue.Put(ErrorInfo{"test error", 123456, 0})
 	}
 	assert.False(t, testErrorQueue.Empty())
 	assert.Equal(t, 1, testErrorQueue.Size())
-	assert.Equal(t, int64(81), testErrorQueue.GetFirst().Count)
+	assert.Equal(t, int64(81), testErrorQueue.Front().Count)
 	errorsList = testErrorQueue.List()
 	assert.Equal(t, 1, len(errorsList))
-	assert.Equal(t, ErrorInfo{"test error", 123456, 81}, testErrorQueue.GetLast())
+	assert.Equal(t, ErrorInfo{"test error", 123456, 81}, testErrorQueue.End())
 
 	for i := 0; i < 180; i++ {
 		testErrorQueue.Put(ErrorInfo{"test error" + strconv.Itoa(i), 123456, 0})
@@ -43,7 +43,7 @@ func TestErrorQueue(t *testing.T) {
 	errorsList = testErrorQueue.List()
 	assert.Equal(t, DefaultErrorsListCap, len(errorsList))
 	assert.Equal(t, int64(1), testErrorQueue.GetN(1).Count)
-	assert.Equal(t, ErrorInfo{"test error179", 123456, 1}, testErrorQueue.GetLast())
+	assert.Equal(t, ErrorInfo{"test error179", 123456, 1}, testErrorQueue.End())
 
 	expectError := ErrorInfo{
 		Error:     "my test",
@@ -56,7 +56,7 @@ func TestErrorQueue(t *testing.T) {
 	errorsList = testErrorQueue.List()
 	assert.Equal(t, DefaultErrorsListCap, len(errorsList))
 	assert.Equal(t, int64(10), errorsList[DefaultErrorsListCap-1].Count)
-	assert.Equal(t, expectError, testErrorQueue.GetLast())
+	assert.Equal(t, expectError, testErrorQueue.End())
 }
 
 func TestErrRandRead(t *testing.T) {
@@ -187,13 +187,13 @@ func TestGetFirstLast(t *testing.T) {
 		}
 		total += ni
 		q.Append(te)
-		assert.Equal(t, te[ni-1], q.GetLast())
+		assert.Equal(t, te[ni-1], q.End())
 		elist = append(elist, te...)
 		var firstidx int
 		if total >= 50 {
 			firstidx = total - 50
 		}
-		assert.Equal(t, elist[firstidx], q.GetFirst())
+		assert.Equal(t, elist[firstidx], q.Front())
 	}
 	elist = elist[total-maxsize:]
 	assert.Equal(t, elist, q.List())

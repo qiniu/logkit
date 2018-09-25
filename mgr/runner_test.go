@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log/syslog"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -24,11 +26,14 @@ import (
 	"github.com/qiniu/logkit/router"
 	"github.com/qiniu/logkit/sender"
 	_ "github.com/qiniu/logkit/sender/builtin"
+	"github.com/qiniu/logkit/sender/discard"
 	"github.com/qiniu/logkit/sender/mock"
 	"github.com/qiniu/logkit/sender/pandora"
 	"github.com/qiniu/logkit/transforms"
 	_ "github.com/qiniu/logkit/transforms/builtin"
 	"github.com/qiniu/logkit/transforms/ip"
+	"github.com/qiniu/logkit/transforms/mutate"
+	"github.com/qiniu/logkit/utils/equeue"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -2091,5 +2096,135 @@ func Test_removeServerIPSchema(t *testing.T) {
 	for _, test := range tests {
 		res := removeServerIPSchema(test.autoCreate, test.key)
 		assert.Equal(t, test.expect, res)
+	}
+}
+
+//之前：5000	    242788 ns/op	  126474 B/op	     758 allocs/op
+//现在：5000	    266301 ns/op	  145645 B/op	    1572 allocs/op
+// 需要优化
+func BenchmarkStatusRestore(b *testing.B) {
+	logkitConf := conf.MapConf{
+		reader.KeyMetaPath: "testmeta",
+		reader.KeyMode:     reader.ModeMongo,
+	}
+	meta, err := reader.NewMetaWithConf(logkitConf)
+	if err != nil {
+		b.Fatal(err)
+	}
+	r1 := &LogExportRunner{
+		meta: meta,
+		rs: &RunnerStatus{
+			HistoryErrors: &ErrorsList{},
+		},
+		lastRs: &RunnerStatus{
+			HistoryErrors: &ErrorsList{},
+		},
+	}
+	r2 := &LogExportRunner{
+		meta: meta,
+		rs: &RunnerStatus{
+			HistoryErrors: &ErrorsList{},
+		},
+		lastRs: &RunnerStatus{
+			HistoryErrors: &ErrorsList{},
+		},
+	}
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		r1.StatusRestore()
+		r2.StatusRestore()
+	}
+}
+
+func randinsert(l *equeue.ErrorQueue, num int) {
+	for i := 0; i < num; i++ {
+		l.Put(equeue.ErrorInfo{
+			Error: fmt.Sprintf("err %v", rand.Intn(100)),
+			Count: int64(rand.Intn(100) + 1),
+		})
+	}
+}
+
+func TestBackupRestoreHistory(t *testing.T) {
+	logkitConf := conf.MapConf{
+		reader.KeyMetaPath: "meta",
+		reader.KeyMode:     reader.ModeMongo,
+	}
+	meta, err := reader.NewMetaWithConf(logkitConf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll("meta")
+
+	rq := equeue.New(10)
+	randinsert(rq, 12)
+	pq := equeue.New(10)
+	randinsert(pq, 12)
+	tq := equeue.New(10)
+	randinsert(tq, 12)
+	sq := equeue.New(10)
+	randinsert(sq, 12)
+
+	s1, _ := discard.NewSender(conf.MapConf{"name": "s1"})
+	r1 := &LogExportRunner{
+		meta:    meta,
+		rsMutex: new(sync.RWMutex),
+		rs: &RunnerStatus{
+			HistoryErrors: &ErrorsList{
+				ReadErrors:  rq,
+				ParseErrors: pq,
+				TransformErrors: map[string]*equeue.ErrorQueue{
+					"pick-0": tq,
+				},
+				SendErrors: map[string]*equeue.ErrorQueue{
+					"s1": sq,
+				},
+			},
+			TransformStats: map[string]StatsInfo{"pick-0": {Success: 1}},
+			SenderStats:    map[string]StatsInfo{"s1": {Success: 1}},
+		},
+		lastRs: &RunnerStatus{
+			HistoryErrors: &ErrorsList{},
+		},
+		transformers: []transforms.Transformer{&mutate.Pick{}},
+		senders:      []sender.Sender{s1},
+	}
+
+	r1.StatusBackup()
+
+	r2 := &LogExportRunner{
+		meta: meta,
+		rs: &RunnerStatus{
+			HistoryErrors:  &ErrorsList{},
+			TransformStats: map[string]StatsInfo{},
+			SenderStats:    map[string]StatsInfo{},
+		},
+		lastRs: &RunnerStatus{
+			HistoryErrors: &ErrorsList{},
+		},
+		transformers: []transforms.Transformer{&mutate.Pick{}},
+		senders:      []sender.Sender{s1},
+	}
+	r2.StatusRestore()
+
+	//保证restore与前面一致
+	assert.Equal(t, r1.rs.HistoryErrors.ReadErrors.List(), r2.rs.HistoryErrors.ReadErrors.List())
+	assert.Equal(t, r1.rs.HistoryErrors.ParseErrors.List(), r2.rs.HistoryErrors.ParseErrors.List())
+	for k, v := range r1.rs.HistoryErrors.TransformErrors {
+		assert.Equal(t, v.List(), r2.rs.HistoryErrors.TransformErrors[k].List())
+	}
+	for k, v := range r1.rs.HistoryErrors.SendErrors {
+		assert.Equal(t, v.List(), r2.rs.HistoryErrors.SendErrors[k].List())
+	}
+
+	//保证lastRs的clone有效
+	assert.Equal(t, r1.rs.HistoryErrors.ReadErrors.List(), r2.lastRs.HistoryErrors.ReadErrors.List())
+	assert.Equal(t, r1.rs.HistoryErrors.ParseErrors.List(), r2.lastRs.HistoryErrors.ParseErrors.List())
+	for k, v := range r1.rs.HistoryErrors.TransformErrors {
+		assert.Equal(t, v.List(), r2.lastRs.HistoryErrors.TransformErrors[k].List())
+	}
+	for k, v := range r1.rs.HistoryErrors.SendErrors {
+		assert.Equal(t, v.List(), r2.lastRs.HistoryErrors.SendErrors[k].List())
 	}
 }

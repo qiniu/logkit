@@ -44,13 +44,14 @@ const (
 )
 
 type Statistic struct {
-	ReaderCnt       int64                 `json:"reader_count"` // 读取总条数
-	ParserCnt       [2]int64              `json:"parser_connt"` // [解析成功, 解析失败]
-	SenderCnt       map[string][2]int64   `json:"sender_count"` // [发送成功, 发送失败]
-	ReadErrors      ErrorQueue            `json:"read_errors"`
-	ParseErrors     ErrorQueue            `json:"parse_errors"`
-	TransformErrors map[string]ErrorQueue `json:"transform_errors"`
-	SendErrors      map[string]ErrorQueue `json:"send_errors"`
+	ReaderCnt       int64                     `json:"reader_count"`    // 读取总条数
+	ParserCnt       [2]int64                  `json:"parser_connt"`    // [解析成功, 解析失败]
+	SenderCnt       map[string][2]int64       `json:"sender_count"`    // [发送成功, 发送失败]
+	TransCnt        map[string][2]int64       `json:"transform_count"` // [解析成功, 解析失败]
+	ReadErrors      ErrorStatistic            `json:"read_errors"`
+	ParseErrors     ErrorStatistic            `json:"parse_errors"`
+	TransformErrors map[string]ErrorStatistic `json:"transform_errors"`
+	SendErrors      map[string]ErrorStatistic `json:"send_errors"`
 }
 
 type Meta struct {

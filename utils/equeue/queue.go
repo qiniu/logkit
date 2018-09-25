@@ -3,6 +3,7 @@ package equeue
 import (
 	"container/ring"
 	"strings"
+	"time"
 )
 
 const (
@@ -12,10 +13,10 @@ const (
 
 //保证内部成员的数值只能由方法调用而改变，不能直接修改
 type ErrorQueue struct {
-	r       *ring.Ring //永远指向最新(最后)元素
-	l       *ring.Ring //永远指向第早(最前)元素
-	maxSize int
-	curSize int
+	r        *ring.Ring //永远指向最新(最后)元素
+	l        *ring.Ring //永远指向第早(最前)元素
+	capacity int
+	size     int
 }
 
 type ErrorInfo struct {
@@ -24,12 +25,20 @@ type ErrorInfo struct {
 	Count     int64  `json:"count"`
 }
 
-func New(maxSize int) *ErrorQueue {
-	if maxSize <= 0 {
-		maxSize = DefaultErrorsListCap
+func NewError(msg string) ErrorInfo {
+	return ErrorInfo{
+		Error:     msg,
+		Timestamp: time.Now().UnixNano(),
+		Count:     0,
+	}
+}
+
+func New(capacity int) *ErrorQueue {
+	if capacity <= 0 {
+		capacity = DefaultErrorsListCap
 	}
 	return &ErrorQueue{
-		maxSize: maxSize,
+		capacity: capacity,
 	}
 }
 
@@ -44,7 +53,7 @@ func (q *ErrorQueue) Put(e ErrorInfo) {
 	if e.Count <= 0 {
 		e.Count = 1
 	}
-	if q.curSize < q.maxSize {
+	if q.size < q.capacity {
 		n := ring.New(1)
 		n.Value = &e
 		if q.r == nil {
@@ -54,7 +63,7 @@ func (q *ErrorQueue) Put(e ErrorInfo) {
 			q.r.Link(n)
 			q.r = q.r.Next()
 		}
-		q.curSize++
+		q.size++
 	} else {
 		q.r = q.r.Next()
 		q.r.Value = &e
@@ -70,7 +79,7 @@ func (q *ErrorQueue) Append(errors []ErrorInfo) {
 }
 
 // 获取队列中最后一个元素
-func (q *ErrorQueue) GetLast() ErrorInfo {
+func (q *ErrorQueue) End() ErrorInfo {
 	if q.Empty() {
 		return ErrorInfo{}
 	}
@@ -79,7 +88,7 @@ func (q *ErrorQueue) GetLast() ErrorInfo {
 }
 
 // 获取队列中第一个元素
-func (q *ErrorQueue) GetFirst() ErrorInfo {
+func (q *ErrorQueue) Front() ErrorInfo {
 	if q.Empty() {
 		return ErrorInfo{}
 	}
@@ -92,7 +101,7 @@ func (q *ErrorQueue) GetN(n int) ErrorInfo {
 	if q.Empty() {
 		return ErrorInfo{}
 	}
-	n = n % q.curSize
+	n = n % q.size
 	tmp := q.l
 	for i := 1; i < n; i++ {
 		tmp = tmp.Next()
@@ -102,7 +111,7 @@ func (q *ErrorQueue) GetN(n int) ErrorInfo {
 }
 
 func (q *ErrorQueue) Size() int {
-	return q.curSize
+	return q.size
 }
 
 func (q *ErrorQueue) Empty() bool {
@@ -112,7 +121,7 @@ func (q *ErrorQueue) Empty() bool {
 	if q.r == nil {
 		return true
 	}
-	if q.curSize <= 0 {
+	if q.size <= 0 {
 		return true
 	}
 	return false
@@ -124,9 +133,9 @@ func (q *ErrorQueue) List() []ErrorInfo {
 		return nil
 	}
 
-	errorInfoList := make([]ErrorInfo, 0, q.curSize)
+	errorInfoList := make([]ErrorInfo, 0, q.size)
 	tmp := q.l
-	for i := 0; i < q.curSize; i++ {
+	for i := 0; i < q.size; i++ {
 		errorInfoList = append(errorInfoList, *tmp.Value.(*ErrorInfo))
 		tmp = tmp.Next()
 	}
@@ -135,23 +144,23 @@ func (q *ErrorQueue) List() []ErrorInfo {
 
 // 返回队列实际容量
 func (q *ErrorQueue) GetMaxSize() int {
-	return q.maxSize
+	return q.capacity
 }
 
 // 将另一个queue复制到当前queue中
 func (q *ErrorQueue) Clone() *ErrorQueue {
 	if q.Empty() {
 		if q != nil {
-			return New(q.maxSize)
+			return New(q.capacity)
 		}
 		return nil
 	}
-	nq := New(q.maxSize)
-	nq.l = ring.New(q.curSize)
+	nq := New(q.capacity)
+	nq.l = ring.New(q.Size())
 	nq.r = nq.l
-	nq.curSize = q.curSize
+	nq.size = q.size
 	tmp := q.l
-	for i := 0; i < q.curSize; i++ {
+	for i := 0; i < q.size; i++ {
 		e := tmp.Value.(*ErrorInfo)
 		nq.r.Value = &ErrorInfo{
 			Error:     e.Error,
