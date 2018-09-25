@@ -45,6 +45,12 @@ func NewMockPandoraWithPrefix(prefix string) (*mock_pandora, string) {
 	mux.POST(prefix+"/repos/:reponame/data", pandora.PostRepos_Data())
 	mux.GET(prefix+"/repos/:reponame", pandora.GetRepos_())
 
+	mux.GET(prefix+"/ping", pandora.GetPing())
+	mux.POST(prefix+"/stream/:reponame", pandora.PostRepos_())
+	mux.PUT(prefix+"/stream/:reponame", pandora.PutRepos_())
+	mux.POST(prefix+"/stream/:reponame/data", pandora.PostRepos_Data())
+	mux.GET(prefix+"/stream/:reponame", pandora.GetRepos_())
+
 	var port = 9000
 	for {
 		address := ":" + strconv.Itoa(port)
@@ -178,6 +184,13 @@ func (s *mock_pandora) PostRepos_Data() echo.HandlerFunc {
 			c.Response().WriteHeader(http.StatusNotFound)
 
 			return jsoniter.NewEncoder(c.Response()).Encode(map[string]string{"error": "E18125: invalid DataSchema"})
+		}
+
+		if strings.Contains(s.Body, "22222") && strings.Contains(s.Body, "test_pandora_stream_binary_unpack") {
+			c.Response().Header().Set(ContentTypeHeader, ApplicationJson)
+			c.Response().WriteHeader(http.StatusNotFound)
+
+			return jsoniter.NewEncoder(c.Response()).Encode(map[string]string{"error": "E18005: Pandora Entity Too Large"})
 		}
 
 		if strings.Contains(s.Body, "E18110") {
