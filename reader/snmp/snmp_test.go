@@ -231,6 +231,12 @@ func TestGetSNMPConnection_v2(t *testing.T) {
 		"snmp_community": "foo",
 	}
 	ss, err := NewReader(&reader.Meta{RunnerName: "TestGetSNMPConnection_v2"}, c)
+	assert.Error(t, err)
+	c[reader.KeySnmpReaderTables] = `[{"table_oid": "TEST::testTable"}]`
+	ss, err = NewReader(&reader.Meta{RunnerName: "TestGetSNMPConnection_v2"}, c)
+	if err != nil {
+		t.Fatalf("exp no error, but got %v", err)
+	}
 	s := ss.(*Reader)
 	assert.NoError(t, err)
 
@@ -266,6 +272,9 @@ func TestGetSNMPConnection_v3(t *testing.T) {
 		reader.KeySnmpReaderEngineTime:     "2",
 	}
 	ss, err := NewReader(&reader.Meta{RunnerName: "TestGetSNMPConnection_v3"}, c)
+	assert.Error(t, err)
+	c[reader.KeySnmpReaderTables] = `[{"table_oid": "TEST::testTable"}]`
+	ss, err = NewReader(&reader.Meta{RunnerName: "TestGetSNMPConnection_v3"}, c)
 	if err != nil {
 		t.Fatalf("exp no error, but got %v", err)
 	}
@@ -294,6 +303,9 @@ func TestGetSNMPConnection_caching(t *testing.T) {
 		reader.KeySnmpReaderAgents: "1.2.3.4, 1.2.3.5, 1.2.3.5",
 	}
 	ss, err := NewReader(&reader.Meta{RunnerName: "TestGetSNMPConnection_caching"}, c)
+	assert.Error(t, err)
+	c[reader.KeySnmpReaderTables] = `[{"table_oid": "TEST::testTable"}]`
+	ss, err = NewReader(&reader.Meta{RunnerName: "TestGetSNMPConnection_caching"}, c)
 	if err != nil {
 		t.Fatalf("exp no error, but got %v", err)
 	}
