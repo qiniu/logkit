@@ -3,6 +3,7 @@ sudo: true
 go:
   - 1.10.3
 script:
+  - make all
   - make test
 services:
  - mysql

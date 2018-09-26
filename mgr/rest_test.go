@@ -395,7 +395,6 @@ func restGetFailedDataStatusTest(p *testParam) {
 	assert.Equal(t, true, ex)
 	clearGotStatus(&v)
 	v.ReadDataSize = exp[runnerName].ReadDataSize
-	v.HistoryErrors = nil
 	rss[runnerName] = v
 	assert.Equal(t, exp[runnerName], rss[runnerName], out.String())
 }

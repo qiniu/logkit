@@ -29,6 +29,7 @@ import (
 	_ "github.com/qiniu/logkit/sender/builtin"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/transforms/ip"
+	"github.com/qiniu/logkit/utils/equeue"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -78,6 +79,7 @@ type LogExportRunner struct {
 	senders      []sender.Sender
 	router       *router.Router
 	transformers []transforms.Transformer
+	historyError *ErrorsList
 
 	rs      *RunnerStatus
 	lastRs  *RunnerStatus
@@ -140,10 +142,6 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 			lastState:      time.Now(),
 			Name:           info.RunnerName,
 			RunningStatus:  RunnerRunning,
-			HistoryErrors: &ErrorsList{
-				TransformErrors: make(map[string]*ErrorQueue),
-				SendErrors:      make(map[string]*ErrorQueue),
-			},
 		},
 		lastRs: &RunnerStatus{
 			SenderStats:    make(map[string]StatsInfo),
@@ -151,12 +149,9 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 			lastState:      time.Now(),
 			Name:           info.RunnerName,
 			RunningStatus:  RunnerRunning,
-			HistoryErrors: &ErrorsList{
-				TransformErrors: make(map[string]*ErrorQueue),
-				SendErrors:      make(map[string]*ErrorQueue),
-			},
 		},
-		rsMutex: new(sync.RWMutex),
+		historyError: NewErrorsList(),
+		rsMutex:      new(sync.RWMutex),
 	}
 
 	if reader == nil {
@@ -401,13 +396,13 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 		}
 
 		info.LastError = TruncateStrSize(err.Error(), DefaultTruncateMaxSize)
-		if r.rs.HistoryErrors.SendErrors == nil {
-			r.rs.HistoryErrors.SendErrors = make(map[string]*ErrorQueue)
+		if r.historyError.SendErrors == nil {
+			r.historyError.SendErrors = make(map[string]*equeue.ErrorQueue)
 		}
-		if r.rs.HistoryErrors.SendErrors[s.Name()] == nil {
-			r.rs.HistoryErrors.SendErrors[s.Name()] = NewErrorQueue(r.ErrorsListCap)
+		if r.historyError.SendErrors[s.Name()] == nil {
+			r.historyError.SendErrors[s.Name()] = equeue.New(r.ErrorsListCap)
 		}
-		r.rs.HistoryErrors.SendErrors[s.Name()].Put(ErrorInfo{Error: info.LastError, Timestamp: time.Now().UnixNano(), Count: 0})
+		r.historyError.SendErrors[s.Name()].Put(equeue.NewError(info.LastError))
 
 		//FaultTolerant Sender 正常的错误会在backupqueue里面记录，自己重试，此处无需重试
 		if se != nil && se.Ft && se.FtNotRetry {
@@ -487,10 +482,10 @@ func (r *LogExportRunner) readDatas(dr reader.DataReader, dataSourceTag string) 
 	r.rsMutex.Lock()
 	if err != nil {
 		r.rs.ReaderStats.LastError = TruncateStrSize(err.Error(), DefaultTruncateMaxSize)
-		if r.rs.HistoryErrors.ReadErrors == nil {
-			r.rs.HistoryErrors.ReadErrors = NewErrorQueue(r.ErrorsListCap)
+		if r.historyError.ReadErrors == nil {
+			r.historyError.ReadErrors = equeue.New(r.ErrorsListCap)
 		}
-		r.rs.HistoryErrors.ReadErrors.Put(ErrorInfo{Error: r.rs.ReaderStats.LastError, Timestamp: time.Now().UnixNano(), Count: 0})
+		r.historyError.ReadErrors.Put(equeue.NewError(r.rs.ReaderStats.LastError))
 	} else {
 		r.rs.ReaderStats.LastError = ""
 	}
@@ -537,10 +532,10 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 		} else {
 			r.rs.ReaderStats.LastError = TruncateStrSize(err.Error(), DefaultTruncateMaxSize)
 		}
-		if r.rs.HistoryErrors.ReadErrors == nil {
-			r.rs.HistoryErrors.ReadErrors = NewErrorQueue(r.ErrorsListCap)
+		if r.historyError.ReadErrors == nil {
+			r.historyError.ReadErrors = equeue.New(r.ErrorsListCap)
 		}
-		r.rs.HistoryErrors.ReadErrors.Put(ErrorInfo{Error: r.rs.ReaderStats.LastError, Timestamp: time.Now().UnixNano(), Count: 0})
+		r.historyError.ReadErrors.Put(equeue.NewError(r.rs.ReaderStats.LastError))
 	} else {
 		r.rs.ReaderStats.LastError = ""
 	}
@@ -583,10 +578,10 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 	}
 	if err != nil {
 		r.rs.ParserStats.LastError = TruncateStrSize(err.Error(), DefaultTruncateMaxSize)
-		if r.rs.HistoryErrors.ParseErrors == nil {
-			r.rs.HistoryErrors.ParseErrors = NewErrorQueue(r.ErrorsListCap)
+		if r.historyError.ParseErrors == nil {
+			r.historyError.ParseErrors = equeue.New(r.ErrorsListCap)
 		}
-		r.rs.HistoryErrors.ParseErrors.Put(ErrorInfo{Error: r.rs.ParserStats.LastError, Timestamp: time.Now().UnixNano(), Count: 0})
+		r.historyError.ParseErrors.Put(equeue.NewError(r.rs.ParserStats.LastError))
 	}
 	r.rsMutex.Unlock()
 	if err != nil {
@@ -679,7 +674,7 @@ func (r *LogExportRunner) Run() {
 			datas, err = r.transformers[i].Transform(datas)
 			tp := r.transformers[i].Type()
 			r.rsMutex.Lock()
-			tstats, ok := r.rs.TransformStats[tp]
+			tstats, ok := r.rs.TransformStats[formatTransformName(tp, i)]
 			if !ok {
 				tstats = StatsInfo{}
 			}
@@ -699,13 +694,13 @@ func (r *LogExportRunner) Run() {
 					statesTransformer.SetStats(err.Error())
 				}
 				tstats.LastError = TruncateStrSize(err.Error(), DefaultTruncateMaxSize)
-				if r.rs.HistoryErrors.TransformErrors == nil {
-					r.rs.HistoryErrors.TransformErrors = make(map[string]*ErrorQueue)
+				if r.historyError.TransformErrors == nil {
+					r.historyError.TransformErrors = make(map[string]*equeue.ErrorQueue)
 				}
-				if r.rs.HistoryErrors.TransformErrors[tp] == nil {
-					r.rs.HistoryErrors.TransformErrors[tp] = NewErrorQueue(r.ErrorsListCap)
+				if r.historyError.TransformErrors[tp] == nil {
+					r.historyError.TransformErrors[tp] = equeue.New(r.ErrorsListCap)
 				}
-				r.rs.HistoryErrors.TransformErrors[tp].Put(ErrorInfo{Error: tstats.LastError, Timestamp: time.Now().UnixNano(), Count: 0})
+				r.historyError.TransformErrors[tp].Put(equeue.NewError(tstats.LastError))
 			}
 
 			r.rs.TransformStats[tp] = tstats
@@ -943,8 +938,8 @@ func getTrend(old, new float64) string {
 }
 
 func (r *LogExportRunner) GetErrors() ErrorsResult {
-	if r.Status().HistoryErrors != nil {
-		return r.Status().HistoryErrors.Sort()
+	if r.historyError != nil {
+		return r.historyError.List()
 	}
 	return ErrorsResult{}
 }
@@ -995,7 +990,7 @@ func (r *LogExportRunner) getRefreshStatus(elaspedtime float64) RunnerStatus {
 			newtsts.Speed, newtsts.Trend = calcSpeedTrend(StatsInfo{}, newtsts, elaspedtime)
 		}
 		newtsts.LastError = TruncateStrSize(newtsts.LastError, DefaultTruncateMaxSize)
-		r.rs.TransformStats[ttp] = newtsts
+		r.rs.TransformStats[formatTransformName(ttp, i)] = newtsts
 	}
 
 	/*
@@ -1108,6 +1103,36 @@ func (r *LogExportRunner) TokenRefresh(tokens AuthTokens) error {
 	return nil
 }
 
+func restoreErrorStatisic(sts ErrorStatistic) *equeue.ErrorQueue {
+	maxSize := sts.GetMaxSize()
+	q := equeue.New(maxSize)
+	if sts.IsNewVersion() {
+		q.Append(sts.ErrorSlice)
+		return q
+	}
+
+	//对于没有满的情况，即队列没有满的情况，直接从头读到尾
+	if sts.Rear > sts.Front && (sts.Rear+1)%maxSize != sts.Front {
+		for i := sts.Front; i < sts.Rear && i < len(sts.ErrorSlice); i++ {
+			q.Put(sts.ErrorSlice[i])
+		}
+		return q
+	}
+
+	//到这里说明队列已经满了，那么循环队列大小次数，获得所有值
+	idx := sts.Front
+	for i := 0; i < maxSize; i++ {
+		if idx >= len(sts.ErrorSlice) {
+			log.Warnf("statistic restore error, index should never larger than slice capacity")
+			continue
+		}
+		q.Put(sts.ErrorSlice[idx])
+		idx = (idx + 1) % maxSize
+	}
+	return q
+}
+
+// StatusRestore 除了恢复Status的数据之外，还会恢复historyError数据，因为重构前混到一起，导致备份写到同一个statistics.meta文件中
 func (r *LogExportRunner) StatusRestore() {
 	rStat, err := r.meta.ReadStatistic()
 	if err != nil {
@@ -1118,49 +1143,23 @@ func (r *LogExportRunner) StatusRestore() {
 	r.rs.ParserStats.Success = rStat.ParserCnt[0]
 	r.rs.ParserStats.Errors = rStat.ParserCnt[1]
 
-	readMax := rStat.ReadErrors.GetMaxSize()
-	readErrors := rStat.ReadErrors
-	if readMax > 0 && readErrors.Front != readErrors.Rear {
-		if r.rs.HistoryErrors.ReadErrors == nil {
-			r.rs.HistoryErrors.ReadErrors = NewErrorQueue(r.ErrorsListCap)
-		}
-		for idx := readErrors.Front; idx != readErrors.Rear; idx = (idx + 1) % readMax {
-			r.rs.HistoryErrors.ReadErrors.Copy(readErrors.ErrorSlice[idx])
-		}
-	}
+	//恢复Errorlist
+	r.historyError.ReadErrors = restoreErrorStatisic(rStat.ReadErrors)
+	r.historyError.ParseErrors = restoreErrorStatisic(rStat.ParseErrors)
 
-	parseMax := rStat.ParseErrors.GetMaxSize()
-	parseErrors := rStat.ParseErrors
-	if parseMax > 0 && parseErrors.Front != parseErrors.Rear {
-		if r.rs.HistoryErrors.ParseErrors == nil {
-			r.rs.HistoryErrors.ParseErrors = NewErrorQueue(r.ErrorsListCap)
-		}
-		for idx := parseErrors.Front; idx != parseErrors.Rear; idx = (idx + 1) % parseMax {
-			r.rs.HistoryErrors.ParseErrors.Copy(parseErrors.ErrorSlice[idx])
-		}
+	if len(rStat.TransformErrors) > 0 {
+		r.historyError.TransformErrors = make(map[string]*equeue.ErrorQueue)
 	}
-	if len(rStat.TransformErrors) != 0 {
-		for _, t := range r.transformers {
-			transformErrors, exist := rStat.TransformErrors[t.Type()]
-			if !exist {
-				continue
-			}
-
-			transformMax := transformErrors.GetMaxSize()
-			if transformMax > 0 && transformErrors.Front != transformErrors.Rear {
-				if r.rs.HistoryErrors.TransformErrors == nil {
-					r.rs.HistoryErrors.TransformErrors = make(map[string]*ErrorQueue)
-				}
-				if r.rs.HistoryErrors.TransformErrors[t.Type()] == nil {
-					r.rs.HistoryErrors.TransformErrors[t.Type()] = NewErrorQueue(r.ErrorsListCap)
-				}
-				for idx := transformErrors.Front; idx != transformErrors.Rear; idx = (idx + 1) % transformMax {
-					r.rs.HistoryErrors.TransformErrors[t.Type()].Copy(transformErrors.ErrorSlice[idx])
-				}
-			}
+	for idx, t := range r.transformers {
+		transformErrors, exist := rStat.TransformErrors[formatTransformName(t.Type(), idx)]
+		if !exist {
+			continue
 		}
+		r.historyError.TransformErrors[formatTransformName(t.Type(), idx)] = restoreErrorStatisic(transformErrors)
 	}
-
+	if len(rStat.SendErrors) > 0 {
+		r.historyError.SendErrors = make(map[string]*equeue.ErrorQueue)
+	}
 	for _, s := range r.senders {
 		name := s.Name()
 		info, exist := rStat.SenderCnt[name]
@@ -1189,25 +1188,20 @@ func (r *LogExportRunner) StatusRestore() {
 		if !exist {
 			continue
 		}
-
-		sendMax := sendErrors.GetMaxSize()
-		if sendMax > 0 && sendErrors.Front != sendErrors.Rear {
-			if r.rs.HistoryErrors.SendErrors == nil {
-				r.rs.HistoryErrors.SendErrors = make(map[string]*ErrorQueue)
-			}
-			if r.rs.HistoryErrors.SendErrors[name] == nil {
-				r.rs.HistoryErrors.SendErrors[name] = NewErrorQueue(r.ErrorsListCap)
-			}
-			for idx := sendErrors.Front; idx != sendErrors.Rear; idx = (idx + 1) % sendMax {
-				r.rs.HistoryErrors.SendErrors[name].Copy(sendErrors.ErrorSlice[idx])
-			}
-		}
+		r.historyError.SendErrors[name] = restoreErrorStatisic(sendErrors)
 	}
-	*r.lastRs = r.rs.Clone()
+	tmp := r.rs.Clone()
+	r.lastRs = &tmp
+
 	log.Infof("runner %v restore status read count: %v, parse count: %v, send count: %v", r.RunnerName,
 		rStat.ReaderCnt, rStat.ParserCnt, rStat.SenderCnt)
 }
 
+func formatTransformName(tp string, idx int) string {
+	return fmt.Sprintf("%s-%v", tp, idx)
+}
+
+// StatusBackup 除了备份Status的数据之外，还会备份historyError数据，因为重构前混到一起，导致备份写到同一个statistics.meta文件中
 func (r *LogExportRunner) StatusBackup() {
 	status := r.Status()
 	bStart := &reader.Statistic{
@@ -1216,14 +1210,40 @@ func (r *LogExportRunner) StatusBackup() {
 			status.ParserStats.Success,
 			status.ParserStats.Errors,
 		},
+		TransCnt:  map[string][2]int64{},
 		SenderCnt: map[string][2]int64{},
 	}
-	if status.HistoryErrors != nil && status.HistoryErrors.ReadErrors != nil {
-		bStart.ReadErrors = *status.HistoryErrors.ReadErrors
+	if r.historyError.HasReadErr() {
+		bStart.ReadErrors.ErrorSlice = r.historyError.ReadErrors.List()
+		bStart.ReadErrors.MaxSize = r.historyError.ReadErrors.GetMaxSize()
 	}
-	if status.HistoryErrors != nil && status.HistoryErrors.ParseErrors != nil {
-		bStart.ParseErrors = *status.HistoryErrors.ParseErrors
+	if r.historyError.HasParseErr() {
+		bStart.ParseErrors.ErrorSlice = r.historyError.ParseErrors.List()
+		bStart.ParseErrors.MaxSize = r.historyError.ParseErrors.GetMaxSize()
 	}
+
+	for idx, t := range r.transformers {
+		name := formatTransformName(t.Type(), idx)
+		sta := t.Stats()
+		bStart.SenderCnt[name] = [2]int64{
+			sta.Success,
+			sta.Errors,
+		}
+	}
+
+	if r.historyError.HasTransformErr() {
+		bStart.TransformErrors = make(map[string]ErrorStatistic)
+		for name, transformErrors := range r.historyError.TransformErrors {
+			if transformErrors.Empty() {
+				continue
+			}
+			bStart.TransformErrors[name] = ErrorStatistic{
+				ErrorSlice: transformErrors.List(),
+				MaxSize:    transformErrors.GetMaxSize(),
+			}
+		}
+	}
+
 	for _, s := range r.senders {
 		name := s.Name()
 		sStatus, ok := s.(sender.StatsSender)
@@ -1239,37 +1259,19 @@ func (r *LogExportRunner) StatusBackup() {
 			}
 		}
 	}
-
-	if status.HistoryErrors != nil {
-		for transform, transformErrors := range status.HistoryErrors.TransformErrors {
-			if transformErrors != nil {
-				queue := NewErrorQueue(r.ErrorsListCap)
-				queue.CopyQueue(transformErrors)
-				if bStart.TransformErrors == nil {
-					bStart.TransformErrors = make(map[string]ErrorQueue)
-				}
-				bStart.TransformErrors[transform] = ErrorQueue{
-					ErrorSlice: queue.ErrorSlice,
-					Front:      queue.Front,
-					Rear:       queue.Rear,
-				}
+	if r.historyError.HasSendErr() {
+		bStart.SendErrors = make(map[string]ErrorStatistic)
+		for send, sendErrors := range r.historyError.SendErrors {
+			if sendErrors.Empty() {
+				continue
 			}
-		}
-		for send, sendErrors := range status.HistoryErrors.SendErrors {
-			if sendErrors != nil {
-				queue := NewErrorQueue(r.ErrorsListCap)
-				queue.CopyQueue(sendErrors)
-				if bStart.SendErrors == nil {
-					bStart.SendErrors = make(map[string]ErrorQueue)
-				}
-				bStart.SendErrors[send] = ErrorQueue{
-					ErrorSlice: queue.ErrorSlice,
-					Front:      queue.Front,
-					Rear:       queue.Rear,
-				}
+			bStart.SendErrors[send] = ErrorStatistic{
+				ErrorSlice: sendErrors.List(),
+				MaxSize:    sendErrors.GetMaxSize(),
 			}
 		}
 	}
+
 	err := r.meta.WriteStatistic(bStart)
 	if err != nil {
 		log.Warnf("runner %v, backup status failed", r.RunnerName)

@@ -571,20 +571,20 @@ func (m *Manager) Status() (rss map[string]RunnerStatus) {
 	return rss
 }
 
-func (m *Manager) Errors() (rss map[string]ErrorsResult) {
+func (m *Manager) Errors() (es map[string]ErrorsResult) {
 	m.runnerLock.RLock()
 	defer m.runnerLock.RUnlock()
-	rss = make(map[string]ErrorsResult)
+	es = make(map[string]ErrorsResult)
 	for key, conf := range m.runnerConfigs {
 		if r, ex := m.runners[key]; ex {
 			if runnerErr, ok := r.(RunnerErrors); ok {
-				rss[r.Name()] = runnerErr.GetErrors()
+				es[r.Name()] = runnerErr.GetErrors()
 				continue
 			}
 		}
-		rss[conf.RunnerName] = ErrorsResult{}
+		es[conf.RunnerName] = ErrorsResult{}
 	}
-	return rss
+	return es
 }
 
 func (m *Manager) Error(name string) (rss ErrorsResult, err error) {
