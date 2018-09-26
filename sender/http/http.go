@@ -194,11 +194,15 @@ func (h *Sender) sendData(byteData []byte) (err error) {
 	if err != nil {
 		return err
 	}
+	switch h.protocol {
+	case SendProtocolJson, SendProtocolWholeJson:
+		req.Header.Set(ContentTypeHeader, ApplicationJson)
+	case SendProtocolCSV, SendProtocolRaw:
+		req.Header.Set(ContentTypeHeader, TextPlain)
+	default:
+	}
 	if h.gZip {
-		req.Header.Set(ContentTypeHeader, ApplicationGzip)
 		req.Header.Set(ContentEncodingHeader, "gzip")
-	} else {
-		req.Header.Set(ContentTypeHeader, TestPlain)
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
