@@ -124,11 +124,11 @@ func NewReader(meta *reader.Meta, c conf.MapConf) (reader.Reader, error) {
 	}
 	if version == 3 {
 		contextName, _ = c.GetStringOr(reader.KeySnmpReaderContextName, "")
-		secLevel, _ = c.GetStringOr(reader.KeySnmpReaderSecLevel, "noAuthNoPriv")
+		secLevel, _ = c.GetStringOr(reader.KeySnmpReaderSecLevel, reader.SnmpReaderAuthProtocolNoAuthNoPriv)
 		secName, _ = c.GetStringOr(reader.KeySnmpReaderSecName, "user")
-		authProtocol, _ = c.GetStringOr(reader.KeySnmpReaderAuthProtocol, "MD5")
+		authProtocol, _ = c.GetStringOr(reader.KeySnmpReaderAuthProtocol, reader.SnmpReaderAuthProtocolNoAuth)
 		authPassword, _ = c.GetPasswordEnvStringOr(reader.KeySnmpReaderAuthPassword, "")
-		privProtocol, _ = c.GetStringOr(reader.KeySnmpReaderPrivProtocol, "DES")
+		privProtocol, _ = c.GetStringOr(reader.KeySnmpReaderPrivProtocol, reader.SnmpReaderAuthProtocolNoPriv)
 		privPassword, _ = c.GetStringOr(reader.KeySnmpReaderPrivPassword, "mypass")
 		engineID, _ = c.GetString(reader.KeySnmpReaderEngineID)
 		engineBoots, _ = c.GetInt(reader.KeySnmpReaderEngineBoots)
@@ -728,7 +728,7 @@ func (r *Reader) getConnection(idx int) (snmpConnection, error) {
 			sp.AuthenticationProtocol = gosnmp.MD5
 		case "sha":
 			sp.AuthenticationProtocol = gosnmp.SHA
-		case "":
+		case "noauth", "":
 			sp.AuthenticationProtocol = gosnmp.NoAuth
 		default:
 			return nil, fmt.Errorf("invalid authProtocol")
@@ -741,7 +741,7 @@ func (r *Reader) getConnection(idx int) (snmpConnection, error) {
 			sp.PrivacyProtocol = gosnmp.DES
 		case "aes":
 			sp.PrivacyProtocol = gosnmp.AES
-		case "":
+		case "nopriv", "":
 			sp.PrivacyProtocol = gosnmp.NoPriv
 		default:
 			return nil, fmt.Errorf("invalid privProtocol")
