@@ -32,7 +32,7 @@ type RunnerStatus struct {
 	Url              string  `json:"url,omitempty"`
 
 	//仅作为将history error同步上传到服务端时使用
-	HistorySyncErrors ErrorsResult `json:"history_errors"`
+	HistorySyncErrors CompatibleErrorResult `json:"history_errors"`
 }
 
 //Clone 复制出一个完整的RunnerStatus
@@ -114,6 +114,14 @@ type ErrorsResult struct {
 	ParseErrors     []equeue.ErrorInfo            `json:"parse_errors"`
 	TransformErrors map[string][]equeue.ErrorInfo `json:"transform_errors"`
 	SendErrors      map[string][]equeue.ErrorInfo `json:"send_errors"`
+}
+
+//为了兼容之前的消息传递是errorqueue的结构
+type CompatibleErrorResult struct {
+	ReadErrors      *ErrorStatistic            `json:"read_errors"`
+	ParseErrors     *ErrorStatistic            `json:"parse_errors"`
+	TransformErrors map[string]*ErrorStatistic `json:"transform_errors"`
+	SendErrors      map[string]*ErrorStatistic `json:"send_errors"`
 }
 
 func NewErrorsList() *ErrorsList {

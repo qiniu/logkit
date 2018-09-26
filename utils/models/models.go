@@ -130,7 +130,10 @@ type StatsInfo struct {
 
 type ErrorStatistic struct {
 	ErrorSlice []equeue.ErrorInfo `json:"error_slice"`
-	MaxSize    int                `json:"max_size"`
+
+	//对于runnerstatus的CompatibleErrorResult结构体来说，下面的三个都没用，只是为了保证兼容性
+	//服务端用这个结构体也没有用到下面这三个成员
+	MaxSize int `json:"max_size"`
 
 	//以下为v1.0.4及以前版本的结构，为了兼容保留
 	Front int `json:"front"`
