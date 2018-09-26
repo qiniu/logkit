@@ -364,48 +364,15 @@ func (ft *FtSender) trySendBytes(dat []byte, failSleep int, isRetry bool) (backD
 // trySendDatas 尝试发送数据，如果失败，将失败数据加入backup queue，并睡眠指定时间。返回结果为是否正常发送
 func (ft *FtSender) trySendDatas(datas []Data, failSleep int, isRetry bool) (backDataContext []*datasContext, err error) {
 	err = ft.innerSender.Send(datas)
-	defer func() {
-		if err != nil {
-			return
-		}
+	dataLen := int64(0)
+	if datas != nil {
+		dataLen = int64(len(datas))
+	}
 
-		ft.statsMutex.Lock()
-		ft.stats.LastError = ""
-		ft.stats.Success += int64(len(datas))
-		if isRetry {
-			ft.stats.Errors -= int64(len(datas))
-		}
-		ft.statsMutex.Unlock()
-	}()
+	err = ft.handleStat(err, isRetry, dataLen)
 	if err == nil {
 		return nil, nil
 	}
-
-	ft.statsMutex.Lock()
-	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
-		if err == nil {
-			return nil, nil
-		}
-		if isRetry {
-			ft.stats.Errors -= c.Success
-		} else {
-			ft.stats.Errors += c.Errors
-		}
-		ft.stats.Success += c.Success
-	} else {
-		if !isRetry {
-			ft.stats.Errors += int64(len(datas))
-		}
-	}
-
-	se, succ := err.(*reqerr.SendError)
-	if !succ {
-		ft.stats.LastError = err.Error()
-	} else {
-		ft.stats.LastError = se.Error()
-	}
-	ft.statsMutex.Unlock()
 
 	retDatasContext := ft.handleSendError(err, datas)
 	for _, v := range retDatasContext {
@@ -424,6 +391,52 @@ func (ft *FtSender) trySendDatas(datas []Data, failSleep int, isRetry bool) (bac
 	time.Sleep(time.Second * time.Duration(failSleep))
 
 	return backDataContext, err
+}
+
+func (ft *FtSender) handleStat(err error, isRetry bool, dataLen int64) error {
+	ft.statsMutex.Lock()
+	defer ft.statsMutex.Unlock()
+
+	if err == nil {
+		ft.stats.LastError = ""
+		ft.stats.Success += dataLen
+		if isRetry {
+			ft.stats.Errors -= dataLen
+		}
+		return err
+	}
+
+	if c, ok := err.(*StatsError); ok {
+		err = c.ErrorDetail
+		if err == nil {
+			ft.stats.LastError = ""
+			ft.stats.Success += dataLen
+			if isRetry {
+				ft.stats.Errors -= dataLen
+			}
+			log.Warnf("Sender return error, but error detail is nil")
+			return err
+		}
+		if isRetry {
+			ft.stats.Errors -= c.Success
+		} else {
+			ft.stats.Errors += c.Errors
+		}
+		ft.stats.Success += c.Success
+	} else {
+		if !isRetry {
+			ft.stats.Errors += dataLen
+		}
+	}
+
+	se, succ := err.(*reqerr.SendError)
+	if !succ {
+		ft.stats.LastError = err.Error()
+	} else {
+		ft.stats.LastError = se.Error()
+	}
+
+	return err
 }
 
 func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []*datasContext) {
