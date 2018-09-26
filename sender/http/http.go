@@ -18,13 +18,6 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-const (
-	SendProtocolCSV       = "csv"
-	SendProtocolJson      = "json"
-	SendProtocolWholeJson = "body_json"
-	SendProtocolRaw       = "raw"
-)
-
 var _ sender.SkipDeepCopySender = &Sender{}
 
 type Sender struct {
@@ -54,15 +47,15 @@ func NewSender(c conf.MapConf) (sender.Sender, error) {
 	gZip, _ := c.GetBoolOr(sender.KeyHttpSenderGzip, true)
 	csvHead, _ := c.GetBoolOr(sender.KeyHttpSenderCsvHead, true)
 	csvSplit, _ := c.GetStringOr(sender.KeyHttpSenderCsvSplit, "\t")
-	protocol, _ := c.GetStringOr(sender.KeyHttpSenderProtocol, SendProtocolJson)
+	protocol, _ := c.GetStringOr(sender.KeyHttpSenderProtocol, sender.SendProtocolJson)
 	runnerName, _ := c.GetStringOr(KeyRunnerName, sender.UnderfinedRunnerName)
 
 	switch protocol {
-	case SendProtocolCSV:
+	case sender.SendProtocolCSV:
 		if csvSplit == "" {
 			csvSplit = "\t"
 		}
-	case SendProtocolJson, SendProtocolWholeJson, SendProtocolRaw:
+	case sender.SendProtocolJson, sender.SendProtocolWholeJson, sender.SendProtocolRaw:
 	default:
 		return nil, fmt.Errorf("runner[%v] create sender error, protocol %v is not support", runnerName, protocol)
 	}
@@ -85,19 +78,19 @@ func (h *Sender) Name() string {
 func (h *Sender) Send(data []Data) (err error) {
 	var sendBytes []byte
 	switch h.protocol {
-	case SendProtocolJson:
+	case sender.SendProtocolJson:
 		if sendBytes, err = h.convertToJsonBytes(data); err != nil {
 			return err
 		}
-	case SendProtocolCSV:
+	case sender.SendProtocolCSV:
 		if sendBytes, err = h.convertToCsvBytes(data); err != nil {
 			return err
 		}
-	case SendProtocolWholeJson:
+	case sender.SendProtocolWholeJson:
 		if sendBytes, err = jsoniter.Marshal(data); err != nil {
 			return err
 		}
-	case SendProtocolRaw:
+	case sender.SendProtocolRaw:
 		if sendBytes, err = h.convertToRawBytes(data); err != nil {
 			return err
 		}
@@ -120,12 +113,17 @@ func (h *Sender) convertToRawBytes(datas []Data) ([]byte, error) {
 		switch newVal := data["raw"].(type) {
 		case string:
 			buf.WriteString(newVal)
+			if !strings.HasSuffix(newVal, "\n") {
+				buf.WriteString("\n")
+			}
 		case []byte:
 			buf.Write(newVal)
+			if !strings.HasSuffix(string(newVal), "\n") {
+				buf.WriteString("\n")
+			}
 		default:
 			return nil, fmt.Errorf("value[%v] expect as string or []byte,actual get %T", data["raw"], data["raw"])
 		}
-		buf.WriteString("\n")
 	}
 	return buf.Bytes(), nil
 }
@@ -195,9 +193,9 @@ func (h *Sender) sendData(byteData []byte) (err error) {
 		return err
 	}
 	switch h.protocol {
-	case SendProtocolJson, SendProtocolWholeJson:
+	case sender.SendProtocolJson, sender.SendProtocolWholeJson:
 		req.Header.Set(ContentTypeHeader, ApplicationJson)
-	case SendProtocolCSV, SendProtocolRaw:
+	case sender.SendProtocolCSV, sender.SendProtocolRaw:
 		req.Header.Set(ContentTypeHeader, TextPlain)
 	default:
 	}
