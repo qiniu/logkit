@@ -23,14 +23,16 @@ type RunnerStatus struct {
 	TransformStats   map[string]StatsInfo `json:"transformStats"`
 	Error            string               `json:"error,omitempty"`
 	lastState        time.Time
-	ReadSpeedKB      float64     `json:"readspeed_kb"`
-	ReadSpeed        float64     `json:"readspeed"`
-	ReadSpeedTrendKb string      `json:"readspeedtrend_kb"`
-	ReadSpeedTrend   string      `json:"readspeedtrend"`
-	RunningStatus    string      `json:"runningStatus"`
-	Tag              string      `json:"tag,omitempty"`
-	Url              string      `json:"url,omitempty"`
-	HistoryErrors    *ErrorsList `json:"history_errors"`
+	ReadSpeedKB      float64 `json:"readspeed_kb"`
+	ReadSpeed        float64 `json:"readspeed"`
+	ReadSpeedTrendKb string  `json:"readspeedtrend_kb"`
+	ReadSpeedTrend   string  `json:"readspeedtrend"`
+	RunningStatus    string  `json:"runningStatus"`
+	Tag              string  `json:"tag,omitempty"`
+	Url              string  `json:"url,omitempty"`
+
+	//仅作为将history error同步上传到服务端时使用
+	HistorySyncErrors ErrorsResult `json:"history_errors"`
 }
 
 //Clone 复制出一个完整的RunnerStatus
@@ -65,9 +67,6 @@ func (src *RunnerStatus) Clone() RunnerStatus {
 	dst.RunningStatus = src.RunningStatus
 	dst.Tag = src.Tag
 	dst.Url = src.Url
-	if src.HistoryErrors != nil {
-		dst.HistoryErrors = src.HistoryErrors.Clone()
-	}
 	return dst
 }
 

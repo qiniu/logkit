@@ -2112,22 +2112,16 @@ func BenchmarkStatusRestore(b *testing.B) {
 		b.Fatal(err)
 	}
 	r1 := &LogExportRunner{
-		meta: meta,
-		rs: &RunnerStatus{
-			HistoryErrors: &ErrorsList{},
-		},
-		lastRs: &RunnerStatus{
-			HistoryErrors: &ErrorsList{},
-		},
+		meta:         meta,
+		rs:           &RunnerStatus{},
+		lastRs:       &RunnerStatus{},
+		historyError: &ErrorsList{},
 	}
 	r2 := &LogExportRunner{
-		meta: meta,
-		rs: &RunnerStatus{
-			HistoryErrors: &ErrorsList{},
-		},
-		lastRs: &RunnerStatus{
-			HistoryErrors: &ErrorsList{},
-		},
+		meta:         meta,
+		rs:           &RunnerStatus{},
+		lastRs:       &RunnerStatus{},
+		historyError: &ErrorsList{},
 	}
 	b.ReportAllocs()
 
@@ -2171,22 +2165,20 @@ func TestBackupRestoreHistory(t *testing.T) {
 		meta:    meta,
 		rsMutex: new(sync.RWMutex),
 		rs: &RunnerStatus{
-			HistoryErrors: &ErrorsList{
-				ReadErrors:  rq,
-				ParseErrors: pq,
-				TransformErrors: map[string]*equeue.ErrorQueue{
-					"pick-0": tq,
-				},
-				SendErrors: map[string]*equeue.ErrorQueue{
-					"s1": sq,
-				},
-			},
 			TransformStats: map[string]StatsInfo{"pick-0": {Success: 1}},
 			SenderStats:    map[string]StatsInfo{"s1": {Success: 1}},
 		},
-		lastRs: &RunnerStatus{
-			HistoryErrors: &ErrorsList{},
+		historyError: &ErrorsList{
+			ReadErrors:  rq,
+			ParseErrors: pq,
+			TransformErrors: map[string]*equeue.ErrorQueue{
+				"pick-0": tq,
+			},
+			SendErrors: map[string]*equeue.ErrorQueue{
+				"s1": sq,
+			},
 		},
+		lastRs:       &RunnerStatus{},
 		transformers: []transforms.Transformer{&mutate.Pick{}},
 		senders:      []sender.Sender{s1},
 	}
@@ -2196,35 +2188,23 @@ func TestBackupRestoreHistory(t *testing.T) {
 	r2 := &LogExportRunner{
 		meta: meta,
 		rs: &RunnerStatus{
-			HistoryErrors:  &ErrorsList{},
 			TransformStats: map[string]StatsInfo{},
 			SenderStats:    map[string]StatsInfo{},
 		},
-		lastRs: &RunnerStatus{
-			HistoryErrors: &ErrorsList{},
-		},
+		historyError: &ErrorsList{},
+		lastRs:       &RunnerStatus{},
 		transformers: []transforms.Transformer{&mutate.Pick{}},
 		senders:      []sender.Sender{s1},
 	}
 	r2.StatusRestore()
 
 	//保证restore与前面一致
-	assert.Equal(t, r1.rs.HistoryErrors.ReadErrors.List(), r2.rs.HistoryErrors.ReadErrors.List())
-	assert.Equal(t, r1.rs.HistoryErrors.ParseErrors.List(), r2.rs.HistoryErrors.ParseErrors.List())
-	for k, v := range r1.rs.HistoryErrors.TransformErrors {
-		assert.Equal(t, v.List(), r2.rs.HistoryErrors.TransformErrors[k].List())
+	assert.Equal(t, r1.historyError.ReadErrors.List(), r2.historyError.ReadErrors.List())
+	assert.Equal(t, r1.historyError.ParseErrors.List(), r2.historyError.ParseErrors.List())
+	for k, v := range r1.historyError.TransformErrors {
+		assert.Equal(t, v.List(), r2.historyError.TransformErrors[k].List())
 	}
-	for k, v := range r1.rs.HistoryErrors.SendErrors {
-		assert.Equal(t, v.List(), r2.rs.HistoryErrors.SendErrors[k].List())
-	}
-
-	//保证lastRs的clone有效
-	assert.Equal(t, r1.rs.HistoryErrors.ReadErrors.List(), r2.lastRs.HistoryErrors.ReadErrors.List())
-	assert.Equal(t, r1.rs.HistoryErrors.ParseErrors.List(), r2.lastRs.HistoryErrors.ParseErrors.List())
-	for k, v := range r1.rs.HistoryErrors.TransformErrors {
-		assert.Equal(t, v.List(), r2.lastRs.HistoryErrors.TransformErrors[k].List())
-	}
-	for k, v := range r1.rs.HistoryErrors.SendErrors {
-		assert.Equal(t, v.List(), r2.lastRs.HistoryErrors.SendErrors[k].List())
+	for k, v := range r1.historyError.SendErrors {
+		assert.Equal(t, v.List(), r2.historyError.SendErrors[k].List())
 	}
 }

@@ -12,15 +12,6 @@ import (
 func TestRunnerStatusClone(t *testing.T) {
 	// 所有类型的错误都有值
 	{
-		errQueue1 := equeue.New(3)
-		randinsert(errQueue1, 4)
-		errQueue2 := equeue.New(3)
-		randinsert(errQueue2, 4)
-		errQueue3 := equeue.New(3)
-		randinsert(errQueue2, 2)
-		errQueue4 := equeue.New(3)
-		randinsert(errQueue2, 0)
-
 		rs := &RunnerStatus{
 			Name: "nihao",
 			ReaderStats: StatsInfo{
@@ -33,16 +24,6 @@ func TestRunnerStatusClone(t *testing.T) {
 			},
 			TransformStats: map[string]StatsInfo{},
 			Url:            "abc",
-			HistoryErrors: &ErrorsList{
-				ReadErrors:  errQueue1,
-				ParseErrors: errQueue2,
-				TransformErrors: map[string]*equeue.ErrorQueue{
-					"t1": errQueue3,
-				},
-				SendErrors: map[string]*equeue.ErrorQueue{
-					"s1": errQueue4,
-				},
-			},
 		}
 		exp := RunnerStatus{
 			Name: "nihao",
@@ -56,49 +37,18 @@ func TestRunnerStatusClone(t *testing.T) {
 			},
 			TransformStats: map[string]StatsInfo{},
 			Url:            "abc",
-			HistoryErrors: &ErrorsList{
-				ReadErrors:  errQueue1,
-				ParseErrors: errQueue2,
-				TransformErrors: map[string]*equeue.ErrorQueue{
-					"t1": errQueue3,
-				},
-				SendErrors: map[string]*equeue.ErrorQueue{
-					"s1": errQueue4,
-				},
-			},
 		}
 		got := rs.Clone()
-		assert.Equal(t, exp.Name, got.Name)
-		assert.Equal(t, exp.ReaderStats, got.ReaderStats)
-		assert.Equal(t, exp.SenderStats, got.SenderStats)
-		assert.Equal(t, exp.TransformStats, got.TransformStats)
-		assert.Equal(t, exp.Url, got.Url)
-		assert.Equal(t, exp.HistoryErrors.ReadErrors.List(), got.HistoryErrors.ReadErrors.List())
-		assert.Equal(t, exp.HistoryErrors.ParseErrors.List(), got.HistoryErrors.ParseErrors.List())
-		assert.Equal(t, exp.HistoryErrors.TransformErrors["t1"].List(), got.HistoryErrors.TransformErrors["t1"].List())
-		assert.Equal(t, exp.HistoryErrors.SendErrors["s1"].List(), got.HistoryErrors.SendErrors["s1"].List())
+		assert.Equal(t, exp, got)
 
 		rs.ReaderStats.Success = 3
 		rs.SenderStats["hah"] = StatsInfo{Success: 2}
+		assert.Equal(t, exp, got)
 
-		assert.Equal(t, exp.Name, got.Name)
-		assert.Equal(t, exp.ReaderStats, got.ReaderStats)
-		assert.Equal(t, exp.SenderStats, got.SenderStats)
-		assert.Equal(t, exp.TransformStats, got.TransformStats)
-		assert.Equal(t, exp.Url, got.Url)
-		assert.Equal(t, exp.HistoryErrors.ReadErrors.List(), got.HistoryErrors.ReadErrors.List())
-		assert.Equal(t, exp.HistoryErrors.ParseErrors.List(), got.HistoryErrors.ParseErrors.List())
-		assert.Equal(t, exp.HistoryErrors.TransformErrors["t1"].List(), got.HistoryErrors.TransformErrors["t1"].List())
-		assert.Equal(t, exp.HistoryErrors.SendErrors["s1"].List(), got.HistoryErrors.SendErrors["s1"].List())
 	}
 
 	// 部分类型的错误有值
 	{
-		errQueue1 := equeue.New(3)
-		randinsert(errQueue1, 4)
-		errQueue2 := equeue.New(3)
-		randinsert(errQueue2, 4)
-
 		rs := &RunnerStatus{
 			Name: "nihao",
 			ReaderStats: StatsInfo{
@@ -111,12 +61,6 @@ func TestRunnerStatusClone(t *testing.T) {
 			},
 			TransformStats: map[string]StatsInfo{},
 			Url:            "abc",
-			HistoryErrors: &ErrorsList{
-				ParseErrors: errQueue1,
-				SendErrors: map[string]*equeue.ErrorQueue{
-					"s1": errQueue2,
-				},
-			},
 		}
 		exp := RunnerStatus{
 			Name: "nihao",
@@ -130,37 +74,13 @@ func TestRunnerStatusClone(t *testing.T) {
 			},
 			TransformStats: map[string]StatsInfo{},
 			Url:            "abc",
-			HistoryErrors: &ErrorsList{
-				ParseErrors: errQueue1,
-				SendErrors: map[string]*equeue.ErrorQueue{
-					"s1": errQueue2,
-				},
-			},
 		}
 		got := rs.Clone()
-
-		assert.Equal(t, exp.Name, got.Name)
-		assert.Equal(t, exp.ReaderStats, got.ReaderStats)
-		assert.Equal(t, exp.SenderStats, got.SenderStats)
-		assert.Equal(t, exp.TransformStats, got.TransformStats)
-		assert.Equal(t, exp.Url, got.Url)
-		assert.Equal(t, exp.HistoryErrors.ReadErrors.List(), got.HistoryErrors.ReadErrors.List())
-		assert.Equal(t, exp.HistoryErrors.ParseErrors.List(), got.HistoryErrors.ParseErrors.List())
-		assert.Equal(t, exp.HistoryErrors.TransformErrors["t1"].List(), got.HistoryErrors.TransformErrors["t1"].List())
-		assert.Equal(t, exp.HistoryErrors.SendErrors["s1"].List(), got.HistoryErrors.SendErrors["s1"].List())
+		assert.Equal(t, exp, got)
 
 		rs.ReaderStats.Success = 3
 		rs.SenderStats["hah"] = StatsInfo{Success: 2}
-
-		assert.Equal(t, exp.Name, got.Name)
-		assert.Equal(t, exp.ReaderStats, got.ReaderStats)
-		assert.Equal(t, exp.SenderStats, got.SenderStats)
-		assert.Equal(t, exp.TransformStats, got.TransformStats)
-		assert.Equal(t, exp.Url, got.Url)
-		assert.Equal(t, exp.HistoryErrors.ReadErrors.List(), got.HistoryErrors.ReadErrors.List())
-		assert.Equal(t, exp.HistoryErrors.ParseErrors.List(), got.HistoryErrors.ParseErrors.List())
-		assert.Equal(t, exp.HistoryErrors.TransformErrors["t1"].List(), got.HistoryErrors.TransformErrors["t1"].List())
-		assert.Equal(t, exp.HistoryErrors.SendErrors["s1"].List(), got.HistoryErrors.SendErrors["s1"].List())
+		assert.Equal(t, exp, got)
 	}
 }
 
