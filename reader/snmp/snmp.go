@@ -147,6 +147,10 @@ func NewReader(meta *reader.Meta, c conf.MapConf) (reader.Reader, error) {
 		return nil, err
 	}
 
+	if len(tables) == 0 && len(fields) == 0 {
+		return nil, fmt.Errorf("'snmp_tables' and 'snmp_fields' are both empty, must have one of them")
+	}
+
 	for i := range tables {
 		if subErr := tables[i].init(tableHost); subErr != nil {
 			return nil, Errorf(subErr, "initializing table %s", tables[i].Name)
