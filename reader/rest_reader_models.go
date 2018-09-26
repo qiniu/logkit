@@ -102,19 +102,28 @@ const (
 
 	KeySnmpReaderMaxRepetitions = "snmp_max_repetitions"
 
-	KeySnmpReaderContextName  = "snmp_context_name"
-	KeySnmpReaderSecLevel     = "snmp_sec_level"
-	KeySnmpReaderSecName      = "snmp_sec_name"
-	KeySnmpReaderAuthProtocol = "snmp_auth_protocol"
-	KeySnmpReaderAuthPassword = "snmp_auth_password"
-	KeySnmpReaderPrivProtocol = "snmp_priv_protocol"
-	KeySnmpReaderPrivPassword = "snmp_priv_password"
-	KeySnmpReaderEngineID     = "snmp_engine_id"
-	KeySnmpReaderEngineBoots  = "snmp_engine_boots"
-	KeySnmpReaderEngineTime   = "snmp_engine_time"
-	KeySnmpReaderTables       = "snmp_tables"
-	KeySnmpReaderName         = "snmp_reader_name"
-	KeySnmpReaderFields       = "snmp_fields"
+	KeySnmpReaderContextName           = "snmp_context_name"
+	KeySnmpReaderSecLevel              = "snmp_sec_level"
+	KeySnmpReaderSecName               = "snmp_sec_name"
+	KeySnmpReaderAuthProtocol          = "snmp_auth_protocol"
+	KeySnmpReaderAuthPassword          = "snmp_auth_password"
+	KeySnmpReaderPrivProtocol          = "snmp_priv_protocol"
+	KeySnmpReaderPrivPassword          = "snmp_priv_password"
+	KeySnmpReaderEngineID              = "snmp_engine_id"
+	KeySnmpReaderEngineBoots           = "snmp_engine_boots"
+	KeySnmpReaderEngineTime            = "snmp_engine_time"
+	KeySnmpReaderTables                = "snmp_tables"
+	KeySnmpReaderName                  = "snmp_reader_name"
+	KeySnmpReaderFields                = "snmp_fields"
+	SnmpReaderAuthProtocolMd5          = "MD5"
+	SnmpReaderAuthProtocolSha          = "SHA"
+	SnmpReaderAuthProtocolNoAuth       = "NoAuth"
+	SnmpReaderAuthProtocolDes          = "DES"
+	SnmpReaderAuthProtocolAes          = "AES"
+	SnmpReaderAuthProtocolNoPriv       = "NoPriv"
+	SnmpReaderAuthProtocolNoAuthNoPriv = "noAuthNoPriv"
+	SnmpReaderAuthProtocolAuthNoPriv   = "authNoPriv"
+	SnmpReaderAuthProtocolAuthPriv     = "authPriv"
 
 	KeySnmpTableName = "snmp_table"
 	KeyTimestamp     = "timestamp"
@@ -1471,7 +1480,8 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:       KeySnmpReaderSecLevel,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{"noAuthNoPriv", "authNoPriv", "authPriv"},
+			ChooseOptions: []interface{}{SnmpReaderAuthProtocolNoAuthNoPriv, SnmpReaderAuthProtocolAuthNoPriv, SnmpReaderAuthProtocolAuthPriv},
+			Default:       SnmpReaderAuthProtocolNoAuthNoPriv,
 			DefaultNoUse:  true,
 			Description:   "安全等级(snmp_sec_level)",
 			Advance:       true,
@@ -1489,7 +1499,8 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:       KeySnmpReaderAuthProtocol,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{"md5", "sha", ""},
+			ChooseOptions: []interface{}{SnmpReaderAuthProtocolMd5, SnmpReaderAuthProtocolSha, SnmpReaderAuthProtocolNoAuth},
+			Default:       SnmpReaderAuthProtocolNoAuth,
 			DefaultNoUse:  false,
 			Description:   "认证协议(snmp_auth_protocol)",
 			Advance:       true,
@@ -1507,7 +1518,8 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:       KeySnmpReaderPrivProtocol,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{"des", "aes", ""},
+			ChooseOptions: []interface{}{SnmpReaderAuthProtocolDes, SnmpReaderAuthProtocolAes, SnmpReaderAuthProtocolNoPriv},
+			Default:       SnmpReaderAuthProtocolNoPriv,
 			DefaultNoUse:  false,
 			Description:   "隐私协议(snmp_priv_protocol)",
 			Advance:       true,
