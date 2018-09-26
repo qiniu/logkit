@@ -228,3 +228,36 @@ func TestClone(t *testing.T) {
 	nq := q.Clone()
 	assert.Equal(t, nq.List(), q.List())
 }
+
+func TestEqualError(t *testing.T) {
+	testcases := []struct {
+		old string
+		new string
+		exp bool
+	}{
+		{
+			old: "abc",
+			new: "ABC",
+			exp: true,
+		},
+		{
+			old: "abc1",
+			new: "ABC",
+			exp: false,
+		},
+		{
+			old: "xsxs ErrorMessage=E1002:sxs",
+			new: "ErrorMessage=E1002:xsyy",
+			exp: true,
+		},
+		{
+			old: "ErrorMessage=E1002:sxs",
+			new: "ErrorMessage=E1003:xsyy",
+			exp: false,
+		},
+	}
+	for _, tc := range testcases {
+		got := EqualErrors(tc.old, tc.new)
+		assert.Equal(t, tc.exp, got, fmt.Sprintf("case %v", tc))
+	}
+}

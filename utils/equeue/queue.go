@@ -180,17 +180,18 @@ func (q *ErrorQueue) EqualLast(e ErrorInfo) bool {
 	}
 	//永远不会断言失败，因为Put进去的时候就控制了类型
 	lerr := q.r.Value.(*ErrorInfo)
-	lastError := lerr.Error
-	current := e.Error
-	if strings.EqualFold(lastError, current) {
+	return EqualErrors(lerr.Error, e.Error)
+}
+
+func EqualErrors(old, new string) bool {
+	if strings.EqualFold(old, new) {
 		return true
 	}
-
-	lastErrorIdx := strings.Index(lastError, PipeLineError)
-	currentIdx := strings.Index(current, PipeLineError)
+	lastErrorIdx := strings.Index(old, PipeLineError)
+	currentIdx := strings.Index(new, PipeLineError)
 	if lastErrorIdx != -1 && currentIdx != -1 {
-		currentErrArr := strings.SplitN(current[currentIdx:], ":", 2)
-		lastErrorArr := strings.SplitN(lastError[lastErrorIdx:], ":", 2)
+		currentErrArr := strings.SplitN(new[currentIdx:], ":", 2)
+		lastErrorArr := strings.SplitN(old[lastErrorIdx:], ":", 2)
 		if strings.EqualFold(currentErrArr[0], lastErrorArr[0]) {
 			return true
 		}
