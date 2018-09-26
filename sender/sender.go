@@ -163,6 +163,10 @@ const (
 	KeyHttpSenderProtocol = "http_sender_protocol"
 	KeyHttpSenderCsvHead  = "http_sender_csv_head"
 	KeyHttpSenderCsvSplit = "http_sender_csv_split"
+	SendProtocolCSV       = "csv"
+	SendProtocolJson      = "json"
+	SendProtocolWholeJson = "body_json"
+	SendProtocolRaw       = "raw"
 
 	// Influxdb sender 的可配置字段
 	KeyInfluxdbHost                  = "influxdb_host"

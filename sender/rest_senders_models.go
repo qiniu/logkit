@@ -940,7 +940,7 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:       KeyHttpSenderProtocol,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{"json", "csv", "body_json", "raw"},
+			ChooseOptions: []interface{}{SendProtocolJson, SendProtocolCSV, SendProtocolWholeJson, SendProtocolRaw},
 			Default:       "json",
 			Description:   "发送数据时使用的格式(http_sender_protocol)",
 			ToolTip:       `使用raw格式发送时，需使用raw解析方式，发送时将raw字段的值取出作为http body发送`,
