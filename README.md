@@ -5,6 +5,8 @@
 
 ## 在社区版的基础上，我们正式推出了体验更好，功能更全的产品[logkit-pro专业版](https://logkit-pro.qiniu.com/)，欢迎大家体验 [logkit-pro（专业版）](https://developer.qiniu.com/insight/manual/4738/logkit-pro-induction)
 
+## [logkit (社区版)和 logkit-pro (企业版)的对比说明](https://developer.qiniu.com/insight/manual/5156/logkit-community-and-logkit-pro-enterprise-edition-contrast)
+
 ## 简介
 
 logkit-community（社区版）是[七牛智能日志管理平台](https://www.qiniu.com/products/insight)开发的一个配套的日志收集工具，支持海量的数据源，方便地发送到[七牛智能日志管理平台](https://www.qiniu.com/products/insight)以及其他常见的数据存储服务进行分析，同时也，除了基本的数据发送功能，logkit还有容错、并发、监控、删除等功能。
