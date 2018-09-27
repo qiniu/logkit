@@ -174,6 +174,32 @@ func TestPandoraSender(t *testing.T) {
 	exp = "a1=1.1 ab=a ac=0 ax=b d=" + timeexp
 	assert.Equal(t, exp, pandora.Body)
 
+	s.UserSchema = parseUserSchema("TestPandoraSenderRepo", "a-b b-c, a-b-c a1,a-b-c-d,d,e f-d,...")
+	assert.Equal(t, UserSchema{
+		DefaultAll: true,
+		Fields: map[string]string{
+			"a_b":     "b_c",
+			"a_b_c":   "a1",
+			"a_b_c_d": "a_b_c_d",
+			"d":       "d",
+			"e":       "f_d",
+		},
+	}, s.UserSchema)
+	time.Sleep(2 * time.Second)
+	d["a_b"] = "a"
+	d["a_b_c"] = 1.1
+	d["ac"] = 0
+	d["d"] = 1477373632504888
+	d["ax"] = "b"
+	s.opt.updateInterval = 0
+	err = s.Send([]Data{d})
+	if st, ok := err.(*StatsError); ok {
+		err = st.ErrorDetail
+	}
+	if err != nil {
+		t.Error(err)
+	}
+
 }
 
 func TestNestPandoraSender(t *testing.T) {

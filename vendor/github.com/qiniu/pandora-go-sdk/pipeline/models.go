@@ -513,6 +513,8 @@ func toSchema(dsl string, depth int) (schemas []RepoSchemaEntry, err error) {
 					if valueType == "" {
 						valueType = "map"
 					}
+					// 非法字符转换
+					key, _ = PandoraKey(key)
 					schemas = append(schemas, RepoSchemaEntry{
 						Key:       key,
 						ValueType: valueType,
@@ -537,6 +539,8 @@ func toSchema(dsl string, depth int) (schemas []RepoSchemaEntry, err error) {
 						if valueType == "" {
 							valueType = PandoraTypeString
 						}
+						// 非法字符转换
+						key, _ = PandoraKey(key)
 						schemas = append(schemas, RepoSchemaEntry{
 							Key:       key,
 							ValueType: valueType,
@@ -554,6 +558,72 @@ func toSchema(dsl string, depth int) (schemas []RepoSchemaEntry, err error) {
 		return
 	}
 	return
+}
+
+// 判断时只有数字和字母为合法字符，规则：
+// 1. 首字符为数字时，增加首字符 "K"
+// 2. 首字符为非法字符时，去掉首字符（例如，如果字符串全为非法字符，则转换后为空）
+// 3. 非首字符并且为非法字符时，使用 "_" 替代非法字符
+// 返回key，以及原始key是否合法，如果不合法，则后续需要用转换后的key进行替换
+func PandoraKey(key string) (string, bool) {
+	// check
+	valid := true
+	size := 0
+	if key == "" {
+		return "KEmptyPandoraAutoAdd", false
+	}
+
+	for idx, c := range key {
+		if c >= '0' && c <= '9' {
+			size++
+			if idx == 0 {
+				size++
+				valid = false
+			}
+			continue
+		}
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+			size++
+			continue
+		}
+
+		if idx > 0 && size > 0 {
+			size++
+		}
+		valid = false
+	}
+	if valid {
+		return key, true
+	}
+
+	if size <= 0 {
+		return "", false
+	}
+	// set
+	bytes := make([]byte, size)
+	bp := 0
+	for idx, c := range key {
+		if c >= '0' && c <= '9' {
+			if idx == 0 {
+				bytes[bp] = 'K'
+				bp++
+			}
+			bytes[bp] = byte(c)
+			bp++
+			continue
+		}
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+			bytes[bp] = byte(c)
+			bp++
+			continue
+		}
+
+		if bp > 0 {
+			bytes[bp] = '_'
+			bp++
+		}
+	}
+	return string(bytes), valid
 }
 
 func getDepthIndent(depth int, indent string) (ds string) {

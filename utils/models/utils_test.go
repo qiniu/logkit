@@ -723,33 +723,12 @@ func TestPickMapValue(t *testing.T) {
 	assert.NotEqual(t, exp, pick)
 }
 
-func TestPandoraKey(t *testing.T) {
-	testKeys := []string{"", "@timestamp", ".dot", "percent%100", "^^^^^^^^^^", "timestamp"}
-	expectKeys := []string{"KEmptyPandoraAutoAdd", "timestamp", "dot", "percent_100", "", "timestamp"}
-	expectValid := []bool{false, false, false, false, false, true}
-	for idx, key := range testKeys {
-		actual, valid := PandoraKey(key)
-		assert.Equal(t, expectKeys[idx], actual)
-		assert.Equal(t, expectValid[idx], valid)
-	}
-}
-
 func TestCheckPandoraKey(t *testing.T) {
 	testKeys := []string{"@timestamp", ".dot", "percent%100", "^^^^^^^^^^", "timestamp"}
 	expectValid := []bool{false, false, false, false, true}
 	for idx, key := range testKeys {
 		valid := CheckPandoraKey(key)
 		assert.Equal(t, expectValid[idx], valid)
-	}
-}
-
-func BenchmarkPandoraKey(b *testing.B) {
-	b.ReportAllocs()
-	testKeys := []string{"@timestamp", ".dot", "percent%100", "^^^^^^^^^^", "timestamp", "aaa"}
-	for i := 0; i < b.N; i++ {
-		for _, key := range testKeys {
-			PandoraKey(key)
-		}
 	}
 }
 

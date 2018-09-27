@@ -613,6 +613,8 @@ func parseUserSchema(repoName, schema string) (us UserSchema) {
 		if name == "" && alias == "" {
 			continue
 		}
+		name, _ = pipeline.PandoraKey(name)
+		alias, _ = pipeline.PandoraKey(alias)
 		us.Fields[name] = alias
 	}
 	return
