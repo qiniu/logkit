@@ -17,6 +17,7 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base/ratelimit"
+	"github.com/qiniu/pandora-go-sdk/pipeline"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
@@ -488,7 +489,7 @@ func formatKey(metricName string, statistic string) string {
 }
 
 func snakeCase(s string) string {
-	s, _ = PandoraKey(s)
+	s, _ = pipeline.PandoraKey(s)
 	s = strings.Replace(s, "__", "_", -1)
 	return s
 }
