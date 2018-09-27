@@ -23,6 +23,8 @@ var (
 	_ reader.Reader       = &Reader{}
 )
 
+var waitTime = time.Minute
+
 func init() {
 	reader.RegisterConstructor(reader.ModeScript, NewReader)
 }
@@ -94,7 +96,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 				log.Errorf("Runner[%v] %v %v", r.meta.RunnerName, r.Name(), err)
 			}
 			if r.loopDuration.Nanoseconds() <= 0 {
-				r.loopDuration = 1 * time.Second
+				r.loopDuration = time.Second
 			}
 		} else {
 			err = r.Cron.AddFunc(cronSchedule, r.run)
@@ -287,13 +289,13 @@ func checkPath(meta *reader.Meta, path string) (string, error) {
 		realPath, fileInfo, err := GetRealPath(path)
 		if err != nil {
 			log.Warnf("Runner[%v] %s - utils.GetRealPath failed, err:%v", meta.RunnerName, path, err)
-			time.Sleep(1 * time.Minute)
+			time.Sleep(waitTime)
 			continue
 		}
 
 		if fileInfo == nil {
 			log.Warnf("Runner[%v] %s - utils.GetRealPath file info nil ", meta.RunnerName, path)
-			time.Sleep(1 * time.Minute)
+			time.Sleep(waitTime)
 			continue
 		}
 
