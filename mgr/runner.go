@@ -29,6 +29,7 @@ import (
 	_ "github.com/qiniu/logkit/sender/builtin"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/transforms/ip"
+	"github.com/qiniu/logkit/utils"
 	"github.com/qiniu/logkit/utils/equeue"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -748,7 +749,7 @@ func classifySenderData(senders []sender.Sender, datas []Data, router *router.Ro
 		} else {
 			// 数据进行深度拷贝，防止数据污染
 			var copiedDatas []Data
-			deepCopyByJSON(&copiedDatas, &datas)
+			utils.DeepCopyByJSON(&copiedDatas, &datas)
 			senderDataList[i] = copiedDatas
 		}
 	}
@@ -1047,20 +1048,6 @@ func calcSpeedTrend(old, new StatsInfo, elaspedtime float64) (speed float64, tre
 	}
 	trend = getTrend(old.Speed, speed)
 	return
-}
-
-func deepCopyByJSON(dst, src interface{}) {
-	confBytes, err := jsoniter.Marshal(src)
-	if err != nil {
-		log.Errorf("deepCopyByJSON marshal error %v, use same pointer", err)
-		dst = src
-		return
-	}
-	if err = jsoniter.Unmarshal(confBytes, dst); err != nil {
-		log.Errorf("deepCopyByJSON unmarshal error %v, use same pointer", err)
-		dst = src
-		return
-	}
 }
 
 //Compatible 用于新老配置的兼容

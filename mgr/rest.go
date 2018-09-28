@@ -18,6 +18,7 @@ import (
 	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/parser"
+	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
 )
@@ -334,7 +335,7 @@ func (rs *RestService) checkNameAndConfig(c echo.Context) (name string, conf Run
 		err = errors.New("config " + name + " is not found")
 		return
 	}
-	deepCopyByJSON(&conf, &tmpConf)
+	utils.DeepCopyByJSON(&conf, &tmpConf)
 	return
 }
 
