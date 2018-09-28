@@ -165,6 +165,7 @@ const (
 	KeyHttpSenderUrl      = "http_sender_url"
 	KeyHttpSenderGzip     = "http_sender_gzip"
 	KeyHttpSenderProtocol = "http_sender_protocol"
+	KeyHttpTimeout        = "http_sender_timeout"
 	KeyHttpSenderCsvHead  = "http_sender_csv_head"
 	KeyHttpSenderCsvSplit = "http_sender_csv_split"
 	SendProtocolCSV       = "csv"

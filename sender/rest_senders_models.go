@@ -976,6 +976,12 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse:  true,
 			Description:   "是否启用gzip(http_sender_gzip)",
 		},
+		{
+			KeyName:      KeyHttpTimeout,
+			Default:      "30s",
+			DefaultNoUse: false,
+			Description:  "发送超时时间(http_sender_timeout)",
+		},
 		OptionSaveLogPath,
 		OptionFtWriteLimit,
 		OptionFtStrategy,

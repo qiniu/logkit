@@ -3,10 +3,12 @@ package http
 import (
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/json-iterator/go"
 
@@ -27,6 +29,7 @@ type Sender struct {
 	protocol string
 	csvSplit string
 
+	client     *http.Client
 	runnerName string
 }
 
@@ -49,7 +52,11 @@ func NewSender(c conf.MapConf) (sender.Sender, error) {
 	csvSplit, _ := c.GetStringOr(sender.KeyHttpSenderCsvSplit, "\t")
 	protocol, _ := c.GetStringOr(sender.KeyHttpSenderProtocol, sender.SendProtocolJson)
 	runnerName, _ := c.GetStringOr(KeyRunnerName, sender.UnderfinedRunnerName)
-
+	timeout, _ := c.GetStringOr(sender.KeyHttpTimeout, "30s")
+	dur, err := time.ParseDuration(timeout)
+	if err != nil {
+		return nil, errors.New("timeout configure " + timeout + " is invalid")
+	}
 	switch protocol {
 	case sender.SendProtocolCSV:
 		if csvSplit == "" {
@@ -67,6 +74,7 @@ func NewSender(c conf.MapConf) (sender.Sender, error) {
 		protocol:   protocol,
 		csvSplit:   csvSplit,
 		runnerName: runnerName,
+		client:     &http.Client{Timeout: dur},
 	}
 	return httpSender, nil
 }
@@ -202,7 +210,7 @@ func (h *Sender) sendData(byteData []byte) (err error) {
 	if h.gZip {
 		req.Header.Set(ContentEncodingHeader, "gzip")
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := h.client.Do(req)
 	if err != nil {
 		log.Errorf("Runner[%v] Sender[%v] post data error %v\n", h.runnerName, h.Name(), err)
 		return err

@@ -807,7 +807,7 @@ func addTagsToData(tags map[string]interface{}, datas []Data, runnername string)
 // 先停Reader，不再读取，然后停Run函数，让读取的都转到发送，最后停Sender结束整个过程。
 // Parser 无状态，无需stop。
 func (r *LogExportRunner) Stop() {
-	log.Infof("Runner[%v] wait for reader %v stopped", r.Name(), r.reader.Name())
+	log.Infof("Runner[%v] wait for reader %v to stop", r.Name(), r.reader.Name())
 	err := r.reader.Close()
 	if err != nil {
 		log.Errorf("Runner[%v] cannot close reader name: %s, err: %v", r.Name(), r.reader.Name(), err)
@@ -840,7 +840,7 @@ func (r *LogExportRunner) Stop() {
 		}
 	}
 
-	log.Infof("Runner[%v] wait for sender %v stopped", r.Name(), r.reader.Name())
+	log.Infof("Runner[%v] wait for sender %v to stop", r.Name(), r.reader.Name())
 	for _, s := range r.senders {
 		err := s.Close()
 		if err != nil {
@@ -853,6 +853,7 @@ func (r *LogExportRunner) Stop() {
 	if r.cleaner != nil {
 		r.cleaner.Close()
 	}
+	log.Infof("Runner[%v] stopped successfully", r.Name())
 }
 
 func (r *LogExportRunner) Name() string {
