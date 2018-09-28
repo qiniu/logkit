@@ -82,9 +82,13 @@ func (krp *Parser) Parse(lines []string) ([]Data, error) {
 			if !krp.disableRecordErrData || krp.keepRawData {
 				datas = append(datas, errData)
 			}
-			se.ErrorDetail = fmt.Errorf("kafka parser need data fields at least 3,acutal get %v", len(fields))
+			se.LastError = fmt.Sprintf("kafka parser need data fields at least 3, acutal get %d", len(fields))
 			se.AddErrors()
 		}
+	}
+
+	if se.Errors == 0 {
+		return datas, nil
 	}
 	return datas, se
 }

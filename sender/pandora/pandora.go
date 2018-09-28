@@ -898,26 +898,22 @@ func (s *Sender) Send(datas []Data) (se error) {
 func (s *Sender) rawSend(datas []Data) (se error) {
 	for idx, v := range datas {
 		if v["_repo"] == nil || v["_raw"] == nil || v["_ak"] == nil || v["_sk"] == nil {
-			errinfo := "_repo or _raw or _ak or _sk not found"
 			return &StatsError{
-				ErrorDetail: errors.New(errinfo),
 				StatsInfo: StatsInfo{
 					Success:   int64(idx),
 					Errors:    int64(len(datas[idx:]) - idx),
-					LastError: errinfo,
+					LastError: "_repo or _raw or _ak or _sk not found",
 				},
 				RemainDatas: datas[idx:],
 			}
 		}
 		repoName, ok := v["_repo"].(string)
 		if !ok {
-			errinfo := "_repo not string type"
 			return &StatsError{
-				ErrorDetail: errors.New(errinfo),
 				StatsInfo: StatsInfo{
 					Success:   int64(idx),
 					Errors:    int64(len(datas) - idx),
-					LastError: errinfo,
+					LastError: "_repo not string type",
 				},
 				RemainDatas: datas[idx:],
 			}
@@ -926,13 +922,11 @@ func (s *Sender) rawSend(datas []Data) (se error) {
 		if !ok {
 			str, sok := v["_raw"].(string)
 			if !sok {
-				errinfo := "_raw not []byte or string type"
 				return &StatsError{
-					ErrorDetail: errors.New(errinfo),
 					StatsInfo: StatsInfo{
 						Success:   int64(idx),
 						Errors:    int64(len(datas[idx:])),
-						LastError: errinfo,
+						LastError: "_raw not []byte or string type",
 					},
 					RemainDatas: datas[idx:],
 				}
@@ -940,13 +934,11 @@ func (s *Sender) rawSend(datas []Data) (se error) {
 
 			decodeBytes, err := base64.StdEncoding.DecodeString(str)
 			if err != nil {
-				errinfo := "can not unbase 64 raw, err = " + err.Error()
 				return &StatsError{
-					ErrorDetail: errors.New(errinfo),
 					StatsInfo: StatsInfo{
 						Success:   int64(idx),
 						Errors:    int64(len(datas[idx:])),
-						LastError: errinfo,
+						LastError: fmt.Sprintf("can not unbase 64 raw, err: %v", err),
 					},
 					RemainDatas: datas[idx:],
 				}
@@ -955,26 +947,22 @@ func (s *Sender) rawSend(datas []Data) (se error) {
 		}
 		ak, ok := v["_ak"].(string)
 		if !ok {
-			errinfo := "_ak not string type"
 			return &StatsError{
-				ErrorDetail: errors.New(errinfo),
 				StatsInfo: StatsInfo{
 					Success:   int64(idx),
 					Errors:    int64(len(datas[idx:])),
-					LastError: errinfo,
+					LastError: "_ak not string type",
 				},
 				RemainDatas: datas[idx:],
 			}
 		}
 		sk, ok := v["_sk"].(string)
 		if !ok {
-			errinfo := "_sk not string type"
 			return &StatsError{
-				ErrorDetail: errors.New(errinfo),
 				StatsInfo: StatsInfo{
 					Success:   int64(idx),
 					Errors:    int64(len(datas[idx:])),
-					LastError: errinfo,
+					LastError: "_sk not string type",
 				},
 				RemainDatas: datas[idx:],
 			}
@@ -991,13 +979,11 @@ func (s *Sender) rawSend(datas []Data) (se error) {
 			WithHeaderUserAgent(s.opt.useragent).WithInsecureServer(s.opt.insecureServer)
 		client, err := pipeline.New(config)
 		if err != nil {
-			err = fmt.Errorf("cannot init pipelineClient %v", err)
 			return &StatsError{
-				ErrorDetail: err,
 				StatsInfo: StatsInfo{
 					Success:   int64(idx),
 					Errors:    int64(len(datas[idx:]) - idx),
-					LastError: err.Error(),
+					LastError: fmt.Sprintf("cannot init pipelineClient %v", err),
 				},
 				RemainDatas: datas[idx:],
 			}
@@ -1005,8 +991,18 @@ func (s *Sender) rawSend(datas []Data) (se error) {
 
 		err = client.PostDataFromBytes(&pipeline.PostDataFromBytesInput{RepoName: repoName, Buffer: raw})
 		if err != nil {
+			if nse, ok := se.(*reqerr.SendError); ok {
+				return &StatsError{
+					StatsInfo: StatsInfo{
+						Errors:    int64(len(nse.GetFailDatas())),
+						Success:   int64(len(datas) - len(nse.GetFailDatas())),
+						LastError: nse.Error(),
+					},
+					SendError: nse,
+				}
+			}
+
 			return &StatsError{
-				ErrorDetail: err,
 				StatsInfo: StatsInfo{
 					Success:   int64(idx),
 					Errors:    int64(len(datas) - idx),
@@ -1016,12 +1012,7 @@ func (s *Sender) rawSend(datas []Data) (se error) {
 			}
 		}
 	}
-	return &StatsError{
-		StatsInfo: StatsInfo{
-			Success: int64(len(datas)),
-			Errors:  0,
-		},
-	}
+	return nil
 }
 
 func (s *Sender) schemaFreeSend(datas []Data) (se error) {
@@ -1033,7 +1024,7 @@ func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 				Errors:    int64(len(datas)),
 				LastError: "Get pandora schema error or repo not exist",
 			},
-			ErrorDetail: reqerr.NewSendError(
+			SendError: reqerr.NewSendError(
 				"Get pandora schema error, failed to send data",
 				sender.ConvertDatasBack(datas),
 				reqerr.TypeDefault,
@@ -1129,7 +1120,7 @@ func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 					Success:   int64(len(datas) - len(nse.GetFailDatas())),
 					LastError: nse.Error(),
 				},
-				ErrorDetail: se,
+				SendError: nse,
 			}
 		}
 
@@ -1138,7 +1129,6 @@ func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 				Errors:    int64(len(datas)),
 				LastError: se.Error(),
 			},
-			ErrorDetail: se,
 		}
 	}
 	// 发送失败时无需更新 schema，更新 schema 的操作在 checkSchemaUpdate 中进行

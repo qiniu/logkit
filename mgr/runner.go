@@ -380,19 +380,19 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 
 		se, ok := err.(*StatsError)
 		if ok {
-			// se.ErrorDetail == nil 为了兼容，一般情况下不应该出现se.ErrorDetail == nil
-			if se.Errors == 0 || se.ErrorDetail == nil {
+			if se.Errors == 0 {
 				successDatasLen += int64(len(datas))
 				break
 			}
-			err = se.ErrorDetail
+
 			if se.Ft {
 				r.rsMutex.Lock()
 				r.rs.Lag.Ftlags = se.FtQueueLag
 				r.rsMutex.Unlock()
 			}
-			if sendErrors, ok := err.(*reqerr.SendError); ok {
-				successDatasLen += int64(len(datas) - len(sendErrors.GetFailDatas()))
+			if se.SendError != nil {
+				successDatasLen += int64(len(datas) - len(se.SendError.GetFailDatas()))
+				err = se.SendError
 			}
 		}
 
@@ -568,14 +568,14 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 	r.rsMutex.Lock()
 	if ok {
 		numErrs = se.Errors
-		err = se.ErrorDetail
+		err = errors.New(se.LastError)
 		r.rs.ParserStats.Errors += se.Errors
 		r.rs.ParserStats.Success += se.Success
 	} else if err != nil {
 		numErrs = 1
 		r.rs.ParserStats.Errors++
 	} else {
-		r.rs.ParserStats.Success++
+		r.rs.ParserStats.Success += int64(len(lines))
 	}
 	if err != nil {
 		r.rs.ParserStats.LastError = TruncateStrSize(err.Error(), DefaultTruncateMaxSize)
@@ -681,7 +681,7 @@ func (r *LogExportRunner) Run() {
 			}
 			se, ok := err.(*StatsError)
 			if ok {
-				err = se.ErrorDetail
+				err = errors.New(se.LastError)
 				tstats.Errors += se.Errors
 				tstats.Success += se.Success
 			} else if err != nil {

@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/log"
-	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 
 	"github.com/qiniu/logkit/conf"
@@ -60,9 +59,9 @@ func TestFtSender(t *testing.T) {
 	err = fts.Send(datas)
 	se, ok := err.(*StatsError)
 	if !ok {
-		t.Fatal("ft send return error should .(*SendError)")
+		t.Fatal("ft send return error should .(*StatsError)")
 	}
-	assert.NoError(t, se.ErrorDetail)
+	assert.Nil(t, se.SendError)
 	time.Sleep(5 * time.Second)
 	if fts.BackupQueue.Depth() != 1 {
 		t.Error("Ft send error exp 1 but got ", fts.BackupQueue.Depth())
@@ -73,7 +72,7 @@ func TestFtSender(t *testing.T) {
 	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyAlwaysSave
 	fts2, err := sender.NewFtSender(s, mp, ftTestDir2)
 	defer os.RemoveAll(ftTestDir2)
-	assert.NoError(t, err)
+	assert.Nil(t, err)
 	var maxData string
 	for {
 		if int64(len(maxData)) > 2*DefaultMaxBatchSize {
@@ -87,9 +86,9 @@ func TestFtSender(t *testing.T) {
 	err = fts2.Send(datas2)
 	se, ok = err.(*StatsError)
 	if !ok {
-		t.Fatal("ft send return error should .(*SendError)")
+		t.Fatal("ft send return error should .(*StatsError)")
 	}
-	assert.NoError(t, se.ErrorDetail)
+	assert.Nil(t, se.SendError)
 	time.Sleep(5 * time.Second)
 	if fts2.BackupQueue.Depth() != 0 {
 		t.Error("Ft send error exp 0 but got ", fts2.BackupQueue.Depth())
@@ -107,9 +106,9 @@ func TestFtSender(t *testing.T) {
 	err = fts3.Send(datas3)
 	se, ok = err.(*StatsError)
 	if !ok {
-		t.Fatal("ft send return error should .(*SendError)")
+		t.Fatal("ft send return error should .(*StatsError)")
 	}
-	assert.NoError(t, se.ErrorDetail)
+	assert.Nil(t, se.SendError)
 	time.Sleep(5 * time.Second)
 	if fts3.BackupQueue.Depth() != 0 {
 		t.Error("Ft send error exp 0 but got ", fts3.BackupQueue.Depth())
@@ -153,9 +152,10 @@ func TestFtDiscardLast(t *testing.T) {
 	err = fts.Send(datas)
 	se, ok := err.(*StatsError)
 	if !ok {
-		t.Fatal("ft send return error should .(*SendError)")
+		t.Fatal("ft send return error should .(*StatsError)")
 	}
-	assert.Error(t, se.ErrorDetail)
+	assert.NotEmpty(t, se.LastError)
+	assert.NotNil(t, se.SendError)
 	time.Sleep(5 * time.Second)
 	//get three records
 	p.SetMux.Lock()
@@ -170,9 +170,10 @@ func TestFtDiscardLast(t *testing.T) {
 	err = fts2.Send(datas)
 	se, ok = err.(*StatsError)
 	if !ok {
-		t.Fatal("ft send return error should .(*SendError)")
+		t.Fatal("ft send return error should .(*StatsError)")
 	}
-	assert.Error(t, se.ErrorDetail)
+	assert.NotEmpty(t, se.LastError)
+	assert.NotNil(t, se.SendError)
 	time.Sleep(5 * time.Second)
 	//get four records
 	p.SetMux.Lock()
@@ -222,7 +223,7 @@ func TestFtMemorySender(t *testing.T) {
 	if !ok {
 		t.Fatal("ft send return error should .(*StatsError)")
 	}
-	assert.NoError(t, se.ErrorDetail)
+	assert.Nil(t, se.SendError)
 	time.Sleep(10 * time.Second)
 	if fts.BackupQueue.Depth() != 1 {
 		t.Error("Ft send error exp 1 but got", fts.BackupQueue.Depth())
@@ -269,7 +270,7 @@ func TestFtMemoryEmptySender(t *testing.T) {
 	if !ok {
 		t.Fatal("ft send return error should .(*StatsError)")
 	}
-	assert.NoError(t, se.ErrorDetail)
+	assert.Nil(t, se.SendError)
 	time.Sleep(10 * time.Second)
 	assert.Zero(t, fts.BackupQueue.Depth())
 }
@@ -322,16 +323,14 @@ func TestFtChannelFullSender(t *testing.T) {
 		if !ok {
 			t.Fatal("ft send return error should .(*StatsError)")
 		}
-		if se.ErrorDetail != nil {
-			sx, succ := se.ErrorDetail.(*reqerr.SendError)
-			if succ {
-				datas := sender.ConvertDatas(sx.GetFailDatas())
-				moreDatas = append(moreDatas, datas)
-			} else {
-				t.Fatal("ft send StatsError error should contains send error", se.ErrorDetail)
-			}
+
+		if se.SendError != nil {
+			moreDatas = append(moreDatas, sender.ConvertDatas(se.SendError.GetFailDatas()))
 		}
+
 	}
+	assert.NotEmpty(t, fts.Stats().LastError)
+
 	mockP.SetMux.Lock()
 	mockP.PostSleep = 0
 	mockP.SetMux.Unlock()
@@ -341,16 +340,10 @@ func TestFtChannelFullSender(t *testing.T) {
 			err = fts.Send(v)
 			se, ok := err.(*StatsError)
 			if !ok {
-				t.Fatal("ft send return error should .(*SendError)")
+				t.Fatal("ft send return error should .(*StatsError)")
 			}
-			if se.ErrorDetail != nil {
-				sx, succ := se.ErrorDetail.(*reqerr.SendError)
-				if succ {
-					datas := sender.ConvertDatas(sx.GetFailDatas())
-					moreAndMoreDatas = append(moreAndMoreDatas, datas)
-				} else {
-					t.Fatal("ft send StatsError error should contains send error", se.ErrorDetail)
-				}
+			if se.SendError != nil {
+				moreAndMoreDatas = append(moreAndMoreDatas, sender.ConvertDatas(se.SendError.GetFailDatas()))
 			}
 		}
 		moreDatas = moreAndMoreDatas
@@ -386,9 +379,9 @@ func TestFtSenderConcurrent(t *testing.T) {
 		err = fts.Send(datas)
 		se, ok := err.(*StatsError)
 		if !ok {
-			t.Fatal("ft send return error should .(*SendError)")
+			t.Fatal("ft send return error should .(*StatsError)")
 		}
-		assert.NoError(t, se.ErrorDetail)
+		assert.Nil(t, se.SendError)
 	}
 	fts.Close()
 	ms := s.(*mock.Sender)
@@ -440,7 +433,7 @@ func ftSenderConcurrent(b *testing.B, c conf.MapConf) {
 		for {
 			err = fts.Send(datas)
 			se, _ := err.(*StatsError)
-			if se.ErrorDetail == nil {
+			if se.SendError == nil {
 				break
 			}
 		}
@@ -525,13 +518,11 @@ func TestFtSenderConvertData(t *testing.T) {
 		if !ok {
 			t.Fatal("ft send return error should .(*StatsError)")
 		}
-		if se.ErrorDetail != nil {
-			sx, succ := se.ErrorDetail.(*reqerr.SendError)
-			if succ {
-				datas := sender.ConvertDatas(sx.GetFailDatas())
-				moreDatas = append(moreDatas, datas)
-			} else if !(se.Ft && se.FtNotRetry) {
-				t.Fatal("ft send StatsError error should contains send error", se.ErrorDetail)
+		if se.SendError != nil {
+			datas := sender.ConvertDatas(se.SendError.GetFailDatas())
+			moreDatas = append(moreDatas, datas)
+			if !(se.Ft && se.FtNotRetry) {
+				t.Fatal("ft send StatsError error should contains send error", se.SendError)
 			}
 		}
 		<-exitChan
@@ -697,7 +688,7 @@ func TestPandoraExtraInfo(t *testing.T) {
 	d["osinfo"] = "123.2"
 	err = s.Send([]Data{d})
 	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
+		err = st.SendError
 	}
 	if err != nil {
 		t.Error(err)
@@ -744,7 +735,7 @@ func TestPandoraExtraInfo(t *testing.T) {
 	}
 	err = s.Send([]Data{d})
 	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
+		err = st.SendError
 	}
 	if err != nil {
 		t.Error(err)

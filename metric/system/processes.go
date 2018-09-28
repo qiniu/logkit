@@ -2,6 +2,7 @@ package system
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -88,7 +89,7 @@ func (p *Processes) Collect() (datas []map[string]interface{}, err error) {
 	// Collect windows process info
 	if runtime.GOOS == "windows" {
 		if err := p.getWinStat(fields); err != nil {
-			return nil, fmt.Errorf("collect windows processes error: %v", err.Error())
+			return nil, errors.New("collect windows processes error: " + err.Error())
 		}
 		return append(datas, fields), nil
 	}

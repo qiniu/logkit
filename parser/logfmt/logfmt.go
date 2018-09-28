@@ -18,14 +18,12 @@ func init() {
 	parser.RegisterConstructor(parser.TypeLogfmt, NewParser)
 }
 
-// Parser decodes logfmt formatted messages into metrics.
 type Parser struct {
 	name                 string
 	disableRecordErrData bool
 	numRoutine           int
 }
 
-// NewParser creates a parser.
 func NewParser(c conf.MapConf) (parser.Parser, error) {
 	name, _ := c.GetStringOr(parser.KeyParserName, "")
 	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
@@ -86,7 +84,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 
 		if parseResult.Err != nil {
 			se.AddErrors()
-			se.ErrorDetail = parseResult.Err
+			se.LastError = parseResult.Err.Error()
 			if !p.disableRecordErrData {
 				datas = append(datas, Data{
 					KeyPandoraStash: parseResult.Line,
@@ -97,7 +95,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 			continue
 		}
 		if len(parseResult.Datas) == 0 { //数据为空时不发送
-			se.ErrorDetail = fmt.Errorf("parsed no data by line [%v]", parseResult.Line)
+			se.LastError = fmt.Sprintf("parsed no data by line [%s]", parseResult.Line)
 			se.AddErrors()
 			continue
 		}
@@ -106,10 +104,12 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		datas = append(datas, parseResult.Datas...)
 	}
 
+	if se.Errors == 0 {
+		return datas, nil
+	}
 	return datas, se
 }
 
-// Parse converts a slice of line in logfmt format to metrics.
 func (p *Parser) parse(line string) ([]Data, error) {
 	reader := bytes.NewReader([]byte(line))
 	decoder := logfmt.NewDecoder(reader)

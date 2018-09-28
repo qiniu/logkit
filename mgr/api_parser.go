@@ -1,6 +1,7 @@
 package mgr
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -34,7 +35,7 @@ func (rs *RestService) PostParse() echo.HandlerFunc {
 		parseData, err := ParseData(parserConfig)
 		se, ok := err.(*StatsError)
 		if ok {
-			err = se.ErrorDetail
+			err = errors.New(se.LastError)
 		}
 		if err != nil {
 			errMsg := fmt.Sprintf("parser error %v", err)

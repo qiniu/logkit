@@ -2,6 +2,7 @@ package csv
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -63,7 +64,7 @@ func Test_Parser(t *testing.T) {
 	}
 	datas, err := p.Parse(lines)
 	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
+		err = errors.New(c.LastError)
 	}
 	assert.Error(t, err)
 
@@ -114,7 +115,7 @@ func Test_CsvParserForErrData(t *testing.T) {
 	}
 	datas, err := p.Parse(lines)
 	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
+		err = errors.New(c.LastError)
 	}
 	assert.Error(t, err)
 
@@ -157,7 +158,7 @@ func Test_CsvParserKeepRawData(t *testing.T) {
 	}
 	datas, err := p.Parse(lines)
 	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
+		err = errors.New(c.LastError)
 	}
 	assert.NoError(t, err)
 	assert.Equal(t, []Data{
@@ -204,7 +205,7 @@ func Test_Jsonmap(t *testing.T) {
 	}
 	datas, err := p.Parse(lines)
 	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
+		err = errors.New(c.LastError)
 	}
 	if err != nil {
 		t.Error(err)
@@ -242,7 +243,7 @@ func Test_CsvParserLabel(t *testing.T) {
 	}
 	datas, err := p.Parse(lines)
 	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
+		err = errors.New(c.LastError)
 	}
 	assert.Error(t, err)
 	if len(datas) != 3 {
@@ -343,7 +344,7 @@ func TestRename(t *testing.T) {
 	}
 	gotDatas, err := p.Parse(lines)
 	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
+		err = errors.New(c.LastError)
 	}
 	assert.NoError(t, err)
 	expDatas := []Data{
@@ -386,7 +387,7 @@ func TestRename(t *testing.T) {
 	assert.NoError(t, err)
 	gotDatas, err = p.Parse(lines)
 	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
+		err = errors.New(c.LastError)
 	}
 	assert.NoError(t, err)
 	expDatas = []Data{
@@ -454,14 +455,14 @@ func TestAllMoreName(t *testing.T) {
 	assert.NoError(t, err)
 	datas, err := pp.Parse([]string{"a|b|c|d"})
 	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
+		err = errors.New(c.LastError)
 	}
 	assert.NoError(t, err)
 	assert.Equal(t, []Data{{"ha0": "b", "logType": "a", "ha1": "c", "ha2": "d"}}, datas)
 
 	datas, err = pp.Parse([]string{"a"})
 	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
+		err = errors.New(c.LastError)
 	}
 	assert.NoError(t, err)
 	assert.Equal(t, []Data{{"logType": "a"}}, datas)
@@ -478,28 +479,28 @@ func TestAllowLess(t *testing.T) {
 	assert.NoError(t, err)
 	datas, err := pp.Parse([]string{"a|1|1.2|d"})
 	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
+		err = errors.New(c.LastError)
 	}
 	assert.NoError(t, err)
 	assert.Equal(t, []Data{{"a": int64(1), "logType": "a", "b": 1.2, "c": "d"}}, datas)
 
 	datas, err = pp.Parse([]string{"a|1|1.2|d|xx|yy"})
 	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
+		err = errors.New(c.LastError)
 	}
 	assert.NoError(t, err)
 	assert.Equal(t, []Data{{"a": int64(1), "logType": "a", "b": 1.2, "c": "d", "ha0": "xx", "ha1": "yy"}}, datas)
 
 	datas, err = pp.Parse([]string{"a|1"})
 	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
+		err = errors.New(c.LastError)
 	}
 	assert.NoError(t, err)
 	assert.Equal(t, []Data{{"a": int64(1), "logType": "a"}}, datas)
 
 	datas, err = pp.Parse([]string{"a|1.2|1.2|d"})
 	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
+		err = errors.New(c.LastError)
 	}
 	assert.Error(t, err)
 }
@@ -516,14 +517,14 @@ func TestIgnoreField(t *testing.T) {
 	assert.NoError(t, err)
 	datas, err := pp.Parse([]string{"a|1.2|1.2|d"})
 	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
+		err = errors.New(c.LastError)
 	}
 	assert.NoError(t, err)
 	assert.Equal(t, []Data{{"logType": "a", "b": 1.2, "c": "d"}}, datas)
 
 	datas, err = pp.Parse([]string{"a|1.2|1.2|d|xx"})
 	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
+		err = errors.New(c.LastError)
 	}
 	assert.Error(t, err)
 }
@@ -539,14 +540,14 @@ func TestAllowNotMatch(t *testing.T) {
 	assert.NoError(t, err)
 	datas, err := pp.Parse([]string{"a|1|1.2|d|e"})
 	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
+		err = errors.New(c.LastError)
 	}
 	assert.NoError(t, err)
 	assert.Equal(t, []Data{{"logType": "a", "a": int64(1), "b": 1.2, "c": "d"}}, datas)
 
 	datas, err = pp.Parse([]string{"a|1|1.2"})
 	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
+		err = errors.New(c.LastError)
 	}
 	assert.NoError(t, err)
 	assert.Equal(t, []Data{{"logType": "a", "a": int64(1), "b": 1.2}}, datas)
@@ -562,7 +563,7 @@ func TestCsvlastempty(t *testing.T) {
 	assert.NoError(t, err)
 	datas, err := pp.Parse([]string{"a\t1\t1.2\t "})
 	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
+		err = errors.New(c.LastError)
 	}
 	assert.NoError(t, err)
 	assert.Equal(t, []Data{{"logType": "a", "a": int64(1), "b": 1.2, "c": " "}}, datas)

@@ -1,6 +1,7 @@
 package nginx
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -64,10 +65,7 @@ func TestNewNginxParser(t *testing.T) {
 	}
 	assert.Equal(t, p.Name(), "nginx", "nginx parser name not equal")
 	entry1S, err := p.Parse(accLog1)
-	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
-		assert.Equal(t, int64(0), c.Errors)
-	}
+	assert.Nil(t, err)
 	entry1 := entry1S[0]
 	for k, v := range entry1 {
 		assert.Equal(t, accLog1Entry[k], v, "parser "+k+" not match")
@@ -75,7 +73,7 @@ func TestNewNginxParser(t *testing.T) {
 	errFormat := fmt.Errorf("NginxParser fail to parse log line [%v], given format is [%v]", accErrLog[0], p.regexp)
 	_, err = p.Parse(accErrLog)
 	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
+		err = errors.New(c.LastError)
 	}
 	assert.Equal(t, err, errFormat, "it should be err format")
 
@@ -84,12 +82,7 @@ func TestNewNginxParser(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = p2.Parse(accLog2)
-	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
-	}
-	if err != nil {
-		t.Error(err)
-	}
+	assert.Nil(t, err)
 }
 
 func TestNewNginxParserForErrData(t *testing.T) {
@@ -100,10 +93,7 @@ func TestNewNginxParserForErrData(t *testing.T) {
 	}
 	assert.Equal(t, p.Name(), "nginx", "nginx parser name not equal")
 	entry1S, err := p.Parse(accLog1)
-	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
-		assert.Equal(t, int64(0), c.Errors)
-	}
+	assert.Nil(t, err)
 	if len(entry1S) != 1 {
 		t.Fatalf("parse lines error, expect 1 lines but got %v lines", len(entry1S))
 	}
@@ -122,11 +112,7 @@ func TestNginxParserKeepRawData(t *testing.T) {
 	}
 	assert.Equal(t, p.Name(), "nginx", "nginx parser name not equal")
 	entry1S, err := p.Parse(accLog1)
-
-	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
-		assert.Equal(t, int64(0), c.Errors)
-	}
+	assert.Nil(t, err)
 	if len(entry1S) != 1 {
 		t.Fatalf("parse lines error, expect 1 lines but got %v lines", len(entry1S))
 	}
@@ -142,18 +128,13 @@ func TestNewNginxWithManuelRegex(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = p2.Parse(accLog2)
-	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
-	}
-	if err != nil {
-		t.Error(err)
-	}
+	assert.Nil(t, err)
 }
 
 func TestFindAllRegexpsFromConf(t *testing.T) {
 	confPath := "test_data/nginx.conf"
 	patterns, err := FindAllRegexpsFromConf(confPath)
-	assert.NoError(t, err)
+	assert.Nil(t, err)
 
 	{
 		assert.NotNil(t, patterns["main"])

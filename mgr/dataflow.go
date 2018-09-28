@@ -173,12 +173,12 @@ func TransformData(transformerConfig map[string]interface{}) ([]Data, error) {
 	transformedData, transErr := transformer.Transform(data)
 	se, ok := transErr.(*StatsError)
 	if ok {
-		transErr = se.ErrorDetail
+		transErr = errors.New(se.LastError)
 	}
 	if transErr != nil {
 		se, ok := transErr.(*StatsError)
 		if ok {
-			transErr = se.ErrorDetail
+			transErr = errors.New(se.LastError)
 		}
 		err := fmt.Errorf("transform processing error %v", transErr)
 		return nil, err
@@ -320,7 +320,13 @@ func trySend(s sender.Sender, datas []Data, times int) (err error) {
 		}
 		err = s.Send(datas)
 		if se, ok := err.(*StatsError); ok {
-			err = se.ErrorDetail
+			if se.Errors == 0 {
+				return nil
+			}
+
+			if se.SendError != nil {
+				err = se.SendError
+			}
 		}
 
 		if err != nil {
@@ -338,7 +344,7 @@ func trySend(s sender.Sender, datas []Data, times int) (err error) {
 		}
 		break
 	}
-	return
+	return nil
 }
 
 func getSampleData(parserConfig conf.MapConf) ([]string, error) {

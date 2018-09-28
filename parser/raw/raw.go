@@ -46,7 +46,6 @@ func (p *Parser) Type() string {
 }
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
-
 	se := &StatsError{}
 	datas := []Data{}
 	for idx, line := range lines {
@@ -65,6 +64,10 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		}
 		datas = append(datas, d)
 		se.AddSuccess()
+	}
+
+	if se.Errors == 0 {
+		return datas, nil
 	}
 	return datas, se
 }

@@ -150,7 +150,6 @@ func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 		d, err := p.parse(line)
 		if err != nil {
 			se.AddErrors()
-			se.ErrorDetail = err
 			se.LastError = err.Error()
 			if d != nil {
 				datas = append(datas, d)
@@ -171,6 +170,10 @@ func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 		}
 		datas = append(datas, d)
 		se.AddSuccess()
+	}
+
+	if se.Errors == 0 {
+		return datas, nil
 	}
 	return datas, se
 }

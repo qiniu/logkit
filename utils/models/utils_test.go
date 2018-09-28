@@ -2,6 +2,7 @@ package models
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -1070,5 +1071,21 @@ func TestIsSubMetaExpireValid(t *testing.T) {
 	}
 	for _, test := range tests {
 		assert.Equal(t, test.result, IsSubmetaExpireValid(test.submetaExpire, test.expire))
+	}
+}
+
+// 10000000	       148 ns/op	      64 B/op	       2 allocs/op
+func BenchmarkFmt(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		fmt.Errorf("test fmt errorf and errors.new with benchmark: %s", "my error")
+	}
+}
+
+// 2000000000	         0.87 ns/op	       0 B/op	       0 allocs/op
+func BenchmarkErrors(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		errors.New("test fmt errorf and errors.new with benchmark: " + "my error")
 	}
 }

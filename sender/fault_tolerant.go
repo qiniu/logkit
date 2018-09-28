@@ -206,22 +206,23 @@ func (ft *FtSender) Send(datas []Data) error {
 		isRetry := false
 		backDataContext, err := ft.trySendDatas(datas, 1, isRetry)
 		if err == nil {
-			se.AddSuccessNum(len(datas))
-			return se
+			return nil
 		}
 
 		if ste, ok := err.(*StatsError); ok {
-			se.Success = ste.Success
 			se.Errors = ste.Errors
+			se.Success = ste.Success
+			se.LastError = ste.LastError
+			se.SendError = ste.SendError
 		} else {
 			se.AddErrorsNum(len(datas))
+			se.LastError = err.Error()
 		}
 
 		err = fmt.Errorf("Runner[%v] Sender[%v] try Send Datas err: %v, will put to backup queue and retry later... ", ft.runnerName, ft.innerSender.Name(), err)
 		log.Error(err)
 		se.FtNotRetry = true
 		// 容错队列会保证重试，此处不向外部暴露发送错误信息
-		se.ErrorDetail = err
 		se.FtQueueLag = ft.BackupQueue.Depth()
 		if backDataContext != nil {
 			var nowDatas []Data
@@ -230,24 +231,27 @@ func (ft *FtSender) Send(datas []Data) error {
 			}
 			if nowDatas != nil {
 				se.FtNotRetry = false
-				se.ErrorDetail = reqerr.NewSendError("save data to backend queue error", ConvertDatasBack(nowDatas), reqerr.TypeDefault)
-				se.LastError = se.ErrorDetail.Error()
+				se.SendError = reqerr.NewSendError("save data to backend queue error", ConvertDatasBack(nowDatas), reqerr.TypeDefault)
+				se.LastError = se.SendError.Error()
 				ft.statsMutex.Lock()
-				ft.stats.LastError = se.ErrorDetail.Error()
+				ft.stats.LastError = se.SendError.Error()
 				ft.statsMutex.Unlock()
 			}
 		}
 	} else {
 		err := ft.saveToFile(datas)
 		if err != nil {
-			se.AddErrorsNum(len(datas))
 			se.FtNotRetry = false
-			se.ErrorDetail = err
+			if sendError, ok := err.(*reqerr.SendError); ok {
+				se.SendError = sendError
+			}
+			se.AddErrorsNum(len(datas))
 			ft.statsMutex.Lock()
 			ft.stats.LastError = err.Error()
 			ft.stats.Errors += int64(len(datas))
 			ft.statsMutex.Unlock()
 		} else {
+			// se 中的 lasterror 和 senderror 都为空，需要使用 se.FtQueueLag
 			se.AddSuccessNum(len(datas))
 		}
 		se.FtQueueLag = ft.BackupQueue.Depth() + ft.logQueue.Depth()
@@ -317,10 +321,9 @@ func (ft *FtSender) unmarshalData(dat []byte) (datas []Data, err error) {
 	ctx := new(datasContext)
 	err = ft.jsontool.Unmarshal(dat, &ctx)
 	if err != nil {
-		return
+		return nil, err
 	}
-	datas = ctx.Datas
-	return
+	return ctx.Datas, nil
 }
 
 func (ft *FtSender) saveToFile(datas []Data) error {
@@ -357,12 +360,13 @@ func (ft *FtSender) asyncSendLogFromDiskQueue() {
 func (ft *FtSender) trySendBytes(dat []byte, failSleep int, isRetry bool) (backDataContext []*datasContext, err error) {
 	datas, err := ft.unmarshalData(dat)
 	if err != nil {
-		return
+		return nil, err
 	}
 	return ft.trySendDatas(datas, failSleep, isRetry)
 }
 
 // trySendDatas 尝试发送数据，如果失败，将失败数据加入backup queue，并睡眠指定时间。返回结果为是否正常发送
+// isRetry 只有在 FtStrategy 为 BackupOnly 或
 func (ft *FtSender) trySendDatas(datas []Data, failSleep int, isRetry bool) (backDataContext []*datasContext, err error) {
 	err = ft.innerSender.Send(datas)
 	dataLen := int64(0)
@@ -399,44 +403,40 @@ func (ft *FtSender) handleStat(err error, isRetry bool, dataLen int64) error {
 	defer ft.statsMutex.Unlock()
 
 	if err == nil {
-		ft.stats.LastError = ""
-		ft.stats.Success += dataLen
 		if isRetry {
 			ft.stats.Errors -= dataLen
 		}
+		ft.stats.Success += dataLen
+		ft.stats.LastError = ""
+		return nil
+	}
+
+	var errRes StatsError
+	c, ok := err.(*StatsError)
+	if !ok {
+		ft.stats.Errors += dataLen
+		ft.stats.LastError = err.Error()
+		errRes.Errors += dataLen
 		return err
 	}
 
-	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
-		if err == nil {
-			ft.stats.LastError = ""
-			ft.stats.Success += dataLen
-			if isRetry {
-				ft.stats.Errors -= dataLen
-			}
-			log.Warnf("Sender return error, but error detail is nil")
-			return err
-		}
-		if isRetry {
-			ft.stats.Errors -= c.Success
-		} else {
-			ft.stats.Errors += c.Errors
-		}
-		ft.stats.Success += c.Success
-	} else {
+	// sender error 为空时，一定是全部发送失败
+	if c.SendError == nil {
 		if !isRetry {
 			ft.stats.Errors += dataLen
 		}
+		ft.stats.LastError = c.LastError
+		return err
 	}
 
-	se, succ := err.(*reqerr.SendError)
-	if !succ {
-		ft.stats.LastError = err.Error()
+	// sender error 不为空时，可能部分成功部分失败
+	if !isRetry {
+		ft.stats.Errors += c.Errors
 	} else {
-		ft.stats.LastError = se.Error()
+		ft.stats.Errors -= c.Success
 	}
-
+	ft.stats.Success += c.Success
+	ft.stats.LastError = c.SendError.Error()
 	return err
 }
 
@@ -444,22 +444,29 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 	failCtx := new(datasContext)
 	var binaryUnpack bool
 	var errMessage string
-	se, succ := err.(*reqerr.SendError)
+	se, succ := err.(*StatsError)
 	if !succ {
 		// 如果不是SendError 默认所有的数据都发送失败
-		errMessage = "error type is not *SendError! reSend all datas by default"
+		errMessage = "error type is not *StatsError! reSend all datas by default"
 		failCtx.Datas = datas
 	} else {
-		failCtx.Datas = ConvertDatas(se.GetFailDatas())
-		if se.ErrorType == reqerr.TypeBinaryUnpack {
-			binaryUnpack = true
-			errMessage = "error type is binaryUnpack, will be divided to 2 parts and retry"
-		} else if se.ErrorType == reqerr.TypeSchemaFreeRetry {
-			errMessage = "maybe this is because of server schema cache, will send all data again"
+		if se.SendError == nil {
+			// 如果不是SendError 默认所有的数据都发送失败
+			errMessage = "error type is not *SendError! reSend all datas by default"
+			failCtx.Datas = datas
 		} else {
-			errMessage = "error type is default, will send all failed data again"
+			failCtx.Datas = ConvertDatas(se.SendError.GetFailDatas())
+			if se.SendError.ErrorType == reqerr.TypeBinaryUnpack {
+				binaryUnpack = true
+				errMessage = "error type is binaryUnpack, will be divided to 2 parts and retry"
+			} else if se.SendError.ErrorType == reqerr.TypeSchemaFreeRetry {
+				errMessage = "maybe this is because of server schema cache, will send all data again"
+			} else {
+				errMessage = "error type is default, will send all failed data again"
+			}
 		}
 	}
+
 	log.Errorf("Runner[%v] Sender[%v] cannot write points: %v, failDatas size: %v, %s", ft.runnerName, ft.innerSender.Name(), err, len(failCtx.Datas), errMessage)
 	log.Debugf("Runner[%v] Sender[%v] failed datas [[%v]]", ft.runnerName, ft.innerSender.Name(), failCtx.Datas)
 	if binaryUnpack {
@@ -470,7 +477,7 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 			failCtx.Datas = failCtx.Datas[lens:]
 			retDatasContext = append(retDatasContext, newFailCtx)
 			retDatasContext = append(retDatasContext, failCtx)
-			return
+			return retDatasContext
 		}
 		if len(failCtx.Datas) == 1 {
 			//当数据仅有一条且discardErr为true时，丢弃数据
@@ -481,8 +488,9 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 			// 小于 2M 时，放入 pandora_stash中
 			dataBytes, err := jsoniter.Marshal(failCtxData)
 			if err != nil {
+				log.Errorf("binaryUnpack marshal failed, err: %v", err)
 				retDatasContext = append(retDatasContext, failCtx)
-				return
+				return retDatasContext
 			}
 			if int64(len(string(dataBytes))) < DefaultMaxBatchSize {
 				// 此处将 data 改为 raw 放在 pandora_stash 中
@@ -500,12 +508,12 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 					}
 				}
 				retDatasContext = append(retDatasContext, failCtx)
-				return
+				return retDatasContext
 			}
 
 			if ft.opt.longDataDiscard {
 				log.Infof("Runner[%v] Sender[%v] discard long data (more than 2M), length: ", ft.runnerName, ft.innerSender.Name(), len(string(dataBytes)))
-				return
+				return retDatasContext
 			}
 
 			// 大于 2M 时，切片发送
@@ -563,11 +571,11 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 			return retDatasContext
 		}
 
-		return
+		return retDatasContext
 	}
 
 	retDatasContext = append(retDatasContext, failCtx)
-	return
+	return retDatasContext
 }
 
 func (ft *FtSender) sendFromQueue(queueName string, readChan <-chan []byte, readDatasChan <-chan []Data, isRetry bool) {

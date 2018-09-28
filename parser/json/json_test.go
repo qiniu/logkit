@@ -95,8 +95,8 @@ func TestJsonParser(t *testing.T) {
 	m, err = p.Parse(tests[1].in)
 	if err != nil {
 		errx, _ := err.(*StatsError)
-		if errx.ErrorDetail != nil {
-			t.Error(errx.ErrorDetail)
+		if errx.LastError != "" {
+			t.Error(errx.LastError)
 		}
 	}
 	assert.EqualValues(t, tests[1].exp, m)
@@ -171,8 +171,8 @@ func TestJsonKeepRawData(t *testing.T) {
 	m, err = p.Parse(tests[1].in)
 	if err != nil {
 		errx, _ := err.(*StatsError)
-		if errx.ErrorDetail != nil {
-			t.Error(errx.ErrorDetail)
+		if errx.LastError != "" {
+			t.Error(errx.LastError)
 		}
 	}
 	assert.EqualValues(t, tests[1].exp, m)
@@ -380,9 +380,7 @@ func TestParseMutiLineJson(t *testing.T) {
 	p, _ := NewParser(c)
 	data := `[{"name":"ethancai", "fansCount": 9223372036854775807}]`
 	res, err := p.Parse([]string{data})
-	errx, _ := err.(*StatsError)
-	err = errx.ErrorDetail
-	assert.NoError(t, err)
+	assert.Nil(t, err)
 
 	exp := []Data{{"name": "ethancai", "fansCount": json.Number("9223372036854775807")}}
 	assert.Equal(t, exp, res)
@@ -396,9 +394,7 @@ func TestParseSpaceJson(t *testing.T) {
 	p, _ := NewParser(c)
 	data := "\n"
 	res, err := p.Parse([]string{data})
-	errx, _ := err.(*StatsError)
-	err = errx.ErrorDetail
-	assert.NoError(t, err)
+	assert.Nil(t, err)
 
 	exp := []Data{}
 	assert.Equal(t, exp, res)
