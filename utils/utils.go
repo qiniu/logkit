@@ -2,6 +2,10 @@ package utils
 
 import (
 	"os"
+
+	"github.com/json-iterator/go"
+
+	"github.com/qiniu/log"
 )
 
 // IsExist checks whether a file or directory exists.
@@ -21,5 +25,19 @@ func GetParseTestData(line string, size int) []string {
 		}
 		testSlice = append(testSlice, line)
 		totalSize += len(line)
+	}
+}
+
+func DeepCopyByJSON(dst, src interface{}) {
+	confBytes, err := jsoniter.Marshal(src)
+	if err != nil {
+		log.Errorf("DeepCopyByJSON marshal error %v, use same pointer", err)
+		dst = src
+		return
+	}
+	if err = jsoniter.Unmarshal(confBytes, dst); err != nil {
+		log.Errorf("DeepCopyByJSON unmarshal error %v, use same pointer", err)
+		dst = src
+		return
 	}
 }
