@@ -1276,12 +1276,14 @@ func MergeEnvTags(name string, tags map[string]interface{}) map[string]interface
 	}
 
 	envTags := make(map[string]interface{})
-	if value := os.Getenv(name); value != "" {
+	if value, exist := os.LookupEnv(name); exist {
 		err := jsoniter.Unmarshal([]byte(value), &envTags)
 		if err != nil {
-			log.Warnf("get env tags error: %v", err)
+			log.Warnf("get env tags unmarshl error: %v", err)
 			return tags
 		}
+	} else {
+		log.Warnf("env[%s] not exist", name)
 	}
 
 	if tags == nil {
