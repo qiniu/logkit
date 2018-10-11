@@ -83,6 +83,7 @@ func multiReaderOneLineTest(t *testing.T) {
 		"log_path":        logPathPattern,
 		"stat_interval":   "1s",
 		"expire":          "5s",
+		"submeta_expire":  "0h",
 		"max_open_files":  "128",
 		"read_from":       "oldest",
 		"reader_buf_size": "1024",
@@ -99,7 +100,7 @@ func multiReaderOneLineTest(t *testing.T) {
 	t.Log("Reader has started")
 
 	assert.Equal(t, 5*time.Second, dr.expire)
-	assert.Equal(t, 720*time.Hour, dr.submetaExpire)
+	assert.Equal(t, time.Duration(0), dr.submetaExpire)
 
 	maxNum := 0
 	emptyNum := 0

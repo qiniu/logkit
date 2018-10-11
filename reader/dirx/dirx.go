@@ -89,7 +89,9 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	submetaExpire, err := time.ParseDuration(submetaExpireDur)
 	if err != nil {
 		return nil, err
-	} else if submetaExpire < expire {
+	}
+	// submetaExpire 为 0 时，不清理元数据
+	if IsSubmetaExpireValid(submetaExpire, expire) {
 		return nil, fmt.Errorf("%q valus is less than %q", reader.KeySubmetaExpire, reader.KeyExpire)
 	}
 
@@ -304,7 +306,7 @@ func (r *Reader) Start() error {
 		}
 	}()
 
-	if r.expire.Nanoseconds() > 0 {
+	if IsSubMetaExpire(r.submetaExpire, r.expire) {
 		go func() {
 			ticker := time.NewTicker(time.Hour)
 			defer ticker.Stop()
@@ -371,7 +373,7 @@ func (r *Reader) SyncMeta() {
 		return
 	}
 
-	if r.expire.Nanoseconds() > 0 {
+	if IsSubMetaExpire(r.submetaExpire, r.expire) {
 		r.meta.CleanExpiredSubMetas(r.submetaExpire)
 	}
 }

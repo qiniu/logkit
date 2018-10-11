@@ -114,6 +114,7 @@ func multiReaderOneLineTest(t *testing.T) {
 		"reader_buf_size": "1024",
 		"read_from":       "oldest",
 		"expire":          "15s",
+		"submeta_expire":  "0s",
 		"stat_interval":   "1s",
 		"max_open_files":  "128",
 	}
@@ -125,7 +126,7 @@ func multiReaderOneLineTest(t *testing.T) {
 	t.Log("Reader has started")
 
 	assert.Equal(t, 15*time.Second, mr.expire)
-	assert.Equal(t, 720*time.Hour, mr.submetaExpire)
+	assert.Equal(t, time.Duration(0), mr.submetaExpire)
 
 	go func() {
 		time.Sleep(15 * time.Second)
