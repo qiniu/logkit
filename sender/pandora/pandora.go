@@ -170,7 +170,7 @@ func NewSender(conf logkitconf.MapConf) (pandoraSender sender.Sender, err error)
 	useragent, _ := conf.GetStringOr(sender.InnerUserAgent, "")
 	schema, _ := conf.GetStringOr(sender.KeyPandoraSchema, "")
 	name, _ := conf.GetStringOr(sender.KeyName, fmt.Sprintf("pandoraSender:(%v,repo:%v,region:%v)", host, repoName, region))
-	updateInterval, _ := conf.GetInt64Or(sender.KeyPandoraSchemaUpdateInterval, 300)
+	updateInterval, _ := conf.GetInt64Or(sender.KeyPandoraSchemaUpdateInterval, 60)
 	schemaFree, _ := conf.GetBoolOr(sender.KeyPandoraSchemaFree, false)
 	forceMicrosecond, _ := conf.GetBoolOr(sender.KeyForceMicrosecond, false)
 	autoCreateSchema, _ := conf.GetStringOr(sender.KeyPandoraAutoCreate, "")
@@ -1121,10 +1121,6 @@ func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 	}
 	s.opt.tokenLock.RUnlock()
 	schemas, se := s.client.PostDataSchemaFree(schemaFreeInput)
-	if schemas != nil {
-		s.updateSchemas(schemas)
-	}
-
 	if se != nil {
 		if nse, ok := se.(*reqerr.SendError); ok {
 			return &StatsError{
@@ -1144,6 +1140,10 @@ func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 			},
 			ErrorDetail: se,
 		}
+	}
+	// 发送失败时无需更新 schema，更新 schema 的操作在 checkSchemaUpdate 中进行
+	if schemas != nil {
+		s.updateSchemas(schemas)
 	}
 
 	return nil
