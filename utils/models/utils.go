@@ -878,3 +878,11 @@ func TruncateStrSize(err string, size int) string {
 	return fmt.Sprintf(err[:size]+"......(only show %d bytes, remain %d bytes)",
 		size, len(err)-size)
 }
+
+func IsSubMetaExpire(submetaExpire, expire time.Duration) bool {
+	return submetaExpire.Nanoseconds() > 0 && expire.Nanoseconds() > 0
+}
+
+func IsSubmetaExpireValid(submetaExpire, expire time.Duration) bool {
+	return submetaExpire.Nanoseconds() > 0 && submetaExpire < expire
+}

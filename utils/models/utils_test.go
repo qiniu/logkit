@@ -983,3 +983,92 @@ func Test_CheckErrorSize(t *testing.T) {
 		"......(only show 1024 bytes, remain "+
 		strconv.Itoa(len(err)-DefaultTruncateMaxSize)+" bytes)", actualErr)
 }
+
+func TestIsSubMetaExpire(t *testing.T) {
+	tests := []struct {
+		submetaExpire time.Duration
+		expire        time.Duration
+		result        bool
+	}{
+		{
+			submetaExpire: time.Duration(100) * time.Second,
+			expire:        time.Duration(200) * time.Second,
+			result:        true,
+		},
+		{
+			submetaExpire: time.Duration(10) * time.Second,
+			expire:        time.Duration(5) * time.Second,
+			result:        true,
+		},
+		{
+			submetaExpire: time.Duration(0) * time.Hour,
+			expire:        time.Duration(5) * time.Second,
+			result:        false,
+		},
+		{
+			submetaExpire: time.Duration(0) * time.Second,
+			expire:        time.Duration(0) * time.Second,
+			result:        false,
+		},
+		{
+			submetaExpire: time.Duration(10) * time.Second,
+			expire:        time.Duration(0) * time.Second,
+			result:        false,
+		},
+		{
+			submetaExpire: time.Duration(-10) * time.Second,
+			expire:        time.Duration(0) * time.Second,
+			result:        false,
+		},
+	}
+	for _, test := range tests {
+		assert.Equal(t, test.result, IsSubMetaExpire(test.submetaExpire, test.expire))
+	}
+}
+
+func TestIsSubMetaExpireValid(t *testing.T) {
+	tests := []struct {
+		submetaExpire time.Duration
+		expire        time.Duration
+		result        bool
+	}{
+		{
+			submetaExpire: time.Duration(100) * time.Second,
+			expire:        time.Duration(200) * time.Second,
+			result:        true,
+		},
+		{
+			submetaExpire: time.Duration(10) * time.Second,
+			expire:        time.Duration(5) * time.Second,
+			result:        false,
+		},
+		{
+			submetaExpire: time.Duration(0) * time.Hour,
+			expire:        time.Duration(5) * time.Second,
+			result:        false,
+		},
+		{
+			submetaExpire: time.Duration(0) * time.Second,
+			expire:        time.Duration(0) * time.Second,
+			result:        false,
+		},
+		{
+			submetaExpire: time.Duration(10) * time.Second,
+			expire:        time.Duration(0) * time.Second,
+			result:        false,
+		},
+		{
+			submetaExpire: time.Duration(-1) * time.Second,
+			expire:        time.Duration(0) * time.Second,
+			result:        false,
+		},
+		{
+			submetaExpire: time.Duration(5) * time.Hour,
+			expire:        time.Duration(24) * time.Hour,
+			result:        true,
+		},
+	}
+	for _, test := range tests {
+		assert.Equal(t, test.result, IsSubmetaExpireValid(test.submetaExpire, test.expire))
+	}
+}
