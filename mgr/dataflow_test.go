@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -78,7 +79,7 @@ func Test_RawData(t *testing.T) {
 		t.Error(err)
 	}
 
-	expected := "abc\n"
+	expected := []string{"abc\n", "abc\n", "abc\n", "abc\n", "abc\n", "abc\n", "abc\n", "abc\n", "abc\n", "abc\n"}
 	assert.Equal(t, expected, rawData)
 }
 
@@ -90,7 +91,8 @@ func Test_RawDataWithReadData(t *testing.T) {
     "batch_interval": 60,
     "batch_try_times": 3, 
     "reader":{
-        "mode":"mockreader"
+        "mode":"mockreader",
+		"raw_data_lines": "1"
     }
 }
 `
@@ -126,7 +128,7 @@ func Test_RawDataWithReadData(t *testing.T) {
 		t.Error(err)
 	}
 
-	expected := string("{\n  \"logkit\": \"logkit\"\n}")
+	expected := []string{"{\n  \"logkit\": \"logkit\"\n}"}
 	assert.Equal(t, expected, rawData)
 }
 
@@ -142,7 +144,8 @@ func Test_RawData_DaemonReader(t *testing.T) {
         "meta_path":"./Test_RawData1/meta_req_csv",
         "mode":"tailx",
         "read_from":"oldest",
-        "ignore_hidden":"true"
+        "ignore_hidden":"true",
+		"raw_data_lines": "1"
     }
 }
 `
@@ -187,7 +190,7 @@ func Test_RawData_DaemonReader(t *testing.T) {
 		t.Error(err)
 	}
 
-	expected := "abc\n"
+	expected := []string{"abc\n"}
 	assert.Equal(t, expected, rawData)
 }
 
@@ -556,4 +559,45 @@ func Test_getSenders(t *testing.T) {
 	if len(senders) != 1 {
 		t.Errorf("expect 1 sender but got %v", len(senders))
 	}
+}
+
+func Test_RawData_MutliLines(t *testing.T) {
+	fileName := filepath.Join(os.TempDir(), "TestProRawData")
+	//create file & write file
+	err := createFile(fileName, 20000000)
+	if err != nil {
+		t.Error(err)
+	}
+	//createRawDataFile(fileName, "TestProRawData01\nTestProRawData02\nTestProRawData03\nTestProRawData04\nTestProRawData05\nTestProRawData06\n")
+	defer os.RemoveAll(fileName)
+
+	readConfig := conf.MapConf{
+		"log_path":        fileName,
+		"meta_path":       "",
+		"reader_buf_size": "",
+		"read_from":       "oldest",
+		"datasource_tag":  "datasource",
+		"encoding":        "UTF-8",
+		"readio_limit":    "",
+		"head_pattern":    "",
+		"mode":            "file",
+		"delete_enable":   "false",
+		"raw_data_lines":  "3",
+	}
+	actual, err := RawData(readConfig)
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"abc\n", "abc\n", "abc\n"}, actual)
+
+	readConfig["raw_data_lines"] = "2"
+	actual, err = RawData(readConfig)
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"abc\n", "abc\n"}, actual)
+}
+
+// createRawDataFile creates file in given path.
+func createRawDataFile(fileName string, content string) {
+	f, _ := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY, DefaultFilePerm)
+	f.WriteString(content)
+	f.Sync()
+	f.Close()
 }

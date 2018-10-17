@@ -1017,7 +1017,8 @@ func (s *Sender) rawSend(datas []Data) (se error) {
 
 func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 	s.checkSchemaUpdate()
-	if !s.opt.schemaFree && (len(s.schemas) <= 0 || len(s.alias2key) <= 0) {
+	senderSchemas, senderAlias2Key := s.getSchemasAlias()
+	if !s.opt.schemaFree && (len(senderSchemas) <= 0 || len(senderAlias2Key) <= 0) {
 		return &StatsError{
 			StatsInfo: StatsInfo{
 				Success:   0,
