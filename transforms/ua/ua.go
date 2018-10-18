@@ -3,6 +3,7 @@ package ua
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"sync"
 
@@ -35,7 +36,9 @@ type UATransformer struct {
 	memcache         bool
 	stats            StatsInfo
 	uap              *uaparser.Parser
-	cache            map[string]*uaparser.Client
+	cache            *sync.Map
+
+	numRoutine int
 }
 
 func (it *UATransformer) Init() (err error) {
@@ -48,11 +51,16 @@ func (it *UATransformer) Init() (err error) {
 	if it.uap == nil {
 		it.uap = uaparser.NewFromSaved()
 	}
-	it.cache = make(map[string]*uaparser.Client)
+	it.cache = new(sync.Map)
 	it.memcache, _ = strconv.ParseBool(it.MemCache)
 	it.agent, _ = strconv.ParseBool(it.UA_Agent)
 	it.dev, _ = strconv.ParseBool(it.UA_Device)
 	it.os, _ = strconv.ParseBool(it.UA_OS)
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = 1
+	}
+	it.numRoutine = numRoutine
 	return nil
 }
 
@@ -66,12 +74,14 @@ func (it *UATransformer) getParsedData(line string) (UserAgent *uaparser.UserAge
 	}
 
 	if it.memcache {
-		ag, ok := it.cache[line]
+		ag, ok := it.cache.Load(line)
 		if ok {
-			return ag.UserAgent, ag.Os, ag.Device
+			if agClient, ok := ag.(*uaparser.Client); ok {
+				return agClient.UserAgent, agClient.Os, agClient.Device
+			}
 		}
 	}
-	var wg sync.WaitGroup
+	wg := new(sync.WaitGroup)
 	if it.agent {
 		wg.Add(1)
 		go func() {
@@ -79,6 +89,7 @@ func (it *UATransformer) getParsedData(line string) (UserAgent *uaparser.UserAge
 			it.uap.RLock()
 			UserAgent = it.uap.ParseUserAgent(line)
 			it.uap.RUnlock()
+			return
 		}()
 	}
 	if it.os {
@@ -88,6 +99,7 @@ func (it *UATransformer) getParsedData(line string) (UserAgent *uaparser.UserAge
 			it.uap.RLock()
 			Os = it.uap.ParseOs(line)
 			it.uap.RUnlock()
+			return
 		}()
 	}
 	if it.dev {
@@ -97,11 +109,12 @@ func (it *UATransformer) getParsedData(line string) (UserAgent *uaparser.UserAge
 			it.uap.RLock()
 			Device = it.uap.ParseDevice(line)
 			it.uap.RUnlock()
+			return
 		}()
 	}
 	wg.Wait()
 	if it.memcache {
-		it.cache[line] = &uaparser.Client{UserAgent, Os, Device}
+		it.cache.Store(line, &uaparser.Client{UserAgent, Os, Device})
 	}
 	return
 }
@@ -112,85 +125,50 @@ func (it *UATransformer) Transform(datas []Data) ([]Data, error) {
 	}
 	var err, fmtErr error
 	errNum := 0
-	keys := GetKeys(it.Key)
-	newKeys := make([]string, len(keys))
-	for i := range datas {
-		copy(newKeys, keys)
-		val, getErr := GetMapValue(datas[i], keys...)
-		if getErr != nil {
-			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, it.Key)
-			continue
-		}
-		strVal, ok := val.(string)
-		if !ok {
-			typeErr := fmt.Errorf("transform key %v data type is not string", it.Key)
-			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
-			continue
-		}
-		if strVal == "" {
-			emptyErr := fmt.Errorf("transform key %v is empty string", it.Key)
-			errNum, err = transforms.SetError(errNum, emptyErr, transforms.General, "")
-			continue
-		}
 
-		if it.agent {
-			UserAgent := it.uap.ParseUserAgent(strVal)
-			if UserAgent.Family != "" {
-				newKeys[len(newKeys)-1] = "UA_Family"
-				SetMapValue(datas[i], UserAgent.Family, false, newKeys...)
-			}
-			if UserAgent.Major != "" {
-				newKeys[len(newKeys)-1] = "UA_Major"
-				SetMapValue(datas[i], UserAgent.Major, false, newKeys...)
-			}
-			if UserAgent.Minor != "" {
-				newKeys[len(newKeys)-1] = "UA_Minor"
-				SetMapValue(datas[i], UserAgent.Minor, false, newKeys...)
-			}
-			if UserAgent.Patch != "" {
-				newKeys[len(newKeys)-1] = "UA_Patch"
-				SetMapValue(datas[i], UserAgent.Patch, false, newKeys...)
-			}
-		}
-		if it.agent {
-			Device := it.uap.ParseDevice(strVal)
-			if Device.Family != "" {
-				newKeys[len(newKeys)-1] = "UA_Device_Family"
-				SetMapValue(datas[i], Device.Family, false, newKeys...)
-			}
-			if Device.Brand != "" {
-				newKeys[len(newKeys)-1] = "UA_Device_Brand"
-				SetMapValue(datas[i], Device.Brand, false, newKeys...)
-			}
-			if Device.Model != "" {
-				newKeys[len(newKeys)-1] = "UA_Device_Model"
-				SetMapValue(datas[i], Device.Model, false, newKeys...)
-			}
-		}
+	numRoutine := it.numRoutine
+	if len(datas) < numRoutine {
+		numRoutine = len(datas)
+	}
+	dataPipline := make(chan transforms.TransformInfo)
+	resultChan := make(chan transforms.TransformResult)
 
-		if it.os {
-			Os := it.uap.ParseOs(strVal)
-			if Os.Family != "" {
-				newKeys[len(newKeys)-1] = "UA_OS_Family"
-				SetMapValue(datas[i], Os.Family, false, newKeys...)
-			}
-			if Os.Patch != "" {
-				newKeys[len(newKeys)-1] = "UA_OS_Patch"
-				SetMapValue(datas[i], Os.Patch, false, newKeys...)
-			}
-			if Os.Minor != "" {
-				newKeys[len(newKeys)-1] = "UA_OS_Minor"
-				SetMapValue(datas[i], Os.Minor, false, newKeys...)
-			}
-			if Os.Major != "" {
-				newKeys[len(newKeys)-1] = "UA_OS_Major"
-				SetMapValue(datas[i], Os.Major, false, newKeys...)
-			}
-			if Os.PatchMinor != "" {
-				newKeys[len(newKeys)-1] = "UA_OS_PatchMinor"
-				SetMapValue(datas[i], Os.PatchMinor, false, newKeys...)
+	wg := new(sync.WaitGroup)
+	for i := 0; i < numRoutine; i++ {
+		wg.Add(1)
+		go it.transform(dataPipline, resultChan, wg)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, data := range datas {
+			dataPipline <- transforms.TransformInfo{
+				CurData: data,
+				Index:   idx,
 			}
 		}
+		close(dataPipline)
+	}()
+
+	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
+	for resultInfo := range resultChan {
+		transformResultSlice = append(transformResultSlice, resultInfo)
+	}
+	if numRoutine > 1 {
+		sort.Stable(transformResultSlice)
+	}
+
+	for _, transformResult := range transformResultSlice {
+		if transformResult.Err != nil {
+			err = transformResult.Err
+			errNum += transformResult.ErrNum
+			continue
+		}
+		datas[transformResult.Index] = transformResult.CurData
 	}
 
 	it.stats, fmtErr = transforms.SetStatsInfo(err, it.stats, int64(errNum), int64(len(datas)), it.Type())
@@ -287,4 +265,121 @@ func init() {
 	transforms.Add(Name, func() transforms.Transformer {
 		return &UATransformer{}
 	})
+}
+
+func (it *UATransformer) transform(dataPipline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+	var (
+		err    error
+		errNum int
+	)
+	keys := GetKeys(it.Key)
+	newKeys := make([]string, len(keys))
+	for transformInfo := range dataPipline {
+		err = nil
+		errNum = 0
+
+		copy(newKeys, keys)
+		val, getErr := GetMapValue(transformInfo.CurData, keys...)
+		if getErr != nil {
+			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, it.Key)
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				Err:     err,
+				ErrNum:  errNum,
+			}
+			continue
+		}
+		strVal, ok := val.(string)
+		if !ok {
+			typeErr := fmt.Errorf("transform key %v data type is not string", it.Key)
+			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				Err:     err,
+				ErrNum:  errNum,
+			}
+			continue
+		}
+		if strVal == "" {
+			emptyErr := fmt.Errorf("transform key %v is empty string", it.Key)
+			errNum, err = transforms.SetError(errNum, emptyErr, transforms.General, "")
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				Err:     err,
+				ErrNum:  errNum,
+			}
+			continue
+		}
+
+		if !it.agent && !it.dev && !it.os {
+			continue
+		}
+
+		UserAgent, Os, Device := it.getParsedData(strVal)
+		if it.agent {
+			if UserAgent.Family != "" {
+				newKeys[len(newKeys)-1] = "UA_Family"
+				SetMapValue(transformInfo.CurData, UserAgent.Family, false, newKeys...)
+			}
+			if UserAgent.Major != "" {
+				newKeys[len(newKeys)-1] = "UA_Major"
+				SetMapValue(transformInfo.CurData, UserAgent.Major, false, newKeys...)
+			}
+			if UserAgent.Minor != "" {
+				newKeys[len(newKeys)-1] = "UA_Minor"
+				SetMapValue(transformInfo.CurData, UserAgent.Minor, false, newKeys...)
+			}
+			if UserAgent.Patch != "" {
+				newKeys[len(newKeys)-1] = "UA_Patch"
+				SetMapValue(transformInfo.CurData, UserAgent.Patch, false, newKeys...)
+			}
+		}
+
+		if it.dev {
+			if Device.Family != "" {
+				newKeys[len(newKeys)-1] = "UA_Device_Family"
+				SetMapValue(transformInfo.CurData, Device.Family, false, newKeys...)
+			}
+			if Device.Brand != "" {
+				newKeys[len(newKeys)-1] = "UA_Device_Brand"
+				SetMapValue(transformInfo.CurData, Device.Brand, false, newKeys...)
+			}
+			if Device.Model != "" {
+				newKeys[len(newKeys)-1] = "UA_Device_Model"
+				SetMapValue(transformInfo.CurData, Device.Model, false, newKeys...)
+			}
+		}
+
+		if it.os {
+			if Os.Family != "" {
+				newKeys[len(newKeys)-1] = "UA_OS_Family"
+				SetMapValue(transformInfo.CurData, Os.Family, false, newKeys...)
+			}
+			if Os.Patch != "" {
+				newKeys[len(newKeys)-1] = "UA_OS_Patch"
+				SetMapValue(transformInfo.CurData, Os.Patch, false, newKeys...)
+			}
+			if Os.Minor != "" {
+				newKeys[len(newKeys)-1] = "UA_OS_Minor"
+				SetMapValue(transformInfo.CurData, Os.Minor, false, newKeys...)
+			}
+			if Os.Major != "" {
+				newKeys[len(newKeys)-1] = "UA_OS_Major"
+				SetMapValue(transformInfo.CurData, Os.Major, false, newKeys...)
+			}
+			if Os.PatchMinor != "" {
+				newKeys[len(newKeys)-1] = "UA_OS_PatchMinor"
+				SetMapValue(transformInfo.CurData, Os.PatchMinor, false, newKeys...)
+			}
+		}
+
+		resultChan <- transforms.TransformResult{
+			Index:   transformInfo.Index,
+			CurData: transformInfo.CurData,
+		}
+	}
+	wg.Done()
 }
