@@ -60,6 +60,21 @@ func (mv Map) ValuesForKey(key string, subkeys ...string) ([]interface{}, error)
 	return ret[:cnt], nil
 }
 
+var KeyNotExistError = errors.New("Key does not exist")
+
+// ValueForKey is a wrapper on ValuesForKey.  It returns the first member of []interface{}, if any.
+// If there is no value, "nil, nil" is returned.
+func (mv Map) ValueForKey(key string, subkeys ...string) (interface{}, error) {
+	vals, err := mv.ValuesForKey(key, subkeys...)
+	if err != nil {
+		return nil, err
+	}
+	if len(vals) == 0 {
+		return nil, KeyNotExistError
+	}
+	return vals[0], nil
+}
+
 // hasKey - if the map 'key' exists append it to array
 //          if it doesn't do nothing except scan array and map values
 func hasKey(iv interface{}, key string, ret *[]interface{}, cnt *int, subkeys map[string]interface{}) {
@@ -615,14 +630,17 @@ func hasKeyPath(crumbs string, iv interface{}, key string, basket map[string]boo
 	}
 }
 
-// Returns the first found value for the path.
+var PathNotExistError = errors.New("Path does not exist")
+
+// ValueForPath wrap ValuesFor Path and returns the first value returned.
+// If no value is found it returns 'nil' and PathNotExistError.
 func (mv Map) ValueForPath(path string) (interface{}, error) {
 	vals, err := mv.ValuesForPath(path)
 	if err != nil {
 		return nil, err
 	}
 	if len(vals) == 0 {
-		return nil, errors.New("ValueForPath: path not found")
+		return nil, PathNotExistError
 	}
 	return vals[0], nil
 }
