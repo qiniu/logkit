@@ -138,7 +138,7 @@ func (s *Sender) Send(datas []Data) (se error) {
 		}
 	}
 	if len(failure) > 0 && lastErr != nil {
-		ss.ErrorDetail = reqerr.NewSendError("Write failure, last err is: "+lastErr.Error(), sender.ConvertDatasBack(failure), reqerr.TypeDefault)
+		ss.SendError = reqerr.NewSendError("Write failure, last err is: "+lastErr.Error(), sender.ConvertDatasBack(failure), reqerr.TypeDefault)
 	}
 	return ss
 }

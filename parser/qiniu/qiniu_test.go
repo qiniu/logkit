@@ -9,7 +9,6 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/times"
-	. "github.com/qiniu/logkit/utils/models"
 )
 
 func Test_QiniuLogRegex(t *testing.T) {
@@ -108,7 +107,7 @@ func Test_QiniuLogRegex(t *testing.T) {
 	}
 	for _, ti := range tests2 {
 		got, err := regexp.MatchString("^"+PREFIX+" "+mp, ti.line)
-		assert.NoError(t, err)
+		assert.Nil(t, err)
 		assert.Equal(t, ti.exp, got)
 	}
 }
@@ -121,9 +120,7 @@ func Test_QiniulogParser(t *testing.T) {
 	c[parser.KeyKeepRawData] = "true"
 	ps := parser.NewRegistry()
 	p, err := ps.NewLogParser(c)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.Nil(t, err)
 	lines := []string{
 		"2017/03/28 15:41:06 [Wm0AAPg-IUMW-68U][INFO] bdc.go:573: deleted: 67608",
 		`2016/10/20 17:30:21.433423 [GE2owHck-Y4IWJHS][WARN] github.com/qiniu/http/rpcutil.v1/rpc_util.go:203:  ==> qiniu.com/streaming.v2/apiserver.go:1367: E18102: The specified repo does not exist under the provided appid ~
@@ -133,10 +130,7 @@ func Test_QiniulogParser(t *testing.T) {
 		"",
 	}
 	dts, err := p.Parse(lines)
-	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
-		assert.Equal(t, int64(0), c.Errors)
-	}
+	assert.Nil(t, err)
 	if len(dts) != 4 {
 		t.Fatalf("parse lines error expect 4 but %v", len(dts))
 	}
@@ -167,12 +161,7 @@ func Test_QiniulogParser(t *testing.T) {
 		"2016/10/20 17:20:30.642662 [123][WARN] disk.go github.com/qiniu/logkit/queue/disk.go:241: 1",
 	}
 	dts, err = p.Parse(newlines)
-	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
-	}
-	if err != nil {
-		t.Error(err)
-	}
+	assert.Nil(t, err)
 	if len(dts) != 2 {
 		t.Fatalf("parse lines error expect 2 but %v", len(dts))
 	}
@@ -207,10 +196,7 @@ func Test_QiniulogParserForErrData(t *testing.T) {
 		"",
 	}
 	dts, err := p.Parse(lines)
-	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
-		assert.Equal(t, int64(0), c.Errors)
-	}
+	assert.Nil(t, err)
 	if len(dts) != 1 {
 		t.Fatalf("parse lines error, expect 1 but %v", len(dts))
 	}
@@ -227,9 +213,7 @@ func Test_QiniulogParserForTeapot(t *testing.T) {
 	c[parser.KeyLogHeaders] = "date,time,level,reqid,file"
 	ps := parser.NewRegistry()
 	p, err := ps.NewLogParser(c)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.Nil(t, err)
 
 	lines := []string{
 		`2017/01/22 11:16:08.885550 [INFO][2pyKMgVp5EKg-ZsU]["github.com/teapots/request-logger/logger.go:75"] [REQ_END] 200 0.010k 3.792ms
@@ -239,12 +223,7 @@ func Test_QiniulogParserForTeapot(t *testing.T) {
 	}
 
 	dts, err := p.Parse(lines)
-	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
-	}
-	if err != nil {
-		t.Error(err)
-	}
+	assert.Nil(t, err)
 
 	if len(dts) != 3 {
 		t.Fatalf("parse lines error expect 3 but %v", len(dts))
@@ -273,10 +252,7 @@ func Test_QiniulogParserForTeapot(t *testing.T) {
 	}
 
 	dts, err = p.Parse(newlines)
-	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
-	}
-	assert.NoError(t, err)
+	assert.Nil(t, err)
 	assert.Equal(t, len(dts), 2)
 	assert.Equal(t, dts[0]["level"], "ERROR")
 	assert.Equal(t, dts[1]["level"], "WARN")
@@ -289,9 +265,7 @@ func Test_QiniulogParserForChange(t *testing.T) {
 	c[parser.KeyLogHeaders] = "date,time,reqid,level,file"
 	ps := parser.NewRegistry()
 	p, err := ps.NewLogParser(c)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.Nil(t, err)
 
 	lines := []string{
 		`2017/01/22 11:16:08.885550 [2pyKMgVp5EKg-ZsU][INFO]["github.com/teapots/request-logger/logger.go:75"] [REQ_END] 200 0.010k 3.792ms
@@ -301,12 +275,7 @@ func Test_QiniulogParserForChange(t *testing.T) {
 	}
 
 	dts, err := p.Parse(lines)
-	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
-	}
-	if err != nil {
-		t.Error(err)
-	}
+	assert.Nil(t, err)
 
 	if len(dts) != 3 {
 		t.Fatalf("parse lines error expect 3 but %v", len(dts))
@@ -335,10 +304,7 @@ func Test_QiniulogParserForChange(t *testing.T) {
 	}
 
 	dts, err = p.Parse(newlines)
-	if c, ok := err.(*StatsError); ok {
-		err = c.ErrorDetail
-	}
-	assert.NoError(t, err)
+	assert.Nil(t, err)
 	assert.Equal(t, len(dts), 2)
 	assert.Equal(t, dts[0]["level"], "ERROR")
 	assert.Equal(t, dts[1]["level"], "WARN")

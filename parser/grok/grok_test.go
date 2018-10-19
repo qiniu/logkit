@@ -115,9 +115,7 @@ func TestKeepRawData(t *testing.T) {
 	assert.NoError(t, p.compile())
 
 	m, err := p.Parse([]string{"142 bot"})
-	assert.Error(t, err)
-	require.NotNil(t, m)
-
+	assert.Nil(t, err)
 	assert.Equal(t, []Data{
 		{
 			"num":      int64(142),

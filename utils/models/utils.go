@@ -184,10 +184,9 @@ func IsJsonString(s string) bool {
 }
 
 func ExtractField(slice []string) ([]string, error) {
-	var err error
 	switch len(slice) {
 	case 1:
-		return slice, err
+		return slice, nil
 	case 2:
 		rgexpr := "^%\\{\\[\\S+\\]}$" // --->  %{[type]}
 		r, _ := regexp.Compile(rgexpr)
@@ -196,12 +195,11 @@ func ExtractField(slice []string) ([]string, error) {
 		if bol {
 			rs := []rune(slice[0])
 			slice[0] = string(rs[3 : len(rs)-2])
-			return slice, err
+			return slice, nil
 		}
 	default:
 	}
-	err = fmt.Errorf("parameters error,  you can write two parameters like: %%{[type]}, default or only one: default")
-	return nil, err
+	return nil, errors.New("parameters error,  you can write two parameters like: %%{[type]}, default or only one: default")
 }
 
 func AddHttpProtocal(url string) string {
@@ -854,7 +852,7 @@ func CheckErr(err error) error {
 	var errorCnt int64
 	if ok {
 		errorCnt = se.Errors
-		err = se.ErrorDetail
+		err = errors.New(se.LastError)
 	} else {
 		errorCnt = 1
 	}

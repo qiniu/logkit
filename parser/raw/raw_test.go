@@ -7,7 +7,6 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
-	. "github.com/qiniu/logkit/utils/models"
 )
 
 func Test_RawlogParser(t *testing.T) {
@@ -16,6 +15,7 @@ func Test_RawlogParser(t *testing.T) {
 	c[parser.KeyLabels] = "machine nb110"
 	c[parser.KeyDisableRecordErrData] = "true"
 	p, err := NewParser(c)
+	assert.Nil(t, err)
 	lines := []string{
 		"Oct 31 17:56:02 dell sudo:  boponik : TTY=pts/13 ; PWD=/home/boponik ; USER=root ; COMMAND=/bin/cat /var/log/auth.log",
 		`Oct 31 17:25:01 dell CRON[22418]: pam_unix(cron:session): session opened for user root by (uid=0)`,
@@ -24,14 +24,7 @@ func Test_RawlogParser(t *testing.T) {
 		"",
 	}
 	dts, err := p.Parse(lines)
-	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
-		assert.Equal(t, int64(0), st.Errors)
-	}
-	if err != nil {
-		t.Error(err)
-	}
-
+	assert.Nil(t, err)
 	if len(dts) != 4 {
 		t.Fatalf("parse lines error expect 4 lines but got %v lines", len(dts))
 	}
@@ -51,17 +44,13 @@ func Test_RawlogParserForErrData(t *testing.T) {
 	c[parser.KeyLabels] = "machine nb110"
 	c[parser.KeyDisableRecordErrData] = "false"
 	p, err := NewParser(c)
+	assert.Nil(t, err)
 	lines := []string{
 		"Oct 31 17:56:02 dell sudo:  boponik : TTY=pts/13 ; PWD=/home/boponik ; USER=root ; COMMAND=/bin/cat /var/log/auth.log",
 		"",
 	}
 	dts, err := p.Parse(lines)
-	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
-	}
-	if err != nil {
-		t.Error(err)
-	}
+	assert.Nil(t, err)
 
 	if len(dts) != 1 {
 		t.Fatalf("parse lines error, expect 1 lines but got %v lines", len(dts))

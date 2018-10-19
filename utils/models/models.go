@@ -7,6 +7,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/utils/equeue"
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 )
 
 const (
@@ -115,9 +116,9 @@ type LagInfo struct {
 
 type StatsError struct {
 	StatsInfo
-	ErrorDetail         error `json:"error"`
-	Ft                  bool  `json:"-"`
-	FtNotRetry          bool  `json:"-"`
+	SendError           *reqerr.SendError `json:"error"`
+	Ft                  bool              `json:"-"`
+	FtNotRetry          bool              `json:"-"`
 	DatasourceSkipIndex []int
 	RemainDatas         []Data
 }
@@ -189,7 +190,7 @@ func (se *StatsError) Error() string {
 	if se == nil {
 		return ""
 	}
-	return fmt.Sprintf("success %v errors %v errordetail %v", se.Success, se.Errors, se.ErrorDetail)
+	return fmt.Sprintf("success %d errors %d last error %s, send error detail %v", se.Success, se.Errors, se.LastError, se.SendError)
 }
 
 func (se *StatsError) ErrorIndexIn(idx int) bool {

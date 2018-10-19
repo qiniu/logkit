@@ -63,7 +63,7 @@ func (mock *Sender) Send(d []Data) error {
 				Success: int64(len(d) - len(failedDatas)),
 				Errors:  int64(len(failedDatas)),
 			},
-			ErrorDetail: reqerr.NewSendError(
+			SendError: reqerr.NewSendError(
 				"mock failed",
 				failedDatas,
 				reqerr.TypeBinaryUnpack,

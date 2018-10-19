@@ -145,15 +145,16 @@ func (this *Sender) Send(data []Data) error {
 	var (
 		producer        = this.producer
 		msgs            []*sarama.ProducerMessage
-		ss              = &StatsError{}
+		statsError      = &StatsError{}
+		statsLastError  string
 		ignoreDataCount int
 	)
 	for _, doc := range data {
 		message, err := this.getEventMessage(doc)
 		if err != nil {
 			log.Debugf("Dropping event: %v", err)
-			ss.AddErrors()
-			ss.LastError = err.Error()
+			statsError.AddErrors()
+			statsError.LastError = err.Error()
 			ignoreDataCount++
 			continue
 		}
@@ -161,15 +162,14 @@ func (this *Sender) Send(data []Data) error {
 	}
 	err := producer.SendMessages(msgs)
 	if err != nil {
-		ss.AddErrorsNum(len(msgs))
+		statsError.AddErrorsNum(len(msgs))
 		pde, ok := err.(sarama.ProducerErrors)
 		if !ok {
-			if ss.LastError != "" {
-				ss.LastError = fmt.Sprintf("ignore %d datas, last error: %s", ignoreDataCount, ss.LastError) + "\n"
+			if statsError.LastError != "" {
+				statsError.LastError = fmt.Sprintf("ignore %d datas, last error: %s", ignoreDataCount, statsError.LastError) + "\n"
 			}
-			ss.LastError += err.Error()
-			ss.ErrorDetail = err
-			return ss
+			statsError.LastError += err.Error()
+			return statsError
 		}
 
 		var allcir = true
@@ -179,28 +179,28 @@ func (this *Sender) Send(data []Data) error {
 				continue
 			}
 			allcir = false
-			ss.ErrorDetail = fmt.Errorf("%v detail: %v", ss.ErrorDetail, v.Error())
+			statsLastError = fmt.Sprintf("%v detail: %v", statsError.SendError, v.Error())
 			this.lastError = v
 			//发送错误为message too large时，启用二分策略重新发送
 			if v.Err == sarama.ErrMessageSizeTooLarge {
-				ss.ErrorDetail = reqerr.NewSendError("Sender[Kafka]:Message was too large, server rejected it to avoid allocation error", sender.ConvertDatasBack(data), reqerr.TypeBinaryUnpack)
+				statsError.SendError = reqerr.NewSendError("Sender[Kafka]:Message was too large, server rejected it to avoid allocation error", sender.ConvertDatasBack(data), reqerr.TypeBinaryUnpack)
 			}
 			break
 		}
 
 		if allcir {
-			ss.ErrorDetail = fmt.Errorf("%v, all error is circuit breaker is open , last error %v", err, this.lastError)
+			statsLastError = fmt.Sprintf("%v, all error is circuit breaker is open", err)
 		}
-		if ss.LastError != "" {
-			ss.LastError = fmt.Sprintf("ignore %d datas, last error: %s", ignoreDataCount, ss.LastError) + "\n"
+		if statsError.LastError != "" {
+			statsError.LastError = fmt.Sprintf("ignore %d datas, last error: %s", ignoreDataCount, statsError.LastError) + "\n"
 		}
-		ss.LastError = ss.ErrorDetail.Error()
-		return ss
+		statsError.LastError += statsLastError
+		return statsError
 	}
-	ss.AddSuccessNum(len(msgs))
+	statsError.AddSuccessNum(len(msgs))
 	//本次发送成功, lastError 置为 nil
 	this.lastError = nil
-	return ss
+	return statsError
 }
 
 func (kf *Sender) getEventMessage(event map[string]interface{}) (pm *sarama.ProducerMessage, err error) {

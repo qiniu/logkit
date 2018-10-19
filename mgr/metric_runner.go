@@ -84,7 +84,7 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner
 	collectors := make([]metric.Collector, 0)
 	transformers := make(map[string][]transforms.Transformer)
 	if len(rc.MetricConfig) == 0 {
-		return nil, fmt.Errorf("Runner " + rc.RunnerName + " has zero metric, ignore it")
+		return nil, errors.New("Runner " + rc.RunnerName + " has zero metric, ignore it")
 	}
 	for _, m := range rc.MetricConfig {
 		tp := m.MetricType
@@ -144,7 +144,7 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner
 									trans = append(trans, DisTrans)
 								}
 							} else {
-								return nil, fmt.Errorf("http_datas need to be string")
+								return nil, errors.New("http_datas need to be string")
 							}
 						} else {
 							DisTrans, err := createDiscardTransformer(attr.Key)
@@ -328,7 +328,7 @@ func (r *MetricRunner) trySend(s sender.Sender, datas []Data, times int) bool {
 		}
 		err := s.Send(datas)
 		if se, ok := err.(*StatsError); ok {
-			err = se.ErrorDetail
+			err = se.SendError
 			if se.Ft {
 				r.rs.Lag.Ftlags = se.FtQueueLag
 			} else {

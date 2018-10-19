@@ -163,7 +163,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 
 		if parseResult.Err != nil {
 			se.AddErrors()
-			se.ErrorDetail = parseResult.Err
+			se.LastError = parseResult.Err.Error()
 			errData := make(Data)
 			if !p.disableRecordErrData {
 				errData[KeyPandoraStash] = parseResult.Line
@@ -179,7 +179,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 			continue
 		}
 		if len(parseResult.Data) < 1 { //数据为空时不发送
-			se.ErrorDetail = fmt.Errorf("parsed no data by line [%v]", parseResult.Line)
+			se.LastError = fmt.Sprintf("parsed no data by line [%v]", parseResult.Line)
 			se.AddErrors()
 			continue
 		}
@@ -191,6 +191,9 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		datas = append(datas, parseResult.Data)
 	}
 
+	if se.Errors == 0 {
+		return datas, nil
+	}
 	return datas, se
 }
 

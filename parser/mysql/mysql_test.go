@@ -24,12 +24,7 @@ func TestMySqlLogParser1(t *testing.T) {
 	p, err := NewParser(nil)
 	assert.NoError(t, err)
 	datas, err := p.Parse(strings.Split(content, "\n"))
-	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
-		assert.Equal(t, "", st.LastError, st.LastError)
-		assert.Equal(t, int64(0), st.Errors)
-	}
-	assert.NoError(t, err)
+	assert.Nil(t, err)
 
 	expectedEvent := Data{
 		"User":          "rdsadmin",
@@ -49,12 +44,7 @@ func TestMySqlKeepRawData(t *testing.T) {
 	p, err := NewParser(conf.MapConf{parser.KeyKeepRawData: "true"})
 	assert.NoError(t, err)
 	datas, err := p.Parse(strings.Split(content, "\n"))
-	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
-		assert.Equal(t, "", st.LastError, st.LastError)
-		assert.Equal(t, int64(0), st.Errors)
-	}
-	assert.NoError(t, err)
+	assert.Nil(t, err)
 
 	expectedEvent := Data{
 		"User":            "rdsadmin",

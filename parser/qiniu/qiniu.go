@@ -361,7 +361,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		d, err := p.parse(line)
 		if err != nil {
 			se.AddErrors()
-			se.ErrorDetail = err
+			se.LastError = err.Error()
 			errData := make(Data)
 			if !p.disableRecordErrData {
 				errData[KeyPandoraStash] = line
@@ -381,6 +381,10 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 			d[parser.KeyRawData] = line
 		}
 		datas = append(datas, d)
+	}
+
+	if se.Errors == 0 {
+		return datas, nil
 	}
 	return datas, se
 }

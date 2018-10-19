@@ -42,6 +42,7 @@ func Test_SyslogParser(t *testing.T) {
 	c[parser.KeyLabels] = "machine nb110"
 	c[parser.KeyKeepRawData] = "true"
 	p, err := NewParser(c)
+	assert.Nil(t, err)
 	lines := []string{
 		`<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47`,
 		`- BOM'su root' failed for lonvick on /dev/pts/8`,
@@ -64,29 +65,17 @@ func Test_SyslogParser(t *testing.T) {
 		`- BOM'su root' failed for lonvick on /dev/pts/8`,
 	}
 	dts, err := p.Parse(lines)
+	assert.Nil(t, err)
 	indexes := []int{2, 3, 5, 9, 13, 15}
 	for i := range dts {
 		assert.Equal(t, lines[indexes[i]], dts[i][parser.KeyRawData])
-	}
-	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
-		assert.Equal(t, "", st.LastError, st.LastError)
-		assert.Equal(t, int64(0), st.Errors)
-	}
-	if err != nil {
-		t.Error(err)
 	}
 
 	if len(dts) != 6 {
 		t.Fatalf("parse lines error expect 6 lines but got %v lines", len(dts))
 	}
 	ndata, err := p.Parse([]string{parser.PandoraParseFlushSignal})
-	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
-		assert.Equal(t, "", st.LastError, st.LastError)
-		assert.Equal(t, int64(0), st.Errors)
-	}
-	assert.NoError(t, err)
+	assert.Nil(t, err)
 	dts = append(dts, ndata...)
 	for _, dt := range dts {
 		assert.Equal(t, "nb110", dt["machine"])
@@ -97,6 +86,7 @@ func Test_SyslogParserError(t *testing.T) {
 	c := conf.MapConf{}
 	c[parser.KeyParserType] = "syslog"
 	p, err := NewParser(c)
+	assert.Nil(t, err)
 	line := "Test my syslog CRON[000]: (root) CMD"
 	lines := []string{
 		line,
@@ -133,7 +123,7 @@ func TestSyslogParser_NoPanic(t *testing.T) {
 	c := conf.MapConf{}
 	c[parser.KeyParserType] = "syslog"
 	p, err := NewParser(c)
-	assert.NoError(t, err)
+	assert.Nil(t, err)
 	lines := []string{
 		`<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47`,
 		`- BOM'su root' failed for lonvick on /dev/pts/8`,
@@ -159,7 +149,7 @@ func TestSyslogParser_NoMatch(t *testing.T) {
 	c[parser.KeyParserType] = "syslog"
 	c[parser.KeySyslogMaxline] = "3"
 	p, err := NewParser(c)
-	assert.NoError(t, err)
+	assert.Nil(t, err)
 	lines := []string{
 		`003-10-11T22:14:15.003Z mymachine.example.com su - ID47`,
 		`BOM'su root' failed for lonvick on /dev/pts/8`,
@@ -171,7 +161,7 @@ func TestSyslogParser_NoMatch(t *testing.T) {
 	}
 	_, err = p.Parse(lines)
 	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
+		err = fmt.Errorf(st.LastError)
 	}
 	assert.Equal(t, errors.New("syslog meet max line 3, try to parse err No start char found for priority, check if this is standard rfc3164/rfc5424 syslog"), err)
 }

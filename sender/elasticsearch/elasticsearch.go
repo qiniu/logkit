@@ -232,7 +232,7 @@ func (s *Sender) Send(datas []Data) error {
 				Errors:    int64(len(failedDatas)),
 				LastError: lastError,
 			},
-			ErrorDetail: reqerr.NewSendError(
+			SendError: reqerr.NewSendError(
 				fmt.Sprintf("bulk failed with last error: %s", lastError),
 				failedDatas,
 				reqerr.TypeBinaryUnpack,
@@ -292,7 +292,7 @@ func (s *Sender) Send(datas []Data) error {
 				Errors:    int64(len(failedDatas)),
 				LastError: lastError,
 			},
-			ErrorDetail: reqerr.NewSendError(
+			SendError: reqerr.NewSendError(
 				fmt.Sprintf("bulk failed with last error: %s", lastError),
 				failedDatas,
 				reqerr.TypeBinaryUnpack,
@@ -352,7 +352,7 @@ func (s *Sender) Send(datas []Data) error {
 				Errors:    int64(len(failedDatas)),
 				LastError: lastError,
 			},
-			ErrorDetail: reqerr.NewSendError(
+			SendError: reqerr.NewSendError(
 				fmt.Sprintf("bulk failed with last error: %s", lastError),
 				failedDatas,
 				reqerr.TypeBinaryUnpack,

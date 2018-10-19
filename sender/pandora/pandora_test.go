@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/log"
-	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 
 	"github.com/qiniu/logkit/conf"
@@ -55,7 +54,7 @@ func TestPandoraSender(t *testing.T) {
 	d["d"] = 14773736325048765
 	err = s.Send([]Data{d})
 	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
+		err = st.SendError
 	}
 	if err != nil {
 		t.Error(err)
@@ -80,7 +79,7 @@ func TestPandoraSender(t *testing.T) {
 	d = Data{"ab": "h1"}
 	err = s.Send([]Data{d})
 	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
+		err = st.SendError
 	}
 	if err != nil {
 		t.Error(err)
@@ -94,7 +93,7 @@ func TestPandoraSender(t *testing.T) {
 	d["d"] = "2016/11/01 12:00:00.123456" + zoneValue
 	err = s.Send([]Data{d})
 	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
+		err = st.SendError
 	}
 	if err != nil {
 		t.Error(err)
@@ -116,7 +115,7 @@ func TestPandoraSender(t *testing.T) {
 	}
 	err = s.Send([]Data{d})
 	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
+		err = st.SendError
 	}
 	if err != nil {
 		t.Error(err)
@@ -163,7 +162,7 @@ func TestPandoraSender(t *testing.T) {
 	s.opt.updateInterval = 0
 	err = s.Send([]Data{d})
 	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
+		err = st.SendError
 	}
 	if err != nil {
 		t.Error(err)
@@ -194,7 +193,7 @@ func TestPandoraSender(t *testing.T) {
 	s.opt.updateInterval = 0
 	err = s.Send([]Data{d})
 	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
+		err = st.SendError
 	}
 	if err != nil {
 		t.Error(err)
@@ -237,7 +236,7 @@ func TestNestPandoraSender(t *testing.T) {
 	}
 	err = s.Send([]Data{d})
 	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
+		err = st.SendError
 	}
 	if err != nil {
 		t.Error(err)
@@ -276,7 +275,7 @@ func TestUUIDPandoraSender(t *testing.T) {
 	d["x1"] = "hh"
 	err = s.Send([]Data{d})
 	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
+		err = st.SendError
 	}
 	if err != nil {
 		t.Error(err)
@@ -629,7 +628,7 @@ func TestUpdatePandoraSchema(t *testing.T) {
 	d["x1"] = "hh"
 	err = s.Send([]Data{d})
 	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
+		err = st.SendError
 	}
 	if err != nil {
 		t.Error(err)
@@ -641,7 +640,7 @@ func TestUpdatePandoraSchema(t *testing.T) {
 	d["x2"] = 2
 	err = s.Send([]Data{d})
 	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
+		err = st.SendError
 	}
 	if err != nil {
 		t.Error(err)
@@ -666,7 +665,7 @@ func TestUpdatePandoraSchema(t *testing.T) {
 	d["x3"] = 2.1
 	err = s.Send([]Data{d})
 	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
+		err = st.SendError
 	}
 	if err != nil {
 		t.Error(err)
@@ -714,7 +713,7 @@ func TestUpdatePandoraSchema(t *testing.T) {
 	d["x3"] = tm
 	err = s.Send([]Data{d})
 	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
+		err = st.SendError
 	}
 	if err != nil {
 		t.Error(err)
@@ -734,7 +733,7 @@ func TestUpdatePandoraSchema(t *testing.T) {
 	d["x4"] = 1
 	err = s.Send([]Data{d})
 	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
+		err = st.SendError
 	}
 	if err != nil {
 		t.Error(err)
@@ -837,7 +836,7 @@ func TestConvertDataPandoraSender(t *testing.T) {
 	d["x1"] = "123.2"
 	err = s.Send([]Data{d})
 	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
+		err = st.SendError
 	}
 	if err != nil {
 		t.Error(err)
@@ -877,7 +876,7 @@ func TestPandoraSenderTime(t *testing.T) {
 	d["x1"] = "123.2"
 	err = s.Send([]Data{d})
 	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
+		err = st.SendError
 	}
 	if err != nil {
 		t.Error(err)
@@ -910,7 +909,7 @@ func TestPandoraSenderTime(t *testing.T) {
 	d["x1"] = "123.2"
 	err = s.Send([]Data{d})
 	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
+		err = st.SendError
 	}
 	if err != nil {
 		t.Error(err)
@@ -967,7 +966,7 @@ func TestPandoraSenderTime(t *testing.T) {
 	d["x1"] = "123.2"
 	err = s.Send([]Data{d})
 	if st, ok := err.(*StatsError); ok {
-		err = st.ErrorDetail
+		err = st.SendError
 	}
 	if err != nil {
 		t.Error(err)
@@ -1016,11 +1015,10 @@ func TestErrPandoraSender(t *testing.T) {
 		t.Errorf("expect StatsError, but got: %v", err)
 	}
 
-	sendError, ok := st.ErrorDetail.(*reqerr.SendError)
-	if !ok {
+	if st.SendError == nil {
 		t.Errorf("expect SendError, but got: %v", err)
 	}
-	assert.Equal(t, []map[string]interface{}{{"PointFailedSendx1": "x1Val"}}, sendError.GetFailDatas())
+	assert.Equal(t, []map[string]interface{}{{"PointFailedSendx1": "x1Val"}}, st.SendError.GetFailDatas())
 	assert.Equal(t, int64(1), st.Errors)
 	assert.Equal(t, int64(2), st.Success)
 }

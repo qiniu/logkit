@@ -1,6 +1,7 @@
 package conf
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -36,8 +37,8 @@ func ErrConfKeyType(key, dataType string) error {
 	return fmt.Errorf("TypeError: The configs must contains %s, dataType must be %s", key, dataType)
 }
 
-func ErrMissConfigAliasMap(detailKeys string) error {
-	return fmt.Errorf("AliasMapType must use format \"a b\" or \"a\",and split with \",\"")
+func ErrMissConfigAliasMap() error {
+	return errors.New("AliasMapType must use format \"a b\" or \"a\",and split with \",\"")
 }
 
 func (conf MapConf) Get(key string) (interface{}, error) {
@@ -222,7 +223,7 @@ func (conf MapConf) GetAliasMap(key string) (map[string]string, error) {
 		case 2:
 			name, alias = splits[0], splits[1]
 		default:
-			return newV, ErrMissConfigAliasMap(trimI)
+			return newV, ErrMissConfigAliasMap()
 		}
 		newV[name] = alias
 	}
@@ -290,7 +291,7 @@ func GetEnv(env string) string {
 func GetEnvValue(envName string) (string, error) {
 	envName = strings.TrimSpace(envName)
 	if envName == "" {
-		return "", fmt.Errorf("environment name is empty")
+		return "", errors.New("environment name is empty")
 	}
 	if osEnv := os.Getenv(envName); osEnv != "" {
 		return osEnv, nil

@@ -116,7 +116,7 @@ func (s *Sender) Send(datas []Data) error {
 	for filename := range batchDatas {
 		bytes, err := s.marshalFunc(batchDatas[filename])
 		if err != nil {
-			ste.ErrorDetail = reqerr.NewSendError(
+			ste.SendError = reqerr.NewSendError(
 				fmt.Sprintf("%s marshal data failed: %v", s.Name(), err),
 				sender.ConvertDatasBack(datas),
 				reqerr.TypeDefault,
@@ -128,7 +128,7 @@ func (s *Sender) Send(datas []Data) error {
 
 		_, err = s.writers.Write(filename, bytes)
 		if err != nil {
-			ste.ErrorDetail = reqerr.NewSendError(
+			ste.SendError = reqerr.NewSendError(
 				fmt.Sprintf("%s write data to file failed: %v", s.Name(), err),
 				sender.ConvertDatasBack(datas),
 				reqerr.TypeDefault,

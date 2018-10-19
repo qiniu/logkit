@@ -7,8 +7,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/qiniu/logkit/utils/models"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
+
+	"github.com/qiniu/logkit/utils/models"
 )
 
 func Test_HandleStat(t *testing.T) {
@@ -38,22 +39,23 @@ func Test_HandleStat(t *testing.T) {
 	assert.Equal(t, int64(30), fs.stats.Errors)
 
 	se := &models.StatsError{
-		ErrorDetail: errors.New("i am detail"),
 		StatsInfo: models.StatsInfo{
-			Success: 100,
-			Errors:  20,
+			Success:   100,
+			Errors:    20,
+			LastError: "i am detail",
 		},
 	}
 
 	fs.stats.Errors = 0
 	fs.stats.Success = 0
-	err = fs.handleStat(se, false, 30)
-	assert.Equal(t, "i am detail", err.Error())
+	err = fs.handleStat(se, false, 130)
+	assert.Equal(t, "success 100 errors 20 last error i am detail, send error detail <nil>", err.Error())
 	assert.Equal(t, "i am detail", fs.stats.LastError)
-	assert.Equal(t, int64(20), fs.stats.Errors)
+	assert.Equal(t, int64(0), fs.stats.Success)
+	assert.Equal(t, int64(130), fs.stats.Errors)
 
 	se = &models.StatsError{
-		ErrorDetail: reqerr.NewSendError("senderror", nil, "no"),
+		SendError: reqerr.NewSendError("senderror", nil, "no"),
 		StatsInfo: models.StatsInfo{
 			Success: 100,
 			Errors:  20,
@@ -63,8 +65,7 @@ func Test_HandleStat(t *testing.T) {
 	fs.stats.Errors = 0
 	fs.stats.Success = 0
 	err = fs.handleStat(se, false, 30)
-	assert.Equal(t, "SendError: senderror, failDatas size : 0", err.Error())
+	assert.Equal(t, "success 100 errors 20 last error , send error detail SendError: senderror, failDatas size : 0", err.Error())
 	assert.Equal(t, "SendError: senderror, failDatas size : 0", fs.stats.LastError)
 	assert.Equal(t, int64(20), fs.stats.Errors)
-
 }
