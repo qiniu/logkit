@@ -118,3 +118,29 @@ var (
 		ToolTip:      "如果key中带有时区信息，则以该时区作为offset的基础时区，否则以UTC时区为基础时区",
 	}
 )
+
+type TransformInfo struct {
+	CurData Data
+	Index   int
+}
+
+type TransformResult struct {
+	Index   int
+	CurData Data
+	Err     error
+	ErrNum  int
+}
+
+type TransformResultSlice []TransformResult
+
+func (slice TransformResultSlice) Len() int {
+	return len(slice)
+}
+
+func (slice TransformResultSlice) Less(i, j int) bool {
+	return slice[i].Index < slice[j].Index
+}
+
+func (slice TransformResultSlice) Swap(i, j int) {
+	slice[i], slice[j] = slice[j], slice[i]
+}

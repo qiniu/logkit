@@ -674,10 +674,10 @@
 			"revisionTime": "2017-01-30T11:31:45Z"
 		},
 		{
-			"checksumSHA1": "kBA6oOPn+zjf0OXDas1vnOhqKU0=",
+			"checksumSHA1": "IEgxXMF1+l3TBYxew8GxC9m083U=",
 			"path": "github.com/ua-parser/uap-go/uaparser",
-			"revision": "3ecf81168f828e6f335fa615097569a5ad3afcdd",
-			"revisionTime": "2018-01-08T17:11:26Z"
+			"revision": "705feb871b1a6ed93a9163eba6d6f2d963eb5020",
+			"revisionTime": "2018-10-03T03:33:59Z"
 		},
 		{
 			"checksumSHA1": "ZUu/tNw07VWinMKe/4T3ylceyp8=",
