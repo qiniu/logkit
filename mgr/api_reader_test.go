@@ -10,8 +10,8 @@ import (
 )
 
 type respReaderRet struct {
-	Code string `json:"code"`
-	Data string `json:"data"`
+	Code string   `json:"code"`
+	Data []string `json:"data"`
 }
 
 // Rest 测试 端口容易冲突导致混淆，61xx
@@ -45,7 +45,8 @@ func readerAPITest(p *testParam) {
 		"meta_path":"./readerAPITest1/meta_req_csv",
 		"mode":"dir",
 		"read_from":"oldest",
-		"ignore_hidden":"true"
+		"ignore_hidden":"true",
+		"raw_data_lines":"1"
 	}`
 	logfile := "./readerAPITest/logdir/log1"
 	logdir := "./readerAPITest/logdir"
@@ -69,7 +70,7 @@ func readerAPITest(p *testParam) {
 	if err = jsoniter.Unmarshal(respBody, &got3); err != nil {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
-	expect := "abc\n"
+	expect := []string{"abc\n"}
 	assert.Equal(t, expect, got3.Data)
 
 	// Test reader/check with date transformer
