@@ -118,10 +118,17 @@ func NewSender(conf conf.MapConf) (s sender.Sender, err error) {
 		}
 	}()
 
-	datasource, _ := conf.GetStringOr(sender.KeyMySQLDataSource, "")
-	table, _ := conf.GetStringOr(sender.KeyMySQLTable, "")
+	datasource, err := conf.GetPasswordEnvString(sender.KeyMySQLDataSource)
+	if err != nil {
+		return nil, err
+	}
+	table, err := conf.GetString(sender.KeyMySQLTable)
+	if err != nil {
+		return nil, err
+	}
 	name, _ := conf.GetStringOr(sender.KeyName, "")
 	rate, _ := conf.GetInt64Or(sender.KeyMaxSendRate, -1)
+
 	return &Sender{
 		name: name,
 		c: &dbconn{
