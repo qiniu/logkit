@@ -590,8 +590,12 @@ func (sf *SeqFile) Lag() (rl *LagInfo, err error) {
 	if err != nil {
 		return rl, fmt.Errorf("ReadDirByTime err %v, can't get stats", err)
 	}
+	condition := sf.getIgnoreCondition()
 	for _, l := range logs {
 		if l.IsDir() {
+			continue
+		}
+		if condition == nil || !condition(l) {
 			continue
 		}
 		rl.Size += l.Size()
