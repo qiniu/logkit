@@ -3,9 +3,9 @@ package mutate
 import (
 	"testing"
 
-	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 
+	"github.com/qiniu/logkit/transforms"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -37,4 +37,16 @@ func TestSplitTransformer(t *testing.T) {
 	assert.Equal(t, exp2, data2)
 
 	assert.Equal(t, gsub2.Stage(), transforms.StageAfterParser)
+
+	gsub3 := &Spliter{
+		Key:         "multi.myword",
+		SeperateKey: " ",
+	}
+	_, err3 := gsub3.Transform([]Data{
+		{"multi": map[string]interface{}{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}},
+	})
+	assert.NotNil(t, err3)
+	expectErr := "find total 1 erorrs in transform split, last error info is array name is empty string,can't use as array field key name"
+	assert.EqualValues(t, expectErr, err3.Error())
+	assert.Equal(t, expectErr, gsub3.stats.LastError)
 }

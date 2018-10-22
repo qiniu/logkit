@@ -33,8 +33,7 @@ func (g *Spliter) Transform(datas []Data) ([]Data, error) {
 		g.ArraryName = g.ArraryNameNew
 	}
 	if g.ArraryName == "" {
-		fmtErr = errors.New("array name is empty string,can't use as array field key name")
-		g.stats.LastError = fmtErr.Error()
+		err = errors.New("array name is empty string,can't use as array field key name")
 		errNum = len(datas)
 	} else {
 		keys := GetKeys(g.Key)
