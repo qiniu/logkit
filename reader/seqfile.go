@@ -588,6 +588,7 @@ func (sf *SeqFile) Lag() (rl *LagInfo, err error) {
 
 	logs, err := ReadDirByTime(sf.dir)
 	if err != nil {
+		rl.Size = 0
 		return rl, fmt.Errorf("ReadDirByTime err %v, can't get stats", err)
 	}
 	condition := sf.getIgnoreCondition()
@@ -604,6 +605,9 @@ func (sf *SeqFile) Lag() (rl *LagInfo, err error) {
 		}
 	}
 
+	if rl.Size < 0 {
+		rl.Size = 0
+	}
 	return rl, nil
 }
 

@@ -338,5 +338,8 @@ func (sf *SingleFile) Lag() (rl *LagInfo, err error) {
 	}
 	rl.Size += fi.Size()
 
+	if rl.Size < 0 {
+		rl.Size = 0
+	}
 	return rl, nil
 }
