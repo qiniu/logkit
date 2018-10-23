@@ -332,7 +332,7 @@ func TestLag(t *testing.T) {
 
 	rl, err = sf.Lag()
 	assert.NoError(t, err)
-	assert.Equal(t, &LagInfo{16, "bytes", 0, 0}, rl)
+	assert.Equal(t, &LagInfo{8, "bytes", 0, 0}, rl)
 }
 
 func Test_NewFileNewLine2(t *testing.T) {
