@@ -42,6 +42,7 @@ func TestStart(t *testing.T) {
 	funcMap := map[string]func(*testing.T){
 		"multiReaderOneLineTest":          multiReaderOneLineTest,
 		"multiReaderMultiLineTest":        multiReaderMultiLineTest,
+		"multiReaderEmptyDirxTest":        multiReaderEmptyDirxTest,
 		"multiReaderSyncMetaOneLineTest":  multiReaderSyncMetaOneLineTest,
 		"multiReaderSyncMetaMutilineTest": multiReaderSyncMetaMutilineTest,
 	}
@@ -677,4 +678,73 @@ func TestReaderErrBegin(t *testing.T) {
 	}
 	assert.NoError(t, dr.Close())
 	t.Log("Reader has closed")
+}
+
+func multiReaderEmptyDirxTest(t *testing.T) {
+	dirName := "multiReaderEmptyDirxTest"
+	dir1 := filepath.Join(dirName, "logs/abc")
+	dir2 := filepath.Join(dirName, "logs/xyz")
+	dir1file1 := filepath.Join(dir1, "file1.log")
+
+	createDirWithName(dirName)
+	defer os.RemoveAll(dirName)
+
+	createDirWithName(dir1)
+	createFileWithContent(dir1file1, "abc123\nabc123\nabc123\nabc123\nabc123\n")
+	createDirWithName(dir2)
+	go func() {
+		time.Sleep(5 * time.Second)
+		dir1file2 := filepath.Join(dir1, "file2.log")
+		createFileWithContent(dir1file2, "xyz1\nxyz2\nxyz3\nxyz4\nxyz5\nxyz6\nxyz7\nxyz8\nxyz9\nxyz10\n")
+	}()
+
+	logPathPattern := filepath.Join(dirName, "logs/*")
+	c := conf.MapConf{
+		"log_path":        logPathPattern,
+		"stat_interval":   "1s",
+		"expire":          "0s",
+		"submeta_expire":  "720h",
+		"max_open_files":  "128",
+		"read_from":       "newest",
+		"reader_buf_size": "1024",
+		"meta_path":       dirName,
+		"mode":            reader.ModeDirx,
+	}
+	meta, err := reader.NewMetaWithConf(c)
+	assert.Nil(t, err)
+	r, err := NewReader(meta, c)
+	assert.Nil(t, err)
+
+	dr := r.(*Reader)
+	assert.NoError(t, dr.Start())
+	t.Log("Reader has started")
+
+	maxNum := 0
+	emptyNum := 0
+	var lastError error
+	for {
+		data, err := dr.ReadLine()
+		if data != "" {
+			t.Log("Data:", data, maxNum)
+			maxNum++
+		} else {
+			if err != nil {
+				lastError = err
+			}
+			emptyNum++
+		}
+		if err == io.EOF {
+			break
+		}
+		if maxNum >= 10 {
+			break
+		}
+	}
+	t.Log("Reader has finished reading one")
+	assert.Equal(t, 10, maxNum)
+	if emptyNum < 0 {
+		t.Fatalf("expect > 0, but got: %d", emptyNum)
+	}
+	assert.NotNil(t, lastError)
+	assert.Equal(t, "file does not exist", lastError.Error())
 }
