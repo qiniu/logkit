@@ -338,9 +338,8 @@ func (r *Reader) ReadLine() (string, error) {
 	case msg := <-r.msgChan:
 		r.currentFile = msg.logpath
 		return msg.result, nil
-	case err := <-r.errChan:
-		return "", err
 	case <-timer.C:
+		return "", r.readError()
 	}
 
 	return "", nil
@@ -397,4 +396,13 @@ func (r *Reader) Close() error {
 
 func (r *Reader) Reset() error {
 	return r.dirReaders.Reset()
+}
+
+func (r *Reader) readError() error {
+	select {
+	case err := <-r.errChan:
+		return err
+	default:
+		return nil
+	}
 }
