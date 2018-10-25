@@ -128,6 +128,8 @@ type PandoraOption struct {
 	tokenLock *sync.RWMutex
 
 	autoCreateDescription string
+
+	timeout time.Duration
 }
 
 //PandoraMaxBatchSize 发送到Pandora的batch限制
@@ -220,6 +222,11 @@ func NewSender(conf logkitconf.MapConf) (pandoraSender sender.Sender, err error)
 	numberUseFloat, _ := conf.GetBoolOr(sender.KeyNumberUseFloat, false)
 	unescape, _ := conf.GetBoolOr(sender.KeyPandoraUnescape, false)
 	insecureServer, _ := conf.GetBoolOr(sender.KeyInsecureServer, false)
+	timeoutDur, _ := conf.GetStringOr(sender.KeyTimeout, "30s")
+	timeout, err := time.ParseDuration(timeoutDur)
+	if err != nil {
+		return nil, err
+	}
 
 	sendType, _ := conf.GetStringOr(sender.KeyPandoraSendType, SendTypeNormal)
 	description, _ := conf.GetStringOr(sender.KeyPandoraDescription, "")
@@ -304,6 +311,8 @@ func NewSender(conf logkitconf.MapConf) (pandoraSender sender.Sender, err error)
 		tokenLock: new(sync.RWMutex),
 
 		autoCreateDescription: description,
+
+		timeout: timeout,
 	}
 	if withIp {
 		opt.withip = "logkitIP"
@@ -486,8 +495,11 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 		WithRequestRateLimit(opt.reqRateLimit).
 		WithFlowRateLimit(opt.flowRateLimit).
 		WithGzipData(opt.gzip).
-		WithHeaderUserAgent(opt.useragent).WithInsecureServer(opt.insecureServer).
-		WithDefaultRegion(s.opt.region)
+		WithHeaderUserAgent(opt.useragent).
+		WithInsecureServer(opt.insecureServer).
+		WithDefaultRegion(s.opt.region).
+		WithResponseTimeout(opt.timeout)
+
 	if opt.logdbendpoint != "" {
 		config = config.WithLogDBEndpoint(opt.logdbendpoint)
 	}
