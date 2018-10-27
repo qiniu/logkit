@@ -623,6 +623,16 @@ var ModeKeyOptions = map[string][]Option{
 			Advance:       true,
 			ToolTip:       `对于https等情况不对证书和安全性检验`,
 		},
+		{
+			KeyName:      KeyTimeout,
+			ChooseOnly:   false,
+			Default:      "30s",
+			DefaultNoUse: false,
+			Description:  "发送数据超时时间(pandora_send_timeout)",
+			Advance:      true,
+			CheckRegex:   "\\d+[hms]",
+			ToolTip:      `设置发送数据超时时间，写法为：数字加单位符号，支持时h、分m、秒s为单位，例如3h(3小时)、10m(10分钟)、5s(5秒)，默认的timeout时间是30s，当timeout时间为0s时表示永不超时`,
+		},
 	},
 	TypeMongodbAccumulate: {
 		{

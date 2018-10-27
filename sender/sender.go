@@ -61,6 +61,7 @@ const (
 	KeyPandoraUnescape        = "pandora_unescape"
 	KeyPandoraSendType        = "pandora_send_type"
 	KeyInsecureServer         = "insecure_server"
+	KeyTimeout                = "pandora_send_timeout"
 	KeyPandoraDescription     = "pandora_description"
 
 	PandoraUUID = "Pandora_UUID"
