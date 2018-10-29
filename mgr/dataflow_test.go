@@ -23,6 +23,7 @@ import (
 )
 
 func Test_RawData(t *testing.T) {
+	t.Parallel()
 	var testRawData = `{
     "name":"testGetRawData.csv",
     "batch_len": 3,
@@ -84,6 +85,7 @@ func Test_RawData(t *testing.T) {
 }
 
 func Test_RawDataWithReadData(t *testing.T) {
+	t.Parallel()
 	var testRawData = `{
     "name":"testReadData",
     "batch_len": 3,
@@ -133,6 +135,7 @@ func Test_RawDataWithReadData(t *testing.T) {
 }
 
 func Test_RawData_DaemonReader(t *testing.T) {
+	t.Parallel()
 	var testRawData = `{
     "name":"testGetRawData.csv",
     "batch_len": 3,
@@ -140,8 +143,8 @@ func Test_RawData_DaemonReader(t *testing.T) {
     "batch_interval": 60,
     "batch_try_times": 3, 
     "reader":{
-        "log_path":"./Test_RawData/logdir/*",
-        "meta_path":"./Test_RawData1/meta_req_csv",
+        "log_path":"./Test_RawData_DaemonReader/logdir/*",
+        "meta_path":"./Test_RawData_DaemonReader1/meta_req_csv",
         "mode":"tailx",
         "read_from":"oldest",
         "ignore_hidden":"true",
@@ -149,14 +152,14 @@ func Test_RawData_DaemonReader(t *testing.T) {
     }
 }
 `
-	logfile := "./Test_RawData/logdir/log1"
-	logdir := "./Test_RawData/logdir"
-	if err := os.MkdirAll("./Test_RawData/confs1", 0777); err != nil {
+	logfile := "./Test_RawData_DaemonReader/logdir/log1"
+	logdir := "./Test_RawData_DaemonReader/logdir"
+	if err := os.MkdirAll("./Test_RawData_DaemonReader/confs1", 0777); err != nil {
 		t.Error(err)
 	}
 	defer func() {
-		os.RemoveAll("./Test_RawData")
-		os.RemoveAll("./Test_RawData1")
+		os.RemoveAll("./Test_RawData_DaemonReader")
+		os.RemoveAll("./Test_RawData_DaemonReader1")
 	}()
 
 	if err := os.MkdirAll(logdir, 0777); err != nil {
@@ -166,7 +169,7 @@ func Test_RawData_DaemonReader(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	err = ioutil.WriteFile("./Test_RawData/confs1/test1.conf", []byte(testRawData), 0666)
+	err = ioutil.WriteFile("./Test_RawData_DaemonReader/confs1/test1.conf", []byte(testRawData), 0666)
 	if err != nil {
 		t.Error(err)
 	}
@@ -174,7 +177,7 @@ func Test_RawData_DaemonReader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	confPathAbs, _, err := GetRealPath("./Test_RawData/confs1/test1.conf")
+	confPathAbs, _, err := GetRealPath("./Test_RawData_DaemonReader/confs1/test1.conf")
 	if err != nil {
 		t.Error(err)
 	}
@@ -195,6 +198,7 @@ func Test_RawData_DaemonReader(t *testing.T) {
 }
 
 func Test_ParseData(t *testing.T) {
+	t.Parallel()
 	c := conf.MapConf{}
 	c[parser.KeyParserName] = "testparser"
 	c[parser.KeyParserType] = "csv"
@@ -250,6 +254,7 @@ func Test_ParseData(t *testing.T) {
 }
 
 func Test_TransformData(t *testing.T) {
+	t.Parallel()
 	config1 := `{
 			"type":"IP",
 			"key":  "ip",
@@ -275,6 +280,7 @@ func Test_TransformData(t *testing.T) {
 }
 
 func Test_getTransformerCreator(t *testing.T) {
+	t.Parallel()
 	config1 := `{
 			"type":"IP",
 			"key":  "ip",
@@ -296,6 +302,7 @@ func Test_getTransformerCreator(t *testing.T) {
 }
 
 func Test_getDataFromTransformConfig(t *testing.T) {
+	t.Parallel()
 	config1 := `{
 			"type":"IP",
 			"key":  "ip",
@@ -321,6 +328,7 @@ func Test_getDataFromTransformConfig(t *testing.T) {
 }
 
 func Test_getTransformer(t *testing.T) {
+	t.Parallel()
 	config1 := `{
 			"type":"IP",
 			"key":  "ip",
@@ -346,6 +354,7 @@ func Test_getTransformer(t *testing.T) {
 }
 
 func Test_SendData(t *testing.T) {
+	t.Parallel()
 	c := conf.MapConf{
 		reader.KeyHTTPServiceAddress: "127.0.0.1:8000",
 		reader.KeyHTTPServicePath:    "/logkit/data",
@@ -453,6 +462,7 @@ func Test_SendData(t *testing.T) {
 }
 
 func Test_getSendersConfig(t *testing.T) {
+	t.Parallel()
 	testInput := `[
 		{
 			"a": 1,
@@ -495,6 +505,7 @@ func Test_getSendersConfig(t *testing.T) {
 }
 
 func Test_getDataFromSenderConfig(t *testing.T) {
+	t.Parallel()
 	testInput := `[
 		{
 			"a": 1,
@@ -539,6 +550,7 @@ func Test_getDataFromSenderConfig(t *testing.T) {
 }
 
 func Test_getSenders(t *testing.T) {
+	t.Parallel()
 	var sendersConfig []conf.MapConf
 	senderConf := conf.MapConf{
 		sender.KeySenderType:         sender.TypeHttp,
@@ -562,13 +574,13 @@ func Test_getSenders(t *testing.T) {
 }
 
 func Test_RawData_MutliLines(t *testing.T) {
-	fileName := filepath.Join(os.TempDir(), "TestProRawData")
+	t.Parallel()
+	fileName := filepath.Join(os.TempDir(), "Test_RawData_MutliLines")
 	//create file & write file
 	err := createFile(fileName, 20000000)
 	if err != nil {
 		t.Error(err)
 	}
-	//createRawDataFile(fileName, "TestProRawData01\nTestProRawData02\nTestProRawData03\nTestProRawData04\nTestProRawData05\nTestProRawData06\n")
 	defer os.RemoveAll(fileName)
 
 	readConfig := conf.MapConf{
@@ -592,6 +604,12 @@ func Test_RawData_MutliLines(t *testing.T) {
 	actual, err = RawData(readConfig)
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"abc\n", "abc\n"}, actual)
+
+	os.RemoveAll(fileName)
+	createRawDataFile(fileName, "abc\n")
+	actual, err = RawData(readConfig)
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"abc\n"}, actual)
 }
 
 // createRawDataFile creates file in given path.

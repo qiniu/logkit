@@ -104,7 +104,7 @@ func RawData(readerConfig conf.MapConf) ([]string, error) {
 
 	case <-timeout.C:
 		atomic.StoreInt32(&timeoutStatus, 1)
-		return nil, fmt.Errorf("reader %q read timeout, no data received", rd.Name())
+		return readRawData(readChan, rd.Name())
 	}
 
 	if len(rawData) >= DefaultMaxBatchSize {
@@ -543,4 +543,19 @@ func checkLineSize(rawData string, size int) string {
 	return rawData[:size] +
 		fmt.Sprintf(" ......(only show %d bytes, remain %d bytes)",
 			size, size)
+}
+
+// readChan 也是通过 timeoutStatus 判断是否超时，超时之后返回的值需要进一步获取，因此等待一秒之后获取 readChan 的值
+func readRawData(readChan chan dataResult, name string) ([]string, error) {
+	time.Sleep(time.Second)
+	select {
+	case rc := <-readChan:
+		rawData, err := rc.data, rc.lastErr
+		if err != nil {
+			return nil, fmt.Errorf("reader %q - error: %v", name, err)
+		}
+		return rawData, err
+	default:
+		return nil, fmt.Errorf("reader %q read timeout, no data received", name)
+	}
 }
