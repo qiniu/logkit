@@ -238,7 +238,7 @@ func main() {
 	if conf.TimeLayouts != nil {
 		times.AddLayout(conf.TimeLayouts)
 	}
-	if conf.MaxProcs == 0 {
+	if conf.MaxProcs <= 0 {
 		conf.MaxProcs = NumCPU
 	}
 	MaxProcs = conf.MaxProcs

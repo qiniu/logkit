@@ -91,18 +91,20 @@ func NewFtSender(innerSender Sender, conf conf.MapConf, ftSaveLogPath string) (*
 	default:
 		return nil, errors.New("no match ft_strategy")
 	}
-	procs, _ := conf.GetIntOr(KeyFtProcs, defaultMaxProcs)
 	runnerName, _ := conf.GetStringOr(KeyRunnerName, UnderfinedRunnerName)
 	maxDiskUsedBytes, _ := conf.GetInt64Or(KeyMaxDiskUsedBytes, maxDiskUsedBytes)
 	maxSizePerFile, _ := conf.GetInt32Or(KeyMaxSizePerFile, maxBytesPerFile)
 	discardErr, _ := conf.GetBoolOr(KeyFtDiscardErr, false)
+	if MaxProcs <= 0 {
+		MaxProcs = NumCPU
+	}
 
 	opt := &FtOption{
 		saveLogPath:       logPath,
 		syncEvery:         int64(syncEvery),
 		writeLimit:        writeLimit,
 		strategy:          strategy,
-		procs:             procs,
+		procs:             MaxProcs,
 		memoryChannel:     memoryChannel,
 		memoryChannelSize: memoryChannelSize,
 		longDataDiscard:   longDataDiscard,
