@@ -622,6 +622,11 @@ func (m *Manager) Configs() (rss map[string]RunnerConfig) {
 
 func (m *Manager) getDeepCopyConfig(name string) (filename string, conf RunnerConfig, err error) {
 	filename = filepath.Join(m.RestDir, name+".conf")
+	conf, err = m.getDeepCopyConfigWithFilename(filename)
+	return
+}
+
+func (m *Manager) getDeepCopyConfigWithFilename(filename string) (conf RunnerConfig, err error) {
 	m.runnerLock.RLock()
 	defer m.runnerLock.RUnlock()
 	if tmpConf, ok := m.runnerConfigs[filename]; !ok {
@@ -803,23 +808,31 @@ func (m *Manager) StartRunner(name string) (err error) {
 	if err != nil {
 		return err
 	}
-	if conf.IsStopped == false {
-		return fmt.Errorf("runner %v has already started", filename)
+
+	if err = m.startRunner(filename, conf); err != nil {
+		return err
 	}
-	conf.IsStopped = false
-	if err = m.ForkRunner(filename, conf, true); err != nil {
-		return fmt.Errorf("forkRunner %v error %v", filename, err)
-	}
+
 	if err = m.backupRunnerConfig(filename, conf); err != nil {
 		// 备份配置文件失败，回滚
 		if subErr := m.RemoveWithConfig(filename, false); subErr != nil {
-			log.Errorf("runner %v start backup config error and rollback error %v", name, subErr)
+			log.Errorf("runner %v start backup config error and rollback error %v", filename, subErr)
 		} else {
 			conf.IsStopped = true
 			m.setRunnerConfig(filename, conf)
 		}
 	}
+
 	return
+}
+
+func (m *Manager) StartRunnerWithFilename(filename string) (err error) {
+	conf, err := m.getDeepCopyConfigWithFilename(filename)
+	if err != nil {
+		return err
+	}
+
+	return m.startRunner(filename, conf)
 }
 
 func (m *Manager) setRunnerConfig(filename string, conf RunnerConfig) {
@@ -833,26 +846,28 @@ func (m *Manager) StopRunner(name string) (err error) {
 	if err != nil {
 		return err
 	}
-	if conf.IsStopped == true {
-		return fmt.Errorf("runner %v has already stopped", filename)
+	err = m.stopRunner(filename, conf)
+	if err != nil {
+		return err
 	}
-	conf.IsStopped = true
-	if !m.IsRunning(filename) {
-		m.setRunnerConfig(filename, conf)
-		return
-	}
-	if err = m.RemoveWithConfig(filename, false); err != nil {
-		return fmt.Errorf("remove runner %v error %v", filename, err)
-	}
-	m.setRunnerConfig(filename, conf)
+
 	if err = m.backupRunnerConfig(filename, conf); err != nil {
 		// 备份配置文件失败，回滚
 		conf.IsStopped = false
 		if subErr := m.ForkRunner(filename, conf, true); subErr != nil {
-			log.Errorf("runner %v stop backup config error and rollback error %v", name, subErr)
+			log.Errorf("runner %v stop backup config error and rollback error %v", filename, subErr)
 		}
 	}
-	return
+	return err
+}
+
+func (m *Manager) StopRunnerWithFilename(filename string) error {
+	conf, err := m.getDeepCopyConfigWithFilename(filename)
+	if err != nil {
+		return err
+	}
+
+	return m.stopRunner(filename, conf)
 }
 
 //ResetRunner 必须在runner实例存在下才可以reset, reset是调用runner本身的方法，
@@ -940,4 +955,43 @@ func (m *Manager) DeleteRunner(name string) (err error) {
 		return fmt.Errorf("remove runner %v error %v", filename, err)
 	}
 	return
+}
+
+func (m *Manager) GetRunnerNames() []string {
+	m.runnerLock.RLock()
+	defer m.runnerLock.RUnlock()
+	var runnerNames = make([]string, 0, len(m.runners))
+	for name := range m.runners {
+		runnerNames = append(runnerNames, name)
+	}
+	return runnerNames
+}
+
+func (m *Manager) startRunner(filename string, conf RunnerConfig) (err error) {
+	if conf.IsStopped == false {
+		return fmt.Errorf("runner %v has already started", filename)
+	}
+	conf.IsStopped = false
+	if err = m.ForkRunner(filename, conf, true); err != nil {
+		return fmt.Errorf("forkRunner %v error %v", filename, err)
+	}
+
+	return nil
+}
+
+func (m *Manager) stopRunner(filename string, conf RunnerConfig) (err error) {
+	if conf.IsStopped == true {
+		return fmt.Errorf("runner %v has already stopped", filename)
+	}
+	conf.IsStopped = true
+	if !m.IsRunning(filename) {
+		m.setRunnerConfig(filename, conf)
+		return nil
+	}
+	if err = m.RemoveWithConfig(filename, false); err != nil {
+		return fmt.Errorf("remove runner %v error %v", filename, err)
+	}
+	m.setRunnerConfig(filename, conf)
+
+	return nil
 }

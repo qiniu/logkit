@@ -299,9 +299,7 @@ func Test_Watch(t *testing.T) {
 	}
 	time.Sleep(5 * time.Second) //因为使用了异步add runners 有可能还没执行完。
 	var runnerLength int
-	m.runnerLock.Lock()
-	runnerLength = len(m.runners)
-	m.runnerLock.Unlock()
+	runnerLength = len(m.GetRunnerNames())
 	if runnerLength != 2 {
 		t.Fatalf("runners exp 2 but got %v", runnerLength)
 	}
@@ -314,9 +312,7 @@ func Test_Watch(t *testing.T) {
 	}
 
 	if !tryTest(10, func() bool {
-		m.runnerLock.RLock()
-		runnerLength = len(m.runners)
-		m.runnerLock.RUnlock()
+		runnerLength = len(m.GetRunnerNames())
 		return runnerLength == 3
 	}) {
 		t.Fatalf("runners exp 3 after add test3.conf but got %v", runnerLength)
@@ -337,9 +333,7 @@ func Test_Watch(t *testing.T) {
 	}
 
 	if !tryTest(10, func() bool {
-		m.runnerLock.Lock()
-		runnerLength = len(m.runners)
-		m.runnerLock.Unlock()
+		runnerLength = len(m.GetRunnerNames())
 		return runnerLength == 4
 	}) {
 		t.Fatalf("runners exp 4 after add test4.conf but got %v", runnerLength)
@@ -393,9 +387,7 @@ func Test_Watch(t *testing.T) {
 	// 移除一个文件，变成三个runner
 	os.Remove("./tests/confs1/test4.conf")
 	if !tryTest(10, func() bool {
-		m.runnerLock.Lock()
-		runnerLength = len(m.runners)
-		m.runnerLock.Unlock()
+		runnerLength = len(m.GetRunnerNames())
 		return runnerLength == 3
 	}) {
 		t.Fatalf("runners exp 3 after remove test4.conf but got %v", runnerLength)
@@ -408,9 +400,7 @@ func Test_Watch(t *testing.T) {
 	// 移除一个文件，变回两个runner
 	os.Remove("./tests/confs2/test3.conf")
 	if !tryTest(10, func() bool {
-		m.runnerLock.Lock()
-		runnerLength = len(m.runners)
-		m.runnerLock.Unlock()
+		runnerLength = len(m.GetRunnerNames())
 		return runnerLength == 2
 	}) {
 		t.Fatalf("runners exp 2 after remove test3.conf but got %v", runnerLength)
