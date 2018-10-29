@@ -148,6 +148,7 @@ func (this *Sender) Send(data []Data) error {
 		statsError      = &StatsError{}
 		statsLastError  string
 		ignoreDataCount int
+		failedDatas     = make([]map[string]interface{}, 0)
 	)
 	for _, doc := range data {
 		message, err := this.getEventMessage(doc)
@@ -155,19 +156,21 @@ func (this *Sender) Send(data []Data) error {
 			log.Debugf("Dropping event: %v", err)
 			statsError.AddErrors()
 			statsError.LastError = err.Error()
+			failedDatas = append(failedDatas, doc)
 			ignoreDataCount++
 			continue
 		}
 		msgs = append(msgs, message)
 	}
+	if statsError.LastError != "" {
+		statsError.LastError = fmt.Sprintf("ignore %d datas, last error: %s", ignoreDataCount, statsError.LastError) + "\n"
+	}
+
 	err := producer.SendMessages(msgs)
 	if err != nil {
 		statsError.AddErrorsNum(len(msgs))
 		pde, ok := err.(sarama.ProducerErrors)
 		if !ok {
-			if statsError.LastError != "" {
-				statsError.LastError = fmt.Sprintf("ignore %d datas, last error: %s", ignoreDataCount, statsError.LastError) + "\n"
-			}
 			statsError.LastError += err.Error()
 			return statsError
 		}
@@ -191,16 +194,24 @@ func (this *Sender) Send(data []Data) error {
 		if allcir {
 			statsLastError = fmt.Sprintf("%v, all error is circuit breaker is open", err)
 		}
-		if statsError.LastError != "" {
-			statsError.LastError = fmt.Sprintf("ignore %d datas, last error: %s", ignoreDataCount, statsError.LastError) + "\n"
-		}
 		statsError.LastError += statsLastError
 		return statsError
 	}
+
 	statsError.AddSuccessNum(len(msgs))
 	//本次发送成功, lastError 置为 nil
 	this.lastError = nil
-	return statsError
+
+	if statsError.Errors > 0 {
+		statsError.SendError = reqerr.NewSendError(
+			fmt.Sprintf("bulk failed with last error: %s", statsError.LastError),
+			failedDatas,
+			reqerr.TypeDefault,
+		)
+		return statsError
+	}
+
+	return nil
 }
 
 func (kf *Sender) getEventMessage(event map[string]interface{}) (pm *sarama.ProducerMessage, err error) {
