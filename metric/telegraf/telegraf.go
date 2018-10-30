@@ -145,6 +145,7 @@ func (c *Collector) Config() map[string]interface{} {
 
 func (c *Collector) Collect() ([]map[string]interface{}, error) {
 	acc := new(Accumulator)
+	acc.name = c.name
 	if err := c.Gather(acc); err != nil {
 		return nil, fmt.Errorf("failed to gather %q from telegraf: %v", c.name, err)
 	}
