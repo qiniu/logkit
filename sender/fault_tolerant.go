@@ -377,7 +377,7 @@ func (ft *FtSender) trySendDatas(datas []Data, failSleep int, isRetry bool) (bac
 	}
 
 	err = ft.handleStat(err, isRetry, dataLen)
-	if err == nil {
+	if empty := isErrorEmpty(err); empty {
 		return nil, nil
 	}
 
@@ -688,4 +688,20 @@ func SplitDataWithSplitSize(data string, splitSize int64) (valArray []string) {
 		valArray = append(valArray, string(dataConverse[end:]))
 	}
 	return valArray
+}
+
+func isErrorEmpty(err error) bool {
+	if err == nil {
+		return true
+	}
+
+	se, succ := err.(*StatsError)
+	if !succ {
+		return false
+	}
+	if se.LastError == "" && se.SendError == nil {
+		return true
+	}
+
+	return false
 }

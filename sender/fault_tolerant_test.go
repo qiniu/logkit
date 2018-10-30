@@ -69,3 +69,75 @@ func Test_HandleStat(t *testing.T) {
 	assert.Equal(t, "SendError: senderror, failDatas size : 0", fs.stats.LastError)
 	assert.Equal(t, int64(20), fs.stats.Errors)
 }
+
+func Test_isErrorEmpty(t *testing.T) {
+	tests := []struct {
+		err error
+		res bool
+	}{
+		{
+			err: nil,
+			res: true,
+		},
+		{
+			err: errors.New("test error"),
+			res: false,
+		},
+		{
+			err: &models.StatsError{
+				StatsInfo: models.StatsInfo{
+					Success: 10,
+					Errors:  0,
+				},
+			},
+			res: true,
+		},
+		{
+			err: &models.StatsError{
+				StatsInfo: models.StatsInfo{
+					Success:   10,
+					Errors:    1,
+					LastError: "last error is test error",
+				},
+			},
+			res: false,
+		},
+		{
+			err: &models.StatsError{
+				StatsInfo: models.StatsInfo{
+					Success: 10,
+					Errors:  1,
+				},
+				SendError: reqerr.NewSendError(
+					"bulk failed with last error: error test",
+					[]map[string]interface{}{
+						{"a": "b"},
+					},
+					reqerr.TypeDefault,
+				),
+			},
+			res: false,
+		},
+		{
+			err: &models.StatsError{
+				StatsInfo: models.StatsInfo{
+					Success:   10,
+					Errors:    1,
+					LastError: "last error is error test",
+				},
+				SendError: reqerr.NewSendError(
+					"bulk failed with last error: error test",
+					[]map[string]interface{}{
+						{"c": "d"},
+					},
+					reqerr.TypeDefault,
+				),
+			},
+			res: false,
+		},
+	}
+
+	for _, test := range tests {
+		assert.Equal(t, test.res, isErrorEmpty(test.err))
+	}
+}
