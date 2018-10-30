@@ -1112,7 +1112,7 @@ func restoreErrorStatisic(sts ErrorStatistic) *equeue.ErrorQueue {
 	for i := 0; i < maxSize; i++ {
 		if idx >= len(sts.ErrorSlice) {
 			log.Warnf("statistic restore error, index should never larger than slice capacity")
-			continue
+			break
 		}
 		q.Put(sts.ErrorSlice[idx])
 		idx = (idx + 1) % maxSize
