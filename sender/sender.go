@@ -171,6 +171,7 @@ const (
 	KeyHttpTimeout        = "http_sender_timeout"
 	KeyHttpSenderCsvHead  = "http_sender_csv_head"
 	KeyHttpSenderCsvSplit = "http_sender_csv_split"
+	KeyHttpSenderTemplate = "http_sender_template"
 	SendProtocolCSV       = "csv"
 	SendProtocolJson      = "json"
 	SendProtocolWholeJson = "body_json"
