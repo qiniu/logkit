@@ -404,13 +404,14 @@ func NewFullText(analyzer string) FullText {
 
 type CreateRepoInput struct {
 	PandoraToken
-	RepoName     string
-	Region       string            `json:"region"`
-	Retention    string            `json:"retention"`
-	Schema       []RepoSchemaEntry `json:"schema"`
-	PrimaryField string            `json:"primaryField"`
-	FullText     FullText          `json:"fullText"`
-	Description  *string           `json:"description"`
+	RepoName       string
+	Region         string            `json:"region"`
+	Retention      string            `json:"retention"`
+	Schema         []RepoSchemaEntry `json:"schema"`
+	FullText       FullText          `json:"fullText"`
+	Description    *string           `json:"description"`
+	PrimaryField   string            `json:"primaryField"`
+	DateIndexField string            `json:"dateIndexField"`
 }
 
 func (r *CreateRepoInput) Validate() (err error) {
@@ -482,25 +483,27 @@ type GetRepoInput struct {
 }
 
 type GetRepoOutput struct {
-	Region       string            `json:"region"`
-	Retention    string            `json:"retention"`
-	Schema       []RepoSchemaEntry `json:"schema"`
-	PrimaryField string            `json:"primaryField"`
-	CreateTime   string            `json:"createTime"`
-	UpdateTime   string            `json:"updateTime"`
-	FullText     FullText          `json:"fullText"`
-	Description  *string           `json:"description"`
+	Region         string            `json:"region"`
+	Retention      string            `json:"retention"`
+	Schema         []RepoSchemaEntry `json:"schema"`
+	CreateTime     string            `json:"createTime"`
+	UpdateTime     string            `json:"updateTime"`
+	FullText       FullText          `json:"fullText"`
+	Description    *string           `json:"description"`
+	PrimaryField   string            `json:"primaryField"`
+	DateIndexField string            `json:"dateIndexField"`
 }
 
 type RepoDesc struct {
-	RepoName     string   `json:"name"`
-	Region       string   `json:"region"`
-	PrimaryField string   `json:"primaryField"`
-	Retention    string   `json:"retention"`
-	CreateTime   string   `json:"createTime"`
-	UpdateTime   string   `json:"updateTime"`
-	FullText     FullText `json:"fullText"`
-	Description  *string  `json:"description"`
+	RepoName       string   `json:"name"`
+	Region         string   `json:"region"`
+	Retention      string   `json:"retention"`
+	CreateTime     string   `json:"createTime"`
+	UpdateTime     string   `json:"updateTime"`
+	FullText       FullText `json:"fullText"`
+	Description    *string  `json:"description"`
+	PrimaryField   string   `json:"primaryField"`
+	DateIndexField string   `json:"dateIndexField"`
 }
 
 type ListReposInput struct {

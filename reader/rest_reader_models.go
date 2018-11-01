@@ -85,9 +85,10 @@ const (
 )
 
 const (
-	SocketRulePacket = "按原始包读取"
-	SocketRuleJson   = "按json格式读取"
-	SocketRuleLine   = "按换行符读取"
+	SocketRulePacket      = "按原始包读取"
+	SocketRuleJson        = "按json格式读取"
+	SocketRuleLine        = "按换行符读取"
+	SocketRuleHeadPattern = "按行首正则读取"
 )
 
 // Constants for SNMP
@@ -142,9 +143,10 @@ const (
 	// socket_service_address = "udp6://:3110"
 	// socket_service_address = "unix:///tmp/sys.sock"
 	// socket_service_address = "unixgram:///tmp/sys.sock"
-	KeySocketServiceAddress = "socket_service_address"
-	KeySocketSplitByLine    = "socket_split_by_line"
-	KeySocketRule           = "socket_rule"
+	KeySocketServiceAddress  = "socket_service_address"
+	KeySocketSplitByLine     = "socket_split_by_line"
+	KeySocketRule            = "socket_rule"
+	KeySocketRuleHeadPattern = "head_pattern"
 
 	// 最大并发连接数
 	// 仅用于 stream sockets (e.g. TCP).
@@ -1115,12 +1117,22 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:       KeySocketRule,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{SocketRulePacket, SocketRuleLine, SocketRuleJson},
-			Default:       "false",
+			ChooseOptions: []interface{}{SocketRulePacket, SocketRuleLine, SocketRuleJson}, //SocketRuleHeadPattern,
+			Default:       SocketRulePacket,
 			Advance:       true,
 			Description:   "获取方式(socket_rule)",
 			ToolTip:       "默认对socket内容按包获取, json仅对tcp有效",
 		},
+		//{
+		//	KeyName:            KeySocketRuleHeadPattern,
+		//	ChooseOnly:         false,
+		//	Default:            "",
+		//	DefaultNoUse:       false,
+		//	Description:        "正则表达式规则(head_pattern)",
+		//	AdvanceDepend:      KeySocketRule,
+		//	AdvanceDependValue: SocketRuleHeadPattern,
+		//	ToolTip:            "选则按行首正则读取，请填写head_pattern，表示匹配多行时新的一行的开始符合该正则表达式",
+		//},
 		{
 			KeyName:      KeySocketReadTimeout,
 			ChooseOnly:   false,
