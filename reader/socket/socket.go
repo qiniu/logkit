@@ -226,10 +226,9 @@ func (ssr *streamSocketReader) jsonRead(c net.Conn) {
 				if err != nil {
 					log.Errorf("runner[%v] Reader %q read decoder buffered error: %v", ssr.meta.RunnerName, ssr.Name(), err)
 				} else {
-					log.Errorf("runner[%v] Reader %q read streaming message: %v", ssr.meta.RunnerName, ssr.Name(), TruncateStrSize(string(readBytes), 2048))
+					log.Infof("runner[%v] Reader %q read streaming message:{ %v }, will combine it to next json decoder", ssr.meta.RunnerName, ssr.Name(), TruncateStrSize(string(readBytes), 2048))
 				}
 				decoder = json.NewDecoder(bufioReader)
-				log.Errorf("runner[%v] Reader %q decode message error %v", ssr.meta.RunnerName, ssr.Name(), err)
 				time.Sleep(time.Second)
 				continue
 			}
