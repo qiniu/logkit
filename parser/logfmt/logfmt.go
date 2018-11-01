@@ -11,11 +11,12 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	. "github.com/qiniu/logkit/parser/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
 func init() {
-	parser.RegisterConstructor(parser.TypeLogfmt, NewParser)
+	parser.RegisterConstructor(TypeLogfmt, NewParser)
 }
 
 type Parser struct {
@@ -25,8 +26,8 @@ type Parser struct {
 }
 
 func NewParser(c conf.MapConf) (parser.Parser, error) {
-	name, _ := c.GetStringOr(parser.KeyParserName, "")
-	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
+	name, _ := c.GetStringOr(KeyParserName, "")
+	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
 	numRoutine := MaxProcs
 	if numRoutine == 0 {
 		numRoutine = 1
@@ -153,5 +154,5 @@ func (p *Parser) Name() string {
 }
 
 func (p *Parser) Type() string {
-	return parser.TypeLogfmt
+	return TypeLogfmt
 }

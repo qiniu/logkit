@@ -8,6 +8,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -50,11 +51,11 @@ func NewCleaner(conf conf.MapConf, meta *reader.Meta, cleanChan chan<- CleanSign
 		return nil, nil
 	}
 	mode := meta.GetMode()
-	if mode != reader.ModeDir &&
-		mode != reader.ModeFile &&
-		mode != reader.ModeCloudTrail &&
-		mode != reader.ModeTailx &&
-		mode != reader.ModeDirx {
+	if mode != config.ModeDir &&
+		mode != config.ModeFile &&
+		mode != config.ModeCloudTrail &&
+		mode != config.ModeTailx &&
+		mode != config.ModeDirx {
 		log.Errorf("Cleaner only supports reader mode dir|file|cloudtrail|tailx|dirx, current mode is %v, cleaner disabled", meta.GetMode())
 		return nil, nil
 	}
@@ -70,7 +71,7 @@ func NewCleaner(conf conf.MapConf, meta *reader.Meta, cleanChan chan<- CleanSign
 		reserveSize = defaultReserveFileSize
 	}
 	reserveSize = reserveSize * MB
-	if mode != reader.ModeTailx && mode != reader.ModeDirx {
+	if mode != config.ModeTailx && mode != config.ModeDirx {
 		var err error
 		logdir, _, err = GetRealPath(logdir)
 		if err != nil {
@@ -132,7 +133,7 @@ func (c *Cleaner) checkBelong(path string) bool {
 	}
 
 	switch c.meta.GetMode() {
-	case reader.ModeTailx:
+	case config.ModeTailx:
 		matched, err := filepath.Match(filepath.Dir(c.logdir), filepath.Dir(path))
 		if err != nil {
 			log.Errorf("Failed to check if %q belongs to %q: %v", path, c.logdir, err)
@@ -140,7 +141,7 @@ func (c *Cleaner) checkBelong(path string) bool {
 		}
 		return matched
 
-	case reader.ModeDirx:
+	case config.ModeDirx:
 		matched, err := filepath.Match(c.logdir, filepath.Dir(path))
 		if err != nil {
 			log.Errorf("Failed to check if %q belongs to %q: %v", path, c.logdir, err)

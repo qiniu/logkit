@@ -21,6 +21,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -31,7 +32,7 @@ var (
 )
 
 func init() {
-	reader.RegisterConstructor(reader.ModeSnmp, NewReader)
+	reader.RegisterConstructor(ModeSnmp, NewReader)
 }
 
 type readInfo struct {
@@ -99,43 +100,43 @@ func execCmd(arg0 string, args ...string) ([]byte, error) {
 }
 
 func NewReader(meta *reader.Meta, c conf.MapConf) (reader.Reader, error) {
-	name, _ := c.GetStringOr(reader.KeySnmpReaderName, "logkit_default_snmp_name")
-	agents, _ := c.GetStringListOr(reader.KeySnmpReaderAgents, []string{"127.0.0.1:161"})
-	tableHost, _ := c.GetStringOr(reader.KeySnmpTableInitHost, "127.0.0.1")
-	timeStr, _ := c.GetStringOr(reader.KeySnmpReaderTimeOut, "5s")
+	name, _ := c.GetStringOr(KeySnmpReaderName, "logkit_default_snmp_name")
+	agents, _ := c.GetStringListOr(KeySnmpReaderAgents, []string{"127.0.0.1:161"})
+	tableHost, _ := c.GetStringOr(KeySnmpTableInitHost, "127.0.0.1")
+	timeStr, _ := c.GetStringOr(KeySnmpReaderTimeOut, "5s")
 	timeOut, err := time.ParseDuration(timeStr)
 	if err != nil {
 		return nil, err
 	}
-	intervalStr, _ := c.GetStringOr(reader.KeySnmpReaderInterval, "30s")
+	intervalStr, _ := c.GetStringOr(KeySnmpReaderInterval, "30s")
 	interval, err := time.ParseDuration(intervalStr)
 	if err != nil {
 		return nil, err
 	}
-	retries, _ := c.GetIntOr(reader.KeySnmpReaderRetries, 3)
-	version, _ := c.GetIntOr(reader.KeySnmpReaderVersion, 2)
+	retries, _ := c.GetIntOr(KeySnmpReaderRetries, 3)
+	version, _ := c.GetIntOr(KeySnmpReaderVersion, 2)
 	var maxRepetitions, engineBoots, engineTime int
 	var community, contextName, secLevel, secName, authProtocol, authPassword, privProtocol, privPassword, engineID string
 	if version == 1 || version == 2 {
-		community, _ = c.GetStringOr(reader.KeySnmpReaderCommunity, "public")
+		community, _ = c.GetStringOr(KeySnmpReaderCommunity, "public")
 	}
 	if version == 2 || version == 3 {
-		maxRepetitions, _ = c.GetIntOr(reader.KeySnmpReaderMaxRepetitions, 50)
+		maxRepetitions, _ = c.GetIntOr(KeySnmpReaderMaxRepetitions, 50)
 	}
 	if version == 3 {
-		contextName, _ = c.GetStringOr(reader.KeySnmpReaderContextName, "")
-		secLevel, _ = c.GetStringOr(reader.KeySnmpReaderSecLevel, reader.SnmpReaderAuthProtocolNoAuthNoPriv)
-		secName, _ = c.GetStringOr(reader.KeySnmpReaderSecName, "user")
-		authProtocol, _ = c.GetStringOr(reader.KeySnmpReaderAuthProtocol, reader.SnmpReaderAuthProtocolNoAuth)
-		authPassword, _ = c.GetPasswordEnvStringOr(reader.KeySnmpReaderAuthPassword, "")
-		privProtocol, _ = c.GetStringOr(reader.KeySnmpReaderPrivProtocol, reader.SnmpReaderAuthProtocolNoPriv)
-		privPassword, _ = c.GetStringOr(reader.KeySnmpReaderPrivPassword, "mypass")
-		engineID, _ = c.GetString(reader.KeySnmpReaderEngineID)
-		engineBoots, _ = c.GetInt(reader.KeySnmpReaderEngineBoots)
-		engineTime, _ = c.GetInt(reader.KeySnmpReaderEngineTime)
+		contextName, _ = c.GetStringOr(KeySnmpReaderContextName, "")
+		secLevel, _ = c.GetStringOr(KeySnmpReaderSecLevel, SnmpReaderAuthProtocolNoAuthNoPriv)
+		secName, _ = c.GetStringOr(KeySnmpReaderSecName, "user")
+		authProtocol, _ = c.GetStringOr(KeySnmpReaderAuthProtocol, SnmpReaderAuthProtocolNoAuth)
+		authPassword, _ = c.GetPasswordEnvStringOr(KeySnmpReaderAuthPassword, "")
+		privProtocol, _ = c.GetStringOr(KeySnmpReaderPrivProtocol, SnmpReaderAuthProtocolNoPriv)
+		privPassword, _ = c.GetStringOr(KeySnmpReaderPrivPassword, "mypass")
+		engineID, _ = c.GetString(KeySnmpReaderEngineID)
+		engineBoots, _ = c.GetInt(KeySnmpReaderEngineBoots)
+		engineTime, _ = c.GetInt(KeySnmpReaderEngineTime)
 	}
-	tableConf, _ := c.GetStringOr(reader.KeySnmpReaderTables, "[]")
-	fieldConf, _ := c.GetStringOr(reader.KeySnmpReaderFields, "[]")
+	tableConf, _ := c.GetStringOr(KeySnmpReaderTables, "[]")
+	fieldConf, _ := c.GetStringOr(KeySnmpReaderFields, "[]")
 
 	var tables []Table
 	var fields []Field
@@ -163,8 +164,8 @@ func NewReader(meta *reader.Meta, c conf.MapConf) (reader.Reader, error) {
 	}
 	return &Reader{
 		meta:            meta,
-		status:          reader.StatusInit,
-		routineStatus:   reader.StatusInit,
+		status:          StatusInit,
+		routineStatus:   StatusInit,
 		stopChan:        make(chan struct{}),
 		readChan:        make(chan readInfo, 1000),
 		errChan:         make(chan error),
@@ -193,11 +194,11 @@ func NewReader(meta *reader.Meta, c conf.MapConf) (reader.Reader, error) {
 }
 
 func (r *Reader) isStopping() bool {
-	return atomic.LoadInt32(&r.status) == reader.StatusStopping
+	return atomic.LoadInt32(&r.status) == StatusStopping
 }
 
 func (r *Reader) hasStopped() bool {
-	return atomic.LoadInt32(&r.status) == reader.StatusStopped
+	return atomic.LoadInt32(&r.status) == StatusStopped
 }
 
 func (r *Reader) Name() string {
@@ -223,7 +224,7 @@ func (r *Reader) sendError(err error) {
 func (r *Reader) Start() error {
 	if r.isStopping() || r.hasStopped() {
 		return errors.New("reader is stopping or has stopped")
-	} else if !atomic.CompareAndSwapInt32(&r.status, reader.StatusInit, reader.StatusRunning) {
+	} else if !atomic.CompareAndSwapInt32(&r.status, StatusInit, StatusRunning) {
 		log.Warnf("Runner[%v] %q daemon has already started and is running", r.meta.RunnerName, r.Name())
 		return nil
 	}
@@ -241,7 +242,7 @@ func (r *Reader) Start() error {
 
 			select {
 			case <-r.stopChan:
-				atomic.StoreInt32(&r.status, reader.StatusStopped)
+				atomic.StoreInt32(&r.status, StatusStopped)
 				log.Infof("Runner[%v] %q daemon has stopped from running", r.meta.RunnerName, r.Name())
 				return
 			case <-ticker.C:
@@ -277,7 +278,7 @@ func (r *Reader) ReadData() (Data, int64, error) {
 func (r *Reader) SyncMeta() {}
 
 func (r *Reader) Close() error {
-	if !atomic.CompareAndSwapInt32(&r.status, reader.StatusRunning, reader.StatusStopping) {
+	if !atomic.CompareAndSwapInt32(&r.status, StatusRunning, StatusStopping) {
 		log.Warnf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
 		return nil
 	}
@@ -285,7 +286,7 @@ func (r *Reader) Close() error {
 	close(r.stopChan)
 
 	// 如果此时没有 routine 正在运行，则在此处关闭数据管道，否则由 routine 在退出时负责关闭
-	if atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusInit, reader.StatusStopping) {
+	if atomic.CompareAndSwapInt32(&r.routineStatus, StatusInit, StatusStopping) {
 		close(r.readChan)
 		close(r.errChan)
 	}
@@ -401,7 +402,7 @@ func (r *Reader) StoreData(datas []Data) (err error) {
 
 func (r *Reader) Gather() error {
 	// 未在准备状态（StatusInit）时无法执行此次任务
-	if !atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusInit, reader.StatusRunning) {
+	if !atomic.CompareAndSwapInt32(&r.routineStatus, StatusInit, StatusRunning) {
 		if r.isStopping() || r.hasStopped() {
 			log.Warnf("Runner[%v] %q daemon has stopped, this task does not need to be executed and is skipped this time", r.meta.RunnerName, r.Name())
 		} else {
@@ -412,13 +413,13 @@ func (r *Reader) Gather() error {
 	defer func() {
 		// 如果 reader 在 routine 运行时关闭，则需要此 routine 负责关闭数据管道
 		if r.isStopping() || r.hasStopped() {
-			if atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusRunning, reader.StatusStopping) {
+			if atomic.CompareAndSwapInt32(&r.routineStatus, StatusRunning, StatusStopping) {
 				close(r.readChan)
 				close(r.errChan)
 			}
 			return
 		}
-		atomic.StoreInt32(&r.routineStatus, reader.StatusInit)
+		atomic.StoreInt32(&r.routineStatus, StatusInit)
 	}()
 
 	var wg sync.WaitGroup
@@ -499,8 +500,8 @@ func (r *Reader) gatherTable(gs snmpConnection, t Table, topTags map[string]stri
 		for k, v := range tr.Tags {
 			data[k] = v
 		}
-		data[reader.KeyTimestamp] = rt.Time
-		data[reader.KeySnmpTableName] = t.Name
+		data[KeyTimestamp] = rt.Time
+		data[KeySnmpTableName] = t.Name
 		datas = append(datas, data)
 	}
 	return datas, nil

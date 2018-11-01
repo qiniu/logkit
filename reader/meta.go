@@ -17,6 +17,7 @@ import (
 	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/conf"
+	. "github.com/qiniu/logkit/reader/config"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"

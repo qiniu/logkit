@@ -14,6 +14,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
+	. "github.com/qiniu/logkit/sender/config"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -35,33 +36,33 @@ type Sender struct {
 }
 
 func init() {
-	sender.RegisterConstructor(sender.TypeMongodbAccumulate, NewSender)
+	sender.RegisterConstructor(TypeMongodbAccumulate, NewSender)
 }
 
 // NewMongodbAccSender mongodb accumulate sender constructor
 func NewSender(conf conf.MapConf) (mongodbSender sender.Sender, err error) {
-	host, err := conf.GetPasswordEnvString(sender.KeyMongodbHost)
+	host, err := conf.GetPasswordEnvString(KeyMongodbHost)
 	if err != nil {
 		return nil, err
 	}
 
-	dbName, err := conf.GetString(sender.KeyMongodbDB)
+	dbName, err := conf.GetString(KeyMongodbDB)
 	if err != nil {
 		return nil, err
 	}
-	updKey, err := conf.GetAliasList(sender.KeyMongodbUpdateKey)
+	updKey, err := conf.GetAliasList(KeyMongodbUpdateKey)
 	if err != nil {
 		return nil, err
 	}
-	accKey, err := conf.GetAliasList(sender.KeyMongodbAccKey)
+	accKey, err := conf.GetAliasList(KeyMongodbAccKey)
 	if err != nil {
 		return nil, err
 	}
-	collectionName, err := conf.GetString(sender.KeyMongodbCollection)
+	collectionName, err := conf.GetString(KeyMongodbCollection)
 	if err != nil {
 		return nil, err
 	}
-	name, _ := conf.GetStringOr(sender.KeyName, fmt.Sprintf("mongodb_acc:(%v,db:%v,collection:%v)", host, dbName, collectionName))
+	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("mongodb_acc:(%v,db:%v,collection:%v)", host, dbName, collectionName))
 	return newSender(name, host, dbName, collectionName, updKey, accKey)
 }
 

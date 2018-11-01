@@ -11,6 +11,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
+	. "github.com/qiniu/logkit/sender/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -28,7 +29,7 @@ type Sender struct {
 }
 
 func init() {
-	sender.RegisterConstructor(sender.TypeFile, NewSender)
+	sender.RegisterConstructor(TypeFile, NewSender)
 }
 
 func newSender(name, pattern, timestampKey string, maxOpenFile int, marshalFunc func([]Data) ([]byte, error)) (*Sender, error) {
@@ -61,13 +62,13 @@ func jsonMarshalWithNewLineFunc(datas []Data) ([]byte, error) {
 }
 
 func NewSender(conf conf.MapConf) (sender.Sender, error) {
-	path, err := conf.GetString(sender.KeyFileSenderPath)
+	path, err := conf.GetString(KeyFileSenderPath)
 	if err != nil {
 		return nil, err
 	}
-	name, _ := conf.GetStringOr(sender.KeyName, "fileSender:"+path)
-	timestampKey, _ := conf.GetStringOr(sender.KeyFileSenderTimestampKey, "")
-	maxOpenFile, _ := conf.GetIntOr(sender.KeyFileSenderMaxOpenFiles, defaultFileWriterPoolSize)
+	name, _ := conf.GetStringOr(KeyName, "fileSender:"+path)
+	timestampKey, _ := conf.GetStringOr(KeyFileSenderTimestampKey, "")
+	maxOpenFile, _ := conf.GetIntOr(KeyFileSenderMaxOpenFiles, defaultFileWriterPoolSize)
 	s, err := newSender(name, path, timestampKey, maxOpenFile, jsonMarshalWithNewLineFunc)
 	if err != nil {
 		return nil, err

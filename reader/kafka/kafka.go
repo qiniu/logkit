@@ -15,6 +15,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -25,7 +26,7 @@ var (
 )
 
 func init() {
-	reader.RegisterConstructor(reader.ModeKafka, NewReader)
+	reader.RegisterConstructor(ModeKafka, NewReader)
 }
 
 type Reader struct {
@@ -54,22 +55,22 @@ type Reader struct {
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 
-	whence, _ := conf.GetStringOr(reader.KeyWhence, reader.WhenceOldest)
-	consumerGroup, err := conf.GetString(reader.KeyKafkaGroupID)
+	whence, _ := conf.GetStringOr(KeyWhence, WhenceOldest)
+	consumerGroup, err := conf.GetString(KeyKafkaGroupID)
 	if err != nil {
 		return nil, err
 	}
-	topics, err := conf.GetStringList(reader.KeyKafkaTopic)
+	topics, err := conf.GetStringList(KeyKafkaTopic)
 	if err != nil {
 		return nil, err
 	}
-	zookeeperTimeout, _ := conf.GetIntOr(reader.KeyKafkaZookeeperTimeout, 1)
+	zookeeperTimeout, _ := conf.GetIntOr(KeyKafkaZookeeperTimeout, 1)
 
-	zookeeper, err := conf.GetStringList(reader.KeyKafkaZookeeper)
+	zookeeper, err := conf.GetStringList(KeyKafkaZookeeper)
 	if err != nil {
 		return nil, err
 	}
-	zkchroot, _ := conf.GetStringOr(reader.KeyKafkaZookeeperChroot, "")
+	zkchroot, _ := conf.GetStringOr(KeyKafkaZookeeperChroot, "")
 	offsets := make(map[string]map[int32]int64)
 	for _, v := range topics {
 		offsets[v] = make(map[int32]int64)
@@ -125,11 +126,11 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 }
 
 func (r *Reader) isStopping() bool {
-	return atomic.LoadInt32(&r.status) == reader.StatusStopping
+	return atomic.LoadInt32(&r.status) == StatusStopping
 }
 
 func (r *Reader) hasStopped() bool {
-	return atomic.LoadInt32(&r.status) == reader.StatusStopped
+	return atomic.LoadInt32(&r.status) == StatusStopped
 }
 
 func (r *Reader) Name() string {
@@ -226,7 +227,7 @@ func (r *Reader) SyncMeta() {
 }
 
 func (r *Reader) Close() error {
-	if !atomic.CompareAndSwapInt32(&r.status, reader.StatusRunning, reader.StatusStopping) {
+	if !atomic.CompareAndSwapInt32(&r.status, StatusRunning, StatusStopping) {
 		log.Warnf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
 		return nil
 	}
@@ -236,6 +237,6 @@ func (r *Reader) Close() error {
 	defer r.lock.Unlock()
 
 	err := r.Consumer.Close()
-	atomic.StoreInt32(&r.status, reader.StatusStopped)
+	atomic.StoreInt32(&r.status, StatusStopped)
 	return err
 }

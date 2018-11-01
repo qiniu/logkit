@@ -11,6 +11,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -33,10 +34,10 @@ func Test_CheckBelong(t *testing.T) {
 	}
 	defer os.RemoveAll(logfiles)
 	c := conf.MapConf{}
-	c[reader.KeyMetaPath] = logfiles
+	c[config.KeyMetaPath] = logfiles
 	c[KeyCleanEnable] = "true"
-	c[reader.KeyLogPath] = logfiles
-	c[reader.KeyMode] = "dir"
+	c[config.KeyLogPath] = logfiles
+	c[config.KeyMode] = "dir"
 	meta, err := reader.NewMetaWithConf(c)
 	if err != nil {
 		t.Error(err)
@@ -118,9 +119,9 @@ func GetTestFiles(path string) error {
 func Test_clean(t *testing.T) {
 	donefiles := "Test_clean"
 	c := conf.MapConf{}
-	c[reader.KeyMetaPath] = donefiles
-	c[reader.KeyLogPath] = donefiles + "/" + "log"
-	c[reader.KeyMode] = "dir"
+	c[config.KeyMetaPath] = donefiles
+	c[config.KeyLogPath] = donefiles + "/" + "log"
+	c[config.KeyMode] = "dir"
 	c[KeyCleanEnable] = "true"
 	c[KeyReserveFileSize] = "15"
 	c[KeyReserveFileNumber] = "1"

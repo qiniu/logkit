@@ -17,6 +17,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -28,7 +29,7 @@ var (
 )
 
 func init() {
-	reader.RegisterConstructor(reader.ModeDirx, NewReader)
+	reader.RegisterConstructor(ModeDirx, NewReader)
 }
 
 type message struct {
@@ -68,41 +69,41 @@ type Reader struct {
 }
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
-	logPathPattern, err := conf.GetString(reader.KeyLogPath)
+	logPathPattern, err := conf.GetString(KeyLogPath)
 	if err != nil {
 		return nil, err
 	}
 
-	statIntervalDur, _ := conf.GetStringOr(reader.KeyStatInterval, "3m")
+	statIntervalDur, _ := conf.GetStringOr(KeyStatInterval, "3m")
 	statInterval, err := time.ParseDuration(statIntervalDur)
 	if err != nil {
 		return nil, err
 	}
 
-	expireDur, _ := conf.GetStringOr(reader.KeyExpire, "0s")
+	expireDur, _ := conf.GetStringOr(KeyExpire, "0s")
 	expire, err := time.ParseDuration(expireDur)
 	if err != nil {
 		return nil, err
 	}
 
-	submetaExpireDur, _ := conf.GetStringOr(reader.KeySubmetaExpire, "720h")
+	submetaExpireDur, _ := conf.GetStringOr(KeySubmetaExpire, "720h")
 	submetaExpire, err := time.ParseDuration(submetaExpireDur)
 	if err != nil {
 		return nil, err
 	}
 	// submetaExpire 为 0 时，不清理元数据
 	if IsSubmetaExpireValid(submetaExpire, expire) {
-		return nil, fmt.Errorf("%q valus is less than %q", reader.KeySubmetaExpire, reader.KeyExpire)
+		return nil, fmt.Errorf("%q valus is less than %q", KeySubmetaExpire, KeyExpire)
 	}
 
-	maxOpenFiles, _ := conf.GetIntOr(reader.KeyMaxOpenFiles, 256)
-	ignoreHidden, _ := conf.GetBoolOr(reader.KeyIgnoreHiddenFile, true) // 默认不读取隐藏文件
-	skipFirstLine, _ := conf.GetBoolOr(reader.KeySkipFileFirstLine, false)
-	newFileNewLine, _ := conf.GetBoolOr(reader.KeyNewFileNewLine, false)
-	ignoreFileSuffixes, _ := conf.GetStringListOr(reader.KeyIgnoreFileSuffix, reader.DefaultIgnoreFileSuffixes)
-	validFilesRegex, _ := conf.GetStringOr(reader.KeyValidFilePattern, "*")
-	whence, _ := conf.GetStringOr(reader.KeyWhence, reader.WhenceOldest)
-	bufferSize, _ := conf.GetIntOr(reader.KeyBufSize, reader.DefaultBufSize)
+	maxOpenFiles, _ := conf.GetIntOr(KeyMaxOpenFiles, 256)
+	ignoreHidden, _ := conf.GetBoolOr(KeyIgnoreHiddenFile, true) // 默认不读取隐藏文件
+	skipFirstLine, _ := conf.GetBoolOr(KeySkipFileFirstLine, false)
+	newFileNewLine, _ := conf.GetBoolOr(KeyNewFileNewLine, false)
+	ignoreFileSuffixes, _ := conf.GetStringListOr(KeyIgnoreFileSuffix, DefaultIgnoreFileSuffixes)
+	validFilesRegex, _ := conf.GetStringOr(KeyValidFilePattern, "*")
+	whence, _ := conf.GetStringOr(KeyWhence, WhenceOldest)
+	bufferSize, _ := conf.GetIntOr(KeyBufSize, reader.DefaultBufSize)
 
 	_, _, bufsize, err := meta.ReadBufMeta()
 	if err != nil {
@@ -133,7 +134,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 
 	return &Reader{
 		meta:               meta,
-		status:             reader.StatusInit,
+		status:             StatusInit,
 		stopChan:           make(chan struct{}),
 		msgChan:            make(chan message),
 		errChan:            make(chan error),
@@ -154,11 +155,11 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 }
 
 func (r *Reader) isStopping() bool {
-	return atomic.LoadInt32(&r.status) == reader.StatusStopping
+	return atomic.LoadInt32(&r.status) == StatusStopping
 }
 
 func (r *Reader) hasStopped() bool {
-	return atomic.LoadInt32(&r.status) == reader.StatusStopped
+	return atomic.LoadInt32(&r.status) == StatusStopped
 }
 
 func (r *Reader) Name() string {
@@ -258,7 +259,7 @@ func (r *Reader) statLogPath() {
 		}
 
 		if r.headRegexp != nil {
-			err = dr.br.SetMode(reader.ReadModeHeadPatternRegexp, r.headRegexp)
+			err = dr.br.SetMode(ReadModeHeadPatternRegexp, r.headRegexp)
 			if err != nil {
 				errMsg := fmt.Sprintf("Runner[%v] set mode for log path %q failed: %v", r.meta.RunnerName, logPath, err)
 				log.Error(errMsg)
@@ -284,7 +285,7 @@ func (r *Reader) statLogPath() {
 func (r *Reader) Start() error {
 	if r.isStopping() || r.hasStopped() {
 		return errors.New("reader is stopping or has stopped")
-	} else if !atomic.CompareAndSwapInt32(&r.status, reader.StatusInit, reader.StatusRunning) {
+	} else if !atomic.CompareAndSwapInt32(&r.status, StatusInit, StatusRunning) {
 		log.Warnf("Runner[%v] %q daemon has already started and is running", r.meta.RunnerName, r.Name())
 		return nil
 	}
@@ -298,7 +299,7 @@ func (r *Reader) Start() error {
 
 			select {
 			case <-r.stopChan:
-				atomic.StoreInt32(&r.status, reader.StatusStopped)
+				atomic.StoreInt32(&r.status, StatusStopped)
 				log.Infof("Runner[%v] %q daemon has stopped from running", r.meta.RunnerName, r.Name())
 				return
 			case <-ticker.C:
@@ -378,7 +379,7 @@ func (r *Reader) SyncMeta() {
 }
 
 func (r *Reader) Close() error {
-	if !atomic.CompareAndSwapInt32(&r.status, reader.StatusRunning, reader.StatusStopping) {
+	if !atomic.CompareAndSwapInt32(&r.status, StatusRunning, StatusStopping) {
 		log.Warnf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
 		return nil
 	}

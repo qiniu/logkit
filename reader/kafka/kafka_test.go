@@ -10,15 +10,16 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/reader/test"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
 func TestKafkaReader(t *testing.T) {
 	logkitConf := conf.MapConf{
-		reader.KeyMetaPath: MetaDir,
-		reader.KeyFileDone: MetaDir,
-		reader.KeyMode:     reader.ModeElastic,
+		KeyMetaPath: MetaDir,
+		KeyFileDone: MetaDir,
+		KeyMode:     ModeElastic,
 	}
 	meta, err := reader.NewMetaWithConf(logkitConf)
 	assert.NoError(t, err)

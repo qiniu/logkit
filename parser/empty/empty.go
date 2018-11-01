@@ -3,11 +3,12 @@ package parser
 import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	. "github.com/qiniu/logkit/parser/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
 func init() {
-	parser.RegisterConstructor(parser.TypeEmpty, NewParser)
+	parser.RegisterConstructor(TypeEmpty, NewParser)
 }
 
 type Parser struct {
@@ -15,7 +16,7 @@ type Parser struct {
 }
 
 func NewParser(c conf.MapConf) (parser.Parser, error) {
-	name, _ := c.GetStringOr(parser.KeyParserName, "")
+	name, _ := c.GetStringOr(KeyParserName, "")
 	return &Parser{
 		name: name,
 	}, nil

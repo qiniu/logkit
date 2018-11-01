@@ -7,11 +7,12 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	. "github.com/qiniu/logkit/parser/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
 func init() {
-	parser.RegisterConstructor(parser.TypeMySQL, NewParser)
+	parser.RegisterConstructor(TypeMySQL, NewParser)
 }
 
 type Parser struct {
@@ -24,14 +25,14 @@ type Parser struct {
 }
 
 func NewParser(c conf.MapConf) (parser.Parser, error) {
-	name, _ := c.GetStringOr(parser.KeyParserName, "")
-	labelList, _ := c.GetStringListOr(parser.KeyLabels, []string{})
+	name, _ := c.GetStringOr(KeyParserName, "")
+	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
 
 	nameMap := make(map[string]struct{})
 	labels := parser.GetLabels(labelList, nameMap)
 
-	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
-	keepRawData, _ := c.GetBoolOr(parser.KeyKeepRawData, false)
+	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)
 
 	return &Parser{
 		name:                 name,
@@ -47,11 +48,11 @@ func (p *Parser) Name() string {
 }
 
 func (p *Parser) Type() string {
-	return parser.TypeMySQL
+	return TypeMySQL
 }
 
 func (p *Parser) parse(line string) (d Data, err error) {
-	if line == parser.PandoraParseFlushSignal {
+	if line == PandoraParseFlushSignal {
 		return p.Flush()
 	}
 	if p.keepRawData {
@@ -69,7 +70,7 @@ func (p *Parser) parse(line string) (d Data, err error) {
 		d[l.Name] = l.Value
 	}
 	if p.keepRawData {
-		d[parser.KeyRawData] = strings.Join(p.rawDatas, "\n")
+		d[KeyRawData] = strings.Join(p.rawDatas, "\n")
 		p.rawDatas = p.rawDatas[:0:0]
 	}
 	return d, nil
@@ -94,7 +95,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			}
 			if p.keepRawData {
-				errData[parser.KeyRawData] = line
+				errData[KeyRawData] = line
 			}
 			if !p.disableRecordErrData || p.keepRawData {
 				datas = append(datas, errData)

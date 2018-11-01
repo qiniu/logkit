@@ -21,6 +21,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -43,7 +44,7 @@ var (
 )
 
 func init() {
-	reader.RegisterConstructor(reader.ModeCloudTrail, NewReader)
+	reader.RegisterConstructor(ModeCloudTrail, NewReader)
 }
 
 type Reader struct {
@@ -60,10 +61,10 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	validFilePattern, _ := conf.GetStringOr(reader.KeyValidFilePattern, "*")
-	bufSize, _ := conf.GetIntOr(reader.KeyBufSize, reader.DefaultBufSize)
-	skipFirstLine, _ := conf.GetBoolOr(reader.KeySkipFileFirstLine, false)
-	sf, err := reader.NewSeqFile(meta, opts.directory, true, true, ignoredSuffixes, validFilePattern, reader.WhenceOldest)
+	validFilePattern, _ := conf.GetStringOr(KeyValidFilePattern, "*")
+	bufSize, _ := conf.GetIntOr(KeyBufSize, reader.DefaultBufSize)
+	skipFirstLine, _ := conf.GetBoolOr(KeySkipFileFirstLine, false)
+	sf, err := reader.NewSeqFile(meta, opts.directory, true, true, ignoredSuffixes, validFilePattern, WhenceOldest)
 	if err != nil {
 		return nil, err
 	}
@@ -133,27 +134,27 @@ func invalidConfigError(key, value string, err error) error {
 }
 
 func GetS3UserInfo(conf conf.MapConf) (bucket, prefix, region, ak, sk string, err error) {
-	region, _ = conf.GetString(reader.KeyS3Region)
+	region, _ = conf.GetString(KeyS3Region)
 	if region == "" {
-		err = emptyConfigError(reader.KeyS3Region)
+		err = emptyConfigError(KeyS3Region)
 		return
 	}
-	ak, _ = conf.GetPasswordEnvString(reader.KeyS3AccessKey)
+	ak, _ = conf.GetPasswordEnvString(KeyS3AccessKey)
 	if ak == "" {
-		err = emptyConfigError(reader.KeyS3AccessKey)
+		err = emptyConfigError(KeyS3AccessKey)
 		return
 	}
-	sk, _ = conf.GetPasswordEnvString(reader.KeyS3SecretKey)
+	sk, _ = conf.GetPasswordEnvString(KeyS3SecretKey)
 	if sk == "" {
-		err = emptyConfigError(reader.KeyS3SecretKey)
+		err = emptyConfigError(KeyS3SecretKey)
 		return
 	}
-	bucket, _ = conf.GetString(reader.KeyS3Bucket)
+	bucket, _ = conf.GetString(KeyS3Bucket)
 	if bucket == "" {
-		err = emptyConfigError(reader.KeyS3Bucket)
+		err = emptyConfigError(KeyS3Bucket)
 		return
 	}
-	prefix, _ = conf.GetStringOr(reader.KeyS3Prefix, "")
+	prefix, _ = conf.GetStringOr(KeyS3Prefix, "")
 	return
 }
 
@@ -169,29 +170,29 @@ func buildSyncOptions(conf conf.MapConf) (*syncOptions, error) {
 	if err != nil {
 		return nil, err
 	}
-	opts.directory, _ = conf.GetStringOr(reader.KeySyncDirectory, "")
+	opts.directory, _ = conf.GetStringOr(KeySyncDirectory, "")
 	if opts.directory == "" {
 		opts.directory = GetDefaultSyncDir(opts.bucket, opts.prefix, opts.region, opts.accessKey, opts.secretKey, runnerName)
 	}
 	if err = os.MkdirAll(opts.directory, 0755); err != nil {
 		return nil, fmt.Errorf("cannot create target directory %q: %v", opts.directory, err)
 	}
-	opts.metastore, _ = conf.GetStringOr(reader.KeySyncMetastore, "")
+	opts.metastore, _ = conf.GetStringOr(KeySyncMetastore, "")
 	if opts.metastore == "" {
 		opts.metastore = GetDefaultMetaStore(opts.bucket, opts.prefix, opts.region, opts.accessKey, opts.secretKey, runnerName)
 	}
 
-	s, _ := conf.GetStringOr(reader.KeySyncInterval, "5m")
+	s, _ := conf.GetStringOr(KeySyncInterval, "5m")
 	if opts.interval, err = time.ParseDuration(s); err != nil {
-		return nil, invalidConfigError(reader.KeySyncInterval, s, err)
+		return nil, invalidConfigError(KeySyncInterval, s, err)
 	}
 	if opts.interval.Nanoseconds() <= 0 {
 		opts.interval = 5 * time.Minute
 	}
 
-	s, _ = conf.GetStringOr(reader.KeySyncConcurrent, "5")
+	s, _ = conf.GetStringOr(KeySyncConcurrent, "5")
 	if opts.concurrent, err = strconv.Atoi(s); err != nil {
-		return nil, invalidConfigError(reader.KeySyncInterval, s, err)
+		return nil, invalidConfigError(KeySyncInterval, s, err)
 	}
 	if opts.concurrent <= 0 {
 		opts.concurrent = 5

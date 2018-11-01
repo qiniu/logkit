@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/parser"
+	. "github.com/qiniu/logkit/parser/config"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -21,7 +21,7 @@ var (
 // now: 10	 139839802 ns/op	routine = 2  (2MB)
 func Benchmark_ParseLine(b *testing.B) {
 	c := conf.MapConf{}
-	c[parser.KeyParserName] = "testparser"
+	c[KeyParserName] = "testparser"
 	p, _ := NewParser(c)
 
 	var m []Data
@@ -100,7 +100,7 @@ func Test_parseLine(t *testing.T) {
 		},
 	}
 	l := Parser{
-		name: parser.TypeLogfmt,
+		name: TypeLogfmt,
 	}
 	for _, tt := range tests {
 
@@ -150,7 +150,7 @@ func TestParse(t *testing.T) {
 		},
 	}
 	l := Parser{
-		name: parser.TypeLogfmt,
+		name: TypeLogfmt,
 	}
 	for _, tt := range tests {
 		got, err := l.Parse(tt.s)

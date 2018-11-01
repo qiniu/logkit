@@ -15,6 +15,7 @@ import (
 	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/rateio"
+	"github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
 )
@@ -158,9 +159,9 @@ func (sf *SingleFile) openSingleFile(path string) (pfi os.FileInfo, f *os.File, 
 
 func (sf *SingleFile) startOffset(whence string) (int64, error) {
 	switch whence {
-	case WhenceOldest:
+	case config.WhenceOldest:
 		return 0, nil
-	case WhenceNewest:
+	case config.WhenceNewest:
 		return sf.f.Seek(0, io.SeekEnd)
 	default:
 		return 0, errors.New("whence not supported " + whence)

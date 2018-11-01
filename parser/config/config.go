@@ -1,4 +1,4 @@
-package parser
+package config
 
 import (
 	. "github.com/qiniu/logkit/utils/models"

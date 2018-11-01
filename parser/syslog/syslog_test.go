@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/parser"
+	. "github.com/qiniu/logkit/parser/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -38,9 +38,9 @@ func TestDetectSyslogType(t *testing.T) {
 
 func Test_SyslogParser(t *testing.T) {
 	c := conf.MapConf{}
-	c[parser.KeyParserType] = "syslog"
-	c[parser.KeyLabels] = "machine nb110"
-	c[parser.KeyKeepRawData] = "true"
+	c[KeyParserType] = "syslog"
+	c[KeyLabels] = "machine nb110"
+	c[KeyKeepRawData] = "true"
 	p, err := NewParser(c)
 	assert.Nil(t, err)
 	lines := []string{
@@ -68,13 +68,13 @@ func Test_SyslogParser(t *testing.T) {
 	assert.Nil(t, err)
 	indexes := []int{2, 3, 5, 9, 13, 15}
 	for i := range dts {
-		assert.Equal(t, lines[indexes[i]], dts[i][parser.KeyRawData])
+		assert.Equal(t, lines[indexes[i]], dts[i][KeyRawData])
 	}
 
 	if len(dts) != 6 {
 		t.Fatalf("parse lines error expect 6 lines but got %v lines", len(dts))
 	}
-	ndata, err := p.Parse([]string{parser.PandoraParseFlushSignal})
+	ndata, err := p.Parse([]string{PandoraParseFlushSignal})
 	assert.Nil(t, err)
 	dts = append(dts, ndata...)
 	for _, dt := range dts {
@@ -84,7 +84,7 @@ func Test_SyslogParser(t *testing.T) {
 
 func Test_SyslogParserError(t *testing.T) {
 	c := conf.MapConf{}
-	c[parser.KeyParserType] = "syslog"
+	c[KeyParserType] = "syslog"
 	p, err := NewParser(c)
 	assert.Nil(t, err)
 	line := "Test my syslog CRON[000]: (root) CMD"
@@ -121,7 +121,7 @@ func TestSyslogParser5424(t *testing.T) {
 
 func TestSyslogParser_NoPanic(t *testing.T) {
 	c := conf.MapConf{}
-	c[parser.KeyParserType] = "syslog"
+	c[KeyParserType] = "syslog"
 	p, err := NewParser(c)
 	assert.Nil(t, err)
 	lines := []string{
@@ -138,7 +138,7 @@ func TestSyslogParser_NoPanic(t *testing.T) {
 		lenStr := len(str)
 		for j := 1; j <= lenStr; j++ {
 			dataLine[i] = str[:j]
-			dataLine[i+1] = parser.PandoraParseFlushSignal
+			dataLine[i+1] = PandoraParseFlushSignal
 			p.Parse(dataLine)
 		}
 	}
@@ -146,8 +146,8 @@ func TestSyslogParser_NoPanic(t *testing.T) {
 
 func TestSyslogParser_NoMatch(t *testing.T) {
 	c := conf.MapConf{}
-	c[parser.KeyParserType] = "syslog"
-	c[parser.KeySyslogMaxline] = "3"
+	c[KeyParserType] = "syslog"
+	c[KeySyslogMaxline] = "3"
 	p, err := NewParser(c)
 	assert.Nil(t, err)
 	lines := []string{

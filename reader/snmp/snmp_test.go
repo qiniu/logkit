@@ -14,6 +14,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -232,7 +233,7 @@ func TestGetSNMPConnection_v2(t *testing.T) {
 	}
 	ss, err := NewReader(&reader.Meta{RunnerName: "TestGetSNMPConnection_v2"}, c)
 	assert.Error(t, err)
-	c[reader.KeySnmpReaderTables] = `[{"table_oid": "TEST::testTable"}]`
+	c[KeySnmpReaderTables] = `[{"table_oid": "TEST::testTable"}]`
 	ss, err = NewReader(&reader.Meta{RunnerName: "TestGetSNMPConnection_v2"}, c)
 	if err != nil {
 		t.Fatalf("exp no error, but got %v", err)
@@ -257,23 +258,23 @@ func TestGetSNMPConnection_v2(t *testing.T) {
 
 func TestGetSNMPConnection_v3(t *testing.T) {
 	c := conf.MapConf{
-		reader.KeySnmpReaderAgents:         "1.2.3.4",
-		reader.KeySnmpReaderVersion:        "3",
-		reader.KeySnmpReaderMaxRepetitions: "20",
-		reader.KeySnmpReaderContextName:    "mycontext",
-		reader.KeySnmpReaderSecLevel:       "authpriv",
-		reader.KeySnmpReaderSecName:        "myuser",
-		reader.KeySnmpReaderAuthProtocol:   "md5",
-		reader.KeySnmpReaderAuthPassword:   "password123",
-		reader.KeySnmpReaderPrivProtocol:   "des",
-		reader.KeySnmpReaderPrivPassword:   "321drowssap",
-		reader.KeySnmpReaderEngineID:       "myengineid",
-		reader.KeySnmpReaderEngineBoots:    "1",
-		reader.KeySnmpReaderEngineTime:     "2",
+		KeySnmpReaderAgents:         "1.2.3.4",
+		KeySnmpReaderVersion:        "3",
+		KeySnmpReaderMaxRepetitions: "20",
+		KeySnmpReaderContextName:    "mycontext",
+		KeySnmpReaderSecLevel:       "authpriv",
+		KeySnmpReaderSecName:        "myuser",
+		KeySnmpReaderAuthProtocol:   "md5",
+		KeySnmpReaderAuthPassword:   "password123",
+		KeySnmpReaderPrivProtocol:   "des",
+		KeySnmpReaderPrivPassword:   "321drowssap",
+		KeySnmpReaderEngineID:       "myengineid",
+		KeySnmpReaderEngineBoots:    "1",
+		KeySnmpReaderEngineTime:     "2",
 	}
 	ss, err := NewReader(&reader.Meta{RunnerName: "TestGetSNMPConnection_v3"}, c)
 	assert.Error(t, err)
-	c[reader.KeySnmpReaderTables] = `[{"table_oid": "TEST::testTable"}]`
+	c[KeySnmpReaderTables] = `[{"table_oid": "TEST::testTable"}]`
 	ss, err = NewReader(&reader.Meta{RunnerName: "TestGetSNMPConnection_v3"}, c)
 	if err != nil {
 		t.Fatalf("exp no error, but got %v", err)
@@ -300,11 +301,11 @@ func TestGetSNMPConnection_v3(t *testing.T) {
 
 func TestGetSNMPConnection_caching(t *testing.T) {
 	c := conf.MapConf{
-		reader.KeySnmpReaderAgents: "1.2.3.4, 1.2.3.5, 1.2.3.5",
+		KeySnmpReaderAgents: "1.2.3.4, 1.2.3.5, 1.2.3.5",
 	}
 	ss, err := NewReader(&reader.Meta{RunnerName: "TestGetSNMPConnection_caching"}, c)
 	assert.Error(t, err)
-	c[reader.KeySnmpReaderTables] = `[{"table_oid": "TEST::testTable"}]`
+	c[KeySnmpReaderTables] = `[{"table_oid": "TEST::testTable"}]`
 	ss, err = NewReader(&reader.Meta{RunnerName: "TestGetSNMPConnection_caching"}, c)
 	if err != nil {
 		t.Fatalf("exp no error, but got %v", err)
@@ -600,22 +601,22 @@ func TestReadData(t *testing.T) {
 	}
 
 	m := datas[0]
-	assert.Equal(t, "mytable", m[reader.KeySnmpTableName])
+	assert.Equal(t, "mytable", m[KeySnmpTableName])
 	assert.Equal(t, "tsc", m["agent_host"])
 	assert.Equal(t, "baz", m["myfield1"])
 	assert.Equal(t, int(234), m["myfield2"])
 	assert.Equal(t, "baz", m["myfield3"])
-	timestamp, subErr := time.Parse(time.RFC3339Nano, m[reader.KeyTimestamp].(string))
+	timestamp, subErr := time.Parse(time.RFC3339Nano, m[KeyTimestamp].(string))
 	assert.NoError(t, subErr)
 	assert.True(t, timestamp.UnixNano() > tstart)
 	assert.True(t, timestamp.UnixNano() < tstop)
 
 	m2 := datas[1]
-	assert.Equal(t, "myOtherTable", m2[reader.KeySnmpTableName])
+	assert.Equal(t, "myOtherTable", m2[KeySnmpTableName])
 	assert.Equal(t, "tsc", m2["agent_host"])
 	assert.Equal(t, "baz", m2["myfield1"])
 	assert.Equal(t, int(123456), m2["myOtherField"])
-	timestamp, subErr = time.Parse(time.RFC3339Nano, m[reader.KeyTimestamp].(string))
+	timestamp, subErr = time.Parse(time.RFC3339Nano, m[KeyTimestamp].(string))
 	assert.NoError(t, subErr)
 	assert.True(t, timestamp.UnixNano() > tstart)
 	assert.True(t, timestamp.UnixNano() < tstop)

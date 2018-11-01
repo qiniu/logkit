@@ -17,6 +17,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	. "github.com/qiniu/logkit/parser/config"
 	"github.com/qiniu/logkit/times"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -47,7 +48,7 @@ var (
 )
 
 func init() {
-	parser.RegisterConstructor(parser.TypeGrok, NewParser)
+	parser.RegisterConstructor(TypeGrok, NewParser)
 }
 
 type Parser struct {
@@ -91,23 +92,23 @@ type Parser struct {
 }
 
 func NewParser(c conf.MapConf) (parser.Parser, error) {
-	name, _ := c.GetStringOr(parser.KeyParserName, "")
-	patterns, err := c.GetStringList(parser.KeyGrokPatterns)
+	name, _ := c.GetStringOr(KeyParserName, "")
+	patterns, err := c.GetStringList(KeyGrokPatterns)
 	if err != nil {
-		return nil, fmt.Errorf("parse key %v error %v", parser.KeyGrokPatterns, err)
+		return nil, fmt.Errorf("parse key %v error %v", KeyGrokPatterns, err)
 	}
-	mode, _ := c.GetStringOr(parser.KeyGrokMode, "")
-	labelList, _ := c.GetStringListOr(parser.KeyLabels, []string{})
-	timeZoneOffsetRaw, _ := c.GetStringOr(parser.KeyTimeZoneOffset, "")
+	mode, _ := c.GetStringOr(KeyGrokMode, "")
+	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
+	timeZoneOffsetRaw, _ := c.GetStringOr(KeyTimeZoneOffset, "")
 	timeZoneOffset := parser.ParseTimeZoneOffset(timeZoneOffsetRaw)
 	nameMap := make(map[string]struct{})
 	labels := parser.GetLabels(labelList, nameMap)
 
-	customPatterns, _ := c.GetStringOr(parser.KeyGrokCustomPatterns, "")
-	customPatternFiles, _ := c.GetStringListOr(parser.KeyGrokCustomPatternFiles, []string{})
+	customPatterns, _ := c.GetStringOr(KeyGrokCustomPatterns, "")
+	customPatternFiles, _ := c.GetStringListOr(KeyGrokCustomPatternFiles, []string{})
 
-	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
-	keepRawData, _ := c.GetBoolOr(parser.KeyKeepRawData, false)
+	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)
 
 	numRoutine := MaxProcs
 	if numRoutine == 0 {
@@ -184,7 +185,7 @@ func (p *Parser) Name() string {
 }
 
 func (p *Parser) Type() string {
-	return parser.TypeGrok
+	return TypeGrok
 }
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
@@ -242,7 +243,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
 			}
 			if p.keepRawData {
-				errData[parser.KeyRawData] = parseResult.Line
+				errData[KeyRawData] = parseResult.Line
 			}
 			if !p.disableRecordErrData || p.keepRawData {
 				datas = append(datas, errData)
@@ -255,7 +256,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		log.Debugf("D! parse result(%v)", parseResult.Data)
 		se.AddSuccess()
 		if p.keepRawData {
-			parseResult.Data[parser.KeyRawData] = parseResult.Line
+			parseResult.Data[KeyRawData] = parseResult.Line
 		}
 		datas = append(datas, parseResult.Data)
 	}

@@ -13,6 +13,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -23,7 +24,7 @@ var (
 )
 
 func init() {
-	reader.RegisterConstructor(reader.ModeRedis, NewReader)
+	reader.RegisterConstructor(ModeRedis, NewReader)
 }
 
 type Reader struct {
@@ -65,19 +66,19 @@ type Options struct {
 }
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
-	dataType, err := conf.GetString(reader.KeyRedisDataType)
+	dataType, err := conf.GetString(KeyRedisDataType)
 	if err != nil {
 		return nil, err
 	}
-	db, _ := conf.GetIntOr(reader.KeyRedisDB, 0)
-	key, _ := conf.GetStringList(reader.KeyRedisKey)
+	db, _ := conf.GetIntOr(KeyRedisDB, 0)
+	key, _ := conf.GetStringList(KeyRedisKey)
 	if err != nil {
 		return nil, err
 	}
-	area, err := conf.GetString(reader.KeyRedisHashArea)
-	address, _ := conf.GetStringOr(reader.KeyRedisAddress, "127.0.0.1:6379")
-	password, _ := conf.GetStringOr(reader.KeyRedisPassword, "")
-	KeyTimeoutDuration, _ := conf.GetStringOr(reader.KeyTimeoutDuration, "5s")
+	area, err := conf.GetString(KeyRedisHashArea)
+	address, _ := conf.GetStringOr(KeyRedisAddress, "127.0.0.1:6379")
+	password, _ := conf.GetStringOr(KeyRedisPassword, "")
+	KeyTimeoutDuration, _ := conf.GetStringOr(KeyTimeoutDuration, "5s")
 	timeout, err := time.ParseDuration(KeyTimeoutDuration)
 	if err != nil {
 		return nil, err
@@ -106,8 +107,8 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 
 	return &Reader{
 		meta:          meta,
-		status:        reader.StatusInit,
-		routineStatus: reader.StatusInit,
+		status:        StatusInit,
+		routineStatus: StatusInit,
 		stopChan:      make(chan struct{}),
 		readChan:      make(chan string),
 		errChan:       make(chan error),
@@ -117,11 +118,11 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 }
 
 func (r *Reader) isStopping() bool {
-	return atomic.LoadInt32(&r.status) == reader.StatusStopping
+	return atomic.LoadInt32(&r.status) == StatusStopping
 }
 
 func (r *Reader) hasStopped() bool {
-	return atomic.LoadInt32(&r.status) == reader.StatusStopped
+	return atomic.LoadInt32(&r.status) == StatusStopped
 }
 
 func (r *Reader) Name() string {
@@ -152,7 +153,7 @@ func (r *Reader) sendError(err error) {
 
 func (r *Reader) run() {
 	// 未在准备状态（StatusInit）时无法执行此次任务
-	if !atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusInit, reader.StatusRunning) {
+	if !atomic.CompareAndSwapInt32(&r.routineStatus, StatusInit, StatusRunning) {
 		if r.isStopping() || r.hasStopped() {
 			log.Warnf("Runner[%v] %q daemon has stopped, this task does not need to be executed and is skipped this time", r.meta.RunnerName, r.Name())
 		} else {
@@ -163,23 +164,23 @@ func (r *Reader) run() {
 	defer func() {
 		// 如果 reader 在 routine 运行时关闭，则需要此 routine 负责关闭数据管道
 		if r.isStopping() || r.hasStopped() {
-			if atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusRunning, reader.StatusStopping) {
+			if atomic.CompareAndSwapInt32(&r.routineStatus, StatusRunning, StatusStopping) {
 				close(r.readChan)
 				close(r.errChan)
 				r.client.Close()
 			}
 			return
 		}
-		atomic.StoreInt32(&r.routineStatus, reader.StatusInit)
+		atomic.StoreInt32(&r.routineStatus, StatusInit)
 	}()
 
 	switch r.opts.dataType {
-	case reader.DataTypeChannel, reader.DataTypePatterChannel:
+	case DataTypeChannel, DataTypePatterChannel:
 		message := <-r.channelIn
 		if message != nil {
 			r.readChan <- message.Payload
 		}
-	case reader.DataTypeList:
+	case DataTypeList:
 		for _, key := range r.opts.key {
 			ans, subErr := r.client.BLPop(r.opts.timeout, key).Result()
 			if subErr != nil && subErr != redis.Nil {
@@ -197,7 +198,7 @@ func (r *Reader) run() {
 			}
 		}
 		//Added string support for redis
-	case reader.DataTypeString:
+	case DataTypeString:
 		for _, key := range r.opts.key {
 			anString, subErr := r.client.Get(key).Result()
 			if subErr != nil && subErr != redis.Nil {
@@ -212,7 +213,7 @@ func (r *Reader) run() {
 			}
 		}
 		//Added set support for redis
-	case reader.DataTypeSet:
+	case DataTypeSet:
 		for _, key := range r.opts.key {
 			anSet, subErr := r.client.SPop(key).Result()
 			if subErr != nil && subErr != redis.Nil {
@@ -224,7 +225,7 @@ func (r *Reader) run() {
 			}
 		}
 		//Added sortedSet support for redis
-	case reader.DataTypeSortedSet:
+	case DataTypeSortedSet:
 		for _, key := range r.opts.key {
 			anSortedSet, subErr := r.client.ZRange(key, 0, -1).Result()
 			if subErr != nil && subErr != redis.Nil {
@@ -239,7 +240,7 @@ func (r *Reader) run() {
 			}
 		}
 		//Added hash support for redis
-	case reader.DataTypeHash:
+	case DataTypeHash:
 		for _, key := range r.opts.key {
 			anHash, subErr := r.client.HGet(key, r.opts.area).Result() //redis key and area for hash
 			if subErr != nil && subErr != redis.Nil {
@@ -263,21 +264,21 @@ func (r *Reader) run() {
 func (r *Reader) Start() error {
 	if r.isStopping() || r.hasStopped() {
 		return errors.New("reader is stopping or has stopped")
-	} else if !atomic.CompareAndSwapInt32(&r.status, reader.StatusInit, reader.StatusRunning) {
+	} else if !atomic.CompareAndSwapInt32(&r.status, StatusInit, StatusRunning) {
 		log.Warnf("Runner[%v] %q daemon has already started and is running", r.meta.RunnerName, r.Name())
 		return nil
 	}
 
 	switch r.opts.dataType {
-	case reader.DataTypeChannel:
+	case DataTypeChannel:
 		r.channelIn = r.client.Subscribe(r.opts.key...).Channel()
-	case reader.DataTypePatterChannel:
+	case DataTypePatterChannel:
 		r.channelIn = r.client.PSubscribe(r.opts.key...).Channel()
-	case reader.DataTypeList:
-	case reader.DataTypeString:
-	case reader.DataTypeSet:
-	case reader.DataTypeSortedSet:
-	case reader.DataTypeHash:
+	case DataTypeList:
+	case DataTypeString:
+	case DataTypeSet:
+	case DataTypeSortedSet:
+	case DataTypeHash:
 	default:
 		err := fmt.Errorf("data Type < %v > not exist, exit", r.opts.dataType)
 		log.Error(err)
@@ -290,7 +291,7 @@ func (r *Reader) Start() error {
 
 			select {
 			case <-r.stopChan:
-				atomic.StoreInt32(&r.status, reader.StatusStopped)
+				atomic.StoreInt32(&r.status, StatusStopped)
 				log.Infof("Runner[%v] %q daemon has stopped from running", r.meta.RunnerName, r.Name())
 				return
 			default:
@@ -328,7 +329,7 @@ func (r *Reader) Status() StatsInfo {
 func (_ *Reader) SyncMeta() {}
 
 func (r *Reader) Close() error {
-	if !atomic.CompareAndSwapInt32(&r.status, reader.StatusRunning, reader.StatusStopping) {
+	if !atomic.CompareAndSwapInt32(&r.status, StatusRunning, StatusStopping) {
 		log.Warnf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
 		return nil
 	}
@@ -336,7 +337,7 @@ func (r *Reader) Close() error {
 	close(r.stopChan)
 
 	// 如果此时没有 routine 正在运行，则在此处关闭数据管道，否则由 routine 在退出时负责关闭
-	if atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusInit, reader.StatusStopping) {
+	if atomic.CompareAndSwapInt32(&r.routineStatus, StatusInit, StatusStopping) {
 		close(r.readChan)
 		close(r.errChan)
 		r.client.Close()

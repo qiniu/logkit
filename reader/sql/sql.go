@@ -23,6 +23,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -75,9 +76,9 @@ var (
 var MysqlSystemDB = []string{"information_schema", "performance_schema", "mysql", "sys"}
 
 func init() {
-	reader.RegisterConstructor(reader.ModeMySQL, NewReader)
-	reader.RegisterConstructor(reader.ModeMSSQL, NewReader)
-	reader.RegisterConstructor(reader.ModePostgreSQL, NewReader)
+	reader.RegisterConstructor(ModeMySQL, NewReader)
+	reader.RegisterConstructor(ModeMSSQL, NewReader)
+	reader.RegisterConstructor(ModePostgreSQL, NewReader)
 }
 
 type readInfo struct {
@@ -143,58 +144,58 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	var readBatch int
 	var dbtype, dataSource, rawDatabase, rawSQLs, cronSchedule, offsetKey, encoder, table, dbSchema string
 	var execOnStart, historyAll bool
-	dbtype, _ = conf.GetStringOr(reader.KeyMode, reader.ModeMySQL)
-	logpath, _ := conf.GetStringOr(reader.KeyLogPath, "")
+	dbtype, _ = conf.GetStringOr(KeyMode, ModeMySQL)
+	logpath, _ := conf.GetStringOr(KeyLogPath, "")
 
 	var err error
 	switch dbtype {
-	case reader.ModeMySQL:
-		readBatch, _ = conf.GetIntOr(reader.KeyMysqlReadBatch, 100)
-		offsetKey, _ = conf.GetStringOr(reader.KeyMysqlOffsetKey, "")
+	case ModeMySQL:
+		readBatch, _ = conf.GetIntOr(KeyMysqlReadBatch, 100)
+		offsetKey, _ = conf.GetStringOr(KeyMysqlOffsetKey, "")
 		if logpath == "" {
-			dataSource, err = conf.GetPasswordEnvString(reader.KeyMysqlDataSource)
+			dataSource, err = conf.GetPasswordEnvString(KeyMysqlDataSource)
 		} else {
-			dataSource, err = conf.GetPasswordEnvStringOr(reader.KeyMysqlDataSource, logpath)
+			dataSource, err = conf.GetPasswordEnvStringOr(KeyMysqlDataSource, logpath)
 		}
 		if err != nil {
 			return nil, err
 		}
-		rawDatabase, _ = conf.GetStringOr(reader.KeyMysqlDataBase, "")
-		rawSQLs, _ = conf.GetStringOr(reader.KeyMysqlSQL, "")
-		cronSchedule, _ = conf.GetStringOr(reader.KeyMysqlCron, "")
-		execOnStart, _ = conf.GetBoolOr(reader.KeyMysqlExecOnStart, true)
-		encoder, _ = conf.GetStringOr(reader.KeyMysqlEncoding, "utf8")
+		rawDatabase, _ = conf.GetStringOr(KeyMysqlDataBase, "")
+		rawSQLs, _ = conf.GetStringOr(KeyMysqlSQL, "")
+		cronSchedule, _ = conf.GetStringOr(KeyMysqlCron, "")
+		execOnStart, _ = conf.GetBoolOr(KeyMysqlExecOnStart, true)
+		encoder, _ = conf.GetStringOr(KeyMysqlEncoding, "utf8")
 		if strings.Contains(encoder, "-") {
 			encoder = strings.Replace(strings.ToLower(encoder), "-", "", -1)
 		}
-		historyAll, _ = conf.GetBoolOr(reader.KeyMysqlHistoryAll, false)
-		table, _ = conf.GetStringOr(reader.KyeMysqlTable, "")
-	case reader.ModeMSSQL:
-		readBatch, _ = conf.GetIntOr(reader.KeyMssqlReadBatch, 100)
-		offsetKey, _ = conf.GetStringOr(reader.KeyMssqlOffsetKey, "")
+		historyAll, _ = conf.GetBoolOr(KeyMysqlHistoryAll, false)
+		table, _ = conf.GetStringOr(KyeMysqlTable, "")
+	case ModeMSSQL:
+		readBatch, _ = conf.GetIntOr(KeyMssqlReadBatch, 100)
+		offsetKey, _ = conf.GetStringOr(KeyMssqlOffsetKey, "")
 		if logpath == "" {
-			dataSource, err = conf.GetPasswordEnvString(reader.KeyMssqlDataSource)
+			dataSource, err = conf.GetPasswordEnvString(KeyMssqlDataSource)
 		} else {
-			dataSource, err = conf.GetPasswordEnvStringOr(reader.KeyMssqlDataSource, logpath)
+			dataSource, err = conf.GetPasswordEnvStringOr(KeyMssqlDataSource, logpath)
 		}
 		if err != nil {
 			return nil, err
 		}
-		rawDatabase, err = conf.GetString(reader.KeyMssqlDataBase)
+		rawDatabase, err = conf.GetString(KeyMssqlDataBase)
 		if err != nil {
 			return nil, err
 		}
-		dbSchema, _ = conf.GetStringOr(reader.KeyMssqlSchema, "dbo")
-		rawSQLs, _ = conf.GetStringOr(reader.KeyMssqlSQL, "")
-		cronSchedule, _ = conf.GetStringOr(reader.KeyMssqlCron, "")
-		execOnStart, _ = conf.GetBoolOr(reader.KeyMssqlExecOnStart, true)
-	case reader.ModePostgreSQL:
-		readBatch, _ = conf.GetIntOr(reader.KeyPGsqlReadBatch, 100)
-		offsetKey, _ = conf.GetStringOr(reader.KeyPGsqlOffsetKey, "")
+		dbSchema, _ = conf.GetStringOr(KeyMssqlSchema, "dbo")
+		rawSQLs, _ = conf.GetStringOr(KeyMssqlSQL, "")
+		cronSchedule, _ = conf.GetStringOr(KeyMssqlCron, "")
+		execOnStart, _ = conf.GetBoolOr(KeyMssqlExecOnStart, true)
+	case ModePostgreSQL:
+		readBatch, _ = conf.GetIntOr(KeyPGsqlReadBatch, 100)
+		offsetKey, _ = conf.GetStringOr(KeyPGsqlOffsetKey, "")
 		if logpath == "" {
-			dataSource, err = conf.GetPasswordEnvString(reader.KeyPGsqlDataSource)
+			dataSource, err = conf.GetPasswordEnvString(KeyPGsqlDataSource)
 		} else {
-			dataSource, err = conf.GetPasswordEnvStringOr(reader.KeyPGsqlDataSource, logpath)
+			dataSource, err = conf.GetPasswordEnvStringOr(KeyPGsqlDataSource, logpath)
 		}
 		if err != nil {
 			return nil, err
@@ -211,7 +212,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 				return nil, err
 			}
 		}
-		rawDatabase, err = conf.GetString(reader.KeyPGsqlDataBase)
+		rawDatabase, err = conf.GetString(KeyPGsqlDataBase)
 		if err != nil {
 			got := false
 			for _, v := range sps {
@@ -225,16 +226,16 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 				return nil, err
 			}
 		}
-		dbSchema, _ = conf.GetStringOr(reader.KeyPGsqlSchema, "public")
-		rawSQLs, _ = conf.GetStringOr(reader.KeyPGsqlSQL, "")
-		cronSchedule, _ = conf.GetStringOr(reader.KeyPGsqlCron, "")
-		execOnStart, _ = conf.GetBoolOr(reader.KeyPGsqlExecOnStart, true)
+		dbSchema, _ = conf.GetStringOr(KeyPGsqlSchema, "public")
+		rawSQLs, _ = conf.GetStringOr(KeyPGsqlSQL, "")
+		cronSchedule, _ = conf.GetStringOr(KeyPGsqlCron, "")
+		execOnStart, _ = conf.GetBoolOr(KeyPGsqlExecOnStart, true)
 	default:
 		err = fmt.Errorf("%v mode not support in sql reader", dbtype)
 		return nil, err
 	}
-	rawSchemas, _ := conf.GetStringListOr(reader.KeySQLSchema, []string{})
-	magicLagDur, _ := conf.GetStringOr(reader.KeyMagicLagDuration, "")
+	rawSchemas, _ := conf.GetStringListOr(KeySQLSchema, []string{})
+	magicLagDur, _ := conf.GetStringOr(KeyMagicLagDuration, "")
 	var mgld time.Duration
 	if magicLagDur != "" {
 		mgld, err = time.ParseDuration(magicLagDur)
@@ -256,8 +257,8 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 
 	r := &Reader{
 		meta:          meta,
-		status:        reader.StatusInit,
-		routineStatus: reader.StatusInit,
+		status:        StatusInit,
+		routineStatus: StatusInit,
 		stopChan:      make(chan struct{}),
 		readChan:      make(chan readInfo),
 		errChan:       make(chan error),
@@ -307,7 +308,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	// 定时任务配置串
 	if len(cronSchedule) > 0 {
 		cronSchedule = strings.ToLower(cronSchedule)
-		if strings.HasPrefix(cronSchedule, reader.Loop) {
+		if strings.HasPrefix(cronSchedule, Loop) {
 			r.isLoop = true
 			r.loopDuration, err = reader.ParseLoopDuration(cronSchedule)
 			if err != nil {
@@ -329,11 +330,11 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 }
 
 func (r *Reader) isStopping() bool {
-	return atomic.LoadInt32(&r.status) == reader.StatusStopping
+	return atomic.LoadInt32(&r.status) == StatusStopping
 }
 
 func (r *Reader) hasStopped() bool {
-	return atomic.LoadInt32(&r.status) == reader.StatusStopped
+	return atomic.LoadInt32(&r.status) == StatusStopped
 }
 
 func (r *Reader) Name() string {
@@ -365,7 +366,7 @@ func (r *Reader) sendError(err error) {
 func (r *Reader) Start() error {
 	if r.isStopping() || r.hasStopped() {
 		return errors.New("reader is stopping or has stopped")
-	} else if !atomic.CompareAndSwapInt32(&r.status, reader.StatusInit, reader.StatusRunning) {
+	} else if !atomic.CompareAndSwapInt32(&r.status, StatusInit, StatusRunning) {
 		log.Warnf("Runner[%v] %q daemon has already started and is running", r.meta.RunnerName, r.Name())
 		return nil
 	}
@@ -379,7 +380,7 @@ func (r *Reader) Start() error {
 
 				select {
 				case <-r.stopChan:
-					atomic.StoreInt32(&r.status, reader.StatusStopped)
+					atomic.StoreInt32(&r.status, StatusStopped)
 					log.Infof("Runner[%v] %q daemon has stopped from running", r.meta.RunnerName, r.Name())
 					return
 				case <-ticker.C:
@@ -471,7 +472,7 @@ func (r *Reader) SyncMeta() {
 }
 
 func (r *Reader) Close() error {
-	if !atomic.CompareAndSwapInt32(&r.status, reader.StatusRunning, reader.StatusStopping) {
+	if !atomic.CompareAndSwapInt32(&r.status, StatusRunning, StatusStopping) {
 		log.Warnf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
 		return nil
 	}
@@ -481,7 +482,7 @@ func (r *Reader) Close() error {
 	r.Cron.Stop()
 
 	// 如果此时没有 routine 正在运行，则在此处关闭数据管道，否则由 routine 在退出时负责关闭
-	if atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusInit, reader.StatusStopping) {
+	if atomic.CompareAndSwapInt32(&r.routineStatus, StatusInit, StatusStopping) {
 		close(r.readChan)
 		close(r.errChan)
 	}
@@ -760,7 +761,7 @@ func (r *Reader) updateOffsets(sqls []string) {
 
 func (r *Reader) run() {
 	// 未在准备状态（StatusInit）时无法执行此次任务
-	if !atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusInit, reader.StatusRunning) {
+	if !atomic.CompareAndSwapInt32(&r.routineStatus, StatusInit, StatusRunning) {
 		if r.isStopping() || r.hasStopped() {
 			log.Warnf("Runner[%v] %q daemon has stopped, this task does not need to be executed and is skipped this time", r.meta.RunnerName, r.Name())
 		} else {
@@ -776,13 +777,13 @@ func (r *Reader) run() {
 	defer func() {
 		// 如果 reader 在 routine 运行时关闭，则需要此 routine 负责关闭数据管道
 		if r.isStopping() || r.hasStopped() {
-			if atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusRunning, reader.StatusStopping) {
+			if atomic.CompareAndSwapInt32(&r.routineStatus, StatusRunning, StatusStopping) {
 				close(r.readChan)
 				close(r.errChan)
 			}
 			return
 		}
-		atomic.StoreInt32(&r.routineStatus, reader.StatusInit)
+		atomic.StoreInt32(&r.routineStatus, StatusInit)
 	}()
 
 	now := time.Now().Add(-r.magicLagDur)
@@ -918,7 +919,7 @@ func (r *Reader) exec(connectStr string) (err error) {
 	// 获取符合条件的数据库
 	dbs := make([]string, 0)
 	switch r.dbtype {
-	case reader.ModeMySQL:
+	case ModeMySQL:
 		if r.rawSQLs != "" {
 			dbs = append(dbs, goMagic(r.rawDatabase, now))
 		} else {
@@ -936,7 +937,7 @@ func (r *Reader) exec(connectStr string) (err error) {
 				return
 			}()
 		}
-	case reader.ModeMSSQL, reader.ModePostgreSQL:
+	case ModeMSSQL, ModePostgreSQL:
 		dbs = append(dbs, r.database)
 	}
 
@@ -1368,19 +1369,19 @@ func (r *Reader) getSQL(idx int, rawSQL string) (sql string, err error) {
 	defer r.muxOffsets.RUnlock()
 	rawSQL = strings.TrimSuffix(strings.TrimSpace(rawSQL), ";")
 	switch r.dbtype {
-	case reader.ModeMySQL:
+	case ModeMySQL:
 		if len(r.offsetKey) > 0 && len(r.offsets) > idx {
 			sql = fmt.Sprintf("%s WHERE %v >= %d AND %v < %d;", rawSQL, r.offsetKey, r.offsets[idx], r.offsetKey, r.offsets[idx]+int64(r.readBatch))
 		} else {
 			sql = fmt.Sprintf("%s", rawSQL)
 		}
-	case reader.ModeMSSQL:
+	case ModeMSSQL:
 		if len(r.offsetKey) > 0 && len(r.offsets) > idx {
 			sql = fmt.Sprintf("%s WHERE CAST(%v AS BIGINT) >= %d AND CAST(%v AS BIGINT) < %d;", rawSQL, r.offsetKey, r.offsets[idx], r.offsetKey, r.offsets[idx]+int64(r.readBatch))
 		} else {
 			err = fmt.Errorf("%v dbtype is not support get SQL without id now", r.dbtype)
 		}
-	case reader.ModePostgreSQL:
+	case ModePostgreSQL:
 		if len(r.offsetKey) > 0 && len(r.offsets) > idx {
 			sql = fmt.Sprintf("%s WHERE %v >= %d AND %v < %d;", rawSQL, r.offsetKey, r.offsets[idx], r.offsetKey, r.offsets[idx]+int64(r.readBatch))
 		} else {
@@ -1400,7 +1401,7 @@ func (r *Reader) checkExit(idx int, db *sql.DB) (bool, int64) {
 	rawSQL := r.syncSQLs[idx]
 	rawSQL = strings.TrimSuffix(strings.TrimSpace(rawSQL), ";")
 	var tsql string
-	if r.dbtype == reader.ModeMySQL {
+	if r.dbtype == ModeMySQL {
 		tsql = fmt.Sprintf("%s WHERE %v >= %d order by %v limit 1;", rawSQL, r.offsetKey, r.offsets[idx], r.offsetKey)
 	} else {
 		ix := strings.Index(rawSQL, "from")
@@ -1598,15 +1599,15 @@ func (r *Reader) getValidData(connectStr, curDB, rawData string, now time.Time, 
 
 func (r *Reader) getConnectStr(database string, now time.Time) (connectStr string, err error) {
 	switch r.dbtype {
-	case reader.ModeMySQL:
+	case ModeMySQL:
 		connectStr = r.datasource + "/" + database
 		if r.encoder != "" {
 			connectStr += "?charset=" + r.encoder
 		}
-	case reader.ModeMSSQL:
+	case ModeMSSQL:
 		r.database = goMagic(r.rawDatabase, now)
 		connectStr = r.datasource + ";database=" + r.database
-	case reader.ModePostgreSQL:
+	case ModePostgreSQL:
 		r.database = goMagic(r.rawDatabase, now)
 		spls := strings.Split(r.datasource, " ")
 		contains := false
@@ -1621,7 +1622,7 @@ func (r *Reader) getConnectStr(database string, now time.Time) (connectStr strin
 		}
 		connectStr = strings.Join(spls, " ")
 	default:
-		return "", fmt.Errorf("not support reader type: %v", r.dbtype)
+		return "", fmt.Errorf("reader type unsupported: %v", r.dbtype)
 	}
 	return connectStr, nil
 }
@@ -1692,16 +1693,16 @@ func (r *Reader) Lag() (rl *LagInfo, err error) {
 
 func (r *Reader) getDefaultSql(database string) (defaultSql string, err error) {
 	switch r.dbtype {
-	case reader.ModeMySQL:
+	case ModeMySQL:
 		return strings.Replace(DefaultMySQLTable, "DATABASE_NAME", database, -1), nil
-	case reader.ModePostgreSQL:
+	case ModePostgreSQL:
 		return strings.Replace(DefaultPGSQLTable, "SCHEMA_NAME", r.dbSchema, -1), nil
-	case reader.ModeMSSQL:
+	case ModeMSSQL:
 		sql := strings.Replace(DefaultMSSQLTable, "DATABASE_NAME", database, -1)
 		sql = strings.Replace(sql, "SCHEMA_NAME", r.dbSchema, -1)
 		return sql, nil
 	default:
-		return "", fmt.Errorf("not support reader type: %v", r.dbtype)
+		return "", fmt.Errorf("reader type unsupported: %v", r.dbtype)
 	}
 }
 
@@ -1726,11 +1727,11 @@ func (r *Reader) getAll(queryType int) (getAll bool, err error) {
 //根据数据库类型返回表名
 func (r *Reader) getWrappedTableName(table string) (tableName string, err error) {
 	switch r.dbtype {
-	case reader.ModeMySQL:
+	case ModeMySQL:
 		tableName = "`" + table + "`"
-	case reader.ModeMSSQL:
+	case ModeMSSQL:
 		tableName = fmt.Sprintf("\"%s\".\"%s\"", r.dbSchema, table)
-	case reader.ModePostgreSQL:
+	case ModePostgreSQL:
 		tableName = fmt.Sprintf("\"%s\".\"%s\"", r.dbSchema, table)
 	default:
 		err = fmt.Errorf("%v mode not support in sql reader", r.dbtype)

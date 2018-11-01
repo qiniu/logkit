@@ -15,6 +15,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
+	. "github.com/qiniu/logkit/sender/config"
 	"github.com/qiniu/logkit/sender/mock"
 	"github.com/qiniu/logkit/sender/mock_pandora"
 	"github.com/qiniu/logkit/sender/pandora"
@@ -47,8 +48,8 @@ func TestFtSender(t *testing.T) {
 		t.Fatal(err)
 	}
 	mp := conf.MapConf{}
-	mp[sender.KeyFtSaveLogPath] = fttestdir
-	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyAlwaysSave
+	mp[KeyFtSaveLogPath] = fttestdir
+	mp[KeyFtStrategy] = KeyFtStrategyAlwaysSave
 	defer os.RemoveAll(fttestdir)
 	fts, err := sender.NewFtSender(s, mp, fttestdir)
 	assert.NoError(t, err)
@@ -68,8 +69,8 @@ func TestFtSender(t *testing.T) {
 	}
 
 	ftTestDir2 := "TestFtSender2"
-	mp[sender.KeyFtSaveLogPath] = ftTestDir2
-	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyAlwaysSave
+	mp[KeyFtSaveLogPath] = ftTestDir2
+	mp[KeyFtStrategy] = KeyFtStrategyAlwaysSave
 	fts2, err := sender.NewFtSender(s, mp, ftTestDir2)
 	defer os.RemoveAll(ftTestDir2)
 	assert.Nil(t, err)
@@ -95,8 +96,8 @@ func TestFtSender(t *testing.T) {
 	}
 
 	ftTestDir3 := "TestFtSender3"
-	mp[sender.KeyFtSaveLogPath] = ftTestDir3
-	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyAlwaysSave
+	mp[KeyFtSaveLogPath] = ftTestDir3
+	mp[KeyFtStrategy] = KeyFtStrategyAlwaysSave
 	fts3, err := sender.NewFtSender(s, mp, ftTestDir3)
 	defer os.RemoveAll(ftTestDir3)
 	assert.NoError(t, err)
@@ -137,9 +138,9 @@ func TestFtDiscardLast(t *testing.T) {
 		t.Fatal(err)
 	}
 	mp := conf.MapConf{}
-	mp[sender.KeyFtSaveLogPath] = fttestdir
-	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyBackupOnly
-	mp[sender.KeyFtDiscardErr] = "true"
+	mp[KeyFtSaveLogPath] = fttestdir
+	mp[KeyFtStrategy] = KeyFtStrategyBackupOnly
+	mp[KeyFtDiscardErr] = "true"
 	defer os.RemoveAll(fttestdir)
 	fts, err := sender.NewFtSender(s, mp, fttestdir)
 	assert.NoError(t, err)
@@ -163,9 +164,9 @@ func TestFtDiscardLast(t *testing.T) {
 	p.SetMux.Unlock()
 
 	mp2 := conf.MapConf{}
-	mp2[sender.KeyFtSaveLogPath] = fttestdir
-	mp2[sender.KeyFtStrategy] = sender.KeyFtStrategyBackupOnly
-	mp2[sender.KeyFtDiscardErr] = "false"
+	mp2[KeyFtSaveLogPath] = fttestdir
+	mp2[KeyFtStrategy] = KeyFtStrategyBackupOnly
+	mp2[KeyFtDiscardErr] = "false"
 	fts2, err := sender.NewFtSender(s, mp2, fttestdir)
 	err = fts2.Send(datas)
 	se, ok = err.(*StatsError)
@@ -208,10 +209,10 @@ func TestFtMemorySender(t *testing.T) {
 		t.Fatal(err)
 	}
 	mp := conf.MapConf{}
-	mp[sender.KeyFtSaveLogPath] = tmpDir
-	mp[sender.KeyFtMemoryChannel] = "true"
-	mp[sender.KeyFtMemoryChannelSize] = "3"
-	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyAlwaysSave
+	mp[KeyFtSaveLogPath] = tmpDir
+	mp[KeyFtMemoryChannel] = "true"
+	mp[KeyFtMemoryChannelSize] = "3"
+	mp[KeyFtStrategy] = KeyFtStrategyAlwaysSave
 	fts, err := sender.NewFtSender(s, mp, tmpDir)
 	assert.NoError(t, err)
 	datas := []Data{
@@ -258,10 +259,10 @@ func TestFtMemoryEmptySender(t *testing.T) {
 		t.Fatal(err)
 	}
 	mp := conf.MapConf{}
-	mp[sender.KeyFtSaveLogPath] = tmpDir
-	mp[sender.KeyFtMemoryChannel] = "true"
-	mp[sender.KeyFtMemoryChannelSize] = "3"
-	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyAlwaysSave
+	mp[KeyFtSaveLogPath] = tmpDir
+	mp[KeyFtMemoryChannel] = "true"
+	mp[KeyFtMemoryChannelSize] = "3"
+	mp[KeyFtStrategy] = KeyFtStrategyAlwaysSave
 	fts, err := sender.NewFtSender(s, mp, tmpDir)
 	assert.NoError(t, err)
 	datas := []Data{{"c": "E18006:BackupQueue.Depth"}}
@@ -307,10 +308,10 @@ func TestFtChannelFullSender(t *testing.T) {
 	mockP.PostSleep = 1
 	mockP.SetMux.Unlock()
 	mp := conf.MapConf{}
-	mp[sender.KeyFtSaveLogPath] = tmpDir
-	mp[sender.KeyFtMemoryChannel] = "true"
-	mp[sender.KeyFtMemoryChannelSize] = "1"
-	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyAlwaysSave
+	mp[KeyFtSaveLogPath] = tmpDir
+	mp[KeyFtMemoryChannel] = "true"
+	mp[KeyFtMemoryChannelSize] = "1"
+	mp[KeyFtStrategy] = KeyFtStrategyAlwaysSave
 	fts, err := sender.NewFtSender(s, mp, tmpDir)
 	assert.NoError(t, err)
 
@@ -366,8 +367,8 @@ func TestFtSenderConcurrent(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	mp := conf.MapConf{}
-	mp[sender.KeyFtSaveLogPath] = tmpDir
-	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyConcurrent
+	mp[KeyFtSaveLogPath] = tmpDir
+	mp[KeyFtStrategy] = KeyFtStrategyConcurrent
 	fts, err := sender.NewFtSender(s, mp, tmpDir)
 	assert.NoError(t, err)
 	datas := []Data{
@@ -390,20 +391,20 @@ func TestFtSenderConcurrent(t *testing.T) {
 
 func BenchmarkFtSenderConcurrentDirect(b *testing.B) {
 	c := conf.MapConf{}
-	c[sender.KeyFtStrategy] = sender.KeyFtStrategyConcurrent
+	c[KeyFtStrategy] = KeyFtStrategyConcurrent
 	ftSenderConcurrent(b, c)
 }
 
 func BenchmarkFtSenderConcurrentDisk(b *testing.B) {
 	c := conf.MapConf{}
-	c[sender.KeyFtStrategy] = sender.KeyFtStrategyAlwaysSave
+	c[KeyFtStrategy] = KeyFtStrategyAlwaysSave
 	ftSenderConcurrent(b, c)
 }
 
 func BenchmarkFtSenderConcurrentMemory(b *testing.B) {
 	c := conf.MapConf{}
-	c[sender.KeyFtStrategy] = sender.KeyFtStrategyAlwaysSave
-	c[sender.KeyFtMemoryChannel] = "true"
+	c[KeyFtStrategy] = KeyFtStrategyAlwaysSave
+	c[KeyFtMemoryChannel] = "true"
 	ftSenderConcurrent(b, c)
 }
 
@@ -418,7 +419,7 @@ func ftSenderConcurrent(b *testing.B, c conf.MapConf) {
 		panic(err)
 	}
 	defer os.RemoveAll(tmpDir)
-	c[sender.KeyFtSaveLogPath] = tmpDir
+	c[KeyFtSaveLogPath] = tmpDir
 	fts, err := sender.NewFtSender(s, c, tmpDir)
 	if err != nil {
 		b.Fatal(err)
@@ -476,9 +477,9 @@ func TestFtSenderConvertData(t *testing.T) {
 	mockP.PostSleep = 1
 	mockP.SetMux.Unlock()
 	mp := conf.MapConf{}
-	mp[sender.KeyFtSaveLogPath] = tmpDir
-	mp[sender.KeyFtMemoryChannel] = "false"
-	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyBackupOnly
+	mp[KeyFtSaveLogPath] = tmpDir
+	mp[KeyFtMemoryChannel] = "false"
+	mp[KeyFtStrategy] = KeyFtStrategyBackupOnly
 	fts, err := sender.NewFtSender(s, mp, tmpDir)
 	assert.NoError(t, err)
 	expStr := []string{"a=typeBinaryUnpack", `pandora_stash={"a":"typeBinaryUnpack"}`, "a=typeBinaryUnpack", `pandora_stash={"a":"typeBinaryUnpack"}`}
@@ -607,8 +608,8 @@ func TestTypeSchemaRetry(t *testing.T) {
 		t.Fatal(err)
 	}
 	mp := conf.MapConf{}
-	mp[sender.KeyFtSaveLogPath] = fttestdir
-	mp[sender.KeyFtStrategy] = sender.KeyFtStrategyBackupOnly
+	mp[KeyFtSaveLogPath] = fttestdir
+	mp[KeyFtStrategy] = KeyFtStrategyBackupOnly
 	defer os.RemoveAll(fttestdir)
 	fts, err := sender.NewFtSender(s, mp, fttestdir)
 	assert.NoError(t, err)

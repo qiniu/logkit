@@ -17,7 +17,9 @@ import (
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/metric/curl"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	"github.com/qiniu/logkit/sender"
+	senderConf "github.com/qiniu/logkit/sender/config"
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -71,9 +73,9 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner
 	}
 	interval := time.Duration(rc.CollectInterval) * time.Second
 	cf := conf.MapConf{
-		GlobalKeyName:  rc.RunnerName,
-		KeyRunnerName:  rc.RunnerName,
-		reader.KeyMode: reader.ModeMetrics,
+		GlobalKeyName: rc.RunnerName,
+		KeyRunnerName: rc.RunnerName,
+		KeyMode:       reader.ModeMetrics,
 	}
 	if rc.ExtraInfo {
 		cf[ExtraInfo] = Bool2String(rc.ExtraInfo)
@@ -173,15 +175,15 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner
 
 	senders := make([]sender.Sender, 0)
 	for _, senderConfig := range rc.SendersConfig {
-		senderConfig[sender.KeyIsMetrics] = "true"
-		senderConfig[sender.KeyPandoraTSDBTimeStamp] = metric.Timestamp
-		if senderConfig[sender.KeySenderType] == sender.TypePandora {
+		senderConfig[senderConf.KeyIsMetrics] = "true"
+		senderConfig[senderConf.KeyPandoraTSDBTimeStamp] = metric.Timestamp
+		if senderConfig[senderConf.KeySenderType] == senderConf.TypePandora {
 			if rc.ExtraInfo {
 				//如果已经开启了，不要重复加
-				senderConfig[sender.KeyPandoraExtraInfo] = "false"
+				senderConfig[senderConf.KeyPandoraExtraInfo] = "false"
 			}
-			if senderConfig[sender.KeyPandoraDescription] == "" {
-				senderConfig[sender.KeyPandoraDescription] = MetricAutoCreateDescription
+			if senderConfig[senderConf.KeyPandoraDescription] == "" {
+				senderConfig[senderConf.KeyPandoraDescription] = MetricAutoCreateDescription
 			}
 		}
 		s, err := sr.NewSender(senderConfig, meta.FtSaveLogPath())

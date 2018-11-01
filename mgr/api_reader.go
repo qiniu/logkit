@@ -6,6 +6,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/labstack/echo"
@@ -14,23 +15,23 @@ import (
 // get /logkit/reader/usages 获取Reader用途
 func (rs *RestService) GetReaderUsages() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		sort.Stable(reader.ModeUsages)
-		return RespSuccess(c, reader.ModeUsages)
+		sort.Stable(ModeUsages)
+		return RespSuccess(c, ModeUsages)
 	}
 }
 
 // get /logkit/reader/tooltips 获取Reader用途提示
 func (rs *RestService) GetReaderTooltips() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		sort.Stable(reader.ModeToolTips)
-		return RespSuccess(c, reader.ModeToolTips)
+		sort.Stable(ModeToolTips)
+		return RespSuccess(c, ModeToolTips)
 	}
 }
 
 // get /logkit/reader/options 获取Reader参数配置
 func (rs *RestService) GetReaderKeyOptions() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		return RespSuccess(c, reader.ModeKeyOptions)
+		return RespSuccess(c, ModeKeyOptions)
 	}
 }
 

@@ -5,10 +5,12 @@ import (
 
 	"github.com/json-iterator/go"
 
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
+
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
+	. "github.com/qiniu/logkit/sender/config"
 	. "github.com/qiniu/logkit/utils/models"
-	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 )
 
 var _ sender.SkipDeepCopySender = &Sender{}
@@ -23,12 +25,12 @@ type Sender struct {
 }
 
 func init() {
-	sender.RegisterConstructor(sender.TypeMock, NewSender)
+	sender.RegisterConstructor(TypeMock, NewSender)
 }
 
 // NewMockSender 测试用sender
 func NewSender(c conf.MapConf) (sender.Sender, error) {
-	name, _ := c.GetStringOr(sender.KeyName, "mockSender")
+	name, _ := c.GetStringOr(KeyName, "mockSender")
 	isReqErr, _ := c.GetBoolOr("is_req_err", false)
 	ms := &Sender{
 		name:     name,

@@ -6,11 +6,12 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	. "github.com/qiniu/logkit/parser/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
 func init() {
-	parser.RegisterConstructor(parser.TypeRaw, NewParser)
+	parser.RegisterConstructor(TypeRaw, NewParser)
 }
 
 type Parser struct {
@@ -21,13 +22,13 @@ type Parser struct {
 }
 
 func NewParser(c conf.MapConf) (parser.Parser, error) {
-	name, _ := c.GetStringOr(parser.KeyParserName, "")
-	labelList, _ := c.GetStringListOr(parser.KeyLabels, []string{})
-	withtimestamp, _ := c.GetBoolOr(parser.KeyTimestamp, true)
+	name, _ := c.GetStringOr(KeyParserName, "")
+	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
+	withtimestamp, _ := c.GetBoolOr(KeyTimestamp, true)
 	nameMap := make(map[string]struct{})
 	labels := parser.GetLabels(labelList, nameMap)
 
-	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
+	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
 
 	return &Parser{
 		name:                 name,
@@ -42,7 +43,7 @@ func (p *Parser) Name() string {
 }
 
 func (p *Parser) Type() string {
-	return parser.TypeRaw
+	return TypeRaw
 }
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
@@ -55,9 +56,9 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 			continue
 		}
 		d := Data{}
-		d[parser.KeyRaw] = line
+		d[KeyRaw] = line
 		if p.withTimeStamp {
-			d[parser.KeyTimestamp] = time.Now().Format(time.RFC3339Nano)
+			d[KeyTimestamp] = time.Now().Format(time.RFC3339Nano)
 		}
 		for _, label := range p.labels {
 			d[label.Name] = label.Value

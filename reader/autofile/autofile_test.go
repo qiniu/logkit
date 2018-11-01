@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -37,32 +37,32 @@ func TestMatchMode(t *testing.T) {
 		{
 			input:   "/usr",
 			expPath: "/usr",
-			expMode: reader.ModeDir,
+			expMode: ModeDir,
 		},
 		{
 			input:   "/usr/",
 			expPath: "/usr",
-			expMode: reader.ModeDir,
+			expMode: ModeDir,
 		},
 		{
 			input:   "/usr/local",
 			expPath: "/usr/local",
-			expMode: reader.ModeDir,
+			expMode: ModeDir,
 		},
 		{
 			input:   "/usr/local/",
 			expPath: "/usr/local",
-			expMode: reader.ModeDir,
+			expMode: ModeDir,
 		},
 		{
 			input:   filePath,
 			expPath: filePath,
-			expMode: reader.ModeFile,
+			expMode: ModeFile,
 		},
 		{
 			input:   rootDir,
 			expPath: filepath.Join(rootDir, "*"),
-			expMode: reader.ModeTailx,
+			expMode: ModeTailx,
 		},
 		{
 			input:   filepath.Join(rootDir, "123"),
@@ -107,5 +107,5 @@ func TestMatchModeDir(t *testing.T) {
 	path, mode, err := matchMode(rootDir)
 	assert.NoError(t, err)
 	assert.Equal(t, rootDir, path)
-	assert.Equal(t, reader.ModeDir, mode)
+	assert.Equal(t, ModeDir, mode)
 }

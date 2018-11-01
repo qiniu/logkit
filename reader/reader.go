@@ -7,6 +7,7 @@ import (
 	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/conf"
+	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -58,146 +59,6 @@ type FileReader interface {
 	Close() error
 	SyncMeta() error
 }
-
-// FileReader's conf keys
-const (
-	// General
-	KeyAuthUsername = "auth_username"
-	KeyAuthPassword = "auth_password"
-
-	KeyLogPath           = "log_path"
-	KeyMetaPath          = "meta_path"
-	KeyFileDone          = "file_done"
-	KeyMode              = "mode"
-	KeyBufSize           = "reader_buf_size"
-	KeyWhence            = "read_from"
-	KeyEncoding          = "encoding"
-	KeyMysqlEncoding     = "encoding"
-	KeyReadIOLimit       = "readio_limit"
-	KeyDataSourceTag     = "datasource_tag"
-	KeyTagFile           = "tag_file"
-	KeyHeadPattern       = "head_pattern"
-	KeyNewFileNewLine    = "newfile_newline"
-	KeySkipFileFirstLine = "skip_first_line"
-
-	// 忽略隐藏文件
-	KeyIgnoreHiddenFile = "ignore_hidden"
-	KeyIgnoreFileSuffix = "ignore_file_suffix"
-	KeyValidFilePattern = "valid_file_pattern"
-
-	KeyExpire        = "expire"
-	KeySubmetaExpire = "submeta_expire"
-	KeyMaxOpenFiles  = "max_open_files"
-	KeyStatInterval  = "stat_interval"
-
-	KeyMysqlOffsetKey   = "mysql_offset_key"
-	KeyMysqlReadBatch   = "mysql_limit_batch"
-	KeyMysqlDataSource  = "mysql_datasource"
-	KeyMysqlDataBase    = "mysql_database"
-	KeyMysqlSQL         = "mysql_sql"
-	KeyMysqlCron        = "mysql_cron"
-	KeyMysqlExecOnStart = "mysql_exec_onstart"
-	KeyMysqlHistoryAll  = "mysql_history_all"
-	KyeMysqlTable       = "mysql_table"
-
-	KeySQLSchema        = "sql_schema"
-	KeyMagicLagDuration = "magic_lag_duration"
-
-	KeyMssqlOffsetKey   = "mssql_offset_key"
-	KeyMssqlReadBatch   = "mssql_limit_batch"
-	KeyMssqlDataSource  = "mssql_datasource"
-	KeyMssqlDataBase    = "mssql_database"
-	KeyMssqlSchema      = "mssql_schema"
-	KeyMssqlSQL         = "mssql_sql"
-	KeyMssqlCron        = "mssql_cron"
-	KeyMssqlExecOnStart = "mssql_exec_onstart"
-
-	KeyPGsqlOffsetKey   = "postgres_offset_key"
-	KeyPGsqlReadBatch   = "postgres_limit_batch"
-	KeyPGsqlDataSource  = "postgres_datasource"
-	KeyPGsqlDataBase    = "postgres_database"
-	KeyPGsqlSchema      = "postgres_schema"
-	KeyPGsqlSQL         = "postgres_sql"
-	KeyPGsqlCron        = "postgres_cron"
-	KeyPGsqlExecOnStart = "postgres_exec_onstart"
-
-	KeyESReadBatch = "es_limit_batch"
-	KeyESIndex     = "es_index"
-	KeyESType      = "es_type"
-	KeyESHost      = "es_host"
-	KeyESKeepAlive = "es_keepalive"
-	KeyESVersion   = "es_version"
-
-	KeyMongoHost        = "mongo_host"
-	KeyMongoDatabase    = "mongo_database"
-	KeyMongoCollection  = "mongo_collection"
-	KeyMongoOffsetKey   = "mongo_offset_key"
-	KeyMongoReadBatch   = "mongo_limit_batch"
-	KeyMongoCron        = "mongo_cron"
-	KeyMongoExecOnstart = "mongo_exec_onstart"
-	KeyMongoFilters     = "mongo_filters"
-	KeyMongoCert        = "mongo_cacert"
-
-	KeyKafkaGroupID          = "kafka_groupid"
-	KeyKafkaTopic            = "kafka_topic"
-	KeyKafkaZookeeper        = "kafka_zookeeper"
-	KeyKafkaZookeeperChroot  = "kafka_zookeeper_chroot"
-	KeyKafkaZookeeperTimeout = "kafka_zookeeper_timeout"
-
-	KeyExecInterpreter   = "script_exec_interprepter"
-	KeyScriptCron        = "script_cron"
-	KeyScriptExecOnStart = "script_exec_onstart"
-
-	KeyErrDirectReturn = "errDirectReturn"
-)
-
-var DefaultIgnoreFileSuffixes = []string{
-	".pid", ".swap", ".go", ".conf", ".tar.gz", ".tar", ".zip",
-	".a", ".o", ".so"}
-
-// FileReader's modes
-const (
-	ModeDir        = "dir"
-	ModeFile       = "file"
-	ModeTailx      = "tailx"
-	ModeFileAuto   = "fileauto"
-	ModeDirx       = "dirx"
-	ModeMySQL      = "mysql"
-	ModeMSSQL      = "mssql"
-	ModePostgreSQL = "postgres"
-	ModeElastic    = "elastic"
-	ModeMongo      = "mongo"
-	ModeKafka      = "kafka"
-	ModeRedis      = "redis"
-	ModeSocket     = "socket"
-	ModeHTTP       = "http"
-	ModeScript     = "script"
-	ModeSnmp       = "snmp"
-	ModeCloudWatch = "cloudwatch"
-	ModeCloudTrail = "cloudtrail"
-)
-
-const (
-	ReadModeHeadPatternString = "mode_head_pattern_string"
-	ReadModeHeadPatternRegexp = "mode_head_pattern_regexp"
-)
-
-// KeyWhence 的可选项
-const (
-	WhenceOldest = "oldest"
-	WhenceNewest = "newest"
-)
-
-const (
-	Loop = "loop"
-)
-
-const (
-	StatusInit int32 = iota
-	StatusStopped
-	StatusStopping
-	StatusRunning
-)
 
 func NewReader(conf conf.MapConf, errDirectReturn bool) (reader Reader, err error) {
 	rs := NewRegistry()
@@ -266,7 +127,7 @@ func (reg *Registry) NewReaderWithMeta(conf conf.MapConf, meta *Meta, errDirectR
 
 	constructor, exist := reg.readerTypeMap[mode]
 	if !exist {
-		return nil, fmt.Errorf("reader type unsupperted : %v", mode)
+		return nil, fmt.Errorf("reader type unsupported : %v", mode)
 	}
 
 	reader, err := constructor(meta, conf)

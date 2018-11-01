@@ -17,6 +17,7 @@ import (
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/reader/test"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -567,7 +568,7 @@ func TestReflectTime(t *testing.T) {
 func Test_getDefaultSql(t *testing.T) {
 	database := "my_database"
 	r1 := Reader{
-		dbtype: reader.ModeMySQL,
+		dbtype: ModeMySQL,
 	}
 	actualSql, err := r1.getDefaultSql(database)
 	assert.NoError(t, err)
@@ -575,7 +576,7 @@ func Test_getDefaultSql(t *testing.T) {
 	assert.Equal(t, actualSql, expectSql)
 
 	r2 := Reader{
-		dbtype:   reader.ModeMSSQL,
+		dbtype:   ModeMSSQL,
 		dbSchema: "dbo",
 	}
 	actualSql, err = r2.getDefaultSql(database)
@@ -585,7 +586,7 @@ func Test_getDefaultSql(t *testing.T) {
 	assert.Equal(t, actualSql, expectSql)
 
 	r3 := Reader{
-		dbtype:   reader.ModePostgreSQL,
+		dbtype:   ModePostgreSQL,
 		dbSchema: "public",
 	}
 	actualSql, err = r3.getDefaultSql(database)
@@ -1038,7 +1039,7 @@ func Test_getCheckAll(t *testing.T) {
 }
 func Test_getWrappedTableName(t *testing.T) {
 	r1 := Reader{
-		dbtype: reader.ModeMySQL,
+		dbtype: ModeMySQL,
 	}
 	tname, err := r1.getWrappedTableName("my_table")
 	expRes := "`my_table`"
@@ -1046,7 +1047,7 @@ func Test_getWrappedTableName(t *testing.T) {
 	assert.EqualValues(t, expRes, tname)
 
 	r2 := Reader{
-		dbtype:   reader.ModeMSSQL,
+		dbtype:   ModeMSSQL,
 		dbSchema: "dbo",
 	}
 	tname, err = r2.getWrappedTableName("my_table")
@@ -1055,7 +1056,7 @@ func Test_getWrappedTableName(t *testing.T) {
 	assert.EqualValues(t, expRes, tname)
 
 	r3 := Reader{
-		dbtype:   reader.ModePostgreSQL,
+		dbtype:   ModePostgreSQL,
 		dbSchema: "public",
 	}
 	tname, err = r3.getWrappedTableName("my_table")
@@ -1065,7 +1066,7 @@ func Test_getWrappedTableName(t *testing.T) {
 }
 func Test_getRawSQLs(t *testing.T) {
 	r1 := &Reader{
-		dbtype: reader.ModeMySQL,
+		dbtype: ModeMySQL,
 	}
 	mysqltests := []struct {
 		queryType int
@@ -1091,7 +1092,7 @@ func Test_getRawSQLs(t *testing.T) {
 		assert.EqualValues(t, test.expSQLs, sqls)
 	}
 	r2 := Reader{
-		dbtype:   reader.ModePostgreSQL,
+		dbtype:   ModePostgreSQL,
 		dbSchema: "public",
 	}
 	pgtests := []struct {
@@ -1117,7 +1118,7 @@ func Test_getRawSQLs(t *testing.T) {
 		assert.EqualValues(t, test.expSQLs, sqls)
 	}
 	r3 := Reader{
-		dbtype:   reader.ModeMSSQL,
+		dbtype:   ModeMSSQL,
 		dbSchema: "dbo",
 	}
 	mssqltests := []struct {
@@ -1450,9 +1451,9 @@ func getContent(readRecords DBRecords) string {
 
 func getMeta(metaDir string) (*reader.Meta, error) {
 	logkitConf := conf.MapConf{
-		reader.KeyMetaPath: metaDir,
-		reader.KeyFileDone: metaDir,
-		reader.KeyMode:     reader.ModeMySQL,
+		KeyMetaPath: metaDir,
+		KeyFileDone: metaDir,
+		KeyMode:     ModeMySQL,
 	}
 	return reader.NewMetaWithConf(logkitConf)
 }

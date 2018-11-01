@@ -15,17 +15,18 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/reader/test"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
 func TestUdpSocketReader(t *testing.T) {
 	logkitConf := conf.MapConf{
-		reader.KeyMetaPath:             MetaDir,
-		reader.KeyFileDone:             MetaDir,
-		KeyRunnerName:                  "TestUdpSocketReader",
-		reader.KeyMode:                 reader.ModeSocket,
-		reader.KeySocketServiceAddress: "udp://127.0.0.1:5140",
+		KeyMetaPath:             MetaDir,
+		KeyFileDone:             MetaDir,
+		KeyRunnerName:           "TestUdpSocketReader",
+		KeyMode:                 ModeSocket,
+		KeySocketServiceAddress: "udp://127.0.0.1:5140",
 	}
 	meta, err := reader.NewMetaWithConf(logkitConf)
 	assert.NoError(t, err)
@@ -63,12 +64,12 @@ func TestUdpSocketReader(t *testing.T) {
 
 func TestUdpSocketReaderWithSplit(t *testing.T) {
 	logkitConf := conf.MapConf{
-		reader.KeyMetaPath:             MetaDir,
-		reader.KeyFileDone:             MetaDir,
-		KeyRunnerName:                  "TestUdpSocketReader",
-		reader.KeyMode:                 reader.ModeSocket,
-		reader.KeySocketServiceAddress: "udp://127.0.0.1:5140",
-		reader.KeySocketSplitByLine:    "true",
+		KeyMetaPath:             MetaDir,
+		KeyFileDone:             MetaDir,
+		KeyRunnerName:           "TestUdpSocketReader",
+		KeyMode:                 ModeSocket,
+		KeySocketServiceAddress: "udp://127.0.0.1:5140",
+		KeySocketSplitByLine:    "true",
 	}
 	meta, err := reader.NewMetaWithConf(logkitConf)
 	assert.NoError(t, err)
@@ -104,11 +105,11 @@ func TestUdpSocketReaderWithSplit(t *testing.T) {
 
 func TestTCPSocketReader(t *testing.T) {
 	logkitConf := conf.MapConf{
-		reader.KeyMetaPath:             MetaDir,
-		reader.KeyFileDone:             MetaDir,
-		KeyRunnerName:                  "TestTCPSocketReader",
-		reader.KeyMode:                 reader.ModeSocket,
-		reader.KeySocketServiceAddress: "tcp://127.0.0.1:5141",
+		KeyMetaPath:             MetaDir,
+		KeyFileDone:             MetaDir,
+		KeyRunnerName:           "TestTCPSocketReader",
+		KeyMode:                 ModeSocket,
+		KeySocketServiceAddress: "tcp://127.0.0.1:5141",
 	}
 	meta, err := reader.NewMetaWithConf(logkitConf)
 	assert.NoError(t, err)
@@ -145,12 +146,12 @@ func TestTCPSocketReader(t *testing.T) {
 
 func TestTCPSocketReaderWithSplit(t *testing.T) {
 	logkitConf := conf.MapConf{
-		reader.KeyMetaPath:             MetaDir,
-		reader.KeyFileDone:             MetaDir,
-		KeyRunnerName:                  "TestTCPSocketReader",
-		reader.KeyMode:                 reader.ModeSocket,
-		reader.KeySocketServiceAddress: "tcp://127.0.0.1:5141",
-		reader.KeySocketSplitByLine:    "true",
+		KeyMetaPath:             MetaDir,
+		KeyFileDone:             MetaDir,
+		KeyRunnerName:           "TestTCPSocketReader",
+		KeyMode:                 ModeSocket,
+		KeySocketServiceAddress: "tcp://127.0.0.1:5141",
+		KeySocketSplitByLine:    "true",
 	}
 	meta, err := reader.NewMetaWithConf(logkitConf)
 	assert.NoError(t, err)
@@ -185,12 +186,12 @@ func TestTCPSocketReaderWithSplit(t *testing.T) {
 
 func TestTCPSocketReaderWithJson(t *testing.T) {
 	logkitConf := conf.MapConf{
-		reader.KeyMetaPath:             MetaDir,
-		reader.KeyFileDone:             MetaDir,
-		KeyRunnerName:                  "TestTCPSocketReaderWithJson",
-		reader.KeyMode:                 reader.ModeSocket,
-		reader.KeySocketServiceAddress: "tcp://127.0.0.1:5141",
-		reader.KeySocketRule:           reader.SocketRuleJson,
+		KeyMetaPath:             MetaDir,
+		KeyFileDone:             MetaDir,
+		KeyRunnerName:           "TestTCPSocketReaderWithJson",
+		KeyMode:                 ModeSocket,
+		KeySocketServiceAddress: "tcp://127.0.0.1:5141",
+		KeySocketRule:           SocketRuleJson,
 	}
 	meta, err := reader.NewMetaWithConf(logkitConf)
 	assert.NoError(t, err)
@@ -237,11 +238,11 @@ func TestTCPSocketReaderWithJson(t *testing.T) {
 
 func TestUnixSocketReader(t *testing.T) {
 	logkitConf := conf.MapConf{
-		reader.KeyMetaPath:             MetaDir,
-		reader.KeyFileDone:             MetaDir,
-		KeyRunnerName:                  "TestUnixSocketReader",
-		reader.KeyMode:                 reader.ModeSocket,
-		reader.KeySocketServiceAddress: "unix://./TestUnixSocketReader/log.socket",
+		KeyMetaPath:             MetaDir,
+		KeyFileDone:             MetaDir,
+		KeyRunnerName:           "TestUnixSocketReader",
+		KeyMode:                 ModeSocket,
+		KeySocketServiceAddress: "unix://./TestUnixSocketReader/log.socket",
 	}
 	meta, err := reader.NewMetaWithConf(logkitConf)
 	assert.NoError(t, err)
@@ -283,11 +284,11 @@ func TestUnixSocketReader(t *testing.T) {
 
 func TestUnixGramSocketReader(t *testing.T) {
 	logkitConf := conf.MapConf{
-		reader.KeyMetaPath:             MetaDir,
-		reader.KeyFileDone:             MetaDir,
-		KeyRunnerName:                  "TestUnixGramSocketReader",
-		reader.KeyMode:                 reader.ModeSocket,
-		reader.KeySocketServiceAddress: "unixgram://./TestUnixGramSocketReader/log.socket",
+		KeyMetaPath:             MetaDir,
+		KeyFileDone:             MetaDir,
+		KeyRunnerName:           "TestUnixGramSocketReader",
+		KeyMode:                 ModeSocket,
+		KeySocketServiceAddress: "unixgram://./TestUnixGramSocketReader/log.socket",
 	}
 	meta, err := reader.NewMetaWithConf(logkitConf)
 	assert.NoError(t, err)
@@ -329,11 +330,11 @@ func TestUnixGramSocketReader(t *testing.T) {
 
 func TestSocketReaderClosePanic(t *testing.T) {
 	logkitConf := conf.MapConf{
-		reader.KeyMetaPath:             MetaDir,
-		reader.KeyFileDone:             MetaDir,
-		KeyRunnerName:                  "TestSocketReaderClosePanic",
-		reader.KeyMode:                 reader.ModeSocket,
-		reader.KeySocketServiceAddress: "tcp://:5141",
+		KeyMetaPath:             MetaDir,
+		KeyFileDone:             MetaDir,
+		KeyRunnerName:           "TestSocketReaderClosePanic",
+		KeyMode:                 ModeSocket,
+		KeySocketServiceAddress: "tcp://:5141",
 	}
 	meta, err := reader.NewMetaWithConf(logkitConf)
 	assert.NoError(t, err)

@@ -18,6 +18,7 @@ import (
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
+	. "github.com/qiniu/logkit/sender/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -37,12 +38,12 @@ type Sender struct {
 }
 
 func init() {
-	sender.RegisterConstructor(sender.TypeHttp, NewSender)
+	sender.RegisterConstructor(TypeHttp, NewSender)
 }
 
 // http sender
 func NewSender(c conf.MapConf) (sender.Sender, error) {
-	url, err := c.GetString(sender.KeyHttpSenderUrl)
+	url, err := c.GetString(KeyHttpSenderUrl)
 	if err != nil {
 		return nil, err
 	}
@@ -50,23 +51,23 @@ func NewSender(c conf.MapConf) (sender.Sender, error) {
 		url = "http://" + url
 	}
 
-	gZip, _ := c.GetBoolOr(sender.KeyHttpSenderGzip, false)
-	templateStr, _ := c.GetStringOr(sender.KeyHttpSenderTemplate, "")
-	csvHead, _ := c.GetBoolOr(sender.KeyHttpSenderCsvHead, true)
-	csvSplit, _ := c.GetStringOr(sender.KeyHttpSenderCsvSplit, "\t")
-	protocol, _ := c.GetStringOr(sender.KeyHttpSenderProtocol, sender.SendProtocolJson)
-	runnerName, _ := c.GetStringOr(KeyRunnerName, sender.UnderfinedRunnerName)
-	timeout, _ := c.GetStringOr(sender.KeyHttpTimeout, "30s")
+	gZip, _ := c.GetBoolOr(KeyHttpSenderGzip, false)
+	templateStr, _ := c.GetStringOr(KeyHttpSenderTemplate, "")
+	csvHead, _ := c.GetBoolOr(KeyHttpSenderCsvHead, true)
+	csvSplit, _ := c.GetStringOr(KeyHttpSenderCsvSplit, "\t")
+	protocol, _ := c.GetStringOr(KeyHttpSenderProtocol, SendProtocolJson)
+	runnerName, _ := c.GetStringOr(KeyRunnerName, UnderfinedRunnerName)
+	timeout, _ := c.GetStringOr(KeyHttpTimeout, "30s")
 	dur, err := time.ParseDuration(timeout)
 	if err != nil {
 		return nil, errors.New("timeout configure " + timeout + " is invalid")
 	}
 	switch protocol {
-	case sender.SendProtocolCSV:
+	case SendProtocolCSV:
 		if csvSplit == "" {
 			csvSplit = "\t"
 		}
-	case sender.SendProtocolJson, sender.SendProtocolWholeJson, sender.SendProtocolRaw:
+	case SendProtocolJson, SendProtocolWholeJson, SendProtocolRaw:
 	default:
 		return nil, fmt.Errorf("runner[%v] create sender error, protocol %v is not support", runnerName, protocol)
 	}
@@ -97,19 +98,19 @@ func (h *Sender) Name() string {
 func (h *Sender) Send(data []Data) (err error) {
 	var sendBytes []byte
 	switch h.protocol {
-	case sender.SendProtocolJson:
+	case SendProtocolJson:
 		if sendBytes, err = h.convertToJsonBytes(data); err != nil {
 			return err
 		}
-	case sender.SendProtocolCSV:
+	case SendProtocolCSV:
 		if sendBytes, err = h.convertToCsvBytes(data); err != nil {
 			return err
 		}
-	case sender.SendProtocolWholeJson:
+	case SendProtocolWholeJson:
 		if sendBytes, err = h.convertToBodyJsonBytes(data); err != nil {
 			return err
 		}
-	case sender.SendProtocolRaw:
+	case SendProtocolRaw:
 		if sendBytes, err = h.convertToRawBytes(data); err != nil {
 			return err
 		}
@@ -235,9 +236,9 @@ func (h *Sender) sendData(byteData []byte) (err error) {
 		return err
 	}
 	switch h.protocol {
-	case sender.SendProtocolJson, sender.SendProtocolWholeJson:
+	case SendProtocolJson, SendProtocolWholeJson:
 		req.Header.Set(ContentTypeHeader, ApplicationJson)
-	case sender.SendProtocolCSV, sender.SendProtocolRaw:
+	case SendProtocolCSV, SendProtocolRaw:
 		req.Header.Set(ContentTypeHeader, TextPlain)
 	default:
 	}

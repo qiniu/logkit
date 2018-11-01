@@ -7,12 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jeromer/syslogparser"
 	"github.com/jeromer/syslogparser/rfc3164"
 	"github.com/jeromer/syslogparser/rfc5424"
 
+	"github.com/jeromer/syslogparser"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	. "github.com/qiniu/logkit/parser/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -24,7 +25,7 @@ const (
 )
 
 func init() {
-	parser.RegisterConstructor(parser.TypeSyslog, NewParser)
+	parser.RegisterConstructor(TypeSyslog, NewParser)
 }
 
 type LogParts map[string]interface{}
@@ -95,16 +96,16 @@ func GetFormt(format string) Format {
 }
 
 func NewParser(c conf.MapConf) (parser.Parser, error) {
-	name, _ := c.GetStringOr(parser.KeyParserName, "")
-	labelList, _ := c.GetStringListOr(parser.KeyLabels, []string{})
-	rfctype, _ := c.GetStringOr(parser.KeyRFCType, "automic")
-	maxline, _ := c.GetIntOr(parser.KeySyslogMaxline, 100)
+	name, _ := c.GetStringOr(KeyParserName, "")
+	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
+	rfctype, _ := c.GetStringOr(KeyRFCType, "automic")
+	maxline, _ := c.GetIntOr(KeySyslogMaxline, 100)
 
 	nameMap := make(map[string]struct{})
 	labels := parser.GetLabels(labelList, nameMap)
 
-	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
-	keepRawData, _ := c.GetBoolOr(parser.KeyKeepRawData, false)
+	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)
 
 	format := GetFormt(rfctype)
 	buff := bytes.NewBuffer([]byte{})
@@ -136,7 +137,7 @@ func (p *SyslogParser) Name() string {
 }
 
 func (p *SyslogParser) Type() string {
-	return parser.TypeSyslog
+	return TypeSyslog
 }
 
 func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
@@ -166,7 +167,7 @@ func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 			d[label.Name] = label.Value
 		}
 		if p.keepRawData {
-			d[parser.KeyRawData] = line
+			d[KeyRawData] = line
 		}
 		datas = append(datas, d)
 		se.AddSuccess()
@@ -180,7 +181,7 @@ func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 
 func (p *SyslogParser) parse(line string) (data Data, err error) {
 	if p.buff.Len() > 0 {
-		if line == parser.PandoraParseFlushSignal {
+		if line == PandoraParseFlushSignal {
 			return p.Flush()
 		}
 
@@ -194,7 +195,7 @@ func (p *SyslogParser) parse(line string) (data Data, err error) {
 		}
 	}
 
-	if line != parser.PandoraParseFlushSignal {
+	if line != PandoraParseFlushSignal {
 		_, err = p.buff.Write([]byte(line))
 		if err != nil {
 			if !p.disableRecordErrData || p.keepRawData {
@@ -204,7 +205,7 @@ func (p *SyslogParser) parse(line string) (data Data, err error) {
 				data[KeyPandoraStash] = string(p.buff.Bytes())
 			}
 			if p.keepRawData {
-				data[parser.KeyRawData] = string(p.buff.Bytes())
+				data[KeyRawData] = string(p.buff.Bytes())
 			}
 		}
 		return data, err
@@ -229,7 +230,7 @@ func (p *SyslogParser) Flush() (data Data, err error) {
 			data[KeyPandoraStash] = string(p.buff.Bytes())
 		}
 		if p.keepRawData {
-			data[parser.KeyRawData] = string(p.buff.Bytes())
+			data[KeyRawData] = string(p.buff.Bytes())
 		}
 	}
 	p.curline = 0

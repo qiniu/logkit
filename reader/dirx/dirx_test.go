@@ -14,6 +14,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -89,7 +90,7 @@ func multiReaderOneLineTest(t *testing.T) {
 		"read_from":       "oldest",
 		"reader_buf_size": "1024",
 		"meta_path":       dirName,
-		"mode":            reader.ModeDirx,
+		"mode":            ModeDirx,
 	}
 	meta, err := reader.NewMetaWithConf(c)
 	assert.NoError(t, err)
@@ -183,14 +184,14 @@ func multiReaderMultiLineTest(t *testing.T) {
 		"read_from":       "oldest",
 		"reader_buf_size": "1024",
 		"meta_path":       dirName,
-		"mode":            reader.ModeDirx,
+		"mode":            ModeDirx,
 	}
 	meta, err := reader.NewMetaWithConf(c)
 	assert.NoError(t, err)
 	r, err := NewReader(meta, c)
 	assert.NoError(t, err)
 
-	r.SetMode(reader.ReadModeHeadPatternString, "^abc*")
+	r.SetMode(ReadModeHeadPatternString, "^abc*")
 	dr := r.(*Reader)
 	assert.NoError(t, dr.Start())
 	t.Log("Reader has started")
@@ -287,7 +288,7 @@ func multiReaderSyncMetaOneLineTest(t *testing.T) {
 		"read_from":       "oldest",
 		"reader_buf_size": "1024",
 		"meta_path":       dirName,
-		"mode":            reader.ModeDirx,
+		"mode":            ModeDirx,
 	}
 	meta, err := reader.NewMetaWithConf(c)
 	assert.NoError(t, err)
@@ -416,14 +417,14 @@ func multiReaderSyncMetaMutilineTest(t *testing.T) {
 		"read_from":       "oldest",
 		"reader_buf_size": "1024",
 		"meta_path":       dirname,
-		"mode":            reader.ModeDirx,
+		"mode":            ModeDirx,
 	}
 	meta, err := reader.NewMetaWithConf(c)
 	assert.NoError(t, err)
 	r, err := NewReader(meta, c)
 	assert.NoError(t, err)
 
-	r.SetMode(reader.ReadModeHeadPatternString, "^abc*")
+	r.SetMode(ReadModeHeadPatternString, "^abc*")
 	dr := r.(*Reader)
 	assert.NoError(t, dr.Start())
 	t.Log("Reader has started")
@@ -457,7 +458,7 @@ func multiReaderSyncMetaMutilineTest(t *testing.T) {
 	r, err = NewReader(meta, c)
 	assert.NoError(t, err)
 
-	r.SetMode(reader.ReadModeHeadPatternString, "^abc*")
+	r.SetMode(ReadModeHeadPatternString, "^abc*")
 	dr = r.(*Reader)
 	assert.NoError(t, dr.Start())
 	t.Log("Reader has started again", maxNum)
@@ -544,7 +545,7 @@ func TestMultiReaderReset(t *testing.T) {
 		"read_from":       "oldest",
 		"reader_buf_size": "1024",
 		"meta_path":       metaDir,
-		"mode":            reader.ModeDirx,
+		"mode":            ModeDirx,
 	}
 	meta, err := reader.NewMetaWithConf(c)
 	assert.NoError(t, err)
@@ -644,7 +645,7 @@ func TestReaderErrBegin(t *testing.T) {
 		"read_from":       "oldest",
 		"reader_buf_size": "1024",
 		"meta_path":       metaDir,
-		"mode":            reader.ModeDirx,
+		"mode":            ModeDirx,
 	}
 	meta, err := reader.NewMetaWithConf(c)
 	assert.NoError(t, err)
@@ -708,7 +709,7 @@ func multiReaderEmptyDirxTest(t *testing.T) {
 		"read_from":       "newest",
 		"reader_buf_size": "1024",
 		"meta_path":       dirName,
-		"mode":            reader.ModeDirx,
+		"mode":            ModeDirx,
 	}
 	meta, err := reader.NewMetaWithConf(c)
 	assert.Nil(t, err)

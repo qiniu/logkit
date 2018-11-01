@@ -7,6 +7,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	. "github.com/qiniu/logkit/parser/config"
 	"github.com/qiniu/logkit/times"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -42,7 +43,7 @@ var (
 )
 
 func init() {
-	parser.RegisterConstructor(parser.TypeLogv1, NewParser)
+	parser.RegisterConstructor(TypeLogv1, NewParser)
 }
 
 type Parser struct {
@@ -63,10 +64,10 @@ func checkLevel(str string) bool {
 }
 
 func NewParser(c conf.MapConf) (parser.Parser, error) {
-	name, _ := c.GetStringOr(parser.KeyParserName, "")
-	labelList, _ := c.GetStringListOr(parser.KeyLabels, []string{})
-	logHeaders, _ := c.GetStringListOr(parser.KeyLogHeaders, defaultLogHeads)
-	keepRawData, _ := c.GetBoolOr(parser.KeyKeepRawData, false)
+	name, _ := c.GetStringOr(KeyParserName, "")
+	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
+	logHeaders, _ := c.GetStringListOr(KeyLogHeaders, defaultLogHeads)
+	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)
 	if len(logHeaders) < 1 {
 		return nil, fmt.Errorf("no log headers was configured to parse")
 	}
@@ -85,7 +86,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	}
 	labels := parser.GetLabels(labelList, nameMap)
 
-	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
+	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
 
 	return &Parser{
 		name:                 name,
@@ -101,7 +102,7 @@ func (p *Parser) Name() string {
 }
 
 func (p *Parser) Type() string {
-	return parser.TypeLogv1
+	return TypeLogv1
 }
 
 func (p *Parser) GetParser(head string) (func(string) (string, map[string]string, error), error) {
@@ -369,7 +370,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			}
 			if p.keepRawData {
-				errData[parser.KeyRawData] = line
+				errData[KeyRawData] = line
 			}
 			if !p.disableRecordErrData || p.keepRawData {
 				datas = append(datas, errData)
@@ -378,7 +379,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		}
 		se.AddSuccess()
 		if p.keepRawData {
-			d[parser.KeyRawData] = line
+			d[KeyRawData] = line
 		}
 		datas = append(datas, d)
 	}
