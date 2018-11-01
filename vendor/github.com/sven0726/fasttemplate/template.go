@@ -9,8 +9,10 @@ package fasttemplate
 import (
 	"bytes"
 	"fmt"
-	"github.com/valyala/bytebufferpool"
 	"io"
+	"strconv"
+
+	"github.com/valyala/bytebufferpool"
 )
 
 // ExecuteFunc calls f on each template tag (placeholder) occurrence.
@@ -309,6 +311,16 @@ func stdTagFunc(w io.Writer, tag string, m map[string]interface{}) (int, error) 
 		return w.Write(value)
 	case string:
 		return w.Write([]byte(value))
+	case bool:
+		return w.Write([]byte(strconv.FormatBool(value)))
+	case int:
+		return w.Write([]byte(strconv.Itoa(value)))
+	case int64:
+		return w.Write([]byte(strconv.FormatInt(value, 10)))
+	case uint64:
+		return w.Write([]byte(strconv.FormatUint(value, 10)))
+	case float64:
+		return w.Write([]byte(strconv.FormatFloat(value, 'f', -1, 64)))
 	case TagFunc:
 		return value(w, tag)
 	default:
