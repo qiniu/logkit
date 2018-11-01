@@ -210,6 +210,39 @@ const (
 
 	ErrSchemaFieldNotExist
 	ErrTagsDecodeError
+
+	ErrInvalidSchemaKey
+	ErrInvalidTimestamp
+	ErrInvalidUrl
+	ErrInvalidDestinationField
+	ErrRepoFieldNotExist
+	ErrEmptySourceField
+	ErrFieldNotExist
+	ErrIncompatibleTypes
+	ErrInvalidFieldName
+	ErrFieldMissed
+	ErrInvalidFieldType
+	ErrEmptyField
+	ErrInvalidPrefix
+	ErrInvalidFieldValue
+	ErrInvalidExportType
+	ErrNoSuchBucket
+	ErrSourceFieldInvalidPrefix
+	ErrFieldTypeError
+	ErrRepoNotExistError
+	ErrNoSuchSeries
+	ErrInvalidTagName
+	ErrDuplicatedKey
+	ErrMissingDelimiterForCsv
+	ErrRotateSizeExceed
+	ErrNoSuchDatabase
+	ErrNoSuchTables
+	ErrDestinationEmptyError
+	ErrInvalidSourceField
+	ErrInvalidEmptySourceField
+	ErrConnectHdfsFailed
+	ErrStatFileFailed
+	ErrExportTypeDisabled
 )
 
 type ErrBuilder interface {

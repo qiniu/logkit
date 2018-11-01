@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"strings"
 
+	"time"
+
 	"github.com/qiniu/pandora-go-sdk/base"
 	. "github.com/qiniu/pandora-go-sdk/base/models"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
@@ -997,7 +999,18 @@ func (p *PointField) Bytes() []byte {
 	} else if typ == reflect.String {
 		value = escapeBytesField([]byte(reflect.ValueOf(p.Value).String()))
 	} else {
-		value = escapeBytesField([]byte(fmt.Sprintf("%v", p.Value)))
+		switch nv := p.Value.(type) {
+		case time.Time:
+			value = escapeBytesField([]byte(nv.Format(time.RFC3339Nano)))
+		case *time.Time:
+			if nv == nil {
+				return []byte("")
+			}
+			value = escapeBytesField([]byte(nv.Format(time.RFC3339Nano)))
+		default:
+			value = escapeBytesField([]byte(fmt.Sprintf("%v", p.Value)))
+		}
+
 	}
 	ret := []byte(p.Key)
 	ret = append(ret, '=')
@@ -1018,7 +1031,17 @@ func (p *PointField) String() string {
 	} else if typ == reflect.String {
 		value = escapeStringField(reflect.ValueOf(p.Value).String())
 	} else {
-		value = escapeStringField(fmt.Sprintf("%v", p.Value))
+		switch nv := p.Value.(type) {
+		case time.Time:
+			value = escapeStringField(nv.Format(time.RFC3339Nano))
+		case *time.Time:
+			if nv == nil {
+				return ""
+			}
+			value = escapeStringField(nv.Format(time.RFC3339Nano))
+		default:
+			value = escapeStringField(fmt.Sprintf("%v", p.Value))
+		}
 	}
 	return p.Key + "=" + value + "\t"
 }

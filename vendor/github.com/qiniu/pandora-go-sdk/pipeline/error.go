@@ -93,6 +93,70 @@ func (e PipelineErrBuilder) Build(msg, text, reqId string, code int) error {
 		err.ErrorType = reqerr.ErrIncompatibleRepoSchema
 	case "E18305":
 		err.ErrorType = reqerr.InvalidExportSpecError
+	case "E18308":
+		err.ErrorType = reqerr.ErrInvalidSchemaKey
+	case "E18309":
+		err.ErrorType = reqerr.ErrInvalidTimestamp
+	case "E18310":
+		err.ErrorType = reqerr.ErrInvalidUrl
+	case "E18311":
+		err.ErrorType = reqerr.ErrInvalidDestinationField
+	case "E18312":
+		err.ErrorType = reqerr.ErrRepoFieldNotExist
+	case "E18313":
+		err.ErrorType = reqerr.ErrEmptySourceField
+	case "E18314":
+		err.ErrorType = reqerr.ErrFieldNotExist
+	case "E18315":
+		err.ErrorType = reqerr.ErrIncompatibleTypes
+	case "E18316":
+		err.ErrorType = reqerr.ErrInvalidFieldName
+	case "E18317":
+		err.ErrorType = reqerr.ErrFieldMissed
+	case "E18318":
+		err.ErrorType = reqerr.ErrInvalidFieldType
+	case "E18319":
+		err.ErrorType = reqerr.ErrEmptyField
+	case "E18320":
+		err.ErrorType = reqerr.ErrInvalidPrefix
+	case "E18321":
+		err.ErrorType = reqerr.ErrInvalidFieldValue
+	case "E18322":
+		err.ErrorType = reqerr.ErrInvalidExportType
+	case "E18323":
+		err.ErrorType = reqerr.ErrNoSuchBucket
+	case "E18324":
+		err.ErrorType = reqerr.ErrSourceFieldInvalidPrefix
+	case "E18325":
+		err.ErrorType = reqerr.ErrFieldTypeError
+	case "E18326":
+		err.ErrorType = reqerr.ErrRepoNotExistError
+	case "E18327":
+		err.ErrorType = reqerr.ErrNoSuchSeries
+	case "E18328":
+		err.ErrorType = reqerr.ErrInvalidTagName
+	case "E18329":
+		err.ErrorType = reqerr.ErrDuplicatedKey
+	case "E18330":
+		err.ErrorType = reqerr.ErrMissingDelimiterForCsv
+	case "E18331":
+		err.ErrorType = reqerr.ErrRotateSizeExceed
+	case "E18332":
+		err.ErrorType = reqerr.ErrNoSuchDatabase
+	case "E18333":
+		err.ErrorType = reqerr.ErrNoSuchTables
+	case "E18334":
+		err.ErrorType = reqerr.ErrDestinationEmptyError
+	case "E18335":
+		err.ErrorType = reqerr.ErrInvalidSourceField
+	case "E18336":
+		err.ErrorType = reqerr.ErrInvalidEmptySourceField
+	case "E18337":
+		err.ErrorType = reqerr.ErrConnectHdfsFailed
+	case "E18338":
+		err.ErrorType = reqerr.ErrStatFileFailed
+	case "E18339":
+		err.ErrorType = reqerr.ErrExportTypeDisabled
 	case "E18600":
 		err.ErrorType = reqerr.ErrInvalidDataSourceName
 	case "E18601":
@@ -240,6 +304,8 @@ func (e PipelineErrBuilder) Build(msg, text, reqId string, code int) error {
 	case "E9001":
 		err.ErrorType = reqerr.NotImplementedError
 		err.Message = fmt.Sprintf("this function is not implemented on server, ask server admin for explain: %s", msg)
+	case "E8111":
+		err.ErrorType = reqerr.NoSuchRepoError
 	default:
 		if code == 401 {
 			err.Message = fmt.Sprintf("unauthorized: %v. 1. Please check your qiniu access_key and secret_key are both correct and you're authorized qiniu pandora user. 2. Please check the local time to ensure the consistent with the server time. 3. If you are using the token, please make sure that token has not expired.", msg)

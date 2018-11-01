@@ -18,6 +18,8 @@ import (
 
 	"github.com/qiniu/log"
 
+	"regexp"
+
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/utils/models"
@@ -116,10 +118,11 @@ func (ssr *streamSocketReader) read(c net.Conn) {
 		ssr.SocketRule == reader.SocketRuleLine ||
 		ssr.SocketRule == reader.SocketRulePacket {
 		ssr.packetAndLineRead(c)
+	} else if ssr.SocketRule == reader.SocketRuleHeadPattern {
+		// 后续要加
 	} else {
 		ssr.jsonRead(c)
 	}
-
 	return
 }
 
@@ -216,20 +219,20 @@ func (ssr *streamSocketReader) jsonRead(c net.Conn) {
 
 		var res interface{}
 		err = decoder.Decode(&res)
-		if _, ok := err.(*json.SyntaxError); ok {
-			bufferReader := decoder.Buffered()
-			readBytes, err := ioutil.ReadAll(bufferReader)
-			if err != nil {
-				log.Errorf("runner[%v] Reader %q read decoder buffered error: %v", ssr.meta.RunnerName, ssr.Name(), err)
-			} else {
-				log.Errorf("runner[%v] Reader %q read streaming message: %v", ssr.meta.RunnerName, ssr.Name(), TruncateStrSize(string(readBytes), 2048))
-			}
-			decoder = json.NewDecoder(bufioReader)
-			log.Errorf("runner[%v] Reader %q decode message error %v", ssr.meta.RunnerName, ssr.Name(), err)
-			time.Sleep(time.Second)
-			continue
-		}
 		if err != nil {
+			if _, ok := err.(*json.SyntaxError); ok {
+				bufferReader := decoder.Buffered()
+				readBytes, err := ioutil.ReadAll(bufferReader)
+				if err != nil {
+					log.Errorf("runner[%v] Reader %q read decoder buffered error: %v", ssr.meta.RunnerName, ssr.Name(), err)
+				} else {
+					log.Errorf("runner[%v] Reader %q read streaming message: %v", ssr.meta.RunnerName, ssr.Name(), TruncateStrSize(string(readBytes), 2048))
+				}
+				decoder = json.NewDecoder(bufioReader)
+				log.Errorf("runner[%v] Reader %q decode message error %v", ssr.meta.RunnerName, ssr.Name(), err)
+				time.Sleep(time.Second)
+				continue
+			}
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				if !tryDecodeReader(decoder) {
 					decoder = json.NewDecoder(bufioReader)
@@ -329,6 +332,7 @@ type Reader struct {
 	KeepAlivePeriod time.Duration
 	IsSplitByLine   bool
 	SocketRule      string
+	HeadPattern     *regexp.Regexp
 
 	closer io.Closer
 }
@@ -354,6 +358,15 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	}
 	IsSplitByLine, _ := conf.GetBoolOr(reader.KeySocketSplitByLine, false)
 	socketRule, _ := conf.GetStringOr(reader.KeySocketRule, reader.SocketRulePacket)
+	var headPattern *regexp.Regexp
+	if socketRule == reader.SocketRuleHeadPattern {
+		patternStr, _ := conf.GetStringOr(reader.KeySocketRuleHeadPattern, "*")
+		headPattern, err = regexp.Compile(patternStr)
+		if err != nil {
+			err = fmt.Errorf("head pattern %v compile error %v", patternStr, err)
+			return nil, err
+		}
+	}
 	return &Reader{
 		meta:            meta,
 		status:          reader.StatusInit,
@@ -366,6 +379,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		KeepAlivePeriod: KeepAlivePeriodDur,
 		IsSplitByLine:   IsSplitByLine,
 		SocketRule:      socketRule,
+		HeadPattern:     headPattern,
 	}, nil
 }
 
