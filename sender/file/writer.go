@@ -18,7 +18,7 @@ const defaultFileWriterPoolSize = 10
 
 type writer struct {
 	inUseStatus int32 // Note: 原子操作
-	lastWrote   int64
+	lastWrote   int32
 	wc          io.WriteCloser
 }
 
@@ -38,7 +38,7 @@ func (w *writer) SetIdle() {
 }
 
 func (w *writer) Write(b []byte) (int, error) {
-	atomic.StoreInt64(&w.lastWrote, time.Now().Unix())
+	atomic.StoreInt32(&w.lastWrote, int32(time.Now().Unix()))
 	return w.wc.Write(b)
 }
 
@@ -106,9 +106,9 @@ func (s *writerStore) NewWriter(filename string) (w *writer, _ error) {
 	// 关闭并删除 (total - size) 个最不活跃的句柄，因为可能同时创建多个句柄而当时无法确认谁是最不活跃的
 	for i := 1; i <= len(s.writers)-s.size; i++ {
 		var expiredFilename string
-		lastWrite := time.Now().Unix()
+		lastWrite := int32(time.Now().Unix())
 		for name, w := range s.writers {
-			currentLastWrite := atomic.LoadInt64(&w.lastWrote)
+			currentLastWrite := atomic.LoadInt32(&w.lastWrote)
 			if currentLastWrite == 0 || w.IsBusy() {
 				continue // 暂时忽略刚创建和正忙的句柄
 			}
