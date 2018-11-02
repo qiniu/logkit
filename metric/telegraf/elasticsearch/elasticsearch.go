@@ -185,15 +185,15 @@ func (c *collector) SyncConfig(data map[string]interface{}, meta *reader.Meta) e
 	}
 	es.TLSCA, ok = data[ConfigTLSCA].(string)
 	if !ok {
-		err += fmt.Sprintf("key tls_ca want as string,actual get %T\n", data[ConfigTLSCA])
+		log.Warnf("key tls_ca want as string,actual get %T", data[ConfigTLSCA])
 	}
 	es.TLSCert, ok = data[ConfigTLSCert].(string)
 	if !ok {
-		err += fmt.Sprintf("key tls_cert want as string,actual get %T\n", data[ConfigTLSCert])
+		log.Warnf("key tls_cert want as string,actual get %T", data[ConfigTLSCert])
 	}
 	es.TLSKey, ok = data[ConfigTLSKey].(string)
 	if !ok {
-		err += fmt.Sprintf("key tls_key want as string,actual get %T\n", data[ConfigTLSKey])
+		log.Warnf("key tls_key want as string,actual get %T", data[ConfigTLSKey])
 	}
 	if err != "" {
 		return errors.New(err)
