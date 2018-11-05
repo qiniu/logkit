@@ -352,6 +352,12 @@
 			"revisionTime": "2018-10-19T20:32:54Z"
 		},
 		{
+			"checksumSHA1": "7dLuXe+C7JIMjUdvOJ1Ovtdr0EY=",
+			"path": "github.com/influxdata/telegraf/plugins/inputs/http_response",
+			"revision": "19a338b92221fbaa18131ebd81303779b426545e",
+			"revisionTime": "2018-11-03T01:23:41Z"
+		},
+		{
 			"checksumSHA1": "+of8tax6y1YqctWPSxxU7u99aTk=",
 			"path": "github.com/influxdata/telegraf/plugins/inputs/memcached",
 			"revision": "1ac64596bf65716e9aa6752ba720ed4f3af758e9",

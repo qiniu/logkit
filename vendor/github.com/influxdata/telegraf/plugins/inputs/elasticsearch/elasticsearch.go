@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/influxdata/telegraf"
-	"github.com/influxdata/telegraf/internal"
 	"github.com/influxdata/telegraf/internal/tls"
 	"github.com/influxdata/telegraf/plugins/inputs"
 	jsonparser "github.com/influxdata/telegraf/plugins/parsers/json"
@@ -126,7 +125,7 @@ const sampleConfig = `
 type Elasticsearch struct {
 	Local              bool
 	Servers            []string
-	HttpTimeout        internal.Duration
+	HttpTimeout        time.Duration
 	ClusterHealth      bool
 	ClusterHealthLevel string
 	ClusterStats       bool
@@ -141,7 +140,7 @@ type Elasticsearch struct {
 // NewElasticsearch return a new instance of Elasticsearch
 func NewElasticsearch() *Elasticsearch {
 	return &Elasticsearch{
-		HttpTimeout:        internal.Duration{Duration: time.Second * 5},
+		HttpTimeout:        time.Second * 5,
 		ClusterHealthLevel: "indices",
 	}
 }
@@ -235,12 +234,12 @@ func (e *Elasticsearch) createHttpClient() (*http.Client, error) {
 		return nil, err
 	}
 	tr := &http.Transport{
-		ResponseHeaderTimeout: e.HttpTimeout.Duration,
+		ResponseHeaderTimeout: e.HttpTimeout,
 		TLSClientConfig:       tlsCfg,
 	}
 	client := &http.Client{
 		Transport: tr,
-		Timeout:   e.HttpTimeout.Duration,
+		Timeout:   e.HttpTimeout,
 	}
 
 	return client, nil

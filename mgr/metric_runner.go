@@ -43,6 +43,7 @@ type MetricRunner struct {
 	collectors   []metric.Collector
 	senders      []sender.Sender
 	transformers map[string][]transforms.Transformer
+	commonTrans  []transforms.Transformer
 
 	collectInterval time.Duration
 	rs              *RunnerStatus
@@ -65,6 +66,9 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner
 	if rc.CollectInterval <= 0 {
 		rc.CollectInterval = defaultCollectInterval
 	}
+	if len(rc.MetricConfig) == 0 {
+		return nil, errors.New("Runner " + rc.RunnerName + " has no metric, ignore it")
+	}
 	interval := time.Duration(rc.CollectInterval) * time.Second
 	cf := conf.MapConf{
 		GlobalKeyName:  rc.RunnerName,
@@ -83,9 +87,7 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner
 	}
 	collectors := make([]metric.Collector, 0)
 	transformers := make(map[string][]transforms.Transformer)
-	if len(rc.MetricConfig) == 0 {
-		return nil, errors.New("Runner " + rc.RunnerName + " has zero metric, ignore it")
-	}
+
 	for _, m := range rc.MetricConfig {
 		tp := m.MetricType
 		c, err := NewMetric(tp)
@@ -164,6 +166,11 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner
 		return
 	}
 
+	commonTransformers, err := createTransformers(rc)
+	if err != nil {
+		return nil, err
+	}
+
 	senders := make([]sender.Sender, 0)
 	for _, senderConfig := range rc.SendersConfig {
 		senderConfig[sender.KeyIsMetrics] = "true"
@@ -207,6 +214,7 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner
 		collectInterval: interval,
 		collectors:      collectors,
 		transformers:    transformers,
+		commonTrans:     commonTransformers,
 		senders:         senders,
 		envTag:          rc.EnvTag,
 	}
@@ -267,6 +275,12 @@ func (r *MetricRunner) Run() {
 					if err != nil {
 						log.Error(err)
 					}
+				}
+			}
+			for _, t := range r.commonTrans {
+				tmpDatas, err = t.Transform(tmpDatas)
+				if err != nil {
+					log.Error(err)
 				}
 			}
 			for _, metricData := range tmpDatas {
