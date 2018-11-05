@@ -21,6 +21,7 @@ const MetricName = "elasticsearch"
 var (
 	ConfigServers            = "servers"
 	ConfigLocal              = "local"
+	ConfigTimeout            = "timeout"
 	ConfigClusterHealth      = "cluster_health"
 	ConfigClusterHealthLevel = "cluster_health_level"
 	ConfigClusterStats       = "cluster_stats"
@@ -60,6 +61,13 @@ func init() {
 				DefaultNoUse:  false,
 				Description:   "只读取本节点的状态信息",
 				Type:          metric.ConfigTypeBool,
+			},
+			{
+				KeyName:      ConfigTimeout,
+				Default:      "5s",
+				DefaultNoUse: false,
+				Description:  "请求超时时间",
+				Type:         metric.ConfigTypeBool,
 			},
 			{
 				KeyName:       ConfigClusterHealth,
@@ -156,48 +164,45 @@ func (c *collector) SyncConfig(data map[string]interface{}, meta *reader.Meta) e
 	if !ok {
 		return errors.New("unexpected elasticsearch type, want '*elasticsearch.Elasticsearch'")
 	}
-	var err string
 	servers, ok := data[ConfigServers].(string)
+	if !ok {
+		return fmt.Errorf("key servers want as string,actual get %T\n", data[ConfigServers])
+	}
+	es.Servers = strings.Split(servers, ",")
+
+	local, ok := data[ConfigLocal].(bool)
 	if ok {
-		es.Servers = strings.Split(servers, ",")
-	} else {
-		err += fmt.Sprintf("key servers want as string,actual get %T\n", data[ConfigServers])
+		es.Local = local
 	}
-	es.Local, ok = data[ConfigLocal].(bool)
-	if !ok {
-		err += fmt.Sprintf("key local want as bool,actual get %T\n", data[ConfigLocal])
+	health, ok := data[ConfigClusterHealth].(bool)
+	if ok {
+		es.ClusterHealth = health
 	}
-	es.ClusterHealth, ok = data[ConfigClusterHealth].(bool)
-	if !ok {
-		err += fmt.Sprintf("key cluster_health want as bool,actual get %T\n", data[ConfigClusterHealth])
+	healthLevel, ok := data[ConfigClusterHealthLevel].(string)
+	if ok {
+		es.ClusterHealthLevel = strings.TrimSpace(healthLevel)
 	}
-	es.ClusterHealthLevel, ok = data[ConfigClusterHealthLevel].(string)
-	if !ok {
-		err += fmt.Sprintf("key cluster_health_level want as string,actual get %T\n", data[ConfigClusterHealthLevel])
+	ClusterStats, ok := data[ConfigClusterStats].(bool)
+	if ok {
+		es.ClusterStats = ClusterStats
 	}
-	es.ClusterStats, ok = data[ConfigClusterStats].(bool)
-	if !ok {
-		err += fmt.Sprintf("key cluster_stats want as bool,actual get %T\n", data[ConfigClusterStats])
+	InsecureSkipVerify, ok := data[ConfigInsecureSkipVerify].(bool)
+	if ok {
+		es.InsecureSkipVerify = InsecureSkipVerify
 	}
-	es.InsecureSkipVerify, ok = data[ConfigInsecureSkipVerify].(bool)
-	if !ok {
-		err += fmt.Sprintf("key insecure_skip_verify want as bool,actual get %T\n", data[ConfigInsecureSkipVerify])
+	TLSCA, ok := data[ConfigTLSCA].(string)
+	if ok {
+		es.TLSCA = TLSCA
 	}
-	es.TLSCA, ok = data[ConfigTLSCA].(string)
-	if !ok {
-		err += fmt.Sprintf("key tls_ca want as string,actual get %T\n", data[ConfigTLSCA])
+	TLSCert, ok := data[ConfigTLSCert].(string)
+	if ok {
+		es.TLSCert = TLSCert
 	}
-	es.TLSCert, ok = data[ConfigTLSCert].(string)
-	if !ok {
-		err += fmt.Sprintf("key tls_cert want as string,actual get %T\n", data[ConfigTLSCert])
+	TLSKey, ok := data[ConfigTLSKey].(string)
+	if ok {
+		es.TLSKey = TLSKey
 	}
-	es.TLSKey, ok = data[ConfigTLSKey].(string)
-	if !ok {
-		err += fmt.Sprintf("key tls_key want as string,actual get %T\n", data[ConfigTLSKey])
-	}
-	if err != "" {
-		return errors.New(err)
-	}
+
 	return nil
 }
 
