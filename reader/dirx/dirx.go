@@ -267,8 +267,8 @@ func (r *Reader) statLogPath() {
 		}
 		newPaths = append(newPaths, logPath)
 
-		if r.hasStopped() {
-			log.Warnf("Runner[%v] created new reader for log path %q but daemon reader has stopped, will not run at this time", r.meta.RunnerName, logPath)
+		if r.hasStopped() || r.isStopping() {
+			log.Warnf("Runner[%v] created new reader for log path %q but daemon reader has stopped/is stopping, will not run at this time", r.meta.RunnerName, logPath)
 			continue
 		}
 
