@@ -72,8 +72,8 @@ func NewSender(c conf.MapConf) (sender.Sender, error) {
 	}
 	var templateRender *fasttemplate.Template
 	_temp := strings.TrimSpace(templateStr)
-	if strings.TrimSpace(_temp) != "" {
-		templateRender = fasttemplate.New(strings.TrimSpace(_temp), "{{", "}}")
+	if _temp != "" {
+		templateRender = fasttemplate.New(_temp, "{{", "}}")
 	}
 
 	httpSender := &Sender{
@@ -176,7 +176,7 @@ func (h *Sender) convertToBodyJsonBytes(datas []Data) (byteData []byte, err erro
 	for i, data := range datas {
 		dataArray[i], err = h.renderTemplate(data)
 		if err != nil {
-			return byteData, err
+			return nil, err
 		}
 	}
 	byteData = []byte("[" + strings.Join(dataArray, ",") + "]")
