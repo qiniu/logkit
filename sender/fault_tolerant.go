@@ -18,14 +18,13 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/queue"
+	. "github.com/qiniu/logkit/sender/config"
 	. "github.com/qiniu/logkit/utils/models"
 	"github.com/qiniu/logkit/utils/reqid"
 )
 
 const (
-	mb                = 1024 * 1024 // 1MB
-	defaultWriteLimit = 10          // 默认写速限制为10MB
-	maxBytesPerFile   = 100 * mb
+	defaultWriteLimit = 10 // 默认写速限制为10MB
 	qNameSuffix       = "_local_save"
 	directSuffix      = "_direct"
 	defaultMaxProcs   = 1         // 默认没有并发
@@ -92,8 +91,8 @@ func NewFtSender(innerSender Sender, conf conf.MapConf, ftSaveLogPath string) (*
 		return nil, errors.New("no match ft_strategy")
 	}
 	runnerName, _ := conf.GetStringOr(KeyRunnerName, UnderfinedRunnerName)
-	maxDiskUsedBytes, _ := conf.GetInt64Or(KeyMaxDiskUsedBytes, maxDiskUsedBytes)
-	maxSizePerFile, _ := conf.GetInt32Or(KeyMaxSizePerFile, maxBytesPerFile)
+	maxDiskUsedBytes, _ := conf.GetInt64Or(KeyMaxDiskUsedBytes, MaxDiskUsedBytes)
+	maxSizePerFile, _ := conf.GetInt32Or(KeyMaxSizePerFile, MaxBytesPerFile)
 	discardErr, _ := conf.GetBoolOr(KeyFtDiscardErr, false)
 	if MaxProcs <= 0 {
 		MaxProcs = NumCPU
@@ -135,7 +134,7 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 			SyncEveryWrite:   opt.syncEvery,
 			SyncEveryRead:    opt.syncEvery,
 			SyncTimeout:      2 * time.Second,
-			WriteRateLimit:   opt.writeLimit * mb,
+			WriteRateLimit:   opt.writeLimit * MB,
 			MaxDiskUsedBytes: opt.maxDiskUsedBytes,
 		})
 	} else {
@@ -147,7 +146,7 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 			SyncEveryWrite:    opt.syncEvery,
 			SyncEveryRead:     opt.syncEvery,
 			SyncTimeout:       2 * time.Second,
-			WriteRateLimit:    opt.writeLimit * mb,
+			WriteRateLimit:    opt.writeLimit * MB,
 			EnableMemoryQueue: true,
 			MemoryQueueSize:   int64(opt.memoryChannelSize),
 			MaxDiskUsedBytes:  opt.maxDiskUsedBytes,
@@ -161,7 +160,7 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 		SyncEveryWrite:   opt.syncEvery,
 		SyncEveryRead:    opt.syncEvery,
 		SyncTimeout:      2 * time.Second,
-		WriteRateLimit:   opt.writeLimit * mb,
+		WriteRateLimit:   opt.writeLimit * MB,
 		MaxDiskUsedBytes: opt.maxDiskUsedBytes,
 	})
 	ftSender := FtSender{

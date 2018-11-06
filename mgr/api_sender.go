@@ -5,7 +5,7 @@ import (
 	"sort"
 
 	"github.com/qiniu/logkit/router"
-	"github.com/qiniu/logkit/sender"
+	. "github.com/qiniu/logkit/sender/config"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/labstack/echo"
@@ -17,15 +17,15 @@ const KeyRouterConfig = "router"
 // get /logkit/sender/usages 获取sender用途说明
 func (rs *RestService) GetSenderUsages() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		sort.Stable(sender.ModeUsages)
-		return RespSuccess(c, sender.ModeUsages)
+		sort.Stable(ModeUsages)
+		return RespSuccess(c, ModeUsages)
 	}
 }
 
 // get /logkit/sender/options 获取sender配置参数
 func (rs *RestService) GetSenderKeyOptions() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		return RespSuccess(c, sender.ModeKeyOptions)
+		return RespSuccess(c, ModeKeyOptions)
 	}
 }
 

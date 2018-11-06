@@ -11,16 +11,16 @@ import (
 	"testing"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
+	. "github.com/qiniu/logkit/sender/config"
 	"github.com/qiniu/logkit/utils/models"
 )
 
 func TestCSVSender(t *testing.T) {
 	conf := conf.MapConf{
-		sender.KeyCSVFields:     "name,uid,age",
-		sender.KeyCSVDelimiter:  ",",
-		sender.KeyCSVRotateSize: "10485760",
-		sender.KeyMaxSendRate:   "10000",
+		KeyCSVFields:     "name,uid,age",
+		KeyCSVDelimiter:  ",",
+		KeyCSVRotateSize: "10485760",
+		KeyMaxSendRate:   "10000",
 	}
 	sender, err := NewSender(conf)
 	if err != nil {

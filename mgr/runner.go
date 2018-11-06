@@ -20,13 +20,16 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	_ "github.com/qiniu/logkit/parser/builtin"
+	"github.com/qiniu/logkit/parser/config"
 	"github.com/qiniu/logkit/parser/qiniu"
 	"github.com/qiniu/logkit/reader"
 	_ "github.com/qiniu/logkit/reader/builtin"
 	"github.com/qiniu/logkit/reader/cloudtrail"
+	. "github.com/qiniu/logkit/reader/config"
 	"github.com/qiniu/logkit/router"
 	"github.com/qiniu/logkit/sender"
 	_ "github.com/qiniu/logkit/sender/builtin"
+	senderConf "github.com/qiniu/logkit/sender/config"
 	"github.com/qiniu/logkit/transforms"
 	"github.com/qiniu/logkit/transforms/ip"
 	"github.com/qiniu/logkit/utils"
@@ -205,7 +208,7 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	}
 	if rc.ParserConf == nil {
 		log.Warn(rc.RunnerName + " parser conf is nil, use raw parser as default")
-		rc.ParserConf = conf.MapConf{parser.KeyParserType: parser.TypeRaw}
+		rc.ParserConf = conf.MapConf{config.KeyParserType: config.TypeRaw}
 	}
 	rc.ReaderConfig[GlobalKeyName] = rc.RunnerName
 	rc.ReaderConfig[KeyRunnerName] = rc.RunnerName
@@ -223,13 +226,13 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 		cl *cleaner.Cleaner
 	)
 	mode := rc.ReaderConfig["mode"]
-	if mode == reader.ModeCloudTrail {
-		syncDir := rc.ReaderConfig[reader.KeySyncDirectory]
+	if mode == ModeCloudTrail {
+		syncDir := rc.ReaderConfig[KeySyncDirectory]
 		if syncDir == "" {
 			bucket, prefix, region, ak, sk, _ := cloudtrail.GetS3UserInfo(rc.ReaderConfig)
 			syncDir = cloudtrail.GetDefaultSyncDir(bucket, prefix, region, ak, sk, rc.RunnerName)
 		}
-		rc.ReaderConfig[reader.KeyLogPath] = syncDir
+		rc.ReaderConfig[KeyLogPath] = syncDir
 		if len(rc.CleanerConfig) == 0 {
 			rc.CleanerConfig = conf.MapConf{
 				"delete_enable":       "true",
@@ -281,13 +284,13 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	}
 	senders := make([]sender.Sender, 0)
 	for i, senderConfig := range rc.SendersConfig {
-		if senderConfig[sender.KeySenderType] == sender.TypePandora {
+		if senderConfig[senderConf.KeySenderType] == senderConf.TypePandora {
 			if rc.ExtraInfo {
 				//如果已经开启了，不要重复加
-				senderConfig[sender.KeyPandoraExtraInfo] = "false"
+				senderConfig[senderConf.KeyPandoraExtraInfo] = "false"
 			}
-			if senderConfig[sender.KeyPandoraDescription] == "" {
-				senderConfig[sender.KeyPandoraDescription] = LogkitAutoCreateDescription
+			if senderConfig[senderConf.KeyPandoraDescription] == "" {
+				senderConfig[senderConf.KeyPandoraDescription] = LogkitAutoCreateDescription
 			}
 		}
 		senderConfig, err := setPandoraServerConfig(senderConfig, serverConfigs)
@@ -299,8 +302,8 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 			return nil, err
 		}
 		senders = append(senders, s)
-		delete(rc.SendersConfig[i], sender.InnerUserAgent)
-		delete(rc.SendersConfig[i], sender.KeyPandoraDescription)
+		delete(rc.SendersConfig[i], senderConf.InnerUserAgent)
+		delete(rc.SendersConfig[i], senderConf.KeyPandoraDescription)
 	}
 
 	senderCnt := len(senders)
@@ -325,7 +328,7 @@ func createTransformers(rc RunnerConfig) ([]transforms.Transformer, error) {
 		}
 		creater, ok := transforms.Transformers[strTP]
 		if !ok {
-			return nil, fmt.Errorf("transformer type %v not exist", strTP)
+			return nil, fmt.Errorf("transformer type unsupported: %v", strTP)
 		}
 		trans := creater()
 		bts, err := jsoniter.Marshal(tConf)
@@ -555,7 +558,7 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 		log.Debugf("Runner[%v] fetched 0 lines", r.Name())
 		_, ok := r.parser.(parser.Flushable)
 		if ok {
-			lines = []string{parser.PandoraParseFlushSignal}
+			lines = []string{config.PandoraParseFlushSignal}
 		} else {
 			return nil
 		}
@@ -1060,12 +1063,12 @@ func Compatible(rc RunnerConfig) RunnerConfig {
 	if rc.ReaderConfig == nil {
 		return rc
 	}
-	parserType, err := rc.ParserConf.GetString(parser.KeyParserType)
+	parserType, err := rc.ParserConf.GetString(config.KeyParserType)
 	if err != nil {
 		return rc
 	}
-	pattern, _ := rc.ReaderConfig.GetStringOr(reader.KeyHeadPattern, "")
-	if parserType == parser.TypeLogv1 && pattern == "" {
+	pattern, _ := rc.ReaderConfig.GetStringOr(KeyHeadPattern, "")
+	if parserType == config.TypeLogv1 && pattern == "" {
 		prefix, _ := rc.ParserConf.GetStringOr(qiniu.KeyPrefix, "")
 		prefix = strings.TrimSpace(prefix)
 		var readpattern string
@@ -1074,7 +1077,7 @@ func Compatible(rc RunnerConfig) RunnerConfig {
 		} else {
 			readpattern = "^" + qiniu.HeadPatthern
 		}
-		rc.ReaderConfig[reader.KeyHeadPattern] = readpattern
+		rc.ReaderConfig[KeyHeadPattern] = readpattern
 	}
 	return rc
 }
@@ -1308,7 +1311,7 @@ func MergeExtraInfoTags(meta *reader.Meta, tags map[string]interface{}) map[stri
 }
 
 func setPandoraServerConfig(senderConfig conf.MapConf, serverConfigs []map[string]interface{}) (conf.MapConf, error) {
-	if senderConfig[sender.KeySenderType] != sender.TypePandora {
+	if senderConfig[senderConf.KeySenderType] != senderConf.TypePandora {
 		return senderConfig, nil
 	}
 
@@ -1335,13 +1338,13 @@ func setIPConfig(senderConfig conf.MapConf, serverConfig map[string]interface{})
 		return senderConfig, nil
 	}
 
-	autoCreate := senderConfig[sender.KeyPandoraAutoCreate]
+	autoCreate := senderConfig[senderConf.KeyPandoraAutoCreate]
 	transformAt, transformAtOk := serverConfig[transforms.TransformAt].(string)
 	if !transformAtOk {
 		return senderConfig, nil
 	}
 
-	senderConfig[sender.KeyPandoraAutoCreate] = removeServerIPSchema(senderConfig[sender.KeyPandoraAutoCreate], key)
+	senderConfig[senderConf.KeyPandoraAutoCreate] = removeServerIPSchema(senderConfig[senderConf.KeyPandoraAutoCreate], key)
 	if transformAt == ip.Local {
 		return senderConfig, nil
 	}
@@ -1351,12 +1354,12 @@ func setIPConfig(senderConfig conf.MapConf, serverConfig map[string]interface{})
 	}
 
 	if autoCreate == "" {
-		senderConfig[sender.KeyPandoraAutoCreate] = fmt.Sprintf("%s %s", key, TypeIP)
+		senderConfig[senderConf.KeyPandoraAutoCreate] = fmt.Sprintf("%s %s", key, TypeIP)
 		return senderConfig, nil
 	}
 
-	if !strings.Contains(senderConfig[sender.KeyPandoraAutoCreate], fmt.Sprintf("%s %s", key, TypeIP)) {
-		senderConfig[sender.KeyPandoraAutoCreate] += fmt.Sprintf(",%s %s", key, TypeIP)
+	if !strings.Contains(senderConfig[senderConf.KeyPandoraAutoCreate], fmt.Sprintf("%s %s", key, TypeIP)) {
+		senderConfig[senderConf.KeyPandoraAutoCreate] += fmt.Sprintf(",%s %s", key, TypeIP)
 	}
 	return senderConfig, nil
 }

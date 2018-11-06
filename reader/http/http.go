@@ -19,6 +19,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -35,7 +36,7 @@ const (
 )
 
 func init() {
-	reader.RegisterConstructor(reader.ModeHTTP, NewReader)
+	reader.RegisterConstructor(ModeHTTP, NewReader)
 }
 
 type Details struct {
@@ -59,8 +60,8 @@ type Reader struct {
 }
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
-	address, _ := conf.GetStringOr(reader.KeyHTTPServiceAddress, reader.DefaultHTTPServiceAddress)
-	path, _ := conf.GetStringOr(reader.KeyHTTPServicePath, reader.DefaultHTTPServicePath)
+	address, _ := conf.GetStringOr(KeyHTTPServiceAddress, DefaultHTTPServiceAddress)
+	path, _ := conf.GetStringOr(KeyHTTPServicePath, DefaultHTTPServicePath)
 	paths := strings.Split(path, ",")
 	for _, val := range paths {
 		if strings.TrimSpace(val) == "" {
@@ -79,7 +80,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	}
 	return &Reader{
 		meta:     meta,
-		status:   reader.StatusInit,
+		status:   StatusInit,
 		readChan: make(chan Details, len(paths)),
 		address:  address,
 		paths:    paths,
@@ -87,11 +88,11 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 }
 
 func (r *Reader) isStopping() bool {
-	return atomic.LoadInt32(&r.status) == reader.StatusStopping
+	return atomic.LoadInt32(&r.status) == StatusStopping
 }
 
 func (r *Reader) hasStopped() bool {
-	return atomic.LoadInt32(&r.status) == reader.StatusStopped
+	return atomic.LoadInt32(&r.status) == StatusStopped
 }
 
 func (r *Reader) Name() string {
@@ -105,7 +106,7 @@ func (r *Reader) SetMode(_ string, _ interface{}) error {
 func (r *Reader) Start() error {
 	if r.isStopping() || r.hasStopped() {
 		return errors.New("reader is stopping or has stopped")
-	} else if !atomic.CompareAndSwapInt32(&r.status, reader.StatusInit, reader.StatusRunning) {
+	} else if !atomic.CompareAndSwapInt32(&r.status, StatusInit, StatusRunning) {
 		log.Warnf("Runner[%v] %q daemon has already started and is running", r.meta.RunnerName, r.Name())
 		return nil
 	}
@@ -153,7 +154,7 @@ func (r *Reader) ReadLine() (string, error) {
 func (_ *Reader) SyncMeta() {}
 
 func (r *Reader) Close() error {
-	if !atomic.CompareAndSwapInt32(&r.status, reader.StatusRunning, reader.StatusStopping) {
+	if !atomic.CompareAndSwapInt32(&r.status, StatusRunning, StatusStopping) {
 		log.Warnf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
 		return nil
 	}
@@ -162,7 +163,7 @@ func (r *Reader) Close() error {
 	//Note：确保所有数据被读取后，再关闭channel
 	r.wg.Wait()
 	close(r.readChan)
-	atomic.StoreInt32(&r.status, reader.StatusStopped)
+	atomic.StoreInt32(&r.status, StatusStopped)
 	return nil
 }
 
@@ -205,7 +206,7 @@ func (r *Reader) storageData(br *bufio.Reader, path string) (err error) {
 		if line == "" {
 			continue
 		}
-		if atomic.LoadInt32(&r.status) == reader.StatusStopped || atomic.LoadInt32(&r.status) == reader.StatusStopping {
+		if atomic.LoadInt32(&r.status) == StatusStopped || atomic.LoadInt32(&r.status) == StatusStopping {
 			return err
 		}
 		r.wg.Add(1)

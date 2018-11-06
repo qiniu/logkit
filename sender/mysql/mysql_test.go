@@ -12,7 +12,7 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
+	. "github.com/qiniu/logkit/sender/config"
 	"github.com/qiniu/logkit/utils/models"
 )
 
@@ -43,9 +43,9 @@ func TestMySQLSender(t *testing.T) {
 	defer os.Unsetenv("MySQL_DATASOURCE")
 
 	conf := conf.MapConf{
-		sender.KeyMySQLDataSource: "${MySQL_DATASOURCE}",
-		sender.KeyMySQLTable:      tabname,
-		sender.KeyMaxSendRate:     "10000",
+		KeyMySQLDataSource: "${MySQL_DATASOURCE}",
+		KeyMySQLTable:      tabname,
+		KeyMaxSendRate:     "10000",
 	}
 	sender, err := NewSender(conf)
 	if err != nil {

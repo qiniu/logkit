@@ -11,15 +11,15 @@ import (
 	"testing"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
+	. "github.com/qiniu/logkit/sender/config"
 	"github.com/qiniu/logkit/utils/models"
 )
 
 func TestSQLFileSender(t *testing.T) {
 	conf := conf.MapConf{
-		sender.KeySQLFileRotateSize: "2097152",
-		sender.KeySQLFileTable:      "table1",
-		sender.KeyMaxSendRate:       "10000",
+		KeySQLFileRotateSize: "2097152",
+		KeySQLFileTable:      "table1",
+		KeyMaxSendRate:       "10000",
 	}
 	sender, err := NewSender(conf)
 	if err != nil {

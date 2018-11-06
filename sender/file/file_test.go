@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
+	. "github.com/qiniu/logkit/sender/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -22,8 +22,8 @@ func TestFileSender(t *testing.T) {
 	// 默认情况，使用当前时间
 	{
 		fsender, err := NewSender(conf.MapConf{
-			sender.KeyFileSenderPath:         filepath.Join(path, "%Y%m%d-1.log"),
-			sender.KeyFileSenderMaxOpenFiles: "10",
+			KeyFileSenderPath:         filepath.Join(path, "%Y%m%d-1.log"),
+			KeyFileSenderMaxOpenFiles: "10",
 		})
 		assert.NoError(t, err)
 		assert.Equal(t, 1, fsender.(*Sender).writers.size)
@@ -43,8 +43,8 @@ func TestFileSender(t *testing.T) {
 	// 设置了 timestamp key 但根本没有用到
 	{
 		fsender, err := NewSender(conf.MapConf{
-			sender.KeyFileSenderPath:         filepath.Join(path, "%Y%m%d-2.log"),
-			sender.KeyFileSenderTimestampKey: "timestamp",
+			KeyFileSenderPath:         filepath.Join(path, "%Y%m%d-2.log"),
+			KeyFileSenderTimestampKey: "timestamp",
 		})
 		assert.NoError(t, err)
 		assert.Equal(t, 10, fsender.(*Sender).writers.size)
@@ -64,9 +64,9 @@ func TestFileSender(t *testing.T) {
 	// 混合 timestamp key 出现和没出现的情况，并自动清理过期的文件句柄
 	{
 		fsender, err := NewSender(conf.MapConf{
-			sender.KeyFileSenderPath:         filepath.Join(path, "%Y%m%d-3.log"),
-			sender.KeyFileSenderTimestampKey: "timestamp",
-			sender.KeyFileSenderMaxOpenFiles: "2",
+			KeyFileSenderPath:         filepath.Join(path, "%Y%m%d-3.log"),
+			KeyFileSenderTimestampKey: "timestamp",
+			KeyFileSenderMaxOpenFiles: "2",
 		})
 		assert.NoError(t, err)
 		assert.Equal(t, 2, fsender.(*Sender).writers.size)

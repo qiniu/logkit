@@ -1,10 +1,11 @@
-package sender
+package config
 
 import (
 	"strconv"
 
-	. "github.com/qiniu/logkit/utils/models"
 	"github.com/qiniu/pandora-go-sdk/base/config"
+
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 // ModeUsages 用途说明
@@ -95,7 +96,7 @@ var (
 	OptionMaxDiskUsedBytes = Option{
 		KeyName:      KeyMaxDiskUsedBytes,
 		ChooseOnly:   false,
-		Default:      strconv.Itoa(maxDiskUsedBytes),
+		Default:      strconv.Itoa(MaxDiskUsedBytes),
 		DefaultNoUse: false,
 		Description:  "磁盘使用总大小限制(max_disk_used_bytes)",
 		Advance:      true,
@@ -104,7 +105,7 @@ var (
 	OptionMaxSizePerSize = Option{
 		KeyName:      KeyMaxSizePerFile,
 		ChooseOnly:   false,
-		Default:      strconv.Itoa(maxBytesPerFile),
+		Default:      strconv.Itoa(MaxBytesPerFile),
 		DefaultNoUse: false,
 		Description:  "磁盘队列单个文件最大字节(max_size_per_file)",
 		Advance:      true,
@@ -952,6 +953,18 @@ var ModeKeyOptions = map[string][]Option{
 			Default:       "json",
 			Description:   "发送数据时使用的格式(http_sender_protocol)",
 			ToolTip:       `使用raw格式发送时，需使用raw解析方式，发送时将raw字段的值取出作为http body发送`,
+		},
+		{
+			KeyName:      KeyHttpSenderTemplate,
+			Element:      Text,
+			ChooseOnly:   false,
+			Default:      "",
+			Placeholder:  `{"a": "{{key1}}", "b": "{{key2}}"}`,
+			Required:     false,
+			DefaultNoUse: true,
+			Description:  "自定义数据模板(http_sender_template)",
+			ToolTip:      `渲染自定义的数据模板，使用"{{key}}"作为占位符，key为需要发送的字段名，渲染后为该字段的值。目前仅支持json和body_json两种数据格式`,
+			Advance:      true,
 		},
 		{
 			KeyName:      KeyHttpSenderTemplate,

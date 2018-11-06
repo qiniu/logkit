@@ -19,7 +19,9 @@ import (
 	config "github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	"github.com/qiniu/logkit/sender"
+	senderConf "github.com/qiniu/logkit/sender/config"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
@@ -286,7 +288,7 @@ func (m *Manager) ForkRunner(confPath string, config RunnerConfig, returnOnErr b
 			if config.SendersConfig[k] == nil {
 				return fmt.Errorf("%s sender config is invalid", confPath)
 			}
-			config.SendersConfig[k][sender.InnerUserAgent] = "logkit/" + m.Version + " " + m.SystemInfo + " " + webornot
+			config.SendersConfig[k][senderConf.InnerUserAgent] = "logkit/" + m.Version + " " + m.SystemInfo + " " + webornot
 		}
 
 		if runner, err = NewCustomRunner(config, m.cleanChan, m.rregistry, m.pregistry, m.sregistry); err != nil {
@@ -384,7 +386,7 @@ func (m *Manager) handle(path string, watcher *fsnotify.Watcher) {
 }
 
 func (m *Manager) getCleanQueues(dir, file, mode string) ([]*cleanQueue, error) {
-	if mode == reader.ModeTailx {
+	if mode == ModeTailx {
 		cleanQueues := make([]*cleanQueue, 0, len(m.cleanQueues))
 		for k, v := range m.cleanQueues {
 			matched, err := filepath.Match(k, filepath.Join(dir, file))

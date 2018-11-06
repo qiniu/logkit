@@ -18,6 +18,7 @@ import (
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
+	. "github.com/qiniu/logkit/sender/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -41,39 +42,39 @@ type Sender struct {
 }
 
 func init() {
-	sender.RegisterConstructor(sender.TypeInfluxdb, NewSender)
+	sender.RegisterConstructor(TypeInfluxdb, NewSender)
 }
 
 // influxdb sender
 func NewSender(c conf.MapConf) (influxdbSender sender.Sender, err error) {
-	host, err := c.GetString(sender.KeyInfluxdbHost)
+	host, err := c.GetString(KeyInfluxdbHost)
 	if err != nil {
 		return
 	}
 	if !strings.HasPrefix(host, "http://") && !strings.HasSuffix(host, "https://") {
 		host = "http://" + host
 	}
-	db, err := c.GetString(sender.KeyInfluxdbDB)
+	db, err := c.GetString(KeyInfluxdbDB)
 	if err != nil {
 		return
 	}
-	autoCreate, _ := c.GetBoolOr(sender.KeyInfluxdbAutoCreate, true)
-	measurement, err := c.GetString(sender.KeyInfluxdbMeasurement)
+	autoCreate, _ := c.GetBoolOr(KeyInfluxdbAutoCreate, true)
+	measurement, err := c.GetString(KeyInfluxdbMeasurement)
 	if err != nil {
 		return
 	}
-	fields, err := c.GetAliasMap(sender.KeyInfluxdbFields)
+	fields, err := c.GetAliasMap(KeyInfluxdbFields)
 	if err != nil {
 		return
 	}
-	tags, _ := c.GetAliasMapOr(sender.KeyInfluxdbTags, make(map[string]string))
-	retention, _ := c.GetStringOr(sender.KeyInfluxdbRetetion, "")
-	duration, _ := c.GetStringOr(sender.KeyInfluxdbRetetionDuration, "")
-	timestamp, _ := c.GetStringOr(sender.KeyInfluxdbTimestamp, "")
-	prec, _ := c.GetIntOr(sender.KeyInfluxdbTimestampPrecision, 1)
-	ignoreBeyRent, _ := c.GetBoolOr(sender.KeyInfluxdbIgnoreBeyondRetention, false)
-	name, _ := c.GetStringOr(sender.KeyName, fmt.Sprintf("influxdbSender:(%v,db:%v,measurement:%v", host, db, measurement))
-	runnerName, _ := c.GetStringOr(KeyRunnerName, sender.UnderfinedRunnerName)
+	tags, _ := c.GetAliasMapOr(KeyInfluxdbTags, make(map[string]string))
+	retention, _ := c.GetStringOr(KeyInfluxdbRetetion, "")
+	duration, _ := c.GetStringOr(KeyInfluxdbRetetionDuration, "")
+	timestamp, _ := c.GetStringOr(KeyInfluxdbTimestamp, "")
+	prec, _ := c.GetIntOr(KeyInfluxdbTimestampPrecision, 1)
+	ignoreBeyRent, _ := c.GetBoolOr(KeyInfluxdbIgnoreBeyondRetention, false)
+	name, _ := c.GetStringOr(KeyName, fmt.Sprintf("influxdbSender:(%v,db:%v,measurement:%v", host, db, measurement))
+	runnerName, _ := c.GetStringOr(KeyRunnerName, UnderfinedRunnerName)
 	influxdbSender = &Sender{
 		name:                  name,
 		runnerName:            runnerName,

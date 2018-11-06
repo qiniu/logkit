@@ -24,7 +24,8 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
-	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/parser/config"
+	"github.com/qiniu/logkit/reader/config"
 	"github.com/qiniu/logkit/router"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -356,7 +357,7 @@ func restGetFailedDataStatusTest(p *testParam) {
 		t.Fatalf("mkdir test path error %v", err)
 	}
 	time.Sleep(1 * time.Second)
-	runnerConf, err := getMockSenderRunnerConfig(runnerName, logDir, metaDir, reader.ModeDir)
+	runnerConf, err := getMockSenderRunnerConfig(runnerName, logDir, metaDir, config.ModeDir)
 	if err != nil {
 		t.Fatalf("get mock sender runner config failed, error is %v", err)
 	}
@@ -416,7 +417,7 @@ func restGetStatusTest(p *testParam) {
 		t.Fatalf("mkdir test path error %v", err)
 	}
 	time.Sleep(1 * time.Second)
-	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, reader.ModeDir, resvPath)
+	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, config.ModeDir, resvPath)
 	if err != nil {
 		t.Fatalf("get runner config failed, error is %v", err)
 	}
@@ -483,7 +484,7 @@ func restCRUDTest(p *testParam) {
 	if err := writeLogFile([]string{log1}, logDir2); err != nil {
 		t.Fatalf("write log data error %v", err)
 	}
-	mode := reader.ModeDir
+	mode := config.ModeDir
 	conf1, err := getRunnerConfig(runnerName1, logDir1, metaDir, mode, resvPath1)
 	if err != nil {
 		t.Fatalf("get runner config failed, error is %v", err)
@@ -492,7 +493,7 @@ func restCRUDTest(p *testParam) {
 	if err != nil {
 		t.Fatalf("get runner config failed, error is %v", err)
 	}
-	mode = reader.ModeFile
+	mode = config.ModeFile
 	conf1Upd, err := getRunnerConfig(runnerName1, logPath1, metaDir, mode, resvPath1)
 	if err != nil {
 		t.Fatalf("get runner config failed, error is %v", err)
@@ -669,7 +670,7 @@ func runnerResetTest(p *testParam) {
 	if err := writeLogFile([]string{log1}, logDir); err != nil {
 		t.Fatalf("write log data error %v", err)
 	}
-	mode := reader.ModeDir
+	mode := config.ModeDir
 	resetConf, err := getRunnerConfig(runnerName, logDir, metaDir, mode, resvPath)
 	if err != nil {
 		t.Fatalf("get runner config failed, error is %v", err)
@@ -789,7 +790,7 @@ func runnerStopStartTest(p *testParam) {
 	if err := writeLogFile([]string{log1}, logDir); err != nil {
 		t.Fatalf("write log data error %v", err)
 	}
-	mode := reader.ModeDir
+	mode := config.ModeDir
 	startConf, err := getRunnerConfig(runnerName, logDir, metaDir, mode, resvPath)
 	if err != nil {
 		t.Fatalf("get runner config failed, error is %v", err)
@@ -897,7 +898,7 @@ func runnerDataIntegrityTest(p *testParam) {
 	file.Close()
 	time.Sleep(time.Second)
 
-	mode := reader.ModeDir
+	mode := config.ModeDir
 	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, mode, resvPath)
 	if err != nil {
 		t.Fatalf("get runner config failed, error is %v", err)
@@ -1024,7 +1025,7 @@ func getRunnersTest(p *testParam) {
 	if err := writeLogFile([]string{log1}, logDir); err != nil {
 		t.Fatalf("write log data error %v", err)
 	}
-	mode := reader.ModeDir
+	mode := config.ModeDir
 	runnerConf1, err := getRunnerConfig(runnerName1, logDir, metaDir, mode, resvPath)
 	runnerConf2, err := getRunnerConfig(runnerName2, logDir, metaDir, mode, resvPath)
 	if err != nil {
@@ -1119,7 +1120,7 @@ func senderRouterTest(p *testParam) {
 	if err := writeLogFile([]string{log1}, logDir); err != nil {
 		t.Fatalf("write log data error %v", err)
 	}
-	mode := reader.ModeDir
+	mode := config.ModeDir
 	runnerConfBytes, err := getRunnerConfig(runnerName, logDir, metaDir, mode, resvPath1)
 	if err != nil {
 		t.Fatalf("get runner config failed, error is %v", err)
@@ -1223,22 +1224,22 @@ func senderRouterTest(p *testParam) {
 
 func TestConvertWebParserConfig(t *testing.T) {
 	cf := conf.MapConf{
-		parser.KeyCSVSplitter:        "\\t",
-		parser.KeyGrokCustomPatterns: `JUUyJTgyJUFDJTIwJUU0JUJEJUEwJUU1JUE1JUJEJTIwJUMzJUE2JUMzJUI4JUMzJUE1JUMzJTg2JUMzJTk4JUMzJTg1`,
+		KeyCSVSplitter:        "\\t",
+		KeyGrokCustomPatterns: `JUUyJTgyJUFDJTIwJUU0JUJEJUEwJUU1JUE1JUJEJTIwJUMzJUE2JUMzJUI4JUMzJUE1JUMzJTg2JUMzJTk4JUMzJTg1`,
 	}
 	newcf := parser.ConvertWebParserConfig(cf)
 	expcf := conf.MapConf{
-		parser.KeyCSVSplitter:        "\t",
-		parser.KeyGrokCustomPatterns: `€ 你好 æøåÆØÅ`,
+		KeyCSVSplitter:        "\t",
+		KeyGrokCustomPatterns: `€ 你好 æøåÆØÅ`,
 	}
 	assert.Equal(t, expcf, newcf)
 
 	cf = conf.MapConf{
-		parser.KeyGrokCustomPatterns: `TkVXREFUQSUyMCguKiU1Q24pJTJCJTBBTVlMT0clMjAlNUMlNUIlMjUlN0JEQVRBJTNBdGltZXN0YW1wJTNBZGF0ZSU3RCU1QyU1RCU1QyU1QiUyNSU3Qk5PVFNQQUNFJTNBdHJhbnNOdW1iZXIlM0Fsb25nJTdEJTVDJTVEJTIwTGV2ZWwlMjAlMjUlN0JOT1RTUEFDRSUzQWxldmVsJTNBbG9uZyU3RCUyMFBNVFNNU0dIREwlM0ElMjAlNUNuJUU1JTg5JThEJUU0JUI4JTgwJUU1JUIxJThBJUU3JTgyJUI5JUU1JThGJTkxJUU5JTgwJTgxJUU2JTk3JUI2JUU5JTk3JUI0JTVDJTVCJTI1JTdCREFUQSUzQXByZXRyYXNuVGltZSUzQWRhdGUlN0QlNUMlNUQlMkMlRTglQjAlODMlRTclOTQlQThEb05leHRNc2clRTYlOTclQjYlRTklOTclQjQlNUMlNUIlMjUlN0JEQVRBJTNBbmV4dFRyYW5UaW1lJTNBZGF0ZSU3RCU1QyU1RCU1Q24lRTYlOUMlQUMlRTUlOUMlQjAlRTklOTglOUYlRTUlODglOTclRTclQUUlQTElRTclOTAlODYlRTUlOTklQTglM0ElNUMlNUIlMjUlN0JOT1RTUEFDRSUzQXF1ZXVlTWFuZ2VyJTdEJTVDJTVEJTJDJUU2JTlDJUFDJUU1JTlDJUIwJUU5JTk4JTlGJUU1JTg4JTk3JTNBJTVDJTVCJTI1JTdCTk9UU1BBQ0UlM0Fsb2NhbFF1ZXVlJTdEJTVDJTVEJTVDbiVFOSVBNiU5NiVFNSU4NSU4OCVFNSU4RiU5MSVFOSU4MCU4MSVFOSU5OCU5RiVFNSU4OCU5NyVFNSU5MCU4RCUzQSU1QyU1QiUyNSU3Qk5PVFNQQUNFJTNBZmlyc3RRdWV1ZU5hbWUlN0QlNUMlNUQlMkMlRTUlQTQlODclRTYlQjMlQTglM0ElNUMlNUIlMjUlN0JEQVRBJTNBbm90ZSU3RCU1QyU1RCU1Q25VJUU1JUE0JUI0JUU0JUJGJUExJUU2JTgxJUFGJTNBJTVDJTVCJTI1JTdCREFUQSUzQXVoZWFkZXIlN0QlNUMlNUQlNUNuJUU2JThBJUE1JUU2JTk2JTg3JUU1JTg2JTg1JUU1JUFFJUI5JTNBJTVDbiU3QkglM0ElMjUlN0JOT1RTUEFDRSUzQWhjb2RlJTdEJTVDdCUyQiUyNSU3Qk5PVFNQQUNFJTNBaGNvZGUyJTdEJTVDdCUyQiUyNSU3Qk5PVFNQQUNFJTNBaGNvZGUzJTdEJTVDdCUyQiUyNSU3Qk5PVFNQQUNFJTNBaGNvZGU0JTdEJTVDdCUyQiU3RCU1Q24oJTdCUyUzQSUyNSU3QkRBVEElM0FzZGF0YSU3RCU3RCU1Q24pJTNGJTI1JTdCTkVXREFUQSUzQXhtbCU3RCU1Q24lNUNuJTVDbg==`,
+		KeyGrokCustomPatterns: `TkVXREFUQSUyMCguKiU1Q24pJTJCJTBBTVlMT0clMjAlNUMlNUIlMjUlN0JEQVRBJTNBdGltZXN0YW1wJTNBZGF0ZSU3RCU1QyU1RCU1QyU1QiUyNSU3Qk5PVFNQQUNFJTNBdHJhbnNOdW1iZXIlM0Fsb25nJTdEJTVDJTVEJTIwTGV2ZWwlMjAlMjUlN0JOT1RTUEFDRSUzQWxldmVsJTNBbG9uZyU3RCUyMFBNVFNNU0dIREwlM0ElMjAlNUNuJUU1JTg5JThEJUU0JUI4JTgwJUU1JUIxJThBJUU3JTgyJUI5JUU1JThGJTkxJUU5JTgwJTgxJUU2JTk3JUI2JUU5JTk3JUI0JTVDJTVCJTI1JTdCREFUQSUzQXByZXRyYXNuVGltZSUzQWRhdGUlN0QlNUMlNUQlMkMlRTglQjAlODMlRTclOTQlQThEb05leHRNc2clRTYlOTclQjYlRTklOTclQjQlNUMlNUIlMjUlN0JEQVRBJTNBbmV4dFRyYW5UaW1lJTNBZGF0ZSU3RCU1QyU1RCU1Q24lRTYlOUMlQUMlRTUlOUMlQjAlRTklOTglOUYlRTUlODglOTclRTclQUUlQTElRTclOTAlODYlRTUlOTklQTglM0ElNUMlNUIlMjUlN0JOT1RTUEFDRSUzQXF1ZXVlTWFuZ2VyJTdEJTVDJTVEJTJDJUU2JTlDJUFDJUU1JTlDJUIwJUU5JTk4JTlGJUU1JTg4JTk3JTNBJTVDJTVCJTI1JTdCTk9UU1BBQ0UlM0Fsb2NhbFF1ZXVlJTdEJTVDJTVEJTVDbiVFOSVBNiU5NiVFNSU4NSU4OCVFNSU4RiU5MSVFOSU4MCU4MSVFOSU5OCU5RiVFNSU4OCU5NyVFNSU5MCU4RCUzQSU1QyU1QiUyNSU3Qk5PVFNQQUNFJTNBZmlyc3RRdWV1ZU5hbWUlN0QlNUMlNUQlMkMlRTUlQTQlODclRTYlQjMlQTglM0ElNUMlNUIlMjUlN0JEQVRBJTNBbm90ZSU3RCU1QyU1RCU1Q25VJUU1JUE0JUI0JUU0JUJGJUExJUU2JTgxJUFGJTNBJTVDJTVCJTI1JTdCREFUQSUzQXVoZWFkZXIlN0QlNUMlNUQlNUNuJUU2JThBJUE1JUU2JTk2JTg3JUU1JTg2JTg1JUU1JUFFJUI5JTNBJTVDbiU3QkglM0ElMjUlN0JOT1RTUEFDRSUzQWhjb2RlJTdEJTVDdCUyQiUyNSU3Qk5PVFNQQUNFJTNBaGNvZGUyJTdEJTVDdCUyQiUyNSU3Qk5PVFNQQUNFJTNBaGNvZGUzJTdEJTVDdCUyQiUyNSU3Qk5PVFNQQUNFJTNBaGNvZGU0JTdEJTVDdCUyQiU3RCU1Q24oJTdCUyUzQSUyNSU3QkRBVEElM0FzZGF0YSU3RCU3RCU1Q24pJTNGJTI1JTdCTkVXREFUQSUzQXhtbCU3RCU1Q24lNUNuJTVDbg==`,
 	}
 	newcf = parser.ConvertWebParserConfig(cf)
 	expcf = conf.MapConf{
-		parser.KeyGrokCustomPatterns: `NEWDATA (.*\n)+
+		KeyGrokCustomPatterns: `NEWDATA (.*\n)+
 MYLOG \[%{DATA:timestamp:date}\]\[%{NOTSPACE:transNumber:long}\] Level %{NOTSPACE:level:long} PMTSMSGHDL: \n前一届点发送时间\[%{DATA:pretrasnTime:date}\],调用DoNextMsg时间\[%{DATA:nextTranTime:date}\]\n本地队列管理器:\[%{NOTSPACE:queueManger}\],本地队列:\[%{NOTSPACE:localQueue}\]\n首先发送队列名:\[%{NOTSPACE:firstQueueName}\],备注:\[%{DATA:note}\]\nU头信息:\[%{DATA:uheader}\]\n报文内容:\n{H:%{NOTSPACE:hcode}\t+%{NOTSPACE:hcode2}\t+%{NOTSPACE:hcode3}\t+%{NOTSPACE:hcode4}\t+}\n({S:%{DATA:sdata}}\n)?%{NEWDATA:xml}\n\n\n`,
 	}
 	assert.Equal(t, expcf, newcf)

@@ -18,10 +18,13 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	. "github.com/qiniu/logkit/parser/config"
 	"github.com/qiniu/logkit/parser/grok"
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/reader/config"
 	"github.com/qiniu/logkit/router"
 	"github.com/qiniu/logkit/sender"
+	senderConf "github.com/qiniu/logkit/sender/config"
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -45,7 +48,7 @@ func RawData(readerConfig conf.MapConf) ([]string, error) {
 	configMetaPath := runnerName + "_" + Hash(strconv.FormatInt(time.Now().Unix(), 10))
 	metaPath := filepath.Join(MetaTmp, configMetaPath)
 	log.Debugf("Runner[%v] Using %s as default metaPath", runnerName, metaPath)
-	readerConfig[reader.KeyMetaPath] = metaPath
+	readerConfig[config.KeyMetaPath] = metaPath
 	size, _ := readerConfig.GetIntOr("raw_data_lines", DefaultRawDataBatchLen)
 	// 控制最大条数为 100
 	if size > RawDataMaxBatchLines {
@@ -262,14 +265,14 @@ func getSenders(sendersConf []conf.MapConf) ([]sender.Sender, error) {
 	sr := sender.NewRegistry()
 	ftSaveLogPath := filepath.Join(MetaTmp, reader.FtSaveLogPath)
 	for i, senderConfig := range sendersConf {
-		senderConfig[sender.KeyFaultTolerant] = "false"
-		senderConfig[sender.KeyFtSaveLogPath] = ftSaveLogPath
+		senderConfig[senderConf.KeyFaultTolerant] = "false"
+		senderConfig[senderConf.KeyFtSaveLogPath] = ftSaveLogPath
 		s, err := sr.NewSender(senderConfig, "")
 		if err != nil {
 			return nil, err
 		}
 		senders = append(senders, s)
-		delete(sendersConf[i], sender.InnerUserAgent)
+		delete(sendersConf[i], senderConf.InnerUserAgent)
 	}
 	return senders, nil
 }
@@ -344,21 +347,21 @@ func trySend(s sender.Sender, datas []Data, times int) (err error) {
 }
 
 func getSampleData(parserConfig conf.MapConf) ([]string, error) {
-	parserType, _ := parserConfig.GetString(parser.KeyParserType)
+	parserType, _ := parserConfig.GetString(KeyParserType)
 	rawData, _ := parserConfig.GetStringOr(KeySampleLog, "")
 	var sampleData []string
 
 	switch parserType {
-	case parser.TypeCSV, parser.TypeJSON, parser.TypeRaw, parser.TypeNginx, parser.TypeEmpty, parser.TypeKafkaRest, parser.TypeLogv1:
+	case TypeCSV, TypeJSON, TypeRaw, TypeNginx, TypeEmpty, TypeKafkaRest, TypeLogv1:
 		sampleData = append(sampleData, rawData)
-	case parser.TypeSyslog:
+	case TypeSyslog:
 		sampleData = strings.Split(rawData, "\n")
-		sampleData = append(sampleData, parser.PandoraParseFlushSignal)
-	case parser.TypeMySQL:
+		sampleData = append(sampleData, PandoraParseFlushSignal)
+	case TypeMySQL:
 		sampleData = strings.Split(rawData, "\n")
-		sampleData = append(sampleData, parser.PandoraParseFlushSignal)
-	case parser.TypeGrok:
-		grokMode, _ := parserConfig.GetString(parser.KeyGrokMode)
+		sampleData = append(sampleData, PandoraParseFlushSignal)
+	case TypeGrok:
+		grokMode, _ := parserConfig.GetString(KeyGrokMode)
 		if grokMode != grok.ModeMulti {
 			sampleData = append(sampleData, rawData)
 		} else {
@@ -375,7 +378,7 @@ func checkSampleData(sampleData []string, logParser parser.Parser) ([]string, er
 	if len(sampleData) <= 0 {
 		_, ok := logParser.(parser.Flushable)
 		if ok {
-			sampleData = []string{parser.PandoraParseFlushSignal}
+			sampleData = []string{PandoraParseFlushSignal}
 		} else {
 			err := fmt.Errorf("parser [%v] fetched 0 lines", logParser.Name())
 			return nil, err

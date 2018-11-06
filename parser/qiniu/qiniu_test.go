@@ -8,6 +8,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	. "github.com/qiniu/logkit/parser/config"
 	"github.com/qiniu/logkit/times"
 )
 
@@ -114,10 +115,10 @@ func Test_QiniuLogRegex(t *testing.T) {
 
 func Test_QiniulogParser(t *testing.T) {
 	c := conf.MapConf{}
-	c[parser.KeyParserName] = "qiniulogparser"
-	c[parser.KeyParserType] = "qiniulog"
-	c[parser.KeyDisableRecordErrData] = "true"
-	c[parser.KeyKeepRawData] = "true"
+	c[KeyParserName] = "qiniulogparser"
+	c[KeyParserType] = "qiniulog"
+	c[KeyDisableRecordErrData] = "true"
+	c[KeyKeepRawData] = "true"
 	ps := parser.NewRegistry()
 	p, err := ps.NewLogParser(c)
 	assert.Nil(t, err)
@@ -153,7 +154,7 @@ func Test_QiniulogParser(t *testing.T) {
 		t.Errorf("parse time error exp %v but %v", exp, dts[1]["time"])
 	}
 	for i := range dts {
-		assert.Equal(t, lines[i], dts[i][parser.KeyRawData])
+		assert.Equal(t, lines[i], dts[i][KeyRawData])
 	}
 
 	newlines := []string{
@@ -176,16 +177,16 @@ func Test_QiniulogParser(t *testing.T) {
 	}
 
 	for i := range dts {
-		assert.Equal(t, newlines[i], dts[i][parser.KeyRawData])
+		assert.Equal(t, newlines[i], dts[i][KeyRawData])
 	}
 	assert.EqualValues(t, "qiniulogparser", p.Name())
 }
 
 func Test_QiniulogParserForErrData(t *testing.T) {
 	c := conf.MapConf{}
-	c[parser.KeyParserName] = "qiniulogparser"
-	c[parser.KeyParserType] = "qiniulog"
-	c[parser.KeyDisableRecordErrData] = "false"
+	c[KeyParserName] = "qiniulogparser"
+	c[KeyParserType] = "qiniulog"
+	c[KeyDisableRecordErrData] = "false"
 	ps := parser.NewRegistry()
 	p, err := ps.NewLogParser(c)
 	if err != nil {
@@ -209,8 +210,8 @@ func Test_QiniulogParserForErrData(t *testing.T) {
 
 func Test_QiniulogParserForTeapot(t *testing.T) {
 	c := conf.MapConf{}
-	c[parser.KeyParserType] = "qiniulog"
-	c[parser.KeyLogHeaders] = "date,time,level,reqid,file"
+	c[KeyParserType] = "qiniulog"
+	c[KeyLogHeaders] = "date,time,level,reqid,file"
 	ps := parser.NewRegistry()
 	p, err := ps.NewLogParser(c)
 	assert.Nil(t, err)
@@ -261,8 +262,8 @@ func Test_QiniulogParserForTeapot(t *testing.T) {
 
 func Test_QiniulogParserForChange(t *testing.T) {
 	c := conf.MapConf{}
-	c[parser.KeyParserType] = "qiniulog"
-	c[parser.KeyLogHeaders] = "date,time,reqid,level,file"
+	c[KeyParserType] = "qiniulog"
+	c[KeyLogHeaders] = "date,time,reqid,level,file"
 	ps := parser.NewRegistry()
 	p, err := ps.NewLogParser(c)
 	assert.Nil(t, err)

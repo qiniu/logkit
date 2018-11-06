@@ -14,6 +14,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
+	. "github.com/qiniu/logkit/sender/config"
 	"github.com/qiniu/logkit/utils/models"
 	"github.com/qiniu/logkit/utils/ratelimit"
 )
@@ -28,7 +29,7 @@ var bufPool = sync.Pool{
 }
 
 func init() {
-	sender.RegisterConstructor(sender.TypeSQLFile, NewSender)
+	sender.RegisterConstructor(TypeSQLFile, NewSender)
 }
 
 type writer struct {
@@ -157,23 +158,23 @@ type Sender struct {
 }
 
 func NewSender(conf conf.MapConf) (s sender.Sender, err error) {
-	rotateSize, err := conf.GetInt64Or(sender.KeySQLFileRotateSize, defaultRotateSize)
+	rotateSize, err := conf.GetInt64Or(KeySQLFileRotateSize, defaultRotateSize)
 	if err != nil {
 		return
 	}
-	table, err := conf.GetString(sender.KeySQLFileTable)
+	table, err := conf.GetString(KeySQLFileTable)
 	if err != nil {
 		return
 	}
-	pathPrefix, _ := conf.GetStringOr(sender.KeySQLFilePathPrefix, defaultPathPrefix)
+	pathPrefix, _ := conf.GetStringOr(KeySQLFilePathPrefix, defaultPathPrefix)
 
 	w := &writer{
 		rotateSize: rotateSize,
 		table:      table,
 		pathPrefix: pathPrefix,
 	}
-	name, _ := conf.GetStringOr(sender.KeyName, fmt.Sprintf("sqlfile(table:%s)", table))
-	rate, _ := conf.GetInt64Or(sender.KeyMaxSendRate, -1)
+	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("sqlfile(table:%s)", table))
+	rate, _ := conf.GetInt64Or(KeyMaxSendRate, -1)
 	return &Sender{
 		w:       w,
 		name:    name,

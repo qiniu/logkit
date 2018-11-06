@@ -12,15 +12,16 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/reader/config"
 	"github.com/qiniu/logkit/reader/tailx"
 )
 
 func init() {
-	reader.RegisterConstructor(reader.ModeFileAuto, NewReader)
+	reader.RegisterConstructor(config.ModeFileAuto, NewReader)
 }
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (r reader.Reader, err error) {
-	path, err := conf.GetString(reader.KeyLogPath)
+	path, err := conf.GetString(config.KeyLogPath)
 	if err != nil {
 		return
 	}
@@ -30,12 +31,12 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (r reader.Reader, err error
 		return
 	}
 	switch mode {
-	case reader.ModeTailx:
-		conf[reader.KeyLogPath] = logpath
+	case config.ModeTailx:
+		conf[config.KeyLogPath] = logpath
 		return tailx.NewReader(meta, conf)
-	case reader.ModeDir:
+	case config.ModeDir:
 		return reader.NewFileDirReader(meta, conf)
-	case reader.ModeFile:
+	case config.ModeFile:
 		return reader.NewSingleFileReader(meta, conf)
 	default:
 		err = fmt.Errorf("can not find property mode for this logpath %v", logpath)
@@ -52,7 +53,7 @@ func matchMode(logpath string) (path, mode string, err error) {
 	//path with * matching tailx mode
 	matchTailx := strings.Contains(logpath, "*")
 	if matchTailx == true {
-		mode = reader.ModeTailx
+		mode = config.ModeTailx
 		return
 	}
 	//for logpath this path to make judgments
@@ -62,14 +63,14 @@ func matchMode(logpath string) (path, mode string, err error) {
 	}
 	if fileInfo.IsDir() == true {
 		if shouldUseModeDir(path) {
-			mode = reader.ModeDir
+			mode = config.ModeDir
 		} else {
-			mode = reader.ModeTailx
+			mode = config.ModeTailx
 			path = filepath.Join(path, "*")
 		}
 		return
 	}
-	mode = reader.ModeFile
+	mode = config.ModeFile
 	return
 }
 

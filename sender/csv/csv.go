@@ -11,6 +11,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
+	. "github.com/qiniu/logkit/sender/config"
 	"github.com/qiniu/logkit/utils/models"
 	"github.com/qiniu/logkit/utils/ratelimit"
 )
@@ -21,7 +22,7 @@ const (
 )
 
 func init() {
-	sender.RegisterConstructor(sender.TypeCSV, NewSender)
+	sender.RegisterConstructor(TypeCSV, NewSender)
 }
 
 type writer struct {
@@ -145,19 +146,19 @@ type Sender struct {
 }
 
 func NewSender(conf conf.MapConf) (s sender.Sender, err error) {
-	fields, err := conf.GetStringList(sender.KeyCSVFields)
+	fields, err := conf.GetStringList(KeyCSVFields)
 	if err != nil {
 		return
 	}
-	delimeter, err := conf.GetStringOr(sender.KeyCSVDelimiter, ",")
+	delimeter, err := conf.GetStringOr(KeyCSVDelimiter, ",")
 	if err != nil {
 		return
 	}
-	rotateSize, err := conf.GetInt64Or(sender.KeyCSVRotateSize, defaultRotateSize)
+	rotateSize, err := conf.GetInt64Or(KeyCSVRotateSize, defaultRotateSize)
 	if err != nil {
 		return
 	}
-	pathPrefix, _ := conf.GetStringOr(sender.KeyCSVPathPrefix, defaultPathPrefix)
+	pathPrefix, _ := conf.GetStringOr(KeyCSVPathPrefix, defaultPathPrefix)
 
 	w := &writer{
 		fields:     fields,
@@ -165,8 +166,8 @@ func NewSender(conf conf.MapConf) (s sender.Sender, err error) {
 		rotateSize: rotateSize,
 		pathPrefix: pathPrefix,
 	}
-	name, _ := conf.GetStringOr(sender.KeyName, fmt.Sprintf("sqlfile(path_prefix:%s)", pathPrefix))
-	rate, _ := conf.GetInt64Or(sender.KeyMaxSendRate, -1)
+	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("sqlfile(path_prefix:%s)", pathPrefix))
+	rate, _ := conf.GetInt64Or(KeyMaxSendRate, -1)
 	return &Sender{
 		w:       w,
 		name:    name,

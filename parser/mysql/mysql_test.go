@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/parser"
+	. "github.com/qiniu/logkit/parser/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -41,22 +41,22 @@ func TestMySqlLogParser1(t *testing.T) {
 }
 
 func TestMySqlKeepRawData(t *testing.T) {
-	p, err := NewParser(conf.MapConf{parser.KeyKeepRawData: "true"})
+	p, err := NewParser(conf.MapConf{KeyKeepRawData: "true"})
 	assert.NoError(t, err)
 	datas, err := p.Parse(strings.Split(content, "\n"))
 	assert.Nil(t, err)
 
 	expectedEvent := Data{
-		"User":            "rdsadmin",
-		"Host":            "localhost",
-		"Database":        "foo",
-		"Query_time":      float64(0.020363),
-		"Lock_time":       float64(0.018450),
-		"Rows_sent":       int64(0),
-		"Rows_examined":   int64(1),
-		"Timestamp":       time.Unix(1514083320, 0).UTC(),
-		"Statement":       "SELECT count(*) from mysql.rds_replication_status WHERE master_host IS NOT NULL and master_port IS NOT NULL GROUP BY action_timestamp,called_by_user,action,mysql_version,master_host,master_port ORDER BY action_timestamp LIMIT 1;",
-		parser.KeyRawData: content,
+		"User":          "rdsadmin",
+		"Host":          "localhost",
+		"Database":      "foo",
+		"Query_time":    float64(0.020363),
+		"Lock_time":     float64(0.018450),
+		"Rows_sent":     int64(0),
+		"Rows_examined": int64(1),
+		"Timestamp":     time.Unix(1514083320, 0).UTC(),
+		"Statement":     "SELECT count(*) from mysql.rds_replication_status WHERE master_host IS NOT NULL and master_port IS NOT NULL GROUP BY action_timestamp,called_by_user,action,mysql_version,master_host,master_port ORDER BY action_timestamp LIMIT 1;",
+		KeyRawData:      content,
 	}
 	assert.Equal(t, expectedEvent, datas[0])
 }

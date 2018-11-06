@@ -8,15 +8,16 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/reader/test"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
 func TestElasticReader(t *testing.T) {
 	logkitConf := conf.MapConf{
-		reader.KeyMetaPath: MetaDir,
-		reader.KeyFileDone: MetaDir,
-		reader.KeyMode:     reader.ModeElastic,
+		KeyMetaPath: MetaDir,
+		KeyFileDone: MetaDir,
+		KeyMode:     ModeElastic,
 	}
 	meta, err := reader.NewMetaWithConf(logkitConf)
 	assert.NoError(t, err)
@@ -27,7 +28,7 @@ func TestElasticReader(t *testing.T) {
 		estype:    "type",
 		eshost:    "127.0.0.1:9200",
 		readBatch: 100,
-		status:    reader.StatusInit,
+		status:    StatusInit,
 		offset:    "TestElasticReader",
 		readChan:  make(chan json.RawMessage),
 	}

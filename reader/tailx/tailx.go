@@ -19,6 +19,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -31,7 +32,7 @@ var (
 )
 
 func init() {
-	reader.RegisterConstructor(reader.ModeTailx, NewReader)
+	reader.RegisterConstructor(ModeTailx, NewReader)
 }
 
 type Reader struct {
@@ -90,7 +91,7 @@ func NewActiveReader(originPath, realPath, whence string, meta *reader.Meta, msg
 		rpath = strings.Replace(rpath, ":", "_", -1)
 	}
 	subMetaPath := filepath.Join(meta.Dir, rpath)
-	subMeta, err := reader.NewMeta(subMetaPath, subMetaPath, realPath, reader.ModeFile, meta.TagFile, reader.DefautFileRetention)
+	subMeta, err := reader.NewMeta(subMetaPath, subMetaPath, realPath, ModeFile, meta.TagFile, reader.DefautFileRetention)
 	if err != nil {
 		return nil, err
 	}
@@ -114,22 +115,22 @@ func NewActiveReader(originPath, realPath, whence string, meta *reader.Meta, msg
 		inactive:     1,
 		emptyLineCnt: 0,
 		runnerName:   meta.RunnerName,
-		status:       reader.StatusInit,
+		status:       StatusInit,
 		statsLock:    sync.RWMutex{},
 	}, nil
 
 }
 
 func (ar *ActiveReader) Run() {
-	if !atomic.CompareAndSwapInt32(&ar.status, reader.StatusInit, reader.StatusRunning) {
+	if !atomic.CompareAndSwapInt32(&ar.status, StatusInit, StatusRunning) {
 		log.Errorf("Runner[%v] ActiveReader %s was not in StatusInit before Running,exit it...", ar.runnerName, ar.originpath)
 		return
 	}
 	var err error
 	timer := time.NewTicker(time.Second)
 	for {
-		if atomic.LoadInt32(&ar.status) == reader.StatusStopped || atomic.LoadInt32(&ar.status) == reader.StatusStopping {
-			atomic.CompareAndSwapInt32(&ar.status, reader.StatusStopping, reader.StatusStopped)
+		if atomic.LoadInt32(&ar.status) == StatusStopped || atomic.LoadInt32(&ar.status) == StatusStopping {
+			atomic.CompareAndSwapInt32(&ar.status, StatusStopping, StatusStopped)
 			log.Warnf("Runner[%v] ActiveReader %s was stopped", ar.runnerName, ar.originpath)
 			return
 		}
@@ -176,9 +177,9 @@ func (ar *ActiveReader) Run() {
 			atomic.StoreInt32(&ar.inactive, 0)
 			ar.emptyLineCnt = 0
 			//做这一层结构为了快速结束
-			if atomic.LoadInt32(&ar.status) == reader.StatusStopped || atomic.LoadInt32(&ar.status) == reader.StatusStopping {
+			if atomic.LoadInt32(&ar.status) == StatusStopped || atomic.LoadInt32(&ar.status) == StatusStopping {
 				log.Debugf("Runner[%v] %v ActiveReader was stopped when waiting to send data", ar.runnerName, ar.originpath)
-				atomic.CompareAndSwapInt32(&ar.status, reader.StatusStopping, reader.StatusStopped)
+				atomic.CompareAndSwapInt32(&ar.status, StatusStopping, StatusStopped)
 				return
 			}
 			select {
@@ -194,7 +195,7 @@ func (ar *ActiveReader) Run() {
 func (ar *ActiveReader) Close() error {
 	defer log.Warnf("Runner[%v] ActiveReader %s was closed", ar.runnerName, ar.originpath)
 	err := ar.br.Close()
-	if atomic.CompareAndSwapInt32(&ar.status, reader.StatusRunning, reader.StatusStopping) {
+	if atomic.CompareAndSwapInt32(&ar.status, StatusRunning, StatusStopping) {
 		log.Warnf("Runner[%v] ActiveReader %s was closing", ar.runnerName, ar.originpath)
 	} else {
 		return err
@@ -202,7 +203,7 @@ func (ar *ActiveReader) Close() error {
 
 	cnt := 0
 	// 等待结束
-	for atomic.LoadInt32(&ar.status) != reader.StatusStopped {
+	for atomic.LoadInt32(&ar.status) != StatusStopped {
 		cnt++
 		//超过300个10ms，即3s，就强行退出
 		if cnt > 300 {
@@ -271,29 +272,29 @@ func (ar *ActiveReader) expired(expire time.Duration) bool {
 }
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
-	logPathPattern, err := conf.GetString(reader.KeyLogPath)
+	logPathPattern, err := conf.GetString(KeyLogPath)
 	if err != nil {
 		return nil, err
 	}
-	whence, _ := conf.GetStringOr(reader.KeyWhence, reader.WhenceOldest)
+	whence, _ := conf.GetStringOr(KeyWhence, WhenceOldest)
 
-	statIntervalDur, _ := conf.GetStringOr(reader.KeyStatInterval, "3m")
-	maxOpenFiles, _ := conf.GetIntOr(reader.KeyMaxOpenFiles, 256)
+	statIntervalDur, _ := conf.GetStringOr(KeyStatInterval, "3m")
+	maxOpenFiles, _ := conf.GetIntOr(KeyMaxOpenFiles, 256)
 
-	expireDur, _ := conf.GetStringOr(reader.KeyExpire, "24h")
+	expireDur, _ := conf.GetStringOr(KeyExpire, "24h")
 	expire, err := time.ParseDuration(expireDur)
 	if err != nil {
 		return nil, err
 	}
 
-	submetaExpireDur, _ := conf.GetStringOr(reader.KeySubmetaExpire, "720h")
+	submetaExpireDur, _ := conf.GetStringOr(KeySubmetaExpire, "720h")
 	submetaExpire, err := time.ParseDuration(submetaExpireDur)
 	if err != nil {
 		return nil, err
 	}
 	// submetaExpire 为 0 时，不清理元数据
 	if IsSubmetaExpireValid(submetaExpire, expire) {
-		return nil, fmt.Errorf("%q valus is less than %q", reader.KeySubmetaExpire, reader.KeyExpire)
+		return nil, fmt.Errorf("%q valus is less than %q", KeySubmetaExpire, KeyExpire)
 	}
 
 	statInterval, err := time.ParseDuration(statIntervalDur)
@@ -331,7 +332,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 
 	return &Reader{
 		meta:           meta,
-		status:         reader.StatusInit,
+		status:         StatusInit,
 		stopChan:       make(chan struct{}),
 		msgChan:        make(chan Result),
 		errChan:        make(chan error),
@@ -347,11 +348,11 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 }
 
 func (r *Reader) isStopping() bool {
-	return atomic.LoadInt32(&r.status) == reader.StatusStopping
+	return atomic.LoadInt32(&r.status) == StatusStopping
 }
 
 func (r *Reader) hasStopped() bool {
-	return atomic.LoadInt32(&r.status) == reader.StatusStopped
+	return atomic.LoadInt32(&r.status) == StatusStopped
 }
 
 func (r *Reader) Name() string {
@@ -459,7 +460,7 @@ func (r *Reader) statLogPath() {
 		}
 		ar.readcache = cacheline
 		if r.headRegexp != nil {
-			err = ar.br.SetMode(reader.ReadModeHeadPatternRegexp, r.headRegexp)
+			err = ar.br.SetMode(ReadModeHeadPatternRegexp, r.headRegexp)
 			if err != nil {
 				log.Errorf("Runner[%v] NewActiveReader for matches %v SetMode error %v", r.meta.RunnerName, rp, err)
 				r.setStatsError("Runner[" + r.meta.RunnerName + "] NewActiveReader for matches " + rp + " SetMode error " + err.Error())
@@ -467,7 +468,7 @@ func (r *Reader) statLogPath() {
 		}
 		newaddsPath = append(newaddsPath, rp)
 		r.armapmux.Lock()
-		if atomic.LoadInt32(&r.status) != reader.StatusStopped {
+		if atomic.LoadInt32(&r.status) != StatusStopped {
 			if err = r.meta.AddSubMeta(rp, ar.br.Meta); err != nil {
 				log.Errorf("Runner[%v] %v add submeta for %v err %v, but this reader will still working", r.meta.RunnerName, mc, rp, err)
 			}
@@ -476,7 +477,7 @@ func (r *Reader) statLogPath() {
 			log.Warnf("Runner[%v] %v NewActiveReader but reader was stopped, ignore this...", r.meta.RunnerName, mc)
 		}
 		r.armapmux.Unlock()
-		if atomic.LoadInt32(&r.status) != reader.StatusStopped {
+		if atomic.LoadInt32(&r.status) != StatusStopped {
 			go ar.Run()
 		} else {
 			log.Warnf("Runner[%v] %v NewActiveReader but reader was stopped, will not running...", r.meta.RunnerName, mc)
@@ -490,7 +491,7 @@ func (r *Reader) statLogPath() {
 func (r *Reader) Start() error {
 	if r.isStopping() || r.hasStopped() {
 		return errors.New("reader is stopping or has stopped")
-	} else if !atomic.CompareAndSwapInt32(&r.status, reader.StatusInit, reader.StatusRunning) {
+	} else if !atomic.CompareAndSwapInt32(&r.status, StatusInit, StatusRunning) {
 		log.Warnf("Runner[%v] %q daemon has already started and is running", r.meta.RunnerName, r.Name())
 		return nil
 	}
@@ -504,7 +505,7 @@ func (r *Reader) Start() error {
 
 			select {
 			case <-r.stopChan:
-				atomic.StoreInt32(&r.status, reader.StatusStopped)
+				atomic.StoreInt32(&r.status, StatusStopped)
 				log.Infof("Runner[%v] %q daemon has stopped from running", r.meta.RunnerName, r.Name())
 				return
 			case <-ticker.C:
@@ -629,7 +630,7 @@ func (r *Reader) SyncMeta() {
 }
 
 func (r *Reader) Close() error {
-	if !atomic.CompareAndSwapInt32(&r.status, reader.StatusRunning, reader.StatusStopping) {
+	if !atomic.CompareAndSwapInt32(&r.status, StatusRunning, StatusStopping) {
 		log.Warnf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
 		return nil
 	}

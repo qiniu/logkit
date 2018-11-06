@@ -12,6 +12,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
+	. "github.com/qiniu/logkit/sender/config"
 	"github.com/qiniu/logkit/utils/models"
 	"github.com/qiniu/logkit/utils/ratelimit"
 )
@@ -25,7 +26,7 @@ var bufPool = sync.Pool{
 }
 
 func init() {
-	sender.RegisterConstructor(sender.TypeMySQL, NewSender)
+	sender.RegisterConstructor(TypeMySQL, NewSender)
 }
 
 type dbconn struct {
@@ -118,16 +119,16 @@ func NewSender(conf conf.MapConf) (s sender.Sender, err error) {
 		}
 	}()
 
-	datasource, err := conf.GetPasswordEnvString(sender.KeyMySQLDataSource)
+	datasource, err := conf.GetPasswordEnvString(KeyMySQLDataSource)
 	if err != nil {
 		return nil, err
 	}
-	table, err := conf.GetString(sender.KeyMySQLTable)
+	table, err := conf.GetString(KeyMySQLTable)
 	if err != nil {
 		return nil, err
 	}
-	name, _ := conf.GetStringOr(sender.KeyName, "")
-	rate, _ := conf.GetInt64Or(sender.KeyMaxSendRate, -1)
+	name, _ := conf.GetStringOr(KeyName, "")
+	rate, _ := conf.GetInt64Or(KeyMaxSendRate, -1)
 
 	return &Sender{
 		name: name,

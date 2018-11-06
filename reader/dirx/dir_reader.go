@@ -16,6 +16,7 @@ import (
 	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -57,7 +58,7 @@ func (dr *dirReader) sendError(err error) {
 }
 
 func (dr *dirReader) Run() {
-	if !atomic.CompareAndSwapInt32(&dr.status, reader.StatusInit, reader.StatusRunning) {
+	if !atomic.CompareAndSwapInt32(&dr.status, StatusInit, StatusRunning) {
 		log.Errorf("Runner[%v] log path[%v] reader is not in init state before running, exiting", dr.runnerName, dr.originalPath)
 		return
 	}
@@ -67,8 +68,8 @@ func (dr *dirReader) Run() {
 
 	var err error
 	for {
-		if atomic.LoadInt32(&dr.status) == reader.StatusStopping || atomic.LoadInt32(&dr.status) == reader.StatusStopped {
-			atomic.CompareAndSwapInt32(&dr.status, reader.StatusStopping, reader.StatusStopped)
+		if atomic.LoadInt32(&dr.status) == StatusStopping || atomic.LoadInt32(&dr.status) == StatusStopped {
+			atomic.CompareAndSwapInt32(&dr.status, StatusStopping, StatusStopped)
 			log.Warnf("Runner[%v] log path[%v] reader has stopped", dr.runnerName, dr.originalPath)
 			return
 		}
@@ -121,9 +122,9 @@ func (dr *dirReader) Run() {
 			dr.numEmptyLines = 0
 
 			// 做这一层检查是为了快速结束和确保在上层 reader 已经关闭的情况下不会继续向 dr.msgChan 发送数据（因为可能已经被关闭）
-			if atomic.LoadInt32(&dr.status) == reader.StatusStopping || atomic.LoadInt32(&dr.status) == reader.StatusStopped {
+			if atomic.LoadInt32(&dr.status) == StatusStopping || atomic.LoadInt32(&dr.status) == StatusStopped {
 				log.Debugf("Runner[%v] log path[%v] reader has stopped when waits to send data", dr.runnerName, dr.originalPath)
-				atomic.CompareAndSwapInt32(&dr.status, reader.StatusStopping, reader.StatusStopped)
+				atomic.CompareAndSwapInt32(&dr.status, StatusStopping, StatusStopped)
 				return
 			}
 
@@ -196,7 +197,7 @@ func (dr *dirReader) SyncMeta() string {
 func (dr *dirReader) Close() error {
 	defer log.Warnf("Runner[%v] log path[%v] reader has closed", dr.runnerName, dr.originalPath)
 	err := dr.br.Close()
-	if atomic.CompareAndSwapInt32(&dr.status, reader.StatusRunning, reader.StatusStopping) {
+	if atomic.CompareAndSwapInt32(&dr.status, StatusRunning, StatusStopping) {
 		log.Warnf("Runner[%v] log path[%v] reader is closing", dr.runnerName, dr.originalPath)
 	} else {
 		return err
@@ -204,7 +205,7 @@ func (dr *dirReader) Close() error {
 
 	waitedTimes := 0
 	// 等待结束
-	for atomic.LoadInt32(&dr.status) != reader.StatusStopped {
+	for atomic.LoadInt32(&dr.status) != StatusStopped {
 		waitedTimes++
 		// 超过 300 个 10ms，即 3s 就强行退出
 		if waitedTimes > 300 {
@@ -271,7 +272,7 @@ type newReaderOptions struct {
 func (drs *dirReaders) NewReader(opts newReaderOptions) (*dirReader, error) {
 	rpath := strings.Replace(opts.LogPath, string(os.PathSeparator), "_", -1)
 	subMetaPath := filepath.Join(opts.Meta.Dir, rpath)
-	subMeta, err := reader.NewMeta(subMetaPath, subMetaPath, opts.LogPath, reader.ModeDir, opts.Meta.TagFile, reader.DefautFileRetention)
+	subMeta, err := reader.NewMeta(subMetaPath, subMetaPath, opts.LogPath, ModeDir, opts.Meta.TagFile, reader.DefautFileRetention)
 	if err != nil {
 		return nil, fmt.Errorf("new meta: %v", err)
 	}
@@ -288,7 +289,7 @@ func (drs *dirReaders) NewReader(opts newReaderOptions) (*dirReader, error) {
 	}
 
 	dr := &dirReader{
-		status:       reader.StatusInit,
+		status:       StatusInit,
 		inactive:     1,
 		br:           br,
 		runnerName:   opts.Meta.RunnerName,

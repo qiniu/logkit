@@ -11,6 +11,7 @@ import (
 
 	"github.com/json-iterator/go"
 
+	"github.com/qiniu/logkit/reader/config"
 	"github.com/qiniu/logkit/utils/models"
 )
 
@@ -89,7 +90,7 @@ func notCondition(f1 func(os.FileInfo) bool) func(os.FileInfo) bool {
 
 func HeadPatternMode(mode string, v interface{}) (reg *regexp.Regexp, err error) {
 	switch mode {
-	case ReadModeHeadPatternString:
+	case config.ReadModeHeadPatternString:
 		pattern, ok := v.(string)
 		if !ok {
 			err = fmt.Errorf(" %v is not pattern string", v)
@@ -101,7 +102,7 @@ func HeadPatternMode(mode string, v interface{}) (reg *regexp.Regexp, err error)
 			return
 		}
 		return
-	case ReadModeHeadPatternRegexp:
+	case config.ReadModeHeadPatternRegexp:
 		reg1, ok := v.(*regexp.Regexp)
 		if !ok {
 			err = fmt.Errorf(" %v is not *regexp.Regexp type value", v)
@@ -115,7 +116,7 @@ func HeadPatternMode(mode string, v interface{}) (reg *regexp.Regexp, err error)
 }
 
 func ParseLoopDuration(cronSched string) (dur time.Duration, err error) {
-	cronSched = strings.TrimSpace(strings.TrimPrefix(cronSched, Loop))
+	cronSched = strings.TrimSpace(strings.TrimPrefix(cronSched, config.Loop))
 	dur, err = time.ParseDuration(cronSched)
 	if err != nil {
 		dur = time.Duration(0)

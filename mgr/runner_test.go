@@ -21,11 +21,14 @@ import (
 	"github.com/qiniu/logkit/cleaner"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	parserConf "github.com/qiniu/logkit/parser/config"
 	"github.com/qiniu/logkit/parser/qiniu"
 	"github.com/qiniu/logkit/reader"
+	readerConf "github.com/qiniu/logkit/reader/config"
 	"github.com/qiniu/logkit/router"
 	"github.com/qiniu/logkit/sender"
 	_ "github.com/qiniu/logkit/sender/builtin"
+	senderConf "github.com/qiniu/logkit/sender/config"
 	"github.com/qiniu/logkit/sender/discard"
 	"github.com/qiniu/logkit/sender/mock"
 	"github.com/qiniu/logkit/sender/pandora"
@@ -133,7 +136,7 @@ func Test_Run(t *testing.T) {
 	}
 	parseConf := conf.MapConf{
 		"name":                   "req_csv",
-		"type":                   parser.TypeCSV,
+		"type":                   parserConf.TypeCSV,
 		"csv_schema":             "logtype string, xx long",
 		"csv_splitter":           " ",
 		"disable_record_errdata": "true",
@@ -630,7 +633,7 @@ func Test_QiniulogRun(t *testing.T) {
 	}
 	parseConf := conf.MapConf{
 		"name": "qiniu",
-		"type": parser.TypeLogv1,
+		"type": parserConf.TypeLogv1,
 	}
 	senderConfigs := []conf.MapConf{
 		{
@@ -1889,8 +1892,8 @@ func TestMergeEnvTags(t *testing.T) {
 
 func TestMergeExtraInfoTags(t *testing.T) {
 	meta, err := reader.NewMetaWithConf(conf.MapConf{
-		ExtraInfo:      "true",
-		reader.KeyMode: reader.ModeMySQL,
+		ExtraInfo:          "true",
+		readerConf.KeyMode: readerConf.ModeMySQL,
 	})
 	assert.NoError(t, err)
 	tags := MergeExtraInfoTags(meta, nil)
@@ -1987,7 +1990,7 @@ DONE:
 			ret++
 			assert.Equal(t, "a.log.1", sig.Filename)
 			assert.NoError(t, os.Remove(filepath.Join(sig.Logdir, sig.Filename)))
-			assert.Equal(t, reader.ModeTailx, sig.ReadMode)
+			assert.Equal(t, readerConf.ModeTailx, sig.ReadMode)
 			break DONE
 		default:
 			dft++
@@ -2003,7 +2006,7 @@ DONE:
 
 func Test_setSenderConfig(t *testing.T) {
 	senderConfig := conf.MapConf{
-		sender.KeySenderType: sender.TypePandora,
+		senderConf.KeySenderType: senderConf.TypePandora,
 	}
 
 	serverConfigs := []map[string]interface{}{
@@ -2014,7 +2017,7 @@ func Test_setSenderConfig(t *testing.T) {
 	}
 	actualConfig, err := setPandoraServerConfig(senderConfig, serverConfigs)
 	assert.NoError(t, err)
-	assert.Equal(t, "", actualConfig[sender.KeyPandoraAutoCreate])
+	assert.Equal(t, "", actualConfig[senderConf.KeyPandoraAutoCreate])
 
 	serverConfigs = []map[string]interface{}{
 		{
@@ -2025,10 +2028,10 @@ func Test_setSenderConfig(t *testing.T) {
 	}
 	actualConfig, err = setPandoraServerConfig(senderConfig, serverConfigs)
 	assert.NoError(t, err)
-	assert.Equal(t, "ip ip", actualConfig[sender.KeyPandoraAutoCreate])
+	assert.Equal(t, "ip ip", actualConfig[senderConf.KeyPandoraAutoCreate])
 
 	senderConfig = conf.MapConf{
-		sender.KeySenderType: sender.TypePandora,
+		senderConf.KeySenderType: senderConf.TypePandora,
 	}
 	serverConfigs = []map[string]interface{}{
 		{
@@ -2039,7 +2042,7 @@ func Test_setSenderConfig(t *testing.T) {
 	}
 	actualConfig, err = setPandoraServerConfig(senderConfig, serverConfigs)
 	assert.NoError(t, err)
-	assert.Equal(t, "", actualConfig[sender.KeyPandoraAutoCreate])
+	assert.Equal(t, "", actualConfig[senderConf.KeyPandoraAutoCreate])
 
 	serverConfigs = []map[string]interface{}{
 		{
@@ -2048,7 +2051,7 @@ func Test_setSenderConfig(t *testing.T) {
 	}
 	actualConfig, err = setPandoraServerConfig(senderConfig, serverConfigs)
 	assert.NoError(t, err)
-	assert.Equal(t, "", actualConfig[sender.KeyPandoraAutoCreate])
+	assert.Equal(t, "", actualConfig[senderConf.KeyPandoraAutoCreate])
 
 	serverConfigs = []map[string]interface{}{
 		{
@@ -2104,8 +2107,8 @@ func Test_removeServerIPSchema(t *testing.T) {
 // 需要优化
 func BenchmarkStatusRestore(b *testing.B) {
 	logkitConf := conf.MapConf{
-		reader.KeyMetaPath: "testmeta",
-		reader.KeyMode:     reader.ModeMongo,
+		readerConf.KeyMetaPath: "testmeta",
+		readerConf.KeyMode:     readerConf.ModeMongo,
 	}
 	meta, err := reader.NewMetaWithConf(logkitConf)
 	if err != nil {
@@ -2142,8 +2145,8 @@ func randinsert(l *equeue.ErrorQueue, num int) {
 
 func TestBackupRestoreHistory(t *testing.T) {
 	logkitConf := conf.MapConf{
-		reader.KeyMetaPath: "meta",
-		reader.KeyMode:     reader.ModeMongo,
+		readerConf.KeyMetaPath: "meta",
+		readerConf.KeyMode:     readerConf.ModeMongo,
 	}
 	meta, err := reader.NewMetaWithConf(logkitConf)
 	if err != nil {

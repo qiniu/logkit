@@ -9,15 +9,16 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/reader/test"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
 func TestMongoReader(t *testing.T) {
 	logkitConf := conf.MapConf{
-		reader.KeyMetaPath: MetaDir,
-		reader.KeyFileDone: MetaDir,
-		reader.KeyMode:     reader.ModeMongo,
+		KeyMetaPath: MetaDir,
+		KeyFileDone: MetaDir,
+		KeyMode:     ModeMongo,
 	}
 	meta, err := reader.NewMetaWithConf(logkitConf)
 	assert.NoError(t, err)
@@ -32,7 +33,7 @@ func TestMongoReader(t *testing.T) {
 		offset:     obj,
 
 		collectionFilters: map[string]CollectionFilter{},
-		status:            reader.StatusInit,
+		status:            StatusInit,
 		readChan:          make(chan []byte),
 	}
 	assert.EqualValues(t, "MongoReader<127.0.0.1:12701_testdb_coll>", er.Name())

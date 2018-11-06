@@ -14,6 +14,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/reader/test"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -38,7 +39,7 @@ func createDirWithName(dirx string) {
 func Test_ActiveReader(t *testing.T) {
 	testfile := "Test_ActiveReader"
 	CreateDir()
-	meta, err := reader.NewMeta(MetaDir, MetaDir, testfile, reader.ModeDir, "", reader.DefautFileRetention)
+	meta, err := reader.NewMeta(MetaDir, MetaDir, testfile, ModeDir, "", reader.DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
@@ -50,7 +51,7 @@ func Test_ActiveReader(t *testing.T) {
 	assert.NoError(t, err)
 	msgchan := make(chan Result)
 	errChan := make(chan error)
-	ar, err := NewActiveReader(ppath, ppath, reader.WhenceOldest, meta, msgchan, errChan)
+	ar, err := NewActiveReader(ppath, ppath, WhenceOldest, meta, msgchan, errChan)
 	assert.NoError(t, err)
 	go ar.Run()
 	data := <-msgchan
@@ -109,7 +110,7 @@ func multiReaderOneLineTest(t *testing.T) {
 	c := conf.MapConf{
 		"log_path":        logPathPattern,
 		"meta_path":       dirname,
-		"mode":            reader.ModeTailx,
+		"mode":            ModeTailx,
 		"sync_every":      "1",
 		"reader_buf_size": "1024",
 		"read_from":       "oldest",
@@ -208,7 +209,7 @@ func multiReaderMultiLineTest(t *testing.T) {
 	c := conf.MapConf{
 		"log_path":        logPathPattern,
 		"meta_path":       dirname,
-		"mode":            reader.ModeTailx,
+		"mode":            ModeTailx,
 		"sync_every":      "1",
 		"reader_buf_size": "1024",
 		"read_from":       "oldest",
@@ -219,7 +220,7 @@ func multiReaderMultiLineTest(t *testing.T) {
 	meta, err := reader.NewMetaWithConf(c)
 	assert.NoError(t, err)
 	mmr, err := NewReader(meta, c)
-	mmr.SetMode(reader.ReadModeHeadPatternString, "^abc*")
+	mmr.SetMode(ReadModeHeadPatternString, "^abc*")
 	mr := mmr.(*Reader)
 	assert.NoError(t, mr.Start())
 	t.Log("Reader has started")
@@ -314,7 +315,7 @@ func multiReaderSyncMetaOneLineTest(t *testing.T) {
 	c := conf.MapConf{
 		"log_path":        logPathPattern,
 		"meta_path":       dirname,
-		"mode":            reader.ModeTailx,
+		"mode":            ModeTailx,
 		"sync_every":      "1",
 		"reader_buf_size": "1024",
 		"read_from":       "oldest",
@@ -447,7 +448,7 @@ func multiReaderSyncMetaMutilineTest(t *testing.T) {
 	c := conf.MapConf{
 		"log_path":        logPathPattern,
 		"meta_path":       dirname,
-		"mode":            reader.ModeTailx,
+		"mode":            ModeTailx,
 		"sync_every":      "1",
 		"reader_buf_size": "1024",
 		"read_from":       "oldest",
@@ -458,7 +459,7 @@ func multiReaderSyncMetaMutilineTest(t *testing.T) {
 	meta, err := reader.NewMetaWithConf(c)
 	assert.NoError(t, err)
 	mmr, err := NewReader(meta, c)
-	mmr.SetMode(reader.ReadModeHeadPatternString, "^abc*")
+	mmr.SetMode(ReadModeHeadPatternString, "^abc*")
 	mr := mmr.(*Reader)
 	assert.NoError(t, mr.Start())
 	t.Log("Reader has started")
@@ -493,7 +494,7 @@ func multiReaderSyncMetaMutilineTest(t *testing.T) {
 	assert.NoError(t, err)
 	time.Sleep(500 * time.Millisecond)
 	mmr, err = NewReader(meta, c)
-	mmr.SetMode(reader.ReadModeHeadPatternString, "^abc*")
+	mmr.SetMode(ReadModeHeadPatternString, "^abc*")
 	mr = mmr.(*Reader)
 	assert.NoError(t, mr.Start())
 	time.Sleep(100 * time.Millisecond)
@@ -574,7 +575,7 @@ func TestMultiReaderReset(t *testing.T) {
 	c := conf.MapConf{
 		"log_path":        logPathPattern,
 		"meta_path":       metaDir,
-		"mode":            reader.ModeTailx,
+		"mode":            ModeTailx,
 		"sync_every":      "1",
 		"reader_buf_size": "1024",
 		"read_from":       "oldest",
@@ -669,7 +670,7 @@ func TestReaderErrBegin(t *testing.T) {
 	c := conf.MapConf{
 		"log_path":        logPathPattern,
 		"meta_path":       metaDir,
-		"mode":            reader.ModeTailx,
+		"mode":            ModeTailx,
 		"sync_every":      "1",
 		"reader_buf_size": "1024",
 		"read_from":       "oldest",
@@ -733,7 +734,7 @@ func TestReaderErrMiddle(t *testing.T) {
 	c := conf.MapConf{
 		"log_path":        logPathPattern,
 		"meta_path":       metaDir,
-		"mode":            reader.ModeTailx,
+		"mode":            ModeTailx,
 		"sync_every":      "1",
 		"reader_buf_size": "1024",
 		"read_from":       "oldest",

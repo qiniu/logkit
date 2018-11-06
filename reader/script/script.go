@@ -14,6 +14,7 @@ import (
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -26,7 +27,7 @@ var (
 var waitTime = time.Minute
 
 func init() {
-	reader.RegisterConstructor(reader.ModeScript, NewReader)
+	reader.RegisterConstructor(ModeScript, NewReader)
 }
 
 type Reader struct {
@@ -60,7 +61,7 @@ type Reader struct {
 }
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
-	path, _ := conf.GetStringOr(reader.KeyLogPath, "")
+	path, _ := conf.GetStringOr(KeyLogPath, "")
 	originPath := path
 
 	var err error
@@ -69,13 +70,13 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		return nil, err
 	}
 
-	cronSchedule, _ := conf.GetStringOr(reader.KeyScriptCron, "")
-	execOnStart, _ := conf.GetBoolOr(reader.KeyScriptExecOnStart, true)
-	scriptType, _ := conf.GetStringOr(reader.KeyExecInterpreter, "bash")
+	cronSchedule, _ := conf.GetStringOr(KeyScriptCron, "")
+	execOnStart, _ := conf.GetBoolOr(KeyScriptExecOnStart, true)
+	scriptType, _ := conf.GetStringOr(KeyExecInterpreter, "bash")
 	r := &Reader{
 		meta:          meta,
-		status:        reader.StatusInit,
-		routineStatus: reader.StatusInit,
+		status:        StatusInit,
+		routineStatus: StatusInit,
 		stopChan:      make(chan struct{}),
 		readChan:      make(chan []byte),
 		errChan:       make(chan error),
@@ -89,7 +90,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	// 定时任务配置串
 	if len(cronSchedule) > 0 {
 		cronSchedule = strings.ToLower(cronSchedule)
-		if strings.HasPrefix(cronSchedule, reader.Loop) {
+		if strings.HasPrefix(cronSchedule, Loop) {
 			r.isLoop = true
 			r.loopDuration, err = reader.ParseLoopDuration(cronSchedule)
 			if err != nil {
@@ -110,11 +111,11 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 }
 
 func (r *Reader) isStopping() bool {
-	return atomic.LoadInt32(&r.status) == reader.StatusStopping
+	return atomic.LoadInt32(&r.status) == StatusStopping
 }
 
 func (r *Reader) hasStopped() bool {
-	return atomic.LoadInt32(&r.status) == reader.StatusStopped
+	return atomic.LoadInt32(&r.status) == StatusStopped
 }
 
 func (r *Reader) Name() string {
@@ -146,7 +147,7 @@ func (r *Reader) sendError(err error) {
 func (r *Reader) Start() error {
 	if r.isStopping() || r.hasStopped() {
 		return errors.New("reader is stopping or has stopped")
-	} else if !atomic.CompareAndSwapInt32(&r.status, reader.StatusInit, reader.StatusRunning) {
+	} else if !atomic.CompareAndSwapInt32(&r.status, StatusInit, StatusRunning) {
 		log.Warnf("Runner[%v] %q daemon has already started and is running", r.meta.RunnerName, r.Name())
 		return nil
 	}
@@ -160,7 +161,7 @@ func (r *Reader) Start() error {
 
 				select {
 				case <-r.stopChan:
-					atomic.StoreInt32(&r.status, reader.StatusStopped)
+					atomic.StoreInt32(&r.status, StatusStopped)
 					log.Infof("Runner[%v] %q daemon has stopped from running", r.meta.RunnerName, r.Name())
 					return
 				case <-ticker.C:
@@ -205,7 +206,7 @@ func (r *Reader) Status() StatsInfo {
 func (r *Reader) SyncMeta() {}
 
 func (r *Reader) Close() error {
-	if !atomic.CompareAndSwapInt32(&r.status, reader.StatusRunning, reader.StatusStopping) {
+	if !atomic.CompareAndSwapInt32(&r.status, StatusRunning, StatusStopping) {
 		log.Warnf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
 		return nil
 	}
@@ -215,7 +216,7 @@ func (r *Reader) Close() error {
 	r.Cron.Stop()
 
 	// 如果此时没有 routine 正在运行，则在此处关闭数据管道，否则由 routine 在退出时负责关闭
-	if atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusInit, reader.StatusStopping) {
+	if atomic.CompareAndSwapInt32(&r.routineStatus, StatusInit, StatusStopping) {
 		close(r.readChan)
 		close(r.errChan)
 	}
@@ -224,7 +225,7 @@ func (r *Reader) Close() error {
 
 func (r *Reader) run() {
 	// 未在准备状态（StatusInit）时无法执行此次任务
-	if !atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusInit, reader.StatusRunning) {
+	if !atomic.CompareAndSwapInt32(&r.routineStatus, StatusInit, StatusRunning) {
 		if r.isStopping() || r.hasStopped() {
 			log.Warnf("Runner[%v] %q daemon has stopped, this task does not need to be executed and is skipped this time", r.meta.RunnerName, r.Name())
 		} else {
@@ -240,13 +241,13 @@ func (r *Reader) run() {
 	defer func() {
 		// 如果 reader 在 routine 运行时关闭，则需要此 routine 负责关闭数据管道
 		if r.isStopping() || r.hasStopped() {
-			if atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusRunning, reader.StatusStopping) {
+			if atomic.CompareAndSwapInt32(&r.routineStatus, StatusRunning, StatusStopping) {
 				close(r.readChan)
 				close(r.errChan)
 			}
 			return
 		}
-		atomic.StoreInt32(&r.routineStatus, reader.StatusInit)
+		atomic.StoreInt32(&r.routineStatus, StatusInit)
 	}()
 
 	// 如果执行失败，最多重试 10 次

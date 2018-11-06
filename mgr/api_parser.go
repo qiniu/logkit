@@ -8,6 +8,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	. "github.com/qiniu/logkit/parser/config"
 	. "github.com/qiniu/logkit/utils/models"
 
 	"github.com/labstack/echo"
@@ -49,30 +50,30 @@ func (rs *RestService) PostParse() echo.HandlerFunc {
 // get /logkit/parser/usages 获得解析用途说明
 func (rs *RestService) GetParserUsages() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		sort.Stable(parser.ModeUsages)
-		return RespSuccess(c, parser.ModeUsages)
+		sort.Stable(ModeUsages)
+		return RespSuccess(c, ModeUsages)
 	}
 }
 
 // get /logkit/parser/tooltips 获取解析用途提示
 func (rs *RestService) GetParserTooltips() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		sort.Stable(parser.ModeToolTips)
-		return RespSuccess(c, parser.ModeToolTips)
+		sort.Stable(ModeToolTips)
+		return RespSuccess(c, ModeToolTips)
 	}
 }
 
 // get /logkit/parser/options 获取解析选项
 func (rs *RestService) GetParserKeyOptions() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		return RespSuccess(c, parser.ModeKeyOptions)
+		return RespSuccess(c, ModeKeyOptions)
 	}
 }
 
 // get /logkit/parser/samplelogs 获取样例日志
 func (rs *RestService) GetParserSampleLogs() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		return RespSuccess(c, parser.SampleLogs)
+		return RespSuccess(c, SampleLogs)
 	}
 }
 

@@ -6,14 +6,14 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/parser"
+	. "github.com/qiniu/logkit/parser/config"
 )
 
 func Test_RawlogParser(t *testing.T) {
 	c := conf.MapConf{}
-	c[parser.KeyParserType] = "raw"
-	c[parser.KeyLabels] = "machine nb110"
-	c[parser.KeyDisableRecordErrData] = "true"
+	c[KeyParserType] = "raw"
+	c[KeyLabels] = "machine nb110"
+	c[KeyDisableRecordErrData] = "true"
 	p, err := NewParser(c)
 	assert.Nil(t, err)
 	lines := []string{
@@ -40,9 +40,9 @@ func Test_RawlogParser(t *testing.T) {
 
 func Test_RawlogParserForErrData(t *testing.T) {
 	c := conf.MapConf{}
-	c[parser.KeyParserType] = "raw"
-	c[parser.KeyLabels] = "machine nb110"
-	c[parser.KeyDisableRecordErrData] = "false"
+	c[KeyParserType] = "raw"
+	c[KeyLabels] = "machine nb110"
+	c[KeyDisableRecordErrData] = "false"
 	p, err := NewParser(c)
 	assert.Nil(t, err)
 	lines := []string{

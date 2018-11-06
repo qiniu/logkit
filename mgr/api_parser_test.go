@@ -3,12 +3,12 @@ package mgr
 import (
 	"net/http"
 
-	conf2 "github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/parser"
-	. "github.com/qiniu/logkit/utils/models"
-
 	"github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
+
+	conf2 "github.com/qiniu/logkit/conf"
+	. "github.com/qiniu/logkit/parser/config"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 type respParserRet struct {
@@ -23,8 +23,8 @@ func parserParseTest(p *testParam) {
 
 	// raw
 	rawConf := conf2.MapConf{}
-	rawConf[KeySampleLog] = parser.SampleLogs[parser.TypeRaw]
-	rawConf[parser.KeyParserType] = parser.TypeRaw
+	rawConf[KeySampleLog] = SampleLogs[TypeRaw]
+	rawConf[KeyParserType] = TypeRaw
 	rawpst, err := jsoniter.Marshal(rawConf)
 	assert.NoError(t, err)
 	url := "http://127.0.0.1" + rs.address + "/logkit/parser/parse"
@@ -40,8 +40,8 @@ func parserParseTest(p *testParam) {
 	// json
 	var got2 respParserRet
 	jsonConf := conf2.MapConf{}
-	jsonConf[KeySampleLog] = parser.SampleLogs[parser.TypeJSON]
-	jsonConf[parser.KeyParserType] = parser.TypeJSON
+	jsonConf[KeySampleLog] = SampleLogs[TypeJSON]
+	jsonConf[KeyParserType] = TypeJSON
 	rawpst, err = jsoniter.Marshal(jsonConf)
 	assert.NoError(t, err)
 	url = "http://127.0.0.1" + rs.address + "/logkit/parser/parse"
@@ -62,9 +62,9 @@ func parserParseTest(p *testParam) {
 	// grok
 	grokConf := conf2.MapConf{}
 	var got3 respParserRet
-	grokConf[KeySampleLog] = parser.SampleLogs[parser.TypeGrok]
-	grokConf[parser.KeyParserType] = parser.TypeGrok
-	grokConf[parser.KeyGrokPatterns] = "%{COMMON_LOG_FORMAT}"
+	grokConf[KeySampleLog] = SampleLogs[TypeGrok]
+	grokConf[KeyParserType] = TypeGrok
+	grokConf[KeyGrokPatterns] = "%{COMMON_LOG_FORMAT}"
 	rawpst, err = jsoniter.Marshal(grokConf)
 	assert.NoError(t, err)
 	url = "http://127.0.0.1" + rs.address + "/logkit/parser/parse"
@@ -101,7 +101,7 @@ func parserAPITest(p *testParam) {
 	if err = jsoniter.Unmarshal(respBody, &got1); err != nil {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
-	assert.Equal(t, parser.ModeUsages, got1.Data)
+	assert.Equal(t, ModeUsages, got1.Data)
 
 	var got2 respModeKeyOptions
 	url = "http://127.0.0.1" + rs.address + "/logkit/parser/options"
@@ -111,7 +111,7 @@ func parserAPITest(p *testParam) {
 	if err = jsoniter.Unmarshal(respBody, &got2); err != nil {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
-	assert.Equal(t, parser.ModeKeyOptions, got2.Data)
+	assert.Equal(t, ModeKeyOptions, got2.Data)
 
 	var got3 respSampleLogs
 	url = "http://127.0.0.1" + rs.address + "/logkit/parser/samplelogs"
@@ -121,7 +121,7 @@ func parserAPITest(p *testParam) {
 	if err = jsoniter.Unmarshal(respBody, &got3); err != nil {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
-	assert.Equal(t, parser.SampleLogs, got3.Data)
+	assert.Equal(t, SampleLogs, got3.Data)
 
 	var got4 respModeUsages
 	url = "http://127.0.0.1" + rs.address + "/logkit/parser/tooltips"
@@ -131,5 +131,5 @@ func parserAPITest(p *testParam) {
 	if err = jsoniter.Unmarshal(respBody, &got4); err != nil {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
-	assert.Equal(t, parser.ModeToolTips, got4.Data)
+	assert.Equal(t, ModeToolTips, got4.Data)
 }

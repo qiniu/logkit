@@ -10,6 +10,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/reader/test"
 )
 
@@ -21,8 +22,8 @@ func Test_scriptFile(t *testing.T) {
 	defer DeleteFile(fileName)
 
 	readerConf := conf.MapConf{
-		reader.KeyExecInterpreter: "bash",
-		reader.KeyLogPath:         fileName,
+		KeyExecInterpreter: "bash",
+		KeyLogPath:         fileName,
 	}
 	meta, err := reader.NewMetaWithConf(readerConf)
 	if err != nil {
@@ -57,8 +58,8 @@ func Test_checkPath(t *testing.T) {
 
 	waitTime = 4 * time.Second
 	readerConf := conf.MapConf{
-		reader.KeyExecInterpreter: "bash",
-		reader.KeyLogPath:         fileName,
+		KeyExecInterpreter: "bash",
+		KeyLogPath:         fileName,
 	}
 	meta, err := reader.NewMetaWithConf(readerConf)
 	if err != nil {

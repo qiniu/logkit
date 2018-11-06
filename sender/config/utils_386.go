@@ -1,7 +1,7 @@
-package sender
+package config
 
 import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-const maxDiskUsedBytes = 2*GB - 1
+const MaxDiskUsedBytes = 2*GB - 1

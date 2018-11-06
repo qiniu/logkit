@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/json-iterator/go"
-	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/reader/config"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,7 +27,7 @@ func readerAPITest(p *testParam) {
 	if err = jsoniter.Unmarshal(respBody, &got1); err != nil {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
-	assert.Equal(t, reader.ModeUsages, got1.Data)
+	assert.Equal(t, config.ModeUsages, got1.Data)
 
 	var got2 respModeKeyOptions
 	url = "http://127.0.0.1" + rs.address + "/logkit/reader/options"
@@ -37,7 +37,7 @@ func readerAPITest(p *testParam) {
 	if err = jsoniter.Unmarshal(respBody, &got2); err != nil {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
-	assert.Equal(t, reader.ModeKeyOptions, got2.Data)
+	assert.Equal(t, config.ModeKeyOptions, got2.Data)
 
 	var got3 respReaderRet
 	readerConfig := `{
@@ -92,5 +92,5 @@ func readerAPITest(p *testParam) {
 	if err = jsoniter.Unmarshal(respBody, &got5); err != nil {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
-	assert.Equal(t, reader.ModeToolTips, got5.Data)
+	assert.Equal(t, config.ModeToolTips, got5.Data)
 }

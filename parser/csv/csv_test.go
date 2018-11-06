@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/parser"
+	. "github.com/qiniu/logkit/parser/config"
 	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
@@ -29,10 +29,10 @@ var (
 // now: 5	 225912351 ns/op routine = 2  (2MB)
 func Benchmark_ParseLine(b *testing.B) {
 	c := conf.MapConf{}
-	c[parser.KeyParserName] = "testparser"
-	c[parser.KeyParserType] = "csv"
-	c[parser.KeyCSVSchema] = "a long, b string, c float, d jsonmap"
-	c[parser.KeyCSVSplitter] = " "
+	c[KeyParserName] = "testparser"
+	c[KeyParserType] = "csv"
+	c[KeyCSVSchema] = "a long, b string, c float, d jsonmap"
+	c[KeyCSVSplitter] = " "
 	p, _ := NewParser(c)
 
 	var m []Data
@@ -44,11 +44,11 @@ func Benchmark_ParseLine(b *testing.B) {
 
 func Test_Parser(t *testing.T) {
 	c := conf.MapConf{}
-	c[parser.KeyParserName] = "testparser"
-	c[parser.KeyParserType] = "csv"
-	c[parser.KeyCSVSchema] = "a long, b string, c float, d jsonmap,e date"
-	c[parser.KeyCSVSplitter] = " "
-	c[parser.KeyDisableRecordErrData] = "true"
+	c[KeyParserName] = "testparser"
+	c[KeyParserType] = "csv"
+	c[KeyCSVSchema] = "a long, b string, c float, d jsonmap,e date"
+	c[KeyCSVSplitter] = " "
+	c[KeyDisableRecordErrData] = "true"
 	p, err := NewParser(c)
 	if err != nil {
 		t.Error(err)
@@ -95,11 +95,11 @@ func Test_Parser(t *testing.T) {
 
 func Test_CsvParserForErrData(t *testing.T) {
 	c := conf.MapConf{}
-	c[parser.KeyParserName] = "testparser"
-	c[parser.KeyParserType] = "csv"
-	c[parser.KeyCSVSchema] = "a long, b string, c float, d jsonmap,e date"
-	c[parser.KeyCSVSplitter] = " "
-	c[parser.KeyDisableRecordErrData] = "false"
+	c[KeyParserName] = "testparser"
+	c[KeyParserType] = "csv"
+	c[KeyCSVSchema] = "a long, b string, c float, d jsonmap,e date"
+	c[KeyCSVSplitter] = " "
+	c[KeyDisableRecordErrData] = "false"
 	p, err := NewParser(c)
 	if err != nil {
 		t.Error(err)
@@ -140,12 +140,12 @@ func Test_CsvParserForErrData(t *testing.T) {
 
 func Test_CsvParserKeepRawData(t *testing.T) {
 	c := conf.MapConf{}
-	c[parser.KeyParserName] = "testparser"
-	c[parser.KeyParserType] = "csv"
-	c[parser.KeyCSVSchema] = "a long, b string, c float, d jsonmap,e date"
-	c[parser.KeyCSVSplitter] = " "
-	c[parser.KeyDisableRecordErrData] = "false"
-	c[parser.KeyKeepRawData] = "true"
+	c[KeyParserName] = "testparser"
+	c[KeyParserType] = "csv"
+	c[KeyCSVSchema] = "a long, b string, c float, d jsonmap,e date"
+	c[KeyCSVSplitter] = " "
+	c[KeyDisableRecordErrData] = "false"
+	c[KeyKeepRawData] = "true"
 	p, err := NewParser(c)
 	if err != nil {
 		t.Error(err)
@@ -192,10 +192,10 @@ func Test_CsvParserKeepRawData(t *testing.T) {
 
 func Test_Jsonmap(t *testing.T) {
 	c := conf.MapConf{}
-	c[parser.KeyParserName] = "testjsonmap"
-	c[parser.KeyParserType] = "csv"
-	c[parser.KeyCSVSchema] = "a long, d jsonmap,e jsonmap{x string,y long},f jsonmap{z float, ...}"
-	c[parser.KeyCSVSplitter] = " "
+	c[KeyParserName] = "testjsonmap"
+	c[KeyParserType] = "csv"
+	c[KeyCSVSchema] = "a long, d jsonmap,e jsonmap{x string,y long},f jsonmap{z float, ...}"
+	c[KeyCSVSplitter] = " "
 	p, err := NewParser(c)
 	if err != nil {
 		t.Fatal(err)
@@ -227,11 +227,11 @@ func Test_Jsonmap(t *testing.T) {
 
 func Test_CsvParserLabel(t *testing.T) {
 	c := conf.MapConf{}
-	c[parser.KeyParserName] = "testparser"
-	c[parser.KeyParserType] = "csv"
-	c[parser.KeyCSVSchema] = "a long, b string, c float"
-	c[parser.KeyLabels] = "d nb1684"
-	c[parser.KeyCSVSplitter] = " "
+	c[KeyParserName] = "testparser"
+	c[KeyParserType] = "csv"
+	c[KeyCSVSchema] = "a long, b string, c float"
+	c[KeyLabels] = "d nb1684"
+	c[KeyCSVSplitter] = " "
 	p, err := NewParser(c)
 	if err != nil {
 		t.Error(err)
@@ -264,10 +264,10 @@ func Test_CsvParserLabel(t *testing.T) {
 
 func Test_CsvParserDupColumn1(t *testing.T) {
 	c := conf.MapConf{}
-	c[parser.KeyParserName] = "testparser"
-	c[parser.KeyParserType] = "csv"
-	c[parser.KeyCSVSchema] = "a long, a string, c float"
-	c[parser.KeyCSVSplitter] = " "
+	c[KeyParserName] = "testparser"
+	c[KeyParserType] = "csv"
+	c[KeyCSVSchema] = "a long, a string, c float"
+	c[KeyCSVSplitter] = " "
 	_, err := NewParser(c)
 	if err == nil {
 		t.Error("there must be an error about duplicate key a")
@@ -320,7 +320,7 @@ func Test_convertValue(t *testing.T) {
 }
 
 func TestField_MakeValue(t *testing.T) {
-	tm, err := makeValue("2017/01/02 15:00:00", parser.TypeDate, 1)
+	tm, err := makeValue("2017/01/02 15:00:00", TypeDate, 1)
 	if err != nil {
 		t.Error(err)
 	}
@@ -333,10 +333,10 @@ func TestField_MakeValue(t *testing.T) {
 
 func TestRename(t *testing.T) {
 	c := conf.MapConf{}
-	c[parser.KeyParserName] = "testRename"
-	c[parser.KeyParserType] = "csv"
-	c[parser.KeyCSVSchema] = "logType string, service string, timestamp string, method string, path string, reqHeader jsonmap, nullStr string, code long, resBody jsonmap, info string, t1 long, t2 long"
-	c[parser.KeyCSVSplitter] = "	"
+	c[KeyParserName] = "testRename"
+	c[KeyParserType] = "csv"
+	c[KeyCSVSchema] = "logType string, service string, timestamp string, method string, path string, reqHeader jsonmap, nullStr string, code long, resBody jsonmap, info string, t1 long, t2 long"
+	c[KeyCSVSplitter] = "	"
 	p, err := NewParser(c)
 	assert.NoError(t, err)
 	lines := []string{
@@ -382,7 +382,7 @@ func TestRename(t *testing.T) {
 		}
 	}
 
-	c[parser.KeyCSVAutoRename] = "true"
+	c[KeyCSVAutoRename] = "true"
 	p, err = NewParser(c)
 	assert.NoError(t, err)
 	gotDatas, err = p.Parse(lines)
@@ -429,7 +429,7 @@ func TestRename(t *testing.T) {
 func TestJSONMap(t *testing.T) {
 	fd := field{
 		name:     "c",
-		dataType: parser.TypeJSONMap,
+		dataType: TypeJSONMap,
 	}
 	testx := "999"
 	data, err := fd.ValueParse(testx, 0)
@@ -446,11 +446,11 @@ func TestGetUnmachedMessage(t *testing.T) {
 
 func TestAllMoreName(t *testing.T) {
 	c := conf.MapConf{}
-	c[parser.KeyParserName] = "TestAllMoreName"
-	c[parser.KeyParserType] = "csv"
-	c[parser.KeyCSVSchema] = "logType string"
-	c[parser.KeyCSVSplitter] = "|"
-	c[parser.KeyCSVAllowMore] = "ha"
+	c[KeyParserName] = "TestAllMoreName"
+	c[KeyParserType] = "csv"
+	c[KeyCSVSchema] = "logType string"
+	c[KeyCSVSplitter] = "|"
+	c[KeyCSVAllowMore] = "ha"
 	pp, err := NewParser(c)
 	assert.NoError(t, err)
 	datas, err := pp.Parse([]string{"a|b|c|d"})
@@ -470,11 +470,11 @@ func TestAllMoreName(t *testing.T) {
 
 func TestAllowLess(t *testing.T) {
 	c := conf.MapConf{}
-	c[parser.KeyParserName] = "TestAllowLess"
-	c[parser.KeyParserType] = "csv"
-	c[parser.KeyCSVSchema] = "logType string,a long,b float,c string"
-	c[parser.KeyCSVSplitter] = "|"
-	c[parser.KeyCSVAllowMore] = "ha"
+	c[KeyParserName] = "TestAllowLess"
+	c[KeyParserType] = "csv"
+	c[KeyCSVSchema] = "logType string,a long,b float,c string"
+	c[KeyCSVSplitter] = "|"
+	c[KeyCSVAllowMore] = "ha"
 	pp, err := NewParser(c)
 	assert.NoError(t, err)
 	datas, err := pp.Parse([]string{"a|1|1.2|d"})
@@ -507,12 +507,12 @@ func TestAllowLess(t *testing.T) {
 
 func TestIgnoreField(t *testing.T) {
 	c := conf.MapConf{}
-	c[parser.KeyParserName] = "TestIgnoreField"
-	c[parser.KeyParserType] = "csv"
-	c[parser.KeyCSVSchema] = "logType string,a long,b float,c string"
-	c[parser.KeyCSVSplitter] = "|"
-	c[parser.KeyCSVIgnoreInvalidField] = "true"
-	c[parser.KeyCSVAllowNoMatch] = "false"
+	c[KeyParserName] = "TestIgnoreField"
+	c[KeyParserType] = "csv"
+	c[KeyCSVSchema] = "logType string,a long,b float,c string"
+	c[KeyCSVSplitter] = "|"
+	c[KeyCSVIgnoreInvalidField] = "true"
+	c[KeyCSVAllowNoMatch] = "false"
 	pp, err := NewParser(c)
 	assert.NoError(t, err)
 	datas, err := pp.Parse([]string{"a|1.2|1.2|d"})
@@ -531,11 +531,11 @@ func TestIgnoreField(t *testing.T) {
 
 func TestAllowNotMatch(t *testing.T) {
 	c := conf.MapConf{}
-	c[parser.KeyParserName] = "TestAllowNotMatch"
-	c[parser.KeyParserType] = "csv"
-	c[parser.KeyCSVSchema] = "logType string,a long,b float,c string"
-	c[parser.KeyCSVSplitter] = "|"
-	c[parser.KeyCSVAllowNoMatch] = "true"
+	c[KeyParserName] = "TestAllowNotMatch"
+	c[KeyParserType] = "csv"
+	c[KeyCSVSchema] = "logType string,a long,b float,c string"
+	c[KeyCSVSplitter] = "|"
+	c[KeyCSVAllowNoMatch] = "true"
 	pp, err := NewParser(c)
 	assert.NoError(t, err)
 	datas, err := pp.Parse([]string{"a|1|1.2|d|e"})
@@ -555,10 +555,10 @@ func TestAllowNotMatch(t *testing.T) {
 
 func TestCsvlastempty(t *testing.T) {
 	c := conf.MapConf{}
-	c[parser.KeyParserName] = "TestCsvlastempty"
-	c[parser.KeyParserType] = "csv"
-	c[parser.KeyCSVSchema] = "logType string,a long,b float,c string"
-	c[parser.KeyCSVSplitter] = "\t"
+	c[KeyParserName] = "TestCsvlastempty"
+	c[KeyParserType] = "csv"
+	c[KeyCSVSchema] = "logType string,a long,b float,c string"
+	c[KeyCSVSplitter] = "\t"
 	pp, err := NewParser(c)
 	assert.NoError(t, err)
 	datas, err := pp.Parse([]string{"a\t1\t1.2\t "})

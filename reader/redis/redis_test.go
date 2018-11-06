@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 )
 
 func TestRedisReaderWithString(t *testing.T) {
@@ -22,8 +22,8 @@ func TestRedisReaderWithString(t *testing.T) {
 	assert.NoError(t, err)
 
 	conf := conf.MapConf{
-		reader.KeyRedisDataType: reader.DataTypeString,
-		reader.KeyRedisKey:      "test_str",
+		KeyRedisDataType: DataTypeString,
+		KeyRedisKey:      "test_str",
 	}
 
 	reader, err := NewReader(nil, conf)
@@ -45,8 +45,8 @@ func TestRedisReaderWithList(t *testing.T) {
 	assert.NoError(t, err)
 
 	conf := conf.MapConf{
-		reader.KeyRedisDataType: reader.DataTypeList,
-		reader.KeyRedisKey:      "test_list",
+		KeyRedisDataType: DataTypeList,
+		KeyRedisKey:      "test_list",
 	}
 
 	var datas []string
@@ -75,9 +75,9 @@ func TestRedisReaderWithHash(t *testing.T) {
 	assert.NoError(t, err)
 
 	conf := conf.MapConf{
-		reader.KeyRedisDataType: reader.DataTypeHash,
-		reader.KeyRedisKey:      "test_hash",
-		reader.KeyRedisHashArea: "a",
+		KeyRedisDataType: DataTypeHash,
+		KeyRedisKey:      "test_hash",
+		KeyRedisHashArea: "a",
 	}
 
 	reader, err := NewReader(nil, conf)
@@ -99,8 +99,8 @@ func TestRedisReaderWithSet(t *testing.T) {
 	assert.NoError(t, err)
 
 	conf := conf.MapConf{
-		reader.KeyRedisDataType: reader.DataTypeSet,
-		reader.KeyRedisKey:      "test_set",
+		KeyRedisDataType: DataTypeSet,
+		KeyRedisKey:      "test_set",
 	}
 
 	var datas []string
@@ -141,8 +141,8 @@ func TestRedisReaderWithSortedSet(t *testing.T) {
 	assert.NoError(t, err)
 
 	conf := conf.MapConf{
-		reader.KeyRedisDataType: reader.DataTypeSortedSet,
-		reader.KeyRedisKey:      "test_sortedset",
+		KeyRedisDataType: DataTypeSortedSet,
+		KeyRedisKey:      "test_sortedset",
 	}
 
 	var datas []string
@@ -170,16 +170,16 @@ func TestNewRedisReader(t *testing.T) {
 
 	//check key's type
 	con := conf.MapConf{
-		reader.KeyRedisDataType: reader.DataTypeString,
-		reader.KeyRedisKey:      "test_str",
+		KeyRedisDataType: DataTypeString,
+		KeyRedisKey:      "test_str",
 	}
 
 	_, err = NewReader(nil, con)
 	assert.NoError(t, err)
 
 	con = conf.MapConf{
-		reader.KeyRedisDataType: reader.DataTypeList,
-		reader.KeyRedisKey:      "test_str",
+		KeyRedisDataType: DataTypeList,
+		KeyRedisKey:      "test_str",
 	}
 	_, err = NewReader(nil, con)
 	assert.Error(t, err)

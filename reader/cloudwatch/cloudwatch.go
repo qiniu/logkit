@@ -21,6 +21,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -88,25 +89,25 @@ type (
 )
 
 func init() {
-	reader.RegisterConstructor(reader.ModeCloudWatch, NewReader)
+	reader.RegisterConstructor(ModeCloudWatch, NewReader)
 }
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
-	region, err := conf.GetString(reader.KeyRegion)
+	region, err := conf.GetString(KeyRegion)
 	if err != nil {
 		return nil, err
 	}
-	namespace, err := conf.GetString(reader.KeyNamespace)
+	namespace, err := conf.GetString(KeyNamespace)
 	if err != nil {
 		return nil, err
 	}
 
-	ak, _ := conf.GetPasswordEnvStringOr(reader.KeyAWSAccessKey, "")
-	sk, _ := conf.GetPasswordEnvStringOr(reader.KeyAWSSecretKey, "")
-	roleARN, _ := conf.GetStringOr(reader.KeyRoleArn, "")
-	token, _ := conf.GetPasswordEnvStringOr(reader.KeyAWSToken, "")
-	profile, _ := conf.GetPasswordEnvStringOr(reader.KeyAWSProfile, "")
-	sharedCredentialFile, _ := conf.GetStringOr(reader.KeySharedCredentialFile, "")
+	ak, _ := conf.GetPasswordEnvStringOr(KeyAWSAccessKey, "")
+	sk, _ := conf.GetPasswordEnvStringOr(KeyAWSSecretKey, "")
+	roleARN, _ := conf.GetStringOr(KeyRoleArn, "")
+	token, _ := conf.GetPasswordEnvStringOr(KeyAWSToken, "")
+	profile, _ := conf.GetPasswordEnvStringOr(KeyAWSProfile, "")
+	sharedCredentialFile, _ := conf.GetStringOr(KeySharedCredentialFile, "")
 	credentialConfig := &CredentialConfig{
 		Region:    region,
 		AccessKey: ak,
@@ -121,20 +122,20 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		log.Errorf("aws Credentials err %v", err)
 		return nil, err
 	}
-	cacheTTL, _ := conf.GetStringOr(reader.KeyCacheTTL, "1hr")
+	cacheTTL, _ := conf.GetStringOr(KeyCacheTTL, "1hr")
 	ttl, err := time.ParseDuration(cacheTTL)
 	if err != nil {
 		return nil, fmt.Errorf("parse cachettl %v error %v", cacheTTL, err)
 	}
-	interval, _ := conf.GetStringOr(reader.KeyCollectInterval, "5m")
+	interval, _ := conf.GetStringOr(KeyCollectInterval, "5m")
 	collectInteval, err := time.ParseDuration(interval)
 	if err != nil {
 		return nil, fmt.Errorf("parse interval %v error %v", interval, err)
 	}
-	rateLimit, _ := conf.GetInt64Or(reader.KeyRateLimit, 200)
-	metrics, _ := conf.GetStringListOr(reader.KeyMetrics, []string{})
+	rateLimit, _ := conf.GetInt64Or(KeyRateLimit, 200)
+	metrics, _ := conf.GetStringListOr(KeyMetrics, []string{})
 	var dimensions []*Dimension
-	dimensionList, _ := conf.GetStringListOr(reader.KeyDimension, []string{})
+	dimensionList, _ := conf.GetStringListOr(KeyDimension, []string{})
 	for _, v := range dimensionList {
 		v = strings.TrimSpace(v)
 		sks := strings.Fields(v)
@@ -148,12 +149,12 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		}
 		dimensions = append(dimensions, &Dimension{name, value})
 	}
-	delayStr, _ := conf.GetStringOr(reader.KeyDelay, "5m")
+	delayStr, _ := conf.GetStringOr(KeyDelay, "5m")
 	delay, err := time.ParseDuration(delayStr)
 	if err != nil {
 		return nil, fmt.Errorf("parse delay %v error %v", delayStr, err)
 	}
-	periodStr, _ := conf.GetStringOr(reader.KeyPeriod, "5m")
+	periodStr, _ := conf.GetStringOr(KeyPeriod, "5m")
 	period, err := time.ParseDuration(periodStr)
 	if err != nil {
 		return nil, fmt.Errorf("parse period %v error %v", periodStr, err)
@@ -169,8 +170,8 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 
 	return &Reader{
 		meta:            meta,
-		status:          reader.StatusInit,
-		routineStatus:   reader.StatusInit,
+		status:          StatusInit,
+		routineStatus:   StatusInit,
 		stopChan:        make(chan struct{}),
 		readChan:        make(chan readInfo),
 		errChan:         make(chan error),
@@ -187,11 +188,11 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 }
 
 func (r *Reader) isStopping() bool {
-	return atomic.LoadInt32(&r.status) == reader.StatusStopping
+	return atomic.LoadInt32(&r.status) == StatusStopping
 }
 
 func (r *Reader) hasStopped() bool {
-	return atomic.LoadInt32(&r.status) == reader.StatusStopped
+	return atomic.LoadInt32(&r.status) == StatusStopped
 }
 
 func (r *Reader) Name() string {
@@ -217,7 +218,7 @@ func (r *Reader) sendError(err error) {
 func (r *Reader) Start() error {
 	if r.isStopping() || r.hasStopped() {
 		return errors.New("reader is stopping or has stopped")
-	} else if !atomic.CompareAndSwapInt32(&r.status, reader.StatusInit, reader.StatusRunning) {
+	} else if !atomic.CompareAndSwapInt32(&r.status, StatusInit, StatusRunning) {
 		log.Warnf("Runner[%v] %q daemon has already started and is running", r.meta.RunnerName, r.Name())
 		return nil
 	}
@@ -233,7 +234,7 @@ func (r *Reader) Start() error {
 
 			select {
 			case <-r.stopChan:
-				atomic.StoreInt32(&r.status, reader.StatusStopped)
+				atomic.StoreInt32(&r.status, StatusStopped)
 				log.Infof("Runner[%v] %q daemon has stopped from running", r.meta.RunnerName, r.Name())
 				return
 			case <-ticker.C:
@@ -269,7 +270,7 @@ func (r *Reader) ReadData() (Data, int64, error) {
 func (_ *Reader) SyncMeta() {}
 
 func (r *Reader) Close() error {
-	if !atomic.CompareAndSwapInt32(&r.status, reader.StatusRunning, reader.StatusStopping) {
+	if !atomic.CompareAndSwapInt32(&r.status, StatusRunning, StatusStopping) {
 		log.Warnf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
 		return nil
 	}
@@ -277,7 +278,7 @@ func (r *Reader) Close() error {
 	close(r.stopChan)
 
 	// 如果此时没有 routine 正在运行，则在此处关闭数据管道，否则由 routine 在退出时负责关闭
-	if atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusInit, reader.StatusStopping) {
+	if atomic.CompareAndSwapInt32(&r.routineStatus, StatusInit, StatusStopping) {
 		close(r.readChan)
 		close(r.errChan)
 	}
@@ -357,7 +358,7 @@ func SelectMetrics(c *Reader) ([]*cloudwatch.Metric, error) {
 
 func (r *Reader) Gather() error {
 	// 未在准备状态（StatusInit）时无法执行此次任务
-	if !atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusInit, reader.StatusRunning) {
+	if !atomic.CompareAndSwapInt32(&r.routineStatus, StatusInit, StatusRunning) {
 		if r.isStopping() || r.hasStopped() {
 			log.Warnf("Runner[%v] %q daemon has stopped, this task does not need to be executed and is skipped this time", r.meta.RunnerName, r.Name())
 		} else {
@@ -368,13 +369,13 @@ func (r *Reader) Gather() error {
 	defer func() {
 		// 如果 reader 在 routine 运行时关闭，则需要此 routine 负责关闭数据管道
 		if r.isStopping() || r.hasStopped() {
-			if atomic.CompareAndSwapInt32(&r.routineStatus, reader.StatusRunning, reader.StatusStopping) {
+			if atomic.CompareAndSwapInt32(&r.routineStatus, StatusRunning, StatusStopping) {
 				close(r.readChan)
 				close(r.errChan)
 			}
 			return
 		}
-		atomic.StoreInt32(&r.routineStatus, reader.StatusInit)
+		atomic.StoreInt32(&r.routineStatus, StatusInit)
 	}()
 
 	metrics, err := SelectMetrics(r)
@@ -462,7 +463,7 @@ func (r *Reader) gatherMetric(metric *cloudwatch.Metric, now time.Time) ([]readI
 		for _, d := range metric.Dimensions {
 			data[snakeCase(*d.Name)] = *d.Value
 		}
-		data[reader.KeyTimestamp] = *point.Timestamp
+		data[KeyTimestamp] = *point.Timestamp
 
 		if point.Average != nil {
 			data[formatKey(*metric.MetricName, cloudwatch.StatisticAverage)] = *point.Average

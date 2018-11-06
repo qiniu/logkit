@@ -18,7 +18,7 @@ import (
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/sender"
+	. "github.com/qiniu/logkit/sender/config"
 	mockPandora "github.com/qiniu/logkit/sender/mock_pandora"
 	"github.com/qiniu/logkit/times"
 	. "github.com/qiniu/logkit/utils/models"
@@ -283,7 +283,7 @@ func TestUUIDPandoraSender(t *testing.T) {
 	if !strings.Contains(pandora.Body, "x1=hh") {
 		t.Error("not x1 find error")
 	}
-	if !strings.Contains(pandora.Body, sender.PandoraUUID) {
+	if !strings.Contains(pandora.Body, PandoraUUID) {
 		t.Error("no uuid found")
 	}
 }
@@ -413,7 +413,7 @@ func TestSuppurtedTimeFormat(t *testing.T) {
 		assert.NoError(t, err)
 		expTimeStamp := expTime.UnixNano()
 
-		assert.Equal(t, sender.TimestampPrecision, len(strconv.FormatInt(gotTimeStamp, 10)))
+		assert.Equal(t, TimestampPrecision, len(strconv.FormatInt(gotTimeStamp, 10)))
 		assert.Equal(t, force, gotTimeStamp-expTimeStamp)
 	}
 }
@@ -887,7 +887,7 @@ func TestPandoraSenderTime(t *testing.T) {
 	if len(params) == 2 {
 		logkitSendTime := strings.Split(params[0], "=")
 		if len(logkitSendTime) == 2 {
-			assert.Equal(t, sender.KeyLogkitSendTime, logkitSendTime[0])
+			assert.Equal(t, KeyLogkitSendTime, logkitSendTime[0])
 			lastTime, err = time.Parse(time.RFC3339Nano, logkitSendTime[1])
 			assert.NoError(t, err)
 		} else {
@@ -920,7 +920,7 @@ func TestPandoraSenderTime(t *testing.T) {
 	if len(params) == 2 {
 		logkitSendTime := strings.Split(params[0], "=")
 		if len(logkitSendTime) == 2 {
-			assert.Equal(t, sender.KeyLogkitSendTime, logkitSendTime[0])
+			assert.Equal(t, KeyLogkitSendTime, logkitSendTime[0])
 			curTime, err = time.Parse(time.RFC3339Nano, logkitSendTime[1])
 			assert.NoError(t, err)
 		} else {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	. "github.com/qiniu/logkit/parser/config"
 	"github.com/qiniu/logkit/times"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -28,7 +29,7 @@ const (
 )
 
 func init() {
-	parser.RegisterConstructor(parser.TypeKafkaRest, NewParser)
+	parser.RegisterConstructor(TypeKafkaRest, NewParser)
 }
 
 type Parser struct {
@@ -43,7 +44,7 @@ func (krp *Parser) Name() string {
 }
 
 func (krp *Parser) Type() string {
-	return parser.TypeKafkaRest
+	return TypeKafkaRest
 }
 
 func (krp *Parser) Parse(lines []string) ([]Data, error) {
@@ -58,13 +59,13 @@ func (krp *Parser) Parse(lines []string) ([]Data, error) {
 			if len(fields) == 16 && fields[2] == "INFO" {
 				data := krp.parseRequestLog(fields)
 				if krp.keepRawData {
-					data[parser.KeyRawData] = line
+					data[KeyRawData] = line
 				}
 				datas = append(datas, data)
 			} else if (len(fields) > 0 && fields[2] == "ERROR") || (len(fields) > 0 && fields[2] == "WARN") {
 				data := krp.parseAbnormalLog(fields)
 				if krp.keepRawData {
-					data[parser.KeyRawData] = line
+					data[KeyRawData] = line
 				}
 				datas = append(datas, data)
 			}
@@ -77,7 +78,7 @@ func (krp *Parser) Parse(lines []string) ([]Data, error) {
 				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			}
 			if krp.keepRawData {
-				errData[parser.KeyRawData] = line
+				errData[KeyRawData] = line
 			}
 			if !krp.disableRecordErrData || krp.keepRawData {
 				datas = append(datas, errData)
@@ -123,9 +124,9 @@ func (krp *Parser) parseAbnormalLog(fields []string) Data {
 }
 
 func NewParser(c conf.MapConf) (parser.Parser, error) {
-	name, _ := c.GetStringOr(parser.KeyParserName, "")
-	labelList, _ := c.GetStringListOr(parser.KeyLabels, []string{})
-	keepRawData, _ := c.GetBoolOr(parser.KeyKeepRawData, false)
+	name, _ := c.GetStringOr(KeyParserName, "")
+	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
+	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)
 	nameMap := map[string]struct{}{
 		KEY_SRC_IP:   struct{}{},
 		KEY_METHOD:   struct{}{},
@@ -137,7 +138,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	}
 	labels := parser.GetLabels(labelList, nameMap)
 
-	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
+	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
 
 	return &Parser{
 		name:                 name,

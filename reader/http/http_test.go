@@ -15,6 +15,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/reader/test"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -23,10 +24,10 @@ var testData []string
 
 func getHttpReader(port string) (*Reader, error) {
 	readConf := conf.MapConf{
-		reader.KeyMetaPath: MetaDir,
-		reader.KeyFileDone: MetaDir,
-		reader.KeyMode:     reader.ModeHTTP,
-		KeyRunnerName:      "TestNewHttpReader",
+		KeyMetaPath:   MetaDir,
+		KeyFileDone:   MetaDir,
+		KeyMode:       ModeHTTP,
+		KeyRunnerName: "TestNewHttpReader",
 	}
 	meta, err := reader.NewMetaWithConf(readConf)
 	if err != nil {
@@ -34,8 +35,8 @@ func getHttpReader(port string) (*Reader, error) {
 	}
 
 	c := conf.MapConf{
-		reader.KeyHTTPServiceAddress: "127.0.0.1:" + port,
-		reader.KeyHTTPServicePath:    "/logkit/aaa,/logkit/bbb,/logkit/ccc,/logkit/ddd",
+		KeyHTTPServiceAddress: "127.0.0.1:" + port,
+		KeyHTTPServicePath:    "/logkit/aaa,/logkit/bbb,/logkit/ccc,/logkit/ddd",
 	}
 	reader, err := NewReader(meta, c)
 	httpReader := reader.(*Reader)

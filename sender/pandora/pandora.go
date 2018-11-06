@@ -24,6 +24,7 @@ import (
 	logkitconf "github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/sender"
+	. "github.com/qiniu/logkit/sender/config"
 	"github.com/qiniu/logkit/times"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
@@ -136,100 +137,100 @@ type PandoraOption struct {
 var PandoraMaxBatchSize = 2 * 1024 * 1024
 
 func init() {
-	sender.RegisterConstructor(sender.TypePandora, NewSender)
+	sender.RegisterConstructor(TypePandora, NewSender)
 }
 
 // pandora sender
 func NewSender(conf logkitconf.MapConf) (pandoraSender sender.Sender, err error) {
-	repoName, err := conf.GetString(sender.KeyPandoraRepoName)
+	repoName, err := conf.GetString(KeyPandoraRepoName)
 	if err != nil {
 		return
 	}
 	if repoName == "" {
 		return nil, errors.New("repoName is empty")
 	}
-	region, err := conf.GetString(sender.KeyPandoraRegion)
+	region, err := conf.GetString(KeyPandoraRegion)
 	if err != nil {
 		return
 	}
-	host, err := conf.GetString(sender.KeyPandoraHost)
+	host, err := conf.GetString(KeyPandoraHost)
 	if err != nil {
 		return
 	}
-	ak, _ := conf.GetString(sender.KeyPandoraAk)
+	ak, _ := conf.GetString(KeyPandoraAk)
 	akFromEnv := logkitconf.GetEnv(ak)
 	if akFromEnv == "" {
 		akFromEnv = ak
 	}
 
-	sk, _ := conf.GetString(sender.KeyPandoraSk)
+	sk, _ := conf.GetString(KeyPandoraSk)
 	skFromEnv := logkitconf.GetEnv(sk)
 	if skFromEnv == "" {
 		skFromEnv = sk
 	}
 
-	workflowName, _ := conf.GetStringOr(sender.KeyPandoraWorkflowName, "")
-	useragent, _ := conf.GetStringOr(sender.InnerUserAgent, "")
-	schema, _ := conf.GetStringOr(sender.KeyPandoraSchema, "")
-	name, _ := conf.GetStringOr(sender.KeyName, fmt.Sprintf("pandoraSender:(%v,repo:%v,region:%v)", host, repoName, region))
-	updateInterval, _ := conf.GetInt64Or(sender.KeyPandoraSchemaUpdateInterval, 60)
-	schemaFree, _ := conf.GetBoolOr(sender.KeyPandoraSchemaFree, false)
-	forceMicrosecond, _ := conf.GetBoolOr(sender.KeyForceMicrosecond, false)
-	autoCreateSchema, _ := conf.GetStringOr(sender.KeyPandoraAutoCreate, "")
-	reqRateLimit, _ := conf.GetInt64Or(sender.KeyRequestRateLimit, 0)
-	flowRateLimit, _ := conf.GetInt64Or(sender.KeyFlowRateLimit, 0)
-	gzip, _ := conf.GetBoolOr(sender.KeyPandoraGzip, false)
-	uuid, _ := conf.GetBoolOr(sender.KeyPandoraUUID, false)
-	withIp, _ := conf.GetBoolOr(sender.KeyPandoraWithIP, false)
-	runnerName, _ := conf.GetStringOr(KeyRunnerName, sender.UnderfinedRunnerName)
-	extraInfo, _ := conf.GetBoolOr(sender.KeyPandoraExtraInfo, false)
+	workflowName, _ := conf.GetStringOr(KeyPandoraWorkflowName, "")
+	useragent, _ := conf.GetStringOr(InnerUserAgent, "")
+	schema, _ := conf.GetStringOr(KeyPandoraSchema, "")
+	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("pandoraSender:(%v,repo:%v,region:%v)", host, repoName, region))
+	updateInterval, _ := conf.GetInt64Or(KeyPandoraSchemaUpdateInterval, 60)
+	schemaFree, _ := conf.GetBoolOr(KeyPandoraSchemaFree, false)
+	forceMicrosecond, _ := conf.GetBoolOr(KeyForceMicrosecond, false)
+	autoCreateSchema, _ := conf.GetStringOr(KeyPandoraAutoCreate, "")
+	reqRateLimit, _ := conf.GetInt64Or(KeyRequestRateLimit, 0)
+	flowRateLimit, _ := conf.GetInt64Or(KeyFlowRateLimit, 0)
+	gzip, _ := conf.GetBoolOr(KeyPandoraGzip, false)
+	uuid, _ := conf.GetBoolOr(KeyPandoraUUID, false)
+	withIp, _ := conf.GetBoolOr(KeyPandoraWithIP, false)
+	runnerName, _ := conf.GetStringOr(KeyRunnerName, UnderfinedRunnerName)
+	extraInfo, _ := conf.GetBoolOr(KeyPandoraExtraInfo, false)
 
-	enableLogdb, _ := conf.GetBoolOr(sender.KeyPandoraEnableLogDB, false)
-	logdbreponame, _ := conf.GetStringOr(sender.KeyPandoraLogDBName, repoName)
-	logdbhost, _ := conf.GetStringOr(sender.KeyPandoraLogDBHost, "")
-	logdbAnalyzer, _ := conf.GetStringListOr(sender.KeyPandoraLogDBAnalyzer, []string{})
+	enableLogdb, _ := conf.GetBoolOr(KeyPandoraEnableLogDB, false)
+	logdbreponame, _ := conf.GetStringOr(KeyPandoraLogDBName, repoName)
+	logdbhost, _ := conf.GetStringOr(KeyPandoraLogDBHost, "")
+	logdbAnalyzer, _ := conf.GetStringListOr(KeyPandoraLogDBAnalyzer, []string{})
 	analyzerMap := convertAnalyzerMap(logdbAnalyzer)
 
-	enableTsdb, _ := conf.GetBoolOr(sender.KeyPandoraEnableTSDB, false)
-	tsdbReponame, _ := conf.GetStringOr(sender.KeyPandoraTSDBName, repoName)
-	tsdbSeriesName, _ := conf.GetStringOr(sender.KeyPandoraTSDBSeriesName, tsdbReponame)
-	tsdbHost, _ := conf.GetStringOr(sender.KeyPandoraTSDBHost, "")
-	tsdbTimestamp, _ := conf.GetStringOr(sender.KeyPandoraTSDBTimeStamp, "")
-	seriesTags, _ := conf.GetStringListOr(sender.KeyPandoraTSDBSeriesTags, []string{})
+	enableTsdb, _ := conf.GetBoolOr(KeyPandoraEnableTSDB, false)
+	tsdbReponame, _ := conf.GetStringOr(KeyPandoraTSDBName, repoName)
+	tsdbSeriesName, _ := conf.GetStringOr(KeyPandoraTSDBSeriesName, tsdbReponame)
+	tsdbHost, _ := conf.GetStringOr(KeyPandoraTSDBHost, "")
+	tsdbTimestamp, _ := conf.GetStringOr(KeyPandoraTSDBTimeStamp, "")
+	seriesTags, _ := conf.GetStringListOr(KeyPandoraTSDBSeriesTags, []string{})
 	tsdbSeriesTags := map[string][]string{tsdbSeriesName: seriesTags}
 
-	enableKodo, _ := conf.GetBoolOr(sender.KeyPandoraEnableKodo, false)
-	kodobucketName, _ := conf.GetStringOr(sender.KeyPandoraKodoBucketName, repoName)
-	email, _ := conf.GetStringOr(sender.KeyPandoraEmail, "")
-	format, _ := conf.GetStringOr(sender.KeyPandoraKodoCompressPrefix, "parquet")
-	prefix, _ := conf.GetStringOr(sender.KeyPandoraKodoFilePrefix, "logkitauto/date=$(year)-$(mon)-$(day)/hour=$(hour)/min=$(min)/$(sec)")
-	compress, _ := conf.GetBoolOr(sender.KeyPandoraKodoGzip, false)
-	kodoRotateStrategy, _ := conf.GetStringOr(sender.KeyPandoraKodoRotateStrategy, "interval")
-	kodoRotateSize, _ := conf.GetIntOr(sender.KeyPandoraKodoRotateSize, pipeline.DefaultLogkitRotateSize)
+	enableKodo, _ := conf.GetBoolOr(KeyPandoraEnableKodo, false)
+	kodobucketName, _ := conf.GetStringOr(KeyPandoraKodoBucketName, repoName)
+	email, _ := conf.GetStringOr(KeyPandoraEmail, "")
+	format, _ := conf.GetStringOr(KeyPandoraKodoCompressPrefix, "parquet")
+	prefix, _ := conf.GetStringOr(KeyPandoraKodoFilePrefix, "logkitauto/date=$(year)-$(mon)-$(day)/hour=$(hour)/min=$(min)/$(sec)")
+	compress, _ := conf.GetBoolOr(KeyPandoraKodoGzip, false)
+	kodoRotateStrategy, _ := conf.GetStringOr(KeyPandoraKodoRotateStrategy, "interval")
+	kodoRotateSize, _ := conf.GetIntOr(KeyPandoraKodoRotateSize, pipeline.DefaultLogkitRotateSize)
 	kodoRotateSize = kodoRotateSize * 1024
-	kodoRotateInterval, _ := conf.GetIntOr(sender.KeyPandoraKodoRotateInterval, 10*60)
-	kodoFileRetention, _ := conf.GetIntOr(sender.KeyPandoraKodoFileRetention, 0)
+	kodoRotateInterval, _ := conf.GetIntOr(KeyPandoraKodoRotateInterval, 10*60)
+	kodoFileRetention, _ := conf.GetIntOr(KeyPandoraKodoFileRetention, 0)
 	kodoFileType := 0
-	if v, err := conf.GetBoolOr(sender.KeyPandoraKodoLowFreqFile, false); err == nil && v {
+	if v, err := conf.GetBoolOr(KeyPandoraKodoLowFreqFile, false); err == nil && v {
 		kodoFileType = 1
 	}
 
-	forceconvert, _ := conf.GetBoolOr(sender.KeyForceDataConvert, false)
-	ignoreInvalidField, _ := conf.GetBoolOr(sender.KeyIgnoreInvalidField, true)
-	autoconvertDate, _ := conf.GetBoolOr(sender.KeyPandoraAutoConvertDate, true)
-	logkitSendTime, _ := conf.GetBoolOr(sender.KeyLogkitSendTime, true)
-	isMetrics, _ := conf.GetBoolOr(sender.KeyIsMetrics, false)
-	numberUseFloat, _ := conf.GetBoolOr(sender.KeyNumberUseFloat, false)
-	unescape, _ := conf.GetBoolOr(sender.KeyPandoraUnescape, false)
-	insecureServer, _ := conf.GetBoolOr(sender.KeyInsecureServer, false)
-	timeoutDur, _ := conf.GetStringOr(sender.KeyTimeout, "30s")
+	forceconvert, _ := conf.GetBoolOr(KeyForceDataConvert, false)
+	ignoreInvalidField, _ := conf.GetBoolOr(KeyIgnoreInvalidField, true)
+	autoconvertDate, _ := conf.GetBoolOr(KeyPandoraAutoConvertDate, true)
+	logkitSendTime, _ := conf.GetBoolOr(KeyLogkitSendTime, true)
+	isMetrics, _ := conf.GetBoolOr(KeyIsMetrics, false)
+	numberUseFloat, _ := conf.GetBoolOr(KeyNumberUseFloat, false)
+	unescape, _ := conf.GetBoolOr(KeyPandoraUnescape, false)
+	insecureServer, _ := conf.GetBoolOr(KeyInsecureServer, false)
+	timeoutDur, _ := conf.GetStringOr(KeyTimeout, "30s")
 	timeout, err := time.ParseDuration(timeoutDur)
 	if err != nil {
 		return nil, err
 	}
 
-	sendType, _ := conf.GetStringOr(sender.KeyPandoraSendType, SendTypeNormal)
-	description, _ := conf.GetStringOr(sender.KeyPandoraDescription, "")
+	sendType, _ := conf.GetStringOr(KeyPandoraSendType, SendTypeNormal)
+	description, _ := conf.GetStringOr(KeyPandoraDescription, "")
 
 	var subErr error
 	var tokens Tokens
@@ -724,10 +725,10 @@ func convertDate(v interface{}, option forceMicrosecondOption) (d interface{}, e
 		s = alignTimestamp(s, option.nanosecond)
 	}
 	timestampStr := strconv.FormatInt(s, 10)
-	for i := len(timestampStr); i < sender.TimestampPrecision; i++ {
+	for i := len(timestampStr); i < TimestampPrecision; i++ {
 		timestampStr += "0"
 	}
-	timestampStr = timestampStr[0:sender.TimestampPrecision]
+	timestampStr = timestampStr[0:TimestampPrecision]
 	if s, err = strconv.ParseInt(timestampStr, 10, 64); err != nil {
 		return v, err
 	}
@@ -742,7 +743,7 @@ func alignTimestamp(t int64, nanosecond uint64) int64 {
 	for i := 0; t%10 == 0; i++ {
 		t /= 10
 	}
-	offset := sender.TimestampPrecision - len(strconv.FormatInt(t, 10))
+	offset := TimestampPrecision - len(strconv.FormatInt(t, 10))
 	dividend := int64(math.Pow10(offset))
 	if offset > 0 {
 		t = t * dividend //补齐相应的位数
@@ -869,7 +870,7 @@ func (s *Sender) generatePoint(data Data) (point Data) {
 	}
 	if s.opt.uuid {
 		uuid, _ := gouuid.NewV4()
-		point[sender.PandoraUUID] = uuid.String()
+		point[PandoraUUID] = uuid.String()
 	}
 	/*
 		data中剩余的值，但是在schema中不存在的，根据defaultAll和schemaFree判断是否增加。
@@ -1051,7 +1052,7 @@ func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 			continue
 		}
 		if s.opt.logkitSendTime {
-			d[sender.KeyLogkitSendTime] = now
+			d[KeyLogkitSendTime] = now
 		}
 		if s.opt.extraInfo {
 			for key, val := range s.extraInfo {

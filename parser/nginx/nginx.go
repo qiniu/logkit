@@ -16,12 +16,13 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	. "github.com/qiniu/logkit/parser/config"
 	"github.com/qiniu/logkit/times"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
 func init() {
-	parser.RegisterConstructor(parser.TypeNginx, NewParser)
+	parser.RegisterConstructor(TypeNginx, NewParser)
 }
 
 type Parser struct {
@@ -39,11 +40,11 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 }
 
 func NewNginxAccParser(c conf.MapConf) (p *Parser, err error) {
-	name, _ := c.GetStringOr(parser.KeyParserName, "")
-	schema, _ := c.GetStringOr(parser.NginxSchema, "")
-	nginxRegexStr, _ := c.GetStringOr(parser.NginxFormatRegex, "")
-	labelList, _ := c.GetStringListOr(parser.KeyLabels, []string{})
-	keepRawData, _ := c.GetBoolOr(parser.KeyKeepRawData, false)
+	name, _ := c.GetStringOr(KeyParserName, "")
+	schema, _ := c.GetStringOr(NginxSchema, "")
+	nginxRegexStr, _ := c.GetStringOr(NginxFormatRegex, "")
+	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
+	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)
 	nameMap := make(map[string]struct{})
 	labels := parser.GetLabels(labelList, nameMap)
 	numRoutine := MaxProcs
@@ -51,7 +52,7 @@ func NewNginxAccParser(c conf.MapConf) (p *Parser, err error) {
 		numRoutine = 1
 	}
 
-	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
+	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
 
 	p = &Parser{
 		name:                 name,
@@ -65,11 +66,11 @@ func NewNginxAccParser(c conf.MapConf) (p *Parser, err error) {
 		return
 	}
 	if nginxRegexStr == "" {
-		nginxConfPath, err := c.GetString(parser.NginxConfPath)
+		nginxConfPath, err := c.GetString(NginxConfPath)
 		if err != nil {
 			return nil, err
 		}
-		formatName, err := c.GetString(parser.NginxLogFormat)
+		formatName, err := c.GetString(NginxLogFormat)
 		if err != nil {
 			return nil, err
 		}
@@ -112,7 +113,7 @@ func (p *Parser) Name() string {
 }
 
 func (p *Parser) Type() string {
-	return parser.TypeNginx
+	return TypeNginx
 }
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
@@ -171,7 +172,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
 			}
 			if p.keepRawData {
-				errData[parser.KeyRawData] = parseResult.Line
+				errData[KeyRawData] = parseResult.Line
 			}
 			if !p.disableRecordErrData || p.keepRawData {
 				datas = append(datas, errData)
@@ -186,7 +187,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		se.AddSuccess()
 		log.Debugf("D! parse result(%v)", parseResult.Data)
 		if p.keepRawData {
-			parseResult.Data[parser.KeyRawData] = parseResult.Line
+			parseResult.Data[KeyRawData] = parseResult.Line
 		}
 		datas = append(datas, parseResult.Data)
 	}
@@ -225,8 +226,8 @@ func (p *Parser) parse(line string) (Data, error) {
 
 func (p *Parser) makeValue(name, raw string) (data interface{}, err error) {
 	valueType := p.schema[name]
-	switch parser.DataType(valueType) {
-	case parser.TypeFloat:
+	switch DataType(valueType) {
+	case TypeFloat:
 		if raw == "-" {
 			return 0.0, nil
 		}
@@ -235,7 +236,7 @@ func (p *Parser) makeValue(name, raw string) (data interface{}, err error) {
 			err = fmt.Errorf("convet for %q to float64 failed: %q", name, raw)
 		}
 		return v, err
-	case parser.TypeLong:
+	case TypeLong:
 		if raw == "-" {
 			return 0, nil
 		}
@@ -244,9 +245,9 @@ func (p *Parser) makeValue(name, raw string) (data interface{}, err error) {
 			err = fmt.Errorf("convet for %q to int64 failed, %q", name, raw)
 		}
 		return v, err
-	case parser.TypeString:
+	case TypeString:
 		return raw, nil
-	case parser.TypeDate:
+	case TypeDate:
 		tm, nerr := times.StrToTime(raw)
 		if nerr != nil {
 			return tm, nerr

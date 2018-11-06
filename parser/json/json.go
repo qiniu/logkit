@@ -11,13 +11,14 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
+	. "github.com/qiniu/logkit/parser/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
 func init() {
-	parser.RegisterConstructor(parser.TypeInnerSQL, NewParser)
-	parser.RegisterConstructor(parser.TypeInnerMySQL, NewParser)
-	parser.RegisterConstructor(parser.TypeJSON, NewParser)
+	parser.RegisterConstructor(TypeInnerSQL, NewParser)
+	parser.RegisterConstructor(TypeInnerMySQL, NewParser)
+	parser.RegisterConstructor(TypeJSON, NewParser)
 }
 
 type Parser struct {
@@ -30,8 +31,8 @@ type Parser struct {
 }
 
 func NewParser(c conf.MapConf) (parser.Parser, error) {
-	name, _ := c.GetStringOr(parser.KeyParserName, "")
-	labelList, _ := c.GetStringListOr(parser.KeyLabels, []string{})
+	name, _ := c.GetStringOr(KeyParserName, "")
+	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
 	nameMap := map[string]struct{}{}
 	labels := parser.GetLabels(labelList, nameMap)
 	jsontool := jsoniter.Config{
@@ -39,8 +40,8 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		UseNumber:  true,
 	}.Froze()
 
-	disableRecordErrData, _ := c.GetBoolOr(parser.KeyDisableRecordErrData, false)
-	keepRawData, _ := c.GetBoolOr(parser.KeyKeepRawData, false)
+	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)
 	numRoutine := MaxProcs
 	if numRoutine == 0 {
 		numRoutine = 1
@@ -61,7 +62,7 @@ func (p *Parser) Name() string {
 }
 
 func (p *Parser) Type() string {
-	return parser.TypeJSON
+	return TypeJSON
 }
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
@@ -118,7 +119,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
 			}
 			if p.keepRawData {
-				errData[parser.KeyRawData] = parseResult.Line
+				errData[KeyRawData] = parseResult.Line
 			}
 			if !p.disableRecordErrData || p.keepRawData {
 				datas = append(datas, errData)
@@ -134,7 +135,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		se.AddSuccess()
 		//一条Json格式的数据可能返回多个Data，只有当返回Data数组长度为1是raw_data才会生效
 		if p.keepRawData && len(parseResult.Datas) == 1 {
-			parseResult.Datas[0][parser.KeyRawData] = parseResult.Line
+			parseResult.Datas[0][KeyRawData] = parseResult.Line
 		}
 		datas = append(datas, parseResult.Datas...)
 	}
