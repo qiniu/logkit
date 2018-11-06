@@ -714,6 +714,12 @@
 			"revisionTime": "2017-01-30T11:31:45Z"
 		},
 		{
+			"checksumSHA1": "LJisu1wsCgdPkT4P6JBZivYpnN0=",
+			"path": "github.com/sven0726/fasttemplate",
+			"revision": "b905fab20e57bb8129a708b28e02d2179447de9b",
+			"revisionTime": "2018-11-01T06:39:38Z"
+		},
+		{
 			"checksumSHA1": "+aq6vfX37dIMIqeWaE5tgf0v3fE=",
 			"path": "github.com/tidwall/gjson",
 			"revision": "1e3f6aeaa5bad08d777ea7807b279a07885dd8b2",
@@ -738,11 +744,11 @@
 			"revisionTime": "2018-02-21T05:11:55Z"
 		},
 		{
-			"checksumSHA1": "LTOa3BADhwvT0wFCknPueQALm8I=",
+			"checksumSHA1": "ua2PK6PDbNCyzxOmakS3BJoF8Co=",
 			"origin": "github.com/valyala/fasttemplate/vendor/github.com/valyala/bytebufferpool",
 			"path": "github.com/valyala/bytebufferpool",
-			"revision": "dcecefd839c4193db0d35b88ec65b4c12d360ab0",
-			"revisionTime": "2017-02-24T21:24:29Z"
+			"revision": "cdfbe9377474227bb42120c1e22fd4433e7f69bf",
+			"revisionTime": "2018-09-05T18:22:47Z"
 		},
 		{
 			"checksumSHA1": "gtG8jeB0fcTmKZf+6Vbcoa6nfec=",

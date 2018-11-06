@@ -20,11 +20,16 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var templateExp = `{"keyA":{{a}},"keyC":"{{c}}"}`
+
 var testData = []struct {
 	input       []Data
 	jsonExp     [][]string
 	csvExp      []map[string]string
 	bodyJSONExp string
+
+	templateJSONExp     []string
+	templateBodyJSONExp string
 }{
 	{
 		input: []Data{
@@ -91,7 +96,9 @@ var testData = []struct {
 				"e": "",
 			},
 		},
-		bodyJSONExp: `[{"a":1,"b":true,"c":"1","e":1.43,"d":{"a1":1,"b1":true,"c1":"1","d1":{}}},{"b":true,"c":"1","d":{"b1":true,"c1":"1","d1":{},"a1":1},"a":1}]`,
+		bodyJSONExp:         `[{"a":1,"b":true,"c":"1","e":1.43,"d":{"a1":1,"b1":true,"c1":"1","d1":{}}},{"b":true,"c":"1","d":{"b1":true,"c1":"1","d1":{},"a1":1},"a":1}]`,
+		templateJSONExp:     []string{`{"keyA":1,"keyC":"1"}`, `{"keyA":1,"keyC":"1"}`},
+		templateBodyJSONExp: `[{"keyA":1,"keyC":"1"},{"keyA":1,"keyC":"1"}]`,
 	},
 }
 
@@ -136,6 +143,7 @@ func TestHTTPSenderGzipWithJSON(t *testing.T) {
 		sender.KeyHttpSenderCsvSplit: "\t",
 		sender.KeyHttpSenderProtocol: "json",
 		sender.KeyHttpSenderCsvHead:  "false",
+		sender.KeyHttpSenderTemplate: "",
 		KeyRunnerName:                runnerName,
 		sender.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
 	})
@@ -145,10 +153,12 @@ func TestHTTPSenderGzipWithJSON(t *testing.T) {
 	for _, val := range testData {
 		wg.Add(1)
 		go func(httpReader *http.Reader, val struct {
-			input       []Data
-			jsonExp     [][]string
-			csvExp      []map[string]string
-			bodyJSONExp string
+			input               []Data
+			jsonExp             [][]string
+			csvExp              []map[string]string
+			bodyJSONExp         string
+			templateJSONExp     []string
+			templateBodyJSONExp string
 		}, t *testing.T) {
 			for _, exp := range val.jsonExp {
 				got, err := httpReader.ReadLine()
@@ -183,6 +193,7 @@ func TestHTTPSenderNoGzipWithJSON(t *testing.T) {
 		sender.KeyHttpSenderCsvSplit: "\t",
 		sender.KeyHttpSenderProtocol: "json",
 		sender.KeyHttpSenderCsvHead:  "false",
+		sender.KeyHttpSenderTemplate: "",
 		KeyRunnerName:                runnerName,
 		sender.KeyHttpSenderUrl:      "127.0.0.1:8001/logkit/data",
 	})
@@ -192,10 +203,12 @@ func TestHTTPSenderNoGzipWithJSON(t *testing.T) {
 	for _, val := range testData {
 		wg.Add(1)
 		go func(httpReader *http.Reader, val struct {
-			input       []Data
-			jsonExp     [][]string
-			csvExp      []map[string]string
-			bodyJSONExp string
+			input               []Data
+			jsonExp             [][]string
+			csvExp              []map[string]string
+			bodyJSONExp         string
+			templateJSONExp     []string
+			templateBodyJSONExp string
 		}, t *testing.T) {
 			for _, exp := range val.jsonExp {
 				got, err := httpReader.ReadLine()
@@ -230,6 +243,7 @@ func TestHTTPSenderGzipAndCSVHeadWithCSV(t *testing.T) {
 		sender.KeyHttpSenderCsvSplit: "\t",
 		sender.KeyHttpSenderProtocol: "csv",
 		sender.KeyHttpSenderCsvHead:  "true",
+		sender.KeyHttpSenderTemplate: "",
 		KeyRunnerName:                runnerName,
 		sender.KeyHttpSenderUrl:      "http://127.0.0.1:8002/logkit/data",
 	})
@@ -239,10 +253,12 @@ func TestHTTPSenderGzipAndCSVHeadWithCSV(t *testing.T) {
 	for _, val := range testData {
 		wg.Add(1)
 		go func(httpReader *http.Reader, val struct {
-			input       []Data
-			jsonExp     [][]string
-			csvExp      []map[string]string
-			bodyJSONExp string
+			input               []Data
+			jsonExp             [][]string
+			csvExp              []map[string]string
+			bodyJSONExp         string
+			templateJSONExp     []string
+			templateBodyJSONExp string
 		}, t *testing.T) {
 			head, err := httpReader.ReadLine()
 			assert.NoError(t, err)
@@ -289,6 +305,7 @@ func TestHTTPSenderNoGzipAndCSVHeadWithCSV(t *testing.T) {
 		sender.KeyHttpSenderCsvSplit: "\t",
 		sender.KeyHttpSenderProtocol: "csv",
 		sender.KeyHttpSenderCsvHead:  "true",
+		sender.KeyHttpSenderTemplate: "",
 		KeyRunnerName:                runnerName,
 		sender.KeyHttpSenderUrl:      "http://127.0.0.1:8003/logkit/data",
 	})
@@ -298,10 +315,12 @@ func TestHTTPSenderNoGzipAndCSVHeadWithCSV(t *testing.T) {
 	for _, val := range testData {
 		wg.Add(1)
 		go func(httpReader *http.Reader, val struct {
-			input       []Data
-			jsonExp     [][]string
-			csvExp      []map[string]string
-			bodyJSONExp string
+			input               []Data
+			jsonExp             [][]string
+			csvExp              []map[string]string
+			bodyJSONExp         string
+			templateJSONExp     []string
+			templateBodyJSONExp string
 		}, t *testing.T) {
 			head, err := httpReader.ReadLine()
 			assert.NoError(t, err)
@@ -348,6 +367,7 @@ func TestHTTPSenderGzipAndNoCSVHeadWithCSV(t *testing.T) {
 		sender.KeyHttpSenderCsvSplit: "\t",
 		sender.KeyHttpSenderProtocol: "csv",
 		sender.KeyHttpSenderCsvHead:  "false",
+		sender.KeyHttpSenderTemplate: "",
 		KeyRunnerName:                runnerName,
 		sender.KeyHttpSenderUrl:      "127.0.0.1:8004/logkit/data",
 	})
@@ -357,10 +377,12 @@ func TestHTTPSenderGzipAndNoCSVHeadWithCSV(t *testing.T) {
 	for _, val := range testData {
 		wg.Add(1)
 		go func(httpReader *http.Reader, val struct {
-			input       []Data
-			jsonExp     [][]string
-			csvExp      []map[string]string
-			bodyJSONExp string
+			input               []Data
+			jsonExp             [][]string
+			csvExp              []map[string]string
+			bodyJSONExp         string
+			templateJSONExp     []string
+			templateBodyJSONExp string
 		}, t *testing.T) {
 			for i := 0; i < len(val.input); i++ {
 				_, err := httpReader.ReadLine()
@@ -395,6 +417,7 @@ func TestHTTPSenderGzipAndNoCSVHeadWithBodyJSON(t *testing.T) {
 		sender.KeyHttpSenderCsvSplit: "\t",
 		sender.KeyHttpSenderProtocol: "body_json",
 		sender.KeyHttpSenderCsvHead:  "false",
+		sender.KeyHttpSenderTemplate: "",
 		KeyRunnerName:                runnerName,
 		sender.KeyHttpSenderUrl:      "127.0.0.1:8005/logkit/data",
 	})
@@ -404,10 +427,12 @@ func TestHTTPSenderGzipAndNoCSVHeadWithBodyJSON(t *testing.T) {
 	for _, val := range testData {
 		wg.Add(1)
 		go func(httpReader *http.Reader, val struct {
-			input       []Data
-			jsonExp     [][]string
-			csvExp      []map[string]string
-			bodyJSONExp string
+			input               []Data
+			jsonExp             [][]string
+			csvExp              []map[string]string
+			bodyJSONExp         string
+			templateJSONExp     []string
+			templateBodyJSONExp string
 		}, t *testing.T) {
 			got, err := httpReader.ReadLine()
 			assert.NoError(t, err)
@@ -458,6 +483,7 @@ func TestHTTPSenderNoGzipWithRaw(t *testing.T) {
 		sender.KeyHttpSenderGzip:     "false",
 		sender.KeyHttpSenderProtocol: "raw",
 		sender.KeyHttpSenderCsvHead:  "false",
+		sender.KeyHttpSenderTemplate: "",
 		KeyRunnerName:                runnerName,
 		sender.KeyHttpSenderUrl:      "127.0.0.1:8006/logkit/data",
 	})
@@ -482,6 +508,98 @@ func TestHTTPSenderNoGzipWithRaw(t *testing.T) {
 	assert.NoError(t, httpSender.Send(testData))
 	wg.Wait()
 	assert.Equal(t, "aaaaIf newbie have bad time,it's a bug on logkit!!!", res)
+}
+
+func TestHTTPSenderJSONWithTemplate(t *testing.T) {
+	t.Parallel()
+	runnerName := "TestHTTPSenderJSONWithTamplate"
+
+	httpReader, err := newHTTPReader(runnerName, "8007")
+	assert.NoError(t, err)
+	defer func() {
+		os.RemoveAll("./meta/" + runnerName)
+		httpReader.Close()
+	}()
+
+	//	// CI 环境启动监听较慢，需要等待几秒
+	time.Sleep(2 * time.Second)
+
+	httpSender, err := NewSender(conf.MapConf{
+		sender.KeyHttpSenderGzip:     "false",
+		sender.KeyHttpSenderCsvSplit: "\t",
+		sender.KeyHttpSenderProtocol: "json",
+		sender.KeyHttpSenderCsvHead:  "false",
+		sender.KeyHttpSenderTemplate: templateExp,
+		KeyRunnerName:                runnerName,
+		sender.KeyHttpSenderUrl:      "http://127.0.0.1:8007/logkit/data",
+	})
+	assert.NoError(t, err)
+	var wg sync.WaitGroup
+	for _, val := range testData {
+		wg.Add(1)
+		go func(httpReader *http.Reader, val struct {
+			input               []Data
+			jsonExp             [][]string
+			csvExp              []map[string]string
+			bodyJSONExp         string
+			templateJSONExp     []string
+			templateBodyJSONExp string
+		}, t *testing.T) {
+			for _, exp := range val.templateJSONExp {
+				got, err := httpReader.ReadLine()
+				assert.NoError(t, err)
+				assert.Equal(t, got, exp)
+			}
+			wg.Done()
+		}(httpReader, val, t)
+		assert.NoError(t, httpSender.Send(val.input))
+	}
+	wg.Wait()
+}
+
+func TestHTTPSenderJSONBodyWithTemplate(t *testing.T) {
+	t.Parallel()
+	runnerName := "TestHTTPSenderJSONWithTamplate"
+
+	httpReader, err := newHTTPReader(runnerName, "8008")
+	assert.NoError(t, err)
+	defer func() {
+		os.RemoveAll("./meta/" + runnerName)
+		httpReader.Close()
+	}()
+
+	//	// CI 环境启动监听较慢，需要等待几秒
+	time.Sleep(2 * time.Second)
+
+	httpSender, err := NewSender(conf.MapConf{
+		sender.KeyHttpSenderGzip:     "false",
+		sender.KeyHttpSenderCsvSplit: "\t",
+		sender.KeyHttpSenderProtocol: "body_json",
+		sender.KeyHttpSenderCsvHead:  "false",
+		sender.KeyHttpSenderTemplate: templateExp,
+		KeyRunnerName:                runnerName,
+		sender.KeyHttpSenderUrl:      "http://127.0.0.1:8008/logkit/data",
+	})
+	assert.NoError(t, err)
+	var wg sync.WaitGroup
+	for _, val := range testData {
+		wg.Add(1)
+		go func(httpReader *http.Reader, val struct {
+			input               []Data
+			jsonExp             [][]string
+			csvExp              []map[string]string
+			bodyJSONExp         string
+			templateJSONExp     []string
+			templateBodyJSONExp string
+		}, t *testing.T) {
+			got, err := httpReader.ReadLine()
+			assert.NoError(t, err)
+			assert.Equal(t, got, val.templateBodyJSONExp)
+			wg.Done()
+		}(httpReader, val, t)
+		assert.NoError(t, httpSender.Send(val.input))
+	}
+	wg.Wait()
 }
 
 func TestGzipData(t *testing.T) {
