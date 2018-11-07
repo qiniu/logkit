@@ -53,6 +53,8 @@ const (
 
 	DefaultMaxBatchSize = 2 * MB
 
+	DefaultSendIntervalSeconds = 60
+
 	DefaultTruncateMaxSize = 1024
 
 	DefaultErrorsListCap = 100
@@ -135,6 +137,22 @@ type AuthTokens struct {
 	RunnerName   string
 	SenderIndex  int
 	SenderTokens conf.MapConf
+}
+
+type SelfLogSet struct {
+	LogPath  string `json:"log_path"`
+	ReadFrom string `json:"read_from"`
+	Pandora
+}
+
+type Pandora struct {
+	Name    string `json:"pandora_name"`
+	Region  string `json:"pandora_region"`
+	Pipline string `json:"pandora_pipeline"`
+	Logdb   string `json:"pandora_logdb"`
+	Tsdb    string `json:"pandora_tsdb"`
+	AK      string `json:"pandora_ak"`
+	SK      string `json:"pandora_sk"`
 }
 
 type LagInfo struct {

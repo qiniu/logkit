@@ -13,6 +13,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/json-iterator/go"
+
 	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/audit"
@@ -21,6 +22,7 @@ import (
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/reader/config"
+	"github.com/qiniu/logkit/self"
 	"github.com/qiniu/logkit/sender"
 	senderConf "github.com/qiniu/logkit/sender/config"
 	"github.com/qiniu/logkit/utils"
@@ -41,6 +43,13 @@ type ManagerConfig struct {
 	DisableWeb   bool          `json:"disable_web"`
 	ServerBackup bool          `json:"-"`
 	AuditDir     string        `json:"audit_dir"`
+
+	SelfLog
+}
+
+type SelfLog struct {
+	SelfLogSet
+	SelfLogEnable bool `json:"self_log_enable"`
 }
 
 type cleanQueue struct {
@@ -76,6 +85,8 @@ type Manager struct {
 
 	Version    string
 	SystemInfo string
+
+	SelfLogRunner *self.LogRunner
 }
 
 func NewManager(conf ManagerConfig) (*Manager, error) {
@@ -110,6 +121,14 @@ func NewCustomManager(conf ManagerConfig, rr *reader.Registry, pr *parser.Regist
 	if err != nil {
 		return nil, err
 	}
+	var selfLogRunner *self.LogRunner
+	if conf.SelfLogEnable {
+		selfLogRunner, err = self.NewLogRunner(nil, nil, nil)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	m := &Manager{
 		ManagerConfig: conf,
 		cleanLock:     new(sync.RWMutex),
@@ -126,6 +145,7 @@ func NewCustomManager(conf ManagerConfig, rr *reader.Registry, pr *parser.Regist
 		SystemInfo:    utilsos.GetOSInfo().String(),
 		audit:         audt,
 		auditChan:     make(chan audit.Message, 100),
+		SelfLogRunner: selfLogRunner,
 	}
 	return m, nil
 }
@@ -151,7 +171,11 @@ func (m *Manager) Stop() error {
 	close(m.cleanChan)
 	//在所有runner close以后，就保证了不会有audit message发送到Channel里
 	close(m.auditChan)
-	return nil
+
+	if m.SelfLogRunner != nil {
+		m.SelfLogRunner.Stop()
+	}
+g	return nil
 }
 
 func (m *Manager) RemoveWithConfig(confPath string, isDelete bool) (err error) {
@@ -797,6 +821,11 @@ func (m *Manager) UpdateToken(tokens []AuthTokens) (err error) {
 	errMsg := make([]string, 0)
 	for _, token := range tokens {
 		runnerPath := token.RunnerName
+		if strings.HasPrefix(runnerPath, self.DefaultInternalPrefix) && m.SelfLogRunner != nil {
+			m.SelfLogRunner.TokenRefresh(token)
+			continue
+		}
+
 		if runner, ok := m.runners[runnerPath]; ok {
 			if r, ok := runner.(TokenRefreshable); ok {
 				token.RunnerName = runner.Name()

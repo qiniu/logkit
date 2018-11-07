@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo"
+
 	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/cli"
@@ -272,6 +273,7 @@ func main() {
 		go loopRotateLogs(filepath.Join(logdir, logpattern), defaultRotateSize, 10*time.Second, stopRotate)
 		conf.CleanSelfPattern = logpattern + "-*"
 		conf.CleanSelfDir = logdir
+		conf.ManagerConfig.SelfLogSet.LogPath = conf.LogPath
 	}
 
 	log.Infof("Welcome to use Logkit, Version: %v \n\nConfig: %#v", NextVersion, conf)
@@ -289,6 +291,10 @@ func main() {
 		log.Fatalf("watch path error %v", err)
 	}
 	m.RestoreWebDir()
+
+	if m.SelfLogRunner != nil {
+		go m.SelfLogRunner.Run()
+	}
 
 	stopClean := make(chan struct{}, 0)
 	defer close(stopClean)
