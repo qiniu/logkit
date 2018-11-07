@@ -603,7 +603,7 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 			var selen int
 			if se != nil {
 				selen = len(se.DatasourceSkipIndex)
-				log.Debugf("Runner[%v] datasourcetag add error, datas %v datasourceSkipIndex %v froms %v", datas, se.DatasourceSkipIndex, froms)
+				log.Debugf("Runner[%v] datasourcetag add error, datas %v datasourceSkipIndex %v froms %v",  r.Name(), datas, se.DatasourceSkipIndex, froms)
 			}
 			log.Errorf("Runner[%v] datasourcetag add error, datas(TOTAL %v), datasourceSkipIndex(TOTAL %v) not match with froms(TOTAL %v)", r.Name(), len(datas), selen, len(froms))
 		}

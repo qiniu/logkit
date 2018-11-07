@@ -8,6 +8,7 @@ import (
 
 	"github.com/qiniu/logkit/metric"
 	. "github.com/qiniu/logkit/utils/models"
+	"time"
 )
 
 const (
@@ -131,16 +132,28 @@ const (
 	MetricDiskioUsages = "磁盘IO(diskIo)"
 
 	// TypeMetricDiskio 信息中的字段
-	KeyDiskioReads          = "diskio_reads"
-	KeyDiskioWrites         = "diskio_writes"
-	KeyDiskioReadBytes      = "diskio_read_bytes"
-	KeyDiskioWriteBytes     = "diskio_write_bytes"
-	KeyDiskioReadTime       = "diskio_read_time"
-	KeyDiskioWriteTime      = "diskio_write_time"
-	KeyDiskioIoTime         = "diskio_io_time"
-	KeyDiskioIopsInProgress = "diskio_iops_in_progress"
-	KeyDiskioName           = "diskio_name"
-	KeyDiskioSerial         = "diskio_serial"
+	KeyDiskioReads                  = "diskio_reads"
+	KeyDiskioWrites                 = "diskio_writes"
+	KeyDiskioReadsPerSec            = "diskio_reads_per_sec"
+	KeyDiskioWritesPerSec           = "diskio_writes_per_sec"
+	KeyDiskioMergedReadCount        = "diskio_merged_read_count"
+	KeyDiskioMergedWriteCount       = "diskio_merged_write_count"
+	KeyDiskioMergedReadCountPerSec  = "diskio_merged_read_count_per_sec"
+	KeyDiskioMergedWriteCountPerSec = "diskio_merged_write_count_per_sec"
+	KeyDiskioReadBytes              = "diskio_read_bytes"
+	KeyDiskioWriteBytes             = "diskio_write_bytes"
+	KeyDiskioReadBytesPerSec        = "diskio_read_bytes_per_sec"
+	KeyDiskioWriteBytesPerSec       = "diskio_write_bytes_per_sec"
+	KeyDiskioReadTime               = "diskio_read_time"
+	KeyDiskioWriteTime              = "diskio_write_time"
+	KeyDiskioReadAWait               = "diskio_read_await"
+	KeyDiskioWriteAWait              = "diskio_write_await"
+	KeyDiskioAWait                   = "diskio_await"
+	KeyDiskioIoTime                 = "diskio_io_time"
+	KeyDiskioIoUtil                 = "diskio_io_util"
+	KeyDiskioIopsInProgress         = "diskio_iops_in_progress"
+	KeyDiskioName                   = "diskio_name"
+	KeyDiskioSerial                 = "diskio_serial"
 
 	// Config 字段
 	ConfigDiskioDevices          = "devices"
@@ -153,11 +166,23 @@ const (
 var KeyDiskioUsages = KeyValueSlice{
 	{KeyDiskioReads, "磁盘被读的总次数", ""},
 	{KeyDiskioWrites, "磁盘被写的总次数", ""},
+	{KeyDiskioReadsPerSec, "每秒磁盘被读的次数", ""},
+	{KeyDiskioWritesPerSec, "每秒磁盘被写的次数", ""},
+	{KeyDiskioMergedReadCount, "磁盘合并读总次数", ""},
+	{KeyDiskioMergedWriteCount, "磁盘合并写的总次数", ""},
+	{KeyDiskioMergedReadCountPerSec, "每秒磁盘合并读次数", ""},
+	{KeyDiskioMergedWriteCountPerSec, "每秒磁盘合并写的次数", ""},
 	{KeyDiskioReadBytes, "读取的总数据量", ""},
 	{KeyDiskioWriteBytes, "写入的总数据量", ""},
+	{KeyDiskioReadBytesPerSec, "每秒读取的数据量(bytes/s)", ""},
+	{KeyDiskioWriteBytesPerSec, "每秒写入的数据量(bytes/s)", ""},
 	{KeyDiskioReadTime, "磁盘读取总用时", ""},
 	{KeyDiskioWriteTime, "磁盘写入总用时", ""},
+	{KeyDiskioReadAWait, "每个读操作平均所需的时间", ""},
+	{KeyDiskioWriteAWait, "每个写操作平均所需的时间", ""},
+	{KeyDiskioAWait, "每个I/O平均所需的时间", ""},
 	{KeyDiskioIoTime, "io总时间", ""},
+	{KeyDiskioIoUtil, "设备的繁忙比率", ""},
 	{KeyDiskioIopsInProgress, "运行中的每秒IO数据量", ""},
 	{KeyDiskioName, "磁盘名称", ""},
 	{KeyDiskioSerial, "磁盘序列号", ""},
@@ -171,8 +196,22 @@ var ConfigDiskioUsages = KeyValueSlice{
 	{ConfigDiskioSkipSerialNumber, "是否忽略磁盘序列号(" + ConfigDiskioSkipSerialNumber + ")", ""},
 }
 
+type DiskioCollectInfo struct {
+	timestamp        time.Time
+	ReadCount        uint64
+	WriteCount       uint64
+	MergedReadCount  uint64
+	MergedWriteCount uint64
+	ReadBytes        uint64
+	WriteBytes       uint64
+	ReadTime         uint64
+	WriteTime        uint64
+	IoTime           uint64
+}
+
 type DiskIOStats struct {
-	ps PS
+	ps          PS
+	lastCollect map[string]DiskioCollectInfo
 
 	Devices          []string `json:"devices"`
 	DeviceTags       []string `json:"device_tags"`
@@ -238,15 +277,27 @@ func (s *DiskIOStats) Collect() (datas []map[string]interface{}, err error) {
 
 	for _, io := range diskio {
 		fields := map[string]interface{}{
-			KeyDiskioReads:          io.ReadCount,
-			KeyDiskioWrites:         io.WriteCount,
-			KeyDiskioReadBytes:      io.ReadBytes,
-			KeyDiskioWriteBytes:     io.WriteBytes,
-			KeyDiskioReadTime:       io.ReadTime,
-			KeyDiskioWriteTime:      io.WriteTime,
-			KeyDiskioIoTime:         io.IoTime,
-			KeyDiskioIopsInProgress: io.IopsInProgress,
-			KeyDiskioName:           s.diskName(io.Name),
+			KeyDiskioReads:                  io.ReadCount,
+			KeyDiskioWrites:                 io.WriteCount,
+			KeyDiskioReadsPerSec:            0,
+			KeyDiskioWritesPerSec:           0,
+			KeyDiskioMergedReadCount:        io.MergedReadCount,
+			KeyDiskioMergedWriteCount:       io.MergedWriteCount,
+			KeyDiskioMergedReadCountPerSec:  0,
+			KeyDiskioMergedWriteCountPerSec: 0,
+			KeyDiskioReadBytes:              io.ReadBytes,
+			KeyDiskioWriteBytes:             io.WriteBytes,
+			KeyDiskioReadBytesPerSec:        0,
+			KeyDiskioWriteBytesPerSec:       0,
+			KeyDiskioReadTime:               io.ReadTime,
+			KeyDiskioWriteTime:              io.WriteTime,
+			KeyDiskioReadAWait:               0,
+			KeyDiskioWriteAWait:              0,
+			KeyDiskioAWait:                   0,
+			KeyDiskioIoTime:                 io.IoTime,
+			KeyDiskioIoUtil:                 0,
+			KeyDiskioIopsInProgress:         io.IopsInProgress,
+			KeyDiskioName:                   s.diskName(io.Name),
 		}
 		for t, v := range s.diskTags(io.Name) {
 			fields[t] = v
@@ -258,6 +309,52 @@ func (s *DiskIOStats) Collect() (datas []map[string]interface{}, err error) {
 				fields[KeyDiskioSerial] = "unknown"
 			}
 		}
+		thisTime := time.Now()
+		if info, ok := s.lastCollect[io.Name]; ok {
+			dur := thisTime.Sub(info.timestamp)
+			readsDur := io.ReadCount - info.ReadCount
+			writesDur := io.WriteCount - info.WriteCount
+			mergeReadDur := io.MergedReadCount - info.MergedReadCount
+			mergeWriteDur := io.MergedWriteCount - info.MergedReadCount
+			readBytesDur := io.ReadBytes - info.ReadBytes
+			writeBytesDur := io.WriteBytes - info.WriteBytes
+			readTimeDur := io.ReadTime - info.ReadTime
+			writeTimeDur := io.WriteTime - info.WriteTime
+			utilDur := io.IoTime - info.IoTime
+			secs := float64(dur) / float64(time.Second)
+
+			if secs > 0 {
+				fields[KeyDiskioReadsPerSec] = uint64(float64(readsDur) / secs)
+				fields[KeyDiskioWritesPerSec] = uint64(float64(writesDur) / secs)
+				fields[KeyDiskioMergedReadCount] = uint64(float64(mergeReadDur) / secs)
+				fields[KeyDiskioMergedWriteCount] = uint64(float64(mergeWriteDur) / secs)
+				fields[KeyDiskioReadBytesPerSec] = uint64(float64(readBytesDur) / secs)
+				fields[KeyDiskioWriteBytesPerSec] = uint64(float64(writeBytesDur) / secs)
+				if readsDur > 0 {
+					fields[KeyDiskioReadAWait] = float64(readTimeDur) / float64(readsDur)
+				}
+				if writesDur > 0 {
+					fields[KeyDiskioWriteAWait] = float64(writeTimeDur) / float64(writesDur)
+				}
+				if val := readsDur + writesDur; val > 0 {
+					fields[KeyDiskioAWait] = float64(readTimeDur+writeTimeDur) / float64(val)
+				}
+				fields[KeyDiskioIoUtil] = uint64(float64(utilDur) / 10 / secs)
+			}
+		}
+		s.lastCollect[io.Name] = DiskioCollectInfo{
+			timestamp:        thisTime,
+			ReadCount:        io.ReadCount,
+			WriteCount:       io.WriteCount,
+			MergedReadCount:  io.MergedReadCount,
+			MergedWriteCount: io.MergedWriteCount,
+			ReadBytes:        io.ReadBytes,
+			WriteBytes:       io.WriteBytes,
+			ReadTime:         io.ReadTime,
+			WriteTime:        io.WriteTime,
+			IoTime:           io.IoTime,
+		}
+
 		datas = append(datas, fields)
 	}
 	return
@@ -328,6 +425,8 @@ func init() {
 	})
 	ps2 := newSystemPS()
 	metric.Add(TypeMetricDiskio, func() metric.Collector {
-		return &DiskIOStats{ps: ps2, SkipSerialNumber: true}
+		return &DiskIOStats{ps: ps2,
+			lastCollect: make(map[string]DiskioCollectInfo),
+			SkipSerialNumber: true}
 	})
 }
