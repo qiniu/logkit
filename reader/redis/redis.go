@@ -78,8 +78,8 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	area, err := conf.GetString(KeyRedisHashArea)
 	address, _ := conf.GetStringOr(KeyRedisAddress, "127.0.0.1:6379")
 	password, _ := conf.GetStringOr(KeyRedisPassword, "")
-	KeyTimeoutDuration, _ := conf.GetStringOr(KeyTimeoutDuration, "5s")
-	timeout, err := time.ParseDuration(KeyTimeoutDuration)
+	keyTimeoutDuration, _ := conf.GetStringOr(KeyTimeoutDuration, "5s")
+	timeout, err := time.ParseDuration(keyTimeoutDuration)
 	if err != nil {
 		return nil, err
 	}
