@@ -123,7 +123,9 @@ func NewCustomManager(conf ManagerConfig, rr *reader.Registry, pr *parser.Regist
 	}
 	var selfLogRunner *self.LogRunner
 	if conf.SelfLogEnable {
-		selfLogRunner, err = self.NewLogRunner(nil, nil, nil)
+		rdConf := self.SetReaderConfig(self.GetReaderConfig(), conf.LogPath, conf.ReadFrom)
+		sdConf := self.SetSenderConfig(self.GetSenderConfig(), conf.Pandora)
+		selfLogRunner, err = self.NewLogRunner(rdConf, self.GetParserConfig(), self.GetTransformerConfig(), sdConf)
 		if err != nil {
 			return nil, err
 		}
@@ -821,7 +823,7 @@ func (m *Manager) UpdateToken(tokens []AuthTokens) (err error) {
 	errMsg := make([]string, 0)
 	for _, token := range tokens {
 		runnerPath := token.RunnerName
-		if strings.HasPrefix(runnerPath, self.DefaultInternalPrefix) && m.SelfLogRunner != nil {
+		if strings.HasPrefix(runnerPath, DefaultInternalPrefix) && m.SelfLogRunner != nil {
 			m.SelfLogRunner.TokenRefresh(token)
 			continue
 		}

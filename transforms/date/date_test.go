@@ -12,6 +12,7 @@ import (
 )
 
 func TestTransformer(t *testing.T) {
+	t.Parallel()
 	const k = "k"
 	nowstr := time.Now().Format("2006/01/02")
 	tm := time.Unix(1506049632, 0)
@@ -83,6 +84,7 @@ func TestTransformer(t *testing.T) {
 }
 
 func TestTransformerLocal(t *testing.T) {
+	t.Parallel()
 	zoneValueRFC3339 := "Z"
 	_, offset := time.Now().Zone()
 	value := offset / 3600

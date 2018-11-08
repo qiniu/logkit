@@ -9,6 +9,7 @@ import (
 )
 
 func TestTrimTransformer(t *testing.T) {
+	t.Parallel()
 	tr := &Trim{
 		Key:        "myword",
 		Characters: "1",

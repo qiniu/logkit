@@ -10,6 +10,7 @@ import (
 )
 
 func TestReplaceTransformer(t *testing.T) {
+	t.Parallel()
 	gsub := &Replacer{
 		Key: "myword",
 		Old: "x1",

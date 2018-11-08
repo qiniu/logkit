@@ -71,6 +71,9 @@ const (
 	STRING = "string"
 	DATE   = "date"
 	DROP   = "drop"
+
+	DefaultSelfRunnerName = DefaultInternalPrefix + "SelfLogRunner"
+	DefaultInternalPrefix = "LogkitInternal"
 )
 
 var (

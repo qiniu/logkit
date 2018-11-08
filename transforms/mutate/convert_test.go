@@ -14,6 +14,7 @@ import (
 )
 
 func TestConvertTransformer(t *testing.T) {
+	t.Parallel()
 	gsub := &Converter{
 		DSL: "myword array(long)",
 	}
@@ -47,6 +48,7 @@ func TestConvertTransformer(t *testing.T) {
 }
 
 func TestConvert(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		v   Data
 		DSL string
@@ -89,6 +91,7 @@ func TestConvert(t *testing.T) {
 }
 
 func TestConvertType(t *testing.T) {
+	t.Parallel()
 	gsub := &Converter{
 		DSL: "myword string",
 	}
@@ -107,6 +110,7 @@ func TestConvertType(t *testing.T) {
 }
 
 func TestConvertData(t *testing.T) {
+	t.Parallel()
 	type helloint int
 	tests := []struct {
 		v      interface{}
@@ -366,6 +370,7 @@ func TestConvertData(t *testing.T) {
 }
 
 func TestDefaultConvert(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		str string
 		tp  string
@@ -405,6 +410,7 @@ func TestDefaultConvert(t *testing.T) {
 }
 
 func TestParseDSL(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		dsl string
 		exp []DslSchemaEntry
@@ -450,6 +456,7 @@ func TestParseDSL(t *testing.T) {
 }
 
 func TestGetField(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		str    string
 		expkey string

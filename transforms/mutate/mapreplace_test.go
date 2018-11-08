@@ -14,6 +14,7 @@ import (
 )
 
 func TestMapReplaceTransformer(t *testing.T) {
+	t.Parallel()
 	gsub := &MapReplacer{
 		Key: "myword",
 		Map: "x1 y1,x2 y2",
@@ -94,6 +95,7 @@ func TestMapReplaceTransformer(t *testing.T) {
 }
 
 func TestMapReplaceTransformerWithConvert(t *testing.T) {
+	t.Parallel()
 	gsub := &MapReplacer{
 		Key: "myword",
 		Map: "1 y1,2 y2",
@@ -125,6 +127,7 @@ func TestMapReplaceTransformerWithConvert(t *testing.T) {
 }
 
 func TestMapReplaceConvert(t *testing.T) {
+	t.Parallel()
 	gsub := &MapReplacer{
 		Key: "myword",
 		Map: "1 y1,2 2",

@@ -10,6 +10,7 @@ import (
 )
 
 func TestLabelTransformer(t *testing.T) {
+	t.Parallel()
 	// simple label
 	label := &Label{
 		Key:   "new_key",

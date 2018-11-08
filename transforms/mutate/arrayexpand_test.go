@@ -3,13 +3,14 @@ package mutate
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestArrayExpand(t *testing.T) {
+	t.Parallel()
 	ae := &ArrayExpand{
 		Key: "myword",
 	}
@@ -50,6 +51,7 @@ func TestArrayExpand(t *testing.T) {
 }
 
 func TestArrayExpandError(t *testing.T) {
+	t.Parallel()
 	ae := &ArrayExpand{
 		Key: "myword",
 	}
@@ -86,6 +88,7 @@ func TestArrayExpandError(t *testing.T) {
 }
 
 func TestArrayExpandIgnore(t *testing.T) {
+	t.Parallel()
 	ae := &ArrayExpand{
 		Key: "myword",
 	}
@@ -169,6 +172,7 @@ func TestArrayExpandIgnore(t *testing.T) {
 }
 
 func TestArrayExpandEveryType(t *testing.T) {
+	t.Parallel()
 	ae := &ArrayExpand{
 		Key: "myword",
 	}
@@ -392,6 +396,7 @@ func TestArrayExpandEveryType(t *testing.T) {
 }
 
 func TestArrayExpandMultiKey(t *testing.T) {
+	t.Parallel()
 	ae := &ArrayExpand{
 		Key: "multi.myWord",
 	}

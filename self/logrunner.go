@@ -10,6 +10,14 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/pkg/errors"
+
+	"github.com/json-iterator/go"
+
+	"github.com/qiniu/logkit/transforms/mutate"
+
+	"github.com/qiniu/logkit/transforms"
+
 	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
@@ -29,12 +37,11 @@ import (
 const (
 	DefaultSendTime        = 3
 	DefaultSelfLogRepoName = "logkit_self_log"
-	DefaultSelfRunnerName  = "LogkitInternalSelfLogRunner"
-	DefaultInternalPrefix  = "LogkitInternal"
 )
 
 var (
 	readerConfig = conf.MapConf{
+		"name":           DefaultSelfRunnerName,
 		"mode":           "tailx",
 		"log_path":       "",
 		"read_from":      "oldest",
@@ -48,6 +55,11 @@ var (
 		"type": "raw",
 		"name": "parser",
 		"disable_record_errdata": "true",
+	}
+	transformConfig = conf.MapConf{
+		"key":            "raw",
+		"remove_pattern": ".*\\[DEBUG\\]\\[.*",
+		"type":           "filter",
 	}
 	senderConfig = conf.MapConf{
 		"sender_type":                     "pandora",
@@ -77,14 +89,16 @@ var (
 )
 
 type LogRunner struct {
-	readerConfig conf.MapConf
-	parserConfig conf.MapConf
-	senderConfig conf.MapConf
+	readerConfig    conf.MapConf
+	parserConfig    conf.MapConf
+	transformConfig conf.MapConf
+	senderConfig    conf.MapConf
 
-	reader reader.Reader
-	parser parser.Parser
-	sender sender.Sender
-	meta   *reader.Meta
+	reader    reader.Reader
+	parser    parser.Parser
+	transform transforms.Transformer
+	sender    sender.Sender
+	meta      *reader.Meta
 
 	batchLen  int64
 	batchSize int64
@@ -94,12 +108,15 @@ type LogRunner struct {
 	exitChan chan struct{}
 }
 
-func NewLogRunner(rdConf, psConf, sdConf conf.MapConf) (*LogRunner, error) {
+func NewLogRunner(rdConf, psConf, tsConf, sdConf conf.MapConf) (*LogRunner, error) {
 	if rdConf == nil {
 		rdConf = readerConfig
 	}
-	if parserConfig == nil {
+	if psConf == nil {
 		psConf = parserConfig
+	}
+	if tsConf == nil {
+		tsConf = transformConfig
 	}
 	if sdConf == nil {
 		sdConf = senderConfig
@@ -115,6 +132,7 @@ func NewLogRunner(rdConf, psConf, sdConf conf.MapConf) (*LogRunner, error) {
 	var (
 		rd  reader.Reader
 		ps  parser.Parser
+		ts  transforms.Transformer
 		sd  sender.Sender
 		err error
 	)
@@ -134,20 +152,39 @@ func NewLogRunner(rdConf, psConf, sdConf conf.MapConf) (*LogRunner, error) {
 	if ps, err = raw.NewParser(parserConfig); err != nil {
 		return nil, err
 	}
+	ts = &mutate.Filter{}
+	bts, err := jsoniter.Marshal(tsConf)
+	if err != nil {
+		return nil, errors.New("type filter of transformer marshal config error " + err.Error())
+	}
+	err = jsoniter.Unmarshal(bts, ts)
+	if err != nil {
+		return nil, errors.New("type filter of transformer unmarshal config error " + err.Error())
+	}
+	//transformer初始化
+	if trans, ok := ts.(transforms.Initializer); ok {
+		err = trans.Init()
+		if err != nil {
+			return nil, errors.New("type filter of transformer init error " + err.Error())
+		}
+	}
+
 	if sd, err = pandora.NewSender(senderConfig); err != nil {
 		return nil, err
 	}
 
 	return &LogRunner{
-		readerConfig: rdConf,
-		parserConfig: psConf,
-		senderConfig: sdConf,
+		readerConfig:    rdConf,
+		parserConfig:    psConf,
+		transformConfig: tsConf,
+		senderConfig:    sdConf,
 
-		reader:   rd,
-		parser:   ps,
-		sender:   sd,
-		meta:     meta,
-		exitChan: make(chan struct{}),
+		reader:    rd,
+		parser:    ps,
+		transform: ts,
+		sender:    sd,
+		meta:      meta,
+		exitChan:  make(chan struct{}),
 	}, nil
 }
 
@@ -169,6 +206,8 @@ func (lr *LogRunner) Run() {
 		}
 	}()
 
+	var err error
+
 	for {
 		if atomic.LoadInt32(&lr.stopped) > 0 {
 			log.Debugf("Runner[%s] exited from run", lr.Name())
@@ -178,14 +217,18 @@ func (lr *LogRunner) Run() {
 
 		// read and parse data
 		datas := lr.readLines()
+		lr.batchLen = 0
+		lr.batchSize = 0
+		lr.lastSend = time.Now()
 		if len(datas) <= 0 {
 			log.Debugf("Runner[%s] received parsed data length = 0", lr.Name())
 			continue
 		}
 
-		lr.batchLen = 0
-		lr.batchSize = 0
-		lr.lastSend = time.Now()
+		datas, err = lr.transform.Transform(datas)
+		if err != nil {
+			log.Debugf("Runner[%s] transform failed: %v", lr.Name(), err)
+		}
 
 		// send data
 		log.Debugf("Runner[%s] reader %s start to send at: %v", lr.Name(), lr.reader.Name(), time.Now().Format(time.RFC3339))
@@ -413,6 +456,10 @@ func GetReaderConfig() conf.MapConf {
 
 func GetParserConfig() conf.MapConf {
 	return parserConfig
+}
+
+func GetTransformerConfig() conf.MapConf {
+	return transformConfig
 }
 
 func GetSenderConfig() conf.MapConf {

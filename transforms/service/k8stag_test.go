@@ -10,6 +10,7 @@ import (
 )
 
 func TestK8sTransformer(t *testing.T) {
+	t.Parallel()
 	ktag := &K8sTag{
 		SourceFileKey: "sourcetag",
 	}

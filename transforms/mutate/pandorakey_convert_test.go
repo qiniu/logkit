@@ -3,12 +3,13 @@ package mutate
 import (
 	"testing"
 
-	. "github.com/qiniu/logkit/utils/models"
 	"github.com/stretchr/testify/assert"
+
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 func TestDeepconvertkey(t *testing.T) {
-
+	t.Parallel()
 	pandoraConvert := &PandoraKeyConvert{}
 
 	data := []Data{{"ts。ts2": "stamp1"}, {"ts-tes2/1.2": "stamp2"}}

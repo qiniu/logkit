@@ -11,6 +11,7 @@ import (
 )
 
 func TestParamTransformer(t *testing.T) {
+	t.Parallel()
 	par := &UrlParam{
 		Key: "myword",
 	}

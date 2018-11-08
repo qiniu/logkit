@@ -3,12 +3,13 @@ package ip
 import (
 	"testing"
 
-	. "github.com/qiniu/logkit/utils/models"
-
 	"github.com/stretchr/testify/assert"
+
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 func TestInt2IpTransformer(t *testing.T) {
+	t.Parallel()
 	jsonConf := &Number2Ip{
 		Key: "my_int",
 		New: "my_ip",
@@ -45,6 +46,7 @@ func TestInt2IpTransformer(t *testing.T) {
 }
 
 func Test_convertIp(t *testing.T) {
+	t.Parallel()
 	ipInt1 := int64(223556667)
 	ip1 := convertIp(ipInt1)
 	exp1 := "13.83.52.59"
