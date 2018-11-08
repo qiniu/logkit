@@ -228,7 +228,7 @@ func (m *Manager) Add(confPath string) {
 	log.Infof("Adding config %q", confPath)
 	confPathAbs, _, err := GetRealPath(confPath)
 	if err != nil {
-		log.Warnf("Failed to get real path of %q: %v", confPath)
+		log.Warnf("Failed to get real path of %q: %v", confPath, err)
 		return
 	}
 	confPath = confPathAbs
@@ -543,7 +543,7 @@ func (m *Manager) RestoreWebDir() {
 	nums := 0
 	for _, f := range files {
 		if f.IsDir() {
-			log.Warn("skipped dir", f.Name)
+			log.Warn("skipped dir", f.Name())
 			continue
 		}
 		m.Add(filepath.Join(m.RestDir, f.Name()))
