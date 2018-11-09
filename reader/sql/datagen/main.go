@@ -4,20 +4,17 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	"os"
-
 	"math/rand"
+	"os"
 	"strconv"
+	"strings"
+	"time"
 
 	_ "github.com/denisenkom/go-mssqldb" //mssql 驱动
 	_ "github.com/go-sql-driver/mysql"   //mysql 驱动
 	_ "github.com/lib/pq"                //postgres 驱动
+	"github.com/qiniu/log"
 	utilsos "github.com/qiniu/logkit/utils/os"
-	"github.com/qiniu/x/log.v7"
-
-	"time"
-
-	"strings"
 
 	"github.com/Pallinder/go-randomdata"
 )

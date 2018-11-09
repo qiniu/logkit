@@ -9,6 +9,12 @@
 			"revisionTime": "2017-06-26T11:06:00Z"
 		},
 		{
+			"checksumSHA1": "06LjOczBTeuEZSSXYTs3mH/R8YU=",
+			"path": "github.com/Pallinder/go-randomdata",
+			"revision": "dab270d296c6c8fb98de3b4334bbd7d7b0ceca53",
+			"revisionTime": "2018-03-29T15:44:40Z"
+		},
+		{
 			"checksumSHA1": "2BZ8vWKUa6bjjMLdLLK/JufuTVY=",
 			"path": "github.com/Preetam/mysqllog",
 			"revision": "6562e7684c19650afe9b8a0b2b0d9dc90f701a99",

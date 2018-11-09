@@ -1176,6 +1176,7 @@ func RestoreTimestmapOffset(doneFilePath string) (time.Time, error) {
 	}
 	return time.Parse(time.RFC3339Nano, string(data))
 }
+
 func WriteTimestmapOffset(doneFilePath, content string) (err error) {
 	var f *os.File
 	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, TimestampRecordsFile)
