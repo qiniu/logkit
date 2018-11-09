@@ -58,6 +58,9 @@ const (
 	KeyMssqlExecOnStart = "mssql_exec_onstart"
 
 	KeyPGsqlOffsetKey   = "postgres_offset_key"
+	KeyPGtimestampKey   = "postgres_timestamp_key"
+	KeyPGStartTime      = "postgres_start_time_key"
+	KeyPGBatchDuration  = "postgres_batch_intervel"
 	KeyPGsqlReadBatch   = "postgres_limit_batch"
 	KeyPGsqlDataSource  = "postgres_datasource"
 	KeyPGsqlDataBase    = "postgres_database"
