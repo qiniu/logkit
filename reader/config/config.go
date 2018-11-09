@@ -851,6 +851,16 @@ var ModeKeyOptions = map[string][]Option{
 			ToolTip:      "zookeeper连接超时时间，单位为秒",
 		},
 		OptionDataSourceTag,
+		{
+			KeyName:       KeyKafkaUncompressGzip,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"false", "true"},
+			Default:       "false",
+			DefaultNoUse:  false,
+			Description:   "对消息进行gzip解压缩(kafka_uncompress_gzip)",
+			Advance:       true,
+			ToolTip:       "对消息进行gzip解压缩",
+		},
 	},
 	ModeRedis: {
 		{

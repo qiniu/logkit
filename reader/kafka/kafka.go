@@ -1,8 +1,10 @@
 package kafka
 
 import (
+	"compress/gzip"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -11,8 +13,8 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/wvanbergen/kafka/consumergroup"
 
+	"github.com/qiniu/bytes"
 	"github.com/qiniu/log"
-
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/reader/config"
@@ -51,6 +53,7 @@ type Reader struct {
 	ZookeeperChroot  string
 	ZookeeperTimeout time.Duration
 	Whence           string
+	Gzip             bool
 }
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
@@ -75,6 +78,9 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	for _, v := range topics {
 		offsets[v] = make(map[int32]int64)
 	}
+
+	gzip, _ := conf.GetBoolOr(KeyKafkaUncompressGzip, false)
+
 	sarama.Logger = log.Std
 	kr := &Reader{
 		meta:             meta,
@@ -87,6 +93,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		lock:             new(sync.Mutex),
 		statsLock:        new(sync.RWMutex),
 		currentOffsets:   offsets,
+		Gzip:             gzip,
 	}
 
 	config := consumergroup.NewConfig()
@@ -158,7 +165,24 @@ func (r *Reader) ReadLine() (string, error) {
 	case msg := <-r.readChan:
 		var line string
 		if msg != nil && msg.Value != nil && len(msg.Value) > 0 {
-			line = string(msg.Value)
+			if r.Gzip {
+				gr, gerr := gzip.NewReader(bytes.NewReader(msg.Value))
+				if gerr != nil {
+					gerr = fmt.Errorf("runner[%v] Uncompress gzip Error: %s\n", r.meta.RunnerName, gerr)
+					log.Error(gerr)
+					return "", gerr
+				}
+				defer r.Close()
+				bLine, rerr := ioutil.ReadAll(gr)
+				if rerr != nil {
+					rerr = fmt.Errorf("runner[%v] Uncompress gzip Error: %s\n", r.meta.RunnerName, rerr)
+					log.Error(rerr)
+					return "", rerr
+				}
+				line = string(bLine)
+			} else {
+				line = string(msg.Value)
+			}
 			r.currentMsg = msg
 			r.statsLock.Lock()
 			if tp, ok := r.currentOffsets[msg.Topic]; ok {

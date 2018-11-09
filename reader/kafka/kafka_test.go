@@ -17,9 +17,10 @@ import (
 
 func TestKafkaReader(t *testing.T) {
 	logkitConf := conf.MapConf{
-		KeyMetaPath: MetaDir,
-		KeyFileDone: MetaDir,
-		KeyMode:     ModeElastic,
+		KeyMetaPath:            MetaDir,
+		KeyFileDone:            MetaDir,
+		KeyMode:                ModeElastic,
+		KeyKafkaUncompressGzip: "true",
 	}
 	meta, err := reader.NewMetaWithConf(logkitConf)
 	assert.NoError(t, err)
@@ -34,8 +35,10 @@ func TestKafkaReader(t *testing.T) {
 		errChan:          make(chan error, 1000),
 		lock:             new(sync.Mutex),
 		statsLock:        new(sync.RWMutex),
+		Gzip:             true,
 	}
 	assert.EqualValues(t, "KafkaReader:[topic1],[group1]", er.Name())
 
 	assert.Equal(t, StatsInfo{}, er.Status())
+	assert.Equal(t, true, er.Gzip)
 }

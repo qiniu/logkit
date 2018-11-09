@@ -88,6 +88,7 @@ const (
 	KeyKafkaZookeeper        = "kafka_zookeeper"
 	KeyKafkaZookeeperChroot  = "kafka_zookeeper_chroot"
 	KeyKafkaZookeeperTimeout = "kafka_zookeeper_timeout"
+	KeyKafkaUncompressGzip   = "kafka_uncompress_gzip"
 
 	KeyExecInterpreter   = "script_exec_interprepter"
 	KeyScriptCron        = "script_cron"
