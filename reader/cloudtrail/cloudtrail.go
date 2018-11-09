@@ -373,9 +373,9 @@ func (s *syncRunner) syncToDir() error {
 			}
 
 			if err = storeSyncedFiles(metastore, syncedFiles); err != nil {
-				log.Errorf("Runner[%v] wrote synced files to %q failed: %v", s.meta.RunnerName, s.metastore)
+				log.Errorf("Runner[%s] wrote synced files to %q failed: %v", s.meta.RunnerName, s.metastore, err)
 			} else {
-				log.Infof("Runner[%v] wrote %d synced files to %q", s.meta.RunnerName, len(syncedFiles), s.metastore)
+				log.Infof("Runner[%s] wrote %d synced files to %q", s.meta.RunnerName, len(syncedFiles), s.metastore)
 
 				// Note: 可能导致在 Sync 失败的情况下部分文件名重复输入到 metastore 中，但比丢失已同步记录重新处理一遍相同数据结果要更加合理
 				syncedFiles = make(map[string]bool, maximumFlushSyncedFilesOneTime)
@@ -383,7 +383,7 @@ func (s *syncRunner) syncToDir() error {
 		}
 
 		if err = storeSyncedFiles(metastore, syncedFiles); err != nil {
-			log.Errorf("Runner[%v] wrote synced files to %q failed: %v", s.meta.RunnerName, s.metastore)
+			log.Errorf("Runner[%v] wrote synced files to %q failed: %v", s.meta.RunnerName, s.metastore, err)
 		} else {
 			log.Infof("Runner[%v] wrote %d synced files to %q", s.meta.RunnerName, len(syncedFiles), s.metastore)
 		}

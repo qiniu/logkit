@@ -513,7 +513,7 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 			}
 
 			if ft.opt.longDataDiscard {
-				log.Infof("Runner[%v] Sender[%v] discard long data (more than 2M), length: ", ft.runnerName, ft.innerSender.Name(), len(string(dataBytes)))
+				log.Infof("Runner[%s] Sender[%s] discard long data (more than 2M), length: %d", ft.runnerName, ft.innerSender.Name(), len(string(dataBytes)))
 				return retDatasContext
 			}
 
@@ -523,7 +523,7 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 			for failCtxDataKey, failCtxDataVal := range failCtxData {
 				byteVal, err := json.Marshal(failCtxDataVal)
 				if err != nil {
-					log.Warnf("Runner[%v] marshal data to string error %v", ft.runnerName, err)
+					log.Warnf("Runner[%s] marshal data to string error %v", ft.runnerName, err)
 				}
 
 				if len(byteVal) < DefaultMaxBatchSize {
@@ -608,7 +608,7 @@ func (ft *FtSender) sendFromQueue(queueName string, readChan <-chan []byte, read
 			numWaits = 1
 			//此处的成功发送没有被stats统计
 		} else {
-			log.Errorf("Runner[%v] Sender[%v] cannot send points from queue %v, error is %v", ft.runnerName, ft.innerSender.Name(), queueName, err)
+			log.Errorf("Runner[%s] Sender[%s] cannot send points from queue %s, error is %v", ft.runnerName, ft.innerSender.Name(), queueName, err)
 			//此处的发送错误没有被stats统计
 			numWaits++
 			if numWaits > 10 {

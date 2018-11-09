@@ -33,7 +33,7 @@ var jsontool = jsoniter.Config{
 type Parser struct {
 	name                 string
 	schema               []field
-	labels               []parser.Label
+	labels               []GrokLabel
 	delim                string
 	isAutoRename         bool
 	timeZoneOffset       int
@@ -66,7 +66,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		return nil, err
 	}
 	timeZoneOffsetRaw, _ := c.GetStringOr(KeyTimeZoneOffset, "")
-	timeZoneOffset := parser.ParseTimeZoneOffset(timeZoneOffsetRaw)
+	timeZoneOffset := ParseTimeZoneOffset(timeZoneOffsetRaw)
 	isAutoRename, _ := c.GetBoolOr(KeyCSVAutoRename, false)
 
 	fieldList, err := parseSchemaFieldList(schema)
@@ -89,7 +89,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	if len(labelList) < 1 {
 		labelList, _ = c.GetStringListOr(KeyCSVLabels, []string{}) //向前兼容老的配置
 	}
-	labels := parser.GetLabels(labelList, nameMap)
+	labels := GetGrokLabels(labelList, nameMap)
 
 	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
 

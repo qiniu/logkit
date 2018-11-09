@@ -23,7 +23,7 @@ func init() {
 
 type Parser struct {
 	name                 string
-	labels               []parser.Label
+	labels               []GrokLabel
 	disableRecordErrData bool
 	jsontool             jsoniter.API
 	numRoutine           int
@@ -34,7 +34,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	name, _ := c.GetStringOr(KeyParserName, "")
 	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
 	nameMap := map[string]struct{}{}
-	labels := parser.GetLabels(labelList, nameMap)
+	labels := GetGrokLabels(labelList, nameMap)
 	jsontool := jsoniter.Config{
 		EscapeHTML: true,
 		UseNumber:  true,

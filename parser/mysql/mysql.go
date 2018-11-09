@@ -18,7 +18,7 @@ func init() {
 type Parser struct {
 	name                 string
 	ps                   *mysqllog.Parser
-	labels               []parser.Label
+	labels               []GrokLabel
 	disableRecordErrData bool
 	keepRawData          bool
 	rawDatas             []string
@@ -29,7 +29,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
 
 	nameMap := make(map[string]struct{})
-	labels := parser.GetLabels(labelList, nameMap)
+	labels := GetGrokLabels(labelList, nameMap)
 
 	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
 	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)

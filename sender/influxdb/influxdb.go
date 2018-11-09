@@ -131,7 +131,7 @@ func (s *Sender) Send(datas []Data) error {
 			} else {
 				partialData = string(buff)
 			}
-			log.Warnf("Runner[%s] %s data is out of retention and ignore_beyond_retention is true, some of ignored data %s it", s.runnerName, s.Name(), err, partialData)
+			log.Warnf("Runner[%s] %s data is out of retention and ignore_beyond_retention is true, error: %v, some of ignored data %s it", s.runnerName, s.Name(), err, partialData)
 			return nil
 		}
 		return reqerr.NewSendError(s.Name()+" Cannot write data into influxdb, error is "+err.Error(), sender.ConvertDatasBack(datas), reqerr.TypeDefault)

@@ -842,7 +842,7 @@ func (r *Reader) getInitScans(length int, rows *sql.Rows, sqltype string) (scanA
 		scanArgs = nochoice
 	}
 	if len(tps) != length {
-		log.Errorf("Runner[%v] %v getInitScans length is %v not equal to columetypes %v", length, len(tps))
+		log.Errorf("Runner[%s] %s getInitScans length is %d not equal to columetypes %d", r.meta.RunnerName, r.Name(), length, len(tps))
 		scanArgs = nochoice
 	}
 	scanArgs = make([]interface{}, length)
@@ -894,7 +894,7 @@ func (r *Reader) getInitScans(length int, rows *sql.Rows, sqltype string) (scanA
 				nochoiced[i] = true
 			}
 		}
-		log.Infof("Runner[%v] %v Init field %v scan type is %v ", r.meta.RunnerName, r.Name(), v.Name(), scantype)
+		log.Infof("Runner[%s] %s Init field %s scan type is %v ", r.meta.RunnerName, r.Name(), v.Name(), scantype)
 	}
 
 	return scanArgs, nochoiced
@@ -1053,13 +1053,13 @@ func (r *Reader) execReadDB(curDB string, now time.Time, recordTablesDone TableR
 		// 获取符合条件的数据表和获取所有数据的语句
 		tables, sqls, err = r.getValidData(connectStr, curDB, r.rawTable, now, TABLE)
 		if err != nil {
-			log.Errorf("Runner[%v] %v rawTable: %v get tables and sqls error %v", r.meta.RunnerName, r.Name(), r.rawTable, r.rawSQLs, err)
+			log.Errorf("Runner[%s] %s rawTable: %v rawSQLs: %v get tables and sqls error %v", r.meta.RunnerName, r.Name(), r.rawTable, r.rawSQLs, err)
 			if len(tables) == 0 && sqls == "" {
 				return err
 			}
 		}
 
-		log.Infof("Runner[%v] %v default sqls %v", r.meta.RunnerName, r.Name(), sqls)
+		log.Infof("Runner[%s] %s default sqls %v", r.meta.RunnerName, r.Name(), sqls)
 
 		if r.omitDoneDBRecords && !recordTablesDone.restoreTableDone(r.meta, curDB, tables) {
 			// 兼容
@@ -1067,7 +1067,7 @@ func (r *Reader) execReadDB(curDB string, now time.Time, recordTablesDone TableR
 			r.doneRecords.SetTableRecords(curDB, recordTablesDone)
 		}
 	}
-	log.Infof("Runner[%v] %v get valid tables: %v, recordTablesDone: %v", r.meta.RunnerName, r.Name(), tables, recordTablesDone)
+	log.Infof("Runner[%s] %s get valid tables: %v, recordTablesDone: %v", r.meta.RunnerName, r.Name(), tables, recordTablesDone)
 
 	var sqlsSlice []string
 	if r.rawSQLs != "" {

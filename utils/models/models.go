@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"regexp"
 	"runtime"
 	"sync/atomic"
 
@@ -60,6 +61,12 @@ const (
 	Checkbox    = "checkbox"
 	Radio       = "radio"
 	InputNumber = "inputNumber"
+
+	LONG   = "long"
+	FLOAT  = "float"
+	STRING = "string"
+	DATE   = "date"
+	DROP   = "drop"
 )
 
 var (
@@ -67,6 +74,15 @@ var (
 	NumCPU                      = runtime.NumCPU()
 	LogkitAutoCreateDescription = "由logkit日志收集自动创建"
 	MetricAutoCreateDescription = "由logkit监控收集自动创建"
+
+	// matches named captures that contain a modifier.
+	//   ie,
+	//     %{NUMBER:bytes:long}
+	//     %{IPORHOST:clientip:date}
+	//     %{HTTPDATE:ts1:float}
+	ModifierRe = regexp.MustCompile(`%{\w+:(\w+):(long|string|date|float|drop)}`)
+	// matches a plain pattern name. ie, %{NUMBER}
+	PatternOnlyRe = regexp.MustCompile(`%{(\w+)}`)
 )
 
 type Option struct {
@@ -90,6 +106,18 @@ type Option struct {
 	MutiDefaultSource  bool                   `json:"muti_default_source"`
 	MultiDefault       map[string]interface{} `json:"multi_default,omitempty"`
 	MultiDefaultDepend string                 `json:"multi_default_depend,omitempty"`
+}
+
+type GrokLabel struct {
+	Name  string
+	Value string
+}
+
+func NewGrokLabel(name, dataValue string) GrokLabel {
+	return GrokLabel{
+		Name:  name,
+		Value: dataValue,
+	}
 }
 
 type KeyValue struct {

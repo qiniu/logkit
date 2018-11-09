@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -26,26 +25,9 @@ const (
 	ModeMulti = "multi"
 )
 
-const (
-	LONG   = "long"
-	FLOAT  = "float"
-	STRING = "string"
-	DATE   = "date"
-	DROP   = "drop"
-)
-
 const MaxGrokMultiLineBuffer = 64 * 1024 * 1024 // 64MB
 
-var (
-	// matches named captures that contain a modifier.
-	//   ie,
-	//     %{NUMBER:bytes:long}
-	//     %{IPORHOST:clientip:date}
-	//     %{HTTPDATE:ts1:float}
-	modifierRe = regexp.MustCompile(`%{\w+:(\w+):(long|string|date|float|drop)}`)
-	// matches a plain pattern name. ie, %{NUMBER}
-	patternOnlyRe = regexp.MustCompile(`%{(\w+)}`)
-)
+var ()
 
 func init() {
 	parser.RegisterConstructor(TypeGrok, NewParser)
@@ -53,7 +35,7 @@ func init() {
 
 type Parser struct {
 	name                 string
-	labels               []parser.Label
+	labels               []GrokLabel
 	mode                 string
 	disableRecordErrData bool
 
@@ -100,9 +82,9 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	mode, _ := c.GetStringOr(KeyGrokMode, "")
 	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
 	timeZoneOffsetRaw, _ := c.GetStringOr(KeyTimeZoneOffset, "")
-	timeZoneOffset := parser.ParseTimeZoneOffset(timeZoneOffsetRaw)
+	timeZoneOffset := ParseTimeZoneOffset(timeZoneOffsetRaw)
 	nameMap := make(map[string]struct{})
-	labels := parser.GetLabels(labelList, nameMap)
+	labels := GetGrokLabels(labelList, nameMap)
 
 	customPatterns, _ := c.GetStringOr(KeyGrokCustomPatterns, "")
 	customPatternFiles, _ := c.GetStringListOr(KeyGrokCustomPatternFiles, []string{})
@@ -352,7 +334,7 @@ func (p *Parser) parse(line string) (Data, error) {
 func (p *Parser) addCustomPatterns(scanner *bufio.Scanner) error {
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		line = trimInvalidSpace(line)
+		line = TrimInvalidSpace(line)
 		if len(line) > 0 && line[0] != '#' {
 			names := strings.SplitN(line, " ", 2)
 			if len(names) < 2 {
@@ -370,7 +352,7 @@ func (p *Parser) compileCustomPatterns() error {
 	// replace it with the subpattern for modifier inheritance.
 	for i := 0; i < 2; i++ {
 		for name, pattern := range p.patterns {
-			subNames := patternOnlyRe.FindAllStringSubmatch(pattern, -1)
+			subNames := PatternOnlyRe.FindAllStringSubmatch(pattern, -1)
 			for _, subName := range subNames {
 				if subPattern, ok := p.patterns[subName[1]]; ok {
 					pattern = strings.Replace(pattern, subName[0], subPattern, 1)
@@ -382,7 +364,7 @@ func (p *Parser) compileCustomPatterns() error {
 
 	// check if pattern contains modifiers. Parse them out if it does.
 	for name, pattern := range p.patterns {
-		if modifierRe.MatchString(pattern) {
+		if ModifierRe.MatchString(pattern) {
 			// this pattern has modifiers, so parse out the modifiers
 			pattern, err = p.parseTypedCaptures(name, pattern)
 			if err != nil {
@@ -395,38 +377,10 @@ func (p *Parser) compileCustomPatterns() error {
 	return p.g.AddPatternsFromMap(p.patterns)
 }
 
-func trimInvalidSpace(pattern string) string {
-	reg := regexp.MustCompile(`%{((.*?:)*?.*?)}`)
-	substringIndex := reg.FindAllStringSubmatchIndex(pattern, -1)
-	curIndex := 0
-	var clearString string = ""
-	for _, val := range substringIndex {
-		if curIndex < val[2] {
-			clearString += pattern[curIndex:val[2]]
-		}
-		subString := pattern[val[2]:val[3]]
-		subStringSlice := strings.Split(subString, ":")
-		subLen := len(subStringSlice)
-		for index, chr := range subStringSlice {
-			clearString += strings.TrimSpace(chr)
-			if index != subLen-1 {
-				clearString += ":"
-			} else {
-				clearString += "}"
-			}
-		}
-		curIndex = val[3] + 1
-	}
-	if curIndex < len(pattern) {
-		clearString += pattern[curIndex:]
-	}
-	return clearString
-}
-
 // parseTypedCaptures parses the capture modifiers, and then deletes the
 // modifier from the line so that it is a valid "grok" pattern again.
 func (p *Parser) parseTypedCaptures(name, pattern string) (string, error) {
-	matches := modifierRe.FindAllStringSubmatch(pattern, -1)
+	matches := ModifierRe.FindAllStringSubmatch(pattern, -1)
 
 	// grab the name of the capture pattern
 	patternName := "%{" + name + "}"

@@ -25,11 +25,6 @@ type Flushable interface {
 	Flush() (Data, error)
 }
 
-type Label struct {
-	Name  string
-	Value string
-}
-
 type ParseInfo struct {
 	Line  string
 	Index int

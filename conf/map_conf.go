@@ -158,14 +158,7 @@ func (conf MapConf) GetStringList(key string) ([]string, error) {
 	if !exist {
 		return []string{}, ErrConfMissingKey(key, StringListType)
 	}
-	v := strings.Split(value, ",")
-	var newV []string
-	for _, i := range v {
-		trimI := strings.TrimSpace(i)
-		if len(trimI) > 0 {
-			newV = append(newV, trimI)
-		}
-	}
+	newV := GetStringList(value)
 	if len(newV) <= 0 {
 		return []string{}, ErrConfKeyType(key, StringListType)
 	}
@@ -268,6 +261,18 @@ func (conf MapConf) GetPasswordEnvStringOr(key, deft string) (string, error) {
 	}
 
 	return value, nil
+}
+
+func GetStringList(value string) []string {
+	v := strings.Split(value, ",")
+	var newV []string
+	for _, i := range v {
+		trimI := strings.TrimSpace(i)
+		if len(trimI) > 0 {
+			newV = append(newV, trimI)
+		}
+	}
+	return newV
 }
 
 // parse ${ENV} to ENV
