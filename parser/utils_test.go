@@ -1,11 +1,8 @@
 package parser
 
 import (
-	"reflect"
 	"strconv"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 type cmdArgs struct {
@@ -34,75 +31,5 @@ func Test_UtilsTime(t *testing.T) {
 	}
 	if s4 != s3+300 {
 		t.Errorf("Time5Min err: t1: %v, s3: %v, t3: %v, s4: %v", t1, s3, t3, s4)
-	}
-}
-
-func Test_getLabels(t *testing.T) {
-	tests := []struct {
-		labelList []string
-		nameLabel map[string]struct{}
-		exp       []Label
-	}{
-		{
-			labelList: []string{"a v", "x y"},
-			nameLabel: map[string]struct{}{},
-			exp:       []Label{{Name: "a", Value: "v"}, {Name: "x", Value: "y"}},
-		},
-		{
-			labelList: []string{"a v", "x"},
-			nameLabel: map[string]struct{}{},
-			exp:       []Label{{Name: "a", Value: "v"}},
-		},
-		{
-			labelList: []string{"a v", "x y"},
-			nameLabel: map[string]struct{}{"x": struct{}{}},
-			exp:       []Label{{Name: "a", Value: "v"}},
-		},
-	}
-	for _, ti := range tests {
-		labes := GetLabels(ti.labelList, ti.nameLabel)
-		if !reflect.DeepEqual(labes, ti.exp) {
-			t.Errorf("Test_getLabels error exp %v but got %v", ti.exp, labes)
-		}
-	}
-}
-
-func TestParseTimeZoneOffset(t *testing.T) {
-	tests := []struct {
-		s   string
-		exp int
-	}{
-		{
-			s:   "+08",
-			exp: 8,
-		},
-		{
-			s:   "+8",
-			exp: 8,
-		},
-		{
-			s:   "8",
-			exp: 8,
-		},
-		{
-			s:   "-8",
-			exp: -8,
-		},
-		{
-			s:   "-08",
-			exp: -8,
-		},
-		{
-			s:   "-1",
-			exp: -1,
-		},
-		{
-			s:   "0",
-			exp: 0,
-		},
-	}
-	for _, ti := range tests {
-		got := ParseTimeZoneOffset(ti.s)
-		assert.Equal(t, ti.exp, got)
 	}
 }

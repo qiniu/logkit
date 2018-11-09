@@ -16,7 +16,7 @@ func init() {
 
 type Parser struct {
 	name                 string
-	labels               []parser.Label
+	labels               []GrokLabel
 	withTimeStamp        bool
 	disableRecordErrData bool
 }
@@ -26,7 +26,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
 	withtimestamp, _ := c.GetBoolOr(KeyTimestamp, true)
 	nameMap := make(map[string]struct{})
-	labels := parser.GetLabels(labelList, nameMap)
+	labels := GetGrokLabels(labelList, nameMap)
 
 	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
 

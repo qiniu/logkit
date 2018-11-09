@@ -539,7 +539,7 @@ func (p *Procstat) findPids() ([]PID, error) {
 	}
 	if p.CGroup != "" {
 		if ps, err = p.cgroupPIDs(); err != nil {
-			log.Warnf("get pids by cgroup error %v", p.CGroup, err)
+			log.Warnf("cgroup: %s get pids by cgroup error %v", p.CGroup, err)
 		} else {
 			pids = append(pids, ps...)
 		}

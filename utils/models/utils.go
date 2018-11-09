@@ -884,3 +884,73 @@ func IsSubMetaExpire(submetaExpire, expire time.Duration) bool {
 func IsSubmetaExpireValid(submetaExpire, expire time.Duration) bool {
 	return submetaExpire.Nanoseconds() > 0 && submetaExpire < expire
 }
+
+func TrimInvalidSpace(pattern string) string {
+	reg := regexp.MustCompile(`%{((.*?:)*?.*?)}`)
+	substringIndex := reg.FindAllStringSubmatchIndex(pattern, -1)
+	curIndex := 0
+	var clearString string = ""
+	for _, val := range substringIndex {
+		if curIndex < val[2] {
+			clearString += pattern[curIndex:val[2]]
+		}
+		subString := pattern[val[2]:val[3]]
+		subStringSlice := strings.Split(subString, ":")
+		subLen := len(subStringSlice)
+		for index, chr := range subStringSlice {
+			clearString += strings.TrimSpace(chr)
+			if index != subLen-1 {
+				clearString += ":"
+			} else {
+				clearString += "}"
+			}
+		}
+		curIndex = val[3] + 1
+	}
+	if curIndex < len(pattern) {
+		clearString += pattern[curIndex:]
+	}
+	return clearString
+}
+
+func ParseTimeZoneOffset(zoneoffset string) (ret int) {
+	zoneoffset = strings.TrimSpace(zoneoffset)
+	if zoneoffset == "" {
+		return
+	}
+	mi := false
+	if strings.HasPrefix(zoneoffset, "-") {
+		mi = true
+	}
+	zoneoffset = strings.Trim(zoneoffset, "+-")
+	i, err := strconv.ParseInt(zoneoffset, 10, 64)
+	if err != nil {
+		log.Errorf("parse %v error %v, ignore zoneoffset...", zoneoffset, err)
+		return
+	}
+	ret = int(i)
+	if mi {
+		ret = 0 - ret
+	}
+	return
+}
+
+func GetGrokLabels(labelList []string, nameMap map[string]struct{}) (labels []GrokLabel) {
+	labels = make([]GrokLabel, 0)
+	for _, f := range labelList {
+		parts := strings.Fields(f)
+		if len(parts) < 2 {
+			log.Errorf("label conf error: " + f + ", format should be \"labelName labelValue\", ignore this label...")
+			continue
+		}
+		labelName, labelValue := parts[0], parts[1]
+		if _, ok := nameMap[labelName]; ok {
+			log.Errorf("label name %v was duplicated, ignore this lable <%v,%v>...", labelName, labelName, labelValue)
+			continue
+		}
+		nameMap[labelName] = struct{}{}
+		l := NewGrokLabel(labelName, labelValue)
+		labels = append(labels, l)
+	}
+	return
+}

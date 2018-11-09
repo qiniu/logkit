@@ -1089,3 +1089,184 @@ func BenchmarkErrors(b *testing.B) {
 		errors.New("test fmt errorf and errors.new with benchmark: " + "my error")
 	}
 }
+
+func Benchmark_GrokTrimInvalidSpace(b *testing.B) {
+	src := "TEST_LOG_A %{NUMBER :myfloat:  float} %{  RESPONSE_CODE} %{IPORHOST : clientip} %{  RESPONSE_TIME}"
+	for i := 0; i < b.N; i++ {
+		TrimInvalidSpace(src)
+	}
+}
+
+func TestTrimInvalidSpace(t *testing.T) {
+	tests := []struct {
+		s   string
+		exp string
+	}{
+		{
+			"%{aaa}",
+			"%{aaa}",
+		},
+		{
+			"%{  aa}",
+			"%{aa}",
+		},
+		{
+			"%{aaa }",
+			"%{aaa}",
+		},
+		{
+			"%{ aa a }",
+			"%{aa a}",
+		},
+		{
+			"%{ a a:	bb }",
+			"%{a a:bb}",
+		},
+		{
+			"%{ aa a : b	bb b :ss }",
+			"%{aa a:b	bb b:ss}",
+		},
+		{
+			"%{ a aa: b b :c} :$ s absc%{ aa: b bb }",
+			"%{a aa:b b:c} :$ s absc%{aa:b bb}",
+		},
+		{
+			"%{ a a : b b : c c } : %{ d d : e e } : %{ f f }",
+			"%{a a:b b:c c} : %{d d:e e} : %{f f}",
+		},
+		{
+			"%{a:a} aa : bb %{b:c} bb : cc %{e} ee: ff",
+			"%{a:a} aa : bb %{b:c} bb : cc %{e} ee: ff",
+		},
+		{
+			"%{aaa:bbb:ccc}%{aaa:bbb}%{aaa}",
+			"%{aaa:bbb:ccc}%{aaa:bbb}%{aaa}",
+		},
+		{
+			"DURATION %{NUMBER  }[nuµm]?s",
+			"DURATION %{NUMBER}[nuµm]?s",
+		},
+		{
+			"DURATION %{NUMBER  }[nuµm]?s",
+			"DURATION %{NUMBER}[nuµm]?s",
+		},
+		{
+			"RESPONSE_CODE %{ NUMBER :   response_code }",
+			"RESPONSE_CODE %{NUMBER:response_code}",
+		},
+		{
+			"RESPONSE_TIME %{ DURATION :  response_time  }",
+			"RESPONSE_TIME %{DURATION:response_time}",
+		},
+		{
+			"TEST_LOG_A %{NUMBER :myfloat:  float} %{  RESPONSE_CODE} %{IPORHOST : clientip} %{  RESPONSE_TIME}",
+			"TEST_LOG_A %{NUMBER:myfloat:float} %{RESPONSE_CODE} %{IPORHOST:clientip} %{RESPONSE_TIME}",
+		},
+		{
+			"%{{}",
+			"%{{}",
+		},
+		{
+			"%{ { }",
+			"%{{}",
+		},
+		{
+			"%{ { } } ",
+			"%{{} } ",
+		},
+		{
+			"%{}",
+			"%{}",
+		},
+		{
+			"%{ }",
+			"%{}",
+		},
+		{
+			"%{",
+			"%{",
+		},
+		{
+			"%}",
+			"%}",
+		},
+		{
+			"{ }",
+			"{ }",
+		},
+	}
+	for _, ti := range tests {
+		got := TrimInvalidSpace(ti.s)
+		assert.Equal(t, ti.exp, got)
+	}
+}
+
+func Test_GetGrokLabels(t *testing.T) {
+	tests := []struct {
+		labelList []string
+		nameLabel map[string]struct{}
+		exp       []GrokLabel
+	}{
+		{
+			labelList: []string{"a v", "x y"},
+			nameLabel: map[string]struct{}{},
+			exp:       []GrokLabel{{Name: "a", Value: "v"}, {Name: "x", Value: "y"}},
+		},
+		{
+			labelList: []string{"a v", "x"},
+			nameLabel: map[string]struct{}{},
+			exp:       []GrokLabel{{Name: "a", Value: "v"}},
+		},
+		{
+			labelList: []string{"a v", "x y"},
+			nameLabel: map[string]struct{}{"x": struct{}{}},
+			exp:       []GrokLabel{{Name: "a", Value: "v"}},
+		},
+	}
+	for _, ti := range tests {
+		labels := GetGrokLabels(ti.labelList, ti.nameLabel)
+		if !reflect.DeepEqual(labels, ti.exp) {
+			t.Errorf("Test_getLabels error exp %v but got %v", ti.exp, labels)
+		}
+	}
+}
+
+func TestParseTimeZoneOffset(t *testing.T) {
+	tests := []struct {
+		s   string
+		exp int
+	}{
+		{
+			s:   "+08",
+			exp: 8,
+		},
+		{
+			s:   "+8",
+			exp: 8,
+		},
+		{
+			s:   "8",
+			exp: 8,
+		},
+		{
+			s:   "-8",
+			exp: -8,
+		},
+		{
+			s:   "-08",
+			exp: -8,
+		},
+		{
+			s:   "-1",
+			exp: -1,
+		},
+		{
+			s:   "0",
+			exp: 0,
+		},
+	}
+	for _, ti := range tests {
+		got := ParseTimeZoneOffset(ti.s)
+		assert.Equal(t, ti.exp, got)
+	}
+}

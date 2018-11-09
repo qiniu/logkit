@@ -29,7 +29,7 @@ type Parser struct {
 	name                 string
 	regexp               *regexp.Regexp
 	schema               map[string]string
-	labels               []parser.Label
+	labels               []GrokLabel
 	disableRecordErrData bool
 	numRoutine           int
 	keepRawData          bool
@@ -46,7 +46,7 @@ func NewNginxAccParser(c conf.MapConf) (p *Parser, err error) {
 	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
 	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)
 	nameMap := make(map[string]struct{})
-	labels := parser.GetLabels(labelList, nameMap)
+	labels := GetGrokLabels(labelList, nameMap)
 	numRoutine := MaxProcs
 	if numRoutine == 0 {
 		numRoutine = 1

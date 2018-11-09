@@ -102,7 +102,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	maxline, _ := c.GetIntOr(KeySyslogMaxline, 100)
 
 	nameMap := make(map[string]struct{})
-	labels := parser.GetLabels(labelList, nameMap)
+	labels := GetGrokLabels(labelList, nameMap)
 
 	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
 	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)
@@ -123,7 +123,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 
 type SyslogParser struct {
 	name                 string
-	labels               []parser.Label
+	labels               []GrokLabel
 	buff                 *bytes.Buffer
 	format               Format
 	maxline              int
