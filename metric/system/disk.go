@@ -6,9 +6,10 @@ import (
 	"strings"
 	"sync"
 
+	"time"
+
 	"github.com/qiniu/logkit/metric"
 	. "github.com/qiniu/logkit/utils/models"
-	"time"
 )
 
 const (
@@ -146,9 +147,9 @@ const (
 	KeyDiskioWriteBytesPerSec       = "diskio_write_bytes_per_sec"
 	KeyDiskioReadTime               = "diskio_read_time"
 	KeyDiskioWriteTime              = "diskio_write_time"
-	KeyDiskioReadAWait               = "diskio_read_await"
-	KeyDiskioWriteAWait              = "diskio_write_await"
-	KeyDiskioAWait                   = "diskio_await"
+	KeyDiskioReadAWait              = "diskio_read_await"
+	KeyDiskioWriteAWait             = "diskio_write_await"
+	KeyDiskioAWait                  = "diskio_await"
 	KeyDiskioIoTime                 = "diskio_io_time"
 	KeyDiskioIoUtil                 = "diskio_io_util"
 	KeyDiskioIopsInProgress         = "diskio_iops_in_progress"
@@ -291,9 +292,9 @@ func (s *DiskIOStats) Collect() (datas []map[string]interface{}, err error) {
 			KeyDiskioWriteBytesPerSec:       0,
 			KeyDiskioReadTime:               io.ReadTime,
 			KeyDiskioWriteTime:              io.WriteTime,
-			KeyDiskioReadAWait:               0,
-			KeyDiskioWriteAWait:              0,
-			KeyDiskioAWait:                   0,
+			KeyDiskioReadAWait:              0,
+			KeyDiskioWriteAWait:             0,
+			KeyDiskioAWait:                  0,
 			KeyDiskioIoTime:                 io.IoTime,
 			KeyDiskioIoUtil:                 0,
 			KeyDiskioIopsInProgress:         io.IopsInProgress,
@@ -426,7 +427,7 @@ func init() {
 	ps2 := newSystemPS()
 	metric.Add(TypeMetricDiskio, func() metric.Collector {
 		return &DiskIOStats{ps: ps2,
-			lastCollect: make(map[string]DiskioCollectInfo),
+			lastCollect:      make(map[string]DiskioCollectInfo),
 			SkipSerialNumber: true}
 	})
 }
