@@ -172,7 +172,7 @@ func (r *Reader) ReadLine() (string, error) {
 					log.Error(gerr)
 					return "", gerr
 				}
-				defer r.Close()
+				defer gr.Close()
 				bLine, rerr := ioutil.ReadAll(gr)
 				if rerr != nil {
 					rerr = fmt.Errorf("runner[%v] Uncompress gzip Error: %s\n", r.meta.RunnerName, rerr)
