@@ -27,16 +27,18 @@ type UATransformer struct {
 	Key              string `json:"key"`
 	RegexYmlFilePath string `json:"regex_yml_path"`
 	UA_Device        string `json:"device"`
-	dev              bool
 	UA_OS            string `json:"os"`
-	os               bool
 	UA_Agent         string `json:"agent"`
-	agent            bool
 	MemCache         string `json:"memory_cache"`
-	memcache         bool
-	stats            StatsInfo
-	uap              *uaparser.Parser
-	cache            *sync.Map
+
+	dev      bool
+	os       bool
+	agent    bool
+	memcache bool
+	stats    StatsInfo
+	uap      *uaparser.Parser
+	cache    *sync.Map
+	keys     []string
 
 	numRoutine int
 }
@@ -56,6 +58,7 @@ func (it *UATransformer) Init() (err error) {
 	it.agent, _ = strconv.ParseBool(it.UA_Agent)
 	it.dev, _ = strconv.ParseBool(it.UA_Device)
 	it.os, _ = strconv.ParseBool(it.UA_OS)
+	it.keys = GetKeys(it.Key)
 	numRoutine := MaxProcs
 	if numRoutine == 0 {
 		numRoutine = 1
@@ -123,8 +126,10 @@ func (it *UATransformer) Transform(datas []Data) ([]Data, error) {
 	if it.uap == nil {
 		it.uap = uaparser.NewFromSaved()
 	}
-	var err, fmtErr error
-	errNum := 0
+	var (
+		err, fmtErr error
+		errNum      int
+	)
 
 	numRoutine := it.numRoutine
 	if len(datas) < numRoutine {
@@ -272,14 +277,13 @@ func (it *UATransformer) transform(dataPipline <-chan transforms.TransformInfo, 
 		err    error
 		errNum int
 	)
-	keys := GetKeys(it.Key)
-	newKeys := make([]string, len(keys))
+	newKeys := make([]string, len(it.keys))
 	for transformInfo := range dataPipline {
 		err = nil
 		errNum = 0
 
-		copy(newKeys, keys)
-		val, getErr := GetMapValue(transformInfo.CurData, keys...)
+		copy(newKeys, it.keys)
+		val, getErr := GetMapValue(transformInfo.CurData, it.keys...)
 		if getErr != nil {
 			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, it.Key)
 			resultChan <- transforms.TransformResult{

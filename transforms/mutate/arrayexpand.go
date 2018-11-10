@@ -3,7 +3,9 @@ package mutate
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
+	"sync"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/transforms"
@@ -21,10 +23,17 @@ type ArrayExpand struct {
 	stats StatsInfo
 
 	keys []string
+
+	numRoutine int
 }
 
 func (p *ArrayExpand) Init() error {
 	p.keys = GetKeys(p.Key)
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = 1
+	}
+	p.numRoutine = numRoutine
 	return nil
 }
 
@@ -143,46 +152,58 @@ func (p *ArrayExpand) RawTransform(datas []string) ([]string, error) {
 }
 
 func (p *ArrayExpand) Transform(datas []Data) ([]Data, error) {
-	var err, fmtErr error
-	errNum := 0
 	if p.keys == nil {
 		p.Init()
 	}
-	newKeys := make([]string, len(p.keys))
-	for i := range datas {
-		copy(newKeys, p.keys)
-		val, getErr := GetMapValue(datas[i], p.keys...)
-		if getErr != nil {
-			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, p.Key)
-			continue
-		}
-		if resultMap := p.transformToMap(val, newKeys[len(p.keys)-1]); resultMap != nil {
-			for key, arrVal := range resultMap {
-				suffix := 0
-				keyName := key
-				newKeys[len(newKeys)-1] = keyName
-				_, getErr := GetMapValue(datas[i], newKeys...)
-				for ; getErr == nil; suffix++ {
-					if suffix > 5 {
-						log.Warnf("keys %v -- %v already exist, the key %v will be ignored", key, keyName, key)
-						break
-					}
-					keyName = key + "_" + strconv.Itoa(suffix)
-					newKeys[len(newKeys)-1] = keyName
-					_, getErr = GetMapValue(datas[i], newKeys...)
-				}
-				if suffix <= 5 {
-					setErr := SetMapValue(datas[i], arrVal, false, newKeys...)
-					if setErr != nil {
-						errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, p.Key)
-					}
-				}
-			}
-		} else {
-			typeErr := fmt.Errorf("transform key %v data type is not array", p.Key)
-			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
-		}
+
+	var (
+		err, fmtErr error
+		errNum      int
+	)
+	numRoutine := p.numRoutine
+	if len(datas) < numRoutine {
+		numRoutine = len(datas)
 	}
+	dataPipline := make(chan transforms.TransformInfo)
+	resultChan := make(chan transforms.TransformResult)
+
+	wg := new(sync.WaitGroup)
+	for i := 0; i < numRoutine; i++ {
+		wg.Add(1)
+		go p.transform(dataPipline, resultChan, wg)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, data := range datas {
+			dataPipline <- transforms.TransformInfo{
+				CurData: data,
+				Index:   idx,
+			}
+		}
+		close(dataPipline)
+	}()
+
+	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
+	for resultInfo := range resultChan {
+		transformResultSlice = append(transformResultSlice, resultInfo)
+	}
+	if numRoutine > 1 {
+		sort.Stable(transformResultSlice)
+	}
+
+	for _, transformResult := range transformResultSlice {
+		if transformResult.Err != nil {
+			err = transformResult.Err
+			errNum += transformResult.ErrNum
+		}
+		datas[transformResult.Index] = transformResult.CurData
+	}
+
 	p.stats, fmtErr = transforms.SetStatsInfo(err, p.stats, int64(errNum), int64(len(datas)), p.Type())
 	return datas, fmtErr
 }
@@ -226,4 +247,64 @@ func init() {
 	transforms.Add("arrayexpand", func() transforms.Transformer {
 		return &ArrayExpand{}
 	})
+}
+
+func (p *ArrayExpand) transform(dataPipline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+	var (
+		err    error
+		errNum int
+	)
+	newKeys := make([]string, len(p.keys))
+	for transformInfo := range dataPipline {
+		err = nil
+		errNum = 0
+
+		copy(newKeys, p.keys)
+		val, getErr := GetMapValue(transformInfo.CurData, p.keys...)
+		if getErr != nil {
+			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, p.Key)
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				ErrNum:  errNum,
+				Err:     err,
+			}
+			continue
+		}
+
+		if resultMap := p.transformToMap(val, newKeys[len(p.keys)-1]); resultMap != nil {
+			for key, arrVal := range resultMap {
+				suffix := 0
+				keyName := key
+				newKeys[len(newKeys)-1] = keyName
+				_, getErr := GetMapValue(transformInfo.CurData, newKeys...)
+				for ; getErr == nil; suffix++ {
+					if suffix > 5 {
+						log.Warnf("keys %v -- %v already exist, the key %v will be ignored", key, keyName, key)
+						break
+					}
+					keyName = key + "_" + strconv.Itoa(suffix)
+					newKeys[len(newKeys)-1] = keyName
+					_, getErr = GetMapValue(transformInfo.CurData, newKeys...)
+				}
+				if suffix <= 5 {
+					setErr := SetMapValue(transformInfo.CurData, arrVal, false, newKeys...)
+					if setErr != nil {
+						errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, p.Key)
+					}
+				}
+			}
+		} else {
+			typeErr := fmt.Errorf("transform key %v data type is not array", p.Key)
+			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
+		}
+
+		resultChan <- transforms.TransformResult{
+			Index:   transformInfo.Index,
+			CurData: transformInfo.CurData,
+			ErrNum:  errNum,
+			Err:     err,
+		}
+	}
+	wg.Done()
 }

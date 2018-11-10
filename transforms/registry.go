@@ -144,3 +144,29 @@ func (slice TransformResultSlice) Less(i, j int) bool {
 func (slice TransformResultSlice) Swap(i, j int) {
 	slice[i], slice[j] = slice[j], slice[i]
 }
+
+type RawTransformInfo struct {
+	CurData string
+	Index   int
+}
+
+type RawTransformResult struct {
+	Index   int
+	CurData string
+	Err     error
+	ErrNum  int
+}
+
+type RawTransformResultSlice []RawTransformResult
+
+func (slice RawTransformResultSlice) Len() int {
+	return len(slice)
+}
+
+func (slice RawTransformResultSlice) Less(i, j int) bool {
+	return slice[i].Index < slice[j].Index
+}
+
+func (slice RawTransformResultSlice) Swap(i, j int) {
+	slice[i], slice[j] = slice[j], slice[i]
+}

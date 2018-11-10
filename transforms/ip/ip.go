@@ -3,7 +3,9 @@ package ip
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
+	"sync"
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
@@ -54,6 +56,8 @@ type Transformer struct {
 	keysLatitude     []string
 	keysLongitude    []string
 	keysDistrictCode []string
+
+	numRoutine int
 }
 
 func (t *Transformer) Init() error {
@@ -88,6 +92,12 @@ func (t *Transformer) Init() error {
 	t.keysLatitude = generateKeys(t.keys, Latitude, t.KeyAsPrefix)
 	t.keysLongitude = generateKeys(t.keys, Longitude, t.KeyAsPrefix)
 	t.keysDistrictCode = generateKeys(t.keys, DistrictCode, t.KeyAsPrefix)
+
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = 1
+	}
+	t.numRoutine = numRoutine
 	return nil
 }
 
@@ -118,66 +128,49 @@ func (t *Transformer) Transform(datas []Data) ([]Data, error) {
 			return datas, err
 		}
 	}
-	newKeys := make([]string, len(t.keys))
-	for i := range datas {
-		copy(newKeys, t.keys)
-		val, getErr := GetMapValue(datas[i], t.keys...)
-		if getErr != nil {
-			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, t.Key)
-			continue
-		}
-		strVal, ok := val.(string)
-		if !ok {
-			notStringErr := fmt.Errorf("transform key %v data type is not string", t.Key)
-			errNum, err = transforms.SetError(errNum, notStringErr, transforms.General, "")
-			continue
-		}
-		strVal = strings.TrimSpace(strVal)
-		info, findErr := t.loc.Find(strVal)
-		if findErr != nil {
-			errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
-			continue
-		}
-		findErr = t.SetMapValue(datas[i], info.Region, t.keysRegion...)
-		if findErr != nil {
-			errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
-		}
-		findErr = t.SetMapValue(datas[i], info.City, t.keysCity...)
-		if findErr != nil {
-			errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
-		}
-		findErr = t.SetMapValue(datas[i], info.Country, t.keysCountry...)
-		if findErr != nil {
-			errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
-		}
-		findErr = t.SetMapValue(datas[i], info.Isp, t.keysIsp...)
-		if findErr != nil {
-			errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
-		}
-		if info.CountryCode != "" {
-			findErr = t.SetMapValue(datas[i], info.CountryCode, t.keysCountryCode...)
-			if findErr != nil {
-				errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
+
+	numRoutine := t.numRoutine
+	if len(datas) < numRoutine {
+		numRoutine = len(datas)
+	}
+	dataPipline := make(chan transforms.TransformInfo)
+	resultChan := make(chan transforms.TransformResult)
+
+	wg := new(sync.WaitGroup)
+	for i := 0; i < numRoutine; i++ {
+		wg.Add(1)
+		go t.transform(dataPipline, resultChan, wg)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, data := range datas {
+			dataPipline <- transforms.TransformInfo{
+				CurData: data,
+				Index:   idx,
 			}
 		}
-		if info.Latitude != "" {
-			findErr = t.SetMapValue(datas[i], info.Latitude, t.keysLatitude...)
-			if findErr != nil {
-				errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
-			}
+		close(dataPipline)
+	}()
+
+	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
+	for resultInfo := range resultChan {
+		transformResultSlice = append(transformResultSlice, resultInfo)
+	}
+	if numRoutine > 1 {
+		sort.Stable(transformResultSlice)
+	}
+
+	for _, transformResult := range transformResultSlice {
+		if transformResult.Err != nil {
+			err = transformResult.Err
+			errNum += transformResult.ErrNum
 		}
-		if info.Longitude != "" {
-			findErr = t.SetMapValue(datas[i], info.Longitude, t.keysLongitude...)
-			if findErr != nil {
-				errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
-			}
-		}
-		if info.DistrictCode != "" {
-			findErr = t.SetMapValue(datas[i], info.DistrictCode, t.keysDistrictCode...)
-			if findErr != nil {
-				errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
-			}
-		}
+		datas[transformResult.Index] = transformResult.CurData
 	}
 
 	t.stats, fmtErr = transforms.SetStatsInfo(err, t.stats, int64(errNum), int64(len(datas)), t.Type())
@@ -335,4 +328,101 @@ func init() {
 	transforms.Add(Name, func() transforms.Transformer {
 		return &Transformer{}
 	})
+}
+
+func (t *Transformer) transform(dataPipline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+	var (
+		err    error
+		errNum int
+	)
+	newKeys := make([]string, len(t.keys))
+	for transformInfo := range dataPipline {
+		err = nil
+		errNum = 0
+
+		copy(newKeys, t.keys)
+		val, getErr := GetMapValue(transformInfo.CurData, t.keys...)
+		if getErr != nil {
+			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, t.Key)
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				ErrNum:  errNum,
+				Err:     err,
+			}
+			continue
+		}
+		strVal, ok := val.(string)
+		if !ok {
+			notStringErr := fmt.Errorf("transform key %v data type is not string", t.Key)
+			errNum, err = transforms.SetError(errNum, notStringErr, transforms.General, "")
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				ErrNum:  errNum,
+				Err:     err,
+			}
+			continue
+		}
+		strVal = strings.TrimSpace(strVal)
+		info, findErr := t.loc.Find(strVal)
+		if findErr != nil {
+			errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				ErrNum:  errNum,
+				Err:     err,
+			}
+			continue
+		}
+		findErr = t.SetMapValue(transformInfo.CurData, info.Region, t.keysRegion...)
+		if findErr != nil {
+			errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
+		}
+		findErr = t.SetMapValue(transformInfo.CurData, info.City, t.keysCity...)
+		if findErr != nil {
+			errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
+		}
+		findErr = t.SetMapValue(transformInfo.CurData, info.Country, t.keysCountry...)
+		if findErr != nil {
+			errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
+		}
+		findErr = t.SetMapValue(transformInfo.CurData, info.Isp, t.keysIsp...)
+		if findErr != nil {
+			errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
+		}
+		if info.CountryCode != "" {
+			findErr = t.SetMapValue(transformInfo.CurData, info.CountryCode, t.keysCountryCode...)
+			if findErr != nil {
+				errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
+			}
+		}
+		if info.Latitude != "" {
+			findErr = t.SetMapValue(transformInfo.CurData, info.Latitude, t.keysLatitude...)
+			if findErr != nil {
+				errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
+			}
+		}
+		if info.Longitude != "" {
+			findErr = t.SetMapValue(transformInfo.CurData, info.Longitude, t.keysLongitude...)
+			if findErr != nil {
+				errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
+			}
+		}
+		if info.DistrictCode != "" {
+			findErr = t.SetMapValue(transformInfo.CurData, info.DistrictCode, t.keysDistrictCode...)
+			if findErr != nil {
+				errNum, err = transforms.SetError(errNum, findErr, transforms.General, "")
+			}
+		}
+
+		resultChan <- transforms.TransformResult{
+			Index:   transformInfo.Index,
+			CurData: transformInfo.CurData,
+			ErrNum:  errNum,
+			Err:     err,
+		}
+	}
+	wg.Done()
 }

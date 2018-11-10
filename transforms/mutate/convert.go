@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -18,12 +20,36 @@ import (
 var (
 	_ transforms.StatsTransformer = &Converter{}
 	_ transforms.Transformer      = &Converter{}
+	_ transforms.Initializer      = &Converter{}
 )
 
 type Converter struct {
-	DSL     string `json:"dsl"`
+	DSL string `json:"dsl"`
+
 	stats   StatsInfo
 	schemas []DslSchemaEntry
+	keysMap map[int][]string
+
+	numRoutine int
+}
+
+func (g *Converter) Init() error {
+	schemas, err := ParseDsl(g.DSL, 0)
+	if err != nil {
+		return fmt.Errorf("convert typedsl %s to schema error: %v", g.DSL, err)
+	}
+	g.schemas = schemas
+	g.keysMap = map[int][]string{}
+	for i, sc := range g.schemas {
+		g.keysMap[i] = GetKeys(sc.Key)
+	}
+
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = 1
+	}
+	g.numRoutine = numRoutine
+	return nil
 }
 
 func (g *Converter) RawTransform(datas []string) ([]string, error) {
@@ -31,19 +57,14 @@ func (g *Converter) RawTransform(datas []string) ([]string, error) {
 }
 
 func (g *Converter) Transform(datas []Data) ([]Data, error) {
-	var err, fmtErr error
-	errNum := 0
 	if g.schemas == nil {
-		schemas, err := ParseDsl(g.DSL, 0)
-		if err != nil {
-			err = fmt.Errorf("convert typedsl %s to schema error: %v", g.DSL, err)
-			errNum = len(datas)
-			g.schemas = make([]DslSchemaEntry, 0)
-		} else {
-			g.schemas = schemas
-		}
+		g.Init()
 	}
 
+	var (
+		err, fmtErr error
+		errNum      int
+	)
 	if len(g.schemas) == 0 {
 		err = fmt.Errorf("no valid dsl[%v] to schema, please enter correct format dsl: \"field type\"", g.DSL)
 		errNum = len(datas)
@@ -51,31 +72,48 @@ func (g *Converter) Transform(datas []Data) ([]Data, error) {
 		return datas, err
 	}
 
-	keysMap := map[int][]string{}
-	for i, sc := range g.schemas {
-		keys := GetKeys(sc.Key)
-		keysMap[i] = keys
+	numRoutine := g.numRoutine
+	if len(datas) < numRoutine {
+		numRoutine = len(datas)
 	}
-	for i := range datas {
-		for k, keys := range keysMap {
-			val, getErr := GetMapValue(datas[i], keys...)
-			if getErr != nil {
-				errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.schemas[k].Key)
-				continue
-			}
-			val, convertErr := dataConvert(val, g.schemas[k])
-			if convertErr != nil {
-				errNum, err = transforms.SetError(errNum, convertErr, transforms.General, "")
-			}
-			if val == nil {
-				DeleteMapValue(datas[i], keys...)
-				continue
-			}
-			setErr := SetMapValue(datas[i], val, false, keys...)
-			if setErr != nil {
-				errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, strings.Join(keys, "."))
+	dataPipline := make(chan transforms.TransformInfo)
+	resultChan := make(chan transforms.TransformResult)
+
+	wg := new(sync.WaitGroup)
+	for i := 0; i < numRoutine; i++ {
+		wg.Add(1)
+		go g.transform(dataPipline, resultChan, wg)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, data := range datas {
+			dataPipline <- transforms.TransformInfo{
+				CurData: data,
+				Index:   idx,
 			}
 		}
+		close(dataPipline)
+	}()
+
+	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
+	for resultInfo := range resultChan {
+		transformResultSlice = append(transformResultSlice, resultInfo)
+	}
+	if numRoutine > 1 {
+		sort.Stable(transformResultSlice)
+	}
+
+	for _, transformResult := range transformResultSlice {
+		if transformResult.Err != nil {
+			err = transformResult.Err
+			errNum += transformResult.ErrNum
+		}
+		datas[transformResult.Index] = transformResult.CurData
 	}
 
 	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
@@ -706,4 +744,43 @@ func mapDataConvert(mpvalue map[string]interface{}, schemas []DslSchemaEntry) (c
 		}
 	}
 	return mpvalue
+}
+
+func (g *Converter) transform(dataPipline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+	var (
+		err    error
+		errNum int
+	)
+	for transformInfo := range dataPipline {
+		err = nil
+		errNum = 0
+
+		for k, keys := range g.keysMap {
+			val, getErr := GetMapValue(transformInfo.CurData, keys...)
+			if getErr != nil {
+				errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.schemas[k].Key)
+				continue
+			}
+			val, convertErr := dataConvert(val, g.schemas[k])
+			if convertErr != nil {
+				errNum, err = transforms.SetError(errNum, convertErr, transforms.General, "")
+			}
+			if val == nil {
+				DeleteMapValue(transformInfo.CurData, keys...)
+				continue
+			}
+			setErr := SetMapValue(transformInfo.CurData, val, false, keys...)
+			if setErr != nil {
+				errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, strings.Join(keys, "."))
+			}
+		}
+
+		resultChan <- transforms.TransformResult{
+			Index:   transformInfo.Index,
+			CurData: transformInfo.CurData,
+			ErrNum:  errNum,
+			Err:     err,
+		}
+	}
+	wg.Done()
 }

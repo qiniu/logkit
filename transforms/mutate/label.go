@@ -3,6 +3,8 @@ package mutate
 import (
 	"errors"
 	"fmt"
+	"sort"
+	"sync"
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
@@ -11,13 +13,28 @@ import (
 var (
 	_ transforms.StatsTransformer = &Label{}
 	_ transforms.Transformer      = &Label{}
+	_ transforms.Initializer      = &Label{}
 )
 
 type Label struct {
 	Key      string `json:"key"`
 	Value    string `json:"value"`
 	Override bool   `json:"override"`
-	stats    StatsInfo
+
+	keys  []string
+	stats StatsInfo
+
+	numRoutine int
+}
+
+func (g *Label) Init() error {
+	g.keys = GetKeys(g.Key)
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = 1
+	}
+	g.numRoutine = numRoutine
+	return nil
 }
 
 func (g *Label) RawTransform(datas []string) ([]string, error) {
@@ -25,20 +42,57 @@ func (g *Label) RawTransform(datas []string) ([]string, error) {
 }
 
 func (g *Label) Transform(datas []Data) ([]Data, error) {
-	var err, fmtErr error
-	errNum := 0
-	keySlice := GetKeys(g.Key)
-	for i := range datas {
-		_, getErr := GetMapValue(datas[i], keySlice...)
-		if getErr == nil && !g.Override {
-			existErr := fmt.Errorf("the key %v already exists", g.Key)
-			errNum, err = transforms.SetError(errNum, existErr, transforms.General, "")
-			continue
+	if len(g.keys) == 0 {
+		g.Init()
+	}
+
+	var (
+		err, fmtErr error
+		errNum      int
+	)
+
+	numRoutine := g.numRoutine
+	if len(datas) < numRoutine {
+		numRoutine = len(datas)
+	}
+	dataPipline := make(chan transforms.TransformInfo)
+	resultChan := make(chan transforms.TransformResult)
+
+	wg := new(sync.WaitGroup)
+	for i := 0; i < numRoutine; i++ {
+		wg.Add(1)
+		go g.transform(dataPipline, resultChan, wg)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, data := range datas {
+			dataPipline <- transforms.TransformInfo{
+				CurData: data,
+				Index:   idx,
+			}
 		}
-		setErr := SetMapValue(datas[i], g.Value, false, keySlice...)
-		if setErr != nil {
-			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.Key)
+		close(dataPipline)
+	}()
+
+	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
+	for resultInfo := range resultChan {
+		transformResultSlice = append(transformResultSlice, resultInfo)
+	}
+	if numRoutine > 1 {
+		sort.Stable(transformResultSlice)
+	}
+
+	for _, transformResult := range transformResultSlice {
+		if transformResult.Err != nil {
+			err = transformResult.Err
+			errNum += transformResult.ErrNum
 		}
+		datas[transformResult.Index] = transformResult.CurData
 	}
 
 	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
@@ -105,4 +159,40 @@ func init() {
 	transforms.Add("label", func() transforms.Transformer {
 		return &Label{}
 	})
+}
+
+func (g *Label) transform(dataPipline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+	var (
+		err    error
+		errNum int
+	)
+	for transformInfo := range dataPipline {
+		err = nil
+		errNum = 0
+
+		_, getErr := GetMapValue(transformInfo.CurData, g.keys...)
+		if getErr == nil && !g.Override {
+			existErr := fmt.Errorf("the key %v already exists", g.Key)
+			errNum, err = transforms.SetError(errNum, existErr, transforms.General, "")
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				Err:     err,
+				ErrNum:  errNum,
+			}
+			continue
+		}
+		setErr := SetMapValue(transformInfo.CurData, g.Value, false, g.keys...)
+		if setErr != nil {
+			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.Key)
+		}
+
+		resultChan <- transforms.TransformResult{
+			Index:   transformInfo.Index,
+			CurData: transformInfo.CurData,
+			Err:     err,
+			ErrNum:  errNum,
+		}
+	}
+	wg.Done()
 }
