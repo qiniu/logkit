@@ -19,8 +19,9 @@ type Rename struct {
 	NewKey     string `json:"new"`
 	stats      StatsInfo
 
-	keys []string
-	news []string
+	keys       []string
+	news       []string
+	numRoutine int
 }
 
 func (g *Rename) Init() error {
@@ -29,6 +30,11 @@ func (g *Rename) Init() error {
 		g.NewKey = g.NewKeyName
 	}
 	g.news = GetKeys(g.NewKey)
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = 1
+	}
+	g.numRoutine = numRoutine
 	return nil
 }
 func (g *Rename) RawTransform(datas []string) ([]string, error) {

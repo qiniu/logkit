@@ -3,6 +3,8 @@ package mutate
 import (
 	"fmt"
 	"regexp"
+	"sort"
+	"sync"
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
@@ -23,7 +25,8 @@ type Replacer struct {
 	stats     StatsInfo
 	Regexp    *regexp.Regexp
 
-	keys []string
+	keys       []string
+	numRoutine int
 }
 
 func (g *Replacer) Init() error {
@@ -37,31 +40,65 @@ func (g *Replacer) Init() error {
 	}
 	g.Regexp = rgx
 	g.keys = GetKeys(g.Key)
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = 1
+	}
+	g.numRoutine = numRoutine
 	return nil
 }
 
 func (g *Replacer) Transform(datas []Data) ([]Data, error) {
-	var err, fmtErr error
-	errNum := 0
+	if len(g.keys) == 0 {
+		g.Init()
+	}
+	var (
+		err, fmtErr error
+		errNum      int
+	)
 
-	for i := range datas {
-		val, getErr := GetMapValue(datas[i], g.keys...)
-		if getErr != nil {
-			errNum++
-			err = fmt.Errorf("transform key %v not exist in data", g.Key)
-			continue
+	numRoutine := g.numRoutine
+	if len(datas) < numRoutine {
+		numRoutine = len(datas)
+	}
+	dataPipline := make(chan transforms.TransformInfo)
+	resultChan := make(chan transforms.TransformResult)
+
+	wg := new(sync.WaitGroup)
+	for i := 0; i < numRoutine; i++ {
+		wg.Add(1)
+		go g.transform(dataPipline, resultChan, wg)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, data := range datas {
+			dataPipline <- transforms.TransformInfo{
+				CurData: data,
+				Index:   idx,
+			}
 		}
-		strVal, ok := val.(string)
-		if !ok {
-			errNum++
-			err = fmt.Errorf("transform key %v data type is not string", g.Key)
-			continue
+		close(dataPipline)
+	}()
+
+	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
+	for resultInfo := range resultChan {
+		transformResultSlice = append(transformResultSlice, resultInfo)
+	}
+	if numRoutine > 1 {
+		sort.Stable(transformResultSlice)
+	}
+
+	for _, transformResult := range transformResultSlice {
+		if transformResult.Err != nil {
+			err = transformResult.Err
+			errNum += transformResult.ErrNum
 		}
-		setErr := SetMapValue(datas[i], g.Regexp.ReplaceAllString(strVal, g.New), false, g.keys...)
-		if setErr != nil {
-			errNum++
-			err = fmt.Errorf("value of %v is not the type of map[string]interface{}", g.Key)
-		}
+		datas[transformResult.Index] = transformResult.CurData
 	}
 
 	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
@@ -154,4 +191,53 @@ func init() {
 	transforms.Add("replace", func() transforms.Transformer {
 		return &Replacer{}
 	})
+}
+
+func (g *Replacer) transform(dataPipline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+	var (
+		err    error
+		errNum int
+	)
+	for transformInfo := range dataPipline {
+		err = nil
+		errNum = 0
+
+		val, getErr := GetMapValue(transformInfo.CurData, g.keys...)
+		if getErr != nil {
+			errNum++
+			err = fmt.Errorf("transform key %v not exist in data", g.Key)
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				Err:     err,
+				ErrNum:  errNum,
+			}
+			continue
+		}
+		strVal, ok := val.(string)
+		if !ok {
+			errNum++
+			err = fmt.Errorf("transform key %v data type is not string", g.Key)
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				Err:     err,
+				ErrNum:  errNum,
+			}
+			continue
+		}
+		setErr := SetMapValue(transformInfo.CurData, g.Regexp.ReplaceAllString(strVal, g.New), false, g.keys...)
+		if setErr != nil {
+			errNum++
+			err = fmt.Errorf("value of %v is not the type of map[string]interface{}", g.Key)
+		}
+
+		resultChan <- transforms.TransformResult{
+			Index:   transformInfo.Index,
+			CurData: transformInfo.CurData,
+			Err:     err,
+			ErrNum:  errNum,
+		}
+	}
+	wg.Done()
 }

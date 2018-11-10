@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/transforms"
@@ -30,6 +32,8 @@ type UrlParam struct {
 	keys          []string
 	selectKeyList []string // slice 形式存放收集的 key 名称
 	stats         StatsInfo
+
+	numRoutine int
 }
 
 func (p *UrlParam) Init() error {
@@ -43,6 +47,12 @@ func (p *UrlParam) Init() error {
 			p.selectKeyList = append(p.selectKeyList, selectKeys[i])
 		}
 	}
+
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = 1
+	}
+	p.numRoutine = numRoutine
 	return nil
 }
 
@@ -115,51 +125,52 @@ func (p *UrlParam) Transform(datas []Data) ([]Data, error) {
 	if p.keys == nil {
 		p.Init()
 	}
-	var err, fmtErr, toMapErr error
-	errNum := 0
-	newKeys := make([]string, len(p.keys))
-	for i := range datas {
-		copy(newKeys, p.keys)
-		val, getErr := GetMapValue(datas[i], newKeys...)
-		if getErr != nil {
-			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, p.Key)
-			continue
-		}
-		var res map[string]interface{}
-		strVal, ok := val.(string)
-		if !ok {
-			typeErr := fmt.Errorf("transform key %v data type is not string", p.Key)
-			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
-			continue
-		}
+	var (
+		err, fmtErr error
+		errNum      int
+	)
+	numRoutine := p.numRoutine
+	if len(datas) < numRoutine {
+		numRoutine = len(datas)
+	}
+	dataPipline := make(chan transforms.TransformInfo)
+	resultChan := make(chan transforms.TransformResult)
 
-		res, toMapErr = p.transformToMap(strVal, newKeys[len(newKeys)-1])
-		if toMapErr != nil {
-			errNum, err = transforms.SetError(errNum, toMapErr, transforms.General, "")
-			continue
-		}
+	wg := new(sync.WaitGroup)
+	for i := 0; i < numRoutine; i++ {
+		wg.Add(1)
+		go p.transform(dataPipline, resultChan, wg)
+	}
 
-		for key, mapVal := range res {
-			suffix := 1
-			keyName := key
-			newKeys[len(newKeys)-1] = keyName
-			_, getErr := GetMapValue(datas[i], newKeys...)
-			for ; getErr == nil; suffix++ {
-				if suffix > 5 {
-					log.Warnf("keys %v -- %v already exist, the item %v will be ignored", key, keyName, key)
-					break
-				}
-				keyName = key + strconv.Itoa(suffix)
-				newKeys[len(newKeys)-1] = keyName
-				_, getErr = GetMapValue(datas[i], newKeys...)
-			}
-			if suffix <= 5 {
-				setErr := SetMapValue(datas[i], mapVal, false, newKeys...)
-				if setErr != nil {
-					errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, strings.Join(newKeys, "."))
-				}
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, data := range datas {
+			dataPipline <- transforms.TransformInfo{
+				CurData: data,
+				Index:   idx,
 			}
 		}
+		close(dataPipline)
+	}()
+
+	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
+	for resultInfo := range resultChan {
+		transformResultSlice = append(transformResultSlice, resultInfo)
+	}
+	if numRoutine > 1 {
+		sort.Stable(transformResultSlice)
+	}
+
+	for _, transformResult := range transformResultSlice {
+		if transformResult.Err != nil {
+			err = transformResult.Err
+			errNum += transformResult.ErrNum
+		}
+		datas[transformResult.Index] = transformResult.CurData
 	}
 
 	p.stats, fmtErr = transforms.SetStatsInfo(err, p.stats, int64(errNum), int64(len(datas)), p.Type())
@@ -216,4 +227,84 @@ func init() {
 	transforms.Add("urlparam", func() transforms.Transformer {
 		return &UrlParam{}
 	})
+}
+
+func (p *UrlParam) transform(dataPipline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+	var (
+		err, toMapErr error
+		errNum        int
+	)
+	newKeys := make([]string, len(p.keys))
+	for transformInfo := range dataPipline {
+		err = nil
+		errNum = 0
+
+		copy(newKeys, p.keys)
+		val, getErr := GetMapValue(transformInfo.CurData, newKeys...)
+		if getErr != nil {
+			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, p.Key)
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				ErrNum:  errNum,
+				Err:     err,
+			}
+			continue
+		}
+		var res map[string]interface{}
+		strVal, ok := val.(string)
+		if !ok {
+			typeErr := fmt.Errorf("transform key %v data type is not string", p.Key)
+			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				ErrNum:  errNum,
+				Err:     err,
+			}
+			continue
+		}
+
+		res, toMapErr = p.transformToMap(strVal, newKeys[len(newKeys)-1])
+		if toMapErr != nil {
+			errNum, err = transforms.SetError(errNum, toMapErr, transforms.General, "")
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				ErrNum:  errNum,
+				Err:     err,
+			}
+			continue
+		}
+
+		for key, mapVal := range res {
+			suffix := 1
+			keyName := key
+			newKeys[len(newKeys)-1] = keyName
+			_, getErr := GetMapValue(transformInfo.CurData, newKeys...)
+			for ; getErr == nil; suffix++ {
+				if suffix > 5 {
+					log.Warnf("keys %v -- %v already exist, the item %v will be ignored", key, keyName, key)
+					break
+				}
+				keyName = key + strconv.Itoa(suffix)
+				newKeys[len(newKeys)-1] = keyName
+				_, getErr = GetMapValue(transformInfo.CurData, newKeys...)
+			}
+			if suffix <= 5 {
+				setErr := SetMapValue(transformInfo.CurData, mapVal, false, newKeys...)
+				if setErr != nil {
+					errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, strings.Join(newKeys, "."))
+				}
+			}
+		}
+
+		resultChan <- transforms.TransformResult{
+			Index:   transformInfo.Index,
+			CurData: transformInfo.CurData,
+			ErrNum:  errNum,
+			Err:     err,
+		}
+	}
+	wg.Done()
 }

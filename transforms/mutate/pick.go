@@ -1,7 +1,9 @@
 package mutate
 
 import (
+	"sort"
 	"strings"
+	"sync"
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
@@ -12,12 +14,26 @@ const TYPE = "pick"
 var (
 	_ transforms.StatsTransformer = &Pick{}
 	_ transforms.Transformer      = &Pick{}
+	_ transforms.Initializer      = &Pick{}
 )
 
 type Pick struct {
 	Key       string `json:"key"`
 	StageTime string `json:"stage"`
 	stats     StatsInfo
+
+	keys       []string
+	numRoutine int
+}
+
+func (g *Pick) Init() error {
+	g.keys = strings.Split(g.Key, ",")
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = 1
+	}
+	g.numRoutine = numRoutine
+	return nil
 }
 
 func (g *Pick) RawTransform(datas []string) ([]string, error) {
@@ -33,21 +49,69 @@ func (g *Pick) RawTransform(datas []string) ([]string, error) {
 }
 
 func (g *Pick) Transform(datas []Data) ([]Data, error) {
-	pickKeys := strings.Split(g.Key, ",")
-	var retDatas []Data
-	for i := range datas {
-		data := Data{}
-		for _, v := range pickKeys {
-			keys := GetKeys(v)
-			PickMapValue(datas[i], data, keys...)
-		}
-		if len(data) != 0 {
-			retDatas = append(retDatas, data)
-		}
+	if len(g.keys) == 0 {
+		g.Init()
 	}
 
-	g.stats, _ = transforms.SetStatsInfo(nil, g.stats, 0, int64(len(datas)), g.Type())
-	return retDatas, nil
+	var (
+		err, fmtErr error
+		errNum      int
+		retDatas    = make([]Data, len(datas))
+		result      = make([]Data, 0, len(datas))
+	)
+
+	numRoutine := g.numRoutine
+	if len(datas) < numRoutine {
+		numRoutine = len(datas)
+	}
+	dataPipline := make(chan transforms.TransformInfo)
+	resultChan := make(chan transforms.TransformResult)
+
+	wg := new(sync.WaitGroup)
+	for i := 0; i < numRoutine; i++ {
+		wg.Add(1)
+		go g.transform(dataPipline, resultChan, wg)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, data := range datas {
+			dataPipline <- transforms.TransformInfo{
+				CurData: data,
+				Index:   idx,
+			}
+		}
+		close(dataPipline)
+	}()
+
+	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
+	for resultInfo := range resultChan {
+		transformResultSlice = append(transformResultSlice, resultInfo)
+	}
+	if numRoutine > 1 {
+		sort.Stable(transformResultSlice)
+	}
+
+	for _, transformResult := range transformResultSlice {
+		if transformResult.Err != nil {
+			err = transformResult.Err
+			errNum += transformResult.ErrNum
+		}
+		retDatas[transformResult.Index] = transformResult.CurData
+	}
+
+	for _, data := range retDatas {
+		if len(data) == 0 {
+			continue
+		}
+		result = append(result, data)
+	}
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	return result, fmtErr
 }
 
 func (g *Pick) Description() string {
@@ -93,4 +157,20 @@ func init() {
 	transforms.Add(TYPE, func() transforms.Transformer {
 		return &Pick{}
 	})
+}
+
+func (g *Pick) transform(dataPipline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+	for transformInfo := range dataPipline {
+		data := Data{}
+		for _, v := range g.keys {
+			keys := GetKeys(v)
+			PickMapValue(transformInfo.CurData, data, keys...)
+		}
+
+		resultChan <- transforms.TransformResult{
+			Index:   transformInfo.Index,
+			CurData: data,
+		}
+	}
+	wg.Done()
 }

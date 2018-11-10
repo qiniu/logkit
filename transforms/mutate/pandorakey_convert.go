@@ -2,6 +2,8 @@ package mutate
 
 import (
 	"errors"
+	"sort"
+	"sync"
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
@@ -15,10 +17,17 @@ var (
 type PandoraKeyConvert struct {
 	stats StatsInfo
 	cache map[string]KeyInfo
+
+	numRoutine int
 }
 
 func (g *PandoraKeyConvert) Init() error {
 	g.cache = make(map[string]KeyInfo)
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = 1
+	}
+	g.numRoutine = numRoutine
 	return nil
 }
 func (g *PandoraKeyConvert) RawTransform(datas []string) ([]string, error) {
@@ -26,12 +35,59 @@ func (g *PandoraKeyConvert) RawTransform(datas []string) ([]string, error) {
 }
 
 func (g *PandoraKeyConvert) Transform(datas []Data) ([]Data, error) {
-	for i, v := range datas {
-		datas[i] = DeepConvertKeyWithCache(v, g.cache)
-		//datas[i] = DeepConvertKey(v)
+	if g.cache == nil {
+		g.Init()
 	}
 
-	g.stats, _ = transforms.SetStatsInfo(nil, g.stats, 0, int64(len(datas)), g.Type())
+	var (
+		err    error
+		errNum int
+	)
+	numRoutine := g.numRoutine
+	if len(datas) < numRoutine {
+		numRoutine = len(datas)
+	}
+	dataPipline := make(chan transforms.TransformInfo)
+	resultChan := make(chan transforms.TransformResult)
+
+	wg := new(sync.WaitGroup)
+	for i := 0; i < numRoutine; i++ {
+		wg.Add(1)
+		go g.transform(dataPipline, resultChan, wg)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, data := range datas {
+			dataPipline <- transforms.TransformInfo{
+				CurData: data,
+				Index:   idx,
+			}
+		}
+		close(dataPipline)
+	}()
+
+	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
+	for resultInfo := range resultChan {
+		transformResultSlice = append(transformResultSlice, resultInfo)
+	}
+	if numRoutine > 1 {
+		sort.Stable(transformResultSlice)
+	}
+
+	for _, transformResult := range transformResultSlice {
+		if transformResult.Err != nil {
+			err = transformResult.Err
+			errNum += transformResult.ErrNum
+		}
+		datas[transformResult.Index] = transformResult.CurData
+	}
+
+	g.stats, _ = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
 	return datas, nil
 }
 
@@ -71,4 +127,15 @@ func init() {
 	transforms.Add("pandora_key_convert", func() transforms.Transformer {
 		return &PandoraKeyConvert{cache: make(map[string]KeyInfo)}
 	})
+}
+
+func (g *PandoraKeyConvert) transform(dataPipline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+	for transformInfo := range dataPipline {
+		transformInfo.CurData = DeepConvertKeyWithCache(transformInfo.CurData, g.cache)
+		resultChan <- transforms.TransformResult{
+			Index:   transformInfo.Index,
+			CurData: transformInfo.CurData,
+		}
+	}
+	wg.Done()
 }

@@ -3,7 +3,9 @@ package mutate
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
+	"sync"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/transforms"
@@ -26,49 +28,73 @@ type Json struct {
 
 	keys []string
 	news []string
+
+	numRoutine int
 }
 
 func (g *Json) Init() error {
 	g.keys = GetKeys(g.Key)
 	g.news = GetKeys(g.New)
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = 1
+	}
+	g.numRoutine = numRoutine
 	return nil
 }
 
 func (g *Json) Transform(datas []Data) ([]Data, error) {
-	var err, fmtErr error
-	errNum := 0
-	if g.keys == nil {
+	if len(g.keys) == 0 {
 		g.Init()
 	}
-	for i := range datas {
-		val, getErr := GetMapValue(datas[i], g.keys...)
-		if getErr != nil {
-			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.Key)
-			continue
-		}
-		strVal, ok := val.(string)
-		if !ok {
-			typeErr := fmt.Errorf("transform key %v data type is not string", g.Key)
-			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
-			continue
-		}
-		strVal = strings.TrimSpace(strVal)
-		if strVal == "" {
-			continue
-		}
-		jsonVal, parseErr := parseJson(g.jsonTool, strVal)
-		if parseErr != nil {
-			errNum, err = transforms.SetError(errNum, parseErr, transforms.General, "")
-			continue
-		}
 
-		if len(g.news) == 0 {
-			g.news = g.keys
+	var (
+		err, fmtErr error
+		errNum      int
+	)
+
+	numRoutine := g.numRoutine
+	if len(datas) < numRoutine {
+		numRoutine = len(datas)
+	}
+	dataPipline := make(chan transforms.TransformInfo)
+	resultChan := make(chan transforms.TransformResult)
+
+	wg := new(sync.WaitGroup)
+	for i := 0; i < numRoutine; i++ {
+		wg.Add(1)
+		go g.transform(dataPipline, resultChan, wg)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, data := range datas {
+			dataPipline <- transforms.TransformInfo{
+				CurData: data,
+				Index:   idx,
+			}
 		}
-		setErr := SetMapValue(datas[i], jsonVal, false, g.news...)
-		if setErr != nil {
-			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
+		close(dataPipline)
+	}()
+
+	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
+	for resultInfo := range resultChan {
+		transformResultSlice = append(transformResultSlice, resultInfo)
+	}
+	if numRoutine > 1 {
+		sort.Stable(transformResultSlice)
+	}
+
+	for _, transformResult := range transformResultSlice {
+		if transformResult.Err != nil {
+			err = transformResult.Err
+			errNum += transformResult.ErrNum
 		}
+		datas[transformResult.Index] = transformResult.CurData
 	}
 
 	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
@@ -134,4 +160,73 @@ func init() {
 			}.Froze(),
 		}
 	})
+}
+
+func (g *Json) transform(dataPipline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+	var (
+		err    error
+		errNum int
+	)
+	for transformInfo := range dataPipline {
+		err = nil
+		errNum = 0
+
+		val, getErr := GetMapValue(transformInfo.CurData, g.keys...)
+		if getErr != nil {
+			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.Key)
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				ErrNum:  errNum,
+				Err:     err,
+			}
+			continue
+		}
+		strVal, ok := val.(string)
+		if !ok {
+			typeErr := fmt.Errorf("transform key %v data type is not string", g.Key)
+			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				ErrNum:  errNum,
+				Err:     err,
+			}
+			continue
+		}
+		strVal = strings.TrimSpace(strVal)
+		if strVal == "" {
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+			}
+			continue
+		}
+		jsonVal, parseErr := parseJson(g.jsonTool, strVal)
+		if parseErr != nil {
+			errNum, err = transforms.SetError(errNum, parseErr, transforms.General, "")
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				ErrNum:  errNum,
+				Err:     err,
+			}
+			continue
+		}
+
+		if len(g.news) == 0 {
+			g.news = g.keys
+		}
+		setErr := SetMapValue(transformInfo.CurData, jsonVal, false, g.news...)
+		if setErr != nil {
+			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
+		}
+		resultChan <- transforms.TransformResult{
+			Index:   transformInfo.Index,
+			CurData: transformInfo.CurData,
+			ErrNum:  errNum,
+			Err:     err,
+		}
+	}
+	wg.Done()
 }

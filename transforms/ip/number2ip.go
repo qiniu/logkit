@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
+	"sync"
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
@@ -13,69 +15,84 @@ import (
 var (
 	_ transforms.StatsTransformer = &Number2Ip{}
 	_ transforms.Transformer      = &Number2Ip{}
+	_ transforms.Initializer      = &Number2Ip{}
 )
 
 type Number2Ip struct {
-	Key   string `json:"key"`
-	New   string `json:"new"`
+	Key string `json:"key"`
+	New string `json:"new"`
+
+	keys  []string
+	news  []string
 	stats StatsInfo
+
+	numRoutine int
+}
+
+func (g *Number2Ip) Init() error {
+	g.keys = GetKeys(g.Key)
+	g.news = GetKeys(g.New)
+
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = 1
+	}
+	g.numRoutine = numRoutine
+	return nil
 }
 
 func (g *Number2Ip) Transform(datas []Data) ([]Data, error) {
-	var err, fmtErr, convertErr error
-	errNum := 0
-	keys := GetKeys(g.Key)
-	news := GetKeys(g.New)
+	if len(g.keys) == 0 {
+		g.Init()
+	}
 
-	for i := range datas {
-		val, getErr := GetMapValue(datas[i], keys...)
-		if getErr != nil {
-			errNum++
-			err = fmt.Errorf("transform key %v not exist in data", g.Key)
-			continue
-		}
-		var number int64
-		switch newVal := val.(type) {
-		case int64:
-			number = newVal
-		case int:
-			number = int64(newVal)
-		case int32:
-			number = int64(newVal)
-		case int16:
-			number = int64(newVal)
-		case uint64:
-			number = int64(newVal)
-		case uint32:
-			number = int64(newVal)
-		case json.Number:
-			number, convertErr = newVal.Int64()
-			if convertErr != nil {
-				errNum++
-				err = fmt.Errorf("transform key %v data type is not int64", g.Key)
-				continue
-			}
-		case string:
-			number, convertErr = strconv.ParseInt(newVal, 10, 64)
-			if convertErr != nil {
-				errNum, err = transforms.SetError(errNum, convertErr, transforms.General, "")
-				continue
-			}
-		default:
-			typeErr := fmt.Errorf("transform key %v data type is not correct", g.Key)
-			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
-			continue
-		}
+	var (
+		err, fmtErr error
+		errNum      int
+	)
 
-		ipVal := convertIp(number)
-		if len(news) == 0 {
-			DeleteMapValue(datas[i], keys...)
-			news = keys
+	numRoutine := g.numRoutine
+	if len(datas) < numRoutine {
+		numRoutine = len(datas)
+	}
+	dataPipline := make(chan transforms.TransformInfo)
+	resultChan := make(chan transforms.TransformResult)
+
+	wg := new(sync.WaitGroup)
+	for i := 0; i < numRoutine; i++ {
+		wg.Add(1)
+		go g.transform(dataPipline, resultChan, wg)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, data := range datas {
+			dataPipline <- transforms.TransformInfo{
+				CurData: data,
+				Index:   idx,
+			}
 		}
-		setErr := SetMapValue(datas[i], ipVal, false, news...)
-		if setErr != nil {
-			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
+		close(dataPipline)
+	}()
+
+	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
+	for resultInfo := range resultChan {
+		transformResultSlice = append(transformResultSlice, resultInfo)
+	}
+	if numRoutine > 1 {
+		sort.Stable(transformResultSlice)
+	}
+
+	for _, transformResult := range transformResultSlice {
+		if transformResult.Err != nil {
+			err = transformResult.Err
+			errNum += transformResult.ErrNum
 		}
+		datas[transformResult.Index] = transformResult.CurData
 	}
 
 	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
@@ -135,4 +152,97 @@ func init() {
 	transforms.Add("number2ip", func() transforms.Transformer {
 		return &Number2Ip{}
 	})
+}
+
+func (g *Number2Ip) transform(dataPipline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+	var (
+		err, convertErr error
+		errNum          int
+	)
+	news := g.news
+	for transformInfo := range dataPipline {
+		err = nil
+		errNum = 0
+
+		val, getErr := GetMapValue(transformInfo.CurData, g.keys...)
+		if getErr != nil {
+			errNum++
+			err = fmt.Errorf("transform key %v not exist in data", g.Key)
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				Err:     err,
+				ErrNum:  errNum,
+			}
+			continue
+		}
+		var number int64
+		switch newVal := val.(type) {
+		case int64:
+			number = newVal
+		case int:
+			number = int64(newVal)
+		case int32:
+			number = int64(newVal)
+		case int16:
+			number = int64(newVal)
+		case uint64:
+			number = int64(newVal)
+		case uint32:
+			number = int64(newVal)
+		case json.Number:
+			number, convertErr = newVal.Int64()
+			if convertErr != nil {
+				errNum++
+				err = fmt.Errorf("transform key %v data type is not int64", g.Key)
+				resultChan <- transforms.TransformResult{
+					Index:   transformInfo.Index,
+					CurData: transformInfo.CurData,
+					Err:     err,
+					ErrNum:  errNum,
+				}
+				continue
+			}
+		case string:
+			number, convertErr = strconv.ParseInt(newVal, 10, 64)
+			if convertErr != nil {
+				errNum, err = transforms.SetError(errNum, convertErr, transforms.General, "")
+				resultChan <- transforms.TransformResult{
+					Index:   transformInfo.Index,
+					CurData: transformInfo.CurData,
+					Err:     err,
+					ErrNum:  errNum,
+				}
+				continue
+			}
+		default:
+			typeErr := fmt.Errorf("transform key %v data type is not correct", g.Key)
+			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				Err:     err,
+				ErrNum:  errNum,
+			}
+			continue
+		}
+
+		ipVal := convertIp(number)
+		if len(news) == 0 {
+			DeleteMapValue(transformInfo.CurData, g.keys...)
+			news = g.keys
+		}
+		setErr := SetMapValue(transformInfo.CurData, ipVal, false, news...)
+		if setErr != nil {
+			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
+		}
+
+		resultChan <- transforms.TransformResult{
+			Index:   transformInfo.Index,
+			CurData: transformInfo.CurData,
+			Err:     err,
+			ErrNum:  errNum,
+		}
+	}
+	wg.Done()
 }
