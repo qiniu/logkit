@@ -163,9 +163,9 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 			RunningStatus:  RunnerRunning,
 		},
 		historyError: NewErrorsList(),
-		historyMutex: new(sync.RWMutex),
 		rsMutex:      new(sync.RWMutex),
 		tracker:      utils.NewTracker(),
+		historyMutex: new(sync.RWMutex),
 	}
 
 	if reader == nil {
@@ -1143,8 +1143,8 @@ func getTrend(old, new int64) string {
 }
 
 func (r *LogExportRunner) GetErrors() ErrorsResult {
-	r.historyMutex.Lock()
-	defer r.historyMutex.Unlock()
+	r.historyMutex.RLock()
+	defer r.historyMutex.RUnlock()
 	if r.historyError != nil {
 		return r.historyError.List()
 	}

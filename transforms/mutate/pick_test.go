@@ -10,7 +10,6 @@ import (
 )
 
 func TestPickTransformer(t *testing.T) {
-	t.Parallel()
 	pick := &Pick{
 		Key: "myword",
 	}

@@ -10,7 +10,6 @@ import (
 )
 
 func TestDiscardTransformer(t *testing.T) {
-	t.Parallel()
 	dis := &Discarder{
 		Key: "myword",
 	}

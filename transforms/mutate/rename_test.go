@@ -10,7 +10,6 @@ import (
 )
 
 func TestRenameTransformer(t *testing.T) {
-	t.Parallel()
 	// rename plain field
 	rename := &Rename{
 		Key:        "ts",

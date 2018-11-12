@@ -1,6 +1,7 @@
 package self
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -10,26 +11,23 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/json-iterator/go"
 
-	"github.com/qiniu/logkit/transforms/mutate"
-
-	"github.com/qiniu/logkit/transforms"
-
 	"github.com/qiniu/log"
+	"github.com/qiniu/pandora-go-sdk/base/config"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
-	"github.com/qiniu/logkit/parser/config"
+	parserconfig "github.com/qiniu/logkit/parser/config"
 	"github.com/qiniu/logkit/parser/raw"
 	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/reader/config"
 	"github.com/qiniu/logkit/reader/tailx"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/sender/pandora"
+	"github.com/qiniu/logkit/transforms"
+	"github.com/qiniu/logkit/transforms/mutate"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -41,22 +39,22 @@ const (
 
 var (
 	readerConfig = conf.MapConf{
+		"runner_name":    DefaultSelfRunnerName,
 		"name":           DefaultSelfRunnerName,
 		"mode":           "tailx",
 		"log_path":       "",
 		"read_from":      "oldest",
 		"encoding":       "UTF-8",
 		"datasource_tag": "datasource",
-		"expire":         "24h",
-		"submeta_expire": "720h",
-		"stat_interval":  "3m",
+		"expire":         "0s",
+		"submeta_expire": "0s",
 	}
 	parserConfig = conf.MapConf{
 		"type": "raw",
 		"name": "parser",
 		"disable_record_errdata": "true",
 	}
-	transformConfig = conf.MapConf{
+	transformerConfig = conf.MapConf{
 		"key":            "raw",
 		"remove_pattern": ".*\\[DEBUG\\]\\[.*",
 		"type":           "filter",
@@ -67,12 +65,12 @@ var (
 		"pandora_repo_name":               DefaultSelfLogRepoName,
 		"logkit_send_time":                "true",
 		"pandora_region":                  "nb",
-		"pandora_host":                    "https://nb-pipeline.qiniuapi.com",
+		"pandora_host":                    config.DefaultPipelineEndpoint,
 		"pandora_schema_free":             "true",
 		"pandora_enable_logdb":            "true",
-		"pandora_logdb_host":              "https://nb-insight.qiniuapi.com",
+		"pandora_logdb_host":              config.DefaultLogDBEndpoint,
 		"pandora_enable_tsdb":             "false",
-		"pandora_tsdb_host":               "https://nb-tsdb.qiniuapi.com",
+		"pandora_tsdb_host":               config.DefaultTSDBEndpoint,
 		"pandora_enable_kodo":             "false",
 		"pandora_kodo_low_frequency_file": "false",
 		"pandora_gzip":                    "true",
@@ -85,14 +83,15 @@ var (
 		"pandora_auto_convert_date":       "false",
 		"pandora_unescape":                "true",
 		"insecure_server":                 "false",
+		"runner_name":                     DefaultSelfRunnerName,
 	}
 )
 
 type LogRunner struct {
-	readerConfig    conf.MapConf
-	parserConfig    conf.MapConf
-	transformConfig conf.MapConf
-	senderConfig    conf.MapConf
+	readerConfig      conf.MapConf
+	parserConfig      conf.MapConf
+	transformerConfig conf.MapConf
+	senderConfig      conf.MapConf
 
 	reader    reader.Reader
 	parser    parser.Parser
@@ -110,23 +109,30 @@ type LogRunner struct {
 
 func NewLogRunner(rdConf, psConf, tsConf, sdConf conf.MapConf) (*LogRunner, error) {
 	if rdConf == nil {
-		rdConf = readerConfig
+		rdConf = conf.DeepCopy(readerConfig)
 	}
 	if psConf == nil {
-		psConf = parserConfig
+		psConf = conf.DeepCopy(parserConfig)
 	}
 	if tsConf == nil {
-		tsConf = transformConfig
+		tsConf = conf.DeepCopy(transformerConfig)
 	}
 	if sdConf == nil {
-		sdConf = senderConfig
+		sdConf = conf.DeepCopy(senderConfig)
 	}
-	if rdConf["log_path"] == "" {
+	logPath := rdConf["log_path"]
+	if logPath == "" {
 		dir, err := os.Getwd()
 		if err != nil {
-			return nil, fmt.Errorf("get system current workdir error %v, please set rest_dir config", err)
+			return nil, fmt.Errorf("get system current workdir error %v", err)
 		}
-		readerConfig["log_path"] = filepath.Join(dir, "logkit.log*")
+		rdConf["log_path"] = filepath.Join(dir, "logkit.log*")
+	} else {
+		path, err := filepath.Abs(logPath)
+		if err != nil {
+			return nil, fmt.Errorf("get system current workdir error %v", err)
+		}
+		rdConf["log_path"] = path + "*"
 	}
 
 	var (
@@ -136,7 +142,7 @@ func NewLogRunner(rdConf, psConf, tsConf, sdConf conf.MapConf) (*LogRunner, erro
 		sd  sender.Sender
 		err error
 	)
-	meta, err := reader.NewMetaWithConf(readerConfig)
+	meta, err := reader.NewMetaWithConf(rdConf)
 	if err != nil {
 		return nil, err
 	}
@@ -146,10 +152,10 @@ func NewLogRunner(rdConf, psConf, tsConf, sdConf conf.MapConf) (*LogRunner, erro
 		}
 	}()
 
-	if rd, err = tailx.NewReader(meta, readerConfig); err != nil {
+	if rd, err = tailx.NewReader(meta, rdConf); err != nil {
 		return nil, err
 	}
-	if ps, err = raw.NewParser(parserConfig); err != nil {
+	if ps, err = raw.NewParser(psConf); err != nil {
 		return nil, err
 	}
 	ts = &mutate.Filter{}
@@ -169,15 +175,20 @@ func NewLogRunner(rdConf, psConf, tsConf, sdConf conf.MapConf) (*LogRunner, erro
 		}
 	}
 
-	if sd, err = pandora.NewSender(senderConfig); err != nil {
+	if sd, err = pandora.NewSender(sdConf); err != nil {
 		return nil, err
 	}
 
+	return NewLogRunnerWithService(rdConf, psConf, tsConf, psConf, meta, rd, ps, ts, sd), nil
+}
+
+func NewLogRunnerWithService(rdConf, psConf, tsConf, sdConf conf.MapConf,
+	meta *reader.Meta, rd reader.Reader, ps parser.Parser, ts transforms.Transformer, sd sender.Sender) *LogRunner {
 	return &LogRunner{
-		readerConfig:    rdConf,
-		parserConfig:    psConf,
-		transformConfig: tsConf,
-		senderConfig:    sdConf,
+		readerConfig:      rdConf,
+		parserConfig:      psConf,
+		transformerConfig: tsConf,
+		senderConfig:      sdConf,
 
 		reader:    rd,
 		parser:    ps,
@@ -185,7 +196,7 @@ func NewLogRunner(rdConf, psConf, tsConf, sdConf conf.MapConf) (*LogRunner, erro
 		sender:    sd,
 		meta:      meta,
 		exitChan:  make(chan struct{}),
-	}, nil
+	}
 }
 
 func (lr *LogRunner) Run() {
@@ -251,7 +262,7 @@ func (lr *LogRunner) Stop() {
 	var errJoin string
 	err := lr.reader.Close()
 	if err != nil {
-		err = fmt.Errorf("Runner[%s] cannot close reader name: %s, err: %v", lr.Name(), lr.reader.Name(), err)
+		err = fmt.Errorf("Runner[%s] cannot close reader name: %s, err: %v ", lr.Name(), lr.reader.Name(), err)
 		errJoin += err.Error()
 	}
 
@@ -314,7 +325,7 @@ func (lr *LogRunner) readLines() []Data {
 		log.Debugf("Runner[%s] fetched 0 lines", lr.Name())
 		_, ok := lr.parser.(parser.Flushable)
 		if ok {
-			lines = []string{config.PandoraParseFlushSignal}
+			lines = []string{parserconfig.PandoraParseFlushSignal}
 		} else {
 			return nil
 		}
@@ -384,14 +395,38 @@ func (lr *LogRunner) GetReaderConfig() conf.MapConf {
 	return lr.readerConfig
 }
 
+func (lr *LogRunner) GetParserConfig() conf.MapConf {
+	return lr.parserConfig
+}
+
+func (lr *LogRunner) GetTransformerConfig() conf.MapConf {
+	return lr.transformerConfig
+}
+
 func (lr *LogRunner) GetSenderConfig() conf.MapConf {
 	return lr.senderConfig
 }
 
-func SetReaderConfig(rdConf conf.MapConf, path, from string) conf.MapConf {
-	path = strings.TrimSpace(path)
-	if path != "" {
-		rdConf["log_path"] = path
+func SetReaderConfig(readConf conf.MapConf, logpath, metapath, from string) conf.MapConf {
+	rdConf := conf.DeepCopy(readConf)
+	logpath = strings.TrimSpace(logpath)
+	if logpath != "" {
+		path, err := filepath.Abs(logpath)
+		if err != nil {
+			log.Debugf("got logpath[%s] absolute filepath failed: %v", logpath, err)
+			rdConf["log_path"] = logpath + "*"
+		} else {
+			rdConf["log_path"] = path + "*"
+		}
+	}
+	if metapath != "" {
+		path, err := filepath.Abs(metapath)
+		if err != nil {
+			log.Debugf("got metapath[%s] absolute filepath failed: %v", metapath, err)
+			rdConf["meta_path"] = path
+		} else {
+			rdConf["meta_path"] = metapath
+		}
 	}
 
 	from = strings.TrimSpace(from)
@@ -411,7 +446,8 @@ func SetReaderConfig(rdConf conf.MapConf, path, from string) conf.MapConf {
 	return rdConf
 }
 
-func SetSenderConfig(sdConf conf.MapConf, pandora Pandora) conf.MapConf {
+func SetSenderConfig(sendConf conf.MapConf, pandora Pandora) conf.MapConf {
+	sdConf := conf.DeepCopy(sendConf)
 	logDBHost := strings.TrimSpace(pandora.Logdb)
 	if logDBHost != "" {
 		sdConf["pandora_logdb_host"] = logDBHost
@@ -459,7 +495,7 @@ func GetParserConfig() conf.MapConf {
 }
 
 func GetTransformerConfig() conf.MapConf {
-	return transformConfig
+	return transformerConfig
 }
 
 func GetSenderConfig() conf.MapConf {

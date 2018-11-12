@@ -10,7 +10,6 @@ import (
 )
 
 func TestArrayExpand(t *testing.T) {
-	t.Parallel()
 	ae := &ArrayExpand{
 		Key: "myword",
 	}
@@ -51,7 +50,6 @@ func TestArrayExpand(t *testing.T) {
 }
 
 func TestArrayExpandError(t *testing.T) {
-	t.Parallel()
 	ae := &ArrayExpand{
 		Key: "myword",
 	}
@@ -88,7 +86,6 @@ func TestArrayExpandError(t *testing.T) {
 }
 
 func TestArrayExpandIgnore(t *testing.T) {
-	t.Parallel()
 	ae := &ArrayExpand{
 		Key: "myword",
 	}
@@ -172,7 +169,6 @@ func TestArrayExpandIgnore(t *testing.T) {
 }
 
 func TestArrayExpandEveryType(t *testing.T) {
-	t.Parallel()
 	ae := &ArrayExpand{
 		Key: "myword",
 	}
@@ -396,7 +392,6 @@ func TestArrayExpandEveryType(t *testing.T) {
 }
 
 func TestArrayExpandMultiKey(t *testing.T) {
-	t.Parallel()
 	ae := &ArrayExpand{
 		Key: "multi.myWord",
 	}

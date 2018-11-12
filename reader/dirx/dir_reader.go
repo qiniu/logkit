@@ -274,7 +274,7 @@ type newReaderOptions struct {
 func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool) (*dirReader, error) {
 	rpath := strings.Replace(opts.LogPath, string(os.PathSeparator), "_", -1)
 	subMetaPath := filepath.Join(opts.Meta.Dir, rpath)
-	subMeta, err := reader.NewMeta(subMetaPath, subMetaPath, opts.LogPath, ModeDir, opts.Meta.TagFile, reader.DefautFileRetention)
+	subMeta, err := reader.NewMetaWithRunnerName(drs.meta.RunnerName, subMetaPath, subMetaPath, opts.LogPath, ModeDir, opts.Meta.TagFile, reader.DefautFileRetention)
 	if err != nil {
 		return nil, fmt.Errorf("new meta: %v", err)
 	}

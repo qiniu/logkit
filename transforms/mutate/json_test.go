@@ -11,7 +11,6 @@ import (
 )
 
 func TestJsonTransformer(t *testing.T) {
-	t.Parallel()
 	jsonConf := &Json{
 		Key: "json",
 		New: "json",
@@ -69,7 +68,6 @@ func TestJsonTransformer(t *testing.T) {
 }
 
 func TestParseJson(t *testing.T) {
-	t.Parallel()
 	jsonTool := jsoniter.Config{
 		EscapeHTML: true,
 		UseNumber:  true,

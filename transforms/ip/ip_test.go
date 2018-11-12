@@ -12,7 +12,6 @@ import (
 )
 
 func TestTransformer(t *testing.T) {
-	t.Parallel()
 	ipt := &Transformer{
 		Key:      "ip",
 		DataPath: "./test_data/17monipdb.dat",
@@ -305,7 +304,6 @@ func BenchmarkIpTrans(b *testing.B) {
 }
 
 func Test_badData(t *testing.T) {
-	t.Parallel()
 	ipt := &Transformer{
 		Key:         "ip",
 		DataPath:    "./test_data/bad.dat",

@@ -99,6 +99,15 @@ func getValidDir(dir string) (realPath string, err error) {
 	return
 }
 
+func NewMetaWithRunnerName(runnerName, metadir, filedonedir, logpath, mode, tagfile string, donefileRetention int) (m *Meta, err error) {
+	m, err = NewMeta(metadir, filedonedir, logpath, mode, tagfile, donefileRetention)
+	if err != nil {
+		return nil, err
+	}
+	m.RunnerName = runnerName
+	return m, nil
+}
+
 func NewMeta(metadir, filedonedir, logpath, mode, tagfile string, donefileRetention int) (m *Meta, err error) {
 	metadir, err = getValidDir(metadir)
 	if err != nil {

@@ -94,7 +94,7 @@ func NewActiveReader(originPath, realPath, whence string, notFirstTime bool, met
 		rpath = strings.Replace(rpath, ":", "_", -1)
 	}
 	subMetaPath := filepath.Join(meta.Dir, rpath)
-	subMeta, err := reader.NewMeta(subMetaPath, subMetaPath, realPath, ModeFile, meta.TagFile, reader.DefautFileRetention)
+	subMeta, err := reader.NewMetaWithRunnerName(meta.RunnerName, subMetaPath, subMetaPath, realPath, ModeFile, meta.TagFile, reader.DefautFileRetention)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +170,11 @@ func (ar *ActiveReader) Stop() error {
 		log.Debug(err)
 		return err
 	} else {
-		log.Warnf("Runner[%v] ActiveReader %s was closing", ar.runnerName, ar.originpath)
+		if !IsSelfRunner(ar.runnerName) {
+			log.Warnf("Runner[%v] ActiveReader %s was closing", ar.runnerName, ar.originpath)
+		} else {
+			log.Debugf("Runner[%v] ActiveReader %s was closing", ar.runnerName, ar.originpath)
+		}
 	}
 
 	cnt := 0
@@ -190,7 +194,11 @@ func (ar *ActiveReader) Stop() error {
 
 func (ar *ActiveReader) Run() {
 	if !atomic.CompareAndSwapInt32(&ar.status, StatusInit, StatusRunning) {
-		log.Errorf("Runner[%v] ActiveReader %s was not in StatusInit before Running,exit it...", ar.runnerName, ar.originpath)
+		if !IsSelfRunner(ar.runnerName) {
+			log.Errorf("Runner[%v] ActiveReader %s was not in StatusInit before Running,exit it...", ar.runnerName, ar.originpath)
+		} else {
+			log.Debugf("Runner[%v] ActiveReader %s was not in StatusInit before Running,exit it...", ar.runnerName, ar.originpath)
+		}
 		return
 	}
 	var err error
@@ -199,7 +207,11 @@ func (ar *ActiveReader) Run() {
 	for {
 		if atomic.LoadInt32(&ar.status) == StatusStopped || atomic.LoadInt32(&ar.status) == StatusStopping {
 			atomic.CompareAndSwapInt32(&ar.status, StatusStopping, StatusStopped)
-			log.Warnf("Runner[%v] ActiveReader %s was stopped", ar.runnerName, ar.originpath)
+			if !IsSelfRunner(ar.runnerName) {
+				log.Warnf("Runner[%v] ActiveReader %s was stopped", ar.runnerName, ar.originpath)
+			} else {
+				log.Debugf("Runner[%v] ActiveReader %s was stopped", ar.runnerName, ar.originpath)
+			}
 			return
 		}
 		if ar.readcache == "" {
@@ -207,7 +219,11 @@ func (ar *ActiveReader) Run() {
 			ar.readcache, err = ar.br.ReadLine()
 			ar.cacheLineMux.Unlock()
 			if err != nil && err != io.EOF && err != os.ErrClosed {
-				log.Warnf("Runner[%v] ActiveReader %s read error: %v, stop it", ar.runnerName, ar.originpath, err)
+				if !IsSelfRunner(ar.runnerName) {
+					log.Warnf("Runner[%v] ActiveReader %s read error: %v, stop it", ar.runnerName, ar.originpath, err)
+				} else {
+					log.Debugf("Runner[%v] ActiveReader %s read error: %v, stop it", ar.runnerName, ar.originpath, err)
+				}
 				ar.setStatsError(err.Error())
 				ar.sendError(err)
 				ar.Stop()
@@ -242,7 +258,11 @@ func (ar *ActiveReader) Run() {
 			}
 			repeat++
 			if repeat%3000 == 0 {
-				log.Errorf("Runner[%v] %v ActiveReader has timeout 3000 times with readcache %v", ar.runnerName, ar.originpath, ar.readcache)
+				if !IsSelfRunner(ar.runnerName) {
+					log.Errorf("Runner[%v] %v ActiveReader has timeout 3000 times with readcache %v", ar.runnerName, ar.originpath, ar.readcache)
+				} else {
+					log.Debugf("Runner[%v] %v ActiveReader has timeout 3000 times with readcache %v", ar.runnerName, ar.originpath, ar.readcache)
+				}
 			}
 
 			atomic.StoreInt32(&ar.inactive, 0)
@@ -273,7 +293,13 @@ func (ar *ActiveReader) hasStopped() bool {
 }
 
 func (ar *ActiveReader) Close() error {
-	defer log.Warnf("Runner[%v] ActiveReader %s was closed", ar.runnerName, ar.originpath)
+	defer func() {
+		if !IsSelfRunner(ar.runnerName) {
+			log.Warnf("Runner[%v] ActiveReader %s was closed", ar.runnerName, ar.originpath)
+		} else {
+			log.Debugf("Runner[%v] ActiveReader %s was closed", ar.runnerName, ar.originpath)
+		}
+	}()
 	brCloseErr := ar.br.Close()
 	if err := ar.Stop(); err != nil {
 		return brCloseErr
@@ -332,7 +358,11 @@ func (ar *ActiveReader) expired(expire time.Duration) bool {
 		if os.IsNotExist(err) {
 			return true
 		}
-		log.Errorf("Runner[%v] stat log %v error %v, will not expire it...", ar.runnerName, ar.originpath, err)
+		if !IsSelfRunner(ar.runnerName) {
+			log.Errorf("Runner[%v] stat log %v error %v, will not expire it...", ar.runnerName, ar.originpath, err)
+		} else {
+			log.Debugf("Runner[%v] stat log %v error %v, will not expire it...", ar.runnerName, ar.originpath, err)
+		}
 		return false
 	}
 	if fi.ModTime().Add(expire).Before(time.Now()) && atomic.LoadInt32(&ar.inactive) > 0 {
@@ -378,7 +408,11 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		if os.IsNotExist(err) {
 			log.Debugf("Runner[%v] %v recover from meta error %v, ignore...", meta.RunnerName, logPathPattern, err)
 		} else {
-			log.Warnf("Runner[%v] %v recover from meta error %v, ignore...", meta.RunnerName, logPathPattern, err)
+			if !IsSelfRunner(meta.RunnerName) {
+				log.Warnf("Runner[%v] %v recover from meta error %v, ignore...", meta.RunnerName, logPathPattern, err)
+			} else {
+				log.Debugf("Runner[%v] %v recover from meta error %v, ignore...", meta.RunnerName, logPathPattern, err)
+			}
 		}
 		bufsize = 0
 		err = nil
@@ -391,12 +425,20 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 			if os.IsNotExist(err) {
 				log.Debugf("Runner[%v] read buf file %v error %v, ignore...", meta.RunnerName, meta.BufFile(), err)
 			} else {
-				log.Warnf("Runner[%v] read buf file %v error %v, ignore...", meta.RunnerName, meta.BufFile(), err)
+				if !IsSelfRunner(meta.RunnerName) {
+					log.Warnf("Runner[%v] read buf file %v error %v, ignore...", meta.RunnerName, meta.BufFile(), err)
+				} else {
+					log.Debugf("Runner[%v] read buf file %v error %v, ignore...", meta.RunnerName, meta.BufFile(), err)
+				}
 			}
 		} else {
 			err = jsoniter.Unmarshal(buf, &cacheMap)
 			if err != nil {
-				log.Warnf("Runner[%v] Unmarshal read buf cache error %v, ignore...", meta.RunnerName, err)
+				if !IsSelfRunner(meta.RunnerName) {
+					log.Warnf("Runner[%v] Unmarshal read buf cache error %v, ignore...", meta.RunnerName, err)
+				} else {
+					log.Debugf("Runner[%v] Unmarshal read buf cache error %v, ignore...", meta.RunnerName, err)
+				}
 			}
 		}
 		err = nil
@@ -477,19 +519,31 @@ func (r *Reader) checkExpiredFiles() {
 		}
 	}
 	if len(paths) > 0 {
-		log.Infof("Runner[%v] expired logpath: %v", r.meta.RunnerName, strings.Join(paths, ", "))
+		if !IsSelfRunner(r.meta.RunnerName) {
+			log.Infof("Runner[%v] expired logpath: %v", r.meta.RunnerName, strings.Join(paths, ", "))
+		} else {
+			log.Debugf("Runner[%v] expired logpath: %v", r.meta.RunnerName, strings.Join(paths, ", "))
+		}
 	}
 }
 
 func (r *Reader) statLogPath() {
 	//达到最大打开文件数，不再追踪
 	if len(r.fileReaders) >= r.maxOpenFiles {
-		log.Warnf("Runner[%v] %v meet maxOpenFiles limit %v, ignore Stat new log...", r.meta.RunnerName, r.Name(), r.maxOpenFiles)
+		if !IsSelfRunner(r.meta.RunnerName) {
+			log.Warnf("Runner[%v] %v meet maxOpenFiles limit %v, ignore Stat new log...", r.meta.RunnerName, r.Name(), r.maxOpenFiles)
+		} else {
+			log.Debugf("Runner[%v] %v meet maxOpenFiles limit %v, ignore Stat new log...", r.meta.RunnerName, r.Name(), r.maxOpenFiles)
+		}
 		return
 	}
 	matches, err := filepath.Glob(r.logPathPattern)
 	if err != nil {
-		log.Errorf("Runner[%v] stat logPathPattern error %v", r.meta.RunnerName, err)
+		if !IsSelfRunner(r.meta.RunnerName) {
+			log.Errorf("Runner[%v] stat logPathPattern error %v", r.meta.RunnerName, err)
+		} else {
+			log.Debugf("Runner[%v] stat logPathPattern error %v", r.meta.RunnerName, err)
+		}
 		r.setStatsError("Runner[" + r.meta.RunnerName + "] stat logPathPattern error " + err.Error())
 		return
 	}
@@ -520,7 +574,11 @@ func (r *Reader) statLogPath() {
 		}
 		rp, fi, err := GetRealPath(mc)
 		if err != nil {
-			log.Errorf("Runner[%v] file pattern %v match %v stat error %v, ignore this match...", r.meta.RunnerName, r.logPathPattern, mc, err)
+			if !IsSelfRunner(r.meta.RunnerName) {
+				log.Errorf("Runner[%v] file pattern %v match %v stat error %v, ignore this match...", r.meta.RunnerName, r.logPathPattern, mc, err)
+			} else {
+				log.Debugf("Runner[%v] file pattern %v match %v stat error %v, ignore this match...", r.meta.RunnerName, r.logPathPattern, mc, err)
+			}
 			continue
 		}
 		if fi.IsDir() {
@@ -551,14 +609,22 @@ func (r *Reader) statLogPath() {
 		if err != nil {
 			err = fmt.Errorf("runner[%v] NewActiveReader for matches %v error %v", r.meta.RunnerName, rp, err)
 			r.sendError(err)
-			log.Error(err, ", ignore this match...")
+			if !IsSelfRunner(r.meta.RunnerName) {
+				log.Error(err, ", ignore this match...")
+			} else {
+				log.Debug(err, ", ignore this match...")
+			}
 			continue
 		}
 		ar.readcache = cacheline
 		if r.headRegexp != nil {
 			err = ar.br.SetMode(ReadModeHeadPatternRegexp, r.headRegexp)
 			if err != nil {
-				log.Errorf("Runner[%v] NewActiveReader for matches %v SetMode error %v", r.meta.RunnerName, rp, err)
+				if !IsSelfRunner(r.meta.RunnerName) {
+					log.Errorf("Runner[%v] NewActiveReader for matches %v SetMode error %v", r.meta.RunnerName, rp, err)
+				} else {
+					log.Debugf("Runner[%v] NewActiveReader for matches %v SetMode error %v", r.meta.RunnerName, rp, err)
+				}
 				r.setStatsError("Runner[" + r.meta.RunnerName + "] NewActiveReader for matches " + rp + " SetMode error " + err.Error())
 			}
 		}
@@ -566,24 +632,40 @@ func (r *Reader) statLogPath() {
 		r.armapmux.Lock()
 		if !r.hasStopped() && !r.isStopping() {
 			if err = r.meta.AddSubMeta(rp, ar.br.Meta); err != nil {
-				log.Errorf("Runner[%v] %v add submeta for %v err %v, but this reader will still working", r.meta.RunnerName, mc, rp, err)
+				if !IsSelfRunner(r.meta.RunnerName) {
+					log.Errorf("Runner[%v] %v add submeta for %v err %v, but this reader will still working", r.meta.RunnerName, mc, rp, err)
+				} else {
+					log.Debugf("Runner[%v] %v add submeta for %v err %v, but this reader will still working", r.meta.RunnerName, mc, rp, err)
+				}
 			}
 			r.fileReaders[rp] = ar
 		} else {
-			log.Warnf("Runner[%v] %v NewActiveReader but reader was stopped, ignore this...", r.meta.RunnerName, mc)
+			if !IsSelfRunner(r.meta.RunnerName) {
+				log.Warnf("Runner[%v] %v NewActiveReader but reader was stopped, ignore this...", r.meta.RunnerName, mc)
+			} else {
+				log.Debugf("Runner[%v] %v NewActiveReader but reader was stopped, ignore this...", r.meta.RunnerName, mc)
+			}
 		}
 		r.armapmux.Unlock()
 		if !r.hasStopped() && !r.isStopping() {
 			ar.Start()
 		} else {
-			log.Warnf("Runner[%v] %v NewActiveReader but reader was stopped, will not running...", r.meta.RunnerName, mc)
+			if !IsSelfRunner(r.meta.RunnerName) {
+				log.Warnf("Runner[%v] %v NewActiveReader but reader was stopped, will not running...", r.meta.RunnerName, mc)
+			} else {
+				log.Debugf("Runner[%v] %v NewActiveReader but reader was stopped, will not running...", r.meta.RunnerName, mc)
+			}
 		}
 	}
 	if !r.notFirstTime {
 		r.notFirstTime = true
 	}
 	if len(newaddsPath) > 0 {
-		log.Infof("Runner[%v] statLogPath find new logpath: %v", r.meta.RunnerName, strings.Join(newaddsPath, ", "))
+		if !IsSelfRunner(r.meta.RunnerName) {
+			log.Infof("Runner[%v] statLogPath find new logpath: %v", r.meta.RunnerName, strings.Join(newaddsPath, ", "))
+		} else {
+			log.Debugf("Runner[%v] statLogPath find new logpath: %v", r.Name(), strings.Join(newaddsPath, ", "))
+		}
 	}
 }
 
@@ -591,7 +673,11 @@ func (r *Reader) Start() error {
 	if r.isStopping() || r.hasStopped() {
 		return errors.New("reader is stopping or has stopped")
 	} else if !atomic.CompareAndSwapInt32(&r.status, StatusInit, StatusRunning) {
-		log.Warnf("Runner[%v] %q daemon has already started and is running", r.meta.RunnerName, r.Name())
+		if !IsSelfRunner(r.meta.RunnerName) {
+			log.Warnf("Runner[%v] %q daemon has already started and is running", r.meta.RunnerName, r.Name())
+		} else {
+			log.Debugf("Runner[%v] %q daemon has already started and is running", r.meta.RunnerName, r.Name())
+		}
 		return nil
 	}
 
@@ -605,7 +691,11 @@ func (r *Reader) Start() error {
 			select {
 			case <-r.stopChan:
 				atomic.StoreInt32(&r.status, StatusStopped)
-				log.Infof("Runner[%v] %q daemon has stopped from running", r.meta.RunnerName, r.Name())
+				if !IsSelfRunner(r.meta.RunnerName) {
+					log.Infof("Runner[%v] %q daemon has stopped from running", r.meta.RunnerName, r.Name())
+				} else {
+					log.Debugf("Runner[%v] %q daemon has stopped from running", r.meta.RunnerName, r.Name())
+				}
 				return
 			case <-ticker.C:
 			}
@@ -628,7 +718,11 @@ func (r *Reader) Start() error {
 		}()
 	}
 
-	log.Infof("Runner[%v] %q daemon has started", r.meta.RunnerName, r.Name())
+	if !IsSelfRunner(r.meta.RunnerName) {
+		log.Infof("Runner[%v] %q daemon has started", r.meta.RunnerName, r.Name())
+	} else {
+		log.Debugf("Runner[%v] %q daemon has started", r.meta.RunnerName, r.Name())
+	}
 	return nil
 }
 
@@ -714,12 +808,20 @@ func (r *Reader) SyncMeta() {
 	buf, err := jsoniter.Marshal(r.cacheMap)
 	r.armapmux.Unlock()
 	if err != nil {
-		log.Errorf("%v sync meta error %v, cacheMap %v", r.Name(), err, r.cacheMap)
+		if !IsSelfRunner(r.meta.RunnerName) {
+			log.Errorf("%s sync meta error %v, cacheMap %v", r.Name(), err, r.cacheMap)
+		} else {
+			log.Debugf("Runner[%s] %s sync meta error %v, cacheMap %v", r.meta.RunnerName, r.Name(), err, r.cacheMap)
+		}
 		return
 	}
 	err = r.meta.WriteBuf(buf, 0, 0, len(buf))
 	if err != nil {
-		log.Errorf("%v sync meta WriteBuf error %v, buf %v", r.Name(), err, string(buf))
+		if !IsSelfRunner(r.meta.RunnerName) {
+			log.Errorf("%v sync meta WriteBuf error %v, buf %v", r.Name(), err, string(buf))
+		} else {
+			log.Debugf("Runner[%s] %s sync meta WriteBuf error %v, buf %v", r.meta.RunnerName, r.Name(), err, string(buf))
+		}
 		return
 	}
 
@@ -730,7 +832,11 @@ func (r *Reader) SyncMeta() {
 
 func (r *Reader) Close() error {
 	if !atomic.CompareAndSwapInt32(&r.status, StatusRunning, StatusStopping) {
-		log.Warnf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
+		if !IsSelfRunner(r.meta.RunnerName) {
+			log.Warnf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
+		} else {
+			log.Debugf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
+		}
 		return nil
 	}
 	log.Debugf("Runner[%v] %q daemon is stopping", r.meta.RunnerName, r.Name())
@@ -747,7 +853,11 @@ func (r *Reader) Close() error {
 			defer wg.Done()
 			xerr := mar.Close()
 			if xerr != nil {
-				log.Errorf("Runner[%v] Close ActiveReader %v error %v", r.meta.RunnerName, mar.originpath, xerr)
+				if !IsSelfRunner(r.meta.RunnerName) {
+					log.Errorf("Runner[%v] Close ActiveReader %v error %v", r.meta.RunnerName, mar.originpath, xerr)
+				} else {
+					log.Debugf("Runner[%v] Close ActiveReader %v error %v", r.meta.RunnerName, mar.originpath, xerr)
+				}
 			}
 		}(ar)
 	}

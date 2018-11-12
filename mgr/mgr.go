@@ -123,7 +123,7 @@ func NewCustomManager(conf ManagerConfig, rr *reader.Registry, pr *parser.Regist
 	}
 	var selfLogRunner *self.LogRunner
 	if conf.SelfLogEnable {
-		rdConf := self.SetReaderConfig(self.GetReaderConfig(), conf.LogPath, conf.ReadFrom)
+		rdConf := self.SetReaderConfig(self.GetReaderConfig(), conf.LogPath, "", conf.ReadFrom)
 		sdConf := self.SetSenderConfig(self.GetSenderConfig(), conf.Pandora)
 		selfLogRunner, err = self.NewLogRunner(rdConf, self.GetParserConfig(), self.GetTransformerConfig(), sdConf)
 		if err != nil {
@@ -177,7 +177,7 @@ func (m *Manager) Stop() error {
 	if m.SelfLogRunner != nil {
 		m.SelfLogRunner.Stop()
 	}
-g	return nil
+	return nil
 }
 
 func (m *Manager) RemoveWithConfig(confPath string, isDelete bool) (err error) {

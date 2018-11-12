@@ -11,7 +11,6 @@ import (
 )
 
 func TestScriptTransformer(t *testing.T) {
-	t.Parallel()
 	fileName := os.TempDir() + "/scriptFile.sh"
 	//create file & write file
 	content := `word=$1

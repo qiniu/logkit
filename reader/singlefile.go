@@ -46,7 +46,11 @@ func NewSingleFile(meta *Meta, path, whence string, errDirectReturn bool) (sf *S
 			if errDirectReturn {
 				return sf, fmt.Errorf("runner[%v] %s - utils.GetRealPath failed, err:%v", meta.RunnerName, path, err)
 			}
-			log.Warnf("Runner[%v] %s - utils.GetRealPath failed, err:%v", meta.RunnerName, path, err)
+			if !IsSelfRunner(meta.RunnerName) {
+				log.Warnf("Runner[%v] %s - utils.GetRealPath failed, err:%v", meta.RunnerName, path, err)
+			} else {
+				log.Debugf("Runner[%v] %s - utils.GetRealPath failed, err:%v", meta.RunnerName, path, err)
+			}
 			time.Sleep(time.Minute)
 			continue
 		}
@@ -54,7 +58,11 @@ func NewSingleFile(meta *Meta, path, whence string, errDirectReturn bool) (sf *S
 			if errDirectReturn {
 				return sf, fmt.Errorf("runner[%v] %s - file failed, err: file is not regular", meta.RunnerName, path)
 			}
-			log.Warnf("Runner[%v] %s - file failed, err: file is not regular", meta.RunnerName, path)
+			if !IsSelfRunner(meta.RunnerName) {
+				log.Warnf("Runner[%v] %s - file failed, err: file is not regular", meta.RunnerName, path)
+			} else {
+				log.Debugf("Runner[%v] %s - file failed, err: file is not regular", meta.RunnerName, path)
+			}
 			time.Sleep(time.Minute)
 			continue
 		}
@@ -63,7 +71,11 @@ func NewSingleFile(meta *Meta, path, whence string, errDirectReturn bool) (sf *S
 			if errDirectReturn {
 				return sf, fmt.Errorf("runner[%v] %s - open file err:%v", meta.RunnerName, path, err)
 			}
-			log.Warnf("Runner[%v] %s - open file err:%v", meta.RunnerName, path, err)
+			if !IsSelfRunner(meta.RunnerName) {
+				log.Warnf("Runner[%v] %s - open file err:%v", meta.RunnerName, path, err)
+			} else {
+				log.Debugf("Runner[%v] %s - open file err:%v", meta.RunnerName, path, err)
+			}
 			time.Sleep(time.Minute)
 			continue
 		}
@@ -76,12 +88,20 @@ func NewSingleFile(meta *Meta, path, whence string, errDirectReturn bool) (sf *S
 		if os.IsNotExist(err) {
 			log.Debugf("Runner[%v] %v -meta data is corrupted err:%v, omit meta data", meta.RunnerName, meta.MetaFile(), err)
 		} else {
-			log.Warnf("Runner[%v] %v -meta data is corrupted err:%v, omit meta data", meta.RunnerName, meta.MetaFile(), err)
+			if !IsSelfRunner(meta.RunnerName) {
+				log.Warnf("Runner[%v] %v -meta data is corrupted err:%v, omit meta data", meta.RunnerName, meta.MetaFile(), err)
+			} else {
+				log.Debugf("Runner[%v] %v -meta data is corrupted err:%v, omit meta data", meta.RunnerName, meta.MetaFile(), err)
+			}
 		}
 		omitMeta = true
 	}
 	if metafile != originpath {
-		log.Warnf("Runner[%v] %v -meta file <%v> is not current file <%v>， omit meta data", meta.RunnerName, meta.MetaFile(), metafile, originpath)
+		if !IsSelfRunner(meta.RunnerName) {
+			log.Warnf("Runner[%v] %v -meta file <%v> is not current file <%v>， omit meta data", meta.RunnerName, meta.MetaFile(), metafile, originpath)
+		} else {
+			log.Debugf("Runner[%v] %v -meta file <%v> is not current file <%v>， omit meta data", meta.RunnerName, meta.MetaFile(), metafile, originpath)
+		}
 		omitMeta = true
 	}
 
@@ -129,12 +149,15 @@ func (sf *SingleFile) statFile(path string) (pfi os.FileInfo, err error) {
 
 	for {
 		if atomic.LoadInt32(&sf.stopped) > 0 {
-			err = errors.New("reader " + sf.Name() + " has been exited")
-			return
+			return pfi, errors.New("reader " + sf.Name() + " has been exited")
 		}
 		path, pfi, err = GetRealPath(path)
 		if err != nil || pfi == nil {
-			log.Warnf("Runner[%v] %s - utils.GetRealPath failed, err:%v", sf.meta.RunnerName, path, err)
+			if !IsSelfRunner(sf.meta.RunnerName) {
+				log.Warnf("Runner[%v] %s - utils.GetRealPath failed, err:%v", sf.meta.RunnerName, path, err)
+			} else {
+				log.Debugf("Runner[%v] %s - utils.GetRealPath failed, err:%v", sf.meta.RunnerName, path, err)
+			}
 			time.Sleep(time.Minute)
 			continue
 		}
@@ -146,19 +169,16 @@ func (sf *SingleFile) statFile(path string) (pfi os.FileInfo, err error) {
 func (sf *SingleFile) openSingleFile(path string) (pfi os.FileInfo, f *os.File, err error) {
 	path, pfi, err = GetRealPath(path)
 	if err != nil || pfi == nil {
-		err = fmt.Errorf("runner[%v] %s - utils.GetRealPath failed, err:%v", sf.meta.RunnerName, path, err)
-		return
+		return nil, nil, fmt.Errorf("runner[%v] %s - utils.GetRealPath failed, err:%v", sf.meta.RunnerName, path, err)
 	}
 	if !pfi.Mode().IsRegular() {
-		err = fmt.Errorf("runner[%v] %s - file failed, err: file is not regular", sf.meta.RunnerName, path)
-		return
+		return nil, nil, fmt.Errorf("runner[%v] %s - file failed, err: file is not regular", sf.meta.RunnerName, path)
 	}
 	f, err = os.Open(path)
 	if err != nil {
-		err = fmt.Errorf("runner[%v] %s - open file err:%v", sf.meta.RunnerName, path, err)
-		return
+		return nil, nil, fmt.Errorf("runner[%v] %s - open file err:%v", sf.meta.RunnerName, path, err)
 	}
-	return
+	return pfi, f, nil
 }
 
 func (sf *SingleFile) startOffset(whence string) (int64, error) {
@@ -200,7 +220,11 @@ func (sf *SingleFile) detectMovedName(inode uint64) (name string) {
 	dir := filepath.Dir(sf.realpath)
 	fis, err := ioutil.ReadDir(dir)
 	if err != nil {
-		log.Errorf("Runner[%v] read SingleFile path %v err %v", sf.meta.RunnerName, dir, err)
+		if !IsSelfRunner(sf.meta.RunnerName) {
+			log.Errorf("Runner[%v] read SingleFile path %v err %v", sf.meta.RunnerName, dir, err)
+		} else {
+			log.Debugf("Runner[%v] read SingleFile path %v err %v", sf.meta.RunnerName, dir, err)
+		}
 		return
 	}
 	for _, fi := range fis {
@@ -210,7 +234,11 @@ func (sf *SingleFile) detectMovedName(inode uint64) (name string) {
 		}
 		newInode, err := utilsos.GetIdentifyIDByPath(filepath.Join(dir, fi.Name()))
 		if err != nil {
-			log.Error(err)
+			if !IsSelfRunner(sf.meta.RunnerName) {
+				log.Error(err)
+			} else {
+				log.Debug(err)
+			}
 			continue
 		}
 		if newInode == inode {
@@ -239,12 +267,20 @@ func (sf *SingleFile) Reopen() (err error) {
 	detectStr := sf.detectMovedName(oldInode)
 	if detectStr != "" {
 		if derr := sf.meta.AppendDoneFileInode(detectStr, oldInode); derr != nil {
-			log.Errorf("Runner[%v] AppendDoneFile %v error %v", sf.meta.RunnerName, detectStr, derr)
+			if !IsSelfRunner(sf.meta.RunnerName) {
+				log.Errorf("Runner[%v] AppendDoneFile %v error %v", sf.meta.RunnerName, detectStr, derr)
+			} else {
+				log.Debugf("Runner[%v] AppendDoneFile %v error %v", sf.meta.RunnerName, detectStr, derr)
+			}
 		}
 	} else {
 		detectStr = "not detected"
 	}
-	log.Infof("Runner[%v] rotate %s successfully , rotated file is <%v>", sf.meta.RunnerName, sf.originpath, detectStr)
+	if !IsSelfRunner(sf.meta.RunnerName) {
+		log.Infof("Runner[%v] rotate %s successfully , rotated file is <%v>", sf.meta.RunnerName, sf.originpath, detectStr)
+	} else {
+		log.Debugf("Runner[%v] rotate %s successfully , rotated file is <%v>", sf.meta.RunnerName, sf.originpath, detectStr)
+	}
 	pfi, f, err := sf.openSingleFile(sf.originpath)
 	if err != nil {
 		return
@@ -302,7 +338,11 @@ func (sf *SingleFile) Read(p []byte) (n int, err error) {
 	if err != nil && strings.Contains(err.Error(), "stale NFS file handle") {
 		nerr := sf.reopenForESTALE()
 		if nerr != nil {
-			log.Errorf("Runner[%v] %v meet eror %v reopen error %v", sf.meta.RunnerName, sf.originpath, err, nerr)
+			if !IsSelfRunner(sf.meta.RunnerName) {
+				log.Errorf("Runner[%v] %v meet eror %v reopen error %v", sf.meta.RunnerName, sf.originpath, err, nerr)
+			} else {
+				log.Debugf("Runner[%v] %v meet eror %v reopen error %v", sf.meta.RunnerName, sf.originpath, err, nerr)
+			}
 		}
 		return
 	}

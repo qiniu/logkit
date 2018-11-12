@@ -9,7 +9,6 @@ import (
 )
 
 func TestInt2IpTransformer(t *testing.T) {
-	t.Parallel()
 	jsonConf := &Number2Ip{
 		Key: "my_int",
 		New: "my_ip",

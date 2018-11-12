@@ -982,3 +982,7 @@ func IsFileModified(path string, interval time.Duration, compare time.Time) bool
 
 	return true
 }
+
+func IsSelfRunner(runnerName string) bool {
+	return strings.HasPrefix(runnerName, DefaultSelfRunnerName)
+}

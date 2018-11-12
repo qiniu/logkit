@@ -239,8 +239,12 @@ func NewSender(conf logkitconf.MapConf) (pandoraSender sender.Sender, err error)
 	}
 
 	if skFromEnv == "" && tokens.SchemaFreeTokens.PipelinePostDataToken.Token == "" {
-		err = fmt.Errorf("your authrization config is empty, need to config ak/sk or tokens")
-		log.Errorf("Runner[%v] Sender[%v]: %v", runnerName, name, err)
+		err = fmt.Errorf("Runner[%v] Sender[%v] your authrization config is empty, need to config ak/sk or tokens", runnerName, name)
+		if !IsSelfRunner(runnerName) {
+			log.Error(err)
+		} else {
+			log.Debug(err)
+		}
 		return
 	}
 	// 当 schema free 为 false 时，需要自动创建 pandora_stash 字段，需要自动创建 pandora_separate_id 字段
@@ -378,8 +382,7 @@ func getTokensFromConf(conf logkitconf.MapConf) (tokens Tokens, err error) {
 	for _, v := range strings.Split(createSeriesTokenStr, ",") {
 		tmpArr := strings.Split(strings.TrimSpace(v), " ")
 		if len(tmpArr) < 2 {
-			err = fmt.Errorf("parser create series token error, string[%v] is invalid, will not use token", v)
-			return
+			return tokens, fmt.Errorf("parser create series token error, string[%v] is invalid, will not use token", v)
 		} else {
 			tokens.TsDBTokens.CreateTSDBSeriesTokens[tmpArr[0]] = models.PandoraToken{Token: strings.Join(tmpArr[1:], " ")}
 		}
@@ -388,8 +391,7 @@ func getTokensFromConf(conf logkitconf.MapConf) (tokens Tokens, err error) {
 	for _, v := range strings.Split(createExTokenStr, ",") {
 		tmpArr := strings.Split(strings.TrimSpace(v), " ")
 		if len(tmpArr) < 2 {
-			err = fmt.Errorf("parser create export token error, string[%v] is invalid, will not use token", v)
-			return
+			return tokens, fmt.Errorf("parser create export token error, string[%v] is invalid, will not use token", v)
 		} else {
 			tokens.TsDBTokens.CreateExportToken[tmpArr[0]] = models.PandoraToken{Token: strings.Join(tmpArr[1:], " ")}
 		}
@@ -398,8 +400,7 @@ func getTokensFromConf(conf logkitconf.MapConf) (tokens Tokens, err error) {
 	for _, v := range strings.Split(updateExTokenStr, ",") {
 		tmpArr := strings.Split(strings.TrimSpace(v), " ")
 		if len(tmpArr) < 2 {
-			err = fmt.Errorf("parser update export token error, string[%v] is invalid, will not use token", v)
-			return
+			return tokens, fmt.Errorf("parser update export token error, string[%v] is invalid, will not use token", v)
 		} else {
 			tokens.TsDBTokens.UpdateExportToken[tmpArr[0]] = models.PandoraToken{Token: strings.Join(tmpArr[1:], " ")}
 		}
@@ -408,8 +409,7 @@ func getTokensFromConf(conf logkitconf.MapConf) (tokens Tokens, err error) {
 	for _, v := range strings.Split(getExTokenStr, ",") {
 		tmpArr := strings.Split(strings.TrimSpace(v), " ")
 		if len(tmpArr) <= 2 {
-			err = fmt.Errorf("parser get export token error, string[%v] is invalid, will not use token", v)
-			return
+			return tokens, fmt.Errorf("parser get export token error, string[%v] is invalid, will not use token", v)
 		} else {
 			tokens.TsDBTokens.GetExportToken[tmpArr[0]] = models.PandoraToken{Token: strings.Join(tmpArr[1:], " ")}
 		}
@@ -440,12 +440,20 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 	logger := pipelinebase.NewDefaultLogger()
 
 	if opt.reqRateLimit > 0 {
-		log.Warnf("Runner[%v] Sender[%v]: you have limited send speed within %v requests/s", opt.runnerName, opt.name, opt.reqRateLimit)
+		if !IsSelfRunner(opt.runnerName) {
+			log.Warnf("Runner[%v] Sender[%v]: you have limited send speed within %v requests/s", opt.runnerName, opt.name, opt.reqRateLimit)
+		} else {
+			log.Debugf("Runner[%v] Sender[%v]: you have limited send speed within %v requests/s", opt.runnerName, opt.name, opt.reqRateLimit)
+		}
 	}
 	if opt.flowRateLimit > 0 {
-		log.Warnf("Runner[%v] Sender[%v]: you have limited send speed within %v KB/s", opt.runnerName, opt.name, opt.flowRateLimit)
+		if !IsSelfRunner(opt.runnerName) {
+			log.Warnf("Runner[%v] Sender[%v]: you have limited send speed within %v KB/s", opt.runnerName, opt.name, opt.flowRateLimit)
+		} else {
+			log.Debugf("Runner[%v] Sender[%v]: you have limited send speed within %v KB/s", opt.runnerName, opt.name, opt.flowRateLimit)
+		}
 	}
-	userSchema := parseUserSchema(opt.repoName, opt.schema)
+	userSchema := parseUserSchema(opt.runnerName, opt.repoName, opt.schema)
 	s = &Sender{
 		opt:        *opt,
 		alias2key:  make(map[string]string),
@@ -487,7 +495,6 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 	/*
 		以下是 repo 创建相关的，raw类型的不需要处理
 	*/
-
 	config := pipeline.NewConfig().
 		WithPipelineEndpoint(opt.endpoint).
 		WithAccessKeySecretKey(opt.ak, opt.sk).
@@ -506,15 +513,18 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 	}
 	client, err := pipeline.New(config)
 	if err != nil {
-		err = fmt.Errorf("cannot init pipelineClient %v", err)
-		return
+		return nil, fmt.Errorf("cannot init pipelineClient %v", err)
 	}
 	s.client = client
 
 	dsl := strings.TrimSpace(opt.autoCreate)
 	schemas, err := pipeline.DSLtoSchema(dsl)
 	if err != nil {
-		log.Errorf("Runner[%v] Sender[%v]: auto create pandora repo error: %v, you can create on pandora portal, ignored...", opt.runnerName, opt.name, err)
+		if !IsSelfRunner(opt.runnerName) {
+			log.Errorf("Runner[%v] Sender[%v]: auto create pandora repo error: %v, you can create on pandora portal, ignored...", opt.runnerName, opt.name, err)
+		} else {
+			log.Debugf("Runner[%v] Sender[%v]: auto create pandora repo error: %v, you can create on pandora portal, ignored...", opt.runnerName, opt.name, err)
+		}
 		err = nil
 	}
 
@@ -595,7 +605,7 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 	return
 }
 
-func parseUserSchema(repoName, schema string) (us UserSchema) {
+func parseUserSchema(runnerName, repoName, schema string) (us UserSchema) {
 	schema = strings.TrimSpace(schema)
 	us.Fields = make(map[string]string)
 	us.DefaultAll = false
@@ -621,7 +631,11 @@ func parseUserSchema(repoName, schema string) (us UserSchema) {
 		case 2:
 			name, alias = splits[0], splits[1]
 		default:
-			log.Errorf("Repo-%s:pandora sender schema parse error %v was splited out %v not 1 or 2 by ',', ignore this splits...", repoName, f, len(splits))
+			if !IsSelfRunner(runnerName) {
+				log.Errorf("Runner[%s] Repo-%s:pandora sender schema parse error %v was splited out %v not 1 or 2 by ',', ignore this splits...", runnerName, repoName, f, len(splits))
+			} else {
+				log.Debugf("Runner[%s] Repo-%s:pandora sender schema parse error %v was splited out %v not 1 or 2 by ',', ignore this splits...", runnerName, repoName, f, len(splits))
+			}
 		}
 		if name == "" && alias == "" {
 			continue
@@ -643,7 +657,11 @@ func (s *Sender) UpdateSchemas() {
 			PandoraToken: s.opt.tokens.SchemaFreeTokens.PipelineGetRepoToken,
 		})
 	if err != nil && (!s.opt.schemaFree || !reqerr.IsNoSuchResourceError(err)) {
-		log.Warnf("Runner[%v] Sender[%v]: update pandora repo <%v> schema error %v", s.opt.runnerName, s.opt.name, s.opt.repoName, err)
+		if !IsSelfRunner(s.opt.runnerName) {
+			log.Warnf("Runner[%v] Sender[%v]: update pandora repo <%v> schema error %v", s.opt.runnerName, s.opt.name, s.opt.repoName, err)
+		} else {
+			log.Debugf("Runner[%v] Sender[%v]: update pandora repo <%v> schema error %v", s.opt.runnerName, s.opt.name, s.opt.repoName, err)
+		}
 		return
 	}
 	if schemas == nil {
@@ -861,7 +879,11 @@ func (s *Sender) generatePoint(data Data) (point Data) {
 		}
 		if !s.opt.forceDataConvert && s.opt.ignoreInvalidField && !validSchema(v.ValueType, value, s.opt.numberUseFloat) {
 			if value != nil {
-				log.Warnf("Runner[%v] Sender[%v]: key <%v> value < %v > not match type %v, from data < %v >, ignored this field", s.opt.runnerName, s.opt.name, name, value, v.ValueType, data)
+				if !IsSelfRunner(s.opt.runnerName) {
+					log.Warnf("Runner[%v] Sender[%v]: key <%v> value < %v > not match type %v, from data < %v >, ignored this field", s.opt.runnerName, s.opt.name, name, value, v.ValueType, data)
+				} else {
+					log.Debugf("Runner[%v] Sender[%v]: key <%v> value < %v > not match type %v, from data < %v >, ignored this field", s.opt.runnerName, s.opt.name, name, value, v.ValueType, data)
+				}
 			}
 			continue
 		}

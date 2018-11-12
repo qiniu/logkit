@@ -10,7 +10,6 @@ import (
 )
 
 func TestSplitTransformer(t *testing.T) {
-	t.Parallel()
 	gsub := &Spliter{
 		Key:         "myword",
 		SeperateKey: " ",
