@@ -447,7 +447,7 @@ func (mr *MetricRunner) Status() (rs RunnerStatus) {
 	mr.rs.Elaspedtime += elaspedtime
 	mr.rs.lastState = now
 	durationTime := float64(mr.collectInterval.Seconds())
-	mr.rs.ReadSpeed = float64(mr.rs.ReadDataCount-mr.lastRs.ReadDataCount) / durationTime
+	mr.rs.ReadSpeed = int64(float64(mr.rs.ReadDataCount-mr.lastRs.ReadDataCount) / durationTime)
 	mr.rs.ReadSpeedTrend = getTrend(mr.lastRs.ReadSpeed, mr.rs.ReadSpeed)
 
 	for i := range mr.senders {

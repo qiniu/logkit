@@ -932,11 +932,11 @@ func (r *LogExportRunner) LagStats() (rl *LagInfo, err error) {
 	return
 }
 
-func getTrend(old, new float64) string {
-	if old < new-0.1 {
+func getTrend(old, new int64) string {
+	if old <= new-1 {
 		return SpeedUp
 	}
-	if old > new+0.1 {
+	if old >= new+1 {
 		return SpeedDown
 	}
 	return SpeedStable
@@ -1005,9 +1005,9 @@ func (r *LogExportRunner) getRefreshStatus(elaspedtime float64) RunnerStatus {
 		}
 	*/
 
-	r.rs.ReadSpeedKB = float64(r.rs.ReadDataSize-r.lastRs.ReadDataSize) / elaspedtime
+	r.rs.ReadSpeedKB = int64(float64(r.rs.ReadDataSize-r.lastRs.ReadDataSize) / elaspedtime)
 	r.rs.ReadSpeedTrendKb = getTrend(r.lastRs.ReadSpeedKB, r.rs.ReadSpeedKB)
-	r.rs.ReadSpeed = float64(r.rs.ReadDataCount-r.lastRs.ReadDataCount) / elaspedtime
+	r.rs.ReadSpeed = int64(float64(r.rs.ReadDataCount-r.lastRs.ReadDataCount) / elaspedtime)
 	r.rs.ReadSpeedTrend = getTrend(r.lastRs.ReadSpeed, r.rs.ReadSpeed)
 	r.rs.ReaderStats.Speed = r.rs.ReadSpeed
 	r.rs.ReaderStats.Trend = r.rs.ReadSpeedTrend
@@ -1044,11 +1044,11 @@ func (r *LogExportRunner) getRefreshStatus(elaspedtime float64) RunnerStatus {
 	return *r.lastRs
 }
 
-func calcSpeedTrend(old, new StatsInfo, elaspedtime float64) (speed float64, trend string) {
+func calcSpeedTrend(old, new StatsInfo, elaspedtime float64) (speed int64, trend string) {
 	if elaspedtime < 0.001 {
 		speed = old.Speed
 	} else {
-		speed = float64(new.Success-old.Success) / elaspedtime
+		speed = int64(float64(new.Success-old.Success) / elaspedtime)
 	}
 	trend = getTrend(old.Speed, speed)
 	return

@@ -915,7 +915,7 @@ func TestSplitAndConvertTransforms(t *testing.T) {
 func TestGetTrend(t *testing.T) {
 	assert.Equal(t, SpeedUp, getTrend(0, 1))
 	assert.Equal(t, SpeedDown, getTrend(1, 0))
-	assert.Equal(t, SpeedStable, getTrend(0.02, 0))
+	assert.Equal(t, SpeedStable, getTrend(1, 1))
 }
 
 func TestSpeedTrend(t *testing.T) {
