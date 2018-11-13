@@ -711,7 +711,12 @@ func (m *Meta) GetTagFile() string {
 }
 
 func (m *Meta) GetTags() map[string]interface{} {
-	return m.tags
+	tags := make(map[string]interface{})
+	for k, v := range m.tags {
+		tags[k] = v
+	}
+	return tags
+	//return m.tags
 }
 
 func (m *Meta) Reset() error {
@@ -773,7 +778,12 @@ func (m *Meta) WriteStatistic(stat *Statistic) error {
 }
 
 func (m *Meta) ExtraInfo() map[string]string {
-	return m.extrainfo
+	extra := make(map[string]string)
+	for k, v := range m.extrainfo {
+		extra[k] = v
+	}
+	return extra
+	//	return m.extrainfo
 }
 
 func checkRecordsFile(doneFiles []File, recordsFile string) bool {
