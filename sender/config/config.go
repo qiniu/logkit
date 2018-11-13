@@ -173,6 +173,24 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "时间戳键名(file_send_timestamp_key)",
 			ToolTip:      `用于获取时间的时间戳键名，如果该键存在则将替代当前时间渲染路径中的魔法变量，格式必须是 RFC3339Nano`,
 		},
+		{
+			KeyName:       KeyWriteRaw,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"false", "true"},
+			Default:       "false",
+			Required:      false,
+			DefaultNoUse:  true,
+			Description:   "原始raw字段写入(file_write_raw)",
+			ToolTip:       `直接写入Data中的raw字段`,
+		},
+		{
+			KeyName:      KeyFilePartition,
+			Default:      "4",
+			Required:     false,
+			DefaultNoUse: true,
+			Description:  "文件Partition切分数量(file_partition)",
+			ToolTip:      `文件Partition切分可以指定路径写入`,
+		},
 	},
 	TypePandora: {
 		{

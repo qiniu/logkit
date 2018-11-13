@@ -9,6 +9,14 @@ import (
 
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
+	"strconv"
+
+	"bytes"
+
+	"path/filepath"
+
+	"strings"
+
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
 	. "github.com/qiniu/logkit/sender/config"
@@ -24,6 +32,7 @@ type Sender struct {
 	name         string
 	pattern      *strftime.Strftime
 	timestampKey string
+	partition    int
 	marshalFunc  func([]Data) ([]byte, error)
 	writers      *writerStore
 }
@@ -52,6 +61,26 @@ func newSender(name, pattern, timestampKey string, maxOpenFile int, marshalFunc 
 	}, nil
 }
 
+func WriteRawFunc(datas []Data) ([]byte, error) {
+	var buf bytes.Buffer
+	for _, d := range datas {
+		rawi := d["raw"]
+		switch bts := rawi.(type) {
+		case string:
+			buf.Write([]byte(bts))
+			if !strings.HasSuffix(bts, "\n") {
+				buf.Write([]byte("\n"))
+			}
+		case []byte:
+			buf.Write(bts)
+			if !strings.HasSuffix(string(bts), "\n") {
+				buf.Write([]byte("\n"))
+			}
+		}
+	}
+	return buf.Bytes(), nil
+}
+
 // jsonMarshalWithNewLineFunc 将数据序列化为 JSON 并且在末尾追加换行符
 func jsonMarshalWithNewLineFunc(datas []Data) ([]byte, error) {
 	bytes, err := jsoniter.Marshal(datas)
@@ -69,10 +98,17 @@ func NewSender(conf conf.MapConf) (sender.Sender, error) {
 	name, _ := conf.GetStringOr(KeyName, "fileSender:"+path)
 	timestampKey, _ := conf.GetStringOr(KeyFileSenderTimestampKey, "")
 	maxOpenFile, _ := conf.GetIntOr(KeyFileSenderMaxOpenFiles, defaultFileWriterPoolSize)
-	s, err := newSender(name, path, timestampKey, maxOpenFile, jsonMarshalWithNewLineFunc)
+	rawmaral, _ := conf.GetBoolOr(KeyWriteRaw, false)
+	partition, _ := conf.GetIntOr(KeyFilePartition, 0)
+	maral := jsonMarshalWithNewLineFunc
+	if rawmaral {
+		maral = WriteRawFunc
+	}
+	s, err := newSender(name, path, timestampKey, maxOpenFile, maral)
 	if err != nil {
 		return nil, err
 	}
+	s.partition = partition
 	return s, nil
 }
 
@@ -81,6 +117,12 @@ func (s *Sender) Name() string {
 }
 
 func (_ *Sender) SkipDeepCopy() bool { return true }
+
+func getpartionFolder(nowstr string, idx int) string {
+	base := filepath.Base(nowstr)
+	dir := filepath.Dir(nowstr)
+	return filepath.Join(dir, "partition"+strconv.Itoa(idx), base)
+}
 
 func (s *Sender) Send(datas []Data) error {
 	// 仅仅上报错误信息，但是日志会正常写出，所以不需要上层重试
@@ -93,7 +135,19 @@ func (s *Sender) Send(datas []Data) error {
 
 	// 如果没有设置 timestamp key 则直接赋值
 	if len(s.timestampKey) == 0 {
-		batchDatas[nowStr] = datas
+		if s.partition <= 0 {
+			batchDatas[nowStr] = datas
+		} else {
+			for i := 0; i < s.partition; i++ {
+				batchDatas[getpartionFolder(nowStr, i)] = make([]Data, 0)
+			}
+			for i, v := range datas {
+
+				idx := i % s.partition
+				str := getpartionFolder(nowStr, idx)
+				batchDatas[str] = append(batchDatas[str], v)
+			}
+		}
 	} else {
 		var tStr string
 		for i := range datas {
