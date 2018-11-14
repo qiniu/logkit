@@ -409,11 +409,14 @@ func (sf *SeqFile) getNextFileCondition() (condition func(os.FileInfo) bool, err
 		if inode == sf.inode {
 			return false
 		}
-		if len(sf.inodeDone) < 1 {
-			return true
-		}
-		_, ok := sf.inodeDone[joinFileInode(f.Name(), strconv.FormatUint(inode, 10))]
-		return !ok
+		return true //此处客户硬要rotate到曾经的文件夹，临时改一把
+		/*
+			if len(sf.inodeDone) < 1 {
+				return true
+			}
+			_, ok := sf.inodeDone[joinFileInode(f.Name(), strconv.FormatUint(inode, 10))]
+			return !ok
+		*/
 	}
 
 	condition = andCondition(andCondition(newerThanCurrFile, sf.getIgnoreCondition()), isNewFile)
