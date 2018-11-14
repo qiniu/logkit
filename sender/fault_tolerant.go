@@ -201,7 +201,7 @@ func (ft *FtSender) Send(datas []Data) error {
 	default:
 	}
 
-	se := &StatsError{Ft: true}
+	se := &StatsError{Ft: true, FtNotRetry: true}
 	if ft.strategy == KeyFtStrategyBackupOnly {
 		// 尝试直接发送数据，当数据失败的时候会加入到本地重试队列。外部不需要重试
 		isRetry := false
@@ -222,7 +222,6 @@ func (ft *FtSender) Send(datas []Data) error {
 
 		err = fmt.Errorf("Runner[%v] Sender[%v] try Send Datas err: %v, will put to backup queue and retry later... ", ft.runnerName, ft.innerSender.Name(), err)
 		log.Error(err)
-		se.FtNotRetry = true
 		// 容错队列会保证重试，此处不向外部暴露发送错误信息
 		se.FtQueueLag = ft.BackupQueue.Depth()
 		if backDataContext != nil {
