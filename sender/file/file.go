@@ -7,8 +7,6 @@ import (
 	"github.com/json-iterator/go"
 	"github.com/lestrrat-go/strftime"
 
-	"github.com/qiniu/pandora-go-sdk/base/reqerr"
-
 	"strconv"
 
 	"bytes"
@@ -16,6 +14,8 @@ import (
 	"path/filepath"
 
 	"strings"
+
+	"sync"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
@@ -166,37 +166,29 @@ func (s *Sender) Send(datas []Data) error {
 			batchDatas[tStr] = append(batchDatas[tStr], datas[i])
 		}
 	}
-
+	wg := &sync.WaitGroup{}
 	// 分批写入不同文件
-	for filename := range batchDatas {
-		bytes, err := s.marshalFunc(batchDatas[filename])
-		if err != nil {
-			ste.SendError = reqerr.NewSendError(
-				fmt.Sprintf("%s marshal data failed: %v", s.Name(), err),
-				sender.ConvertDatasBack(datas),
-				reqerr.TypeDefault,
-			)
-			ste.LastError = err.Error()
-			ste.Errors += int64(len(batchDatas[filename]))
-			return ste
-		}
-
-		_, err = s.writers.Write(filename, bytes)
-		if err != nil {
-			ste.SendError = reqerr.NewSendError(
-				fmt.Sprintf("%s write data to file failed: %v", s.Name(), err),
-				sender.ConvertDatasBack(datas),
-				reqerr.TypeDefault,
-			)
-			ste.LastError = err.Error()
-			ste.Errors += int64(len(batchDatas[filename]))
-			return ste
-		}
+	for filename, datas := range batchDatas {
+		wg.Add(1)
+		go s.writeFile(filename, datas, wg)
 	}
+	wg.Wait()
 	if ste.Errors > 0 {
 		return ste
 	}
 	return nil
+}
+
+func (s *Sender) writeFile(filename string, datas []Data, wg *sync.WaitGroup) {
+	defer wg.Done()
+	bytes, err := s.marshalFunc(datas)
+	if err != nil {
+		return
+	}
+	_, err = s.writers.Write(filename, bytes)
+	if err != nil {
+		return
+	}
 }
 
 func (s *Sender) Close() error {
