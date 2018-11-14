@@ -15,17 +15,20 @@ const (
 	MetricNetUsages = "网络设备状态(net)"
 
 	// TypeMetricNet 信息中的字段
-	KeyNetBytesSent       = "net_bytes_sent"
-	KeyNetBytesSentPerSec = "net_bytes_sent_per_sec"
-	KeyNetBytesRecv       = "net_bytes_recv"
-	KeyNetBytesRecvPerSec = "net_bytes_recv_per_sec"
-	KeyNetPacketsSent     = "net_packets_sent"
-	KeyNetPacketsRecv     = "net_packets_recv"
-	KeyNetErrIn           = "net_err_in"
-	KeyNetErrOut          = "net_err_out"
-	KeyNetDropIn          = "net_drop_in"
-	KeyNetDropOut         = "net_drop_out"
-	KeyNetInterface       = "net_interface"
+	KeyNetBytesSent         = "net_bytes_sent"
+	KeyNetBytesSentPerSec   = "net_bytes_sent_per_sec"
+	KeyNetBytesRecv         = "net_bytes_recv"
+	KeyNetBytesRecvPerSec   = "net_bytes_recv_per_sec"
+	KeyNetPacketsSent       = "net_packets_sent"
+	KeyNetPacketsSentPerSec = "net_packets_sent_per_sec"
+	KeyNetPacketsRecv       = "net_packets_recv"
+	KeyNetPacketsRecvPerSec = "net_packets_recv_per_sec"
+	KeyNetErrIn             = "net_err_in"
+	KeyNetErrOut            = "net_err_out"
+	KeyNetDropIn            = "net_drop_in"
+	KeyNetDropOut           = "net_drop_out"
+	KeyNetInterface         = "net_interface"
+	KeyNetHWAddr            = "net_hw_addr"
 )
 
 // KeyNetUsages TypeMetricNet 中的字段名称
@@ -35,18 +38,23 @@ var KeyNetUsages = KeyValueSlice{
 	{KeyNetBytesRecv, "网卡收包总数(bytes)", ""},
 	{KeyNetBytesRecvPerSec, "网卡收包速率(bytes/s)", ""},
 	{KeyNetPacketsSent, "网卡发包数量", ""},
+	{KeyNetPacketsSentPerSec, "每秒网卡发包数量", ""},
 	{KeyNetPacketsRecv, "网卡收包数量", ""},
+	{KeyNetPacketsRecvPerSec, "每秒网卡收包数量", ""},
 	{KeyNetErrIn, "网卡收包错误数量", ""},
 	{KeyNetErrOut, "网卡发包错误数量", ""},
 	{KeyNetDropIn, "网卡收 丢包数量", ""},
 	{KeyNetDropOut, "网卡发 丢包数量", ""},
 	{KeyNetInterface, "网卡设备名称", ""},
+	{KeyNetHWAddr, "网卡设备地址", ""},
 }
 
 type CollectInfo struct {
-	timestamp time.Time
-	BytesSent uint64
-	BytesRecv uint64
+	timestamp   time.Time
+	BytesSent   uint64
+	BytesRecv   uint64
+	PacketsSent uint64
+	PacketsRecv uint64
 }
 
 type NetIOStats struct {
@@ -56,6 +64,7 @@ type NetIOStats struct {
 	skipChecks     bool
 	skipProtoState bool     `json:"skip_protocols_state"`
 	Interfaces     []string `json:"interfaces"`
+	InterfacesMap  map[string]net.Interface
 }
 
 func (_ *NetIOStats) Name() string {
@@ -105,6 +114,15 @@ func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 	}
 
 	for _, io := range netio {
+		hwAddr := ""
+		if _, ok := s.InterfacesMap[io.Name]; !ok {
+			s.initInterfaces()
+		}
+
+		if iface, ok := s.InterfacesMap[io.Name]; ok {
+			hwAddr = fmt.Sprintf("%v", iface.HardwareAddr)
+		}
+
 		if len(s.Interfaces) != 0 {
 			var found bool
 
@@ -143,6 +161,7 @@ func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 			KeyNetDropIn:      io.Dropin,
 			KeyNetDropOut:     io.Dropout,
 			KeyNetInterface:   io.Name,
+			KeyNetHWAddr:      hwAddr,
 		}
 		thisTime := time.Now()
 		if info, ok := s.lastCollect[io.Name]; ok {
@@ -153,6 +172,8 @@ func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 			if secs > 0 {
 				fields[KeyNetBytesSentPerSec] = uint64(float64(sentBytesDur) / secs)
 				fields[KeyNetBytesRecvPerSec] = uint64(float64(recvBytesDur) / secs)
+				fields[KeyNetPacketsRecvPerSec] = uint64(float64(io.PacketsRecv-info.PacketsRecv) / secs)
+				fields[KeyNetPacketsSentPerSec] = uint64(float64(io.PacketsSent-info.PacketsSent) / secs)
 			}
 		}
 		s.lastCollect[io.Name] = CollectInfo{
@@ -180,11 +201,22 @@ func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 	return
 }
 
-func init() {
-	metric.Add(TypeMetricNet, func() metric.Collector {
-		return &NetIOStats{
-			ps:          newSystemPS(),
-			lastCollect: make(map[string]CollectInfo),
+func (s *NetIOStats) initInterfaces() {
+	if interfaces, err := net.Interfaces(); err == nil {
+		for _, _interface := range interfaces {
+			s.InterfacesMap[_interface.Name] = _interface
 		}
+	}
+}
+
+func init() {
+	netIoStats := &NetIOStats{
+		ps:            newSystemPS(),
+		lastCollect:   make(map[string]CollectInfo),
+		InterfacesMap: make(map[string]net.Interface, 0),
+	}
+	netIoStats.initInterfaces()
+	metric.Add(TypeMetricNet, func() metric.Collector {
+		return netIoStats
 	})
 }
