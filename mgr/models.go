@@ -23,13 +23,13 @@ type RunnerStatus struct {
 	TransformStats   map[string]StatsInfo `json:"transformStats"`
 	Error            string               `json:"error,omitempty"`
 	lastState        time.Time
-	ReadSpeedKB      float64 `json:"readspeed_kb"`
-	ReadSpeed        float64 `json:"readspeed"`
-	ReadSpeedTrendKb string  `json:"readspeedtrend_kb"`
-	ReadSpeedTrend   string  `json:"readspeedtrend"`
-	RunningStatus    string  `json:"runningStatus"`
-	Tag              string  `json:"tag,omitempty"`
-	Url              string  `json:"url,omitempty"`
+	ReadSpeedKB      int64  `json:"readspeed_kb"`
+	ReadSpeed        int64  `json:"readspeed"`
+	ReadSpeedTrendKb string `json:"readspeedtrend_kb"`
+	ReadSpeedTrend   string `json:"readspeedtrend"`
+	RunningStatus    string `json:"runningStatus"`
+	Tag              string `json:"tag,omitempty"`
+	Url              string `json:"url,omitempty"`
 
 	//仅作为将history error同步上传到服务端时使用
 	HistorySyncErrors CompatibleErrorResult `json:"history_errors"`

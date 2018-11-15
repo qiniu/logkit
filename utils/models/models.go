@@ -152,12 +152,12 @@ type StatsError struct {
 }
 
 type StatsInfo struct {
-	Errors     int64   `json:"errors"`
-	Success    int64   `json:"success"`
-	Speed      float64 `json:"speed"`
-	Trend      string  `json:"trend"`
-	LastError  string  `json:"last_error"`
-	FtQueueLag int64   `json:"-"`
+	Errors     int64  `json:"errors"`
+	Success    int64  `json:"success"`
+	Speed      int64  `json:"speed"`
+	Trend      string `json:"trend"`
+	LastError  string `json:"last_error"`
+	FtQueueLag int64  `json:"-"`
 }
 
 type ErrorStatistic struct {
