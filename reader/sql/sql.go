@@ -1480,13 +1480,22 @@ func (r *Reader) checkExit(idx int, db *sql.DB) (bool, int64) {
 	var tsql string
 	if r.dbtype == ModeMySQL {
 		tsql = fmt.Sprintf("%s WHERE %v >= %d order by %v limit 1;", rawSQL, r.offsetKey, r.offsets[idx], r.offsetKey)
-	} else if r.dbtype == ModePostgreSQL && len(r.timestampKey) > 0 {
-		ix := strings.Index(rawSQL, "from")
-		if ix < 0 {
-			return true, -1
+	} else if r.dbtype == ModePostgreSQL {
+		if len(r.timestampKey) > 0 {
+			ix := strings.Index(rawSQL, "from")
+			if ix < 0 {
+				return true, -1
+			}
+			rawSQL = rawSQL[ix:]
+			tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v between '%s' and '%s';", r.timestampKey, r.timestampKey, rawSQL, r.timestampKey, r.startTime.Format(postgresTimeFormat), time.Now().Format(postgresTimeFormat))
+		} else {
+			ix := strings.Index(rawSQL, "from")
+			if ix < 0 {
+				return true, -1
+			}
+			rawSQL = rawSQL[ix:]
+			tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v >= %v;", r.offsetKey, r.offsetKey, rawSQL, r.offsetKey, r.offsets[idx])
 		}
-		rawSQL = rawSQL[ix:]
-		tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v between '%s' and '%s';", r.timestampKey, r.timestampKey, rawSQL, r.timestampKey, r.startTime.Format(postgresTimeFormat), time.Now().Format(postgresTimeFormat))
 	} else {
 		ix := strings.Index(rawSQL, "from")
 		if ix < 0 {
