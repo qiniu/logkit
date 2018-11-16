@@ -468,7 +468,7 @@ func (r *Reader) statLogPath() {
 		}
 		newaddsPath = append(newaddsPath, rp)
 		r.armapmux.Lock()
-		if atomic.LoadInt32(&r.status) != StatusStopped {
+		if !r.hasStopped() && !r.isStopping() {
 			if err = r.meta.AddSubMeta(rp, ar.br.Meta); err != nil {
 				log.Errorf("Runner[%v] %v add submeta for %v err %v, but this reader will still working", r.meta.RunnerName, mc, rp, err)
 			}
@@ -477,7 +477,7 @@ func (r *Reader) statLogPath() {
 			log.Warnf("Runner[%v] %v NewActiveReader but reader was stopped, ignore this...", r.meta.RunnerName, mc)
 		}
 		r.armapmux.Unlock()
-		if atomic.LoadInt32(&r.status) != StatusStopped {
+		if !r.hasStopped() && !r.isStopping() {
 			go ar.Run()
 		} else {
 			log.Warnf("Runner[%v] %v NewActiveReader but reader was stopped, will not running...", r.meta.RunnerName, mc)
