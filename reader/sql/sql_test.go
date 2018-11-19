@@ -3,6 +3,7 @@ package sql
 import (
 	"database/sql"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"reflect"
@@ -1472,7 +1473,7 @@ type CronInfo struct {
 
 var (
 	dbSource   = "root:@tcp(127.0.0.1:3306)"
-	pgDbSource = "host=127.0.0.1 port=5432 connect_timeout=10 user=postgres password=  sslmode=disable"
+	pgDbSource = "host=127.0.0.1 port=5432 connect_timeout=10 user=postgres password=lyt  sslmode=disable"
 	connectStr = dbSource + "/?charset=gbk"
 	now        = time.Now()
 	year       = getDateStr(now.Year())
@@ -2048,7 +2049,7 @@ func setSecond() (int, string, error) {
 //for postgres
 
 func TestPostgres(t *testing.T) {
-	if err := preparePostgres(); err != nil {
+	if err := preparePostgres(0); err != nil {
 		t.Fatalf("prepare postgres database failed: %v", err)
 	}
 	expectDatas := []Data{
@@ -2080,7 +2081,7 @@ func TestPostgres(t *testing.T) {
 
 	runnerName := "TestPostgres"
 	mr, err := reader.NewReader(conf.MapConf{
-		"postgres_database":     pgDatabaseTest.database,
+		"postgres_database":     pgDatabaseTest.database + "0",
 		"postgres_limit_batch":  "100",
 		"mode":                  "postgres",
 		"postgres_exec_onstart": "true",
@@ -2122,6 +2123,86 @@ func TestPostgres(t *testing.T) {
 	}
 }
 
+func TestPostgresWithOffset(t *testing.T) {
+	if err := preparePostgres(1); err != nil {
+		t.Fatalf("prepare postgres database failed: %v", err)
+	}
+	expectDatas := []Data{
+		{
+			"id":          int64(1),
+			"name":        "小王",
+			"age":         int64(0),
+			"salary":      5000.2998046875,
+			"delete":      true,
+			"create_time": "2017-09-04T11:26:17Z",
+		},
+		{
+			"id":          int64(2),
+			"name":        "小明",
+			"age":         int64(28),
+			"salary":      float64(0),
+			"delete":      false,
+			"create_time": "2018-03-20T11:22:17Z",
+		},
+		{
+			"id":          int64(3),
+			"name":        "小张",
+			"age":         int64(28),
+			"salary":      5000.5,
+			"delete":      false,
+			"create_time": "2018-10-10T11:23:17Z",
+		},
+	}
+
+	os.MkdirAll(MetaDir+"/TestPostgres/", 0777)
+	err := ioutil.WriteFile("meta/TestPostgres/file.meta", []byte("select@*@from@person##2\t1\n"), 0777)
+	assert.NoError(t, err)
+
+	runnerName := "TestPostgres"
+	mr, err := reader.NewReader(conf.MapConf{
+		"postgres_database":     pgDatabaseTest.database + "1",
+		"postgres_limit_batch":  "100",
+		"mode":                  "postgres",
+		"postgres_offset_key":   "id",
+		"postgres_exec_onstart": "true",
+		"postgres_datasource":   pgDbSource,
+		"postgres_sql":          "select * from person",
+		"meta_path":             path.Join(MetaDir, runnerName),
+		"file_done":             path.Join(MetaDir, runnerName),
+		"runner_name":           runnerName,
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(MetaDir)
+	r, ok := mr.(reader.DataReader)
+	if !ok {
+		t.Error("postgres read should have readdata interface")
+	}
+	assert.NoError(t, mr.(*Reader).Start())
+
+	dataLine := 0
+	before := time.Now()
+	var actualData []Data
+	for !batchTimeout(before, 2) {
+		data, _, err := r.ReadData()
+		if err != nil {
+			t.Error(err)
+		}
+		if len(data) <= 0 {
+			continue
+		}
+		actualData = append(actualData, data)
+		dataLine++
+
+	}
+	assert.Equal(t, 2, dataLine)
+
+	for i := 0; i < len(actualData); i++ {
+		assert.Equal(t, expectDatas[i+1], actualData[i])
+	}
+}
+
 func getPostgresDb(dbsource string) (db *sql.DB, err error) {
 	db, err = openSql("postgres", dbsource)
 	if err != nil {
@@ -2132,23 +2213,25 @@ func getPostgresDb(dbsource string) (db *sql.DB, err error) {
 	}
 	return db, nil
 }
-func preparePostgres() error {
+
+//使用相同数据库会由于排他锁而无法访问 故加一个随机数以区分
+func preparePostgres(random int) error {
 	db, err := getPostgresDb(pgDbSource)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
-	_, err = db.Query("DROP DATABASE IF EXISTS " + pgDatabaseTest.database)
+	_, err = db.Query("DROP DATABASE IF EXISTS " + pgDatabaseTest.database + strconv.Itoa(random))
 	if err != nil {
 		return err
 	}
-	_, err = db.Exec("CREATE DATABASE " + pgDatabaseTest.database)
+	_, err = db.Exec("CREATE DATABASE " + pgDatabaseTest.database + strconv.Itoa(random))
 	if err != nil {
 		return err
 	}
 	db.Close()
 
-	db, err = getPostgresDb(pgDbSource + " dbname=" + pgDatabaseTest.database)
+	db, err = getPostgresDb(pgDbSource + " dbname=" + pgDatabaseTest.database + strconv.Itoa(random))
 	if err != nil {
 		return err
 	}
