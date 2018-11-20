@@ -12,6 +12,16 @@ func init() {
 			return encodeGBKRune
 		},
 	})
+
+	RegisterCharset(&Charset{
+		Name: "GB2312",
+		NewDecoder: func() Decoder {
+			return decodeGBKRune
+		},
+		NewEncoder: func() Encoder {
+			return encodeGBKRune
+		},
+	})
 }
 
 func decodeGBKRune(p []byte) (r rune, size int, status Status) {
