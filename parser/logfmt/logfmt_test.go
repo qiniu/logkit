@@ -39,6 +39,7 @@ func Test_parseLine(t *testing.T) {
 	}{
 		{
 			expectData: []Data{},
+			existErr:   true,
 		},
 		{
 			line: "foo=\"bar\"",
@@ -81,12 +82,12 @@ func Test_parseLine(t *testing.T) {
 		{
 			line:       `no data.`,
 			expectData: []Data{},
-			existErr:   false,
+			existErr:   true,
 		},
 		{
 			line:       `foo="" bar=`,
 			expectData: []Data{},
-			existErr:   false,
+			existErr:   true,
 		},
 		{
 			line:       `abc=abc foo="def`,
@@ -126,7 +127,7 @@ func TestParse(t *testing.T) {
 			expectData: []Data{
 				{
 					"ts":     "2018-01-02T03:04:05.123Z",
-					"lvl":    int64(5),
+					"lvl":    float64(5),
 					"msg":    "error",
 					"log_id": "123456abc",
 				},
@@ -137,7 +138,7 @@ func TestParse(t *testing.T) {
 			expectData: []Data{
 				{
 					"ts":     "2018-01-02T03:04:05.123Z",
-					"lvl":    int64(5),
+					"lvl":    float64(5),
 					"msg":    "error",
 					"log_id": "123456abc",
 				},
@@ -150,7 +151,65 @@ func TestParse(t *testing.T) {
 		},
 	}
 	l := Parser{
-		name: TypeLogfmt,
+		name:       TypeLogfmt,
+		numRoutine: 1,
+	}
+	for _, tt := range tests {
+		got, err := l.Parse(tt.s)
+		if c, ok := err.(*StatsError); ok {
+			err = errors.New(c.LastError)
+			assert.Equal(t, int64(0), c.Errors)
+		}
+
+		for i, m := range got {
+			assert.Equal(t, tt.expectData[i], m)
+		}
+	}
+}
+
+func TestParseWithKeepRawData(t *testing.T) {
+	tests := []struct {
+		s          []string
+		expectData []Data
+	}{
+		{
+			expectData: []Data{},
+		},
+		{
+			s: []string{`ts=2018-01-02T03:04:05.123Z lvl=5 msg="error" log_id=123456abc`},
+			expectData: []Data{
+				{
+					"ts":       "2018-01-02T03:04:05.123Z",
+					"lvl":      float64(5),
+					"msg":      "error",
+					"log_id":   "123456abc",
+					"raw_data": `ts=2018-01-02T03:04:05.123Z lvl=5 msg="error" log_id=123456abc`,
+				},
+			},
+		},
+		{
+			s: []string{"ts=2018-01-02T03:04:05.123Z lvl=5 msg=\"error\" log_id=123456abc\nmethod=PUT duration=1.23 log_id=123456abc"},
+			expectData: []Data{
+				{
+					"ts":       "2018-01-02T03:04:05.123Z",
+					"lvl":      float64(5),
+					"msg":      "error",
+					"log_id":   "123456abc",
+					"raw_data": "ts=2018-01-02T03:04:05.123Z lvl=5 msg=\"error\" log_id=123456abc\nmethod=PUT duration=1.23 log_id=123456abc",
+				},
+				{
+					"method":   "PUT",
+					"duration": 1.23,
+					"log_id":   "123456abc",
+					"raw_data": "ts=2018-01-02T03:04:05.123Z lvl=5 msg=\"error\" log_id=123456abc\nmethod=PUT duration=1.23 log_id=123456abc",
+				},
+			},
+		},
+	}
+	l := Parser{
+		name:        TypeLogfmt,
+		keepRawData: true,
+		numRoutine:  1,
 	}
 	for _, tt := range tests {
 		got, err := l.Parse(tt.s)

@@ -2,6 +2,7 @@ package logfmt
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -23,11 +24,13 @@ type Parser struct {
 	name                 string
 	disableRecordErrData bool
 	numRoutine           int
+	keepRawData          bool
 }
 
 func NewParser(c conf.MapConf) (parser.Parser, error) {
 	name, _ := c.GetStringOr(KeyParserName, "")
 	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)
 	numRoutine := MaxProcs
 	if numRoutine == 0 {
 		numRoutine = 1
@@ -36,6 +39,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		name:                 name,
 		disableRecordErrData: disableRecordErrData,
 		numRoutine:           numRoutine,
+		keepRawData:          keepRawData,
 	}, nil
 }
 
@@ -86,12 +90,17 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		if parseResult.Err != nil {
 			se.AddErrors()
 			se.LastError = parseResult.Err.Error()
+			errData := make(Data)
 			if !p.disableRecordErrData {
-				datas = append(datas, Data{
-					KeyPandoraStash: parseResult.Line,
-				})
-			} else {
+				errData[KeyPandoraStash] = parseResult.Line
+			} else if !p.keepRawData {
 				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
+			}
+			if p.keepRawData {
+				errData[KeyRawData] = parseResult.Line
+			}
+			if !p.disableRecordErrData || p.keepRawData {
+				datas = append(datas, errData)
 			}
 			continue
 		}
@@ -102,6 +111,13 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		}
 
 		se.AddSuccess()
+		if p.keepRawData {
+			//解析后的部分数据对应全部的原始数据会造成比较严重的数据膨胀
+			//TODO 减少膨胀的数据
+			for i := range parseResult.Datas {
+				parseResult.Datas[i][KeyRawData] = parseResult.Line
+			}
+		}
 		datas = append(datas, parseResult.Datas...)
 	}
 
@@ -115,6 +131,7 @@ func (p *Parser) parse(line string) ([]Data, error) {
 	reader := bytes.NewReader([]byte(line))
 	decoder := logfmt.NewDecoder(reader)
 	datas := make([]Data, 0)
+	var fields Data
 	for {
 		ok := decoder.ScanRecord()
 		if !ok {
@@ -122,14 +139,17 @@ func (p *Parser) parse(line string) ([]Data, error) {
 			if err != nil {
 				return nil, err
 			}
+			//此错误仅用于当原始数据解析成功但无解析数据时，保留原始数据之用
+			if len(fields) == 0 {
+				return nil, errors.New("no value was parsed after logfmt, will keep origin data in pandora_stash if disable_record_errdata field is false")
+			}
 			break
 		}
-		fields := make(Data)
+		fields = make(Data)
 		for decoder.ScanKeyval() {
 			if string(decoder.Value()) == "" {
 				continue
 			}
-
 			//type conversions
 			value := string(decoder.Value())
 			if fValue, err := strconv.ParseFloat(value, 64); err == nil {
