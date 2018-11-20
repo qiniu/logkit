@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/howeyc/fsnotify"
+	"github.com/fsnotify/fsnotify"
 	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
 
@@ -349,13 +349,14 @@ func (m *Manager) IsRunning(confPath string) bool {
 func (m *Manager) handle(path string, watcher *fsnotify.Watcher) {
 	for {
 		select {
-		case ev, ok := <-watcher.Event:
+		case ev, ok := <-watcher.Events:
 			if !ok {
 				log.Info("Manager watcher chan was closed")
 				return
 			}
 			log.Info("event:", ev)
-			if ev.IsDelete() || ev.IsRename() {
+			if ev.Op&fsnotify.Remove == fsnotify.Remove ||
+				ev.Op&fsnotify.Rename == fsnotify.Rename {
 				_, err := os.Stat(path)
 				if os.IsNotExist(err) {
 					// 如果当前监听文件被删除，则不再监听，退出
@@ -370,14 +371,15 @@ func (m *Manager) handle(path string, watcher *fsnotify.Watcher) {
 				}
 				m.Remove(ev.Name)
 			}
-			if ev.IsCreate() {
+			if ev.Op&fsnotify.Create == fsnotify.Create {
 				m.Add(ev.Name)
 			}
-			if ev.IsModify() && !ev.IsCreate() {
+			if ev.Op&fsnotify.Write == fsnotify.Write &&
+				ev.Op&fsnotify.Create != fsnotify.Create {
 				m.Remove(ev.Name)
 				m.Add(ev.Name)
 			}
-		case err := <-watcher.Error:
+		case err := <-watcher.Errors:
 			if err != nil {
 				log.Error("error:", err)
 			}
@@ -516,7 +518,7 @@ func (m *Manager) addWatchers(confsPath []string) (err error) {
 			m.watchers[path] = watcher
 			m.watcherMux.Unlock()
 			go m.handle(path, watcher)
-			if err = watcher.Watch(path); err != nil {
+			if err = watcher.Add(path); err != nil {
 				log.Errorf("watch %v error %v", path, err)
 			}
 		}

@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build darwin
+// +build freebsd openbsd netbsd dragonfly
 
 package fsnotify
 
-import "syscall"
+import "golang.org/x/sys/unix"
 
-const open_FLAGS = syscall.O_EVTONLY
+const openMode = unix.O_NONBLOCK | unix.O_RDONLY
