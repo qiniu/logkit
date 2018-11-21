@@ -60,6 +60,8 @@ type Reader struct {
 	statInterval   time.Duration
 	maxOpenFiles   int
 	whence         string
+
+	notFirstTime bool
 }
 
 type ActiveReader struct {
@@ -85,7 +87,7 @@ type Result struct {
 	logpath string
 }
 
-func NewActiveReader(originPath, realPath, whence string, meta *reader.Meta, msgChan chan<- Result, errChan chan<- error) (ar *ActiveReader, err error) {
+func NewActiveReader(originPath, realPath, whence string, notFirstTime bool, meta *reader.Meta, msgChan chan<- Result, errChan chan<- error) (ar *ActiveReader, err error) {
 	rpath := strings.Replace(realPath, string(os.PathSeparator), "_", -1)
 	if runtime.GOOS == "windows" {
 		rpath = strings.Replace(rpath, ":", "_", -1)
@@ -96,6 +98,11 @@ func NewActiveReader(originPath, realPath, whence string, meta *reader.Meta, msg
 		return nil, err
 	}
 	subMeta.Readlimit = meta.Readlimit
+	isNewFile := meta.IsStatisticFileExist() || notFirstTime //是否为存量文件
+	if isNewFile && subMeta.IsNotExist() {
+		whence = WhenceOldest // 非存量文件第一次读取时从头开始读
+	}
+
 	//tailx模式下新增runner是因为文件已经感知到了，所以不可能文件不存在，那么如果读取还遇到错误，应该马上返回，所以errDirectReturn=true
 	fr, err := reader.NewSingleFile(subMeta, realPath, whence, true)
 	if err != nil {
@@ -451,7 +458,7 @@ func (r *Reader) statLogPath() {
 			log.Debugf("Runner[%v] <%v> is expired, ignore...", r.meta.RunnerName, mc)
 			continue
 		}
-		ar, err := NewActiveReader(mc, rp, r.whence, r.meta, r.msgChan, r.errChan)
+		ar, err := NewActiveReader(mc, rp, r.whence, r.notFirstTime, r.meta, r.msgChan, r.errChan)
 		if err != nil {
 			err = fmt.Errorf("runner[%v] NewActiveReader for matches %v error %v", r.meta.RunnerName, rp, err)
 			r.sendError(err)
@@ -482,6 +489,9 @@ func (r *Reader) statLogPath() {
 		} else {
 			log.Warnf("Runner[%v] %v NewActiveReader but reader was stopped, will not running...", r.meta.RunnerName, mc)
 		}
+	}
+	if !r.notFirstTime {
+		r.notFirstTime = true
 	}
 	if len(newaddsPath) > 0 {
 		log.Infof("Runner[%v] statLogPath find new logpath: %v", r.meta.RunnerName, strings.Join(newaddsPath, ", "))

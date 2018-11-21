@@ -33,8 +33,9 @@ func init() {
 }
 
 type message struct {
-	result  string
-	logpath string
+	result      string
+	logpath     string
+	currentFile string
 }
 
 type Reader struct {
@@ -66,6 +67,8 @@ type Reader struct {
 	validFilesRegex    string
 	whence             string
 	bufferSize         int
+
+	notFirstTime bool
 }
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
@@ -250,7 +253,7 @@ func (r *Reader) statLogPath() {
 			BufferSize:         r.bufferSize,
 			MsgChan:            r.msgChan,
 			ErrChan:            r.errChan,
-		})
+		}, r.notFirstTime)
 		if err != nil {
 			err = fmt.Errorf("create new reader for log path %q failed: %v", logPath, err)
 			r.sendError(err)
@@ -274,6 +277,9 @@ func (r *Reader) statLogPath() {
 		}
 
 		go dr.Run()
+	}
+	if !r.notFirstTime {
+		r.notFirstTime = true
 	}
 	if len(newPaths) > 0 {
 		log.Infof("Runner[%v] stat log path found %d new log paths: %v", r.meta.RunnerName, len(newPaths), newPaths)
@@ -337,7 +343,7 @@ func (r *Reader) ReadLine() (string, error) {
 	defer timer.Stop()
 	select {
 	case msg := <-r.msgChan:
-		r.currentFile = msg.logpath
+		r.currentFile = msg.currentFile
 		return msg.result, nil
 	case <-timer.C:
 		return "", r.readError()
