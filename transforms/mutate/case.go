@@ -148,7 +148,10 @@ func (c *Case) RawTransform(datas []string) ([]string, error) {
 }
 
 func (c *Case) Stage() string {
-	return transforms.StageAfterParser
+	if c.CStage == "" {
+		return transforms.StageAfterParser
+	}
+	return c.CStage
 }
 
 func (c *Case) Stats() StatsInfo {
