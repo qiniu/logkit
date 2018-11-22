@@ -146,6 +146,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionParserName,
 		OptionLabels,
 		OptionDisableRecordErrData,
+		OptionKeepRawData,
 	},
 	TypeNginx: {
 		{
@@ -365,6 +366,7 @@ var ModeKeyOptions = map[string][]Option{
 	TypeLogfmt: {
 		OptionParserName,
 		OptionDisableRecordErrData,
+		OptionKeepRawData,
 	},
 }
 
