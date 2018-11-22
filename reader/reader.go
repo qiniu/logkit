@@ -158,11 +158,13 @@ func NewFileDirReader(meta *Meta, conf conf.MapConf) (reader Reader, err error) 
 	validFilesRegex, _ := conf.GetStringOr(KeyValidFilePattern, "*")
 	newfileNewLine, _ := conf.GetBoolOr(KeyNewFileNewLine, false)
 	skipFirstLine, _ := conf.GetBoolOr(KeySkipFileFirstLine, false)
+	readSameInode, _ := conf.GetBoolOr(KeyReadSameInode, false)
 	fr, err := NewSeqFile(meta, logpath, ignoreHidden, newfileNewLine, ignoreFileSuffix, validFilesRegex, whence)
 	if err != nil {
 		return
 	}
 	fr.SkipFileFirstLine = skipFirstLine
+	fr.ReadSameInode = readSameInode
 	return NewReaderSize(fr, meta, bufSize)
 }
 

@@ -267,6 +267,8 @@ type newReaderOptions struct {
 
 	MsgChan chan<- message
 	ErrChan chan<- error
+
+	ReadSameInode bool
 }
 
 func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool) (*dirReader, error) {
@@ -287,6 +289,7 @@ func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool) (*dir
 		return nil, fmt.Errorf("new sequence file: %v", err)
 	}
 	fr.SkipFileFirstLine = opts.SkipFirstLine
+	fr.ReadSameInode = opts.ReadSameInode
 	br, err := reader.NewReaderSize(fr, subMeta, opts.BufferSize)
 	if err != nil {
 		return nil, fmt.Errorf("new buffer reader: %v", err)

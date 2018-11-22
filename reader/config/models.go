@@ -24,6 +24,7 @@ const (
 	KeyHeadPattern       = "head_pattern"
 	KeyNewFileNewLine    = "newfile_newline"
 	KeySkipFileFirstLine = "skip_first_line"
+	KeyReadSameInode     = "read_same_inode"
 
 	// 忽略隐藏文件
 	KeyIgnoreHiddenFile = "ignore_hidden"

@@ -170,6 +170,18 @@ var (
 		Required:      false,
 		ToolTip:       "常用于带抬头的csv文件，抬头与实际数据类型不一致",
 	}
+	OptionKeyReadSameInode = Option{
+		KeyName:       KeyReadSameInode,
+		Element:       Radio,
+		ChooseOnly:    true,
+		ChooseOptions: []interface{}{"false", "true"},
+		Default:       "false",
+		DefaultNoUse:  false,
+		Description:   "是否读取已经读完的文件(read_same_inode)",
+		Advance:       true,
+		Required:      false,
+		ToolTip:       "已经读完的文件（inode相同）是否继续读取",
+	}
 	OptionKeyValidFilePattern = Option{
 		KeyName:      KeyValidFilePattern,
 		ChooseOnly:   false,
@@ -268,6 +280,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionHeadPattern,
 		OptionKeyNewFileNewLine,
 		OptionKeySkipFileFirstLine,
+		OptionKeyReadSameInode,
 		OptionKeyIgnoreHiddenFile,
 		OptionKeyIgnoreFileSuffix,
 		OptionKeyValidFilePattern,
@@ -343,6 +356,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionHeadPattern,
 		OptionKeyNewFileNewLine,
 		OptionKeySkipFileFirstLine,
+		OptionKeyReadSameInode,
 		OptionKeyIgnoreHiddenFile,
 		OptionKeyIgnoreFileSuffix,
 		{
