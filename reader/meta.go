@@ -592,6 +592,17 @@ func (m *Meta) StatisticFile() string {
 	return m.statisticPath
 }
 
+func (m *Meta) IsStatisticFileExist() bool {
+	return !m.IsStatisticFileNotExist()
+}
+
+// IsNotExist meta 不存在，用来判断是第一次创建
+func (m *Meta) IsStatisticFileNotExist() bool {
+	path := m.StatisticFile()
+	_, err := os.Stat(path)
+	return os.IsNotExist(err)
+}
+
 // BufFile 返回buf的文件路径
 func (m *Meta) BufFile() string {
 	return m.bufFilePath

@@ -129,7 +129,7 @@ func (dr *dirReader) Run() {
 			}
 
 			select {
-			case dr.msgChan <- message{result: dr.readcache, logpath: dr.originalPath}:
+			case dr.msgChan <- message{result: dr.readcache, logpath: dr.originalPath, currentFile: dr.br.Source()}:
 				dr.readLock.Lock()
 				dr.readcache = ""
 				dr.readLock.Unlock()
@@ -269,7 +269,7 @@ type newReaderOptions struct {
 	ErrChan chan<- error
 }
 
-func (drs *dirReaders) NewReader(opts newReaderOptions) (*dirReader, error) {
+func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool) (*dirReader, error) {
 	rpath := strings.Replace(opts.LogPath, string(os.PathSeparator), "_", -1)
 	subMetaPath := filepath.Join(opts.Meta.Dir, rpath)
 	subMeta, err := reader.NewMeta(subMetaPath, subMetaPath, opts.LogPath, ModeDir, opts.Meta.TagFile, reader.DefautFileRetention)
@@ -278,6 +278,10 @@ func (drs *dirReaders) NewReader(opts newReaderOptions) (*dirReader, error) {
 	}
 	subMeta.Readlimit = opts.Meta.Readlimit
 
+	isNewDir := opts.Meta.IsStatisticFileExist() || notFirstTime //是否为存量文件
+	if isNewDir && subMeta.IsNotExist() {
+		opts.Whence = WhenceOldest // 非存量文件第一次读取时从头开始读
+	}
 	fr, err := reader.NewSeqFile(subMeta, opts.LogPath, opts.IgnoreHidden, opts.NewFileNewLine, opts.IgnoreFileSuffixes, opts.ValidFilesRegex, opts.Whence)
 	if err != nil {
 		return nil, fmt.Errorf("new sequence file: %v", err)
