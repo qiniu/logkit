@@ -60,6 +60,8 @@ type SeqFile struct {
 
 	lastSyncPath   string
 	lastSyncOffset int64
+
+	ReadSameInode bool //记录已经度过的filename_inode是否继续读
 }
 
 func getStartFile(path, whence string, meta *Meta, sf *SeqFile) (f *os.File, dir, currFile string, offset int64, err error) {
@@ -409,6 +411,10 @@ func (sf *SeqFile) getNextFileCondition() (condition func(os.FileInfo) bool, err
 		if inode == sf.inode {
 			return false
 		}
+		if sf.ReadSameInode {
+			return true
+		}
+
 		if len(sf.inodeDone) < 1 {
 			return true
 		}

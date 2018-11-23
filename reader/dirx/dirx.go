@@ -68,7 +68,8 @@ type Reader struct {
 	whence             string
 	bufferSize         int
 
-	notFirstTime bool
+	notFirstTime  bool
+	readSameInode bool
 }
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
@@ -107,6 +108,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	validFilesRegex, _ := conf.GetStringOr(KeyValidFilePattern, "*")
 	whence, _ := conf.GetStringOr(KeyWhence, WhenceOldest)
 	bufferSize, _ := conf.GetIntOr(KeyBufSize, reader.DefaultBufSize)
+	readSameInode, _ := conf.GetBoolOr(KeyReadSameInode, false)
 
 	_, _, bufsize, err := meta.ReadBufMeta()
 	if err != nil {
@@ -154,6 +156,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		validFilesRegex:    validFilesRegex,
 		whence:             whence,
 		bufferSize:         bufferSize,
+		readSameInode:      readSameInode,
 	}, nil
 }
 
@@ -253,6 +256,7 @@ func (r *Reader) statLogPath() {
 			BufferSize:         r.bufferSize,
 			MsgChan:            r.msgChan,
 			ErrChan:            r.errChan,
+			ReadSameInode:      r.readSameInode,
 		}, r.notFirstTime)
 		if err != nil {
 			err = fmt.Errorf("create new reader for log path %q failed: %v", logPath, err)

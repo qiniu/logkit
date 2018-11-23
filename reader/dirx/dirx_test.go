@@ -47,6 +47,7 @@ func TestStart(t *testing.T) {
 		"multiReaderSyncMetaOneLineTest":  multiReaderSyncMetaOneLineTest,
 		"multiReaderSyncMetaMutilineTest": multiReaderSyncMetaMutilineTest,
 		"multiReaderNewestTest":           multiReaderNewestTest,
+		"multiReaderSameInodeTest":        multiReaderSameInodeTest,
 	}
 
 	for k, f := range funcMap {
@@ -613,6 +614,130 @@ func multiReaderNewestTest(t *testing.T) {
 
 	assert.EqualValues(t, expectResults, actualResults)
 	assert.Equal(t, StatsInfo{}, dr.Status())
+}
+
+func multiReaderSameInodeTest(t *testing.T) {
+	dirname := "multiReaderSameInodeTest"
+	dir1 := filepath.Join(dirname, "logs/abc")
+	dir2 := filepath.Join(dirname, "logs/xyz")
+	dir1file1 := filepath.Join(dir1, "file1.log")
+	dir1file2 := filepath.Join(dir1, "file2.log")
+	dir2file1 := filepath.Join(dir2, "file1.log")
+
+	createDirWithName(dirname)
+	defer os.RemoveAll(dirname)
+
+	createDirWithName(dir1)
+	createFileWithContent(dir1file1, "abc123\nabc124\nabc125\nabc126\nabc127\n")
+	expectResults := map[string]int{
+		"abc123\n": 3,
+		"abc124\n": 3,
+		"abc125\n": 3,
+		"abc126\n": 3,
+		"abc127\n": 3,
+		"abc\nx\n": 1,
+		"abc\ny\n": 1,
+		"abc\nz\n": 1,
+	}
+	actualResults := make(map[string]int)
+	logPathPattern := filepath.Join(dirname, "logs/*")
+	c := conf.MapConf{
+		"log_path":        logPathPattern,
+		"stat_interval":   "1s",
+		"expire":          "0s",
+		"max_open_files":  "128",
+		"read_from":       "oldest",
+		"reader_buf_size": "1024",
+		"meta_path":       dirname,
+		"mode":            ModeDirx,
+		"read_same_inode": "true",
+	}
+	meta, err := reader.NewMetaWithConf(c)
+	assert.NoError(t, err)
+	r, err := NewReader(meta, c)
+	assert.NoError(t, err)
+
+	err = r.SetMode(ReadModeHeadPatternString, "^abc*")
+	assert.Nil(t, err)
+	dr := r.(*Reader)
+	assert.NoError(t, dr.Start())
+	t.Log("Reader has started")
+
+	createFileWithContent(dir1file2, "abc123\nabc124\nabc125\nabc126\nabc127\n")
+	time.Sleep(3 * time.Second)
+
+	maxNum := 0
+	emptyNum := 0
+	for {
+		data, err := dr.ReadLine()
+		assert.Nil(t, err)
+		if data != "" {
+			t.Log("Data:", data, maxNum)
+			actualResults[data]++
+			maxNum++
+		} else {
+			emptyNum++
+		}
+		if maxNum >= 10 || emptyNum > 5 {
+			break
+		}
+	}
+	t.Log("Reader has finished reading one")
+
+	emptyNum = 0
+	// 确保上个 reader 已过期，新的 reader 已经探测到并创建成功
+	createDirWithName(dir2)
+	createFileWithContent(dir2file1, "abc\nx\nabc\ny\nabc\nz\n")
+	time.Sleep(3 * time.Second)
+
+	assert.Equal(t, 2, dr.dirReaders.Num(), "Number of readers")
+
+	t.Log("Reader has started to read two")
+	emptyNum = 0
+	for {
+		data, err := dr.ReadLine()
+		if data != "" {
+			t.Log("Data:", data, maxNum)
+			actualResults[data]++
+			maxNum++
+		} else {
+			emptyNum++
+		}
+		if err == io.EOF {
+			break
+		}
+		if maxNum >= 13 || emptyNum > 10 {
+			break
+		}
+	}
+	t.Log("Reader has finished reading two")
+
+	createFileWithContent(dir1file1, "abc123\nabc124\nabc125\nabc126\nabc127\n")
+	time.Sleep(3 * time.Second)
+	assert.Equal(t, 2, dr.dirReaders.Num(), "Number of readers")
+
+	t.Log("Reader has started to read three")
+	emptyNum = 0
+	for {
+		data, err := dr.ReadLine()
+		if data != "" {
+			t.Log("Data:", data, maxNum)
+			actualResults[data]++
+			maxNum++
+		} else {
+			emptyNum++
+		}
+		if err == io.EOF {
+			break
+		}
+		if maxNum >= 18 || emptyNum > 10 {
+			break
+		}
+	}
+
+	assert.EqualValues(t, expectResults, actualResults)
+	assert.Equal(t, StatsInfo{}, dr.Status())
+	t.Log("Reader has finished reading three")
 }
 
 func TestMultiReaderReset(t *testing.T) {
