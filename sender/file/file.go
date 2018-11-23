@@ -1,14 +1,18 @@
 package file
 
 import (
+	"bytes"
 	"fmt"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/json-iterator/go"
 	"github.com/lestrrat-go/strftime"
 
-	"github.com/qiniu/pandora-go-sdk/base/reqerr"
-
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
 	. "github.com/qiniu/logkit/sender/config"
@@ -26,6 +30,8 @@ type Sender struct {
 	timestampKey string
 	marshalFunc  func([]Data) ([]byte, error)
 	writers      *writerStore
+
+	partition int
 }
 
 func init() {
@@ -61,6 +67,26 @@ func jsonMarshalWithNewLineFunc(datas []Data) ([]byte, error) {
 	return append(bytes, '\n'), nil
 }
 
+func writeRawFunc(datas []Data) ([]byte, error) {
+	var buf bytes.Buffer
+	for _, d := range datas {
+		raw := d["raw"]
+		switch bts := raw.(type) {
+		case string:
+			buf.Write([]byte(bts))
+			if !strings.HasSuffix(bts, "\n") {
+				buf.Write([]byte("\n"))
+			}
+		case []byte:
+			buf.Write(bts)
+			if !strings.HasSuffix(string(bts), "\n") {
+				buf.Write([]byte("\n"))
+			}
+		}
+	}
+	return buf.Bytes(), nil
+}
+
 func NewSender(conf conf.MapConf) (sender.Sender, error) {
 	path, err := conf.GetString(KeyFileSenderPath)
 	if err != nil {
@@ -69,10 +95,17 @@ func NewSender(conf conf.MapConf) (sender.Sender, error) {
 	name, _ := conf.GetStringOr(KeyName, "fileSender:"+path)
 	timestampKey, _ := conf.GetStringOr(KeyFileSenderTimestampKey, "")
 	maxOpenFile, _ := conf.GetIntOr(KeyFileSenderMaxOpenFiles, defaultFileWriterPoolSize)
-	s, err := newSender(name, path, timestampKey, maxOpenFile, jsonMarshalWithNewLineFunc)
+	rawMarshal, _ := conf.GetBoolOr(KeyFileWriteRaw, false)
+	partition, _ := conf.GetIntOr(KeyFilePartition, 0)
+	marshal := jsonMarshalWithNewLineFunc
+	if rawMarshal {
+		marshal = writeRawFunc
+	}
+	s, err := newSender(name, path, timestampKey, maxOpenFile, marshal)
 	if err != nil {
 		return nil, err
 	}
+	s.partition = partition
 	return s, nil
 }
 
@@ -93,7 +126,17 @@ func (s *Sender) Send(datas []Data) error {
 
 	// 如果没有设置 timestamp key 则直接赋值
 	if len(s.timestampKey) == 0 {
-		batchDatas[nowStr] = datas
+		if s.partition <= 1 {
+			batchDatas[nowStr] = datas
+		} else {
+			for i := 0; i < s.partition; i++ {
+				batchDatas[getPartitionFolder(nowStr, i)] = make([]Data, 0)
+			}
+			for i, v := range datas {
+				str := getPartitionFolder(nowStr, i%s.partition)
+				batchDatas[str] = append(batchDatas[str], v)
+			}
+		}
 	} else {
 		var tStr string
 		for i := range datas {
@@ -114,37 +157,39 @@ func (s *Sender) Send(datas []Data) error {
 	}
 
 	// 分批写入不同文件
-	for filename := range batchDatas {
-		bytes, err := s.marshalFunc(batchDatas[filename])
-		if err != nil {
-			ste.SendError = reqerr.NewSendError(
-				fmt.Sprintf("%s marshal data failed: %v", s.Name(), err),
-				sender.ConvertDatasBack(datas),
-				reqerr.TypeDefault,
-			)
-			ste.LastError = err.Error()
-			ste.Errors += int64(len(batchDatas[filename]))
-			return ste
-		}
-
-		_, err = s.writers.Write(filename, bytes)
-		if err != nil {
-			ste.SendError = reqerr.NewSendError(
-				fmt.Sprintf("%s write data to file failed: %v", s.Name(), err),
-				sender.ConvertDatasBack(datas),
-				reqerr.TypeDefault,
-			)
-			ste.LastError = err.Error()
-			ste.Errors += int64(len(batchDatas[filename]))
-			return ste
-		}
+	wg := &sync.WaitGroup{}
+	for filename, datas := range batchDatas {
+		wg.Add(1)
+		go s.writeFile(filename, datas, wg)
 	}
+	wg.Wait()
+
 	if ste.Errors > 0 {
 		return ste
 	}
 	return nil
 }
 
+func (s *Sender) writeFile(filename string, datas []Data, wg *sync.WaitGroup) {
+	defer wg.Done()
+	datasBytes, err := s.marshalFunc(datas)
+	if err != nil {
+		log.Errorf("get datas bytes to file[%s] failed: %v, datas length: %d", filename, err, len(datas))
+		return
+	}
+	_, err = s.writers.Write(filename, datasBytes)
+	if err != nil {
+		log.Errorf("write to file[%s] failed: %v, datas length: %d", filename, err, len(datas))
+		return
+	}
+}
+
 func (s *Sender) Close() error {
 	return s.writers.Close()
+}
+
+func getPartitionFolder(nowStr string, idx int) string {
+	base := filepath.Base(nowStr)
+	dir := filepath.Dir(nowStr)
+	return filepath.Join(dir, "partition"+strconv.Itoa(idx), base)
 }
