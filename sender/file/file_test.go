@@ -109,4 +109,58 @@ func TestFileSender(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, strings.Contains(string(body), `"def":456`))
 	}
+
+	// 默认情况，使用当前时间，partition 为 2, rawWrite 为 false
+	{
+		fsender, err := NewSender(conf.MapConf{
+			KeyFileSenderPath:         filepath.Join(path, "%Y%m%d-1.log"),
+			KeyFileSenderMaxOpenFiles: "10",
+			KeyFilePartition:          "2",
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, 1, fsender.(*Sender).writers.size)
+
+		assert.NoError(t, fsender.Send([]Data{{"abc": 123}, {"def": 456}, {"ghi": 789}, {"jkl": 120}}))
+		assert.Len(t, fsender.(*Sender).writers.writers, 2)
+		assert.NoError(t, fsender.Close())
+
+		datet := time.Now().Format("20060102")
+		partition0 := filepath.Join(path, "partition0")
+		body, err := ioutil.ReadFile(filepath.Join(partition0, datet+"-1.log"))
+		assert.NoError(t, err)
+		assert.Equal(t, "[{\"abc\":123},{\"ghi\":789}]\n", string(body))
+
+		partition1 := filepath.Join(path, "partition1")
+		body, err = ioutil.ReadFile(filepath.Join(partition1, datet+"-1.log"))
+		assert.NoError(t, err)
+		assert.Equal(t, "[{\"def\":456},{\"jkl\":120}]\n", string(body))
+	}
+	os.RemoveAll(path)
+
+	// 默认情况，使用当前时间，partition 为 2, rawWrite 为 true
+	{
+		fsender, err := NewSender(conf.MapConf{
+			KeyFileSenderPath:         filepath.Join(path, "%Y%m%d-1.log"),
+			KeyFileSenderMaxOpenFiles: "10",
+			KeyFilePartition:          "2",
+			KeyFileWriteRaw:           "true",
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, 1, fsender.(*Sender).writers.size)
+
+		assert.NoError(t, fsender.Send([]Data{{"abc": 123, "raw": "12"}, {"def": 456, "raw": "1"}, {"ghi": 789}, {"jkl": 102}}))
+		assert.Len(t, fsender.(*Sender).writers.writers, 2)
+		assert.NoError(t, fsender.Close())
+
+		datet := time.Now().Format("20060102")
+		partition0 := filepath.Join(path, "partition0")
+		body, err := ioutil.ReadFile(filepath.Join(partition0, datet+"-1.log"))
+		assert.NoError(t, err)
+		assert.Equal(t, "12\n", string(body))
+
+		partition1 := filepath.Join(path, "partition1")
+		body, err = ioutil.ReadFile(filepath.Join(partition1, datet+"-1.log"))
+		assert.NoError(t, err)
+		assert.Equal(t, "1\n", string(body))
+	}
 }

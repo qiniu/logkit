@@ -575,21 +575,10 @@ func multiReaderNewestTest(t *testing.T) {
 	assert.EqualValues(t, 0, maxNum)
 	t.Log("Reader has finished reading one")
 
-	assert.NoError(t, dr.Close())
-	t.Log("Reader has closed")
-
-	r, err = NewReader(meta, c)
-	assert.NoError(t, err)
-
-	err = r.SetMode(ReadModeHeadPatternString, "^abc*")
-	assert.Nil(t, err)
-	dr = r.(*Reader)
-	assert.NoError(t, dr.Start())
 	emptyNum = 0
 	// 确保上个 reader 已过期，新的 reader 已经探测到并创建成功
 	createDirWithName(dir2)
 	createFileWithContent(dir2file1, "abc\nx\nabc\ny\nabc\nz\n")
-	time.Sleep(10 * time.Second)
 	assert.Equal(t, 1, dr.dirReaders.Num(), "Number of readers")
 
 	t.Log("Reader has started to read two")

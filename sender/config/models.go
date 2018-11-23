@@ -161,6 +161,8 @@ const (
 	KeyFileSenderPath         = "file_send_path"
 	KeyFileSenderTimestampKey = "file_send_timestamp_key"
 	KeyFileSenderMaxOpenFiles = "file_send_max_open_files"
+	KeyFileWriteRaw           = "file_write_raw"
+	KeyFilePartition          = "file_partition"
 
 	// http
 	KeyHttpSenderUrl      = "http_sender_url"
