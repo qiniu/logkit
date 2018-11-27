@@ -186,7 +186,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:      KeyFilePartition,
-			Default:      "4",
+			Default:      "0",
 			Required:     false,
 			Advance:      true,
 			DefaultNoUse: true,

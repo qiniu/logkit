@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/influxdata/telegraf"
+
 	"github.com/qiniu/log"
 )
 
