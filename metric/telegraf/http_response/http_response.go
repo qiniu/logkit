@@ -9,6 +9,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/influxdata/telegraf/plugins/inputs"
 	"github.com/influxdata/telegraf/plugins/inputs/http_response"
+
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/metric/telegraf"
