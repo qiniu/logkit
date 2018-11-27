@@ -39,6 +39,11 @@ const (
 	DefaultOffsetKey = "_id"
 )
 
+const (
+	Release int32 = iota
+	NoRelease
+)
+
 type Reader struct {
 	meta *reader.Meta
 	// Note: 原子操作，用于表示 reader 整体的运行状态
@@ -50,7 +55,8 @@ type Reader struct {
 		- StatusRunning: 当前有任务正在执行
 		- StatusStopping: 数据管道已经由上层关闭，执行中的任务完成时直接退出无需再处理
 	*/
-	routineStatus int32
+	routineStatus    int32
+	isReleaseCluster int32 //Note: 原子操作，用于表示mgo session的连接池是否被释放
 
 	stopChan chan struct{}
 	readChan chan []byte //bson
@@ -72,7 +78,6 @@ type Reader struct {
 	Cron         *cron.Cron //定时任务
 	session      *mgo.Session
 	offset       interface{} //对于默认的offset_key: "_id", 是objectID作为offset，存储的表现形式是string，其他则是int64
-
 }
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
@@ -110,6 +115,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		meta:              meta,
 		status:            StatusInit,
 		routineStatus:     StatusInit,
+		isReleaseCluster:  Release,
 		stopChan:          make(chan struct{}),
 		readChan:          make(chan []byte),
 		errChan:           make(chan error),
@@ -283,6 +289,7 @@ func (r *Reader) Close() (err error) {
 
 	r.Cron.Stop()
 	if r.session != nil {
+		atomic.StoreInt32(&r.isReleaseCluster, Release)
 		r.session.Close()
 	}
 
@@ -364,6 +371,7 @@ func (r *Reader) exec() (err error) {
 		if err != nil {
 			return
 		}
+		atomic.StoreInt32(&r.isReleaseCluster, NoRelease)
 		r.session.SetSocketTimeout(time.Second * 5)
 		r.session.SetSyncTimeout(time.Second * 5)
 	} else {
@@ -372,11 +380,12 @@ func (r *Reader) exec() (err error) {
 			r.session.Refresh()
 			r.session.SetSocketTimeout(time.Second * 5)
 			r.session.SetSyncTimeout(time.Second * 5)
-		} else {
-			time.Sleep(time.Second * 5)
 		}
 	}
-
+	if atomic.LoadInt32(&r.isReleaseCluster) == Release {
+		log.Warnf("Runner[%s] %s mongo session's cluster has released,this exec will be exited", r.meta.RunnerName, r.Name())
+		return
+	}
 	iter := r.catQuery(r.collection, r.offset, r.session).Iter()
 
 	var result bson.M
