@@ -255,7 +255,6 @@ func Test_ParseData(t *testing.T) {
 }
 
 func Test_TransformData(t *testing.T) {
-	t.Parallel()
 	config1 := `{
 			"type":"IP",
 			"key":  "ip",
@@ -329,7 +328,6 @@ func Test_getDataFromTransformConfig(t *testing.T) {
 }
 
 func Test_getTransformer(t *testing.T) {
-	t.Parallel()
 	config1 := `{
 			"type":"IP",
 			"key":  "ip",

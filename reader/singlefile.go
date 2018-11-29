@@ -92,8 +92,13 @@ func NewSingleFile(meta *Meta, path, whence string, errDirectReturn bool) (sf *S
 		originpath: originpath,
 		pfi:        pfi,
 		f:          f,
-		ratereader: rateio.NewRateReader(f, meta.Readlimit),
 		mux:        sync.Mutex{},
+	}
+
+	if meta.Readlimit > 0 {
+		sf.ratereader = rateio.NewRateReader(f, meta.Readlimit)
+	} else {
+		sf.ratereader = f
 	}
 
 	// 如果meta初始信息损坏
