@@ -1,7 +1,6 @@
 package elastic
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,7 +29,7 @@ func TestElasticReader(t *testing.T) {
 		readBatch: 100,
 		status:    StatusInit,
 		offset:    "TestElasticReader",
-		readChan:  make(chan json.RawMessage),
+		readChan:  make(chan Record),
 	}
 	assert.EqualValues(t, "ESReader:127.0.0.1:9200_app_type", er.Name())
 	er.SyncMeta()
