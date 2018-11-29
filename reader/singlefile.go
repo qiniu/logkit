@@ -189,7 +189,10 @@ func (sf *SingleFile) Close() (err error) {
 		sf.ratereader.Close()
 	}
 	if sf.f != nil {
-		return sf.f.Close()
+		err = sf.f.Close()
+		if err != nil && err != os.ErrClosed {
+			return err
+		}
 	}
 	return nil
 }

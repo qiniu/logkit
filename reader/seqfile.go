@@ -228,7 +228,13 @@ func (sf *SeqFile) Close() (err error) {
 	if sf.f == nil {
 		return
 	}
-	return sf.f.Close()
+
+	err = sf.f.Close()
+	if err != nil && err == os.ErrClosed {
+		return err
+	}
+
+	return nil
 }
 
 // 这个函数目前只针对stale NFS file handle的情况，重新打开文件
