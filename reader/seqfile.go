@@ -141,7 +141,11 @@ func NewSeqFile(meta *Meta, path string, ignoreHidden, newFileNewLine bool, suff
 			return nil, err
 		}
 		sf.f = f
-		sf.ratereader = rateio.NewRateReader(f, meta.Readlimit)
+		if meta.Readlimit > 0 {
+			sf.ratereader = rateio.NewRateReader(f, meta.Readlimit)
+		} else {
+			sf.ratereader = f
+		}
 		sf.offset = offset
 	} else {
 		sf.inode = 0
@@ -249,7 +253,11 @@ func (sf *SeqFile) reopenForESTALE() error {
 	if sf.ratereader != nil {
 		sf.ratereader.Close()
 	}
-	sf.ratereader = rateio.NewRateReader(f, sf.meta.Readlimit)
+	if sf.meta.Readlimit > 0 {
+		sf.ratereader = rateio.NewRateReader(f, sf.meta.Readlimit)
+	} else {
+		sf.ratereader = f
+	}
 	ninode, err := utilsos.GetIdentifyIDByFile(f)
 	if err != nil {
 		//为了不影响程序运行
@@ -499,7 +507,11 @@ func (sf *SeqFile) newOpen() (err error) {
 	if sf.ratereader != nil {
 		sf.ratereader.Close()
 	}
-	sf.ratereader = rateio.NewRateReader(f, sf.meta.Readlimit)
+	if sf.meta.Readlimit > 0 {
+		sf.ratereader = rateio.NewRateReader(f, sf.meta.Readlimit)
+	} else {
+		sf.ratereader = f
+	}
 	sf.f = f
 	sf.offset = 0
 	sf.inode, err = utilsos.GetIdentifyIDByPath(sf.currFile)
@@ -536,7 +548,11 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 	if sf.ratereader != nil {
 		sf.ratereader.Close()
 	}
-	sf.ratereader = rateio.NewRateReader(f, sf.meta.Readlimit)
+	if sf.meta.Readlimit > 0 {
+		sf.ratereader = rateio.NewRateReader(f, sf.meta.Readlimit)
+	} else {
+		sf.ratereader = f
+	}
 	sf.offset = 0
 	sf.inode, err = utilsos.GetIdentifyIDByPath(sf.currFile)
 	if err != nil {

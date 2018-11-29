@@ -252,7 +252,11 @@ func (sf *SingleFile) Reopen() (err error) {
 	if sf.ratereader != nil {
 		sf.ratereader.Close()
 	}
-	sf.ratereader = rateio.NewRateReader(f, sf.meta.Readlimit)
+	if sf.meta.Readlimit > 0 {
+		sf.ratereader = rateio.NewRateReader(f, sf.meta.Readlimit)
+	} else {
+		sf.ratereader = f
+	}
 	sf.offset = 0
 	return
 }
@@ -278,7 +282,11 @@ func (sf *SingleFile) reopenForESTALE() (err error) {
 	if sf.ratereader != nil {
 		sf.ratereader.Close()
 	}
-	sf.ratereader = rateio.NewRateReader(f, sf.meta.Readlimit)
+	if sf.meta.Readlimit > 0 {
+		sf.ratereader = rateio.NewRateReader(f, sf.meta.Readlimit)
+	} else {
+		sf.ratereader = f
+	}
 	return
 }
 

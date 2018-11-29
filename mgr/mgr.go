@@ -854,6 +854,7 @@ func (m *Manager) StopRunner(name string) (err error) {
 	if err != nil {
 		return err
 	}
+	conf.IsStopped = true
 
 	if err = m.backupRunnerConfig(filename, conf); err != nil {
 		// 备份配置文件失败，回滚
@@ -983,7 +984,7 @@ func (m *Manager) startRunner(filename string, conf RunnerConfig) (err error) {
 	return nil
 }
 
-func (m *Manager) stopRunner(filename string, conf RunnerConfig) (err error) {
+func (m *Manager) stopRunner(filename string, conf RunnerConfig) error {
 	if conf.IsStopped == true {
 		return fmt.Errorf("runner %v has already stopped", filename)
 	}
@@ -992,7 +993,7 @@ func (m *Manager) stopRunner(filename string, conf RunnerConfig) (err error) {
 		m.setRunnerConfig(filename, conf)
 		return nil
 	}
-	if err = m.RemoveWithConfig(filename, false); err != nil {
+	if err := m.RemoveWithConfig(filename, false); err != nil {
 		return fmt.Errorf("remove runner %v error %v", filename, err)
 	}
 	m.setRunnerConfig(filename, conf)
