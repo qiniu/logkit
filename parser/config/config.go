@@ -164,7 +164,7 @@ var ModeKeyOptions = map[string][]Option{
 			ChooseOnly:   false,
 			Default:      "main",
 			Placeholder:  "main",
-			Required:     false,
+			Required:     true,
 			DefaultNoUse: true,
 			Description:  "nginx日志格式名称(nginx_log_format_name)",
 		},
