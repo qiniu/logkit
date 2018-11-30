@@ -1,7 +1,6 @@
 package raw
 
 import (
-	"strings"
 	"time"
 
 	"github.com/qiniu/logkit/conf"
@@ -48,22 +47,16 @@ func (p *Parser) Type() string {
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
 	se := &StatsError{}
-	datas := []Data{}
+	datas := make([]Data, len(lines))
 	for idx, line := range lines {
-		//raw格式的不应该trime空格，只需要判断剔除掉全空就好了
-		if len(strings.TrimSpace(line)) <= 0 {
-			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
-			continue
-		}
-		d := Data{}
-		d[KeyRaw] = line
+		//raw就是原样全copy到Raw字段
+		datas[idx] = Data{KeyRaw: line}
 		if p.withTimeStamp {
-			d[KeyTimestamp] = time.Now().Format(time.RFC3339Nano)
+			datas[idx][KeyTimestamp] = time.Now().Format(time.RFC3339Nano)
 		}
 		for _, label := range p.labels {
-			d[label.Name] = label.Value
+			datas[idx][label.Name] = label.Value
 		}
-		datas = append(datas, d)
 		se.AddSuccess()
 	}
 
