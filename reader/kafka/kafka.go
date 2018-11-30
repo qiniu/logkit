@@ -210,7 +210,7 @@ func (r *Reader) Lag() (*LagInfo, error) {
 	r.statsLock.RLock()
 	for _, ptv := range r.currentOffsets {
 		for _, v := range ptv {
-			rl.Size -= v
+			rl.Size -= v + 1 //HighWaterMarks 拿到的是下一个数据的Offset，所以实际在算size的时候多了1，要在现在扣掉。
 		}
 	}
 	r.statsLock.RUnlock()
