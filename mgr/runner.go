@@ -199,7 +199,9 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 		MaxBatchLen:      rc.MaxBatchLen,
 		MaxBatchInterval: rc.MaxBatchInterval,
 		MaxBatchTryTimes: rc.MaxBatchTryTimes,
+		SyncEvery:        rc.SyncEvery,
 		ErrorsListCap:    rc.ErrorsListCap,
+		SendRaw:          rc.SendRaw,
 	}
 	if rc.ReaderConfig == nil {
 		return nil, errors.New(rc.RunnerName + " reader in config is nil")
@@ -285,6 +287,9 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	}
 	senders := make([]sender.Sender, 0)
 	for i, senderConfig := range rc.SendersConfig {
+		if rc.SendRaw {
+			senderConfig[senderConf.InnerSendRaw] = "true"
+		}
 		if senderConfig[senderConf.KeySenderType] == senderConf.TypePandora {
 			if rc.ExtraInfo {
 				//如果已经开启了，不要重复加
@@ -305,6 +310,7 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 		senders = append(senders, s)
 		delete(rc.SendersConfig[i], senderConf.InnerUserAgent)
 		delete(rc.SendersConfig[i], senderConf.KeyPandoraDescription)
+		delete(rc.SendersConfig[i], senderConf.InnerSendRaw)
 	}
 
 	senderCnt := len(senders)
@@ -350,6 +356,105 @@ func createTransformers(rc RunnerConfig) ([]transforms.Transformer, error) {
 		transformers = append(transformers, trans)
 	}
 	return transformers, nil
+}
+
+// trySend 尝试发送数据，如果此时runner退出返回false，其他情况无论是达到最大重试次数还是发送成功，都返回true
+func (r *LogExportRunner) tryRawSend(s sender.Sender, datas []string, times int) bool {
+	if len(datas) <= 0 {
+		return true
+	}
+	r.rsMutex.Lock()
+	if _, ok := r.rs.SenderStats[s.Name()]; !ok {
+		r.rs.SenderStats[s.Name()] = StatsInfo{}
+	}
+	info := r.rs.SenderStats[s.Name()]
+	r.rsMutex.Unlock()
+
+	var (
+		err             error
+		successDatasLen int64
+		originDatasLen  = int64(len(datas))
+		cnt             = 1
+	)
+	rawSender, ok := s.(sender.RawSender)
+	if !ok {
+		log.Error("sender not raw sender, can not use tryRawSend")
+		return true
+	}
+
+	for {
+		// 至少尝试一次。如果任务已经停止，那么只尝试一次
+		if cnt > 1 && atomic.LoadInt32(&r.stopped) > 0 {
+			return false
+		}
+
+		err = rawSender.RawSend(datas)
+		if err == nil {
+			successDatasLen += int64(len(datas))
+			break
+		}
+
+		se, ok := err.(*StatsError)
+		if ok {
+			if se.Errors == 0 {
+				successDatasLen += int64(len(datas))
+				break
+			}
+
+			if se.Ft {
+				r.rsMutex.Lock()
+				r.rs.Lag.Ftlags = se.FtQueueLag
+				r.rsMutex.Unlock()
+			}
+			if se.SendError != nil {
+				successDatasLen += int64(len(datas) - len(se.SendError.GetFailDatas()))
+				err = se.SendError
+			}
+		}
+
+		info.LastError = TruncateStrSize(err.Error(), DefaultTruncateMaxSize)
+		if r.historyError.SendErrors == nil {
+			r.historyError.SendErrors = make(map[string]*equeue.ErrorQueue)
+		}
+		if r.historyError.SendErrors[s.Name()] == nil {
+			r.historyError.SendErrors[s.Name()] = equeue.New(r.ErrorsListCap)
+		}
+		r.historyError.SendErrors[s.Name()].Put(equeue.NewError(info.LastError))
+
+		//FaultTolerant Sender 正常的错误会在backupqueue里面记录，自己重试，此处无需重试
+		if se != nil && se.Ft && se.FtNotRetry {
+			break
+		}
+		time.Sleep(time.Second)
+		_, ok = err.(*reqerr.SendError)
+		if ok {
+			//无限重试的，除非遇到关闭
+			if atomic.LoadInt32(&r.stopped) > 0 {
+				return false
+			}
+			log.Errorf("Runner[%v] send error %v for %v times, failed datas length %v will retry send it", r.RunnerName, se.Error(), cnt, len(datas))
+			cnt++
+			continue
+		}
+
+		if err == ErrQueueClosed {
+			log.Errorf("Runner[%v] send to closed queue, discard datas, send error %v, failed datas (length %v): %v", r.RunnerName, se.Error(), cnt, datas)
+			break
+		}
+		if times <= 0 || cnt < times {
+			cnt++
+			continue
+		}
+		log.Errorf("Runner[%v] retry send %v times, but still error %v, total %v data lines", r.RunnerName, cnt, err, len(datas))
+		break
+	}
+
+	info.Errors += originDatasLen - successDatasLen
+	info.Success += successDatasLen
+	r.rsMutex.Lock()
+	r.rs.SenderStats[s.Name()] = info
+	r.rsMutex.Unlock()
+	return true
 }
 
 // trySend 尝试发送数据，如果此时runner退出返回false，其他情况无论是达到最大重试次数还是发送成功，都返回true
@@ -498,13 +603,9 @@ func (r *LogExportRunner) readDatas(dr reader.DataReader, dataSourceTag string) 
 	r.rsMutex.Unlock()
 	return datas
 }
-
-func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
-	var (
-		err          error
-		lines, froms []string
-		line         string
-	)
+func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []string) {
+	var line string
+	var err error
 	for !r.batchFullOrTimeout() {
 		line, err = r.reader.ReadLine()
 		if os.IsNotExist(err) {
@@ -546,6 +647,12 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 		r.rs.ReaderStats.LastError = ""
 	}
 	r.rsMutex.Unlock()
+	return lines, froms
+}
+
+func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
+	var err error
+	lines, froms := r.rawReadLines(dataSourceTag)
 
 	for i := range r.transformers {
 		if r.transformers[i].Stage() == transforms.StageBeforeParser {
@@ -613,6 +720,18 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 	return datas
 }
 
+func (r *LogExportRunner) addResetStat() {
+	r.rsMutex.Lock()
+	r.rs.ReaderStats.Success = r.batchLen
+	r.rs.ReadDataCount += r.batchLen
+	r.rs.ReadDataSize += r.batchSize
+	r.rsMutex.Unlock()
+
+	r.batchLen = 0
+	r.batchSize = 0
+	r.lastSend = time.Now()
+}
+
 func (r *LogExportRunner) Run() {
 	if dr, ok := r.reader.(reader.DaemonReader); ok {
 		if err := dr.Start(); err != nil {
@@ -642,7 +761,33 @@ func (r *LogExportRunner) Run() {
 			}
 			return
 		}
+		if r.SendRaw {
+			lines, _ := r.rawReadLines(r.meta.GetDataSourceTag())
+			r.addResetStat()
+			// send data
+			if len(lines) <= 0 {
+				log.Debugf("Runner[%v] received read data length = 0", r.Name())
+				continue
+			}
+			log.Debugf("Runner[%v] reader %s start to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
+			success := true
+			for _, s := range r.senders {
+				if !r.tryRawSend(s, lines, r.MaxBatchTryTimes) {
+					success = false
+					log.Errorf("Runner[%v] failed to send data finally", r.Name())
+					break
+				}
+			}
 
+			if success && r.SyncEvery > 0 {
+				r.syncInc = (r.syncInc + 1) % r.SyncEvery
+				if r.syncInc == 0 {
+					r.reader.SyncMeta()
+				}
+			}
+			log.Debugf("Runner[%v] send %s finish to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
+			continue
+		}
 		// read data
 		var err error
 		var datas []Data
@@ -651,16 +796,7 @@ func (r *LogExportRunner) Run() {
 		} else {
 			datas = r.readLines(r.meta.GetDataSourceTag())
 		}
-
-		r.rsMutex.Lock()
-		r.rs.ReaderStats.Success = r.batchLen
-		r.rs.ReadDataCount += r.batchLen
-		r.rs.ReadDataSize += r.batchSize
-		r.rsMutex.Unlock()
-
-		r.batchLen = 0
-		r.batchSize = 0
-		r.lastSend = time.Now()
+		r.addResetStat()
 
 		// send data
 		if len(datas) <= 0 {
@@ -727,6 +863,7 @@ func (r *LogExportRunner) Run() {
 				break
 			}
 		}
+
 		if success && r.SyncEvery > 0 {
 			r.syncInc = (r.syncInc + 1) % r.SyncEvery
 			if r.syncInc == 0 {

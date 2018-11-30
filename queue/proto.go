@@ -24,6 +24,14 @@ type DataQueue interface {
 	ReadDatasChan() <-chan []Data
 }
 
+// LinesQueue 代表了无需编解码可直接放取 []Line 的队列
+type LinesQueue interface {
+	// PutDatas 用于存放一组数据
+	PutLines([]string) error
+	// ReadLinesChan 用于获取直接读取 []line 的管道
+	ReadLinesChan() <-chan []string
+}
+
 const (
 	FromNone = iota
 	FromDisk
