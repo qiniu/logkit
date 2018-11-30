@@ -90,6 +90,7 @@ const (
 	TypeSQLFile           = "sqlfile"
 
 	InnerUserAgent = "_useragent"
+	InnerSendRaw   = "_send_raw"
 )
 
 const (

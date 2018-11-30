@@ -13,22 +13,25 @@ const (
 )
 
 var _ DataQueue = &directQueue{}
+var _ LinesQueue = &directQueue{}
 
 type directQueue struct {
-	name    string
-	channel chan []Data
-	mux     sync.Mutex
-	status  int32
-	quit    chan bool
+	name     string
+	channel  chan []Data
+	lineChan chan []string
+	mux      sync.Mutex
+	status   int32
+	quit     chan bool
 }
 
 func NewDirectQueue(name string) BackendQueue {
 	return &directQueue{
-		name:    name,
-		channel: make(chan []Data),
-		mux:     sync.Mutex{},
-		status:  StatusInit,
-		quit:    make(chan bool),
+		name:     name,
+		channel:  make(chan []Data),
+		lineChan: make(chan []string),
+		mux:      sync.Mutex{},
+		status:   StatusInit,
+		quit:     make(chan bool),
 	}
 }
 
@@ -42,6 +45,25 @@ func (dq *directQueue) Put(msg []byte) error {
 
 func (dq *directQueue) ReadChan() <-chan []byte {
 	return make(chan []byte) // Blocks forever because no inputs
+}
+
+func (dq *directQueue) PutLines(datas []string) error {
+	dq.mux.Lock()
+	defer dq.mux.Unlock()
+	if dq.status == StatusClosed {
+		return ErrQueueClosed
+	}
+
+	select {
+	case dq.lineChan <- datas:
+		return nil
+	case <-dq.quit:
+		return ErrQueueClosed
+	}
+}
+
+func (dq *directQueue) ReadLinesChan() <-chan []string {
+	return dq.lineChan
 }
 
 func (dq *directQueue) PutDatas(datas []Data) error {
@@ -70,6 +92,7 @@ func (dq *directQueue) Close() error {
 	defer dq.mux.Unlock()
 	dq.status = StatusClosed
 	close(dq.channel)
+	close(dq.lineChan)
 	return nil
 }
 

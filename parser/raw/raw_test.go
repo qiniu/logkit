@@ -25,9 +25,7 @@ func Test_RawlogParser(t *testing.T) {
 	}
 	dts, err := p.Parse(lines)
 	assert.Nil(t, err)
-	if len(dts) != 4 {
-		t.Fatalf("parse lines error expect 4 lines but got %v lines", len(dts))
-	}
+	assert.Equal(t, len(lines), len(dts))
 	for _, dt := range dts {
 		if len(dt) != 3 {
 			t.Fatalf("parse line error expect 3 fields but got %v fields", len(dt))
@@ -51,10 +49,7 @@ func Test_RawlogParserForErrData(t *testing.T) {
 	}
 	dts, err := p.Parse(lines)
 	assert.Nil(t, err)
-
-	if len(dts) != 1 {
-		t.Fatalf("parse lines error, expect 1 lines but got %v lines", len(dts))
-	}
+	assert.Equal(t, len(lines), len(dts))
 	if dts[0]["machine"] != "nb110" {
 		t.Fatalf("parse label error")
 	}
