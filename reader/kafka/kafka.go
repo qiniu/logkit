@@ -39,8 +39,7 @@ type Reader struct {
 	errChan  <-chan error
 
 	Consumer       *consumergroup.ConsumerGroup
-	currentMsg     *sarama.ConsumerMessage
-	currentOffsets map[string]map[int32]int64
+	currentOffsets map[string]map[int32]int64 // <topic,<partition,offset>>
 
 	stats     StatsInfo
 	statsLock *sync.RWMutex
@@ -125,6 +124,20 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	return kr, nil
 }
 
+func (r *Reader) startMarkOffset() {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			if r.isStopping() || r.hasStopped() {
+				return
+			}
+			r.markOffset()
+		}
+	}
+}
+
 func (r *Reader) isStopping() bool {
 	return atomic.LoadInt32(&r.status) == StatusStopping
 }
@@ -159,7 +172,6 @@ func (r *Reader) ReadLine() (string, error) {
 		var line string
 		if msg != nil && msg.Value != nil && len(msg.Value) > 0 {
 			line = string(msg.Value)
-			r.currentMsg = msg
 			r.statsLock.Lock()
 			if tp, ok := r.currentOffsets[msg.Topic]; ok {
 				tp[msg.Partition] = msg.Offset
@@ -218,11 +230,23 @@ func (r *Reader) Lag() (*LagInfo, error) {
 }
 
 func (r *Reader) SyncMeta() {
+	r.markOffset()
+}
+
+func (r *Reader) markOffset() {
 	r.lock.Lock()
 	defer r.lock.Unlock()
-
-	if r.currentMsg != nil {
-		r.Consumer.CommitUpto(r.currentMsg)
+	for topic, partOffset := range r.currentOffsets {
+		if partOffset == nil {
+			continue
+		}
+		for partition, offset := range partOffset {
+			r.Consumer.CommitUpto(&sarama.ConsumerMessage{
+				Topic:     topic,
+				Partition: partition,
+				Offset:    offset,
+			})
+		}
 	}
 }
 
@@ -235,7 +259,7 @@ func (r *Reader) Close() error {
 
 	r.lock.Lock()
 	defer r.lock.Unlock()
-
+	r.markOffset()
 	err := r.Consumer.Close()
 	atomic.StoreInt32(&r.status, StatusStopped)
 	return err
