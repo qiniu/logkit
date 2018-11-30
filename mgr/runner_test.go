@@ -1522,6 +1522,14 @@ func TestRunWithDataSource(t *testing.T) {
 			"datasource": logPath,
 		},
 		{
+			"raw":        "\n",
+			"datasource": logPath,
+		},
+		{
+			"raw":        "\n",
+			"datasource": logPath,
+		},
+		{
 			"raw":        "c\n",
 			"datasource": logPath,
 		},
