@@ -18,6 +18,9 @@ var ModeUsages = KeyValueSlice{
 	{TypeElastic, "Elasticsearch 服务", ""},
 	{TypeKafka, "Kafka 服务", ""},
 	{TypeHttp, "HTTP 服务器", ""},
+	{TypeMySQL, "Mysql服务", ""},
+	{TypeSQLFile, "SqlFile文件", ""},
+	{TypeCSV, "CSV文件", ""},
 }
 
 var (
@@ -148,6 +151,16 @@ var (
 		Description:   "开启Gzip压缩(enable_gzip)",
 		Secret:        true,
 		Advance:       true,
+	}
+	OptionMaxSendRate = Option{
+		KeyName:      KeyMaxSendRate,
+		ChooseOnly:   false,
+		Default:      "-1",
+		DefaultNoUse: false,
+		Description:  "发送最大速率(max_send_rate)",
+		Advance:      true,
+		CheckRegex:   "\\d+",
+		ToolTip:      `可选项，默认值为-1，表示不限速，单位为条/秒，比如填写1000，则表示每秒限制发送1000条`,
 	}
 )
 
@@ -1031,5 +1044,105 @@ var ModeKeyOptions = map[string][]Option{
 		OptionKeyFtLongDataDiscard,
 		OptionMaxDiskUsedBytes,
 		OptionMaxSizePerSize,
+	},
+	TypeSQLFile: {
+		{
+			KeyName:      KeySQLFileTable,
+			ChooseOnly:   false,
+			Default:      "",
+			Placeholder:  "sql语句操作的表名称",
+			DefaultNoUse: true,
+			Required:     true,
+			Description:  "sql语句操作的表名称(sqlfile_table)",
+			ToolTip:      `表示sql语句操作的表名称`,
+		},
+		{
+			KeyName:      KeySQLFilePathPrefix,
+			ChooseOnly:   false,
+			Default:      "./sync.sql",
+			Placeholder:  "发送sqlfile文件路径前缀",
+			DefaultNoUse: false,
+			Required:     false,
+			Description:  "发送sqlfile文件路径前缀(sqlfile_path_prefix)",
+			ToolTip:      `默认为./sync.sql，表示发送的sqlfile文件路径前缀`,
+		},
+		{
+			KeyName:      KeySQLFileRotateSize,
+			ChooseOnly:   false,
+			Default:      "10485760",
+			DefaultNoUse: false,
+			Description:  "sqlfile文件切割大小(sqlfile_rotate_size)",
+			CheckRegex:   "\\d+",
+			ToolTip:      `默认为10485760（10MB），表示当sqlfile文件大小超过指定大小时将触发该文件的切割，继续写入到下一个sqlfile文件`,
+		},
+		OptionMaxSendRate,
+	},
+	TypeCSV: {
+		{
+			KeyName:      KeyCSVFields,
+			ChooseOnly:   false,
+			Default:      "",
+			Placeholder:  "csv字段名称",
+			DefaultNoUse: true,
+			Required:     true,
+			Description:  "csv字段名称(csv_fields)",
+			ToolTip:      `指定每一行记录包含的字段集，使用,分割多个字段`,
+		},
+		{
+			KeyName:      KeyCSVDelimiter,
+			ChooseOnly:   false,
+			Default:      ",",
+			Placeholder:  "csv字段分隔符",
+			DefaultNoUse: false,
+			Required:     false,
+			Description:  "csv字段分隔符(csv_delimiter)",
+			ToolTip:      `默认为 ,(逗号)，表示每一行记录中字段之间的分隔符`,
+		},
+		{
+			KeyName:      KeyCSVPathPrefix,
+			ChooseOnly:   false,
+			Default:      "./sync.csv",
+			Placeholder:  "csv文件前缀",
+			DefaultNoUse: false,
+			Required:     false,
+			Description:  "csv文件前缀(csv_path_prefix)",
+			ToolTip:      `默认为./sync.csv，表示发送的csv文件路径前缀。`,
+		},
+		{
+			KeyName:      KeyCSVRotateSize,
+			ChooseOnly:   false,
+			Default:      "10485760",
+			Placeholder:  "csv文件切割大小",
+			DefaultNoUse: false,
+			Description:  "csv文件切割大小(csv_rotate_size)",
+			CheckRegex:   "\\d+",
+			ToolTip:      `默认为10485760（10MB），表示当csv文件大小超过指定大小时将触发该文件的切割，继续写入到下一个csv文件`,
+		},
+		OptionMaxSendRate,
+	},
+	TypeMySQL: {
+		{
+			KeyName:      KeyMySQLDataSource,
+			ChooseOnly:   false,
+			Default:      "",
+			Placeholder:  "数据库地址",
+			DefaultNoUse: true,
+			Required:     true,
+			Description:  "数据库地址(mysql_datasource)",
+			ToolTip: `数据库地址可以通过明文或者环境变量填写。明文填写：由 username: 用户名, password: 用户密码, hostname: mysql 地址, port: mysql 端口, dbname: 数据库名称组成， 一个完整 mysql_datasource 示例:"root:123456@tcp(127.0.0.1:3306)/db1"。
+环境变量填写：对不便明文存储的数据库地址，可以使用环境变量的方式填写该字段，填写方式为：${YOUR_ENV}，其中 YOUR_ENV 为环境变量，需要在机器上将该环境变量设置为原先要填写的值，YOUR_ENV 可以根据您的实际使用需求进行修改。`,
+		},
+		{
+			KeyName:      KeyMySQLTable,
+			ChooseOnly:   false,
+			Default:      "",
+			Placeholder:  "数据库表名称",
+			DefaultNoUse: true,
+			Required:     true,
+			Description:  "数据库表名称(mysql_table)",
+			ToolTip: `表示目的数据库表名称。
+注意，发送之前数据表必须已存在`,
+		},
+		OptionMaxSendRate,
 	},
 }
