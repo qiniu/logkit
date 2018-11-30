@@ -60,6 +60,16 @@ var (
 		Advance:       true,
 		ToolTip:       `默认不丢弃，设置此选项后会丢弃发送错误的数据，仅在数据只有一条时才会丢弃，多余一条会不断二分。`,
 	}
+	OptionFtProcs = Option{
+		KeyName:      KeyFtProcs,
+		ChooseOnly:   false,
+		Default:      "",
+		DefaultNoUse: false,
+		Description:  "发送并发数量(ft_procs)",
+		CheckRegex:   "\\d+",
+		Advance:      true,
+		ToolTip:      "并发仅在 ft_strategy 模式选择 always_save 或 concurrent 时生效",
+	}
 	OptionFtMemoryChannel = Option{
 		KeyName:       KeyFtMemoryChannel,
 		Element:       Radio,
@@ -193,6 +203,7 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "文件Partition切分数量(file_partition)",
 			ToolTip:      `文件Partition切分可以指定路径写入`,
 		},
+		OptionFtProcs,
 	},
 	TypePandora: {
 		{
@@ -551,6 +562,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		OptionFtWriteLimit,
 		OptionFtStrategy,
+		OptionFtProcs,
 		OptionFtDiscardErr,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
@@ -694,6 +706,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionSaveLogPath,
 		OptionFtWriteLimit,
 		OptionFtStrategy,
+		OptionFtProcs,
 		OptionFtDiscardErr,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
@@ -800,6 +813,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionSaveLogPath,
 		OptionFtWriteLimit,
 		OptionFtStrategy,
+		OptionFtProcs,
 		OptionFtDiscardErr,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
@@ -868,6 +882,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionSaveLogPath,
 		OptionFtWriteLimit,
 		OptionFtStrategy,
+		OptionFtProcs,
 		OptionFtDiscardErr,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
@@ -949,6 +964,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionSaveLogPath,
 		OptionFtWriteLimit,
 		OptionFtStrategy,
+		OptionFtProcs,
 		OptionFtDiscardErr,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
@@ -1025,6 +1041,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionSaveLogPath,
 		OptionFtWriteLimit,
 		OptionFtStrategy,
+		OptionFtProcs,
 		OptionFtDiscardErr,
 		OptionFtMemoryChannel,
 		OptionFtMemoryChannelSize,
