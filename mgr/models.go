@@ -98,9 +98,9 @@ type RunnerInfo struct {
 	ErrorsListCap          int    `json:"errors_list_cap"`                      // 记录错误信息的最大条数
 	SyncEvery              int    `json:"sync_every,omitempty"`                 // 每多少次sync一下，填小于的数字表示stop时sync，正整数表示发送成功多少次以后同步，填0或1就是每次发送成功都同步，兼容原来不配置的逻辑
 	CreateTime             string `json:"createtime"`
-	EnvTag                 string `json:"env_tag,omitempty"`
+	EnvTag                 string `json:"env_tag,omitempty"` // 用这个字段的值来获取环境变量, 作为 tag 添加到数据中
 	ExtraInfo              bool   `json:"extra_info"`
-	// 用这个字段的值来获取环境变量, 作为 tag 添加到数据中
+	SendRaw                bool   `json:"send_raw"` //使用发送原始字符串的接口，而不是Data
 }
 
 type ErrorsList struct {

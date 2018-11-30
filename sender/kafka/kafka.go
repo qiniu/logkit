@@ -13,6 +13,8 @@ import (
 	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
+	"errors"
+
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
 	. "github.com/qiniu/logkit/sender/config"
@@ -20,6 +22,7 @@ import (
 )
 
 var _ sender.SkipDeepCopySender = &Sender{}
+var _ sender.RawSender = &Sender{}
 
 type Sender struct {
 	name  string
@@ -65,6 +68,9 @@ func NewSender(conf conf.MapConf) (kafkaSender sender.Sender, err error) {
 	topic, err = ExtractField(topic)
 	if err != nil {
 		return
+	}
+	if len(topic) < 1 {
+		return nil, errors.New("you need to fill at least one topic for kafka sender")
 	}
 	hostName, err := os.Hostname()
 	if err != nil {
@@ -140,6 +146,56 @@ func newSender(name string, hosts []string, topic []string, cfg *sarama.Config, 
 
 func (this *Sender) Name() string {
 	return this.name
+}
+
+func (this *Sender) RawSend(datas []string) error {
+	var (
+		producer       = this.producer
+		msgs           = make([]*sarama.ProducerMessage, len(datas))
+		statsError     = &StatsError{}
+		statsLastError string
+	)
+	for idx, doc := range datas {
+		msgs[idx] = &sarama.ProducerMessage{
+			Topic: this.topic[0], //在new Sender的地方已经检验过
+			Value: sarama.StringEncoder(doc),
+		}
+	}
+	err := producer.SendMessages(msgs)
+	if err != nil {
+		statsError.AddErrorsNum(len(msgs))
+		pde, ok := err.(sarama.ProducerErrors)
+		if !ok {
+			statsError.LastError += err.Error()
+			return statsError
+		}
+
+		var allcir = true
+		for _, v := range pde {
+			//对于熔断的错误提示，没有任何帮助，过滤掉
+			if strings.Contains(v.Error(), "circuit breaker is open") {
+				continue
+			}
+			allcir = false
+			statsLastError = fmt.Sprintf("%v detail: %v", statsError.SendError, v.Error())
+			this.lastError = v
+			//发送错误为message too large时，启用二分策略重新发送
+			if v.Err == sarama.ErrMessageSizeTooLarge {
+				statsError.SendError = reqerr.NewRawSendError("Sender[Kafka]:Message was too large, server rejected it to avoid allocation error", datas, reqerr.TypeBinaryUnpack)
+			}
+			break
+		}
+
+		if allcir {
+			statsLastError = fmt.Sprintf("%v, all error is circuit breaker is open", err)
+		}
+		statsError.LastError += statsLastError
+		return statsError
+	}
+
+	//本次发送成功, lastError 置为 nil
+	this.lastError = nil
+	return nil
 }
 
 func (this *Sender) Send(data []Data) error {
