@@ -40,7 +40,7 @@ const (
 	metaFormat          = "%s\t%d\n"
 	tableDoneFormat     = "%s\n"
 	bufMetaFormat       = "read:%d\nwrite:%d\nbufsize:%d\n"
-	defaultIOLimit      = 20 //默认读取速度为20MB/s
+	defaultIOLimit      = -1 // 默认不限速，之前默认读取速度为20MB/s
 	ModeMetrics         = "metrics"
 )
 

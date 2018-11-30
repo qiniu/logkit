@@ -816,6 +816,7 @@ func (m *Manager) StartRunner(name string) (err error) {
 	if err = m.startRunner(filename, conf); err != nil {
 		return err
 	}
+	conf.IsStopped = false
 
 	if err = m.backupRunnerConfig(filename, conf); err != nil {
 		// 备份配置文件失败，回滚
@@ -854,6 +855,7 @@ func (m *Manager) StopRunner(name string) (err error) {
 	if err != nil {
 		return err
 	}
+	conf.IsStopped = true
 
 	if err = m.backupRunnerConfig(filename, conf); err != nil {
 		// 备份配置文件失败，回滚
@@ -971,19 +973,19 @@ func (m *Manager) GetRunnerNames() []string {
 	return runnerNames
 }
 
-func (m *Manager) startRunner(filename string, conf RunnerConfig) (err error) {
+func (m *Manager) startRunner(filename string, conf RunnerConfig) error {
 	if conf.IsStopped == false {
 		return fmt.Errorf("runner %v has already started", filename)
 	}
 	conf.IsStopped = false
-	if err = m.ForkRunner(filename, conf, true); err != nil {
+	if err := m.ForkRunner(filename, conf, true); err != nil {
 		return fmt.Errorf("forkRunner %v error %v", filename, err)
 	}
 
 	return nil
 }
 
-func (m *Manager) stopRunner(filename string, conf RunnerConfig) (err error) {
+func (m *Manager) stopRunner(filename string, conf RunnerConfig) error {
 	if conf.IsStopped == true {
 		return fmt.Errorf("runner %v has already stopped", filename)
 	}
@@ -992,7 +994,7 @@ func (m *Manager) stopRunner(filename string, conf RunnerConfig) (err error) {
 		m.setRunnerConfig(filename, conf)
 		return nil
 	}
-	if err = m.RemoveWithConfig(filename, false); err != nil {
+	if err := m.RemoveWithConfig(filename, false); err != nil {
 		return fmt.Errorf("remove runner %v error %v", filename, err)
 	}
 	m.setRunnerConfig(filename, conf)

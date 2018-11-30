@@ -92,8 +92,13 @@ func NewSingleFile(meta *Meta, path, whence string, errDirectReturn bool) (sf *S
 		originpath: originpath,
 		pfi:        pfi,
 		f:          f,
-		ratereader: rateio.NewRateReader(f, meta.Readlimit),
 		mux:        sync.Mutex{},
+	}
+
+	if meta.Readlimit > 0 {
+		sf.ratereader = rateio.NewRateReader(f, meta.Readlimit)
+	} else {
+		sf.ratereader = f
 	}
 
 	// 如果meta初始信息损坏
@@ -184,7 +189,10 @@ func (sf *SingleFile) Close() (err error) {
 		sf.ratereader.Close()
 	}
 	if sf.f != nil {
-		return sf.f.Close()
+		err = sf.f.Close()
+		if err != nil && err != os.ErrClosed {
+			return err
+		}
 	}
 	return nil
 }
@@ -247,7 +255,11 @@ func (sf *SingleFile) Reopen() (err error) {
 	if sf.ratereader != nil {
 		sf.ratereader.Close()
 	}
-	sf.ratereader = rateio.NewRateReader(f, sf.meta.Readlimit)
+	if sf.meta.Readlimit > 0 {
+		sf.ratereader = rateio.NewRateReader(f, sf.meta.Readlimit)
+	} else {
+		sf.ratereader = f
+	}
 	sf.offset = 0
 	return
 }
@@ -273,7 +285,11 @@ func (sf *SingleFile) reopenForESTALE() (err error) {
 	if sf.ratereader != nil {
 		sf.ratereader.Close()
 	}
-	sf.ratereader = rateio.NewRateReader(f, sf.meta.Readlimit)
+	if sf.meta.Readlimit > 0 {
+		sf.ratereader = rateio.NewRateReader(f, sf.meta.Readlimit)
+	} else {
+		sf.ratereader = f
+	}
 	return
 }
 

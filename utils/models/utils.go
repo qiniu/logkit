@@ -954,3 +954,19 @@ func GetGrokLabels(labelList []string, nameMap map[string]struct{}) (labels []Gr
 	}
 	return
 }
+
+func IsFileModified(path string, interval time.Duration, compare time.Time) bool {
+	modTime := time.Now()
+	fi, err := os.Stat(path)
+	if err != nil {
+		log.Warnf("Failed to get config modtime: %v", err)
+	} else {
+		modTime = fi.ModTime()
+	}
+
+	if modTime.Add(interval).Before(compare) {
+		return false
+	}
+
+	return true
+}

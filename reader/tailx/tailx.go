@@ -128,6 +128,62 @@ func NewActiveReader(originPath, realPath, whence string, notFirstTime bool, met
 
 }
 
+func (ar *ActiveReader) Start() {
+	if atomic.LoadInt32(&ar.status) == StatusRunning {
+		log.Warnf("Runner[%v] ActiveReader %s was already running", ar.runnerName, ar.originpath)
+		return
+	}
+
+	if atomic.LoadInt32(&ar.status) == StatusStopping {
+		cnt := 0
+		// 等待结束
+		for atomic.LoadInt32(&ar.status) != StatusStopped {
+			cnt++
+			//超过300个10ms，即3s，就强行退出
+			if cnt > 300 {
+				log.Errorf("Runner[%v] ActiveReader %s was not closed after 3s, force closing it", ar.runnerName, ar.originpath)
+				break
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+		atomic.CompareAndSwapInt32(&ar.status, StatusStopping, StatusStopped)
+		log.Warnf("Runner[%v] ActiveReader %s was stopped", ar.runnerName, ar.originpath)
+	}
+
+	atomic.StoreInt32(&ar.status, StatusInit)
+
+	go ar.Run()
+}
+
+func (ar *ActiveReader) Stop() error {
+	if atomic.LoadInt32(&ar.status) == StatusStopped {
+		return nil
+	}
+
+	if !atomic.CompareAndSwapInt32(&ar.status, StatusRunning, StatusStopping) &&
+		atomic.LoadInt32(&ar.status) != StatusStopping {
+		err := fmt.Errorf("Runner[%v] ActiveReader %s was not in StatusRunning or StatusStopping status, exit it... ", ar.runnerName, ar.originpath)
+		log.Debug(err)
+		return err
+	} else {
+		log.Warnf("Runner[%v] ActiveReader %s was closing", ar.runnerName, ar.originpath)
+	}
+
+	cnt := 0
+	// 等待结束
+	for atomic.LoadInt32(&ar.status) != StatusStopped {
+		cnt++
+		//超过3个1s，即3s，就强行退出
+		if cnt > 3 {
+			log.Errorf("Runner[%v] ActiveReader %s was not closed after 3s, force closing it", ar.runnerName, ar.originpath)
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	return nil
+}
+
 func (ar *ActiveReader) Run() {
 	if !atomic.CompareAndSwapInt32(&ar.status, StatusInit, StatusRunning) {
 		log.Errorf("Runner[%v] ActiveReader %s was not in StatusInit before Running,exit it...", ar.runnerName, ar.originpath)
@@ -135,6 +191,7 @@ func (ar *ActiveReader) Run() {
 	}
 	var err error
 	timer := time.NewTicker(time.Second)
+	defer timer.Stop()
 	for {
 		if atomic.LoadInt32(&ar.status) == StatusStopped || atomic.LoadInt32(&ar.status) == StatusStopping {
 			atomic.CompareAndSwapInt32(&ar.status, StatusStopping, StatusStopped)
@@ -146,24 +203,27 @@ func (ar *ActiveReader) Run() {
 			ar.readcache, err = ar.br.ReadLine()
 			ar.cacheLineMux.Unlock()
 			if err != nil && err != io.EOF && err != os.ErrClosed {
-				log.Warnf("Runner[%v] ActiveReader %s read error: %v", ar.runnerName, ar.originpath, err)
+				log.Warnf("Runner[%v] ActiveReader %s read error: %v, stop it", ar.runnerName, ar.originpath, err)
 				ar.setStatsError(err.Error())
 				ar.sendError(err)
-				time.Sleep(2 * time.Second)
-				continue
+				ar.Stop()
+				return
 			}
 			if ar.readcache == "" {
 				ar.emptyLineCnt++
 				//文件EOF，同时没有任何内容，代表不是第一次EOF，休息时间设置长一些
 				if err == io.EOF {
 					atomic.StoreInt32(&ar.inactive, 1)
-					log.Debugf("Runner[%v] %v meet EOF, ActiveReader was inactive now, sleep 5 seconds", ar.runnerName, ar.originpath)
-					time.Sleep(5 * time.Second)
-					continue
+					log.Debugf("Runner[%v] %v meet EOF, ActiveReader was inactive now, stop it", ar.runnerName, ar.originpath)
+					ar.Stop()
+					return
 				}
-				// 一小时没读到内容，设置为inactive
-				if ar.emptyLineCnt > 60*60 {
+				// 3s 没读到内容，设置为inactive
+				if ar.emptyLineCnt > 3 {
 					atomic.StoreInt32(&ar.inactive, 1)
+					log.Debugf("Runner[%v] %v meet EOF, ActiveReader was inactive now, stop it", ar.runnerName, ar.originpath)
+					ar.Stop()
+					return
 				}
 				//读取的结果为空，无论如何都sleep 1s
 				time.Sleep(time.Second)
@@ -201,25 +261,11 @@ func (ar *ActiveReader) Run() {
 }
 func (ar *ActiveReader) Close() error {
 	defer log.Warnf("Runner[%v] ActiveReader %s was closed", ar.runnerName, ar.originpath)
-	err := ar.br.Close()
-	if atomic.CompareAndSwapInt32(&ar.status, StatusRunning, StatusStopping) {
-		log.Warnf("Runner[%v] ActiveReader %s was closing", ar.runnerName, ar.originpath)
-	} else {
-		return err
+	brCloseErr := ar.br.Close()
+	if err := ar.Stop(); err != nil {
+		return brCloseErr
 	}
-
-	cnt := 0
-	// 等待结束
-	for atomic.LoadInt32(&ar.status) != StatusStopped {
-		cnt++
-		//超过300个10ms，即3s，就强行退出
-		if cnt > 300 {
-			log.Errorf("Runner[%v] ActiveReader %s was not closed after 3s, force closing it", ar.runnerName, ar.originpath)
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	return err
+	return nil
 }
 
 func (ar *ActiveReader) setStatsError(err string) {
@@ -431,6 +477,7 @@ func (r *Reader) statLogPath() {
 		log.Debugf("Runner[%v] statLogPath %v find matches: %v", r.meta.RunnerName, r.logPathPattern, strings.Join(matches, ", "))
 	}
 	var newaddsPath []string
+	now := time.Now()
 	for _, mc := range matches {
 		rp, fi, err := GetRealPath(mc)
 		if err != nil {
@@ -442,9 +489,12 @@ func (r *Reader) statLogPath() {
 			continue
 		}
 		r.armapmux.Lock()
-		_, ok := r.fileReaders[rp]
+		filear, ok := r.fileReaders[rp]
 		r.armapmux.Unlock()
 		if ok {
+			if IsFileModified(rp, r.statInterval, now) {
+				filear.Start()
+			}
 			log.Debugf("Runner[%v] <%v> is collecting, ignore...", r.meta.RunnerName, rp)
 			continue
 		}
@@ -485,7 +535,7 @@ func (r *Reader) statLogPath() {
 		}
 		r.armapmux.Unlock()
 		if !r.hasStopped() && !r.isStopping() {
-			go ar.Run()
+			ar.Start()
 		} else {
 			log.Warnf("Runner[%v] %v NewActiveReader but reader was stopped, will not running...", r.meta.RunnerName, mc)
 		}
