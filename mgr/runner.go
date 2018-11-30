@@ -94,6 +94,7 @@ type LogExportRunner struct {
 	batchLen  int64
 	batchSize int64
 	lastSend  time.Time
+	syncInc   int
 }
 
 const defaultSendIntervalSeconds = 60
@@ -635,6 +636,7 @@ func (r *LogExportRunner) Run() {
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
 			log.Debugf("Runner[%v] exited from run", r.Name())
+			r.reader.SyncMeta()
 			if atomic.LoadInt32(&r.stopped) < 2 {
 				r.exitChan <- struct{}{}
 			}
@@ -725,8 +727,11 @@ func (r *LogExportRunner) Run() {
 				break
 			}
 		}
-		if success {
-			r.reader.SyncMeta()
+		if success && r.SyncEvery > 0 {
+			r.syncInc = (r.syncInc + 1) % r.SyncEvery
+			if r.syncInc == 0 {
+				r.reader.SyncMeta()
+			}
 		}
 		log.Debugf("Runner[%v] send %s finish to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
 	}
