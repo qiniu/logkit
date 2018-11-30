@@ -97,13 +97,14 @@ func NewFtSender(innerSender Sender, conf conf.MapConf, ftSaveLogPath string) (*
 	if MaxProcs <= 0 {
 		MaxProcs = NumCPU
 	}
+	procs, _ := conf.GetIntOr(KeyFtProcs, MaxProcs)
 
 	opt := &FtOption{
 		saveLogPath:       logPath,
 		syncEvery:         int64(syncEvery),
 		writeLimit:        writeLimit,
 		strategy:          strategy,
-		procs:             MaxProcs,
+		procs:             procs,
 		memoryChannel:     memoryChannel,
 		memoryChannelSize: memoryChannelSize,
 		longDataDiscard:   longDataDiscard,
