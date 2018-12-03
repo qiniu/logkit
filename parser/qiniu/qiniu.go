@@ -3,7 +3,9 @@ package qiniu
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
+	"sync"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
@@ -52,6 +54,7 @@ type Parser struct {
 	labels               []GrokLabel
 	disableRecordErrData bool
 	keepRawData          bool
+	numRoutine           int
 }
 
 func checkLevel(str string) bool {
@@ -87,6 +90,10 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	labels := GetGrokLabels(labelList, nameMap)
 
 	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = 1
+	}
 
 	return &Parser{
 		name:                 name,
@@ -94,6 +101,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		headers:              logHeaders,
 		disableRecordErrData: disableRecordErrData,
 		keepRawData:          keepRawData,
+		numRoutine:           numRoutine,
 	}, nil
 }
 
@@ -352,36 +360,75 @@ func (p *Parser) parse(line string) (d Data, err error) {
 }
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
-	datas := []Data{}
-	se := &StatsError{}
-	for idx, line := range lines {
-		if len(strings.TrimSpace(line)) <= 0 {
-			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
+	var (
+		datas = make([]Data, 0, len(lines))
+		se    = &StatsError{}
+	)
+	numRoutine := p.numRoutine
+	if len(lines) < numRoutine {
+		numRoutine = len(lines)
+	}
+	sendChan := make(chan parser.ParseInfo)
+	resultChan := make(chan parser.ParseResult)
+
+	wg := new(sync.WaitGroup)
+	for i := 0; i < numRoutine; i++ {
+		wg.Add(1)
+		go parser.ParseLine(sendChan, resultChan, wg, true, p.parse)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, line := range lines {
+			sendChan <- parser.ParseInfo{
+				Line:  line,
+				Index: idx,
+			}
+		}
+		close(sendChan)
+	}()
+
+	var parseResultSlice = make(parser.ParseResultSlice, 0, len(lines))
+	for resultInfo := range resultChan {
+		parseResultSlice = append(parseResultSlice, resultInfo)
+	}
+	if numRoutine > 1 {
+		sort.Stable(parseResultSlice)
+	}
+
+	for _, parseResult := range parseResultSlice {
+		if len(parseResult.Line) == 0 {
+			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
 			continue
 		}
-		d, err := p.parse(line)
-		if err != nil {
+
+		if parseResult.Err != nil {
 			se.AddErrors()
-			se.LastError = err.Error()
+			se.LastError = parseResult.Err.Error()
 			errData := make(Data)
 			if !p.disableRecordErrData {
-				errData[KeyPandoraStash] = line
+				errData[KeyPandoraStash] = parseResult.Line
 			} else if !p.keepRawData {
-				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
+				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
 			}
 			if p.keepRawData {
-				errData[KeyRawData] = line
+				errData[KeyRawData] = parseResult.Line
 			}
 			if !p.disableRecordErrData || p.keepRawData {
 				datas = append(datas, errData)
 			}
 			continue
 		}
+
 		se.AddSuccess()
 		if p.keepRawData {
-			d[KeyRawData] = line
+			parseResult.Data[KeyRawData] = parseResult.Line
 		}
-		datas = append(datas, d)
+		datas = append(datas, parseResult.Data)
 	}
 
 	if se.Errors == 0 {

@@ -481,8 +481,10 @@ func HasSpace(spliter string) bool {
 }
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
-	datas := make([]Data, 0, len(lines))
-	se := &StatsError{}
+	var (
+		datas = make([]Data, 0, len(lines))
+		se    = &StatsError{}
+	)
 	numRoutine := p.numRoutine
 	if len(lines) < numRoutine {
 		numRoutine = len(lines)

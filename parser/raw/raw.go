@@ -47,8 +47,10 @@ func (p *Parser) Type() string {
 }
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
-	se := &StatsError{}
-	datas := []Data{}
+	var (
+		datas = make([]Data, 0, len(lines))
+		se    = &StatsError{}
+	)
 	for idx, line := range lines {
 		//raw格式的不应该trime空格，只需要判断剔除掉全空就好了
 		if len(strings.TrimSpace(line)) <= 0 {

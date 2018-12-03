@@ -2,8 +2,10 @@ package kafkarest
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/qiniu/log"
@@ -37,6 +39,8 @@ type Parser struct {
 	labels               []GrokLabel
 	disableRecordErrData bool
 	keepRawData          bool
+
+	numRoutine int
 }
 
 func (krp *Parser) Name() string {
@@ -48,44 +52,78 @@ func (krp *Parser) Type() string {
 }
 
 func (krp *Parser) Parse(lines []string) ([]Data, error) {
-	datas := []Data{}
-	se := &StatsError{}
-	for idx, line := range lines {
-		line = strings.Replace(line, "\n", " ", -1)
-		line = strings.Replace(line, "\t", "\\t", -1)
-		line = strings.Trim(line, " ")
-		fields := strings.Split(line, " ")
-		if len(fields) >= 3 {
-			if len(fields) == 16 && fields[2] == "INFO" {
-				data := krp.parseRequestLog(fields)
-				if krp.keepRawData {
-					data[KeyRawData] = line
-				}
-				datas = append(datas, data)
-			} else if (len(fields) > 0 && fields[2] == "ERROR") || (len(fields) > 0 && fields[2] == "WARN") {
-				data := krp.parseAbnormalLog(fields)
-				if krp.keepRawData {
-					data[KeyRawData] = line
-				}
-				datas = append(datas, data)
+	var (
+		datas = make([]Data, 0, len(lines))
+		se    = &StatsError{}
+	)
+	numRoutine := krp.numRoutine
+	if len(lines) < numRoutine {
+		numRoutine = len(lines)
+	}
+	sendChan := make(chan parser.ParseInfo)
+	resultChan := make(chan parser.ParseResult)
+
+	wg := new(sync.WaitGroup)
+	for i := 0; i < numRoutine; i++ {
+		wg.Add(1)
+		go parser.ParseLine(sendChan, resultChan, wg, false, krp.parse)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, line := range lines {
+			line = strings.Replace(line, "\n", " ", -1)
+			line = strings.Replace(line, "\t", "\\t", -1)
+			line = strings.Trim(line, " ")
+			sendChan <- parser.ParseInfo{
+				Line:  line,
+				Index: idx,
 			}
-			se.AddSuccess()
-		} else {
+		}
+		close(sendChan)
+	}()
+
+	var parseResultSlice = make(parser.ParseResultSlice, 0, len(lines))
+	for resultInfo := range resultChan {
+		parseResultSlice = append(parseResultSlice, resultInfo)
+	}
+	if numRoutine > 1 {
+		sort.Stable(parseResultSlice)
+	}
+
+	for _, parseResult := range parseResultSlice {
+		if parseResult.Err != nil {
+			se.AddErrors()
+			se.LastError = parseResult.Err.Error()
 			errData := make(Data)
 			if !krp.disableRecordErrData {
-				errData[KeyPandoraStash] = line
+				errData[KeyPandoraStash] = parseResult.Line
 			} else if !krp.keepRawData {
-				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
+				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
 			}
 			if krp.keepRawData {
-				errData[KeyRawData] = line
+				errData[KeyRawData] = parseResult.Line
 			}
 			if !krp.disableRecordErrData || krp.keepRawData {
 				datas = append(datas, errData)
 			}
-			se.LastError = fmt.Sprintf("kafka parser need data fields at least 3, acutal get %d", len(fields))
-			se.AddErrors()
+			continue
 		}
+
+		if len(parseResult.Data) < 1 { //数据为空时不发送
+			se.AddSuccess()
+			continue
+		}
+
+		se.AddSuccess()
+		if krp.keepRawData {
+			parseResult.Data[KeyRawData] = parseResult.Line
+		}
+		datas = append(datas, parseResult.Data)
 	}
 
 	if se.Errors == 0 {
@@ -139,12 +177,17 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	labels := GetGrokLabels(labelList, nameMap)
 
 	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = 1
+	}
 
 	return &Parser{
 		name:                 name,
 		labels:               labels,
 		disableRecordErrData: disableRecordErrData,
 		keepRawData:          keepRawData,
+		numRoutine:           numRoutine,
 	}, nil
 }
 
@@ -236,4 +279,19 @@ func (krp *Parser) ParseLogTime(fields []string) int64 {
 		return 0
 	}
 	return ts
+}
+
+func (krp *Parser) parse(line string) (data Data, err error) {
+	fields := strings.Split(line, " ")
+	if len(fields) < 3 {
+		return nil, fmt.Errorf("kafka parser need data fields at least 3, acutal get %d", len(fields))
+	}
+
+	if len(fields) == 16 && fields[2] == "INFO" {
+		return krp.parseRequestLog(fields), nil
+	}
+	if (len(fields) > 0 && fields[2] == "ERROR") || (len(fields) > 0 && fields[2] == "WARN") {
+		return krp.parseAbnormalLog(fields), nil
+	}
+	return nil, nil
 }

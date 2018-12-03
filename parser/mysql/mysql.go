@@ -1,7 +1,9 @@
 package mysql
 
 import (
+	"sort"
 	"strings"
+	"sync"
 
 	"github.com/Preetam/mysqllog"
 
@@ -22,6 +24,7 @@ type Parser struct {
 	disableRecordErrData bool
 	keepRawData          bool
 	rawDatas             []string
+	numRoutine           int
 }
 
 func NewParser(c conf.MapConf) (parser.Parser, error) {
@@ -33,6 +36,10 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 
 	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
 	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = 1
+	}
 
 	return &Parser{
 		name:                 name,
@@ -40,6 +47,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		disableRecordErrData: disableRecordErrData,
 		ps:                   &mysqllog.Parser{},
 		keepRawData:          keepRawData,
+		numRoutine:           numRoutine,
 	}, nil
 }
 
@@ -76,37 +84,74 @@ func (p *Parser) parse(line string) (d Data, err error) {
 	return d, nil
 }
 func (p *Parser) Parse(lines []string) ([]Data, error) {
-	var datas []Data
-	se := &StatsError{}
-	for idx, line := range lines {
-		line = strings.TrimSpace(line)
-		if len(line) <= 0 {
-			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
+	var (
+		datas = make([]Data, 0, len(lines))
+		se    = &StatsError{}
+	)
+	numRoutine := p.numRoutine
+	if len(lines) < numRoutine {
+		numRoutine = len(lines)
+	}
+	sendChan := make(chan parser.ParseInfo)
+	resultChan := make(chan parser.ParseResult)
+
+	wg := new(sync.WaitGroup)
+	for i := 0; i < numRoutine; i++ {
+		wg.Add(1)
+		go parser.ParseLine(sendChan, resultChan, wg, true, p.parse)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, line := range lines {
+			sendChan <- parser.ParseInfo{
+				Line:  line,
+				Index: idx,
+			}
+		}
+		close(sendChan)
+	}()
+
+	var parseResultSlice = make(parser.ParseResultSlice, 0, len(lines))
+	for resultInfo := range resultChan {
+		parseResultSlice = append(parseResultSlice, resultInfo)
+	}
+	if numRoutine > 1 {
+		sort.Stable(parseResultSlice)
+	}
+
+	for _, parseResult := range parseResultSlice {
+		if len(parseResult.Line) == 0 {
+			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
 			continue
 		}
-		d, err := p.parse(line)
-		if err != nil {
+
+		if parseResult.Err != nil {
 			se.AddErrors()
-			se.LastError = err.Error()
+			se.LastError = parseResult.Err.Error()
 			errData := make(Data)
 			if !p.disableRecordErrData {
-				errData[KeyPandoraStash] = line
+				errData[KeyPandoraStash] = parseResult.Line
 			} else if !p.keepRawData {
-				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
+				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
 			}
 			if p.keepRawData {
-				errData[KeyRawData] = line
+				errData[KeyRawData] = parseResult.Line
 			}
 			if !p.disableRecordErrData || p.keepRawData {
 				datas = append(datas, errData)
 			}
 			continue
 		}
-		if d == nil || len(d) < 1 {
+		if len(parseResult.Data) < 1 { //数据为空时不发送
 			continue
 		}
 		se.AddSuccess()
-		datas = append(datas, d)
+		datas = append(datas, parseResult.Data)
 	}
 
 	if se.Errors == 0 {
