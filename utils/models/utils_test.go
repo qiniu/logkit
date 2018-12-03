@@ -598,6 +598,14 @@ func Test_ConvertDate(t *testing.T) {
 	date, err = ConvertDate("20060102150405", "", 0, time.UTC, "20180204221045")
 	assert.NoError(t, err)
 	assert.Equal(t, "2018-02-04T22:10:45Z", date)
+
+	date, err = ConvertDate("Jan 2, 2006 at 3:04pm (MST)", "", 0, time.UTC, "Jul 9, 2012 at 5:02am (CEST)")
+	assert.NoError(t, err)
+	assert.Equal(t, "2012-07-09T05:02:00Z", date)
+
+	date, err = ConvertDate("", "", 0, time.UTC, "2018-12-03 15:09:06,139")
+	assert.NoError(t, err)
+	assert.Equal(t, "2018-12-03T15:09:06.139Z", date)
 }
 
 func Test_FormatWithUserOption(t *testing.T) {

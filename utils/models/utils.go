@@ -722,6 +722,10 @@ func ConvertDate(layoutBefore, layoutAfter string, offset int, loc *time.Locatio
 			}
 			return FormatWithUserOption(layoutAfter, offset, t), nil
 		}
+
+		if strings.Contains(newv, ",") {
+			newv = strings.Replace(newv, ",", ".", -1)
+		}
 		t, err := times.StrToTimeLocation(newv, loc)
 		if err != nil {
 			return v, err
