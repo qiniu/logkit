@@ -422,6 +422,7 @@ func (p *Parser) parse(line string) (d Data, err error) {
 	}
 	moreNum := p.allmoreStartNUmber
 	for i, part := range parts {
+		part = strings.TrimSpace(part)
 		if i >= len(p.schema) && p.allowMoreName == "" {
 			continue
 		}
