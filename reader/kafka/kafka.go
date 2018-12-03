@@ -124,6 +124,11 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	return kr, nil
 }
 
+func (r *Reader) Start() error {
+	go r.startMarkOffset()
+	return nil
+}
+
 func (r *Reader) startMarkOffset() {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
