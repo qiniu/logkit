@@ -715,6 +715,7 @@ func ConvertDate(layoutBefore, layoutAfter string, offset int, loc *time.Locatio
 	case uint32:
 		s = int64(newv)
 	case string:
+		newv = strings.Replace(newv, ",", ".", -1)
 		if layoutBefore != "" {
 			t, err := time.ParseInLocation(layoutBefore, newv, loc)
 			if err != nil {
@@ -723,9 +724,6 @@ func ConvertDate(layoutBefore, layoutAfter string, offset int, loc *time.Locatio
 			return FormatWithUserOption(layoutAfter, offset, t), nil
 		}
 
-		if strings.Contains(newv, ",") {
-			newv = strings.Replace(newv, ",", ".", -1)
-		}
 		t, err := times.StrToTimeLocation(newv, loc)
 		if err != nil {
 			return v, err
