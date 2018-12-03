@@ -205,6 +205,11 @@ func (r *Reader) Status() StatsInfo {
 	return r.stats
 }
 
+func (r *Reader) Start() error {
+	go r.startMarkOffset()
+	return nil
+}
+
 func (r *Reader) Lag() (*LagInfo, error) {
 	if r.Consumer == nil {
 		return nil, errors.New("kafka consumer is closed")
