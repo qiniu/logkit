@@ -196,7 +196,7 @@ func (s *Sender) Send(datas []Data) error {
 			}
 			//添加发送时间
 			if s.logkitSendTime {
-				doc[KeySendTime] = time.Now().In(s.timeZone)
+				doc[KeySendTime] = time.Now().In(s.timeZone).UnixNano() / 1000000
 			}
 			doc2 := doc
 			bulkService.Add(elasticV6.NewBulkIndexRequest().Index(indexName).Type(s.eType).Doc(&doc2))
@@ -262,7 +262,7 @@ func (s *Sender) Send(datas []Data) error {
 			}
 			//添加发送时间
 			if s.logkitSendTime {
-				doc[KeySendTime] = time.Now().In(s.timeZone)
+				doc[KeySendTime] = time.Now().In(s.timeZone).UnixNano() / 1000000
 			}
 			doc2 := doc
 			bulkService.Add(elasticV5.NewBulkIndexRequest().Index(indexName).Type(s.eType).Doc(&doc2))
@@ -327,7 +327,7 @@ func (s *Sender) Send(datas []Data) error {
 			}
 			//添加发送时间
 			if s.logkitSendTime {
-				doc[KeySendTime] = time.Now().In(s.timeZone)
+				doc[KeySendTime] = time.Now().In(s.timeZone).UnixNano() / 1000000
 			}
 			doc2 := doc
 			bulkService.Add(elasticV3.NewBulkIndexRequest().Index(indexName).Type(s.eType).Doc(&doc2))
