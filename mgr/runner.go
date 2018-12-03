@@ -448,7 +448,6 @@ func (r *LogExportRunner) tryRawSend(s sender.Sender, datas []string, times int)
 		log.Errorf("Runner[%v] retry send %v times, but still error %v, total %v data lines", r.RunnerName, cnt, err, len(datas))
 		break
 	}
-
 	info.Errors += originDatasLen - successDatasLen
 	info.Success += successDatasLen
 	r.rsMutex.Lock()
@@ -1162,7 +1161,7 @@ func (r *LogExportRunner) getRefreshStatus(elaspedtime float64) RunnerStatus {
 	r.rs.ReaderStats.Success = r.rs.ReadDataCount
 
 	//对于DataReader，不需要Parser，默认全部成功
-	if _, ok := r.reader.(reader.DataReader); ok {
+	if _, ok := r.reader.(reader.DataReader); ok || r.SendRaw {
 		r.rs.ParserStats.Success = r.rs.ReadDataCount
 		r.rs.ParserStats.Speed = r.rs.ReadSpeed
 		r.rs.ParserStats.Trend = r.rs.ReadSpeedTrend

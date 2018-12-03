@@ -422,7 +422,9 @@ func (ft *FtSender) unmarshalData(dat []byte) (datas []Data, err error) {
 }
 
 func (ft *FtSender) saveRawToFile(datas []string) error {
-
+	if dqueue, ok := ft.logQueue.(queue.LinesQueue); ok {
+		return dqueue.PutLines(datas)
+	}
 	bs, err := ft.marshalRaws(datas)
 	if err != nil {
 		return err
@@ -498,9 +500,6 @@ func (ft *FtSender) trySendRaws(datas []string, failSleep int, isRetry bool) (ba
 		return nil, errors.New("inner sender not support Raw Sender")
 	}
 	err = rawSender.RawSend(datas)
-	if err == nil {
-		return nil, nil
-	}
 	dataLen := int64(len(datas))
 
 	err = ft.handleStat(err, isRetry, dataLen)
