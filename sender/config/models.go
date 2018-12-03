@@ -129,7 +129,7 @@ const (
 	KeyUTCTimezone   = "UTC"
 	KeyPRCTimezone   = "PRC"
 
-	KeySendTime = "sendTime"
+	KeySendTime = "_time"
 
 	// fault_tolerant
 	// 可选参数 fault_tolerant 为true的话，以下必填
