@@ -566,5 +566,5 @@ func TestCsvlastempty(t *testing.T) {
 		err = errors.New(c.LastError)
 	}
 	assert.NoError(t, err)
-	assert.Equal(t, []Data{{"logType": "a", "a": int64(1), "b": 1.2, "c": " "}}, datas)
+	assert.Equal(t, []Data{{"logType": "a", "a": int64(1), "b": 1.2, "c": ""}}, datas)
 }
