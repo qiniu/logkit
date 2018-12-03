@@ -103,14 +103,14 @@ func ParseLine(dataPipline <-chan ParseInfo, resultChan chan ParseResult, wg *sy
 	trimSpace bool, handlerFunc func(string) (Data, error)) {
 	for parseInfo := range dataPipline {
 		if trimSpace {
-			parseInfo.Line = strings.TrimSpace(parseInfo.Line)
-		}
-		if len(parseInfo.Line) <= 0 {
-			resultChan <- ParseResult{
-				Line:  parseInfo.Line,
-				Index: parseInfo.Index,
+			line := strings.TrimSpace(parseInfo.Line)
+			if len(line) <= 0 {
+				resultChan <- ParseResult{
+					Line:  line,
+					Index: parseInfo.Index,
+				}
+				continue
 			}
-			continue
 		}
 
 		data, err := handlerFunc(parseInfo.Line)

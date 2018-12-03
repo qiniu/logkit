@@ -3,8 +3,10 @@ package syslog
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jeromer/syslogparser/rfc3164"
@@ -109,6 +111,10 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 
 	format := GetFormt(rfctype)
 	buff := bytes.NewBuffer([]byte{})
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = 1
+	}
 	return &SyslogParser{
 		name:                 name,
 		labels:               labels,
@@ -118,6 +124,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		maxline:              maxline,
 		curline:              0,
 		keepRawData:          keepRawData,
+		numRoutine:           numRoutine,
 	}, nil
 }
 
@@ -130,6 +137,8 @@ type SyslogParser struct {
 	curline              int
 	disableRecordErrData bool
 	keepRawData          bool
+
+	numRoutine int
 }
 
 func (p *SyslogParser) Name() string {
@@ -141,36 +150,75 @@ func (p *SyslogParser) Type() string {
 }
 
 func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
-	se := &StatsError{}
-	var datas []Data
-	for idx, line := range lines {
-		if len(strings.TrimSpace(line)) <= 0 {
-			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
+	var (
+		datas = make([]Data, 0, len(lines))
+		se    = &StatsError{}
+	)
+	numRoutine := p.numRoutine
+	if len(lines) < numRoutine {
+		numRoutine = len(lines)
+	}
+	sendChan := make(chan parser.ParseInfo)
+	resultChan := make(chan parser.ParseResult)
+
+	wg := new(sync.WaitGroup)
+	for i := 0; i < numRoutine; i++ {
+		wg.Add(1)
+		go parser.ParseLine(sendChan, resultChan, wg, true, p.parse)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, line := range lines {
+			sendChan <- parser.ParseInfo{
+				Line:  line,
+				Index: idx,
+			}
+		}
+		close(sendChan)
+	}()
+
+	var parseResultSlice = make(parser.ParseResultSlice, 0, len(lines))
+	for resultInfo := range resultChan {
+		parseResultSlice = append(parseResultSlice, resultInfo)
+	}
+	if numRoutine > 1 {
+		sort.Stable(parseResultSlice)
+	}
+
+	for _, parseResult := range parseResultSlice {
+		if len(parseResult.Line) == 0 {
+			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
 			continue
 		}
-		d, err := p.parse(line)
-		if err != nil {
+
+		if parseResult.Err != nil {
 			se.AddErrors()
-			se.LastError = err.Error()
-			if d != nil {
-				datas = append(datas, d)
-			}
+			se.LastError = parseResult.Err.Error()
 			if p.disableRecordErrData && !p.keepRawData {
-				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
+				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
+			}
+			if parseResult.Data != nil {
+				datas = append(datas, parseResult.Data)
 			}
 			continue
 		}
-		if len(d) < 1 {
+		if len(parseResult.Data) < 1 { //数据为空时不发送
+			se.AddSuccess()
 			continue
 		}
 		for _, label := range p.labels {
-			d[label.Name] = label.Value
+			parseResult.Data[label.Name] = label.Value
 		}
-		if p.keepRawData {
-			d[KeyRawData] = line
-		}
-		datas = append(datas, d)
 		se.AddSuccess()
+		if p.keepRawData {
+			parseResult.Data[KeyRawData] = parseResult.Line
+		}
+		datas = append(datas, parseResult.Data)
 	}
 
 	if se.Errors == 0 {
