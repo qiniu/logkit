@@ -199,7 +199,7 @@ func (s *Sender) Send(datas []Data) error {
 				doc[KeySendTime] = time.Now().In(s.timeZone).UnixNano() / 1000000
 			}
 			doc2 := doc
-			bulkService.Add(elasticV6.NewBulkIndexRequest().Index(indexName).Type(s.eType).Doc(&doc2))
+			bulkService.Add(elasticV6.NewBulkIndexRequest().UseEasyJSON(true).Index(indexName).Type(s.eType).Doc(&doc2))
 		}
 
 		resp, err := bulkService.Do(context.Background())
