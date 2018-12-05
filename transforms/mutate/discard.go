@@ -46,18 +46,20 @@ func (g *Discarder) RawTransform(datas []string) ([]string, error) {
 	}
 
 	var (
-		ret    = make([]string, len(datas))
-		err    error
-		errNum int
-	)
-	numRoutine := g.numRoutine
-	if len(datas) < numRoutine {
-		numRoutine = len(datas)
-	}
-	dataPipline := make(chan transforms.RawTransformInfo)
-	resultChan := make(chan transforms.RawTransformResult)
+		dataLine   = len(datas)
+		ret        = make([]string, dataLine)
+		err        error
+		errNum     int
+		numRoutine = g.numRoutine
 
-	wg := new(sync.WaitGroup)
+		dataPipline = make(chan transforms.RawTransformInfo)
+		resultChan  = make(chan transforms.RawTransformResult)
+		wg          = new(sync.WaitGroup)
+	)
+	if dataLine < numRoutine {
+		numRoutine = dataLine
+	}
+
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
 		go g.rawtransform(dataPipline, resultChan, wg)
@@ -78,12 +80,9 @@ func (g *Discarder) RawTransform(datas []string) ([]string, error) {
 		close(dataPipline)
 	}()
 
-	var transformResultSlice = make(transforms.RawTransformResultSlice, 0, len(datas))
+	var transformResultSlice = make(transforms.RawTransformResultSlice, dataLine)
 	for resultInfo := range resultChan {
-		transformResultSlice = append(transformResultSlice, resultInfo)
-	}
-	if numRoutine > 1 {
-		sort.Stable(transformResultSlice)
+		transformResultSlice[resultInfo.Index] = resultInfo
 	}
 
 	for _, transformResult := range transformResultSlice {
@@ -95,16 +94,20 @@ func (g *Discarder) RawTransform(datas []string) ([]string, error) {
 		ret[transformResult.Index] = transformResult.CurData
 	}
 
-	result := make([]string, 0, len(datas))
+	var (
+		result      = make([]string, dataLine)
+		resultIndex = 0
+	)
 	for _, retEntry := range ret {
 		if retEntry == "" {
 			continue
 		}
-		result = append(result, retEntry)
+		result[resultIndex] = retEntry
+		resultIndex++
 	}
 
-	g.stats, _ = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
-	return result, nil
+	g.stats, _ = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(dataLine), g.Type())
+	return result[:resultIndex], nil
 }
 
 func (g *Discarder) Transform(datas []Data) ([]Data, error) {
