@@ -667,7 +667,9 @@ func (r *LogExportRunner) Run() {
 		}
 
 		tags := r.meta.GetTags()
-		tags = MergeEnvTags(r.EnvTag, tags)
+		if r.ExtraInfo {
+			tags = MergeEnvTags(r.EnvTag, tags)
+		}
 		tags = MergeExtraInfoTags(r.meta, tags)
 		if len(tags) > 0 {
 			datas = addTagsToData(tags, datas, r.Name())

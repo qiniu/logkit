@@ -7,9 +7,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestMapReplaceTransformer(t *testing.T) {

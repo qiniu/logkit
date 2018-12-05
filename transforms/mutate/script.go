@@ -8,9 +8,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"unicode"
 
 	"github.com/qiniu/log"
+
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -29,6 +31,11 @@ type Script struct {
 	Script      string `json:"script"`
 	storePath   string
 	stats       StatsInfo
+
+	keysDetail [][]string
+	news       []string
+	recordErrs []string
+	numRoutine int
 }
 
 func (g *Script) Init() error {
@@ -52,79 +59,93 @@ func (g *Script) Init() error {
 			return fileWriteErr
 		}
 	}
-	return nil
-}
+	if g.storePath == "" {
+		g.storePath = g.ScriptPath
+	}
+	g.storePath, err = checkPath(g.storePath)
+	if err != nil {
+		return err
+	}
 
-func (g *Script) Transform(datas []Data) ([]Data, error) {
-	var err, fmtErr error
-	errNum := 0
 	// 获取 keys
 	keysArr := strings.Split(g.Key, ",")
-	keysDetail := make([][]string, 0)
+	g.keysDetail = make([][]string, 0, 100)
 	for _, key := range keysArr {
 		key = strings.TrimSpace(key)
 		keys := GetKeys(key)
 		if len(keys) <= 0 {
 			continue
 		}
-		keysDetail = append(keysDetail, keys)
+		g.keysDetail = append(g.keysDetail, keys)
 	}
 	// 获取新建keys
-	news := GetKeys(g.New)
+	g.news = GetKeys(g.New)
 	// 增加error
 	newsErr := g.New + "_error"
-	recordErrs := GetKeys(newsErr)
+	g.recordErrs = GetKeys(newsErr)
 
-	if g.storePath == "" {
-		g.storePath = g.ScriptPath
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = 1
 	}
-	scriptPath, err := checkPath(g.storePath)
-	if err != nil {
-		g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(1), int64(len(datas)), g.Type())
-		return datas, fmtErr
-	}
+	g.numRoutine = numRoutine
+	return nil
+}
 
-	for i := range datas {
-		var scriptRes string
-		var getErr error
-		params := []string{scriptPath}
-		for _, keys := range keysDetail {
-			val, getErr := GetMapValue(datas[i], keys...)
-			if getErr != nil {
-				errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.Key)
-				continue
-			}
-
-			valStr, ok := val.(string)
-			if !ok {
-				typeErr := fmt.Errorf("transform key %v data type is not string", g.Key)
-				errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
-				continue
-			}
-			params = append(params, valStr)
-		}
-
-		getErr = nil
-		scriptRes, getErr = getScriptRes(g.Interpreter, params)
-		if getErr != nil {
-			if len(getErr.Error()) > 0 {
-				// 设置脚本执行结果的错误信息
-				setErr := SetMapValue(datas[i], getErr.Error(), false, recordErrs...)
-				if setErr != nil {
-					errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
-				}
-			}
-			continue
-		}
-
-		// 设置脚本执行结果
-		setErr := SetMapValue(datas[i], scriptRes, false, news...)
-		if setErr != nil {
-			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
-		}
+func (g *Script) Transform(datas []Data) ([]Data, error) {
+	if g.keysDetail == nil {
+		g.Init()
 	}
 
-	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	var (
+		dataLen     = len(datas)
+		err, fmtErr error
+		errNum      int
+
+		numRoutine   = g.numRoutine
+		dataPipeline = make(chan transforms.TransformInfo)
+		resultChan   = make(chan transforms.TransformResult)
+		wg           = new(sync.WaitGroup)
+	)
+
+	if dataLen < numRoutine {
+		numRoutine = dataLen
+	}
+
+	for i := 0; i < numRoutine; i++ {
+		wg.Add(1)
+		go g.transform(dataPipeline, resultChan, wg)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, data := range datas {
+			dataPipeline <- transforms.TransformInfo{
+				CurData: data,
+				Index:   idx,
+			}
+		}
+		close(dataPipeline)
+	}()
+
+	var transformResultSlice = make(transforms.TransformResultSlice, dataLen)
+	for resultInfo := range resultChan {
+		transformResultSlice[resultInfo.Index] = resultInfo
+	}
+
+	for _, transformResult := range transformResultSlice {
+		if transformResult.Err != nil {
+			err = transformResult.Err
+			errNum += transformResult.ErrNum
+		}
+		datas[transformResult.Index] = transformResult.CurData
+	}
+
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(dataLen), g.Type())
 	return datas, fmtErr
 }
 
@@ -133,7 +154,7 @@ func getScriptRes(interpreter string, params []string) (string, error) {
 
 	res, err := command.Output()
 	if err != nil {
-		return "", fmt.Errorf("%s %s - run script err info is: %v", interpreter, params, err)
+		return "", errors.New(interpreter + " " + strings.Join(params, ",") + " - run script err info is: " + err.Error())
 	}
 
 	return string(res), nil
@@ -265,4 +286,71 @@ func getValidDir(dir string) (realPath string, err error) {
 		err = errors.New("file is not directory")
 	}
 	return
+}
+
+func (g *Script) transform(dataPipeline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+	var (
+		err       error
+		errNum    int
+		scriptRes string
+		getErr    error
+	)
+	for transformInfo := range dataPipeline {
+		err = nil
+		errNum = 0
+		scriptRes = ""
+		getErr = nil
+
+		params := make([]string, 1+len(g.keysDetail))
+		params[0] = g.storePath
+		paramIndex := 1
+		for _, keys := range g.keysDetail {
+			val, getErr := GetMapValue(transformInfo.CurData, keys...)
+			if getErr != nil {
+				errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.Key)
+				continue
+			}
+
+			valStr, ok := val.(string)
+			if !ok {
+				typeErr := errors.New("transform key " + g.Key + " data type is not string")
+				errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
+				continue
+			}
+			params[paramIndex] = valStr
+			paramIndex++
+		}
+		params = params[:paramIndex]
+
+		getErr = nil
+		scriptRes, getErr = getScriptRes(g.Interpreter, params)
+		if getErr != nil {
+			// 设置脚本执行结果的错误信息
+			setErr := SetMapValue(transformInfo.CurData, getErr.Error(), false, g.recordErrs...)
+			if setErr != nil {
+				errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
+			}
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				ErrNum:  errNum,
+				Err:     err,
+			}
+			continue
+		}
+
+		// 设置脚本执行结果
+		setErr := SetMapValue(transformInfo.CurData, scriptRes, false, g.news...)
+		if setErr != nil {
+			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
+		}
+
+		resultChan <- transforms.TransformResult{
+			Index:   transformInfo.Index,
+			CurData: transformInfo.CurData,
+			ErrNum:  errNum,
+			Err:     err,
+		}
+	}
+	wg.Done()
 }

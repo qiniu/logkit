@@ -46,21 +46,23 @@ func (g *Discarder) RawTransform(datas []string) ([]string, error) {
 	}
 
 	var (
-		ret    = make([]string, len(datas))
-		err    error
-		errNum int
-	)
-	numRoutine := g.numRoutine
-	if len(datas) < numRoutine {
-		numRoutine = len(datas)
-	}
-	dataPipline := make(chan transforms.RawTransformInfo)
-	resultChan := make(chan transforms.RawTransformResult)
+		dataLine   = len(datas)
+		ret        = make([]string, dataLine)
+		err        error
+		errNum     int
+		numRoutine = g.numRoutine
 
-	wg := new(sync.WaitGroup)
+		dataPipeline = make(chan transforms.RawTransformInfo)
+		resultChan   = make(chan transforms.RawTransformResult)
+		wg           = new(sync.WaitGroup)
+	)
+	if dataLine < numRoutine {
+		numRoutine = dataLine
+	}
+
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
-		go g.rawtransform(dataPipline, resultChan, wg)
+		go g.rawtransform(dataPipeline, resultChan, wg)
 	}
 
 	go func() {
@@ -70,20 +72,17 @@ func (g *Discarder) RawTransform(datas []string) ([]string, error) {
 
 	go func() {
 		for idx, data := range datas {
-			dataPipline <- transforms.RawTransformInfo{
+			dataPipeline <- transforms.RawTransformInfo{
 				CurData: data,
 				Index:   idx,
 			}
 		}
-		close(dataPipline)
+		close(dataPipeline)
 	}()
 
-	var transformResultSlice = make(transforms.RawTransformResultSlice, 0, len(datas))
+	var transformResultSlice = make(transforms.RawTransformResultSlice, dataLine)
 	for resultInfo := range resultChan {
-		transformResultSlice = append(transformResultSlice, resultInfo)
-	}
-	if numRoutine > 1 {
-		sort.Stable(transformResultSlice)
+		transformResultSlice[resultInfo.Index] = resultInfo
 	}
 
 	for _, transformResult := range transformResultSlice {
@@ -95,16 +94,20 @@ func (g *Discarder) RawTransform(datas []string) ([]string, error) {
 		ret[transformResult.Index] = transformResult.CurData
 	}
 
-	result := make([]string, 0, len(datas))
+	var (
+		result      = make([]string, dataLine)
+		resultIndex = 0
+	)
 	for _, retEntry := range ret {
 		if retEntry == "" {
 			continue
 		}
-		result = append(result, retEntry)
+		result[resultIndex] = retEntry
+		resultIndex++
 	}
 
-	g.stats, _ = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
-	return result, nil
+	g.stats, _ = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(dataLine), g.Type())
+	return result[:resultIndex], nil
 }
 
 func (g *Discarder) Transform(datas []Data) ([]Data, error) {
@@ -120,13 +123,13 @@ func (g *Discarder) Transform(datas []Data) ([]Data, error) {
 	if len(datas) < numRoutine {
 		numRoutine = len(datas)
 	}
-	dataPipline := make(chan transforms.TransformInfo)
+	dataPipeline := make(chan transforms.TransformInfo)
 	resultChan := make(chan transforms.TransformResult)
 
 	wg := new(sync.WaitGroup)
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
-		go g.transform(dataPipline, resultChan, wg)
+		go g.transform(dataPipeline, resultChan, wg)
 	}
 
 	go func() {
@@ -136,12 +139,12 @@ func (g *Discarder) Transform(datas []Data) ([]Data, error) {
 
 	go func() {
 		for idx, data := range datas {
-			dataPipline <- transforms.TransformInfo{
+			dataPipeline <- transforms.TransformInfo{
 				CurData: data,
 				Index:   idx,
 			}
 		}
-		close(dataPipline)
+		close(dataPipeline)
 	}()
 
 	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
@@ -209,8 +212,8 @@ func init() {
 	})
 }
 
-func (g *Discarder) transform(dataPipline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
-	for transformInfo := range dataPipline {
+func (g *Discarder) transform(dataPipeline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+	for transformInfo := range dataPipeline {
 		for _, keys := range g.discardKeys {
 			DeleteMapValue(transformInfo.CurData, keys...)
 		}
@@ -223,8 +226,8 @@ func (g *Discarder) transform(dataPipline <-chan transforms.TransformInfo, resul
 	wg.Done()
 }
 
-func (g *Discarder) rawtransform(dataPipline <-chan transforms.RawTransformInfo, resultChan chan transforms.RawTransformResult, wg *sync.WaitGroup) {
-	for transformInfo := range dataPipline {
+func (g *Discarder) rawtransform(dataPipeline <-chan transforms.RawTransformInfo, resultChan chan transforms.RawTransformResult, wg *sync.WaitGroup) {
+	for transformInfo := range dataPipeline {
 		if strings.Contains(transformInfo.CurData, g.Key) {
 			continue
 		}

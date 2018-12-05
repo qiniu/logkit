@@ -48,8 +48,9 @@ func (p *Parser) Type() string {
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
 	var (
-		datas = make([]Data, 0, len(lines))
-		se    = &StatsError{}
+		datas     = make([]Data, len(lines))
+		se        = &StatsError{}
+		dataIndex = 0
 	)
 	for idx, line := range lines {
 		//raw格式的不应该trime空格，只需要判断剔除掉全空就好了
@@ -65,10 +66,12 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		for _, label := range p.labels {
 			d[label.Name] = label.Value
 		}
-		datas = append(datas, d)
+		datas[dataIndex] = d
+		dataIndex++
 		se.AddSuccess()
 	}
 
+	datas = datas[:dataIndex]
 	if se.Errors == 0 {
 		return datas, nil
 	}

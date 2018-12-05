@@ -99,9 +99,9 @@ func (ps *Registry) NewLogParser(conf conf.MapConf) (p Parser, err error) {
 	return f(conf)
 }
 
-func ParseLine(dataPipline <-chan ParseInfo, resultChan chan ParseResult, wg *sync.WaitGroup,
+func ParseLine(dataPipeline <-chan ParseInfo, resultChan chan ParseResult, wg *sync.WaitGroup,
 	trimSpace bool, handlerFunc func(string) (Data, error)) {
-	for parseInfo := range dataPipline {
+	for parseInfo := range dataPipeline {
 		if trimSpace {
 			line := strings.TrimSpace(parseInfo.Line)
 			if len(line) <= 0 {
@@ -124,9 +124,9 @@ func ParseLine(dataPipline <-chan ParseInfo, resultChan chan ParseResult, wg *sy
 	wg.Done()
 }
 
-func ParseLineDataSlice(dataPipline <-chan ParseInfo, resultChan chan ParseResult, wg *sync.WaitGroup,
+func ParseLineDataSlice(dataPipeline <-chan ParseInfo, resultChan chan ParseResult, wg *sync.WaitGroup,
 	trimSpace bool, handlerFunc func(string) ([]Data, error)) {
-	for parseInfo := range dataPipline {
+	for parseInfo := range dataPipeline {
 		if trimSpace {
 			parseInfo.Line = strings.TrimSpace(parseInfo.Line)
 		}

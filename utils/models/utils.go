@@ -27,9 +27,9 @@ import (
 
 	"github.com/json-iterator/go"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 
-	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/times"
 )
 

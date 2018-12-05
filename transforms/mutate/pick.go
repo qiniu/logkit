@@ -1,7 +1,6 @@
 package mutate
 
 import (
-	"sort"
 	"strings"
 	"sync"
 
@@ -54,23 +53,25 @@ func (g *Pick) Transform(datas []Data) ([]Data, error) {
 	}
 
 	var (
+		dataLen     = len(datas)
 		err, fmtErr error
 		errNum      int
 		retDatas    = make([]Data, len(datas))
 		result      = make([]Data, 0, len(datas))
+
+		numRoutine   = g.numRoutine
+		dataPipeline = make(chan transforms.TransformInfo)
+		resultChan   = make(chan transforms.TransformResult)
+		wg           = new(sync.WaitGroup)
 	)
 
-	numRoutine := g.numRoutine
-	if len(datas) < numRoutine {
-		numRoutine = len(datas)
+	if dataLen < numRoutine {
+		numRoutine = dataLen
 	}
-	dataPipline := make(chan transforms.TransformInfo)
-	resultChan := make(chan transforms.TransformResult)
 
-	wg := new(sync.WaitGroup)
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
-		go g.transform(dataPipline, resultChan, wg)
+		go g.transform(dataPipeline, resultChan, wg)
 	}
 
 	go func() {
@@ -80,20 +81,17 @@ func (g *Pick) Transform(datas []Data) ([]Data, error) {
 
 	go func() {
 		for idx, data := range datas {
-			dataPipline <- transforms.TransformInfo{
+			dataPipeline <- transforms.TransformInfo{
 				CurData: data,
 				Index:   idx,
 			}
 		}
-		close(dataPipline)
+		close(dataPipeline)
 	}()
 
-	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
+	var transformResultSlice = make(transforms.TransformResultSlice, dataLen)
 	for resultInfo := range resultChan {
-		transformResultSlice = append(transformResultSlice, resultInfo)
-	}
-	if numRoutine > 1 {
-		sort.Stable(transformResultSlice)
+		transformResultSlice[resultInfo.Index] = resultInfo
 	}
 
 	for _, transformResult := range transformResultSlice {
@@ -110,7 +108,7 @@ func (g *Pick) Transform(datas []Data) ([]Data, error) {
 		}
 		result = append(result, data)
 	}
-	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(dataLen), g.Type())
 	return result, fmtErr
 }
 
@@ -159,8 +157,8 @@ func init() {
 	})
 }
 
-func (g *Pick) transform(dataPipline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
-	for transformInfo := range dataPipline {
+func (g *Pick) transform(dataPipeline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+	for transformInfo := range dataPipeline {
 		data := Data{}
 		for _, v := range g.keys {
 			keys := GetKeys(v)

@@ -1,6 +1,7 @@
 package transforms
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 
@@ -11,9 +12,6 @@ const (
 	General = iota
 	GetErr
 	SetErr
-
-	NotExistErr = "transform key %v not exist in data"
-	TypeErr     = "value of %v is not the type of map[string]interface{}"
 )
 
 func GetTransformerUsages() KeyValueSlice {
@@ -54,9 +52,9 @@ func SetError(errNum int, currentErr error, errType int, key string) (int, error
 	errNum++
 	switch errType {
 	case GetErr:
-		return errNum, fmt.Errorf(NotExistErr, key)
+		return errNum, errors.New("transform key " + key + " not exist in data")
 	case SetErr:
-		return errNum, fmt.Errorf(TypeErr, key)
+		return errNum, errors.New("value of " + key + " is not the type of map[string]interface{}")
 	default:
 		return errNum, currentErr
 	}

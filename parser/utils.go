@@ -4,11 +4,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/qiniu/logkit/conf"
-	. "github.com/qiniu/logkit/utils/models"
-
 	"github.com/qiniu/log"
+
+	"github.com/qiniu/logkit/conf"
 	. "github.com/qiniu/logkit/parser/config"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 const SECOND_PER_DAY = 24 * 60 * 60

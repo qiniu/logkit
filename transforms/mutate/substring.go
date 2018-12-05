@@ -2,8 +2,6 @@ package mutate
 
 import (
 	"errors"
-	"fmt"
-	"sort"
 	"sync"
 
 	"github.com/qiniu/logkit/transforms"
@@ -113,20 +111,22 @@ func (s *Sub) RawTransform(datas []string) ([]string, error) {
 	}
 
 	var (
+		dataLen     = len(datas)
 		err, fmtErr error
 		errNum      int
-	)
-	numRoutine := s.numRoutine
-	if len(datas) < numRoutine {
-		numRoutine = len(datas)
-	}
-	dataPipline := make(chan transforms.RawTransformInfo)
-	resultChan := make(chan transforms.RawTransformResult)
 
-	wg := new(sync.WaitGroup)
+		numRoutine   = s.numRoutine
+		dataPipeline = make(chan transforms.RawTransformInfo)
+		resultChan   = make(chan transforms.RawTransformResult)
+		wg           = new(sync.WaitGroup)
+	)
+	if dataLen < numRoutine {
+		numRoutine = dataLen
+	}
+
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
-		go s.rawtransform(dataPipline, resultChan, wg)
+		go s.rawtransform(dataPipeline, resultChan, wg)
 	}
 
 	go func() {
@@ -136,20 +136,17 @@ func (s *Sub) RawTransform(datas []string) ([]string, error) {
 
 	go func() {
 		for idx, data := range datas {
-			dataPipline <- transforms.RawTransformInfo{
+			dataPipeline <- transforms.RawTransformInfo{
 				CurData: data,
 				Index:   idx,
 			}
 		}
-		close(dataPipline)
+		close(dataPipeline)
 	}()
 
-	var transformResultSlice = make(transforms.RawTransformResultSlice, 0, len(datas))
+	var transformResultSlice = make(transforms.RawTransformResultSlice, dataLen)
 	for resultInfo := range resultChan {
-		transformResultSlice = append(transformResultSlice, resultInfo)
-	}
-	if numRoutine > 1 {
-		sort.Stable(transformResultSlice)
+		transformResultSlice[resultInfo.Index] = resultInfo
 	}
 
 	for _, transformResult := range transformResultSlice {
@@ -160,7 +157,7 @@ func (s *Sub) RawTransform(datas []string) ([]string, error) {
 		datas[transformResult.Index] = transformResult.CurData
 	}
 
-	s.stats, fmtErr = transforms.SetStatsInfo(err, s.stats, int64(errNum), int64(len(datas)), s.Type())
+	s.stats, fmtErr = transforms.SetStatsInfo(err, s.stats, int64(errNum), int64(dataLen), s.Type())
 	return datas, fmtErr
 }
 
@@ -188,20 +185,22 @@ func (s *Sub) Transform(datas []Data) ([]Data, error) {
 	}
 
 	var (
+		dataLen     = len(datas)
 		err, fmtErr error
 		errNum      int
-	)
-	numRoutine := s.numRoutine
-	if len(datas) < numRoutine {
-		numRoutine = len(datas)
-	}
-	dataPipline := make(chan transforms.TransformInfo)
-	resultChan := make(chan transforms.TransformResult)
 
-	wg := new(sync.WaitGroup)
+		numRoutine   = s.numRoutine
+		dataPipeline = make(chan transforms.TransformInfo)
+		resultChan   = make(chan transforms.TransformResult)
+		wg           = new(sync.WaitGroup)
+	)
+	if dataLen < numRoutine {
+		numRoutine = dataLen
+	}
+
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
-		go s.transform(dataPipline, resultChan, wg)
+		go s.transform(dataPipeline, resultChan, wg)
 	}
 
 	go func() {
@@ -211,20 +210,17 @@ func (s *Sub) Transform(datas []Data) ([]Data, error) {
 
 	go func() {
 		for idx, data := range datas {
-			dataPipline <- transforms.TransformInfo{
+			dataPipeline <- transforms.TransformInfo{
 				CurData: data,
 				Index:   idx,
 			}
 		}
-		close(dataPipline)
+		close(dataPipeline)
 	}()
 
-	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
+	var transformResultSlice = make(transforms.TransformResultSlice, dataLen)
 	for resultInfo := range resultChan {
-		transformResultSlice = append(transformResultSlice, resultInfo)
-	}
-	if numRoutine > 1 {
-		sort.Stable(transformResultSlice)
+		transformResultSlice[resultInfo.Index] = resultInfo
 	}
 
 	for _, transformResult := range transformResultSlice {
@@ -235,7 +231,7 @@ func (s *Sub) Transform(datas []Data) ([]Data, error) {
 		datas[transformResult.Index] = transformResult.CurData
 	}
 
-	s.stats, fmtErr = transforms.SetStatsInfo(err, s.stats, int64(errNum), int64(len(datas)), s.Type())
+	s.stats, fmtErr = transforms.SetStatsInfo(err, s.stats, int64(errNum), int64(dataLen), s.Type())
 	return datas, fmtErr
 }
 
@@ -245,14 +241,14 @@ func init() {
 	})
 }
 
-func (s *Sub) transform(dataPipline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+func (s *Sub) transform(dataPipeline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
 	var (
 		err    error
 		errNum int
 		sLen   int
 		newVal string
 	)
-	for transformInfo := range dataPipline {
+	for transformInfo := range dataPipeline {
 		err = nil
 		errNum = 0
 		val, getErr := GetMapValue(transformInfo.CurData, s.oldKeys...)
@@ -268,7 +264,7 @@ func (s *Sub) transform(dataPipline <-chan transforms.TransformInfo, resultChan 
 		}
 		strVal, ok := val.(string)
 		if !ok {
-			typeErr := fmt.Errorf("transform key %v data type is not string", s.Key)
+			typeErr := errors.New("transform key " + s.Key + " data type is not string")
 			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
 			resultChan <- transforms.TransformResult{
 				Index:   transformInfo.Index,
@@ -301,7 +297,7 @@ func (s *Sub) transform(dataPipline <-chan transforms.TransformInfo, resultChan 
 	wg.Done()
 }
 
-func (s *Sub) rawtransform(dataPipline <-chan transforms.RawTransformInfo, resultChan chan transforms.RawTransformResult, wg *sync.WaitGroup) {
+func (s *Sub) rawtransform(dataPipeline <-chan transforms.RawTransformInfo, resultChan chan transforms.RawTransformResult, wg *sync.WaitGroup) {
 	var (
 		err    error
 		errNum int
@@ -309,7 +305,7 @@ func (s *Sub) rawtransform(dataPipline <-chan transforms.RawTransformInfo, resul
 		sLen   int
 		newVal string
 	)
-	for transformInfo := range dataPipline {
+	for transformInfo := range dataPipeline {
 		err = nil
 		errNum = 0
 		strVal = transformInfo.CurData

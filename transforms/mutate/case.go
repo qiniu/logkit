@@ -1,8 +1,7 @@
 package mutate
 
 import (
-	"fmt"
-	"sort"
+	"errors"
 	"strings"
 	"sync"
 
@@ -49,10 +48,9 @@ type Case struct {
 	Mode   string `json:"mode"`
 	Key    string `json:"key"`
 	CStage string `json:"stage"`
-	stats  StatsInfo
 
-	keys []string
-
+	stats      StatsInfo
+	keys       []string
 	numRoutine int
 }
 
@@ -96,20 +94,23 @@ func (c *Case) RawTransform(datas []string) ([]string, error) {
 	}
 
 	var (
+		dataLen     = len(datas)
 		err, fmtErr error
 		errNum      int
-	)
-	numRoutine := c.numRoutine
-	if len(datas) < numRoutine {
-		numRoutine = len(datas)
-	}
-	dataPipline := make(chan transforms.RawTransformInfo)
-	resultChan := make(chan transforms.RawTransformResult)
 
-	wg := new(sync.WaitGroup)
+		numRoutine   = c.numRoutine
+		dataPipeline = make(chan transforms.RawTransformInfo)
+		resultChan   = make(chan transforms.RawTransformResult)
+		wg           = new(sync.WaitGroup)
+	)
+
+	if dataLen < numRoutine {
+		numRoutine = dataLen
+	}
+
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
-		go c.rawtransform(dataPipline, resultChan, wg)
+		go c.rawtransform(dataPipeline, resultChan, wg)
 	}
 
 	go func() {
@@ -119,20 +120,17 @@ func (c *Case) RawTransform(datas []string) ([]string, error) {
 
 	go func() {
 		for idx, data := range datas {
-			dataPipline <- transforms.RawTransformInfo{
+			dataPipeline <- transforms.RawTransformInfo{
 				CurData: data,
 				Index:   idx,
 			}
 		}
-		close(dataPipline)
+		close(dataPipeline)
 	}()
 
-	var transformResultSlice = make(transforms.RawTransformResultSlice, 0, len(datas))
+	var transformResultSlice = make(transforms.RawTransformResultSlice, dataLen)
 	for resultInfo := range resultChan {
-		transformResultSlice = append(transformResultSlice, resultInfo)
-	}
-	if numRoutine > 1 {
-		sort.Stable(transformResultSlice)
+		transformResultSlice[resultInfo.Index] = resultInfo
 	}
 
 	for _, transformResult := range transformResultSlice {
@@ -143,7 +141,7 @@ func (c *Case) RawTransform(datas []string) ([]string, error) {
 		datas[transformResult.Index] = transformResult.CurData
 	}
 
-	c.stats, fmtErr = transforms.SetStatsInfo(err, c.stats, int64(errNum), int64(len(datas)), c.Type())
+	c.stats, fmtErr = transforms.SetStatsInfo(err, c.stats, int64(errNum), int64(dataLen), c.Type())
 	return datas, fmtErr
 }
 
@@ -169,20 +167,22 @@ func (c *Case) Transform(datas []Data) ([]Data, error) {
 	}
 
 	var (
+		dataLen     = len(datas)
 		err, fmtErr error
 		errNum      int
-	)
-	numRoutine := c.numRoutine
-	if len(datas) < numRoutine {
-		numRoutine = len(datas)
-	}
-	dataPipline := make(chan transforms.TransformInfo)
-	resultChan := make(chan transforms.TransformResult)
 
-	wg := new(sync.WaitGroup)
+		numRoutine   = c.numRoutine
+		dataPipeline = make(chan transforms.TransformInfo)
+		resultChan   = make(chan transforms.TransformResult)
+		wg           = new(sync.WaitGroup)
+	)
+	if dataLen < numRoutine {
+		numRoutine = dataLen
+	}
+
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
-		go c.transform(dataPipline, resultChan, wg)
+		go c.transform(dataPipeline, resultChan, wg)
 	}
 
 	go func() {
@@ -192,20 +192,17 @@ func (c *Case) Transform(datas []Data) ([]Data, error) {
 
 	go func() {
 		for idx, data := range datas {
-			dataPipline <- transforms.TransformInfo{
+			dataPipeline <- transforms.TransformInfo{
 				CurData: data,
 				Index:   idx,
 			}
 		}
-		close(dataPipline)
+		close(dataPipeline)
 	}()
 
-	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
+	var transformResultSlice = make(transforms.TransformResultSlice, dataLen)
 	for resultInfo := range resultChan {
-		transformResultSlice = append(transformResultSlice, resultInfo)
-	}
-	if numRoutine > 1 {
-		sort.Stable(transformResultSlice)
+		transformResultSlice[resultInfo.Index] = resultInfo
 	}
 
 	for _, transformResult := range transformResultSlice {
@@ -216,7 +213,7 @@ func (c *Case) Transform(datas []Data) ([]Data, error) {
 		datas[transformResult.Index] = transformResult.CurData
 	}
 
-	c.stats, fmtErr = transforms.SetStatsInfo(err, c.stats, int64(errNum), int64(len(datas)), c.Type())
+	c.stats, fmtErr = transforms.SetStatsInfo(err, c.stats, int64(errNum), int64(dataLen), c.Type())
 	return datas, fmtErr
 }
 
@@ -226,12 +223,12 @@ func init() {
 	})
 }
 
-func (c *Case) transform(dataPipline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+func (c *Case) transform(dataPipeline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
 	var (
 		err    error
 		errNum int
 	)
-	for transformInfo := range dataPipline {
+	for transformInfo := range dataPipeline {
 		err = nil
 		errNum = 0
 
@@ -248,7 +245,7 @@ func (c *Case) transform(dataPipline <-chan transforms.TransformInfo, resultChan
 		}
 		strVal, ok := val.(string)
 		if !ok {
-			typeErr := fmt.Errorf("transform key %v data type is not string", c.Key)
+			typeErr := errors.New("transform key " + c.Key + " data type is not string")
 			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
 			resultChan <- transforms.TransformResult{
 				Index:   transformInfo.Index,
@@ -266,7 +263,7 @@ func (c *Case) transform(dataPipline <-chan transforms.TransformInfo, resultChan
 			newVal = strings.ToLower(strVal)
 		default:
 			newVal = strVal
-			errNum, err = transforms.SetError(errNum, fmt.Errorf("case transformer not support this mode[%s]", c.Mode), transforms.General, "")
+			errNum, err = transforms.SetError(errNum, errors.New("case transformer not support this mode["+c.Mode+"]"), transforms.General, "")
 		}
 		setErr := SetMapValue(transformInfo.CurData, newVal, false, c.keys...)
 		if setErr != nil {
@@ -283,12 +280,12 @@ func (c *Case) transform(dataPipline <-chan transforms.TransformInfo, resultChan
 	wg.Done()
 }
 
-func (c *Case) rawtransform(dataPipline <-chan transforms.RawTransformInfo, resultChan chan transforms.RawTransformResult, wg *sync.WaitGroup) {
+func (c *Case) rawtransform(dataPipeline <-chan transforms.RawTransformInfo, resultChan chan transforms.RawTransformResult, wg *sync.WaitGroup) {
 	var (
 		err    error
 		errNum int
 	)
-	for transformInfo := range dataPipline {
+	for transformInfo := range dataPipeline {
 		err = nil
 		errNum = 0
 		strVal := transformInfo.CurData
@@ -300,7 +297,7 @@ func (c *Case) rawtransform(dataPipline <-chan transforms.RawTransformInfo, resu
 			newVal = strings.ToLower(strVal)
 		default:
 			newVal = strVal
-			errNum, err = transforms.SetError(errNum, fmt.Errorf("case transformer not support this mode[%s]", c.Mode), transforms.General, "")
+			errNum, err = transforms.SetError(errNum, errors.New("case transformer not support this mode["+c.Mode+"]"), transforms.General, "")
 		}
 		transformInfo.CurData = newVal
 
