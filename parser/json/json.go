@@ -67,16 +67,20 @@ func (p *Parser) Type() string {
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
 	log.Info("YYYYYYYYYYYYy!!!!!!!!!!!!!", p.Name(), "now datas: ", lines)
-	datas := make([]Data, 0, len(lines))
-	se := &StatsError{}
-	numRoutine := p.numRoutine
-	if len(lines) < numRoutine {
-		numRoutine = len(lines)
+	var (
+		lineLen    = len(lines)
+		datas      = make([]Data, lineLen)
+		se         = &StatsError{}
+		numRoutine = p.numRoutine
+
+		sendChan   = make(chan parser.ParseInfo)
+		resultChan = make(chan parser.ParseResult)
+		wg         = new(sync.WaitGroup)
+	)
+	if lineLen < numRoutine {
+		numRoutine = lineLen
 	}
-	sendChan := make(chan parser.ParseInfo)
-	resultChan := make(chan parser.ParseResult)
-	log.Info("YYYYYYYYYYYYy!!!!!!!!!!!!!", p.Name(), "now datas: ", numRoutine)
-	wg := new(sync.WaitGroup)
+
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
 		go parser.ParseLineDataSlice(sendChan, resultChan, wg, true, p.parse)
@@ -97,7 +101,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		}
 		close(sendChan)
 	}()
-	var parseResultSlice = make(parser.ParseResultSlice, 0, len(lines))
+	var parseResultSlice = make(parser.ParseResultSlice, lineLen)
 	for resultInfo := range resultChan {
 		parseResultSlice = append(parseResultSlice, resultInfo)
 	}
