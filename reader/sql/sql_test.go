@@ -1473,7 +1473,7 @@ type CronInfo struct {
 
 var (
 	dbSource   = "root:@tcp(127.0.0.1:3306)"
-	pgDbSource = "host=127.0.0.1 port=5432 connect_timeout=10 user=postgres password=lyt  sslmode=disable"
+	pgDbSource = "host=127.0.0.1 port=5432 connect_timeout=10 user=test password=lyt  sslmode=disable"
 	connectStr = dbSource + "/?charset=gbk"
 	now        = time.Now()
 	year       = getDateStr(now.Year())
@@ -2127,6 +2127,9 @@ func TestPostgresWithOffset(t *testing.T) {
 	if err := preparePostgres(1); err != nil {
 		t.Fatalf("prepare postgres database failed: %v", err)
 	}
+	tm1, _ := time.Parse(time.RFC3339, "2017-09-04T11:26:17Z")
+	tm2, _ := time.Parse(time.RFC3339, "2018-03-20T11:22:17Z")
+	tm3, _ := time.Parse(time.RFC3339, "2018-10-10T11:23:17Z")
 	expectDatas := []Data{
 		{
 			"id":          int64(1),
@@ -2134,7 +2137,7 @@ func TestPostgresWithOffset(t *testing.T) {
 			"age":         int64(0),
 			"salary":      5000.2998046875,
 			"delete":      true,
-			"create_time": "2017-09-04T11:26:17Z",
+			"create_time": tm1,
 		},
 		{
 			"id":          int64(2),
@@ -2142,7 +2145,7 @@ func TestPostgresWithOffset(t *testing.T) {
 			"age":         int64(28),
 			"salary":      float64(0),
 			"delete":      false,
-			"create_time": "2018-03-20T11:22:17Z",
+			"create_time": tm2,
 		},
 		{
 			"id":          int64(3),
@@ -2150,7 +2153,7 @@ func TestPostgresWithOffset(t *testing.T) {
 			"age":         int64(28),
 			"salary":      5000.5,
 			"delete":      false,
-			"create_time": "2018-10-10T11:23:17Z",
+			"create_time": tm3,
 		},
 	}
 

@@ -52,10 +52,10 @@ var (
 	host         = flag.String("h", "127.0.0.1", "specify database host")
 	port         = flag.String("p", "5432", "specify database port")
 	databaseType = flag.String("t", "postgres", "specify database type mysql or postgres")
-	database     = flag.String("db", "testdb", "specify database name")
-	username     = flag.String("u", "postgres", "database username")
+	database     = flag.String("db", "testdb2", "specify database name")
+	username     = flag.String("u", "test", "database username")
 	password     = flag.String("password", "", "database password")
-	table        = flag.String("table", "test", "database table name")
+	table        = flag.String("table", "test5", "database table name")
 )
 
 func usageExit(rc int) {
@@ -82,6 +82,8 @@ func main() {
 	case "postgres":
 		fmt.Println("Start to generate data to ", *host, *port, *username, *database, *table)
 		generatePostgresData(*host, *port, *username, *password, *database, *table)
+	default:
+		fmt.Println("no db type choosed, exit...")
 	}
 }
 
@@ -124,22 +126,32 @@ func generatePostgresData(host, port, username, password, database, table string
 	}
 	defer db.Close()
 
-	_, err = db.Exec(`CREATE TABLE ` + table + ` (id int4,email varchar, city varchar, useragent varchar,age int4,salary float4,delete  bool,create_time timestamp(6))WITH (OIDS=FALSE);`)
+	_, err = db.Exec(`CREATE TABLE ` + table + ` (id int4,realtm varchar,email varchar, city varchar, useragent varchar,age int4,salary float4,delete  bool,create_time timestamp(6))WITH (OIDS=FALSE);`)
 	if err != nil && !strings.Contains(err.Error(), "already exists") {
 		log.Error(err)
 		return
 	}
 	datanum := 1
+	ii := 0
+	tm := time.Date(2018, 11, 1, 0, 0, 0, 0, time.Local)
 	for {
-		dt := `INSERT INTO ` + table + ` VALUES ('` + strconv.Itoa(datanum) + `', '` + randomdata.Email() + `', '` + randomdata.City() + `','` + randomdata.UserAgentString() + `', ` + strconv.Itoa(rand.Intn(100)) + `, '` + strconv.FormatFloat(rand.Float64(), 'f', -1, 64) + `', 't', '` + time.Unix(int64(149999999+datanum), 0).Format("2006-01-02 15:04:05") + `');`
+		dt := `INSERT INTO ` + table + ` VALUES ('` + strconv.Itoa(datanum) + `', '` + time.Now().Format(time.RFC3339Nano) + `', '` + randomdata.Email() + `', '` + randomdata.City() + `','` + randomdata.UserAgentString() + `', ` + strconv.Itoa(rand.Intn(100)) + `, '` + strconv.FormatFloat(rand.Float64(), 'f', -1, 64) + `', 't', '` + tm.Format("2006-01-02 15:04:05") + `');`
 		_, err = db.Exec(dt)
 		if err != nil {
 			log.Error(err)
 			return
 		}
-		if datanum%100 == 0 {
+		ii++
+		if datanum%10000 == 0 {
 			fmt.Println(datanum, " of data inserted")
+			if ii%2 == 0 {
+				tm = tm.Add(30 * time.Minute)
+			}
+		}
+		if datanum == 1000000 {
+			break
 		}
 		datanum++
 	}
+	fmt.Println(datanum, " finish inserted")
 }

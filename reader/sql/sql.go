@@ -87,6 +87,7 @@ func init() {
 type readInfo struct {
 	data  Data
 	bytes int64
+	json  string //排序去重时使用，其他时候无用
 }
 
 type Reader struct {
@@ -118,18 +119,18 @@ type Reader struct {
 	rawTable    string // 记录原始数据库表名
 	table       string // 数据库表名
 
-	isLoop        bool
-	loopDuration  time.Duration
-	cronSchedule  bool //是否为定时任务
-	execOnStart   bool
-	Cron          *cron.Cron //定时任务
-	readBatch     int        // 每次读取的数据量
-	offsetKey     string
-	timestampKey  string
-	startTime     time.Time
-	datacnt       int64
-	lastData      Data
-	batchDuration time.Duration
+	isLoop               bool
+	loopDuration         time.Duration
+	cronSchedule         bool //是否为定时任务
+	execOnStart          bool
+	Cron                 *cron.Cron //定时任务
+	readBatch            int        // 每次读取的数据量
+	offsetKey            string
+	timestampKey         string
+	startTime            time.Time
+	datacnt              int64
+	lastDataForTimestamp string
+	batchDuration        time.Duration
 
 	encoder           string  // 解码方式
 	offsets           []int64 // 当前处理文件的sql的offset
@@ -1171,17 +1172,29 @@ func (r *Reader) execReadDB(curDB string, now time.Time, recordTablesDone TableR
 	}
 	return nil
 }
-func RestoreTimestmapOffset(doneFilePath string) (time.Time, error) {
+func RestoreTimestmapOffset(doneFilePath string) (time.Time, string, error) {
 	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, TimestampRecordsFile)
 	filePath := filepath.Join(doneFilePath, filename)
 	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, "", err
 	}
-	return time.Parse(time.RFC3339Nano, string(data))
+	values := strings.SplitN(string(data), "$-$", 2)
+	if len(values) < 1 {
+		return time.Time{}, "", err
+	}
+	tm, err := time.Parse(time.RFC3339Nano, values[0])
+	if err != nil {
+		return tm, "", err
+	}
+	var lastdata string
+	if len(values) > 1 {
+		lastdata = values[1]
+	}
+	return tm, lastdata, err
 }
 
-func WriteTimestmapOffset(doneFilePath, content string) (err error) {
+func WriteTimestmapOffset(doneFilePath, content, lastdata string) (err error) {
 	var f *os.File
 	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, TimestampRecordsFile)
 	filePath := filepath.Join(doneFilePath, filename)
@@ -1191,7 +1204,7 @@ func WriteTimestmapOffset(doneFilePath, content string) (err error) {
 		return err
 	}
 	defer f.Close()
-	_, err = f.Write([]byte(content))
+	_, err = f.Write([]byte(content + "$-$" + lastdata))
 	if err != nil {
 		return err
 	}
@@ -1501,6 +1514,34 @@ func (r *Reader) getSQL(idx int, rawSQL string) (sql string, err error) {
 	return sql, err
 }
 
+//这个query只有一行
+func queryNumber(tsql string, db *sql.DB) (int64, error) {
+	rows, err := db.Query(tsql)
+	if err != nil {
+		log.Error(err)
+		return 0, err
+	}
+	defer rows.Close()
+	var scanArgs = []interface{}{new(interface{})}
+	for rows.Next() {
+		err = rows.Scan(scanArgs...)
+		if err != nil {
+			log.Error(err)
+			return 0, err
+		}
+		if len(scanArgs) < 1 {
+			return 0, errors.New("no data found")
+		}
+
+		number, err := convertLong(scanArgs[0])
+		if err != nil {
+			log.Error(err)
+		}
+		return number, nil
+	}
+	return 0, errors.New("no data found")
+}
+
 func (r *Reader) checkExit(idx int, db *sql.DB) (bool, int64) {
 	if len(r.offsetKey) <= 0 && len(r.timestampKey) <= 0 {
 		return true, -1
@@ -1516,8 +1557,24 @@ func (r *Reader) checkExit(idx int, db *sql.DB) (bool, int64) {
 			if ix < 0 {
 				return true, -1
 			}
+			/* 是否要更新时间，取决于两点
+			1. 原来那一刻到现在为止是否有新增数据
+			2. 原来那一刻是否有新数据
+			如果第一点满足，就不能退出
+			如果第二点满足，就不能移动时间
+			否则要移动时间，不然就死循环了
+			*/
 			rawSQL = rawSQL[ix:]
-			tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v between '%s' and '%s';", r.timestampKey, r.timestampKey, rawSQL, r.timestampKey, r.startTime.Add(time.Microsecond).Format(postgresTimeFormat), time.Now().Format(postgresTimeFormat))
+
+			//获得最新时间戳到当前时间的数据量
+			tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v > '%s';", rawSQL, r.timestampKey, r.startTime.Format(postgresTimeFormat))
+			//-- 比较有没有比之前的数量大，如果没有变大就退出
+			//如果变大，继续判断当前这个重复的时间有没有数据
+			tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v = '%s';", rawSQL, r.timestampKey, r.startTime.Format(postgresTimeFormat))
+
+			//此处如果发现同样的时间戳数据没有变，那么说明是新的时间产生的数据，时间戳要更新了
+			//获得最小的时间戳
+			tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v > '%s';", r.timestampKey, r.timestampKey, rawSQL, r.timestampKey, r.startTime.Format(postgresTimeFormat))
 		} else {
 			ix := strings.Index(rawSQL, "from")
 			if ix < 0 {
@@ -1534,6 +1591,7 @@ func (r *Reader) checkExit(idx int, db *sql.DB) (bool, int64) {
 		rawSQL = rawSQL[ix:]
 		tsql = fmt.Sprintf("select top(1) * %v WHERE CAST(%v AS BIGINT) >= %v order by CAST(%v AS BIGINT);", rawSQL, r.offsetKey, r.offsets[idx], r.offsetKey)
 	}
+	log.Info("query <", tsql, "> to check exit")
 	rows, err := db.Query(tsql)
 	if err != nil {
 		log.Error(err)
@@ -2082,7 +2140,7 @@ func (r *Reader) getAllDatas(rows *sql.Rows, scanArgs []interface{}, columns []s
 			log.Warnf("Runner[%v] %v stopped from running", r.meta.RunnerName, r.Name())
 			return nil, true
 		}
-		datas = append(datas, readInfo{data, totalBytes})
+		datas = append(datas, readInfo{data: data, bytes: totalBytes})
 	}
 	return datas, false
 }
@@ -2102,15 +2160,24 @@ func (r *Reader) updateStartTimeFromData(data Data) {
 	if !ok {
 		return
 	}
-	r.startTime = timeData
-
+	if timeData.After(r.startTime) {
+		log.Println("FindNew time", ok, timeData.String())
+		r.startTime = timeData
+	}
 }
+
 func (r *Reader) updateStartTime(offsetKeyIndex int, scanArgs []interface{}) bool {
 	timeData, ok := r.getTimeFromArgs(offsetKeyIndex, scanArgs)
 	if ok && timeData.After(r.startTime) {
-		r.startTime = timeData
+		log.Println("FindNew time", ok, timeData.String())
+		//如果凑巧是与多一微秒的取值相同的，那么就改回来，因为在查找是否有新数据时，为了不死循环，加了1微妙取数据的。
+		//当然实际上也可以加一个判断，通过对比原来那一刻的时间数据量是否有变化来作为依据要不要时间前移，但是相对比较复杂。
+		if !r.startTime.Add(time.Microsecond).Equal(timeData) {
+			r.startTime = timeData
+		}
 		return true
 	}
+	log.Println("XXXXXXX checkexit time", ok, timeData.String(), offsetKeyIndex, scanArgs)
 	return false
 }
 
@@ -2126,37 +2193,48 @@ func (r *Reader) checkTime(offsetKeyIndex int, scanArgs []interface{}) bool {
 	return false
 }
 
-func (r *Reader) trimeExistData(datas []readInfo) int {
+func (r *Reader) trimeExistData(datas []readInfo) []readInfo {
 	if len(r.timestampKey) <= 0 || len(datas) < 1 {
-		return 0
+		return datas
 	}
+	datas, failed := sortByJson(datas)
+	if failed {
+		return datas
+	}
+	//r.printalltime(datas)
 	//检验最后一个数据的时间
 	lastData := datas[len(datas)-1]
 	lastTime, ok := r.getTimeFromData(lastData.data)
 	if !ok {
 		//如果数据的时间类型都不对，那么就全部都读
-		return 0
+		return datas
 	}
-	if lastTime.Equal(r.startTime) && reflect.DeepEqual(lastData, r.lastData) {
+	fmt.Println("`````````````", r.startTime.String(), lastTime.String())
+	if lastTime.Equal(r.startTime) && (lastData.json == r.lastDataForTimestamp) {
 		//如果最后的时间戳和数据都完全一样，表明这次拿到的就是重复的数据，一个数据都不要
-		return len(datas)
+		log.Info("all data are equal with lastData: ", r.lastDataForTimestamp)
+		return []readInfo{}
 	}
 	//其他情况下就要找到那个开始的点，逐一对比，找到上次拿到的最后数据
 	for idx, v := range datas {
 		tm, ok := r.getTimeFromData(v.data)
 		if !ok {
 			//如果出现了数据中没有时间的，实际上已经不合法了，那么就把数据全取出来算了，以便暴露问题
-			return idx
+			return datas[idx:]
 		}
 		if tm.After(r.startTime) {
 			//找到的最早的数据都是比当前时间还要新的，那么就直接全取了
-			return idx
+			return datas[idx:]
 		}
-		if tm.Equal(r.startTime) && reflect.DeepEqual(v.data, r.lastData) {
-			return idx + 1
+		if tm.Equal(r.startTime) {
+			if v.json == r.lastDataForTimestamp {
+				return datas[idx+1:]
+			}
 		}
 	}
-	return len(datas)
+	//时间都相同，没找到一样的数据，全取
+	fmt.Println("````````````` no same data find, get all data,last data is ", r.lastDataForTimestamp)
+	return datas
 }
 
 // 执行每条 sql 语句
@@ -2212,8 +2290,9 @@ func (r *Reader) execReadSql(connectStr, curDB string, idx int, rawSql string, t
 	if closed {
 		return exit, isRawSql, readSize, nil
 	}
-	idx1 := r.trimeExistData(alldatas)
-	alldatas = alldatas[idx1:]
+	total := len(alldatas)
+	alldatas = r.trimeExistData(alldatas)
+	log.Info("``````````````````after trimed index is: ", len(alldatas), " total data is", total)
 	// Fetch rows
 	var maxOffset int64 = -1
 	for _, v := range alldatas {
@@ -2226,6 +2305,7 @@ func (r *Reader) execReadSql(connectStr, curDB string, idx int, rawSql string, t
 			continue
 		}
 		if len(r.timestampKey) > 0 {
+			r.lastDataForTimestamp = v.json
 			r.updateStartTimeFromData(v.data)
 		} else {
 			maxOffset = r.updateOffset(idx, offsetKeyIndex, maxOffset, scanArgs)
@@ -2284,6 +2364,8 @@ func (r *Reader) getTimeFromArgs(offsetKeyIndex int, scanArgs []interface{}) (ti
 			return timeData, true
 		case *time.Time:
 			return *timeData, true
+		//case nil:
+		//	return time.Time{}, false
 		default:
 			log.Errorf("updateStartTime failed as %v(%T) is not time.Time", data, data)
 		}
