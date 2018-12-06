@@ -496,7 +496,7 @@ func Test_RunForErrData(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	assert.Equal(t, 5, len(dts), "got sender data not match")
+	assert.Equal(t, 4, len(dts), "got sender data not match")
 	for idx, dt := range dts {
 		if _, ok := dt[KeyPandoraStash]; ok {
 			if dt["testtag"] == nil {
@@ -1479,7 +1479,7 @@ func TestRunWithDataSource(t *testing.T) {
 
 	config1 := `{
 			"name":"TestRunWithDataSource",
-			"batch_len":5,
+			"batch_len":3,
 			"reader":{
 				"mode":"file",
 				"meta_path":"./TestRunWithDataSource/meta",
@@ -1519,14 +1519,6 @@ func TestRunWithDataSource(t *testing.T) {
 		},
 		{
 			"raw":        "b\n",
-			"datasource": logPath,
-		},
-		{
-			"raw":        "\n",
-			"datasource": logPath,
-		},
-		{
-			"raw":        "\n",
 			"datasource": logPath,
 		},
 		{

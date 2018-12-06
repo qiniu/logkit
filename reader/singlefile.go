@@ -40,7 +40,6 @@ func NewSingleFile(meta *Meta, path, whence string, errDirectReturn bool) (sf *S
 	var pfi os.FileInfo
 	var f *os.File
 	originpath := path
-
 	for {
 		path, pfi, err = GetRealPath(path)
 		if err != nil || pfi == nil {
