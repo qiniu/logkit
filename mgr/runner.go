@@ -1265,7 +1265,10 @@ func restoreErrorStatisic(sts ErrorStatistic) *equeue.ErrorQueue {
 		}
 		return q
 	}
-
+	//根本没错误
+	if len(sts.ErrorSlice) <= 0 {
+		return q
+	}
 	//到这里说明队列已经满了，那么循环队列大小次数，获得所有值
 	idx := sts.Front
 	for i := 0; i < maxSize; i++ {
