@@ -172,7 +172,7 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 	}
 	runner.meta = meta
 	if cleaner == nil {
-		log.Warnf("%v's cleaner was disabled", info.RunnerName)
+		log.Debugf("%v's cleaner was disabled", info.RunnerName)
 	}
 	runner.cleaner = cleaner
 	if parser == nil {
@@ -610,7 +610,7 @@ func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []str
 	for !r.batchFullOrTimeout() {
 		line, err = r.reader.ReadLine()
 		if os.IsNotExist(err) {
-			log.Errorf("Runner[%v] reader %s - error: %v, sleep 3 second...", r.Name(), r.reader.Name(), err)
+			log.Debugf("Runner[%v] reader %s - error: %v, sleep 3 second...", r.Name(), r.reader.Name(), err)
 			time.Sleep(3 * time.Second)
 			break
 		}
@@ -622,6 +622,9 @@ func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []str
 		if len(line) <= 0 {
 			log.Debugf("Runner[%v] reader %s no more content fetched sleep 1 second...", r.Name(), r.reader.Name())
 			time.Sleep(1 * time.Second)
+			continue
+		}
+		if strings.TrimSpace(line) == "" {
 			continue
 		}
 
@@ -673,7 +676,6 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 			return nil
 		}
 	}
-
 	// parse data
 	var numErrs int64
 	datas, err := r.parser.Parse(lines)
@@ -812,7 +814,9 @@ func (r *LogExportRunner) Run() {
 		}
 
 		tags := r.meta.GetTags()
-		tags = MergeEnvTags(r.EnvTag, tags)
+		if r.ExtraInfo {
+			tags = MergeEnvTags(r.EnvTag, tags)
+		}
 		tags = MergeExtraInfoTags(r.meta, tags)
 		if len(tags) > 0 {
 			datas = addTagsToData(tags, datas, r.Name())
@@ -1262,7 +1266,10 @@ func restoreErrorStatisic(sts ErrorStatistic) *equeue.ErrorQueue {
 		}
 		return q
 	}
-
+	//根本没错误
+	if len(sts.ErrorSlice) <= 0 {
+		return q
+	}
 	//到这里说明队列已经满了，那么循环队列大小次数，获得所有值
 	idx := sts.Front
 	for i := 0; i < maxSize; i++ {
@@ -1419,9 +1426,6 @@ func (r *LogExportRunner) StatusBackup() {
 	err := r.meta.WriteStatistic(bStart)
 	if err != nil {
 		log.Warnf("runner %v, backup status failed", r.RunnerName)
-	} else {
-		log.Infof("runner %v, backup read count: %v, parse count: %v, send count: %v", r.RunnerName,
-			bStart.ReaderCnt, bStart.ParserCnt, bStart.SenderCnt)
 	}
 }
 

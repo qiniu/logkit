@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -232,7 +231,13 @@ func isJsonMap(f string) bool {
 	return strings.HasPrefix(rawfield, string(TypeJSONMap))
 }
 
-func parseSchemaFields(fieldList []string) (fields []field, err error) {
+func parseSchemaFields(fieldList []string) ([]field, error) {
+	var (
+		fields     = make([]field, len(fieldList))
+		fieldIndex = 0
+		err        error
+	)
+
 	for _, f := range fieldList {
 		f = strings.TrimSpace(f)
 		fi := field{}
@@ -245,28 +250,28 @@ func parseSchemaFields(fieldList []string) (fields []field, err error) {
 			fi, err = parseSchemaRawField(f)
 		}
 		if err != nil {
-			return
+			return nil, err
 		}
-		fields = append(fields, fi)
+		fields[fieldIndex] = fi
+		fieldIndex++
 	}
-	return
+	return fields[:fieldIndex], nil
 }
 
 func dataTypeNotSupperted(dataType DataType) error {
 	return errors.New("type not supported " + string(dataType) + " csv parser currently support string long float date jsonmap 5 types")
 }
 
-func newCsvField(name string, dataType DataType) (f field, err error) {
+func newCsvField(name string, dataType DataType) (field, error) {
 	switch dataType {
 	case TypeFloat, TypeLong, TypeString, TypeDate:
-		f = field{
+		return field{
 			name:     name,
 			dataType: dataType,
-		}
+		}, nil
 	default:
-		err = dataTypeNotSupperted(dataType)
+		return field{}, dataTypeNotSupperted(dataType)
 	}
-	return
 }
 
 func (f field) MakeValue(raw string, timeZoneOffset int) (interface{}, error) {
@@ -302,10 +307,10 @@ func makeValue(raw string, valueType DataType, timeZoneOffset int) (interface{},
 	}
 }
 
-func checkValue(v interface{}) (f interface{}, err error) {
+func checkValue(v interface{}) (interface{}, error) {
 	switch x := v.(type) {
 	case int, int64, float64, string:
-		f = x
+		return x, nil
 	default:
 		vtype := reflect.TypeOf(v)
 		if vtype != nil {
@@ -313,18 +318,17 @@ func checkValue(v interface{}) (f interface{}, err error) {
 		}
 		return nil, dataTypeNotSupperted(DataType("null"))
 	}
-	return
 }
 
-func convertValue(v interface{}, valueType DataType) (ret interface{}, err error) {
+func convertValue(v interface{}, valueType DataType) (interface{}, error) {
 	value := fmt.Sprintf("%v", v)
 	switch valueType {
 	case TypeFloat:
-		ret, err = strconv.ParseFloat(value, 64)
+		return strconv.ParseFloat(value, 64)
 	case TypeLong:
-		ret, err = strconv.ParseInt(value, 10, 64)
+		return strconv.ParseInt(value, 10, 64)
 	case TypeString:
-		ret = value
+		return value, nil
 	default:
 		vtype := reflect.TypeOf(v)
 		if vtype != nil {
@@ -332,23 +336,21 @@ func convertValue(v interface{}, valueType DataType) (ret interface{}, err error
 		}
 		return nil, dataTypeNotSupperted(DataType("null"))
 	}
-	return
 }
 
-func (f field) ValueParse(value string, timeZoneOffset int) (datas Data, err error) {
+func (f field) ValueParse(value string, timeZoneOffset int) (Data, error) {
 	if f.dataType != TypeString {
 		value = strings.TrimSpace(value)
 	}
-	datas = Data{}
+	datas := Data{}
 	switch f.dataType {
 	case TypeJSONMap:
 		if value == "" {
-			return
+			return Data{}, nil
 		}
 		m := make(map[string]interface{})
-		if err = jsontool.Unmarshal([]byte(value), &m); err != nil {
-			err = fmt.Errorf("unmarshal json map type error: %v", err)
-			return
+		if err := jsontool.Unmarshal([]byte(value), &m); err != nil {
+			return Data{}, errors.New("unmarshal json map type error: " + err.Error())
 		}
 		for k, v := range m {
 			if v == nil {
@@ -375,11 +377,11 @@ func (f field) ValueParse(value string, timeZoneOffset int) (datas Data, err err
 	default:
 		v, err := f.MakeValue(value, timeZoneOffset)
 		if err != nil {
-			return nil, err
+			return Data{}, err
 		}
 		datas[f.name] = v
 	}
-	return
+	return datas, nil
 }
 
 func (p *Parser) Name() string {
@@ -456,9 +458,9 @@ func (p *Parser) parse(line string) (d Data, err error) {
 }
 
 func Rename(datas []Data) []Data {
-	newData := make([]Data, 0)
-	for _, d := range datas {
-		newData = append(newData, RenameData(d))
+	newData := make([]Data, len(datas))
+	for idx, d := range datas {
+		newData[idx] = RenameData(d)
 	}
 	return newData
 }
@@ -483,17 +485,19 @@ func HasSpace(spliter string) bool {
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
 	var (
-		datas = make([]Data, 0, len(lines))
-		se    = &StatsError{}
-	)
-	numRoutine := p.numRoutine
-	if len(lines) < numRoutine {
-		numRoutine = len(lines)
-	}
-	sendChan := make(chan parser.ParseInfo)
-	resultChan := make(chan parser.ParseResult)
+		lineLen    = len(lines)
+		datas      = make([]Data, lineLen)
+		se         = &StatsError{}
+		numRoutine = p.numRoutine
 
-	wg := new(sync.WaitGroup)
+		sendChan   = make(chan parser.ParseInfo)
+		resultChan = make(chan parser.ParseResult)
+		wg         = new(sync.WaitGroup)
+	)
+	if lineLen < numRoutine {
+		numRoutine = lineLen
+	}
+
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
 		go parser.ParseLine(sendChan, resultChan, wg, !HasSpace(p.delim), p.parse)
@@ -514,17 +518,18 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		close(sendChan)
 	}()
 
-	var parseResultSlice = make(parser.ParseResultSlice, 0, len(lines))
+	var parseResultSlice = make(parser.ParseResultSlice, lineLen)
 	for resultInfo := range resultChan {
-		parseResultSlice = append(parseResultSlice, resultInfo)
-	}
-	if numRoutine > 1 {
-		sort.Stable(parseResultSlice)
+		parseResultSlice[resultInfo.Index] = resultInfo
 	}
 
+	se.DatasourceSkipIndex = make([]int, lineLen)
+	datasourceIndex := 0
+	dataIndex := 0
 	for _, parseResult := range parseResultSlice {
 		if len(parseResult.Line) == 0 {
-			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
+			se.DatasourceSkipIndex[datasourceIndex] = parseResult.Index
+			datasourceIndex++
 			continue
 		}
 
@@ -535,18 +540,20 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 			if !p.disableRecordErrData {
 				errData[KeyPandoraStash] = parseResult.Line
 			} else if !p.keepRawData {
-				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
+				se.DatasourceSkipIndex[datasourceIndex] = parseResult.Index
+				datasourceIndex++
 			}
 			if p.keepRawData {
 				errData[KeyRawData] = parseResult.Line
 			}
 			if !p.disableRecordErrData || p.keepRawData {
-				datas = append(datas, errData)
+				datas[dataIndex] = errData
+				dataIndex++
 			}
 			continue
 		}
 		if len(parseResult.Data) < 1 { //数据为空时不发送
-			se.LastError = fmt.Sprintf("parsed no data by line [%s]", parseResult.Line)
+			se.LastError = "parsed no data by line " + parseResult.Line
 			se.AddErrors()
 			continue
 		}
@@ -554,9 +561,12 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		if p.keepRawData {
 			parseResult.Data[KeyRawData] = parseResult.Line
 		}
-		datas = append(datas, parseResult.Data)
+		datas[dataIndex] = parseResult.Data
+		dataIndex++
 	}
 
+	se.DatasourceSkipIndex = se.DatasourceSkipIndex[:datasourceIndex]
+	datas = datas[:dataIndex]
 	if se.Errors == 0 {
 		return datas, nil
 	}

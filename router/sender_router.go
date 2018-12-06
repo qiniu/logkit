@@ -51,7 +51,7 @@ func (r *Router) GetSenderIndex(data Data) int {
 func NewSenderRouter(conf RouterConfig, senderCnt int) (*Router, error) {
 	keyName := conf.KeyName
 	if keyName == "" {
-		log.Warnf("route key name is empty, ignored it")
+		log.Debug("route key name is empty, ignored it")
 		return nil, nil
 	}
 	defaultIndex := conf.DefaultIndex

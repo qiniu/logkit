@@ -186,6 +186,8 @@ func clusterUpdateTest(p *testCluParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
+
+	//让他运行一段时间
 	time.Sleep(6 * time.Second)
 
 	// 获取 status , tag = test
