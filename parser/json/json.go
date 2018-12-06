@@ -68,7 +68,7 @@ func (p *Parser) Type() string {
 func (p *Parser) Parse(lines []string) ([]Data, error) {
 	var (
 		lineLen    = len(lines)
-		datas      = make([]Data, lineLen)
+		datas      = make([]Data, 0, lineLen)
 		se         = &StatsError{}
 		numRoutine = p.numRoutine
 
@@ -141,6 +141,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		if p.keepRawData && len(parseResult.Datas) == 1 {
 			parseResult.Datas[0][KeyRawData] = parseResult.Line
 		}
+
 		datas = append(datas, parseResult.Datas...)
 	}
 

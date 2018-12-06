@@ -95,6 +95,7 @@ type LogExportRunner struct {
 	batchSize int64
 	lastSend  time.Time
 	syncInc   int
+	tracker   *utils.Tracker
 }
 
 const defaultSendIntervalSeconds = 60
@@ -157,6 +158,7 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 		},
 		historyError: NewErrorsList(),
 		rsMutex:      new(sync.RWMutex),
+		tracker:      utils.NewTracker(),
 	}
 
 	if reader == nil {
@@ -170,7 +172,7 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 	}
 	runner.meta = meta
 	if cleaner == nil {
-		log.Warnf("%v's cleaner was disabled", info.RunnerName)
+		log.Debugf("%v's cleaner was disabled", info.RunnerName)
 	}
 	runner.cleaner = cleaner
 	if parser == nil {
@@ -608,7 +610,7 @@ func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []str
 	for !r.batchFullOrTimeout() {
 		line, err = r.reader.ReadLine()
 		if os.IsNotExist(err) {
-			log.Errorf("Runner[%v] reader %s - error: %v, sleep 3 second...", r.Name(), r.reader.Name(), err)
+			log.Debugf("Runner[%v] reader %s - error: %v, sleep 3 second...", r.Name(), r.reader.Name(), err)
 			time.Sleep(3 * time.Second)
 			break
 		}
@@ -620,6 +622,9 @@ func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []str
 		if len(line) <= 0 {
 			log.Debugf("Runner[%v] reader %s no more content fetched sleep 1 second...", r.Name(), r.reader.Name())
 			time.Sleep(1 * time.Second)
+			continue
+		}
+		if strings.TrimSpace(line) == "" {
 			continue
 		}
 
@@ -652,7 +657,7 @@ func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []str
 func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 	var err error
 	lines, froms := r.rawReadLines(dataSourceTag)
-
+	r.tracker.Track("finish rawReadLines")
 	for i := range r.transformers {
 		if r.transformers[i].Stage() == transforms.StageBeforeParser {
 			lines, err = r.transformers[i].RawTransform(lines)
@@ -671,10 +676,10 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 			return nil
 		}
 	}
-
 	// parse data
 	var numErrs int64
 	datas, err := r.parser.Parse(lines)
+	r.tracker.Track("finish parse data")
 	se, ok := err.(*StatsError)
 	r.rsMutex.Lock()
 	if ok {
@@ -760,8 +765,10 @@ func (r *LogExportRunner) Run() {
 			}
 			return
 		}
+		r.tracker.Reset()
 		if r.SendRaw {
 			lines, _ := r.rawReadLines(r.meta.GetDataSourceTag())
+			r.tracker.Track("rawReadLines")
 			r.addResetStat()
 			// send data
 			if len(lines) <= 0 {
@@ -777,7 +784,7 @@ func (r *LogExportRunner) Run() {
 					break
 				}
 			}
-
+			r.tracker.Track("finised send")
 			if success && r.SyncEvery > 0 {
 				r.syncInc = (r.syncInc + 1) % r.SyncEvery
 				if r.syncInc == 0 {
@@ -785,6 +792,7 @@ func (r *LogExportRunner) Run() {
 				}
 			}
 			log.Debugf("Runner[%v] send %s finish to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
+			log.Info(r.tracker.Print())
 			continue
 		}
 		// read data
@@ -792,8 +800,10 @@ func (r *LogExportRunner) Run() {
 		var datas []Data
 		if dr, ok := r.reader.(reader.DataReader); ok {
 			datas = r.readDatas(dr, r.meta.GetDataSourceTag())
+			r.tracker.Track("readDatas")
 		} else {
 			datas = r.readLines(r.meta.GetDataSourceTag())
+			r.tracker.Track("finish readLines")
 		}
 		r.addResetStat()
 
@@ -853,6 +863,7 @@ func (r *LogExportRunner) Run() {
 				log.Error(err)
 			}
 		}
+		r.tracker.Track("Transform")
 
 		log.Debugf("Runner[%v] reader %s start to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
 		success := true
@@ -864,6 +875,7 @@ func (r *LogExportRunner) Run() {
 				break
 			}
 		}
+		r.tracker.Track("Send Data")
 
 		if success && r.SyncEvery > 0 {
 			r.syncInc = (r.syncInc + 1) % r.SyncEvery
@@ -872,6 +884,7 @@ func (r *LogExportRunner) Run() {
 			}
 		}
 		log.Debugf("Runner[%v] send %s finish to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
+		log.Debug(r.tracker.Print())
 	}
 }
 
@@ -1253,7 +1266,10 @@ func restoreErrorStatisic(sts ErrorStatistic) *equeue.ErrorQueue {
 		}
 		return q
 	}
-
+	//根本没错误
+	if len(sts.ErrorSlice) <= 0 {
+		return q
+	}
 	//到这里说明队列已经满了，那么循环队列大小次数，获得所有值
 	idx := sts.Front
 	for i := 0; i < maxSize; i++ {
@@ -1410,9 +1426,6 @@ func (r *LogExportRunner) StatusBackup() {
 	err := r.meta.WriteStatistic(bStart)
 	if err != nil {
 		log.Warnf("runner %v, backup status failed", r.RunnerName)
-	} else {
-		log.Infof("runner %v, backup read count: %v, parse count: %v, send count: %v", r.RunnerName,
-			bStart.ReaderCnt, bStart.ParserCnt, bStart.SenderCnt)
 	}
 }
 
