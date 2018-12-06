@@ -172,7 +172,7 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 	}
 	runner.meta = meta
 	if cleaner == nil {
-		log.Warnf("%v's cleaner was disabled", info.RunnerName)
+		log.Debugf("%v's cleaner was disabled", info.RunnerName)
 	}
 	runner.cleaner = cleaner
 	if parser == nil {
@@ -610,7 +610,7 @@ func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []str
 	for !r.batchFullOrTimeout() {
 		line, err = r.reader.ReadLine()
 		if os.IsNotExist(err) {
-			log.Errorf("Runner[%v] reader %s - error: %v, sleep 3 second...", r.Name(), r.reader.Name(), err)
+			log.Debugf("Runner[%v] reader %s - error: %v, sleep 3 second...", r.Name(), r.reader.Name(), err)
 			time.Sleep(3 * time.Second)
 			break
 		}
@@ -1425,9 +1425,6 @@ func (r *LogExportRunner) StatusBackup() {
 	err := r.meta.WriteStatistic(bStart)
 	if err != nil {
 		log.Warnf("runner %v, backup status failed", r.RunnerName)
-	} else {
-		log.Infof("runner %v, backup read count: %v, parse count: %v, send count: %v", r.RunnerName,
-			bStart.ReaderCnt, bStart.ParserCnt, bStart.SenderCnt)
 	}
 }
 

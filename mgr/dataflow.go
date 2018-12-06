@@ -501,7 +501,7 @@ func readLines(rd reader.Reader, size int, timeoutStatus *int32) dataResult {
 	for !batchFullOrTimeout(batchLen, size, timeoutStatus) {
 		line, err = rd.ReadLine()
 		if os.IsNotExist(err) {
-			log.Errorf("data read error: %v", err)
+			log.Debugf("data read error: %v", err)
 			time.Sleep(3 * time.Second)
 			break
 		}
