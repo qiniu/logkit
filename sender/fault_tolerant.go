@@ -501,6 +501,7 @@ func (ft *FtSender) trySendRaws(datas []string, failSleep int, isRetry bool) (ba
 	}
 	err = rawSender.RawSend(datas)
 	dataLen := int64(len(datas))
+	log.Info("YYYYYYYYYYYYy!!!!!!!!!!!!!", ft.runnerName, "now datas: ", datas)
 
 	err = ft.handleStat(err, isRetry, dataLen)
 	if empty := isErrorEmpty(err); empty {
@@ -534,6 +535,7 @@ func (ft *FtSender) trySendDatas(datas []Data, failSleep int, isRetry bool) (bac
 	if datas != nil {
 		dataLen = int64(len(datas))
 	}
+	log.Info("YYYYYYYYYYYYy!!!!!!!!!!!!!", ft.runnerName, "now datas: ", datas)
 
 	err = ft.handleStat(err, isRetry, dataLen)
 	if empty := isErrorEmpty(err); empty {
@@ -567,6 +569,7 @@ func (ft *FtSender) handleStat(err error, isRetry bool, dataLen int64) error {
 		if isRetry {
 			ft.stats.Errors -= dataLen
 		}
+		log.Info("XXXXXXXXXXX!!!!!!!!!!!!!", ft.runnerName, "now success is", ft.stats.Success, " add Success", dataLen)
 		ft.stats.Success += dataLen
 		ft.stats.LastError = ""
 		return nil
@@ -596,6 +599,7 @@ func (ft *FtSender) handleStat(err error, isRetry bool, dataLen int64) error {
 	} else {
 		ft.stats.Errors -= c.Success
 	}
+	log.Info("XXXXXXXXXXX!!!!!!!!!!!!!", ft.runnerName, "now success is", ft.stats.Success, " add Success", c.Success)
 	ft.stats.Success += c.Success
 	ft.stats.LastError = c.SendError.Error()
 	return err

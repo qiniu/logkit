@@ -676,11 +676,12 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 			return nil
 		}
 	}
-
+	log.Info("YYYYYYYYYYYYy!!!!!!!!!!!!!", r.Name(), "now datas: ", lines)
 	// parse data
 	var numErrs int64
 	datas, err := r.parser.Parse(lines)
 	r.tracker.Track("finish parse data")
+	log.Info("YYYYYYYYYYYYy!!!!!!!!!!!!!", r.Name(), "now datas: ", datas)
 	se, ok := err.(*StatsError)
 	r.rsMutex.Lock()
 	if ok {

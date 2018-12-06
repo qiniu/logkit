@@ -66,6 +66,7 @@ func (p *Parser) Type() string {
 }
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
+	log.Info("YYYYYYYYYYYYy!!!!!!!!!!!!!", p.Name(), "now datas: ", lines)
 	datas := make([]Data, 0, len(lines))
 	se := &StatsError{}
 	numRoutine := p.numRoutine
@@ -74,7 +75,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 	}
 	sendChan := make(chan parser.ParseInfo)
 	resultChan := make(chan parser.ParseResult)
-
+	log.Info("YYYYYYYYYYYYy!!!!!!!!!!!!!", p.Name(), "now datas: ", numRoutine)
 	wg := new(sync.WaitGroup)
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
@@ -88,6 +89,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 
 	go func() {
 		for idx, line := range lines {
+			log.Info("YYYYYYYYYYYYy!!!!!!!!!!!!!", p.Name(), "now datas: ", idx, line)
 			sendChan <- parser.ParseInfo{
 				Line:  line,
 				Index: idx,
@@ -108,6 +110,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
 			continue
 		}
+		log.Info("YYYYYYYYYYYYy!!!!!!!!!!!!!", p.Name(), "now datas: ", parseResult)
 
 		if parseResult.Err != nil {
 			se.AddErrors()
@@ -137,6 +140,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		if p.keepRawData && len(parseResult.Datas) == 1 {
 			parseResult.Datas[0][KeyRawData] = parseResult.Line
 		}
+		log.Info("YYYYYYYYYYYYy!!!!!!!!!!!!!", p.Name(), "now datas: ", parseResult)
 		datas = append(datas, parseResult.Datas...)
 	}
 

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	. "github.com/qiniu/logkit/parser/config"
 	. "github.com/qiniu/logkit/utils/models"
@@ -130,6 +131,7 @@ func ParseLineDataSlice(dataPipline <-chan ParseInfo, resultChan chan ParseResul
 		if trimSpace {
 			parseInfo.Line = strings.TrimSpace(parseInfo.Line)
 		}
+		log.Info("YYYYYYYYYYYYy!!!!!!!!!!!!!", "now datas: ", parseInfo)
 		if len(parseInfo.Line) <= 0 {
 			resultChan <- ParseResult{
 				Line:  parseInfo.Line,
