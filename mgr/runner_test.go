@@ -406,7 +406,7 @@ func Test_RunForErrData(t *testing.T) {
 
 	exppath1 := filepath.Join(absLogpath, "log1")
 	exppath3 := filepath.Join(absLogpath, "log3")
-	exppaths := []string{exppath1, exppath1, "", exppath3, exppath3}
+	exppaths := []string{exppath1, exppath1, exppath3, exppath3}
 	rinfo := RunnerInfo{
 		RunnerName:   "test_runner",
 		MaxBatchLen:  1,
@@ -2108,13 +2108,14 @@ func Test_removeServerIPSchema(t *testing.T) {
 // 需要优化
 func BenchmarkStatusRestore(b *testing.B) {
 	logkitConf := conf.MapConf{
-		readerConf.KeyMetaPath: "testmeta",
+		readerConf.KeyMetaPath: "BenchmarkStatusRestore",
 		readerConf.KeyMode:     readerConf.ModeMongo,
 	}
 	meta, err := reader.NewMetaWithConf(logkitConf)
 	if err != nil {
 		b.Fatal(err)
 	}
+	defer os.RemoveAll("BenchmarkStatusRestore")
 	r1 := &LogExportRunner{
 		meta:         meta,
 		rs:           &RunnerStatus{},

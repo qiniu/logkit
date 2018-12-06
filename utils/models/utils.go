@@ -618,7 +618,6 @@ func GetRealPath(path string) (newPath string, fi os.FileInfo, err error) {
 		return
 	}
 	if fi.Mode()&os.ModeSymlink != 0 {
-		log.Infof("%s is symbol link", path)
 		newPath, err = filepath.EvalSymlinks(path)
 		if err != nil {
 			return

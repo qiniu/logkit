@@ -202,7 +202,7 @@ func (d *diskQueue) exit(deleted bool) error {
 	if deleted {
 		log.Warnf("DISKQUEUE(%s): deleting", d.name)
 	} else {
-		log.Warnf("DISKQUEUE(%s): closing", d.name)
+		log.Debugf("DISKQUEUE(%s): closing", d.name)
 	}
 
 	close(d.exitChan)
