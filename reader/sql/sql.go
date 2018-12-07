@@ -40,6 +40,7 @@ const (
 
 	DefaultDoneRecordsFile = "sql.records"
 	TimestampRecordsFile   = "timestamp.records"
+	CacheMapFile           = "cachemap.records"
 
 	postgresTimeFormat = "2006-01-02 15:04:05.000000"
 )
@@ -119,18 +120,18 @@ type Reader struct {
 	rawTable    string // 记录原始数据库表名
 	table       string // 数据库表名
 
-	isLoop               bool
-	loopDuration         time.Duration
-	cronSchedule         bool //是否为定时任务
-	execOnStart          bool
-	Cron                 *cron.Cron //定时任务
-	readBatch            int        // 每次读取的数据量
-	offsetKey            string
-	timestampKey         string
-	startTime            time.Time
-	datacnt              int64
-	lastDataForTimestamp string
-	batchDuration        time.Duration
+	isLoop        bool
+	loopDuration  time.Duration
+	cronSchedule  bool //是否为定时任务
+	execOnStart   bool
+	Cron          *cron.Cron //定时任务
+	readBatch     int        // 每次读取的数据量
+	offsetKey     string
+	timestampKey  string
+	timestampmux  sync.RWMutex
+	startTime     time.Time
+	trimecachemap map[string]string
+	batchDuration time.Duration
 
 	encoder           string  // 解码方式
 	offsets           []int64 // 当前处理文件的sql的offset
@@ -323,9 +324,12 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		r.rawTable = "*"
 	}
 	if r.timestampKey != "" {
-		tm, err := RestoreTimestmapOffset(r.meta.DoneFilePath)
+		tm, cache, err := RestoreTimestmapOffset(r.meta.DoneFilePath)
 		if err == nil {
-			r.startTime = tm.Add(time.Microsecond)
+			r.startTime = tm
+			r.trimecachemap = cache
+		} else {
+			log.Errorf("RestoreTimestmapOffset err %v", err)
 		}
 	}
 
@@ -495,9 +499,14 @@ func (r *Reader) SyncMeta() {
 		return
 	}
 	if r.timestampKey != "" {
+		r.timestampmux.RLock()
 		if err := WriteTimestmapOffset(r.meta.DoneFilePath, r.startTime.Format(time.RFC3339Nano)); err != nil {
-			log.Errorf("Runner[%v] %v SyncMeta error %v", r.meta.RunnerName, r.Name(), err)
+			log.Errorf("Runner[%v] %v SyncMeta WriteTimestmapOffset error %v", r.meta.RunnerName, r.Name(), err)
 		}
+		if err := WriteCacheMap(r.meta.DoneFilePath, r.trimecachemap); err != nil {
+			log.Errorf("Runner[%v] %v SyncMeta WriteCacheMap error %v", r.meta.RunnerName, r.Name(), err)
+		}
+		r.timestampmux.RUnlock()
 	}
 	encodeSQLs := make([]string, 0)
 	for _, sql := range r.syncSQLs {
@@ -1096,7 +1105,7 @@ func (r *Reader) execReadDB(curDB string, now time.Time, recordTablesDone TableR
 		return err
 	}
 
-	log.Infof("Runner[%v] %v prepare %v change database success", r.meta.RunnerName, curDB, r.dbtype)
+	log.Debugf("Runner[%v] %v prepare %v change database success", r.meta.RunnerName, curDB, r.dbtype)
 	r.database = curDB
 
 	//更新sqls
@@ -1120,7 +1129,7 @@ func (r *Reader) execReadDB(curDB string, now time.Time, recordTablesDone TableR
 			r.doneRecords.SetTableRecords(curDB, recordTablesDone)
 		}
 	}
-	log.Infof("Runner[%s] %s get valid tables: %v, recordTablesDone: %v", r.meta.RunnerName, r.Name(), tables, recordTablesDone)
+	log.Debugf("Runner[%s] %s get valid tables: %v, recordTablesDone: %v", r.meta.RunnerName, r.Name(), tables, recordTablesDone)
 
 	var sqlsSlice []string
 	if r.rawSQLs != "" {
@@ -1172,29 +1181,56 @@ func (r *Reader) execReadDB(curDB string, now time.Time, recordTablesDone TableR
 	}
 	return nil
 }
-func RestoreTimestmapOffset(doneFilePath string) (time.Time, string, error) {
+func RestoreTimestmapOffset(doneFilePath string) (time.Time, map[string]string, error) {
 	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, TimestampRecordsFile)
+	cachemapfilename := fmt.Sprintf("%v.%v", reader.DoneFileName, CacheMapFile)
+
 	filePath := filepath.Join(doneFilePath, filename)
 	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		return time.Time{}, "", err
+		return time.Time{}, nil, err
 	}
-	values := strings.SplitN(string(data), "$-$", 2)
-	if len(values) < 1 {
-		return time.Time{}, "", err
-	}
-	tm, err := time.Parse(time.RFC3339Nano, values[0])
+	tm, err := time.Parse(time.RFC3339Nano, string(data))
 	if err != nil {
-		return tm, "", err
+		return tm, nil, err
 	}
-	var lastdata string
-	if len(values) > 1 {
-		lastdata = values[1]
+
+	cachemapfilePath := filepath.Join(doneFilePath, cachemapfilename)
+	data, err = ioutil.ReadFile(cachemapfilePath)
+	if err != nil {
+		return tm, nil, err
 	}
-	return tm, lastdata, err
+	cache := make(map[string]string)
+	err = json.Unmarshal(data, &cache)
+	if err != nil {
+		return tm, nil, err
+	}
+	return tm, cache, nil
 }
 
-func WriteTimestmapOffset(doneFilePath, content, lastdata string) (err error) {
+func WriteCacheMap(doneFilePath string, cache map[string]string) (err error) {
+	var f *os.File
+	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, CacheMapFile)
+	filePath := filepath.Join(doneFilePath, filename)
+	// write to tmp file
+	f, err = os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, DefaultFilePerm)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	data, err := json.Marshal(cache)
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(data)
+	if err != nil {
+		return err
+	}
+
+	return f.Sync()
+}
+
+func WriteTimestmapOffset(doneFilePath, content string) (err error) {
 	var f *os.File
 	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, TimestampRecordsFile)
 	filePath := filepath.Join(doneFilePath, filename)
@@ -1204,7 +1240,7 @@ func WriteTimestmapOffset(doneFilePath, content, lastdata string) (err error) {
 		return err
 	}
 	defer f.Close()
-	_, err = f.Write([]byte(content + "$-$" + lastdata))
+	_, err = f.Write([]byte(content))
 	if err != nil {
 		return err
 	}
@@ -1568,10 +1604,18 @@ func (r *Reader) checkExit(idx int, db *sql.DB) (bool, int64) {
 
 			//获得最新时间戳到当前时间的数据量
 			tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v > '%s';", rawSQL, r.timestampKey, r.startTime.Format(postgresTimeFormat))
+			largerAmount, err := queryNumber(tsql, db)
+			if err != nil || largerAmount == 0 {
+				return true, -1
+			}
 			//-- 比较有没有比之前的数量大，如果没有变大就退出
 			//如果变大，继续判断当前这个重复的时间有没有数据
 			tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v = '%s';", rawSQL, r.timestampKey, r.startTime.Format(postgresTimeFormat))
-
+			equalAmount, err := queryNumber(tsql, db)
+			if err == nil && equalAmount > int64(len(r.trimecachemap)) {
+				//说明还有新数据在原来的时间点，不能退出，且还要再查
+				return false, -1
+			}
 			//此处如果发现同样的时间戳数据没有变，那么说明是新的时间产生的数据，时间戳要更新了
 			//获得最小的时间戳
 			tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v > '%s';", r.timestampKey, r.timestampKey, rawSQL, r.timestampKey, r.startTime.Format(postgresTimeFormat))
@@ -2155,86 +2199,72 @@ func (r *Reader) compareWithStartTime(offsetKeyIndex int, data Data) (time.Time,
 	}
 	return r.startTime, 0
 }
-func (r *Reader) updateStartTimeFromData(data Data) {
-	timeData, ok := r.getTimeFromData(data)
+
+//用于更新时间戳，已经同样时间戳上那个数据点
+func (r *Reader) updateTimeCntFromData(v readInfo) {
+	timeData, ok := r.getTimeFromData(v.data)
 	if !ok {
 		return
 	}
 	if timeData.After(r.startTime) {
-		log.Println("FindNew time", ok, timeData.String())
 		r.startTime = timeData
+		r.trimecachemap = map[string]string{v.json: "1"}
+	} else if timeData.Equal(r.startTime) {
+		if r.trimecachemap == nil {
+			r.trimecachemap = make(map[string]string)
+		}
+		r.trimecachemap[v.json] = "1"
 	}
 }
 
 func (r *Reader) updateStartTime(offsetKeyIndex int, scanArgs []interface{}) bool {
 	timeData, ok := r.getTimeFromArgs(offsetKeyIndex, scanArgs)
 	if ok && timeData.After(r.startTime) {
-		log.Println("FindNew time", ok, timeData.String())
-		//如果凑巧是与多一微秒的取值相同的，那么就改回来，因为在查找是否有新数据时，为了不死循环，加了1微妙取数据的。
-		//当然实际上也可以加一个判断，通过对比原来那一刻的时间数据量是否有变化来作为依据要不要时间前移，但是相对比较复杂。
-		if !r.startTime.Add(time.Microsecond).Equal(timeData) {
-			r.startTime = timeData
-		}
+		r.startTime = timeData
+		r.trimecachemap = nil
 		return true
 	}
 	log.Println("XXXXXXX checkexit time", ok, timeData.String(), offsetKeyIndex, scanArgs)
 	return false
 }
 
-func (r *Reader) checkTime(offsetKeyIndex int, scanArgs []interface{}) bool {
-	timeData, ok := r.getTimeFromArgs(offsetKeyIndex, scanArgs)
-	if ok {
-		if timeData.After(r.startTime) {
-			r.startTime = timeData
-			r.datacnt = 1
-			return true
-		}
-	}
-	return false
-}
+//func (r *Reader) checkTime(offsetKeyIndex int, scanArgs []interface{}) bool {
+//	timeData, ok := r.getTimeFromArgs(offsetKeyIndex, scanArgs)
+//	if ok {
+//		if timeData.After(r.startTime) {
+//			r.startTime = timeData
+//			return true
+//		}
+//	}
+//	return false
+//}
 
 func (r *Reader) trimeExistData(datas []readInfo) []readInfo {
 	if len(r.timestampKey) <= 0 || len(datas) < 1 {
 		return datas
 	}
-	datas, failed := sortByJson(datas)
-	if failed {
+	datas, success := getJson(datas)
+	if !success {
 		return datas
 	}
-	//r.printalltime(datas)
-	//检验最后一个数据的时间
-	lastData := datas[len(datas)-1]
-	lastTime, ok := r.getTimeFromData(lastData.data)
-	if !ok {
-		//如果数据的时间类型都不对，那么就全部都读
-		return datas
-	}
-	fmt.Println("`````````````", r.startTime.String(), lastTime.String())
-	if lastTime.Equal(r.startTime) && (lastData.json == r.lastDataForTimestamp) {
-		//如果最后的时间戳和数据都完全一样，表明这次拿到的就是重复的数据，一个数据都不要
-		log.Info("all data are equal with lastData: ", r.lastDataForTimestamp)
-		return []readInfo{}
-	}
-	//其他情况下就要找到那个开始的点，逐一对比，找到上次拿到的最后数据
-	for idx, v := range datas {
+	newdatas := make([]readInfo, 0, len(datas))
+	for _, v := range datas {
 		tm, ok := r.getTimeFromData(v.data)
 		if !ok {
-			//如果出现了数据中没有时间的，实际上已经不合法了，那么就把数据全取出来算了，以便暴露问题
-			return datas[idx:]
+			//如果出现了数据中没有时间的，实际上已经不合法了，那就获取
+			newdatas = append(newdatas, v)
 		}
 		if tm.After(r.startTime) {
-			//找到的最早的数据都是比当前时间还要新的，那么就直接全取了
-			return datas[idx:]
+			//找到的数据都是比当前时间还要新的，选取
+			newdatas = append(newdatas, v)
 		}
 		if tm.Equal(r.startTime) {
-			if v.json == r.lastDataForTimestamp {
-				return datas[idx+1:]
+			if _, ok := r.trimecachemap[v.json]; !ok {
+				newdatas = append(newdatas, v)
 			}
 		}
 	}
-	//时间都相同，没找到一样的数据，全取
-	fmt.Println("````````````` no same data find, get all data,last data is ", r.lastDataForTimestamp)
-	return datas
+	return newdatas
 }
 
 // 执行每条 sql 语句
@@ -2262,7 +2292,7 @@ func (r *Reader) execReadSql(connectStr, curDB string, idx int, rawSql string, t
 		return exit, isRawSql, 0, err
 	}
 
-	log.Infof("Runner[%v] reader <%v> exec sql <%v>", r.meta.RunnerName, r.Name(), execSQL)
+	log.Debugf("Runner[%v] reader <%v> start to exec sql <%v>", r.meta.RunnerName, r.Name(), execSQL)
 	rows, err := db.Query(execSQL)
 	if err != nil {
 		err = fmt.Errorf("runner[%v] %v prepare %v <%v> query error %v", r.meta.RunnerName, r.Name(), r.dbtype, execSQL, err)
@@ -2279,7 +2309,7 @@ func (r *Reader) execReadSql(connectStr, curDB string, idx int, rawSql string, t
 		r.sendError(err)
 		return exit, isRawSql, readSize, err
 	}
-	log.Infof("Runner[%v] SQL ：<%v>, schemas: <%v>", r.meta.RunnerName, execSQL, strings.Join(columns, ", "))
+	log.Debugf("Runner[%v] SQL ：<%v>, got schemas: <%v>", r.meta.RunnerName, execSQL, strings.Join(columns, ", "))
 	scanArgs, nochiced := r.getInitScans(len(columns), rows, r.dbtype)
 	var offsetKeyIndex int
 	if r.rawSQLs != "" {
@@ -2292,7 +2322,7 @@ func (r *Reader) execReadSql(connectStr, curDB string, idx int, rawSql string, t
 	}
 	total := len(alldatas)
 	alldatas = r.trimeExistData(alldatas)
-	log.Info("``````````````````after trimed index is: ", len(alldatas), " total data is", total)
+
 	// Fetch rows
 	var maxOffset int64 = -1
 	for _, v := range alldatas {
@@ -2305,12 +2335,12 @@ func (r *Reader) execReadSql(connectStr, curDB string, idx int, rawSql string, t
 			continue
 		}
 		if len(r.timestampKey) > 0 {
-			r.lastDataForTimestamp = v.json
-			r.updateStartTimeFromData(v.data)
+			r.updateTimeCntFromData(v)
 		} else {
 			maxOffset = r.updateOffset(idx, offsetKeyIndex, maxOffset, scanArgs)
 		}
 	}
+	log.Infof("Runner[%v] SQL ：<%v> find total  %d data, after trime duplicated, left data is: %d, now we have total got %v data, and start time is %s ", r.meta.RunnerName, execSQL, total, len(alldatas), len(r.trimecachemap), r.startTime.String())
 	if maxOffset > 0 {
 		r.offsets[idx] = maxOffset + 1
 	}
@@ -2364,8 +2394,6 @@ func (r *Reader) getTimeFromArgs(offsetKeyIndex int, scanArgs []interface{}) (ti
 			return timeData, true
 		case *time.Time:
 			return *timeData, true
-		//case nil:
-		//	return time.Time{}, false
 		default:
 			log.Errorf("updateStartTime failed as %v(%T) is not time.Time", data, data)
 		}

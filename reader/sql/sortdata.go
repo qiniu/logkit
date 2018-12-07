@@ -46,3 +46,19 @@ func sortByJson(datas []readInfo) ([]readInfo, bool) {
 	}
 	return newdata, false
 }
+
+//getJson return true, if bejson success
+func getJson(datas []readInfo) ([]readInfo, bool) {
+	if len(datas) < 1 {
+		return datas, false
+	}
+	for idx, v := range datas {
+		jst, err := json.Marshal(v.data)
+		if err != nil {
+			log.Error("can't marshal json for sort", err)
+			return datas, false
+		}
+		datas[idx].json = string(jst)
+	}
+	return datas, true
+}

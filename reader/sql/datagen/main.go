@@ -12,9 +12,11 @@ import (
 
 	_ "github.com/denisenkom/go-mssqldb" //mssql 驱动
 	_ "github.com/go-sql-driver/mysql"   //mysql 驱动
-	_ "github.com/lib/pq"                //postgres 驱动
+	"github.com/lib/pq"                  //postgres 驱动
 	"github.com/qiniu/log"
 	utilsos "github.com/qiniu/logkit/utils/os"
+
+	"sync"
 
 	"github.com/Pallinder/go-randomdata"
 )
@@ -31,14 +33,15 @@ Usage:
 
 The commands & flags are:
 
-  -v                 print the version to stdout.
-  -h <host>          specify database host
-  -p <port>			 specify database port
-  -db <database>	 specify database name
-  -t <type>  		 specify database type: mysql or postgres
-  -u <username>		 database username
-  -p <password>		 database password
-  -table <tablename> database tablename
+  -v                   print the version to stdout.
+  -h <host>            specify database host
+  -p <port>			   specify database port
+  -db <database>	   specify database name
+  -t <type>  		   specify database type: mysql or postgres
+  -u <username>		   database username
+  -password <password> database password
+  -table <tablename>   database tablename
+  -num <total data>    total data number, 0 for forever
 
 Examples:
 
@@ -52,10 +55,11 @@ var (
 	host         = flag.String("h", "127.0.0.1", "specify database host")
 	port         = flag.String("p", "5432", "specify database port")
 	databaseType = flag.String("t", "postgres", "specify database type mysql or postgres")
-	database     = flag.String("db", "testdb2", "specify database name")
-	username     = flag.String("u", "test", "database username")
-	password     = flag.String("password", "", "database password")
-	table        = flag.String("table", "test5", "database table name")
+	database     = flag.String("db", "testdb", "specify database name")
+	username     = flag.String("u", "postgres", "database username")
+	password     = flag.String("password", "abc123", "database password")
+	table        = flag.String("table", "test12", "database table name")
+	totalnumber  = flag.Int64("num", 0, "total data number, 0 for forever")
 )
 
 func usageExit(rc int) {
@@ -131,27 +135,54 @@ func generatePostgresData(host, port, username, password, database, table string
 		log.Error(err)
 		return
 	}
-	datanum := 1
-	ii := 0
-	tm := time.Date(2018, 11, 1, 0, 0, 0, 0, time.Local)
+	var datanum int64
 	for {
-		dt := `INSERT INTO ` + table + ` VALUES ('` + strconv.Itoa(datanum) + `', '` + time.Now().Format(time.RFC3339Nano) + `', '` + randomdata.Email() + `', '` + randomdata.City() + `','` + randomdata.UserAgentString() + `', ` + strconv.Itoa(rand.Intn(100)) + `, '` + strconv.FormatFloat(rand.Float64(), 'f', -1, 64) + `', 't', '` + tm.Format("2006-01-02 15:04:05") + `');`
-		_, err = db.Exec(dt)
-		if err != nil {
-			log.Error(err)
-			return
+		var wg = new(sync.WaitGroup)
+		for i := 0; i < 4; i++ {
+			wg.Add(1)
+			go insert(db, table, datanum, wg)
+			datanum += 500
 		}
-		ii++
-		if datanum%10000 == 0 {
-			fmt.Println(datanum, " of data inserted")
-			if ii%2 == 0 {
-				tm = tm.Add(30 * time.Minute)
-			}
-		}
-		if datanum == 1000000 {
+		wg.Wait()
+		fmt.Println(datanum, " of data inserted ", time.Now().String())
+		if *totalnumber > 0 && datanum >= *totalnumber {
 			break
 		}
-		datanum++
 	}
 	fmt.Println(datanum, " finish inserted")
+}
+
+func insert(db *sql.DB, table string, datanum int64, wg *sync.WaitGroup) {
+	defer wg.Done()
+	txn, err := db.Begin()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	stmt, err := txn.Prepare(pq.CopyIn(table, "id", "realtm", "email", "city", "useragent", "age", "salary", "delete", "create_time"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for i := 0; i < 500; i++ {
+		_, err = stmt.Exec(strconv.FormatInt(datanum+int64(i)+1, 10), time.Now().Format(time.RFC3339Nano), randomdata.Email(), randomdata.City(), randomdata.UserAgentString(), strconv.Itoa(rand.Intn(100)), strconv.FormatFloat(rand.Float64(), 'f', -1, 64), randomdata.Boolean(), time.Now().Format("2006-01-02 15:04:00"))
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	_, err = stmt.Exec()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = stmt.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = txn.Commit()
+	if err != nil {
+		log.Fatal(err)
+	}
 }
