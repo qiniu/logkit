@@ -65,6 +65,11 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		return nil, err
 	}
 	zookeeperTimeout, _ := conf.GetIntOr(KeyKafkaZookeeperTimeout, 1)
+	maxProcessingTime, _ := conf.GetStringOr(KeyKafkaMaxProcessTime, "1s")
+	maxProcessingTimeDur, err := time.ParseDuration(maxProcessingTime)
+	if err != nil {
+		return nil, fmt.Errorf("parse %s %s err %v", KeyKafkaMaxProcessTime, maxProcessingTime, err)
+	}
 
 	zookeeper, err := conf.GetStringList(KeyKafkaZookeeper)
 	if err != nil {
@@ -93,6 +98,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	config.Zookeeper.Chroot = kr.ZookeeperChroot
 	config.Zookeeper.Timeout = kr.ZookeeperTimeout
 	config.Consumer.Return.Errors = true
+	config.Consumer.MaxProcessingTime = maxProcessingTimeDur
 
 	/*********************  kafka offset *************************/
 	/* 这里设定的offset不影响原有的offset，因为kafka client会去获取   */
