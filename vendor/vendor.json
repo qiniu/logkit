@@ -256,10 +256,10 @@
 			"revisionTime": "2018-04-03T20:44:34Z"
 		},
 		{
-			"checksumSHA1": "KxX/Drph+byPXBFIXaCZaCOAnrU=",
+			"checksumSHA1": "g8yM1TRZyIjXtopiqbslzgLqtM0=",
 			"path": "github.com/go-logfmt/logfmt",
-			"revision": "390ab7935ee28ec6b286364bba9b4dd6410cb3d5",
-			"revisionTime": "2016-11-15T14:25:13Z"
+			"revision": "07c9b44f60d7ffdfb7d8efe1ad539965737836dc",
+			"revisionTime": "2018-11-22T01:56:15Z"
 		},
 		{
 			"checksumSHA1": "oyULO1B/l2OLy2xereo+2w3hYk4=",
