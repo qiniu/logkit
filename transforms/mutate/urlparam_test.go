@@ -81,7 +81,7 @@ func TestParamTransformerSelectKeys(t *testing.T) {
 		{"myword": "http://10.100.0.1/index/mytest"},
 	})
 	assert.Error(t, err)
-	expectError := "find total 1 erorrs in transform urlparam, last error info is transform key myword not exist in data"
+	expectError := "find total 1 erorrs in transform urldecode, last error info is transform key myword not exist in data"
 	assert.Equal(t, expectError, err.Error())
 	exp := []Data{
 		{

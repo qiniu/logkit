@@ -77,7 +77,7 @@ func (s *Sub) Init() error {
 }
 
 func (s *Sub) Description() string {
-	return `对于日志数据中的每条记录，对指定的键值进行字段提取。`
+	return `对于日志数据中的每条记录，对指定的键值进行定长字段提取。`
 }
 
 func (s *Sub) SampleConfig() string {

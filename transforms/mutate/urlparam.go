@@ -180,12 +180,12 @@ func (p *UrlParam) Description() string {
 }
 
 func (p *UrlParam) Type() string {
-	return "urlparam"
+	return "urldecode"
 }
 
 func (p *UrlParam) SampleConfig() string {
 	return `{
-		"type":"urlparam",
+		"type":"urldecode",
 		"key":"ParamFieldKey"
 	}`
 }
@@ -221,7 +221,7 @@ func (p *UrlParam) SetStats(err string) StatsInfo {
 }
 
 func init() {
-	transforms.Add("urlparam", func() transforms.Transformer {
+	transforms.Add("urldecode", func() transforms.Transformer {
 		return &UrlParam{}
 	})
 }

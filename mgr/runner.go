@@ -795,9 +795,10 @@ func (r *LogExportRunner) Run() {
 				}
 			}
 			log.Debugf("Runner[%v] send %s finish to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
-			log.Info(r.tracker.Print())
+			log.Debug(r.tracker.Print())
 			continue
 		}
+		curTimeStr := time.Now().Format("2006-01-02 15:04:05")
 		// read data
 		var err error
 		var datas []Data
@@ -821,6 +822,7 @@ func (r *LogExportRunner) Run() {
 			tags = MergeEnvTags(r.EnvTag, tags)
 		}
 		tags = MergeExtraInfoTags(r.meta, tags)
+		tags["lst"] = curTimeStr
 		if len(tags) > 0 {
 			datas = addTagsToData(tags, datas, r.Name())
 		}
