@@ -3,8 +3,6 @@ package raw
 import (
 	"time"
 
-	"strings"
-
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	. "github.com/qiniu/logkit/parser/config"
@@ -49,22 +47,19 @@ func (p *Parser) Type() string {
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
 	se := &StatsError{}
-	datas := make([]Data, 0, len(lines))
-	for _, line := range lines {
+	datas := make([]Data, len(lines))
+	for idx, line := range lines {
 		//raw就是原样全copy到Raw字段
-		if len(strings.TrimSpace(line)) < 1 {
-			continue
-		}
-		data := Data{KeyRaw: line}
+		datas[idx] = Data{KeyRaw: line}
 		if p.withTimeStamp {
-			data[KeyTimestamp] = time.Now().Format(time.RFC3339Nano)
+			datas[idx][KeyTimestamp] = time.Now().Format(time.RFC3339Nano)
 		}
 		for _, label := range p.labels {
-			data[label.Name] = label.Value
+			datas[idx][label.Name] = label.Value
 		}
 		se.AddSuccess()
-		datas = append(datas, data)
 	}
+
 	if se.Errors == 0 {
 		return datas, nil
 	}
