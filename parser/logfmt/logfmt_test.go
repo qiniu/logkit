@@ -36,22 +36,26 @@ func Test_parseLine(t *testing.T) {
 		line       string
 		expectData []Data
 		existErr   bool
+		splitter   string
 	}{
 		{
 			expectData: []Data{},
 			existErr:   true,
+			splitter:   "=",
 		},
 		{
 			line: "foo=\"bar\"",
 			expectData: []Data{
 				{"foo": "bar"},
 			},
+			splitter: "=",
 		},
 		{
 			line: "foo=\"bar\"\n",
 			expectData: []Data{
 				{"foo": "bar"},
 			},
+			splitter: "=",
 		},
 		{
 			line: "ts=2018-01-02T03:04:05.123Z lvl=info msg=\"http request\" method=PUT\nduration=1.23 log_id=123456abc",
@@ -67,6 +71,7 @@ func Test_parseLine(t *testing.T) {
 					"log_id":   "123456abc",
 				},
 			},
+			splitter: "=",
 		},
 		{
 			line: `ts=2018-01-02T03:04:05.123Z lvl=info  method=PUT msg="http request"`,
@@ -78,33 +83,38 @@ func Test_parseLine(t *testing.T) {
 					"ts":     "2018-01-02T03:04:05.123Z",
 				},
 			},
+			splitter: "=",
 		},
 		{
 			line:       `no data.`,
 			expectData: []Data{},
 			existErr:   true,
+			splitter:   "=",
 		},
 		{
 			line:       `foo="" bar=`,
 			expectData: []Data{},
 			existErr:   true,
+			splitter:   "=",
 		},
 		{
 			line:       `abc=abc foo="def`,
 			expectData: []Data{},
 			existErr:   true,
+			splitter:   "=",
 		},
 		{
 			line:       `"foo=" bar=abc`,
 			expectData: []Data{},
 			existErr:   true,
+			splitter:   "=",
 		},
 	}
 	l := Parser{
 		name: TypeLogfmt,
 	}
 	for _, tt := range tests {
-
+		l.splitter = tt.splitter
 		got, err := l.parse(tt.line)
 		assert.Equal(t, tt.existErr, err != nil)
 		assert.Equal(t, len(tt.expectData), len(got))
@@ -171,9 +181,11 @@ func TestParseWithKeepRawData(t *testing.T) {
 	tests := []struct {
 		s          []string
 		expectData []Data
+		splitter   string
 	}{
 		{
 			expectData: []Data{},
+			splitter:   "=",
 		},
 		{
 			s: []string{`ts=2018-01-02T03:04:05.123Z lvl=5 msg="error" log_id=123456abc`},
@@ -186,6 +198,7 @@ func TestParseWithKeepRawData(t *testing.T) {
 					"raw_data": `ts=2018-01-02T03:04:05.123Z lvl=5 msg="error" log_id=123456abc`,
 				},
 			},
+			splitter: "=",
 		},
 		{
 			s: []string{"ts=2018-01-02T03:04:05.123Z lvl=5 msg=\"error\" log_id=123456abc\nmethod=PUT duration=1.23 log_id=123456abc"},
@@ -204,6 +217,26 @@ func TestParseWithKeepRawData(t *testing.T) {
 					"raw_data": "ts=2018-01-02T03:04:05.123Z lvl=5 msg=\"error\" log_id=123456abc\nmethod=PUT duration=1.23 log_id=123456abc",
 				},
 			},
+			splitter: "=",
+		},
+		{
+			s: []string{"ts:2018-01-02T03:04:05.123Z lvl:5 msg:\"error\" log_id:123456abc\nmethod:PUT duration:1.23 log_id:123456abc"},
+			expectData: []Data{
+				{
+					"ts":       "2018-01-02T03:04:05.123Z",
+					"lvl":      float64(5),
+					"msg":      "error",
+					"log_id":   "123456abc",
+					"raw_data": "ts:2018-01-02T03:04:05.123Z lvl:5 msg:\"error\" log_id:123456abc\nmethod:PUT duration:1.23 log_id:123456abc",
+				},
+				{
+					"method":   "PUT",
+					"duration": 1.23,
+					"log_id":   "123456abc",
+					"raw_data": "ts:2018-01-02T03:04:05.123Z lvl:5 msg:\"error\" log_id:123456abc\nmethod:PUT duration:1.23 log_id:123456abc",
+				},
+			},
+			splitter: ":",
 		},
 	}
 	l := Parser{
@@ -212,6 +245,7 @@ func TestParseWithKeepRawData(t *testing.T) {
 		numRoutine:  1,
 	}
 	for _, tt := range tests {
+		l.splitter = tt.splitter
 		got, err := l.Parse(tt.s)
 		if c, ok := err.(*StatsError); ok {
 			err = errors.New(c.LastError)
