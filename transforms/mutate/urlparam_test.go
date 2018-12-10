@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestParamTransformer(t *testing.T) {

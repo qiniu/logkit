@@ -3,10 +3,10 @@ package mutate
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestRenameTransformer(t *testing.T) {
@@ -36,8 +36,8 @@ func TestRenameTransformer(t *testing.T) {
 		Key:        "a.ts",
 		NewKeyName: "b.@timestamp",
 	}
-	data3, err := rename3.Transform([]Data{{"a": map[string]interface{}{"ts": "stamp1"}}})
-	assert.NoError(t, err)
-	exp3 := []Data{{"a": map[string]interface{}{}, "b": map[string]interface{}{"@timestamp": "stamp1"}}}
+	data3, err := rename3.Transform([]Data{{"b": "test"}, {"a": map[string]interface{}{"ts": "stamp1"}}})
+	assert.Error(t, err)
+	exp3 := []Data{{"b": "test"}, {"a": map[string]interface{}{}, "b": map[string]interface{}{"@timestamp": "stamp1"}}}
 	assert.Equal(t, exp3, data3)
 }

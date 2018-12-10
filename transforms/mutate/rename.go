@@ -2,6 +2,7 @@ package mutate
 
 import (
 	"errors"
+	"sync"
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
@@ -45,22 +46,56 @@ func (g *Rename) Transform(datas []Data) ([]Data, error) {
 	if g.keys == nil {
 		g.Init()
 	}
-	var err, fmtErr error
-	errNum := 0
-	for i := range datas {
-		val, getErr := GetMapValue(datas[i], g.keys...)
-		if getErr != nil {
-			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.Key)
-			continue
-		}
-		DeleteMapValue(datas[i], g.keys...)
-		setErr := SetMapValue(datas[i], val, false, g.news...)
-		if setErr != nil {
-			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.NewKeyName)
-		}
+
+	var (
+		dataLen     = len(datas)
+		err, fmtErr error
+		errNum      int
+
+		numRoutine   = g.numRoutine
+		dataPipeline = make(chan transforms.TransformInfo)
+		resultChan   = make(chan transforms.TransformResult)
+		wg           = new(sync.WaitGroup)
+	)
+
+	if dataLen < numRoutine {
+		numRoutine = dataLen
 	}
 
-	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	for i := 0; i < numRoutine; i++ {
+		wg.Add(1)
+		go g.transform(dataPipeline, resultChan, wg)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, data := range datas {
+			dataPipeline <- transforms.TransformInfo{
+				CurData: data,
+				Index:   idx,
+			}
+		}
+		close(dataPipeline)
+	}()
+
+	var transformResultSlice = make(transforms.TransformResultSlice, dataLen)
+	for resultInfo := range resultChan {
+		transformResultSlice[resultInfo.Index] = resultInfo
+	}
+
+	for _, transformResult := range transformResultSlice {
+		if transformResult.Err != nil {
+			err = transformResult.Err
+			errNum += transformResult.ErrNum
+		}
+		datas[transformResult.Index] = transformResult.CurData
+	}
+
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(dataLen), g.Type())
 	return datas, fmtErr
 }
 
@@ -105,4 +140,40 @@ func init() {
 	transforms.Add("rename", func() transforms.Transformer {
 		return &Rename{}
 	})
+}
+
+func (g *Rename) transform(dataPipeline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+	var (
+		err    error
+		errNum int
+	)
+	for transformInfo := range dataPipeline {
+		err = nil
+		errNum = 0
+
+		val, getErr := GetMapValue(transformInfo.CurData, g.keys...)
+		if getErr != nil {
+			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.Key)
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				ErrNum:  errNum,
+				Err:     err,
+			}
+			continue
+		}
+		DeleteMapValue(transformInfo.CurData, g.keys...)
+		setErr := SetMapValue(transformInfo.CurData, val, false, g.news...)
+		if setErr != nil {
+			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.NewKeyName)
+		}
+
+		resultChan <- transforms.TransformResult{
+			Index:   transformInfo.Index,
+			CurData: transformInfo.CurData,
+			ErrNum:  errNum,
+			Err:     err,
+		}
+	}
+	wg.Done()
 }

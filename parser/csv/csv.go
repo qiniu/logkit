@@ -193,8 +193,7 @@ func parseSchemaJsonField(f string) (fd field, err error) {
 	if len(rawfield) > 0 {
 		allin = false
 		if !strings.HasPrefix(rawfield, "{") || !strings.HasSuffix(rawfield, "}") {
-			err = fmt.Errorf("%v didn't use {key valuetype} to specify jsonmap field", f)
-			return
+			return field{}, errors.New(f + " didn't use {key valuetype} to specify jsonmap field")
 		}
 		rawfield := strings.TrimSpace(rawfield[1 : len(rawfield)-1])
 		if strings.HasSuffix(rawfield, "...") {

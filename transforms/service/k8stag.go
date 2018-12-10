@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
@@ -21,11 +22,22 @@ const (
 var (
 	_ transforms.StatsTransformer = &K8sTag{}
 	_ transforms.Transformer      = &K8sTag{}
+	_ transforms.Initializer      = &K8sTag{}
 )
 
 type K8sTag struct {
 	SourceFileKey string `json:"sourcefilefield"`
 	stats         StatsInfo
+	numRoutine    int
+}
+
+func (g *K8sTag) Init() error {
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = 1
+	}
+	g.numRoutine = numRoutine
+	return nil
 }
 
 func (g *K8sTag) RawTransform(datas []string) ([]string, error) {
@@ -33,36 +45,58 @@ func (g *K8sTag) RawTransform(datas []string) ([]string, error) {
 }
 
 func (g *K8sTag) Transform(datas []Data) ([]Data, error) {
-	var err, fmtErr error
-	errNum := 0
-	for i := range datas {
-		val, ok := datas[i][g.SourceFileKey]
-		if !ok {
-			errNum, err = transforms.SetError(errNum, nil, transforms.GetErr, g.SourceFileKey)
-			continue
-		}
-		strVal, ok := val.(string)
-		if !ok {
-			typeErr := fmt.Errorf("transform key %v data type is not string", g.SourceFileKey)
-			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
-			continue
-		}
-		strVal = filepath.Base(strVal)
-		splits := strings.Split(strVal, "_")
-		if len(splits) < 3 {
-			splitErr := fmt.Errorf("k8stag transform sourcefile must has more than 2 sperated field but now only %v fields of %v", len(splits), strVal)
-			errNum, err = transforms.SetError(errNum, splitErr, transforms.General, "")
-			continue
-		}
-		datas[i][K8sPodName] = splits[0]
-		datas[i][K8sNamespace] = splits[1]
-		containerInfo := strings.TrimSuffix(strings.Join(splits[2:], "_"), ".log")
-		containerInfoSplits := strings.Split(containerInfo, "-")
-		datas[i][K8sContainerId] = containerInfoSplits[len(containerInfoSplits)-1]
-		datas[i][K8sContainerName] = strings.Join(containerInfoSplits[0:len(containerInfoSplits)-1], "-")
+	if g.numRoutine == 0 {
+		g.Init()
 	}
 
-	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	var (
+		dataLen     = len(datas)
+		err, fmtErr error
+		errNum      int
+
+		numRoutine   = g.numRoutine
+		dataPipeline = make(chan transforms.TransformInfo)
+		resultChan   = make(chan transforms.TransformResult)
+		wg           = new(sync.WaitGroup)
+	)
+	if dataLen < numRoutine {
+		numRoutine = dataLen
+	}
+
+	for i := 0; i < numRoutine; i++ {
+		wg.Add(1)
+		go g.transform(dataPipeline, resultChan, wg)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, data := range datas {
+			dataPipeline <- transforms.TransformInfo{
+				CurData: data,
+				Index:   idx,
+			}
+		}
+		close(dataPipeline)
+	}()
+
+	var transformResultSlice = make(transforms.TransformResultSlice, dataLen)
+	for resultInfo := range resultChan {
+		transformResultSlice[resultInfo.Index] = resultInfo
+	}
+
+	for _, transformResult := range transformResultSlice {
+		if transformResult.Err != nil {
+			err = transformResult.Err
+			errNum += transformResult.ErrNum
+		}
+		datas[transformResult.Index] = transformResult.CurData
+	}
+
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(dataLen), g.Type())
 	return datas, fmtErr
 }
 
@@ -115,4 +149,66 @@ func init() {
 	transforms.Add(K8sTagType, func() transforms.Transformer {
 		return &K8sTag{}
 	})
+}
+
+func (g *K8sTag) transform(dataPipeline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+	var (
+		err    error
+		errNum int
+	)
+	for transformInfo := range dataPipeline {
+		err = nil
+		errNum = 0
+
+		val, ok := transformInfo.CurData[g.SourceFileKey]
+		if !ok {
+			errNum, err = transforms.SetError(errNum, nil, transforms.GetErr, g.SourceFileKey)
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				Err:     err,
+				ErrNum:  errNum,
+			}
+			continue
+		}
+		strVal, ok := val.(string)
+		if !ok {
+			typeErr := errors.New("transform key " + g.SourceFileKey + " data type is not string")
+			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				Err:     err,
+				ErrNum:  errNum,
+			}
+			continue
+		}
+		strVal = filepath.Base(strVal)
+		splits := strings.Split(strVal, "_")
+		if len(splits) < 3 {
+			splitErr := fmt.Errorf("k8stag transform sourcefile must has more than 2 sperated field but now only %v fields of %v", len(splits), strVal)
+			errNum, err = transforms.SetError(errNum, splitErr, transforms.General, "")
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				Err:     err,
+				ErrNum:  errNum,
+			}
+			continue
+		}
+		transformInfo.CurData[K8sPodName] = splits[0]
+		transformInfo.CurData[K8sNamespace] = splits[1]
+		containerInfo := strings.TrimSuffix(strings.Join(splits[2:], "_"), ".log")
+		containerInfoSplits := strings.Split(containerInfo, "-")
+		transformInfo.CurData[K8sContainerId] = containerInfoSplits[len(containerInfoSplits)-1]
+		transformInfo.CurData[K8sContainerName] = strings.Join(containerInfoSplits[0:len(containerInfoSplits)-1], "-")
+
+		resultChan <- transforms.TransformResult{
+			Index:   transformInfo.Index,
+			CurData: transformInfo.CurData,
+			Err:     err,
+			ErrNum:  errNum,
+		}
+	}
+	wg.Done()
 }

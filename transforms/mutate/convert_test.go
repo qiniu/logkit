@@ -5,11 +5,12 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/qiniu/logkit/transforms"
-	. "github.com/qiniu/logkit/utils/models"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/pandora-go-sdk/pipeline"
-	"github.com/stretchr/testify/assert"
+
+	"github.com/qiniu/logkit/transforms"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 func TestConvertTransformer(t *testing.T) {

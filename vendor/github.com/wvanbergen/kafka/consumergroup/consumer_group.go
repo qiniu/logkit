@@ -48,7 +48,7 @@ func (cgc *Config) Validate() error {
 	}
 
 	if cgc.Offsets.Initial != sarama.OffsetOldest && cgc.Offsets.Initial != sarama.OffsetNewest {
-		return errors.New("Offsets.Initial should be sarama.OffsetOldest or sarama.OffsetNewest.")
+		return errors.New("offsets.Initial should be sarama.OffsetOldest or sarama.OffsetNewest")
 	}
 
 	if cgc.Config != nil {
