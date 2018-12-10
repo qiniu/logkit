@@ -165,7 +165,7 @@ func insert(db *sql.DB, table string, datanum int64, wg *sync.WaitGroup) {
 	}
 
 	for i := 0; i < 500; i++ {
-		_, err = stmt.Exec(strconv.FormatInt(datanum+int64(i)+1, 10), time.Now().Format(time.RFC3339Nano), randomdata.Email(), randomdata.City(), randomdata.UserAgentString(), strconv.Itoa(rand.Intn(100)), strconv.FormatFloat(rand.Float64(), 'f', -1, 64), randomdata.Boolean(), time.Now().Format("2006-01-02 15:04:00"))
+		_, err = stmt.Exec(strconv.FormatInt(datanum+int64(i)+1, 10), time.Now().Format(time.RFC3339Nano), randomdata.Email(), randomdata.City(), randomdata.UserAgentString(), strconv.Itoa(rand.Intn(100)), strconv.FormatFloat(rand.Float64(), 'f', -1, 64), randomdata.Boolean(), time.Now().Add(-8*time.Hour).Format("2006-01-02 15:04:00"))
 		if err != nil {
 			log.Fatal(err)
 		}

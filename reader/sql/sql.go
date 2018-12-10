@@ -234,7 +234,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		if startTimeStr != "" {
 			startTime, err = time.Parse(postgresTimeFormat, startTimeStr)
 			if err != nil {
-				return nil, fmt.Errorf("parse starttime %s error, not in formart 2006-01-02 15:04:05", startTimeStr)
+				return nil, fmt.Errorf("parse starttime %s in format %s error %v", startTimeStr, postgresTimeFormat, err)
 			}
 		} else {
 			startTime = time.Now()
@@ -327,7 +327,9 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		tm, cache, err := RestoreTimestmapOffset(r.meta.DoneFilePath)
 		if err == nil {
 			r.startTime = tm
+			r.timestampmux.Lock()
 			r.trimecachemap = cache
+			r.timestampmux.Unlock()
 		} else {
 			log.Errorf("RestoreTimestmapOffset err %v", err)
 		}
@@ -2208,12 +2210,16 @@ func (r *Reader) updateTimeCntFromData(v readInfo) {
 	}
 	if timeData.After(r.startTime) {
 		r.startTime = timeData
+		r.timestampmux.Lock()
 		r.trimecachemap = map[string]string{v.json: "1"}
+		r.timestampmux.Unlock()
 	} else if timeData.Equal(r.startTime) {
+		r.timestampmux.Lock()
 		if r.trimecachemap == nil {
 			r.trimecachemap = make(map[string]string)
 		}
 		r.trimecachemap[v.json] = "1"
+		r.timestampmux.Unlock()
 	}
 }
 
@@ -2221,10 +2227,11 @@ func (r *Reader) updateStartTime(offsetKeyIndex int, scanArgs []interface{}) boo
 	timeData, ok := r.getTimeFromArgs(offsetKeyIndex, scanArgs)
 	if ok && timeData.After(r.startTime) {
 		r.startTime = timeData
+		r.timestampmux.Lock()
 		r.trimecachemap = nil
+		r.timestampmux.Unlock()
 		return true
 	}
-	log.Println("XXXXXXX checkexit time", ok, timeData.String(), offsetKeyIndex, scanArgs)
 	return false
 }
 
@@ -2259,9 +2266,11 @@ func (r *Reader) trimeExistData(datas []readInfo) []readInfo {
 			newdatas = append(newdatas, v)
 		}
 		if tm.Equal(r.startTime) {
+			r.timestampmux.RLock()
 			if _, ok := r.trimecachemap[v.json]; !ok {
 				newdatas = append(newdatas, v)
 			}
+			r.timestampmux.RUnlock()
 		}
 	}
 	return newdatas
@@ -2327,6 +2336,9 @@ func (r *Reader) execReadSql(connectStr, curDB string, idx int, rawSql string, t
 	var maxOffset int64 = -1
 	for _, v := range alldatas {
 		exit = false
+		if len(r.timestampKey) > 0 {
+			r.updateTimeCntFromData(v)
+		}
 		r.readChan <- v
 		r.CurrentCount++
 		readSize++
@@ -2334,9 +2346,7 @@ func (r *Reader) execReadSql(connectStr, curDB string, idx int, rawSql string, t
 		if r.historyAll || r.rawSQLs == "" {
 			continue
 		}
-		if len(r.timestampKey) > 0 {
-			r.updateTimeCntFromData(v)
-		} else {
+		if len(r.timestampKey) <= 0 {
 			maxOffset = r.updateOffset(idx, offsetKeyIndex, maxOffset, scanArgs)
 		}
 	}
