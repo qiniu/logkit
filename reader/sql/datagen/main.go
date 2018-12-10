@@ -12,9 +12,11 @@ import (
 
 	_ "github.com/denisenkom/go-mssqldb" //mssql 驱动
 	_ "github.com/go-sql-driver/mysql"   //mysql 驱动
-	_ "github.com/lib/pq"                //postgres 驱动
+	"github.com/lib/pq"                  //postgres 驱动
 	"github.com/qiniu/log"
 	utilsos "github.com/qiniu/logkit/utils/os"
+
+	"sync"
 
 	"github.com/Pallinder/go-randomdata"
 )
@@ -31,14 +33,15 @@ Usage:
 
 The commands & flags are:
 
-  -v                 print the version to stdout.
-  -h <host>          specify database host
-  -p <port>			 specify database port
-  -db <database>	 specify database name
-  -t <type>  		 specify database type: mysql or postgres
-  -u <username>		 database username
-  -p <password>		 database password
-  -table <tablename> database tablename
+  -v                   print the version to stdout.
+  -h <host>            specify database host
+  -p <port>			   specify database port
+  -db <database>	   specify database name
+  -t <type>  		   specify database type: mysql or postgres
+  -u <username>		   database username
+  -password <password> database password
+  -table <tablename>   database tablename
+  -num <total data>    total data number, 0 for forever
 
 Examples:
 
@@ -54,8 +57,9 @@ var (
 	databaseType = flag.String("t", "postgres", "specify database type mysql or postgres")
 	database     = flag.String("db", "testdb", "specify database name")
 	username     = flag.String("u", "postgres", "database username")
-	password     = flag.String("password", "", "database password")
-	table        = flag.String("table", "test", "database table name")
+	password     = flag.String("password", "abc123", "database password")
+	table        = flag.String("table", "test12", "database table name")
+	totalnumber  = flag.Int64("num", 0, "total data number, 0 for forever")
 )
 
 func usageExit(rc int) {
@@ -82,6 +86,8 @@ func main() {
 	case "postgres":
 		fmt.Println("Start to generate data to ", *host, *port, *username, *database, *table)
 		generatePostgresData(*host, *port, *username, *password, *database, *table)
+	default:
+		fmt.Println("no db type choosed, exit...")
 	}
 }
 
@@ -124,22 +130,59 @@ func generatePostgresData(host, port, username, password, database, table string
 	}
 	defer db.Close()
 
-	_, err = db.Exec(`CREATE TABLE ` + table + ` (id int4,email varchar, city varchar, useragent varchar,age int4,salary float4,delete  bool,create_time timestamp(6))WITH (OIDS=FALSE);`)
+	_, err = db.Exec(`CREATE TABLE ` + table + ` (id int4,realtm varchar,email varchar, city varchar, useragent varchar,age int4,salary float4,delete  bool,create_time timestamp(6))WITH (OIDS=FALSE);`)
 	if err != nil && !strings.Contains(err.Error(), "already exists") {
 		log.Error(err)
 		return
 	}
-	datanum := 1
+	var datanum int64
 	for {
-		dt := `INSERT INTO ` + table + ` VALUES ('` + strconv.Itoa(datanum) + `', '` + randomdata.Email() + `', '` + randomdata.City() + `','` + randomdata.UserAgentString() + `', ` + strconv.Itoa(rand.Intn(100)) + `, '` + strconv.FormatFloat(rand.Float64(), 'f', -1, 64) + `', 't', '` + time.Unix(int64(149999999+datanum), 0).Format("2006-01-02 15:04:05") + `');`
-		_, err = db.Exec(dt)
+		var wg = new(sync.WaitGroup)
+		for i := 0; i < 4; i++ {
+			wg.Add(1)
+			go insert(db, table, datanum, wg)
+			datanum += 500
+		}
+		wg.Wait()
+		fmt.Println(datanum, " of data inserted ", time.Now().String())
+		if *totalnumber > 0 && datanum >= *totalnumber {
+			break
+		}
+	}
+	fmt.Println(datanum, " finish inserted")
+}
+
+func insert(db *sql.DB, table string, datanum int64, wg *sync.WaitGroup) {
+	defer wg.Done()
+	txn, err := db.Begin()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	stmt, err := txn.Prepare(pq.CopyIn(table, "id", "realtm", "email", "city", "useragent", "age", "salary", "delete", "create_time"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for i := 0; i < 500; i++ {
+		_, err = stmt.Exec(strconv.FormatInt(datanum+int64(i)+1, 10), time.Now().Format(time.RFC3339Nano), randomdata.Email(), randomdata.City(), randomdata.UserAgentString(), strconv.Itoa(rand.Intn(100)), strconv.FormatFloat(rand.Float64(), 'f', -1, 64), randomdata.Boolean(), time.Now().Add(-8*time.Hour).Format("2006-01-02 15:04:00"))
 		if err != nil {
-			log.Error(err)
-			return
+			log.Fatal(err)
 		}
-		if datanum%100 == 0 {
-			fmt.Println(datanum, " of data inserted")
-		}
-		datanum++
+	}
+
+	_, err = stmt.Exec()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = stmt.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = txn.Commit()
+	if err != nil {
+		log.Fatal(err)
 	}
 }
