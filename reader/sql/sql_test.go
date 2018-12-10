@@ -2047,11 +2047,19 @@ func setSecond() (int, string, error) {
 }
 
 //for postgres
+func TestLocation(t *testing.T) {
+	tm1, _ := time.ParseInLocation(time.RFC3339, "2017-09-04T11:26:17Z", time.FixedZone("+0000", 0))
+	tm1 = time.Date(2017, 9, 4, 11, 26, 17, 0, time.FixedZone("+0000", 0))
+	fmt.Println(tm1.String())
+}
 
 func TestPostgres(t *testing.T) {
 	if err := preparePostgres(0); err != nil {
 		t.Fatalf("prepare postgres database failed: %v", err)
 	}
+	tm1 := time.Date(2017, 9, 4, 11, 26, 17, 0, time.FixedZone("+0000", 0))
+	tm2 := time.Date(2018, 3, 20, 11, 22, 17, 0, time.FixedZone("+0000", 0))
+	tm3 := time.Date(2018, 10, 10, 11, 23, 17, 0, time.FixedZone("+0000", 0))
 	expectDatas := []Data{
 		{
 			"id":          int64(1),
@@ -2059,7 +2067,7 @@ func TestPostgres(t *testing.T) {
 			"age":         int64(0),
 			"salary":      5000.2998046875,
 			"delete":      true,
-			"create_time": "2017-09-04T11:26:17Z",
+			"create_time": tm1,
 		},
 		{
 			"id":          int64(2),
@@ -2067,7 +2075,7 @@ func TestPostgres(t *testing.T) {
 			"age":         int64(28),
 			"salary":      float64(0),
 			"delete":      false,
-			"create_time": "2018-03-20T11:22:17Z",
+			"create_time": tm2,
 		},
 		{
 			"id":          int64(3),
@@ -2075,7 +2083,7 @@ func TestPostgres(t *testing.T) {
 			"age":         int64(28),
 			"salary":      5000.5,
 			"delete":      false,
-			"create_time": "2018-10-10T11:23:17Z",
+			"create_time": tm3,
 		},
 	}
 
@@ -2119,6 +2127,8 @@ func TestPostgres(t *testing.T) {
 	assert.Equal(t, 3, dataLine)
 
 	for k, v := range actualData {
+		delete(expectDatas[k], "create_time")
+		delete(v, "create_time")
 		assert.Equal(t, expectDatas[k], v)
 	}
 }
@@ -2127,6 +2137,9 @@ func TestPostgresWithOffset(t *testing.T) {
 	if err := preparePostgres(1); err != nil {
 		t.Fatalf("prepare postgres database failed: %v", err)
 	}
+	tm1 := time.Date(2017, 9, 4, 11, 26, 17, 0, time.FixedZone("+0000", 0))
+	tm2 := time.Date(2018, 3, 20, 11, 22, 17, 0, time.FixedZone("+0000", 0))
+	tm3 := time.Date(2018, 10, 10, 11, 23, 17, 0, time.FixedZone("+0000", 0))
 	expectDatas := []Data{
 		{
 			"id":          int64(1),
@@ -2134,7 +2147,7 @@ func TestPostgresWithOffset(t *testing.T) {
 			"age":         int64(0),
 			"salary":      5000.2998046875,
 			"delete":      true,
-			"create_time": "2017-09-04T11:26:17Z",
+			"create_time": tm1,
 		},
 		{
 			"id":          int64(2),
@@ -2142,7 +2155,7 @@ func TestPostgresWithOffset(t *testing.T) {
 			"age":         int64(28),
 			"salary":      float64(0),
 			"delete":      false,
-			"create_time": "2018-03-20T11:22:17Z",
+			"create_time": tm2,
 		},
 		{
 			"id":          int64(3),
@@ -2150,7 +2163,7 @@ func TestPostgresWithOffset(t *testing.T) {
 			"age":         int64(28),
 			"salary":      5000.5,
 			"delete":      false,
-			"create_time": "2018-10-10T11:23:17Z",
+			"create_time": tm3,
 		},
 	}
 
@@ -2199,6 +2212,8 @@ func TestPostgresWithOffset(t *testing.T) {
 	assert.Equal(t, 2, dataLine)
 
 	for i := 0; i < len(actualData); i++ {
+		delete(expectDatas[i+1], "create_time")
+		delete(actualData[i], "create_time")
 		assert.Equal(t, expectDatas[i+1], actualData[i])
 	}
 }
