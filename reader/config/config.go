@@ -923,6 +923,16 @@ var ModeKeyOptions = map[string][]Option{
 			Advance:      true,
 			ToolTip:      "zookeeper连接超时时间，单位为秒",
 		},
+		{
+			KeyName:      KeyKafkaMaxProcessTime,
+			ChooseOnly:   false,
+			Default:      "1s",
+			Required:     true,
+			DefaultNoUse: false,
+			Description:  "kafka单次请求最大处理时间(" + KeyKafkaMaxProcessTime + ")",
+			Advance:      true,
+			ToolTip:      "kafka单次请求最大处理时间，可以填写单位如1s(1秒)、2m(2分钟)、3h(3小时)",
+		},
 		OptionDataSourceTag,
 	},
 	ModeRedis: {

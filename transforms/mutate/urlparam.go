@@ -2,9 +2,7 @@ package mutate
 
 import (
 	"errors"
-	"fmt"
 	"net/url"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -126,20 +124,22 @@ func (p *UrlParam) Transform(datas []Data) ([]Data, error) {
 		p.Init()
 	}
 	var (
+		dataLen     = len(datas)
 		err, fmtErr error
 		errNum      int
-	)
-	numRoutine := p.numRoutine
-	if len(datas) < numRoutine {
-		numRoutine = len(datas)
-	}
-	dataPipline := make(chan transforms.TransformInfo)
-	resultChan := make(chan transforms.TransformResult)
 
-	wg := new(sync.WaitGroup)
+		numRoutine   = p.numRoutine
+		dataPipeline = make(chan transforms.TransformInfo)
+		resultChan   = make(chan transforms.TransformResult)
+		wg           = new(sync.WaitGroup)
+	)
+	if dataLen < numRoutine {
+		numRoutine = dataLen
+	}
+
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
-		go p.transform(dataPipline, resultChan, wg)
+		go p.transform(dataPipeline, resultChan, wg)
 	}
 
 	go func() {
@@ -149,20 +149,17 @@ func (p *UrlParam) Transform(datas []Data) ([]Data, error) {
 
 	go func() {
 		for idx, data := range datas {
-			dataPipline <- transforms.TransformInfo{
+			dataPipeline <- transforms.TransformInfo{
 				CurData: data,
 				Index:   idx,
 			}
 		}
-		close(dataPipline)
+		close(dataPipeline)
 	}()
 
-	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
+	var transformResultSlice = make(transforms.TransformResultSlice, dataLen)
 	for resultInfo := range resultChan {
-		transformResultSlice = append(transformResultSlice, resultInfo)
-	}
-	if numRoutine > 1 {
-		sort.Stable(transformResultSlice)
+		transformResultSlice[resultInfo.Index] = resultInfo
 	}
 
 	for _, transformResult := range transformResultSlice {
@@ -173,7 +170,7 @@ func (p *UrlParam) Transform(datas []Data) ([]Data, error) {
 		datas[transformResult.Index] = transformResult.CurData
 	}
 
-	p.stats, fmtErr = transforms.SetStatsInfo(err, p.stats, int64(errNum), int64(len(datas)), p.Type())
+	p.stats, fmtErr = transforms.SetStatsInfo(err, p.stats, int64(errNum), int64(dataLen), p.Type())
 	return datas, fmtErr
 }
 
@@ -229,13 +226,13 @@ func init() {
 	})
 }
 
-func (p *UrlParam) transform(dataPipline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+func (p *UrlParam) transform(dataPipeline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
 	var (
 		err, toMapErr error
 		errNum        int
 	)
 	newKeys := make([]string, len(p.keys))
-	for transformInfo := range dataPipline {
+	for transformInfo := range dataPipeline {
 		err = nil
 		errNum = 0
 
@@ -254,7 +251,7 @@ func (p *UrlParam) transform(dataPipline <-chan transforms.TransformInfo, result
 		var res map[string]interface{}
 		strVal, ok := val.(string)
 		if !ok {
-			typeErr := fmt.Errorf("transform key %v data type is not string", p.Key)
+			typeErr := errors.New("transform key " + p.Key + " data type is not string")
 			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
 			resultChan <- transforms.TransformResult{
 				Index:   transformInfo.Index,

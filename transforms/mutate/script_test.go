@@ -2,13 +2,12 @@ package mutate
 
 import (
 	"os"
+	"strings"
 	"testing"
 
-	. "github.com/qiniu/logkit/utils/models"
-
-	"strings"
-
 	"github.com/stretchr/testify/assert"
+
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 func TestScriptTransformer(t *testing.T) {
@@ -28,8 +27,8 @@ echo "say: ${word} ${name}"`
 		New:         "myscript",
 		Interpreter: "bash",
 	}
-	scriptConf.Init()
 	scriptConf.ScriptPath = fileName
+	scriptConf.Init()
 	data := []Data{{"key1": "bye", "other": "other"}, {"key1": "nice", "key2": "qiniu"}}
 	res, err := scriptConf.Transform(data)
 	assert.NoError(t, err)
@@ -41,8 +40,8 @@ echo "say: ${word} ${name}"`
 		New:         "myscript",
 		Interpreter: "bash",
 	}
-	scriptConf2.Init()
 	scriptConf2.ScriptPath = fileName
+	scriptConf2.Init()
 	data2 := []Data{{"key1": "", "key2": "qiniu"}, {"key1": "nice", "key2": "qiniu"}}
 	res2, err2 := scriptConf2.Transform(data2)
 	assert.NoError(t, err2)
@@ -54,8 +53,8 @@ echo "say: ${word} ${name}"`
 		New:         "myscript...",
 		Interpreter: "bash",
 	}
-	scriptConf3.Init()
 	scriptConf3.ScriptPath = fileName
+	scriptConf3.Init()
 	data3 := []Data{{"key1": "", "key2": "qiniu"}, {"key1": "nice", "key2": "qiniu"}}
 	res3, err3 := scriptConf3.Transform(data3)
 	assert.NoError(t, err3)
@@ -67,8 +66,8 @@ echo "say: ${word} ${name}"`
 		New:         "myscript...",
 		Interpreter: "bash",
 	}
-	scriptConf5.Init()
 	scriptConf5.ScriptPath = fileName
+	scriptConf5.Init()
 	data5 := []Data{{"key1": "", "key2": "qiniu"}, {"key1": "nice", "key2": "qiniu"}}
 	res5, err5 := scriptConf5.Transform(data5)
 	assert.NoError(t, err5)
@@ -86,8 +85,8 @@ echo "say: ${word} ${name}"`
 		New:         "myscript",
 		Interpreter: "bash",
 	}
-	scriptConf4.Init()
 	scriptConf4.ScriptPath = fileName
+	scriptConf4.Init()
 	data4 := []Data{{"key1": "", "key2": "qiniu"}, {"key1": "nice", "key2": "qiniu"}}
 	res4, err4 := scriptConf4.Transform(data4)
 	assert.NoError(t, err4)

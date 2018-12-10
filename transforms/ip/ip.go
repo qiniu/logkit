@@ -2,8 +2,6 @@ package ip
 
 import (
 	"errors"
-	"fmt"
-	"sort"
 	"strings"
 	"sync"
 
@@ -120,8 +118,6 @@ func (t *Transformer) Transform(datas []Data) ([]Data, error) {
 		return datas, nil
 	}
 
-	var err, fmtErr error
-	errNum := 0
 	if t.loc == nil {
 		err := t.Init()
 		if err != nil {
@@ -129,17 +125,24 @@ func (t *Transformer) Transform(datas []Data) ([]Data, error) {
 		}
 	}
 
-	numRoutine := t.numRoutine
-	if len(datas) < numRoutine {
-		numRoutine = len(datas)
-	}
-	dataPipline := make(chan transforms.TransformInfo)
-	resultChan := make(chan transforms.TransformResult)
+	var (
+		err, fmtErr error
+		errNum      = 0
+		dataLen     = len(datas)
 
-	wg := new(sync.WaitGroup)
+		numRoutine   = t.numRoutine
+		dataPipeline = make(chan transforms.TransformInfo)
+		resultChan   = make(chan transforms.TransformResult)
+		wg           = new(sync.WaitGroup)
+	)
+
+	if dataLen < numRoutine {
+		numRoutine = dataLen
+	}
+
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
-		go t.transform(dataPipline, resultChan, wg)
+		go t.transform(dataPipeline, resultChan, wg)
 	}
 
 	go func() {
@@ -149,20 +152,17 @@ func (t *Transformer) Transform(datas []Data) ([]Data, error) {
 
 	go func() {
 		for idx, data := range datas {
-			dataPipline <- transforms.TransformInfo{
+			dataPipeline <- transforms.TransformInfo{
 				CurData: data,
 				Index:   idx,
 			}
 		}
-		close(dataPipline)
+		close(dataPipeline)
 	}()
 
-	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
+	var transformResultSlice = make(transforms.TransformResultSlice, dataLen)
 	for resultInfo := range resultChan {
-		transformResultSlice = append(transformResultSlice, resultInfo)
-	}
-	if numRoutine > 1 {
-		sort.Stable(transformResultSlice)
+		transformResultSlice[resultInfo.Index] = resultInfo
 	}
 
 	for _, transformResult := range transformResultSlice {
@@ -173,7 +173,7 @@ func (t *Transformer) Transform(datas []Data) ([]Data, error) {
 		datas[transformResult.Index] = transformResult.CurData
 	}
 
-	t.stats, fmtErr = transforms.SetStatsInfo(err, t.stats, int64(errNum), int64(len(datas)), t.Type())
+	t.stats, fmtErr = transforms.SetStatsInfo(err, t.stats, int64(errNum), int64(dataLen), t.Type())
 	return datas, fmtErr
 }
 
@@ -199,7 +199,7 @@ func (t *Transformer) SetMapValue(m map[string]interface{}, val interface{}, key
 		if curr, ok = finalVal.(Data); ok {
 			continue
 		}
-		return fmt.Errorf("SetMapValueWithPrefix failed, %v is not the type of map[string]interface{}", keys)
+		return errors.New("SetMapValueWithPrefix failed, " + strings.Join(keys, ",") + " is not the type of map[string]interface{}")
 	}
 	//判断val(k)是否存在
 	_, exist := curr[keys[len(keys)-1]]
@@ -330,13 +330,13 @@ func init() {
 	})
 }
 
-func (t *Transformer) transform(dataPipline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+func (t *Transformer) transform(dataPipeline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
 	var (
 		err    error
 		errNum int
 	)
 	newKeys := make([]string, len(t.keys))
-	for transformInfo := range dataPipline {
+	for transformInfo := range dataPipeline {
 		err = nil
 		errNum = 0
 
@@ -354,7 +354,7 @@ func (t *Transformer) transform(dataPipline <-chan transforms.TransformInfo, res
 		}
 		strVal, ok := val.(string)
 		if !ok {
-			notStringErr := fmt.Errorf("transform key %v data type is not string", t.Key)
+			notStringErr := errors.New("transform key " + t.Key + " data type is not string")
 			errNum, err = transforms.SetError(errNum, notStringErr, transforms.General, "")
 			resultChan <- transforms.TransformResult{
 				Index:   transformInfo.Index,

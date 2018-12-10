@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -82,7 +81,7 @@ func NewNginxAccParser(c conf.MapConf) (p *Parser, err error) {
 	} else {
 		re, err := regexp.Compile(nginxRegexStr)
 		if err != nil {
-			return nil, fmt.Errorf("Compile nginx_log_format_regex %v error %v", nginxRegexStr, err)
+			return nil, errors.New("Compile nginx_log_format_regex " + nginxRegexStr + " error " + err.Error())
 		}
 		p.regexp = re
 	}
@@ -117,17 +116,21 @@ func (p *Parser) Type() string {
 }
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
-	datas := make([]Data, 0, len(lines))
-	se := &StatsError{}
+	var (
+		lineLen = len(lines)
+		datas   = make([]Data, lineLen)
+		se      = &StatsError{}
 
-	numRoutine := p.numRoutine
-	if len(lines) < numRoutine {
-		numRoutine = len(lines)
+		numRoutine = p.numRoutine
+		sendChan   = make(chan parser.ParseInfo)
+		resultChan = make(chan parser.ParseResult)
+		wg         = new(sync.WaitGroup)
+	)
+
+	if lineLen < numRoutine {
+		numRoutine = lineLen
 	}
-	sendChan := make(chan parser.ParseInfo)
-	resultChan := make(chan parser.ParseResult)
 
-	wg := new(sync.WaitGroup)
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
 		go parser.ParseLine(sendChan, resultChan, wg, true, p.parse)
@@ -148,17 +151,18 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		close(sendChan)
 	}()
 
-	var parseResultSlice = make(parser.ParseResultSlice, 0, len(lines))
+	var parseResultSlice = make(parser.ParseResultSlice, lineLen)
 	for resultInfo := range resultChan {
-		parseResultSlice = append(parseResultSlice, resultInfo)
-	}
-	if numRoutine > 1 {
-		sort.Stable(parseResultSlice)
+		parseResultSlice[resultInfo.Index] = resultInfo
 	}
 
+	se.DatasourceSkipIndex = make([]int, lineLen)
+	datasourceIndex := 0
+	dataIndex := 0
 	for _, parseResult := range parseResultSlice {
 		if len(parseResult.Line) == 0 {
-			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
+			se.DatasourceSkipIndex[datasourceIndex] = parseResult.Index
+			datasourceIndex++
 			continue
 		}
 
@@ -169,18 +173,20 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 			if !p.disableRecordErrData {
 				errData[KeyPandoraStash] = parseResult.Line
 			} else if !p.keepRawData {
-				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
+				se.DatasourceSkipIndex[datasourceIndex] = parseResult.Index
+				datasourceIndex++
 			}
 			if p.keepRawData {
 				errData[KeyRawData] = parseResult.Line
 			}
 			if !p.disableRecordErrData || p.keepRawData {
-				datas = append(datas, errData)
+				datas[dataIndex] = errData
+				dataIndex++
 			}
 			continue
 		}
 		if len(parseResult.Data) < 1 { //数据为空时不发送
-			se.LastError = fmt.Sprintf("parsed no data by line [%v]", parseResult.Line)
+			se.LastError = "parsed no data by line: " + parseResult.Line
 			se.AddErrors()
 			continue
 		}
@@ -189,9 +195,12 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		if p.keepRawData {
 			parseResult.Data[KeyRawData] = parseResult.Line
 		}
-		datas = append(datas, parseResult.Data)
+		datas[dataIndex] = parseResult.Data
+		dataIndex++
 	}
 
+	se.DatasourceSkipIndex = se.DatasourceSkipIndex[:datasourceIndex]
+	datas = datas[:dataIndex]
 	if se.Errors == 0 {
 		return datas, nil
 	}
@@ -224,7 +233,7 @@ func (p *Parser) parse(line string) (Data, error) {
 	return entry, nil
 }
 
-func (p *Parser) makeValue(name, raw string) (data interface{}, err error) {
+func (p *Parser) makeValue(name, raw string) (interface{}, error) {
 	valueType := p.schema[name]
 	switch DataType(valueType) {
 	case TypeFloat:
@@ -233,18 +242,18 @@ func (p *Parser) makeValue(name, raw string) (data interface{}, err error) {
 		}
 		v, err := strconv.ParseFloat(raw, 64)
 		if err != nil {
-			err = fmt.Errorf("convet for %q to float64 failed: %q", name, raw)
+			return nil, fmt.Errorf("convet for %q to float64 failed: %q", name, raw)
 		}
-		return v, err
+		return v, nil
 	case TypeLong:
 		if raw == "-" {
 			return 0, nil
 		}
 		v, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil {
-			err = fmt.Errorf("convet for %q to int64 failed, %q", name, raw)
+			return nil, fmt.Errorf("convet for %q to int64 failed, %q", name, raw)
 		}
-		return v, err
+		return v, nil
 	case TypeString:
 		return raw, nil
 	case TypeDate:
@@ -252,8 +261,7 @@ func (p *Parser) makeValue(name, raw string) (data interface{}, err error) {
 		if nerr != nil {
 			return tm, nerr
 		}
-		data = tm.Format(time.RFC3339Nano)
-		return
+		return tm.Format(time.RFC3339Nano), nil
 	default:
 		return strings.TrimSpace(raw), nil
 	}
@@ -269,14 +277,14 @@ var (
 func ResolveRegexpFromConf(confPath, name string) (*regexp.Regexp, error) {
 	f, err := os.Open(confPath)
 	if err != nil {
-		return nil, fmt.Errorf("open: %v", err)
+		return nil, errors.New("open: " + err.Error())
 	}
 	defer f.Close()
 
 	scanner := bufio.NewScanner(f)
 	reTmp, err := regexp.Compile(fmt.Sprintf(`^\s*log_format\s+%v\s+(.+)\s*$`, name))
 	if err != nil {
-		return nil, fmt.Errorf("compile log format regexp: %v", err)
+		return nil, errors.New("compile log format regexp: " + err.Error())
 	}
 
 	found := false
@@ -305,7 +313,7 @@ func ResolveRegexpFromConf(confPath, name string) (*regexp.Regexp, error) {
 	if scanner.Err() != nil {
 		return nil, scanner.Err()
 	} else if !found {
-		return nil, fmt.Errorf("`log_format %v` not found in given config", name)
+		return nil, errors.New("`log_format `" + name + "`" + " not found in given config")
 	}
 
 	restr := replaceRegexp.ReplaceAllString(regexp.QuoteMeta(format+" "), "(?P<$1>[^$3]*)$2")
@@ -316,7 +324,7 @@ func ResolveRegexpFromConf(confPath, name string) (*regexp.Regexp, error) {
 func FindAllRegexpsFromConf(confPath string) (map[string]*regexp.Regexp, error) {
 	f, err := os.Open(confPath)
 	if err != nil {
-		return nil, fmt.Errorf("open: %v", err)
+		return nil, errors.New("open: " + err.Error())
 	}
 	defer f.Close()
 
@@ -347,7 +355,7 @@ func FindAllRegexpsFromConf(confPath string) (map[string]*regexp.Regexp, error) 
 			restr := replaceRegexp.ReplaceAllString(regexp.QuoteMeta(format+" "), "(?P<$1>[^$3]*)$2")
 			re, err := regexp.Compile(fmt.Sprintf("^%v$", strings.Trim(restr, " ")))
 			if err != nil {
-				return nil, fmt.Errorf("compile log format regexp: %v", err)
+				return nil, errors.New("compile log format regexp: " + err.Error())
 			}
 			patterns[name] = re
 			found = false

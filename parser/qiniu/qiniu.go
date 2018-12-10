@@ -1,11 +1,11 @@
 package qiniu
 
 import (
-	"fmt"
 	"regexp"
-	"sort"
 	"strings"
 	"sync"
+
+	"github.com/pkg/errors"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
@@ -72,7 +72,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	logHeaders, _ := c.GetStringListOr(KeyLogHeaders, defaultLogHeads)
 	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)
 	if len(logHeaders) < 1 {
-		return nil, fmt.Errorf("no log headers was configured to parse")
+		return nil, errors.New("no log headers was configured to parse")
 	}
 
 	//兼容老的配置，以前的配置必须要配 KeyPrefix 才能匹配 prefix
@@ -136,10 +136,10 @@ func (p *Parser) GetParser(head string) (func(string) (string, map[string]string
 		return p.parseCombinedModuleFile, nil
 
 	}
-	return nil, fmt.Errorf("QiniulogParser Loghead <%v> not exist", head)
+	return nil, errors.New("QiniulogParser Loghead <" + head + "> not exist")
 }
 
-func getSplitByFirstSpace(line string) (firstPart, left string) {
+func getSplitByFirstSpace(line string) (string, string) {
 	space := strings.Index(line, " ")
 	if space < 0 {
 		return line, ""
@@ -165,23 +165,20 @@ func (p *Parser) parseTime(line string) (string, map[string]string, error) {
 	return leftline, result, nil
 }
 
-func parseFromBracket(line, leftBracket, rightBracket string) (leftline, thing string, err error) {
+func parseFromBracket(line, leftBracket, rightBracket string) (string, string, error) {
 	if !strings.HasPrefix(line, leftBracket) {
-		err = fmt.Errorf("can not find left bracket %v %s", leftBracket, line)
-		return
+		return "", "", errors.New("can not find left bracket " + leftBracket + " " + line)
 	}
 	index := strings.Index(line, rightBracket)
 	if index < 0 {
-		err = fmt.Errorf("can not find right bracket %v from log %s", leftBracket, line)
-		return
+		return "", "", errors.New("can not find right bracket " + leftBracket + " from log " + line)
 	}
-	thing = line[len(leftBracket):index]
-	if index+1 >= len(line) {
-		leftline = ""
-	} else {
+	thing := line[len(leftBracket):index]
+	leftline := ""
+	if index+1 < len(line) {
 		leftline = line[index+1:]
 	}
-	return
+	return leftline, thing, nil
 }
 
 func (p *Parser) parseReqid(line string) (string, map[string]string, error) {
@@ -211,16 +208,14 @@ func (p *Parser) parseReqid(line string) (string, map[string]string, error) {
 func (p *Parser) parseCombinedReqidLevel(line string) (string, map[string]string, error) {
 	leftline, firstRes, err := parseFromBracket(line, "[", "]")
 	if err != nil {
-		err = errorCanNotParse(LogCombinedReqidLevel, line, err)
-		return line, nil, err
+		return line, nil, errorCanNotParse(LogCombinedReqidLevel, line, err)
 	}
 	result := make(map[string]string)
 	var secondRes string
 	if strings.HasPrefix(leftline, "[") {
 		leftline, secondRes, err = parseFromBracket(leftline, "[", "]")
 		if err != nil {
-			err = errorCanNotParse(LogCombinedReqidLevel, leftline, err)
-			return line, nil, err
+			return line, nil, errorCanNotParse(LogCombinedReqidLevel, leftline, err)
 		}
 		result[LogHeadReqid] = firstRes
 		result[LogHeadLevel] = secondRes
@@ -233,11 +228,9 @@ func (p *Parser) parseCombinedReqidLevel(line string) (string, map[string]string
 func (p *Parser) parseLogLevel(line string) (string, map[string]string, error) {
 	leftline, loglevel, err := parseFromBracket(line, "[", "]")
 	if err != nil {
-		err = errorCanNotParse(LogHeadLevel, line, err)
-		return line, nil, err
+		return line, nil, errorCanNotParse(LogHeadLevel, line, err)
 	}
-	result := map[string]string{LogHeadLevel: loglevel}
-	return leftline, result, nil
+	return leftline, map[string]string{LogHeadLevel: loglevel}, nil
 }
 
 func (p *Parser) parseModule(line string) (string, map[string]string, error) {
@@ -246,11 +239,9 @@ func (p *Parser) parseModule(line string) (string, map[string]string, error) {
 	}
 	leftline, module, err := parseFromBracket(line, "[", "]")
 	if err != nil {
-		err = errorCanNotParse(LogHeadModule, line, err)
-		return line, nil, err
+		return line, nil, errorCanNotParse(LogHeadModule, line, err)
 	}
-	result := map[string]string{LogHeadModule: module}
-	return leftline, result, err
+	return leftline, map[string]string{LogHeadModule: module}, err
 }
 
 func (p *Parser) parseLogFile(line string) (string, map[string]string, error) {
@@ -261,15 +252,13 @@ func (p *Parser) parseLogFile(line string) (string, map[string]string, error) {
 		return leftline, result, nil
 	}
 	if len(leftline) < 1 {
-		err := errorCanNotParse(LogHeadFile, line, fmt.Errorf("no left log to parse"))
-		return line, nil, err
+		return line, nil, errorCanNotParse(LogHeadFile, line, errors.New("no left log to parse"))
 	}
 	leftline = strings.TrimSpace(leftline)
 	nextfile, leftline := getSplitByFirstSpace(leftline)
 	match = isMatch(logFilePattern, nextfile)
 	if !match {
-		err := errorCanNotParse(LogHeadFile, nextfile, fmt.Errorf("pattern <%v> not match %v", LogFilePattern, nextfile))
-		return line, nil, err
+		return line, nil, errorCanNotParse(LogHeadFile, nextfile, errors.New("pattern <"+LogFilePattern+"> not match "+nextfile))
 	}
 	logFile += " " + nextfile
 	result := map[string]string{LogHeadFile: logFile}
@@ -309,11 +298,11 @@ func isMatch(pattern *regexp.Regexp, raw string) bool {
 }
 
 func errorCanNotParse(s string, line string, err error) error {
-	return fmt.Errorf("can not parse %v from %v %v", s, line, err)
+	return errors.New("can not parse " + s + " from " + line + " err: " + err.Error())
 }
 
-func (p *Parser) parse(line string) (d Data, err error) {
-	d = make(Data, len(p.headers)+len(p.labels))
+func (p *Parser) parse(line string) (Data, error) {
+	d := make(Data, len(p.headers)+len(p.labels))
 	// 不明白为什么之前要把换行和\t干掉，现在注释
 	//line = strings.Replace(line, "\n", " ", -1)
 	//line = strings.Replace(line, "\t", "\\t", -1)
@@ -361,17 +350,19 @@ func (p *Parser) parse(line string) (d Data, err error) {
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
 	var (
-		datas = make([]Data, 0, len(lines))
-		se    = &StatsError{}
-	)
-	numRoutine := p.numRoutine
-	if len(lines) < numRoutine {
-		numRoutine = len(lines)
-	}
-	sendChan := make(chan parser.ParseInfo)
-	resultChan := make(chan parser.ParseResult)
+		lineLen = len(lines)
+		datas   = make([]Data, lineLen)
+		se      = &StatsError{}
 
-	wg := new(sync.WaitGroup)
+		numRoutine = p.numRoutine
+		sendChan   = make(chan parser.ParseInfo)
+		resultChan = make(chan parser.ParseResult)
+		wg         = new(sync.WaitGroup)
+	)
+	if lineLen < numRoutine {
+		numRoutine = lineLen
+	}
+
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
 		go parser.ParseLine(sendChan, resultChan, wg, true, p.parse)
@@ -392,17 +383,18 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		close(sendChan)
 	}()
 
-	var parseResultSlice = make(parser.ParseResultSlice, 0, len(lines))
+	var parseResultSlice = make(parser.ParseResultSlice, lineLen)
 	for resultInfo := range resultChan {
-		parseResultSlice = append(parseResultSlice, resultInfo)
-	}
-	if numRoutine > 1 {
-		sort.Stable(parseResultSlice)
+		parseResultSlice[resultInfo.Index] = resultInfo
 	}
 
+	se.DatasourceSkipIndex = make([]int, lineLen)
+	datasourceIndex := 0
+	dataIndex := 0
 	for _, parseResult := range parseResultSlice {
 		if len(parseResult.Line) == 0 {
-			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
+			se.DatasourceSkipIndex[datasourceIndex] = parseResult.Index
+			datasourceIndex++
 			continue
 		}
 
@@ -413,13 +405,15 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 			if !p.disableRecordErrData {
 				errData[KeyPandoraStash] = parseResult.Line
 			} else if !p.keepRawData {
-				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
+				se.DatasourceSkipIndex[datasourceIndex] = parseResult.Index
+				datasourceIndex++
 			}
 			if p.keepRawData {
 				errData[KeyRawData] = parseResult.Line
 			}
 			if !p.disableRecordErrData || p.keepRawData {
-				datas = append(datas, errData)
+				datas[dataIndex] = errData
+				dataIndex++
 			}
 			continue
 		}
@@ -428,9 +422,12 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		if p.keepRawData {
 			parseResult.Data[KeyRawData] = parseResult.Line
 		}
-		datas = append(datas, parseResult.Data)
+		datas[dataIndex] = parseResult.Data
+		dataIndex++
 	}
 
+	se.DatasourceSkipIndex = se.DatasourceSkipIndex[:datasourceIndex]
+	datas = datas[:dataIndex]
 	if se.Errors == 0 {
 		return datas, nil
 	}

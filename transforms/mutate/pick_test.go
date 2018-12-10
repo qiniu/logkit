@@ -37,7 +37,7 @@ func TestPickTransformer(t *testing.T) {
 	pick = &Pick{
 		Key: "myword,abc",
 	}
-	data, err = pick.Transform([]Data{{"abc": "x1 y2", "xxx": 123, "myword": "hello x1 y2 x1nihao"}, {"abc": "x1", "nihao": "abc", "myword": "x1x.x.x11"}})
+	data, err = pick.Transform([]Data{{"nihao": "abc"}, {"abc": "x1 y2", "xxx": 123, "myword": "hello x1 y2 x1nihao"}, {"abc": "x1", "nihao": "abc", "myword": "x1x.x.x11"}})
 	assert.NoError(t, err)
 	exp = []Data{{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}, {"abc": "x1", "myword": "x1x.x.x11"}}
 	assert.Equal(t, exp, data)

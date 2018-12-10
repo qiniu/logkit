@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"sort"
 	"strings"
 	"sync"
 
@@ -62,21 +61,23 @@ func (f *Filter) Transform(datas []Data) ([]Data, error) {
 	}
 
 	var (
+		dataLen     = len(datas)
 		err, fmtErr error
 		errNum      int
+
+		numRoutine   = f.numRoutine
+		dataPipeline = make(chan transforms.TransformInfo)
+		resultChan   = make(chan transforms.TransformResult)
+		wg           = new(sync.WaitGroup)
 	)
 
-	numRoutine := f.numRoutine
-	if len(datas) < numRoutine {
-		numRoutine = len(datas)
+	if dataLen < numRoutine {
+		numRoutine = dataLen
 	}
-	dataPipline := make(chan transforms.TransformInfo)
-	resultChan := make(chan transforms.TransformResult)
 
-	wg := new(sync.WaitGroup)
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
-		go f.transform(dataPipline, resultChan, wg)
+		go f.transform(dataPipeline, resultChan, wg)
 	}
 
 	go func() {
@@ -86,61 +87,38 @@ func (f *Filter) Transform(datas []Data) ([]Data, error) {
 
 	go func() {
 		for idx, data := range datas {
-			dataPipline <- transforms.TransformInfo{
+			dataPipeline <- transforms.TransformInfo{
 				CurData: data,
 				Index:   idx,
 			}
 		}
-		close(dataPipline)
+		close(dataPipeline)
 	}()
 
-	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
+	var (
+		transformResultSlice = make(transforms.TransformResultSlice, dataLen)
+		results              = make([]Data, dataLen)
+		resultIndex          = 0
+	)
 	for resultInfo := range resultChan {
-		transformResultSlice = append(transformResultSlice, resultInfo)
-	}
-	if numRoutine > 1 {
-		sort.Stable(transformResultSlice)
+		transformResultSlice[resultInfo.Index] = resultInfo
 	}
 
-	results := make([]Data, 0, len(datas))
 	for _, transformResult := range transformResultSlice {
+		if transformResult.CurData == nil {
+			continue
+		}
+
 		if transformResult.Err != nil {
 			err = transformResult.Err
 			errNum += transformResult.ErrNum
-			continue
 		}
-		results = append(results, transformResult.CurData)
+
+		results[resultIndex] = transformResult.CurData
+		resultIndex++
 	}
-
-	f.stats, fmtErr = transforms.SetStatsInfo(err, f.stats, int64(errNum), int64(len(datas)), f.Type())
-	return results, fmtErr
-
-	//var (
-	//	errNum int
-	//	err    error
-	//	result = make([]Data, 0, len(datas))
-	//)
-	//for i := range datas {
-	//	remove := false
-	//	for _, keys := range f.discardKeys {
-	//		val, getErr := GetMapValue(datas[i], keys...)
-	//		if getErr != nil {
-	//			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, strings.Join(keys, "."))
-	//			continue
-	//		}
-	//		if f.removeRegex == nil || f.removeRegex.MatchString(fmt.Sprintf("%v", val)) {
-	//			remove = true
-	//			break
-	//		}
-	//	}
-	//	if remove {
-	//		continue
-	//	}
-	//	result = append(result, datas[i])
-	//}
-	//
-	//f.stats, _ = transforms.SetStatsInfo(err, f.stats, 0, int64(len(datas)), f.Type())
-	//return result, nil
+	f.stats, fmtErr = transforms.SetStatsInfo(err, f.stats, int64(errNum), int64(dataLen), f.Type())
+	return results[:resultIndex], fmtErr
 }
 
 func (f *Filter) Description() string {
@@ -196,13 +174,13 @@ func init() {
 	})
 }
 
-func (f *Filter) transform(dataPipline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+func (f *Filter) transform(dataPipeline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
 	var (
 		err    error
 		errNum int
 	)
 
-	for transformInfo := range dataPipline {
+	for transformInfo := range dataPipeline {
 		err = nil
 		errNum = 0
 
@@ -211,12 +189,6 @@ func (f *Filter) transform(dataPipline <-chan transforms.TransformInfo, resultCh
 			val, getErr := GetMapValue(transformInfo.CurData, keys...)
 			if getErr != nil {
 				errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, strings.Join(keys, "."))
-				resultChan <- transforms.TransformResult{
-					Index:   transformInfo.Index,
-					CurData: transformInfo.CurData,
-					ErrNum:  errNum,
-					Err:     err,
-				}
 				continue
 			}
 			if f.removeRegex == nil || f.removeRegex.MatchString(fmt.Sprintf("%v", val)) {
@@ -227,10 +199,11 @@ func (f *Filter) transform(dataPipline <-chan transforms.TransformInfo, resultCh
 		if remove {
 			continue
 		}
-
 		resultChan <- transforms.TransformResult{
 			Index:   transformInfo.Index,
 			CurData: transformInfo.CurData,
+			Err:     err,
+			ErrNum:  errNum,
 		}
 	}
 	wg.Done()

@@ -125,10 +125,11 @@ type TransformInfo struct {
 }
 
 type TransformResult struct {
-	Index   int
-	CurData Data
-	Err     error
-	ErrNum  int
+	Index    int
+	CurData  Data
+	CurDatas []Data
+	Err      error
+	ErrNum   int
 }
 
 type TransformResultSlice []TransformResult

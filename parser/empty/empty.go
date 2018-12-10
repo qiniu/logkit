@@ -26,6 +26,6 @@ func (p *Parser) Name() string {
 	return p.name
 }
 
-func (p *Parser) Parse(lines []string) (datas []Data, err error) {
-	return
+func (p *Parser) Parse(lines []string) ([]Data, error) {
+	return []Data{}, nil
 }
