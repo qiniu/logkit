@@ -1339,7 +1339,13 @@ func TestAddDatasourceForRawData(t *testing.T) {
 			"a":          float64(4),
 		},
 	}
-	assert.Equal(t, exp, res)
+	assert.Equal(t, len(exp), len(res))
+	// res 多了 lst 键值对
+	for idx := range exp {
+		for expKey, expVal := range exp[idx] {
+			assert.Equal(t, expVal, res[idx][expKey])
+		}
+	}
 }
 
 func TestAddDatatags(t *testing.T) {
@@ -1409,7 +1415,13 @@ func TestAddDatatags(t *testing.T) {
 			"Host":   float64(99),
 		},
 	}
-	assert.Equal(t, exp, res)
+	assert.Equal(t, len(exp), len(res))
+	// res 多了 lst 键值对
+	for idx := range exp {
+		for expKey, expVal := range exp[idx] {
+			assert.Equal(t, expVal, res[idx][expKey])
+		}
+	}
 }
 
 func TestRunWithExtra(t *testing.T) {
@@ -1459,7 +1471,8 @@ func TestRunWithExtra(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	assert.Equal(t, 7, len(res[0]))
+	// res 多了 lst 键值对
+	assert.Equal(t, 8, len(res[0]))
 }
 
 func TestRunWithDataSource(t *testing.T) {
@@ -1527,7 +1540,13 @@ func TestRunWithDataSource(t *testing.T) {
 			"datasource": logPath,
 		},
 	}
-	assert.Equal(t, exp, res)
+	assert.Equal(t, len(exp), len(res))
+	// res 多了 lst 键值对
+	for idx := range exp {
+		for expKey, expVal := range exp[idx] {
+			assert.Equal(t, expVal, res[idx][expKey])
+		}
+	}
 }
 
 func TestRunWithDataSourceFial(t *testing.T) {
@@ -1586,7 +1605,13 @@ func TestRunWithDataSourceFial(t *testing.T) {
 			"datasource":    logPath,
 		},
 	}
-	assert.Equal(t, exp, res)
+	assert.Equal(t, len(exp), len(res))
+	// res 多了 lst 键值对
+	for idx := range exp {
+		for expKey, expVal := range exp[idx] {
+			assert.Equal(t, expVal, res[idx][expKey])
+		}
+	}
 }
 
 func TestClassifySenderData(t *testing.T) {

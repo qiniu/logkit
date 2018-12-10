@@ -100,7 +100,7 @@ func (t *Transformer) Transform(datas []Data) ([]Data, error) {
 
 func (t *Transformer) Description() string {
 	//return "transform string/long to specified date format"
-	return "将string/long数据转换成指定的时间格式, 如 1523878855 变为 2018-04-16T19:40:55+08:00"
+	return "日期规范化，将string/long数据转换成指定的时间格式, 如 1523878855 变为 2018-04-16T19:40:55+08:00"
 }
 
 func (t *Transformer) Type() string {

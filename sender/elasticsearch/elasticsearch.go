@@ -3,6 +3,7 @@ package elasticsearch
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -126,11 +127,15 @@ func NewSender(conf conf.MapConf) (elasticSender sender.Sender, err error) {
 			return nil, err
 		}
 	default:
+		httpClient := &http.Client{
+			Timeout: 300 * time.Second,
+		}
 		optFns := []elasticV5.ClientOptionFunc{
 			elasticV5.SetSniff(false),
 			elasticV5.SetHealthcheck(false),
 			elasticV5.SetURL(host...),
 			elasticV5.SetGzip(enableGzip),
+			elasticV5.SetHttpClient(httpClient),
 		}
 
 		if len(authUsername) > 0 && len(authPassword) > 0 {
