@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -9,11 +10,10 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/json-iterator/go"
+	"github.com/rcrowley/go-metrics"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
-
-	"errors"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
@@ -88,6 +88,7 @@ func NewSender(conf conf.MapConf) (kafkaSender sender.Sender, err error) {
 	gzipCompressionLevel, _ := conf.GetStringOr(KeyGZIPCompressionLevel, KeyGZIPCompressionDefault)
 
 	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("kafkaSender:(kafkaUrl:%s,topic:%s)", hosts, topic))
+	metrics.UseNilMetrics = true
 	cfg := sarama.NewConfig()
 	cfg.Producer.Return.Successes = true
 	cfg.Producer.Return.Errors = true
