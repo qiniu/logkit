@@ -3,10 +3,10 @@ package mutate
 import (
 	"testing"
 
-	. "github.com/qiniu/logkit/utils/models"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/logkit/transforms"
-	"github.com/stretchr/testify/assert"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 func TestSplitTransformer(t *testing.T) {

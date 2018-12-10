@@ -2,8 +2,6 @@ package mutate
 
 import (
 	"errors"
-	"fmt"
-	"sort"
 	"strings"
 	"sync"
 
@@ -49,29 +47,31 @@ func (g *Spliter) Transform(datas []Data) ([]Data, error) {
 	}
 
 	var (
+		dataLen     = len(datas)
 		err, fmtErr error
 		errNum      int
+
+		numRoutine   = g.numRoutine
+		dataPipeline = make(chan transforms.TransformInfo)
+		resultChan   = make(chan transforms.TransformResult)
+		wg           = new(sync.WaitGroup)
 	)
 	if g.ArraryName == "" {
 		g.ArraryName = g.ArraryNameNew
 	}
 	if g.ArraryName == "" {
 		err = errors.New("array name is empty string,can't use as array field key name")
-		errNum = len(datas)
-		g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+		errNum = dataLen
+		g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(dataLen), g.Type())
 		return datas, fmtErr
 	}
-	numRoutine := g.numRoutine
-	if len(datas) < numRoutine {
-		numRoutine = len(datas)
+	if dataLen < numRoutine {
+		numRoutine = dataLen
 	}
-	dataPipline := make(chan transforms.TransformInfo)
-	resultChan := make(chan transforms.TransformResult)
 
-	wg := new(sync.WaitGroup)
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
-		go g.transform(dataPipline, resultChan, wg)
+		go g.transform(dataPipeline, resultChan, wg)
 	}
 
 	go func() {
@@ -81,20 +81,17 @@ func (g *Spliter) Transform(datas []Data) ([]Data, error) {
 
 	go func() {
 		for idx, data := range datas {
-			dataPipline <- transforms.TransformInfo{
+			dataPipeline <- transforms.TransformInfo{
 				CurData: data,
 				Index:   idx,
 			}
 		}
-		close(dataPipline)
+		close(dataPipeline)
 	}()
 
-	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
+	var transformResultSlice = make(transforms.TransformResultSlice, dataLen)
 	for resultInfo := range resultChan {
-		transformResultSlice = append(transformResultSlice, resultInfo)
-	}
-	if numRoutine > 1 {
-		sort.Stable(transformResultSlice)
+		transformResultSlice[resultInfo.Index] = resultInfo
 	}
 
 	for _, transformResult := range transformResultSlice {
@@ -105,7 +102,7 @@ func (g *Spliter) Transform(datas []Data) ([]Data, error) {
 		datas[transformResult.Index] = transformResult.CurData
 	}
 
-	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(dataLen), g.Type())
 	return datas, fmtErr
 }
 
@@ -172,13 +169,13 @@ func init() {
 	})
 }
 
-func (g *Spliter) transform(dataPipline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+func (g *Spliter) transform(dataPipeline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
 	var (
 		err    error
 		errNum int
 	)
 	newKeys := make([]string, len(g.keys))
-	for transformInfo := range dataPipline {
+	for transformInfo := range dataPipeline {
 		err = nil
 		errNum = 0
 
@@ -196,7 +193,7 @@ func (g *Spliter) transform(dataPipline <-chan transforms.TransformInfo, resultC
 		}
 		strVal, ok := val.(string)
 		if !ok {
-			typeErr := fmt.Errorf("transform key %v data type is not string", g.Key)
+			typeErr := errors.New("transform key " + g.Key + " data type is not string")
 			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
 			resultChan <- transforms.TransformResult{
 				Index:   transformInfo.Index,

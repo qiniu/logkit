@@ -260,6 +260,7 @@ func Test_RunForEnvTag(t *testing.T) {
 		MaxBatchLen:  1,
 		MaxBatchSize: 2048,
 		EnvTag:       "Test_RunForEnvTag",
+		ExtraInfo:    true,
 	}
 	readerConfig := conf.MapConf{
 		"log_path":        logpathLink,

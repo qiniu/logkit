@@ -2,8 +2,8 @@ package mutate
 
 import (
 	"errors"
-	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/clbanning/mxj"
 
@@ -22,54 +22,77 @@ type Xml struct {
 	New   string `json:"new"`
 	stats StatsInfo
 
-	keys []string
-	news []string
+	keys       []string
+	news       []string
+	numRoutine int
 }
 
 func (g *Xml) Init() error {
 	g.keys = GetKeys(g.Key)
 	g.news = GetKeys(g.New)
+
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = 1
+	}
+	g.numRoutine = numRoutine
 	return nil
 }
 
 func (g *Xml) Transform(datas []Data) ([]Data, error) {
-	var err, fmtErr error
-	errNum := 0
 	if g.keys == nil {
 		g.Init()
 	}
-	for i := range datas {
-		val, getErr := GetMapValue(datas[i], g.keys...)
-		if getErr != nil {
-			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.Key)
-			continue
-		}
-		strVal, ok := val.(string)
-		if !ok {
-			typeErr := fmt.Errorf("transform key %v data type is not string", g.Key)
-			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
-			continue
-		}
-		strVal = strings.TrimSpace(strVal)
-		if len(strVal) < 1 {
-			continue
-		}
-		xmlVal, perr := parseXml(strVal)
-		if perr != nil {
-			errNum, err = transforms.SetError(errNum, perr, transforms.General, "")
-			continue
-		}
-		if len(g.news) == 0 {
-			DeleteMapValue(datas[i], g.keys...)
-			g.news = g.keys
-		}
-		setErr := SetMapValue(datas[i], xmlVal, false, g.news...)
-		if setErr != nil {
-			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
-		}
+
+	var (
+		dataLen     = len(datas)
+		err, fmtErr error
+		errNum      int
+
+		numRoutine   = g.numRoutine
+		dataPipeline = make(chan transforms.TransformInfo)
+		resultChan   = make(chan transforms.TransformResult)
+		wg           = new(sync.WaitGroup)
+	)
+
+	if dataLen < numRoutine {
+		numRoutine = dataLen
 	}
 
-	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	for i := 0; i < numRoutine; i++ {
+		wg.Add(1)
+		go g.transform(dataPipeline, resultChan, wg)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, data := range datas {
+			dataPipeline <- transforms.TransformInfo{
+				CurData: data,
+				Index:   idx,
+			}
+		}
+		close(dataPipeline)
+	}()
+
+	var transformResultSlice = make(transforms.TransformResultSlice, dataLen)
+	for resultInfo := range resultChan {
+		transformResultSlice[resultInfo.Index] = resultInfo
+	}
+
+	for _, transformResult := range transformResultSlice {
+		if transformResult.Err != nil {
+			err = transformResult.Err
+			errNum += transformResult.ErrNum
+		}
+		datas[transformResult.Index] = transformResult.CurData
+	}
+
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(dataLen), g.Type())
 	return datas, fmtErr
 }
 
@@ -122,4 +145,70 @@ func init() {
 	transforms.Add("xml", func() transforms.Transformer {
 		return &Xml{}
 	})
+}
+
+func (g *Xml) transform(dataPipeline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+	var (
+		err    error
+		errNum int
+	)
+	for transformInfo := range dataPipeline {
+		err = nil
+		errNum = 0
+
+		val, getErr := GetMapValue(transformInfo.CurData, g.keys...)
+		if getErr != nil {
+			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.Key)
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				ErrNum:  errNum,
+				Err:     err,
+			}
+			continue
+		}
+		strVal, ok := val.(string)
+		if !ok {
+			typeErr := errors.New("transform key " + g.Key + " data type is not string")
+			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				ErrNum:  errNum,
+				Err:     err,
+			}
+			continue
+		}
+		strVal = strings.TrimSpace(strVal)
+		if len(strVal) < 1 {
+			continue
+		}
+		xmlVal, perr := parseXml(strVal)
+		if perr != nil {
+			errNum, err = transforms.SetError(errNum, perr, transforms.General, "")
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				ErrNum:  errNum,
+				Err:     err,
+			}
+			continue
+		}
+		if len(g.news) == 0 {
+			DeleteMapValue(transformInfo.CurData, g.keys...)
+			g.news = g.keys
+		}
+		setErr := SetMapValue(transformInfo.CurData, xmlVal, false, g.news...)
+		if setErr != nil {
+			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
+		}
+
+		resultChan <- transforms.TransformResult{
+			Index:   transformInfo.Index,
+			CurData: transformInfo.CurData,
+			ErrNum:  errNum,
+			Err:     err,
+		}
+	}
+	wg.Done()
 }

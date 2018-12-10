@@ -3,8 +3,6 @@ package ip
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
-	"sort"
 	"strconv"
 	"sync"
 
@@ -47,21 +45,23 @@ func (g *Number2Ip) Transform(datas []Data) ([]Data, error) {
 	}
 
 	var (
+		dataLen     = len(datas)
 		err, fmtErr error
 		errNum      int
+		numRoutine  = g.numRoutine
+
+		dataPipeline = make(chan transforms.TransformInfo)
+		resultChan   = make(chan transforms.TransformResult)
+		wg           = new(sync.WaitGroup)
 	)
 
-	numRoutine := g.numRoutine
-	if len(datas) < numRoutine {
-		numRoutine = len(datas)
+	if dataLen < numRoutine {
+		numRoutine = dataLen
 	}
-	dataPipline := make(chan transforms.TransformInfo)
-	resultChan := make(chan transforms.TransformResult)
 
-	wg := new(sync.WaitGroup)
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
-		go g.transform(dataPipline, resultChan, wg)
+		go g.transform(dataPipeline, resultChan, wg)
 	}
 
 	go func() {
@@ -71,20 +71,17 @@ func (g *Number2Ip) Transform(datas []Data) ([]Data, error) {
 
 	go func() {
 		for idx, data := range datas {
-			dataPipline <- transforms.TransformInfo{
+			dataPipeline <- transforms.TransformInfo{
 				CurData: data,
 				Index:   idx,
 			}
 		}
-		close(dataPipline)
+		close(dataPipeline)
 	}()
 
-	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
+	var transformResultSlice = make(transforms.TransformResultSlice, dataLen)
 	for resultInfo := range resultChan {
-		transformResultSlice = append(transformResultSlice, resultInfo)
-	}
-	if numRoutine > 1 {
-		sort.Stable(transformResultSlice)
+		transformResultSlice[resultInfo.Index] = resultInfo
 	}
 
 	for _, transformResult := range transformResultSlice {
@@ -95,7 +92,7 @@ func (g *Number2Ip) Transform(datas []Data) ([]Data, error) {
 		datas[transformResult.Index] = transformResult.CurData
 	}
 
-	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(dataLen), g.Type())
 	return datas, fmtErr
 }
 
@@ -154,24 +151,23 @@ func init() {
 	})
 }
 
-func (g *Number2Ip) transform(dataPipline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+func (g *Number2Ip) transform(dataPipeline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
 	var (
 		err, convertErr error
 		errNum          int
 	)
 	news := g.news
-	for transformInfo := range dataPipline {
+	for transformInfo := range dataPipeline {
 		err = nil
 		errNum = 0
 
 		val, getErr := GetMapValue(transformInfo.CurData, g.keys...)
 		if getErr != nil {
 			errNum++
-			err = fmt.Errorf("transform key %v not exist in data", g.Key)
 			resultChan <- transforms.TransformResult{
 				Index:   transformInfo.Index,
 				CurData: transformInfo.CurData,
-				Err:     err,
+				Err:     errors.New("transform key " + g.Key + " not exist in data"),
 				ErrNum:  errNum,
 			}
 			continue
@@ -194,11 +190,10 @@ func (g *Number2Ip) transform(dataPipline <-chan transforms.TransformInfo, resul
 			number, convertErr = newVal.Int64()
 			if convertErr != nil {
 				errNum++
-				err = fmt.Errorf("transform key %v data type is not int64", g.Key)
 				resultChan <- transforms.TransformResult{
 					Index:   transformInfo.Index,
 					CurData: transformInfo.CurData,
-					Err:     err,
+					Err:     errors.New("transform key " + g.Key + " data type is not int64"),
 					ErrNum:  errNum,
 				}
 				continue
@@ -216,7 +211,7 @@ func (g *Number2Ip) transform(dataPipline <-chan transforms.TransformInfo, resul
 				continue
 			}
 		default:
-			typeErr := fmt.Errorf("transform key %v data type is not correct", g.Key)
+			typeErr := errors.New("transform key " + g.Key + " data type is not correct")
 			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
 			resultChan <- transforms.TransformResult{
 				Index:   transformInfo.Index,

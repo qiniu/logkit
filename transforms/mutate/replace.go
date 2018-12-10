@@ -1,10 +1,10 @@
 package mutate
 
 import (
-	"fmt"
 	"regexp"
-	"sort"
 	"sync"
+
+	"github.com/pkg/errors"
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
@@ -53,21 +53,23 @@ func (g *Replacer) Transform(datas []Data) ([]Data, error) {
 		g.Init()
 	}
 	var (
+		dataLen     = len(datas)
 		err, fmtErr error
 		errNum      int
+
+		numRoutine   = g.numRoutine
+		dataPipeline = make(chan transforms.TransformInfo)
+		resultChan   = make(chan transforms.TransformResult)
+		wg           = new(sync.WaitGroup)
 	)
 
-	numRoutine := g.numRoutine
-	if len(datas) < numRoutine {
-		numRoutine = len(datas)
+	if dataLen < numRoutine {
+		numRoutine = dataLen
 	}
-	dataPipline := make(chan transforms.TransformInfo)
-	resultChan := make(chan transforms.TransformResult)
 
-	wg := new(sync.WaitGroup)
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
-		go g.transform(dataPipline, resultChan, wg)
+		go g.transform(dataPipeline, resultChan, wg)
 	}
 
 	go func() {
@@ -77,20 +79,17 @@ func (g *Replacer) Transform(datas []Data) ([]Data, error) {
 
 	go func() {
 		for idx, data := range datas {
-			dataPipline <- transforms.TransformInfo{
+			dataPipeline <- transforms.TransformInfo{
 				CurData: data,
 				Index:   idx,
 			}
 		}
-		close(dataPipline)
+		close(dataPipeline)
 	}()
 
-	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
+	var transformResultSlice = make(transforms.TransformResultSlice, dataLen)
 	for resultInfo := range resultChan {
-		transformResultSlice = append(transformResultSlice, resultInfo)
-	}
-	if numRoutine > 1 {
-		sort.Stable(transformResultSlice)
+		transformResultSlice[resultInfo.Index] = resultInfo
 	}
 
 	for _, transformResult := range transformResultSlice {
@@ -101,7 +100,7 @@ func (g *Replacer) Transform(datas []Data) ([]Data, error) {
 		datas[transformResult.Index] = transformResult.CurData
 	}
 
-	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(dataLen), g.Type())
 	return datas, fmtErr
 }
 
@@ -193,19 +192,19 @@ func init() {
 	})
 }
 
-func (g *Replacer) transform(dataPipline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+func (g *Replacer) transform(dataPipeline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
 	var (
 		err    error
 		errNum int
 	)
-	for transformInfo := range dataPipline {
+	for transformInfo := range dataPipeline {
 		err = nil
 		errNum = 0
 
 		val, getErr := GetMapValue(transformInfo.CurData, g.keys...)
 		if getErr != nil {
 			errNum++
-			err = fmt.Errorf("transform key %v not exist in data", g.Key)
+			err = errors.New("transform key " + g.Key + " not exist in data")
 			resultChan <- transforms.TransformResult{
 				Index:   transformInfo.Index,
 				CurData: transformInfo.CurData,
@@ -217,7 +216,7 @@ func (g *Replacer) transform(dataPipline <-chan transforms.TransformInfo, result
 		strVal, ok := val.(string)
 		if !ok {
 			errNum++
-			err = fmt.Errorf("transform key %v data type is not string", g.Key)
+			err = errors.New("transform key " + g.Key + " data type is not string")
 			resultChan <- transforms.TransformResult{
 				Index:   transformInfo.Index,
 				CurData: transformInfo.CurData,
@@ -229,7 +228,7 @@ func (g *Replacer) transform(dataPipline <-chan transforms.TransformInfo, result
 		setErr := SetMapValue(transformInfo.CurData, g.Regexp.ReplaceAllString(strVal, g.New), false, g.keys...)
 		if setErr != nil {
 			errNum++
-			err = fmt.Errorf("value of %v is not the type of map[string]interface{}", g.Key)
+			err = errors.New("value of " + g.Key + " is not the type of map[string]interface{}")
 		}
 
 		resultChan <- transforms.TransformResult{

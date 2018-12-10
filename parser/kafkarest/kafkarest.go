@@ -2,7 +2,6 @@ package kafkarest
 
 import (
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -53,17 +52,20 @@ func (krp *Parser) Type() string {
 
 func (krp *Parser) Parse(lines []string) ([]Data, error) {
 	var (
-		datas = make([]Data, 0, len(lines))
-		se    = &StatsError{}
-	)
-	numRoutine := krp.numRoutine
-	if len(lines) < numRoutine {
-		numRoutine = len(lines)
-	}
-	sendChan := make(chan parser.ParseInfo)
-	resultChan := make(chan parser.ParseResult)
+		lineLen    = len(lines)
+		datas      = make([]Data, lineLen)
+		se         = &StatsError{}
+		numRoutine = krp.numRoutine
 
-	wg := new(sync.WaitGroup)
+		sendChan   = make(chan parser.ParseInfo)
+		resultChan = make(chan parser.ParseResult)
+		wg         = new(sync.WaitGroup)
+	)
+
+	if lineLen < numRoutine {
+		numRoutine = lineLen
+	}
+
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
 		go parser.ParseLine(sendChan, resultChan, wg, false, krp.parse)
@@ -87,14 +89,14 @@ func (krp *Parser) Parse(lines []string) ([]Data, error) {
 		close(sendChan)
 	}()
 
-	var parseResultSlice = make(parser.ParseResultSlice, 0, len(lines))
+	var parseResultSlice = make(parser.ParseResultSlice, lineLen)
 	for resultInfo := range resultChan {
-		parseResultSlice = append(parseResultSlice, resultInfo)
-	}
-	if numRoutine > 1 {
-		sort.Stable(parseResultSlice)
+		parseResultSlice[resultInfo.Index] = resultInfo
 	}
 
+	se.DatasourceSkipIndex = make([]int, lineLen)
+	datasourceIndex := 0
+	dataIndex := 0
 	for _, parseResult := range parseResultSlice {
 		if parseResult.Err != nil {
 			se.AddErrors()
@@ -103,13 +105,15 @@ func (krp *Parser) Parse(lines []string) ([]Data, error) {
 			if !krp.disableRecordErrData {
 				errData[KeyPandoraStash] = parseResult.Line
 			} else if !krp.keepRawData {
-				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
+				se.DatasourceSkipIndex[datasourceIndex] = parseResult.Index
+				datasourceIndex++
 			}
 			if krp.keepRawData {
 				errData[KeyRawData] = parseResult.Line
 			}
 			if !krp.disableRecordErrData || krp.keepRawData {
-				datas = append(datas, errData)
+				datas[dataIndex] = errData
+				dataIndex++
 			}
 			continue
 		}
@@ -123,9 +127,12 @@ func (krp *Parser) Parse(lines []string) ([]Data, error) {
 		if krp.keepRawData {
 			parseResult.Data[KeyRawData] = parseResult.Line
 		}
-		datas = append(datas, parseResult.Data)
+		datas[dataIndex] = parseResult.Data
+		dataIndex++
 	}
 
+	se.DatasourceSkipIndex = se.DatasourceSkipIndex[:datasourceIndex]
+	datas = datas[:dataIndex]
 	if se.Errors == 0 {
 		return datas, nil
 	}

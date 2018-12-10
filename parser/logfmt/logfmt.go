@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"sort"
 	"strconv"
 	"sync"
 
@@ -45,17 +44,20 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
 	var (
-		datas = make([]Data, 0, len(lines))
-		se    = &StatsError{}
-	)
-	numRoutine := p.numRoutine
-	if len(lines) < numRoutine {
-		numRoutine = len(lines)
-	}
-	sendChan := make(chan parser.ParseInfo)
-	resultChan := make(chan parser.ParseResult)
+		lineLen = len(lines)
+		datas   = make([]Data, 0, lineLen)
+		se      = &StatsError{}
 
-	wg := new(sync.WaitGroup)
+		numRoutine = p.numRoutine
+		sendChan   = make(chan parser.ParseInfo)
+		resultChan = make(chan parser.ParseResult)
+		wg         = new(sync.WaitGroup)
+	)
+
+	if lineLen < numRoutine {
+		numRoutine = lineLen
+	}
+
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
 		go parser.ParseLineDataSlice(sendChan, resultChan, wg, true, p.parse)
@@ -75,17 +77,17 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		}
 		close(sendChan)
 	}()
-	var parseResultSlice = make(parser.ParseResultSlice, 0, len(lines))
+	var parseResultSlice = make(parser.ParseResultSlice, lineLen)
 	for resultInfo := range resultChan {
-		parseResultSlice = append(parseResultSlice, resultInfo)
-	}
-	if numRoutine > 1 {
-		sort.Stable(parseResultSlice)
+		parseResultSlice[resultInfo.Index] = resultInfo
 	}
 
+	se.DatasourceSkipIndex = make([]int, lineLen)
+	datasourceIndex := 0
 	for _, parseResult := range parseResultSlice {
 		if len(parseResult.Line) == 0 {
-			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
+			se.DatasourceSkipIndex[datasourceIndex] = parseResult.Index
+			datasourceIndex++
 			continue
 		}
 
@@ -96,7 +98,8 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 			if !p.disableRecordErrData {
 				errData[KeyPandoraStash] = parseResult.Line
 			} else if !p.keepRawData {
-				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
+				se.DatasourceSkipIndex[datasourceIndex] = parseResult.Index
+				datasourceIndex++
 			}
 			if p.keepRawData {
 				errData[KeyRawData] = parseResult.Line
@@ -123,6 +126,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		datas = append(datas, parseResult.Datas...)
 	}
 
+	se.DatasourceSkipIndex = se.DatasourceSkipIndex[:datasourceIndex]
 	if se.Errors == 0 {
 		return datas, nil
 	}
@@ -132,7 +136,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 func (p *Parser) parse(line string) ([]Data, error) {
 	reader := bytes.NewReader([]byte(line))
 	decoder := logfmt.NewDecoder(reader)
-	datas := make([]Data, 0)
+	datas := make([]Data, 0, 100)
 	var fields Data
 	for {
 		ok := decoder.ScanRecord()

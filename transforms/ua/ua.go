@@ -135,13 +135,13 @@ func (it *UATransformer) Transform(datas []Data) ([]Data, error) {
 	if len(datas) < numRoutine {
 		numRoutine = len(datas)
 	}
-	dataPipline := make(chan transforms.TransformInfo)
+	dataPipeline := make(chan transforms.TransformInfo)
 	resultChan := make(chan transforms.TransformResult)
 
 	wg := new(sync.WaitGroup)
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
-		go it.transform(dataPipline, resultChan, wg)
+		go it.transform(dataPipeline, resultChan, wg)
 	}
 
 	go func() {
@@ -151,12 +151,12 @@ func (it *UATransformer) Transform(datas []Data) ([]Data, error) {
 
 	go func() {
 		for idx, data := range datas {
-			dataPipline <- transforms.TransformInfo{
+			dataPipeline <- transforms.TransformInfo{
 				CurData: data,
 				Index:   idx,
 			}
 		}
-		close(dataPipline)
+		close(dataPipeline)
 	}()
 
 	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
@@ -272,13 +272,13 @@ func init() {
 	})
 }
 
-func (it *UATransformer) transform(dataPipline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+func (it *UATransformer) transform(dataPipeline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
 	var (
 		err    error
 		errNum int
 	)
 	newKeys := make([]string, len(it.keys))
-	for transformInfo := range dataPipline {
+	for transformInfo := range dataPipeline {
 		err = nil
 		errNum = 0
 

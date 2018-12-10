@@ -4,12 +4,12 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/vjeantet/grok"
 
 	"github.com/qiniu/log"
@@ -77,7 +77,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	name, _ := c.GetStringOr(KeyParserName, "")
 	patterns, err := c.GetStringList(KeyGrokPatterns)
 	if err != nil {
-		return nil, fmt.Errorf("parse key %v error %v", KeyGrokPatterns, err)
+		return nil, errors.New("parse key " + KeyGrokPatterns + " error " + err.Error())
 	}
 	mode, _ := c.GetStringOr(KeyGrokMode, "")
 	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
@@ -171,16 +171,20 @@ func (p *Parser) Type() string {
 }
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
-	datas := make([]Data, 0, len(lines))
-	se := &StatsError{}
-	numRoutine := p.numRoutine
-	if len(lines) < numRoutine {
-		numRoutine = len(lines)
-	}
-	sendChan := make(chan parser.ParseInfo)
-	resultChan := make(chan parser.ParseResult)
+	var (
+		linesLen   = len(lines)
+		datas      = make([]Data, linesLen)
+		se         = &StatsError{}
+		numRoutine = p.numRoutine
 
-	wg := new(sync.WaitGroup)
+		sendChan   = make(chan parser.ParseInfo)
+		resultChan = make(chan parser.ParseResult)
+		wg         = new(sync.WaitGroup)
+	)
+	if linesLen < numRoutine {
+		numRoutine = linesLen
+	}
+
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
 		go parser.ParseLine(sendChan, resultChan, wg, true, p.parse)
@@ -201,17 +205,18 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		close(sendChan)
 	}()
 
-	var parseResultSlice = make(parser.ParseResultSlice, 0, len(lines))
+	var parseResultSlice = make(parser.ParseResultSlice, linesLen)
 	for resultInfo := range resultChan {
-		parseResultSlice = append(parseResultSlice, resultInfo)
-	}
-	if numRoutine > 1 {
-		sort.Stable(parseResultSlice)
+		parseResultSlice[resultInfo.Index] = resultInfo
 	}
 
+	se.DatasourceSkipIndex = make([]int, linesLen)
+	var datasourceIndex = 0
+	var dataIndex = 0
 	for _, parseResult := range parseResultSlice {
 		if len(parseResult.Line) == 0 {
-			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
+			se.DatasourceSkipIndex[datasourceIndex] = parseResult.Index
+			datasourceIndex++
 			continue
 		}
 
@@ -222,13 +227,15 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 			if !p.disableRecordErrData {
 				errData[KeyPandoraStash] = parseResult.Line
 			} else if !p.keepRawData {
-				se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, parseResult.Index)
+				se.DatasourceSkipIndex[datasourceIndex] = parseResult.Index
+				datasourceIndex++
 			}
 			if p.keepRawData {
 				errData[KeyRawData] = parseResult.Line
 			}
 			if !p.disableRecordErrData || p.keepRawData {
-				datas = append(datas, errData)
+				datas[dataIndex] = errData
+				dataIndex++
 			}
 			continue
 		}
@@ -240,9 +247,12 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		if p.keepRawData {
 			parseResult.Data[KeyRawData] = parseResult.Line
 		}
-		datas = append(datas, parseResult.Data)
+		datas[dataIndex] = parseResult.Data
+		dataIndex++
 	}
 
+	datas = datas[:dataIndex]
+	se.DatasourceSkipIndex = se.DatasourceSkipIndex[:datasourceIndex]
 	if se.Errors == 0 {
 		return datas, nil
 	}
@@ -268,8 +278,9 @@ func (p *Parser) parse(line string) (Data, error) {
 		}
 	}
 	if len(values) < 1 {
-		log.Errorf("%v no value was parsed after grok pattern %v", TruncateStrSize(line, DefaultTruncateMaxSize), p.Patterns)
-		return nil, fmt.Errorf("%v no value was parsed after grok pattern %v", TruncateStrSize(line, DefaultTruncateMaxSize), p.Patterns)
+		err = fmt.Errorf("%v no value was parsed after grok pattern %v", TruncateStrSize(line, DefaultTruncateMaxSize), p.Patterns)
+		log.Error(err)
+		return nil, err
 	}
 	data := Data{}
 	for k, v := range values {
@@ -322,7 +333,7 @@ func (p *Parser) parse(line string) (Data, error) {
 	}
 
 	if len(data) <= 0 {
-		return data, fmt.Errorf("all data was ignored in this line? Check WARN log and fix your grok pattern")
+		return data, errors.New("all data was ignored in this line? Check WARN log and fix your grok pattern")
 	}
 
 	for _, l := range p.labels {
@@ -338,7 +349,7 @@ func (p *Parser) addCustomPatterns(scanner *bufio.Scanner) error {
 		if len(line) > 0 && line[0] != '#' {
 			names := strings.SplitN(line, " ", 2)
 			if len(names) < 2 {
-				return fmt.Errorf("the pattern %v is invalid, and has been ignored", line)
+				return errors.New("the pattern " + line + " is invalid, and has been ignored")
 			}
 			p.patterns[names[0]] = names[1]
 		}

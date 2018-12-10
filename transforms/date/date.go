@@ -2,7 +2,6 @@ package date
 
 import (
 	"errors"
-	"sort"
 	"sync"
 	"time"
 
@@ -50,19 +49,21 @@ func (t *Transformer) Transform(datas []Data) ([]Data, error) {
 	var (
 		err, fmtErr error
 		errNum      int
+		numRoutine  = t.numRoutine
+		dataLen     = len(datas)
+
+		dataPipeline = make(chan transforms.TransformInfo)
+		resultChan   = make(chan transforms.TransformResult)
+		wg           = new(sync.WaitGroup)
 	)
 
-	numRoutine := t.numRoutine
-	if len(datas) < numRoutine {
-		numRoutine = len(datas)
+	if dataLen < numRoutine {
+		numRoutine = dataLen
 	}
-	dataPipline := make(chan transforms.TransformInfo)
-	resultChan := make(chan transforms.TransformResult)
 
-	wg := new(sync.WaitGroup)
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
-		go t.transform(dataPipline, resultChan, wg)
+		go t.transform(dataPipeline, resultChan, wg)
 	}
 
 	go func() {
@@ -72,20 +73,17 @@ func (t *Transformer) Transform(datas []Data) ([]Data, error) {
 
 	go func() {
 		for idx, data := range datas {
-			dataPipline <- transforms.TransformInfo{
+			dataPipeline <- transforms.TransformInfo{
 				CurData: data,
 				Index:   idx,
 			}
 		}
-		close(dataPipline)
+		close(dataPipeline)
 	}()
 
-	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
+	var transformResultSlice = make(transforms.TransformResultSlice, dataLen)
 	for resultInfo := range resultChan {
-		transformResultSlice = append(transformResultSlice, resultInfo)
-	}
-	if numRoutine > 1 {
-		sort.Stable(transformResultSlice)
+		transformResultSlice[resultInfo.Index] = resultInfo
 	}
 
 	for _, transformResult := range transformResultSlice {
@@ -96,7 +94,7 @@ func (t *Transformer) Transform(datas []Data) ([]Data, error) {
 		datas[transformResult.Index] = transformResult.CurData
 	}
 
-	t.stats, fmtErr = transforms.SetStatsInfo(err, t.stats, int64(errNum), int64(len(datas)), t.Type())
+	t.stats, fmtErr = transforms.SetStatsInfo(err, t.stats, int64(errNum), int64(dataLen), t.Type())
 	return datas, fmtErr
 }
 
@@ -162,12 +160,12 @@ func init() {
 	})
 }
 
-func (t *Transformer) transform(dataPipline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+func (t *Transformer) transform(dataPipeline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
 	var (
 		err    error
 		errNum int
 	)
-	for transformInfo := range dataPipline {
+	for transformInfo := range dataPipeline {
 		err = nil
 		errNum = 0
 

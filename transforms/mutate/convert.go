@@ -5,16 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 	"unicode"
 
+	"github.com/qiniu/pandora-go-sdk/pipeline"
+
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
-	"github.com/qiniu/pandora-go-sdk/pipeline"
 )
 
 var (
@@ -36,7 +36,7 @@ type Converter struct {
 func (g *Converter) Init() error {
 	schemas, err := ParseDsl(g.DSL, 0)
 	if err != nil {
-		return fmt.Errorf("convert typedsl %s to schema error: %v", g.DSL, err)
+		return errors.New("convert typedsl " + g.DSL + " to schema error: " + err.Error())
 	}
 	g.schemas = schemas
 	g.keysMap = map[int][]string{}
@@ -62,27 +62,28 @@ func (g *Converter) Transform(datas []Data) ([]Data, error) {
 	}
 
 	var (
+		dataLen     = len(datas)
 		err, fmtErr error
 		errNum      int
+
+		numRoutine   = g.numRoutine
+		dataPipeline = make(chan transforms.TransformInfo)
+		resultChan   = make(chan transforms.TransformResult)
+		wg           = new(sync.WaitGroup)
 	)
 	if len(g.schemas) == 0 {
-		err = fmt.Errorf("no valid dsl[%v] to schema, please enter correct format dsl: \"field type\"", g.DSL)
-		errNum = len(datas)
-		g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+		err = errors.New("no valid dsl[" + g.DSL + "] to schema, please enter correct format dsl: \"field type\"")
+		g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(dataLen), int64(dataLen), g.Type())
 		return datas, err
 	}
 
-	numRoutine := g.numRoutine
-	if len(datas) < numRoutine {
-		numRoutine = len(datas)
+	if dataLen < numRoutine {
+		numRoutine = dataLen
 	}
-	dataPipline := make(chan transforms.TransformInfo)
-	resultChan := make(chan transforms.TransformResult)
 
-	wg := new(sync.WaitGroup)
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
-		go g.transform(dataPipline, resultChan, wg)
+		go g.transform(dataPipeline, resultChan, wg)
 	}
 
 	go func() {
@@ -92,20 +93,17 @@ func (g *Converter) Transform(datas []Data) ([]Data, error) {
 
 	go func() {
 		for idx, data := range datas {
-			dataPipline <- transforms.TransformInfo{
+			dataPipeline <- transforms.TransformInfo{
 				CurData: data,
 				Index:   idx,
 			}
 		}
-		close(dataPipline)
+		close(dataPipeline)
 	}()
 
-	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
+	var transformResultSlice = make(transforms.TransformResultSlice, dataLen)
 	for resultInfo := range resultChan {
-		transformResultSlice = append(transformResultSlice, resultInfo)
-	}
-	if numRoutine > 1 {
-		sort.Stable(transformResultSlice)
+		transformResultSlice[resultInfo.Index] = resultInfo
 	}
 
 	for _, transformResult := range transformResultSlice {
@@ -116,7 +114,7 @@ func (g *Converter) Transform(datas []Data) ([]Data, error) {
 		datas[transformResult.Index] = transformResult.CurData
 	}
 
-	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(dataLen), g.Type())
 	return datas, fmtErr
 }
 
@@ -181,12 +179,11 @@ type DslSchemaEntry struct {
 func getField(f string) (key, valueType, elementType string, defaultVal interface{}, err error) {
 	f = strings.TrimSpace(f)
 	if f == "" {
-		return
+		return "", "", "", nil, nil
 	}
 	first := strings.IndexFunc(f, unicode.IsSpace)
 	if first == -1 {
-		key = f
-		return
+		return f, "", "", nil, nil
 	}
 	var defaultStr string
 	key = f[:first]
@@ -203,25 +200,24 @@ func getField(f string) (key, valueType, elementType string, defaultVal interfac
 	if beg := strings.Index(valueType, "("); beg != -1 {
 		ed := strings.Index(valueType, ")")
 		if ed <= beg {
-			err = fmt.Errorf("field schema %v has no type specified", f)
-			return
+			return key, valueType, "", nil, errors.New("field schema " + f + " has no type specified")
 		}
 		elementType, err = getRawType(valueType[beg+1 : ed])
 		if err != nil {
-			err = fmt.Errorf("array 【%v】: %v, key %v valuetype %v", f, err, key, valueType)
+			err = errors.New("array 【" + f + "】: " + err.Error() + ", key " + key + " valuetype " + valueType)
 		}
 		valueType = "array"
-		return
+		return key, valueType, elementType, nil, err
 	}
 	valueType, err = getRawType(valueType)
 	if err != nil {
-		err = fmt.Errorf("normal 【%v】: %v, key %v valuetype %v", f, err, key, valueType)
-		return
+		err = errors.New("normal 【" + f + "】: " + err.Error() + ", key " + key + " valuetype " + valueType)
+		return key, valueType, elementType, nil, err
 	}
 	if len(defaultStr) > 0 {
 		defaultVal, err = defaultConvert(defaultStr, valueType)
 	}
-	return
+	return key, valueType, elementType, defaultVal, err
 }
 
 /*
@@ -249,8 +245,7 @@ func getRawType(tp string) (schemaType string, err error) {
 	case "d", "date":
 		schemaType = pipeline.PandoraTypeDate
 	case "a", "array":
-		err = errors.New("arrary type must specify data type surrounded by ( )")
-		return
+		return schemaType, errors.New("arrary type must specify data type surrounded by ( )")
 	case "m", "map":
 		schemaType = pipeline.PandoraTypeMap
 	case "b", "bool", "boolean":
@@ -259,18 +254,16 @@ func getRawType(tp string) (schemaType string, err error) {
 		schemaType = pipeline.PandoraTypeJsonString
 	case "": //这个是一种缺省
 	default:
-		err = fmt.Errorf("schema type %v not supperted", schemaType)
-		return
+		return schemaType, errors.New("schema type " + schemaType + " not supperted")
 	}
-	return
+	return schemaType, nil
 }
 
-func ParseDsl(dsl string, depth int) (schemas []DslSchemaEntry, err error) {
+func ParseDsl(dsl string, depth int) ([]DslSchemaEntry, error) {
 	if depth > 5 {
-		err = fmt.Errorf("DslSchemaEntry are nested out of limit %v", 5)
-		return
+		return nil, errors.New("DslSchemaEntry are nested out of limit 5")
 	}
-	schemas = make([]DslSchemaEntry, 0)
+	schemas := make([]DslSchemaEntry, 0)
 	dsl = strings.TrimSpace(dsl)
 	start := 0
 	nestbalance := 0
@@ -279,8 +272,7 @@ func ParseDsl(dsl string, depth int) (schemas []DslSchemaEntry, err error) {
 	dupcheck := make(map[string]struct{})
 	for end, c := range dsl {
 		if start > end {
-			err = errors.New("parse dsl inner error: start index is larger than end")
-			return
+			return schemas, errors.New("parse dsl inner error: start index is larger than end")
 		}
 		switch c {
 		case '{':
@@ -293,23 +285,22 @@ func ParseDsl(dsl string, depth int) (schemas []DslSchemaEntry, err error) {
 			if nestbalance == 0 {
 				nestend = end
 				if nestend <= neststart {
-					err = errors.New("parse dsl error: nest end should never less or equal than nest start")
-					return
+					return schemas, errors.New("parse dsl error: nest end should never less or equal than nest start")
 				}
 				subschemas, err := ParseDsl(dsl[neststart+1:nestend], depth+1)
 				if err != nil {
-					return nil, err
+					return schemas, err
 				}
 				if neststart <= start {
-					return nil, errors.New("parse dsl error: map{} not specified")
+					return schemas, errors.New("parse dsl error: map{} not specified")
 				}
 				key, valueType, _, defaultVal, err := getField(dsl[start:neststart])
 				if err != nil {
-					return nil, err
+					return schemas, err
 				}
 				if key != "" {
 					if _, ok := dupcheck[key]; ok {
-						return nil, errors.New("parse dsl error: " + key + " is duplicated key")
+						return schemas, errors.New("parse dsl error: " + key + " is duplicated key")
 					}
 					dupcheck[key] = struct{}{}
 					if valueType == "" {
@@ -329,11 +320,11 @@ func ParseDsl(dsl string, depth int) (schemas []DslSchemaEntry, err error) {
 				if start < end {
 					key, valueType, elemtype, defaultVal, err := getField(strings.TrimSpace(dsl[start:end]))
 					if err != nil {
-						return nil, err
+						return schemas, err
 					}
 					if key != "" {
 						if _, ok := dupcheck[key]; ok {
-							return nil, errors.New("parse dsl error: " + key + " is duplicated key")
+							return schemas, errors.New("parse dsl error: " + key + " is duplicated key")
 						}
 						dupcheck[key] = struct{}{}
 						if valueType == "" {
@@ -352,10 +343,9 @@ func ParseDsl(dsl string, depth int) (schemas []DslSchemaEntry, err error) {
 		}
 	}
 	if nestbalance != 0 {
-		err = errors.New("parse dsl error: { and } not match")
-		return
+		return schemas, errors.New("parse dsl error: { and } not match")
 	}
-	return
+	return schemas, nil
 }
 
 func defaultConvert(defaultStr, valueType string) (converted interface{}, err error) {
@@ -363,14 +353,14 @@ func defaultConvert(defaultStr, valueType string) (converted interface{}, err er
 	switch valueType {
 	case pipeline.PandoraTypeLong:
 		if converted, err = strconv.ParseInt(defaultStr, 10, 64); err == nil {
-			return
+			return converted, nil
 		}
 		var floatc float64
 		if floatc, err = strconv.ParseFloat(defaultStr, 10); err == nil {
 			converted = int64(floatc)
-			return
+			return converted, nil
 		}
-		return
+		return converted, err
 	case pipeline.PandoraTypeFloat:
 		return strconv.ParseFloat(defaultStr, 10)
 	case pipeline.PandoraTypeString, pipeline.PandoraTypeJsonString, pipeline.PandoraTypeDate:
@@ -378,9 +368,8 @@ func defaultConvert(defaultStr, valueType string) (converted interface{}, err er
 	case pipeline.PandoraTypeBool:
 		return strconv.ParseBool(defaultStr)
 	default:
-		err = fmt.Errorf("not support default value for type(%v)", valueType)
+		return nil, errors.New("not support default value for type(" + valueType + ")")
 	}
-	return
 }
 
 func dataConvert(data interface{}, schema DslSchemaEntry) (converted interface{}, err error) {
@@ -746,12 +735,12 @@ func mapDataConvert(mpvalue map[string]interface{}, schemas []DslSchemaEntry) (c
 	return mpvalue
 }
 
-func (g *Converter) transform(dataPipline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+func (g *Converter) transform(dataPipeline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
 	var (
 		err    error
 		errNum int
 	)
-	for transformInfo := range dataPipline {
+	for transformInfo := range dataPipeline {
 		err = nil
 		errNum = 0
 

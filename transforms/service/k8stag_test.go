@@ -3,10 +3,10 @@ package service
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestK8sTransformer(t *testing.T) {
