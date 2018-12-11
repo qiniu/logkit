@@ -176,16 +176,16 @@ func (p *UrlParam) Transform(datas []Data) ([]Data, error) {
 
 func (p *UrlParam) Description() string {
 	//return "parse url parameters like 'a=a&b=2&c=aa' into Data map {a:a,b:2,c:aa}"
-	return "针对指定的字段做url decode解析，例：'a=a&b=2&c=aa'解析为map{a:a,b:2,c:aa}"
+	return "针对指定的字段做url param解析，例：'a=a&b=2&c=aa'解析为map{a:a,b:2,c:aa}"
 }
 
 func (p *UrlParam) Type() string {
-	return "urldecode"
+	return "urlparam"
 }
 
 func (p *UrlParam) SampleConfig() string {
 	return `{
-		"type":"urldecode",
+		"type":"urlparam",
 		"key":"ParamFieldKey"
 	}`
 }
@@ -221,7 +221,7 @@ func (p *UrlParam) SetStats(err string) StatsInfo {
 }
 
 func init() {
-	transforms.Add("urldecode", func() transforms.Transformer {
+	transforms.Add("urlparam", func() transforms.Transformer {
 		return &UrlParam{}
 	})
 }
