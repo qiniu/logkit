@@ -1285,7 +1285,7 @@ func MergeEnvTags(name string, tags map[string]interface{}) map[string]interface
 	if value, exist := os.LookupEnv(name); exist {
 		err := jsoniter.Unmarshal([]byte(value), &envTags)
 		if err != nil {
-			log.Warnf("get env tags unmarshl error: %v", err)
+			log.Warnf("get env tags unmarshal error: %v", err)
 			return tags
 		}
 	} else {

@@ -8,7 +8,7 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-func TestURL_Transform(t *testing.T) {
+func TestURLConvert_Transform(t *testing.T) {
 	tests := []struct {
 		log  []Data
 		mode string
@@ -68,13 +68,13 @@ func TestURL_Transform(t *testing.T) {
 		},
 	}
 
-	url := &URL{
+	urlConvert := &URLConvert{
 		Key: "raw",
 	}
 
 	for _, test := range tests {
-		url.Mode = test.mode
-		acutal, err := url.Transform(test.log)
+		urlConvert.Mode = test.mode
+		acutal, err := urlConvert.Transform(test.log)
 		assert.Nil(t, err)
 		assert.EqualValues(t, len(test.exp), len(acutal))
 		assert.EqualValues(t, test.exp, acutal)
@@ -82,7 +82,7 @@ func TestURL_Transform(t *testing.T) {
 
 }
 
-func TestURL_RawTransform(t *testing.T) {
+func TestURLConvert_RawTransform(t *testing.T) {
 	tests := []struct {
 		log  []string
 		mode string
@@ -109,15 +109,13 @@ func TestURL_RawTransform(t *testing.T) {
 			exp:  []string{"qiniu.com"},
 		},
 	}
-
-	url := &URL{}
+	urlConvert := &URLConvert{}
 
 	for _, test := range tests {
-		url.Mode = test.mode
-		acutal, err := url.RawTransform(test.log)
+		urlConvert.Mode = test.mode
+		acutal, err := urlConvert.RawTransform(test.log)
 		assert.Nil(t, err)
 		assert.EqualValues(t, len(test.exp), len(acutal))
 		assert.EqualValues(t, test.exp, acutal)
 	}
-
 }
