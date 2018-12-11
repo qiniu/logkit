@@ -1,6 +1,7 @@
 package raw
 
 import (
+	"strings"
 	"time"
 
 	"github.com/qiniu/logkit/conf"
@@ -50,6 +51,9 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 	datas := make([]Data, len(lines))
 	for idx, line := range lines {
 		//raw就是原样全copy到Raw字段
+		if len(strings.TrimSpace(line)) <= 0 {
+			continue
+		}
 		datas[idx] = Data{KeyRaw: line}
 		if p.withTimeStamp {
 			datas[idx][KeyTimestamp] = time.Now().Format(time.RFC3339Nano)
