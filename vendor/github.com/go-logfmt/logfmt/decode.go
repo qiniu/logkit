@@ -51,7 +51,7 @@ func (dec *Decoder) ScanRecord() bool {
 // record, which can then be retrieved with the Key and Value methods. It
 // returns false when decoding stops, either by reaching the end of the
 // current record or an error.
-func (dec *Decoder) ScanKeyval() bool {
+func (dec *Decoder) ScanKeyval(splitter byte) bool {
 	dec.key, dec.value = nil, nil
 	if dec.err != nil {
 		return false
@@ -75,7 +75,7 @@ key:
 	start, multibyte := dec.pos, false
 	for p, c := range line[dec.pos:] {
 		switch {
-		case c == '=':
+		case c == splitter:
 			dec.pos += p
 			if dec.pos > start {
 				dec.key = line[start:dec.pos]
