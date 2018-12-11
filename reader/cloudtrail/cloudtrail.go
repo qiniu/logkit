@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -576,6 +577,14 @@ func writeToFile(zipf *zip.File, filename string) error {
 	return nil
 }
 
+//gzip 前两位是固定的： https://stackoverflow.com/questions/6059302/how-to-check-if-a-file-is-gzip-compressed
+func isGzipped(data []byte) bool {
+	if data == nil || len(data) < 2 {
+		return false
+	}
+	return data[0] == 31 && data[1] == 139
+}
+
 func writeFile(filename string, bucket *s3.Bucket, path string) error {
 	data, err := bucket.Get(path)
 	if err != nil {
@@ -595,6 +604,19 @@ func writeFile(filename string, bucket *s3.Bucket, path string) error {
 			}
 		}
 		return writeErr
+	}
+	if isGzipped(data) {
+		gzipData, err := gzip.NewReader(bytes.NewReader(data))
+		if err != nil {
+			log.Errorf("reader file %v as gzip error %v, write to file as raw_text", filename, err)
+			return ioutil.WriteFile(filename, data, os.FileMode(0644))
+		}
+		gdata, err := ioutil.ReadAll(gzipData)
+		if err != nil {
+			log.Errorf("reader gzip reader error %v, write to file as raw_text", err)
+			return ioutil.WriteFile(filename, data, os.FileMode(0644))
+		}
+		return ioutil.WriteFile(filename, gdata, os.FileMode(0644))
 	}
 	return ioutil.WriteFile(filename, data, os.FileMode(0644))
 }
