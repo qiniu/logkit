@@ -1,0 +1,262 @@
+package mutate
+
+import (
+	"bytes"
+	"errors"
+	"strconv"
+	"strings"
+	"sync"
+
+	"github.com/go-logfmt/logfmt"
+
+	"github.com/qiniu/logkit/transforms"
+	. "github.com/qiniu/logkit/utils/models"
+)
+
+var (
+	_ transforms.StatsTransformer = &KV{}
+	_ transforms.Transformer      = &KV{}
+	_ transforms.Initializer      = &KV{}
+
+	OptionKVSplitter = Option{
+		KeyName:      "splitter",
+		ChooseOnly:   false,
+		Default:      "=",
+		Required:     false,
+		Placeholder:  "my_field_splitter",
+		DefaultNoUse: true,
+		Description:  "分隔符",
+		ToolTip:      "使用该分隔符分隔键值对",
+		Type:         transforms.TransformTypeString,
+	}
+)
+
+type KV struct {
+	Key      string `json:"key"`
+	New      string `json:"new"`
+	Splitter string `json:"splitter"`
+
+	stats      StatsInfo
+	keys       []string
+	news       []string
+	numRoutine int
+}
+
+func (k *KV) Init() error {
+	if k.Splitter == "" {
+		k.Splitter = "="
+	}
+	k.keys = GetKeys(k.Key)
+	if strings.TrimSpace(k.New) == "" {
+		k.news = k.keys
+	} else {
+		k.news = GetKeys(k.New)
+	}
+	numRoutine := MaxProcs
+	if numRoutine == 0 {
+		numRoutine = 1
+	}
+	k.numRoutine = numRoutine
+	return nil
+}
+
+func (k *KV) Description() string {
+	return `对于日志数据中的每条记录，解析键值对。`
+}
+
+func (k *KV) SampleConfig() string {
+	return `{
+       "type":"keyvalue",
+       "key":"myParseKey",
+    }`
+}
+
+func (k *KV) ConfigOptions() []Option {
+	return []Option{
+		transforms.KeyFieldName,
+		transforms.KeyFieldNew,
+		OptionKVSplitter,
+	}
+}
+
+func (k *KV) Type() string {
+	return "keyvalue"
+}
+
+func (k *KV) Stage() string {
+	return transforms.StageAfterParser
+}
+
+func (k *KV) Stats() StatsInfo {
+	return k.stats
+}
+
+func (k *KV) SetStats(err string) StatsInfo {
+	k.stats.LastError = err
+	return k.stats
+}
+
+func (k *KV) RawTransform(datas []string) ([]string, error) {
+	return datas, errors.New("keyvalue transformer not support rawTransform")
+}
+
+func (k *KV) Transform(datas []Data) ([]Data, error) {
+	if len(k.keys) == 0 {
+		k.Init()
+	}
+
+	var (
+		dataLen     = len(datas)
+		err, fmtErr error
+		errNum      int
+
+		numRoutine   = k.numRoutine
+		dataPipeline = make(chan transforms.TransformInfo)
+		resultChan   = make(chan transforms.TransformResult)
+		wg           = new(sync.WaitGroup)
+	)
+	if dataLen < numRoutine {
+		numRoutine = dataLen
+	}
+
+	for i := 0; i < numRoutine; i++ {
+		wg.Add(1)
+		go k.transform(dataPipeline, resultChan, wg)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	go func() {
+		for idx, data := range datas {
+			dataPipeline <- transforms.TransformInfo{
+				CurData: data,
+				Index:   idx,
+			}
+		}
+		close(dataPipeline)
+	}()
+
+	var transformResultSlice = make(transforms.TransformResultSlice, dataLen)
+	for resultInfo := range resultChan {
+		transformResultSlice[resultInfo.Index] = resultInfo
+	}
+
+	for _, transformResult := range transformResultSlice {
+		if transformResult.Err != nil {
+			err = transformResult.Err
+			errNum += transformResult.ErrNum
+		}
+		datas[transformResult.Index] = transformResult.CurData
+	}
+
+	k.stats, fmtErr = transforms.SetStatsInfo(err, k.stats, int64(errNum), int64(dataLen), k.Type())
+	return datas, fmtErr
+}
+
+func init() {
+	transforms.Add("keyvalue", func() transforms.Transformer {
+		return &KV{}
+	})
+}
+
+func (k *KV) transform(dataPipeline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+	var (
+		err    error
+		errNum int
+	)
+	for transformInfo := range dataPipeline {
+		err = nil
+		errNum = 0
+
+		val, getErr := GetMapValue(transformInfo.CurData, k.keys...)
+		if getErr != nil {
+			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, k.Key)
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				Err:     err,
+				ErrNum:  errNum,
+			}
+			continue
+		}
+		strVal, ok := val.(string)
+		if !ok {
+			typeErr := errors.New("transform key " + k.Key + " data type is not string")
+			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				Err:     err,
+				ErrNum:  errNum,
+			}
+			continue
+		}
+
+		datas, kvErr := kvTransform(strVal, k.Splitter)
+		if kvErr != nil {
+			errNum, err = transforms.SetError(errNum, kvErr, transforms.General, "")
+		} else {
+			if len(datas) == 0 {
+				errNum, err = transforms.SetError(errNum, errors.New("no value matched in key value transform in "+k.Key), transforms.General, "")
+			}
+		}
+		setErr := SetMapValue(transformInfo.CurData, datas, false, k.news...)
+		if setErr != nil {
+			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, k.New)
+		}
+		resultChan <- transforms.TransformResult{
+			Index:    transformInfo.Index,
+			CurData:  transformInfo.CurData,
+			CurDatas: datas,
+			Err:      err,
+			ErrNum:   errNum,
+		}
+	}
+	wg.Done()
+}
+
+func kvTransform(strVal string, splitter string) ([]Data, error) {
+	reader := bytes.NewReader([]byte(strVal))
+	decoder := logfmt.NewDecoder(reader)
+	datas := make([]Data, 0, 100)
+	var fields Data
+	for {
+		ok := decoder.ScanRecord()
+		if !ok {
+			err := decoder.Err()
+			if err != nil {
+				return nil, err
+			}
+			//此错误仅用于当原始数据解析成功但无解析数据时，保留原始数据之用
+			if len(fields) == 0 {
+				break
+				return nil, errors.New("no value was parsed after logfmt, will keep origin data in pandora_stash if disable_record_errdata field is false")
+			}
+			break
+		}
+		fields = make(Data)
+		for decoder.ScanKeyval(splitter[0]) {
+			if string(decoder.Value()) == "" {
+				continue
+			}
+			//type conversions
+			value := string(decoder.Value())
+			if fValue, err := strconv.ParseFloat(value, 64); err == nil {
+				fields[string(decoder.Key())] = fValue
+			} else if bValue, err := strconv.ParseBool(value); err == nil {
+				fields[string(decoder.Key())] = bValue
+			} else {
+				fields[string(decoder.Key())] = value
+			}
+		}
+		if len(fields) == 0 {
+			continue
+		}
+
+		datas = append(datas, fields)
+	}
+	return datas, nil
+}

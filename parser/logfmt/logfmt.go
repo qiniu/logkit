@@ -17,6 +17,7 @@ import (
 
 func init() {
 	parser.RegisterConstructor(TypeLogfmt, NewParser)
+	parser.RegisterConstructor(TypeKeyValue, NewParser)
 }
 
 type Parser struct {
@@ -24,12 +25,14 @@ type Parser struct {
 	disableRecordErrData bool
 	numRoutine           int
 	keepRawData          bool
+	splitter             string
 }
 
 func NewParser(c conf.MapConf) (parser.Parser, error) {
 	name, _ := c.GetStringOr(KeyParserName, "")
 	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
 	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)
+	splitter, _ := c.GetStringOr(KeySplitter, "=")
 	numRoutine := MaxProcs
 	if numRoutine == 0 {
 		numRoutine = 1
@@ -39,10 +42,14 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		disableRecordErrData: disableRecordErrData,
 		numRoutine:           numRoutine,
 		keepRawData:          keepRawData,
+		splitter:             splitter,
 	}, nil
 }
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
+	if p.splitter == "" {
+		p.splitter = "="
+	}
 	var (
 		lineLen = len(lines)
 		datas   = make([]Data, 0, lineLen)
@@ -152,7 +159,7 @@ func (p *Parser) parse(line string) ([]Data, error) {
 			break
 		}
 		fields = make(Data)
-		for decoder.ScanKeyval() {
+		for decoder.ScanKeyval(p.splitter[0]) {
 			if string(decoder.Value()) == "" {
 				continue
 			}
@@ -180,5 +187,5 @@ func (p *Parser) Name() string {
 }
 
 func (p *Parser) Type() string {
-	return TypeLogfmt
+	return TypeKeyValue
 }

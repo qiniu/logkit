@@ -29,6 +29,7 @@ const (
 	TypeSyslog     = "syslog"
 	TypeMySQL      = "mysqllog"
 	TypeLogfmt     = "logfmt"
+	TypeKeyValue   = "KV"
 )
 
 // 数据常量类型
