@@ -62,6 +62,7 @@ const (
 	KeyPGtimestampKey   = "postgres_timestamp_key"
 	KeyPGStartTime      = "postgres_start_time_key"
 	KeyPGBatchDuration  = "postgres_batch_intervel"
+	KeyPGtimestampInt   = "postgres_timestamp_int"
 	KeyPGsqlReadBatch   = "postgres_limit_batch"
 	KeyPGsqlDataSource  = "postgres_datasource"
 	KeyPGsqlDataBase    = "postgres_database"
