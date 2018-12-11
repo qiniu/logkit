@@ -16,6 +16,11 @@ const (
 	KeyCSVIgnoreInvalidField = "csv_ignore_invalid"    // 忽略解析错误的字段
 )
 
+// Constants for logfmt/KV
+const (
+	KeySplitter = "splitter" //logfmt/KV 的分隔符
+)
+
 // Constants for Grok
 const (
 	KeyGrokMode               = "grok_mode"     //是否替换\n以匹配多行
@@ -65,7 +70,7 @@ var (
 		{TypeKafkaRest, "按 kafkarest 日志解析", ""},
 		{TypeEmpty, "通过解析清空数据", ""},
 		{TypeMySQL, "按 mysql 慢请求日志解析", ""},
-		{TypeLogfmt, "logfmt 日志解析", ""},
+		{TypeKeyValue, "key value 日志解析", ""},
 	}
 
 	ModeToolTips = KeyValueSlice{
@@ -79,7 +84,7 @@ var (
 		{TypeKafkaRest, "将Kafka Rest日志文件的每一行解析为一条结构化的日志.", ""},
 		{TypeEmpty, "通过解析清空数据", ""},
 		{TypeMySQL, "解析mysql的慢请求日志。", ""},
-		{TypeLogfmt, "解析 logfmt 日志", ""},
+		{TypeKeyValue, "按照key value解析日志", ""},
 	}
 )
 
