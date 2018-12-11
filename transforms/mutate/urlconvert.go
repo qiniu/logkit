@@ -15,9 +15,9 @@ const (
 )
 
 var (
-	_ transforms.StatsTransformer = &URL{}
-	_ transforms.Transformer      = &URL{}
-	_ transforms.Initializer      = &URL{}
+	_ transforms.StatsTransformer = &URLConvert{}
+	_ transforms.Transformer      = &URLConvert{}
+	_ transforms.Initializer      = &URLConvert{}
 
 	OptionURLMode = Option{
 		KeyName:       KeyMode,
@@ -30,7 +30,7 @@ var (
 	}
 )
 
-type URL struct {
+type URLConvert struct {
 	Mode   string `json:"mode"`
 	Key    string `json:"key"`
 	CStage string `json:"stage"`
@@ -40,7 +40,7 @@ type URL struct {
 	numRoutine int
 }
 
-func (u *URL) Init() error {
+func (u *URLConvert) Init() error {
 	u.keys = GetKeys(u.Key)
 	numRoutine := MaxProcs
 	if numRoutine == 0 {
@@ -50,19 +50,19 @@ func (u *URL) Init() error {
 	return nil
 }
 
-func (u *URL) Description() string {
+func (u *URLConvert) Description() string {
 	return `对于日志数据中的每条记录，进行url decode/encode。`
 }
 
-func (u *URL) SampleConfig() string {
+func (u *URLConvert) SampleConfig() string {
 	return `{
-       "type":"url",
+       "type":"urlconvert",
        "mode":"decode",
        "key":"myParseKey",
     }`
 }
 
-func (u *URL) ConfigOptions() []Option {
+func (u *URLConvert) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
 		OptionURLMode,
@@ -70,11 +70,11 @@ func (u *URL) ConfigOptions() []Option {
 	}
 }
 
-func (u *URL) Type() string {
-	return "url"
+func (u *URLConvert) Type() string {
+	return "urlconvert"
 }
 
-func (u *URL) RawTransform(datas []string) ([]string, error) {
+func (u *URLConvert) RawTransform(datas []string) ([]string, error) {
 	if len(u.keys) == 0 {
 		u.Init()
 	}
@@ -131,23 +131,23 @@ func (u *URL) RawTransform(datas []string) ([]string, error) {
 	return datas, fmtErr
 }
 
-func (u *URL) Stage() string {
+func (u *URLConvert) Stage() string {
 	if u.CStage == "" {
 		return transforms.StageAfterParser
 	}
 	return u.CStage
 }
 
-func (u *URL) Stats() StatsInfo {
+func (u *URLConvert) Stats() StatsInfo {
 	return u.stats
 }
 
-func (u *URL) SetStats(err string) StatsInfo {
+func (u *URLConvert) SetStats(err string) StatsInfo {
 	u.stats.LastError = err
 	return u.stats
 }
 
-func (u *URL) Transform(datas []Data) ([]Data, error) {
+func (u *URLConvert) Transform(datas []Data) ([]Data, error) {
 	if len(u.keys) == 0 {
 		u.Init()
 	}
@@ -204,12 +204,12 @@ func (u *URL) Transform(datas []Data) ([]Data, error) {
 }
 
 func init() {
-	transforms.Add("url", func() transforms.Transformer {
-		return &URL{}
+	transforms.Add("urlconvert", func() transforms.Transformer {
+		return &URLConvert{}
 	})
 }
 
-func (u *URL) transform(dataPipeline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
+func (u *URLConvert) transform(dataPipeline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
 	var (
 		err    error
 		errNum int
@@ -251,7 +251,7 @@ func (u *URL) transform(dataPipeline <-chan transforms.TransformInfo, resultChan
 		case ModeEncode:
 			newVal = url.QueryEscape(strVal)
 		default:
-			errNum, err = transforms.SetError(errNum, errors.New("url transformer not support this mode["+u.Mode+"]"), transforms.General, "")
+			errNum, err = transforms.SetError(errNum, errors.New("url convert transformer not support this mode["+u.Mode+"]"), transforms.General, "")
 		}
 		setErr := SetMapValue(transformInfo.CurData, newVal, false, u.keys...)
 		if setErr != nil {
@@ -268,7 +268,7 @@ func (u *URL) transform(dataPipeline <-chan transforms.TransformInfo, resultChan
 	wg.Done()
 }
 
-func (u *URL) rawtransform(dataPipeline <-chan transforms.RawTransformInfo, resultChan chan transforms.RawTransformResult, wg *sync.WaitGroup) {
+func (u *URLConvert) rawtransform(dataPipeline <-chan transforms.RawTransformInfo, resultChan chan transforms.RawTransformResult, wg *sync.WaitGroup) {
 	var (
 		err    error
 		errNum int
@@ -287,7 +287,7 @@ func (u *URL) rawtransform(dataPipeline <-chan transforms.RawTransformInfo, resu
 		case ModeEncode:
 			newVal = url.QueryEscape(transformInfo.CurData)
 		default:
-			errNum, err = transforms.SetError(errNum, errors.New("url transformer not support this mode["+u.Mode+"]"), transforms.General, "")
+			errNum, err = transforms.SetError(errNum, errors.New("url convert transformer not support this mode["+u.Mode+"]"), transforms.General, "")
 		}
 		transformInfo.CurData = newVal
 
