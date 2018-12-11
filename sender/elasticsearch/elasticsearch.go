@@ -252,17 +252,17 @@ func (s *Sender) Send(datas []Data) error {
 		if len(s.aliasFields) == 0 {
 			makeDoc = false
 		}
-		var indexName string
+		curTime := time.Now().In(s.timeZone).UnixNano() / 1000000
+		indexName := buildIndexName(s.indexName, s.timeZone, s.intervalIndex)
 		for _, doc := range datas {
 			//计算索引
-			indexName = buildIndexName(s.indexName, s.timeZone, s.intervalIndex)
 			//字段名称替换
 			if makeDoc {
 				doc = s.wrapDoc(doc)
 			}
 			//添加发送时间
 			if s.logkitSendTime {
-				doc[KeySendTime] = time.Now().In(s.timeZone).UnixNano() / 1000000
+				doc[KeySendTime] = curTime
 			}
 			doc2 := doc
 			bulkService.Add(elasticV5.NewBulkIndexRequest().Index(indexName).Type(s.eType).Doc(&doc2))
