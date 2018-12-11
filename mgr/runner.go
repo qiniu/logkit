@@ -666,6 +666,8 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 		}
 	}
 
+	curTimeStr := time.Now().Format("2006-01-02 15:04:05.999")
+
 	if len(lines) <= 0 {
 		log.Debugf("Runner[%v] fetched 0 lines", r.Name())
 		_, ok := r.parser.(parser.Flushable)
@@ -705,6 +707,22 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 		errMsg := fmt.Sprintf("Runner[%v] parser %s error : %v ", r.Name(), r.parser.Name(), err.Error())
 		log.Debugf(errMsg)
 		(&SchemaErr{}).Output(numErrs, errors.New(errMsg))
+	}
+
+	// send data
+	if len(datas) <= 0 {
+		log.Debugf("Runner[%v] received parsed data length = 0", r.Name())
+		return []Data{}
+	}
+
+	tags := r.meta.GetTags()
+	if r.ExtraInfo {
+		tags = MergeEnvTags(r.EnvTag, tags)
+	}
+	tags = MergeExtraInfoTags(r.meta, tags)
+	tags["lst"] = curTimeStr
+	if len(tags) > 0 {
+		datas = addTagsToData(tags, datas, r.Name())
 	}
 
 	// 把 source 加到 data 里，前提是认为 []line 变成 []data 以后是一一对应的，一旦错位就不加
@@ -798,7 +816,6 @@ func (r *LogExportRunner) Run() {
 			log.Debug(r.tracker.Print())
 			continue
 		}
-		curTimeStr := time.Now().Format("2006-01-02 15:04:05")
 		// read data
 		var err error
 		var datas []Data
@@ -811,21 +828,23 @@ func (r *LogExportRunner) Run() {
 		}
 		r.addResetStat()
 
-		// send data
-		if len(datas) <= 0 {
-			log.Debugf("Runner[%v] received parsed data length = 0", r.Name())
-			continue
-		}
-
-		tags := r.meta.GetTags()
-		if r.ExtraInfo {
-			tags = MergeEnvTags(r.EnvTag, tags)
-		}
-		tags = MergeExtraInfoTags(r.meta, tags)
-		tags["lst"] = curTimeStr
-		if len(tags) > 0 {
-			datas = addTagsToData(tags, datas, r.Name())
-		}
+		//curTimeStr := time.Now().Format("2006-01-02 15:04:05.999")
+		//
+		//// send data
+		//if len(datas) <= 0 {
+		//	log.Debugf("Runner[%v] received parsed data length = 0", r.Name())
+		//	continue
+		//}
+		//
+		//tags := r.meta.GetTags()
+		//if r.ExtraInfo {
+		//	tags = MergeEnvTags(r.EnvTag, tags)
+		//}
+		//tags = MergeExtraInfoTags(r.meta, tags)
+		//tags["lst"] = curTimeStr
+		//if len(tags) > 0 {
+		//	datas = addTagsToData(tags, datas, r.Name())
+		//}
 		for i := range r.transformers {
 			if r.transformers[i].Stage() != transforms.StageAfterParser {
 				continue
