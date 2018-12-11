@@ -47,26 +47,30 @@ func (p *Parser) Type() string {
 }
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
-	se := &StatsError{}
-	datas := make([]Data, len(lines))
-	for idx, line := range lines {
+	var (
+		se        = &StatsError{}
+		datas     = make([]Data, len(lines))
+		dataIndex = 0
+	)
+	for _, line := range lines {
 		//raw就是原样全copy到Raw字段
 		if len(strings.TrimSpace(line)) <= 0 {
 			continue
 		}
-		datas[idx] = Data{KeyRaw: line}
+		datas[dataIndex] = Data{KeyRaw: line}
 		if p.withTimeStamp {
-			datas[idx][KeyTimestamp] = time.Now().Format(time.RFC3339Nano)
+			datas[dataIndex][KeyTimestamp] = time.Now().Format(time.RFC3339Nano)
 		}
 		for _, label := range p.labels {
-			datas[idx][label.Name] = label.Value
+			datas[dataIndex][label.Name] = label.Value
 		}
+		dataIndex++
 		se.AddSuccess()
 	}
 
 	if se.Errors == 0 {
-		return datas, nil
+		return datas[:dataIndex], nil
 	}
 
-	return datas, se
+	return datas[:dataIndex], se
 }
