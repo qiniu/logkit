@@ -42,7 +42,34 @@ func restoreMeta(meta *reader.Meta, rawSqls string, magicLagDur time.Duration) (
 	return
 }
 
-func RestoreTimestmapOffset(doneFilePath string) (time.Time, map[string]string, error) {
+func RestoreTimestampIntOffset(doneFilePath string) (int64, map[string]string, error) {
+	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, TimestampRecordsFile)
+	cachemapfilename := fmt.Sprintf("%v.%v", reader.DoneFileName, CacheMapFile)
+
+	filePath := filepath.Join(doneFilePath, filename)
+	data, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return 0, nil, err
+	}
+	tm, err := strconv.ParseInt(string(data), 10, 64)
+	if err != nil {
+		return tm, nil, err
+	}
+
+	cachemapfilePath := filepath.Join(doneFilePath, cachemapfilename)
+	data, err = ioutil.ReadFile(cachemapfilePath)
+	if err != nil {
+		return tm, nil, err
+	}
+	cache := make(map[string]string)
+	err = json.Unmarshal(data, &cache)
+	if err != nil {
+		return tm, nil, err
+	}
+	return tm, cache, nil
+}
+
+func RestoreTimestampOffset(doneFilePath string) (time.Time, map[string]string, error) {
 	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, TimestampRecordsFile)
 	cachemapfilename := fmt.Sprintf("%v.%v", reader.DoneFileName, CacheMapFile)
 
