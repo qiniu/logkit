@@ -12,11 +12,12 @@ import (
 	"strconv"
 	"syscall"
 
+	"github.com/shirou/gopsutil/process"
+
 	"github.com/qiniu/log"
+
 	"github.com/qiniu/logkit/metric"
 	. "github.com/qiniu/logkit/utils/models"
-
-	"github.com/shirou/gopsutil/process"
 )
 
 const (

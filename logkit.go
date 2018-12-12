@@ -16,7 +16,7 @@ import (
 
 	"github.com/qiniu/logkit/cli"
 	config "github.com/qiniu/logkit/conf"
-	_ "github.com/qiniu/logkit/metric/all"
+	_ "github.com/qiniu/logkit/metric/builtin"
 	"github.com/qiniu/logkit/mgr"
 	"github.com/qiniu/logkit/times"
 	_ "github.com/qiniu/logkit/transforms/builtin"

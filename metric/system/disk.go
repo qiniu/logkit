@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-
 	"time"
 
 	"github.com/qiniu/logkit/metric"
