@@ -208,7 +208,7 @@ func (p *ArrayExpand) Transform(datas []Data) ([]Data, error) {
 
 func (p *ArrayExpand) Description() string {
 	//return "expand an array like arraykey:[a, b, c] into Data map {arraykey0:a,arraykey1:b,arraykey2:c}"
-	return "展开数组，例：arraykey:[a, b, c]展开为map{arraykey0:a,arraykey1:b,arraykey2:c}"
+	return "展开数组，例：arraykey:[a, b, c]展开为{arraykey0:a,arraykey1:b,arraykey2:c}"
 }
 
 func (p *ArrayExpand) Type() string {

@@ -106,7 +106,7 @@ func parseXml(xmlStr string) (data map[string]interface{}, err error) {
 
 func (g *Xml) Description() string {
 	//return "parse xmlString to xml data"
-	return "解析xml, 将xml格式转变为map结构"
+	return "解析xml, 将xml格式转变为json结构"
 }
 
 func (g *Xml) Type() string {

@@ -175,8 +175,8 @@ func (p *UrlParam) Transform(datas []Data) ([]Data, error) {
 }
 
 func (p *UrlParam) Description() string {
-	//return "parse url parameters like 'a=a&b=2&c=aa' into Data map {a:a,b:2,c:aa}"
-	return "针对指定的字段做url param解析，例：'a=a&b=2&c=aa'解析为map{a:a,b:2,c:aa}"
+	//return "parse url parameters like 'a=a&b=2&c=aa' into Data {a:a,b:2,c:aa}"
+	return "针对指定的字段做url param解析，例：'a=a&b=2&c=aa'解析为{a:a,b:2,c:aa}"
 }
 
 func (p *UrlParam) Type() string {
