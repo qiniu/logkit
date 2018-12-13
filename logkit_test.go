@@ -32,7 +32,7 @@ func Test_RotateClean(t *testing.T) {
 	os.MkdirAll(dirp, 0755)
 	defer os.RemoveAll(dirp)
 	ch1 := make(chan struct{}, 0)
-	go loopCleanLogkitLog(dirp, "logkit.log-*", 3, 10*time.Millisecond, ch1)
+	go loopCleanLogkitLog(dirp, "logkit.log-*", 3, "10ms", ch1)
 	ch2 := make(chan struct{}, 0)
 	go loopRotateLogs(filepath.Join(dirp, "logkit.log"), 10, 10*time.Nanosecond, ch2)
 	exitchan := make(chan struct{}, 0)
