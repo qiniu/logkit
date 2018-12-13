@@ -36,9 +36,6 @@ const (
 	DefaultDoneRecordsFile = "sql.records"
 	TimestampRecordsFile   = "timestamp.records"
 	CacheMapFile           = "cachemap.records"
-
-	postgresTimeFormat  = "2006-01-02 15:04:05.000000"
-	postgresTimeFormat2 = "2006-01-02 15:04:05"
 )
 
 const (
@@ -236,12 +233,9 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		if !pgtimestampInt {
 			startTimeStr, _ := conf.GetStringOr(KeyPGStartTime, "")
 			if startTimeStr != "" {
-				startTime, err = time.ParseInLocation(postgresTimeFormat, startTimeStr, time.Local)
+				startTime, err = parsePostgresDatetime(startTimeStr)
 				if err != nil {
-					startTime, err = time.ParseInLocation(postgresTimeFormat2, startTimeStr, time.Local)
-					if err != nil {
-						return nil, fmt.Errorf("parse starttime %s in format %s error %v", startTimeStr, postgresTimeFormat, err)
-					}
+					return nil, fmt.Errorf("parse starttime %s error %v", startTimeStr, err)
 				}
 			} else {
 				startTime = time.Now()
@@ -1027,7 +1021,7 @@ func (r *Reader) getSQL(idx int, rawSQL string) (sql string, err error) {
 			if r.timestampKeyInt {
 				sql = fmt.Sprintf("%s WHERE %s >= %v and %s < %v;", rawSQL, r.timestampKey, r.startTimeInt, r.timestampKey, r.startTimeInt+int64(r.batchDurInt))
 			} else {
-				sql = fmt.Sprintf("%s WHERE %s >= '%s' and %s < '%s';", rawSQL, r.timestampKey, r.startTime.Format(postgresTimeFormat), r.timestampKey, r.startTime.Add(r.batchDuration).Format(postgresTimeFormat))
+				sql = fmt.Sprintf("%s WHERE %s >= '%s' and %s < '%s';", rawSQL, r.timestampKey, r.startTime.Format(pgtimeFormat), r.timestampKey, r.startTime.Add(r.batchDuration).Format(pgtimeFormat))
 			}
 		} else if len(r.offsetKey) > 0 && len(r.offsets) > idx {
 			sql = fmt.Sprintf("%s WHERE %v >= %d AND %v < %d;", rawSQL, r.offsetKey, r.offsets[idx], r.offsetKey, r.offsets[idx]+int64(r.readBatch))
@@ -1097,7 +1091,7 @@ func (r *Reader) checkExit(idx int, db *sql.DB) (bool, int64) {
 			if r.timestampKeyInt {
 				tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v >= %v;", rawSQL, r.timestampKey, r.startTimeInt)
 			} else {
-				tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v >= '%s';", rawSQL, r.timestampKey, r.startTime.Format(postgresTimeFormat))
+				tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v >= '%s';", rawSQL, r.timestampKey, r.startTime.Format(pgtimeFormat))
 			}
 			largerAmount, err := queryNumber(tsql, db)
 			if err != nil || largerAmount <= int64(len(r.trimecachemap)) {
@@ -1109,7 +1103,7 @@ func (r *Reader) checkExit(idx int, db *sql.DB) (bool, int64) {
 			if r.timestampKeyInt {
 				tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v = %v;", rawSQL, r.timestampKey, r.startTimeInt)
 			} else {
-				tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v = '%s';", rawSQL, r.timestampKey, r.startTime.Format(postgresTimeFormat))
+				tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v = '%s';", rawSQL, r.timestampKey, r.startTime.Format(pgtimeFormat))
 			}
 			equalAmount, err := queryNumber(tsql, db)
 			if err == nil && equalAmount > int64(len(r.trimecachemap)) {
@@ -1121,7 +1115,7 @@ func (r *Reader) checkExit(idx int, db *sql.DB) (bool, int64) {
 			if r.timestampKeyInt {
 				tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v > %v;", r.timestampKey, r.timestampKey, rawSQL, r.timestampKey, r.startTimeInt)
 			} else {
-				tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v > '%s';", r.timestampKey, r.timestampKey, rawSQL, r.timestampKey, r.startTime.Format(postgresTimeFormat))
+				tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v > '%s';", r.timestampKey, r.timestampKey, rawSQL, r.timestampKey, r.startTime.Format(pgtimeFormat))
 			}
 		} else {
 			ix := strings.Index(rawSQL, "from")

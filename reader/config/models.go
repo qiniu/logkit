@@ -60,7 +60,7 @@ const (
 
 	KeyPGsqlOffsetKey   = "postgres_offset_key"
 	KeyPGtimestampKey   = "postgres_timestamp_key"
-	KeyPGStartTime      = "postgres_start_time_key"
+	KeyPGStartTime      = "postgres_start_time"
 	KeyPGBatchDuration  = "postgres_batch_intervel"
 	KeyPGtimestampInt   = "postgres_timestamp_int"
 	KeyPGsqlReadBatch   = "postgres_limit_batch"
