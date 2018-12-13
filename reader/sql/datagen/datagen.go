@@ -76,7 +76,7 @@ func GeneratePostgresData(datasource, table string, totalnumber int64, sleepDura
 			time.Sleep(sleepDuration)
 		}
 		xx++
-		if xx%3 == 0 {
+		if xx%10 == 0 {
 			tm = tm.Add(timeaddDuration)
 		}
 	}

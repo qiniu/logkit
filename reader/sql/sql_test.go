@@ -2308,7 +2308,7 @@ func TestPostgresWithTimestampInt(t *testing.T) {
 	dataLine := 0
 	before := time.Now()
 	var actualData []Data
-	for !batchTimeout(before, 30) {
+	for !batchTimeout(before, 60) {
 		data, _, err := r.ReadData()
 		if err != nil {
 			continue
@@ -2363,7 +2363,7 @@ func TestPostgresWithTimestampS(t *testing.T) {
 	dataLine := 0
 	before := time.Now()
 	var actualData []Data
-	for !batchTimeout(before, 30) {
+	for !batchTimeout(before, 60) {
 		data, _, err := r.ReadData()
 		if err != nil {
 			continue
