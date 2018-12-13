@@ -259,6 +259,15 @@ func (ar *ActiveReader) Run() {
 		}
 	}
 }
+
+func (ar *ActiveReader) isStopping() bool {
+	return atomic.LoadInt32(&ar.status) == StatusStopping
+}
+
+func (ar *ActiveReader) hasStopped() bool {
+	return atomic.LoadInt32(&ar.status) == StatusStopped
+}
+
 func (ar *ActiveReader) Close() error {
 	defer log.Warnf("Runner[%v] ActiveReader %s was closed", ar.runnerName, ar.originpath)
 	brCloseErr := ar.br.Close()
@@ -276,6 +285,10 @@ func (ar *ActiveReader) setStatsError(err string) {
 
 func (ar *ActiveReader) sendError(err error) {
 	if err == nil {
+		return
+	}
+	if ar.isStopping() || ar.hasStopped() {
+		err = fmt.Errorf("sendError %v failed as is closed", err)
 		return
 	}
 	defer func() {

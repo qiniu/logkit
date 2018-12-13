@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"database/sql"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -9,6 +10,8 @@ import (
 	"time"
 
 	"github.com/qiniu/log"
+
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 func convertLong(v interface{}) (int64, error) {
@@ -260,4 +263,129 @@ func convertBool(v interface{}) (bool, error) {
 		log.Errorf("sql reader convertBool for type %v is not supported", reflect.TypeOf(idv))
 	}
 	return false, fmt.Errorf("%v type can not convert to Bool", dv.Kind())
+}
+
+func (r *Reader) getData(rows *sql.Rows, scanArgs []interface{}, columns []string, nochiced []bool) (Data, int64) {
+	// get RawBytes from data
+	err := rows.Scan(scanArgs...)
+	if err != nil {
+		err = fmt.Errorf("runner[%v] %v scan rows error %v", r.meta.RunnerName, r.Name(), err)
+		log.Error(err)
+		r.sendError(err)
+		return nil, 0
+	}
+
+	var totalBytes int64
+	data := make(Data, len(scanArgs))
+	for i := 0; i < len(scanArgs); i++ {
+		var bytes int64
+		vtype, ok := r.schemas[columns[i]]
+		if !ok {
+			vtype = "unknown"
+		}
+		switch vtype {
+		case "long":
+			val, serr := convertLong(scanArgs[i])
+			if serr != nil {
+				serr = fmt.Errorf("runner[%v] %v convertLong for %v (%v) error %v, this key will be ignored", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
+				log.Error(serr)
+				r.sendError(serr)
+			} else {
+				data[columns[i]] = val
+				bytes = 8
+			}
+		case "float":
+			val, serr := convertFloat(scanArgs[i])
+			if serr != nil {
+				serr = fmt.Errorf("runner[%v] %v convertFloat for %v (%v) error %v, this key will be ignored", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
+				log.Error(serr)
+				r.sendError(serr)
+			} else {
+				data[columns[i]] = val
+				bytes = 8
+			}
+		case "string":
+			val, serr := convertString(scanArgs[i])
+			if serr != nil {
+				serr = fmt.Errorf("runner[%v] %v convertString for %v (%v) error %v, this key will be ignored", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
+				log.Error(serr)
+				r.sendError(serr)
+			} else {
+				data[columns[i]] = val
+				bytes = int64(len(val))
+			}
+		case "bool":
+			val, serr := convertBool(scanArgs[i])
+			if serr != nil {
+				serr = fmt.Errorf("runner[%v] %v convertBool for %v (%v) error %v, this key will be ignored", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
+				log.Error(serr)
+				r.sendError(serr)
+			} else {
+				data[columns[i]] = val
+				bytes = 4
+			}
+		case "date":
+			val, serr := convertDate(scanArgs[i])
+			if serr != nil {
+				serr = fmt.Errorf("runner[%v] %v convertDate for %v (%v) error %v, this key will be ignored", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
+				log.Error(serr)
+				r.sendError(serr)
+			} else {
+				data[columns[i]] = val
+				bytes = 20
+			}
+		default:
+			dealed := false
+			if !nochiced[i] {
+				dealed = true
+				switch d := scanArgs[i].(type) {
+				case *string:
+					data[columns[i]] = *d
+					bytes = int64(len(*d))
+				case *[]byte:
+					data[columns[i]] = string(*d)
+					bytes = int64(len(*d))
+				case *bool:
+					data[columns[i]] = *d
+					bytes = 1
+				case int64:
+					data[columns[i]] = d
+					bytes = 8
+				case *int64:
+					data[columns[i]] = *d
+					bytes = 8
+				case float64:
+					data[columns[i]] = d
+					bytes = 8
+				case *float64:
+					data[columns[i]] = *d
+					bytes = 8
+				case uint64:
+					data[columns[i]] = d
+					bytes = 8
+				case *uint64:
+					data[columns[i]] = *d
+					bytes = 8
+				case *interface{}:
+					dealed = false
+				default:
+					dealed = false
+				}
+			}
+			if !dealed {
+				val, serr := convertString(scanArgs[i])
+				if serr != nil {
+					serr = fmt.Errorf("runner[%v] %v convertString for %v (%v) error %v, this key will be ignored", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
+					log.Error(serr)
+					r.sendError(serr)
+				} else {
+					data[columns[i]] = val
+					bytes = int64(len(val))
+				}
+			}
+		}
+
+		totalBytes += bytes
+	}
+	return data, totalBytes
 }
