@@ -117,6 +117,17 @@ var (
 		Type:         TransformTypeLong,
 		ToolTip:      "如果key中带有时区信息，则以该时区作为offset的基础时区，否则以UTC时区为基础时区",
 	}
+	KeyKeepString = Option{
+		KeyName:       "keep",
+		Element:       Radio,
+		ChooseOnly:    true,
+		Default:       false,
+		ChooseOptions: []interface{}{false, true},
+		DefaultNoUse:  false,
+		Description:   "值解析为字符串，不进行转换",
+		Advance:       true,
+		Type:          TransformTypeBoolean,
+	}
 )
 
 type TransformInfo struct {
