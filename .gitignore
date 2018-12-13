@@ -107,3 +107,4 @@ __pycache__/
 .metastore
 data/
 mytestservice/
+logkit_audit/

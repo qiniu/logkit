@@ -16,6 +16,7 @@ import (
 	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
+	"github.com/qiniu/logkit/audit"
 	"github.com/qiniu/logkit/cleaner"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
@@ -96,6 +97,7 @@ type LogExportRunner struct {
 	lastSend  time.Time
 	syncInc   int
 	tracker   *utils.Tracker
+	auditChan chan<- audit.Message
 }
 
 const defaultSendIntervalSeconds = 60
@@ -194,17 +196,7 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 }
 
 func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *reader.Registry, pr *parser.Registry, sr *sender.Registry) (runner *LogExportRunner, err error) {
-	runnerInfo := RunnerInfo{
-		EnvTag:           rc.EnvTag,
-		RunnerName:       rc.RunnerName,
-		MaxBatchSize:     rc.MaxBatchSize,
-		MaxBatchLen:      rc.MaxBatchLen,
-		MaxBatchInterval: rc.MaxBatchInterval,
-		MaxBatchTryTimes: rc.MaxBatchTryTimes,
-		SyncEvery:        rc.SyncEvery,
-		ErrorsListCap:    rc.ErrorsListCap,
-		SendRaw:          rc.SendRaw,
-	}
+	runnerInfo := rc.RunnerInfo
 	if rc.ReaderConfig == nil {
 		return nil, errors.New(rc.RunnerName + " reader in config is nil")
 	}
@@ -320,7 +312,18 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	if err != nil {
 		return nil, fmt.Errorf("runner %v add sender router error, %v", rc.RunnerName, err)
 	}
-	return NewLogExportRunnerWithService(runnerInfo, rd, cl, parser, transformers, senders, router, meta)
+	runner, err = NewLogExportRunnerWithService(runnerInfo, rd, cl, parser, transformers, senders, router, meta)
+	if err != nil {
+		return runner, err
+	}
+	if runner.LogAudit {
+		if rc.AuditChan == nil {
+			runner.LogAudit = false
+		} else {
+			runner.auditChan = rc.AuditChan
+		}
+	}
+	return runner, nil
 }
 
 func createTransformers(rc RunnerConfig) ([]transforms.Transformer, error) {
@@ -754,6 +757,25 @@ func (r *LogExportRunner) addResetStat() {
 	r.lastSend = time.Now()
 }
 
+func (r *LogExportRunner) syncAndLog(batchlen, batchSize, sendDataLen int64) {
+	if r.SyncEvery > 0 {
+		r.syncInc = (r.syncInc + 1) % r.SyncEvery
+		if r.syncInc == 0 {
+			r.reader.SyncMeta()
+		}
+	}
+	if r.LogAudit {
+		r.auditChan <- audit.Message{
+			Runnername: r.RunnerName,
+			Timestamp:  time.Now().UnixNano() / 1000000,
+			ReadBytes:  batchSize,
+			ReadLines:  batchlen,
+			SendLines:  sendDataLen,
+			RunnerNote: r.Note,
+		}
+	}
+}
+
 func (r *LogExportRunner) Run() {
 	if r.SyncEvery == 0 {
 		r.SyncEvery = 1
@@ -790,6 +812,7 @@ func (r *LogExportRunner) Run() {
 		if r.SendRaw {
 			lines, _ := r.rawReadLines(r.meta.GetDataSourceTag())
 			r.tracker.Track("rawReadLines")
+			batchLen, batchSize := r.batchLen, r.batchSize
 			r.addResetStat()
 			// send data
 			if len(lines) <= 0 {
@@ -798,6 +821,7 @@ func (r *LogExportRunner) Run() {
 			}
 			log.Debugf("Runner[%v] reader %s start to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
 			success := true
+			dataLen := len(lines)
 			for _, s := range r.senders {
 				if !r.tryRawSend(s, lines, r.MaxBatchTryTimes) {
 					success = false
@@ -806,11 +830,8 @@ func (r *LogExportRunner) Run() {
 				}
 			}
 			r.tracker.Track("finised send")
-			if success && r.SyncEvery > 0 {
-				r.syncInc = (r.syncInc + 1) % r.SyncEvery
-				if r.syncInc == 0 {
-					r.reader.SyncMeta()
-				}
+			if success {
+				r.syncAndLog(batchLen, batchSize, int64(dataLen))
 			}
 			log.Debugf("Runner[%v] send %s finish to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
 			log.Debug(r.tracker.Print())
@@ -826,25 +847,12 @@ func (r *LogExportRunner) Run() {
 			datas = r.readLines(r.meta.GetDataSourceTag())
 			r.tracker.Track("finish readLines")
 		}
+		batchLen, batchSize := r.batchLen, r.batchSize
 		r.addResetStat()
+		if len(datas) <= 0 {
+			continue
+		}
 
-		//curTimeStr := time.Now().Format("2006-01-02 15:04:05.999")
-		//
-		//// send data
-		//if len(datas) <= 0 {
-		//	log.Debugf("Runner[%v] received parsed data length = 0", r.Name())
-		//	continue
-		//}
-		//
-		//tags := r.meta.GetTags()
-		//if r.ExtraInfo {
-		//	tags = MergeEnvTags(r.EnvTag, tags)
-		//}
-		//tags = MergeExtraInfoTags(r.meta, tags)
-		//tags["lst"] = curTimeStr
-		//if len(tags) > 0 {
-		//	datas = addTagsToData(tags, datas, r.Name())
-		//}
 		for i := range r.transformers {
 			if r.transformers[i].Stage() != transforms.StageAfterParser {
 				continue
@@ -888,7 +896,7 @@ func (r *LogExportRunner) Run() {
 			}
 		}
 		r.tracker.Track("Transform")
-
+		dataLen := len(datas)
 		log.Debugf("Runner[%v] reader %s start to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
 		success := true
 		senderDataList := classifySenderData(r.senders, datas, r.router)
@@ -901,11 +909,8 @@ func (r *LogExportRunner) Run() {
 		}
 		r.tracker.Track("Send Data")
 
-		if success && r.SyncEvery > 0 {
-			r.syncInc = (r.syncInc + 1) % r.SyncEvery
-			if r.syncInc == 0 {
-				r.reader.SyncMeta()
-			}
+		if success {
+			r.syncAndLog(batchLen, batchSize, int64(dataLen))
 		}
 		log.Debugf("Runner[%v] send %s finish to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
 		log.Debug(r.tracker.Print())
