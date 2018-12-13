@@ -19,6 +19,7 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/reader/config"
+	"github.com/qiniu/logkit/reader/sql/datagen"
 	. "github.com/qiniu/logkit/reader/test"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -2229,24 +2230,28 @@ func getPostgresDb(dbsource string) (db *sql.DB, err error) {
 	return db, nil
 }
 
-//使用相同数据库会由于排他锁而无法访问 故加一个随机数以区分
-func preparePostgres(random int) error {
+func dropAndCreateDB(id int) error {
 	db, err := getPostgresDb(pgDbSource)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
-	_, err = db.Query("DROP DATABASE IF EXISTS " + pgDatabaseTest.database + strconv.Itoa(random))
+	_, err = db.Query("DROP DATABASE IF EXISTS " + pgDatabaseTest.database + strconv.Itoa(id))
 	if err != nil {
 		return err
 	}
-	_, err = db.Exec("CREATE DATABASE " + pgDatabaseTest.database + strconv.Itoa(random))
+	_, err = db.Exec("CREATE DATABASE " + pgDatabaseTest.database + strconv.Itoa(id))
 	if err != nil {
 		return err
 	}
-	db.Close()
+	return nil
+}
 
-	db, err = getPostgresDb(pgDbSource + " dbname=" + pgDatabaseTest.database + strconv.Itoa(random))
+//使用相同数据库会由于排他锁而无法访问 故加一个随机数以区分
+func preparePostgres(random int) error {
+	dropAndCreateDB(random)
+
+	db, err := getPostgresDb(pgDbSource + " dbname=" + pgDatabaseTest.database + strconv.Itoa(random))
 	if err != nil {
 		return err
 	}
@@ -2263,4 +2268,115 @@ func preparePostgres(random int) error {
 		}
 	}
 	return nil
+}
+
+func TestPostgresWithTimestampInt(t *testing.T) {
+	t.Parallel()
+	if err := dropAndCreateDB(2); err != nil {
+		t.Fatalf("prepare postgres database failed: %v", err)
+	}
+
+	os.MkdirAll(MetaDir+"/TestPostgresWithTimestamp/", 0777)
+	defer os.RemoveAll(MetaDir)
+	tablename := "testtime1"
+	runnerName := "TestPostgresWithTimestamp"
+	mr, err := reader.NewReader(conf.MapConf{
+		"postgres_database": pgDatabaseTest.database + "2",
+		"mode":              "postgres",
+		"postgres_timestamp_key":  "timestamp",
+		"postgres_exec_onstart":   "true",
+		"postgres_start_time":     "0",
+		"postgres_batch_intervel": "1000",
+		"postgres_timestamp_int":  "true",
+		"postgres_cron":           "loop 1s",
+		"postgres_datasource":     pgDbSource,
+		"postgres_sql":            "select * from " + tablename,
+		"meta_path":               path.Join(MetaDir, runnerName),
+		"file_done":               path.Join(MetaDir, runnerName),
+		"runner_name":             runnerName,
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := mr.(reader.DataReader)
+	if !ok {
+		t.Error("postgres read should have readdata interface")
+	}
+	assert.NoError(t, mr.(*Reader).Start())
+	totalnum := 10000
+	go datagen.GeneratePostgresData(pgDbSource+" dbname="+pgDatabaseTest.database+"2", tablename, int64(totalnum), 100*time.Millisecond, time.Hour, time.Now().Add(-100*time.Hour))
+	dataLine := 0
+	before := time.Now()
+	var actualData []Data
+	for !batchTimeout(before, 30) {
+		data, _, err := r.ReadData()
+		if err != nil {
+			continue
+		}
+		if len(data) <= 0 {
+			continue
+		}
+		actualData = append(actualData, data)
+		dataLine++
+		if dataLine >= totalnum {
+			break
+		}
+	}
+	assert.Equal(t, totalnum, dataLine)
+
+}
+
+func TestPostgresWithTimestampS(t *testing.T) {
+	t.Parallel()
+	if err := dropAndCreateDB(3); err != nil {
+		t.Fatalf("prepare postgres database failed: %v", err)
+	}
+
+	os.MkdirAll(MetaDir+"/TestPostgresWithTimestampS/", 0777)
+	defer os.RemoveAll(MetaDir)
+	tablename := "testtime2"
+	runnerName := "TestPostgresWithTimestampS"
+	mr, err := reader.NewReader(conf.MapConf{
+		"postgres_database": pgDatabaseTest.database + "3",
+		"mode":              "postgres",
+		"postgres_timestamp_key":  "create_time",
+		"postgres_exec_onstart":   "true",
+		"postgres_start_time":     "2018-10-01 15:04:05",
+		"postgres_batch_intervel": "30m",
+		"postgres_cron":           "loop 1s",
+		"postgres_datasource":     pgDbSource,
+		"postgres_sql":            "select * from " + tablename,
+		"meta_path":               path.Join(MetaDir, runnerName),
+		"file_done":               path.Join(MetaDir, runnerName),
+		"runner_name":             runnerName,
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := mr.(reader.DataReader)
+	if !ok {
+		t.Error("postgres read should have readdata interface")
+	}
+	assert.NoError(t, mr.(*Reader).Start())
+	totalnum := 10000
+	go datagen.GeneratePostgresData(pgDbSource+" dbname="+pgDatabaseTest.database+"3", tablename, int64(totalnum), 100*time.Millisecond, time.Hour, time.Now().Add(-100*time.Hour))
+	dataLine := 0
+	before := time.Now()
+	var actualData []Data
+	for !batchTimeout(before, 30) {
+		data, _, err := r.ReadData()
+		if err != nil {
+			continue
+		}
+		if len(data) <= 0 {
+			continue
+		}
+		actualData = append(actualData, data)
+		dataLine++
+		if dataLine >= totalnum {
+			break
+		}
+	}
+	assert.Equal(t, totalnum, dataLine)
+
 }

@@ -288,6 +288,7 @@ func (ar *ActiveReader) sendError(err error) {
 		return
 	}
 	if ar.isStopping() || ar.hasStopped() {
+		err = fmt.Errorf("sendError %v failed as is closed", err)
 		return
 	}
 	defer func() {
