@@ -7,11 +7,13 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/qiniu/log"
-	"github.com/qiniu/logkit/metric"
-	. "github.com/qiniu/logkit/utils/models"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/w32"
+
+	"github.com/qiniu/log"
+
+	"github.com/qiniu/logkit/metric"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 // KeySystemUsages TypeMetricSystem的字段名称

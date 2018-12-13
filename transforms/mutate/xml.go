@@ -20,6 +20,7 @@ var (
 type Xml struct {
 	Key   string `json:"key"`
 	New   string `json:"new"`
+	Keep  bool   `json:"keep"`
 	stats StatsInfo
 
 	keys       []string
@@ -100,13 +101,13 @@ func (g *Xml) RawTransform(datas []string) ([]string, error) {
 	return datas, errors.New("xml transformer not support rawTransform")
 }
 
-func parseXml(xmlStr string) (data map[string]interface{}, err error) {
-	return mxj.NewMapXml([]byte(xmlStr), true)
+func parseXml(xmlStr string, keep bool) (data map[string]interface{}, err error) {
+	return mxj.NewMapXml([]byte(xmlStr), !keep)
 }
 
 func (g *Xml) Description() string {
 	//return "parse xmlString to xml data"
-	return "解析xml, 将xml格式转变为map结构"
+	return "解析xml, 将xml格式转变为json结构"
 }
 
 func (g *Xml) Type() string {
@@ -117,7 +118,8 @@ func (g *Xml) SampleConfig() string {
 	return `{
        "type":"xml",
        "key":"myParseKey",
-       "new":"myNewKey"
+       "new":"myNewKey",
+       "keep": "keepString"
     }`
 }
 
@@ -125,6 +127,7 @@ func (g *Xml) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
 		transforms.KeyFieldNewRequired,
+		transforms.KeyKeepString,
 	}
 }
 
@@ -183,7 +186,7 @@ func (g *Xml) transform(dataPipeline <-chan transforms.TransformInfo, resultChan
 		if len(strVal) < 1 {
 			continue
 		}
-		xmlVal, perr := parseXml(strVal)
+		xmlVal, perr := parseXml(strVal, g.Keep)
 		if perr != nil {
 			errNum, err = transforms.SetError(errNum, perr, transforms.General, "")
 			resultChan <- transforms.TransformResult{

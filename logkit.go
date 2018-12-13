@@ -16,7 +16,7 @@ import (
 
 	"github.com/qiniu/logkit/cli"
 	config "github.com/qiniu/logkit/conf"
-	_ "github.com/qiniu/logkit/metric/all"
+	_ "github.com/qiniu/logkit/metric/builtin"
 	"github.com/qiniu/logkit/mgr"
 	"github.com/qiniu/logkit/times"
 	_ "github.com/qiniu/logkit/transforms/builtin"
@@ -26,28 +26,30 @@ import (
 
 //Config of logkit
 type Config struct {
-	MaxProcs         int      `json:"max_procs"`
-	DebugLevel       int      `json:"debug_level"`
-	ProfileHost      string   `json:"profile_host"`
-	ConfsPath        []string `json:"confs_path"`
-	LogPath          string   `json:"log"`
-	CleanSelfLog     bool     `json:"clean_self_log"`
-	CleanSelfDir     string   `json:"clean_self_dir"`
-	CleanSelfPattern string   `json:"clean_self_pattern"`
-	TimeLayouts      []string `json:"timeformat_layouts"`
-	CleanSelfLogCnt  int      `json:"clean_self_cnt"`
-	StaticRootPath   string   `json:"static_root_path"`
+	MaxProcs          int      `json:"max_procs"`
+	DebugLevel        int      `json:"debug_level"`
+	ProfileHost       string   `json:"profile_host"`
+	ConfsPath         []string `json:"confs_path"`
+	LogPath           string   `json:"log"`
+	CleanSelfLog      bool     `json:"clean_self_log"`
+	CleanSelfDir      string   `json:"clean_self_dir"`
+	CleanSelfPattern  string   `json:"clean_self_pattern"`
+	CleanSelfDuration string   `json:"clean_self_duration"`
+	CleanSelfLogCnt   int      `json:"clean_self_cnt"`
+	TimeLayouts       []string `json:"timeformat_layouts"`
+	StaticRootPath    string   `json:"static_root_path"`
 	mgr.ManagerConfig
 }
 
 var conf Config
 
 const (
-	NextVersion       = "v1.5.4"
-	defaultReserveCnt = 5
-	defaultLogDir     = "./run"
-	defaultLogPattern = "*.log-*"
-	defaultRotateSize = 100 * 1024 * 1024
+	NextVersion        = "v1.5.4"
+	defaultReserveCnt  = 5
+	defaultLogDir      = "./"
+	defaultLogPattern  = "*.log-*"
+	defaultLogDuration = 10 * time.Minute
+	defaultRotateSize  = 100 * 1024 * 1024
 )
 
 const usage = `logkit, Very easy-to-use server agent for collecting & sending logs & metrics.
@@ -146,7 +148,7 @@ func cleanLogkitLog(dir, pattern string, reserveCnt int) {
 	return
 }
 
-func loopCleanLogkitLog(dir, pattern string, reserveCnt int, dur time.Duration, exitchan chan struct{}) {
+func loopCleanLogkitLog(dir, pattern string, reserveCnt int, duration string, exitchan chan struct{}) {
 	if len(dir) <= 0 {
 		dir = defaultLogDir
 	}
@@ -156,7 +158,21 @@ func loopCleanLogkitLog(dir, pattern string, reserveCnt int, dur time.Duration, 
 	if reserveCnt <= 0 {
 		reserveCnt = defaultReserveCnt
 	}
+	var (
+		dur time.Duration
+		err error
+	)
+	if duration != "" {
+		dur, err = time.ParseDuration(duration)
+		if err != nil {
+			log.Warnf("clean self duration parse failed: %v, Valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'. Use default duration: 10m", err)
+			dur = defaultLogDuration
+		}
+	} else {
+		dur = defaultLogDuration
+	}
 	ticker := time.NewTicker(dur)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-exitchan:
@@ -184,6 +200,7 @@ func loopRotateLogs(path string, rotateSize int64, dur time.Duration, exitchan c
 		log.Fatal(err)
 	}
 	ticker := time.NewTicker(dur)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-exitchan:
@@ -276,7 +293,7 @@ func main() {
 	stopClean := make(chan struct{}, 0)
 	defer close(stopClean)
 	if conf.CleanSelfLog {
-		go loopCleanLogkitLog(conf.CleanSelfDir, conf.CleanSelfPattern, conf.CleanSelfLogCnt, 10*time.Minute, stopClean)
+		go loopCleanLogkitLog(conf.CleanSelfDir, conf.CleanSelfPattern, conf.CleanSelfLogCnt, conf.CleanSelfDuration, stopClean)
 	}
 	if len(conf.BindHost) > 0 {
 		m.BindHost = conf.BindHost

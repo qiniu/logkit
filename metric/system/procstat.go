@@ -11,13 +11,14 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/shirou/gopsutil/process"
+
 	"github.com/qiniu/log"
+
 	"github.com/qiniu/logkit/metric"
 	. "github.com/qiniu/logkit/metric/system/utils"
 	"github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
-
-	"github.com/shirou/gopsutil/process"
 )
 
 const (
