@@ -1,10 +1,10 @@
 package system
 
 import (
+	"github.com/shirou/gopsutil/cpu"
+
 	"github.com/qiniu/logkit/metric"
 	. "github.com/qiniu/logkit/utils/models"
-
-	"github.com/shirou/gopsutil/cpu"
 )
 
 const (

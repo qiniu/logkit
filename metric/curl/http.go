@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/json-iterator/go"
+
 	"github.com/qiniu/logkit/metric"
 	. "github.com/qiniu/logkit/utils/models"
-
-	"github.com/json-iterator/go"
 )
 
 const (
