@@ -323,6 +323,8 @@ type Reader struct {
 	readChan chan socketInfo
 	errChan  chan error
 
+	initErr         error
+	initErrLock     sync.RWMutex
 	netproto        string
 	ServiceAddress  string
 	sourceIp        string
@@ -372,6 +374,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		status:          StatusInit,
 		readChan:        make(chan socketInfo, 2),
 		errChan:         make(chan error),
+		initErrLock:     sync.RWMutex{},
 		ServiceAddress:  ServiceAddress,
 		MaxConnections:  MaxConnections,
 		ReadBufferSize:  ReadBufferSize,
@@ -411,7 +414,12 @@ func (r *Reader) sendError(err error) {
 	r.errChan <- err
 }
 
-func (r *Reader) Start() error {
+func (r *Reader) Start() (err error) {
+	defer func() {
+		r.initErrLock.Lock()
+		r.initErr = err
+		r.initErrLock.Unlock()
+	}()
 	if r.isStopping() || r.hasStopped() {
 		return errors.New("reader is stopping or has stopped")
 	} else if !atomic.CompareAndSwapInt32(&r.status, StatusInit, StatusRunning) {
@@ -488,6 +496,12 @@ func (r *Reader) Source() string {
 	return r.sourceIp
 }
 
+func (r *Reader) FetchInitError() error {
+	r.initErrLock.RLock()
+	defer r.initErrLock.RUnlock()
+	return r.initErr
+}
+
 // Note: 对 sourceIp 的操作非线程安全，需由上层逻辑保证同步调用 ReadLine
 func (r *Reader) ReadLine() (string, error) {
 	timer := time.NewTimer(time.Second)
@@ -501,7 +515,7 @@ func (r *Reader) ReadLine() (string, error) {
 	case <-timer.C:
 	}
 
-	return "", nil
+	return "", r.FetchInitError()
 }
 
 func (r *Reader) SyncMeta() {

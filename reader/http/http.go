@@ -50,6 +50,7 @@ type Reader struct {
 	status int32
 
 	readChan chan Details
+	errChan  chan error
 
 	currentPath string
 	address     string
@@ -82,6 +83,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		meta:     meta,
 		status:   StatusInit,
 		readChan: make(chan Details, len(paths)),
+		errChan:  make(chan error, 1),
 		address:  address,
 		paths:    paths,
 	}, nil
@@ -123,6 +125,7 @@ func (r *Reader) Start() error {
 	go func() {
 		if err := r.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Errorf("Runner[%v] %q daemon start HTTP server failed: %v", r.meta.RunnerName, r.Name(), err)
+			r.errChan <- err
 		}
 	}()
 	log.Infof("Runner[%v] %q daemon has started", r.meta.RunnerName, r.Name())
@@ -146,6 +149,13 @@ func (r *Reader) ReadLine() (string, error) {
 		r.currentPath = data.Path
 		return data.Content, nil
 	case <-timer.C:
+		select {
+		case err := <-r.errChan:
+			log.Errorf("Reader %s failed: %v", r.Name(), err)
+			return "", err
+		default:
+			return "", nil
+		}
 	}
 
 	return "", nil
