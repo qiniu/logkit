@@ -838,6 +838,7 @@ func (ft *FtSender) sendRawFromQueue(queueName string, readChan <-chan []byte, r
 
 func (ft *FtSender) sendFromQueue(queueName string, readChan <-chan []byte, readDatasChan <-chan []Data, isRetry bool) {
 	timer := time.NewTicker(time.Second)
+	defer timer.Stop()
 	numWaits := 1
 	var curDataContext, otherDataContext []*datasContext
 	var curIdx int
