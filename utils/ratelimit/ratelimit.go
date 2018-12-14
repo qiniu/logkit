@@ -18,7 +18,6 @@ func (r *noopLimiter) Limit(uint64) bool {
 type countLimiter struct {
 	limit  uint64
 	count  uint64
-	ticker *time.Ticker
 	lockCh chan struct{}
 }
 
@@ -26,15 +25,14 @@ func NewLimiter(limit int64) Limiter {
 	if limit <= 0 {
 		return &noopLimiter{}
 	}
-
-	ticker := time.NewTicker(time.Second)
 	r := &countLimiter{
 		limit:  uint64(limit),
 		count:  0,
-		ticker: ticker,
 		lockCh: make(chan struct{}),
 	}
 	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
 		for range ticker.C {
 			if r.loadCount() > r.limit {
 				select {
