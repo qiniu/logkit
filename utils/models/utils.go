@@ -959,6 +959,8 @@ func GetGrokLabels(labelList []string, nameMap map[string]struct{}) (labels []Gr
 }
 
 func IsFileModified(path string, interval time.Duration, compare time.Time) bool {
+	// time.NewTicker时不是严格的整数时间，例如 3s ,实际相差可能时3.0002s，此时如果在 3-3.002之间出现文件修改则检测不出来
+	interval = interval + 500*time.Millisecond
 	modTime := time.Now()
 	fi, err := os.Stat(path)
 	if err != nil {
