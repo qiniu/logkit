@@ -484,6 +484,7 @@ func (m *Manager) auditLog() {
 
 func (m *Manager) detectMoreWatchers(confsPath []string) {
 	ticker := time.NewTicker(time.Second * 10)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
