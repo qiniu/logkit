@@ -18,7 +18,7 @@ func TestAuidt(t *testing.T) {
 	assert.NoError(t, err)
 	defer os.RemoveAll(dir)
 	for i := 0; i < 1000; i++ {
-		auidt.Log(Message{"haha", time.Now().UnixNano() / 1000000, rand.Int63n(100000000), rand.Int63n(100000), rand.Int63n(100000), ""})
+		auidt.Log(Message{"haha", time.Now().UnixNano() / 1000000, rand.Int63n(100000000), rand.Int63n(100000), rand.Int63n(100000), "", 123})
 	}
 	files, err := ioutil.ReadDir(dir)
 	assert.NoError(t, err)
@@ -36,7 +36,7 @@ func BenchmarkAudit(b *testing.B) {
 	}
 	defer os.RemoveAll(dir)
 	for i := 0; i < b.N; i++ {
-		auidt.Log(Message{"haha", time.Now().UnixNano() / 1000000, 123239232, 123343, 13201200, ""})
+		auidt.Log(Message{"haha", time.Now().UnixNano() / 1000000, 123239232, 123343, 13201200, "", 123})
 	}
 }
 
