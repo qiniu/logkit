@@ -1,13 +1,12 @@
 package audit
 
 import (
+	"bytes"
 	"io/ioutil"
 	"math/rand"
 	"os"
 	"testing"
 	"time"
-
-	"bytes"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -22,7 +21,7 @@ func TestAuidt(t *testing.T) {
 	}
 	files, err := ioutil.ReadDir(dir)
 	assert.NoError(t, err)
-	assert.Equal(t, 8, len(files))
+	assert.Equal(t, 9, len(files))
 }
 
 //200000	      8027 ns/op	     208 B/op	       1 allocs/op
