@@ -19,7 +19,7 @@ func TestSQLFileSender(t *testing.T) {
 	conf := conf.MapConf{
 		KeySQLFileRotateSize: "2097152",
 		KeySQLFileTable:      "table1",
-		KeyMaxSendRate:       "10000",
+		KeyMaxSendRate:       "200",
 	}
 	sender, err := NewSender(conf)
 	if err != nil {

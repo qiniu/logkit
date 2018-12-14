@@ -9,11 +9,12 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/qiniu/pandora-go-sdk/base/ratelimit"
+
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
 	. "github.com/qiniu/logkit/sender/config"
 	"github.com/qiniu/logkit/utils/models"
-	"github.com/qiniu/logkit/utils/ratelimit"
 )
 
 const (
@@ -142,7 +143,7 @@ type Sender struct {
 	w    *writer
 	name string
 
-	limiter ratelimit.Limiter
+	limiter *ratelimit.Limiter
 }
 
 func NewSender(conf conf.MapConf) (s sender.Sender, err error) {
@@ -176,7 +177,7 @@ func NewSender(conf conf.MapConf) (s sender.Sender, err error) {
 }
 
 func (s *Sender) Send(records []models.Data) error {
-	s.limiter.Limit(uint64(len(records)))
+	s.limiter.Assign(int64(len(records)))
 	return s.w.Write(records)
 }
 
@@ -185,5 +186,6 @@ func (s *Sender) Name() string {
 }
 
 func (s *Sender) Close() error {
+	s.limiter.Close()
 	return s.w.Close()
 }
