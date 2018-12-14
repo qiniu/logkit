@@ -20,6 +20,7 @@ type Message struct {
 	ReadLines  int64
 	SendLines  int64
 	RunnerNote string
+	Lag        int64
 }
 
 type Audit struct {
@@ -152,6 +153,8 @@ func (a *Audit) output(msg *Message) error {
 	itoa(&a.buf, msg.SendLines)
 	a.buf.WriteByte('\t')
 	a.buf.WriteString(msg.RunnerNote)
+	a.buf.WriteByte('\t')
+	itoa(&a.buf, msg.Lag)
 	a.buf.WriteByte('\n')
 
 	_, err := a.f.Write(a.buf.Bytes())

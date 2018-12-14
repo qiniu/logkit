@@ -765,6 +765,13 @@ func (r *LogExportRunner) syncAndLog(batchlen, batchSize, sendDataLen int64) {
 		}
 	}
 	if r.LogAudit {
+		var lag int64
+		//当延迟数据是最近一分钟内时才获取，数据更新依赖心跳，但是不影响性能
+		r.rsMutex.RLock()
+		if r.rs != nil && r.rs.lastState.Add(time.Minute).After(time.Now()) {
+			lag = r.rs.Lag.Size
+		}
+		r.rsMutex.RUnlock()
 		r.auditChan <- audit.Message{
 			Runnername: r.RunnerName,
 			Timestamp:  time.Now().UnixNano() / 1000000,
@@ -772,6 +779,7 @@ func (r *LogExportRunner) syncAndLog(batchlen, batchSize, sendDataLen int64) {
 			ReadLines:  batchlen,
 			SendLines:  sendDataLen,
 			RunnerNote: r.Note,
+			Lag:        lag,
 		}
 	}
 }
