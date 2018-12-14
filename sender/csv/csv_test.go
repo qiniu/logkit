@@ -20,7 +20,7 @@ func TestCSVSender(t *testing.T) {
 		KeyCSVFields:     "name,uid,age",
 		KeyCSVDelimiter:  ",",
 		KeyCSVRotateSize: "10485760",
-		KeyMaxSendRate:   "10000",
+		KeyMaxSendRate:   "200",
 	}
 	sender, err := NewSender(conf)
 	if err != nil {
