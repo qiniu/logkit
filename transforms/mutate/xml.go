@@ -18,19 +18,41 @@ var (
 )
 
 type Xml struct {
-	Key   string `json:"key"`
-	New   string `json:"new"`
-	Keep  bool   `json:"keep"`
-	stats StatsInfo
+	Key        string `json:"key"`
+	New        string `json:"new"`
+	Keep       bool   `json:"keep"`
+	Expand     bool   `json:"expand"`
+	DiscardKey bool   `json:"discard_key"`
+	stats      StatsInfo
 
-	keys       []string
-	news       []string
-	numRoutine int
+	keys          []string
+	news          []string
+	isDelete      bool // 1. 如果keys news相等（Key New相等或者不展开时New为空）, 则删除key value 2. 根据discardKey是否为true进行删除
+	cacheNews     map[string][]string
+	cacheNewsLock sync.RWMutex
+	numRoutine    int
 }
 
 func (g *Xml) Init() error {
+	var isDelete bool
+	if g.Key == g.New {
+		isDelete = true // keys news相等
+	}
 	g.keys = GetKeys(g.Key)
 	g.news = GetKeys(g.New)
+	if g.New == "" {
+		g.news = g.keys
+		if g.Expand {
+			g.news = g.news[:len(g.news)-1] // keys news不相等
+		} else {
+			isDelete = true // keys news相等
+		}
+	}
+
+	if g.DiscardKey || isDelete {
+		g.isDelete = true
+	}
+	g.cacheNews = make(map[string][]string)
 
 	numRoutine := MaxProcs
 	if numRoutine == 0 {
@@ -43,6 +65,10 @@ func (g *Xml) Init() error {
 func (g *Xml) Transform(datas []Data) ([]Data, error) {
 	if g.keys == nil {
 		g.Init()
+	}
+	if g.Expand {
+		mxj.LeafUseDotNotation()
+		defer mxj.LeafUseDotNotation()
 	}
 
 	var (
@@ -126,8 +152,30 @@ func (g *Xml) SampleConfig() string {
 func (g *Xml) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
-		transforms.KeyFieldNewRequired,
+		transforms.KeyFieldNew,
 		transforms.KeyKeepString,
+		{
+			KeyName:       "discard_key",
+			Element:       Radio,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{false, true},
+			Default:       false,
+			DefaultNoUse:  false,
+			Description:   "删除原始key指定的字段名和字段值",
+			Type:          transforms.TransformTypeBoolean,
+			Advance:       true,
+		},
+		{
+			KeyName:       "expand",
+			Element:       Radio,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{false, true},
+			Default:       false,
+			DefaultNoUse:  false,
+			Description:   "展开xml里的字段（请确保字段名不重名）",
+			Type:          transforms.TransformTypeBoolean,
+			Advance:       true,
+		},
 	}
 }
 
@@ -186,24 +234,67 @@ func (g *Xml) transform(dataPipeline <-chan transforms.TransformInfo, resultChan
 		if len(strVal) < 1 {
 			continue
 		}
-		xmlVal, perr := parseXml(strVal, g.Keep)
-		if perr != nil {
-			errNum, err = transforms.SetError(errNum, perr, transforms.General, "")
-			resultChan <- transforms.TransformResult{
-				Index:   transformInfo.Index,
-				CurData: transformInfo.CurData,
-				ErrNum:  errNum,
-				Err:     err,
+
+		if g.Expand {
+			m, xmlErr := mxj.NewMapXml([]byte(strVal))
+			if xmlErr != nil {
+				errNum, err = transforms.SetError(errNum, xmlErr, transforms.General, "")
+				resultChan <- transforms.TransformResult{
+					Index:   transformInfo.Index,
+					CurData: transformInfo.CurData,
+					ErrNum:  errNum,
+					Err:     err,
+				}
+				continue
 			}
-			continue
-		}
-		if len(g.news) == 0 {
-			DeleteMapValue(transformInfo.CurData, g.keys...)
-			g.news = g.keys
-		}
-		setErr := SetMapValue(transformInfo.CurData, xmlVal, false, g.news...)
-		if setErr != nil {
-			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
+
+			errNum, err = g.delete(transformInfo.CurData, errNum, err)
+			ln := m.LeafNodes()
+			for _, v := range ln {
+				paths := GetKeys(v.Path)
+				pathsLen := len(paths)
+				if pathsLen == 0 {
+					continue
+				}
+				currentKey := paths[pathsLen-1]
+				var (
+					values []string
+					ok     bool
+				)
+				g.cacheNewsLock.RLock()
+				values, ok = g.cacheNews[currentKey]
+				g.cacheNewsLock.RUnlock()
+				if !ok {
+					values = make([]string, len(g.news))
+					copy(values, g.news)
+					values = append(values, currentKey)
+					g.cacheNewsLock.Lock()
+					g.cacheNews[currentKey] = values
+					g.cacheNewsLock.Unlock()
+				}
+				setErr := SetMapValue(transformInfo.CurData, v.Value, false, values...)
+				if setErr != nil {
+					errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, paths[pathsLen-1])
+				}
+			}
+		} else {
+			xmlVal, perr := parseXml(strVal, g.Keep)
+			if perr != nil {
+				errNum, err = transforms.SetError(errNum, perr, transforms.General, "")
+				resultChan <- transforms.TransformResult{
+					Index:   transformInfo.Index,
+					CurData: transformInfo.CurData,
+					ErrNum:  errNum,
+					Err:     err,
+				}
+				continue
+			}
+			errNum, err = g.delete(transformInfo.CurData, errNum, err)
+
+			setErr := SetMapValue(transformInfo.CurData, xmlVal, false, g.news...)
+			if setErr != nil {
+				errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
+			}
 		}
 
 		resultChan <- transforms.TransformResult{
@@ -214,4 +305,31 @@ func (g *Xml) transform(dataPipeline <-chan transforms.TransformInfo, resultChan
 		}
 	}
 	wg.Done()
+}
+
+func (g *Xml) delete(curData Data, errNum int, err error) (int, error) {
+	if !g.isDelete {
+		return errNum, err
+	}
+
+	keys := make([]string, len(g.keys))
+	copy(keys, g.keys)
+	for len(keys) > 0 {
+		DeleteMapValue(curData, keys...)
+		val, getErr := GetMapValue(curData, keys[:len(keys)-1]...)
+		if getErr != nil {
+			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, strings.Join(keys, "."))
+			continue
+		}
+		if val == nil {
+			keys = keys[:len(keys)-1]
+			continue
+		}
+		if valMap, ok := val.(map[string]interface{}); ok && len(valMap) == 0 {
+			keys = keys[:len(keys)-1]
+			continue
+		}
+		break
+	}
+	return errNum, err
 }
