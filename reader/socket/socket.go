@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -17,8 +18,6 @@ import (
 	"github.com/json-iterator/go"
 
 	"github.com/qiniu/log"
-
-	"regexp"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
