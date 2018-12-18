@@ -50,6 +50,8 @@ type Reader struct {
 	status int32
 
 	readChan chan Details
+	initErr         error
+	initErrLock     sync.RWMutex
 
 	currentPath string
 	address     string
@@ -82,6 +84,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		meta:     meta,
 		status:   StatusInit,
 		readChan: make(chan Details, len(paths)),
+		initErrLock:  sync.RWMutex{},
 		address:  address,
 		paths:    paths,
 	}, nil
@@ -123,6 +126,9 @@ func (r *Reader) Start() error {
 	go func() {
 		if err := r.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Errorf("Runner[%v] %q daemon start HTTP server failed: %v", r.meta.RunnerName, r.Name(), err)
+			r.initErrLock.Lock()
+			r.initErr = err
+			r.initErrLock.Unlock()
 		}
 	}()
 	log.Infof("Runner[%v] %q daemon has started", r.meta.RunnerName, r.Name())
@@ -148,7 +154,13 @@ func (r *Reader) ReadLine() (string, error) {
 	case <-timer.C:
 	}
 
-	return "", nil
+	return "", r.FetchInitError()
+}
+
+func (r *Reader) FetchInitError() error {
+	r.initErrLock.RLock()
+	defer r.initErrLock.RUnlock()
+	return r.initErr
 }
 
 func (_ *Reader) SyncMeta() {}
