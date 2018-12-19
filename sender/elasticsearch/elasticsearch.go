@@ -207,18 +207,23 @@ func (s *Sender) Send(datas []Data) error {
 			return err
 		}
 
-		// 查找出失败的操作并回溯对应的数据返回给上层
-		var lastFailedResult *elasticV6.BulkResponseItem
-		failedDatas := make([]map[string]interface{}, 0)
+		var (
+			// 查找出失败的操作并回溯对应的数据返回给上层
+			lastFailedResult *elasticV6.BulkResponseItem
+			failedDatas      = make([]map[string]interface{}, len(datas))
+			failedDatasIdx   = 0
+		)
 		for i, item := range resp.Items {
 			for _, result := range item {
 				if !(result.Status >= 200 && result.Status <= 299) {
-					failedDatas = append(failedDatas, datas[i])
+					failedDatas[failedDatasIdx] = datas[i]
+					failedDatasIdx++
 					lastFailedResult = result
 					break // 任一情况的失败都算该条数据整体操作失败，没有必要重复检查
 				}
 			}
 		}
+		failedDatas = failedDatas[:failedDatasIdx]
 		if len(failedDatas) == 0 {
 			return nil
 		}
@@ -268,18 +273,23 @@ func (s *Sender) Send(datas []Data) error {
 			return err
 		}
 
-		// 查找出失败的操作并回溯对应的数据返回给上层
-		var lastFailedResult *elasticV5.BulkResponseItem
-		failedDatas := make([]map[string]interface{}, 0)
+		var (
+			// 查找出失败的操作并回溯对应的数据返回给上层
+			lastFailedResult *elasticV5.BulkResponseItem
+			failedDatas      = make([]map[string]interface{}, len(datas))
+			failedDatasIdx   = 0
+		)
 		for i, item := range resp.Items {
 			for _, result := range item {
 				if !(result.Status >= 200 && result.Status <= 299) {
-					failedDatas = append(failedDatas, datas[i])
+					failedDatas[failedDatasIdx] = datas[i]
+					failedDatasIdx++
 					lastFailedResult = result
 					break // 任一情况的失败都算该条数据整体操作失败，没有必要重复检查
 				}
 			}
 		}
+		failedDatas = failedDatas[:failedDatasIdx]
 		if len(failedDatas) == 0 {
 			return nil
 		}
@@ -328,18 +338,23 @@ func (s *Sender) Send(datas []Data) error {
 			return err
 		}
 
-		// 查找出失败的操作并回溯对应的数据返回给上层
-		var lastFailedResult *elasticV3.BulkResponseItem
-		failedDatas := make([]map[string]interface{}, 0)
+		var (
+			// 查找出失败的操作并回溯对应的数据返回给上层
+			lastFailedResult *elasticV3.BulkResponseItem
+			failedDatas      = make([]map[string]interface{}, len(datas))
+			failedDatasIdx   = 0
+		)
 		for i, item := range resp.Items {
 			for _, result := range item {
 				if !(result.Status >= 200 && result.Status <= 299) {
-					failedDatas = append(failedDatas, datas[i])
+					failedDatas[failedDatasIdx] = datas[i]
+					failedDatasIdx++
 					lastFailedResult = result
 					break // 任一情况的失败都算该条数据整体操作失败，没有必要重复检查
 				}
 			}
 		}
+		failedDatas = failedDatas[:failedDatasIdx]
 		if len(failedDatas) == 0 {
 			return nil
 		}
@@ -380,7 +395,18 @@ func buildIndexName(indexName string, timeZone *time.Location, size int) string 
 }
 
 // Close ElasticSearch Sender Close
-func (_ *Sender) Close() error { return nil }
+func (s *Sender) Close() error {
+	if s.elasticV3Client != nil {
+		s.elasticV3Client.Stop()
+	}
+	if s.elasticV5Client != nil {
+		s.elasticV5Client.Stop()
+	}
+	if s.elasticV6Client != nil {
+		s.elasticV6Client.Stop()
+	}
+	return nil
+}
 
 func (s *Sender) wrapDoc(doc map[string]interface{}) map[string]interface{} {
 	for oldKey, newKey := range s.aliasFields {
