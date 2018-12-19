@@ -82,6 +82,9 @@ type Reader struct {
 	keepAlive              string //scrollID 保留时间
 	esVersion              string //ElasticSearch version
 	offset                 string // 当前处理es的offset
+	elasticV3Client        *elasticV3.Client
+	elasticV5Client        *elasticV5.Client
+	elasticV6Client        *elasticV6.Client
 }
 
 func init() {
@@ -115,6 +118,58 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	if err != nil {
 		log.Errorf("Runner[%v] %v -meta data is corrupted err:%v, omit meta data", meta.RunnerName, meta.MetaFile(), err)
 	}
+
+	// 初始化 client
+	var elasticV3Client *elasticV3.Client
+	var elasticV5Client *elasticV5.Client
+	var elasticV6Client *elasticV6.Client
+	switch esVersion {
+	case ElasticVersion6:
+		optFns := []elasticV6.ClientOptionFunc{
+			elasticV6.SetHealthcheck(false),
+			elasticV6.SetURL(eshost),
+		}
+
+		if len(authUsername) > 0 && len(authPassword) > 0 {
+			optFns = append(optFns, elasticV6.SetBasicAuth(authUsername, authPassword))
+		}
+
+		elasticV6Client, err = elasticV6.NewClient(optFns...)
+		if err != nil {
+			return nil, err
+		}
+	case ElasticVersion3:
+		optFns := []elasticV3.ClientOptionFunc{
+			elasticV3.SetSniff(false),
+			elasticV3.SetHealthcheck(false),
+			elasticV3.SetURL(eshost),
+		}
+
+		if len(authUsername) > 0 && len(authPassword) > 0 {
+			optFns = append(optFns, elasticV3.SetBasicAuth(authUsername, authPassword))
+		}
+
+		elasticV3Client, err = elasticV3.NewClient(optFns...)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		optFns := []elasticV5.ClientOptionFunc{
+			elasticV5.SetSniff(false),
+			elasticV5.SetHealthcheck(false),
+			elasticV5.SetURL(eshost),
+		}
+
+		if len(authUsername) > 0 && len(authPassword) > 0 {
+			optFns = append(optFns, elasticV5.SetBasicAuth(authUsername, authPassword))
+		}
+
+		elasticV5Client, err = elasticV5.NewClient(optFns...)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	r := &Reader{
 		meta:          meta,
 		status:        StatusInit,
@@ -136,6 +191,9 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		cronOffsetKey:          cronOffset,
 		execOnStart:            execOnStart,
 		metaFile:               metaFile,
+		elasticV3Client:        elasticV3Client,
+		elasticV5Client:        elasticV5Client,
+		elasticV6Client:        elasticV6Client,
 	}
 	if len(cronSched) > 0 {
 		cronSched = strings.ToLower(cronSched)
@@ -255,21 +313,9 @@ func (r *Reader) execWithLoop() error {
 	// Create a client
 	switch r.esVersion {
 	case ElasticVersion6:
-		optFns := []elasticV6.ClientOptionFunc{
-			elasticV6.SetURL(r.eshost),
-		}
-
-		if len(r.authUsername) > 0 && len(r.authPassword) > 0 {
-			optFns = append(optFns, elasticV6.SetBasicAuth(r.authUsername, r.authPassword))
-		}
-		client, err := elasticV6.NewClient(optFns...)
-		if err != nil {
-			return err
-		}
-		scroll := client.Scroll(r.esindex).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
+		scroll := r.elasticV6Client.Scroll(r.esindex).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
 		for {
-			ctx := context.Background()
-			results, err := scroll.ScrollId(r.offset).Do(ctx)
+			results, err := scroll.ScrollId(r.offset).Do(context.Background())
 			if err == io.EOF {
 				return nil // all results retrieved
 			}
@@ -289,18 +335,7 @@ func (r *Reader) execWithLoop() error {
 			}
 		}
 	case ElasticVersion3:
-		optFns := []elasticV3.ClientOptionFunc{
-			elasticV3.SetURL(r.eshost),
-		}
-
-		if len(r.authUsername) > 0 && len(r.authPassword) > 0 {
-			optFns = append(optFns, elasticV3.SetBasicAuth(r.authUsername, r.authPassword))
-		}
-		client, err := elasticV3.NewClient(optFns...)
-		if err != nil {
-			return err
-		}
-		scroll := client.Scroll(r.esindex).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
+		scroll := r.elasticV3Client.Scroll(r.esindex).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
 		for {
 			results, err := scroll.ScrollId(r.offset).Do()
 			if err == io.EOF {
@@ -322,21 +357,9 @@ func (r *Reader) execWithLoop() error {
 			}
 		}
 	default:
-		optFns := []elasticV5.ClientOptionFunc{
-			elasticV5.SetURL(r.eshost),
-		}
-
-		if len(r.authUsername) > 0 && len(r.authPassword) > 0 {
-			optFns = append(optFns, elasticV5.SetBasicAuth(r.authUsername, r.authPassword))
-		}
-		client, err := elasticV5.NewClient(optFns...)
-		if err != nil {
-			return err
-		}
-		scroll := client.Scroll(r.esindex).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
+		scroll := r.elasticV5Client.Scroll(r.esindex).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
 		for {
-			ctx := context.Background()
-			results, err := scroll.ScrollId(r.offset).Do(ctx)
+			results, err := scroll.ScrollId(r.offset).Do(context.Background())
 			if err == io.EOF {
 				return nil // all results retrieved
 			}
@@ -363,27 +386,15 @@ func (r *Reader) execWithCron() error {
 	// Create a client
 	switch r.esVersion {
 	case ElasticVersion6:
-		optFns := []elasticV6.ClientOptionFunc{
-			elasticV6.SetURL(r.eshost),
-		}
-
-		if len(r.authUsername) > 0 && len(r.authPassword) > 0 {
-			optFns = append(optFns, elasticV6.SetBasicAuth(r.authUsername, r.authPassword))
-		}
-		client, err := elasticV6.NewClient(optFns...)
-		if err != nil {
-			return err
-		}
 		var rangeQuery *elasticV6.RangeQuery
 		if r.cronOffsetValueIsValid {
 			rangeQuery = elasticV6.NewRangeQuery(r.cronOffsetKey).Gte(r.cronOffsetValue)
 		} else {
 			rangeQuery = elasticV6.NewRangeQuery(r.cronOffsetKey)
 		}
-		scroll := client.Scroll(r.esindex).Query(rangeQuery).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
+		scroll := r.elasticV6Client.Scroll(r.esindex).Query(rangeQuery).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
 		for {
-			ctx := context.Background()
-			results, err := scroll.ScrollId(r.offset).Do(ctx)
+			results, err := scroll.ScrollId(r.offset).Do(context.Background())
 			if err == io.EOF {
 				return nil // all results retrieved
 			}
@@ -406,24 +417,13 @@ func (r *Reader) execWithCron() error {
 			}
 		}
 	case ElasticVersion3:
-		optFns := []elasticV3.ClientOptionFunc{
-			elasticV3.SetURL(r.eshost),
-		}
-
-		if len(r.authUsername) > 0 && len(r.authPassword) > 0 {
-			optFns = append(optFns, elasticV3.SetBasicAuth(r.authUsername, r.authPassword))
-		}
-		client, err := elasticV3.NewClient(optFns...)
-		if err != nil {
-			return err
-		}
 		var rangeQuery *elasticV3.RangeQuery
 		if r.cronOffsetValueIsValid {
 			rangeQuery = elasticV3.NewRangeQuery(r.cronOffsetKey).Gte(r.cronOffsetValue)
 		} else {
 			rangeQuery = elasticV3.NewRangeQuery(r.cronOffsetKey)
 		}
-		scroll := client.Scroll(r.esindex).Query(rangeQuery).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
+		scroll := r.elasticV3Client.Scroll(r.esindex).Query(rangeQuery).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
 		for {
 			results, err := scroll.ScrollId(r.offset).Do()
 			if err == io.EOF {
@@ -448,27 +448,15 @@ func (r *Reader) execWithCron() error {
 			}
 		}
 	default:
-		optFns := []elasticV5.ClientOptionFunc{
-			elasticV5.SetURL(r.eshost),
-		}
-
-		if len(r.authUsername) > 0 && len(r.authPassword) > 0 {
-			optFns = append(optFns, elasticV5.SetBasicAuth(r.authUsername, r.authPassword))
-		}
-		client, err := elasticV5.NewClient(optFns...)
-		if err != nil {
-			return err
-		}
 		var rangeQuery *elasticV5.RangeQuery
 		if r.cronOffsetValueIsValid {
 			rangeQuery = elasticV5.NewRangeQuery(r.cronOffsetKey).Gte(r.cronOffsetValue)
 		} else {
 			rangeQuery = elasticV5.NewRangeQuery(r.cronOffsetKey)
 		}
-		scroll := client.Scroll(r.esindex).Query(rangeQuery).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
+		scroll := r.elasticV5Client.Scroll(r.esindex).Query(rangeQuery).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
 		for {
-			ctx := context.Background()
-			results, err := scroll.ScrollId(r.offset).Do(ctx)
+			results, err := scroll.ScrollId(r.offset).Do(context.Background())
 			if err == io.EOF {
 				return nil // all results retrieved
 			}
@@ -584,6 +572,16 @@ func (r *Reader) Close() error {
 	}
 	log.Debugf("Runner[%v] %s daemon is stopping", r.meta.RunnerName, r.Name())
 	close(r.stopChan)
+
+	if r.elasticV3Client != nil {
+		r.elasticV3Client.Stop()
+	}
+	if r.elasticV5Client != nil {
+		r.elasticV5Client.Stop()
+	}
+	if r.elasticV6Client != nil {
+		r.elasticV6Client.Stop()
+	}
 
 	// 如果此时没有 routine 正在运行，则在此处关闭数据管道，否则由 routine 在退出时负责关闭
 	if atomic.CompareAndSwapInt32(&r.routineStatus, StatusInit, StatusStopping) {
