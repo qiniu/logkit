@@ -614,6 +614,9 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 }
 
 func (r *LogExportRunner) Run() {
+	if r.SyncEvery == 0 {
+		r.SyncEvery = 1
+	}
 	if dr, ok := r.reader.(reader.DaemonReader); ok {
 		if err := dr.Start(); err != nil {
 			log.Errorf("Runner[%v] start reader daemon failed: %v", r.RunnerName, err)

@@ -96,7 +96,7 @@ type RunnerInfo struct {
 	MaxBatchTryTimes       int    `json:"batch_try_times,omitempty"`            // 最大发送次数，小于等于0代表无限重试
 	MaxReaderCloseWaitTime int    `json:"max_reader_close_wait_time,omitempty"` // runner 等待reader close时间，
 	ErrorsListCap          int    `json:"errors_list_cap"`                      // 记录错误信息的最大条数
-	SyncEvery              int    `json:"sync_every,omitempty"`                 // 每多少次sync一下，填小于等于0的数字表示stop时sync，正整数表示发送成功多少次以后同步，填1自然就是每次都同步
+	SyncEvery              int    `json:"sync_every,omitempty"`                 // 每多少次sync一下，填小于的数字表示stop时sync，正整数表示发送成功多少次以后同步，填0或1就是每次发送成功都同步，兼容原来不配置的逻辑
 	CreateTime             string `json:"createtime"`
 	EnvTag                 string `json:"env_tag,omitempty"`
 	ExtraInfo              bool   `json:"extra_info"`
