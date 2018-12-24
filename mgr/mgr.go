@@ -625,6 +625,37 @@ func (m *Manager) Configs() (rss map[string]RunnerConfig) {
 	return
 }
 
+func (m *Manager) StatusAndConfig() (rs map[string]RunnerStatus, rc map[string]RunnerConfig) {
+	rs = make(map[string]RunnerStatus)
+	rc = make(map[string]RunnerConfig)
+	tmpRc := make(map[string]RunnerConfig)
+
+	m.runnerLock.RLock()
+	defer m.runnerLock.RUnlock()
+	for key, conf := range m.runnerConfigs {
+		if r, ex := m.runners[key]; ex {
+			rs[r.Name()] = r.Status()
+			continue
+		}
+		rs[conf.RunnerName] = RunnerStatus{
+			Name:           conf.RunnerName,
+			ReaderStats:    StatsInfo{},
+			ParserStats:    StatsInfo{},
+			TransformStats: make(map[string]StatsInfo),
+			SenderStats:    make(map[string]StatsInfo),
+			RunningStatus:  RunnerStopped,
+		}
+
+		if filepath.Dir(key) == m.RestDir {
+			conf.IsInWebFolder = true
+		}
+		tmpRc[key] = conf
+	}
+	utils.DeepCopyByJSON(&rc, &tmpRc)
+
+	return rs, rc
+}
+
 func (m *Manager) getDeepCopyConfig(name string) (filename string, conf RunnerConfig, err error) {
 	filename = filepath.Join(m.RestDir, name+".conf")
 	conf, err = m.getDeepCopyConfigWithFilename(filename)
