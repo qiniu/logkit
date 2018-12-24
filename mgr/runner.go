@@ -624,7 +624,9 @@ func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []str
 			time.Sleep(1 * time.Second)
 			continue
 		}
-
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
 		lines = append(lines, line)
 		if dataSourceTag != "" {
 			froms = append(froms, r.reader.Source())
