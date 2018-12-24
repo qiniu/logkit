@@ -39,8 +39,7 @@ type Reader struct {
 	errChan  <-chan error
 
 	Consumer       *consumergroup.ConsumerGroup
-	currentMsg     *sarama.ConsumerMessage
-	currentOffsets map[string]map[int32]int64
+	currentOffsets map[string]map[int32]int64 // <topic,<partition,offset>>
 
 	stats     StatsInfo
 	statsLock *sync.RWMutex
@@ -131,6 +130,20 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	return kr, nil
 }
 
+func (r *Reader) startMarkOffset() {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			if r.isStopping() || r.hasStopped() {
+				return
+			}
+			r.markOffset()
+		}
+	}
+}
+
 func (r *Reader) isStopping() bool {
 	return atomic.LoadInt32(&r.status) == StatusStopping
 }
@@ -165,7 +178,6 @@ func (r *Reader) ReadLine() (string, error) {
 		var line string
 		if msg != nil && msg.Value != nil && len(msg.Value) > 0 {
 			line = string(msg.Value)
-			r.currentMsg = msg
 			r.statsLock.Lock()
 			if tp, ok := r.currentOffsets[msg.Topic]; ok {
 				tp[msg.Partition] = msg.Offset
@@ -199,6 +211,11 @@ func (r *Reader) Status() StatsInfo {
 	return r.stats
 }
 
+func (r *Reader) Start() error {
+	go r.startMarkOffset()
+	return nil
+}
+
 func (r *Reader) Lag() (*LagInfo, error) {
 	if r.Consumer == nil {
 		return nil, errors.New("kafka consumer is closed")
@@ -216,7 +233,7 @@ func (r *Reader) Lag() (*LagInfo, error) {
 	r.statsLock.RLock()
 	for _, ptv := range r.currentOffsets {
 		for _, v := range ptv {
-			rl.Size -= v
+			rl.Size -= v + 1 //HighWaterMarks 拿到的是下一个数据的Offset，所以实际在算size的时候多了1，要在现在扣掉。
 		}
 	}
 	r.statsLock.RUnlock()
@@ -224,11 +241,23 @@ func (r *Reader) Lag() (*LagInfo, error) {
 }
 
 func (r *Reader) SyncMeta() {
+	r.markOffset()
+}
+
+func (r *Reader) markOffset() {
 	r.lock.Lock()
 	defer r.lock.Unlock()
-
-	if r.currentMsg != nil {
-		r.Consumer.CommitUpto(r.currentMsg)
+	for topic, partOffset := range r.currentOffsets {
+		if partOffset == nil {
+			continue
+		}
+		for partition, offset := range partOffset {
+			r.Consumer.CommitUpto(&sarama.ConsumerMessage{
+				Topic:     topic,
+				Partition: partition,
+				Offset:    offset,
+			})
+		}
 	}
 }
 
@@ -241,7 +270,7 @@ func (r *Reader) Close() error {
 
 	r.lock.Lock()
 	defer r.lock.Unlock()
-
+	r.markOffset()
 	err := r.Consumer.Close()
 	atomic.StoreInt32(&r.status, StatusStopped)
 	return err

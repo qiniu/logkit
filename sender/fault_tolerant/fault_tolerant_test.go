@@ -368,6 +368,7 @@ func TestFtSenderConcurrent(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	mp := conf.MapConf{}
 	mp[KeyFtSaveLogPath] = tmpDir
+	mp[KeyFtProcs] = "3"
 	mp[KeyFtStrategy] = KeyFtStrategyConcurrent
 	fts, err := sender.NewFtSender(s, mp, tmpDir)
 	assert.NoError(t, err)
@@ -420,6 +421,7 @@ func ftSenderConcurrent(b *testing.B, c conf.MapConf) {
 	}
 	defer os.RemoveAll(tmpDir)
 	c[KeyFtSaveLogPath] = tmpDir
+	c[KeyFtProcs] = "3"
 	fts, err := sender.NewFtSender(s, c, tmpDir)
 	if err != nil {
 		b.Fatal(err)

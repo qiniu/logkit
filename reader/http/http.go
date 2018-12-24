@@ -49,9 +49,9 @@ type Reader struct {
 	// Note: 原子操作，用于表示 reader 整体的运行状态
 	status int32
 
-	readChan chan Details
-	initErr         error
-	initErrLock     sync.RWMutex
+	readChan    chan Details
+	initErr     error
+	initErrLock sync.RWMutex
 
 	currentPath string
 	address     string
@@ -81,12 +81,12 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		return nil, err
 	}
 	return &Reader{
-		meta:     meta,
-		status:   StatusInit,
-		readChan: make(chan Details, len(paths)),
-		initErrLock:  sync.RWMutex{},
-		address:  address,
-		paths:    paths,
+		meta:        meta,
+		status:      StatusInit,
+		readChan:    make(chan Details, len(paths)),
+		initErrLock: sync.RWMutex{},
+		address:     address,
+		paths:       paths,
 	}, nil
 }
 

@@ -3,6 +3,7 @@ package elasticsearch
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -126,11 +127,15 @@ func NewSender(conf conf.MapConf) (elasticSender sender.Sender, err error) {
 			return nil, err
 		}
 	default:
+		httpClient := &http.Client{
+			Timeout: 300 * time.Second,
+		}
 		optFns := []elasticV5.ClientOptionFunc{
 			elasticV5.SetSniff(false),
 			elasticV5.SetHealthcheck(false),
 			elasticV5.SetURL(host...),
 			elasticV5.SetGzip(enableGzip),
+			elasticV5.SetHttpClient(httpClient),
 		}
 
 		if len(authUsername) > 0 && len(authPassword) > 0 {
@@ -196,10 +201,10 @@ func (s *Sender) Send(datas []Data) error {
 			}
 			//添加发送时间
 			if s.logkitSendTime {
-				doc[KeySendTime] = time.Now().In(s.timeZone)
+				doc[KeySendTime] = time.Now().In(s.timeZone).UnixNano() / 1000000
 			}
 			doc2 := doc
-			bulkService.Add(elasticV6.NewBulkIndexRequest().Index(indexName).Type(s.eType).Doc(&doc2))
+			bulkService.Add(elasticV6.NewBulkIndexRequest().UseEasyJSON(true).Index(indexName).Type(s.eType).Doc(&doc2))
 		}
 
 		resp, err := bulkService.Do(context.Background())
@@ -252,17 +257,17 @@ func (s *Sender) Send(datas []Data) error {
 		if len(s.aliasFields) == 0 {
 			makeDoc = false
 		}
-		var indexName string
+		curTime := time.Now().In(s.timeZone).UnixNano() / 1000000
+		indexName := buildIndexName(s.indexName, s.timeZone, s.intervalIndex)
 		for _, doc := range datas {
 			//计算索引
-			indexName = buildIndexName(s.indexName, s.timeZone, s.intervalIndex)
 			//字段名称替换
 			if makeDoc {
 				doc = s.wrapDoc(doc)
 			}
 			//添加发送时间
 			if s.logkitSendTime {
-				doc[KeySendTime] = time.Now().In(s.timeZone)
+				doc[KeySendTime] = curTime
 			}
 			doc2 := doc
 			bulkService.Add(elasticV5.NewBulkIndexRequest().Index(indexName).Type(s.eType).Doc(&doc2))
@@ -327,7 +332,7 @@ func (s *Sender) Send(datas []Data) error {
 			}
 			//添加发送时间
 			if s.logkitSendTime {
-				doc[KeySendTime] = time.Now().In(s.timeZone)
+				doc[KeySendTime] = time.Now().In(s.timeZone).UnixNano() / 1000000
 			}
 			doc2 := doc
 			bulkService.Add(elasticV3.NewBulkIndexRequest().Index(indexName).Type(s.eType).Doc(&doc2))

@@ -618,7 +618,6 @@ func GetRealPath(path string) (newPath string, fi os.FileInfo, err error) {
 		return
 	}
 	if fi.Mode()&os.ModeSymlink != 0 {
-		log.Infof("%s is symbol link", path)
 		newPath, err = filepath.EvalSymlinks(path)
 		if err != nil {
 			return
@@ -959,8 +958,12 @@ func GetGrokLabels(labelList []string, nameMap map[string]struct{}) (labels []Gr
 }
 
 func IsFileModified(path string, interval time.Duration, compare time.Time) bool {
-	// time.NewTicker时不是严格的整数时间，例如 3s ,实际相差可能时3.0002s，此时如果在 3-3.002之间出现文件修改则检测不出来
+	// time.NewTicker时不是严格的整数时间，例如 3s ,实际相差可能时3.0002s，此时如果在 3-3.5之间出现文件修改则检测不出来
 	interval = interval + 500*time.Millisecond
+	//如果周期设置的过短，这里的检查就要放大检查的时间，否则容易错过在短时间内真正有数据更新的文件，通常情况下至少一秒
+	if interval < 3*time.Second {
+		interval = 3 * time.Second
+	}
 	modTime := time.Now()
 	fi, err := os.Stat(path)
 	if err != nil {

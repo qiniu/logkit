@@ -15,6 +15,7 @@ import (
 	"github.com/json-iterator/go"
 	"github.com/qiniu/log"
 
+	"github.com/qiniu/logkit/audit"
 	"github.com/qiniu/logkit/cleaner"
 	config "github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
@@ -39,6 +40,7 @@ type ManagerConfig struct {
 	Cluster      ClusterConfig `json:"cluster"`
 	DisableWeb   bool          `json:"disable_web"`
 	ServerBackup bool          `json:"-"`
+	AuditDir     string        `json:"audit_dir"`
 }
 
 type cleanQueue struct {
@@ -63,6 +65,9 @@ type Manager struct {
 	runnerNames map[string]bool
 	// runnerConfigs 存储了当前每个 runner 对应的 config
 	runnerConfigs map[string]RunnerConfig
+
+	audit     *audit.Audit
+	auditChan chan audit.Message
 
 	watchers  map[string]*fsnotify.Watcher // inode到watcher的映射表
 	rregistry *reader.Registry
@@ -98,6 +103,13 @@ func NewCustomManager(conf ManagerConfig, rr *reader.Registry, pr *parser.Regist
 			log.Warnf("make dir for rest default dir error %v", err)
 		}
 	}
+	if conf.AuditDir == "" {
+		conf.AuditDir = "logkit_audit"
+	}
+	audt, err := audit.NewAuditLogger(conf.AuditDir, 0)
+	if err != nil {
+		return nil, err
+	}
 	m := &Manager{
 		ManagerConfig: conf,
 		cleanLock:     new(sync.RWMutex),
@@ -112,6 +124,8 @@ func NewCustomManager(conf ManagerConfig, rr *reader.Registry, pr *parser.Regist
 		pregistry:     pr,
 		sregistry:     sr,
 		SystemInfo:    utilsos.GetOSInfo().String(),
+		audit:         audt,
+		auditChan:     make(chan audit.Message, 100),
 	}
 	return m, nil
 }
@@ -135,6 +149,8 @@ func (m *Manager) Stop() error {
 	}
 	m.watcherMux.Unlock()
 	close(m.cleanChan)
+	//在所有runner close以后，就保证了不会有audit message发送到Channel里
+	close(m.auditChan)
 	return nil
 }
 
@@ -264,6 +280,7 @@ func (m *Manager) ForkRunner(confPath string, config RunnerConfig, returnOnErr b
 	var runner Runner
 	var err error
 	i := 0
+	config.AuditChan = m.auditChan
 	for {
 		if m.IsRunning(confPath) {
 			err = fmt.Errorf("%s already added - ", confPath)
@@ -461,6 +478,12 @@ func (m *Manager) clean() {
 	}
 }
 
+func (m *Manager) auditLog() {
+	for sig := range m.auditChan {
+		m.audit.Log(sig)
+	}
+}
+
 func (m *Manager) detectMoreWatchers(confsPath []string) {
 	ticker := time.NewTicker(time.Second * 10)
 	defer ticker.Stop()
@@ -534,6 +557,7 @@ func (m *Manager) Watch(confsPath []string) (err error) {
 	}
 	go m.detectMoreWatchers(confsPath)
 	go m.clean()
+	go m.auditLog()
 	return
 }
 

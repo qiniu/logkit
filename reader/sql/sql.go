@@ -2,13 +2,8 @@ package sql
 
 import (
 	"database/sql"
-	"encoding/binary"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -40,8 +35,7 @@ const (
 
 	DefaultDoneRecordsFile = "sql.records"
 	TimestampRecordsFile   = "timestamp.records"
-
-	postgresTimeFormat = "2006-01-02 15:04:05.000000"
+	CacheMapFile           = "cachemap.records"
 )
 
 const (
@@ -87,6 +81,7 @@ func init() {
 type readInfo struct {
 	data  Data
 	bytes int64
+	json  string //排序去重时使用，其他时候无用
 }
 
 type Reader struct {
@@ -118,16 +113,21 @@ type Reader struct {
 	rawTable    string // 记录原始数据库表名
 	table       string // 数据库表名
 
-	isLoop        bool
-	loopDuration  time.Duration
-	cronSchedule  bool //是否为定时任务
-	execOnStart   bool
-	Cron          *cron.Cron //定时任务
-	readBatch     int        // 每次读取的数据量
-	offsetKey     string
-	timestampKey  string
-	startTime     time.Time
-	batchDuration time.Duration
+	isLoop          bool
+	loopDuration    time.Duration
+	cronSchedule    bool //是否为定时任务
+	execOnStart     bool
+	Cron            *cron.Cron //定时任务
+	readBatch       int        // 每次读取的数据量
+	offsetKey       string
+	timestampKey    string
+	timestampKeyInt bool
+	timestampmux    sync.RWMutex
+	startTime       time.Time
+	startTimeInt    int64
+	trimecachemap   map[string]string
+	batchDuration   time.Duration
+	batchDurInt     int
 
 	encoder           string  // 解码方式
 	offsets           []int64 // 当前处理文件的sql的offset
@@ -153,9 +153,12 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	var dbtype, dataSource, rawDatabase, rawSQLs, cronSchedule, offsetKey, encoder, table, dbSchema string
 	var execOnStart, historyAll bool
 	var (
-		timestampkey  string
-		startTime     time.Time
-		batchDuration time.Duration
+		timestampkey   string
+		startTime      time.Time
+		batchDuration  time.Duration
+		startTimeInt   int64
+		batchDurInt    int
+		pgtimestampInt bool
 	)
 	dbtype, _ = conf.GetStringOr(KeyMode, ModeMySQL)
 	logpath, _ := conf.GetStringOr(KeyLogPath, "")
@@ -226,19 +229,25 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 			}
 		}
 		timestampkey, _ = conf.GetStringOr(KeyPGtimestampKey, "")
-		startTimeStr, _ := conf.GetStringOr(KeyPGStartTime, "")
-		if startTimeStr != "" {
-			startTime, err = time.Parse(postgresTimeFormat, startTimeStr)
+		pgtimestampInt, _ = conf.GetBoolOr(KeyPGtimestampInt, false)
+		if !pgtimestampInt {
+			startTimeStr, _ := conf.GetStringOr(KeyPGStartTime, "")
+			if startTimeStr != "" {
+				startTime, err = parsePostgresDatetime(startTimeStr)
+				if err != nil {
+					return nil, fmt.Errorf("parse starttime %s error %v", startTimeStr, err)
+				}
+			} else {
+				startTime = time.Now()
+			}
+			timestampDurationStr, _ := conf.GetStringOr(KeyPGBatchDuration, "1m")
+			batchDuration, err = time.ParseDuration(timestampDurationStr)
 			if err != nil {
-				return nil, fmt.Errorf("parse starttime %s error, not in formart 2006-01-02 15:04:05", startTimeStr)
+				return nil, err
 			}
 		} else {
-			startTime = time.Now()
-		}
-		timestampDurationStr, _ := conf.GetStringOr(KeyPGBatchDuration, "1m")
-		batchDuration, err = time.ParseDuration(timestampDurationStr)
-		if err != nil {
-			return nil, err
+			startTimeInt, _ = conf.GetInt64Or(KeyPGStartTime, 0)
+			batchDurInt, _ = conf.GetIntOr(KeyPGBatchDuration, 1000)
 		}
 
 		rawDatabase, err = conf.GetString(KeyPGsqlDataBase)
@@ -285,32 +294,35 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	}
 
 	r := &Reader{
-		meta:          meta,
-		status:        StatusInit,
-		routineStatus: StatusInit,
-		stopChan:      make(chan struct{}),
-		readChan:      make(chan readInfo),
-		errChan:       make(chan error),
-		datasource:    dataSource,
-		database:      rawDatabase,
-		rawDatabase:   rawDatabase,
-		rawSQLs:       rawSQLs,
-		Cron:          cron.New(),
-		readBatch:     readBatch,
-		offsetKey:     offsetKey,
-		timestampKey:  timestampkey,
-		startTime:     startTime,
-		batchDuration: batchDuration,
-		syncSQLs:      sqls,
-		dbtype:        dbtype,
-		execOnStart:   execOnStart,
-		historyAll:    historyAll,
-		rawTable:      table,
-		table:         table,
-		magicLagDur:   mgld,
-		schemas:       schemas,
-		encoder:       encoder,
-		dbSchema:      dbSchema,
+		meta:            meta,
+		status:          StatusInit,
+		routineStatus:   StatusInit,
+		stopChan:        make(chan struct{}),
+		readChan:        make(chan readInfo),
+		errChan:         make(chan error),
+		datasource:      dataSource,
+		database:        rawDatabase,
+		rawDatabase:     rawDatabase,
+		rawSQLs:         rawSQLs,
+		Cron:            cron.New(),
+		readBatch:       readBatch,
+		offsetKey:       offsetKey,
+		timestampKey:    timestampkey,
+		timestampKeyInt: pgtimestampInt,
+		startTime:       startTime,
+		startTimeInt:    startTimeInt,
+		batchDuration:   batchDuration,
+		batchDurInt:     batchDurInt,
+		syncSQLs:        sqls,
+		dbtype:          dbtype,
+		execOnStart:     execOnStart,
+		historyAll:      historyAll,
+		rawTable:        table,
+		table:           table,
+		magicLagDur:     mgld,
+		schemas:         schemas,
+		encoder:         encoder,
+		dbSchema:        dbSchema,
 	}
 
 	if r.rawDatabase == "" {
@@ -320,9 +332,26 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		r.rawTable = "*"
 	}
 	if r.timestampKey != "" {
-		tm, err := RestoreTimestmapOffset(r.meta.DoneFilePath)
-		if err == nil {
-			r.startTime = tm.Add(time.Microsecond)
+		if r.timestampKeyInt {
+			tm, cache, err := RestoreTimestampIntOffset(r.meta.DoneFilePath)
+			if err == nil {
+				r.startTimeInt = tm
+				r.timestampmux.Lock()
+				r.trimecachemap = cache
+				r.timestampmux.Unlock()
+			} else {
+				log.Errorf("RestoreTimestampIntOffset err %v", err)
+			}
+		} else {
+			tm, cache, err := RestoreTimestampOffset(r.meta.DoneFilePath)
+			if err == nil {
+				r.startTime = tm
+				r.timestampmux.Lock()
+				r.trimecachemap = cache
+				r.timestampmux.Unlock()
+			} else {
+				log.Errorf("RestoreTimestampOffset err %v", err)
+			}
 		}
 	}
 
@@ -492,13 +521,24 @@ func (r *Reader) SyncMeta() {
 		return
 	}
 	if r.timestampKey != "" {
-		if err := WriteTimestmapOffset(r.meta.DoneFilePath, r.startTime.Format(time.RFC3339Nano)); err != nil {
-			log.Errorf("Runner[%v] %v SyncMeta error %v", r.meta.RunnerName, r.Name(), err)
+		r.timestampmux.RLock()
+		var content string
+		if r.timestampKeyInt {
+			content = strconv.FormatInt(r.startTimeInt, 10)
+		} else {
+			content = r.startTime.Format(time.RFC3339Nano)
 		}
+		if err := WriteTimestmapOffset(r.meta.DoneFilePath, content); err != nil {
+			log.Errorf("Runner[%v] %v SyncMeta WriteTimestmapOffset error %v", r.meta.RunnerName, r.Name(), err)
+		}
+		if err := WriteCacheMap(r.meta.DoneFilePath, r.trimecachemap); err != nil {
+			log.Errorf("Runner[%v] %v SyncMeta WriteCacheMap error %v", r.meta.RunnerName, r.Name(), err)
+		}
+		r.timestampmux.RUnlock()
 	}
 	encodeSQLs := make([]string, 0)
-	for _, sql := range r.syncSQLs {
-		encodeSQLs = append(encodeSQLs, strings.Replace(sql, " ", "@", -1))
+	for _, sqlStr := range r.syncSQLs {
+		encodeSQLs = append(encodeSQLs, strings.Replace(sqlStr, " ", "@", -1))
 	}
 	r.muxOffsets.RLock()
 	defer r.muxOffsets.RUnlock()
@@ -556,217 +596,6 @@ func schemaCheck(rawSchemas []string) (schemas map[string]string, err error) {
 	return
 }
 
-func restoreMeta(meta *reader.Meta, rawSqls string, magicLagDur time.Duration) (offsets []int64, sqls []string, omitMeta bool) {
-	now := time.Now().Add(-magicLagDur)
-	sqls = updateSqls(rawSqls, now)
-	omitMeta = true
-	sqlAndOffsets, length, err := meta.ReadOffset()
-	if err != nil {
-		log.Errorf("Runner[%v] %v -meta data is corrupted err:%v, omit meta data", meta.RunnerName, meta.MetaFile(), err)
-		return
-	}
-	tmps := strings.Split(sqlAndOffsets, sqlOffsetConnector)
-	if int64(len(tmps)) != 2*length || int64(len(sqls)) != length {
-		log.Errorf("Runner[%v] %v -meta file is not invalid sql meta file %v， omit meta data", meta.RunnerName, meta.MetaFile(), sqlAndOffsets)
-		return
-	}
-	omitMeta = false
-	offsets = make([]int64, length)
-	for idx, sql := range sqls {
-		syncSQL := strings.Replace(tmps[idx], "@", " ", -1)
-		offset, err := strconv.ParseInt(tmps[idx+int(length)], 10, 64)
-		if err != nil || sql != syncSQL {
-			log.Errorf("Runner[%v] %v -meta file sql is out of date %v or parse offset err %v， omit this offset", meta.RunnerName, meta.MetaFile(), syncSQL, err)
-		}
-		offsets[idx] = offset
-	}
-	return
-}
-
-// 支持 YYYY, YY, MM, DD, hh, mm, ss, M, D, h, m, s
-func convertMagic(magic string, now time.Time) (ret string) {
-	switch magic {
-	case "YYYY":
-		return fmt.Sprintf("%d", now.Year())
-	case "YY":
-		return fmt.Sprintf("%d", now.Year())[2:]
-	case "MM":
-		m := int(now.Month())
-		return fmt.Sprintf("%02d", m)
-	case "M":
-		m := int(now.Month())
-		return fmt.Sprintf("%d", m)
-	case "D":
-		d := int(now.Day())
-		return fmt.Sprintf("%d", d)
-	case "DD":
-		d := int(now.Day())
-		return fmt.Sprintf("%02d", d)
-	case "hh":
-		h := now.Hour()
-		return fmt.Sprintf("%02d", h)
-	case "h":
-		h := now.Hour()
-		return fmt.Sprintf("%d", h)
-	case "mm":
-		m := now.Minute()
-		return fmt.Sprintf("%02d", m)
-	case "m":
-		m := now.Minute()
-		return fmt.Sprintf("%d", m)
-	case "ss":
-		s := now.Second()
-		return fmt.Sprintf("%02d", s)
-	case "s":
-		s := now.Second()
-		return fmt.Sprintf("%d", s)
-	}
-	return ""
-}
-
-// 仅支持 YYYY, YY, MM, DD, hh, mm, ss，不支持 M, D, h, m, s
-func convertMagicIndex(magic string, now time.Time) (ret string, index int) {
-	switch magic {
-	case "YYYY":
-		return fmt.Sprintf("%d", now.Year()), YEAR
-	case "YY":
-		return fmt.Sprintf("%d", now.Year())[2:], YEAR
-	case "MM":
-		m := int(now.Month())
-		return fmt.Sprintf("%02d", m), MONTH
-	case "DD":
-		d := int(now.Day())
-		return fmt.Sprintf("%02d", d), DAY
-	case "hh":
-		h := now.Hour()
-		return fmt.Sprintf("%02d", h), HOUR
-	case "mm":
-		m := now.Minute()
-		return fmt.Sprintf("%02d", m), MINUTE
-	case "ss":
-		s := now.Second()
-		return fmt.Sprintf("%02d", s), SECOND
-	}
-	return "", -1
-}
-
-// 渲染魔法变量，获取渲染结果
-func goMagic(rawSql string, now time.Time) (ret string) {
-	sps := strings.Split(rawSql, "@(") //@()，对于每个分片找右括号
-	ret = sps[0]
-	for idx := 1; idx < len(sps); idx++ {
-		idxr := strings.Index(sps[idx], ")")
-		if idxr == -1 {
-			return rawSql
-		}
-		ret += convertMagic(sps[idx][0:idxr], now)
-		if idxr+1 < len(sps[idx]) {
-			ret += sps[idx][idxr+1:]
-		}
-	}
-
-	return ret
-}
-
-type MagicRes struct {
-	timeStart   []int  // 按照 YY,MM,DD,hh,mm,ss 顺序记录时间位置
-	timeEnd     []int  // 按照 YY,MM,DD,hh,mm,ss 顺序记录时间长度
-	remainIndex []int  // 按顺序记录非时间字符串开始结束位置，去除 *
-	ret         string // 渲染结果，包含 *
-}
-
-// 渲染魔法变量
-func goMagicIndex(rawSql string, now time.Time) (MagicRes, error) {
-	sps := strings.Split(rawSql, "@(") //@()，对于每个分片找右括号
-	var magicRes = MagicRes{
-		timeStart:   []int{-1, -1, -1, -1, -1, -1},
-		timeEnd:     make([]int, 6),
-		remainIndex: []int{0},
-		ret:         sps[0],
-	}
-	recordIndex := len(magicRes.ret)
-
-	// 没有魔法变量的情况，例如 mytest*
-	if len(sps) < 2 {
-		magicRes.remainIndex = append(magicRes.remainIndex, removeWildcards(magicRes.ret, recordIndex))
-		return magicRes, nil
-	}
-
-	magicRes.remainIndex = append(magicRes.remainIndex, recordIndex)
-	for idx := 1; idx < len(sps); idx++ {
-		idxr := strings.Index(sps[idx], ")")
-		if idxr == -1 {
-			magicRes.ret = rawSql
-			return magicRes, nil
-		}
-		spsStr := sps[idx][0:idxr]
-		if len(spsStr) < 2 {
-			magicRes.ret = rawSql
-			return magicRes, fmt.Errorf(SupportReminder)
-		}
-		res, index := convertMagicIndex(sps[idx][0:idxr], now)
-		if index == -1 {
-			magicRes.ret = rawSql
-			return magicRes, fmt.Errorf(SupportReminder)
-		}
-
-		// 记录日期起始位置
-		magicRes.timeStart[index] = recordIndex
-		magicRes.ret += res
-		recordIndex = len(magicRes.ret)
-
-		// 记录日期长度
-		magicRes.timeEnd[index] = recordIndex
-
-		if idxr+1 < len(sps[idx]) {
-			spsRemain := sps[idx][idxr+1:]
-			magicRes.ret += spsRemain
-			if spsRemain == Wildcards {
-				recordIndex = len(magicRes.ret)
-				continue
-			}
-			magicRes.remainIndex = append(magicRes.remainIndex, recordIndex)
-			magicRes.remainIndex = append(magicRes.remainIndex, removeWildcards(spsRemain, len(magicRes.ret)))
-			recordIndex = len(magicRes.ret)
-		}
-	}
-
-	return magicRes, nil
-}
-
-// 若包含通配符，字段长度相应 - 1
-func removeWildcards(checkWildcards string, length int) int {
-	if strings.Contains(checkWildcards, Wildcards) {
-		return length - 1
-	}
-	return length
-}
-
-func checkMagic(rawSql string) (valid bool) {
-	sps := strings.Split(rawSql, "@(") //@()，对于每个分片找右括号
-	now := time.Now()
-
-	for idx := 1; idx < len(sps); idx++ {
-		idxr := strings.Index(sps[idx], ")")
-		if idxr == -1 {
-			return true
-		}
-		spsStr := sps[idx][0:idxr]
-		if len(spsStr) < 2 {
-			log.Errorf(SupportReminder)
-			return false
-		}
-
-		_, index := convertMagicIndex(sps[idx][0:idxr], now)
-		if index == -1 {
-			log.Errorf(SupportReminder)
-			return false
-		}
-	}
-
-	return true
-}
-
 func updateSqls(rawsqls string, now time.Time) []string {
 	encodedSQLs := strings.Split(rawsqls, sqlSpliter)
 	sqls := make([]string, 0)
@@ -784,7 +613,7 @@ func updateSqls(rawsqls string, now time.Time) []string {
 func (r *Reader) updateOffsets(sqls []string) {
 	r.muxOffsets.Lock()
 	defer r.muxOffsets.Unlock()
-	for idx, sql := range sqls {
+	for idx, sqlStr := range sqls {
 		if idx >= len(r.offsets) {
 			r.offsets = append(r.offsets, 0)
 			continue
@@ -792,7 +621,7 @@ func (r *Reader) updateOffsets(sqls []string) {
 		if idx >= len(r.syncSQLs) {
 			continue
 		}
-		if r.syncSQLs[idx] != sql {
+		if r.syncSQLs[idx] != sqlStr {
 			r.offsets[idx] = 0
 		}
 	}
@@ -871,7 +700,7 @@ func (r *Reader) getInitScans(length int, rows *sql.Rows, sqltype string) (scanA
 	}
 	defer func() {
 		if r := recover(); r != nil {
-			log.Error("Recovered in f", r)
+			log.Error("Recovered in getInitScans", r)
 			scanArgs = nochoice
 			return
 		}
@@ -908,11 +737,15 @@ func (r *Reader) getInitScans(length int, rows *sql.Rows, sqltype string) (scanA
 			}
 		case "[]uint8":
 			scanArgs[i] = new([]byte)
-		case "string", "RawBytes", "time.Time", "NullTime":
-			//时间类型也作为string处理
+		case "string", "RawBytes", "NullTime":
 			scanArgs[i] = new(interface{})
 			if _, ok := r.schemas[v.Name()]; !ok {
 				r.schemas[v.Name()] = "string"
+			}
+		case "time.Time":
+			scanArgs[i] = new(interface{})
+			if _, ok := r.schemas[v.Name()]; !ok {
+				r.schemas[v.Name()] = "date"
 			}
 		case "sql.NullInt64":
 			scanArgs[i] = new(interface{})
@@ -1089,7 +922,7 @@ func (r *Reader) execReadDB(curDB string, now time.Time, recordTablesDone TableR
 		return err
 	}
 
-	log.Infof("Runner[%v] %v prepare %v change database success", r.meta.RunnerName, curDB, r.dbtype)
+	log.Debugf("Runner[%v] %v prepare %v change database success", r.meta.RunnerName, curDB, r.dbtype)
 	r.database = curDB
 
 	//更新sqls
@@ -1113,7 +946,7 @@ func (r *Reader) execReadDB(curDB string, now time.Time, recordTablesDone TableR
 			r.doneRecords.SetTableRecords(curDB, recordTablesDone)
 		}
 	}
-	log.Infof("Runner[%s] %s get valid tables: %v, recordTablesDone: %v", r.meta.RunnerName, r.Name(), tables, recordTablesDone)
+	log.Debugf("Runner[%s] %s get valid tables: %v, recordTablesDone: %v", r.meta.RunnerName, r.Name(), tables, recordTablesDone)
 
 	var sqlsSlice []string
 	if r.rawSQLs != "" {
@@ -1165,277 +998,6 @@ func (r *Reader) execReadDB(curDB string, now time.Time, recordTablesDone TableR
 	}
 	return nil
 }
-func RestoreTimestmapOffset(doneFilePath string) (time.Time, error) {
-	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, TimestampRecordsFile)
-	filePath := filepath.Join(doneFilePath, filename)
-	data, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return time.Parse(time.RFC3339Nano, string(data))
-}
-
-func WriteTimestmapOffset(doneFilePath, content string) (err error) {
-	var f *os.File
-	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, TimestampRecordsFile)
-	filePath := filepath.Join(doneFilePath, filename)
-	// write to tmp file
-	f, err = os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, DefaultFilePerm)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	_, err = f.Write([]byte(content))
-	if err != nil {
-		return err
-	}
-
-	return f.Sync()
-}
-
-// WriteRecordsFile 将当前文件写入donefiel中
-func WriteRecordsFile(doneFilePath, content string) (err error) {
-	var f *os.File
-	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, DefaultDoneRecordsFile)
-	filePath := filepath.Join(doneFilePath, filename)
-	// write to tmp file
-	f, err = os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, DefaultFilePerm)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	_, err = f.Write([]byte(content))
-	if err != nil {
-		return err
-	}
-
-	return f.Sync()
-}
-
-func convertLong(v interface{}) (int64, error) {
-	dpv := reflect.ValueOf(v)
-	if dpv.Kind() != reflect.Ptr {
-		return 0, errors.New("scanArgs not a pointer")
-	}
-	if dpv.IsNil() {
-		return 0, errors.New("scanArgs is a nil pointer")
-	}
-	dv := reflect.Indirect(dpv)
-	switch dv.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return dv.Int(), nil
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return int64(dv.Uint()), nil
-	case reflect.String:
-		return strconv.ParseInt(dv.String(), 10, 64)
-	case reflect.Interface:
-		idv := dv.Interface()
-		if ret, ok := idv.(int64); ok {
-			return ret, nil
-		}
-		if ret, ok := idv.(int); ok {
-			return int64(ret), nil
-		}
-		if ret, ok := idv.(uint); ok {
-			return int64(ret), nil
-		}
-		if ret, ok := idv.(uint64); ok {
-			return int64(ret), nil
-		}
-		if ret, ok := idv.(string); ok {
-			return strconv.ParseInt(ret, 10, 64)
-		}
-		if ret, ok := idv.(int8); ok {
-			return int64(ret), nil
-		}
-		if ret, ok := idv.(int16); ok {
-			return int64(ret), nil
-		}
-		if ret, ok := idv.(int32); ok {
-			return int64(ret), nil
-		}
-		if ret, ok := idv.(uint8); ok {
-			return int64(ret), nil
-		}
-		if ret, ok := idv.(uint16); ok {
-			return int64(ret), nil
-		}
-		if ret, ok := idv.(uint32); ok {
-			return int64(ret), nil
-		}
-		if ret, ok := idv.([]byte); ok {
-			if len(ret) == 8 {
-				return int64(binary.BigEndian.Uint64(ret)), nil
-			} else {
-				return strconv.ParseInt(string(ret), 10, 64)
-			}
-		}
-		if idv == nil {
-			return 0, nil
-		}
-		log.Errorf("sql reader convertLong for type %v is not supported", reflect.TypeOf(idv))
-	}
-	return 0, fmt.Errorf("%v type can not convert to int", dv.Kind())
-}
-
-func convertFloat(v interface{}) (float64, error) {
-	dpv := reflect.ValueOf(v)
-	if dpv.Kind() != reflect.Ptr {
-		return 0, errors.New("scanArgs not a pointer")
-	}
-	if dpv.IsNil() {
-		return 0, errors.New("scanArgs is a nil pointer")
-	}
-	dv := reflect.Indirect(dpv)
-	switch dv.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return float64(dv.Int()), nil
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return float64(dv.Uint()), nil
-	case reflect.Float32, reflect.Float64:
-		return dv.Float(), nil
-	case reflect.String:
-		return strconv.ParseFloat(dv.String(), 64)
-	case reflect.Interface:
-		idv := dv.Interface()
-		if ret, ok := idv.(float64); ok {
-			return ret, nil
-		}
-		if ret, ok := idv.(float32); ok {
-			return float64(ret), nil
-		}
-		if ret, ok := idv.(int64); ok {
-			return float64(ret), nil
-		}
-		if ret, ok := idv.(int); ok {
-			return float64(ret), nil
-		}
-		if ret, ok := idv.(uint); ok {
-			return float64(ret), nil
-		}
-		if ret, ok := idv.(uint64); ok {
-			return float64(ret), nil
-		}
-		if ret, ok := idv.(string); ok {
-			return strconv.ParseFloat(ret, 64)
-		}
-		if ret, ok := idv.(int8); ok {
-			return float64(ret), nil
-		}
-		if ret, ok := idv.(int16); ok {
-			return float64(ret), nil
-		}
-		if ret, ok := idv.(int32); ok {
-			return float64(ret), nil
-		}
-		if ret, ok := idv.(uint8); ok {
-			return float64(ret), nil
-		}
-		if ret, ok := idv.(uint16); ok {
-			return float64(ret), nil
-		}
-		if ret, ok := idv.(uint32); ok {
-			return float64(ret), nil
-		}
-		if ret, ok := idv.([]byte); ok {
-			return strconv.ParseFloat(string(ret), 64)
-		}
-		if idv == nil {
-			return 0, nil
-		}
-		log.Errorf("sql reader convertFloat for type %v is not supported", reflect.TypeOf(idv))
-	}
-	return 0, fmt.Errorf("%v type can not convert to int", dv.Kind())
-}
-
-func convertString(v interface{}) (string, error) {
-	dpv := reflect.ValueOf(v)
-	if dpv.Kind() != reflect.Ptr {
-		return "", errors.New("scanArgs not a pointer")
-	}
-	if dpv.IsNil() {
-		return "", errors.New("scanArgs is a nil pointer")
-	}
-	dv := reflect.Indirect(dpv)
-	switch dv.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return strconv.Itoa(int(dv.Int())), nil
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return strconv.Itoa(int(dv.Uint())), nil
-	case reflect.String:
-		return dv.String(), nil
-	case reflect.Interface:
-		idv := dv.Interface()
-		if ret, ok := idv.(int64); ok {
-			return strconv.Itoa(int(ret)), nil
-		}
-		if ret, ok := idv.(int); ok {
-			return strconv.Itoa(int(ret)), nil
-		}
-		if ret, ok := idv.(uint); ok {
-			return strconv.Itoa(int(ret)), nil
-		}
-		if ret, ok := idv.(uint64); ok {
-			return strconv.Itoa(int(ret)), nil
-		}
-		if ret, ok := idv.(string); ok {
-			return ret, nil
-		}
-		if ret, ok := idv.(int8); ok {
-			return strconv.Itoa(int(ret)), nil
-		}
-		if ret, ok := idv.(int16); ok {
-			return strconv.Itoa(int(ret)), nil
-		}
-		if ret, ok := idv.(int32); ok {
-			return strconv.Itoa(int(ret)), nil
-		}
-		if ret, ok := idv.(uint8); ok {
-			return strconv.Itoa(int(ret)), nil
-		}
-		if ret, ok := idv.(uint16); ok {
-			return strconv.Itoa(int(ret)), nil
-		}
-		if ret, ok := idv.(uint32); ok {
-			return strconv.Itoa(int(ret)), nil
-		}
-		if ret, ok := idv.([]byte); ok {
-			return string(ret), nil
-		}
-		//Postgres的时间类型为time.Time
-		if ret, ok := idv.(time.Time); ok {
-			return ret.Format(time.RFC3339), nil
-		}
-		if idv == nil {
-			return "", nil
-		}
-		log.Errorf("sql reader convertString for type %v is not supported", reflect.TypeOf(idv))
-	}
-	return "", fmt.Errorf("%v type can not convert to string", dv.Kind())
-}
-
-func convertBool(v interface{}) (bool, error) {
-	dpv := reflect.ValueOf(v)
-	if dpv.Kind() != reflect.Ptr {
-		return false, errors.New("scanArgs not a pointer")
-	}
-	if dpv.IsNil() {
-		return false, errors.New("scanArgs is a nil pointer")
-	}
-	dv := reflect.Indirect(dpv)
-	switch dv.Kind() {
-	case reflect.Interface:
-		idv := dv.Interface()
-		if ret, ok := idv.(bool); ok {
-			return bool(ret), nil
-		}
-		if idv == nil {
-			return false, nil
-		}
-		log.Errorf("sql reader convertBool for type %v is not supported", reflect.TypeOf(idv))
-	}
-	return false, fmt.Errorf("%v type can not convert to Bool", dv.Kind())
-}
 
 func (r *Reader) getSQL(idx int, rawSQL string) (sql string, err error) {
 	r.muxOffsets.RLock()
@@ -1456,7 +1018,11 @@ func (r *Reader) getSQL(idx int, rawSQL string) (sql string, err error) {
 		}
 	case ModePostgreSQL:
 		if len(r.timestampKey) > 0 {
-			sql = fmt.Sprintf("%s WHERE %s >= '%s' and %s < '%s';", rawSQL, r.timestampKey, r.startTime.Format(postgresTimeFormat), r.timestampKey, r.startTime.Add(r.batchDuration).Format(postgresTimeFormat))
+			if r.timestampKeyInt {
+				sql = fmt.Sprintf("%s WHERE %s >= %v and %s < %v;", rawSQL, r.timestampKey, r.startTimeInt, r.timestampKey, r.startTimeInt+int64(r.batchDurInt))
+			} else {
+				sql = fmt.Sprintf("%s WHERE %s >= '%s' and %s < '%s';", rawSQL, r.timestampKey, r.startTime.Format(pgtimeFormat), r.timestampKey, r.startTime.Add(r.batchDuration).Format(pgtimeFormat))
+			}
 		} else if len(r.offsetKey) > 0 && len(r.offsets) > idx {
 			sql = fmt.Sprintf("%s WHERE %v >= %d AND %v < %d;", rawSQL, r.offsetKey, r.offsets[idx], r.offsetKey, r.offsets[idx]+int64(r.readBatch))
 		} else {
@@ -1467,6 +1033,34 @@ func (r *Reader) getSQL(idx int, rawSQL string) (sql string, err error) {
 	}
 
 	return sql, err
+}
+
+//这个query只有一行
+func queryNumber(tsql string, db *sql.DB) (int64, error) {
+	rows, err := db.Query(tsql)
+	if err != nil {
+		log.Error(err)
+		return 0, err
+	}
+	defer rows.Close()
+	var scanArgs = []interface{}{new(interface{})}
+	for rows.Next() {
+		err = rows.Scan(scanArgs...)
+		if err != nil {
+			log.Error(err)
+			return 0, err
+		}
+		if len(scanArgs) < 1 {
+			return 0, errors.New("no data found")
+		}
+
+		number, err := convertLong(scanArgs[0])
+		if err != nil {
+			log.Error(err)
+		}
+		return number, nil
+	}
+	return 0, errors.New("no data found")
 }
 
 func (r *Reader) checkExit(idx int, db *sql.DB) (bool, int64) {
@@ -1484,8 +1078,45 @@ func (r *Reader) checkExit(idx int, db *sql.DB) (bool, int64) {
 			if ix < 0 {
 				return true, -1
 			}
+			/* 是否要更新时间，取决于两点
+			1. 原来那一刻到现在为止是否有新增数据
+			2. 原来那一刻是否有新数据
+			如果第一点满足，就不能退出
+			如果第二点满足，就不能移动时间
+			否则要移动时间，不然就死循环了
+			*/
 			rawSQL = rawSQL[ix:]
-			tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v between '%s' and '%s';", r.timestampKey, r.timestampKey, rawSQL, r.timestampKey, r.startTime.Format(postgresTimeFormat), time.Now().Format(postgresTimeFormat))
+
+			//获得最新时间戳到当前时间的数据量
+			if r.timestampKeyInt {
+				tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v >= %v;", rawSQL, r.timestampKey, r.startTimeInt)
+			} else {
+				tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v >= '%s';", rawSQL, r.timestampKey, r.startTime.Format(pgtimeFormat))
+			}
+			largerAmount, err := queryNumber(tsql, db)
+			if err != nil || largerAmount <= int64(len(r.trimecachemap)) {
+				//查询失败或者数据量不变本轮就先退出了
+				return true, -1
+			}
+			//-- 比较有没有比之前的数量大，如果没有变大就退出
+			//如果变大，继续判断当前这个重复的时间有没有数据
+			if r.timestampKeyInt {
+				tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v = %v;", rawSQL, r.timestampKey, r.startTimeInt)
+			} else {
+				tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v = '%s';", rawSQL, r.timestampKey, r.startTime.Format(pgtimeFormat))
+			}
+			equalAmount, err := queryNumber(tsql, db)
+			if err == nil && equalAmount > int64(len(r.trimecachemap)) {
+				//说明还有新数据在原来的时间点，不能退出，且还要再查
+				return false, -1
+			}
+			//此处如果发现同样的时间戳数据没有变，那么说明是新的时间产生的数据，时间戳要更新了
+			//获得最小的时间戳
+			if r.timestampKeyInt {
+				tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v > %v;", r.timestampKey, r.timestampKey, rawSQL, r.timestampKey, r.startTimeInt)
+			} else {
+				tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v > '%s';", r.timestampKey, r.timestampKey, rawSQL, r.timestampKey, r.startTime.Format(pgtimeFormat))
+			}
 		} else {
 			ix := strings.Index(rawSQL, "from")
 			if ix < 0 {
@@ -1502,6 +1133,7 @@ func (r *Reader) checkExit(idx int, db *sql.DB) (bool, int64) {
 		rawSQL = rawSQL[ix:]
 		tsql = fmt.Sprintf("select top(1) * %v WHERE CAST(%v AS BIGINT) >= %v order by CAST(%v AS BIGINT);", rawSQL, r.offsetKey, r.offsets[idx], r.offsetKey)
 	}
+	log.Info("query <", tsql, "> to check exit")
 	rows, err := db.Query(tsql)
 	if err != nil {
 		log.Error(err)
@@ -1792,9 +1424,9 @@ func (r *Reader) getDefaultSql(database string) (defaultSql string, err error) {
 	case ModePostgreSQL:
 		return strings.Replace(DefaultPGSQLTable, "SCHEMA_NAME", r.dbSchema, -1), nil
 	case ModeMSSQL:
-		sql := strings.Replace(DefaultMSSQLTable, "DATABASE_NAME", database, -1)
-		sql = strings.Replace(sql, "SCHEMA_NAME", r.dbSchema, -1)
-		return sql, nil
+		sqlStr := strings.Replace(DefaultMSSQLTable, "DATABASE_NAME", database, -1)
+		sqlStr = strings.Replace(sqlStr, "SCHEMA_NAME", r.dbSchema, -1)
+		return sqlStr, nil
 	default:
 		return "", fmt.Errorf("reader type unsupported: %v", r.dbtype)
 	}
@@ -1914,6 +1546,22 @@ func (r *Reader) execTableCount(connectStr string, idx int, curDB, rawSql string
 	return tableSize, nil
 }
 
+func (r *Reader) getAllDatas(rows *sql.Rows, scanArgs []interface{}, columns []string, nochiced []bool) ([]readInfo, bool) {
+	datas := make([]readInfo, 0)
+	for rows.Next() {
+		data, totalBytes := r.getData(rows, scanArgs, columns, nochiced)
+		if len(data) <= 0 {
+			continue
+		}
+		if r.isStopping() || r.hasStopped() {
+			log.Warnf("Runner[%v] %v stopped from running", r.meta.RunnerName, r.Name())
+			return nil, true
+		}
+		datas = append(datas, readInfo{data: data, bytes: totalBytes})
+	}
+	return datas, false
+}
+
 // 执行每条 sql 语句
 func (r *Reader) execReadSql(connectStr, curDB string, idx int, rawSql string, tables []string) (exit bool, isRawSql bool, readSize int64, err error) {
 	exit = true
@@ -1939,7 +1587,7 @@ func (r *Reader) execReadSql(connectStr, curDB string, idx int, rawSql string, t
 		return exit, isRawSql, 0, err
 	}
 
-	log.Infof("Runner[%v] reader <%v> exec sql <%v>", r.meta.RunnerName, r.Name(), execSQL)
+	log.Debugf("Runner[%v] reader <%v> start to exec sql <%v>", r.meta.RunnerName, r.Name(), execSQL)
 	rows, err := db.Query(execSQL)
 	if err != nil {
 		err = fmt.Errorf("runner[%v] %v prepare %v <%v> query error %v", r.meta.RunnerName, r.Name(), r.dbtype, execSQL, err)
@@ -1956,152 +1604,45 @@ func (r *Reader) execReadSql(connectStr, curDB string, idx int, rawSql string, t
 		r.sendError(err)
 		return exit, isRawSql, readSize, err
 	}
-	log.Infof("Runner[%v] SQL ：<%v>, schemas: <%v>", r.meta.RunnerName, execSQL, strings.Join(columns, ", "))
+	log.Debugf("Runner[%v] SQL ：<%v>, got schemas: <%v>", r.meta.RunnerName, execSQL, strings.Join(columns, ", "))
 	scanArgs, nochiced := r.getInitScans(len(columns), rows, r.dbtype)
 	var offsetKeyIndex int
 	if r.rawSQLs != "" {
 		offsetKeyIndex = r.getOffsetIndex(columns)
 	}
 
-	var newtime bool
+	alldatas, closed := r.getAllDatas(rows, scanArgs, columns, nochiced)
+	if closed {
+		return exit, isRawSql, readSize, nil
+	}
+	total := len(alldatas)
+	alldatas = r.trimeExistData(alldatas)
+
 	// Fetch rows
 	var maxOffset int64 = -1
-	for rows.Next() {
+	for _, v := range alldatas {
 		exit = false
-		// get RawBytes from data
-		err = rows.Scan(scanArgs...)
-		if err != nil {
-			err = fmt.Errorf("runner[%v] %v scan rows error %v", r.meta.RunnerName, r.Name(), err)
-			log.Error(err)
-			r.sendError(err)
-			continue
+		if len(r.timestampKey) > 0 {
+			r.updateTimeCntFromData(v)
 		}
-
-		var totalBytes int64
-		data := make(Data, len(scanArgs))
-		for i := 0; i < len(scanArgs); i++ {
-			var bytes int64
-			vtype, ok := r.schemas[columns[i]]
-			if !ok {
-				vtype = "unknown"
-			}
-			switch vtype {
-			case "long":
-				val, serr := convertLong(scanArgs[i])
-				if serr != nil {
-					serr = fmt.Errorf("runner[%v] %v convertLong for %v (%v) error %v, this key will be ignored", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
-					log.Error(serr)
-					r.sendError(serr)
-				} else {
-					data[columns[i]] = val
-					bytes = 8
-				}
-			case "float":
-				val, serr := convertFloat(scanArgs[i])
-				if serr != nil {
-					serr = fmt.Errorf("runner[%v] %v convertFloat for %v (%v) error %v, this key will be ignored", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
-					log.Error(serr)
-					r.sendError(serr)
-				} else {
-					data[columns[i]] = val
-					bytes = 8
-				}
-			case "string":
-				val, serr := convertString(scanArgs[i])
-				if serr != nil {
-					serr = fmt.Errorf("runner[%v] %v convertString for %v (%v) error %v, this key will be ignored", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
-					log.Error(serr)
-					r.sendError(serr)
-				} else {
-					data[columns[i]] = val
-					bytes = int64(len(val))
-				}
-			case "bool":
-				val, serr := convertBool(scanArgs[i])
-				if serr != nil {
-					serr = fmt.Errorf("runner[%v] %v convertBool for %v (%v) error %v, this key will be ignored", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
-					log.Error(serr)
-					r.sendError(serr)
-				} else {
-					data[columns[i]] = val
-					bytes = 4
-				}
-			default:
-				dealed := false
-				if !nochiced[i] {
-					dealed = true
-					switch d := scanArgs[i].(type) {
-					case *string:
-						data[columns[i]] = *d
-						bytes = int64(len(*d))
-					case *[]byte:
-						data[columns[i]] = string(*d)
-						bytes = int64(len(*d))
-					case *bool:
-						data[columns[i]] = *d
-						bytes = 1
-					case int64:
-						data[columns[i]] = d
-						bytes = 8
-					case *int64:
-						data[columns[i]] = *d
-						bytes = 8
-					case float64:
-						data[columns[i]] = d
-						bytes = 8
-					case *float64:
-						data[columns[i]] = *d
-						bytes = 8
-					case uint64:
-						data[columns[i]] = d
-						bytes = 8
-					case *uint64:
-						data[columns[i]] = *d
-						bytes = 8
-					case *interface{}:
-						dealed = false
-					default:
-						dealed = false
-					}
-				}
-				if !dealed {
-					val, serr := convertString(scanArgs[i])
-					if serr != nil {
-						serr = fmt.Errorf("runner[%v] %v convertString for %v (%v) error %v, this key will be ignored", r.meta.RunnerName, r.Name(), columns[i], scanArgs[i], serr)
-						log.Error(serr)
-						r.sendError(serr)
-					} else {
-						data[columns[i]] = val
-						bytes = int64(len(val))
-					}
-				}
-			}
-
-			totalBytes += bytes
-		}
-		if r.isStopping() || r.hasStopped() {
-			log.Warnf("Runner[%v] %v stopped from running", r.meta.RunnerName, r.Name())
-			return exit, isRawSql, readSize, nil
-		}
-		r.readChan <- readInfo{data, totalBytes}
+		r.readChan <- v
 		r.CurrentCount++
 		readSize++
 
 		if r.historyAll || r.rawSQLs == "" {
 			continue
 		}
-		if len(r.timestampKey) > 0 {
-			changed := r.updateStartTime(offsetKeyIndex, scanArgs)
-			if changed {
-				newtime = true
-			}
-		} else {
+		if len(r.timestampKey) <= 0 {
 			maxOffset = r.updateOffset(idx, offsetKeyIndex, maxOffset, scanArgs)
 		}
 	}
-	if !newtime {
-		exit = true
+	var startTimePrint string
+	if r.timestampKeyInt {
+		startTimePrint = strconv.FormatInt(r.startTimeInt, 10)
+	} else {
+		startTimePrint = r.startTime.String()
 	}
+	log.Infof("Runner[%v] SQL ：<%v> find total  %d data, after trime duplicated, left data is: %d, now we have total got %v data, and start time is %v ", r.meta.RunnerName, execSQL, total, len(alldatas), len(r.trimecachemap), startTimePrint)
 	if maxOffset > 0 {
 		r.offsets[idx] = maxOffset + 1
 	}
@@ -2118,45 +1659,6 @@ func (r *Reader) execReadSql(connectStr, curDB string, idx int, rawSql string, t
 		}
 	}
 	return exit, isRawSql, readSize, rows.Err()
-}
-
-func (r *Reader) updateStartTime(offsetKeyIndex int, scanArgs []interface{}) bool {
-	if offsetKeyIndex < 0 || offsetKeyIndex > len(scanArgs) {
-		return false
-	}
-	v := scanArgs[offsetKeyIndex]
-	dpv := reflect.ValueOf(v)
-	if dpv.Kind() != reflect.Ptr {
-		log.Error("scanArgs not a pointer")
-		return false
-	}
-	if dpv.IsNil() {
-		log.Error("scanArgs is a nil pointer")
-		return false
-	}
-	dv := reflect.Indirect(dpv)
-	switch dv.Kind() {
-	case reflect.Interface:
-		data := dv.Interface()
-		switch timeData := data.(type) {
-		case time.Time:
-			if timeData.After(r.startTime) {
-				r.startTime = timeData.Add(time.Microsecond)
-				return true
-			}
-
-		case *time.Time:
-			if (*timeData).After(r.startTime) {
-				r.startTime = (*timeData).Add(time.Microsecond)
-				return true
-			}
-		default:
-			log.Errorf("updateStartTime failed as %v(%T) is not time.Time", data, data)
-		}
-	default:
-		log.Errorf("updateStartTime is not Interface but %v", dv.Kind())
-	}
-	return false
 }
 
 func (r *Reader) updateOffset(idx, offsetKeyIndex int, maxOffset int64, scanArgs []interface{}) int64 {

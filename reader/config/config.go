@@ -3,6 +3,8 @@ package config
 import (
 	"strings"
 
+	"time"
+
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -646,20 +648,30 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:      KeyPGStartTime,
 			ChooseOnly:   false,
-			Default:      "",
+			Default:      time.Now().Format("2006-01-02 15:04:05.000000"),
 			DefaultNoUse: true,
 			Description:  `起始时间(` + KeyPGStartTime + `)`,
 			Advance:      true,
-			ToolTip:      `指定一个 PostgreSQL 的时间戳开始时间(1999-01-08 04:05:06)`,
+			ToolTip:      `指定一个 PostgreSQL 的时间戳开始时间，按格式填写(2006-01-02 15:04:05.000000)；如果时间戳类型是整型，此处填数字`,
 		},
 		{
 			KeyName:      KeyPGBatchDuration,
 			ChooseOnly:   false,
 			Default:      "1m",
 			DefaultNoUse: true,
-			Description:  `起始时间(` + KeyPGBatchDuration + `)`,
+			Description:  `单次查询范围(` + KeyPGBatchDuration + `)`,
 			Advance:      true,
-			ToolTip:      `指定一个 PostgreSQL 搜索的范围(10s、2m、1h)`,
+			ToolTip:      `指定一个 PostgreSQL 搜索的范围(10s、2m、1h)；如果时间戳类型是整型，此处填数字`,
+		},
+		{
+			KeyName:       KeyPGtimestampInt,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"false", "true"},
+			Default:       "false",
+			DefaultNoUse:  true,
+			Description:   `时间字段是否整型(` + KeyPGtimestampInt + `)`,
+			Advance:       true,
+			ToolTip:       `指定 PostgreSQL 的时间戳是否整型，默认为否，是时间类型(Date/Time Types)`,
 		},
 		OptionMetaPath,
 		OptionDataSourceTag,

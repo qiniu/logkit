@@ -8,10 +8,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"net/url"
-
-	"gopkg.in/olivere/elastic.v5/uritemplates"
 )
 
 // BulkService allows for batching bulk requests and sending them to
@@ -191,47 +188,47 @@ func (s *BulkService) Do(ctx context.Context) (*BulkResponse, error) {
 	}
 
 	// Build url
-	path := "/"
-	if len(s.index) > 0 {
-		index, err := uritemplates.Expand("{index}", map[string]string{
-			"index": s.index,
-		})
-		if err != nil {
-			return nil, err
-		}
-		path += index + "/"
-	}
-	if len(s.typ) > 0 {
-		typ, err := uritemplates.Expand("{type}", map[string]string{
-			"type": s.typ,
-		})
-		if err != nil {
-			return nil, err
-		}
-		path += typ + "/"
-	}
-	path += "_bulk"
+	path := "/" + s.index +"/"+ s.typ + "/_bulk"
+	//if len(s.index) > 0 {
+	//	index, err := uritemplates.Expand("{index}", map[string]string{
+	//		"index": s.index,
+	//	})
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//	path += index + "/"
+	//}
+	//if len(s.typ) > 0 {
+	//	typ, err := uritemplates.Expand("{type}", map[string]string{
+	//		"type": s.typ,
+	//	})
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//	path += typ + "/"
+	//}
+	//path += "_bulk"
 
 	// Parameters
 	params := make(url.Values)
-	if s.pretty {
-		params.Set("pretty", fmt.Sprintf("%v", s.pretty))
-	}
-	if s.pipeline != "" {
-		params.Set("pipeline", s.pipeline)
-	}
-	if s.refresh != "" {
-		params.Set("refresh", s.refresh)
-	}
-	if s.routing != "" {
-		params.Set("routing", s.routing)
-	}
-	if s.timeout != "" {
-		params.Set("timeout", s.timeout)
-	}
-	if s.waitForActiveShards != "" {
-		params.Set("wait_for_active_shards", s.waitForActiveShards)
-	}
+	//if s.pretty {
+	//	params.Set("pretty", fmt.Sprintf("%v", s.pretty))
+	//}
+	//if s.pipeline != "" {
+	//	params.Set("pipeline", s.pipeline)
+	//}
+	//if s.refresh != "" {
+	//	params.Set("refresh", s.refresh)
+	//}
+	//if s.routing != "" {
+	//	params.Set("routing", s.routing)
+	//}
+	//if s.timeout != "" {
+	//	params.Set("timeout", s.timeout)
+	//}
+	//if s.waitForActiveShards != "" {
+	//	params.Set("wait_for_active_shards", s.waitForActiveShards)
+	//}
 
 	// Get response
 	res, err := s.client.PerformRequest(ctx, "POST", path, params, body)

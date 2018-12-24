@@ -259,8 +259,8 @@ func Test_RunForEnvTag(t *testing.T) {
 		RunnerName:   "test_runner",
 		MaxBatchLen:  1,
 		MaxBatchSize: 2048,
-		EnvTag:       "Test_RunForEnvTag",
 		ExtraInfo:    true,
+		EnvTag:       "Test_RunForEnvTag",
 	}
 	readerConfig := conf.MapConf{
 		"log_path":        logpathLink,
@@ -406,7 +406,7 @@ func Test_RunForErrData(t *testing.T) {
 
 	exppath1 := filepath.Join(absLogpath, "log1")
 	exppath3 := filepath.Join(absLogpath, "log3")
-	exppaths := []string{exppath1, exppath1, "", exppath3, exppath3}
+	exppaths := []string{exppath1, exppath1, exppath3, exppath3}
 	rinfo := RunnerInfo{
 		RunnerName:   "test_runner",
 		MaxBatchLen:  1,
@@ -497,7 +497,7 @@ func Test_RunForErrData(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	assert.Equal(t, 5, len(dts), "got sender data not match")
+	assert.Equal(t, 4, len(dts), "got sender data not match")
 	for idx, dt := range dts {
 		if _, ok := dt[KeyPandoraStash]; ok {
 			if dt["testtag"] == nil {
@@ -1339,7 +1339,13 @@ func TestAddDatasourceForRawData(t *testing.T) {
 			"a":          float64(4),
 		},
 	}
-	assert.Equal(t, exp, res)
+	assert.Equal(t, len(exp), len(res))
+	// res 多了 lst 键值对
+	for idx := range exp {
+		for expKey, expVal := range exp[idx] {
+			assert.Equal(t, expVal, res[idx][expKey])
+		}
+	}
 }
 
 func TestAddDatatags(t *testing.T) {
@@ -1409,7 +1415,13 @@ func TestAddDatatags(t *testing.T) {
 			"Host":   float64(99),
 		},
 	}
-	assert.Equal(t, exp, res)
+	assert.Equal(t, len(exp), len(res))
+	// res 多了 lst 键值对
+	for idx := range exp {
+		for expKey, expVal := range exp[idx] {
+			assert.Equal(t, expVal, res[idx][expKey])
+		}
+	}
 }
 
 func TestRunWithExtra(t *testing.T) {
@@ -1459,7 +1471,8 @@ func TestRunWithExtra(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	assert.Equal(t, 7, len(res[0]))
+	// res 多了 lst 键值对
+	assert.Equal(t, 8, len(res[0]))
 }
 
 func TestRunWithDataSource(t *testing.T) {
@@ -1480,7 +1493,7 @@ func TestRunWithDataSource(t *testing.T) {
 
 	config1 := `{
 			"name":"TestRunWithDataSource",
-			"batch_len":5,
+			"batch_len":3,
 			"reader":{
 				"mode":"file",
 				"meta_path":"./TestRunWithDataSource/meta",
@@ -1527,7 +1540,13 @@ func TestRunWithDataSource(t *testing.T) {
 			"datasource": logPath,
 		},
 	}
-	assert.Equal(t, exp, res)
+	assert.Equal(t, len(exp), len(res))
+	// res 多了 lst 键值对
+	for idx := range exp {
+		for expKey, expVal := range exp[idx] {
+			assert.Equal(t, expVal, res[idx][expKey])
+		}
+	}
 }
 
 func TestRunWithDataSourceFial(t *testing.T) {
@@ -1586,7 +1605,13 @@ func TestRunWithDataSourceFial(t *testing.T) {
 			"datasource":    logPath,
 		},
 	}
-	assert.Equal(t, exp, res)
+	assert.Equal(t, len(exp), len(res))
+	// res 多了 lst 键值对
+	for idx := range exp {
+		for expKey, expVal := range exp[idx] {
+			assert.Equal(t, expVal, res[idx][expKey])
+		}
+	}
 }
 
 func TestClassifySenderData(t *testing.T) {
@@ -2108,13 +2133,14 @@ func Test_removeServerIPSchema(t *testing.T) {
 // 需要优化
 func BenchmarkStatusRestore(b *testing.B) {
 	logkitConf := conf.MapConf{
-		readerConf.KeyMetaPath: "testmeta",
+		readerConf.KeyMetaPath: "BenchmarkStatusRestore",
 		readerConf.KeyMode:     readerConf.ModeMongo,
 	}
 	meta, err := reader.NewMetaWithConf(logkitConf)
 	if err != nil {
 		b.Fatal(err)
 	}
+	defer os.RemoveAll("BenchmarkStatusRestore")
 	r1 := &LogExportRunner{
 		meta:         meta,
 		rs:           &RunnerStatus{},
