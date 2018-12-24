@@ -259,6 +259,7 @@ func Test_RunForEnvTag(t *testing.T) {
 		RunnerName:   "test_runner",
 		MaxBatchLen:  1,
 		MaxBatchSize: 2048,
+		ExtraInfo:    true,
 		EnvTag:       "Test_RunForEnvTag",
 	}
 	readerConfig := conf.MapConf{
