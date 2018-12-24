@@ -149,6 +149,8 @@ func (m *Manager) Stop() error {
 	}
 	m.watcherMux.Unlock()
 	close(m.cleanChan)
+	//在所有runner close以后，就保证了不会有audit message发送到Channel里
+	close(m.auditChan)
 	return nil
 }
 

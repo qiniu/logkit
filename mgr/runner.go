@@ -764,7 +764,9 @@ func (r *LogExportRunner) syncAndLog(batchlen, batchSize, sendDataLen int64) {
 			r.reader.SyncMeta()
 		}
 	}
-	if r.LogAudit {
+
+	//审计日志发送选项开启并且runner在运行
+	if r.LogAudit && atomic.LoadInt32(&r.stopped) <= 0 {
 		var lag int64
 		//当延迟数据是最近一分钟内时才获取，数据更新依赖心跳，但是不影响性能
 		r.rsMutex.RLock()
@@ -819,7 +821,7 @@ func (r *LogExportRunner) Run() {
 		r.tracker.Reset()
 		if r.SendRaw {
 			lines, _ := r.rawReadLines(r.meta.GetDataSourceTag())
-			r.tracker.Track("rawReadLines")
+			r.tracker.Track("finish rawReadLines")
 			batchLen, batchSize := r.batchLen, r.batchSize
 			r.addResetStat()
 			// send data
@@ -837,7 +839,7 @@ func (r *LogExportRunner) Run() {
 					break
 				}
 			}
-			r.tracker.Track("finised send")
+			r.tracker.Track("finish Sender")
 			if success {
 				r.syncAndLog(batchLen, batchSize, int64(dataLen))
 			}
@@ -850,7 +852,7 @@ func (r *LogExportRunner) Run() {
 		var datas []Data
 		if dr, ok := r.reader.(reader.DataReader); ok {
 			datas = r.readDatas(dr, r.meta.GetDataSourceTag())
-			r.tracker.Track("readDatas")
+			r.tracker.Track("finish readDatas")
 		} else {
 			datas = r.readLines(r.meta.GetDataSourceTag())
 			r.tracker.Track("finish readLines")
@@ -903,7 +905,7 @@ func (r *LogExportRunner) Run() {
 				log.Error(err)
 			}
 		}
-		r.tracker.Track("Transform")
+		r.tracker.Track("finish transformers")
 		dataLen := len(datas)
 		log.Debugf("Runner[%v] reader %s start to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
 		success := true
@@ -915,7 +917,7 @@ func (r *LogExportRunner) Run() {
 				break
 			}
 		}
-		r.tracker.Track("Send Data")
+		r.tracker.Track("finish Sender")
 
 		if success {
 			r.syncAndLog(batchLen, batchSize, int64(dataLen))
