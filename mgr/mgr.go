@@ -62,7 +62,7 @@ type Manager struct {
 	// runners  存储了正在运行的 runner
 	runners map[string]Runner
 	// runnerNames 存储了当前已经被使用的 runner name
-	runnerNames map[string]bool
+	runnerNames map[string]string
 	// runnerConfigs 存储了当前每个 runner 对应的 config
 	runnerConfigs map[string]RunnerConfig
 
@@ -118,7 +118,7 @@ func NewCustomManager(conf ManagerConfig, rr *reader.Registry, pr *parser.Regist
 		cleanQueues:   make(map[string]*cleanQueue),
 		runners:       make(map[string]Runner),
 		runnerConfigs: make(map[string]RunnerConfig),
-		runnerNames:   make(map[string]bool),
+		runnerNames:   make(map[string]string),
 		watchers:      make(map[string]*fsnotify.Watcher),
 		rregistry:     rr,
 		pregistry:     pr,
@@ -337,7 +337,8 @@ func (m *Manager) ForkRunner(confPath string, config RunnerConfig, returnOnErr b
 	// 确保 config 没有重复添加，且 runner name 没有冲突
 	if _, ok := m.runners[confPath]; ok {
 		return fmt.Errorf("config path %q already added", confPath)
-	} else if m.runnerNames[config.RunnerName] {
+	}
+	if _, ok := m.runnerNames[config.RunnerName]; ok {
 		return fmt.Errorf("runner name %q already used", config.RunnerName)
 	}
 
@@ -345,7 +346,7 @@ func (m *Manager) ForkRunner(confPath string, config RunnerConfig, returnOnErr b
 	log.Infof("Runner[%v] added: %#v", config.RunnerName, confPath)
 	go runner.Run()
 	m.runners[confPath] = runner
-	m.runnerNames[config.RunnerName] = true
+	m.runnerNames[config.RunnerName] = confPath
 	m.runnerConfigs[confPath] = config
 	log.Infof("new Runner[%v] is added, total %d", config.RunnerName, len(m.runners))
 	return nil
@@ -681,7 +682,10 @@ func (m *Manager) StatusAndConfig() (rs map[string]RunnerStatus, rc map[string]R
 }
 
 func (m *Manager) getDeepCopyConfig(name string) (filename string, conf RunnerConfig, err error) {
-	filename = filepath.Join(m.RestDir, name+".conf")
+	filename, ok := m.runnerNames[name]
+	if !ok {
+		return name, RunnerConfig{}, errors.New("runner " + name + " not found")
+	}
 	conf, err = m.getDeepCopyConfigWithFilename(filename)
 	return
 }
