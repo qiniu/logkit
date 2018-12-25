@@ -151,7 +151,11 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner
 								return nil, errors.New("http_datas need to be string")
 							}
 						} else {
-							DisTrans, err := createDiscardTransformer(metricName + "_" + attr.Key)
+							key := attr.Key
+							if !strings.HasPrefix(attr.Key, metricName+"_") {
+								key = metricName + "_" + attr.Key
+							}
+							DisTrans, err := createDiscardTransformer(key)
 							if err != nil {
 								return nil, fmt.Errorf("metric %v key %v, transform add failed, %v", tp, attr.Key, err)
 							}

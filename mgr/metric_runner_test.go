@@ -217,7 +217,7 @@ func metricRunTest(p *testParam) {
 			log.Fatalf("metricRunTest error unmarshal %v curLine = %v %v", string(str), curLine, err)
 		}
 		assert.Equal(t, 1, len(result))
-		assert.Equal(t, len(cpuAttr)/2, len(result[0]))
+		assert.Equal(t, len(cpuAttr)/2, len(result[0])) //cpu_usage_guest_nice为false
 		curLine++
 	}
 }
