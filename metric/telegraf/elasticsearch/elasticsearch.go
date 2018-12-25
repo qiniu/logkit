@@ -10,6 +10,7 @@ import (
 	"github.com/influxdata/telegraf/plugins/inputs/elasticsearch"
 
 	"github.com/qiniu/log"
+
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/metric/telegraf"
 	"github.com/qiniu/logkit/reader"
@@ -21,7 +22,6 @@ const MetricName = "elasticsearch"
 var (
 	ConfigServers            = "servers"
 	ConfigLocal              = "local"
-	ConfigTimeout            = "timeout"
 	ConfigClusterHealth      = "cluster_health"
 	ConfigClusterHealthLevel = "cluster_health_level"
 	ConfigClusterStats       = "cluster_stats"
@@ -61,13 +61,6 @@ func init() {
 				DefaultNoUse:  false,
 				Description:   "只读取本节点的状态信息",
 				Type:          metric.ConfigTypeBool,
-			},
-			{
-				KeyName:      ConfigTimeout,
-				Default:      "5s",
-				DefaultNoUse: false,
-				Description:  "请求超时时间",
-				Type:         metric.ConfigTypeBool,
 			},
 			{
 				KeyName:       ConfigClusterHealth,

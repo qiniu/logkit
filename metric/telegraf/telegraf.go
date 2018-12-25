@@ -66,6 +66,16 @@ func (acc *Accumulator) AddError(err error) {
 	acc.err = err
 }
 
+// mock AddMetric. Implement when needed
+func (acc *Accumulator) AddMetric(telegraf.Metric) {
+}
+
+// mock WithTracking. Implement when needed
+func (acc *Accumulator) WithTracking(maxTracked int) telegraf.TrackingAccumulator {
+	return nil
+}
+
+// Accumulator implements telegraf.Accumulator.
 var usages = map[string]string{}
 
 // AddUsage adds usage information to data table.

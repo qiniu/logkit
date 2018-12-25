@@ -4,13 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/influxdata/telegraf/plugins/inputs"
 	"github.com/influxdata/telegraf/plugins/inputs/http_response"
 
 	"github.com/qiniu/log"
+
 	"github.com/qiniu/logkit/metric"
 	"github.com/qiniu/logkit/metric/telegraf"
 	"github.com/qiniu/logkit/reader"
@@ -22,7 +22,6 @@ const MetricName = "http_response"
 var (
 	ConfigAddress             = "address"
 	ConfigHttpProxy           = "http_proxy"
-	ConfigResponseTimeout     = "response_timeout"
 	ConfigMethod              = "method"
 	ConfigFollowRedirects     = "follow_redirects"
 	ConfigBody                = "body"
@@ -51,13 +50,6 @@ func init() {
 				Placeholder:  "http://localhost:8888",
 				DefaultNoUse: false,
 				Description:  "http代理地址",
-				Type:         metric.ConfigTypeString,
-			},
-			{
-				KeyName:      ConfigResponseTimeout,
-				Default:      "5s",
-				DefaultNoUse: false,
-				Description:  "请求超时时间",
 				Type:         metric.ConfigTypeString,
 			},
 			{
@@ -164,16 +156,6 @@ func (c *collector) SyncConfig(data map[string]interface{}, meta *reader.Meta) e
 	httpProxy, ok := data[ConfigHttpProxy].(string)
 	if ok {
 		hr.HTTPProxy = strings.TrimSpace(httpProxy)
-	}
-	timeout, ok := data[ConfigResponseTimeout].(string)
-	if ok {
-		dur, err := time.ParseDuration(timeout)
-		if err != nil {
-			return fmt.Errorf("parse timeout duration %s err %v", timeout, err)
-		}
-		hr.ResponseTimeout = dur
-	} else {
-		hr.ResponseTimeout = time.Second * 5
 	}
 
 	method, ok := data[ConfigMethod].(string)

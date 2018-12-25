@@ -151,7 +151,7 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner
 								return nil, errors.New("http_datas need to be string")
 							}
 						} else {
-							DisTrans, err := createDiscardTransformer(attr.Key)
+							DisTrans, err := createDiscardTransformer(metricName + "_" + attr.Key)
 							if err != nil {
 								return nil, fmt.Errorf("metric %v key %v, transform add failed, %v", tp, attr.Key, err)
 							}
@@ -259,7 +259,9 @@ func (r *MetricRunner) Run() {
 			tmpdatas, err := c.Collect()
 			if err != nil {
 				log.Debugf("collecter <%v> collect data error: %v", c.Name(), err)
-				continue
+				if len(tmpdatas) == 0 {
+					continue
+				}
 			}
 			dataLen := len(tmpdatas)
 			nameLen := len(metricName)
