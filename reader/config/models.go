@@ -80,6 +80,8 @@ const (
 	KeyESCron        = "es_cron"
 	KeyESExecOnstart = "es_exec_onstart"
 	KeyESCronOffset  = "es_cron_offset"
+	KeyESDateShift   = "es_date_shift"
+	KeyESDateOffset  = "es_date_offset"
 
 	KeyMongoHost        = "mongo_host"
 	KeyMongoDatabase    = "mongo_database"

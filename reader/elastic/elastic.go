@@ -82,6 +82,8 @@ type Reader struct {
 	keepAlive              string //scrollID 保留时间
 	esVersion              string //ElasticSearch version
 	offset                 string // 当前处理es的offset
+	dateShift              bool
+	dateShiftOffset        int
 	elasticV3Client        *elasticV3.Client
 	elasticV5Client        *elasticV5.Client
 	elasticV6Client        *elasticV6.Client
@@ -105,6 +107,10 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	if !strings.HasPrefix(eshost, "http://") && !strings.HasPrefix(eshost, "https://") {
 		eshost = "http://" + eshost
 	}
+
+	dateshift, _ := conf.GetBoolOr(KeyESDateShift, false)
+	dateshiftoffset, _ := conf.GetIntOr(KeyESDateOffset, 0)
+
 	esVersion, _ := conf.GetStringOr(KeyESVersion, ElasticVersion5)
 	authUsername, _ := conf.GetStringOr(KeyAuthUsername, "")
 	authPassword, _ := conf.GetPasswordEnvStringOr(KeyAuthPassword, "")
@@ -171,22 +177,24 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	}
 
 	r := &Reader{
-		meta:          meta,
-		status:        StatusInit,
-		routineStatus: StatusInit,
-		stopChan:      make(chan struct{}),
-		readChan:      make(chan Record),
-		errChan:       make(chan error),
-		esindex:       esindex,
-		estype:        estype,
-		eshost:        eshost,
-		authUsername:  authUsername,
-		authPassword:  authPassword,
-		esVersion:     esVersion,
-		readBatch:     readBatch,
-		keepAlive:     keepAlive,
-		offset:        offset,
-		Cron:          cron.New(),
+		meta:            meta,
+		status:          StatusInit,
+		routineStatus:   StatusInit,
+		stopChan:        make(chan struct{}),
+		readChan:        make(chan Record),
+		errChan:         make(chan error),
+		esindex:         esindex,
+		estype:          estype,
+		eshost:          eshost,
+		authUsername:    authUsername,
+		authPassword:    authPassword,
+		esVersion:       esVersion,
+		readBatch:       readBatch,
+		keepAlive:       keepAlive,
+		offset:          offset,
+		dateShift:       dateshift,
+		dateShiftOffset: dateshiftoffset,
+		Cron:            cron.New(),
 		cronOffsetValueIsValid: false,
 		cronOffsetKey:          cronOffset,
 		execOnStart:            execOnStart,
@@ -308,12 +316,20 @@ func (r *Reader) sendError(err error) {
 	r.errChan <- err
 }
 
+func (r *Reader) getIndexShift() string {
+	return time.Now().Add(-1 * time.Duration(r.dateShiftOffset) * time.Hour).Format(r.esindex)
+}
+
 // 循环读取默认间隔时间3s，只支持全量读取，不支持offset字段
 func (r *Reader) execWithLoop() error {
+	var index = r.esindex
+	if r.dateShift {
+		index = r.getIndexShift()
+	}
 	// Create a client
 	switch r.esVersion {
 	case ElasticVersion6:
-		scroll := r.elasticV6Client.Scroll(r.esindex).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
+		scroll := r.elasticV6Client.Scroll(index).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
 		for {
 			results, err := scroll.ScrollId(r.offset).Do(context.Background())
 			if err == io.EOF {
@@ -335,7 +351,7 @@ func (r *Reader) execWithLoop() error {
 			}
 		}
 	case ElasticVersion3:
-		scroll := r.elasticV3Client.Scroll(r.esindex).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
+		scroll := r.elasticV3Client.Scroll(index).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
 		for {
 			results, err := scroll.ScrollId(r.offset).Do()
 			if err == io.EOF {
@@ -357,7 +373,7 @@ func (r *Reader) execWithLoop() error {
 			}
 		}
 	default:
-		scroll := r.elasticV5Client.Scroll(r.esindex).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
+		scroll := r.elasticV5Client.Scroll(index).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
 		for {
 			results, err := scroll.ScrollId(r.offset).Do(context.Background())
 			if err == io.EOF {
@@ -383,6 +399,10 @@ func (r *Reader) execWithLoop() error {
 
 // 定时读取，支持增量读取，需要指定具有自增属性的offset字段
 func (r *Reader) execWithCron() error {
+	var index = r.esindex
+	if r.dateShift {
+		index = r.getIndexShift()
+	}
 	// Create a client
 	switch r.esVersion {
 	case ElasticVersion6:
@@ -392,7 +412,7 @@ func (r *Reader) execWithCron() error {
 		} else {
 			rangeQuery = elasticV6.NewRangeQuery(r.cronOffsetKey)
 		}
-		scroll := r.elasticV6Client.Scroll(r.esindex).Query(rangeQuery).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
+		scroll := r.elasticV6Client.Scroll(index).Query(rangeQuery).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
 		for {
 			results, err := scroll.ScrollId(r.offset).Do(context.Background())
 			if err == io.EOF {
@@ -423,7 +443,7 @@ func (r *Reader) execWithCron() error {
 		} else {
 			rangeQuery = elasticV3.NewRangeQuery(r.cronOffsetKey)
 		}
-		scroll := r.elasticV3Client.Scroll(r.esindex).Query(rangeQuery).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
+		scroll := r.elasticV3Client.Scroll(index).Query(rangeQuery).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
 		for {
 			results, err := scroll.ScrollId(r.offset).Do()
 			if err == io.EOF {
@@ -454,7 +474,7 @@ func (r *Reader) execWithCron() error {
 		} else {
 			rangeQuery = elasticV5.NewRangeQuery(r.cronOffsetKey)
 		}
-		scroll := r.elasticV5Client.Scroll(r.esindex).Query(rangeQuery).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
+		scroll := r.elasticV5Client.Scroll(index).Query(rangeQuery).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
 		for {
 			results, err := scroll.ScrollId(r.offset).Do(context.Background())
 			if err == io.EOF {
