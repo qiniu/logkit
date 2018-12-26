@@ -279,6 +279,7 @@ func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool) (*dir
 		return nil, fmt.Errorf("new meta: %v", err)
 	}
 	subMeta.Readlimit = opts.Meta.Readlimit
+	subMeta.SetEncodingWay(opts.Meta.GetEncodingWay())
 
 	isNewDir := opts.Meta.IsStatisticFileExist() || notFirstTime //是否为存量文件
 	if isNewDir && subMeta.IsNotExist() {
