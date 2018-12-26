@@ -743,7 +743,7 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 	tags = MergeExtraInfoTags(r.meta, tags)
 	tags["lst"] = curTimeStr
 	if len(tags) > 0 {
-		datas = addTagsToData(tags, datas, r.Name())
+		datas = AddTagsToData(tags, datas, r.Name())
 	}
 
 	// 把 source 加到 data 里，前提是认为 []line 变成 []data 以后是一一对应的，一旦错位就不加
@@ -1009,20 +1009,6 @@ func addSourceToData(sourceFroms []string, se *StatsError, datas []Data, datasou
 	return datas
 }
 
-func addTagsToData(tags map[string]interface{}, datas []Data, runnername string) []Data {
-	for j, data := range datas {
-		for k, v := range tags {
-			if dt, ok := data[k]; ok {
-				log.Debugf("Runner[%v] datasource tag already has data %v, ignore %v", runnername, dt, v)
-			} else {
-				data[k] = v
-			}
-		}
-		datas[j] = data
-	}
-	return datas
-}
-
 // Stop 清理所有使用到的资源, 等待10秒尝试读取完毕
 // 先停Reader，不再读取，然后停Run函数，让读取的都转到发送，最后停Sender结束整个过程。
 // Parser 无状态，无需stop。
@@ -1044,6 +1030,7 @@ func (r *LogExportRunner) Stop() {
 
 	log.Infof("Runner[%v] waiting for Run() stopped signal", r.Name())
 	timer := time.NewTimer(time.Second * 10)
+	defer timer.Stop()
 	select {
 	case <-r.exitChan:
 		log.Warnf("runner %v has been stopped", r.Name())
@@ -1476,32 +1463,6 @@ func (r *LogExportRunner) StatusBackup() {
 	if err != nil {
 		log.Warnf("runner %v, backup status failed", r.RunnerName)
 	}
-}
-
-// MergeEnvTags 获取环境变量里的内容
-func MergeEnvTags(name string, tags map[string]interface{}) map[string]interface{} {
-	if name == "" {
-		return tags
-	}
-
-	envTags := make(map[string]interface{})
-	if value, exist := os.LookupEnv(name); exist {
-		err := jsoniter.Unmarshal([]byte(value), &envTags)
-		if err != nil {
-			log.Warnf("get env tags unmarshal error: %v", err)
-			return tags
-		}
-	} else {
-		log.Warnf("env[%s] not exist", name)
-	}
-
-	if tags == nil {
-		tags = make(map[string]interface{})
-	}
-	for k, v := range envTags {
-		tags[k] = v
-	}
-	return tags
 }
 
 func MergeExtraInfoTags(meta *reader.Meta, tags map[string]interface{}) map[string]interface{} {

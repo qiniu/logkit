@@ -8,6 +8,8 @@ import (
 	"github.com/json-iterator/go"
 
 	"github.com/qiniu/log"
+
+	"github.com/qiniu/logkit/utils/models"
 )
 
 // IsExist checks whether a file or directory exists.
@@ -63,7 +65,11 @@ func BatchFullOrTimeout(runnerName string, stopped *int32, batchLen, batchSize i
 	}
 	// 如果任务已经停止
 	if atomic.LoadInt32(stopped) > 0 {
-		log.Warnf("Runner[%v] meet the stopped signal", runnerName)
+		if !models.IsSelfRunner(runnerName) {
+			log.Warnf("Runner[%v] meet the stopped signal", runnerName)
+		} else {
+			log.Debugf("Runner[%v] meet the stopped signal", runnerName)
+		}
 		return true
 	}
 	return false

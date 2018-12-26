@@ -44,12 +44,15 @@ type ManagerConfig struct {
 	ServerBackup bool          `json:"-"`
 	AuditDir     string        `json:"audit_dir"`
 
-	SelfLog
+	CollectLog
 }
 
-type SelfLog struct {
-	SelfLogSet
-	SelfLogEnable bool `json:"self_log_enable"`
+type CollectLog struct {
+	CollectLogPath   string `json:"collect_log_path"`
+	CollectLogEnable bool   `json:"collect_log_enable"`
+	ReadFrom         string `json:"read_from"`
+	EnvTag           string `json:"-"`
+	Pandora
 }
 
 type cleanQueue struct {
@@ -86,7 +89,7 @@ type Manager struct {
 	Version    string
 	SystemInfo string
 
-	SelfLogRunner *self.LogRunner
+	CollectLogRunner *self.LogRunner
 }
 
 func NewManager(conf ManagerConfig) (*Manager, error) {
@@ -121,33 +124,34 @@ func NewCustomManager(conf ManagerConfig, rr *reader.Registry, pr *parser.Regist
 	if err != nil {
 		return nil, err
 	}
-	var selfLogRunner *self.LogRunner
-	if conf.SelfLogEnable {
-		rdConf := self.SetReaderConfig(self.GetReaderConfig(), conf.LogPath, "", conf.ReadFrom)
+	var collectLogRunner *self.LogRunner
+	if conf.CollectLogEnable {
+		rdConf := self.SetReaderConfig(self.GetReaderConfig(), conf.CollectLogPath, "", conf.ReadFrom)
 		sdConf := self.SetSenderConfig(self.GetSenderConfig(), conf.Pandora)
-		selfLogRunner, err = self.NewLogRunner(rdConf, self.GetParserConfig(), self.GetTransformerConfig(), sdConf)
+		collectLogRunner, err = self.NewLogRunner(rdConf, self.GetParserConfig(), sdConf, conf.EnvTag)
 		if err != nil {
-			return nil, err
+			log.Errorf("new collect log runner failed: %v", err)
+			err = nil
 		}
 	}
 
 	m := &Manager{
-		ManagerConfig: conf,
-		cleanLock:     new(sync.RWMutex),
-		watcherMux:    new(sync.RWMutex),
-		cleanChan:     make(chan cleaner.CleanSignal),
-		cleanQueues:   make(map[string]*cleanQueue),
-		runners:       make(map[string]Runner),
-		runnerConfigs: make(map[string]RunnerConfig),
-		runnerPaths:   make(map[string]string),
-		watchers:      make(map[string]*fsnotify.Watcher),
-		rregistry:     rr,
-		pregistry:     pr,
-		sregistry:     sr,
-		SystemInfo:    utilsos.GetOSInfo().String(),
-		audit:         audt,
-		auditChan:     make(chan audit.Message, 100),
-		SelfLogRunner: selfLogRunner,
+		ManagerConfig:    conf,
+		cleanLock:        new(sync.RWMutex),
+		watcherMux:       new(sync.RWMutex),
+		cleanChan:        make(chan cleaner.CleanSignal),
+		cleanQueues:      make(map[string]*cleanQueue),
+		runners:          make(map[string]Runner),
+		runnerConfigs:    make(map[string]RunnerConfig),
+		runnerPaths:      make(map[string]string),
+		watchers:         make(map[string]*fsnotify.Watcher),
+		rregistry:        rr,
+		pregistry:        pr,
+		sregistry:        sr,
+		SystemInfo:       utilsos.GetOSInfo().String(),
+		audit:            audt,
+		auditChan:        make(chan audit.Message, 100),
+		CollectLogRunner: collectLogRunner,
 	}
 	return m, nil
 }
@@ -174,8 +178,8 @@ func (m *Manager) Stop() error {
 	//在所有runner close以后，就保证了不会有audit message发送到Channel里
 	close(m.auditChan)
 
-	if m.SelfLogRunner != nil {
-		m.SelfLogRunner.Stop()
+	if m.CollectLogRunner != nil {
+		m.CollectLogRunner.Stop()
 	}
 	return nil
 }
@@ -823,8 +827,8 @@ func (m *Manager) UpdateToken(tokens []AuthTokens) (err error) {
 	errMsg := make([]string, 0)
 	for _, token := range tokens {
 		runnerPath := token.RunnerName
-		if strings.HasPrefix(runnerPath, DefaultInternalPrefix) && m.SelfLogRunner != nil {
-			m.SelfLogRunner.TokenRefresh(token)
+		if strings.HasPrefix(runnerPath, DefaultInternalPrefix) && m.CollectLogRunner != nil {
+			m.CollectLogRunner.TokenRefresh(token)
 			continue
 		}
 

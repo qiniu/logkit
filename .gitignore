@@ -60,7 +60,6 @@ logkit
 stats
 .logkitconfs/
 public/.project
-parser/grok/patterns.go
 
 # logkitWeb ignore 
 # See https://help.github.com/ignore-files/ for more about ignoring files.

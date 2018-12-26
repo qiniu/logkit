@@ -6,16 +6,14 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime/debug"
 	"strings"
 	"sync/atomic"
 	"time"
 
-	"github.com/json-iterator/go"
-
 	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base/config"
-	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
@@ -26,8 +24,6 @@ import (
 	"github.com/qiniu/logkit/reader/tailx"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/sender/pandora"
-	"github.com/qiniu/logkit/transforms"
-	"github.com/qiniu/logkit/transforms/mutate"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -35,55 +31,50 @@ import (
 const (
 	DefaultSendTime        = 3
 	DefaultSelfLogRepoName = "logkit_self_log"
+	DebugPattern           = `^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} \[DEBUG\]`
 )
 
 var (
+	debugRegex   = regexp.MustCompile(DebugPattern)
 	readerConfig = conf.MapConf{
 		"runner_name":    DefaultSelfRunnerName,
 		"name":           DefaultSelfRunnerName,
 		"mode":           "tailx",
 		"log_path":       "",
-		"read_from":      "oldest",
+		"read_from":      WhenceNewest,
 		"encoding":       "UTF-8",
 		"datasource_tag": "datasource",
 		"expire":         "0s",
 		"submeta_expire": "0s",
+		"head_pattern":   `^(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} \[(WARN)|(INFO)|(ERROR)]|(DEBUG)\])`,
 	}
 	parserConfig = conf.MapConf{
 		"type": "raw",
 		"name": "parser",
 		"disable_record_errdata": "true",
 	}
-	transformerConfig = conf.MapConf{
-		"key":            "raw",
-		"remove_pattern": ".*\\[DEBUG\\]\\[.*",
-		"type":           "filter",
-	}
 	senderConfig = conf.MapConf{
-		"sender_type":                     "pandora",
-		"pandora_workflow_name":           DefaultSelfLogRepoName,
-		"pandora_repo_name":               DefaultSelfLogRepoName,
-		"logkit_send_time":                "true",
-		"pandora_region":                  "nb",
-		"pandora_host":                    config.DefaultPipelineEndpoint,
-		"pandora_schema_free":             "true",
-		"pandora_enable_logdb":            "true",
-		"pandora_logdb_host":              config.DefaultLogDBEndpoint,
-		"pandora_enable_tsdb":             "false",
-		"pandora_tsdb_host":               config.DefaultTSDBEndpoint,
-		"pandora_enable_kodo":             "false",
-		"pandora_kodo_low_frequency_file": "false",
-		"pandora_gzip":                    "true",
-		"pandora_uuid":                    "false",
-		"pandora_withip":                  "false",
-		"force_microsecond":               "false",
-		"pandora_force_convert":           "false",
-		"number_use_float":                "true",
-		"ignore_invalid_field":            "true",
-		"pandora_auto_convert_date":       "false",
-		"pandora_unescape":                "true",
-		"insecure_server":                 "false",
-		"runner_name":                     DefaultSelfRunnerName,
+		"sender_type":               "pandora",
+		"pandora_workflow_name":     DefaultSelfLogRepoName,
+		"pandora_repo_name":         DefaultSelfLogRepoName,
+		"logkit_send_time":          "true",
+		"pandora_region":            "nb",
+		"pandora_host":              config.DefaultPipelineEndpoint,
+		"pandora_schema_free":       "true",
+		"pandora_enable_logdb":      "true",
+		"pandora_logdb_host":        config.DefaultLogDBEndpoint,
+		"pandora_gzip":              "true",
+		"pandora_uuid":              "false",
+		"pandora_withip":            "false",
+		"force_microsecond":         "false",
+		"pandora_force_convert":     "false",
+		"number_use_float":          "true",
+		"ignore_invalid_field":      "true",
+		"pandora_auto_convert_date": "false",
+		"pandora_unescape":          "true",
+		"insecure_server":           "false",
+		"runner_name":               DefaultSelfRunnerName,
+		"pandora_description":       SelfLogAutoCreateDescription,
 	}
 )
 
@@ -93,29 +84,26 @@ type LogRunner struct {
 	transformerConfig conf.MapConf
 	senderConfig      conf.MapConf
 
-	reader    reader.Reader
-	parser    parser.Parser
-	transform transforms.Transformer
-	sender    sender.Sender
-	meta      *reader.Meta
+	reader reader.Reader
+	parser parser.Parser
+	sender sender.Sender
+	meta   *reader.Meta
 
 	batchLen  int64
 	batchSize int64
 	lastSend  time.Time
+	envTag    string
 
 	stopped  int32
 	exitChan chan struct{}
 }
 
-func NewLogRunner(rdConf, psConf, tsConf, sdConf conf.MapConf) (*LogRunner, error) {
+func NewLogRunner(rdConf, psConf, sdConf conf.MapConf, envTag string) (*LogRunner, error) {
 	if rdConf == nil {
 		rdConf = conf.DeepCopy(readerConfig)
 	}
 	if psConf == nil {
 		psConf = conf.DeepCopy(parserConfig)
-	}
-	if tsConf == nil {
-		tsConf = conf.DeepCopy(transformerConfig)
 	}
 	if sdConf == nil {
 		sdConf = conf.DeepCopy(senderConfig)
@@ -132,13 +120,12 @@ func NewLogRunner(rdConf, psConf, tsConf, sdConf conf.MapConf) (*LogRunner, erro
 		if err != nil {
 			return nil, fmt.Errorf("get system current workdir error %v", err)
 		}
-		rdConf["log_path"] = path + "*"
+		rdConf["log_path"] = path
 	}
 
 	var (
 		rd  reader.Reader
 		ps  parser.Parser
-		ts  transforms.Transformer
 		sd  sender.Sender
 		err error
 	)
@@ -158,44 +145,31 @@ func NewLogRunner(rdConf, psConf, tsConf, sdConf conf.MapConf) (*LogRunner, erro
 	if ps, err = raw.NewParser(psConf); err != nil {
 		return nil, err
 	}
-	ts = &mutate.Filter{}
-	bts, err := jsoniter.Marshal(tsConf)
-	if err != nil {
-		return nil, errors.New("type filter of transformer marshal config error " + err.Error())
-	}
-	err = jsoniter.Unmarshal(bts, ts)
-	if err != nil {
-		return nil, errors.New("type filter of transformer unmarshal config error " + err.Error())
-	}
-	//transformer初始化
-	if trans, ok := ts.(transforms.Initializer); ok {
-		err = trans.Init()
-		if err != nil {
-			return nil, errors.New("type filter of transformer init error " + err.Error())
-		}
-	}
 
 	if sd, err = pandora.NewSender(sdConf); err != nil {
 		return nil, err
 	}
+	// ft sender
+	if sd, err = sender.NewFtSender(sd, sdConf, meta.FtSaveLogPath()); err != nil {
+		return nil, err
+	}
 
-	return NewLogRunnerWithService(rdConf, psConf, tsConf, psConf, meta, rd, ps, ts, sd), nil
+	return NewLogRunnerWithService(rdConf, psConf, sdConf, meta, rd, ps, sd, envTag), nil
 }
 
-func NewLogRunnerWithService(rdConf, psConf, tsConf, sdConf conf.MapConf,
-	meta *reader.Meta, rd reader.Reader, ps parser.Parser, ts transforms.Transformer, sd sender.Sender) *LogRunner {
+func NewLogRunnerWithService(rdConf, psConf, sdConf conf.MapConf,
+	meta *reader.Meta, rd reader.Reader, ps parser.Parser, sd sender.Sender, envTag string) *LogRunner {
 	return &LogRunner{
-		readerConfig:      rdConf,
-		parserConfig:      psConf,
-		transformerConfig: tsConf,
-		senderConfig:      sdConf,
+		readerConfig: rdConf,
+		parserConfig: psConf,
+		senderConfig: sdConf,
+		envTag:       envTag,
 
-		reader:    rd,
-		parser:    ps,
-		transform: ts,
-		sender:    sd,
-		meta:      meta,
-		exitChan:  make(chan struct{}),
+		reader:   rd,
+		parser:   ps,
+		sender:   sd,
+		meta:     meta,
+		exitChan: make(chan struct{}),
 	}
 }
 
@@ -217,8 +191,6 @@ func (lr *LogRunner) Run() {
 		}
 	}()
 
-	var err error
-
 	for {
 		if atomic.LoadInt32(&lr.stopped) > 0 {
 			log.Debugf("Runner[%s] exited from run", lr.Name())
@@ -236,20 +208,11 @@ func (lr *LogRunner) Run() {
 			continue
 		}
 
-		datas, err = lr.transform.Transform(datas)
-		if err != nil {
-			log.Debugf("Runner[%s] transform failed: %v", lr.Name(), err)
-		}
-
 		// send data
 		log.Debugf("Runner[%s] reader %s start to send at: %v", lr.Name(), lr.reader.Name(), time.Now().Format(time.RFC3339))
-		success := true
-		if !lr.trySend(lr.sender, datas) {
-			success = false
-			log.Errorf("Runner[%s] failed to send data finally", lr.Name())
-			break
-		}
-		if success {
+		if err := lr.sender.Send(datas); err != nil {
+			log.Debugf("Runner[%s] failed to send data finally, error: %v", lr.Name(), err)
+		} else {
 			lr.reader.SyncMeta()
 		}
 		log.Debugf("Runner[%s] send %s finish to send at: %v", lr.Name(), lr.reader.Name(), time.Now().Format(time.RFC3339))
@@ -257,8 +220,8 @@ func (lr *LogRunner) Run() {
 	return
 }
 
-func (lr *LogRunner) Stop() {
-	log.Infof("Runner[%s] wait for reader %v to stop", lr.Name(), lr.reader.Name())
+func (lr *LogRunner) Stop() error {
+	log.Debugf("Runner[%s] wait for reader %v to stop", lr.Name(), lr.reader.Name())
 	var errJoin string
 	err := lr.reader.Close()
 	if err != nil {
@@ -267,8 +230,9 @@ func (lr *LogRunner) Stop() {
 	}
 
 	atomic.StoreInt32(&lr.stopped, 1)
-	log.Infof("Runner[%s] waiting for Run() stopped signal", lr.Name())
+	log.Debugf("Runner[%s] waiting for Run() stopped signal", lr.Name())
 	timer := time.NewTimer(time.Second * 10)
+	defer timer.Stop()
 	select {
 	case <-lr.exitChan:
 		log.Debugf("runner %s has been stopped", lr.Name())
@@ -277,13 +241,23 @@ func (lr *LogRunner) Stop() {
 		atomic.StoreInt32(&lr.stopped, 1)
 	}
 
-	log.Infof("Runner[%s] wait for sender %v to stop", lr.Name(), lr.reader.Name())
+	log.Debugf("Runner[%s] wait for sender %v to stop", lr.Name(), lr.reader.Name())
 
 	if err := lr.sender.Close(); err != nil {
 		log.Debugf("Runner[%v] cannot close sender name: %s, err: %v", lr.Name(), lr.sender.Name(), err)
+		errJoin += "\n" + err.Error()
 	}
 
+	if err = lr.meta.Delete(); err != nil {
+		log.Debugf("Runner[%v] cannot delete meta, err: %v", lr.Name(), err)
+		errJoin += "\n" + err.Error()
+	}
+
+	if errJoin != "" {
+		return errors.New(errJoin)
+	}
 	log.Infof("Runner[%s] stopped successfully", lr.Name())
+	return nil
 }
 
 func (lr *LogRunner) Name() string {
@@ -300,7 +274,7 @@ func (lr *LogRunner) readLines() []Data {
 		0, DefaultMaxBatchSize, DefaultSendIntervalSeconds) {
 		line, err = lr.reader.ReadLine()
 		if os.IsNotExist(err) {
-			log.Errorf("Runner[%s] reader %s - error: %v, sleep 3 second...", lr.Name(), lr.reader.Name(), err)
+			log.Debugf("Runner[%s] reader %s - error: %v, sleep 3 second...", lr.Name(), lr.reader.Name(), err)
 			time.Sleep(3 * time.Second)
 			break
 		}
@@ -315,6 +289,12 @@ func (lr *LogRunner) readLines() []Data {
 			continue
 		}
 
+		if debugRegex.MatchString(line) {
+			continue
+		}
+		if strings.Contains(line, DefaultSelfRunnerName) {
+			continue
+		}
 		lines = append(lines, line)
 
 		lr.batchLen++
@@ -336,49 +316,14 @@ func (lr *LogRunner) readLines() []Data {
 	if err != nil {
 		log.Debugf("Runner[%s] parser %s error: %v ", lr.Name(), lr.parser.Name(), err)
 	}
+
+	if lr.envTag != "" {
+		tags := MergeEnvTags(lr.envTag, nil)
+		if len(tags) > 0 {
+			datas = AddTagsToData(tags, datas, lr.Name())
+		}
+	}
 	return datas
-}
-
-// trySend 尝试发送数据，如果此时runner退出返回false，其他情况无论是达到最大重试次数还是发送成功，都返回true
-func (lr *LogRunner) trySend(s sender.Sender, datas []Data) bool {
-	if len(datas) <= 0 {
-		return true
-	}
-
-	var (
-		err error
-		cnt = 1
-	)
-
-	for {
-		// 至少尝试一次。如果任务已经停止，那么只尝试一次
-		if cnt > 1 && atomic.LoadInt32(&lr.stopped) > 0 {
-			return false
-		}
-
-		err = s.Send(datas)
-		if err == nil {
-			break
-		}
-		if err == ErrQueueClosed {
-			log.Debugf("Runner[%s] send to closed queue, discard datas, send error %v, failed datas (length %d): %v", lr.Name(), err, cnt, datas)
-			break
-		}
-		log.Debug(TruncateStrSize(err.Error(), DefaultTruncateMaxSize))
-
-		if sendError, ok := err.(*reqerr.SendError); ok {
-			datas = sender.ConvertDatas(sendError.GetFailDatas())
-		}
-
-		if cnt < DefaultSendTime {
-			cnt++
-			continue
-		}
-		log.Debugf("Runner[%s] retry send %v times, but still error %v, discard datas %v ... total %d lines", lr.Name(), cnt, err, datas, len(datas))
-		break
-	}
-
-	return true
 }
 
 func (lr *LogRunner) TokenRefresh(token AuthTokens) error {
@@ -411,13 +356,7 @@ func SetReaderConfig(readConf conf.MapConf, logpath, metapath, from string) conf
 	rdConf := conf.DeepCopy(readConf)
 	logpath = strings.TrimSpace(logpath)
 	if logpath != "" {
-		path, err := filepath.Abs(logpath)
-		if err != nil {
-			log.Debugf("got logpath[%s] absolute filepath failed: %v", logpath, err)
-			rdConf["log_path"] = logpath + "*"
-		} else {
-			rdConf["log_path"] = path + "*"
-		}
+		rdConf["log_path"] = logpath
 	}
 	if metapath != "" {
 		path, err := filepath.Abs(metapath)
@@ -440,7 +379,7 @@ func SetReaderConfig(readConf conf.MapConf, logpath, metapath, from string) conf
 		rdConf["read_from"] = WhenceNewest
 	default:
 		log.Debugf("reader from %s unsupported", from)
-		rdConf["read_from"] = WhenceOldest
+		rdConf["read_from"] = WhenceNewest
 	}
 
 	return rdConf
@@ -448,12 +387,12 @@ func SetReaderConfig(readConf conf.MapConf, logpath, metapath, from string) conf
 
 func SetSenderConfig(sendConf conf.MapConf, pandora Pandora) conf.MapConf {
 	sdConf := conf.DeepCopy(sendConf)
-	logDBHost := strings.TrimSpace(pandora.Logdb)
+	logDBHost := strings.TrimSpace(pandora.LogDB)
 	if logDBHost != "" {
 		sdConf["pandora_logdb_host"] = logDBHost
 	}
 
-	pandoraHost := strings.TrimSpace(pandora.Pipline)
+	pandoraHost := strings.TrimSpace(pandora.Pipeline)
 	if pandoraHost != "" {
 		sdConf["pandora_host"] = pandoraHost
 	}
@@ -461,11 +400,6 @@ func SetSenderConfig(sendConf conf.MapConf, pandora Pandora) conf.MapConf {
 	pandoraRegion := strings.TrimSpace(pandora.Region)
 	if pandoraRegion != "" {
 		sdConf["pandora_region"] = pandoraRegion
-	}
-
-	tsdbHost := strings.TrimSpace(pandora.Tsdb)
-	if tsdbHost != "" {
-		sdConf["pandora_tsdb_host"] = tsdbHost
 	}
 
 	name := strings.TrimSpace(pandora.Name)
@@ -492,10 +426,6 @@ func GetReaderConfig() conf.MapConf {
 
 func GetParserConfig() conf.MapConf {
 	return parserConfig
-}
-
-func GetTransformerConfig() conf.MapConf {
-	return transformerConfig
 }
 
 func GetSenderConfig() conf.MapConf {

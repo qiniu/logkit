@@ -183,7 +183,11 @@ func (ar *ActiveReader) Stop() error {
 		cnt++
 		//超过3个1s，即3s，就强行退出
 		if cnt > 3 {
-			log.Errorf("Runner[%v] ActiveReader %s was not closed after 3s, force closing it", ar.runnerName, ar.originpath)
+			if !IsSelfRunner(ar.runnerName) {
+				log.Errorf("Runner[%v] ActiveReader %s was not closed after 3s, force closing it", ar.runnerName, ar.originpath)
+			} else {
+				log.Debugf("Runner[%v] ActiveReader %s was not closed after 3s, force closing it", ar.runnerName, ar.originpath)
+			}
 			break
 		}
 		time.Sleep(1 * time.Second)
@@ -250,7 +254,7 @@ func (ar *ActiveReader) Run() {
 				continue
 			}
 		}
-		log.Debugf("Runner[%v] %v >>>>>>readcache <%v> linecache <%v>", ar.runnerName, ar.originpath, ar.readcache, string(ar.br.FormMutiLine()))
+		log.Debugf("Runner[%v] %v >>>>>>readcache <%v> linecache <%v>", ar.runnerName, ar.originpath, strings.TrimSpace(ar.readcache), string(ar.br.FormMutiLine()))
 		repeat := 0
 		for {
 			if ar.readcache == "" {
@@ -259,9 +263,9 @@ func (ar *ActiveReader) Run() {
 			repeat++
 			if repeat%3000 == 0 {
 				if !IsSelfRunner(ar.runnerName) {
-					log.Errorf("Runner[%v] %v ActiveReader has timeout 3000 times with readcache %v", ar.runnerName, ar.originpath, ar.readcache)
+					log.Errorf("Runner[%v] %v ActiveReader has timeout 3000 times with readcache %v", ar.runnerName, ar.originpath, strings.TrimSpace(ar.readcache))
 				} else {
-					log.Debugf("Runner[%v] %v ActiveReader has timeout 3000 times with readcache %v", ar.runnerName, ar.originpath, ar.readcache)
+					log.Debugf("Runner[%v] %v ActiveReader has timeout 3000 times with readcache %v", ar.runnerName, ar.originpath, strings.TrimSpace(ar.readcache))
 				}
 			}
 

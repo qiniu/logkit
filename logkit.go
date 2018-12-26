@@ -263,17 +263,21 @@ func main() {
 	runtime.GOMAXPROCS(conf.MaxProcs)
 	log.SetOutputLevel(conf.DebugLevel)
 
-	stopRotate := make(chan struct{}, 0)
+	var (
+		stopRotate         = make(chan struct{}, 0)
+		logdir, logpattern string
+		err                error
+	)
 	defer close(stopRotate)
 	if conf.LogPath != "" {
-		logdir, logpattern, err := LogDirAndPattern(conf.LogPath)
+		logdir, logpattern, err = LogDirAndPattern(conf.LogPath)
 		if err != nil {
 			log.Fatal(err)
 		}
 		go loopRotateLogs(filepath.Join(logdir, logpattern), defaultRotateSize, 10*time.Second, stopRotate)
 		conf.CleanSelfPattern = logpattern + "-*"
 		conf.CleanSelfDir = logdir
-		conf.ManagerConfig.SelfLogSet.LogPath = conf.LogPath
+		conf.ManagerConfig.CollectLogPath = filepath.Join(logdir, logpattern+"-*")
 	}
 
 	log.Infof("Welcome to use Logkit, Version: %v \n\nConfig: %#v", NextVersion, conf)
@@ -282,6 +286,11 @@ func main() {
 		log.Fatalf("NewManager: %v", err)
 	}
 	m.Version = NextVersion
+
+	if m.CollectLogRunner != nil {
+		go m.CollectLogRunner.Run()
+		time.Sleep(time.Second) // 等待1秒让收集器启动
+	}
 
 	paths := getValidPath(conf.ConfsPath)
 	if len(paths) <= 0 {
@@ -292,13 +301,15 @@ func main() {
 	}
 	m.RestoreWebDir()
 
-	if m.SelfLogRunner != nil {
-		go m.SelfLogRunner.Run()
-	}
-
 	stopClean := make(chan struct{}, 0)
 	defer close(stopClean)
 	if conf.CleanSelfLog {
+		if conf.CleanSelfDir == "" && logdir != "" {
+			conf.CleanSelfDir = logdir
+		}
+		if conf.CleanSelfPattern == "" && logpattern != "" {
+			conf.CleanSelfPattern = logpattern + "-*"
+		}
 		go loopCleanLogkitLog(conf.CleanSelfDir, conf.CleanSelfPattern, conf.CleanSelfLogCnt, conf.CleanSelfDuration, stopClean)
 	}
 	if len(conf.BindHost) > 0 {

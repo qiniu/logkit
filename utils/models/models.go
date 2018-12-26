@@ -72,15 +72,16 @@ const (
 	DATE   = "date"
 	DROP   = "drop"
 
-	DefaultSelfRunnerName = DefaultInternalPrefix + "SelfLogRunner"
+	DefaultSelfRunnerName = DefaultInternalPrefix + "CollectLogRunner"
 	DefaultInternalPrefix = "LogkitInternal"
 )
 
 var (
-	MaxProcs                    = 1
-	NumCPU                      = runtime.NumCPU()
-	LogkitAutoCreateDescription = "由logkit日志收集自动创建"
-	MetricAutoCreateDescription = "由logkit监控收集自动创建"
+	MaxProcs                     = 1
+	NumCPU                       = runtime.NumCPU()
+	LogkitAutoCreateDescription  = "由logkit日志收集自动创建"
+	MetricAutoCreateDescription  = "由logkit监控收集自动创建"
+	SelfLogAutoCreateDescription = "由logkit收集自身日志创建"
 
 	// matches named captures that contain a modifier.
 	//   ie,
@@ -142,20 +143,13 @@ type AuthTokens struct {
 	SenderTokens conf.MapConf
 }
 
-type SelfLogSet struct {
-	LogPath  string `json:"log_path"`
-	ReadFrom string `json:"read_from"`
-	Pandora
-}
-
 type Pandora struct {
-	Name    string `json:"pandora_name"`
-	Region  string `json:"pandora_region"`
-	Pipline string `json:"pandora_pipeline"`
-	Logdb   string `json:"pandora_logdb"`
-	Tsdb    string `json:"pandora_tsdb"`
-	AK      string `json:"pandora_ak"`
-	SK      string `json:"pandora_sk"`
+	Name     string `json:"pandora_name"`
+	Region   string `json:"pandora_region"`
+	Pipeline string `json:"pandora_pipeline"`
+	LogDB    string `json:"pandora_logdb"`
+	AK       string `json:"pandora_ak"`
+	SK       string `json:"pandora_sk"`
 }
 
 type LagInfo struct {

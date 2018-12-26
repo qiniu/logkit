@@ -46,7 +46,7 @@ logkit 的 cluster 功能配置非常简单，只需要在 logkit 的主配置�
     "bind_host":"127.0.0.1:4000",    # 选填，默认自己找一个4000以上的可用端口开启
     "profile_host":"localhost:6060", # 选填，默认为空，不开启
     "clean_self_log":true,           # 选填，默认false
-    "clean_self_dir":"./run",        # 选填，clean_self_log 为true时候生效，默认 "./run"
+    "clean_self_dir":"./",           # 选填，clean_self_log 为true时候生效，默认 "./"
     "clean_self_pattern":"*.log-*",  # 选填，clean_self_log 为true时候生效，默认 "*.log-*"
     "clean_self_cnt":5,              # 选填，clean_self_log 为true时候生效，默认 5
     "rest_dir":"./.logkitconfs",     # 选填，通过web页面存放的logkit配置文件夹，默认为logkit程序运行目录的子目录`.logkitconfs`下
