@@ -97,6 +97,7 @@ func NewActiveReader(originPath, realPath, whence string, notFirstTime bool, met
 	if err != nil {
 		return nil, err
 	}
+	subMeta.SetEncodingWay(meta.GetEncodingWay())
 	subMeta.Readlimit = meta.Readlimit
 	isNewFile := meta.IsStatisticFileExist() || notFirstTime //是否为存量文件
 	if isNewFile && subMeta.IsNotExist() {
