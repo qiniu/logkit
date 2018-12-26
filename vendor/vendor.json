@@ -316,64 +316,124 @@
 			"revisionTime": "2018-07-19T07:19:42Z"
 		},
 		{
+			"checksumSHA1": "ApSLjc10RxzqUffxOBlTMqJmiGk=",
+			"path": "github.com/gobwas/glob",
+			"revision": "e7a84e9525fe90abcda167b604e483cc959ad4aa",
+			"revisionTime": "2018-09-11T21:33:45Z"
+		},
+		{
+			"checksumSHA1": "UIxNdlqa2kcYi5EEe79/WzyPiz4=",
+			"path": "github.com/gobwas/glob/compiler",
+			"revision": "e7a84e9525fe90abcda167b604e483cc959ad4aa",
+			"revisionTime": "2018-09-11T21:33:45Z"
+		},
+		{
+			"checksumSHA1": "jNdbCxBabqjv9tREXA4Nx45Y4wg=",
+			"path": "github.com/gobwas/glob/match",
+			"revision": "e7a84e9525fe90abcda167b604e483cc959ad4aa",
+			"revisionTime": "2018-09-11T21:33:45Z"
+		},
+		{
+			"checksumSHA1": "2KhDNUE98XhHnIgg2S9E4gcWoig=",
+			"path": "github.com/gobwas/glob/syntax",
+			"revision": "e7a84e9525fe90abcda167b604e483cc959ad4aa",
+			"revisionTime": "2018-09-11T21:33:45Z"
+		},
+		{
+			"checksumSHA1": "FPIMdPSazNZGNU+ZmPtIeZpVHFU=",
+			"path": "github.com/gobwas/glob/syntax/ast",
+			"revision": "e7a84e9525fe90abcda167b604e483cc959ad4aa",
+			"revisionTime": "2018-09-11T21:33:45Z"
+		},
+		{
+			"checksumSHA1": "umyztSrQrQIl9JgwhDDb6wrSLeI=",
+			"path": "github.com/gobwas/glob/syntax/lexer",
+			"revision": "e7a84e9525fe90abcda167b604e483cc959ad4aa",
+			"revisionTime": "2018-09-11T21:33:45Z"
+		},
+		{
+			"checksumSHA1": "vux29fN5O22F3QPLOnjQ37278vg=",
+			"path": "github.com/gobwas/glob/util/runes",
+			"revision": "e7a84e9525fe90abcda167b604e483cc959ad4aa",
+			"revisionTime": "2018-09-11T21:33:45Z"
+		},
+		{
+			"checksumSHA1": "Sxp2AHWkkLkIq6w9aMcLmzcwD6w=",
+			"path": "github.com/gobwas/glob/util/strings",
+			"revision": "e7a84e9525fe90abcda167b604e483cc959ad4aa",
+			"revisionTime": "2018-09-11T21:33:45Z"
+		},
+		{
 			"checksumSHA1": "p/8vSviYF91gFflhrt5vkyksroo=",
 			"path": "github.com/golang/snappy",
 			"revision": "553a641470496b2327abcac10b36396bd98e45c9",
 			"revisionTime": "2017-02-15T23:32:05Z"
 		},
 		{
-			"checksumSHA1": "vGiaxmjpTVEWCaEt35cOLJZqAqE=",
+			"checksumSHA1": "xAtRC74g8m+aZGcp/jaud8vP/0M=",
 			"path": "github.com/influxdata/telegraf",
-			"revision": "1ac64596bf65716e9aa6752ba720ed4f3af758e9",
-			"revisionTime": "2018-05-25T21:33:57Z"
+			"revision": "acd176cf4255a096dbf39af209877e887bde1c35",
+			"revisionTime": "2018-12-21T19:30:31Z"
 		},
 		{
-			"checksumSHA1": "i8gNYs5ae7XYCQmWTjwytg+mS0I=",
+			"checksumSHA1": "gNsLGqaxbjgEE1mcu55ldiOhGK0=",
+			"path": "github.com/influxdata/telegraf/filter",
+			"revision": "acd176cf4255a096dbf39af209877e887bde1c35",
+			"revisionTime": "2018-12-21T19:30:31Z"
+		},
+		{
+			"checksumSHA1": "btolyA30WIQLMjaOYLhoD3vBPaU=",
 			"path": "github.com/influxdata/telegraf/internal",
-			"revision": "ee056278f5e5860c252be4731280f75c91a40bc0",
-			"revisionTime": "2018-10-19T20:32:54Z"
+			"revision": "acd176cf4255a096dbf39af209877e887bde1c35",
+			"revisionTime": "2018-12-21T19:30:31Z"
 		},
 		{
 			"checksumSHA1": "MQry1PZYACCdDYhHU0UUrtEei/g=",
 			"path": "github.com/influxdata/telegraf/internal/tls",
-			"revision": "ee056278f5e5860c252be4731280f75c91a40bc0",
-			"revisionTime": "2018-10-19T20:32:54Z"
+			"revision": "acd176cf4255a096dbf39af209877e887bde1c35",
+			"revisionTime": "2018-12-21T19:30:31Z"
 		},
 		{
-			"checksumSHA1": "xB1OYRGaHi1TIWa/Puv4igVDdXU=",
+			"checksumSHA1": "XO4D3xx8+zMwkG6Lmj36B83gFzc=",
 			"path": "github.com/influxdata/telegraf/metric",
-			"revision": "ee056278f5e5860c252be4731280f75c91a40bc0",
-			"revisionTime": "2018-10-19T20:32:54Z"
+			"revision": "acd176cf4255a096dbf39af209877e887bde1c35",
+			"revisionTime": "2018-12-21T19:30:31Z"
 		},
 		{
-			"checksumSHA1": "OyU3/SH7kx2weUp0zMHefwjdT9Y=",
+			"checksumSHA1": "ndlMI6F5fLXx3LBvgU8ipj3Bs/M=",
 			"path": "github.com/influxdata/telegraf/plugins/inputs",
-			"revision": "1ac64596bf65716e9aa6752ba720ed4f3af758e9",
-			"revisionTime": "2018-05-25T21:33:57Z"
+			"revision": "acd176cf4255a096dbf39af209877e887bde1c35",
+			"revisionTime": "2018-12-21T19:30:31Z"
 		},
 		{
-			"checksumSHA1": "0ELjR3yCQGTjThJA92NiuYnlSmI=",
+			"checksumSHA1": "Hk6m8ARPM05gpIoPX5kzvxNitKk=",
+			"path": "github.com/influxdata/telegraf/plugins/inputs/docker",
+			"revision": "acd176cf4255a096dbf39af209877e887bde1c35",
+			"revisionTime": "2018-12-21T19:30:31Z"
+		},
+		{
+			"checksumSHA1": "lFF0ya0cz5b27g+u4zKJrunJnQ0=",
 			"path": "github.com/influxdata/telegraf/plugins/inputs/elasticsearch",
-			"revision": "ee056278f5e5860c252be4731280f75c91a40bc0",
-			"revisionTime": "2018-10-19T20:32:54Z"
+			"revision": "acd176cf4255a096dbf39af209877e887bde1c35",
+			"revisionTime": "2018-12-21T19:30:31Z"
 		},
 		{
 			"checksumSHA1": "7dLuXe+C7JIMjUdvOJ1Ovtdr0EY=",
 			"path": "github.com/influxdata/telegraf/plugins/inputs/http_response",
-			"revision": "19a338b92221fbaa18131ebd81303779b426545e",
-			"revisionTime": "2018-11-03T01:23:41Z"
+			"revision": "acd176cf4255a096dbf39af209877e887bde1c35",
+			"revisionTime": "2018-12-21T19:30:31Z"
 		},
 		{
-			"checksumSHA1": "+of8tax6y1YqctWPSxxU7u99aTk=",
+			"checksumSHA1": "J0ywR8aidsjFc7L8muO4L3BK+As=",
 			"path": "github.com/influxdata/telegraf/plugins/inputs/memcached",
-			"revision": "1ac64596bf65716e9aa6752ba720ed4f3af758e9",
-			"revisionTime": "2018-05-25T21:33:57Z"
+			"revision": "acd176cf4255a096dbf39af209877e887bde1c35",
+			"revisionTime": "2018-12-21T19:30:31Z"
 		},
 		{
-			"checksumSHA1": "NwrzXURmniPURFRPLyw9iHkXZ0k=",
+			"checksumSHA1": "giCDJLh+GoIeKJoikOiGtkRt4F4=",
 			"path": "github.com/influxdata/telegraf/plugins/parsers/json",
-			"revision": "ee056278f5e5860c252be4731280f75c91a40bc0",
-			"revisionTime": "2018-10-19T20:32:54Z"
+			"revision": "acd176cf4255a096dbf39af209877e887bde1c35",
+			"revisionTime": "2018-12-21T19:30:31Z"
 		},
 		{
 			"checksumSHA1": "0ZrwvB6KoGPj2PoDNSEJwxQ6Mog=",
@@ -815,6 +875,20 @@
 			"path": "golang.org/x/net/context/ctxhttp",
 			"revision": "34057069f4ab13dc4433c68d368737ebeafcccdc",
 			"revisionTime": "2017-05-09T19:22:37Z"
+		},
+		{
+			"checksumSHA1": "W+3cWL5KjepzF1XvyMSBUYfa8x8=",
+			"origin": "github.com/docker/docker/vendor/golang.org/x/net/internal/socks",
+			"path": "golang.org/x/net/internal/socks",
+			"revision": "c32f042e2b6ade7de1dd0cf622d7280cce738775",
+			"revisionTime": "2018-12-24T21:20:02Z"
+		},
+		{
+			"checksumSHA1": "UrFs0T7kkYsUxJG5bsJt7KB8ejI=",
+			"origin": "github.com/docker/docker/vendor/golang.org/x/net/proxy",
+			"path": "golang.org/x/net/proxy",
+			"revision": "c32f042e2b6ade7de1dd0cf622d7280cce738775",
+			"revisionTime": "2018-12-24T21:20:02Z"
 		},
 		{
 			"checksumSHA1": "AnGAvYf1P/pIoabZKUmtJpfguvI=",

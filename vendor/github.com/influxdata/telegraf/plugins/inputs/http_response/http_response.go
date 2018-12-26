@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/influxdata/telegraf"
+	"github.com/influxdata/telegraf/internal"
 	"github.com/influxdata/telegraf/internal/tls"
 	"github.com/influxdata/telegraf/plugins/inputs"
 )
@@ -25,7 +26,7 @@ type HTTPResponse struct {
 	HTTPProxy           string `toml:"http_proxy"`
 	Body                string
 	Method              string
-	ResponseTimeout     time.Duration
+	ResponseTimeout     internal.Duration
 	Headers             map[string]string
 	FollowRedirects     bool
 	ResponseStringMatch string
@@ -115,7 +116,7 @@ func (h *HTTPResponse) createHttpClient() (*http.Client, error) {
 			DisableKeepAlives: true,
 			TLSClientConfig:   tlsCfg,
 		},
-		Timeout: h.ResponseTimeout,
+		Timeout: h.ResponseTimeout.Duration,
 	}
 
 	if h.FollowRedirects == false {
@@ -276,8 +277,8 @@ func (h *HTTPResponse) Gather(acc telegraf.Accumulator) error {
 	}
 
 	// Set default values
-	if h.ResponseTimeout < time.Second {
-		h.ResponseTimeout = time.Second * 5
+	if h.ResponseTimeout.Duration < time.Second {
+		h.ResponseTimeout.Duration = time.Second * 5
 	}
 	// Check send and expected string
 	if h.Method == "" {
