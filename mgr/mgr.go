@@ -661,6 +661,11 @@ func (m *Manager) StatusAndConfig() (rs map[string]RunnerStatus, rc map[string]R
 	m.runnerLock.RLock()
 	defer m.runnerLock.RUnlock()
 	for key, conf := range m.runnerConfigs {
+		if filepath.Dir(key) == m.RestDir {
+			conf.IsInWebFolder = true
+		}
+		tmpRc[key] = conf
+
 		if r, ex := m.runners[key]; ex {
 			rs[r.Name()] = r.Status()
 			continue
@@ -673,11 +678,6 @@ func (m *Manager) StatusAndConfig() (rs map[string]RunnerStatus, rc map[string]R
 			SenderStats:    make(map[string]StatsInfo),
 			RunningStatus:  RunnerStopped,
 		}
-
-		if filepath.Dir(key) == m.RestDir {
-			conf.IsInWebFolder = true
-		}
-		tmpRc[key] = conf
 	}
 	utils.DeepCopyByJSON(&rc, &tmpRc)
 
