@@ -95,10 +95,8 @@ func init() {
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	readBatch, _ := conf.GetIntOr(KeyESReadBatch, 100)
-	estype, err := conf.GetString(KeyESType)
-	if err != nil {
-		return nil, err
-	}
+	estype, _ := conf.GetStringOr(KeyESType, "")
+
 	esindex, err := conf.GetString(KeyESIndex)
 	if err != nil {
 		return nil, err
@@ -329,7 +327,10 @@ func (r *Reader) execWithLoop() error {
 	// Create a client
 	switch r.esVersion {
 	case ElasticVersion6:
-		scroll := r.elasticV6Client.Scroll(index).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
+		scroll := r.elasticV6Client.Scroll(index).Size(r.readBatch).KeepAlive(r.keepAlive)
+		if r.estype != "" {
+			scroll = scroll.Type(r.estype)
+		}
 		for {
 			results, err := scroll.ScrollId(r.offset).Do(context.Background())
 			if err == io.EOF {
@@ -351,7 +352,10 @@ func (r *Reader) execWithLoop() error {
 			}
 		}
 	case ElasticVersion3:
-		scroll := r.elasticV3Client.Scroll(index).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
+		scroll := r.elasticV3Client.Scroll(index).Size(r.readBatch).KeepAlive(r.keepAlive)
+		if r.estype != "" {
+			scroll = scroll.Type(r.estype)
+		}
 		for {
 			results, err := scroll.ScrollId(r.offset).Do()
 			if err == io.EOF {
@@ -373,7 +377,10 @@ func (r *Reader) execWithLoop() error {
 			}
 		}
 	default:
-		scroll := r.elasticV5Client.Scroll(index).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
+		scroll := r.elasticV5Client.Scroll(index).Size(r.readBatch).KeepAlive(r.keepAlive)
+		if r.estype != "" {
+			scroll = scroll.Type(r.estype)
+		}
 		for {
 			results, err := scroll.ScrollId(r.offset).Do(context.Background())
 			if err == io.EOF {
@@ -412,7 +419,10 @@ func (r *Reader) execWithCron() error {
 		} else {
 			rangeQuery = elasticV6.NewRangeQuery(r.cronOffsetKey)
 		}
-		scroll := r.elasticV6Client.Scroll(index).Query(rangeQuery).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
+		scroll := r.elasticV6Client.Scroll(index).Query(rangeQuery).Size(r.readBatch).KeepAlive(r.keepAlive)
+		if r.estype != "" {
+			scroll = scroll.Type(r.estype)
+		}
 		for {
 			results, err := scroll.ScrollId(r.offset).Do(context.Background())
 			if err == io.EOF {
@@ -443,7 +453,10 @@ func (r *Reader) execWithCron() error {
 		} else {
 			rangeQuery = elasticV3.NewRangeQuery(r.cronOffsetKey)
 		}
-		scroll := r.elasticV3Client.Scroll(index).Query(rangeQuery).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
+		scroll := r.elasticV3Client.Scroll(index).Query(rangeQuery).Size(r.readBatch).KeepAlive(r.keepAlive)
+		if r.estype != "" {
+			scroll = scroll.Type(r.estype)
+		}
 		for {
 			results, err := scroll.ScrollId(r.offset).Do()
 			if err == io.EOF {
@@ -474,7 +487,10 @@ func (r *Reader) execWithCron() error {
 		} else {
 			rangeQuery = elasticV5.NewRangeQuery(r.cronOffsetKey)
 		}
-		scroll := r.elasticV5Client.Scroll(index).Query(rangeQuery).Type(r.estype).Size(r.readBatch).KeepAlive(r.keepAlive)
+		scroll := r.elasticV5Client.Scroll(index).Query(rangeQuery).Size(r.readBatch).KeepAlive(r.keepAlive)
+		if r.estype != "" {
+			scroll = scroll.Type(r.estype)
+		}
 		for {
 			results, err := scroll.ScrollId(r.offset).Do(context.Background())
 			if err == io.EOF {
