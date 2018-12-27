@@ -21,27 +21,41 @@ type Filter struct {
 	Key           string `json:"key"`
 	StageTime     string `json:"stage"`
 	stats         StatsInfo
-	KeepData      bool   `json:"keep_data"` // 暂时没用到
+	Mode          string `json:"mode"`
+	Pattern       string `json:"pattern"`
 	RemovePattern string `json:"remove_pattern"`
-	removeRegex   *regexp.Regexp
+	Regex         *regexp.Regexp
 
-	discardKeys [][]string
+	keys [][]string
 
 	numRoutine int
 }
 
+const (
+	Keep   = "keep"
+	Remove = "remove"
+)
+
 func (f *Filter) Init() error {
-	discardKeys := strings.Split(f.Key, ",")
-	f.discardKeys = make([][]string, len(discardKeys))
-	for i := range f.discardKeys {
-		f.discardKeys[i] = GetKeys(discardKeys[i])
+	keys := strings.Split(f.Key, ",")
+	f.keys = make([][]string, len(keys))
+	for i := range f.keys {
+		f.keys[i] = GetKeys(keys[i])
+	}
+	f.Mode = strings.TrimSpace(f.Mode)
+	f.Mode = strings.ToLower(f.Mode)
+	if f.Mode == "" {
+		f.Mode = Remove
 	}
 	if f.RemovePattern != "" {
-		removeRegex, err := regexp.Compile(f.RemovePattern)
+		f.Pattern = f.RemovePattern
+	}
+	if f.Pattern != "" {
+		Regex, err := regexp.Compile(f.Pattern)
 		if err != nil {
 			return errors.New("regex compile failed: " + err.Error())
 		}
-		f.removeRegex = removeRegex
+		f.Regex = Regex
 	}
 	numRoutine := MaxProcs
 	if numRoutine == 0 {
@@ -56,7 +70,7 @@ func (f *Filter) RawTransform(datas []string) ([]string, error) {
 }
 
 func (f *Filter) Transform(datas []Data) ([]Data, error) {
-	if f.discardKeys == nil {
+	if f.keys == nil {
 		f.Init()
 	}
 
@@ -123,7 +137,7 @@ func (f *Filter) Transform(datas []Data) ([]Data, error) {
 
 func (f *Filter) Description() string {
 	//return "convert can use dsl to convert multi-field data to specify data type"
-	return `将符合条件的数据丢弃`
+	return `保留/移除符合条件的数据`
 }
 
 func (f *Filter) Type() string {
@@ -134,7 +148,7 @@ func (f *Filter) SampleConfig() string {
 	return `{
 		"type":"filter",
 		"key":"a.b,c",
-		"remove_pattern":".* [DEBUG][.*"
+		"pattern":".* [DEBUG][.*"
 	}`
 }
 
@@ -142,14 +156,27 @@ func (f *Filter) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
 		{
-			KeyName:      "remove_pattern",
+			KeyName:       "mode",
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{Keep, Remove},
+			Default:       Remove,
+			Required:      false,
+			Advance:       true,
+			Placeholder:   "mode string",
+			DefaultNoUse:  false,
+			Description:   "保留/移除匹配的正则表达式(pattern)的数据",
+			Type:          transforms.TransformTypeString,
+		},
+		{
+			KeyName:      "pattern",
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     false,
 			Advance:      true,
-			Placeholder:  "fieldone string",
+			Placeholder:  "pattern string",
 			DefaultNoUse: true,
-			Description:  "去除数据匹配的正则表达式(remove_pattern)",
+			Description:  "正则表达式(pattern)所匹配的数据做处理",
+			ToolTip:      "保留或移除匹配正则表达式的数据，为空且mode为remove则丢弃整条数据，否则保留",
 			Type:         transforms.TransformTypeString,
 		},
 	}
@@ -184,21 +211,31 @@ func (f *Filter) transform(dataPipeline <-chan transforms.TransformInfo, resultC
 		err = nil
 		errNum = 0
 
-		remove := false
-		for _, keys := range f.discardKeys {
+		match := false
+		for _, keys := range f.keys {
 			val, getErr := GetMapValue(transformInfo.CurData, keys...)
 			if getErr != nil {
 				errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, strings.Join(keys, "."))
 				continue
 			}
-			if f.removeRegex == nil || f.removeRegex.MatchString(fmt.Sprintf("%v", val)) {
-				remove = true
+
+			if f.Regex == nil || f.Regex.MatchString(fmt.Sprintf("%v", val)) {
+				match = true
 				break
 			}
 		}
-		if remove {
-			continue
+
+		switch f.Mode {
+		case Keep:
+			if !match {
+				continue
+			}
+		default:
+			if match {
+				continue
+			}
 		}
+
 		resultChan <- transforms.TransformResult{
 			Index:   transformInfo.Index,
 			CurData: transformInfo.CurData,
