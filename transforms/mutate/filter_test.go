@@ -45,4 +45,33 @@ func TestFilterTransformer(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, []Data{{"myword": "xxx"}}, datas)
 	assert.Equal(t, transforms.StageAfterParser, filter.Stage())
+
+	filter = &Filter{
+		Key:           "myword",
+		Mode:          Keep,
+		RemovePattern: `.*\[DEBUG\]\[.*`,
+	}
+	datas, err = filter.Transform([]Data{{"myword": "xxx[DEBUG][qiniu.com/]"}, {"myword": "xxx"}})
+	assert.NoError(t, err)
+	assert.Equal(t, []Data{{"myword": "xxx[DEBUG][qiniu.com/]"}}, datas)
+	assert.Equal(t, transforms.StageAfterParser, filter.Stage())
+
+	filter = &Filter{
+		Key:     "myword",
+		Mode:    Keep,
+		Pattern: `.*\[DEBUG\]\[.*`,
+	}
+	datas, err = filter.Transform([]Data{{"myword": "xxx[DEBUG][qiniu.com/]"}, {"myword": "xxx"}})
+	assert.NoError(t, err)
+	assert.Equal(t, []Data{{"myword": "xxx[DEBUG][qiniu.com/]"}}, datas)
+	assert.Equal(t, transforms.StageAfterParser, filter.Stage())
+
+	filter = &Filter{
+		Key:  "myword",
+		Mode: Keep,
+	}
+	datas, err = filter.Transform([]Data{{"myword": "xxx[DEBUG][qiniu.com/]"}, {"myword": "xxx"}})
+	assert.NoError(t, err)
+	assert.Equal(t, []Data{{"myword": "xxx[DEBUG][qiniu.com/]"}, {"myword": "xxx"}}, datas)
+	assert.Equal(t, transforms.StageAfterParser, filter.Stage())
 }
