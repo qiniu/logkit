@@ -203,7 +203,7 @@ func (c *collector) SyncConfig(data map[string]interface{}, meta *reader.Meta) e
 func NewCollector() metric.Collector {
 	input := inputs.Inputs[MetricName]()
 	if _, err := toml.Decode(input.SampleConfig(), input); err != nil {
-		log.Errorf("metric: failed to decode sample config of elasticsearch: %v", err)
+		log.Warnf("metric: failed to decode sample config of elasticsearch: %v", err)
 	}
 	return &collector{telegraf.NewCollector(MetricName, input)}
 }

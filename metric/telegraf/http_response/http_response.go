@@ -222,7 +222,7 @@ func getheaders(header string) map[string]string {
 func NewCollector() metric.Collector {
 	input := inputs.Inputs[MetricName]()
 	if _, err := toml.Decode(input.SampleConfig(), input); err != nil {
-		log.Errorf("metric: failed to decode sample config of http_response: %v", err)
+		log.Warnf("metric: failed to decode sample config of http_response: %v", err)
 	}
 	return &collector{telegraf.NewCollector(MetricName, input)}
 }

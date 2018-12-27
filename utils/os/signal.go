@@ -21,7 +21,7 @@ func WaitForInterrupt(interrupt func()) {
 	// Block until a signal is received.
 	s := <-c
 
-	log.Info("Receiving signal:", s)
+	log.Infof("Receiving signal: %v, stopping...", s)
 
 	interrupt()
 }
