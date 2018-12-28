@@ -293,6 +293,8 @@ func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool) (*dir
 	fr.ReadSameInode = opts.ReadSameInode
 	br, err := reader.NewReaderSize(fr, subMeta, opts.BufferSize)
 	if err != nil {
+		//如果没有创建成功，要把reader close掉，否则会因为ratelimit导致线程泄露
+		fr.Close()
 		return nil, fmt.Errorf("new buffer reader: %v", err)
 	}
 
