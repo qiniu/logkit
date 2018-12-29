@@ -26,6 +26,7 @@ import (
 	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/reader/config"
 	"github.com/qiniu/logkit/utils"
+	"github.com/qiniu/logkit/utils/magic"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -121,6 +122,9 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	offset, _, err := meta.ReadOffset()
 	if err != nil {
 		log.Errorf("Runner[%v] %v -meta data is corrupted err:%v, omit meta data", meta.RunnerName, meta.MetaFile(), err)
+	}
+	if cronOffset == "" {
+		offset = ""
 	}
 
 	// 初始化 client
@@ -241,7 +245,7 @@ func (r *Reader) hasStopped() bool {
 }
 
 func (r *Reader) Name() string {
-	return "ESReader:" + r.Source()
+	return "ESReader_" + r.Source()
 }
 
 func (r *Reader) run() {
@@ -315,7 +319,7 @@ func (r *Reader) sendError(err error) {
 }
 
 func (r *Reader) getIndexShift() string {
-	return time.Now().Add(-1 * time.Duration(r.dateShiftOffset) * time.Hour).Format(r.esindex)
+	return magic.GoMagic(r.esindex, time.Now().Add(-1*time.Duration(r.dateShiftOffset)*time.Hour))
 }
 
 // 循环读取默认间隔时间3s，只支持全量读取，不支持offset字段
@@ -357,7 +361,10 @@ func (r *Reader) execWithLoop() error {
 			scroll = scroll.Type(r.estype)
 		}
 		for {
-			results, err := scroll.ScrollId(r.offset).Do()
+			if r.offset != "" {
+				scroll = scroll.ScrollId(r.offset)
+			}
+			results, err := scroll.Do()
 			if err == io.EOF {
 				return nil // all results retrieved
 			}
@@ -458,7 +465,10 @@ func (r *Reader) execWithCron() error {
 			scroll = scroll.Type(r.estype)
 		}
 		for {
-			results, err := scroll.ScrollId(r.offset).Do()
+			if r.offset != "" {
+				scroll = scroll.ScrollId(r.offset)
+			}
+			results, err := scroll.Do()
 			if err == io.EOF {
 				return nil // all results retrieved
 			}
@@ -552,7 +562,15 @@ func (r *Reader) Start() error {
 }
 
 func (r *Reader) Source() string {
-	return r.eshost + "_" + r.esindex + "_" + r.estype
+	var index = r.esindex
+	if r.dateShift {
+		index = r.getIndexShift()
+	}
+	source := r.eshost + "_" + index
+	if r.estype != "" {
+		source = source + "_" + r.estype
+	}
+	return source
 }
 
 func (r *Reader) ReadLine() (string, error) {
