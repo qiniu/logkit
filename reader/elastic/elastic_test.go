@@ -31,7 +31,7 @@ func TestElasticReader(t *testing.T) {
 		offset:    "TestElasticReader",
 		readChan:  make(chan Record),
 	}
-	assert.EqualValues(t, "ESReader:127.0.0.1:9200_app_type", er.Name())
+	assert.EqualValues(t, "ESReader_127.0.0.1:9200_app_type", er.Name())
 	er.SyncMeta()
 	got, _, err := er.meta.ReadOffset()
 	assert.NoError(t, err)

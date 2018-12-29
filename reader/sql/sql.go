@@ -19,6 +19,7 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/reader/config"
+	"github.com/qiniu/logkit/utils/magic"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -600,7 +601,7 @@ func updateSqls(rawsqls string, now time.Time) []string {
 	encodedSQLs := strings.Split(rawsqls, sqlSpliter)
 	sqls := make([]string, 0)
 	for _, esql := range encodedSQLs {
-		magicSQL := strings.TrimSpace(goMagic(esql, now))
+		magicSQL := strings.TrimSpace(magic.GoMagic(esql, now))
 		if len(magicSQL) <= 0 {
 			continue
 		}
@@ -657,7 +658,7 @@ func (r *Reader) run() {
 	}()
 
 	now := time.Now().Add(-r.magicLagDur)
-	r.table = goMagic(r.rawTable, now)
+	r.table = magic.GoMagic(r.rawTable, now)
 
 	connectStr, err := r.getConnectStr("", now)
 	if err != nil {
@@ -800,7 +801,7 @@ func (r *Reader) exec(connectStr string) (err error) {
 	switch r.dbtype {
 	case ModeMySQL:
 		if r.rawSQLs != "" {
-			dbs = append(dbs, goMagic(r.rawDatabase, now))
+			dbs = append(dbs, magic.GoMagic(r.rawDatabase, now))
 		} else {
 			var err error
 			dbs, err = r.getDBs(connectStr, now)
@@ -1331,10 +1332,10 @@ func (r *Reader) getConnectStr(database string, now time.Time) (connectStr strin
 			connectStr += "?charset=" + r.encoder
 		}
 	case ModeMSSQL:
-		r.database = goMagic(r.rawDatabase, now)
+		r.database = magic.GoMagic(r.rawDatabase, now)
 		connectStr = r.datasource + ";database=" + r.database
 	case ModePostgreSQL:
-		r.database = goMagic(r.rawDatabase, now)
+		r.database = magic.GoMagic(r.rawDatabase, now)
 		spls := strings.Split(r.datasource, " ")
 		contains := false
 		for idx, v := range spls {
