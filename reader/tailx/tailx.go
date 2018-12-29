@@ -111,6 +111,8 @@ func NewActiveReader(originPath, realPath, whence string, notFirstTime bool, met
 	}
 	bf, err := reader.NewReaderSize(fr, subMeta, reader.DefaultBufSize)
 	if err != nil {
+		//如果没有创建成功，要把reader close掉，否则会因为ratelimit导致线程泄露
+		fr.Close()
 		return
 	}
 	return &ActiveReader{
