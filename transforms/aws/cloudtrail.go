@@ -87,21 +87,6 @@ func (g *CloudTrail) Transform(datas []Data) ([]Data, error) {
 
 	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(dataLen), g.Type())
 	return resData, fmtErr
-
-	//var err, cloudTrailErr error
-	//errNum := 0
-	//var newData []Data
-	//for _, v := range datas {
-	//	newData, cloudTrailErr = transform(v)
-	//	if cloudTrailErr != nil {
-	//		errNum, err = transforms.SetError(errNum, cloudTrailErr, transforms.General, "")
-	//	}
-	//	//不管有没有错误发生，都把返回的newdata加进来，让部分成功的情况也能解析出数据，同时也把原来的数据给进来
-	//	retdata = append(retdata, newData...)
-	//}
-	//
-	//g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
-	//return retdata, fmtErr
 }
 
 //如果有错误发生，要把原来的数据给回去

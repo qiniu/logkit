@@ -47,8 +47,11 @@ func (k *KV) Init() error {
 		k.Splitter = "="
 	}
 	k.keys = GetKeys(k.Key)
+	if len(k.keys) < 1 {
+		return errors.New("invalid key: " + k.Key + ", key can't be empty")
+	}
 	if strings.TrimSpace(k.New) == "" {
-		k.news = k.keys
+		k.news = k.keys[:len(k.keys)-1]
 	} else {
 		k.news = GetKeys(k.New)
 	}
@@ -148,6 +151,7 @@ func (k *KV) Transform(datas []Data) ([]Data, error) {
 		if transformResult.Err != nil {
 			err = transformResult.Err
 			errNum += transformResult.ErrNum
+			continue
 		}
 		datas[transformResult.Index] = transformResult.CurData
 	}
@@ -195,34 +199,48 @@ func (k *KV) transform(dataPipeline <-chan transforms.TransformInfo, resultChan 
 			continue
 		}
 
-		datas, kvErr := kvTransform(strVal, k.Splitter)
+		data, kvErr := kvTransform(strVal, k.Splitter)
+		if kvErr == nil && len(data) == 0 {
+			kvErr = errors.New("no value matched in key value transform in " + k.Key)
+		}
 		if kvErr != nil {
 			errNum, err = transforms.SetError(errNum, kvErr, transforms.General, "")
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				Err:     err,
+				ErrNum:  errNum,
+			}
+			continue
+
+		}
+		if len(k.news) != 0 {
+			setErr := SetMapValue(transformInfo.CurData, data, false, k.news...)
+			if setErr != nil {
+				errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, k.New)
+			}
 		} else {
-			if len(datas) == 0 {
-				errNum, err = transforms.SetError(errNum, errors.New("no value matched in key value transform in "+k.Key), transforms.General, "")
+			for k, v := range data {
+				transformInfo.CurData[k] = v
 			}
 		}
-		setErr := SetMapValue(transformInfo.CurData, datas, false, k.news...)
-		if setErr != nil {
-			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, k.New)
-		}
 		resultChan <- transforms.TransformResult{
-			Index:    transformInfo.Index,
-			CurData:  transformInfo.CurData,
-			CurDatas: datas,
-			Err:      err,
-			ErrNum:   errNum,
+			Index:   transformInfo.Index,
+			CurData: transformInfo.CurData,
+			Err:     err,
+			ErrNum:  errNum,
 		}
 	}
 	wg.Done()
 }
 
-func kvTransform(strVal string, splitter string) ([]Data, error) {
-	reader := bytes.NewReader([]byte(strVal))
-	decoder := logfmt.NewDecoder(reader)
-	datas := make([]Data, 0, 100)
-	var fields Data
+func kvTransform(strVal string, splitter string) (Data, error) {
+	var (
+		reader  = bytes.NewReader([]byte(strVal))
+		decoder = logfmt.NewDecoder(reader)
+		data    = make(Data, 0)
+		fields  Data
+	)
 	for {
 		ok := decoder.ScanRecord()
 		if !ok {
@@ -256,7 +274,9 @@ func kvTransform(strVal string, splitter string) ([]Data, error) {
 			continue
 		}
 
-		datas = append(datas, fields)
+		for fieldKey, fieldVal := range fields {
+			data[fieldKey] = fieldVal
+		}
 	}
-	return datas, nil
+	return data, nil
 }
