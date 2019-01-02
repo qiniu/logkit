@@ -246,7 +246,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: true,
 			Required:     true,
 			Description:  "新增或现有的Pipeline名称(pandora_workflow_name)",
-			CheckRegex:   "^[a-zA-Z_][a-zA-Z0-9_]{0,127}$",
+			CheckRegex:   CheckPattern,
 			ToolTip:      "新增或现有的七牛大数据平台Pipeline名称",
 		},
 		{
