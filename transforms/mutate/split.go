@@ -135,6 +135,7 @@ func (g *Spliter) ConfigOptions() []Option {
 			Placeholder:  "new_field_keyname",
 			DefaultNoUse: true,
 			Description:  "解析后数据的字段名(newfield)",
+			CheckRegex:   CheckPattern,
 			Type:         transforms.TransformTypeString,
 		},
 		{

@@ -89,6 +89,7 @@ var (
 		Placeholder:  "new_field_keyname",
 		DefaultNoUse: false,
 		Description:  "新的字段名(new)",
+		CheckRegex:   CheckPattern,
 		ToolTip:      "生成的字段名称，不改变原有的字段",
 		Type:         TransformTypeString,
 	}
@@ -100,6 +101,7 @@ var (
 		Placeholder:  "new_field_keyname",
 		DefaultNoUse: false,
 		Description:  "新的字段名(new)",
+		CheckRegex:   CheckPattern,
 		ToolTip:      "生成的字段名称，不改变原有的字段",
 		Type:         TransformTypeString,
 	}
