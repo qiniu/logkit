@@ -199,9 +199,9 @@ func (g *Trim) transform(dataPipeline <-chan transforms.TransformInfo, resultCha
 		}
 		switch g.Place {
 		case Prefix:
-			strVal = strings.TrimPrefix(strVal, g.Characters)
+			strVal = strings.TrimLeft(strVal, g.Characters)
 		case Suffix:
-			strVal = strings.TrimSuffix(strVal, g.Characters)
+			strVal = strings.TrimRight(strVal, g.Characters)
 		default:
 			strVal = strings.Trim(strVal, g.Characters)
 		}
