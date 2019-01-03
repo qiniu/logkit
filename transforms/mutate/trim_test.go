@@ -14,7 +14,7 @@ func TestTrimTransformer(t *testing.T) {
 		Characters: "1",
 		Place:      Both,
 	}
-	data, err := tr.Transform([]Data{{"myword": "1hello x1 y2 x1nihao"}, {"myword": "x1x.x.x11"}})
+	data, err := tr.Transform([]Data{{"myword": "1111hello x1 y2 x1nihao"}, {"myword": "x1x.x.x11"}})
 	assert.NoError(t, err)
 	exp := []Data{
 		{"myword": "hello x1 y2 x1nihao"},
@@ -26,7 +26,7 @@ func TestTrimTransformer(t *testing.T) {
 		Characters: "hello",
 		Place:      Prefix,
 	}
-	data, err = tr.Transform([]Data{{"myword": "hello x1 y2 x1nihao"}, {"myword": "x1x.x.x11"}})
+	data, err = tr.Transform([]Data{{"myword": "hellohello x1 y2 x1nihao"}, {"myword": "x1x.x.x11"}})
 	assert.NoError(t, err)
 	exp = []Data{
 		{"myword": " x1 y2 x1nihao"},
@@ -38,7 +38,7 @@ func TestTrimTransformer(t *testing.T) {
 		Characters: "\"",
 		Place:      Suffix,
 	}
-	data, err = tr.Transform([]Data{{"myword": "hello x1 y2 x1nihao"}, {"myword": `x1x.x.x11"`}})
+	data, err = tr.Transform([]Data{{"myword": "hello x1 y2 x1nihao"}, {"myword": `x1x.x.x11"""""`}})
 	assert.NoError(t, err)
 	exp = []Data{
 		{"myword": "hello x1 y2 x1nihao"},
