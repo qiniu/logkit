@@ -277,7 +277,10 @@ var (
 func ResolveRegexpFromConf(confPath, name string) (*regexp.Regexp, error) {
 	f, err := os.Open(confPath)
 	if err != nil {
-		return nil, errors.New("open: " + err.Error())
+		if strings.Contains(confPath, "fakepath") {
+			return nil, errors.New("打开配置文件失败，请指定正则表达式解析")
+		}
+		return nil, err
 	}
 	defer f.Close()
 

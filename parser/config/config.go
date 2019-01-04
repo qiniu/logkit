@@ -178,8 +178,8 @@ var ModeKeyOptions = map[string][]Option{
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
-			Description:  "手动指定正则表达式解析(nginx_log_format_regex)",
-			ToolTip:      "若根据配置文件自动生成的正则表达式无效，可通过此配置手动填写",
+			Description:  "指定正则表达式解析(nginx_log_format_regex)",
+			ToolTip:      "若根据配置文件自动生成的正则表达式无效，可通过此配置修改指定填写",
 		},
 		{
 			KeyName:      NginxSchema,
