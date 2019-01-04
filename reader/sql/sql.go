@@ -123,10 +123,10 @@ type Reader struct {
 	offsetKey       string
 	timestampKey    string
 	timestampKeyInt bool
-	timestampmux    sync.RWMutex
+	timestampMux    sync.RWMutex
 	startTime       time.Time
 	startTimeInt    int64
-	trimecachemap   map[string]string
+	timeCacheMap    map[string]string
 	batchDuration   time.Duration
 	batchDurInt     int
 
@@ -137,7 +137,7 @@ type Reader struct {
 	syncRecords       SyncDBRecords // 将要append的记录
 	doneRecords       SyncDBRecords // 已经读过的记录
 	lastDatabase      string        // 读过的最后一条记录的数据库
-	lastTabel         string        // 读过的最后一条记录的数据表
+	lastTable         string        // 读过的最后一条记录的数据表
 	omitDoneDBRecords bool
 	schemas           map[string]string
 	dbSchema          string
@@ -337,9 +337,9 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 			tm, cache, err := RestoreTimestampIntOffset(r.meta.DoneFilePath)
 			if err == nil {
 				r.startTimeInt = tm
-				r.timestampmux.Lock()
-				r.trimecachemap = cache
-				r.timestampmux.Unlock()
+				r.timestampMux.Lock()
+				r.timeCacheMap = cache
+				r.timestampMux.Unlock()
 			} else {
 				log.Errorf("RestoreTimestampIntOffset err %v", err)
 			}
@@ -347,9 +347,9 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 			tm, cache, err := RestoreTimestampOffset(r.meta.DoneFilePath)
 			if err == nil {
 				r.startTime = tm
-				r.timestampmux.Lock()
-				r.trimecachemap = cache
-				r.timestampmux.Unlock()
+				r.timestampMux.Lock()
+				r.timeCacheMap = cache
+				r.timestampMux.Unlock()
 			} else {
 				log.Errorf("RestoreTimestampOffset err %v", err)
 			}
@@ -363,7 +363,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 			return nil, err
 		}
 
-		r.lastDatabase, r.lastTabel, r.omitDoneDBRecords = r.doneRecords.restoreRecordsFile(r.meta)
+		r.lastDatabase, r.lastTable, r.omitDoneDBRecords = r.doneRecords.restoreRecordsFile(r.meta)
 	}
 
 	// 如果meta初始信息损坏
@@ -522,7 +522,7 @@ func (r *Reader) SyncMeta() {
 		return
 	}
 	if r.timestampKey != "" {
-		r.timestampmux.RLock()
+		r.timestampMux.RLock()
 		var content string
 		if r.timestampKeyInt {
 			content = strconv.FormatInt(r.startTimeInt, 10)
@@ -532,10 +532,10 @@ func (r *Reader) SyncMeta() {
 		if err := WriteTimestmapOffset(r.meta.DoneFilePath, content); err != nil {
 			log.Errorf("Runner[%v] %v SyncMeta WriteTimestmapOffset error %v", r.meta.RunnerName, r.Name(), err)
 		}
-		if err := WriteCacheMap(r.meta.DoneFilePath, r.trimecachemap); err != nil {
+		if err := WriteCacheMap(r.meta.DoneFilePath, r.timeCacheMap); err != nil {
 			log.Errorf("Runner[%v] %v SyncMeta WriteCacheMap error %v", r.meta.RunnerName, r.Name(), err)
 		}
-		r.timestampmux.RUnlock()
+		r.timestampMux.RUnlock()
 	}
 	encodeSQLs := make([]string, 0)
 	for _, sqlStr := range r.syncSQLs {
@@ -1095,7 +1095,7 @@ func (r *Reader) checkExit(idx int, db *sql.DB) (bool, int64) {
 				tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v >= '%s';", rawSQL, r.timestampKey, r.startTime.Format(pgtimeFormat))
 			}
 			largerAmount, err := queryNumber(tsql, db)
-			if err != nil || largerAmount <= int64(len(r.trimecachemap)) {
+			if err != nil || largerAmount <= int64(len(r.timeCacheMap)) {
 				//查询失败或者数据量不变本轮就先退出了
 				return true, -1
 			}
@@ -1107,7 +1107,7 @@ func (r *Reader) checkExit(idx int, db *sql.DB) (bool, int64) {
 				tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v = '%s';", rawSQL, r.timestampKey, r.startTime.Format(pgtimeFormat))
 			}
 			equalAmount, err := queryNumber(tsql, db)
-			if err == nil && equalAmount > int64(len(r.trimecachemap)) {
+			if err == nil && equalAmount > int64(len(r.timeCacheMap)) {
 				//说明还有新数据在原来的时间点，不能退出，且还要再查
 				return false, -1
 			}
@@ -1643,7 +1643,9 @@ func (r *Reader) execReadSql(connectStr, curDB string, idx int, rawSql string, t
 	} else {
 		startTimePrint = r.startTime.String()
 	}
-	log.Infof("Runner[%v] SQL ：<%v> find total  %d data, after trime duplicated, left data is: %d, now we have total got %v data, and start time is %v ", r.meta.RunnerName, execSQL, total, len(alldatas), len(r.trimecachemap), startTimePrint)
+	log.Infof("Runner[%v] SQL: <%v> find total %d data, after trim duplicated, left data is: %d, "+
+		"now we have total got %v data, and start time is %v ",
+		r.meta.RunnerName, execSQL, total, len(alldatas), len(r.timeCacheMap), startTimePrint)
 	if maxOffset > 0 {
 		r.offsets[idx] = maxOffset + 1
 	}
@@ -1709,7 +1711,7 @@ func (r *Reader) checkDoneRecords(target, curDB string) bool {
 
 // 取大于等于 最后一条记录 的数据，结果为 true 为小于或者不符合, false 为大于等于
 func (r *Reader) greaterThanLastRecord(queryType int, target, magicRemainStr string, magicRes *MagicRes) bool {
-	log.Debugf("Runner[%v] current data: %v, last database record: %v, last table record: %v", r.meta.RunnerName, target, r.lastDatabase, r.lastTabel)
+	log.Debugf("Runner[%v] current data: %v, last database record: %v, last table record: %v", r.meta.RunnerName, target, r.lastDatabase, r.lastTable)
 	if magicRes == nil {
 		return true
 	}
@@ -1718,7 +1720,7 @@ func (r *Reader) greaterThanLastRecord(queryType int, target, magicRemainStr str
 	case DATABASE:
 		rawData = r.lastDatabase
 	case TABLE, COUNT:
-		rawData = r.lastTabel
+		rawData = r.lastTable
 	default:
 		return false
 	}

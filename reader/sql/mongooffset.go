@@ -81,9 +81,9 @@ func (r *Reader) updateStartTime(offsetKeyIndex int, scanArgs []interface{}) boo
 		timeOffset, ok := r.getTimeIntFromArgs(offsetKeyIndex, scanArgs)
 		if ok && timeOffset > r.startTimeInt {
 			r.startTimeInt = timeOffset
-			r.timestampmux.Lock()
-			r.trimecachemap = nil
-			r.timestampmux.Unlock()
+			r.timestampMux.Lock()
+			r.timeCacheMap = nil
+			r.timestampMux.Unlock()
 			return true
 		}
 		return false
@@ -91,9 +91,9 @@ func (r *Reader) updateStartTime(offsetKeyIndex int, scanArgs []interface{}) boo
 	timeData, ok := r.getTimeFromArgs(offsetKeyIndex, scanArgs)
 	if ok && timeData.After(r.startTime) {
 		r.startTime = timeData
-		r.timestampmux.Lock()
-		r.trimecachemap = nil
-		r.timestampmux.Unlock()
+		r.timestampMux.Lock()
+		r.timeCacheMap = nil
+		r.timestampMux.Unlock()
 		return true
 	}
 	return false
@@ -108,16 +108,16 @@ func (r *Reader) updateTimeCntFromData(v readInfo) {
 		}
 		if timeData > r.startTimeInt {
 			r.startTimeInt = timeData
-			r.timestampmux.Lock()
-			r.trimecachemap = map[string]string{v.json: "1"}
-			r.timestampmux.Unlock()
+			r.timestampMux.Lock()
+			r.timeCacheMap = map[string]string{v.json: "1"}
+			r.timestampMux.Unlock()
 		} else if timeData == r.startTimeInt {
-			r.timestampmux.Lock()
-			if r.trimecachemap == nil {
-				r.trimecachemap = make(map[string]string)
+			r.timestampMux.Lock()
+			if r.timeCacheMap == nil {
+				r.timeCacheMap = make(map[string]string)
 			}
-			r.trimecachemap[v.json] = "1"
-			r.timestampmux.Unlock()
+			r.timeCacheMap[v.json] = "1"
+			r.timestampMux.Unlock()
 		}
 		return
 	}
@@ -127,16 +127,16 @@ func (r *Reader) updateTimeCntFromData(v readInfo) {
 	}
 	if timeData.After(r.startTime) {
 		r.startTime = timeData
-		r.timestampmux.Lock()
-		r.trimecachemap = map[string]string{v.json: "1"}
-		r.timestampmux.Unlock()
+		r.timestampMux.Lock()
+		r.timeCacheMap = map[string]string{v.json: "1"}
+		r.timestampMux.Unlock()
 	} else if timeData.Equal(r.startTime) {
-		r.timestampmux.Lock()
-		if r.trimecachemap == nil {
-			r.trimecachemap = make(map[string]string)
+		r.timestampMux.Lock()
+		if r.timeCacheMap == nil {
+			r.timeCacheMap = make(map[string]string)
 		}
-		r.trimecachemap[v.json] = "1"
-		r.timestampmux.Unlock()
+		r.timeCacheMap[v.json] = "1"
+		r.timestampMux.Unlock()
 	}
 }
 
@@ -194,12 +194,12 @@ func (r *Reader) trimeExistData(datas []readInfo) []readInfo {
 			continue
 		}
 		if compare == 0 {
-			r.timestampmux.RLock()
+			r.timestampMux.RLock()
 			//判断map去重
-			if _, ok := r.trimecachemap[v.json]; !ok {
+			if _, ok := r.timeCacheMap[v.json]; !ok {
 				newdatas = append(newdatas, v)
 			}
-			r.timestampmux.RUnlock()
+			r.timestampMux.RUnlock()
 		}
 	}
 	return newdatas
