@@ -924,6 +924,10 @@ func convertDatas(datas Datas) []map[string]interface{} {
 func (c *Pipeline) PostDataSchemaFree(input *SchemaFreeInput) (newSchemas map[string]RepoSchemaEntry, err error) {
 	contexts, err := c.unpack(input)
 	if err != nil {
+		if reqErr, ok := err.(*reqerr.RequestError); ok && reqErr.ErrorType == reqerr.InvalidArgs {
+			err = reqerr.NewSendError("Cannot send data to pandora, "+err.Error(), convertDatas(input.Datas), reqerr.TypeContainInvalidPoint)
+			return
+		}
 		err = reqerr.NewSendError("Cannot send data to pandora, "+err.Error(), convertDatas(input.Datas), reqerr.TypeDefault)
 		return
 	}

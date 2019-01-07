@@ -575,6 +575,7 @@ func PandoraKey(key string) (string, bool) {
 		return "KEmptyPandoraAutoAdd", false
 	}
 
+	lastInderlineIndex := -1
 	for idx, c := range key {
 		if c >= '0' && c <= '9' {
 			size++
@@ -586,6 +587,12 @@ func PandoraKey(key string) (string, bool) {
 		}
 		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
 			size++
+			continue
+		}
+
+		if c == '_' && idx == lastInderlineIndex+1 {
+			valid = false
+			lastInderlineIndex++
 			continue
 		}
 
@@ -604,6 +611,8 @@ func PandoraKey(key string) (string, bool) {
 	// set
 	bytes := make([]byte, size)
 	bp := 0
+	lastBeReplace := false
+	key = key[(lastInderlineIndex + 1):]
 	for idx, c := range key {
 		if c >= '0' && c <= '9' {
 			if idx == 0 {
@@ -612,20 +621,31 @@ func PandoraKey(key string) (string, bool) {
 			}
 			bytes[bp] = byte(c)
 			bp++
+			lastBeReplace = false
 			continue
 		}
 		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
 			bytes[bp] = byte(c)
 			bp++
+			lastBeReplace = false
 			continue
 		}
 
-		if bp > 0 {
+		if c == '_' && bp > 0 {
+			bytes[bp] = byte(c)
+			bp++
+			lastBeReplace = false
+			continue
+		}
+
+		// 前一个字符被替换为 '_' 则当前字符不用 '_' 替换
+		if bp > 0 && (!lastBeReplace) {
 			bytes[bp] = '_'
+			lastBeReplace = true
 			bp++
 		}
 	}
-	return string(bytes), valid
+	return string(bytes[:bp]), valid
 }
 
 func getDepthIndent(depth int, indent string) (ds string) {

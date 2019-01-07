@@ -904,7 +904,7 @@ func Test_DeepConvertKey(t *testing.T) {
 	}
 	expectDatas := []map[string]interface{}{
 		{
-			"a_____b": "a.....b",
+			"a_b": "a.....b",
 			"b":       true,
 		},
 		{
@@ -912,8 +912,8 @@ func Test_DeepConvertKey(t *testing.T) {
 			"abc": "abc",
 		},
 		{
-			"a": Data{"a__b__": "a-=b++"},
-			"b": Data{"ab": map[string]interface{}{"abc__": "abc++"}},
+			"a": Data{"a_b_": "a-=b++"},
+			"b": Data{"ab": map[string]interface{}{"abc_": "abc++"}},
 		},
 		{
 			"a": map[string]interface{}{"b_1": 123},
