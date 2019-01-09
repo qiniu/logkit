@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/axgle/mahonia"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/logkit/conf"
@@ -27,6 +28,7 @@ func TestUdpSocketReader(t *testing.T) {
 		KeyRunnerName:           "TestUdpSocketReader",
 		KeyMode:                 ModeSocket,
 		KeySocketServiceAddress: "udp://127.0.0.1:5140",
+		KeyEncoding:             "gbk",
 	}
 	meta, err := reader.NewMetaWithConf(logkitConf)
 	assert.NoError(t, err)
@@ -44,14 +46,16 @@ func TestUdpSocketReader(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = sysLog.Emerg("And this is a daemon emergency with demotag.")
+	decoder := mahonia.NewEncoder("gbk")
+	encodingConent := decoder.ConvertString("And this is a daemon emergency with demotag. 中文")
+	err = sysLog.Emerg(encodingConent)
 	assert.NoError(t, err)
 	err = sysLog.Emerg("this is OK")
 	assert.NoError(t, err)
 	time.Sleep(30 * time.Millisecond)
 	line, err := sr.ReadLine()
 	assert.NoError(t, err)
-	assert.Contains(t, line, "And this is a daemon emergency with demotag.")
+	assert.Contains(t, line, "And this is a daemon emergency with demotag. 中文")
 	assert.Contains(t, sr.Source(), "127.0.0.1")
 	line, err = sr.ReadLine()
 	assert.NoError(t, err)
@@ -152,6 +156,7 @@ func TestTCPSocketReaderWithSplit(t *testing.T) {
 		KeyMode:                 ModeSocket,
 		KeySocketServiceAddress: "tcp://127.0.0.1:5141",
 		KeySocketSplitByLine:    "true",
+		KeyEncoding:             "GBK",
 	}
 	meta, err := reader.NewMetaWithConf(logkitConf)
 	assert.NoError(t, err)
@@ -168,16 +173,19 @@ func TestTCPSocketReaderWithSplit(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = sysLog.Emerg("And this is a daemon emergency with demotag.\n \nthis is OK")
+
+	decoder := mahonia.NewEncoder("gbk")
+	encodingConent := decoder.ConvertString("And this is a daemon emergency with demotag 中 文.\n \nthis is OK 中 文")
+	err = sysLog.Emerg(encodingConent)
 	assert.NoError(t, err)
 	time.Sleep(30 * time.Millisecond)
 	line, err := sr.ReadLine()
 	assert.NoError(t, err)
-	assert.Contains(t, line, "And this is a daemon emergency with demotag.")
+	assert.Contains(t, line, "And this is a daemon emergency with demotag 中 文.")
 	assert.Contains(t, sr.Source(), "127.0.0.1")
 	line, err = sr.ReadLine()
 	assert.NoError(t, err)
-	assert.Contains(t, line, "this is OK")
+	assert.Contains(t, line, "this is OK 中 文")
 	assert.Contains(t, sr.Source(), "127.0.0.1")
 
 	err = sr.Close()

@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/axgle/mahonia"
 	"github.com/json-iterator/go"
 
 	"github.com/qiniu/log"
@@ -334,6 +335,7 @@ type Reader struct {
 	IsSplitByLine   bool
 	SocketRule      string
 	HeadPattern     *regexp.Regexp
+	decoder         mahonia.Decoder
 
 	closer io.Closer
 }
@@ -368,6 +370,15 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 			return nil, err
 		}
 	}
+	var decoder mahonia.Decoder
+	encoding, _ := conf.GetStringOr(KeyEncoding, "")
+	encoding = strings.ToUpper(encoding)
+	if encoding != "UTF-8" {
+		decoder = mahonia.NewDecoder(encoding)
+		if decoder == nil {
+			log.Warnf("Encoding Way [%v] is not supported, will read as utf-8", encoding)
+		}
+	}
 	return &Reader{
 		meta:            meta,
 		status:          StatusInit,
@@ -382,6 +393,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		IsSplitByLine:   IsSplitByLine,
 		SocketRule:      socketRule,
 		HeadPattern:     headPattern,
+		decoder:         decoder,
 	}, nil
 }
 
@@ -508,13 +520,28 @@ func (r *Reader) ReadLine() (string, error) {
 	select {
 	case info := <-r.readChan:
 		r.sourceIp = info.address
-		return info.data, nil
+		return r.readString(info.data), nil
 	case err := <-r.errChan:
 		return "", err
 	case <-timer.C:
 	}
 
 	return "", r.FetchInitError()
+}
+
+// ReadString reads until the first occurrence of delim in the input,
+// returning a string containing the data up to and including the delimiter.
+// If ReadString encounters an error before finding a delimiter,
+// it returns the data read before the error and the error itself (often io.EOF).
+// ReadString returns err != nil if and only if the returned data does not end in
+// delim.
+// For simple uses, a Scanner may be more convenient.
+func (r *Reader) readString(ret string) string {
+	//默认都是utf-8
+	if r.decoder != nil {
+		ret = r.decoder.ConvertString(ret)
+	}
+	return ret
 }
 
 func (r *Reader) SyncMeta() {
