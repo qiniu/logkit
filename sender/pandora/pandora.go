@@ -1001,6 +1001,7 @@ func (s *Sender) rawSend(datas []Data) (se error) {
 				RemainDatas: datas[idx:],
 			}
 		}
+		defer client.Close()
 
 		err = client.PostDataFromBytes(&pipeline.PostDataFromBytesInput{RepoName: repoName, Buffer: raw})
 		if err != nil {
