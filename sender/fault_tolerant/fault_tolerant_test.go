@@ -2,6 +2,7 @@ package fault_tolerant
 
 import (
 	"fmt"
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -181,6 +182,76 @@ func TestFtDiscardLast(t *testing.T) {
 	assert.Equal(t, 7, p.DumpDataNum)
 	p.SetMux.Unlock()
 }
+
+func TestInvalidData(t *testing.T) {
+	p, pt := mock_pandora.NewMockPandoraWithPrefix("/v2")
+	pandoraSenderConfig := conf.MapConf{
+		"name":                           "p",
+		"pandora_region":                 "nb",
+		"pandora_host":                   "http://127.0.0.1:" + pt,
+		"pandora_schema":                 "",
+		"pandora_auto_create":            "",
+		"pandora_schema_free":            "true",
+		"pandora_ak":                     "ak",
+		"pandora_sk":                     "sk",
+		"pandora_schema_update_interval": "1",
+		"pandora_gzip":                   "false",
+
+		"sender_type": "pandora",
+	}
+	pandoraSenderConfig["pandora_repo_name"] = "TestFtSender"
+	s, err := pandora.NewSender(pandoraSenderConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mp := conf.MapConf{}
+	mp[KeyFtSaveLogPath] = fttestdir
+	mp[KeyFtStrategy] = KeyFtStrategyBackupOnly
+	mp[KeyFtDiscardErr] = "true"
+	defer os.RemoveAll(fttestdir)
+	fts, err := sender.NewFtSender(s, mp, fttestdir)
+	assert.NoError(t, err)
+	datas := []Data{
+		{"test1": "11111"},
+		{"b": "22222"},
+		{"ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc": "33333"},
+		{"ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd": "long key"},
+	}
+	err = fts.Send(datas)
+	se, ok := err.(*StatsError)
+	if !ok {
+		t.Fatal("ft send return error should .(*StatsError)")
+	}
+	assert.NotEmpty(t, se.LastError)
+	assert.NotNil(t, se.SendError)
+	if se.SendError != nil{
+		assert.Equal(t, reqerr.TypeContainInvalidPoint, se.SendError.ErrorType)
+	}
+	time.Sleep(5 * time.Second)
+	//get three records
+	p.SetMux.Lock()
+	assert.Equal(t, 4, p.DumpDataNum)
+	p.SetMux.Unlock()
+
+	mp2 := conf.MapConf{}
+	mp2[KeyFtSaveLogPath] = fttestdir
+	mp2[KeyFtStrategy] = KeyFtStrategyBackupOnly
+	mp2[KeyFtDiscardErr] = "false"
+	fts2, err := sender.NewFtSender(s, mp2, fttestdir)
+	err = fts2.Send(datas)
+	se, ok = err.(*StatsError)
+	if !ok {
+		t.Fatal("ft send return error should .(*StatsError)")
+	}
+	assert.NotEmpty(t, se.LastError)
+	assert.NotNil(t, se.SendError)
+	time.Sleep(5 * time.Second)
+	//get four records
+	p.SetMux.Lock()
+	assert.Equal(t, 8, p.DumpDataNum)
+	p.SetMux.Unlock()
+}
+
 
 func TestFtMemorySender(t *testing.T) {
 	_, pt := mock_pandora.NewMockPandoraWithPrefix("/v2")

@@ -617,12 +617,16 @@ func (ft *FtSender) handleRawSendError(err error, datas []string) (retDatasConte
 			failCtx.Lines = datas
 		} else {
 			failCtx.Lines = datas
-			if se.SendError.ErrorType == reqerr.TypeBinaryUnpack {
+			switch se.SendError.ErrorType {
+			case reqerr.TypeBinaryUnpack:
 				binaryUnpack = true
 				errMessage = "error type is binaryUnpack, will be divided to 2 parts and retry"
-			} else if se.SendError.ErrorType == reqerr.TypeSchemaFreeRetry {
+			case reqerr.TypeSchemaFreeRetry:
 				errMessage = "maybe this is because of server schema cache, will send all data again"
-			} else {
+			case reqerr.TypeContainInvalidPoint:
+				binaryUnpack = true
+				errMessage = "error type is invalidPoint, all failed data will be divided to 2 parts and retry"
+			default:
 				errMessage = "error type is default, will send all failed data again"
 			}
 		}
