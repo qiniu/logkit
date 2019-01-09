@@ -101,7 +101,7 @@ var (
 		DefaultNoUse: false,
 		Description:  "编码方式(encoding)",
 		Advance:      true,
-		ToolTip:      "读取日志文件的编码方式，默认为UTF-8，即按照UTF-8的编码方式读取文件",
+		ToolTip:      "读取日志的编码方式，默认为UTF-8，即按照UTF-8的编码方式读取文件",
 	}
 	OptionWhence = Option{
 		KeyName:       KeyWhence,
@@ -1093,6 +1093,7 @@ var ModeKeyOptions = map[string][]Option{
 			Description:   "获取方式(socket_rule)",
 			ToolTip:       "默认对socket内容按包获取, json仅对tcp有效",
 		},
+		OptionEncoding,
 		//{
 		//	KeyName:            KeySocketRuleHeadPattern,
 		//	ChooseOnly:         false,
