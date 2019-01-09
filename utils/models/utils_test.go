@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -589,7 +590,9 @@ func Test_ConvertDate(t *testing.T) {
 
 	date, err = ConvertDate("", "", 0, time.UTC, "Feb 05 01:02:03")
 	assert.NoError(t, err)
-	assert.Equal(t, "0000-02-05T01:02:03Z", date)
+	year := strconv.Itoa(time.Now().Year())
+	expect = strings.Replace("0000-02-05T01:02:03Z", "0000", year, -1)
+	assert.Equal(t, expect, date)
 
 	date, err = ConvertDate("", "", 0, time.UTC, "19/Aug/2000:14:47:37 -0400")
 	assert.NoError(t, err)
@@ -620,7 +623,9 @@ func Test_FormatWithUserOption(t *testing.T) {
 	ti, err := times.StrToTime("Feb 05 01:02:03")
 	assert.NoError(t, err)
 	date := FormatWithUserOption("", 0, ti)
-	assert.Equal(t, "0000-02-05T01:02:03Z", date)
+	year := strconv.Itoa(time.Now().Year())
+	expect := strings.Replace("0000-02-05T01:02:03Z", "0000", year, -1)
+	assert.Equal(t, expect, date)
 
 	ti, err = time.Parse("20060102150405", "20180204221045")
 	assert.NoError(t, err)
@@ -632,6 +637,15 @@ func Test_FormatWithUserOption(t *testing.T) {
 
 	date = FormatWithUserOption("", 0, ti)
 	assert.Equal(t, ti.Format(time.RFC3339Nano), date)
+}
+
+// Benchmark_FormatWithUserOption-4   	 3000000	       488 ns/op	      48 B/op	       2 allocs/op
+func Benchmark_FormatWithUserOption(b *testing.B) {
+	ti, _ := times.StrToTime("Feb 05 01:02:03")
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		FormatWithUserOption("", 0, ti)
+	}
 }
 
 func getTime(tiTmp int64) (ti time.Time, err error) {
@@ -905,7 +919,7 @@ func Test_DeepConvertKey(t *testing.T) {
 	expectDatas := []map[string]interface{}{
 		{
 			"a_b": "a.....b",
-			"b":       true,
+			"b":   true,
 		},
 		{
 			"a_b": []string{"a", "b", "....a+b"},
