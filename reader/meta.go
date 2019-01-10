@@ -141,15 +141,6 @@ func NewMeta(metadir, filedonedir, logpath, mode, tagfile string, donefileRetent
 	}, nil
 }
 
-func getLogPathAbs(conf conf.MapConf) (logpath string, err error) {
-	logpath, err = conf.GetString(KeyLogPath)
-	if err != nil {
-		err = fmt.Errorf("get logpath in new meta error %v", err)
-		return
-	}
-	return filepath.Abs(logpath)
-}
-
 func getTagFileAbs(conf conf.MapConf) (tagfile string, err error) {
 	tagfile, _ = conf.GetStringOr(KeyTagFile, "")
 	if tagfile != "" {
@@ -160,30 +151,21 @@ func getTagFileAbs(conf conf.MapConf) (tagfile string, err error) {
 
 func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 	runnerName, _ := conf.GetStringOr(KeyRunnerName, "UndefinedRunnerName")
-	mode, _ := conf.GetStringOr(KeyMode, ModeDir)
-	logPath, err := getLogPathAbs(conf)
-	if err != nil && (mode == ModeDir || mode == ModeFile) {
-		return
+	mode, logPath, metaPath, err := GetMetaOption(conf)
+	if err != nil {
+		return nil, err
 	}
-	err = nil
 	tagFile, err := getTagFileAbs(conf)
 	if err != nil {
 		return
 	}
-	metapath, _ := conf.GetStringOr(KeyMetaPath, "")
-	if metapath == "" {
-		runnerName, _ := conf.GetString(GlobalKeyName)
-		base := filepath.Base(logPath)
-		metapath = "meta/" + runnerName + "_" + Hash(base)
-		log.Debugf("Runner[%v] Using %s as default metaPath", runnerName, metapath)
-	}
 	datasourceTag, _ := conf.GetStringOr(KeyDataSourceTag, "")
-	filedonepath, _ := conf.GetStringOr(KeyFileDone, metapath)
+	filedonepath, _ := conf.GetStringOr(KeyFileDone, metaPath)
 	donefileRetention, _ := conf.GetIntOr(doneFileRetention, DefautFileRetention)
 	readlimit, _ := conf.GetIntOr(KeyReadIOLimit, defaultIOLimit)
-	meta, err = NewMeta(metapath, filedonepath, logPath, mode, tagFile, donefileRetention)
+	meta, err = NewMeta(metaPath, filedonepath, logPath, mode, tagFile, donefileRetention)
 	if err != nil {
-		log.Warnf("Runner[%v] %s - newMeta failed, err:%v", runnerName, metapath, err)
+		log.Warnf("Runner[%v] %s - newMeta failed, err:%v", runnerName, metaPath, err)
 		return
 	}
 	extrainfo, _ := conf.GetBoolOr(ExtraInfo, false)
@@ -727,41 +709,33 @@ func (m *Meta) GetTags() map[string]interface{} {
 
 func (m *Meta) Reset() error {
 	if m == nil {
-		return errors.New("Reset error as meta is nil")
+		return errors.New("Reset error as meta is nil ")
 	}
-	if err := os.RemoveAll(m.statisticPath); err != nil {
+	if err := m.Delete(); err != nil {
 		return err
 	}
-	if err := os.RemoveAll(m.metaFilePath); err != nil {
-		return err
-	}
-	// DoneFilePath 默认为 meta 文件夹，不能直接删除
-	files, err := ioutil.ReadDir(m.DoneFilePath)
-	if err != nil && os.IsNotExist(err) {
-		return nil
-	} else if err != nil {
-		return err
-	}
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		} else if strings.HasPrefix(file.Name(), DoneFileName) {
-			if err := os.RemoveAll(filepath.Join(m.DoneFilePath, file.Name())); err != nil {
-				return err
-			}
-		}
+
+	return nil
+}
+
+func (m *Meta) Delete() error {
+	if m == nil {
+		return errors.New("Delete error as meta is nil ")
 	}
 
 	m.subMetaLock.RLock()
-	defer m.subMetaLock.RUnlock()
-
 	for key, mv := range m.subMetas {
-		err := mv.Reset()
+		err := mv.Delete()
 		if err != nil {
-			log.Errorf("reset sub meta %v err %v", key, err)
-			//出错继续reset
+			log.Errorf("delete sub meta %v err %v", key, err)
+			//出错继续 delete
 			continue
 		}
+	}
+	m.subMetaLock.RUnlock()
+
+	if err := os.RemoveAll(m.Dir); err != nil {
+		return err
 	}
 	return nil
 }
@@ -796,4 +770,29 @@ func checkRecordsFile(doneFiles []File, recordsFile string) bool {
 	}
 
 	return false
+}
+
+func GetLogPathAbs(conf conf.MapConf) (logpath string, err error) {
+	logpath, err = conf.GetString(KeyLogPath)
+	if err != nil {
+		err = fmt.Errorf("get logpath in new meta error %v", err)
+		return
+	}
+	return filepath.Abs(logpath)
+}
+
+func GetMetaOption(conf conf.MapConf) (string, string, string, error) {
+	mode, _ := conf.GetStringOr(KeyMode, ModeDir)
+	logPath, err := GetLogPathAbs(conf)
+	if err != nil && (mode == ModeDir || mode == ModeFile) {
+		return mode, logPath, "", err
+	}
+	metaPath, _ := conf.GetStringOr(KeyMetaPath, "")
+	if metaPath == "" {
+		runnerName, _ := conf.GetString(GlobalKeyName)
+		base := filepath.Base(logPath)
+		metaPath = "meta/" + runnerName + "_" + Hash(base)
+		log.Debugf("Runner[%v] Using %s as default metaPath", runnerName, metaPath)
+	}
+	return mode, logPath, metaPath, nil
 }

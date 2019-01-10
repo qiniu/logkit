@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/json-iterator/go"
+
 	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/conf"
@@ -423,6 +424,13 @@ func (mr *MetricRunner) Reset() (err error) {
 		err = errors.New(errMsg)
 	}
 	return err
+}
+
+func (mr *MetricRunner) Delete() (err error) {
+	if err = mr.meta.Delete(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (_ *MetricRunner) Cleaner() CleanInfo {

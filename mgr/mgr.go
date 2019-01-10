@@ -690,18 +690,18 @@ func (m *Manager) getDeepCopyConfig(name string) (filename string, conf RunnerCo
 		return name, RunnerConfig{}, errors.New("runner " + name + " not found")
 	}
 	conf, err = m.getDeepCopyConfigWithFilename(filename)
-	return
+	return filename, conf, err
 }
 
 func (m *Manager) getDeepCopyConfigWithFilename(filename string) (conf RunnerConfig, err error) {
 	m.runnerLock.RLock()
 	defer m.runnerLock.RUnlock()
-	if tmpConf, ok := m.runnerConfigs[filename]; !ok {
-		err = fmt.Errorf("runner %v is not found", filename)
-	} else {
-		utils.DeepCopyByJSON(&conf, &tmpConf)
+	tmpConf, ok := m.runnerConfigs[filename]
+	if !ok {
+		return RunnerConfig{}, fmt.Errorf("runner %v is not found", filename)
 	}
-	return
+	utils.DeepCopyByJSON(&conf, &tmpConf)
+	return conf, nil
 }
 
 // TrimSecretInfo 将配置文件中的 token 等鉴权相关信息去掉
@@ -1011,22 +1011,27 @@ func (m *Manager) DeleteRunner(name string) (err error) {
 		if err = m.Remove(filename); err != nil {
 			return fmt.Errorf("remove runner %v error %v", filename, err)
 		}
-		if runnerReset, ok := r.(Resetable); ok {
-			runnerReset.Reset()
+		if runnerDelete, ok := r.(Deleteable); ok {
+			runnerDelete.Delete()
+		}
+	} else {
+		if err = deleteStopRunner(filename, conf); err != nil {
+			return err
 		}
 	}
+
 	if err = os.Remove(filename); err != nil {
 		if os.IsNotExist(err) {
-			err = nil
-			return
+			return nil
 		}
 		// 回滚
 		if subErr := m.ForkRunner(filename, conf, true); subErr != nil {
-			log.Errorf("remove runner %v error and rollback error %v", filename, subErr)
+			log.Errorf("remove runner %s error and rollback error %v", filename, subErr)
 		}
-		return fmt.Errorf("remove runner %v error %v", filename, err)
+		return fmt.Errorf("remove runner %s error %v", filename, err)
 	}
-	return
+
+	return nil
 }
 
 func (m *Manager) GetRunnerNames() []string {
@@ -1076,5 +1081,25 @@ func (m *Manager) stopRunner(filename string, conf RunnerConfig) error {
 	}
 	m.setRunnerConfig(filename, conf)
 
+	return nil
+}
+
+func deleteStopRunner(confPath string, conf RunnerConfig) error {
+	cf := conf.ReaderConfig
+	if conf.MetricConfig != nil {
+		cf = config.MapConf{
+			GlobalKeyName: conf.RunnerName,
+			KeyRunnerName: conf.RunnerName,
+			KeyMode:       reader.ModeMetrics,
+		}
+	}
+	_, _, metaPath, err := reader.GetMetaOption(cf)
+	if err != nil {
+		return err
+	}
+
+	if err = os.RemoveAll(metaPath); err != nil {
+		return fmt.Errorf("remove runner %s error %v", confPath, err)
+	}
 	return nil
 }

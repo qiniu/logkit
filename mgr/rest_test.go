@@ -27,6 +27,7 @@ import (
 	. "github.com/qiniu/logkit/parser/config"
 	"github.com/qiniu/logkit/reader/config"
 	"github.com/qiniu/logkit/router"
+	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -282,6 +283,7 @@ func TestWebRest(t *testing.T) {
 		t.Error(err)
 	}
 	dirName := "testWebRest"
+	defer os.RemoveAll(dirName)
 	confDirName := "confs"
 	webConfDirName := "webConfs"
 	rootDir := filepath.Join(pwd, dirName)
@@ -349,6 +351,7 @@ func restGetFailedDataStatusTest(p *testParam) {
 	rs := p.rs
 	runnerName := "restGetFailedDataStatusTest"
 	dir := runnerName + "Dir"
+	defer os.RemoveAll(dir)
 	testDir := filepath.Join(rd, dir)
 	logDir := filepath.Join(testDir, "logdir")
 	metaDir := filepath.Join(testDir, "meta")
@@ -408,6 +411,7 @@ func restGetStatusTest(p *testParam) {
 	resvName := "sendData"
 	runnerName := "restGetStatusTest"
 	dir := runnerName + "Dir"
+	defer os.RemoveAll(dir)
 	testDir := filepath.Join(rd, dir)
 	logDir := filepath.Join(testDir, "logdir")
 	metaDir := filepath.Join(testDir, "meta")
@@ -463,6 +467,7 @@ func restCRUDTest(p *testParam) {
 	resvName1 := "sendData1"
 	resvName2 := "sendData2"
 	dir := "restCRUDTestDir"
+	defer os.RemoveAll(dir)
 	runnerName1 := "restCrud1"
 	runnerName2 := "restCrud2"
 	testDir := filepath.Join(rd, dir)
@@ -608,6 +613,7 @@ func restCRUDTest(p *testParam) {
 	gotUpdate = respGotUpdate.Data
 	assert.Equal(t, mode, gotUpdate.ReaderConfig["mode"])
 	assert.Equal(t, logPath1, gotUpdate.ReaderConfig["log_path"])
+	assert.True(t, utils.IsExist(metaDir))
 
 	// DELETE runner2
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName2
@@ -615,6 +621,7 @@ func restCRUDTest(p *testParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	time.Sleep(3 * time.Second)
+	assert.False(t, utils.IsExist(metaDir))
 
 	// get runner2
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName2
@@ -658,6 +665,7 @@ func runnerResetTest(p *testParam) {
 	resvName := "sendData"
 	runnerName := "runnerReset"
 	dir := runnerName + "Dir"
+	defer os.RemoveAll(dir)
 	testDir := filepath.Join(rd, dir)
 	logDir := filepath.Join(testDir, "logdir")
 	metaDir := filepath.Join(testDir, "meta")
@@ -778,6 +786,7 @@ func runnerStopStartTest(p *testParam) {
 	resvName := "sendData"
 	runnerName := "runnerStopStartTest"
 	dir := runnerName + "Dir"
+	defer os.RemoveAll(dir)
 	testDir := filepath.Join(rd, dir)
 	logDir := filepath.Join(testDir, "logdir")
 	metaDir := filepath.Join(testDir, "meta")
@@ -865,6 +874,20 @@ func runnerStopStartTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusBadRequest, respCode)
+	assert.True(t, utils.IsExist(metaDir))
+
+	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName + "/stop"
+	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(3 * time.Second)
+
+	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName
+	respCode, respBody, err = makeRequest(url, http.MethodDelete, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(3 * time.Second)
+	assert.False(t, utils.IsExist(metaDir))
 }
 
 func runnerDataIntegrityTest(p *testParam) {
@@ -876,6 +899,7 @@ func runnerDataIntegrityTest(p *testParam) {
 	resvName := "sendData"
 	runnerName := "runnerDataIntegrityTest"
 	dir := runnerName + "Dir"
+	defer os.RemoveAll(dir)
 	testDir := filepath.Join(rd, dir)
 	logDir := filepath.Join(testDir, "logdir")
 	metaDir := filepath.Join(testDir, "meta")
@@ -1013,6 +1037,7 @@ func getRunnersTest(p *testParam) {
 	runnerName1 := "getRunnersTest1"
 	runnerName2 := "getRunnersTest2"
 	dir := "getRunnersTestDir"
+	defer os.RemoveAll(dir)
 	testDir := filepath.Join(rd, dir)
 	logDir := filepath.Join(testDir, "logdir")
 	metaDir := filepath.Join(testDir, "meta")
@@ -1095,6 +1120,7 @@ func senderRouterTest(p *testParam) {
 	resvName3 := "sendData3"
 	runnerName := "senderRouter"
 	dir := runnerName + "Test"
+	defer os.RemoveAll(dir)
 	testDir := filepath.Join(rd, dir)
 	logDir := filepath.Join(testDir, "logdir")
 	metaDir := filepath.Join(testDir, "meta")

@@ -11,14 +11,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/json-iterator/go"
+	"github.com/labstack/echo"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/metric/curl"
 	"github.com/qiniu/logkit/metric/system"
 	senderConf "github.com/qiniu/logkit/sender/config"
-
-	"github.com/json-iterator/go"
-	"github.com/labstack/echo"
-	"github.com/stretchr/testify/assert"
+	"github.com/qiniu/logkit/utils"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 const (
@@ -193,6 +195,9 @@ func metricRunTest(p *testParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 	time.Sleep(3 * time.Second)
+	base := filepath.Base("")
+	metaPath := "meta/" + runnerName + "_" + Hash(base)
+	assert.True(t, utils.IsExist(metaPath))
 
 	// 停止 runner
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName + "/stop"
@@ -220,6 +225,14 @@ func metricRunTest(p *testParam) {
 		assert.Equal(t, len(cpuAttr)/2, len(result[0])) //cpu_usage_guest_nice为false
 		curLine++
 	}
+
+	// 删除 runner
+	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName
+	respCode, respBody, err = makeRequest(url, http.MethodDelete, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	time.Sleep(2 * time.Second)
+	assert.False(t, utils.IsExist(metaPath))
 }
 
 func metricNetTest(p *testParam) {
