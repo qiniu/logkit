@@ -426,7 +426,7 @@ func (rs *RestService) PostConfigStop() echo.HandlerFunc {
 	}
 }
 
-// delete /logkit/configs/<name>
+// Delete /logkit/configs/<name>
 func (rs *RestService) DeleteConfig() echo.HandlerFunc {
 	return func(c echo.Context) (err error) {
 		var name string

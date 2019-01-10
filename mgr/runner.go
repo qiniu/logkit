@@ -73,6 +73,11 @@ type StatusPersistable interface {
 	StatusRestore()
 }
 
+var (
+	_ Resetable  = &LogExportRunner{}
+	_ Deleteable = &LogExportRunner{}
+)
+
 type LogExportRunner struct {
 	RunnerInfo
 
@@ -1067,6 +1072,7 @@ func (r *LogExportRunner) Reset() (err error) {
 			errMsg += subErr.Error() + "\n"
 		}
 	}
+
 	if err = r.meta.Reset(); err != nil {
 		errMsg += err.Error() + "\n"
 	}
@@ -1082,6 +1088,13 @@ func (r *LogExportRunner) Reset() (err error) {
 		err = errors.New(errMsg)
 	}
 	return err
+}
+
+func (r *LogExportRunner) Delete() (err error) {
+	if err = r.meta.Delete(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *LogExportRunner) Cleaner() CleanInfo {
