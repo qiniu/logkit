@@ -192,6 +192,7 @@ func multiReaderMultiLineTest(t *testing.T) {
 	dir2 := filepath.Join(dirname, "xyz")
 	dir1file1 := filepath.Join(dir1, "file1.log")
 	dir1file2 := filepath.Join(dir1, "file2.log")
+	dir1file3 := filepath.Join(dir1, "file3.log")
 	dir2file1 := filepath.Join(dir2, "file1.log")
 
 	createDirWithName(dirname)
@@ -201,6 +202,7 @@ func multiReaderMultiLineTest(t *testing.T) {
 	createDirWithName(dir2)
 	createFileWithContent(dir1file1, "abc123\nabc123\nabc123\nabc123\nabc123\n")
 	createFileWithContent(dir1file2, "abc456\n789\nabc456\n789\n")
+	createFileWithContent(dir1file3, "abc456\n789\nabc456\n789\n")
 	expresult := map[string]int{
 		"abc123\n":      5,
 		"abc456\n789\n": 2,
@@ -208,8 +210,10 @@ func multiReaderMultiLineTest(t *testing.T) {
 	}
 	resultmap := make(map[string]int)
 	logPathPattern := filepath.Join(filepath.Join(dirname, "*"), "*.log")
+	ignoreLogPathPattern := filepath.Join(filepath.Join(dirname, "*"), "*3.log")
 	c := conf.MapConf{
 		"log_path":        logPathPattern,
+		"ignore_log_path": ignoreLogPathPattern,
 		"meta_path":       dirname,
 		"mode":            ModeTailx,
 		"sync_every":      "1",

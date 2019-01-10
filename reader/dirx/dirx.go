@@ -55,18 +55,19 @@ type Reader struct {
 	dirReaders  *dirReaders
 
 	// 以下为传入参数
-	logPathPattern     string
-	statInterval       time.Duration
-	expire             time.Duration
-	submetaExpire      time.Duration
-	maxOpenFiles       int
-	ignoreHidden       bool
-	skipFirstLine      bool
-	newFileNewLine     bool
-	ignoreFileSuffixes []string
-	validFilesRegex    string
-	whence             string
-	bufferSize         int
+	logPathPattern       string
+	ignoreLogPathPattern string
+	statInterval         time.Duration
+	expire               time.Duration
+	submetaExpire        time.Duration
+	maxOpenFiles         int
+	ignoreHidden         bool
+	skipFirstLine        bool
+	newFileNewLine       bool
+	ignoreFileSuffixes   []string
+	validFilesRegex      string
+	whence               string
+	bufferSize           int
 
 	notFirstTime  bool
 	readSameInode bool
@@ -77,6 +78,8 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	ignoreLogPathPattern, _ := conf.GetStringOr(KeyIgnoreLogPath, "")
 
 	statIntervalDur, _ := conf.GetStringOr(KeyStatInterval, "3m")
 	statInterval, err := time.ParseDuration(statIntervalDur)
@@ -138,25 +141,26 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	}
 
 	return &Reader{
-		meta:               meta,
-		status:             StatusInit,
-		stopChan:           make(chan struct{}),
-		msgChan:            make(chan message),
-		errChan:            make(chan error),
-		dirReaders:         newDirReaders(meta, expire, cachedLines),
-		logPathPattern:     strings.TrimSuffix(logPathPattern, "/"),
-		statInterval:       statInterval,
-		expire:             expire,
-		submetaExpire:      submetaExpire,
-		maxOpenFiles:       maxOpenFiles,
-		ignoreHidden:       ignoreHidden,
-		skipFirstLine:      skipFirstLine,
-		newFileNewLine:     newFileNewLine,
-		ignoreFileSuffixes: ignoreFileSuffixes,
-		validFilesRegex:    validFilesRegex,
-		whence:             whence,
-		bufferSize:         bufferSize,
-		readSameInode:      readSameInode,
+		meta:                 meta,
+		status:               StatusInit,
+		stopChan:             make(chan struct{}),
+		msgChan:              make(chan message),
+		errChan:              make(chan error),
+		dirReaders:           newDirReaders(meta, expire, cachedLines),
+		logPathPattern:       strings.TrimSuffix(logPathPattern, "/"),
+		ignoreLogPathPattern: strings.TrimSuffix(ignoreLogPathPattern, "/"),
+		statInterval:         statInterval,
+		expire:               expire,
+		submetaExpire:        submetaExpire,
+		maxOpenFiles:         maxOpenFiles,
+		ignoreHidden:         ignoreHidden,
+		skipFirstLine:        skipFirstLine,
+		newFileNewLine:       newFileNewLine,
+		ignoreFileSuffixes:   ignoreFileSuffixes,
+		validFilesRegex:      validFilesRegex,
+		whence:               whence,
+		bufferSize:           bufferSize,
+		readSameInode:        readSameInode,
 	}, nil
 }
 
@@ -221,8 +225,27 @@ func (r *Reader) statLogPath() {
 	}
 	log.Debugf("Runner[%v] %d matches found after stated log path %q: %v", r.meta.RunnerName, len(matches), r.logPathPattern, matches)
 
+	var unmatchMap = make(map[string]bool)
+	if r.ignoreLogPathPattern != "" {
+		unmatches, err := filepath.Glob(r.ignoreLogPathPattern)
+		if err != nil {
+			log.Errorf("Runner[%v] stat ignoreLogPathPattern error %v", r.meta.RunnerName, err)
+			r.setStatsError("Runner[" + r.meta.RunnerName + "] stat ignoreLogPathPattern error " + err.Error())
+			return
+		}
+		for _, unmatch := range unmatches {
+			unmatchMap[unmatch] = true
+		}
+		if len(unmatches) > 0 {
+			log.Debugf("Runner[%v] %d unmatches found after stated ignore log path %q: %v", r.meta.RunnerName, len(unmatches), r.ignoreLogPathPattern, unmatches)
+		}
+	}
+
 	var newPaths []string
 	for _, m := range matches {
+		if unmatchMap[m] {
+			continue
+		}
 		logPath, fi, err := GetRealPath(m)
 		if err != nil {
 			log.Warnf("Runner[%v] file pattern %v match %v stat failed: %v, ignored this match", r.meta.RunnerName, r.logPathPattern, m, err)

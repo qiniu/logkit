@@ -54,12 +54,13 @@ type Reader struct {
 	cacheMap    map[string]string
 
 	//以下为传入参数
-	logPathPattern string
-	expire         time.Duration
-	submetaExpire  time.Duration
-	statInterval   time.Duration
-	maxOpenFiles   int
-	whence         string
+	logPathPattern       string
+	ignoreLogPathPattern string
+	expire               time.Duration
+	submetaExpire        time.Duration
+	statInterval         time.Duration
+	maxOpenFiles         int
+	whence               string
 
 	notFirstTime bool
 }
@@ -356,6 +357,8 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		return nil, err
 	}
 
+	ignoreLogPathPattern, _ := conf.GetStringOr(KeyIgnoreLogPath, "")
+
 	submetaExpireDur, _ := conf.GetStringOr(KeySubmetaExpire, "720h")
 	submetaExpire, err := time.ParseDuration(submetaExpireDur)
 	if err != nil {
@@ -400,19 +403,20 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	}
 
 	return &Reader{
-		meta:           meta,
-		status:         StatusInit,
-		stopChan:       make(chan struct{}),
-		msgChan:        make(chan Result),
-		errChan:        make(chan error),
-		logPathPattern: logPathPattern,
-		whence:         whence,
-		expire:         expire,
-		submetaExpire:  submetaExpire,
-		statInterval:   statInterval,
-		maxOpenFiles:   maxOpenFiles,
-		fileReaders:    make(map[string]*ActiveReader), //armapmux
-		cacheMap:       cacheMap,                       //armapmux
+		meta:                 meta,
+		status:               StatusInit,
+		stopChan:             make(chan struct{}),
+		msgChan:              make(chan Result),
+		errChan:              make(chan error),
+		logPathPattern:       logPathPattern,
+		ignoreLogPathPattern: strings.TrimSpace(ignoreLogPathPattern),
+		whence:               whence,
+		expire:               expire,
+		submetaExpire:        submetaExpire,
+		statInterval:         statInterval,
+		maxOpenFiles:         maxOpenFiles,
+		fileReaders:          make(map[string]*ActiveReader), //armapmux
+		cacheMap:             cacheMap,                       //armapmux
 	}, nil
 }
 
@@ -492,9 +496,28 @@ func (r *Reader) statLogPath() {
 	if len(matches) > 0 {
 		log.Debugf("Runner[%v] statLogPath %v find matches: %v", r.meta.RunnerName, r.logPathPattern, strings.Join(matches, ", "))
 	}
+
+	var unmatchMap = make(map[string]bool)
+	if r.ignoreLogPathPattern != "" {
+		unmatches, err := filepath.Glob(r.ignoreLogPathPattern)
+		if err != nil {
+			log.Errorf("Runner[%v] stat ignoreLogPathPattern error %v", r.meta.RunnerName, err)
+			r.setStatsError("Runner[" + r.meta.RunnerName + "] stat ignoreLogPathPattern error " + err.Error())
+			return
+		}
+		for _, unmatch := range unmatches {
+			unmatchMap[unmatch] = true
+		}
+		if len(unmatches) > 0 {
+			log.Debugf("Runner[%v] %d unmatches found after stated ignore log path %q: %v", r.meta.RunnerName, len(unmatches), r.ignoreLogPathPattern, unmatches)
+		}
+	}
 	var newaddsPath []string
 	now := time.Now()
 	for _, mc := range matches {
+		if unmatchMap[mc] {
+			continue
+		}
 		rp, fi, err := GetRealPath(mc)
 		if err != nil {
 			log.Errorf("Runner[%v] file pattern %v match %v stat error %v, ignore this match...", r.meta.RunnerName, r.logPathPattern, mc, err)

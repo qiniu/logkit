@@ -66,8 +66,10 @@ func multiReaderOneLineTest(t *testing.T) {
 	dirName := "TestMultiReaderOneLine"
 	dir1 := filepath.Join(dirName, "logs/abc")
 	dir2 := filepath.Join(dirName, "logs/xyz")
+	dir3 := filepath.Join(dirName, "logs/abc123")
 	dir1file1 := filepath.Join(dir1, "file1.log")
 	dir1file2 := filepath.Join(dir1, "file2.log")
+	dir3file3 := filepath.Join(dir3, "file3.log")
 	dir2file1 := filepath.Join(dir2, "file1.log")
 
 	createDirWithName(dirName)
@@ -76,6 +78,7 @@ func multiReaderOneLineTest(t *testing.T) {
 	createDirWithName(dir1)
 	createFileWithContent(dir1file1, "abc123\nabc123\nabc123\nabc123\nabc123\n")
 	createFileWithContent(dir1file2, "xyz\nxyz\nxyz\nxyz\nxyz\nxyz\nxyz\nxyz\nxyz\nxyz\n")
+	createFileWithContent(dir3file3, "xyz\nxyz\nxyz\nxyz\nxyz\nxyz\nxyz\nxyz\nxyz\nxyz\n")
 	expectResults := map[string]int{
 		"abc123\n": 5,
 		"xyz\n":    10,
@@ -83,8 +86,10 @@ func multiReaderOneLineTest(t *testing.T) {
 	}
 	actualResults := make(map[string]int)
 	logPathPattern := filepath.Join(dirName, "logs/*")
+	ignoreLogPathPattern := filepath.Join(dirName, "logs/*123")
 	c := conf.MapConf{
 		"log_path":        logPathPattern,
+		"ignore_log_path": ignoreLogPathPattern,
 		"stat_interval":   "1s",
 		"expire":          "5s",
 		"submeta_expire":  "0h",
