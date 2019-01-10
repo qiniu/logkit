@@ -164,11 +164,11 @@ func (ssr *streamSocketReader) packetAndLineRead(c net.Conn) {
 			vals := strings.Split(val, "\n")
 			for _, value := range vals {
 				if value = strings.TrimSpace(value); value != "" {
-					ssr.readChan <- socketInfo{address: address, data: value}
+					ssr.sendReadChan(address, value)
 				}
 			}
 		} else {
-			ssr.readChan <- socketInfo{address: address, data: val}
+			ssr.sendReadChan(address, val)
 		}
 	}
 
@@ -249,7 +249,7 @@ func (ssr *streamSocketReader) jsonRead(c net.Conn) {
 			log.Errorf("runner[%v] Reader %q json marshal error %v", ssr.meta.RunnerName, ssr.Name(), err)
 			return
 		}
-		ssr.readChan <- socketInfo{address: address, data: string(bytes)}
+		ssr.sendReadChan(address, string(bytes))
 	}
 }
 
@@ -280,10 +280,6 @@ func (psr *packetSocketReader) listen() {
 			psr.sendError(err)
 			break
 		}
-		// double check
-		if atomic.LoadInt32(&psr.status) == StatusStopped || atomic.LoadInt32(&psr.status) == StatusStopping {
-			return
-		}
 
 		var address string
 		// get remote addr
@@ -302,11 +298,11 @@ func (psr *packetSocketReader) listen() {
 			vals := strings.Split(val, "\n")
 			for _, value := range vals {
 				if value = strings.TrimSpace(value); value != "" {
-					psr.readChan <- socketInfo{address: address, data: value}
+					psr.sendReadChan(address, value)
 				}
 			}
 		} else {
-			psr.readChan <- socketInfo{address: address, data: val}
+			psr.sendReadChan(address, val)
 		}
 	}
 }
@@ -419,10 +415,26 @@ func (r *Reader) sendError(err error) {
 	}
 	defer func() {
 		if rec := recover(); rec != nil {
-			log.Errorf("runner[%v] Reader %q was panicked and recovered from %v", r.meta.RunnerName, r.Name(), rec)
+			log.Errorf("runner[%v] Reader %q panic and was recovered from %v", r.meta.RunnerName, r.Name(), rec)
 		}
 	}()
+
+	if atomic.LoadInt32(&r.status) == StatusStopped || atomic.LoadInt32(&r.status) == StatusStopping {
+		return
+	}
 	r.errChan <- err
+}
+
+func (r *Reader) sendReadChan(address string, value string) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Errorf("runner[%v] Reader %q panic and was recovered from %v", r.meta.RunnerName, r.Name(), rec)
+		}
+	}()
+	if atomic.LoadInt32(&r.status) == StatusStopped || atomic.LoadInt32(&r.status) == StatusStopping {
+		return
+	}
+	r.readChan <- socketInfo{address: address, data: value}
 }
 
 func (r *Reader) Start() (err error) {
