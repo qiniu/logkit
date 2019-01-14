@@ -26,6 +26,9 @@ const (
 	KeySkipFileFirstLine = "skip_first_line"
 	KeyReadSameInode     = "read_same_inode"
 
+	// 忽略文件路径
+	KeyIgnoreLogPath = "ignore_log_path"
+
 	// 忽略隐藏文件
 	KeyIgnoreHiddenFile = "ignore_hidden"
 	KeyIgnoreFileSuffix = "ignore_file_suffix"
