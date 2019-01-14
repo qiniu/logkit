@@ -279,7 +279,7 @@ func (p *Parser) parse(line string) (Data, error) {
 	}
 	if len(values) < 1 {
 		err = fmt.Errorf("%v no value was parsed after grok pattern %v", TruncateStrSize(line, DefaultTruncateMaxSize), p.Patterns)
-		log.Error(err)
+		log.Errorf("Parser[%v]: error %v", p.name, err)
 		return nil, err
 	}
 	data := Data{}

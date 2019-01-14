@@ -394,7 +394,7 @@ func (sf *SeqFile) getNextFileCondition() (condition func(os.FileInfo) bool, err
 		sf.dir = dir
 		if !pfi.IsDir() {
 			err = fmt.Errorf("%s -the path is not directory", dir)
-			log.Error(err)
+			log.Errorf("Reader[%v]: error %v", sf.name, err)
 			return
 		}
 		return

@@ -2,12 +2,13 @@ package fault_tolerant
 
 import (
 	"fmt"
-	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
 	"github.com/stretchr/testify/assert"
 
@@ -224,7 +225,7 @@ func TestInvalidData(t *testing.T) {
 	}
 	assert.NotEmpty(t, se.LastError)
 	assert.NotNil(t, se.SendError)
-	if se.SendError != nil{
+	if se.SendError != nil {
 		assert.Equal(t, reqerr.TypeContainInvalidPoint, se.SendError.ErrorType)
 	}
 	time.Sleep(5 * time.Second)
@@ -251,7 +252,6 @@ func TestInvalidData(t *testing.T) {
 	assert.Equal(t, 8, p.DumpDataNum)
 	p.SetMux.Unlock()
 }
-
 
 func TestFtMemorySender(t *testing.T) {
 	_, pt := mock_pandora.NewMockPandoraWithPrefix("/v2")

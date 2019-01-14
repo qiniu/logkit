@@ -240,7 +240,7 @@ func NewSender(conf logkitconf.MapConf) (pandoraSender sender.Sender, err error)
 
 	if skFromEnv == "" && tokens.SchemaFreeTokens.PipelinePostDataToken.Token == "" {
 		err = fmt.Errorf("your authrization config is empty, need to config ak/sk or tokens")
-		log.Error(err)
+		log.Errorf("Runner[%v] Sender[%v]: %v", runnerName, name, err)
 		return
 	}
 	// 当 schema free 为 false 时，需要自动创建 pandora_stash 字段，需要自动创建 pandora_separate_id 字段
@@ -853,7 +853,7 @@ func (s *Sender) generatePoint(data Data) (point Data) {
 				nanosecond:       s.microsecondCounter,
 				forceMicrosecond: s.opt.forceMicrosecond})
 			if err != nil {
-				log.Error(err)
+				log.Errorf("Runner[%v] Sender[%v]: %v", s.opt.runnerName, s.opt.name, err)
 				continue
 			}
 			s.microsecondCounter = s.microsecondCounter + 1

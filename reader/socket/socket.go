@@ -275,7 +275,7 @@ func (psr *packetSocketReader) listen() {
 		n, remoteAddr, err := psr.PacketConn.ReadFrom(buf)
 		if err != nil {
 			if !strings.HasSuffix(err.Error(), ": use of closed network connection") {
-				log.Error(err)
+				log.Errorf("runner[%v]: error %v", psr.Name(), err)
 			}
 			psr.sendError(err)
 			break

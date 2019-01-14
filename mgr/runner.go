@@ -388,7 +388,7 @@ func (r *LogExportRunner) tryRawSend(s sender.Sender, datas []string, times int)
 	)
 	rawSender, ok := s.(sender.RawSender)
 	if !ok {
-		log.Error("sender not raw sender, can not use tryRawSend")
+		log.Errorf("runner[%v]: sender not raw sender, can not use tryRawSend", r.RunnerName, err)
 		return true
 	}
 
@@ -669,7 +669,7 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 		if r.transformers[i].Stage() == transforms.StageBeforeParser {
 			lines, err = r.transformers[i].RawTransform(lines)
 			if err != nil {
-				log.Error(err)
+				log.Errorf("runner[%v]: error %v", r.RunnerName, err)
 			}
 		}
 	}
@@ -907,7 +907,7 @@ func (r *LogExportRunner) Run() {
 			r.rs.TransformStats[tp] = tstats
 			r.rsMutex.Unlock()
 			if err != nil {
-				log.Error(err)
+				log.Errorf("runner[%v]: error %v", r.RunnerName, err)
 			}
 		}
 		r.tracker.Track("finish transformers")

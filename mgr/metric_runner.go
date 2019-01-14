@@ -282,14 +282,14 @@ func (r *MetricRunner) Run() {
 				for _, t := range trans {
 					tmpDatas, err = t.Transform(tmpDatas)
 					if err != nil {
-						log.Error(err)
+						log.Errorf("runner[%v]: error %v", r.RunnerName, err)
 					}
 				}
 			}
 			for _, t := range r.commonTrans {
 				tmpDatas, err = t.Transform(tmpDatas)
 				if err != nil {
-					log.Error(err)
+					log.Errorf("runner[%v]: error %v", r.RunnerName, err)
 				}
 			}
 			for _, metricData := range tmpDatas {
@@ -370,7 +370,7 @@ func (r *MetricRunner) trySend(s sender.Sender, datas []Data, times int) bool {
 			info.Success += int64(len(datas))
 		}
 		if err != nil {
-			log.Error(err)
+			log.Errorf("runner[%v]: error %v", r.RunnerName, err)
 			time.Sleep(time.Second)
 			if times <= 0 || cnt < times {
 				cnt++
