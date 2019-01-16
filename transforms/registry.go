@@ -130,6 +130,17 @@ var (
 		Advance:       true,
 		Type:          TransformTypeBoolean,
 	}
+	KeyOverride = Option{
+		KeyName:       "override",
+		Element:       Radio,
+		ChooseOnly:    true,
+		ChooseOptions: []interface{}{false, true},
+		Default:       false,
+		DefaultNoUse:  false,
+		Description:   "要进行Transform变化的键已存在时，是否覆盖原有的值(override)",
+		Type:          TransformTypeBoolean,
+		Advance:       true,
+	}
 )
 
 type TransformInfo struct {

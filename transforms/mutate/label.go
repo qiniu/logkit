@@ -125,17 +125,7 @@ func (g *Label) ConfigOptions() []Option {
 			Description:  "要添加的数据值[仅限string类型](value)",
 			Type:         transforms.TransformTypeString,
 		},
-		{
-			KeyName:       "override",
-			Element:       Radio,
-			ChooseOnly:    true,
-			ChooseOptions: []interface{}{false, true},
-			Default:       false,
-			DefaultNoUse:  false,
-			Description:   "要进行Transform变化的键已存在时，是否覆盖原有的值(override)",
-			Type:          transforms.TransformTypeBoolean,
-			Advance:       true,
-		},
+		transforms.KeyOverride,
 	}
 }
 
