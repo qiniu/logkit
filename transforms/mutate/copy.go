@@ -1,9 +1,11 @@
 package mutate
 
 import (
+	"encoding/json"
 	"errors"
 	"sync"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -13,6 +15,8 @@ var (
 	_ transforms.Transformer      = &Copy{}
 	_ transforms.Initializer      = &Copy{}
 )
+
+const maxMapLevel = 5
 
 type Copy struct {
 	Key      string `json:"key"`
@@ -164,20 +168,26 @@ func (c *Copy) transform(dataPipeline <-chan transforms.TransformInfo, resultCha
 			continue
 		}
 
-		_, getErr = GetMapValue(transformInfo.CurData, c.news...)
-		if getErr == nil && !c.Override {
-			existErr := errors.New("the key " + c.New + " already exists")
-			errNum, err = transforms.SetError(errNum, existErr, transforms.General, "")
-			resultChan <- transforms.TransformResult{
-				Index:   transformInfo.Index,
-				CurData: transformInfo.CurData,
-				Err:     err,
-				ErrNum:  errNum,
+		if !c.Override {
+			_, getErr = GetMapValue(transformInfo.CurData, c.news...)
+			if getErr == nil {
+				existErr := errors.New("the key " + c.New + " already exists")
+				errNum, err = transforms.SetError(errNum, existErr, transforms.General, "")
+				resultChan <- transforms.TransformResult{
+					Index:   transformInfo.Index,
+					CurData: transformInfo.CurData,
+					Err:     err,
+					ErrNum:  errNum,
+				}
+				continue
 			}
-			continue
 		}
 
-		setErr := SetMapValue(transformInfo.CurData, val, true, c.news...)
+		if valMap, ok := val.(map[string]interface{}); ok {
+			val = copyData(valMap, 0)
+		}
+
+		setErr := SetMapValue(transformInfo.CurData, val, false, c.news...)
 		if setErr != nil {
 			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, c.New)
 		}
@@ -190,4 +200,61 @@ func (c *Copy) transform(dataPipeline <-chan transforms.TransformInfo, resultCha
 		}
 	}
 	wg.Done()
+}
+
+func copyData(d map[string]interface{}, mapLevel int) map[string]interface{} {
+	md := make(map[string]interface{}, len(d))
+	for k, v := range d {
+		switch nv := v.(type) {
+		case map[string]interface{}:
+			if len(nv) == 0 {
+				continue
+			}
+			if mapLevel >= 5 {
+				str, err := json.Marshal(nv)
+				if err != nil {
+					log.Warnf("Nesting depth of repo schema is exceeded: maximum nesting depth %v, data %v will be ignored", maxMapLevel, nv)
+				}
+				v = string(str)
+			} else {
+				v = map[string]interface{}(copyData(nv, mapLevel+1))
+			}
+		case []uint64:
+			if len(nv) == 0 {
+				continue
+			}
+			newArr := make([]int64, 0)
+			for _, value := range nv {
+				newArr = append(newArr, int64(value))
+			}
+			v = newArr
+		case []interface{}:
+			if len(nv) == 0 {
+				continue
+			}
+			switch nv[0].(type) {
+			case uint64:
+				newArr := make([]interface{}, 0)
+				for _, value := range nv {
+					switch newV := value.(type) {
+					case uint64:
+						newArr = append(newArr, int64(newV))
+					default:
+						newArr = append(newArr, newV)
+					}
+				}
+				v = newArr
+			}
+		case uint64:
+			v = int64(nv)
+		case string:
+			if len(nv) == 0 {
+				continue
+			}
+		case nil:
+			continue
+		}
+		md[k] = v
+	}
+	return md
 }
