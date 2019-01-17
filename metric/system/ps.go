@@ -7,6 +7,8 @@ import (
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/net"
+
+	"github.com/qiniu/logkit/metric/system/utils"
 )
 
 type PS interface {
@@ -113,7 +115,7 @@ func (s *systemPS) DiskUsage(
 }
 
 func (s *systemPS) NetProto() ([]net.ProtoCountersStat, error) {
-	return net.ProtoCounters(nil)
+	return utils.ProtoCounters(nil)
 }
 
 func (s *systemPS) NetIO() ([]net.IOCountersStat, error) {
