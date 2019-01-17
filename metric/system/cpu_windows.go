@@ -4,6 +4,10 @@ package system
 
 import (
 	"fmt"
+
+	"github.com/shirou/gopsutil/cpu"
+
+	"github.com/qiniu/logkit/metric/system/utils"
 )
 
 const (
@@ -12,7 +16,9 @@ const (
 )
 
 func (s *CPUStats) Collect() (datas []map[string]interface{}, err error) {
-	times, err := s.ps.CPUTimes(s.PerCPU, s.TotalCPU)
+	//Note: 重写CPUTimes，避免修改vendor，后续跟进gopsutil库；
+	//times, err := s.ps.CPUTimes(s.PerCPU, s.TotalCPU)
+	times, err := s.CPUTimes(s.PerCPU, s.TotalCPU)
 	if err != nil {
 		return nil, fmt.Errorf("error getting CPU info: %s", err)
 	}
@@ -70,4 +76,23 @@ func isTotalCpuTimeStat(name string) bool {
 }
 func isTotalCpuUsageStat(name string) bool {
 	return name == WindowsCPUTotalKey
+}
+
+func (s *CPUStats) CPUTimes(perCPU, totalCPU bool) ([]cpu.TimesStat, error) {
+	var cpuTimes []cpu.TimesStat
+	if perCPU {
+		if perCPUTimes, err := utils.Times(true); err == nil {
+			cpuTimes = append(cpuTimes, perCPUTimes...)
+		} else {
+			return nil, err
+		}
+	}
+	if totalCPU {
+		if totalCPUTimes, err := cpu.Times(false); err == nil {
+			cpuTimes = append(cpuTimes, totalCPUTimes...)
+		} else {
+			return nil, err
+		}
+	}
+	return cpuTimes, nil
 }
