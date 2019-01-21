@@ -8,10 +8,9 @@ import (
 	"strings"
 
 	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/w32"
+	"github.com/shirou/gopsutil/host"
 
 	"github.com/qiniu/log"
-
 	"github.com/qiniu/logkit/metric"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -44,7 +43,10 @@ func (_ *WinSystemStats) Collect() (datas []map[string]interface{}, err error) {
 	if err != nil {
 		return
 	}
-	uptime := w32.GetTickCount64() / 1000 //second
+	uptime, err := host.Uptime()
+	if err != nil {
+		log.Errorf("Get Uptime failed, error: %v", err)
+	}
 	data := map[string]interface{}{
 		KeySystemLoad1:  lp,
 		KeySystemLoad5:  lp,
