@@ -65,3 +65,17 @@ func Test_scriptFile(t *testing.T) {
 	assert.NotNil(t, data)
 	t.Log("data: ", data)
 }
+
+func TestCmdRunWithTimeout(t *testing.T) {
+	cmdResult, isTimeout := CmdRunWithTimeout("echo", "hello")
+	assert.Nil(t, cmdResult.err)
+	assert.False(t, isTimeout)
+	assert.EqualValues(t, "hello\n", string(cmdResult.content))
+
+	cmdResult, isTimeout = CmdRunWithTimeout("test")
+	assert.NotNil(t, cmdResult.err)
+	assert.False(t, isTimeout)
+
+	cmdResult, isTimeout = CmdRunWithTimeout("top")
+	assert.NotNil(t, cmdResult.err)
+}

@@ -376,7 +376,7 @@ func (r *MetricRunner) trySend(s sender.Sender, datas []Data, times int) bool {
 				cnt++
 				continue
 			}
-			log.Errorf("retry send %v times, but still error %v, discard datas %v ... total %v lines", cnt, err, datas[0], len(datas))
+			log.Errorf("retry send %v times, but still error %v, discard datas... total %v lines", cnt, err, len(datas))
 		}
 		break
 	}

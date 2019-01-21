@@ -3,6 +3,7 @@ package script
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os/exec"
 	"strings"
 	"sync"
@@ -127,9 +128,9 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		}
 	}
 
-	_, err = exec.Command(r.scripttype, r.commandArgs...).Output()
-	if err != nil {
-		return nil, err
+	CmdResult, _ := CmdRunWithTimeout(r.scripttype, r.commandArgs...)
+	if CmdResult.err != nil {
+		return nil, CmdResult.err
 	}
 	return r, nil
 }
@@ -307,10 +308,63 @@ func (r *Reader) run() {
 }
 
 func (r *Reader) exec() error {
-	res, err := exec.Command(r.scripttype, r.commandArgs...).Output()
-	if err != nil {
-		return err
+	cmdResult, _ := CmdRunWithTimeout(r.scripttype, r.commandArgs...)
+	if cmdResult.err != nil {
+		return cmdResult.err
 	}
-	r.readChan <- res
+	r.readChan <- cmdResult.content
 	return nil
+}
+
+type CmdResult struct {
+	content []byte
+	err     error
+}
+
+func CmdRunWithTimeout(scriptType string, params ...string) (CmdResult, bool) {
+	cmd := exec.Command(scriptType, params...)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return CmdResult{err: err}, false
+	}
+	defer stdout.Close()
+	if err := cmd.Start(); err != nil {
+		return CmdResult{err: err}, false
+	}
+
+	done := make(chan CmdResult)
+	go func() {
+		var errJoin string
+		content, stdOutErr := ioutil.ReadAll(stdout)
+		if stdOutErr != nil {
+			errJoin += stdOutErr.Error() + "\n"
+		}
+		if cmdWaitErr := cmd.Wait(); cmdWaitErr != nil {
+			errJoin += cmdWaitErr.Error()
+		}
+		if errJoin != "" {
+			err = errors.New(errJoin)
+		}
+		done <- CmdResult{err: err, content: content}
+		close(done)
+	}()
+
+	timeout := 5 * time.Second
+	select {
+	case <-time.After(timeout):
+		errJoin := fmt.Sprintf("process: %s %v timeout, be killed", scriptType, params)
+		if killErr := cmd.Process.Kill(); killErr != nil {
+			errJoin += ", kill error: " + killErr.Error()
+			return CmdResult{err: errors.New(errJoin)}, true
+		}
+
+		if cmdResult := <-done; cmdResult.err != nil {
+			errJoin += ", cmd wait error: " + cmdResult.err.Error()
+			return CmdResult{err: errors.New(errJoin)}, true
+		}
+
+		return CmdResult{}, true
+	case cmdResult := <-done:
+		return cmdResult, false
+	}
 }
