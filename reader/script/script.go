@@ -54,6 +54,8 @@ type Reader struct {
 	originpath string
 	scripttype string
 
+	commandArgs []string
+
 	isLoop       bool
 	loopDuration time.Duration
 	execOnStart  bool
@@ -61,13 +63,29 @@ type Reader struct {
 }
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
-	path, _ := conf.GetStringOr(KeyLogPath, "")
-	originPath := path
-
-	var err error
-	path, err = checkPath(meta, path)
-	if err != nil {
-		return nil, err
+	path, _ := conf.GetStringOr(KeyLogPath, "") // 兼容
+	var (
+		content, params string
+		err             error
+		commandArgs     = make([]string, 0)
+	)
+	if path == "" {
+		params, _ = conf.GetStringOr(KeyScriptParams, "")
+		if params != "" {
+			paramsArray := GetCmd(params)
+			commandArgs = append(commandArgs, paramsArray...)
+		}
+		content, _ = conf.GetStringOr(KeyScriptContent, "")
+		if err != nil {
+			log.Errorf("decode script content failed: %v", err)
+			return nil, err
+		}
+		if content != "" {
+			commandArgs = append(commandArgs, content)
+		}
+	} else {
+		content = path
+		commandArgs = append(commandArgs, content)
 	}
 
 	cronSchedule, _ := conf.GetStringOr(KeyScriptCron, "")
@@ -80,9 +98,10 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		stopChan:      make(chan struct{}),
 		readChan:      make(chan []byte),
 		errChan:       make(chan error),
-		originpath:    originPath,
+		originpath:    path,
 		realpath:      path,
 		scripttype:    scriptType,
+		commandArgs:   commandArgs,
 		execOnStart:   execOnStart,
 		Cron:          cron.New(),
 	}
@@ -107,6 +126,11 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 			log.Infof("Runner[%v] %v Cron job added with schedule <%v>", r.meta.RunnerName, r.Name(), cronSchedule)
 		}
 	}
+
+	_, err = exec.Command(r.scripttype, r.commandArgs...).Output()
+	if err != nil {
+		return nil, err
+	}
 	return r, nil
 }
 
@@ -119,7 +143,12 @@ func (r *Reader) hasStopped() bool {
 }
 
 func (r *Reader) Name() string {
-	return "ScriptFile: " + r.originpath
+	name := "ScriptFile: " + r.scripttype
+	if len(r.commandArgs) != 0 {
+		name += strings.Join(r.commandArgs, "_")
+	}
+
+	return name
 }
 
 func (r *Reader) SetMode(mode string, v interface{}) error {
@@ -175,6 +204,7 @@ func (r *Reader) Start() error {
 		}
 		r.Cron.Start()
 	}
+
 	log.Infof("Runner[%v] %q daemon has started", r.meta.RunnerName, r.Name())
 	return nil
 }
@@ -277,41 +307,10 @@ func (r *Reader) run() {
 }
 
 func (r *Reader) exec() error {
-	res, err := exec.Command(r.scripttype, r.realpath).Output()
+	res, err := exec.Command(r.scripttype, r.commandArgs...).Output()
 	if err != nil {
 		return err
 	}
 	r.readChan <- res
 	return nil
-}
-
-func checkPath(meta *reader.Meta, path string) (string, error) {
-	for {
-		realPath, fileInfo, err := GetRealPath(path)
-		if err != nil {
-			log.Warnf("Runner[%v] %s - utils.GetRealPath failed, err:%v", meta.RunnerName, path, err)
-			time.Sleep(waitTime)
-			continue
-		}
-
-		if fileInfo == nil {
-			log.Warnf("Runner[%v] %s - utils.GetRealPath file info nil ", meta.RunnerName, path)
-			time.Sleep(waitTime)
-			continue
-		}
-
-		fileMode := fileInfo.Mode()
-		if !fileMode.IsRegular() {
-			err = fmt.Errorf("Runner[%v] %s - file failed, err: file is not regular ", meta.RunnerName, path)
-			return "", err
-		}
-
-		err = CheckFileMode(realPath, fileMode)
-		if err != nil {
-			err = fmt.Errorf("Runner[%v] %s - file failed, err: %v ", meta.RunnerName, path, err)
-			return "", err
-		}
-
-		return realPath, nil
-	}
 }

@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"unicode"
 
 	"github.com/qiniu/log"
 
@@ -62,7 +61,7 @@ func (g *Script) Init() error {
 	if g.storePath == "" {
 		g.storePath = g.ScriptPath
 	}
-	g.storePath, err = checkPath(g.storePath)
+	g.storePath, err = CheckPath(g.storePath)
 	if err != nil {
 		return err
 	}
@@ -161,7 +160,7 @@ func getScriptRes(interpreter string, params []string) (string, error) {
 }
 
 func getScriptResFromCmd(script string) (string, error) {
-	cmdArr := getCmd(script)
+	cmdArr := GetCmd(script)
 	command := exec.Command(cmdArr[0], cmdArr[1:]...) //初始化Cmd
 
 	res, err := command.Output()
@@ -170,30 +169,6 @@ func getScriptResFromCmd(script string) (string, error) {
 	}
 
 	return string(res), nil
-}
-
-//根据key字符串,拆分出层级keys数据
-func getCmd(keyStr string) []string {
-	keys := strings.FieldsFunc(keyStr, isSeparator)
-	return keys
-}
-
-func isSeparator(separator rune) bool {
-	return separator == ' ' || unicode.IsSpace(separator)
-}
-
-func checkPath(path string) (string, error) {
-	realPath, fileInfo, err := GetRealPath(path)
-	if err != nil || fileInfo == nil {
-		return "", fmt.Errorf("%s - GetRealPath failed, err:%v", path, err)
-	}
-
-	fileMode := fileInfo.Mode()
-	if !fileMode.IsRegular() {
-		return "", fmt.Errorf("%s - file failed, err: file is not regular", path)
-	}
-	CheckFileMode(realPath, fileMode)
-	return realPath, nil
 }
 
 func (g *Script) RawTransform(datas []string) ([]string, error) {

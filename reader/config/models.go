@@ -103,6 +103,8 @@ const (
 	KeyKafkaZookeeperTimeout = "kafka_zookeeper_timeout"
 	KeyKafkaMaxProcessTime   = "kafka_maxprocessing_time"
 
+	KeyScriptParams      = "script_params"
+	KeyScriptContent     = "script_content"
 	KeyExecInterpreter   = "script_exec_interprepter"
 	KeyScriptCron        = "script_cron"
 	KeyScriptExecOnStart = "script_exec_onstart"

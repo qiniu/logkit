@@ -580,6 +580,16 @@ func isSeparator(separator rune) bool {
 	return separator == '.' || unicode.IsSpace(separator)
 }
 
+//根据key字符串,拆分出层级keys数据
+func GetCmd(keyStr string) []string {
+	keys := strings.FieldsFunc(keyStr, isSeparator)
+	return keys
+}
+
+func IsSpace(separator rune) bool {
+	return separator == ' ' || unicode.IsSpace(separator)
+}
+
 //通过层级key获取value.
 //所有层级的map必须为 map[string]interface{} 类型.
 //keys为空切片,返回原m
@@ -1025,4 +1035,18 @@ func AddTagsToData(tags map[string]interface{}, datas []Data, runnername string)
 		datas[j] = data
 	}
 	return datas
+}
+
+func CheckPath(path string) (string, error) {
+	realPath, fileInfo, err := GetRealPath(path)
+	if err != nil || fileInfo == nil {
+		return "", fmt.Errorf("%s - GetRealPath failed, err:%v", path, err)
+	}
+
+	fileMode := fileInfo.Mode()
+	if !fileMode.IsRegular() {
+		return "", fmt.Errorf("%s - file failed, err: file is not regular", path)
+	}
+	CheckFileMode(realPath, fileMode)
+	return realPath, nil
 }
