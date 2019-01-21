@@ -53,6 +53,8 @@ type Reader struct {
 	headRegexp  *regexp.Regexp
 	cacheMap    map[string]string
 
+	expireMap map[string]int64 // expire file offset map
+
 	//以下为传入参数
 	logPathPattern       string
 	ignoreLogPathPattern string
@@ -88,7 +90,7 @@ type Result struct {
 	logpath string
 }
 
-func NewActiveReader(originPath, realPath, whence string, notFirstTime bool, meta *reader.Meta, msgChan chan<- Result, errChan chan<- error) (ar *ActiveReader, err error) {
+func NewActiveReader(originPath, realPath, whence string, notFirstTime bool, expireMap map[string]int64, meta *reader.Meta, msgChan chan<- Result, errChan chan<- error) (ar *ActiveReader, err error) {
 	rpath := strings.Replace(realPath, string(os.PathSeparator), "_", -1)
 	if runtime.GOOS == "windows" {
 		rpath = strings.Replace(rpath, ":", "_", -1)
@@ -463,6 +465,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		maxOpenFiles:         maxOpenFiles,
 		fileReaders:          make(map[string]*ActiveReader), //armapmux
 		cacheMap:             cacheMap,                       //armapmux
+		expireMap:            make(map[string]int64),
 	}, nil
 }
 
@@ -602,14 +605,16 @@ func (r *Reader) statLogPath() {
 		r.armapmux.Lock()
 		cacheline := r.cacheMap[rp]
 		r.armapmux.Unlock()
+		fileName := fi.Name()
 		// 过期的文件不追踪，除非之前追踪的并且有日志没读完
 		// 如果过期时间为 0，则永不过期
 		if cacheline == "" &&
 			r.expire.Nanoseconds() > 0 && fi.ModTime().Add(r.expire).Before(time.Now()) {
+			r.expireMap[fileName] = fi.Size()
 			log.Debugf("Runner[%v] <%v> is expired, ignore...", r.meta.RunnerName, mc)
 			continue
 		}
-		ar, err := NewActiveReader(mc, rp, r.whence, r.notFirstTime, r.meta, r.msgChan, r.errChan)
+		ar, err := NewActiveReader(mc, rp, r.whence, r.notFirstTime, r.expireMap, r.meta, r.msgChan, r.errChan)
 		if err != nil {
 			err = fmt.Errorf("runner[%v] NewActiveReader for matches %v error %v", r.meta.RunnerName, rp, err)
 			r.sendError(err)
