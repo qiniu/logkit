@@ -97,7 +97,7 @@ func RawData(readerConfig conf.MapConf) ([]string, error) {
 	}()
 
 	var rawData []string
-	timeout := time.NewTimer(time.Minute)
+	timeout := time.NewTimer(30 * time.Second)
 	defer timeout.Stop()
 	select {
 	case de := <-readChan:
@@ -489,7 +489,7 @@ func readDatas(dr reader.DataReader, size int, timeoutStatus *int32) dataResult 
 		batchSize += int(bytes)
 	}
 
-	return dataResult{datas, nil}
+	return dataResult{datas, err}
 }
 
 func readLines(rd reader.Reader, size int, timeoutStatus *int32) dataResult {
@@ -509,6 +509,9 @@ func readLines(rd reader.Reader, size int, timeoutStatus *int32) dataResult {
 		if err != nil && err != io.EOF {
 			return dataResult{lines, err}
 		}
+		if err == io.EOF {
+			err = nil
+		}
 
 		if len(line) < 1 {
 			log.Debugf("no more content fetched sleep 1 second...")
@@ -522,7 +525,7 @@ func readLines(rd reader.Reader, size int, timeoutStatus *int32) dataResult {
 		batchSize += len(line)
 	}
 
-	return dataResult{lines, nil}
+	return dataResult{lines, err}
 }
 
 func batchFullOrTimeout(batchLen, size int, timeoutStatus *int32) bool {
