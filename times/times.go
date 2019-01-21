@@ -8,6 +8,8 @@ import (
 )
 
 var layouts = []string{
+	time.RFC3339,
+	time.RFC3339Nano,
 	"02/Jan/2006:15:04:05 -0700",
 	"2006/01/02 15:04:05",
 	`20060102T150405-07`,
@@ -33,8 +35,6 @@ var layouts = []string{
 	time.RFC850,
 	time.RFC1123,
 	time.RFC1123Z,
-	time.RFC3339,
-	time.RFC3339Nano,
 	time.Kitchen,
 	time.Stamp,
 	time.StampMilli,

@@ -719,7 +719,7 @@ func ConvertDate(layoutBefore, layoutAfter string, offset int, loc *time.Locatio
 			layoutBefore = strings.Replace(layoutBefore, ",", ".", -1)
 			t, err := time.ParseInLocation(layoutBefore, newv, loc)
 			if err != nil {
-				return v, fmt.Errorf("can not parse %v with layout %v", newv, layoutAfter)
+				return v, fmt.Errorf("can not parse %v with layout %v", newv, layoutBefore)
 			}
 			return FormatWithUserOption(layoutAfter, offset, t), nil
 		}
