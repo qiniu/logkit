@@ -1,7 +1,12 @@
 package utils
 
 import (
+	"io"
+	"io/ioutil"
 	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -10,6 +15,7 @@ import (
 	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/utils/models"
+	utilsos "github.com/qiniu/logkit/utils/os"
 )
 
 // IsExist checks whether a file or directory exists.
@@ -73,4 +79,70 @@ func BatchFullOrTimeout(runnerName string, stopped *int32, batchLen, batchSize i
 		return true
 	}
 	return false
+}
+
+func CheckNotExistFile(runnerName string, expireMap map[string]int64) {
+	for inodePath := range expireMap {
+		arr := strings.SplitN(inodePath, "_", 2)
+		if len(arr) < 2 {
+			log.Errorf("Runner[%s] expect inode_path, but got: ", runnerName, inodePath)
+			return
+		}
+		// 不存在时删除
+		if !IsExist(arr[1]) {
+			delete(expireMap, inodePath)
+		}
+	}
+}
+
+func UpdateExpireMap(runnerName string, fileMap map[string]string, expireMap map[string]int64) {
+	if expireMap == nil {
+		expireMap = make(map[string]int64)
+	}
+	for realPath, inode := range fileMap {
+		f, errOpen := os.Open(realPath)
+		if errOpen != nil {
+			log.Errorf("Runner[%s] update expire map open file: %s offset failed: %v, ignore...", runnerName, realPath, errOpen)
+			continue
+		}
+
+		offset, errSeek := f.Seek(0, io.SeekEnd)
+		if errSeek != nil {
+			log.Errorf("Runner[%s] update expire map get file: %s offset failed: %v, ignore...", runnerName, realPath, errSeek)
+			f.Close()
+			continue
+		}
+		expireMap[inode+"_"+realPath] = offset
+		f.Close()
+	}
+}
+
+//获取指定目录下的所有文件和对应inode
+func GetFiles(runnerName, dirPath string) (map[string]string, error) {
+	dir, err := ioutil.ReadDir(dirPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		files    = make(map[string]string)
+		inodeStr string
+	)
+	for _, fi := range dir {
+		if fi.IsDir() {
+			continue
+		}
+
+		filePath := filepath.Join(dirPath, fi.Name())
+		inode, err := utilsos.GetIdentifyIDByPath(filePath)
+		if err != nil {
+			log.Errorf("Runner[%s]update expire map get file: %s inode failed: %v, ignore...", runnerName, filePath, err)
+		} else {
+			inodeStr = strconv.FormatUint(inode, 10)
+		}
+
+		files[filePath] = inodeStr
+	}
+
+	return files, nil
 }

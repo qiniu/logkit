@@ -15,6 +15,7 @@ var (
 	MetaDir  = "./meta"
 	Files    = []string{"f3", "f2", "f1"}
 	Contents = []string{"223456789", "123456789", "123456789"}
+	Appends  = []string{"11111", "22222", "33333"}
 )
 
 // CreateDir creates a new directory with default permission.
@@ -53,6 +54,23 @@ func CreateFiles(interval int) {
 		}
 
 		file.WriteString(Contents[i])
+		file.Close()
+		time.Sleep(time.Millisecond * time.Duration(interval))
+	}
+}
+
+// Append files append dummy files with dummy content.
+// It delays given interval in milliseconds between creation of each file.
+// It does not create missing parent directories and will return error if any parent directory does not exist.
+func AppendFiles(interval int) {
+	for i, f := range Files {
+		file, err := os.OpenFile(filepath.Join(Dir, f), os.O_APPEND|os.O_WRONLY, DefaultFilePerm)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+
+		file.WriteString(Appends[i])
 		file.Close()
 		time.Sleep(time.Millisecond * time.Duration(interval))
 	}

@@ -61,6 +61,8 @@ type SeqFile struct {
 	lastSyncPath   string
 	lastSyncOffset int64
 
+	expireMap map[string]int64
+
 	ReadSameInode bool //记录已经度过的filename_inode是否继续读
 }
 
@@ -110,7 +112,7 @@ func getStartFile(path, whence string, meta *Meta, sf *SeqFile) (f *os.File, dir
 	return
 }
 
-func NewSeqFile(meta *Meta, path string, ignoreHidden, newFileNewLine bool, suffixes []string, validFileRegex, whence string) (sf *SeqFile, err error) {
+func NewSeqFile(meta *Meta, path string, ignoreHidden, newFileNewLine bool, suffixes []string, validFileRegex, whence string, expireMap map[string]int64) (sf *SeqFile, err error) {
 	sf = &SeqFile{
 		ignoreFileSuffix: suffixes,
 		ignoreHidden:     ignoreHidden,
@@ -119,6 +121,7 @@ func NewSeqFile(meta *Meta, path string, ignoreHidden, newFileNewLine bool, suff
 		newFileAsNewLine: newFileNewLine,
 		meta:             meta,
 		inodeDone:        make(map[string]bool),
+		expireMap:        expireMap,
 	}
 	//原来的for循环替换成单次执行，启动的时候出错就直接报错给用户即可，不需要等待重试。
 	f, dir, currFile, offset, err := getStartFile(path, whence, meta, sf)
@@ -130,7 +133,9 @@ func NewSeqFile(meta *Meta, path string, ignoreHidden, newFileNewLine bool, suff
 		err = nil
 		dir = path
 	}
+
 	if f != nil {
+		offset = sf.getOffset(f, offset, false)
 		_, err = f.Seek(offset, io.SeekStart)
 		if err != nil {
 			f.Close()
@@ -518,8 +523,9 @@ func (sf *SeqFile) newOpen() (err error) {
 	} else {
 		sf.ratereader = f
 	}
+	sf.offset = sf.getOffset(f, 0, true)
 	sf.f = f
-	sf.offset = 0
+
 	sf.inode, err = utilsos.GetIdentifyIDByPath(sf.currFile)
 	if err != nil {
 		return
@@ -559,7 +565,7 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 	} else {
 		sf.ratereader = f
 	}
-	sf.offset = 0
+	sf.offset = sf.getOffset(f, 0, true)
 	sf.inode, err = utilsos.GetIdentifyIDByPath(sf.currFile)
 	if err != nil {
 		return err
@@ -650,4 +656,48 @@ func (sf *SeqFile) SetSkipped() {
 type LineSkipper interface {
 	IsNewOpen() bool
 	SetSkipped()
+}
+
+func (sf *SeqFile) getOffset(f *os.File, offset int64, seek bool) int64 {
+	if len(sf.expireMap) == 0 || offset != 0 || f == nil {
+		return offset
+	}
+
+	if sf.meta.IsExist() {
+		deleteNotExist(filepath.Dir(f.Name()), sf.expireMap)
+		return offset
+	}
+
+	fileName := f.Name()
+	inode, err := utilsos.GetIdentifyIDByPath(fileName)
+	if err != nil {
+		log.Errorf("Runner[%s] NewSeqFile get file %s inode error %v, ignore...", sf.meta.RunnerName, fileName, err)
+		return offset
+	}
+	inodeStr := strconv.FormatUint(inode, 10)
+	offset = sf.expireMap[inodeStr+"_"+fileName]
+	if seek {
+		_, err = f.Seek(sf.offset, io.SeekStart)
+		if err != nil {
+			log.Errorf("Runner[%s] file: %s seek offset: %d failed: %v", sf.meta.RunnerName, f.Name(), sf.offset, err)
+		}
+	}
+	return offset
+}
+
+func deleteNotExist(dir string, expireMap map[string]int64) {
+	if dir == "" {
+		return
+	}
+	var arr []string
+	for inodeFile := range expireMap {
+		arr = strings.SplitN(inodeFile, "_", 2)
+		if len(arr) < 2 {
+			continue
+		}
+		if filepath.Dir(arr[1]) != dir {
+			continue
+		}
+		delete(expireMap, inodeFile)
+	}
 }

@@ -183,5 +183,4 @@ func TestSetMapValueExistWithPrefix(t *testing.T) {
 		},
 	}
 	assert.Equal(t, exp4, data2)
-
 }

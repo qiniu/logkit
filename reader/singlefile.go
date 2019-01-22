@@ -36,7 +36,7 @@ type SingleFile struct {
 	meta *Meta // 记录offset的元数据
 }
 
-func NewSingleFile(meta *Meta, path, whence string, errDirectReturn bool) (sf *SingleFile, err error) {
+func NewSingleFile(meta *Meta, path, whence string, originOffset int64, errDirectReturn bool) (sf *SingleFile, err error) {
 	var pfi os.FileInfo
 	var f *os.File
 	originpath := path
@@ -120,15 +120,23 @@ func NewSingleFile(meta *Meta, path, whence string, errDirectReturn bool) (sf *S
 		sf.ratereader = f
 	}
 
-	// 如果meta初始信息损坏
+	// 如果meta初始信息损坏或者没有meta信息
 	if omitMeta {
-		offset, err = sf.startOffset(whence)
-		if err != nil {
-			return nil, err
+		if originOffset != 0 {
+			offset = originOffset // 使用传入offset
+			if _, err = sf.f.Seek(offset, io.SeekStart); err != nil {
+				return nil, err
+			}
+		} else {
+			offset, err = sf.startOffset(whence)
+			if err != nil {
+				return nil, err
+			}
 		}
 	} else {
 		log.Debugf("Runner[%v] %v restore meta success", sf.meta.RunnerName, sf.Name())
 	}
+
 	sf.offset = offset
 	st, err := f.Stat()
 	if err != nil {
