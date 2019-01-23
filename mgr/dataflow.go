@@ -387,13 +387,13 @@ func checkSampleData(sampleData []string, logParser parser.Parser) ([]string, er
 }
 
 func getTransformerCreator(transformerConfig map[string]interface{}) (transforms.Creator, error) {
-	transformKeyType, ok := transformerConfig[transforms.KeyType]
+	transformKeyType, ok := transformerConfig[KeyType]
 	if !ok {
-		return nil, fmt.Errorf("missing param %s", transforms.KeyType)
+		return nil, fmt.Errorf("missing param %s", KeyType)
 	}
 	transformKeyTypeStr, ok := transformKeyType.(string)
 	if !ok {
-		return nil, fmt.Errorf("param %s must be of type string", transforms.KeyType)
+		return nil, fmt.Errorf("param %s must be of type string", KeyType)
 	}
 
 	create, ok := transforms.Transformers[transformKeyTypeStr]

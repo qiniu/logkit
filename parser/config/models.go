@@ -30,6 +30,7 @@ const (
 	TypeMySQL      = "mysqllog"
 	TypeLogfmt     = "logfmt"
 	TypeKeyValue   = "KV"
+	TypeLinuxAudit = "linuxaudit"
 )
 
 // 数据常量类型

@@ -2036,8 +2036,8 @@ func Test_setSenderConfig(t *testing.T) {
 
 	serverConfigs := []map[string]interface{}{
 		{
-			transforms.KeyType:     ip.Name,
-			transforms.TransformAt: ip.Server,
+			KeyType:   ip.Name,
+			ProcessAt: Server,
 		},
 	}
 	actualConfig, err := setPandoraServerConfig(senderConfig, serverConfigs)
@@ -2046,9 +2046,9 @@ func Test_setSenderConfig(t *testing.T) {
 
 	serverConfigs = []map[string]interface{}{
 		{
-			transforms.KeyType:     ip.Name,
-			transforms.TransformAt: ip.Server,
-			"key": "ip",
+			KeyType:   ip.Name,
+			ProcessAt: Server,
+			"key":     "ip",
 		},
 	}
 	actualConfig, err = setPandoraServerConfig(senderConfig, serverConfigs)
@@ -2060,9 +2060,9 @@ func Test_setSenderConfig(t *testing.T) {
 	}
 	serverConfigs = []map[string]interface{}{
 		{
-			transforms.KeyType:     ip.Name,
-			transforms.TransformAt: ip.Local,
-			"key": "a.b",
+			KeyType:   ip.Name,
+			ProcessAt: Local,
+			"key":     "a.b",
 		},
 	}
 	actualConfig, err = setPandoraServerConfig(senderConfig, serverConfigs)
@@ -2071,7 +2071,7 @@ func Test_setSenderConfig(t *testing.T) {
 
 	serverConfigs = []map[string]interface{}{
 		{
-			transforms.KeyType: "other",
+			KeyType: "other",
 		},
 	}
 	actualConfig, err = setPandoraServerConfig(senderConfig, serverConfigs)
@@ -2080,9 +2080,9 @@ func Test_setSenderConfig(t *testing.T) {
 
 	serverConfigs = []map[string]interface{}{
 		{
-			transforms.KeyType:     ip.Name,
-			transforms.TransformAt: ip.Server,
-			"key": "ip.ip",
+			KeyType:   ip.Name,
+			ProcessAt: Server,
+			"key":     "ip.ip",
 		},
 	}
 	actualConfig, err = setPandoraServerConfig(senderConfig, serverConfigs)

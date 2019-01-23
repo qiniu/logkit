@@ -750,18 +750,10 @@ func ConvertDate(layoutBefore, layoutAfter string, offset int, loc *time.Locatio
 	}
 	news := s
 	timestamp := strconv.FormatInt(news, 10)
-	timeSecondPrecision := 16
-	//补齐16位
-	for i := len(timestamp); i < timeSecondPrecision; i++ {
-		timestamp += "0"
-	}
-	// 取前16位，截取精度 微妙
-	timestamp = timestamp[0:timeSecondPrecision]
-	t, err := strconv.ParseInt(timestamp, 10, 64)
+	tm, err := GetTime(timestamp)
 	if err != nil {
 		return v, err
 	}
-	tm := time.Unix(0, t*int64(time.Microsecond))
 	return FormatWithUserOption(layoutAfter, offset, tm), nil
 }
 
@@ -1049,4 +1041,19 @@ func CheckPath(path string) (string, error) {
 	}
 	CheckFileMode(realPath, fileMode)
 	return realPath, nil
+}
+
+func GetTime(timestamp string) (time.Time, error) {
+	timeSecondPrecision := 19
+	//补齐19位
+	for i := len(timestamp); i < timeSecondPrecision; i++ {
+		timestamp += "0"
+	}
+	// 取前19位，截取精度 纳妙
+	timestamp = timestamp[0:timeSecondPrecision]
+	t, err := strconv.ParseInt(timestamp, 10, 64)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return time.Unix(0, t), nil
 }

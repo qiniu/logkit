@@ -17,6 +17,10 @@ type Parser interface {
 	Parse(lines []string) (datas []Data, err error)
 }
 
+type ServerParser interface {
+	ServerConfig() map[string]interface{}
+}
+
 type ParserType interface {
 	Type() string
 }

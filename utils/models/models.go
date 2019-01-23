@@ -21,6 +21,11 @@ const (
 const (
 	CheckPattern = "^[a-zA-Z_][a-zA-Z0-9_]{0,127}$"
 
+	KeyType   = "type"
+	ProcessAt = "process_at"
+	Local     = "local"
+	Server    = "server"
+
 	GlobalKeyName = "name"
 	ExtraInfo     = "extra_info"
 	/* 该选项兼容如下配置 KeyPandoraExtraInfo */
