@@ -368,7 +368,14 @@ var ModeKeyOptions = map[string][]Option{
 		OptionDisableRecordErrData,
 		OptionKeepRawData,
 	},
-	TypeLogfmt: {
+	TypeKeyValue: {
+		{
+			KeyName:      KeySplitter,
+			ChooseOnly:   false,
+			Default:      "=",
+			DefaultNoUse: false,
+			Description:  "分隔符(splitter)",
+		},
 		OptionParserName,
 		OptionDisableRecordErrData,
 		OptionKeepRawData,
