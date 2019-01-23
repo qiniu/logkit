@@ -316,7 +316,7 @@ func (r *MetricRunner) Run() {
 			continue
 		}
 		if len(tags) > 0 {
-			datas = addTagsToData(tags, datas, r.Name())
+			datas = AddTagsToData(tags, datas, r.Name())
 		}
 		r.rsMutex.Lock()
 		r.rs.ReadDataCount += int64(dataCnt)
@@ -391,6 +391,7 @@ func (mr *MetricRunner) Stop() {
 
 	log.Warnf("wait for MetricRunner " + mr.Name() + " stopped")
 	timer := time.NewTimer(time.Second * 10)
+	defer timer.Stop()
 	select {
 	case <-mr.exitChan:
 		log.Warnf("MetricRunner " + mr.Name() + " has been stopped ")

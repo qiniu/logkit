@@ -91,9 +91,10 @@ type LogExportRunner struct {
 	transformers []transforms.Transformer
 	historyError *ErrorsList
 
-	rs      *RunnerStatus
-	lastRs  *RunnerStatus
-	rsMutex *sync.RWMutex
+	rs           *RunnerStatus
+	lastRs       *RunnerStatus
+	rsMutex      *sync.RWMutex
+	historyMutex *sync.RWMutex
 
 	meta *reader.Meta
 
@@ -104,8 +105,6 @@ type LogExportRunner struct {
 	tracker   *utils.Tracker
 	auditChan chan<- audit.Message
 }
-
-const defaultSendIntervalSeconds = 60
 
 // NewRunner 创建Runner
 func NewRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal) (runner Runner, err error) {
@@ -140,7 +139,7 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 		info.MaxBatchSize = DefaultMaxBatchSize
 	}
 	if info.MaxBatchInterval <= 0 {
-		info.MaxBatchInterval = defaultSendIntervalSeconds
+		info.MaxBatchInterval = DefaultSendIntervalSeconds
 	}
 	if info.ErrorsListCap <= 0 {
 		info.ErrorsListCap = DefaultErrorsListCap
@@ -166,6 +165,7 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 		historyError: NewErrorsList(),
 		rsMutex:      new(sync.RWMutex),
 		tracker:      utils.NewTracker(),
+		historyMutex: new(sync.RWMutex),
 	}
 
 	if reader == nil {
@@ -423,6 +423,7 @@ func (r *LogExportRunner) tryRawSend(s sender.Sender, datas []string, times int)
 		}
 
 		info.LastError = TruncateStrSize(err.Error(), DefaultTruncateMaxSize)
+		r.historyMutex.Lock()
 		if r.historyError.SendErrors == nil {
 			r.historyError.SendErrors = make(map[string]*equeue.ErrorQueue)
 		}
@@ -430,6 +431,7 @@ func (r *LogExportRunner) tryRawSend(s sender.Sender, datas []string, times int)
 			r.historyError.SendErrors[s.Name()] = equeue.New(r.ErrorsListCap)
 		}
 		r.historyError.SendErrors[s.Name()].Put(equeue.NewError(info.LastError))
+		r.historyMutex.Unlock()
 
 		//FaultTolerant Sender 正常的错误会在backupqueue里面记录，自己重试，此处无需重试
 		if se != nil && se.Ft && se.FtNotRetry {
@@ -515,6 +517,7 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 		}
 
 		info.LastError = TruncateStrSize(err.Error(), DefaultTruncateMaxSize)
+		r.historyMutex.Lock()
 		if r.historyError.SendErrors == nil {
 			r.historyError.SendErrors = make(map[string]*equeue.ErrorQueue)
 		}
@@ -522,6 +525,7 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 			r.historyError.SendErrors[s.Name()] = equeue.New(r.ErrorsListCap)
 		}
 		r.historyError.SendErrors[s.Name()].Put(equeue.NewError(info.LastError))
+		r.historyMutex.Unlock()
 
 		//FaultTolerant Sender 正常的错误会在backupqueue里面记录，自己重试，此处无需重试
 		if se != nil && se.Ft && se.FtNotRetry {
@@ -581,7 +585,8 @@ func (r *LogExportRunner) readDatas(dr reader.DataReader, dataSourceTag string) 
 		bytes int64
 		data  Data
 	)
-	for !r.batchFullOrTimeout() {
+	for !utils.BatchFullOrTimeout(r.RunnerName, &r.stopped, r.batchLen, r.batchSize, r.lastSend,
+		r.MaxBatchLen, r.MaxBatchSize, r.MaxBatchInterval) {
 		data, bytes, err = dr.ReadData()
 		if err != nil {
 			log.Errorf("Runner[%v] data reader %s - error: %v, sleep 1 second...", r.Name(), r.reader.Name(), err)
@@ -602,20 +607,24 @@ func (r *LogExportRunner) readDatas(dr reader.DataReader, dataSourceTag string) 
 	r.rsMutex.Lock()
 	if err != nil {
 		r.rs.ReaderStats.LastError = TruncateStrSize(err.Error(), DefaultTruncateMaxSize)
+		r.historyMutex.Lock()
 		if r.historyError.ReadErrors == nil {
 			r.historyError.ReadErrors = equeue.New(r.ErrorsListCap)
 		}
 		r.historyError.ReadErrors.Put(equeue.NewError(r.rs.ReaderStats.LastError))
+		r.historyMutex.Unlock()
 	} else {
 		r.rs.ReaderStats.LastError = ""
 	}
 	r.rsMutex.Unlock()
 	return datas
 }
+
 func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []string) {
 	var line string
 	var err error
-	for !r.batchFullOrTimeout() {
+	for !utils.BatchFullOrTimeout(r.RunnerName, &r.stopped, r.batchLen, r.batchSize, r.lastSend,
+		r.MaxBatchLen, r.MaxBatchSize, r.MaxBatchInterval) {
 		line, err = r.reader.ReadLine()
 		if os.IsNotExist(err) {
 			log.Debugf("Runner[%v] reader %s - error: %v, sleep 3 second...", r.Name(), r.reader.Name(), err)
@@ -650,10 +659,12 @@ func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []str
 		} else {
 			r.rs.ReaderStats.LastError = TruncateStrSize(err.Error(), DefaultTruncateMaxSize)
 		}
+		r.historyMutex.Lock()
 		if r.historyError.ReadErrors == nil {
 			r.historyError.ReadErrors = equeue.New(r.ErrorsListCap)
 		}
 		r.historyError.ReadErrors.Put(equeue.NewError(r.rs.ReaderStats.LastError))
+		r.historyMutex.Unlock()
 	} else {
 		r.rs.ReaderStats.LastError = ""
 	}
@@ -705,10 +716,12 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 	}
 	if err != nil {
 		r.rs.ParserStats.LastError = TruncateStrSize(err.Error(), DefaultTruncateMaxSize)
+		r.historyMutex.Lock()
 		if r.historyError.ParseErrors == nil {
 			r.historyError.ParseErrors = equeue.New(r.ErrorsListCap)
 		}
 		r.historyError.ParseErrors.Put(equeue.NewError(r.rs.ParserStats.LastError))
+		r.historyMutex.Unlock()
 	}
 	r.rsMutex.Unlock()
 	if err != nil {
@@ -730,7 +743,7 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 	tags = MergeExtraInfoTags(r.meta, tags)
 	tags["lst"] = curTimeStr
 	if len(tags) > 0 {
-		datas = addTagsToData(tags, datas, r.Name())
+		datas = AddTagsToData(tags, datas, r.Name())
 	}
 
 	// 把 source 加到 data 里，前提是认为 []line 变成 []data 以后是一一对应的，一旦错位就不加
@@ -895,6 +908,7 @@ func (r *LogExportRunner) Run() {
 					statesTransformer.SetStats(err.Error())
 				}
 				tstats.LastError = TruncateStrSize(err.Error(), DefaultTruncateMaxSize)
+				r.historyMutex.Lock()
 				if r.historyError.TransformErrors == nil {
 					r.historyError.TransformErrors = make(map[string]*equeue.ErrorQueue)
 				}
@@ -902,6 +916,7 @@ func (r *LogExportRunner) Run() {
 					r.historyError.TransformErrors[tp] = equeue.New(r.ErrorsListCap)
 				}
 				r.historyError.TransformErrors[tp].Put(equeue.NewError(tstats.LastError))
+				r.historyMutex.Unlock()
 			}
 
 			r.rs.TransformStats[tp] = tstats
@@ -994,20 +1009,6 @@ func addSourceToData(sourceFroms []string, se *StatsError, datas []Data, datasou
 	return datas
 }
 
-func addTagsToData(tags map[string]interface{}, datas []Data, runnername string) []Data {
-	for j, data := range datas {
-		for k, v := range tags {
-			if dt, ok := data[k]; ok {
-				log.Debugf("Runner[%v] datasource tag already has data %v, ignore %v", runnername, dt, v)
-			} else {
-				data[k] = v
-			}
-		}
-		datas[j] = data
-	}
-	return datas
-}
-
 // Stop 清理所有使用到的资源, 等待10秒尝试读取完毕
 // 先停Reader，不再读取，然后停Run函数，让读取的都转到发送，最后停Sender结束整个过程。
 // Parser 无状态，无需stop。
@@ -1029,6 +1030,7 @@ func (r *LogExportRunner) Stop() {
 
 	log.Infof("Runner[%v] waiting for Run() stopped signal", r.Name())
 	timer := time.NewTimer(time.Second * 10)
+	defer timer.Stop()
 	select {
 	case <-r.exitChan:
 		log.Warnf("runner %v has been stopped", r.Name())
@@ -1107,30 +1109,6 @@ func (r *LogExportRunner) Cleaner() CleanInfo {
 	}
 }
 
-func (r *LogExportRunner) batchFullOrTimeout() bool {
-	// 达到最大行数
-	if r.MaxBatchLen > 0 && int(r.batchLen) >= r.MaxBatchLen {
-		log.Debugf("Runner[%v] meet the max batch length %v", r.RunnerName, r.MaxBatchLen)
-		return true
-	}
-	// 达到最大字节数
-	if r.MaxBatchSize > 0 && int(r.batchSize) >= r.MaxBatchSize {
-		log.Debugf("Runner[%v] meet the max batch size %v", r.RunnerName, r.MaxBatchSize)
-		return true
-	}
-	// 超过最长的发送间隔
-	if time.Now().Sub(r.lastSend).Seconds() >= float64(r.MaxBatchInterval) {
-		log.Debugf("Runner[%v] meet the max batch send interval %v", r.RunnerName, r.MaxBatchInterval)
-		return true
-	}
-	// 如果任务已经停止
-	if atomic.LoadInt32(&r.stopped) > 0 {
-		log.Warnf("Runner[%v] meet the stopped signal", r.RunnerName)
-		return true
-	}
-	return false
-}
-
 func (r *LogExportRunner) LagStats() (rl *LagInfo, err error) {
 	lr, ok := r.reader.(reader.LagReader)
 	if ok {
@@ -1152,6 +1130,8 @@ func getTrend(old, new int64) string {
 }
 
 func (r *LogExportRunner) GetErrors() ErrorsResult {
+	r.historyMutex.RLock()
+	defer r.historyMutex.RUnlock()
 	if r.historyError != nil {
 		return r.historyError.List()
 	}
@@ -1347,6 +1327,8 @@ func (r *LogExportRunner) StatusRestore() {
 	r.rs.ParserStats.Errors = rStat.ParserCnt[1]
 
 	//恢复Errorlist
+	r.historyMutex.Lock()
+	defer r.historyMutex.Unlock()
 	r.historyError.ReadErrors = restoreErrorStatisic(rStat.ReadErrors)
 	r.historyError.ParseErrors = restoreErrorStatisic(rStat.ParseErrors)
 
@@ -1416,6 +1398,8 @@ func (r *LogExportRunner) StatusBackup() {
 		TransCnt:  map[string][2]int64{},
 		SenderCnt: map[string][2]int64{},
 	}
+	r.historyMutex.Lock()
+	defer r.historyMutex.Unlock()
 	if r.historyError.HasReadErr() {
 		bStart.ReadErrors.ErrorSlice = r.historyError.ReadErrors.List()
 		bStart.ReadErrors.MaxSize = r.historyError.ReadErrors.GetMaxSize()
@@ -1479,32 +1463,6 @@ func (r *LogExportRunner) StatusBackup() {
 	if err != nil {
 		log.Warnf("runner %v, backup status failed", r.RunnerName)
 	}
-}
-
-// MergeEnvTags 获取环境变量里的内容
-func MergeEnvTags(name string, tags map[string]interface{}) map[string]interface{} {
-	if name == "" {
-		return tags
-	}
-
-	envTags := make(map[string]interface{})
-	if value, exist := os.LookupEnv(name); exist {
-		err := jsoniter.Unmarshal([]byte(value), &envTags)
-		if err != nil {
-			log.Warnf("get env tags unmarshal error: %v", err)
-			return tags
-		}
-	} else {
-		log.Warnf("env[%s] not exist", name)
-	}
-
-	if tags == nil {
-		tags = make(map[string]interface{})
-	}
-	for k, v := range envTags {
-		tags[k] = v
-	}
-	return tags
 }
 
 func MergeExtraInfoTags(meta *reader.Meta, tags map[string]interface{}) map[string]interface{} {

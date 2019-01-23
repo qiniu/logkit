@@ -3,10 +3,10 @@ package aws
 import (
 	"testing"
 
-	. "github.com/qiniu/logkit/utils/models"
-
 	"github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
+
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 var log1 = `{"Records": [{
@@ -168,6 +168,7 @@ var log2exp2 = `{
 }`
 
 func TestClocktrailTransformer(t *testing.T) {
+	t.Parallel()
 	ct := &CloudTrail{numRoutine: 1}
 	var data1, data1exp Data
 	err := jsoniter.Unmarshal([]byte(log1), &data1)

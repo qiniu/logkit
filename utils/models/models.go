@@ -53,6 +53,8 @@ const (
 
 	DefaultMaxBatchSize = 2 * MB
 
+	DefaultSendIntervalSeconds = 60
+
 	DefaultTruncateMaxSize = 1024
 
 	DefaultErrorsListCap = 100
@@ -69,13 +71,17 @@ const (
 	STRING = "string"
 	DATE   = "date"
 	DROP   = "drop"
+
+	DefaultSelfRunnerName = DefaultInternalPrefix + "CollectLogRunner"
+	DefaultInternalPrefix = "LogkitInternal"
 )
 
 var (
-	MaxProcs                    = 1
-	NumCPU                      = runtime.NumCPU()
-	LogkitAutoCreateDescription = "由logkit日志收集自动创建"
-	MetricAutoCreateDescription = "由logkit监控收集自动创建"
+	MaxProcs                     = 1
+	NumCPU                       = runtime.NumCPU()
+	LogkitAutoCreateDescription  = "由logkit日志收集自动创建"
+	MetricAutoCreateDescription  = "由logkit监控收集自动创建"
+	SelfLogAutoCreateDescription = "由logkit收集自身日志创建"
 
 	// matches named captures that contain a modifier.
 	//   ie,
@@ -135,6 +141,15 @@ type AuthTokens struct {
 	RunnerName   string
 	SenderIndex  int
 	SenderTokens conf.MapConf
+}
+
+type Pandora struct {
+	Name     string `json:"pandora_name"`
+	Region   string `json:"pandora_region"`
+	Pipeline string `json:"pandora_pipeline"`
+	LogDB    string `json:"pandora_logdb"`
+	AK       string `json:"pandora_ak"`
+	SK       string `json:"pandora_sk"`
 }
 
 type LagInfo struct {

@@ -103,7 +103,11 @@ func NewReaderSize(rd FileReader, meta *Meta, size int) (*BufReader, error) {
 			log.Debugf("Runner[%v] %s cannot find out buf meta file, start from zero", meta.RunnerName, rd.Name())
 			bufFromFile = false
 		} else {
-			log.Warnf("Runner[%v] %s cannot read buf meta info %v", meta.RunnerName, rd.Name(), err)
+			if !IsSelfRunner(meta.RunnerName) {
+				log.Warnf("Runner[%v] %s cannot read buf meta info %v", meta.RunnerName, rd.Name(), err)
+			} else {
+				log.Debugf("Runner[%v] %s cannot read buf meta info %v", meta.RunnerName, rd.Name(), err)
+			}
 			return nil, err
 		}
 	} else {
@@ -117,7 +121,11 @@ func NewReaderSize(rd FileReader, meta *Meta, size int) (*BufReader, error) {
 		if os.IsNotExist(err) {
 			log.Debugf("Runner[%v] ReadCacheLine from file error %v", meta.RunnerName, err)
 		} else {
-			log.Warnf("Runner[%v] ReadCacheLine from file error %v", meta.RunnerName, err)
+			if !IsSelfRunner(meta.RunnerName) {
+				log.Warnf("Runner[%v] ReadCacheLine from file error %v", meta.RunnerName, err)
+			} else {
+				log.Debugf("Runner[%v] ReadCacheLine from file error %v", meta.RunnerName, err)
+			}
 		}
 		err = nil
 		linesbytes = []byte("")
@@ -133,7 +141,11 @@ func NewReaderSize(rd FileReader, meta *Meta, size int) (*BufReader, error) {
 	if r.Meta.GetEncodingWay() != "" {
 		r.decoder = mahonia.NewDecoder(r.Meta.GetEncodingWay())
 		if r.decoder == nil {
-			log.Warnf("Encoding Way [%v] is not supported, will read as utf-8", r.Meta.GetEncodingWay())
+			if !IsSelfRunner(meta.RunnerName) {
+				log.Warnf("Encoding Way [%v] is not supported, will read as utf-8", r.Meta.GetEncodingWay())
+			} else {
+				log.Debugf("Encoding Way [%v] is not supported, will read as utf-8", r.Meta.GetEncodingWay())
+			}
 		}
 	}
 	if meta.IsExist() && meta.IsValid() {
@@ -279,7 +291,11 @@ func (b *BufReader) readSlice(delim byte) (line []byte, err error) {
 	defer b.mux.Unlock()
 	for {
 		if atomic.LoadInt32(&b.stopped) > 0 {
-			log.Warn("BufReader was stopped while reading...")
+			if !IsSelfRunner(b.Meta.RunnerName) {
+				log.Warn("BufReader was stopped while reading...")
+			} else {
+				log.Debug("BufReader was stopped while reading...")
+			}
 			return
 		}
 		// Search buffer.
@@ -452,7 +468,11 @@ func (b *BufReader) ReadLine() (ret string, err error) {
 		ret, err = b.ReadString('\n')
 		if os.IsNotExist(err) {
 			if b.lastErrShowTime.Add(5 * time.Second).Before(time.Now()) {
-				log.Errorf("%v ReadLine err %v", b.Meta.RunnerName, err)
+				if !IsSelfRunner(b.Meta.RunnerName) {
+					log.Errorf("runner[%v] ReadLine err %v", b.Meta.RunnerName, err)
+				} else {
+					log.Debugf("runner[%v] ReadLine err %v", b.Meta.RunnerName, err)
+				}
 				b.lastErrShowTime = time.Now()
 			}
 		}
@@ -461,7 +481,11 @@ func (b *BufReader) ReadLine() (ret string, err error) {
 	}
 	if skp, ok := b.rd.(LineSkipper); ok {
 		if skp.IsNewOpen() {
-			log.Infof("Runner[%s] Skip line %v as first line skipper was configured", b.Meta.RunnerName, ret)
+			if !IsSelfRunner(b.Meta.RunnerName) {
+				log.Infof("Runner[%s] Skip line %v as first line skipper was configured", b.Meta.RunnerName, ret)
+			} else {
+				log.Debugf("Runner[%s] Skip line %v as first line skipper was configured", b.Meta.RunnerName, ret)
+			}
 			ret = ""
 			skp.SetSkipped()
 		}
@@ -533,12 +557,20 @@ func (b *BufReader) SyncMeta() {
 		log.Debugf("Runner[%v] %v sync meta started, linecache [%v] buf [%v] （%v %v）", b.Meta.RunnerName, b.Name(), linecache, string(b.buf), b.r, b.w)
 		err := b.Meta.WriteBuf(b.buf, b.r, b.w, len(b.buf))
 		if err != nil {
-			log.Errorf("Runner[%v] %s cannot write buf, err :%v", b.Meta.RunnerName, b.Name(), err)
+			if !IsSelfRunner(b.Meta.RunnerName) {
+				log.Errorf("Runner[%v] %s cannot write buf, err :%v", b.Meta.RunnerName, b.Name(), err)
+			} else {
+				log.Debugf("Runner[%v] %s cannot write buf, err :%v", b.Meta.RunnerName, b.Name(), err)
+			}
 			return
 		}
 		err = b.Meta.WriteCacheLine(linecache)
 		if err != nil {
-			log.Errorf("Runner[%v] %s cannot write linecache, err :%v", b.Meta.RunnerName, b.Name(), err)
+			if !IsSelfRunner(b.Meta.RunnerName) {
+				log.Errorf("Runner[%v] %s cannot write linecache, err :%v", b.Meta.RunnerName, b.Name(), err)
+			} else {
+				log.Debugf("Runner[%v] %s cannot write linecache, err :%v", b.Meta.RunnerName, b.Name(), err)
+			}
 			return
 		}
 		b.lastSync.cache = linecache
@@ -551,7 +583,11 @@ func (b *BufReader) SyncMeta() {
 	}
 	err := b.rd.SyncMeta()
 	if err != nil {
-		log.Errorf("Runner[%v] %s cannot write reader %v's meta info, err %v", b.Meta.RunnerName, b.Name(), b.rd.Name(), err)
+		if !IsSelfRunner(b.Meta.RunnerName) {
+			log.Errorf("Runner[%v] %s cannot write reader %v's meta info, err %v", b.Meta.RunnerName, b.Name(), b.rd.Name(), err)
+		} else {
+			log.Debugf("Runner[%v] %s cannot write reader %v's meta info, err %v", b.Meta.RunnerName, b.Name(), b.rd.Name(), err)
+		}
 		return
 	}
 }

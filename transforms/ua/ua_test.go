@@ -19,6 +19,7 @@ var (
 )
 
 func TestUaTransformer(t *testing.T) {
+	t.Parallel()
 	ipt := &UATransformer{
 		Key:       "ua",
 		UA_Device: "true",
@@ -87,6 +88,7 @@ func TestUaTransformer(t *testing.T) {
 }
 
 func Test_getParsedData(t *testing.T) {
+	t.Parallel()
 	ipt := &UATransformer{
 		Key:       "ua",
 		UA_Device: "true",

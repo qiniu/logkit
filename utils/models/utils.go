@@ -982,3 +982,47 @@ func IsFileModified(path string, interval time.Duration, compare time.Time) bool
 
 	return true
 }
+
+func IsSelfRunner(runnerName string) bool {
+	return strings.HasPrefix(runnerName, DefaultSelfRunnerName)
+}
+
+// MergeEnvTags 获取环境变量里的内容
+func MergeEnvTags(name string, tags map[string]interface{}) map[string]interface{} {
+	if name == "" {
+		return tags
+	}
+
+	envTags := make(map[string]interface{})
+	if value, exist := os.LookupEnv(name); exist {
+		err := jsoniter.Unmarshal([]byte(value), &envTags)
+		if err != nil {
+			log.Warnf("get env tags unmarshal error: %v", err)
+			return tags
+		}
+	} else {
+		log.Warnf("env[%s] not exist", name)
+	}
+
+	if tags == nil {
+		tags = make(map[string]interface{})
+	}
+	for k, v := range envTags {
+		tags[k] = v
+	}
+	return tags
+}
+
+func AddTagsToData(tags map[string]interface{}, datas []Data, runnername string) []Data {
+	for j, data := range datas {
+		for k, v := range tags {
+			if dt, ok := data[k]; ok {
+				log.Debugf("Runner[%v] datasource tag already has data %v, ignore %v", runnername, dt, v)
+			} else {
+				data[k] = v
+			}
+		}
+		datas[j] = data
+	}
+	return datas
+}

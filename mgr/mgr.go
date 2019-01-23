@@ -13,6 +13,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/json-iterator/go"
+
 	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/audit"
@@ -21,6 +22,7 @@ import (
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/reader/config"
+	"github.com/qiniu/logkit/self"
 	"github.com/qiniu/logkit/sender"
 	senderConf "github.com/qiniu/logkit/sender/config"
 	"github.com/qiniu/logkit/utils"
@@ -41,6 +43,16 @@ type ManagerConfig struct {
 	DisableWeb   bool          `json:"disable_web"`
 	ServerBackup bool          `json:"-"`
 	AuditDir     string        `json:"audit_dir"`
+
+	CollectLog
+}
+
+type CollectLog struct {
+	CollectLogPath   string `json:"collect_log_path"`
+	CollectLogEnable bool   `json:"collect_log_enable"`
+	ReadFrom         string `json:"read_from"`
+	EnvTag           string `json:"-"`
+	Pandora
 }
 
 type cleanQueue struct {
@@ -76,6 +88,8 @@ type Manager struct {
 
 	Version    string
 	SystemInfo string
+
+	CollectLogRunner *self.LogRunner
 }
 
 func NewManager(conf ManagerConfig) (*Manager, error) {
@@ -110,22 +124,34 @@ func NewCustomManager(conf ManagerConfig, rr *reader.Registry, pr *parser.Regist
 	if err != nil {
 		return nil, err
 	}
+	var collectLogRunner *self.LogRunner
+	if conf.CollectLogEnable {
+		rdConf := self.SetReaderConfig(self.GetReaderConfig(), conf.CollectLogPath, "", conf.ReadFrom)
+		sdConf := self.SetSenderConfig(self.GetSenderConfig(), conf.Pandora)
+		collectLogRunner, err = self.NewLogRunner(rdConf, self.GetParserConfig(), sdConf, conf.EnvTag)
+		if err != nil {
+			log.Errorf("new collect log runner failed: %v", err)
+			err = nil
+		}
+	}
+
 	m := &Manager{
-		ManagerConfig: conf,
-		cleanLock:     new(sync.RWMutex),
-		watcherMux:    new(sync.RWMutex),
-		cleanChan:     make(chan cleaner.CleanSignal),
-		cleanQueues:   make(map[string]*cleanQueue),
-		runners:       make(map[string]Runner),
-		runnerConfigs: make(map[string]RunnerConfig),
-		runnerPaths:   make(map[string]string),
-		watchers:      make(map[string]*fsnotify.Watcher),
-		rregistry:     rr,
-		pregistry:     pr,
-		sregistry:     sr,
-		SystemInfo:    utilsos.GetOSInfo().String(),
-		audit:         audt,
-		auditChan:     make(chan audit.Message, 100),
+		ManagerConfig:    conf,
+		cleanLock:        new(sync.RWMutex),
+		watcherMux:       new(sync.RWMutex),
+		cleanChan:        make(chan cleaner.CleanSignal),
+		cleanQueues:      make(map[string]*cleanQueue),
+		runners:          make(map[string]Runner),
+		runnerConfigs:    make(map[string]RunnerConfig),
+		runnerPaths:      make(map[string]string),
+		watchers:         make(map[string]*fsnotify.Watcher),
+		rregistry:        rr,
+		pregistry:        pr,
+		sregistry:        sr,
+		SystemInfo:       utilsos.GetOSInfo().String(),
+		audit:            audt,
+		auditChan:        make(chan audit.Message, 100),
+		CollectLogRunner: collectLogRunner,
 	}
 	return m, nil
 }
@@ -151,6 +177,10 @@ func (m *Manager) Stop() error {
 	close(m.cleanChan)
 	//在所有runner close以后，就保证了不会有audit message发送到Channel里
 	close(m.auditChan)
+
+	if m.CollectLogRunner != nil {
+		m.CollectLogRunner.Stop()
+	}
 	return nil
 }
 
@@ -797,6 +827,11 @@ func (m *Manager) UpdateToken(tokens []AuthTokens) (err error) {
 	errMsg := make([]string, 0)
 	for _, token := range tokens {
 		runnerPath := token.RunnerName
+		if strings.HasPrefix(runnerPath, DefaultInternalPrefix) && m.CollectLogRunner != nil {
+			m.CollectLogRunner.TokenRefresh(token)
+			continue
+		}
+
 		if runner, ok := m.runners[runnerPath]; ok {
 			if r, ok := runner.(TokenRefreshable); ok {
 				token.RunnerName = runner.Name()

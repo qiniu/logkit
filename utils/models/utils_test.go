@@ -1300,3 +1300,16 @@ func TestParseTimeZoneOffset(t *testing.T) {
 		assert.Equal(t, ti.exp, got)
 	}
 }
+
+func TestMergeEnvTags(t *testing.T) {
+	key := "TestMergeEnvTags"
+	os.Setenv(key, `{"a":"hello"}`)
+	defer os.Unsetenv(key)
+	tags := MergeEnvTags(key, nil)
+	assert.Equal(t, map[string]interface{}{"a": "hello"}, tags)
+
+	os.Setenv(key, `{"b":"123","c":"nihao"}`)
+	tags = MergeEnvTags(key, tags)
+	assert.Equal(t, map[string]interface{}{"a": "hello", "b": "123", "c": "nihao"}, tags)
+
+}

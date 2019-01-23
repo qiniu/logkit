@@ -9,7 +9,6 @@ import (
 )
 
 func TestXmlTransformer(t *testing.T) {
-
 	xtr := Xml{
 		Key: "xml",
 		New: "xml",

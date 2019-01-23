@@ -2141,12 +2141,14 @@ func BenchmarkStatusRestore(b *testing.B) {
 	}
 	defer os.RemoveAll("BenchmarkStatusRestore")
 	r1 := &LogExportRunner{
+		historyMutex: new(sync.RWMutex),
 		meta:         meta,
 		rs:           &RunnerStatus{},
 		lastRs:       &RunnerStatus{},
 		historyError: &ErrorsList{},
 	}
 	r2 := &LogExportRunner{
+		historyMutex: new(sync.RWMutex),
 		meta:         meta,
 		rs:           &RunnerStatus{},
 		lastRs:       &RunnerStatus{},
@@ -2191,8 +2193,9 @@ func TestBackupRestoreHistory(t *testing.T) {
 
 	s1, _ := discard.NewSender(conf.MapConf{"name": "s1"})
 	r1 := &LogExportRunner{
-		meta:    meta,
-		rsMutex: new(sync.RWMutex),
+		meta:         meta,
+		rsMutex:      new(sync.RWMutex),
+		historyMutex: new(sync.RWMutex),
 		rs: &RunnerStatus{
 			TransformStats: map[string]StatsInfo{"pick-0": {Success: 1}},
 			SenderStats:    map[string]StatsInfo{"s1": {Success: 1}},
@@ -2215,7 +2218,8 @@ func TestBackupRestoreHistory(t *testing.T) {
 	r1.StatusBackup()
 
 	r2 := &LogExportRunner{
-		meta: meta,
+		meta:         meta,
+		historyMutex: new(sync.RWMutex),
 		rs: &RunnerStatus{
 			TransformStats: map[string]StatsInfo{},
 			SenderStats:    map[string]StatsInfo{},

@@ -98,6 +98,7 @@ func RawData(readerConfig conf.MapConf) ([]string, error) {
 
 	var rawData []string
 	timeout := time.NewTimer(time.Minute)
+	defer timeout.Stop()
 	select {
 	case de := <-readChan:
 		rawData, err = de.data, de.lastErr

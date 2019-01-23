@@ -313,3 +313,11 @@ func IsEnv(env string) (string, bool) {
 	}
 	return "", false
 }
+
+func DeepCopy(value MapConf) MapConf {
+	result := make(MapConf)
+	for key, value := range value {
+		result[key] = value
+	}
+	return result
+}

@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"testing"
 
-	. "github.com/qiniu/logkit/utils/models"
-
 	"github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
+
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 func TestJsonTransformer(t *testing.T) {

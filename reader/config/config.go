@@ -129,7 +129,7 @@ var (
 		Description:  "读取速度限制(readio_limit)",
 		CheckRegex:   "\\d+",
 		Advance:      true,
-		ToolTip:      "读取文件的磁盘限速，填写正整数，单位为MB/s, 默认限速20MB/s",
+		ToolTip:      "读取文件的磁盘限速，填写正整数，单位为MB/s, 默认不限速",
 	}
 	OptionHeadPattern = Option{
 		KeyName:      KeyHeadPattern,

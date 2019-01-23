@@ -152,7 +152,7 @@ func TestPandoraSender(t *testing.T) {
 			Required:  false,
 		},
 	})
-	s.UserSchema = parseUserSchema("TestPandoraSenderRepo", "ab, abc a1,d,...")
+	s.UserSchema = parseUserSchema("", "TestPandoraSenderRepo", "ab, abc a1,d,...")
 	time.Sleep(2 * time.Second)
 	d["ab"] = "a"
 	d["abc"] = 1.1
@@ -173,7 +173,7 @@ func TestPandoraSender(t *testing.T) {
 	exp = "a1=1.1 ab=a ac=0 ax=b d=" + timeexp
 	assert.Equal(t, exp, pandora.Body)
 
-	s.UserSchema = parseUserSchema("TestPandoraSenderRepo", "a-b b-c, a-b-c a1,a-b-c-d,d,e f-d,...")
+	s.UserSchema = parseUserSchema("", "TestPandoraSenderRepo", "a-b b-c, a-b-c a1,a-b-c-d,d,e f-d,...")
 	assert.Equal(t, UserSchema{
 		DefaultAll: true,
 		Fields: map[string]string{
@@ -599,7 +599,7 @@ func TestParseUserSchema(t *testing.T) {
 		},
 	}
 	for idx, ti := range tests {
-		us := parseUserSchema(fmt.Sprintf("repo%v", idx), ti.schema)
+		us := parseUserSchema("", fmt.Sprintf("repo%v", idx), ti.schema)
 		if !reflect.DeepEqual(ti.exp, us) {
 			t.Errorf("TestParseUserSchema error exp %v but got %v", ti.exp, us)
 		}
