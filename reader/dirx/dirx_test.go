@@ -28,6 +28,16 @@ func createFileWithContent(filepathn, lines string) {
 	file.Close()
 }
 
+func appendFileWithContent(filepathn, lines string) {
+	file, err := os.OpenFile(filepathn, os.O_APPEND|os.O_WRONLY, DefaultFilePerm)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	file.WriteString(lines)
+	file.Close()
+}
+
 func createDirWithName(dirx string) {
 	err := os.MkdirAll(dirx, DefaultDirPerm)
 	if err != nil {
@@ -47,6 +57,7 @@ func TestStart(t *testing.T) {
 		"multiReaderSyncMetaOneLineTest":  multiReaderSyncMetaOneLineTest,
 		"multiReaderSyncMetaMutilineTest": multiReaderSyncMetaMutilineTest,
 		"multiReaderNewestTest":           multiReaderNewestTest,
+		"multiReaderNewestOffsetTest":     multiReaderNewestOffsetTest,
 		"multiReaderSameInodeTest":        multiReaderSameInodeTest,
 	}
 
@@ -601,6 +612,104 @@ func multiReaderNewestTest(t *testing.T) {
 			break
 		}
 		if maxNum >= 3 || emptyNum > 10 {
+			break
+		}
+	}
+	t.Log("Reader has finished reading two")
+
+	assert.EqualValues(t, expectResults, actualResults)
+	assert.Equal(t, StatsInfo{}, dr.Status())
+}
+
+func multiReaderNewestOffsetTest(t *testing.T) {
+	dirname := "multiReaderNewestOffsetTest"
+	dir1 := filepath.Join(dirname, "logs/abc")
+	dir2 := filepath.Join(dirname, "logs/xyz")
+	dir1file1 := filepath.Join(dir1, "file1.log")
+	dir2file1 := filepath.Join(dir2, "file1.log")
+
+	createDirWithName(dirname)
+	defer os.RemoveAll(dirname)
+
+	createDirWithName(dir1)
+	createFileWithContent(dir1file1, "abc123\nabc124\nabc125\nabc126\nabc127\n")
+	time.Sleep(15 * time.Second)
+	expectResults := map[string]int{
+		"abc\nx\n": 1,
+		"abc\ny\n": 1,
+		"abc\nz\n": 1,
+		"abc\na\n": 1,
+		"abc\nb\n": 1,
+		"abc\nc\n": 1,
+	}
+	actualResults := make(map[string]int)
+	logPathPattern := filepath.Join(dirname, "logs/*")
+	c := conf.MapConf{
+		"log_path":        logPathPattern,
+		"stat_interval":   "1s",
+		"expire":          "10s",
+		"max_open_files":  "128",
+		"read_from":       "newest",
+		"reader_buf_size": "1024",
+		"meta_path":       dirname,
+		"mode":            ModeDirx,
+	}
+	meta, err := reader.NewMetaWithConf(c)
+	assert.NoError(t, err)
+	r, err := NewReader(meta, c)
+	assert.NoError(t, err)
+
+	err = r.SetMode(ReadModeHeadPatternString, "^abc*")
+	assert.Nil(t, err)
+	dr := r.(*Reader)
+	assert.NoError(t, dr.Start())
+	t.Log("Reader has started")
+
+	assert.Equal(t, 10*time.Second, dr.expire)
+	assert.Equal(t, 720*time.Hour, dr.submetaExpire)
+
+	maxNum := 0
+	emptyNum := 0
+	for {
+		data, err := dr.ReadLine()
+		assert.Nil(t, err)
+		if data != "" {
+			t.Log("Data:", data, dr.Source(), maxNum)
+			actualResults[data]++
+			maxNum++
+		} else {
+			emptyNum++
+		}
+		if emptyNum > 5 {
+			break
+		}
+	}
+	assert.EqualValues(t, 0, maxNum)
+	t.Log("Reader has finished reading one")
+
+	emptyNum = 0
+	// 确保上个 reader 已过期，新的 reader 已经探测到并创建成功
+	createDirWithName(dir2)
+	createFileWithContent(dir2file1, "abc\nx\nabc\ny\nabc\nz\n")
+	appendFileWithContent(dir1file1, "abc\na\nabc\nb\nabc\nc\n")
+	time.Sleep(3 * time.Second)
+	assert.Equal(t, 2, dr.dirReaders.Num(), "Number of readers")
+
+	t.Log("Reader has started to read two")
+	emptyNum = 0
+	for {
+		data, err := dr.ReadLine()
+		if data != "" {
+			t.Log("Data:", data, dr.Source(), maxNum)
+			actualResults[data]++
+			maxNum++
+		} else {
+			emptyNum++
+		}
+		if err == io.EOF {
+			break
+		}
+		if maxNum >= 6 || emptyNum > 10 {
 			break
 		}
 	}

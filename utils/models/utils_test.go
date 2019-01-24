@@ -1311,5 +1311,4 @@ func TestMergeEnvTags(t *testing.T) {
 	os.Setenv(key, `{"b":"123","c":"nihao"}`)
 	tags = MergeEnvTags(key, tags)
 	assert.Equal(t, map[string]interface{}{"a": "hello", "b": "123", "c": "nihao"}, tags)
-
 }

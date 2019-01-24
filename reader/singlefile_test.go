@@ -31,7 +31,7 @@ func Test_singleFileRotate(t *testing.T) {
 		t.Error(err)
 	}
 
-	sf, err := NewSingleFile(meta, fileName, WhenceOldest, false)
+	sf, err := NewSingleFile(meta, fileName, WhenceOldest, 0, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -86,7 +86,7 @@ func Test_singleFileNotRotate(t *testing.T) {
 		t.Error(err)
 	}
 
-	sf, err := NewSingleFile(meta, fileName, WhenceOldest, false)
+	sf, err := NewSingleFile(meta, fileName, WhenceOldest, 0, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -118,6 +118,60 @@ func Test_singleFileNotRotate(t *testing.T) {
 	}
 	assert.Equal(t, 5, n)
 	assert.Equal(t, "67890", string(p))
+}
+
+//测试single file有offset的情况
+func Test_singleFileOffset(t *testing.T) {
+	fileName := os.TempDir() + "/test.singleFile"
+	metaDir := os.TempDir() + "/rotates"
+
+	//create file & write file
+	CreateFile(fileName, "12345")
+	defer DeleteFile(fileName)
+
+	//create sf
+	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeFile, "", DefautFileRetention)
+	if err != nil {
+		t.Error(err)
+	}
+
+	sf, err := NewSingleFile(meta, fileName, WhenceOldest, 5, false)
+	if err != nil {
+		t.Error(err)
+	}
+	oldInode, err := utilsos.GetIdentifyIDByFile(sf.f)
+	assert.NoError(t, err)
+
+	//read file 正常读
+	p := make([]byte, 5)
+	n, err := sf.Read(p)
+	assert.Equal(t, io.EOF, err)
+	assert.Equal(t, 0, n)
+
+	newInode, err := utilsos.GetIdentifyIDByFile(sf.f)
+	assert.NoError(t, err)
+	assert.Equal(t, newInode, oldInode)
+
+	//append文件，从 offset 5 开始读
+	appendTestFile(fileName, "12345")
+	n, err = sf.Read(p)
+	if err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, 5, n)
+	assert.Equal(t, "12345", string(p))
+
+	//append文件，从 offset 10 开始读
+	appendTestFile(fileName, "67890")
+	n, err = sf.Read(p)
+	if err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, 5, n)
+	assert.Equal(t, "67890", string(p))
+
+	n, err = sf.Read(p)
+	assert.Equal(t, io.EOF, err)
 }
 
 func appendTestFile(fileName, content string) {

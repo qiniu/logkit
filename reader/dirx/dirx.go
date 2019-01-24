@@ -18,6 +18,7 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/reader/config"
+	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -68,6 +69,8 @@ type Reader struct {
 	validFilesRegex      string
 	whence               string
 	bufferSize           int
+
+	expireMap map[string]int64
 
 	notFirstTime  bool
 	readSameInode bool
@@ -161,6 +164,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		whence:               whence,
 		bufferSize:           bufferSize,
 		readSameInode:        readSameInode,
+		expireMap:            make(map[string]int64),
 	}, nil
 }
 
@@ -262,6 +266,14 @@ func (r *Reader) statLogPath() {
 
 		// 过期的文件不追踪，除非之前追踪的并且有日志没读完
 		if !r.dirReaders.hasCachedLine(logPath) && HasDirExpired(logPath, r.dirReaders.expire) {
+			if r.whence == WhenceNewest {
+				fileMap, err := utils.GetFiles(r.meta.RunnerName, logPath)
+				if err != nil {
+					log.Errorf("Runner[%v] get log path %q failed %v, ignored this time", r.meta.RunnerName, logPath, err)
+				} else {
+					utils.UpdateExpireMap(r.meta.RunnerName, fileMap, r.expireMap)
+				}
+			}
 			log.Debugf("Runner[%v] log path %q has expired, ignored this time", r.meta.RunnerName, logPath)
 			continue
 		}
@@ -280,6 +292,7 @@ func (r *Reader) statLogPath() {
 			MsgChan:            r.msgChan,
 			ErrChan:            r.errChan,
 			ReadSameInode:      r.readSameInode,
+			expireMap:          r.expireMap,
 		}, r.notFirstTime)
 		if err != nil {
 			err = fmt.Errorf("create new reader for log path %q failed: %v", logPath, err)
@@ -328,6 +341,7 @@ func (r *Reader) Start() error {
 		defer ticker.Stop()
 		for {
 			r.dirReaders.checkExpiredDirs()
+			utils.CheckNotExistFile(r.meta.RunnerName, r.expireMap)
 			r.statLogPath()
 
 			select {
@@ -429,6 +443,7 @@ func (r *Reader) Close() error {
 }
 
 func (r *Reader) Reset() error {
+	r.expireMap = make(map[string]int64)
 	return r.dirReaders.Reset()
 }
 

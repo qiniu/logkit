@@ -265,6 +265,8 @@ type newReaderOptions struct {
 	Whence             string
 	BufferSize         int
 
+	expireMap map[string]int64
+
 	MsgChan chan<- message
 	ErrChan chan<- error
 
@@ -285,7 +287,7 @@ func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool) (*dir
 	if isNewDir && subMeta.IsNotExist() {
 		opts.Whence = WhenceOldest // 非存量文件第一次读取时从头开始读
 	}
-	fr, err := reader.NewSeqFile(subMeta, opts.LogPath, opts.IgnoreHidden, opts.NewFileNewLine, opts.IgnoreFileSuffixes, opts.ValidFilesRegex, opts.Whence)
+	fr, err := reader.NewSeqFile(subMeta, opts.LogPath, opts.IgnoreHidden, opts.NewFileNewLine, opts.IgnoreFileSuffixes, opts.ValidFilesRegex, opts.Whence, opts.expireMap)
 	if err != nil {
 		return nil, fmt.Errorf("new sequence file: %v", err)
 	}
