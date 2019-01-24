@@ -5,10 +5,11 @@ package utils
 
 import (
 	"context"
+	"unsafe"
+
 	"github.com/StackExchange/wmi"
 	"github.com/shirou/gopsutil/cpu"
 	"golang.org/x/sys/windows"
-	"unsafe"
 )
 
 var (
