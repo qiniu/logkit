@@ -20,9 +20,6 @@ const (
 	Latitude     = "Latitude"
 	Longitude    = "Longitude"
 	DistrictCode = "DistrictCode"
-
-	Local  = "local"
-	Server = "server"
 )
 
 var (
@@ -317,8 +314,8 @@ func (t *Transformer) Close() error {
 
 func (t *Transformer) ServerConfig() map[string]interface{} {
 	config := make(map[string]interface{})
-	config[transforms.KeyType] = Name
-	config[transforms.TransformAt] = t.TransformAt
+	config[KeyType] = Name
+	config[ProcessAt] = t.TransformAt
 	config["key"] = t.Key
 
 	return config

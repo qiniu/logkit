@@ -25,3 +25,6 @@ example
 	  fmt.Println(enc.ConvertString("hello,世界"))  
 	}
 
+donate
+-------
+https://github.com/axgle/mahonia/wiki/Donate

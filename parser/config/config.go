@@ -60,17 +60,18 @@ const (
 // ModeUsages 和 ModeTooltips 用途说明
 var (
 	ModeUsages = KeyValueSlice{
-		{TypeRaw, "按原始日志逐行发送", ""},
-		{TypeJSON, "按 json 格式解析", ""},
-		{TypeNginx, "按 nginx 日志解析", ""},
-		{TypeGrok, "按 grok 格式解析", ""},
-		{TypeCSV, "按 csv 格式解析", ""},
-		{TypeSyslog, "按 syslog 格式解析", ""},
-		{TypeLogv1, "按七牛日志库格式解析", ""},
-		{TypeKafkaRest, "按 kafkarest 日志解析", ""},
+		{TypeRaw, "原始日志逐行发送", ""},
+		{TypeJSON, "json 格式解析", ""},
+		{TypeNginx, "nginx 日志解析", ""},
+		{TypeGrok, "grok 格式解析", ""},
+		{TypeCSV, "csv 格式解析", ""},
+		{TypeSyslog, "syslog 格式解析", ""},
+		{TypeLogv1, "七牛日志库格式解析", ""},
+		{TypeKafkaRest, "kafkarest 日志解析", ""},
 		{TypeEmpty, "通过解析清空数据", ""},
-		{TypeMySQL, "按 mysql 慢请求日志解析", ""},
+		{TypeMySQL, "mysql 慢请求日志解析", ""},
 		{TypeKeyValue, "key value 日志解析", ""},
+		{TypeLinuxAudit, "redhat 审计日志解析", ""},
 	}
 
 	ModeToolTips = KeyValueSlice{
@@ -85,6 +86,7 @@ var (
 		{TypeEmpty, "通过解析清空数据", ""},
 		{TypeMySQL, "解析mysql的慢请求日志。", ""},
 		{TypeKeyValue, "按照key value解析日志", ""},
+		{TypeLinuxAudit, "按 redhat 审计日志解析", ""},
 	}
 )
 
@@ -369,6 +371,30 @@ var ModeKeyOptions = map[string][]Option{
 		OptionKeepRawData,
 	},
 	TypeLogfmt: {
+		{
+			KeyName:      KeySplitter,
+			ChooseOnly:   false,
+			Default:      "=",
+			DefaultNoUse: false,
+			Description:  "分隔符(splitter)",
+		},
+		OptionParserName,
+		OptionDisableRecordErrData,
+		OptionKeepRawData,
+	},
+	TypeKeyValue: {
+		{
+			KeyName:      KeySplitter,
+			ChooseOnly:   false,
+			Default:      "=",
+			DefaultNoUse: false,
+			Description:  "分隔符(splitter)",
+		},
+		OptionParserName,
+		OptionDisableRecordErrData,
+		OptionKeepRawData,
+	},
+	TypeLinuxAudit: {
 		OptionParserName,
 		OptionDisableRecordErrData,
 		OptionKeepRawData,
@@ -396,4 +422,7 @@ SELECT count(*) from mysql.rds_replication_status WHERE master_host IS NOT NULL 
 #`,
 	TypeLogfmt: `ts=2018-01-02T03:04:05.123Z lvl=5 msg="error" log_id=123456abc
 method=PUT duration=1.23 log_id=123456abc`,
+	TypeKeyValue: `ts=2018-01-02T03:04:05.123Z lvl=5 msg="error" log_id=123456abc
+method=PUT duration=1.23 log_id=123456abc`,
+	TypeLinuxAudit: `type=SYSCALL msg=audit(1364481363.243:24287): arch=c000003e syscall=2 success=no exit=-13 a0=7fffd19c5592 a1=0    a2=7fffd19c4b50`,
 }

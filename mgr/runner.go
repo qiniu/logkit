@@ -22,6 +22,7 @@ import (
 	"github.com/qiniu/logkit/parser"
 	_ "github.com/qiniu/logkit/parser/builtin"
 	"github.com/qiniu/logkit/parser/config"
+	parserconfig "github.com/qiniu/logkit/parser/config"
 	"github.com/qiniu/logkit/parser/qiniu"
 	"github.com/qiniu/logkit/reader"
 	_ "github.com/qiniu/logkit/reader/builtin"
@@ -267,16 +268,22 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 			return nil, err
 		}
 	}
-	parser, err := pr.NewLogParser(rc.ParserConf)
+	ps, err := pr.NewLogParser(rc.ParserConf)
 	if err != nil {
 		return nil, err
+	}
+
+	var serverConfigs = make([]map[string]interface{}, 0, 10)
+	if serverParser, ok := ps.(parser.ServerParser); ok {
+		if serverParser.ServerConfig() != nil {
+			serverConfigs = append(serverConfigs, serverParser.ServerConfig())
+		}
 	}
 
 	transformers, err := createTransformers(rc)
 	if err != nil {
 		return nil, err
 	}
-	var serverConfigs = make([]map[string]interface{}, 0, len(transformers))
 	for _, transform := range transformers {
 		if serverTransformer, ok := transform.(transforms.ServerTansformer); ok {
 			if serverTransformer.ServerConfig() != nil {
@@ -317,7 +324,7 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	if err != nil {
 		return nil, fmt.Errorf("runner %v add sender router error, %v", rc.RunnerName, err)
 	}
-	runner, err = NewLogExportRunnerWithService(runnerInfo, rd, cl, parser, transformers, senders, router, meta)
+	runner, err = NewLogExportRunnerWithService(runnerInfo, rd, cl, ps, transformers, senders, router, meta)
 	if err != nil {
 		return runner, err
 	}
@@ -335,7 +342,7 @@ func createTransformers(rc RunnerConfig) ([]transforms.Transformer, error) {
 	transformers := make([]transforms.Transformer, 0)
 	for idx := range rc.Transforms {
 		tConf := rc.Transforms[idx]
-		tp := tConf[transforms.KeyType]
+		tp := tConf[KeyType]
 		if tp == nil {
 			return nil, fmt.Errorf("transformer config type is empty %v", tConf)
 		}
@@ -1484,12 +1491,12 @@ func setPandoraServerConfig(senderConfig conf.MapConf, serverConfigs []map[strin
 
 	var err error
 	for _, serverConfig := range serverConfigs {
-		keyType, ok := serverConfig[transforms.KeyType].(string)
+		keyType, ok := serverConfig[KeyType].(string)
 		if !ok {
 			continue
 		}
 		switch keyType {
-		case ip.Name:
+		case ip.Name, parserconfig.TypeLinuxAudit:
 			if senderConfig, err = setIPConfig(senderConfig, serverConfig); err != nil {
 				return senderConfig, err
 			}
@@ -1506,13 +1513,13 @@ func setIPConfig(senderConfig conf.MapConf, serverConfig map[string]interface{})
 	}
 
 	autoCreate := senderConfig[senderConf.KeyPandoraAutoCreate]
-	transformAt, transformAtOk := serverConfig[transforms.TransformAt].(string)
-	if !transformAtOk {
+	processAt, processAtOk := serverConfig[ProcessAt].(string)
+	if !processAtOk {
 		return senderConfig, nil
 	}
 
 	senderConfig[senderConf.KeyPandoraAutoCreate] = removeServerIPSchema(senderConfig[senderConf.KeyPandoraAutoCreate], key)
-	if transformAt == ip.Local {
+	if processAt == Local {
 		return senderConfig, nil
 	}
 
