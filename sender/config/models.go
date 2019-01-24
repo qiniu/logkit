@@ -143,6 +143,8 @@ const (
 	KeyFtMemoryChannelSize = "ft_memory_channel_size"
 	KeyFtLongDataDiscard   = "ft_long_data_discard"
 
+	KeySenderTest = "sender_test" // dataflow中测试发送，不需要ft sender
+
 	// queue
 	KeyMaxDiskUsedBytes = "max_disk_used_bytes"
 	KeyMaxSizePerFile   = "max_size_per_file"

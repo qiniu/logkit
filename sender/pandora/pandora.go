@@ -601,7 +601,9 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 	}); initErr != nil {
 		log.Errorf("runner[%v] Sender [%v]: init Workflow error %v", opt.runnerName, opt.name, initErr)
 	}
-	s.UpdateSchemas()
+	if schemaErr := s.UpdateSchemas(); schemaErr != nil {
+		log.Errorf("runner[%v] Sender [%v]: get schemas failed: %v", opt.runnerName, opt.name, schemaErr)
+	}
 	return
 }
 
@@ -647,9 +649,9 @@ func parseUserSchema(runnerName, repoName, schema string) (us UserSchema) {
 	return
 }
 
-func (s *Sender) UpdateSchemas() {
+func (s *Sender) UpdateSchemas() error {
 	if s.opt.sendType == SendTypeRaw {
-		return
+		return nil
 	}
 	schemas, err := s.client.GetUpdateSchemasWithInput(
 		&pipeline.GetRepoInput{
@@ -658,16 +660,17 @@ func (s *Sender) UpdateSchemas() {
 		})
 	if err != nil && (!s.opt.schemaFree || !reqerr.IsNoSuchResourceError(err)) {
 		if !IsSelfRunner(s.opt.runnerName) {
-			log.Warnf("Runner[%v] Sender[%v]: update pandora repo <%v> schema error %v", s.opt.runnerName, s.opt.name, s.opt.repoName, err)
+			log.Warnf("Runner[%s] Sender[%s]: update pandora repo <%s> schema error %v", s.opt.runnerName, s.opt.name, s.opt.repoName, err)
 		} else {
-			log.Debugf("Runner[%v] Sender[%v]: update pandora repo <%v> schema error %v", s.opt.runnerName, s.opt.name, s.opt.repoName, err)
+			log.Debugf("Runner[%s] Sender[%s]: update pandora repo <%s> schema error %v", s.opt.runnerName, s.opt.name, s.opt.repoName, err)
 		}
-		return
+		return err
 	}
 	if schemas == nil {
-		return
+		return nil
 	}
 	s.updateSchemas(schemas)
+	return nil
 }
 
 func (s *Sender) updateSchemas(schemas map[string]pipeline.RepoSchemaEntry) {
@@ -909,15 +912,15 @@ func (s *Sender) generatePoint(data Data) (point Data) {
 	return
 }
 
-func (s *Sender) checkSchemaUpdate() {
+func (s *Sender) checkSchemaUpdate() error {
 	var lastUpdateTime time.Time
 	s.schemasMux.RLock()
 	lastUpdateTime = s.lastUpdate
 	s.schemasMux.RUnlock()
 	if lastUpdateTime.Add(s.opt.updateInterval).After(time.Now()) {
-		return
+		return nil
 	}
-	s.UpdateSchemas()
+	return s.UpdateSchemas()
 }
 
 func (s *Sender) Send(datas []Data) (se error) {
@@ -1052,17 +1055,23 @@ func (s *Sender) rawSend(datas []Data) (se error) {
 }
 
 func (s *Sender) schemaFreeSend(datas []Data) (se error) {
-	s.checkSchemaUpdate()
+	err := s.checkSchemaUpdate()
 	senderSchemas, senderAlias2Key := s.getSchemasAlias()
 	if !s.opt.schemaFree && (len(senderSchemas) <= 0 || len(senderAlias2Key) <= 0) {
+		lastError := "Get pandora schema error or repo not exist"
+		msg := "Get pandora schema error, failed to send data"
+		if err != nil {
+			lastError += ": " + err.Error()
+			msg += ": " + err.Error()
+		}
 		return &StatsError{
 			StatsInfo: StatsInfo{
 				Success:   0,
 				Errors:    int64(len(datas)),
-				LastError: "Get pandora schema error or repo not exist",
+				LastError: lastError,
 			},
 			SendError: reqerr.NewSendError(
-				"Get pandora schema error, failed to send data",
+				msg,
 				sender.ConvertDatasBack(datas),
 				reqerr.TypeDefault,
 			),

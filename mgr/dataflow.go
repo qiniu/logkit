@@ -97,7 +97,7 @@ func RawData(readerConfig conf.MapConf) ([]string, error) {
 	}()
 
 	var rawData []string
-	timeout := time.NewTimer(time.Minute)
+	timeout := time.NewTimer(30 * time.Second)
 	defer timeout.Stop()
 	select {
 	case de := <-readChan:
@@ -268,12 +268,14 @@ func getSenders(sendersConf []conf.MapConf) ([]sender.Sender, error) {
 	for i, senderConfig := range sendersConf {
 		senderConfig[senderConf.KeyFaultTolerant] = "false"
 		senderConfig[senderConf.KeyFtSaveLogPath] = ftSaveLogPath
+		senderConfig[senderConf.KeySenderTest] = "true"
 		s, err := sr.NewSender(senderConfig, "")
 		if err != nil {
 			return nil, err
 		}
 		senders = append(senders, s)
 		delete(sendersConf[i], senderConf.InnerUserAgent)
+		delete(sendersConf[i], senderConf.KeySenderTest)
 	}
 	return senders, nil
 }
@@ -315,34 +317,30 @@ func trySend(s sender.Sender, datas []Data, times int) (err error) {
 	}
 	cnt := 0
 	for {
-		if cnt >= times {
+		err = s.Send(datas)
+		if err == nil {
 			break
 		}
-		err = s.Send(datas)
+
 		if se, ok := err.(*StatsError); ok {
 			if se.Errors == 0 {
-				return nil
+				break
 			}
-
 			if se.SendError != nil {
 				err = se.SendError
 			}
 		}
 
-		if err != nil {
-			cnt++
-			se, ok := err.(*reqerr.SendError)
-			if ok {
-				datas = sender.ConvertDatas(se.GetFailDatas())
-				continue
-			}
-			if cnt < times {
-				continue
-			}
-			err = fmt.Errorf("retry send %v times, but still error %v, discard datas %v ... total %v lines", cnt, err, datas, len(datas))
-			return err
+		if se, ok := err.(*reqerr.SendError); ok {
+			datas = sender.ConvertDatas(se.GetFailDatas())
 		}
-		break
+
+		cnt++
+		if cnt < times {
+			continue
+		}
+		err = fmt.Errorf("retry send %v times, but still error %v, discard datas... total %v lines", cnt, err, len(datas))
+		return err
 	}
 	return nil
 }
@@ -489,7 +487,7 @@ func readDatas(dr reader.DataReader, size int, timeoutStatus *int32) dataResult 
 		batchSize += int(bytes)
 	}
 
-	return dataResult{datas, nil}
+	return dataResult{datas, err}
 }
 
 func readLines(rd reader.Reader, size int, timeoutStatus *int32) dataResult {
@@ -509,6 +507,9 @@ func readLines(rd reader.Reader, size int, timeoutStatus *int32) dataResult {
 		if err != nil && err != io.EOF {
 			return dataResult{lines, err}
 		}
+		if err == io.EOF {
+			err = nil
+		}
 
 		if len(line) < 1 {
 			log.Debugf("no more content fetched sleep 1 second...")
@@ -522,7 +523,7 @@ func readLines(rd reader.Reader, size int, timeoutStatus *int32) dataResult {
 		batchSize += len(line)
 	}
 
-	return dataResult{lines, nil}
+	return dataResult{lines, err}
 }
 
 func batchFullOrTimeout(batchLen, size int, timeoutStatus *int32) bool {
