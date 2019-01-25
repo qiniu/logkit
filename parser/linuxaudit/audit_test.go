@@ -94,12 +94,14 @@ func Test_parseLine(t *testing.T) {
 			},
 		},
 		{
-			line: `type=CWD msg='op=PAM:secret test1="a" res=success'
+			line: `type=CWD msg=audit(1364481363.243:24287) msg='op=PAM:secret test1="a" res=success'
 					cwd="/home/shadowman" `,
 			expectData: Data{
-				"type": "CWD",
-				"cwd":  "/home/shadowman",
-				"msg":  Data{"op": "PAM:secret", "test1": "a", "res": "success"},
+				"type":          "CWD",
+				"msg_timestamp": "2013-03-28T14:36:03.243Z",
+				"msg_id":        "24287",
+				"cwd":           "/home/shadowman",
+				"msg":           map[string]interface{}{"op": "PAM:secret", "test1": "a", "res": "success"},
 			},
 		},
 		{
@@ -222,6 +224,48 @@ func Test_setData(t *testing.T) {
 
 	for _, test := range tests {
 		setData(test.key, test.line, test.data)
+		assert.EqualValues(t, len(test.expect), len(test.data))
+		for key, value := range test.expect {
+			val, ok := test.data[key]
+			assert.True(t, ok)
+			assert.EqualValues(t, value, val)
+		}
+	}
+}
+
+func Test_setAddr(t *testing.T) {
+	tests := []struct {
+		data   Data
+		val    interface{}
+		expect Data
+	}{
+		{
+			data: Data{},
+		},
+		{
+			data: Data{},
+			val: map[string]interface{}{
+				"addr": "?",
+			},
+		},
+		{
+			data: Data{},
+			val: map[string]interface{}{
+				"addr": "10.10.10.10",
+			},
+			expect: Data{"addr": "10.10.10.10"},
+		},
+		{
+			data: Data{},
+			val: map[string]interface{}{
+				"net": "10.10.10.10",
+			},
+			expect: Data{},
+		},
+	}
+
+	for _, test := range tests {
+		setAddr(test.data, test.val)
 		assert.EqualValues(t, len(test.expect), len(test.data))
 		for key, value := range test.expect {
 			val, ok := test.data[key]
