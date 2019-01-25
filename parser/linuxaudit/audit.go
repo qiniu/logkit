@@ -13,7 +13,13 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-const DefaultCheckKey = 5
+const (
+	DefaultCheckKey = 5
+	Addr            = "addr"
+	Msg             = "msg"
+	MsgTimestamp    = Msg + "_timestamp"
+	MsgID           = Msg + "_id"
+)
 
 type Parser struct {
 	name                 string
@@ -191,7 +197,7 @@ func processSpace(key, tmp string, data Data) {
 	if strings.HasSuffix(tmp, ":") {
 		tmp = strings.TrimSuffix(tmp, ":")
 	}
-	if key == "msg" && strings.HasPrefix(tmp, "audit(") {
+	if key == Msg && strings.HasPrefix(tmp, "audit(") {
 		if getTimestampID(tmp, data) {
 			return
 		}
@@ -217,12 +223,12 @@ func getTimestampID(tmp string, data Data) bool {
 	tm, err := GetTime(timestamp)
 	if err != nil {
 		log.Errorf("parse msg timestamp: %s failed: %v", timestamp, err)
-		data["msg_timestamp"] = strings.TrimSpace(arr[0])
+		data[MsgTimestamp] = strings.TrimSpace(arr[0])
 	} else {
-		data["msg_timestamp"] = FormatWithUserOption("", 0, tm)
+		data[MsgTimestamp] = FormatWithUserOption("", 0, tm)
 	}
 
-	data["msg_id"] = strings.TrimSpace(arr[1])
+	data[MsgID] = strings.TrimSpace(arr[1])
 	return true
 }
 
@@ -239,11 +245,15 @@ func (p *Parser) processSubLine(tmp, tmpLine, key string, data Data) {
 
 	suffix := strings.Index(tmpLine, "'")
 	if suffix != -1 {
-		value, err := p.parse(tmpLine[:suffix+1])
+		tmpData, err := p.parse(tmpLine[:suffix+1])
 		if err != nil {
 			log.Errorf("parse line: %s failed: %v", tmpLine[:suffix+1], err)
 		} else {
+			value := convertDataToMap(tmpData)
 			setData(key, value, data)
+			if val, ok := data[Msg]; ok {
+				setAddr(data, val)
+			}
 		}
 	}
 	return
@@ -276,7 +286,42 @@ func (t *Parser) ServerConfig() map[string]interface{} {
 	config := make(map[string]interface{})
 	config[KeyType] = TypeLinuxAudit
 	config[ProcessAt] = Server
-	config["key"] = "arr"
+	config["key"] = Addr
 
 	return config
+}
+
+func convertDataToMap(data Data) map[string]interface{} {
+	if len(data) == 0 {
+		return make(map[string]interface{})
+	}
+
+	res := make(map[string]interface{})
+	for k, v := range data {
+		res[k] = v
+	}
+	return res
+}
+
+func setAddr(data Data, val interface{}) {
+	valMap, ok := val.(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	addr, ok := valMap[Addr]
+	if !ok {
+		return
+	}
+
+	addrStr, ok := addr.(string)
+	if !ok {
+		return
+	}
+
+	if addrStr == "?" {
+		return
+	}
+
+	data[Addr] = addrStr
 }
