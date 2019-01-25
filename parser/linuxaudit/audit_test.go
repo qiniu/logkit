@@ -94,7 +94,7 @@ func Test_parseLine(t *testing.T) {
 			},
 		},
 		{
-			line: `type=CWD msg=audit(1364481363.243:24287) msg='op=PAM:secret test1="a" res=success'
+			line: `type=CWD msg=audit(1364481363.243:24287) msg='op=PAM:secret test1="a" res=success b=  ' a=
 					cwd="/home/shadowman" `,
 			expectData: Data{
 				"type":          "CWD",

@@ -193,6 +193,10 @@ func processSpace(key, tmp string, data Data) {
 	if key == "" {
 		return
 	}
+	tmp = strings.TrimSpace(tmp)
+	if tmp == "" {
+		return
+	}
 
 	if strings.HasSuffix(tmp, ":") {
 		tmp = strings.TrimSuffix(tmp, ":")
@@ -217,18 +221,24 @@ func getTimestampID(tmp string, data Data) bool {
 	}
 
 	timestamp := strings.TrimSpace(arr[0])
-	if idx := strings.Index(arr[0], "."); idx != -1 {
-		timestamp = arr[0][:idx] + arr[0][idx+1:]
-	}
-	tm, err := GetTime(timestamp)
-	if err != nil {
-		log.Errorf("parse msg timestamp: %s failed: %v", timestamp, err)
-		data[MsgTimestamp] = strings.TrimSpace(arr[0])
-	} else {
-		data[MsgTimestamp] = FormatWithUserOption("", 0, tm)
+	if timestamp != "" {
+		if idx := strings.Index(arr[0], "."); idx != -1 {
+			timestamp = arr[0][:idx] + arr[0][idx+1:]
+		}
+		tm, err := GetTime(timestamp)
+		if err != nil {
+			log.Errorf("parse msg timestamp: %s failed: %v", timestamp, err)
+			data[MsgTimestamp] = strings.TrimSpace(arr[0])
+		} else {
+			data[MsgTimestamp] = FormatWithUserOption("", 0, tm)
+		}
 	}
 
-	data[MsgID] = strings.TrimSpace(arr[1])
+	id := strings.TrimSpace(arr[1])
+	if id == "" {
+		return true
+	}
+	data[MsgID] = id
 	return true
 }
 
@@ -248,21 +258,28 @@ func (p *Parser) processSubLine(tmp, tmpLine, key string, data Data) {
 		tmpData, err := p.parse(tmpLine[:suffix+1])
 		if err != nil {
 			log.Errorf("parse line: %s failed: %v", tmpLine[:suffix+1], err)
-		} else {
-			value := convertDataToMap(tmpData)
-			setData(key, value, data)
-			if val, ok := data[Msg]; ok {
-				setAddr(data, val)
-			}
+			return
+		}
+		if len(tmpData) == 0 {
+			return
+		}
+		value := convertDataToMap(tmpData)
+		setData(key, value, data)
+		if val, ok := data[Msg]; ok {
+			setAddr(data, val)
 		}
 	}
 	return
 }
 
 func setData(key string, value interface{}, data Data) {
-	if key == "" {
+	if key == "" || value == nil {
 		return
 	}
+	if val, ok := value.(string); ok && val == "" {
+		return
+	}
+
 	_, ok := data[key]
 	if !ok {
 		data[key] = value
