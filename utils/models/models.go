@@ -96,6 +96,19 @@ var (
 	ModifierRe = regexp.MustCompile(`%{\w+:(\w+):(long|string|date|float|drop)}`)
 	// matches a plain pattern name. ie, %{NUMBER}
 	PatternOnlyRe = regexp.MustCompile(`%{(\w+)}`)
+
+	Encoding = []interface{}{"UTF-8", "UTF-16", "US-ASCII", "ISO-8859-1",
+		"GBK", "latin1", "GB18030", "EUC-JP", "UTF-16BE", "UTF-16LE", "Big5", "Shift_JIS",
+		"ISO-8859-2", "ISO-8859-3", "ISO-8859-4", "ISO-8859-5", "ISO-8859-6", "ISO-8859-7",
+		"ISO-8859-8", "ISO-8859-9", "ISO-8859-10", "ISO-8859-11", "ISO-8859-13",
+		"ISO-8859-14", "ISO-8859-15", "ISO-8859-16", "macos-0_2-10.2", "macos-6_2-10.4",
+		"macos-7_3-10.2", "macos-29-10.2", "macos-35-10.2", "windows-1250", "windows-1251",
+		"windows-1252", "windows-1253", "windows-1254", "windows-1255", "windows-1256",
+		"windows-1257", "windows-1258", "windows-874", "IBM037", "ibm-273_P100-1995",
+		"ibm-277_P100-1995", "ibm-278_P100-1995", "ibm-280_P100-1995", "ibm-284_P100-1995",
+		"ibm-285_P100-1995", "ibm-290_P100-1995", "ibm-297_P100-1995", "ibm-420_X120-1999",
+		//此处省略大量IBM的字符集，太多，等用户需要再加
+		"KOI8-R", "KOI8-U", "ebcdic-xml-us"}
 )
 
 type Option struct {
