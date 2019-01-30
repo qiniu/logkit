@@ -72,6 +72,7 @@ var (
 		{TypeMySQL, "mysql 慢请求日志解析", ""},
 		{TypeKeyValue, "key value 日志解析", ""},
 		{TypeLinuxAudit, "redhat 审计日志解析", ""},
+		{TypeCisco, "cisco 防火墙日志解析", ""},
 	}
 
 	ModeToolTips = KeyValueSlice{
@@ -86,7 +87,8 @@ var (
 		{TypeEmpty, "通过解析清空数据", ""},
 		{TypeMySQL, "解析mysql的慢请求日志。", ""},
 		{TypeKeyValue, "按照key value解析日志", ""},
-		{TypeLinuxAudit, "按 redhat 审计日志解析", ""},
+		{TypeLinuxAudit, "按照 redhat 审计日志解析", ""},
+		{TypeCisco, "按照 cisco 防火墙日志解析", ""},
 	}
 )
 
@@ -399,6 +401,11 @@ var ModeKeyOptions = map[string][]Option{
 		OptionDisableRecordErrData,
 		OptionKeepRawData,
 	},
+	TypeCisco: {
+		OptionParserName,
+		OptionDisableRecordErrData,
+		OptionKeepRawData,
+	},
 }
 
 // SampleLogs 样例日志，用于前端界面试玩解析器
@@ -425,4 +432,5 @@ method=PUT duration=1.23 log_id=123456abc`,
 	TypeKeyValue: `ts=2018-01-02T03:04:05.123Z lvl=5 msg="error" log_id=123456abc
 method=PUT duration=1.23 log_id=123456abc`,
 	TypeLinuxAudit: `type=SYSCALL msg=audit(1364481363.243:24287): arch=c000003e syscall=2 success=no exit=-13 a0=7fffd19c5592 a1=0    a2=7fffd19c4b50`,
+	TypeCisco:      `Teardown dynamic TCP translation from Inside:100.20.50.100/70000 to Outside:8.8.8.8/40000 duration 0:00:00`,
 }
