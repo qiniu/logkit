@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -12,19 +13,19 @@ import (
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/reader"
 
-	. "github.com/qiniu/logkit/utils/models"
+	"github.com/qiniu/logkit/utils/models"
 )
 
-func restoreMeta(meta *reader.Meta, rawSqls string, magicLagDur time.Duration) (offsets []int64, sqls []string, omitMeta bool) {
+func RestoreMeta(meta *reader.Meta, rawSqls string, magicLagDur time.Duration) (offsets []int64, sqls []string, omitMeta bool) {
 	now := time.Now().Add(-magicLagDur)
-	sqls = updateSqls(rawSqls, now)
+	sqls = UpdateSqls(rawSqls, now)
 	omitMeta = true
 	sqlAndOffsets, length, err := meta.ReadOffset()
 	if err != nil {
 		log.Errorf("Runner[%v] %v -meta data is corrupted err:%v, omit meta data", meta.RunnerName, meta.MetaFile(), err)
 		return
 	}
-	tmps := strings.Split(sqlAndOffsets, sqlOffsetConnector)
+	tmps := strings.Split(sqlAndOffsets, SqlOffsetConnector)
 	if int64(len(tmps)) != 2*length || int64(len(sqls)) != length {
 		log.Errorf("Runner[%v] %v -meta file is not invalid sql meta file %v， omit meta data", meta.RunnerName, meta.MetaFile(), sqlAndOffsets)
 		return
@@ -101,7 +102,7 @@ func WriteCacheMap(doneFilePath string, cache map[string]string) (err error) {
 	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, CacheMapFile)
 	filePath := filepath.Join(doneFilePath, filename)
 	// write to tmp file
-	f, err = os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, DefaultFilePerm)
+	f, err = os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, models.DefaultFilePerm)
 	if err != nil {
 		return err
 	}
@@ -123,7 +124,7 @@ func WriteTimestmapOffset(doneFilePath, content string) (err error) {
 	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, TimestampRecordsFile)
 	filePath := filepath.Join(doneFilePath, filename)
 	// write to tmp file
-	f, err = os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, DefaultFilePerm)
+	f, err = os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, models.DefaultFilePerm)
 	if err != nil {
 		return err
 	}
@@ -142,7 +143,7 @@ func WriteRecordsFile(doneFilePath, content string) (err error) {
 	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, DefaultDoneRecordsFile)
 	filePath := filepath.Join(doneFilePath, filename)
 	// write to tmp file
-	f, err = os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, DefaultFilePerm)
+	f, err = os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, models.DefaultFilePerm)
 	if err != nil {
 		return err
 	}

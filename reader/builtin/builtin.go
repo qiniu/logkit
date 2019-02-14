@@ -11,10 +11,12 @@ import (
 	_ "github.com/qiniu/logkit/reader/kafka"
 	_ "github.com/qiniu/logkit/reader/mockreader"
 	_ "github.com/qiniu/logkit/reader/mongo"
+	_ "github.com/qiniu/logkit/reader/mssql"
+	_ "github.com/qiniu/logkit/reader/mysql"
+	_ "github.com/qiniu/logkit/reader/postgres"
 	_ "github.com/qiniu/logkit/reader/redis"
 	_ "github.com/qiniu/logkit/reader/script"
 	_ "github.com/qiniu/logkit/reader/snmp"
 	_ "github.com/qiniu/logkit/reader/socket"
-	_ "github.com/qiniu/logkit/reader/sql"
 	_ "github.com/qiniu/logkit/reader/tailx"
 )

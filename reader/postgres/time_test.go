@@ -1,4 +1,4 @@
-package sql
+package postgres
 
 import (
 	"testing"
@@ -11,7 +11,7 @@ func TestParsePostgresDatetime(t *testing.T) {
 	tests := []string{"2018-10-1 12:2:3", "2018-10-01 12:02:03", "2018-10-01 12:02:03.000000"}
 	var t0 time.Time
 	for _, v := range tests {
-		tm, err := parsePostgresDatetime(v)
+		tm, err := ParsePostgresDatetime(v)
 		if err != nil {
 			t.Error(err)
 		}

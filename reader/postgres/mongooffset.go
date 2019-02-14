@@ -1,14 +1,16 @@
-package sql
+package postgres
 
 import (
 	"reflect"
 	"time"
 
 	"github.com/qiniu/log"
-	. "github.com/qiniu/logkit/utils/models"
+
+	. "github.com/qiniu/logkit/reader/sql"
+	"github.com/qiniu/logkit/utils/models"
 )
 
-func (r *Reader) getTimeFromData(data Data) (time.Time, bool) {
+func (r *PostgresReader) getTimeFromData(data models.Data) (time.Time, bool) {
 	if len(r.timestampKey) <= 0 {
 		return time.Time{}, false
 	}
@@ -20,7 +22,7 @@ func (r *Reader) getTimeFromData(data Data) (time.Time, bool) {
 	return tm, ok
 }
 
-func (r *Reader) getTimeIntFromData(data Data) (int64, bool) {
+func (r *PostgresReader) getTimeIntFromData(data models.Data) (int64, bool) {
 	if len(r.timestampKey) <= 0 {
 		return 0, false
 	}
@@ -32,7 +34,7 @@ func (r *Reader) getTimeIntFromData(data Data) (int64, bool) {
 	return tm, ok
 }
 
-func (r *Reader) getTimeFromArgs(offsetKeyIndex int, scanArgs []interface{}) (time.Time, bool) {
+func (r *PostgresReader) getTimeFromArgs(offsetKeyIndex int, scanArgs []interface{}) (time.Time, bool) {
 	if offsetKeyIndex < 0 || offsetKeyIndex > len(scanArgs) {
 		return time.Time{}, false
 	}
@@ -64,11 +66,11 @@ func (r *Reader) getTimeFromArgs(offsetKeyIndex int, scanArgs []interface{}) (ti
 	return time.Time{}, false
 }
 
-func (r *Reader) getTimeIntFromArgs(offsetKeyIndex int, scanArgs []interface{}) (int64, bool) {
+func (r *PostgresReader) getTimeIntFromArgs(offsetKeyIndex int, scanArgs []interface{}) (int64, bool) {
 	if offsetKeyIndex < 0 || offsetKeyIndex > len(scanArgs) {
 		return 0, false
 	}
-	timeOffset, err := convertLong(scanArgs[offsetKeyIndex])
+	timeOffset, err := ConvertLong(scanArgs[offsetKeyIndex])
 	if err != nil {
 		log.Error("getTimeIntFromArgs err ", err)
 		return 0, false
@@ -76,7 +78,7 @@ func (r *Reader) getTimeIntFromArgs(offsetKeyIndex int, scanArgs []interface{}) 
 	return timeOffset, true
 }
 
-func (r *Reader) updateStartTime(offsetKeyIndex int, scanArgs []interface{}) bool {
+func (r *PostgresReader) updateStartTime(offsetKeyIndex int, scanArgs []interface{}) bool {
 	if r.timestampKeyInt {
 		timeOffset, ok := r.getTimeIntFromArgs(offsetKeyIndex, scanArgs)
 		if ok && timeOffset > r.startTimeInt {
@@ -100,7 +102,7 @@ func (r *Reader) updateStartTime(offsetKeyIndex int, scanArgs []interface{}) boo
 }
 
 //用于更新时间戳，已经同样时间戳上那个数据点
-func (r *Reader) updateTimeCntFromData(v readInfo) {
+func (r *PostgresReader) updateTimeCntFromData(v readInfo) {
 	if r.timestampKeyInt {
 		timeData, ok := r.getTimeIntFromData(v.data)
 		if !ok {
@@ -141,7 +143,7 @@ func (r *Reader) updateTimeCntFromData(v readInfo) {
 }
 
 //-1 代表不存在; 1 代表更大; 0 代表相等
-func (r *Reader) compareWithStartTime(data Data) (int, bool) {
+func (r *PostgresReader) compareWithStartTime(data models.Data) (int, bool) {
 	timeData, ok := r.getTimeFromData(data)
 	if !ok {
 		//如果出现了数据中没有时间的，实际上已经不合法了，那就获取，宁愿重复不愿遗漏
@@ -154,7 +156,7 @@ func (r *Reader) compareWithStartTime(data Data) (int, bool) {
 }
 
 //-1 代表不存在; 1 代表更大; 0 代表相等
-func (r *Reader) compareWithStartTimeInt(data Data) (int, bool) {
+func (r *PostgresReader) compareWithStartTimeInt(data models.Data) (int, bool) {
 	timeData, ok := r.getTimeIntFromData(data)
 	if !ok {
 		//如果出现了数据中没有时间的，实际上已经不合法了，那就获取，宁愿重复不愿遗漏
@@ -166,11 +168,11 @@ func (r *Reader) compareWithStartTimeInt(data Data) (int, bool) {
 	return 0, true
 }
 
-func (r *Reader) trimeExistData(datas []readInfo) []readInfo {
+func (r *PostgresReader) trimeExistData(datas []readInfo) []readInfo {
 	if len(r.timestampKey) <= 0 || len(datas) < 1 {
 		return datas
 	}
-	datas, success := getJson(datas)
+	datas, success := GetJson(datas)
 	if !success {
 		return datas
 	}
