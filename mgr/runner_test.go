@@ -1197,6 +1197,40 @@ func TestAddDatasource(t *testing.T) {
 
 }
 
+func TestAddEncode(t *testing.T) {
+	datas := []Data{
+		{
+			"f1": "2",
+		},
+		{
+			"f2": "1",
+		},
+		{
+			"f3": "3",
+		},
+	}
+	encodeTagName := "encode"
+	runnername := "runner1"
+	encode := "gbk"
+	exp := []Data{
+		{
+			"f1":     "2",
+			"encode": "gbk",
+		},
+		{
+			"f2":     "1",
+			"encode": "gbk",
+		},
+		{
+			"f3":     "3",
+			"encode": "gbk",
+		},
+	}
+	addEncodeToData(datas, encodeTagName, encode, runnername)
+	assert.Equal(t, exp, datas)
+
+}
+
 func TestAddDatasourceForErrData(t *testing.T) {
 	sourceFroms := []string{"a", "b", "c", "d", "e", "f"}
 	se := &StatsError{

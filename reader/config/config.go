@@ -80,6 +80,15 @@ var (
 		Advance:      true,
 		ToolTip:      "把读取日志的路径名称也作为标签，记录到解析出来的数据结果中，此处填写标签名称",
 	}
+	OptionEncodeTag = Option{
+		KeyName:      KeyEncodeTag,
+		ChooseOnly:   false,
+		Default:      "encode",
+		DefaultNoUse: false,
+		Description:  "编码方式标签(encode_tag)",
+		Advance:      true,
+		ToolTip:      "把日志的编码方式也作为标签，记录到解析出来的数据结果中，此处填写标签名称",
+	}
 	OptionBuffSize = Option{
 		KeyName:      KeyBufSize,
 		ChooseOnly:   false,
@@ -275,6 +284,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionWhence,
 		OptionEncoding,
 		OptionDataSourceTag,
+		OptionEncodeTag,
 		OptionReadIoLimit,
 		OptionHeadPattern,
 		OptionKeyNewFileNewLine,
@@ -299,6 +309,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionBuffSize,
 		OptionWhence,
 		OptionDataSourceTag,
+		OptionEncodeTag,
 		OptionEncoding,
 		OptionReadIoLimit,
 		OptionHeadPattern,
@@ -321,6 +332,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionEncoding,
 		OptionReadIoLimit,
 		OptionDataSourceTag,
+		OptionEncodeTag,
 		OptionHeadPattern,
 		{
 			KeyName:      KeyExpire,
@@ -353,6 +365,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionWhence,
 		OptionEncoding,
 		OptionDataSourceTag,
+		OptionEncodeTag,
 		OptionReadIoLimit,
 		OptionHeadPattern,
 		OptionKeyNewFileNewLine,
@@ -402,6 +415,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionWhence,
 		OptionEncoding,
 		OptionDataSourceTag,
+		OptionEncodeTag,
 		OptionReadIoLimit,
 		OptionHeadPattern,
 		OptionKeyNewFileNewLine,
