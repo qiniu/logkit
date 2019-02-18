@@ -682,9 +682,7 @@ func (m *Meta) getDoneFiles() (doneFiles []File, err error) {
 //SetEncodingWay 设置文件编码方式，默认为 utf-8
 func (m *Meta) SetEncodingWay(e string) {
 	e = strings.ToUpper(e)
-	if e != "UTF-8" {
-		m.encodingWay = e
-	}
+	m.encodingWay = e
 
 	m.subMetaLock.RLock()
 	defer m.subMetaLock.RUnlock()

@@ -369,7 +369,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	var decoder mahonia.Decoder
 	encoding, _ := conf.GetStringOr(KeyEncoding, "")
 	encoding = strings.ToUpper(encoding)
-	if encoding != "UTF-8" {
+	if encoding != DefaultEncodingWay {
 		decoder = mahonia.NewDecoder(encoding)
 		if decoder == nil {
 			log.Warnf("Encoding Way [%v] is not supported, will read as utf-8", encoding)
