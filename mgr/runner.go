@@ -587,10 +587,11 @@ func getSampleContent(line string, maxBatchSize int) string {
 
 func (r *LogExportRunner) readDatas(dr reader.DataReader, dataSourceTag string) []Data {
 	var (
-		datas []Data
-		err   error
-		bytes int64
-		data  Data
+		datas     []Data
+		err       error
+		bytes     int64
+		data      Data
+		encodeTag = r.meta.GetEncodeTag()
 	)
 	for !utils.BatchFullOrTimeout(r.RunnerName, &r.stopped, r.batchLen, r.batchSize, r.lastSend,
 		r.MaxBatchLen, r.MaxBatchSize, r.MaxBatchInterval) {
@@ -606,6 +607,10 @@ func (r *LogExportRunner) readDatas(dr reader.DataReader, dataSourceTag string) 
 		}
 		if len(dataSourceTag) > 0 {
 			data[dataSourceTag] = r.reader.Source()
+		}
+
+		if len(encodeTag) > 0 {
+			data[encodeTag] = r.meta.GetEncodingWay()
 		}
 		datas = append(datas, data)
 		r.batchLen++
@@ -766,6 +771,10 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 			}
 			log.Errorf("Runner[%v] datasourcetag add error, datas(TOTAL %v), datasourceSkipIndex(TOTAL %v) not match with froms(TOTAL %v)", r.Name(), len(datas), selen, len(froms))
 		}
+	}
+	encodeTag := r.meta.GetEncodeTag()
+	if encodeTag != "" {
+		addEncodeToData(datas, encodeTag, r.meta.GetEncodingWay(), r.Name())
 	}
 	return datas
 }
@@ -1014,6 +1023,16 @@ func addSourceToData(sourceFroms []string, se *StatsError, datas []Data, datasou
 		j++
 	}
 	return datas
+}
+
+func addEncodeToData(datas []Data, encodeTag, encode, runnerName string) {
+	for idx := range datas {
+		if dt, ok := datas[idx][encodeTag]; ok {
+			log.Debugf("Runner[%v] encode tag already has data %v, ignore %v", runnerName, dt, encode)
+		} else {
+			datas[idx][encodeTag] = encode
+		}
+	}
 }
 
 // Stop 清理所有使用到的资源, 等待10秒尝试读取完毕

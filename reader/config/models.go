@@ -20,6 +20,7 @@ const (
 	KeyMysqlEncoding     = "encoding"
 	KeyReadIOLimit       = "readio_limit"
 	KeyDataSourceTag     = "datasource_tag"
+	KeyEncodeTag         = "encode_tag"
 	KeyTagFile           = "tag_file"
 	KeyHeadPattern       = "head_pattern"
 	KeyNewFileNewLine    = "newfile_newline"

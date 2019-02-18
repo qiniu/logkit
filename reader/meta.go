@@ -67,6 +67,7 @@ type Meta struct {
 	encodingWay       string //文件编码格式，默认为utf-8
 	logpath           string
 	dataSourceTag     string                 //记录文件路径的标签名称
+	encodeTag         string                 //记录文件编码的标签名称
 	TagFile           string                 //记录tag文件路径的标签名称
 	tags              map[string]interface{} //记录tag文件内容
 	Readlimit         int                    //读取磁盘限速单位 MB/s
@@ -169,6 +170,7 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 		return
 	}
 	datasourceTag, _ := conf.GetStringOr(KeyDataSourceTag, "")
+	encodeTag, _ := conf.GetStringOr(KeyEncodeTag, "")
 	filedonepath, _ := conf.GetStringOr(KeyFileDone, metaPath)
 	donefileRetention, _ := conf.GetIntOr(doneFileRetention, DefautFileRetention)
 	readlimit, _ := conf.GetIntOr(KeyReadIOLimit, defaultIOLimit)
@@ -188,6 +190,7 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 		meta.SetEncodingWay(strings.ToLower(decoder))
 	}
 	meta.dataSourceTag = datasourceTag
+	meta.encodeTag = encodeTag
 	meta.Readlimit = readlimit * 1024 * 1024 //readlimit*MB
 	meta.RunnerName = runnerName
 	return
@@ -706,6 +709,10 @@ func (m *Meta) IsFileMode() bool {
 
 func (m *Meta) GetDataSourceTag() string {
 	return m.dataSourceTag
+}
+
+func (m *Meta) GetEncodeTag() string {
+	return m.encodeTag
 }
 
 func (m *Meta) GetTagFile() string {
