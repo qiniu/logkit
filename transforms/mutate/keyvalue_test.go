@@ -15,6 +15,7 @@ func TestKV_Transform(t *testing.T) {
 		expectData []Data
 		expectErr  error
 		splitter   string
+		keepString bool
 		new        string
 	}{
 		{
@@ -69,10 +70,24 @@ func TestKV_Transform(t *testing.T) {
 			new:      "raw",
 		},
 		{
-			line:       []Data{{"raw": `no data.`}},
-			expectData: []Data{{"raw": `no data.`}},
+			line:       []Data{{"raw": `123456789012345`}},
+			expectData: []Data{{"raw": `123456789012345`}},
 			expectErr:  errors.New("find total 1 erorrs in transform keyvalue, last error info is no value matched in key value transform in raw"),
 			splitter:   "=",
+			keepString: true,
+			new:        "raw",
+		},
+		{
+			line:       []Data{{"raw": `a:12345678901234567890123456789`}},
+			expectData: []Data{{"raw": Data{"a": 1.2345678901234568e+28}}},
+			splitter:   ":",
+			new:        "raw",
+		},
+		{
+			line:       []Data{{"raw": `a:12345678901234567890123456789`}},
+			expectData: []Data{{"raw": Data{"a": "12345678901234567890123456789"}}},
+			splitter:   ":",
+			keepString: true,
 			new:        "raw",
 		},
 		{
@@ -119,6 +134,7 @@ func TestKV_Transform(t *testing.T) {
 
 	for _, test := range tests {
 		k.New = test.new
+		k.KeepString = test.keepString
 		k.Init()
 		k.Splitter = test.splitter
 		actual, err := k.Transform(test.line)

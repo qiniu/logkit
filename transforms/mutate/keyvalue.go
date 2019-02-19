@@ -32,9 +32,10 @@ var (
 )
 
 type KV struct {
-	Key      string `json:"key"`
-	New      string `json:"new"`
-	Splitter string `json:"splitter"`
+	Key        string `json:"key"`
+	New        string `json:"new"`
+	Splitter   string `json:"splitter"`
+	KeepString bool   `json:"keep_string"`
 
 	stats      StatsInfo
 	keys       []string
@@ -79,6 +80,19 @@ func (k *KV) ConfigOptions() []Option {
 		transforms.KeyFieldName,
 		transforms.KeyFieldNew,
 		OptionKVSplitter,
+		{
+			KeyName:       "数字保持字符串形式",
+			Element:       Radio,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{false, true},
+			Default:       false,
+			Advance:       true,
+			Placeholder:   "my_field_keep_string",
+			DefaultNoUse:  false,
+			Description:   "数字是否以字符串形式展现",
+			ToolTip:       "数字是否以字符串形式展现",
+			Type:          transforms.TransformTypeBoolean,
+		},
 	}
 }
 
@@ -199,7 +213,7 @@ func (k *KV) transform(dataPipeline <-chan transforms.TransformInfo, resultChan 
 			continue
 		}
 
-		data, kvErr := kvTransform(strVal, k.Splitter)
+		data, kvErr := kvTransform(strVal, k.Splitter, k.KeepString)
 		if kvErr == nil && len(data) == 0 {
 			kvErr = errors.New("no value matched in key value transform in " + k.Key)
 		}
@@ -234,7 +248,7 @@ func (k *KV) transform(dataPipeline <-chan transforms.TransformInfo, resultChan 
 	wg.Done()
 }
 
-func kvTransform(strVal string, splitter string) (Data, error) {
+func kvTransform(strVal string, splitter string, keepString bool) (Data, error) {
 	var (
 		reader  = bytes.NewReader([]byte(strVal))
 		decoder = logfmt.NewDecoder(reader)
@@ -262,13 +276,17 @@ func kvTransform(strVal string, splitter string) (Data, error) {
 			}
 			//type conversions
 			value := string(decoder.Value())
-			if fValue, err := strconv.ParseFloat(value, 64); err == nil {
-				fields[string(decoder.Key())] = fValue
-			} else if bValue, err := strconv.ParseBool(value); err == nil {
-				fields[string(decoder.Key())] = bValue
-			} else {
-				fields[string(decoder.Key())] = value
+			if !keepString {
+				if fValue, err := strconv.ParseFloat(value, 64); err == nil {
+					fields[string(decoder.Key())] = fValue
+					continue
+				}
 			}
+			if bValue, err := strconv.ParseBool(value); err == nil {
+				fields[string(decoder.Key())] = bValue
+				continue
+			}
+			fields[string(decoder.Key())] = value
 		}
 		if len(fields) == 0 {
 			continue

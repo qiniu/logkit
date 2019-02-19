@@ -22,6 +22,7 @@ func init() {
 
 type Parser struct {
 	name                 string
+	keepString           bool
 	disableRecordErrData bool
 	numRoutine           int
 	keepRawData          bool
@@ -33,12 +34,14 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
 	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)
 	splitter, _ := c.GetStringOr(KeySplitter, "=")
+	keepString, _ := c.GetBoolOr(KeyKeepString, false)
 	numRoutine := MaxProcs
 	if numRoutine == 0 {
 		numRoutine = 1
 	}
 	return &Parser{
 		name:                 name,
+		keepString:           keepString,
 		disableRecordErrData: disableRecordErrData,
 		numRoutine:           numRoutine,
 		keepRawData:          keepRawData,
@@ -165,13 +168,17 @@ func (p *Parser) parse(line string) ([]Data, error) {
 			}
 			//type conversions
 			value := string(decoder.Value())
-			if fValue, err := strconv.ParseFloat(value, 64); err == nil {
-				fields[string(decoder.Key())] = fValue
-			} else if bValue, err := strconv.ParseBool(value); err == nil {
-				fields[string(decoder.Key())] = bValue
-			} else {
-				fields[string(decoder.Key())] = value
+			if !p.keepString {
+				if fValue, err := strconv.ParseFloat(value, 64); err == nil {
+					fields[string(decoder.Key())] = fValue
+					continue
+				}
 			}
+			if bValue, err := strconv.ParseBool(value); err == nil {
+				fields[string(decoder.Key())] = bValue
+				continue
+			}
+			fields[string(decoder.Key())] = value
 		}
 		if len(fields) == 0 {
 			continue
