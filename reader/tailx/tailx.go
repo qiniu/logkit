@@ -94,6 +94,10 @@ type Result struct {
 }
 
 func NewActiveReader(originPath, realPath, whence, inode string, notFirstTime bool, expireMap map[string]int64, meta *reader.Meta, msgChan chan<- Result, errChan chan<- error) (ar *ActiveReader, err error) {
+	realPath, err = utils.CheckAndUnCompress(realPath)
+	if err != nil {
+		return nil, err
+	}
 	rpath := strings.Replace(realPath, string(os.PathSeparator), "_", -1)
 	if runtime.GOOS == "windows" {
 		rpath = strings.Replace(rpath, ":", "_", -1)
@@ -630,6 +634,7 @@ func (r *Reader) statLogPath() {
 			log.Debugf("Runner[%s] <%s> is expired, ignore...", r.meta.RunnerName, mc)
 			continue
 		}
+
 		ar, err := NewActiveReader(mc, rp, r.whence, inodeStr, r.notFirstTime, r.expireMap, r.meta, r.msgChan, r.errChan)
 		if err != nil {
 			err = fmt.Errorf("Runner[%s] NewActiveReader for matches %s error %v ", r.meta.RunnerName, rp, err)
