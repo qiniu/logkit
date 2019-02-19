@@ -18,7 +18,8 @@ const (
 
 // Constants for logfmt/KV
 const (
-	KeySplitter = "splitter" //logfmt/KV 的分隔符
+	KeySplitter   = "splitter" //logfmt/KV 的分隔符
+	KeyKeepString = "keep_string"
 )
 
 // Constants for Grok
@@ -145,6 +146,17 @@ var (
 		DefaultNoUse: false,
 		Description:  "指定名称(name)",
 		Advance:      true,
+	}
+	OptionKeepString = Option{
+		KeyName:       KeyKeepString,
+		Element:       Radio,
+		ChooseOnly:    true,
+		ChooseOptions: []interface{}{"false", "true"},
+		Default:       "false",
+		Advance:       true,
+		DefaultNoUse:  false,
+		Description:   "数字保持字符串形式",
+		ToolTip:       "数字保持字符串形式",
 	}
 )
 
@@ -378,6 +390,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: false,
 			Description:  "分隔符(splitter)",
 		},
+		OptionKeepString,
 		OptionParserName,
 		OptionDisableRecordErrData,
 		OptionKeepRawData,
@@ -390,6 +403,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: false,
 			Description:  "分隔符(splitter)",
 		},
+		OptionKeepString,
 		OptionParserName,
 		OptionDisableRecordErrData,
 		OptionKeepRawData,

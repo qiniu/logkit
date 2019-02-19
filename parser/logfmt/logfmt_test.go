@@ -34,6 +34,7 @@ func Benchmark_ParseLine(b *testing.B) {
 func Test_parseLine(t *testing.T) {
 	tests := []struct {
 		line       string
+		keepString bool
 		expectData []Data
 		existErr   bool
 		splitter   string
@@ -74,13 +75,28 @@ func Test_parseLine(t *testing.T) {
 			splitter: "=",
 		},
 		{
-			line: `ts=2018-01-02T03:04:05.123Z lvl=info  method=PUT msg="http request"`,
+			line: `ts=2018-01-02T03:04:05.123Z lvl=info  method=PUT msg="http request" a=12345678901234567890123456789`,
 			expectData: []Data{
 				{
 					"lvl":    "info",
 					"msg":    "http request",
 					"method": "PUT",
 					"ts":     "2018-01-02T03:04:05.123Z",
+					"a":      1.2345678901234568e+28,
+				},
+			},
+			splitter: "=",
+		},
+		{
+			line:       `ts=2018-01-02T03:04:05.123Z lvl=info  method=PUT msg="http request" a=12345678901234567890123456789`,
+			keepString: true,
+			expectData: []Data{
+				{
+					"lvl":    "info",
+					"msg":    "http request",
+					"method": "PUT",
+					"ts":     "2018-01-02T03:04:05.123Z",
+					"a":      "12345678901234567890123456789",
 				},
 			},
 			splitter: "=",
@@ -114,6 +130,7 @@ func Test_parseLine(t *testing.T) {
 		name: TypeLogfmt,
 	}
 	for _, tt := range tests {
+		l.keepString = tt.keepString
 		l.splitter = tt.splitter
 		got, err := l.parse(tt.line)
 		assert.Equal(t, tt.existErr, err != nil)
