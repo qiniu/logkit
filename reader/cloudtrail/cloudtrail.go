@@ -23,6 +23,7 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/reader/config"
+	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -559,32 +560,6 @@ DONE:
 	wg.Wait()
 }
 
-func writeToFile(zipf *zip.File, filename string) error {
-	srcF, err := zipf.Open()
-	if err != nil {
-		return err
-	}
-	defer srcF.Close()
-	distF, err := os.OpenFile(filepath.Join(filepath.Dir(filename), zipf.Name), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(0644))
-	if err != nil {
-		return err
-	}
-	defer distF.Close()
-	_, err = io.Copy(distF, srcF)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-//gzip 前两位是固定的： https://stackoverflow.com/questions/6059302/how-to-check-if-a-file-is-gzip-compressed
-func isGzipped(data []byte) bool {
-	if data == nil || len(data) < 2 {
-		return false
-	}
-	return data[0] == 31 && data[1] == 139
-}
-
 func writeFile(filename string, bucket *s3.Bucket, path string) error {
 	data, err := bucket.Get(path)
 	if err != nil {
@@ -598,14 +573,14 @@ func writeFile(filename string, bucket *s3.Bucket, path string) error {
 		}
 		var writeErr error
 		for _, f := range rd.File {
-			err = writeToFile(f, filename)
+			err = utils.WriteZipToFile(f, filename)
 			if err != nil {
 				writeErr = fmt.Errorf("write to %v err %v; %v", f.Name, err, writeErr)
 			}
 		}
 		return writeErr
 	}
-	if isGzipped(data) {
+	if utils.IsGzipped(data) {
 		gzipData, err := gzip.NewReader(bytes.NewReader(data))
 		if err != nil {
 			log.Errorf("reader file %v as gzip error %v, write to file as raw_text", filename, err)

@@ -255,7 +255,7 @@ func (r *Reader) statLogPath() {
 			log.Warnf("Runner[%v] file pattern %v match %v stat failed: %v, ignored this match", r.meta.RunnerName, r.logPathPattern, m, err)
 			continue
 		}
-		if !fi.IsDir() {
+		if !fi.IsDir() && !(strings.HasSuffix(logPath, ".tar") || strings.HasSuffix(logPath, ".tar.gz")) {
 			log.Debugf("Runner[%v] %v is a file, mode[dirx] only supports stat directory, ignored this match", r.meta.RunnerName, m)
 			continue
 		}

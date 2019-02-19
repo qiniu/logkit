@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"io/ioutil"
+
 	"github.com/qiniu/log"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -139,4 +141,41 @@ func createFileWithContent(filepathn, lines string) {
 	}
 	file.WriteString(lines)
 	file.Close()
+}
+
+func TestUncompress(t *testing.T) {
+	defer os.RemoveAll("testdata/123")
+	defer os.RemoveAll("testdata/a.txt")
+	defer os.RemoveAll("testdata/b.txt")
+	defer os.RemoveAll("testdata/456")
+	dir, err := CheckAndUnCompress("testdata/123.tar")
+	assert.NoError(t, err)
+	assert.Equal(t, "testdata/123", dir)
+	data, err := ioutil.ReadFile("testdata/123/a.txt")
+	assert.NoError(t, err)
+	assert.Equal(t, "ia\n", string(data))
+	data, err = ioutil.ReadFile("testdata/123/b.txt")
+	assert.NoError(t, err)
+	assert.Equal(t, "v\n", string(data))
+
+	dir, err = CheckAndUnCompress("testdata/a.txt.gz")
+	assert.NoError(t, err)
+	assert.Equal(t, "testdata/a.txt", dir)
+	data, err = ioutil.ReadFile("testdata/a.txt")
+	assert.NoError(t, err)
+	assert.Equal(t, "ia\n", string(data))
+
+	dir, err = CheckAndUnCompress("testdata/b.txt.tar.gz")
+	assert.NoError(t, err)
+	assert.Equal(t, "testdata/b.txt", dir)
+	data, err = ioutil.ReadFile("testdata/b.txt")
+	assert.NoError(t, err)
+	assert.Equal(t, "b\n", string(data))
+
+	dir, err = CheckAndUnCompress("testdata/456.tar.gz")
+	assert.NoError(t, err)
+	assert.Equal(t, "testdata/456", dir)
+	data, err = ioutil.ReadFile("testdata/456/c.txt")
+	assert.NoError(t, err)
+	assert.Equal(t, "a\n", string(data))
 }

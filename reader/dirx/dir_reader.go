@@ -274,6 +274,12 @@ type newReaderOptions struct {
 }
 
 func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool) (*dirReader, error) {
+	var err error
+	opts.LogPath, err = utils.CheckAndUnCompress(opts.LogPath)
+	if err != nil {
+		return nil, err
+	}
+
 	rpath := strings.Replace(opts.LogPath, string(os.PathSeparator), "_", -1)
 	subMetaPath := filepath.Join(opts.Meta.Dir, rpath)
 	subMeta, err := reader.NewMetaWithRunnerName(drs.meta.RunnerName, subMetaPath, subMetaPath, opts.LogPath, ModeDir, opts.Meta.TagFile, reader.DefautFileRetention)
