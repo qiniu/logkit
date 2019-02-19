@@ -81,7 +81,7 @@ func (k *KV) ConfigOptions() []Option {
 		transforms.KeyFieldNew,
 		OptionKVSplitter,
 		{
-			KeyName:       "数字保持字符串形式",
+			KeyName:       "keep_string",
 			Element:       Radio,
 			ChooseOnly:    true,
 			ChooseOptions: []interface{}{false, true},
