@@ -1,4 +1,4 @@
-package reader
+package singlefile
 
 import (
 	"errors"
@@ -15,6 +15,7 @@ import (
 	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/rateio"
+	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
@@ -33,10 +34,10 @@ type SingleFile struct {
 	lastSyncOffset int64
 
 	mux  sync.Mutex
-	meta *Meta // 记录offset的元数据
+	meta *reader.Meta // 记录offset的元数据
 }
 
-func NewSingleFile(meta *Meta, path, whence string, originOffset int64, errDirectReturn bool) (sf *SingleFile, err error) {
+func NewSingleFile(meta *reader.Meta, path, whence string, originOffset int64, errDirectReturn bool) (sf *SingleFile, err error) {
 	var pfi os.FileInfo
 	var f *os.File
 	originpath := path

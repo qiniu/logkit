@@ -4,46 +4,24 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
-
-	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/log"
-
 	"github.com/qiniu/logkit/conf"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/qiniu/logkit/reader/bufreader"
 	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/reader/test"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-var lines = "123456789\n123456789\n123456789\n123456789\n"
-
-func createSeqFile(interval int, lines string) {
-	err := os.Mkdir(Dir, DefaultDirPerm)
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	for _, f := range Files {
-		file, err := os.OpenFile(filepath.Join(Dir, f), os.O_CREATE|os.O_WRONLY, DefaultFilePerm)
-		if err != nil {
-			log.Error(err)
-			return
-		}
-
-		file.WriteString(lines)
-		file.Close()
-		time.Sleep(time.Millisecond * time.Duration(interval))
-	}
-}
-
 func Test_BuffReader(t *testing.T) {
-	createSeqFile(1000, lines)
+	CreateSeqFile(1000, lines)
 	defer DestroyDir()
 	c := conf.MapConf{
 		"log_path":        Dir,
 		"meta_path":       MetaDir,
-		"mode":            DirMode,
+		"mode":            ModeDir,
 		"sync_every":      "1",
 		"ignore_hidden":   "true",
 		"reader_buf_size": "24",
@@ -89,7 +67,7 @@ func Test_Datasource(t *testing.T) {
 	}
 	c := conf.MapConf{
 		"log_path":        testdir,
-		"mode":            DirMode,
+		"mode":            ModeDir,
 		"sync_every":      "1",
 		"ignore_hidden":   "true",
 		"reader_buf_size": "37",
@@ -138,7 +116,7 @@ func Test_Datasource2(t *testing.T) {
 	}
 	c := conf.MapConf{
 		"log_path":        testdir,
-		"mode":            DirMode,
+		"mode":            ModeDir,
 		"sync_every":      "1",
 		"ignore_hidden":   "true",
 		"reader_buf_size": "10",
@@ -187,7 +165,7 @@ func Test_Datasource3(t *testing.T) {
 	}
 	c := conf.MapConf{
 		"log_path":        testdir,
-		"mode":            DirMode,
+		"mode":            ModeDir,
 		"sync_every":      "1",
 		"ignore_hidden":   "true",
 		"reader_buf_size": "20",
@@ -216,12 +194,12 @@ func Test_Datasource3(t *testing.T) {
 }
 
 func Test_BuffReaderBufSizeLarge(t *testing.T) {
-	createSeqFile(1000, lines)
+	CreateSeqFile(1000, lines)
 	defer DestroyDir()
 	c := conf.MapConf{
 		"log_path":        Dir,
 		"meta_path":       MetaDir,
-		"mode":            DirMode,
+		"mode":            ModeDir,
 		"sync_every":      "1",
 		"ignore_hidden":   "true",
 		"reader_buf_size": "1024",
@@ -248,13 +226,13 @@ func Test_BuffReaderBufSizeLarge(t *testing.T) {
 
 func Test_GBKEncoding(t *testing.T) {
 	body := "\x82\x31\x89\x38"
-	createSeqFile(1000, body)
+	CreateSeqFile(1000, body)
 	exp := "㧯"
 	defer DestroyDir()
 	c := conf.MapConf{
 		"log_path":        Dir,
 		"meta_path":       MetaDir,
-		"mode":            DirMode,
+		"mode":            ModeDir,
 		"sync_every":      "1",
 		"ignore_hidden":   "true",
 		"reader_buf_size": "1024",
@@ -282,13 +260,13 @@ func Test_GBKEncoding(t *testing.T) {
 
 func Test_NoPanicEncoding(t *testing.T) {
 	body := "123123"
-	createSeqFile(1000, body)
+	CreateSeqFile(1000, body)
 	exp := "123123"
 	defer DestroyDir()
 	c := conf.MapConf{
 		"log_path":        Dir,
 		"meta_path":       MetaDir,
-		"mode":            DirMode,
+		"mode":            ModeDir,
 		"sync_every":      "1",
 		"ignore_hidden":   "true",
 		"reader_buf_size": "1024",
@@ -316,12 +294,12 @@ func Test_NoPanicEncoding(t *testing.T) {
 
 func Test_BuffReaderMultiLine(t *testing.T) {
 	body := "test123\n12\n34\n56\ntest\nxtestx\n123\n"
-	createSeqFile(1000, body)
+	CreateSeqFile(1000, body)
 	defer DestroyDir()
 	c := conf.MapConf{
 		"log_path":        Dir,
 		"meta_path":       MetaDir,
-		"mode":            DirMode,
+		"mode":            ModeDir,
 		"sync_every":      "1",
 		"ignore_hidden":   "true",
 		"reader_buf_size": "1024",
@@ -373,12 +351,12 @@ func Test_BuffReaderMultiLine(t *testing.T) {
 
 func Test_BuffReaderStats(t *testing.T) {
 	body := "Test_BuffReaderStats\n"
-	createSeqFile(1000, body)
+	CreateSeqFile(1000, body)
 	defer DestroyDir()
 	c := conf.MapConf{
 		"log_path":  Dir,
 		"meta_path": MetaDir,
-		"mode":      DirMode,
+		"mode":      ModeDir,
 		"read_from": "oldest",
 	}
 	r, err := NewFileBufReader(c, false)
@@ -396,7 +374,7 @@ func Test_BuffReaderStats(t *testing.T) {
 }
 
 func Test_FileNotFound(t *testing.T) {
-	createSeqFile(1000, lines)
+	CreateSeqFile(1000, lines)
 	defer DestroyDir()
 	c := conf.MapConf{
 		"mode":            ModeFile,
@@ -427,6 +405,8 @@ func Test_FileNotFound(t *testing.T) {
 	}
 	r.Close()
 }
+
+var lines = "123456789\n123456789\n123456789\n123456789\n"
 
 type MockReader struct {
 	num int
@@ -475,7 +455,7 @@ func BenchmarkReadPattern(b *testing.B) {
 	if err != nil {
 		b.Error(err)
 	}
-	r, err := NewReaderSize(m, ma, 1024)
+	r, err := bufreader.NewReaderSize(m, ma, 1024)
 	if err != nil {
 		b.Fatal(err)
 	}

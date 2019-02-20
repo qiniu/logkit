@@ -20,7 +20,10 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/reader/bufreader"
 	. "github.com/qiniu/logkit/reader/config"
+	"github.com/qiniu/logkit/reader/extract"
+	"github.com/qiniu/logkit/reader/singlefile"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
@@ -72,7 +75,7 @@ type Reader struct {
 
 type ActiveReader struct {
 	cacheLineMux sync.RWMutex
-	br           *reader.BufReader
+	br           *bufreader.BufReader
 	realpath     string
 	originpath   string
 	readcache    string
@@ -94,10 +97,6 @@ type Result struct {
 }
 
 func NewActiveReader(originPath, realPath, whence, inode string, notFirstTime bool, expireMap map[string]int64, meta *reader.Meta, msgChan chan<- Result, errChan chan<- error) (ar *ActiveReader, err error) {
-	realPath, err = utils.CheckAndUnCompress(realPath)
-	if err != nil {
-		return nil, err
-	}
 	rpath := strings.Replace(realPath, string(os.PathSeparator), "_", -1)
 	if runtime.GOOS == "windows" {
 		rpath = strings.Replace(rpath, ":", "_", -1)
@@ -119,11 +118,19 @@ func NewActiveReader(originPath, realPath, whence, inode string, notFirstTime bo
 	if len(expireMap) != 0 {
 		originOffset = expireMap[inode+"_"+realPath]
 	}
-	fr, err := reader.NewSingleFile(subMeta, realPath, whence, originOffset, true)
-	if err != nil {
-		return
+	var fr reader.FileReader
+	if reader.CompressedFile(realPath) {
+		fr, err = extract.NewReader(subMeta, realPath)
+		if err != nil {
+			return
+		}
+	} else {
+		fr, err = singlefile.NewSingleFile(subMeta, realPath, whence, originOffset, true)
+		if err != nil {
+			return
+		}
 	}
-	bf, err := reader.NewReaderSize(fr, subMeta, reader.DefaultBufSize)
+	bf, err := bufreader.NewReaderSize(fr, subMeta, bufreader.DefaultBufSize)
 	if err != nil {
 		//如果没有创建成功，要把reader close掉，否则会因为ratelimit导致线程泄露
 		fr.Close()

@@ -1,4 +1,4 @@
-package reader
+package seqfile
 
 import (
 	"errors"
@@ -16,22 +16,17 @@ import (
 	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/rateio"
+	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
 )
 
-// FileMode 读取单个文件模式
-const FileMode = "file"
-
-// DirMode 按时间顺序顺次读取文件夹下所有文件的模式
-const DirMode = "dir"
-
 const deafultFilePerm = 0600
 
 // SeqFile 按最终修改时间依次读取文件的Reader类型
 type SeqFile struct {
-	meta *Meta
+	meta *reader.Meta
 	mux  sync.Mutex
 
 	name             string
@@ -48,8 +43,8 @@ type SeqFile struct {
 	newFileAsNewLine bool //新文件自动加换行符
 	newLineNotAdded  bool //文件最后的部分正好填满buffer，导致\n符号加不上，此时要用这个变量
 
-	newLineBytesSourceIndex []SourceIndex //新文件被读取时的bytes位置
-	justOpenedNewFile       bool          //新文件刚刚打开
+	newLineBytesSourceIndex []reader.SourceIndex //新文件被读取时的bytes位置
+	justOpenedNewFile       bool                 //新文件刚刚打开
 
 	validFilePattern  string // 合法的文件名正则表达式
 	stopped           int32  // 停止标志位
@@ -66,7 +61,7 @@ type SeqFile struct {
 	ReadSameInode bool //记录已经度过的filename_inode是否继续读
 }
 
-func getStartFile(path, whence string, meta *Meta, sf *SeqFile) (f *os.File, dir, currFile string, offset int64, err error) {
+func getStartFile(path, whence string, meta *reader.Meta, sf *SeqFile) (f *os.File, dir, currFile string, offset int64, err error) {
 	var pfi os.FileInfo
 	dir, pfi, err = GetRealPath(path)
 	if err != nil || pfi == nil {
@@ -112,7 +107,7 @@ func getStartFile(path, whence string, meta *Meta, sf *SeqFile) (f *os.File, dir
 	return
 }
 
-func NewSeqFile(meta *Meta, path string, ignoreHidden, newFileNewLine bool, suffixes []string, validFileRegex, whence string, expireMap map[string]int64) (sf *SeqFile, err error) {
+func NewSeqFile(meta *reader.Meta, path string, ignoreHidden, newFileNewLine bool, suffixes []string, validFileRegex, whence string, expireMap map[string]int64) (sf *SeqFile, err error) {
 	sf = &SeqFile{
 		ignoreFileSuffix: suffixes,
 		ignoreHidden:     ignoreHidden,
@@ -190,7 +185,7 @@ func (sf *SeqFile) getIgnoreCondition() func(os.FileInfo) bool {
 }
 
 func newestFile(logdir string, condition func(os.FileInfo) bool) (currFile string, offset int64, err error) {
-	fi, err := getMaxFile(logdir, condition, ModTimeLater)
+	fi, err := reader.GetMaxFile(logdir, condition, ModTimeLater)
 	if err != nil {
 		return
 	}
@@ -208,7 +203,7 @@ func newestFile(logdir string, condition func(os.FileInfo) bool) (currFile strin
 }
 
 func oldestFile(logdir string, condition func(os.FileInfo) bool) (currFile string, offset int64, err error) {
-	fi, err := getMinFile(logdir, condition, ModTimeLater)
+	fi, err := reader.GetMinFile(logdir, condition, ModTimeLater)
 	if err != nil {
 		return
 	}
@@ -281,10 +276,10 @@ func (sf *SeqFile) reopenForESTALE() error {
 }
 
 type NewLineBytesRecorder interface {
-	NewLineBytesIndex() []SourceIndex
+	NewLineBytesIndex() []reader.SourceIndex
 }
 
-func (sf *SeqFile) NewLineBytesIndex() []SourceIndex {
+func (sf *SeqFile) NewLineBytesIndex() []reader.SourceIndex {
 	return sf.newLineBytesSourceIndex
 }
 
@@ -296,7 +291,7 @@ func (sf *SeqFile) handleUnexpectErr(err error) {
 }
 
 func (sf *SeqFile) Read(p []byte) (n int, err error) {
-	sf.newLineBytesSourceIndex = []SourceIndex{}
+	sf.newLineBytesSourceIndex = []reader.SourceIndex{}
 	var nextFileRetry int
 	sf.mux.Lock()
 	defer sf.mux.Unlock()
@@ -333,7 +328,7 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 		}
 		if n1 > 0 && sf.justOpenedNewFile {
 			sf.justOpenedNewFile = false
-			sf.newLineBytesSourceIndex = append(sf.newLineBytesSourceIndex, SourceIndex{
+			sf.newLineBytesSourceIndex = append(sf.newLineBytesSourceIndex, reader.SourceIndex{
 				Source: sf.lastFile,
 				Index:  n,
 			})
@@ -352,7 +347,7 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 				}
 				// dir removed or file rotated
 				log.Debugf("Runner[%v] %s - nextFile: %v", sf.meta.RunnerName, sf.dir, err1)
-				time.Sleep(WaitNoSuchFile)
+				time.Sleep(reader.WaitNoSuchFile)
 				nextFileRetry++
 				continue
 			}
@@ -437,11 +432,11 @@ func (sf *SeqFile) getNextFileCondition() (condition func(os.FileInfo) bool, err
 		if len(sf.inodeDone) < 1 {
 			return true
 		}
-		_, ok := sf.inodeDone[joinFileInode(f.Name(), strconv.FormatUint(inode, 10))]
+		_, ok := sf.inodeDone[reader.JoinFileInode(f.Name(), strconv.FormatUint(inode, 10))]
 		return !ok
 	}
 
-	condition = andCondition(andCondition(newerThanCurrFile, sf.getIgnoreCondition()), isNewFile)
+	condition = reader.AndCondition(reader.AndCondition(newerThanCurrFile, sf.getIgnoreCondition()), isNewFile)
 	return
 }
 
@@ -450,7 +445,7 @@ func (sf *SeqFile) nextFile() (fi os.FileInfo, err error) {
 	if err != nil {
 		return
 	}
-	fi, err = getMinFile(sf.dir, condition, ModTimeLater)
+	fi, err = reader.GetMinFile(sf.dir, condition, ModTimeLater)
 	if err != nil {
 		log.Debugf("Runner[%v] getMinFile error %v", sf.meta.RunnerName, err)
 		return nil, err
@@ -574,7 +569,7 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 	if sf.inodeDone == nil {
 		sf.inodeDone = make(map[string]bool)
 	}
-	sf.inodeDone[joinFileInode(doneFile, strconv.FormatUint(doneFileInode, 10))] = true
+	sf.inodeDone[reader.JoinFileInode(doneFile, strconv.FormatUint(doneFileInode, 10))] = true
 	tryTime := 0
 	for {
 		err = sf.meta.AppendDoneFileInode(doneFile, doneFileInode)

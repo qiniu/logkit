@@ -17,6 +17,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/reader/bufreader"
 	. "github.com/qiniu/logkit/reader/config"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
@@ -113,7 +114,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	ignoreFileSuffixes, _ := conf.GetStringListOr(KeyIgnoreFileSuffix, DefaultIgnoreFileSuffixes)
 	validFilesRegex, _ := conf.GetStringOr(KeyValidFilePattern, "*")
 	whence, _ := conf.GetStringOr(KeyWhence, WhenceOldest)
-	bufferSize, _ := conf.GetIntOr(KeyBufSize, reader.DefaultBufSize)
+	bufferSize, _ := conf.GetIntOr(KeyBufSize, bufreader.DefaultBufSize)
 	readSameInode, _ := conf.GetBoolOr(KeyReadSameInode, false)
 
 	_, _, bufsize, err := meta.ReadBufMeta()

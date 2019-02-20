@@ -279,8 +279,9 @@ const (
 
 // FileReader's modes
 const (
-	ModeDir        = "dir"
-	ModeFile       = "file"
+	ModeExtract    = "extract"
+	ModeDir        = "dir"  // ModeDir 按时间顺序顺次读取文件夹下所有文件的模式
+	ModeFile       = "file" // FileMode 读取单个文件模式
 	ModeTailx      = "tailx"
 	ModeFileAuto   = "fileauto"
 	ModeDirx       = "dirx"

@@ -80,3 +80,8 @@ func AppendFiles(interval int) {
 func DeleteFile(fpath string) {
 	os.RemoveAll(fpath)
 }
+
+func CreateFileForTest(interval int) {
+	CreateDir()
+	CreateFiles(interval)
+}

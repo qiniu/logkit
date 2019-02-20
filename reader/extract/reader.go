@@ -13,6 +13,7 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/utils/models"
 )
 
 // FileReader reader 接口方法
@@ -21,6 +22,7 @@ type Reader struct {
 	path       string
 	tp         string
 	m          *reader.Meta
+	done       bool
 }
 
 //NewReader 实现对压缩包的读取
@@ -31,7 +33,8 @@ type Reader struct {
 func NewReader(meta *reader.Meta, path string) (*Reader, error) {
 	var rd SourceReader
 	var err error
-	var tp string
+	var tp, curFile string
+	var offset int64
 	if strings.HasSuffix(path, ".tar.gz") {
 		rd, err = NewTarGz(path)
 		if err != nil {
@@ -61,11 +64,18 @@ func NewReader(meta *reader.Meta, path string) (*Reader, error) {
 		}
 		tp = "zip"
 	}
+	var done bool
+	curFile, offset, err = meta.ReadOffset()
+	if err == nil && curFile == path && offset > 0 {
+		log.Infof("log(%s) has been already read done before", path)
+		done = true
+	}
 	return &Reader{
 		underlying: rd,
 		path:       path,
 		tp:         tp,
 		m:          meta,
+		done:       done,
 	}, nil
 
 }
@@ -79,7 +89,14 @@ func (r *Reader) Source() string {
 }
 
 func (r *Reader) Read(p []byte) (n int, err error) {
-	return r.underlying.Read(p)
+	if r.done {
+		return 0, io.EOF
+	}
+	n, err = r.underlying.Read(p)
+	if err == io.EOF && n == 0 {
+		r.done = true
+	}
+	return n, err
 }
 
 func (r *Reader) Close() error {
@@ -87,7 +104,14 @@ func (r *Reader) Close() error {
 }
 
 func (r *Reader) SyncMeta() error {
+	if r.done {
+		return r.m.WriteOffset(r.path, 1)
+	}
 	return nil
+}
+
+func (r *Reader) Lag() (rl *LagInfo, err error) {
+	return r.underlying.Lag()
 }
 
 // Compile-time checks to ensure type implements desired interfaces.
@@ -101,6 +125,7 @@ var (
 type SourceReader interface {
 	io.ReadCloser
 	Source() string
+	Lag() (rl *LagInfo, err error)
 }
 
 type Tar struct {
@@ -109,8 +134,10 @@ type Tar struct {
 	header *tar.Header
 	path   string
 
-	source string
-	sLock  *sync.RWMutex
+	source    string
+	sLock     *sync.RWMutex
+	totalSize int64
+	curSize   int64
 }
 
 func NewTarGz(path string) (*Tar, error) {
@@ -128,12 +155,13 @@ func NewTarGz(path string) (*Tar, error) {
 		return nil, err
 	}
 	return &Tar{
-		rd:    tar.NewReader(gzf),
-		f:     f,
-		path:  path,
-		sLock: new(sync.RWMutex),
+		rd:        tar.NewReader(gzf),
+		f:         f,
+		path:      path,
+		sLock:     new(sync.RWMutex),
+		totalSize: 0,
+		curSize:   0,
 	}, nil
-
 }
 
 func NewTar(path string) (*Tar, error) {
@@ -145,10 +173,12 @@ func NewTar(path string) (*Tar, error) {
 		return nil, err
 	}
 	return &Tar{
-		rd:    tar.NewReader(f),
-		f:     f,
-		path:  path,
-		sLock: new(sync.RWMutex),
+		rd:        tar.NewReader(f),
+		f:         f,
+		path:      path,
+		sLock:     new(sync.RWMutex),
+		totalSize: 0,
+		curSize:   0,
 	}, nil
 }
 
@@ -160,10 +190,16 @@ func (t *Tar) next() (err error) {
 	t.sLock.Lock()
 	defer t.sLock.Unlock()
 	t.source = t.header.Name
+	t.totalSize += t.header.Size
 	return nil
 }
 
 func (t *Tar) Read(p []byte) (n int, err error) {
+	defer func() {
+		t.sLock.Lock()
+		defer t.sLock.Unlock()
+		t.curSize += int64(n)
+	}()
 	if t.header == nil {
 		err = t.next()
 		if err != nil {
@@ -177,6 +213,7 @@ func (t *Tar) Read(p []byte) (n int, err error) {
 			if err != nil {
 				return n, err
 			}
+			//如果已经EOF，但是上次还读到了，先返回上次的结果
 			if n > 0 {
 				return n, nil
 			}
@@ -198,6 +235,19 @@ func (t *Tar) Source() string {
 	t.sLock.RLock()
 	defer t.sLock.RUnlock()
 	return t.source
+}
+
+func (t *Tar) Lag() (rl *LagInfo, err error) {
+	t.sLock.Lock()
+	defer t.sLock.Unlock()
+	lag := t.totalSize - t.curSize
+	if lag < 0 {
+		lag = 0
+	}
+	return &LagInfo{
+		Size:     lag,
+		SizeUnit: "byte",
+	}, nil
 }
 
 type GZ struct {
@@ -246,6 +296,10 @@ func (t *GZ) Close() error {
 
 func (t *GZ) Source() string {
 	return t.source
+}
+
+func (t *GZ) Lag() (rl *LagInfo, err error) {
+	return &LagInfo{SizeUnit: "byte"}, nil
 }
 
 type ZIP struct {
@@ -310,6 +364,7 @@ func (t *ZIP) Read(p []byte) (n int, err error) {
 			if err != nil {
 				return 0, err
 			}
+			//如果已经EOF，但是上次还读到了，先返回上次的结果
 			if n > 0 {
 				return n, nil
 			}
@@ -334,4 +389,8 @@ func (t *ZIP) Source() string {
 	t.sLock.RLock()
 	defer t.sLock.RUnlock()
 	return t.source
+}
+
+func (t *ZIP) Lag() (rl *LagInfo, err error) {
+	return &LagInfo{SizeUnit: "byte"}, nil
 }

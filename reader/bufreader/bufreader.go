@@ -5,7 +5,7 @@
 // Package bufio implements buffered I/O.  It wraps an FileReader or io.Writer
 // object, creating another object (Reader or Writer) that also implements
 // the interface but provides buffering and some help for textual I/O.
-package reader
+package bufreader
 
 import (
 	"bytes"
@@ -23,6 +23,11 @@ import (
 
 	"github.com/qiniu/log"
 
+	"github.com/qiniu/logkit/conf"
+	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
+	"github.com/qiniu/logkit/reader/seqfile"
+	"github.com/qiniu/logkit/reader/singlefile"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -51,8 +56,8 @@ type BufReader struct {
 	stopped       int32
 	buf           []byte
 	mutiLineCache []string
-	rd            FileReader // reader provided by the client
-	r, w          int        // buf read and write positions
+	rd            reader.FileReader // reader provided by the client
+	r, w          int               // buf read and write positions
 	err           error
 	lastByte      int
 	lastRuneSize  int
@@ -61,7 +66,7 @@ type BufReader struct {
 	mux     sync.Mutex
 	decoder mahonia.Decoder
 
-	Meta            *Meta // 存放offset的元信息
+	Meta            *reader.Meta // 存放offset的元信息
 	multiLineRegexp *regexp.Regexp
 
 	stats     StatsInfo
@@ -70,13 +75,8 @@ type BufReader struct {
 	lastErrShowTime time.Time
 
 	// 这里的变量用于记录buffer中的数据从底层的哪个DataSource出来的，用于精准定位seqfile的DataSource
-	lastRdSource []SourceIndex
+	lastRdSource []reader.SourceIndex
 	latestSource string
-}
-
-type SourceIndex struct {
-	Source string
-	Index  int
 }
 
 const minReadBufferSize = 16
@@ -87,7 +87,7 @@ const maxConsecutiveEmptyReads = 10
 // NewReaderSize returns a new Reader whose buffer has at least the specified
 // size. If the argument FileReader is already a Reader with large enough
 // size, it returns the underlying Reader.
-func NewReaderSize(rd FileReader, meta *Meta, size int) (*BufReader, error) {
+func NewReaderSize(rd reader.FileReader, meta *reader.Meta, size int) (*BufReader, error) {
 	// Is it already a Reader?
 	if size < minReadBufferSize {
 		size = minReadBufferSize
@@ -169,7 +169,7 @@ func NewReaderSize(rd FileReader, meta *Meta, size int) (*BufReader, error) {
 }
 
 func (b *BufReader) SetMode(mode string, v interface{}) (err error) {
-	b.multiLineRegexp, err = HeadPatternMode(mode, v)
+	b.multiLineRegexp, err = reader.HeadPatternMode(mode, v)
 	if err != nil {
 		err = fmt.Errorf("%v set mode error %v ", b.Name(), err)
 		return
@@ -177,7 +177,7 @@ func (b *BufReader) SetMode(mode string, v interface{}) (err error) {
 	return
 }
 
-func (b *BufReader) reset(buf []byte, r FileReader) {
+func (b *BufReader) reset(buf []byte, r reader.FileReader) {
 	*b = BufReader{
 		buf:           buf,
 		rd:            r,
@@ -208,7 +208,7 @@ func (b *BufReader) updateLastRdSource() {
 		idx++
 	}
 	if idx >= len(b.lastRdSource) {
-		b.lastRdSource = []SourceIndex{}
+		b.lastRdSource = []reader.SourceIndex{}
 		return
 	}
 	if idx > 0 {
@@ -243,11 +243,11 @@ func (b *BufReader) fill() {
 		}
 		if b.latestSource != b.rd.Source() {
 			//这个情况表示文件的数据源出现了变化，在buf中已经出现了2个数据源的数据，要定位是哪个位置的数据出现的分隔
-			if rc, ok := b.rd.(NewLineBytesRecorder); ok {
+			if rc, ok := b.rd.(seqfile.NewLineBytesRecorder); ok {
 				SIdx := rc.NewLineBytesIndex()
 				for _, v := range SIdx {
 					// 从 NewLineBytesIndex 函数中返回的index值就是本次读取的批次中上一个DataSource的数据量，加上b.w就是上个DataSource的整体数据
-					b.lastRdSource = append(b.lastRdSource, SourceIndex{
+					b.lastRdSource = append(b.lastRdSource, reader.SourceIndex{
 						Source: v.Source,
 						Index:  b.w + v.Index,
 					})
@@ -481,7 +481,7 @@ func (b *BufReader) ReadLine() (ret string, err error) {
 	} else {
 		ret, err = b.ReadPattern()
 	}
-	if skp, ok := b.rd.(LineSkipper); ok {
+	if skp, ok := b.rd.(seqfile.LineSkipper); ok {
 		if skp.IsNewOpen() {
 			if !IsSelfRunner(b.Meta.RunnerName) {
 				log.Infof("Runner[%s] Skip line %v as first line skipper was configured", b.Meta.RunnerName, ret)
@@ -542,7 +542,7 @@ func (b *BufReader) setStatsError(err string) {
 }
 
 func (b *BufReader) Lag() (rl *LagInfo, err error) {
-	lr, ok := b.rd.(LagReader)
+	lr, ok := b.rd.(reader.LagReader)
 	if ok {
 		return lr.Lag()
 	}
@@ -592,4 +592,49 @@ func (b *BufReader) SyncMeta() {
 		}
 		return
 	}
+}
+
+func NewFileDirReader(meta *reader.Meta, conf conf.MapConf) (reader reader.Reader, err error) {
+	whence, _ := conf.GetStringOr(KeyWhence, WhenceOldest)
+	logpath, err := conf.GetString(KeyLogPath)
+	if err != nil {
+		return
+	}
+	bufSize, _ := conf.GetIntOr(KeyBufSize, DefaultBufSize)
+
+	// 默认不读取隐藏文件
+	ignoreHidden, _ := conf.GetBoolOr(KeyIgnoreHiddenFile, true)
+	ignoreFileSuffix, _ := conf.GetStringListOr(KeyIgnoreFileSuffix, DefaultIgnoreFileSuffixes)
+	validFilesRegex, _ := conf.GetStringOr(KeyValidFilePattern, "*")
+	newfileNewLine, _ := conf.GetBoolOr(KeyNewFileNewLine, false)
+	skipFirstLine, _ := conf.GetBoolOr(KeySkipFileFirstLine, false)
+	readSameInode, _ := conf.GetBoolOr(KeyReadSameInode, false)
+	fr, err := seqfile.NewSeqFile(meta, logpath, ignoreHidden, newfileNewLine, ignoreFileSuffix, validFilesRegex, whence, nil)
+	if err != nil {
+		return
+	}
+	fr.SkipFileFirstLine = skipFirstLine
+	fr.ReadSameInode = readSameInode
+	return NewReaderSize(fr, meta, bufSize)
+}
+
+func NewSingleFileReader(meta *reader.Meta, conf conf.MapConf) (reader reader.Reader, err error) {
+	logpath, err := conf.GetString(KeyLogPath)
+	if err != nil {
+		return
+	}
+	bufSize, _ := conf.GetIntOr(KeyBufSize, DefaultBufSize)
+	whence, _ := conf.GetStringOr(KeyWhence, WhenceOldest)
+	errDirectReturn, _ := conf.GetBoolOr(KeyErrDirectReturn, true)
+
+	fr, err := singlefile.NewSingleFile(meta, logpath, whence, 0, errDirectReturn)
+	if err != nil {
+		return
+	}
+	return NewReaderSize(fr, meta, bufSize)
+}
+
+func init() {
+	reader.RegisterConstructor(ModeDir, NewFileDirReader)
+	reader.RegisterConstructor(ModeFile, NewSingleFileReader)
 }

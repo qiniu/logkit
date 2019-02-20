@@ -9,10 +9,10 @@ import (
 )
 
 func TestTarGz(t *testing.T) {
-	rd, err := NewReader(&reader.Meta{}, "../../utils/testdata/456.tar.gz")
+	rd, err := NewReader(&reader.Meta{}, "testdata/456.tar.gz")
 	assert.NoError(t, err)
 
-	assert.Equal(t, "targz:../../utils/testdata/456.tar.gz", rd.Name())
+	assert.Equal(t, "targz:testdata/456.tar.gz", rd.Name())
 	data, err := ioutil.ReadAll(rd)
 	assert.NoError(t, err)
 	assert.Equal(t, "a\n", string(data))
@@ -20,10 +20,10 @@ func TestTarGz(t *testing.T) {
 	assert.Equal(t, "456/c.txt", rd.Source())
 	assert.NoError(t, rd.Close())
 
-	rd, err = NewReader(&reader.Meta{}, "../../utils/testdata/b.txt.tar.gz")
+	rd, err = NewReader(&reader.Meta{}, "testdata/b.txt.tar.gz")
 	assert.NoError(t, err)
 
-	assert.Equal(t, "targz:../../utils/testdata/b.txt.tar.gz", rd.Name())
+	assert.Equal(t, "targz:testdata/b.txt.tar.gz", rd.Name())
 	data, err = ioutil.ReadAll(rd)
 	assert.NoError(t, err)
 	assert.Equal(t, "b\n", string(data))
@@ -33,10 +33,10 @@ func TestTarGz(t *testing.T) {
 }
 
 func TestTar(t *testing.T) {
-	rd, err := NewReader(&reader.Meta{}, "../../utils/testdata/123.tar")
+	rd, err := NewReader(&reader.Meta{}, "testdata/123.tar")
 	assert.NoError(t, err)
 
-	assert.Equal(t, "tar:../../utils/testdata/123.tar", rd.Name())
+	assert.Equal(t, "tar:testdata/123.tar", rd.Name())
 	data, err := ioutil.ReadAll(rd)
 	assert.NoError(t, err)
 	assert.Equal(t, "v\nia\n", string(data))
@@ -45,23 +45,23 @@ func TestTar(t *testing.T) {
 }
 
 func TestGz(t *testing.T) {
-	rd, err := NewReader(&reader.Meta{}, "../../utils/testdata/a.txt.gz")
+	rd, err := NewReader(&reader.Meta{}, "testdata/a.txt.gz")
 	assert.NoError(t, err)
 
-	assert.Equal(t, "gz:../../utils/testdata/a.txt.gz", rd.Name())
+	assert.Equal(t, "gz:testdata/a.txt.gz", rd.Name())
 	data, err := ioutil.ReadAll(rd)
 	assert.NoError(t, err)
 	assert.Equal(t, "ia\n", string(data))
 
-	assert.Equal(t, "../../utils/testdata/a.txt", rd.Source())
+	assert.Equal(t, "testdata/a.txt", rd.Source())
 	assert.NoError(t, rd.Close())
 }
 
 func TestZip(t *testing.T) {
-	rd, err := NewReader(&reader.Meta{}, "../../utils/testdata/a.zip")
+	rd, err := NewReader(&reader.Meta{}, "testdata/a.zip")
 	assert.NoError(t, err)
 
-	assert.Equal(t, "zip:../../utils/testdata/a.zip", rd.Name())
+	assert.Equal(t, "zip:testdata/a.zip", rd.Name())
 	data, err := ioutil.ReadAll(rd)
 	assert.NoError(t, err)
 	assert.Equal(t, "b\n\na\n", string(data))

@@ -16,7 +16,10 @@ import (
 	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/reader/bufreader"
 	. "github.com/qiniu/logkit/reader/config"
+	"github.com/qiniu/logkit/reader/extract"
+	"github.com/qiniu/logkit/reader/seqfile"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -24,7 +27,7 @@ import (
 type dirReader struct {
 	status        int32 // Note: 原子操作
 	inactive      int32 // Note: 原子操作，当 inactive>0 时才会被 expire 回收
-	br            *reader.BufReader
+	br            *bufreader.BufReader
 	runnerName    string
 	originalPath  string // 实际的路径可能和配置传递进来的路径有所不同
 	logPath       string
@@ -274,11 +277,6 @@ type newReaderOptions struct {
 }
 
 func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool) (*dirReader, error) {
-	var err error
-	opts.LogPath, err = utils.CheckAndUnCompress(opts.LogPath)
-	if err != nil {
-		return nil, err
-	}
 
 	rpath := strings.Replace(opts.LogPath, string(os.PathSeparator), "_", -1)
 	subMetaPath := filepath.Join(opts.Meta.Dir, rpath)
@@ -293,16 +291,25 @@ func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool) (*dir
 	if isNewDir && subMeta.IsNotExist() {
 		opts.Whence = WhenceOldest // 非存量文件第一次读取时从头开始读
 	}
-	fr, err := reader.NewSeqFile(subMeta, opts.LogPath, opts.IgnoreHidden, opts.NewFileNewLine, opts.IgnoreFileSuffixes, opts.ValidFilesRegex, opts.Whence, opts.expireMap)
-	if err != nil {
-		return nil, fmt.Errorf("new sequence file: %v", err)
+	var fri reader.FileReader
+	if reader.CompressedFile(opts.LogPath) {
+		fri, err = extract.NewReader(subMeta, opts.LogPath)
+		if err != nil {
+			return nil, fmt.Errorf("new extract reader: %v", err)
+		}
+	} else {
+		fr, err := seqfile.NewSeqFile(subMeta, opts.LogPath, opts.IgnoreHidden, opts.NewFileNewLine, opts.IgnoreFileSuffixes, opts.ValidFilesRegex, opts.Whence, opts.expireMap)
+		if err != nil {
+			return nil, fmt.Errorf("new sequence file: %v", err)
+		}
+		fr.SkipFileFirstLine = opts.SkipFirstLine
+		fr.ReadSameInode = opts.ReadSameInode
+		fri = fr
 	}
-	fr.SkipFileFirstLine = opts.SkipFirstLine
-	fr.ReadSameInode = opts.ReadSameInode
-	br, err := reader.NewReaderSize(fr, subMeta, opts.BufferSize)
+	br, err := bufreader.NewReaderSize(fri, subMeta, opts.BufferSize)
 	if err != nil {
 		//如果没有创建成功，要把reader close掉，否则会因为ratelimit导致线程泄露
-		fr.Close()
+		fri.Close()
 		return nil, fmt.Errorf("new buffer reader: %v", err)
 	}
 
