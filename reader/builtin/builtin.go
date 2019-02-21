@@ -3,6 +3,7 @@ package builtin
 
 import (
 	_ "github.com/qiniu/logkit/reader/autofile"
+	_ "github.com/qiniu/logkit/reader/bufreader"
 	_ "github.com/qiniu/logkit/reader/cloudtrail"
 	_ "github.com/qiniu/logkit/reader/cloudwatch"
 	_ "github.com/qiniu/logkit/reader/dirx"

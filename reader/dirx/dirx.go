@@ -62,6 +62,8 @@ type Reader struct {
 	statInterval         time.Duration
 	expire               time.Duration
 	submetaExpire        time.Duration
+	expireDelete         bool
+	deleteDirs           chan string
 	maxOpenFiles         int
 	ignoreHidden         bool
 	skipFirstLine        bool
@@ -107,6 +109,8 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		return nil, fmt.Errorf("%q valus is less than %q", KeySubmetaExpire, KeyExpire)
 	}
 
+	expireDelete, _ := conf.GetBoolOr(KeyExpireDelete, false)
+
 	maxOpenFiles, _ := conf.GetIntOr(KeyMaxOpenFiles, 256)
 	ignoreHidden, _ := conf.GetBoolOr(KeyIgnoreHiddenFile, true) // 默认不读取隐藏文件
 	skipFirstLine, _ := conf.GetBoolOr(KeySkipFileFirstLine, false)
@@ -144,18 +148,21 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		}
 	}
 
+	deleteDirs := make(chan string, 10)
 	return &Reader{
 		meta:                 meta,
 		status:               StatusInit,
 		stopChan:             make(chan struct{}),
 		msgChan:              make(chan message),
 		errChan:              make(chan error),
-		dirReaders:           newDirReaders(meta, expire, cachedLines),
+		dirReaders:           newDirReaders(meta, expire, cachedLines, expireDelete, deleteDirs),
 		logPathPattern:       strings.TrimSuffix(logPathPattern, "/"),
 		ignoreLogPathPattern: strings.TrimSuffix(ignoreLogPathPattern, "/"),
 		statInterval:         statInterval,
 		expire:               expire,
 		submetaExpire:        submetaExpire,
+		expireDelete:         expireDelete,
+		deleteDirs:           deleteDirs,
 		maxOpenFiles:         maxOpenFiles,
 		ignoreHidden:         ignoreHidden,
 		skipFirstLine:        skipFirstLine,
@@ -278,7 +285,6 @@ func (r *Reader) statLogPath() {
 			log.Debugf("Runner[%v] log path %q has expired, ignored this time", r.meta.RunnerName, logPath)
 			continue
 		}
-
 		dr, err := r.dirReaders.NewReader(newReaderOptions{
 			Meta:               r.meta,
 			OriginalPath:       m,
@@ -354,6 +360,24 @@ func (r *Reader) Start() error {
 			}
 		}
 	}()
+
+	if r.expireDelete {
+		go func() {
+			for {
+				select {
+				case <-r.stopChan:
+					return
+				case path := <-r.deleteDirs:
+					err := os.RemoveAll(path)
+					if err != nil {
+						log.Errorf("Runner[%v] %q delete expire and read done dir %s, err: %v", r.meta.RunnerName, r.Name(), path, err)
+					} else {
+						log.Infof("Runner[%v] %q delete expire and read done dir %s finished", r.meta.RunnerName, r.Name(), path)
+					}
+				}
+			}
+		}()
+	}
 
 	if IsSubMetaExpire(r.submetaExpire, r.expire) {
 		go func() {

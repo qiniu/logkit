@@ -51,6 +51,10 @@ type LagReader interface {
 	Lag() (*LagInfo, error)
 }
 
+type OnceReader interface {
+	ReadDone() bool
+}
+
 // FileReader reader 接口方法
 type FileReader interface {
 	Name() string
@@ -122,7 +126,6 @@ func (reg *Registry) NewReaderWithMeta(conf conf.MapConf, meta *Meta, errDirectR
 	}
 	mode, _ := conf.GetStringOr(KeyMode, ModeDir)
 	headPattern, _ := conf.GetStringOr(KeyHeadPattern, "")
-
 	constructor, exist := reg.readerTypeMap[mode]
 	if !exist {
 		return nil, fmt.Errorf("reader type unsupported : %v", mode)

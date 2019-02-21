@@ -1,4 +1,4 @@
-package reader
+package bufreader
 
 import (
 	"os"
@@ -7,13 +7,74 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
-	"github.com/stretchr/testify/assert"
-
-	"github.com/qiniu/logkit/reader/bufreader"
+	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/reader/test"
 	. "github.com/qiniu/logkit/utils/models"
+
+	"github.com/stretchr/testify/assert"
 )
+
+type MockReader struct {
+	num int
+}
+
+func (m *MockReader) Name() string {
+	return "mock"
+}
+func (m *MockReader) Source() string {
+	return "mock"
+}
+
+func (m *MockReader) Read(p []byte) (n int, err error) {
+	if m.num%1000 == 0 {
+		for i, v := range "abchaha\n" {
+			p[i] = byte(v)
+		}
+		m.num++
+		return 8, nil
+	}
+	vv := "abxxxabxxxabxxxabxxxabxxxabxabxxxabxxxabxxxabxxxabxxxabxabxxxabxxxabxxxabxxx\n"
+	vv += vv
+	for i, v := range vv {
+		p[i] = byte(v)
+	}
+	m.num++
+	return len(vv), nil
+}
+func (m *MockReader) SyncMeta() error {
+	return nil
+}
+
+func (m *MockReader) Close() error {
+	return nil
+}
+
+var line string
+
+func BenchmarkReadPattern(b *testing.B) {
+	m := &MockReader{}
+	c := conf.MapConf{}
+	c[KeyLogPath] = "logpath"
+	c[KeyMode] = ModeDir
+	c[KeyDataSourceTag] = "tag1path"
+	ma, err := reader.NewMetaWithConf(c)
+	if err != nil {
+		b.Error(err)
+	}
+	r, err := NewReaderSize(m, ma, 1024)
+	if err != nil {
+		b.Fatal(err)
+	}
+	err = r.SetMode(ReadModeHeadPatternString, "^abc")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	for i := 0; i < b.N; i++ {
+		line, _ = r.ReadPattern()
+	}
+}
 
 func Test_BuffReader(t *testing.T) {
 	CreateSeqFile(1000, lines)
@@ -27,7 +88,7 @@ func Test_BuffReader(t *testing.T) {
 		"reader_buf_size": "24",
 		"read_from":       "oldest",
 	}
-	r, err := NewFileBufReader(c, false)
+	r, err := reader.NewFileBufReader(c, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -73,7 +134,7 @@ func Test_Datasource(t *testing.T) {
 		"reader_buf_size": "37",
 		"read_from":       "oldest",
 	}
-	r, err := NewFileBufReader(c, false)
+	r, err := reader.NewFileBufReader(c, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -122,7 +183,7 @@ func Test_Datasource2(t *testing.T) {
 		"reader_buf_size": "10",
 		"read_from":       "oldest",
 	}
-	r, err := NewFileBufReader(c, false)
+	r, err := reader.NewFileBufReader(c, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -171,7 +232,7 @@ func Test_Datasource3(t *testing.T) {
 		"reader_buf_size": "20",
 		"read_from":       "oldest",
 	}
-	r, err := NewFileBufReader(c, false)
+	r, err := reader.NewFileBufReader(c, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -205,7 +266,7 @@ func Test_BuffReaderBufSizeLarge(t *testing.T) {
 		"reader_buf_size": "1024",
 		"read_from":       "oldest",
 	}
-	r, err := NewFileBufReader(c, false)
+	r, err := reader.NewFileBufReader(c, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -239,7 +300,7 @@ func Test_GBKEncoding(t *testing.T) {
 		"read_from":       "oldest",
 		"encoding":        "gb18030",
 	}
-	r, err := NewFileBufReader(c, false)
+	r, err := reader.NewFileBufReader(c, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -273,7 +334,7 @@ func Test_NoPanicEncoding(t *testing.T) {
 		"read_from":       "oldest",
 		"encoding":        "nopanic",
 	}
-	r, err := NewFileBufReader(c, false)
+	r, err := reader.NewFileBufReader(c, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -306,7 +367,7 @@ func Test_BuffReaderMultiLine(t *testing.T) {
 		"read_from":       "oldest",
 		"head_pattern":    "^test*",
 	}
-	r, err := NewFileBufReader(c, false)
+	r, err := reader.NewFileBufReader(c, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -325,7 +386,7 @@ func Test_BuffReaderMultiLine(t *testing.T) {
 		assert.NoError(t, err)
 	}
 	r.Close()
-	r, err = NewFileBufReader(c, false)
+	r, err = reader.NewFileBufReader(c, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -359,13 +420,13 @@ func Test_BuffReaderStats(t *testing.T) {
 		"mode":      ModeDir,
 		"read_from": "oldest",
 	}
-	r, err := NewFileBufReader(c, false)
+	r, err := reader.NewFileBufReader(c, false)
 	if err != nil {
 		t.Error(err)
 	}
 	_, err = r.ReadLine()
 	assert.NoError(t, err)
-	str, ok := r.(StatsReader)
+	str, ok := r.(reader.StatsReader)
 	assert.Equal(t, true, ok)
 	stsx := str.Status()
 	expsts := StatsInfo{}
@@ -385,11 +446,11 @@ func Test_FileNotFound(t *testing.T) {
 		"reader_buf_size": "24",
 		"read_from":       "oldest",
 	}
-	r, err := NewFileBufReader(c, true)
+	r, err := reader.NewFileBufReader(c, true)
 	assert.Error(t, err)
 
 	c["log_path"] = filepath.Join(Dir, Files[0])
-	r, err = NewFileBufReader(c, true)
+	r, err = reader.NewFileBufReader(c, true)
 	assert.NoError(t, err)
 	rest := []string{}
 	for {
@@ -407,64 +468,3 @@ func Test_FileNotFound(t *testing.T) {
 }
 
 var lines = "123456789\n123456789\n123456789\n123456789\n"
-
-type MockReader struct {
-	num int
-}
-
-func (m *MockReader) Name() string {
-	return "mock"
-}
-func (m *MockReader) Source() string {
-	return "mock"
-}
-
-func (m *MockReader) Read(p []byte) (n int, err error) {
-	if m.num%1000 == 0 {
-		for i, v := range "abchaha\n" {
-			p[i] = byte(v)
-		}
-		m.num++
-		return 8, nil
-	}
-	vv := "abxxxabxxxabxxxabxxxabxxxabxabxxxabxxxabxxxabxxxabxxxabxabxxxabxxxabxxxabxxx\n"
-	vv += vv
-	for i, v := range vv {
-		p[i] = byte(v)
-	}
-	m.num++
-	return len(vv), nil
-}
-func (m *MockReader) SyncMeta() error {
-	return nil
-}
-
-func (m *MockReader) Close() error {
-	return nil
-}
-
-var line string
-
-func BenchmarkReadPattern(b *testing.B) {
-	m := &MockReader{}
-	c := conf.MapConf{}
-	c[KeyLogPath] = "logpath"
-	c[KeyMode] = ModeDir
-	c[KeyDataSourceTag] = "tag1path"
-	ma, err := NewMetaWithConf(c)
-	if err != nil {
-		b.Error(err)
-	}
-	r, err := bufreader.NewReaderSize(m, ma, 1024)
-	if err != nil {
-		b.Fatal(err)
-	}
-	err = r.SetMode(ReadModeHeadPatternString, "^abc")
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	for i := 0; i < b.N; i++ {
-		line, _ = r.ReadPattern()
-	}
-}

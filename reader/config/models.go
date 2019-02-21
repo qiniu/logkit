@@ -36,6 +36,7 @@ const (
 	KeyValidFilePattern = "valid_file_pattern"
 
 	KeyExpire        = "expire"
+	KeyExpireDelete  = "expire_delete"
 	KeySubmetaExpire = "submeta_expire"
 	KeyMaxOpenFiles  = "max_open_files"
 	KeyStatInterval  = "stat_interval"

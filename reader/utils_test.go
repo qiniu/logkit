@@ -11,30 +11,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/qiniu/log"
 	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/reader/test"
 	. "github.com/qiniu/logkit/utils/models"
 )
-
-func CreateSeqFile(interval int, lines string) {
-	err := os.Mkdir(Dir, DefaultDirPerm)
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	for _, f := range Files {
-		file, err := os.OpenFile(filepath.Join(Dir, f), os.O_CREATE|os.O_WRONLY, DefaultFilePerm)
-		if err != nil {
-			log.Error(err)
-			return
-		}
-
-		file.WriteString(lines)
-		file.Close()
-		time.Sleep(time.Millisecond * time.Duration(interval))
-	}
-}
 
 func TestFindFile(t *testing.T) {
 	CreateFileForTest(1000)

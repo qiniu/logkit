@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/reader"
@@ -22,7 +23,7 @@ type Reader struct {
 	path       string
 	tp         string
 	m          *reader.Meta
-	done       bool
+	done       int32
 }
 
 //NewReader 实现对压缩包的读取
@@ -64,11 +65,11 @@ func NewReader(meta *reader.Meta, path string) (*Reader, error) {
 		}
 		tp = "zip"
 	}
-	var done bool
+	var done int32 = 0
 	curFile, offset, err = meta.ReadOffset()
 	if err == nil && curFile == path && offset > 0 {
 		log.Infof("log(%s) has been already read done before", path)
-		done = true
+		done = 1
 	}
 	return &Reader{
 		underlying: rd,
@@ -89,12 +90,12 @@ func (r *Reader) Source() string {
 }
 
 func (r *Reader) Read(p []byte) (n int, err error) {
-	if r.done {
+	if atomic.LoadInt32(&r.done) > 0 {
 		return 0, io.EOF
 	}
 	n, err = r.underlying.Read(p)
 	if err == io.EOF && n == 0 {
-		r.done = true
+		atomic.StoreInt32(&r.done, 1)
 	}
 	return n, err
 }
@@ -104,7 +105,8 @@ func (r *Reader) Close() error {
 }
 
 func (r *Reader) SyncMeta() error {
-	if r.done {
+	if atomic.LoadInt32(&r.done) > 0 {
+		r.Close()
 		return r.m.WriteOffset(r.path, 1)
 	}
 	return nil
@@ -112,6 +114,10 @@ func (r *Reader) SyncMeta() error {
 
 func (r *Reader) Lag() (rl *LagInfo, err error) {
 	return r.underlying.Lag()
+}
+
+func (r *Reader) ReadDone() bool {
+	return atomic.LoadInt32(&r.done) > 0
 }
 
 // Compile-time checks to ensure type implements desired interfaces.

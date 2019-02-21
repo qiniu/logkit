@@ -19,11 +19,6 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-func CreateFileForTest(interval int) {
-	CreateDir()
-	CreateFiles(interval)
-}
-
 func TestMeta(t *testing.T) {
 	CreateFileForTest(50)
 	defer DestroyDir()

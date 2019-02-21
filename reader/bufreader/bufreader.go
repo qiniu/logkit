@@ -547,7 +547,15 @@ func (b *BufReader) Lag() (rl *LagInfo, err error) {
 		return lr.Lag()
 	}
 
-	return rl, fmt.Errorf("internal reader haven't support lag info yet")
+	return rl, errors.New("internal reader haven't support lag info yet")
+}
+
+func (b *BufReader) ReadDone() bool {
+	lr, ok := b.rd.(reader.OnceReader)
+	if ok {
+		return lr.ReadDone()
+	}
+	return false
 }
 
 func (b *BufReader) SyncMeta() {

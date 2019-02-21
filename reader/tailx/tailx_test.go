@@ -1,7 +1,10 @@
 package tailx
 
 import (
+	"compress/gzip"
+	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -83,6 +86,8 @@ func TestStart(t *testing.T) {
 		"multiReaderNewestTest":           multiReaderNewestTest,
 		"multiReaderNewestOffsetTest":     multiReaderNewestOffsetTest,
 		"multiReaderNewestModify":         multiReaderNewestModify,
+		"readerExpireDeleteTest":          readerExpireDeleteTest,
+		"readerGZDeleteTest":              readerGZDeleteTest,
 	}
 
 	for k, f := range funcMap {
@@ -138,6 +143,7 @@ func multiReaderOneLineTest(t *testing.T) {
 	mr := mmr.(*Reader)
 	assert.NoError(t, mr.Start())
 	t.Log("Reader has started")
+	defer mr.Close()
 
 	assert.Equal(t, 15*time.Second, mr.expire)
 	assert.Equal(t, time.Duration(0), mr.submetaExpire)
@@ -194,6 +200,189 @@ func multiReaderOneLineTest(t *testing.T) {
 	assert.EqualValues(t, expresult, resultmap)
 
 	assert.Equal(t, StatsInfo{}, mr.Status())
+	files1, err := ioutil.ReadDir(dir1)
+	assert.NoError(t, err)
+	files2, err := ioutil.ReadDir(dir2)
+	assert.NoError(t, err)
+	assert.Equal(t, 3, len(files1)+len(files2))
+}
+
+func readerExpireDeleteTest(t *testing.T) {
+	maxnum := 0
+	dirname := "readerExpireDeleteTest"
+	dir1 := filepath.Join(dirname, "abc")
+	dir2 := filepath.Join(dirname, "xyz")
+	dir1file1 := filepath.Join(dir1, "file1.log")
+	dir1file2 := filepath.Join(dir1, "file2.log")
+	dir2file1 := filepath.Join(dir2, "file1.log")
+
+	createDirWithName(dirname)
+	defer os.RemoveAll(dirname)
+
+	createDirWithName(dir1)
+	createDirWithName(dir2)
+	createFileWithContent(dir1file1, "abc123\nabc123\nabc123\nabc123\nabc123\n")
+	createFileWithContent(dir1file2, "xyz\nxyz\nxyz\nxyz\nxyz\nxyz\nxyz\nxyz\nxyz\nxyz\n")
+	createFileWithContent(dir2file1, "hahaha\nhahaha\nhahaha\n")
+	expresult := map[string]int{
+		"abc123\n": 5,
+		"xyz\n":    10,
+		"hahaha\n": 3,
+	}
+	resultmap := make(map[string]int)
+	logPathPattern := filepath.Join(filepath.Join(dirname, "*"), "*.log")
+	c := conf.MapConf{
+		"log_path":        logPathPattern,
+		"meta_path":       dirname,
+		"mode":            ModeTailx,
+		"sync_every":      "1",
+		"reader_buf_size": "1024",
+		"read_from":       "oldest",
+		"expire":          "10s",
+		"submeta_expire":  "0s",
+		KeyExpireDelete:   "true",
+		"stat_interval":   "1s",
+		"max_open_files":  "128",
+	}
+	meta, err := reader.NewMetaWithConf(c)
+	assert.NoError(t, err)
+	mmr, err := NewReader(meta, c)
+	mr := mmr.(*Reader)
+	assert.NoError(t, mr.Start())
+	t.Log("Reader has started")
+	defer mr.Close()
+
+	assert.Equal(t, 10*time.Second, mr.expire)
+	assert.Equal(t, time.Duration(0), mr.submetaExpire)
+
+	spacenum := 0
+	for {
+		data, err := mr.ReadLine()
+		if data != "" {
+			resultmap[data]++
+			maxnum++
+		} else {
+			spacenum++
+		}
+		if err == io.EOF {
+			break
+		}
+		t.Log(data)
+		if maxnum >= 18 || spacenum > 20 {
+			break
+		}
+	}
+	mr.ReadLine()
+	assert.EqualValues(t, expresult, resultmap)
+	assert.Equal(t, StatsInfo{}, mr.Status())
+	time.Sleep(20 * time.Second)
+
+	files1, _ := ioutil.ReadDir(dir1)
+	files2, _ := ioutil.ReadDir(dir2)
+	assert.Equal(t, 0, len(files1)+len(files2))
+}
+
+func gzipit(source, target string) error {
+	reader, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+
+	filename := filepath.Base(source)
+	target = filepath.Join(target, fmt.Sprintf("%s.gz", filename))
+	writer, err := os.Create(target)
+	if err != nil {
+		return err
+	}
+	defer writer.Close()
+
+	archiver := gzip.NewWriter(writer)
+	archiver.Name = filename
+	defer archiver.Close()
+
+	_, err = io.Copy(archiver, reader)
+	return err
+}
+
+func readerGZDeleteTest(t *testing.T) {
+	maxnum := 0
+	dirname := "readerGZDeleteTest"
+	dir1 := filepath.Join(dirname, "abc")
+	dir2 := filepath.Join(dirname, "xyz")
+	dir1file1 := filepath.Join(dir1, "file1.log")
+	dir1file2 := filepath.Join(dir1, "file2.log")
+	dir2file1 := filepath.Join(dir2, "file1.log")
+
+	createDirWithName(dirname)
+	defer os.RemoveAll(dirname)
+
+	createDirWithName(dir1)
+	createDirWithName(dir2)
+	createFileWithContent(dir1file1, "abc123\nabc123\nabc123\nabc123\nabc123\n")
+	createFileWithContent(dir1file2, "xyz\nxyz\nxyz\nxyz\nxyz\nxyz\nxyz\nxyz\nxyz\nxyz\n")
+	createFileWithContent(dir2file1, "hahaha\nhahaha\nhahaha\n")
+	assert.NoError(t, gzipit(dir1file1, dir1))
+	assert.NoError(t, gzipit(dir1file2, dir1))
+	assert.NoError(t, gzipit(dir2file1, dir2))
+	os.RemoveAll(dir1file1)
+	os.RemoveAll(dir1file2)
+	os.RemoveAll(dir2file1)
+	expresult := map[string]int{
+		"abc123\n": 5,
+		"xyz\n":    10,
+		"hahaha\n": 3,
+	}
+	resultmap := make(map[string]int)
+	logPathPattern := filepath.Join(filepath.Join(dirname, "*"), "*.gz")
+	c := conf.MapConf{
+		"log_path":        logPathPattern,
+		"meta_path":       dirname,
+		"mode":            ModeTailx,
+		"sync_every":      "1",
+		"reader_buf_size": "1024",
+		"read_from":       "oldest",
+		"expire":          "10s",
+		"submeta_expire":  "0s",
+		KeyExpireDelete:   "true",
+		"stat_interval":   "1s",
+		"max_open_files":  "128",
+	}
+	meta, err := reader.NewMetaWithConf(c)
+	assert.NoError(t, err)
+	mmr, err := NewReader(meta, c)
+	mr := mmr.(*Reader)
+	assert.NoError(t, mr.Start())
+	t.Log("Reader has started")
+	defer mr.Close()
+
+	assert.Equal(t, 10*time.Second, mr.expire)
+	assert.Equal(t, time.Duration(0), mr.submetaExpire)
+
+	spacenum := 0
+	for {
+		data, err := mr.ReadLine()
+		if data != "" {
+			resultmap[data]++
+			maxnum++
+		} else {
+			spacenum++
+		}
+		if err == io.EOF {
+			break
+		}
+		t.Log(data)
+		if maxnum >= 18 || spacenum > 20 {
+			break
+		}
+	}
+	mr.ReadLine()
+	assert.EqualValues(t, expresult, resultmap)
+	assert.Equal(t, StatsInfo{}, mr.Status())
+	time.Sleep(20 * time.Second)
+
+	files1, _ := ioutil.ReadDir(dir1)
+	files2, _ := ioutil.ReadDir(dir2)
+	assert.Equal(t, 0, len(files1)+len(files2))
 }
 
 func multiReaderMultiLineTest(t *testing.T) {
@@ -241,6 +430,7 @@ func multiReaderMultiLineTest(t *testing.T) {
 	mr := mmr.(*Reader)
 	assert.NoError(t, mr.Start())
 	t.Log("Reader has started")
+	defer mr.Close()
 
 	assert.Equal(t, 15*time.Second, mr.expire)
 	assert.Equal(t, 720*time.Hour, mr.submetaExpire)
@@ -384,6 +574,8 @@ func multiReaderSyncMetaOneLineTest(t *testing.T) {
 	mmr, err = NewReader(meta, c)
 	mr = mmr.(*Reader)
 	assert.NoError(t, mr.Start())
+	defer mr.Close()
+
 	time.Sleep(500 * time.Millisecond)
 	for {
 		data, err := mr.ReadLine()
@@ -514,6 +706,7 @@ func multiReaderSyncMetaMutilineTest(t *testing.T) {
 	mmr.SetMode(ReadModeHeadPatternString, "^abc*")
 	mr = mmr.(*Reader)
 	assert.NoError(t, mr.Start())
+	defer mr.Close()
 	time.Sleep(100 * time.Millisecond)
 	for {
 		data, err := mr.ReadLine()
@@ -635,6 +828,7 @@ func multiReaderNewestTest(t *testing.T) {
 	assert.Nil(t, err)
 	mr = mmr.(*Reader)
 	assert.NoError(t, mr.Start())
+	defer mr.Close()
 	t.Log("mr Started again")
 	time.Sleep(20 * time.Second)
 	mr.armapmux.Lock()
@@ -744,6 +938,7 @@ func multiReaderNewestOffsetTest(t *testing.T) {
 	mr = mmr.(*Reader)
 	assert.NoError(t, mr.Start())
 	t.Log("mr Started again")
+	defer mr.Close()
 	time.Sleep(20 * time.Second)
 	mr.armapmux.Lock()
 	assert.Equal(t, 2, len(mr.fileReaders), "activereader number")
@@ -920,6 +1115,8 @@ func TestMultiReaderReset(t *testing.T) {
 	mmr, err = NewReader(meta, c)
 	mr = mmr.(*Reader)
 	assert.NoError(t, mr.Start())
+	t.Log("mr Started again")
+	defer mr.Close()
 	time.Sleep(100 * time.Millisecond)
 	resultMap = make(map[string]int)
 	maxNum = 0
@@ -940,7 +1137,7 @@ func TestMultiReaderReset(t *testing.T) {
 			break
 		}
 	}
-	t.Log("mr Started again")
+
 	assert.EqualValues(t, expResult, resultMap)
 }
 

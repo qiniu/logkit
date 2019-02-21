@@ -229,6 +229,15 @@ var (
 		CheckRegex:   "\\d+[hms]",
 		ToolTip:      `当元数据的文件达到expire时间，则对其进行清理操作。写法为：数字加单位符号，组成字符串duration写法，支持时h、分m、秒s为单位，类似3h(3小时)，10m(10分钟)，5s(5秒)，默认的expire时间是720h，即30天。若最大过期时间(expire)为0s，则不会清理元数据`,
 	}
+	OptionKeyExpireDelete = Option{
+		KeyName:       KeyExpireDelete,
+		ChooseOnly:    true,
+		ChooseOptions: []interface{}{"false", "true"},
+		Default:       "false",
+		DefaultNoUse:  false,
+		Description:   "自动删除读取完毕的文件(" + KeyExpireDelete + ")",
+		ToolTip:       "自动删除已经读取完毕并且已经达到过期时间的文件/文件夹，压缩文件读完就认为已经过期",
+	}
 	OptionKeyMaxOpenFiles = Option{
 		KeyName:      KeyMaxOpenFiles,
 		ChooseOnly:   false,
@@ -345,6 +354,7 @@ var ModeKeyOptions = map[string][]Option{
 			ToolTip:      `当日志达到expire时间，则放弃追踪。写法为：数字加单位符号，组成字符串duration写法，支持时h、分m、秒s为单位，类似3h(3小时)，10m(10分钟)，5s(5秒)，默认的expire时间是24h，当expire时间是0s时表示永不过期`,
 		},
 		OptionKeySubmetaExpire,
+		OptionKeyExpireDelete,
 		OptionKeyMaxOpenFiles,
 		OptionKeyStatInterval,
 	},
@@ -384,6 +394,7 @@ var ModeKeyOptions = map[string][]Option{
 			ToolTip:      `当文件夹内所有的日志达到expire时间，则放弃追踪。写法为：数字加单位符号，组成字符串duration写法，支持时h、分m、秒s为单位，类似3h(3小时)，10m(10分钟)，5s(5秒)，默认的expire时间是0s，即永不过期`,
 		},
 		OptionKeySubmetaExpire,
+		OptionKeyExpireDelete,
 		OptionKeyMaxOpenFiles,
 		OptionKeyStatInterval,
 		OptionKeyValidFilePattern,
@@ -410,6 +421,7 @@ var ModeKeyOptions = map[string][]Option{
 			ToolTip:      `当日志/文件夹内所有的日志达到expire时间，则放弃追踪。写法为：数字加单位符号，组成字符串duration写法，支持时h、分m、秒s为单位，类似3h(3小时)，10m(10分钟)，5s(5秒)，默认的expire时间是0s，即永不过期`,
 		},
 		OptionKeySubmetaExpire,
+		OptionKeyExpireDelete,
 		OptionMetaPath,
 		OptionIgnoreLogPath,
 		OptionWhence,

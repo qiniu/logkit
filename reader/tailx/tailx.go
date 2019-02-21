@@ -66,9 +66,12 @@ type Reader struct {
 	ignoreLogPathPattern string
 	expire               time.Duration
 	submetaExpire        time.Duration
-	statInterval         time.Duration
-	maxOpenFiles         int
-	whence               string
+	expireDelete         bool
+	deleteDirs           chan string
+
+	statInterval time.Duration
+	maxOpenFiles int
+	whence       string
 
 	notFirstTime bool
 }
@@ -376,6 +379,9 @@ func (ar *ActiveReader) expired(expire time.Duration) bool {
 	if expire.Nanoseconds() == 0 {
 		return false
 	}
+	if ar.br.ReadDone() {
+		return true
+	}
 
 	fi, err := os.Stat(ar.realpath)
 	if err != nil {
@@ -422,6 +428,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	if IsSubmetaExpireValid(submetaExpire, expire) {
 		return nil, fmt.Errorf("%q valus is less than %q", KeySubmetaExpire, KeyExpire)
 	}
+	expireDelete, _ := conf.GetBoolOr(KeyExpireDelete, false)
 
 	statInterval, err := time.ParseDuration(statIntervalDur)
 	if err != nil {
@@ -479,6 +486,8 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		whence:               whence,
 		expire:               expire,
 		submetaExpire:        submetaExpire,
+		expireDelete:         expireDelete,
+		deleteDirs:           make(chan string, 10),
 		statInterval:         statInterval,
 		maxOpenFiles:         maxOpenFiles,
 		fileReaders:          make(map[string]*ActiveReader), //armapmux
@@ -541,6 +550,10 @@ func (r *Reader) checkExpiredFiles() {
 			delete(r.cacheMap, path)
 			r.meta.RemoveSubMeta(path)
 			paths = append(paths, path)
+			if r.expireDelete {
+				log.Infof("Runner[%v] %q start to delete expire and read done dir %s", r.meta.RunnerName, r.Name(), path)
+				r.deleteDirs <- path
+			}
 		}
 	}
 	if len(paths) > 0 {
@@ -740,6 +753,24 @@ func (r *Reader) Start() error {
 			}
 		}
 	}()
+
+	if r.expireDelete {
+		go func() {
+			for {
+				select {
+				case <-r.stopChan:
+					return
+				case path := <-r.deleteDirs:
+					err := os.RemoveAll(path)
+					if err != nil {
+						log.Errorf("Runner[%v] %q delete expire and read done dir %s, err: %v", r.meta.RunnerName, r.Name(), path, err)
+					} else {
+						log.Infof("Runner[%v] %q delete expire and read done dir %s finished", r.meta.RunnerName, r.Name(), path)
+					}
+				}
+			}
+		}()
+	}
 
 	if IsSubMetaExpire(r.submetaExpire, r.expire) {
 		go func() {

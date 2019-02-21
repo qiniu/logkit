@@ -160,6 +160,9 @@ func HasDirExpired(dir string, expire time.Duration) bool {
 			log.Errorf("Failed to get directory entry[%v] info: %v", path, err)
 			return nil
 		} else if dir == path {
+			if latestModTime.IsZero() {
+				latestModTime = info.ModTime()
+			}
 			return nil
 		} else if info.IsDir() {
 			return filepath.SkipDir // 过滤子目录
@@ -178,6 +181,10 @@ func HasDirExpired(dir string, expire time.Duration) bool {
 }
 
 func (dr *dirReader) HasExpired(expire time.Duration) bool {
+	if dr.br.ReadDone() {
+		//对于读完的直接认为过期，因为不会追加新数据
+		return true
+	}
 	// 在非 inactive 的情况下，数据尚未读完，有必要先继续处理
 	return atomic.LoadInt32(&dr.inactive) > 0 && HasDirExpired(dr.logPath, expire)
 }
@@ -227,16 +234,20 @@ type dirReaders struct {
 	cachedLines map[string]string     // logPath -> data
 
 	// 以下为传入参数
-	meta   *reader.Meta
-	expire time.Duration
+	meta         *reader.Meta
+	expire       time.Duration
+	expireDelete bool
+	deleteDirs   chan string
 }
 
-func newDirReaders(meta *reader.Meta, expire time.Duration, cachedLines map[string]string) *dirReaders {
+func newDirReaders(meta *reader.Meta, expire time.Duration, cachedLines map[string]string, expireDelete bool, deleteDirs chan string) *dirReaders {
 	return &dirReaders{
-		readers:     make(map[string]*dirReader),
-		cachedLines: cachedLines,
-		meta:        meta,
-		expire:      expire,
+		readers:      make(map[string]*dirReader),
+		cachedLines:  cachedLines,
+		meta:         meta,
+		expire:       expire,
+		expireDelete: expireDelete,
+		deleteDirs:   deleteDirs,
 	}
 }
 
@@ -355,6 +366,10 @@ func (drs *dirReaders) checkExpiredDirs() {
 			delete(drs.cachedLines, logPath)
 			drs.meta.RemoveSubMeta(logPath)
 			expiredDirs = append(expiredDirs, logPath)
+			if drs.expireDelete {
+				log.Infof("Runner[%v] start to delete expire and read done dir %s", drs.meta.RunnerName, logPath)
+				drs.deleteDirs <- logPath
+			}
 		}
 	}
 	if len(expiredDirs) > 0 {

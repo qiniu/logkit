@@ -1,16 +1,18 @@
 package dirx
 
 import (
+	"archive/tar"
+	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/qiniu/log"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
@@ -59,6 +61,8 @@ func TestStart(t *testing.T) {
 		"multiReaderNewestTest":           multiReaderNewestTest,
 		"multiReaderNewestOffsetTest":     multiReaderNewestOffsetTest,
 		"multiReaderSameInodeTest":        multiReaderSameInodeTest,
+		"readerExpireDeleteTest":          readerExpireDeleteTest,
+		"readerExpireDeleteTarTest":       readerExpireDeleteTarTest,
 	}
 
 	for k, f := range funcMap {
@@ -118,6 +122,7 @@ func multiReaderOneLineTest(t *testing.T) {
 	dr := r.(*Reader)
 	assert.NoError(t, dr.Start())
 	t.Log("Reader has started")
+	defer dr.Close()
 
 	assert.Equal(t, 5*time.Second, dr.expire)
 	assert.Equal(t, time.Duration(0), dr.submetaExpire)
@@ -213,6 +218,7 @@ func multiReaderMultiLineTest(t *testing.T) {
 	dr := r.(*Reader)
 	assert.NoError(t, dr.Start())
 	t.Log("Reader has started")
+	defer dr.Close()
 
 	assert.Equal(t, 5*time.Second, dr.expire)
 	assert.Equal(t, 720*time.Hour, dr.submetaExpire)
@@ -349,6 +355,7 @@ func multiReaderSyncMetaOneLineTest(t *testing.T) {
 	dr = r.(*Reader)
 	assert.NoError(t, dr.Start())
 	t.Log("Reader has started again", maxNum)
+	defer dr.Close()
 	emptyNum = 0
 	for {
 		data, err := dr.ReadLine()
@@ -480,6 +487,7 @@ func multiReaderSyncMetaMutilineTest(t *testing.T) {
 	dr = r.(*Reader)
 	assert.NoError(t, dr.Start())
 	t.Log("Reader has started again", maxNum)
+	defer dr.Close()
 	emptyNum = 0
 	for {
 		data, err := dr.ReadLine()
@@ -568,6 +576,7 @@ func multiReaderNewestTest(t *testing.T) {
 	dr := r.(*Reader)
 	assert.NoError(t, dr.Start())
 	t.Log("Reader has started")
+	defer dr.Close()
 
 	assert.Equal(t, 10*time.Second, dr.expire)
 	assert.Equal(t, 720*time.Hour, dr.submetaExpire)
@@ -664,6 +673,7 @@ func multiReaderNewestOffsetTest(t *testing.T) {
 	dr := r.(*Reader)
 	assert.NoError(t, dr.Start())
 	t.Log("Reader has started")
+	defer dr.Close()
 
 	assert.Equal(t, 10*time.Second, dr.expire)
 	assert.Equal(t, 720*time.Hour, dr.submetaExpire)
@@ -765,6 +775,7 @@ func multiReaderSameInodeTest(t *testing.T) {
 	dr := r.(*Reader)
 	assert.NoError(t, dr.Start())
 	t.Log("Reader has started")
+	defer dr.Close()
 
 	createFileWithContent(dir1file2, "abc123\nabc124\nabc125\nabc126\nabc127\n")
 	time.Sleep(3 * time.Second)
@@ -840,7 +851,237 @@ func multiReaderSameInodeTest(t *testing.T) {
 
 	assert.EqualValues(t, expectResults, actualResults)
 	assert.Equal(t, StatsInfo{}, dr.Status())
+	files1, err := ioutil.ReadDir(dir1)
+	assert.NoError(t, err)
+	files2, err := ioutil.ReadDir(dir2)
+	assert.NoError(t, err)
+	assert.Equal(t, 3, len(files1)+len(files2))
+
 	t.Log("Reader has finished reading three")
+}
+
+func readerExpireDeleteTest(t *testing.T) {
+	dirname := "readerExpireDeleteTest"
+	dir1 := filepath.Join(dirname, "logs/dir1")
+	dir2 := filepath.Join(dirname, "logs/dir2")
+	dir1file1 := filepath.Join(dir1, "file1.log")
+	dir1file2 := filepath.Join(dir1, "file2.log")
+	dir2file1 := filepath.Join(dir2, "file1.log")
+
+	createDirWithName(dirname)
+	defer os.RemoveAll(dirname)
+
+	createDirWithName(dir1)
+	expectResults := map[string]int{
+		"abc123\n": 2,
+		"abc124\n": 2,
+		"abc125\n": 2,
+		"abc126\n": 2,
+		"abc127\n": 2,
+		"abc\nx\n": 1,
+		"abc\ny\n": 1,
+		"abc\nz\n": 1,
+	}
+	actualResults := make(map[string]int)
+	logPathPattern := filepath.Join(dirname, "logs/*")
+	c := conf.MapConf{
+		"log_path":        logPathPattern,
+		"stat_interval":   "1s",
+		"expire":          "10s",
+		KeyExpireDelete:   "true",
+		"max_open_files":  "128",
+		"read_from":       "oldest",
+		"reader_buf_size": "1024",
+		"meta_path":       dirname,
+		"mode":            ModeDirx,
+		"read_same_inode": "true",
+	}
+	meta, err := reader.NewMetaWithConf(c)
+	assert.NoError(t, err)
+	r, err := NewReader(meta, c)
+	assert.NoError(t, err)
+
+	err = r.SetMode(ReadModeHeadPatternString, "^abc*")
+	assert.Nil(t, err)
+	dr := r.(*Reader)
+	assert.NoError(t, dr.Start())
+	t.Log("Reader has started")
+	defer dr.Close()
+	createFileWithContent(dir1file1, "abc123\nabc124\nabc125\nabc126\nabc127\n")
+	createDirWithName(dir2)
+	createFileWithContent(dir2file1, "abc\nx\nabc\ny\nabc\nz\n")
+	time.Sleep(time.Second)
+	createFileWithContent(dir1file2, "abc123\nabc124\nabc125\nabc126\nabc127\n")
+	time.Sleep(2 * time.Second)
+
+	maxNum := 0
+	emptyNum := 0
+	for {
+		data, err := dr.ReadLine()
+		if data != "" {
+			t.Log("Data:", data, maxNum, dr.Source())
+			actualResults[data]++
+			maxNum++
+		} else {
+			emptyNum++
+		}
+		if err == io.EOF {
+			break
+		}
+		if maxNum >= 18 || emptyNum > 10 {
+			break
+		}
+	}
+
+	assert.EqualValues(t, expectResults, actualResults)
+	assert.Equal(t, StatsInfo{}, dr.Status())
+	time.Sleep(8 * time.Second)
+	files1, err := ioutil.ReadDir(dir1)
+	assert.Equal(t, true, os.IsNotExist(err))
+	files2, err := ioutil.ReadDir(dir2)
+	assert.Equal(t, true, os.IsNotExist(err))
+	assert.Equal(t, 0, len(files1)+len(files2))
+}
+
+func tarit(source, target string) error {
+	filename := filepath.Base(source)
+	target = filepath.Join(target, fmt.Sprintf("%s.tar", filename))
+	tarfile, err := os.Create(target)
+	if err != nil {
+		return err
+	}
+	defer tarfile.Close()
+
+	tarball := tar.NewWriter(tarfile)
+	defer tarball.Close()
+
+	info, err := os.Stat(source)
+	if err != nil {
+		return nil
+	}
+
+	var baseDir string
+	if info.IsDir() {
+		baseDir = filepath.Base(source)
+	}
+
+	return filepath.Walk(source,
+		func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			header, err := tar.FileInfoHeader(info, info.Name())
+			if err != nil {
+				return err
+			}
+			if baseDir != "" {
+				header.Name = filepath.Join(baseDir, strings.TrimPrefix(path, source))
+			}
+			if err := tarball.WriteHeader(header); err != nil {
+				return err
+			}
+
+			if info.IsDir() {
+				return nil
+			}
+
+			file, err := os.Open(path)
+			if err != nil {
+				return err
+			}
+			defer file.Close()
+			_, err = io.Copy(tarball, file)
+			return err
+		})
+}
+
+func readerExpireDeleteTarTest(t *testing.T) {
+	dirname := "readerExpireDeleteTarTest"
+	dir1 := filepath.Join(dirname, "logs/dir1")
+	dir2 := filepath.Join(dirname, "logs/dir2")
+	dir1file1 := filepath.Join(dir1, "file1.log")
+	dir1file2 := filepath.Join(dir1, "file2.log")
+	dir2file1 := filepath.Join(dir2, "file1.log")
+	createDirWithName(dirname)
+	defer os.RemoveAll(dirname)
+
+	createDirWithName(dir1)
+	createFileWithContent(dir1file1, "abc123\nabc124\nabc125\nabc126\nabc127\n")
+	createDirWithName(dir2)
+	createFileWithContent(dir2file1, "abc\nx\nabc\ny\nabc\nz\n")
+	createFileWithContent(dir1file2, "abc123\nabc124\nabc125\nabc126\nabc127\n")
+	err := tarit(dir1, filepath.Join(dirname, "logs"))
+	assert.NoError(t, err)
+	err = tarit(dir2, filepath.Join(dirname, "logs"))
+	assert.NoError(t, err)
+	os.RemoveAll(dir1)
+	os.RemoveAll(dir2)
+
+	expectResults := map[string]int{
+		"abc123\n": 2,
+		"abc124\n": 2,
+		"abc125\n": 2,
+		"abc126\n": 2,
+		"abc127\n": 2,
+		"abc\nx\n": 1,
+		"abc\ny\n": 1,
+		"abc\nz\n": 1,
+	}
+	actualResults := make(map[string]int)
+	logPathPattern := filepath.Join(dirname, "logs/*.tar")
+	c := conf.MapConf{
+		"log_path":        logPathPattern,
+		"stat_interval":   "1s",
+		"expire":          "100s",
+		KeyExpireDelete:   "true",
+		"max_open_files":  "128",
+		"read_from":       "oldest",
+		"reader_buf_size": "1024",
+		"meta_path":       dirname,
+		"mode":            ModeDirx,
+		"read_same_inode": "true",
+	}
+	meta, err := reader.NewMetaWithConf(c)
+	assert.NoError(t, err)
+	r, err := NewReader(meta, c)
+	assert.NoError(t, err)
+
+	err = r.SetMode(ReadModeHeadPatternString, "^abc*")
+	assert.Nil(t, err)
+	dr := r.(*Reader)
+	assert.NoError(t, dr.Start())
+	t.Log("Reader has started")
+	defer dr.Close()
+
+	time.Sleep(2 * time.Second)
+
+	maxNum := 0
+	emptyNum := 0
+	for {
+		data, err := dr.ReadLine()
+		if data != "" {
+			t.Log("Data:", data, maxNum, dr.Source())
+			actualResults[data]++
+			maxNum++
+		} else {
+			emptyNum++
+		}
+		if err == io.EOF {
+			break
+		}
+		if maxNum >= 18 || emptyNum > 10 {
+			break
+		}
+	}
+
+	assert.EqualValues(t, expectResults, actualResults)
+	assert.Equal(t, StatsInfo{}, dr.Status())
+	time.Sleep(5 * time.Second)
+	files1, err := ioutil.ReadDir(dir1)
+	assert.Equal(t, true, os.IsNotExist(err))
+	files2, err := ioutil.ReadDir(dir2)
+	assert.Equal(t, true, os.IsNotExist(err))
+	assert.Equal(t, 0, len(files1)+len(files2))
 }
 
 func TestMultiReaderReset(t *testing.T) {
@@ -926,6 +1167,8 @@ func TestMultiReaderReset(t *testing.T) {
 	dr = r.(*Reader)
 	assert.NoError(t, dr.Start())
 	t.Log("Reader has started again")
+	defer dr.Close()
+
 	actualResults = make(map[string]int)
 	maxNum = 0
 	emptyNum = 0
@@ -1051,6 +1294,7 @@ func multiReaderEmptyDirxTest(t *testing.T) {
 	dr := r.(*Reader)
 	assert.NoError(t, dr.Start())
 	t.Log("Reader has started")
+	defer dr.Close()
 
 	maxNum := 0
 	emptyNum := 0

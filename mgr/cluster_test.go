@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/logkit/conf"
+	. "github.com/qiniu/logkit/reader/config"
 	"github.com/qiniu/logkit/router"
 )
 

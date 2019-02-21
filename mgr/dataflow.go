@@ -41,7 +41,7 @@ const (
 // RawData 从 reader 模块中根据 type 获取多条字符串形式的样例日志
 func RawData(readerConfig conf.MapConf) ([]string, error) {
 	if readerConfig == nil {
-		return nil, fmt.Errorf("reader config cannot be empty")
+		return nil, errors.New("reader config cannot be empty")
 	}
 
 	runnerName, _ := readerConfig.GetString(GlobalKeyName)
@@ -122,7 +122,7 @@ func RawData(readerConfig conf.MapConf) ([]string, error) {
 func ParseData(parserConfig conf.MapConf) (parsedData []Data, err error) {
 	parserConfig = parser.ConvertWebParserConfig(parserConfig)
 	if parserConfig == nil {
-		err = fmt.Errorf("parser config was empty after web config convet")
+		err = errors.New("parser config was empty after web config convet")
 		return
 	}
 
@@ -150,8 +150,7 @@ func ParseData(parserConfig conf.MapConf) (parsedData []Data, err error) {
 
 func TransformData(transformerConfig map[string]interface{}) ([]Data, error) {
 	if transformerConfig == nil {
-		err := fmt.Errorf("transformer config cannot be empty")
-		return nil, err
+		return nil, errors.New("transformer config cannot be empty")
 	}
 
 	create, err := getTransformerCreator(transformerConfig)
@@ -188,7 +187,7 @@ func TransformData(transformerConfig map[string]interface{}) ([]Data, error) {
 
 func SendData(senderConfig map[string]interface{}) error {
 	if senderConfig == nil {
-		return fmt.Errorf("sender config cannot be empty")
+		return errors.New("sender config cannot be empty")
 	}
 
 	sendersConf, err := getSendersConfig(senderConfig)
@@ -237,7 +236,7 @@ func getSendersConfig(senderConfig map[string]interface{}) ([]conf.MapConf, erro
 		return nil, jsonErr
 	}
 	if sendersConf == nil {
-		return nil, fmt.Errorf("sender config cannot be empty")
+		return nil, errors.New("sender config cannot be empty")
 	}
 	return sendersConf, nil
 }
@@ -251,8 +250,7 @@ func getDataFromSenderConfig(senderConfig map[string]interface{}) ([]Data, error
 		return nil, err
 	}
 	if rawDataStr == "" {
-		err := fmt.Errorf("sender fetched empty sample log")
-		return nil, err
+		return nil, errors.New("sender fetched empty sample log")
 	}
 
 	if jsonErr := jsoniter.Unmarshal([]byte(rawDataStr), &datas); jsonErr != nil {
@@ -415,8 +413,7 @@ func getDataFromTransformConfig(transformerConfig map[string]interface{}) ([]Dat
 		return nil, err
 	}
 	if rawDataStr == "" {
-		err := fmt.Errorf("transformer fetched empty sample log")
-		return nil, err
+		return nil, errors.New("transformer fetched empty sample log")
 	}
 
 	var data = []Data{}

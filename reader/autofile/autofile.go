@@ -1,7 +1,7 @@
 package autofile
 
 import (
-	"fmt"
+	"errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -40,7 +40,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (r reader.Reader, err error
 	case config.ModeFile:
 		return bufreader.NewSingleFileReader(meta, conf)
 	default:
-		err = fmt.Errorf("can not find property mode for this logpath %v", logpath)
+		err = errors.New("can not find property mode for this path " + logpath)
 	}
 	return
 }
