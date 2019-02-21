@@ -1,9 +1,10 @@
-package sql
+package postgres
 
 import (
 	"sort"
 
 	"github.com/json-iterator/go"
+
 	"github.com/qiniu/log"
 )
 
@@ -21,7 +22,7 @@ func (a ByJson) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByJson) Less(i, j int) bool { return a[i].Json < a[j].Json }
 
 //if Marshal failed return all data
-func sortByJson(datas []readInfo) ([]readInfo, bool) {
+func SortByJson(datas []readInfo) ([]readInfo, bool) {
 	if len(datas) < 1 {
 		return datas, true
 	}
@@ -47,8 +48,8 @@ func sortByJson(datas []readInfo) ([]readInfo, bool) {
 	return newdata, false
 }
 
-//getJson return true, if bejson success
-func getJson(datas []readInfo) ([]readInfo, bool) {
+//GetJson return true, if bejson success
+func GetJson(datas []readInfo) ([]readInfo, bool) {
 	if len(datas) < 1 {
 		return datas, false
 	}

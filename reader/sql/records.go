@@ -8,54 +8,54 @@ import (
 	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/reader"
-	. "github.com/qiniu/logkit/utils/models"
+	"github.com/qiniu/logkit/utils/models"
 )
 
 type DBRecords map[string]TableRecords
 
 type TableInfo struct {
-	size   int64
-	offset int64
+	Size   int64
+	Offset int64
 }
 
 type TableRecords struct {
 	Table map[string]TableInfo
-	mutex sync.RWMutex
+	Mutex sync.RWMutex
 }
 
 func (tableRecords *TableRecords) Set(value TableRecords) {
 	if tableRecords.GetTable() == nil {
 		*tableRecords = TableRecords{
 			Table: make(map[string]TableInfo),
-			mutex: sync.RWMutex{},
+			Mutex: sync.RWMutex{},
 		}
 	}
 
 	valueTable := value.GetTable()
-	value.mutex.RLock()
+	value.Mutex.RLock()
 	if valueTable != nil {
 		for key, tableInfo := range valueTable {
 			tableRecords.SetTableInfo(key, tableInfo)
 		}
 	}
-	value.mutex.RUnlock()
+	value.Mutex.RUnlock()
 }
 
 func (tableRecords *TableRecords) SetTableInfo(table string, tableInfo TableInfo) {
 	if tableRecords.GetTable() == nil {
 		*tableRecords = TableRecords{
 			Table: make(map[string]TableInfo),
-			mutex: sync.RWMutex{},
+			Mutex: sync.RWMutex{},
 		}
 	}
-	tableRecords.mutex.Lock()
+	tableRecords.Mutex.Lock()
 	tableRecords.Table[table] = tableInfo
-	tableRecords.mutex.Unlock()
+	tableRecords.Mutex.Unlock()
 }
 
 func (tableRecords *TableRecords) GetTableInfo(table string) TableInfo {
-	tableRecords.mutex.RLock()
-	defer tableRecords.mutex.RUnlock()
+	tableRecords.Mutex.RLock()
+	defer tableRecords.Mutex.RUnlock()
 	if tableRecords.Table != nil {
 		return tableRecords.Table[table]
 	}
@@ -63,8 +63,8 @@ func (tableRecords *TableRecords) GetTableInfo(table string) TableInfo {
 }
 
 func (tableRecords *TableRecords) GetTable() map[string]TableInfo {
-	tableRecords.mutex.RLock()
-	defer tableRecords.mutex.RUnlock()
+	tableRecords.Mutex.RLock()
+	defer tableRecords.Mutex.RUnlock()
 	if tableRecords.Table != nil {
 		return tableRecords.Table
 	}
@@ -75,7 +75,7 @@ func (tableRecords *TableRecords) Reset() {
 	*tableRecords = TableRecords{}
 }
 
-func (tableRecords *TableRecords) restoreTableDone(meta *reader.Meta, database string, tables []string) bool {
+func (tableRecords *TableRecords) RestoreTableDone(meta *reader.Meta, database string, tables []string) bool {
 	omitTableRecords := true
 	tablesDoneRecord, err := meta.ReadDBDoneFile(database)
 	if err != nil {
@@ -88,10 +88,10 @@ func (tableRecords *TableRecords) restoreTableDone(meta *reader.Meta, database s
 	}
 	omitTableRecords = false
 	for _, table := range tables {
-		if contains(tablesDoneRecord, table) {
+		if Contains(tablesDoneRecord, table) {
 			tableRecords.SetTableInfo(table, TableInfo{
-				size:   -1,
-				offset: -1,
+				Size:   -1,
+				Offset: -1,
 			})
 		}
 	}
@@ -120,7 +120,7 @@ func (dbRecords *DBRecords) SetTableInfo(db, table string, tableInfo TableInfo) 
 	if tableRecords.GetTable() == nil {
 		tableRecords = TableRecords{
 			Table: make(map[string]TableInfo),
-			mutex: sync.RWMutex{},
+			Mutex: sync.RWMutex{},
 		}
 	}
 	tableRecords.SetTableInfo(table, tableInfo)
@@ -139,43 +139,58 @@ func (dbRecords *DBRecords) Reset() {
 }
 
 type SyncDBRecords struct {
-	records DBRecords
-	mutex   sync.RWMutex
+	Records DBRecords
+	Mutex   sync.RWMutex
 }
 
 func (syncDBRecords *SyncDBRecords) SetTableRecords(db string, tableRecords TableRecords) {
-	syncDBRecords.mutex.Lock()
-	syncDBRecords.records.SetTableRecords(db, tableRecords)
-	syncDBRecords.mutex.Unlock()
+	syncDBRecords.Mutex.Lock()
+	syncDBRecords.Records.SetTableRecords(db, tableRecords)
+	syncDBRecords.Mutex.Unlock()
 }
 
 func (syncDBRecords *SyncDBRecords) SetTableInfo(db, table string, tableInfo TableInfo) {
-	syncDBRecords.mutex.Lock()
-	syncDBRecords.records.SetTableInfo(db, table, tableInfo)
-	syncDBRecords.mutex.Unlock()
+	syncDBRecords.Mutex.Lock()
+	syncDBRecords.Records.SetTableInfo(db, table, tableInfo)
+	syncDBRecords.Mutex.Unlock()
 }
 
 func (syncDBRecords *SyncDBRecords) GetTableRecords(db string) TableRecords {
-	syncDBRecords.mutex.RLock()
-	tableRecords := syncDBRecords.records.GetTableRecords(db)
-	syncDBRecords.mutex.RUnlock()
+	syncDBRecords.Mutex.RLock()
+	tableRecords := syncDBRecords.Records.GetTableRecords(db)
+	syncDBRecords.Mutex.RUnlock()
 	return tableRecords
 }
 
+func (syncDBRecords *SyncDBRecords) CheckDoneRecords(target, curDB string) bool {
+	var tableInfo TableInfo
+	tableDoneRecords := syncDBRecords.GetTableRecords(curDB)
+	if tableDoneRecords.GetTable() == nil {
+		return false
+	}
+
+	tableInfo = tableDoneRecords.GetTableInfo(target)
+	if tableInfo == (TableInfo{}) {
+		return false
+	}
+
+	return true
+}
+
 func (syncDBRecords *SyncDBRecords) GetDBRecords() DBRecords {
-	syncDBRecords.mutex.RLock()
-	dbRecords := syncDBRecords.records
-	syncDBRecords.mutex.RUnlock()
+	syncDBRecords.Mutex.RLock()
+	dbRecords := syncDBRecords.Records
+	syncDBRecords.Mutex.RUnlock()
 	return dbRecords
 }
 
 func (syncDBRecords *SyncDBRecords) Reset() {
-	syncDBRecords.mutex.Lock()
-	syncDBRecords.records.Reset()
-	syncDBRecords.mutex.Unlock()
+	syncDBRecords.Mutex.Lock()
+	syncDBRecords.Records.Reset()
+	syncDBRecords.Mutex.Unlock()
 }
 
-func (dbRecords *SyncDBRecords) restoreRecordsFile(meta *reader.Meta) (lastDB, lastTable string, omitDoneDBRecords bool) {
+func (dbRecords *SyncDBRecords) RestoreRecordsFile(meta *reader.Meta) (lastDB, lastTable string, omitDoneDBRecords bool) {
 	recordsDone, err := meta.ReadRecordsFile(DefaultDoneRecordsFile)
 	if err != nil {
 		log.Errorf("Runner[%v] %v -table done data is corrupted err:%v, omit table done data", meta.RunnerName, meta.DoneFilePath, err)
@@ -189,9 +204,9 @@ func (dbRecords *SyncDBRecords) restoreRecordsFile(meta *reader.Meta) (lastDB, l
 	}
 
 	for idx, record := range recordsDone {
-		tmpDBRecords := TrimeList(strings.Split(record, sqlOffsetConnector))
+		tmpDBRecords := models.TrimeList(strings.Split(record, SqlOffsetConnector))
 		if int64(len(tmpDBRecords)) != 2 {
-			log.Errorf("Runner[%v] %v -meta records done file is not invalid sql records done file %v， omit meta data", meta.RunnerName, meta.MetaFile(), record)
+			log.Errorf("Runner[%v] %v -meta Records done file is not invalid sql Records done file %v， omit meta data", meta.RunnerName, meta.MetaFile(), record)
 			continue
 		}
 
@@ -202,35 +217,35 @@ func (dbRecords *SyncDBRecords) restoreRecordsFile(meta *reader.Meta) (lastDB, l
 			tableRecords.Set(tmpTableRecords)
 		}
 
-		tmpTablesRecords := TrimeList(strings.Split(tmpDBRecords[1], "@"))
+		tmpTablesRecords := models.TrimeList(strings.Split(tmpDBRecords[1], "@"))
 		if int64(len(tmpTablesRecords)) < 1 {
-			log.Errorf("Runner[%v] %v -meta records done file is not invalid sql records done file %v， omit meta data", meta.RunnerName, meta.MetaFile(), tmpDBRecords)
+			log.Errorf("Runner[%v] %v -meta Records done file is not invalid sql Records done file %v， omit meta data", meta.RunnerName, meta.MetaFile(), tmpDBRecords)
 			continue
 		}
 
 		for idx, tableRecord := range tmpTablesRecords {
 			tableRecordArr := strings.Split(tableRecord, ",")
 			if int64(len(tableRecordArr)) != 4 {
-				log.Errorf("Runner[%v] %v -meta records done file is not invalid sql records done file %v， omit meta data", meta.RunnerName, meta.MetaFile(), tableRecord)
+				log.Errorf("Runner[%v] %v -meta Records done file is not invalid sql Records done file %v， omit meta data", meta.RunnerName, meta.MetaFile(), tableRecord)
 				continue
 			}
 
 			omitDoneDBRecords = false
-			size, err := strconv.ParseInt(tableRecordArr[1], 10, 64)
+			Size, err := strconv.ParseInt(tableRecordArr[1], 10, 64)
 			if err != nil {
-				log.Errorf("Runner[%v] %v -meta file sql is out of date %v or parse size err %v， omit this offset", meta.RunnerName, meta.MetaFile(), tableRecordArr[1], err)
-				size = -1
+				log.Errorf("Runner[%v] %v -meta file sql is out of date %v or parse Size err %v， omit this Offset", meta.RunnerName, meta.MetaFile(), tableRecordArr[1], err)
+				Size = -1
 			}
 
-			offset, err := strconv.ParseInt(tableRecordArr[1], 10, 64)
+			Offset, err := strconv.ParseInt(tableRecordArr[1], 10, 64)
 			if err != nil {
-				log.Errorf("Runner[%v] %v -meta file sql is out of date %v or parse offset err %v， omit this offset", meta.RunnerName, meta.MetaFile(), tableRecordArr[1], err)
-				offset = -1
+				log.Errorf("Runner[%v] %v -meta file sql is out of date %v or parse Offset err %v， omit this Offset", meta.RunnerName, meta.MetaFile(), tableRecordArr[1], err)
+				Offset = -1
 			}
 
 			tableInfo := TableInfo{
-				size:   size,
-				offset: offset,
+				Size:   Size,
+				Offset: Offset,
 			}
 			tableRecords.SetTableInfo(tableRecordArr[0], tableInfo)
 			if idx == len(tmpTablesRecords)-1 {
