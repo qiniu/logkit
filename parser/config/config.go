@@ -262,7 +262,7 @@ var ModeKeyOptions = map[string][]Option{
 			Placeholder:  "abc string,xyz long,data1 string,data2 float",
 			DefaultNoUse: true,
 			Description:  "指定字段类型(csv_schema)",
-			ToolTip:      `按照逗号分隔的字符串，如"abc string"，字段类型现在支持string, long, jsonmap, float, date`,
+			ToolTip:      `按照逗号分隔的字符串，如"abc string"，字段类型现在支持string, long, jsonmap, float, date，如果连续的字段类型相同，可以用 | 分隔，例如"a|b string"，表示"a string,b string"`,
 		},
 		{
 			KeyName:       KeyCSVAllowNoMatch,

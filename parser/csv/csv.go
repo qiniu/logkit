@@ -146,8 +146,8 @@ func parseSchemaFieldList(schema string) (fieldList []string, err error) {
 					err = errors.New("parse fieldList error: start index is larger than end")
 					return
 				}
-				field := strings.TrimSpace(schema[start:end])
-				fieldList = append(fieldList, field)
+				fields := splitFields(schema[start:end])
+				fieldList = append(fieldList, fields...)
 				start = end + 1
 			}
 		}
@@ -157,7 +157,8 @@ func parseSchemaFieldList(schema string) (fieldList []string, err error) {
 		return
 	}
 	if start < len(schema) {
-		fieldList = append(fieldList, strings.TrimSpace(schema[start:]))
+		fields := splitFields(schema[start:])
+		fieldList = append(fieldList, fields...)
 	}
 	return
 }
@@ -201,7 +202,16 @@ func parseSchemaJsonField(f string) (fd field, err error) {
 			rawfield = strings.TrimSuffix(rawfield, "...")
 		}
 		fieldList := strings.Split(rawfield, ",")
-		fields, err = parseSchemaFields(fieldList)
+		var fieldListFinal = make([]string, 0, len(fieldList))
+		if strings.Contains(rawfield, "|") {
+			for _, field := range fieldList {
+				fieldListFinal = append(fieldListFinal, splitFields(field)...)
+				continue
+			}
+		} else {
+			fieldListFinal = fieldList
+		}
+		fields, err = parseSchemaFields(fieldListFinal)
 		if err != nil {
 			return
 		}
@@ -570,4 +580,32 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		return datas, nil
 	}
 	return datas, se
+}
+
+func splitFields(field string) []string {
+	var (
+		fields       = make([]string, 0, 10)
+		indexJsonMap = strings.Index(field, "{")
+		last         string
+	)
+	field = strings.TrimSpace(field)
+	if indexJsonMap != -1 {
+		last = field[indexJsonMap:]
+		field = field[:indexJsonMap]
+	}
+	if strings.Contains(field, "|") {
+		lastIndex := strings.LastIndex(field, " ")
+		if lastIndex == -1 {
+			return []string{field + last}
+		}
+		typeFormat := field[lastIndex:] // 例如 " string"
+		keyStr := field[:lastIndex]
+		keys := strings.Split(keyStr, "|")
+		for _, key := range keys {
+			key = strings.TrimSpace(key)
+			fields = append(fields, key+typeFormat+last)
+		}
+		return fields
+	}
+	return []string{field + last}
 }
