@@ -20,7 +20,10 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/reader/bufreader"
 	. "github.com/qiniu/logkit/reader/config"
+	"github.com/qiniu/logkit/reader/extract"
+	"github.com/qiniu/logkit/reader/singlefile"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
@@ -63,16 +66,19 @@ type Reader struct {
 	ignoreLogPathPattern string
 	expire               time.Duration
 	submetaExpire        time.Duration
-	statInterval         time.Duration
-	maxOpenFiles         int
-	whence               string
+	expireDelete         bool
+	deleteDirs           chan string
+
+	statInterval time.Duration
+	maxOpenFiles int
+	whence       string
 
 	notFirstTime bool
 }
 
 type ActiveReader struct {
 	cacheLineMux sync.RWMutex
-	br           *reader.BufReader
+	br           *bufreader.BufReader
 	realpath     string
 	originpath   string
 	readcache    string
@@ -94,10 +100,6 @@ type Result struct {
 }
 
 func NewActiveReader(originPath, realPath, whence, inode string, notFirstTime bool, expireMap map[string]int64, meta *reader.Meta, msgChan chan<- Result, errChan chan<- error) (ar *ActiveReader, err error) {
-	realPath, err = utils.CheckAndUnCompress(realPath)
-	if err != nil {
-		return nil, err
-	}
 	rpath := strings.Replace(realPath, string(os.PathSeparator), "_", -1)
 	if runtime.GOOS == "windows" {
 		rpath = strings.Replace(rpath, ":", "_", -1)
@@ -119,11 +121,19 @@ func NewActiveReader(originPath, realPath, whence, inode string, notFirstTime bo
 	if len(expireMap) != 0 {
 		originOffset = expireMap[inode+"_"+realPath]
 	}
-	fr, err := reader.NewSingleFile(subMeta, realPath, whence, originOffset, true)
-	if err != nil {
-		return
+	var fr reader.FileReader
+	if reader.CompressedFile(realPath) {
+		fr, err = extract.NewReader(subMeta, realPath)
+		if err != nil {
+			return
+		}
+	} else {
+		fr, err = singlefile.NewSingleFile(subMeta, realPath, whence, originOffset, true)
+		if err != nil {
+			return
+		}
 	}
-	bf, err := reader.NewReaderSize(fr, subMeta, reader.DefaultBufSize)
+	bf, err := bufreader.NewReaderSize(fr, subMeta, bufreader.DefaultBufSize)
 	if err != nil {
 		//如果没有创建成功，要把reader close掉，否则会因为ratelimit导致线程泄露
 		fr.Close()
@@ -369,6 +379,9 @@ func (ar *ActiveReader) expired(expire time.Duration) bool {
 	if expire.Nanoseconds() == 0 {
 		return false
 	}
+	if ar.br.ReadDone() {
+		return true
+	}
 
 	fi, err := os.Stat(ar.realpath)
 	if err != nil {
@@ -415,6 +428,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	if IsSubmetaExpireValid(submetaExpire, expire) {
 		return nil, fmt.Errorf("%q valus is less than %q", KeySubmetaExpire, KeyExpire)
 	}
+	expireDelete, _ := conf.GetBoolOr(KeyExpireDelete, false)
 
 	statInterval, err := time.ParseDuration(statIntervalDur)
 	if err != nil {
@@ -472,6 +486,8 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		whence:               whence,
 		expire:               expire,
 		submetaExpire:        submetaExpire,
+		expireDelete:         expireDelete,
+		deleteDirs:           make(chan string, 10),
 		statInterval:         statInterval,
 		maxOpenFiles:         maxOpenFiles,
 		fileReaders:          make(map[string]*ActiveReader), //armapmux
@@ -534,6 +550,10 @@ func (r *Reader) checkExpiredFiles() {
 			delete(r.cacheMap, path)
 			r.meta.RemoveSubMeta(path)
 			paths = append(paths, path)
+			if r.expireDelete {
+				log.Infof("Runner[%v] %q start to delete expire and read done dir %s", r.meta.RunnerName, r.Name(), path)
+				r.deleteDirs <- path
+			}
 		}
 	}
 	if len(paths) > 0 {
@@ -733,6 +753,24 @@ func (r *Reader) Start() error {
 			}
 		}
 	}()
+
+	if r.expireDelete {
+		go func() {
+			for {
+				select {
+				case <-r.stopChan:
+					return
+				case path := <-r.deleteDirs:
+					err := os.RemoveAll(path)
+					if err != nil {
+						log.Errorf("Runner[%v] %q delete expire and read done dir %s, err: %v", r.meta.RunnerName, r.Name(), path, err)
+					} else {
+						log.Infof("Runner[%v] %q delete expire and read done dir %s finished", r.meta.RunnerName, r.Name(), path)
+					}
+				}
+			}
+		}()
+	}
 
 	if IsSubMetaExpire(r.submetaExpire, r.expire) {
 		go func() {

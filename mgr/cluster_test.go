@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/logkit/conf"
-	"github.com/qiniu/logkit/reader"
+	. "github.com/qiniu/logkit/reader/config"
 	"github.com/qiniu/logkit/router"
 )
 
@@ -175,7 +175,7 @@ func clusterUpdateTest(p *testCluParam) {
 		t.Fatalf("write log string to file failed error is %v", err)
 	}
 	time.Sleep(1 * time.Second)
-	mode := reader.DirMode
+	mode := ModeDir
 	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, mode, resvPath)
 	if err != nil {
 		t.Fatalf("get runner config failed error is %v", err)
@@ -237,7 +237,7 @@ func clusterUpdateTest(p *testCluParam) {
 	}
 
 	// 测试 update runner
-	mode = reader.FileMode
+	mode = ModeFile
 	updateConf, err := getRunnerConfig(runnerName, logPath, metaDir, mode, resvPath)
 	if err != nil {
 		t.Fatalf("get runner config failed error is %v", err)
@@ -308,7 +308,7 @@ func clusterStartStopTest(p *testCluParam) {
 		t.Fatalf("write log string to file failed error is %v", err)
 	}
 	time.Sleep(1 * time.Second)
-	mode := reader.DirMode
+	mode := ModeDir
 	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, mode, resvPath)
 	if err != nil {
 		t.Fatalf("get runner config failed error is %v", err)
@@ -590,7 +590,7 @@ func clusterResetDeleteTest(p *testCluParam) {
 		t.Fatalf("write log string to file failed error is %v", err)
 	}
 	time.Sleep(1 * time.Second)
-	mode := reader.DirMode
+	mode := ModeDir
 	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, mode, resvPath)
 	if err != nil {
 		t.Fatalf("get runner config failed error is %v", err)
@@ -709,7 +709,7 @@ func clusterSalveConfigsTest(p *testCluParam) {
 		t.Fatalf("write log string to file failed error is %v", err)
 	}
 	time.Sleep(1 * time.Second)
-	mode := reader.DirMode
+	mode := ModeDir
 	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, mode, resvPath)
 	if err != nil {
 		t.Fatalf("get runner config failed error is %v", err)
@@ -939,7 +939,7 @@ func getSlavesRunnerTest(p *testCluParam) {
 		t.Fatalf("write log string to file failed error is %v", err)
 	}
 	time.Sleep(1 * time.Second)
-	mode := reader.DirMode
+	mode := ModeDir
 	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, mode, resvPath)
 	if err != nil {
 		t.Fatalf("get runner config failed error is %v", err)
@@ -1008,7 +1008,7 @@ func getSlaveConfigTest(p *testCluParam) {
 		t.Fatalf("write log string to file failed error is %v", err)
 	}
 	time.Sleep(1 * time.Second)
-	mode := reader.DirMode
+	mode := ModeDir
 	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, mode, resvPath)
 	if err != nil {
 		t.Fatalf("get runner config failed error is %v", err)

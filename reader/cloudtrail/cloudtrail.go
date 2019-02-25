@@ -22,7 +22,9 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/reader/bufreader"
 	. "github.com/qiniu/logkit/reader/config"
+	"github.com/qiniu/logkit/reader/seqfile"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -50,7 +52,7 @@ func init() {
 }
 
 type Reader struct {
-	*reader.BufReader
+	*bufreader.BufReader
 	syncMgr *syncManager
 }
 
@@ -64,14 +66,14 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		return nil, err
 	}
 	validFilePattern, _ := conf.GetStringOr(KeyValidFilePattern, "*")
-	bufSize, _ := conf.GetIntOr(KeyBufSize, reader.DefaultBufSize)
+	bufSize, _ := conf.GetIntOr(KeyBufSize, bufreader.DefaultBufSize)
 	skipFirstLine, _ := conf.GetBoolOr(KeySkipFileFirstLine, false)
-	sf, err := reader.NewSeqFile(meta, opts.directory, true, true, ignoredSuffixes, validFilePattern, WhenceOldest, nil)
+	sf, err := seqfile.NewSeqFile(meta, opts.directory, true, true, ignoredSuffixes, validFilePattern, WhenceOldest, nil)
 	if err != nil {
 		return nil, err
 	}
 	sf.SkipFileFirstLine = skipFirstLine
-	br, err := reader.NewReaderSize(sf, meta, bufSize)
+	br, err := bufreader.NewReaderSize(sf, meta, bufSize)
 	if err != nil {
 		return nil, err
 	}

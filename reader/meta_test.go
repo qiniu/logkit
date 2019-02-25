@@ -19,13 +19,8 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-func createFile(interval int) {
-	CreateDir()
-	CreateFiles(interval)
-}
-
 func TestMeta(t *testing.T) {
-	createFile(50)
+	CreateFileForTest(50)
 	defer DestroyDir()
 	logkitConf := conf.MapConf{
 		KeyMetaPath: MetaDir,

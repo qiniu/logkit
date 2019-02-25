@@ -1,4 +1,4 @@
-package reader
+package seqfile
 
 import (
 	"bufio"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/reader/test"
 	"github.com/qiniu/logkit/utils"
@@ -26,10 +27,10 @@ const (
 )
 
 func Test_Read(t *testing.T) {
-	createFile(1000)
+	CreateFileForTest(1000)
 	defer DestroyDir()
 
-	meta, err := NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", DefautFileRetention)
+	meta, err := reader.NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", reader.DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
@@ -102,7 +103,7 @@ func Test_Read(t *testing.T) {
 
 func Test_NewReaderWithoutFile(t *testing.T) {
 	CreateDir()
-	meta, err := NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", DefautFileRetention)
+	meta, err := reader.NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", reader.DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
@@ -110,7 +111,7 @@ func Test_NewReaderWithoutFile(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	CreateFiles(1000)
+	CreateFileForTest(1000)
 	defer DestroyDir()
 	buffer := make([]byte, 9)
 	_, err = sf.Read(buffer)
@@ -124,7 +125,7 @@ func Test_NewReaderWithoutFile(t *testing.T) {
 
 func Test_NewReaderWithQiniuLogFile(t *testing.T) {
 	CreateDir()
-	meta, err := NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", DefautFileRetention)
+	meta, err := reader.NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", reader.DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
@@ -148,7 +149,7 @@ func Test_NewReaderWithQiniuLogFile(t *testing.T) {
 
 func Test_NewFileNewLine(t *testing.T) {
 	CreateDir()
-	meta, err := NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", DefautFileRetention)
+	meta, err := reader.NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", reader.DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
@@ -172,7 +173,7 @@ func Test_NewFileNewLine(t *testing.T) {
 
 func Test_NewReaderWithInvalidFile(t *testing.T) {
 	CreateDir()
-	meta, err := NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", DefautFileRetention)
+	meta, err := reader.NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", reader.DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
@@ -190,10 +191,10 @@ func Test_NewReaderWithInvalidFile(t *testing.T) {
 }
 
 func Test_ReadWhenDelete(t *testing.T) {
-	createFile(1000)
+	CreateFileForTest(1000)
 	defer DestroyDir()
 
-	meta, err := NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", DefautFileRetention)
+	meta, err := reader.NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", reader.DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
@@ -219,10 +220,10 @@ func Test_ReadWhenDelete(t *testing.T) {
 }
 
 func Test_ReadNewest(t *testing.T) {
-	createFile(1000)
+	CreateFileForTest(1000)
 	defer DestroyDir()
 
-	meta, err := NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", DefautFileRetention)
+	meta, err := reader.NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", reader.DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
@@ -303,7 +304,7 @@ func Test_SeekUnreachable(t *testing.T) {
 
 func TestLag(t *testing.T) {
 	CreateDir()
-	meta, err := NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", DefautFileRetention)
+	meta, err := reader.NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", reader.DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
@@ -338,10 +339,10 @@ func TestLag(t *testing.T) {
 }
 
 func Test_NewFileNewLine2(t *testing.T) {
-	createFile(1000)
+	CreateFileForTest(1000)
 	defer DestroyDir()
 
-	meta, err := NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", DefautFileRetention)
+	meta, err := reader.NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", reader.DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
@@ -372,7 +373,7 @@ func Test_NewFileNewLine2(t *testing.T) {
 
 func Test_NewFileNewLine3(t *testing.T) {
 
-	meta, err := NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", DefautFileRetention)
+	meta, err := reader.NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", reader.DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
@@ -381,7 +382,7 @@ func Test_NewFileNewLine3(t *testing.T) {
 		t.Error(err)
 	}
 
-	createFile(1000)
+	CreateFileForTest(1000)
 	defer DestroyDir()
 
 	buffer := make([]byte, 9)
@@ -406,10 +407,10 @@ func Test_NewFileNewLine3(t *testing.T) {
 }
 
 func Test_NewFileOffset(t *testing.T) {
-	createFile(1000)
+	CreateFileForTest(1000)
 	defer DestroyDir()
 
-	meta, err := NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", DefautFileRetention)
+	meta, err := reader.NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", reader.DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
@@ -446,7 +447,7 @@ func Test_NewFileOffset(t *testing.T) {
 
 func Test_INode(t *testing.T) {
 
-	meta, err := NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", DefautFileRetention)
+	meta, err := reader.NewMeta(MetaDir, MetaDir, testlogpath, ModeDir, "", reader.DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
@@ -455,7 +456,7 @@ func Test_INode(t *testing.T) {
 		t.Error(err)
 	}
 
-	createFile(1000)
+	CreateFileForTest(1000)
 	defer DestroyDir()
 
 	buffer := make([]byte, 9)

@@ -16,7 +16,10 @@ import (
 	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/reader/bufreader"
 	. "github.com/qiniu/logkit/reader/config"
+	"github.com/qiniu/logkit/reader/extract"
+	"github.com/qiniu/logkit/reader/seqfile"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -24,7 +27,7 @@ import (
 type dirReader struct {
 	status        int32 // Note: 原子操作
 	inactive      int32 // Note: 原子操作，当 inactive>0 时才会被 expire 回收
-	br            *reader.BufReader
+	br            *bufreader.BufReader
 	runnerName    string
 	originalPath  string // 实际的路径可能和配置传递进来的路径有所不同
 	logPath       string
@@ -157,6 +160,9 @@ func HasDirExpired(dir string, expire time.Duration) bool {
 			log.Errorf("Failed to get directory entry[%v] info: %v", path, err)
 			return nil
 		} else if dir == path {
+			if latestModTime.IsZero() {
+				latestModTime = info.ModTime()
+			}
 			return nil
 		} else if info.IsDir() {
 			return filepath.SkipDir // 过滤子目录
@@ -175,6 +181,10 @@ func HasDirExpired(dir string, expire time.Duration) bool {
 }
 
 func (dr *dirReader) HasExpired(expire time.Duration) bool {
+	if dr.br.ReadDone() {
+		//对于读完的直接认为过期，因为不会追加新数据
+		return true
+	}
 	// 在非 inactive 的情况下，数据尚未读完，有必要先继续处理
 	return atomic.LoadInt32(&dr.inactive) > 0 && HasDirExpired(dr.logPath, expire)
 }
@@ -224,16 +234,20 @@ type dirReaders struct {
 	cachedLines map[string]string     // logPath -> data
 
 	// 以下为传入参数
-	meta   *reader.Meta
-	expire time.Duration
+	meta         *reader.Meta
+	expire       time.Duration
+	expireDelete bool
+	deleteDirs   chan string
 }
 
-func newDirReaders(meta *reader.Meta, expire time.Duration, cachedLines map[string]string) *dirReaders {
+func newDirReaders(meta *reader.Meta, expire time.Duration, cachedLines map[string]string, expireDelete bool, deleteDirs chan string) *dirReaders {
 	return &dirReaders{
-		readers:     make(map[string]*dirReader),
-		cachedLines: cachedLines,
-		meta:        meta,
-		expire:      expire,
+		readers:      make(map[string]*dirReader),
+		cachedLines:  cachedLines,
+		meta:         meta,
+		expire:       expire,
+		expireDelete: expireDelete,
+		deleteDirs:   deleteDirs,
 	}
 }
 
@@ -274,11 +288,6 @@ type newReaderOptions struct {
 }
 
 func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool) (*dirReader, error) {
-	var err error
-	opts.LogPath, err = utils.CheckAndUnCompress(opts.LogPath)
-	if err != nil {
-		return nil, err
-	}
 
 	rpath := strings.Replace(opts.LogPath, string(os.PathSeparator), "_", -1)
 	subMetaPath := filepath.Join(opts.Meta.Dir, rpath)
@@ -293,16 +302,25 @@ func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool) (*dir
 	if isNewDir && subMeta.IsNotExist() {
 		opts.Whence = WhenceOldest // 非存量文件第一次读取时从头开始读
 	}
-	fr, err := reader.NewSeqFile(subMeta, opts.LogPath, opts.IgnoreHidden, opts.NewFileNewLine, opts.IgnoreFileSuffixes, opts.ValidFilesRegex, opts.Whence, opts.expireMap)
-	if err != nil {
-		return nil, fmt.Errorf("new sequence file: %v", err)
+	var fri reader.FileReader
+	if reader.CompressedFile(opts.LogPath) {
+		fri, err = extract.NewReader(subMeta, opts.LogPath)
+		if err != nil {
+			return nil, fmt.Errorf("new extract reader: %v", err)
+		}
+	} else {
+		fr, err := seqfile.NewSeqFile(subMeta, opts.LogPath, opts.IgnoreHidden, opts.NewFileNewLine, opts.IgnoreFileSuffixes, opts.ValidFilesRegex, opts.Whence, opts.expireMap)
+		if err != nil {
+			return nil, fmt.Errorf("new sequence file: %v", err)
+		}
+		fr.SkipFileFirstLine = opts.SkipFirstLine
+		fr.ReadSameInode = opts.ReadSameInode
+		fri = fr
 	}
-	fr.SkipFileFirstLine = opts.SkipFirstLine
-	fr.ReadSameInode = opts.ReadSameInode
-	br, err := reader.NewReaderSize(fr, subMeta, opts.BufferSize)
+	br, err := bufreader.NewReaderSize(fri, subMeta, opts.BufferSize)
 	if err != nil {
 		//如果没有创建成功，要把reader close掉，否则会因为ratelimit导致线程泄露
-		fr.Close()
+		fri.Close()
 		return nil, fmt.Errorf("new buffer reader: %v", err)
 	}
 
@@ -348,6 +366,10 @@ func (drs *dirReaders) checkExpiredDirs() {
 			delete(drs.cachedLines, logPath)
 			drs.meta.RemoveSubMeta(logPath)
 			expiredDirs = append(expiredDirs, logPath)
+			if drs.expireDelete {
+				log.Infof("Runner[%v] start to delete expire and read done dir %s", drs.meta.RunnerName, logPath)
+				drs.deleteDirs <- logPath
+			}
 		}
 	}
 	if len(expiredDirs) > 0 {

@@ -51,6 +51,10 @@ type LagReader interface {
 	Lag() (*LagInfo, error)
 }
 
+type OnceReader interface {
+	ReadDone() bool
+}
+
 // FileReader reader 接口方法
 type FileReader interface {
 	Name() string
@@ -90,8 +94,6 @@ func NewRegistry() *Registry {
 	ret := &Registry{
 		readerTypeMap: map[string]func(*Meta, conf.MapConf) (Reader, error){},
 	}
-	ret.RegisterReader(ModeDir, NewFileDirReader)
-	ret.RegisterReader(ModeFile, NewSingleFileReader)
 
 	for typ, c := range registeredConstructors {
 		ret.RegisterReader(typ, c)
@@ -124,7 +126,6 @@ func (reg *Registry) NewReaderWithMeta(conf conf.MapConf, meta *Meta, errDirectR
 	}
 	mode, _ := conf.GetStringOr(KeyMode, ModeDir)
 	headPattern, _ := conf.GetStringOr(KeyHeadPattern, "")
-
 	constructor, exist := reg.readerTypeMap[mode]
 	if !exist {
 		return nil, fmt.Errorf("reader type unsupported : %v", mode)
@@ -144,42 +145,7 @@ func (reg *Registry) NewReaderWithMeta(conf conf.MapConf, meta *Meta, errDirectR
 	return reader, nil
 }
 
-func NewFileDirReader(meta *Meta, conf conf.MapConf) (reader Reader, err error) {
-	whence, _ := conf.GetStringOr(KeyWhence, WhenceOldest)
-	logpath, err := conf.GetString(KeyLogPath)
-	if err != nil {
-		return
-	}
-	bufSize, _ := conf.GetIntOr(KeyBufSize, DefaultBufSize)
-
-	// 默认不读取隐藏文件
-	ignoreHidden, _ := conf.GetBoolOr(KeyIgnoreHiddenFile, true)
-	ignoreFileSuffix, _ := conf.GetStringListOr(KeyIgnoreFileSuffix, DefaultIgnoreFileSuffixes)
-	validFilesRegex, _ := conf.GetStringOr(KeyValidFilePattern, "*")
-	newfileNewLine, _ := conf.GetBoolOr(KeyNewFileNewLine, false)
-	skipFirstLine, _ := conf.GetBoolOr(KeySkipFileFirstLine, false)
-	readSameInode, _ := conf.GetBoolOr(KeyReadSameInode, false)
-	fr, err := NewSeqFile(meta, logpath, ignoreHidden, newfileNewLine, ignoreFileSuffix, validFilesRegex, whence, nil)
-	if err != nil {
-		return
-	}
-	fr.SkipFileFirstLine = skipFirstLine
-	fr.ReadSameInode = readSameInode
-	return NewReaderSize(fr, meta, bufSize)
-}
-
-func NewSingleFileReader(meta *Meta, conf conf.MapConf) (reader Reader, err error) {
-	logpath, err := conf.GetString(KeyLogPath)
-	if err != nil {
-		return
-	}
-	bufSize, _ := conf.GetIntOr(KeyBufSize, DefaultBufSize)
-	whence, _ := conf.GetStringOr(KeyWhence, WhenceOldest)
-	errDirectReturn, _ := conf.GetBoolOr(KeyErrDirectReturn, true)
-
-	fr, err := NewSingleFile(meta, logpath, whence, 0, errDirectReturn)
-	if err != nil {
-		return
-	}
-	return NewReaderSize(fr, meta, bufSize)
+type SourceIndex struct {
+	Source string
+	Index  int
 }

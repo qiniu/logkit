@@ -25,18 +25,18 @@ var WaitNoSuchFile = 100 * time.Millisecond
 
 // getLatestFile 获得当前文件夹下最新的文件
 func getLatestFile(logdir string) (os.FileInfo, error) {
-	return getMaxFile(logdir, noCondition, models.ModTimeLater)
+	return GetMaxFile(logdir, NoCondition, models.ModTimeLater)
 }
 
 // getOldestFile 获得当前文件夹下最旧的文件
 func getOldestFile(logdir string) (os.FileInfo, error) {
-	return getMinFile(logdir, noCondition, models.ModTimeLater)
+	return GetMinFile(logdir, NoCondition, models.ModTimeLater)
 }
 
-// getMaxFile 在指定的限制条件condition下，根据比较函数gte 选择最大的os.FileInfo
+// GetMaxFile 在指定的限制条件condition下，根据比较函数gte 选择最大的os.FileInfo
 // condition 文件必须满足的条件
 // gte f1 >= f2 则返回true
-func getMaxFile(logdir string, condition func(os.FileInfo) bool, gte func(f1, f2 os.FileInfo) bool) (chosen os.FileInfo, err error) {
+func GetMaxFile(logdir string, condition func(os.FileInfo) bool, gte func(f1, f2 os.FileInfo) bool) (chosen os.FileInfo, err error) {
 	files, err := ioutil.ReadDir(logdir)
 	if err != nil {
 		return nil, err
@@ -58,31 +58,31 @@ func getMaxFile(logdir string, condition func(os.FileInfo) bool, gte func(f1, f2
 	return
 }
 
-// getMinFile 于getMaxFile 相反，返回最小的文件
-func getMinFile(logdir string, condition func(os.FileInfo) bool, gte func(f1, f2 os.FileInfo) bool) (os.FileInfo, error) {
-	return getMaxFile(logdir, condition, func(f1, f2 os.FileInfo) bool {
+// GetMinFile 于getMaxFile 相反，返回最小的文件
+func GetMinFile(logdir string, condition func(os.FileInfo) bool, gte func(f1, f2 os.FileInfo) bool) (os.FileInfo, error) {
+	return GetMaxFile(logdir, condition, func(f1, f2 os.FileInfo) bool {
 		return !gte(f1, f2)
 	})
 }
 
-// noCondition 无限制条件
-func noCondition(f os.FileInfo) bool {
+// NoCondition 无限制条件
+func NoCondition(f os.FileInfo) bool {
 	return true
 }
 
-func andCondition(f1, f2 func(os.FileInfo) bool) func(os.FileInfo) bool {
+func AndCondition(f1, f2 func(os.FileInfo) bool) func(os.FileInfo) bool {
 	return func(fi os.FileInfo) bool {
 		return f1(fi) && f2(fi)
 	}
 }
 
-func orCondition(f1, f2 func(os.FileInfo) bool) func(os.FileInfo) bool {
+func OrCondition(f1, f2 func(os.FileInfo) bool) func(os.FileInfo) bool {
 	return func(fi os.FileInfo) bool {
 		return f1(fi) || f2(fi)
 	}
 }
 
-func notCondition(f1 func(os.FileInfo) bool) func(os.FileInfo) bool {
+func NotCondition(f1 func(os.FileInfo) bool) func(os.FileInfo) bool {
 	return func(fi os.FileInfo) bool {
 		return !f1(fi)
 	}
@@ -138,4 +138,11 @@ func getTags(tagFile string) (tags map[string]interface{}, err error) {
 		return
 	}
 	return
+}
+
+func CompressedFile(path string) bool {
+	if strings.HasSuffix(path, ".gz") || strings.HasSuffix(path, ".tar") || strings.HasSuffix(path, ".zip") {
+		return true
+	}
+	return false
 }

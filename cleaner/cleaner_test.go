@@ -67,7 +67,7 @@ func (tr *TestReader) Read(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func createFile(name string, size int64, rd *TestReader) error {
+func CreateFile(name string, size int64, rd *TestReader) error {
 	f, err := os.Create(name)
 	if err != nil {
 		return err
@@ -101,15 +101,15 @@ func GetTestFiles(path string) error {
 		return err
 	}
 	tr := &TestReader{}
-	err = createFile(log1, 1000000, tr)
+	err = CreateFile(log1, 1000000, tr)
 	if err != nil {
 		return err
 	}
-	err = createFile(log2, 10000000, tr)
+	err = CreateFile(log2, 10000000, tr)
 	if err != nil {
 		return err
 	}
-	err = createFile(log3, 10000000, tr)
+	err = CreateFile(log3, 10000000, tr)
 	if err != nil {
 		return err
 	}

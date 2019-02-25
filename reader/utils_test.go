@@ -17,7 +17,7 @@ import (
 )
 
 func TestFindFile(t *testing.T) {
-	createFile(1000)
+	CreateFileForTest(1000)
 	defer DestroyDir()
 
 	fi, err := getLatestFile(Dir)
@@ -40,13 +40,13 @@ func TestFindFile(t *testing.T) {
 
 func TestCondition(t *testing.T) {
 	var fi os.FileInfo
-	trueCondition := noCondition
-	falseCondition := notCondition(trueCondition)
+	trueCondition := NoCondition
+	falseCondition := NotCondition(trueCondition)
 
 	assert.True(t, trueCondition(fi))
 	assert.False(t, falseCondition(fi))
-	assert.True(t, orCondition(trueCondition, falseCondition)(fi))
-	assert.False(t, andCondition(trueCondition, falseCondition)(fi))
+	assert.True(t, OrCondition(trueCondition, falseCondition)(fi))
+	assert.False(t, AndCondition(trueCondition, falseCondition)(fi))
 }
 
 func TestHeadPatternMode(t *testing.T) {
@@ -107,10 +107,10 @@ func TestModTimeLater(t *testing.T) {
 		err := ioutil.WriteFile(filepath.Join(dir, v), []byte("abc"), 0644)
 		assert.NoError(t, err)
 	}
-	cs, err := getMaxFile(dir, func(info os.FileInfo) bool { return true }, ModTimeLater)
+	cs, err := GetMaxFile(dir, func(info os.FileInfo) bool { return true }, ModTimeLater)
 	assert.NoError(t, err)
 	assert.Equal(t, "f3", cs.Name())
-	cs, err = getMinFile(dir, func(info os.FileInfo) bool { return true }, ModTimeLater)
+	cs, err = GetMinFile(dir, func(info os.FileInfo) bool { return true }, ModTimeLater)
 	assert.NoError(t, err)
 	assert.Equal(t, "f1", cs.Name())
 }

@@ -1,7 +1,7 @@
 package autofile
 
 import (
-	"fmt"
+	"errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -12,6 +12,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/reader/bufreader"
 	"github.com/qiniu/logkit/reader/config"
 	"github.com/qiniu/logkit/reader/tailx"
 )
@@ -35,11 +36,11 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (r reader.Reader, err error
 		conf[config.KeyLogPath] = logpath
 		return tailx.NewReader(meta, conf)
 	case config.ModeDir:
-		return reader.NewFileDirReader(meta, conf)
+		return bufreader.NewFileDirReader(meta, conf)
 	case config.ModeFile:
-		return reader.NewSingleFileReader(meta, conf)
+		return bufreader.NewSingleFileReader(meta, conf)
 	default:
-		err = fmt.Errorf("can not find property mode for this logpath %v", logpath)
+		err = errors.New("can not find property mode for this path " + logpath)
 	}
 	return
 }

@@ -1,4 +1,4 @@
-package reader
+package singlefile
 
 import (
 	"io"
@@ -10,11 +10,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/reader/test"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
 )
+
+const testlogpath = "logpath"
 
 //测试single file rotate的情况
 func Test_singleFileRotate(t *testing.T) {
@@ -26,7 +29,7 @@ func Test_singleFileRotate(t *testing.T) {
 	CreateFile(fileName, "12345")
 
 	//create sf
-	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeFile, "", DefautFileRetention)
+	meta, err := reader.NewMeta(metaDir, metaDir, testlogpath, ModeFile, "", reader.DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
@@ -81,7 +84,7 @@ func Test_singleFileNotRotate(t *testing.T) {
 	defer DeleteFile(fileName)
 
 	//create sf
-	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeFile, "", DefautFileRetention)
+	meta, err := reader.NewMeta(metaDir, metaDir, testlogpath, ModeFile, "", reader.DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}
@@ -130,7 +133,7 @@ func Test_singleFileOffset(t *testing.T) {
 	defer DeleteFile(fileName)
 
 	//create sf
-	meta, err := NewMeta(metaDir, metaDir, testlogpath, ModeFile, "", DefautFileRetention)
+	meta, err := reader.NewMeta(metaDir, metaDir, testlogpath, ModeFile, "", reader.DefautFileRetention)
 	if err != nil {
 		t.Error(err)
 	}

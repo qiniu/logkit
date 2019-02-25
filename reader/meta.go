@@ -527,7 +527,7 @@ func (m *Meta) getDoneFileContent() ([]string, error) {
 	return ret, nil
 }
 
-func joinFileInode(filename, inode string) string {
+func JoinFileInode(filename, inode string) string {
 	return filepath.Base(filename) + "_" + inode
 }
 
@@ -541,7 +541,7 @@ func (m *Meta) GetDoneFileInode() map[string]bool {
 	for _, v := range contents {
 		sps := strings.Split(v, "\t")
 		if len(sps) >= 2 {
-			inodeMap[joinFileInode(sps[0], sps[1])] = true
+			inodeMap[JoinFileInode(sps[0], sps[1])] = true
 		}
 	}
 	return inodeMap
