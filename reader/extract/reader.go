@@ -26,39 +26,43 @@ type Reader struct {
 	done       int32
 }
 
+type Opts struct {
+	IgnoreHidden bool
+}
+
 //NewReader 实现对压缩包的读取
 // 还可以实现更多功能：
 // 1. ignoreHidden 忽略压缩包中的隐藏文件
 // 2. suffixes []string 只读某些后缀
 // 3. validFileRegex  只读匹配的文件
-func NewReader(meta *reader.Meta, path string) (*Reader, error) {
+func NewReader(meta *reader.Meta, path string, opt Opts) (*Reader, error) {
 	var rd SourceReader
 	var err error
 	var tp, curFile string
 	var offset int64
 	if strings.HasSuffix(path, ".tar.gz") {
-		rd, err = NewTarGz(path)
+		rd, err = NewTarGz(path, opt)
 		if err != nil {
 			log.Errorf("New .tar.gz err %v", err)
 			return nil, err
 		}
 		tp = "targz"
 	} else if strings.HasSuffix(path, ".tar") {
-		rd, err = NewTar(path)
+		rd, err = NewTar(path, opt)
 		if err != nil {
 			log.Errorf("New .tar err %v", err)
 			return nil, err
 		}
 		tp = "tar"
 	} else if strings.HasSuffix(path, ".gz") {
-		rd, err = NewGZ(path)
+		rd, err = NewGZ(path, opt)
 		if err != nil {
 			log.Errorf("New .gz err %v", err)
 			return nil, err
 		}
 		tp = "gz"
 	} else if strings.HasSuffix(path, ".zip") {
-		rd, err = NewZIP(path)
+		rd, err = NewZIP(path, opt)
 		if err != nil {
 			log.Errorf("New .zip err %v", err)
 			return nil, err
@@ -139,6 +143,7 @@ type Tar struct {
 	f      *os.File
 	header *tar.Header
 	path   string
+	opt    Opts
 
 	source    string
 	sLock     *sync.RWMutex
@@ -146,7 +151,7 @@ type Tar struct {
 	curSize   int64
 }
 
-func NewTarGz(path string) (*Tar, error) {
+func NewTarGz(path string, opt Opts) (*Tar, error) {
 	if !strings.HasSuffix(path, ".tar.gz") {
 		return nil, fmt.Errorf("%s is not .tar.gz format", path)
 	}
@@ -167,10 +172,11 @@ func NewTarGz(path string) (*Tar, error) {
 		sLock:     new(sync.RWMutex),
 		totalSize: 0,
 		curSize:   0,
+		opt:       opt,
 	}, nil
 }
 
-func NewTar(path string) (*Tar, error) {
+func NewTar(path string, opt Opts) (*Tar, error) {
 	if !strings.HasSuffix(path, ".tar") {
 		return nil, fmt.Errorf("%s is not .tar format", path)
 	}
@@ -185,7 +191,18 @@ func NewTar(path string) (*Tar, error) {
 		sLock:     new(sync.RWMutex),
 		totalSize: 0,
 		curSize:   0,
+		opt:       opt,
 	}, nil
+}
+
+func (t *Tar) ignoreHidden() bool {
+	if !t.opt.IgnoreHidden {
+		return false
+	}
+	if strings.HasPrefix(filepath.Base(t.header.Name), ".") {
+		return true
+	}
+	return false
 }
 
 func (t *Tar) next() (err error) {
@@ -197,6 +214,7 @@ func (t *Tar) next() (err error) {
 	defer t.sLock.Unlock()
 	t.source = t.header.Name
 	t.totalSize += t.header.Size
+	log.Println("XXXXX next called", t.source, t.header.Size)
 	return nil
 }
 
@@ -206,11 +224,15 @@ func (t *Tar) Read(p []byte) (n int, err error) {
 		defer t.sLock.Unlock()
 		t.curSize += int64(n)
 	}()
-	if t.header == nil {
-		err = t.next()
-		if err != nil {
-			return 0, err
+	for {
+		if t.header == nil || t.ignoreHidden() {
+			err = t.next()
+			if err != nil {
+				return 0, err
+			}
+			continue
 		}
+		break
 	}
 	for {
 		n, err = t.rd.Read(p)
@@ -221,6 +243,7 @@ func (t *Tar) Read(p []byte) (n int, err error) {
 			}
 			//如果已经EOF，但是上次还读到了，先返回上次的结果
 			if n > 0 {
+				log.Println("read ", string(p), n)
 				return n, nil
 			}
 			continue
@@ -228,6 +251,7 @@ func (t *Tar) Read(p []byte) (n int, err error) {
 		if err != nil {
 			return n, err
 		}
+		log.Println("read ", string(p), n)
 		break
 	}
 	return n, nil
@@ -262,9 +286,10 @@ type GZ struct {
 	path string
 
 	source string
+	opt    Opts
 }
 
-func NewGZ(path string) (*GZ, error) {
+func NewGZ(path string, opt Opts) (*GZ, error) {
 	if !strings.HasSuffix(path, ".gz") {
 		return nil, fmt.Errorf("%s is not .gz format", path)
 	}
@@ -285,6 +310,7 @@ func NewGZ(path string) (*GZ, error) {
 		f:      f,
 		path:   path,
 		source: source,
+		opt:    opt,
 	}, nil
 }
 
@@ -313,12 +339,13 @@ type ZIP struct {
 	f    io.ReadCloser
 	path string
 	idx  int
+	opt  Opts
 
 	source string
 	sLock  *sync.RWMutex
 }
 
-func NewZIP(path string) (*ZIP, error) {
+func NewZIP(path string, opt Opts) (*ZIP, error) {
 	if !strings.HasSuffix(path, ".zip") {
 		return nil, fmt.Errorf("%s is not .zip format", path)
 	}
@@ -331,6 +358,7 @@ func NewZIP(path string) (*ZIP, error) {
 		path:  path,
 		sLock: new(sync.RWMutex),
 		idx:   0,
+		opt:   opt,
 	}, nil
 }
 
@@ -356,12 +384,26 @@ func (t *ZIP) next() (err error) {
 	return nil
 }
 
+func (t *ZIP) ignoreHidden() bool {
+	if !t.opt.IgnoreHidden {
+		return false
+	}
+	if strings.HasPrefix(filepath.Base(t.source), ".") {
+		return true
+	}
+	return false
+}
+
 func (t *ZIP) Read(p []byte) (n int, err error) {
-	if t.f == nil {
-		err = t.next()
-		if err != nil {
-			return 0, err
+	for {
+		if t.f == nil || t.ignoreHidden() {
+			err = t.next()
+			if err != nil {
+				return 0, err
+			}
+			continue
 		}
+		break
 	}
 	for {
 		n, err = t.f.Read(p)

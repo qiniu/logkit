@@ -51,6 +51,15 @@ func matchMode(logpath string) (path, mode string, err error) {
 		logpath = filepath.Dir(logpath)
 	}
 	path = logpath
+	if strings.HasSuffix(logpath, ".tar.gz") || strings.HasSuffix(logpath, ".tar") || strings.HasSuffix(logpath, ".zip") {
+		mode = config.ModeDirx
+		return
+	}
+	if strings.HasSuffix(logpath, ".gz") {
+		mode = config.ModeTailx
+		return
+	}
+
 	//path with * matching tailx mode
 	matchTailx := strings.Contains(logpath, "*")
 	if matchTailx == true {

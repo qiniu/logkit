@@ -123,7 +123,7 @@ func NewActiveReader(originPath, realPath, whence, inode string, notFirstTime bo
 	}
 	var fr reader.FileReader
 	if reader.CompressedFile(realPath) {
-		fr, err = extract.NewReader(subMeta, realPath)
+		fr, err = extract.NewReader(subMeta, realPath, extract.Opts{})
 		if err != nil {
 			return
 		}

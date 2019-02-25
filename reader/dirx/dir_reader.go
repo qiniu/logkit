@@ -304,7 +304,7 @@ func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool) (*dir
 	}
 	var fri reader.FileReader
 	if reader.CompressedFile(opts.LogPath) {
-		fri, err = extract.NewReader(subMeta, opts.LogPath)
+		fri, err = extract.NewReader(subMeta, opts.LogPath, extract.Opts{IgnoreHidden: opts.IgnoreHidden})
 		if err != nil {
 			return nil, fmt.Errorf("new extract reader: %v", err)
 		}
