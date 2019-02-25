@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"reflect"
+	"syscall"
 	"unsafe"
 
 	"github.com/shirou/gopsutil/internal/common"
@@ -16,13 +16,9 @@ import (
 )
 
 var (
-	modiphlpapi             = windows.NewLazyDLL("iphlpapi.dll")
+	modiphlpapi             = windows.NewLazySystemDLL("iphlpapi.dll")
 	procGetExtendedTCPTable = modiphlpapi.NewProc("GetExtendedTcpTable")
 	procGetExtendedUDPTable = modiphlpapi.NewProc("GetExtendedUdpTable")
-	procGetTcpTable         = modiphlpapi.NewProc("GetTcpTable")
-	procGetIcmpStatistics   = modiphlpapi.NewProc("GetIcmpStatistics")
-	procGetTcpStatistics    = modiphlpapi.NewProc("GetTcpStatistics")
-	procGetUdpStatistics    = modiphlpapi.NewProc("GetUdpStatistics")
 )
 
 const (
@@ -37,125 +33,44 @@ const (
 	TCPTableOwnerModuleAll
 )
 
-var netProtocols = []string{"tcp", "udp"}
-var netProtocolsObjs = map[string]StatsInterface{
-	"tcp": &MIB_TCPSTATS{},
-	"udp": &MIB_UDPSTATS{},
+type netConnectionKindType struct {
+	family   uint32
+	sockType uint32
+	filename string
 }
 
-const ANY_SIZE = 100
-
-type DWORD uint32
-type MIB_TCPTABLE struct {
-	DwNumEntries DWORD
-	Table        [ANY_SIZE]MIB_TCPROW // TODO: pass array to dll func
+var kindTCP4 = netConnectionKindType{
+	family:   syscall.AF_INET,
+	sockType: syscall.SOCK_STREAM,
+	filename: "tcp",
 }
-type PMIB_TCPTABLE *MIB_TCPTABLE
-type MIB_TCPROW struct {
-	State        MIB_TCP_STATE
-	DwLocalAddr  DWORD
-	DwLocalPort  DWORD
-	DwRemoteAddr DWORD
-	DwRemotePort DWORD
+var kindTCP6 = netConnectionKindType{
+	family:   syscall.AF_INET6,
+	sockType: syscall.SOCK_STREAM,
+	filename: "tcp6",
 }
-type MIB_TCP_STATE int32
-
-const (
-	MIB_TCP_STATE_CLOSED     MIB_TCP_STATE = 1
-	MIB_TCP_STATE_LISTEN                   = 2
-	MIB_TCP_STATE_SYN_SENT                 = 3
-	MIB_TCP_STATE_SYN_RCVD                 = 4
-	MIB_TCP_STATE_ESTAB                    = 5
-	MIB_TCP_STATE_FIN_WAIT1                = 6
-	MIB_TCP_STATE_FIN_WAIT2                = 7
-	MIB_TCP_STATE_CLOSE_WAIT               = 8
-	MIB_TCP_STATE_CLOSING                  = 9
-	MIB_TCP_STATE_LAST_ACK                 = 10
-	MIB_TCP_STATE_TIME_WAIT                = 11
-	MIB_TCP_STATE_DELETE_TCB               = 12
-)
-
-var TcpStateMap = map[MIB_TCP_STATE]string{
-	MIB_TCP_STATE_CLOSED:     "CLOSE",
-	MIB_TCP_STATE_LISTEN:     "LISTEN",
-	MIB_TCP_STATE_SYN_SENT:   "SYN_SENT",
-	MIB_TCP_STATE_SYN_RCVD:   "SYN_RECV",
-	MIB_TCP_STATE_ESTAB:      "ESTABLISHED",
-	MIB_TCP_STATE_FIN_WAIT1:  "FIN_WAIT1",
-	MIB_TCP_STATE_FIN_WAIT2:  "FIN_WAIT2",
-	MIB_TCP_STATE_CLOSE_WAIT: "CLOSE_WAIT",
-	MIB_TCP_STATE_CLOSING:    "CLOSING",
-	MIB_TCP_STATE_LAST_ACK:   "LAST_ACK",
-	MIB_TCP_STATE_TIME_WAIT:  "TIME_WAIT",
+var kindUDP4 = netConnectionKindType{
+	family:   syscall.AF_INET,
+	sockType: syscall.SOCK_DGRAM,
+	filename: "udp",
+}
+var kindUDP6 = netConnectionKindType{
+	family:   syscall.AF_INET6,
+	sockType: syscall.SOCK_DGRAM,
+	filename: "udp6",
 }
 
-// copied from https://msdn.microsoft.com/en-us/library/windows/desktop/aa366020(v=vs.85).aspx
-type MIB_TCPSTATS struct {
-	dwRtoAlgorithm DWORD `RtoAlgorithm`
-	dwRtoMin       DWORD `RtoMin`
-	dwRtoMax       DWORD `RtoMax`
-	dwMaxConn      DWORD `MaxConn`
-	dwActiveOpens  DWORD `ActiveOpens`
-	dwPassiveOpens DWORD `PassiveOpens`
-	dwAttemptFails DWORD `AttemptFails`
-	dwEstabResets  DWORD `EstabResets`
-	dwCurrEstab    DWORD `CurrEstab`
-	dwInSegs       DWORD `InSegs`
-	dwOutSegs      DWORD `OutSegs`
-	dwRetransSegs  DWORD `RetransSegs`
-	dwInErrs       DWORD `InErrs`
-	dwOutRstsv     DWORD `OutRsts`
-	dwNumConns     DWORD `NumConns`
-}
-type PMIB_TCPSTATS *MIB_TCPSTATS
-
-func (t *MIB_TCPSTATS) GetStatsFunc() DWORD {
-	return GetTcpStatistics(t)
-}
-func (t *MIB_TCPSTATS) Name() string {
-	return "tcp"
-}
-
-// copied from https://msdn.microsoft.com/en-us/library/windows/desktop/aa366929(v=vs.85).aspx
-type MIB_UDPSTATS struct {
-	dwInDatagrams  DWORD `InDatagrams`
-	dwNoPorts      DWORD `NoPorts`
-	dwInErrors     DWORD `InErrors`
-	dwOutDatagrams DWORD `OutDatagrams`
-	dwNumAddrs     DWORD `NumAddrs`
-}
-type PMIB_UDPSTATS *MIB_UDPSTATS
-
-func (u *MIB_UDPSTATS) GetStatsFunc() DWORD {
-	return GetUdpStatistics(u)
-}
-func (u *MIB_UDPSTATS) Name() string {
-	return "udp"
-}
-
-func GetTcpTable(tcpTable PMIB_TCPTABLE, sizePointer *uint32, order bool) DWORD {
-	ret, _, _ := procGetTcpTable.Call(
-		uintptr(unsafe.Pointer(tcpTable)),
-		uintptr(unsafe.Pointer(sizePointer)),
-		getUintptrFromBool(order))
-	return DWORD(ret)
-}
-
-type StatsInterface interface {
-	GetStatsFunc() DWORD
-	Name() string
-}
-
-func GetTcpStatistics(pStats PMIB_TCPSTATS) DWORD {
-	ret, _, _ := procGetTcpStatistics.Call(
-		uintptr(unsafe.Pointer(pStats)))
-	return DWORD(ret)
-}
-
-func GetUdpStatistics(pStats PMIB_UDPSTATS) DWORD {
-	ret, _, _ := procGetUdpStatistics.Call(
-		uintptr(unsafe.Pointer(pStats)))
-	return DWORD(ret)
+var netConnectionKindMap = map[string][]netConnectionKindType{
+	"all":   {kindTCP4, kindTCP6, kindUDP4, kindUDP6},
+	"tcp":   {kindTCP4, kindTCP6},
+	"tcp4":  {kindTCP4},
+	"tcp6":  {kindTCP6},
+	"udp":   {kindUDP4, kindUDP6},
+	"udp4":  {kindUDP4},
+	"udp6":  {kindUDP6},
+	"inet":  {kindTCP4, kindTCP6, kindUDP4, kindUDP6},
+	"inet4": {kindTCP4, kindUDP4},
+	"inet6": {kindTCP6, kindUDP6},
 }
 
 func IOCounters(pernic bool) ([]IOCountersStat, error) {
@@ -206,34 +121,71 @@ func IOCountersByFileWithContext(ctx context.Context, pernic bool, filename stri
 	return IOCounters(pernic)
 }
 
-// Return a list of network connections opened by a process
+// Return a list of network connections
+// Available kind:
+//   reference to netConnectionKindMap
 func Connections(kind string) ([]ConnectionStat, error) {
 	return ConnectionsWithContext(context.Background(), kind)
 }
 
 func ConnectionsWithContext(ctx context.Context, kind string) ([]ConnectionStat, error) {
-	var ret []ConnectionStat
-	var tcpTable PMIB_TCPTABLE
-	var sizePointer uint32 = 0
-	resCode := GetTcpTable(tcpTable, &sizePointer, true)
-	//ERROR_INSUFFICIENT_BUFFER(122)
-	//The data area passed to a system call is too small.
-	if resCode != 122 {
-		return ret, fmt.Errorf("Call win func GetTcpTable failed, errCode: %v", resCode)
+	return ConnectionsPidWithContext(ctx, kind, 0)
+}
+
+// ConnectionsPid Return a list of network connections opened by a process
+func ConnectionsPid(kind string, pid int32) ([]ConnectionStat, error) {
+	return ConnectionsPidWithContext(context.Background(), kind, pid)
+}
+
+func ConnectionsPidWithContext(ctx context.Context, kind string, pid int32) ([]ConnectionStat, error) {
+	tmap, ok := netConnectionKindMap[kind]
+	if !ok {
+		return nil, fmt.Errorf("invalid kind, %s", kind)
 	}
-	tcpTable = &MIB_TCPTABLE{}
-	// call twice
-	resCode = GetTcpTable(tcpTable, &sizePointer, true)
-	if resCode != 0 {
-		return ret, fmt.Errorf("Call win func GetTcpTable failed, errCode: %v", resCode)
-	}
-	for i := 0; DWORD(i) < tcpTable.DwNumEntries; i++ {
-		cs := ConnectionStat{
-			Status: TcpStateMap[tcpTable.Table[i].State],
+	return getProcInet(tmap, pid)
+}
+
+func getProcInet(kinds []netConnectionKindType, pid int32) ([]ConnectionStat, error) {
+	stats := make([]ConnectionStat, 0)
+
+	for _, kind := range kinds {
+		s, err := getNetStatWithKind(kind)
+		if err != nil {
+			continue
 		}
-		ret = append(ret, cs)
+
+		if pid == 0 {
+			stats = append(stats, s...)
+		} else {
+			for _, ns := range s {
+				if ns.Pid != pid {
+					continue
+				}
+				stats = append(stats, ns)
+			}
+		}
 	}
-	return ret, nil
+
+	return stats, nil
+}
+
+func getNetStatWithKind(kindType netConnectionKindType) ([]ConnectionStat, error) {
+	if kindType.filename == "" {
+		return nil, fmt.Errorf("kind filename must be required")
+	}
+
+	switch kindType.filename {
+	case kindTCP4.filename:
+		return getTCPConnections(kindTCP4.family)
+	case kindTCP6.filename:
+		return getTCPConnections(kindTCP6.family)
+	case kindUDP4.filename:
+		return getUDPConnections(kindUDP4.family)
+	case kindUDP6.filename:
+		return getUDPConnections(kindUDP6.family)
+	}
+
+	return nil, fmt.Errorf("invalid kind filename, %s", kindType.filename)
 }
 
 // Return a list of network connections opened returning at most `max`
@@ -263,51 +215,431 @@ func ProtoCounters(protocols []string) ([]ProtoCountersStat, error) {
 }
 
 func ProtoCountersWithContext(ctx context.Context, protocols []string) ([]ProtoCountersStat, error) {
-	if len(protocols) == 0 {
-		protocols = netProtocols
-	}
-	var pcs []ProtoCountersStat
-	var err error
-	for _, proto := range protocols {
-		if o, ok := netProtocolsObjs[proto]; ok {
-			pc, err := getProtoCountersStat(o)
-			if err != nil {
-				err = fmt.Errorf("%v %s stat err: ", err.Error(), o.Name())
-			}
-			if pc != nil {
-				pcs = append(pcs, *pc)
-			}
+	return nil, errors.New("NetProtoCounters not implemented for windows")
+}
+
+func getTableUintptr(family uint32, buf []byte) uintptr {
+	var (
+		pmibTCPTable  pmibTCPTableOwnerPidAll
+		pmibTCP6Table pmibTCP6TableOwnerPidAll
+
+		p uintptr
+	)
+	switch family {
+	case kindTCP4.family:
+		if len(buf) > 0 {
+			pmibTCPTable = (*mibTCPTableOwnerPid)(unsafe.Pointer(&buf[0]))
+			p = uintptr(unsafe.Pointer(pmibTCPTable))
+		} else {
+			p = uintptr(unsafe.Pointer(pmibTCPTable))
+		}
+	case kindTCP6.family:
+		if len(buf) > 0 {
+			pmibTCP6Table = (*mibTCP6TableOwnerPid)(unsafe.Pointer(&buf[0]))
+			p = uintptr(unsafe.Pointer(pmibTCP6Table))
+		} else {
+			p = uintptr(unsafe.Pointer(pmibTCP6Table))
 		}
 	}
-	return pcs, err
+	return p
+}
+
+func getTableInfo(filename string, table interface{}) (index, step, length int) {
+	switch filename {
+	case kindTCP4.filename:
+		index = int(unsafe.Sizeof(table.(pmibTCPTableOwnerPidAll).DwNumEntries))
+		step = int(unsafe.Sizeof(table.(pmibTCPTableOwnerPidAll).Table))
+		length = int(table.(pmibTCPTableOwnerPidAll).DwNumEntries)
+	case kindTCP6.filename:
+		index = int(unsafe.Sizeof(table.(pmibTCP6TableOwnerPidAll).DwNumEntries))
+		step = int(unsafe.Sizeof(table.(pmibTCP6TableOwnerPidAll).Table))
+		length = int(table.(pmibTCP6TableOwnerPidAll).DwNumEntries)
+	case kindUDP4.filename:
+		index = int(unsafe.Sizeof(table.(pmibUDPTableOwnerPid).DwNumEntries))
+		step = int(unsafe.Sizeof(table.(pmibUDPTableOwnerPid).Table))
+		length = int(table.(pmibUDPTableOwnerPid).DwNumEntries)
+	case kindUDP6.filename:
+		index = int(unsafe.Sizeof(table.(pmibUDP6TableOwnerPid).DwNumEntries))
+		step = int(unsafe.Sizeof(table.(pmibUDP6TableOwnerPid).Table))
+		length = int(table.(pmibUDP6TableOwnerPid).DwNumEntries)
+	}
+
+	return
+}
+
+func getTCPConnections(family uint32) ([]ConnectionStat, error) {
+	var (
+		p    uintptr
+		buf  []byte
+		size uint32
+
+		pmibTCPTable  pmibTCPTableOwnerPidAll
+		pmibTCP6Table pmibTCP6TableOwnerPidAll
+	)
+
+	if family == 0 {
+		return nil, fmt.Errorf("faimly must be required")
+	}
+
+	for {
+		switch family {
+		case kindTCP4.family:
+			if len(buf) > 0 {
+				pmibTCPTable = (*mibTCPTableOwnerPid)(unsafe.Pointer(&buf[0]))
+				p = uintptr(unsafe.Pointer(pmibTCPTable))
+			} else {
+				p = uintptr(unsafe.Pointer(pmibTCPTable))
+			}
+		case kindTCP6.family:
+			if len(buf) > 0 {
+				pmibTCP6Table = (*mibTCP6TableOwnerPid)(unsafe.Pointer(&buf[0]))
+				p = uintptr(unsafe.Pointer(pmibTCP6Table))
+			} else {
+				p = uintptr(unsafe.Pointer(pmibTCP6Table))
+			}
+		}
+
+		err := getExtendedTcpTable(p,
+			&size,
+			true,
+			family,
+			tcpTableOwnerPidAll,
+			0)
+		if err == nil {
+			break
+		}
+		if err != windows.ERROR_INSUFFICIENT_BUFFER {
+			return nil, err
+		}
+		buf = make([]byte, size)
+	}
+
+	var (
+		index, step int
+		length      int
+	)
+
+	stats := make([]ConnectionStat, 0)
+	switch family {
+	case kindTCP4.family:
+		index, step, length = getTableInfo(kindTCP4.filename, pmibTCPTable)
+	case kindTCP6.family:
+		index, step, length = getTableInfo(kindTCP6.filename, pmibTCP6Table)
+	}
+
+	if length == 0 {
+		return nil, nil
+	}
+
+	for i := 0; i < length; i++ {
+		switch family {
+		case kindTCP4.family:
+			mibs := (*mibTCPRowOwnerPid)(unsafe.Pointer(&buf[index]))
+			ns := mibs.convertToConnectionStat()
+			stats = append(stats, ns)
+		case kindTCP6.family:
+			mibs := (*mibTCP6RowOwnerPid)(unsafe.Pointer(&buf[index]))
+			ns := mibs.convertToConnectionStat()
+			stats = append(stats, ns)
+		}
+
+		index += step
+	}
+	return stats, nil
+}
+
+func getUDPConnections(family uint32) ([]ConnectionStat, error) {
+	var (
+		p    uintptr
+		buf  []byte
+		size uint32
+
+		pmibUDPTable  pmibUDPTableOwnerPid
+		pmibUDP6Table pmibUDP6TableOwnerPid
+	)
+
+	if family == 0 {
+		return nil, fmt.Errorf("faimly must be required")
+	}
+
+	for {
+		switch family {
+		case kindUDP4.family:
+			if len(buf) > 0 {
+				pmibUDPTable = (*mibUDPTableOwnerPid)(unsafe.Pointer(&buf[0]))
+				p = uintptr(unsafe.Pointer(pmibUDPTable))
+			} else {
+				p = uintptr(unsafe.Pointer(pmibUDPTable))
+			}
+		case kindUDP6.family:
+			if len(buf) > 0 {
+				pmibUDP6Table = (*mibUDP6TableOwnerPid)(unsafe.Pointer(&buf[0]))
+				p = uintptr(unsafe.Pointer(pmibUDP6Table))
+			} else {
+				p = uintptr(unsafe.Pointer(pmibUDP6Table))
+			}
+		}
+
+		err := getExtendedUdpTable(
+			p,
+			&size,
+			true,
+			family,
+			udpTableOwnerPid,
+			0,
+		)
+		if err == nil {
+			break
+		}
+		if err != windows.ERROR_INSUFFICIENT_BUFFER {
+			return nil, err
+		}
+		buf = make([]byte, size)
+	}
+
+	var (
+		index, step, length int
+	)
+
+	stats := make([]ConnectionStat, 0)
+	switch family {
+	case kindUDP4.family:
+		index, step, length = getTableInfo(kindUDP4.filename, pmibUDPTable)
+	case kindUDP6.family:
+		index, step, length = getTableInfo(kindUDP6.filename, pmibUDP6Table)
+	}
+
+	if length == 0 {
+		return nil, nil
+	}
+
+	for i := 0; i < length; i++ {
+		switch family {
+		case kindUDP4.family:
+			mibs := (*mibUDPRowOwnerPid)(unsafe.Pointer(&buf[index]))
+			ns := mibs.convertToConnectionStat()
+			stats = append(stats, ns)
+		case kindUDP4.family:
+			mibs := (*mibUDP6RowOwnerPid)(unsafe.Pointer(&buf[index]))
+			ns := mibs.convertToConnectionStat()
+			stats = append(stats, ns)
+		}
+
+		index += step
+	}
+	return stats, nil
+}
+
+// tcpStatuses https://msdn.microsoft.com/en-us/library/windows/desktop/bb485761(v=vs.85).aspx
+var tcpStatuses = map[mibTCPState]string{
+	1:  "CLOSED",
+	2:  "LISTEN",
+	3:  "SYN_SENT",
+	4:  "SYN_RECEIVED",
+	5:  "ESTABLISHED",
+	6:  "FIN_WAIT_1",
+	7:  "FIN_WAIT_2",
+	8:  "CLOSE_WAIT",
+	9:  "CLOSING",
+	10: "LAST_ACK",
+	11: "TIME_WAIT",
+	12: "DELETE",
+}
+
+func getExtendedTcpTable(pTcpTable uintptr, pdwSize *uint32, bOrder bool, ulAf uint32, tableClass tcpTableClass, reserved uint32) (errcode error) {
+	r1, _, _ := syscall.Syscall6(procGetExtendedTCPTable.Addr(), 6, pTcpTable, uintptr(unsafe.Pointer(pdwSize)), getUintptrFromBool(bOrder), uintptr(ulAf), uintptr(tableClass), uintptr(reserved))
+	if r1 != 0 {
+		errcode = syscall.Errno(r1)
+	}
+	return
+}
+
+func getExtendedUdpTable(pUdpTable uintptr, pdwSize *uint32, bOrder bool, ulAf uint32, tableClass udpTableClass, reserved uint32) (errcode error) {
+	r1, _, _ := syscall.Syscall6(procGetExtendedUDPTable.Addr(), 6, pUdpTable, uintptr(unsafe.Pointer(pdwSize)), getUintptrFromBool(bOrder), uintptr(ulAf), uintptr(tableClass), uintptr(reserved))
+	if r1 != 0 {
+		errcode = syscall.Errno(r1)
+	}
+	return
 }
 
 func getUintptrFromBool(b bool) uintptr {
 	if b {
 		return 1
-	} else {
-		return 0
 	}
+	return 0
 }
 
-func StatsToProtoCountersStat(stats interface{}) map[string]int64 {
-	t := reflect.TypeOf(stats).Elem()
-	val := reflect.ValueOf(stats).Elem()
-	ret := make(map[string]int64, t.NumField())
-	for i := 0; i < t.NumField(); i++ {
-		sf := t.Field(i)
-		ret[string(sf.Tag)] = int64(val.FieldByName(sf.Name).Uint())
-	}
-	return ret
+const anySize = 1
+
+// type MIB_TCP_STATE int32
+type mibTCPState int32
+
+type tcpTableClass int32
+
+const (
+	tcpTableBasicListener tcpTableClass = iota
+	tcpTableBasicConnections
+	tcpTableBasicAll
+	tcpTableOwnerPidListener
+	tcpTableOwnerPidConnections
+	tcpTableOwnerPidAll
+	tcpTableOwnerModuleListener
+	tcpTableOwnerModuleConnections
+	tcpTableOwnerModuleAll
+)
+
+type udpTableClass int32
+
+const (
+	udpTableBasic udpTableClass = iota
+	udpTableOwnerPid
+	udpTableOwnerModule
+)
+
+// TCP
+
+type mibTCPRowOwnerPid struct {
+	DwState      uint32
+	DwLocalAddr  uint32
+	DwLocalPort  uint32
+	DwRemoteAddr uint32
+	DwRemotePort uint32
+	DwOwningPid  uint32
 }
 
-func getProtoCountersStat(i StatsInterface) (*ProtoCountersStat, error) {
-	var err error
-	if ret := i.GetStatsFunc(); ret != 0 {
-		return nil, fmt.Errorf("get stat errCode: %v", err.Error(), ret)
+func (m *mibTCPRowOwnerPid) convertToConnectionStat() ConnectionStat {
+	ns := ConnectionStat{
+		Family: kindTCP4.family,
+		Type:   kindTCP4.sockType,
+		Laddr: Addr{
+			IP:   parseIPv4HexString(m.DwLocalAddr),
+			Port: uint32(decodePort(m.DwLocalPort)),
+		},
+		Raddr: Addr{
+			IP:   parseIPv4HexString(m.DwRemoteAddr),
+			Port: uint32(decodePort(m.DwRemotePort)),
+		},
+		Pid:    int32(m.DwOwningPid),
+		Status: tcpStatuses[mibTCPState(m.DwState)],
 	}
-	return &ProtoCountersStat{
-		Protocol: i.Name(),
-		Stats:    StatsToProtoCountersStat(i),
-	}, nil
+
+	return ns
+}
+
+type mibTCPTableOwnerPid struct {
+	DwNumEntries uint32
+	Table        [anySize]mibTCPRowOwnerPid
+}
+
+type mibTCP6RowOwnerPid struct {
+	UcLocalAddr     [16]byte
+	DwLocalScopeId  uint32
+	DwLocalPort     uint32
+	UcRemoteAddr    [16]byte
+	DwRemoteScopeId uint32
+	DwRemotePort    uint32
+	DwState         uint32
+	DwOwningPid     uint32
+}
+
+func (m *mibTCP6RowOwnerPid) convertToConnectionStat() ConnectionStat {
+	ns := ConnectionStat{
+		Family: kindTCP6.family,
+		Type:   kindTCP6.sockType,
+		Laddr: Addr{
+			IP:   parseIPv6HexString(m.UcLocalAddr),
+			Port: uint32(decodePort(m.DwLocalPort)),
+		},
+		Raddr: Addr{
+			IP:   parseIPv6HexString(m.UcRemoteAddr),
+			Port: uint32(decodePort(m.DwRemotePort)),
+		},
+		Pid:    int32(m.DwOwningPid),
+		Status: tcpStatuses[mibTCPState(m.DwState)],
+	}
+
+	return ns
+}
+
+type mibTCP6TableOwnerPid struct {
+	DwNumEntries uint32
+	Table        [anySize]mibTCP6RowOwnerPid
+}
+
+type pmibTCPTableOwnerPidAll *mibTCPTableOwnerPid
+type pmibTCP6TableOwnerPidAll *mibTCP6TableOwnerPid
+
+// UDP
+
+type mibUDPRowOwnerPid struct {
+	DwLocalAddr uint32
+	DwLocalPort uint32
+	DwOwningPid uint32
+}
+
+func (m *mibUDPRowOwnerPid) convertToConnectionStat() ConnectionStat {
+	ns := ConnectionStat{
+		Family: kindUDP4.family,
+		Type:   kindUDP4.sockType,
+		Laddr: Addr{
+			IP:   parseIPv4HexString(m.DwLocalAddr),
+			Port: uint32(decodePort(m.DwLocalPort)),
+		},
+		Pid: int32(m.DwOwningPid),
+	}
+
+	return ns
+}
+
+type mibUDPTableOwnerPid struct {
+	DwNumEntries uint32
+	Table        [anySize]mibUDPRowOwnerPid
+}
+
+type mibUDP6RowOwnerPid struct {
+	UcLocalAddr    [16]byte
+	DwLocalScopeId uint32
+	DwLocalPort    uint32
+	DwOwningPid    uint32
+}
+
+func (m *mibUDP6RowOwnerPid) convertToConnectionStat() ConnectionStat {
+	ns := ConnectionStat{
+		Family: kindUDP6.family,
+		Type:   kindUDP6.sockType,
+		Laddr: Addr{
+			IP:   parseIPv6HexString(m.UcLocalAddr),
+			Port: uint32(decodePort(m.DwLocalPort)),
+		},
+		Pid: int32(m.DwOwningPid),
+	}
+
+	return ns
+}
+
+type mibUDP6TableOwnerPid struct {
+	DwNumEntries uint32
+	Table        [anySize]mibUDP6RowOwnerPid
+}
+
+type pmibUDPTableOwnerPid *mibUDPTableOwnerPid
+type pmibUDP6TableOwnerPid *mibUDP6TableOwnerPid
+
+func decodePort(port uint32) uint16 {
+	return syscall.Ntohs(uint16(port))
+}
+
+func parseIPv4HexString(addr uint32) string {
+	return fmt.Sprintf("%d.%d.%d.%d", addr&255, addr>>8&255, addr>>16&255, addr>>24&255)
+}
+
+func parseIPv6HexString(addr [16]byte) string {
+	var ret [16]byte
+	for i := 0; i < 16; i++ {
+		ret[i] = uint8(addr[i])
+	}
+
+	// convert []byte to net.IP
+	ip := net.IP(ret[:])
+	return ip.String()
 }
