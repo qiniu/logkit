@@ -83,11 +83,11 @@ var (
 	OptionEncodeTag = Option{
 		KeyName:      KeyEncodeTag,
 		ChooseOnly:   false,
-		Default:      "encode",
+		Default:      "",
 		DefaultNoUse: false,
 		Description:  "编码方式标签(encode_tag)",
 		Advance:      true,
-		ToolTip:      "把日志的编码方式也作为标签，记录到解析出来的数据结果中，此处填写标签名称",
+		ToolTip:      "把日志的编码方式也作为标签，记录到解析出来的数据结果中，此处填写标签名称，空值则不记录编码方式",
 	}
 	OptionBuffSize = Option{
 		KeyName:      KeyBufSize,

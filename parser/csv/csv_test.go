@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -212,16 +211,16 @@ func Test_Jsonmap(t *testing.T) {
 	}
 	d := datas[0]
 	if d["f-x"] != json.Number("1.0") {
-		t.Errorf("f-x should be json.Number 1.0 but %v %v", reflect.TypeOf(d["f-x"]), d["f-x"])
+		t.Errorf("f-x should be json.Number 1.0 but %T %v", d["f-x"], d["f-x"])
 	}
 	if d["f-z"] != 3.0 {
-		t.Errorf("f-z should be float 3.0 but type %v %v", reflect.TypeOf(d["f-z"]), d["f-z"])
+		t.Errorf("f-z should be float 3.0 but type %T %v", d["f-z"], d["f-z"])
 	}
 	if _, ok := d["e-z"]; ok {
 		t.Errorf("e-z should not exist but %v", d["e-z"])
 	}
 	if d["e-x"] != "1" {
-		t.Errorf("e-x should be string 1 but %v %v", reflect.TypeOf(d["e-x"]), d["e-x"])
+		t.Errorf("e-x should be string 1 but %T %v", d["e-x"], d["e-x"])
 	}
 }
 
@@ -285,24 +284,74 @@ func Test_ParseField(t *testing.T) {
 	if got != exp {
 		t.Error("parseFieldList error")
 	}
-	_, err = parseSchemaFields(fields)
+	schemaFields, err := parseSchemaFields(fields)
 	if err != nil {
 		t.Error(err)
 	}
+	expectFiled := field{
+		typeChange: map[string]DataType{
+			"a": "string",
+			"b": "float",
+		},
+	}
+	for _, schema := range schemaFields {
+		if schema.name == "method" {
+			assert.EqualValues(t, expectFiled.typeChange, schema.typeChange)
+		}
+	}
 
-	schema = "a long, d jsonmap,e jsonmap{x string,y long},f jsonmap{z float,...}"
+	schema = "logtype string,timestamp long, method|method2 jsonmap{a | c string,b|d float}, path | reqheader string"
 	fields, err = parseSchemaFieldList(schema)
 	if err != nil {
 		t.Error(err)
 	}
 	got = strings.Join(fields, "|")
-	exp = "a long|d jsonmap|e jsonmap{x string,y long}|f jsonmap{z float,...}"
+	exp = "logtype string|timestamp long|method jsonmap{a | c string,b|d float}|method2 jsonmap{a | c string,b|d float}|path string|reqheader string"
 	if got != exp {
 		t.Error("parseFieldList error")
 	}
-	_, err = parseSchemaFields(fields)
+	schemaFields, err = parseSchemaFields(fields)
 	if err != nil {
 		t.Error(err)
+	}
+	expect := map[string]DataType{
+		"a": "string",
+		"c": "string",
+		"b": "float",
+		"d": "float",
+	}
+	for _, schema := range schemaFields {
+		if schema.name == "method" || schema.name == "method2" {
+			assert.EqualValues(t, expect, schema.typeChange)
+		}
+	}
+
+	schema = "a long, d jsonmap,e jsonmap{x string,y long},f jsonmap{z|l float,...}"
+	fields, err = parseSchemaFieldList(schema)
+	if err != nil {
+		t.Error(err)
+	}
+	got = strings.Join(fields, "|")
+	exp = "a long|d jsonmap|e jsonmap{x string,y long}|f jsonmap{z|l float,...}"
+	if got != exp {
+		t.Error("parseFieldList error")
+	}
+	schemaFields, err = parseSchemaFields(fields)
+	if err != nil {
+		t.Error(err)
+	}
+	expectFiled = field{
+		typeChange: map[string]DataType{
+			"z": "float",
+			"l": "float",
+		},
+		allin: true,
+	}
+	for _, schema := range schemaFields {
+		if schema.name == "f" {
+			assert.EqualValues(t, expectFiled.typeChange, schema.typeChange)
+			assert.EqualValues(t, expectFiled.allin, schema.allin)
+		}
 	}
 }
 
@@ -567,4 +616,24 @@ func TestCsvlastempty(t *testing.T) {
 	}
 	assert.NoError(t, err)
 	assert.Equal(t, []Data{{"logType": "a", "a": int64(1), "b": 1.2, "c": ""}}, datas)
+}
+
+func Test_spitFields(t *testing.T) {
+	actual := splitFields("a string")
+	assert.EqualValues(t, []string{"a string"}, actual)
+
+	actual = splitFields("a|b string")
+	assert.EqualValues(t, []string{"a string", "b string"}, actual)
+
+	actual = splitFields("a | b string")
+	assert.EqualValues(t, []string{"a string", "b string"}, actual)
+
+	actual = splitFields("a_b string")
+	assert.EqualValues(t, []string{"a_b string"}, actual)
+
+	actual = splitFields("a_b")
+	assert.EqualValues(t, []string{"a_b"}, actual)
+
+	actual = splitFields("method|method2 jsonmap{a | c string,b|d float}")
+	assert.EqualValues(t, []string{"method jsonmap{a | c string,b|d float}", "method2 jsonmap{a | c string,b|d float}"}, actual)
 }
