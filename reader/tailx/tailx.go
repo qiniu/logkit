@@ -327,6 +327,7 @@ func (ar *ActiveReader) Close() error {
 			log.Debugf("Runner[%s] ActiveReader %s was closed", ar.runnerName, ar.originpath)
 		}
 	}()
+	ar.SyncMeta()
 	brCloseErr := ar.br.Close()
 	if err := ar.Stop(); err != nil {
 		return brCloseErr
@@ -680,6 +681,10 @@ func (r *Reader) statLogPath() {
 		}
 		newaddsPath = append(newaddsPath, rp)
 		r.armapmux.Lock()
+		if _, ok := r.fileReaders[rp]; ok {
+			r.armapmux.Unlock()
+			continue
+		}
 		if !r.hasStopped() && !r.isStopping() {
 			if err = r.meta.AddSubMeta(rp, ar.br.Meta); err != nil {
 				if !IsSelfRunner(r.meta.RunnerName) {

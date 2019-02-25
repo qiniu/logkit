@@ -24,6 +24,8 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var ErrAlreadyExist = errors.New("runner already exist")
+
 type dirReader struct {
 	status        int32 // Note: 原子操作
 	inactive      int32 // Note: 原子操作，当 inactive>0 时才会被 expire 回收
@@ -181,6 +183,11 @@ func HasDirExpired(dir string, expire time.Duration) bool {
 }
 
 func (dr *dirReader) HasExpired(expire time.Duration) bool {
+	// 如果过期时间为 0，则永不过期
+	if expire.Nanoseconds() == 0 {
+		return false
+	}
+
 	if dr.br.ReadDone() {
 		//对于读完的直接认为过期，因为不会追加新数据
 		return true
@@ -206,6 +213,7 @@ func (dr *dirReader) SyncMeta() string {
 
 func (dr *dirReader) Close() error {
 	defer log.Warnf("Runner[%v] log path[%v] reader has closed", dr.runnerName, dr.originalPath)
+	dr.SyncMeta()
 	err := dr.br.Close()
 	if atomic.CompareAndSwapInt32(&dr.status, StatusRunning, StatusStopping) {
 		log.Warnf("Runner[%v] log path[%v] reader is closing", dr.runnerName, dr.originalPath)
@@ -338,6 +346,11 @@ func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool) (*dir
 	drs.lock.Lock()
 	defer drs.lock.Unlock()
 
+	//double check
+	if _, ok := drs.readers[opts.LogPath]; ok {
+		return nil, ErrAlreadyExist
+	}
+
 	dr.readcache = drs.cachedLines[opts.LogPath]
 	opts.Meta.AddSubMeta(opts.LogPath, subMeta)
 	drs.readers[opts.LogPath] = dr
@@ -380,10 +393,9 @@ func (drs *dirReaders) checkExpiredDirs() {
 }
 
 func (drs *dirReaders) getReaders() []*dirReader {
+	readers := make([]*dirReader, 0, drs.Num())
 	drs.lock.RLock()
 	defer drs.lock.RUnlock()
-
-	readers := make([]*dirReader, 0, drs.Num())
 	for _, dr := range drs.readers {
 		readers = append(readers, dr)
 	}

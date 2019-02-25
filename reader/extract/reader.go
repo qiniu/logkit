@@ -214,7 +214,6 @@ func (t *Tar) next() (err error) {
 	defer t.sLock.Unlock()
 	t.source = t.header.Name
 	t.totalSize += t.header.Size
-	log.Println("XXXXX next called", t.source, t.header.Size)
 	return nil
 }
 
@@ -243,7 +242,6 @@ func (t *Tar) Read(p []byte) (n int, err error) {
 			}
 			//如果已经EOF，但是上次还读到了，先返回上次的结果
 			if n > 0 {
-				log.Println("read ", string(p), n)
 				return n, nil
 			}
 			continue
@@ -251,7 +249,6 @@ func (t *Tar) Read(p []byte) (n int, err error) {
 		if err != nil {
 			return n, err
 		}
-		log.Println("read ", string(p), n)
 		break
 	}
 	return n, nil

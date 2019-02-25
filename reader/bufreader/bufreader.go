@@ -55,7 +55,7 @@ type LastSync struct {
 type BufReader struct {
 	stopped       int32
 	buf           []byte
-	mutiLineCache []string
+	mutiLineCache *LineCache
 	rd            reader.FileReader // reader provided by the client
 	r, w          int               // buf read and write positions
 	err           error
@@ -136,6 +136,7 @@ func NewReaderSize(rd reader.FileReader, meta *reader.Meta, size int) (*BufReade
 	r := new(BufReader)
 	r.stopped = 0
 	r.reset(make([]byte, size), rd)
+	r.mutiLineCache = NewLineCache()
 
 	r.Meta = meta
 	encodingWay := r.Meta.GetEncodingWay()
@@ -163,7 +164,7 @@ func NewReaderSize(rd reader.FileReader, meta *reader.Meta, size int) (*BufReade
 		}
 	}
 	if len(linesbytes) > 0 {
-		r.mutiLineCache = append(r.mutiLineCache, string(linesbytes))
+		r.mutiLineCache.Append(string(linesbytes))
 	}
 	return r, nil
 }
@@ -183,7 +184,7 @@ func (b *BufReader) reset(buf []byte, r reader.FileReader) {
 		rd:            r,
 		lastByte:      -1,
 		lastRuneSize:  -1,
-		mutiLineCache: make([]string, 0, 16),
+		mutiLineCache: NewLineCache(),
 		lastSync:      LastSync{},
 		mux:           sync.Mutex{},
 		statsLock:     sync.RWMutex{},
@@ -404,24 +405,24 @@ func (b *BufReader) ReadPattern() (string, error) {
 		line, err := b.ReadString('\n')
 		//读取到line的情况
 		if len(line) > 0 {
-			if len(b.mutiLineCache) <= 0 {
-				b.mutiLineCache = []string{line}
+			if b.mutiLineCache.Size() <= 0 {
+				b.mutiLineCache.Set([]string{line})
 				continue
 			}
 			//匹配行首，成功则返回之前的cache，否则加入到cache，返回空串
 			if b.multiLineRegexp.Match([]byte(line)) {
 				tmp := line
-				line = string(b.FormMutiLine())
-				b.mutiLineCache = make([]string, 0, 16)
-				b.mutiLineCache = append(b.mutiLineCache, tmp)
+				line = string(b.mutiLineCache.Combine())
+				b.mutiLineCache.Set(make([]string, 0, 16))
+				b.mutiLineCache.Append(tmp)
 				return line, err
 			}
-			b.mutiLineCache = append(b.mutiLineCache, line)
+			b.mutiLineCache.Append(line)
 			maxTimes = 0
 		} else { //读取不到日志
 			if err != nil {
-				line = string(b.FormMutiLine())
-				b.mutiLineCache = make([]string, 0, 16)
+				line = string(b.mutiLineCache.Combine())
+				b.mutiLineCache.Set(make([]string, 0, 16))
 				return line, err
 			}
 			maxTimes++
@@ -432,36 +433,16 @@ func (b *BufReader) ReadPattern() (string, error) {
 			}
 		}
 		//对于读取到了Cache的情况，继续循环，直到超过最大限制
-		if b.calcMutiLineCache() > MaxHeadPatternBufferSize {
-			line = string(b.FormMutiLine())
-			b.mutiLineCache = make([]string, 0, 16)
+		if b.mutiLineCache.TotalLen() > MaxHeadPatternBufferSize {
+			line = string(b.mutiLineCache.Combine())
+			b.mutiLineCache.Set(make([]string, 0, 16))
 			return line, err
 		}
 	}
 }
 
 func (b *BufReader) FormMutiLine() []byte {
-	if len(b.mutiLineCache) <= 0 {
-		return make([]byte, 0)
-	}
-	n := 0
-	for i := 0; i < len(b.mutiLineCache); i++ {
-		n += len(b.mutiLineCache[i])
-	}
-
-	xb := make([]byte, n)
-	bp := copy(xb, b.mutiLineCache[0])
-	for _, s := range b.mutiLineCache[1:] {
-		bp += copy(xb[bp:], s)
-	}
-	return xb
-}
-
-func (b *BufReader) calcMutiLineCache() (ret int) {
-	for _, v := range b.mutiLineCache {
-		ret += len(v)
-	}
-	return
+	return b.mutiLineCache.Combine()
 }
 
 //ReadLine returns a string line as a normal Reader
@@ -561,7 +542,7 @@ func (b *BufReader) ReadDone() bool {
 func (b *BufReader) SyncMeta() {
 	b.mux.Lock()
 	defer b.mux.Unlock()
-	linecache := string(b.FormMutiLine())
+	linecache := string(b.mutiLineCache.Combine())
 	//把linecache也缓存
 	if b.lastSync.cache != linecache || b.lastSync.buf != string(b.buf) || b.r != b.lastSync.r || b.w != b.lastSync.w {
 		log.Debugf("Runner[%v] %v sync meta started, linecache [%v] buf [%v] （%v %v）", b.Meta.RunnerName, b.Name(), linecache, string(b.buf), b.r, b.w)

@@ -9,7 +9,7 @@ import (
 )
 
 func TestTarGz(t *testing.T) {
-	rd, err := NewReader(&reader.Meta{}, "testdata/456.tar.gz")
+	rd, err := NewReader(&reader.Meta{}, "testdata/456.tar.gz", Opts{})
 	assert.NoError(t, err)
 
 	assert.Equal(t, "targz:testdata/456.tar.gz", rd.Name())
@@ -20,7 +20,7 @@ func TestTarGz(t *testing.T) {
 	assert.Equal(t, "456/c.txt", rd.Source())
 	assert.NoError(t, rd.Close())
 
-	rd, err = NewReader(&reader.Meta{}, "testdata/b.txt.tar.gz")
+	rd, err = NewReader(&reader.Meta{}, "testdata/b.txt.tar.gz", Opts{})
 	assert.NoError(t, err)
 
 	assert.Equal(t, "targz:testdata/b.txt.tar.gz", rd.Name())
@@ -33,7 +33,7 @@ func TestTarGz(t *testing.T) {
 }
 
 func TestTar(t *testing.T) {
-	rd, err := NewReader(&reader.Meta{}, "testdata/123.tar")
+	rd, err := NewReader(&reader.Meta{}, "testdata/123.tar", Opts{})
 	assert.NoError(t, err)
 
 	assert.Equal(t, "tar:testdata/123.tar", rd.Name())
@@ -45,7 +45,7 @@ func TestTar(t *testing.T) {
 }
 
 func TestGz(t *testing.T) {
-	rd, err := NewReader(&reader.Meta{}, "testdata/a.txt.gz")
+	rd, err := NewReader(&reader.Meta{}, "testdata/a.txt.gz", Opts{})
 	assert.NoError(t, err)
 
 	assert.Equal(t, "gz:testdata/a.txt.gz", rd.Name())
@@ -58,7 +58,7 @@ func TestGz(t *testing.T) {
 }
 
 func TestZip(t *testing.T) {
-	rd, err := NewReader(&reader.Meta{}, "testdata/a.zip")
+	rd, err := NewReader(&reader.Meta{}, "testdata/a.zip", Opts{})
 	assert.NoError(t, err)
 
 	assert.Equal(t, "zip:testdata/a.zip", rd.Name())
