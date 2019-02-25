@@ -45,7 +45,6 @@ var (
 	procSetConsoleTextAttribute    = modkernel32.NewProc("SetConsoleTextAttribute")
 	procGetDiskFreeSpaceEx         = modkernel32.NewProc("GetDiskFreeSpaceExW")
 	procGetProcessTimes            = modkernel32.NewProc("GetProcessTimes")
-	procGetTickCount64             = modkernel32.NewProc("GetTickCount64")
 )
 
 func GetModuleHandle(modulename string) HINSTANCE {
@@ -314,9 +313,4 @@ func GetDiskFreeSpaceEx(dirName string) (r bool,
 		uintptr(unsafe.Pointer(&totalNumberOfFreeBytes)))
 	return ret != 0,
 		freeBytesAvailable, totalNumberOfBytes, totalNumberOfFreeBytes
-}
-
-func GetTickCount64() uint64 {
-	ret, _, _ := syscall.Syscall(procGetTickCount64.Addr(), 0, 0, 0, 0)
-	return uint64(ret)
 }
