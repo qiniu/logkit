@@ -469,7 +469,7 @@ func (r *MssqlReader) sendError(err error) {
 }
 
 func (r *MssqlReader) checkExit(idx int, db *sql.DB) (bool, int64) {
-	if len(r.offsetKey) <= 0 {
+	if idx >= len(r.offsets) || len(r.offsetKey) <= 0 {
 		return true, -1
 	}
 	rawSQL := strings.TrimSuffix(strings.TrimSpace(r.syncSQLs[idx]), ";")

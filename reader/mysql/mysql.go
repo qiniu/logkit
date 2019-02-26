@@ -681,7 +681,7 @@ func (r *MysqlReader) getSQL(idx int, rawSQL string) string {
 }
 
 func (r *MysqlReader) checkExit(idx int, db *sql.DB) (bool, int64) {
-	if len(r.offsetKey) <= 0 {
+	if len(r.offsetKey) <= 0 || idx >= len(r.offsets) {
 		return true, -1
 	}
 	rawSQL := r.syncSQLs[idx]
@@ -971,7 +971,7 @@ func (r *MysqlReader) execReadSql(curDB string, idx int, execSQL string, db *sql
 	if maxOffset > 0 {
 		r.offsets[idx] = maxOffset + 1
 	}
-	if exit {
+	if exit && !r.historyAll {
 		var newOffsetIdx int64
 		exit, newOffsetIdx = r.checkExit(idx, db)
 		if !exit {

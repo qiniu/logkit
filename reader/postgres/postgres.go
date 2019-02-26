@@ -644,7 +644,7 @@ func (r *PostgresReader) getSQL(idx int, rawSQL string) string {
 }
 
 func (r *PostgresReader) checkExit(idx int, db *sql.DB) (bool, int64) {
-	if len(r.offsetKey) <= 0 && len(r.timestampKey) <= 0 {
+	if idx >= len(r.offsets) || (len(r.offsetKey) <= 0 && len(r.timestampKey) <= 0) {
 		return true, -1
 	}
 	rawSQL := r.syncSQLs[idx]
