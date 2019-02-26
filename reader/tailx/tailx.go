@@ -123,7 +123,7 @@ func NewActiveReader(originPath, realPath, whence, inode string, notFirstTime bo
 	}
 	var fr reader.FileReader
 	if reader.CompressedFile(realPath) {
-		fr, err = extract.NewReader(subMeta, realPath)
+		fr, err = extract.NewReader(subMeta, realPath, extract.Opts{IgnoreHidden: true})
 		if err != nil {
 			return
 		}
@@ -327,6 +327,7 @@ func (ar *ActiveReader) Close() error {
 			log.Debugf("Runner[%s] ActiveReader %s was closed", ar.runnerName, ar.originpath)
 		}
 	}()
+	ar.SyncMeta()
 	brCloseErr := ar.br.Close()
 	if err := ar.Stop(); err != nil {
 		return brCloseErr
@@ -374,13 +375,14 @@ func (ar *ActiveReader) SyncMeta() string {
 	return ar.readcache
 }
 
+func (ar *ActiveReader) ReadDone() bool {
+	return ar.br.ReadDone()
+}
+
 func (ar *ActiveReader) expired(expire time.Duration) bool {
 	// 如果过期时间为 0，则永不过期
 	if expire.Nanoseconds() == 0 {
 		return false
-	}
-	if ar.br.ReadDone() {
-		return true
 	}
 
 	fi, err := os.Stat(ar.realpath)
@@ -544,7 +546,7 @@ func (r *Reader) checkExpiredFiles() {
 
 	var paths []string
 	for path, ar := range r.fileReaders {
-		if ar.expired(r.expire) {
+		if ar.expired(r.expire) || (r.expireDelete && ar.ReadDone()) {
 			ar.Close()
 			delete(r.fileReaders, path)
 			delete(r.cacheMap, path)
@@ -680,6 +682,10 @@ func (r *Reader) statLogPath() {
 		}
 		newaddsPath = append(newaddsPath, rp)
 		r.armapmux.Lock()
+		if _, ok := r.fileReaders[rp]; ok {
+			r.armapmux.Unlock()
+			continue
+		}
 		if !r.hasStopped() && !r.isStopping() {
 			if err = r.meta.AddSubMeta(rp, ar.br.Meta); err != nil {
 				if !IsSelfRunner(r.meta.RunnerName) {

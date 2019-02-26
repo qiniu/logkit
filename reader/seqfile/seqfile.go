@@ -22,8 +22,6 @@ import (
 	utilsos "github.com/qiniu/logkit/utils/os"
 )
 
-const deafultFilePerm = 0600
-
 // SeqFile 按最终修改时间依次读取文件的Reader类型
 type SeqFile struct {
 	meta *reader.Meta
@@ -162,21 +160,13 @@ func NewSeqFile(meta *reader.Meta, path string, ignoreHidden, newFileNewLine boo
 func (sf *SeqFile) getIgnoreCondition() func(os.FileInfo) bool {
 	return func(fi os.FileInfo) bool {
 
-		if sf.ignoreHidden {
-			if strings.HasPrefix(fi.Name(), ".") {
-				return false
-			}
-		}
-		for _, s := range sf.ignoreFileSuffix {
-			if strings.HasSuffix(fi.Name(), s) {
-				return false
-			}
-		}
-		match, err := filepath.Match(sf.validFilePattern, fi.Name())
-		if err != nil {
-			log.Errorf("when read dir %s, get not valid file pattern. Error->%v", sf.dir, err)
+		if reader.IgnoreHidden(fi.Name(), sf.ignoreHidden) {
 			return false
 		}
+		if reader.IgnoreFileSuffixes(fi.Name(), sf.ignoreFileSuffix) {
+			return false
+		}
+		match := reader.ValidFileRegex(fi.Name(), sf.validFilePattern)
 		if !match {
 			log.Debugf(" when read dir %s, get no valid file in pattern %v", sf.dir, sf.validFilePattern)
 		}
@@ -275,11 +265,7 @@ func (sf *SeqFile) reopenForESTALE() error {
 	return nil
 }
 
-type NewLineBytesRecorder interface {
-	NewLineBytesIndex() []reader.SourceIndex
-}
-
-func (sf *SeqFile) NewLineBytesIndex() []reader.SourceIndex {
+func (sf *SeqFile) NewSourceIndex() []reader.SourceIndex {
 	return sf.newLineBytesSourceIndex
 }
 
@@ -696,3 +682,8 @@ func deleteNotExist(dir string, expireMap map[string]int64) {
 		delete(expireMap, inodeFile)
 	}
 }
+
+var (
+	_ LineSkipper              = new(SeqFile)
+	_ reader.NewSourceRecorder = new(SeqFile)
+)

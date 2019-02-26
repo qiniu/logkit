@@ -1006,10 +1006,10 @@ func readerExpireDeleteTarTest(t *testing.T) {
 	defer os.RemoveAll(dirname)
 
 	createDirWithName(dir1)
-	createFileWithContent(dir1file1, "abc123\nabc124\nabc125\nabc126\nabc127\n")
+	createFileWithContent(dir1file1, "abc111\nabc124\nabc125\nabc126\nabc127\n")
 	createDirWithName(dir2)
 	createFileWithContent(dir2file1, "abc\nx\nabc\ny\nabc\nz\n")
-	createFileWithContent(dir1file2, "abc123\nabc124\nabc125\nabc126\nabc127\n")
+	createFileWithContent(dir1file2, "abc122\nabc124\nabc125\nabc126\nabc127\n")
 	err := tarit(dir1, filepath.Join(dirname, "logs"))
 	assert.NoError(t, err)
 	err = tarit(dir2, filepath.Join(dirname, "logs"))
@@ -1018,7 +1018,8 @@ func readerExpireDeleteTarTest(t *testing.T) {
 	os.RemoveAll(dir2)
 
 	expectResults := map[string]int{
-		"abc123\n": 2,
+		"abc111\n": 1,
+		"abc122\n": 1,
 		"abc124\n": 2,
 		"abc125\n": 2,
 		"abc126\n": 2,
@@ -1061,6 +1062,12 @@ func readerExpireDeleteTarTest(t *testing.T) {
 		data, err := dr.ReadLine()
 		if data != "" {
 			t.Log("Data:", data, maxNum, dr.Source())
+			if data == "abc111\n" {
+				assert.Equal(t, "dir1/file1.log", dr.Source())
+			}
+			if data == "abc122\n" {
+				assert.Equal(t, "dir1/file2.log", dr.Source())
+			}
 			actualResults[data]++
 			maxNum++
 		} else {
@@ -1073,7 +1080,7 @@ func readerExpireDeleteTarTest(t *testing.T) {
 			break
 		}
 	}
-
+	t.Log("maxNum ", maxNum, "emptyNum", emptyNum)
 	assert.EqualValues(t, expectResults, actualResults)
 	assert.Equal(t, StatsInfo{}, dr.Status())
 	time.Sleep(5 * time.Second)

@@ -24,6 +24,8 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var ErrAlreadyExist = errors.New("runner already exist")
+
 type dirReader struct {
 	status        int32 // Note: 原子操作
 	inactive      int32 // Note: 原子操作，当 inactive>0 时才会被 expire 回收
@@ -180,11 +182,17 @@ func HasDirExpired(dir string, expire time.Duration) bool {
 	return latestModTime.Add(expire).Before(time.Now())
 }
 
+//对于读完的直接认为过期，因为不会追加新数据
+func (dr *dirReader) ReadDone() bool {
+	return dr.br.ReadDone()
+}
+
 func (dr *dirReader) HasExpired(expire time.Duration) bool {
-	if dr.br.ReadDone() {
-		//对于读完的直接认为过期，因为不会追加新数据
-		return true
+	// 如果过期时间为 0，则永不过期
+	if expire.Nanoseconds() == 0 {
+		return false
 	}
+
 	// 在非 inactive 的情况下，数据尚未读完，有必要先继续处理
 	return atomic.LoadInt32(&dr.inactive) > 0 && HasDirExpired(dr.logPath, expire)
 }
@@ -206,6 +214,7 @@ func (dr *dirReader) SyncMeta() string {
 
 func (dr *dirReader) Close() error {
 	defer log.Warnf("Runner[%v] log path[%v] reader has closed", dr.runnerName, dr.originalPath)
+	dr.SyncMeta()
 	err := dr.br.Close()
 	if atomic.CompareAndSwapInt32(&dr.status, StatusRunning, StatusStopping) {
 		log.Warnf("Runner[%v] log path[%v] reader is closing", dr.runnerName, dr.originalPath)
@@ -304,7 +313,7 @@ func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool) (*dir
 	}
 	var fri reader.FileReader
 	if reader.CompressedFile(opts.LogPath) {
-		fri, err = extract.NewReader(subMeta, opts.LogPath)
+		fri, err = extract.NewReader(subMeta, opts.LogPath, extract.Opts{IgnoreHidden: opts.IgnoreHidden, NewFileNewLine: opts.NewFileNewLine, IgnoreFileSuffixes: opts.IgnoreFileSuffixes, ValidFilesRegex: opts.ValidFilesRegex})
 		if err != nil {
 			return nil, fmt.Errorf("new extract reader: %v", err)
 		}
@@ -338,6 +347,11 @@ func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool) (*dir
 	drs.lock.Lock()
 	defer drs.lock.Unlock()
 
+	//double check
+	if _, ok := drs.readers[opts.LogPath]; ok {
+		return nil, ErrAlreadyExist
+	}
+
 	dr.readcache = drs.cachedLines[opts.LogPath]
 	opts.Meta.AddSubMeta(opts.LogPath, subMeta)
 	drs.readers[opts.LogPath] = dr
@@ -358,7 +372,7 @@ func (drs *dirReaders) checkExpiredDirs() {
 
 	var expiredDirs []string
 	for logPath, dr := range drs.readers {
-		if dr.HasExpired(drs.expire) {
+		if dr.HasExpired(drs.expire) || (drs.expireDelete && dr.ReadDone()) {
 			if err := dr.Close(); err != nil {
 				log.Errorf("Failed to close log path[%v] reader: %v", logPath, err)
 			}
@@ -380,10 +394,9 @@ func (drs *dirReaders) checkExpiredDirs() {
 }
 
 func (drs *dirReaders) getReaders() []*dirReader {
+	readers := make([]*dirReader, 0, drs.Num())
 	drs.lock.RLock()
 	defer drs.lock.RUnlock()
-
-	readers := make([]*dirReader, 0, drs.Num())
 	for _, dr := range drs.readers {
 		readers = append(readers, dr)
 	}

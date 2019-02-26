@@ -14,6 +14,7 @@ import (
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/reader/bufreader"
 	"github.com/qiniu/logkit/reader/config"
+	"github.com/qiniu/logkit/reader/dirx"
 	"github.com/qiniu/logkit/reader/tailx"
 )
 
@@ -39,6 +40,9 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (r reader.Reader, err error
 		return bufreader.NewFileDirReader(meta, conf)
 	case config.ModeFile:
 		return bufreader.NewSingleFileReader(meta, conf)
+	case config.ModeDirx:
+		conf[config.KeyLogPath] = logpath
+		return dirx.NewReader(meta, conf)
 	default:
 		err = errors.New("can not find property mode for this path " + logpath)
 	}
@@ -51,6 +55,15 @@ func matchMode(logpath string) (path, mode string, err error) {
 		logpath = filepath.Dir(logpath)
 	}
 	path = logpath
+	if strings.HasSuffix(logpath, ".tar.gz") || strings.HasSuffix(logpath, ".tar") || strings.HasSuffix(logpath, ".zip") {
+		mode = config.ModeDirx
+		return
+	}
+	if strings.HasSuffix(logpath, ".gz") {
+		mode = config.ModeTailx
+		return
+	}
+
 	//path with * matching tailx mode
 	matchTailx := strings.Contains(logpath, "*")
 	if matchTailx == true {

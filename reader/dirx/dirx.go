@@ -302,6 +302,9 @@ func (r *Reader) statLogPath() {
 			expireMap:          r.expireMap,
 		}, r.notFirstTime)
 		if err != nil {
+			if err == ErrAlreadyExist {
+				continue
+			}
 			err = fmt.Errorf("create new reader for log path %q failed: %v", logPath, err)
 			r.sendError(err)
 			log.Errorf("Runner[%v] %v, ignored this path", r.meta.RunnerName, err)

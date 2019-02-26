@@ -149,3 +149,7 @@ type SourceIndex struct {
 	Source string
 	Index  int
 }
+
+type NewSourceRecorder interface {
+	NewSourceIndex() []SourceIndex
+}
