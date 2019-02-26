@@ -182,16 +182,17 @@ func HasDirExpired(dir string, expire time.Duration) bool {
 	return latestModTime.Add(expire).Before(time.Now())
 }
 
+//对于读完的直接认为过期，因为不会追加新数据
+func (dr *dirReader) ReadDone() bool {
+	return dr.br.ReadDone()
+}
+
 func (dr *dirReader) HasExpired(expire time.Duration) bool {
 	// 如果过期时间为 0，则永不过期
 	if expire.Nanoseconds() == 0 {
 		return false
 	}
 
-	if dr.br.ReadDone() {
-		//对于读完的直接认为过期，因为不会追加新数据
-		return true
-	}
 	// 在非 inactive 的情况下，数据尚未读完，有必要先继续处理
 	return atomic.LoadInt32(&dr.inactive) > 0 && HasDirExpired(dr.logPath, expire)
 }
@@ -312,7 +313,7 @@ func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool) (*dir
 	}
 	var fri reader.FileReader
 	if reader.CompressedFile(opts.LogPath) {
-		fri, err = extract.NewReader(subMeta, opts.LogPath, extract.Opts{IgnoreHidden: opts.IgnoreHidden})
+		fri, err = extract.NewReader(subMeta, opts.LogPath, extract.Opts{IgnoreHidden: opts.IgnoreHidden, NewFileNewLine: opts.NewFileNewLine, IgnoreFileSuffixes: opts.IgnoreFileSuffixes, ValidFilesRegex: opts.ValidFilesRegex})
 		if err != nil {
 			return nil, fmt.Errorf("new extract reader: %v", err)
 		}
@@ -371,7 +372,7 @@ func (drs *dirReaders) checkExpiredDirs() {
 
 	var expiredDirs []string
 	for logPath, dr := range drs.readers {
-		if dr.HasExpired(drs.expire) {
+		if dr.HasExpired(drs.expire) || (drs.expireDelete && dr.ReadDone()) {
 			if err := dr.Close(); err != nil {
 				log.Errorf("Failed to close log path[%v] reader: %v", logPath, err)
 			}

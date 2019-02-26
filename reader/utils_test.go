@@ -184,3 +184,32 @@ func TestSetMapValueExistWithPrefix(t *testing.T) {
 	}
 	assert.Equal(t, exp4, data2)
 }
+
+func TestCompressFile(t *testing.T) {
+	assert.Equal(t, true, CompressedFile("abc.gz"))
+	assert.Equal(t, true, CompressedFile("xxx.tar"))
+	assert.Equal(t, true, CompressedFile("as.zip"))
+	assert.Equal(t, true, CompressedFile("123.tar.gz"))
+	assert.Equal(t, false, CompressedFile("abc.taxs"))
+}
+
+func TestIgnoreFileSuffixes(t *testing.T) {
+	suffixes := []string{".swap", ".gz", ".tar"}
+	assert.Equal(t, false, IgnoreFileSuffixes("abc.log", suffixes))
+	assert.Equal(t, true, IgnoreFileSuffixes("abc.tar", suffixes))
+	assert.Equal(t, true, IgnoreFileSuffixes("abc.swap", suffixes))
+}
+
+func TestValidFile(t *testing.T) {
+	assert.Equal(t, true, ValidFileRegex("abc.log", "*.log"))
+	assert.Equal(t, true, ValidFileRegex("abc.1", "abc.[1-9]"))
+	assert.Equal(t, false, ValidFileRegex("abc.1", "abc.[1-9]1"))
+	assert.Equal(t, false, ValidFileRegex("abc.swap", "abc.s[*"))
+	assert.Equal(t, true, ValidFileRegex("abc.swap", "abc.s*"))
+	assert.Equal(t, true, ValidFileRegex("abc.log", ""))
+}
+
+func TestIgnoreHidden(t *testing.T) {
+	assert.Equal(t, true, IgnoreHidden(".log", true))
+	assert.Equal(t, false, IgnoreHidden(".1", false))
+}

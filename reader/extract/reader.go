@@ -27,7 +27,10 @@ type Reader struct {
 }
 
 type Opts struct {
-	IgnoreHidden bool
+	IgnoreHidden       bool
+	NewFileNewLine     bool
+	IgnoreFileSuffixes []string
+	ValidFilesRegex    string
 }
 
 //NewReader 实现对压缩包的读取
@@ -93,6 +96,10 @@ func (r *Reader) Source() string {
 	return r.underlying.Source()
 }
 
+func (r *Reader) NewSourceIndex() []reader.SourceIndex {
+	return r.underlying.NewSourceIndex()
+}
+
 func (r *Reader) Read(p []byte) (n int, err error) {
 	if atomic.LoadInt32(&r.done) > 0 {
 		return 0, io.EOF
@@ -134,6 +141,7 @@ var (
 
 type SourceReader interface {
 	io.ReadCloser
+	reader.NewSourceRecorder
 	Source() string
 	Lag() (rl *LagInfo, err error)
 }
@@ -145,10 +153,11 @@ type Tar struct {
 	path   string
 	opt    Opts
 
-	source    string
-	sLock     *sync.RWMutex
-	totalSize int64
-	curSize   int64
+	sourceIndexes []reader.SourceIndex //新文件被读取时的bytes位置
+	source        string
+	sLock         *sync.RWMutex
+	totalSize     int64
+	curSize       int64
 }
 
 func NewTarGz(path string, opt Opts) (*Tar, error) {
@@ -195,16 +204,6 @@ func NewTar(path string, opt Opts) (*Tar, error) {
 	}, nil
 }
 
-func (t *Tar) ignoreHidden() bool {
-	if !t.opt.IgnoreHidden {
-		return false
-	}
-	if strings.HasPrefix(filepath.Base(t.header.Name), ".") {
-		return true
-	}
-	return false
-}
-
 func (t *Tar) next() (err error) {
 	t.header, err = t.rd.Next()
 	if err != nil {
@@ -223,26 +222,37 @@ func (t *Tar) Read(p []byte) (n int, err error) {
 		defer t.sLock.Unlock()
 		t.curSize += int64(n)
 	}()
+	t.sourceIndexes = []reader.SourceIndex{}
 	for {
-		if t.header == nil || t.ignoreHidden() {
+		var lastSource string
+		if t.header == nil ||
+			reader.IgnoreHidden(t.header.Name, t.opt.IgnoreHidden) ||
+			reader.IgnoreFileSuffixes(t.header.Name, t.opt.IgnoreFileSuffixes) ||
+			!reader.ValidFileRegex(filepath.Base(t.header.Name), t.opt.ValidFilesRegex) {
+			if t.header != nil {
+				lastSource = t.header.Name
+				log.Infof("ignore  %s in path %s", t.header.Name, t.path)
+			}
 			err = t.next()
 			if err != nil {
 				return 0, err
 			}
 			continue
 		}
+		t.sourceIndexes = append(t.sourceIndexes, reader.SourceIndex{Source: lastSource})
+		log.Infof("start to read %s in path %s", t.header.Name, t.path)
 		break
 	}
 	for {
 		n, err = t.rd.Read(p)
 		if err == io.EOF {
-			err = t.next()
-			if err != nil {
-				return n, err
-			}
 			//如果已经EOF，但是上次还读到了，先返回上次的结果
 			if n > 0 {
 				return n, nil
+			}
+			err = t.next()
+			if err != nil {
+				return n, err
 			}
 			continue
 		}
@@ -262,6 +272,10 @@ func (t *Tar) Source() string {
 	t.sLock.RLock()
 	defer t.sLock.RUnlock()
 	return t.source
+}
+
+func (t *Tar) NewSourceIndex() []reader.SourceIndex {
+	return t.sourceIndexes
 }
 
 func (t *Tar) Lag() (rl *LagInfo, err error) {
@@ -331,15 +345,21 @@ func (t *GZ) Lag() (rl *LagInfo, err error) {
 	return &LagInfo{SizeUnit: "byte"}, nil
 }
 
+func (t *GZ) NewSourceIndex() []reader.SourceIndex {
+	return nil
+}
+
 type ZIP struct {
 	rd   *zip.ReadCloser
 	f    io.ReadCloser
+	zipf *zip.File
 	path string
 	idx  int
 	opt  Opts
 
-	source string
-	sLock  *sync.RWMutex
+	source        string
+	sourceIndexes []reader.SourceIndex
+	sLock         *sync.RWMutex
 }
 
 func NewZIP(path string, opt Opts) (*ZIP, error) {
@@ -364,15 +384,14 @@ func (t *ZIP) next() (err error) {
 		t.f.Close()
 	}
 	if t.idx >= 0 && t.idx < len(t.rd.File) {
-		zipf := t.rd.File[t.idx]
-		t.f, err = zipf.Open()
+		t.zipf = t.rd.File[t.idx]
+		t.f, err = t.zipf.Open()
 		if err != nil {
 			return err
 		}
 		t.sLock.Lock()
-
-		t.source = zipf.Name
-		defer t.sLock.Unlock()
+		t.source = t.zipf.Name
+		t.sLock.Unlock()
 	} else {
 		return io.EOF
 	}
@@ -381,37 +400,37 @@ func (t *ZIP) next() (err error) {
 	return nil
 }
 
-func (t *ZIP) ignoreHidden() bool {
-	if !t.opt.IgnoreHidden {
-		return false
-	}
-	if strings.HasPrefix(filepath.Base(t.source), ".") {
-		return true
-	}
-	return false
-}
-
 func (t *ZIP) Read(p []byte) (n int, err error) {
 	for {
-		if t.f == nil || t.ignoreHidden() {
+		var lastSource string
+		if t.f == nil ||
+			reader.IgnoreHidden(t.zipf.Name, t.opt.IgnoreHidden) ||
+			reader.IgnoreFileSuffixes(t.zipf.Name, t.opt.IgnoreFileSuffixes) ||
+			!reader.ValidFileRegex(filepath.Base(t.zipf.Name), t.opt.ValidFilesRegex) {
+			if t.f != nil {
+				lastSource = t.zipf.Name
+				log.Infof("ignore  %s in path %s", t.zipf.Name, t.path)
+			}
 			err = t.next()
 			if err != nil {
 				return 0, err
 			}
 			continue
 		}
+		t.sourceIndexes = append(t.sourceIndexes, reader.SourceIndex{Source: lastSource})
+		log.Infof("start to read %s in path %s", t.zipf.Name, t.path)
 		break
 	}
 	for {
 		n, err = t.f.Read(p)
 		if err == io.EOF {
-			err = t.next()
-			if err != nil {
-				return 0, err
-			}
 			//如果已经EOF，但是上次还读到了，先返回上次的结果
 			if n > 0 {
 				return n, nil
+			}
+			err = t.next()
+			if err != nil {
+				return 0, err
 			}
 			continue
 		}
@@ -434,6 +453,10 @@ func (t *ZIP) Source() string {
 	t.sLock.RLock()
 	defer t.sLock.RUnlock()
 	return t.source
+}
+
+func (t *ZIP) NewSourceIndex() []reader.SourceIndex {
+	return t.sourceIndexes
 }
 
 func (t *ZIP) Lag() (rl *LagInfo, err error) {

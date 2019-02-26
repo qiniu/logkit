@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/json-iterator/go"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/reader/config"
 	"github.com/qiniu/logkit/utils/models"
 )
@@ -142,6 +144,40 @@ func getTags(tagFile string) (tags map[string]interface{}, err error) {
 
 func CompressedFile(path string) bool {
 	if strings.HasSuffix(path, ".gz") || strings.HasSuffix(path, ".tar") || strings.HasSuffix(path, ".zip") {
+		return true
+	}
+	return false
+}
+
+// IgnoreFileSuffixes return true if file has suffix of one of the suffixes
+func IgnoreFileSuffixes(file string, suffixes []string) bool {
+	for _, s := range suffixes {
+		if strings.HasSuffix(file, s) {
+			return true
+		}
+	}
+	return false
+}
+
+// ValidFileRegex return true if file matches with validFilePattern
+func ValidFileRegex(file, validFilePattern string) bool {
+	if validFilePattern == "" {
+		return true
+	}
+	match, err := filepath.Match(validFilePattern, file)
+	if err != nil {
+		log.Debugf("Pattern %s is invalid to match file %s", validFilePattern, file)
+		return false
+	}
+	return match
+}
+
+// IgnoreHidden return ture if file has dot(.) which presents ignore files in *nix system
+func IgnoreHidden(file string, ignoreHidden bool) bool {
+	if !ignoreHidden {
+		return false
+	}
+	if strings.HasPrefix(filepath.Base(file), ".") {
 		return true
 	}
 	return false

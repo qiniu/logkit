@@ -243,18 +243,24 @@ func (b *BufReader) fill() {
 			panic(errNegativeRead)
 		}
 		if b.latestSource != b.rd.Source() {
-			//这个情况表示文件的数据源出现了变化，在buf中已经出现了2个数据源的数据，要定位是哪个位置的数据出现的分隔
-			if rc, ok := b.rd.(seqfile.NewLineBytesRecorder); ok {
-				SIdx := rc.NewLineBytesIndex()
+			//这个情况表示文件的数据源出现了变化，在buf中已经出现了至少2个数据源的数据，要定位是哪个位置的数据出现的分隔
+			if rc, ok := b.rd.(reader.NewSourceRecorder); ok {
+				SIdx := rc.NewSourceIndex()
 				for _, v := range SIdx {
-					// 从 NewLineBytesIndex 函数中返回的index值就是本次读取的批次中上一个DataSource的数据量，加上b.w就是上个DataSource的整体数据
+					// 从 NewSourceIndex 函数中返回的index值就是本次读取的批次中上一个DataSource的数据量，加上b.w就是上个DataSource的整体数据
 					b.lastRdSource = append(b.lastRdSource, reader.SourceIndex{
 						Source: v.Source,
 						Index:  b.w + v.Index,
 					})
 				}
-				b.latestSource = b.rd.Source()
+			} else {
+				//如果没实现这个接口，那么就认为到上次读到的为止都是前一次source的文件
+				b.lastRdSource = append(b.lastRdSource, reader.SourceIndex{
+					Source: b.latestSource,
+					Index:  b.w,
+				})
 			}
+			b.latestSource = b.rd.Source()
 		}
 
 		b.w += n
