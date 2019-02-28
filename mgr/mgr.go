@@ -156,6 +156,10 @@ func NewCustomManager(conf ManagerConfig, rr *reader.Registry, pr *parser.Regist
 	return m, nil
 }
 
+func (m *Manager) UpdateReaderRegister() {
+	m.rregistry = reader.NewRegistry()
+}
+
 func (m *Manager) Stop() error {
 	m.runnerLock.Lock()
 	for _, runner := range m.runners {
