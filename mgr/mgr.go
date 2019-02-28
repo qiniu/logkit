@@ -156,7 +156,7 @@ func NewCustomManager(conf ManagerConfig, rr *reader.Registry, pr *parser.Regist
 	return m, nil
 }
 
-func (m *Manager)UpdateReaderRegister() {
+func (m *Manager) UpdateReaderRegister() {
 	m.rregistry = reader.NewRegistry()
 }
 
