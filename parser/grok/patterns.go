@@ -1,6 +1,6 @@
-//!!! Notice This is auto generated file, DO NOT EDIT IT!!!
+//!!! Notice This is auto generated file, DO NOT EDIT IT!!! 
 
-package grok
+package grok 
 
 const DEFAULT_PATTERNS = `S3_REQUEST_LINE (?:%{WORD:verb} %{NOTSPACE:request}(?: HTTP/%{NUMBER:httpversion})?|%{DATA:rawrequest})
 
@@ -137,7 +137,9 @@ CISCOFW713172 Group = %{GREEDYDATA:group}, IP = %{IP:src_ip}, Automatic NAT Dete
 CISCOFW733100 \[\s*%{DATA:drop_type}\s*\] drop %{DATA:drop_rate_id} exceeded. Current burst rate is %{INT:drop_rate_current_burst} per second, max configured rate is %{INT:drop_rate_max_burst}; Current average rate is %{INT:drop_rate_current_avg} per second, max configured rate is %{INT:drop_rate_max_avg}; Cumulative total count is %{INT:drop_total_count}
 
 SHOREWALL (%{SYSLOGTIMESTAMP:timestamp}) (%{WORD:nf_host}) kernel:.*Shorewall:(%{WORD:nf_action1})?:(%{WORD:nf_action2})?.*IN=(%{USERNAME:nf_in_interface})?.*(OUT= *MAC=(%{COMMONMAC:nf_dst_mac}):(%{COMMONMAC:nf_src_mac})?|OUT=%{USERNAME:nf_out_interface}).*SRC=(%{IPV4:nf_src_ip}).*DST=(%{IPV4:nf_dst_ip}).*LEN=(%{WORD:nf_len}).?*TOS=(%{WORD:nf_tos}).?*PREC=(%{WORD:nf_prec}).?*TTL=(%{INT:nf_ttl}).?*ID=(%{INT:nf_id}).?*PROTO=(%{WORD:nf_protocol}).?*SPT=(%{INT:nf_src_port}?.*DPT=%{INT:nf_dst_port}?.*)
+LOGKITSHOREWALL (%{SYSLOGTIMESTAMP:timestamp}) (%{WORD:nf_host}) kernel:.*Shorewall:(%{WORD:nf_action1})?:(%{WORD:nf_action2})?.*IN=(%{USERNAME:nf_in_interface})?.*(OUT= *MAC=(%{COMMONMAC:nf_dst_mac}):(%{COMMONMAC:nf_src_mac})?|OUT=%{USERNAME:nf_out_interface}).*SRC=(%{IPV4:nf_src_ip}).*DST=(%{IPV4:nf_dst_ip}).*LEN=(%{WORD:nf_len}).*TOS=(%{WORD:nf_tos}).*PREC=(%{WORD:nf_prec}).*TTL=(%{INT:nf_ttl}).*ID=(%{INT:nf_id}).*PROTO=(%{WORD:nf_protocol}).*SPT=(%{INT:nf_src_port}?.*DPT=%{INT:nf_dst_port}?.*)
 SFW2 ((%{SYSLOGTIMESTAMP})|(%{TIMESTAMP_ISO8601}))\s*%{HOSTNAME}\s*kernel\S+\s*%{NAGIOSTIME}\s*SFW2\-INext\-%{NOTSPACE:nf_action}\s*IN=%{USERNAME:nf_in_interface}.*OUT=((\s*%{USERNAME:nf_out_interface})|(\s*))MAC=((%{COMMONMAC:nf_dst_mac}:%{COMMONMAC:nf_src_mac})|(\s*)).*SRC=%{IP:nf_src_ip}\s*DST=%{IP:nf_dst_ip}.*PROTO=%{WORD:nf_protocol}((.*SPT=%{INT:nf_src_port}.*DPT=%{INT:nf_dst_port}.*)|())
+LOGKITSFW2 ((%{SYSLOGTIMESTAMP})|(%{TIMESTAMP_ISO8601}))\s*%{HOSTNAME}\s*kernel\S+\s*(%{NAGIOSTIME})*\s*SFW2\-INext\-%{NOTSPACE:nf_action}\s*IN=%{USERNAME:nf_in_interface}.*OUT=((\s*%{USERNAME:nf_out_interface})|(\s*))MAC=((%{COMMONMAC:nf_dst_mac}:%{COMMONMAC:nf_src_mac})|(\s*)).*SRC=%{IP:nf_src_ip}\s*DST=%{IP:nf_dst_ip}.*PROTO=%{WORD:nf_protocol}((.*SPT=%{INT:nf_src_port}.*DPT=%{INT:nf_dst_port}.*)|())
 USERNAME [a-zA-Z0-9._-]+
 USER %{USERNAME}
 INT (?:[+-]?(?:[0-9]+))

@@ -232,7 +232,7 @@ func usageExit(rc int) {
 }
 
 //！！！注意： 自动生成 grok pattern代码，下述注释请勿删除！！！
-//go:generate go run generators/grok_pattern_generater.go
+//go:generate go run tools/generators/grok_pattern_generator.go
 func main() {
 	flag.Usage = func() { usageExit(0) }
 	flag.Parse()
