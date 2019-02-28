@@ -117,12 +117,6 @@ func (dbRecords *DBRecords) SetTableInfo(db, table string, tableInfo TableInfo) 
 		*dbRecords = make(DBRecords)
 	}
 	tableRecords := (*dbRecords)[db]
-	if tableRecords.GetTable() == nil {
-		tableRecords = TableRecords{
-			Table: make(map[string]TableInfo),
-			Mutex: sync.RWMutex{},
-		}
-	}
 	tableRecords.SetTableInfo(table, tableInfo)
 	(*dbRecords)[db] = tableRecords
 }
