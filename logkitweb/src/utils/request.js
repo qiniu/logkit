@@ -33,6 +33,6 @@ export default function request(url, options) {
         }
       })
       .catch(err => {
-        err
+        return err
       });
 }
