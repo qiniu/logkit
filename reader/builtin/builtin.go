@@ -20,4 +20,5 @@ import (
 	_ "github.com/qiniu/logkit/reader/snmp"
 	_ "github.com/qiniu/logkit/reader/socket"
 	_ "github.com/qiniu/logkit/reader/tailx"
+	_ "github.com/qiniu/logkit/reader/httpfetch"
 )

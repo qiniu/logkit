@@ -112,6 +112,16 @@ const (
 	KeyScriptExecOnStart = "script_exec_onstart"
 
 	KeyErrDirectReturn = "errDirectReturn"
+
+	KeyHttpExecOnStart     = "http_exec_onstart"
+	KeyHttpCron            = "http_cron"
+	KeyHttpMethod          = "http_method"
+	KeyHttpHeaders         = "http_headers"
+	KeyHttpPageSize        = "http_page_size"
+	KeyHttpPageNo          = "http_page_no"
+	KeyHttpBody            = "http_body"
+	KeyHttpDialTimeout     = "http_dial_timeout"
+	KeyHttpResponseTimeout = "http_response_timeout"
 )
 
 // Constants for cloudtrail
@@ -295,6 +305,7 @@ const (
 	ModeRedis      = "redis"
 	ModeSocket     = "socket"
 	ModeHTTP       = "http"
+	ModeHTTPFETCH  = "httpfetch"
 	ModeScript     = "script"
 	ModeSnmp       = "snmp"
 	ModeCloudWatch = "cloudwatch"
