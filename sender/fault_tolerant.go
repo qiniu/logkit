@@ -581,7 +581,16 @@ func (ft *FtSender) handleStat(err error, isRetry bool, dataLen int64) error {
 		return err
 	}
 
-	// sender error 为空时，一定是全部发送失败
+	if c.SendError == nil && c.LastError == "" {
+		if isRetry {
+			ft.stats.Errors -= dataLen
+		}
+		ft.stats.Success += dataLen
+		ft.stats.LastError = ""
+		return nil
+	}
+
+	// sender error 为空时（last error非空），一定是全部发送失败
 	if c.SendError == nil {
 		if !isRetry {
 			ft.stats.Errors += dataLen
