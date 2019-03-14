@@ -45,7 +45,6 @@ type CronInfo struct {
 
 var (
 	dbSource   = "root:@tcp(127.0.0.1:3306)"
-	pgDbSource = "host=127.0.0.1 port=5432 connect_timeout=10 user=postgres password=lyt  sslmode=disable"
 	connectStr = dbSource + "/?charset=gbk"
 	now        = time.Now()
 	year       = getDateStr(now.Year())
@@ -100,11 +99,12 @@ func TestMySql(t *testing.T) {
 			t.Errorf("clean mysql database failed: %v", err)
 		}
 	}()
+	submissionDate, _ := time.ParseInLocation("2006-01-02", year+"-"+month+"-"+day, time.Local)
 	expectData := models.Data{
 		"runoob_id":       int64(1),
 		"runoob_title":    "学习 mysql",
 		"runoob_author":   "教程",
-		"submission_date": year + "-" + month + "-" + day,
+		"submission_date": submissionDate,
 	}
 
 	runnerName := "mrOnce"
@@ -144,7 +144,7 @@ func TestMySql(t *testing.T) {
 		if len(data) <= 0 {
 			continue
 		}
-		assert.Equal(t, int64(36), bytes)
+		assert.Equal(t, int64(46), bytes)
 		assert.Equal(t, expectData, data)
 		dataLine++
 	}
@@ -170,7 +170,7 @@ func TestMySql(t *testing.T) {
 		if len(data) <= 0 {
 			continue
 		}
-		assert.Equal(t, int64(36), bytes)
+		assert.Equal(t, int64(46), bytes)
 		assert.Equal(t, expectData, data)
 		dataLine++
 	}
@@ -188,7 +188,7 @@ func TestMySql(t *testing.T) {
 		if len(data) <= 0 {
 			continue
 		}
-		assert.Equal(t, int64(36), bytes)
+		assert.Equal(t, int64(46), bytes)
 		assert.Equal(t, expectData, data)
 		dataLine++
 	}
@@ -216,7 +216,7 @@ func TestMySql(t *testing.T) {
 		if len(data) <= 0 {
 			continue
 		}
-		assert.Equal(t, int64(36), bytes)
+		assert.Equal(t, int64(46), bytes)
 		assert.Equal(t, expectData, data)
 		dataLine++
 	}
@@ -234,7 +234,7 @@ func TestMySql(t *testing.T) {
 		if len(data) <= 0 {
 			continue
 		}
-		assert.Equal(t, int64(36), bytes)
+		assert.Equal(t, int64(46), bytes)
 		assert.Equal(t, expectData, data)
 		dataLine++
 	}
@@ -262,7 +262,7 @@ func TestMySql(t *testing.T) {
 		if len(data) <= 0 {
 			continue
 		}
-		assert.Equal(t, int64(36), bytes)
+		assert.Equal(t, int64(46), bytes)
 		assert.Equal(t, expectData, data)
 		dataLine++
 	}
@@ -319,7 +319,7 @@ func TestMySql(t *testing.T) {
 		if len(data) <= 0 {
 			continue
 		}
-		assert.Equal(t, int64(36), bytes)
+		assert.Equal(t, int64(46), bytes)
 		assert.Equal(t, expectData, data)
 		dataLine++
 	}
@@ -356,7 +356,7 @@ func TestMySql(t *testing.T) {
 		if len(data) <= 0 {
 			continue
 		}
-		assert.Equal(t, int64(36), bytes)
+		assert.Equal(t, int64(46), bytes)
 		assert.Equal(t, expectData, data)
 		dataLine++
 	}
@@ -383,7 +383,7 @@ func TestMySql(t *testing.T) {
 		if len(data) <= 0 {
 			continue
 		}
-		assert.Equal(t, int64(36), bytes)
+		assert.Equal(t, int64(46), bytes)
 		assert.Equal(t, expectData, data)
 		dataLine++
 	}
@@ -416,7 +416,7 @@ func TestMySql(t *testing.T) {
 		if len(data) <= 0 {
 			continue
 		}
-		assert.Equal(t, int64(36), bytes)
+		assert.Equal(t, int64(46), bytes)
 		assert.Equal(t, expectData, data)
 		dataLine++
 	}

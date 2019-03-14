@@ -10,6 +10,7 @@ import (
 
 	"github.com/qiniu/log"
 
+	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils/models"
 )
 
@@ -169,6 +170,10 @@ func ConvertDate(v interface{}) (time.Time, error) {
 		}
 		if idv == nil {
 			return time.Time{}, nil
+		}
+
+		if ret, ok := idv.([]byte); ok {
+			return times.StrToTimeLocation(string(ret), time.Local)
 		}
 		log.Errorf("sql reader convertDate for type %v is not supported", reflect.TypeOf(idv))
 	}
