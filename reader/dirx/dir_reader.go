@@ -59,7 +59,18 @@ func (dr *dirReader) sendError(err error) {
 			log.Errorf("Runner[%v] eader of log path %q has recovered from %v", dr.runnerName, dr.originalPath, err)
 		}
 	}()
+	if dr.isStopping() || dr.hasStopped() {
+		return
+	}
 	dr.errChan <- err
+}
+
+func (dr *dirReader) isStopping() bool {
+	return atomic.LoadInt32(&dr.status) == StatusStopping
+}
+
+func (dr *dirReader) hasStopped() bool {
+	return atomic.LoadInt32(&dr.status) == StatusStopped
 }
 
 func (dr *dirReader) Run() {
@@ -73,7 +84,7 @@ func (dr *dirReader) Run() {
 
 	var err error
 	for {
-		if atomic.LoadInt32(&dr.status) == StatusStopping || atomic.LoadInt32(&dr.status) == StatusStopped {
+		if dr.isStopping() || dr.hasStopped() {
 			atomic.CompareAndSwapInt32(&dr.status, StatusStopping, StatusStopped)
 			log.Warnf("Runner[%v] log path[%v] reader has stopped", dr.runnerName, dr.originalPath)
 			return
@@ -127,7 +138,7 @@ func (dr *dirReader) Run() {
 			dr.numEmptyLines = 0
 
 			// 做这一层检查是为了快速结束和确保在上层 reader 已经关闭的情况下不会继续向 dr.msgChan 发送数据（因为可能已经被关闭）
-			if atomic.LoadInt32(&dr.status) == StatusStopping || atomic.LoadInt32(&dr.status) == StatusStopped {
+			if dr.isStopping() || dr.hasStopped() {
 				log.Debugf("Runner[%v] log path[%v] reader has stopped when waits to send data", dr.runnerName, dr.originalPath)
 				atomic.CompareAndSwapInt32(&dr.status, StatusStopping, StatusStopped)
 				return
