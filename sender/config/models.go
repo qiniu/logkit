@@ -98,8 +98,8 @@ const (
 	KeyAuthUsername            = "auth_username"
 	KeyAuthPassword            = "auth_password"
 	KeyEnableGzip              = "enable_gzip"
-	DefaultJJHPipelineEndpoint = "http://jjh-pipeline.qiniuapi.com"
-	DefaultJJHLogDBEndpoint    = "http://jjh-insight.qiniuapi.com"
+	DefaultJJHPipelineEndpoint = "https://jjh-pipeline.qiniuapi.com"
+	DefaultJJHLogDBEndpoint    = "https://jjh-insight.qiniuapi.com"
 	NBRegion                   = "nb"
 	JJHRegion                  = "jjh"
 
