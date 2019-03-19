@@ -117,7 +117,7 @@ type ProcessInfo struct {
 	Process
 }
 
-// linux 和 mac 使用原来的会阶段，例如 java 和 python 脚本程序只会显示java和python
+// linux 和 mac 使用原来的会截断，例如 java 和 python 脚本程序只会显示java和python
 // 现在top 和 supervised的程序会自己设置name，没有再走原来的逻辑
 func (p *ProcessInfo) Name() (string, error) {
 	return p.name, nil
@@ -755,7 +755,7 @@ func (p *Procstat) SupervisordStat(process map[PID]ProcessInfo) (err error) {
 		}
 		info.Status, _ = processStat[fields[1]]
 		if pid, err = strconv.Atoi(strings.Trim(fields[3], ",")); err != nil {
-			log.Error("parse %s ERROR: %v", err)
+			log.Infof("parse %s ERROR: %v", err)
 			continue
 		}
 		info.Pid = PID(pid)
