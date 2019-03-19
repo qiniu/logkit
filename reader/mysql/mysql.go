@@ -934,6 +934,7 @@ func (r *MysqlReader) execReadSql(curDB string, idx int, execSQL string, db *sql
 		return exit, readSize, err
 	}
 	defer rows.Close()
+
 	// Get column names
 	columns, err := rows.Columns()
 	if err != nil {
