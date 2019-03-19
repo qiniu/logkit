@@ -3,6 +3,9 @@ package sql
 import (
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/qiniu/logkit/utils/models"
 )
 
 // 查看时间是否符合, min为true则取出来为小于等于，min为false则取出来大于等于
@@ -118,4 +121,30 @@ func GetRemainStr(origin string, magicRemainIndex []int) (remainStr string) {
 	}
 
 	return remainStr
+}
+
+//-1 代表不存在; 1 代表更大; 0 代表相等
+func CompareWithStartTimeInt(data models.Data, timestampKey string, startTimeInt int64) (int, bool) {
+	timeData, ok := GetTimeIntFromData(data, timestampKey)
+	if !ok {
+		//如果出现了数据中没有时间的，实际上已经不合法了，那就获取，宁愿重复不愿遗漏
+		return 1, false
+	}
+	if timeData > startTimeInt {
+		return 1, true
+	}
+	return 0, true
+}
+
+//-1 代表不存在; 1 代表更大; 0 代表相等
+func CompareWithStartTime(data models.Data, timestampKey string, startTime time.Time) (int, bool) {
+	timeData, ok := GetTimeFromData(data, timestampKey)
+	if !ok {
+		//如果出现了数据中没有时间的，实际上已经不合法了，那就获取，宁愿重复不愿遗漏
+		return 1, false
+	}
+	if timeData.After(startTime) {
+		return 1, true
+	}
+	return 0, true
 }

@@ -1,10 +1,10 @@
-package postgres
+package mysql
 
 import (
 	. "github.com/qiniu/logkit/reader/sql"
 )
 
-func (r *PostgresReader) updateStartTime(offsetKeyIndex int, scanArgs []interface{}) bool {
+func (r *MysqlReader) updateStartTime(offsetKeyIndex int, scanArgs []interface{}) bool {
 	if r.timestampKeyInt {
 		timeOffset, ok := GetTimeIntFromArgs(offsetKeyIndex, scanArgs)
 		if ok && timeOffset > r.startTimeInt {
@@ -28,7 +28,7 @@ func (r *PostgresReader) updateStartTime(offsetKeyIndex int, scanArgs []interfac
 }
 
 //用于更新时间戳，已经同样时间戳上那个数据点
-func (r *PostgresReader) updateTimeCntFromData(v ReadInfo) {
+func (r *MysqlReader) updateTimeCntFromData(v ReadInfo) {
 	if r.timestampKeyInt {
 		timeData, ok := GetTimeIntFromData(v.Data, r.timestampKey)
 		if !ok {
@@ -68,7 +68,7 @@ func (r *PostgresReader) updateTimeCntFromData(v ReadInfo) {
 	}
 }
 
-func (r *PostgresReader) trimExistData(datas []ReadInfo) []ReadInfo {
+func (r *MysqlReader) trimExistData(datas []ReadInfo) []ReadInfo {
 	if len(r.timestampKey) <= 0 || len(datas) < 1 {
 		return datas
 	}

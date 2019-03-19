@@ -18,6 +18,7 @@ import (
 	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/reader/sql"
+	"github.com/qiniu/logkit/reader/sql/datagen"
 	. "github.com/qiniu/logkit/reader/test"
 	"github.com/qiniu/logkit/utils/models"
 )
@@ -439,6 +440,129 @@ func TestMySql(t *testing.T) {
 	mrLoopOnStart.Close()
 }
 
+func TestMysqlWithTimestampInt(t *testing.T) {
+	database := "TestMysqlWithTimestampInt"
+	databasesTest = append(databasesTest, todayDataTests...)
+	if err := dropAndCreateDB(1, database); err != nil {
+		t.Errorf("prepare mysql database failed: %v", err)
+	}
+	defer func() {
+		if err := dropDB(1, database); err != nil {
+			t.Errorf("clean mysql database failed: %v", err)
+		}
+	}()
+
+	os.MkdirAll(MetaDir+"/TestMysqlWithTimestampInt/", 0777)
+	defer os.RemoveAll(MetaDir)
+	tablename := "testTime"
+	runnerName := "mrTime"
+	mr, err := reader.NewReader(conf.MapConf{
+		"mysql_database":       database + "1",
+		"mode":                 "mysql",
+		"mysql_exec_onstart":   "true",
+		"encoding":             "gbk",
+		"mysql_datasource":     dbSource,
+		"mysql_timestamp_key":  "timestamp",
+		"mysql_start_time":     "0",
+		"mysql_batch_intervel": "1",
+		"mysql_timestamp_int":  "true",
+		"mysql_cron":           "loop 1s",
+		"mysql_sql":            "select * from " + tablename,
+		"meta_path":            path.Join(MetaDir, runnerName),
+		"file_done":            path.Join(MetaDir, runnerName),
+		"runner_name":          runnerName,
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := mr.(reader.DataReader)
+	if !ok {
+		t.Error("mysql read should have readdata interface")
+	}
+	assert.NoError(t, mr.(*MysqlReader).Start())
+	totalnum := 10000
+	go datagen.GenerateMysqlData(dbSource+"/"+database+"1"+"?charset=gbk", tablename, int64(totalnum), 100*time.Millisecond, time.Hour, time.Now().Add(-100*time.Hour))
+	dataLine := 0
+	before := time.Now()
+	var actualData []models.Data
+	for !batchTimeout(before, 60) {
+		data, _, err := r.ReadData()
+		if err != nil {
+			continue
+		}
+		if len(data) <= 0 {
+			continue
+		}
+		actualData = append(actualData, data)
+		dataLine++
+		if dataLine >= totalnum {
+			break
+		}
+	}
+	assert.Equal(t, totalnum, dataLine)
+}
+
+func TestMysqlWithTimestamp(t *testing.T) {
+	database := "TestMysqlWithTimestamp"
+	databasesTest = append(databasesTest, todayDataTests...)
+	if err := dropAndCreateDB(1, database); err != nil {
+		t.Errorf("prepare mysql database failed: %v", err)
+	}
+	defer func() {
+		if err := dropDB(1, database); err != nil {
+			t.Errorf("clean mysql database failed: %v", err)
+		}
+	}()
+
+	os.MkdirAll(MetaDir+"/TestMysqlWithTimestamp/", 0777)
+	defer os.RemoveAll(MetaDir)
+	tablename := "testTime"
+	runnerName := "mrTime"
+	mr, err := reader.NewReader(conf.MapConf{
+		"mysql_database":       database + "1",
+		"mode":                 "mysql",
+		"mysql_exec_onstart":   "true",
+		"encoding":             "gbk",
+		"mysql_datasource":     dbSource,
+		"mysql_timestamp_key":  "submission_date",
+		"mysql_start_time":     "2018-10-01 15:04:05",
+		"mysql_batch_intervel": "30m",
+		"mysql_cron":           "loop 1s",
+		"mysql_sql":            "select * from " + tablename,
+		"meta_path":            path.Join(MetaDir, runnerName),
+		"file_done":            path.Join(MetaDir, runnerName),
+		"runner_name":          runnerName,
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := mr.(reader.DataReader)
+	if !ok {
+		t.Error("mysql read should have readdata interface")
+	}
+	assert.NoError(t, mr.(*MysqlReader).Start())
+	totalNum := 10000
+	go datagen.GenerateMysqlData(dbSource+"/"+database+"1"+"?charset=gbk", tablename, int64(totalNum), 100*time.Millisecond, time.Hour, time.Now().Add(-100*time.Hour))
+	dataLine := 0
+	before := time.Now()
+	var actualData []models.Data
+	for !batchTimeout(before, 60) {
+		data, _, err := r.ReadData()
+		if err != nil {
+			continue
+		}
+		if len(data) <= 0 {
+			continue
+		}
+		actualData = append(actualData, data)
+		dataLine++
+		if dataLine >= totalNum {
+			break
+		}
+	}
+	assert.Equal(t, totalNum, dataLine)
+}
+
 func getMySqlReader(historyAll, rawsql, loop bool, runnerName string, cronInfo CronInfo) (reader.Reader, error) {
 	readerConf := conf.MapConf{
 		"mysql_database":     "Test_MySql@(YYYY)@(MM)@(DD)",
@@ -517,6 +641,38 @@ func prepareMysql() error {
 		}
 	}
 
+	return nil
+}
+
+func dropAndCreateDB(id int, database string) error {
+	db, err := OpenSql("mysql", connectStr)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	_, err = db.Query("DROP DATABASE IF EXISTS " + database + strconv.Itoa(id))
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec("CREATE DATABASE " + database + strconv.Itoa(id))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func dropDB(id int, database string) error {
+	db, err := OpenSql("mysql", connectStr)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	_, err = db.Query("DROP DATABASE IF EXISTS " + database + strconv.Itoa(id))
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

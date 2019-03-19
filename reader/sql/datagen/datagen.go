@@ -22,8 +22,8 @@ func openSql(dbtype, connectStr string) (db *sql.DB, err error) {
 	return db, nil
 }
 
-func getPostgresDb(dbsource string) (db *sql.DB, err error) {
-	db, err = openSql("postgres", dbsource)
+func getSqlDb(dbType, dbSource string) (db *sql.DB, err error) {
+	db, err = openSql(dbType, dbSource)
 	if err != nil {
 		return nil, err
 	}
@@ -33,19 +33,19 @@ func getPostgresDb(dbsource string) (db *sql.DB, err error) {
 	return db, nil
 }
 
-func preparePostgres(pgDbSource string) (db *sql.DB, err error) {
-	db, err = openSql("postgres", pgDbSource)
+func prepareSql(dbType, dbSource string) (db *sql.DB, err error) {
+	db, err = openSql(dbType, dbSource)
 	if err != nil {
 		log.Error(err)
 		return nil, err
 	}
 	defer db.Close()
 
-	return getPostgresDb(pgDbSource)
+	return getSqlDb(dbType, dbSource)
 }
 
-func GeneratePostgresData(datasource, table string, totalnumber int64, sleepDuration, timeaddDuration time.Duration, startTime time.Time) {
-	db, err := preparePostgres(datasource)
+func GeneratePostgresData(dataSource, table string, totalnumber int64, sleepDuration, timeaddDuration time.Duration, startTime time.Time) {
+	db, err := prepareSql("postgres", dataSource)
 	if err != nil {
 		log.Error(err)
 		return
@@ -64,7 +64,7 @@ func GeneratePostgresData(datasource, table string, totalnumber int64, sleepDura
 		var wg = new(sync.WaitGroup)
 		for i := 0; i < 4; i++ {
 			wg.Add(1)
-			go insert(db, table, datanum, tm, wg)
+			go insertPG(db, table, datanum, tm, wg)
 			datanum += 500
 		}
 		wg.Wait()
@@ -83,7 +83,7 @@ func GeneratePostgresData(datasource, table string, totalnumber int64, sleepDura
 	fmt.Println(datanum, " finish inserted")
 }
 
-func insert(db *sql.DB, table string, datanum int64, tm time.Time, wg *sync.WaitGroup) {
+func insertPG(db *sql.DB, table string, datanum int64, tm time.Time, wg *sync.WaitGroup) {
 	defer wg.Done()
 	txn, err := db.Begin()
 	if err != nil {
@@ -110,6 +110,66 @@ func insert(db *sql.DB, table string, datanum int64, tm time.Time, wg *sync.Wait
 	err = stmt.Close()
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	err = txn.Commit()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func GenerateMysqlData(dataSource, table string, totalNumber int64, sleepDuration, timeAddDuration time.Duration, startTime time.Time) {
+	db, err := prepareSql("mysql", dataSource)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	defer db.Close()
+
+	_, err = db.Exec(`CREATE TABLE ` + table + ` (id INT NOT NULL AUTO_INCREMENT,timestamp INT, title VARCHAR(100) NOT NULL,author VARCHAR(40) NOT NULL,submission_date TIMESTAMP,PRIMARY KEY ( id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;`)
+	if err != nil && !strings.Contains(err.Error(), "already exists") {
+		log.Error(err)
+		return
+	}
+	var dataNum int64
+	tm := startTime
+	var xx int
+	for {
+		var wg = new(sync.WaitGroup)
+		for i := 0; i < 4; i++ {
+			wg.Add(1)
+			go insertMysql(db, table, dataNum, tm, wg)
+			dataNum += 500
+		}
+		wg.Wait()
+		fmt.Println(dataNum, " of data inserted ", time.Now().String())
+		if totalNumber > 0 && dataNum >= totalNumber {
+			break
+		}
+		if sleepDuration > 0 {
+			time.Sleep(sleepDuration)
+		}
+		xx++
+		if xx%2 == 0 {
+			tm = tm.Add(timeAddDuration)
+		}
+	}
+	fmt.Println(dataNum, " finish inserted")
+}
+
+func insertMysql(db *sql.DB, table string, dataNum int64, tm time.Time, wg *sync.WaitGroup) {
+	defer wg.Done()
+	txn, err := db.Begin()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for i := 0; i < 500; i++ {
+		sql := `INSERT INTO ` + table + ` (id, timestamp, title, author, submission_date) VALUES (` + strconv.FormatInt(dataNum+int64(i)+1, 10) + `, ` + strconv.FormatInt(tm.Unix(), 10) + `, "` + randomdata.Address() + `", "` + randomdata.Email() + `", "` + tm.Add(-8*time.Hour).Format("2006-01-02 15:04:00") + `");`
+		_, err = txn.Exec(sql)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	err = txn.Commit()
