@@ -43,11 +43,13 @@ func (tableRecords *TableRecords) Set(value TableRecords) {
 
 func (tableRecords *TableRecords) SetTableInfo(table string, tableInfo TableInfo) {
 	if tableRecords.GetTable() == nil {
-		*tableRecords = TableRecords{
-			Table: make(map[string]TableInfo),
-			Mutex: sync.RWMutex{},
-		}
+		tableRecords.Mutex.Lock()
+		tableRecords.Table = make(map[string]TableInfo)
+		tableRecords.Table[table] = tableInfo
+		tableRecords.Mutex.Unlock()
+		return
 	}
+
 	tableRecords.Mutex.Lock()
 	tableRecords.Table[table] = tableInfo
 	tableRecords.Mutex.Unlock()
