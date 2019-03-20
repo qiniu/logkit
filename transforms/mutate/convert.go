@@ -426,6 +426,10 @@ func dataConvert(data interface{}, schema DslSchemaEntry) (converted interface{}
 			if err == nil {
 				return string(str), nil
 			}
+		case time.Time:
+			return value.Format(time.RFC3339Nano), nil
+		case *time.Time:
+			return value.Format(time.RFC3339Nano), nil
 		case nil:
 			if schema.Default != nil {
 				return schema.Default, nil

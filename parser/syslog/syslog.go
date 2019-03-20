@@ -164,6 +164,10 @@ func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 		numRoutine = lineLen
 	}
 
+	if p.buff.Len() == 0 && len(lines) == 1 && lines[0] == PandoraParseFlushSignal {
+		return []Data{}, nil
+	}
+
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
 		go parser.ParseLine(sendChan, resultChan, wg, true, p.parse)

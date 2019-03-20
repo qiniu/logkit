@@ -699,7 +699,8 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 
 	curTimeStr := time.Now().Format("2006-01-02 15:04:05.999")
 
-	if len(lines) <= 0 {
+	linenums := len(lines)
+	if linenums <= 0 {
 		log.Debugf("Runner[%v] fetched 0 lines", r.Name())
 		_, ok := r.parser.(parser.Flushable)
 		if ok {
@@ -724,7 +725,7 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 		numErrs = 1
 		r.rs.ParserStats.Errors++
 	} else {
-		r.rs.ParserStats.Success += int64(len(lines))
+		r.rs.ParserStats.Success += int64(linenums)
 	}
 	if err != nil {
 		r.rs.ParserStats.LastError = TruncateStrSize(err.Error(), DefaultTruncateMaxSize)
