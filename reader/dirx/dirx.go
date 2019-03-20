@@ -464,24 +464,14 @@ func (r *Reader) Close() error {
 	r.dirReaders.Close()
 	r.SyncMeta()
 
-	go func() {
-		//读掉所有阻塞的信息
-		var mok, eok bool
-		for {
-			select {
-			case _, mok = <-r.msgChan:
-			case _, eok = <-r.errChan:
-			}
-			if mok || eok {
-				continue
-			}
-			return
-		}
-	}()
-	time.Sleep(10 * time.Millisecond)
-	// 在所有 dirReader 关闭完成后再关闭管道
+	// errChan 关闭完成后再关闭管道
+	select {
+	case <-r.errChan:
+	default:
+	}
 	close(r.msgChan)
 	close(r.errChan)
+
 	return nil
 }
 

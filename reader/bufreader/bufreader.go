@@ -63,6 +63,8 @@ type BufReader struct {
 	lastRuneSize  int
 	lastSync      LastSync
 
+	runTime reader.RunTime
+
 	mux     sync.Mutex
 	decoder mahonia.Decoder
 
@@ -176,6 +178,11 @@ func (b *BufReader) SetMode(mode string, v interface{}) (err error) {
 		return
 	}
 	return
+}
+
+func (b *BufReader) SetRunTime(mode string, v interface{}) (err error) {
+	b.runTime, err = reader.ParseRunTimeWithMode(mode, v)
+	return err
 }
 
 func (b *BufReader) reset(buf []byte, r reader.FileReader) {
@@ -453,6 +460,12 @@ func (b *BufReader) FormMutiLine() []byte {
 
 //ReadLine returns a string line as a normal Reader
 func (b *BufReader) ReadLine() (ret string, err error) {
+	now := time.Now()
+	if !reader.InRunTime(now.Hour(), now.Minute(), b.runTime) {
+		time.Sleep(10 * time.Second)
+		return "", nil
+	}
+
 	if b.multiLineRegexp == nil {
 		ret, err = b.ReadString('\n')
 		if os.IsNotExist(err) {

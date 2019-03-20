@@ -40,6 +40,7 @@ const (
 	KeySubmetaExpire = "submeta_expire"
 	KeyMaxOpenFiles  = "max_open_files"
 	KeyStatInterval  = "stat_interval"
+	KeyRunTime       = "run_time"
 
 	KeyMysqlOffsetKey     = "mysql_offset_key"
 	KeyMysqlTimestampKey  = "mysql_timestamp_key"
@@ -319,6 +320,9 @@ const (
 const (
 	ReadModeHeadPatternString = "mode_head_pattern_string"
 	ReadModeHeadPatternRegexp = "mode_head_pattern_regexp"
+
+	ReadModeRunTimeString = "mode_run_time_string"
+	ReadModeRunTimeStruct = "mode_run_time_struct"
 )
 
 // KeyWhence 的可选项
