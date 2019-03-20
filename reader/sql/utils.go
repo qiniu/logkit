@@ -175,3 +175,16 @@ func setDataBaseType(schemas map[string]string, dataBaseType string, v *sql.Colu
 		return false
 	}
 }
+
+func GetOffsetIndexWithTimeStamp(offsetKey, timestampKey string, columns []string) int {
+	offsetKeyIndex := -1
+	for idx, key := range columns {
+		if len(offsetKey) > 0 && key == offsetKey {
+			return idx
+		}
+		if len(timestampKey) > 0 && key == timestampKey {
+			return idx
+		}
+	}
+	return offsetKeyIndex
+}
