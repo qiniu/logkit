@@ -745,6 +745,13 @@ func ConvertDate(layoutBefore, layoutAfter string, offset int, loc *time.Locatio
 			return v, err
 		}
 		s = jsonNumber
+	case time.Time:
+		return FormatWithUserOption(layoutAfter, offset, newv), nil
+	case *time.Time:
+		if newv == nil {
+			return nil, nil
+		}
+		return FormatWithUserOption(layoutAfter, offset, *newv), nil
 	default:
 		return v, fmt.Errorf("can not parse %v type %v as date time", v, reflect.TypeOf(v))
 	}
