@@ -16,59 +16,62 @@ import (
 )
 
 func TestCSVSender(t *testing.T) {
-	conf := conf.MapConf{
-		KeyCSVFields:     "name,uid,age",
-		KeyCSVDelimiter:  ",",
-		KeyCSVRotateSize: "10485760",
-		KeyMaxSendRate:   "200",
-	}
-	sender, err := NewSender(conf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer sender.Close()
-
-	nr := 1000
-	for i := 0; i < nr; i++ {
-		data := []models.Data{
-			{
-				"name": fmt.Sprintf("annonym %d", i),
-				"uid":  strconv.FormatInt(rand.Int63(), 10),
-				"age":  rand.Int31n(100),
-			},
+	seperators := []string{",", ":"}
+	for _, seperator := range seperators {
+		conf := conf.MapConf{
+			KeyCSVFields:     "name,uid,age",
+			KeyCSVDelimiter:  seperator,
+			KeyCSVRotateSize: "10485760",
+			KeyMaxSendRate:   "200",
 		}
-		if err := sender.Send(data); err != nil {
-			t.Error(err)
+		sender, err := NewSender(conf)
+		if err != nil {
+			t.Fatal(err)
 		}
-	}
+		defer sender.Close()
 
-	file := sender.(*Sender).w.file
-	if file != nil {
-		file.Seek(0, io.SeekStart)
-		defer func() {
-			os.Remove(file.Name())
-			file = nil
-		}()
-
-		i := 0
-		buf := bufio.NewReader(file)
-		for {
-			line, _, err := buf.ReadLine()
-			if err == io.EOF {
-				break
-			} else if err != nil {
+		nr := 1000
+		for i := 0; i < nr; i++ {
+			data := []models.Data{
+				{
+					"name": fmt.Sprintf("annonym %d", i),
+					"uid":  strconv.FormatInt(rand.Int63(), 10),
+					"age":  rand.Int31n(100),
+				},
+			}
+			if err := sender.Send(data); err != nil {
 				t.Error(err)
 			}
-			i++
-
-			parts := strings.Split(string(line), ",")
-			if len(parts) != 3 {
-				t.Errorf("unexpect field count, got %d, want %d", len(parts), 3)
-			}
 		}
 
-		if i != nr {
-			t.Errorf("unexpect record count, got %d, want %d", i, nr)
+		file := sender.(*Sender).w.file
+		if file != nil {
+			file.Seek(0, io.SeekStart)
+			defer func() {
+				os.Remove(file.Name())
+				file = nil
+			}()
+
+			i := 0
+			buf := bufio.NewReader(file)
+			for {
+				line, _, err := buf.ReadLine()
+				if err == io.EOF {
+					break
+				} else if err != nil {
+					t.Error(err)
+				}
+				i++
+
+				parts := strings.Split(string(line), seperator)
+				if len(parts) != 3 {
+					t.Errorf("unexpect field count, got %d, want %d", len(parts), 3)
+				}
+			}
+
+			if i != nr {
+				t.Errorf("unexpect record count, got %d, want %d", i, nr)
+			}
 		}
 	}
 }

@@ -1104,7 +1104,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: true,
 			Required:     true,
 			Description:  "csv字段名称(csv_fields)",
-			ToolTip:      `指定每一行记录包含的字段集，使用,分割多个字段`,
+			ToolTip:      `指定每一行记录包含的字段集，默认使用,分割多个字段`,
 		},
 		{
 			KeyName:      KeyCSVDelimiter,
@@ -1114,7 +1114,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: false,
 			Required:     false,
 			Description:  "csv字段分隔符(csv_delimiter)",
-			ToolTip:      `默认为 ,(逗号)，表示每一行记录中字段之间的分隔符`,
+			ToolTip:      `默认为 ,(逗号)，表示每一行记录中字段之间的分隔符，只能为单个字符`,
 		},
 		{
 			KeyName:      KeyCSVPathPrefix,

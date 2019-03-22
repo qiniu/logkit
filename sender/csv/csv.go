@@ -115,6 +115,7 @@ func (w *writer) RotateNow() (err error) {
 		return
 	}
 	w.w = csv.NewWriter(w.file)
+	w.w.Comma = rune(w.delimeter[0])
 	w.apprSize = 0
 	return nil
 }
