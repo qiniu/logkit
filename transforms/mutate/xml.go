@@ -256,25 +256,35 @@ func (g *Xml) transform(dataPipeline <-chan transforms.TransformInfo, resultChan
 				if pathsLen == 0 {
 					continue
 				}
-				currentKey := paths[pathsLen-1]
-				var (
-					values []string
-					ok     bool
-				)
-				g.cacheNewsLock.RLock()
-				values, ok = g.cacheNews[currentKey]
-				g.cacheNewsLock.RUnlock()
-				if !ok {
-					values = make([]string, len(g.news))
+				if g.Expand {
+					currentKey := paths[pathsLen-1]
+					var (
+						values []string
+						ok     bool
+					)
+					g.cacheNewsLock.RLock()
+					values, ok = g.cacheNews[currentKey]
+					g.cacheNewsLock.RUnlock()
+					if !ok {
+						values = make([]string, len(g.news))
+						copy(values, g.news)
+						values = append(values, currentKey)
+						g.cacheNewsLock.Lock()
+						g.cacheNews[currentKey] = values
+						g.cacheNewsLock.Unlock()
+					}
+					setErr := SetMapValue(transformInfo.CurData, v.Value, false, values...)
+					if setErr != nil {
+						errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, paths[pathsLen-1])
+					}
+				} else {
+					values := make([]string, len(g.news))
 					copy(values, g.news)
-					values = append(values, currentKey)
-					g.cacheNewsLock.Lock()
-					g.cacheNews[currentKey] = values
-					g.cacheNewsLock.Unlock()
-				}
-				setErr := SetMapValue(transformInfo.CurData, v.Value, false, values...)
-				if setErr != nil {
-					errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, paths[pathsLen-1])
+					values = append(values, paths...)
+					setErr := SetMapValue(transformInfo.CurData, v.Value, false, values...)
+					if setErr != nil {
+						errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, paths[pathsLen-1])
+					}
 				}
 			}
 		} else {

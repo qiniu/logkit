@@ -19,7 +19,7 @@ func TestXmlTransformer(t *testing.T) {
 			"xml": `<?xml version="1.0" encoding="UTF-8"?>
 		<note>
 		 <to>Tove</to>
-		 <from>Jani</from>
+		 <from attr="field">Jani</from>
 		 <heading>Reminder</heading>
 		 <body>Don't forget me this weekend!</body>
 		</note>`,
@@ -35,7 +35,7 @@ func TestXmlTransformer(t *testing.T) {
 					"heading": "Reminder",
 					"body":    "Don't forget me this weekend!",
 					"to":      "Tove",
-					"from":    "Jani",
+					"from":    map[string]interface{}{"-attr": "field", "#text": "Jani"},
 				},
 			},
 		},
@@ -236,7 +236,7 @@ func TestXmlTransformer(t *testing.T) {
 			"raw": `<?xml version="1.0" encoding="UTF-8"?>
 	<note>
 	<to>Tove</to>
-	<from>Jani</from>
+	<from attr="field">Jani</from>
 	<heading>Reminder</heading>
 	<body>Don't forget me this weekend!</body>
 	</note>`,
@@ -246,17 +246,67 @@ func TestXmlTransformer(t *testing.T) {
 	assert.NoError(t, err5)
 	expdata5 := []Data{
 		{
-			"key1": "value1",
-			"body": "Don't forget me this weekend!",
-			"to":   "Tove", "from": "Jani",
+			"key1":    "value1",
+			"body":    "Don't forget me this weekend!",
+			"to":      "Tove",
+			"from":    "Jani",
 			"heading": "Reminder",
 		},
 		{
-			"key1": "value1",
-			"body": "Don't forget me this weekend!",
-			"to":   "Tove", "from": "Jani",
+			"key1":    "value1",
+			"body":    "Don't forget me this weekend!",
+			"to":      "Tove",
 			"heading": "Reminder",
+			"-attr":   "field",
+			"#text":   "Jani",
 		},
 	}
 	assert.Equal(t, expdata5, newdata5)
+
+	//xtr6 := Xml{
+	//	Key:        "raw",
+	//	Expand:     true,
+	//	DiscardKey: true,
+	//}
+	//data6 := []Data{
+	//	{
+	//		"key1": "value1",
+	//		"raw": `<?xml version="1.0" encoding="UTF-8"?>
+	//<note>
+	//<to>Tove</to>
+	//<from>Jani</from>
+	//<heading>Reminder</heading>
+	//<body>Don't forget me this weekend!</body>
+	//</note>`,
+	//	},
+	//	{
+	//		"key1": "value1",
+	//		"raw": `<?xml version="1.0" encoding="UTF-8"?>
+	//<note>
+	//<to>Tove</to>
+	//<from attr="field">Jani</from>
+	//<heading>Reminder</heading>
+	//<body>Don't forget me this weekend!</body>
+	//</note>`,
+	//	},
+	//}
+	//newdata6, err6 := xtr6.Transform(data6)
+	//assert.NoError(t, err6)
+	//expdata6 := []Data{
+	//	{
+	//		"key1":    "value1",
+	//		"body":    "Don't forget me this weekend!",
+	//		"to":      "Tove",
+	//		"from":    "Jani",
+	//		"heading": "Reminder",
+	//	},
+	//	{
+	//		"key1":    "value1",
+	//		"body":    "Don't forget me this weekend!",
+	//		"to":      "Tove",
+	//		"heading": "Reminder",
+	//		"from":    "Jani",
+	//	},
+	//}
+	//assert.Equal(t, expdata6, newdata6)
 }
