@@ -118,7 +118,7 @@ func insertPG(db *sql.DB, table string, datanum int64, tm time.Time, wg *sync.Wa
 	}
 }
 
-func GenerateMysqlData(dataSource, table string, totalNumber int64, sleepDuration, timeAddDuration time.Duration, startTime time.Time) {
+func GenerateMysqlData(dataSource, table string, totalNumber int64, sleepDuration, timeAddDuration time.Duration, startTime time.Time, timeStr bool) {
 	db, err := prepareSql("mysql", dataSource)
 	if err != nil {
 		log.Error(err)
@@ -126,10 +126,18 @@ func GenerateMysqlData(dataSource, table string, totalNumber int64, sleepDuratio
 	}
 	defer db.Close()
 
-	_, err = db.Exec(`CREATE TABLE ` + table + ` (id INT NOT NULL AUTO_INCREMENT,timestamp INT, title VARCHAR(100) NOT NULL,author VARCHAR(40) NOT NULL,submission_date TIMESTAMP,PRIMARY KEY ( id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;`)
-	if err != nil && !strings.Contains(err.Error(), "already exists") {
-		log.Error(err)
-		return
+	if !timeStr {
+		_, err = db.Exec(`CREATE TABLE ` + table + ` (id INT NOT NULL AUTO_INCREMENT,timestamp INT, title VARCHAR(100) NOT NULL,author VARCHAR(40) NOT NULL,submission_date TIMESTAMP,PRIMARY KEY ( id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;`)
+		if err != nil && !strings.Contains(err.Error(), "already exists") {
+			log.Error(err)
+			return
+		}
+	} else {
+		_, err = db.Exec(`CREATE TABLE ` + table + ` (id INT NOT NULL AUTO_INCREMENT,timestamp INT, title VARCHAR(100) NOT NULL,author VARCHAR(40) NOT NULL,submission_date VARCHAR(100),PRIMARY KEY ( id ))ENGINE=InnoDB DEFAULT CHARSET=utf8;`)
+		if err != nil && !strings.Contains(err.Error(), "already exists") {
+			log.Error(err)
+			return
+		}
 	}
 	var dataNum int64
 	tm := startTime
@@ -138,7 +146,11 @@ func GenerateMysqlData(dataSource, table string, totalNumber int64, sleepDuratio
 		var wg = new(sync.WaitGroup)
 		for i := 0; i < 4; i++ {
 			wg.Add(1)
-			go insertMysql(db, table, dataNum, tm, wg)
+			if timeStr {
+				go insertStrMysql(db, table, dataNum, tm, wg)
+			} else {
+				go insertMysql(db, table, dataNum, tm, wg)
+			}
 			dataNum += 500
 		}
 		wg.Wait()
@@ -166,6 +178,27 @@ func insertMysql(db *sql.DB, table string, dataNum int64, tm time.Time, wg *sync
 
 	for i := 0; i < 500; i++ {
 		sql := `INSERT INTO ` + table + ` (id, timestamp, title, author, submission_date) VALUES (` + strconv.FormatInt(dataNum+int64(i)+1, 10) + `, ` + strconv.FormatInt(tm.Unix(), 10) + `, "` + randomdata.Address() + `", "` + randomdata.Email() + `", "` + tm.Add(-8*time.Hour).Format("2006-01-02 15:04:00") + `");`
+		_, err = txn.Exec(sql)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	err = txn.Commit()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func insertStrMysql(db *sql.DB, table string, dataNum int64, tm time.Time, wg *sync.WaitGroup) {
+	defer wg.Done()
+	txn, err := db.Begin()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for i := 0; i < 500; i++ {
+		sql := `INSERT INTO ` + table + ` (id, timestamp, title, author, submission_date) VALUES (` + strconv.FormatInt(dataNum+int64(i)+1, 10) + `, ` + strconv.FormatInt(tm.Unix(), 10) + `, "` + randomdata.Address() + `", "` + randomdata.Email() + `", "` + "mytest" + tm.Add(-8*time.Hour).Format("20060102150400") + `");`
 		_, err = txn.Exec(sql)
 		if err != nil {
 			log.Fatal(err)

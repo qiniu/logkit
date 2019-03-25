@@ -148,3 +148,16 @@ func CompareWithStartTime(data models.Data, timestampKey string, startTime time.
 	}
 	return 0, true
 }
+
+//-1 代表不存在; 1 代表更大; 0 代表相等
+func CompareWithStartTimeStr(data models.Data, timestampKey, startTimeStr string) (int, bool) {
+	timeDataStr, ok := GetTimeStrFromData(data, timestampKey)
+	if !ok {
+		//如果出现了数据中没有时间的，实际上已经不合法了，那就获取，宁愿重复不愿遗漏
+		return 1, false
+	}
+	if timeDataStr > startTimeStr {
+		return 1, true
+	}
+	return 0, true
+}

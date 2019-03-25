@@ -77,11 +77,11 @@ func GetTimeFromArgs(offsetKeyIndex int, scanArgs []interface{}) (time.Time, boo
 			return *timeData, true
 		case []byte:
 			ret, _ := data.([]byte)
-			timedata, err := times.StrToTimeLocation(string(ret), time.Local)
+			timeDataResult, err := times.StrToTimeLocation(string(ret), time.Local)
 			if err != nil {
 				log.Errorf("updateStartTime failed as %v(%T) is not time.Time", data, data)
 			} else {
-				return timedata, true
+				return timeDataResult, true
 			}
 		default:
 			log.Errorf("updateStartTime failed as %v(%T) is not time.Time", data, data)
@@ -102,6 +102,18 @@ func GetTimeIntFromData(data models.Data, timestampKey string) (int64, bool) {
 	}
 	tm, ok := dt.(int64)
 	return tm, ok
+}
+
+func GetTimeStrFromData(data models.Data, timestampKey string) (string, bool) {
+	if len(timestampKey) <= 0 {
+		return "", false
+	}
+	dt, ok := data[timestampKey]
+	if !ok {
+		return "", false
+	}
+	tmStr, ok := dt.(string)
+	return tmStr, ok
 }
 
 func GetTimeFromData(data models.Data, timestampKey string) (time.Time, bool) {
