@@ -9,14 +9,15 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/shirou/gopsutil/process"
 
 	"github.com/qiniu/log"
-
 	"github.com/qiniu/logkit/metric"
 	. "github.com/qiniu/logkit/metric/system/utils"
+	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
 )
@@ -28,6 +29,7 @@ const (
 	// TypeMetricProcstat 信息中的字段
 	KeyProcstatProcessName      = "procstat_process_name"
 	KeyProcstatPid              = "procstat_pid"
+	KeyProcstatStatus           = "procstat_status"
 	KeyProcstatThreadsNum       = "procstat_threads_num"
 	KeyProcstatFdsNum           = "procstat_fds_num"
 	KeyProcstatVolConSwitches   = "procstat_voluntary_context_switches"
@@ -94,15 +96,38 @@ const (
 	GoOSWindows = "windows"
 )
 
+var processStat = map[string]int{
+	"RUNNING":  0, // 默认或者非 supervisor 监控的进程都会是正在运行，所以选择 0 表示running
+	"STARTING": 1,
+	"STOPPING": 2,
+	"STOPPED":  3,
+	"EXITED":   4,
+	"FATAL":    5,
+}
+
 var (
 	defaultPIDFinder = NewPgrep
 	defaultProcess   = NewProc
 )
 
+type ProcessInfo struct {
+	Pid    PID
+	name   string
+	Status int
+	Process
+}
+
+// linux 和 mac 使用原来的会截断，例如 java 和 python 脚本程序只会显示java和python
+// 现在top 和 supervised的程序会自己设置name，没有再走原来的逻辑
+func (p *ProcessInfo) Name() (string, error) {
+	return p.name, nil
+}
+
 type Procstat struct {
 	PidTag      bool
 	Prefix      string
 	ProcessName string
+	config      map[string]interface{}
 
 	MemRelated      bool `json:"mem_related"`
 	IoRelated       bool `json:"io_related"`
@@ -128,12 +153,33 @@ type Procstat struct {
 	kernel          string
 	pidFinder       PIDFinder
 	createPIDFinder func() (PIDFinder, error)
-	procs           map[PID]Process
+	procs           map[PID]ProcessInfo
 	createProcess   func(PID) (Process, error)
 }
 
 // KeyProcUsages TypeMetricProc 中的字段名称
 var KeyProcUsages = models.KeyValueSlice{}
+
+const (
+	MemRelated      = "mem_related"
+	IoRelated       = "io_related"
+	CtxSwitRelated  = "context_switch_related"
+	ThreadsRelated  = "threads_related"
+	FileDescRelated = "file_descriptor_related"
+	CpuTimeRelated  = "cpu_time_related"
+	CpuUsageRelated = "cpu_usage_related"
+	ResourceLimits  = "resource_limits"
+	CpuTop10        = "cpu_top_10"
+	MemTop10        = "mem_top_10"
+	Supervisord     = "supervisord"
+	DaemonTools     = "daemon_tools"
+	PidFile         = "pid_file"
+	Exe             = "exe"
+	Pattern         = "pattern"
+	User            = "user"
+	SystemdUnit     = "system_unit"
+	CGroup          = "cgroup"
+)
 
 // ConfigProcUsages TypeMetricProc 配置项的描述
 var ConfigProcUsages = []models.Option{
@@ -213,8 +259,8 @@ var ConfigProcUsages = []models.Option{
 		KeyName:       "cpu_top_10",
 		Element:       models.Radio,
 		ChooseOnly:    true,
-		ChooseOptions: []interface{}{"false", "true"},
-		Default:       "false",
+		ChooseOptions: []interface{}{"true", "false"},
+		Default:       "true",
 		Description:   "收集CPU利用率前10的进程(cpu_top_10)",
 		Type:          metric.ConfigTypeBool,
 	},
@@ -222,8 +268,8 @@ var ConfigProcUsages = []models.Option{
 		KeyName:       "mem_top_10",
 		Element:       models.Radio,
 		ChooseOnly:    true,
-		ChooseOptions: []interface{}{"false", "true"},
-		Default:       "false",
+		ChooseOptions: []interface{}{"true", "false"},
+		Default:       "true",
 		Description:   "收集内存占用前10的进程(mem_top_10)",
 		Type:          metric.ConfigTypeBool,
 	},
@@ -231,8 +277,8 @@ var ConfigProcUsages = []models.Option{
 		KeyName:       "supervisord",
 		Element:       models.Radio,
 		ChooseOnly:    true,
-		ChooseOptions: []interface{}{"false", "true"},
-		Default:       "false",
+		ChooseOptions: []interface{}{"true", "false"},
+		Default:       "true",
 		Description:   "收集supervisord管理的进程(supervisord)",
 		Type:          metric.ConfigTypeBool,
 	},
@@ -298,11 +344,45 @@ func (p *Procstat) Usages() string {
 }
 
 func (p *Procstat) Config() map[string]interface{} {
+	opts := ConfigProcUsages
+	for _, opt := range opts {
+		if v, ok := p.config[opt.KeyName]; ok {
+			opt.Default = v
+		}
+	}
 	config := map[string]interface{}{
-		metric.OptionString:     ConfigProcUsages,
+		metric.OptionString:     opts,
 		metric.AttributesString: KeyProcUsages,
 	}
 	return config
+}
+
+func (p *Procstat) SyncConfig(config map[string]interface{}, meta *reader.Meta) error {
+	osInfo := utilsos.GetOSInfo()
+	p.config = config
+	p.MemRelated = getBoolOr(config, MemRelated, true)
+	p.IoRelated = getBoolOr(config, IoRelated, true)
+	p.CtxSwitRelated = getBool(config, CtxSwitRelated)
+	p.ThreadsRelated = getBool(config, ThreadsRelated)
+	p.FileDescRelated = getBool(config, FileDescRelated)
+	p.CpuTimeRelated = getBool(config, CpuTimeRelated)
+	p.CpuUsageRelated = getBoolOr(config, CpuUsageRelated, true)
+	p.ResourceLimits = getBool(config, ResourceLimits)
+
+	p.CpuTop10 = getBoolOr(config, CpuTop10, true)
+	p.MemTop10 = getBoolOr(config, MemTop10, true)
+	p.Supervisord = getBoolOr(config, Supervisord, true)
+	p.DaemonTools = getBool(config, DaemonTools)
+
+	p.PidFile = getString(config, PidFile)
+	p.Exe = getString(config, Exe)
+	p.Pattern = getString(config, Pattern)
+	p.User = getString(config, User)
+	p.SystemdUnit = getString(config, SystemdUnit)
+	p.CGroup = getString(config, CGroup)
+
+	p.kernel = osInfo.Kernel
+	return nil
 }
 
 func (p *Procstat) Tags() []string {
@@ -331,11 +411,12 @@ func (p *Procstat) Collect() (datas []map[string]interface{}, err error) {
 	return
 }
 
-func (p *Procstat) collectMetrics(proc Process) map[string]interface{} {
+func (p *Procstat) collectMetrics(proc ProcessInfo) map[string]interface{} {
 	fields := map[string]interface{}{}
 	if name, err := proc.Name(); err == nil {
 		fields[KeyProcstatProcessName] = name
 	}
+	fields[KeyProcstatStatus] = proc.Status
 	fields[KeyProcstatPid] = int32(proc.PID())
 
 	if p.ThreadsRelated {
@@ -463,19 +544,23 @@ func (p *Procstat) collectMetrics(proc Process) map[string]interface{} {
 	return fields
 }
 
-func (p *Procstat) updateProcesses(prevInfo map[PID]Process) (map[PID]Process, error) {
-	pids, err := p.findPids()
-	if err != nil {
+func (p *Procstat) updateProcesses(prevInfo map[PID]ProcessInfo) (map[PID]ProcessInfo, error) {
+	processInfos, err := p.findPids()
+	if err != nil && len(processInfos) == 0 {
 		return nil, err
 	}
-	procs := make(map[PID]Process, len(prevInfo))
-	for _, pid := range pids {
-		info, ok := prevInfo[pid]
+	procs := make(map[PID]ProcessInfo, len(prevInfo))
+	for _, processInfo := range processInfos {
+		info, ok := prevInfo[processInfo.Pid]
 		if ok {
-			procs[pid] = info
+			procs[processInfo.Pid] = info
 		} else {
-			if proc, err := p.createProcess(pid); err == nil {
-				procs[pid] = proc
+			if proc, err := p.createProcess(processInfo.Pid); err == nil {
+				processInfo.Process = proc
+				if processInfo.name == "" {
+					processInfo.name, _ = proc.Name()
+				}
+				procs[processInfo.Pid] = processInfo
 			}
 		}
 	}
@@ -493,9 +578,9 @@ func (p *Procstat) getPIDFinder() (PIDFinder, error) {
 	return p.pidFinder, nil
 }
 
-func (p *Procstat) findPids() ([]PID, error) {
+func (p *Procstat) findPids() (map[PID]ProcessInfo, error) {
 	var ps []PID
-	var pids []PID
+	process := make(map[PID]ProcessInfo)
 	var err error
 
 	f, err := p.getPIDFinder()
@@ -507,81 +592,77 @@ func (p *Procstat) findPids() ([]PID, error) {
 		if ps, err = f.PidFile(p.PidFile); err != nil {
 			log.Warnf("get pidfile %v error %v", p.PidFile, err)
 		} else {
-			pids = append(pids, ps...)
+			pid2ProcessInfo(process, ps)
 		}
 	}
 	if p.Exe != "" {
 		if ps, err = f.Pattern(p.Exe); err != nil {
 			log.Warnf("get pids by exec 'pgrep %v' error %v", p.Exe, err)
 		} else {
-			pids = append(pids, ps...)
+			pid2ProcessInfo(process, ps)
 		}
 	}
 	if p.Pattern != "" {
 		if ps, err = f.FullPattern(p.Pattern); err != nil {
 			log.Warnf("get pids by exec 'pgrep -f %v error %v", p.Pattern, err)
 		} else {
-			pids = append(pids, ps...)
+			pid2ProcessInfo(process, ps)
 		}
 	}
 	if p.User != "" {
 		if ps, err = f.Uid(p.User); err != nil {
 			log.Warnf("get pids by exec 'pgrep -u %v error %v", p.User, err)
 		} else {
-			pids = append(pids, ps...)
+			pid2ProcessInfo(process, ps)
 		}
 	}
 	if p.SystemdUnit != "" {
-		if ps, err = p.systemdUnitPIDs(); err != nil {
+		if err = p.systemdUnitPIDs(process); err != nil {
 			log.Warnf("get pids by exec 'systemctl show %v error %v", p.SystemdUnit, err)
-		} else {
-			pids = append(pids, ps...)
 		}
 	}
 	if p.CGroup != "" {
-		if ps, err = p.cgroupPIDs(); err != nil {
+		if err = p.cgroupPIDs(process); err != nil {
 			log.Warnf("cgroup: %s get pids by cgroup error %v", p.CGroup, err)
-		} else {
-			pids = append(pids, ps...)
 		}
 	}
 	if p.CpuTop10 {
-		if ps, err = p.PCpuTop10(); err != nil {
+		if err = p.PCpuTop10(process); err != nil {
 			log.Warnf("get pids of cpu usage top 10 error %v", err)
-		} else {
-			pids = append(pids, ps...)
 		}
 	}
 	if p.MemTop10 {
-		if ps, err = p.PMemTop10(); err != nil {
+		if err = p.PMemTop10(process); err != nil {
 			log.Warnf("get pids of mem usage top 10 error %v", err)
-		} else {
-			pids = append(pids, ps...)
 		}
 	}
 	if p.Supervisord {
-		if ps, err = p.childProcess("supervisord"); err != nil {
+		if err = p.SupervisordStat(process); err != nil {
 			log.Warnf("get pids of supervisord managed process error %v", err)
-		} else {
-			pids = append(pids, ps...)
 		}
 	}
 	if p.DaemonTools {
-		if ps, err = p.childProcess("daemontools"); err != nil {
+		if err = p.childProcess(process); err != nil {
 			log.Warnf("get pids of daemontools managed process error %v", err)
-		} else {
-			pids = append(pids, ps...)
 		}
 	}
-	return pids, err
+	return process, err
 }
 
-func (p *Procstat) systemdUnitPIDs() ([]PID, error) {
-	var pids []PID
+func pid2ProcessInfo(process map[PID]ProcessInfo, pids []PID) {
+	for _, pid := range pids {
+		process[pid] = ProcessInfo{
+			Pid: pid,
+		}
+	}
+	return
+}
+
+func (p *Procstat) systemdUnitPIDs(process map[PID]ProcessInfo) error {
 	cmd := ExecCommand("systemctl", "show", p.SystemdUnit)
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, line := range bytes.Split(out, []byte{'\n'}) {
 		kv := bytes.SplitN(line, []byte{'='}, 2)
@@ -592,20 +673,20 @@ func (p *Procstat) systemdUnitPIDs() ([]PID, error) {
 			continue
 		}
 		if len(kv[1]) == 0 {
-			return nil, nil
+			return nil
 		}
 		pid, err := strconv.Atoi(string(kv[1]))
 		if err != nil {
-			return nil, fmt.Errorf("invalid pid '%s'", kv[1])
+			return fmt.Errorf("invalid pid '%s'", kv[1])
 		}
-		pids = append(pids, PID(pid))
+		process[ PID(pid)] = ProcessInfo{
+			Pid: PID(pid),
+		}
 	}
-	return pids, nil
+	return nil
 }
 
-func (p *Procstat) cgroupPIDs() ([]PID, error) {
-	var pids []PID
-
+func (p *Procstat) cgroupPIDs(process map[PID]ProcessInfo) error {
 	procsPath := p.CGroup
 	if procsPath[0] != '/' {
 		procsPath = "/sys/fs/cgroup/" + procsPath
@@ -613,7 +694,7 @@ func (p *Procstat) cgroupPIDs() ([]PID, error) {
 	procsPath = filepath.Join(procsPath, "cgroup.procs")
 	out, err := ioutil.ReadFile(procsPath)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, pidBS := range bytes.Split(out, []byte{'\n'}) {
 		if len(pidBS) == 0 {
@@ -621,62 +702,157 @@ func (p *Procstat) cgroupPIDs() ([]PID, error) {
 		}
 		pid, err := strconv.Atoi(string(pidBS))
 		if err != nil {
-			return nil, fmt.Errorf("invalid pid '%s'", pidBS)
+			return fmt.Errorf("invalid pid '%s'", pidBS)
 		}
-		pids = append(pids, PID(pid))
+		process[ PID(pid)] = ProcessInfo{
+			Pid: PID(pid),
+		}
 	}
 
-	return pids, nil
+	return nil
 }
 
-func (p *Procstat) PCpuTop10() (pids []PID, err error) {
+func (p *Procstat) PCpuTop10(process map[PID]ProcessInfo) (err error) {
 	var comm string
 	if p.kernel == GoOSMac {
-		comm = "ps x -o pid= -r | head -n 10"
+		comm = "ps x -o pid=,command= -r | head -n 10"
 	} else if p.kernel == GoOSLinux {
-		comm = "ps -Ao pid= --sort=-pcpu | head -n 10"
+		comm = "ps -Ao pid=,cmd= --sort=-pcpu | head -n 10"
 	} else {
 		log.Warnf("not support kernel %v, ignored it", p.kernel)
 		return
 	}
-	pids, err = runCommand(comm)
+	err = runCommandIdName(process, comm)
 	return
 }
 
-func (p *Procstat) PMemTop10() (pids []PID, err error) {
+func (p *Procstat) PMemTop10(process map[PID]ProcessInfo) (err error) {
 	var comm string
 	if p.kernel == GoOSMac {
-		comm = "ps x -o pid= -m | head -n 10"
+		comm = "ps x -o pid=,command= -m | head -n 10"
 	} else if p.kernel == GoOSLinux {
-		comm = "ps -Ao pid= --sort=-pmem | head -n 10"
+		comm = "ps -Ao pid=,cmd= --sort=-pmem | head -n 10"
 	} else {
 		log.Warnf("not support kernel %v, ignored it", p.kernel)
 		return
 	}
-	return runCommand(comm)
+	return runCommandIdName(process, comm)
 }
 
-func (p *Procstat) childProcess(name string) (pids []PID, err error) {
-	comm := `ps -ef | grep ` + name + ` | grep -v 'grep ' | awk '{print $2}'|xargs ps -o pid= --ppid`
-	return runCommand(comm)
+func (p *Procstat) SupervisordStat(process map[PID]ProcessInfo) (err error) {
+	stdout, err := exec.Command("bash", "-c", "supervisorctl status").Output()
+	if err != nil {
+		return fmt.Errorf("exec command supervisorctl status error [%v]: %s", err, string(stdout))
+	}
+	var pid = 0
+	for _, str := range strings.Split(string(stdout), "\n") {
+		fields := strings.Fields(str)
+		if len(fields) < 4 {
+			continue
+		}
+		info := ProcessInfo{
+			name: fields[0],
+		}
+		info.Status, _ = processStat[fields[1]]
+		if pid, err = strconv.Atoi(strings.Trim(fields[3], ",")); err != nil {
+			log.Infof("parse %s ERROR: %v", err)
+			continue
+		}
+		info.Pid = PID(pid)
+		process[info.Pid] = info
+	}
+	return
 }
 
-func runCommand(comm string) (pids []PID, err error) {
+func (p *Procstat) childProcess(process map[PID]ProcessInfo) (err error) {
+	comm := `ps -ef | grep daemontools | grep -v 'grep ' | awk '{print $2}'|xargs ps -o pid= --ppid`
+	return runCommand(process, comm)
+}
+
+func runCommandIdName(process map[PID]ProcessInfo, comm string) (err error) {
+	out, err := exec.Command("sh", "-c", comm).Output()
+	if err != nil {
+		return fmt.Errorf("exec command %v error [%v]: %s", comm, err, string(out))
+	}
+	lines := strings.Split(string(out), "\n")
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+		pid, err := strconv.Atoi(fields[0])
+		if err != nil {
+			return err
+		}
+
+		info := ProcessInfo{
+			Pid:  PID(pid),
+			name: strings.Join(fields[1:], " "),
+		}
+		process[info.Pid] = info
+	}
+	return nil
+}
+
+func runCommand(process map[PID]ProcessInfo, comm string) (err error) {
 	out, err := exec.Command("bash", "-c", comm).Output()
 	if err != nil {
-		return pids, fmt.Errorf("exec command %v error [%v]: %s", comm, err, string(out))
+		return fmt.Errorf("exec command %v error [%v]: %s", comm, err, string(out))
 	}
-	return ParseOutput(string(out))
+	var pids []PID
+	if pids, err = ParseOutput(string(out)); err != nil {
+		return
+	}
+
+	for _, pid := range pids {
+		process[pid] = ProcessInfo{
+			Pid: pid,
+		}
+	}
+	return
+}
+
+func getBool(config map[string]interface{}, key string) bool {
+	if v, ok := config[key]; ok {
+		if b, ok := v.(bool); ok {
+			return b
+		}
+	}
+	return false
+}
+
+func getString(config map[string]interface{}, key string) string {
+	if v, ok := config[key]; ok {
+		if str, ok := v.(string); ok {
+			return str
+		}
+	}
+	return ""
+}
+
+func getBoolOr(config map[string]interface{}, key string, dv bool) bool {
+	if v, ok := config[key]; ok {
+		if b, ok := v.(bool); ok {
+			return b
+		}
+	}
+	return dv
+}
+
+func NewCreator() metric.Collector {
+	osInfo := utilsos.GetOSInfo()
+	return &Procstat{
+		config:          map[string]interface{}{},
+		MemRelated:      true,
+		IoRelated:       true,
+		CpuUsageRelated: true,
+		MemTop10:        true,
+		CpuTop10:        true,
+		Supervisord:     true,
+		kernel:          osInfo.Kernel,
+	}
 }
 
 func init() {
-	metric.Add(TypeMetricProcstat, func() metric.Collector {
-		osInfo := utilsos.GetOSInfo()
-		return &Procstat{
-			IoRelated:       true,
-			MemRelated:      true,
-			CpuUsageRelated: true,
-			kernel:          osInfo.Kernel,
-		}
-	})
+	metric.Add(TypeMetricProcstat, NewCreator)
 }
