@@ -247,7 +247,6 @@ func (g *Xml) transform(dataPipeline <-chan transforms.TransformInfo, resultChan
 			continue
 		}
 
-		//if g.Expand {
 		m, xmlErr := mxj.NewMapXml([]byte(strVal), g.Keep)
 		if xmlErr != nil {
 			errNum, err = transforms.SetError(errNum, xmlErr, transforms.General, "")
