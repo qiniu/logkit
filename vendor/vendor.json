@@ -370,70 +370,70 @@
 			"revisionTime": "2017-02-15T23:32:05Z"
 		},
 		{
-			"checksumSHA1": "xAtRC74g8m+aZGcp/jaud8vP/0M=",
+			"checksumSHA1": "cqepZhPMa15NCFUeAGTtWSbFVDQ=",
 			"path": "github.com/influxdata/telegraf",
-			"revision": "acd176cf4255a096dbf39af209877e887bde1c35",
-			"revisionTime": "2018-12-21T19:30:31Z"
+			"revision": "5109847be1f24e958be54599049217793612554c",
+			"revisionTime": "2019-03-27T01:20:52Z"
 		},
 		{
 			"checksumSHA1": "gNsLGqaxbjgEE1mcu55ldiOhGK0=",
 			"path": "github.com/influxdata/telegraf/filter",
-			"revision": "acd176cf4255a096dbf39af209877e887bde1c35",
-			"revisionTime": "2018-12-21T19:30:31Z"
+			"revision": "5109847be1f24e958be54599049217793612554c",
+			"revisionTime": "2019-03-27T01:20:52Z"
 		},
 		{
-			"checksumSHA1": "btolyA30WIQLMjaOYLhoD3vBPaU=",
+			"checksumSHA1": "Gf4sdqyaP2oLVb6CWqRQxcp/JLc=",
 			"path": "github.com/influxdata/telegraf/internal",
-			"revision": "acd176cf4255a096dbf39af209877e887bde1c35",
-			"revisionTime": "2018-12-21T19:30:31Z"
+			"revision": "5109847be1f24e958be54599049217793612554c",
+			"revisionTime": "2019-03-27T01:20:52Z"
 		},
 		{
 			"checksumSHA1": "MQry1PZYACCdDYhHU0UUrtEei/g=",
 			"path": "github.com/influxdata/telegraf/internal/tls",
-			"revision": "acd176cf4255a096dbf39af209877e887bde1c35",
-			"revisionTime": "2018-12-21T19:30:31Z"
+			"revision": "5109847be1f24e958be54599049217793612554c",
+			"revisionTime": "2019-03-27T01:20:52Z"
 		},
 		{
-			"checksumSHA1": "XO4D3xx8+zMwkG6Lmj36B83gFzc=",
+			"checksumSHA1": "XzO2UVLFDVU6Q5YV/3laN/Gfc0Y=",
 			"path": "github.com/influxdata/telegraf/metric",
-			"revision": "acd176cf4255a096dbf39af209877e887bde1c35",
-			"revisionTime": "2018-12-21T19:30:31Z"
+			"revision": "5109847be1f24e958be54599049217793612554c",
+			"revisionTime": "2019-03-27T01:20:52Z"
 		},
 		{
 			"checksumSHA1": "ndlMI6F5fLXx3LBvgU8ipj3Bs/M=",
 			"path": "github.com/influxdata/telegraf/plugins/inputs",
-			"revision": "acd176cf4255a096dbf39af209877e887bde1c35",
-			"revisionTime": "2018-12-21T19:30:31Z"
+			"revision": "5109847be1f24e958be54599049217793612554c",
+			"revisionTime": "2019-03-27T01:20:52Z"
 		},
 		{
-			"checksumSHA1": "Hk6m8ARPM05gpIoPX5kzvxNitKk=",
+			"checksumSHA1": "HTXtCVcjv03RG3Zz+RSF0gk6BGk=",
 			"path": "github.com/influxdata/telegraf/plugins/inputs/docker",
-			"revision": "acd176cf4255a096dbf39af209877e887bde1c35",
-			"revisionTime": "2018-12-21T19:30:31Z"
+			"revision": "5109847be1f24e958be54599049217793612554c",
+			"revisionTime": "2019-03-27T01:20:52Z"
 		},
 		{
 			"checksumSHA1": "lFF0ya0cz5b27g+u4zKJrunJnQ0=",
 			"path": "github.com/influxdata/telegraf/plugins/inputs/elasticsearch",
-			"revision": "acd176cf4255a096dbf39af209877e887bde1c35",
-			"revisionTime": "2018-12-21T19:30:31Z"
+			"revision": "5109847be1f24e958be54599049217793612554c",
+			"revisionTime": "2019-03-27T01:20:52Z"
 		},
 		{
-			"checksumSHA1": "7dLuXe+C7JIMjUdvOJ1Ovtdr0EY=",
+			"checksumSHA1": "fl5CKlwzAGclxItvy1oM8NbdV54=",
 			"path": "github.com/influxdata/telegraf/plugins/inputs/http_response",
-			"revision": "acd176cf4255a096dbf39af209877e887bde1c35",
-			"revisionTime": "2018-12-21T19:30:31Z"
+			"revision": "5109847be1f24e958be54599049217793612554c",
+			"revisionTime": "2019-03-27T01:20:52Z"
 		},
 		{
 			"checksumSHA1": "J0ywR8aidsjFc7L8muO4L3BK+As=",
 			"path": "github.com/influxdata/telegraf/plugins/inputs/memcached",
-			"revision": "acd176cf4255a096dbf39af209877e887bde1c35",
-			"revisionTime": "2018-12-21T19:30:31Z"
+			"revision": "5109847be1f24e958be54599049217793612554c",
+			"revisionTime": "2019-03-27T01:20:52Z"
 		},
 		{
-			"checksumSHA1": "giCDJLh+GoIeKJoikOiGtkRt4F4=",
+			"checksumSHA1": "71VbHoIrbGIByRoSQUHi4AEZY6s=",
 			"path": "github.com/influxdata/telegraf/plugins/parsers/json",
-			"revision": "acd176cf4255a096dbf39af209877e887bde1c35",
-			"revisionTime": "2018-12-21T19:30:31Z"
+			"revision": "5109847be1f24e958be54599049217793612554c",
+			"revisionTime": "2019-03-27T01:20:52Z"
 		},
 		{
 			"checksumSHA1": "0ZrwvB6KoGPj2PoDNSEJwxQ6Mog=",
