@@ -82,7 +82,7 @@ func main() {
 			fmt.Printf("will generate total %v data\n", *totalnumber)
 		}
 		datasource := *username + ":" + *password + "@tcp(" + *host + ":" + *port + ")" + "/" + *database + "?charset="
-		datagen.GenerateMysqlData(datasource, *table, *totalnumber, 100*time.Millisecond, time.Hour, time.Now().Add(-100*time.Hour))
+		datagen.GenerateMysqlData(datasource, *table, *totalnumber, 100*time.Millisecond, time.Hour, time.Now().Add(-100*time.Hour), false)
 	case "postgres":
 		fmt.Printf("Start to generate data to %s %s %s %s %s ", *host, *port, *username, *database, *table)
 		if *totalnumber <= 0 {

@@ -78,6 +78,7 @@ type MysqlReader struct {
 	timestampKeyInt bool
 	timestampMux    sync.RWMutex
 	startTime       time.Time
+	startTimeStr    string
 	startTimeInt    int64
 	timeCacheMap    map[string]string
 	batchDuration   time.Duration
@@ -110,6 +111,7 @@ func NewMysqlReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error)
 		mgld                    time.Duration
 
 		timestampkey  string
+		startTimeStr  string
 		startTime     time.Time
 		batchDuration time.Duration
 		startTimeInt  int64
@@ -133,11 +135,13 @@ func NewMysqlReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error)
 	timestampInt, _ = conf.GetBoolOr(KeyMysqlTimestampInt, false)
 	if !timestampInt {
 		startTime = time.Now()
-		startTimeStr, _ := conf.GetStringOr(KeyMysqlStartTime, "")
+		startTimeStr, _ = conf.GetStringOr(KeyMysqlStartTime, "")
 		if startTimeStr != "" {
 			startTime, err = times.StrToTimeLocation(startTimeStr, time.Local)
 			if err != nil {
-				return nil, fmt.Errorf("parse starttime %s error %v", startTimeStr, err)
+				log.Errorf("parse starttime %s error %v", startTimeStr, err)
+			} else {
+				startTimeStr = ""
 			}
 		}
 		timestampDurationStr, _ := conf.GetStringOr(KeyMysqlBatchDuration, "1m")
@@ -203,6 +207,7 @@ func NewMysqlReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error)
 		timestampKeyInt: timestampInt,
 		startTime:       startTime,
 		startTimeInt:    startTimeInt,
+		startTimeStr:    startTimeStr,
 		batchDuration:   batchDuration,
 		batchDurInt:     batchDurInt,
 
@@ -225,27 +230,7 @@ func NewMysqlReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error)
 	}
 
 	if r.timestampKey != "" {
-		if r.timestampKeyInt {
-			tm, cache, err := RestoreTimestampIntOffset(r.meta.DoneFilePath)
-			if err == nil {
-				r.startTimeInt = tm
-				r.timestampMux.Lock()
-				r.timeCacheMap = cache
-				r.timestampMux.Unlock()
-			} else {
-				log.Errorf("RestoreTimestampIntOffset err %v", err)
-			}
-		} else {
-			tm, cache, err := RestoreTimestampOffset(r.meta.DoneFilePath)
-			if err == nil {
-				r.startTime = tm
-				r.timestampMux.Lock()
-				r.timeCacheMap = cache
-				r.timestampMux.Unlock()
-			} else {
-				log.Errorf("RestoreTimestampOffset err %v", err)
-			}
-		}
+		r.restoreTimestamp()
 	}
 
 	if r.rawSQLs == "" {
@@ -421,7 +406,11 @@ func (r *MysqlReader) SyncMeta() {
 		if r.timestampKeyInt {
 			content = strconv.FormatInt(r.startTimeInt, 10)
 		} else {
-			content = r.startTime.Format(time.RFC3339Nano)
+			if r.startTimeStr == "" {
+				content = r.startTime.Format(time.RFC3339Nano)
+			} else {
+				content = r.startTimeStr
+			}
 		}
 		if err := WriteTimestmapOffset(r.meta.DoneFilePath, content); err != nil {
 			log.Errorf("Runner[%v] %v SyncMeta WriteTimestmapOffset error %v", r.meta.RunnerName, r.Name(), err)
@@ -762,7 +751,10 @@ func (r *MysqlReader) getSQL(idx int, rawSQL string) string {
 		if r.timestampKeyInt {
 			return fmt.Sprintf("%s WHERE %s >= %v and %s < %v;", rawSQL, r.timestampKey, r.startTimeInt, r.timestampKey, r.startTimeInt+int64(r.batchDurInt))
 		}
-		return fmt.Sprintf("%s WHERE %s >= '%s' and %s < '%s';", rawSQL, r.timestampKey, r.startTime.Format(MysqlTimeFormat), r.timestampKey, r.startTime.Add(r.batchDuration).Format(MysqlTimeFormat))
+		if r.startTimeStr == "" {
+			return fmt.Sprintf("%s WHERE %s >= '%s' and %s < '%s';", rawSQL, r.timestampKey, r.startTime.Format(MysqlTimeFormat), r.timestampKey, r.startTime.Add(r.batchDuration).Format(MysqlTimeFormat))
+		}
+		return fmt.Sprintf("%s WHERE %s >= '%s';", rawSQL, r.timestampKey, r.startTimeStr)
 	}
 
 	rawSQL = strings.TrimSuffix(strings.TrimSpace(rawSQL), ";")
@@ -798,8 +790,13 @@ func (r *MysqlReader) checkExit(idx int, db *sql.DB) (bool, int64) {
 		if r.timestampKeyInt {
 			tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v >= %v;", rawSQL, r.timestampKey, r.startTimeInt)
 		} else {
-			tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v >= '%s';", rawSQL, r.timestampKey, r.startTime.Format(MysqlTimeFormat))
+			if r.startTimeStr == "" {
+				tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v >= '%s';", rawSQL, r.timestampKey, r.startTime.Format(MysqlTimeFormat))
+			} else {
+				tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v >= '%s';", rawSQL, r.timestampKey, r.startTimeStr)
+			}
 		}
+
 		largerAmount, err := QueryNumber(tsql, db)
 		if err != nil || largerAmount <= int64(len(r.timeCacheMap)) {
 			//查询失败或者数据量不变本轮就先退出了
@@ -810,7 +807,11 @@ func (r *MysqlReader) checkExit(idx int, db *sql.DB) (bool, int64) {
 		if r.timestampKeyInt {
 			tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v = %v;", rawSQL, r.timestampKey, r.startTimeInt)
 		} else {
-			tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v = '%s';", rawSQL, r.timestampKey, r.startTime.Format(MysqlTimeFormat))
+			if r.startTimeStr == "" {
+				tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v = '%s';", rawSQL, r.timestampKey, r.startTime.Format(MysqlTimeFormat))
+			} else {
+				tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v = '%s';", rawSQL, r.timestampKey, r.startTimeStr)
+			}
 		}
 		equalAmount, err := QueryNumber(tsql, db)
 		if err == nil && equalAmount > int64(len(r.timeCacheMap)) {
@@ -822,7 +823,11 @@ func (r *MysqlReader) checkExit(idx int, db *sql.DB) (bool, int64) {
 		if r.timestampKeyInt {
 			tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v > %v;", r.timestampKey, r.timestampKey, rawSQL, r.timestampKey, r.startTimeInt)
 		} else {
-			tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v > '%s';", r.timestampKey, r.timestampKey, rawSQL, r.timestampKey, r.startTime.Format(MysqlTimeFormat))
+			if r.startTimeStr == "" {
+				tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v > '%s';", r.timestampKey, r.timestampKey, rawSQL, r.timestampKey, r.startTime.Format(MysqlTimeFormat))
+			} else {
+				tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v > '%s';", r.timestampKey, r.timestampKey, rawSQL, r.timestampKey, r.startTimeStr)
+			}
 		}
 	} else {
 		tsql = fmt.Sprintf("%s WHERE %v >= %d order by %v limit 1;", rawSQL, r.offsetKey, r.offsets[idx], r.offsetKey)
@@ -1125,7 +1130,11 @@ func (r *MysqlReader) execReadSql(curDB string, idx int, execSQL string, db *sql
 	if r.timestampKeyInt {
 		startTimePrint = strconv.FormatInt(r.startTimeInt, 10)
 	} else {
-		startTimePrint = r.startTime.String()
+		if r.startTimeStr == "" {
+			startTimePrint = r.startTime.String()
+		} else {
+			startTimePrint = r.startTimeStr
+		}
 	}
 	log.Infof("Runner[%v] SQL: <%v> find total %d data, after trim duplicated, left data is: %d, "+
 		"now we have total got %v data, and start time is %v ",
@@ -1266,4 +1275,42 @@ func (r *MysqlReader) greaterThanLastRecord(queryType int, target, magicRemainSt
 	}
 
 	return CompareTime(target, rawData, magicRes.TimeStart, magicRes.TimeEnd, false)
+}
+
+func (r *MysqlReader) restoreTimestamp() {
+	if r.timestampKeyInt {
+		tm, cache, err := RestoreTimestampIntOffset(r.meta.DoneFilePath)
+		if err == nil {
+			r.startTimeInt = tm
+			r.timestampMux.Lock()
+			r.timeCacheMap = cache
+			r.timestampMux.Unlock()
+		} else {
+			log.Errorf("RestoreTimestampIntOffset err %v", err)
+		}
+		return
+	}
+	if r.startTimeStr == "" {
+		tm, cache, err := RestoreTimestampOffset(r.meta.DoneFilePath)
+		if err == nil {
+			r.startTime = tm
+			r.timestampMux.Lock()
+			r.timeCacheMap = cache
+			r.timestampMux.Unlock()
+		} else {
+			log.Errorf("RestoreTimestampOffset err %v", err)
+		}
+		return
+	}
+
+	tmStr, cache, err := RestoreTimestampStrOffset(r.meta.DoneFilePath)
+	if err == nil {
+		r.startTimeStr = tmStr
+		r.timestampMux.Lock()
+		r.timeCacheMap = cache
+		r.timestampMux.Unlock()
+	} else {
+		log.Errorf("RestoreTimestampStrOffset err %v", err)
+	}
+	return
 }

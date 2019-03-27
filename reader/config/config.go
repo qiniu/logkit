@@ -542,7 +542,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: true,
 			Description:  `单次查询范围(` + KeyMysqlBatchDuration + `)`,
 			Advance:      true,
-			ToolTip:      `指定一个 mysql 搜索的范围(10s、2m、1h)；如果时间戳类型是整型，此处填数字`,
+			ToolTip:      `指定一个 mysql 搜索的范围(10s、2m、1h)；如果时间戳类型是整型，此处填数字，仅在有效时间戳时生效`,
 		},
 		{
 			KeyName:       KeyMysqlTimestampInt,

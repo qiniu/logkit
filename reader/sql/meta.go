@@ -57,8 +57,8 @@ func RestoreTimestampIntOffset(doneFilePath string) (int64, map[string]string, e
 		return tm, nil, err
 	}
 
-	cachemapfilePath := filepath.Join(doneFilePath, cachemapfilename)
-	data, err = ioutil.ReadFile(cachemapfilePath)
+	cacheMapFilePath := filepath.Join(doneFilePath, cachemapfilename)
+	data, err = ioutil.ReadFile(cacheMapFilePath)
 	if err != nil {
 		return tm, nil, err
 	}
@@ -79,13 +79,14 @@ func RestoreTimestampOffset(doneFilePath string) (time.Time, map[string]string, 
 	if err != nil {
 		return time.Time{}, nil, err
 	}
+
 	tm, err := time.Parse(time.RFC3339Nano, string(data))
 	if err != nil {
 		return tm, nil, err
 	}
 
-	cachemapfilePath := filepath.Join(doneFilePath, cachemapfilename)
-	data, err = ioutil.ReadFile(cachemapfilePath)
+	cacheMapFilePath := filepath.Join(doneFilePath, cachemapfilename)
+	data, err = ioutil.ReadFile(cacheMapFilePath)
 	if err != nil {
 		return tm, nil, err
 	}
@@ -95,6 +96,30 @@ func RestoreTimestampOffset(doneFilePath string) (time.Time, map[string]string, 
 		return tm, nil, err
 	}
 	return tm, cache, nil
+}
+
+func RestoreTimestampStrOffset(doneFilePath string) (string, map[string]string, error) {
+	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, TimestampRecordsFile)
+	cachemapfilename := fmt.Sprintf("%v.%v", reader.DoneFileName, CacheMapFile)
+
+	filePath := filepath.Join(doneFilePath, filename)
+	data, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return "", nil, err
+	}
+
+	tmStr := string(data)
+	cacheMapFilePath := filepath.Join(doneFilePath, cachemapfilename)
+	data, err = ioutil.ReadFile(cacheMapFilePath)
+	if err != nil {
+		return "", nil, err
+	}
+	cache := make(map[string]string)
+	err = json.Unmarshal(data, &cache)
+	if err != nil {
+		return "", nil, err
+	}
+	return tmStr, cache, nil
 }
 
 func WriteCacheMap(doneFilePath string, cache map[string]string) (err error) {
