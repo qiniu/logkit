@@ -138,6 +138,15 @@ var (
 		Advance:      true,
 		ToolTip:      "reader每次读取一行，若要读取多行，请填写head_pattern，表示匹配多行时新的一行的开始符合该正则表达式",
 	}
+	OptionRunTime = Option{
+		KeyName:      KeyRunTime,
+		ChooseOnly:   false,
+		Default:      "",
+		DefaultNoUse: false,
+		Description:  "运行时间(run_time)",
+		Advance:      true,
+		ToolTip:      "reader每次读取时间范围，24小时制，请填写时间范围，例如 22-23，表示每天 22点到23点 之间进行采集，仅file和tailx模式支持",
+	}
 	OptionSQLSchema = Option{
 		KeyName:      KeySQLSchema,
 		ChooseOnly:   false,
@@ -323,6 +332,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionEncoding,
 		OptionReadIoLimit,
 		OptionHeadPattern,
+		OptionRunTime,
 	},
 	ModeTailx: {
 		{
@@ -344,6 +354,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionDataSourceTag,
 		OptionEncodeTag,
 		OptionHeadPattern,
+		OptionRunTime,
 		{
 			KeyName:      KeyExpire,
 			ChooseOnly:   false,
@@ -431,6 +442,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionEncodeTag,
 		OptionReadIoLimit,
 		OptionHeadPattern,
+		OptionRunTime,
 		OptionKeyNewFileNewLine,
 		OptionKeySkipFileFirstLine,
 		OptionKeyReadSameInode,

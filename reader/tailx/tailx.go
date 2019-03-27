@@ -30,11 +30,12 @@ import (
 )
 
 var (
-	_ reader.DaemonReader = &Reader{}
-	_ reader.StatsReader  = &Reader{}
-	_ reader.LagReader    = &Reader{}
-	_ reader.Reader       = &Reader{}
-	_ Resetable           = &Reader{}
+	_ reader.DaemonReader  = &Reader{}
+	_ reader.StatsReader   = &Reader{}
+	_ reader.LagReader     = &Reader{}
+	_ reader.Reader        = &Reader{}
+	_ Resetable            = &Reader{}
+	_ reader.RunTimeReader = &Reader{}
 )
 
 func init() {
@@ -68,10 +69,10 @@ type Reader struct {
 	submetaExpire        time.Duration
 	expireDelete         bool
 	deleteDirs           chan string
-
-	statInterval time.Duration
-	maxOpenFiles int
-	whence       string
+	runTime              reader.RunTime
+	statInterval         time.Duration
+	maxOpenFiles         int
+	whence               string
 
 	notFirstTime bool
 }
@@ -87,6 +88,7 @@ type ActiveReader struct {
 	status       int32
 	inactive     int32 //当inactive>0 时才会被expire回收
 	runnerName   string
+	runtime      reader.RunTime
 
 	emptyLineCnt int
 
@@ -99,27 +101,27 @@ type Result struct {
 	logpath string
 }
 
-func NewActiveReader(originPath, realPath, whence, inode string, notFirstTime bool, expireMap map[string]int64, meta *reader.Meta, msgChan chan<- Result, errChan chan<- error) (ar *ActiveReader, err error) {
+func NewActiveReader(originPath, realPath, whence, inode string, r *Reader) (ar *ActiveReader, err error) {
 	rpath := strings.Replace(realPath, string(os.PathSeparator), "_", -1)
 	if runtime.GOOS == "windows" {
 		rpath = strings.Replace(rpath, ":", "_", -1)
 	}
-	subMetaPath := filepath.Join(meta.Dir, rpath)
-	subMeta, err := reader.NewMetaWithRunnerName(meta.RunnerName, subMetaPath, subMetaPath, realPath, ModeFile, meta.TagFile, reader.DefautFileRetention)
+	subMetaPath := filepath.Join(r.meta.Dir, rpath)
+	subMeta, err := reader.NewMetaWithRunnerName(r.meta.RunnerName, subMetaPath, subMetaPath, realPath, ModeFile, r.meta.TagFile, reader.DefautFileRetention)
 	if err != nil {
 		return nil, err
 	}
-	subMeta.SetEncodingWay(meta.GetEncodingWay())
-	subMeta.Readlimit = meta.Readlimit
-	isNewFile := meta.IsStatisticFileExist() || notFirstTime //是否为存量文件
+	subMeta.SetEncodingWay(r.meta.GetEncodingWay())
+	subMeta.Readlimit = r.meta.Readlimit
+	isNewFile := r.meta.IsStatisticFileExist() || r.notFirstTime //是否为存量文件
 	if isNewFile && subMeta.IsNotExist() {
 		whence = WhenceOldest // 非存量文件第一次读取时从头开始读
 	}
 
 	//tailx模式下新增runner是因为文件已经感知到了，所以不可能文件不存在，那么如果读取还遇到错误，应该马上返回，所以errDirectReturn=true
 	var originOffset int64
-	if len(expireMap) != 0 {
-		originOffset = expireMap[inode+"_"+realPath]
+	if len(r.expireMap) != 0 {
+		originOffset = r.expireMap[inode+"_"+realPath]
 	}
 	var fr reader.FileReader
 	if reader.CompressedFile(realPath) {
@@ -144,13 +146,14 @@ func NewActiveReader(originPath, realPath, whence, inode string, notFirstTime bo
 		br:           bf,
 		realpath:     realPath,
 		originpath:   originPath,
-		msgchan:      msgChan,
-		errChan:      errChan,
+		msgchan:      r.msgChan,
+		errChan:      r.errChan,
 		inactive:     1,
 		emptyLineCnt: 0,
-		runnerName:   meta.RunnerName,
+		runnerName:   r.meta.RunnerName,
 		status:       StatusInit,
 		statsLock:    sync.RWMutex{},
+		runtime:      r.runTime,
 	}, nil
 
 }
@@ -228,6 +231,7 @@ func (ar *ActiveReader) Run() {
 		}
 		return
 	}
+
 	var err error
 	timer := time.NewTicker(time.Second)
 	defer timer.Stop()
@@ -241,6 +245,12 @@ func (ar *ActiveReader) Run() {
 			}
 			return
 		}
+		now := time.Now()
+		if !reader.InRunTime(now.Hour(), now.Minute(), ar.runtime) {
+			time.Sleep(time.Minute)
+			continue
+		}
+
 		if ar.readcache == "" {
 			ar.cacheLineMux.Lock()
 			ar.readcache, err = ar.br.ReadLine()
@@ -521,6 +531,15 @@ func (r *Reader) SetMode(mode string, value interface{}) error {
 	return nil
 }
 
+func (r *Reader) SetRunTime(mode string, value interface{}) error {
+	runTime, err := reader.ParseRunTimeWithMode(mode, value)
+	if err != nil {
+		return errors.New("get run time: " + err.Error())
+	}
+	r.runTime = runTime
+	return nil
+}
+
 func (r *Reader) setStatsError(err string) {
 	r.statsLock.Lock()
 	defer r.statsLock.Unlock()
@@ -657,7 +676,7 @@ func (r *Reader) statLogPath() {
 			continue
 		}
 
-		ar, err := NewActiveReader(mc, rp, r.whence, inodeStr, r.notFirstTime, r.expireMap, r.meta, r.msgChan, r.errChan)
+		ar, err := NewActiveReader(mc, rp, r.whence, inodeStr, r)
 		if err != nil {
 			err = fmt.Errorf("Runner[%s] NewActiveReader for matches %s error %v ", r.meta.RunnerName, rp, err)
 			r.sendError(err)
@@ -671,6 +690,17 @@ func (r *Reader) statLogPath() {
 		ar.readcache = cacheline
 		if r.headRegexp != nil {
 			err = ar.br.SetMode(ReadModeHeadPatternRegexp, r.headRegexp)
+			if err != nil {
+				if !IsSelfRunner(r.meta.RunnerName) {
+					log.Errorf("Runner[%s] NewActiveReader for matches %s SetMode error %v", r.meta.RunnerName, rp, err)
+				} else {
+					log.Debugf("Runner[%s] NewActiveReader for matches %s SetMode error %v", r.meta.RunnerName, rp, err)
+				}
+				r.setStatsError("Runner[" + r.meta.RunnerName + "] NewActiveReader for matches " + rp + " SetMode error " + err.Error())
+			}
+		}
+		if !r.runTime.Equal() {
+			err = ar.br.SetRunTime(ReadModeRunTimeStruct, r.runTime)
 			if err != nil {
 				if !IsSelfRunner(r.meta.RunnerName) {
 					log.Errorf("Runner[%s] NewActiveReader for matches %s SetMode error %v", r.meta.RunnerName, rp, err)
@@ -742,9 +772,12 @@ func (r *Reader) Start() error {
 		ticker := time.NewTicker(r.statInterval)
 		defer ticker.Stop()
 		for {
-			r.checkExpiredFiles()
-			utils.CheckNotExistFile(r.meta.RunnerName, r.expireMap)
-			r.statLogPath()
+			now := time.Now()
+			if reader.InRunTime(now.Hour(), now.Minute(), r.runTime) {
+				r.checkExpiredFiles()
+				utils.CheckNotExistFile(r.meta.RunnerName, r.expireMap)
+				r.statLogPath()
+			}
 
 			select {
 			case <-r.stopChan:

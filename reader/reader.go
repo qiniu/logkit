@@ -27,6 +27,10 @@ type Reader interface {
 	Close() error
 }
 
+type RunTimeReader interface {
+	SetRunTime(mode string, v interface{}) error
+}
+
 // DaemonReader 代表了一个需要守护线程的读取器
 type DaemonReader interface {
 	// Start 用于非阻塞的启动读取器对应的守护线程，需要读取器自行负责其生命周期
@@ -126,6 +130,8 @@ func (reg *Registry) NewReaderWithMeta(conf conf.MapConf, meta *Meta, errDirectR
 	}
 	mode, _ := conf.GetStringOr(KeyMode, ModeDir)
 	headPattern, _ := conf.GetStringOr(KeyHeadPattern, "")
+	runTime, _ := conf.GetStringOr(KeyRunTime, "")
+
 	constructor, exist := reg.readerTypeMap[mode]
 	if !exist {
 		return nil, fmt.Errorf("reader type unsupported : %v", mode)
@@ -138,6 +144,13 @@ func (reg *Registry) NewReaderWithMeta(conf conf.MapConf, meta *Meta, errDirectR
 	if headPattern != "" {
 		err = reader.SetMode(ReadModeHeadPatternString, headPattern)
 		if err != nil {
+			return nil, err
+		}
+	}
+
+	runTimeReader, ok := reader.(RunTimeReader)
+	if runTime != "" && ok {
+		if err = runTimeReader.SetRunTime(ReadModeRunTimeString, runTime); err != nil {
 			return nil, err
 		}
 	}

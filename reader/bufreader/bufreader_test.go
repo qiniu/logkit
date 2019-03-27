@@ -3,7 +3,9 @@ package bufreader
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
@@ -104,6 +106,84 @@ func Test_BuffReader(t *testing.T) {
 	if len(rest) != 12 {
 		t.Errorf("rest should be 12, but got %v", len(rest))
 	}
+	r.Close()
+}
+
+func Test_BuffReaderInRunTime(t *testing.T) {
+	t.Parallel()
+	fileName := filepath.Join(os.TempDir(), "Test_BuffReaderInRunTime")
+	//create file & write file
+	CreateFile(fileName, "12345\n12345\n12345\n12345\n12345\n12345")
+	defer DeleteFile(fileName)
+	if time.Now().Second() < 5 {
+		time.Sleep(10 * time.Second)
+	}
+	runTime := strconv.Itoa(time.Now().Hour())
+	c := conf.MapConf{
+		"log_path":        fileName,
+		"meta_path":       MetaDir,
+		"mode":            ModeFile,
+		"sync_every":      "1",
+		"ignore_hidden":   "true",
+		"reader_buf_size": "24",
+		"read_from":       "oldest",
+		"run_time":        runTime + "-",
+	}
+	r, err := reader.NewFileBufReader(c, false)
+	if err != nil {
+		t.Error(err)
+	}
+	rest := []string{}
+	for {
+		line, err := r.ReadLine()
+		if err == nil && line != "" {
+			rest = append(rest, line)
+		} else {
+			break
+		}
+	}
+	if len(rest) != 5 {
+		t.Errorf("rest should be 12, but got %v", len(rest))
+	}
+	r.Close()
+}
+
+func Test_BuffReaderOutRunTime(t *testing.T) {
+	t.Parallel()
+	fileName := filepath.Join(os.TempDir(), "Test_BuffReaderOutRunTime")
+	//create file & write file
+	CreateFile(fileName, "12345\n12345\n12345\n12345\n12345\n12345")
+	defer DeleteFile(fileName)
+	runTime := strconv.Itoa(time.Now().Hour() + 2)
+	c := conf.MapConf{
+		"log_path":        fileName,
+		"meta_path":       MetaDir,
+		"mode":            ModeFile,
+		"sync_every":      "1",
+		"ignore_hidden":   "true",
+		"reader_buf_size": "24",
+		"read_from":       "oldest",
+		"run_time":        runTime + "-",
+	}
+	r, err := reader.NewFileBufReader(c, false)
+	if err != nil {
+		t.Error(err)
+	}
+	rest := []string{}
+	spaceNum := 0
+	for {
+		line, err := r.ReadLine()
+		if err == nil && line != "" {
+			rest = append(rest, line)
+		} else {
+			if spaceNum > 2 {
+				break
+			}
+			spaceNum++
+			continue
+		}
+	}
+	assert.EqualValues(t, 0, len(rest))
 	r.Close()
 }
 
