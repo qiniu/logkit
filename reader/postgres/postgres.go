@@ -685,7 +685,7 @@ func (r *PostgresReader) checkExit(idx int, db *sql.DB) (bool, int64) {
 		tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v >= %v;", r.offsetKey, r.offsetKey, rawSQL, r.offsetKey, r.offsets[idx])
 	}
 
-	log.Info("query <", tsql, "> to check exit")
+	log.Debug("query <", tsql, "> to check exit")
 	rows, err := db.Query(tsql)
 	if err != nil {
 		log.Error(err)
@@ -868,9 +868,12 @@ func (r *PostgresReader) execReadSql(curDB, execSQL string, idx int, tables []st
 	} else {
 		startTimePrint = r.startTime.String()
 	}
-	log.Infof("Runner[%v] SQL: <%v> find total %d data, after trim duplicated, left data is: %d, "+
-		"now we have total got %v data, and start time is %v ",
-		r.meta.RunnerName, execSQL, total, len(alldatas), len(r.timeCacheMap), startTimePrint)
+	if len(alldatas) != 0 {
+		log.Infof("Runner[%v] SQL: <%v> find total %d data, after trim duplicated, left data is: %d, "+
+			"now we have total got %v data, and start time is %v ",
+			r.meta.RunnerName, execSQL, total, len(alldatas), len(r.timeCacheMap), startTimePrint)
+	}
+
 	if maxOffset > 0 {
 		r.offsets[idx] = maxOffset + 1
 	}
