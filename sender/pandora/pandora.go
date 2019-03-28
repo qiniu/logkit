@@ -829,6 +829,9 @@ func validSchema(valueType string, value interface{}, numberAsFloat bool) bool {
 		if _, ok := value.(map[string]interface{}); ok {
 			return true
 		}
+		if _, ok := value.(map[string]string); ok {
+			return true
+		}
 		vu := reflect.ValueOf(value)
 		var str string
 		if vu.Kind() == reflect.String {
