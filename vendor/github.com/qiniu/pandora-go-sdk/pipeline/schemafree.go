@@ -1014,19 +1014,19 @@ func GetTrimedDataSchema(data Data) (valueType map[string]RepoSchemaEntry) {
 				delete(data, k)
 				continue
 			}
-
-			sc := formValueType(k, PandoraTypeMap)
-			for _, m := range follows {
-				sc.Schema = append(sc.Schema, m)
-			}
-			valueType[k] = sc
+			valueType[k] = formValueType(k, PandoraTypeJsonString)
 		case map[string]string:
-			sc := formValueType(k, PandoraTypeMap)
-			for mapKey := range nv {
-				scFollow := formValueType(mapKey, PandoraTypeString)
-				sc.Schema = append(sc.Schema, scFollow)
+			isEmpty := true
+			for _, nvVal := range nv {
+				if nvVal != "" {
+					isEmpty = false
+					break
+				}
 			}
-			valueType[k] = sc
+			if isEmpty {
+				continue
+			}
+			valueType[k] = formValueType(k, PandoraTypeJsonString)
 		case []interface{}:
 			sc := formValueType(k, PandoraTypeArray)
 			if len(nv) > 0 {
