@@ -194,8 +194,14 @@ func ConvertString(v interface{}) (string, error) {
 		return strconv.Itoa(int(dv.Int())), nil
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		return strconv.Itoa(int(dv.Uint())), nil
+	case reflect.Float32:
+		return strconv.FormatFloat(dv.Float(), 'g', -1, 32), nil
+	case reflect.Float64:
+		return strconv.FormatFloat(dv.Float(), 'g', -1, 64), nil
 	case reflect.String:
 		return dv.String(), nil
+	case reflect.Bool:
+		return strconv.FormatBool(dv.Bool()), nil
 	case reflect.Interface:
 		idv := dv.Interface()
 		if ret, ok := idv.(int64); ok {
@@ -233,6 +239,12 @@ func ConvertString(v interface{}) (string, error) {
 		}
 		if ret, ok := idv.([]byte); ok {
 			return string(ret), nil
+		}
+		if ret, ok := idv.(float64); ok {
+			return strconv.FormatFloat(float64(ret), 'g', -1, 64), nil
+		}
+		if ret, ok := idv.(float32); ok {
+			return strconv.FormatFloat(float64(ret), 'g', -1, 32), nil
 		}
 		//Postgres的时间类型为time.Time
 		if ret, ok := idv.(time.Time); ok {
