@@ -1,4 +1,4 @@
-# logkit-community（社区版） [![Build Status](https://api.travis-ci.org/qiniu/logkit.svg)](http://travis-ci.org/qiniu/logkit)
+# logkit-community（社区版） [![Build Status](https://api.travis-ci.org/qiniu/logkit.svg)](http://travis-ci.org/qiniu/logkit) [![Go Report Card](https://goreportcard.com/badge/github.com/qiniu/logkit)](https://goreportcard.com/report/github.com/qiniu/logkit)
 
 ![logkit LOGO](https://raw.githubusercontent.com/qiniu/logkit/master/resources/logo.png)
 
