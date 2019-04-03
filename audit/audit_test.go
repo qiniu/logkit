@@ -11,15 +11,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestAuidt(t *testing.T) {
-	dir := "./TestAuidt"
-	auidt, err := NewAuditLogger(dir, 5*1024)
+func TestAudit(t *testing.T) {
+	dir := "./TestAudit"
+	audit, err := NewAuditLogger(dir, 5*1024)
 	assert.NoError(t, err)
 	defer os.RemoveAll(dir)
 	for i := 0; i < 1000; i++ {
-		auidt.Log(Message{"haha", time.Now().UnixNano() / 1000000, rand.Int63n(100000000), rand.Int63n(100000), rand.Int63n(100000), "", 123})
+		audit.Log(Message{"haha", time.Now().UnixNano() / 1000000, rand.Int63n(100000000), rand.Int63n(100000), rand.Int63n(100000), "", 123})
+		time.Sleep(time.Millisecond)
 	}
 	files, err := ioutil.ReadDir(dir)
+	for _, f := range files {
+		t.Log(f.Name(), " ", f.Size())
+	}
 	assert.NoError(t, err)
 	assert.Equal(t, 9, len(files))
 }
