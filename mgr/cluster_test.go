@@ -815,11 +815,6 @@ func changeTagsTest(p *testCluParam) {
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
 
-	slaves := make([]Slave, 0)
-	slaves = append(slaves, Slave{Url: rs[1].cluster.Address, Tag: "test-test", Status: StatusOK})
-	slaves = append(slaves, Slave{Url: rs[2].cluster.Address, Tag: "test-test", Status: StatusOK})
-	slaves = append(slaves, Slave{Url: rs[3].cluster.Address, Tag: rs[3].cluster.Tag, Status: StatusOK})
-
 	url = rs[0].cluster.Address + "/logkit/cluster/slaves?tag="
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
 	assert.NoError(t, err, string(respBody))
@@ -828,7 +823,7 @@ func changeTagsTest(p *testCluParam) {
 	err = jsoniter.Unmarshal(respBody, &respGetSlaves)
 	assert.NoError(t, err)
 	getSlaves := respGetSlaves.Data
-	for i, _ := range getSlaves {
+	for i := range getSlaves {
 		getSlaves[i].LastTouch = time.Time{}
 	}
 
@@ -836,11 +831,6 @@ func changeTagsTest(p *testCluParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, marshaled)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-
-	slaves = make([]Slave, 0)
-	slaves = append(slaves, Slave{Url: rs[1].cluster.Address, Tag: "test-test", Status: StatusOK})
-	slaves = append(slaves, Slave{Url: rs[2].cluster.Address, Tag: "test-test", Status: StatusOK})
-	slaves = append(slaves, Slave{Url: rs[3].cluster.Address, Tag: "test-test", Status: StatusOK})
 
 	url = rs[0].cluster.Address + "/logkit/cluster/slaves"
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
@@ -883,7 +873,7 @@ func clusterSlavesDeleteTest(p *testCluParam) {
 	err = jsoniter.Unmarshal(respBody, &respGetSlaves)
 	assert.NoError(t, err)
 	getSlaves := respGetSlaves.Data
-	for i, _ := range getSlaves {
+	for i := range getSlaves {
 		getSlaves[i].LastTouch = time.Time{}
 	}
 	assert.Equal(t, slaves, getSlaves)

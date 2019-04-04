@@ -125,7 +125,6 @@ func TestGetTags(t *testing.T) {
 	  	}`), 0644)
 	assert.NoError(t, err)
 	defer os.Remove(tagFile)
-	err = nil
 	exp := map[string]interface{}{
 		"Title":  "tags",
 		"Author": []interface{}{"john", "ada", "alice"},

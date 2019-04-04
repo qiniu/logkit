@@ -69,7 +69,7 @@ func TestNewHttpFetchReader(t *testing.T) {
 	except := `{"logkit1":"data1","logkit2":"data2","logkit3":"data3","logkit4":"data4"}`
 	var line string
 	times := 0
-	for ; line == "" && times < 5; {
+	for line == "" && times < 5 {
 		line, err = httpReader.ReadLine()
 		assert.NoError(t, err)
 		time.Sleep(2 * time.Second)

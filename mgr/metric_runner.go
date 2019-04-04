@@ -565,7 +565,7 @@ func (mr *MetricRunner) StatusBackup() {
 
 func createDiscardTransformer(key string) (transforms.Transformer, error) {
 	strTP := "discard"
-	creater, ok := transforms.Transformers[strTP]
+	creator, ok := transforms.Transformers[strTP]
 	if !ok {
 		return nil, fmt.Errorf("type %v of transformer not exist", strTP)
 	}
@@ -574,7 +574,7 @@ func createDiscardTransformer(key string) (transforms.Transformer, error) {
 		"type":  strTP,
 		"stage": "after_parser",
 	}
-	trans := creater()
+	trans := creator()
 	bts, err := jsoniter.Marshal(tConf)
 	if err != nil {
 		return nil, fmt.Errorf("type %v of transformer marshal config error %v", strTP, err)

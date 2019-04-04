@@ -9,6 +9,7 @@ import (
 	_ "github.com/qiniu/logkit/reader/dirx"
 	_ "github.com/qiniu/logkit/reader/elastic"
 	_ "github.com/qiniu/logkit/reader/http"
+	_ "github.com/qiniu/logkit/reader/httpfetch"
 	_ "github.com/qiniu/logkit/reader/kafka"
 	_ "github.com/qiniu/logkit/reader/mockreader"
 	_ "github.com/qiniu/logkit/reader/mongo"
@@ -20,5 +21,4 @@ import (
 	_ "github.com/qiniu/logkit/reader/snmp"
 	_ "github.com/qiniu/logkit/reader/socket"
 	_ "github.com/qiniu/logkit/reader/tailx"
-	_ "github.com/qiniu/logkit/reader/httpfetch"
 )

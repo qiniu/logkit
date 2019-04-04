@@ -124,10 +124,8 @@ func TestGetFiles(t *testing.T) {
 }
 
 func createDirWithName(dirx string) {
-	err := os.Mkdir(dirx, DefaultDirPerm)
-	if err != nil {
+	if err := os.Mkdir(dirx, DefaultDirPerm); err != nil {
 		log.Error(err)
-		return
 	}
 }
 

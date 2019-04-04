@@ -439,6 +439,7 @@ func Test_Watch_LogDir(t *testing.T) {
 		t.Error(err)
 	}
 	confPathAbs, err := filepath.Abs("./Test_Watch_LogDir/tests2/confs1/test5.conf")
+	assert.Nil(t, err)
 	m.runnerLock.Lock()
 	_, ok := m.runners[confPathAbs]
 	m.runnerLock.Unlock()

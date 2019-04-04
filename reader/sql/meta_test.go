@@ -83,7 +83,7 @@ func TestSyncDBRecords_RestoreRecordsFileestoreRecordsFile(t *testing.T) {
 				},
 				"db4": TableRecords{
 					Table: map[string]TableInfo{
-						"db4_tb10": TableInfo{Size: -1, Offset: -1},
+						"db4_tb10": {Size: -1, Offset: -1},
 					},
 					Mutex: sync.RWMutex{},
 				},

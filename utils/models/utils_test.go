@@ -237,7 +237,7 @@ func TestExtractField(t *testing.T) {
 	slice3 := []string{"%{[type}", "default"}
 	slice3, err3 := ExtractField(slice3)
 	assert.Error(t, err3)
-
+	assert.Nil(t, slice3)
 }
 
 func TestGetKeys(t *testing.T) {
@@ -1260,7 +1260,7 @@ func Test_GetGrokLabels(t *testing.T) {
 		},
 		{
 			labelList: []string{"a v", "x y"},
-			nameLabel: map[string]struct{}{"x": struct{}{}},
+			nameLabel: map[string]struct{}{"x": {}},
 			exp:       []GrokLabel{{Name: "a", Value: "v"}},
 		},
 	}

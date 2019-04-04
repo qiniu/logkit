@@ -660,6 +660,7 @@ func testDecompress(t *testing.T, rtDir, url string) {
 	}
 	assert.NotEqual(t, "", downloadUrl)
 	tmpFile, err := downloadPackage(downloadUrl, rootDir)
+	assert.Nil(t, err)
 	if err = os.Rename(tmpFile.Name(), packageFilePath); err != nil {
 		t.Fatalf("package rename error %v", err)
 	}

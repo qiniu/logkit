@@ -217,7 +217,6 @@ func (lr *LogRunner) Run() {
 		}
 		log.Debugf("Runner[%s] send %s finish to send at: %v", lr.Name(), lr.reader.Name(), time.Now().Format(time.RFC3339))
 	}
-	return
 }
 
 func (lr *LogRunner) Stop() error {

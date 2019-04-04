@@ -170,6 +170,7 @@ func TestFtDiscardLast(t *testing.T) {
 	mp2[KeyFtStrategy] = KeyFtStrategyBackupOnly
 	mp2[KeyFtDiscardErr] = "false"
 	fts2, err := sender.NewFtSender(s, mp2, fttestdir)
+	assert.Nil(t, err)
 	err = fts2.Send(datas)
 	se, ok = err.(*StatsError)
 	if !ok {
@@ -239,6 +240,7 @@ func TestInvalidData(t *testing.T) {
 	mp2[KeyFtStrategy] = KeyFtStrategyBackupOnly
 	mp2[KeyFtDiscardErr] = "false"
 	fts2, err := sender.NewFtSender(s, mp2, fttestdir)
+	assert.Nil(t, err)
 	err = fts2.Send(datas)
 	se, ok = err.(*StatsError)
 	if !ok {
@@ -800,6 +802,7 @@ func TestPandoraExtraInfo(t *testing.T) {
 	}
 
 	s, err = sender.NewFtSender(innerSender, conf1, fttestdir)
+	assert.Nil(t, err)
 	d = Data{
 		"*x1":        "123.2",
 		"x2.dot":     "123.2",

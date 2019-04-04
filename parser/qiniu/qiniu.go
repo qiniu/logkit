@@ -84,7 +84,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	}
 
 	nameMap := make(map[string]struct{})
-	for k, _ := range logHeaders {
+	for k := range logHeaders {
 		nameMap[string(k)] = struct{}{}
 	}
 	labels := GetGrokLabels(labelList, nameMap)

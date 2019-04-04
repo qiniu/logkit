@@ -586,8 +586,7 @@ func restCRUDTest(p *testParam) {
 	var respGotLists respRunnerConfigs
 	err = jsoniter.Unmarshal(respBody, &respGotLists)
 	assert.NoError(t, err)
-	gotLists := make(map[string]RunnerConfig)
-	gotLists = respGotLists.Data
+	gotLists := respGotLists.Data
 	for i, v := range gotLists {
 		v.CreateTime = ""
 		gotLists[i] = v
@@ -1060,9 +1059,12 @@ func getRunnersTest(p *testParam) {
 	}
 	mode := config.ModeDir
 	runnerConf1, err := getRunnerConfig(runnerName1, logDir, metaDir, mode, resvPath)
+	if err != nil {
+		t.Fatalf("get runner %s config failed, error is %v", runnerName1, err)
+	}
 	runnerConf2, err := getRunnerConfig(runnerName2, logDir, metaDir, mode, resvPath)
 	if err != nil {
-		t.Fatalf("get runner config failed, error is %v", err)
+		t.Fatalf("get runner %s config failed, error is %v", runnerName2, err)
 	}
 	url := "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName1
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf1)

@@ -27,8 +27,6 @@ const (
 
 const MaxGrokMultiLineBuffer = 64 * 1024 * 1024 // 64MB
 
-var ()
-
 func init() {
 	parser.RegisterConstructor(TypeGrok, NewParser)
 }
