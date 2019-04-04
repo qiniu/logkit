@@ -346,7 +346,7 @@ func TestPostgresWithTimestampS(t *testing.T) {
 	dataLine := 0
 	before := time.Now()
 	var actualData []models.Data
-	for !batchTimeout(before, 60) {
+	for !batchTimeout(before, 120) {
 		data, _, err := r.ReadData()
 		if err != nil {
 			continue

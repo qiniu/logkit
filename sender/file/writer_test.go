@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -39,6 +40,7 @@ func Test_writer(t *testing.T) {
 			wg.Done()
 		}()
 	}
+	time.Sleep(time.Second)
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
 		go func() {
