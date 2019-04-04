@@ -1326,6 +1326,7 @@ func TestReaderErrBegin(t *testing.T) {
 		"sync_every":      "1",
 		"reader_buf_size": "1024",
 		"read_from":       "oldest",
+		"runner_name":     "LogkitInternalCollectLogRunnerTest",
 	}
 	meta, err := reader.NewMetaWithConf(c)
 	assert.NoError(t, err)
