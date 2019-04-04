@@ -15,11 +15,11 @@ import (
 
 // /proc/stat file line prefixes to gather stats on:
 var (
-	interrupts       = []byte("intr")
-	context_switches = []byte("ctxt")
-	processes_forked = []byte("processes")
-	disk_pages       = []byte("page")
-	boot_time        = []byte("btime")
+	interrupts      = []byte("intr")
+	contextSwitches = []byte("ctxt")
+	processesForked = []byte("processes")
+	diskPages       = []byte("page")
+	bootTime        = []byte("btime")
 )
 
 const (
@@ -85,25 +85,25 @@ func (k *Kernel) Collect() (datas []map[string]interface{}, err error) {
 				return nil, err
 			}
 			fields[KernelInterrupts] = int64(m)
-		case bytes.Equal(field, context_switches):
+		case bytes.Equal(field, contextSwitches):
 			m, err := strconv.ParseInt(string(dataFields[i+1]), 10, 64)
 			if err != nil {
 				return nil, err
 			}
 			fields[KernelContextSwitches] = int64(m)
-		case bytes.Equal(field, processes_forked):
+		case bytes.Equal(field, processesForked):
 			m, err := strconv.ParseInt(string(dataFields[i+1]), 10, 64)
 			if err != nil {
 				return nil, err
 			}
 			fields[KernelProcessesForked] = int64(m)
-		case bytes.Equal(field, boot_time):
+		case bytes.Equal(field, bootTime):
 			m, err := strconv.ParseInt(string(dataFields[i+1]), 10, 64)
 			if err != nil {
 				return nil, err
 			}
 			fields[KernelBootTime] = int64(m)
-		case bytes.Equal(field, disk_pages):
+		case bytes.Equal(field, diskPages):
 			in, err := strconv.ParseInt(string(dataFields[i+1]), 10, 64)
 			if err != nil {
 				return nil, err

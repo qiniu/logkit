@@ -247,7 +247,7 @@ func TestWebAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 	rs := NewRestService(m, echo.New())
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Second)
 	c := make(chan string)
 	defer func() {
 		close(c)
@@ -304,7 +304,7 @@ func TestWebRest(t *testing.T) {
 		t.Fatal(err)
 	}
 	rs := NewRestService(m, echo.New())
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Second)
 	defer func() {
 		rs.Stop()
 		os.RemoveAll(rootDir)
@@ -326,7 +326,7 @@ func TestWebRest(t *testing.T) {
 	wg.Add(len(funcMap))
 	for k, f := range funcMap {
 		go func(k string, f func(*testParam), group *sync.WaitGroup) {
-			f(&testParam{rootDir, t, rs})
+			f(&testParam{rootDir, &testing.T{}, rs})
 			group.Done()
 		}(k, f, wg)
 	}
@@ -334,6 +334,7 @@ func TestWebRest(t *testing.T) {
 }
 
 func Test_generateStatsShell(t *testing.T) {
+	t.Parallel()
 	err := generateStatsShell(":4001", "/logkit")
 	if err != nil {
 		t.Errorf("Test_generateStatsShell fail %v", err)
@@ -359,7 +360,7 @@ func restGetFailedDataStatusTest(p *testParam) {
 	if err := mkTestDir(testDir, logDir, metaDir, resvDir); err != nil {
 		t.Fatalf("mkdir test path error %v", err)
 	}
-	time.Sleep(1 * time.Second)
+	time.Sleep(time.Millisecond)
 	runnerConf, err := getMockSenderRunnerConfig(runnerName, logDir, metaDir, config.ModeDir)
 	if err != nil {
 		t.Fatalf("get mock sender runner config failed, error is %v", err)
@@ -379,7 +380,7 @@ func restGetFailedDataStatusTest(p *testParam) {
 	if err := writeLogFile([]string{log1}, logDir); err != nil {
 		t.Fatalf("write log data error %v", err)
 	}
-	time.Sleep(20 * time.Second)
+	time.Sleep(10 * time.Second)
 	cmd := exec.Command("./stats")
 	cmd.Stdin = strings.NewReader("some input")
 	var out bytes.Buffer
@@ -388,8 +389,10 @@ func restGetFailedDataStatusTest(p *testParam) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rss := make(map[string]RunnerStatus)
-	var respRss respRunnerStatus
+	var (
+		rss     map[string]RunnerStatus
+		respRss respRunnerStatus
+	)
 	err = jsoniter.Unmarshal([]byte(out.String()), &respRss)
 	assert.NoError(t, err, out.String())
 	rss = respRss.Data
@@ -420,7 +423,7 @@ func restGetStatusTest(p *testParam) {
 	if err := mkTestDir(testDir, logDir, metaDir, resvDir); err != nil {
 		t.Fatalf("mkdir test path error %v", err)
 	}
-	time.Sleep(1 * time.Second)
+	time.Sleep(time.Millisecond)
 	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, config.ModeDir, resvPath)
 	if err != nil {
 		t.Fatalf("get runner config failed, error is %v", err)
@@ -436,7 +439,7 @@ func restGetStatusTest(p *testParam) {
 	if err := writeLogFile([]string{log1}, logDir); err != nil {
 		t.Fatalf("write log data error %v", err)
 	}
-	time.Sleep(20 * time.Second)
+	time.Sleep(10 * time.Second)
 	cmd := exec.Command("./stats")
 	cmd.Stdin = strings.NewReader("some input")
 	var out bytes.Buffer
@@ -445,8 +448,10 @@ func restGetStatusTest(p *testParam) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rss := make(map[string]RunnerStatus)
-	var respRss respRunnerStatus
+	var (
+		rss     map[string]RunnerStatus
+		respRss respRunnerStatus
+	)
 	err = jsoniter.Unmarshal([]byte(out.String()), &respRss)
 	assert.NoError(t, err, out.String())
 	rss = respRss.Data
@@ -509,7 +514,7 @@ func restCRUDTest(p *testParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, conf1)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(3 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	var expconf1, got1 RunnerConfig
 	var respGot1 respRunnerConfig
@@ -560,7 +565,7 @@ func restCRUDTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, conf2)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(3 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName2
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
@@ -577,6 +582,7 @@ func restCRUDTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
+	assert.Nil(t, err)
 	var respGotLists respRunnerConfigs
 	err = jsoniter.Unmarshal(respBody, &respGotLists)
 	assert.NoError(t, err)
@@ -600,7 +606,7 @@ func restCRUDTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPut, conf1Upd)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(5 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName1
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
@@ -620,7 +626,7 @@ func restCRUDTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodDelete, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(3 * time.Second)
+	time.Sleep(time.Second)
 	assert.False(t, utils.IsExist(metaDir))
 
 	// get runner2
@@ -687,7 +693,7 @@ func runnerResetTest(p *testParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, resetConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(6 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	exp := getRunnerStatus(runnerName, logDir, RunnerRunning, "file_sender", "", 1, 29, 0, 1, 0, 1)
 	url = "http://127.0.0.1" + rs.address + "/logkit/status"
@@ -708,7 +714,7 @@ func runnerResetTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(10 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	url = "http://127.0.0.1" + rs.address + "/logkit/status"
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
@@ -745,7 +751,7 @@ func runnerResetTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(5 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	url = "http://127.0.0.1" + rs.address + "/logkit/errors"
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
@@ -808,7 +814,7 @@ func runnerStopStartTest(p *testParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, startConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(10 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	exp := getRunnerStatus(runnerName, logDir, RunnerRunning, "file_sender", "", 1, 29, 0, 1, 0, 1)
 	url = "http://127.0.0.1" + rs.address + "/logkit/status"
@@ -829,7 +835,7 @@ func runnerStopStartTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(3 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	expStopped := getRunnerStatus(runnerName, "", RunnerStopped, "file_sender", "", 0, 0, 0, 0, 0, 0)
 	url = "http://127.0.0.1" + rs.address + "/logkit/status"
@@ -853,7 +859,7 @@ func runnerStopStartTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(5 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	url = "http://127.0.0.1" + rs.address + "/logkit/status"
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
@@ -880,13 +886,13 @@ func runnerStopStartTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(3 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName
 	respCode, respBody, err = makeRequest(url, http.MethodDelete, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(3 * time.Second)
+	time.Sleep(2 * time.Second)
 	assert.False(t, utils.IsExist(metaDir))
 }
 
@@ -951,15 +957,15 @@ func runnerDataIntegrityTest(p *testParam) {
 		writeCnt++
 		w.Flush()
 		file.Close()
-		time.Sleep(time.Second)
+		time.Sleep(time.Millisecond)
 
 		url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName + "/start"
 		respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 		assert.NoError(t, err, string(respBody))
 		assert.Equal(t, http.StatusOK, respCode)
-		time.Sleep(3 * time.Second)
+		time.Sleep(2 * time.Second)
 	}
-	time.Sleep(10 * time.Second)
+	time.Sleep(5 * time.Second)
 	url = "http://127.0.0.1" + rs.address + "/logkit/status"
 	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
 	assert.NoError(t, err, string(respBody))
@@ -996,11 +1002,13 @@ func runnerDataIntegrityTest(p *testParam) {
 }
 
 func TestParseUrl(t *testing.T) {
+	t.Parallel()
 	host, port, err := net.SplitHostPort(":1234")
 	assert.NoError(t, err, fmt.Sprintf("%v:%v", host, port))
 }
 
 func TestGetMySlaveUrl(t *testing.T) {
+	t.Parallel()
 	url, err := GetMySlaveUrl("127.0.0.1:1222", "https://")
 	assert.NoError(t, err)
 	assert.Equal(t, "https://127.0.0.1:1222", url)
@@ -1155,17 +1163,17 @@ func senderRouterTest(p *testParam) {
 	err = jsoniter.Unmarshal(runnerConfBytes, &runnerConf)
 	assert.NoError(t, err)
 	runnerConf.SendersConfig = []conf.MapConf{
-		conf.MapConf{
+		{
 			"name":           "file_sender1",
 			"sender_type":    "file",
 			"file_send_path": resvPath1,
 		},
-		conf.MapConf{
+		{
 			"name":           "file_sender2",
 			"sender_type":    "file",
 			"file_send_path": resvPath2,
 		},
-		conf.MapConf{
+		{
 			"name":           "file_sender3",
 			"sender_type":    "file",
 			"file_send_path": resvPath3,
@@ -1249,6 +1257,7 @@ func senderRouterTest(p *testParam) {
 }
 
 func TestConvertWebParserConfig(t *testing.T) {
+	t.Parallel()
 	cf := conf.MapConf{
 		KeyCSVSplitter:        "\\t",
 		KeyGrokCustomPatterns: `JUUyJTgyJUFDJTIwJUU0JUJEJUEwJUU1JUE1JUJEJTIwJUMzJUE2JUMzJUI4JUMzJUE1JUMzJTg2JUMzJTk4JUMzJTg1`,

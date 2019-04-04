@@ -967,8 +967,6 @@ func (r *MysqlReader) getAll(queryType int) (getAll bool, err error) {
 	default:
 		return false, fmt.Errorf("%v queryType is not support get sql now", queryType)
 	}
-
-	return true, nil
 }
 
 // 根据 queryType 获取 table 中所有记录或者表中所有数据的条数的sql语句

@@ -417,8 +417,6 @@ func (r *Reader) ReadLine() (string, error) {
 	case <-timer.C:
 		return "", r.readError()
 	}
-
-	return "", nil
 }
 
 func (r *Reader) Status() StatsInfo {

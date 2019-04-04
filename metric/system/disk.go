@@ -104,9 +104,9 @@ func (s *DiskStats) Collect() (datas []map[string]interface{}, err error) {
 			// Skip dummy filesystem (procfs, cgroupfs, ...)
 			continue
 		}
-		var used_percent float64
+		var usedPercent float64
 		if du.Used+du.Free > 0 {
-			used_percent = float64(du.Used) /
+			usedPercent = float64(du.Used) /
 				(float64(du.Used) + float64(du.Free)) * 100
 		}
 
@@ -117,7 +117,7 @@ func (s *DiskStats) Collect() (datas []map[string]interface{}, err error) {
 			KeyDiskTotal:       du.Total,
 			KeyDiskFree:        du.Free,
 			KeyDiskUsed:        du.Used,
-			KeyDiskUsedPercent: used_percent,
+			KeyDiskUsedPercent: usedPercent,
 			KeyDiskInodesTotal: du.InodesTotal,
 			KeyDiskInodesFree:  du.InodesFree,
 			KeyDiskInodesUsed:  du.InodesUsed,

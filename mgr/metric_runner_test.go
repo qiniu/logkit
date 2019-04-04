@@ -45,6 +45,7 @@ func getMetricRunnerConfig(name string, mc []MetricConfig, senderPath string) ([
 }
 
 func TestMetricRunner(t *testing.T) {
+	t.Parallel()
 	pwd, err := os.Getwd()
 	if err != nil {
 		t.Error(err)
@@ -65,7 +66,7 @@ func TestMetricRunner(t *testing.T) {
 		t.Fatal(err)
 	}
 	rs := NewRestService(m, echo.New())
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Millisecond)
 	c := make(chan string)
 	defer func() {
 		close(c)
@@ -110,7 +111,7 @@ func metricRunTest(p *testParam) {
 	if err := mkTestDir(testDir, resvDir); err != nil {
 		t.Fatalf("mkdir test path error %v", err)
 	}
-	time.Sleep(1 * time.Second)
+
 	mc := []MetricConfig{
 		{
 			MetricType: "cpu",
@@ -132,21 +133,21 @@ func metricRunTest(p *testParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(3 * time.Second)
+	time.Sleep(time.Second)
 
 	// 停止 runner
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName + "/stop"
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Second)
 
 	// 必须要引入 system 以便执行其中的 init
 	log.Println(system.TypeMetricCpu)
 
 	// 读取发送端文件，
 	cpuAttr := system.KeyCpuUsages
-	var curLine int64 = 0
+	var curLine int64
 	f, err := os.Open(resvPath1)
 	assert.NoError(t, err)
 	br := bufio.NewReaderSize(f, bufSize)
@@ -204,7 +205,7 @@ func metricRunTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Second)
 
 	curLine = 0
 	f, err = os.Open(resvPath2)
@@ -231,7 +232,7 @@ func metricRunTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodDelete, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Second)
 	assert.False(t, utils.IsExist(metaPath))
 }
 
@@ -248,7 +249,6 @@ func metricNetTest(p *testParam) {
 	if err := mkTestDir(testDir, resvDir); err != nil {
 		t.Fatalf("mkdir test path error %v", err)
 	}
-	time.Sleep(1 * time.Second)
 	mc := []MetricConfig{
 		{
 			MetricType: "net",
@@ -268,16 +268,16 @@ func metricNetTest(p *testParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(3 * time.Second)
+	time.Sleep(time.Second)
 
 	// 停止 runner
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName + "/stop"
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Second)
 
-	var curLine int64 = 0
+	var curLine int64
 	f, err := os.Open(resvPath)
 	assert.NoError(t, err)
 	br := bufio.NewReaderSize(f, bufSize)
@@ -312,7 +312,6 @@ func metricDiskioTest(p *testParam) {
 	if err := mkTestDir(testDir, resvDir); err != nil {
 		t.Fatalf("mkdir test path error %v", err)
 	}
-	time.Sleep(1 * time.Second)
 	mc := []MetricConfig{
 		{
 			MetricType: "diskio",
@@ -332,16 +331,16 @@ func metricDiskioTest(p *testParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(3 * time.Second)
+	time.Sleep(time.Second)
 
 	// 停止 runner
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName + "/stop"
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Second)
 
-	var curLine int64 = 0
+	var curLine int64
 	diskIoAttr := system.KeyDiskioUsages
 	f, err := os.Open(resvPath1)
 	assert.NoError(t, err)
@@ -378,14 +377,14 @@ func metricDiskioTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPut, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(5 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	// 停止 runner
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName + "/stop"
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Second)
 
 	curLine = 0
 	f, err = os.Open(resvPath2)
@@ -427,7 +426,6 @@ func metricRunEnvTagTest(p *testParam) {
 	if err := os.Setenv(runnerName, "{\""+runnerName+"\":\"env_value\"}"); err != nil {
 		t.Fatalf("metricRunEnvTagTest set env error %v", err)
 	}
-	time.Sleep(1 * time.Second)
 	mc := []MetricConfig{
 		{
 			MetricType: "cpu",
@@ -463,14 +461,14 @@ func metricRunEnvTagTest(p *testParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(3 * time.Second)
+	time.Sleep(time.Second)
 
 	// 停止 runner
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName + "/stop"
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Second)
 
 	// 必须要引入 system 以便执行其中的 init
 	log.Println(system.TypeMetricCpu)
@@ -517,7 +515,6 @@ func metricHttpTest(p *testParam) {
 	if err := mkTestDir(testDir, resvDir); err != nil {
 		t.Fatalf("mkdir test path error %v", err)
 	}
-	time.Sleep(1 * time.Second)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		io.WriteString(w, "<html><body>七牛云</body></html>")
@@ -559,16 +556,16 @@ func metricHttpTest(p *testParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(3 * time.Second)
+	time.Sleep(time.Second)
 
 	// 停止 runner
 	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName + "/stop"
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Second)
 
-	var curLine int64 = 0
+	var curLine int64
 	httpAttr := curl.KeyHttpUsages
 	f, err := os.Open(resvPath1)
 	assert.NoError(t, err)
@@ -638,7 +635,7 @@ func metricHttpTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Second)
 
 	curLine = 0
 	f, err = os.Open(resvPath2)
@@ -711,7 +708,7 @@ func metricHttpTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Second)
 
 	curLine = 0
 	f, err = os.Open(resvPath3)
@@ -739,6 +736,7 @@ func metricHttpTest(p *testParam) {
 }
 
 func TestSendType(t *testing.T) {
+	t.Parallel()
 	abc := make(map[string]string)
 	if abc["abc"] == "hello" {
 		t.Errorf("xx")

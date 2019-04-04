@@ -12,6 +12,7 @@ import (
 )
 
 func Test_getValidPath(t *testing.T) {
+	t.Parallel()
 	confs := []string{
 		"test1",
 		"./test1",
@@ -28,6 +29,7 @@ func Test_getValidPath(t *testing.T) {
 }
 
 func Test_RotateClean(t *testing.T) {
+	t.Parallel()
 	dirp := "Test_RotateClean"
 	os.MkdirAll(dirp, 0755)
 	defer os.RemoveAll(dirp)
@@ -49,16 +51,17 @@ func Test_RotateClean(t *testing.T) {
 			i++
 		}
 	}()
-	time.Sleep(time.Second * 3)
+	time.Sleep(2 * time.Second)
 	exitchan <- struct{}{}
 	ch2 <- struct{}{}
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond)
 	ch1 <- struct{}{}
 	nn, _ := ioutil.ReadDir(dirp)
 	assert.Equal(t, 3, len(nn))
 }
 
 func Test_cleanlogkitlog(t *testing.T) {
+	t.Parallel()
 	dirp := "Test_cleanlogkitlog"
 	os.MkdirAll(dirp, 0755)
 	defer os.RemoveAll(dirp)

@@ -56,6 +56,7 @@ func getClusterRunnerStatus(rn, lp, rs string, rdc, rds, pe, ps, se, ss int64, t
 }
 
 func TestClusterRest(t *testing.T) {
+	t.Parallel()
 	pwd, err := os.Getwd()
 	if err != nil {
 		t.Error(err)
@@ -174,7 +175,7 @@ func clusterUpdateTest(p *testCluParam) {
 	if err := writeLogFile([]string{log1}, logDir); err != nil {
 		t.Fatalf("write log string to file failed error is %v", err)
 	}
-	time.Sleep(1 * time.Second)
+	time.Sleep(time.Millisecond)
 	mode := ModeDir
 	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, mode, resvPath)
 	if err != nil {
@@ -186,7 +187,7 @@ func clusterUpdateTest(p *testCluParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(6 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	// 获取 status , tag = test
 	url = rs[0].cluster.Address + "/logkit/cluster/status?tag=" + rs[1].cluster.Tag
@@ -248,7 +249,7 @@ func clusterUpdateTest(p *testCluParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPut, updateConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(10 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	// 尝试更改一个不存在的 slave
 	url = rs[0].cluster.Address + "/logkit/cluster/configs/" + runnerName + "?tag=" + rs[1].cluster.Tag + "&url=" + rs[3].cluster.Address
@@ -307,7 +308,7 @@ func clusterStartStopTest(p *testCluParam) {
 	if err := writeLogFile([]string{log1}, logDir); err != nil {
 		t.Fatalf("write log string to file failed error is %v", err)
 	}
-	time.Sleep(1 * time.Second)
+	time.Sleep(time.Millisecond)
 	mode := ModeDir
 	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, mode, resvPath)
 	if err != nil {
@@ -319,7 +320,7 @@ func clusterStartStopTest(p *testCluParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(6 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	// 获取 status , tag = test
 	url = rs[0].cluster.Address + "/logkit/cluster/status?tag=" + rs[1].cluster.Tag
@@ -376,7 +377,7 @@ func clusterStartStopTest(p *testCluParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(3 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// 停止后，tag == 'test' 的 status runningStatus 为 stopped
 	url = rs[0].cluster.Address + "/logkit/cluster/status?tag=" + rs[1].cluster.Tag
@@ -474,7 +475,7 @@ func clusterStartStopTest(p *testCluParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(6 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	// tag == 'test' 的 status 恢复
 	url = rs[0].cluster.Address + "/logkit/cluster/status?tag=" + rs[1].cluster.Tag
@@ -533,7 +534,7 @@ func clusterStartStopTest(p *testCluParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Second)
 
 	// tag == "test_change" status 状态为 stopped
 	url = rs[0].cluster.Address + "/logkit/cluster/status?url=" + rs[3].cluster.Address
@@ -589,7 +590,7 @@ func clusterResetDeleteTest(p *testCluParam) {
 	if err := writeLogFile([]string{log1}, logDir); err != nil {
 		t.Fatalf("write log string to file failed error is %v", err)
 	}
-	time.Sleep(1 * time.Second)
+	time.Sleep(time.Second)
 	mode := ModeDir
 	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, mode, resvPath)
 	if err != nil {
@@ -644,7 +645,7 @@ func clusterResetDeleteTest(p *testCluParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodDelete, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Second)
 
 	// 删除后，status 返回为空
 	url = rs[0].cluster.Address + "/logkit/cluster/status?tag=" + rs[1].cluster.Tag
@@ -708,7 +709,7 @@ func clusterSalveConfigsTest(p *testCluParam) {
 	if err := writeLogFile([]string{log1}, logDir); err != nil {
 		t.Fatalf("write log string to file failed error is %v", err)
 	}
-	time.Sleep(1 * time.Second)
+	time.Sleep(time.Millisecond)
 	mode := ModeDir
 	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, mode, resvPath)
 	if err != nil {
@@ -720,7 +721,7 @@ func clusterSalveConfigsTest(p *testCluParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(6 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// 测试获取 slave configs tag = test
 	url = rs[0].cluster.Address + "/logkit/cluster/configs?tag=" + rs[1].cluster.Tag
@@ -938,7 +939,7 @@ func getSlavesRunnerTest(p *testCluParam) {
 	if err := writeLogFile([]string{log1}, logDir); err != nil {
 		t.Fatalf("write log string to file failed error is %v", err)
 	}
-	time.Sleep(1 * time.Second)
+	time.Sleep(time.Millisecond)
 	mode := ModeDir
 	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, mode, resvPath)
 	if err != nil {
@@ -950,7 +951,7 @@ func getSlavesRunnerTest(p *testCluParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(6 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// 获取 tag = test 的 runner name
 	url = rs[0].cluster.Address + "/logkit/cluster/runners?tag="
@@ -1007,7 +1008,7 @@ func getSlaveConfigTest(p *testCluParam) {
 	if err := writeLogFile([]string{log1}, logDir); err != nil {
 		t.Fatalf("write log string to file failed error is %v", err)
 	}
-	time.Sleep(1 * time.Second)
+	time.Sleep(time.Millisecond)
 	mode := ModeDir
 	runnerConf, err := getRunnerConfig(runnerName, logDir, metaDir, mode, resvPath)
 	if err != nil {
@@ -1019,7 +1020,7 @@ func getSlaveConfigTest(p *testCluParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(6 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// 获取 tag = test, runner 的 config
 	url = rs[0].cluster.Address + "/logkit/cluster/configs/" + runnerName + "?tag=" + rs[1].cluster.Tag
@@ -1052,6 +1053,7 @@ func getSlaveConfigTest(p *testCluParam) {
 }
 
 func TestJsoniterMashalUnmashal(t *testing.T) {
+	t.Parallel()
 	runnerConf := RunnerConfig{
 		RunnerInfo: RunnerInfo{
 			RunnerName:       "xxx",
@@ -1089,6 +1091,7 @@ func TestJsoniterMashalUnmashal(t *testing.T) {
 }
 
 func TestJsoniter(t *testing.T) {
+	t.Parallel()
 	respGotConfigs1, respGotConfigs2 := respSlaveConfig{}, respSlaveConfig{}
 	var teststring = `{"code":"L200","data":{"http://192.168.0.106:6202":{"configs":{"/Users/sunjianbo/gopath/src/github.com/qiniu/logkit/mgr/testClusterRest/slave1/confs/clusterSalveConfigsTest.conf":{"name":"clusterSalveConfigsTest","collect_interval":1,"batch_len":1,"batch_size":200,"batch_interval":1,"batch_try_times":3,"createtime":"2018-01-03T22:25:36.497442704+08:00","reader":{"ignore_hidden":"true","log_path":"/Users/sunjianbo/gopath/src/github.com/qiniu/logkit/mgr/testClusterRest/clusterSalveConfigsTestDir/logdir","meta_path":"/Users/sunjianbo/gopath/src/github.com/qiniu/logkit/mgr/testClusterRest/clusterSalveConfigsTestDir/meta","mode":"dir","name":"clusterSalveConfigsTest","read_from":"oldest","runner_name":"clusterSalveConfigsTest"},"parser":{"name":"json_parser","runner_name":"clusterSalveConfigsTest","type":"json"},"senders":[{"file_send_path":"/Users/sunjianbo/gopath/src/github.com/qiniu/logkit/mgr/testClusterRest/clusterSalveConfigsTestDir/sender/sendData","name":"file_sender","runner_name":"clusterSalveConfigsTest","sender_type":"file"}],"router":{"router_key_name":"","router_match_type":"","router_default_sender":0,"router_routes":null},"web_folder":true}},"tag":"test","error":null},"http://192.168.0.106:6203":{"configs":{"/Users/sunjianbo/gopath/src/github.com/qiniu/logkit/mgr/testClusterRest/slave2/confs/clusterSalveConfigsTest.conf":{"name":"clusterSalveConfigsTest","collect_interval":1,"batch_len":1,"batch_size":200,"batch_interval":1,"batch_try_times":3,"createtime":"2018-01-03T22:25:36.497453622+08:00","reader":{"ignore_hidden":"true","log_path":"/Users/sunjianbo/gopath/src/github.com/qiniu/logkit/mgr/testClusterRest/clusterSalveConfigsTestDir/logdir","meta_path":"/Users/sunjianbo/gopath/src/github.com/qiniu/logkit/mgr/testClusterRest/clusterSalveConfigsTestDir/meta","mode":"dir","name":"clusterSalveConfigsTest","read_from":"oldest","runner_name":"clusterSalveConfigsTest"},"parser":{"name":"json_parser","runner_name":"clusterSalveConfigsTest","type":"json"},"senders":[{"file_send_path":"/Users/sunjianbo/gopath/src/github.com/qiniu/logkit/mgr/testClusterRest/clusterSalveConfigsTestDir/sender/sendData","name":"file_sender","runner_name":"clusterSalveConfigsTest","sender_type":"file"}],"router":{"router_key_name":"","router_match_type":"","router_default_sender":0,"router_routes":null},"web_folder":true}},"tag":"test","error":null}}}`
 	err := json.Unmarshal([]byte(teststring), &respGotConfigs1)

@@ -248,7 +248,6 @@ func (conf MapConf) GetPasswordEnvStringOr(key, deft string) (string, error) {
 	value, err := conf.GetString(key)
 	if err != nil {
 		value = deft
-		err = nil
 	}
 
 	envName, isEnv := IsEnv(value)

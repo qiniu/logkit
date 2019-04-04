@@ -1,4 +1,5 @@
 // +build windows
+
 package os
 
 import (

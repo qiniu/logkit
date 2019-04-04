@@ -725,11 +725,8 @@ func (m *Meta) Reset() error {
 	if m == nil {
 		return errors.New("Reset error as meta is nil ")
 	}
-	if err := m.Delete(); err != nil {
-		return err
-	}
 
-	return nil
+	return m.Delete()
 }
 
 func (m *Meta) Delete() error {
@@ -748,10 +745,7 @@ func (m *Meta) Delete() error {
 	}
 	m.subMetaLock.RUnlock()
 
-	if err := os.RemoveAll(m.Dir); err != nil {
-		return err
-	}
-	return nil
+	return os.RemoveAll(m.Dir)
 }
 
 func (m *Meta) ReadStatistic() (stat Statistic, err error) {

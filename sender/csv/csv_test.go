@@ -16,11 +16,11 @@ import (
 )
 
 func TestCSVSender(t *testing.T) {
-	seperators := []string{",", ":"}
-	for _, seperator := range seperators {
+	separators := []string{",", ":"}
+	for _, separator := range separators {
 		conf := conf.MapConf{
 			KeyCSVFields:     "name,uid,age",
-			KeyCSVDelimiter:  seperator,
+			KeyCSVDelimiter:  separator,
 			KeyCSVRotateSize: "10485760",
 			KeyMaxSendRate:   "200",
 		}
@@ -63,7 +63,7 @@ func TestCSVSender(t *testing.T) {
 				}
 				i++
 
-				parts := strings.Split(string(line), seperator)
+				parts := strings.Split(string(line), separator)
 				if len(parts) != 3 {
 					t.Errorf("unexpect field count, got %d, want %d", len(parts), 3)
 				}

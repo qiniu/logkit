@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-logfmt/logfmt"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -264,8 +265,8 @@ func kvTransform(strVal string, splitter string, keepString bool) (Data, error) 
 			}
 			//此错误仅用于当原始数据解析成功但无解析数据时，保留原始数据之用
 			if len(fields) == 0 {
+				log.Error("no value was parsed after logfmt, will keep origin data in pandora_stash if disable_record_errdata field is false")
 				break
-				return nil, errors.New("no value was parsed after logfmt, will keep origin data in pandora_stash if disable_record_errdata field is false")
 			}
 			break
 		}

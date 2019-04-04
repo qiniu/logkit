@@ -191,7 +191,7 @@ func (r *Reader) run() {
 			} else if len(ans) > 1 {
 				r.readChan <- ans[1]
 			} else if len(ans) == 1 {
-				err := fmt.Errorf("runner[%v] %v list read only one result in arrary %v", r.meta.RunnerName, r.Name(), ans)
+				err := fmt.Errorf("runner[%v] %v list read only one result in array %v", r.meta.RunnerName, r.Name(), ans)
 				log.Error(err)
 				r.sendError(err)
 				r.setStatsError(err.Error())

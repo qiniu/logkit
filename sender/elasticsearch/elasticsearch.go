@@ -380,7 +380,6 @@ func (s *Sender) Send(datas []Data) error {
 			),
 		}
 	}
-	return nil
 }
 
 func buildIndexName(indexName string, timeZone *time.Location, size int) string {

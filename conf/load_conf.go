@@ -49,10 +49,10 @@ func GetConfigDir(app string) (dir string, err error) {
 	return "", ErrHomeNotFound
 }
 
-func Init(cflag, app, default_conf string) {
+func Init(cflag, app, defaultConf string) {
 
 	confDir, _ := GetConfigDir(app)
-	confName = flag.String(cflag, confDir+"/"+default_conf, "the config file")
+	confName = flag.String(cflag, confDir+"/"+defaultConf, "the config file")
 }
 
 func ConfName() string {

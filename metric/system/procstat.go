@@ -679,7 +679,7 @@ func (p *Procstat) systemdUnitPIDs(process map[PID]ProcessInfo) error {
 		if err != nil {
 			return fmt.Errorf("invalid pid '%s'", kv[1])
 		}
-		process[ PID(pid)] = ProcessInfo{
+		process[PID(pid)] = ProcessInfo{
 			Pid: PID(pid),
 		}
 	}
@@ -704,7 +704,7 @@ func (p *Procstat) cgroupPIDs(process map[PID]ProcessInfo) error {
 		if err != nil {
 			return fmt.Errorf("invalid pid '%s'", pidBS)
 		}
-		process[ PID(pid)] = ProcessInfo{
+		process[PID(pid)] = ProcessInfo{
 			Pid: PID(pid),
 		}
 	}
@@ -744,7 +744,7 @@ func (p *Procstat) SupervisordStat(process map[PID]ProcessInfo) (err error) {
 	if err != nil {
 		return fmt.Errorf("exec command supervisorctl status error [%v]: %s", err, string(stdout))
 	}
-	var pid = 0
+	var pid int
 	for _, str := range strings.Split(string(stdout), "\n") {
 		fields := strings.Fields(str)
 		if len(fields) < 4 {
