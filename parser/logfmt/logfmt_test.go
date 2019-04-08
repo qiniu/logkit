@@ -1,7 +1,6 @@
 package logfmt
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -184,7 +183,6 @@ func TestParse(t *testing.T) {
 	for _, tt := range tests {
 		got, err := l.Parse(tt.s)
 		if c, ok := err.(*StatsError); ok {
-			err = errors.New(c.LastError)
 			assert.Equal(t, int64(0), c.Errors)
 		}
 
@@ -265,7 +263,6 @@ func TestParseWithKeepRawData(t *testing.T) {
 		l.splitter = tt.splitter
 		got, err := l.Parse(tt.s)
 		if c, ok := err.(*StatsError); ok {
-			err = errors.New(c.LastError)
 			assert.Equal(t, int64(0), c.Errors)
 		}
 

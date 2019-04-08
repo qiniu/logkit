@@ -14,7 +14,6 @@ const (
 )
 
 func doTestTrimComments(t *testing.T) {
-
 	ast := assert.New(t)
 	var (
 		err         error
@@ -24,6 +23,7 @@ func doTestTrimComments(t *testing.T) {
 	err = LoadEx(&conf, srcconf)
 	ast.Nil(err)
 	tb, err := ioutil.ReadFile(destconf)
+	assert.Nil(t, err)
 	err = json.Unmarshal(tb, &conf1)
 	ast.Nil(err)
 	b, err = json.Marshal(conf)

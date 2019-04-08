@@ -350,11 +350,11 @@ func createTransformers(rc RunnerConfig) ([]transforms.Transformer, error) {
 		if !ok {
 			return nil, fmt.Errorf("transformer config field type %v is not string", tp)
 		}
-		creater, ok := transforms.Transformers[strTP]
+		creator, ok := transforms.Transformers[strTP]
 		if !ok {
 			return nil, fmt.Errorf("transformer type unsupported: %v", strTP)
 		}
-		trans := creater()
+		trans := creator()
 		bts, err := jsoniter.Marshal(tConf)
 		if err != nil {
 			return nil, fmt.Errorf("type %v of transformer marshal config error %v", strTP, err)

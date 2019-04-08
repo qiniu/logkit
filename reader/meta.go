@@ -443,7 +443,6 @@ func (m *Meta) ReadDBDoneFile(database string) (content []string, err error) {
 			if err != nil {
 				return nil, err
 			}
-			return nil, err
 		}
 	}
 	return content, nil

@@ -650,11 +650,11 @@ func TestUpdatePandoraSchema(t *testing.T) {
 		t.Errorf("send data error exp %v but %v", exp, pandora.Body)
 	}
 	expschema := []pipeline.RepoSchemaEntry{
-		pipeline.RepoSchemaEntry{
+		{
 			Key:       "x1",
 			ValueType: PandoraTypeString,
 		},
-		pipeline.RepoSchemaEntry{
+		{
 			Key:       "x2",
 			ValueType: PandoraTypeLong,
 		},
@@ -674,15 +674,15 @@ func TestUpdatePandoraSchema(t *testing.T) {
 	assert.Equal(t, exp, pandora.Body)
 
 	expschema = []pipeline.RepoSchemaEntry{
-		pipeline.RepoSchemaEntry{
+		{
 			Key:       "x1",
 			ValueType: PandoraTypeString,
 		},
-		pipeline.RepoSchemaEntry{
+		{
 			Key:       "x2",
 			ValueType: PandoraTypeLong,
 		},
-		pipeline.RepoSchemaEntry{
+		{
 			Key:       "x3change",
 			ValueType: PandoraTypeFloat,
 		},
@@ -722,7 +722,7 @@ func TestUpdatePandoraSchema(t *testing.T) {
 	assert.Equal(t, exp, pandora.Body)
 
 	expschema = []pipeline.RepoSchemaEntry{
-		pipeline.RepoSchemaEntry{
+		{
 			Key:       "x3change",
 			ValueType: PandoraTypeDate,
 		},
@@ -742,11 +742,11 @@ func TestUpdatePandoraSchema(t *testing.T) {
 	assert.Equal(t, exp, pandora.Body)
 
 	expschema = []pipeline.RepoSchemaEntry{
-		pipeline.RepoSchemaEntry{
+		{
 			Key:       "x3change",
 			ValueType: PandoraTypeDate,
 		},
-		pipeline.RepoSchemaEntry{
+		{
 			Key:       "x4",
 			ValueType: PandoraTypeLong,
 		},

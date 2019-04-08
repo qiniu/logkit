@@ -108,6 +108,7 @@ func Test_singleFileNotRotate(t *testing.T) {
 	//应该遇到EOF,pfi没有被更新
 	n, err = sf.Read(p)
 	assert.Equal(t, io.EOF, err)
+	assert.EqualValues(t, 0, n)
 
 	newInode, err := utilsos.GetIdentifyIDByFile(sf.f)
 	assert.NoError(t, err)
@@ -143,7 +144,8 @@ func Test_singleFileOffset(t *testing.T) {
 		t.Error(err)
 	}
 	oldInode, err := utilsos.GetIdentifyIDByFile(sf.f)
-	assert.NoError(t, err)
+	assert.Nil(t, err)
+	assert.NotEmpty(t, oldInode)
 
 	//read file 正常读
 	p := make([]byte, 5)

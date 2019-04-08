@@ -750,4 +750,5 @@ func TestNagiosLog(t *testing.T) {
 		"nagios_epoch": "1474520444",
 		"nagios_log":   "Auto-save of retention data completed successfully.",
 	}, got)
+	assert.Nil(t, err)
 }

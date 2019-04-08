@@ -148,7 +148,7 @@ func Test_Run(t *testing.T) {
 		t.Error(err)
 	}
 	senderConfigs := []conf.MapConf{
-		conf.MapConf{
+		{
 			"name":        "mock_sender",
 			"sender_type": "mock",
 		},
@@ -859,6 +859,7 @@ func TestDateTransforms(t *testing.T) {
 	datas := []Data{{"status": "02/01/2016--15:04:05"}, {"status": "2006-01-02 15:04:15"}}
 	for k := range transformers {
 		datas, err = transformers[k].Transform(datas)
+		assert.Nil(t, err)
 	}
 	exp := []Data{
 		{
@@ -905,6 +906,7 @@ func TestSplitAndConvertTransforms(t *testing.T) {
 	datas := []Data{{"status": "1,2,3"}, {"status": "4,5,6"}}
 	for k := range transformers {
 		datas, err = transformers[k].Transform(datas)
+		assert.Nil(t, err)
 	}
 	exp := []Data{
 		{
@@ -1355,6 +1357,7 @@ func TestAddDatasourceForRawData(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 	data, err := ioutil.ReadFile("./TestAddDatasource/filesend.csv")
+	assert.Nil(t, err)
 	var res []Data
 	err = jsoniter.Unmarshal(data, &res)
 	if err != nil {
@@ -1404,7 +1407,7 @@ func TestAddDatatags(t *testing.T) {
 		log.Fatalf("TestAddDatatags error mkdir %v %v", dir, err)
 	}
 	tagFile := filepath.Join(dir, "tagFile.json")
-	err := ioutil.WriteFile(tagFile, []byte(`{  
+	err := ioutil.WriteFile(tagFile, []byte(`{
 	   	"Title":"tags",
 	    "Author":["john","ada","alice"],
 	    "IsTrue":true,
@@ -1448,6 +1451,7 @@ func TestAddDatatags(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 	data, err := ioutil.ReadFile("./TestAddDatatags/filesend.json")
+	assert.Nil(t, err)
 	var res []Data
 	err = jsoniter.Unmarshal(data, &res)
 	if err != nil {
@@ -1516,6 +1520,7 @@ func TestRunWithExtra(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 	data, err := ioutil.ReadFile("./TestRunWithExtra/filesend.json")
+	assert.Nil(t, err)
 	var res []Data
 	err = jsoniter.Unmarshal(data, &res)
 	if err != nil {
@@ -1572,6 +1577,7 @@ func TestRunWithDataSource(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 	data, err := ioutil.ReadFile("./TestRunWithDataSource/filesend.json")
+	assert.Nil(t, err)
 	var res []Data
 	err = json.Unmarshal(data, &res)
 	if err != nil {
@@ -1646,6 +1652,7 @@ func TestRunWithDataSourceFail(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 	data, err := ioutil.ReadFile("./TestRunWithDataSourceFail/filesend.json")
+	assert.Nil(t, err)
 	var res []Data
 	err = json.Unmarshal(data, &res)
 	if err != nil {
@@ -1709,6 +1716,7 @@ func TestClassifySenderData(t *testing.T) {
 		}
 
 		r, err := router.NewSenderRouter(routerConf, numSenders)
+		assert.Nil(t, err)
 
 		senderDataList := classifySenderData(senders, datas, r)
 		assert.Equal(t, numSenders, len(senderDataList))
@@ -2142,7 +2150,7 @@ func Test_setSenderConfig(t *testing.T) {
 			"key":     "ip.ip",
 		},
 	}
-	actualConfig, err = setPandoraServerConfig(senderConfig, serverConfigs)
+	_, err = setPandoraServerConfig(senderConfig, serverConfigs)
 	assert.Error(t, err)
 }
 

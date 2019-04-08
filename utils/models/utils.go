@@ -282,7 +282,7 @@ func (s *HashSet) Elements() []interface{} {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	element := make([]interface{}, 0)
-	for key, _ := range s.data {
+	for key := range s.data {
 		element = append(element, key)
 	}
 	return element

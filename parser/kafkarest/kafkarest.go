@@ -173,13 +173,13 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
 	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)
 	nameMap := map[string]struct{}{
-		KEY_SRC_IP:   struct{}{},
-		KEY_METHOD:   struct{}{},
-		KEY_TOPIC:    struct{}{},
-		KEY_CODE:     struct{}{},
-		KEY_RESP_LEN: struct{}{},
-		KEY_DURATION: struct{}{},
-		KEY_LOG_TIME: struct{}{},
+		KEY_SRC_IP:   {},
+		KEY_METHOD:   {},
+		KEY_TOPIC:    {},
+		KEY_CODE:     {},
+		KEY_RESP_LEN: {},
+		KEY_DURATION: {},
+		KEY_LOG_TIME: {},
 	}
 	labels := GetGrokLabels(labelList, nameMap)
 
@@ -273,7 +273,7 @@ func (krp *Parser) ParseLogTime(fields []string) int64 {
 	str = strings.Trim(str, "]")
 	_, zoneValue := times.GetTimeZone()
 	ymdhms := str[:len(str)-4] + zoneValue
-	precesionStr := str[20:len(str)]
+	precesionStr := str[20:]
 	precesionInt, err := strconv.ParseInt(precesionStr, 10, 64)
 	if err != nil {
 		log.Errorf("KafaRestlogParser parse time err %v", err)

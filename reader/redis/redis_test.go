@@ -27,6 +27,7 @@ func TestRedisReaderWithString(t *testing.T) {
 	}
 
 	reader, err := NewReader(nil, conf)
+	assert.Nil(t, err)
 	redisReader := reader.(*Reader)
 	go func() {
 		redisReader.run()
@@ -51,6 +52,7 @@ func TestRedisReaderWithList(t *testing.T) {
 
 	var datas []string
 	reader, err := NewReader(nil, conf)
+	assert.Nil(t, err)
 	redisReader := reader.(*Reader)
 	go func() {
 		for i := 0; i < 3; i++ {
@@ -81,6 +83,7 @@ func TestRedisReaderWithHash(t *testing.T) {
 	}
 
 	reader, err := NewReader(nil, conf)
+	assert.Nil(t, err)
 	redisReader := reader.(*Reader)
 	go func() {
 		redisReader.run()
@@ -105,6 +108,7 @@ func TestRedisReaderWithSet(t *testing.T) {
 
 	var datas []string
 	reader, err := NewReader(nil, conf)
+	assert.Nil(t, err)
 	redisReader := reader.(*Reader)
 	go func() {
 		for i := 0; i < 3; i++ {
@@ -147,6 +151,7 @@ func TestRedisReaderWithSortedSet(t *testing.T) {
 
 	var datas []string
 	reader, err := NewReader(nil, conf)
+	assert.Nil(t, err)
 	redisReader := reader.(*Reader)
 	go func() {
 		redisReader.run()
@@ -175,7 +180,7 @@ func TestNewRedisReader(t *testing.T) {
 	}
 
 	_, err = NewReader(nil, con)
-	assert.NoError(t, err)
+	assert.Nil(t, err)
 
 	con = conf.MapConf{
 		KeyRedisDataType: DataTypeList,

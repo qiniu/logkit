@@ -78,11 +78,10 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	cronSchedule, _ := conf.GetStringOr(KeyHttpCron, "")
 	httpFetchMethod, _ := conf.GetStringOr(KeyHttpMethod, "GET")
 	httpFetchAddress, err := conf.GetString(KeyHTTPServiceAddress)
-	execOnStart, _ := conf.GetBoolOr(KeyHttpExecOnStart, true)
-
 	if err != nil {
 		return nil, err
 	}
+	execOnStart, _ := conf.GetBoolOr(KeyHttpExecOnStart, true)
 	if !strings.HasPrefix(httpFetchAddress, "http://") && !strings.HasPrefix(httpFetchAddress, "https://") {
 		httpFetchAddress = "http://" + httpFetchAddress
 	}
@@ -117,8 +116,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		TLSClientConfig:       &tls.Config{},
 	}
 
-	var pageNo int64 = 1
-	var pageSize int64 = 10
+	var pageNo, pageSize int64
 	pageSizeStr, pageNo, err := meta.ReadOffset()
 	// err 不为空，表示第一次启动，从配置中读取pageSize 和 pageNum
 	if err != nil {

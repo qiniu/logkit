@@ -94,9 +94,11 @@ func Test_Read(t *testing.T) {
 
 	condition := sf.getIgnoreCondition()
 	fi, err := os.Stat(testPidFile)
+	assert.Nil(t, err)
 	ignore := condition(fi)
 	assert.False(t, ignore)
 	fi, err = os.Stat(hiddenFile)
+	assert.Nil(t, err)
 	assert.True(t, condition(fi))
 	sf.Close()
 }
@@ -299,6 +301,7 @@ func Test_SeekUnreachable(t *testing.T) {
 	}
 	fmt.Println("x1", x1)
 	st, err := f.Stat()
+	assert.Nil(t, err)
 	fmt.Println(st.Size())
 }
 

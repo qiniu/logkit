@@ -131,7 +131,6 @@ func NewCustomManager(conf ManagerConfig, rr *reader.Registry, pr *parser.Regist
 		collectLogRunner, err = self.NewLogRunner(rdConf, self.GetParserConfig(), sdConf, conf.EnvTag)
 		if err != nil {
 			log.Errorf("new collect log runner failed: %v", err)
-			err = nil
 		}
 	}
 

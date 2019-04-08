@@ -1054,6 +1054,7 @@ func multiReaderNewestModify(t *testing.T) {
 
 	t.Log("mr finished")
 	err = mr.Close()
+	assert.Nil(t, err)
 	assert.EqualValues(t, expresult, resultmap)
 }
 
@@ -1130,6 +1131,7 @@ func multiReaderOutRunTime(t *testing.T) {
 
 	t.Log("mr finished")
 	err = mr.Close()
+	assert.Nil(t, err)
 	assert.EqualValues(t, 0, len(resultmap))
 }
 
@@ -1208,6 +1210,7 @@ func multiReaderInRunTime(t *testing.T) {
 
 	t.Log("mr finished")
 	err = mr.Close()
+	assert.Nil(t, err)
 	assert.EqualValues(t, expresult, resultmap)
 }
 
@@ -1375,8 +1378,7 @@ func TestReaderErrBegin(t *testing.T) {
 		t.Error("no matched error")
 	}
 	err = mr.Close()
-	assert.NoError(t, err)
-
+	assert.Nil(t, err)
 }
 
 func TestReaderErrMiddle(t *testing.T) {
@@ -1441,5 +1443,5 @@ func TestReaderErrMiddle(t *testing.T) {
 		t.Errorf("no matched error %v, expect %v", err, os.ErrPermission)
 	}
 	err = mr.Close()
-	assert.NoError(t, err)
+	assert.Nil(t, err)
 }

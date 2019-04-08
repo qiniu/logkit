@@ -190,9 +190,11 @@ func TestGetEnvValue(t *testing.T) {
 
 	value, err = GetEnvValue("tes")
 	assert.Error(t, err)
+	assert.EqualValues(t, "", value)
 
-	value, err = GetEnvValue("")
+	_, err = GetEnvValue("")
 	assert.Error(t, err)
+	assert.EqualValues(t, "", value)
 }
 
 func TestIsEnv(t *testing.T) {
