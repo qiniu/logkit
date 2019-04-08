@@ -96,7 +96,6 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner
 		c, err := NewMetric(tp)
 		if err != nil {
 			log.Errorf("%v ignore it...", err)
-			err = nil
 			continue
 		}
 		// sync config to ExtCollector
@@ -428,10 +427,7 @@ func (mr *MetricRunner) Reset() (err error) {
 }
 
 func (mr *MetricRunner) Delete() (err error) {
-	if err = mr.meta.Delete(); err != nil {
-		return err
-	}
-	return nil
+	return mr.meta.Delete()
 }
 
 func (_ *MetricRunner) Cleaner() CleanInfo {

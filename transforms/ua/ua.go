@@ -23,12 +23,13 @@ var (
 	_ transforms.Initializer      = &UATransformer{}
 )
 
+// UATransformer represents a transform to run an ua log.
 type UATransformer struct {
 	Key              string `json:"key"`
 	RegexYmlFilePath string `json:"regex_yml_path"`
-	UA_Device        string `json:"device"`
-	UA_OS            string `json:"os"`
-	UA_Agent         string `json:"agent"`
+	UADevice         string `json:"device"`
+	UAOS             string `json:"os"`
+	UAAgent          string `json:"agent"`
 	MemCache         string `json:"memory_cache"`
 
 	dev      bool
@@ -55,9 +56,9 @@ func (it *UATransformer) Init() (err error) {
 	}
 	it.cache = new(sync.Map)
 	it.memcache, _ = strconv.ParseBool(it.MemCache)
-	it.agent, _ = strconv.ParseBool(it.UA_Agent)
-	it.dev, _ = strconv.ParseBool(it.UA_Device)
-	it.os, _ = strconv.ParseBool(it.UA_OS)
+	it.agent, _ = strconv.ParseBool(it.UAAgent)
+	it.dev, _ = strconv.ParseBool(it.UADevice)
+	it.os, _ = strconv.ParseBool(it.UAOS)
 	it.keys = GetKeys(it.Key)
 	numRoutine := MaxProcs
 	if numRoutine == 0 {
@@ -279,7 +280,6 @@ func (it *UATransformer) transform(dataPipeline <-chan transforms.TransformInfo,
 	)
 	newKeys := make([]string, len(it.keys))
 	for transformInfo := range dataPipeline {
-		err = nil
 		errNum = 0
 
 		copy(newKeys, it.keys)

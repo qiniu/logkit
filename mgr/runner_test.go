@@ -56,7 +56,8 @@ func cleanMetaFolder(path string) {
 }
 
 func Test_Run(t *testing.T) {
-	dir := "Test_RunForErrData"
+	t.Parallel()
+	dir := "Test_Run"
 	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_Run error mkdir %v %v", dir, err)
 	}
@@ -203,6 +204,7 @@ func Test_Run(t *testing.T) {
 }
 
 func Test_RunForEnvTag(t *testing.T) {
+	t.Parallel()
 	dir := "Test_RunForEnvTag"
 	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_RunForEnvTag error mkdir %v %v", dir, err)
@@ -359,7 +361,8 @@ func Test_RunForEnvTag(t *testing.T) {
 }
 
 func Test_RunForErrData(t *testing.T) {
-	dir := "Test_Run"
+	t.Parallel()
+	dir := "Test_RunForErrData"
 	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
 		log.Fatalf("Test_Run error mkdir %v %v", dir, err)
 	}
@@ -510,6 +513,7 @@ func Test_RunForErrData(t *testing.T) {
 }
 
 func Test_Compatible(t *testing.T) {
+	t.Parallel()
 	rc := RunnerConfig{
 		ReaderConfig: conf.MapConf{
 			"log_path":       "/path1",
@@ -569,6 +573,7 @@ func Test_Compatible(t *testing.T) {
 }
 
 func Test_QiniulogRun(t *testing.T) {
+	t.Parallel()
 	dir := "Test_QiniulogRun"
 	//clean dir first
 	os.RemoveAll(dir)
@@ -723,6 +728,7 @@ func Test_QiniulogRun(t *testing.T) {
 }
 
 func TestCreateTransforms(t *testing.T) {
+	t.Parallel()
 	config1 := `{
 		"name":"test2.csv",
 		"reader":{
@@ -765,7 +771,7 @@ func TestCreateTransforms(t *testing.T) {
 }
 
 func TestReplaceTransforms(t *testing.T) {
-
+	t.Parallel()
 	config1 := `{
 		"name":"test2.csv",
 		"reader":{
@@ -822,7 +828,7 @@ func TestReplaceTransforms(t *testing.T) {
 }
 
 func TestDateTransforms(t *testing.T) {
-
+	t.Parallel()
 	config1 := `{
 		"name":"test2.csv",
 		"reader":{
@@ -866,7 +872,7 @@ func TestDateTransforms(t *testing.T) {
 }
 
 func TestSplitAndConvertTransforms(t *testing.T) {
-
+	t.Parallel()
 	config1 := `{
 		"name":"test2.csv",
 		"reader":{
@@ -914,12 +920,14 @@ func TestSplitAndConvertTransforms(t *testing.T) {
 }
 
 func TestGetTrend(t *testing.T) {
+	t.Parallel()
 	assert.Equal(t, SpeedUp, getTrend(0, 1))
 	assert.Equal(t, SpeedDown, getTrend(1, 0))
 	assert.Equal(t, SpeedStable, getTrend(1, 1))
 }
 
 func TestSpeedTrend(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		olds  StatsInfo
 		news  StatsInfo
@@ -989,6 +997,7 @@ func TestSpeedTrend(t *testing.T) {
 }
 
 func TestCopyStats(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		src RunnerStatus
 		dst RunnerStatus
@@ -1084,6 +1093,7 @@ func TestCopyStats(t *testing.T) {
 }
 
 func TestSyslogRunnerX(t *testing.T) {
+	t.Parallel()
 	metaDir := "TestSyslogRunner"
 
 	os.Mkdir(metaDir, DefaultDirPerm)
@@ -1133,6 +1143,7 @@ func TestSyslogRunnerX(t *testing.T) {
 }
 
 func TestAddDatasource(t *testing.T) {
+	t.Parallel()
 	sourceFroms := []string{"a", "b", "c", "d", "e", "f"}
 	se := &StatsError{
 		DatasourceSkipIndex: []int{0, 3, 5},
@@ -1198,6 +1209,7 @@ func TestAddDatasource(t *testing.T) {
 }
 
 func TestAddEncode(t *testing.T) {
+	t.Parallel()
 	datas := []Data{
 		{
 			"f1": "2",
@@ -1232,6 +1244,7 @@ func TestAddEncode(t *testing.T) {
 }
 
 func TestAddDatasourceForErrData(t *testing.T) {
+	t.Parallel()
 	sourceFroms := []string{"a", "b", "c", "d", "e", "f"}
 	se := &StatsError{
 		DatasourceSkipIndex: []int{0, 3, 5},
@@ -1289,6 +1302,7 @@ func TestAddDatasourceForErrData(t *testing.T) {
 }
 
 func TestAddDatasourceForRawData(t *testing.T) {
+	t.Parallel()
 	dir := "TestAddDatasource"
 	metaDir := filepath.Join(dir, "meta")
 	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
@@ -1383,6 +1397,7 @@ func TestAddDatasourceForRawData(t *testing.T) {
 }
 
 func TestAddDatatags(t *testing.T) {
+	t.Parallel()
 	dir := "TestAddDatatags"
 	metaDir := filepath.Join(dir, "meta")
 	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
@@ -1459,6 +1474,7 @@ func TestAddDatatags(t *testing.T) {
 }
 
 func TestRunWithExtra(t *testing.T) {
+	t.Parallel()
 	dir := "TestRunWithExtra"
 	metaDir := filepath.Join(dir, "meta")
 	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
@@ -1510,6 +1526,7 @@ func TestRunWithExtra(t *testing.T) {
 }
 
 func TestRunWithDataSource(t *testing.T) {
+	t.Parallel()
 	cur, err := os.Getwd()
 	assert.NoError(t, err)
 	dir := filepath.Join(cur, "TestRunWithDataSource")
@@ -1583,10 +1600,11 @@ func TestRunWithDataSource(t *testing.T) {
 	}
 }
 
-func TestRunWithDataSourceFial(t *testing.T) {
+func TestRunWithDataSourceFail(t *testing.T) {
+	t.Parallel()
 	cur, err := os.Getwd()
 	assert.NoError(t, err)
-	dir := filepath.Join(cur, "TestRunWithDataSourceFial")
+	dir := filepath.Join(cur, "TestRunWithDataSourceFail")
 	metaDir := filepath.Join(dir, "meta")
 	os.RemoveAll(dir)
 	if err := os.Mkdir(dir, DefaultDirPerm); err != nil {
@@ -1600,12 +1618,12 @@ func TestRunWithDataSourceFial(t *testing.T) {
 	defer os.RemoveAll(metaDir)
 
 	config1 := `{
-			"name":"TestRunWithDataSourceFial",
+			"name":"TestRunWithDataSourceFail",
 			"batch_len":1,
 			"reader":{
 				"mode":"file",
 				"log_path":"` + logPath + `",
-				"meta_path":"./TestRunWithDataSourceFial/meta",
+				"meta_path":"./TestRunWithDataSourceFail/meta",
 				"datasource_tag":"datasource"
 			},
 			"parser":{
@@ -1615,7 +1633,7 @@ func TestRunWithDataSourceFial(t *testing.T) {
 			"senders":[{
 				"name":"file_sender",
 				"sender_type":"file",
-				"file_send_path":"./TestRunWithDataSourceFial/filesend.json"
+				"file_send_path":"./TestRunWithDataSourceFail/filesend.json"
 			}]
 		}`
 	rc := RunnerConfig{}
@@ -1627,7 +1645,7 @@ func TestRunWithDataSourceFial(t *testing.T) {
 	go rr.Run()
 
 	time.Sleep(2 * time.Second)
-	data, err := ioutil.ReadFile("./TestRunWithDataSourceFial/filesend.json")
+	data, err := ioutil.ReadFile("./TestRunWithDataSourceFail/filesend.json")
 	var res []Data
 	err = json.Unmarshal(data, &res)
 	if err != nil {
@@ -1649,6 +1667,7 @@ func TestRunWithDataSourceFial(t *testing.T) {
 }
 
 func TestClassifySenderData(t *testing.T) {
+	t.Parallel()
 	{
 		senders := []sender.Sender{&mock.Sender{}, &mock.Sender{}, &mock.Sender{}}
 		numSenders := len(senders)
@@ -1761,8 +1780,8 @@ func TestClassifySenderData(t *testing.T) {
 	}
 }
 
-// Reponse from Clearbit API. Size: 2.4kb
-var mediumFixture []byte = []byte(`{
+// Response from Clearbit API. Size: 2.4kb
+var mediumFixture = []byte(`{
   "person": {
     "id": "d50887ca-a6ce-4e59-b89f-14f0b5d03b03",
     "name": {
@@ -1880,7 +1899,7 @@ type CBPerson struct {
 
 type MediumPayload struct {
 	Person  *CBPerson `json:"person"`
-	Company string    `json:"compnay"`
+	Company string    `json:"company"`
 }
 
 func BenchmarkDecodeStdStructMedium(b *testing.B) {
@@ -1938,6 +1957,7 @@ PASS
 */
 
 func TestMergeEnvTags(t *testing.T) {
+	t.Parallel()
 	key := "TestMergeEnvTags"
 	os.Setenv(key, `{"a":"hello"}`)
 	defer os.Unsetenv(key)
@@ -1950,6 +1970,7 @@ func TestMergeEnvTags(t *testing.T) {
 }
 
 func TestMergeExtraInfoTags(t *testing.T) {
+	t.Parallel()
 	meta, err := reader.NewMetaWithConf(conf.MapConf{
 		ExtraInfo:          "true",
 		readerConf.KeyMode: readerConf.ModeMySQL,
@@ -1963,6 +1984,7 @@ func TestMergeExtraInfoTags(t *testing.T) {
 }
 
 func TestTailxCleaner(t *testing.T) {
+	t.Parallel()
 	cur, err := os.Getwd()
 	assert.NoError(t, err)
 	dir := filepath.Join(cur, "TestTailxCleaner")
@@ -2064,6 +2086,7 @@ DONE:
 }
 
 func Test_setSenderConfig(t *testing.T) {
+	t.Parallel()
 	senderConfig := conf.MapConf{
 		senderConf.KeySenderType: senderConf.TypePandora,
 	}
@@ -2124,6 +2147,7 @@ func Test_setSenderConfig(t *testing.T) {
 }
 
 func Test_removeServerIPSchema(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		autoCreate string
 		key        string
@@ -2206,6 +2230,7 @@ func randinsert(l *equeue.ErrorQueue, num int) {
 }
 
 func TestBackupRestoreHistory(t *testing.T) {
+	t.Parallel()
 	logkitConf := conf.MapConf{
 		readerConf.KeyMetaPath: "meta",
 		readerConf.KeyMode:     readerConf.ModeMongo,

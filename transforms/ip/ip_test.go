@@ -125,7 +125,7 @@ func TestTransformer(t *testing.T) {
 		DataPath: "./test_data/17monipdb.dat",
 	}
 
-	multi_ip := []Data{{
+	multiIp := []Data{{
 		"multi": map[string]interface{}{
 			"ip":      "111.2.3.4",
 			"Region":  "浙江",
@@ -141,7 +141,7 @@ func TestTransformer(t *testing.T) {
 		},
 	}
 	assert.Nil(t, ipt4.Init())
-	data4, err4 := ipt4.Transform(multi_ip)
+	data4, err4 := ipt4.Transform(multiIp)
 	exp4 := []Data{
 		{
 			"multi": map[string]interface{}{
@@ -217,7 +217,7 @@ func TestTransformer(t *testing.T) {
 		Language: "en",
 	}
 
-	multi_ip2 := []Data{{
+	multiIp2 := []Data{{
 		"multi": map[string]interface{}{
 			"ip":      "111.2.3.4",
 			"Region":  "浙江",
@@ -233,7 +233,7 @@ func TestTransformer(t *testing.T) {
 		},
 	}
 	assert.Nil(t, ipt6.Init())
-	data6, err6 := ipt6.Transform(multi_ip2)
+	data6, err6 := ipt6.Transform(multiIp2)
 	exp6 := []Data{
 		{
 			"multi": map[string]interface{}{

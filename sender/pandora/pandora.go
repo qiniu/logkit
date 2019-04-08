@@ -933,7 +933,6 @@ func (s *Sender) Send(datas []Data) (se error) {
 	default:
 		return s.schemaFreeSend(datas)
 	}
-	return nil
 }
 
 func (s *Sender) rawSend(datas []Data) (se error) {

@@ -552,6 +552,7 @@ func TestAllowLess(t *testing.T) {
 		err = errors.New(c.LastError)
 	}
 	assert.Error(t, err)
+	assert.EqualValues(t, []Data{{"pandora_stash": "a|1.2|1.2|d"}}, datas)
 }
 
 func TestIgnoreField(t *testing.T) {
@@ -576,6 +577,7 @@ func TestIgnoreField(t *testing.T) {
 		err = errors.New(c.LastError)
 	}
 	assert.Error(t, err)
+	assert.EqualValues(t, []Data{{"pandora_stash": "a|1.2|1.2|d|xx"}}, datas)
 }
 
 func TestAllowNotMatch(t *testing.T) {

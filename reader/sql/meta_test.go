@@ -287,7 +287,7 @@ func Test_RestoreMeta(t *testing.T) {
 	}
 	defer os.RemoveAll(MetaDir)
 
-	file, Offset, err := meta.ReadOffset()
+	_, _, err = meta.ReadOffset()
 	if err == nil {
 		t.Error("Offset must be nil")
 	}
@@ -305,7 +305,8 @@ func Test_RestoreMeta(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	file, Offset, err = meta.ReadOffset()
+	file, Offset, err := meta.ReadOffset()
+	assert.Nil(t, err)
 	if file != all {
 		t.Error("sql meta Offset should be " + all)
 	}
@@ -329,6 +330,8 @@ func Test_RestoreMeta(t *testing.T) {
 	rawSqls = "SELECT * FROM A; SELECT * FROM B;"
 	actualOffsets, actualSqls, omitMeta = RestoreMeta(meta, rawSqls, mgld)
 	assert.EqualValues(t, true, omitMeta)
+	assert.EqualValues(t, 0, len(actualOffsets))
+	assert.EqualValues(t, []string{"SELECT * FROM A", "SELECT * FROM B"}, actualSqls)
 }
 
 func GetContent(ReadRecords DBRecords) string {

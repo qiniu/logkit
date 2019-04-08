@@ -233,6 +233,7 @@ func TestGetSNMPConnection_v2(t *testing.T) {
 	}
 	ss, err := NewReader(&reader.Meta{RunnerName: "TestGetSNMPConnection_v2"}, c)
 	assert.Error(t, err)
+	assert.Nil(t, ss)
 	c[KeySnmpReaderTables] = `[{"table_oid": "TEST::testTable"}]`
 	ss, err = NewReader(&reader.Meta{RunnerName: "TestGetSNMPConnection_v2"}, c)
 	if err != nil {
@@ -274,6 +275,7 @@ func TestGetSNMPConnection_v3(t *testing.T) {
 	}
 	ss, err := NewReader(&reader.Meta{RunnerName: "TestGetSNMPConnection_v3"}, c)
 	assert.Error(t, err)
+	assert.Nil(t, ss)
 	c[KeySnmpReaderTables] = `[{"table_oid": "TEST::testTable"}]`
 	ss, err = NewReader(&reader.Meta{RunnerName: "TestGetSNMPConnection_v3"}, c)
 	if err != nil {
@@ -305,6 +307,7 @@ func TestGetSNMPConnection_caching(t *testing.T) {
 	}
 	ss, err := NewReader(&reader.Meta{RunnerName: "TestGetSNMPConnection_caching"}, c)
 	assert.Error(t, err)
+	assert.Nil(t, ss)
 	c[KeySnmpReaderTables] = `[{"table_oid": "TEST::testTable"}]`
 	ss, err = NewReader(&reader.Meta{RunnerName: "TestGetSNMPConnection_caching"}, c)
 	if err != nil {

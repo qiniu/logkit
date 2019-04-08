@@ -458,7 +458,6 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 			}
 		}
 		bufsize = 0
-		err = nil
 	}
 
 	cacheMap := make(map[string]string)
@@ -484,7 +483,6 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 				}
 			}
 		}
-		err = nil
 	}
 
 	return &Reader{

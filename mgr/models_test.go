@@ -10,6 +10,7 @@ import (
 )
 
 func TestRunnerStatusClone(t *testing.T) {
+	t.Parallel()
 	// 所有类型的错误都有值
 	{
 		rs := &RunnerStatus{
@@ -85,6 +86,7 @@ func TestRunnerStatusClone(t *testing.T) {
 }
 
 func TestErrList(t *testing.T) {
+	t.Parallel()
 	el := ErrorsList{
 		TransformErrors: make(map[string]*equeue.ErrorQueue),
 		SendErrors:      make(map[string]*equeue.ErrorQueue),

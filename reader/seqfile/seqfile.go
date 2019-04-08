@@ -258,7 +258,6 @@ func (sf *SeqFile) reopenForESTALE() error {
 	if err != nil {
 		//为了不影响程序运行
 		log.Errorf("Runner[%v] %v getinode error %v, use old inode", sf.meta.RunnerName, sf.dir, err)
-		err = nil
 	} else {
 		sf.inode = ninode
 	}
@@ -438,9 +437,8 @@ func (sf *SeqFile) nextFile() (fi os.FileInfo, err error) {
 	}
 	if sf.isNewFile(fi, filepath.Join(sf.dir, fi.Name())) {
 		return fi, nil
-	} else {
-		log.Warnf("Runner[%v] %v is not new file", sf.meta.RunnerName, fi.Name())
 	}
+	log.Warnf("Runner[%v] %v is not new file", sf.meta.RunnerName, fi.Name())
 	return nil, nil
 }
 

@@ -476,7 +476,7 @@ func loadS3Files(bucket *s3.Bucket, path string, files map[string]bool, marker s
 		loadS3Files(bucket, path, files, lastKey)
 	}
 
-	log.Infof("load %d files from 's3://%s/%s' succesfully", len(files), bucket.Name, path)
+	log.Infof("load %d files from 's3://%s/%s' successfully", len(files), bucket.Name, path)
 	return files, nil
 }
 

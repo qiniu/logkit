@@ -199,6 +199,9 @@ func (p *Processes) gatherFromProc(fields map[string]interface{}) error {
 
 	for _, filename := range filenames {
 		_, err := os.Stat(filename)
+		if err != nil {
+			log.Errorf("stat file: %s failed: %v", filename, err)
+		}
 
 		data, err := p.readProcFile(filename)
 		if err != nil {
@@ -242,7 +245,7 @@ func (p *Processes) gatherFromProc(fields map[string]interface{}) error {
 
 		threads, err := strconv.Atoi(string(stats[17]))
 		if err != nil {
-			log.Printf("I! processes: Error parsing thread count: %s", err)
+			log.Infof("I! processes: Error parsing thread count: %s", err)
 			continue
 		}
 		fields[KeyProcessesTotalThreads] = fields[KeyProcessesTotalThreads].(int64) + int64(threads)
@@ -254,15 +257,15 @@ func (p *Processes) gatherFromProc(fields map[string]interface{}) error {
 func (p *Processes) getWinStat(fields map[string]interface{}) error {
 	pids, err := process.Pids()
 	if err != nil {
-		return fmt.Errorf("Get all processes pids failed, error: %v", err.Error())
+		return fmt.Errorf("Get all processes pids failed, error: %v", err)
 	}
 	// total processes
 	fields[KeyProcessesTotal] = int64(len(pids))
 	for _, pid := range pids {
-		threads := int32(0)
 		p, _ := process.NewProcess(pid)
-		if threads, err = p.NumThreads(); err != nil {
-			log.Errorf("Get process threads failed, error: %v", err.Error())
+		threads, err := p.NumThreads()
+		if err != nil {
+			log.Errorf("Get process threads failed, error: %v", err)
 			continue
 		}
 		fields[KeyProcessesTotalThreads] = fields[KeyProcessesTotalThreads].(int64) + int64(threads)

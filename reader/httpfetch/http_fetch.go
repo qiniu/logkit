@@ -358,7 +358,7 @@ func (r *Reader) run() {
 }
 
 func (r *Reader) curl() (string, error) {
-	var body io.Reader = nil
+	var body io.Reader
 	if r.httpBody != "" {
 		body = bytes.NewBufferString(r.httpBody)
 	}

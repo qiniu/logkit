@@ -186,7 +186,7 @@ func Test_NewReaderWithInvalidFile(t *testing.T) {
 	}
 
 	if sf.currFile != "" {
-		t.Errorf("exp emtpy file, but got %s", sf.currFile)
+		t.Errorf("exp empty file, but got %s", sf.currFile)
 	}
 }
 

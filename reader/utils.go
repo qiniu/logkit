@@ -296,7 +296,7 @@ func ParseRunTimeWithMode(mode string, v interface{}) (runTime RunTime, err erro
 		runTimeStr, ok := v.(string)
 		if !ok {
 			err = fmt.Errorf(" %v is not string", v)
-			return
+			return RunTime{}, err
 		}
 		return ParseRunTime(runTimeStr)
 	case config.ReadModeRunTimeStruct:
@@ -304,6 +304,7 @@ func ParseRunTimeWithMode(mode string, v interface{}) (runTime RunTime, err erro
 		runTime, ok = v.(RunTime)
 		if !ok {
 			err = fmt.Errorf(" %v is not RunTime struct value", v)
+			return RunTime{}, err
 		}
 		return runTime, nil
 	default:

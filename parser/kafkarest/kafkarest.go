@@ -218,9 +218,9 @@ func (krp *Parser) ParseTopic(fields []string) string {
 		return EMPTY_STRING
 	}
 	str := fields[9]
-	topic_fields := strings.Split(str, `/`)
-	if len(topic_fields) > 2 {
-		str = topic_fields[2]
+	topicFields := strings.Split(str, `/`)
+	if len(topicFields) > 2 {
+		str = topicFields[2]
 	} else {
 		str = EMPTY_STRING
 	}
@@ -273,14 +273,14 @@ func (krp *Parser) ParseLogTime(fields []string) int64 {
 	str = strings.Trim(str, "]")
 	_, zoneValue := times.GetTimeZone()
 	ymdhms := str[:len(str)-4] + zoneValue
-	precesion_str := str[20:len(str)]
-	precesion_int, err := strconv.ParseInt(precesion_str, 10, 64)
+	precesionStr := str[20:len(str)]
+	precesionInt, err := strconv.ParseInt(precesionStr, 10, 64)
 	if err != nil {
 		log.Errorf("KafaRestlogParser parse time err %v", err)
 		return 0
 	}
 	t, err := time.Parse("2006-01-02 15:04:05 -0700", ymdhms)
-	ts := t.Unix()*1000 + precesion_int
+	ts := t.Unix()*1000 + precesionInt
 	if err != nil {
 		log.Error(err)
 		return 0

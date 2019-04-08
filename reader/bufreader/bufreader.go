@@ -129,7 +129,6 @@ func NewReaderSize(rd reader.FileReader, meta *reader.Meta, size int) (*BufReade
 				log.Debugf("Runner[%v] ReadCacheLine from file error %v", meta.RunnerName, err)
 			}
 		}
-		err = nil
 		linesbytes = []byte("")
 	} else {
 		log.Debugf("Runner[%v] %v restore line cache success: [%v]", meta.RunnerName, meta.LogPath(), string(linesbytes))

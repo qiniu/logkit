@@ -61,10 +61,7 @@ func Test_RawData(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	time.Sleep(1 * time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
+	time.Sleep(time.Millisecond)
 	confPathAbs, _, err := GetRealPath("./Test_RawData/confs1/test1.conf")
 	if err != nil {
 		t.Error(err)
@@ -102,19 +99,14 @@ func Test_RawDataWithReadData(t *testing.T) {
 	if err := os.MkdirAll("./Test_RawDataWithReadData/confs", 0777); err != nil {
 		t.Error(err)
 	}
-	defer func() {
-		os.RemoveAll("./Test_RawDataWithReadData")
-	}()
+	defer os.RemoveAll("./Test_RawDataWithReadData")
 
 	err := ioutil.WriteFile("./Test_RawDataWithReadData/confs/test1.conf", []byte(testRawData), 0666)
 	if err != nil {
 		t.Error(err)
 	}
 
-	time.Sleep(1 * time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
+	time.Sleep(time.Second)
 	confPathAbs, _, err := GetRealPath("./Test_RawDataWithReadData/confs/test1.conf")
 	if err != nil {
 		t.Error(err)
@@ -126,6 +118,7 @@ func Test_RawDataWithReadData(t *testing.T) {
 		t.Error(err)
 	}
 
+	RawDataTimeOut = 30 * time.Second
 	rawData, err := RawData(runnerConf.ReaderConfig)
 	if err != nil {
 		t.Error(err)
@@ -174,10 +167,7 @@ func Test_RawData_DaemonReader(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	time.Sleep(1 * time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
+	time.Sleep(time.Millisecond)
 	confPathAbs, _, err := GetRealPath("./Test_RawData_DaemonReader/confs1/test1.conf")
 	if err != nil {
 		t.Error(err)
@@ -255,6 +245,7 @@ func Test_ParseData(t *testing.T) {
 }
 
 func Test_TransformData(t *testing.T) {
+	t.Parallel()
 	config1 := `{
 			"type":"IP",
 			"key":  "ip",
@@ -328,6 +319,7 @@ func Test_getDataFromTransformConfig(t *testing.T) {
 }
 
 func Test_getTransformer(t *testing.T) {
+	t.Parallel()
 	config1 := `{
 			"type":"IP",
 			"key":  "ip",
@@ -572,11 +564,11 @@ func Test_getSenders(t *testing.T) {
 	}
 }
 
-func Test_RawData_MutliLines(t *testing.T) {
+func Test_RawData_MultiLines(t *testing.T) {
 	t.Parallel()
-	fileName := filepath.Join(os.TempDir(), "Test_RawData_MutliLines")
+	fileName := filepath.Join(os.TempDir(), "Test_RawData_MultiLines")
 	//create file & write file
-	err := createFile(fileName, 20000000)
+	err := createFile(fileName, 2000)
 	if err != nil {
 		t.Error(err)
 	}
@@ -604,9 +596,11 @@ func Test_RawData_MutliLines(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"abc\n", "abc\n"}, actual)
 
+	RawDataTimeOut = 3 * time.Second
 	os.RemoveAll(fileName)
 	createRawDataFile(fileName, "abc\n")
 	actual, err = RawData(readConfig)
+	RawDataTimeOut = 30 * time.Second
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"abc\n"}, actual)
 }

@@ -2,7 +2,6 @@ package models
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -1120,7 +1119,7 @@ func TestIsSubMetaExpireValid(t *testing.T) {
 func BenchmarkFmt(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		fmt.Errorf("test fmt errorf and errors.new with benchmark: %s", "my error")
+		b.Log("test fmt errorf and errors.new with benchmark: my error")
 	}
 }
 
@@ -1128,7 +1127,7 @@ func BenchmarkFmt(b *testing.B) {
 func BenchmarkErrors(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		errors.New("test fmt errorf and errors.new with benchmark: " + "my error")
+		b.Log("test fmt errorf and errors.new with benchmark: my error")
 	}
 }
 

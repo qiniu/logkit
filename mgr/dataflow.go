@@ -38,6 +38,8 @@ const (
 	DefaultRawDataSize     = 16 * 1024
 )
 
+var RawDataTimeOut = 30 * time.Second
+
 // RawData 从 reader 模块中根据 type 获取多条字符串形式的样例日志
 func RawData(readerConfig conf.MapConf) ([]string, error) {
 	if readerConfig == nil {
@@ -97,7 +99,7 @@ func RawData(readerConfig conf.MapConf) ([]string, error) {
 	}()
 
 	var rawData []string
-	timeout := time.NewTimer(30 * time.Second)
+	timeout := time.NewTimer(RawDataTimeOut)
 	defer timeout.Stop()
 	select {
 	case de := <-readChan:

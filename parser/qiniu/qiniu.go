@@ -278,10 +278,10 @@ func (p *Parser) parseCombinedModuleFile(line string) (string, map[string]string
 			//适配teapot日志
 			result[LogHeadFile] = strings.Trim(module, `"`)
 			return line, result, nil
-		} else {
-			result[LogHeadModule] = module
 		}
+		result[LogHeadModule] = module
 	}
+
 	leftLine, logRes, err := p.parseLogFile(line)
 	if err != nil {
 		if len(result) > 0 {
