@@ -57,7 +57,7 @@ func (k *Kernel) Usages() string {
 	return MetricKernelUsages
 }
 
-func (_ *Kernel) Tags() []string {
+func (*Kernel) Tags() []string {
 	return []string{}
 }
 

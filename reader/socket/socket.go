@@ -405,7 +405,7 @@ func (r *Reader) Name() string {
 	return "SocketReader<" + r.ServiceAddress + ">"
 }
 
-func (_ *Reader) SetMode(_ string, _ interface{}) error {
+func (*Reader) SetMode(_ string, _ interface{}) error {
 	return errors.New("socket reader does not support read mode")
 }
 

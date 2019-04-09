@@ -293,4 +293,4 @@ func (h *Sender) interfaceJoin(dataArray []interface{}, sep string) (string, err
 	return strings.Join(strData, sep), nil
 }
 
-func (_ *Sender) SkipDeepCopy() bool { return true }
+func (*Sender) SkipDeepCopy() bool { return true }

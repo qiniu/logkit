@@ -67,19 +67,19 @@ type NetIOStats struct {
 	InterfacesMap  map[string]net.Interface
 }
 
-func (_ *NetIOStats) Name() string {
+func (*NetIOStats) Name() string {
 	return TypeMetricNet
 }
 
-func (_ *NetIOStats) Usages() string {
+func (*NetIOStats) Usages() string {
 	return MetricNetUsages
 }
 
-func (_ *NetIOStats) Tags() []string {
+func (*NetIOStats) Tags() []string {
 	return []string{KeyNetInterface}
 }
 
-func (_ *NetIOStats) Config() map[string]interface{} {
+func (*NetIOStats) Config() map[string]interface{} {
 	configOption := []Option{
 		{
 			KeyName:      "interfaces",

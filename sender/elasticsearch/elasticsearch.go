@@ -425,4 +425,4 @@ func (s *Sender) wrapDoc(doc map[string]interface{}) map[string]interface{} {
 	return doc
 }
 
-func (_ *Sender) SkipDeepCopy() bool { return true }
+func (*Sender) SkipDeepCopy() bool { return true }

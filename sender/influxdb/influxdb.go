@@ -523,7 +523,7 @@ func String(in string) string {
 	return in
 }
 
-func (_ *Sender) SkipDeepCopy() bool { return true }
+func (*Sender) SkipDeepCopy() bool { return true }
 
 func isBeyondRetentionErr(err error) bool {
 	if err != nil && strings.Contains(err.Error(), "points beyond retention policy") {

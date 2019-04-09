@@ -61,19 +61,19 @@ type DiskStats struct {
 	IgnoreFS    []string `json:"ignore_fs"`
 }
 
-func (_ *DiskStats) Name() string {
+func (*DiskStats) Name() string {
 	return TypeMetricDisk
 }
 
-func (_ *DiskStats) Usages() string {
+func (*DiskStats) Usages() string {
 	return MetricDiskUsages
 }
 
-func (_ *DiskStats) Tags() []string {
+func (*DiskStats) Tags() []string {
 	return []string{KeyDiskFstype, KeyDiskPath, KeyDiskDevice}
 }
 
-func (_ *DiskStats) Config() map[string]interface{} {
+func (*DiskStats) Config() map[string]interface{} {
 	configOptions := make([]Option, 0)
 	for _, val := range ConfigDiskUsages {
 		option := Option{
@@ -221,19 +221,19 @@ type DiskIOStats struct {
 	infoCache map[string]diskInfoCache
 }
 
-func (_ *DiskIOStats) Name() string {
+func (*DiskIOStats) Name() string {
 	return TypeMetricDiskio
 }
 
-func (_ *DiskIOStats) Usages() string {
+func (*DiskIOStats) Usages() string {
 	return MetricDiskioUsages
 }
 
-func (_ *DiskIOStats) Tags() []string {
+func (*DiskIOStats) Tags() []string {
 	return []string{KeyDiskioName, KeyDiskioSerial}
 }
 
-func (_ *DiskIOStats) Config() map[string]interface{} {
+func (*DiskIOStats) Config() map[string]interface{} {
 	configOptions := make([]Option, 0)
 	for i := 0; i < 3; i++ {
 		option := Option{

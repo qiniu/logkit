@@ -129,7 +129,7 @@ func (r *Reader) Name() string {
 	return fmt.Sprintf("[%s],[%v],[%s]", r.opts.dataType, r.opts.db, r.opts.key)
 }
 
-func (_ *Reader) SetMode(_ string, _ interface{}) error {
+func (*Reader) SetMode(_ string, _ interface{}) error {
 	return errors.New("redis reader does not support read mode")
 }
 
@@ -326,7 +326,7 @@ func (r *Reader) Status() StatsInfo {
 	return r.stats
 }
 
-func (_ *Reader) SyncMeta() {}
+func (*Reader) SyncMeta() {}
 
 func (r *Reader) Close() error {
 	if !atomic.CompareAndSwapInt32(&r.status, StatusRunning, StatusStopping) {

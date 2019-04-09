@@ -87,7 +87,7 @@ type LocationInfo struct {
 	DistrictCode string
 }
 
-func (_ *datxLocator) newLocationInfo(str []byte) *LocationInfo {
+func (*datxLocator) newLocationInfo(str []byte) *LocationInfo {
 	var info *LocationInfo
 
 	fields := bytes.Split(str, []byte("\t"))

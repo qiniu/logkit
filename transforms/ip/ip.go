@@ -106,7 +106,7 @@ func generateKeys(keys []string, lastEle string, keyAsPrefix bool) []string {
 	return newKeys
 }
 
-func (_ *Transformer) RawTransform(datas []string) ([]string, error) {
+func (*Transformer) RawTransform(datas []string) ([]string, error) {
 	return datas, errors.New("IP transformer not support rawTransform")
 }
 
@@ -208,16 +208,16 @@ func (t *Transformer) SetMapValue(m map[string]interface{}, val interface{}, key
 	return nil
 }
 
-func (_ *Transformer) Description() string {
+func (*Transformer) Description() string {
 	//return "transform ip to country region and isp"
 	return "获取IP的区域、国家、城市和运营商信息"
 }
 
-func (_ *Transformer) Type() string {
+func (*Transformer) Type() string {
 	return "IP"
 }
 
-func (_ *Transformer) SampleConfig() string {
+func (*Transformer) SampleConfig() string {
 	return `{
 		"type":"IP",
 		"stage":"after_parser",
@@ -226,7 +226,7 @@ func (_ *Transformer) SampleConfig() string {
 	}`
 }
 
-func (_ *Transformer) ConfigOptions() []Option {
+func (*Transformer) ConfigOptions() []Option {
 	return []Option{
 		{
 			KeyName:       transforms.TransformAt,
