@@ -1,4 +1,4 @@
-package mock_pandora
+package mockpandora
 
 import (
 	"bufio"

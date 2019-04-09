@@ -19,7 +19,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	. "github.com/qiniu/logkit/sender/config"
-	mockPandora "github.com/qiniu/logkit/sender/mock_pandora"
+	mockPandora "github.com/qiniu/logkit/sender/mockpandora"
 	"github.com/qiniu/logkit/times"
 	. "github.com/qiniu/logkit/utils/models"
 )

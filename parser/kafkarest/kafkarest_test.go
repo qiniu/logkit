@@ -57,10 +57,10 @@ func TestKafaRestLogParser(t *testing.T) {
 	expectedResultGet[KEY_CODE] = 200
 	expectedResultGet[KEY_DURATION] = 211
 	expectedResultGet[KEY_RESP_LEN] = 448238
-	get_line := dts[3]
+	getLine := dts[3]
 	for k, v := range expectedResultGet {
-		if v != get_line[k] {
-			t.Errorf("unexpected result get of key:%v, %v not equal %v", k, get_line[k], v)
+		if v != getLine[k] {
+			t.Errorf("unexpected result get of key:%v, %v not equal %v", k, getLine[k], v)
 		}
 	}
 	assert.EqualValues(t, "krp-1", p.Name())
@@ -110,10 +110,10 @@ func TestKafaRestKeepRawData(t *testing.T) {
 	expectedResultGet[KEY_DURATION] = 211
 	expectedResultGet[KEY_RESP_LEN] = 448238
 	expectedResultGet[KeyRawData] = `[2016-12-07 07:35:11,009] INFO 192.168.85.32 - - [07/Dec/2016:07:35:10 +0800] "GET /topics/VIP_XfH2Fd3NRCuZpqyP_0000000000/partitions/16/messages?offset=3857621267&count=20000 HTTP/1.1" 200 448238  211 (io.confluent.rest-utils.requests)`
-	get_line := dts[1]
+	getLine := dts[1]
 	for k, v := range expectedResultGet {
-		if v != get_line[k] {
-			t.Errorf("unexpected result get of key:%v, %v not equal %v", k, get_line[k], v)
+		if v != getLine[k] {
+			t.Errorf("unexpected result get of key:%v, %v not equal %v", k, getLine[k], v)
 		}
 	}
 
@@ -123,7 +123,7 @@ func TestKafaRestKeepRawData(t *testing.T) {
 	errLine := dts[2]
 	for k, v := range expectedResultErr {
 		if v != errLine[k] {
-			t.Errorf("unexpected result get of key:%v, %v not equal %v", k, get_line[k], v)
+			t.Errorf("unexpected result get of key:%v, %v not equal %v", k, getLine[k], v)
 		}
 	}
 	assert.EqualValues(t, "krp-1", p.Name())
