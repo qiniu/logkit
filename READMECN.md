@@ -1,4 +1,4 @@
-# logkit-community（社区版） [![Build Status](https://api.travis-ci.org/qiniu/logkit.svg)](http://travis-ci.org/qiniu/logkit) [![Go Report Card](https://goreportcard.com/badge/github.com/qiniu/logkit)](https://goreportcard.com/report/github.com/qiniu/logkit) [![codecov](https://codecov.io/gh/qiniu/logkit/branch/master/graph/badge.svg)](https://codecov.io/gh/qiniu/logkit) [![GoDoc](https://godoc.org/github.com/qiniu/logkit?status.svg)](https://godoc.org/github.com/qiniu/logkit)
+# logkit-community（社区版） [![Build Status](https://api.travis-ci.org/qiniu/logkit.svg)](http://travis-ci.org/qiniu/logkit) [![Go Report Card](https://goreportcard.com/badge/github.com/qiniu/logkit)](https://goreportcard.com/report/github.com/qiniu/logkit) [![codecov](https://codecov.io/gh/qiniu/logkit/branch/master/graph/badge.svg)](https://codecov.io/gh/qiniu/logkit/branch/master) [![GoDoc](https://godoc.org/github.com/qiniu/logkit?status.svg)](https://godoc.org/github.com/qiniu/logkit)
 
 ![logkit LOGO](https://raw.githubusercontent.com/qiniu/logkit/master/resources/logo.png)
 
