@@ -19,7 +19,7 @@ import (
 	"github.com/qiniu/logkit/sender"
 	. "github.com/qiniu/logkit/sender/config"
 	"github.com/qiniu/logkit/sender/mock"
-	"github.com/qiniu/logkit/sender/mock_pandora"
+	"github.com/qiniu/logkit/sender/mockpandora"
 	"github.com/qiniu/logkit/sender/pandora"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -29,7 +29,7 @@ const (
 )
 
 func TestFtSender(t *testing.T) {
-	_, pt := mock_pandora.NewMockPandoraWithPrefix("/v2")
+	_, pt := mockpandora.NewMockPandoraWithPrefix("/v2")
 	pandoraSenderConfig := conf.MapConf{
 		"name":                           "p",
 		"pandora_region":                 "nb",
@@ -119,7 +119,7 @@ func TestFtSender(t *testing.T) {
 }
 
 func TestFtDiscardLast(t *testing.T) {
-	p, pt := mock_pandora.NewMockPandoraWithPrefix("/v2")
+	p, pt := mockpandora.NewMockPandoraWithPrefix("/v2")
 	pandoraSenderConfig := conf.MapConf{
 		"name":                           "p",
 		"pandora_region":                 "nb",
@@ -186,7 +186,7 @@ func TestFtDiscardLast(t *testing.T) {
 }
 
 func TestInvalidData(t *testing.T) {
-	p, pt := mock_pandora.NewMockPandoraWithPrefix("/v2")
+	p, pt := mockpandora.NewMockPandoraWithPrefix("/v2")
 	pandoraSenderConfig := conf.MapConf{
 		"name":                           "p",
 		"pandora_region":                 "nb",
@@ -256,7 +256,7 @@ func TestInvalidData(t *testing.T) {
 }
 
 func TestFtMemorySender(t *testing.T) {
-	_, pt := mock_pandora.NewMockPandoraWithPrefix("/v2")
+	_, pt := mockpandora.NewMockPandoraWithPrefix("/v2")
 	pandoraSenderConfig := conf.MapConf{
 		"name":                           "p",
 		"pandora_region":                 "nb",
@@ -305,7 +305,7 @@ func TestFtMemorySender(t *testing.T) {
 }
 
 func TestFtMemoryEmptySender(t *testing.T) {
-	mockPandora, pt := mock_pandora.NewMockPandoraWithPrefix("/v2")
+	mockPandora, pt := mockpandora.NewMockPandoraWithPrefix("/v2")
 	pandoraSenderConfig := conf.MapConf{
 		"name":                           "p",
 		"pandora_region":                 "nb",
@@ -350,7 +350,7 @@ func TestFtMemoryEmptySender(t *testing.T) {
 }
 
 func TestFtChannelFullSender(t *testing.T) {
-	mockP, pt := mock_pandora.NewMockPandoraWithPrefix("/v2")
+	mockP, pt := mockpandora.NewMockPandoraWithPrefix("/v2")
 	pandoraSenderConfig := conf.MapConf{
 		"name":                           "p",
 		"pandora_region":                 "nb",
@@ -526,7 +526,7 @@ func TestFtSenderConvertData(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	mockP, pt := mock_pandora.NewMockPandoraWithPrefix("/v2")
+	mockP, pt := mockpandora.NewMockPandoraWithPrefix("/v2")
 	senderConfig := conf.MapConf{
 		"pandora_repo_name":              "TestFtSenderConvertData",
 		"name":                           "p",
@@ -662,7 +662,7 @@ func Test_SplitData(t *testing.T) {
 }
 
 func TestTypeSchemaRetry(t *testing.T) {
-	_, pt := mock_pandora.NewMockPandoraWithPrefix("/v2")
+	_, pt := mockpandora.NewMockPandoraWithPrefix("/v2")
 	pandoraSenderConfig := conf.MapConf{
 		"name":                           "p",
 		"pandora_region":                 "nb",
@@ -722,7 +722,7 @@ func TestSkipDeepCopySender(t *testing.T) {
 }
 
 func TestPandoraExtraInfo(t *testing.T) {
-	pandoraServer, pt := mock_pandora.NewMockPandoraWithPrefix("/v2")
+	pandoraServer, pt := mockpandora.NewMockPandoraWithPrefix("/v2")
 	conf1 := conf.MapConf{
 		"force_microsecond":         "false",
 		"ft_memory_channel":         "false",
