@@ -800,7 +800,7 @@ func changeTagsTest(p *testCluParam) {
 	t := p.t
 	rs := p.rs
 	rd := p.rd
-	dir := "changeTagsTestDir"
+	dir := "changeTagsTest"
 	rootDir := filepath.Join(rd, dir)
 	if err := mkTestDir(rootDir); err != nil {
 		t.Fatalf("mkdir error %v", err)
@@ -849,7 +849,7 @@ func clusterSlavesDeleteTest(p *testCluParam) {
 	t := p.t
 	rs := p.rs
 	rd := p.rd
-	dir := "clusterSlavesDeleteTestDir"
+	dir := "clusterSlavesDeleteTest"
 	rootDir := filepath.Join(rd, dir)
 	if err := mkTestDir(rootDir); err != nil {
 		t.Fatalf("mkdir error %v", err)

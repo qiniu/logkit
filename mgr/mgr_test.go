@@ -374,7 +374,7 @@ func Test_Watch(t *testing.T) {
 		t.Error(err)
 	}
 
-	time.Sleep(time.Second)
+	time.Sleep(2 * time.Second)
 	exps = make([]string, 0)
 	gots, err = getfilename(logdir)
 	if err != nil {

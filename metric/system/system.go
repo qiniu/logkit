@@ -46,15 +46,15 @@ var KeySystemUsages = KeyValueSlice{
 type SystemStats struct {
 }
 
-func (_ *SystemStats) Name() string {
+func (*SystemStats) Name() string {
 	return TypeMetricSystem
 }
 
-func (_ *SystemStats) Usages() string {
+func (*SystemStats) Usages() string {
 	return MetricSystemUsage
 }
 
-func (_ *SystemStats) Tags() []string {
+func (*SystemStats) Tags() []string {
 	return []string{}
 }
 

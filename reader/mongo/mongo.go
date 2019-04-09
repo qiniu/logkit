@@ -177,7 +177,7 @@ func (r *Reader) Name() string {
 	return "MongoReader<" + r.Source() + ">"
 }
 
-func (_ *Reader) SetMode(_ string, _ interface{}) error {
+func (*Reader) SetMode(_ string, _ interface{}) error {
 	return errors.New("MongoDB Reader does not support read mode")
 }
 

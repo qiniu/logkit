@@ -163,7 +163,7 @@ func (r *Reader) FetchInitError() error {
 	return r.initErr
 }
 
-func (_ *Reader) SyncMeta() {}
+func (*Reader) SyncMeta() {}
 
 func (r *Reader) Close() error {
 	if !atomic.CompareAndSwapInt32(&r.status, StatusRunning, StatusStopping) {

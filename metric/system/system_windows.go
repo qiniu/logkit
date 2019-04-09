@@ -11,7 +11,6 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/metric"
-	. "github.com/qiniu/logkit/metric/system/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -38,7 +37,7 @@ func (s *WinSystemStats) Config() map[string]interface{} {
 	return config
 }
 
-func (_ *WinSystemStats) Collect() (datas []map[string]interface{}, err error) {
+func (*WinSystemStats) Collect() (datas []map[string]interface{}, err error) {
 	lp, err := LoadPercentage()
 	if err != nil {
 		return

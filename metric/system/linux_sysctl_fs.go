@@ -73,19 +73,19 @@ var KeyLinuxSysctlFsUsage = KeyValueSlice{
 	{KeySysctlFsFieldNameMap[KeyLinuxSysctlFsFileMax], "内核支持的最大file handle数量", ""},
 }
 
-func (_ *SysctlFS) Name() string {
+func (*SysctlFS) Name() string {
 	return TypeLinuxSysctlFs
 }
 
-func (_ *SysctlFS) Usages() string {
+func (*SysctlFS) Usages() string {
 	return MetricLinuxSysctlFsUsage
 }
 
-func (_ *SysctlFS) Tags() []string {
+func (*SysctlFS) Tags() []string {
 	return []string{}
 }
 
-func (_ *SysctlFS) Config() map[string]interface{} {
+func (*SysctlFS) Config() map[string]interface{} {
 	config := map[string]interface{}{
 		metric.OptionString:     []Option{},
 		metric.AttributesString: KeyLinuxSysctlFsUsage,

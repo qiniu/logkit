@@ -42,19 +42,19 @@ type MemStats struct {
 	ps PS
 }
 
-func (_ *MemStats) Name() string {
+func (*MemStats) Name() string {
 	return TypeMetricMem
 }
 
-func (_ *MemStats) Usages() string {
+func (*MemStats) Usages() string {
 	return MetricMemUsages
 }
 
-func (_ *MemStats) Tags() []string {
+func (*MemStats) Tags() []string {
 	return []string{}
 }
 
-func (_ *MemStats) Config() map[string]interface{} {
+func (*MemStats) Config() map[string]interface{} {
 	config := map[string]interface{}{
 		metric.OptionString:     []Option{},
 		metric.AttributesString: KeyMemUsages,
@@ -111,19 +111,19 @@ type SwapStats struct {
 	ps PS
 }
 
-func (_ *SwapStats) Name() string {
+func (*SwapStats) Name() string {
 	return TypeMetricSwap
 }
 
-func (_ *SwapStats) Usages() string {
+func (*SwapStats) Usages() string {
 	return MetricSwapUsages
 }
 
-func (_ *SwapStats) Tags() []string {
+func (*SwapStats) Tags() []string {
 	return []string{}
 }
 
-func (_ *SwapStats) Config() map[string]interface{} {
+func (*SwapStats) Config() map[string]interface{} {
 	config := map[string]interface{}{
 		metric.OptionString:     []Option{},
 		metric.AttributesString: KeySwapUsages,

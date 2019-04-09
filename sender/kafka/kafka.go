@@ -305,4 +305,4 @@ func (this *Sender) Close() (err error) {
 	return nil
 }
 
-func (_ *Sender) SkipDeepCopy() bool { return true }
+func (*Sender) SkipDeepCopy() bool { return true }

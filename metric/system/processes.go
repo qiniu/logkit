@@ -71,11 +71,11 @@ func (p *Processes) Usages() string {
 	return MetricProcessesUsage
 }
 
-func (_ *Processes) Tags() []string {
+func (*Processes) Tags() []string {
 	return []string{}
 }
 
-func (_ *Processes) Config() map[string]interface{} {
+func (*Processes) Config() map[string]interface{} {
 	config := map[string]interface{}{
 		metric.OptionString:     []Option{},
 		metric.AttributesString: KeyProcessesUsages,

@@ -430,7 +430,7 @@ func (mr *MetricRunner) Delete() (err error) {
 	return mr.meta.Delete()
 }
 
-func (_ *MetricRunner) Cleaner() CleanInfo {
+func (*MetricRunner) Cleaner() CleanInfo {
 	return CleanInfo{
 		enable: false,
 	}
