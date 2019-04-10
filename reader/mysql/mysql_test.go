@@ -194,7 +194,6 @@ func TestMySql(t *testing.T) {
 		dataLine++
 	}
 	assert.Equal(t, 0, dataLine)
-	mr.SyncMeta()
 	mr.Close()
 
 	// test exec on start, sql not empty
@@ -240,7 +239,6 @@ func TestMySql(t *testing.T) {
 		dataLine++
 	}
 	assert.Equal(t, 0, dataLine)
-	mrRawSql.SyncMeta()
 	mrRawSql.Close()
 
 	// test history all
@@ -268,7 +266,6 @@ func TestMySql(t *testing.T) {
 		dataLine++
 	}
 	assert.Equal(t, dayDataTestsLine+todayDataTestsLine, dataLine)
-	mrHistoryAll.SyncMeta()
 	mrHistoryAll.Close()
 
 	// test file done in meta dir
@@ -291,7 +288,6 @@ func TestMySql(t *testing.T) {
 		dataLine++
 	}
 	assert.Equal(t, 0, dataLine)
-	mrHistoryAll2.SyncMeta()
 	mrHistoryAll2.Close()
 
 	// test cron
@@ -325,7 +321,6 @@ func TestMySql(t *testing.T) {
 		dataLine++
 	}
 	assert.Equal(t, minDataTestsLine, dataLine)
-	mrCron.SyncMeta()
 	mrCron.Close()
 
 	// cron task, exec on start
@@ -362,7 +357,6 @@ func TestMySql(t *testing.T) {
 		dataLine++
 	}
 	assert.Equal(t, minDataTestsLine, dataLine)
-	mrCronExecOnStart.SyncMeta()
 	mrCronExecOnStart.Close()
 
 	mrCronExecOnStart2, err := getMySqlReader(false, false, false, runnerName, CronInfo{true, secondAdd3, false})
@@ -389,7 +383,6 @@ func TestMySql(t *testing.T) {
 		dataLine++
 	}
 	assert.Equal(t, 0, dataLine)
-	mrCronExecOnStart2.SyncMeta()
 	mrCronExecOnStart2.Close()
 
 	// cron task, exec on start

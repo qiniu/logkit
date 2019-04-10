@@ -82,6 +82,7 @@ func TestMetricRunner(t *testing.T) {
 		"metricDiskioTest":    metricDiskioTest,
 		"metricHttpTest":      metricHttpTest,
 		"metricRunEnvTagTest": metricRunEnvTagTest,
+		"metricRunErrTest":    metricRunErrTest,
 	}
 
 	for k, f := range funcMap {
@@ -295,6 +296,12 @@ func metricNetTest(p *testParam) {
 		}
 		assert.Equal(t, 1, len(result))
 	}
+
+	// 重置 runner
+	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName + "/reset"
+	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
 }
 
 func metricDiskioTest(p *testParam) {
@@ -563,7 +570,7 @@ func metricHttpTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(time.Second)
+	time.Sleep(time.Millisecond)
 
 	var curLine int64
 	httpAttr := curl.KeyHttpUsages
@@ -635,7 +642,7 @@ func metricHttpTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPost, []byte{})
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(time.Second)
+	time.Sleep(time.Millisecond)
 
 	curLine = 0
 	f, err = os.Open(resvPath2)
@@ -733,6 +740,73 @@ func metricHttpTest(p *testParam) {
 		assert.Equal(t, float64(0), result[0]["http__err_state_total"])
 		assert.Equal(t, "don't contain: 潘多拉", result[0]["http__err_msg_total"])
 	}
+}
+
+func metricRunErrTest(p *testParam) {
+	t := p.t
+	rd := p.rd
+	rs := p.rs
+	resvName1 := "sendData"
+	runnerName := "metricRunErrTest"
+	dir := runnerName + "Dir"
+	testDir := filepath.Join(rd, dir)
+	resvDir := filepath.Join(testDir, "sender")
+	resvPath1 := filepath.Join(resvDir, resvName1)
+	if err := mkTestDir(testDir, resvDir); err != nil {
+		t.Fatalf("mkdir test path error %v", err)
+	}
+
+	mc := []MetricConfig{
+		{
+			MetricType: "metric_test",
+			Attributes: map[string]bool{},
+			Config: map[string]interface{}{
+				"total_cpu":        true,
+				"per_cpu":          false,
+				"collect_cpu_time": true,
+			},
+		},
+	}
+	runnerConf, err := getMetricRunnerConfig(runnerName, mc, resvPath1)
+	if err != nil {
+		t.Fatalf("get runner config failed, error is %v", err)
+	}
+
+	// 添加 runner 失败
+	url := "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName
+	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, respCode)
+	var got1 respDataMessage
+	if err = jsoniter.Unmarshal(respBody, &got1); err != nil {
+		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
+	}
+	assert.EqualValues(t, "L1002", got1.Code)
+	assert.EqualValues(t, "forkRunner metricRunErrTest error NewRunner(metricRunErrTest) failed: no collectors were added", got1.Message)
+
+	// 添加 runner 失败
+	runnerConfStruct := RunnerConfig{
+		RunnerInfo: RunnerInfo{
+			RunnerName:       "metricRunErrTest",
+			MaxBatchInterval: 1,
+		},
+		SendersConfig: []conf.MapConf{{
+			"name":           "file_sender",
+			"sender_type":    "file",
+			"file_send_path": "",
+		}},
+	}
+	runnerConf, _ = jsoniter.Marshal(runnerConfStruct)
+	url = "http://127.0.0.1" + rs.address + "/logkit/configs/" + runnerName
+	respCode, respBody, err = makeRequest(url, http.MethodPost, runnerConf)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, respCode)
+	var got2 respDataMessage
+	if err = jsoniter.Unmarshal(respBody, &got2); err != nil {
+		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
+	}
+	assert.EqualValues(t, "L1002", got2.Code)
+	assert.EqualValues(t, "forkRunner metricRunErrTest error NewRunner(metricRunErrTest) failed: get logpath in new meta error MissingKey: The configs must contains log_path, dataType must be string", got2.Message)
 }
 
 func TestSendType(t *testing.T) {

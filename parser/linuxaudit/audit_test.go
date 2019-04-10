@@ -1,10 +1,12 @@
 package linuxaudit
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/qiniu/logkit/conf"
 	. "github.com/qiniu/logkit/parser/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -26,7 +28,7 @@ func TestParse(t *testing.T) {
 				{
 					"arch":          "c000003e",
 					"type":          "SYSCALL",
-					"msg_timestamp": "1364481363.243",
+					"msg_timestamp": "2013-03-28T14:36:03.243Z",
 					"msg_id":        "24287",
 					"syscall":       "2",
 					"success":       "no",
@@ -38,11 +40,11 @@ func TestParse(t *testing.T) {
 				{
 					"type": "CWD",
 					"cwd":  "/home/shadowman",
-					"msg":  Data{"op": "PAM:secret", "test1": "a", "res": "success"},
+					"msg":  map[string]interface{}{"op": "PAM:secret", "test1": "a", "res": "success"},
 				},
 				{
 					"type":          "PATH",
-					"msg_timestamp": "1364481363.243",
+					"msg_timestamp": "2013-03-28T14:36:03.243Z",
 					"msg_id":        "24287",
 					"item":          "0",
 					"name":          "/etc/ssh/sshd_config",
@@ -53,15 +55,15 @@ func TestParse(t *testing.T) {
 			},
 		},
 	}
-	l := Parser{
-		name: TypeLinuxAudit,
-	}
+	l, err := NewParser(conf.MapConf{
+		"name": TypeLinuxAudit,
+	})
+	fmt.Println(l.Name())
+	assert.Nil(t, err)
 	for _, tt := range tests {
 		got, err := l.Parse(tt.s)
-		if c, ok := err.(*StatsError); ok {
-			assert.Equal(t, int64(0), c.Errors)
-		}
-
+		assert.Nil(t, err)
+		assert.EqualValues(t, len(tt.expectData), len(got))
 		for i, m := range got {
 			assert.Equal(t, tt.expectData[i], m)
 		}

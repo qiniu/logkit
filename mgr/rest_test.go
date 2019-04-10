@@ -41,6 +41,11 @@ type respModeKeyOptions struct {
 	Data map[string][]Option `json:"data"`
 }
 
+type respModeOptions struct {
+	Code string   `json:"code"`
+	Data []Option `json:"data"`
+}
+
 type respSampleLogs struct {
 	Code string            `json:"code"`
 	Data map[string]string `json:"data"`
@@ -227,6 +232,7 @@ func makeRequest(url, method string, configBytes []byte) (respCode int, respBody
 }
 
 func TestWebAPI(t *testing.T) {
+	t.Parallel()
 	pwd, err := os.Getwd()
 	if err != nil {
 		t.Error(err)
@@ -263,6 +269,7 @@ func TestWebAPI(t *testing.T) {
 		"readerAPITest":      readerAPITest,
 		"senderAPITest":      senderAPITest,
 		"transformerAPITest": transformerAPITest,
+		"cleanerAPITest":     cleanerAPITest,
 	}
 
 	for k, f := range funcMap {

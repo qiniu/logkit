@@ -181,8 +181,7 @@ func TransformData(transformerConfig map[string]interface{}) ([]Data, error) {
 		if ok {
 			transErr = errors.New(se.LastError)
 		}
-		err := fmt.Errorf("transform processing error %v", transErr)
-		return nil, err
+		return nil, fmt.Errorf("transform processing error %v", transErr)
 	}
 	return transformedData, nil
 }
@@ -346,7 +345,10 @@ func trySend(s sender.Sender, datas []Data, times int) (err error) {
 }
 
 func getSampleData(parserConfig conf.MapConf) ([]string, error) {
-	parserType, _ := parserConfig.GetString(KeyParserType)
+	parserType, err := parserConfig.GetString(KeyParserType)
+	if err != nil {
+		return []string{}, err
+	}
 	rawData, _ := parserConfig.GetStringOr(KeySampleLog, "")
 	var sampleData []string
 
@@ -369,7 +371,6 @@ func getSampleData(parserConfig conf.MapConf) ([]string, error) {
 	default:
 		sampleData = append(sampleData, rawData)
 	}
-
 	return sampleData, nil
 }
 
@@ -379,8 +380,7 @@ func checkSampleData(sampleData []string, logParser parser.Parser) ([]string, er
 		if ok {
 			sampleData = []string{PandoraParseFlushSignal}
 		} else {
-			err := fmt.Errorf("parser [%v] fetched 0 lines", logParser.Name())
-			return nil, err
+			return nil, errors.New("parser [" + logParser.Name() + "] fetched 0 lines")
 		}
 	}
 	return sampleData, nil
@@ -406,13 +406,11 @@ func getTransformerCreator(transformerConfig map[string]interface{}) (transforms
 func getDataFromTransformConfig(transformerConfig map[string]interface{}) ([]Data, error) {
 	rawData, ok := transformerConfig[KeySampleLog]
 	if !ok {
-		err := fmt.Errorf("missing param %s", KeySampleLog)
-		return nil, err
+		return nil, errors.New("missing param " + KeySampleLog)
 	}
 	rawDataStr, ok := rawData.(string)
 	if !ok {
-		err := fmt.Errorf("missing param %s", KeySampleLog)
-		return nil, err
+		return nil, fmt.Errorf("expect %s string, but got %T", KeySampleLog, rawData)
 	}
 	if rawDataStr == "" {
 		return nil, errors.New("transformer fetched empty sample log")

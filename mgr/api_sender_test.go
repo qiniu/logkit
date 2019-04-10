@@ -3,10 +3,11 @@ package mgr
 import (
 	"net/http"
 
-	. "github.com/qiniu/logkit/sender/config"
-
 	"github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/qiniu/logkit/router"
+	. "github.com/qiniu/logkit/sender/config"
 )
 
 // Rest 测试 端口容易冲突导致混淆，66xx
@@ -62,4 +63,24 @@ func senderAPITest(p *testParam) {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
 	assert.Equal(t, "", got4.Message)
+
+	var got5 respModeOptions
+	url = "http://127.0.0.1" + rs.address + "/logkit/sender/router/option"
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	if err = jsoniter.Unmarshal(respBody, &got5); err != nil {
+		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
+	}
+	assert.Equal(t, len(router.GetRouterOption()), len(got5.Data))
+
+	var got6 respModeUsages
+	url = "http://127.0.0.1" + rs.address + "/logkit/sender/router/usage"
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	if err = jsoniter.Unmarshal(respBody, &got6); err != nil {
+		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
+	}
+	assert.Equal(t, len(router.GetRouterMatchTypeUsage()), len(got6.Data))
 }

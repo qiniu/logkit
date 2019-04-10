@@ -412,8 +412,8 @@ func (r *MysqlReader) SyncMeta() {
 				content = r.startTimeStr
 			}
 		}
-		if err := WriteTimestmapOffset(r.meta.DoneFilePath, content); err != nil {
-			log.Errorf("Runner[%v] %v SyncMeta WriteTimestmapOffset error %v", r.meta.RunnerName, r.Name(), err)
+		if err := WriteTimestampOffset(r.meta.DoneFilePath, content); err != nil {
+			log.Errorf("Runner[%v] %v SyncMeta WriteTimestampOffset error %v", r.meta.RunnerName, r.Name(), err)
 		}
 		if err := WriteCacheMap(r.meta.DoneFilePath, r.timeCacheMap); err != nil {
 			log.Errorf("Runner[%v] %v SyncMeta WriteCacheMap error %v", r.meta.RunnerName, r.Name(), err)
@@ -451,6 +451,8 @@ func (r *MysqlReader) Close() error {
 		close(r.readChan)
 		close(r.errChan)
 	}
+
+	r.SyncMeta()
 	return nil
 }
 

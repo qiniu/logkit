@@ -87,10 +87,7 @@ func TestRunnerStatusClone(t *testing.T) {
 
 func TestErrList(t *testing.T) {
 	t.Parallel()
-	el := ErrorsList{
-		TransformErrors: make(map[string]*equeue.ErrorQueue),
-		SendErrors:      make(map[string]*equeue.ErrorQueue),
-	}
+	el := NewErrorsList()
 	tel := el.Clone()
 	assert.Nil(t, tel)
 
@@ -111,6 +108,7 @@ func TestErrList(t *testing.T) {
 	el.ParseErrors = equeue.New(2)
 	assert.Equal(t, false, el.HasParseErr())
 	el.ParseErrors.Put(equeue.ErrorInfo{Error: "parse1"})
+	assert.Equal(t, false, el.Empty())
 	assert.Equal(t, true, el.HasParseErr())
 	el.ParseErrors.Put(equeue.ErrorInfo{Error: "parse2"})
 	el.ParseErrors.Put(equeue.ErrorInfo{Error: "parse3"})
@@ -119,9 +117,9 @@ func TestErrList(t *testing.T) {
 	transname := "t1"
 	el.TransformErrors[transname] = equeue.New(2)
 	el.TransformErrors[transname].Put(equeue.ErrorInfo{Error: "trans1"})
+	assert.Equal(t, false, el.Empty())
 	assert.Equal(t, true, el.HasTransformErr())
 
-	assert.Equal(t, false, el.Empty())
 	nel := el.Clone()
 	nel.SendErrors[sendName1].Put(equeue.ErrorInfo{Error: "send2"})
 	nel.ReadErrors.Put(equeue.ErrorInfo{Error: "read3"})
@@ -143,4 +141,11 @@ func TestErrList(t *testing.T) {
 	assert.Equal(t, true, el.Empty())
 	rel := el.Clone()
 	assert.Equal(t, true, rel.Empty())
+
+	el = nil
+	assert.EqualValues(t, false, el.HasReadErr())
+	assert.EqualValues(t, false, el.HasParseErr())
+	assert.EqualValues(t, false, el.HasTransformErr())
+	assert.EqualValues(t, false, el.HasSendErr())
+	assert.EqualValues(t, true, el.Empty())
 }

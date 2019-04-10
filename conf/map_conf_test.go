@@ -8,6 +8,7 @@ import (
 )
 
 func TestGetString(t *testing.T) {
+	t.Parallel()
 	c := MapConf{}
 	c["k1"] = "abc"
 
@@ -16,12 +17,18 @@ func TestGetString(t *testing.T) {
 		t.Error(err)
 	}
 	assert.Equal(t, key, "abc")
+}
 
-	key, _ = c.GetStringOr("k2", "def")
+func TestGetStringOr(t *testing.T) {
+	t.Parallel()
+	c := MapConf{}
+	c["k1"] = "abc"
+	key, _ := c.GetStringOr("k2", "def")
 	assert.Equal(t, key, "def")
 }
 
 func TestGetInt(t *testing.T) {
+	t.Parallel()
 	c := MapConf{}
 	c["k1"] = "1"
 
@@ -30,26 +37,78 @@ func TestGetInt(t *testing.T) {
 		t.Error(err)
 	}
 	assert.Equal(t, key, 1)
+}
 
-	key, _ = c.GetIntOr("k2", 2)
+func TestGetIntOr(t *testing.T) {
+	t.Parallel()
+	c := MapConf{}
+	c["k1"] = "1"
+	key, _ := c.GetIntOr("k2", 2)
 	assert.Equal(t, key, 2)
 }
 
+func TestGetInt32(t *testing.T) {
+	t.Parallel()
+	c := MapConf{}
+	c["k1"] = "1"
+
+	key, err := c.GetInt32("k1")
+	if err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, key, int32(1))
+}
+
+func TestGetInt32Or(t *testing.T) {
+	t.Parallel()
+	c := MapConf{}
+	c["k1"] = "1"
+	key, _ := c.GetInt32Or("k2", 2)
+	assert.Equal(t, key, int32(2))
+}
+
+func TestGetInt64(t *testing.T) {
+	t.Parallel()
+	c := MapConf{}
+	c["k1"] = "1"
+
+	key, err := c.GetInt64("k1")
+	if err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, key, int64(1))
+}
+
+func TestGetInt64Or(t *testing.T) {
+	t.Parallel()
+	c := MapConf{}
+	c["k1"] = "1"
+	key, _ := c.GetInt64Or("k2", 2)
+	assert.Equal(t, key, int64(2))
+}
+
 func TestGetBool(t *testing.T) {
+	t.Parallel()
 	c := MapConf{}
 	c["k1"] = "true"
-
 	key, err := c.GetBool("k1")
 	if err != nil {
 		t.Error(err)
 	}
 	assert.Equal(t, key, true)
 
-	key, _ = c.GetBoolOr("k2", true)
+}
+
+func TestGetBoolOr(t *testing.T) {
+	t.Parallel()
+	c := MapConf{}
+	c["k1"] = "true"
+	key, _ := c.GetBoolOr("k2", true)
 	assert.Equal(t, key, true)
 }
 
 func TestGetStringList(t *testing.T) {
+	t.Parallel()
 	c := MapConf{}
 	c["k1"] = "a,b,c"
 
@@ -58,12 +117,19 @@ func TestGetStringList(t *testing.T) {
 		t.Error(err)
 	}
 	assert.Equal(t, len(key), 3)
+}
 
-	key, _ = c.GetStringListOr("k2", []string{"test"})
+func TestGetStringListOr(t *testing.T) {
+	t.Parallel()
+	c := MapConf{}
+	c["k1"] = "a,b,c"
+
+	key, _ := c.GetStringListOr("k2", []string{"test"})
 	assert.Equal(t, len(key), 1)
 }
 
 func TestGetAliasMap(t *testing.T) {
+	t.Parallel()
 	c := MapConf{}
 	c["k1"] = "a e,b,c"
 
@@ -83,7 +149,16 @@ func TestGetAliasMap(t *testing.T) {
 	assert.Equal(t, len(key), 0)
 }
 
+func TestGetAliasMapOr(t *testing.T) {
+	t.Parallel()
+	c := MapConf{}
+	c["k1"] = "a e,b,c"
+	key, _ := c.GetAliasMapOr("k2", map[string]string{})
+	assert.Equal(t, len(key), 0)
+}
+
 func TestGetAliasList(t *testing.T) {
+	t.Parallel()
 	c := MapConf{}
 	c["k1"] = "a e,b,c"
 
@@ -103,6 +178,7 @@ func TestGetAliasList(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
+	t.Parallel()
 	c := MapConf{}
 	c["k1"] = ""
 
@@ -113,6 +189,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestGetPasswordEnvString(t *testing.T) {
+	t.Parallel()
 	err := os.Setenv("TestGetPasswordString", "testPassordString")
 	assert.NoError(t, err)
 	defer os.Unsetenv("TestGetPasswordString")
@@ -132,6 +209,7 @@ func TestGetPasswordEnvString(t *testing.T) {
 }
 
 func TestGetPasswordEnvStringOr(t *testing.T) {
+	t.Parallel()
 	err := os.Setenv("TestGetPasswordString", "testPassordString")
 	assert.NoError(t, err)
 	defer os.Unsetenv("TestGetPasswordString")
@@ -158,7 +236,15 @@ func TestGetPasswordEnvStringOr(t *testing.T) {
 	assert.Equal(t, c["c"], actual)
 }
 
+func TestFunGetStringList(t *testing.T) {
+	t.Parallel()
+	list := GetStringList("a,b,c")
+	assert.Equal(t, len(list), 3)
+	assert.EqualValues(t, []string{"a", "b", "c"}, list)
+}
+
 func TestGetEnv(t *testing.T) {
+	t.Parallel()
 	var exceptedValue = "mockEnv"
 	err := os.Setenv("test", exceptedValue)
 	if err != nil {
@@ -172,6 +258,7 @@ func TestGetEnv(t *testing.T) {
 }
 
 func TestGetEnvValue(t *testing.T) {
+	t.Parallel()
 	var exceptedValue = "mockEnv"
 	err := os.Setenv("test", exceptedValue)
 	if err != nil {
@@ -198,6 +285,7 @@ func TestGetEnvValue(t *testing.T) {
 }
 
 func TestIsEnv(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		data          string
 		expectIsEnv   bool
@@ -224,4 +312,16 @@ func TestIsEnv(t *testing.T) {
 		assert.Equal(t, test.expectIsEnv, isEnv)
 		assert.Equal(t, test.expectEnvName, envName)
 	}
+}
+
+func TestDeepCopy(t *testing.T) {
+	t.Parallel()
+	value := MapConf{
+		"a": "b",
+	}
+
+	result := DeepCopy(value)
+	assert.EqualValues(t, value, result)
+	value["a"] = "c"
+	assert.NotEqual(t, value, result)
 }
