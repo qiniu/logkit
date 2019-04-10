@@ -43,6 +43,7 @@ var KeySystemUsages = KeyValueSlice{
 	{KeySystemNServices, "总服务数", ""},
 }
 
+// SystemStats has Name, Usages, Tags, Config, Collect
 type SystemStats struct {
 }
 

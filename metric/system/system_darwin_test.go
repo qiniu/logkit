@@ -8,7 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetNumFromOut(t *testing.T) {
+func Test_getNumFromOutput(t *testing.T) {
+	t.Parallel()
 	out := `/dev/disk0 (internal):
    #:                       TYPE NAME                    SIZE       IDENTIFIER
    0:      GUID_partition_scheme                         251.0 GB   disk0
@@ -30,4 +31,18 @@ func TestGetNumFromOut(t *testing.T) {
    1:             Windows_FAT_32 JERRY                   16.1 GB    disk2s4
 `
 	assert.Equal(t, 3, getNumFromOutput(out))
+}
+
+func Test_getNumDisk(t *testing.T) {
+	t.Parallel()
+	number := getNumDisk()
+	if number <= 0 {
+		t.Fatalf("disk number should greater than 0")
+	}
+	t.Log("get disk number: ", number)
+}
+
+func Test_getNumService(t *testing.T) {
+	t.Parallel()
+	assert.EqualValues(t, 0, getNumService())
 }
