@@ -2,6 +2,8 @@
 
 ![logkit LOGO](https://raw.githubusercontent.com/qiniu/logkit/master/resources/logo.png)
 
+[中文版](https://github.com/qiniu/logkit/blob/master/READMECN.md)
+
 ## Introduce
 
 Very powerful server agent for collecting & sending logs & metrics with an easy-to-use web console.
