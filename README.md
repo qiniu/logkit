@@ -37,7 +37,7 @@ Weclome to contribute to logkit:
 
 * fix or[report bug](https://github.com/qiniu/logkit/issues/new)
 * [pull issue](https://github.com/qiniu/logkit/issues/new)improve[wiki doc](https://github.com/qiniu/logkit/wiki)
-* [review code](https://github.com/qiniu/logkit/pulls)or[提出功能需求](https://github.com/qiniu/logkit/issues/new)
+* [review code](https://github.com/qiniu/logkit/pulls)or[create issues](https://github.com/qiniu/logkit/issues/new)
 * contribute code (contribute kinds of modules including[reader](https://github.com/qiniu/logkit/wiki/Readers)、[parser](https://github.com/qiniu/logkit/wiki/Parsers)、[sender](https://github.com/qiniu/logkit/wiki/Senders)以及[transformer](https://github.com/qiniu/logkit/wiki/Transformers)）
 
 ## Download
