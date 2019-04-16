@@ -35,16 +35,16 @@ logkit-community support multiple sources and can send kinds of data to Pandora,
 
 Weclome to contribute to logkit:
 
-* fix or[report bug](https://github.com/qiniu/logkit/issues/new)
-* [pull issue](https://github.com/qiniu/logkit/issues/new)improve[wiki doc](https://github.com/qiniu/logkit/wiki)
-* [review code](https://github.com/qiniu/logkit/pulls)or[create issues](https://github.com/qiniu/logkit/issues/new)
-* contribute code (contribute kinds of modules including[reader](https://github.com/qiniu/logkit/wiki/Readers)、[parser](https://github.com/qiniu/logkit/wiki/Parsers)、[sender](https://github.com/qiniu/logkit/wiki/Senders)以及[transformer](https://github.com/qiniu/logkit/wiki/Transformers)）
+* fix or [report bug](https://github.com/qiniu/logkit/issues/new)
+* [pull issue](https://github.com/qiniu/logkit/issues/new) improve [wiki doc](https://github.com/qiniu/logkit/wiki)
+* [review code](https://github.com/qiniu/logkit/pulls) or [create issues](https://github.com/qiniu/logkit/issues/new)
+* contribute code (contribute kinds of modules including [reader](https://github.com/qiniu/logkit/wiki/Readers)、[parser](https://github.com/qiniu/logkit/wiki/Parsers)、[sender](https://github.com/qiniu/logkit/wiki/Senders) and [transformer](https://github.com/qiniu/logkit/wiki/Transformers)）
 
 ## Download
 
-**lastest stable**：Go to[Download page](https://github.com/qiniu/logkit/wiki/Download)
+**lastest stable**：Go to [Download page](https://github.com/qiniu/logkit/wiki/Download)
 
-**History**：Go to[Releases](https://github.com/qiniu/logkit/releases)
+**History**：Go to [Releases](https://github.com/qiniu/logkit/releases)
 
 **Trial**：construct lastest logkit trial version every 5:00am (only for Linux 64 and Docker), you can download it (note: not include update of frontend).
 
