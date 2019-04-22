@@ -11,6 +11,7 @@ import (
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/metric"
+	. "github.com/qiniu/logkit/metric/system/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 

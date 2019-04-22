@@ -25,45 +25,33 @@ var homeEnvNames = [][]string{
 var ErrHomeNotFound = errors.New("$HOME not found")
 
 func getEnv(name []string) (v string) {
-
 	if len(name) == 1 {
 		return os.Getenv(name[0])
 	}
 	for _, k := range name {
 		v += os.Getenv(k)
 	}
-	return
+	return v
 }
 
 func GetConfigDir(app string) (dir string, err error) {
-
 	for _, name := range homeEnvNames {
 		home := getEnv(name)
 		if home == "" {
 			continue
 		}
 		dir = home + "/." + app
-		err = os.MkdirAll(dir, 0700)
-		return
+		return dir, os.MkdirAll(dir, 0700)
 	}
 	return "", ErrHomeNotFound
 }
 
 func Init(cflag, app, defaultConf string) {
-
 	confDir, _ := GetConfigDir(app)
 	confName = flag.String(cflag, confDir+"/"+defaultConf, "the config file")
 }
 
-func ConfName() string {
-	if confName != nil {
-		return *confName
-	}
-	return ""
-}
-
-func Load(conf interface{}) (err error) {
-
+func Load(conf interface{}) error {
 	if !flag.Parsed() {
 		flag.Parse()
 	}
@@ -73,16 +61,14 @@ func Load(conf interface{}) (err error) {
 }
 
 func trimComments(data []byte) (data1 []byte) {
-
-	conflines := bytes.Split(data, NL)
-	for k, line := range conflines {
-		conflines[k] = trimCommentsLine(line)
+	confLines := bytes.Split(data, NL)
+	for k, line := range confLines {
+		confLines[k] = trimCommentsLine(line)
 	}
-	return bytes.Join(conflines, NL)
+	return bytes.Join(confLines, NL)
 }
 
 func trimCommentsLine(line []byte) []byte {
-
 	var newLine []byte
 	var i, quoteCount int
 	lastIdx := len(line) - 1
@@ -107,23 +93,21 @@ func trimCommentsLine(line []byte) []byte {
 	return newLine
 }
 
-func LoadEx(conf interface{}, confName string) (err error) {
-
+func LoadEx(conf interface{}, confName string) error {
 	data, err := ioutil.ReadFile(confName)
 	if err != nil {
-		return
+		return err
 	}
-	data = trimComments(data)
 
-	err = json.Unmarshal(data, conf)
-	if err != nil {
+	data = trimComments(data)
+	if err = json.Unmarshal(data, conf); err != nil {
 		log.Errorf("Parse conf %v failed: %v", string(data), err)
+		return err
 	}
-	return
+	return nil
 }
 
 func LoadFile(conf interface{}, confName string) (err error) {
-
 	data, err := ioutil.ReadFile(confName)
 	if err != nil {
 		return
@@ -131,14 +115,4 @@ func LoadFile(conf interface{}, confName string) (err error) {
 	data = trimComments(data)
 
 	return json.Unmarshal(data, conf)
-}
-
-func LoadData(conf interface{}, data []byte) (err error) {
-	data = trimComments(data)
-
-	err = json.Unmarshal(data, conf)
-	if err != nil {
-		log.Error("Parse conf failed:", err)
-	}
-	return
 }

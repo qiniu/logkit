@@ -15,11 +15,11 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/logkit/conf"
-	parserConf "github.com/qiniu/logkit/parser/config"
+	parserconf "github.com/qiniu/logkit/parser/config"
 	"github.com/qiniu/logkit/reader"
-	readerConf "github.com/qiniu/logkit/reader/config"
+	readerconf "github.com/qiniu/logkit/reader/config"
 	"github.com/qiniu/logkit/reader/http"
-	senderConf "github.com/qiniu/logkit/sender/config"
+	senderconf "github.com/qiniu/logkit/sender/config"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -80,6 +80,20 @@ func Test_RawData(t *testing.T) {
 
 	expected := []string{"abc\n", "abc\n", "abc\n", "abc\n", "abc\n", "abc\n", "abc\n", "abc\n", "abc\n", "abc\n"}
 	assert.Equal(t, expected, rawData)
+
+	_, err = RawData(nil)
+	assert.Error(t, err)
+
+	runnerConf.ReaderConfig["raw_data_lines"] = "200"
+	rawData, err = RawData(runnerConf.ReaderConfig)
+	if err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, 100, len(rawData))
+
+	runnerConf.ReaderConfig["log_path"] = "./Test_RawDataNotExist"
+	_, err = RawData(runnerConf.ReaderConfig)
+	assert.Error(t, err)
 }
 
 func Test_RawDataWithReadData(t *testing.T) {
@@ -106,7 +120,7 @@ func Test_RawDataWithReadData(t *testing.T) {
 		t.Error(err)
 	}
 
-	time.Sleep(time.Second)
+	time.Sleep(time.Millisecond)
 	confPathAbs, _, err := GetRealPath("./Test_RawDataWithReadData/confs/test1.conf")
 	if err != nil {
 		t.Error(err)
@@ -126,6 +140,7 @@ func Test_RawDataWithReadData(t *testing.T) {
 
 	expected := []string{"{\n  \"logkit\": \"logkit\"\n}"}
 	assert.Equal(t, expected, rawData)
+	RawDataTimeOut = 30 * time.Second
 }
 
 func Test_RawData_DaemonReader(t *testing.T) {
@@ -191,11 +206,11 @@ func Test_RawData_DaemonReader(t *testing.T) {
 func Test_ParseData(t *testing.T) {
 	t.Parallel()
 	c := conf.MapConf{}
-	c[parserConf.KeyParserName] = "testparser"
-	c[parserConf.KeyParserType] = "csv"
-	c[parserConf.KeyCSVSchema] = "a long, b string, c float, d jsonmap,e date"
-	c[parserConf.KeyCSVSplitter] = " "
-	c[parserConf.KeyDisableRecordErrData] = "true"
+	c[parserconf.KeyParserName] = "testparser"
+	c[parserconf.KeyParserType] = "csv"
+	c[parserconf.KeyCSVSchema] = "a long, b string, c float, d jsonmap,e date"
+	c[parserconf.KeyCSVSplitter] = " "
+	c[parserconf.KeyDisableRecordErrData] = "true"
 	tmstr := time.Now().Format(time.RFC3339Nano)
 	line1 := `1 fufu 3.14 {"x":1,"y":"2"} ` + tmstr
 	c[KeySampleLog] = line1
@@ -225,9 +240,9 @@ func Test_ParseData(t *testing.T) {
 	}
 
 	jsonConf := conf.MapConf{}
-	jsonConf[parserConf.KeyParserName] = "jsonparser"
-	jsonConf[parserConf.KeyParserType] = "json"
-	jsonConf[parserConf.KeyDisableRecordErrData] = "true"
+	jsonConf[parserconf.KeyParserName] = "jsonparser"
+	jsonConf[parserconf.KeyParserType] = "json"
+	jsonConf[parserconf.KeyDisableRecordErrData] = "true"
 	line := "{\t\"my key\":\"myvalue\"\t}\n"
 	jsonConf[KeySampleLog] = line
 	parsedJsonData, jsonErr := ParseData(jsonConf)
@@ -242,6 +257,19 @@ func Test_ParseData(t *testing.T) {
 	}
 	jsonExpNum := 1
 	assert.Equal(t, jsonExpNum, len(parsedJsonData), fmt.Sprintln(parsedJsonData))
+
+	jsonConf[parserconf.KeyParserType] = ""
+	_, jsonErr = ParseData(jsonConf)
+	assert.Error(t, jsonErr)
+
+	jsonConf[parserconf.KeyParserType] = "parse_test"
+	_, jsonErr = ParseData(jsonConf)
+	assert.Error(t, jsonErr)
+
+	jsonConf[parserconf.KeyParserType] = "json"
+	jsonConf[KeySampleLog] = "{\t\"my key:\"myvalue\"\t}\n"
+	_, jsonErr = ParseData(jsonConf)
+	assert.Error(t, jsonErr)
 }
 
 func Test_TransformData(t *testing.T) {
@@ -268,6 +296,42 @@ func Test_TransformData(t *testing.T) {
 		"Country": "中国",
 		"Isp":     "N/A"}}
 	assert.Equal(t, exp, transformData)
+
+	_, err = TransformData(nil)
+	assert.Error(t, err)
+
+	rc["type"] = ""
+	_, err = TransformData(nil)
+	assert.Error(t, err)
+
+	rc["type"] = 1
+	_, err = TransformData(nil)
+	assert.Error(t, err)
+
+	rc["type"] = "transform_test"
+	_, err = TransformData(nil)
+	assert.Error(t, err)
+
+	rc["type"] = "ip"
+	delete(rc, "sampleLog")
+	_, err = TransformData(nil)
+	assert.Error(t, err)
+
+	rc["sampleLog"] = 1
+	_, err = TransformData(nil)
+	assert.Error(t, err)
+
+	rc["sampleLog"] = ""
+	_, err = TransformData(nil)
+	assert.Error(t, err)
+
+	rc["sampleLog"] = "{\"ip\": }"
+	_, err = TransformData(nil)
+	assert.Error(t, err)
+
+	rc["sampleLog"] = "{\"ip\": \"{a:b}\"}"
+	_, err = TransformData(nil)
+	assert.Error(t, err)
 }
 
 func Test_getTransformerCreator(t *testing.T) {
@@ -347,13 +411,13 @@ func Test_getTransformer(t *testing.T) {
 func Test_SendData(t *testing.T) {
 	t.Parallel()
 	c := conf.MapConf{
-		readerConf.KeyHTTPServiceAddress: "127.0.0.1:8000",
-		readerConf.KeyHTTPServicePath:    "/logkit/data",
+		readerconf.KeyHTTPServiceAddress: "127.0.0.1:8000",
+		readerconf.KeyHTTPServicePath:    "/logkit/data",
 	}
 	readConf := conf.MapConf{
-		readerConf.KeyMetaPath: "./meta",
-		readerConf.KeyFileDone: "./meta",
-		readerConf.KeyMode:     readerConf.ModeHTTP,
+		readerconf.KeyMetaPath: "./meta",
+		readerconf.KeyFileDone: "./meta",
+		readerconf.KeyMode:     readerconf.ModeHTTP,
 		KeyRunnerName:          "TestNewHttpReader",
 	}
 	meta, err := reader.NewMetaWithConf(readConf)
@@ -417,13 +481,13 @@ func Test_SendData(t *testing.T) {
 
 	var senders []conf.MapConf
 	senderConf := conf.MapConf{
-		senderConf.KeySenderType:         senderConf.TypeHttp,
-		senderConf.KeyHttpSenderGzip:     "true",
-		senderConf.KeyHttpSenderCsvSplit: "\t",
-		senderConf.KeyHttpSenderProtocol: "json",
-		senderConf.KeyHttpSenderCsvHead:  "false",
+		senderconf.KeySenderType:         senderconf.TypeHttp,
+		senderconf.KeyHttpSenderGzip:     "true",
+		senderconf.KeyHttpSenderCsvSplit: "\t",
+		senderconf.KeyHttpSenderProtocol: "json",
+		senderconf.KeyHttpSenderCsvHead:  "false",
 		KeyRunnerName:                    "testRunner",
-		senderConf.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
+		senderconf.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
 	}
 	senders = append(senders, senderConf)
 
@@ -450,6 +514,19 @@ func Test_SendData(t *testing.T) {
 		t.Error(err)
 	}
 	wg.Wait()
+
+	err = SendData(nil)
+	assert.Error(t, err)
+
+	senderConfig["senders"] = ""
+	err = SendData(senderConfig)
+	assert.Error(t, err)
+
+	senderConfig["senders"] = []map[string]interface{}{
+		{senderconf.KeySenderType: "sender_test"},
+	}
+	err = SendData(senderConfig)
+	assert.Error(t, err)
 }
 
 func Test_getSendersConfig(t *testing.T) {
@@ -465,13 +542,13 @@ func Test_getSendersConfig(t *testing.T) {
 
 	var senders []conf.MapConf
 	senderMapConf := conf.MapConf{
-		senderConf.KeySenderType:         senderConf.TypeHttp,
-		senderConf.KeyHttpSenderGzip:     "true",
-		senderConf.KeyHttpSenderCsvSplit: "\t",
-		senderConf.KeyHttpSenderProtocol: "json",
-		senderConf.KeyHttpSenderCsvHead:  "false",
+		senderconf.KeySenderType:         senderconf.TypeHttp,
+		senderconf.KeyHttpSenderGzip:     "true",
+		senderconf.KeyHttpSenderCsvSplit: "\t",
+		senderconf.KeyHttpSenderProtocol: "json",
+		senderconf.KeyHttpSenderCsvHead:  "false",
 		KeyRunnerName:                    "testRunner",
-		senderConf.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
+		senderconf.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
 	}
 	senders = append(senders, senderMapConf)
 
@@ -490,8 +567,8 @@ func Test_getSendersConfig(t *testing.T) {
 	}
 
 	for _, val := range sendersConfig {
-		assert.Equal(t, senderConf.TypeHttp, val[senderConf.KeySenderType])
-		assert.Equal(t, "true", val[senderConf.KeyHttpSenderGzip])
+		assert.Equal(t, senderconf.TypeHttp, val[senderconf.KeySenderType])
+		assert.Equal(t, "true", val[senderconf.KeyHttpSenderGzip])
 	}
 }
 
@@ -508,13 +585,13 @@ func Test_getDataFromSenderConfig(t *testing.T) {
 
 	var senders []conf.MapConf
 	senderConf := conf.MapConf{
-		senderConf.KeySenderType:         senderConf.TypeHttp,
-		senderConf.KeyHttpSenderGzip:     "true",
-		senderConf.KeyHttpSenderCsvSplit: "\t",
-		senderConf.KeyHttpSenderProtocol: "json",
-		senderConf.KeyHttpSenderCsvHead:  "false",
+		senderconf.KeySenderType:         senderconf.TypeHttp,
+		senderconf.KeyHttpSenderGzip:     "true",
+		senderconf.KeyHttpSenderCsvSplit: "\t",
+		senderconf.KeyHttpSenderProtocol: "json",
+		senderconf.KeyHttpSenderCsvHead:  "false",
 		KeyRunnerName:                    "testRunner",
-		senderConf.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
+		senderconf.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
 	}
 	senders = append(senders, senderConf)
 
@@ -544,13 +621,13 @@ func Test_getSenders(t *testing.T) {
 	t.Parallel()
 	var sendersConfig []conf.MapConf
 	senderConf := conf.MapConf{
-		senderConf.KeySenderType:         senderConf.TypeHttp,
-		senderConf.KeyHttpSenderGzip:     "true",
-		senderConf.KeyHttpSenderCsvSplit: "\t",
-		senderConf.KeyHttpSenderProtocol: "json",
-		senderConf.KeyHttpSenderCsvHead:  "false",
+		senderconf.KeySenderType:         senderconf.TypeHttp,
+		senderconf.KeyHttpSenderGzip:     "true",
+		senderconf.KeyHttpSenderCsvSplit: "\t",
+		senderconf.KeyHttpSenderProtocol: "json",
+		senderconf.KeyHttpSenderCsvHead:  "false",
 		KeyRunnerName:                    "testRunner",
-		senderConf.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
+		senderconf.KeyHttpSenderUrl:      "http://127.0.0.1:8000/logkit/data",
 	}
 	sendersConfig = append(sendersConfig, senderConf)
 

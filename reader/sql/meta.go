@@ -45,7 +45,7 @@ func RestoreMeta(meta *reader.Meta, rawSqls string, magicLagDur time.Duration) (
 
 func RestoreTimestampIntOffset(doneFilePath string) (int64, map[string]string, error) {
 	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, TimestampRecordsFile)
-	cachemapfilename := fmt.Sprintf("%v.%v", reader.DoneFileName, CacheMapFile)
+	cacheMapFilename := fmt.Sprintf("%v.%v", reader.DoneFileName, CacheMapFile)
 
 	filePath := filepath.Join(doneFilePath, filename)
 	data, err := ioutil.ReadFile(filePath)
@@ -57,7 +57,7 @@ func RestoreTimestampIntOffset(doneFilePath string) (int64, map[string]string, e
 		return tm, nil, err
 	}
 
-	cacheMapFilePath := filepath.Join(doneFilePath, cachemapfilename)
+	cacheMapFilePath := filepath.Join(doneFilePath, cacheMapFilename)
 	data, err = ioutil.ReadFile(cacheMapFilePath)
 	if err != nil {
 		return tm, nil, err
@@ -72,7 +72,7 @@ func RestoreTimestampIntOffset(doneFilePath string) (int64, map[string]string, e
 
 func RestoreTimestampOffset(doneFilePath string) (time.Time, map[string]string, error) {
 	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, TimestampRecordsFile)
-	cachemapfilename := fmt.Sprintf("%v.%v", reader.DoneFileName, CacheMapFile)
+	cacheMapFilename := fmt.Sprintf("%v.%v", reader.DoneFileName, CacheMapFile)
 
 	filePath := filepath.Join(doneFilePath, filename)
 	data, err := ioutil.ReadFile(filePath)
@@ -85,7 +85,7 @@ func RestoreTimestampOffset(doneFilePath string) (time.Time, map[string]string, 
 		return tm, nil, err
 	}
 
-	cacheMapFilePath := filepath.Join(doneFilePath, cachemapfilename)
+	cacheMapFilePath := filepath.Join(doneFilePath, cacheMapFilename)
 	data, err = ioutil.ReadFile(cacheMapFilePath)
 	if err != nil {
 		return tm, nil, err
@@ -100,7 +100,7 @@ func RestoreTimestampOffset(doneFilePath string) (time.Time, map[string]string, 
 
 func RestoreTimestampStrOffset(doneFilePath string) (string, map[string]string, error) {
 	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, TimestampRecordsFile)
-	cachemapfilename := fmt.Sprintf("%v.%v", reader.DoneFileName, CacheMapFile)
+	cacheMapFilename := fmt.Sprintf("%v.%v", reader.DoneFileName, CacheMapFile)
 
 	filePath := filepath.Join(doneFilePath, filename)
 	data, err := ioutil.ReadFile(filePath)
@@ -109,7 +109,7 @@ func RestoreTimestampStrOffset(doneFilePath string) (string, map[string]string, 
 	}
 
 	tmStr := string(data)
-	cacheMapFilePath := filepath.Join(doneFilePath, cachemapfilename)
+	cacheMapFilePath := filepath.Join(doneFilePath, cacheMapFilename)
 	data, err = ioutil.ReadFile(cacheMapFilePath)
 	if err != nil {
 		return "", nil, err
@@ -144,7 +144,7 @@ func WriteCacheMap(doneFilePath string, cache map[string]string) (err error) {
 	return f.Sync()
 }
 
-func WriteTimestmapOffset(doneFilePath, content string) (err error) {
+func WriteTimestampOffset(doneFilePath, content string) (err error) {
 	var f *os.File
 	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, TimestampRecordsFile)
 	filePath := filepath.Join(doneFilePath, filename)

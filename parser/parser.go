@@ -94,7 +94,7 @@ func (ps *Registry) RegisterParser(parserType string, constructor func(conf.MapC
 func (ps *Registry) NewLogParser(conf conf.MapConf) (p Parser, err error) {
 	t, err := conf.GetString(KeyParserType)
 	if err != nil {
-		return
+		return nil, err
 	}
 	f, exist := ps.parserTypeMap[t]
 	if !exist {

@@ -168,8 +168,7 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner
 		transformers[metricName] = trans
 	}
 	if len(collectors) < 1 {
-		err = errors.New("no collectors were added")
-		return
+		return nil, errors.New("no collectors were added")
 	}
 
 	commonTransformers, err := createTransformers(rc)

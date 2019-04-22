@@ -87,6 +87,17 @@ func parserParseTest(p *testParam) {
 		"auth":         "frank", "client_ip": "127.0.0.1"}
 
 	assert.Equal(t, exp3, got3.Data.SamplePoints[0])
+
+	// raw
+	rawConf = conf2.MapConf{}
+	rawConf[KeySampleLog] = SampleLogs[TypeRaw]
+	rawConf[KeyParserType] = TypeRaw
+	rawpst, err = jsoniter.Marshal(rawConf)
+	assert.NoError(t, err)
+	url = "http://127.0.0.1" + rs.address + "/logkit/parser/check"
+	respCode, respBody, err = makeRequest(url, http.MethodPost, rawpst)
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
 }
 
 func parserAPITest(p *testParam) {
