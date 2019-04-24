@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -147,7 +148,7 @@ func TestLoad(t *testing.T) {
 		{
 			content: "",
 			conf:    &Config{},
-			expect:  errors.New("open : no such file or directory"),
+			expect:  errors.New("no such file or directory"),
 		},
 		{
 			confName: "./TestLoad",
@@ -172,7 +173,12 @@ func TestLoad(t *testing.T) {
 			assert.Nil(t, err)
 		}
 		err := Load(test.conf)
-		assert.EqualValues(t, fmt.Sprintf("%v", test.expect), fmt.Sprintf("%v", err))
+		if err != nil {
+			assert.NotNil(t, test.expect)
+			if !strings.Contains(err.Error(), test.expect.Error()) {
+				t.Fatalf("expect contains: %s, but got: %s", test.expect.Error(), err.Error())
+			}
+		}
 		os.RemoveAll(test.confName)
 	}
 }

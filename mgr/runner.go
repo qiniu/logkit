@@ -1120,10 +1120,7 @@ func (r *LogExportRunner) Reset() (err error) {
 }
 
 func (r *LogExportRunner) Delete() (err error) {
-	if err = r.meta.Delete(); err != nil {
-		return err
-	}
-	return nil
+	return r.meta.Delete()
 }
 
 func (r *LogExportRunner) Cleaner() CleanInfo {

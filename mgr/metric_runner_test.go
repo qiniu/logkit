@@ -196,9 +196,14 @@ func metricRunTest(p *testParam) {
 	respCode, respBody, err = makeRequest(url, http.MethodPut, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(3 * time.Second)
+	time.Sleep(time.Second)
 	base := filepath.Base("")
 	metaPath := "meta/" + runnerName + "_" + Hash(base)
+	t.Log("metaPath: ", metaPath)
+	for i := 0; !utils.IsExist(metaPath) && i < 6; i++ {
+		time.Sleep(500 * time.Millisecond)
+		i++
+	}
 	assert.True(t, utils.IsExist(metaPath))
 
 	// 停止 runner
