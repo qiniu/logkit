@@ -3,11 +3,12 @@ package parser
 import (
 	"strconv"
 	"testing"
-)
 
-type cmdArgs struct {
-	CmdArgs []string
-}
+	"github.com/stretchr/testify/assert"
+
+	"github.com/qiniu/logkit/conf"
+	. "github.com/qiniu/logkit/parser/config"
+)
 
 func Test_UtilsTime(t *testing.T) {
 	t1 := 1473680977
@@ -32,4 +33,43 @@ func Test_UtilsTime(t *testing.T) {
 	if s4 != s3+300 {
 		t.Errorf("Time5Min err: t1: %v, s3: %v, t3: %v, s4: %v", t1, s3, t3, s4)
 	}
+}
+
+func TestConvertWebParserConfig(t *testing.T) {
+	tests := []struct {
+		conf   conf.MapConf
+		expect conf.MapConf
+	}{
+		{},
+		{
+			conf: conf.MapConf{
+				KeyGrokCustomPatterns: "aaaa",
+			},
+			expect: conf.MapConf{
+				KeyGrokCustomPatterns: "i\xa6\x9a",
+			},
+		},
+		{
+			conf: conf.MapConf{
+				KeyGrokCustomPatterns: "111",
+			},
+			expect: conf.MapConf{
+				KeyGrokCustomPatterns: "111",
+			},
+		},
+		{
+			conf: conf.MapConf{
+				KeyCSVSplitter: "\\t",
+			},
+			expect: conf.MapConf{
+				KeyCSVSplitter: "\t",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		acutal := ConvertWebParserConfig(test.conf)
+		assert.EqualValues(t, test.expect, acutal)
+	}
+
 }

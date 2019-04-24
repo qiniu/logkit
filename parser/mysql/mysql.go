@@ -82,6 +82,7 @@ func (p *Parser) parse(line string) (d Data, err error) {
 	}
 	return d, nil
 }
+
 func (p *Parser) Parse(lines []string) ([]Data, error) {
 	var (
 		lineLen    = len(lines)
@@ -168,6 +169,5 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 }
 
 func (p *Parser) Flush() (data Data, err error) {
-	data = Data(p.ps.Flush())
-	return
+	return Data(p.ps.Flush()), nil
 }

@@ -94,6 +94,10 @@ func Test_RawData(t *testing.T) {
 	runnerConf.ReaderConfig["log_path"] = "./Test_RawDataNotExist"
 	_, err = RawData(runnerConf.ReaderConfig)
 	assert.Error(t, err)
+
+	runnerConf.ReaderConfig["mode"] = "test_read"
+	_, err = RawData(runnerConf.ReaderConfig)
+	assert.Error(t, err)
 }
 
 func Test_RawDataWithReadData(t *testing.T) {
@@ -205,7 +209,11 @@ func Test_RawData_DaemonReader(t *testing.T) {
 
 func Test_ParseData(t *testing.T) {
 	t.Parallel()
+
+	_, err := ParseData(nil)
+	assert.NotNil(t, err)
 	c := conf.MapConf{}
+
 	c[parserconf.KeyParserName] = "testparser"
 	c[parserconf.KeyParserType] = "csv"
 	c[parserconf.KeyCSVSchema] = "a long, b string, c float, d jsonmap,e date"
@@ -301,36 +309,36 @@ func Test_TransformData(t *testing.T) {
 	assert.Error(t, err)
 
 	rc["type"] = ""
-	_, err = TransformData(nil)
+	_, err = TransformData(rc)
 	assert.Error(t, err)
 
 	rc["type"] = 1
-	_, err = TransformData(nil)
+	_, err = TransformData(rc)
 	assert.Error(t, err)
 
 	rc["type"] = "transform_test"
-	_, err = TransformData(nil)
+	_, err = TransformData(rc)
 	assert.Error(t, err)
 
 	rc["type"] = "ip"
 	delete(rc, "sampleLog")
-	_, err = TransformData(nil)
+	_, err = TransformData(rc)
 	assert.Error(t, err)
 
 	rc["sampleLog"] = 1
-	_, err = TransformData(nil)
+	_, err = TransformData(rc)
 	assert.Error(t, err)
 
 	rc["sampleLog"] = ""
-	_, err = TransformData(nil)
+	_, err = TransformData(rc)
 	assert.Error(t, err)
 
 	rc["sampleLog"] = "{\"ip\": }"
-	_, err = TransformData(nil)
+	_, err = TransformData(rc)
 	assert.Error(t, err)
 
 	rc["sampleLog"] = "{\"ip\": \"{a:b}\"}"
-	_, err = TransformData(nil)
+	_, err = TransformData(rc)
 	assert.Error(t, err)
 }
 

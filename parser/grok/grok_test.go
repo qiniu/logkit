@@ -5,9 +5,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/qiniu/logkit/conf"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	. "github.com/qiniu/logkit/parser/config"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -97,17 +100,19 @@ func TestSimpleParse(t *testing.T) {
 }
 
 func TestKeepRawData(t *testing.T) {
-	p := &Parser{
-		Patterns: []string{"%{TESTLOG}"},
-		CustomPatterns: `
-			TESTLOG %{NUMBER:num:long} %{WORD:client}
-		`,
-		keepRawData: true,
-		numRoutine:  1,
-	}
-	assert.NoError(t, p.compile())
+	p, err := NewParser(conf.MapConf{
+		KeyGrokCustomPatterns: `TESTLOG %{NUMBER:num:long} %{WORD:client}`,
+		KeyKeepRawData:        "true",
+	})
+	assert.NotNil(t, err)
 
-	m, err := p.Parse([]string{"142 bot"})
+	p, err = NewParser(conf.MapConf{
+		KeyGrokPatterns:       "%{TESTLOG}",
+		KeyGrokCustomPatterns: `TESTLOG %{NUMBER:num:long} %{WORD:client}`,
+		KeyKeepRawData:        "true",
+	})
+	assert.Nil(t, err)
+	m, err := p.Parse([]string{"142 bot", ""})
 	assert.Nil(t, err)
 	assert.Equal(t, []Data{
 		{

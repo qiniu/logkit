@@ -176,10 +176,10 @@ func TestParse(t *testing.T) {
 			},
 		},
 	}
-	l := Parser{
-		name:       TypeLogfmt,
-		numRoutine: 1,
-	}
+	l, err := NewParser(conf.MapConf{
+		KeyParserName: TypeLogfmt,
+	})
+	assert.Nil(t, err)
 	for _, tt := range tests {
 		got, err := l.Parse(tt.s)
 		if c, ok := err.(*StatsError); ok {

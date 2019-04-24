@@ -124,8 +124,7 @@ func RawData(readerConfig conf.MapConf) ([]string, error) {
 func ParseData(parserConfig conf.MapConf) (parsedData []Data, err error) {
 	parserConfig = parser.ConvertWebParserConfig(parserConfig)
 	if parserConfig == nil {
-		err = errors.New("parser config was empty after web config convet")
-		return
+		return nil, errors.New("parser config was empty after web config convet")
 	}
 
 	sampleData, err := getSampleData(parserConfig)

@@ -39,8 +39,7 @@ func (rs *RestService) PostParse() echo.HandlerFunc {
 			err = errors.New(se.LastError)
 		}
 		if err != nil {
-			errMsg := fmt.Sprintf("parser error %v", err)
-			return RespError(c, http.StatusBadRequest, ErrParseParse, errMsg)
+			return RespError(c, http.StatusBadRequest, ErrParseParse, fmt.Sprintf("parser error %v", err))
 		}
 
 		return RespSuccess(c, PostParseRet{SamplePoints: parseData})

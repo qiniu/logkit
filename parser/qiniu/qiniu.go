@@ -71,9 +71,6 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
 	logHeaders, _ := c.GetStringListOr(KeyLogHeaders, defaultLogHeads)
 	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)
-	if len(logHeaders) < 1 {
-		return nil, errors.New("no log headers was configured to parse")
-	}
 
 	//兼容老的配置，以前的配置必须要配 KeyPrefix 才能匹配 prefix
 	prefix, _ := c.GetStringOr(KeyPrefix, "")
