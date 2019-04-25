@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/qiniu/logkit/parser"
+
 	"github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
 
@@ -44,6 +46,10 @@ func TestJsonParser(t *testing.T) {
 	c[KeyLabels] = "mm abc"
 	c[KeyDisableRecordErrData] = "true"
 	p, _ := NewParser(c)
+	pType, ok := p.(parser.ParserType)
+	assert.True(t, ok)
+	assert.EqualValues(t, TypeJSON, pType.Type())
+
 	tests := []struct {
 		in  []string
 		exp []Data

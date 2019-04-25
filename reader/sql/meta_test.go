@@ -334,6 +334,41 @@ func Test_RestoreMeta(t *testing.T) {
 	assert.EqualValues(t, []string{"SELECT * FROM A", "SELECT * FROM B"}, actualSqls)
 }
 
+func Test_WriteSqlsFile(t *testing.T) {
+	meta, err := reader.NewMeta(MetaDir, MetaDir, "mysql", "logpath", "", 7)
+	if err != nil {
+		t.Error(err)
+	}
+	defer os.RemoveAll(MetaDir)
+
+	err = WriteSqlsFile(meta.DoneFilePath, "testdb1##select * from table1,select * from table2\ntestdb2##select * from table1,select * from table2\n")
+	assert.Nil(t, err)
+}
+
+func Test_RestoreSqls(t *testing.T) {
+	meta, err := reader.NewMeta(MetaDir, MetaDir, "mysql", "logpath", "", 7)
+	if err != nil {
+		t.Error(err)
+	}
+	defer os.RemoveAll(MetaDir)
+
+	err = WriteSqlsFile(meta.DoneFilePath, "testdb1##select * from table1,select * from table2\ntestdb2##select * from table1,select * from table2\n")
+	assert.Nil(t, err)
+
+	result := RestoreSqls(meta)
+	assert.EqualValues(t, map[string]string{
+		"testdb1": "select * from table1,select * from table2",
+		"testdb2": "select * from table1,select * from table2",
+	}, result)
+
+	err = WriteSqlsFile(meta.DoneFilePath, "testdb1\ntestdb2##select * from table1,select * from table2\n")
+	assert.Nil(t, err)
+	result = RestoreSqls(meta)
+	assert.EqualValues(t, map[string]string{
+		"testdb2": "select * from table1,select * from table2",
+	}, result)
+}
+
 func GetContent(ReadRecords DBRecords) string {
 	now := time.Now().String()
 	var all string

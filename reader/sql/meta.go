@@ -43,6 +43,25 @@ func RestoreMeta(meta *reader.Meta, rawSqls string, magicLagDur time.Duration) (
 	return
 }
 
+func RestoreSqls(meta *reader.Meta) map[string]string {
+	recordsDone, err := meta.ReadRecordsFile(DefaultDoneSqlsFile)
+	if err != nil {
+		log.Errorf("Runner[%v] %v -table done data is corrupted err:%v, omit table done data", meta.RunnerName, meta.DoneFilePath, err)
+		return map[string]string{}
+	}
+
+	var result = make(map[string]string)
+	for _, record := range recordsDone {
+		tmpRecord := models.TrimeList(strings.Split(record, SqlOffsetConnector))
+		if int64(len(tmpRecord)) != 2 {
+			log.Errorf("Runner[%v] %v -meta Records done file is invalid sqls file %v， omit meta data", meta.RunnerName, meta.MetaFile(), record)
+			continue
+		}
+		result[tmpRecord[0]] = tmpRecord[1]
+	}
+	return result
+}
+
 func RestoreTimestampIntOffset(doneFilePath string) (int64, map[string]string, error) {
 	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, TimestampRecordsFile)
 	cacheMapFilename := fmt.Sprintf("%v.%v", reader.DoneFileName, CacheMapFile)
@@ -169,6 +188,25 @@ func WriteRecordsFile(doneFilePath, content string) (err error) {
 	filePath := filepath.Join(doneFilePath, filename)
 	// write to tmp file
 	f, err = os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, models.DefaultFilePerm)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = f.Write([]byte(content))
+	if err != nil {
+		return err
+	}
+
+	return f.Sync()
+}
+
+// WriteSqlsFile 将当前文件写入donefiel中
+func WriteSqlsFile(doneFilePath, content string) (err error) {
+	var f *os.File
+	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, DefaultDoneSqlsFile)
+	filePath := filepath.Join(doneFilePath, filename)
+	// write to tmp file
+	f, err = os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, models.DefaultFilePerm)
 	if err != nil {
 		return err
 	}
