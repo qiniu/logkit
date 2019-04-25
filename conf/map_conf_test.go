@@ -190,13 +190,13 @@ func TestGet(t *testing.T) {
 
 func TestGetPasswordEnvString(t *testing.T) {
 	t.Parallel()
-	err := os.Setenv("TestGetPasswordString", "testPassordString")
+	err := os.Setenv("TestGetPasswordEnvString", "testGetPasswordEnvString")
 	assert.NoError(t, err)
-	defer os.Unsetenv("TestGetPasswordString")
+	defer os.Unsetenv("TestGetPasswordEnvString")
 
 	c := MapConf{
-		"a": "TestGetPasswordString",
-		"b": "${TestGetPasswordString}",
+		"a": "TestGetPasswordEnvString",
+		"b": "${TestGetPasswordEnvString}",
 	}
 
 	actual, err := c.GetPasswordEnvString("a")
@@ -205,31 +205,31 @@ func TestGetPasswordEnvString(t *testing.T) {
 
 	actual, err = c.GetPasswordEnvString("b")
 	assert.NoError(t, err)
-	assert.Equal(t, "testPassordString", actual)
+	assert.Equal(t, "testGetPasswordEnvString", actual)
 }
 
 func TestGetPasswordEnvStringOr(t *testing.T) {
 	t.Parallel()
-	err := os.Setenv("TestGetPasswordString", "testPassordString")
+	err := os.Setenv("TestGetPasswordEnvStringOr", "testPasswordStringOr")
 	assert.NoError(t, err)
-	defer os.Unsetenv("TestGetPasswordString")
+	defer os.Unsetenv("TestGetPasswordEnvStringOr")
 
 	c := MapConf{
-		"b": "${TestGetPasswordString}",
-		"c": "TestGetPasswordString",
+		"b": "${TestGetPasswordEnvStringOr}",
+		"c": "TestGetPasswordEnvStringOr",
 	}
 
-	actual, err := c.GetPasswordEnvStringOr("a", "TestGetPasswordString")
+	actual, err := c.GetPasswordEnvStringOr("a", "TestGetPasswordEnvStringOr")
 	assert.NoError(t, err)
-	assert.Equal(t, "TestGetPasswordString", actual)
+	assert.Equal(t, "TestGetPasswordEnvStringOr", actual)
 
-	actual, err = c.GetPasswordEnvStringOr("a", "${TestGetPasswordString}")
+	actual, err = c.GetPasswordEnvStringOr("a", "${TestGetPasswordEnvStringOr}")
 	assert.NoError(t, err)
-	assert.Equal(t, "testPassordString", actual)
+	assert.Equal(t, "testPasswordStringOr", actual)
 
 	actual, err = c.GetPasswordEnvStringOr("b", "${TestGetPasswordStringDeft}")
 	assert.NoError(t, err)
-	assert.Equal(t, "testPassordString", actual)
+	assert.Equal(t, "testPasswordStringOr", actual)
 
 	actual, err = c.GetPasswordEnvStringOr("c", "TestGetPasswordStringDeft")
 	assert.NoError(t, err)
@@ -246,32 +246,32 @@ func TestFunGetStringList(t *testing.T) {
 func TestGetEnv(t *testing.T) {
 	t.Parallel()
 	var exceptedValue = "mockEnv"
-	err := os.Setenv("test", exceptedValue)
+	err := os.Setenv("TestGetEnv", exceptedValue)
 	if err != nil {
 		t.Error(err)
 	}
 
 	defer os.Clearenv()
 
-	assert.Equal(t, exceptedValue, GetEnv("${test}"))
-	assert.Equal(t, exceptedValue, GetEnv("  ${test} "))
+	assert.Equal(t, exceptedValue, GetEnv("${TestGetEnv}"))
+	assert.Equal(t, exceptedValue, GetEnv("  ${TestGetEnv} "))
 }
 
 func TestGetEnvValue(t *testing.T) {
 	t.Parallel()
 	var exceptedValue = "mockEnv"
-	err := os.Setenv("test", exceptedValue)
+	err := os.Setenv("TestGetEnvValue", exceptedValue)
 	if err != nil {
 		t.Error(err)
 	}
 
 	defer os.Clearenv()
 
-	value, err := GetEnvValue("test")
+	value, err := GetEnvValue("TestGetEnvValue")
 	assert.NoError(t, err)
 	assert.Equal(t, exceptedValue, value)
 
-	value, err = GetEnvValue("  test ")
+	value, err = GetEnvValue("  TestGetEnvValue ")
 	assert.NoError(t, err)
 	assert.Equal(t, exceptedValue, value)
 

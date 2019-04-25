@@ -39,6 +39,10 @@ type MetricConfig struct {
 	Config     map[string]interface{} `json:"config"`
 }
 
+var (
+	_ Deleteable = &MetricRunner{}
+)
+
 type MetricRunner struct {
 	RunnerName string `json:"name"`
 	envTag     string
@@ -247,6 +251,18 @@ func (r *MetricRunner) Run() {
 	tags = MergeEnvTags(r.envTag, tags)
 	tags = MergeExtraInfoTags(r.meta, tags)
 
+	for _, c := range r.collectors {
+		collectorService, ok := c.(metric.CollectorService)
+		if !ok {
+			continue
+		}
+		if err := collectorService.Start(); err != nil {
+			log.Errorf("collecter <%v> start failed: %v", c.Name(), err)
+		} else {
+			log.Infof("collecter <%v> start success", c.Name())
+		}
+	}
+
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
 			log.Debugf("runner %v exited from run", r.RunnerName)
@@ -396,6 +412,15 @@ func (mr *MetricRunner) Stop() {
 	case <-timer.C:
 		log.Warnf("MetricRunner " + mr.Name() + " exited timeout ")
 	}
+	for _, collector := range mr.collectors {
+		collectorClose, ok := collector.(metric.CollectorService)
+		if !ok {
+			continue
+		}
+		if err := collectorClose.Close(); err != nil {
+			log.Errorf("cannot close collect name: %s, err: %v", collector.Name(), err)
+		}
+	}
 	for _, s := range mr.senders {
 		err := s.Close()
 		if err != nil {
@@ -425,8 +450,23 @@ func (mr *MetricRunner) Reset() (err error) {
 	return err
 }
 
-func (mr *MetricRunner) Delete() (err error) {
-	return mr.meta.Delete()
+func (mr *MetricRunner) Delete() error {
+	var errs []string
+	for _, collector := range mr.collectors {
+		collectorClose, ok := collector.(metric.CollectorService)
+		if !ok {
+			continue
+		}
+		if err := collectorClose.Close(); err != nil {
+			errs = append(errs, err.Error())
+			log.Errorf("cannot close collect name: %s, err: %v", collector.Name(), err)
+		}
+	}
+	err := mr.meta.Delete()
+	if err != nil {
+		errs = append(errs, err.Error())
+	}
+	return errors.New(strings.Join(errs, ","))
 }
 
 func (*MetricRunner) Cleaner() CleanInfo {
