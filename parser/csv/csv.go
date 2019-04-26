@@ -131,20 +131,17 @@ func parseSchemaFieldList(schema string) (fieldList []string, err error) {
 		case '{':
 			nestedDepth++
 			if nestedDepth > 1 {
-				err = errors.New("parse fieldList error: jsonmap in jsonmap is not supported by now")
-				return
+				return []string{}, errors.New("parse fieldList error: jsonmap in jsonmap is not supported by now")
 			}
 		case '}':
 			nestedDepth--
 			if nestedDepth < 0 {
-				err = errors.New("parse fieldList error: find } befor {")
-				return
+				return []string{}, errors.New("parse fieldList error: find } befor {")
 			}
 		case ',':
 			if nestedDepth == 0 {
 				if start > end {
-					err = errors.New("parse fieldList error: start index is larger than end")
-					return
+					return []string{}, errors.New("parse fieldList error: start index is larger than end")
 				}
 				fields := splitFields(schema[start:end])
 				fieldList = append(fieldList, fields...)
@@ -153,21 +150,19 @@ func parseSchemaFieldList(schema string) (fieldList []string, err error) {
 		}
 	}
 	if nestedDepth != 0 {
-		err = errors.New("parse fieldList error: { and } not match")
-		return
+		return []string{}, errors.New("parse fieldList error: { and } not match")
 	}
 	if start < len(schema) {
 		fields := splitFields(schema[start:])
 		fieldList = append(fieldList, fields...)
 	}
-	return
+	return fieldList, nil
 }
 
 func parseSchemaRawField(f string) (newField field, err error) {
 	parts := strings.Fields(f)
 	if len(parts) < 2 {
-		err = errors.New("column conf error: " + f + ", format should be \"columnName dataType\"")
-		return
+		return field{}, errors.New("column conf error: " + f + ", format should be \"columnName dataType\"")
 	}
 	columnName, dataType := parts[0], parts[1]
 	switch strings.ToLower(dataType) {
@@ -213,19 +208,19 @@ func parseSchemaJsonField(f string) (fd field, err error) {
 		}
 		fields, err = parseSchemaFields(fieldListFinal)
 		if err != nil {
-			return
+			return fd, err
 		}
 		for _, f := range fields {
 			typeChange[f.name] = DataType(f.dataType)
 		}
 	}
-	fd = field{
+
+	return field{
 		name:       key,
 		dataType:   TypeJSONMap,
 		typeChange: typeChange,
 		allin:      allin,
-	}
-	return
+	}, nil
 }
 
 func isJsonMap(f string) bool {

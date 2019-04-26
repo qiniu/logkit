@@ -335,6 +335,9 @@ func (p *Parser) parse(line string) (Data, error) {
 	}
 
 	for _, l := range p.labels {
+		if _, ok := data[l.Name]; ok {
+			continue
+		}
 		data[l.Name] = l.Value
 	}
 	return data, nil
