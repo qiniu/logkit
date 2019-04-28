@@ -1195,6 +1195,9 @@ func (s *Sender) Name() string {
 }
 
 func (s *Sender) Close() error {
+	if s.client == nil {
+		return nil
+	}
 	return s.client.Close()
 }
 

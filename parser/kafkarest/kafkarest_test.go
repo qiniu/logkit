@@ -17,11 +17,24 @@ func TestKafaRestLogParser(t *testing.T) {
 	c[KeyParserName] = "krp-1"
 	c[KeyParserType] = "kafkarest"
 	c[KeyDisableRecordErrData] = "true"
+	c[KeyLabels] = "app logkit"
 	ps := parser.NewRegistry()
 	p, err := ps.NewLogParser(c)
 	if err != nil {
 		t.Error(err)
 	}
+
+	pType, ok := p.(parser.ParserType)
+	assert.True(t, ok)
+	assert.EqualValues(t, TypeKafkaRest, pType.Type())
+
+	dts, err := p.Parse(nil)
+	assert.Nil(t, err)
+	assert.EqualValues(t, []Data{}, dts)
+
+	dts, err = p.Parse([]string{"", ""})
+	assert.NotNil(t, err)
+
 	lines := []string{
 		`[2016-12-05 03:35:20,682] INFO 172.16.16.191 - - [05/Dec/2016:03:35:20 +0000] "POST /topics/VIP_VvBVy0tuMPPspm1A_0000000000 HTTP/1.1" 200 101640  46 (io.confluent.rest-utils.requests)` + "\n",
 		`[2016-08-19 22:35:09,232] WARN Accept failed for channel null (org.eclipse.jetty.io.SelectorManager)`,
@@ -31,7 +44,7 @@ func TestKafaRestLogParser(t *testing.T) {
 		`abcd efg Warn hijk`,
 		"",
 	}
-	dts, err := p.Parse(lines)
+	dts, err = p.Parse(lines)
 	assert.Error(t, err)
 	if len(dts) != 4 {
 		t.Fatalf("parse lines error, expect 4 lines but got %v lines", len(dts))
@@ -43,6 +56,7 @@ func TestKafaRestLogParser(t *testing.T) {
 	expectedResultPost[KEY_CODE] = 200
 	expectedResultPost[KEY_DURATION] = 46
 	expectedResultPost[KEY_RESP_LEN] = 101640
+	expectedResultPost["app"] = "logkit"
 	postLine := dts[0]
 	for k, v := range expectedResultPost {
 		if v != postLine[k] {
@@ -57,6 +71,7 @@ func TestKafaRestLogParser(t *testing.T) {
 	expectedResultGet[KEY_CODE] = 200
 	expectedResultGet[KEY_DURATION] = 211
 	expectedResultGet[KEY_RESP_LEN] = 448238
+	expectedResultGet["app"] = "logkit"
 	getLine := dts[3]
 	for k, v := range expectedResultGet {
 		if v != getLine[k] {
@@ -198,4 +213,26 @@ func TestParseField(t *testing.T) {
 	if duration == 0 {
 		t.Error("failed to parse field duration")
 	}
+}
+
+func Test_ParseField(t *testing.T) {
+	p := &Parser{}
+	assert.EqualValues(t, "", p.ParseIp(nil))
+
+	assert.EqualValues(t, "", p.ParseMethod(nil))
+
+	assert.EqualValues(t, "", p.ParseTopic(nil))
+	assert.EqualValues(t, "", p.ParseTopic([]string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"}))
+
+	assert.EqualValues(t, int(0), p.ParseCode(nil))
+	assert.EqualValues(t, int(0), p.ParseCode([]string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "aa"}))
+
+	assert.EqualValues(t, int(0), p.ParseDuration(nil))
+	assert.EqualValues(t, int(0), p.ParseDuration([]string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "aa"}))
+
+	assert.EqualValues(t, int(0), p.ParseRespCL(nil))
+	assert.EqualValues(t, int(0), p.ParseRespCL([]string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "aa"}))
+
+	assert.EqualValues(t, int(0), p.ParseLogTime(nil))
+	assert.NotEmpty(t, p.ParseLogTime([]string{"[2016-12-05", "03:35:20,682]"}))
 }
