@@ -685,7 +685,10 @@ func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []str
 }
 
 func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
-	var err error
+	var (
+		err        error
+		curTimeStr string
+	)
 	lines, froms := r.rawReadLines(dataSourceTag)
 	r.tracker.Track("finish rawReadLines")
 	for i := range r.transformers {
@@ -697,7 +700,9 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 		}
 	}
 
-	curTimeStr := time.Now().Format("2006-01-02 15:04:05.999")
+	if !r.NoReadTime {
+		curTimeStr = time.Now().Format("2006-01-02 15:04:05.999")
+	}
 
 	linenums := len(lines)
 	if linenums <= 0 {
@@ -754,7 +759,9 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 		tags = MergeEnvTags(r.EnvTag, tags)
 	}
 	tags = MergeExtraInfoTags(r.meta, tags)
-	tags["lst"] = curTimeStr
+	if !r.NoReadTime {
+		tags["lst"] = curTimeStr
+	}
 	if len(tags) > 0 {
 		datas = AddTagsToData(tags, datas, r.Name())
 	}
