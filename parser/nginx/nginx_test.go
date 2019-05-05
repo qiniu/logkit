@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/qiniu/logkit/parser"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/logkit/conf"
@@ -63,9 +65,8 @@ func TestNewNginxParser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, p.Name(), "nginx", "nginx parser name not equal")
 	entry1S, err := p.Parse(accLog1)
-	assert.Nil(t, err)
+	assert.NotNil(t, err)
 	entry1 := entry1S[0]
 	for k, v := range entry1 {
 		assert.Equal(t, accLog1Entry[k], v, "parser "+k+" not match")
@@ -93,7 +94,7 @@ func TestNewNginxParserForErrData(t *testing.T) {
 	}
 	assert.Equal(t, p.Name(), "nginx", "nginx parser name not equal")
 	entry1S, err := p.Parse(accLog1)
-	assert.Nil(t, err)
+	assert.NotNil(t, err)
 	if len(entry1S) != 1 {
 		t.Fatalf("parse lines error, expect 1 lines but got %v lines", len(entry1S))
 	}
@@ -106,13 +107,18 @@ func TestNewNginxParserForErrData(t *testing.T) {
 func TestNginxParserKeepRawData(t *testing.T) {
 	cfg5[KeyDisableRecordErrData] = "true"
 	cfg5[KeyKeepRawData] = "true"
-	p, err := NewNginxAccParser(cfg5)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, p.Name(), "nginx", "nginx parser name not equal")
-	entry1S, err := p.Parse(accLog1)
+	cfg5[KeyType] = TypeNginx
+	cfg5[KeyDisableRecordErrData] = "true"
+	p, err := NewParser(cfg5)
 	assert.Nil(t, err)
+
+	assert.EqualValues(t, TypeNginx, p.Name())
+	pType, ok := p.(parser.ParserType)
+	assert.True(t, ok)
+	assert.EqualValues(t, pType.Type(), TypeNginx)
+
+	entry1S, err := p.Parse(accLog1)
+	assert.NotNil(t, err)
 	if len(entry1S) != 1 {
 		t.Fatalf("parse lines error, expect 1 lines but got %v lines", len(entry1S))
 	}
@@ -120,6 +126,14 @@ func TestNginxParserKeepRawData(t *testing.T) {
 	for k, v := range entry1 {
 		assert.Equal(t, accLog1EntryKeepRawData[k], v, "parser "+k+" not match")
 	}
+
+	got, err := p.Parse(nil)
+	assert.Nil(t, err)
+	assert.EqualValues(t, 0, len(got))
+
+	got, err = p.Parse([]string{"a"})
+	assert.NotNil(t, err)
+	assert.EqualValues(t, []Data{{"raw_data": "a"}}, got)
 }
 
 func TestNewNginxWithManuelRegex(t *testing.T) {

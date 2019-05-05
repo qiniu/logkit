@@ -133,7 +133,7 @@ func (krp *Parser) Parse(lines []string) ([]Data, error) {
 
 	se.DatasourceSkipIndex = se.DatasourceSkipIndex[:datasourceIndex]
 	datas = datas[:dataIndex]
-	if se.Errors == 0 {
+	if se.Errors == 0 && len(se.DatasourceSkipIndex) == 0 {
 		return datas, nil
 	}
 	return datas, se

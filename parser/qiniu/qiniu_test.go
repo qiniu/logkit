@@ -131,7 +131,7 @@ func Test_QiniulogParser(t *testing.T) {
 		"",
 	}
 	dts, err := p.Parse(lines)
-	assert.Nil(t, err)
+	assert.NotNil(t, err)
 	if len(dts) != 4 {
 		t.Fatalf("parse lines error expect 4 but %v", len(dts))
 	}
@@ -197,7 +197,7 @@ func Test_QiniulogParserForErrData(t *testing.T) {
 		"",
 	}
 	dts, err := p.Parse(lines)
-	assert.Nil(t, err)
+	assert.NotNil(t, err)
 	if len(dts) != 1 {
 		t.Fatalf("parse lines error, expect 1 but %v", len(dts))
 	}
