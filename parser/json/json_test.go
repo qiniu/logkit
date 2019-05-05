@@ -125,7 +125,7 @@ func TestJsonKeepRawData(t *testing.T) {
 	assert.EqualValues(t, []Data{}, m)
 
 	m, err = p.Parse([]string{"", ""})
-	assert.Nil(t, err)
+	assert.NotNil(t, err)
 	assert.EqualValues(t, []Data{}, m)
 
 	pType, ok := p.(parser.ParserType)
@@ -429,7 +429,7 @@ func TestParseSpaceJson(t *testing.T) {
 	p, _ := NewParser(c)
 	data := "\n"
 	res, err := p.Parse([]string{data})
-	assert.Nil(t, err)
+	assert.NotNil(t, err)
 
 	exp := []Data{}
 	assert.Equal(t, exp, res)

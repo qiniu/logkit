@@ -133,7 +133,7 @@ func TestKeepRawData(t *testing.T) {
 	assert.EqualValues(t, TypeGrok, pType.Type())
 
 	m, err := p.Parse([]string{"142 bot", ""})
-	assert.Nil(t, err)
+	assert.NotNil(t, err)
 	assert.Equal(t, []Data{
 		{
 			"num":      int64(142),

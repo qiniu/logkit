@@ -64,7 +64,7 @@ func Test_Parser(t *testing.T) {
 	assert.EqualValues(t, datas, []Data{})
 
 	datas, err = p.Parse([]string{"", "", ""})
-	assert.Nil(t, err)
+	assert.NotNil(t, err)
 	assert.EqualValues(t, datas, []Data{})
 
 	tmstr := time.Now().Format(time.RFC3339Nano)

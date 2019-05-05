@@ -251,7 +251,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 
 	datas = datas[:dataIndex]
 	se.DatasourceSkipIndex = se.DatasourceSkipIndex[:datasourceIndex]
-	if se.Errors == 0 {
+	if se.Errors == 0 && len(se.DatasourceSkipIndex) == 0 {
 		return datas, nil
 	}
 	return datas, se
