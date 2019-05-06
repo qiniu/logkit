@@ -700,7 +700,7 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 		}
 	}
 
-	if !r.NoReadTime {
+	if r.ReadTime {
 		curTimeStr = time.Now().Format("2006-01-02 15:04:05.999")
 	}
 
@@ -759,7 +759,7 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 		tags = MergeEnvTags(r.EnvTag, tags)
 	}
 	tags = MergeExtraInfoTags(r.meta, tags)
-	if !r.NoReadTime {
+	if r.ReadTime {
 		tags["lst"] = curTimeStr
 	}
 	if len(tags) > 0 {
