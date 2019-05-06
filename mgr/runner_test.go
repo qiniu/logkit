@@ -1495,6 +1495,7 @@ func TestRunWithExtra(t *testing.T) {
 			"name":"TestRunWithExtra",
 			"batch_len":1,
 			"extra_info":true,
+			"read_time":true,
 			"reader":{
 				"mode":"file",
 				"meta_path":"./TestRunWithExtra/meta",
