@@ -359,6 +359,16 @@ var ModeKeyOptions = map[string][]Option{
 			AdvanceDepend: KeyPandoraEnableLogDB,
 			ToolTip:       `指定字段的分词方式，逗号分隔多个，如 "f1 keyword, f2 full_text"。仅在新建时生效，更改时不生效，请在日志仓库更改。`,
 		},
+		{
+			KeyName:       KeyPandoraLogdbRetention,
+			ChooseOnly:    false,
+			Default:       "30",
+			DefaultNoUse:  false,
+			Description:   "指定logdb存储时间(pandora_logdb_retention)",
+			Advance:       true,
+			AdvanceDepend: KeyPandoraEnableLogDB,
+			ToolTip:       `指定logdb存储时间，单位为天，为正整数，默认为 30 天`,
+		},
 		//暂时下线时序数据库
 		//{
 		//	KeyName:            KeyPandoraEnableTSDB,
