@@ -131,6 +131,8 @@ type PandoraOption struct {
 	autoCreateDescription string
 
 	timeout time.Duration
+
+	retention string
 }
 
 //PandoraMaxBatchSize 发送到Pandora的batch限制
@@ -190,6 +192,15 @@ func NewSender(conf logkitconf.MapConf) (pandoraSender sender.Sender, err error)
 	logdbhost, _ := conf.GetStringOr(KeyPandoraLogDBHost, "")
 	logdbAnalyzer, _ := conf.GetStringListOr(KeyPandoraLogDBAnalyzer, []string{})
 	analyzerMap := convertAnalyzerMap(logdbAnalyzer)
+	logdbRetention, _ := conf.GetStringOr(KeyPandoraLogdbRetention, "30")
+	logdbRetention = strings.TrimSpace(logdbRetention)
+	if logdbRetention == "" || logdbRetention == "0" {
+		logdbRetention = "30"
+	}
+	_, err = strconv.Atoi(logdbRetention)
+	if err != nil {
+		return
+	}
 
 	enableTsdb, _ := conf.GetBoolOr(KeyPandoraEnableTSDB, false)
 	tsdbReponame, _ := conf.GetStringOr(KeyPandoraTSDBName, repoName)
@@ -318,6 +329,10 @@ func NewSender(conf logkitconf.MapConf) (pandoraSender sender.Sender, err error)
 		autoCreateDescription: description,
 
 		timeout: timeout,
+	}
+
+	if logdbRetention != "" {
+		opt.retention = logdbRetention + "d"
 	}
 	if withIp {
 		opt.withip = "logkitIP"
@@ -565,6 +580,7 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 				AutoExportLogDBTokens: s.opt.tokens.LogDBTokens,
 				Description:           &s.opt.autoCreateDescription,
 				IPConfig:              ipConfig,
+				Retention:             s.opt.retention,
 			},
 			ToKODO: s.opt.enableKodo,
 			AutoExportToKODOInput: pipeline.AutoExportToKODOInput{
@@ -1124,6 +1140,7 @@ func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 				AutoExportLogDBTokens: s.opt.tokens.LogDBTokens,
 				Description:           &s.opt.autoCreateDescription,
 				IPConfig:              s.ipConfig,
+				Retention:             s.opt.retention,
 			},
 			ToKODO: s.opt.enableKodo,
 			AutoExportToKODOInput: pipeline.AutoExportToKODOInput{

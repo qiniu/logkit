@@ -868,7 +868,13 @@ func TestPandoraSenderTime(t *testing.T) {
 		"name":                      "TestPandoraSenderTime",
 		"KeyPandoraSchemaUpdateInterval": "1s",
 	}
+	conf1["pandora_logdb_retention"] = "a"
 	s, err := NewSender(conf1)
+	assert.NotNil(t, err)
+
+	conf1["pandora_withip"] = "true"
+	conf1["pandora_logdb_retention"] = ""
+	s, err = NewSender(conf1)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1078,7 +1078,12 @@ func readerExpireDeleteTarTest(t *testing.T) {
 		}
 	}
 	t.Log("maxNum ", maxNum, "emptyNum", emptyNum)
-	assert.EqualValues(t, expectResults, actualResults)
+	assert.EqualValues(t, len(expectResults), len(actualResults))
+	for k, v := range expectResults {
+		actualV, ok := actualResults[k]
+		assert.True(t, ok)
+		assert.EqualValues(t, v, actualV)
+	}
 	assert.Equal(t, StatsInfo{}, dr.Status())
 	time.Sleep(5 * time.Second)
 	files1, err := ioutil.ReadDir(dir1)
