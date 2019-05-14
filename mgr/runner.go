@@ -580,9 +580,12 @@ func getSampleContent(line string, maxBatchSize int) string {
 		return line
 	}
 	if maxBatchSize <= 1024 {
-		return line
+		if len(line) <= 1024 {
+			return line
+		}
+		return line[0:1024]
 	}
-	return line[0:1024]
+	return line[0:maxBatchSize]
 }
 
 func (r *LogExportRunner) readDatas(dr reader.DataReader, dataSourceTag string) []Data {

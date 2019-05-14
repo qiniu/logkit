@@ -471,6 +471,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:      KeyMysqlSQL,
+			Element:      Text,
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     false,
@@ -632,6 +633,7 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:      KeyMssqlSQL,
 			Default:      "",
+			Element:      Text,
 			Required:     false,
 			ChooseOnly:   false,
 			Placeholder:  "select * from <table>;",
@@ -717,6 +719,7 @@ var ModeKeyOptions = map[string][]Option{
 		},
 		{
 			KeyName:      KeyPGsqlSQL,
+			Element:      Text,
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     false,

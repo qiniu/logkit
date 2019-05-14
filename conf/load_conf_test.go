@@ -174,7 +174,7 @@ func TestLoad(t *testing.T) {
 		}
 		err := Load(test.conf)
 		if err != nil {
-			assert.NotNil(t, test.expect)
+			t.Log("load conf  ", test.confName, " failed: ", err)
 			if !strings.Contains(err.Error(), test.expect.Error()) {
 				t.Fatalf("expect contains: %s, but got: %s", test.expect.Error(), err.Error())
 			}

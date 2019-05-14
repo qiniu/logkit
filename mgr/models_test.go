@@ -105,6 +105,7 @@ func TestErrList(t *testing.T) {
 	el.ReadErrors.Put(equeue.ErrorInfo{Error: "read2"})
 	assert.Equal(t, true, el.HasReadErr())
 
+	el.ReadErrors = nil
 	el.ParseErrors = equeue.New(2)
 	assert.Equal(t, false, el.HasParseErr())
 	el.ParseErrors.Put(equeue.ErrorInfo{Error: "parse1"})
@@ -113,6 +114,7 @@ func TestErrList(t *testing.T) {
 	el.ParseErrors.Put(equeue.ErrorInfo{Error: "parse2"})
 	el.ParseErrors.Put(equeue.ErrorInfo{Error: "parse3"})
 
+	el.ParseErrors = nil
 	assert.Equal(t, false, el.HasTransformErr())
 	transname := "t1"
 	el.TransformErrors[transname] = equeue.New(2)
@@ -122,9 +124,20 @@ func TestErrList(t *testing.T) {
 
 	nel := el.Clone()
 	nel.SendErrors[sendName1].Put(equeue.ErrorInfo{Error: "send2"})
+	nel.ReadErrors = equeue.New(2)
+	nel.ReadErrors.Put(equeue.ErrorInfo{Error: "read1"})
+	nel.ReadErrors.Put(equeue.ErrorInfo{Error: "read2"})
 	nel.ReadErrors.Put(equeue.ErrorInfo{Error: "read3"})
 	nel.ReadErrors.Put(equeue.ErrorInfo{Error: "read3"})
 	assert.Equal(t, equeue.ErrorInfo{Error: "read3", Count: 2}, nel.ReadErrors.End())
+
+	el.ReadErrors = equeue.New(2)
+	el.ReadErrors.Put(equeue.ErrorInfo{Error: "read1"})
+	el.ReadErrors.Put(equeue.ErrorInfo{Error: "read2"})
+	el.ParseErrors = equeue.New(2)
+	el.ParseErrors.Put(equeue.ErrorInfo{Error: "parse1"})
+	el.ParseErrors.Put(equeue.ErrorInfo{Error: "parse2"})
+	el.ParseErrors.Put(equeue.ErrorInfo{Error: "parse3"})
 
 	assert.Equal(t, ErrorsResult{
 		ReadErrors:  []equeue.ErrorInfo{{Error: "read1", Count: 1}, {Error: "read2", Count: 1}},
