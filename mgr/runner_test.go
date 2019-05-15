@@ -164,10 +164,27 @@ func Test_Run(t *testing.T) {
 	}
 	senders = append(senders, s)
 
+	_, err = NewRunnerWithService(rinfo, r, c, pparser, nil, senders, nil, meta)
+	assert.Nil(t, err)
+
+	_, err = NewLogExportRunnerWithService(rinfo, nil, c, pparser, nil, senders, nil, meta)
+	assert.NotNil(t, err)
+	assert.EqualValues(t, "reader can not be nil", err.Error())
+
+	_, err = NewLogExportRunnerWithService(rinfo, r, c, nil, nil, senders, nil, meta)
+	assert.NotNil(t, err)
+	assert.EqualValues(t, "parser can not be nil", err.Error())
+
+	_, err = NewLogExportRunnerWithService(rinfo, r, c, pparser, nil, senders, nil, nil)
+	assert.NotNil(t, err)
+	assert.EqualValues(t, "meta can not be nil", err.Error())
+
+	_, err = NewLogExportRunnerWithService(rinfo, r, c, pparser, nil, nil, nil, meta)
+	assert.NotNil(t, err)
+	assert.EqualValues(t, "senders can not be nil", err.Error())
+
 	runner, err := NewLogExportRunnerWithService(rinfo, r, c, pparser, nil, senders, nil, meta)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.Nil(t, err)
 
 	cleanInfo := CleanInfo{
 		enable: true,
@@ -1351,8 +1368,11 @@ func TestAddDatasourceForRawData(t *testing.T) {
 	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
 
+	_, err = NewCustomRunner(rc, make(chan cleaner.CleanSignal), nil, nil, nil)
+	assert.Nil(t, err)
+
 	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
-	assert.NoError(t, err)
+	assert.Nil(t, err)
 	go rr.Run()
 
 	time.Sleep(2 * time.Second)
@@ -2049,8 +2069,10 @@ func TestTailxCleaner(t *testing.T) {
 	rc := RunnerConfig{}
 	assert.NoError(t, jsoniter.Unmarshal([]byte(config), &rc))
 	cleanChan := make(chan cleaner.CleanSignal)
+	_, err = NewRunner(rc, cleanChan)
+	assert.Nil(t, err)
 	rr, err := NewLogExportRunner(rc, cleanChan, reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
-	assert.NoError(t, err)
+	assert.Nil(t, err)
 	assert.NotNil(t, rr)
 	go rr.Run()
 
@@ -2308,4 +2330,15 @@ func TestBackupRestoreHistory(t *testing.T) {
 	for k, v := range r1.historyError.SendErrors {
 		assert.Equal(t, v.List(), r2.historyError.SendErrors[k].List())
 	}
+}
+
+func Test_getSampleContent(t *testing.T) {
+	assert.EqualValues(t, "a", getSampleContent("a", 2))
+	assert.EqualValues(t, "abc", getSampleContent("abc", 2))
+	var test string
+	for len(test) < 1024 {
+		test += "abcdefghijklmnopqrstuvwxyz"
+	}
+	assert.EqualValues(t, 1024, len(getSampleContent(test, 1024)))
+	assert.EqualValues(t, 1039, len(getSampleContent(test, 1039)))
 }

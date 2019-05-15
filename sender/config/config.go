@@ -1027,18 +1027,6 @@ var ModeKeyOptions = map[string][]Option{
 			Advance:      true,
 		},
 		{
-			KeyName:      KeyHttpSenderTemplate,
-			Element:      Text,
-			ChooseOnly:   false,
-			Default:      "",
-			Placeholder:  `{"a": "{{key1}}", "b": "{{key2}}"}`,
-			Required:     false,
-			DefaultNoUse: true,
-			Description:  "自定义数据模板(http_sender_template)",
-			ToolTip:      `渲染自定义的数据模板，使用"{{key}}"作为占位符，key为需要发送的字段名，渲染后为该字段的值。目前仅支持json和body_json两种数据格式`,
-			Advance:      true,
-		},
-		{
 			KeyName:      KeyHttpSenderCsvSplit,
 			ChooseOnly:   false,
 			Default:      "",
