@@ -43,6 +43,7 @@ type Parser struct {
 	ignoreInvalid        bool
 	numRoutine           int
 	keepRawData          bool
+	containSplitterKey   string
 	containSplitterIndex int
 }
 
@@ -101,7 +102,20 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	allmoreStartNumber, _ := c.GetIntOr(KeyCSVAllowMoreStartNum, 0)
 	ignoreInvalid, _ := c.GetBoolOr(KeyCSVIgnoreInvalidField, false)
 	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)
-	containSplitterIndex, _ := c.GetIntOr(KeyCSVContainSplitterIndex, -1)
+	containSplitterKey, _ := c.GetStringOr(KeyCSVContainSplitterKey, "")
+	containSplitterIndex := -1
+	if containSplitterKey != "" {
+		for index, f := range fields {
+			if f.name == containSplitterKey {
+				containSplitterIndex = index
+				break
+			}
+		}
+		if containSplitterIndex == -1 {
+			return nil, errors.New("containSplitterKey:" + containSplitterKey + " not exists in column")
+		}
+	}
+
 	numRoutine := MaxProcs
 	if numRoutine == 0 {
 		numRoutine = 1
@@ -120,6 +134,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		allmoreStartNUmber:   allmoreStartNumber,
 		numRoutine:           numRoutine,
 		keepRawData:          keepRawData,
+		containSplitterKey:   containSplitterKey,
 		containSplitterIndex: containSplitterIndex,
 	}, nil
 }

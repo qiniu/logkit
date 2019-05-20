@@ -746,40 +746,59 @@ func Test_Rename(t *testing.T) {
 }
 
 func Test_ContainSplitterParse(t *testing.T) {
-
-	testFileds := []field{
-		{"field1", TypeJSONMap, make(map[string]DataType), true},
-		{"field2", TypeFloat, make(map[string]DataType), true},
-		{"field3", TypeLong, make(map[string]DataType), true},
-		{"field4", TypeString, make(map[string]DataType), true},
-	}
-
-	testLabels := []GrokLabel{}
+	parserName := "testContainSplitter"
+	parserType := "csv"
+	schema := "a jsonmap, b float, c long, d string"
+	splitter := ","
+	autoRename := "true"
 
 	testCases := []struct {
-		parser Parser
-		line   string
-		wanted Data
+		parserConf conf.MapConf
+		line       []string
+		wanted     []Data
 	}{
 		{
-			Parser{"csv", testFileds, testLabels, ",", true, 0, true, "unkown", 0, true, true, 1, false, -1},
-			"{\"json_key\":\"aaa\"},1.23,123,foo",
-			Data{"field1_json_key": "aaa", "field2": 1.23, "field3": int64(123), "field4": "foo"},
+			conf.MapConf{
+				KeyParserName:            parserName,
+				KeyParserType:            parserType,
+				KeyCSVSchema:             schema,
+				KeyCSVSplitter:           splitter,
+				KeyCSVAutoRename:         autoRename,
+				KeyCSVContainSplitterKey: "a",
+			},
+			[]string{"{\"foo\":\"aaa\", \"bar\":\"bbb\"},1.23,123,foo"},
+			[]Data{{"a_foo": "aaa", "a_bar": "bbb", "b": 1.23, "c": int64(123), "d": "foo"}},
 		},
 		{
-			Parser{"csv", testFileds, testLabels, ",", true, 0, true, "unkown", 0, true, true, 1, false, 0},
-			"{\"json_key1\":\"aaa\",\"json_key2\":\"bbb\"},1.23,123,foo",
-			Data{"field1_json_key1": "aaa", "field1_json_key2": "bbb", "field2": 1.23, "field3": int64(123), "field4": "foo"},
+			conf.MapConf{
+				KeyParserName:            parserName,
+				KeyParserType:            parserType,
+				KeyCSVSchema:             schema,
+				KeyCSVSplitter:           splitter,
+				KeyCSVAutoRename:         autoRename,
+				KeyCSVContainSplitterKey: "d",
+			},
+			[]string{"{\"foo\":\"aaa\"},1.23,123,this,is,one"},
+			[]Data{{"a_foo": "aaa", "b": 1.23, "c": int64(123), "d": "this,is,one"}},
 		},
 		{
-			Parser{"csv", testFileds, testLabels, ",", true, 0, true, "unkown", 0, true, true, 1, false, 3},
-			"{\"json_key1\":\"aaa\"},1.23,123,foo,bar",
-			Data{"field1_json_key1": "aaa", "field2": 1.23, "field3": int64(123), "field4": "foo,bar"},
+			conf.MapConf{
+				KeyParserName:            parserName,
+				KeyParserType:            parserType,
+				KeyCSVSchema:             schema,
+				KeyCSVSplitter:           splitter,
+				KeyCSVAutoRename:         autoRename,
+				KeyCSVContainSplitterKey: "",
+			},
+			[]string{"{\"foo\":\"aaa\"},1.23,123,this"},
+			[]Data{{"a_foo": "aaa", "b": 1.23, "c": int64(123), "d": "this"}},
 		},
 	}
 
 	for _, tc := range testCases {
-		res, err := tc.parser.parse(tc.line)
+		parser, err := NewParser(tc.parserConf)
+		assert.NoError(t, err)
+		res, err := parser.Parse(tc.line)
 		assert.NoError(t, err)
 		assert.Equal(t, tc.wanted, res, "")
 	}
