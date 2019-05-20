@@ -43,7 +43,6 @@ type Parser struct {
 	ignoreInvalid        bool
 	numRoutine           int
 	keepRawData          bool
-	containSplitterKey   string
 	containSplitterIndex int
 }
 
@@ -134,7 +133,6 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		allmoreStartNUmber:   allmoreStartNumber,
 		numRoutine:           numRoutine,
 		keepRawData:          keepRawData,
-		containSplitterKey:   containSplitterKey,
 		containSplitterIndex: containSplitterIndex,
 	}, nil
 }
@@ -445,15 +443,16 @@ func (p *Parser) parse(line string) (d Data, err error) {
 		return nil, fmt.Errorf("schema length not match: schema length %v, actual column length %v, %s", len(p.schema), len(parts), getUnmachedMessage(parts, p.schema))
 	}
 
-	if p.containSplitterIndex >= 0 {
+	if p.containSplitterIndex >= 0 && len(parts) > len(p.schema) {
 		if p.containSplitterIndex >= len(p.schema) {
 			return nil, fmt.Errorf("containSplitterIndex(%d) is large then fields count(%d)", p.containSplitterIndex, len(p.schema))
 		}
 		partsFormer := parts[:p.containSplitterIndex]
-		containSplitterFieldIndexEnd := p.containSplitterIndex + len(parts) - len(p.schema)
+		// ctnSplitIdx is short for containSplitterFieldIndexEnd
+		ctnSplitIdx := p.containSplitterIndex + len(parts) - len(p.schema)
 
-		containSplitterField := strings.Join(parts[p.containSplitterIndex:containSplitterFieldIndexEnd+1], p.delim)
-		partsLetter := parts[containSplitterFieldIndexEnd+1:]
+		containSplitterField := strings.Join(parts[p.containSplitterIndex:ctnSplitIdx+1], p.delim)
+		partsLetter := parts[ctnSplitIdx+1:]
 
 		parts = append([]string{}, partsFormer...)
 		parts = append(parts, containSplitterField)

@@ -793,6 +793,18 @@ func Test_ContainSplitterParse(t *testing.T) {
 			[]string{"{\"foo\":\"aaa\"},1.23,123,this"},
 			[]Data{{"a_foo": "aaa", "b": 1.23, "c": int64(123), "d": "this"}},
 		},
+		{
+			conf.MapConf{
+				KeyParserName:            parserName,
+				KeyParserType:            parserType,
+				KeyCSVSchema:             schema,
+				KeyCSVSplitter:           splitter,
+				KeyCSVAutoRename:         autoRename,
+				KeyCSVContainSplitterKey: "d",
+			},
+			[]string{"{\"foo\":\"aaa\"},1.23"},
+			[]Data{{"a_foo": "aaa", "b": 1.23}},
+		},
 	}
 
 	for _, tc := range testCases {
