@@ -10,7 +10,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/json-iterator/go"
+	jsoniter "github.com/json-iterator/go"
 
 	"github.com/qiniu/log"
 
@@ -43,6 +43,7 @@ type Parser struct {
 	ignoreInvalid        bool
 	numRoutine           int
 	keepRawData          bool
+	containSplitterIndex int
 }
 
 type field struct {
@@ -100,6 +101,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	allmoreStartNumber, _ := c.GetIntOr(KeyCSVAllowMoreStartNum, 0)
 	ignoreInvalid, _ := c.GetBoolOr(KeyCSVIgnoreInvalidField, false)
 	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)
+	containSplitterIndex, _ := c.GetIntOr(KeyCSVContainSplitterIndex, -1)
 	numRoutine := MaxProcs
 	if numRoutine == 0 {
 		numRoutine = 1
@@ -118,6 +120,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		allmoreStartNUmber:   allmoreStartNumber,
 		numRoutine:           numRoutine,
 		keepRawData:          keepRawData,
+		containSplitterIndex: containSplitterIndex,
 	}, nil
 }
 
@@ -423,9 +426,25 @@ func getUnmachedMessage(parts []string, schemas []field) (ret string) {
 func (p *Parser) parse(line string) (d Data, err error) {
 	d = make(Data)
 	parts := strings.Split(line, p.delim)
-	if len(parts) != len(p.schema) && !p.allowNotMatch {
+	if len(parts) != len(p.schema) && !p.allowNotMatch && p.containSplitterIndex < 0 {
 		return nil, fmt.Errorf("schema length not match: schema length %v, actual column length %v, %s", len(p.schema), len(parts), getUnmachedMessage(parts, p.schema))
 	}
+
+	if p.containSplitterIndex >= 0 {
+		if p.containSplitterIndex >= len(p.schema) {
+			return nil, fmt.Errorf("containSplitterIndex(%d) is large then fields count(%d)", p.containSplitterIndex, len(p.schema))
+		}
+		partsFormer := parts[:p.containSplitterIndex]
+		containSplitterFieldIndexEnd := p.containSplitterIndex + len(parts) - len(p.schema)
+
+		containSplitterField := strings.Join(parts[p.containSplitterIndex:containSplitterFieldIndexEnd+1], p.delim)
+		partsLetter := parts[containSplitterFieldIndexEnd+1:]
+
+		parts = append([]string{}, partsFormer...)
+		parts = append(parts, containSplitterField)
+		parts = append(parts, partsLetter...)
+	}
+
 	moreNum := p.allmoreStartNUmber
 	for i, part := range parts {
 		part = strings.TrimSpace(part)

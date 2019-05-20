@@ -10,7 +10,7 @@ import (
 
 	"github.com/qiniu/logkit/parser"
 
-	"github.com/json-iterator/go"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/logkit/conf"
@@ -484,9 +484,9 @@ func TestRename(t *testing.T) {
 			"reqHeader-Content-Length":  "0",
 			"nullStr":                   "",
 			"code":                      int64(200),
-			"resBody-Content-Length": "55",
-			"resBody-Content-Type":   "application/json",
-			"resBody-X-Reqid":        "pyAAAO0mQ0HoBvkU",
+			"resBody-Content-Length":    "55",
+			"resBody-Content-Type":      "application/json",
+			"resBody-X-Reqid":           "pyAAAO0mQ0HoBvkU",
 			"resBody-X-Log": []interface{}{
 				"REPORT:1",
 			},
@@ -527,9 +527,9 @@ func TestRename(t *testing.T) {
 			"reqHeader_Content_Length":  "0",
 			"nullStr":                   "",
 			"code":                      int64(200),
-			"resBody_Content_Length": "55",
-			"resBody_Content_Type":   "application/json",
-			"resBody_X_Reqid":        "pyAAAO0mQ0HoBvkU",
+			"resBody_Content_Length":    "55",
+			"resBody_Content_Type":      "application/json",
+			"resBody_X_Reqid":           "pyAAAO0mQ0HoBvkU",
 			"resBody_X_Log": []interface{}{
 				"REPORT:1",
 			},
@@ -743,4 +743,44 @@ func Test_Rename(t *testing.T) {
 
 	newDatas[0] = nil
 	assert.NotEqual(t, datas[0], newDatas[0])
+}
+
+func Test_ContainSplitterParse(t *testing.T) {
+
+	testFileds := []field{
+		{"field1", TypeJSONMap, make(map[string]DataType), true},
+		{"field2", TypeFloat, make(map[string]DataType), true},
+		{"field3", TypeLong, make(map[string]DataType), true},
+		{"field4", TypeString, make(map[string]DataType), true},
+	}
+
+	testLabels := []GrokLabel{}
+
+	testCases := []struct {
+		parser Parser
+		line   string
+		wanted Data
+	}{
+		{
+			Parser{"csv", testFileds, testLabels, ",", true, 0, true, "unkown", 0, true, true, 1, false, -1},
+			"{\"json_key\":\"aaa\"},1.23,123,foo",
+			Data{"field1_json_key": "aaa", "field2": 1.23, "field3": int64(123), "field4": "foo"},
+		},
+		{
+			Parser{"csv", testFileds, testLabels, ",", true, 0, true, "unkown", 0, true, true, 1, false, 0},
+			"{\"json_key1\":\"aaa\",\"json_key2\":\"bbb\"},1.23,123,foo",
+			Data{"field1_json_key1": "aaa", "field1_json_key2": "bbb", "field2": 1.23, "field3": int64(123), "field4": "foo"},
+		},
+		{
+			Parser{"csv", testFileds, testLabels, ",", true, 0, true, "unkown", 0, true, true, 1, false, 3},
+			"{\"json_key1\":\"aaa\"},1.23,123,foo,bar",
+			Data{"field1_json_key1": "aaa", "field2": 1.23, "field3": int64(123), "field4": "foo,bar"},
+		},
+	}
+
+	for _, tc := range testCases {
+		res, err := tc.parser.parse(tc.line)
+		assert.NoError(t, err)
+		assert.Equal(t, tc.wanted, res, "")
+	}
 }
