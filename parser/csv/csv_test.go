@@ -10,7 +10,7 @@ import (
 
 	"github.com/qiniu/logkit/parser"
 
-	"github.com/json-iterator/go"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/logkit/conf"
@@ -484,9 +484,9 @@ func TestRename(t *testing.T) {
 			"reqHeader-Content-Length":  "0",
 			"nullStr":                   "",
 			"code":                      int64(200),
-			"resBody-Content-Length": "55",
-			"resBody-Content-Type":   "application/json",
-			"resBody-X-Reqid":        "pyAAAO0mQ0HoBvkU",
+			"resBody-Content-Length":    "55",
+			"resBody-Content-Type":      "application/json",
+			"resBody-X-Reqid":           "pyAAAO0mQ0HoBvkU",
 			"resBody-X-Log": []interface{}{
 				"REPORT:1",
 			},
@@ -527,9 +527,9 @@ func TestRename(t *testing.T) {
 			"reqHeader_Content_Length":  "0",
 			"nullStr":                   "",
 			"code":                      int64(200),
-			"resBody_Content_Length": "55",
-			"resBody_Content_Type":   "application/json",
-			"resBody_X_Reqid":        "pyAAAO0mQ0HoBvkU",
+			"resBody_Content_Length":    "55",
+			"resBody_Content_Type":      "application/json",
+			"resBody_X_Reqid":           "pyAAAO0mQ0HoBvkU",
 			"resBody_X_Log": []interface{}{
 				"REPORT:1",
 			},
@@ -743,4 +743,75 @@ func Test_Rename(t *testing.T) {
 
 	newDatas[0] = nil
 	assert.NotEqual(t, datas[0], newDatas[0])
+}
+
+func Test_ContainSplitterParse(t *testing.T) {
+	parserName := "testContainSplitter"
+	parserType := "csv"
+	schema := "a jsonmap, b float, c long, d string"
+	splitter := ","
+	autoRename := "true"
+
+	testCases := []struct {
+		parserConf conf.MapConf
+		line       []string
+		wanted     []Data
+	}{
+		{
+			conf.MapConf{
+				KeyParserName:            parserName,
+				KeyParserType:            parserType,
+				KeyCSVSchema:             schema,
+				KeyCSVSplitter:           splitter,
+				KeyCSVAutoRename:         autoRename,
+				KeyCSVContainSplitterKey: "a",
+			},
+			[]string{"{\"foo\":\"aaa\", \"bar\":\"bbb\"},1.23,123,foo"},
+			[]Data{{"a_foo": "aaa", "a_bar": "bbb", "b": 1.23, "c": int64(123), "d": "foo"}},
+		},
+		{
+			conf.MapConf{
+				KeyParserName:            parserName,
+				KeyParserType:            parserType,
+				KeyCSVSchema:             schema,
+				KeyCSVSplitter:           splitter,
+				KeyCSVAutoRename:         autoRename,
+				KeyCSVContainSplitterKey: "d",
+			},
+			[]string{"{\"foo\":\"aaa\"},1.23,123,this,is,one"},
+			[]Data{{"a_foo": "aaa", "b": 1.23, "c": int64(123), "d": "this,is,one"}},
+		},
+		{
+			conf.MapConf{
+				KeyParserName:            parserName,
+				KeyParserType:            parserType,
+				KeyCSVSchema:             schema,
+				KeyCSVSplitter:           splitter,
+				KeyCSVAutoRename:         autoRename,
+				KeyCSVContainSplitterKey: "",
+			},
+			[]string{"{\"foo\":\"aaa\"},1.23,123,this"},
+			[]Data{{"a_foo": "aaa", "b": 1.23, "c": int64(123), "d": "this"}},
+		},
+		{
+			conf.MapConf{
+				KeyParserName:            parserName,
+				KeyParserType:            parserType,
+				KeyCSVSchema:             schema,
+				KeyCSVSplitter:           splitter,
+				KeyCSVAutoRename:         autoRename,
+				KeyCSVContainSplitterKey: "d",
+			},
+			[]string{"{\"foo\":\"aaa\"},1.23"},
+			[]Data{{"a_foo": "aaa", "b": 1.23}},
+		},
+	}
+
+	for _, tc := range testCases {
+		parser, err := NewParser(tc.parserConf)
+		assert.NoError(t, err)
+		res, err := parser.Parse(tc.line)
+		assert.NoError(t, err)
+		assert.Equal(t, tc.wanted, res, "")
+	}
 }
