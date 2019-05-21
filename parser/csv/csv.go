@@ -439,17 +439,19 @@ func getUnmachedMessage(parts []string, schemas []field) (ret string) {
 func (p *Parser) parse(line string) (d Data, err error) {
 	d = make(Data)
 	parts := strings.Split(line, p.delim)
-	if len(parts) != len(p.schema) && !p.allowNotMatch && p.containSplitterIndex < 0 {
-		return nil, fmt.Errorf("schema length not match: schema length %v, actual column length %v, %s", len(p.schema), len(parts), getUnmachedMessage(parts, p.schema))
+	partsLength := len(parts)
+	schemaLength := len(p.schema)
+	if partsLength != schemaLength && !p.allowNotMatch && p.containSplitterIndex < 0 {
+		return nil, fmt.Errorf("schema length not match: schema length %v, actual column length %v, %s", schemaLength, partsLength, getUnmachedMessage(parts, p.schema))
 	}
 
-	if p.containSplitterIndex >= 0 && len(parts) > len(p.schema) {
-		if p.containSplitterIndex >= len(p.schema) {
-			return nil, fmt.Errorf("containSplitterIndex(%d) is large then fields count(%d)", p.containSplitterIndex, len(p.schema))
+	if p.containSplitterIndex >= 0 && partsLength > schemaLength {
+		if p.containSplitterIndex >= schemaLength {
+			return nil, fmt.Errorf("containSplitterIndex(%d) is large then fields count(%d)", p.containSplitterIndex, schemaLength)
 		}
 		partsFormer := parts[:p.containSplitterIndex]
 		// ctnSplitIdx is short for containSplitterFieldIndexEnd
-		ctnSplitIdx := p.containSplitterIndex + len(parts) - len(p.schema)
+		ctnSplitIdx := p.containSplitterIndex + partsLength - schemaLength
 
 		containSplitterField := strings.Join(parts[p.containSplitterIndex:ctnSplitIdx+1], p.delim)
 		partsLetter := parts[ctnSplitIdx+1:]
@@ -462,10 +464,10 @@ func (p *Parser) parse(line string) (d Data, err error) {
 	moreNum := p.allmoreStartNUmber
 	for i, part := range parts {
 		part = strings.TrimSpace(part)
-		if i >= len(p.schema) && p.allowMoreName == "" {
+		if i >= schemaLength && p.allowMoreName == "" {
 			continue
 		}
-		if i >= len(p.schema) {
+		if i >= schemaLength {
 			d[p.allowMoreName+strconv.Itoa(moreNum)] = part
 			moreNum++
 		} else {
