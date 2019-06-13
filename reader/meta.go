@@ -80,6 +80,7 @@ type Meta struct {
 	subMetas           map[string]*Meta // 对于 tailx 和 dirx 模式的情况会有嵌套的 meta
 	subMetaExpiredLock sync.Mutex
 	subMetaExpired     map[string]bool // 上次扫描后已知的过期 submeta
+	LastKey            string          // 记录从s3 最近一次拉取的文件
 }
 
 func getValidDir(dir string) (realPath string, err error) {
