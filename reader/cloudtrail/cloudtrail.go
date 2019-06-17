@@ -358,7 +358,6 @@ func (s *syncRunner) syncToDir() error {
 	}
 
 	sourceFiles := make(map[string]bool)
-	//sourceFiles, err = loadS3Files(bucket, s3url.Path(), sourceFiles, "")
 	lastKey, err := loadS3Files(bucket, s3url.Path(), sourceFiles, s.meta.LastKey)
 	log.Infof("sourceFiles length = %d, marker = %s, lastKey = %s", len(sourceFiles), s.meta.LastKey, lastKey)
 	s.meta.LastKey = lastKey
