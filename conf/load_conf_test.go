@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -171,6 +172,7 @@ func TestLoad(t *testing.T) {
 		if test.confName != "" {
 			err := ioutil.WriteFile(test.confName, []byte(test.content), 0600)
 			assert.Nil(t, err)
+			time.Sleep(3 * time.Second)
 		}
 		err := Load(test.conf)
 		if err != nil {
