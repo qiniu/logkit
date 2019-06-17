@@ -359,7 +359,7 @@ func (s *syncRunner) syncToDir() error {
 
 	sourceFiles := make(map[string]bool)
 	lastKey, err := loadS3Files(bucket, s3url.Path(), sourceFiles, s.meta.LastKey)
-	log.Infof("sourceFiles length = %d, marker = %s, lastKey = %s", len(sourceFiles), s.meta.LastKey, lastKey)
+	log.Debugf("sourceFiles length = %d, marker = %s, lastKey = %s", len(sourceFiles), s.meta.LastKey, lastKey)
 	s.meta.LastKey = lastKey
 	if err != nil {
 		return fmt.Errorf("load s3 files: %v", err)
@@ -482,27 +482,28 @@ func loadS3Files(bucket *s3.Bucket, path string, files map[string]bool, marker s
 	return lastKey, nil
 }
 
-func loadS3FilesIter(bucket *s3.Bucket, path string, files map[string]bool, marker string) (lastKey string, isTruncated bool, err error) {
+func loadS3FilesIter(bucket *s3.Bucket, path string, files map[string]bool, marker string) (string, bool, error) {
 	log.Infof("loading files from 's3://%s/%s', marker=%s", bucket.Name, path, marker)
 
 	data, err := bucket.List(path, "", marker, 0)
 	if err != nil {
 		log.Errorf("s3 bucket list path=%s, marker=%s, failed: %v", path, marker, err)
-		return
+		return "", false, err
 	}
 
 	for _, key := range data.Contents {
 		files[key.Key] = true
 	}
 
-	isTruncated = data.IsTruncated
+	isTruncated := data.IsTruncated
+	var lastKey string
 	if data.IsTruncated {
 		lastKey = data.Contents[(len(data.Contents) - 1)].Key
 		log.Infof("results truncated, loading additional files via previous last key %q", lastKey)
 	}
 
 	log.Infof("load %d files from 's3://%s/%s' successfully", len(files), bucket.Name, path)
-	return
+	return lastKey, isTruncated, nil
 }
 
 func (s *syncRunner) loadSyncedFiles() (map[string]bool, error) {
