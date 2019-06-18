@@ -154,10 +154,10 @@ func TestLoad(t *testing.T) {
 		{
 			confName: "./TestLoad",
 			content: `{
-"max_procs": 2,
-"debug_level": 1,
-"confs_path": ["conf1","conf2"]
-}`,
+				"max_procs": 2,
+				"debug_level": 1,
+				"confs_path": ["conf1","conf2"]
+			}`,
 			conf: &Config{
 				MaxProcs:   2,
 				DebugLevel: 1,
@@ -174,6 +174,7 @@ func TestLoad(t *testing.T) {
 			assert.Nil(t, err)
 			time.Sleep(3 * time.Second)
 		}
+		Init("f", "app", test.confName)
 		err := Load(test.conf)
 		if err != nil {
 			t.Log("load conf  ", test.confName, " failed: ", err)
