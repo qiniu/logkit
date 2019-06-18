@@ -174,11 +174,10 @@ func TestLoad(t *testing.T) {
 			assert.Nil(t, err)
 			time.Sleep(3 * time.Second)
 		}
-		Init("f", "app", test.confName)
 		err := Load(test.conf)
 		if err != nil {
 			t.Log("load conf  ", test.confName, " failed: ", err)
-			if !strings.Contains(err.Error(), test.expect.Error()) {
+			if test.expect != nil && !strings.Contains(err.Error(), test.expect.Error()) {
 				t.Fatalf("expect contains: %s, but got: %s", test.expect.Error(), err.Error())
 			}
 		}
