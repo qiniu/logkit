@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -153,10 +154,10 @@ func TestLoad(t *testing.T) {
 		{
 			confName: "./TestLoad",
 			content: `{
-"max_procs": 2,
-"debug_level": 1,
-"confs_path": ["conf1","conf2"]
-}`,
+				"max_procs": 2,
+				"debug_level": 1,
+				"confs_path": ["conf1","conf2"]
+			}`,
 			conf: &Config{
 				MaxProcs:   2,
 				DebugLevel: 1,
@@ -171,11 +172,12 @@ func TestLoad(t *testing.T) {
 		if test.confName != "" {
 			err := ioutil.WriteFile(test.confName, []byte(test.content), 0600)
 			assert.Nil(t, err)
+			time.Sleep(3 * time.Second)
 		}
 		err := Load(test.conf)
 		if err != nil {
 			t.Log("load conf  ", test.confName, " failed: ", err)
-			if !strings.Contains(err.Error(), test.expect.Error()) {
+			if test.expect != nil && !strings.Contains(err.Error(), test.expect.Error()) {
 				t.Fatalf("expect contains: %s, but got: %s", test.expect.Error(), err.Error())
 			}
 		}
