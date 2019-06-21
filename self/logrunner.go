@@ -20,8 +20,8 @@ import (
 	parserconfig "github.com/qiniu/logkit/parser/config"
 	"github.com/qiniu/logkit/parser/raw"
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/reader/bufreader"
 	. "github.com/qiniu/logkit/reader/config"
-	"github.com/qiniu/logkit/reader/tailx"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/sender/pandora"
 	"github.com/qiniu/logkit/utils"
@@ -37,20 +37,23 @@ const (
 var (
 	debugRegex   = regexp.MustCompile(DebugPattern)
 	readerConfig = conf.MapConf{
-		"runner_name":    DefaultSelfRunnerName,
-		"name":           DefaultSelfRunnerName,
-		"mode":           "tailx",
-		"log_path":       "",
-		"read_from":      WhenceNewest,
-		"encoding":       "UTF-8",
-		"datasource_tag": "datasource",
-		"expire":         "0s",
-		"submeta_expire": "0s",
-		"head_pattern":   `^(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} \[(WARN)|(INFO)|(ERROR)]|(DEBUG)\])`,
+		"runner_name":        DefaultSelfRunnerName,
+		"name":               DefaultSelfRunnerName,
+		"encoding":           "UTF-8",
+		"ignore_file_suffix": ".pid,.swap,.go,.conf,.tar.gz,.tar,.zip,.a,.o,.so",
+		"ignore_hidden":      "true",
+		"log_path":           "",
+		"mode":               "dir",
+		"newfile_newline":    "false",
+		"read_from":          "oldest",
+		"read_same_inode":    "false",
+		"skip_first_line":    "false",
+		"valid_file_pattern": "logkit.log-*",
+		"head_pattern":       `^(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} \[(WARN)|(INFO)|(ERROR)]|(DEBUG)\])`,
 	}
 	parserConfig = conf.MapConf{
-		"type": "raw",
-		"name": "parser",
+		"type":                   "raw",
+		"name":                   "parser",
 		"disable_record_errdata": "true",
 	}
 	senderConfig = conf.MapConf{
@@ -139,7 +142,7 @@ func NewLogRunner(rdConf, psConf, sdConf conf.MapConf, envTag string) (*LogRunne
 		}
 	}()
 
-	if rd, err = tailx.NewReader(meta, rdConf); err != nil {
+	if rd, err = bufreader.NewFileDirReader(meta, rdConf); err != nil {
 		return nil, err
 	}
 	if ps, err = raw.NewParser(psConf); err != nil {
