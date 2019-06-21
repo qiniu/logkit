@@ -179,9 +179,9 @@ func getInfo(t *testing.T, logpath, metapath string) (conf.MapConf, conf.MapConf
 	var filePattern string
 	if logpath == "" {
 		logpath = "TestNewLogRunner/"
-		filePattern = "logkit.log-*"
+		filePattern = "logkit.log*"
 	} else {
-		filePattern = filepath.Base(logpath)+"-*"
+		filePattern = filepath.Base(logpath)+"*"
 		logpath = filepath.Dir(logpath)
 	}
 	rdConf := SetReaderConfig(readerConfig, logpath, filePattern, metapath, "oldest")
