@@ -32,6 +32,7 @@ const (
 	DefaultSendTime        = 3
 	DefaultSelfLogRepoName = "logkit_self_log"
 	DebugPattern           = `^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} \[DEBUG\]`
+	ValidFilePattern       = "valid_file_pattern"
 )
 
 var (
@@ -48,7 +49,7 @@ var (
 		"read_from":          WhenceNewest,
 		"read_same_inode":    "false",
 		"skip_first_line":    "false",
-		"valid_file_pattern": "logkit.log-*",
+		ValidFilePattern:     "logkit.log-*",
 		"head_pattern":       `^(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} \[(WARN)|(INFO)|(ERROR)]|(DEBUG)\])`,
 	}
 	parserConfig = conf.MapConf{
@@ -354,11 +355,14 @@ func (lr *LogRunner) GetSenderConfig() conf.MapConf {
 	return lr.senderConfig
 }
 
-func SetReaderConfig(readConf conf.MapConf, logpath, metapath, from string) conf.MapConf {
+func SetReaderConfig(readConf conf.MapConf, logpath, filePattern, metapath, from string) conf.MapConf {
 	rdConf := conf.DeepCopy(readConf)
 	logpath = strings.TrimSpace(logpath)
 	if logpath != "" {
 		rdConf["log_path"] = logpath
+	}
+	if filePattern != "" {
+		rdConf[ValidFilePattern] = filePattern
 	}
 	if metapath != "" {
 		path, err := filepath.Abs(metapath)
