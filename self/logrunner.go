@@ -45,7 +45,7 @@ var (
 		"log_path":           "",
 		"mode":               "dir",
 		"newfile_newline":    "false",
-		"read_from":          "oldest",
+		"read_from":          WhenceNewest,
 		"read_same_inode":    "false",
 		"skip_first_line":    "false",
 		"valid_file_pattern": "logkit.log-*",
