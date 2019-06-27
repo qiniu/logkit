@@ -531,7 +531,7 @@ func JoinFileInode(filename, inode string) string {
 	return filepath.Base(filename) + "_" + inode
 }
 
-func (m *Meta) GetDoneFileInode() map[string]bool {
+func (m *Meta) GetDoneFileInode(inodeSensitive bool) map[string]bool {
 	inodeMap := make(map[string]bool)
 	contents, err := m.getDoneFileContent()
 	if err != nil {
@@ -541,7 +541,11 @@ func (m *Meta) GetDoneFileInode() map[string]bool {
 	for _, v := range contents {
 		sps := strings.Split(v, "\t")
 		if len(sps) >= 2 {
-			inodeMap[JoinFileInode(sps[0], sps[1])] = true
+			if inodeSensitive {
+				inodeMap[JoinFileInode(sps[0], sps[1])] = true
+			} else {
+				inodeMap[sps[0]] = true
+			}
 		}
 	}
 	return inodeMap

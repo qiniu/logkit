@@ -283,6 +283,16 @@ var (
 		Advance:      true,
 		ToolTip:      `支持从自定义环境变量（如 YOUR_AUTH_PASSWORD_ENV）里读取对应值，填写方式为 ${YOUR_AUTH_PASSWORD_ENV}`,
 	}
+	OptionInodeSensitive = Option{
+		KeyName: KeyInodeSensitive,
+		Description: "单个文件的inode值是否固定(inode_sensitive)",
+		Element:       Radio,
+		ChooseOnly:    true,
+		ChooseOptions: []interface{}{"true", "false"},
+		Default:       "true",
+		DefaultNoUse:  false,
+		ToolTip:       "是否以inode值定位某个文件",
+	}
 )
 
 var ModeKeyOptions = map[string][]Option{
@@ -300,6 +310,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionMetaPath,
 		OptionBuffSize,
 		OptionWhence,
+		OptionInodeSensitive,
 		OptionEncoding,
 		OptionDataSourceTag,
 		OptionEncodeTag,

@@ -26,6 +26,7 @@ const (
 	KeyNewFileNewLine    = "newfile_newline"
 	KeySkipFileFirstLine = "skip_first_line"
 	KeyReadSameInode     = "read_same_inode"
+	KeyInodeSensitive    = "inode_sensitive"
 
 	// 忽略文件路径
 	KeyIgnoreLogPath = "ignore_log_path"

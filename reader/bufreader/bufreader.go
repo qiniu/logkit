@@ -603,6 +603,7 @@ func (b *BufReader) SyncMeta() {
 
 func NewFileDirReader(meta *reader.Meta, conf conf.MapConf) (reader reader.Reader, err error) {
 	whence, _ := conf.GetStringOr(KeyWhence, WhenceOldest)
+	inodeSensitive, _ := conf.GetBoolOr(KeyInodeSensitive, true)
 	logpath, err := conf.GetString(KeyLogPath)
 	if err != nil {
 		return
@@ -616,7 +617,7 @@ func NewFileDirReader(meta *reader.Meta, conf conf.MapConf) (reader reader.Reade
 	newfileNewLine, _ := conf.GetBoolOr(KeyNewFileNewLine, false)
 	skipFirstLine, _ := conf.GetBoolOr(KeySkipFileFirstLine, false)
 	readSameInode, _ := conf.GetBoolOr(KeyReadSameInode, false)
-	fr, err := seqfile.NewSeqFile(meta, logpath, ignoreHidden, newfileNewLine, ignoreFileSuffix, validFilesRegex, whence, nil)
+	fr, err := seqfile.NewSeqFile(meta, logpath, ignoreHidden, newfileNewLine, ignoreFileSuffix, validFilesRegex, whence, nil, inodeSensitive)
 	if err != nil {
 		return
 	}
