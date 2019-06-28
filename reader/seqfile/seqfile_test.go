@@ -541,7 +541,7 @@ func Test_deleteNotExist(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		deleteNotExist(test.dir, test.expireMap)
+		deleteNotExist(test.dir, test.expireMap, true)
 		assert.EqualValues(t, len(test.expect), len(test.expireMap))
 		for key, value := range test.expect {
 			val, ok := test.expireMap[key]
