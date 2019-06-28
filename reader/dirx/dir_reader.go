@@ -329,7 +329,7 @@ func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool) (*dir
 			return nil, fmt.Errorf("new extract reader: %v", err)
 		}
 	} else {
-		fr, err := seqfile.NewSeqFile(subMeta, opts.LogPath, opts.IgnoreHidden, opts.NewFileNewLine, opts.IgnoreFileSuffixes, opts.ValidFilesRegex, opts.Whence, opts.expireMap)
+		fr, err := seqfile.NewSeqFile(subMeta, opts.LogPath, opts.IgnoreHidden, opts.NewFileNewLine, opts.IgnoreFileSuffixes, opts.ValidFilesRegex, opts.Whence, opts.expireMap, true)
 		if err != nil {
 			return nil, fmt.Errorf("new sequence file: %v", err)
 		}
