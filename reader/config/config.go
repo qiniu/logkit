@@ -285,7 +285,7 @@ var (
 	}
 	OptionInodeSensitive = Option{
 		KeyName: KeyInodeSensitive,
-		Description: "单个文件的inode值是否固定(inode_sensitive)",
+		Description: "文件的inode值是否固定(inode_sensitive)",
 		Element:       Radio,
 		ChooseOnly:    true,
 		ChooseOptions: []interface{}{"true", "false"},
