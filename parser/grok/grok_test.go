@@ -5,9 +5,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/qiniu/logkit/parser"
+
+	"github.com/qiniu/logkit/conf"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	. "github.com/qiniu/logkit/parser/config"
 	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -72,8 +77,6 @@ func Benchmark_GrokParseLine_Common(b *testing.B) {
 	grokBench = m
 }
 
-//100000	     17110 ns/op
-
 // Test a very simple parse pattern.
 func TestSimpleParse(t *testing.T) {
 	p := &Parser{
@@ -85,7 +88,7 @@ func TestSimpleParse(t *testing.T) {
 	assert.NoError(t, p.compile())
 
 	m, err := p.parse(`142 bot`)
-	assert.NoError(t, err)
+	assert.Nil(t, err)
 	require.NotNil(t, m)
 
 	assert.Equal(t,
@@ -94,21 +97,43 @@ func TestSimpleParse(t *testing.T) {
 			"client": "bot",
 		},
 		m)
+
+	p.labels = GetGrokLabels([]string{"app logkit", "client pandora"}, make(map[string]struct{}))
+	m, err = p.parse(`142 bot`)
+	assert.Nil(t, err)
+	assert.EqualValues(t, Data{"client": "bot", "app": "logkit", "num": int64(142)}, m)
+
+	p = &Parser{
+		Patterns: []string{"%{TESTLOG}"},
+		CustomPatterns: `
+			TESTLOG %{NUMBER:num:date} %{WORD:client}
+		`,
+	}
+	m, err = p.parse(`142 bot`)
+	assert.NotNil(t, err)
+	assert.EqualValues(t, Data(nil), m)
 }
 
 func TestKeepRawData(t *testing.T) {
-	p := &Parser{
-		Patterns: []string{"%{TESTLOG}"},
-		CustomPatterns: `
-			TESTLOG %{NUMBER:num:long} %{WORD:client}
-		`,
-		keepRawData: true,
-		numRoutine:  1,
-	}
-	assert.NoError(t, p.compile())
+	p, err := NewParser(conf.MapConf{
+		KeyGrokCustomPatterns: `TESTLOG %{NUMBER:num:long} %{WORD:client}`,
+		KeyKeepRawData:        "true",
+	})
+	assert.NotNil(t, err)
 
-	m, err := p.Parse([]string{"142 bot"})
+	p, err = NewParser(conf.MapConf{
+		KeyGrokPatterns:       "%{TESTLOG}",
+		KeyGrokCustomPatterns: `TESTLOG %{NUMBER:num:long} %{WORD:client}`,
+		KeyKeepRawData:        "true",
+	})
 	assert.Nil(t, err)
+
+	pType, ok := p.(parser.ParserType)
+	assert.True(t, ok)
+	assert.EqualValues(t, TypeGrok, pType.Type())
+
+	m, err := p.Parse([]string{"142 bot", ""})
+	assert.NotNil(t, err)
 	assert.Equal(t, []Data{
 		{
 			"num":      int64(142),
@@ -116,6 +141,16 @@ func TestKeepRawData(t *testing.T) {
 			"raw_data": `142 bot`,
 		},
 	}, m)
+
+	p, err = NewParser(conf.MapConf{
+		KeyKeepRawData:        "true",
+		KeyGrokCustomPatterns: "TESTLOG %{NUMBER:num:date} %{WORD:client}",
+		KeyGrokPatterns:       "%{TESTLOG}",
+	})
+	assert.Nil(t, err)
+	data, err := p.Parse([]string{`12:00 bot`})
+	assert.Nil(t, err)
+	assert.EqualValues(t, []Data{{"client": "bot", "raw_data": "12:00 bot"}}, data)
 }
 
 // Test a nginx time.
@@ -750,4 +785,5 @@ func TestNagiosLog(t *testing.T) {
 		"nagios_epoch": "1474520444",
 		"nagios_log":   "Auto-save of retention data completed successfully.",
 	}, got)
+	assert.Nil(t, err)
 }

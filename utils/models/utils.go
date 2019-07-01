@@ -121,7 +121,7 @@ type SchemaErr struct {
 func (s *SchemaErr) Output(count int64, err error) {
 	s.Number += count
 	if time.Now().Sub(s.Last) > 3*time.Second {
-		log.Errorf("%v parse line errors occured, same as %v", s.Number, err)
+		log.Errorf("%v parse line errors occurred, same as %v", s.Number, err)
 		s.Number = 0
 		s.Last = time.Now()
 	}
@@ -282,7 +282,7 @@ func (s *HashSet) Elements() []interface{} {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	element := make([]interface{}, 0)
-	for key, _ := range s.data {
+	for key := range s.data {
 		element = append(element, key)
 	}
 	return element
@@ -745,6 +745,13 @@ func ConvertDate(layoutBefore, layoutAfter string, offset int, loc *time.Locatio
 			return v, err
 		}
 		s = jsonNumber
+	case time.Time:
+		return FormatWithUserOption(layoutAfter, offset, newv), nil
+	case *time.Time:
+		if newv == nil {
+			return nil, nil
+		}
+		return FormatWithUserOption(layoutAfter, offset, *newv), nil
 	default:
 		return v, fmt.Errorf("can not parse %v type %v as date time", v, reflect.TypeOf(v))
 	}
@@ -866,7 +873,7 @@ func CheckErr(err error) error {
 	}
 
 	if err != nil {
-		return fmt.Errorf("%v parse line errors occured, error %v ", errorCnt, err.Error())
+		return fmt.Errorf("%v parse line errors occurred, error %v ", errorCnt, err.Error())
 	}
 	return nil
 }

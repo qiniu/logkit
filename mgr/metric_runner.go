@@ -39,6 +39,10 @@ type MetricConfig struct {
 	Config     map[string]interface{} `json:"config"`
 }
 
+var (
+	_ Deleteable = &MetricRunner{}
+)
+
 type MetricRunner struct {
 	RunnerName string `json:"name"`
 	envTag     string
@@ -96,7 +100,6 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner
 		c, err := NewMetric(tp)
 		if err != nil {
 			log.Errorf("%v ignore it...", err)
-			err = nil
 			continue
 		}
 		// sync config to ExtCollector
@@ -169,8 +172,7 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner
 		transformers[metricName] = trans
 	}
 	if len(collectors) < 1 {
-		err = errors.New("no collectors were added")
-		return
+		return nil, errors.New("no collectors were added")
 	}
 
 	commonTransformers, err := createTransformers(rc)
@@ -249,6 +251,21 @@ func (r *MetricRunner) Run() {
 	tags = MergeEnvTags(r.envTag, tags)
 	tags = MergeExtraInfoTags(r.meta, tags)
 
+	for _, c := range r.collectors {
+		collectorService, ok := c.(metric.CollectorService)
+		if !ok {
+			continue
+		}
+		if err := collectorService.Start(); err != nil {
+			log.Errorf("collecter <%v> start failed: %v", c.Name(), err)
+		} else {
+			log.Infof("collecter <%v> start success", c.Name())
+		}
+	}
+
+	for _, c := range r.collectors {
+		log.Warnf("MetricRunner %v has %v collect", r.Name(), c.Name())
+	}
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
 			log.Debugf("runner %v exited from run", r.RunnerName)
@@ -263,7 +280,7 @@ func (r *MetricRunner) Run() {
 			metricName := c.Name()
 			tmpdatas, err := c.Collect()
 			if err != nil {
-				log.Debugf("collecter <%v> collect data error: %v", c.Name(), err)
+				log.Warnf("collecter <%v> collect data error: %v", c.Name(), err)
 				if len(tmpdatas) == 0 {
 					continue
 				}
@@ -271,7 +288,7 @@ func (r *MetricRunner) Run() {
 			dataLen := len(tmpdatas)
 			nameLen := len(metricName)
 			if dataLen == 0 {
-				log.Debugf("MetricRunner %v collect No data", c.Name())
+				log.Warnf("MetricRunner %v collect No data", c.Name())
 				continue
 			}
 			tmpDatas := make([]Data, dataLen)
@@ -398,6 +415,15 @@ func (mr *MetricRunner) Stop() {
 	case <-timer.C:
 		log.Warnf("MetricRunner " + mr.Name() + " exited timeout ")
 	}
+	for _, collector := range mr.collectors {
+		collectorClose, ok := collector.(metric.CollectorService)
+		if !ok {
+			continue
+		}
+		if err := collectorClose.Close(); err != nil {
+			log.Errorf("cannot close collect name: %s, err: %v", collector.Name(), err)
+		}
+	}
 	for _, s := range mr.senders {
 		err := s.Close()
 		if err != nil {
@@ -427,14 +453,26 @@ func (mr *MetricRunner) Reset() (err error) {
 	return err
 }
 
-func (mr *MetricRunner) Delete() (err error) {
-	if err = mr.meta.Delete(); err != nil {
-		return err
+func (mr *MetricRunner) Delete() error {
+	var errs []string
+	for _, collector := range mr.collectors {
+		collectorClose, ok := collector.(metric.CollectorService)
+		if !ok {
+			continue
+		}
+		if err := collectorClose.Close(); err != nil {
+			errs = append(errs, err.Error())
+			log.Errorf("cannot close collect name: %s, err: %v", collector.Name(), err)
+		}
 	}
-	return nil
+	err := mr.meta.Delete()
+	if err != nil {
+		errs = append(errs, err.Error())
+	}
+	return errors.New(strings.Join(errs, ","))
 }
 
-func (_ *MetricRunner) Cleaner() CleanInfo {
+func (*MetricRunner) Cleaner() CleanInfo {
 	return CleanInfo{
 		enable: false,
 	}
@@ -569,7 +607,7 @@ func (mr *MetricRunner) StatusBackup() {
 
 func createDiscardTransformer(key string) (transforms.Transformer, error) {
 	strTP := "discard"
-	creater, ok := transforms.Transformers[strTP]
+	creator, ok := transforms.Transformers[strTP]
 	if !ok {
 		return nil, fmt.Errorf("type %v of transformer not exist", strTP)
 	}
@@ -578,7 +616,7 @@ func createDiscardTransformer(key string) (transforms.Transformer, error) {
 		"type":  strTP,
 		"stage": "after_parser",
 	}
-	trans := creater()
+	trans := creator()
 	bts, err := jsoniter.Marshal(tConf)
 	if err != nil {
 		return nil, fmt.Errorf("type %v of transformer marshal config error %v", strTP, err)

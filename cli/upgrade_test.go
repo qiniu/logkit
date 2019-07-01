@@ -618,6 +618,7 @@ func testDownloadPackage(t *testing.T, rtDir, url string) {
 	}
 	assert.NotEqual(t, "", downloadUrl)
 	tmpFile, err := downloadPackage(downloadUrl, rootDir)
+	assert.Nil(t, err)
 	if err = os.Rename(tmpFile.Name(), packageFilePath); err != nil {
 		t.Fatalf("package rename error %v", err)
 	}
@@ -630,10 +631,12 @@ func testDownloadPackage(t *testing.T, rtDir, url string) {
 	downloadErrUrl := downloadUrl + "?error=statusCode500"
 	tmpFile, err = downloadPackage(downloadErrUrl, rootDir)
 	assert.Error(t, err)
+	assert.Nil(t, tmpFile)
 
 	// 测试路径不存在
 	tmpFile, err = downloadPackage(downloadUrl, rootDir+"/aaa")
 	assert.Error(t, err)
+	assert.Nil(t, tmpFile)
 }
 
 func testDecompress(t *testing.T, rtDir, url string) {
@@ -657,6 +660,7 @@ func testDecompress(t *testing.T, rtDir, url string) {
 	}
 	assert.NotEqual(t, "", downloadUrl)
 	tmpFile, err := downloadPackage(downloadUrl, rootDir)
+	assert.Nil(t, err)
 	if err = os.Rename(tmpFile.Name(), packageFilePath); err != nil {
 		t.Fatalf("package rename error %v", err)
 	}

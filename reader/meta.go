@@ -80,6 +80,7 @@ type Meta struct {
 	subMetas           map[string]*Meta // 对于 tailx 和 dirx 模式的情况会有嵌套的 meta
 	subMetaExpiredLock sync.Mutex
 	subMetaExpired     map[string]bool // 上次扫描后已知的过期 submeta
+	LastKey            string          // 记录从s3 最近一次拉取的文件
 }
 
 func getValidDir(dir string) (realPath string, err error) {
@@ -443,7 +444,6 @@ func (m *Meta) ReadDBDoneFile(database string) (content []string, err error) {
 			if err != nil {
 				return nil, err
 			}
-			return nil, err
 		}
 	}
 	return content, nil
@@ -531,7 +531,7 @@ func JoinFileInode(filename, inode string) string {
 	return filepath.Base(filename) + "_" + inode
 }
 
-func (m *Meta) GetDoneFileInode() map[string]bool {
+func (m *Meta) GetDoneFileInode(inodeSensitive bool) map[string]bool {
 	inodeMap := make(map[string]bool)
 	contents, err := m.getDoneFileContent()
 	if err != nil {
@@ -541,7 +541,11 @@ func (m *Meta) GetDoneFileInode() map[string]bool {
 	for _, v := range contents {
 		sps := strings.Split(v, "\t")
 		if len(sps) >= 2 {
-			inodeMap[JoinFileInode(sps[0], sps[1])] = true
+			if inodeSensitive {
+				inodeMap[JoinFileInode(sps[0], sps[1])] = true
+			} else {
+				inodeMap[sps[0]] = true
+			}
 		}
 	}
 	return inodeMap
@@ -725,11 +729,8 @@ func (m *Meta) Reset() error {
 	if m == nil {
 		return errors.New("Reset error as meta is nil ")
 	}
-	if err := m.Delete(); err != nil {
-		return err
-	}
 
-	return nil
+	return m.Delete()
 }
 
 func (m *Meta) Delete() error {
@@ -748,10 +749,7 @@ func (m *Meta) Delete() error {
 	}
 	m.subMetaLock.RUnlock()
 
-	if err := os.RemoveAll(m.Dir); err != nil {
-		return err
-	}
-	return nil
+	return os.RemoveAll(m.Dir)
 }
 
 func (m *Meta) ReadStatistic() (stat Statistic, err error) {

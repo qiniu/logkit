@@ -679,6 +679,8 @@ func (r *MssqlReader) Close() error {
 		close(r.readChan)
 		close(r.errChan)
 	}
+
+	r.SyncMeta()
 	return nil
 }
 

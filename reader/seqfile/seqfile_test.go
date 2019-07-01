@@ -34,7 +34,7 @@ func Test_Read(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, "*", WhenceOldest, nil)
+	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, "*", WhenceOldest, nil, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -94,9 +94,11 @@ func Test_Read(t *testing.T) {
 
 	condition := sf.getIgnoreCondition()
 	fi, err := os.Stat(testPidFile)
+	assert.Nil(t, err)
 	ignore := condition(fi)
 	assert.False(t, ignore)
 	fi, err = os.Stat(hiddenFile)
+	assert.Nil(t, err)
 	assert.True(t, condition(fi))
 	sf.Close()
 }
@@ -107,7 +109,7 @@ func Test_NewReaderWithoutFile(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, "*", WhenceOldest, nil)
+	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, "*", WhenceOldest, nil, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -133,7 +135,7 @@ func Test_NewReaderWithQiniuLogFile(t *testing.T) {
 	createInvalidSuffixFile(Dir)
 	defer DestroyDir()
 
-	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, `logkit.log-*`, WhenceOldest, nil)
+	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, `logkit.log-*`, WhenceOldest, nil, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -157,7 +159,7 @@ func Test_NewFileNewLine(t *testing.T) {
 	createInvalidSuffixFile(Dir)
 	defer DestroyDir()
 
-	sf, err := NewSeqFile(meta, Dir, false, true, []string{".pid"}, `*`, WhenceOldest, nil)
+	sf, err := NewSeqFile(meta, Dir, false, true, []string{".pid"}, `*`, WhenceOldest, nil, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -180,13 +182,13 @@ func Test_NewReaderWithInvalidFile(t *testing.T) {
 	createInvalidSuffixFile(Dir)
 	defer DestroyDir()
 
-	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, `test-logkit.log-*ss`, WhenceOldest, nil)
+	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, `test-logkit.log-*ss`, WhenceOldest, nil, true)
 	if err != nil {
 		t.Error(err)
 	}
 
 	if sf.currFile != "" {
-		t.Errorf("exp emtpy file, but got %s", sf.currFile)
+		t.Errorf("exp empty file, but got %s", sf.currFile)
 	}
 }
 
@@ -198,7 +200,7 @@ func Test_ReadWhenDelete(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, "*", WhenceOldest, nil)
+	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, "*", WhenceOldest, nil, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -227,7 +229,7 @@ func Test_ReadNewest(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, "*", WhenceNewest, nil)
+	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, "*", WhenceNewest, nil, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -299,6 +301,7 @@ func Test_SeekUnreachable(t *testing.T) {
 	}
 	fmt.Println("x1", x1)
 	st, err := f.Stat()
+	assert.Nil(t, err)
 	fmt.Println(st.Size())
 }
 
@@ -312,7 +315,7 @@ func TestLag(t *testing.T) {
 	createInvalidSuffixFile(Dir)
 	defer DestroyDir()
 
-	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, `logkit.log-*`, WhenceOldest, nil)
+	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, `logkit.log-*`, WhenceOldest, nil, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -346,7 +349,7 @@ func Test_NewFileNewLine2(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	sf, err := NewSeqFile(meta, Dir, false, true, []string{".pid"}, "*", WhenceOldest, nil)
+	sf, err := NewSeqFile(meta, Dir, false, true, []string{".pid"}, "*", WhenceOldest, nil, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -377,7 +380,7 @@ func Test_NewFileNewLine3(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	sf, err := NewSeqFile(meta, Dir, false, true, []string{".pid"}, "*", WhenceOldest, nil)
+	sf, err := NewSeqFile(meta, Dir, false, true, []string{".pid"}, "*", WhenceOldest, nil, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -424,7 +427,7 @@ func Test_NewFileOffset(t *testing.T) {
 	utils.UpdateExpireMap("", fileMap, expireMap)
 	t.Log("expireMap: ", expireMap)
 
-	sf, err := NewSeqFile(meta, dirPath, false, false, []string{".pid"}, "*", WhenceOldest, expireMap)
+	sf, err := NewSeqFile(meta, dirPath, false, false, []string{".pid"}, "*", WhenceOldest, expireMap, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -451,7 +454,7 @@ func Test_INode(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	sf, err := NewSeqFile(meta, Dir, false, true, []string{".pid"}, "*", WhenceOldest, nil)
+	sf, err := NewSeqFile(meta, Dir, false, true, []string{".pid"}, "*", WhenceOldest, nil, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -498,7 +501,7 @@ func Test_INode(t *testing.T) {
 	file.WriteString("hello2")
 	file.Close()
 
-	sf, err = NewSeqFile(meta, Dir, false, true, []string{".pid"}, "*", WhenceOldest, nil)
+	sf, err = NewSeqFile(meta, Dir, false, true, []string{".pid"}, "*", WhenceOldest, nil, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -538,7 +541,7 @@ func Test_deleteNotExist(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		deleteNotExist(test.dir, test.expireMap)
+		deleteNotExist(test.dir, test.expireMap, true)
 		assert.EqualValues(t, len(test.expect), len(test.expireMap))
 		for key, value := range test.expect {
 			val, ok := test.expireMap[key]

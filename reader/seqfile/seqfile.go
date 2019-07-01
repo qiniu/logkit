@@ -50,13 +50,14 @@ type SeqFile struct {
 	hasSkiped         bool
 
 	inodeDone map[string]bool //记录filename_inode是否已经读过
+	inodeSensitive bool // 是否以inode信息作为 inodeDone 和 expireMap 的key值
 
 	lastSyncPath   string
 	lastSyncOffset int64
 
 	expireMap map[string]int64
 
-	ReadSameInode bool //记录已经度过的filename_inode是否继续读
+	ReadSameInode bool //记录已经读过的filename_inode是否继续读
 }
 
 func getStartFile(path, whence string, meta *reader.Meta, sf *SeqFile) (f *os.File, dir, currFile string, offset int64, err error) {
@@ -105,7 +106,7 @@ func getStartFile(path, whence string, meta *reader.Meta, sf *SeqFile) (f *os.Fi
 	return
 }
 
-func NewSeqFile(meta *reader.Meta, path string, ignoreHidden, newFileNewLine bool, suffixes []string, validFileRegex, whence string, expireMap map[string]int64) (sf *SeqFile, err error) {
+func NewSeqFile(meta *reader.Meta, path string, ignoreHidden, newFileNewLine bool, suffixes []string, validFileRegex, whence string, expireMap map[string]int64, inodeSensitive bool) (sf *SeqFile, err error) {
 	sf = &SeqFile{
 		ignoreFileSuffix: suffixes,
 		ignoreHidden:     ignoreHidden,
@@ -115,6 +116,7 @@ func NewSeqFile(meta *reader.Meta, path string, ignoreHidden, newFileNewLine boo
 		meta:             meta,
 		inodeDone:        make(map[string]bool),
 		expireMap:        expireMap,
+		inodeSensitive:   inodeSensitive,
 	}
 	//原来的for循环替换成单次执行，启动的时候出错就直接报错给用户即可，不需要等待重试。
 	f, dir, currFile, offset, err := getStartFile(path, whence, meta, sf)
@@ -150,7 +152,7 @@ func NewSeqFile(meta *reader.Meta, path string, ignoreHidden, newFileNewLine boo
 		sf.f = nil
 		sf.offset = 0
 	}
-	sf.inodeDone = meta.GetDoneFileInode()
+	sf.inodeDone = meta.GetDoneFileInode(sf.inodeSensitive)
 	sf.dir = dir
 	sf.currFile = currFile
 	sf.name = "SeqFile:" + dir
@@ -258,7 +260,6 @@ func (sf *SeqFile) reopenForESTALE() error {
 	if err != nil {
 		//为了不影响程序运行
 		log.Errorf("Runner[%v] %v getinode error %v, use old inode", sf.meta.RunnerName, sf.dir, err)
-		err = nil
 	} else {
 		sf.inode = ninode
 	}
@@ -329,6 +330,11 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 			fi, err1 := sf.nextFile()
 			if os.IsNotExist(err1) {
 				if nextFileRetry >= 1 {
+					if !sf.inodeSensitive {
+						if err = sf.reopenCurrentFile(); err != nil {
+							return n, err
+						}
+					}
 					return n, io.EOF
 				}
 				// dir removed or file rotated
@@ -363,6 +369,42 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 				return 0, io.EOF
 			}
 		}
+	}
+	return
+}
+
+func (sf *SeqFile) reopenCurrentFile() (err error) {
+	fc := sf.f
+	sf.f = nil
+	err = fc.Close()
+	if err != nil && err != syscall.EINVAL {
+		log.Warnf("Runner[%s] %s - %s f.Close: %v", sf.meta.RunnerName, sf.dir, sf.currFile, err)
+		return
+	}
+
+	f, err := os.Open(sf.currFile)
+	if err != nil {
+		log.Warnf("Runner[%v] os.Open %s: %v", sf.meta.RunnerName, sf.currFile, err)
+		return err
+	}
+	sf.f = f
+	//开新的之前关掉老的
+	if sf.ratereader != nil {
+		sf.ratereader.Close()
+	}
+	if sf.meta.Readlimit > 0 {
+		sf.ratereader = rateio.NewRateReader(f, sf.meta.Readlimit)
+	} else {
+		sf.ratereader = f
+	}
+	_, err = f.Seek(sf.offset, io.SeekStart)
+	if err != nil {
+		log.Errorf("Runner[%s] file: %s seek offset: %d failed: %v", sf.meta.RunnerName, f.Name(), sf.offset, err)
+		return err
+	}
+	sf.inode, err = utilsos.GetIdentifyIDByPath(sf.currFile)
+	if err != nil {
+		return err
 	}
 	return
 }
@@ -418,7 +460,12 @@ func (sf *SeqFile) getNextFileCondition() (condition func(os.FileInfo) bool, err
 		if len(sf.inodeDone) < 1 {
 			return true
 		}
-		_, ok := sf.inodeDone[reader.JoinFileInode(f.Name(), strconv.FormatUint(inode, 10))]
+		var ok bool
+		if sf.inodeSensitive {
+			_, ok = sf.inodeDone[reader.JoinFileInode(f.Name(), strconv.FormatUint(inode, 10))]
+		} else {
+			_, ok = sf.inodeDone[filepath.Base(f.Name())]
+		}
 		return !ok
 	}
 
@@ -438,9 +485,8 @@ func (sf *SeqFile) nextFile() (fi os.FileInfo, err error) {
 	}
 	if sf.isNewFile(fi, filepath.Join(sf.dir, fi.Name())) {
 		return fi, nil
-	} else {
-		log.Warnf("Runner[%v] %v is not new file", sf.meta.RunnerName, fi.Name())
 	}
+	log.Warnf("Runner[%v] %v is not new file", sf.meta.RunnerName, fi.Name())
 	return nil, nil
 }
 
@@ -555,7 +601,11 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 	if sf.inodeDone == nil {
 		sf.inodeDone = make(map[string]bool)
 	}
-	sf.inodeDone[reader.JoinFileInode(doneFile, strconv.FormatUint(doneFileInode, 10))] = true
+	if sf.inodeSensitive {
+		sf.inodeDone[reader.JoinFileInode(doneFile, strconv.FormatUint(doneFileInode, 10))] = true
+	} else {
+		sf.inodeDone[filepath.Base(doneFile)] = true
+	}
 	tryTime := 0
 	for {
 		err = sf.meta.AppendDoneFileInode(doneFile, doneFileInode)
@@ -645,7 +695,7 @@ func (sf *SeqFile) getOffset(f *os.File, offset int64, seek bool) int64 {
 	}
 
 	if sf.meta.IsExist() {
-		deleteNotExist(filepath.Dir(f.Name()), sf.expireMap)
+		deleteNotExist(filepath.Dir(f.Name()), sf.expireMap, sf.inodeSensitive)
 		return offset
 	}
 
@@ -656,7 +706,11 @@ func (sf *SeqFile) getOffset(f *os.File, offset int64, seek bool) int64 {
 		return offset
 	}
 	inodeStr := strconv.FormatUint(inode, 10)
-	offset = sf.expireMap[inodeStr+"_"+fileName]
+	if sf.inodeSensitive {
+		offset = sf.expireMap[inodeStr+"_"+fileName]
+	} else {
+		offset = sf.expireMap[fileName]
+	}
 	if seek {
 		_, err = f.Seek(sf.offset, io.SeekStart)
 		if err != nil {
@@ -666,18 +720,24 @@ func (sf *SeqFile) getOffset(f *os.File, offset int64, seek bool) int64 {
 	return offset
 }
 
-func deleteNotExist(dir string, expireMap map[string]int64) {
+func deleteNotExist(dir string, expireMap map[string]int64, inodeSensitive bool) {
 	if dir == "" {
 		return
 	}
 	var arr []string
 	for inodeFile := range expireMap {
-		arr = strings.SplitN(inodeFile, "_", 2)
-		if len(arr) < 2 {
-			continue
-		}
-		if filepath.Dir(arr[1]) != dir {
-			continue
+		if inodeSensitive {
+			arr = strings.SplitN(inodeFile, "_", 2)
+			if len(arr) < 2 {
+				continue
+			}
+			if filepath.Dir(arr[1]) != dir {
+				continue
+			}
+		} else {
+			if filepath.Dir(inodeFile) != dir {
+				continue
+			}
 		}
 		delete(expireMap, inodeFile)
 	}

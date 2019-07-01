@@ -23,6 +23,7 @@ type Xml struct {
 	Keep       bool   `json:"keep"`
 	Expand     bool   `json:"expand"`
 	DiscardKey bool   `json:"discard_key"`
+	NoAttr     bool   `json:"no_attr"`
 	stats      StatsInfo
 
 	keys          []string
@@ -176,6 +177,17 @@ func (g *Xml) ConfigOptions() []Option {
 			Type:          transforms.TransformTypeBoolean,
 			Advance:       true,
 		},
+		{
+			KeyName:       "no_attr",
+			Element:       Radio,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{false, true},
+			Default:       false,
+			DefaultNoUse:  false,
+			Description:   "去除xml里属性相关值",
+			Type:          transforms.TransformTypeBoolean,
+			Advance:       true,
+		},
 	}
 }
 
@@ -235,65 +247,52 @@ func (g *Xml) transform(dataPipeline <-chan transforms.TransformInfo, resultChan
 			continue
 		}
 
+		m, xmlErr := mxj.NewMapXml([]byte(strVal), g.Keep)
+		if xmlErr != nil {
+			errNum, err = transforms.SetError(errNum, xmlErr, transforms.General, "")
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				ErrNum:  errNum,
+				Err:     err,
+			}
+			continue
+		}
+
+		errNum, err = g.delete(transformInfo.CurData, errNum, err)
+
 		if g.Expand {
-			m, xmlErr := mxj.NewMapXml([]byte(strVal))
-			if xmlErr != nil {
-				errNum, err = transforms.SetError(errNum, xmlErr, transforms.General, "")
-				resultChan <- transforms.TransformResult{
-					Index:   transformInfo.Index,
-					CurData: transformInfo.CurData,
-					ErrNum:  errNum,
-					Err:     err,
-				}
-				continue
-			}
+			resultChan <- g.expand(m, transformInfo, errNum)
+			continue
+		}
 
-			errNum, err = g.delete(transformInfo.CurData, errNum, err)
-			ln := m.LeafNodes()
-			for _, v := range ln {
-				paths := GetKeys(v.Path)
-				pathsLen := len(paths)
-				if pathsLen == 0 {
-					continue
-				}
-				currentKey := paths[pathsLen-1]
-				var (
-					values []string
-					ok     bool
-				)
-				g.cacheNewsLock.RLock()
-				values, ok = g.cacheNews[currentKey]
-				g.cacheNewsLock.RUnlock()
-				if !ok {
-					values = make([]string, len(g.news))
-					copy(values, g.news)
-					values = append(values, currentKey)
-					g.cacheNewsLock.Lock()
-					g.cacheNews[currentKey] = values
-					g.cacheNewsLock.Unlock()
-				}
-				setErr := SetMapValue(transformInfo.CurData, v.Value, false, values...)
-				if setErr != nil {
-					errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, paths[pathsLen-1])
-				}
-			}
-		} else {
-			xmlVal, perr := parseXml(strVal, g.Keep)
-			if perr != nil {
-				errNum, err = transforms.SetError(errNum, perr, transforms.General, "")
-				resultChan <- transforms.TransformResult{
-					Index:   transformInfo.Index,
-					CurData: transformInfo.CurData,
-					ErrNum:  errNum,
-					Err:     err,
-				}
-				continue
-			}
-			errNum, err = g.delete(transformInfo.CurData, errNum, err)
-
-			setErr := SetMapValue(transformInfo.CurData, xmlVal, false, g.news...)
+		if !g.NoAttr {
+			setErr := SetMapValue(transformInfo.CurData, map[string]interface{}(m), false, g.news...)
 			if setErr != nil {
 				errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
+			}
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				ErrNum:  errNum,
+				Err:     err,
+			}
+			continue
+		}
+
+		ln := m.LeafNodes(g.NoAttr)
+		for _, v := range ln {
+			paths := GetKeys(v.Path)
+			pathsLen := len(paths)
+			if pathsLen == 0 {
+				continue
+			}
+			values := make([]string, len(g.news))
+			copy(values, g.news)
+			values = append(values, paths...)
+			setErr := SetMapValue(transformInfo.CurData, v.Value, false, values...)
+			if setErr != nil {
+				errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, paths[pathsLen-1])
 			}
 		}
 
@@ -332,4 +331,43 @@ func (g *Xml) delete(curData Data, errNum int, err error) (int, error) {
 		break
 	}
 	return errNum, err
+}
+
+func (g *Xml) expand(m mxj.Map, transformInfo transforms.TransformInfo, errNum int) transforms.TransformResult {
+	var err error
+	ln := m.LeafNodes(g.NoAttr)
+	for _, v := range ln {
+		paths := GetKeys(v.Path)
+		pathsLen := len(paths)
+		if pathsLen == 0 {
+			continue
+		}
+		currentKey := paths[pathsLen-1]
+		var (
+			values []string
+			ok     bool
+		)
+		g.cacheNewsLock.RLock()
+		values, ok = g.cacheNews[currentKey]
+		g.cacheNewsLock.RUnlock()
+		if !ok {
+			values = make([]string, len(g.news))
+			copy(values, g.news)
+			values = append(values, currentKey)
+			g.cacheNewsLock.Lock()
+			g.cacheNews[currentKey] = values
+			g.cacheNewsLock.Unlock()
+		}
+		setErr := SetMapValue(transformInfo.CurData, v.Value, false, values...)
+		if setErr != nil {
+			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, paths[pathsLen-1])
+		}
+	}
+
+	return transforms.TransformResult{
+		ErrNum:  errNum,
+		Err:     err,
+		CurData: transformInfo.CurData,
+		Index:   transformInfo.Index,
+	}
 }

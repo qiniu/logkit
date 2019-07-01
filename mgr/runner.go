@@ -350,11 +350,11 @@ func createTransformers(rc RunnerConfig) ([]transforms.Transformer, error) {
 		if !ok {
 			return nil, fmt.Errorf("transformer config field type %v is not string", tp)
 		}
-		creater, ok := transforms.Transformers[strTP]
+		creator, ok := transforms.Transformers[strTP]
 		if !ok {
 			return nil, fmt.Errorf("transformer type unsupported: %v", strTP)
 		}
-		trans := creater()
+		trans := creator()
 		bts, err := jsoniter.Marshal(tConf)
 		if err != nil {
 			return nil, fmt.Errorf("type %v of transformer marshal config error %v", strTP, err)
@@ -580,9 +580,12 @@ func getSampleContent(line string, maxBatchSize int) string {
 		return line
 	}
 	if maxBatchSize <= 1024 {
-		return line
+		if len(line) <= 1024 {
+			return line
+		}
+		return line[0:1024]
 	}
-	return line[0:1024]
+	return line[0:maxBatchSize]
 }
 
 func (r *LogExportRunner) readDatas(dr reader.DataReader, dataSourceTag string) []Data {
@@ -685,7 +688,10 @@ func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []str
 }
 
 func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
-	var err error
+	var (
+		err        error
+		curTimeStr string
+	)
 	lines, froms := r.rawReadLines(dataSourceTag)
 	r.tracker.Track("finish rawReadLines")
 	for i := range r.transformers {
@@ -697,9 +703,12 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 		}
 	}
 
-	curTimeStr := time.Now().Format("2006-01-02 15:04:05.999")
+	if r.ReadTime {
+		curTimeStr = time.Now().Format("2006-01-02 15:04:05.999")
+	}
 
-	if len(lines) <= 0 {
+	linenums := len(lines)
+	if linenums <= 0 {
 		log.Debugf("Runner[%v] fetched 0 lines", r.Name())
 		_, ok := r.parser.(parser.Flushable)
 		if ok {
@@ -724,7 +733,7 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 		numErrs = 1
 		r.rs.ParserStats.Errors++
 	} else {
-		r.rs.ParserStats.Success += int64(len(lines))
+		r.rs.ParserStats.Success += int64(linenums)
 	}
 	if err != nil {
 		r.rs.ParserStats.LastError = TruncateStrSize(err.Error(), DefaultTruncateMaxSize)
@@ -753,7 +762,9 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 		tags = MergeEnvTags(r.EnvTag, tags)
 	}
 	tags = MergeExtraInfoTags(r.meta, tags)
-	tags["lst"] = curTimeStr
+	if r.ReadTime {
+		tags["lst"] = curTimeStr
+	}
 	if len(tags) > 0 {
 		datas = AddTagsToData(tags, datas, r.Name())
 	}
@@ -1119,10 +1130,7 @@ func (r *LogExportRunner) Reset() (err error) {
 }
 
 func (r *LogExportRunner) Delete() (err error) {
-	if err = r.meta.Delete(); err != nil {
-		return err
-	}
-	return nil
+	return r.meta.Delete()
 }
 
 func (r *LogExportRunner) Cleaner() CleanInfo {

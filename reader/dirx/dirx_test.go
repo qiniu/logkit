@@ -150,7 +150,7 @@ func multiReaderOneLineTest(t *testing.T) {
 	// 确保上个 reader 已过期，新的 reader 已经探测到并创建成功
 	createDirWithName(dir2)
 	createFileWithContent(dir2file1, "hahaha\nhahaha\nhahaha\n")
-	time.Sleep(6 * time.Second)
+	time.Sleep(5 * time.Second)
 	assert.Equal(t, 1, dr.dirReaders.Num(), "Number of readers")
 	assert.Equal(t, "TestMultiReaderOneLine/logs/xyz", dr.dirReaders.getReaders()[0].originalPath)
 
@@ -246,7 +246,7 @@ func multiReaderMultiLineTest(t *testing.T) {
 	// 确保上个 reader 已过期，新的 reader 已经探测到并创建成功
 	createDirWithName(dir2)
 	createFileWithContent(dir2file1, "abc\nx\nabc\nx\nabc\nx\n")
-	time.Sleep(6 * time.Second)
+	time.Sleep(5 * time.Second)
 	assert.Equal(t, 1, dr.dirReaders.Num(), "Number of readers")
 	assert.Equal(t, "TestMultiReaderMultiLine/logs/xyz", dr.dirReaders.getReaders()[0].originalPath)
 
@@ -378,7 +378,7 @@ func multiReaderSyncMetaOneLineTest(t *testing.T) {
 	// 确保上个 reader 已过期，新的 reader 已经探测到并创建成功
 	createDirWithName(dir2)
 	createFileWithContent(dir2file1, "ab1\nab2\nab3\n")
-	time.Sleep(11 * time.Second)
+	time.Sleep(10 * time.Second)
 	assert.Equal(t, 1, dr.dirReaders.Num(), "Number of readers")
 	assert.Equal(t, "TestMultiReaderSyncMetaOneLine/logs/xyz", dr.dirReaders.getReaders()[0].originalPath)
 
@@ -510,7 +510,7 @@ func multiReaderSyncMetaMutilineTest(t *testing.T) {
 	// 确保上个 reader 已过期，新的 reader 已经探测到并创建成功
 	createDirWithName(dir2)
 	createFileWithContent(dir2file1, "abc\nx\nabc\ny\nabc\nz\n")
-	time.Sleep(11 * time.Second)
+	time.Sleep(10 * time.Second)
 	assert.Equal(t, 1, dr.dirReaders.Num(), "Number of readers")
 
 	t.Log("Reader has started to read two")
@@ -600,7 +600,6 @@ func multiReaderNewestTest(t *testing.T) {
 	assert.EqualValues(t, 0, maxNum)
 	t.Log("Reader has finished reading one")
 
-	emptyNum = 0
 	// 确保上个 reader 已过期，新的 reader 已经探测到并创建成功
 	createDirWithName(dir2)
 	createFileWithContent(dir2file1, "abc\nx\nabc\ny\nabc\nz\n")
@@ -697,12 +696,11 @@ func multiReaderNewestOffsetTest(t *testing.T) {
 	assert.EqualValues(t, 0, maxNum)
 	t.Log("Reader has finished reading one")
 
-	emptyNum = 0
 	// 确保上个 reader 已过期，新的 reader 已经探测到并创建成功
 	createDirWithName(dir2)
 	createFileWithContent(dir2file1, "abc\nx\nabc\ny\nabc\nz\n")
 	appendFileWithContent(dir1file1, "abc\na\nabc\nb\nabc\nc\n")
-	time.Sleep(3 * time.Second)
+	time.Sleep(5 * time.Second)
 	assert.Equal(t, 2, dr.dirReaders.Num(), "Number of readers")
 
 	t.Log("Reader has started to read two")
@@ -798,11 +796,10 @@ func multiReaderSameInodeTest(t *testing.T) {
 	}
 	t.Log("Reader has finished reading one")
 
-	emptyNum = 0
 	// 确保上个 reader 已过期，新的 reader 已经探测到并创建成功
 	createDirWithName(dir2)
 	createFileWithContent(dir2file1, "abc\nx\nabc\ny\nabc\nz\n")
-	time.Sleep(3 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	assert.Equal(t, 2, dr.dirReaders.Num(), "Number of readers")
 
@@ -1081,7 +1078,12 @@ func readerExpireDeleteTarTest(t *testing.T) {
 		}
 	}
 	t.Log("maxNum ", maxNum, "emptyNum", emptyNum)
-	assert.EqualValues(t, expectResults, actualResults)
+	assert.EqualValues(t, len(expectResults), len(actualResults))
+	for k, v := range expectResults {
+		actualV, ok := actualResults[k]
+		assert.True(t, ok)
+		assert.EqualValues(t, v, actualV)
+	}
 	assert.Equal(t, StatsInfo{}, dr.Status())
 	time.Sleep(5 * time.Second)
 	files1, err := ioutil.ReadDir(dir1)
@@ -1171,6 +1173,7 @@ func TestMultiReaderReset(t *testing.T) {
 	t.Log("Reader has resetted")
 
 	r, err = NewReader(meta, c)
+	assert.Nil(t, err)
 	dr = r.(*Reader)
 	assert.NoError(t, dr.Start())
 	t.Log("Reader has started again")

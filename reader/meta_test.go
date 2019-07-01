@@ -59,7 +59,7 @@ func TestMeta(t *testing.T) {
 	}
 	defer os.RemoveAll(MetaDir)
 
-	file, offset, err := meta.ReadOffset()
+	_, _, err = meta.ReadOffset()
 	if err == nil {
 		t.Error("offset must be nil")
 	}
@@ -67,7 +67,8 @@ func TestMeta(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	file, offset, err = meta.ReadOffset()
+	file, offset, err := meta.ReadOffset()
+	assert.Nil(t, err)
 	if file != filepath.Join(Dir, "f1") {
 		t.Error("file should be " + filepath.Join(Dir, "f1"))
 	}
@@ -84,12 +85,12 @@ func TestMeta(t *testing.T) {
 	if meta.IsDoneFile("filedone.11111") != false {
 		t.Error("test is done file error,expect filedone.11111 is done file")
 	}
-	donefile := filepath.Join(MetaDir, DoneFileName+".2015-11-11")
-	_, err = os.Create(donefile)
+	doneFile := filepath.Join(MetaDir, DoneFileName+".2015-11-11")
+	_, err = os.Create(doneFile)
 	if err != nil {
 		t.Error(err)
 	}
-	if err = meta.DeleteDoneFile(donefile); err != nil {
+	if err = meta.DeleteDoneFile(doneFile); err != nil {
 		t.Error(err)
 	}
 	_, err = os.Stat(filepath.Join(MetaDir, deletedFileName+".2015-11-11"))
@@ -97,13 +98,13 @@ func TestMeta(t *testing.T) {
 		t.Error("not deleted", err)
 	}
 	y, m, d := time.Now().Date()
-	donefile = filepath.Join(MetaDir, DoneFileName+fmt.Sprintf(".%d-%d-%d", y, m, d))
-	if err = meta.DeleteDoneFile(donefile); err != nil {
+	doneFile = filepath.Join(MetaDir, DoneFileName+fmt.Sprintf(".%d-%d-%d", y, m, d))
+	if err = meta.DeleteDoneFile(doneFile); err != nil {
 		t.Error(err)
 	}
-	_, err = os.Stat(donefile)
+	_, err = os.Stat(doneFile)
 	if err != nil {
-		t.Errorf("%v shoud not deleted %v", donefile, err)
+		t.Errorf("%v shoud not deleted %v", doneFile, err)
 	}
 	stat := &Statistic{
 		ReaderCnt: 6,

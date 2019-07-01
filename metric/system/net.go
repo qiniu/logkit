@@ -63,24 +63,24 @@ type NetIOStats struct {
 	lastCollect map[string]CollectInfo
 
 	skipChecks     bool
-	skipProtoState bool     `json:"skip_protocols_state"`
+	SkipProtoState bool     `json:"skip_protocols_state"`
 	Interfaces     []string `json:"interfaces"`
 	InterfacesMap  map[string]net.Interface
 }
 
-func (_ *NetIOStats) Name() string {
+func (*NetIOStats) Name() string {
 	return TypeMetricNet
 }
 
-func (_ *NetIOStats) Usages() string {
+func (*NetIOStats) Usages() string {
 	return MetricNetUsages
 }
 
-func (_ *NetIOStats) Tags() []string {
+func (*NetIOStats) Tags() []string {
 	return []string{KeyNetInterface}
 }
 
-func (_ *NetIOStats) Config() map[string]interface{} {
+func (*NetIOStats) Config() map[string]interface{} {
 	configOption := []Option{
 		{
 			KeyName:      "interfaces",
@@ -198,7 +198,7 @@ func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 		datas = append(datas, fields)
 	}
 
-	if !s.skipProtoState {
+	if !s.SkipProtoState {
 		// Get system wide stats for different network protocols
 		// (ignore these stats if the call fails)
 		netprotos, _ := s.ps.NetProto()

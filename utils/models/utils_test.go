@@ -2,7 +2,6 @@ package models
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -238,7 +237,7 @@ func TestExtractField(t *testing.T) {
 	slice3 := []string{"%{[type}", "default"}
 	slice3, err3 := ExtractField(slice3)
 	assert.Error(t, err3)
-
+	assert.Nil(t, slice3)
 }
 
 func TestGetKeys(t *testing.T) {
@@ -617,6 +616,18 @@ func Test_ConvertDate(t *testing.T) {
 	date, err = ConvertDate("2006-01-02 15:04:05.999", "", 0, time.UTC, "2018-12-03 15:09:06,139")
 	assert.NoError(t, err)
 	assert.Equal(t, "2018-12-03T15:09:06.139Z", date)
+
+	tm := time.Now()
+	af := tm.Add(2 * time.Hour)
+	date, err = ConvertDate("", "", 2, time.UTC, tm)
+	assert.NoError(t, err)
+	assert.Equal(t, af.Format(time.RFC3339Nano), date)
+
+	tm = time.Now()
+	af = tm.Add(2 * time.Hour)
+	date, err = ConvertDate("", "", 2, time.UTC, &tm)
+	assert.NoError(t, err)
+	assert.Equal(t, af.Format(time.RFC3339Nano), date)
 }
 
 func Test_FormatWithUserOption(t *testing.T) {
@@ -1108,7 +1119,7 @@ func TestIsSubMetaExpireValid(t *testing.T) {
 func BenchmarkFmt(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		fmt.Errorf("test fmt errorf and errors.new with benchmark: %s", "my error")
+		b.Log("test fmt errorf and errors.new with benchmark: my error")
 	}
 }
 
@@ -1116,7 +1127,7 @@ func BenchmarkFmt(b *testing.B) {
 func BenchmarkErrors(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		errors.New("test fmt errorf and errors.new with benchmark: " + "my error")
+		b.Log("test fmt errorf and errors.new with benchmark: my error")
 	}
 }
 
@@ -1249,7 +1260,7 @@ func Test_GetGrokLabels(t *testing.T) {
 		},
 		{
 			labelList: []string{"a v", "x y"},
-			nameLabel: map[string]struct{}{"x": struct{}{}},
+			nameLabel: map[string]struct{}{"x": {}},
 			exp:       []GrokLabel{{Name: "a", Value: "v"}},
 		},
 	}

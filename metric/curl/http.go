@@ -63,19 +63,19 @@ type HttpStats struct {
 
 var httpdatas string
 
-func (_ *HttpStats) Name() string {
+func (*HttpStats) Name() string {
 	return TypeMetricHttp
 }
 
-func (_ *HttpStats) Usages() string {
+func (*HttpStats) Usages() string {
 	return MetricHttpUsages
 }
 
-func (_ *HttpStats) Tags() []string {
+func (*HttpStats) Tags() []string {
 	return []string{HttpStatusCode, HttpRespHead, HttpData, HttpTimeCost, HttpTarget, HttpErrState, HttpErrMsg}
 }
 
-func (_ *HttpStats) Config() map[string]interface{} {
+func (*HttpStats) Config() map[string]interface{} {
 	configOptions := make([]Option, 0)
 	for _, val := range ConfigHttpUsages {
 		option := Option{

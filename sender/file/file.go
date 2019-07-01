@@ -113,7 +113,7 @@ func (s *Sender) Name() string {
 	return s.name
 }
 
-func (_ *Sender) SkipDeepCopy() bool { return true }
+func (*Sender) SkipDeepCopy() bool { return true }
 
 func (s *Sender) Send(datas []Data) error {
 	// 仅仅上报错误信息，但是日志会正常写出，所以不需要上层重试

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/qiniu/logkit/parser"
+
 	"github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
 
@@ -41,9 +43,13 @@ func TestJsonParser(t *testing.T) {
 	c := conf.MapConf{}
 	c[KeyParserName] = "testjsonparser"
 	c[KeyParserType] = "json"
-	c[KeyLabels] = "mm abc"
+	c[KeyLabels] = "mm abc, a 1"
 	c[KeyDisableRecordErrData] = "true"
 	p, _ := NewParser(c)
+	pType, ok := p.(parser.ParserType)
+	assert.True(t, ok)
+	assert.EqualValues(t, TypeJSON, pType.Type())
+
 	tests := []struct {
 		in  []string
 		exp []Data
@@ -68,7 +74,7 @@ func TestJsonParser(t *testing.T) {
 		},
 		{
 			in: []string{`{"a":1,"b":[1.0,2.0,3.0],"c":{"d":"123","g":1.2},"e":"x","mm":1.23,"jjj":1493797500346428926}`},
-			exp: []Data{Data{
+			exp: []Data{{
 				"a": json.Number("1"),
 				"b": []interface{}{json.Number("1.0"), json.Number("2.0"), json.Number("3.0")},
 				"c": map[string]interface{}{
@@ -111,7 +117,21 @@ func TestJsonKeepRawData(t *testing.T) {
 	c[KeyLabels] = "mm abc"
 	c[KeyDisableRecordErrData] = "true"
 	c[KeyKeepRawData] = "true"
-	p, _ := NewParser(c)
+	p, err := NewParser(c)
+	assert.Nil(t, err)
+
+	m, err := p.Parse(nil)
+	assert.Nil(t, err)
+	assert.EqualValues(t, []Data{}, m)
+
+	m, err = p.Parse([]string{"", ""})
+	assert.NotNil(t, err)
+	assert.EqualValues(t, []Data{}, m)
+
+	pType, ok := p.(parser.ParserType)
+	assert.True(t, ok)
+	assert.EqualValues(t, TypeJSON, pType.Type())
+
 	tests := []struct {
 		in  []string
 		exp []Data
@@ -158,7 +178,7 @@ func TestJsonKeepRawData(t *testing.T) {
 		},
 	}
 
-	m, err := p.Parse(tests[0].in)
+	m, err = p.Parse(tests[0].in)
 	if err != nil {
 		errx, _ := err.(*StatsError)
 		assert.Equal(t, int64(0), errx.StatsInfo.Errors)
@@ -178,6 +198,21 @@ func TestJsonKeepRawData(t *testing.T) {
 	assert.EqualValues(t, tests[1].exp, m)
 
 	assert.EqualValues(t, "testjsonparser", p.Name())
+
+	c[KeyKeepRawData] = "false"
+	p, err = NewParser(c)
+	assert.Nil(t, err)
+	m, err = p.Parse([]string{`{a":1,"b":[1.0,2.0,3.0],`})
+	assert.NotNil(t, err)
+	assert.EqualValues(t, []Data{}, m)
+	t.Log("err: ", err)
+
+	c[KeyKeepRawData] = "true"
+	p, err = NewParser(c)
+	assert.Nil(t, err)
+	m, err = p.Parse([]string{`{a":1,"b":[1.0,2.0,3.0],`})
+	assert.NotNil(t, err)
+	assert.EqualValues(t, []Data{{"raw_data": "{a\":1,\"b\":[1.0,2.0,3.0],"}}, m)
 }
 
 func TestJsonParserForErrData(t *testing.T) {
@@ -394,7 +429,7 @@ func TestParseSpaceJson(t *testing.T) {
 	p, _ := NewParser(c)
 	data := "\n"
 	res, err := p.Parse([]string{data})
-	assert.Nil(t, err)
+	assert.NotNil(t, err)
 
 	exp := []Data{}
 	assert.Equal(t, exp, res)

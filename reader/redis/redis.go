@@ -75,7 +75,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	area, err := conf.GetString(KeyRedisHashArea)
+	area, _ := conf.GetStringOr(KeyRedisHashArea, "")
 	address, _ := conf.GetStringOr(KeyRedisAddress, "127.0.0.1:6379")
 	password, _ := conf.GetStringOr(KeyRedisPassword, "")
 	keyTimeoutDuration, _ := conf.GetStringOr(KeyTimeoutDuration, "5s")
@@ -129,7 +129,7 @@ func (r *Reader) Name() string {
 	return fmt.Sprintf("[%s],[%v],[%s]", r.opts.dataType, r.opts.db, r.opts.key)
 }
 
-func (_ *Reader) SetMode(_ string, _ interface{}) error {
+func (*Reader) SetMode(_ string, _ interface{}) error {
 	return errors.New("redis reader does not support read mode")
 }
 
@@ -191,7 +191,7 @@ func (r *Reader) run() {
 			} else if len(ans) > 1 {
 				r.readChan <- ans[1]
 			} else if len(ans) == 1 {
-				err := fmt.Errorf("runner[%v] %v list read only one result in arrary %v", r.meta.RunnerName, r.Name(), ans)
+				err := fmt.Errorf("runner[%v] %v list read only one result in array %v", r.meta.RunnerName, r.Name(), ans)
 				log.Error(err)
 				r.sendError(err)
 				r.setStatsError(err.Error())
@@ -326,7 +326,7 @@ func (r *Reader) Status() StatsInfo {
 	return r.stats
 }
 
-func (_ *Reader) SyncMeta() {}
+func (*Reader) SyncMeta() {}
 
 func (r *Reader) Close() error {
 	if !atomic.CompareAndSwapInt32(&r.status, StatusRunning, StatusStopping) {

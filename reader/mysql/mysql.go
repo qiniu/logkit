@@ -19,6 +19,7 @@ import (
 	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/reader/sql"
+	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils/magic"
 	"github.com/qiniu/logkit/utils/models"
 )
@@ -32,13 +33,10 @@ var (
 
 var MysqlSystemDB = []string{"information_schema", "performance_schema", "mysql", "sys"}
 
+const MysqlTimeFormat = "2006-01-02 15:04:05.000000"
+
 func init() {
 	reader.RegisterConstructor(ModeMySQL, NewMysqlReader)
-}
-
-type readInfo struct {
-	data  models.Data
-	bytes int64
 }
 
 type MysqlReader struct {
@@ -55,7 +53,7 @@ type MysqlReader struct {
 	routineStatus int32
 
 	stopChan chan struct{}
-	readChan chan readInfo
+	readChan chan ReadInfo
 	errChan  chan error
 
 	stats     models.StatsInfo
@@ -69,13 +67,22 @@ type MysqlReader struct {
 	rawTable    string // 记录原始数据库表名
 	table       string // 数据库表名
 
-	isLoop       bool
-	loopDuration time.Duration
-	cronSchedule bool //是否为定时任务
-	execOnStart  bool
-	Cron         *cron.Cron //定时任务
-	readBatch    int        // 每次读取的数据量
-	offsetKey    string
+	isLoop          bool
+	loopDuration    time.Duration
+	cronSchedule    bool //是否为定时任务
+	execOnStart     bool
+	Cron            *cron.Cron //定时任务
+	readBatch       int        // 每次读取的数据量
+	offsetKey       string
+	timestampKey    string
+	timestampKeyInt bool
+	timestampMux    sync.RWMutex
+	startTime       time.Time
+	startTimeStr    string
+	startTimeInt    int64
+	timeCacheMap    map[string]string
+	batchDuration   time.Duration
+	batchDurInt     int
 
 	encoder           string  // 解码方式
 	offsets           []int64 // 当前处理文件的sql的offset
@@ -92,6 +99,7 @@ type MysqlReader struct {
 	count             int64
 	CurrentCount      int64
 	countLock         sync.RWMutex
+	sqlsRecord        map[string]string
 }
 
 func NewMysqlReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
@@ -102,6 +110,14 @@ func NewMysqlReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error)
 		readBatch               int
 		err                     error
 		mgld                    time.Duration
+
+		timestampkey  string
+		startTimeStr  string
+		startTime     time.Time
+		batchDuration time.Duration
+		startTimeInt  int64
+		batchDurInt   int
+		timestampInt  bool
 	)
 
 	logpath, _ := conf.GetStringOr(KeyLogPath, "")
@@ -115,6 +131,30 @@ func NewMysqlReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error)
 	if err != nil {
 		return nil, err
 	}
+
+	timestampkey, _ = conf.GetStringOr(KeyMysqlTimestampKey, "")
+	timestampInt, _ = conf.GetBoolOr(KeyMysqlTimestampInt, false)
+	if !timestampInt {
+		startTime = time.Now()
+		startTimeStr, _ = conf.GetStringOr(KeyMysqlStartTime, "")
+		if startTimeStr != "" {
+			startTime, err = times.StrToTimeLocation(startTimeStr, time.Local)
+			if err != nil {
+				log.Errorf("parse starttime %s error %v", startTimeStr, err)
+			} else {
+				startTimeStr = ""
+			}
+		}
+		timestampDurationStr, _ := conf.GetStringOr(KeyMysqlBatchDuration, "1m")
+		batchDuration, err = time.ParseDuration(timestampDurationStr)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		startTimeInt, _ = conf.GetInt64Or(KeyMysqlStartTime, 0)
+		batchDurInt, _ = conf.GetIntOr(KeyMysqlBatchDuration, 1000)
+	}
+
 	rawDatabase, err = conf.GetString(KeyMysqlDataBase)
 	if err != nil {
 		return nil, err
@@ -128,6 +168,7 @@ func NewMysqlReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error)
 	}
 	historyAll, _ = conf.GetBoolOr(KeyMysqlHistoryAll, false)
 	table, _ = conf.GetStringOr(KyeMysqlTable, "")
+	table = strings.TrimSpace(table)
 	rawSchemas, _ := conf.GetStringListOr(KeySQLSchema, []string{})
 	magicLagDur, _ := conf.GetStringOr(KeyMagicLagDuration, "")
 	if magicLagDur != "" {
@@ -151,28 +192,37 @@ func NewMysqlReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error)
 	}
 
 	r := &MysqlReader{
-		meta:          meta,
-		status:        StatusInit,
-		routineStatus: StatusInit,
-		stopChan:      make(chan struct{}),
-		readChan:      make(chan readInfo),
-		errChan:       make(chan error),
-		datasource:    dataSource,
-		database:      rawDatabase,
-		rawDatabase:   rawDatabase,
-		rawSQLs:       rawSQLs,
-		Cron:          cron.New(),
-		readBatch:     readBatch,
-		offsetKey:     offsetKey,
-		syncSQLs:      sqls,
-		execOnStart:   execOnStart,
-		historyAll:    historyAll,
-		rawTable:      table,
-		table:         table,
-		magicLagDur:   mgld,
-		schemas:       schemas,
-		encoder:       encoder,
-		dbSchema:      dbSchema,
+		meta:            meta,
+		status:          StatusInit,
+		routineStatus:   StatusInit,
+		stopChan:        make(chan struct{}),
+		readChan:        make(chan ReadInfo),
+		errChan:         make(chan error),
+		datasource:      dataSource,
+		database:        rawDatabase,
+		rawDatabase:     rawDatabase,
+		rawSQLs:         rawSQLs,
+		Cron:            cron.New(),
+		readBatch:       readBatch,
+		offsetKey:       offsetKey,
+		timestampKey:    timestampkey,
+		timestampKeyInt: timestampInt,
+		startTime:       startTime,
+		startTimeInt:    startTimeInt,
+		startTimeStr:    startTimeStr,
+		batchDuration:   batchDuration,
+		batchDurInt:     batchDurInt,
+
+		syncSQLs:    sqls,
+		execOnStart: execOnStart,
+		historyAll:  historyAll,
+		rawTable:    table,
+		table:       table,
+		magicLagDur: mgld,
+		schemas:     schemas,
+		encoder:     encoder,
+		dbSchema:    dbSchema,
+		sqlsRecord:  make(map[string]string),
 	}
 
 	if r.rawDatabase == "" {
@@ -180,6 +230,14 @@ func NewMysqlReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error)
 	}
 	if r.rawTable == "" {
 		r.rawTable = "*"
+	}
+
+	if r.timestampKey != "" {
+		r.restoreTimestamp()
+	}
+	// 没有任何信息并且填写了sql语句时恢复
+	if r.isRecordSqls() {
+		r.sqlsRecord = RestoreSqls(r.meta)
 	}
 
 	if r.rawSQLs == "" {
@@ -307,7 +365,7 @@ func (r *MysqlReader) ReadData() (models.Data, int64, error) {
 	defer timer.Stop()
 	select {
 	case info := <-r.readChan:
-		return info.data, info.bytes, nil
+		return info.Data, info.Bytes, nil
 	case err := <-r.errChan:
 		return nil, 0, err
 	case <-timer.C:
@@ -324,9 +382,9 @@ func (r *MysqlReader) Status() models.StatsInfo {
 
 // SyncMeta 从队列取数据时同步队列，作用在于保证数据不重复
 func (r *MysqlReader) SyncMeta() {
+	var all string
 	if r.rawSQLs == "" {
 		now := time.Now().String()
-		var all string
 		dbRecords := r.syncRecords.GetDBRecords()
 
 		for database, tablesRecord := range dbRecords {
@@ -348,6 +406,38 @@ func (r *MysqlReader) SyncMeta() {
 		r.syncRecords.Reset()
 		return
 	}
+
+	if r.timestampKey != "" {
+		r.timestampMux.RLock()
+		var content string
+		if r.timestampKeyInt {
+			content = strconv.FormatInt(r.startTimeInt, 10)
+		} else {
+			if r.startTimeStr == "" {
+				content = r.startTime.Format(time.RFC3339Nano)
+			} else {
+				content = r.startTimeStr
+			}
+		}
+		if err := WriteTimestampOffset(r.meta.DoneFilePath, content); err != nil {
+			log.Errorf("Runner[%v] %v SyncMeta WriteTimestampOffset error %v", r.meta.RunnerName, r.Name(), err)
+		}
+		if err := WriteCacheMap(r.meta.DoneFilePath, r.timeCacheMap); err != nil {
+			log.Errorf("Runner[%v] %v SyncMeta WriteCacheMap error %v", r.meta.RunnerName, r.Name(), err)
+		}
+		r.timestampMux.RUnlock()
+	}
+	if r.isRecordSqls() {
+		for db, sqls := range r.sqlsRecord {
+			all += db + SqlOffsetConnector + sqls + "\n"
+		}
+		if len(all) > 0 {
+			if err := WriteSqlsFile(r.meta.DoneFilePath, all); err != nil {
+				log.Errorf("Runner[%v] %v SyncMeta error %v", r.meta.RunnerName, r.Name(), err)
+			}
+		}
+	}
+
 	encodeSQLs := make([]string, 0)
 	for _, sqlStr := range r.syncSQLs {
 		encodeSQLs = append(encodeSQLs, strings.Replace(sqlStr, " ", "@", -1))
@@ -357,7 +447,7 @@ func (r *MysqlReader) SyncMeta() {
 	for _, offset := range r.offsets {
 		encodeSQLs = append(encodeSQLs, strconv.FormatInt(offset, 10))
 	}
-	all := strings.Join(encodeSQLs, SqlOffsetConnector)
+	all = strings.Join(encodeSQLs, SqlOffsetConnector)
 	if err := r.meta.WriteOffset(all, int64(len(r.syncSQLs))); err != nil {
 		log.Errorf("Runner[%v] %v SyncMeta error %v", r.meta.RunnerName, r.Name(), err)
 	}
@@ -378,6 +468,8 @@ func (r *MysqlReader) Close() error {
 		close(r.readChan)
 		close(r.errChan)
 	}
+
+	r.SyncMeta()
 	return nil
 }
 
@@ -609,7 +701,7 @@ func (r *MysqlReader) execReadDB(curDB string, now time.Time, recordTablesDone T
 			}
 		}
 
-		log.Infof("Runner[%s] %s default sqls %v", r.meta.RunnerName, r.Name(), sqls)
+		log.Infof("Runner[%s] %s default tables %v sqls %v", r.meta.RunnerName, r.Name(), tables, sqls)
 
 		if r.omitDoneDBRecords && !recordTablesDone.RestoreTableDone(r.meta, curDB, tables) {
 			// 兼容
@@ -631,7 +723,19 @@ func (r *MysqlReader) execReadDB(curDB string, now time.Time, recordTablesDone T
 	tablesLen := len(tables)
 	log.Infof("Runner[%v] %v start to work, sqls %v offsets %v", r.meta.RunnerName, r.Name(), r.syncSQLs, r.offsets)
 
+	sqlsRecordMap := make(map[string]bool)
+	if sqlStr, ok := r.sqlsRecord[curDB]; ok {
+		sqls := strings.Split(sqlStr, ",")
+		for _, sql := range sqls {
+			sqlsRecordMap[sql] = true
+		}
+	}
+
 	for idx, rawSql := range r.syncSQLs {
+		// 已读取过
+		if r.rawSQLs != "" && len(sqlsRecordMap) != 0 && sqlsRecordMap[rawSql] {
+			continue
+		}
 		//分sql执行
 		exit := false
 		var tableName string
@@ -667,12 +771,31 @@ func (r *MysqlReader) execReadDB(curDB string, now time.Time, recordTablesDone T
 			}
 		}
 	}
+
+	if r.isRecordSqls() {
+		r.sqlsRecord[curDB] = strings.Join(r.syncSQLs, ",")
+	}
 	return nil
+}
+
+func (r *MysqlReader) isRecordSqls() bool {
+	return r.timestampKey == "" && r.offsetKey == "" && r.rawSQLs != ""
 }
 
 func (r *MysqlReader) getSQL(idx int, rawSQL string) string {
 	r.muxOffsets.RLock()
 	defer r.muxOffsets.RUnlock()
+
+	if len(r.timestampKey) > 0 {
+		if r.timestampKeyInt {
+			return fmt.Sprintf("%s WHERE %s >= %v and %s < %v;", rawSQL, r.timestampKey, r.startTimeInt, r.timestampKey, r.startTimeInt+int64(r.batchDurInt))
+		}
+		if r.startTimeStr == "" {
+			return fmt.Sprintf("%s WHERE %s >= '%s' and %s < '%s';", rawSQL, r.timestampKey, r.startTime.Format(MysqlTimeFormat), r.timestampKey, r.startTime.Add(r.batchDuration).Format(MysqlTimeFormat))
+		}
+		return fmt.Sprintf("%s WHERE %s >= '%s';", rawSQL, r.timestampKey, r.startTimeStr)
+	}
+
 	rawSQL = strings.TrimSuffix(strings.TrimSpace(rawSQL), ";")
 	if len(r.offsetKey) > 0 && len(r.offsets) > idx {
 		return fmt.Sprintf("%s WHERE %v >= %d AND %v < %d;", rawSQL, r.offsetKey, r.offsets[idx], r.offsetKey, r.offsets[idx]+int64(r.readBatch))
@@ -681,12 +804,74 @@ func (r *MysqlReader) getSQL(idx int, rawSQL string) string {
 }
 
 func (r *MysqlReader) checkExit(idx int, db *sql.DB) (bool, int64) {
-	if len(r.offsetKey) <= 0 || idx >= len(r.offsets) {
+	if idx >= len(r.offsets) || (len(r.offsetKey) <= 0 && len(r.timestampKey) <= 0) {
 		return true, -1
 	}
 	rawSQL := r.syncSQLs[idx]
 	rawSQL = strings.TrimSuffix(strings.TrimSpace(rawSQL), ";")
-	tsql := fmt.Sprintf("%s WHERE %v >= %d order by %v limit 1;", rawSQL, r.offsetKey, r.offsets[idx], r.offsetKey)
+	var tsql string
+
+	if len(r.timestampKey) > 0 {
+		ix := strings.Index(rawSQL, "from")
+		if ix < 0 {
+			return true, -1
+		}
+		/* 是否要更新时间，取决于两点
+		1. 原来那一刻到现在为止是否有新增数据
+		2. 原来那一刻是否有新数据
+		如果第一点满足，就不能退出
+		如果第二点满足，就不能移动时间
+		否则要移动时间，不然就死循环了
+		*/
+		rawSQL = rawSQL[ix:]
+
+		//获得最新时间戳到当前时间的数据量
+		if r.timestampKeyInt {
+			tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v >= %v;", rawSQL, r.timestampKey, r.startTimeInt)
+		} else {
+			if r.startTimeStr == "" {
+				tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v >= '%s';", rawSQL, r.timestampKey, r.startTime.Format(MysqlTimeFormat))
+			} else {
+				tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v >= '%s';", rawSQL, r.timestampKey, r.startTimeStr)
+			}
+		}
+
+		largerAmount, err := QueryNumber(tsql, db)
+		if err != nil || largerAmount <= int64(len(r.timeCacheMap)) {
+			//查询失败或者数据量不变本轮就先退出了
+			return true, -1
+		}
+		//-- 比较有没有比之前的数量大，如果没有变大就退出
+		//如果变大，继续判断当前这个重复的时间有没有数据
+		if r.timestampKeyInt {
+			tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v = %v;", rawSQL, r.timestampKey, r.startTimeInt)
+		} else {
+			if r.startTimeStr == "" {
+				tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v = '%s';", rawSQL, r.timestampKey, r.startTime.Format(MysqlTimeFormat))
+			} else {
+				tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v = '%s';", rawSQL, r.timestampKey, r.startTimeStr)
+			}
+		}
+		equalAmount, err := QueryNumber(tsql, db)
+		if err == nil && equalAmount > int64(len(r.timeCacheMap)) {
+			//说明还有新数据在原来的时间点，不能退出，且还要再查
+			return false, -1
+		}
+		//此处如果发现同样的时间戳数据没有变，那么说明是新的时间产生的数据，时间戳要更新了
+		//获得最小的时间戳
+		if r.timestampKeyInt {
+			tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v > %v;", r.timestampKey, r.timestampKey, rawSQL, r.timestampKey, r.startTimeInt)
+		} else {
+			if r.startTimeStr == "" {
+				tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v > '%s';", r.timestampKey, r.timestampKey, rawSQL, r.timestampKey, r.startTime.Format(MysqlTimeFormat))
+			} else {
+				tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v > '%s';", r.timestampKey, r.timestampKey, rawSQL, r.timestampKey, r.startTimeStr)
+			}
+		}
+	} else {
+		tsql = fmt.Sprintf("%s WHERE %v >= %d order by %v limit 1;", rawSQL, r.offsetKey, r.offsets[idx], r.offsetKey)
+	}
+
 	log.Info("query <", tsql, "> to check exit")
 	rows, err := db.Query(tsql)
 	if err != nil {
@@ -702,13 +887,17 @@ func (r *MysqlReader) checkExit(idx int, db *sql.DB) (bool, int64) {
 		return true, -1
 	}
 	scanArgs, _ := GetInitScans(len(columns), rows, r.schemas, r.meta.RunnerName, r.Name())
-	offsetKeyIndex := GetOffsetIndex(r.offsetKey, columns)
+	offsetKeyIndex := GetOffsetIndexWithTimeStamp(r.offsetKey, r.timestampKey, columns)
 	for rows.Next() {
 		err = rows.Scan(scanArgs...)
 		if err != nil {
 			return false, -1
 		}
 		if offsetKeyIndex >= 0 {
+			if len(r.timestampKey) > 0 {
+				updated := r.updateStartTime(offsetKeyIndex, scanArgs)
+				return !updated, -1
+			}
 			offsetIdx, err := ConvertLong(scanArgs[offsetKeyIndex])
 			if err != nil {
 				return false, -1
@@ -817,8 +1006,6 @@ func (r *MysqlReader) getAll(queryType int) (getAll bool, err error) {
 	default:
 		return false, fmt.Errorf("%v queryType is not support get sql now", queryType)
 	}
-
-	return true, nil
 }
 
 // 根据 queryType 获取 table 中所有记录或者表中所有数据的条数的sql语句
@@ -885,8 +1072,8 @@ func (r *MysqlReader) execTableCount(connectStr string, idx int, curDB, rawSql s
 	return tableSize, nil
 }
 
-func (r *MysqlReader) getAllDatas(rows *sql.Rows, scanArgs []interface{}, columns []string, nochiced []bool) ([]readInfo, bool) {
-	datas := make([]readInfo, 0)
+func (r *MysqlReader) getAllDatas(rows *sql.Rows, scanArgs []interface{}, columns []string, nochiced []bool) ([]ReadInfo, bool) {
+	datas := make([]ReadInfo, 0)
 	for rows.Next() {
 		// get RawBytes from data
 		err := rows.Scan(scanArgs...)
@@ -916,7 +1103,7 @@ func (r *MysqlReader) getAllDatas(rows *sql.Rows, scanArgs []interface{}, column
 			log.Warnf("Runner[%v] %v stopped from running", r.meta.RunnerName, r.Name())
 			return nil, true
 		}
-		datas = append(datas, readInfo{data: data, bytes: totalBytes})
+		datas = append(datas, ReadInfo{Data: data, Bytes: totalBytes})
 	}
 	return datas, false
 }
@@ -934,6 +1121,7 @@ func (r *MysqlReader) execReadSql(curDB string, idx int, execSQL string, db *sql
 		return exit, readSize, err
 	}
 	defer rows.Close()
+
 	// Get column names
 	columns, err := rows.Columns()
 	if err != nil {
@@ -946,18 +1134,23 @@ func (r *MysqlReader) execReadSql(curDB string, idx int, execSQL string, db *sql
 	scanArgs, nochiced := GetInitScans(len(columns), rows, r.schemas, r.meta.RunnerName, r.Name())
 	var offsetKeyIndex int
 	if r.rawSQLs != "" {
-		offsetKeyIndex = GetOffsetIndex(r.offsetKey, columns)
+		offsetKeyIndex = GetOffsetIndexWithTimeStamp(r.offsetKey, r.timestampKey, columns)
 	}
 
 	alldatas, closed := r.getAllDatas(rows, scanArgs, columns, nochiced)
 	if closed {
 		return exit, readSize, nil
 	}
+	total := len(alldatas)
+	alldatas = r.trimExistData(alldatas)
 
 	// Fetch rows
 	var maxOffset int64 = -1
 	for _, v := range alldatas {
 		exit = false
+		if len(r.timestampKey) > 0 {
+			r.updateTimeCntFromData(v)
+		}
 		r.readChan <- v
 		r.CurrentCount++
 		readSize++
@@ -965,8 +1158,24 @@ func (r *MysqlReader) execReadSql(curDB string, idx int, execSQL string, db *sql
 		if r.historyAll || r.rawSQLs == "" {
 			continue
 		}
-		maxOffset = r.updateOffset(idx, offsetKeyIndex, maxOffset, scanArgs)
+		if len(r.timestampKey) <= 0 {
+			maxOffset = r.updateOffset(idx, offsetKeyIndex, maxOffset, scanArgs)
+		}
 	}
+
+	var startTimePrint string
+	if r.timestampKeyInt {
+		startTimePrint = strconv.FormatInt(r.startTimeInt, 10)
+	} else {
+		if r.startTimeStr == "" {
+			startTimePrint = r.startTime.String()
+		} else {
+			startTimePrint = r.startTimeStr
+		}
+	}
+	log.Infof("Runner[%v] SQL: <%v> find total %d data, after trim duplicated, left data is: %d, "+
+		"now we have total got %v data, and start time is %v ",
+		r.meta.RunnerName, execSQL, total, len(alldatas), len(r.timeCacheMap), startTimePrint)
 
 	if maxOffset > 0 {
 		r.offsets[idx] = maxOffset + 1
@@ -1103,4 +1312,42 @@ func (r *MysqlReader) greaterThanLastRecord(queryType int, target, magicRemainSt
 	}
 
 	return CompareTime(target, rawData, magicRes.TimeStart, magicRes.TimeEnd, false)
+}
+
+func (r *MysqlReader) restoreTimestamp() {
+	if r.timestampKeyInt {
+		tm, cache, err := RestoreTimestampIntOffset(r.meta.DoneFilePath)
+		if err == nil {
+			r.startTimeInt = tm
+			r.timestampMux.Lock()
+			r.timeCacheMap = cache
+			r.timestampMux.Unlock()
+		} else {
+			log.Errorf("RestoreTimestampIntOffset err %v", err)
+		}
+		return
+	}
+	if r.startTimeStr == "" {
+		tm, cache, err := RestoreTimestampOffset(r.meta.DoneFilePath)
+		if err == nil {
+			r.startTime = tm
+			r.timestampMux.Lock()
+			r.timeCacheMap = cache
+			r.timestampMux.Unlock()
+		} else {
+			log.Errorf("RestoreTimestampOffset err %v", err)
+		}
+		return
+	}
+
+	tmStr, cache, err := RestoreTimestampStrOffset(r.meta.DoneFilePath)
+	if err == nil {
+		r.startTimeStr = tmStr
+		r.timestampMux.Lock()
+		r.timeCacheMap = cache
+		r.timestampMux.Unlock()
+	} else {
+		log.Errorf("RestoreTimestampStrOffset err %v", err)
+	}
+	return
 }

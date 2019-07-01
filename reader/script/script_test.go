@@ -76,6 +76,6 @@ func TestCmdRunWithTimeout(t *testing.T) {
 	assert.NotNil(t, cmdResult.err)
 	assert.False(t, isTimeout)
 
-	cmdResult, isTimeout = CmdRunWithTimeout("top")
+	cmdResult, _ = CmdRunWithTimeout("top")
 	assert.NotNil(t, cmdResult.err)
 }

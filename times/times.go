@@ -94,11 +94,9 @@ func GetTimeZone() (zoneName, zoneValue string) {
 
 	value := offset / 3600 * 100
 	if value > 0 {
-		zoneValue += fmt.Sprintf(" +%04d", value)
-	} else if value < 0 {
-		zoneValue += fmt.Sprintf(" -%04d", value)
+		return zoneName, fmt.Sprintf(" +%04d", value)
 	}
-	return
+	return zoneName, fmt.Sprintf(" -%04d", value)
 }
 
 func StrToTimeLocation(value string, loc *time.Location) (time.Time, error) {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/qiniu/log"
 
+	"github.com/qiniu/logkit/times"
 	"github.com/qiniu/logkit/utils/models"
 )
 
@@ -170,6 +171,10 @@ func ConvertDate(v interface{}) (time.Time, error) {
 		if idv == nil {
 			return time.Time{}, nil
 		}
+
+		if ret, ok := idv.([]byte); ok {
+			return times.StrToTimeLocation(string(ret), time.Local)
+		}
 		log.Errorf("sql reader convertDate for type %v is not supported", reflect.TypeOf(idv))
 	}
 	return time.Time{}, fmt.Errorf("%v type can not convert to string", dv.Kind())
@@ -189,8 +194,14 @@ func ConvertString(v interface{}) (string, error) {
 		return strconv.Itoa(int(dv.Int())), nil
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		return strconv.Itoa(int(dv.Uint())), nil
+	case reflect.Float32:
+		return strconv.FormatFloat(dv.Float(), 'g', -1, 32), nil
+	case reflect.Float64:
+		return strconv.FormatFloat(dv.Float(), 'g', -1, 64), nil
 	case reflect.String:
 		return dv.String(), nil
+	case reflect.Bool:
+		return strconv.FormatBool(dv.Bool()), nil
 	case reflect.Interface:
 		idv := dv.Interface()
 		if ret, ok := idv.(int64); ok {
@@ -228,6 +239,12 @@ func ConvertString(v interface{}) (string, error) {
 		}
 		if ret, ok := idv.([]byte); ok {
 			return string(ret), nil
+		}
+		if ret, ok := idv.(float64); ok {
+			return strconv.FormatFloat(float64(ret), 'g', -1, 64), nil
+		}
+		if ret, ok := idv.(float32); ok {
+			return strconv.FormatFloat(float64(ret), 'g', -1, 32), nil
 		}
 		//Postgres的时间类型为time.Time
 		if ret, ok := idv.(time.Time); ok {

@@ -19,7 +19,7 @@ import (
 
 	"github.com/qiniu/logkit/conf"
 	. "github.com/qiniu/logkit/sender/config"
-	mockPandora "github.com/qiniu/logkit/sender/mock_pandora"
+	mockPandora "github.com/qiniu/logkit/sender/mockpandora"
 	"github.com/qiniu/logkit/times"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -650,11 +650,11 @@ func TestUpdatePandoraSchema(t *testing.T) {
 		t.Errorf("send data error exp %v but %v", exp, pandora.Body)
 	}
 	expschema := []pipeline.RepoSchemaEntry{
-		pipeline.RepoSchemaEntry{
+		{
 			Key:       "x1",
 			ValueType: PandoraTypeString,
 		},
-		pipeline.RepoSchemaEntry{
+		{
 			Key:       "x2",
 			ValueType: PandoraTypeLong,
 		},
@@ -674,15 +674,15 @@ func TestUpdatePandoraSchema(t *testing.T) {
 	assert.Equal(t, exp, pandora.Body)
 
 	expschema = []pipeline.RepoSchemaEntry{
-		pipeline.RepoSchemaEntry{
+		{
 			Key:       "x1",
 			ValueType: PandoraTypeString,
 		},
-		pipeline.RepoSchemaEntry{
+		{
 			Key:       "x2",
 			ValueType: PandoraTypeLong,
 		},
-		pipeline.RepoSchemaEntry{
+		{
 			Key:       "x3change",
 			ValueType: PandoraTypeFloat,
 		},
@@ -722,7 +722,7 @@ func TestUpdatePandoraSchema(t *testing.T) {
 	assert.Equal(t, exp, pandora.Body)
 
 	expschema = []pipeline.RepoSchemaEntry{
-		pipeline.RepoSchemaEntry{
+		{
 			Key:       "x3change",
 			ValueType: PandoraTypeDate,
 		},
@@ -742,11 +742,11 @@ func TestUpdatePandoraSchema(t *testing.T) {
 	assert.Equal(t, exp, pandora.Body)
 
 	expschema = []pipeline.RepoSchemaEntry{
-		pipeline.RepoSchemaEntry{
+		{
 			Key:       "x3change",
 			ValueType: PandoraTypeDate,
 		},
-		pipeline.RepoSchemaEntry{
+		{
 			Key:       "x4",
 			ValueType: PandoraTypeLong,
 		},
@@ -868,7 +868,13 @@ func TestPandoraSenderTime(t *testing.T) {
 		"name":                      "TestPandoraSenderTime",
 		"KeyPandoraSchemaUpdateInterval": "1s",
 	}
+	conf1["pandora_logdb_retention"] = "a"
 	s, err := NewSender(conf1)
+	assert.NotNil(t, err)
+
+	conf1["pandora_withip"] = "true"
+	conf1["pandora_logdb_retention"] = ""
+	s, err = NewSender(conf1)
 	if err != nil {
 		t.Fatal(err)
 	}

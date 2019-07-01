@@ -359,6 +359,16 @@ var ModeKeyOptions = map[string][]Option{
 			AdvanceDepend: KeyPandoraEnableLogDB,
 			ToolTip:       `指定字段的分词方式，逗号分隔多个，如 "f1 keyword, f2 full_text"。仅在新建时生效，更改时不生效，请在日志仓库更改。`,
 		},
+		{
+			KeyName:       KeyPandoraLogdbRetention,
+			ChooseOnly:    false,
+			Default:       "30",
+			DefaultNoUse:  false,
+			Description:   "指定logdb存储时间(pandora_logdb_retention)",
+			Advance:       true,
+			AdvanceDepend: KeyPandoraEnableLogDB,
+			ToolTip:       `指定logdb存储时间，单位为天，为正整数，默认为 30 天`,
+		},
 		//暂时下线时序数据库
 		//{
 		//	KeyName:            KeyPandoraEnableTSDB,
@@ -1017,18 +1027,6 @@ var ModeKeyOptions = map[string][]Option{
 			Advance:      true,
 		},
 		{
-			KeyName:      KeyHttpSenderTemplate,
-			Element:      Text,
-			ChooseOnly:   false,
-			Default:      "",
-			Placeholder:  `{"a": "{{key1}}", "b": "{{key2}}"}`,
-			Required:     false,
-			DefaultNoUse: true,
-			Description:  "自定义数据模板(http_sender_template)",
-			ToolTip:      `渲染自定义的数据模板，使用"{{key}}"作为占位符，key为需要发送的字段名，渲染后为该字段的值。目前仅支持json和body_json两种数据格式`,
-			Advance:      true,
-		},
-		{
 			KeyName:      KeyHttpSenderCsvSplit,
 			ChooseOnly:   false,
 			Default:      "",
@@ -1104,7 +1102,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: true,
 			Required:     true,
 			Description:  "csv字段名称(csv_fields)",
-			ToolTip:      `指定每一行记录包含的字段集，使用,分割多个字段`,
+			ToolTip:      `指定每一行记录包含的字段集，默认使用,分割多个字段`,
 		},
 		{
 			KeyName:      KeyCSVDelimiter,
@@ -1114,7 +1112,7 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: false,
 			Required:     false,
 			Description:  "csv字段分隔符(csv_delimiter)",
-			ToolTip:      `默认为 ,(逗号)，表示每一行记录中字段之间的分隔符`,
+			ToolTip:      `默认为 ,(逗号)，表示每一行记录中字段之间的分隔符，只能为单个字符`,
 		},
 		{
 			KeyName:      KeyCSVPathPrefix,

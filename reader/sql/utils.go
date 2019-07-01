@@ -99,6 +99,10 @@ func GetInitScans(length int, rows *sql.Rows, schemas map[string]string, runnerN
 		nochoiced[i] = false
 		scantype := v.ScanType().String()
 		dataBaseType := v.DatabaseTypeName()
+		if setDataBaseType(schemas, dataBaseType, v) {
+			scanArgs[i] = new(interface{})
+			continue
+		}
 		switch scantype {
 		case "int64", "int32", "int16", "int", "int8":
 			scanArgs[i] = new(interface{})
@@ -155,6 +159,30 @@ func GetOffsetIndex(offsetKey string, columns []string) int {
 	offsetKeyIndex := -1
 	for idx, key := range columns {
 		if len(offsetKey) > 0 && key == offsetKey {
+			return idx
+		}
+	}
+	return offsetKeyIndex
+}
+
+func setDataBaseType(schemas map[string]string, dataBaseType string, v *sql.ColumnType) bool {
+	// mysql
+	switch dataBaseType {
+	case "DATE", "DATETIME", "TIMESTAMP", "TIME":
+		schemas[v.Name()] = "date"
+		return true
+	default:
+		return false
+	}
+}
+
+func GetOffsetIndexWithTimeStamp(offsetKey, timestampKey string, columns []string) int {
+	offsetKeyIndex := -1
+	for idx, key := range columns {
+		if len(offsetKey) > 0 && key == offsetKey {
+			return idx
+		}
+		if len(timestampKey) > 0 && key == timestampKey {
 			return idx
 		}
 	}

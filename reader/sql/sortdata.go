@@ -1,4 +1,4 @@
-package postgres
+package sql
 
 import (
 	"sort"
@@ -8,7 +8,7 @@ import (
 	"github.com/qiniu/log"
 )
 
-var json = jsoniter.Config{SortMapKeys: true}.Froze()
+var jsonConfig = jsoniter.Config{SortMapKeys: true}.Froze()
 
 type jsonIndex struct {
 	Json string
@@ -22,13 +22,13 @@ func (a ByJson) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByJson) Less(i, j int) bool { return a[i].Json < a[j].Json }
 
 //if Marshal failed return all data
-func SortByJson(datas []readInfo) ([]readInfo, bool) {
+func SortByJson(datas []ReadInfo) ([]ReadInfo, bool) {
 	if len(datas) < 1 {
 		return datas, true
 	}
 	byjson := make(ByJson, len(datas))
 	for idx, v := range datas {
-		jst, err := json.Marshal(v.data)
+		jst, err := jsonConfig.Marshal(v.Data)
 		if err != nil {
 			log.Error("can't marshal json for sort", err)
 			return datas, true
@@ -37,11 +37,11 @@ func SortByJson(datas []readInfo) ([]readInfo, bool) {
 			Idx:  idx,
 			Json: string(jst),
 		}
-		datas[idx].json = string(jst)
+		datas[idx].Json = string(jst)
 	}
 
 	sort.Sort(byjson)
-	newdata := make([]readInfo, len(datas))
+	newdata := make([]ReadInfo, len(datas))
 	for idx, v := range byjson {
 		newdata[idx] = datas[v.Idx]
 	}
@@ -49,17 +49,17 @@ func SortByJson(datas []readInfo) ([]readInfo, bool) {
 }
 
 //GetJson return true, if bejson success
-func GetJson(datas []readInfo) ([]readInfo, bool) {
+func GetJson(datas []ReadInfo) ([]ReadInfo, bool) {
 	if len(datas) < 1 {
 		return datas, false
 	}
 	for idx, v := range datas {
-		jst, err := json.Marshal(v.data)
+		jst, err := jsonConfig.Marshal(v.Data)
 		if err != nil {
 			log.Error("can't marshal json for sort", err)
 			return datas, false
 		}
-		datas[idx].json = string(jst)
+		datas[idx].Json = string(jst)
 	}
 	return datas, true
 }

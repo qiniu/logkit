@@ -62,13 +62,14 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		return nil, err
 	}
 	syncMgr, err := newSyncManager(meta, opts)
+	syncMgr.meta.LastKey = ""
 	if err != nil {
 		return nil, err
 	}
 	validFilePattern, _ := conf.GetStringOr(KeyValidFilePattern, "*")
 	bufSize, _ := conf.GetIntOr(KeyBufSize, bufreader.DefaultBufSize)
 	skipFirstLine, _ := conf.GetBoolOr(KeySkipFileFirstLine, false)
-	sf, err := seqfile.NewSeqFile(meta, opts.directory, true, true, ignoredSuffixes, validFilePattern, WhenceOldest, nil)
+	sf, err := seqfile.NewSeqFile(meta, opts.directory, true, true, ignoredSuffixes, validFilePattern, WhenceOldest, nil, true)
 	if err != nil {
 		return nil, err
 	}
@@ -247,6 +248,9 @@ func (mgr *syncManager) startSync() {
 		if err := mgr.syncOnce(); err != nil {
 			log.Errorf("Runner[%v] daemon sync once failed: %v", mgr.meta.RunnerName, err)
 		}
+		if mgr.meta.LastKey != "" {
+			continue
+		}
 
 		select {
 		case <-mgr.quitChan:
@@ -354,7 +358,9 @@ func (s *syncRunner) syncToDir() error {
 	}
 
 	sourceFiles := make(map[string]bool)
-	sourceFiles, err = loadS3Files(bucket, s3url.Path(), sourceFiles, "")
+	lastKey, err := loadS3Files(bucket, s3url.Path(), sourceFiles, s.meta.LastKey)
+	log.Debugf("sourceFiles length = %d, marker = %s, lastKey = %s", len(sourceFiles), s.meta.LastKey, lastKey)
+	s.meta.LastKey = lastKey
 	if err != nil {
 		return fmt.Errorf("load s3 files: %v", err)
 	}
@@ -458,26 +464,46 @@ func bucketRegionError(err error) bool {
 	return false
 }
 
-func loadS3Files(bucket *s3.Bucket, path string, files map[string]bool, marker string) (map[string]bool, error) {
-	log.Infof("loading files from 's3://%s/%s'", bucket.Name, path)
+func loadS3Files(bucket *s3.Bucket, path string, files map[string]bool, marker string) (string, error) {
+	lastKey, isTruncated, err := loadS3FilesIter(bucket, path, files, marker)
+	for {
+		if err != nil {
+			return "", err
+		}
+		if !isTruncated {
+			return "", nil
+		}
+		log.Infof("loadS3Files len(files) = %d", len(files))
+		if len(files) >= 1000 { // 一批处理1k条文件
+			break
+		}
+		lastKey, isTruncated, err = loadS3FilesIter(bucket, path, files, lastKey)
+	}
+	return lastKey, nil
+}
+
+func loadS3FilesIter(bucket *s3.Bucket, path string, files map[string]bool, marker string) (string, bool, error) {
+	log.Infof("loading files from 's3://%s/%s', marker=%s", bucket.Name, path, marker)
 
 	data, err := bucket.List(path, "", marker, 0)
 	if err != nil {
-		return files, err
+		log.Errorf("s3 bucket list path=%s, marker=%s, failed: %v", path, marker, err)
+		return "", false, err
 	}
 
 	for _, key := range data.Contents {
 		files[key.Key] = true
 	}
 
+	isTruncated := data.IsTruncated
+	var lastKey string
 	if data.IsTruncated {
-		lastKey := data.Contents[(len(data.Contents) - 1)].Key
+		lastKey = data.Contents[(len(data.Contents) - 1)].Key
 		log.Infof("results truncated, loading additional files via previous last key %q", lastKey)
-		loadS3Files(bucket, path, files, lastKey)
 	}
 
-	log.Infof("load %d files from 's3://%s/%s' succesfully", len(files), bucket.Name, path)
-	return files, nil
+	log.Infof("load %d files from 's3://%s/%s' successfully", len(files), bucket.Name, path)
+	return lastKey, isTruncated, nil
 }
 
 func (s *syncRunner) loadSyncedFiles() (map[string]bool, error) {

@@ -1,5 +1,7 @@
 package sql
 
+import "github.com/qiniu/logkit/utils/models"
+
 const (
 	SqlOffsetConnector   = "##"
 	SqlSpliter           = ";"
@@ -12,6 +14,7 @@ const (
 	Wildcards       = "*"
 
 	DefaultDoneRecordsFile = "sql.records"
+	DefaultDoneSqlsFile    = "sqls"
 	TimestampRecordsFile   = "timestamp.records"
 	CacheMapFile           = "cachemap.records"
 )
@@ -40,3 +43,9 @@ const (
 	MINUTE
 	SECOND
 )
+
+type ReadInfo struct {
+	Data  models.Data
+	Bytes int64
+	Json  string //排序去重时使用，其他时候无用
+}

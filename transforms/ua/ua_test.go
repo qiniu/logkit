@@ -20,11 +20,11 @@ var (
 
 func TestUaTransformer(t *testing.T) {
 	ipt := &UATransformer{
-		Key:       "ua",
-		UA_Device: "true",
-		UA_OS:     "true",
-		UA_Agent:  "true",
-		MemCache:  "true",
+		Key:      "ua",
+		UADevice: "true",
+		UAOS:     "true",
+		UAAgent:  "true",
+		MemCache: "true",
 	}
 	MaxProcs = 2
 	ipt.Init()
@@ -88,11 +88,11 @@ func TestUaTransformer(t *testing.T) {
 
 func Test_getParsedData(t *testing.T) {
 	ipt := &UATransformer{
-		Key:       "ua",
-		UA_Device: "true",
-		UA_OS:     "true",
-		UA_Agent:  "true",
-		MemCache:  "true",
+		Key:      "ua",
+		UADevice: "true",
+		UAOS:     "true",
+		UAAgent:  "true",
+		MemCache: "true",
 	}
 	ipt.Init()
 	userAgent, os, device := ipt.getParsedData("Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10_6_3; en-us; Silk/1.1.0-80) AppleWebKit/533.16 (KHTML, like Gecko) Version/5.0 Safari/533.16 Silk-Accelerated=true")
@@ -162,11 +162,11 @@ func BenchmarkUAAgent(b *testing.B) {
 // now: 1	8476822464 ns/op routine = 2  (2MB cache)
 func Benchmark_Transform(b *testing.B) {
 	ipt := &UATransformer{
-		Key:       "ua",
-		UA_Device: "true",
-		UA_OS:     "true",
-		UA_Agent:  "true",
-		MemCache:  "true",
+		Key:      "ua",
+		UADevice: "true",
+		UAOS:     "true",
+		UAAgent:  "true",
+		MemCache: "true",
 	}
 	MaxProcs = 2
 	ipt.Init()
@@ -197,5 +197,4 @@ func getUATestData(data Data, size int) []Data {
 		totalSize += len(dataBytes)
 		index++
 	}
-	return testSlice
 }

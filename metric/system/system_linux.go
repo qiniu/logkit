@@ -64,6 +64,10 @@ func getNumDisk() (mountsNum int) {
 		return 0
 	}
 	out, err := exec.Command(fDisk, "-l").Output()
+	if err != nil {
+		log.Errorf("exec command /sbin/fdisk -l failed: %v", err)
+		return 0
+	}
 	str := string(out)
 	sps := strings.Split(str, "\n")
 	mountsNum = 0

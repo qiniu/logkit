@@ -30,6 +30,7 @@ func TestCopyTransformer(t *testing.T) {
 	}
 	replace.Init()
 	actual, err := replace.Transform(data)
+	assert.NotNil(t, err)
 	exp = []Data{{"old": map[string]interface{}{"key1": "new_value"}, "new": map[string]interface{}{"key1": "old_value"}}, {"old": "old_value", "new": "new_value"}}
 	assert.EqualValues(t, exp, actual)
 

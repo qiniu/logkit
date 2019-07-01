@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/qiniu/logkit/parser"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/logkit/conf"
@@ -41,8 +43,13 @@ func TestMySqlLogParser1(t *testing.T) {
 }
 
 func TestMySqlKeepRawData(t *testing.T) {
-	p, err := NewParser(conf.MapConf{KeyKeepRawData: "true"})
+	p, err := NewParser(conf.MapConf{KeyKeepRawData: "true", KeyLabels: "name label_test"})
 	assert.NoError(t, err)
+	assert.EqualValues(t, "", p.Name())
+	pType, ok := p.(parser.ParserType)
+	assert.True(t, ok)
+	assert.EqualValues(t, TypeMySQL, pType.Type())
+
 	datas, err := p.Parse(strings.Split(content, "\n"))
 	assert.Nil(t, err)
 
@@ -57,6 +64,15 @@ func TestMySqlKeepRawData(t *testing.T) {
 		"Timestamp":     time.Unix(1514083320, 0).UTC(),
 		"Statement":     "SELECT count(*) from mysql.rds_replication_status WHERE master_host IS NOT NULL and master_port IS NOT NULL GROUP BY action_timestamp,called_by_user,action,mysql_version,master_host,master_port ORDER BY action_timestamp LIMIT 1;",
 		KeyRawData:      content,
+		"name":          "label_test",
 	}
 	assert.Equal(t, expectedEvent, datas[0])
+
+	got, err := p.Parse([]string{"a", PandoraParseFlushSignal})
+	assert.Nil(t, err)
+	assert.EqualValues(t, []Data{{"Statement": "a"}}, got)
+
+	got, err = p.Parse(nil)
+	assert.Nil(t, err)
+	assert.EqualValues(t, 0, len(got))
 }

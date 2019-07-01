@@ -125,7 +125,6 @@ func TestGetTags(t *testing.T) {
 	  	}`), 0644)
 	assert.NoError(t, err)
 	defer os.Remove(tagFile)
-	err = nil
 	exp := map[string]interface{}{
 		"Title":  "tags",
 		"Author": []interface{}{"john", "ada", "alice"},
@@ -212,4 +211,309 @@ func TestValidFile(t *testing.T) {
 func TestIgnoreHidden(t *testing.T) {
 	assert.Equal(t, true, IgnoreHidden(".log", true))
 	assert.Equal(t, false, IgnoreHidden(".1", false))
+}
+
+func TestParseNumber(t *testing.T) {
+	tests := []struct {
+		str    string
+		expect int
+	}{
+		{
+			str:    "01",
+			expect: 1,
+		},
+		{
+			str:    "001",
+			expect: 01,
+		},
+		{
+			str:    "10",
+			expect: 10,
+		},
+		{
+			str:    "10",
+			expect: 10,
+		},
+	}
+
+	for _, test := range tests {
+		actual, err := ParseNumber(test.str)
+		assert.Nil(t, err)
+		assert.EqualValues(t, test.expect, actual)
+	}
+}
+
+func TestParseTime(t *testing.T) {
+	tests := []struct {
+		timeStr      string
+		expectHour   int
+		expectMinute int
+	}{
+		{
+			timeStr: "   ",
+		},
+		{
+			timeStr:      " 12:21 ",
+			expectHour:   12,
+			expectMinute: 21,
+		},
+		{
+			timeStr:      " 25:21 ",
+			expectHour:   1,
+			expectMinute: 21,
+		},
+		{
+			timeStr:      " 24:60",
+			expectHour:   0,
+			expectMinute: 00,
+		},
+		{
+			timeStr:      "01:02 ",
+			expectHour:   1,
+			expectMinute: 2,
+		},
+		{
+			timeStr:      "01:30",
+			expectHour:   1,
+			expectMinute: 30,
+		},
+		{
+			timeStr:      "01 : 30",
+			expectHour:   1,
+			expectMinute: 30,
+		},
+	}
+
+	for _, test := range tests {
+		actualHour, actualMinute, err := ParseTime(test.timeStr)
+		assert.Nil(t, err)
+		assert.EqualValues(t, test.expectHour, actualHour)
+		assert.EqualValues(t, test.expectMinute, actualMinute)
+	}
+}
+
+func TestParseRunTime(t *testing.T) {
+	tests := []struct {
+		runTimeStr string
+		runTime    RunTime
+		err        error
+	}{
+		{
+			runTimeStr: "",
+			err:        errors.New("empty string, must be 'hh:mm' (use 24 hour)"),
+		},
+		{
+			runTimeStr: "-",
+		},
+		{
+			runTimeStr: "12:00",
+			runTime: RunTime{
+				StartHour: 12,
+			},
+		},
+		{
+			runTimeStr: "12:00-",
+			runTime: RunTime{
+				StartHour: 12,
+			},
+		},
+		{
+			runTimeStr: "-12:00",
+			runTime: RunTime{
+				EndHour: 12,
+			},
+		},
+		{
+			runTimeStr: "12:00-12:1",
+			runTime: RunTime{
+				StartHour: 12,
+				EndHour:   12,
+				EndMin:    1,
+			},
+		},
+		{
+			runTimeStr: "02:30-24:02",
+			runTime: RunTime{
+				StartHour: 2,
+				StartMin:  30,
+				EndHour:   0,
+				EndMin:    2,
+			},
+		},
+		{
+			runTimeStr: "12-12",
+			runTime: RunTime{
+				StartHour: 12,
+				EndHour:   12,
+			},
+		},
+		{
+			runTimeStr: "12-24",
+			runTime: RunTime{
+				StartHour: 12,
+				EndHour:   0,
+			},
+		},
+		{
+			runTimeStr: "12-11",
+			runTime: RunTime{
+				StartHour: 12,
+				EndHour:   11,
+			},
+		},
+		{
+			runTimeStr: "12-02",
+			runTime: RunTime{
+				StartHour: 12,
+				EndHour:   2,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		actualRunTime, actualErr := ParseRunTime(test.runTimeStr)
+		assert.EqualValues(t, test.err, actualErr)
+		assert.EqualValues(t, test.runTime, actualRunTime)
+	}
+}
+
+func TestInRunTime(t *testing.T) {
+	tests := []struct {
+		hour, minute int
+		runTime      RunTime
+		expect       bool
+	}{
+		{
+			expect: true,
+		},
+		{
+			hour:    1,
+			minute:  1,
+			runTime: RunTime{},
+			expect:  true,
+		},
+		{
+			hour:   1,
+			minute: 1,
+			runTime: RunTime{
+				StartHour: 1,
+				StartMin:  0,
+			},
+			expect: true,
+		},
+		{
+			hour:   1,
+			minute: 1,
+			runTime: RunTime{
+				StartHour: 0,
+				StartMin:  30,
+			},
+			expect: true,
+		},
+		{
+			hour:   1,
+			minute: 1,
+			runTime: RunTime{
+				StartHour: 1,
+				StartMin:  30,
+			},
+			expect: false,
+		},
+		{
+			hour:   1,
+			minute: 1,
+			runTime: RunTime{
+				EndHour: 12,
+				EndMin:  1,
+			},
+			expect: true,
+		},
+		{
+			hour:   1,
+			minute: 1,
+			runTime: RunTime{
+				EndHour: 1,
+			},
+			expect: false,
+		},
+		{
+			hour:   1,
+			minute: 1,
+			runTime: RunTime{
+				EndHour: 1,
+				EndMin:  30,
+			},
+			expect: true,
+		},
+		{
+			hour:   1,
+			minute: 1,
+			runTime: RunTime{
+				StartHour: 1,
+				StartMin:  0,
+				EndHour:   1,
+				EndMin:    30,
+			},
+			expect: true,
+		},
+	}
+
+	for _, test := range tests {
+		actual := InRunTime(test.hour, test.minute, test.runTime)
+		assert.EqualValues(t, test.expect, actual)
+	}
+}
+
+func TestParseRunTimeWithMode(t *testing.T) {
+	tests := []struct {
+		mode          string
+		value         interface{}
+		expectRunTime RunTime
+	}{
+		{
+			mode:  ReadModeRunTimeString,
+			value: "12-",
+			expectRunTime: RunTime{
+				StartHour: 12,
+			},
+		},
+		{
+			mode:  ReadModeRunTimeString,
+			value: "12-24",
+			expectRunTime: RunTime{
+				StartHour: 12,
+				EndHour:   0,
+			},
+		},
+		{
+			mode:  ReadModeRunTimeString,
+			value: "12-15",
+			expectRunTime: RunTime{
+				StartHour: 12,
+				EndHour:   15,
+			},
+		},
+		{
+			mode:          ReadModeRunTimeStruct,
+			value:         RunTime{},
+			expectRunTime: RunTime{},
+		},
+		{
+			mode: ReadModeRunTimeStruct,
+			value: RunTime{
+				StartHour: 23,
+				EndHour:   1,
+			},
+			expectRunTime: RunTime{
+				StartHour: 23,
+				EndHour:   1,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		actualRunTime, err := ParseRunTimeWithMode(test.mode, test.value)
+		assert.Nil(t, err)
+		assert.EqualValues(t, test.expectRunTime, actualRunTime)
+	}
 }

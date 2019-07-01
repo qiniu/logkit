@@ -200,7 +200,7 @@ func (dbRecords *SyncDBRecords) RestoreRecordsFile(meta *reader.Meta) (lastDB, l
 	for idx, record := range recordsDone {
 		tmpDBRecords := models.TrimeList(strings.Split(record, SqlOffsetConnector))
 		if int64(len(tmpDBRecords)) != 2 {
-			log.Errorf("Runner[%v] %v -meta Records done file is not invalid sql Records done file %v， omit meta data", meta.RunnerName, meta.MetaFile(), record)
+			log.Errorf("Runner[%v] %v -meta Records done file is invalid sql Records done file %v， omit meta data", meta.RunnerName, meta.MetaFile(), record)
 			continue
 		}
 
@@ -213,14 +213,14 @@ func (dbRecords *SyncDBRecords) RestoreRecordsFile(meta *reader.Meta) (lastDB, l
 
 		tmpTablesRecords := models.TrimeList(strings.Split(tmpDBRecords[1], "@"))
 		if int64(len(tmpTablesRecords)) < 1 {
-			log.Errorf("Runner[%v] %v -meta Records done file is not invalid sql Records done file %v， omit meta data", meta.RunnerName, meta.MetaFile(), tmpDBRecords)
+			log.Errorf("Runner[%v] %v -meta Records done file is invalid sql Records done file %v， omit meta data", meta.RunnerName, meta.MetaFile(), tmpDBRecords)
 			continue
 		}
 
 		for idx, tableRecord := range tmpTablesRecords {
 			tableRecordArr := strings.Split(tableRecord, ",")
 			if int64(len(tableRecordArr)) != 4 {
-				log.Errorf("Runner[%v] %v -meta Records done file is not invalid sql Records done file %v， omit meta data", meta.RunnerName, meta.MetaFile(), tableRecord)
+				log.Errorf("Runner[%v] %v -meta Records done file is invalid sql Records done file %v， omit meta data", meta.RunnerName, meta.MetaFile(), tableRecord)
 				continue
 			}
 

@@ -27,8 +27,6 @@ const (
 
 const MaxGrokMultiLineBuffer = 64 * 1024 * 1024 // 64MB
 
-var ()
-
 func init() {
 	parser.RegisterConstructor(TypeGrok, NewParser)
 }
@@ -253,7 +251,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 
 	datas = datas[:dataIndex]
 	se.DatasourceSkipIndex = se.DatasourceSkipIndex[:datasourceIndex]
-	if se.Errors == 0 {
+	if se.Errors == 0 && len(se.DatasourceSkipIndex) == 0 {
 		return datas, nil
 	}
 	return datas, se
@@ -337,6 +335,9 @@ func (p *Parser) parse(line string) (Data, error) {
 	}
 
 	for _, l := range p.labels {
+		if _, ok := data[l.Name]; ok {
+			continue
+		}
 		data[l.Name] = l.Value
 	}
 	return data, nil

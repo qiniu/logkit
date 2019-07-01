@@ -63,6 +63,8 @@ type BufReader struct {
 	lastRuneSize  int
 	lastSync      LastSync
 
+	runTime reader.RunTime
+
 	mux     sync.Mutex
 	decoder mahonia.Decoder
 
@@ -127,7 +129,6 @@ func NewReaderSize(rd reader.FileReader, meta *reader.Meta, size int) (*BufReade
 				log.Debugf("Runner[%v] ReadCacheLine from file error %v", meta.RunnerName, err)
 			}
 		}
-		err = nil
 		linesbytes = []byte("")
 	} else {
 		log.Debugf("Runner[%v] %v restore line cache success: [%v]", meta.RunnerName, meta.LogPath(), string(linesbytes))
@@ -176,6 +177,11 @@ func (b *BufReader) SetMode(mode string, v interface{}) (err error) {
 		return
 	}
 	return
+}
+
+func (b *BufReader) SetRunTime(mode string, v interface{}) (err error) {
+	b.runTime, err = reader.ParseRunTimeWithMode(mode, v)
+	return err
 }
 
 func (b *BufReader) reset(buf []byte, r reader.FileReader) {
@@ -453,6 +459,12 @@ func (b *BufReader) FormMutiLine() []byte {
 
 //ReadLine returns a string line as a normal Reader
 func (b *BufReader) ReadLine() (ret string, err error) {
+	now := time.Now()
+	if !reader.InRunTime(now.Hour(), now.Minute(), b.runTime) {
+		time.Sleep(10 * time.Second)
+		return "", nil
+	}
+
 	if b.multiLineRegexp == nil {
 		ret, err = b.ReadString('\n')
 		if os.IsNotExist(err) {
@@ -591,6 +603,7 @@ func (b *BufReader) SyncMeta() {
 
 func NewFileDirReader(meta *reader.Meta, conf conf.MapConf) (reader reader.Reader, err error) {
 	whence, _ := conf.GetStringOr(KeyWhence, WhenceOldest)
+	inodeSensitive, _ := conf.GetBoolOr(KeyInodeSensitive, true)
 	logpath, err := conf.GetString(KeyLogPath)
 	if err != nil {
 		return
@@ -604,7 +617,7 @@ func NewFileDirReader(meta *reader.Meta, conf conf.MapConf) (reader reader.Reade
 	newfileNewLine, _ := conf.GetBoolOr(KeyNewFileNewLine, false)
 	skipFirstLine, _ := conf.GetBoolOr(KeySkipFileFirstLine, false)
 	readSameInode, _ := conf.GetBoolOr(KeyReadSameInode, false)
-	fr, err := seqfile.NewSeqFile(meta, logpath, ignoreHidden, newfileNewLine, ignoreFileSuffix, validFilesRegex, whence, nil)
+	fr, err := seqfile.NewSeqFile(meta, logpath, ignoreHidden, newfileNewLine, ignoreFileSuffix, validFilesRegex, whence, nil, inodeSensitive)
 	if err != nil {
 		return
 	}

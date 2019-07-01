@@ -43,9 +43,28 @@ func RestoreMeta(meta *reader.Meta, rawSqls string, magicLagDur time.Duration) (
 	return
 }
 
+func RestoreSqls(meta *reader.Meta) map[string]string {
+	recordsDone, err := meta.ReadRecordsFile(DefaultDoneSqlsFile)
+	if err != nil {
+		log.Errorf("Runner[%v] %v -table done data is corrupted err:%v, omit table done data", meta.RunnerName, meta.DoneFilePath, err)
+		return map[string]string{}
+	}
+
+	var result = make(map[string]string)
+	for _, record := range recordsDone {
+		tmpRecord := models.TrimeList(strings.Split(record, SqlOffsetConnector))
+		if int64(len(tmpRecord)) != 2 {
+			log.Errorf("Runner[%v] %v -meta Records done file is invalid sqls file %v， omit meta data", meta.RunnerName, meta.MetaFile(), record)
+			continue
+		}
+		result[tmpRecord[0]] = tmpRecord[1]
+	}
+	return result
+}
+
 func RestoreTimestampIntOffset(doneFilePath string) (int64, map[string]string, error) {
 	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, TimestampRecordsFile)
-	cachemapfilename := fmt.Sprintf("%v.%v", reader.DoneFileName, CacheMapFile)
+	cacheMapFilename := fmt.Sprintf("%v.%v", reader.DoneFileName, CacheMapFile)
 
 	filePath := filepath.Join(doneFilePath, filename)
 	data, err := ioutil.ReadFile(filePath)
@@ -57,8 +76,8 @@ func RestoreTimestampIntOffset(doneFilePath string) (int64, map[string]string, e
 		return tm, nil, err
 	}
 
-	cachemapfilePath := filepath.Join(doneFilePath, cachemapfilename)
-	data, err = ioutil.ReadFile(cachemapfilePath)
+	cacheMapFilePath := filepath.Join(doneFilePath, cacheMapFilename)
+	data, err = ioutil.ReadFile(cacheMapFilePath)
 	if err != nil {
 		return tm, nil, err
 	}
@@ -72,20 +91,21 @@ func RestoreTimestampIntOffset(doneFilePath string) (int64, map[string]string, e
 
 func RestoreTimestampOffset(doneFilePath string) (time.Time, map[string]string, error) {
 	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, TimestampRecordsFile)
-	cachemapfilename := fmt.Sprintf("%v.%v", reader.DoneFileName, CacheMapFile)
+	cacheMapFilename := fmt.Sprintf("%v.%v", reader.DoneFileName, CacheMapFile)
 
 	filePath := filepath.Join(doneFilePath, filename)
 	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return time.Time{}, nil, err
 	}
+
 	tm, err := time.Parse(time.RFC3339Nano, string(data))
 	if err != nil {
 		return tm, nil, err
 	}
 
-	cachemapfilePath := filepath.Join(doneFilePath, cachemapfilename)
-	data, err = ioutil.ReadFile(cachemapfilePath)
+	cacheMapFilePath := filepath.Join(doneFilePath, cacheMapFilename)
+	data, err = ioutil.ReadFile(cacheMapFilePath)
 	if err != nil {
 		return tm, nil, err
 	}
@@ -95,6 +115,30 @@ func RestoreTimestampOffset(doneFilePath string) (time.Time, map[string]string, 
 		return tm, nil, err
 	}
 	return tm, cache, nil
+}
+
+func RestoreTimestampStrOffset(doneFilePath string) (string, map[string]string, error) {
+	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, TimestampRecordsFile)
+	cacheMapFilename := fmt.Sprintf("%v.%v", reader.DoneFileName, CacheMapFile)
+
+	filePath := filepath.Join(doneFilePath, filename)
+	data, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return "", nil, err
+	}
+
+	tmStr := string(data)
+	cacheMapFilePath := filepath.Join(doneFilePath, cacheMapFilename)
+	data, err = ioutil.ReadFile(cacheMapFilePath)
+	if err != nil {
+		return "", nil, err
+	}
+	cache := make(map[string]string)
+	err = json.Unmarshal(data, &cache)
+	if err != nil {
+		return "", nil, err
+	}
+	return tmStr, cache, nil
 }
 
 func WriteCacheMap(doneFilePath string, cache map[string]string) (err error) {
@@ -119,7 +163,7 @@ func WriteCacheMap(doneFilePath string, cache map[string]string) (err error) {
 	return f.Sync()
 }
 
-func WriteTimestmapOffset(doneFilePath, content string) (err error) {
+func WriteTimestampOffset(doneFilePath, content string) (err error) {
 	var f *os.File
 	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, TimestampRecordsFile)
 	filePath := filepath.Join(doneFilePath, filename)
@@ -144,6 +188,25 @@ func WriteRecordsFile(doneFilePath, content string) (err error) {
 	filePath := filepath.Join(doneFilePath, filename)
 	// write to tmp file
 	f, err = os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, models.DefaultFilePerm)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = f.Write([]byte(content))
+	if err != nil {
+		return err
+	}
+
+	return f.Sync()
+}
+
+// WriteSqlsFile 将当前文件写入donefiel中
+func WriteSqlsFile(doneFilePath, content string) (err error) {
+	var f *os.File
+	filename := fmt.Sprintf("%v.%v", reader.DoneFileName, DefaultDoneSqlsFile)
+	filePath := filepath.Join(doneFilePath, filename)
+	// write to tmp file
+	f, err = os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, models.DefaultFilePerm)
 	if err != nil {
 		return err
 	}

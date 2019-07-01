@@ -74,7 +74,7 @@ func (g *Converter) Transform(datas []Data) ([]Data, error) {
 	if len(g.schemas) == 0 {
 		err = errors.New("no valid dsl[" + g.DSL + "] to schema, please enter correct format dsl: \"field type\"")
 		g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(dataLen), int64(dataLen), g.Type())
-		return datas, err
+		return datas, fmtErr
 	}
 
 	if dataLen < numRoutine {
@@ -196,7 +196,7 @@ func getField(f string) (key, valueType, elementType string, defaultVal interfac
 		}
 	}
 	valueType = f
-	//处理arrary类型
+	//处理array类型
 	if beg := strings.Index(valueType, "("); beg != -1 {
 		ed := strings.Index(valueType, ")")
 		if ed <= beg {
@@ -245,7 +245,7 @@ func getRawType(tp string) (schemaType string, err error) {
 	case "d", "date":
 		schemaType = pipeline.PandoraTypeDate
 	case "a", "array":
-		return schemaType, errors.New("arrary type must specify data type surrounded by ( )")
+		return schemaType, errors.New("array type must specify data type surrounded by ( )")
 	case "m", "map":
 		schemaType = pipeline.PandoraTypeMap
 	case "b", "bool", "boolean":
@@ -426,6 +426,10 @@ func dataConvert(data interface{}, schema DslSchemaEntry) (converted interface{}
 			if err == nil {
 				return string(str), nil
 			}
+		case time.Time:
+			return value.Format(time.RFC3339Nano), nil
+		case *time.Time:
+			return value.Format(time.RFC3339Nano), nil
 		case nil:
 			if schema.Default != nil {
 				return schema.Default, nil

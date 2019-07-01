@@ -224,7 +224,7 @@ func (dr *dirReader) SyncMeta() string {
 }
 
 func (dr *dirReader) Close() error {
-	defer log.Warnf("Runner[%v] log path[%v] reader has closed", dr.runnerName, dr.originalPath)
+	defer log.Debugf("Runner[%v] log path[%v] reader has closed", dr.runnerName, dr.originalPath)
 	dr.SyncMeta()
 	err := dr.br.Close()
 	if atomic.CompareAndSwapInt32(&dr.status, StatusRunning, StatusStopping) {
@@ -239,7 +239,7 @@ func (dr *dirReader) Close() error {
 		waitedTimes++
 		// 超过 300 个 10ms，即 3s 就强行退出
 		if waitedTimes > 300 {
-			log.Errorf("Runner[%v] log path[%v] reader was not closed after 3s, force closing it", dr.runnerName, dr.originalPath)
+			log.Debugf("Runner[%v] log path[%v] reader was not closed after 3s, force closing it", dr.runnerName, dr.originalPath)
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -329,7 +329,7 @@ func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool) (*dir
 			return nil, fmt.Errorf("new extract reader: %v", err)
 		}
 	} else {
-		fr, err := seqfile.NewSeqFile(subMeta, opts.LogPath, opts.IgnoreHidden, opts.NewFileNewLine, opts.IgnoreFileSuffixes, opts.ValidFilesRegex, opts.Whence, opts.expireMap)
+		fr, err := seqfile.NewSeqFile(subMeta, opts.LogPath, opts.IgnoreHidden, opts.NewFileNewLine, opts.IgnoreFileSuffixes, opts.ValidFilesRegex, opts.Whence, opts.expireMap, true)
 		if err != nil {
 			return nil, fmt.Errorf("new sequence file: %v", err)
 		}

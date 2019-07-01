@@ -20,8 +20,8 @@ import (
 	parserconfig "github.com/qiniu/logkit/parser/config"
 	"github.com/qiniu/logkit/parser/raw"
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/reader/bufreader"
 	. "github.com/qiniu/logkit/reader/config"
-	"github.com/qiniu/logkit/reader/tailx"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/sender/pandora"
 	"github.com/qiniu/logkit/utils"
@@ -32,25 +32,29 @@ const (
 	DefaultSendTime        = 3
 	DefaultSelfLogRepoName = "logkit_self_log"
 	DebugPattern           = `^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} \[DEBUG\]`
+	ValidFilePattern       = "valid_file_pattern"
 )
 
 var (
 	debugRegex   = regexp.MustCompile(DebugPattern)
 	readerConfig = conf.MapConf{
-		"runner_name":    DefaultSelfRunnerName,
-		"name":           DefaultSelfRunnerName,
-		"mode":           "tailx",
-		"log_path":       "",
-		"read_from":      WhenceNewest,
-		"encoding":       "UTF-8",
-		"datasource_tag": "datasource",
-		"expire":         "0s",
-		"submeta_expire": "0s",
-		"head_pattern":   `^(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} \[(WARN)|(INFO)|(ERROR)]|(DEBUG)\])`,
+		"runner_name":        DefaultSelfRunnerName,
+		"name":               DefaultSelfRunnerName,
+		"encoding":           "UTF-8",
+		"ignore_file_suffix": ".pid,.swap,.go,.conf,.tar.gz,.tar,.zip,.a,.o,.so",
+		"ignore_hidden":      "true",
+		"log_path":           "",
+		"mode":               "dir",
+		"newfile_newline":    "false",
+		"read_from":          WhenceNewest,
+		"read_same_inode":    "false",
+		"skip_first_line":    "false",
+		ValidFilePattern:     "logkit.log-*",
+		"head_pattern":       `^(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} \[(WARN)|(INFO)|(ERROR)]|(DEBUG)\])`,
 	}
 	parserConfig = conf.MapConf{
-		"type": "raw",
-		"name": "parser",
+		"type":                   "raw",
+		"name":                   "parser",
 		"disable_record_errdata": "true",
 	}
 	senderConfig = conf.MapConf{
@@ -139,7 +143,7 @@ func NewLogRunner(rdConf, psConf, sdConf conf.MapConf, envTag string) (*LogRunne
 		}
 	}()
 
-	if rd, err = tailx.NewReader(meta, rdConf); err != nil {
+	if rd, err = bufreader.NewFileDirReader(meta, rdConf); err != nil {
 		return nil, err
 	}
 	if ps, err = raw.NewParser(psConf); err != nil {
@@ -217,7 +221,6 @@ func (lr *LogRunner) Run() {
 		}
 		log.Debugf("Runner[%s] send %s finish to send at: %v", lr.Name(), lr.reader.Name(), time.Now().Format(time.RFC3339))
 	}
-	return
 }
 
 func (lr *LogRunner) Stop() error {
@@ -352,11 +355,14 @@ func (lr *LogRunner) GetSenderConfig() conf.MapConf {
 	return lr.senderConfig
 }
 
-func SetReaderConfig(readConf conf.MapConf, logpath, metapath, from string) conf.MapConf {
+func SetReaderConfig(readConf conf.MapConf, logpath, filePattern, metapath, from string) conf.MapConf {
 	rdConf := conf.DeepCopy(readConf)
 	logpath = strings.TrimSpace(logpath)
 	if logpath != "" {
 		rdConf["log_path"] = logpath
+	}
+	if filePattern != "" {
+		rdConf[ValidFilePattern] = filePattern
 	}
 	if metapath != "" {
 		path, err := filepath.Abs(metapath)

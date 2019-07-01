@@ -21,10 +21,11 @@ const (
 	KeyPandoraSchemaFree           = "pandora_schema_free"
 	KeyPandoraExtraInfo            = "pandora_extra_info"
 
-	KeyPandoraEnableLogDB   = "pandora_enable_logdb"
-	KeyPandoraLogDBName     = "pandora_logdb_name"
-	KeyPandoraLogDBHost     = "pandora_logdb_host"
-	KeyPandoraLogDBAnalyzer = "pandora_logdb_analyzer"
+	KeyPandoraEnableLogDB    = "pandora_enable_logdb"
+	KeyPandoraLogDBName      = "pandora_logdb_name"
+	KeyPandoraLogDBHost      = "pandora_logdb_host"
+	KeyPandoraLogDBAnalyzer  = "pandora_logdb_analyzer"
+	KeyPandoraLogdbRetention = "pandora_logdb_retention"
 
 	KeyPandoraEnableTSDB     = "pandora_enable_tsdb"
 	KeyPandoraTSDBName       = "pandora_tsdb_name"

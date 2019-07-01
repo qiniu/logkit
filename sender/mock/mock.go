@@ -41,7 +41,7 @@ func NewSender(c conf.MapConf) (sender.Sender, error) {
 	return ms, nil
 }
 
-//Name function will return the name and datas recieved as string
+//Name function will return the name and datas received as string
 func (mock *Sender) Name() string {
 	mock.mux.Lock()
 	defer mock.mux.Unlock()
@@ -86,4 +86,4 @@ func (mock *Sender) SendCount() int {
 	return mock.count
 }
 
-func (_ *Sender) SkipDeepCopy() bool { return true }
+func (*Sender) SkipDeepCopy() bool { return true }

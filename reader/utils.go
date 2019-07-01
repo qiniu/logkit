@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -181,4 +182,132 @@ func IgnoreHidden(file string, ignoreHidden bool) bool {
 		return true
 	}
 	return false
+}
+
+type RunTime struct {
+	StartHour, StartMin int
+	EndHour, EndMin     int
+}
+
+func (r RunTime) Equal() bool {
+	return r.StartHour == r.EndHour && r.StartMin == r.EndMin
+}
+
+func (r RunTime) GreaterThanStart(hour, minute int) bool {
+	return hour > r.StartHour || (hour == r.StartHour && minute >= r.StartMin)
+}
+
+func (r RunTime) LessThanEnd(hour, minute int) bool {
+	return hour < r.EndHour || (hour == r.EndHour && minute < r.EndMin)
+}
+
+func (r RunTime) isStartLessThanEnd() bool {
+	return r.StartHour < r.EndHour || (r.StartHour == r.EndHour && r.StartMin < r.EndMin)
+}
+
+func ParseRunTime(runTimeStr string) (runTime RunTime, err error) {
+	runTimeStr = strings.TrimSpace(runTimeStr)
+	if runTimeStr == "" {
+		return RunTime{}, errors.New("empty string, must be 'hh:mm' (use 24 hour)")
+	}
+
+	runTimeArr := strings.SplitN(runTimeStr, "-", 2)
+	startHour, startMin, err := ParseTime(runTimeArr[0])
+	if err != nil {
+		return RunTime{}, err
+	}
+	if len(runTimeArr) == 1 {
+		return RunTime{
+			StartHour: startHour,
+			StartMin:  startMin,
+		}, nil
+	}
+
+	endHour, endMin, err := ParseTime(runTimeArr[1])
+	if err != nil {
+		return RunTime{}, err
+	}
+	return RunTime{
+		StartHour: startHour,
+		StartMin:  startMin,
+		EndHour:   endHour,
+		EndMin:    endMin,
+	}, nil
+}
+
+func ParseTime(timeStr string) (hour, minute int, err error) {
+	timeStr = strings.TrimSpace(timeStr)
+	if timeStr == "" {
+		return 0, 0, nil
+	}
+	timeArr := strings.SplitN(timeStr, ":", 2)
+
+	hour, err = ParseNumber(timeArr[0])
+	if err != nil {
+		return 0, 0, err
+	}
+	hour = hour % 24
+	if len(timeArr) == 1 {
+		return hour, 0, nil
+	}
+
+	minute, err = ParseNumber(timeArr[1])
+	if err != nil {
+		return 0, 0, err
+	}
+	minute = minute % 60
+	return hour, minute, nil
+}
+
+func ParseNumber(str string) (number int, err error) {
+	str = strings.TrimSpace(str)
+	str = strings.TrimLeft(str, "0")
+	if str != "" {
+		number, err = strconv.Atoi(str)
+		if err != nil {
+			return 0, errors.New("parse run_time failed: " + err.Error())
+		}
+	}
+	return number, nil
+}
+
+func InRunTime(hour, minute int, runTime RunTime) bool {
+	if runTime.Equal() {
+		return true
+	}
+
+	if !runTime.isStartLessThanEnd() {
+		if runTime.GreaterThanStart(hour, minute) || runTime.LessThanEnd(hour, minute) {
+			return true
+		}
+		return false
+	}
+
+	if runTime.GreaterThanStart(hour, minute) && runTime.LessThanEnd(hour, minute) {
+		return true
+	}
+
+	return false
+}
+
+func ParseRunTimeWithMode(mode string, v interface{}) (runTime RunTime, err error) {
+	switch mode {
+	case config.ReadModeRunTimeString:
+		runTimeStr, ok := v.(string)
+		if !ok {
+			err = fmt.Errorf(" %v is not string", v)
+			return RunTime{}, err
+		}
+		return ParseRunTime(runTimeStr)
+	case config.ReadModeRunTimeStruct:
+		var ok bool
+		runTime, ok = v.(RunTime)
+		if !ok {
+			err = fmt.Errorf(" %v is not RunTime struct value", v)
+			return RunTime{}, err
+		}
+		return runTime, nil
+	default:
+		return RunTime{}, errors.New("unknown ParseRunTime " + mode)
+	}
 }

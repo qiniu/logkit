@@ -8,6 +8,7 @@ import (
 
 	_ "github.com/denisenkom/go-mssqldb" //mssql 驱动
 	_ "github.com/go-sql-driver/mysql"   //mysql 驱动
+
 	//postgres 驱动
 	"github.com/qiniu/logkit/reader/sql/datagen"
 	utilsos "github.com/qiniu/logkit/utils/os"
@@ -74,7 +75,14 @@ func main() {
 	}
 	switch *databaseType {
 	case "mysql":
-		fmt.Println("mysql is not supported now")
+		fmt.Printf("Start to generate data to %s %s %s %s %s ", *host, *port, *username, *database, *table)
+		if *totalnumber <= 0 {
+			fmt.Printf("will generate data forever\n")
+		} else {
+			fmt.Printf("will generate total %v data\n", *totalnumber)
+		}
+		datasource := *username + ":" + *password + "@tcp(" + *host + ":" + *port + ")" + "/" + *database + "?charset="
+		datagen.GenerateMysqlData(datasource, *table, *totalnumber, 100*time.Millisecond, time.Hour, time.Now().Add(-100*time.Hour), false)
 	case "postgres":
 		fmt.Printf("Start to generate data to %s %s %s %s %s ", *host, *port, *username, *database, *table)
 		if *totalnumber <= 0 {

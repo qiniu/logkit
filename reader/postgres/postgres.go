@@ -34,12 +34,6 @@ func init() {
 	reader.RegisterConstructor(ModePostgreSQL, NewPostgresReader)
 }
 
-type readInfo struct {
-	data  models.Data
-	bytes int64
-	json  string //排序去重时使用，其他时候无用
-}
-
 type PostgresReader struct {
 	meta *reader.Meta
 	// Note: 原子操作，用于表示 reader 整体的运行状态
@@ -54,7 +48,7 @@ type PostgresReader struct {
 	routineStatus int32
 
 	stopChan chan struct{}
-	readChan chan readInfo
+	readChan chan ReadInfo
 	errChan  chan error
 
 	stats     models.StatsInfo
@@ -201,7 +195,7 @@ func NewPostgresReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, err
 		status:          StatusInit,
 		routineStatus:   StatusInit,
 		stopChan:        make(chan struct{}),
-		readChan:        make(chan readInfo),
+		readChan:        make(chan ReadInfo),
 		errChan:         make(chan error),
 		datasource:      dataSource,
 		database:        rawDatabase,
@@ -375,7 +369,7 @@ func (r *PostgresReader) ReadData() (models.Data, int64, error) {
 	defer timer.Stop()
 	select {
 	case info := <-r.readChan:
-		return info.data, info.bytes, nil
+		return info.Data, info.Bytes, nil
 	case err := <-r.errChan:
 		return nil, 0, err
 	case <-timer.C:
@@ -424,8 +418,8 @@ func (r *PostgresReader) SyncMeta() {
 		} else {
 			content = r.startTime.Format(time.RFC3339Nano)
 		}
-		if err := WriteTimestmapOffset(r.meta.DoneFilePath, content); err != nil {
-			log.Errorf("Runner[%v] %v SyncMeta WriteTimestmapOffset error %v", r.meta.RunnerName, r.Name(), err)
+		if err := WriteTimestampOffset(r.meta.DoneFilePath, content); err != nil {
+			log.Errorf("Runner[%v] %v SyncMeta WriteTimestampOffset error %v", r.meta.RunnerName, r.Name(), err)
 		}
 		if err := WriteCacheMap(r.meta.DoneFilePath, r.timeCacheMap); err != nil {
 			log.Errorf("Runner[%v] %v SyncMeta WriteCacheMap error %v", r.meta.RunnerName, r.Name(), err)
@@ -462,6 +456,8 @@ func (r *PostgresReader) Close() error {
 		close(r.readChan)
 		close(r.errChan)
 	}
+
+	r.SyncMeta()
 	return nil
 }
 
@@ -524,19 +520,6 @@ func (r *PostgresReader) run() {
 		time.Sleep(3 * time.Second)
 	}
 	log.Errorf("Runner[%v] %q task execution failed and gave up after 10 tries", r.meta.RunnerName, r.Name())
-}
-
-func (r *PostgresReader) getOffsetIndex(columns []string) int {
-	offsetKeyIndex := -1
-	for idx, key := range columns {
-		if len(r.offsetKey) > 0 && key == r.offsetKey {
-			return idx
-		}
-		if len(r.timestampKey) > 0 && key == r.timestampKey {
-			return idx
-		}
-	}
-	return offsetKeyIndex
 }
 
 func (r *PostgresReader) execReadDB(curDB string, now time.Time, recordTablesDone TableRecords) (err error) {
@@ -671,7 +654,7 @@ func (r *PostgresReader) checkExit(idx int, db *sql.DB) (bool, int64) {
 		} else {
 			tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v >= '%s';", rawSQL, r.timestampKey, r.startTime.Format(PgtimeFormat))
 		}
-		largerAmount, err := queryNumber(tsql, db)
+		largerAmount, err := QueryNumber(tsql, db)
 		if err != nil || largerAmount <= int64(len(r.timeCacheMap)) {
 			//查询失败或者数据量不变本轮就先退出了
 			return true, -1
@@ -683,7 +666,7 @@ func (r *PostgresReader) checkExit(idx int, db *sql.DB) (bool, int64) {
 		} else {
 			tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v = '%s';", rawSQL, r.timestampKey, r.startTime.Format(PgtimeFormat))
 		}
-		equalAmount, err := queryNumber(tsql, db)
+		equalAmount, err := QueryNumber(tsql, db)
 		if err == nil && equalAmount > int64(len(r.timeCacheMap)) {
 			//说明还有新数据在原来的时间点，不能退出，且还要再查
 			return false, -1
@@ -704,7 +687,7 @@ func (r *PostgresReader) checkExit(idx int, db *sql.DB) (bool, int64) {
 		tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v >= %v;", r.offsetKey, r.offsetKey, rawSQL, r.offsetKey, r.offsets[idx])
 	}
 
-	log.Info("query <", tsql, "> to check exit")
+	log.Debug("query <", tsql, "> to check exit")
 	rows, err := db.Query(tsql)
 	if err != nil {
 		log.Error(err)
@@ -719,7 +702,7 @@ func (r *PostgresReader) checkExit(idx int, db *sql.DB) (bool, int64) {
 	}
 	scanArgs, _ := GetInitScans(len(columns), rows, r.schemas, r.meta.RunnerName, r.Name())
 	r.firstPrinted = true
-	offsetKeyIndex := r.getOffsetIndex(columns)
+	offsetKeyIndex := GetOffsetIndexWithTimeStamp(r.offsetKey, r.timestampKey, columns)
 	for rows.Next() {
 		err = rows.Scan(scanArgs...)
 		if err != nil {
@@ -794,8 +777,8 @@ func (r *PostgresReader) checkCron() bool {
 	return r.isLoop || r.cronSchedule
 }
 
-func (r *PostgresReader) getAllDatas(rows *sql.Rows, scanArgs []interface{}, columns []string, nochiced []bool) ([]readInfo, bool) {
-	datas := make([]readInfo, 0)
+func (r *PostgresReader) getAllDatas(rows *sql.Rows, scanArgs []interface{}, columns []string, nochiced []bool) ([]ReadInfo, bool) {
+	datas := make([]ReadInfo, 0)
 	for rows.Next() {
 		// get RawBytes from data
 		err := rows.Scan(scanArgs...)
@@ -825,7 +808,7 @@ func (r *PostgresReader) getAllDatas(rows *sql.Rows, scanArgs []interface{}, col
 			log.Warnf("Runner[%v] %v stopped from running", r.meta.RunnerName, r.Name())
 			return nil, true
 		}
-		datas = append(datas, readInfo{data: data, bytes: totalBytes})
+		datas = append(datas, ReadInfo{Data: data, Bytes: totalBytes})
 	}
 	return datas, false
 }
@@ -854,7 +837,7 @@ func (r *PostgresReader) execReadSql(curDB, execSQL string, idx int, tables []st
 	r.firstPrinted = true
 	var offsetKeyIndex int
 	if r.rawSQLs != "" {
-		offsetKeyIndex = r.getOffsetIndex(columns)
+		offsetKeyIndex = GetOffsetIndexWithTimeStamp(r.offsetKey, r.timestampKey, columns)
 	}
 
 	alldatas, closed := r.getAllDatas(rows, scanArgs, columns, nochiced)
@@ -862,7 +845,7 @@ func (r *PostgresReader) execReadSql(curDB, execSQL string, idx int, tables []st
 		return exit, readSize, nil
 	}
 	total := len(alldatas)
-	alldatas = r.trimeExistData(alldatas)
+	alldatas = r.trimExistData(alldatas)
 
 	// Fetch rows
 	var maxOffset int64 = -1
@@ -887,9 +870,12 @@ func (r *PostgresReader) execReadSql(curDB, execSQL string, idx int, tables []st
 	} else {
 		startTimePrint = r.startTime.String()
 	}
-	log.Infof("Runner[%v] SQL: <%v> find total %d data, after trim duplicated, left data is: %d, "+
-		"now we have total got %v data, and start time is %v ",
-		r.meta.RunnerName, execSQL, total, len(alldatas), len(r.timeCacheMap), startTimePrint)
+	if len(alldatas) != 0 {
+		log.Infof("Runner[%v] SQL: <%v> find total %d data, after trim duplicated, left data is: %d, "+
+			"now we have total got %v data, and start time is %v ",
+			r.meta.RunnerName, execSQL, total, len(alldatas), len(r.timeCacheMap), startTimePrint)
+	}
+
 	if maxOffset > 0 {
 		r.offsets[idx] = maxOffset + 1
 	}

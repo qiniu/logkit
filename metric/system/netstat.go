@@ -49,19 +49,19 @@ type NetStats struct {
 	ps PS
 }
 
-func (_ *NetStats) Name() string {
+func (*NetStats) Name() string {
 	return TypeMetricNetstat
 }
 
-func (_ *NetStats) Usages() string {
+func (*NetStats) Usages() string {
 	return MetricNetstatUsages
 }
 
-func (_ *NetStats) Tags() []string {
+func (*NetStats) Tags() []string {
 	return []string{}
 }
 
-func (_ *NetStats) Config() map[string]interface{} {
+func (*NetStats) Config() map[string]interface{} {
 	config := map[string]interface{}{
 		metric.OptionString:     []Option{},
 		metric.AttributesString: KeyNetStatUsages,

@@ -417,8 +417,6 @@ func (r *Reader) ReadLine() (string, error) {
 	case <-timer.C:
 		return "", r.readError()
 	}
-
-	return "", nil
 }
 
 func (r *Reader) Status() StatsInfo {
@@ -464,9 +462,14 @@ func (r *Reader) Close() error {
 	r.dirReaders.Close()
 	r.SyncMeta()
 
-	// 在所有 dirReader 关闭完成后再关闭管道
+	// errChan 关闭完成后再关闭管道
+	select {
+	case <-r.errChan:
+	default:
+	}
 	close(r.msgChan)
 	close(r.errChan)
+
 	return nil
 }
 

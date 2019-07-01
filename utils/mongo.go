@@ -9,7 +9,7 @@ import (
 	"github.com/qiniu/log"
 )
 
-var g_modes = map[string]int{
+var modes = map[string]int{
 	"eventual":  0,
 	"monotonic": 1,
 	"mono":      1,
@@ -51,7 +51,7 @@ func MongoDail(host string, mode string, syncTimeoutInS int64) (session *mgo.Ses
 }
 
 func SetMode(s *mgo.Session, modeFriendly string, refresh bool) {
-	mode, ok := g_modes[strings.ToLower(modeFriendly)]
+	mode, ok := modes[strings.ToLower(modeFriendly)]
 	if !ok {
 		log.Fatal("invalid mgo mode")
 	}

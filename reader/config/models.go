@@ -26,6 +26,7 @@ const (
 	KeyNewFileNewLine    = "newfile_newline"
 	KeySkipFileFirstLine = "skip_first_line"
 	KeyReadSameInode     = "read_same_inode"
+	KeyInodeSensitive    = "inode_sensitive"
 
 	// 忽略文件路径
 	KeyIgnoreLogPath = "ignore_log_path"
@@ -40,16 +41,21 @@ const (
 	KeySubmetaExpire = "submeta_expire"
 	KeyMaxOpenFiles  = "max_open_files"
 	KeyStatInterval  = "stat_interval"
+	KeyRunTime       = "run_time"
 
-	KeyMysqlOffsetKey   = "mysql_offset_key"
-	KeyMysqlReadBatch   = "mysql_limit_batch"
-	KeyMysqlDataSource  = "mysql_datasource"
-	KeyMysqlDataBase    = "mysql_database"
-	KeyMysqlSQL         = "mysql_sql"
-	KeyMysqlCron        = "mysql_cron"
-	KeyMysqlExecOnStart = "mysql_exec_onstart"
-	KeyMysqlHistoryAll  = "mysql_history_all"
-	KyeMysqlTable       = "mysql_table"
+	KeyMysqlOffsetKey     = "mysql_offset_key"
+	KeyMysqlTimestampKey  = "mysql_timestamp_key"
+	KeyMysqlStartTime     = "mysql_start_time"
+	KeyMysqlBatchDuration = "mysql_batch_intervel"
+	KeyMysqlTimestampInt  = "mysql_timestamp_int"
+	KeyMysqlReadBatch     = "mysql_limit_batch"
+	KeyMysqlDataSource    = "mysql_datasource"
+	KeyMysqlDataBase      = "mysql_database"
+	KeyMysqlSQL           = "mysql_sql"
+	KeyMysqlCron          = "mysql_cron"
+	KeyMysqlExecOnStart   = "mysql_exec_onstart"
+	KeyMysqlHistoryAll    = "mysql_history_all"
+	KyeMysqlTable         = "mysql_table"
 
 	KeySQLSchema        = "sql_schema"
 	KeyMagicLagDuration = "magic_lag_duration"
@@ -112,6 +118,16 @@ const (
 	KeyScriptExecOnStart = "script_exec_onstart"
 
 	KeyErrDirectReturn = "errDirectReturn"
+
+	KeyHttpExecOnStart     = "http_exec_onstart"
+	KeyHttpCron            = "http_cron"
+	KeyHttpMethod          = "http_method"
+	KeyHttpHeaders         = "http_headers"
+	KeyHttpPageSize        = "http_page_size"
+	KeyHttpPageNo          = "http_page_no"
+	KeyHttpBody            = "http_body"
+	KeyHttpDialTimeout     = "http_dial_timeout"
+	KeyHttpResponseTimeout = "http_response_timeout"
 )
 
 // Constants for cloudtrail
@@ -295,6 +311,7 @@ const (
 	ModeRedis      = "redis"
 	ModeSocket     = "socket"
 	ModeHTTP       = "http"
+	ModeHTTPFETCH  = "httpfetch"
 	ModeScript     = "script"
 	ModeSnmp       = "snmp"
 	ModeCloudWatch = "cloudwatch"
@@ -304,6 +321,9 @@ const (
 const (
 	ReadModeHeadPatternString = "mode_head_pattern_string"
 	ReadModeHeadPatternRegexp = "mode_head_pattern_regexp"
+
+	ReadModeRunTimeString = "mode_run_time_string"
+	ReadModeRunTimeStruct = "mode_run_time_struct"
 )
 
 // KeyWhence 的可选项

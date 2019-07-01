@@ -6,7 +6,6 @@ import (
 	"path"
 	"reflect"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 
@@ -18,6 +17,7 @@ import (
 	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/reader/sql"
+	"github.com/qiniu/logkit/reader/sql/datagen"
 	. "github.com/qiniu/logkit/reader/test"
 	"github.com/qiniu/logkit/utils/models"
 )
@@ -45,7 +45,6 @@ type CronInfo struct {
 
 var (
 	dbSource   = "root:@tcp(127.0.0.1:3306)"
-	pgDbSource = "host=127.0.0.1 port=5432 connect_timeout=10 user=postgres password=lyt  sslmode=disable"
 	connectStr = dbSource + "/?charset=gbk"
 	now        = time.Now()
 	year       = getDateStr(now.Year())
@@ -100,11 +99,12 @@ func TestMySql(t *testing.T) {
 			t.Errorf("clean mysql database failed: %v", err)
 		}
 	}()
+	submissionDate, _ := time.ParseInLocation("2006-01-02", year+"-"+month+"-"+day, time.Local)
 	expectData := models.Data{
 		"runoob_id":       int64(1),
 		"runoob_title":    "学习 mysql",
 		"runoob_author":   "教程",
-		"submission_date": year + "-" + month + "-" + day,
+		"submission_date": submissionDate,
 	}
 
 	runnerName := "mrOnce"
@@ -144,16 +144,31 @@ func TestMySql(t *testing.T) {
 		if len(data) <= 0 {
 			continue
 		}
-		assert.Equal(t, int64(36), bytes)
+		assert.Equal(t, int64(46), bytes)
 		assert.Equal(t, expectData, data)
 		dataLine++
 	}
 	assert.Equal(t, 1, dataLine)
 
-	// test exec on start
-	runnerName = "mr"
-	mr, err = getMySqlReader(false, false, false, runnerName, CronInfo{})
-	assert.NoError(t, err)
+	// sqls
+	runnerName = "mrOnce_sqls"
+	mr, err = reader.NewReader(conf.MapConf{
+		"mysql_database":     "Test_MySql20180510",
+		"mysql_sql":          "select * from runoob_tbl20180510est",
+		"mysql_limit_batch":  "100",
+		"mysql_history_all":  "true",
+		"mode":               "mysql",
+		"mysql_exec_onstart": "true",
+		"encoding":           "gbk",
+		"mysql_datasource":   "${TestMySql_dbSource}",
+		"meta_path":          path.Join(MetaDir, runnerName),
+		"file_done":          path.Join(MetaDir, runnerName),
+		"runner_name":        runnerName,
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(MetaDir)
 	r, ok = mr.(reader.DataReader)
 	if !ok {
 		t.Error("mysql read should have readdata interface")
@@ -170,117 +185,38 @@ func TestMySql(t *testing.T) {
 		if len(data) <= 0 {
 			continue
 		}
-		assert.Equal(t, int64(36), bytes)
+		assert.Equal(t, int64(46), bytes)
 		assert.Equal(t, expectData, data)
 		dataLine++
 	}
-	assert.Equal(t, todayDataTestsLine, dataLine)
-	mr.SyncMeta()
-
-	// test sync Records
-	dataLine = 0
-	before = time.Now()
-	for !batchTimeout(before, 2) {
-		data, bytes, err := r.ReadData()
-		if err != nil {
-			t.Error(err)
-		}
-		if len(data) <= 0 {
-			continue
-		}
-		assert.Equal(t, int64(36), bytes)
-		assert.Equal(t, expectData, data)
-		dataLine++
-	}
-	assert.Equal(t, 0, dataLine)
-	mr.SyncMeta()
+	assert.Equal(t, 1, dataLine)
 	mr.Close()
 
-	// test exec on start, sql not empty
-	runnerName = "mrRawSql"
-	mrRawSql, err := getMySqlReader(false, true, false, runnerName, CronInfo{})
-	assert.NoError(t, err)
-	mrRawSqlData, ok := mrRawSql.(reader.DataReader)
+	mr, err = reader.NewReader(conf.MapConf{
+		"mysql_database":     "Test_MySql20180510",
+		"mysql_sql":          "select * from runoob_tbl20180510est",
+		"mysql_limit_batch":  "100",
+		"mysql_history_all":  "true",
+		"mode":               "mysql",
+		"mysql_exec_onstart": "true",
+		"encoding":           "gbk",
+		"mysql_datasource":   "${TestMySql_dbSource}",
+		"meta_path":          path.Join(MetaDir, runnerName),
+		"file_done":          path.Join(MetaDir, runnerName),
+		"runner_name":        runnerName,
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok = mr.(reader.DataReader)
 	if !ok {
 		t.Error("mysql read should have readdata interface")
 	}
-	assert.NoError(t, mrRawSql.(*MysqlReader).Start())
-
+	assert.NoError(t, mr.(*MysqlReader).Start())
 	dataLine = 0
 	before = time.Now()
 	for !batchTimeout(before, 2) {
-		data, bytes, err := mrRawSqlData.ReadData()
-		if err != nil {
-			t.Error(err)
-		}
-		if len(data) <= 0 {
-			continue
-		}
-		assert.Equal(t, int64(36), bytes)
-		assert.Equal(t, expectData, data)
-		dataLine++
-	}
-	assert.Equal(t, todayDataTestsLine, dataLine)
-	mrRawSql.SyncMeta()
-
-	// no sync Records when raw sql is not empty
-	dataLine = 0
-	before = time.Now()
-	for !batchTimeout(before, 2) {
-		data, bytes, err := mrRawSqlData.ReadData()
-		if err != nil {
-			t.Error(err)
-		}
-		if len(data) <= 0 {
-			continue
-		}
-		assert.Equal(t, int64(36), bytes)
-		assert.Equal(t, expectData, data)
-		dataLine++
-	}
-	assert.Equal(t, 0, dataLine)
-	mrRawSql.SyncMeta()
-	mrRawSql.Close()
-
-	// test history all
-	runnerName = "mrHistoryAll"
-	mrHistoryAll, err := getMySqlReader(true, false, false, runnerName, CronInfo{})
-	assert.NoError(t, err)
-	mrHistoryAllData, ok := mrHistoryAll.(reader.DataReader)
-	if !ok {
-		t.Error("mysql read should have readdata interface")
-	}
-	assert.NoError(t, mrHistoryAll.(*MysqlReader).Start())
-
-	dataLine = 0
-	before = time.Now()
-	for !batchTimeout(before, 2) {
-		data, bytes, err := mrHistoryAllData.ReadData()
-		if err != nil {
-			t.Error(err)
-		}
-		if len(data) <= 0 {
-			continue
-		}
-		assert.Equal(t, int64(36), bytes)
-		assert.Equal(t, expectData, data)
-		dataLine++
-	}
-	assert.Equal(t, dayDataTestsLine+todayDataTestsLine, dataLine)
-	mrHistoryAll.SyncMeta()
-	mrHistoryAll.Close()
-
-	// test file done in meta dir
-	mrHistoryAll2, err := getMySqlReader(true, false, false, runnerName, CronInfo{})
-	assert.NoError(t, err)
-	mrHistoryAllData2, ok := mrHistoryAll2.(reader.DataReader)
-	if !ok {
-		t.Error("mysql read should have readdata interface")
-	}
-	dataLine = 0
-	before = time.Now()
-	for !batchTimeout(before, 2) {
-		data, _, err := mrHistoryAllData2.ReadData()
+		data, _, err := r.ReadData()
 		if err != nil {
 			t.Error(err)
 		}
@@ -290,153 +226,470 @@ func TestMySql(t *testing.T) {
 		dataLine++
 	}
 	assert.Equal(t, 0, dataLine)
-	mrHistoryAll2.SyncMeta()
-	mrHistoryAll2.Close()
 
-	// test cron
-	minDataTestsLine, secondAdd3, err := setMinute(time.Now())
-	if err != nil {
+	//// test exec on start
+	//runnerName = "mr"
+	//mr, err = getMySqlReader(false, false, false, runnerName, CronInfo{})
+	//assert.NoError(t, err)
+	//r, ok = mr.(reader.DataReader)
+	//if !ok {
+	//	t.Error("mysql read should have readdata interface")
+	//}
+	//assert.NoError(t, mr.(*MysqlReader).Start())
+	//
+	//dataLine = 0
+	//before = time.Now()
+	//for !batchTimeout(before, 2) {
+	//	data, bytes, err := r.ReadData()
+	//	if err != nil {
+	//		t.Error(err)
+	//	}
+	//	if len(data) <= 0 {
+	//		continue
+	//	}
+	//	assert.Equal(t, int64(46), bytes)
+	//	assert.Equal(t, expectData, data)
+	//	dataLine++
+	//}
+	//assert.Equal(t, todayDataTestsLine, dataLine)
+	//mr.SyncMeta()
+	//
+	//// test sync Records
+	//dataLine = 0
+	//before = time.Now()
+	//for !batchTimeout(before, 2) {
+	//	data, bytes, err := r.ReadData()
+	//	if err != nil {
+	//		t.Error(err)
+	//	}
+	//	if len(data) <= 0 {
+	//		continue
+	//	}
+	//	assert.Equal(t, int64(46), bytes)
+	//	assert.Equal(t, expectData, data)
+	//	dataLine++
+	//}
+	//assert.Equal(t, 0, dataLine)
+	//mr.Close()
+	//
+	//// test exec on start, sql not empty
+	//runnerName = "mrRawSql"
+	//mrRawSql, err := getMySqlReader(false, true, false, runnerName, CronInfo{})
+	//assert.NoError(t, err)
+	//mrRawSqlData, ok := mrRawSql.(reader.DataReader)
+	//if !ok {
+	//	t.Error("mysql read should have readdata interface")
+	//}
+	//assert.NoError(t, mrRawSql.(*MysqlReader).Start())
+	//
+	//dataLine = 0
+	//before = time.Now()
+	//for !batchTimeout(before, 2) {
+	//	data, bytes, err := mrRawSqlData.ReadData()
+	//	if err != nil {
+	//		t.Error(err)
+	//	}
+	//	if len(data) <= 0 {
+	//		continue
+	//	}
+	//	assert.Equal(t, int64(46), bytes)
+	//	assert.Equal(t, expectData, data)
+	//	dataLine++
+	//}
+	//assert.Equal(t, todayDataTestsLine, dataLine)
+	//mrRawSql.SyncMeta()
+	//
+	//// no sync Records when raw sql is not empty
+	//dataLine = 0
+	//before = time.Now()
+	//for !batchTimeout(before, 2) {
+	//	data, bytes, err := mrRawSqlData.ReadData()
+	//	if err != nil {
+	//		t.Error(err)
+	//	}
+	//	if len(data) <= 0 {
+	//		continue
+	//	}
+	//	assert.Equal(t, int64(46), bytes)
+	//	assert.Equal(t, expectData, data)
+	//	dataLine++
+	//}
+	//assert.Equal(t, 0, dataLine)
+	//mrRawSql.Close()
+	//
+	//// test history all
+	//runnerName = "mrHistoryAll"
+	//mrHistoryAll, err := getMySqlReader(true, false, false, runnerName, CronInfo{})
+	//assert.NoError(t, err)
+	//mrHistoryAllData, ok := mrHistoryAll.(reader.DataReader)
+	//if !ok {
+	//	t.Error("mysql read should have readdata interface")
+	//}
+	//assert.NoError(t, mrHistoryAll.(*MysqlReader).Start())
+	//
+	//dataLine = 0
+	//before = time.Now()
+	//for !batchTimeout(before, 2) {
+	//	data, bytes, err := mrHistoryAllData.ReadData()
+	//	if err != nil {
+	//		t.Error(err)
+	//	}
+	//	if len(data) <= 0 {
+	//		continue
+	//	}
+	//	assert.Equal(t, int64(46), bytes)
+	//	assert.Equal(t, expectData, data)
+	//	dataLine++
+	//}
+	//assert.Equal(t, dayDataTestsLine+todayDataTestsLine, dataLine)
+	//mrHistoryAll.Close()
+	//
+	//// test file done in meta dir
+	//mrHistoryAll2, err := getMySqlReader(true, false, false, runnerName, CronInfo{})
+	//assert.NoError(t, err)
+	//mrHistoryAllData2, ok := mrHistoryAll2.(reader.DataReader)
+	//if !ok {
+	//	t.Error("mysql read should have readdata interface")
+	//}
+	//dataLine = 0
+	//before = time.Now()
+	//for !batchTimeout(before, 2) {
+	//	data, _, err := mrHistoryAllData2.ReadData()
+	//	if err != nil {
+	//		t.Error(err)
+	//	}
+	//	if len(data) <= 0 {
+	//		continue
+	//	}
+	//	dataLine++
+	//}
+	//assert.Equal(t, 0, dataLine)
+	//mrHistoryAll2.Close()
+	//
+	//// test cron
+	//minDataTestsLine, secondAdd3, err := setMinute(time.Now())
+	//if err != nil {
+	//	t.Errorf("prepare mysql database failed: %v", err)
+	//}
+	//// cron task, not exec on start
+	//runnerName = "mrCron"
+	//mrCron, err := getMySqlReader(false, false, false, runnerName, CronInfo{true, secondAdd3, true})
+	//assert.NoError(t, err)
+	//mrCronData, ok := mrCron.(reader.DataReader)
+	//if !ok {
+	//	t.Error("mysql read should have readdata interface")
+	//}
+	//assert.NoError(t, mrCron.(*MysqlReader).Start())
+	//
+	//dataLine = 0
+	//before = time.Now()
+	//log.Infof("before: %v", before)
+	//for !batchTimeout(before, 5) {
+	//	data, bytes, err := mrCronData.ReadData()
+	//	if err != nil {
+	//		t.Error(err)
+	//	}
+	//	if len(data) <= 0 {
+	//		continue
+	//	}
+	//	assert.Equal(t, int64(46), bytes)
+	//	assert.Equal(t, expectData, data)
+	//	dataLine++
+	//}
+	//assert.Equal(t, minDataTestsLine, dataLine)
+	//mrCron.Close()
+	//
+	//// cron task, exec on start
+	//now := time.Now()
+	//minDataTestsLine, secondAdd3, err = setMinute(now)
+	//if err != nil {
+	//	t.Errorf("prepare mysql database failed: %v", err)
+	//}
+	//if now.Second() >= 57 {
+	//	minDataTestsLine++
+	//}
+	//runnerName = "mrCronExecOnStart"
+	//mrCronExecOnStart, err := getMySqlReader(false, false, false, runnerName, CronInfo{true, secondAdd3, false})
+	//assert.NoError(t, err)
+	//mrCronExecOnStartData, ok := mrCronExecOnStart.(reader.DataReader)
+	//if !ok {
+	//	t.Error("mysql read should have readdata interface")
+	//}
+	//assert.NoError(t, mrCronExecOnStart.(*MysqlReader).Start())
+	//
+	//dataLine = 0
+	//before = time.Now()
+	//log.Infof("before: %v", before)
+	//for !batchTimeout(before, 5) {
+	//	data, bytes, err := mrCronExecOnStartData.ReadData()
+	//	if err != nil {
+	//		t.Error(err)
+	//	}
+	//	if len(data) <= 0 {
+	//		continue
+	//	}
+	//	assert.Equal(t, int64(46), bytes)
+	//	assert.Equal(t, expectData, data)
+	//	dataLine++
+	//}
+	//assert.Equal(t, minDataTestsLine, dataLine)
+	//mrCronExecOnStart.Close()
+	//
+	//mrCronExecOnStart2, err := getMySqlReader(false, false, false, runnerName, CronInfo{true, secondAdd3, false})
+	//assert.NoError(t, err)
+	//mrCronExecOnStartData2, ok := mrCronExecOnStart2.(reader.DataReader)
+	//if !ok {
+	//	t.Error("mysql read should have readdata interface")
+	//}
+	//assert.NoError(t, mrCronExecOnStart2.(*MysqlReader).Start())
+	//
+	//dataLine = 0
+	//before = time.Now()
+	//log.Infof("before: %v", before)
+	//for !batchTimeout(before, 5) {
+	//	data, bytes, err := mrCronExecOnStartData2.ReadData()
+	//	if err != nil {
+	//		t.Error(err)
+	//	}
+	//	if len(data) <= 0 {
+	//		continue
+	//	}
+	//	assert.Equal(t, int64(46), bytes)
+	//	assert.Equal(t, expectData, data)
+	//	dataLine++
+	//}
+	//assert.Equal(t, 0, dataLine)
+	//mrCronExecOnStart2.Close()
+	//
+	//// cron task, exec on start
+	//minDataTestsLine, _, err = setSecond()
+	//if err != nil {
+	//	t.Errorf("prepare mysql database failed: %v", err)
+	//}
+	//runnerName = "mrLoopcOnStart"
+	//mrLoopOnStart, err := getMySqlReader(false, false, true, runnerName, CronInfo{false, "", false})
+	//assert.NoError(t, err)
+	//mrLoopOnStartData, ok := mrLoopOnStart.(reader.DataReader)
+	//if !ok {
+	//	t.Error("mysql read should have readdata interface")
+	//}
+	//assert.NoError(t, mrLoopOnStart.(*MysqlReader).Start())
+	//
+	//dataLine = 0
+	//before = time.Now()
+	//log.Infof("before: %v", before)
+	//for !batchTimeout(before, 5) {
+	//	data, bytes, err := mrLoopOnStartData.ReadData()
+	//	if err != nil {
+	//		t.Error(err)
+	//	}
+	//	if len(data) <= 0 {
+	//		continue
+	//	}
+	//	assert.Equal(t, int64(46), bytes)
+	//	assert.Equal(t, expectData, data)
+	//	dataLine++
+	//}
+	//assert.Equal(t, minDataTestsLine, dataLine)
+	//mrLoopOnStart.SyncMeta()
+	//
+	//meta, err := getMeta(path.Join(MetaDir, runnerName))
+	//assert.NoError(t, err)
+	//var doneRecords = SyncDBRecords{
+	//	Mutex: sync.RWMutex{},
+	//}
+	//lastDB, lastTable, omitDoneFile := doneRecords.RestoreRecordsFile(meta)
+	//assert.False(t, omitDoneFile)
+	//assert.Equal(t, 1, len(doneRecords.Records))
+	//expectDB := "Test_MySql" + year + month + day
+	//tableRecords := doneRecords.Records.GetTableRecords(expectDB)
+	//assert.Equal(t, 2, len(tableRecords.GetTable()))
+	//assert.Equal(t, expectDB, lastDB)
+	//assert.NotEmpty(t, lastTable)
+	//mrLoopOnStart.Close()
+}
+
+func TestMysqlWithTimestampInt(t *testing.T) {
+	database := "TestMysqlWithTimestampInt"
+	databasesTest = append(databasesTest, todayDataTests...)
+	if err := dropAndCreateDB(1, database); err != nil {
 		t.Errorf("prepare mysql database failed: %v", err)
 	}
-	// cron task, not exec on start
-	runnerName = "mrCron"
-	mrCron, err := getMySqlReader(false, false, false, runnerName, CronInfo{true, secondAdd3, true})
-	assert.NoError(t, err)
-	mrCronData, ok := mrCron.(reader.DataReader)
+	defer func() {
+		if err := dropDB(1, database); err != nil {
+			t.Errorf("clean mysql database failed: %v", err)
+		}
+	}()
+
+	os.MkdirAll(MetaDir+"/TestMysqlWithTimestampInt/", 0777)
+	defer os.RemoveAll(MetaDir)
+	tablename := "testTime"
+	runnerName := "mrTime"
+	mr, err := reader.NewReader(conf.MapConf{
+		"mysql_database":       database + "1",
+		"mode":                 "mysql",
+		"mysql_exec_onstart":   "true",
+		"encoding":             "gbk",
+		"mysql_datasource":     dbSource,
+		"mysql_timestamp_key":  "timestamp",
+		"mysql_start_time":     "0",
+		"mysql_batch_intervel": "1",
+		"mysql_timestamp_int":  "true",
+		"mysql_cron":           "loop 1s",
+		"mysql_sql":            "select * from " + tablename,
+		"meta_path":            path.Join(MetaDir, runnerName),
+		"file_done":            path.Join(MetaDir, runnerName),
+		"runner_name":          runnerName,
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := mr.(reader.DataReader)
 	if !ok {
 		t.Error("mysql read should have readdata interface")
 	}
-	assert.NoError(t, mrCron.(*MysqlReader).Start())
-
-	dataLine = 0
-	before = time.Now()
-	log.Infof("before: %v", before)
-	for !batchTimeout(before, 5) {
-		data, bytes, err := mrCronData.ReadData()
+	assert.NoError(t, mr.(*MysqlReader).Start())
+	totalnum := 10000
+	go datagen.GenerateMysqlData(dbSource+"/"+database+"1"+"?charset=gbk", tablename, int64(totalnum), 100*time.Millisecond, time.Hour, time.Now().Add(-100*time.Hour), false)
+	dataLine := 0
+	before := time.Now()
+	var actualData []models.Data
+	for !batchTimeout(before, 60) {
+		data, _, err := r.ReadData()
 		if err != nil {
-			t.Error(err)
+			continue
 		}
 		if len(data) <= 0 {
 			continue
 		}
-		assert.Equal(t, int64(36), bytes)
-		assert.Equal(t, expectData, data)
+		actualData = append(actualData, data)
 		dataLine++
+		if dataLine >= totalnum {
+			break
+		}
 	}
-	assert.Equal(t, minDataTestsLine, dataLine)
-	mrCron.SyncMeta()
-	mrCron.Close()
+	assert.Equal(t, totalnum, dataLine)
+}
 
-	// cron task, exec on start
-	now := time.Now()
-	minDataTestsLine, secondAdd3, err = setMinute(now)
-	if err != nil {
+func TestMysqlWithTimestamp(t *testing.T) {
+	database := "TestMysqlWithTimestamp"
+	databasesTest = append(databasesTest, todayDataTests...)
+	if err := dropAndCreateDB(1, database); err != nil {
 		t.Errorf("prepare mysql database failed: %v", err)
 	}
-	if now.Second() >= 57 {
-		minDataTestsLine++
-	}
-	runnerName = "mrCronExecOnStart"
-	mrCronExecOnStart, err := getMySqlReader(false, false, false, runnerName, CronInfo{true, secondAdd3, false})
-	assert.NoError(t, err)
-	mrCronExecOnStartData, ok := mrCronExecOnStart.(reader.DataReader)
-	if !ok {
-		t.Error("mysql read should have readdata interface")
-	}
-	assert.NoError(t, mrCronExecOnStart.(*MysqlReader).Start())
-
-	dataLine = 0
-	before = time.Now()
-	log.Infof("before: %v", before)
-	for !batchTimeout(before, 5) {
-		data, bytes, err := mrCronExecOnStartData.ReadData()
-		if err != nil {
-			t.Error(err)
+	defer func() {
+		if err := dropDB(1, database); err != nil {
+			t.Errorf("clean mysql database failed: %v", err)
 		}
-		if len(data) <= 0 {
-			continue
-		}
-		assert.Equal(t, int64(36), bytes)
-		assert.Equal(t, expectData, data)
-		dataLine++
-	}
-	assert.Equal(t, minDataTestsLine, dataLine)
-	mrCronExecOnStart.SyncMeta()
-	mrCronExecOnStart.Close()
+	}()
 
-	mrCronExecOnStart2, err := getMySqlReader(false, false, false, runnerName, CronInfo{true, secondAdd3, false})
-	assert.NoError(t, err)
-	mrCronExecOnStartData2, ok := mrCronExecOnStart2.(reader.DataReader)
-	if !ok {
-		t.Error("mysql read should have readdata interface")
-	}
-	assert.NoError(t, mrCronExecOnStart2.(*MysqlReader).Start())
-
-	dataLine = 0
-	before = time.Now()
-	log.Infof("before: %v", before)
-	for !batchTimeout(before, 5) {
-		data, bytes, err := mrCronExecOnStartData2.ReadData()
-		if err != nil {
-			t.Error(err)
-		}
-		if len(data) <= 0 {
-			continue
-		}
-		assert.Equal(t, int64(36), bytes)
-		assert.Equal(t, expectData, data)
-		dataLine++
-	}
-	assert.Equal(t, 0, dataLine)
-	mrCronExecOnStart2.SyncMeta()
-	mrCronExecOnStart2.Close()
-
-	// cron task, exec on start
-	minDataTestsLine, _, err = setSecond()
+	os.MkdirAll(MetaDir+"/TestMysqlWithTimestamp/", 0777)
+	defer os.RemoveAll(MetaDir)
+	tablename := "testTime"
+	runnerName := "mrTime"
+	mr, err := reader.NewReader(conf.MapConf{
+		"mysql_database":       database + "1",
+		"mode":                 "mysql",
+		"mysql_exec_onstart":   "true",
+		"encoding":             "gbk",
+		"mysql_datasource":     dbSource,
+		"mysql_timestamp_key":  "submission_date",
+		"mysql_start_time":     "2018-10-01 15:04:05",
+		"mysql_batch_intervel": "30m",
+		"mysql_cron":           "loop 1s",
+		"mysql_sql":            "select * from " + tablename,
+		"meta_path":            path.Join(MetaDir, runnerName),
+		"file_done":            path.Join(MetaDir, runnerName),
+		"runner_name":          runnerName,
+	}, true)
 	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := mr.(reader.DataReader)
+	if !ok {
+		t.Error("mysql read should have readdata interface")
+	}
+	assert.NoError(t, mr.(*MysqlReader).Start())
+	totalNum := 10000
+	go datagen.GenerateMysqlData(dbSource+"/"+database+"1"+"?charset=gbk", tablename, int64(totalNum), 100*time.Millisecond, time.Hour, time.Now().Add(-100*time.Hour), false)
+	dataLine := 0
+	before := time.Now()
+	var actualData []models.Data
+	for !batchTimeout(before, 60) {
+		data, _, err := r.ReadData()
+		if err != nil {
+			continue
+		}
+		if len(data) <= 0 {
+			continue
+		}
+		actualData = append(actualData, data)
+		dataLine++
+		if dataLine >= totalNum {
+			break
+		}
+	}
+	assert.Equal(t, totalNum, dataLine)
+}
+
+func TestMysqlWithTimestampStr(t *testing.T) {
+	database := "TestMysqlWithTimestampStr"
+	databasesTest = append(databasesTest, todayDataTests...)
+	if err := dropAndCreateDB(1, database); err != nil {
 		t.Errorf("prepare mysql database failed: %v", err)
 	}
-	runnerName = "mrLoopcOnStart"
-	mrLoopOnStart, err := getMySqlReader(false, false, true, runnerName, CronInfo{false, "", false})
-	assert.NoError(t, err)
-	mrLoopOnStartData, ok := mrLoopOnStart.(reader.DataReader)
+	defer func() {
+		if err := dropDB(1, database); err != nil {
+			t.Errorf("clean mysql database failed: %v", err)
+		}
+	}()
+
+	os.MkdirAll(MetaDir+"/TestMysqlWithTimestampStr/", 0777)
+	defer os.RemoveAll(MetaDir)
+	tablename := "testTime"
+	runnerName := "mrTime"
+	mr, err := reader.NewReader(conf.MapConf{
+		"mysql_database":      database + "1",
+		"mode":                "mysql",
+		"mysql_exec_onstart":  "true",
+		"encoding":            "gbk",
+		"mysql_datasource":    dbSource,
+		"mysql_timestamp_key": "submission_date",
+		"mysql_start_time":    "mytest20181001150405",
+		"mysql_cron":          "loop 1s",
+		"mysql_sql":           "select * from " + tablename,
+		"meta_path":           path.Join(MetaDir, runnerName),
+		"file_done":           path.Join(MetaDir, runnerName),
+		"runner_name":         runnerName,
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := mr.(reader.DataReader)
 	if !ok {
 		t.Error("mysql read should have readdata interface")
 	}
-	assert.NoError(t, mrLoopOnStart.(*MysqlReader).Start())
-
-	dataLine = 0
-	before = time.Now()
-	log.Infof("before: %v", before)
-	for !batchTimeout(before, 5) {
-		data, bytes, err := mrLoopOnStartData.ReadData()
+	assert.NoError(t, mr.(*MysqlReader).Start())
+	totalNum := 10000
+	go datagen.GenerateMysqlData(dbSource+"/"+database+"1"+"?charset=gbk", tablename, int64(totalNum), 100*time.Millisecond, time.Hour, time.Now().Add(-100*time.Hour), true)
+	dataLine := 0
+	before := time.Now()
+	var actualData []models.Data
+	for !batchTimeout(before, 60) {
+		data, _, err := r.ReadData()
 		if err != nil {
-			t.Error(err)
+			continue
 		}
 		if len(data) <= 0 {
 			continue
 		}
-		assert.Equal(t, int64(36), bytes)
-		assert.Equal(t, expectData, data)
+		actualData = append(actualData, data)
 		dataLine++
+		if dataLine >= totalNum {
+			break
+		}
 	}
-	assert.Equal(t, minDataTestsLine, dataLine)
-	mrLoopOnStart.SyncMeta()
-
-	meta, err := getMeta(path.Join(MetaDir, runnerName))
-	assert.NoError(t, err)
-	var doneRecords = SyncDBRecords{
-		Mutex: sync.RWMutex{},
-	}
-	lastDB, lastTable, omitDoneFile := doneRecords.RestoreRecordsFile(meta)
-	assert.False(t, omitDoneFile)
-	assert.Equal(t, 1, len(doneRecords.Records))
-	expectDB := "Test_MySql" + year + month + day
-	tableRecords := doneRecords.Records.GetTableRecords(expectDB)
-	assert.Equal(t, 2, len(tableRecords.GetTable()))
-	assert.Equal(t, expectDB, lastDB)
-	assert.NotEmpty(t, lastTable)
-	mrLoopOnStart.Close()
+	assert.Equal(t, totalNum, dataLine)
 }
 
 func getMySqlReader(historyAll, rawsql, loop bool, runnerName string, cronInfo CronInfo) (reader.Reader, error) {
@@ -517,6 +770,38 @@ func prepareMysql() error {
 		}
 	}
 
+	return nil
+}
+
+func dropAndCreateDB(id int, database string) error {
+	db, err := OpenSql("mysql", connectStr)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	_, err = db.Query("DROP DATABASE IF EXISTS " + database + strconv.Itoa(id))
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec("CREATE DATABASE " + database + strconv.Itoa(id))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func dropDB(id int, database string) error {
+	db, err := OpenSql("mysql", connectStr)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	_, err = db.Query("DROP DATABASE IF EXISTS " + database + strconv.Itoa(id))
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

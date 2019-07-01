@@ -156,7 +156,7 @@ func (r *Reader) Name() string {
 	return fmt.Sprintf("KafkaReader:[%s],[%s]", strings.Join(r.Topics, ","), r.ConsumerGroup)
 }
 
-func (_ *Reader) SetMode(_ string, _ interface{}) error {
+func (*Reader) SetMode(_ string, _ interface{}) error {
 	return errors.New("KafkaReader does not support read mode")
 }
 

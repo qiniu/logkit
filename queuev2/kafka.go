@@ -192,8 +192,8 @@ func (kq *kafkaQueue) startConsumer() {
 	for {
 		select {
 		case <-kq.exitChan:
-			break
 			log.Info("Kafka Queue Consumer is end")
+			break
 		case msg := <-kq.in:
 			if msg != nil && msg.Value != nil && len(msg.Value) > 0 {
 				kq.channel <- msg.Value
