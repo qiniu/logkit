@@ -725,9 +725,13 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 	se, ok := err.(*StatsError)
 	r.rsMutex.Lock()
 	if ok {
-		numErrs = se.Errors
-		err = errors.New(se.LastError)
-		r.rs.ParserStats.Errors += se.Errors
+		if se.Errors == 0 && se.LastError == "" {
+			err = nil
+		} else {
+			numErrs = se.Errors
+			err = errors.New(se.LastError)
+			r.rs.ParserStats.Errors += se.Errors
+		}
 		r.rs.ParserStats.Success += se.Success
 	} else if err != nil {
 		numErrs = 1
