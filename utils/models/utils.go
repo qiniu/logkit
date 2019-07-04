@@ -866,6 +866,9 @@ func CheckErr(err error) error {
 	se, ok := err.(*StatsError)
 	var errorCnt int64
 	if ok {
+		if se.Errors == 0 && se.LastError == "" {
+			return nil
+		}
 		errorCnt = se.Errors
 		err = errors.New(se.LastError)
 	} else {
@@ -873,7 +876,7 @@ func CheckErr(err error) error {
 	}
 
 	if err != nil {
-		return fmt.Errorf("%v parse line errors occurred, error %v ", errorCnt, err.Error())
+		return fmt.Errorf("%v parse line errors occurred, error %v", errorCnt, err.Error())
 	}
 	return nil
 }
