@@ -79,18 +79,18 @@ const (
 	UnderfinedRunnerName = "UnderfinedRunnerName"
 
 	// SenderType 发送类型
-	TypeFile              = "file"          // 本地文件
-	TypePandora           = "pandora"       // pandora 打点
-	TypeMongodbAccumulate = "mongodb_acc"   // mongodb 并且按字段聚合
-	TypeInfluxdb          = "influxdb"      // influxdb
-	TypeMock              = "mock"          // mock sender
-	TypeDiscard           = "discard"       // discard sender
-	TypeElastic           = "elasticsearch" // elastic
-	TypeKafka             = "kafka"         // kafka
-	TypeHttp              = "http"          // http sender
-	TypeMySQL             = "mysql"
-	TypeCSV               = "csv"
-	TypeSQLFile           = "sqlfile"
+	TypeFile               = "file"          // 本地文件
+	TypePandora            = "pandora"       // pandora 打点
+	TypeMongodbAccumulate  = "mongodb_acc"   // mongodb 并且按字段聚合
+	TypeInfluxdb           = "influxdb"      // influxdb
+	TypeMock               = "mock"          // mock sender
+	TypeDiscard            = "discard"       // discard sender
+	TypeElastic            = "elasticsearch" // elastic
+	TypeKafka              = "kafka"         // kafka
+	TypeHttp               = "http"          // http sender
+	TypeMySQL              = "mysql"
+	TypeCSV                = "csv"
+	TypeSQLFile            = "sqlfile"
 	TypeOpenFalconTransfer = "open_falcon"
 
 	InnerUserAgent = "_useragent"
