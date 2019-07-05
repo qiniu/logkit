@@ -74,7 +74,6 @@ var (
 		Required:     true,
 		Placeholder:  "my_field_keyname",
 		DefaultNoUse: true,
-		CheckRegex:   CheckPatternKey,
 		Description:  "要进行Transform变化的键(key)",
 		ToolTip:      "对该字段的值进行transform变换",
 		Type:         TransformTypeString,
