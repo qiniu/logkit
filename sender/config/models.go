@@ -62,6 +62,8 @@ const (
 	KeyInsecureServer         = "insecure_server"
 	KeyTimeout                = "pandora_send_timeout"
 	KeyPandoraDescription     = "pandora_description"
+	KeyCollectInterval        = "collect_interval"
+	KeyTags                   = "tags"
 
 	PandoraUUID = "Pandora_UUID"
 
@@ -89,6 +91,7 @@ const (
 	TypeMySQL             = "mysql"
 	TypeCSV               = "csv"
 	TypeSQLFile           = "sqlfile"
+	TypeOpenFalconTransfer = "open_falcon"
 
 	InnerUserAgent = "_useragent"
 	InnerSendRaw   = "_send_raw"

@@ -305,6 +305,18 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 				senderConfig[senderConf.KeyPandoraDescription] = LogkitAutoCreateDescription
 			}
 		}
+		if senderConfig[senderConf.KeySenderType] == senderConf.TypeOpenFalconTransfer {
+			if meta.GetMode() == ModeSnmp {
+				intervalStr, _ := rc.ReaderConfig.GetStringOr(KeySnmpReaderInterval, "30s")
+				interval, err := time.ParseDuration(intervalStr)
+				if err != nil {
+					return nil, err
+				}
+				senderConfig[senderConf.KeyCollectInterval] = fmt.Sprintf("%d", int64(interval.Seconds()))
+				senderConfig[senderConf.KeyName] = rc.RunnerName
+			}
+			log.Infof("senderConfig = %+v", senderConfig)
+		}
 		senderConfig, err := setPandoraServerConfig(senderConfig, serverConfigs)
 		if err != nil {
 			return nil, err
@@ -725,13 +737,9 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 	se, ok := err.(*StatsError)
 	r.rsMutex.Lock()
 	if ok {
-		if se.Errors == 0 && se.LastError == "" {
-			err = nil
-		} else {
-			numErrs = se.Errors
-			err = errors.New(se.LastError)
-			r.rs.ParserStats.Errors += se.Errors
-		}
+		numErrs = se.Errors
+		err = errors.New(se.LastError)
+		r.rs.ParserStats.Errors += se.Errors
 		r.rs.ParserStats.Success += se.Success
 	} else if err != nil {
 		numErrs = 1
