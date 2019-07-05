@@ -9,7 +9,7 @@ import (
 	"github.com/qiniu/logkit/parser"
 	. "github.com/qiniu/logkit/parser/config"
 	. "github.com/qiniu/logkit/utils/models"
-	"github.com/qiniu/logkit/utils/syslog"
+	"github.com/qiniu/logkit/utils/parse/syslog"
 )
 
 func init() {
