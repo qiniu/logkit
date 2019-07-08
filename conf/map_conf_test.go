@@ -321,7 +321,6 @@ func TestFunGetStringList(t *testing.T) {
 }
 
 func TestGetEnv(t *testing.T) {
-	t.Parallel()
 	var exceptedValue = "mockEnv"
 	err := os.Setenv("TestGetEnv", exceptedValue)
 	if err != nil {
@@ -337,7 +336,6 @@ func TestGetEnv(t *testing.T) {
 }
 
 func TestGetEnvValue(t *testing.T) {
-	t.Parallel()
 	var exceptedValue = "mockEnv"
 	err := os.Setenv("TestGetEnvValue", exceptedValue)
 	if err != nil {

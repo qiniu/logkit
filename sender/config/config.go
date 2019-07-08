@@ -21,6 +21,7 @@ var ModeUsages = KeyValueSlice{
 	{TypeMySQL, "Mysql服务", ""},
 	{TypeSQLFile, "SqlFile文件", ""},
 	{TypeCSV, "CSV文件", ""},
+	{TypeOpenFalconTransfer, "open-falcon 平台", ""},
 }
 
 var (
@@ -1160,5 +1161,39 @@ var ModeKeyOptions = map[string][]Option{
 注意，发送之前数据表必须已存在`,
 		},
 		OptionMaxSendRate,
+	},
+	TypeOpenFalconTransfer: {
+		{
+			KeyName:      KeyOpenFalconTransferHost,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Placeholder:  "http://127.0.0.1:6060",
+			Description:  "open-falcon transfer 地址(open_falcon_transfer_host)",
+			Advance:      false,
+			ToolTip:      "数据发送的目的域名，私有部署请对应修改",
+		},
+		{
+			KeyName:      KeyOpenFalconTransferURL,
+			ChooseOnly:   false,
+			Default:      "/api/push",
+			DefaultNoUse: false,
+			Description:  "open-falcon transfer 推送数据URL(open_falcon_transfer_url)",
+			Advance:      false,
+			ToolTip:      "数据发送的url",
+		},
+		{
+			KeyName:      KeyHttpTimeout,
+			Default:      "30s",
+			DefaultNoUse: false,
+			Description:  "发送超时时间(http_sender_timeout)",
+		},
+		{
+			KeyName:      KeyTags,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "标签(tags)",
+			ToolTip:      "格式：tag1=xx,tag2=yy",
+		},
 	},
 }

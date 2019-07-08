@@ -244,6 +244,10 @@ const (
 	KeySQLFileRotateSize = "sqlfile_rotate_size"
 	KeySQLFileTable      = "sqlfile_table"
 	KeySQLFilePathPrefix = "sqlfile_path_prefix"
+
+	// open-falcon
+	KeyOpenFalconTransferHost = "open_falcon_transfer_host"
+	KeyOpenFalconTransferURL  = "open_falcon_transfer_url"
 )
 
 // NotAsyncSender return when sender is not async
