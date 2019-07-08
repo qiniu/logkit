@@ -12,12 +12,13 @@ import (
 	"time"
 
 	"github.com/qiniu/log"
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
+
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/sender"
 	. "github.com/qiniu/logkit/sender/config"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
-	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 )
 
 type TransferSender struct {

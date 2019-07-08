@@ -305,7 +305,7 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 				senderConfig[senderConf.KeyPandoraDescription] = LogkitAutoCreateDescription
 			}
 		}
-		if senderConfig[senderConf.KeySenderType] == senderConf.TypeOpenFalconTransfer {
+		if senderType, ok := senderConfig[senderConf.KeySenderType]; ok && senderType == senderConf.TypeOpenFalconTransfer {
 			if meta.GetMode() == ModeSnmp {
 				intervalStr, _ := rc.ReaderConfig.GetStringOr(KeySnmpReaderInterval, "30s")
 				interval, err := time.ParseDuration(intervalStr)

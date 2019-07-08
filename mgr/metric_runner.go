@@ -193,7 +193,7 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner
 				senderConfig[senderConf.KeyPandoraDescription] = MetricAutoCreateDescription
 			}
 		}
-		if senderConfig[senderConf.KeySenderType] == senderConf.TypeOpenFalconTransfer {
+		if senderType, ok := senderConfig[senderConf.KeySenderType]; ok && senderType == senderConf.TypeOpenFalconTransfer {
 			senderConfig[senderConf.KeyCollectInterval] = fmt.Sprintf("%d", rc.CollectInterval)
 			senderConfig[senderConf.KeyName] = rc.RunnerName
 		}
@@ -281,7 +281,7 @@ func (r *MetricRunner) Run() {
 			metricName := c.Name()
 			tmpdatas, err := c.Collect()
 			if err != nil {
-				log.Debugf("collecter <%v> collect data error: %v", c.Name(), err)
+				log.Warnf("collecter <%v> collect data error: %v", c.Name(), err)
 				if len(tmpdatas) == 0 {
 					continue
 				}
