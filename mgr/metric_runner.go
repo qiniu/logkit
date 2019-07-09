@@ -260,6 +260,7 @@ func (r *MetricRunner) Run() {
 		if !ok {
 			continue
 		}
+		log.Warnf("MetricRunner %v has %v collect", r.Name(), c.Name())
 		if err := collectorService.Start(); err != nil {
 			log.Errorf("collecter <%v> start failed: %v", c.Name(), err)
 		} else {
