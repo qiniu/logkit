@@ -193,6 +193,10 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner
 				senderConfig[senderConf.KeyPandoraDescription] = MetricAutoCreateDescription
 			}
 		}
+		if senderType, ok := senderConfig[senderConf.KeySenderType]; ok && senderType == senderConf.TypeOpenFalconTransfer {
+			senderConfig[senderConf.KeyCollectInterval] = fmt.Sprintf("%d", rc.CollectInterval)
+			senderConfig[senderConf.KeyName] = rc.RunnerName
+		}
 		s, err := sr.NewSender(senderConfig, meta.FtSaveLogPath())
 		if err != nil {
 			return nil, err
@@ -256,6 +260,7 @@ func (r *MetricRunner) Run() {
 		if !ok {
 			continue
 		}
+		log.Warnf("MetricRunner %v has %v collect", r.Name(), c.Name())
 		if err := collectorService.Start(); err != nil {
 			log.Errorf("collecter <%v> start failed: %v", c.Name(), err)
 		} else {
@@ -263,9 +268,6 @@ func (r *MetricRunner) Run() {
 		}
 	}
 
-	for _, c := range r.collectors {
-		log.Warnf("MetricRunner %v has %v collect", r.Name(), c.Name())
-	}
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
 			log.Debugf("runner %v exited from run", r.RunnerName)
@@ -288,7 +290,7 @@ func (r *MetricRunner) Run() {
 			dataLen := len(tmpdatas)
 			nameLen := len(metricName)
 			if dataLen == 0 {
-				log.Warnf("MetricRunner %v collect No data", c.Name())
+				log.Debugf("MetricRunner %v collect No data", c.Name())
 				continue
 			}
 			tmpDatas := make([]Data, dataLen)

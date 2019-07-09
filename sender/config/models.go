@@ -62,6 +62,8 @@ const (
 	KeyInsecureServer         = "insecure_server"
 	KeyTimeout                = "pandora_send_timeout"
 	KeyPandoraDescription     = "pandora_description"
+	KeyCollectInterval        = "collect_interval"
+	KeyTags                   = "tags"
 
 	PandoraUUID = "Pandora_UUID"
 
@@ -77,18 +79,19 @@ const (
 	UnderfinedRunnerName = "UnderfinedRunnerName"
 
 	// SenderType 发送类型
-	TypeFile              = "file"          // 本地文件
-	TypePandora           = "pandora"       // pandora 打点
-	TypeMongodbAccumulate = "mongodb_acc"   // mongodb 并且按字段聚合
-	TypeInfluxdb          = "influxdb"      // influxdb
-	TypeMock              = "mock"          // mock sender
-	TypeDiscard           = "discard"       // discard sender
-	TypeElastic           = "elasticsearch" // elastic
-	TypeKafka             = "kafka"         // kafka
-	TypeHttp              = "http"          // http sender
-	TypeMySQL             = "mysql"
-	TypeCSV               = "csv"
-	TypeSQLFile           = "sqlfile"
+	TypeFile               = "file"          // 本地文件
+	TypePandora            = "pandora"       // pandora 打点
+	TypeMongodbAccumulate  = "mongodb_acc"   // mongodb 并且按字段聚合
+	TypeInfluxdb           = "influxdb"      // influxdb
+	TypeMock               = "mock"          // mock sender
+	TypeDiscard            = "discard"       // discard sender
+	TypeElastic            = "elasticsearch" // elastic
+	TypeKafka              = "kafka"         // kafka
+	TypeHttp               = "http"          // http sender
+	TypeMySQL              = "mysql"
+	TypeCSV                = "csv"
+	TypeSQLFile            = "sqlfile"
+	TypeOpenFalconTransfer = "open_falcon"
 
 	InnerUserAgent = "_useragent"
 	InnerSendRaw   = "_send_raw"
@@ -241,6 +244,10 @@ const (
 	KeySQLFileRotateSize = "sqlfile_rotate_size"
 	KeySQLFileTable      = "sqlfile_table"
 	KeySQLFilePathPrefix = "sqlfile_path_prefix"
+
+	// open-falcon
+	KeyOpenFalconTransferHost = "open_falcon_transfer_host"
+	KeyOpenFalconTransferURL  = "open_falcon_transfer_url"
 )
 
 // NotAsyncSender return when sender is not async
