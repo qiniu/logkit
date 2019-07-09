@@ -119,7 +119,6 @@ func (ts *TransferSender) Send(datas []Data) error {
 	timeStamp := time.Now().Unix()
 	for _, d := range datas {
 		for k, v := range d {
-			log.Debugf("k = %s, v = %+v", k, v)
 			if vmap, ok = v.(map[string]interface{}); ok {
 				for ik, iv := range vmap {
 					if tmpData, success := ts.converToTransferData(ik, iv, timeStamp); success {
