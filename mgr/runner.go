@@ -743,8 +743,8 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 			numErrs = se.Errors
 			err = errors.New(se.LastError)
 			r.rs.ParserStats.Errors += se.Errors
-			r.rs.ParserStats.Success += se.Success
 		}
+		r.rs.ParserStats.Success += se.Success
 	} else if err != nil {
 		numErrs = 1
 		r.rs.ParserStats.Errors++
