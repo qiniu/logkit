@@ -2,8 +2,9 @@ package open_falcon
 
 import (
 	"encoding/json"
-	"github.com/bmizerany/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestConverToTransferData(t *testing.T) {
