@@ -142,6 +142,8 @@ func (p *Parser) parseTimestamp() (time.Time, error) {
 	var sub []byte
 
 	tsFmts := []string{
+		"Jan 02 15:04:05 2006",
+		"Jan  2 15:04:05 2006",
 		"Jan 02 15:04:05",
 		"Jan  2 15:04:05",
 	}
