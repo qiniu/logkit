@@ -134,6 +134,8 @@ func (c *Pipeline) NewOperation(opName string, args ...interface{}) *request.Ope
 		method, urlTmpl = base.MethodGet, "/v2/repos"
 	case base.OpListReposWithDag:
 		method, urlTmpl = base.MethodGet, "/v2/repos?withDag=true"
+	case base.OpListReposAuthorized:
+		method, urlTmpl = base.MethodGet, "/v2/repos?sourceType=authorized"
 	case base.OpGetRepo:
 		method, urlTmpl = base.MethodGet, "/v2/repos/%s"
 	case base.OpRepoExists:

@@ -112,6 +112,10 @@ type PandoraOption struct {
 	kodoFileRetention  int
 	kodoFileType       int
 
+	kodoZone      string
+	kodoAccessKey string
+	kodoSecretKey string
+
 	forceMicrosecond   bool
 	forceDataConvert   bool
 	ignoreInvalidField bool
@@ -221,6 +225,10 @@ func NewSender(conf logkitconf.MapConf) (pandoraSender sender.Sender, err error)
 	kodoRotateSize = kodoRotateSize * 1024
 	kodoRotateInterval, _ := conf.GetIntOr(KeyPandoraKodoRotateInterval, 10*60)
 	kodoFileRetention, _ := conf.GetIntOr(KeyPandoraKodoFileRetention, 0)
+	kodoZone, _ := conf.GetStringOr(KeyPandoraKodoZone, "")
+	kodoAK, _ := conf.GetStringOr(KeyPandoraKodoAK, "")
+	kodoSK, _ := conf.GetStringOr(KeyPandoraKodoSK, "")
+
 	kodoFileType := 0
 	if v, err := conf.GetBoolOr(KeyPandoraKodoLowFreqFile, false); err == nil && v {
 		kodoFileType = 1
@@ -310,6 +318,9 @@ func NewSender(conf logkitconf.MapConf) (pandoraSender sender.Sender, err error)
 		kodoRotateSize:     kodoRotateSize,
 		kodoFileRetention:  kodoFileRetention,
 		kodoFileType:       kodoFileType,
+		kodoZone:           kodoZone,
+		kodoAccessKey:      kodoAK,
+		kodoSecretKey:      kodoSK,
 
 		forceMicrosecond:   forceMicrosecond,
 		forceDataConvert:   forceconvert,
@@ -595,6 +606,9 @@ func newPandoraSender(opt *PandoraOption) (s *Sender, err error) {
 				RotateStrategy:       s.opt.kodoRotateStrategy,
 				RotateSize:           s.opt.kodoRotateSize,
 				RotateInterval:       s.opt.kodoRotateInterval,
+				KodoZone:             s.opt.kodoZone,
+				KodoAccessKey:        s.opt.kodoAccessKey,
+				KodoSecretKey:        s.opt.kodoSecretKey,
 				RotateSizeType:       "B",
 				RotateNumber:         s.opt.kodoRotateSize,
 				KodoFileType:         s.opt.kodoFileType,
@@ -1158,6 +1172,9 @@ func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 				RotateSizeType:       "B",
 				RotateNumber:         s.opt.kodoRotateSize,
 				AutoExportKodoTokens: s.opt.tokens.KodoTokens,
+				KodoZone:             s.opt.kodoZone,
+				KodoAccessKey:        s.opt.kodoAccessKey,
+				KodoSecretKey:        s.opt.kodoSecretKey,
 			},
 			ToTSDB: s.opt.enableTsdb,
 			AutoExportToTSDBInput: pipeline.AutoExportToTSDBInput{
