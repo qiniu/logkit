@@ -995,6 +995,7 @@ type RepoDesc struct {
 	Workflow    string    `json:"workflow"`
 	RuleNames   *[]string `json:"ruleNames"`
 	Description *string   `json:"description"`
+	Perms       []string  `json:"perms,omitempty"`
 }
 
 type ListReposInput struct {
