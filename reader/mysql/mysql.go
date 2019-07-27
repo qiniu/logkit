@@ -99,6 +99,7 @@ type MysqlReader struct {
 	count             int64
 	CurrentCount      int64
 	countLock         sync.RWMutex
+	sqlsRecord        map[string]string
 }
 
 func NewMysqlReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
@@ -167,6 +168,7 @@ func NewMysqlReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error)
 	}
 	historyAll, _ = conf.GetBoolOr(KeyMysqlHistoryAll, false)
 	table, _ = conf.GetStringOr(KyeMysqlTable, "")
+	table = strings.TrimSpace(table)
 	rawSchemas, _ := conf.GetStringListOr(KeySQLSchema, []string{})
 	magicLagDur, _ := conf.GetStringOr(KeyMagicLagDuration, "")
 	if magicLagDur != "" {
@@ -220,6 +222,7 @@ func NewMysqlReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error)
 		schemas:     schemas,
 		encoder:     encoder,
 		dbSchema:    dbSchema,
+		sqlsRecord:  make(map[string]string),
 	}
 
 	if r.rawDatabase == "" {
@@ -231,6 +234,10 @@ func NewMysqlReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error)
 
 	if r.timestampKey != "" {
 		r.restoreTimestamp()
+	}
+	// 没有任何信息并且填写了sql语句时恢复
+	if r.isRecordSqls() {
+		r.sqlsRecord = RestoreSqls(r.meta)
 	}
 
 	if r.rawSQLs == "" {
@@ -375,9 +382,9 @@ func (r *MysqlReader) Status() models.StatsInfo {
 
 // SyncMeta 从队列取数据时同步队列，作用在于保证数据不重复
 func (r *MysqlReader) SyncMeta() {
+	var all string
 	if r.rawSQLs == "" {
 		now := time.Now().String()
-		var all string
 		dbRecords := r.syncRecords.GetDBRecords()
 
 		for database, tablesRecord := range dbRecords {
@@ -412,13 +419,23 @@ func (r *MysqlReader) SyncMeta() {
 				content = r.startTimeStr
 			}
 		}
-		if err := WriteTimestmapOffset(r.meta.DoneFilePath, content); err != nil {
-			log.Errorf("Runner[%v] %v SyncMeta WriteTimestmapOffset error %v", r.meta.RunnerName, r.Name(), err)
+		if err := WriteTimestampOffset(r.meta.DoneFilePath, content); err != nil {
+			log.Errorf("Runner[%v] %v SyncMeta WriteTimestampOffset error %v", r.meta.RunnerName, r.Name(), err)
 		}
 		if err := WriteCacheMap(r.meta.DoneFilePath, r.timeCacheMap); err != nil {
 			log.Errorf("Runner[%v] %v SyncMeta WriteCacheMap error %v", r.meta.RunnerName, r.Name(), err)
 		}
 		r.timestampMux.RUnlock()
+	}
+	if r.isRecordSqls() {
+		for db, sqls := range r.sqlsRecord {
+			all += db + SqlOffsetConnector + sqls + "\n"
+		}
+		if len(all) > 0 {
+			if err := WriteSqlsFile(r.meta.DoneFilePath, all); err != nil {
+				log.Errorf("Runner[%v] %v SyncMeta error %v", r.meta.RunnerName, r.Name(), err)
+			}
+		}
 	}
 
 	encodeSQLs := make([]string, 0)
@@ -430,7 +447,7 @@ func (r *MysqlReader) SyncMeta() {
 	for _, offset := range r.offsets {
 		encodeSQLs = append(encodeSQLs, strconv.FormatInt(offset, 10))
 	}
-	all := strings.Join(encodeSQLs, SqlOffsetConnector)
+	all = strings.Join(encodeSQLs, SqlOffsetConnector)
 	if err := r.meta.WriteOffset(all, int64(len(r.syncSQLs))); err != nil {
 		log.Errorf("Runner[%v] %v SyncMeta error %v", r.meta.RunnerName, r.Name(), err)
 	}
@@ -451,6 +468,8 @@ func (r *MysqlReader) Close() error {
 		close(r.readChan)
 		close(r.errChan)
 	}
+
+	r.SyncMeta()
 	return nil
 }
 
@@ -682,7 +701,7 @@ func (r *MysqlReader) execReadDB(curDB string, now time.Time, recordTablesDone T
 			}
 		}
 
-		log.Infof("Runner[%s] %s default sqls %v", r.meta.RunnerName, r.Name(), sqls)
+		log.Infof("Runner[%s] %s default tables %v sqls %v", r.meta.RunnerName, r.Name(), tables, sqls)
 
 		if r.omitDoneDBRecords && !recordTablesDone.RestoreTableDone(r.meta, curDB, tables) {
 			// 兼容
@@ -704,7 +723,19 @@ func (r *MysqlReader) execReadDB(curDB string, now time.Time, recordTablesDone T
 	tablesLen := len(tables)
 	log.Infof("Runner[%v] %v start to work, sqls %v offsets %v", r.meta.RunnerName, r.Name(), r.syncSQLs, r.offsets)
 
+	sqlsRecordMap := make(map[string]bool)
+	if sqlStr, ok := r.sqlsRecord[curDB]; ok {
+		sqls := strings.Split(sqlStr, ",")
+		for _, sql := range sqls {
+			sqlsRecordMap[sql] = true
+		}
+	}
+
 	for idx, rawSql := range r.syncSQLs {
+		// 已读取过
+		if r.rawSQLs != "" && len(sqlsRecordMap) != 0 && sqlsRecordMap[rawSql] {
+			continue
+		}
 		//分sql执行
 		exit := false
 		var tableName string
@@ -740,7 +771,15 @@ func (r *MysqlReader) execReadDB(curDB string, now time.Time, recordTablesDone T
 			}
 		}
 	}
+
+	if r.isRecordSqls() {
+		r.sqlsRecord[curDB] = strings.Join(r.syncSQLs, ",")
+	}
 	return nil
+}
+
+func (r *MysqlReader) isRecordSqls() bool {
+	return r.timestampKey == "" && r.offsetKey == "" && r.rawSQLs != ""
 }
 
 func (r *MysqlReader) getSQL(idx int, rawSQL string) string {
@@ -967,8 +1006,6 @@ func (r *MysqlReader) getAll(queryType int) (getAll bool, err error) {
 	default:
 		return false, fmt.Errorf("%v queryType is not support get sql now", queryType)
 	}
-
-	return true, nil
 }
 
 // 根据 queryType 获取 table 中所有记录或者表中所有数据的条数的sql语句

@@ -182,4 +182,4 @@ func (s *Sender) mongoSesssionKeeper(session *mgo.Session) {
 	}
 }
 
-func (_ *Sender) SkipDeepCopy() bool { return true }
+func (*Sender) SkipDeepCopy() bool { return true }

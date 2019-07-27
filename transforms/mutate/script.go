@@ -22,6 +22,7 @@ var (
 	_ transforms.Initializer      = &Script{}
 )
 
+// Script represents a transform to run a script.
 type Script struct {
 	Key         string `json:"key"`
 	New         string `json:"new"`
@@ -273,7 +274,6 @@ func (g *Script) transform(dataPipeline <-chan transforms.TransformInfo, resultC
 	for transformInfo := range dataPipeline {
 		err = nil
 		errNum = 0
-		scriptRes = ""
 		getErr = nil
 
 		params := make([]string, 1+len(g.keysDetail))

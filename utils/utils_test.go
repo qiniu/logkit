@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -123,11 +125,43 @@ func TestGetFiles(t *testing.T) {
 	}
 }
 
+func TestCheckErr(t *testing.T) {
+	tests := []struct {
+		err    error
+		expect error
+	}{
+		{
+			err:    errors.New("test error 1"),
+			expect: fmt.Errorf("1 parse line errors occurred, error test error 1"),
+		},
+		{
+			err: &StatsError{
+				StatsInfo: StatsInfo{
+					Errors:    2,
+					LastError: "last error 1",
+				},
+				DatasourceSkipIndex: []int{1, 2, 3},
+			},
+			expect: fmt.Errorf("2 parse line errors occurred, error last error 1"),
+		},
+		{
+			err: &StatsError{
+				StatsInfo:           StatsInfo{},
+				DatasourceSkipIndex: []int{1, 2, 3},
+			},
+			expect: nil,
+		},
+	}
+
+	for _, test := range tests {
+		actual := CheckErr(test.err)
+		assert.EqualValues(t, test.expect, actual)
+	}
+}
+
 func createDirWithName(dirx string) {
-	err := os.Mkdir(dirx, DefaultDirPerm)
-	if err != nil {
+	if err := os.Mkdir(dirx, DefaultDirPerm); err != nil {
 		log.Error(err)
-		return
 	}
 }
 

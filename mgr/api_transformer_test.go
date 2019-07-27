@@ -71,4 +71,14 @@ func transformerAPITest(p *testParam) {
 		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
 	}
 	assert.Equal(t, "", got4.Message)
+
+	var got5 respSampleLogs
+	url = "http://127.0.0.1" + rs.address + "/logkit/transformer/sampleconfigs"
+	respCode, respBody, err = makeRequest(url, http.MethodGet, []byte{})
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+	if err = jsoniter.Unmarshal(respBody, &got5); err != nil {
+		t.Fatalf("respBody %v unmarshal failed, error is %v", respBody, err)
+	}
+	assert.Equal(t, len(transforms.Transformers), len(got5.Data))
 }

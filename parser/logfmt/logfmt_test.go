@@ -1,8 +1,9 @@
 package logfmt
 
 import (
-	"errors"
 	"testing"
+
+	"github.com/qiniu/logkit/parser"
 
 	"github.com/stretchr/testify/assert"
 
@@ -177,14 +178,20 @@ func TestParse(t *testing.T) {
 			},
 		},
 	}
-	l := Parser{
-		name:       TypeLogfmt,
-		numRoutine: 1,
-	}
+	l, err := NewParser(conf.MapConf{
+		KeyParserName: TypeLogfmt,
+	})
+	assert.Nil(t, err)
+
+	lType, ok := l.(parser.ParserType)
+	assert.True(t, ok)
+	assert.EqualValues(t, TypeKeyValue, lType.Type())
+
+	assert.EqualValues(t, TypeLogfmt, l.Name())
+
 	for _, tt := range tests {
 		got, err := l.Parse(tt.s)
 		if c, ok := err.(*StatsError); ok {
-			err = errors.New(c.LastError)
 			assert.Equal(t, int64(0), c.Errors)
 		}
 
@@ -192,6 +199,31 @@ func TestParse(t *testing.T) {
 			assert.Equal(t, tt.expectData[i], m)
 		}
 	}
+
+	got, err := l.Parse([]string{"", "a"})
+	assert.NotNil(t, err)
+	assert.EqualValues(t, "success 0 errors 1 last error no value was parsed after logfmt, will keep origin data in pandora_stash if disable_record_errdata field is false, send error detail <nil>", err.Error())
+	assert.EqualValues(t, []Data{{"pandora_stash": "a"}}, got)
+
+	l, err = NewParser(conf.MapConf{
+		KeyParserName:  TypeLogfmt,
+		KeyKeepRawData: "true",
+	})
+	assert.Nil(t, err)
+
+	got, err = l.Parse([]string{"", "a"})
+	assert.NotNil(t, err)
+	assert.EqualValues(t, []Data{{"pandora_stash": "a", "raw_data": "a"}}, got)
+
+	l, err = NewParser(conf.MapConf{
+		KeyParserName:           TypeLogfmt,
+		KeyDisableRecordErrData: "true",
+	})
+	assert.Nil(t, err)
+
+	got, err = l.Parse([]string{"", "a"})
+	assert.NotNil(t, err)
+	assert.EqualValues(t, 0, len(got))
 }
 
 func TestParseWithKeepRawData(t *testing.T) {
@@ -265,7 +297,6 @@ func TestParseWithKeepRawData(t *testing.T) {
 		l.splitter = tt.splitter
 		got, err := l.Parse(tt.s)
 		if c, ok := err.(*StatsError); ok {
-			err = errors.New(c.LastError)
 			assert.Equal(t, int64(0), c.Errors)
 		}
 

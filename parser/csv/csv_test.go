@@ -8,7 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/json-iterator/go"
+	"github.com/qiniu/logkit/parser"
+
+	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/logkit/conf"
@@ -52,6 +54,19 @@ func Test_Parser(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+
+	pType, ok := p.(parser.ParserType)
+	assert.True(t, ok)
+	assert.EqualValues(t, TypeCSV, pType.Type())
+
+	datas, err := p.Parse(nil)
+	assert.Nil(t, err)
+	assert.EqualValues(t, datas, []Data{})
+
+	datas, err = p.Parse([]string{"", "", ""})
+	assert.NotNil(t, err)
+	assert.EqualValues(t, datas, []Data{})
+
 	tmstr := time.Now().Format(time.RFC3339Nano)
 	lines := []string{
 		`1 fufu 3.14 {"x":1,"y":"2"} ` + tmstr,       //correct
@@ -61,7 +76,7 @@ func Test_Parser(t *testing.T) {
 		`   `,
 		`4 fufu 3.17  ` + tmstr, //correct,jsonmap允许为空
 	}
-	datas, err := p.Parse(lines)
+	datas, err = p.Parse(lines)
 	if c, ok := err.(*StatsError); ok {
 		err = errors.New(c.LastError)
 	}
@@ -90,6 +105,46 @@ func Test_Parser(t *testing.T) {
 		t.Error("b should be fufu")
 	}
 	assert.EqualValues(t, p.Name(), "testparser")
+
+	delete(c, KeyCSVSchema)
+	_, err = NewParser(c)
+	assert.NotNil(t, err)
+	t.Log("err: ", err)
+
+	c[KeyCSVSchema] = "a long, b string, c float, d jsonmap{x string,y long}},e date"
+	_, err = NewParser(c)
+	assert.NotNil(t, err)
+	t.Log("err: ", err)
+
+	c[KeyCSVSchema] = "a long, b string, c float, d jsonmap{{x string,y long},e date"
+	_, err = NewParser(c)
+	assert.NotNil(t, err)
+	t.Log("err: ", err)
+
+	c[KeyCSVSchema] = "a long, b string, c float, d jsonmap{x string,y long}{,e date"
+	_, err = NewParser(c)
+	assert.NotNil(t, err)
+	t.Log("err: ", err)
+
+	c[KeyCSVSchema] = "a long, b, c float, d jsonmap,e date"
+	_, err = NewParser(c)
+	assert.NotNil(t, err)
+	t.Log("err: ", err)
+
+	c[KeyCSVSchema] = "a long, b string, c float, d jsonmap x string,y long,e date"
+	_, err = NewParser(c)
+	assert.NotNil(t, err)
+	t.Log("err: ", err)
+
+	c[KeyCSVSchema] = "a long, b string, c float, d jsonmap{x string,y},y long,e date"
+	_, err = NewParser(c)
+	assert.NotNil(t, err)
+	t.Log("err: ", err)
+
+	c[KeyCSVSchema] = "a long, b string, c float, d test,e date"
+	_, err = NewParser(c)
+	assert.NotNil(t, err)
+	t.Log("err: ", err)
 }
 
 func Test_CsvParserForErrData(t *testing.T) {
@@ -378,6 +433,25 @@ func TestField_MakeValue(t *testing.T) {
 		t.Error(err)
 	}
 	assert.Equal(t, exp.Format(time.RFC3339Nano), tm)
+
+	_, err = makeValue("2017/01/02 15:00:00", "test", 1)
+	assert.NotNil(t, err)
+	t.Log("err: ", err)
+
+	f, err := makeValue("", TypeFloat, 0)
+	assert.Nil(t, err)
+	assert.EqualValues(t, 0, f)
+
+	l, err := makeValue("", TypeLong, 0)
+	assert.Nil(t, err)
+	assert.EqualValues(t, 0, l)
+
+	_, err = makeValue("", TypeDate, 0)
+	assert.Nil(t, err)
+
+	_, err = makeValue("2017aaa", TypeDate, 0)
+	assert.NotNil(t, err)
+	t.Log("err: ", err)
 }
 
 func TestRename(t *testing.T) {
@@ -410,9 +484,9 @@ func TestRename(t *testing.T) {
 			"reqHeader-Content-Length":  "0",
 			"nullStr":                   "",
 			"code":                      int64(200),
-			"resBody-Content-Length": "55",
-			"resBody-Content-Type":   "application/json",
-			"resBody-X-Reqid":        "pyAAAO0mQ0HoBvkU",
+			"resBody-Content-Length":    "55",
+			"resBody-Content-Type":      "application/json",
+			"resBody-X-Reqid":           "pyAAAO0mQ0HoBvkU",
 			"resBody-X-Log": []interface{}{
 				"REPORT:1",
 			},
@@ -453,9 +527,9 @@ func TestRename(t *testing.T) {
 			"reqHeader_Content_Length":  "0",
 			"nullStr":                   "",
 			"code":                      int64(200),
-			"resBody_Content_Length": "55",
-			"resBody_Content_Type":   "application/json",
-			"resBody_X_Reqid":        "pyAAAO0mQ0HoBvkU",
+			"resBody_Content_Length":    "55",
+			"resBody_Content_Type":      "application/json",
+			"resBody_X_Reqid":           "pyAAAO0mQ0HoBvkU",
 			"resBody_X_Log": []interface{}{
 				"REPORT:1",
 			},
@@ -475,18 +549,34 @@ func TestRename(t *testing.T) {
 	}
 }
 
-func TestJSONMap(t *testing.T) {
+func TestValueParse(t *testing.T) {
+	t.Parallel()
 	fd := field{
 		name:     "c",
 		dataType: TypeJSONMap,
 	}
 	testx := "999"
 	data, err := fd.ValueParse(testx, 0)
-	assert.Error(t, err)
+	assert.NotNil(t, err)
+	t.Log("err: ", err)
+	assert.Equal(t, data, Data{})
+
+	fd.typeChange = map[string]DataType{
+		"a": TypeLong,
+	}
+	testMap := map[string]interface{}{
+		"a": "c",
+	}
+	testBytes, err := jsoniter.Marshal(testMap)
+	assert.Nil(t, err)
+	data, err = fd.ValueParse(string(testBytes), 0)
+	assert.NotNil(t, err)
+	t.Log("err: ", err)
 	assert.Equal(t, data, Data{})
 }
 
 func TestGetUnmachedMessage(t *testing.T) {
+	t.Parallel()
 	got := getUnmachedMessage([]string{"a", "b"}, []field{{name: "a"}})
 	assert.Equal(t, `matched: [a]=>[a],  unmatched log: [b]`, got)
 	got = getUnmachedMessage([]string{"a"}, []field{{name: "a"}, {name: "b"}})
@@ -552,6 +642,7 @@ func TestAllowLess(t *testing.T) {
 		err = errors.New(c.LastError)
 	}
 	assert.Error(t, err)
+	assert.EqualValues(t, []Data{{"pandora_stash": "a|1.2|1.2|d"}}, datas)
 }
 
 func TestIgnoreField(t *testing.T) {
@@ -576,6 +667,7 @@ func TestIgnoreField(t *testing.T) {
 		err = errors.New(c.LastError)
 	}
 	assert.Error(t, err)
+	assert.EqualValues(t, []Data{{"pandora_stash": "a|1.2|1.2|d|xx"}}, datas)
 }
 
 func TestAllowNotMatch(t *testing.T) {
@@ -636,4 +728,90 @@ func Test_spitFields(t *testing.T) {
 
 	actual = splitFields("method|method2 jsonmap{a | c string,b|d float}")
 	assert.EqualValues(t, []string{"method jsonmap{a | c string,b|d float}", "method2 jsonmap{a | c string,b|d float}"}, actual)
+
+	actual = splitFields("a|b")
+	assert.EqualValues(t, []string{"a|b"}, actual)
+}
+
+func Test_Rename(t *testing.T) {
+	datas := []Data{
+		{"a": "c", "b": "d"},
+		{"a1": "c1"},
+	}
+	newDatas := Rename(datas)
+	assert.EqualValues(t, datas, newDatas)
+
+	newDatas[0] = nil
+	assert.NotEqual(t, datas[0], newDatas[0])
+}
+
+func Test_ContainSplitterParse(t *testing.T) {
+	parserName := "testContainSplitter"
+	parserType := "csv"
+	schema := "a jsonmap, b float, c long, d string"
+	splitter := ","
+	autoRename := "true"
+
+	testCases := []struct {
+		parserConf conf.MapConf
+		line       []string
+		wanted     []Data
+	}{
+		{
+			conf.MapConf{
+				KeyParserName:            parserName,
+				KeyParserType:            parserType,
+				KeyCSVSchema:             schema,
+				KeyCSVSplitter:           splitter,
+				KeyCSVAutoRename:         autoRename,
+				KeyCSVContainSplitterKey: "a",
+			},
+			[]string{"{\"foo\":\"aaa\", \"bar\":\"bbb\"},1.23,123,foo"},
+			[]Data{{"a_foo": "aaa", "a_bar": "bbb", "b": 1.23, "c": int64(123), "d": "foo"}},
+		},
+		{
+			conf.MapConf{
+				KeyParserName:            parserName,
+				KeyParserType:            parserType,
+				KeyCSVSchema:             schema,
+				KeyCSVSplitter:           splitter,
+				KeyCSVAutoRename:         autoRename,
+				KeyCSVContainSplitterKey: "d",
+			},
+			[]string{"{\"foo\":\"aaa\"},1.23,123,this,is,one"},
+			[]Data{{"a_foo": "aaa", "b": 1.23, "c": int64(123), "d": "this,is,one"}},
+		},
+		{
+			conf.MapConf{
+				KeyParserName:            parserName,
+				KeyParserType:            parserType,
+				KeyCSVSchema:             schema,
+				KeyCSVSplitter:           splitter,
+				KeyCSVAutoRename:         autoRename,
+				KeyCSVContainSplitterKey: "",
+			},
+			[]string{"{\"foo\":\"aaa\"},1.23,123,this"},
+			[]Data{{"a_foo": "aaa", "b": 1.23, "c": int64(123), "d": "this"}},
+		},
+		{
+			conf.MapConf{
+				KeyParserName:            parserName,
+				KeyParserType:            parserType,
+				KeyCSVSchema:             schema,
+				KeyCSVSplitter:           splitter,
+				KeyCSVAutoRename:         autoRename,
+				KeyCSVContainSplitterKey: "d",
+			},
+			[]string{"{\"foo\":\"aaa\"},1.23"},
+			[]Data{{"a_foo": "aaa", "b": 1.23}},
+		},
+	}
+
+	for _, tc := range testCases {
+		parser, err := NewParser(tc.parserConf)
+		assert.NoError(t, err)
+		res, err := parser.Parse(tc.line)
+		assert.NoError(t, err)
+		assert.Equal(t, tc.wanted, res, "")
+	}
 }

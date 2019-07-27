@@ -141,4 +141,16 @@ func TestKV_Transform(t *testing.T) {
 		assert.EqualValues(t, test.expectErr, err)
 		assert.EqualValues(t, test.expectData, actual)
 	}
+
+	k = &KV{
+		Key:        "raw",
+		DiscardKey: true,
+		Splitter:   "=",
+	}
+	assert.Nil(t, k.Init())
+	line := []Data{{"raw": "foo=\"bar\"\n"}}
+	res, err := k.Transform(line)
+	assert.Nil(t, err)
+	expect := []Data{{"foo": "bar"}}
+	assert.EqualValues(t, expect, res)
 }

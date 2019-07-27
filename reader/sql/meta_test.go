@@ -83,7 +83,7 @@ func TestSyncDBRecords_RestoreRecordsFileestoreRecordsFile(t *testing.T) {
 				},
 				"db4": TableRecords{
 					Table: map[string]TableInfo{
-						"db4_tb10": TableInfo{Size: -1, Offset: -1},
+						"db4_tb10": {Size: -1, Offset: -1},
 					},
 					Mutex: sync.RWMutex{},
 				},
@@ -287,7 +287,7 @@ func Test_RestoreMeta(t *testing.T) {
 	}
 	defer os.RemoveAll(MetaDir)
 
-	file, Offset, err := meta.ReadOffset()
+	_, _, err = meta.ReadOffset()
 	if err == nil {
 		t.Error("Offset must be nil")
 	}
@@ -305,7 +305,8 @@ func Test_RestoreMeta(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	file, Offset, err = meta.ReadOffset()
+	file, Offset, err := meta.ReadOffset()
+	assert.Nil(t, err)
 	if file != all {
 		t.Error("sql meta Offset should be " + all)
 	}
@@ -329,6 +330,43 @@ func Test_RestoreMeta(t *testing.T) {
 	rawSqls = "SELECT * FROM A; SELECT * FROM B;"
 	actualOffsets, actualSqls, omitMeta = RestoreMeta(meta, rawSqls, mgld)
 	assert.EqualValues(t, true, omitMeta)
+	assert.EqualValues(t, 0, len(actualOffsets))
+	assert.EqualValues(t, []string{"SELECT * FROM A", "SELECT * FROM B"}, actualSqls)
+}
+
+func Test_WriteSqlsFile(t *testing.T) {
+	meta, err := reader.NewMeta(MetaDir, MetaDir, "mysql", "logpath", "", 7)
+	if err != nil {
+		t.Error(err)
+	}
+	defer os.RemoveAll(MetaDir)
+
+	err = WriteSqlsFile(meta.DoneFilePath, "testdb1##select * from table1,select * from table2\ntestdb2##select * from table1,select * from table2\n")
+	assert.Nil(t, err)
+}
+
+func Test_RestoreSqls(t *testing.T) {
+	meta, err := reader.NewMeta(MetaDir, MetaDir, "mysql", "logpath", "", 7)
+	if err != nil {
+		t.Error(err)
+	}
+	defer os.RemoveAll(MetaDir)
+
+	err = WriteSqlsFile(meta.DoneFilePath, "testdb1##select * from table1,select * from table2\ntestdb2##select * from table1,select * from table2\n")
+	assert.Nil(t, err)
+
+	result := RestoreSqls(meta)
+	assert.EqualValues(t, map[string]string{
+		"testdb1": "select * from table1,select * from table2",
+		"testdb2": "select * from table1,select * from table2",
+	}, result)
+
+	err = WriteSqlsFile(meta.DoneFilePath, "testdb1\ntestdb2##select * from table1,select * from table2\n")
+	assert.Nil(t, err)
+	result = RestoreSqls(meta)
+	assert.EqualValues(t, map[string]string{
+		"testdb2": "select * from table1,select * from table2",
+	}, result)
 }
 
 func GetContent(ReadRecords DBRecords) string {

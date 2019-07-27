@@ -21,6 +21,7 @@ var ModeUsages = KeyValueSlice{
 	{TypeMySQL, "Mysql服务", ""},
 	{TypeSQLFile, "SqlFile文件", ""},
 	{TypeCSV, "CSV文件", ""},
+	{TypeOpenFalconTransfer, "open-falcon 平台", ""},
 }
 
 var (
@@ -358,6 +359,16 @@ var ModeKeyOptions = map[string][]Option{
 			Advance:       true,
 			AdvanceDepend: KeyPandoraEnableLogDB,
 			ToolTip:       `指定字段的分词方式，逗号分隔多个，如 "f1 keyword, f2 full_text"。仅在新建时生效，更改时不生效，请在日志仓库更改。`,
+		},
+		{
+			KeyName:       KeyPandoraLogdbRetention,
+			ChooseOnly:    false,
+			Default:       "30",
+			DefaultNoUse:  false,
+			Description:   "指定logdb存储时间(pandora_logdb_retention)",
+			Advance:       true,
+			AdvanceDepend: KeyPandoraEnableLogDB,
+			ToolTip:       `指定logdb存储时间，单位为天，为正整数，默认为 30 天`,
 		},
 		//暂时下线时序数据库
 		//{
@@ -1017,18 +1028,6 @@ var ModeKeyOptions = map[string][]Option{
 			Advance:      true,
 		},
 		{
-			KeyName:      KeyHttpSenderTemplate,
-			Element:      Text,
-			ChooseOnly:   false,
-			Default:      "",
-			Placeholder:  `{"a": "{{key1}}", "b": "{{key2}}"}`,
-			Required:     false,
-			DefaultNoUse: true,
-			Description:  "自定义数据模板(http_sender_template)",
-			ToolTip:      `渲染自定义的数据模板，使用"{{key}}"作为占位符，key为需要发送的字段名，渲染后为该字段的值。目前仅支持json和body_json两种数据格式`,
-			Advance:      true,
-		},
-		{
 			KeyName:      KeyHttpSenderCsvSplit,
 			ChooseOnly:   false,
 			Default:      "",
@@ -1162,5 +1161,39 @@ var ModeKeyOptions = map[string][]Option{
 注意，发送之前数据表必须已存在`,
 		},
 		OptionMaxSendRate,
+	},
+	TypeOpenFalconTransfer: {
+		{
+			KeyName:      KeyOpenFalconTransferHost,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Placeholder:  "http://127.0.0.1:6060",
+			Description:  "open-falcon transfer 地址(open_falcon_transfer_host)",
+			Advance:      false,
+			ToolTip:      "数据发送的目的域名，私有部署请对应修改",
+		},
+		{
+			KeyName:      KeyOpenFalconTransferURL,
+			ChooseOnly:   false,
+			Default:      "/api/push",
+			DefaultNoUse: false,
+			Description:  "open-falcon transfer 推送数据URL(open_falcon_transfer_url)",
+			Advance:      false,
+			ToolTip:      "数据发送的url",
+		},
+		{
+			KeyName:      KeyHttpTimeout,
+			Default:      "30s",
+			DefaultNoUse: false,
+			Description:  "发送超时时间(http_sender_timeout)",
+		},
+		{
+			KeyName:      KeyTags,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "标签(tags)",
+			ToolTip:      "格式：tag1=xx,tag2=yy",
+		},
 	},
 }

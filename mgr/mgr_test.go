@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -223,6 +224,7 @@ func createFile(name string, size int64) error {
 	}
 	return ioutil.WriteFile(name, bytes, 0666)
 }
+
 func createTestFile(metapath, logdir, logfile string) error {
 	done1 := filepath.Join(metapath, "file.done.2016-10-01")
 	logs := logfile + "\n"
@@ -246,14 +248,16 @@ func getfilename(dir string) ([]string, error) {
 }
 
 func Test_Watch(t *testing.T) {
-	logfile := "./tests/logdir/log1"
-	logdir := "./tests/logdir"
-	if err := os.MkdirAll("./tests/confs1", 0777); err != nil {
+	t.Parallel()
+	copyTest1, copyTest2, copyTest3, copyTest4, _ := copyTests("Test_Watch")
+	logfile := "./Test_Watch/tests/logdir/log1"
+	logdir := "./Test_Watch/tests/logdir"
+	if err := os.MkdirAll("./Test_Watch/tests/confs1", 0777); err != nil {
 		t.Error(err)
 	}
-	defer os.RemoveAll("./tests")
+	defer os.RemoveAll("./Test_Watch")
 
-	if err := os.MkdirAll("./tests/confs2", 0777); err != nil {
+	if err := os.MkdirAll("./Test_Watch/tests/confs2", 0777); err != nil {
 		t.Error(err)
 	}
 	if err := os.MkdirAll(logdir, 0777); err != nil {
@@ -263,27 +267,27 @@ func Test_Watch(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	err = ioutil.WriteFile("./tests/confs1/test1.conf", []byte(test1), 0666)
+	err = ioutil.WriteFile("./Test_Watch/tests/confs1/test1.conf", []byte(copyTest1), 0666)
 	if err != nil {
 		t.Error(err)
 	}
-	err = ioutil.WriteFile("./tests/confs2/test2.conf", []byte(test2), 0666)
+	err = ioutil.WriteFile("./Test_Watch/tests/confs2/test2.conf", []byte(copyTest2), 0666)
 	if err != nil {
 		t.Error(err)
 	}
-	err = ioutil.WriteFile("./tests/confs2/test3", []byte(test2), 0666)
+	err = ioutil.WriteFile("./Test_Watch/tests/confs2/test3", []byte(copyTest2), 0666)
 	if err != nil {
 		t.Error(err)
 	}
-	time.Sleep(1 * time.Second)
+	time.Sleep(time.Millisecond)
 	var conf ManagerConfig
 	m, err := NewManager(conf)
 	if err != nil {
 		t.Fatal(err)
 	}
 	confs := []string{
-		"./tests/confs1",
-		"./tests/confs2",
+		"./Test_Watch/tests/confs1",
+		"./Test_Watch/tests/confs2",
 	}
 	realdir, err := filepath.Abs(logdir)
 	if err != nil {
@@ -297,16 +301,16 @@ func Test_Watch(t *testing.T) {
 	if len(m.watchers) != 2 {
 		t.Errorf("watchers exp 2 but got %v", len(m.watchers))
 	}
-	time.Sleep(5 * time.Second) //因为使用了异步add runners 有可能还没执行完。
+	time.Sleep(time.Second) //因为使用了异步add runners 有可能还没执行完。
 	var runnerLength int
 	runnerLength = len(m.GetRunnerNames())
 	if runnerLength != 2 {
 		t.Fatalf("runners exp 2 but got %v", runnerLength)
 	}
-	time.Sleep(time.Second)
+	time.Sleep(time.Millisecond)
 
 	// 再写入一个文件，变成三个runner
-	err = ioutil.WriteFile("./tests/confs2/test3.conf", []byte(test3), os.ModePerm)
+	err = ioutil.WriteFile("./Test_Watch/tests/confs2/test3.conf", []byte(copyTest3), os.ModePerm)
 	if err != nil {
 		t.Error(err)
 	}
@@ -325,9 +329,9 @@ func Test_Watch(t *testing.T) {
 		t.Fatalf("cleanerCount exp 2 after add test3.conf  but got %v", m.cleanQueues[realdir].cleanerCount)
 	}
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Millisecond)
 	// 再写入一个文件，变成四个runner
-	err = ioutil.WriteFile("./tests/confs1/test4.conf", []byte(test4), 0666)
+	err = ioutil.WriteFile("./Test_Watch/tests/confs1/test4.conf", []byte(copyTest4), 0666)
 	if err != nil {
 		t.Error(err)
 	}
@@ -343,23 +347,20 @@ func Test_Watch(t *testing.T) {
 	}
 
 	// 此时四个runner有三个cleaner，都是针对同一个logdir
-	if err = createTestFile("./test1/meta_req_csv", logdir, logfile); err != nil {
+	if err = createTestFile("./Test_Watch/test1/meta_req_csv", logdir, logfile); err != nil {
 		t.Error(err)
 	}
-	defer os.RemoveAll("./test1")
 
-	if err = createTestFile("./test2/meta_req_csv", logdir, logfile); err != nil {
+	if err = createTestFile("./Test_Watch/test2/meta_req_csv", logdir, logfile); err != nil {
 		t.Error(err)
 	}
-	defer os.RemoveAll("./test2")
 
-	if err = createTestFile("./test3/meta_req_csv", logdir, logfile); err != nil {
+	if err = createTestFile("./Test_Watch/test3/meta_req_csv", logdir, logfile); err != nil {
 		t.Error(err)
 	}
-	defer os.RemoveAll("./test3")
 
 	// 三个地方有file done，但是依旧不能删。
-	time.Sleep(3 * time.Second)
+	time.Sleep(time.Millisecond)
 	exps := []string{"log1"}
 	gots, err := getfilename(logdir)
 	if err != nil {
@@ -369,10 +370,9 @@ func Test_Watch(t *testing.T) {
 		t.Errorf("test cleaner error exps %v but got %v, after add 3 filedones", exps, gots)
 	}
 	// 此时增加第四个filedone，所有cleaner都到位
-	if err = createTestFile("./test4/meta_req_csv", logdir, logfile); err != nil {
+	if err = createTestFile("./Test_Watch/test4/meta_req_csv", logdir, logfile); err != nil {
 		t.Error(err)
 	}
-	defer os.RemoveAll("./test4")
 
 	time.Sleep(2 * time.Second)
 	exps = make([]string, 0)
@@ -383,9 +383,9 @@ func Test_Watch(t *testing.T) {
 	if !reflect.DeepEqual(gots, exps) {
 		t.Errorf("test cleaner error exps %v but got %v, after add all filedones", exps, gots)
 	}
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Millisecond)
 	// 移除一个文件，变成三个runner
-	os.Remove("./tests/confs1/test4.conf")
+	os.Remove("./Test_Watch/tests/confs1/test4.conf")
 	if !tryTest(10, func() bool {
 		runnerLength = len(m.GetRunnerNames())
 		return runnerLength == 3
@@ -396,9 +396,9 @@ func Test_Watch(t *testing.T) {
 		t.Errorf("cleanerCount exp 2 after remove test4.conf but got %v", m.cleanQueues[realdir].cleanerCount)
 	}
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(time.Millisecond)
 	// 移除一个文件，变回两个runner
-	os.Remove("./tests/confs2/test3.conf")
+	os.Remove("./Test_Watch/tests/confs2/test3.conf")
 	if !tryTest(10, func() bool {
 		runnerLength = len(m.GetRunnerNames())
 		return runnerLength == 2
@@ -412,12 +412,14 @@ func Test_Watch(t *testing.T) {
 }
 
 func Test_Watch_LogDir(t *testing.T) {
-	logfile2 := "./tests2/logdir2/log1"
-	logdir2 := "./tests2/logdir2"
-	if err := os.MkdirAll("./tests2/confs1", 0777); err != nil {
+	t.Parallel()
+	_, _, _, _, copyTest5 := copyTests("Test_Watch")
+	logfile2 := "./Test_Watch_LogDir/tests2/logdir2/log1"
+	logdir2 := "./Test_Watch_LogDir/tests2/logdir2"
+	if err := os.MkdirAll("./Test_Watch_LogDir/tests2/confs1", 0777); err != nil {
 		t.Error(err)
 	}
-	defer os.RemoveAll("./tests2")
+	defer os.RemoveAll("./Test_Watch_LogDir")
 	os.Setenv("DIR_NOT_EXIST_SLEEP_TIME", "8")
 	defer func() {
 		os.Setenv("DIR_NOT_EXIST_SLEEP_TIME", DIR_NOT_EXIST_SLEEP_TIME)
@@ -427,16 +429,17 @@ func Test_Watch_LogDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	confs := []string{"./tests2/confs1"}
+	confs := []string{"./Test_Watch_LogDir/tests2/confs1"}
 	err = m.Watch(confs)
 	if err != nil {
 		t.Error(err)
 	}
-	err = ioutil.WriteFile("./tests2/confs1/test5.conf", []byte(test5), 0666)
+	err = ioutil.WriteFile("./Test_Watch_LogDir/tests2/confs1/test5.conf", []byte(copyTest5), 0666)
 	if err != nil {
 		t.Error(err)
 	}
-	confPathAbs, err := filepath.Abs("./tests2/confs1/test5.conf")
+	confPathAbs, err := filepath.Abs("./Test_Watch_LogDir/tests2/confs1/test5.conf")
+	assert.Nil(t, err)
 	m.runnerLock.Lock()
 	_, ok := m.runners[confPathAbs]
 	m.runnerLock.Unlock()
@@ -444,20 +447,29 @@ func Test_Watch_LogDir(t *testing.T) {
 		t.Fatal("not exp, the runner should be not exsit")
 	}
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(time.Millisecond)
 	//创建logdir目录
 	if err := os.MkdirAll(logdir2, 0777); err != nil {
 		t.Error(err)
 	}
-	defer os.RemoveAll("./test5")
 	err = createFile(logfile2, 20000)
 	if err != nil {
 		t.Error(err)
 	}
-	time.Sleep(10 * time.Second)
+	time.Sleep(5 * time.Second)
 	m.runnerLock.Lock()
 	_, ok = m.runners[confPathAbs]
 	m.runnerLock.Unlock()
 	assert.Equal(t, true, ok, fmt.Sprintf("runner of %v exp but not exsit in runners %v", confPathAbs, m.runners))
 	m.Stop()
+}
+
+func copyTests(method string) (string, string, string, string, string) {
+	return copyTest(test1, "1", method), copyTest(test2, "2", method), copyTest(test3, "3", method),
+		copyTest(test4, "4", method), copyTest(test5, "5", method)
+}
+
+func copyTest(test, number, method string) string {
+	copyTest1 := strings.Replace(test, "./tests", "./"+method+"/tests", -1)
+	return strings.Replace(copyTest1, "./test"+number, "./"+method+"/test"+number, -1)
 }

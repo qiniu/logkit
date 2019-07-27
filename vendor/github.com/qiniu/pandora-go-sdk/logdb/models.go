@@ -14,10 +14,12 @@ import (
 )
 
 const (
-	schemaKeyPattern = "^[a-zA-Z_][a-zA-Z0-9_]{0,127}$"
-	repoNamePattern  = "^[a-z][a-z0-9_]{0,127}$"
-	retentionPattern = "^(0|[1-9][0-9]*)d$"
-	noRetentionRepo  = "-1"
+	schemaKeyPattern     = "^[a-zA-Z_][a-zA-Z0-9_]{0,127}$"
+	repoNamePattern      = "^[a-z][a-z0-9_]{0,127}$"
+	retentionPattern     = "^(0|[1-9][0-9]*)d$"
+	coldRetentionPattern = "^(0|[1-9][0-9]*)d$"
+	noRetentionRepo      = "-1"
+	noColdRetentionRepo  = "-1"
 )
 
 const (
@@ -129,11 +131,12 @@ func (e *RepoSchemaEntry) Validate() (err error) {
 
 type CreateRepoDSLInput struct {
 	PandoraToken
-	RepoName    string
-	Region      string  `json:"region"`
-	Retention   string  `json:"retention"`
-	DSL         string  `json:"dsl"`
-	Description *string `json:"description"`
+	RepoName      string
+	Region        string  `json:"region"`
+	Retention     string  `json:"retention"`
+	ColdRetention string  `json:"coldRetention"`
+	DSL           string  `json:"dsl"`
+	Description   *string `json:"description"`
 }
 
 /*
@@ -407,6 +410,7 @@ type CreateRepoInput struct {
 	RepoName       string
 	Region         string            `json:"region"`
 	Retention      string            `json:"retention"`
+	ColdRetention  string            `json:"coldRetention"`
 	Schema         []RepoSchemaEntry `json:"schema"`
 	FullText       FullText          `json:"fullText"`
 	Description    *string           `json:"description"`
@@ -453,12 +457,35 @@ func checkRetention(retention string) error {
 	return nil
 }
 
+func checkColdRetention(coldRetention string) error {
+	if coldRetention == "" || coldRetention == noRetentionRepo {
+		return nil
+	}
+	matched, err := regexp.MatchString(coldRetentionPattern, coldRetention)
+	if err != nil {
+		return reqerr.NewInvalidArgs("ColdRetention", "parse cold retention time failed")
+	}
+	if !matched {
+		return reqerr.NewInvalidArgs("ColdRetention", "invalid cold retention time format")
+	}
+	coldRetentionInt, err := strconv.Atoi(strings.Replace(coldRetention, "d", "", -1))
+	if err != nil {
+		return reqerr.NewInvalidArgs("ColdRetention", "invalid cold retention time format")
+	}
+
+	if coldRetentionInt < minRetentionDay {
+		return reqerr.NewInvalidArgs("ColdRetention", "invalid cold retention range")
+	}
+	return nil
+}
+
 type UpdateRepoInput struct {
 	PandoraToken
-	RepoName    string
-	Retention   string            `json:"retention"`
-	Schema      []RepoSchemaEntry `json:"schema"`
-	Description *string           `json:"description"`
+	RepoName      string
+	Retention     string            `json:"retention"`
+	ColdRetention string            `json:"coldRetention"`
+	Schema        []RepoSchemaEntry `json:"schema"`
+	Description   *string           `json:"description"`
 }
 
 func (r *UpdateRepoInput) Validate() (err error) {
@@ -474,7 +501,10 @@ func (r *UpdateRepoInput) Validate() (err error) {
 			return
 		}
 	}
-	return checkRetention(r.Retention)
+	if err = checkRetention(r.Retention); err != nil {
+		return
+	}
+	return checkColdRetention(r.ColdRetention)
 }
 
 type GetRepoInput struct {
@@ -485,6 +515,7 @@ type GetRepoInput struct {
 type GetRepoOutput struct {
 	Region         string            `json:"region"`
 	Retention      string            `json:"retention"`
+	ColdRetention  string            `json:"coldRetention"`
 	Schema         []RepoSchemaEntry `json:"schema"`
 	CreateTime     string            `json:"createTime"`
 	UpdateTime     string            `json:"updateTime"`
@@ -498,6 +529,7 @@ type RepoDesc struct {
 	RepoName       string   `json:"name"`
 	Region         string   `json:"region"`
 	Retention      string   `json:"retention"`
+	ColdRetention  string   `json:"coldRetention"`
 	CreateTime     string   `json:"createTime"`
 	UpdateTime     string   `json:"updateTime"`
 	FullText       FullText `json:"fullText"`

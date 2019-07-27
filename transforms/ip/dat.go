@@ -79,7 +79,7 @@ func (loc *datLocator) findIndexOffset(ip uint32, start, end int) int {
 	return start
 }
 
-func (_ *datLocator) newLocationInfo(str []byte) *LocationInfo {
+func (*datLocator) newLocationInfo(str []byte) *LocationInfo {
 	var info *LocationInfo
 
 	fields := bytes.Split(str, []byte("\t"))

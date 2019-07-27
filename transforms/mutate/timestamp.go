@@ -203,7 +203,6 @@ func (t *Timestamp) transform(dataPipeline <-chan transforms.TransformInfo, resu
 		errNum int
 	)
 	for transformInfo := range dataPipeline {
-		err = nil
 		errNum = 0
 
 		val, getErr := GetMapValue(transformInfo.CurData, t.keys...)

@@ -168,7 +168,7 @@ func (conf MapConf) GetStringList(key string) ([]string, error) {
 func (c MapConf) GetAliasList(key string) (aks []AliasKey, err error) {
 	ks, err := c.GetStringList(key)
 	if err != nil {
-		return
+		return nil, err
 	}
 	for _, k := range ks {
 		parts := strings.Fields(k)
@@ -182,7 +182,7 @@ func (c MapConf) GetAliasList(key string) (aks []AliasKey, err error) {
 		}
 		aks = append(aks, AliasKey{Key: name, Alias: alias})
 	}
-	return
+	return aks, nil
 }
 
 func (conf MapConf) GetAliasMapOr(key string, deft map[string]string) (map[string]string, error) {
@@ -248,7 +248,6 @@ func (conf MapConf) GetPasswordEnvStringOr(key, deft string) (string, error) {
 	value, err := conf.GetString(key)
 	if err != nil {
 		value = deft
-		err = nil
 	}
 
 	envName, isEnv := IsEnv(value)

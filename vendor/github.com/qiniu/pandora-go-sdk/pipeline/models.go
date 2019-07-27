@@ -785,6 +785,10 @@ type CreateRepoForKodoInput struct {
 	Format         string
 	Schema         []RepoSchemaEntry
 	AutoExportKodoTokens
+	// workflow 导出到非当前账号的 kodo的bucket，配置ak sk
+	KodoZone      string
+	KodoAccessKey string
+	KodoSecretKey string
 }
 
 type AutoExportKodoTokens struct {
@@ -810,6 +814,11 @@ type AutoExportToKODOInput struct {
 	Email          string
 	Retention      int //数字，单位为天
 	AutoExportKodoTokens
+
+	// workflow 导出到非当前账号的 kodo的bucket，配置ak sk
+	KodoZone      string
+	KodoAccessKey string
+	KodoSecretKey string
 }
 
 type SeriesInfo struct {
@@ -986,11 +995,13 @@ type RepoDesc struct {
 	Workflow    string    `json:"workflow"`
 	RuleNames   *[]string `json:"ruleNames"`
 	Description *string   `json:"description"`
+	Perms       []string  `json:"perms,omitempty"`
 }
 
 type ListReposInput struct {
 	PandoraToken
 	WithDag bool `json:"-"`
+	Authorized bool `json:"-"`
 }
 
 type ListReposOutput struct {
@@ -1568,6 +1579,10 @@ type ExportKodoSpec struct {
 	Compress       bool              `json:"compress"`
 	Retention      int               `json:"retention"`
 	KodoFileType   int               `json:"kodo_file_type"`
+	// 服务端workflow优先使用配置的下列三个字段去校验创建kodo导出
+	ExportZone      string `json:"exportZone"`
+	ExportAccessKey string `json:"exportAccessKey"`
+	ExportSecretKey string `json:"exportSecretKey"`
 }
 
 func (s *ExportKodoSpec) Validate() (err error) {

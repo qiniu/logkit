@@ -27,6 +27,7 @@ func runCleanChan(c <-chan CleanSignal, t *testing.T) {
 }
 
 func Test_CheckBelong(t *testing.T) {
+	t.Parallel()
 	logfiles := "Test_CheckBelong"
 	err := os.Mkdir(logfiles, os.ModePerm)
 	if err != nil {
@@ -117,6 +118,7 @@ func GetTestFiles(path string) error {
 }
 
 func Test_clean(t *testing.T) {
+	t.Parallel()
 	donefiles := "Test_clean"
 	c := conf.MapConf{}
 	c[config.KeyMetaPath] = donefiles
@@ -146,7 +148,7 @@ func Test_clean(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	time.Sleep(3 * time.Second)
+	time.Sleep(2 * time.Second)
 	files, err := ioutil.ReadDir(donefiles)
 	if err != nil {
 		t.Error(err)
@@ -173,7 +175,7 @@ func Test_clean(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	time.Sleep(3 * time.Second)
+	time.Sleep(2 * time.Second)
 	files, err = ioutil.ReadDir(donefiles)
 	if err != nil {
 		t.Error(err)
@@ -206,10 +208,10 @@ func Test_clean(t *testing.T) {
 	cl.reserveNumber = 10
 	cl.reserveSize = 10 * 1024 * 1024
 	err = cl.Clean()
-	time.Sleep(3 * time.Second)
 	if err != nil {
 		t.Error(err)
 	}
+	time.Sleep(2 * time.Second)
 	files, err = ioutil.ReadDir(donefiles)
 	if err != nil {
 		t.Error(err)

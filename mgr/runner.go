@@ -305,6 +305,18 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 				senderConfig[senderConf.KeyPandoraDescription] = LogkitAutoCreateDescription
 			}
 		}
+		if senderType, ok := senderConfig[senderConf.KeySenderType]; ok && senderType == senderConf.TypeOpenFalconTransfer {
+			if meta.GetMode() == ModeSnmp {
+				intervalStr, _ := rc.ReaderConfig.GetStringOr(KeySnmpReaderInterval, "30s")
+				interval, err := time.ParseDuration(intervalStr)
+				if err != nil {
+					return nil, err
+				}
+				senderConfig[senderConf.KeyCollectInterval] = fmt.Sprintf("%d", int64(interval.Seconds()))
+				senderConfig[senderConf.KeyName] = rc.RunnerName
+			}
+			log.Infof("senderConfig = %+v", senderConfig)
+		}
 		senderConfig, err := setPandoraServerConfig(senderConfig, serverConfigs)
 		if err != nil {
 			return nil, err
@@ -350,11 +362,11 @@ func createTransformers(rc RunnerConfig) ([]transforms.Transformer, error) {
 		if !ok {
 			return nil, fmt.Errorf("transformer config field type %v is not string", tp)
 		}
-		creater, ok := transforms.Transformers[strTP]
+		creator, ok := transforms.Transformers[strTP]
 		if !ok {
 			return nil, fmt.Errorf("transformer type unsupported: %v", strTP)
 		}
-		trans := creater()
+		trans := creator()
 		bts, err := jsoniter.Marshal(tConf)
 		if err != nil {
 			return nil, fmt.Errorf("type %v of transformer marshal config error %v", strTP, err)
@@ -580,9 +592,12 @@ func getSampleContent(line string, maxBatchSize int) string {
 		return line
 	}
 	if maxBatchSize <= 1024 {
-		return line
+		if len(line) <= 1024 {
+			return line
+		}
+		return line[0:1024]
 	}
-	return line[0:1024]
+	return line[0:maxBatchSize]
 }
 
 func (r *LogExportRunner) readDatas(dr reader.DataReader, dataSourceTag string) []Data {
@@ -685,7 +700,10 @@ func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []str
 }
 
 func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
-	var err error
+	var (
+		err        error
+		curTimeStr string
+	)
 	lines, froms := r.rawReadLines(dataSourceTag)
 	r.tracker.Track("finish rawReadLines")
 	for i := range r.transformers {
@@ -697,7 +715,9 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 		}
 	}
 
-	curTimeStr := time.Now().Format("2006-01-02 15:04:05.999")
+	if r.ReadTime {
+		curTimeStr = time.Now().Format("2006-01-02 15:04:05.999")
+	}
 
 	linenums := len(lines)
 	if linenums <= 0 {
@@ -717,9 +737,13 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 	se, ok := err.(*StatsError)
 	r.rsMutex.Lock()
 	if ok {
-		numErrs = se.Errors
-		err = errors.New(se.LastError)
-		r.rs.ParserStats.Errors += se.Errors
+		if se.Errors == 0 && se.LastError == "" {
+			err = nil
+		} else {
+			numErrs = se.Errors
+			err = errors.New(se.LastError)
+			r.rs.ParserStats.Errors += se.Errors
+		}
 		r.rs.ParserStats.Success += se.Success
 	} else if err != nil {
 		numErrs = 1
@@ -754,7 +778,9 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 		tags = MergeEnvTags(r.EnvTag, tags)
 	}
 	tags = MergeExtraInfoTags(r.meta, tags)
-	tags["lst"] = curTimeStr
+	if r.ReadTime {
+		tags["lst"] = curTimeStr
+	}
 	if len(tags) > 0 {
 		datas = AddTagsToData(tags, datas, r.Name())
 	}
@@ -1120,10 +1146,7 @@ func (r *LogExportRunner) Reset() (err error) {
 }
 
 func (r *LogExportRunner) Delete() (err error) {
-	if err = r.meta.Delete(); err != nil {
-		return err
-	}
-	return nil
+	return r.meta.Delete()
 }
 
 func (r *LogExportRunner) Cleaner() CleanInfo {

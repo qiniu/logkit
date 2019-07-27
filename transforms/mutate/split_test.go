@@ -12,8 +12,8 @@ import (
 func TestSplitTransformer(t *testing.T) {
 	gsub := &Spliter{
 		Key:         "myword",
-		SeperateKey: " ",
-		ArraryName:  "result",
+		SeparateKey: " ",
+		ArrayName:   "result",
 	}
 	data, err := gsub.Transform([]Data{{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}, {"myword": "x1x x x11", "abc": "x1"}})
 	assert.NoError(t, err)
@@ -26,8 +26,8 @@ func TestSplitTransformer(t *testing.T) {
 
 	gsub2 := &Spliter{
 		Key:         "multi.myword",
-		SeperateKey: " ",
-		ArraryName:  "result",
+		SeparateKey: " ",
+		ArrayName:   "result",
 	}
 	data2, err2 := gsub2.Transform([]Data{{"multi": map[string]interface{}{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}}, {"multi": map[string]interface{}{"myword": "x1x x x11", "abc": "x1"}}})
 	assert.NoError(t, err2)
@@ -40,7 +40,7 @@ func TestSplitTransformer(t *testing.T) {
 
 	gsub3 := &Spliter{
 		Key:         "multi.myword",
-		SeperateKey: " ",
+		SeparateKey: " ",
 	}
 	_, err3 := gsub3.Transform([]Data{
 		{"multi": map[string]interface{}{"myword": "hello x1 y2 x1nihao", "abc": "x1 y2"}},

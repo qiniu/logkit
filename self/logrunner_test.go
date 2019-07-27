@@ -18,8 +18,8 @@ import (
 	"github.com/qiniu/logkit/parser"
 	"github.com/qiniu/logkit/parser/raw"
 	"github.com/qiniu/logkit/reader"
+	"github.com/qiniu/logkit/reader/bufreader"
 	. "github.com/qiniu/logkit/reader/config"
-	"github.com/qiniu/logkit/reader/tailx"
 	"github.com/qiniu/logkit/sender"
 	"github.com/qiniu/logkit/sender/file"
 	"github.com/qiniu/logkit/sender/mock"
@@ -124,8 +124,9 @@ func TestLogRunner_GetSenderConfig(t *testing.T) {
 
 func TestSetReaderConfig(t *testing.T) {
 	t.Parallel()
-	path := "TestSetReaderConfig/logkit.log*"
-	rdConf := SetReaderConfig(readerConfig, path, "", "")
+	path := "TestSetReaderConfig"
+	filePattern := "logkit.log*"
+	rdConf := SetReaderConfig(readerConfig, path, filePattern, "", "")
 	if !strings.HasSuffix(path, rdConf["log_path"]) {
 		t.Fatalf("expect has suffix %v, but got %v", rdConf["log_path"], path)
 	}
@@ -175,10 +176,15 @@ func getInfo(t *testing.T, logpath, metapath string) (conf.MapConf, conf.MapConf
 		err error
 	)
 
+	var filePattern string
 	if logpath == "" {
-		logpath = "TestNewLogRunner/logkit.log"
+		logpath = "TestNewLogRunner/"
+		filePattern = "logkit.log*"
+	} else {
+		filePattern = filepath.Base(logpath) + "*"
+		logpath = filepath.Dir(logpath)
 	}
-	rdConf := SetReaderConfig(readerConfig, logpath, metapath, "oldest")
+	rdConf := SetReaderConfig(readerConfig, logpath, filePattern, metapath, "oldest")
 	meta, err := reader.NewMetaWithConf(rdConf)
 	assert.Nil(t, err)
 	defer func() {
@@ -187,7 +193,7 @@ func getInfo(t *testing.T, logpath, metapath string) (conf.MapConf, conf.MapConf
 		}
 	}()
 
-	rd, err = tailx.NewReader(meta, rdConf)
+	rd, err = bufreader.NewFileDirReader(meta, rdConf)
 	assert.Nil(t, err)
 
 	ps, err = raw.NewParser(nil)

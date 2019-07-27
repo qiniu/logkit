@@ -20,6 +20,7 @@ const (
 
 const (
 	CheckPattern       = "^[a-zA-Z_][a-zA-Z0-9_]{0,127}$"
+	CheckPatternKey    = "^[a-zA-Z_.][a-zA-Z0-9_.]{0,127}$"
 	DefaultEncodingWay = "UTF-8"
 
 	KeyType   = "type"

@@ -59,6 +59,17 @@ func parserParseTest(p *testParam) {
 	}
 	assert.Equal(t, exp2, got2.Data.SamplePoints[0])
 
+	jsonConf[KeySampleLog] = "{\"a\":\"b}"
+	rawpst, err = jsoniter.Marshal(jsonConf)
+	url = "http://127.0.0.1" + rs.address + "/logkit/parser/parse"
+	respCode, respBody, err = makeRequest(url, http.MethodPost, rawpst)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusBadRequest, respCode)
+	err = jsoniter.Unmarshal(respBody, &got2)
+	if err != nil {
+		t.Error(err)
+	}
+
 	// grok
 	grokConf := conf2.MapConf{}
 	var got3 respParserRet
@@ -87,6 +98,25 @@ func parserParseTest(p *testParam) {
 		"auth":         "frank", "client_ip": "127.0.0.1"}
 
 	assert.Equal(t, exp3, got3.Data.SamplePoints[0])
+
+	// raw
+	rawConf = conf2.MapConf{}
+	rawConf[KeySampleLog] = SampleLogs[TypeRaw]
+	rawConf[KeyParserType] = TypeRaw
+	rawpst, err = jsoniter.Marshal(rawConf)
+	assert.NoError(t, err)
+	url = "http://127.0.0.1" + rs.address + "/logkit/parser/check"
+	respCode, respBody, err = makeRequest(url, http.MethodPost, rawpst)
+	assert.NoError(t, err, string(respBody))
+	assert.Equal(t, http.StatusOK, respCode)
+
+	rawConf[KeyParserType] = "testParse"
+	rawpst, err = jsoniter.Marshal(rawConf)
+	assert.NoError(t, err)
+	url = "http://127.0.0.1" + rs.address + "/logkit/parser/check"
+	respCode, _, err = makeRequest(url, http.MethodPost, rawpst)
+	assert.Nil(t, err)
+	assert.Equal(t, http.StatusBadRequest, respCode)
 }
 
 func parserAPITest(p *testParam) {

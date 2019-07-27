@@ -10,7 +10,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/json-iterator/go"
+	jsoniter "github.com/json-iterator/go"
 
 	"github.com/qiniu/log"
 
@@ -43,6 +43,7 @@ type Parser struct {
 	ignoreInvalid        bool
 	numRoutine           int
 	keepRawData          bool
+	containSplitterIndex int
 }
 
 type field struct {
@@ -100,6 +101,20 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	allmoreStartNumber, _ := c.GetIntOr(KeyCSVAllowMoreStartNum, 0)
 	ignoreInvalid, _ := c.GetBoolOr(KeyCSVIgnoreInvalidField, false)
 	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)
+	containSplitterKey, _ := c.GetStringOr(KeyCSVContainSplitterKey, "")
+	containSplitterIndex := -1
+	if containSplitterKey != "" {
+		for index, f := range fields {
+			if f.name == containSplitterKey {
+				containSplitterIndex = index
+				break
+			}
+		}
+		if containSplitterIndex == -1 {
+			return nil, errors.New("containSplitterKey:" + containSplitterKey + " not exists in column")
+		}
+	}
+
 	numRoutine := MaxProcs
 	if numRoutine == 0 {
 		numRoutine = 1
@@ -118,6 +133,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		allmoreStartNUmber:   allmoreStartNumber,
 		numRoutine:           numRoutine,
 		keepRawData:          keepRawData,
+		containSplitterIndex: containSplitterIndex,
 	}, nil
 }
 
@@ -131,20 +147,17 @@ func parseSchemaFieldList(schema string) (fieldList []string, err error) {
 		case '{':
 			nestedDepth++
 			if nestedDepth > 1 {
-				err = errors.New("parse fieldList error: jsonmap in jsonmap is not supported by now")
-				return
+				return []string{}, errors.New("parse fieldList error: jsonmap in jsonmap is not supported by now")
 			}
 		case '}':
 			nestedDepth--
 			if nestedDepth < 0 {
-				err = errors.New("parse fieldList error: find } befor {")
-				return
+				return []string{}, errors.New("parse fieldList error: find } befor {")
 			}
 		case ',':
 			if nestedDepth == 0 {
 				if start > end {
-					err = errors.New("parse fieldList error: start index is larger than end")
-					return
+					return []string{}, errors.New("parse fieldList error: start index is larger than end")
 				}
 				fields := splitFields(schema[start:end])
 				fieldList = append(fieldList, fields...)
@@ -153,21 +166,19 @@ func parseSchemaFieldList(schema string) (fieldList []string, err error) {
 		}
 	}
 	if nestedDepth != 0 {
-		err = errors.New("parse fieldList error: { and } not match")
-		return
+		return []string{}, errors.New("parse fieldList error: { and } not match")
 	}
 	if start < len(schema) {
 		fields := splitFields(schema[start:])
 		fieldList = append(fieldList, fields...)
 	}
-	return
+	return fieldList, nil
 }
 
 func parseSchemaRawField(f string) (newField field, err error) {
 	parts := strings.Fields(f)
 	if len(parts) < 2 {
-		err = errors.New("column conf error: " + f + ", format should be \"columnName dataType\"")
-		return
+		return field{}, errors.New("column conf error: " + f + ", format should be \"columnName dataType\"")
 	}
 	columnName, dataType := parts[0], parts[1]
 	switch strings.ToLower(dataType) {
@@ -213,19 +224,19 @@ func parseSchemaJsonField(f string) (fd field, err error) {
 		}
 		fields, err = parseSchemaFields(fieldListFinal)
 		if err != nil {
-			return
+			return fd, err
 		}
 		for _, f := range fields {
 			typeChange[f.name] = DataType(f.dataType)
 		}
 	}
-	fd = field{
+
+	return field{
 		name:       key,
 		dataType:   TypeJSONMap,
 		typeChange: typeChange,
 		allin:      allin,
-	}
-	return
+	}, nil
 }
 
 func isJsonMap(f string) bool {
@@ -428,16 +439,35 @@ func getUnmachedMessage(parts []string, schemas []field) (ret string) {
 func (p *Parser) parse(line string) (d Data, err error) {
 	d = make(Data)
 	parts := strings.Split(line, p.delim)
-	if len(parts) != len(p.schema) && !p.allowNotMatch {
-		return nil, fmt.Errorf("schema length not match: schema length %v, actual column length %v, %s", len(p.schema), len(parts), getUnmachedMessage(parts, p.schema))
+	partsLength := len(parts)
+	schemaLength := len(p.schema)
+	if partsLength != schemaLength && !p.allowNotMatch && p.containSplitterIndex < 0 {
+		return nil, fmt.Errorf("schema length not match: schema length %v, actual column length %v, %s", schemaLength, partsLength, getUnmachedMessage(parts, p.schema))
 	}
+
+	if p.containSplitterIndex >= 0 && partsLength > schemaLength {
+		if p.containSplitterIndex >= schemaLength {
+			return nil, fmt.Errorf("containSplitterIndex(%d) is large then fields count(%d)", p.containSplitterIndex, schemaLength)
+		}
+		partsFormer := parts[:p.containSplitterIndex]
+		// ctnSplitIdx is short for containSplitterFieldIndexEnd
+		ctnSplitIdx := p.containSplitterIndex + partsLength - schemaLength
+
+		containSplitterField := strings.Join(parts[p.containSplitterIndex:ctnSplitIdx+1], p.delim)
+		partsLetter := parts[ctnSplitIdx+1:]
+
+		parts = append([]string{}, partsFormer...)
+		parts = append(parts, containSplitterField)
+		parts = append(parts, partsLetter...)
+	}
+
 	moreNum := p.allmoreStartNUmber
 	for i, part := range parts {
 		part = strings.TrimSpace(part)
-		if i >= len(p.schema) && p.allowMoreName == "" {
+		if i >= schemaLength && p.allowMoreName == "" {
 			continue
 		}
-		if i >= len(p.schema) {
+		if i >= schemaLength {
 			d[p.allowMoreName+strconv.Itoa(moreNum)] = part
 			moreNum++
 		} else {
@@ -576,7 +606,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 
 	se.DatasourceSkipIndex = se.DatasourceSkipIndex[:datasourceIndex]
 	datas = datas[:dataIndex]
-	if se.Errors == 0 {
+	if se.Errors == 0 && len(se.DatasourceSkipIndex) == 0 {
 		return datas, nil
 	}
 	return datas, se

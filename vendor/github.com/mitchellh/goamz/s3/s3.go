@@ -619,6 +619,8 @@ func (b *Bucket) URL(path string) string {
 	if err != nil {
 		panic(err)
 	}
+	opaquePrefix := "//" + u.Host
+	u.Opaque = opaquePrefix + amazonEscape(u.Opaque[len(opaquePrefix):])
 	u.RawQuery = ""
 	return u.String()
 }
@@ -639,6 +641,8 @@ func (b *Bucket) SignedURL(path string, expires time.Time) string {
 	if err != nil {
 		panic(err)
 	}
+	opaquePrefix := "//" + u.Host
+	u.Opaque = opaquePrefix + amazonEscape(u.Opaque[len(opaquePrefix):])
 	return u.String()
 }
 
@@ -700,7 +704,8 @@ func (req *request) url(full bool) (*url.URL, error) {
 		return nil, fmt.Errorf("bad S3 endpoint URL %q: %v", req.baseurl, err)
 	}
 
-	u.Opaque = amazonEscape(req.path)
+	//u.Opaque = amazonEscape(req.path)
+	u.Opaque = req.path
 	if full {
 		u.Opaque = "//" + u.Host + u.Opaque
 	}
@@ -780,6 +785,8 @@ func (s3 *S3) prepare(req *request) error {
 	}
 	signer := s3.buildSigner()
 	_, err = signer.Sign(req.hreq, nil, "s3", s3.Region.Name, time.Now())
+	opaquePrefix := "//" + url.Host
+	req.hreq.URL.Opaque = opaquePrefix + amazonEscape(req.hreq.URL.Opaque[len(opaquePrefix):])
 	return err
 }
 

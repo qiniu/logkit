@@ -21,10 +21,11 @@ const (
 	KeyPandoraSchemaFree           = "pandora_schema_free"
 	KeyPandoraExtraInfo            = "pandora_extra_info"
 
-	KeyPandoraEnableLogDB   = "pandora_enable_logdb"
-	KeyPandoraLogDBName     = "pandora_logdb_name"
-	KeyPandoraLogDBHost     = "pandora_logdb_host"
-	KeyPandoraLogDBAnalyzer = "pandora_logdb_analyzer"
+	KeyPandoraEnableLogDB    = "pandora_enable_logdb"
+	KeyPandoraLogDBName      = "pandora_logdb_name"
+	KeyPandoraLogDBHost      = "pandora_logdb_host"
+	KeyPandoraLogDBAnalyzer  = "pandora_logdb_analyzer"
+	KeyPandoraLogdbRetention = "pandora_logdb_retention"
 
 	KeyPandoraEnableTSDB     = "pandora_enable_tsdb"
 	KeyPandoraTSDBName       = "pandora_tsdb_name"
@@ -35,6 +36,9 @@ const (
 
 	KeyPandoraEnableKodo         = "pandora_enable_kodo"
 	KeyPandoraKodoBucketName     = "pandora_bucket_name"
+	KeyPandoraKodoZone           = "pandora_kodo_zone"
+	KeyPandoraKodoAK             = "pandora_kodo_ak"
+	KeyPandoraKodoSK             = "pandora_kodo_sk"
 	KeyPandoraKodoFilePrefix     = "pandora_kodo_prefix"
 	KeyPandoraKodoLowFreqFile    = "pandora_kodo_low_frequency_file"
 	KeyPandoraKodoCompressPrefix = "pandora_kodo_compress"
@@ -61,6 +65,8 @@ const (
 	KeyInsecureServer         = "insecure_server"
 	KeyTimeout                = "pandora_send_timeout"
 	KeyPandoraDescription     = "pandora_description"
+	KeyCollectInterval        = "collect_interval"
+	KeyTags                   = "tags"
 
 	PandoraUUID = "Pandora_UUID"
 
@@ -76,18 +82,19 @@ const (
 	UnderfinedRunnerName = "UnderfinedRunnerName"
 
 	// SenderType 发送类型
-	TypeFile              = "file"          // 本地文件
-	TypePandora           = "pandora"       // pandora 打点
-	TypeMongodbAccumulate = "mongodb_acc"   // mongodb 并且按字段聚合
-	TypeInfluxdb          = "influxdb"      // influxdb
-	TypeMock              = "mock"          // mock sender
-	TypeDiscard           = "discard"       // discard sender
-	TypeElastic           = "elasticsearch" // elastic
-	TypeKafka             = "kafka"         // kafka
-	TypeHttp              = "http"          // http sender
-	TypeMySQL             = "mysql"
-	TypeCSV               = "csv"
-	TypeSQLFile           = "sqlfile"
+	TypeFile               = "file"          // 本地文件
+	TypePandora            = "pandora"       // pandora 打点
+	TypeMongodbAccumulate  = "mongodb_acc"   // mongodb 并且按字段聚合
+	TypeInfluxdb           = "influxdb"      // influxdb
+	TypeMock               = "mock"          // mock sender
+	TypeDiscard            = "discard"       // discard sender
+	TypeElastic            = "elasticsearch" // elastic
+	TypeKafka              = "kafka"         // kafka
+	TypeHttp               = "http"          // http sender
+	TypeMySQL              = "mysql"
+	TypeCSV                = "csv"
+	TypeSQLFile            = "sqlfile"
+	TypeOpenFalconTransfer = "open_falcon"
 
 	InnerUserAgent = "_useragent"
 	InnerSendRaw   = "_send_raw"
@@ -240,6 +247,10 @@ const (
 	KeySQLFileRotateSize = "sqlfile_rotate_size"
 	KeySQLFileTable      = "sqlfile_table"
 	KeySQLFilePathPrefix = "sqlfile_path_prefix"
+
+	// open-falcon
+	KeyOpenFalconTransferHost = "open_falcon_transfer_host"
+	KeyOpenFalconTransferURL  = "open_falcon_transfer_url"
 )
 
 // NotAsyncSender return when sender is not async

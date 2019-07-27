@@ -175,21 +175,21 @@ type MIB_TCP_STATE int32
 
 // copied from https://msdn.microsoft.com/en-us/library/windows/desktop/aa366020(v=vs.85).aspx
 type MIB_TCPSTATS struct {
-	dwRtoAlgorithm DWORD `RtoAlgorithm`
-	dwRtoMin       DWORD `RtoMin`
-	dwRtoMax       DWORD `RtoMax`
-	dwMaxConn      DWORD `MaxConn`
-	dwActiveOpens  DWORD `ActiveOpens`
-	dwPassiveOpens DWORD `PassiveOpens`
-	dwAttemptFails DWORD `AttemptFails`
-	dwEstabResets  DWORD `EstabResets`
-	dwCurrEstab    DWORD `CurrEstab`
-	dwInSegs       DWORD `InSegs`
-	dwOutSegs      DWORD `OutSegs`
-	dwRetransSegs  DWORD `RetransSegs`
-	dwInErrs       DWORD `InErrs`
-	dwOutRstsv     DWORD `OutRsts`
-	dwNumConns     DWORD `NumConns`
+	dwRtoAlgorithm DWORD `json:"RtoAlgorithm"`
+	dwRtoMin       DWORD `json:"RtoMin"`
+	dwRtoMax       DWORD `json:"RtoMax"`
+	dwMaxConn      DWORD `json:"MaxConn"`
+	dwActiveOpens  DWORD `json:"ActiveOpens"`
+	dwPassiveOpens DWORD `json:"PassiveOpens"`
+	dwAttemptFails DWORD `json:"AttemptFails"`
+	dwEstabResets  DWORD `json:"EstabResets"`
+	dwCurrEstab    DWORD `json:"CurrEstab"`
+	dwInSegs       DWORD `json:"InSegs"`
+	dwOutSegs      DWORD `json:"OutSegs"`
+	dwRetransSegs  DWORD `json:"RetransSegs"`
+	dwInErrs       DWORD `json:"InErrs"`
+	dwOutRstsv     DWORD `json:"OutRsts"`
+	dwNumConns     DWORD `json:"NumConns"`
 }
 type PMIB_TCPSTATS *MIB_TCPSTATS
 
@@ -202,11 +202,11 @@ func (t *MIB_TCPSTATS) Name() string {
 
 // copied from https://msdn.microsoft.com/en-us/library/windows/desktop/aa366929(v=vs.85).aspx
 type MIB_UDPSTATS struct {
-	dwInDatagrams  DWORD `InDatagrams`
-	dwNoPorts      DWORD `NoPorts`
-	dwInErrors     DWORD `InErrors`
-	dwOutDatagrams DWORD `OutDatagrams`
-	dwNumAddrs     DWORD `NumAddrs`
+	dwInDatagrams  DWORD `json:"InDatagrams"`
+	dwNoPorts      DWORD `json:"NoPorts"`
+	dwInErrors     DWORD `json:"InErrors"`
+	dwOutDatagrams DWORD `json:"OutDatagrams"`
+	dwNumAddrs     DWORD `json:"NumAddrs"`
 }
 type PMIB_UDPSTATS *MIB_UDPSTATS
 

@@ -334,6 +334,9 @@ func (c *Pipeline) UpdateRepoWithKodo(input *UpdateRepoInput, ex ExportDesc) err
 	if !ok {
 		return fmt.Errorf("export kodo spec bucketName assert error %v is not string", ex.Spec["bucket"])
 	}
+	if input.Option.BucketName == "" {
+		return fmt.Errorf("export kodo spec bucketName assert error %v is not string", ex.Spec["bucket"])
+	}
 	fields, ok := ex.Spec["fields"].(map[string]interface{})
 	if !ok {
 		return fmt.Errorf("export kodo spec fields assert error %v is not map[string]interface{}", ex.Spec["fields"])
@@ -390,9 +393,11 @@ func (c *Pipeline) UpdateRepoWithKodo(input *UpdateRepoInput, ex ExportDesc) err
 	if !hasDiff {
 		return nil
 	}
-
+	if bucketName != input.Option.BucketName {
+		log.Infof("workflow[%s] export kodo bucket change [%s] -> [%s]", input.workflow, bucketName, input.Option.BucketName)
+	}
 	spec := &ExportKodoSpec{
-		Bucket:         bucketName,
+		Bucket:         input.Option.BucketName,
 		Fields:         newfields,
 		AccessKey:      ak,
 		Retention:      int(retention),
@@ -405,6 +410,10 @@ func (c *Pipeline) UpdateRepoWithKodo(input *UpdateRepoInput, ex ExportDesc) err
 		RotateStrategy: input.Option.RotateStrategy,
 		RotateNumber:   input.Option.RotateNumber,
 		RotateSizeType: input.Option.RotateSizeType,
+
+		ExportZone:      input.Option.KodoZone,
+		ExportAccessKey: input.Option.KodoAccessKey,
+		ExportSecretKey: input.Option.KodoSecretKey,
 	}
 	if input.Option.KodoFileType == 1 {
 		spec.KodoFileType = 1
@@ -651,7 +660,11 @@ func (c *Pipeline) GetSampleData(input *GetSampleDataInput) (output *SampleDataO
 func (c *Pipeline) ListRepos(input *ListReposInput) (output *ListReposOutput, err error) {
 	var op *request.Operation
 	if input.WithDag {
-		op = c.NewOperation(base.OpListReposWithDag)
+		if input.Authorized {
+			op = c.NewOperation(base.OpListReposAuthorized)
+		} else {
+			op = c.NewOperation(base.OpListReposWithDag)
+		}
 	} else {
 		op = c.NewOperation(base.OpListRepos)
 	}

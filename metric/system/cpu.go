@@ -89,19 +89,19 @@ type CPUStats struct {
 	CollectCPUTime bool `json:"collect_cpu_time"`
 }
 
-func (_ *CPUStats) Name() string {
+func (*CPUStats) Name() string {
 	return TypeMetricCpu
 }
 
-func (_ *CPUStats) Usages() string {
+func (*CPUStats) Usages() string {
 	return MetricCpuUsages
 }
 
-func (_ *CPUStats) Tags() []string {
+func (*CPUStats) Tags() []string {
 	return []string{CpuTimeCPU, CpuUsageCPU}
 }
 
-func (_ *CPUStats) Config() map[string]interface{} {
+func (*CPUStats) Config() map[string]interface{} {
 	cpuConfig := make([]Option, 0)
 	for _, val := range ConfigCpuUsages {
 		opt := Option{

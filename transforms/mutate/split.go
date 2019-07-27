@@ -16,10 +16,10 @@ var (
 )
 
 type Spliter struct {
-	Key           string `json:"key"`
-	SeperateKey   string `json:"sep"`
-	ArraryName    string `json:"newfield"`
-	ArraryNameNew string `json:"new"`
+	Key          string `json:"key"`
+	SeparateKey  string `json:"sep"`
+	ArrayName    string `json:"newfield"`
+	ArrayNameNew string `json:"new"`
 
 	stats      StatsInfo
 	keys       []string
@@ -56,10 +56,10 @@ func (g *Spliter) Transform(datas []Data) ([]Data, error) {
 		resultChan   = make(chan transforms.TransformResult)
 		wg           = new(sync.WaitGroup)
 	)
-	if g.ArraryName == "" {
-		g.ArraryName = g.ArraryNameNew
+	if g.ArrayName == "" {
+		g.ArrayName = g.ArrayNameNew
 	}
-	if g.ArraryName == "" {
+	if g.ArrayName == "" {
 		err = errors.New("array name is empty string,can't use as array field key name")
 		errNum = dataLen
 		g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(dataLen), g.Type())
@@ -204,8 +204,8 @@ func (g *Spliter) transform(dataPipeline <-chan transforms.TransformInfo, result
 			}
 			continue
 		}
-		newKeys[len(newKeys)-1] = g.ArraryName
-		setErr := SetMapValue(transformInfo.CurData, strings.Split(strVal, g.SeperateKey), false, newKeys...)
+		newKeys[len(newKeys)-1] = g.ArrayName
+		setErr := SetMapValue(transformInfo.CurData, strings.Split(strVal, g.SeparateKey), false, newKeys...)
 		if setErr != nil {
 			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, strings.Join(newKeys, "."))
 		}

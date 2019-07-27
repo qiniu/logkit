@@ -71,9 +71,6 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
 	logHeaders, _ := c.GetStringListOr(KeyLogHeaders, defaultLogHeads)
 	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)
-	if len(logHeaders) < 1 {
-		return nil, errors.New("no log headers was configured to parse")
-	}
 
 	//兼容老的配置，以前的配置必须要配 KeyPrefix 才能匹配 prefix
 	prefix, _ := c.GetStringOr(KeyPrefix, "")
@@ -84,7 +81,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	}
 
 	nameMap := make(map[string]struct{})
-	for k, _ := range logHeaders {
+	for k := range logHeaders {
 		nameMap[string(k)] = struct{}{}
 	}
 	labels := GetGrokLabels(labelList, nameMap)
@@ -278,10 +275,10 @@ func (p *Parser) parseCombinedModuleFile(line string) (string, map[string]string
 			//适配teapot日志
 			result[LogHeadFile] = strings.Trim(module, `"`)
 			return line, result, nil
-		} else {
-			result[LogHeadModule] = module
 		}
+		result[LogHeadModule] = module
 	}
+
 	leftLine, logRes, err := p.parseLogFile(line)
 	if err != nil {
 		if len(result) > 0 {
@@ -428,7 +425,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 
 	se.DatasourceSkipIndex = se.DatasourceSkipIndex[:datasourceIndex]
 	datas = datas[:dataIndex]
-	if se.Errors == 0 {
+	if se.Errors == 0 && len(se.DatasourceSkipIndex) == 0 {
 		return datas, nil
 	}
 	return datas, se

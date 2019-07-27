@@ -2,6 +2,7 @@ package system
 
 import (
 	"fmt"
+	"github.com/qiniu/log"
 	"net"
 	"strings"
 	"time"
@@ -62,24 +63,24 @@ type NetIOStats struct {
 	lastCollect map[string]CollectInfo
 
 	skipChecks     bool
-	skipProtoState bool     `json:"skip_protocols_state"`
+	SkipProtoState bool     `json:"skip_protocols_state"`
 	Interfaces     []string `json:"interfaces"`
 	InterfacesMap  map[string]net.Interface
 }
 
-func (_ *NetIOStats) Name() string {
+func (*NetIOStats) Name() string {
 	return TypeMetricNet
 }
 
-func (_ *NetIOStats) Usages() string {
+func (*NetIOStats) Usages() string {
 	return MetricNetUsages
 }
 
-func (_ *NetIOStats) Tags() []string {
+func (*NetIOStats) Tags() []string {
 	return []string{KeyNetInterface}
 }
 
-func (_ *NetIOStats) Config() map[string]interface{} {
+func (*NetIOStats) Config() map[string]interface{} {
 	configOption := []Option{
 		{
 			KeyName:      "interfaces",
@@ -166,8 +167,21 @@ func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 		thisTime := time.Now()
 		if info, ok := s.lastCollect[io.Name]; ok {
 			dur := thisTime.Sub(info.timestamp)
-			sentBytesDur := io.BytesSent - info.BytesSent
+			if io.BytesRecv < info.BytesRecv {
+
+				log.Warnf("error getting disk io info failed ioName:%s curBytesRecv[%v] < "+
+					"lastBytesRecv[%v]", io.Name, io.BytesRecv, info.BytesRecv)
+				delete(s.lastCollect, io.Name)
+				continue
+			}
+			if io.BytesSent < info.BytesSent {
+				log.Warnf("error getting disk io info failed ioName:%s curBytesSent[%v] < "+
+					"lastBytesSent[%v]", io.Name, io.BytesSent, info.BytesSent)
+				delete(s.lastCollect, io.Name)
+				continue
+			}
 			recvBytesDur := io.BytesRecv - info.BytesRecv
+			sentBytesDur := io.BytesSent - info.BytesSent
 			secs := float64(dur) / float64(time.Second)
 			if secs > 0 {
 				fields[KeyNetBytesSentPerSec] = uint64(float64(sentBytesDur) / secs)
@@ -184,7 +198,7 @@ func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 		datas = append(datas, fields)
 	}
 
-	if !s.skipProtoState {
+	if !s.SkipProtoState {
 		// Get system wide stats for different network protocols
 		// (ignore these stats if the call fails)
 		netprotos, _ := s.ps.NetProto()

@@ -133,7 +133,7 @@ func (krp *Parser) Parse(lines []string) ([]Data, error) {
 
 	se.DatasourceSkipIndex = se.DatasourceSkipIndex[:datasourceIndex]
 	datas = datas[:dataIndex]
-	if se.Errors == 0 {
+	if se.Errors == 0 && len(se.DatasourceSkipIndex) == 0 {
 		return datas, nil
 	}
 	return datas, se
@@ -149,6 +149,9 @@ func (krp *Parser) parseRequestLog(fields []string) Data {
 	d[KEY_DURATION] = krp.ParseDuration(fields)
 	d[KEY_LOG_TIME] = krp.ParseLogTime(fields)
 	for _, label := range krp.labels {
+		if _, ok := d[label.Name]; ok {
+			continue
+		}
 		d[label.Name] = label.Value
 	}
 	return d
@@ -163,6 +166,9 @@ func (krp *Parser) parseAbnormalLog(fields []string) Data {
 		d[KEY_WARN] = 1
 	}
 	for _, label := range krp.labels {
+		if _, ok := d[label.Name]; ok {
+			continue
+		}
 		d[label.Name] = label.Value
 	}
 	return d
@@ -173,13 +179,13 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
 	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)
 	nameMap := map[string]struct{}{
-		KEY_SRC_IP:   struct{}{},
-		KEY_METHOD:   struct{}{},
-		KEY_TOPIC:    struct{}{},
-		KEY_CODE:     struct{}{},
-		KEY_RESP_LEN: struct{}{},
-		KEY_DURATION: struct{}{},
-		KEY_LOG_TIME: struct{}{},
+		KEY_SRC_IP:   {},
+		KEY_METHOD:   {},
+		KEY_TOPIC:    {},
+		KEY_CODE:     {},
+		KEY_RESP_LEN: {},
+		KEY_DURATION: {},
+		KEY_LOG_TIME: {},
 	}
 	labels := GetGrokLabels(labelList, nameMap)
 
@@ -209,31 +215,25 @@ func (krp *Parser) ParseMethod(fields []string) string {
 	if len(fields) < 1 {
 		return EMPTY_STRING
 	}
-	str := fields[8]
-	return strings.TrimPrefix(str, "\"")
+	return strings.TrimPrefix(fields[8], "\"")
 }
 
 func (krp *Parser) ParseTopic(fields []string) string {
 	if len(fields) < 1 {
 		return EMPTY_STRING
 	}
-	str := fields[9]
-	topic_fields := strings.Split(str, `/`)
-	if len(topic_fields) > 2 {
-		str = topic_fields[2]
-	} else {
-		str = EMPTY_STRING
+	topicFields := strings.Split(fields[9], `/`)
+	if len(topicFields) > 2 {
+		return topicFields[2]
 	}
-	return str
-
+	return EMPTY_STRING
 }
 
 func (krp *Parser) ParseCode(fields []string) int {
 	if len(fields) < 1 {
 		return 0
 	}
-	str := fields[11]
-	code, err := strconv.Atoi(str)
+	code, err := strconv.Atoi(fields[11])
 	if err != nil {
 		return 0
 	}
@@ -244,8 +244,7 @@ func (krp *Parser) ParseDuration(fields []string) int {
 	if len(fields) < 1 {
 		return 0
 	}
-	str := fields[14]
-	duration, err := strconv.Atoi(str)
+	duration, err := strconv.Atoi(fields[14])
 	if err != nil {
 		return 0
 	}
@@ -256,12 +255,11 @@ func (krp *Parser) ParseRespCL(fields []string) int {
 	if len(fields) < 1 {
 		return 0
 	}
-	str := fields[12]
-	respcl, err := strconv.Atoi(str)
+	respCl, err := strconv.Atoi(fields[12])
 	if err != nil {
 		return 0
 	}
-	return respcl
+	return respCl
 }
 
 func (krp *Parser) ParseLogTime(fields []string) int64 {
@@ -272,15 +270,14 @@ func (krp *Parser) ParseLogTime(fields []string) int64 {
 	str = strings.Trim(str, "[")
 	str = strings.Trim(str, "]")
 	_, zoneValue := times.GetTimeZone()
-	ymdhms := str[:len(str)-4] + zoneValue
-	precesion_str := str[20:len(str)]
-	precesion_int, err := strconv.ParseInt(precesion_str, 10, 64)
+	zoneStr := str[:len(str)-4] + zoneValue
+	precessionInt, err := strconv.ParseInt(str[20:], 10, 64)
 	if err != nil {
 		log.Errorf("KafaRestlogParser parse time err %v", err)
 		return 0
 	}
-	t, err := time.Parse("2006-01-02 15:04:05 -0700", ymdhms)
-	ts := t.Unix()*1000 + precesion_int
+	t, err := time.Parse("2006-01-02 15:04:05 -0700", zoneStr)
+	ts := t.Unix()*1000 + precessionInt
 	if err != nil {
 		log.Error(err)
 		return 0

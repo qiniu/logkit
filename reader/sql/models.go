@@ -14,6 +14,7 @@ const (
 	Wildcards       = "*"
 
 	DefaultDoneRecordsFile = "sql.records"
+	DefaultDoneSqlsFile    = "sqls"
 	TimestampRecordsFile   = "timestamp.records"
 	CacheMapFile           = "cachemap.records"
 )

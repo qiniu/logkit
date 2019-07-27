@@ -196,11 +196,7 @@ func (ar *ActiveReader) Stop() error {
 		log.Debug(err)
 		return err
 	} else {
-		if !IsSelfRunner(ar.runnerName) {
-			log.Warnf("Runner[%s] ActiveReader %s was closing", ar.runnerName, ar.originpath)
-		} else {
-			log.Debugf("Runner[%s] ActiveReader %s was closing", ar.runnerName, ar.originpath)
-		}
+		log.Debugf("Runner[%s] ActiveReader %s was closing", ar.runnerName, ar.originpath)
 	}
 
 	cnt := 0
@@ -209,11 +205,7 @@ func (ar *ActiveReader) Stop() error {
 		cnt++
 		//超过3个1s，即3s，就强行退出
 		if cnt > 3 {
-			if !IsSelfRunner(ar.runnerName) {
-				log.Errorf("Runner[%s] ActiveReader %s was not closed after 3s, force closing it", ar.runnerName, ar.originpath)
-			} else {
-				log.Debugf("Runner[%s] ActiveReader %s was not closed after 3s, force closing it", ar.runnerName, ar.originpath)
-			}
+			log.Debugf("Runner[%s] ActiveReader %s was not closed after 3s, force closing it", ar.runnerName, ar.originpath)
 			break
 		}
 		time.Sleep(1 * time.Second)
@@ -331,11 +323,7 @@ func (ar *ActiveReader) hasStopped() bool {
 
 func (ar *ActiveReader) Close() error {
 	defer func() {
-		if !IsSelfRunner(ar.runnerName) {
-			log.Warnf("Runner[%s] ActiveReader %s was closed", ar.runnerName, ar.originpath)
-		} else {
-			log.Debugf("Runner[%s] ActiveReader %s was closed", ar.runnerName, ar.originpath)
-		}
+		log.Debugf("Runner[%s] ActiveReader %s was closed", ar.runnerName, ar.originpath)
 	}()
 	ar.SyncMeta()
 	brCloseErr := ar.br.Close()
@@ -458,7 +446,6 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 			}
 		}
 		bufsize = 0
-		err = nil
 	}
 
 	cacheMap := make(map[string]string)
@@ -484,7 +471,6 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 				}
 			}
 		}
-		err = nil
 	}
 
 	return &Reader{

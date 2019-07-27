@@ -1,4 +1,4 @@
-package mock_pandora
+package mockpandora
 
 import (
 	"bufio"
@@ -21,7 +21,7 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-type mock_pandora struct {
+type mockPandora struct {
 	Prefix      string
 	Port        string
 	Body        string
@@ -35,8 +35,8 @@ type mock_pandora struct {
 }
 
 //NewMockPandoraWithPrefix 测试的mock pandora server
-func NewMockPandoraWithPrefix(prefix string) (*mock_pandora, string) {
-	pandora := &mock_pandora{Prefix: prefix, SetMux: sync.Mutex{}, BodyMux: new(sync.RWMutex)}
+func NewMockPandoraWithPrefix(prefix string) (*mockPandora, string) {
+	pandora := &mockPandora{Prefix: prefix, SetMux: sync.Mutex{}, BodyMux: new(sync.RWMutex)}
 
 	mux := echo.New()
 	mux.GET(prefix+"/ping", pandora.GetPing())
@@ -87,7 +87,7 @@ func NewMockPandoraWithPrefix(prefix string) (*mock_pandora, string) {
 	return pandora, pandora.Port
 }
 
-func (s *mock_pandora) GetPing() echo.HandlerFunc {
+func (s *mockPandora) GetPing() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		ret := "I am " + s.Prefix
 		log.Println("get ping,", ret, s.Port)
@@ -103,7 +103,7 @@ type PostReposReq struct {
 	Region string                     `json:"region"`
 }
 
-func (s *mock_pandora) PostRepos_() echo.HandlerFunc {
+func (s *mockPandora) PostRepos_() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		log.Println("PostRepos_ request", c.Get("reponame"))
 		var req1 PostReposReq
@@ -117,7 +117,7 @@ func (s *mock_pandora) PostRepos_() echo.HandlerFunc {
 	}
 }
 
-func (s *mock_pandora) PostRepos_Data() echo.HandlerFunc {
+func (s *mockPandora) PostRepos_Data() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		log.Println("PostRepos_Data request")
 		s.SetMux.Lock()
@@ -176,7 +176,7 @@ func (s *mock_pandora) PostRepos_Data() echo.HandlerFunc {
 		}
 
 		if strings.Contains(s.Body, "E18110:BackupQueue.Depth") {
-			return c.JSON(http.StatusNotFound, NewErrorResponse(errors.New("E18110: mock_pandora error")))
+			return c.JSON(http.StatusNotFound, NewErrorResponse(errors.New("E18110: mockPandora error")))
 		}
 
 		if strings.Contains(s.Body, "It's-an-error") && !strings.Contains(s.Body, KeyPandoraStash) {
@@ -197,19 +197,19 @@ func (s *mock_pandora) PostRepos_Data() echo.HandlerFunc {
 			log.Println("get datas: ", s.Body)
 			c.Response().Header().Set(ContentTypeHeader, ApplicationJson)
 			c.Response().WriteHeader(http.StatusNotFound)
-			return jsoniter.NewEncoder(c.Response()).Encode(map[string]string{"error": "E18110: mock_pandora error"})
+			return jsoniter.NewEncoder(c.Response()).Encode(map[string]string{"error": "E18110: mockPandora error"})
 		}
 
 		if len(s.Body) > DefaultMaxBatchSize {
 			c.Response().Header().Set(ContentTypeHeader, ApplicationJson)
 			c.Response().WriteHeader(http.StatusNotFound)
-			return jsoniter.NewEncoder(c.Response()).Encode(map[string]string{"error": "E18005: mock_pandora error"})
+			return jsoniter.NewEncoder(c.Response()).Encode(map[string]string{"error": "E18005: mockPandora error"})
 		}
 
 		if strings.Contains(s.Body, "typeBinaryUnpack") && !strings.Contains(s.Body, KeyPandoraStash) {
 			c.Response().Header().Set(ContentTypeHeader, ApplicationJson)
 			c.Response().WriteHeader(http.StatusBadRequest)
-			return jsoniter.NewEncoder(c.Response()).Encode(map[string]string{"error": "E18110: mock_pandora error"})
+			return jsoniter.NewEncoder(c.Response()).Encode(map[string]string{"error": "E18110: mockPandora error"})
 		}
 		s.PostDataNum++
 		s.DumpDataNum += len(strings.Split(strings.TrimSpace(strByte), "\n"))
@@ -224,10 +224,10 @@ type GetRepoResult struct {
 	DerivedFrom string                     `json:"derivedFrom" bson:"-"`
 }
 
-func (s *mock_pandora) GetRepos_() echo.HandlerFunc {
+func (s *mockPandora) GetRepos_() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		if s.GetRepoErr {
-			return c.String(http.StatusBadRequest, "this is mock_pandora let GetRepo Error")
+			return c.String(http.StatusBadRequest, "this is mockPandora let GetRepo Error")
 		}
 		s.SetMux.Lock()
 		defer s.SetMux.Unlock()
@@ -238,7 +238,7 @@ func (s *mock_pandora) GetRepos_() echo.HandlerFunc {
 	}
 }
 
-func (s *mock_pandora) PutRepos_() echo.HandlerFunc {
+func (s *mockPandora) PutRepos_() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		log.Println("PutRepos_ request")
 		var err error
@@ -254,12 +254,12 @@ func (s *mock_pandora) PutRepos_() echo.HandlerFunc {
 	}
 }
 
-func (s *mock_pandora) ChangeSchema(Schema []pipeline.RepoSchemaEntry) {
+func (s *mockPandora) ChangeSchema(Schema []pipeline.RepoSchemaEntry) {
 	s.SetMux.Lock()
 	defer s.SetMux.Unlock()
 	s.Schemas = Schema
 }
 
-func (s *mock_pandora) LetGetRepoError(f bool) {
+func (s *mockPandora) LetGetRepoError(f bool) {
 	s.GetRepoErr = f
 }

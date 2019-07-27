@@ -83,6 +83,9 @@ func NewRestService(mgr *Manager, router *echo.Echo) *RestService {
 	router.POST(PREFIX+"/reader/read", rs.PostRead())
 	router.POST(PREFIX+"/reader/check", rs.PostReaderCheck())
 
+	//cleaner API
+	router.GET(PREFIX+"/cleaner/options", rs.GetCleanerKeyOptions())
+
 	//parser API
 	router.GET(PREFIX+"/parser/usages", rs.GetParserUsages())
 	router.GET(PREFIX+"/parser/tooltips", rs.GetParserTooltips())

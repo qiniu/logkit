@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-logfmt/logfmt"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -36,6 +37,7 @@ type KV struct {
 	New        string `json:"new"`
 	Splitter   string `json:"splitter"`
 	KeepString bool   `json:"keep_string"`
+	DiscardKey bool   `json:"discard_key"`
 
 	stats      StatsInfo
 	keys       []string
@@ -51,7 +53,8 @@ func (k *KV) Init() error {
 	if len(k.keys) < 1 {
 		return errors.New("invalid key: " + k.Key + ", key can't be empty")
 	}
-	if strings.TrimSpace(k.New) == "" {
+	k.New = strings.TrimSpace(k.New)
+	if k.New == "" {
 		k.news = k.keys[:len(k.keys)-1]
 	} else {
 		k.news = GetKeys(k.New)
@@ -92,6 +95,17 @@ func (k *KV) ConfigOptions() []Option {
 			Description:   "数字是否以字符串形式展现",
 			ToolTip:       "数字是否以字符串形式展现",
 			Type:          transforms.TransformTypeBoolean,
+		},
+		{
+			KeyName:       "discard_key",
+			Element:       Radio,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{false, true},
+			Default:       false,
+			DefaultNoUse:  false,
+			Description:   "删除原始key指定的字段名和字段值",
+			Type:          transforms.TransformTypeBoolean,
+			Advance:       true,
 		},
 	}
 }
@@ -228,6 +242,8 @@ func (k *KV) transform(dataPipeline <-chan transforms.TransformInfo, resultChan 
 			continue
 
 		}
+
+		errNum, err = k.delete(transformInfo.CurData, errNum, err)
 		if len(k.news) != 0 {
 			setErr := SetMapValue(transformInfo.CurData, data, false, k.news...)
 			if setErr != nil {
@@ -264,8 +280,8 @@ func kvTransform(strVal string, splitter string, keepString bool) (Data, error) 
 			}
 			//此错误仅用于当原始数据解析成功但无解析数据时，保留原始数据之用
 			if len(fields) == 0 {
+				log.Error("no value was parsed after logfmt, will keep origin data in pandora_stash if disable_record_errdata field is false")
 				break
-				return nil, errors.New("no value was parsed after logfmt, will keep origin data in pandora_stash if disable_record_errdata field is false")
 			}
 			break
 		}
@@ -297,4 +313,31 @@ func kvTransform(strVal string, splitter string, keepString bool) (Data, error) 
 		}
 	}
 	return data, nil
+}
+
+func (k *KV) delete(curData Data, errNum int, err error) (int, error) {
+	if !k.DiscardKey {
+		return errNum, err
+	}
+
+	keys := make([]string, len(k.keys))
+	copy(keys, k.keys)
+	for len(keys) > 0 {
+		DeleteMapValue(curData, keys...)
+		val, getErr := GetMapValue(curData, keys[:len(keys)-1]...)
+		if getErr != nil {
+			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, strings.Join(keys, "."))
+			continue
+		}
+		if val == nil {
+			keys = keys[:len(keys)-1]
+			continue
+		}
+		if valMap, ok := val.(map[string]interface{}); ok && len(valMap) == 0 {
+			keys = keys[:len(keys)-1]
+			continue
+		}
+		break
+	}
+	return errNum, err
 }
