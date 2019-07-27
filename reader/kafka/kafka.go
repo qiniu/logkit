@@ -156,7 +156,7 @@ func (r *Reader) Name() string {
 	return fmt.Sprintf("KafkaReader:[%s],[%s]", strings.Join(r.Topics, ","), r.ConsumerGroup)
 }
 
-func (_ *Reader) SetMode(_ string, _ interface{}) error {
+func (*Reader) SetMode(_ string, _ interface{}) error {
 	return errors.New("KafkaReader does not support read mode")
 }
 
@@ -261,17 +261,42 @@ func (r *Reader) markOffset() {
 	}
 }
 
-func (r *Reader) Close() error {
-	if !atomic.CompareAndSwapInt32(&r.status, StatusRunning, StatusStopping) {
-		log.Warnf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
-		return nil
-	}
-	log.Debugf("Runner[%v] %q daemon is stopping", r.meta.RunnerName, r.Name())
+func (r *Reader) stop() error {
+	r.markOffset()
 
 	r.lock.Lock()
 	defer r.lock.Unlock()
-	r.markOffset()
-	err := r.Consumer.Close()
+
+	err := r.Consumer.FlushOffsets()
+	if err != nil {
+		log.Errorf("Runner[%v] reader %q flush kafka offset error: %v", r.meta.RunnerName, r.Name(), err.Error())
+	}
+
+	err = r.Consumer.Close()
+	if err != nil {
+		log.Errorf("Runner[%v] reader %q close kafka consumer error: %v", r.meta.RunnerName, r.Name(), err.Error())
+	}
+
 	atomic.StoreInt32(&r.status, StatusStopped)
 	return err
+}
+
+func (r *Reader) Close() error {
+	if !atomic.CompareAndSwapInt32(&r.status, StatusRunning, StatusStopping) {
+		log.Warnf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
+		return r.stop()
+	}
+
+	if r.isStopping() {
+		log.Warnf("Runner[%v] reader %q is stopping", r.meta.RunnerName, r.Name())
+		return nil
+	}
+
+	if r.hasStopped() {
+		log.Warnf("Runner[%v] reader %q has stopped", r.meta.RunnerName, r.Name())
+		return nil
+	}
+
+	log.Debugf("Runner[%v] %q daemon is stopping", r.meta.RunnerName, r.Name())
+	return r.stop()
 }
