@@ -55,8 +55,8 @@ func (acc *Accumulator) AddHistogram(measurement string,
 	acc.AddFields(measurement, fields, tags, t...)
 }
 
-func (*Accumulator) SetPrecision(precision, interval time.Duration) {
-	log.Errorf("Unexpected call of Accumulator.SetPrecision: %v, %v", precision, interval)
+func (_ *Accumulator) SetPrecision(precision time.Duration) {
+	log.Errorf("Unexpected call of Accumulator.SetPrecision: %v", precision)
 }
 
 func (acc *Accumulator) AddError(err error) {
