@@ -370,70 +370,76 @@
 			"revisionTime": "2017-02-15T23:32:05Z"
 		},
 		{
-			"checksumSHA1": "cqepZhPMa15NCFUeAGTtWSbFVDQ=",
+			"checksumSHA1": "ZI7UVjlpqcxxiv02ak+R/G5Svns=",
 			"path": "github.com/influxdata/telegraf",
-			"revision": "5109847be1f24e958be54599049217793612554c",
-			"revisionTime": "2019-03-27T01:20:52Z"
+			"revision": "282c8ce0965e644d767cb7ca16aaddfa15e2049e",
+			"revisionTime": "2019-07-31T06:50:49Z"
 		},
 		{
 			"checksumSHA1": "gNsLGqaxbjgEE1mcu55ldiOhGK0=",
 			"path": "github.com/influxdata/telegraf/filter",
-			"revision": "5109847be1f24e958be54599049217793612554c",
-			"revisionTime": "2019-03-27T01:20:52Z"
+			"revision": "282c8ce0965e644d767cb7ca16aaddfa15e2049e",
+			"revisionTime": "2019-07-31T06:50:49Z"
 		},
 		{
-			"checksumSHA1": "Gf4sdqyaP2oLVb6CWqRQxcp/JLc=",
+			"checksumSHA1": "7qMzGP/kzwj+8q2tfIchVf3EFow=",
 			"path": "github.com/influxdata/telegraf/internal",
-			"revision": "5109847be1f24e958be54599049217793612554c",
-			"revisionTime": "2019-03-27T01:20:52Z"
+			"revision": "282c8ce0965e644d767cb7ca16aaddfa15e2049e",
+			"revisionTime": "2019-07-31T06:50:49Z"
+		},
+		{
+			"checksumSHA1": "Qwm+2hhU654hRj+0DLUQDvUoe5g=",
+			"path": "github.com/influxdata/telegraf/internal/docker",
+			"revision": "282c8ce0965e644d767cb7ca16aaddfa15e2049e",
+			"revisionTime": "2019-07-31T06:50:49Z"
 		},
 		{
 			"checksumSHA1": "MQry1PZYACCdDYhHU0UUrtEei/g=",
 			"path": "github.com/influxdata/telegraf/internal/tls",
-			"revision": "5109847be1f24e958be54599049217793612554c",
-			"revisionTime": "2019-03-27T01:20:52Z"
+			"revision": "282c8ce0965e644d767cb7ca16aaddfa15e2049e",
+			"revisionTime": "2019-07-31T06:50:49Z"
 		},
 		{
-			"checksumSHA1": "XzO2UVLFDVU6Q5YV/3laN/Gfc0Y=",
+			"checksumSHA1": "EBdyAqYBjyT+3VK/gU0hFKwpbUc=",
 			"path": "github.com/influxdata/telegraf/metric",
-			"revision": "5109847be1f24e958be54599049217793612554c",
-			"revisionTime": "2019-03-27T01:20:52Z"
+			"revision": "282c8ce0965e644d767cb7ca16aaddfa15e2049e",
+			"revisionTime": "2019-07-31T06:50:49Z"
 		},
 		{
 			"checksumSHA1": "ndlMI6F5fLXx3LBvgU8ipj3Bs/M=",
 			"path": "github.com/influxdata/telegraf/plugins/inputs",
-			"revision": "5109847be1f24e958be54599049217793612554c",
-			"revisionTime": "2019-03-27T01:20:52Z"
+			"revision": "282c8ce0965e644d767cb7ca16aaddfa15e2049e",
+			"revisionTime": "2019-07-31T06:50:49Z"
 		},
 		{
-			"checksumSHA1": "HTXtCVcjv03RG3Zz+RSF0gk6BGk=",
+			"checksumSHA1": "rrWBxU3keMsEInOfOw6OtrV+K4o=",
 			"path": "github.com/influxdata/telegraf/plugins/inputs/docker",
-			"revision": "5109847be1f24e958be54599049217793612554c",
-			"revisionTime": "2019-03-27T01:20:52Z"
+			"revision": "282c8ce0965e644d767cb7ca16aaddfa15e2049e",
+			"revisionTime": "2019-07-31T06:50:49Z"
 		},
 		{
-			"checksumSHA1": "lFF0ya0cz5b27g+u4zKJrunJnQ0=",
+			"checksumSHA1": "5Ic54QlGw+BbQj+nGNCldGlqjWs=",
 			"path": "github.com/influxdata/telegraf/plugins/inputs/elasticsearch",
-			"revision": "5109847be1f24e958be54599049217793612554c",
-			"revisionTime": "2019-03-27T01:20:52Z"
+			"revision": "282c8ce0965e644d767cb7ca16aaddfa15e2049e",
+			"revisionTime": "2019-07-31T06:50:49Z"
 		},
 		{
-			"checksumSHA1": "fl5CKlwzAGclxItvy1oM8NbdV54=",
+			"checksumSHA1": "dPSg62hdpyTKTQrQsoi4vwHM3AA=",
 			"path": "github.com/influxdata/telegraf/plugins/inputs/http_response",
-			"revision": "5109847be1f24e958be54599049217793612554c",
-			"revisionTime": "2019-03-27T01:20:52Z"
+			"revision": "282c8ce0965e644d767cb7ca16aaddfa15e2049e",
+			"revisionTime": "2019-07-31T06:50:49Z"
 		},
 		{
 			"checksumSHA1": "J0ywR8aidsjFc7L8muO4L3BK+As=",
 			"path": "github.com/influxdata/telegraf/plugins/inputs/memcached",
-			"revision": "5109847be1f24e958be54599049217793612554c",
-			"revisionTime": "2019-03-27T01:20:52Z"
+			"revision": "282c8ce0965e644d767cb7ca16aaddfa15e2049e",
+			"revisionTime": "2019-07-31T06:50:49Z"
 		},
 		{
-			"checksumSHA1": "71VbHoIrbGIByRoSQUHi4AEZY6s=",
+			"checksumSHA1": "7fBtULsNqQpmrdx0RimgXzbFvrM=",
 			"path": "github.com/influxdata/telegraf/plugins/parsers/json",
-			"revision": "5109847be1f24e958be54599049217793612554c",
-			"revisionTime": "2019-03-27T01:20:52Z"
+			"revision": "282c8ce0965e644d767cb7ca16aaddfa15e2049e",
+			"revisionTime": "2019-07-31T06:50:49Z"
 		},
 		{
 			"checksumSHA1": "0ZrwvB6KoGPj2PoDNSEJwxQ6Mog=",
