@@ -16,6 +16,7 @@ import (
 )
 
 func TestKafkaReader(t *testing.T) {
+
 	logkitConf := conf.MapConf{
 		KeyMetaPath: MetaDir,
 		KeyFileDone: MetaDir,
