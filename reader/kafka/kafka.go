@@ -284,19 +284,7 @@ func (r *Reader) stop() error {
 func (r *Reader) Close() error {
 	if !atomic.CompareAndSwapInt32(&r.status, StatusRunning, StatusStopping) {
 		log.Warnf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
-		return r.stop()
-	}
-
-	if r.isStopping() {
-		log.Warnf("Runner[%v] reader %q is stopping", r.meta.RunnerName, r.Name())
 		return nil
 	}
-
-	if r.hasStopped() {
-		log.Warnf("Runner[%v] reader %q has stopped", r.meta.RunnerName, r.Name())
-		return nil
-	}
-
-	log.Debugf("Runner[%v] %q daemon is stopping", r.meta.RunnerName, r.Name())
 	return r.stop()
 }
