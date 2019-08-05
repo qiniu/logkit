@@ -261,17 +261,30 @@ func (r *Reader) markOffset() {
 	}
 }
 
+func (r *Reader) stop() error {
+	r.markOffset()
+
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	err := r.Consumer.FlushOffsets()
+	if err != nil {
+		log.Errorf("Runner[%v] reader %q flush kafka offset error: %v", r.meta.RunnerName, r.Name(), err.Error())
+	}
+
+	err = r.Consumer.Close()
+	if err != nil {
+		log.Errorf("Runner[%v] reader %q close kafka consumer error: %v", r.meta.RunnerName, r.Name(), err.Error())
+	}
+
+	atomic.StoreInt32(&r.status, StatusStopped)
+	return err
+}
+
 func (r *Reader) Close() error {
 	if !atomic.CompareAndSwapInt32(&r.status, StatusRunning, StatusStopping) {
 		log.Warnf("Runner[%v] reader %q is not running, close operation ignored", r.meta.RunnerName, r.Name())
 		return nil
 	}
-	log.Debugf("Runner[%v] %q daemon is stopping", r.meta.RunnerName, r.Name())
-
-	r.lock.Lock()
-	defer r.lock.Unlock()
-	r.markOffset()
-	err := r.Consumer.Close()
-	atomic.StoreInt32(&r.status, StatusStopped)
-	return err
+	return r.stop()
 }
