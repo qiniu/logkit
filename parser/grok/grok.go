@@ -326,7 +326,10 @@ func (p *Parser) parse(line string) (Data, error) {
 		case DROP:
 			// goodbye!
 		default: //default is STRING
-			data[k] = strings.TrimSpace(strings.Trim(v, `"`))
+			if strings.HasPrefix(v, `"`) && strings.HasSuffix(v, `"`) {
+				v = strings.Trim(v, `"`)
+			}
+			data[k] = strings.TrimSpace(v)
 		}
 	}
 
