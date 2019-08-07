@@ -178,7 +178,7 @@ func (r *Reader) ReadLine() (string, error) {
 		var line string
 		if msg != nil && msg.Value != nil && len(msg.Value) > 0 {
 			line = string(msg.Value)
-			r.statsLock.Lock()
+			r.lock.Lock()
 			if tp, ok := r.currentOffsets[msg.Topic]; ok {
 				tp[msg.Partition] = msg.Offset
 				r.currentOffsets[msg.Topic] = tp
@@ -187,7 +187,7 @@ func (r *Reader) ReadLine() (string, error) {
 				tp[msg.Partition] = msg.Offset
 				r.currentOffsets[msg.Topic] = tp
 			}
-			r.statsLock.Unlock()
+			r.lock.Unlock()
 		} else {
 			log.Debugf("runner[%v] Consumer read empty message: %v", r.meta.RunnerName, msg)
 		}
@@ -230,13 +230,13 @@ func (r *Reader) Lag() (*LagInfo, error) {
 			rl.Size += v
 		}
 	}
-	r.statsLock.RLock()
+	r.lock.Lock()
 	for _, ptv := range r.currentOffsets {
 		for _, v := range ptv {
 			rl.Size -= v + 1 //HighWaterMarks 拿到的是下一个数据的Offset，所以实际在算size的时候多了1，要在现在扣掉。
 		}
 	}
-	r.statsLock.RUnlock()
+	r.lock.Unlock()
 	return rl, nil
 }
 
