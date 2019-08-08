@@ -55,9 +55,8 @@ type TransferResponse struct {
 }
 
 const (
-	CounterTypeGauge   string = "GAUGE"
-	CounterTypeCounter string = "COUNTER"
-	Success            string = "success"
+	CounterTypeGauge string = "GAUGE"
+	Success          string = "success"
 )
 
 func init() {
@@ -119,28 +118,33 @@ func (ts *TransferSender) Send(datas []Data) error {
 	timeStamp := time.Now().Unix()
 	for _, d := range datas {
 		tags := ts.tags
+		endpoint := ts.extraInfo[KeyHostName]
 		for k, v := range d {
 			if vmap, ok = v.(map[string]interface{}); ok {
 				for ik, iv := range vmap {
-					if tmpData, success := ts.converToTransferData(ik, iv, timeStamp); success {
-						transferDatas = append(transferDatas, tmpData)
+					if k == "fields" {
+						if tmpData, success := ts.converToTransferData(ik, iv, timeStamp); success {
+							transferDatas = append(transferDatas, tmpData)
+						} else {
+							log.Warnf("ik: %s, iv: %v cannot convert to float, discard it", ik, iv)
+						}
 						continue
-					} else {
-						tags = setTags(tags, k, v)
 					}
+					if k == "tags" && ik == "source" {
+						endpoint = fmt.Sprintf("%s", iv)
+					}
+					tags = setTags(tags, ik, iv)
 				}
 				continue
 			}
 
-			if tmpData, success := ts.converToTransferData(k, v, timeStamp); success {
-				transferDatas = append(transferDatas, tmpData)
-				continue
-			} else {
-				tags = setTags(tags, k, v)
-			}
+			tags = setTags(tags, k, v)
 		}
+
+		// tags 赋值
 		for idx := range transferDatas {
 			transferDatas[idx].Tags = tags
+			transferDatas[idx].EndPoint = endpoint
 		}
 	}
 	if len(transferDatas) == 0 {
@@ -224,9 +228,6 @@ func setTags(tags, key string, val interface{}) string {
 		tags += ","
 	}
 
-	if vStr, ok := val.(string); ok {
-		return tags + key + "=" + vStr
-	}
 	return tags + key + "=" + fmt.Sprintf("%v", val)
 }
 func (ts *TransferSender) Close() (err error) {
@@ -243,7 +244,6 @@ func (ts *TransferSender) converToTransferData(key string, value interface{}, ti
 	var err error
 	result := TransferData{
 		Metric:      key,
-		EndPoint:    ts.extraInfo[KeyHostName],
 		Step:        ts.step,
 		CounterType: CounterTypeGauge,
 		TimeStamp:   timeStamp,
