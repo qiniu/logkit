@@ -22,3 +22,11 @@ func TestConverToTransferData(t *testing.T) {
 	assert.Equal(t, true, ok)
 	assert.Equal(t, 0.02, data.Value)
 }
+
+func TestSetTags(t *testing.T) {
+	tags := setTags("", "hostname", "10.10.1.1")
+	assert.EqualValues(t, "hostname=10.10.1.1", tags)
+
+	tags = setTags(tags, "clustername", "cluster1")
+	assert.EqualValues(t, "hostname=10.10.1.1,clustername=cluster1", tags)
+}

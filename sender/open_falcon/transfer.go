@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -94,7 +94,7 @@ func NewSender(c conf.MapConf) (sender.Sender, error) {
 		url:        transferUrl,
 		path:       transferHost + "/" + transferUrl,
 		step:       step,
-		tags:       tags,
+		tags:       strings.TrimSpace(tags),
 		extraInfo:  utilsos.GetExtraInfo(),
 		client:     &http.Client{Timeout: dur},
 		runnerName: name,
@@ -118,22 +118,29 @@ func (ts *TransferSender) Send(datas []Data) error {
 	}
 	timeStamp := time.Now().Unix()
 	for _, d := range datas {
+		tags := ts.tags
 		for k, v := range d {
 			if vmap, ok = v.(map[string]interface{}); ok {
 				for ik, iv := range vmap {
 					if tmpData, success := ts.converToTransferData(ik, iv, timeStamp); success {
 						transferDatas = append(transferDatas, tmpData)
 						continue
+					} else {
+						tags = setTags(tags, k, v)
 					}
-					log.Warnf("Runner[%v] Sender[%v] key(%s)'s value is %v, (%s) not float64", ts.runnerName, ts.Name(), ik, iv, reflect.TypeOf(iv))
 				}
 				continue
 			}
+
 			if tmpData, success := ts.converToTransferData(k, v, timeStamp); success {
 				transferDatas = append(transferDatas, tmpData)
 				continue
+			} else {
+				tags = setTags(tags, k, v)
 			}
-			log.Warnf("Runner[%v] Sender[%v] key(%s)'s value is %v, (%s) not float64", ts.runnerName, ts.Name(), k, v, reflect.TypeOf(v))
+		}
+		for idx := range transferDatas {
+			transferDatas[idx].Tags = tags
 		}
 	}
 	if len(transferDatas) == 0 {
@@ -209,6 +216,19 @@ func (ts *TransferSender) Send(datas []Data) error {
 	return nil
 }
 
+func setTags(tags, key string, val interface{}) string {
+	if val == nil {
+		return tags
+	}
+	if tags != "" {
+		tags += ","
+	}
+
+	if vStr, ok := val.(string); ok {
+		return tags + key + "=" + vStr
+	}
+	return tags + key + "=" + fmt.Sprintf("%v", val)
+}
 func (ts *TransferSender) Close() (err error) {
 	return nil
 }
@@ -224,7 +244,6 @@ func (ts *TransferSender) converToTransferData(key string, value interface{}, ti
 	result := TransferData{
 		Metric:      key,
 		EndPoint:    ts.extraInfo[KeyHostName],
-		Tags:        ts.tags,
 		Step:        ts.step,
 		CounterType: CounterTypeGauge,
 		TimeStamp:   timeStamp,
