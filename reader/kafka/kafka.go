@@ -246,7 +246,9 @@ func (r *Reader) SyncMeta() {
 
 func (r *Reader) markOffset() {
 	r.lock.Lock()
+	r.statsLock.Lock()
 	defer r.lock.Unlock()
+	defer r.statsLock.Unlock()
 	for topic, partOffset := range r.currentOffsets {
 		if partOffset == nil {
 			continue
