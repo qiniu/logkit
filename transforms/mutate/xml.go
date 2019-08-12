@@ -2,6 +2,7 @@ package mutate
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -358,6 +359,28 @@ func (g *Xml) expand(m mxj.Map, transformInfo transforms.TransformInfo, errNum i
 			g.cacheNews[currentKey] = values
 			g.cacheNewsLock.Unlock()
 		}
+
+		for num := 1; num < 10; num++ {
+			exist, existErr := KeyExist(transformInfo.CurData, v.Value, values...)
+			if existErr != nil {
+				errNum, err = transforms.SetError(errNum, existErr, transforms.GetErr, paths[pathsLen-1])
+				return transforms.TransformResult{
+					ErrNum:  errNum,
+					Err:     err,
+					CurData: transformInfo.CurData,
+					Index:   transformInfo.Index,
+				}
+			}
+
+			if !exist {
+				break
+			}
+			values = make([]string, len(g.news))
+			copy(values, g.news)
+			values = append(values, currentKey+strconv.Itoa(num))
+
+		}
+
 		setErr := SetMapValue(transformInfo.CurData, v.Value, false, values...)
 		if setErr != nil {
 			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, paths[pathsLen-1])

@@ -1168,6 +1168,7 @@ var ModeKeyOptions = map[string][]Option{
 			ChooseOnly:   false,
 			Default:      "",
 			DefaultNoUse: false,
+			Required:     true,
 			Placeholder:  "http://127.0.0.1:6060",
 			Description:  "open-falcon transfer 地址(open_falcon_transfer_host)",
 			Advance:      false,

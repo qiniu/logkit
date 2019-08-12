@@ -177,6 +177,39 @@ func TestXmlTransformer(t *testing.T) {
 	}
 	assert.Equal(t, expdata3, newdata3)
 
+	data31 := []Data{
+		{
+			"key1": "value1",
+			"xml": `<?xml version="1.0" encoding="UTF-8"?>
+		<note>
+		 <food>
+		 	<to>Tove</to>
+			<from>From</from>
+		 </food>
+		 <food>
+		 	<to>Tove1</to>
+			<from>From1</from>
+		 </food>
+		</note>`,
+		},
+	}
+	newdata31, err31 := xtr3.Transform(data31)
+	assert.NoError(t, err31)
+	expdata31 := []Data{
+		{"key1": "value1", "to": "Tove", "from": "From", "to1": "Tove1", "from1": "From1", "xml": `<?xml version="1.0" encoding="UTF-8"?>
+		<note>
+		 <food>
+		 	<to>Tove</to>
+			<from>From</from>
+		 </food>
+		 <food>
+		 	<to>Tove1</to>
+			<from>From1</from>
+		 </food>
+		</note>`},
+	}
+	assert.Equal(t, expdata31, newdata31)
+
 	xtr4 := Xml{
 		Key:    "xml.xml2",
 		New:    "xml2",

@@ -505,6 +505,34 @@ func SetMapValueExistWithPrefix(m map[string]interface{}, val interface{}, prefi
 	return nil
 }
 
+func KeyExist(m map[string]interface{}, val interface{}, keys ...string) (bool, error) {
+	if len(keys) == 0 {
+		return false, nil
+	}
+	var curr map[string]interface{}
+	curr = m
+	for _, k := range keys[0 : len(keys)-1] {
+		finalVal, ok := curr[k]
+		if !ok {
+			n := make(map[string]interface{})
+			curr[k] = n
+			curr = n
+			continue
+		}
+		//判断val是否为map[string]interface{}类型
+		if curr, ok = finalVal.(map[string]interface{}); ok {
+			continue
+		}
+		if curr, ok = finalVal.(Data); ok {
+			continue
+		}
+		return false, fmt.Errorf("KeyExist failed, %v is not the type of map[string]interface{}", keys)
+	}
+	//判断val(k)是否存在
+	_, exist := curr[keys[len(keys)-1]]
+	return exist, nil
+}
+
 //通过层级key删除key-val,并返回被删除的val,是否删除成功
 //如果key不存在,则返回 nil,false
 func DeleteMapValue(m map[string]interface{}, keys ...string) (interface{}, bool) {
