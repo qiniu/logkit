@@ -1201,7 +1201,6 @@ var ModeKeyOptions = map[string][]Option{
 			ChooseOnly:   false,
 			Default:      "logkit_",
 			DefaultNoUse: false,
-			Required:     true,
 			Placeholder:  "logkit_",
 			Description:  "open-falcon transfer metric 前缀(open_falcon_transfer_prefix)",
 			Advance:      false,
