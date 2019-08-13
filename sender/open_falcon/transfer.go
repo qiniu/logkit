@@ -30,6 +30,7 @@ type TransferSender struct {
 	tags       string
 	extraInfo  map[string]string
 	runnerName string
+	prefix     string
 }
 
 type TransferData struct {
@@ -83,6 +84,7 @@ func NewSender(c conf.MapConf) (sender.Sender, error) {
 	if err != nil {
 		return nil, err
 	}
+	prefix, err := c.GetStringOr(KeyOpenFalconTransferPrefix, "logkit_")
 	dur, err := time.ParseDuration(timeout)
 	if err != nil {
 		return nil, errors.New("timeout configure " + timeout + " is invalid")
@@ -97,6 +99,7 @@ func NewSender(c conf.MapConf) (sender.Sender, error) {
 		extraInfo:  utilsos.GetExtraInfo(),
 		client:     &http.Client{Timeout: dur},
 		runnerName: name,
+		prefix:     prefix,
 	}
 	return transferSender, nil
 }
@@ -243,7 +246,7 @@ func (ts *TransferSender) converToTransferData(key string, value interface{}, ti
 	var ok bool
 	var err error
 	result := TransferData{
-		Metric:      key,
+		Metric:      ts.prefix + key,
 		Step:        ts.step,
 		CounterType: CounterTypeGauge,
 		TimeStamp:   timeStamp,
