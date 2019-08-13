@@ -109,9 +109,15 @@ func (ts *TransferSender) Name() string {
 }
 
 func (ts *TransferSender) Send(datas []Data) error {
-	transferDatas := make([]TransferData, 0)
-	var ok bool
-	var vmap map[string]interface{}
+	var (
+		transferDatas = make([]TransferData, 0)
+
+		ok       bool
+		vfields  map[string]interface{}
+		vtags    map[string]string
+		endpoint = ts.extraInfo[KeyHostName]
+	)
+
 	ste := &StatsError{
 		StatsInfo: StatsInfo{
 			Success: 0,
@@ -121,29 +127,35 @@ func (ts *TransferSender) Send(datas []Data) error {
 	timeStamp := time.Now().Unix()
 	for _, d := range datas {
 		tags := ts.tags
-		endpoint := ts.extraInfo[KeyHostName]
+		endpoint = ts.extraInfo[KeyHostName]
 		for k, v := range d {
-			if vmap, ok = v.(map[string]interface{}); ok {
-				for ik, iv := range vmap {
-					if k == "fields" {
+			switch k {
+			case "fields":
+				if vfields, ok = v.(map[string]interface{}); ok {
+					for ik, iv := range vfields {
 						if tmpData, success := ts.converToTransferData(ik, iv, timeStamp); success {
 							transferDatas = append(transferDatas, tmpData)
 						} else {
 							log.Warnf("ik: %s, iv: %v cannot convert to float, discard it", ik, iv)
 						}
-						continue
 					}
-					if k == "tags" && ik == "source" {
-						endpoint = fmt.Sprintf("%s", iv)
-					}
-					tags = setTags(tags, ik, iv)
 				}
-				continue
+			case "tags":
+				if vtags, ok = v.(map[string]string); ok {
+					for ik, iv := range vtags {
+						if ik == "source" {
+							endpoint = fmt.Sprintf("%s", iv)
+						}
+						tags = setTags(tags, ik, iv)
+					}
+					continue
+				}
+			default:
+				tags = setTags(tags, k, v)
 			}
-
-			tags = setTags(tags, k, v)
 		}
 
+		log.Debugf("test fields endpoint: %v, tags: %v", endpoint, tags)
 		// tags 赋值
 		for idx := range transferDatas {
 			transferDatas[idx].Tags = tags
@@ -225,6 +237,10 @@ func (ts *TransferSender) Send(datas []Data) error {
 
 func setTags(tags, key string, val interface{}) string {
 	if val == nil {
+		return tags
+	}
+
+	if key == "timestamp" {
 		return tags
 	}
 	if tags != "" {
