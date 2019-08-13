@@ -249,8 +249,9 @@ const (
 	KeySQLFilePathPrefix = "sqlfile_path_prefix"
 
 	// open-falcon
-	KeyOpenFalconTransferHost = "open_falcon_transfer_host"
-	KeyOpenFalconTransferURL  = "open_falcon_transfer_url"
+	KeyOpenFalconTransferHost   = "open_falcon_transfer_host"
+	KeyOpenFalconTransferURL    = "open_falcon_transfer_url"
+	KeyOpenFalconTransferPrefix = "open_falcon_transfer_prefix"
 )
 
 // NotAsyncSender return when sender is not async

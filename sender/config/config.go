@@ -1196,5 +1196,16 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "标签(tags)",
 			ToolTip:      "格式：tag1=xx,tag2=yy",
 		},
+		{
+			KeyName:      KeyOpenFalconTransferPrefix,
+			ChooseOnly:   false,
+			Default:      "logkit_",
+			DefaultNoUse: false,
+			Required:     true,
+			Placeholder:  "logkit_",
+			Description:  "open-falcon transfer metric 前缀(open_falcon_transfer_prefix)",
+			Advance:      false,
+			ToolTip:      "数据发送时，key添加前缀",
+		},
 	},
 }
