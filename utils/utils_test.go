@@ -1,10 +1,12 @@
 package utils
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,10 +25,16 @@ func TestDeepCopyByJSON(t *testing.T) {
 			src: map[string]interface{}{
 				"a": "b",
 				"c": "d",
+				"d": int64(1234567),
+				"e": float64(1234567.89),
+				"f": json.Number("123"),
 			},
 			expect: map[string]interface{}{
 				"a": "b",
 				"c": "d",
+				"d": json.Number("1234567"),
+				"e": json.Number("1234567.89"),
+				"f": json.Number("123"),
 			},
 		},
 		{
@@ -48,7 +56,88 @@ func TestDeepCopyByJSON(t *testing.T) {
 		assert.Equal(t, len(test.expect), len(test.dst))
 		for key, value := range test.expect {
 			assert.Equal(t, value, test.dst[key])
+			assert.EqualValues(t, reflect.TypeOf(value).String(), reflect.TypeOf(test.dst[key]).String())
 		}
+	}
+}
+
+func TestDeepCopyByGob(t *testing.T) {
+	tests := []struct {
+		src    []Data
+		dst    []Data
+		expect []Data
+	}{
+		{
+			src: []Data{
+				{
+					"a": "b",
+					"c": "d",
+					"d": int64(1234567),
+				},
+			},
+			expect: []Data{
+				{
+					"a": "b",
+					"c": "d",
+					"d": int64(1234567),
+				},
+			},
+		},
+		{
+			src:    nil,
+			expect: nil,
+		},
+	}
+
+	for _, test := range tests {
+		DeepCopyByGob(&test.dst, &test.src)
+		assert.Equal(t, len(test.expect), len(test.dst))
+		for idx, m := range test.expect {
+			for key, value := range m {
+				assert.Equal(t, value, test.dst[idx][key])
+				assert.EqualValues(t, reflect.TypeOf(value).String(), reflect.TypeOf(test.dst[idx][key]).String())
+			}
+		}
+	}
+}
+
+// Benchmark_DeepCopyByGob-4   	   20000	     50866 ns/op	   12614 B/op	     302 allocs/op
+func Benchmark_DeepCopyByGob(b *testing.B) {
+	src := []Data{
+		{
+			"a": map[string]interface{}{
+				"a1": "b2",
+				"a2": float64(1234567.89),
+				"a3": int64(123456789),
+			},
+			"c": float64(1234567.89),
+			"d": int64(123456789),
+		},
+	}
+	dst := []Data{}
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		DeepCopyByGob(&dst, &src)
+	}
+}
+
+// Benchmark_DeepCopyByJSON-4   	  300000	      3623 ns/op	     988 B/op	      34 allocs/op
+func Benchmark_DeepCopyByJSON(b *testing.B) {
+	src := []Data{
+		{
+			"a": map[string]interface{}{
+				"a1": "b2",
+				"a2": float64(1234567.89),
+				"a3": int64(123456789),
+			},
+			"c": float64(1234567.89),
+			"d": int64(123456789),
+		},
+	}
+	dst := []Data{}
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		DeepCopyByJSON(&dst, &src)
 	}
 }
 

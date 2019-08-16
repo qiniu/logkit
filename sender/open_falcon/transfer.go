@@ -31,6 +31,7 @@ type TransferSender struct {
 	extraInfo  map[string]string
 	runnerName string
 	prefix     string
+	tagKeys    map[string]bool
 }
 
 type TransferData struct {
@@ -89,6 +90,17 @@ func NewSender(c conf.MapConf) (sender.Sender, error) {
 	if err != nil {
 		return nil, errors.New("timeout configure " + timeout + " is invalid")
 	}
+
+	keyStr, _ := c.GetStringOr(KeyOpenFalconTransferTagKeys, "")
+	keys := make([]string, 5)
+	if keyStr != "" {
+		keys = strings.Split(strings.TrimSpace(keyStr), ",")
+	}
+	tagKeys := make(map[string]bool)
+	for _, k := range keys {
+		tagKeys[strings.TrimSpace(k)] = true
+	}
+
 	name, _ := c.GetStringOr(KeyName, "")
 	transferSender := &TransferSender{
 		host:       transferHost,
@@ -100,6 +112,7 @@ func NewSender(c conf.MapConf) (sender.Sender, error) {
 		client:     &http.Client{Timeout: dur},
 		runnerName: name,
 		prefix:     prefix,
+		tagKeys:    tagKeys,
 	}
 	return transferSender, nil
 }
@@ -148,14 +161,14 @@ func (ts *TransferSender) Send(datas []Data) error {
 						if ik == "vmname" {
 							endpoint = fmt.Sprintf("%s", iv)
 						}
-						tags = setTags(tags, ts.prefix, ik, iv)
+						tags = setTags(tags, ts.prefix, ts.tagKeys, ik, iv)
 					}
 					continue
 				}
 			case "name":
 				prefixName = fmt.Sprintf("%s", v) + "_"
 			default:
-				tags = setTags(tags, ts.prefix, k, v)
+				tags = setTags(tags, ts.prefix, ts.tagKeys, k, v)
 			}
 		}
 
@@ -242,16 +255,15 @@ func (ts *TransferSender) Send(datas []Data) error {
 	return nil
 }
 
-func setTags(tags, prefix, key string, val interface{}) string {
+func setTags(tags, prefix string, tagKeys map[string]bool, key string, val interface{}) string {
 	if val == nil {
 		return tags
 	}
 
-	if key == "vccenter" || key == "dcname" || key == "clustername" || key == "esxhostname" || key == "vmname" || key == "dsname" {
+	if len(tagKeys) == 0 || tagKeys[key] {
 		if tags != "" {
 			tags += ","
 		}
-
 		return tags + prefix + key + "=" + fmt.Sprintf("%v", val)
 	}
 
