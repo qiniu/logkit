@@ -321,7 +321,7 @@ func (r *MssqlReader) execReadDB(curDB string, now time.Time, recordTablesDone T
 			defer r.muxOffsets.RUnlock()
 			execSQL := r.getSQL(rawSql, idx)
 			// 执行每条 sql 语句
-			exit, readSize, err = r.execReadSql(execSQL, curDB, idx, tables, db)
+			exit, readSize, err = r.execReadSql(curDB, execSQL, idx, tables, db)
 			if err != nil {
 				return err
 			}
