@@ -31,6 +31,7 @@ type TransferSender struct {
 	extraInfo  map[string]string
 	runnerName string
 	prefix     string
+	tagKeys    map[string]bool
 }
 
 type TransferData struct {
@@ -84,11 +85,22 @@ func NewSender(c conf.MapConf) (sender.Sender, error) {
 	if err != nil {
 		return nil, err
 	}
-	prefix, err := c.GetStringOr(KeyOpenFalconTransferPrefix, "logkit_")
+	prefix, err := c.GetStringOr(KeyOpenFalconTransferPrefix, "")
 	dur, err := time.ParseDuration(timeout)
 	if err != nil {
 		return nil, errors.New("timeout configure " + timeout + " is invalid")
 	}
+
+	keyStr, _ := c.GetStringOr(KeyOpenFalconTransferTagKeys, "")
+	keys := make([]string, 5)
+	if keyStr != "" {
+		keys = strings.Split(strings.TrimSpace(keyStr), ",")
+	}
+	tagKeys := make(map[string]bool)
+	for _, k := range keys {
+		tagKeys[strings.TrimSpace(k)] = true
+	}
+
 	name, _ := c.GetStringOr(KeyName, "")
 	transferSender := &TransferSender{
 		host:       transferHost,
@@ -100,6 +112,7 @@ func NewSender(c conf.MapConf) (sender.Sender, error) {
 		client:     &http.Client{Timeout: dur},
 		runnerName: name,
 		prefix:     prefix,
+		tagKeys:    tagKeys,
 	}
 	return transferSender, nil
 }
@@ -109,9 +122,15 @@ func (ts *TransferSender) Name() string {
 }
 
 func (ts *TransferSender) Send(datas []Data) error {
-	transferDatas := make([]TransferData, 0)
-	var ok bool
-	var vmap map[string]interface{}
+	var (
+		transferDatas = make([]TransferData, 0)
+
+		ok       bool
+		vfields  map[string]interface{}
+		vtags    map[string]string
+		endpoint = ts.extraInfo[KeyHostName]
+	)
+
 	ste := &StatsError{
 		StatsInfo: StatsInfo{
 			Success: 0,
@@ -121,34 +140,47 @@ func (ts *TransferSender) Send(datas []Data) error {
 	timeStamp := time.Now().Unix()
 	for _, d := range datas {
 		tags := ts.tags
-		endpoint := ts.extraInfo[KeyHostName]
+		endpoint = ts.extraInfo[KeyHostName]
+		prefixName := ""
+		transferTmpDatas := make([]TransferData, 0)
 		for k, v := range d {
-			if vmap, ok = v.(map[string]interface{}); ok {
-				for ik, iv := range vmap {
-					if k == "fields" {
+			switch k {
+			case "fields":
+				if vfields, ok = v.(map[string]interface{}); ok {
+					for ik, iv := range vfields {
 						if tmpData, success := ts.converToTransferData(ik, iv, timeStamp); success {
-							transferDatas = append(transferDatas, tmpData)
+							transferTmpDatas = append(transferTmpDatas, tmpData)
 						} else {
 							log.Warnf("ik: %s, iv: %v cannot convert to float, discard it", ik, iv)
 						}
-						continue
 					}
-					if k == "tags" && ik == "source" {
-						endpoint = fmt.Sprintf("%s", iv)
-					}
-					tags = setTags(tags, ik, iv)
 				}
-				continue
+			case "tags":
+				if vtags, ok = v.(map[string]string); ok {
+					for ik, iv := range vtags {
+						if ik == "vmname" {
+							endpoint = fmt.Sprintf("%s", iv)
+						}
+						tags = setTags(tags, ts.prefix, ts.tagKeys, ik, iv)
+					}
+					continue
+				}
+			case "name":
+				prefixName = fmt.Sprintf("%s", v) + "_"
+			default:
+				tags = setTags(tags, ts.prefix, ts.tagKeys, k, v)
 			}
-
-			tags = setTags(tags, k, v)
 		}
 
+		log.Debugf("test fields endpoint: %v, prefixName: %v, tags: %v", endpoint, prefixName, tags)
 		// tags 赋值
-		for idx := range transferDatas {
-			transferDatas[idx].Tags = tags
-			transferDatas[idx].EndPoint = endpoint
+		for idx := range transferTmpDatas {
+			transferTmpDatas[idx].Metric = ts.prefix + prefixName + transferTmpDatas[idx].Metric
+			transferTmpDatas[idx].Tags = tags
+			transferTmpDatas[idx].EndPoint = endpoint
+			log.Debugf("test fields metric: %v, value: %v", transferTmpDatas[idx].Metric, transferTmpDatas[idx].Value)
 		}
+		transferDatas = append(transferDatas, transferTmpDatas...)
 	}
 	if len(transferDatas) == 0 {
 		log.Warnf("Runner[%v] Sender[%v] send no data", ts.runnerName, ts.Name())
@@ -223,16 +255,21 @@ func (ts *TransferSender) Send(datas []Data) error {
 	return nil
 }
 
-func setTags(tags, key string, val interface{}) string {
+func setTags(tags, prefix string, tagKeys map[string]bool, key string, val interface{}) string {
 	if val == nil {
 		return tags
 	}
-	if tags != "" {
-		tags += ","
+
+	if len(tagKeys) == 0 || tagKeys[key] {
+		if tags != "" {
+			tags += ","
+		}
+		return tags + prefix + key + "=" + fmt.Sprintf("%v", val)
 	}
 
-	return tags + key + "=" + fmt.Sprintf("%v", val)
+	return tags
 }
+
 func (ts *TransferSender) Close() (err error) {
 	return nil
 }
@@ -246,7 +283,7 @@ func (ts *TransferSender) converToTransferData(key string, value interface{}, ti
 	var ok bool
 	var err error
 	result := TransferData{
-		Metric:      ts.prefix + key,
+		Metric:      key,
 		Step:        ts.step,
 		CounterType: CounterTypeGauge,
 		TimeStamp:   timeStamp,

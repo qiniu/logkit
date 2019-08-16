@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestConverToTransferData(t *testing.T) {
+func TestConvertToTransferData(t *testing.T) {
 	sender := TransferSender{}
 	var timeStamp int64 = 1000000
 	data, ok := sender.converToTransferData("key1", "test", timeStamp)
@@ -24,17 +24,26 @@ func TestConverToTransferData(t *testing.T) {
 }
 
 func TestSetTags(t *testing.T) {
-	tags := setTags("", "hostname", "10.10.1.1")
-	assert.EqualValues(t, "hostname=10.10.1.1", tags)
+	tags := setTags("", "", nil, "vccenter", "10.10.1.1")
+	assert.EqualValues(t, "vccenter=10.10.1.1", tags)
 
-	tags = setTags(tags, "clustername", "cluster1")
-	assert.EqualValues(t, "hostname=10.10.1.1,clustername=cluster1", tags)
+	tags = setTags(tags, "", nil, "dcname", "cluster1")
+	assert.EqualValues(t, "vccenter=10.10.1.1,dcname=cluster1", tags)
 
-	tags = setTags(tags, "float", 1.2)
-	assert.EqualValues(t, "hostname=10.10.1.1,clustername=cluster1,float=1.2", tags)
+	tags = setTags(tags, "", nil, "esxhostname", 1.2)
+	assert.EqualValues(t, "vccenter=10.10.1.1,dcname=cluster1,esxhostname=1.2", tags)
 
-	tags = setTags(tags, "struct", struct {
+	tags = setTags(tags, "", nil, "clustername", struct {
 		Name string
 	}{"name"})
-	assert.EqualValues(t, "hostname=10.10.1.1,clustername=cluster1,float=1.2,struct={name}", tags)
+	assert.EqualValues(t, "vccenter=10.10.1.1,dcname=cluster1,esxhostname=1.2,clustername={name}", tags)
+
+	tags = setTags("", "", map[string]bool{"a": true}, "vccenter", "10.10.1.1")
+	assert.EqualValues(t, "", tags)
+
+	tags = setTags(tags, "", map[string]bool{"a": true}, "a", "10.10.1.1")
+	assert.EqualValues(t, "a=10.10.1.1", tags)
+
+	tags = setTags(tags, "", map[string]bool{"b": true}, "b", "cluster1")
+	assert.EqualValues(t, "a=10.10.1.1,b=cluster1", tags)
 }

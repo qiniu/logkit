@@ -103,7 +103,6 @@ func TestGetConfigDir(t *testing.T) {
 }
 
 func TestInit(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		cflag       string
 		app         string
@@ -139,7 +138,6 @@ type Config struct {
 }
 
 func TestLoad(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		content  string
 		confName string

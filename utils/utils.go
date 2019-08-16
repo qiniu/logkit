@@ -1,6 +1,9 @@
 package utils
 
 import (
+	"archive/zip"
+	"bytes"
+	"encoding/gob"
 	"io"
 	"io/ioutil"
 	"os"
@@ -14,11 +17,17 @@ import (
 
 	"github.com/qiniu/log"
 
-	"archive/zip"
-
 	"github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
 )
+
+func init() {
+	gob.Register(map[string]interface{}{})
+	gob.Register(models.Data{})
+
+}
+
+var JSONTool = jsoniter.Config{UseNumber: true}.Froze()
 
 // IsExist checks whether a file or directory exists.
 // It returns false when the file or directory does not exist.
@@ -41,16 +50,31 @@ func GetParseTestData(line string, size int) []string {
 }
 
 func DeepCopyByJSON(dst, src interface{}) {
-	confBytes, err := jsoniter.Marshal(src)
+	confBytes, err := JSONTool.Marshal(src)
 	if err != nil {
 		log.Errorf("DeepCopyByJSON marshal error %v, use same pointer", err)
 		dst = src
 		return
 	}
-	if err = jsoniter.Unmarshal(confBytes, dst); err != nil {
+	if err = JSONTool.Unmarshal(confBytes, dst); err != nil {
 		log.Errorf("DeepCopyByJSON unmarshal error %v, use same pointer", err)
 		dst = src
 		return
+	}
+}
+
+func DeepCopyByGob(dst, src interface{}) {
+	var network bytes.Buffer
+	enc := gob.NewEncoder(&network)
+	dec := gob.NewDecoder(&network)
+
+	err := enc.Encode(src)
+	if err != nil {
+		log.Fatal("encode error:", err)
+	}
+	err = dec.Decode(dst)
+	if err != nil {
+		log.Fatal("decode error:", err)
 	}
 }
 
