@@ -253,6 +253,7 @@ const (
 	KeyOpenFalconTransferURL     = "open_falcon_transfer_url"
 	KeyOpenFalconTransferPrefix  = "open_falcon_transfer_prefix"
 	KeyOpenFalconTransferTagKeys = "open_falcon_transfer_tag_keys"
+	KeySeparator                 = "separator"
 )
 
 // NotAsyncSender return when sender is not async

@@ -32,6 +32,7 @@ type TransferSender struct {
 	runnerName string
 	prefix     string
 	tagKeys    map[string]bool
+	separator  string
 }
 
 type TransferData struct {
@@ -75,6 +76,7 @@ func NewSender(c conf.MapConf) (sender.Sender, error) {
 	if err != nil {
 		return nil, err
 	}
+	separator, _ := c.GetStringOr(KeySeparator, "_")
 	transferUrl = strings.TrimPrefix(transferUrl, "/")
 	timeout, _ := c.GetStringOr(KeyHttpTimeout, "30s")
 	step, err := c.GetInt(KeyCollectInterval)
@@ -92,7 +94,7 @@ func NewSender(c conf.MapConf) (sender.Sender, error) {
 	}
 
 	keyStr, _ := c.GetStringOr(KeyOpenFalconTransferTagKeys, "")
-	keys := make([]string, 5)
+	var keys []string
 	if keyStr != "" {
 		keys = strings.Split(strings.TrimSpace(keyStr), ",")
 	}
@@ -113,6 +115,7 @@ func NewSender(c conf.MapConf) (sender.Sender, error) {
 		runnerName: name,
 		prefix:     prefix,
 		tagKeys:    tagKeys,
+		separator:  separator,
 	}
 	return transferSender, nil
 }
@@ -125,10 +128,11 @@ func (ts *TransferSender) Send(datas []Data) error {
 	var (
 		transferDatas = make([]TransferData, 0)
 
-		ok       bool
-		vfields  map[string]interface{}
-		vtags    map[string]string
-		endpoint = ts.extraInfo[KeyHostName]
+		ok         bool
+		vfields    map[string]interface{}
+		vtags      map[string]string
+		endpoint   = ts.extraInfo[KeyHostName]
+		prefixName string
 	)
 
 	ste := &StatsError{
@@ -140,9 +144,10 @@ func (ts *TransferSender) Send(datas []Data) error {
 	timeStamp := time.Now().Unix()
 	for _, d := range datas {
 		tags := ts.tags
-		endpoint = ts.extraInfo[KeyHostName]
-		prefixName := ""
 		transferTmpDatas := make([]TransferData, 0)
+		if name, ok := d["name"]; ok {
+			prefixName = fmt.Sprintf("%v", name)
+		}
 		for k, v := range d {
 			switch k {
 			case "fields":
@@ -157,22 +162,20 @@ func (ts *TransferSender) Send(datas []Data) error {
 				}
 			case "tags":
 				if vtags, ok = v.(map[string]string); ok {
+					endpoint = getEndpoint(prefixName, ts.extraInfo[KeyHostName], ts.separator, vtags)
 					for ik, iv := range vtags {
-						if ik == "vmname" {
-							endpoint = fmt.Sprintf("%s", iv)
-						}
 						tags = setTags(tags, ts.prefix, ts.tagKeys, ik, iv)
 					}
-					continue
 				}
-			case "name":
-				prefixName = fmt.Sprintf("%s", v) + "_"
 			default:
 				tags = setTags(tags, ts.prefix, ts.tagKeys, k, v)
 			}
 		}
 
 		log.Debugf("test fields endpoint: %v, prefixName: %v, tags: %v", endpoint, prefixName, tags)
+		if prefixName != "" {
+			prefixName += "_"
+		}
 		// tags 赋值
 		for idx := range transferTmpDatas {
 			transferTmpDatas[idx].Metric = ts.prefix + prefixName + transferTmpDatas[idx].Metric
@@ -313,4 +316,27 @@ func (ts *TransferSender) converToTransferData(key string, value interface{}, ti
 		}
 	}
 	return TransferData{}, false
+}
+
+func getEndpoint(name, defaultVal, separator string, tagsVal map[string]string) string {
+	if strings.HasPrefix(name, "vsphere"+separator+"datacenter"+separator) {
+		return tagsVal["dcname"]
+	}
+
+	if strings.HasPrefix(name, "vsphere"+separator+"cluster"+separator) {
+		return tagsVal["clustername"]
+	}
+
+	if strings.HasPrefix(name, "vsphere"+separator+"host"+separator) {
+		return tagsVal["esxhostname"]
+	}
+
+	if strings.HasPrefix(name, "vsphere"+separator+"vm"+separator) {
+		return tagsVal["vmname"]
+	}
+
+	if strings.HasPrefix(name, "vsphere"+separator+"datastore"+separator) {
+		return tagsVal["dsname"]
+	}
+	return defaultVal
 }
