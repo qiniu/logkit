@@ -378,11 +378,6 @@ func (ar *ActiveReader) ReadDone() bool {
 }
 
 func (ar *ActiveReader) expired(expire time.Duration) bool {
-	// 如果过期时间为 0，则永不过期
-	if expire.Nanoseconds() == 0 {
-		return false
-	}
-
 	fi, err := os.Stat(ar.realpath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -393,6 +388,10 @@ func (ar *ActiveReader) expired(expire time.Duration) bool {
 		} else {
 			log.Debugf("Runner[%s] stat log %s error %v, will not expire it...", ar.runnerName, ar.originpath, err)
 		}
+		return false
+	}
+	// 如果过期时间为 0，则永不过期
+	if expire.Nanoseconds() == 0 {
 		return false
 	}
 	if fi.ModTime().Add(expire).Before(time.Now()) && atomic.LoadInt32(&ar.inactive) > 0 {
