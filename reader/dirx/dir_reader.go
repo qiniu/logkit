@@ -199,11 +199,6 @@ func (dr *dirReader) ReadDone() bool {
 }
 
 func (dr *dirReader) HasExpired(expire time.Duration) bool {
-	// 如果过期时间为 0，则永不过期
-	if expire.Nanoseconds() == 0 {
-		return false
-	}
-
 	// 在非 inactive 的情况下，数据尚未读完，有必要先继续处理
 	return atomic.LoadInt32(&dr.inactive) > 0 && HasDirExpired(dr.logPath, expire)
 }
