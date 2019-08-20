@@ -317,8 +317,6 @@ func (r *MssqlReader) execReadDB(curDB string, now time.Time, recordTablesDone T
 				}
 			}
 
-			r.muxOffsets.RLock()
-			defer r.muxOffsets.RUnlock()
 			execSQL := r.getSQL(rawSql, idx)
 			// 执行每条 sql 语句
 			exit, readSize, err = r.execReadSql(curDB, execSQL, idx, tables, db)
@@ -671,6 +669,7 @@ func (r *MssqlReader) Close() error {
 		return nil
 	}
 
+	log.Debugf("Runner[%v] %q daemon is stopping", r.meta.RunnerName, r.Name())
 	close(r.stopChan)
 	r.Cron.Stop()
 
@@ -723,6 +722,8 @@ func (r *MssqlReader) updateOffset(idx, offsetKeyIndex int, maxOffset int64, sca
 
 func (r *MssqlReader) getSQL(rawSql string, idx int) string {
 	var rawSQL = strings.TrimSuffix(strings.TrimSpace(rawSql), ";")
+	r.muxOffsets.RLock()
+	defer r.muxOffsets.RUnlock()
 	if len(r.offsetKey) > 0 && len(r.offsets) > idx {
 		return fmt.Sprintf("%s WHERE CAST(%v AS BIGINT) >= %d AND CAST(%v AS BIGINT) < %d;", rawSQL, r.offsetKey, r.offsets[idx], r.offsetKey, r.offsets[idx]+int64(r.readBatch))
 	}
