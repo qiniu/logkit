@@ -62,7 +62,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		return nil, err
 	}
 	syncMgr, err := newSyncManager(meta, opts)
-	syncMgr.meta.LastKey = ""
+	log.Infof("Runner[%v] meta.LastKey = %s", meta.RunnerName, syncMgr.meta.LastKey)
 	if err != nil {
 		return nil, err
 	}
@@ -359,7 +359,7 @@ func (s *syncRunner) syncToDir() error {
 
 	sourceFiles := make(map[string]bool)
 	lastKey, err := loadS3Files(bucket, s3url.Path(), sourceFiles, s.meta.LastKey)
-	log.Debugf("sourceFiles length = %d, marker = %s, lastKey = %s", len(sourceFiles), s.meta.LastKey, lastKey)
+	log.Debugf("Runner[%v] sourceFiles length = %d, marker = %s, lastKey = %s", s.meta.RunnerName, len(sourceFiles), s.meta.LastKey, lastKey)
 	s.meta.LastKey = lastKey
 	if err != nil {
 		return fmt.Errorf("load s3 files: %v", err)

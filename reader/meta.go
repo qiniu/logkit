@@ -175,11 +175,13 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 	filedonepath, _ := conf.GetStringOr(KeyFileDone, metaPath)
 	donefileRetention, _ := conf.GetIntOr(doneFileRetention, DefautFileRetention)
 	readlimit, _ := conf.GetIntOr(KeyReadIOLimit, defaultIOLimit)
+	lastKey, _ := conf.GetStringOr(KeyS3LastKey, "")
 	meta, err = NewMeta(metaPath, filedonepath, logPath, mode, tagFile, donefileRetention)
 	if err != nil {
 		log.Warnf("Runner[%v] %s - newMeta failed, err:%v", runnerName, metaPath, err)
 		return
 	}
+	meta.LastKey = lastKey
 	extrainfo, _ := conf.GetBoolOr(ExtraInfo, false)
 	if extrainfo {
 		meta.extrainfo = utilsos.GetExtraInfo()

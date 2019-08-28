@@ -27,6 +27,7 @@ const (
 	KeySkipFileFirstLine = "skip_first_line"
 	KeyReadSameInode     = "read_same_inode"
 	KeyInodeSensitive    = "inode_sensitive"
+	KeyS3LastKey         = "s3_last_key"
 
 	// 忽略文件路径
 	KeyIgnoreLogPath = "ignore_log_path"
