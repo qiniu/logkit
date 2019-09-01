@@ -651,11 +651,41 @@ func (p *Procstat) findPids() (map[PID]ProcessInfo, error) {
 
 func pid2ProcessInfo(process map[PID]ProcessInfo, pids []PID) {
 	for _, pid := range pids {
-		process[pid] = ProcessInfo{
+		processInfo := ProcessInfo{
 			Pid: pid,
 		}
+		status, err := getProcStat(int32(pid))
+		if err != nil {
+			log.Errorf("get process %d status failed: %v", pid, err)
+			processInfo.Status = -1
+		} else {
+			processInfo.Status = status
+		}
+		process[pid] = processInfo
 	}
 	return
+}
+
+func getProcStat(pid int32) (stat int, err error) {
+	pidStr := fmt.Sprintf("%d", pid)
+	stdout, err := exec.Command("bash", "-c", "ps -ax | grep "+pidStr).Output()
+	if err != nil {
+		return -1, fmt.Errorf("exec command 'ps -ax | grep %s' status error [%v]: %s", pidStr, err, string(stdout))
+	}
+	if len(string(stdout)) == 0 {
+		return 4, nil
+	}
+	for _, str := range strings.Split(string(stdout), "\n") {
+		fields := strings.Fields(str)
+		if len(fields) < 4 {
+			continue
+		}
+		if fields[0] != pidStr {
+			continue
+		}
+		return 0, nil
+	}
+	return 4, nil
 }
 
 func (p *Procstat) systemdUnitPIDs(process map[PID]ProcessInfo) error {
