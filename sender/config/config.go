@@ -1212,7 +1212,7 @@ var ModeKeyOptions = map[string][]Option{
 			Default:      "",
 			DefaultNoUse: false,
 			Placeholder:  "vccenter,dcname,clustername,esxhostname,vmname,dsname",
-			Description:  "open-falcon transfer metric 前缀(open_falcon_transfer_prefix)",
+			Description:  "open-falcon transfer tag keys筛选(open_falcon_transfer_tag_keys)",
 			Advance:      true,
 			ToolTip:      "数据发送时，筛选tagkeys，默认为空，表示发送所有tag，用 逗号',' 连接多个tag key",
 		},
