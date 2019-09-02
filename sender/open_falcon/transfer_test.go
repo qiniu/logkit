@@ -36,26 +36,26 @@ func TestConvertToTransferData(t *testing.T) {
 }
 
 func TestSetTags(t *testing.T) {
-	tags := setTags("", "", nil, "vccenter", "10.10.1.1")
+	tags := setTags("", nil, "vccenter", "10.10.1.1")
 	assert.EqualValues(t, "vccenter=10.10.1.1", tags)
 
-	tags = setTags(tags, "", nil, "dcname", "cluster1")
+	tags = setTags(tags, nil, "dcname", "cluster1")
 	assert.EqualValues(t, "vccenter=10.10.1.1,dcname=cluster1", tags)
 
-	tags = setTags(tags, "", nil, "esxhostname", 1.2)
+	tags = setTags(tags, nil, "esxhostname", 1.2)
 	assert.EqualValues(t, "vccenter=10.10.1.1,dcname=cluster1,esxhostname=1.2", tags)
 
-	tags = setTags(tags, "", nil, "clustername", struct {
+	tags = setTags(tags, nil, "clustername", struct {
 		Name string
 	}{"name"})
 	assert.EqualValues(t, "vccenter=10.10.1.1,dcname=cluster1,esxhostname=1.2,clustername={name}", tags)
 
-	tags = setTags("", "", map[string]bool{"a": true}, "vccenter", "10.10.1.1")
+	tags = setTags("", map[string]bool{"a": true}, "vccenter", "10.10.1.1")
 	assert.EqualValues(t, "", tags)
 
-	tags = setTags(tags, "", map[string]bool{"a": true}, "a", "10.10.1.1")
+	tags = setTags(tags, map[string]bool{"a": true}, "a", "10.10.1.1")
 	assert.EqualValues(t, "a=10.10.1.1", tags)
 
-	tags = setTags(tags, "", map[string]bool{"b": true}, "b", "cluster1")
+	tags = setTags(tags, map[string]bool{"b": true}, "b", "cluster1")
 	assert.EqualValues(t, "a=10.10.1.1,b=cluster1", tags)
 }

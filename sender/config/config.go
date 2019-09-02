@@ -1204,7 +1204,7 @@ var ModeKeyOptions = map[string][]Option{
 			Placeholder:  "logkit_",
 			Description:  "open-falcon transfer metric 前缀(open_falcon_transfer_prefix)，例如logkit_",
 			Advance:      true,
-			ToolTip:      "数据发送时，所有key添加前缀",
+			ToolTip:      "数据发送时，所有metric key添加前缀",
 		},
 		{
 			KeyName:      KeyOpenFalconTransferTagKeys,
