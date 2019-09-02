@@ -164,11 +164,11 @@ func (ts *TransferSender) Send(datas []Data) error {
 				if vtags, ok = v.(map[string]string); ok {
 					endpoint = getEndpoint(prefixName, ts.extraInfo[KeyHostName], ts.separator, vtags)
 					for ik, iv := range vtags {
-						tags = setTags(tags, ts.prefix, ts.tagKeys, ik, iv)
+						tags = setTags(tags, ts.tagKeys, ik, iv)
 					}
 				}
 			default:
-				tags = setTags(tags, ts.prefix, ts.tagKeys, k, v)
+				tags = setTags(tags, ts.tagKeys, k, v)
 			}
 		}
 
@@ -258,7 +258,7 @@ func (ts *TransferSender) Send(datas []Data) error {
 	return nil
 }
 
-func setTags(tags, prefix string, tagKeys map[string]bool, key string, val interface{}) string {
+func setTags(tags string, tagKeys map[string]bool, key string, val interface{}) string {
 	if val == nil {
 		return tags
 	}
@@ -267,7 +267,7 @@ func setTags(tags, prefix string, tagKeys map[string]bool, key string, val inter
 		if tags != "" {
 			tags += ","
 		}
-		return tags + prefix + key + "=" + fmt.Sprintf("%v", val)
+		return tags + key + "=" + fmt.Sprintf("%v", val)
 	}
 
 	return tags
