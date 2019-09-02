@@ -156,7 +156,7 @@ func (ts *TransferSender) Send(datas []Data) error {
 						if tmpData, success := ts.converToTransferData(ik, iv, timeStamp); success {
 							transferTmpDatas = append(transferTmpDatas, tmpData)
 						} else {
-							log.Warnf("ik: %s, iv: %v cannot convert to float, discard it", ik, iv)
+							log.Warnf("ik: %s, iv: %v type: %T cannot convert to float, discard it", ik, iv, iv)
 						}
 					}
 				}
@@ -278,31 +278,65 @@ func (ts *TransferSender) Close() (err error) {
 }
 
 func (ts *TransferSender) converToTransferData(key string, value interface{}, timeStamp int64) (TransferData, bool) {
-	var valuef float64
-	var valuei int
-	var valuei64 int64
-	var values string
-	var valuej json.Number
-	var ok bool
-	var err error
+	var (
+		valuef   float64
+		valuef32 float32
+
+		valuei   int
+		valuei32 int32
+		valuei64 int64
+
+		valueui   uint
+		valueui32 uint32
+		valueui64 uint64
+
+		values string
+		valuej json.Number
+
+		ok  bool
+		err error
+	)
 	result := TransferData{
 		Metric:      key,
 		Step:        ts.step,
 		CounterType: CounterTypeGauge,
 		TimeStamp:   timeStamp,
 	}
+	if valuef32, ok = value.(float32); ok {
+		result.Value = float64(valuef32)
+		return result, true
+	}
 	if valuef, ok = value.(float64); ok {
 		result.Value = valuef
 		return result, true
 	}
+
 	if valuei, ok = value.(int); ok {
 		result.Value = float64(valuei)
+		return result, true
+	}
+	if valuei32, ok = value.(int32); ok {
+		result.Value = float64(valuei32)
 		return result, true
 	}
 	if valuei64, ok = value.(int64); ok {
 		result.Value = float64(valuei64)
 		return result, true
 	}
+
+	if valueui, ok = value.(uint); ok {
+		result.Value = float64(valueui)
+		return result, true
+	}
+	if valueui32, ok = value.(uint32); ok {
+		result.Value = float64(valueui32)
+		return result, true
+	}
+	if valueui64, ok = value.(uint64); ok {
+		result.Value = float64(valueui64)
+		return result, true
+	}
+
 	if valuej, ok = value.(json.Number); ok {
 		if valuef, err = valuej.Float64(); err == nil {
 			result.Value = valuef
