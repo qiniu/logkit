@@ -407,7 +407,7 @@ func (r *LogExportRunner) tryRawSend(s sender.Sender, datas []string, times int)
 	)
 	rawSender, ok := s.(sender.RawSender)
 	if !ok {
-		log.Errorf("runner[%v]: sender not raw sender, can not use tryRawSend", r.RunnerName, err)
+		log.Errorf("runner[%s]: sender not raw sender, can not use tryRawSend %v", r.RunnerName, err)
 		return true
 	}
 
