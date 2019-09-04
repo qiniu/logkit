@@ -1,7 +1,7 @@
 language: go
 sudo: true
 go:
-  - 1.10.3
+  - 1.12.9
 script:
   - make all
   - go test -coverprofile=coverage.txt -covermode=count ./...
