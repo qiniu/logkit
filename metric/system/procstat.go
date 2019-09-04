@@ -784,8 +784,11 @@ func (p *Procstat) SupervisordStat(process map[PID]ProcessInfo) (err error) {
 			name: fields[0],
 		}
 		info.Status, _ = processStat[fields[1]]
+		if fields[1] == "STARTING" || fields[1] == "STOPPED" || fields[1] == "EXITED" || fields[1] == "FATAL" {
+			continue
+		}
 		if pid, err = strconv.Atoi(strings.Trim(fields[3], ",")); err != nil {
-			log.Infof("parse %s ERROR: %v", fields[3], err)
+			log.Errorf("parse %s ERROR: %v", strings.Trim(fields[3], ","), err)
 			continue
 		}
 		info.Pid = PID(pid)
