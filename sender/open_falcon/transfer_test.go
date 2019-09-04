@@ -36,7 +36,6 @@ func TestConvertToTransferData(t *testing.T) {
 }
 
 func TestGetEndpoint(t *testing.T) {
-	separator := "."
 	tagsEndpoint := map[string]string{"vmname": "vm", "endpoint": "endpoint", "esxhostname": "host", "dsname": "ds"}
 
 	v := getEndpoint("vsphere.vm.", "", ".", tagsEndpoint)
