@@ -39,10 +39,10 @@ func TestGetEndpoint(t *testing.T) {
 	separator := "."
 	tagsEndpoint := map[string]string{"vmname": "vm", "endpoint": "endpoint", "esxhostname": "host", "dsname": "ds"}
 
-	v := getEndpoint("vsphere.vm.", "", tagsEndpoint)
+	v := getEndpoint("vsphere.vm.", "", ".", tagsEndpoint)
 	assert.Equal(t, v, "endpoint")
 	delete(tagsEndpoint, "endpoint")
-	v = getEndpoint("vsphere.vm.", "", tagsEndpoint)
+	v = getEndpoint("vsphere.vm.", "", ".", tagsEndpoint)
 	assert.Equal(t, v, "vm")
 }
 
