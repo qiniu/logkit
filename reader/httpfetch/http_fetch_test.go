@@ -53,10 +53,9 @@ func getHttpFetchReader(port string) (*Reader, error) {
 }
 
 func TestNewHttpFetchReader(t *testing.T) {
-	var server *http.Server
 	var err error
 	go func() {
-		server, err = startServer(8888)
+		_, err = startServer(8888)
 		assert.NoError(t, err)
 	}()
 
