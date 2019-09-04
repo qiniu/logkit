@@ -353,24 +353,29 @@ func (ts *TransferSender) converToTransferData(key string, value interface{}, ti
 }
 
 func getEndpoint(name, defaultVal, separator string, tagsVal map[string]string) string {
-	if strings.HasPrefix(name, "vsphere"+separator+"datacenter"+separator) {
-		return tagsVal["dcname"]
-	}
-
-	if strings.HasPrefix(name, "vsphere"+separator+"cluster"+separator) {
-		return tagsVal["clustername"]
-	}
-
-	if strings.HasPrefix(name, "vsphere"+separator+"host"+separator) {
-		return tagsVal["esxhostname"]
+	if endpoint, ok := tagsVal["endpoint"]; ok {
+		return endpoint
 	}
 
 	if strings.HasPrefix(name, "vsphere"+separator+"vm"+separator) {
 		return tagsVal["vmname"]
 	}
 
+	if strings.HasPrefix(name, "vsphere"+separator+"host"+separator) {
+		return tagsVal["esxhostname"]
+	}
+
 	if strings.HasPrefix(name, "vsphere"+separator+"datastore"+separator) {
 		return tagsVal["dsname"]
 	}
+
+	if strings.HasPrefix(name, "vsphere"+separator+"cluster"+separator) {
+		return tagsVal["clustername"]
+	}
+
+	if strings.HasPrefix(name, "vsphere"+separator+"datacenter"+separator) {
+		return tagsVal["dcname"]
+	}
+
 	return defaultVal
 }

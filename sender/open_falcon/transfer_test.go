@@ -35,6 +35,16 @@ func TestConvertToTransferData(t *testing.T) {
 	assert.Equal(t, 0.02, data.Value)
 }
 
+func TestGetEndpoint(t *testing.T) {
+	tagsEndpoint := map[string]string{"vmname": "vm", "endpoint": "endpoint", "esxhostname": "host", "dsname": "ds"}
+
+	v := getEndpoint("vsphere.vm.", "", ".", tagsEndpoint)
+	assert.Equal(t, v, "endpoint")
+	delete(tagsEndpoint, "endpoint")
+	v = getEndpoint("vsphere.vm.", "", ".", tagsEndpoint)
+	assert.Equal(t, v, "vm")
+}
+
 func TestSetTags(t *testing.T) {
 	tags := setTags("", nil, "vccenter", "10.10.1.1")
 	assert.EqualValues(t, "vccenter=10.10.1.1", tags)
