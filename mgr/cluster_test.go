@@ -602,7 +602,7 @@ func clusterResetDeleteTest(p *testCluParam) {
 	respCode, respBody, err := makeRequest(url, http.MethodPost, runnerConf)
 	assert.NoError(t, err, string(respBody))
 	assert.Equal(t, http.StatusOK, respCode)
-	time.Sleep(5 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	// 读取日志发送目的文件，记录日志条数
 	dataLine := 0
