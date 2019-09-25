@@ -417,28 +417,35 @@ func (p *Procstat) collectMetrics(proc ProcessInfo) map[string]interface{} {
 		fields[KeyProcstatProcessName] = name
 	}
 	fields[KeyProcstatStatus] = proc.Status
-	fields[KeyProcstatPid] = int32(proc.PID())
+	if proc.Process != nil {
+		fields[KeyProcstatPid] = int32(proc.PID())
+	} else {
+		pid := int32(proc.Pid)
+		if pid != 0 {
+			fields[KeyProcstatPid] = pid
+		}
+	}
 
-	if p.ThreadsRelated {
+	if p.ThreadsRelated && proc.Process != nil {
 		if threadsNum, err := proc.NumThreads(); err == nil {
 			fields[KeyProcstatThreadsNum] = threadsNum
 		}
 	}
 
-	if p.FileDescRelated {
+	if p.FileDescRelated && proc.Process != nil {
 		if fds, err := proc.NumFDs(); err == nil {
 			fields[KeyProcstatFdsNum] = fds
 		}
 	}
 
-	if p.CtxSwitRelated {
+	if p.CtxSwitRelated && proc.Process != nil {
 		if ctx, err := proc.NumCtxSwitches(); err == nil {
 			fields[KeyProcstatVolConSwitches] = ctx.Voluntary
 			fields[KeyProcstatInVolConSwitches] = ctx.Involuntary
 		}
 	}
 
-	if p.IoRelated {
+	if p.IoRelated && proc.Process != nil {
 		if io, err := proc.IOCounters(); err == nil {
 			fields[KeyProcstatReadCount] = io.ReadCount
 			fields[KeyProcstatWriteCount] = io.WriteCount
@@ -447,7 +454,7 @@ func (p *Procstat) collectMetrics(proc ProcessInfo) map[string]interface{} {
 		}
 	}
 
-	if p.CpuTimeRelated {
+	if p.CpuTimeRelated && proc.Process != nil {
 		if cpuTime, err := proc.Times(); err == nil {
 			fields[KeyProcstatCpuTimeUser] = cpuTime.User
 			fields[KeyProcstatCpuTimeSystem] = cpuTime.System
@@ -463,13 +470,13 @@ func (p *Procstat) collectMetrics(proc ProcessInfo) map[string]interface{} {
 		}
 	}
 
-	if p.CpuUsageRelated {
+	if p.CpuUsageRelated && proc.Process != nil {
 		if cpuPerc, err := proc.Percent(time.Duration(0)); err == nil {
 			fields[KeyProcstatCpuUsage] = cpuPerc
 		}
 	}
 
-	if p.MemRelated {
+	if p.MemRelated && proc.Process != nil {
 		if mem, err := proc.MemoryInfo(); err == nil {
 			fields[KeyProcstatMemRss] = mem.RSS
 			fields[KeyProcstatMemVms] = mem.VMS
@@ -480,7 +487,7 @@ func (p *Procstat) collectMetrics(proc ProcessInfo) map[string]interface{} {
 		}
 	}
 
-	if p.ResourceLimits {
+	if p.ResourceLimits && proc.Process != nil {
 		if rlims, err := proc.RlimitUsage(true); err == nil {
 			for _, rlim := range rlims {
 				var name, nameSoft, nameHard string
@@ -555,7 +562,7 @@ func (p *Procstat) updateProcesses(prevInfo map[string]ProcessInfo) (map[string]
 		if ok {
 			procs[name] = info
 		} else {
-			if processInfo.Pid != 0 {
+			if processInfo.Pid != 0 && processInfo.Status == 0 {
 				if proc, err := p.createProcess(processInfo.Pid); err == nil {
 					processInfo.Process = proc
 					if processInfo.name == "" {
@@ -563,6 +570,8 @@ func (p *Procstat) updateProcesses(prevInfo map[string]ProcessInfo) (map[string]
 					}
 					procs[processInfo.name] = processInfo
 				}
+			} else {
+				procs[name] = ProcessInfo{name: name, Status: processInfo.Status, Pid: processInfo.Pid}
 			}
 		}
 	}
@@ -659,11 +668,11 @@ func pid2ProcessInfo(process map[string]ProcessInfo, pids []PID) {
 		status, err := getProcStat(int32(pid))
 		if err != nil {
 			log.Errorf("get process %d status failed: %v", pid, err)
-			processInfo.Status = -1
+			processInfo.Status = 6
 		} else {
 			processInfo.Status = status
 		}
-		pidStr := strconv.FormatInt(int64(pid), 32)
+		pidStr := strconv.FormatInt(int64(pid), 10)
 		process[pidStr] = processInfo
 	}
 	return
@@ -671,9 +680,9 @@ func pid2ProcessInfo(process map[string]ProcessInfo, pids []PID) {
 
 func getProcStat(pid int32) (stat int, err error) {
 	pidStr := fmt.Sprintf("%d", pid)
-	stdout, err := exec.Command("bash", "-c", "ps -ax | grep "+pidStr).Output()
+	stdout, err := exec.Command("bash", "-c", "ps -ax | grep "+pidStr+" | grep -v grep").Output()
 	if err != nil {
-		return -1, fmt.Errorf("exec command 'ps -ax | grep %s' status error [%v]: %s", pidStr, err, string(stdout))
+		return 6, fmt.Errorf("exec command 'ps -ax | grep %s' status error [%v]: %s", pidStr, err, string(stdout))
 	}
 	if len(string(stdout)) == 0 {
 		return 4, nil
@@ -779,7 +788,7 @@ func (p *Procstat) SupervisordStat(process map[string]ProcessInfo) (err error) {
 	}
 	for _, str := range strings.Split(string(stdout), "\n") {
 		fields := strings.Fields(str)
-		if len(fields) < 4 {
+		if len(fields) < 2 {
 			continue
 		}
 		info := ProcessInfo{
@@ -787,10 +796,17 @@ func (p *Procstat) SupervisordStat(process map[string]ProcessInfo) (err error) {
 		}
 		info.Status, _ = processStat[fields[1]]
 
-		pidStr := fields[3]
-		if _, err = strconv.Atoi(strings.Trim(fields[3], ",")); err != nil {
-			log.Errorf("parse %s ERROR: %v", strings.Trim(fields[3], ","), err)
+		if len(fields) < 3 || fields[2] != "pid" {
+			process[fields[0]] = info
+			continue
+		}
+
+		pidStr := strings.Trim(fields[3], ",")
+		if pid, err := strconv.Atoi(pidStr); err != nil {
+			log.Debugf("parse %s of %s ERROR: %v", strings.Trim(fields[3], ","), str, err)
 			pidStr = fields[0]
+		} else {
+			info.Pid = PID(pid)
 		}
 		process[pidStr] = info
 	}
