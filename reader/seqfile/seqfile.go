@@ -49,8 +49,8 @@ type SeqFile struct {
 	SkipFileFirstLine bool   //跳过新文件的第一行，常用于带title的csv文件，title与实际格式不同
 	hasSkiped         bool
 
-	inodeDone map[string]bool //记录filename_inode是否已经读过
-	inodeSensitive bool // 是否以inode信息作为 inodeDone 和 expireMap 的key值
+	inodeDone      map[string]bool //记录filename_inode是否已经读过
+	inodeSensitive bool            // 是否以inode信息作为 inodeDone 和 expireMap 的key值
 
 	lastSyncPath   string
 	lastSyncOffset int64
@@ -440,7 +440,7 @@ func (sf *SeqFile) getNextFileCondition() (condition func(os.FileInfo) bool, err
 		return
 	}
 	newerThanCurrFile := func(f os.FileInfo) bool {
-		return ModTimeLater(f, currFi)
+		return f.ModTime().UnixNano() >= currFi.ModTime().UnixNano()
 	}
 
 	isNewFile := func(f os.FileInfo) bool {
