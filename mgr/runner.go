@@ -229,7 +229,7 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 		cl *cleaner.Cleaner
 	)
 	mode := rc.ReaderConfig["mode"]
-	if mode == ModeCloudTrail {
+	if mode == ModeCloudTrail || mode == ModeCloudTrailV2 {
 		syncDir := rc.ReaderConfig[KeySyncDirectory]
 		if syncDir == "" {
 			bucket, prefix, region, ak, sk, _ := cloudtrail.GetS3UserInfo(rc.ReaderConfig)

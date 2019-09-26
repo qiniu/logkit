@@ -137,11 +137,14 @@ const (
 	KeyS3SecretKey = "s3_secret_key"
 	KeyS3Bucket    = "s3_bucket"
 	KeyS3Prefix    = "s3_prefix"
+	KeyS3DatePrefix    = "s3_date_prefix"
+	KeyS3PrefixDelimiter    = "s3_prefix_delimiter"
 
 	KeySyncDirectory  = "sync_directory"
 	KeySyncMetastore  = "sync_metastore"
 	KeySyncInterval   = "sync_interval"
 	KeySyncConcurrent = "sync_concurrent"
+	KeySyncRangeLeft = "sync_range_left"
 )
 
 // Constants for cloudwatch
@@ -316,6 +319,7 @@ const (
 	ModeSnmp       = "snmp"
 	ModeCloudWatch = "cloudwatch"
 	ModeCloudTrail = "cloudtrail"
+	ModeCloudTrailV2 = "cloudtrailv2"
 )
 
 const (
