@@ -153,7 +153,7 @@ type Procstat struct {
 	kernel          string
 	pidFinder       PIDFinder
 	createPIDFinder func() (PIDFinder, error)
-	procs           map[PID]ProcessInfo
+	procs           map[string]ProcessInfo
 	createProcess   func(PID) (Process, error)
 }
 
@@ -417,28 +417,35 @@ func (p *Procstat) collectMetrics(proc ProcessInfo) map[string]interface{} {
 		fields[KeyProcstatProcessName] = name
 	}
 	fields[KeyProcstatStatus] = proc.Status
-	fields[KeyProcstatPid] = int32(proc.PID())
+	if proc.Process != nil {
+		fields[KeyProcstatPid] = int32(proc.PID())
+	} else {
+		pid := int32(proc.Pid)
+		if pid != 0 {
+			fields[KeyProcstatPid] = pid
+		}
+	}
 
-	if p.ThreadsRelated {
+	if p.ThreadsRelated && proc.Process != nil {
 		if threadsNum, err := proc.NumThreads(); err == nil {
 			fields[KeyProcstatThreadsNum] = threadsNum
 		}
 	}
 
-	if p.FileDescRelated {
+	if p.FileDescRelated && proc.Process != nil {
 		if fds, err := proc.NumFDs(); err == nil {
 			fields[KeyProcstatFdsNum] = fds
 		}
 	}
 
-	if p.CtxSwitRelated {
+	if p.CtxSwitRelated && proc.Process != nil {
 		if ctx, err := proc.NumCtxSwitches(); err == nil {
 			fields[KeyProcstatVolConSwitches] = ctx.Voluntary
 			fields[KeyProcstatInVolConSwitches] = ctx.Involuntary
 		}
 	}
 
-	if p.IoRelated {
+	if p.IoRelated && proc.Process != nil {
 		if io, err := proc.IOCounters(); err == nil {
 			fields[KeyProcstatReadCount] = io.ReadCount
 			fields[KeyProcstatWriteCount] = io.WriteCount
@@ -447,7 +454,7 @@ func (p *Procstat) collectMetrics(proc ProcessInfo) map[string]interface{} {
 		}
 	}
 
-	if p.CpuTimeRelated {
+	if p.CpuTimeRelated && proc.Process != nil {
 		if cpuTime, err := proc.Times(); err == nil {
 			fields[KeyProcstatCpuTimeUser] = cpuTime.User
 			fields[KeyProcstatCpuTimeSystem] = cpuTime.System
@@ -463,13 +470,13 @@ func (p *Procstat) collectMetrics(proc ProcessInfo) map[string]interface{} {
 		}
 	}
 
-	if p.CpuUsageRelated {
+	if p.CpuUsageRelated && proc.Process != nil {
 		if cpuPerc, err := proc.Percent(time.Duration(0)); err == nil {
 			fields[KeyProcstatCpuUsage] = cpuPerc
 		}
 	}
 
-	if p.MemRelated {
+	if p.MemRelated && proc.Process != nil {
 		if mem, err := proc.MemoryInfo(); err == nil {
 			fields[KeyProcstatMemRss] = mem.RSS
 			fields[KeyProcstatMemVms] = mem.VMS
@@ -480,7 +487,7 @@ func (p *Procstat) collectMetrics(proc ProcessInfo) map[string]interface{} {
 		}
 	}
 
-	if p.ResourceLimits {
+	if p.ResourceLimits && proc.Process != nil {
 		if rlims, err := proc.RlimitUsage(true); err == nil {
 			for _, rlim := range rlims {
 				var name, nameSoft, nameHard string
@@ -544,23 +551,27 @@ func (p *Procstat) collectMetrics(proc ProcessInfo) map[string]interface{} {
 	return fields
 }
 
-func (p *Procstat) updateProcesses(prevInfo map[PID]ProcessInfo) (map[PID]ProcessInfo, error) {
+func (p *Procstat) updateProcesses(prevInfo map[string]ProcessInfo) (map[string]ProcessInfo, error) {
 	processInfos, err := p.findPids()
 	if err != nil && len(processInfos) == 0 {
 		return nil, err
 	}
-	procs := make(map[PID]ProcessInfo, len(prevInfo))
-	for _, processInfo := range processInfos {
-		info, ok := prevInfo[processInfo.Pid]
+	procs := make(map[string]ProcessInfo, len(prevInfo))
+	for name, processInfo := range processInfos {
+		info, ok := prevInfo[name]
 		if ok {
-			procs[processInfo.Pid] = info
+			procs[name] = info
 		} else {
-			if proc, err := p.createProcess(processInfo.Pid); err == nil {
-				processInfo.Process = proc
-				if processInfo.name == "" {
-					processInfo.name, _ = proc.Name()
+			if processInfo.Pid != 0 && processInfo.Status == 0 {
+				if proc, err := p.createProcess(processInfo.Pid); err == nil {
+					processInfo.Process = proc
+					if processInfo.name == "" {
+						processInfo.name, _ = proc.Name()
+					}
+					procs[processInfo.name] = processInfo
 				}
-				procs[processInfo.Pid] = processInfo
+			} else {
+				procs[name] = ProcessInfo{name: name, Status: processInfo.Status, Pid: processInfo.Pid}
 			}
 		}
 	}
@@ -578,9 +589,9 @@ func (p *Procstat) getPIDFinder() (PIDFinder, error) {
 	return p.pidFinder, nil
 }
 
-func (p *Procstat) findPids() (map[PID]ProcessInfo, error) {
+func (p *Procstat) findPids() (map[string]ProcessInfo, error) {
 	var ps []PID
-	process := make(map[PID]ProcessInfo)
+	process := make(map[string]ProcessInfo)
 	var err error
 
 	f, err := p.getPIDFinder()
@@ -649,7 +660,7 @@ func (p *Procstat) findPids() (map[PID]ProcessInfo, error) {
 	return process, err
 }
 
-func pid2ProcessInfo(process map[PID]ProcessInfo, pids []PID) {
+func pid2ProcessInfo(process map[string]ProcessInfo, pids []PID) {
 	for _, pid := range pids {
 		processInfo := ProcessInfo{
 			Pid: pid,
@@ -657,20 +668,21 @@ func pid2ProcessInfo(process map[PID]ProcessInfo, pids []PID) {
 		status, err := getProcStat(int32(pid))
 		if err != nil {
 			log.Errorf("get process %d status failed: %v", pid, err)
-			processInfo.Status = -1
+			processInfo.Status = 6
 		} else {
 			processInfo.Status = status
 		}
-		process[pid] = processInfo
+		pidStr := strconv.FormatInt(int64(pid), 10)
+		process[pidStr] = processInfo
 	}
 	return
 }
 
 func getProcStat(pid int32) (stat int, err error) {
 	pidStr := fmt.Sprintf("%d", pid)
-	stdout, err := exec.Command("bash", "-c", "ps -ax | grep "+pidStr).Output()
+	stdout, err := exec.Command("bash", "-c", "ps -ax | grep "+pidStr+" | grep -v grep").Output()
 	if err != nil {
-		return -1, fmt.Errorf("exec command 'ps -ax | grep %s' status error [%v]: %s", pidStr, err, string(stdout))
+		return 6, fmt.Errorf("exec command 'ps -ax | grep %s' status error [%v]: %s", pidStr, err, string(stdout))
 	}
 	if len(string(stdout)) == 0 {
 		return 4, nil
@@ -688,7 +700,7 @@ func getProcStat(pid int32) (stat int, err error) {
 	return 4, nil
 }
 
-func (p *Procstat) systemdUnitPIDs(process map[PID]ProcessInfo) error {
+func (p *Procstat) systemdUnitPIDs(process map[string]ProcessInfo) error {
 	cmd := ExecCommand("systemctl", "show", p.SystemdUnit)
 	out, err := cmd.Output()
 	if err != nil {
@@ -709,14 +721,14 @@ func (p *Procstat) systemdUnitPIDs(process map[PID]ProcessInfo) error {
 		if err != nil {
 			return fmt.Errorf("invalid pid '%s'", kv[1])
 		}
-		process[PID(pid)] = ProcessInfo{
+		process[string(kv[1])] = ProcessInfo{
 			Pid: PID(pid),
 		}
 	}
 	return nil
 }
 
-func (p *Procstat) cgroupPIDs(process map[PID]ProcessInfo) error {
+func (p *Procstat) cgroupPIDs(process map[string]ProcessInfo) error {
 	procsPath := p.CGroup
 	if procsPath[0] != '/' {
 		procsPath = "/sys/fs/cgroup/" + procsPath
@@ -734,7 +746,7 @@ func (p *Procstat) cgroupPIDs(process map[PID]ProcessInfo) error {
 		if err != nil {
 			return fmt.Errorf("invalid pid '%s'", pidBS)
 		}
-		process[PID(pid)] = ProcessInfo{
+		process[string(pidBS)] = ProcessInfo{
 			Pid: PID(pid),
 		}
 	}
@@ -742,7 +754,7 @@ func (p *Procstat) cgroupPIDs(process map[PID]ProcessInfo) error {
 	return nil
 }
 
-func (p *Procstat) PCpuTop10(process map[PID]ProcessInfo) (err error) {
+func (p *Procstat) PCpuTop10(process map[string]ProcessInfo) (err error) {
 	var comm string
 	if p.kernel == GoOSMac {
 		comm = "ps x -o pid=,command= -r | head -n 10"
@@ -756,7 +768,7 @@ func (p *Procstat) PCpuTop10(process map[PID]ProcessInfo) (err error) {
 	return
 }
 
-func (p *Procstat) PMemTop10(process map[PID]ProcessInfo) (err error) {
+func (p *Procstat) PMemTop10(process map[string]ProcessInfo) (err error) {
 	var comm string
 	if p.kernel == GoOSMac {
 		comm = "ps x -o pid=,command= -m | head -n 10"
@@ -769,37 +781,44 @@ func (p *Procstat) PMemTop10(process map[PID]ProcessInfo) (err error) {
 	return runCommandIdName(process, comm)
 }
 
-func (p *Procstat) SupervisordStat(process map[PID]ProcessInfo) (err error) {
+func (p *Procstat) SupervisordStat(process map[string]ProcessInfo) (err error) {
 	stdout, err := exec.Command("bash", "-c", "supervisorctl status").Output()
 	if err != nil {
 		return fmt.Errorf("exec command supervisorctl status error [%v]: %s", err, string(stdout))
 	}
-	var pid int
 	for _, str := range strings.Split(string(stdout), "\n") {
 		fields := strings.Fields(str)
-		if len(fields) < 4 {
+		if len(fields) < 2 {
 			continue
 		}
 		info := ProcessInfo{
 			name: fields[0],
 		}
 		info.Status, _ = processStat[fields[1]]
-		if pid, err = strconv.Atoi(strings.Trim(fields[3], ",")); err != nil {
-			log.Infof("parse %s ERROR: %v", fields[3], err)
+
+		if len(fields) < 3 || fields[2] != "pid" {
+			process[fields[0]] = info
 			continue
 		}
-		info.Pid = PID(pid)
-		process[info.Pid] = info
+
+		pidStr := strings.Trim(fields[3], ",")
+		if pid, err := strconv.Atoi(pidStr); err != nil {
+			log.Debugf("parse %s of %s ERROR: %v", strings.Trim(fields[3], ","), str, err)
+			pidStr = fields[0]
+		} else {
+			info.Pid = PID(pid)
+		}
+		process[pidStr] = info
 	}
 	return
 }
 
-func (p *Procstat) childProcess(process map[PID]ProcessInfo) (err error) {
+func (p *Procstat) childProcess(process map[string]ProcessInfo) (err error) {
 	comm := `ps -ef | grep daemontools | grep -v 'grep ' | awk '{print $2}'|xargs ps -o pid= --ppid`
 	return runCommand(process, comm)
 }
 
-func runCommandIdName(process map[PID]ProcessInfo, comm string) (err error) {
+func runCommandIdName(process map[string]ProcessInfo, comm string) (err error) {
 	out, err := exec.Command("sh", "-c", comm).Output()
 	if err != nil {
 		return fmt.Errorf("exec command %v error [%v]: %s", comm, err, string(out))
@@ -819,12 +838,12 @@ func runCommandIdName(process map[PID]ProcessInfo, comm string) (err error) {
 			Pid:  PID(pid),
 			name: strings.Join(fields[1:], " "),
 		}
-		process[info.Pid] = info
+		process[fields[0]] = info
 	}
 	return nil
 }
 
-func runCommand(process map[PID]ProcessInfo, comm string) (err error) {
+func runCommand(process map[string]ProcessInfo, comm string) (err error) {
 	out, err := exec.Command("bash", "-c", comm).Output()
 	if err != nil {
 		return fmt.Errorf("exec command %v error [%v]: %s", comm, err, string(out))
@@ -834,8 +853,10 @@ func runCommand(process map[PID]ProcessInfo, comm string) (err error) {
 		return
 	}
 
+	var pidStr string
 	for _, pid := range pids {
-		process[pid] = ProcessInfo{
+		pidStr = strconv.FormatInt(int64(pid), 32)
+		process[pidStr] = ProcessInfo{
 			Pid: pid,
 		}
 	}

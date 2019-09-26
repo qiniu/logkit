@@ -218,11 +218,12 @@ func (m *Manager) RemoveWithConfig(confPath string, isDelete bool) (err error) {
 
 	m.removeCleanQueue(runner.Cleaner())
 	runner.Stop()
+	length := len(m.runners)
 	delete(m.runners, confPath)
 	if isDelete {
 		delete(m.runnerConfigs, confPath)
 	}
-	log.Infof("runner %s be removed, total %d", runner.Name(), len(m.runners))
+	log.Infof("runner %s be removed, total %d", runner.Name(), length)
 	if runnerStatus, ok := runner.(StatusPersistable); ok {
 		runnerStatus.StatusBackup()
 	}
