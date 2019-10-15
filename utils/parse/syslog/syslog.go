@@ -12,10 +12,10 @@ import (
 )
 
 const (
-	detectedRFC3164 = iota
-	detectedRFC5424 = iota
-	detectedRFC6587 = iota
-	detectedLeftLog = iota
+	DetectedRFC3164 = iota
+	DetectedRFC5424 = iota
+	DetectedRFC6587 = iota
+	DetectedLeftLog = iota
 )
 
 type LogParts map[string]interface{}
@@ -24,6 +24,7 @@ type Parser interface {
 	Parse() error
 	Dump() LogParts
 	Location(*time.Location)
+	NeedModifyTime() bool
 }
 
 type Format interface {
@@ -33,10 +34,15 @@ type Format interface {
 
 type parserWrapper struct {
 	syslogparser.LogParser
+	bool
 }
 
 func (w *parserWrapper) Dump() LogParts {
 	return LogParts(w.LogParser.Dump())
+}
+
+func (w *parserWrapper) NeedModifyTime() bool {
+	return w.bool
 }
 
 func DetectType(data []byte) (detected int) {
@@ -44,33 +50,33 @@ func DetectType(data []byte) (detected int) {
 	if i := bytes.IndexByte(data, ' '); i > 0 {
 		pLength := data[0:i]
 		if _, err := strconv.Atoi(string(pLength)); err == nil {
-			return detectedRFC6587
+			return DetectedRFC6587
 		}
 		if len(data) < 1 || data[0] != '<' {
-			return detectedLeftLog
+			return DetectedLeftLog
 		}
 		// 开头由一对尖括号组成 <12>
 		angle := bytes.IndexByte(data, '>')
 		if (angle < 0) || (angle >= i) {
-			return detectedLeftLog
+			return DetectedLeftLog
 		}
 
 		//中间是0-9
 		for j := 1; j < angle; j++ {
 			if data[j] < '0' || data[j] > '9' {
-				return detectedLeftLog
+				return DetectedLeftLog
 			}
 		}
 
 		// <1>1 尖括号后紧跟数字的是RFC5424
 		// 否则是 RFC3164
 		if (angle+2 == i) && (data[angle+1] >= '0') && (data[angle+1] <= '9') {
-			return detectedRFC5424
+			return DetectedRFC5424
 		} else {
-			return detectedRFC3164
+			return DetectedRFC3164
 		}
 	}
-	return detectedLeftLog
+	return DetectedLeftLog
 }
 
 func GetFormt(format string) Format {
@@ -88,7 +94,7 @@ func GetFormt(format string) Format {
 type RFC6587 struct{}
 
 func (f *RFC6587) GetParser(line []byte) Parser {
-	return &parserWrapper{rfc5424.NewParser(line)}
+	return &parserWrapper{rfc5424.NewParser(line), false}
 }
 
 func (f *RFC6587) IsNewLine(data []byte) bool {
@@ -110,7 +116,7 @@ func (f *RFC6587) IsNewLine(data []byte) bool {
 type RFC5424 struct{}
 
 func (f *RFC5424) GetParser(line []byte) Parser {
-	return &parserWrapper{rfc5424.NewParser(line)}
+	return &parserWrapper{rfc5424.NewParser(line), false}
 }
 
 func (f *RFC5424) IsNewLine(data []byte) bool {
@@ -137,7 +143,7 @@ func (f *RFC5424) IsNewLine(data []byte) bool {
 type RFC3164 struct{}
 
 func (f *RFC3164) GetParser(line []byte) Parser {
-	return &parserWrapper{rfc3164.NewParser(line)}
+	return &parserWrapper{rfc3164.NewParser(line), true}
 }
 
 func (f *RFC3164) IsNewLine(data []byte) bool {
@@ -154,18 +160,20 @@ type Automatic struct{}
 
 func (f *Automatic) GetParser(line []byte) Parser {
 	switch format := DetectType(line); format {
-	case detectedRFC3164:
-		return &parserWrapper{rfc3164.NewParser(line)}
-	case detectedRFC5424:
-		return &parserWrapper{rfc5424.NewParser(line)}
+	case DetectedRFC3164:
+		return &parserWrapper{rfc3164.NewParser(line), true}
+	case DetectedRFC5424:
+		return &parserWrapper{rfc5424.NewParser(line), false}
+	case DetectedRFC6587:
+		return &parserWrapper{rfc5424.NewParser(line), false}
 	default:
-		return &parserWrapper{rfc3164.NewParser(line)}
+		return &parserWrapper{rfc3164.NewParser(line), false}
 	}
 }
 
 func (f *Automatic) IsNewLine(data []byte) bool {
 	switch format := DetectType(data); format {
-	case detectedRFC6587, detectedRFC3164, detectedRFC5424:
+	case DetectedRFC6587, DetectedRFC3164, DetectedRFC5424:
 		return true
 	}
 	return false
