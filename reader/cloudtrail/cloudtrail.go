@@ -35,12 +35,28 @@ var (
 	_ Resetable          = &Reader{}
 )
 
-func GetDefaultSyncDir(bucket, prefix, region, ak, sk, runnerName string) string {
-	return filepath.Join("s3data", "data"+Hash(ak+sk+region+bucket+prefix+runnerName))
+func GetDefaultSyncDir(bucket, prefix, region, ak, sk, runnerName string) string { // 即便bucket，region一样，ak，sk不同，runnerName也不会一样
+	origDir := filepath.Join("s3data", "data"+Hash(ak+sk+region+bucket+prefix+runnerName))
+	newDir := filepath.Join("s3data", "data"+Hash(region+bucket+prefix+runnerName))
+	if utils.IsExist(origDir) && utils.IsDir(origDir) {
+		if err := os.Rename(origDir, newDir); err != nil {
+			log.Errorf("Runner[%s] rename sync dir (%s-->%s) failed, %v", runnerName, origDir, newDir, err)
+			return origDir
+		}
+	}
+	return newDir
 }
 
 func GetDefaultMetaStore(bucket, prefix, region, ak, sk, runnerName string) string {
-	return ".metastore" + Hash(ak+sk+region+bucket+prefix+runnerName)
+	origMeta := ".metastore" + Hash(ak+sk+region+bucket+prefix+runnerName)
+	newMeta := ".metastore" + Hash(region+bucket+prefix+runnerName)
+	if utils.IsExist(origMeta) && !utils.IsDir(origMeta) {
+		if err := os.Rename(origMeta, newMeta); err != nil {
+			log.Errorf("Runner[%s] rename meta store (%s-->%s) failed, %v", runnerName, origMeta, newMeta, err)
+			return origMeta
+		}
+	}
+	return newMeta
 }
 
 var (

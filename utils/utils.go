@@ -36,6 +36,14 @@ func IsExist(path string) bool {
 	return err == nil || os.IsExist(err)
 }
 
+func IsDir(path string) bool {
+	s, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return s.IsDir()
+}
+
 // 获取测试数据
 func GetParseTestData(line string, size int) []string {
 	testSlice := make([]string, 0)
