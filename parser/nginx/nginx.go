@@ -270,7 +270,7 @@ func (p *Parser) makeValue(name, raw string) (interface{}, error) {
 var (
 	formatRegexp    = regexp.MustCompile(`^\s*log_format\s+(\S+)+\s+(.+)\s*$`)
 	formatEndRegexp = regexp.MustCompile(`^\s*(.*?)\s*(;|$)`)
-	replaceRegexp   = regexp.MustCompile(`\\\$([a-z_]+)(\\?(.))`)
+	replaceRegexp   = regexp.MustCompile(`\\\$([a-zA-Z0-9_]+)(\\?(.))`)
 )
 
 // ResolveRegexpFromConf 根据给定配置文件和日志格式名称返回自动生成的匹配正则表达式
