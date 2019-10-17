@@ -377,6 +377,7 @@ var ModeKeyOptions = map[string][]Option{
 		OptionLabels,
 		OptionDisableRecordErrData,
 		OptionKeepRawData,
+		OptionTimezoneOffset,
 	},
 	TypeKafkaRest: {
 		OptionParserName,

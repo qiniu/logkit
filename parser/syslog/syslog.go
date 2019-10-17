@@ -3,7 +3,9 @@ package syslog
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
@@ -28,7 +30,15 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
 	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)
 
+	timeZoneOffsetRaw, _ := c.GetStringOr(KeyTimeZoneOffset, "")
+	timeZoneOffset := ParseTimeZoneOffset(timeZoneOffsetRaw)
+
 	format := syslog.GetFormt(rfctype)
+	rfctype = strings.ToLower(rfctype)
+	var needModefyTime = false
+	if rfctype == "rfc3164" || rfctype == "automic" {
+		needModefyTime = true
+	}
 	buff := bytes.NewBuffer([]byte{})
 	numRoutine := MaxProcs
 	if numRoutine == 0 {
@@ -43,6 +53,8 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		maxline:              maxline,
 		curline:              0,
 		keepRawData:          keepRawData,
+		timeZoneOffset:       timeZoneOffset,
+		needModefyTime:       needModefyTime,
 		numRoutine:           numRoutine,
 	}, nil
 }
@@ -56,6 +68,8 @@ type SyslogParser struct {
 	curline              int
 	disableRecordErrData bool
 	keepRawData          bool
+	timeZoneOffset       int
+	needModefyTime       bool
 
 	numRoutine int
 }
@@ -198,6 +212,9 @@ func (p *SyslogParser) Flush() (data Data, err error) {
 	err = sparser.Parse()
 	if err == nil || err.Error() == "No structured data" {
 		data = Data(sparser.Dump())
+		if sparser.NeedModifyTime() && p.needModefyTime {
+			data["timestamp"] = data["timestamp"].(time.Time).Add(time.Duration(p.timeZoneOffset) * time.Hour)
+		}
 		err = nil
 	} else {
 		if p.curline == p.maxline {

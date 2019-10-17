@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -122,4 +123,24 @@ func TestSyslogParser_NoMatch(t *testing.T) {
 		err = fmt.Errorf(st.LastError)
 	}
 	assert.Equal(t, errors.New("syslog meet max line 3, try to parse err No start char found for priority, check if this is standard rfc3164/rfc5424 syslog"), err)
+}
+
+func TestSyslogParser_TimeZone(t *testing.T) {
+	c := conf.MapConf{}
+	c[KeyParserType] = "syslog"
+	c[KeyTimeZoneOffset] = "-8"
+	p, err := NewParser(c)
+	assert.Nil(t, err)
+	lines := []string{
+		`<1>Feb 05 01:02:03 abc system[253]: Listening at 0.0.0.0:3000`,
+		`<34>1 2019-02-04T17:02:03.000Z mymachine.example.com su - ID47`,
+	}
+	dts, err := p.Parse(lines)
+	assert.Nil(t, err)
+	ndata, err := p.Parse([]string{PandoraParseFlushSignal})
+	assert.Nil(t, err)
+	dts = append(dts, ndata...)
+	for _, dt := range dts {
+		assert.Equal(t, "2019-02-04 17:02:03 +0000 UTC", dt["timestamp"].(time.Time).String())
+	}
 }
