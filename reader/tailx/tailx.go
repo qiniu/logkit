@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -178,6 +179,7 @@ func (ar *ActiveReader) Start() {
 		}
 		atomic.CompareAndSwapInt32(&ar.status, StatusStopping, StatusStopped)
 		log.Warnf("Runner[%s] ActiveReader %s was stopped", ar.runnerName, ar.originpath)
+		return // 若此处不返回，上面强制设置成 StatusStopped 状态，会被瞬间改变成StatusInit状态（下一行代码），导致Run()里面的退出逻辑失效。
 	}
 
 	atomic.StoreInt32(&ar.status, StatusInit)
@@ -226,7 +228,14 @@ func (ar *ActiveReader) Run() {
 
 	var err error
 	timer := time.NewTicker(time.Second)
-	defer timer.Stop()
+	defer func() {
+		if e := recover(); e != nil {
+			log.Errorf("Panic: %v", e)
+			log.Error("stack trace: ", string(debug.Stack()))
+		}
+		timer.Stop()
+		atomic.StoreInt32(&ar.status, StatusStopped)
+	}()
 	for {
 		if atomic.LoadInt32(&ar.status) == StatusStopped || atomic.LoadInt32(&ar.status) == StatusStopping {
 			atomic.CompareAndSwapInt32(&ar.status, StatusStopping, StatusStopped)
