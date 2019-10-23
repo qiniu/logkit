@@ -11,6 +11,7 @@ const (
 	KeyAuthPassword = "auth_password"
 
 	KeyLogPath           = "log_path"
+	KeyLogPathOld        = "log_path_old"
 	KeyMetaPath          = "meta_path"
 	KeyFileDone          = "file_done"
 	KeyMode              = "mode"

@@ -35,16 +35,16 @@ var (
 	_ Resetable          = &Reader{}
 )
 
-func GetDefaultSyncDir(bucket, prefix, region, ak, sk, runnerName string) string { // 即便bucket，region一样，ak，sk不同，runnerName也不会一样
-	origDir := filepath.Join("s3data", "data"+Hash(ak+sk+region+bucket+prefix+runnerName))
-	newDir := filepath.Join("s3data", "data"+Hash(region+bucket+prefix+runnerName))
+func GetDefaultSyncDir(bucket, prefix, region, ak, sk, runnerName string) (origDir string, newDir string) { // 即便bucket，region一样，ak，sk不同，runnerName也不会一样
+	origDir = filepath.Join("s3data", "data"+Hash(ak+sk+region+bucket+prefix+runnerName))
+	newDir = filepath.Join("s3data", "data"+Hash(region+bucket+prefix+runnerName))
 	if utils.IsExist(origDir) && utils.IsDir(origDir) {
 		if err := os.Rename(origDir, newDir); err != nil {
 			log.Errorf("Runner[%s] rename sync dir (%s-->%s) failed, %v", runnerName, origDir, newDir, err)
-			return origDir
+			return origDir, newDir
 		}
 	}
-	return newDir
+	return origDir, newDir
 }
 
 func GetDefaultMetaStore(bucket, prefix, region, ak, sk, runnerName string) string {
@@ -193,7 +193,7 @@ func buildSyncOptions(conf conf.MapConf) (*syncOptions, error) {
 	}
 	opts.directory, _ = conf.GetStringOr(KeySyncDirectory, "")
 	if opts.directory == "" {
-		opts.directory = GetDefaultSyncDir(opts.bucket, opts.prefix, opts.region, opts.accessKey, opts.secretKey, runnerName)
+		_, opts.directory = GetDefaultSyncDir(opts.bucket, opts.prefix, opts.region, opts.accessKey, opts.secretKey, runnerName)
 	}
 	if err = os.MkdirAll(opts.directory, 0755); err != nil {
 		return nil, fmt.Errorf("cannot create target directory %q: %v", opts.directory, err)
