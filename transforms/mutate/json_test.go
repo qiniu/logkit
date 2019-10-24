@@ -138,6 +138,21 @@ func TestJsonTransformer(t *testing.T) {
 	assert.NoError(t, err8)
 	exp8 := []Data{{"key1": "value1", "json": map[string]interface{}{"a": `{"name":"小明", "sex":"男"}`, "name": "小明", "sex": "男", "b": "c"}}}
 	assert.Equal(t, exp8, res8)
+
+	jsonConf9 := &Json{
+		Key:       "json",
+		New:       "newKey",
+		DiscardKey: true,
+		jsonTool: jsoniter.Config{
+			EscapeHTML: true,
+			UseNumber:  true,
+		}.Froze(),
+	}
+	data9 := []Data{{"key1": "value1", "json": `{"name":"小明", "sex":"男"}`}, {"key2": "value2", "json": `{"name":"小红", "sex":"女"}`}}
+	res9, err9 := jsonConf9.Transform(data9)
+	assert.NoError(t, err9)
+	exp9 := []Data{{"key1": "value1", "newKey": map[string]interface{}{"name": "小明", "sex": "男"}}, {"key2": "value2", "newKey": map[string]interface{}{"name": "小红", "sex": "女"}}}
+	assert.Equal(t, exp9, res9)
 }
 
 func TestParseJson(t *testing.T) {

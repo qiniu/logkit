@@ -82,6 +82,7 @@ func (k *KV) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
 		transforms.KeyFieldNew,
+		transforms.KeyDiscardkey,
 		OptionKVSplitter,
 		{
 			KeyName:       "keep_string",
@@ -95,17 +96,6 @@ func (k *KV) ConfigOptions() []Option {
 			Description:   "数字是否以字符串形式展现",
 			ToolTip:       "数字是否以字符串形式展现",
 			Type:          transforms.TransformTypeBoolean,
-		},
-		{
-			KeyName:       "discard_key",
-			Element:       Radio,
-			ChooseOnly:    true,
-			ChooseOptions: []interface{}{false, true},
-			Default:       false,
-			DefaultNoUse:  false,
-			Description:   "删除原始key指定的字段名和字段值",
-			Type:          transforms.TransformTypeBoolean,
-			Advance:       true,
 		},
 	}
 }
