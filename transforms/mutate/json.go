@@ -2,6 +2,7 @@ package mutate
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -21,6 +22,7 @@ var (
 type Json struct {
 	Key      string `json:"key"`
 	New      string `json:"new"`
+	Extract  bool   `json:"extract"`
 	stats    StatsInfo
 	jsonTool jsoniter.API
 
@@ -31,8 +33,14 @@ type Json struct {
 }
 
 func (g *Json) Init() error {
+	g.Key = strings.TrimSpace(g.Key)
 	g.keys = GetKeys(g.Key)
+	g.New = strings.TrimSpace(g.New)
 	g.news = GetKeys(g.New)
+	if len(g.news) == 0 {
+		g.news = g.keys
+	}
+
 	numRoutine := MaxProcs
 	if numRoutine == 0 {
 		numRoutine = 1
@@ -122,16 +130,28 @@ func (g *Json) Type() string {
 
 func (g *Json) SampleConfig() string {
 	return `{
-       "type":"json",
-       "key":"myParseKey",
-       "new":"myNewKey"
+		"type":"json",
+		"key":"myParseKey",
+		"new":"myNewKey",
+		"extract":false
     }`
 }
 
 func (g *Json) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
-		transforms.KeyFieldNewRequired,
+		transforms.KeyFieldNew,
+		{
+			KeyName:       "extract",
+			Element:       Radio,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{false, true},
+			Default:       false,
+			DefaultNoUse:  false,
+			Description:   "提取json中的字段（只提取第一层，请确保字段名不重名）",
+			Type:          transforms.TransformTypeBoolean,
+			Advance:       true,
+		},
 	}
 }
 
@@ -211,9 +231,36 @@ func (g *Json) transform(dataPipeline <-chan transforms.TransformInfo, resultCha
 			continue
 		}
 
-		if len(g.news) == 0 {
-			g.news = g.keys
+		if g.Extract {
+			jsonMap, ok := jsonVal.(map[string]interface{})
+			if !ok {
+				getErr = fmt.Errorf("expect map[string]interface{}, got %T", jsonVal)
+				errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.New)
+				resultChan <- transforms.TransformResult{
+					Index:   transformInfo.Index,
+					CurData: transformInfo.CurData,
+					ErrNum:  errNum,
+					Err:     err,
+				}
+				continue
+			}
+
+			for k, v := range jsonMap {
+				g.news[len(g.news)-1] = k
+				setErr := SetMapValue(transformInfo.CurData, v, false, g.news...)
+				if setErr != nil {
+					errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
+				}
+				resultChan <- transforms.TransformResult{
+					Index:   transformInfo.Index,
+					CurData: transformInfo.CurData,
+					ErrNum:  errNum,
+					Err:     err,
+				}
+			}
+			continue
 		}
+
 		setErr := SetMapValue(transformInfo.CurData, jsonVal, false, g.news...)
 		if setErr != nil {
 			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
