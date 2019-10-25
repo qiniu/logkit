@@ -1112,7 +1112,7 @@ func (s *Sender) schemaFreeSend(datas []Data) (se error) {
 	var points pipeline.Datas
 	now := time.Now().Format(time.RFC3339Nano)
 	for _, d := range datas {
-		if len(d) < 0 {
+		if len(d) <= 0 {
 			continue
 		}
 		if s.opt.logkitSendTime {
