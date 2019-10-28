@@ -21,7 +21,7 @@ func Test_getValidPath(t *testing.T) {
 	}
 	paths := getValidPath(confs)
 	if len(paths) != 2 {
-		t.Errorf("get paths error exp 2 but got %v %v", len(paths), paths)
+		t.Errorf("get path error exp 2 but got %v %v", len(paths), paths)
 	}
 	for _, v := range paths {
 		os.Remove(v)
