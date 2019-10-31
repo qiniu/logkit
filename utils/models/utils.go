@@ -476,7 +476,11 @@ func SetExtractMapValue(m map[string]interface{}, val interface{}, coercive bool
 		return nil
 	}
 	curr := m
-	for _, k := range keys[0 : len(keys)-1] {
+	subKLen := len(keys) - 1
+	for i, k := range keys {
+		if i == subKLen {
+			break
+		}
 		if _, ok := curr[k]; !ok {
 			n := make(map[string]interface{})
 			curr[k] = n
