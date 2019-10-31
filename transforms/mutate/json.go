@@ -246,15 +246,10 @@ func (g *Json) transform(dataPipeline <-chan transforms.TransformInfo, resultCha
 			}
 
 			for k, v := range jsonMap {
-				//g.news[len(g.news)-1] = k
-				//setErr := SetMapValue(transformInfo.CurData, v, false, g.news...)
-				//if setErr != nil {
-				//	errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
-				//}
-				if _, ok := transformInfo.CurData[k]; !ok {
-					transformInfo.CurData[k] = v
-				} else {
-					log.Warnf("k=%s (v=%v) already exists in CurData=%+v", k, v, transformInfo.CurData)
+				news := append(g.news, k)
+				setErr := SetMapValue(transformInfo.CurData, v, false, news...)
+				if setErr != nil {
+					errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
 				}
 			}
 			resultChan <- transforms.TransformResult{
