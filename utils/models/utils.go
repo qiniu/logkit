@@ -471,6 +471,39 @@ func SetMapValue(m map[string]interface{}, val interface{}, coercive bool, keys 
 	return nil
 }
 
+func SetExtractMapValue(m map[string]interface{}, val interface{}, coercive bool, newKey string, keys ...string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	curr := m
+	for _, k := range keys[0 : len(keys)-1] {
+		if _, ok := curr[k]; !ok {
+			n := make(map[string]interface{})
+			curr[k] = n
+			curr = n
+			continue
+		}
+		if _, ok := curr[k].(map[string]interface{}); !ok {
+			if _, ok := curr[k].(Data); !ok {
+				if coercive {
+					n := make(map[string]interface{})
+					curr[k] = n
+				} else {
+					err := fmt.Errorf("SetMapValue failed, %v is not the type of map[string]interface{}", curr[k])
+					return err
+				}
+			}
+		}
+		if m, ok := curr[k].(Data); ok {
+			curr = map[string]interface{}(m)
+		} else {
+			curr = curr[k].(map[string]interface{})
+		}
+	}
+	curr[newKey] = val
+	return nil
+}
+
 //通过层级key设置value值, 如果keys不存在则不加前缀，否则加前缀
 func SetMapValueExistWithPrefix(m map[string]interface{}, val interface{}, prefix string, keys ...string) error {
 	if len(keys) == 0 {
