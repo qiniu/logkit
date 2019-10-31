@@ -478,7 +478,7 @@ func SetExtractMapValue(m map[string]interface{}, val interface{}, coercive bool
 	curr := m
 	subKLen := len(keys) - 1
 	for i, k := range keys {
-		if i == subKLen {
+		if i == subKLen { // 提取json字段时，keys最后一个key被newKey覆盖
 			break
 		}
 		if _, ok := curr[k]; !ok {
