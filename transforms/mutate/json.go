@@ -246,17 +246,16 @@ func (g *Json) transform(dataPipeline <-chan transforms.TransformInfo, resultCha
 			}
 
 			for k, v := range jsonMap {
-				g.news[len(g.news)-1] = k
-				setErr := SetMapValue(transformInfo.CurData, v, false, g.news...)
+				setErr := SetExtractMapValue(transformInfo.CurData, v, false, k, g.news...)
 				if setErr != nil {
 					errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
 				}
-				resultChan <- transforms.TransformResult{
-					Index:   transformInfo.Index,
-					CurData: transformInfo.CurData,
-					ErrNum:  errNum,
-					Err:     err,
-				}
+			}
+			resultChan <- transforms.TransformResult{
+				Index:   transformInfo.Index,
+				CurData: transformInfo.CurData,
+				ErrNum:  errNum,
+				Err:     err,
 			}
 			continue
 		}
