@@ -784,27 +784,49 @@ func checkRecordsFile(doneFiles []File, recordsFile string) bool {
 	return false
 }
 
-func GetLogPathAbs(conf conf.MapConf) (logpath string, err error) {
+func GetLogPathAbs(conf conf.MapConf) (logpath, oldLogPath string, err error) {
 	logpath, err = conf.GetString(KeyLogPath)
 	if err != nil {
 		err = fmt.Errorf("get logpath in new meta error %v", err)
 		return
 	}
-	return filepath.Abs(logpath)
+	oldLogPath, err = conf.GetString(KeyLogPathOld)
+	if err != nil { // oldLogPath为空时，设置为与logpath相同
+		err = nil
+		oldLogPath = logpath
+	}
+	logpath, err = filepath.Abs(logpath)
+	if err != nil {
+		return
+	}
+	oldLogPath, err = filepath.Abs(oldLogPath)
+	return logpath, oldLogPath, err
 }
 
 func GetMetaOption(conf conf.MapConf) (string, string, string, error) {
 	mode, _ := conf.GetStringOr(KeyMode, ModeDir)
-	logPath, err := GetLogPathAbs(conf)
+	logPath, oldLogPath, err := GetLogPathAbs(conf)
 	if err != nil && (mode == ModeDir || mode == ModeFile) {
 		return mode, logPath, "", err
 	}
 	metaPath, _ := conf.GetStringOr(KeyMetaPath, "")
+	runnerName, _ := conf.GetString(GlobalKeyName)
+	log.Infof("Runner[%v] metaPath=%s, logPath=%s, oldLogPath=%s", runnerName, metaPath, logPath, oldLogPath)
 	if metaPath == "" {
-		runnerName, _ := conf.GetString(GlobalKeyName)
 		base := filepath.Base(logPath)
 		metaPath = "meta/" + runnerName + "_" + Hash(base)
 		log.Debugf("Runner[%v] Using %s as default metaPath", runnerName, metaPath)
+		if logPath != oldLogPath { // mv oldMetaPath metaPath, 若logPath == oldLogPath 则不需要mv
+			oldBase := filepath.Base(oldLogPath)
+			oldMetaPath := "meta/" + runnerName + "_" + Hash(oldBase)
+			if utils.IsExist(oldMetaPath) && utils.IsDir(oldMetaPath) {
+				log.Infof("Runner[%v] oldMetaPath=%s, metaPath=%s, oldLogPath=%s, logPath=%s", runnerName, oldMetaPath, metaPath, oldLogPath, logPath)
+				if err := os.Rename(oldMetaPath, metaPath); err != nil {
+					log.Errorf("Runner[%s] rename meta path (%s-->%s) failed, %v", runnerName, oldMetaPath, metaPath, err)
+					return mode, logPath, metaPath, err
+				}
+			}
+		}
 	}
 	return mode, logPath, metaPath, nil
 }

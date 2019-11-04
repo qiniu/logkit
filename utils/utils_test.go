@@ -248,6 +248,14 @@ func TestCheckErr(t *testing.T) {
 	}
 }
 
+func TestIsDir(t *testing.T) {
+	dir := "meta_test_is_dir"
+	createDirWithName(dir)
+	defer os.RemoveAll(dir)
+	isDir := IsDir(dir)
+	assert.Equal(t, true, isDir)
+}
+
 func createDirWithName(dirx string) {
 	if err := os.Mkdir(dirx, DefaultDirPerm); err != nil {
 		log.Error(err)

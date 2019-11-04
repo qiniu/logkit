@@ -231,11 +231,13 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	mode := rc.ReaderConfig["mode"]
 	if mode == ModeCloudTrail || mode == ModeCloudTrailV2 {
 		syncDir := rc.ReaderConfig[KeySyncDirectory]
+		oldSyncDir := syncDir
 		if syncDir == "" {
 			bucket, prefix, region, ak, sk, _ := cloudtrail.GetS3UserInfo(rc.ReaderConfig)
-			syncDir = cloudtrail.GetDefaultSyncDir(bucket, prefix, region, ak, sk, rc.RunnerName)
+			oldSyncDir, syncDir = cloudtrail.GetDefaultSyncDir(bucket, prefix, region, ak, sk, rc.RunnerName)
 		}
 		rc.ReaderConfig[KeyLogPath] = syncDir
+		rc.ReaderConfig[KeyLogPathOld] = oldSyncDir
 		if len(rc.CleanerConfig) == 0 {
 			rc.CleanerConfig = conf.MapConf{
 				"delete_enable":       "true",
