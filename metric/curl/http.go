@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/json-iterator/go"
 
 	"github.com/qiniu/logkit/metric"
@@ -204,7 +206,7 @@ func setDataValue(data map[string]interface{}, resp *http.Response, httpData Htt
 	if resp != nil {
 		data[httpStatusCodeIdx] = resp.StatusCode
 		data[httpRespHeadIdx] = resp.Header
-		if err, ok := compareExpectResult(httpData.ExpectCode, resp.StatusCode,
+		if ok, err := compareExpectResult(httpData.ExpectCode, resp.StatusCode,
 			httpData.ExpectData, content); !ok {
 			data[httpErrStateIdx] = StateFail
 			data[httpErrMsgIdx] = content
@@ -217,14 +219,14 @@ func setDataValue(data map[string]interface{}, resp *http.Response, httpData Htt
 	return data, failReason
 }
 
-func compareExpectResult(expectCode, realCode int, expectData, realData string) (error, bool) {
+func compareExpectResult(expectCode, realCode int, expectData, realData string) (bool, error) {
 	if expectCode != realCode {
-		return fmt.Errorf("return status code is: %d, expect: %d", realCode, expectCode), false
+		return false, fmt.Errorf("return status code is: %d, expect: %d", realCode, expectCode)
 	}
 	if expectData != "" && !strings.Contains(realData, expectData) {
-		return fmt.Errorf("don't contain: %s", expectData), false
+		return false, errors.New("don't contain: " + expectData)
 	}
-	return nil, true
+	return true, nil
 }
 
 func joinIdx(idx string) (string, string, string, string, string, string, string) {

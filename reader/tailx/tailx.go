@@ -102,6 +102,7 @@ type Result struct {
 	logpath string
 }
 
+// NewActiveReader construct ActiveReader
 func NewActiveReader(originPath, realPath, whence, inode string, r *Reader) (ar *ActiveReader, err error) {
 	rpath := strings.Replace(realPath, string(os.PathSeparator), "_", -1)
 	if runtime.GOOS == "windows" {
@@ -159,6 +160,7 @@ func NewActiveReader(originPath, realPath, whence, inode string, r *Reader) (ar 
 
 }
 
+// Start ActiveReader
 func (ar *ActiveReader) Start() {
 	if atomic.LoadInt32(&ar.status) == StatusRunning {
 		log.Warnf("Runner[%s] ActiveReader %s was already running", ar.runnerName, ar.originpath)
@@ -187,6 +189,7 @@ func (ar *ActiveReader) Start() {
 	go ar.Run()
 }
 
+// Stop ActiveReader
 func (ar *ActiveReader) Stop() error {
 	if atomic.LoadInt32(&ar.status) == StatusStopped {
 		return nil
@@ -216,6 +219,7 @@ func (ar *ActiveReader) Stop() error {
 	return nil
 }
 
+// Run ActiveReader
 func (ar *ActiveReader) Run() {
 	if !atomic.CompareAndSwapInt32(&ar.status, StatusInit, StatusRunning) {
 		if !IsSelfRunner(ar.runnerName) {
@@ -330,6 +334,7 @@ func (ar *ActiveReader) hasStopped() bool {
 	return atomic.LoadInt32(&ar.status) == StatusStopped
 }
 
+// Close ActiveReader
 func (ar *ActiveReader) Close() error {
 	defer func() {
 		log.Debugf("Runner[%s] ActiveReader %s was closed", ar.runnerName, ar.originpath)
@@ -364,16 +369,19 @@ func (ar *ActiveReader) sendError(err error) {
 	ar.errChan <- err
 }
 
+// Status get ActiveReader status
 func (ar *ActiveReader) Status() StatsInfo {
 	ar.statsLock.RLock()
 	defer ar.statsLock.RUnlock()
 	return ar.stats
 }
 
+// Lag get ActiveReader lag
 func (ar *ActiveReader) Lag() (rl *LagInfo, err error) {
 	return ar.br.Lag()
 }
 
+// SyncMeta sync ActiveReader meta
 //除了sync自己的bufreader，还要sync一行linecache
 func (ar *ActiveReader) SyncMeta() string {
 	ar.cacheLineMux.Lock()
@@ -382,6 +390,7 @@ func (ar *ActiveReader) SyncMeta() string {
 	return ar.readcache
 }
 
+// ReadDone implement OnceReader
 func (ar *ActiveReader) ReadDone() bool {
 	return ar.br.ReadDone()
 }
@@ -409,6 +418,7 @@ func (ar *ActiveReader) expired(expire time.Duration) bool {
 	return false
 }
 
+// NewReader construct reader.Reader
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	logPathPattern, err := conf.GetString(KeyLogPath)
 	if err != nil {
@@ -510,10 +520,12 @@ func (r *Reader) hasStopped() bool {
 	return atomic.LoadInt32(&r.status) == StatusStopped
 }
 
+// Name implements Reader interface
 func (r *Reader) Name() string {
 	return "TailxReader: " + r.logPathPattern
 }
 
+// SetMode implements Reader interface
 func (r *Reader) SetMode(mode string, value interface{}) error {
 	reg, err := reader.HeadPatternMode(mode, value)
 	if err != nil {
@@ -525,6 +537,7 @@ func (r *Reader) SetMode(mode string, value interface{}) error {
 	return nil
 }
 
+// SetRunTime set run time
 func (r *Reader) SetRunTime(mode string, value interface{}) error {
 	runTime, err := reader.ParseRunTimeWithMode(mode, value)
 	if err != nil {

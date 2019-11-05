@@ -10,6 +10,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestOSInfo_String(t *testing.T) {
+	osInfo := OSInfo{}
+	assert.EqualValues(t, "; ; ;  ", osInfo.String())
+
+	osInfo = OSInfo{
+		Kernel:   "Darwin",
+		Core:     "17.4.0",
+		Platform: "Darwin",
+		OS:       "Darwin",
+		Hostname: "tst",
+	}
+	assert.EqualValues(t, "tst; Darwin; 17.4.0; Darwin Darwin", osInfo.String())
+}
+
 func TestGetLocalIp(t *testing.T) {
 	ip, err := GetLocalIP()
 	assert.NoError(t, err)

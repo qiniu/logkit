@@ -15,7 +15,7 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
-// KeySystemUsages TypeMetricSystem的字段名称
+// WinSystemUsages TypeMetricSystem 的字段名称
 var WinSystemUsages = KeyValueSlice{
 	{KeySystemLoad1, "1分钟平均load值", ""},
 	{KeySystemLoad5, "5分钟平均load值", ""},
@@ -26,6 +26,7 @@ var WinSystemUsages = KeyValueSlice{
 	{KeySystemUptimeFormat, "格式化的系统启动时间", ""},
 }
 
+// WinSystemStats SystemStats
 type WinSystemStats struct {
 	SystemStats
 }

@@ -25,3 +25,11 @@ func BenchmarkTestGetIdentifyIDByPath(b *testing.B) {
 		uid = x
 	}
 }
+
+func Test_GetIdentifyIDByPath(t *testing.T) {
+
+}
+
+func Test_GetIdentifyIDByFile(t *testing.T) {
+
+}
