@@ -63,6 +63,8 @@ type Reader struct {
 
 	expireMap map[string]int64 // expire file offset map, key is inode_path
 
+	resetChan chan string
+
 	//以下为传入参数
 	logPathPattern       string
 	ignoreLogPathPattern string
@@ -86,10 +88,12 @@ type ActiveReader struct {
 	readcache    string
 	msgchan      chan<- Result
 	errChan      chan<- error
+	resetChan    chan<- string
 	status       int32
 	inactive     int32 //当inactive>0 时才会被expire回收
 	runnerName   string
 	runtime      reader.RunTime
+	inodeStr     string
 
 	emptyLineCnt int
 
@@ -142,6 +146,13 @@ func NewActiveReader(originPath, realPath, whence, inode string, r *Reader) (ar 
 		fr.Close()
 		return
 	}
+	if inode == "" {
+		var inodeInt uint64
+		if inodeInt, err = utilsos.GetIdentifyIDByPath(realPath); err != nil {
+			return
+		}
+		inode = strconv.Itoa(int(inodeInt))
+	}
 	return &ActiveReader{
 		cacheLineMux: sync.RWMutex{},
 		br:           bf,
@@ -149,6 +160,8 @@ func NewActiveReader(originPath, realPath, whence, inode string, r *Reader) (ar 
 		originpath:   originPath,
 		msgchan:      r.msgChan,
 		errChan:      r.errChan,
+		resetChan:    r.resetChan,
+		inodeStr:     inode,
 		inactive:     1,
 		emptyLineCnt: 0,
 		runnerName:   r.meta.RunnerName,
@@ -216,6 +229,40 @@ func (ar *ActiveReader) Stop() error {
 	return nil
 }
 
+func (ar *ActiveReader) ResetFileMeta() error {
+	newInode, err := utilsos.GetIdentifyIDByPath(ar.realpath)
+	if err != nil {
+		log.Errorf("Runner[%s] get file (%s) inode failed, %v", ar.runnerName, ar.realpath, err)
+		return err
+	}
+	if strconv.Itoa(int(newInode)) != ar.inodeStr { // inode 变化的情况，singlefile.go 里已经处理过了，这里不能重置，否则会产生日志重复
+		log.Infof("Runner[%s] file (%s) inode changed (%s --> %d)", ar.runnerName, ar.realpath, ar.inodeStr, newInode)
+		return nil
+	}
+	fileInfo, err := os.Stat(ar.realpath)
+	if err != nil {
+		log.Errorf("Runner[%s] stat file (%s) failed, %v", ar.runnerName, ar.realpath, err)
+		return err
+	}
+	fileSize := fileInfo.Size()
+	_, offset, err := ar.br.Meta.ReadOffset()
+	if err != nil {
+		log.Errorf("Runner[%s] read (%s) offset failed, %v", ar.runnerName, ar.realpath, err)
+		return err
+	}
+	if fileSize < offset { // 文件被覆盖，重置Meta
+		log.Infof("Runner[%s] file (%s) is overwritten, reset meta", ar.runnerName, ar.realpath)
+		if err = ar.br.Close(); err != nil {
+			log.Errorf("Runner[%s] file(%s) close buffer reader failed, %v", ar.runnerName, ar.realpath, err)
+		}
+		if err = ar.br.Meta.Reset(); err != nil {
+			log.Errorf("Runner[%s] file(%s) reset buffer reader failed, %v", ar.runnerName, ar.realpath, err)
+		}
+		ar.resetChan <- ar.realpath
+	}
+	return nil
+}
+
 func (ar *ActiveReader) Run() {
 	if !atomic.CompareAndSwapInt32(&ar.status, StatusInit, StatusRunning) {
 		if !IsSelfRunner(ar.runnerName) {
@@ -273,6 +320,7 @@ func (ar *ActiveReader) Run() {
 				if err == io.EOF {
 					atomic.StoreInt32(&ar.inactive, 1)
 					log.Debugf("Runner[%s] %s meet EOF, ActiveReader was inactive now, stop it", ar.runnerName, ar.originpath)
+					ar.ResetFileMeta()
 					ar.Stop()
 					return
 				}
@@ -280,6 +328,7 @@ func (ar *ActiveReader) Run() {
 				if ar.emptyLineCnt > 3 {
 					atomic.StoreInt32(&ar.inactive, 1)
 					log.Debugf("Runner[%s] %s meet EOF, ActiveReader was inactive now, stop it", ar.runnerName, ar.originpath)
+					ar.ResetFileMeta()
 					ar.Stop()
 					return
 				}
@@ -487,6 +536,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		stopChan:             make(chan struct{}),
 		msgChan:              make(chan Result),
 		errChan:              make(chan error),
+		resetChan:            make(chan string),
 		logPathPattern:       logPathPattern,
 		ignoreLogPathPattern: strings.TrimSpace(ignoreLogPathPattern),
 		whence:               whence,
@@ -782,6 +832,9 @@ func (r *Reader) Start() error {
 					log.Debugf("Runner[%s] %q daemon has stopped from running", r.meta.RunnerName, r.Name())
 				}
 				return
+			case rp := <-r.resetChan:
+				delete(r.fileReaders, rp)
+				break
 			case <-ticker.C:
 			}
 		}
