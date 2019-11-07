@@ -23,6 +23,9 @@ const (
 	CheckPatternKey    = "^[a-zA-Z_.][a-zA-Z0-9_.]{0,127}$"
 	DefaultEncodingWay = "UTF-8"
 
+	InternalKeyPrefix = "internal_key_prefix"
+	Lst               = "lst"
+
 	KeyType   = "type"
 	ProcessAt = "process_at"
 	Local     = "local"

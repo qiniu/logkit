@@ -19,6 +19,8 @@ type Parser struct {
 	labels               []GrokLabel
 	withTimeStamp        bool
 	disableRecordErrData bool
+	keyRaw               string
+	keyTimestamp         string
 }
 
 func NewParser(c conf.MapConf) (parser.Parser, error) {
@@ -27,6 +29,14 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	withtimestamp, _ := c.GetBoolOr(KeyTimestamp, true)
 	nameMap := make(map[string]struct{})
 	labels := GetGrokLabels(labelList, nameMap)
+	keyRaw := KeyRaw
+	keyTimestamp := KeyTimestamp
+	prefix, _ := c.GetStringOr(InternalKeyPrefix, "")
+	if prefix != "" {
+		prefix = strings.TrimSpace(prefix)
+		keyRaw = prefix + keyRaw
+		keyTimestamp = prefix + keyTimestamp
+	}
 
 	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
 
@@ -35,6 +45,8 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		labels:               labels,
 		withTimeStamp:        withtimestamp,
 		disableRecordErrData: disableRecordErrData,
+		keyRaw:               keyRaw,
+		keyTimestamp:         keyTimestamp,
 	}, nil
 }
 
@@ -59,9 +71,9 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 			continue
 		}
 		d := Data{}
-		d[KeyRaw] = line
+		d[p.keyRaw] = line
 		if p.withTimeStamp {
-			d[KeyTimestamp] = time.Now().Format(time.RFC3339Nano)
+			d[p.keyTimestamp] = time.Now().Format(time.RFC3339Nano)
 		}
 		for _, label := range p.labels {
 			d[label.Name] = label.Value

@@ -222,6 +222,10 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 		rc.SendersConfig[i][KeyRunnerName] = rc.RunnerName
 	}
 	rc.ParserConf[KeyRunnerName] = rc.RunnerName
+	if runnerInfo.InternalKeyPrefix != "" {
+		runnerInfo.InternalKeyPrefix = strings.TrimSpace(runnerInfo.InternalKeyPrefix)
+		rc.ParserConf[InternalKeyPrefix] = runnerInfo.InternalKeyPrefix
+	}
 	//配置文件适配
 	rc = Compatible(rc)
 	var (
@@ -779,9 +783,13 @@ func (r *LogExportRunner) readLines(dataSourceTag string) []Data {
 	if r.ExtraInfo {
 		tags = MergeEnvTags(r.EnvTag, tags)
 	}
-	tags = MergeExtraInfoTags(r.meta, tags)
+	tags = MergeExtraInfoTags(r.meta, r.InternalKeyPrefix, tags)
 	if r.ReadTime {
-		tags["lst"] = curTimeStr
+		if r.InternalKeyPrefix != "" {
+			tags[r.InternalKeyPrefix+Lst] = curTimeStr
+		} else {
+			tags[Lst] = curTimeStr
+		}
 	}
 	if len(tags) > 0 {
 		datas = AddTagsToData(tags, datas, r.Name())
@@ -1517,11 +1525,14 @@ func (r *LogExportRunner) StatusBackup() {
 	}
 }
 
-func MergeExtraInfoTags(meta *reader.Meta, tags map[string]interface{}) map[string]interface{} {
+func MergeExtraInfoTags(meta *reader.Meta, prefix string, tags map[string]interface{}) map[string]interface{} {
 	if tags == nil {
 		tags = make(map[string]interface{})
 	}
 	for k, v := range meta.ExtraInfo() {
+		if prefix != "" {
+			k = prefix + k
+		}
 		if _, ok := tags[k]; !ok {
 			tags[k] = v
 		}
