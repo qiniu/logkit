@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -77,6 +78,11 @@ func Test_ActiveReader(t *testing.T) {
 	assert.Equal(t, testContent, data.result)
 
 	assert.Equal(t, StatsInfo{}, ar.Status())
+	overwritten := "abcdefg"
+	cmdStr := fmt.Sprintf("echo %s > %s", overwritten, ppath)
+	exec.Command(cmdStr)
+	data = <-r.msgChan
+	assert.Equal(t, overwritten, data.result)
 	ar.Close()
 }
 
