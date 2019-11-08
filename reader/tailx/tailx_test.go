@@ -78,11 +78,6 @@ func Test_ActiveReader(t *testing.T) {
 	assert.Equal(t, testContent, data.result)
 
 	assert.Equal(t, StatsInfo{}, ar.Status())
-	overwritten := "abcdefg"
-	cmdStr := fmt.Sprintf("echo %s > %s", overwritten, ppath)
-	exec.Command(cmdStr)
-	data = <-r.msgChan
-	assert.Equal(t, overwritten, data.result)
 	ar.Close()
 }
 
@@ -103,6 +98,7 @@ func TestStart(t *testing.T) {
 		"readerGZDeleteTest":              readerGZDeleteTest,
 		"multiReaderOutRunTime":           multiReaderOutRunTime,
 		"multiReaderInRunTime":            multiReaderInRunTime,
+		"logOverwrittenTest":              logOverwrittenTest,
 	}
 
 	for k, f := range funcMap {
@@ -401,6 +397,97 @@ func readerGZDeleteTest(t *testing.T) {
 	files1, _ := ioutil.ReadDir(dir1)
 	files2, _ := ioutil.ReadDir(dir2)
 	assert.Equal(t, 0, len(files1)+len(files2))
+}
+
+func logOverwrittenTest(t *testing.T) {
+	maxnum := 0
+	dirname := "logOverwrittenTest"
+	dir1file1 := filepath.Join(dirname, "file1.log")
+
+	createDirWithName(dirname)
+	defer os.RemoveAll(dirname)
+
+	createFileWithContent(dir1file1, "abc123\nabc123\nabc123\nabc123\nabc123\n")
+	expresult := map[string]int{
+		"abc123\n": 5,
+		"11111\n":  1,
+	}
+	resultmap := make(map[string]int)
+	logPathPattern := filepath.Join(filepath.Join(dirname, "*"), "*.log")
+	c := conf.MapConf{
+		"log_path":        logPathPattern,
+		"meta_path":       dirname,
+		"mode":            ModeTailx,
+		"sync_every":      "1",
+		"reader_buf_size": "1024",
+		"read_from":       "oldest",
+		"expire":          "15s",
+		"submeta_expire":  "0s",
+		"stat_interval":   "1s",
+		"max_open_files":  "128",
+	}
+	meta, err := reader.NewMetaWithConf(c)
+	assert.Nil(t, err)
+	mmr, err := NewReader(meta, c)
+	assert.Nil(t, err)
+	mr := mmr.(*Reader)
+	assert.Nil(t, mr.Start())
+	t.Log("Reader has started")
+	defer mr.Close()
+
+	assert.Equal(t, 15*time.Second, mr.expire)
+	assert.Equal(t, time.Duration(0), mr.submetaExpire)
+
+	spacenum := 0
+	for {
+		data, err := mr.ReadLine()
+		if data != "" {
+			resultmap[data]++
+			maxnum++
+		} else {
+			spacenum++
+		}
+		if err == io.EOF {
+			break
+		}
+		if maxnum >= 15 || spacenum > 20 {
+			break
+		}
+		t.Log(data)
+	}
+	time.Sleep(15 * time.Second)
+	t.Log("mr finished read one")
+	var lens int
+	mr.armapmux.Lock()
+	lens = len(mr.fileReaders)
+	mr.armapmux.Unlock()
+	assert.Equal(t, 1, lens, "activereader number")
+
+	overwritten := "11111"
+	cmdStr := fmt.Sprintf("echo %s > %s", overwritten, dir1file1)
+	exec.Command(cmdStr)
+	t.Log("mr listen 2 round")
+
+	for {
+		data, err := mr.ReadLine()
+		if data != "" {
+			resultmap[data]++
+			maxnum++
+		} else {
+			spacenum++
+		}
+		if err == io.EOF {
+			break
+		}
+		t.Log(data)
+		if maxnum >= 18 || spacenum > 20 {
+			break
+		}
+	}
+	t.Log("mr finish listen 2 round")
+
+	assert.EqualValues(t, expresult, resultmap)
+	assert.Equal(t, StatsInfo{}, mr.Status())
 }
 
 func multiReaderMultiLineTest(t *testing.T) {
