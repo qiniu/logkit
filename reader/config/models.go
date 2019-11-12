@@ -112,11 +112,12 @@ const (
 	KeyKafkaZookeeperTimeout = "kafka_zookeeper_timeout"
 	KeyKafkaMaxProcessTime   = "kafka_maxprocessing_time"
 
-	KeyScriptParams      = "script_params"
-	KeyScriptContent     = "script_content"
-	KeyExecInterpreter   = "script_exec_interprepter"
-	KeyScriptCron        = "script_cron"
-	KeyScriptExecOnStart = "script_exec_onstart"
+	KeyScriptParams        = "script_params"
+	KeyScriptParamsSpliter = "script_params_spliter"
+	KeyScriptContent       = "script_content"
+	KeyExecInterpreter     = "script_exec_interprepter"
+	KeyScriptCron          = "script_cron"
+	KeyScriptExecOnStart   = "script_exec_onstart"
 
 	KeyErrDirectReturn = "errDirectReturn"
 
@@ -133,19 +134,19 @@ const (
 
 // Constants for cloudtrail
 const (
-	KeyS3Region    = "s3_region"
-	KeyS3AccessKey = "s3_access_key"
-	KeyS3SecretKey = "s3_secret_key"
-	KeyS3Bucket    = "s3_bucket"
-	KeyS3Prefix    = "s3_prefix"
-	KeyS3DatePrefix    = "s3_date_prefix"
-	KeyS3PrefixDelimiter    = "s3_prefix_delimiter"
+	KeyS3Region          = "s3_region"
+	KeyS3AccessKey       = "s3_access_key"
+	KeyS3SecretKey       = "s3_secret_key"
+	KeyS3Bucket          = "s3_bucket"
+	KeyS3Prefix          = "s3_prefix"
+	KeyS3DatePrefix      = "s3_date_prefix"
+	KeyS3PrefixDelimiter = "s3_prefix_delimiter"
 
 	KeySyncDirectory  = "sync_directory"
 	KeySyncMetastore  = "sync_metastore"
 	KeySyncInterval   = "sync_interval"
 	KeySyncConcurrent = "sync_concurrent"
-	KeySyncRangeLeft = "sync_range_left"
+	KeySyncRangeLeft  = "sync_range_left"
 )
 
 // Constants for cloudwatch
@@ -300,26 +301,26 @@ const (
 
 // FileReader's modes
 const (
-	ModeExtract    = "extract"
-	ModeDir        = "dir"  // ModeDir 按时间顺序顺次读取文件夹下所有文件的模式
-	ModeFile       = "file" // FileMode 读取单个文件模式
-	ModeTailx      = "tailx"
-	ModeFileAuto   = "fileauto"
-	ModeDirx       = "dirx"
-	ModeMySQL      = "mysql"
-	ModeMSSQL      = "mssql"
-	ModePostgreSQL = "postgres"
-	ModeElastic    = "elastic"
-	ModeMongo      = "mongo"
-	ModeKafka      = "kafka"
-	ModeRedis      = "redis"
-	ModeSocket     = "socket"
-	ModeHTTP       = "http"
-	ModeHTTPFETCH  = "httpfetch"
-	ModeScript     = "script"
-	ModeSnmp       = "snmp"
-	ModeCloudWatch = "cloudwatch"
-	ModeCloudTrail = "cloudtrail"
+	ModeExtract      = "extract"
+	ModeDir          = "dir"  // ModeDir 按时间顺序顺次读取文件夹下所有文件的模式
+	ModeFile         = "file" // FileMode 读取单个文件模式
+	ModeTailx        = "tailx"
+	ModeFileAuto     = "fileauto"
+	ModeDirx         = "dirx"
+	ModeMySQL        = "mysql"
+	ModeMSSQL        = "mssql"
+	ModePostgreSQL   = "postgres"
+	ModeElastic      = "elastic"
+	ModeMongo        = "mongo"
+	ModeKafka        = "kafka"
+	ModeRedis        = "redis"
+	ModeSocket       = "socket"
+	ModeHTTP         = "http"
+	ModeHTTPFETCH    = "httpfetch"
+	ModeScript       = "script"
+	ModeSnmp         = "snmp"
+	ModeCloudWatch   = "cloudwatch"
+	ModeCloudTrail   = "cloudtrail"
 	ModeCloudTrailV2 = "cloudtrailv2"
 )
 

@@ -1272,6 +1272,16 @@ var ModeKeyOptions = map[string][]Option{
 			ToolTip:      "脚本命令参数",
 		},
 		{
+			KeyName:      KeyScriptParamsSpliter,
+			ChooseOnly:   false,
+			Default:      "",
+			Required:     false,
+			Placeholder:  "your script interpreter params spliter",
+			DefaultNoUse: true,
+			Description:  "脚本命令参数分隔符(script_params_spliter)",
+			ToolTip:      "脚本命令参数分隔符",
+		},
+		{
 			KeyName:      KeyScriptContent,
 			ChooseOnly:   false,
 			Element:      Text,

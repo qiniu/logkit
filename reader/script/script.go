@@ -66,14 +66,20 @@ type Reader struct {
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	path, _ := conf.GetStringOr(KeyLogPath, "") // 兼容
 	var (
-		content, params string
-		err             error
-		commandArgs     = make([]string, 0)
+		content, params, paramsSpliter string
+		err                            error
+		commandArgs                    = make([]string, 0)
 	)
 	if path == "" {
 		params, _ = conf.GetStringOr(KeyScriptParams, "")
+		paramsSpliter, _ = conf.GetStringOr(KeyScriptParamsSpliter, "")
 		if params != "" {
-			paramsArray := GetCmd(params)
+			var paramsArray []string
+			if paramsSpliter != "" {
+				paramsArray = strings.Split(params, paramsSpliter)
+			} else {
+				paramsArray = GetCmd(params)
+			}
 			commandArgs = append(commandArgs, paramsArray...)
 		}
 		content, _ = conf.GetStringOr(KeyScriptContent, "")
@@ -128,10 +134,10 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		}
 	}
 
-	CmdResult, _ := CmdRunWithTimeout(r.scripttype, r.commandArgs...)
-	if CmdResult.err != nil {
-		return nil, CmdResult.err
-	}
+	//CmdResult, _ := CmdRunWithTimeout(r.scripttype, r.commandArgs...)
+	//if CmdResult.err != nil {
+	//	return nil, CmdResult.err
+	//}
 	return r, nil
 }
 
