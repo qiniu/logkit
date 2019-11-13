@@ -103,8 +103,9 @@ type RunnerInfo struct {
 	EnvTag                 string `json:"env_tag,omitempty"` // 用这个字段的值来获取环境变量, 作为 tag 添加到数据中
 	ExtraInfo              bool   `json:"extra_info"`
 	LogAudit               bool   `json:"log_audit"`
-	SendRaw                bool   `json:"send_raw"`  //使用发送原始字符串的接口，而不是Data
-	ReadTime               bool   `json:"read_time"` // 读取时间
+	SendRaw                bool   `json:"send_raw"`            //使用发送原始字符串的接口，而不是Data
+	ReadTime               bool   `json:"read_time"`           // 读取时间
+	InternalKeyPrefix      string `json:"internal_key_prefix"` // 内置字段名前缀
 }
 
 type ErrorsList struct {

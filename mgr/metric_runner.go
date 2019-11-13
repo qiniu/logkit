@@ -253,7 +253,7 @@ func (r *MetricRunner) Run() {
 
 	tags := r.meta.GetTags()
 	tags = MergeEnvTags(r.envTag, tags)
-	tags = MergeExtraInfoTags(r.meta, tags)
+	tags = MergeExtraInfoTags(r.meta, "", tags)
 
 	for _, c := range r.collectors {
 		collectorService, ok := c.(metric.CollectorService)

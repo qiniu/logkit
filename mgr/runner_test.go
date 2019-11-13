@@ -2005,10 +2005,10 @@ func TestMergeExtraInfoTags(t *testing.T) {
 		readerConf.KeyMode: readerConf.ModeMySQL,
 	})
 	assert.NoError(t, err)
-	tags := MergeExtraInfoTags(meta, nil)
+	tags := MergeExtraInfoTags(meta, "", nil)
 	assert.Equal(t, 4, len(tags))
 	//再次写入，应该不会产生变化。
-	tags = MergeExtraInfoTags(meta, tags)
+	tags = MergeExtraInfoTags(meta, "", tags)
 	assert.Equal(t, 4, len(tags))
 }
 
