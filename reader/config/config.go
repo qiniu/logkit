@@ -1279,7 +1279,7 @@ var ModeKeyOptions = map[string][]Option{
 			Placeholder:  "your script interpreter params spliter",
 			DefaultNoUse: true,
 			Description:  "脚本命令参数分隔符(script_params_spliter)",
-			ToolTip:      "脚本命令参数分隔符",
+			ToolTip:      "脚本命令参数分隔符，默认为.或者空格",
 		},
 		{
 			KeyName:      KeyScriptContent,
