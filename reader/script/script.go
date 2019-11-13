@@ -134,10 +134,6 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		}
 	}
 
-	//CmdResult, _ := CmdRunWithTimeout(r.scripttype, r.commandArgs...)
-	//if CmdResult.err != nil {
-	//	return nil, CmdResult.err
-	//}
 	return r, nil
 }
 
