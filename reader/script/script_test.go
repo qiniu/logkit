@@ -66,6 +66,41 @@ func Test_scriptFile(t *testing.T) {
 	t.Log("data: ", data)
 }
 
+func Test_ScriptWithParams(t *testing.T) {
+	fileName := filepath.Join(os.TempDir(), "script_with_params_spliter")
+
+	//create file & write file
+	CreateFile(fileName, "aaa.bbbaa\n")
+	defer DeleteFile(fileName)
+
+	readerConf := conf.MapConf{
+		KeyExecInterpreter:     "grep",
+		KeyScriptParams:        "a.b," + fileName + ",-c",
+		KeyScriptParamsSpliter: ",",
+		KeyLogPath:             "",
+	}
+	meta, err := reader.NewMetaWithConf(readerConf)
+	if err != nil {
+		t.Error(err)
+	}
+	defer os.RemoveAll("./meta")
+
+	r, err := NewReader(meta, readerConf)
+	if err != nil {
+		t.Error(err)
+	}
+	assert.NoError(t, err)
+	sr := r.(*Reader)
+	assert.NoError(t, sr.Start())
+	defer sr.Close()
+
+	data, err := r.ReadLine()
+	if err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, "1\n", data)
+}
+
 func TestCmdRunWithTimeout(t *testing.T) {
 	cmdResult, isTimeout := CmdRunWithTimeout("echo", "hello")
 	assert.Nil(t, cmdResult.err)
