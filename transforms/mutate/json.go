@@ -20,11 +20,12 @@ var (
 )
 
 type Json struct {
-	Key      string `json:"key"`
-	New      string `json:"new"`
-	Extract  bool   `json:"extract"`
-	stats    StatsInfo
-	jsonTool jsoniter.API
+	Key        string `json:"key"`
+	New        string `json:"new"`
+	Extract    bool   `json:"extract"`
+	DiscardKey bool   `json:"discard_key"`
+	stats      StatsInfo
+	jsonTool   jsoniter.API
 
 	keys []string
 	news []string
@@ -141,6 +142,7 @@ func (g *Json) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
 		transforms.KeyFieldNew,
+		transforms.KeyDiscardkey,
 		{
 			KeyName:       "extract",
 			Element:       Radio,
@@ -264,6 +266,11 @@ func (g *Json) transform(dataPipeline <-chan transforms.TransformInfo, resultCha
 		if setErr != nil {
 			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.New)
 		}
+
+		if g.DiscardKey {
+			DeleteMapValue(transformInfo.CurData, g.keys...)
+		}
+
 		resultChan <- transforms.TransformResult{
 			Index:   transformInfo.Index,
 			CurData: transformInfo.CurData,

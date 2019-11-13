@@ -156,17 +156,7 @@ func (g *Xml) ConfigOptions() []Option {
 		transforms.KeyFieldName,
 		transforms.KeyFieldNew,
 		transforms.KeyKeepString,
-		{
-			KeyName:       "discard_key",
-			Element:       Radio,
-			ChooseOnly:    true,
-			ChooseOptions: []interface{}{false, true},
-			Default:       false,
-			DefaultNoUse:  false,
-			Description:   "删除原始key指定的字段名和字段值",
-			Type:          transforms.TransformTypeBoolean,
-			Advance:       true,
-		},
+		transforms.KeyDiscardkey,
 		{
 			KeyName:       "expand",
 			Element:       Radio,

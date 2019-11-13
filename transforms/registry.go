@@ -137,6 +137,17 @@ var (
 		Type:          TransformTypeBoolean,
 		Advance:       true,
 	}
+	KeyDiscardkey = Option{
+		KeyName:       "discard_key",
+		Element:       Radio,
+		ChooseOnly:    true,
+		ChooseOptions: []interface{}{false, true},
+		Default:       false,
+		DefaultNoUse:  false,
+		Description:   "删除原始key指定的字段名和字段值",
+		Type:          TransformTypeBoolean,
+		Advance:       true,
+	}
 )
 
 type TransformInfo struct {
