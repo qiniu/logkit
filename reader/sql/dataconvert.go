@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"time"
 
+	mssql "github.com/denisenkom/go-mssqldb" //mssql 驱动
+
 	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/times"
@@ -180,6 +182,34 @@ func ConvertDate(v interface{}) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("%v type can not convert to string", dv.Kind())
 }
 
+func ConvertUUID(v interface{}) (string, error) {
+	dpv := reflect.ValueOf(v)
+	if dpv.Kind() != reflect.Ptr {
+		return "", errors.New("scanArgs not a pointer")
+	}
+	if dpv.IsNil() {
+		return "", errors.New("scanArgs is a nil pointer")
+	}
+	dv := reflect.Indirect(dpv)
+	switch dv.Kind() {
+	case reflect.Interface:
+		idv := dv.Interface()
+		if idv == nil {
+			return "", nil
+		}
+
+		if ret, ok := idv.([]byte); ok {
+			var uuid mssql.UniqueIdentifier
+			if err := uuid.Scan(ret); err != nil {
+				return "", err
+			}
+			return uuid.String(), nil
+		}
+		log.Errorf("sql reader convertUUID for type %v is not supported", reflect.TypeOf(idv))
+	}
+	return "", fmt.Errorf("%v type can not convert to string", dv.Kind())
+}
+
 func ConvertString(v interface{}) (string, error) {
 	dpv := reflect.ValueOf(v)
 	if dpv.Kind() != reflect.Ptr {
@@ -337,6 +367,12 @@ func ConvertScanArgs(data models.Data, scanArg interface{}, column, runnerName, 
 			data[column] = val
 			bytes = 20
 		}
+	case "uniqueidentifier":
+		if data[column], err = ConvertUUID(scanArg); err != nil {
+			log.Errorf("convert to uuid failed, err=%v", err)
+			break
+		}
+		bytes = 16
 	default:
 		dealed := false
 		if !nochiced {
