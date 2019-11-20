@@ -171,6 +171,9 @@ func setDataBaseType(schemas map[string]string, dataBaseType string, v *sql.Colu
 	case "DATE", "DATETIME", "TIMESTAMP", "TIME":
 		schemas[v.Name()] = "date"
 		return true
+	case "UNIQUEIDENTIFIER": // sqlserver
+		schemas[v.Name()] = "uniqueidentifier"
+		return true
 	default:
 		return false
 	}
