@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	mssql "github.com/denisenkom/go-mssqldb" //mssql 驱动
+	mssql "github.com/denisenkom/go-mssqldb"
 
 	"github.com/qiniu/log"
 
