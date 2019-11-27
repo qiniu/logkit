@@ -237,6 +237,7 @@ func (ar *ActiveReader) ResetFileMeta() error {
 	}
 	if strconv.Itoa(int(newInode)) != ar.inodeStr { // inode 变化的情况，singlefile.go 里已经处理过了，这里不能重置，否则会产生日志重复
 		log.Infof("Runner[%s] file (%s) inode changed (%s --> %d)", ar.runnerName, ar.realpath, ar.inodeStr, newInode)
+		ar.inodeStr = strconv.Itoa(int(newInode))
 		return nil
 	}
 	fileInfo, err := os.Stat(ar.realpath)
