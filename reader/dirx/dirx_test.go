@@ -776,7 +776,7 @@ func multiReaderSameInodeTest(t *testing.T) {
 	defer dr.Close()
 
 	createFileWithContent(dir1file2, "abc123\nabc124\nabc125\nabc126\nabc127\n")
-	time.Sleep(3 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	maxNum := 0
 	emptyNum := 0
@@ -824,7 +824,7 @@ func multiReaderSameInodeTest(t *testing.T) {
 	t.Log("Reader has finished reading two")
 
 	createFileWithContent(dir1file1, "abc123\nabc124\nabc125\nabc126\nabc127\n")
-	time.Sleep(3 * time.Second)
+	time.Sleep(5 * time.Second)
 	assert.Equal(t, 2, dr.dirReaders.Num(), "Number of readers")
 
 	t.Log("Reader has started to read three")

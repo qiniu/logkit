@@ -50,6 +50,7 @@ func NewSender(c conf.MapConf) (sender.Sender, error) {
 	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
 		url = "http://" + url
 	}
+	url = strings.TrimSpace(url)
 
 	gZip, _ := c.GetBoolOr(KeyHttpSenderGzip, false)
 	templateStr, _ := c.GetStringOr(KeyHttpSenderTemplate, "")

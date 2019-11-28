@@ -940,8 +940,8 @@ func SplitDataWithSplitSize(data string, splitSize int64) (valArray []string) {
 		return []string{data}
 	}
 
-	//一个中文字符在rune中只占一位，但实际的大小可能是2个byte，对rune的split只有实际传入大小的1/2
-	splitSize /= 2
+	//中文字符在unicode下占2个字节，在utf-8编码下占3个字节
+	splitSize /= 3
 
 	valArray = make([]string, 0)
 	dataConverse := []rune(data)
