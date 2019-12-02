@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
@@ -609,11 +610,15 @@ func Test_SplitData(t *testing.T) {
 		if int64(len(maxData)) > DefaultMaxBatchSize {
 			break
 		}
-		maxData += "abcdefghijklmnopqrstuvwxyz七牛云？？？********0123456789七牛云？？？********abcdefghijklmnopqrstuvwxyz七牛云？？？********0123456789七牛云？？？********"
+		maxData += "七牛云七牛云七牛云 七牛云七牛云七牛云 七牛云七牛云七牛云 七牛云七牛云七牛云 七牛云七牛云七牛云"
 	}
 	valArray := sender.SplitData(maxData)
 	assert.Equal(t, len(maxData), len(strings.Join(valArray, "")))
 	assert.Equal(t, 2, len(valArray))
+	assert.Equal(t, 699050, utf8.RuneCountInString(valArray[0]))
+	assert.Equal(t, 40262, utf8.RuneCountInString(valArray[1]))
+	assert.Equal(t, true, len(valArray[0]) < 2*MB)
+	assert.Equal(t, true, len(valArray[1]) < 2*MB)
 
 	for {
 		if int64(len(maxData)) > 2*DefaultMaxBatchSize {
@@ -624,7 +629,15 @@ func Test_SplitData(t *testing.T) {
 
 	valArray = sender.SplitData(maxData)
 	assert.Equal(t, len(maxData), len(strings.Join(valArray, "")))
-	assert.Equal(t, 3, len(valArray))
+	assert.Equal(t, 4, len(valArray))
+	assert.Equal(t, 699050, utf8.RuneCountInString(valArray[0]))
+	assert.Equal(t, 699050, utf8.RuneCountInString(valArray[1]))
+	assert.Equal(t, 699050, utf8.RuneCountInString(valArray[2]))
+	assert.Equal(t, 167410, utf8.RuneCountInString(valArray[3]))
+	assert.Equal(t, true, len(valArray[0]) < 2*MB)
+	assert.Equal(t, true, len(valArray[1]) < 2*MB)
+	assert.Equal(t, true, len(valArray[2]) < 2*MB)
+	assert.Equal(t, true, len(valArray[3]) < 2*MB)
 
 	maxData += "\n"
 	for {
@@ -634,11 +647,17 @@ func Test_SplitData(t *testing.T) {
 		maxData += "abcdefghijklmnopqrstuvwxyz七牛云？？？********0123456789七牛云？？？********abcdefghijklmnopqrstuvwxyz七牛云？？？********0123456789七牛云？？？********\n"
 	}
 	valArray = sender.SplitData(maxData)
-	assert.Equal(t, 4, len(valArray))
-	assert.Equal(t, 1441792, len(valArray[0]))
-	assert.Equal(t, 1441792, len(valArray[1]))
-	assert.Equal(t, 1310849, len(valArray[2]))
-	assert.Equal(t, 2097096, len(valArray[3]))
+	assert.Equal(t, 5, len(valArray))
+	assert.Equal(t, 699050, utf8.RuneCountInString(valArray[0]))
+	assert.Equal(t, 699050, utf8.RuneCountInString(valArray[1]))
+	assert.Equal(t, 699050, utf8.RuneCountInString(valArray[2]))
+	assert.Equal(t, 167411, utf8.RuneCountInString(valArray[3]))
+	assert.Equal(t, 1528392, utf8.RuneCountInString(valArray[4]))
+	assert.Equal(t, true, len(valArray[0]) < 2*MB)
+	assert.Equal(t, true, len(valArray[1]) < 2*MB)
+	assert.Equal(t, true, len(valArray[2]) < 2*MB)
+	assert.Equal(t, true, len(valArray[3]) < 2*MB)
+	assert.Equal(t, true, len(valArray[4]) < 2*MB)
 
 	maxData = "abc"
 	valArray = sender.SplitData(maxData)
@@ -724,23 +743,23 @@ func TestSkipDeepCopySender(t *testing.T) {
 func TestPandoraExtraInfo(t *testing.T) {
 	pandoraServer, pt := mockpandora.NewMockPandoraWithPrefix("/v2")
 	conf1 := conf.MapConf{
-		"force_microsecond":         "false",
-		"ft_memory_channel":         "false",
-		"ft_strategy":               "backup_only",
-		"ignore_invalid_field":      "true",
-		"logkit_send_time":          "false",
-		"pandora_extra_info":        "true",
-		"pandora_ak":                "ak",
-		"pandora_auto_convert_date": "true",
-		"pandora_gzip":              "true",
-		"pandora_host":              "http://127.0.0.1:" + pt,
-		"pandora_region":            "nb",
-		"pandora_repo_name":         "TestPandoraSenderTime",
-		"pandora_schema_free":       "true",
-		"pandora_sk":                "sk",
-		"runner_name":               "runner.20171117110730",
-		"sender_type":               "pandora",
-		"name":                      "TestPandoraSenderTime",
+		"force_microsecond":              "false",
+		"ft_memory_channel":              "false",
+		"ft_strategy":                    "backup_only",
+		"ignore_invalid_field":           "true",
+		"logkit_send_time":               "false",
+		"pandora_extra_info":             "true",
+		"pandora_ak":                     "ak",
+		"pandora_auto_convert_date":      "true",
+		"pandora_gzip":                   "true",
+		"pandora_host":                   "http://127.0.0.1:" + pt,
+		"pandora_region":                 "nb",
+		"pandora_repo_name":              "TestPandoraSenderTime",
+		"pandora_schema_free":            "true",
+		"pandora_sk":                     "sk",
+		"runner_name":                    "runner.20171117110730",
+		"sender_type":                    "pandora",
+		"name":                           "TestPandoraSenderTime",
 		"KeyPandoraSchemaUpdateInterval": "1s",
 	}
 
@@ -777,23 +796,23 @@ func TestPandoraExtraInfo(t *testing.T) {
 	assert.Equal(t, true, strings.Contains(resp, "hostname2=123.2"))
 
 	conf2 := conf.MapConf{
-		"force_microsecond":         "false",
-		"ft_memory_channel":         "false",
-		"ft_strategy":               "backup_only",
-		"ignore_invalid_field":      "true",
-		"logkit_send_time":          "false",
-		"pandora_extra_info":        "false",
-		"pandora_ak":                "ak",
-		"pandora_auto_convert_date": "true",
-		"pandora_gzip":              "true",
-		"pandora_host":              "http://127.0.0.1:" + pt,
-		"pandora_region":            "nb",
-		"pandora_repo_name":         "TestPandoraSenderTime",
-		"pandora_schema_free":       "true",
-		"pandora_sk":                "sk",
-		"runner_name":               "runner.20171117110730",
-		"sender_type":               "pandora",
-		"name":                      "TestPandoraSenderTime",
+		"force_microsecond":              "false",
+		"ft_memory_channel":              "false",
+		"ft_strategy":                    "backup_only",
+		"ignore_invalid_field":           "true",
+		"logkit_send_time":               "false",
+		"pandora_extra_info":             "false",
+		"pandora_ak":                     "ak",
+		"pandora_auto_convert_date":      "true",
+		"pandora_gzip":                   "true",
+		"pandora_host":                   "http://127.0.0.1:" + pt,
+		"pandora_region":                 "nb",
+		"pandora_repo_name":              "TestPandoraSenderTime",
+		"pandora_schema_free":            "true",
+		"pandora_sk":                     "sk",
+		"runner_name":                    "runner.20171117110730",
+		"sender_type":                    "pandora",
+		"name":                           "TestPandoraSenderTime",
 		"KeyPandoraSchemaUpdateInterval": "1s",
 	}
 	innerSender, err = pandora.NewSender(conf2)
