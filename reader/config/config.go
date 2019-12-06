@@ -1009,6 +1009,16 @@ var ModeKeyOptions = map[string][]Option{
 			ToolTip:       "启动时立即执行一次",
 		},
 		{
+			KeyName:      KeyMongoTimeout,
+			ChooseOnly:   false,
+			Default:      "30",
+			DefaultNoUse: false,
+			Placeholder:  "30",
+			Description:  "超时时间(mongo_timeout)",
+			Advance:      true,
+			ToolTip:      "mongo连接超时时间设置，单位为秒",
+		},
+		{
 			KeyName:      KeyMongoFilters,
 			ChooseOnly:   false,
 			Default:      "",

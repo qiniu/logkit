@@ -104,6 +104,7 @@ const (
 	KeyMongoExecOnstart = "mongo_exec_onstart"
 	KeyMongoFilters     = "mongo_filters"
 	KeyMongoCert        = "mongo_cacert"
+	KeyMongoTimeout     = "mongo_timeout"
 
 	KeyKafkaGroupID          = "kafka_groupid"
 	KeyKafkaTopic            = "kafka_topic"
