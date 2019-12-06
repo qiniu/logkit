@@ -78,6 +78,7 @@ type Reader struct {
 	Cron         *cron.Cron //定时任务
 	session      *mgo.Session
 	offset       interface{} //对于默认的offset_key: "_id", 是objectID作为offset，存储的表现形式是string，其他则是int64
+	timeout      int
 }
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
@@ -99,6 +100,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	execOnStart, _ := conf.GetBoolOr(KeyMongoExecOnstart, true)
 	filters, _ := conf.GetStringOr(KeyMongoFilters, "")
 	certfile, _ := conf.GetStringOr(KeyMongoCert, "")
+	timeout, _ := conf.GetIntOr(KeyMongoTimeout, 30)
 
 	keyOrObj, offset, err := meta.ReadOffset()
 	if err != nil {
@@ -127,6 +129,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		collectionFilters: map[string]CollectionFilter{},
 		execOnStart:       execOnStart,
 		Cron:              cron.New(),
+		timeout:           timeout,
 	}
 	if offsetkey == DefaultOffsetKey {
 		if bson.IsObjectIdHex(keyOrObj) {
@@ -372,14 +375,14 @@ func (r *Reader) exec() (err error) {
 			return
 		}
 		atomic.StoreInt32(&r.isReleaseCluster, NoRelease)
-		r.session.SetSocketTimeout(time.Second * 5)
-		r.session.SetSyncTimeout(time.Second * 5)
+		r.session.SetSocketTimeout(time.Second * time.Duration(r.timeout))
+		r.session.SetSyncTimeout(time.Second * time.Duration(r.timeout))
 	} else {
 		err := r.session.Ping()
 		if err != nil {
 			r.session.Refresh()
-			r.session.SetSocketTimeout(time.Second * 5)
-			r.session.SetSyncTimeout(time.Second * 5)
+			r.session.SetSocketTimeout(time.Second * time.Duration(r.timeout))
+			r.session.SetSyncTimeout(time.Second * time.Duration(r.timeout))
 		}
 	}
 	if atomic.LoadInt32(&r.isReleaseCluster) == Release {
