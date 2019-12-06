@@ -40,16 +40,27 @@ func Test_SyslogParser(t *testing.T) {
 
 		`<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47`,
 		`- BOM'su root' failed for lonvick on /dev/pts/8`,
+		PandoraParseFlushSignal,
 	}
 	dts, err := p.Parse(lines)
 	assert.Nil(t, err)
-	indexes := []int{2, 3, 5, 9, 13, 15}
+	//indexes := []int{2, 3, 5, 9, 13, 15}
+	expected := []string{
+		`<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47- BOM'su root' failed for lonvick on /dev/pts/8`,
+		`<38>Feb 05 01:02:03 abc system[253]: Listening at 0.0.0.0:3000`,
+		`<1>Feb 05 01:02:03 abc system[23]: Listening at 0.0.0.0:3001`,
+		`<165>1 2003-10-11T22:14:15.003Z mymachine.example.comevntslog - ID47 [exampleSDID@32473 iut="3" eventSource="Application" eventID="1011"][examplePriority@32473class="high"]`,
+		`<165>1 2003-10-11T22:14:15.003Z mymachine.example.comevntslog - ID47 [exampleSDID@32473 iut="3" eventSource="Application" eventID="1011"] BOMAn applicationevent log entry...`,
+		`<165>1 2003-08-24T05:14:15.000003-07:00 192.0.2.1myproc 8710 - - %% It's time to make the do-nuts.`,
+		`<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47- BOM'su root' failed for lonvick on /dev/pts/8`,
+	}
+	assert.EqualValues(t, len(expected), len(dts))
 	for i := range dts {
-		assert.Equal(t, lines[indexes[i]], dts[i][KeyRawData])
+		assert.Equal(t, expected[i], dts[i][KeyRawData])
 	}
 
-	if len(dts) != 6 {
-		t.Fatalf("parse lines error expect 6 lines but got %v lines", len(dts))
+	if len(dts) != 7 {
+		t.Fatalf("parse lines error expect 7 lines but got %v lines", len(dts))
 	}
 	ndata, err := p.Parse([]string{PandoraParseFlushSignal})
 	assert.Nil(t, err)

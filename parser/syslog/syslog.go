@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	. "github.com/qiniu/logkit/parser/config"
@@ -40,10 +41,6 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		needModefyTime = true
 	}
 	buff := bytes.NewBuffer([]byte{})
-	numRoutine := MaxProcs
-	if numRoutine == 0 {
-		numRoutine = 1
-	}
 	return &SyslogParser{
 		name:                 name,
 		labels:               labels,
@@ -55,7 +52,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		keepRawData:          keepRawData,
 		timeZoneOffset:       timeZoneOffset,
 		needModefyTime:       needModefyTime,
-		numRoutine:           numRoutine,
+		numRoutine:           1, // 不支持多线程
 	}, nil
 }
 
@@ -143,8 +140,7 @@ func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 			if p.disableRecordErrData && !p.keepRawData {
 				se.DatasourceSkipIndex[datasourceIndex] = parseResult.Index
 				datasourceIndex++
-			}
-			if parseResult.Data != nil {
+			} else {
 				datas[dataIndex] = parseResult.Data
 				dataIndex++
 			}
@@ -158,9 +154,6 @@ func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 			parseResult.Data[label.Name] = label.Value
 		}
 		se.AddSuccess()
-		if p.keepRawData {
-			parseResult.Data[KeyRawData] = parseResult.Line
-		}
 		datas[dataIndex] = parseResult.Data
 		dataIndex++
 	}
@@ -181,17 +174,15 @@ func (p *SyslogParser) parse(line string) (data Data, err error) {
 
 		if p.curline >= p.maxline || p.format.IsNewLine([]byte(line)) {
 			data, err = p.Flush()
-			if err != nil {
-				return data, err
-			}
 		} else {
 			p.curline++
 		}
 	}
 
 	if line != PandoraParseFlushSignal {
-		_, err = p.buff.Write([]byte(line))
-		if err != nil {
+		_, writeErr := p.buff.Write([]byte(line))
+		if data == nil && writeErr != nil {
+			log.Errorf("line: %s write to buff failed: %v", line, writeErr)
 			if !p.disableRecordErrData || p.keepRawData {
 				data = make(Data)
 			}
@@ -201,10 +192,10 @@ func (p *SyslogParser) parse(line string) (data Data, err error) {
 			if p.keepRawData {
 				data[KeyRawData] = string(p.buff.Bytes())
 			}
+			return data, writeErr
 		}
-		return data, err
 	}
-	return data, nil
+	return data, err
 }
 
 func (p *SyslogParser) Flush() (data Data, err error) {
@@ -213,7 +204,10 @@ func (p *SyslogParser) Flush() (data Data, err error) {
 	if err == nil || err.Error() == "No structured data" {
 		data = Data(sparser.Dump())
 		if sparser.NeedModifyTime() && p.needModefyTime {
-			data["timestamp"] = data["timestamp"].(time.Time).Add(time.Duration(p.timeZoneOffset) * time.Hour)
+			dataTime, ok := data["timestamp"].(time.Time)
+			if ok {
+				data["timestamp"] = dataTime.Add(time.Duration(p.timeZoneOffset) * time.Hour)
+			}
 		}
 		err = nil
 	} else {
@@ -226,9 +220,9 @@ func (p *SyslogParser) Flush() (data Data, err error) {
 		if !p.disableRecordErrData {
 			data[KeyPandoraStash] = string(p.buff.Bytes())
 		}
-		if p.keepRawData {
-			data[KeyRawData] = string(p.buff.Bytes())
-		}
+	}
+	if p.keepRawData {
+		data[KeyRawData] = string(p.buff.Bytes())
 	}
 	p.curline = 0
 	p.buff.Reset()
