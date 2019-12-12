@@ -134,7 +134,6 @@ func (c *Concat) ConfigOptions() []Option {
 			DefaultNoUse: false,
 			Advance:      true,
 			Description:  "连接符(joiner)",
-			CheckRegex:   CheckPatternKey,
 			ToolTip:      "连接符，默认为空",
 			Type:         transforms.TransformTypeString,
 		},
