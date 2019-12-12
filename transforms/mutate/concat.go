@@ -17,8 +17,9 @@ var (
 )
 
 type Concat struct {
-	Key string `json:"key"`
-	New string `json:"new"`
+	Key    string `json:"key"`
+	New    string `json:"new"`
+	joiner string `json:"joiner"`
 
 	keys  [][]string
 	news  []string
@@ -125,6 +126,18 @@ func (c *Concat) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
 		transforms.KeyFieldNewRequired,
+		{
+			KeyName:      "joiner",
+			ChooseOnly:   false,
+			Default:      "",
+			Placeholder:  "",
+			DefaultNoUse: false,
+			Advance:      true,
+			Description:  "连接符(joiner)",
+			CheckRegex:   CheckPatternKey,
+			ToolTip:      "连接符，默认为空",
+			Type:         transforms.TransformTypeString,
+		},
 	}
 }
 
@@ -169,6 +182,9 @@ func (c *Concat) transform(dataPipeline <-chan transforms.TransformInfo, resultC
 				typeErr := fmt.Errorf("keys: %s type is: %T, only support concat string", strings.Join(keys, "."), val)
 				errNum, err = transforms.SetError(errNum, typeErr, transforms.GetErr, strings.Join(keys, "."))
 				continue
+			}
+			if c.joiner != "" && concatStr != "" {
+				concatStr += c.joiner
 			}
 			concatStr += valStr
 		}
