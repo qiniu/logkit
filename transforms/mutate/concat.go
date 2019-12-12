@@ -19,7 +19,7 @@ var (
 type Concat struct {
 	Key    string `json:"key"`
 	New    string `json:"new"`
-	joiner string `json:"joiner"`
+	Joiner string `json:"joiner"`
 
 	keys  [][]string
 	news  []string
@@ -182,8 +182,8 @@ func (c *Concat) transform(dataPipeline <-chan transforms.TransformInfo, resultC
 				errNum, err = transforms.SetError(errNum, typeErr, transforms.GetErr, strings.Join(keys, "."))
 				continue
 			}
-			if c.joiner != "" && concatStr != "" {
-				concatStr += c.joiner
+			if c.Joiner != "" && concatStr != "" {
+				concatStr += c.Joiner
 			}
 			concatStr += valStr
 		}
