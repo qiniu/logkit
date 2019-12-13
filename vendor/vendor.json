@@ -601,10 +601,10 @@
 			"revisionTime": "2018-02-22T21:45:52Z"
 		},
 		{
-			"checksumSHA1": "a1WxG0wMDGFnjojQghwu1i1SDhk=",
+			"checksumSHA1": "XEM4wWaZpwP2AHyT3uheujoEPgY=",
 			"path": "github.com/oschwald/maxminddb-golang",
-			"revision": "c5bec84d1963260297932a1b7a1753c8420717a7",
-			"revisionTime": "2018-02-25T17:45:17Z"
+			"revision": "a163813d4db16ceda6947ebf7957e1a5d2ff557f",
+			"revisionTime": "2019-12-11T23:15:50Z"
 		},
 		{
 			"checksumSHA1": "FGg99nQ56Fo3radSCuU1AeEUJug=",
