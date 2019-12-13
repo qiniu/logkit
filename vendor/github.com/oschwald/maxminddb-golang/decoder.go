@@ -6,6 +6,9 @@ import (
 	"math/big"
 	"reflect"
 	"sync"
+	"runtime/debug"
+
+	"github.com/qiniu/log"
 )
 
 type decoder struct {
@@ -61,6 +64,12 @@ func (d *decoder) decodeCtrlData(offset uint) (dataType, uint, uint, error) {
 	if offset >= uint(len(d.buffer)) {
 		return 0, 0, 0, newOffsetError()
 	}
+	defer func() {
+		// recover when stopped
+		if r := recover(); r != nil {
+			log.Errorf("recover when stopped\npanic: %v\nstack: %s", r, debug.Stack())
+		}
+	}()
 	ctrlByte := d.buffer[offset]
 
 	typeNum := dataType(ctrlByte >> 5)
