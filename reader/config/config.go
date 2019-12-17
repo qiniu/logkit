@@ -518,6 +518,15 @@ var ModeKeyOptions = map[string][]Option{
 			ToolTip:      "读取数据库的编码方式，默认为utf8，即按照utf8的编码方式读取数据库",
 		},
 		{
+			KeyName:      KeyMysqlParam,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "数据库参数(mysql_param)",
+			Advance:      true,
+			ToolTip:      "指定 mysql 的参数，参数之间使用 \"&\" 符合连接, 示例: allowOldPasswords=true",
+		},
+		{
 			KeyName:      KeyMysqlOffsetKey,
 			ChooseOnly:   false,
 			Default:      "",
