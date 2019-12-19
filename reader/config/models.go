@@ -57,6 +57,7 @@ const (
 	KeyMysqlExecOnStart   = "mysql_exec_onstart"
 	KeyMysqlHistoryAll    = "mysql_history_all"
 	KyeMysqlTable         = "mysql_table"
+	KeyMysqlParam         = "mysql_param"
 
 	KeySQLSchema        = "sql_schema"
 	KeyMagicLagDuration = "magic_lag_duration"

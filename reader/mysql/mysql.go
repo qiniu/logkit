@@ -85,6 +85,7 @@ type MysqlReader struct {
 	batchDurInt     int
 
 	encoder           string  // 解码方式
+	param             string  //可选参数
 	offsets           []int64 // 当前处理文件的sql的offset
 	muxOffsets        sync.RWMutex
 	syncSQLs          []string      // 当前在查询的sqls
@@ -166,6 +167,12 @@ func NewMysqlReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error)
 	if strings.Contains(encoder, "-") {
 		encoder = strings.Replace(strings.ToLower(encoder), "-", "", -1)
 	}
+	param, _ := conf.GetStringOr(KeyMysqlParam, "")
+	if param != "" {
+		param = strings.TrimSpace(param)
+		param = strings.Trim(param, "&")
+
+	}
 	historyAll, _ = conf.GetBoolOr(KeyMysqlHistoryAll, false)
 	table, _ = conf.GetStringOr(KyeMysqlTable, "")
 	table = strings.TrimSpace(table)
@@ -221,6 +228,7 @@ func NewMysqlReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error)
 		magicLagDur: mgld,
 		schemas:     schemas,
 		encoder:     encoder,
+		param:       param,
 		dbSchema:    dbSchema,
 		sqlsRecord:  make(map[string]string),
 	}
@@ -972,8 +980,11 @@ func (r *MysqlReader) getValidData(curDB, rawData string, now time.Time, queryTy
 
 func (r *MysqlReader) getConnectStr(database string, now time.Time) string {
 	connectStr := r.datasource + "/" + database
-	if r.encoder != "" {
-		connectStr += "?charset=" + r.encoder
+
+	connectStr += "?charset=" + r.encoder
+
+	if r.param != "" {
+		connectStr += "&" + r.param
 	}
 	return connectStr
 }
