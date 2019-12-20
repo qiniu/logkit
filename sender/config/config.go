@@ -1030,10 +1030,10 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:      KeyHttpSenderCsvSplit,
 			ChooseOnly:   false,
-			Default:      "",
+			Default:      ",",
 			Placeholder:  ",",
-			Required:     true,
-			DefaultNoUse: true,
+			Required:     false,
+			DefaultNoUse: false,
 			Description:  "csv分隔符(http_sender_csv_split)",
 		},
 		{
