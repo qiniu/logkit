@@ -10,13 +10,30 @@ import (
 func TestGetString(t *testing.T) {
 	t.Parallel()
 	c := MapConf{}
-	c["k1"] = "abc"
+	c["k1"] = "		abc "
+	c["k2"] = "abc"
+	c["k3"] = " \t "
+	c["k4"] = " "
 
 	key, err := c.GetString("k1")
 	if err != nil {
 		t.Error(err)
 	}
 	assert.Equal(t, key, "abc")
+
+	key, err = c.GetString("k2")
+	if err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, key, "abc")
+
+	key, err = c.GetString("k3")
+	assert.Nil(t, err)
+	assert.Equal(t, key, " \t ")
+
+	key, err = c.GetString("k4")
+	assert.Nil(t, err)
+	assert.Equal(t, key, " ")
 }
 
 func TestGetStringOr(t *testing.T) {
