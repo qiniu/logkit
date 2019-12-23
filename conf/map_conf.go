@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/qiniu/log"
 )
@@ -62,7 +63,17 @@ func (conf MapConf) GetString(key string) (string, error) {
 	if !exist {
 		return "", ErrConfMissingKey(key, StringType)
 	}
-	return value, nil
+	allSpace := true
+	for _, v := range value {
+		if !unicode.IsSpace(v) {
+			allSpace = false
+			break
+		}
+	}
+	if allSpace {
+		return value, nil
+	}
+	return strings.TrimSpace(value), nil
 }
 
 func (conf MapConf) GetIntOr(key string, deft int) (int, error) {
