@@ -1,13 +1,11 @@
 package logfmt
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
-
-	"github.com/go-logfmt/logfmt"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
@@ -144,49 +142,93 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 }
 
 func (p *Parser) parse(line string) ([]Data, error) {
-	reader := bytes.NewReader([]byte(line))
-	decoder := logfmt.NewDecoder(reader)
+
+	pairs, err := splitKV(line, p.splitter)
+	if err != nil {
+		return nil, err
+	}
 	datas := make([]Data, 0, 100)
-	var fields Data
-	for {
-		ok := decoder.ScanRecord()
-		if !ok {
-			err := decoder.Err()
-			if err != nil {
-				return nil, err
-			}
-			//此错误仅用于当原始数据解析成功但无解析数据时，保留原始数据之用
-			if len(fields) == 0 {
+
+	// 调整数据类型
+	for _, pair := range pairs {
+		field := make(Data)
+		for i := 0; i < len(pair); i += 2 {
+			if len(pair[i]) == 0 || len(pair[i+1]) == 0 {
 				return nil, errors.New("no value was parsed after logfmt, will keep origin data in pandora_stash if disable_record_errdata field is false")
 			}
-			break
-		}
-		fields = make(Data)
-		for decoder.ScanKeyval(p.splitter[0]) {
-			if string(decoder.Value()) == "" {
-				continue
-			}
-			//type conversions
-			value := string(decoder.Value())
+
+			value := pair[i+1]
 			if !p.keepString {
 				if fValue, err := strconv.ParseFloat(value, 64); err == nil {
-					fields[string(decoder.Key())] = fValue
+					field[pair[i]] = fValue
 					continue
 				}
+				if bValue, err := strconv.ParseBool(value); err == nil {
+					field[pair[i]] = bValue
+					continue
+				}
+
 			}
-			if bValue, err := strconv.ParseBool(value); err == nil {
-				fields[string(decoder.Key())] = bValue
-				continue
-			}
-			fields[string(decoder.Key())] = value
+			field[pair[i]] = strings.Trim(value, "\"")
 		}
-		if len(fields) == 0 {
+		if len(field) == 0 {
 			continue
 		}
-
-		datas = append(datas, fields)
+		datas = append(datas, field)
 	}
+
 	return datas, nil
+}
+
+func splitKV(line string, sep string) ([][]string, error) {
+	line = strings.ReplaceAll(line, "\\\"", "")
+
+	const space = " "
+	data := make([][]string, 0, 100)
+
+	// contain /n
+	nl := strings.Index(line, "\n")
+	for nl != -1 {
+		if nl >= len(line)-1 {
+			line = line[:len(line)-1]
+			break
+		}
+		next := line[nl+1:]
+		nextResult, err := splitKV(next, sep)
+		if err != nil {
+			return nil, err
+		}
+		data = append(data, nextResult...)
+		line = line[:nl]
+		nl = strings.Index(line, "\n")
+	}
+
+	if !strings.Contains(line, sep) {
+		return nil, errors.New("no value was parsed after logfmt, will keep origin data in pandora_stash if disable_record_errdata field is false")
+	}
+
+	fields := strings.Split(line, sep)
+
+	kvArr := make([]string, 0, 100)
+	kvArr = append(kvArr, strings.TrimSpace(fields[0]))
+	for i := 1; i < len(fields)-1; i++ {
+		spaceIndex := strings.LastIndex(fields[i], space)
+		if spaceIndex == -1 {
+			return nil, errors.New("not correct key-value pair")
+		}
+		// split
+		preV := strings.TrimSpace(fields[i][:spaceIndex])
+		nextK := strings.TrimSpace(fields[i][spaceIndex:])
+
+		kvArr = append(kvArr, preV)
+		kvArr = append(kvArr, nextK)
+
+	}
+
+	kvArr = append(kvArr, strings.TrimSpace(fields[len(fields)-1]))
+	data = append(data, kvArr)
+	return data, nil
+
 }
 
 func (p *Parser) Name() string {

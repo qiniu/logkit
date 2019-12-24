@@ -151,10 +151,10 @@ func TestParse(t *testing.T) {
 			expectData: []Data{},
 		},
 		{
-			s: []string{`ts=2018-01-02T03:04:05.123Z lvl=5 msg="error" log_id=123456abc`},
+			s: []string{`ts=2018-01-02T03:04:05.123Z  CST   lvl=5 msg="error" log_id=123456abc`},
 			expectData: []Data{
 				{
-					"ts":     "2018-01-02T03:04:05.123Z",
+					"ts":     "2018-01-02T03:04:05.123Z  CST",
 					"lvl":    float64(5),
 					"msg":    "error",
 					"log_id": "123456abc",
@@ -165,15 +165,15 @@ func TestParse(t *testing.T) {
 			s: []string{"ts=2018-01-02T03:04:05.123Z lvl=5 msg=\"error\" log_id=123456abc\nmethod=PUT duration=1.23 log_id=123456abc"},
 			expectData: []Data{
 				{
+					"method":   "PUT",
+					"duration": 1.23,
+					"log_id":   "123456abc",
+				},
+				{
 					"ts":     "2018-01-02T03:04:05.123Z",
 					"lvl":    float64(5),
 					"msg":    "error",
 					"log_id": "123456abc",
-				},
-				{
-					"method":   "PUT",
-					"duration": 1.23,
-					"log_id":   "123456abc",
 				},
 			},
 		},
