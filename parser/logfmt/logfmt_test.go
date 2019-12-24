@@ -151,18 +151,19 @@ func TestParse(t *testing.T) {
 			expectData: []Data{},
 		},
 		{
-			s: []string{`ts=2018-01-02T03:04:05.123Z  CST   lvl=5 msg="error" log_id=123456abc`},
+			s: []string{`ts=2018-01-02T03:04:05.123Z  CST   lvl=5 msg="error" isTest=true log_id=123456abc`},
 			expectData: []Data{
 				{
 					"ts":     "2018-01-02T03:04:05.123Z  CST",
 					"lvl":    float64(5),
 					"msg":    "error",
+					"isTest": true,
 					"log_id": "123456abc",
 				},
 			},
 		},
 		{
-			s: []string{"ts=2018-01-02T03:04:05.123Z lvl=5 msg=\"error\" log_id=123456abc\nmethod=PUT duration=1.23 log_id=123456abc"},
+			s: []string{"\nts=2018-01-02T03:04:05.123Z lvl=5 msg=\"error\" log_id=123456abc\nmethod=PUT duration=1.23 log_id=123456abc\n"},
 			expectData: []Data{
 				{
 					"method":   "PUT",
@@ -210,6 +211,22 @@ func TestParse(t *testing.T) {
 		KeyKeepRawData: "true",
 	})
 	assert.Nil(t, err)
+
+	got, err = l.Parse([]string{"lvl= "})
+	assert.NotNil(t, err)
+	assert.EqualValues(t, []Data{{"pandora_stash": "lvl=", "raw_data": "lvl="}}, got)
+
+	got, err = l.Parse([]string{" =50"})
+	assert.NotNil(t, err)
+	assert.EqualValues(t, []Data{{"pandora_stash": "=50", "raw_data": "=50"}}, got)
+
+	got, err = l.Parse([]string{"lvl=50next=sam"})
+	assert.NotNil(t, err)
+	assert.EqualValues(t, []Data{{"pandora_stash": "lvl=50next=sam", "raw_data": "lvl=50next=sam"}}, got)
+
+	got, err = l.Parse([]string{"lvl=50\n=sam"})
+	assert.NotNil(t, err)
+	assert.EqualValues(t, []Data{{"pandora_stash": "lvl=50\n=sam", "raw_data": "lvl=50\n=sam"}}, got)
 
 	got, err = l.Parse([]string{"", "a"})
 	assert.NotNil(t, err)
