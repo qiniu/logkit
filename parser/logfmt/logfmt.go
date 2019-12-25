@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
@@ -151,8 +152,31 @@ func (p *Parser) parse(line string) ([]Data, error) {
 
 	// 调整数据类型
 	for _, pair := range pairs {
+		if len(pair)%2 == 1 {
+			return nil, errors.New("key value not match")
+		}
 		field := make(Data)
 		for i := 0; i < len(pair); i += 2 {
+			// 消除双引号； 针对foo="" ,"foo=" 情况；其他情况如 a"b"c=d"e"f等首尾不出现引号的情况视作合法。
+			kNum := strings.Count(pair[i], "\"")
+			vNum := strings.Count(pair[i+1], "\"")
+			if kNum%2 == 1 && vNum%2 == 1 {
+				if strings.HasPrefix(pair[i], "\"") && strings.HasSuffix(pair[i+1], "\"") {
+					pair[i] = pair[i][1:]
+					pair[i+1] = pair[i+1][:len(pair[i+1])-1]
+				}
+			}
+			if kNum%2 == 0 && len(pair[i]) > 1 {
+				if strings.HasPrefix(pair[i], "\"") && strings.HasSuffix(pair[i], "\"") {
+					pair[i] = pair[i][1 : len(pair[i])-1]
+				}
+			}
+			if vNum%2 == 0 && len(pair[i+1]) > 1 {
+				if strings.HasPrefix(pair[i+1], "\"") && strings.HasSuffix(pair[i+1], "\"") {
+					pair[i+1] = pair[i+1][1 : len(pair[i+1])-1]
+				}
+			}
+
 			if len(pair[i]) == 0 || len(pair[i+1]) == 0 {
 				return nil, errors.New("no value was parsed after logfmt, will keep origin data in pandora_stash if disable_record_errdata field is false")
 			}
@@ -169,7 +193,7 @@ func (p *Parser) parse(line string) ([]Data, error) {
 				}
 
 			}
-			field[pair[i]] = strings.Trim(value, "\"")
+			field[pair[i]] = value
 		}
 		if len(field) == 0 {
 			continue
@@ -177,21 +201,69 @@ func (p *Parser) parse(line string) ([]Data, error) {
 		datas = append(datas, field)
 	}
 
+	// 修改数组顺序
+	for i := 0; i < len(datas)/2; i++ {
+		temp := datas[i]
+		datas[i] = datas[len(datas)-i-1]
+		datas[len(datas)-i-1] = temp
+	}
 	return datas, nil
 }
 
 func splitKV(line string, sep string) ([][]string, error) {
-	line = strings.ReplaceAll(line, "\\\"", "")
+	line = strings.Replace(line, "\\\"", "", -1)
 
-	const space = " "
 	data := make([][]string, 0, 100)
+	// contain /n;
+	// sep 被换行符分割
+	if len(sep) > 1 {
+		sepCount := strings.Count(line, sep)
+		jointCount := strings.Count(strings.Replace(line, "\n", "", -1), sep)
+		j := 1
+		for sepCount < jointCount && j <= jointCount {
+			tempLine := strings.Replace(line, "\n", "", j)
+			tempCount := strings.Count(tempLine, sep)
+			if tempCount > jointCount {
+				jointCount = tempCount
+				line = tempLine
+			}
+			j++
+		}
 
-	// contain /n
+	}
+
 	nl := strings.Index(line, "\n")
 	for nl != -1 {
 		if nl >= len(line)-1 {
 			line = line[:len(line)-1]
 			break
+		}
+		preSep := strings.LastIndex(line[:nl], sep)
+		nextSep := strings.Index(line[nl+1:], sep)
+		// 前后没sep的情况 不用拆分
+		if nextSep == -1 {
+			break
+		}
+
+		if preSep == -1 {
+			n := strings.Index(line[nl+1:], "\n")
+			if n == -1 {
+				break
+			}
+			nl = nl + 1 + n
+			continue
+		}
+
+		// 前后都有sep的情况：右侧trim后有空格 合并；没有则不合并
+		afTrim := strings.TrimSpace(line[nl+1 : nl+1+nextSep])
+		nextSpace := strings.LastIndexFunc(afTrim, unicode.IsSpace)
+		if nextSpace != -1 {
+			n := strings.Index(line[nl+1:], "\n")
+			if n == -1 {
+				break
+			}
+			nl = nl + 1 + n
+			continue
 		}
 		next := line[nl+1:]
 		nextResult, err := splitKV(next, sep)
@@ -203,32 +275,53 @@ func splitKV(line string, sep string) ([][]string, error) {
 		nl = strings.Index(line, "\n")
 	}
 
+	line = strings.Replace(line, "\n", "", -1)
 	if !strings.Contains(line, sep) {
 		return nil, errors.New("no value was parsed after logfmt, will keep origin data in pandora_stash if disable_record_errdata field is false")
 	}
 
-	fields := strings.Split(line, sep)
-
 	kvArr := make([]string, 0, 100)
-	kvArr = append(kvArr, strings.TrimSpace(fields[0]))
-	for i := 1; i < len(fields)-1; i++ {
-		spaceIndex := strings.LastIndex(fields[i], space)
-		if spaceIndex == -1 {
-			return nil, errors.New("not correct key-value pair")
+	isKey := true
+	vhead := 0
+	lastSpace := 0
+	pos := 0
+	sepLen := len(sep)
+
+	// key或value值中包含sep的情况；默认key中不包含sep；导致algorithm = 1+1=2会变成合法
+	for pos+sepLen <= len(line) {
+		if unicode.IsSpace(rune(line[pos : pos+1][0])) {
+			nextSep := strings.Index(line[pos+1:], sep)
+			if nextSep == -1 {
+				break
+			}
+			if strings.TrimSpace(line[pos+1:pos+1+nextSep]) != "" {
+				lastSpace = pos
+				pos++
+				continue
+			}
 		}
-		// split
-		preV := strings.TrimSpace(fields[i][:spaceIndex])
-		nextK := strings.TrimSpace(fields[i][spaceIndex:])
-
-		kvArr = append(kvArr, preV)
-		kvArr = append(kvArr, nextK)
-
+		if line[pos:pos+sepLen] == sep {
+			if isKey {
+				kvArr = append(kvArr, strings.TrimSpace(line[vhead:pos]))
+				isKey = false
+			} else {
+				if lastSpace <= vhead {
+					pos++
+					continue
+				}
+				kvArr = append(kvArr, strings.TrimSpace(line[vhead:lastSpace]))
+				kvArr = append(kvArr, strings.TrimSpace(line[lastSpace:pos]))
+			}
+			vhead = pos + sepLen
+			pos = pos + sepLen - 1
+		}
+		pos++
 	}
-
-	kvArr = append(kvArr, strings.TrimSpace(fields[len(fields)-1]))
+	if vhead < len(line) {
+		kvArr = append(kvArr, strings.TrimSpace(line[vhead:]))
+	}
 	data = append(data, kvArr)
 	return data, nil
-
 }
 
 func (p *Parser) Name() string {

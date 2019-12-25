@@ -115,10 +115,15 @@ func Test_parseLine(t *testing.T) {
 			splitter:   "=",
 		},
 		{
-			line:       `abc=abc foo="def`,
-			expectData: []Data{},
-			existErr:   true,
-			splitter:   "=",
+			line: `abc=abc foo="def`,
+			expectData: []Data{
+				{
+					"abc": "abc",
+					"foo": "\"def",
+				},
+			},
+			existErr: false,
+			splitter: "=",
 		},
 		{
 			line:       `"foo=" bar=abc`,
@@ -166,15 +171,15 @@ func TestParse(t *testing.T) {
 			s: []string{"\nts=2018-01-02T03:04:05.123Z lvl=5 msg=\"error\" log_id=123456abc\nmethod=PUT duration=1.23 log_id=123456abc\n"},
 			expectData: []Data{
 				{
-					"method":   "PUT",
-					"duration": 1.23,
-					"log_id":   "123456abc",
-				},
-				{
 					"ts":     "2018-01-02T03:04:05.123Z",
 					"lvl":    float64(5),
 					"msg":    "error",
 					"log_id": "123456abc",
+				},
+				{
+					"method":   "PUT",
+					"duration": 1.23,
+					"log_id":   "123456abc",
 				},
 			},
 		},
@@ -221,8 +226,8 @@ func TestParse(t *testing.T) {
 	assert.EqualValues(t, []Data{{"pandora_stash": "=50", "raw_data": "=50"}}, got)
 
 	got, err = l.Parse([]string{"lvl=50next=sam"})
-	assert.NotNil(t, err)
-	assert.EqualValues(t, []Data{{"pandora_stash": "lvl=50next=sam", "raw_data": "lvl=50next=sam"}}, got)
+	assert.Nil(t, err)
+	assert.EqualValues(t, []Data{{"lvl": "50next=sam", "raw_data": "lvl=50next=sam"}}, got)
 
 	got, err = l.Parse([]string{"lvl=50\n=sam"})
 	assert.NotNil(t, err)
@@ -333,5 +338,180 @@ func GetParseTestData(line string, size int) []string {
 		}
 		testSlice = append(testSlice, line)
 		totalSize += len(line)
+	}
+}
+
+func Test_splitKV(t *testing.T) {
+
+	tests := []struct {
+		line       string
+		expectData [][]string
+		existErr   bool
+		splitter   string
+	}{
+		{
+			line: "foo=",
+			expectData: [][]string{
+				{
+					"foo",
+				},
+			},
+			existErr: false,
+			splitter: "=",
+		},
+		{
+			line: "=def",
+			expectData: [][]string{{
+				"",
+				"def",
+			}},
+			existErr: false,
+			splitter: "=",
+		},
+		{
+			line: "foo=def abc = abc ",
+			expectData: [][]string{
+				{
+					"foo",
+					"def",
+					"abc",
+					"abc",
+				},
+			},
+			existErr: false,
+			splitter: "=",
+		},
+		{
+			line: "foo\n=def\nabc=a\nbc",
+			expectData: [][]string{
+				{
+					"abc",
+					"abc",
+				},
+				{
+					"foo",
+					"def",
+				},
+			},
+			existErr: false,
+			splitter: "=",
+		},
+		{
+			line: "foo=def \n abc =abc",
+			expectData: [][]string{
+				{
+					"abc",
+					"abc",
+				},
+				{
+					"foo",
+					"def",
+				},
+			},
+			existErr: false,
+			splitter: "=",
+		},
+		{
+			line: "foo=def\n abc=abc",
+			expectData: [][]string{
+				{
+					"abc",
+					"abc",
+				},
+				{
+					"foo",
+					"def",
+				},
+			},
+			existErr: false,
+			splitter: "=",
+		},
+		{
+			line: "foo=def\n test abc=abc",
+			expectData: [][]string{
+				{
+					"foo",
+					"def test",
+					"abc",
+					"abc",
+				},
+			},
+			existErr: false,
+			splitter: "=",
+		},
+		{
+			line: "time=2018-01-02T03:04:05.123Z \nCST abc=abc",
+			expectData: [][]string{
+				{
+					"time",
+					"2018-01-02T03:04:05.123Z CST",
+					"abc",
+					"abc",
+				},
+			},
+			existErr: false,
+			splitter: "=",
+		},
+		{
+			line: "foo:def abc:a:b:c",
+			expectData: [][]string{{
+				"foo",
+				"def",
+				"abc",
+				"a:b:c",
+			}},
+			existErr: false,
+			splitter: ":",
+		},
+		{
+			line: "f:o:o::def",
+			expectData: [][]string{{
+				"f:o:o",
+				"def",
+			}},
+			existErr: false,
+			splitter: "::",
+		},
+		{
+			line:       "f:o:o:def",
+			expectData: [][]string{},
+			existErr:   true,
+			splitter:   "::",
+		},
+		{
+			line: "f:o:o:\n:def",
+			expectData: [][]string{{
+				"f:o:o",
+				"def",
+			}},
+			existErr: false,
+			splitter: "::",
+		},
+		{
+			line: "f:\no::a o:\n:def",
+			expectData: [][]string{{
+				"f:o",
+				"a",
+				"o",
+				"def",
+			}},
+			existErr: false,
+			splitter: "::",
+		},
+		{
+			line:       "f:o:o: \n :def",
+			expectData: [][]string{},
+			existErr:   true,
+			splitter:   "::",
+		},
+	}
+	for _, tt := range tests {
+		got, err := splitKV(tt.line, tt.splitter)
+		assert.Equal(t, tt.existErr, err != nil)
+		assert.Equal(t, len(tt.expectData), len(got))
+		for i, m := range got {
+			assert.Equal(t, tt.expectData[i], m)
+		}
+
 	}
 }
