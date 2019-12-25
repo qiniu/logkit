@@ -209,6 +209,12 @@
 			"revisionTime": "2018-02-08T00:28:26Z"
 		},
 		{
+			"checksumSHA1": "6bytXiEGSHi8Gszj5vbhWeyXcYU=",
+			"path": "github.com/bmatcuk/doublestar",
+			"revision": "50be492faef103d1904fec6e1019454b07cdb03f",
+			"revisionTime": "2019-12-17T19:25:32Z"
+		},
+		{
 			"checksumSHA1": "OW70e5OFoTTxOwUdcuiejGmxF+A=",
 			"path": "github.com/clbanning/mxj",
 			"revision": "be7b154d093db491c61285049f46770a9075bc15",
