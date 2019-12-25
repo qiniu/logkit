@@ -25,12 +25,13 @@ import (
 var _ sender.SkipDeepCopySender = &Sender{}
 
 type Sender struct {
-	url      string
-	gZip     bool
-	csvHead  bool
-	protocol string
-	csvSplit string
-	template string
+	url        string
+	gZip       bool
+	csvHead    bool
+	escapeHtml bool
+	protocol   string
+	csvSplit   string
+	template   string
 
 	client         *http.Client
 	templateRender *fasttemplate.Template
@@ -57,6 +58,7 @@ func NewSender(c conf.MapConf) (sender.Sender, error) {
 	csvHead, _ := c.GetBoolOr(KeyHttpSenderCsvHead, true)
 	csvSplit, _ := c.GetStringOr(KeyHttpSenderCsvSplit, "\t")
 	protocol, _ := c.GetStringOr(KeyHttpSenderProtocol, SendProtocolJson)
+	escapeHtml, _ := c.GetBoolOr(KeyHttpEscapeHtml, true)
 	runnerName, _ := c.GetStringOr(KeyRunnerName, UnderfinedRunnerName)
 	timeout, _ := c.GetStringOr(KeyHttpTimeout, "30s")
 	dur, err := time.ParseDuration(timeout)
@@ -87,6 +89,7 @@ func NewSender(c conf.MapConf) (sender.Sender, error) {
 		csvSplit:       csvSplit,
 		runnerName:     runnerName,
 		templateRender: templateRender,
+		escapeHtml:     escapeHtml,
 		client:         &http.Client{Timeout: dur},
 	}
 	return httpSender, nil
@@ -129,7 +132,15 @@ func (h *Sender) renderTemplate(data Data) (string, error) {
 	if h.template != "" && h.templateRender != nil {
 		return h.templateRender.ExecuteString(data), nil
 	} else {
-		db, err := jsoniter.Marshal(data)
+		var (
+			db  []byte
+			err error
+		)
+		if !h.escapeHtml {
+			db, err = jsoniter.Config{EscapeHTML: false}.Froze().Marshal(data)
+		} else {
+			db, err = jsoniter.Marshal(data)
+		}
 		if err != nil {
 			return "", err
 		}

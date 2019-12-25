@@ -183,6 +183,7 @@ const (
 	KeyHttpSenderCsvHead  = "http_sender_csv_head"
 	KeyHttpSenderCsvSplit = "http_sender_csv_split"
 	KeyHttpSenderTemplate = "http_sender_template"
+	KeyHttpEscapeHtml     = "http_sender_escape_html"
 	SendProtocolCSV       = "csv"
 	SendProtocolJson      = "json"
 	SendProtocolWholeJson = "body_json"

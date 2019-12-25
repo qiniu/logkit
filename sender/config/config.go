@@ -1016,6 +1016,14 @@ var ModeKeyOptions = map[string][]Option{
 			ToolTip:       `使用raw格式发送时，需使用raw解析方式，发送时将raw字段的值取出作为http body发送`,
 		},
 		{
+			KeyName:       KeyHttpEscapeHtml,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{true, false},
+			Default:       true,
+			Description:   "发送数据时使用安全的json(http_sender_escape_html)",
+			ToolTip:       `使用安全的json方式`,
+		},
+		{
 			KeyName:      KeyHttpSenderTemplate,
 			Element:      Text,
 			ChooseOnly:   false,

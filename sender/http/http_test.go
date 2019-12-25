@@ -622,3 +622,19 @@ func TestGzipData(t *testing.T) {
 		assert.Equal(t, val, string(data))
 	}
 }
+
+func Test_renderTemplate(t *testing.T) {
+	t.Parallel()
+	httpSender := Sender{
+		protocol:   "json",
+		escapeHtml: true,
+	}
+	actual, err := httpSender.renderTemplate(Data{"raw": "<a&b&c>"})
+	assert.Nil(t, err)
+	assert.EqualValues(t, "{\"raw\":\"\\u003ca\\u0026b\\u0026c\\u003e\"}", actual)
+
+	httpSender.escapeHtml = false
+	actual, err = httpSender.renderTemplate(Data{"raw": "<a&b&c>"})
+	assert.Nil(t, err)
+	assert.EqualValues(t, "{\"raw\":\"<a&b&c>\"}", actual)
+}
