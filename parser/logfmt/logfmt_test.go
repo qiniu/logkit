@@ -1,6 +1,7 @@
 package logfmt
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/qiniu/logkit/parser"
@@ -63,12 +64,10 @@ func Test_parseLine(t *testing.T) {
 			line: "ts=2018-01-02T03:04:05.123Z lvl=info msg=\"http request\" method=PUT\nduration=1.23 log_id=123456abc",
 			expectData: []Data{
 				{
-					"lvl":    "info",
-					"msg":    "http request",
-					"method": "PUT",
-					"ts":     "2018-01-02T03:04:05.123Z",
-				},
-				{
+					"lvl":      "info",
+					"msg":      "http request",
+					"method":   "PUT",
+					"ts":       "2018-01-02T03:04:05.123Z",
 					"duration": 1.23,
 					"log_id":   "123456abc",
 				},
@@ -139,6 +138,7 @@ func Test_parseLine(t *testing.T) {
 		l.keepString = tt.keepString
 		l.splitter = tt.splitter
 		got, err := l.parse(tt.line)
+		fmt.Println("got: ", got, " err: ", err)
 		assert.Equal(t, tt.existErr, err != nil)
 		assert.Equal(t, len(tt.expectData), len(got))
 		for i, m := range got {
@@ -168,18 +168,15 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			s: []string{"\nts=2018-01-02T03:04:05.123Z lvl=5 msg=\"error\" log_id=123456abc\nmethod=PUT duration=1.23 log_id=123456abc\n"},
+			s: []string{"\nts=2018-01-02T03:04:05.123Z lvl=5 msg=\"error\" log_id=123456abc\nmethod=PUT duration=1.23 \n"},
 			expectData: []Data{
 				{
-					"ts":     "2018-01-02T03:04:05.123Z",
-					"lvl":    float64(5),
-					"msg":    "error",
-					"log_id": "123456abc",
-				},
-				{
+					"ts":       "2018-01-02T03:04:05.123Z",
+					"lvl":      float64(5),
+					"msg":      "error",
+					"log_id":   "123456abc",
 					"method":   "PUT",
 					"duration": 1.23,
-					"log_id":   "123456abc",
 				},
 			},
 		},
@@ -208,7 +205,7 @@ func TestParse(t *testing.T) {
 
 	got, err := l.Parse([]string{"", "a"})
 	assert.NotNil(t, err)
-	assert.EqualValues(t, "success 0 errors 1 last error no value was parsed after logfmt, will keep origin data in pandora_stash if disable_record_errdata field is false, send error detail <nil>", err.Error())
+	assert.EqualValues(t, "success 0 errors 1 last error no splitter exist, will keep origin data in pandora_stash if disable_record_errdata field is false, send error detail <nil>", err.Error())
 	assert.EqualValues(t, []Data{{"pandora_stash": "a"}}, got)
 
 	l, err = NewParser(conf.MapConf{
@@ -279,12 +276,8 @@ func TestParseWithKeepRawData(t *testing.T) {
 					"lvl":      float64(5),
 					"msg":      "error",
 					"log_id":   "123456abc",
-					"raw_data": "ts=2018-01-02T03:04:05.123Z lvl=5 msg=\"error\" log_id=123456abc\nmethod=PUT duration=1.23 log_id=123456abc",
-				},
-				{
 					"method":   "PUT",
 					"duration": 1.23,
-					"log_id":   "123456abc",
 					"raw_data": "ts=2018-01-02T03:04:05.123Z lvl=5 msg=\"error\" log_id=123456abc\nmethod=PUT duration=1.23 log_id=123456abc",
 				},
 			},
@@ -298,12 +291,8 @@ func TestParseWithKeepRawData(t *testing.T) {
 					"lvl":      float64(5),
 					"msg":      "error",
 					"log_id":   "123456abc",
-					"raw_data": "ts:2018-01-02T03:04:05.123Z lvl:5 msg:\"error\" log_id:123456abc\nmethod:PUT duration:1.23 log_id:123456abc",
-				},
-				{
 					"method":   "PUT",
 					"duration": 1.23,
-					"log_id":   "123456abc",
 					"raw_data": "ts:2018-01-02T03:04:05.123Z lvl:5 msg:\"error\" log_id:123456abc\nmethod:PUT duration:1.23 log_id:123456abc",
 				},
 			},
@@ -345,162 +334,142 @@ func Test_splitKV(t *testing.T) {
 
 	tests := []struct {
 		line       string
-		expectData [][]string
+		expectData []string
 		existErr   bool
 		splitter   string
 	}{
 		{
 			line: "foo=",
-			expectData: [][]string{
-				{
-					"foo",
-				},
+			expectData: []string{
+				"foo",
 			},
 			existErr: false,
 			splitter: "=",
 		},
 		{
 			line: "=def",
-			expectData: [][]string{{
+			expectData: []string{
 				"",
 				"def",
-			}},
+			},
 			existErr: false,
 			splitter: "=",
 		},
 		{
 			line: "foo=def abc = abc ",
-			expectData: [][]string{
-				{
-					"foo",
-					"def",
-					"abc",
-					"abc",
-				},
+			expectData: []string{
+				"foo",
+				"def",
+				"abc",
+				"abc",
 			},
 			existErr: false,
 			splitter: "=",
 		},
 		{
 			line: "foo\n=def\nabc=a\nbc",
-			expectData: [][]string{
-				{
-					"abc",
-					"abc",
-				},
-				{
-					"foo",
-					"def",
-				},
+			expectData: []string{
+				"abc",
+				"abc",
+				"foo",
+				"def",
 			},
 			existErr: false,
 			splitter: "=",
 		},
 		{
 			line: "foo=def \n abc =abc",
-			expectData: [][]string{
-				{
-					"abc",
-					"abc",
-				},
-				{
-					"foo",
-					"def",
-				},
+			expectData: []string{
+				"abc",
+				"abc",
+				"foo",
+				"def",
 			},
 			existErr: false,
 			splitter: "=",
 		},
 		{
 			line: "foo=def\n abc=abc",
-			expectData: [][]string{
-				{
-					"abc",
-					"abc",
-				},
-				{
-					"foo",
-					"def",
-				},
+			expectData: []string{
+				"abc",
+				"abc",
+				"foo",
+				"def",
 			},
 			existErr: false,
 			splitter: "=",
 		},
 		{
 			line: "foo=def\n test abc=abc",
-			expectData: [][]string{
-				{
-					"foo",
-					"def test",
-					"abc",
-					"abc",
-				},
+			expectData: []string{
+				"foo",
+				"def test",
+				"abc",
+				"abc",
 			},
 			existErr: false,
 			splitter: "=",
 		},
 		{
 			line: "time=2018-01-02T03:04:05.123Z \nCST abc=abc",
-			expectData: [][]string{
-				{
-					"time",
-					"2018-01-02T03:04:05.123Z CST",
-					"abc",
-					"abc",
-				},
+			expectData: []string{
+				"time",
+				"2018-01-02T03:04:05.123Z CST",
+				"abc",
+				"abc",
 			},
 			existErr: false,
 			splitter: "=",
 		},
 		{
-			line: "foo:def abc:a:b:c",
-			expectData: [][]string{{
+			line: "foo:de:f ad abc:a:b:c",
+			expectData: []string{
 				"foo",
-				"def",
+				"de:f ad",
 				"abc",
 				"a:b:c",
-			}},
+			},
 			existErr: false,
 			splitter: ":",
 		},
 		{
 			line: "f:o:o::def",
-			expectData: [][]string{{
+			expectData: []string{
 				"f:o:o",
 				"def",
-			}},
+			},
 			existErr: false,
 			splitter: "::",
 		},
 		{
 			line:       "f:o:o:def",
-			expectData: [][]string{},
+			expectData: []string{},
 			existErr:   true,
 			splitter:   "::",
 		},
 		{
 			line: "f:o:o:\n:def",
-			expectData: [][]string{{
+			expectData: []string{
 				"f:o:o",
 				"def",
-			}},
+			},
 			existErr: false,
 			splitter: "::",
 		},
 		{
 			line: "f:\no::a o:\n:def",
-			expectData: [][]string{{
+			expectData: []string{
 				"f:o",
 				"a",
 				"o",
 				"def",
-			}},
+			},
 			existErr: false,
 			splitter: "::",
 		},
 		{
 			line:       "f:o:o: \n :def",
-			expectData: [][]string{},
+			expectData: []string{},
 			existErr:   true,
 			splitter:   "::",
 		},

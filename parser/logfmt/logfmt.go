@@ -14,6 +14,10 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+const (
+	errMsg = "will keep origin data in pandora_stash if disable_record_errdata field is false"
+)
+
 func init() {
 	parser.RegisterConstructor(TypeLogfmt, NewParser)
 	parser.RegisterConstructor(TypeKeyValue, NewParser)
@@ -148,74 +152,66 @@ func (p *Parser) parse(line string) ([]Data, error) {
 	if err != nil {
 		return nil, err
 	}
-	datas := make([]Data, 0, 100)
 
 	// 调整数据类型
-	for _, pair := range pairs {
-		if len(pair)%2 == 1 {
-			return nil, errors.New("key value not match")
-		}
-		field := make(Data)
-		for i := 0; i < len(pair); i += 2 {
-			// 消除双引号； 针对foo="" ,"foo=" 情况；其他情况如 a"b"c=d"e"f等首尾不出现引号的情况视作合法。
-			kNum := strings.Count(pair[i], "\"")
-			vNum := strings.Count(pair[i+1], "\"")
-			if kNum%2 == 1 && vNum%2 == 1 {
-				if strings.HasPrefix(pair[i], "\"") && strings.HasSuffix(pair[i+1], "\"") {
-					pair[i] = pair[i][1:]
-					pair[i+1] = pair[i+1][:len(pair[i+1])-1]
-				}
-			}
-			if kNum%2 == 0 && len(pair[i]) > 1 {
-				if strings.HasPrefix(pair[i], "\"") && strings.HasSuffix(pair[i], "\"") {
-					pair[i] = pair[i][1 : len(pair[i])-1]
-				}
-			}
-			if vNum%2 == 0 && len(pair[i+1]) > 1 {
-				if strings.HasPrefix(pair[i+1], "\"") && strings.HasSuffix(pair[i+1], "\"") {
-					pair[i+1] = pair[i+1][1 : len(pair[i+1])-1]
-				}
-			}
-
-			if len(pair[i]) == 0 || len(pair[i+1]) == 0 {
-				return nil, errors.New("no value was parsed after logfmt, will keep origin data in pandora_stash if disable_record_errdata field is false")
-			}
-
-			value := pair[i+1]
-			if !p.keepString {
-				if fValue, err := strconv.ParseFloat(value, 64); err == nil {
-					field[pair[i]] = fValue
-					continue
-				}
-				if bValue, err := strconv.ParseBool(value); err == nil {
-					field[pair[i]] = bValue
-					continue
-				}
-
-			}
-			field[pair[i]] = value
-		}
-		if len(field) == 0 {
-			continue
-		}
-		datas = append(datas, field)
+	if len(pairs)%2 == 1 {
+		return nil, errors.New(fmt.Sprintf("key value not match, %s", errMsg))
 	}
 
-	// 修改数组顺序
-	for i := 0; i < len(datas)/2; i++ {
-		temp := datas[i]
-		datas[i] = datas[len(datas)-i-1]
-		datas[len(datas)-i-1] = temp
+	data := make([]Data, 0, 1)
+	field := make(Data)
+	for i := 0; i < len(pairs); i += 2 {
+		// 消除双引号； 针对foo="" ,"foo=" 情况；其他情况如 a"b"c=d"e"f等首尾不出现引号的情况视作合法。
+		kNum := strings.Count(pairs[i], "\"")
+		vNum := strings.Count(pairs[i+1], "\"")
+		if kNum%2 == 1 && vNum%2 == 1 {
+			if strings.HasPrefix(pairs[i], "\"") && strings.HasSuffix(pairs[i+1], "\"") {
+				pairs[i] = pairs[i][1:]
+				pairs[i+1] = pairs[i+1][:len(pairs[i+1])-1]
+			}
+		}
+		if kNum%2 == 0 && len(pairs[i]) > 1 {
+			if strings.HasPrefix(pairs[i], "\"") && strings.HasSuffix(pairs[i], "\"") {
+				pairs[i] = pairs[i][1 : len(pairs[i])-1]
+			}
+		}
+		if vNum%2 == 0 && len(pairs[i+1]) > 1 {
+			if strings.HasPrefix(pairs[i+1], "\"") && strings.HasSuffix(pairs[i+1], "\"") {
+				pairs[i+1] = pairs[i+1][1 : len(pairs[i+1])-1]
+			}
+		}
+
+		if len(pairs[i]) == 0 || len(pairs[i+1]) == 0 {
+			return nil, fmt.Errorf("no value or key was parsed after logfmt, %s", errMsg)
+		}
+
+		value := pairs[i+1]
+		if !p.keepString {
+			if fValue, err := strconv.ParseFloat(value, 64); err == nil {
+				field[pairs[i]] = fValue
+				continue
+			}
+			if bValue, err := strconv.ParseBool(value); err == nil {
+				field[pairs[i]] = bValue
+				continue
+			}
+
+		}
+		field[pairs[i]] = value
 	}
-	return datas, nil
+	if len(field) == 0 {
+		return nil, fmt.Errorf("data is empty after parse, %s", errMsg)
+	}
+
+	data = append(data, field)
+	return data, nil
 }
 
-func splitKV(line string, sep string) ([][]string, error) {
+func splitKV(line string, sep string) ([]string, error) {
 	line = strings.Replace(line, "\\\"", "", -1)
-
-	data := make([][]string, 0, 100)
+	data := make([]string, 0, 100)
 	// contain /n;
-	// sep 被换行符分割
+	// splitter 中包含\n的情况，\r等其他情况后续解决。
 	if len(sep) > 1 {
 		sepCount := strings.Count(line, sep)
 		jointCount := strings.Count(strings.Replace(line, "\n", "", -1), sep)
@@ -277,7 +273,7 @@ func splitKV(line string, sep string) ([][]string, error) {
 
 	line = strings.Replace(line, "\n", "", -1)
 	if !strings.Contains(line, sep) {
-		return nil, errors.New("no value was parsed after logfmt, will keep origin data in pandora_stash if disable_record_errdata field is false")
+		return nil, errors.New(fmt.Sprintf("no splitter exist, %s", errMsg))
 	}
 
 	kvArr := make([]string, 0, 100)
@@ -320,7 +316,7 @@ func splitKV(line string, sep string) ([][]string, error) {
 	if vhead < len(line) {
 		kvArr = append(kvArr, strings.TrimSpace(line[vhead:]))
 	}
-	data = append(data, kvArr)
+	data = append(data, kvArr...)
 	return data, nil
 }
 
