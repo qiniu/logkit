@@ -211,22 +211,6 @@ func splitKV(line string, sep string) ([]string, error) {
 	line = strings.Replace(line, "\\\"", "", -1)
 	data := make([]string, 0, 100)
 	// contain /n;
-	// splitter 中包含\n的情况，\r等其他情况后续解决。
-	if len(sep) > 1 {
-		sepCount := strings.Count(line, sep)
-		jointCount := strings.Count(strings.Replace(line, "\n", "", -1), sep)
-		j := 1
-		for sepCount < jointCount && j <= jointCount {
-			tempLine := strings.Replace(line, "\n", "", j)
-			tempCount := strings.Count(tempLine, sep)
-			if tempCount > jointCount {
-				jointCount = tempCount
-				line = tempLine
-			}
-			j++
-		}
-
-	}
 
 	nl := strings.Index(line, "\n")
 	for nl != -1 {
