@@ -208,7 +208,6 @@ func (p *Parser) parse(line string) ([]Data, error) {
 }
 
 func splitKV(line string, sep string) ([]string, error) {
-	line = strings.Replace(line, "\\\"", "", -1)
 	data := make([]string, 0, 100)
 
 	if !strings.Contains(line, sep) {

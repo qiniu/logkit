@@ -179,6 +179,7 @@ func Test_Parser(t *testing.T) {
 	t.Log("err: ", err)
 
 	// 3.有标签，重复
+	c[KeyCSVSchema] = ""
 	c[KeyCSVLabels] = "name string, time date"
 	p, err = NewParser(c)
 	lines = []string{
@@ -198,6 +199,7 @@ func Test_Parser(t *testing.T) {
 
 	// 4.有标签，不重复
 	c[KeyCSVLabels] = "pos string, time date"
+	c[KeyCSVSchema] = ""
 	p, err = NewParser(c)
 	lines = []string{
 		"name age",
@@ -246,6 +248,7 @@ func Test_Parser(t *testing.T) {
 	// 5.允许有多余列
 	c[KeyCSVAllowNoMatch] = "true"
 	c[KeyCSVLabels] = ""
+	c[KeyCSVSchema] = ""
 	p, err = NewParser(c)
 	lines = []string{
 		"name age pos",
@@ -263,6 +266,7 @@ func Test_Parser(t *testing.T) {
 
 	// 6.不允许有多余列
 	c[KeyCSVAllowNoMatch] = "false"
+	c[KeyCSVSchema] = ""
 	p, err = NewParser(c)
 	lines = []string{
 		"name age pos",
@@ -275,6 +279,7 @@ func Test_Parser(t *testing.T) {
 	t.Log("err: ", err)
 
 	// 7.缺少列
+	c[KeyCSVSchema] = ""
 	p, err = NewParser(c)
 	lines = []string{
 		"name age",
@@ -287,6 +292,7 @@ func Test_Parser(t *testing.T) {
 	t.Log("err: ", err)
 
 	// 8.包含隔离键 但首部不存在
+	c[KeyCSVSchema] = ""
 	c[KeyCSVContainSplitterKey] = "split"
 	p, err = NewParser(c)
 	lines = []string{
@@ -300,6 +306,7 @@ func Test_Parser(t *testing.T) {
 	t.Log("err: ", err)
 
 	// 9.包含隔离键 且首部存在
+	c[KeyCSVSchema] = ""
 	p, err = NewParser(c)
 	lines = []string{
 		"name age split pos",
@@ -988,286 +995,342 @@ func Test_ContainSplitterParse(t *testing.T) {
 	}
 }
 
-func Test_checkHeader(t *testing.T) {
+func Test_setHeaderWithSchema(t *testing.T) {
 	type args struct {
-		schema             string
-		labelList          []string
-		containSplitterKey string
-		delim              string
-		hasHeader          bool
+		schema string
 	}
 	tests := []struct {
-		name                     string
-		args                     args
-		wantFields               []field
-		wantContainSplitterIndex int
-		wantLabels               []GrokLabel
-		wantErr                  bool
+		name       string
+		args       args
+		wantFields []field
+		wantErr    bool
 	}{
 		{
-			name: "schema_no_label",
+			name: "normal_test",
 			args: args{
-				schema:             "name string, age long, major jsonmap{first string}, pos float, date date",
-				labelList:          []string{},
-				containSplitterKey: "",
-				delim:              "",
-				hasHeader:          true,
+				schema: "name string,age string",
 			},
 			wantFields: []field{
 				{
 					name:     "name",
-					dataType: TypeString,
+					dataType: "string",
 				},
 				{
 					name:     "age",
-					dataType: TypeLong,
-				},
-				{
-					name:     "major",
-					dataType: TypeJSONMap,
-					typeChange: map[string]DataType{
-						"first": TypeString,
-					},
-				},
-				{
-					name:     "pos",
-					dataType: TypeFloat,
-				},
-				{
-					name:     "date",
-					dataType: TypeDate,
-				},
-			},
-			wantContainSplitterIndex: -1,
-			wantLabels:               []GrokLabel{},
-			wantErr:                  false,
-		},
-		{
-			name: "schema_with_label_no_duplicated",
-			args: args{
-				schema:             "name string, age long, major string",
-				labelList:          []string{"time string"},
-				containSplitterKey: "",
-				delim:              "",
-				hasHeader:          true,
-			},
-			wantFields: []field{
-				{
-					name:     "name",
-					dataType: TypeString,
-				},
-				{
-					name:     "age",
-					dataType: TypeLong,
-				},
-				{
-					name:     "major",
-					dataType: TypeString,
-				},
-			},
-			wantContainSplitterIndex: -1,
-			wantLabels: []GrokLabel{
-				{
-					Name:  "time",
-					Value: "string",
+					dataType: "string",
 				},
 			},
 			wantErr: false,
 		},
 		{
-			name: "schema_with_label_duplicated",
+			name: "symbol_match",
 			args: args{
-				schema:             "name string, age string, major string",
-				labelList:          []string{"name string", "time string"},
-				containSplitterKey: "",
-				delim:              "",
-				hasHeader:          true,
+				schema: "name string,age long",
 			},
 			wantFields: []field{
 				{
 					name:     "name",
-					dataType: TypeString,
+					dataType: "string",
 				},
 				{
 					name:     "age",
-					dataType: TypeString,
-				},
-				{
-					name:     "major",
-					dataType: TypeString,
-				},
-			},
-			wantContainSplitterIndex: -1,
-			wantLabels: []GrokLabel{
-				{
-					Name:  "time",
-					Value: "string",
+					dataType: "long",
 				},
 			},
 			wantErr: false,
 		},
 		{
-			name: "schema_containSplitterKey",
+			name: "symbol_not_match",
 			args: args{
-				schema:             "name string, a string, major string",
-				labelList:          []string{},
-				containSplitterKey: "a",
-				delim:              "",
-				hasHeader:          true,
+				schema: "{name string,age string{",
+			},
+			wantFields: nil,
+			wantErr:    true,
+		},
+		{
+			name: "schema_error",
+			args: args{
+				schema: "name string age string",
 			},
 			wantFields: []field{
 				{
 					name:     "name",
-					dataType: TypeString,
-				},
-				{
-					name:     "a",
-					dataType: TypeString,
-				},
-				{
-					name:     "major",
-					dataType: TypeString,
-				},
-			},
-			wantContainSplitterIndex: 1,
-			wantLabels:               []GrokLabel{},
-			wantErr:                  false,
-		},
-		{
-			name: "schema_containSplitterKey_but_not_exist",
-			args: args{
-				schema:             "name string, age string, major string",
-				labelList:          []string{},
-				containSplitterKey: "|",
-				delim:              "",
-				hasHeader:          true,
-			},
-			wantFields:               nil,
-			wantContainSplitterIndex: -1,
-			wantLabels:               nil,
-			wantErr:                  true,
-		},
-		{
-			name: "no_schema_without_label",
-			args: args{
-				schema:             "name, age, major",
-				labelList:          []string{},
-				containSplitterKey: "",
-				delim:              ",",
-				hasHeader:          false,
-			},
-			wantFields: []field{
-				{
-					name:     "name",
-					dataType: TypeString,
-				},
-				{
-					name:     "age",
-					dataType: TypeString,
-				},
-				{
-					name:     "major",
-					dataType: TypeString,
-				},
-			},
-			wantContainSplitterIndex: -1,
-			wantLabels:               []GrokLabel{},
-			wantErr:                  false,
-		},
-		{
-			name: "no_schema_with_label",
-			args: args{
-				schema:             "name, age, major",
-				labelList:          []string{"time string"},
-				containSplitterKey: "",
-				delim:              ",",
-				hasHeader:          false,
-			},
-			wantFields: []field{
-				{
-					name:     "name",
-					dataType: TypeString,
-				},
-				{
-					name:     "age",
-					dataType: TypeString,
-				},
-				{
-					name:     "major",
-					dataType: TypeString,
-				},
-			},
-			wantContainSplitterIndex: -1,
-			wantLabels: []GrokLabel{
-				{
-					Name:  "time",
-					Value: "string",
+					dataType: "string",
 				},
 			},
 			wantErr: false,
 		},
 		{
-			name: "no_schema_with_label_duplicated",
+			name: "schema_error_2",
 			args: args{
-				schema:             "name , age , major ",
-				labelList:          []string{"name string", "time string"},
-				containSplitterKey: "",
-				delim:              ",",
-				hasHeader:          false,
+				schema: "name, age string",
 			},
-			wantFields: []field{
-				{
-					name:     "name",
-					dataType: TypeString,
-				},
-				{
-					name:     "age",
-					dataType: TypeString,
-				},
-				{
-					name:     "major",
-					dataType: TypeString,
-				},
-			},
-			wantContainSplitterIndex: -1,
-			wantLabels: []GrokLabel{
-				{
-					Name:  "time",
-					Value: "string",
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "no_schema_no_data_no_label",
-			args: args{
-				schema:             "",
-				labelList:          []string{},
-				containSplitterKey: "",
-				delim:              "",
-				hasHeader:          false,
-			},
-			wantFields:               nil,
-			wantContainSplitterIndex: -1,
-			wantLabels:               nil,
-			wantErr:                  true,
+			wantFields: nil,
+			wantErr:    true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotFields, gotContainSplitterIndex, gotLabels, err := checkHeader(tt.args.schema, tt.args.labelList, tt.args.containSplitterKey, tt.args.delim, tt.args.hasHeader)
+			gotFields, err := setHeaderWithSchema(tt.args.schema)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("checkHeader() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("setHeaderWithSchema() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(gotFields, tt.wantFields) {
-				t.Errorf("checkHeader() gotFields = %v,\n want %v", gotFields, tt.wantFields)
+				t.Errorf("setHeaderWithSchema() gotFields = %v, want %v", gotFields, tt.wantFields)
 			}
-			if gotContainSplitterIndex != tt.wantContainSplitterIndex {
-				t.Errorf("checkHeader() gotContainSplitterIndex = %v, want %v", gotContainSplitterIndex, tt.wantContainSplitterIndex)
+		})
+	}
+}
+
+func Test_setHeaderWithoutSchema(t *testing.T) {
+	type args struct {
+		line  string
+		delim string
+		c     conf.MapConf
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []field
+		wantErr bool
+	}{
+		{
+			name: "normal_test",
+			args: args{
+				line:  "name age major",
+				delim: " ",
+				c:     make(conf.MapConf),
+			},
+			want: []field{
+				{
+					name:     "name",
+					dataType: "string",
+				},
+				{
+					name:     "age",
+					dataType: "string",
+				},
+				{
+					name:     "major",
+					dataType: "string",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "field_len_zero",
+			args: args{
+				line:  "",
+				delim: ",",
+				c:     make(conf.MapConf),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := setHeaderWithoutSchema(tt.args.line, tt.args.delim, tt.args.c)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("setHeaderWithoutSchema() error = %v, wantErr %v", err, tt.wantErr)
+				return
 			}
-			if !reflect.DeepEqual(gotLabels, tt.wantLabels) {
-				t.Errorf("checkHeader() gotLabels = %v, want %v", gotLabels, tt.wantLabels)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("setHeaderWithoutSchema() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+
+	line := "name age"
+	delim := " "
+	c := make(conf.MapConf)
+	got, err := setHeaderWithoutSchema(line, delim, c)
+	expect := []field{
+		{
+			name:     "name",
+			dataType: "string",
+		},
+		{
+			name:     "age",
+			dataType: "string",
+		},
+	}
+	keyCSVSchema := "name string,age string"
+	assert.Nil(t, err)
+	assert.Equal(t, expect, got)
+	assert.Equal(t, keyCSVSchema, c[KeyCSVSchema])
+}
+
+func Test_checkLabelAndSplitterKey(t *testing.T) {
+	type args struct {
+		schema             []field
+		labelList          []string
+		containSplitterKey string
+	}
+	tests := []struct {
+		name      string
+		args      args
+		want      []GrokLabel
+		wantIndex int
+		wantErr   bool
+	}{
+		{
+			name: "test_with_label_and_splitter_key",
+			args: args{
+				schema: []field{
+					{
+						name:     "name",
+						dataType: "string",
+					},
+					{
+						name:     "age",
+						dataType: "long",
+					},
+				},
+				labelList: []string{
+					"major string",
+					"time date",
+				},
+				containSplitterKey: "age",
+			},
+			want: []GrokLabel{
+				{
+					Name:  "major",
+					Value: "string",
+				},
+				{
+					Name:  "time",
+					Value: "date",
+				},
+			},
+			wantIndex: 1,
+			wantErr:   false,
+		},
+		{
+			name: "test_without_label_and_splitter_key",
+			args: args{
+				schema: []field{
+					{
+						name:     "name",
+						dataType: "string",
+					},
+					{
+						name:     "age",
+						dataType: "long",
+					},
+				},
+			},
+			want:      []GrokLabel{},
+			wantIndex: -1,
+			wantErr:   false,
+		},
+		{
+			name: "column_duplicated",
+			args: args{
+				schema: []field{
+					{
+						name:     "name",
+						dataType: "string",
+					},
+					{
+						name:     "name",
+						dataType: "string",
+					},
+				},
+				labelList: []string{},
+			},
+			want:      nil,
+			wantIndex: -1,
+			wantErr:   true,
+		},
+		{
+			name: "splitter_key_exist",
+			args: args{
+				schema: []field{
+					{
+						name:     "name",
+						dataType: "string",
+					},
+					{
+						name:     "age",
+						dataType: "long",
+					},
+				},
+				containSplitterKey: "age",
+			},
+			want:      []GrokLabel{},
+			wantIndex: 1,
+			wantErr:   false,
+		},
+		{
+			name: "splitter_key_exist_but_not_found",
+			args: args{
+				schema: []field{
+					{
+						name:     "name",
+						dataType: "string",
+					},
+					{
+						name:     "age",
+						dataType: "long",
+					},
+				},
+				containSplitterKey: "major",
+			},
+			want:      nil,
+			wantIndex: -1,
+			wantErr:   true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, index, err := checkLabelAndSplitterKey(tt.args.schema, tt.args.labelList, tt.args.containSplitterKey)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("checkLabel() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if index != tt.wantIndex {
+				t.Errorf("checkLabel() containSplitterKey = %v, wantKeyIndex %v", index, tt.wantIndex)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("checkLabel() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFields_toString(t *testing.T) {
+	tests := []struct {
+		name string
+		f    Fields
+		want string
+	}{
+		{
+			name: "test_empty",
+			f:    Fields{},
+			want: "",
+		},
+		{
+			name: "test_normal",
+			f: Fields{
+				{
+					name:     "name",
+					dataType: "string",
+				},
+				{
+					name:     "age",
+					dataType: "string",
+				},
+			},
+			want: "name string,age string",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.f.toString(); got != tt.want {
+				t.Errorf("toString() = %v, want %v", got, tt.want)
 			}
 		})
 	}

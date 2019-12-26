@@ -234,6 +234,10 @@ func TestParse(t *testing.T) {
 	assert.NotNil(t, err)
 	assert.EqualValues(t, []Data{{"pandora_stash": "a", "raw_data": "a"}}, got)
 
+	got, err = l.Parse([]string{"algorithm = 1+1=2"})
+	assert.Nil(t, err)
+	assert.EqualValues(t, []Data{{"algorithm": "1+1=2", "raw_data": "algorithm = 1+1=2"}}, got)
+
 	l, err = NewParser(conf.MapConf{
 		KeyParserName:           TypeLogfmt,
 		KeyDisableRecordErrData: "true",
