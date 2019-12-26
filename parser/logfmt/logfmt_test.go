@@ -67,8 +67,8 @@ func Test_parseLine(t *testing.T) {
 					"lvl":      "info",
 					"msg":      "http request",
 					"method":   "PUT",
-					"ts":       "2018-01-02T03:04:05.123Z",
 					"duration": 1.23,
+					"ts":       "2018-01-02T03:04:05.123Z",
 					"log_id":   "123456abc",
 				},
 			},
@@ -227,8 +227,8 @@ func TestParse(t *testing.T) {
 	assert.EqualValues(t, []Data{{"lvl": "50next=sam", "raw_data": "lvl=50next=sam"}}, got)
 
 	got, err = l.Parse([]string{"lvl=50\n=sam"})
-	assert.NotNil(t, err)
-	assert.EqualValues(t, []Data{{"pandora_stash": "lvl=50\n=sam", "raw_data": "lvl=50\n=sam"}}, got)
+	assert.Nil(t, err)
+	assert.EqualValues(t, []Data{{"lvl": "50\n=sam", "raw_data": "lvl=50\n=sam"}}, got)
 
 	got, err = l.Parse([]string{"", "a"})
 	assert.NotNil(t, err)
@@ -291,7 +291,7 @@ func TestParseWithKeepRawData(t *testing.T) {
 					"lvl":      float64(5),
 					"msg":      "error",
 					"log_id":   "123456abc",
-					"method":   "PUT",
+					"method":"PUT",
 					"duration": 1.23,
 					"raw_data": "ts:2018-01-02T03:04:05.123Z lvl:5 msg:\"error\" log_id:123456abc\nmethod:PUT duration:1.23 log_id:123456abc",
 				},
@@ -362,6 +362,7 @@ func Test_splitKV(t *testing.T) {
 				"def",
 				"abc",
 				"abc",
+
 			},
 			existErr: false,
 			splitter: "=",
@@ -369,10 +370,10 @@ func Test_splitKV(t *testing.T) {
 		{
 			line: "foo\n=def\nabc=a\nbc",
 			expectData: []string{
-				"abc",
-				"abc",
 				"foo",
 				"def",
+				"abc",
+				"a\nbc",
 			},
 			existErr: false,
 			splitter: "=",
@@ -380,10 +381,10 @@ func Test_splitKV(t *testing.T) {
 		{
 			line: "foo=def \n abc =abc",
 			expectData: []string{
-				"abc",
-				"abc",
 				"foo",
 				"def",
+				"abc",
+				"abc",
 			},
 			existErr: false,
 			splitter: "=",
@@ -391,10 +392,10 @@ func Test_splitKV(t *testing.T) {
 		{
 			line: "foo=def\n abc=abc",
 			expectData: []string{
-				"abc",
-				"abc",
 				"foo",
 				"def",
+				"abc",
+				"abc",
 			},
 			existErr: false,
 			splitter: "=",
@@ -403,7 +404,7 @@ func Test_splitKV(t *testing.T) {
 			line: "foo=def\n test abc=abc",
 			expectData: []string{
 				"foo",
-				"def test",
+				"def\n test",
 				"abc",
 				"abc",
 			},
@@ -414,7 +415,7 @@ func Test_splitKV(t *testing.T) {
 			line: "time=2018-01-02T03:04:05.123Z \nCST abc=abc",
 			expectData: []string{
 				"time",
-				"2018-01-02T03:04:05.123Z CST",
+				"2018-01-02T03:04:05.123Z \nCST",
 				"abc",
 				"abc",
 			},
@@ -448,21 +449,16 @@ func Test_splitKV(t *testing.T) {
 			splitter:   "::",
 		},
 		{
-			line: "f:o:o:\n:def",
-			expectData: []string{
-				"f:o:o",
-				"def",
-			},
-			existErr: false,
-			splitter: "::",
+			line:       "f:o:o:\n:def",
+			expectData: nil,
+			existErr:   true,
+			splitter:   "::",
 		},
 		{
 			line: "f:\no::a o:\n:def",
 			expectData: []string{
-				"f:o",
-				"a",
-				"o",
-				"def",
+				"f:\no",
+				"a o:\n:def",
 			},
 			existErr: false,
 			splitter: "::",

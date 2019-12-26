@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -73,7 +74,7 @@ func Test_Parser(t *testing.T) {
 		`cc jj uu {"x":1,"y":"2"} ` + tmstr,          // error => uu 不是float
 		`2 fufu 3.15 999 ` + tmstr,                   //error，999不是jsonmap
 		`3 fufu 3.16 {"x":1,"y":["xx:12"]} ` + tmstr, //correct
-		`   `,
+		`   `,                   // 空行被省略
 		`4 fufu 3.17  ` + tmstr, //correct,jsonmap允许为空
 	}
 	datas, err = p.Parse(lines)
@@ -108,7 +109,7 @@ func Test_Parser(t *testing.T) {
 
 	delete(c, KeyCSVSchema)
 	_, err = NewParser(c)
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
 	t.Log("err: ", err)
 
 	c[KeyCSVSchema] = "a long, b string, c float, d jsonmap{x string,y long}},e date"
@@ -145,6 +146,177 @@ func Test_Parser(t *testing.T) {
 	_, err = NewParser(c)
 	assert.NotNil(t, err)
 	t.Log("err: ", err)
+
+	// 增加测试 没有schema的情况
+	c[KeyCSVSchema] = ""
+	p, err = NewParser(c)
+	if err != nil {
+		t.Error(err)
+	}
+	// 1.正常情况
+	lines = []string{
+		`id name pos array time `,
+		`1 fufu 3.14 {"x":1,"y":"2"} ` + tmstr,
+	}
+	expectData := []Data{
+		{
+			"id":    "1",
+			"name":  "fufu",
+			"pos":   "3.14",
+			"array": "{\"x\":1,\"y\":\"2\"}",
+			"time":  tmstr,
+		},
+	}
+	datas, err = p.Parse(lines)
+	assert.Nil(t, err)
+	assert.EqualValues(t, expectData, datas)
+
+	// 2. 没有数据
+	p, err = NewParser(c)
+	lines = []string{""}
+	datas, err = p.Parse(lines)
+	assert.NotNil(t, err)
+	t.Log("err: ", err)
+
+	// 3.有标签，重复
+	c[KeyCSVLabels] = "name string, time date"
+	p, err = NewParser(c)
+	lines = []string{
+		"name age",
+		"li 21",
+	}
+	expectData = []Data{
+		{
+			"name": "li",
+			"age":  "21",
+			"time": "date",
+		},
+	}
+	datas, err = p.Parse(lines)
+	assert.Nil(t, err)
+	assert.EqualValues(t, expectData, datas)
+
+	// 4.有标签，不重复
+	c[KeyCSVLabels] = "pos string, time date"
+	p, err = NewParser(c)
+	lines = []string{
+		"name age",
+		"li 21",
+		"sun 22",
+		"zhang 23",
+		"wang 24",
+		"zhou 25",
+	}
+	expectData = []Data{
+		{
+			"name": "li",
+			"age":  "21",
+			"pos":  "string",
+			"time": "date",
+		},
+		{
+			"name": "sun",
+			"age":  "22",
+			"pos":  "string",
+			"time": "date",
+		},
+		{
+			"name": "zhang",
+			"age":  "23",
+			"pos":  "string",
+			"time": "date",
+		},
+		{
+			"name": "wang",
+			"age":  "24",
+			"pos":  "string",
+			"time": "date",
+		},
+		{
+			"name": "zhou",
+			"age":  "25",
+			"pos":  "string",
+			"time": "date",
+		},
+	}
+	datas, err = p.Parse(lines)
+	assert.Nil(t, err)
+	assert.EqualValues(t, expectData, datas)
+
+	// 5.允许有多余列
+	c[KeyCSVAllowNoMatch] = "true"
+	c[KeyCSVLabels] = ""
+	p, err = NewParser(c)
+	lines = []string{
+		"name age pos",
+		"li 21",
+	}
+	expectData = []Data{
+		{
+			"name": "li",
+			"age":  "21",
+		},
+	}
+	datas, err = p.Parse(lines)
+	assert.Nil(t, err)
+	assert.EqualValues(t, expectData, datas)
+
+	// 6.不允许有多余列
+	c[KeyCSVAllowNoMatch] = "false"
+	p, err = NewParser(c)
+	lines = []string{
+		"name age pos",
+		"li 21",
+	}
+	expectData = []Data{}
+	datas, err = p.Parse(lines)
+	assert.NotNil(t, err)
+	assert.EqualValues(t, expectData, datas)
+	t.Log("err: ", err)
+
+	// 7.缺少列
+	p, err = NewParser(c)
+	lines = []string{
+		"name age",
+		"li 21 3.14",
+	}
+	expectData = []Data{}
+	datas, err = p.Parse(lines)
+	assert.NotNil(t, err)
+	assert.EqualValues(t, expectData, datas)
+	t.Log("err: ", err)
+
+	// 8.包含隔离键 但首部不存在
+	c[KeyCSVContainSplitterKey] = "split"
+	p, err = NewParser(c)
+	lines = []string{
+		"name age",
+		"li 21",
+	}
+	expectData = []Data{}
+	datas, err = p.Parse(lines)
+	assert.NotNil(t, err)
+	assert.EqualValues(t, expectData, datas)
+	t.Log("err: ", err)
+
+	// 9.包含隔离键 且首部存在
+	p, err = NewParser(c)
+	lines = []string{
+		"name age split pos",
+		"li 21 test 3.14",
+	}
+	expectData = []Data{
+		{
+			"name":  "li",
+			"age":   "21",
+			"pos":   "3.14",
+			"split": "test",
+		},
+	}
+	datas, err = p.Parse(lines)
+	assert.Nil(t, err)
+	assert.EqualValues(t, expectData, datas)
+
 }
 
 func Test_CsvParserForErrData(t *testing.T) {
@@ -813,5 +985,290 @@ func Test_ContainSplitterParse(t *testing.T) {
 		res, err := parser.Parse(tc.line)
 		assert.NoError(t, err)
 		assert.Equal(t, tc.wanted, res, "")
+	}
+}
+
+func Test_checkHeader(t *testing.T) {
+	type args struct {
+		schema             string
+		labelList          []string
+		containSplitterKey string
+		delim              string
+		hasHeader          bool
+	}
+	tests := []struct {
+		name                     string
+		args                     args
+		wantFields               []field
+		wantContainSplitterIndex int
+		wantLabels               []GrokLabel
+		wantErr                  bool
+	}{
+		{
+			name: "schema_no_label",
+			args: args{
+				schema:             "name string, age long, major jsonmap{first string}, pos float, date date",
+				labelList:          []string{},
+				containSplitterKey: "",
+				delim:              "",
+				hasHeader:          true,
+			},
+			wantFields: []field{
+				{
+					name:     "name",
+					dataType: TypeString,
+				},
+				{
+					name:     "age",
+					dataType: TypeLong,
+				},
+				{
+					name:     "major",
+					dataType: TypeJSONMap,
+					typeChange: map[string]DataType{
+						"first": TypeString,
+					},
+				},
+				{
+					name:     "pos",
+					dataType: TypeFloat,
+				},
+				{
+					name:     "date",
+					dataType: TypeDate,
+				},
+			},
+			wantContainSplitterIndex: -1,
+			wantLabels:               []GrokLabel{},
+			wantErr:                  false,
+		},
+		{
+			name: "schema_with_label_no_duplicated",
+			args: args{
+				schema:             "name string, age long, major string",
+				labelList:          []string{"time string"},
+				containSplitterKey: "",
+				delim:              "",
+				hasHeader:          true,
+			},
+			wantFields: []field{
+				{
+					name:     "name",
+					dataType: TypeString,
+				},
+				{
+					name:     "age",
+					dataType: TypeLong,
+				},
+				{
+					name:     "major",
+					dataType: TypeString,
+				},
+			},
+			wantContainSplitterIndex: -1,
+			wantLabels: []GrokLabel{
+				{
+					Name:  "time",
+					Value: "string",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "schema_with_label_duplicated",
+			args: args{
+				schema:             "name string, age string, major string",
+				labelList:          []string{"name string", "time string"},
+				containSplitterKey: "",
+				delim:              "",
+				hasHeader:          true,
+			},
+			wantFields: []field{
+				{
+					name:     "name",
+					dataType: TypeString,
+				},
+				{
+					name:     "age",
+					dataType: TypeString,
+				},
+				{
+					name:     "major",
+					dataType: TypeString,
+				},
+			},
+			wantContainSplitterIndex: -1,
+			wantLabels: []GrokLabel{
+				{
+					Name:  "time",
+					Value: "string",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "schema_containSplitterKey",
+			args: args{
+				schema:             "name string, a string, major string",
+				labelList:          []string{},
+				containSplitterKey: "a",
+				delim:              "",
+				hasHeader:          true,
+			},
+			wantFields: []field{
+				{
+					name:     "name",
+					dataType: TypeString,
+				},
+				{
+					name:     "a",
+					dataType: TypeString,
+				},
+				{
+					name:     "major",
+					dataType: TypeString,
+				},
+			},
+			wantContainSplitterIndex: 1,
+			wantLabels:               []GrokLabel{},
+			wantErr:                  false,
+		},
+		{
+			name: "schema_containSplitterKey_but_not_exist",
+			args: args{
+				schema:             "name string, age string, major string",
+				labelList:          []string{},
+				containSplitterKey: "|",
+				delim:              "",
+				hasHeader:          true,
+			},
+			wantFields:               nil,
+			wantContainSplitterIndex: -1,
+			wantLabels:               nil,
+			wantErr:                  true,
+		},
+		{
+			name: "no_schema_without_label",
+			args: args{
+				schema:             "name, age, major",
+				labelList:          []string{},
+				containSplitterKey: "",
+				delim:              ",",
+				hasHeader:          false,
+			},
+			wantFields: []field{
+				{
+					name:     "name",
+					dataType: TypeString,
+				},
+				{
+					name:     "age",
+					dataType: TypeString,
+				},
+				{
+					name:     "major",
+					dataType: TypeString,
+				},
+			},
+			wantContainSplitterIndex: -1,
+			wantLabels:               []GrokLabel{},
+			wantErr:                  false,
+		},
+		{
+			name: "no_schema_with_label",
+			args: args{
+				schema:             "name, age, major",
+				labelList:          []string{"time string"},
+				containSplitterKey: "",
+				delim:              ",",
+				hasHeader:          false,
+			},
+			wantFields: []field{
+				{
+					name:     "name",
+					dataType: TypeString,
+				},
+				{
+					name:     "age",
+					dataType: TypeString,
+				},
+				{
+					name:     "major",
+					dataType: TypeString,
+				},
+			},
+			wantContainSplitterIndex: -1,
+			wantLabels: []GrokLabel{
+				{
+					Name:  "time",
+					Value: "string",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "no_schema_with_label_duplicated",
+			args: args{
+				schema:             "name , age , major ",
+				labelList:          []string{"name string", "time string"},
+				containSplitterKey: "",
+				delim:              ",",
+				hasHeader:          false,
+			},
+			wantFields: []field{
+				{
+					name:     "name",
+					dataType: TypeString,
+				},
+				{
+					name:     "age",
+					dataType: TypeString,
+				},
+				{
+					name:     "major",
+					dataType: TypeString,
+				},
+			},
+			wantContainSplitterIndex: -1,
+			wantLabels: []GrokLabel{
+				{
+					Name:  "time",
+					Value: "string",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "no_schema_no_data_no_label",
+			args: args{
+				schema:             "",
+				labelList:          []string{},
+				containSplitterKey: "",
+				delim:              "",
+				hasHeader:          false,
+			},
+			wantFields:               nil,
+			wantContainSplitterIndex: -1,
+			wantLabels:               nil,
+			wantErr:                  true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotFields, gotContainSplitterIndex, gotLabels, err := checkHeader(tt.args.schema, tt.args.labelList, tt.args.containSplitterKey, tt.args.delim, tt.args.hasHeader)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("checkHeader() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(gotFields, tt.wantFields) {
+				t.Errorf("checkHeader() gotFields = %v,\n want %v", gotFields, tt.wantFields)
+			}
+			if gotContainSplitterIndex != tt.wantContainSplitterIndex {
+				t.Errorf("checkHeader() gotContainSplitterIndex = %v, want %v", gotContainSplitterIndex, tt.wantContainSplitterIndex)
+			}
+			if !reflect.DeepEqual(gotLabels, tt.wantLabels) {
+				t.Errorf("checkHeader() gotLabels = %v, want %v", gotLabels, tt.wantLabels)
+			}
+		})
 	}
 }

@@ -210,52 +210,7 @@ func (p *Parser) parse(line string) ([]Data, error) {
 func splitKV(line string, sep string) ([]string, error) {
 	line = strings.Replace(line, "\\\"", "", -1)
 	data := make([]string, 0, 100)
-	// contain /n;
 
-	nl := strings.Index(line, "\n")
-	for nl != -1 {
-		if nl >= len(line)-1 {
-			line = line[:len(line)-1]
-			break
-		}
-		preSep := strings.LastIndex(line[:nl], sep)
-		nextSep := strings.Index(line[nl+1:], sep)
-		// 前后没sep的情况 不用拆分
-		if nextSep == -1 {
-			break
-		}
-
-		if preSep == -1 {
-			n := strings.Index(line[nl+1:], "\n")
-			if n == -1 {
-				break
-			}
-			nl = nl + 1 + n
-			continue
-		}
-
-		// 前后都有sep的情况：右侧trim后有空格 合并；没有则不合并
-		afTrim := strings.TrimSpace(line[nl+1 : nl+1+nextSep])
-		nextSpace := strings.LastIndexFunc(afTrim, unicode.IsSpace)
-		if nextSpace != -1 {
-			n := strings.Index(line[nl+1:], "\n")
-			if n == -1 {
-				break
-			}
-			nl = nl + 1 + n
-			continue
-		}
-		next := line[nl+1:]
-		nextResult, err := splitKV(next, sep)
-		if err != nil {
-			return nil, err
-		}
-		data = append(data, nextResult...)
-		line = line[:nl]
-		nl = strings.Index(line, "\n")
-	}
-
-	line = strings.Replace(line, "\n", "", -1)
 	if !strings.Contains(line, sep) {
 		return nil, errors.New(fmt.Sprintf("no splitter exist, %s", errMsg))
 	}
