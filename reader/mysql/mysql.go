@@ -794,19 +794,23 @@ func (r *MysqlReader) getSQL(idx int, rawSQL string) string {
 	r.muxOffsets.RLock()
 	defer r.muxOffsets.RUnlock()
 
+	link := "WHERE"
+	if strings.Contains(strings.ToUpper(rawSQL), "WHERE") {
+		link = "AND"
+	}
 	if len(r.timestampKey) > 0 {
 		if r.timestampKeyInt {
-			return fmt.Sprintf("%s WHERE %s >= %v and %s < %v;", rawSQL, r.timestampKey, r.startTimeInt, r.timestampKey, r.startTimeInt+int64(r.batchDurInt))
+			return fmt.Sprintf("%s %s %s >= %v AND %s < %v;", rawSQL, link, r.timestampKey, r.startTimeInt, r.timestampKey, r.startTimeInt+int64(r.batchDurInt))
 		}
 		if r.startTimeStr == "" {
-			return fmt.Sprintf("%s WHERE %s >= '%s' and %s < '%s';", rawSQL, r.timestampKey, r.startTime.Format(MysqlTimeFormat), r.timestampKey, r.startTime.Add(r.batchDuration).Format(MysqlTimeFormat))
+			return fmt.Sprintf("%s %s %s >= '%s' AND %s < '%s';", rawSQL, link, r.timestampKey, r.startTime.Format(MysqlTimeFormat), r.timestampKey, r.startTime.Add(r.batchDuration).Format(MysqlTimeFormat))
 		}
-		return fmt.Sprintf("%s WHERE %s >= '%s';", rawSQL, r.timestampKey, r.startTimeStr)
+		return fmt.Sprintf("%s %s %s >= '%s';", rawSQL, link, r.timestampKey, r.startTimeStr)
 	}
 
 	rawSQL = strings.TrimSuffix(strings.TrimSpace(rawSQL), ";")
 	if len(r.offsetKey) > 0 && len(r.offsets) > idx {
-		return fmt.Sprintf("%s WHERE %v >= %d AND %v < %d;", rawSQL, r.offsetKey, r.offsets[idx], r.offsetKey, r.offsets[idx]+int64(r.readBatch))
+		return fmt.Sprintf("%s %s %v >= %d AND %v < %d;", rawSQL, link, r.offsetKey, r.offsets[idx], r.offsetKey, r.offsets[idx]+int64(r.readBatch))
 	}
 	return rawSQL
 }
