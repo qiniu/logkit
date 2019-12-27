@@ -1,6 +1,7 @@
 package logfmt
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/qiniu/logkit/parser"
@@ -63,13 +64,11 @@ func Test_parseLine(t *testing.T) {
 			line: "ts=2018-01-02T03:04:05.123Z lvl=info msg=\"http request\" method=PUT\nduration=1.23 log_id=123456abc",
 			expectData: []Data{
 				{
-					"lvl":    "info",
-					"msg":    "http request",
-					"method": "PUT",
-					"ts":     "2018-01-02T03:04:05.123Z",
-				},
-				{
+					"lvl":      "info",
+					"msg":      "http request",
+					"method":   "PUT",
 					"duration": 1.23,
+					"ts":       "2018-01-02T03:04:05.123Z",
 					"log_id":   "123456abc",
 				},
 			},
@@ -115,10 +114,15 @@ func Test_parseLine(t *testing.T) {
 			splitter:   "=",
 		},
 		{
-			line:       `abc=abc foo="def`,
-			expectData: []Data{},
-			existErr:   true,
-			splitter:   "=",
+			line: `abc=abc foo="def`,
+			expectData: []Data{
+				{
+					"abc": "abc",
+					"foo": "\"def",
+				},
+			},
+			existErr: false,
+			splitter: "=",
 		},
 		{
 			line:       `"foo=" bar=abc`,
@@ -134,6 +138,7 @@ func Test_parseLine(t *testing.T) {
 		l.keepString = tt.keepString
 		l.splitter = tt.splitter
 		got, err := l.parse(tt.line)
+		fmt.Println("got: ", got, " err: ", err)
 		assert.Equal(t, tt.existErr, err != nil)
 		assert.Equal(t, len(tt.expectData), len(got))
 		for i, m := range got {
@@ -151,29 +156,27 @@ func TestParse(t *testing.T) {
 			expectData: []Data{},
 		},
 		{
-			s: []string{`ts=2018-01-02T03:04:05.123Z lvl=5 msg="error" log_id=123456abc`},
+			s: []string{`ts=2018-01-02T03:04:05.123Z  CST   lvl=5 msg="error" isTest=true log_id=123456abc`},
 			expectData: []Data{
 				{
-					"ts":     "2018-01-02T03:04:05.123Z",
+					"ts":     "2018-01-02T03:04:05.123Z  CST",
 					"lvl":    float64(5),
 					"msg":    "error",
+					"isTest": true,
 					"log_id": "123456abc",
 				},
 			},
 		},
 		{
-			s: []string{"ts=2018-01-02T03:04:05.123Z lvl=5 msg=\"error\" log_id=123456abc\nmethod=PUT duration=1.23 log_id=123456abc"},
+			s: []string{"\nts=2018-01-02T03:04:05.123Z lvl=5 msg=\"error\" log_id=123456abc\nmethod=PUT duration=1.23 \n"},
 			expectData: []Data{
 				{
-					"ts":     "2018-01-02T03:04:05.123Z",
-					"lvl":    float64(5),
-					"msg":    "error",
-					"log_id": "123456abc",
-				},
-				{
+					"ts":       "2018-01-02T03:04:05.123Z",
+					"lvl":      float64(5),
+					"msg":      "error",
+					"log_id":   "123456abc",
 					"method":   "PUT",
 					"duration": 1.23,
-					"log_id":   "123456abc",
 				},
 			},
 		},
@@ -202,7 +205,7 @@ func TestParse(t *testing.T) {
 
 	got, err := l.Parse([]string{"", "a"})
 	assert.NotNil(t, err)
-	assert.EqualValues(t, "success 0 errors 1 last error no value was parsed after logfmt, will keep origin data in pandora_stash if disable_record_errdata field is false, send error detail <nil>", err.Error())
+	assert.EqualValues(t, "success 0 errors 1 last error no splitter exist, will keep origin data in pandora_stash if disable_record_errdata field is false, send error detail <nil>", err.Error())
 	assert.EqualValues(t, []Data{{"pandora_stash": "a"}}, got)
 
 	l, err = NewParser(conf.MapConf{
@@ -211,9 +214,29 @@ func TestParse(t *testing.T) {
 	})
 	assert.Nil(t, err)
 
+	got, err = l.Parse([]string{"lvl= "})
+	assert.NotNil(t, err)
+	assert.EqualValues(t, []Data{{"pandora_stash": "lvl=", "raw_data": "lvl="}}, got)
+
+	got, err = l.Parse([]string{" =50"})
+	assert.NotNil(t, err)
+	assert.EqualValues(t, []Data{{"pandora_stash": "=50", "raw_data": "=50"}}, got)
+
+	got, err = l.Parse([]string{"lvl=50next=sam"})
+	assert.Nil(t, err)
+	assert.EqualValues(t, []Data{{"lvl": "50next=sam", "raw_data": "lvl=50next=sam"}}, got)
+
+	got, err = l.Parse([]string{"lvl=50\n=sam"})
+	assert.Nil(t, err)
+	assert.EqualValues(t, []Data{{"lvl": "50\n=sam", "raw_data": "lvl=50\n=sam"}}, got)
+
 	got, err = l.Parse([]string{"", "a"})
 	assert.NotNil(t, err)
 	assert.EqualValues(t, []Data{{"pandora_stash": "a", "raw_data": "a"}}, got)
+
+	got, err = l.Parse([]string{"algorithm = 1+1=2"})
+	assert.Nil(t, err)
+	assert.EqualValues(t, []Data{{"algorithm": "1+1=2", "raw_data": "algorithm = 1+1=2"}}, got)
 
 	l, err = NewParser(conf.MapConf{
 		KeyParserName:           TypeLogfmt,
@@ -257,12 +280,8 @@ func TestParseWithKeepRawData(t *testing.T) {
 					"lvl":      float64(5),
 					"msg":      "error",
 					"log_id":   "123456abc",
-					"raw_data": "ts=2018-01-02T03:04:05.123Z lvl=5 msg=\"error\" log_id=123456abc\nmethod=PUT duration=1.23 log_id=123456abc",
-				},
-				{
 					"method":   "PUT",
 					"duration": 1.23,
-					"log_id":   "123456abc",
 					"raw_data": "ts=2018-01-02T03:04:05.123Z lvl=5 msg=\"error\" log_id=123456abc\nmethod=PUT duration=1.23 log_id=123456abc",
 				},
 			},
@@ -276,12 +295,8 @@ func TestParseWithKeepRawData(t *testing.T) {
 					"lvl":      float64(5),
 					"msg":      "error",
 					"log_id":   "123456abc",
-					"raw_data": "ts:2018-01-02T03:04:05.123Z lvl:5 msg:\"error\" log_id:123456abc\nmethod:PUT duration:1.23 log_id:123456abc",
-				},
-				{
-					"method":   "PUT",
+					"method":"PUT",
 					"duration": 1.23,
-					"log_id":   "123456abc",
 					"raw_data": "ts:2018-01-02T03:04:05.123Z lvl:5 msg:\"error\" log_id:123456abc\nmethod:PUT duration:1.23 log_id:123456abc",
 				},
 			},
@@ -316,5 +331,156 @@ func GetParseTestData(line string, size int) []string {
 		}
 		testSlice = append(testSlice, line)
 		totalSize += len(line)
+	}
+}
+
+func Test_splitKV(t *testing.T) {
+
+	tests := []struct {
+		line       string
+		expectData []string
+		existErr   bool
+		splitter   string
+	}{
+		{
+			line: "foo=",
+			expectData: []string{
+				"foo",
+			},
+			existErr: false,
+			splitter: "=",
+		},
+		{
+			line: "=def",
+			expectData: []string{
+				"",
+				"def",
+			},
+			existErr: false,
+			splitter: "=",
+		},
+		{
+			line: "foo=def abc = abc ",
+			expectData: []string{
+				"foo",
+				"def",
+				"abc",
+				"abc",
+
+			},
+			existErr: false,
+			splitter: "=",
+		},
+		{
+			line: "foo\n=def\nabc=a\nbc",
+			expectData: []string{
+				"foo",
+				"def",
+				"abc",
+				"a\nbc",
+			},
+			existErr: false,
+			splitter: "=",
+		},
+		{
+			line: "foo=def \n abc =abc",
+			expectData: []string{
+				"foo",
+				"def",
+				"abc",
+				"abc",
+			},
+			existErr: false,
+			splitter: "=",
+		},
+		{
+			line: "foo=def\n abc=abc",
+			expectData: []string{
+				"foo",
+				"def",
+				"abc",
+				"abc",
+			},
+			existErr: false,
+			splitter: "=",
+		},
+		{
+			line: "foo=def\n test abc=abc",
+			expectData: []string{
+				"foo",
+				"def\n test",
+				"abc",
+				"abc",
+			},
+			existErr: false,
+			splitter: "=",
+		},
+		{
+			line: "time=2018-01-02T03:04:05.123Z \nCST abc=abc",
+			expectData: []string{
+				"time",
+				"2018-01-02T03:04:05.123Z \nCST",
+				"abc",
+				"abc",
+			},
+			existErr: false,
+			splitter: "=",
+		},
+		{
+			line: "foo:de:f ad abc:a:b:c",
+			expectData: []string{
+				"foo",
+				"de:f ad",
+				"abc",
+				"a:b:c",
+			},
+			existErr: false,
+			splitter: ":",
+		},
+		{
+			line: "f:o:o::def",
+			expectData: []string{
+				"f:o:o",
+				"def",
+			},
+			existErr: false,
+			splitter: "::",
+		},
+		{
+			line:       "f:o:o:def",
+			expectData: []string{},
+			existErr:   true,
+			splitter:   "::",
+		},
+		{
+			line:       "f:o:o:\n:def",
+			expectData: nil,
+			existErr:   true,
+			splitter:   "::",
+		},
+		{
+			line: "f:\no::a o:\n:def",
+			expectData: []string{
+				"f:\no",
+				"a o:\n:def",
+			},
+			existErr: false,
+			splitter: "::",
+		},
+		{
+			line:       "f:o:o: \n :def",
+			expectData: []string{},
+			existErr:   true,
+			splitter:   "::",
+		},
+	}
+	for _, tt := range tests {
+		got, err := splitKV(tt.line, tt.splitter)
+		assert.Equal(t, tt.existErr, err != nil)
+		assert.Equal(t, len(tt.expectData), len(got))
+		for i, m := range got {
+			assert.Equal(t, tt.expectData[i], m)
+		}
+
 	}
 }

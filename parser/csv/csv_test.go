@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -73,7 +74,7 @@ func Test_Parser(t *testing.T) {
 		`cc jj uu {"x":1,"y":"2"} ` + tmstr,          // error => uu 不是float
 		`2 fufu 3.15 999 ` + tmstr,                   //error，999不是jsonmap
 		`3 fufu 3.16 {"x":1,"y":["xx:12"]} ` + tmstr, //correct
-		`   `,
+		`   `,                   // 空行被省略
 		`4 fufu 3.17  ` + tmstr, //correct,jsonmap允许为空
 	}
 	datas, err = p.Parse(lines)
@@ -108,7 +109,7 @@ func Test_Parser(t *testing.T) {
 
 	delete(c, KeyCSVSchema)
 	_, err = NewParser(c)
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
 	t.Log("err: ", err)
 
 	c[KeyCSVSchema] = "a long, b string, c float, d jsonmap{x string,y long}},e date"
@@ -145,6 +146,184 @@ func Test_Parser(t *testing.T) {
 	_, err = NewParser(c)
 	assert.NotNil(t, err)
 	t.Log("err: ", err)
+
+	// 增加测试 没有schema的情况
+	c[KeyCSVSchema] = ""
+	p, err = NewParser(c)
+	if err != nil {
+		t.Error(err)
+	}
+	// 1.正常情况
+	lines = []string{
+		`id name pos array time `,
+		`1 fufu 3.14 {"x":1,"y":"2"} ` + tmstr,
+	}
+	expectData := []Data{
+		{
+			"id":    "1",
+			"name":  "fufu",
+			"pos":   "3.14",
+			"array": "{\"x\":1,\"y\":\"2\"}",
+			"time":  tmstr,
+		},
+	}
+	datas, err = p.Parse(lines)
+	assert.Nil(t, err)
+	assert.EqualValues(t, expectData, datas)
+
+	// 2. 没有数据
+	p, err = NewParser(c)
+	lines = []string{""}
+	datas, err = p.Parse(lines)
+	assert.NotNil(t, err)
+	t.Log("err: ", err)
+
+	// 3.有标签，重复
+	c[KeyCSVSchema] = ""
+	c[KeyCSVLabels] = "name string, time date"
+	p, err = NewParser(c)
+	lines = []string{
+		"name age",
+		"li 21",
+	}
+	expectData = []Data{
+		{
+			"name": "li",
+			"age":  "21",
+			"time": "date",
+		},
+	}
+	datas, err = p.Parse(lines)
+	assert.Nil(t, err)
+	assert.EqualValues(t, expectData, datas)
+
+	// 4.有标签，不重复
+	c[KeyCSVLabels] = "pos string, time date"
+	c[KeyCSVSchema] = ""
+	p, err = NewParser(c)
+	lines = []string{
+		"name age",
+		"li 21",
+		"sun 22",
+		"zhang 23",
+		"wang 24",
+		"zhou 25",
+	}
+	expectData = []Data{
+		{
+			"name": "li",
+			"age":  "21",
+			"pos":  "string",
+			"time": "date",
+		},
+		{
+			"name": "sun",
+			"age":  "22",
+			"pos":  "string",
+			"time": "date",
+		},
+		{
+			"name": "zhang",
+			"age":  "23",
+			"pos":  "string",
+			"time": "date",
+		},
+		{
+			"name": "wang",
+			"age":  "24",
+			"pos":  "string",
+			"time": "date",
+		},
+		{
+			"name": "zhou",
+			"age":  "25",
+			"pos":  "string",
+			"time": "date",
+		},
+	}
+	datas, err = p.Parse(lines)
+	assert.Nil(t, err)
+	assert.EqualValues(t, expectData, datas)
+
+	// 5.允许有多余列
+	c[KeyCSVAllowNoMatch] = "true"
+	c[KeyCSVLabels] = ""
+	c[KeyCSVSchema] = ""
+	p, err = NewParser(c)
+	lines = []string{
+		"name age pos",
+		"li 21",
+	}
+	expectData = []Data{
+		{
+			"name": "li",
+			"age":  "21",
+		},
+	}
+	datas, err = p.Parse(lines)
+	assert.Nil(t, err)
+	assert.EqualValues(t, expectData, datas)
+
+	// 6.不允许有多余列
+	c[KeyCSVAllowNoMatch] = "false"
+	c[KeyCSVSchema] = ""
+	p, err = NewParser(c)
+	lines = []string{
+		"name age pos",
+		"li 21",
+	}
+	expectData = []Data{}
+	datas, err = p.Parse(lines)
+	assert.NotNil(t, err)
+	assert.EqualValues(t, expectData, datas)
+	t.Log("err: ", err)
+
+	// 7.缺少列
+	c[KeyCSVSchema] = ""
+	p, err = NewParser(c)
+	lines = []string{
+		"name age",
+		"li 21 3.14",
+	}
+	expectData = []Data{}
+	datas, err = p.Parse(lines)
+	assert.NotNil(t, err)
+	assert.EqualValues(t, expectData, datas)
+	t.Log("err: ", err)
+
+	// 8.包含隔离键 但首部不存在
+	c[KeyCSVSchema] = ""
+	c[KeyCSVContainSplitterKey] = "split"
+	p, err = NewParser(c)
+	lines = []string{
+		"name age",
+		"li 21",
+	}
+	expectData = []Data{}
+	datas, err = p.Parse(lines)
+	assert.NotNil(t, err)
+	assert.EqualValues(t, expectData, datas)
+	t.Log("err: ", err)
+
+	// 9.包含隔离键 且首部存在
+	c[KeyCSVSchema] = ""
+	p, err = NewParser(c)
+	lines = []string{
+		"name age split pos",
+		"li 21 test 3.14",
+	}
+	expectData = []Data{
+		{
+			"name":  "li",
+			"age":   "21",
+			"pos":   "3.14",
+			"split": "test",
+		},
+	}
+	datas, err = p.Parse(lines)
+	assert.Nil(t, err)
+	assert.EqualValues(t, expectData, datas)
+
 }
 
 func Test_CsvParserForErrData(t *testing.T) {
@@ -813,5 +992,346 @@ func Test_ContainSplitterParse(t *testing.T) {
 		res, err := parser.Parse(tc.line)
 		assert.NoError(t, err)
 		assert.Equal(t, tc.wanted, res, "")
+	}
+}
+
+func Test_setHeaderWithSchema(t *testing.T) {
+	type args struct {
+		schema string
+	}
+	tests := []struct {
+		name       string
+		args       args
+		wantFields []field
+		wantErr    bool
+	}{
+		{
+			name: "normal_test",
+			args: args{
+				schema: "name string,age string",
+			},
+			wantFields: []field{
+				{
+					name:     "name",
+					dataType: "string",
+				},
+				{
+					name:     "age",
+					dataType: "string",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "symbol_match",
+			args: args{
+				schema: "name string,age long",
+			},
+			wantFields: []field{
+				{
+					name:     "name",
+					dataType: "string",
+				},
+				{
+					name:     "age",
+					dataType: "long",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "symbol_not_match",
+			args: args{
+				schema: "{name string,age string{",
+			},
+			wantFields: nil,
+			wantErr:    true,
+		},
+		{
+			name: "schema_error",
+			args: args{
+				schema: "name string age string",
+			},
+			wantFields: []field{
+				{
+					name:     "name",
+					dataType: "string",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "schema_error_2",
+			args: args{
+				schema: "name, age string",
+			},
+			wantFields: nil,
+			wantErr:    true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotFields, err := setHeaderWithSchema(tt.args.schema)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("setHeaderWithSchema() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(gotFields, tt.wantFields) {
+				t.Errorf("setHeaderWithSchema() gotFields = %v, want %v", gotFields, tt.wantFields)
+			}
+		})
+	}
+}
+
+func Test_setHeaderWithoutSchema(t *testing.T) {
+	type args struct {
+		line  string
+		delim string
+		c     conf.MapConf
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []field
+		wantErr bool
+	}{
+		{
+			name: "normal_test",
+			args: args{
+				line:  "name age major",
+				delim: " ",
+				c:     make(conf.MapConf),
+			},
+			want: []field{
+				{
+					name:     "name",
+					dataType: "string",
+				},
+				{
+					name:     "age",
+					dataType: "string",
+				},
+				{
+					name:     "major",
+					dataType: "string",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "field_len_zero",
+			args: args{
+				line:  "",
+				delim: ",",
+				c:     make(conf.MapConf),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := setHeaderWithoutSchema(tt.args.line, tt.args.delim, tt.args.c)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("setHeaderWithoutSchema() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("setHeaderWithoutSchema() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+
+	line := "name age"
+	delim := " "
+	c := make(conf.MapConf)
+	got, err := setHeaderWithoutSchema(line, delim, c)
+	expect := []field{
+		{
+			name:     "name",
+			dataType: "string",
+		},
+		{
+			name:     "age",
+			dataType: "string",
+		},
+	}
+	keyCSVSchema := "name string,age string"
+	assert.Nil(t, err)
+	assert.Equal(t, expect, got)
+	assert.Equal(t, keyCSVSchema, c[KeyCSVSchema])
+}
+
+func Test_checkLabelAndSplitterKey(t *testing.T) {
+	type args struct {
+		schema             []field
+		labelList          []string
+		containSplitterKey string
+	}
+	tests := []struct {
+		name      string
+		args      args
+		want      []GrokLabel
+		wantIndex int
+		wantErr   bool
+	}{
+		{
+			name: "test_with_label_and_splitter_key",
+			args: args{
+				schema: []field{
+					{
+						name:     "name",
+						dataType: "string",
+					},
+					{
+						name:     "age",
+						dataType: "long",
+					},
+				},
+				labelList: []string{
+					"major string",
+					"time date",
+				},
+				containSplitterKey: "age",
+			},
+			want: []GrokLabel{
+				{
+					Name:  "major",
+					Value: "string",
+				},
+				{
+					Name:  "time",
+					Value: "date",
+				},
+			},
+			wantIndex: 1,
+			wantErr:   false,
+		},
+		{
+			name: "test_without_label_and_splitter_key",
+			args: args{
+				schema: []field{
+					{
+						name:     "name",
+						dataType: "string",
+					},
+					{
+						name:     "age",
+						dataType: "long",
+					},
+				},
+			},
+			want:      []GrokLabel{},
+			wantIndex: -1,
+			wantErr:   false,
+		},
+		{
+			name: "column_duplicated",
+			args: args{
+				schema: []field{
+					{
+						name:     "name",
+						dataType: "string",
+					},
+					{
+						name:     "name",
+						dataType: "string",
+					},
+				},
+				labelList: []string{},
+			},
+			want:      nil,
+			wantIndex: -1,
+			wantErr:   true,
+		},
+		{
+			name: "splitter_key_exist",
+			args: args{
+				schema: []field{
+					{
+						name:     "name",
+						dataType: "string",
+					},
+					{
+						name:     "age",
+						dataType: "long",
+					},
+				},
+				containSplitterKey: "age",
+			},
+			want:      []GrokLabel{},
+			wantIndex: 1,
+			wantErr:   false,
+		},
+		{
+			name: "splitter_key_exist_but_not_found",
+			args: args{
+				schema: []field{
+					{
+						name:     "name",
+						dataType: "string",
+					},
+					{
+						name:     "age",
+						dataType: "long",
+					},
+				},
+				containSplitterKey: "major",
+			},
+			want:      nil,
+			wantIndex: -1,
+			wantErr:   true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, index, err := checkLabelAndSplitterKey(tt.args.schema, tt.args.labelList, tt.args.containSplitterKey)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("checkLabel() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if index != tt.wantIndex {
+				t.Errorf("checkLabel() containSplitterKey = %v, wantKeyIndex %v", index, tt.wantIndex)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("checkLabel() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFields_toString(t *testing.T) {
+	tests := []struct {
+		name string
+		f    Fields
+		want string
+	}{
+		{
+			name: "test_empty",
+			f:    Fields{},
+			want: "",
+		},
+		{
+			name: "test_normal",
+			f: Fields{
+				{
+					name:     "name",
+					dataType: "string",
+				},
+				{
+					name:     "age",
+					dataType: "string",
+				},
+			},
+			want: "name string,age string",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.f.toString(); got != tt.want {
+				t.Errorf("toString() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

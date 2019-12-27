@@ -1,18 +1,21 @@
 package logfmt
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
-
-	"github.com/go-logfmt/logfmt"
+	"unicode"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/parser"
 	. "github.com/qiniu/logkit/parser/config"
 	. "github.com/qiniu/logkit/utils/models"
+)
+
+const (
+	errMsg = "will keep origin data in pandora_stash if disable_record_errdata field is false"
 )
 
 func init() {
@@ -144,49 +147,115 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 }
 
 func (p *Parser) parse(line string) ([]Data, error) {
-	reader := bytes.NewReader([]byte(line))
-	decoder := logfmt.NewDecoder(reader)
-	datas := make([]Data, 0, 100)
-	var fields Data
-	for {
-		ok := decoder.ScanRecord()
-		if !ok {
-			err := decoder.Err()
-			if err != nil {
-				return nil, err
+
+	pairs, err := splitKV(line, p.splitter)
+	if err != nil {
+		return nil, err
+	}
+
+	// 调整数据类型
+	if len(pairs)%2 == 1 {
+		return nil, errors.New(fmt.Sprintf("key value not match, %s", errMsg))
+	}
+
+	data := make([]Data, 0, 1)
+	field := make(Data)
+	for i := 0; i < len(pairs); i += 2 {
+		// 消除双引号； 针对foo="" ,"foo=" 情况；其他情况如 a"b"c=d"e"f等首尾不出现引号的情况视作合法。
+		kNum := strings.Count(pairs[i], "\"")
+		vNum := strings.Count(pairs[i+1], "\"")
+		if kNum%2 == 1 && vNum%2 == 1 {
+			if strings.HasPrefix(pairs[i], "\"") && strings.HasSuffix(pairs[i+1], "\"") {
+				pairs[i] = pairs[i][1:]
+				pairs[i+1] = pairs[i+1][:len(pairs[i+1])-1]
 			}
-			//此错误仅用于当原始数据解析成功但无解析数据时，保留原始数据之用
-			if len(fields) == 0 {
-				return nil, errors.New("no value was parsed after logfmt, will keep origin data in pandora_stash if disable_record_errdata field is false")
-			}
-			break
 		}
-		fields = make(Data)
-		for decoder.ScanKeyval(p.splitter[0]) {
-			if string(decoder.Value()) == "" {
-				continue
+		if kNum%2 == 0 && len(pairs[i]) > 1 {
+			if strings.HasPrefix(pairs[i], "\"") && strings.HasSuffix(pairs[i], "\"") {
+				pairs[i] = pairs[i][1 : len(pairs[i])-1]
 			}
-			//type conversions
-			value := string(decoder.Value())
-			if !p.keepString {
-				if fValue, err := strconv.ParseFloat(value, 64); err == nil {
-					fields[string(decoder.Key())] = fValue
-					continue
-				}
-			}
-			if bValue, err := strconv.ParseBool(value); err == nil {
-				fields[string(decoder.Key())] = bValue
-				continue
-			}
-			fields[string(decoder.Key())] = value
 		}
-		if len(fields) == 0 {
-			continue
+		if vNum%2 == 0 && len(pairs[i+1]) > 1 {
+			if strings.HasPrefix(pairs[i+1], "\"") && strings.HasSuffix(pairs[i+1], "\"") {
+				pairs[i+1] = pairs[i+1][1 : len(pairs[i+1])-1]
+			}
 		}
 
-		datas = append(datas, fields)
+		if len(pairs[i]) == 0 || len(pairs[i+1]) == 0 {
+			return nil, fmt.Errorf("no value or key was parsed after logfmt, %s", errMsg)
+		}
+
+		value := pairs[i+1]
+		if !p.keepString {
+			if fValue, err := strconv.ParseFloat(value, 64); err == nil {
+				field[pairs[i]] = fValue
+				continue
+			}
+			if bValue, err := strconv.ParseBool(value); err == nil {
+				field[pairs[i]] = bValue
+				continue
+			}
+
+		}
+		field[pairs[i]] = value
 	}
-	return datas, nil
+	if len(field) == 0 {
+		return nil, fmt.Errorf("data is empty after parse, %s", errMsg)
+	}
+
+	data = append(data, field)
+	return data, nil
+}
+
+func splitKV(line string, sep string) ([]string, error) {
+	data := make([]string, 0, 100)
+
+	if !strings.Contains(line, sep) {
+		return nil, errors.New(fmt.Sprintf("no splitter exist, %s", errMsg))
+	}
+
+	kvArr := make([]string, 0, 100)
+	isKey := true
+	vhead := 0
+	lastSpace := 0
+	pos := 0
+	sepLen := len(sep)
+
+	// key或value值中包含sep的情况；默认key中不包含sep；导致algorithm = 1+1=2会变成合法
+	for pos+sepLen <= len(line) {
+		if unicode.IsSpace(rune(line[pos : pos+1][0])) {
+			nextSep := strings.Index(line[pos+1:], sep)
+			if nextSep == -1 {
+				break
+			}
+			if strings.TrimSpace(line[pos+1:pos+1+nextSep]) != "" {
+				lastSpace = pos
+				pos++
+				continue
+			}
+		}
+		if line[pos:pos+sepLen] == sep {
+			if isKey {
+				kvArr = append(kvArr, strings.TrimSpace(line[vhead:pos]))
+				isKey = false
+			} else {
+				if lastSpace <= vhead {
+					pos++
+					continue
+				}
+				kvArr = append(kvArr, strings.TrimSpace(line[vhead:lastSpace]))
+				kvArr = append(kvArr, strings.TrimSpace(line[lastSpace:pos]))
+			}
+			vhead = pos + sepLen
+			pos = pos + sepLen - 1
+		}
+		pos++
+	}
+	if vhead < len(line) {
+		kvArr = append(kvArr, strings.TrimSpace(line[vhead:]))
+	}
+	data = append(data, kvArr...)
+	return data, nil
 }
 
 func (p *Parser) Name() string {

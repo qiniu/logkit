@@ -44,6 +44,10 @@ type Parser struct {
 	numRoutine           int
 	keepRawData          bool
 	containSplitterIndex int
+	labelList            []string
+	containSplitterKey   string
+	config               conf.MapConf
+	hasHeader            headerStatus
 }
 
 type field struct {
@@ -53,6 +57,16 @@ type field struct {
 	allin      bool
 }
 
+type headerStatus int8
+
+const (
+	hasSchema  headerStatus = 1 // 自带schema
+	needSchema headerStatus = 2 // 需要根据第一条数据生成schema
+	done       headerStatus = 3 // schema生成完成，parse返回数据时用于判断是不是第一条数据
+)
+
+type Fields []field
+
 func init() {
 	parser.RegisterConstructor(TypeCSV, NewParser)
 }
@@ -60,36 +74,6 @@ func init() {
 func NewParser(c conf.MapConf) (parser.Parser, error) {
 	name, _ := c.GetStringOr(KeyParserName, "")
 	splitter, _ := c.GetStringOr(KeyCSVSplitter, "\t")
-
-	schema, err := c.GetString(KeyCSVSchema)
-	if err != nil {
-		return nil, err
-	}
-	timeZoneOffsetRaw, _ := c.GetStringOr(KeyTimeZoneOffset, "")
-	timeZoneOffset := ParseTimeZoneOffset(timeZoneOffsetRaw)
-	isAutoRename, _ := c.GetBoolOr(KeyCSVAutoRename, false)
-
-	fieldList, err := parseSchemaFieldList(schema)
-	if err != nil {
-		return nil, err
-	}
-	fields, err := parseSchemaFields(fieldList)
-	if err != nil {
-		return nil, err
-	}
-	nameMap := map[string]struct{}{}
-	for _, newField := range fields {
-		_, exist := nameMap[newField.name]
-		if exist {
-			return nil, errors.New("column conf error: duplicated column " + newField.name)
-		}
-		nameMap[newField.name] = struct{}{}
-	}
-	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
-	if len(labelList) < 1 {
-		labelList, _ = c.GetStringListOr(KeyCSVLabels, []string{}) //向前兼容老的配置
-	}
-	labels := GetGrokLabels(labelList, nameMap)
 
 	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
 
@@ -101,17 +85,36 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	allmoreStartNumber, _ := c.GetIntOr(KeyCSVAllowMoreStartNum, 0)
 	ignoreInvalid, _ := c.GetBoolOr(KeyCSVIgnoreInvalidField, false)
 	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)
+
+	timeZoneOffsetRaw, _ := c.GetStringOr(KeyTimeZoneOffset, "")
+	timeZoneOffset := ParseTimeZoneOffset(timeZoneOffsetRaw)
+	isAutoRename, _ := c.GetBoolOr(KeyCSVAutoRename, false)
 	containSplitterKey, _ := c.GetStringOr(KeyCSVContainSplitterKey, "")
 	containSplitterIndex := -1
-	if containSplitterKey != "" {
-		for index, f := range fields {
-			if f.name == containSplitterKey {
-				containSplitterIndex = index
-				break
-			}
+
+	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
+	if len(labelList) < 1 {
+		labelList, _ = c.GetStringListOr(KeyCSVLabels, []string{}) //向前兼容老的配置
+	}
+
+	// 预先根据schema的长度和获取配置状态判断，len=0使用列表第一行数据作为表头；否则 使用schema作为表头;
+	// 使用第一行作为表头时，会造成数据类型的不明确；暂时使用string类型；
+	hasHeader := hasSchema
+	fields := make([]field, 0, 20)
+	labels := make([]GrokLabel, 0, 20)
+	schema, _ := c.GetStringOr(KeyCSVSchema, "")
+	if len(schema) == 0 {
+		hasHeader = needSchema
+	}
+
+	var err error
+	if hasHeader == hasSchema {
+		// 头部处理
+		if fields, err = setHeaderWithSchema(schema); err != nil {
+			return nil, err
 		}
-		if containSplitterIndex == -1 {
-			return nil, errors.New("containSplitterKey:" + containSplitterKey + " not exists in column")
+		if labels, containSplitterIndex, err = checkLabelAndSplitterKey(fields, labelList, containSplitterKey); err != nil {
+			return nil, err
 		}
 	}
 
@@ -134,7 +137,85 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		numRoutine:           numRoutine,
 		keepRawData:          keepRawData,
 		containSplitterIndex: containSplitterIndex,
+		labelList:            labelList,
+		containSplitterKey:   containSplitterKey,
+		config:               c,
+		hasHeader:            hasHeader,
 	}, nil
+}
+
+func setHeaderWithSchema(schema string) (fields []field, err error) {
+	// 包装头部处理 hasHeader == true
+	// 用户设置的表头处理
+	fieldList, err := parseSchemaFieldList(schema)
+	if err != nil {
+		return nil, err
+	}
+	fields, err = parseSchemaFields(fieldList)
+	if err != nil {
+		return nil, err
+	}
+	return fields, nil
+}
+
+func setHeaderWithoutSchema(line string, delim string, c conf.MapConf) ([]field, error) {
+	// 从第一行获取的表头处理
+	line = strings.TrimSpace(line)
+	if len(line) == 0 {
+		return nil, fmt.Errorf("cannot parsed csv header, the csv first line is %v, the delim is %v", line, delim)
+	}
+	fieldList := strings.Split(line, delim)
+	fields := make([]field, len(fieldList))
+	for i := 0; i < len(fieldList); i++ {
+		f, err := newCsvField(strings.TrimSpace(fieldList[i]), "string")
+		if err != nil {
+			return nil, err
+		}
+		fields[i] = f
+	}
+	c[KeyCSVSchema] = Fields(fields).toString()
+	return fields, nil
+}
+
+func checkLabelAndSplitterKey(schema []field, lList []string, splitterKey string) ([]GrokLabel, int, error) {
+	nameMap := map[string]struct{}{}
+	containSplitterIndex := -1
+	for _, newField := range schema {
+		_, exist := nameMap[newField.name]
+		if exist {
+			return nil, containSplitterIndex, fmt.Errorf("column conf error: duplicated column %s", newField.name)
+		}
+		nameMap[newField.name] = struct{}{}
+	}
+	// 合并labelList 和 schema
+	labels := GetGrokLabels(lList, nameMap)
+
+	if splitterKey != "" {
+		for index, f := range schema {
+			if f.name == splitterKey {
+				containSplitterIndex = index
+				break
+			}
+		}
+		if containSplitterIndex == -1 {
+			return nil, containSplitterIndex, fmt.Errorf("containSplitterKey: %s not exists in column", splitterKey)
+		}
+	}
+	return labels, containSplitterIndex, nil
+}
+
+func (f Fields) toString() string {
+	str := ""
+	for i := 0; i < len(f); i++ {
+		str += f[i].name
+		str += " "
+		str += string(f[i].dataType)
+		if i == len(f)-1 {
+			continue
+		}
+		str += ","
+	}
+	return str
 }
 
 func parseSchemaFieldList(schema string) (fieldList []string, err error) {
@@ -437,6 +518,21 @@ func getUnmachedMessage(parts []string, schemas []field) (ret string) {
 }
 
 func (p *Parser) parse(line string) (d Data, err error) {
+
+	// 1.判断是否使用schema; 针对第一行转换为表头； 2.多线程执行parse 会导致不是第一行数据被执行，或者多条数据被解析为表头，后续考虑解决方案；
+	if p.hasHeader == needSchema {
+		// 转换表头
+		if p.schema, err = setHeaderWithoutSchema(line, p.delim, p.config); err != nil {
+			return nil, err
+		}
+		// 判断标签
+		if p.labels, p.containSplitterIndex, err = checkLabelAndSplitterKey(p.schema, p.labelList, p.containSplitterKey); err != nil {
+			return
+		}
+		p.hasHeader = done
+		return nil, nil
+	}
+
 	d = make(Data)
 	parts := strings.Split(line, p.delim)
 	partsLength := len(parts)
@@ -592,6 +688,11 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 			continue
 		}
 		if len(parseResult.Data) < 1 { //数据为空时不发送
+			if p.hasHeader == done {
+				// 忽略第一次数据
+				p.hasHeader = hasSchema
+				continue
+			}
 			se.LastError = "parsed no data by line " + parseResult.Line
 			se.AddErrors()
 			continue
