@@ -29,12 +29,6 @@ var jsontool = jsoniter.Config{
 	ValidateJsonRawMessage: true,
 }.Froze()
 
-var (
-	labelList          []string
-	containSplitterKey string
-	config             conf.MapConf
-)
-
 type Parser struct {
 	name                 string
 	schema               []field
@@ -50,6 +44,9 @@ type Parser struct {
 	numRoutine           int
 	keepRawData          bool
 	containSplitterIndex int
+	labelList            []string
+	containSplitterKey   string
+	config               conf.MapConf
 	hasHeader            headerStatus
 }
 
@@ -61,10 +58,11 @@ type field struct {
 }
 
 type headerStatus int8
-const(
-	hasSchema headerStatus = 1  // 自带schema
+
+const (
+	hasSchema  headerStatus = 1 // 自带schema
 	needSchema headerStatus = 2 // 需要根据第一条数据生成schema
-	done headerStatus = 3		// schema生成完成，parse返回数据时用于判断是不是第一条数据
+	done       headerStatus = 3 // schema生成完成，parse返回数据时用于判断是不是第一条数据
 )
 
 type Fields []field
@@ -74,7 +72,6 @@ func init() {
 }
 
 func NewParser(c conf.MapConf) (parser.Parser, error) {
-	config = c
 	name, _ := c.GetStringOr(KeyParserName, "")
 	splitter, _ := c.GetStringOr(KeyCSVSplitter, "\t")
 
@@ -92,10 +89,10 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	timeZoneOffsetRaw, _ := c.GetStringOr(KeyTimeZoneOffset, "")
 	timeZoneOffset := ParseTimeZoneOffset(timeZoneOffsetRaw)
 	isAutoRename, _ := c.GetBoolOr(KeyCSVAutoRename, false)
-	containSplitterKey, _ = c.GetStringOr(KeyCSVContainSplitterKey, "")
+	containSplitterKey, _ := c.GetStringOr(KeyCSVContainSplitterKey, "")
 	containSplitterIndex := -1
 
-	labelList, _ = c.GetStringListOr(KeyLabels, []string{})
+	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
 	if len(labelList) < 1 {
 		labelList, _ = c.GetStringListOr(KeyCSVLabels, []string{}) //向前兼容老的配置
 	}
@@ -140,6 +137,9 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		numRoutine:           numRoutine,
 		keepRawData:          keepRawData,
 		containSplitterIndex: containSplitterIndex,
+		labelList:            labelList,
+		containSplitterKey:   containSplitterKey,
+		config:               c,
 		hasHeader:            hasHeader,
 	}, nil
 }
@@ -522,11 +522,11 @@ func (p *Parser) parse(line string) (d Data, err error) {
 	// 1.判断是否使用schema; 针对第一行转换为表头； 2.多线程执行parse 会导致不是第一行数据被执行，或者多条数据被解析为表头，后续考虑解决方案；
 	if p.hasHeader == needSchema {
 		// 转换表头
-		if p.schema, err = setHeaderWithoutSchema(line, p.delim, config); err != nil {
+		if p.schema, err = setHeaderWithoutSchema(line, p.delim, p.config); err != nil {
 			return nil, err
 		}
 		// 判断标签
-		if p.labels, p.containSplitterIndex, err = checkLabelAndSplitterKey(p.schema, labelList, containSplitterKey); err != nil {
+		if p.labels, p.containSplitterIndex, err = checkLabelAndSplitterKey(p.schema, p.labelList, p.containSplitterKey); err != nil {
 			return
 		}
 		p.hasHeader = done
