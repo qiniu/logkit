@@ -1,17 +1,14 @@
 package mutate
 
 import (
-	"bytes"
 	"errors"
-	"strconv"
+	"fmt"
 	"strings"
 	"sync"
 
-	"github.com/go-logfmt/logfmt"
-
-	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
+	"github.com/qiniu/logkit/utils/parse/mutate"
 )
 
 var (
@@ -254,55 +251,18 @@ func (k *KV) transform(dataPipeline <-chan transforms.TransformInfo, resultChan 
 	wg.Done()
 }
 
+// 弃用logfmt切分方式
 func kvTransform(strVal string, splitter string, keepString bool) (Data, error) {
-	var (
-		reader  = bytes.NewReader([]byte(strVal))
-		decoder = logfmt.NewDecoder(reader)
-		data    = make(Data, 0)
-		fields  Data
-	)
-	for {
-		ok := decoder.ScanRecord()
-		if !ok {
-			err := decoder.Err()
-			if err != nil {
-				return nil, err
-			}
-			//此错误仅用于当原始数据解析成功但无解析数据时，保留原始数据之用
-			if len(fields) == 0 {
-				log.Error("no value was parsed after logfmt, will keep origin data in pandora_stash if disable_record_errdata field is false")
-				break
-			}
-			break
-		}
-		fields = make(Data)
-		for decoder.ScanKeyval(splitter[0]) {
-			if string(decoder.Value()) == "" {
-				continue
-			}
-			//type conversions
-			value := string(decoder.Value())
-			if !keepString {
-				if fValue, err := strconv.ParseFloat(value, 64); err == nil {
-					fields[string(decoder.Key())] = fValue
-					continue
-				}
-			}
-			if bValue, err := strconv.ParseBool(value); err == nil {
-				fields[string(decoder.Key())] = bValue
-				continue
-			}
-			fields[string(decoder.Key())] = value
-		}
-		if len(fields) == 0 {
-			continue
-		}
-
-		for fieldKey, fieldVal := range fields {
-			data[fieldKey] = fieldVal
-		}
+	mp := mutate.Parser{
+		KeepString: keepString,
+		Splitter:   splitter,
 	}
-	return data, nil
+
+	datas, err := mp.Parse(strVal)
+	if err != nil {
+		return nil, fmt.Errorf("parse transform key value failed, error msg: %s", err.Error())
+	}
+	return datas[0], nil
 }
 
 func (k *KV) delete(curData Data, errNum int, err error) (int, error) {
