@@ -1,6 +1,7 @@
 package mgr
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -252,8 +253,9 @@ func getDataFromSenderConfig(senderConfig map[string]interface{}) ([]Data, error
 	if rawDataStr == "" {
 		return nil, errors.New("sender fetched empty sample log")
 	}
-
-	if jsonErr := jsoniter.Unmarshal([]byte(rawDataStr), &datas); jsonErr != nil {
+	encoder := jsoniter.NewEncoder(bytes.NewBuffer([]byte(rawDataStr)))
+	encoder.SetEscapeHTML(false)
+	if jsonErr := encoder.Encode(&datas); jsonErr != nil {
 		return nil, jsonErr
 	}
 	return datas, nil
