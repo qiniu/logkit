@@ -13,7 +13,7 @@
     "react-dom": "^15.6.1",
     "react-router": "^3.0.2",
     "react-scripts": "^2.1.5",
-    "lodash": "^4.17.11",
+    "lodash": "^4.17.13",
     "merge": "^1.2.1"
   },
   "scripts": {
