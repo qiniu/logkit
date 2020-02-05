@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bmatcuk/doublestar"
 	"github.com/fsnotify/fsnotify"
 	"github.com/json-iterator/go"
 
@@ -448,10 +449,23 @@ func (m *Manager) handle(path string, watcher *fsnotify.Watcher) {
 }
 
 func (m *Manager) getCleanQueues(dir, file, mode string) ([]*cleanQueue, error) {
-	if mode == ModeTailx {
-		cleanQueues := make([]*cleanQueue, 0, len(m.cleanQueues))
+	cleanQueues := make([]*cleanQueue, 0, len(m.cleanQueues))
+	switch mode {
+	case ModeTailx:
 		for k, v := range m.cleanQueues {
 			matched, err := filepath.Match(k, filepath.Join(dir, file))
+			if err != nil {
+				log.Errorf("match pattern[%v] to path(%v) err %v", k, filepath.Join(dir, file), err)
+				continue
+			}
+			if matched {
+				cleanQueues = append(cleanQueues, v)
+			}
+		}
+		return cleanQueues, nil
+	case ModeDirx:
+		for k, v := range m.cleanQueues {
+			matched, err := doublestar.Match(k, dir)
 			if err != nil {
 				log.Errorf("match pattern[%v] to path(%v) err %v", k, filepath.Join(dir, file), err)
 				continue

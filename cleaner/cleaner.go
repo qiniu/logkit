@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/bmatcuk/doublestar"
+
 	"github.com/qiniu/log"
 
 	"github.com/qiniu/logkit/conf"
@@ -143,7 +145,7 @@ func (c *Cleaner) checkBelong(path string) bool {
 		return matched
 
 	case config.ModeDirx:
-		matched, err := filepath.Match(c.logdir, filepath.Dir(path))
+		matched, err := doublestar.Match(c.logdir, filepath.Dir(path))
 		if err != nil {
 			log.Errorf("Failed to check if %q belongs to %q: %v", path, c.logdir, err)
 			return false
