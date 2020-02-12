@@ -1018,8 +1018,9 @@ var ModeKeyOptions = map[string][]Option{
 		{
 			KeyName:       KeyHttpEscapeHtml,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{true, false},
-			Default:       true,
+			ChooseOptions: []interface{}{"true", "false"},
+			Default:       "true",
+			Element:       Radio,
 			Description:   "发送数据时使用安全的json(http_sender_escape_html)",
 			ToolTip:       `使用安全的json方式`,
 		},
