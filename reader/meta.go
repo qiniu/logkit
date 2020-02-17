@@ -283,8 +283,9 @@ func (m *Meta) CleanExpiredSubMetas(expire time.Duration) {
 		// 二次确认 submeta 目录在删除前的一刻仍旧是过期状态才执行删除操作
 		if hasSubMetaExpired(path, expire) {
 			numCleaned++
-			err := os.RemoveAll(path)
-			log.Infof("Expired submeta %q has been removed with error %v", path, err)
+			if err := os.RemoveAll(path); err != nil {
+				log.Errorf("Expired submeta %q has been removed with error %v", path, err)
+			}
 		}
 		delete(m.subMetaExpired, path)
 	}

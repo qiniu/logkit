@@ -323,7 +323,7 @@ func (r *Reader) statLogPath() {
 
 		if r.hasStopped() || r.isStopping() {
 			log.Warnf("Runner[%v] created new reader for log path %q but daemon reader has stopped/is stopping, will not run at this time", r.meta.RunnerName, logPath)
-			continue
+			break
 		}
 
 		go dr.Run()
