@@ -356,7 +356,7 @@ func (b *BufReader) readBytes(delim byte) ([]byte, error) {
 	// Use readSlice to look for array,
 	// accumulating full buffers.
 	var frag []byte
-	var full [][]byte
+	var full = make([][]byte, 0, 10)
 	var err error
 	for {
 		var e error
@@ -459,15 +459,14 @@ func (b *BufReader) FormMutiLine() []byte {
 
 //ReadLine returns a string line as a normal Reader
 func (b *BufReader) ReadLine() (ret string, err error) {
-	now := time.Now()
-	if !reader.InRunTime(now.Hour(), now.Minute(), b.runTime) {
+	if !reader.InRunTime(0, 0, b.runTime) {
 		time.Sleep(10 * time.Second)
 		return "", nil
 	}
 
 	if b.multiLineRegexp == nil {
 		ret, err = b.ReadString('\n')
-		if os.IsNotExist(err) {
+		if err != nil && os.IsNotExist(err) {
 			if b.lastErrShowTime.Add(5 * time.Second).Before(time.Now()) {
 				if !IsSelfRunner(b.Meta.RunnerName) {
 					log.Errorf("runner[%v] ReadLine err %v", b.Meta.RunnerName, err)

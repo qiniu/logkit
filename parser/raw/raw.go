@@ -60,18 +60,21 @@ func (p *Parser) Type() string {
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
 	var (
-		datas     = make([]Data, len(lines))
-		se        = &StatsError{}
+		datas = make([]Data, len(lines))
+		se    = &StatsError{
+			DatasourceSkipIndex: make([]int, 0, len(lines)),
+		}
 		dataIndex = 0
 	)
 	for idx, line := range lines {
-		//raw格式的不应该trime空格，只需要判断剔除掉全空就好了
-		if len(strings.TrimSpace(line)) <= 0 {
+		//raw格式的不应该trime空格，只需要判断剔除掉全空就好了，rawReadLines中已剔除空格
+		if len(line) <= 0 {
 			se.DatasourceSkipIndex = append(se.DatasourceSkipIndex, idx)
 			continue
 		}
-		d := Data{}
-		d[p.keyRaw] = line
+		d := Data{
+			p.keyRaw: line,
+		}
 		if p.withTimeStamp {
 			d[p.keyTimestamp] = time.Now().Format(time.RFC3339Nano)
 		}

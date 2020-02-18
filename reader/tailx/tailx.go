@@ -294,8 +294,7 @@ func (ar *ActiveReader) Run() {
 			}
 			return
 		}
-		now := time.Now()
-		if !reader.InRunTime(now.Hour(), now.Minute(), ar.runtime) {
+		if !reader.InRunTime(0, 0, ar.runtime) {
 			time.Sleep(time.Minute)
 			continue
 		}
@@ -834,8 +833,7 @@ func (r *Reader) Start() error {
 		ticker := time.NewTicker(r.statInterval)
 		defer ticker.Stop()
 		for {
-			now := time.Now()
-			if reader.InRunTime(now.Hour(), now.Minute(), r.runTime) {
+			if reader.InRunTime(0, 0, r.runTime) {
 				r.checkExpiredFiles()
 				utils.CheckNotExistFile(r.meta.RunnerName, r.expireMap)
 				r.statLogPath()

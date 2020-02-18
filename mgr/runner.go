@@ -656,10 +656,14 @@ func (r *LogExportRunner) readDatas(dr reader.DataReader, dataSourceTag string) 
 func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []string) {
 	var line string
 	var err error
+	lines = make([]string, 0, r.batchLen)
+	if dataSourceTag != "" {
+		froms = make([]string, 0, r.batchLen)
+	}
 	for !utils.BatchFullOrTimeout(r.RunnerName, &r.stopped, r.batchLen, r.batchSize, r.lastSend,
 		r.MaxBatchLen, r.MaxBatchSize, r.MaxBatchInterval) {
 		line, err = r.reader.ReadLine()
-		if os.IsNotExist(err) {
+		if err != nil && os.IsNotExist(err) {
 			log.Debugf("Runner[%v] reader %s - error: %v, sleep 3 second...", r.Name(), r.reader.Name(), err)
 			time.Sleep(3 * time.Second)
 			break
