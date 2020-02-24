@@ -276,6 +276,11 @@ func InRunTime(hour, minute int, runTime RunTime) bool {
 		return true
 	}
 
+	if hour == 0 && minute == 0 {
+		now := time.Now()
+		hour = now.Hour()
+		minute = now.Minute()
+	}
 	if !runTime.isStartLessThanEnd() {
 		if runTime.GreaterThanStart(hour, minute) || runTime.LessThanEnd(hour, minute) {
 			return true

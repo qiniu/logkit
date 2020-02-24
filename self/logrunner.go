@@ -53,8 +53,8 @@ var (
 		"head_pattern":       `^(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} \[(WARN)|(INFO)|(ERROR)]|(DEBUG)\])`,
 	}
 	parserConfig = conf.MapConf{
-		"type":                   "raw",
-		"name":                   "parser",
+		"type": "raw",
+		"name": "parser",
 		"disable_record_errdata": "true",
 	}
 	senderConfig = conf.MapConf{
@@ -238,9 +238,9 @@ func (lr *LogRunner) Stop() error {
 	defer timer.Stop()
 	select {
 	case <-lr.exitChan:
-		log.Debugf("runner %s has been stopped", lr.Name())
+		log.Debugf("Runner[%s] has been stopped", lr.Name())
 	case <-timer.C:
-		log.Debugf("runner %s exited timeout, start to force stop", lr.Name())
+		log.Debugf("Runner[%s] exited timeout, start to force stop", lr.Name())
 		atomic.StoreInt32(&lr.stopped, 1)
 	}
 
