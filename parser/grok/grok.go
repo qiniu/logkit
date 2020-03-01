@@ -240,7 +240,6 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 		if len(parseResult.Data) < 1 { //数据为空时候不发送
 			continue
 		}
-		log.Debugf("D! parse result(%v)", parseResult.Data)
 		se.AddSuccess()
 		if p.keepRawData {
 			parseResult.Data[KeyRawData] = parseResult.Line
@@ -276,11 +275,14 @@ func (p *Parser) parse(line string) (Data, error) {
 		}
 	}
 	if len(values) < 1 {
-		err = fmt.Errorf("%v no value was parsed after grok pattern %v", TruncateStrSize(line, DefaultTruncateMaxSize), p.Patterns)
-		log.Errorf("Parser[%v]: error %v", p.name, err)
-		return nil, err
+		return nil, fmt.Errorf("%v no value was parsed after grok pattern %v", TruncateStrSize(line, DefaultTruncateMaxSize), p.Patterns)
 	}
 	data := Data{}
+	var (
+		iv int64
+		fv float64
+		ts time.Time
+	)
 	for k, v := range values {
 		if k == "" || v == "" {
 			continue
@@ -300,27 +302,21 @@ func (p *Parser) parse(line string) (Data, error) {
 
 		switch t {
 		case LONG:
-			iv, err := strconv.ParseInt(v, 10, 64)
-			if err != nil {
-				log.Warnf("E! Error parsing %s to long: %s, ignore this field...", v, err)
-			} else {
+			iv, err = strconv.ParseInt(v, 10, 64)
+			if err == nil {
 				data[k] = iv
 			}
 		case FLOAT:
-			fv, err := strconv.ParseFloat(v, 64)
-			if err != nil {
-				log.Warnf("E! Error parsing %s to float: %s, ignore this field...", v, err)
-			} else {
+			fv, err = strconv.ParseFloat(v, 64)
+			if err == nil {
 				data[k] = fv
 			}
 		case DATE:
-			ts, err := times.StrToTime(v)
+			ts, err = times.StrToTime(v)
 			if err == nil {
 				ts = ts.Add(time.Duration(p.timeZoneOffset) * time.Hour)
 				rfctime := ts.Format(time.RFC3339Nano)
 				data[k] = rfctime
-			} else {
-				log.Warnf("E! Error parsing %s to time layout [%s]: %s, ignore this field...", v, t, err)
 			}
 
 		case DROP:
@@ -330,6 +326,9 @@ func (p *Parser) parse(line string) (Data, error) {
 				v = strings.Trim(v, `"`)
 			}
 			data[k] = strings.TrimSpace(v)
+		}
+		if err != nil {
+			log.Warnf("Error parsing value of key %s to %s: %s, ignore this field...", k, t, err.Error())
 		}
 	}
 

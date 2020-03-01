@@ -678,6 +678,10 @@ func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []str
 			time.Sleep(1 * time.Second)
 			continue
 		}
+		if r.MaxReadLine != 0 && int64(len(line)) > r.MaxReadLine {
+			log.Warnf("Runner[%v] line max len %d, drop it", r.Name(), r.MaxReadLine)
+			continue
+		}
 		if strings.TrimSpace(line) == "" {
 			continue
 		}

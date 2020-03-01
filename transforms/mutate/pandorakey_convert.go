@@ -91,7 +91,7 @@ func (g *PandoraKeyConvert) Transform(datas []Data) ([]Data, error) {
 
 func (g *PandoraKeyConvert) Description() string {
 	//return "pandora_key_convert can convert data key name to valid pandora key"
-	return "将数据中的key名称中不合Pandora字段名规则的字符转为下划线, 如 a.b/c 改为 a_b_c"
+	return "将数据中的key名称中不合Pandora字段名规则的字符转为下划线, 如 a.b/c 改为 a_b_c，pandora发送时自动转换，不需要手动指定"
 }
 
 func (g *PandoraKeyConvert) Type() string {

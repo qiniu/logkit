@@ -182,7 +182,7 @@ func (p *SyslogParser) parse(line string) (data Data, err error) {
 	if line != PandoraParseFlushSignal {
 		_, writeErr := p.buff.Write([]byte(line))
 		if data == nil && writeErr != nil {
-			log.Errorf("line: %s write to buff failed: %v", line, writeErr)
+			log.Errorf("line write to buff failed: %v", writeErr)
 			if !p.disableRecordErrData || p.keepRawData {
 				data = make(Data)
 			}
