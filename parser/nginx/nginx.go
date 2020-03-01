@@ -191,7 +191,6 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 			continue
 		}
 		se.AddSuccess()
-		log.Debugf("D! parse result(%v)", parseResult.Data)
 		if p.keepRawData {
 			parseResult.Data[KeyRawData] = parseResult.Line
 		}

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -220,6 +221,9 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	}
 	for i := range rc.SendersConfig {
 		rc.SendersConfig[i][KeyRunnerName] = rc.RunnerName
+		if rc.MaxLineLen != 0 {
+			rc.SendersConfig[i][KeyRunnerMaxLineLen] = strconv.FormatInt(rc.MaxLineLen, 10)
+		}
 	}
 	rc.ParserConf[KeyRunnerName] = rc.RunnerName
 	if runnerInfo.InternalKeyPrefix != "" {
@@ -678,8 +682,8 @@ func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []str
 			time.Sleep(1 * time.Second)
 			continue
 		}
-		if r.MaxReadLine != 0 && int64(len(line)) > r.MaxReadLine {
-			log.Warnf("Runner[%v] line max len %d, drop it", r.Name(), r.MaxReadLine)
+		if r.MaxLineLen != 0 && int64(len(line)) > r.MaxLineLen {
+			log.Warnf("Runner[%v] line max len %d, drop it", r.Name(), r.MaxLineLen)
 			continue
 		}
 		if strings.TrimSpace(line) == "" {

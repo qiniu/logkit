@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -53,6 +54,7 @@ type FtSender struct {
 	jsontool        jsoniter.API
 	pandoraKeyCache map[string]KeyInfo
 	discardErr      bool
+	maxLineLen      int64
 }
 
 type FtOption struct {
@@ -70,6 +72,7 @@ type FtOption struct {
 	maxSizePerFile    int32
 	discardErr        bool
 	sendRaw           bool
+	maxLineLen        int64
 }
 
 type datasContext struct {
@@ -108,6 +111,7 @@ func NewFtSender(innerSender Sender, conf conf.MapConf, ftSaveLogPath string) (*
 			return nil, errors.New("inner sender is not RawSender, can not use RawSend")
 		}
 	}
+	maxLineLen, _ := conf.GetInt64Or(KeyRunnerMaxLineLen, 0)
 
 	opt := &FtOption{
 		saveLogPath:       logPath,
@@ -124,6 +128,7 @@ func NewFtSender(innerSender Sender, conf conf.MapConf, ftSaveLogPath string) (*
 		maxSizePerFile:    maxSizePerFile,
 		discardErr:        discardErr,
 		sendRaw:           sendraw,
+		maxLineLen:        maxLineLen,
 	}
 
 	return newFtSender(innerSender, runnerName, opt)
@@ -188,6 +193,7 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 		statsMutex:  new(sync.RWMutex),
 		jsontool:    jsoniter.Config{EscapeHTML: true, UseNumber: true}.Froze(),
 		discardErr:  opt.discardErr,
+		maxLineLen:  opt.maxLineLen,
 	}
 
 	if opt.innerSenderType == TypePandora {
@@ -491,6 +497,7 @@ func (ft *FtSender) trySendBytes(dat []byte, failSleep int, isRetry bool) (backD
 	if err != nil {
 		return nil, err
 	}
+
 	return ft.trySendDatas(datas, failSleep, isRetry)
 }
 
@@ -521,7 +528,8 @@ func (ft *FtSender) trySendRaws(datas []string, failSleep int, isRetry bool) (ba
 			backDataContext = append(backDataContext, v)
 		}
 	}
-	time.Sleep(time.Second * time.Duration(failSleep))
+	// 退避算法
+	time.Sleep(time.Second * time.Duration(math.Pow(2, float64(failSleep))))
 
 	return backDataContext, err
 }
@@ -541,6 +549,9 @@ func (ft *FtSender) trySendDatas(datas []Data, failSleep int, isRetry bool) (bac
 	}
 
 	retDatasContext := ft.handleSendError(err, datas)
+	if retDatasContext == nil {
+		return nil, nil
+	}
 	for _, v := range retDatasContext {
 		nnBytes, err := jsoniter.Marshal(v)
 		if err != nil {
@@ -555,6 +566,10 @@ func (ft *FtSender) trySendDatas(datas []Data, failSleep int, isRetry bool) (bac
 		}
 	}
 	time.Sleep(time.Second * time.Duration(failSleep))
+	// 发送出错超过10次，并且设置了丢弃发送出错的数据时，丢弃数据
+	if failSleep >= 10 && ft.discardErr {
+		return nil, nil
+	}
 
 	return backDataContext, err
 }

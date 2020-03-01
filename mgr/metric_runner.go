@@ -336,7 +336,7 @@ func (r *MetricRunner) Run() {
 		}
 
 		if r.isBlock {
-			if time.Now().Second() - metricTime.Second() >= 3 {
+			if time.Now().Second()-metricTime.Second() >= 3 {
 				time.Sleep(backoff.Duration())
 			} else {
 				backoff.Reset()
