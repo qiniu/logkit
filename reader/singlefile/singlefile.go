@@ -17,6 +17,7 @@ import (
 	"github.com/qiniu/logkit/rateio"
 	"github.com/qiniu/logkit/reader"
 	"github.com/qiniu/logkit/reader/config"
+	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 	utilsos "github.com/qiniu/logkit/utils/os"
 )
@@ -41,6 +42,7 @@ func NewSingleFile(meta *reader.Meta, path, whence string, originOffset int64, e
 	var pfi os.FileInfo
 	var f *os.File
 	originpath := path
+	backoff := utils.NewBackoff(2, 4, 1*time.Minute, 10*time.Minute)
 	for {
 		path, pfi, err = GetRealPath(path)
 		if err != nil || pfi == nil {
@@ -52,7 +54,7 @@ func NewSingleFile(meta *reader.Meta, path, whence string, originOffset int64, e
 			} else {
 				log.Debugf("Runner[%v] %s - utils.GetRealPath failed, err:%v", meta.RunnerName, path, err)
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(backoff.Duration())
 			continue
 		}
 		if !pfi.Mode().IsRegular() {
@@ -64,7 +66,7 @@ func NewSingleFile(meta *reader.Meta, path, whence string, originOffset int64, e
 			} else {
 				log.Debugf("Runner[%v] %s - file failed, err: file is not regular", meta.RunnerName, path)
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(backoff.Duration())
 			continue
 		}
 		f, err = os.Open(path)
@@ -77,7 +79,7 @@ func NewSingleFile(meta *reader.Meta, path, whence string, originOffset int64, e
 			} else {
 				log.Debugf("Runner[%v] %s - open file err:%v", meta.RunnerName, path, err)
 			}
-			time.Sleep(time.Minute)
+			time.Sleep(backoff.Duration())
 			continue
 		}
 		break

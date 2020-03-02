@@ -139,9 +139,6 @@ type PandoraOption struct {
 	retention string
 }
 
-//PandoraMaxBatchSize 发送到Pandora的batch限制
-var PandoraMaxBatchSize = 2 * 1024 * 1024
-
 func init() {
 	sender.RegisterConstructor(TypePandora, NewSender)
 }

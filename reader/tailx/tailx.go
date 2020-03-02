@@ -345,11 +345,7 @@ func (ar *ActiveReader) Run() {
 			}
 			repeat++
 			if repeat%3000 == 0 {
-				if !IsSelfRunner(ar.runnerName) {
-					log.Errorf("Runner[%s] %s ActiveReader has timeout 3000 times with readcache %s", ar.runnerName, ar.originpath, strings.TrimSpace(ar.readcache))
-				} else {
-					log.Debugf("Runner[%s] %s ActiveReader has timeout 3000 times with readcache %s", ar.runnerName, ar.originpath, strings.TrimSpace(ar.readcache))
-				}
+				log.Debugf("Runner[%s] %s ActiveReader has timeout 3000 times with readcache %s", ar.runnerName, ar.originpath, strings.TrimSpace(ar.readcache))
 			}
 
 			atomic.StoreInt32(&ar.inactive, 0)

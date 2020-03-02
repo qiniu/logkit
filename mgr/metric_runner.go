@@ -22,6 +22,7 @@ import (
 	"github.com/qiniu/logkit/sender"
 	senderConf "github.com/qiniu/logkit/sender/config"
 	"github.com/qiniu/logkit/transforms"
+	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -45,6 +46,7 @@ var (
 
 type MetricRunner struct {
 	RunnerName string `json:"name"`
+	isBlock    bool
 	envTag     string
 
 	collectors   []metric.Collector
@@ -268,6 +270,8 @@ func (r *MetricRunner) Run() {
 		}
 	}
 
+	backoff := utils.NewBackoff(2, 3, 1*time.Minute, 10*time.Minute)
+
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
 			log.Debugf("runner %v exited from run", r.RunnerName)
@@ -277,7 +281,8 @@ func (r *MetricRunner) Run() {
 		// collect data
 		dataCnt := 0
 		datas := make([]Data, 0)
-		tags[metric.Timestamp] = time.Now().Format(time.RFC3339Nano)
+		metricTime := time.Now()
+		tags[metric.Timestamp] = metricTime.Format(time.RFC3339Nano)
 		for _, c := range r.collectors {
 			metricName := c.Name()
 			tmpdatas, err := c.Collect()
@@ -329,6 +334,15 @@ func (r *MetricRunner) Run() {
 				dataCnt++
 			}
 		}
+
+		if r.isBlock {
+			if time.Now().Second() - metricTime.Second() >= 3 {
+				time.Sleep(backoff.Duration())
+			} else {
+				backoff.Reset()
+			}
+		}
+
 		if len(datas) == 0 {
 			log.Warnf("metrics collect no data")
 			time.Sleep(r.collectInterval)

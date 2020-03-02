@@ -262,4 +262,5 @@ var ErrNotAsyncSender = errors.New("sender does not support for Async Push")
 
 const (
 	MaxBytesPerFile = 100 * MB
+	MaxDiskUsedBytes = 500 * MB
 )
