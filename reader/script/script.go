@@ -16,6 +16,7 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/reader/config"
+	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -284,6 +285,7 @@ func (r *Reader) run() {
 	}()
 
 	// 如果执行失败，最多重试 10 次
+	backoff := utils.NewBackoff(2, 3, 3*time.Second, 60*time.Second)
 	for i := 1; i <= 10; i++ {
 		// 判断上层是否已经关闭，先判断 routineStatus 再判断 status 可以保证同时只有一个 r.run 会运行到此处
 		if r.isStopping() || r.hasStopped() {
@@ -304,7 +306,7 @@ func (r *Reader) run() {
 		if r.isLoop {
 			return // 循环执行的任务上层逻辑已经等同重试
 		}
-		time.Sleep(3 * time.Second)
+		time.Sleep(backoff.Duration())
 	}
 	log.Errorf("Runner[%v] %q task execution failed and gave up after 10 tries", r.meta.RunnerName, r.Name())
 }
