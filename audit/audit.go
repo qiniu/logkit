@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/qiniu/log"
+	"github.com/qiniu/logkit/utils"
 )
 
 const defaultRotateSize = 100 * 1024 * 1024
@@ -27,9 +28,10 @@ type Audit struct {
 	Dir        string
 	RotateSize int64
 
-	mu  sync.Mutex
-	buf bytes.Buffer // for accumulating text to write
-	f   *os.File
+	mu      sync.Mutex
+	buf     bytes.Buffer // for accumulating text to write
+	f       *os.File
+	backoff *utils.Backoff
 }
 
 func NewAuditLogger(dir string, rotatesize int64) (*Audit, error) {
@@ -55,6 +57,7 @@ func NewAuditLogger(dir string, rotatesize int64) (*Audit, error) {
 		Dir:        dir,
 		RotateSize: rotatesize,
 		f:          file,
+		backoff:    utils.NewBackoff(2, 1, 1*time.Second, 5*time.Minute),
 	}, nil
 }
 
@@ -106,10 +109,17 @@ func (a *Audit) Log(msg Message) {
 	if a.checksize() {
 		if err := a.rotate(); err != nil {
 			log.Errorf("rotate log err %v", err)
+			time.Sleep(a.backoff.Duration())
 			return
 		}
+		a.backoff.Reset()
 	}
-	a.output(&msg)
+	if err := a.output(&msg); err != nil {
+		log.Errorf("audit output msg err %v", err)
+		time.Sleep(a.backoff.Duration())
+	} else {
+		a.backoff.Reset()
+	}
 }
 
 func itoa(buf *bytes.Buffer, i int64) {

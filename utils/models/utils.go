@@ -290,17 +290,21 @@ func (s *HashSet) Elements() []interface{} {
 
 // 创建目录，并返回日志模式
 func LogDirAndPattern(logpath string) (dir, pattern string, err error) {
-	dir, err = filepath.Abs(filepath.Dir(logpath))
-	if err != nil {
-		if !os.IsNotExist(err) {
-			err = fmt.Errorf("get logkit log dir error %v", err)
-			return
+	dir, logpath = CheckLogPath(logpath)
+
+	if dir == "" {
+		dir, err = filepath.Abs(filepath.Dir(logpath))
+		if err != nil {
+			if !os.IsNotExist(err) {
+				err = fmt.Errorf("get logkit log dir error %v", err)
+				return
+			}
 		}
-	}
-	if _, err = os.Stat(dir); os.IsNotExist(err) {
-		if err = os.MkdirAll(dir, DefaultDirPerm); err != nil {
-			err = fmt.Errorf("create logkit log dir error %v", err)
-			return
+		if _, err = os.Stat(dir); os.IsNotExist(err) {
+			if err = os.MkdirAll(dir, DefaultDirPerm); err != nil {
+				err = fmt.Errorf("create logkit log dir error %v", err)
+				return
+			}
 		}
 	}
 	pattern = filepath.Base(logpath)
@@ -1131,4 +1135,35 @@ func GetTime(timestamp string) (time.Time, error) {
 		return time.Time{}, err
 	}
 	return time.Unix(0, t), nil
+}
+
+func CheckLogPath(logpath string) (dir string, path string) {
+	if !strings.HasPrefix(logpath, "./") {
+		return "", logpath
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		log.Errorf("get working directory failed: %v", err)
+		return "", logpath
+	}
+
+	logpathTmp := strings.TrimPrefix(logpath, "./")
+	wdLog := filepath.Join(wd, logpathTmp)
+	if !isExist(wdLog) {
+		dir, err = filepath.Abs(filepath.Dir(os.Args[0]))
+		if err != nil {
+			log.Errorf("get runtime directory failed: %v", err)
+			return "", logpath
+		}
+		return dir, filepath.Join(dir, logpathTmp)
+	}
+	return "", logpath
+}
+
+// isExist checks whether a file or directory exists.
+// It returns false when the file or directory does not exist.
+func isExist(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil || os.IsExist(err)
 }

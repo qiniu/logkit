@@ -716,6 +716,7 @@ func (d *diskQueue) ioLoop() {
 
 	syncTicker := time.NewTicker(d.syncTimeout)
 	failRead := 1
+	backoff := utils.NewBackoff(2, 1, time.Second, 5*time.Minute)
 
 DONE:
 	for {
@@ -747,7 +748,7 @@ DONE:
 							d.name, d.readPos, d.fileName(d.readFileNum), failRead, err.Error())
 						// NOTE: 根据 handleReadError() 的逻辑，只要读发生错误，就会调过当前这个文件，直接开始读下一个文件
 						d.handleReadError(failRead)
-						time.Sleep(time.Duration(failRead) * time.Second)
+						time.Sleep(backoff.Duration())
 						failRead++
 						continue
 					}
@@ -769,6 +770,7 @@ DONE:
 			r = d.readChan
 		}
 		failRead = 1
+		backoff.Reset()
 
 		select {
 		// the Go channel spec dictates that nil channel operations (read or write)

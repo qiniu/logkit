@@ -32,7 +32,7 @@ import (
 )
 
 var DIR_NOT_EXIST_SLEEP_TIME = "300" //300 s
-var DEFAULT_LOGKIT_REST_DIR = "/.logkitconfs"
+var DEFAULT_LOGKIT_REST_DIR = ".logkitconfs"
 
 type ManagerConfig struct {
 	BindHost string `json:"bind_host"`
@@ -101,12 +101,24 @@ func NewManager(conf ManagerConfig) (*Manager, error) {
 }
 
 func NewCustomManager(conf ManagerConfig, rr *reader.Registry, pr *parser.Registry, sr *sender.Registry) (*Manager, error) {
+	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	if err != nil {
+		return nil, fmt.Errorf("get system logkit-pro workdir error %v, please set rest_dir/audit_dir config", err)
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		log.Errorf("get system cur workdir error %v", err)
+	}
 	if conf.RestDir == "" {
-		dir, err := os.Getwd()
-		if err != nil {
-			return nil, fmt.Errorf("get system current workdir error %v, please set rest_dir config", err)
+		if wd != "" {
+			wdRestDir := filepath.Join(wd, DEFAULT_LOGKIT_REST_DIR)
+			if utils.IsExist(wdRestDir) { // 兼容老逻辑
+				conf.RestDir = wdRestDir
+			}
 		}
-		conf.RestDir = dir + DEFAULT_LOGKIT_REST_DIR
+		if conf.RestDir == "" {
+			conf.RestDir = filepath.Join(dir, DEFAULT_LOGKIT_REST_DIR)
+		}
 	} else {
 		var err error
 		if conf.RestDir, err = filepath.Abs(conf.RestDir); err != nil {
@@ -119,7 +131,15 @@ func NewCustomManager(conf ManagerConfig, rr *reader.Registry, pr *parser.Regist
 		}
 	}
 	if conf.AuditDir == "" {
-		conf.AuditDir = "logkit_audit"
+		if wd != "" {
+			wdAuditDir := filepath.Join(wd, "logkit_audit")
+			if utils.IsExist(wdAuditDir) { // 兼容老逻辑
+				conf.AuditDir = wdAuditDir
+			}
+		}
+		if conf.AuditDir == "" {
+			conf.AuditDir = filepath.Join(dir, "logkit_audit")
+		}
 	}
 	audt, err := audit.NewAuditLogger(conf.AuditDir, 0)
 	if err != nil {

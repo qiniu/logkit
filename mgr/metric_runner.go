@@ -93,9 +93,6 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner
 	}
 	for i := range rc.SendersConfig {
 		rc.SendersConfig[i][KeyRunnerName] = rc.RunnerName
-		if rc.IsBlock {
-			rc.SendersConfig[i][KeyRunnerIsBlock] = "true"
-		}
 	}
 	collectors := make([]metric.Collector, 0)
 	transformers := make(map[string][]transforms.Transformer)
@@ -106,9 +103,6 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner
 		if err != nil {
 			log.Errorf("%v ignore it...", err)
 			continue
-		}
-		if rc.IsBlock {
-			m.Config[KeyRunnerIsBlock] = true
 		}
 		// sync config to ExtCollector
 		ec, ok := c.(metric.ExtCollector)
@@ -238,6 +232,7 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner
 		commonTrans:     commonTransformers,
 		senders:         senders,
 		envTag:          rc.EnvTag,
+		isBlock:         rc.IsBlock,
 	}
 	runner.StatusRestore()
 	return
@@ -363,7 +358,7 @@ func (r *MetricRunner) Run() {
 		r.lastSend = time.Now()
 		for _, s := range r.senders {
 			if !r.trySend(s, datas, 3) {
-				log.Errorf("failed to send metricData: << %v >>", datas)
+				log.Errorf("failed to send metricData length: %d", len(datas))
 				break
 			}
 		}

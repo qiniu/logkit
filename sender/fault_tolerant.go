@@ -20,6 +20,7 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/queue"
 	. "github.com/qiniu/logkit/sender/config"
+	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 	"github.com/qiniu/logkit/utils/reqid"
 )
@@ -56,6 +57,7 @@ type FtSender struct {
 	discardErr      bool
 	maxLineLen      int64
 	isBlock         bool
+	backoff         *utils.Backoff
 }
 
 type FtOption struct {
@@ -199,6 +201,7 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 		discardErr:  opt.discardErr,
 		maxLineLen:  opt.maxLineLen,
 		isBlock:     opt.isBlock,
+		backoff:     utils.NewBackoff(2, 1, 1*time.Second, 5*time.Minute),
 	}
 
 	if opt.innerSenderType == TypePandora {
@@ -263,9 +266,11 @@ func (ft *FtSender) RawSend(datas []string) error {
 			ft.stats.LastError = err.Error()
 			ft.stats.Errors += int64(len(datas))
 			ft.statsMutex.Unlock()
+			time.Sleep(ft.backoff.Duration())
 		} else {
 			// se 中的 lasterror 和 senderror 都为空，需要使用 se.FtQueueLag
 			se.AddSuccessNum(len(datas))
+			ft.backoff.Reset()
 		}
 		se.FtQueueLag = ft.BackupQueue.Depth() + ft.logQueue.Depth()
 	}
@@ -335,9 +340,11 @@ func (ft *FtSender) Send(datas []Data) error {
 			ft.stats.LastError = err.Error()
 			ft.stats.Errors += int64(len(datas))
 			ft.statsMutex.Unlock()
+			time.Sleep(ft.backoff.Duration())
 		} else {
 			// se 中的 lasterror 和 senderror 都为空，需要使用 se.FtQueueLag
 			se.AddSuccessNum(len(datas))
+			ft.backoff.Reset()
 		}
 		se.FtQueueLag = ft.BackupQueue.Depth() + ft.logQueue.Depth()
 	}
@@ -573,7 +580,7 @@ func (ft *FtSender) trySendDatas(datas []Data, failSleep int, isRetry bool) (bac
 		}
 		time.Sleep(time.Second * time.Duration(math.Pow(2, float64(failSleep))))
 		// 发送出错超过10次，并且设置了丢弃发送出错的数据时，丢弃数据
-		if failSleep >= 10 && ft.discardErr {
+		if failSleep >= 8 && ft.discardErr {
 			return nil, nil
 		}
 	}
@@ -738,7 +745,11 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 				retDatasContext = append(retDatasContext, failCtx)
 				return retDatasContext
 			}
-			if int64(len(string(dataBytes))) < DefaultMaxBatchSize {
+			dataBytesLen := int64(len(string(dataBytes)))
+			if ft.maxLineLen != 0 && dataBytesLen > ft.maxLineLen {
+				return nil
+			}
+			if dataBytesLen < DefaultMaxBatchSize {
 				// 此处将 data 改为 raw 放在 pandora_stash 中
 				if _, ok := failCtxData[KeyPandoraStash]; !ok {
 					log.Infof("Runner[%v] Sender[%v] try to convert data to string", ft.runnerName, ft.innerSender.Name())
@@ -1004,7 +1015,9 @@ func (ft *FtSender) backOffReTrySend(datas []Data, failSleep int, isRetry bool) 
 	if !ft.isBlock {
 		return ft.trySendDatas(datas, failSleep, isRetry)
 	}
-	for idx := 0; idx < 10; idx++ {
+
+	backoff := utils.NewBackoff(2, 1, time.Second, 5*time.Minute)
+	for {
 		if atomic.LoadInt32(&ft.stopped) > 0 {
 			for _, v := range res {
 				nnBytes, err := jsoniter.Marshal(v)
@@ -1024,7 +1037,7 @@ func (ft *FtSender) backOffReTrySend(datas []Data, failSleep int, isRetry bool) 
 			ft.exitChan <- struct{}{}
 			return
 		}
-		res, err = ft.trySendDatas(datas, idx, isRetry)
+		res, err = ft.trySendDatas(datas, 1, isRetry)
 		if err == nil {
 			return nil, nil
 		}
@@ -1032,18 +1045,15 @@ func (ft *FtSender) backOffReTrySend(datas []Data, failSleep int, isRetry bool) 
 		if len(res) > 1 {
 			return res, err
 		}
-		time.Sleep(time.Second * time.Duration(math.Pow(2, float64(idx))))
+		time.Sleep(backoff.Duration())
 		// 阻塞
-		if idx == 9 && !ft.discardErr {
-			idx = 0
+		if backoff.Attempt() >= 8 {
+			if ft.discardErr {
+				return nil, nil
+			}
+			backoff.Reset()
 		}
 	}
-
-	// 发送10次失败，并且配置了丢弃
-	if err != nil && ft.discardErr {
-		return nil, nil
-	}
-	return res, err
 }
 
 // 阻塞式全量发送
