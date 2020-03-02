@@ -58,6 +58,7 @@ const (
 
 	KeyRunnerName       = "runner_name"
 	KeyRunnerMaxLineLen = "runner_max_line_Len"
+	KeyRunnerIsBlock    = "is_block"
 
 	DefaultDirPerm  = 0755
 	DefaultFilePerm = 0600

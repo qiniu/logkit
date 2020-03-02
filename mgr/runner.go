@@ -219,6 +219,9 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	if rc.ExtraInfo {
 		rc.ReaderConfig[ExtraInfo] = Bool2String(rc.ExtraInfo)
 	}
+	if rc.IsBlock {
+		rc.ReaderConfig[KeyRunnerIsBlock] = "true"
+	}
 	for i := range rc.SendersConfig {
 		rc.SendersConfig[i][KeyRunnerName] = rc.RunnerName
 		if rc.MaxLineLen != 0 {
@@ -305,6 +308,9 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	for i, senderConfig := range rc.SendersConfig {
 		if rc.SendRaw {
 			senderConfig[senderConf.InnerSendRaw] = "true"
+		}
+		if rc.IsBlock {
+			senderConfig[KeyRunnerIsBlock] = "true"
 		}
 		if senderConfig[senderConf.KeySenderType] == senderConf.TypePandora {
 			if rc.ExtraInfo {
