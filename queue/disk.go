@@ -77,6 +77,7 @@ type diskQueue struct {
 	emptyChan         chan struct{}
 	emptyResponseChan chan error
 	exitChan          chan struct{}
+	stopped           int32
 	exitSyncChan      chan struct{}
 }
 
@@ -205,6 +206,8 @@ func (d *diskQueue) exit(deleted bool) error {
 		log.Debugf("DISKQUEUE(%s): closing", d.name)
 	}
 
+	atomic.AddInt32(&d.stopped, 1)
+
 	close(d.exitChan)
 	// ensure that ioLoop has exited
 	<-d.exitSyncChan
@@ -310,7 +313,6 @@ func (d *diskQueue) readOne() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-
 		log.Warnf("DISKQUEUE(%s): readOne() opened %s", d.name, curFileName)
 
 		if d.readPos > 0 {
@@ -655,7 +657,7 @@ func (d *diskQueue) moveForward() {
 	d.checkTailCorruption(depth)
 }
 
-func (d *diskQueue) handleReadError() {
+func (d *diskQueue) handleReadError(failRead int) {
 	// jump to the next read file and rename the current (bad) file
 	if d.readFileNum == d.writeFileNum {
 		// if you can't properly read from the current write file it's safe to
@@ -671,18 +673,23 @@ func (d *diskQueue) handleReadError() {
 	badFn := d.fileName(d.readFileNum)
 	badRenameFn := badFn + ".bad"
 
-	log.Warnf(
-		"NOTICE: diskqueue(%s) jump to next file and saving bad file as %s",
-		d.name, badRenameFn)
-
 	err := AtomicRename(badFn, badRenameFn)
 	if err != nil {
 		log.Warnf(
 			"ERROR: diskqueue(%s) failed to rename bad diskqueue file %s to %s, error: %s",
 			d.name, badFn, badRenameFn, err.Error())
+	} else {
+		log.Warnf(
+			"NOTICE: diskqueue(%s) jump to next file and saving bad file as %s",
+			d.name, badRenameFn)
 	}
 
-	d.readFileNum++
+	if failRead >= 10 {
+		log.Errorf("ERROR: diskqueue(%s) continue fail read, set readFileNum with writeFileNum: %d", d.name, d.writeFileNum)
+		d.readFileNum = d.writeFileNum
+	} else {
+		d.readFileNum++
+	}
 	d.readPos = 0
 	d.nextReadFileNum = d.readFileNum
 	d.nextReadPos = 0
@@ -708,6 +715,8 @@ func (d *diskQueue) ioLoop() {
 	var r chan []byte
 
 	syncTicker := time.NewTicker(d.syncTimeout)
+	failRead := 1
+	backoff := utils.NewBackoff(2, 1, time.Second, 5*time.Minute)
 
 DONE:
 	for {
@@ -730,14 +739,17 @@ DONE:
 		}
 
 		if origin == FromNone {
-			if (d.readFileNum < d.writeFileNum) || (d.readPos < d.writePos) {
+			// 限制为10，否则kill之后接收不到 exitChan 卡住
+			if (d.readFileNum < d.writeFileNum) && (d.readPos < d.writePos) && failRead <= 10 {
 				if d.nextReadPos == d.readPos {
 					dataRead, err = d.readOne()
-					if err != nil {
-						log.Warnf("ERROR: reading from diskqueue(%s) at %d of %s - %s",
-							d.name, d.readPos, d.fileName(d.readFileNum), err.Error())
+					if err != nil && atomic.LoadInt32(&d.stopped) == 0 {
+						log.Errorf("ERROR: reading from diskqueue(%s) at %d of %s failRead %d - %s",
+							d.name, d.readPos, d.fileName(d.readFileNum), failRead, err.Error())
 						// NOTE: 根据 handleReadError() 的逻辑，只要读发生错误，就会调过当前这个文件，直接开始读下一个文件
-						d.handleReadError()
+						d.handleReadError(failRead)
+						time.Sleep(backoff.Duration())
+						failRead++
 						continue
 					}
 				}
@@ -757,6 +769,8 @@ DONE:
 		} else {
 			r = d.readChan
 		}
+		failRead = 1
+		backoff.Reset()
 
 		select {
 		// the Go channel spec dictates that nil channel operations (read or write)

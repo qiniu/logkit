@@ -180,6 +180,8 @@ func (s *Sender) writeFile(filename string, datas []Data, wg *sync.WaitGroup) {
 	_, err = s.writers.Write(filename, datasBytes)
 	if err != nil {
 		log.Errorf("write to file[%s] failed: %v, datas length: %d", filename, err, len(datas))
+		// 写磁盘失败很可能一致失败，因此 sleep 10s
+		time.Sleep(10 * time.Second)
 		return
 	}
 }

@@ -232,6 +232,7 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner
 		commonTrans:     commonTransformers,
 		senders:         senders,
 		envTag:          rc.EnvTag,
+		isBlock:         rc.IsBlock,
 	}
 	runner.StatusRestore()
 	return
@@ -336,7 +337,7 @@ func (r *MetricRunner) Run() {
 		}
 
 		if r.isBlock {
-			if time.Now().Second() - metricTime.Second() >= 3 {
+			if time.Now().Second()-metricTime.Second() >= 3 {
 				time.Sleep(backoff.Duration())
 			} else {
 				backoff.Reset()
@@ -357,7 +358,7 @@ func (r *MetricRunner) Run() {
 		r.lastSend = time.Now()
 		for _, s := range r.senders {
 			if !r.trySend(s, datas, 3) {
-				log.Errorf("failed to send metricData: << %v >>", datas)
+				log.Errorf("failed to send metricData length: %d", len(datas))
 				break
 			}
 		}

@@ -571,7 +571,7 @@ func (p *Parser) parse(line string) (d Data, err error) {
 			if err != nil {
 				err = fmt.Errorf("schema [%v] type [%v] value [%v] detail: %v", p.schema[i].name, p.schema[i].dataType, part, err)
 				if p.ignoreInvalid {
-					log.Warnf("ignore field: %v", err)
+					log.Debugf("ignore field: %s", err.Error())
 					continue
 				}
 				return nil, err

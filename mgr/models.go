@@ -106,6 +106,8 @@ type RunnerInfo struct {
 	SendRaw                bool   `json:"send_raw"`            //使用发送原始字符串的接口，而不是Data
 	ReadTime               bool   `json:"read_time"`           // 读取时间
 	InternalKeyPrefix      string `json:"internal_key_prefix"` // 内置字段名前缀
+	MaxLineLen             int64  `json:"max_line_len"`        // 限制单条数据/每个key对应的value大小，防止读取数据/发送数据出错时内存/磁盘占用过大
+	IsBlock                bool   `json:"is_block"`            // 阻塞式发送
 }
 
 type ErrorsList struct {

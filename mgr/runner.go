@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -105,6 +106,7 @@ type LogExportRunner struct {
 	syncInc   int
 	tracker   *utils.Tracker
 	auditChan chan<- audit.Message
+	backoff   *utils.Backoff
 }
 
 // NewRunner 创建Runner
@@ -167,6 +169,7 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 		rsMutex:      new(sync.RWMutex),
 		tracker:      utils.NewTracker(),
 		historyMutex: new(sync.RWMutex),
+		backoff:      utils.NewBackoff(2, 1, time.Second, 5*time.Minute),
 	}
 
 	if reader == nil {
@@ -218,8 +221,14 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	if rc.ExtraInfo {
 		rc.ReaderConfig[ExtraInfo] = Bool2String(rc.ExtraInfo)
 	}
+	if rc.IsBlock {
+		rc.ReaderConfig[KeyRunnerIsBlock] = "true"
+	}
 	for i := range rc.SendersConfig {
 		rc.SendersConfig[i][KeyRunnerName] = rc.RunnerName
+		if rc.MaxLineLen != 0 {
+			rc.SendersConfig[i][KeyRunnerMaxLineLen] = strconv.FormatInt(rc.MaxLineLen, 10)
+		}
 	}
 	rc.ParserConf[KeyRunnerName] = rc.RunnerName
 	if runnerInfo.InternalKeyPrefix != "" {
@@ -301,6 +310,9 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	for i, senderConfig := range rc.SendersConfig {
 		if rc.SendRaw {
 			senderConfig[senderConf.InnerSendRaw] = "true"
+		}
+		if rc.IsBlock {
+			senderConfig[KeyRunnerIsBlock] = "true"
 		}
 		if senderConfig[senderConf.KeySenderType] == senderConf.TypePandora {
 			if rc.ExtraInfo {
@@ -665,17 +677,25 @@ func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []str
 		line, err = r.reader.ReadLine()
 		if err != nil && os.IsNotExist(err) {
 			log.Debugf("Runner[%v] reader %s - error: %v, sleep 3 second...", r.Name(), r.reader.Name(), err)
-			time.Sleep(3 * time.Second)
+			time.Sleep(r.backoff.Duration())
 			break
 		}
 		if err != nil && err != io.EOF {
 			log.Errorf("Runner[%v] reader %s - error: %v, sleep 1 second...", r.Name(), r.reader.Name(), err)
-			time.Sleep(time.Second)
+			time.Sleep(r.backoff.Duration())
 			break
 		}
+		r.backoff.Reset()
 		if len(line) <= 0 {
 			log.Debugf("Runner[%v] reader %s no more content fetched sleep 1 second...", r.Name(), r.reader.Name())
 			time.Sleep(1 * time.Second)
+			continue
+		}
+		if r.MaxLineLen != 0 {
+			lineLen := len(line)
+			if int64(lineLen) > r.MaxLineLen {
+				log.Warnf("Runner[%v] line length: %d meet max len %d, drop it", r.Name(), lineLen, r.MaxLineLen)
+			}
 			continue
 		}
 		if strings.TrimSpace(line) == "" {
@@ -696,6 +716,7 @@ func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []str
 		} else {
 			r.rs.ReaderStats.LastError = TruncateStrSize(err.Error(), DefaultTruncateMaxSize)
 		}
+		time.Sleep(r.backoff.Duration())
 		r.historyMutex.Lock()
 		if r.historyError.ReadErrors == nil {
 			r.historyError.ReadErrors = equeue.New(r.ErrorsListCap)
@@ -704,6 +725,7 @@ func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []str
 		r.historyMutex.Unlock()
 	} else {
 		r.rs.ReaderStats.LastError = ""
+		r.backoff.Reset()
 	}
 	r.rsMutex.Unlock()
 	return lines, froms

@@ -28,6 +28,7 @@ import (
 	. "github.com/qiniu/logkit/reader/config"
 	"github.com/qiniu/logkit/reader/seqfile"
 	"github.com/qiniu/logkit/reader/singlefile"
+	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -79,6 +80,7 @@ type BufReader struct {
 	// 这里的变量用于记录buffer中的数据从底层的哪个DataSource出来的，用于精准定位seqfile的DataSource
 	lastRdSource []reader.SourceIndex
 	latestSource string
+	backoff      *utils.Backoff
 }
 
 const minReadBufferSize = 16
@@ -138,6 +140,7 @@ func NewReaderSize(rd reader.FileReader, meta *reader.Meta, size int) (*BufReade
 	r.stopped = 0
 	r.reset(make([]byte, size), rd)
 	r.mutiLineCache = NewLineCache()
+	r.backoff = utils.NewBackoff(2, 1, 1*time.Second, 5*time.Minute)
 
 	r.Meta = meta
 	encodingWay := r.Meta.GetEncodingWay()
@@ -570,8 +573,11 @@ func (b *BufReader) SyncMeta() {
 			} else {
 				log.Debugf("Runner[%v] %s cannot write buf, err :%v", b.Meta.RunnerName, b.Name(), err)
 			}
+			// 写磁盘失败很可能一致失败，因此sleep 10s
+			time.Sleep(b.backoff.Duration())
 			return
 		}
+		b.backoff.Reset()
 		err = b.Meta.WriteCacheLine(linecache)
 		if err != nil {
 			if !IsSelfRunner(b.Meta.RunnerName) {
@@ -579,8 +585,10 @@ func (b *BufReader) SyncMeta() {
 			} else {
 				log.Debugf("Runner[%v] %s cannot write linecache, err :%v", b.Meta.RunnerName, b.Name(), err)
 			}
+			time.Sleep(b.backoff.Duration())
 			return
 		}
+		b.backoff.Reset()
 		b.lastSync.cache = linecache
 		b.lastSync.buf = string(b.buf)
 		b.lastSync.r = b.r
@@ -596,8 +604,10 @@ func (b *BufReader) SyncMeta() {
 		} else {
 			log.Debugf("Runner[%v] %s cannot write reader %v's meta info, err %v", b.Meta.RunnerName, b.Name(), b.rd.Name(), err)
 		}
+		time.Sleep(b.backoff.Duration())
 		return
 	}
+	b.backoff.Reset()
 }
 
 func NewFileDirReader(meta *reader.Meta, conf conf.MapConf) (reader reader.Reader, err error) {

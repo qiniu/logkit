@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -19,6 +20,7 @@ import (
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/queue"
 	. "github.com/qiniu/logkit/sender/config"
+	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 	"github.com/qiniu/logkit/utils/reqid"
 )
@@ -53,6 +55,9 @@ type FtSender struct {
 	jsontool        jsoniter.API
 	pandoraKeyCache map[string]KeyInfo
 	discardErr      bool
+	maxLineLen      int64
+	isBlock         bool
+	backoff         *utils.Backoff
 }
 
 type FtOption struct {
@@ -70,6 +75,8 @@ type FtOption struct {
 	maxSizePerFile    int32
 	discardErr        bool
 	sendRaw           bool
+	maxLineLen        int64
+	isBlock           bool
 }
 
 type datasContext struct {
@@ -108,6 +115,8 @@ func NewFtSender(innerSender Sender, conf conf.MapConf, ftSaveLogPath string) (*
 			return nil, errors.New("inner sender is not RawSender, can not use RawSend")
 		}
 	}
+	maxLineLen, _ := conf.GetInt64Or(KeyRunnerMaxLineLen, 0)
+	isBlock, _ := conf.GetBoolOr(KeyRunnerIsBlock, false)
 
 	opt := &FtOption{
 		saveLogPath:       logPath,
@@ -124,6 +133,8 @@ func NewFtSender(innerSender Sender, conf conf.MapConf, ftSaveLogPath string) (*
 		maxSizePerFile:    maxSizePerFile,
 		discardErr:        discardErr,
 		sendRaw:           sendraw,
+		maxLineLen:        maxLineLen,
+		isBlock:           isBlock,
 	}
 
 	return newFtSender(innerSender, runnerName, opt)
@@ -188,6 +199,9 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 		statsMutex:  new(sync.RWMutex),
 		jsontool:    jsoniter.Config{EscapeHTML: true, UseNumber: true}.Froze(),
 		discardErr:  opt.discardErr,
+		maxLineLen:  opt.maxLineLen,
+		isBlock:     opt.isBlock,
+		backoff:     utils.NewBackoff(2, 1, 1*time.Second, 5*time.Minute),
 	}
 
 	if opt.innerSenderType == TypePandora {
@@ -252,9 +266,11 @@ func (ft *FtSender) RawSend(datas []string) error {
 			ft.stats.LastError = err.Error()
 			ft.stats.Errors += int64(len(datas))
 			ft.statsMutex.Unlock()
+			time.Sleep(ft.backoff.Duration())
 		} else {
 			// se 中的 lasterror 和 senderror 都为空，需要使用 se.FtQueueLag
 			se.AddSuccessNum(len(datas))
+			ft.backoff.Reset()
 		}
 		se.FtQueueLag = ft.BackupQueue.Depth() + ft.logQueue.Depth()
 	}
@@ -276,10 +292,10 @@ func (ft *FtSender) Send(datas []Data) error {
 	}
 
 	se := &StatsError{Ft: true, FtNotRetry: true}
-	if ft.strategy == KeyFtStrategyBackupOnly {
+	if ft.isBlock || ft.strategy == KeyFtStrategyBackupOnly {
 		// 尝试直接发送数据，当数据失败的时候会加入到本地重试队列。外部不需要重试
 		isRetry := false
-		backDataContext, err := ft.trySendDatas(datas, 1, isRetry)
+		backDataContext, err := ft.backOffReTrySend(datas, 1, isRetry)
 		if err == nil {
 			return nil
 		}
@@ -324,9 +340,11 @@ func (ft *FtSender) Send(datas []Data) error {
 			ft.stats.LastError = err.Error()
 			ft.stats.Errors += int64(len(datas))
 			ft.statsMutex.Unlock()
+			time.Sleep(ft.backoff.Duration())
 		} else {
 			// se 中的 lasterror 和 senderror 都为空，需要使用 se.FtQueueLag
 			se.AddSuccessNum(len(datas))
+			ft.backoff.Reset()
 		}
 		se.FtQueueLag = ft.BackupQueue.Depth() + ft.logQueue.Depth()
 	}
@@ -491,7 +509,8 @@ func (ft *FtSender) trySendBytes(dat []byte, failSleep int, isRetry bool) (backD
 	if err != nil {
 		return nil, err
 	}
-	return ft.trySendDatas(datas, failSleep, isRetry)
+
+	return ft.backOffReTrySend(datas, failSleep, isRetry)
 }
 
 func (ft *FtSender) trySendRaws(datas []string, failSleep int, isRetry bool) (backDataContext []*datasContext, err error) {
@@ -521,7 +540,7 @@ func (ft *FtSender) trySendRaws(datas []string, failSleep int, isRetry bool) (ba
 			backDataContext = append(backDataContext, v)
 		}
 	}
-	time.Sleep(time.Second * time.Duration(failSleep))
+	time.Sleep(time.Second * time.Duration(math.Pow(2, float64(failSleep))))
 
 	return backDataContext, err
 }
@@ -541,20 +560,30 @@ func (ft *FtSender) trySendDatas(datas []Data, failSleep int, isRetry bool) (bac
 	}
 
 	retDatasContext := ft.handleSendError(err, datas)
-	for _, v := range retDatasContext {
-		nnBytes, err := jsoniter.Marshal(v)
-		if err != nil {
-			log.Errorf("Runner[%v] Sender[%v] marshal %v failed: %v", ft.runnerName, ft.innerSender.Name(), *v, err)
-			continue
-		}
+	if retDatasContext == nil {
+		return nil, nil
+	}
 
-		err = ft.BackupQueue.Put(nnBytes)
-		if err != nil {
-			log.Errorf("Runner[%v] Sender[%v] cannot write points back to queue %v: %v", ft.runnerName, ft.innerSender.Name(), ft.BackupQueue.Name(), err)
-			backDataContext = append(backDataContext, v)
+	if !ft.isBlock {
+		for _, v := range retDatasContext {
+			nnBytes, err := jsoniter.Marshal(v)
+			if err != nil {
+				log.Errorf("Runner[%v] Sender[%v] marshal %v failed: %v", ft.runnerName, ft.innerSender.Name(), *v, err)
+				continue
+			}
+
+			err = ft.BackupQueue.Put(nnBytes)
+			if err != nil {
+				log.Errorf("Runner[%v] Sender[%v] cannot write points back to queue %v: %v", ft.runnerName, ft.innerSender.Name(), ft.BackupQueue.Name(), err)
+				backDataContext = append(backDataContext, v)
+			}
+		}
+		time.Sleep(time.Second * time.Duration(math.Pow(2, float64(failSleep))))
+		// 发送出错超过10次，并且设置了丢弃发送出错的数据时，丢弃数据
+		if failSleep >= 8 && ft.discardErr {
+			return nil, nil
 		}
 	}
-	time.Sleep(time.Second * time.Duration(failSleep))
 
 	return backDataContext, err
 }
@@ -716,7 +745,11 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 				retDatasContext = append(retDatasContext, failCtx)
 				return retDatasContext
 			}
-			if int64(len(string(dataBytes))) < DefaultMaxBatchSize {
+			dataBytesLen := int64(len(string(dataBytes)))
+			if ft.maxLineLen != 0 && dataBytesLen > ft.maxLineLen {
+				return nil
+			}
+			if dataBytesLen < DefaultMaxBatchSize {
 				// 此处将 data 改为 raw 放在 pandora_stash 中
 				if _, ok := failCtxData[KeyPandoraStash]; !ok {
 					log.Infof("Runner[%v] Sender[%v] try to convert data to string", ft.runnerName, ft.innerSender.Name())
@@ -816,14 +849,14 @@ func (ft *FtSender) sendRawFromQueue(queueName string, readChan <-chan []byte, r
 			return
 		}
 		if curIdx < len(curDataContext) {
-			backDataContext, err = ft.trySendRaws(curDataContext[curIdx].Lines, numWaits, isRetry)
+			backDataContext, err = ft.backOffReTrySendRaw(curDataContext[curIdx].Lines, numWaits, isRetry)
 			curIdx++
 		} else {
 			select {
 			case bytes := <-readChan:
 				backDataContext, err = ft.trySendBytes(bytes, numWaits, isRetry)
 			case datas := <-readDatasChan:
-				backDataContext, err = ft.trySendRaws(datas, numWaits, isRetry)
+				backDataContext, err = ft.backOffReTrySendRaw(datas, numWaits, isRetry)
 			case <-timer.C:
 				continue
 			}
@@ -864,14 +897,14 @@ func (ft *FtSender) sendFromQueue(queueName string, readChan <-chan []byte, read
 			return
 		}
 		if curIdx < len(curDataContext) {
-			backDataContext, err = ft.trySendDatas(curDataContext[curIdx].Datas, numWaits, isRetry)
+			backDataContext, err = ft.backOffReTrySend(curDataContext[curIdx].Datas, numWaits, isRetry)
 			curIdx++
 		} else {
 			select {
 			case bytes := <-readChan:
 				backDataContext, err = ft.trySendBytes(bytes, numWaits, isRetry)
 			case datas := <-readDatasChan:
-				backDataContext, err = ft.trySendDatas(datas, numWaits, isRetry)
+				backDataContext, err = ft.backOffReTrySend(datas, numWaits, isRetry)
 			case <-timer.C:
 				continue
 			}
@@ -975,4 +1008,93 @@ func isErrorEmpty(err error) bool {
 	}
 
 	return false
+}
+
+// 阻塞式全量发送
+func (ft *FtSender) backOffReTrySend(datas []Data, failSleep int, isRetry bool) (res []*datasContext, err error) {
+	if !ft.isBlock {
+		return ft.trySendDatas(datas, failSleep, isRetry)
+	}
+
+	backoff := utils.NewBackoff(2, 1, time.Second, 5*time.Minute)
+	for {
+		if atomic.LoadInt32(&ft.stopped) > 0 {
+			for _, v := range res {
+				nnBytes, err := jsoniter.Marshal(v)
+				if err != nil {
+					log.Errorf("Runner[%v] Sender[%v] marshal %v failed: %v", ft.runnerName, ft.innerSender.Name(), *v, err)
+					continue
+				}
+
+				err = ft.BackupQueue.Put(nnBytes)
+				if err != nil {
+					log.Errorf("Runner[%v] Sender[%v] cannot write points back to queue %v: %v", ft.runnerName, ft.innerSender.Name(), ft.BackupQueue.Name(), err)
+				}
+			}
+			if len(res) != 0 {
+				time.Sleep(2 * time.Second)
+			}
+			ft.exitChan <- struct{}{}
+			return
+		}
+		res, err = ft.trySendDatas(datas, 1, isRetry)
+		if err == nil {
+			return nil, nil
+		}
+		// 非阻塞式全量发送
+		if len(res) > 1 {
+			return res, err
+		}
+		time.Sleep(backoff.Duration())
+		// 阻塞
+		if backoff.Attempt() >= 8 {
+			if ft.discardErr {
+				return nil, nil
+			}
+			backoff.Reset()
+		}
+	}
+}
+
+// 阻塞式全量发送
+func (ft *FtSender) backOffReTrySendRaw(datas []string, failSleep int, isRetry bool) (res []*datasContext, err error) {
+	if !ft.isBlock {
+		return ft.trySendRaws(datas, failSleep, isRetry)
+	}
+	for idx := 0; idx < 10; idx++ {
+		if atomic.LoadInt32(&ft.stopped) > 0 {
+			for _, v := range res {
+				nnBytes, err := jsoniter.Marshal(v)
+				if err != nil {
+					log.Errorf("Runner[%v] Sender[%v] marshal %v failed: %v", ft.runnerName, ft.innerSender.Name(), *v, err)
+					continue
+				}
+
+				err = ft.BackupQueue.Put(nnBytes)
+				if err != nil {
+					log.Errorf("Runner[%v] Sender[%v] cannot write points back to queue %v: %v", ft.runnerName, ft.innerSender.Name(), ft.BackupQueue.Name(), err)
+				}
+			}
+			if len(res) != 0 {
+				time.Sleep(2 * time.Second)
+			}
+			ft.exitChan <- struct{}{}
+			return
+		}
+		res, err = ft.trySendRaws(datas, idx, isRetry)
+		if err == nil {
+			return nil, nil
+		}
+
+		time.Sleep(time.Second * time.Duration(math.Pow(2, float64(idx))))
+		// 阻塞
+		if idx == 9 && !ft.discardErr {
+			idx = 0
+		}
+	}
+	// 发送10次失败，并且配置了丢弃
+	if err != nil && ft.discardErr {
+		return nil, nil
+	}
+	return res, err
 }
