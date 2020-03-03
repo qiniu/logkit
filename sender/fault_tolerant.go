@@ -746,7 +746,7 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 				return retDatasContext
 			}
 			dataBytesLen := int64(len(string(dataBytes)))
-			if ft.maxLineLen != 0 && dataBytesLen > ft.maxLineLen {
+			if ft.maxLineLen > 0 && dataBytesLen > ft.maxLineLen {
 				return nil
 			}
 			if dataBytesLen < DefaultMaxBatchSize {

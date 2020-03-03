@@ -226,7 +226,7 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	}
 	for i := range rc.SendersConfig {
 		rc.SendersConfig[i][KeyRunnerName] = rc.RunnerName
-		if rc.MaxLineLen != 0 {
+		if rc.MaxLineLen > 0 {
 			rc.SendersConfig[i][KeyRunnerMaxLineLen] = strconv.FormatInt(rc.MaxLineLen, 10)
 		}
 	}
@@ -474,7 +474,7 @@ func (r *LogExportRunner) tryRawSend(s sender.Sender, datas []string, times int)
 		if se != nil && se.Ft && se.FtNotRetry {
 			break
 		}
-		time.Sleep(time.Second)
+		time.Sleep(time.Duration(cnt) * time.Second)
 		_, ok = err.(*reqerr.SendError)
 		if ok {
 			//无限重试的，除非遇到关闭
@@ -494,7 +494,7 @@ func (r *LogExportRunner) tryRawSend(s sender.Sender, datas []string, times int)
 			cnt++
 			continue
 		}
-		log.Errorf("Runner[%v] retry send %v times, but still error %v, total %v data lines", r.RunnerName, cnt, err, len(datas))
+		log.Errorf("Runner[%v] retry send %v times error %v, total %v data lines", r.RunnerName, cnt, err, len(datas))
 		break
 	}
 	info.Errors += originDatasLen - successDatasLen
@@ -568,7 +568,7 @@ func (r *LogExportRunner) trySend(s sender.Sender, datas []Data, times int) bool
 		if se != nil && se.Ft && se.FtNotRetry {
 			break
 		}
-		time.Sleep(time.Second)
+		time.Sleep(time.Duration(cnt) * time.Second)
 		sendError, ok := err.(*reqerr.SendError)
 		if ok {
 			datas = sender.ConvertDatas(sendError.GetFailDatas())
@@ -691,7 +691,7 @@ func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []str
 			time.Sleep(1 * time.Second)
 			continue
 		}
-		if r.MaxLineLen != 0 {
+		if r.MaxLineLen > 0 {
 			lineLen := len(line)
 			if int64(lineLen) > r.MaxLineLen {
 				log.Warnf("Runner[%v] line length: %d meet max len %d, drop it", r.Name(), lineLen, r.MaxLineLen)
@@ -932,7 +932,6 @@ func (r *LogExportRunner) Run() {
 			for _, s := range r.senders {
 				if !r.tryRawSend(s, lines, r.MaxBatchTryTimes) {
 					success = false
-					log.Errorf("Runner[%v] failed to send data finally", r.Name())
 					break
 				}
 			}
@@ -1001,7 +1000,7 @@ func (r *LogExportRunner) Run() {
 			r.rs.TransformStats[tp] = tstats
 			r.rsMutex.Unlock()
 			if err != nil {
-				log.Errorf("runner[%v]: error %v", r.RunnerName, err)
+				log.Debugf("runner[%v]: error %v", r.RunnerName, err)
 			}
 		}
 		r.tracker.Track("finish transformers")
@@ -1021,7 +1020,6 @@ func (r *LogExportRunner) Run() {
 		if success {
 			r.syncAndLog(batchLen, batchSize, int64(dataLen))
 		}
-		log.Debugf("Runner[%v] send %s finish to send at: %v", r.Name(), r.reader.Name(), time.Now().Format(time.RFC3339))
 		log.Debug(r.tracker.Print())
 	}
 }
