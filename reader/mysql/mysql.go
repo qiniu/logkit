@@ -1190,8 +1190,7 @@ func (r *MysqlReader) execReadSql(curDB string, idx int, execSQL string, db *sql
 			startTimePrint = r.startTimeStr
 		}
 	}
-	log.Infof("Runner[%v] SQL: <%v> find total %d data, after trim duplicated, left data is: %d, "+
-		"now we have total got %v data, and start time is %v ",
+	log.Infof("Runner[%s] SQL: <%s> total %d data, left dat %d, now total got %v, start time is %v ",
 		r.meta.RunnerName, execSQL, total, len(alldatas), len(r.timeCacheMap), startTimePrint)
 
 	if maxOffset > 0 {
