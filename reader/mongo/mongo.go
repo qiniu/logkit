@@ -37,6 +37,7 @@ type CollectionFilter map[string]interface{}
 
 const (
 	DefaultOffsetKey = "_id"
+	EmptyOffsetKey   = ""
 )
 
 const (
@@ -95,7 +96,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	offsetkey, _ := conf.GetStringOr(KeyMongoOffsetKey, DefaultOffsetKey)
+	offsetkey, _ := conf.GetStringOr(KeyMongoOffsetKey, EmptyOffsetKey)
 	cronSched, _ := conf.GetStringOr(KeyMongoCron, "")
 	execOnStart, _ := conf.GetBoolOr(KeyMongoExecOnstart, true)
 	filters, _ := conf.GetStringOr(KeyMongoFilters, "")
@@ -361,6 +362,10 @@ func (r *Reader) catQuery(c string, lastID interface{}, mgoSession *mgo.Session)
 	query := bson.M{}
 	if f, ok := r.collectionFilters[c]; ok {
 		query = bson.M(f)
+	}
+
+	if r.offsetkey == EmptyOffsetKey {
+		return mgoSession.DB(r.database).C(c).Find(query)
 	}
 	if lastID != nil {
 		query[r.offsetkey] = bson.M{"$gt": lastID}
