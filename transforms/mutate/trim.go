@@ -49,53 +49,39 @@ func (g *Trim) Transform(datas []Data) ([]Data, error) {
 	}
 
 	var (
-		dataLen     = len(datas)
 		err, fmtErr error
 		errNum      int
-
-		numRoutine   = g.numRoutine
-		dataPipeline = make(chan transforms.TransformInfo)
-		resultChan   = make(chan transforms.TransformResult)
-		wg           = new(sync.WaitGroup)
 	)
-	if dataLen < numRoutine {
-		numRoutine = dataLen
-	}
+	for idx := range datas {
+		err = nil
+		errNum = 0
 
-	for i := 0; i < numRoutine; i++ {
-		wg.Add(1)
-		go g.transform(dataPipeline, resultChan, wg)
-	}
-
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
-
-	go func() {
-		for idx, data := range datas {
-			dataPipeline <- transforms.TransformInfo{
-				CurData: data,
-				Index:   idx,
-			}
+		val, getErr := GetMapValue(datas[idx], g.keys...)
+		if getErr != nil {
+			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, g.Key)
+			continue
 		}
-		close(dataPipeline)
-	}()
-
-	var transformResultSlice = make(transforms.TransformResultSlice, dataLen)
-	for resultInfo := range resultChan {
-		transformResultSlice[resultInfo.Index] = resultInfo
-	}
-
-	for _, transformResult := range transformResultSlice {
-		if transformResult.Err != nil {
-			err = transformResult.Err
-			errNum += transformResult.ErrNum
+		strVal, ok := val.(string)
+		if !ok {
+			typeErr := errors.New("transform key " + g.Key + " data type is not string")
+			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
+			continue
 		}
-		datas[transformResult.Index] = transformResult.CurData
+		switch g.Place {
+		case Prefix:
+			strVal = strings.TrimLeft(strVal, g.Characters)
+		case Suffix:
+			strVal = strings.TrimRight(strVal, g.Characters)
+		default:
+			strVal = strings.Trim(strVal, g.Characters)
+		}
+		setErr := SetMapValue(datas[idx], strVal, false, g.keys...)
+		if setErr != nil {
+			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, g.Key)
+		}
 	}
 
-	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(dataLen), g.Type())
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
 	return datas, fmtErr
 }
 

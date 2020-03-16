@@ -1,7 +1,6 @@
 package mutate
 
 import (
-	"sort"
 	"strings"
 	"sync"
 
@@ -45,69 +44,15 @@ func (g *Discarder) RawTransform(datas []string) ([]string, error) {
 		g.Init()
 	}
 
-	var (
-		dataLine   = len(datas)
-		ret        = make([]string, dataLine)
-		err        error
-		errNum     int
-		numRoutine = g.numRoutine
-
-		dataPipeline = make(chan transforms.RawTransformInfo)
-		resultChan   = make(chan transforms.RawTransformResult)
-		wg           = new(sync.WaitGroup)
-	)
-	if dataLine < numRoutine {
-		numRoutine = dataLine
-	}
-
-	for i := 0; i < numRoutine; i++ {
-		wg.Add(1)
-		go g.rawtransform(dataPipeline, resultChan, wg)
-	}
-
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
-
-	go func() {
-		for idx, data := range datas {
-			dataPipeline <- transforms.RawTransformInfo{
-				CurData: data,
-				Index:   idx,
-			}
-		}
-		close(dataPipeline)
-	}()
-
-	var transformResultSlice = make(transforms.RawTransformResultSlice, dataLine)
-	for resultInfo := range resultChan {
-		transformResultSlice[resultInfo.Index] = resultInfo
-	}
-
-	for _, transformResult := range transformResultSlice {
-		if transformResult.Err != nil {
-			err = transformResult.Err
-			errNum += transformResult.ErrNum
+	res := make([]string, 0, len(datas))
+	for _, data := range datas {
+		if strings.Contains(data, g.Key) {
 			continue
 		}
-		ret[transformResult.Index] = transformResult.CurData
+		res = append(res, data)
 	}
 
-	var (
-		result      = make([]string, dataLine)
-		resultIndex = 0
-	)
-	for _, retEntry := range ret {
-		if retEntry == "" {
-			continue
-		}
-		result[resultIndex] = retEntry
-		resultIndex++
-	}
-
-	g.stats, _ = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(dataLine), g.Type())
-	return result[:resultIndex], nil
+	return res, nil
 }
 
 func (g *Discarder) Transform(datas []Data) ([]Data, error) {
@@ -115,55 +60,12 @@ func (g *Discarder) Transform(datas []Data) ([]Data, error) {
 		g.Init()
 	}
 
-	var (
-		err    error
-		errNum int
-	)
-	numRoutine := g.numRoutine
-	if len(datas) < numRoutine {
-		numRoutine = len(datas)
-	}
-	dataPipeline := make(chan transforms.TransformInfo)
-	resultChan := make(chan transforms.TransformResult)
-
-	wg := new(sync.WaitGroup)
-	for i := 0; i < numRoutine; i++ {
-		wg.Add(1)
-		go g.transform(dataPipeline, resultChan, wg)
-	}
-
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
-
-	go func() {
-		for idx, data := range datas {
-			dataPipeline <- transforms.TransformInfo{
-				CurData: data,
-				Index:   idx,
-			}
+	for idx := range datas {
+		for _, keys := range g.discardKeys {
+			DeleteMapValue(datas[idx], keys...)
 		}
-		close(dataPipeline)
-	}()
-
-	var transformResultSlice = make(transforms.TransformResultSlice, 0, len(datas))
-	for resultInfo := range resultChan {
-		transformResultSlice = append(transformResultSlice, resultInfo)
-	}
-	if numRoutine > 1 {
-		sort.Stable(transformResultSlice)
 	}
 
-	for _, transformResult := range transformResultSlice {
-		if transformResult.Err != nil {
-			err = transformResult.Err
-			errNum += transformResult.ErrNum
-		}
-		datas[transformResult.Index] = transformResult.CurData
-	}
-
-	g.stats, _ = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
 	return datas, nil
 }
 
@@ -210,20 +112,6 @@ func init() {
 	transforms.Add("discard", func() transforms.Transformer {
 		return &Discarder{}
 	})
-}
-
-func (g *Discarder) transform(dataPipeline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
-	for transformInfo := range dataPipeline {
-		for _, keys := range g.discardKeys {
-			DeleteMapValue(transformInfo.CurData, keys...)
-		}
-
-		resultChan <- transforms.TransformResult{
-			Index:   transformInfo.Index,
-			CurData: transformInfo.CurData,
-		}
-	}
-	wg.Done()
 }
 
 func (g *Discarder) rawtransform(dataPipeline <-chan transforms.RawTransformInfo, resultChan chan transforms.RawTransformResult, wg *sync.WaitGroup) {

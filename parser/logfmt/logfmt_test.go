@@ -17,8 +17,9 @@ var (
 	testData = utils.GetParseTestData("ts=2018-01-02T03:04:05.123Z lvl=info msg=\"http request\" method=PUT\nduration=1.23 log_id=123456abc", DefaultMaxBatchSize)
 )
 
-// now: 10	 150631356 ns/op	routine = 1  (2MB)
-// now: 10	 139839802 ns/op	routine = 2  (2MB)
+// old: 10	 150631356 ns/op	routine = 1  (2MB)
+// old: 10	 139839802 ns/op	routine = 2  (2MB)
+// now: 20	  84074976 ns/op 	routine = 1  (2MB)
 func Benchmark_ParseLine(b *testing.B) {
 	c := conf.MapConf{}
 	c[KeyParserName] = "testparser"

@@ -2,7 +2,6 @@ package mutate
 
 import (
 	"errors"
-	"sync"
 
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
@@ -110,55 +109,20 @@ func (s *Sub) RawTransform(datas []string) ([]string, error) {
 		}
 	}
 
-	var (
-		dataLen     = len(datas)
-		err, fmtErr error
-		errNum      int
-
-		numRoutine   = s.numRoutine
-		dataPipeline = make(chan transforms.RawTransformInfo)
-		resultChan   = make(chan transforms.RawTransformResult)
-		wg           = new(sync.WaitGroup)
-	)
-	if dataLen < numRoutine {
-		numRoutine = dataLen
-	}
-
-	for i := 0; i < numRoutine; i++ {
-		wg.Add(1)
-		go s.rawtransform(dataPipeline, resultChan, wg)
-	}
-
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
-
-	go func() {
-		for idx, data := range datas {
-			dataPipeline <- transforms.RawTransformInfo{
-				CurData: data,
-				Index:   idx,
-			}
+	newVal := ""
+	for idx, data := range datas {
+		sLen := len(datas[idx])
+		if s.Start >= sLen {
+			newVal = data
+		} else if s.End >= sLen {
+			newVal = data[s.Start:]
+		} else {
+			newVal = data[s.Start:s.End]
 		}
-		close(dataPipeline)
-	}()
-
-	var transformResultSlice = make(transforms.RawTransformResultSlice, dataLen)
-	for resultInfo := range resultChan {
-		transformResultSlice[resultInfo.Index] = resultInfo
+		datas[idx] = newVal
 	}
 
-	for _, transformResult := range transformResultSlice {
-		if transformResult.Err != nil {
-			err = transformResult.Err
-			errNum += transformResult.ErrNum
-		}
-		datas[transformResult.Index] = transformResult.CurData
-	}
-
-	s.stats, fmtErr = transforms.SetStatsInfo(err, s.stats, int64(errNum), int64(dataLen), s.Type())
-	return datas, fmtErr
+	return datas, nil
 }
 
 func (s *Sub) Stage() string {
@@ -183,98 +147,24 @@ func (s *Sub) Transform(datas []Data) ([]Data, error) {
 			return nil, err
 		}
 	}
-
 	var (
-		dataLen     = len(datas)
+		errNum      = 0
 		err, fmtErr error
-		errNum      int
-
-		numRoutine   = s.numRoutine
-		dataPipeline = make(chan transforms.TransformInfo)
-		resultChan   = make(chan transforms.TransformResult)
-		wg           = new(sync.WaitGroup)
+		newVal      string
 	)
-	if dataLen < numRoutine {
-		numRoutine = dataLen
-	}
-
-	for i := 0; i < numRoutine; i++ {
-		wg.Add(1)
-		go s.transform(dataPipeline, resultChan, wg)
-	}
-
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
-
-	go func() {
-		for idx, data := range datas {
-			dataPipeline <- transforms.TransformInfo{
-				CurData: data,
-				Index:   idx,
-			}
-		}
-		close(dataPipeline)
-	}()
-
-	var transformResultSlice = make(transforms.TransformResultSlice, dataLen)
-	for resultInfo := range resultChan {
-		transformResultSlice[resultInfo.Index] = resultInfo
-	}
-
-	for _, transformResult := range transformResultSlice {
-		if transformResult.Err != nil {
-			err = transformResult.Err
-			errNum += transformResult.ErrNum
-		}
-		datas[transformResult.Index] = transformResult.CurData
-	}
-
-	s.stats, fmtErr = transforms.SetStatsInfo(err, s.stats, int64(errNum), int64(dataLen), s.Type())
-	return datas, fmtErr
-}
-
-func init() {
-	transforms.Add("substring", func() transforms.Transformer {
-		return &Sub{}
-	})
-}
-
-func (s *Sub) transform(dataPipeline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
-	var (
-		err    error
-		errNum int
-		sLen   int
-		newVal string
-	)
-	for transformInfo := range dataPipeline {
-		err = nil
-		errNum = 0
-		val, getErr := GetMapValue(transformInfo.CurData, s.oldKeys...)
+	for idx := range datas {
+		val, getErr := GetMapValue(datas[idx], s.oldKeys...)
 		if getErr != nil {
 			errNum, err = transforms.SetError(errNum, getErr, transforms.GetErr, s.Key)
-			resultChan <- transforms.TransformResult{
-				Index:   transformInfo.Index,
-				CurData: transformInfo.CurData,
-				Err:     err,
-				ErrNum:  errNum,
-			}
 			continue
 		}
 		strVal, ok := val.(string)
 		if !ok {
 			typeErr := errors.New("transform key " + s.Key + " data type is not string")
 			errNum, err = transforms.SetError(errNum, typeErr, transforms.General, "")
-			resultChan <- transforms.TransformResult{
-				Index:   transformInfo.Index,
-				CurData: transformInfo.CurData,
-				Err:     err,
-				ErrNum:  errNum,
-			}
 			continue
 		}
-		sLen = len(strVal)
+		sLen := len(strVal)
 		if s.Start >= sLen {
 			newVal = ""
 		} else if s.End >= sLen {
@@ -282,49 +172,19 @@ func (s *Sub) transform(dataPipeline <-chan transforms.TransformInfo, resultChan
 		} else {
 			newVal = strVal[s.Start:s.End]
 		}
-		setErr := SetMapValue(transformInfo.CurData, newVal, false, s.newKeys...)
+		setErr := SetMapValue(datas[idx], newVal, false, s.newKeys...)
 		if setErr != nil {
-			errNum, err = transforms.SetError(errNum, setErr, transforms.SetErr, s.New)
-		}
-
-		resultChan <- transforms.TransformResult{
-			Index:   transformInfo.Index,
-			CurData: transformInfo.CurData,
-			Err:     err,
-			ErrNum:  errNum,
+			errNum, err = transforms.SetError(errNum, getErr, transforms.SetErr, s.Key)
+			continue
 		}
 	}
-	wg.Done()
+
+	s.stats, fmtErr = transforms.SetStatsInfo(err, s.stats, int64(errNum), int64(len(datas)), s.Type())
+	return datas, fmtErr
 }
 
-func (s *Sub) rawtransform(dataPipeline <-chan transforms.RawTransformInfo, resultChan chan transforms.RawTransformResult, wg *sync.WaitGroup) {
-	var (
-		err    error
-		errNum int
-		strVal string
-		sLen   int
-		newVal string
-	)
-	for transformInfo := range dataPipeline {
-		err = nil
-		errNum = 0
-		strVal = transformInfo.CurData
-		sLen = len(strVal)
-		if s.Start >= sLen {
-			newVal = strVal
-		} else if s.End >= sLen {
-			newVal = strVal[s.Start:]
-		} else {
-			newVal = strVal[s.Start:s.End]
-		}
-		transformInfo.CurData = newVal
-
-		resultChan <- transforms.RawTransformResult{
-			Index:   transformInfo.Index,
-			CurData: transformInfo.CurData,
-			Err:     err,
-			ErrNum:  errNum,
-		}
-	}
-	wg.Done()
+func init() {
+	transforms.Add("substring", func() transforms.Transformer {
+		return &Sub{}
+	})
 }
