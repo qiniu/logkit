@@ -2,7 +2,6 @@ package mutate
 
 import (
 	"regexp"
-	"sync"
 
 	"github.com/pkg/errors"
 
@@ -53,54 +52,30 @@ func (g *Replacer) Transform(datas []Data) ([]Data, error) {
 		g.Init()
 	}
 	var (
-		dataLen     = len(datas)
 		err, fmtErr error
 		errNum      int
-
-		numRoutine   = g.numRoutine
-		dataPipeline = make(chan transforms.TransformInfo)
-		resultChan   = make(chan transforms.TransformResult)
-		wg           = new(sync.WaitGroup)
 	)
-
-	if dataLen < numRoutine {
-		numRoutine = dataLen
-	}
-
-	for i := 0; i < numRoutine; i++ {
-		wg.Add(1)
-		go g.transform(dataPipeline, resultChan, wg)
-	}
-
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
-
-	go func() {
-		for idx, data := range datas {
-			dataPipeline <- transforms.TransformInfo{
-				CurData: data,
-				Index:   idx,
-			}
+	for idx := range datas {
+		val, getErr := GetMapValue(datas[idx], g.keys...)
+		if getErr != nil {
+			errNum++
+			err = errors.New("transform key " + g.Key + " not exist in data")
+			continue
 		}
-		close(dataPipeline)
-	}()
-
-	var transformResultSlice = make(transforms.TransformResultSlice, dataLen)
-	for resultInfo := range resultChan {
-		transformResultSlice[resultInfo.Index] = resultInfo
-	}
-
-	for _, transformResult := range transformResultSlice {
-		if transformResult.Err != nil {
-			err = transformResult.Err
-			errNum += transformResult.ErrNum
+		strVal, ok := val.(string)
+		if !ok {
+			errNum++
+			err = errors.New("transform key " + g.Key + " data type is not string")
+			continue
 		}
-		datas[transformResult.Index] = transformResult.CurData
+		setErr := SetMapValue(datas[idx], g.Regexp.ReplaceAllString(strVal, g.New), false, g.keys...)
+		if setErr != nil {
+			errNum++
+			err = errors.New("value of " + g.Key + " is not the type of map[string]interface{}")
+		}
 	}
 
-	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(dataLen), g.Type())
+	g.stats, fmtErr = transforms.SetStatsInfo(err, g.stats, int64(errNum), int64(len(datas)), g.Type())
 	return datas, fmtErr
 }
 
@@ -190,53 +165,4 @@ func init() {
 	transforms.Add("replace", func() transforms.Transformer {
 		return &Replacer{}
 	})
-}
-
-func (g *Replacer) transform(dataPipeline <-chan transforms.TransformInfo, resultChan chan transforms.TransformResult, wg *sync.WaitGroup) {
-	var (
-		err    error
-		errNum int
-	)
-	for transformInfo := range dataPipeline {
-		err = nil
-		errNum = 0
-
-		val, getErr := GetMapValue(transformInfo.CurData, g.keys...)
-		if getErr != nil {
-			errNum++
-			err = errors.New("transform key " + g.Key + " not exist in data")
-			resultChan <- transforms.TransformResult{
-				Index:   transformInfo.Index,
-				CurData: transformInfo.CurData,
-				Err:     err,
-				ErrNum:  errNum,
-			}
-			continue
-		}
-		strVal, ok := val.(string)
-		if !ok {
-			errNum++
-			err = errors.New("transform key " + g.Key + " data type is not string")
-			resultChan <- transforms.TransformResult{
-				Index:   transformInfo.Index,
-				CurData: transformInfo.CurData,
-				Err:     err,
-				ErrNum:  errNum,
-			}
-			continue
-		}
-		setErr := SetMapValue(transformInfo.CurData, g.Regexp.ReplaceAllString(strVal, g.New), false, g.keys...)
-		if setErr != nil {
-			errNum++
-			err = errors.New("value of " + g.Key + " is not the type of map[string]interface{}")
-		}
-
-		resultChan <- transforms.TransformResult{
-			Index:   transformInfo.Index,
-			CurData: transformInfo.CurData,
-			Err:     err,
-			ErrNum:  errNum,
-		}
-	}
-	wg.Done()
 }

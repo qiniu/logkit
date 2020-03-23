@@ -16,6 +16,10 @@ func init() {
 	parser.RegisterConstructor(TypeKeyValue, NewParser)
 }
 
+const (
+	errMsg = "will keep origin data in pandora_stash if disable_record_errdata field is false"
+)
+
 type Parser struct {
 	name                 string
 	keepString           bool
@@ -23,6 +27,7 @@ type Parser struct {
 	numRoutine           int
 	keepRawData          bool
 	splitter             string
+	mp                   mutate.Parser
 }
 
 func NewParser(c conf.MapConf) (parser.Parser, error) {
@@ -42,17 +47,14 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		numRoutine:           numRoutine,
 		keepRawData:          keepRawData,
 		splitter:             splitter,
+		mp: mutate.Parser{
+			KeepString: keepString,
+			Splitter:   splitter,
+		},
 	}, nil
 }
 
 func (p *Parser) Parse(lines []string) ([]Data, error) {
-	mp := mutate.Parser{
-		KeepString: p.keepString,
-		Splitter:   p.splitter,
-	}
-	if mp.Splitter == "" {
-		mp.Splitter = "="
-	}
 	var (
 		lineLen = len(lines)
 		datas   = make([]Data, 0, lineLen)
@@ -70,7 +72,7 @@ func (p *Parser) Parse(lines []string) ([]Data, error) {
 
 	for i := 0; i < numRoutine; i++ {
 		wg.Add(1)
-		go parser.ParseLineDataSlice(sendChan, resultChan, wg, true, mp.Parse)
+		go parser.ParseLineDataSlice(sendChan, resultChan, wg, true, p.mp.Parse)
 	}
 
 	go func() {

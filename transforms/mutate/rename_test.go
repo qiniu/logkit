@@ -9,6 +9,26 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+var (
+	bench     []Data
+	testDatas = []Data{
+		{"a": "key1"},
+		{"b": "key2"},
+		{"c": "key3"},
+	}
+)
+
+// now: Benchmark_Transform-4   	20000000	        69.7 ns/op
+func Benchmark_Transform(b *testing.B) {
+	t := Rename{}
+
+	var m []Data
+	for n := 0; n < b.N; n++ {
+		m, _ = t.Transform(testDatas)
+	}
+	bench = m
+}
+
 func TestRenameTransformer(t *testing.T) {
 	// rename plain field
 	rename := &Rename{
