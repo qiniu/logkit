@@ -393,7 +393,6 @@ func (d *diskQueue) writeOne(data []byte) error {
 		}
 
 		log.Warnf("DISKQUEUE(%s): writeOne() opened %s", d.name, curFileName)
-
 		if d.writePos > 0 {
 			_, err = d.writeFile.Seek(d.writePos, 0)
 			if err != nil {
