@@ -171,17 +171,11 @@ func (p *SyslogParser) parse(line string) (data Data, err error) {
 		if line == PandoraParseFlushSignal {
 			return p.Flush()
 		}
-
-		if p.curline >= p.maxline || p.format.IsNewLine([]byte(line)) {
-			data, err = p.Flush()
-		} else {
-			p.curline++
-		}
 	}
 
 	if line != PandoraParseFlushSignal {
 		_, writeErr := p.buff.Write([]byte(line))
-		if data == nil && writeErr != nil {
+		if writeErr != nil {
 			log.Errorf("line write to buff failed: %v", writeErr)
 			if !p.disableRecordErrData || p.keepRawData {
 				data = make(Data)
@@ -193,6 +187,10 @@ func (p *SyslogParser) parse(line string) (data Data, err error) {
 				data[KeyRawData] = string(p.buff.Bytes())
 			}
 			return data, writeErr
+		}
+		p.curline++
+		if p.curline >= p.maxline || p.format.IsNewLine([]byte(line)) {
+			data, err = p.Flush()
 		}
 	}
 	return data, err
