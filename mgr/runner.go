@@ -246,7 +246,7 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 		syncDir := rc.ReaderConfig[KeySyncDirectory]
 		oldSyncDir := syncDir
 		if syncDir == "" {
-			bucket, prefix, region, ak, sk, _ := cloudtrail.GetS3UserInfo(rc.ReaderConfig)
+			bucket, prefix, region, _, ak, sk, _ := cloudtrail.GetS3UserInfo(rc.ReaderConfig)
 			oldSyncDir, syncDir = cloudtrail.GetDefaultSyncDir(bucket, prefix, region, ak, sk, rc.RunnerName)
 		}
 		rc.ReaderConfig[KeyLogPath] = syncDir

@@ -137,6 +137,7 @@ const (
 // Constants for cloudtrail
 const (
 	KeyS3Region          = "s3_region"
+	KeyS3Endpoint        = "s3_endpoint"
 	KeyS3AccessKey       = "s3_access_key"
 	KeyS3SecretKey       = "s3_secret_key"
 	KeyS3Bucket          = "s3_bucket"
