@@ -88,14 +88,25 @@ func RawData(readerConfig conf.MapConf) ([]string, error) {
 		}
 
 		// ReadLine 是可能读到空值的，在接收器宣布超时或读取到数据之前需要不停循环读取
+		var lastErr error
 		for atomic.LoadInt32(&timeoutStatus) == 0 {
 			res := readLines(rd, size, &timeoutStatus)
-			if len(res.data) == 0 && res.lastErr == nil {
+			if (len(res.data) == 0 && res.lastErr == nil) || os.IsNotExist(res.lastErr) {
+				if res.lastErr != nil {
+					lastErr = res.lastErr
+				}
 				continue
 			}
 			readChan <- res
 			return
 		}
+		if atomic.LoadInt32(&timeoutStatus) == 1 {
+			if lastErr != nil {
+				readChan <- dataResult{lastErr:lastErr}
+				return
+			}
+		}
+
 	}()
 
 	var rawData []string
