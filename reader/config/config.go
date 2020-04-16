@@ -1722,6 +1722,16 @@ var ModeKeyOptions = map[string][]Option{
 			ToolTip:      "存储桶名称",
 		},
 		{
+			KeyName:      KeyS3Endpoint,
+			ChooseOnly:   false,
+			Placeholder:  "s3-REGION.amazonaws.com",
+			DefaultNoUse: false,
+			Required:     false,
+			Description:  "终端节点地址(s3_endpoint)",
+			Advance:      true,
+			ToolTip:      "S3终端节点",
+		},
+		{
 			KeyName:      KeyS3Prefix,
 			ChooseOnly:   false,
 			Default:      "",

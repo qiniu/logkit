@@ -128,6 +128,7 @@ func (r *Reader) Close() error {
 
 type syncOptions struct {
 	region    string
+	endpoint  string
 	accessKey string
 	secretKey string
 
@@ -154,7 +155,7 @@ func invalidConfigError(key, value string, err error) error {
 	return configError(fmt.Sprintf("invalid value(%q) for key %q: %v", key, value, err))
 }
 
-func GetS3UserInfo(conf conf.MapConf) (bucket, prefix, region, ak, sk string, err error) {
+func GetS3UserInfo(conf conf.MapConf) (bucket, prefix, region, endpoint, ak, sk string, err error) {
 	region, _ = conf.GetString(KeyS3Region)
 	if region == "" {
 		err = emptyConfigError(KeyS3Region)
@@ -175,6 +176,7 @@ func GetS3UserInfo(conf conf.MapConf) (bucket, prefix, region, ak, sk string, er
 		err = emptyConfigError(KeyS3Bucket)
 		return
 	}
+	endpoint, _ = conf.GetStringOr(KeyS3Endpoint, "")
 	prefix, _ = conf.GetStringOr(KeyS3Prefix, "")
 	return
 }
@@ -182,8 +184,7 @@ func GetS3UserInfo(conf conf.MapConf) (bucket, prefix, region, ak, sk string, er
 func buildSyncOptions(conf conf.MapConf) (*syncOptions, error) {
 	var opts syncOptions
 	var err error
-
-	opts.bucket, opts.prefix, opts.region, opts.accessKey, opts.secretKey, err = GetS3UserInfo(conf)
+	opts.bucket, opts.prefix, opts.region, opts.endpoint, opts.accessKey, opts.secretKey, err = GetS3UserInfo(conf)
 	if err != nil {
 		return nil, err
 	}
@@ -286,6 +287,7 @@ func (mgr *syncManager) syncOnce() error {
 		metastore:  mgr.metastore,
 		concurrent: mgr.concurrent,
 		region:     mgr.region,
+		endpoint:   mgr.endpoint,
 	}
 	return newSyncRunner(ctx, mgr.quitChan).Sync()
 }
@@ -302,6 +304,7 @@ type syncContext struct {
 	metastore  string
 	concurrent int
 	region     string
+	endpoint   string
 }
 
 type syncRunner struct {
@@ -368,7 +371,7 @@ func (s *syncRunner) syncToDir() error {
 	defer metastore.Close()
 
 	s3url := newS3Url(s.source)
-	bucket, err := lookupBucket(s3url.Bucket(), s.auth, s.region)
+	bucket, err := lookupBucket(s3url.Bucket(), s.auth, s.region, s.endpoint)
 	if err != nil {
 		return fmt.Errorf("lookup bucket: %v", err)
 	}
@@ -454,10 +457,13 @@ func (r *s3Url) keys() []string {
 	return strings.Split(trimmed, "/")
 }
 
-func lookupBucket(bucketName string, auth aws.Auth, region string) (*s3.Bucket, error) {
+func lookupBucket(bucketName string, auth aws.Auth, region string, endpoint string) (*s3.Bucket, error) {
 	log.Infof("looking for bucket %q in region %q", bucketName, region)
-
-	s3 := s3.New(auth, aws.Regions[region])
+	rg := aws.Regions[region]
+	if endpoint != "" {
+		rg.S3Endpoint = endpoint
+	}
+	s3 := s3.New(auth, rg)
 	bucket := s3.Bucket(bucketName)
 	_, err := bucket.List("", "", "", 0)
 	if err == nil {
