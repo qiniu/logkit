@@ -79,7 +79,6 @@ type MysqlReader struct {
 	timestampKeyInt bool
 	timestampMux    sync.RWMutex
 	startTime       time.Time
-	startTimeStr    string
 	startTimeInt    int64
 	timeCacheMap    map[string]string
 	batchDuration   time.Duration
@@ -142,9 +141,9 @@ func NewMysqlReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error)
 		if startTimeStr != "" {
 			startTime, err = times.StrToTimeLocation(startTimeStr, time.Local)
 			if err != nil {
-				log.Errorf("parse starttime %s error %v", startTimeStr, err)
-			} else {
-				startTimeStr = ""
+				errStr := fmt.Sprintf("parse starttime %s error %v", startTimeStr, err)
+				log.Error(errStr)
+				return nil, errors.New(errStr)
 			}
 		}
 		timestampDurationStr, _ := conf.GetStringOr(KeyMysqlBatchDuration, "1m")
@@ -217,7 +216,6 @@ func NewMysqlReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error)
 		timestampKeyInt: timestampInt,
 		startTime:       startTime,
 		startTimeInt:    startTimeInt,
-		startTimeStr:    startTimeStr,
 		batchDuration:   batchDuration,
 		batchDurInt:     batchDurInt,
 
@@ -422,11 +420,7 @@ func (r *MysqlReader) SyncMeta() {
 		if r.timestampKeyInt {
 			content = strconv.FormatInt(r.startTimeInt, 10)
 		} else {
-			if r.startTimeStr == "" {
-				content = r.startTime.Format(time.RFC3339Nano)
-			} else {
-				content = r.startTimeStr
-			}
+			content = r.startTime.Format(time.RFC3339Nano)
 		}
 		if err := WriteTimestampOffset(r.meta.DoneFilePath, content); err != nil {
 			log.Errorf("Runner[%v] %v SyncMeta WriteTimestampOffset error %v", r.meta.RunnerName, r.Name(), err)
@@ -804,10 +798,7 @@ func (r *MysqlReader) getSQL(idx int, rawSQL string) string {
 		if r.timestampKeyInt {
 			return fmt.Sprintf("%s %s %s >= %v AND %s < %v;", rawSQL, link, r.timestampKey, r.startTimeInt, r.timestampKey, r.startTimeInt+int64(r.batchDurInt))
 		}
-		if r.startTimeStr == "" {
-			return fmt.Sprintf("%s %s %s >= '%s' AND %s < '%s';", rawSQL, link, r.timestampKey, r.startTime.Format(MysqlTimeFormat), r.timestampKey, r.startTime.Add(r.batchDuration).Format(MysqlTimeFormat))
-		}
-		return fmt.Sprintf("%s %s %s >= '%s';", rawSQL, link, r.timestampKey, r.startTimeStr)
+		return fmt.Sprintf("%s %s %s >= '%s' AND %s < '%s';", rawSQL, link, r.timestampKey, r.startTime.Format(MysqlTimeFormat), r.timestampKey, r.startTime.Add(r.batchDuration).Format(MysqlTimeFormat))
 	}
 
 	rawSQL = strings.TrimSuffix(strings.TrimSpace(rawSQL), ";")
@@ -843,11 +834,7 @@ func (r *MysqlReader) checkExit(idx int, db *sql.DB) (bool, int64) {
 		if r.timestampKeyInt {
 			tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v >= %v;", rawSQL, r.timestampKey, r.startTimeInt)
 		} else {
-			if r.startTimeStr == "" {
-				tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v >= '%s';", rawSQL, r.timestampKey, r.startTime.Format(MysqlTimeFormat))
-			} else {
-				tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v >= '%s';", rawSQL, r.timestampKey, r.startTimeStr)
-			}
+			tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v >= '%s';", rawSQL, r.timestampKey, r.startTime.Format(MysqlTimeFormat))
 		}
 
 		largerAmount, err := QueryNumber(tsql, db)
@@ -860,11 +847,7 @@ func (r *MysqlReader) checkExit(idx int, db *sql.DB) (bool, int64) {
 		if r.timestampKeyInt {
 			tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v = %v;", rawSQL, r.timestampKey, r.startTimeInt)
 		} else {
-			if r.startTimeStr == "" {
-				tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v = '%s';", rawSQL, r.timestampKey, r.startTime.Format(MysqlTimeFormat))
-			} else {
-				tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v = '%s';", rawSQL, r.timestampKey, r.startTimeStr)
-			}
+			tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v = '%s';", rawSQL, r.timestampKey, r.startTime.Format(MysqlTimeFormat))
 		}
 		equalAmount, err := QueryNumber(tsql, db)
 		if err == nil && equalAmount > int64(len(r.timeCacheMap)) {
@@ -876,11 +859,7 @@ func (r *MysqlReader) checkExit(idx int, db *sql.DB) (bool, int64) {
 		if r.timestampKeyInt {
 			tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v > %v;", r.timestampKey, r.timestampKey, rawSQL, r.timestampKey, r.startTimeInt)
 		} else {
-			if r.startTimeStr == "" {
-				tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v > '%s';", r.timestampKey, r.timestampKey, rawSQL, r.timestampKey, r.startTime.Format(MysqlTimeFormat))
-			} else {
-				tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v > '%s';", r.timestampKey, r.timestampKey, rawSQL, r.timestampKey, r.startTimeStr)
-			}
+			tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v > '%s';", r.timestampKey, r.timestampKey, rawSQL, r.timestampKey, r.startTime.Format(MysqlTimeFormat))
 		}
 	} else {
 		tsql = fmt.Sprintf("%s WHERE %v >= %d order by %v limit 1;", rawSQL, r.offsetKey, r.offsets[idx], r.offsetKey)
@@ -1184,11 +1163,7 @@ func (r *MysqlReader) execReadSql(curDB string, idx int, execSQL string, db *sql
 	if r.timestampKeyInt {
 		startTimePrint = strconv.FormatInt(r.startTimeInt, 10)
 	} else {
-		if r.startTimeStr == "" {
-			startTimePrint = r.startTime.String()
-		} else {
-			startTimePrint = r.startTimeStr
-		}
+		startTimePrint = r.startTime.String()
 	}
 	log.Infof("Runner[%s] SQL: <%s> total %d data, left dat %d, now total got %v, start time is %v ",
 		r.meta.RunnerName, execSQL, total, len(alldatas), len(r.timeCacheMap), startTimePrint)
@@ -1343,27 +1318,14 @@ func (r *MysqlReader) restoreTimestamp() {
 		}
 		return
 	}
-	if r.startTimeStr == "" {
-		tm, cache, err := RestoreTimestampOffset(r.meta.DoneFilePath)
-		if err == nil {
-			r.startTime = tm
-			r.timestampMux.Lock()
-			r.timeCacheMap = cache
-			r.timestampMux.Unlock()
-		} else {
-			log.Errorf("RestoreTimestampOffset err %v", err)
-		}
-		return
-	}
-
-	tmStr, cache, err := RestoreTimestampStrOffset(r.meta.DoneFilePath)
+	tm, cache, err := RestoreTimestampOffset(r.meta.DoneFilePath)
 	if err == nil {
-		r.startTimeStr = tmStr
+		r.startTime = tm
 		r.timestampMux.Lock()
 		r.timeCacheMap = cache
 		r.timestampMux.Unlock()
 	} else {
-		log.Errorf("RestoreTimestampStrOffset err %v", err)
+		log.Errorf("RestoreTimestampOffset err %v", err)
 	}
 	return
 }

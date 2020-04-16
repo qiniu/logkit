@@ -19,21 +19,9 @@ func (r *MysqlReader) updateStartTime(offsetKeyIndex int, scanArgs []interface{}
 		}
 		return false
 	}
-	if r.startTimeStr == "" {
-		timeData, ok := GetTimeFromArgs(offsetKeyIndex, scanArgs)
-		if ok && timeData.After(r.startTime) {
-			r.startTime = timeData
-			r.timestampMux.Lock()
-			r.timeCacheMap = nil
-			r.timestampMux.Unlock()
-			return true
-		}
-		return false
-	}
-
-	timeStrData, ok := GetTimeStrFromArgs(offsetKeyIndex, scanArgs)
-	if ok && timeStrData > r.startTimeStr {
-		r.startTimeStr = timeStrData
+	timeData, ok := GetTimeFromArgs(offsetKeyIndex, scanArgs)
+	if ok && timeData.After(r.startTime) {
+		r.startTime = timeData
 		r.timestampMux.Lock()
 		r.timeCacheMap = nil
 		r.timestampMux.Unlock()
@@ -96,37 +84,16 @@ func (r *MysqlReader) updateTimeCntFromData(v ReadInfo) {
 		return
 	}
 
-	if r.startTimeStr == "" {
-		timeData, ok := GetTimeFromData(v.Data, r.timestampKey)
-		if !ok {
-			return
-		}
-		if timeData.After(r.startTime) {
-			r.startTime = timeData
-			r.timestampMux.Lock()
-			r.timeCacheMap = map[string]string{v.Json: "1"}
-			r.timestampMux.Unlock()
-		} else if timeData.Equal(r.startTime) {
-			r.timestampMux.Lock()
-			if r.timeCacheMap == nil {
-				r.timeCacheMap = make(map[string]string)
-			}
-			r.timeCacheMap[v.Json] = "1"
-			r.timestampMux.Unlock()
-		}
-		return
-	}
-
-	timeDataStr, ok := GetTimeStrFromData(v.Data, r.timestampKey)
+	timeData, ok := GetTimeFromData(v.Data, r.timestampKey)
 	if !ok {
 		return
 	}
-	if timeDataStr > r.startTimeStr {
-		r.startTimeStr = timeDataStr
+	if timeData.After(r.startTime) {
+		r.startTime = timeData
 		r.timestampMux.Lock()
 		r.timeCacheMap = map[string]string{v.Json: "1"}
 		r.timestampMux.Unlock()
-	} else if timeDataStr == r.startTimeStr {
+	} else if timeData.Equal(r.startTime) {
 		r.timestampMux.Lock()
 		if r.timeCacheMap == nil {
 			r.timeCacheMap = make(map[string]string)
@@ -152,11 +119,7 @@ func (r *MysqlReader) trimExistData(datas []ReadInfo) []ReadInfo {
 		if r.timestampKeyInt {
 			compare, exist = CompareWithStartTimeInt(v.Data, r.timestampKey, r.startTimeInt)
 		} else {
-			if r.startTimeStr == "" {
-				compare, exist = CompareWithStartTime(v.Data, r.timestampKey, r.startTime)
-			} else {
-				compare, exist = CompareWithStartTimeStr(v.Data, r.timestampKey, r.startTimeStr)
-			}
+			compare, exist = CompareWithStartTime(v.Data, r.timestampKey, r.startTime)
 		}
 		if !exist {
 			//如果出现了数据中没有时间的，实际上已经不合法了，那就获取
