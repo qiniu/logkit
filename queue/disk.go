@@ -740,12 +740,22 @@ DONE:
 
 		if origin == FromNone {
 			// 限制为10，否则kill之后接收不到 exitChan 卡住
-			if (d.readFileNum < d.writeFileNum) && (d.readPos < d.writePos) && failRead <= 10 {
+			if (d.readFileNum < d.writeFileNum || d.readPos < d.writePos) && failRead <= 10 {
 				if d.nextReadPos == d.readPos {
 					dataRead, err = d.readOne()
 					if err != nil && atomic.LoadInt32(&d.stopped) == 0 {
 						log.Errorf("ERROR: reading from diskqueue(%s) at %d of %s failRead %d - %s",
 							d.name, d.readPos, d.fileName(d.readFileNum), failRead, err.Error())
+						if os.IsNotExist(err) {
+							d.readFileNum++
+							d.readPos = 0
+							if failRead >= 10 {
+								log.Errorf("ERROR: diskqueue(%s) continue fail read, set readFileNum with writeFileNum: %d", d.name, d.writeFileNum)
+								d.readFileNum = d.writeFileNum
+							}
+							failRead++
+							continue
+						}
 						// NOTE: 根据 handleReadError() 的逻辑，只要读发生错误，就会调过当前这个文件，直接开始读下一个文件
 						d.handleReadError(failRead)
 						time.Sleep(backoff.Duration())
