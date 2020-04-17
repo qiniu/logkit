@@ -185,6 +185,10 @@ func (m *Manager) UpdateReaderRegister() {
 	m.rregistry = reader.NewRegistry()
 }
 
+func (m *Manager) UpdateSenderRegister() {
+	m.sregistry = sender.NewRegistry()
+}
+
 func (m *Manager) Stop() error {
 	m.runnerLock.Lock()
 	for _, runner := range m.runners {
