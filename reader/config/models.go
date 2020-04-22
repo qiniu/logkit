@@ -44,20 +44,27 @@ const (
 	KeyStatInterval  = "stat_interval"
 	KeyRunTime       = "run_time"
 
-	KeyMysqlOffsetKey     = "mysql_offset_key"
+	KeyMysqlDataSource  = "mysql_datasource"
+	KeyMysqlDataBase    = "mysql_database"
+	KeyMysqlSQL         = "mysql_sql"
+	KeyMysqlCron        = "mysql_cron"
+	KeyMysqlExecOnStart = "mysql_exec_onstart"
+	KeyMysqlHistoryAll  = "mysql_history_all"
+	KyeMysqlTable       = "mysql_table"
+	KeyMysqlParam       = "mysql_param"
+
+	KeyMysqlFullQuery     = "mysql_fullQuery"
+	KeyMysqlNeedOffset    = "mysql_need_offset"
+
+	//递增的时间列相关
 	KeyMysqlTimestampKey  = "mysql_timestamp_key"
 	KeyMysqlStartTime     = "mysql_start_time"
-	KeyMysqlBatchDuration = "mysql_batch_intervel"
 	KeyMysqlTimestampInt  = "mysql_timestamp_int"
-	KeyMysqlReadBatch     = "mysql_limit_batch"
-	KeyMysqlDataSource    = "mysql_datasource"
-	KeyMysqlDataBase      = "mysql_database"
-	KeyMysqlSQL           = "mysql_sql"
-	KeyMysqlCron          = "mysql_cron"
-	KeyMysqlExecOnStart   = "mysql_exec_onstart"
-	KeyMysqlHistoryAll    = "mysql_history_all"
-	KyeMysqlTable         = "mysql_table"
-	KeyMysqlParam         = "mysql_param"
+	KeyMysqlBatchDuration = "mysql_batch_intervel"
+
+	//递增列(非时间)相关
+	KeyMysqlOffsetKey = "mysql_offset_key"
+	KeyMysqlReadBatch = "mysql_limit_batch"
 
 	KeySQLSchema        = "sql_schema"
 	KeyMagicLagDuration = "magic_lag_duration"
