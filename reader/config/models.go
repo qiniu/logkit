@@ -50,11 +50,12 @@ const (
 	KeyMysqlCron        = "mysql_cron"
 	KeyMysqlExecOnStart = "mysql_exec_onstart"
 	KeyMysqlHistoryAll  = "mysql_history_all"
-	KyeMysqlTable       = "mysql_table"
+	KeyMysqlTable       = "mysql_table"
 	KeyMysqlParam       = "mysql_param"
 
-	KeyMysqlFullQuery     = "mysql_fullQuery"
-	KeyMysqlNeedOffset    = "mysql_need_offset"
+	KeyMysqlFullQuery  = "mysql_fullQuery"
+	KeyMysqlNeedOffset = "mysql_need_offset"
+	KeyMysqlCalcTotal  = "mysql_calc_total"
 
 	//递增的时间列相关
 	KeyMysqlTimestampKey  = "mysql_timestamp_key"

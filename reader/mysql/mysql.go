@@ -106,6 +106,7 @@ type MysqlReader struct {
 
 	isFullQuery bool
 	firstQuery  bool
+	calcTotal   bool  //全量采集计算总数，目前为内部字段默认为true
 	expectCount int64 //全量采集需要采集的数量
 	actualCount int64 //全量采集单次实际采集的的数据
 }
@@ -140,6 +141,7 @@ func NewMysqlReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error)
 	}
 
 	fullQuery, _ := conf.GetBoolOr(KeyMysqlFullQuery, false)
+	calcTotal, _ := conf.GetBoolOr(KeyMysqlCalcTotal, true)
 
 	/*********************分批次查询相关****************************/
 	batchQuery, _ := conf.GetStringOr(KeyMysqlNeedOffset, "")
@@ -188,7 +190,7 @@ func NewMysqlReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error)
 
 	}
 	historyAll, _ := conf.GetBoolOr(KeyMysqlHistoryAll, false)
-	table, _ := conf.GetStringOr(KyeMysqlTable, "")
+	table, _ := conf.GetStringOr(KeyMysqlTable, "")
 	table = strings.TrimSpace(table)
 	rawSchemas, _ := conf.GetStringListOr(KeySQLSchema, []string{})
 	magicLagDur, _ := conf.GetStringOr(KeyMagicLagDuration, "")
@@ -249,6 +251,7 @@ func NewMysqlReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error)
 		sqlsRecord:  make(map[string]string),
 
 		isFullQuery: fullQuery,
+		calcTotal:   calcTotal,
 	}
 
 	if r.rawDatabase == "" {
@@ -534,7 +537,7 @@ func (r *MysqlReader) run() {
 		if len(r.offsetKey) > 0 {
 			r.offsets = make([]int64, len(r.syncSQLs))
 		}
-		if r.expectCount != 0 && r.expectCount > r.actualCount {
+		if r.calcTotal && r.expectCount > r.actualCount {
 			log.Warnf("Runner[%v] the remaining %d data are not collecte", r.meta.RunnerName, r.expectCount-r.actualCount)
 		}
 		r.actualCount = 0
@@ -779,7 +782,7 @@ func (r *MysqlReader) execReadDB(curDB string, now time.Time, recordTablesDone T
 
 	for idx, rawSql := range r.syncSQLs {
 		//先计算需要采集的总量
-		if r.isFullQuery && r.firstQuery {
+		if r.isCalcTotal() {
 			if cnt, err := r.execTotalCount(connectStr, curDB, rawSql); err != nil {
 				log.Error(err)
 				return err
@@ -832,6 +835,10 @@ func (r *MysqlReader) execReadDB(curDB string, now time.Time, recordTablesDone T
 		r.sqlsRecord[curDB] = strings.Join(r.syncSQLs, ",")
 	}
 	return nil
+}
+
+func (r *MysqlReader) isCalcTotal() bool {
+	return r.isFullQuery && r.calcTotal && r.firstQuery
 }
 
 func (r *MysqlReader) isRecordSqls() bool {
