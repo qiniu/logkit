@@ -3,7 +3,9 @@ package utils
 import (
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"encoding/gob"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -206,3 +208,55 @@ func WriteZipToFile(zipf *zip.File, filename string) error {
 	}
 	return nil
 }
+
+func CompressFile(src, dst string) (err error) {
+	f, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("failed to open log file: %v", err)
+	}
+	defer f.Close()
+
+	fi, err := os.Stat(src)
+	if err != nil {
+		return fmt.Errorf("failed to stat file: %v", err)
+	}
+
+	/*if err := os.Chown(dst, fi,1); err != nil {
+		return fmt.Errorf("failed to chown compressed log file: %v", err)
+	}*/
+
+	gzf, err := os.OpenFile(dst, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, fi.Mode())
+	if err != nil {
+		return fmt.Errorf("failed to open compressed log file: %v", err)
+	}
+	defer gzf.Close()
+
+	gz := gzip.NewWriter(gzf)
+
+	defer func() {
+		if err != nil {
+			os.Remove(dst)
+			err = fmt.Errorf("failed to compress file: %v", err)
+		}
+	}()
+
+	if _, err := io.Copy(gz, f); err != nil {
+		return err
+	}
+	if err := gz.Close(); err != nil {
+		return err
+	}
+	if err := gzf.Close(); err != nil {
+		return err
+	}
+
+	if err := f.Close(); err != nil {
+		return err
+	}
+	if err := os.Remove(src); err != nil {
+		return err
+	}
+
+	return nil
+}
+

@@ -94,6 +94,7 @@ const (
 	TypeMySQL              = "mysql"
 	TypeCSV                = "csv"
 	TypeSQLFile            = "sqlfile"
+	TypeS3                 = "s3"
 	TypeOpenFalconTransfer = "open_falcon"
 
 	InnerUserAgent = "_useragent"
@@ -255,12 +256,25 @@ const (
 	KeyOpenFalconTransferPrefix  = "open_falcon_transfer_prefix"
 	KeyOpenFalconTransferTagKeys = "open_falcon_transfer_tag_keys"
 	KeySeparator                 = "separator"
+
+	// s3
+	KeyS3Region       = "s3_region"
+	KeyS3Endpoint     = "s3_endpoint"
+	KeyS3Bucket       = "s3_bucket"
+	KeyS3AccessKey    = "s3_access_key"
+	KeyS3SecretKey    = "s3_secret_key"
+	KeyS3Pattern      = "s3_pattern"
+	KeyS3Compress     = "s3_compress"
+	KeyS3CompressType = "s3_compress_type"
+	KeyS3MaxLines     = "s3_max_lines"
+	KeyS3MaxSize      = "s3_max_size"
+	KeyS3SendInternal = "s3_send_internal"
 )
 
 // NotAsyncSender return when sender is not async
 var ErrNotAsyncSender = errors.New("sender does not support for Async Push")
 
 const (
-	MaxBytesPerFile = 100 * MB
+	MaxBytesPerFile  = 100 * MB
 	MaxDiskUsedBytes = 500 * MB
 )
