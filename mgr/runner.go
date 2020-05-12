@@ -716,7 +716,6 @@ func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []str
 		} else {
 			r.rs.ReaderStats.LastError = TruncateStrSize(err.Error(), DefaultTruncateMaxSize)
 		}
-		time.Sleep(r.backoff.Duration())
 		r.historyMutex.Lock()
 		if r.historyError.ReadErrors == nil {
 			r.historyError.ReadErrors = equeue.New(r.ErrorsListCap)
@@ -725,9 +724,9 @@ func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []str
 		r.historyMutex.Unlock()
 	} else {
 		r.rs.ReaderStats.LastError = ""
-		r.backoff.Reset()
 	}
 	r.rsMutex.Unlock()
+
 	return lines, froms
 }
 
