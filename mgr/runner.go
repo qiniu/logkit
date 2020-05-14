@@ -676,13 +676,15 @@ func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []str
 		r.MaxBatchLen, r.MaxBatchSize, r.MaxBatchInterval) {
 		line, err = r.reader.ReadLine()
 		if err != nil && os.IsNotExist(err) {
-			log.Debugf("Runner[%v] reader %s - error: %v, sleep 3 second...", r.Name(), r.reader.Name(), err)
-			time.Sleep(r.backoff.Duration())
+			sleepTime := r.backoff.Duration()
+			log.Errorf("Runner[%v] reader %s error: %v, sleep %v", r.Name(), r.reader.Name(), err, sleepTime)
+			time.Sleep(sleepTime)
 			break
 		}
 		if err != nil && err != io.EOF {
-			log.Errorf("Runner[%v] reader %s - error: %v, sleep 1 second...", r.Name(), r.reader.Name(), err)
-			time.Sleep(r.backoff.Duration())
+			sleepTime := r.backoff.Duration()
+			log.Errorf("Runner[%v] reader %s error: %v, sleep %v", r.Name(), r.reader.Name(), err, sleepTime)
+			time.Sleep(sleepTime)
 			break
 		}
 		r.backoff.Reset()

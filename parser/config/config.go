@@ -56,6 +56,7 @@ const (
 const (
 	KeyRFCType              = "syslog_rfc"
 	KeySyslogMaxline        = "syslog_maxline"
+	KeyRFC3164ParseYear     = "rfc3164_parse_year"
 	PandoraParseFlushSignal = "!@#pandora-EOF-line#@!"
 )
 
@@ -364,6 +365,16 @@ var ModeKeyOptions = map[string][]Option{
 			ChooseOptions: []interface{}{"automic", "rfc3164", "rfc5424", "rfc6587"},
 			DefaultNoUse:  false,
 			Description:   "rfc协议(syslog_rfc)",
+		},
+		{
+			KeyName:       KeyRFC3164ParseYear,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"false", "true"},
+			Default:       "false",
+			DefaultNoUse:  false,
+			Description:   "rfc3164是否解析年份(rfc3164_parse_year)",
+			ToolTip:       "rfc3164协议中时间格式为 Mmm dd hh:mm:ss, 默认没有年份，无需解析",
+			Advance:       true,
 		},
 		{
 			KeyName:      KeySyslogMaxline,

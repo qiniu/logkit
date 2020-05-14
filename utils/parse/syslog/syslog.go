@@ -28,7 +28,7 @@ type Parser interface {
 }
 
 type Format interface {
-	GetParser([]byte) Parser
+	GetParser([]byte, bool) Parser
 	IsNewLine(data []byte) bool
 }
 
@@ -79,10 +79,10 @@ func DetectType(data []byte) (detected int) {
 	return DetectedLeftLog
 }
 
-func GetFormt(format string) Format {
+func GetFormat(format string, parseYear bool) Format {
 	switch strings.ToLower(format) {
 	case "rfc3164":
-		return &RFC3164{}
+		return &RFC3164{parseYear}
 	case "rfc5424":
 		return &RFC5424{}
 	case "rfc6587":
@@ -93,7 +93,7 @@ func GetFormt(format string) Format {
 
 type RFC6587 struct{}
 
-func (f *RFC6587) GetParser(line []byte) Parser {
+func (f *RFC6587) GetParser(line []byte, parseYear bool) Parser {
 	return &parserWrapper{rfc5424.NewParser(line), false}
 }
 
@@ -115,7 +115,7 @@ func (f *RFC6587) IsNewLine(data []byte) bool {
 
 type RFC5424 struct{}
 
-func (f *RFC5424) GetParser(line []byte) Parser {
+func (f *RFC5424) GetParser(line []byte, parseYear bool) Parser {
 	return &parserWrapper{rfc5424.NewParser(line), false}
 }
 
@@ -140,10 +140,12 @@ func (f *RFC5424) IsNewLine(data []byte) bool {
 	return false
 }
 
-type RFC3164 struct{}
+type RFC3164 struct {
+	needYear bool
+}
 
-func (f *RFC3164) GetParser(line []byte) Parser {
-	return &parserWrapper{rfc3164.NewParser(line), true}
+func (f *RFC3164) GetParser(line []byte, parseYear bool) Parser {
+	return &parserWrapper{rfc3164.NewParser(line, parseYear), true}
 }
 
 func (f *RFC3164) IsNewLine(data []byte) bool {
@@ -158,16 +160,16 @@ func (f *RFC3164) IsNewLine(data []byte) bool {
 
 type Automatic struct{}
 
-func (f *Automatic) GetParser(line []byte) Parser {
+func (f *Automatic) GetParser(line []byte, parseYear bool) Parser {
 	switch format := DetectType(line); format {
 	case DetectedRFC3164:
-		return &parserWrapper{rfc3164.NewParser(line), true}
+		return &parserWrapper{rfc3164.NewParser(line, parseYear), true}
 	case DetectedRFC5424:
 		return &parserWrapper{rfc5424.NewParser(line), false}
 	case DetectedRFC6587:
 		return &parserWrapper{rfc5424.NewParser(line), false}
 	default:
-		return &parserWrapper{rfc3164.NewParser(line), false}
+		return &parserWrapper{rfc3164.NewParser(line, parseYear), false}
 	}
 }
 
