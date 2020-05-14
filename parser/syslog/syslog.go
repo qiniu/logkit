@@ -23,6 +23,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	name, _ := c.GetStringOr(KeyParserName, "")
 	labelList, _ := c.GetStringListOr(KeyLabels, []string{})
 	rfctype, _ := c.GetStringOr(KeyRFCType, "automic")
+	parseYear, _ := c.GetBoolOr(KeyRFC3164ParseYear, false)
 	maxline, _ := c.GetIntOr(KeySyslogMaxline, 100)
 
 	nameMap := make(map[string]struct{})
@@ -34,7 +35,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	timeZoneOffsetRaw, _ := c.GetStringOr(KeyTimeZoneOffset, "")
 	timeZoneOffset := ParseTimeZoneOffset(timeZoneOffsetRaw)
 
-	format := syslog.GetFormt(rfctype)
+	format := syslog.GetFormat(rfctype, parseYear)
 	rfctype = strings.ToLower(rfctype)
 	var needModefyTime = false
 	if rfctype == "rfc3164" || rfctype == "automic" {
@@ -52,6 +53,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		keepRawData:          keepRawData,
 		timeZoneOffset:       timeZoneOffset,
 		needModefyTime:       needModefyTime,
+		parseYear:            parseYear,
 		numRoutine:           1, // 不支持多线程
 	}, nil
 }
@@ -67,6 +69,7 @@ type SyslogParser struct {
 	keepRawData          bool
 	timeZoneOffset       int
 	needModefyTime       bool
+	parseYear            bool
 
 	numRoutine int
 }
@@ -197,7 +200,7 @@ func (p *SyslogParser) parse(line string) (data Data, err error) {
 }
 
 func (p *SyslogParser) Flush() (data Data, err error) {
-	sparser := p.format.GetParser(p.buff.Bytes())
+	sparser := p.format.GetParser(p.buff.Bytes(), p.parseYear)
 	err = sparser.Parse()
 	if err == nil || err.Error() == "No structured data" {
 		data = Data(sparser.Dump())

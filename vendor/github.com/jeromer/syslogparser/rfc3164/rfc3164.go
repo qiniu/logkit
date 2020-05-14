@@ -17,6 +17,8 @@ type Parser struct {
 	location      *time.Location
 	hostname      string
 	ParsePriority bool
+
+	parserYear bool
 }
 
 type header struct {
@@ -29,13 +31,14 @@ type rfc3164message struct {
 	content string
 }
 
-func NewParser(buff []byte) *Parser {
+func NewParser(buff []byte, parserYear bool) *Parser {
 	return &Parser{
 		buff:          buff,
 		cursor:        0,
 		l:             len(buff),
 		location:      time.UTC,
 		ParsePriority: true,
+		parserYear:      parserYear,
 	}
 }
 
@@ -149,9 +152,16 @@ func (p *Parser) parseTimestamp() (time.Time, error) {
 	var tsFmtLen int
 	var sub []byte
 
-	tsFmts := []string{
-		"Jan 02 15:04:05",
-		"Jan  2 15:04:05",
+	if p.parserYear {
+		tsFmts := []string{
+			"Jan 02 15:04:05 2006",
+			"Jan  2 15:04:05 2006",
+		}
+	} else {
+		tsFmts := []string{
+			"Jan 02 15:04:05",
+			"Jan  2 15:04:05",
+		}
 	}
 
 	found := false
