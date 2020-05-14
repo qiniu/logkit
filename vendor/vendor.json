@@ -474,6 +474,12 @@
 			"revisionTime": "2019-03-28T16:16:33Z"
 		},
 		{
+			"checksumSHA1": "JYolL5tGpX0smq5b9Irm2aNMkjQ=",
+			"path": "github.com/jeromer/syslogparser/rfc3164",
+			"revision": "5fbaaf06d9e72f781d19c61e130ba63f4d6dab31",
+			"revisionTime": "2019-04-29T16:15:31Z"
+		},
+		{
 			"checksumSHA1": "0ZrwvB6KoGPj2PoDNSEJwxQ6Mog=",
 			"origin": "github.com/aws/aws-sdk-go/vendor/github.com/jmespath/go-jmespath",
 			"path": "github.com/jmespath/go-jmespath",
