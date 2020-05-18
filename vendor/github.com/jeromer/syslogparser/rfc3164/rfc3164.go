@@ -18,7 +18,8 @@ type Parser struct {
 	hostname      string
 	ParsePriority bool
 
-	parserYear bool
+	parseYear bool
+	skipTag bool
 }
 
 type header struct {
@@ -31,14 +32,14 @@ type rfc3164message struct {
 	content string
 }
 
-func NewParser(buff []byte, parserYear bool) *Parser {
+func NewParser(buff []byte, parseYear bool) *Parser {
 	return &Parser{
 		buff:          buff,
 		cursor:        0,
 		l:             len(buff),
 		location:      time.UTC,
 		ParsePriority: true,
-		parserYear:      parserYear,
+		parseYear:      parseYear,
 	}
 }
 
@@ -65,8 +66,16 @@ func (p *Parser) Parse() error {
 		}
 	}
 
+	tcursor := p.cursor
 	hdr, err := p.parseHeader()
-	if err != nil {
+	if err == syslogparser.ErrTimestampUnknownFormat {
+		// RFC3164 sec 4.3.2.
+		hdr.timestamp = time.Now().Round(time.Second)
+		// No tag processing should be done
+		p.skipTag = true
+		// Reset cursor for content read
+		p.cursor = tcursor
+	} else if err != nil {
 		return err
 	}
 
@@ -129,9 +138,12 @@ func (p *Parser) parsemessage() (rfc3164message, error) {
 	msg := rfc3164message{}
 	var err error
 
-	tag, err := p.parseTag()
-	if err != nil {
-		return msg, err
+	if !p.skipTag {
+		tag, err := p.parseTag()
+		if err != nil {
+			return msg, err
+		}
+		msg.tag = tag
 	}
 
 	content, err := p.parseContent()
@@ -139,7 +151,6 @@ func (p *Parser) parsemessage() (rfc3164message, error) {
 		return msg, err
 	}
 
-	msg.tag = tag
 	msg.content = content
 
 	return msg, err
@@ -153,7 +164,7 @@ func (p *Parser) parseTimestamp() (time.Time, error) {
 	var sub []byte
 	var tsFmts []string
 
-	if p.parserYear {
+	if p.parseYear {
 		tsFmts = []string{
 			"Jan 02 15:04:05 2006",
 			"Jan  2 15:04:05 2006",

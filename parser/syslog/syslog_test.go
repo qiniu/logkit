@@ -155,3 +155,77 @@ func TestSyslogParser_TimeZone(t *testing.T) {
 		assert.Equal(t, "2020-02-04 17:02:03 +0000 UTC", dt["timestamp"].(time.Time).String())
 	}
 }
+
+func TestSyslogParser_ParseYear(t *testing.T) {
+	c := conf.MapConf{}
+	c[KeyParserType] = "syslog"
+	c[KeyTimeZoneOffset] = "-8"
+	c[KeyRFC3164ParseYear] = "true"
+	p, err := NewParser(c)
+	assert.Nil(t, err)
+	lines := []string{
+		`<34>Oct 11 22:14:15 2019 mymachine very.large.syslog.message.tag: 'su root' failed for lonvick on /dev/pts/8`,
+	}
+	dts, err := p.Parse(lines)
+	assert.Nil(t, err)
+	ndata, err := p.Parse([]string{PandoraParseFlushSignal})
+	assert.Nil(t, err)
+	dts = append(dts, ndata...)
+	for _, dt := range dts {
+		assert.Equal(t, "2019-10-11 14:14:15 +0000 UTC", dt["timestamp"].(time.Time).String())
+	}
+
+	c = conf.MapConf{}
+	c[KeyParserType] = "syslog"
+	c[KeyTimeZoneOffset] = "-8"
+	c[KeyRFC3164ParseYear] = "false"
+	p, err = NewParser(c)
+	assert.Nil(t, err)
+	lines = []string{
+		`<34>Oct 11 22:14:15 2019 mymachine very.large.syslog.message.tag: 'su root' failed for lonvick on /dev/pts/8`,
+	}
+	dts, err = p.Parse(lines)
+	assert.Nil(t, err)
+	ndata, err = p.Parse([]string{PandoraParseFlushSignal})
+	assert.Nil(t, err)
+	dts = append(dts, ndata...)
+	for _, dt := range dts {
+		assert.Equal(t, "2020-10-11 14:14:15 +0000 UTC", dt["timestamp"].(time.Time).String())
+	}
+
+	c = conf.MapConf{}
+	c[KeyParserType] = "syslog"
+	c[KeyTimeZoneOffset] = "-8"
+	c[KeyRFC3164ParseYear] = "false"
+	p, err = NewParser(c)
+	assert.Nil(t, err)
+	lines = []string{
+		`<34>Oct 11 22:14:15 mymachine very.large.syslog.message.tag: 'su root' failed for lonvick on /dev/pts/8`,
+	}
+	dts, err = p.Parse(lines)
+	assert.Nil(t, err)
+	ndata, err = p.Parse([]string{PandoraParseFlushSignal})
+	assert.Nil(t, err)
+	dts = append(dts, ndata...)
+	for _, dt := range dts {
+		assert.Equal(t, "2020-10-11 14:14:15 +0000 UTC", dt["timestamp"].(time.Time).String())
+	}
+
+	c = conf.MapConf{}
+	c[KeyParserType] = "syslog"
+	c[KeyTimeZoneOffset] = "-8"
+	c[KeyRFC3164ParseYear] = "true"
+	p, err = NewParser(c)
+	assert.Nil(t, err)
+	lines = []string{
+		`<34>Oct 11 22:14:15 mymachine very.large.syslog.message.tag: 'su root' failed for lonvick on /dev/pts/8`,
+	}
+	dts, err = p.Parse(lines)
+	assert.Nil(t, err)
+	ndata, err = p.Parse([]string{PandoraParseFlushSignal})
+	assert.Nil(t, err)
+	dts = append(dts, ndata...)
+	for _, dt := range dts {
+		assert.Equal(t, time.Now().Month().String(), dt["timestamp"].(time.Time).Month().String())
+	}
+}
