@@ -200,7 +200,7 @@ func (p *SyslogParser) parse(line string) (data Data, err error) {
 }
 
 func (p *SyslogParser) Flush() (data Data, err error) {
-	sparser := p.format.GetParser(p.buff.Bytes(), p.parseYear)
+	sparser := p.format.GetParser(p.buff.Bytes())
 	err = sparser.Parse()
 	if err == nil || err.Error() == "No structured data" {
 		data = Data(sparser.Dump())

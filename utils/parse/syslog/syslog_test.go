@@ -48,3 +48,16 @@ func TestSyslogParser5424(t *testing.T) {
 	pas = fpas.GetParser([]byte(`<165>1 2003-10-11T22:14:15.003Z mymachine.example.com evntslog - ID47 [exampleSDID@32473 iut="3" eventSource="Application" eventID="1011"][examplePriority@32473 class="high"]`))
 	assert.NoError(t, pas.Parse())
 }
+
+func TestSyslogParser3164(t *testing.T) {
+	fpas := &RFC3164{false}
+	pas := fpas.GetParser([]byte("<5>time:2020-05-18 11:10:30;danger_degree:2;breaking_sighn:0;event:[24482]多个应用application.ini数据库配置文件泄露漏洞;src_addr:115.238.89.35;src_port:35327;dst_addr:172.16.56.47;dst_port:80;proto:HTTP;user:"))
+	assert.Nil(t, pas.Parse())
+
+	pas = fpas.GetParser([]byte("<34>Oct 11 22:14:15 mymachine very.large.syslog.message.tag: 'su root' failed for lonvick on /dev/pts/8"))
+	assert.Nil(t, pas.Parse())
+
+	fpas.parseYear = true
+	pas = fpas.GetParser([]byte("<34>Oct 11 22:14:15 2019 mymachine very.large.syslog.message.tag: 'su root' failed for lonvick on /dev/pts/8"))
+	assert.Nil(t, pas.Parse())
+}

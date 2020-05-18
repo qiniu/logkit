@@ -28,7 +28,7 @@ type Parser interface {
 }
 
 type Format interface {
-	GetParser([]byte, bool) Parser
+	GetParser([]byte) Parser
 	IsNewLine(data []byte) bool
 }
 
@@ -88,12 +88,12 @@ func GetFormat(format string, parseYear bool) Format {
 	case "rfc6587":
 		return &RFC6587{}
 	}
-	return &Automatic{}
+	return &Automatic{parseYear}
 }
 
 type RFC6587 struct{}
 
-func (f *RFC6587) GetParser(line []byte, parseYear bool) Parser {
+func (f *RFC6587) GetParser(line []byte) Parser {
 	return &parserWrapper{rfc5424.NewParser(line), false}
 }
 
@@ -115,7 +115,7 @@ func (f *RFC6587) IsNewLine(data []byte) bool {
 
 type RFC5424 struct{}
 
-func (f *RFC5424) GetParser(line []byte, parseYear bool) Parser {
+func (f *RFC5424) GetParser(line []byte) Parser {
 	return &parserWrapper{rfc5424.NewParser(line), false}
 }
 
@@ -141,11 +141,11 @@ func (f *RFC5424) IsNewLine(data []byte) bool {
 }
 
 type RFC3164 struct {
-	needYear bool
+	parseYear bool
 }
 
-func (f *RFC3164) GetParser(line []byte, parseYear bool) Parser {
-	return &parserWrapper{rfc3164.NewParser(line, parseYear), true}
+func (f *RFC3164) GetParser(line []byte) Parser {
+	return &parserWrapper{rfc3164.NewParser(line, f.parseYear), true}
 }
 
 func (f *RFC3164) IsNewLine(data []byte) bool {
@@ -158,18 +158,20 @@ func (f *RFC3164) IsNewLine(data []byte) bool {
 	return false
 }
 
-type Automatic struct{}
+type Automatic struct {
+	parseYear bool
+}
 
-func (f *Automatic) GetParser(line []byte, parseYear bool) Parser {
+func (f *Automatic) GetParser(line []byte) Parser {
 	switch format := DetectType(line); format {
 	case DetectedRFC3164:
-		return &parserWrapper{rfc3164.NewParser(line, parseYear), true}
+		return &parserWrapper{rfc3164.NewParser(line, f.parseYear), true}
 	case DetectedRFC5424:
 		return &parserWrapper{rfc5424.NewParser(line), false}
 	case DetectedRFC6587:
 		return &parserWrapper{rfc5424.NewParser(line), false}
 	default:
-		return &parserWrapper{rfc3164.NewParser(line, parseYear), false}
+		return &parserWrapper{rfc3164.NewParser(line, f.parseYear), false}
 	}
 }
 
