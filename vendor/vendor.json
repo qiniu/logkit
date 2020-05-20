@@ -27,12 +27,10 @@
 			"revisionTime": "2017-12-30T20:18:58Z"
 		},
 		{
-			"checksumSHA1": "LjsodifgDQKmgSNWREMVYtmQdPM=",
+			"checksumSHA1": "7SGQED7U/fViHBT7J3Zxy4JsoM0=",
 			"path": "github.com/Shopify/sarama",
-			"revision": "46c83074a05474240f9620fb7c70fb0d80ca401a",
-			"revisionTime": "2019-07-22T18:01:16Z",
-			"version": "v1.23.1",
-			"versionExact": "v1.23.1"
+			"revision": "8b91b872756c4220f47cc69f2e115a4641908446",
+			"revisionTime": "2020-05-07T22:50:17Z"
 		},
 		{
 			"checksumSHA1": "qtjd74+bErubh+qyv3s+lWmn9wc=",
@@ -474,6 +472,12 @@
 			"revisionTime": "2019-03-28T16:16:33Z"
 		},
 		{
+			"checksumSHA1": "NEDNBkQzLhydMlqYrZQuKNl4iak=",
+			"path": "github.com/jcmturner/rpc/ndr",
+			"revision": "a5898cb6c474b98d188219165475aa8beb8137eb",
+			"revisionTime": "2019-07-27T14:50:11Z"
+		},
+		{
 			"checksumSHA1": "JYolL5tGpX0smq5b9Irm2aNMkjQ=",
 			"path": "github.com/jeromer/syslogparser/rfc3164",
 			"revision": "5fbaaf06d9e72f781d19c61e130ba63f4d6dab31",
@@ -491,6 +495,36 @@
 			"path": "github.com/json-iterator/go",
 			"revision": "8744d7c5c7b40a53e018f78d8c508b3315260b96",
 			"revisionTime": "2018-05-26T01:43:29Z"
+		},
+		{
+			"checksumSHA1": "rZCltl0RQ9G/LItkJGrgYehIgTU=",
+			"path": "github.com/klauspost/compress/fse",
+			"revision": "4a2d40e4b07e5b3d333bc0569facd0f2dbf4ef39",
+			"revisionTime": "2020-04-12T19:18:38Z"
+		},
+		{
+			"checksumSHA1": "aF1Ke91YUJqNbI88SzrzonZf57A=",
+			"path": "github.com/klauspost/compress/huff0",
+			"revision": "4a2d40e4b07e5b3d333bc0569facd0f2dbf4ef39",
+			"revisionTime": "2020-04-12T19:18:38Z"
+		},
+		{
+			"checksumSHA1": "tNh2IRye15m0ddyaEKsU2JrJWgI=",
+			"path": "github.com/klauspost/compress/snappy",
+			"revision": "4a2d40e4b07e5b3d333bc0569facd0f2dbf4ef39",
+			"revisionTime": "2020-04-12T19:18:38Z"
+		},
+		{
+			"checksumSHA1": "953EmoNiSHc9Lu65VusmdMAArdM=",
+			"path": "github.com/klauspost/compress/zstd",
+			"revision": "4a2d40e4b07e5b3d333bc0569facd0f2dbf4ef39",
+			"revisionTime": "2020-04-12T19:18:38Z"
+		},
+		{
+			"checksumSHA1": "e8kyonoHHVgdusN5daTpm45mWnM=",
+			"path": "github.com/klauspost/compress/zstd/internal/xxhash",
+			"revision": "4a2d40e4b07e5b3d333bc0569facd0f2dbf4ef39",
+			"revisionTime": "2020-04-12T19:18:38Z"
 		},
 		{
 			"checksumSHA1": "hz/wVE0xwQ+d8aQbX7ApZVj8Hbg=",
@@ -924,6 +958,12 @@
 			"path": "golang.org/x/net/context/ctxhttp",
 			"revision": "34057069f4ab13dc4433c68d368737ebeafcccdc",
 			"revisionTime": "2017-05-09T19:22:37Z"
+		},
+		{
+			"checksumSHA1": "VJwSx33rjMC7O6K2O50Jw6o1vw4=",
+			"path": "golang.org/x/net/http2/hpack",
+			"revision": "ca1201d0de80cfde86cb01aea620983605dfe99b",
+			"revisionTime": "2019-07-23T18:48:14Z"
 		},
 		{
 			"checksumSHA1": "W+3cWL5KjepzF1XvyMSBUYfa8x8=",
