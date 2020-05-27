@@ -111,7 +111,7 @@ var (
 		DefaultNoUse: false,
 		Description:  "时区偏移量(offset)",
 		Advance:      true,
-		CheckRegex:   "*",
+		CheckRegex:   "",
 		Type:         TransformTypeLong,
 		ToolTip:      "如果key中带有时区信息，则以该时区作为offset的基础时区，否则以UTC时区为基础时区",
 	}

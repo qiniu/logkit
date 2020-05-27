@@ -41,6 +41,7 @@ type MetricConfig struct {
 }
 
 var (
+	_ Runner     = &MetricRunner{}
 	_ Deleteable = &MetricRunner{}
 )
 

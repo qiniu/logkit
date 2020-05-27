@@ -76,6 +76,7 @@ type StatusPersistable interface {
 }
 
 var (
+	_ Runner     = &LogExportRunner{}
 	_ Resetable  = &LogExportRunner{}
 	_ Deleteable = &LogExportRunner{}
 )
