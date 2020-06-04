@@ -56,6 +56,7 @@ type LastSync struct {
 type BufReader struct {
 	stopped       int32
 	buf           []byte
+	delim         []byte
 	mutiLineCache *LineCache
 	rd            reader.FileReader // reader provided by the client
 	r, w          int               // buf read and write positions
@@ -144,6 +145,7 @@ func NewReaderSize(rd reader.FileReader, meta *reader.Meta, size int) (*BufReade
 
 	r.Meta = meta
 	encodingWay := r.Meta.GetEncodingWay()
+	r.delim = getDelimByEncodingWay(encodingWay)
 	if encodingWay != "" && encodingWay != DefaultEncodingWay {
 		r.decoder = mahonia.NewDecoder(r.Meta.GetEncodingWay())
 		if r.decoder == nil {
@@ -303,7 +305,7 @@ func (b *BufReader) buffered() int { return b.w - b.r }
 // by the next I/O operation, most clients should use
 // readBytes or ReadString instead.
 // readSlice returns err != nil if and only if line does not end in delim.
-func (b *BufReader) readSlice(delim byte) (line []byte, err error) {
+func (b *BufReader) readSlice(delim []byte) (line []byte, err error) {
 	b.mux.Lock()
 	defer b.mux.Unlock()
 	for {
@@ -316,9 +318,9 @@ func (b *BufReader) readSlice(delim byte) (line []byte, err error) {
 			return
 		}
 		// Search buffer.
-		if i := bytes.IndexByte(b.buf[b.r:b.w], delim); i >= 0 {
-			line = b.buf[b.r : b.r+i+1]
-			b.r += i + 1
+		if i := bytes.Index(b.buf[b.r:b.w], delim); i >= 0 {
+			line = b.buf[b.r : b.r+i+len(delim)]
+			b.r += i + len(delim)
 			break
 		}
 		// Pending error?
@@ -355,7 +357,7 @@ func (b *BufReader) readSlice(delim byte) (line []byte, err error) {
 // readBytes returns err != nil if and only if the returned data does not end in
 // delim.
 // For simple uses, a Scanner may be more convenient.
-func (b *BufReader) readBytes(delim byte) ([]byte, error) {
+func (b *BufReader) readBytes(delim []byte) ([]byte, error) {
 	// Use readSlice to look for array,
 	// accumulating full buffers.
 	var frag []byte
@@ -402,7 +404,7 @@ func (b *BufReader) readBytes(delim byte) ([]byte, error) {
 // ReadString returns err != nil if and only if the returned data does not end in
 // delim.
 // For simple uses, a Scanner may be more convenient.
-func (b *BufReader) ReadString(delim byte) (ret string, err error) {
+func (b *BufReader) ReadString(delim []byte) (ret string, err error) {
 	bytes, err := b.readBytes(delim)
 	ret = *(*string)(unsafe.Pointer(&bytes))
 	//默认都是utf-8
@@ -417,7 +419,7 @@ func (b *BufReader) ReadString(delim byte) (ret string, err error) {
 func (b *BufReader) ReadPattern() (string, error) {
 	var maxTimes int = 0
 	for {
-		line, err := b.ReadString('\n')
+		line, err := b.ReadString(b.delim)
 		//读取到line的情况
 		if len(line) > 0 {
 			if b.mutiLineCache.Size() <= 0 {
@@ -468,7 +470,7 @@ func (b *BufReader) ReadLine() (ret string, err error) {
 	}
 
 	if b.multiLineRegexp == nil {
-		ret, err = b.ReadString('\n')
+		ret, err = b.ReadString(b.delim)
 		if err != nil && os.IsNotExist(err) {
 			if b.lastErrShowTime.Add(5 * time.Second).Before(time.Now()) {
 				if !IsSelfRunner(b.Meta.RunnerName) {
@@ -654,4 +656,15 @@ func NewSingleFileReader(meta *reader.Meta, conf conf.MapConf) (reader reader.Re
 func init() {
 	reader.RegisterConstructor(ModeDir, NewFileDirReader)
 	reader.RegisterConstructor(ModeFile, NewSingleFileReader)
+}
+
+func getDelimByEncodingWay(encodingWay string) []byte {
+	switch encodingWay {
+	case "UTF-16BE", "utf-16be":
+		return []byte("\x00\n")
+	case "UTF-16LE", "utf16-le":
+		return []byte("\n\x00")
+	default:
+		return []byte("\n")
+	}
 }
