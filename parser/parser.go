@@ -106,8 +106,9 @@ func (ps *Registry) NewLogParser(conf conf.MapConf) (p Parser, err error) {
 func ParseLine(dataPipeline <-chan ParseInfo, resultChan chan ParseResult, wg *sync.WaitGroup,
 	trimSpace bool, handlerFunc func(string) (Data, error)) {
 	for parseInfo := range dataPipeline {
+		line := parseInfo.Line
 		if trimSpace {
-			line := strings.TrimSpace(parseInfo.Line)
+			line = strings.TrimSpace(line)
 			if len(line) <= 0 {
 				resultChan <- ParseResult{
 					Line:  line,
@@ -117,7 +118,7 @@ func ParseLine(dataPipeline <-chan ParseInfo, resultChan chan ParseResult, wg *s
 			}
 		}
 
-		data, err := handlerFunc(parseInfo.Line)
+		data, err := handlerFunc(line)
 		resultChan <- ParseResult{
 			Line:  parseInfo.Line,
 			Index: parseInfo.Index,
