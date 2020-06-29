@@ -905,7 +905,7 @@ func (p *Procstat) SupervisordStat(process map[string]*ProcessInfo, processExist
 			process[pidStr].name = fields[0]
 			process[pidStr].Status = status
 		}
-		processExist[fields[0]] = true
+		processExist[pidStr] = true
 	}
 	return
 }
