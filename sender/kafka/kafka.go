@@ -88,6 +88,9 @@ func NewSender(conf conf.MapConf) (kafkaSender sender.Sender, err error) {
 	gzipCompressionLevel, _ := conf.GetStringOr(KeyGZIPCompressionLevel, KeyGZIPCompressionDefault)
 
 	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("kafkaSender:(kafkaUrl:%s,topic:%s)", hosts, topic))
+
+	saslUsername, _ := conf.GetStringOr(KeySaslUsername, "")
+	saslPassword, _ := conf.GetStringOr(KeySaslPassword, "")
 	metrics.UseNilMetrics = true
 	cfg := sarama.NewConfig()
 	cfg.Producer.Return.Successes = true
@@ -124,6 +127,11 @@ func NewSender(conf conf.MapConf) (kafkaSender sender.Sender, err error) {
 		log.Warnf("unknown gzip compression level: '%v',use default level", gzipCompressionLevel)
 	}
 	cfg.Producer.CompressionLevel = compressionLevelMode
+	if saslUsername != "" && saslPassword != "" {
+		cfg.Net.SASL.User = saslUsername
+		cfg.Net.SASL.Password = saslPassword
+		cfg.Net.SASL.Enable = true
+	}
 
 	producer, err := sarama.NewSyncProducer(hosts, cfg)
 	if err != nil {
