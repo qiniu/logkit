@@ -6,9 +6,10 @@ import (
 	"runtime"
 	"sync/atomic"
 
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
+
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/utils/equeue"
-	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 )
 
 const (
@@ -64,6 +65,8 @@ const (
 	DefaultFilePerm = 0600
 
 	DefaultMaxBatchSize = 2 * MB
+
+	DefaultSplitSize  = 128 * KB // 默认分割为 64 kb
 
 	DefaultSendIntervalSeconds = 60
 

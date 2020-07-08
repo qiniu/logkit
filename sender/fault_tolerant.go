@@ -30,7 +30,6 @@ const (
 	qNameSuffix       = "_local_save"
 	directSuffix      = "_direct"
 	defaultMaxProcs   = 1         // 默认没有并发
-	DefaultSplitSize  = 64 * 1024 // 默认分割为 64 kb
 	// TypeMarshalError 表示marshal出错
 	TypeMarshalError = reqerr.SendErrorType("Data Marshal failed")
 )
@@ -310,6 +309,11 @@ func (ft *FtSender) Send(datas []Data) error {
 			se.LastError = err.Error()
 		}
 
+		if ft.isBlock {
+			log.Error("Runner[%v] Sender[%v] try Send Datas err: %v", ft.runnerName, ft.innerSender.Name(), err)
+			return se;
+		}
+
 		err = fmt.Errorf("Runner[%v] Sender[%v] try Send Datas err: %v, will put to backup queue and retry later... ", ft.runnerName, ft.innerSender.Name(), err)
 		log.Error(err)
 		// 容错队列会保证重试，此处不向外部暴露发送错误信息
@@ -328,26 +332,27 @@ func (ft *FtSender) Send(datas []Data) error {
 				ft.statsMutex.Unlock()
 			}
 		}
-	} else {
-		err := ft.saveToFile(datas)
-		if err != nil {
-			se.FtNotRetry = false
-			if sendError, ok := err.(*reqerr.SendError); ok {
-				se.SendError = sendError
-			}
-			se.AddErrorsNum(len(datas))
-			ft.statsMutex.Lock()
-			ft.stats.LastError = err.Error()
-			ft.stats.Errors += int64(len(datas))
-			ft.statsMutex.Unlock()
-			time.Sleep(ft.backoff.Duration())
-		} else {
-			// se 中的 lasterror 和 senderror 都为空，需要使用 se.FtQueueLag
-			se.AddSuccessNum(len(datas))
-			ft.backoff.Reset()
-		}
-		se.FtQueueLag = ft.BackupQueue.Depth() + ft.logQueue.Depth()
+		return se
 	}
+
+	err := ft.saveToFile(datas)
+	if err != nil {
+		se.FtNotRetry = false
+		if sendError, ok := err.(*reqerr.SendError); ok {
+			se.SendError = sendError
+		}
+		se.AddErrorsNum(len(datas))
+		ft.statsMutex.Lock()
+		ft.stats.LastError = err.Error()
+		ft.stats.Errors += int64(len(datas))
+		ft.statsMutex.Unlock()
+		time.Sleep(ft.backoff.Duration())
+	} else {
+		// se 中的 lasterror 和 senderror 都为空，需要使用 se.FtQueueLag
+		se.AddSuccessNum(len(datas))
+		ft.backoff.Reset()
+	}
+	se.FtQueueLag = ft.BackupQueue.Depth() + ft.logQueue.Depth()
 	return se
 }
 
@@ -564,25 +569,27 @@ func (ft *FtSender) trySendDatas(datas []Data, failSleep int, isRetry bool) (bac
 		return nil, nil
 	}
 
-	if !ft.isBlock {
-		for _, v := range retDatasContext {
-			nnBytes, err := jsoniter.Marshal(v)
-			if err != nil {
-				log.Errorf("Runner[%v] Sender[%v] marshal %v failed: %v", ft.runnerName, ft.innerSender.Name(), *v, err)
-				continue
-			}
+	if ft.isBlock {
+		return retDatasContext, err
+	}
 
-			err = ft.BackupQueue.Put(nnBytes)
-			if err != nil {
-				log.Errorf("Runner[%v] Sender[%v] cannot write points back to queue %v: %v", ft.runnerName, ft.innerSender.Name(), ft.BackupQueue.Name(), err)
-				backDataContext = append(backDataContext, v)
-			}
+	for _, v := range retDatasContext {
+		nnBytes, err := jsoniter.Marshal(v)
+		if err != nil {
+			log.Errorf("Runner[%v] Sender[%v] marshal %v failed: %v", ft.runnerName, ft.innerSender.Name(), *v, err)
+			continue
 		}
-		time.Sleep(time.Second * time.Duration(math.Pow(2, float64(failSleep))))
-		// 发送出错超过10次，并且设置了丢弃发送出错的数据时，丢弃数据
-		if failSleep >= 8 && ft.discardErr {
-			return nil, nil
+
+		err = ft.BackupQueue.Put(nnBytes)
+		if err != nil {
+			log.Errorf("Runner[%v] Sender[%v] cannot write points back to queue %v: %v", ft.runnerName, ft.innerSender.Name(), ft.BackupQueue.Name(), err)
+			backDataContext = append(backDataContext, v)
 		}
+	}
+	time.Sleep(time.Second * time.Duration(math.Pow(2, float64(failSleep))))
+	// 发送出错超过10次，并且设置了丢弃发送出错的数据时，丢弃数据
+	if failSleep >= 8 && ft.discardErr {
+		return nil, nil
 	}
 
 	return backDataContext, err
@@ -749,6 +756,7 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 			if ft.maxLineLen > 0 && dataBytesLen > ft.maxLineLen {
 				return nil
 			}
+
 			if dataBytesLen < DefaultMaxBatchSize {
 				// 此处将 data 改为 raw 放在 pandora_stash 中
 				if _, ok := failCtxData[KeyPandoraStash]; !ok {
@@ -800,6 +808,7 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 				for separateDataKey, separateDataVal := range separateData {
 					strVal, _ := separateDataVal.(string)
 					valArray := SplitData(strVal)
+					log.Infof("Runner[%s] Sender[%s] split long data (more than 2M) %d to array, array length %d", ft.runnerName, ft.innerSender.Name(), len(strVal), len(valArray))
 					separateId := reqid.Gen()
 					for idx, val := range valArray {
 						retData := make(Data, 0)
@@ -815,6 +824,7 @@ func (ft *FtSender) handleSendError(err error, datas []Data) (retDatasContext []
 			// failCtxData 的 key value 中未找到 string 类型且大于 2M 的 value
 			// 此时将 failCtxData 进行 Marshal 之后进行切片，放入pandaora_stash中
 			valArray := SplitData(string(dataBytes))
+			log.Infof("Runner[%s] Sender[%s] split long data (more than 2M) %d to array, array length %d", ft.runnerName, ft.innerSender.Name(), len(string(dataBytes)), len(valArray))
 			newFailCtx := new(datasContext)
 			separateId := reqid.Gen()
 			for idx, val := range valArray {
@@ -953,7 +963,7 @@ func SplitData(data string) (valArray []string) {
 		}
 		//单个slice大于2M
 		if start == last {
-			valArray = append(valArray, SplitDataWithSplitSize(data[start:offset], DefaultMaxBatchSize)...)
+			valArray = append(valArray, SplitDataWithSplitSize(data[start:offset], DefaultSplitSize)...)
 			start = offset
 			continue
 		}
@@ -964,7 +974,7 @@ func SplitData(data string) (valArray []string) {
 		valArray = append(valArray, data[start:last])
 	}
 	//防止加上最后一个slice后大于2M
-	valArray = append(valArray, SplitDataWithSplitSize(data[last:], DefaultMaxBatchSize)...)
+	valArray = append(valArray, SplitDataWithSplitSize(data[last:], DefaultSplitSize)...)
 	return valArray
 }
 
@@ -973,23 +983,19 @@ func SplitDataWithSplitSize(data string, splitSize int64) (valArray []string) {
 		return []string{data}
 	}
 
-	//中文字符在unicode下占2个字节，在utf-8编码下占3个字节
-	splitSize /= 3
-
 	valArray = make([]string, 0)
-	dataConverse := []rune(data)
-	lenData := int64(len(dataConverse)) / splitSize
+	lenData := int64(len(data)) / splitSize
 
 	for i := int64(1); i <= lenData; i++ {
 		start := (i - 1) * splitSize
 		end := i * splitSize
-		valArray = append(valArray, string(dataConverse[start:end]))
+		valArray = append(valArray, string(data[start:end]))
 	}
 
 	end := lenData * splitSize
-	remainData := string(dataConverse[end:])
+	remainData := string(data[end:])
 	if len(remainData) != 0 {
-		valArray = append(valArray, string(dataConverse[end:]))
+		valArray = append(valArray, string(data[end:]))
 	}
 	return valArray
 }
@@ -1037,10 +1043,26 @@ func (ft *FtSender) backOffReTrySend(datas []Data, failSleep int, isRetry bool) 
 			ft.exitChan <- struct{}{}
 			return
 		}
-		res, err = ft.trySendDatas(datas, 1, isRetry)
-		if err == nil {
-			return nil, nil
+		if len(res) != 0 {
+			resResult := make([]*datasContext, 0, 20)
+			for _, resDatas := range res {
+				for _, sendData := range resDatas.Datas {
+					resTmp, err := ft.trySendDatas([]Data{sendData}, 1, isRetry)
+					if err != nil {
+						resResult = append(resResult, resTmp...)
+					}
+				}
+			}
+			res = resResult
+			if len(res) == 0 {
+				return nil, nil
+			}
+		} else {
+			if res, err = ft.trySendDatas(datas, 1, isRetry); err == nil {
+				return nil, nil
+			}
 		}
+
 		// 非阻塞式全量发送
 		if len(res) > 1 {
 			return res, err

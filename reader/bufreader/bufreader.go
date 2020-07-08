@@ -82,6 +82,7 @@ type BufReader struct {
 	lastRdSource []reader.SourceIndex
 	latestSource string
 	backoff      *utils.Backoff
+	maxLenLine   int
 }
 
 const minReadBufferSize = 16
