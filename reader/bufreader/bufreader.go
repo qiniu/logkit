@@ -82,7 +82,7 @@ type BufReader struct {
 	lastRdSource []reader.SourceIndex
 	latestSource string
 	backoff      *utils.Backoff
-	maxLenLine   int
+	maxLenLine   int64
 }
 
 const minReadBufferSize = 16
@@ -93,7 +93,7 @@ const maxConsecutiveEmptyReads = 10
 // NewReaderSize returns a new Reader whose buffer has at least the specified
 // size. If the argument FileReader is already a Reader with large enough
 // size, it returns the underlying Reader.
-func NewReaderSize(rd reader.FileReader, meta *reader.Meta, size int) (*BufReader, error) {
+func NewReaderSize(rd reader.FileReader, meta *reader.Meta, size int, maxLineLen int64) (*BufReader, error) {
 	// Is it already a Reader?
 	if size < minReadBufferSize {
 		size = minReadBufferSize
@@ -143,6 +143,7 @@ func NewReaderSize(rd reader.FileReader, meta *reader.Meta, size int) (*BufReade
 	r.reset(make([]byte, size), rd)
 	r.mutiLineCache = NewLineCache()
 	r.backoff = utils.NewBackoff(2, 1, 1*time.Second, 5*time.Minute)
+	r.maxLenLine = maxLineLen
 
 	r.Meta = meta
 	encodingWay := r.Meta.GetEncodingWay()
@@ -364,6 +365,8 @@ func (b *BufReader) readBytes(delim []byte) ([]byte, error) {
 	var frag []byte
 	var full = make([][]byte, 0, 10)
 	var err error
+	var lineLen int64
+	var nolog bool
 	for {
 		var e error
 		frag, e = b.readSlice(delim)
@@ -377,7 +380,18 @@ func (b *BufReader) readBytes(delim []byte) ([]byte, error) {
 		}
 
 		// Make a copy of the buffer.
-		buf := make([]byte, len(frag))
+		fragLen := len(frag)
+		lineLen += int64(fragLen)
+		if b.maxLenLine > 0 && lineLen > b.maxLenLine {
+			if !nolog {
+				log.Warnf("Runner[%v] max than %d, discard this part", b.Meta.RunnerName, b.maxLenLine)
+			}
+			nolog = true
+			lineLen = 0
+			full = make([][]byte, 0, len(full))	// 重新申请空间
+			continue
+		}
+		buf := make([]byte, fragLen)
 		copy(buf, frag)
 		full = append(full, buf)
 	}
@@ -635,7 +649,8 @@ func NewFileDirReader(meta *reader.Meta, conf conf.MapConf) (reader reader.Reade
 	}
 	fr.SkipFileFirstLine = skipFirstLine
 	fr.ReadSameInode = readSameInode
-	return NewReaderSize(fr, meta, bufSize)
+	maxLineLen, _ := conf.GetInt64Or(KeyRunnerMaxLineLen, 0)
+	return NewReaderSize(fr, meta, bufSize, maxLineLen)
 }
 
 func NewSingleFileReader(meta *reader.Meta, conf conf.MapConf) (reader reader.Reader, err error) {
@@ -651,7 +666,8 @@ func NewSingleFileReader(meta *reader.Meta, conf conf.MapConf) (reader reader.Re
 	if err != nil {
 		return
 	}
-	return NewReaderSize(fr, meta, bufSize)
+	maxLineLen, _ := conf.GetInt64Or(KeyRunnerMaxLineLen, 0)
+	return NewReaderSize(fr, meta, bufSize, maxLineLen)
 }
 
 func init() {

@@ -78,6 +78,7 @@ type Reader struct {
 	whence               string
 
 	notFirstTime bool
+	maxLineLen   int64
 }
 
 type ActiveReader struct {
@@ -140,7 +141,7 @@ func NewActiveReader(originPath, realPath, whence, inode string, r *Reader) (ar 
 			return
 		}
 	}
-	bf, err := bufreader.NewReaderSize(fr, subMeta, bufreader.DefaultBufSize)
+	bf, err := bufreader.NewReaderSize(fr, subMeta, bufreader.DefaultBufSize, r.maxLineLen)
 	if err != nil {
 		//如果没有创建成功，要把reader close掉，否则会因为ratelimit导致线程泄露
 		fr.Close()
@@ -529,6 +530,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 			}
 		}
 	}
+	maxLineLen, _ := conf.GetInt64Or(KeyRunnerMaxLineLen, 0)
 
 	return &Reader{
 		meta:                 meta,
@@ -549,6 +551,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		fileReaders:          make(map[string]*ActiveReader), //armapmux
 		cacheMap:             cacheMap,                       //armapmux
 		expireMap:            make(map[string]int64),
+		maxLineLen:           maxLineLen,
 	}, nil
 }
 

@@ -225,6 +225,9 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	if rc.IsBlock {
 		rc.ReaderConfig[KeyRunnerIsBlock] = "true"
 	}
+	if rc.MaxLineLen > 0 {
+		rc.ReaderConfig[KeyRunnerMaxLineLen] = strconv.FormatInt(rc.MaxLineLen, 10)
+	}
 	for i := range rc.SendersConfig {
 		rc.SendersConfig[i][KeyRunnerName] = rc.RunnerName
 		if rc.MaxLineLen > 0 {

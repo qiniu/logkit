@@ -72,6 +72,7 @@ type Reader struct {
 	validFilesRegex      string
 	whence               string
 	bufferSize           int
+	maxLineLen           int64
 
 	expireMap map[string]int64
 
@@ -149,6 +150,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	}
 
 	deleteDirs := make(chan string, 10)
+	maxLineLen, _ := conf.GetInt64Or(KeyRunnerMaxLineLen, 0)
 	return &Reader{
 		meta:                 meta,
 		status:               StatusInit,
@@ -173,6 +175,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		bufferSize:           bufferSize,
 		readSameInode:        readSameInode,
 		expireMap:            make(map[string]int64),
+		maxLineLen:           maxLineLen,
 	}, nil
 }
 
@@ -300,7 +303,7 @@ func (r *Reader) statLogPath() {
 			ErrChan:            r.errChan,
 			ReadSameInode:      r.readSameInode,
 			expireMap:          r.expireMap,
-		}, r.notFirstTime)
+		}, r.notFirstTime, r.maxLineLen)
 		if err != nil {
 			if err == ErrAlreadyExist {
 				continue

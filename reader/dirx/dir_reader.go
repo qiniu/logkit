@@ -302,7 +302,7 @@ type newReaderOptions struct {
 	ReadSameInode bool
 }
 
-func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool) (*dirReader, error) {
+func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool, maxLineLen int64) (*dirReader, error) {
 
 	rpath := strings.Replace(opts.LogPath, string(os.PathSeparator), "_", -1)
 	rpath = strings.Replace(rpath, string(os.PathListSeparator), "_", -1) // windows不支持命名中包含冒号
@@ -333,7 +333,7 @@ func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool) (*dir
 		fr.ReadSameInode = opts.ReadSameInode
 		fri = fr
 	}
-	br, err := bufreader.NewReaderSize(fri, subMeta, opts.BufferSize)
+	br, err := bufreader.NewReaderSize(fri, subMeta, opts.BufferSize, maxLineLen)
 	if err != nil {
 		//如果没有创建成功，要把reader close掉，否则会因为ratelimit导致线程泄露
 		fri.Close()
