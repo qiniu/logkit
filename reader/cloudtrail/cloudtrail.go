@@ -90,7 +90,8 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		return nil, err
 	}
 	sf.SkipFileFirstLine = skipFirstLine
-	br, err := bufreader.NewReaderSize(sf, meta, bufSize)
+	maxLineLen, _ := conf.GetInt64Or(KeyRunnerMaxLineLen, 0)
+	br, err := bufreader.NewReaderSize(sf, meta, bufSize, maxLineLen)
 	if err != nil {
 		return nil, err
 	}

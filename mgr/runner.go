@@ -225,6 +225,9 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	if rc.IsBlock {
 		rc.ReaderConfig[KeyRunnerIsBlock] = "true"
 	}
+	if rc.MaxLineLen > 0 {
+		rc.ReaderConfig[KeyRunnerMaxLineLen] = strconv.FormatInt(rc.MaxLineLen, 10)
+	}
 	for i := range rc.SendersConfig {
 		rc.SendersConfig[i][KeyRunnerName] = rc.RunnerName
 		if rc.MaxLineLen > 0 {
@@ -689,16 +692,14 @@ func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []str
 			break
 		}
 		r.backoff.Reset()
-		if len(line) <= 0 {
+		lineLen := int64(len(line))
+		if lineLen <= 0 {
 			log.Debugf("Runner[%v] reader %s no more content fetched sleep 1 second...", r.Name(), r.reader.Name())
 			time.Sleep(1 * time.Second)
 			continue
 		}
-		if r.MaxLineLen > 0 {
-			lineLen := len(line)
-			if int64(lineLen) > r.MaxLineLen {
-				log.Warnf("Runner[%v] line length: %d meet max len %d, drop it", r.Name(), lineLen, r.MaxLineLen)
-			}
+		if r.MaxLineLen > 0 && lineLen > r.MaxLineLen {
+			log.Warnf("Runner[%v] line length: %d meet max len %d, drop it", r.Name(), lineLen, r.MaxLineLen)
 			continue
 		}
 		if strings.TrimSpace(line) == "" {
@@ -710,7 +711,7 @@ func (r *LogExportRunner) rawReadLines(dataSourceTag string) (lines, froms []str
 		}
 
 		r.batchLen++
-		r.batchSize += int64(len(line))
+		r.batchSize += lineLen
 	}
 	r.rsMutex.Lock()
 	if err != nil && err != io.EOF {

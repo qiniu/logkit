@@ -67,7 +67,7 @@ func BenchmarkReadPattern(b *testing.B) {
 	if err != nil {
 		b.Error(err)
 	}
-	r, err := NewReaderSize(m, ma, 1024)
+	r, err := NewReaderSize(m, ma, 1024, 0)
 	if err != nil {
 		b.Fatal(err)
 	}
