@@ -79,7 +79,7 @@ func (p *Parser) Parse() error {
 		return err
 	}
 
-	if p.buff[p.cursor] == ' ' {
+	if  (p.cursor < p.l) && p.buff[p.cursor] == ' ' {
 		p.cursor++
 	}
 
