@@ -316,7 +316,7 @@ func (s *DiskIOStats) Collect() (datas []map[string]interface{}, err error) {
 			dur := thisTime.Sub(info.timestamp)
 			// 当前时间获取的数据有问题，本次的 ReadBytes或者WriteBytes 比上次的小，本次的数据和上一次的数据有一个有问题，这里都清理掉，重新开始采集
 			if io.ReadBytes < info.ReadBytes || io.WriteBytes < info.WriteBytes {
-				log.Warnf("error getting disk io info failed curReadBytes[%v] < "+
+				log.Debugf("error getting disk io info failed curReadBytes[%v] < "+
 					"lastReadBytes[%v] || curWriteBytes[%v] < lastWriteBytes[%v]", io.ReadBytes, info.ReadBytes,
 					io.WriteBytes, info.WriteBytes)
 				delete(s.lastCollect, io.Name)

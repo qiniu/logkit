@@ -169,13 +169,13 @@ func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 			dur := thisTime.Sub(info.timestamp)
 			if io.BytesRecv < info.BytesRecv {
 
-				log.Warnf("error getting disk io info failed ioName:%s curBytesRecv[%v] < "+
+				log.Debugf("error getting net io info failed ioName:%s curBytesRecv[%v] < "+
 					"lastBytesRecv[%v]", io.Name, io.BytesRecv, info.BytesRecv)
 				delete(s.lastCollect, io.Name)
 				continue
 			}
 			if io.BytesSent < info.BytesSent {
-				log.Warnf("error getting disk io info failed ioName:%s curBytesSent[%v] < "+
+				log.Debugf("error getting net io info failed ioName:%s curBytesSent[%v] < "+
 					"lastBytesSent[%v]", io.Name, io.BytesSent, info.BytesSent)
 				delete(s.lastCollect, io.Name)
 				continue

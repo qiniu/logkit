@@ -51,7 +51,6 @@ const (
 	KeyProcstatCpuTimeIrq       = "procstat_cpu_time_irq"
 	KeyProcstatCpuTimeSoftirq   = "procstat_cpu_time_softirq"
 	KeyProcstatCpuTimeSteal     = "procstat_cpu_time_steal"
-	KeyProcstatCpuTimeStolen    = "procstat_cpu_time_stolen"
 	KeyProcstatCpuTimeGuest     = "procstat_cpu_time_guest"
 	KeyProcstatCpuTimeGuestNice = "procstat_cpu_time_guest_nice"
 
@@ -492,7 +491,6 @@ func (p *Procstat) collectMetrics(proc *ProcessInfo) map[string]interface{} {
 			fields[KeyProcstatCpuTimeIrq] = cpuTime.Irq
 			fields[KeyProcstatCpuTimeSoftirq] = cpuTime.Softirq
 			fields[KeyProcstatCpuTimeSteal] = cpuTime.Steal
-			fields[KeyProcstatCpuTimeStolen] = cpuTime.Stolen
 			fields[KeyProcstatCpuTimeGuest] = cpuTime.Guest
 			fields[KeyProcstatCpuTimeGuestNice] = cpuTime.GuestNice
 		} else {

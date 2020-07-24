@@ -9,9 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"runtime"
-	"strconv"
 	"strings"
-	"time"
 	"unsafe"
 
 	"github.com/shirou/gopsutil/internal/common"
@@ -40,6 +38,11 @@ func InfoWithContext(ctx context.Context) (*InfoStat, error) {
 		ret.Hostname = hostname
 	}
 
+	kernelArch, err := kernelArch()
+	if err == nil {
+		ret.KernelArch = kernelArch
+	}
+
 	platform, family, version, err := PlatformInformation()
 	if err == nil {
 		ret.Platform = platform
@@ -64,40 +67,6 @@ func InfoWithContext(ctx context.Context) (*InfoStat, error) {
 	}
 
 	return ret, nil
-}
-
-func BootTime() (uint64, error) {
-	return BootTimeWithContext(context.Background())
-}
-
-func BootTimeWithContext(ctx context.Context) (uint64, error) {
-	val, err := common.DoSysctrl("kern.boottime")
-	if err != nil {
-		return 0, err
-	}
-
-	boottime, err := strconv.ParseUint(val[0], 10, 64)
-	if err != nil {
-		return 0, err
-	}
-
-	return boottime, nil
-}
-
-func uptime(boot uint64) uint64 {
-	return uint64(time.Now().Unix()) - boot
-}
-
-func Uptime() (uint64, error) {
-	return UptimeWithContext(context.Background())
-}
-
-func UptimeWithContext(ctx context.Context) (uint64, error) {
-	boot, err := BootTime()
-	if err != nil {
-		return 0, err
-	}
-	return uptime(boot), nil
 }
 
 func PlatformInformation() (string, string, string, error) {
