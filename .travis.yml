@@ -2,7 +2,7 @@ language: go
 dist: xenial
 os: linux
 go:
-  - 1.12.9
+  - 1.14.6
 script:
   - make all
 services:
