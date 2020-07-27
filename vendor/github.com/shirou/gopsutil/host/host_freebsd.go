@@ -7,12 +7,10 @@ import (
 	"context"
 	"encoding/binary"
 	"io/ioutil"
+	"math"
 	"os"
 	"runtime"
 	"strings"
-	"sync/atomic"
-	"syscall"
-	"time"
 	"unsafe"
 
 	"github.com/shirou/gopsutil/internal/common"
@@ -49,6 +47,11 @@ func InfoWithContext(ctx context.Context) (*InfoStat, error) {
 		ret.KernelVersion = version
 	}
 
+	kernelArch, err := kernelArch()
+	if err == nil {
+		ret.KernelArch = kernelArch
+	}
+
 	system, role, err := Virtualization()
 	if err == nil {
 		ret.VirtualizationSystem = system
@@ -72,45 +75,6 @@ func InfoWithContext(ctx context.Context) (*InfoStat, error) {
 	}
 
 	return ret, nil
-}
-
-// cachedBootTime must be accessed via atomic.Load/StoreUint64
-var cachedBootTime uint64
-
-func BootTime() (uint64, error) {
-	return BootTimeWithContext(context.Background())
-}
-
-func BootTimeWithContext(ctx context.Context) (uint64, error) {
-	t := atomic.LoadUint64(&cachedBootTime)
-	if t != 0 {
-		return t, nil
-	}
-	buf, err := unix.SysctlRaw("kern.boottime")
-	if err != nil {
-		return 0, err
-	}
-
-	tv := *(*syscall.Timeval)(unsafe.Pointer((&buf[0])))
-	atomic.StoreUint64(&cachedBootTime, uint64(tv.Sec))
-
-	return t, nil
-}
-
-func uptime(boot uint64) uint64 {
-	return uint64(time.Now().Unix()) - boot
-}
-
-func Uptime() (uint64, error) {
-	return UptimeWithContext(context.Background())
-}
-
-func UptimeWithContext(ctx context.Context) (uint64, error) {
-	boot, err := BootTime()
-	if err != nil {
-		return 0, err
-	}
-	return uptime(boot), nil
 }
 
 func Users() ([]UserStat, error) {
@@ -143,11 +107,11 @@ func UsersWithContext(ctx context.Context) ([]UserStat, error) {
 		b := buf[i*sizeOfUtmpx : (i+1)*sizeOfUtmpx]
 		var u Utmpx
 		br := bytes.NewReader(b)
-		err := binary.Read(br, binary.LittleEndian, &u)
+		err := binary.Read(br, binary.BigEndian, &u)
 		if err != nil || u.Type != 4 {
 			continue
 		}
-		sec := (binary.LittleEndian.Uint32(u.Tv.Sec[:])) / 2 // TODO:
+		sec := math.Floor(float64(u.Tv) / 1000000)
 		user := UserStat{
 			User:     common.IntToString(u.User[:]),
 			Terminal: common.IntToString(u.Line[:]),

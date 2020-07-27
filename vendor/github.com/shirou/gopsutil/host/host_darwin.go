@@ -10,10 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"strconv"
 	"strings"
-	"sync/atomic"
-	"time"
 	"unsafe"
 
 	"github.com/shirou/gopsutil/internal/common"
@@ -44,6 +41,11 @@ func InfoWithContext(ctx context.Context) (*InfoStat, error) {
 		ret.KernelVersion = kernelVersion
 	}
 
+	kernelArch, err := kernelArch()
+	if err == nil {
+		ret.KernelArch = kernelArch
+	}
+
 	platform, family, pver, err := PlatformInformation()
 	if err == nil {
 		ret.Platform = platform
@@ -68,56 +70,12 @@ func InfoWithContext(ctx context.Context) (*InfoStat, error) {
 		ret.Procs = uint64(len(procs))
 	}
 
-	values, err := common.DoSysctrlWithContext(ctx, "kern.uuid")
-	if err == nil && len(values) == 1 && values[0] != "" {
-		ret.HostID = strings.ToLower(values[0])
+	uuid, err := unix.Sysctl("kern.uuid")
+	if err == nil && uuid != "" {
+		ret.HostID = strings.ToLower(uuid)
 	}
 
 	return ret, nil
-}
-
-// cachedBootTime must be accessed via atomic.Load/StoreUint64
-var cachedBootTime uint64
-
-func BootTime() (uint64, error) {
-	return BootTimeWithContext(context.Background())
-}
-
-func BootTimeWithContext(ctx context.Context) (uint64, error) {
-	t := atomic.LoadUint64(&cachedBootTime)
-	if t != 0 {
-		return t, nil
-	}
-	values, err := common.DoSysctrlWithContext(ctx, "kern.boottime")
-	if err != nil {
-		return 0, err
-	}
-	// ex: { sec = 1392261637, usec = 627534 } Thu Feb 13 12:20:37 2014
-	v := strings.Replace(values[2], ",", "", 1)
-	boottime, err := strconv.ParseInt(v, 10, 64)
-	if err != nil {
-		return 0, err
-	}
-	t = uint64(boottime)
-	atomic.StoreUint64(&cachedBootTime, t)
-
-	return t, nil
-}
-
-func uptime(boot uint64) uint64 {
-	return uint64(time.Now().Unix()) - boot
-}
-
-func Uptime() (uint64, error) {
-	return UptimeWithContext(context.Background())
-}
-
-func UptimeWithContext(ctx context.Context) (uint64, error) {
-	boot, err := BootTime()
-	if err != nil {
-		return 0, err
-	}
-	return uptime(boot), nil
 }
 
 func Users() ([]UserStat, error) {
@@ -192,6 +150,16 @@ func PlatformInformationWithContext(ctx context.Context) (string, string, string
 		pver = strings.ToLower(strings.TrimSpace(string(out)))
 	}
 
+	// check if the macos server version file exists
+	_, err = os.Stat("/System/Library/CoreServices/ServerVersion.plist")
+
+	// server file doesn't exist
+	if os.IsNotExist(err) {
+		family = "Standalone Workstation"
+	} else {
+		family = "Server"
+	}
+
 	return platform, family, pver, nil
 }
 
@@ -210,12 +178,4 @@ func KernelVersion() (string, error) {
 func KernelVersionWithContext(ctx context.Context) (string, error) {
 	version, err := unix.Sysctl("kern.osrelease")
 	return strings.ToLower(version), err
-}
-
-func SensorsTemperatures() ([]TemperatureStat, error) {
-	return SensorsTemperaturesWithContext(context.Background())
-}
-
-func SensorsTemperaturesWithContext(ctx context.Context) ([]TemperatureStat, error) {
-	return []TemperatureStat{}, common.ErrNotImplementedError
 }
