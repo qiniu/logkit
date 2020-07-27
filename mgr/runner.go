@@ -628,6 +628,7 @@ func (r *LogExportRunner) readDatas(dr reader.DataReader, dataSourceTag string) 
 		err       error
 		bytes     int64
 		data      Data
+		curTimeStr string
 		encodeTag = r.meta.GetEncodeTag()
 	)
 	for !utils.BatchFullOrTimeout(r.RunnerName, &r.stopped, r.batchLen, r.batchSize, r.lastSend,
@@ -666,6 +667,26 @@ func (r *LogExportRunner) readDatas(dr reader.DataReader, dataSourceTag string) 
 		r.rs.ReaderStats.LastError = ""
 	}
 	r.rsMutex.Unlock()
+
+	if r.ReadTime {
+		curTimeStr = time.Now().Format("2006-01-02 15:04:05.999")
+	}
+	tags := r.meta.GetTags()
+	if r.ExtraInfo {
+		tags = MergeEnvTags(r.EnvTag, tags)
+	}
+	tags = MergeExtraInfoTags(r.meta, r.InternalKeyPrefix, tags)
+	if r.ReadTime {
+		if r.InternalKeyPrefix != "" {
+			tags[r.InternalKeyPrefix+Lst] = curTimeStr
+		} else {
+			tags[Lst] = curTimeStr
+		}
+	}
+	if len(tags) > 0 {
+		datas = AddTagsToData(tags, datas, r.Name())
+	}
+
 	return datas
 }
 
