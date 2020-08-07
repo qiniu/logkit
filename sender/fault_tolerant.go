@@ -587,8 +587,8 @@ func (ft *FtSender) trySendDatas(datas []Data, failSleep int, isRetry bool) (bac
 		}
 	}
 	time.Sleep(time.Second * time.Duration(math.Pow(2, float64(failSleep))))
-	// 发送出错超过10次，并且设置了丢弃发送出错的数据时，丢弃数据
-	if failSleep >= 8 && ft.discardErr {
+	// 发送出错超过4次，超过30秒(避免网络抖动造成发送失败)，并且设置了丢弃发送出错的数据时，丢弃数据
+	if failSleep >= 4 && ft.discardErr {
 		return nil, nil
 	}
 
