@@ -255,10 +255,6 @@ func (r *MetricRunner) Run() {
 		}
 	}()
 
-	tags := r.meta.GetTags()
-	tags = MergeEnvTags(r.envTag, tags)
-	tags = MergeExtraInfoTags(r.meta, "", tags)
-
 	for _, c := range r.collectors {
 		collectorService, ok := c.(metric.CollectorService)
 		if !ok {
@@ -280,6 +276,10 @@ func (r *MetricRunner) Run() {
 			r.exitChan <- struct{}{}
 			return
 		}
+		tags := r.meta.GetTags()
+		tags = MergeEnvTags(r.envTag, tags)
+		tags = MergeExtraInfoTags(r.meta, "", tags)
+		
 		// collect data
 		dataCnt := 0
 		datas := make([]Data, 0)
