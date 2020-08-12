@@ -222,7 +222,7 @@ func (sf *SeqFile) Close() (err error) {
 	}
 
 	err = sf.f.Close()
-	if err != nil && err == os.ErrClosed {
+	if err != nil && err != os.ErrClosed {
 		return err
 	}
 

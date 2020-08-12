@@ -717,7 +717,7 @@ func (d *diskQueue) ioLoop() {
 
 	syncTicker := time.NewTicker(d.syncTimeout)
 	failRead := 1
-	backoff := utils.NewBackoff(2, 1, time.Second, 5*time.Minute)
+	backoff := utils.NewBackoff(2, 1, time.Second, time.Minute)
 
 DONE:
 	for {
