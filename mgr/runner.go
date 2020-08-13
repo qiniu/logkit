@@ -170,7 +170,7 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 		rsMutex:      new(sync.RWMutex),
 		tracker:      utils.NewTracker(),
 		historyMutex: new(sync.RWMutex),
-		backoff:      utils.NewBackoff(2, 1, time.Second, 5*time.Minute),
+		backoff:      utils.NewBackoff(2, 1, time.Second, time.Minute),
 	}
 
 	if reader == nil {

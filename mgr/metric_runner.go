@@ -268,7 +268,7 @@ func (r *MetricRunner) Run() {
 		}
 	}
 
-	backoff := utils.NewBackoff(2, 3, 1*time.Minute, 10*time.Minute)
+	backoff := utils.NewBackoff(2, 3, 10*time.Second, time.Minute)
 
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
@@ -279,7 +279,7 @@ func (r *MetricRunner) Run() {
 		tags := r.meta.GetTags()
 		tags = MergeEnvTags(r.envTag, tags)
 		tags = MergeExtraInfoTags(r.meta, "", tags)
-		
+
 		// collect data
 		dataCnt := 0
 		datas := make([]Data, 0)
