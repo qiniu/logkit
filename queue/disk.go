@@ -747,7 +747,7 @@ DONE:
 					if err != nil && atomic.LoadInt32(&d.stopped) == 0 {
 						log.Errorf("ERROR: reading from diskqueue(%s) at %d of %s failRead %d - %s",
 							d.name, d.readPos, d.fileName(d.readFileNum), failRead, err.Error())
-						if os.IsNotExist(err) || strings.Contains(err.Error(), "no such file or directory") {
+						if os.IsNotExist(err) || strings.Contains(err.Error(), ErrNoSuchFileOrDirectory) {
 							d.readFileNum++
 							d.readPos = 0
 							if failRead >= 10 {

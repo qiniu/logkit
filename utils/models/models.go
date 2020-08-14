@@ -89,6 +89,8 @@ const (
 
 	DefaultSelfRunnerName = DefaultInternalPrefix + "CollectLogRunner"
 	DefaultInternalPrefix = "LogkitInternal"
+
+	ErrNoSuchFileOrDirectory = "no such file or directory"
 )
 
 var (
