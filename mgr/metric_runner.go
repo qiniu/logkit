@@ -13,6 +13,7 @@ import (
 	"github.com/json-iterator/go"
 
 	"github.com/qiniu/log"
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 
 	"github.com/qiniu/logkit/conf"
 	"github.com/qiniu/logkit/metric"
@@ -372,6 +373,8 @@ func (r *MetricRunner) trySend(s sender.Sender, datas []Data, times int) bool {
 	if len(datas) <= 0 {
 		return true
 	}
+
+	var successDatasLen int64
 	if _, ok := r.rs.SenderStats[s.Name()]; !ok {
 		r.rs.SenderStats[s.Name()] = StatsInfo{}
 	}
@@ -385,34 +388,58 @@ func (r *MetricRunner) trySend(s sender.Sender, datas []Data, times int) bool {
 			return false
 		}
 		err := s.Send(datas)
-		if se, ok := err.(*StatsError); ok {
-			err = se.SendError
+		if err == nil {
+			successDatasLen += int64(len(datas))
+			break
+		}
+
+		se, ok := err.(*StatsError)
+		if ok {
+			if se.Errors == 0 {
+				successDatasLen += int64(len(datas))
+				break
+			}
+
 			if se.Ft {
+				r.rsMutex.Lock()
 				r.rs.Lag.Ftlags = se.FtQueueLag
-			} else {
-				if cnt > 1 {
-					info.Errors -= se.Success
-				} else {
-					info.Errors += se.Errors
-				}
-				info.Success += se.Success
+				r.rsMutex.Unlock()
 			}
-		} else if err != nil {
-			if cnt <= 1 {
-				info.Errors += int64(len(datas))
+			if se.SendError != nil {
+				successDatasLen += int64(len(datas) - len(se.SendError.GetFailDatas()))
+				err = se.SendError
 			}
-		} else {
-			info.Success += int64(len(datas))
 		}
-		if err != nil {
-			log.Errorf("runner[%v]: error %v", r.RunnerName, err)
-			time.Sleep(time.Second)
-			if times <= 0 || cnt < times {
-				cnt++
-				continue
-			}
-			log.Errorf("retry send %v times, but still error %v, discard datas... total %v lines", cnt, err, len(datas))
+		if se != nil && se.Ft && se.FtNotRetry {
+			break
 		}
+
+		time.Sleep(time.Duration(cnt) * time.Second)
+		sendError, ok := err.(*reqerr.SendError)
+		if ok {
+			datas = sender.ConvertDatas(sendError.GetFailDatas())
+			//无限重试的，除非遇到关闭
+			if atomic.LoadInt32(&r.stopped) > 0 {
+				return false
+			}
+			if sendError.ErrorType == sender.TypeMarshalError {
+				log.Errorf("Runner[%v] datas marshal failed, discard datas, send error %v, failed datas (length %v): %v", r.RunnerName, se.Error(), cnt, datas)
+				break
+			}
+			log.Errorf("Runner[%v] send error %v for %v times, failed datas length %v will retry send it", r.RunnerName, se.Error(), cnt, len(datas))
+			cnt++
+			continue
+		}
+
+		if err == ErrQueueClosed {
+			log.Errorf("Runner[%v] send to closed queue, discard datas, send error %v, failed datas (length %v): %v", r.RunnerName, se.Error(), cnt, datas)
+			break
+		}
+		if times <= 0 || cnt < times {
+			cnt++
+			continue
+		}
+		log.Errorf("Runner[%v] retry send %v times, but still error %v, total %v data lines", r.RunnerName, cnt, err, len(datas))
 		break
 	}
 	r.rsMutex.Lock()
