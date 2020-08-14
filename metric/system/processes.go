@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/shirou/gopsutil/process"
@@ -200,7 +201,10 @@ func (p *Processes) gatherFromProc(fields map[string]interface{}) error {
 	for _, filename := range filenames {
 		_, err := os.Stat(filename)
 		if err != nil {
-			log.Errorf("stat file: %s failed: %v", filename, err)
+			if err != os.ErrNotExist && !strings.Contains(err.Error(), ErrNoSuchFileOrDirectory) {
+				log.Errorf("stat file: %s failed: %v", filename, err)
+			}
+			continue
 		}
 
 		data, err := p.readProcFile(filename)
