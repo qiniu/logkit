@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -305,7 +306,9 @@ type newReaderOptions struct {
 func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool, maxLineLen int64) (*dirReader, error) {
 
 	rpath := strings.Replace(opts.LogPath, string(os.PathSeparator), "_", -1)
-	rpath = strings.Replace(rpath, string(os.PathListSeparator), "_", -1) // windows不支持命名中包含冒号
+	if runtime.GOOS == "windows" {
+		rpath = strings.Replace(rpath, ":", "_", -1)
+	}
 	subMetaPath := filepath.Join(opts.Meta.Dir, rpath)
 	subMeta, err := reader.NewMetaWithRunnerName(drs.meta.RunnerName, subMetaPath, subMetaPath, opts.LogPath, ModeDir, opts.Meta.TagFile, reader.DefautFileRetention)
 	if err != nil {
