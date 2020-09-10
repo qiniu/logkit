@@ -149,11 +149,17 @@ func (f *RFC3164) GetParser(line []byte) Parser {
 }
 
 func (f *RFC3164) IsNewLine(data []byte) bool {
-	if i := bytes.IndexByte(data, ' '); i > 1 {
-		if string(data[0:1]) != "<" || string(data[i-1:i]) != ">" {
+	// pri: 1.the first char must be '<'; 2. the third,fourth or fifth char must be '>'; 3. between'<' and '>' are numbers
+	if 0 < len(data) && data[0] != '<' {
+		return false
+	}
+	for j := 1; j < len(data) && j < 5; j++ {
+		if j > 1 && data[j] == '>' {
+			return true
+		}
+		if data[j] < '0' || data[j] > '9' {
 			return false
 		}
-		return true
 	}
 	return false
 }
