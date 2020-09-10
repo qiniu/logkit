@@ -2,8 +2,10 @@ package rfc3164
 
 import (
 	"bytes"
-	"github.com/jeromer/syslogparser"
+	"fmt"
 	"time"
+
+	"github.com/jeromer/syslogparser"
 )
 
 type Parser struct {
@@ -51,7 +53,12 @@ func (p *Parser) Hostname(hostname string) {
 	p.hostname = hostname
 }
 
-func (p *Parser) Parse() error {
+func (p *Parser) Parse() (err error) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			err = fmt.Errorf("parse panic: %v", rec)
+		}
+	}()
 	if p.ParsePriority {
 		pri, err := p.parsePriority()
 		if err != nil {
@@ -235,6 +242,9 @@ func (p *Parser) parseTag() (string, error) {
 	from := p.cursor
 
 	for {
+		if p.cursor >= p.l {
+			break
+		}
 		b = p.buff[p.cursor]
 		bracketOpen = (b == '[')
 		endOfTag = (b == ':' || b == ' ')

@@ -478,8 +478,14 @@
 			"revisionTime": "2019-07-27T14:50:11Z"
 		},
 		{
-			"checksumSHA1": "JYolL5tGpX0smq5b9Irm2aNMkjQ=",
+			"checksumSHA1": "ddslouVS8Mlau9h1KTrjLu8zpqw=",
 			"path": "github.com/jeromer/syslogparser/rfc3164",
+			"revision": "5fbaaf06d9e72f781d19c61e130ba63f4d6dab31",
+			"revisionTime": "2019-04-29T16:15:31Z"
+		},
+		{
+			"checksumSHA1": "un+SAb0A0Ha6FN/p1wY0yQgH4pg=",
+			"path": "github.com/jeromer/syslogparser/rfc5424",
 			"revision": "5fbaaf06d9e72f781d19c61e130ba63f4d6dab31",
 			"revisionTime": "2019-04-29T16:15:31Z"
 		},
