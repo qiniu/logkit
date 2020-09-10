@@ -82,7 +82,12 @@ func (p *Parser) Location(location *time.Location) {
 	// Ignore as RFC5424 syslog always has a timezone
 }
 
-func (p *Parser) Parse() error {
+func (p *Parser) Parse() (err error) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			err = fmt.Errorf("parse panic: %v", rec)
+		}
+	}()
 	hdr, err := p.parseHeader()
 	if err != nil {
 		return err

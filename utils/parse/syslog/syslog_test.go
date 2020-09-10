@@ -60,4 +60,7 @@ func TestSyslogParser3164(t *testing.T) {
 	fpas.parseYear = true
 	pas = fpas.GetParser([]byte("<34>Oct 11 22:14:15 2019 mymachine very.large.syslog.message.tag: 'su root' failed for lonvick on /dev/pts/8"))
 	assert.Nil(t, pas.Parse())
+
+	pas = fpas.GetParser([]byte("<34>Oct 11 22:14:15 2019;"))
+	assert.Nil(t, pas.Parse())
 }
