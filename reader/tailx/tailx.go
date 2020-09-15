@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/bmatcuk/doublestar"
 	"github.com/json-iterator/go"
 
 	"github.com/qiniu/log"
@@ -643,7 +644,7 @@ func (r *Reader) statLogPath() {
 		}
 		return
 	}
-	matches, err := filepath.Glob(r.logPathPattern)
+	matches, err := doublestar.Glob(r.logPathPattern)
 	if err != nil {
 		if !IsSelfRunner(r.meta.RunnerName) {
 			log.Errorf("Runner[%s] stat logPathPattern error %v", r.meta.RunnerName, err)
@@ -659,7 +660,7 @@ func (r *Reader) statLogPath() {
 
 	var unmatchMap = make(map[string]bool)
 	if r.ignoreLogPathPattern != "" {
-		unmatches, err := filepath.Glob(r.ignoreLogPathPattern)
+		unmatches, err := doublestar.Glob(r.ignoreLogPathPattern)
 		if err != nil {
 			log.Errorf("Runner[%s] stat ignoreLogPathPattern error %v", r.meta.RunnerName, err)
 			r.setStatsError("Runner[" + r.meta.RunnerName + "] stat ignoreLogPathPattern error " + err.Error())
