@@ -471,12 +471,24 @@ func (r *MssqlReader) checkExit(idx int, db *sql.DB) (bool, int64) {
 		return true, -1
 	}
 	rawSQL := strings.TrimSuffix(strings.TrimSpace(r.syncSQLs[idx]), ";")
+	if !strings.Contains(rawSQL, "from") {
+		rawSQL = strings.ReplaceAll(rawSQL, "FROM", "from")
+	}
 	rawSQLIdx := strings.Index(rawSQL, "from")
 	if rawSQLIdx < 0 {
 		return true, -1
 	}
 	rawSQL = rawSQL[rawSQLIdx:]
-	tsql := fmt.Sprintf("select top(1) * %v WHERE CAST(%v AS BIGINT) >= %v order by CAST(%v AS BIGINT);", rawSQL, r.offsetKey, r.offsets[idx], r.offsetKey)
+	if !strings.Contains(rawSQL, "where") {
+		rawSQL = strings.ReplaceAll(rawSQL, "WHERE", "where")
+	}
+	whereIdx := strings.LastIndex(rawSQL, "where ")
+	var tsql string
+	if whereIdx < 0 {
+		tsql = fmt.Sprintf("select top(1) * %s WHERE CAST(%s AS BIGINT) >= %d order by CAST(%s AS BIGINT);", rawSQL, r.offsetKey, r.offsets[idx], r.offsetKey)
+	} else {
+		tsql = fmt.Sprintf("select top(1) * %s WHERE %s AND CAST(%s AS BIGINT) >= %d order by CAST(%s AS BIGINT);", rawSQL[:whereIdx], rawSQL[whereIdx+6:], r.offsetKey, r.offsets[idx], r.offsetKey)
+	}
 
 	log.Info("query <", tsql, "> to check exit")
 	rows, err := db.Query(tsql)
@@ -724,8 +736,16 @@ func (r *MssqlReader) getSQL(rawSql string, idx int) string {
 	var rawSQL = strings.TrimSuffix(strings.TrimSpace(rawSql), ";")
 	r.muxOffsets.RLock()
 	defer r.muxOffsets.RUnlock()
+	if !strings.Contains(rawSQL, "where") {
+		rawSQL = strings.ReplaceAll(rawSQL, "WHERE", "where")
+	}
+	whereIdx := strings.LastIndex(rawSQL, "where ")
 	if len(r.offsetKey) > 0 && len(r.offsets) > idx {
-		return fmt.Sprintf("%s WHERE CAST(%v AS BIGINT) >= %d AND CAST(%v AS BIGINT) < %d;", rawSQL, r.offsetKey, r.offsets[idx], r.offsetKey, r.offsets[idx]+int64(r.readBatch))
+		if whereIdx < 0 {
+			return fmt.Sprintf("%s WHERE CAST(%v AS BIGINT) >= %d AND CAST(%v AS BIGINT) < %d;", rawSQL, r.offsetKey, r.offsets[idx], r.offsetKey, r.offsets[idx]+int64(r.readBatch))
+		} else {
+			return fmt.Sprintf("%s WHERE CAST(%v AS BIGINT) >= %d AND CAST(%v AS BIGINT) < %d AND %s;", rawSQL[:whereIdx], r.offsetKey, r.offsets[idx], r.offsetKey, r.offsets[idx]+int64(r.readBatch), rawSQL[whereIdx+6:])
+		}
 	}
 
 	log.Warn("get SQL error: MSSQL not support get SQL without id now, use raw SQL")
