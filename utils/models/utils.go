@@ -837,6 +837,9 @@ func FormatWithUserOption(layoutAfter string, offset int, t time.Time) interface
 	t = t.Add(time.Duration(offset) * time.Hour)
 	if t.Year() == 0 {
 		t = t.AddDate(time.Now().Year(), 0, 0)
+		if t.Sub(time.Now()) > 0 {
+			t = t.AddDate(-1, 0, 0)
+		}
 	}
 	if layoutAfter != "" {
 		return t.Format(layoutAfter)

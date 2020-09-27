@@ -621,13 +621,13 @@ func Test_ConvertDate(t *testing.T) {
 	af := tm.Add(2 * time.Hour)
 	date, err = ConvertDate("", "", 2, time.UTC, tm)
 	assert.NoError(t, err)
-	assert.Equal(t, af.Format(time.RFC3339Nano), date)
+	assert.Equal(t, af.AddDate(-1, 0, 0).Format(time.RFC3339Nano), date)
 
 	tm = time.Now()
 	af = tm.Add(2 * time.Hour)
 	date, err = ConvertDate("", "", 2, time.UTC, &tm)
 	assert.NoError(t, err)
-	assert.Equal(t, af.Format(time.RFC3339Nano), date)
+	assert.Equal(t, af.AddDate(-1, 0, 0).Format(time.RFC3339Nano), date)
 }
 
 func Test_FormatWithUserOption(t *testing.T) {
