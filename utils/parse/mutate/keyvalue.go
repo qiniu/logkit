@@ -1,7 +1,6 @@
 package mutate
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -20,113 +19,115 @@ type Parser struct {
 }
 
 func (p *Parser) Parse(line string) ([]models.Data, error) {
+	var (
+		field   = make(models.Data)
+		decoder = NewDecoder(line)
+		key     string
+		value   string
+	)
 
-	pairs, err := splitKV(line, p.Splitter)
-	if err != nil {
-		return nil, err
-	}
-
-	// 调整数据类型
-	if len(pairs)%2 == 1 {
-		return nil, errors.New(fmt.Sprintf("key value not match, %s", errMsg))
-	}
-
-	data := make([]models.Data, 0, 1)
-	field := make(models.Data)
-	for i := 0; i < len(pairs); i += 2 {
+	for decoder.ScanValue(p.Splitter) {
 		// 消除双引号； 针对foo="" ,"foo=" 情况；其他情况如 a"b"c=d"e"f等首尾不出现引号的情况视作合法。
-		kNum := strings.Count(pairs[i], "\"")
-		vNum := strings.Count(pairs[i+1], "\"")
+		key = decoder.key
+		value = decoder.value
+		kNum := strings.Count(key, "\"")
+		vNum := strings.Count(value, "\"")
 		if kNum%2 == 1 && vNum%2 == 1 {
-			if strings.HasPrefix(pairs[i], "\"") && strings.HasSuffix(pairs[i+1], "\"") {
-				pairs[i] = pairs[i][1:]
-				pairs[i+1] = pairs[i+1][:len(pairs[i+1])-1]
+			if strings.HasPrefix(key, "\"") && strings.HasSuffix(value, "\"") {
+				key = key[1:]
+				value = value[:len(value)-1]
 			}
 		}
-		if kNum%2 == 0 && len(pairs[i]) > 1 {
-			if strings.HasPrefix(pairs[i], "\"") && strings.HasSuffix(pairs[i], "\"") {
-				pairs[i] = pairs[i][1 : len(pairs[i])-1]
+		if kNum%2 == 0 && len(key) > 1 {
+			if strings.HasPrefix(key, "\"") && strings.HasSuffix(key, "\"") {
+				key = key[1 : len(key)-1]
 			}
 		}
-		if vNum%2 == 0 && len(pairs[i+1]) > 1 {
-			if strings.HasPrefix(pairs[i+1], "\"") && strings.HasSuffix(pairs[i+1], "\"") {
-				pairs[i+1] = pairs[i+1][1 : len(pairs[i+1])-1]
+		if vNum%2 == 0 && len(value) > 1 {
+			if strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"") {
+				value = value[1 : len(value)-1]
 			}
 		}
 
-		if len(pairs[i]) == 0 || len(pairs[i+1]) == 0 {
+		if len(key) == 0 {
 			return nil, fmt.Errorf("no value or key was parsed after logfmt, %s", errMsg)
 		}
 
-		value := pairs[i+1]
+		dValue := decoder.value
 		if !p.KeepString {
-			if fValue, err := strconv.ParseFloat(value, 64); err == nil {
-				field[pairs[i]] = fValue
+			if fValue, err := strconv.ParseFloat(dValue, 64); err == nil {
+				field[key] = fValue
 				continue
 			}
-			if bValue, err := strconv.ParseBool(value); err == nil {
-				field[pairs[i]] = bValue
+			if bValue, err := strconv.ParseBool(dValue); err == nil {
+				field[key] = bValue
 				continue
 			}
-
 		}
-		field[pairs[i]] = value
+		field[key] = value
 	}
 	if len(field) == 0 {
 		return nil, fmt.Errorf("data is empty after parse, %s", errMsg)
 	}
 
-	data = append(data, field)
-	return data, nil
+	return []models.Data{field}, nil
 }
 
-func splitKV(line string, sep string) ([]string, error) {
-	data := make([]string, 0, 100)
+func splitKV(line string, sep string) []string {
 
-	if !strings.Contains(line, sep) {
-		return nil, errors.New(fmt.Sprintf("no splitter exist, %s", errMsg))
+	kvArr := make([]string, 0)
+	d := NewDecoder(line)
+	for d.ScanValue(sep) {
+		kvArr = append(kvArr, d.Key())
+		kvArr = append(kvArr, d.Value())
 	}
+	return kvArr
+}
 
-	kvArr := make([]string, 0, 100)
-	isKey := true
-	vhead := 0
-	lastSpace := 0
-	pos := 0
-	sepLen := len(sep)
+type Decoder struct {
+	line   string
+	sepPos int
+	key    string
+	value  string
+}
 
-	// key或value值中包含sep的情况；默认key中不包含sep；导致algorithm = 1+1=2会变成合法
-	for pos+sepLen <= len(line) {
-		if unicode.IsSpace(rune(line[pos : pos+1][0])) {
-			nextSep := strings.Index(line[pos+1:], sep)
-			if nextSep == -1 {
-				break
-			}
-			if strings.TrimSpace(line[pos+1:pos+1+nextSep]) != "" {
-				lastSpace = pos
-				pos++
-				continue
-			}
+func NewDecoder(line string) *Decoder {
+	return &Decoder{
+		line: line,
+	}
+}
+
+func (d *Decoder) ScanValue(sep string) bool {
+	if len(d.line) == 0 {
+		return false
+	}
+	if d.sepPos == 0 {
+		d.sepPos = strings.Index(d.line, sep)
+	}
+	if d.sepPos == -1 {
+		return false
+	}
+	d.key = strings.TrimSpace(d.line[:d.sepPos])
+	firstSpace := strings.IndexFunc(d.line[d.sepPos:], unicode.IsSpace)
+	if firstSpace != -1 {
+		nextSep := strings.Index(d.line[d.sepPos+firstSpace:], sep)
+		if nextSep != -1 {
+			lastSpace := strings.LastIndexFunc(strings.TrimRightFunc(d.line[:d.sepPos+firstSpace+nextSep], unicode.IsSpace), unicode.IsSpace)
+			d.value = strings.TrimSpace(d.line[d.sepPos+len(sep) : lastSpace])
+			d.line = d.line[lastSpace+1:]
+			d.sepPos = d.sepPos + firstSpace + nextSep - lastSpace - 1
+			return true
 		}
-		if line[pos:pos+sepLen] == sep {
-			if isKey {
-				kvArr = append(kvArr, strings.TrimSpace(line[vhead:pos]))
-				isKey = false
-			} else {
-				if lastSpace <= vhead {
-					pos++
-					continue
-				}
-				kvArr = append(kvArr, strings.TrimSpace(line[vhead:lastSpace]))
-				kvArr = append(kvArr, strings.TrimSpace(line[lastSpace:pos]))
-			}
-			vhead = pos + sepLen
-			pos = pos + sepLen - 1
-		}
-		pos++
 	}
-	if vhead < len(line) {
-		kvArr = append(kvArr, strings.TrimSpace(line[vhead:]))
-	}
-	data = append(data, kvArr...)
-	return data, nil
+	d.value = strings.TrimSpace(d.line[d.sepPos+len(sep):])
+	d.line = ""
+	return true
+}
+
+func (d *Decoder) Value() string {
+	return d.value
+}
+
+func (d *Decoder) Key() string {
+	return d.key
 }

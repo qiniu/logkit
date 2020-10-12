@@ -1,7 +1,6 @@
 package mutate
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,23 +29,16 @@ func Test_parseLine(t *testing.T) {
 			splitter: "=",
 		},
 		{
-			line: "foo=\"bar\"\n",
+			line: "foo=\"\"",
 			expectData: []models.Data{
-				{"foo": "bar"},
+				{"foo": ""},
 			},
 			splitter: "=",
 		},
 		{
-			line: "ts=2018-01-02T03:04:05.123Z lvl=info msg=\"http request\" method=PUT\nduration=1.23 log_id=123456abc",
+			line: "foo=\"bar\"\n",
 			expectData: []models.Data{
-				{
-					"lvl":      "info",
-					"msg":      "http request",
-					"method":   "PUT",
-					"duration": 1.23,
-					"ts":       "2018-01-02T03:04:05.123Z",
-					"log_id":   "123456abc",
-				},
+				{"foo": "bar"},
 			},
 			splitter: "=",
 		},
@@ -84,10 +76,15 @@ func Test_parseLine(t *testing.T) {
 			splitter:   "=",
 		},
 		{
-			line:       `foo="" bar=`,
-			expectData: []models.Data{},
-			existErr:   true,
-			splitter:   "=",
+			line: `foo="" bar=`,
+			expectData: []models.Data{
+				{
+					"foo": "",
+					"bar": "",
+				},
+			},
+			existErr: false,
+			splitter: "=",
 		},
 		{
 			line: `abc=abc foo="def`,
@@ -101,10 +98,35 @@ func Test_parseLine(t *testing.T) {
 			splitter: "=",
 		},
 		{
-			line:       `"foo=" bar=abc`,
-			expectData: []models.Data{},
-			existErr:   true,
-			splitter:   "=",
+			line: `"foo=" bar=abc`,
+			expectData: []models.Data{
+				{
+					"foo": "",
+					"bar": "abc",
+				},
+			},
+			existErr: false,
+			splitter: "=",
+		},
+		{
+			line: `foo= `,
+			expectData: []models.Data{
+				{
+					"foo": "",
+				},
+			},
+			existErr: false,
+			splitter: "=",
+		},
+		{
+			line: `"= `,
+			expectData: []models.Data{
+				{
+					"\"": "",
+				},
+			},
+			existErr: false,
+			splitter: "=",
 		},
 	}
 	l := Parser{
@@ -115,7 +137,6 @@ func Test_parseLine(t *testing.T) {
 		l.KeepString = tt.keepString
 		l.Splitter = tt.splitter
 		got, err := l.Parse(tt.line)
-		fmt.Println("got: ", got, " err: ", err)
 		assert.Equal(t, tt.existErr, err != nil)
 		assert.Equal(t, len(tt.expectData), len(got))
 		for i, m := range got {
@@ -129,15 +150,14 @@ func Test_splitKV(t *testing.T) {
 	tests := []struct {
 		line       string
 		expectData []string
-		existErr   bool
 		splitter   string
 	}{
 		{
 			line: "foo=",
 			expectData: []string{
 				"foo",
+				"",
 			},
-			existErr: false,
 			splitter: "=",
 		},
 		{
@@ -146,7 +166,6 @@ func Test_splitKV(t *testing.T) {
 				"",
 				"def",
 			},
-			existErr: false,
 			splitter: "=",
 		},
 		{
@@ -157,7 +176,6 @@ func Test_splitKV(t *testing.T) {
 				"abc",
 				"abc",
 			},
-			existErr: false,
 			splitter: "=",
 		},
 		{
@@ -168,7 +186,6 @@ func Test_splitKV(t *testing.T) {
 				"abc",
 				"a\nbc",
 			},
-			existErr: false,
 			splitter: "=",
 		},
 		{
@@ -179,7 +196,6 @@ func Test_splitKV(t *testing.T) {
 				"abc",
 				"abc",
 			},
-			existErr: false,
 			splitter: "=",
 		},
 		{
@@ -190,7 +206,6 @@ func Test_splitKV(t *testing.T) {
 				"abc",
 				"abc",
 			},
-			existErr: false,
 			splitter: "=",
 		},
 		{
@@ -201,7 +216,6 @@ func Test_splitKV(t *testing.T) {
 				"abc",
 				"abc",
 			},
-			existErr: false,
 			splitter: "=",
 		},
 		{
@@ -212,7 +226,6 @@ func Test_splitKV(t *testing.T) {
 				"abc",
 				"abc",
 			},
-			existErr: false,
 			splitter: "=",
 		},
 		{
@@ -223,7 +236,6 @@ func Test_splitKV(t *testing.T) {
 				"abc",
 				"a:b:c",
 			},
-			existErr: false,
 			splitter: ":",
 		},
 		{
@@ -232,19 +244,16 @@ func Test_splitKV(t *testing.T) {
 				"f:o:o",
 				"def",
 			},
-			existErr: false,
 			splitter: "::",
 		},
 		{
 			line:       "f:o:o:def",
 			expectData: []string{},
-			existErr:   true,
 			splitter:   "::",
 		},
 		{
 			line:       "f:o:o:\n:def",
 			expectData: nil,
-			existErr:   true,
 			splitter:   "::",
 		},
 		{
@@ -253,19 +262,16 @@ func Test_splitKV(t *testing.T) {
 				"f:\no",
 				"a o:\n:def",
 			},
-			existErr: false,
 			splitter: "::",
 		},
 		{
 			line:       "f:o:o: \n :def",
 			expectData: []string{},
-			existErr:   true,
 			splitter:   "::",
 		},
 	}
 	for _, tt := range tests {
-		got, err := splitKV(tt.line, tt.splitter)
-		assert.Equal(t, tt.existErr, err != nil)
+		got := splitKV(tt.line, tt.splitter)
 		assert.Equal(t, len(tt.expectData), len(got))
 		for i, m := range got {
 			assert.Equal(t, tt.expectData[i], m)
