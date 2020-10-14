@@ -56,6 +56,19 @@ func Test_parseLine(t *testing.T) {
 			splitter: "=",
 		},
 		{
+			line: `ts=2018-01-02T03:04:05.123Z lvl=  method="" msg="http request" a=12345678901234567890123456789`,
+			expectData: []models.Data{
+				{
+					"lvl":    "",
+					"msg":    "http request",
+					"method": "",
+					"ts":     "2018-01-02T03:04:05.123Z",
+					"a":      1.2345678901234568e+28,
+				},
+			},
+			splitter: "=",
+		},
+		{
 			line:       `ts=2018-01-02T03:04:05.123Z lvl=info  method=PUT msg="http request" a=12345678901234567890123456789`,
 			keepString: true,
 			expectData: []models.Data{
@@ -81,6 +94,58 @@ func Test_parseLine(t *testing.T) {
 				{
 					"foo": "",
 					"bar": "",
+				},
+			},
+			existErr: false,
+			splitter: "=",
+		},
+		{
+			line: `foo= = = =`,
+			expectData: []models.Data{
+				{
+					"foo": "= = =",
+				},
+			},
+			existErr: false,
+			splitter: "=",
+		},
+		{
+			line: `foo= = = = a = b`,
+			expectData: []models.Data{
+				{
+					"foo": "= = =",
+					"a":   "b",
+				},
+			},
+			existErr: false,
+			splitter: "=",
+		},
+		{
+			line: `foo==`,
+			expectData: []models.Data{
+				{
+					"foo": "=",
+				},
+			},
+			existErr: false,
+			splitter: "=",
+		},
+		{
+			line: `foo== =a`,
+			expectData: []models.Data{
+				{
+					"foo": "= =a",
+				},
+			},
+			existErr: false,
+			splitter: "=",
+		},
+		{
+			line: `foo== = b =`,
+			expectData: []models.Data{
+				{
+					"foo": "= =",
+					"b":   "",
 				},
 			},
 			existErr: false,
