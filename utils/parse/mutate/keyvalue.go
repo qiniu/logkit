@@ -104,19 +104,32 @@ func (d *Decoder) ScanValue(sep string) bool {
 	if d.sepPos == 0 {
 		d.sepPos = strings.Index(d.line, sep)
 	}
-	if d.sepPos == -1 {
+	if d.sepPos < 0 || d.sepPos >= len(d.line) {
 		return false
 	}
 	d.key = strings.TrimSpace(d.line[:d.sepPos])
 	firstSpace := strings.IndexFunc(d.line[d.sepPos:], unicode.IsSpace)
 	if firstSpace != -1 {
 		nextSep := strings.Index(d.line[d.sepPos+firstSpace:], sep)
+		// 找第二个key，key不能为空,两个sep之间必须有空格
+		preSepPos := d.sepPos + len(sep)
+		nextSepPos := d.sepPos + firstSpace + nextSep
+		for nextSep != -1 {
+			if strings.TrimFunc(d.line[preSepPos+len(sep):nextSepPos], unicode.IsSpace) != "" {
+				break
+			}
+			preSepPos = nextSepPos + len(sep)
+			nextSep = strings.Index(d.line[preSepPos:], sep)
+			nextSepPos = preSepPos + nextSep
+		}
 		if nextSep != -1 {
-			lastSpace := strings.LastIndexFunc(strings.TrimRightFunc(d.line[:d.sepPos+firstSpace+nextSep], unicode.IsSpace), unicode.IsSpace)
-			d.value = strings.TrimSpace(d.line[d.sepPos+len(sep) : lastSpace])
-			d.line = d.line[lastSpace+1:]
-			d.sepPos = d.sepPos + firstSpace + nextSep - lastSpace - 1
-			return true
+			lastSpace := strings.LastIndexFunc(strings.TrimRightFunc(d.line[:nextSepPos], unicode.IsSpace), unicode.IsSpace)
+			if lastSpace != -1 {
+				d.value = strings.TrimSpace(d.line[d.sepPos+len(sep) : lastSpace])
+				d.line = d.line[lastSpace+1:]
+				d.sepPos = nextSepPos - lastSpace - 1
+				return true
+			}
 		}
 	}
 	d.value = strings.TrimSpace(d.line[d.sepPos+len(sep):])
