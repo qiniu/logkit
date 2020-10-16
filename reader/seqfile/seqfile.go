@@ -449,12 +449,10 @@ func (sf *SeqFile) getNextFileCondition() (condition func(os.FileInfo) bool, err
 			log.Errorf("get %v %v inode err %v", sf.dir, f.Name(), err)
 			return false
 		}
-		//与当前的是同一个文件
 		if inode == sf.inode {
-			return false
-		}
-		if sf.ReadSameInode {
-			return true
+			if !(sf.ReadSameInode && f.Size() < sf.offset) {
+				return false
+			}
 		}
 
 		if len(sf.inodeDone) < 1 {
@@ -486,7 +484,7 @@ func (sf *SeqFile) nextFile() (fi os.FileInfo, err error) {
 	if sf.isNewFile(fi, filepath.Join(sf.dir, fi.Name())) {
 		return fi, nil
 	}
-	log.Warnf("Runner[%v] %v is not new file", sf.meta.RunnerName, fi.Name())
+	log.Debugf("Runner[%v] %v is not new file", sf.meta.RunnerName, fi.Name())
 	return nil, nil
 }
 
@@ -501,7 +499,7 @@ func (sf *SeqFile) isNewFile(newFileInfo os.FileInfo, filePath string) bool {
 	}
 	newName := newFileInfo.Name()
 	newFsize := newFileInfo.Size()
-	if newInode != 0 && sf.inode != 0 && newInode == sf.inode {
+	if newInode != 0 && sf.inode != 0 && !sf.ReadSameInode && newInode == sf.inode {
 		return false
 	}
 	if newInode != sf.inode {
