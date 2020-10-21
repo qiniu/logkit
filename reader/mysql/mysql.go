@@ -9,6 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode"
 
 	_ "github.com/go-sql-driver/mysql" //mysql 驱动
 	"github.com/robfig/cron"
@@ -851,7 +852,7 @@ func (r *MysqlReader) getSQL(idx int, rawSQL string) string {
 
 	link := "WHERE"
 	if strings.Contains(strings.ToUpper(rawSQL), "WHERE") {
-		link = "AND"
+		link = "HAVING"
 	}
 	rawSQL = strings.TrimSuffix(strings.TrimSpace(rawSQL), ";")
 	if len(r.timestampKey) > 0 {
@@ -876,7 +877,7 @@ func (r *MysqlReader) checkExit(idx int, db *sql.DB) (bool, int64) {
 	var tsql string
 
 	if len(r.timestampKey) > 0 {
-		ix := strings.Index(rawSQL, "from")
+		ix := getFromIndex(rawSQL)
 		if ix < 0 {
 			return true, -1
 		}
@@ -890,10 +891,14 @@ func (r *MysqlReader) checkExit(idx int, db *sql.DB) (bool, int64) {
 		rawSQL = rawSQL[ix:]
 
 		//获得最新时间戳到当前时间的数据量
+		link := "WHERE"
+		if strings.Contains(strings.ToUpper(rawSQL), "WHERE") {
+			link = "HAVING"
+		}
 		if r.timestampKeyInt {
-			tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v >= %v;", rawSQL, r.timestampKey, r.startTimeInt)
+			tsql = fmt.Sprintf("select COUNT(*) as countnum %v %s %v >= %v;", rawSQL, link, r.timestampKey, r.startTimeInt)
 		} else {
-			tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v >= '%s';", rawSQL, r.timestampKey, r.startTime.Format(MysqlTimeFormat))
+			tsql = fmt.Sprintf("select COUNT(*) as countnum %v %s %v >= '%s';", rawSQL, link, r.timestampKey, r.startTime.Format(MysqlTimeFormat))
 		}
 
 		largerAmount, err := QueryNumber(tsql, db)
@@ -904,9 +909,9 @@ func (r *MysqlReader) checkExit(idx int, db *sql.DB) (bool, int64) {
 		//-- 比较有没有比之前的数量大，如果没有变大就退出
 		//如果变大，继续判断当前这个重复的时间有没有数据
 		if r.timestampKeyInt {
-			tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v = %v;", rawSQL, r.timestampKey, r.startTimeInt)
+			tsql = fmt.Sprintf("select COUNT(*) as countnum %v %s %v = %v;", rawSQL, link, r.timestampKey, r.startTimeInt)
 		} else {
-			tsql = fmt.Sprintf("select COUNT(*) as countnum %v WHERE %v = '%s';", rawSQL, r.timestampKey, r.startTime.Format(MysqlTimeFormat))
+			tsql = fmt.Sprintf("select COUNT(*) as countnum %v %s %v = '%s';", rawSQL, link, r.timestampKey, r.startTime.Format(MysqlTimeFormat))
 		}
 		equalAmount, err := QueryNumber(tsql, db)
 		if err == nil && equalAmount > int64(len(r.timeCacheMap)) {
@@ -916,9 +921,9 @@ func (r *MysqlReader) checkExit(idx int, db *sql.DB) (bool, int64) {
 		//此处如果发现同样的时间戳数据没有变，那么说明是新的时间产生的数据，时间戳要更新了
 		//获得最小的时间戳
 		if r.timestampKeyInt {
-			tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v > %v;", r.timestampKey, r.timestampKey, rawSQL, r.timestampKey, r.startTimeInt)
+			tsql = fmt.Sprintf("select MIN(%s) as %s %v %s %v > %v;", r.timestampKey, r.timestampKey, rawSQL, link, r.timestampKey, r.startTimeInt)
 		} else {
-			tsql = fmt.Sprintf("select MIN(%s) as %s %v WHERE %v > '%s';", r.timestampKey, r.timestampKey, rawSQL, r.timestampKey, r.startTime.Format(MysqlTimeFormat))
+			tsql = fmt.Sprintf("select MIN(%s) as %s %v %s %v > '%s';", r.timestampKey, r.timestampKey, rawSQL, link, r.timestampKey, r.startTime.Format(MysqlTimeFormat))
 		}
 	} else {
 		tsql = fmt.Sprintf("%s WHERE %v >= %d order by %v limit 1;", rawSQL, r.offsetKey, r.offsets[idx], r.offsetKey)
@@ -959,6 +964,18 @@ func (r *MysqlReader) checkExit(idx int, db *sql.DB) (bool, int64) {
 		return false, -1
 	}
 	return true, -1
+}
+
+func getFromIndex(rawSQL string) int {
+	checkSql := strings.ToUpper(rawSQL)
+	ix := strings.Index(checkSql, "FROM")
+	for ix > 0 && ix < len(checkSql)-4 {
+		if unicode.IsSpace(rune(checkSql[ix-1 : ix][0])) && unicode.IsSpace(rune(checkSql[ix+4 : ix+5][0])) {
+			break
+		}
+		ix = ix + 4 + strings.Index(checkSql[ix+4:], "FROM")
+	}
+	return ix
 }
 
 // 获取有效数据
@@ -1130,9 +1147,9 @@ func (r *MysqlReader) execTableCount(connectStr string, idx int, curDB, rawSql s
 // 计算每个table的计数条数(总数)
 func (r *MysqlReader) execTotalCount(connectStr string, curDB, rawSql string) (totalSize int64, err error) {
 	rawSql = strings.TrimSuffix(strings.TrimSpace(rawSql), ";")
-	ix := strings.Index(strings.ToUpper(rawSql), "FROM")
+	ix := getFromIndex(rawSql)
 	if ix < 0 {
-		return -1, fmt.Errorf("Query statement is abnormal")
+		return -1, fmt.Errorf("query statement is abnormal")
 	}
 	rawSql = rawSql[ix:]
 	execSQL := fmt.Sprintf("select COUNT(*) as countnum %v;", rawSql)
