@@ -6,6 +6,7 @@ import (
 	"path"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -1141,4 +1142,50 @@ func Test_getRawSQLs(t *testing.T) {
 		assert.NoError(t, err)
 		assert.EqualValues(t, test.expSQLs, sqls)
 	}
+}
+
+func Test_getFromIndex(t *testing.T) {
+	sql := ` select * from test;`
+	expect := strings.Index(sql, "from")
+	assert.EqualValues(t, expect, getFromIndex(sql))
+
+	sql = ` select * From test;`
+	expect = strings.Index(sql, "From")
+	assert.EqualValues(t, expect, getFromIndex(sql))
+
+	sql = ` select * FroM test;`
+	expect = strings.Index(sql, "FroM")
+	assert.EqualValues(t, expect, getFromIndex(sql))
+
+	sql = ` select * FROM test;`
+	expect = strings.Index(sql, "FROM")
+	assert.EqualValues(t, expect, getFromIndex(sql))
+
+	sql = ` SELECT * FROM test;`
+	expect = strings.Index(sql, "FROM")
+	assert.EqualValues(t, expect, getFromIndex(sql))
+
+	sql = "select *\nfrom\ntest;"
+	expect = strings.Index(sql, "from")
+	assert.EqualValues(t, expect, getFromIndex(sql))
+
+	sql = ` select a,from_unixstamp(a) as b from test;`
+	expect = strings.LastIndex(sql, "from")
+	assert.EqualValues(t, expect, getFromIndex(sql))
+
+	sql = "select a,from_unixstamp(a) as b \nfrom\n test;"
+	expect = strings.LastIndex(sql, "from")
+	assert.EqualValues(t, expect, getFromIndex(sql))
+
+	sql = "select a,FROM_UNIXSTAMP(a) as b \nfrom\n test;"
+	expect = strings.Index(sql, "from")
+	assert.EqualValues(t, expect, getFromIndex(sql))
+
+	sql = `select * from test where (select count(a) from test where a > 2);`
+	expect = strings.Index(sql, "from")
+	assert.EqualValues(t, expect, getFromIndex(sql))
+
+	sql = `select * FROM test where (select count(a) from test where a > 2);`
+	expect = strings.Index(sql, "FROM")
+	assert.EqualValues(t, expect, getFromIndex(sql))
 }
