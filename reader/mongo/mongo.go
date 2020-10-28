@@ -370,6 +370,19 @@ func (r *Reader) catQuery(c string, lastID interface{}, mgoSession *mgo.Session)
 	if lastID != nil {
 		query[r.offsetkey] = bson.M{"$gt": lastID}
 	}
+	for key, value := range query {
+		if key == DefaultOffsetKey {
+			if v, ok := value.(map[string]interface{}); ok {
+				for opt, val := range v {
+					if bson.IsObjectIdHex(val.(string)) {
+						v[opt] = bson.ObjectIdHex(val.(string))
+					}
+				}
+				query[key] = v
+			}
+			break
+		}
+	}
 	return mgoSession.DB(r.database).C(c).Find(query).Sort(r.offsetkey)
 }
 
