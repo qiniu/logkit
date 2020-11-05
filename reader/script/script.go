@@ -332,6 +332,11 @@ func CmdRunWithTimeout(scriptType string, params ...string) (CmdResult, bool) {
 		return CmdResult{err: err}, false
 	}
 	defer stdout.Close()
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return CmdResult{err: err}, false
+	}
+	defer stderr.Close()
 	if err := cmd.Start(); err != nil {
 		return CmdResult{err: err}, false
 	}
@@ -339,9 +344,15 @@ func CmdRunWithTimeout(scriptType string, params ...string) (CmdResult, bool) {
 	done := make(chan CmdResult)
 	go func() {
 		var errJoin string
-		content, stdOutErr := ioutil.ReadAll(stdout)
+		stdOutContent, stdOutErr := ioutil.ReadAll(stdout)
 		if stdOutErr != nil {
 			errJoin += stdOutErr.Error() + "\n"
+		}
+		stdErrContent, stdErrErr := ioutil.ReadAll(stderr)
+		if stdErrErr != nil {
+			errJoin += stdErrErr.Error() + "\n"
+		} else if stdErrContent != nil && len(stdErrContent) != 0 {
+			errJoin += string(stdErrContent) + "\n"
 		}
 		if cmdWaitErr := cmd.Wait(); cmdWaitErr != nil {
 			errJoin += cmdWaitErr.Error()
@@ -349,7 +360,7 @@ func CmdRunWithTimeout(scriptType string, params ...string) (CmdResult, bool) {
 		if errJoin != "" {
 			err = errors.New(errJoin)
 		}
-		done <- CmdResult{err: err, content: content}
+		done <- CmdResult{err: err, content: stdOutContent}
 		close(done)
 	}()
 
