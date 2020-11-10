@@ -62,9 +62,11 @@ func (g *Script) Init() error {
 	if g.storePath == "" {
 		g.storePath = g.ScriptPath
 	}
-	g.storePath, err = CheckPath(g.storePath)
-	if err != nil {
-		return err
+	if g.storePath != "" {
+		g.storePath, err = CheckPath(g.storePath)
+		if err != nil {
+			return err
+		}
 	}
 
 	// 获取 keys
