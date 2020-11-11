@@ -42,6 +42,11 @@ var RawDataTimeOut = 30 * time.Second
 
 // RawData 从 reader 模块中根据 type 获取多条字符串形式的样例日志
 func RawData(readerConfig conf.MapConf) ([]string, error) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Errorf("RawData panic: %v", rec)
+		}
+	}()
 	if readerConfig == nil {
 		return nil, errors.New("reader config cannot be empty")
 	}

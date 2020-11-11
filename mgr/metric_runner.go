@@ -245,6 +245,11 @@ func (mr *MetricRunner) Name() string {
 }
 
 func (r *MetricRunner) Run() {
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Errorf("Runner[%v] run panic: %v", r.RunnerName, rec)
+		}
+	}()
 	defer close(r.exitChan)
 	defer func() {
 		// recover when runner is stopped

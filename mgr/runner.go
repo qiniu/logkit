@@ -908,6 +908,11 @@ func (r *LogExportRunner) syncAndLog(batchlen, batchSize, sendDataLen int64) {
 }
 
 func (r *LogExportRunner) Run() {
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Errorf("Runner[%v] run panic: %v", r.RunnerName, rec)
+		}
+	}()
 	if r.SyncEvery == 0 {
 		r.SyncEvery = 1
 	}
