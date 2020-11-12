@@ -454,6 +454,13 @@ func (ar *ActiveReader) expired(expire time.Duration) bool {
 	if expire.Nanoseconds() == 0 {
 		return false
 	}
+
+	if lagInfo, err := ar.br.Lag(); err != nil {
+		log.Errorf("Runner[%s] <%s> get lagInfo error: %v", ar.runnerName, ar.originpath, err)
+		return true
+	} else if lagInfo.Size != 0 {
+		return false
+	}
 	if fi.ModTime().Add(expire).Before(time.Now()) && atomic.LoadInt32(&ar.inactive) > 0 {
 		return true
 	}
@@ -696,7 +703,15 @@ func (r *Reader) statLogPath() {
 		filear, ok := r.fileReaders[rp]
 		r.armapmux.Unlock()
 		if ok {
-			if IsFileModified(rp, r.statInterval, now) {
+			lagInfo, err := filear.br.Lag()
+			if err != nil {
+				log.Errorf("Runner[%s] <%s> get lagInfo error: %v", r.meta.RunnerName, rp, err)
+				continue
+			}
+			if IsFileModified(rp, r.statInterval, now) || lagInfo.Size != 0 {
+				if atomic.LoadInt32(&filear.status) == StatusRunning {
+					continue
+				}
 				filear.Start()
 			}
 			log.Debugf("Runner[%s] <%s> is collecting, ignore...", r.meta.RunnerName, rp)
