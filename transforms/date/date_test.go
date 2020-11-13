@@ -16,6 +16,9 @@ func TestTransformer(t *testing.T) {
 	nowstr := time.Now().Format("2006/01/02")
 	tm := time.Unix(1506049632, 0)
 	str3 := tm.Format("2006/01/02/03/04/05")
+	now := time.Now()
+	dayAfterNow := now.AddDate(0, 0, 1)
+	expDate := now.AddDate(-1, 0, 1)
 	tests := []struct {
 		Key          string
 		Offset       int
@@ -63,6 +66,14 @@ func TestTransformer(t *testing.T) {
 			Key:          "a.b",
 			data:         Data{"a": map[string]interface{}{"b": "2017/03/28 15:41:53 -0000"}},
 			exp:          Data{"a": map[string]interface{}{"b": "2017-03-28T15:41:53Z"}},
+		},
+		{
+			Offset:       0,
+			LayoutBefore: "",
+			LayoutAfter:  "",
+			Key:          k,
+			data:         Data{k: dayAfterNow.Unix()},
+			exp:          Data{k: time.Unix(expDate.Unix(), 0).Format(time.RFC3339Nano)},
 		},
 	}
 	for idx, ti := range tests {
