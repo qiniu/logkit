@@ -31,6 +31,8 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 
 	disableRecordErrData, _ := c.GetBoolOr(KeyDisableRecordErrData, false)
 	keepRawData, _ := c.GetBoolOr(KeyKeepRawData, false)
+	facilityDetail, _ := c.GetBoolOr(KeyFacilityDetail, false)
+	severityDetail, _ := c.GetBoolOr(KeySeverityDetail, false)
 
 	timeZoneOffsetRaw, _ := c.GetStringOr(KeyTimeZoneOffset, "")
 	timeZoneOffset := ParseTimeZoneOffset(timeZoneOffsetRaw)
@@ -51,6 +53,8 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		maxline:              maxline,
 		curline:              0,
 		keepRawData:          keepRawData,
+		facilityDetail:       facilityDetail,
+		severityDetail:       severityDetail,
 		timeZoneOffset:       timeZoneOffset,
 		needModefyTime:       needModefyTime,
 		parseYear:            parseYear,
@@ -70,6 +74,8 @@ type SyslogParser struct {
 	timeZoneOffset       int
 	needModefyTime       bool
 	parseYear            bool
+	facilityDetail       bool
+	severityDetail       bool
 
 	numRoutine int
 }
@@ -137,6 +143,18 @@ func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 			continue
 		}
 
+		if p.facilityDetail {
+			if v, ok := parseResult.Data[Facility]; ok {
+				code, _ := v.(int)
+				parseResult.Data[Facility] = syslog.MessageFacilities[code]
+			}
+		}
+		if p.severityDetail {
+			if v, ok := parseResult.Data[Severity]; ok {
+				code, _ := v.(int)
+				parseResult.Data[Severity] = syslog.MessageSeverities[code]
+			}
+		}
 		if parseResult.Err != nil {
 			se.AddErrors()
 			se.LastError = parseResult.Err.Error()

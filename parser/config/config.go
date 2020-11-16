@@ -54,9 +54,13 @@ const (
 
 // Constants for syslog
 const (
+	Facility                = "facility"
+	Severity                = "severity"
 	KeyRFCType              = "syslog_rfc"
 	KeySyslogMaxline        = "syslog_maxline"
 	KeyRFC3164ParseYear     = "rfc3164_parse_year"
+	KeyFacilityDetail       = "facility_detail"
+	KeySeverityDetail       = "severity_detail"
 	PandoraParseFlushSignal = "!@#pandora-EOF-line#@!"
 )
 
@@ -383,6 +387,28 @@ var ModeKeyOptions = map[string][]Option{
 			DefaultNoUse: false,
 			Description:  "最大读取行数(syslog_maxline)",
 			Advance:      true,
+		},
+		{
+			KeyName:       KeyFacilityDetail,
+			Element:       Radio,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"false", "true"},
+			Default:       "false",
+			DefaultNoUse:  false,
+			Description:   "展示facility字段详情信息",
+			ToolTip:       "是否展示facility字段详情信息",
+			Advance:       true,
+		},
+		{
+			KeyName:       KeySeverityDetail,
+			Element:       Radio,
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"false", "true"},
+			Default:       "false",
+			DefaultNoUse:  false,
+			Description:   "展示severity字段详情信息",
+			ToolTip:       "是否展示severity字段详情信息",
+			Advance:       true,
 		},
 		OptionParserName,
 		OptionLabels,
