@@ -472,7 +472,7 @@ func (r *MssqlReader) checkExit(idx int, db *sql.DB) (bool, int64) {
 	}
 	rawSQL := strings.TrimSuffix(strings.TrimSpace(r.syncSQLs[idx]), ";")
 	if !strings.Contains(rawSQL, "from") {
-		rawSQL = strings.ReplaceAll(rawSQL, "FROM", "from")
+		rawSQL = strings.Replace(rawSQL, "FROM", "from", -1)
 	}
 	rawSQLIdx := strings.Index(rawSQL, "from")
 	if rawSQLIdx < 0 {
@@ -480,7 +480,7 @@ func (r *MssqlReader) checkExit(idx int, db *sql.DB) (bool, int64) {
 	}
 	rawSQL = rawSQL[rawSQLIdx:]
 	if !strings.Contains(rawSQL, "where") {
-		rawSQL = strings.ReplaceAll(rawSQL, "WHERE", "where")
+		rawSQL = strings.Replace(rawSQL, "WHERE", "where", -1)
 	}
 	whereIdx := strings.LastIndex(rawSQL, "where ")
 	var tsql string
@@ -737,7 +737,7 @@ func (r *MssqlReader) getSQL(rawSql string, idx int) string {
 	r.muxOffsets.RLock()
 	defer r.muxOffsets.RUnlock()
 	if !strings.Contains(rawSQL, "where") {
-		rawSQL = strings.ReplaceAll(rawSQL, "WHERE", "where")
+		rawSQL = strings.Replace(rawSQL, "WHERE", "where", -1)
 	}
 	whereIdx := strings.LastIndex(rawSQL, "where ")
 	if len(r.offsetKey) > 0 && len(r.offsets) > idx {
