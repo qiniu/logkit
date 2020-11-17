@@ -31,6 +31,7 @@ const (
 	TypeLogfmt     = "logfmt"
 	TypeKeyValue   = "KV"
 	TypeLinuxAudit = "linuxaudit"
+	TypeQPlayerQos = "qplayerqos"
 )
 
 // 数据常量类型
