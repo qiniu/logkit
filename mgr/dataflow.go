@@ -185,6 +185,10 @@ func TransformData(transformerConfig map[string]interface{}) ([]Data, error) {
 		return nil, err
 	}
 
+	if transformer.Type() == "script" {
+		return nil, errors.New("该transformer暂不支持页面上预览")
+	}
+
 	// Transform data
 	transformedData, transErr := transformer.Transform(data)
 	se, ok := transErr.(*StatsError)
