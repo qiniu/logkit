@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -102,15 +103,15 @@ func Test_ScriptWithParams(t *testing.T) {
 }
 
 func TestCmdRunWithTimeout(t *testing.T) {
-	cmdResult, isTimeout := CmdRunWithTimeout("echo", "hello")
+	cmdResult, isTimeout := CmdRunWithTimeout("echo", 5*time.Second, "hello")
 	assert.Nil(t, cmdResult.err)
 	assert.False(t, isTimeout)
 	assert.EqualValues(t, "hello\n", string(cmdResult.content))
 
-	cmdResult, isTimeout = CmdRunWithTimeout("test")
+	cmdResult, isTimeout = CmdRunWithTimeout("test", 5*time.Second)
 	assert.NotNil(t, cmdResult.err)
 	assert.False(t, isTimeout)
 
-	cmdResult, _ = CmdRunWithTimeout("top")
+	cmdResult, _ = CmdRunWithTimeout("top", 5*time.Second)
 	assert.NotNil(t, cmdResult.err)
 }

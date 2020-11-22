@@ -124,6 +124,7 @@ const (
 
 	KeyScriptParams        = "script_params"
 	KeyScriptParamsSpliter = "script_params_spliter"
+	KeyScriptTimeout      = "script_timeout"
 	KeyScriptContent       = "script_content"
 	KeyExecInterpreter     = "script_exec_interprepter"
 	KeyScriptCron          = "script_cron"

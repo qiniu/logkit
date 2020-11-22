@@ -1363,6 +1363,16 @@ var ModeKeyOptions = map[string][]Option{
 			ToolTip:      `定时任务触发周期，直接写"loop"循环执行，crontab的写法，类似于* * * * * *，对应的是秒(0~59)，分(0~59)，时(0~23)，日(1~31)，月(1-12)，星期(0~6)，填*号表示所有遍历都执行`,
 		},
 		{
+			KeyName:      KeyScriptTimeout,
+			ChooseOnly:   false,
+			Default:      "5s",
+			Placeholder:  "5s",
+			DefaultNoUse: false,
+			Description:  "超时时间(script_timeout)",
+			Advance:      true,
+			ToolTip:      `脚本的执行超时时间，超过这个时间，脚本会被强制停止执行`,
+		},
+		{
 			KeyName:       KeyScriptExecOnStart,
 			Element:       Radio,
 			ChooseOnly:    true,
