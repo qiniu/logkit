@@ -26,7 +26,12 @@ var (
 	_ reader.Reader       = &Reader{}
 )
 
-var waitTime = time.Minute
+var (
+	waitTime       = time.Minute
+	defaultTimeout = "5s"
+	MinTimeout     = time.Duration(0)
+	MaxTimeout     = 10 * time.Minute
+)
 
 func init() {
 	reader.RegisterConstructor(ModeScript, NewReader)
@@ -62,6 +67,8 @@ type Reader struct {
 	loopDuration time.Duration
 	execOnStart  bool
 	Cron         *cron.Cron //定时任务
+
+	timeout time.Duration
 }
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
@@ -96,6 +103,14 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		commandArgs = append(commandArgs, content)
 	}
 
+	timeoutDurationStr, _ := conf.GetStringOr(KeyScriptTimeout, defaultTimeout)
+	timeoutDuration, err := time.ParseDuration(timeoutDurationStr)
+	if err != nil {
+		return nil, err
+	}
+	if timeoutDuration <= MinTimeout || timeoutDuration > MaxTimeout {
+		return nil, errors.New("key [script_timeout]'s value must less than 10m, bigger than 0s")
+	}
 	cronSchedule, _ := conf.GetStringOr(KeyScriptCron, "")
 	execOnStart, _ := conf.GetBoolOr(KeyScriptExecOnStart, true)
 	scriptType, _ := conf.GetStringOr(KeyExecInterpreter, "bash")
@@ -112,6 +127,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		commandArgs:   commandArgs,
 		execOnStart:   execOnStart,
 		Cron:          cron.New(),
+		timeout:       timeoutDuration,
 	}
 
 	// 定时任务配置串
@@ -312,7 +328,7 @@ func (r *Reader) run() {
 }
 
 func (r *Reader) exec() error {
-	cmdResult, _ := CmdRunWithTimeout(r.scripttype, r.commandArgs...)
+	cmdResult, _ := CmdRunWithTimeout(r.scripttype, r.timeout, r.commandArgs...)
 	if cmdResult.err != nil {
 		return cmdResult.err
 	}
@@ -325,7 +341,7 @@ type CmdResult struct {
 	err     error
 }
 
-func CmdRunWithTimeout(scriptType string, params ...string) (CmdResult, bool) {
+func CmdRunWithTimeout(scriptType string, timeout time.Duration, params ...string) (CmdResult, bool) {
 	cmd := exec.Command(scriptType, params...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -364,7 +380,6 @@ func CmdRunWithTimeout(scriptType string, params ...string) (CmdResult, bool) {
 		close(done)
 	}()
 
-	timeout := 5 * time.Second
 	select {
 	case <-time.After(timeout):
 		errJoin := fmt.Sprintf("process: %s %v timeout, be killed", scriptType, params)
