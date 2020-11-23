@@ -794,11 +794,21 @@ func ConvertDate(layoutBefore, layoutAfter string, offset int, loc *time.Locatio
 		s = int64(newv)
 	case string:
 		newv = strings.Replace(newv, ",", ".", -1)
+		flag := false
+		if len(newv) == 5 {
+			flag = true
+			newv = fmt.Sprintf("%d%s%s", time.Now().Year(), newv[2:3], newv)
+		}
 		if layoutBefore != "" {
 			layoutBefore = strings.Replace(layoutBefore, ",", ".", -1)
 			t, err := time.ParseInLocation(layoutBefore, newv, loc)
 			if err != nil {
 				return v, fmt.Errorf("can not parse %v with layout %v", newv, layoutBefore)
+			}
+			if flag {
+				if t.Sub(time.Now()) > 0 {
+					t = t.AddDate(-1, 0, 0)
+				}
 			}
 			return FormatWithUserOption(layoutAfter, offset, t), nil
 		}
@@ -806,6 +816,11 @@ func ConvertDate(layoutBefore, layoutAfter string, offset int, loc *time.Locatio
 		t, err := times.StrToTimeLocation(newv, loc)
 		if err != nil {
 			return v, err
+		}
+		if flag {
+			if t.Sub(time.Now()) > 0 {
+				t = t.AddDate(-1, 0, 0)
+			}
 		}
 		return FormatWithUserOption(layoutAfter, offset, t), nil
 	case json.Number:
@@ -837,9 +852,6 @@ func FormatWithUserOption(layoutAfter string, offset int, t time.Time) interface
 	t = t.Add(time.Duration(offset) * time.Hour)
 	if t.Year() == 0 {
 		t = t.AddDate(time.Now().Year(), 0, 0)
-		if t.Sub(time.Now()) > 0 {
-			t = t.AddDate(-1, 0, 0)
-		}
 	}
 	if layoutAfter != "" {
 		return t.Format(layoutAfter)
