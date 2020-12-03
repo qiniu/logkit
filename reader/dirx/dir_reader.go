@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -57,7 +58,7 @@ func (dr *dirReader) sendError(err error) {
 	}
 	defer func() {
 		if err := recover(); err != nil {
-			log.Errorf("Runner[%v] eader of log path %q has recovered from %v", dr.runnerName, dr.originalPath, err)
+			log.Errorf("Runner[%v] eader of log path %q has recovered from %v\nstack: %s", dr.runnerName, dr.originalPath, err, debug.Stack())
 		}
 	}()
 	if dr.isStopping() || dr.hasStopped() {

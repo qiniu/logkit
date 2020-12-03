@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -415,7 +416,7 @@ func (r *Reader) sendError(err error) {
 	}
 	defer func() {
 		if rec := recover(); rec != nil {
-			log.Errorf("runner[%v] Reader %q panic and was recovered from %v", r.meta.RunnerName, r.Name(), rec)
+			log.Errorf("runner[%v] Reader %q panic and was recovered from %v\nstack: %s", r.meta.RunnerName, r.Name(), rec, debug.Stack())
 		}
 	}()
 
@@ -428,7 +429,7 @@ func (r *Reader) sendError(err error) {
 func (r *Reader) sendReadChan(address string, value string) {
 	defer func() {
 		if rec := recover(); rec != nil {
-			log.Errorf("runner[%v] Reader %q panic and was recovered from %v", r.meta.RunnerName, r.Name(), rec)
+			log.Errorf("runner[%v] Reader %q panic and was recovered from %v\nstack: %s", r.meta.RunnerName, r.Name(), rec, debug.Stack())
 		}
 	}()
 	if atomic.LoadInt32(&r.status) == StatusStopped || atomic.LoadInt32(&r.status) == StatusStopping {

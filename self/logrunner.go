@@ -180,7 +180,7 @@ func NewLogRunnerWithService(rdConf, psConf, sdConf conf.MapConf,
 func (lr *LogRunner) Run() {
 	defer func() {
 		if rec := recover(); rec != nil {
-			log.Errorf("Runner[%v] run panic: %v", lr.Name(), rec)
+			log.Errorf("Runner[%v] run panic: %v\nstack: %s", lr.Name(), rec, debug.Stack())
 		}
 	}()
 	if dr, ok := lr.reader.(reader.DaemonReader); ok {

@@ -3,6 +3,7 @@ package sql
 import (
 	"database/sql"
 	"fmt"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -79,7 +80,7 @@ func GetInitScans(length int, rows *sql.Rows, schemas map[string]string, runnerN
 	}
 	defer func() {
 		if r := recover(); r != nil {
-			log.Error("Recovered in getInitScans", r)
+			log.Errorf("Recovered in getInitScans err: %v\nstack: %s", r, debug.Stack())
 			scanArgs = nochoice
 			return
 		}

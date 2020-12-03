@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -44,7 +45,7 @@ var RawDataTimeOut = 30 * time.Second
 func RawData(readerConfig conf.MapConf) ([]string, error) {
 	defer func() {
 		if rec := recover(); rec != nil {
-			log.Errorf("RawData panic: %v", rec)
+			log.Errorf("recover when exec RawData\npanic: %v\nstack: %s", rec, debug.Stack())
 		}
 	}()
 	if readerConfig == nil {
