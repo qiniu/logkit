@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -460,7 +461,7 @@ func (r *MssqlReader) sendError(err error) {
 	}
 	defer func() {
 		if rec := recover(); rec != nil {
-			log.Errorf("Reader %q was panicked and recovered from %v", r.Name(), rec)
+			log.Errorf("Reader %q was panicked and recovered from %v\nstack: %s", r.Name(), rec, debug.Stack())
 		}
 	}()
 	r.errChan <- err

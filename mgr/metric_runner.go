@@ -247,7 +247,7 @@ func (mr *MetricRunner) Name() string {
 func (r *MetricRunner) Run() {
 	defer func() {
 		if rec := recover(); rec != nil {
-			log.Errorf("Runner[%v] run panic: %v", r.RunnerName, rec)
+			log.Errorf("Runner[%v] recover when run metric runner\npanic: %v\nstack: %s", r.RunnerName, rec, debug.Stack())
 		}
 	}()
 	defer close(r.exitChan)

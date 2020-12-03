@@ -910,7 +910,7 @@ func (r *LogExportRunner) syncAndLog(batchlen, batchSize, sendDataLen int64) {
 func (r *LogExportRunner) Run() {
 	defer func() {
 		if rec := recover(); rec != nil {
-			log.Errorf("Runner[%v] run panic: %v", r.RunnerName, rec)
+			log.Errorf("Runner[%v] recover when run log export runner\npanic: %v\nstack: %s", r.RunnerName, rec, debug.Stack())
 		}
 	}()
 	if r.SyncEvery == 0 {
@@ -1129,6 +1129,11 @@ func addEncodeToData(datas []Data, encodeTag, encode, runnerName string) {
 // 先停Reader，不再读取，然后停Run函数，让读取的都转到发送，最后停Sender结束整个过程。
 // Parser 无状态，无需stop。
 func (r *LogExportRunner) Stop() {
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Errorf("recover when stop log export runner\npanic: %v\nstack: %s", rec, debug.Stack())
+		}
+	}()
 	log.Infof("Runner[%v] wait for reader %v to stop", r.Name(), r.reader.Name())
 	err := r.reader.Close()
 	if err != nil {
