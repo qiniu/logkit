@@ -2,6 +2,7 @@ package curl
 
 import (
 	"bytes"
+	"crypto/tls"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -134,6 +135,7 @@ func (s *HttpStats) Collect() (datas []map[string]interface{}, err error) {
 					Deadline:  time.Now().Add(DefaultTimeOut),
 					KeepAlive: DefaultTimeOut,
 				}).Dial,
+				TLSClientConfig: &tls.Config{},
 			},
 		}
 		resp, err := client.Do(request) //发送请求
