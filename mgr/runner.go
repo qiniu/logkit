@@ -112,8 +112,8 @@ type LogExportRunner struct {
 }
 
 // NewRunner 创建Runner
-func NewRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal) (runner Runner, err error) {
-	return NewLogExportRunner(rc, nil, cleanChan, reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
+func NewRunner(rc RunnerConfig, wg *sync.WaitGroup, cleanChan chan<- cleaner.CleanSignal) (runner Runner, err error) {
+	return NewLogExportRunner(rc, wg, cleanChan, reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
 }
 
 func NewCustomRunner(rc RunnerConfig, wg *sync.WaitGroup, cleanChan chan<- cleaner.CleanSignal, rr *reader.Registry, pr *parser.Registry, sr *sender.Registry) (runner Runner, err error) {
@@ -133,9 +133,9 @@ func NewCustomRunner(rc RunnerConfig, wg *sync.WaitGroup, cleanChan chan<- clean
 	return NewLogExportRunner(rc, wg, cleanChan, rr, pr, sr)
 }
 
-func NewRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.Parser, transformers []transforms.Transformer,
+func NewRunnerWithService(info RunnerInfo, wg *sync.WaitGroup, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.Parser, transformers []transforms.Transformer,
 	senders []sender.Sender, router *router.Router, meta *reader.Meta) (runner Runner, err error) {
-	return NewLogExportRunnerWithService(info, nil, reader, cleaner, parser, transformers, senders, router, meta)
+	return NewLogExportRunnerWithService(info, wg, reader, cleaner, parser, transformers, senders, router, meta)
 }
 
 func NewLogExportRunnerWithService(info RunnerInfo, wg *sync.WaitGroup, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.Parser,
