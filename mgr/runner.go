@@ -85,6 +85,7 @@ type LogExportRunner struct {
 	RunnerInfo
 
 	stopped      int32
+	startedWG    *sync.WaitGroup
 	exitChan     chan struct{}
 	reader       reader.Reader
 	cleaner      *cleaner.Cleaner
@@ -112,10 +113,10 @@ type LogExportRunner struct {
 
 // NewRunner 创建Runner
 func NewRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal) (runner Runner, err error) {
-	return NewLogExportRunner(rc, cleanChan, reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
+	return NewLogExportRunner(rc, nil, cleanChan, reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
 }
 
-func NewCustomRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *reader.Registry, pr *parser.Registry, sr *sender.Registry) (runner Runner, err error) {
+func NewCustomRunner(rc RunnerConfig, wg *sync.WaitGroup, cleanChan chan<- cleaner.CleanSignal, rr *reader.Registry, pr *parser.Registry, sr *sender.Registry) (runner Runner, err error) {
 	if rr == nil {
 		rr = reader.NewRegistry()
 	}
@@ -127,17 +128,17 @@ func NewCustomRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *
 	}
 
 	if rc.MetricConfig != nil {
-		return NewMetricRunner(rc, sr)
+		return NewMetricRunner(rc, wg, sr)
 	}
-	return NewLogExportRunner(rc, cleanChan, rr, pr, sr)
+	return NewLogExportRunner(rc, wg, cleanChan, rr, pr, sr)
 }
 
 func NewRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.Parser, transformers []transforms.Transformer,
 	senders []sender.Sender, router *router.Router, meta *reader.Meta) (runner Runner, err error) {
-	return NewLogExportRunnerWithService(info, reader, cleaner, parser, transformers, senders, router, meta)
+	return NewLogExportRunnerWithService(info, nil, reader, cleaner, parser, transformers, senders, router, meta)
 }
 
-func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.Parser,
+func NewLogExportRunnerWithService(info RunnerInfo, wg *sync.WaitGroup, reader reader.Reader, cleaner *cleaner.Cleaner, parser parser.Parser,
 	transformers []transforms.Transformer, senders []sender.Sender, router *router.Router, meta *reader.Meta) (runner *LogExportRunner, err error) {
 	if info.MaxBatchSize <= 0 {
 		info.MaxBatchSize = DefaultMaxBatchSize
@@ -152,6 +153,7 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 		RunnerInfo: info,
 		exitChan:   make(chan struct{}),
 		lastSend:   time.Now(), // 上一次发送时间
+		startedWG:  wg,
 		rs: &RunnerStatus{
 			SenderStats:    make(map[string]StatsInfo),
 			TransformStats: make(map[string]StatsInfo),
@@ -205,7 +207,7 @@ func NewLogExportRunnerWithService(info RunnerInfo, reader reader.Reader, cleane
 	return runner, nil
 }
 
-func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, rr *reader.Registry, pr *parser.Registry, sr *sender.Registry) (runner *LogExportRunner, err error) {
+func NewLogExportRunner(rc RunnerConfig, wg *sync.WaitGroup, cleanChan chan<- cleaner.CleanSignal, rr *reader.Registry, pr *parser.Registry, sr *sender.Registry) (runner *LogExportRunner, err error) {
 	runnerInfo := rc.RunnerInfo
 	if rc.ReaderConfig == nil {
 		return nil, errors.New(rc.RunnerName + " reader in config is nil")
@@ -358,7 +360,7 @@ func NewLogExportRunner(rc RunnerConfig, cleanChan chan<- cleaner.CleanSignal, r
 	if err != nil {
 		return nil, fmt.Errorf("runner %v add sender router error, %v", rc.RunnerName, err)
 	}
-	runner, err = NewLogExportRunnerWithService(runnerInfo, rd, cl, ps, transformers, senders, router, meta)
+	runner, err = NewLogExportRunnerWithService(runnerInfo, wg, rd, cl, ps, transformers, senders, router, meta)
 	if err != nil {
 		return runner, err
 	}
@@ -624,12 +626,12 @@ func getSampleContent(line string, maxBatchSize int) string {
 
 func (r *LogExportRunner) readDatas(dr reader.DataReader, dataSourceTag string) []Data {
 	var (
-		datas     []Data
-		err       error
-		bytes     int64
-		data      Data
+		datas      []Data
+		err        error
+		bytes      int64
+		data       Data
 		curTimeStr string
-		encodeTag = r.meta.GetEncodeTag()
+		encodeTag  = r.meta.GetEncodeTag()
 	)
 	for !utils.BatchFullOrTimeout(r.RunnerName, &r.stopped, r.batchLen, r.batchSize, r.lastSend,
 		r.MaxBatchLen, r.MaxBatchSize, r.MaxBatchInterval) {
@@ -935,6 +937,9 @@ func (r *LogExportRunner) Run() {
 		}
 	}()
 
+	if r.startedWG != nil {
+		r.startedWG.Done()
+	}
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
 			log.Debugf("Runner[%v] exited from run", r.Name())
