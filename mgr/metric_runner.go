@@ -51,6 +51,7 @@ type MetricRunner struct {
 	isBlock    bool
 	envTag     string
 
+	startedWG    *sync.WaitGroup
 	collectors   []metric.Collector
 	senders      []sender.Sender
 	transformers map[string][]transforms.Transformer
@@ -73,7 +74,7 @@ func NewMetric(tp string) (metric.Collector, error) {
 	return nil, fmt.Errorf("metric <%v> is not support now", tp)
 }
 
-func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner, err error) {
+func NewMetricRunner(rc RunnerConfig, wg *sync.WaitGroup, sr *sender.Registry) (runner *MetricRunner, err error) {
 	if rc.CollectInterval <= 0 {
 		rc.CollectInterval = defaultCollectInterval
 	}
@@ -213,6 +214,7 @@ func NewMetricRunner(rc RunnerConfig, sr *sender.Registry) (runner *MetricRunner
 		exitChan:   make(chan struct{}),
 		lastSend:   time.Now(), // 上一次发送时间
 		meta:       meta,
+		startedWG:  wg,
 		rs: &RunnerStatus{
 			ReaderStats:   StatsInfo{},
 			SenderStats:   make(map[string]StatsInfo),
@@ -276,6 +278,9 @@ func (r *MetricRunner) Run() {
 
 	backoff := utils.NewBackoff(2, 3, 10*time.Second, time.Minute)
 
+	if r.startedWG != nil {
+		r.startedWG.Done()
+	}
 	for {
 		if atomic.LoadInt32(&r.stopped) > 0 {
 			log.Debugf("runner %v exited from run", r.RunnerName)

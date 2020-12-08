@@ -344,6 +344,7 @@ func (m *Manager) ForkRunner(confPath string, config RunnerConfig, returnOnErr b
 	var err error
 	i := 0
 	config.AuditChan = m.auditChan
+	runnerStartedWG := &sync.WaitGroup{}
 	for {
 		if m.IsRunning(confPath) {
 			err = fmt.Errorf("%s already added - ", confPath)
@@ -372,7 +373,7 @@ func (m *Manager) ForkRunner(confPath string, config RunnerConfig, returnOnErr b
 			config.SendersConfig[k][senderConf.InnerUserAgent] = "logkit/" + m.Version + " " + m.SystemInfo + " " + webornot
 		}
 
-		if runner, err = NewCustomRunner(config, m.cleanChan, m.rregistry, m.pregistry, m.sregistry); err != nil {
+		if runner, err = NewCustomRunner(config, runnerStartedWG, m.cleanChan, m.rregistry, m.pregistry, m.sregistry); err != nil {
 			errVal, ok := err.(*os.PathError)
 			if !ok {
 				err = fmt.Errorf("NewRunner(%v) failed: %v", config.RunnerName, err)
@@ -409,7 +410,9 @@ func (m *Manager) ForkRunner(confPath string, config RunnerConfig, returnOnErr b
 
 	m.addCleanQueue(runner.Cleaner())
 	log.Infof("Runner[%v] added: %#v", config.RunnerName, confPath)
+	runnerStartedWG.Add(1)
 	go runner.Run()
+	runnerStartedWG.Wait()
 	m.runners[confPath] = runner
 	if !exist {
 		m.runnerPaths[config.RunnerName] = confPath

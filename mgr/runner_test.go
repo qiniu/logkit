@@ -164,26 +164,26 @@ func Test_Run(t *testing.T) {
 	}
 	senders = append(senders, s)
 
-	_, err = NewRunnerWithService(rinfo, r, c, pparser, nil, senders, nil, meta)
+	_, err = NewRunnerWithService(rinfo, nil, r, c, pparser, nil, senders, nil, meta)
 	assert.Nil(t, err)
 
-	_, err = NewLogExportRunnerWithService(rinfo, nil, c, pparser, nil, senders, nil, meta)
+	_, err = NewLogExportRunnerWithService(rinfo, nil, nil, c, pparser, nil, senders, nil, meta)
 	assert.NotNil(t, err)
 	assert.EqualValues(t, "reader can not be nil", err.Error())
 
-	_, err = NewLogExportRunnerWithService(rinfo, r, c, nil, nil, senders, nil, meta)
+	_, err = NewLogExportRunnerWithService(rinfo, nil, r, c, nil, nil, senders, nil, meta)
 	assert.NotNil(t, err)
 	assert.EqualValues(t, "parser can not be nil", err.Error())
 
-	_, err = NewLogExportRunnerWithService(rinfo, r, c, pparser, nil, senders, nil, nil)
+	_, err = NewLogExportRunnerWithService(rinfo, nil, r, c, pparser, nil, senders, nil, nil)
 	assert.NotNil(t, err)
 	assert.EqualValues(t, "meta can not be nil", err.Error())
 
-	_, err = NewLogExportRunnerWithService(rinfo, r, c, pparser, nil, nil, nil, meta)
+	_, err = NewLogExportRunnerWithService(rinfo, nil, r, c, pparser, nil, nil, nil, meta)
 	assert.NotNil(t, err)
 	assert.EqualValues(t, "senders can not be nil", err.Error())
 
-	runner, err := NewLogExportRunnerWithService(rinfo, r, c, pparser, nil, senders, nil, meta)
+	runner, err := NewLogExportRunnerWithService(rinfo, nil, r, c, pparser, nil, senders, nil, meta)
 	assert.Nil(t, err)
 
 	cleanInfo := CleanInfo{
@@ -334,7 +334,7 @@ func Test_RunForEnvTag(t *testing.T) {
 	}
 	senders = append(senders, s)
 
-	r, err := NewLogExportRunnerWithService(rinfo, reader, cleaner, pparser, nil, senders, nil, meta)
+	r, err := NewLogExportRunnerWithService(rinfo, nil, reader, cleaner, pparser, nil, senders, nil, meta)
 	if err != nil {
 		t.Error(err)
 	}
@@ -486,7 +486,7 @@ func Test_RunForErrData(t *testing.T) {
 	}
 	senders = append(senders, s)
 
-	r, err := NewLogExportRunnerWithService(rinfo, reader, cleaner, pparser, nil, senders, nil, meta)
+	r, err := NewLogExportRunnerWithService(rinfo, nil, reader, cleaner, pparser, nil, senders, nil, meta)
 	if err != nil {
 		t.Error(err)
 	}
@@ -698,7 +698,7 @@ func Test_QiniulogRun(t *testing.T) {
 	}
 	senders = append(senders, s)
 
-	runner, err := NewLogExportRunnerWithService(rinfo, r, nil, pparser, nil, senders, nil, meta)
+	runner, err := NewLogExportRunnerWithService(rinfo, nil, r, nil, pparser, nil, senders, nil, meta)
 	if err != nil {
 		t.Error(err)
 	}
@@ -1140,7 +1140,7 @@ func TestSyslogRunnerX(t *testing.T) {
 	rc := RunnerConfig{}
 	err := jsoniter.Unmarshal([]byte(config), &rc)
 	assert.NoError(t, err)
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
+	rr, err := NewCustomRunner(rc, nil, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
 	assert.NoError(t, err)
 	go rr.Run()
 	time.Sleep(1 * time.Second)
@@ -1368,10 +1368,10 @@ func TestAddDatasourceForRawData(t *testing.T) {
 	err := jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
 
-	_, err = NewCustomRunner(rc, make(chan cleaner.CleanSignal), nil, nil, nil)
+	_, err = NewCustomRunner(rc, nil, make(chan cleaner.CleanSignal), nil, nil, nil)
 	assert.Nil(t, err)
 
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
+	rr, err := NewCustomRunner(rc, nil, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
 	assert.Nil(t, err)
 	go rr.Run()
 
@@ -1465,7 +1465,7 @@ func TestAddDatatags(t *testing.T) {
 	err = jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
 
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
+	rr, err := NewCustomRunner(rc, nil, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
 	assert.NoError(t, err)
 	go rr.Run()
 
@@ -1535,7 +1535,7 @@ func TestRunWithExtra(t *testing.T) {
 	err = jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
 
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
+	rr, err := NewCustomRunner(rc, nil, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
 	assert.NoError(t, err)
 	go rr.Run()
 
@@ -1591,7 +1591,7 @@ func TestRunWithDataSource(t *testing.T) {
 	rc := RunnerConfig{}
 	err = jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
+	rr, err := NewCustomRunner(rc, nil, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
 	assert.NoError(t, err)
 	assert.NotNil(t, rr)
 	go rr.Run()
@@ -1666,7 +1666,7 @@ func TestRunWithDataSourceFail(t *testing.T) {
 	rc := RunnerConfig{}
 	err = jsoniter.Unmarshal([]byte(config1), &rc)
 	assert.NoError(t, err)
-	rr, err := NewCustomRunner(rc, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
+	rr, err := NewCustomRunner(rc, nil, make(chan cleaner.CleanSignal), reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
 	assert.NoError(t, err)
 	assert.NotNil(t, rr)
 	go rr.Run()
@@ -2069,9 +2069,9 @@ func TestTailxCleaner(t *testing.T) {
 	rc := RunnerConfig{}
 	assert.NoError(t, jsoniter.Unmarshal([]byte(config), &rc))
 	cleanChan := make(chan cleaner.CleanSignal)
-	_, err = NewRunner(rc, cleanChan)
+	_, err = NewRunner(rc, nil, cleanChan)
 	assert.Nil(t, err)
-	rr, err := NewLogExportRunner(rc, cleanChan, reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
+	rr, err := NewLogExportRunner(rc, nil, cleanChan, reader.NewRegistry(), parser.NewRegistry(), sender.NewRegistry())
 	assert.Nil(t, err)
 	assert.NotNil(t, rr)
 	go rr.Run()
