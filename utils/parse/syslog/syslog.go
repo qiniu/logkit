@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jeromer/syslogparser"
-	"github.com/jeromer/syslogparser/rfc3164"
-	"github.com/jeromer/syslogparser/rfc5424"
+	"github.com/influxdata/go-syslog"
+	"github.com/influxdata/go-syslog/rfc3164"
+	"github.com/influxdata/go-syslog/rfc5424"
 )
 
 const (
@@ -16,6 +16,12 @@ const (
 	DetectedRFC5424 = iota
 	DetectedRFC6587 = iota
 	DetectedLeftLog = iota
+)
+
+const (
+	TypeRFC3164 = "rfc3164"
+	TypeRFC5424 = "rfc5424"
+	TypeRFC6587 = "rfc6587"
 )
 
 var MessageFacilities = map[int]string{
@@ -56,13 +62,11 @@ var MessageSeverities = map[int]string{
 	7: "Debug: debug-level messages",
 }
 
-type LogParts map[string]interface{}
-
 type Parser interface {
-	Parse() error
-	Dump() LogParts
-	Location(*time.Location)
+	Parse(input []byte) (syslog.LogParts, error)
 	NeedModifyTime() bool
+	WithBestEffort()
+	HasBestEffort() bool
 }
 
 type Format interface {
@@ -71,12 +75,20 @@ type Format interface {
 }
 
 type parserWrapper struct {
-	syslogparser.LogParser
+	syslog.Machine
+	Typ string
 	bool
 }
 
-func (w *parserWrapper) Dump() LogParts {
-	return LogParts(w.LogParser.Dump())
+// 保持之前的行为，rfc3164解析失败会返回默认值，rfc5424/rfc6587不会
+func (w *parserWrapper) HasBestEffort() bool {
+	switch w.Typ {
+	case TypeRFC5424, TypeRFC6587:
+		return false
+	case TypeRFC3164:
+		return true
+	}
+	return false
 }
 
 func (w *parserWrapper) NeedModifyTime() bool {
@@ -119,11 +131,11 @@ func DetectType(data []byte) (detected int) {
 
 func GetFormat(format string, parseYear bool) Format {
 	switch strings.ToLower(format) {
-	case "rfc3164":
+	case TypeRFC3164:
 		return &RFC3164{parseYear}
-	case "rfc5424":
+	case TypeRFC5424:
 		return &RFC5424{}
-	case "rfc6587":
+	case TypeRFC6587:
 		return &RFC6587{}
 	}
 	return &Automatic{parseYear}
@@ -132,7 +144,7 @@ func GetFormat(format string, parseYear bool) Format {
 type RFC6587 struct{}
 
 func (f *RFC6587) GetParser(line []byte) Parser {
-	return &parserWrapper{rfc5424.NewParser(line), false}
+	return &parserWrapper{rfc5424.NewParser(), TypeRFC6587, false}
 }
 
 func (f *RFC6587) IsNewLine(data []byte) bool {
@@ -154,7 +166,7 @@ func (f *RFC6587) IsNewLine(data []byte) bool {
 type RFC5424 struct{}
 
 func (f *RFC5424) GetParser(line []byte) Parser {
-	return &parserWrapper{rfc5424.NewParser(line), false}
+	return &parserWrapper{rfc5424.NewParser(), TypeRFC5424, false}
 }
 
 func (f *RFC5424) IsNewLine(data []byte) bool {
@@ -183,7 +195,19 @@ type RFC3164 struct {
 }
 
 func (f *RFC3164) GetParser(line []byte) Parser {
-	return &parserWrapper{rfc3164.NewParser(line, f.parseYear), true}
+	return &parserWrapper{rfc3164.NewParser(f.WithOption(), rfc3164.WithBestEffort()), TypeRFC3164, true}
+}
+
+func (f *RFC3164) WithOption() syslog.MachineOption {
+	if f.parseYear {
+		return rfc3164.WithParseYear()
+	} else {
+		return rfc3164.WithYear(f)
+	}
+}
+
+func (f *RFC3164) Apply() int {
+	return time.Now().Year()
 }
 
 func (f *RFC3164) IsNewLine(data []byte) bool {
@@ -209,13 +233,17 @@ type Automatic struct {
 func (f *Automatic) GetParser(line []byte) Parser {
 	switch format := DetectType(line); format {
 	case DetectedRFC3164:
-		return &parserWrapper{rfc3164.NewParser(line, f.parseYear), true}
+		fpas := &RFC3164{f.parseYear}
+		return fpas.GetParser(line)
 	case DetectedRFC5424:
-		return &parserWrapper{rfc5424.NewParser(line), false}
+		fpas := &RFC5424{}
+		return fpas.GetParser(line)
 	case DetectedRFC6587:
-		return &parserWrapper{rfc5424.NewParser(line), false}
+		fpas := &RFC5424{}
+		return fpas.GetParser(line)
 	default:
-		return &parserWrapper{rfc3164.NewParser(line, f.parseYear), false}
+		fpas := &RFC3164{f.parseYear}
+		return fpas.GetParser(line)
 	}
 }
 
