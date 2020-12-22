@@ -120,6 +120,7 @@ func NewActiveReader(originPath, realPath, whence, inode string, r *Reader) (ar 
 	}
 	subMeta.SetEncodingWay(r.meta.GetEncodingWay())
 	subMeta.Readlimit = r.meta.Readlimit
+	subMeta.Delimiter = r.meta.Delimiter
 	isNewFile := r.meta.IsStatisticFileExist() || r.notFirstTime //是否为存量文件
 	if isNewFile && subMeta.IsNotExist() {
 		whence = WhenceOldest // 非存量文件第一次读取时从头开始读
