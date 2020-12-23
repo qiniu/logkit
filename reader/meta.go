@@ -71,6 +71,7 @@ type Meta struct {
 	TagFile           string                 //记录tag文件路径的标签名称
 	tags              map[string]interface{} //记录tag文件内容
 	Readlimit         int                    //读取磁盘限速单位 MB/s
+	Delimiter         string                 //文件换行符
 	statisticPath     string                 // 记录 runner 计数信息
 	ftSaveLogPath     string                 // 记录 ft_sender 日志信息
 	RunnerName        string
@@ -175,6 +176,12 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 	filedonepath, _ := conf.GetStringOr(KeyFileDone, metaPath)
 	donefileRetention, _ := conf.GetIntOr(doneFileRetention, DefautFileRetention)
 	readlimit, _ := conf.GetIntOr(KeyReadIOLimit, defaultIOLimit)
+	delim, _ := conf.GetStringOr(KeyDelimiter, "")
+	delimiter, err := strconv.Unquote(delim)
+	if err != nil {
+		log.Warnf("Runner[%v] %s - unquote key %s failed, will use [%v] as value, err:%v", runnerName, metaPath, KeyDelimiter, delim, err)
+		delimiter = delim
+	}
 	meta, err = NewMeta(metaPath, filedonepath, logPath, mode, tagFile, donefileRetention)
 	if err != nil {
 		log.Warnf("Runner[%v] %s - newMeta failed, err:%v", runnerName, metaPath, err)
@@ -193,6 +200,7 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 	meta.dataSourceTag = datasourceTag
 	meta.encodeTag = encodeTag
 	meta.Readlimit = readlimit * 1024 * 1024 //readlimit*MB
+	meta.Delimiter = delimiter
 	meta.RunnerName = runnerName
 	return
 }

@@ -148,6 +148,9 @@ func NewReaderSize(rd reader.FileReader, meta *reader.Meta, size int, maxLineLen
 	r.Meta = meta
 	encodingWay := r.Meta.GetEncodingWay()
 	r.delim = getDelimByEncodingWay(encodingWay)
+	if r.Meta.Delimiter != "" {
+		r.delim = []byte(r.Meta.Delimiter)
+	}
 	if encodingWay != "" && encodingWay != DefaultEncodingWay {
 		r.decoder = mahonia.NewDecoder(r.Meta.GetEncodingWay())
 		if r.decoder == nil {
