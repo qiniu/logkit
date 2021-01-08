@@ -2,6 +2,8 @@ package mutate
 
 import (
 	"fmt"
+	"github.com/qiniu/log"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"unicode"
@@ -98,6 +100,11 @@ func NewDecoder(line string) *Decoder {
 }
 
 func (d *Decoder) ScanValue(sep string) bool {
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Errorf("recover when exec ScanValue\nline: %v\npanic: %v\nstack: %s", d.line, rec, debug.Stack())
+		}
+	}()
 	if len(d.line) == 0 {
 		return false
 	}
