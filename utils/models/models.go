@@ -66,7 +66,7 @@ const (
 
 	DefaultMaxBatchSize = 2 * MB
 
-	DefaultSplitSize  = 128 * KB // 默认分割为 64 kb
+	DefaultSplitSize = 128 * KB // 默认分割为 64 kb
 
 	DefaultSendIntervalSeconds = 60
 

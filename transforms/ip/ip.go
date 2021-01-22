@@ -247,6 +247,7 @@ func (*Transformer) ConfigOptions() []Option {
 			Required:     true,
 			Placeholder:  "my_field_keyname",
 			DefaultNoUse: true,
+			CheckRegex:   CheckPatternKey,
 			Description:  "要进行Transform变化的键(key)",
 			ToolTip:      "对该字段的值进行transform变换, 服务端运行不支持嵌套(.)，请先使用rename，本地运行支持",
 			Type:         transforms.TransformTypeString,
