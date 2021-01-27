@@ -149,6 +149,8 @@ func Test_Parser(t *testing.T) {
 
 	// 增加测试 没有schema的情况
 	c[KeyCSVSchema] = ""
+	c[KeyCSVLazyQuotes] = "true"
+
 	p, err = NewParser(c)
 	if err != nil {
 		t.Error(err)
@@ -170,7 +172,7 @@ func Test_Parser(t *testing.T) {
 	datas, err = p.Parse(lines)
 	assert.Nil(t, err)
 	assert.EqualValues(t, expectData, datas)
-
+	delete(c, KeyCSVLazyQuotes)
 	// 2. 没有数据
 	p, err = NewParser(c)
 	lines = []string{""}
@@ -316,6 +318,25 @@ func Test_Parser(t *testing.T) {
 		{
 			"name":  "li",
 			"age":   "21",
+			"pos":   "3.14",
+			"split": "test",
+		},
+	}
+	datas, err = p.Parse(lines)
+	assert.Nil(t, err)
+	assert.EqualValues(t, expectData, datas)
+
+	// 10.有双引号存在
+	c[KeyCSVSchema] = ""
+	p, err = NewParser(c)
+	lines = []string{
+		"name age split pos",
+		`li "21 21" test 3.14`,
+	}
+	expectData = []Data{
+		{
+			"name":  "li",
+			"age":   "21 21",
 			"pos":   "3.14",
 			"split": "test",
 		},
