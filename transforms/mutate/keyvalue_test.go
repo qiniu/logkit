@@ -93,7 +93,7 @@ func TestKV_Transform(t *testing.T) {
 		},
 		{
 			line:       []Data{{"raw": `foo="" bar=`}},
-			expectData: []Data{{"raw": Data{"foo":"","bar":""}}},
+			expectData: []Data{{"raw": Data{"foo": "", "bar": ""}}},
 			expectErr:  nil,
 			splitter:   "=",
 			new:        "raw",
@@ -107,7 +107,7 @@ func TestKV_Transform(t *testing.T) {
 		},
 		{
 			line:       []Data{{"raw": `"foo=" bar=abc`}},
-			expectData: []Data{{"raw": Data{"foo":"","bar":"abc"}}},
+			expectData: []Data{{"raw": Data{"\"foo=\" bar": "abc"}}},
 			expectErr:  nil,
 			splitter:   "=",
 			new:        "raw",
@@ -245,7 +245,7 @@ func Test_kvTransform(t *testing.T) {
 				splitter:   "=",
 				keepString: true,
 			},
-			want:    Data{"foo":"","bar":"\""},
+			want:    Data{"foo": "", "bar": "\""},
 			wantErr: false,
 		},
 		{
@@ -268,7 +268,7 @@ func Test_kvTransform(t *testing.T) {
 				splitter:   "=",
 				keepString: true,
 			},
-			want:    Data{"foo":"","bar":"abc"},
+			want:    Data{"\"foo=\" bar": "abc"},
 			wantErr: false,
 		},
 		{
