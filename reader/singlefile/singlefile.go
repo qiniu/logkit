@@ -269,6 +269,7 @@ func (sf *SingleFile) Reopen() (err error) {
 	if err != nil {
 		return
 	}
+	doneFileOffset := sf.offset
 
 	if newInode == oldInode {
 		return
@@ -277,7 +278,7 @@ func (sf *SingleFile) Reopen() (err error) {
 	sf.f = nil
 	detectStr := sf.detectMovedName(oldInode)
 	if detectStr != "" {
-		if derr := sf.meta.AppendDoneFileInode(detectStr, oldInode); derr != nil {
+		if derr := sf.meta.AppendDoneFileInode(detectStr, oldInode, doneFileOffset); derr != nil {
 			if !IsSelfRunner(sf.meta.RunnerName) {
 				log.Errorf("Runner[%v] AppendDoneFile %v error %v", sf.meta.RunnerName, detectStr, derr)
 			} else {

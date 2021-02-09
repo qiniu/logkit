@@ -227,9 +227,9 @@ func Test_GetLogFiles2(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	meta.AppendDoneFileInode(log1, 123)
-	meta.AppendDoneFileInode(log2, 234)
-	meta.AppendDoneFileInode(log3, 456)
+	meta.AppendDoneFileInode(log1, 123, -1)
+	meta.AppendDoneFileInode(log2, 234, -1)
+	meta.AppendDoneFileInode(log3, 456, -1)
 
 	files := GetLogFiles(meta.DoneFile())
 	exps := []string{"log2", "log1"}

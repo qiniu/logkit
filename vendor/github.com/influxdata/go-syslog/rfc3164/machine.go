@@ -870,6 +870,10 @@ func (m *machine) Parse(input []byte) (syslog.LogParts, error) {
 			goto stCase332
 		case 373:
 			goto stCase373
+		case 374:
+			goto stCase374
+		case 375:
+			goto stCase375
 		}
 		goto stOut
 	stCase1:
@@ -1058,11 +1062,34 @@ func (m *machine) Parse(input []byte) (syslog.LogParts, error) {
 		switch (m.data)[(m.p)] {
 		case 32:
 			goto st9
+		case 48:
+			goto st374
 		case 51:
 			goto st283
 		}
 		if 49 <= (m.data)[(m.p)] && (m.data)[(m.p)] <= 50 {
 			goto st282
+		}
+		if 51 <= (m.data)[(m.p)] && (m.data)[(m.p)] <= 57 {
+			goto st375
+		}
+		goto tr7
+	st374:
+		if (m.p)++; (m.p) >= (m.pe) {
+			goto _testEof282
+		}
+	stCase374:
+		if 49 <= (m.data)[(m.p)] && (m.data)[(m.p)] <= 57 {
+			goto st10
+		}
+		goto tr7
+	st375:
+		if (m.p)++; (m.p) >= (m.pe) {
+			goto _testEof282
+		}
+	stCase375:
+		if (m.data)[(m.p)] == 32 {
+			goto st11
 		}
 		goto tr7
 	st9:
@@ -1070,7 +1097,7 @@ func (m *machine) Parse(input []byte) (syslog.LogParts, error) {
 			goto _testEof9
 		}
 	stCase9:
-		if 49 <= (m.data)[(m.p)] && (m.data)[(m.p)] <= 57 {
+		if 48 <= (m.data)[(m.p)] && (m.data)[(m.p)] <= 57 {
 			goto st10
 		}
 		goto tr7
@@ -5246,6 +5273,9 @@ func (m *machine) Parse(input []byte) (syslog.LogParts, error) {
 	stCase282:
 		if 48 <= (m.data)[(m.p)] && (m.data)[(m.p)] <= 57 {
 			goto st10
+		}
+		if (m.data)[(m.p)] == 32 {
+			goto st11
 		}
 		goto tr7
 	st283:

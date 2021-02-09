@@ -73,7 +73,7 @@ func TestKV_Transform(t *testing.T) {
 		{
 			line:       []Data{{"raw": `123456789012345`}},
 			expectData: []Data{{"raw": `123456789012345`}},
-			expectErr:  errors.New("find total 1 erorrs in transform keyvalue, last error info is parse transform key value failed, error msg: no splitter exist, will keep origin data in pandora_stash if disable_record_errdata field is false"),
+			expectErr:  errors.New("find total 1 erorrs in transform keyvalue, last error info is parse transform key value failed, error msg: data is empty after parse, will keep origin data in pandora_stash if disable_record_errdata field is false"),
 			splitter:   "=",
 			keepString: true,
 			new:        "raw",
@@ -93,8 +93,8 @@ func TestKV_Transform(t *testing.T) {
 		},
 		{
 			line:       []Data{{"raw": `foo="" bar=`}},
-			expectData: []Data{{"raw": `foo="" bar=`}},
-			expectErr:  errors.New("find total 1 erorrs in transform keyvalue, last error info is parse transform key value failed, error msg: key value not match, will keep origin data in pandora_stash if disable_record_errdata field is false"),
+			expectData: []Data{{"raw": Data{"foo":"","bar":""}}},
+			expectErr:  nil,
 			splitter:   "=",
 			new:        "raw",
 		},
@@ -107,8 +107,8 @@ func TestKV_Transform(t *testing.T) {
 		},
 		{
 			line:       []Data{{"raw": `"foo=" bar=abc`}},
-			expectData: []Data{{"raw": `"foo=" bar=abc`}},
-			expectErr:  errors.New(`find total 1 erorrs in transform keyvalue, last error info is parse transform key value failed, error msg: no value or key was parsed after logfmt, will keep origin data in pandora_stash if disable_record_errdata field is false`),
+			expectData: []Data{{"raw": Data{"foo":"","bar":"abc"}}},
+			expectErr:  nil,
 			splitter:   "=",
 			new:        "raw",
 		},
@@ -245,8 +245,8 @@ func Test_kvTransform(t *testing.T) {
 				splitter:   "=",
 				keepString: true,
 			},
-			want:    nil,
-			wantErr: true,
+			want:    Data{"foo":"","bar":"\""},
+			wantErr: false,
 		},
 		{
 			name: "err_test_3",
@@ -268,8 +268,8 @@ func Test_kvTransform(t *testing.T) {
 				splitter:   "=",
 				keepString: true,
 			},
-			want:    nil,
-			wantErr: true,
+			want:    Data{"foo":"","bar":"abc"},
+			wantErr: false,
 		},
 		{
 			name: "err_test_5",

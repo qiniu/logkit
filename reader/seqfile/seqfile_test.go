@@ -489,7 +489,7 @@ func Test_INode(t *testing.T) {
 	err = sf.SyncMeta()
 	assert.NoError(t, err)
 	err = sf.Close()
-	assert.NoError(t, err)
+	assert.Error(t, err)
 
 	file, err = os.OpenFile(filepath.Join(Dir, "f1"), os.O_WRONLY|os.O_APPEND, DefaultFilePerm)
 	assert.NoError(t, err)
@@ -505,7 +505,7 @@ func Test_INode(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	assert.Equal(t, 2, len(sf.inodeDone))
+	assert.Equal(t, 2, len(sf.inodeOffset))
 	buffer = make([]byte, 6)
 	_, err = sf.Read(buffer)
 	assert.NoError(t, err)

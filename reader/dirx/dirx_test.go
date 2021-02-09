@@ -746,6 +746,7 @@ func multiReaderSameInodeTest(t *testing.T) {
 		"abc125\n": 3,
 		"abc126\n": 3,
 		"abc127\n": 3,
+		"abc128\n": 1,
 		"abc\nx\n": 1,
 		"abc\ny\n": 1,
 		"abc\nz\n": 1,
@@ -822,8 +823,7 @@ func multiReaderSameInodeTest(t *testing.T) {
 		}
 	}
 	t.Log("Reader has finished reading two")
-
-	createFileWithContent(dir1file1, "abc123\nabc124\nabc125\nabc126\nabc127\n")
+	createFileWithContent(dir1file1, "abc123\nabc124\nabc125\nabc126\nabc127\nabc128\n")
 	time.Sleep(5 * time.Second)
 	assert.Equal(t, 2, dr.dirReaders.Num(), "Number of readers")
 
@@ -841,10 +841,11 @@ func multiReaderSameInodeTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxNum >= 18 || emptyNum > 10 {
+		if maxNum >= 19 || emptyNum > 10 {
 			break
 		}
 	}
+	t.Log("Reader has finished reading three")
 
 	assert.EqualValues(t, expectResults, actualResults)
 	assert.Equal(t, StatsInfo{}, dr.Status())
@@ -853,8 +854,6 @@ func multiReaderSameInodeTest(t *testing.T) {
 	files2, err := ioutil.ReadDir(dir2)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(files1)+len(files2))
-
-	t.Log("Reader has finished reading three")
 }
 
 func readerExpireDeleteTest(t *testing.T) {

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -83,7 +84,6 @@ func Test_ActiveReader(t *testing.T) {
 
 func TestStart(t *testing.T) {
 	t.Parallel()
-	c := make(chan string)
 
 	// 以下几个函数 sleep 时间较长，放在此处并发执行
 	funcMap := map[string]func(*testing.T){
@@ -100,17 +100,15 @@ func TestStart(t *testing.T) {
 		"multiReaderInRunTime":            multiReaderInRunTime,
 		"logOverwrittenTest":              logOverwrittenTest,
 	}
-
+	wg := new(sync.WaitGroup)
 	for k, f := range funcMap {
-		go func(k string, f func(*testing.T), c chan string) {
+		wg.Add(1)
+		go func(k string, f func(*testing.T), wg *sync.WaitGroup) {
 			f(&testing.T{})
-			c <- k
-		}(k, f, c)
+			wg.Done()
+		}(k, f, wg)
 	}
-	funcCnt := len(funcMap)
-	for i := 0; i < funcCnt; i++ {
-		<-c
-	}
+	wg.Wait()
 }
 
 func multiReaderOneLineTest(t *testing.T) {

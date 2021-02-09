@@ -391,6 +391,11 @@ func TestHashSet(t *testing.T) {
 }
 
 func TestLogDirAndPattern(t *testing.T) {
+	f, err := os.Create("TestLogDirAndPattern.log")
+	defer f.Close()
+	defer os.RemoveAll("TestLogDirAndPattern.log")
+	assert.Nil(t, err)
+
 	dir1, pt1, err := LogDirAndPattern("TestLogDirAndPattern.log")
 	assert.NoError(t, err)
 	assert.Equal(t, pt1, "TestLogDirAndPattern.log")
@@ -619,12 +624,14 @@ func Test_ConvertDate(t *testing.T) {
 
 	tm := time.Now()
 	af := tm.Add(2 * time.Hour)
+	tm = tm.AddDate(time.Now().Year() * -1, 0, 0)
 	date, err = ConvertDate("", "", 2, time.UTC, tm)
 	assert.NoError(t, err)
 	assert.Equal(t, af.AddDate(-1, 0, 0).Format(time.RFC3339Nano), date)
 
 	tm = time.Now()
 	af = tm.Add(2 * time.Hour)
+	tm = tm.AddDate(time.Now().Year() * -1, 0, 0)
 	date, err = ConvertDate("", "", 2, time.UTC, &tm)
 	assert.NoError(t, err)
 	assert.Equal(t, af.AddDate(-1, 0, 0).Format(time.RFC3339Nano), date)

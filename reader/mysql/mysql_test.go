@@ -656,7 +656,8 @@ func TestMysqlWithTimestampStr(t *testing.T) {
 		"encoding":            "gbk",
 		"mysql_datasource":    dbSource,
 		"mysql_timestamp_key": "submission_date",
-		"mysql_start_time":    "mytest20181001150405",
+		"mysql_batch_intervel": "1h",
+		"mysql_start_time":    time.Now().Add(-9*time.Hour).Format("2006-01-02 15:04:05"),
 		"mysql_cron":          "loop 1s",
 		"mysql_sql":           "select * from " + tablename,
 		"meta_path":           path.Join(MetaDir, runnerName),
@@ -670,9 +671,9 @@ func TestMysqlWithTimestampStr(t *testing.T) {
 	if !ok {
 		t.Error("mysql read should have readdata interface")
 	}
-	assert.NoError(t, mr.(*MysqlReader).Start())
 	totalNum := 10000
-	go datagen.GenerateMysqlData(dbSource+"/"+database+"1"+"?charset=gbk", tablename, int64(totalNum), 100*time.Millisecond, time.Hour, time.Now().Add(-100*time.Hour), true)
+	datagen.GenerateMysqlData(dbSource+"/"+database+"1"+"?charset=gbk", tablename, int64(totalNum), 100*time.Millisecond, time.Hour, time.Now(), true)
+	assert.NoError(t, mr.(*MysqlReader).Start())
 	dataLine := 0
 	before := time.Now()
 	var actualData []models.Data

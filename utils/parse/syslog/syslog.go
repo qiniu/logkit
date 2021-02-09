@@ -80,13 +80,9 @@ type parserWrapper struct {
 	bool
 }
 
-// 保持之前的行为，rfc3164解析失败会返回默认值，rfc5424/rfc6587不会
 func (w *parserWrapper) HasBestEffort() bool {
-	switch w.Typ {
-	case TypeRFC5424, TypeRFC6587:
-		return false
-	case TypeRFC3164:
-		return true
+	if w.Machine != nil {
+		return w.Machine.HasBestEffort()
 	}
 	return false
 }
@@ -144,7 +140,7 @@ func GetFormat(format string, parseYear bool) Format {
 type RFC6587 struct{}
 
 func (f *RFC6587) GetParser(line []byte) Parser {
-	return &parserWrapper{rfc5424.NewParser(), TypeRFC6587, false}
+	return &parserWrapper{rfc5424.NewParser(rfc5424.WithBestEffort()), TypeRFC6587, false}
 }
 
 func (f *RFC6587) IsNewLine(data []byte) bool {
@@ -166,7 +162,7 @@ func (f *RFC6587) IsNewLine(data []byte) bool {
 type RFC5424 struct{}
 
 func (f *RFC5424) GetParser(line []byte) Parser {
-	return &parserWrapper{rfc5424.NewParser(), TypeRFC5424, false}
+	return &parserWrapper{rfc5424.NewParser(rfc5424.WithBestEffort()), TypeRFC5424, false}
 }
 
 func (f *RFC5424) IsNewLine(data []byte) bool {
