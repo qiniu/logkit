@@ -5,6 +5,7 @@ go:
   - 1.10.8
 script:
   - make all
+  - make test
 services:
  - mysql
  - postgresql

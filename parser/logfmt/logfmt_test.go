@@ -194,7 +194,7 @@ func TestParseWithKeepRawData(t *testing.T) {
 		numRoutine:  1,
 	}
 	for _, tt := range tests {
-		l.splitter = tt.splitter
+		l.mp.Splitter = tt.splitter
 		got, err := l.Parse(tt.s)
 		if c, ok := err.(*StatsError); ok {
 			assert.Equal(t, int64(0), c.Errors)
