@@ -388,6 +388,38 @@
 			"revisionTime": "2018-11-28T13:14:45Z"
 		},
 		{
+			"checksumSHA1": "cY2NVF5SgnQSqGEn4Ov0N/ytvzY=",
+			"path": "github.com/influxdata/go-syslog",
+			"revision": "a1889d947b48b1519a4615c640d993551ad6d8fc",
+			"revisionTime": "2020-11-28T20:09:27Z",
+			"version": "v3",
+			"versionExact": "v3.0.0"
+		},
+		{
+			"checksumSHA1": "IhLNiJsG2ZZiE/eGv1eoOkmruus=",
+			"path": "github.com/influxdata/go-syslog/common",
+			"revision": "fb1cee65645ce91dfc277a42bca344fd22f42b44",
+			"revisionTime": "2020-02-05T15:24:56Z",
+			"version": "v3",
+			"versionExact": "v3.0.0"
+		},
+		{
+			"checksumSHA1": "ILkh1Hxx3HMDYaeZ+YINcTS5oxA=",
+			"path": "github.com/influxdata/go-syslog/rfc3164",
+			"revision": "a1889d947b48b1519a4615c640d993551ad6d8fc",
+			"revisionTime": "2020-11-28T20:09:27Z",
+			"version": "v3",
+			"versionExact": "v3.0.0"
+		},
+		{
+			"checksumSHA1": "m/bzKPuZiNodv2Bbx7MQd6gI7eI=",
+			"path": "github.com/influxdata/go-syslog/rfc5424",
+			"revision": "a1889d947b48b1519a4615c640d993551ad6d8fc",
+			"revisionTime": "2020-11-28T20:09:27Z",
+			"version": "v3",
+			"versionExact": "v3.0.0"
+		},
+		{
 			"checksumSHA1": "ZI7UVjlpqcxxiv02ak+R/G5Svns=",
 			"path": "github.com/influxdata/telegraf",
 			"revision": "282c8ce0965e644d767cb7ca16aaddfa15e2049e",
@@ -476,18 +508,6 @@
 			"path": "github.com/jcmturner/rpc/ndr",
 			"revision": "a5898cb6c474b98d188219165475aa8beb8137eb",
 			"revisionTime": "2019-07-27T14:50:11Z"
-		},
-		{
-			"checksumSHA1": "ddslouVS8Mlau9h1KTrjLu8zpqw=",
-			"path": "github.com/jeromer/syslogparser/rfc3164",
-			"revision": "5fbaaf06d9e72f781d19c61e130ba63f4d6dab31",
-			"revisionTime": "2019-04-29T16:15:31Z"
-		},
-		{
-			"checksumSHA1": "un+SAb0A0Ha6FN/p1wY0yQgH4pg=",
-			"path": "github.com/jeromer/syslogparser/rfc5424",
-			"revision": "5fbaaf06d9e72f781d19c61e130ba63f4d6dab31",
-			"revisionTime": "2019-04-29T16:15:31Z"
 		},
 		{
 			"checksumSHA1": "0ZrwvB6KoGPj2PoDNSEJwxQ6Mog=",

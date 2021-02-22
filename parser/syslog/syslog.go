@@ -3,6 +3,7 @@ package syslog
 import (
 	"bytes"
 	"fmt"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -188,6 +189,11 @@ func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 }
 
 func (p *SyslogParser) parse(line string) (data Data, err error) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Errorf("syslog parse data error\npanic: %v\nstack: %s", rec, debug.Stack())
+		}
+	}()
 	if p.buff.Len() > 0 {
 		if line == PandoraParseFlushSignal {
 			return p.Flush()
@@ -218,10 +224,26 @@ func (p *SyslogParser) parse(line string) (data Data, err error) {
 }
 
 func (p *SyslogParser) Flush() (data Data, err error) {
-	sparser := p.format.GetParser(p.buff.Bytes())
-	err = sparser.Parse()
-	if err == nil || err.Error() == "No structured data" {
-		data = Data(sparser.Dump())
+	line := p.buff.Bytes()
+	defer func() {
+		if rec := recover(); rec != nil {
+			if data == nil {
+				data = make(Data)
+			}
+			if !p.disableRecordErrData {
+				data[KeyPandoraStash] = string(line)
+			}
+			if p.keepRawData {
+				data[KeyRawData] = string(line)
+			}
+			err = fmt.Errorf("parse syslog failed when flush data, error: %v, line: %v", rec, string(line))
+			log.Errorf("parse syslog failed when flush data\nline: %v\npanic: %v\nstack: %s", string(line), rec, debug.Stack())
+		}
+	}()
+	sparser := p.format.GetParser(line)
+	msg, err := sparser.Parse(line)
+	if err == nil || sparser.HasBestEffort() {
+		data = Data(msg)
 		if sparser.NeedModifyTime() && p.needModefyTime {
 			dataTime, ok := data["timestamp"].(time.Time)
 			if ok {
@@ -237,11 +259,11 @@ func (p *SyslogParser) Flush() (data Data, err error) {
 			data = make(Data)
 		}
 		if !p.disableRecordErrData {
-			data[KeyPandoraStash] = string(p.buff.Bytes())
+			data[KeyPandoraStash] = string(line)
 		}
 	}
 	if p.keepRawData {
-		data[KeyRawData] = string(p.buff.Bytes())
+		data[KeyRawData] = string(line)
 	}
 	p.curline = 0
 	p.buff.Reset()
