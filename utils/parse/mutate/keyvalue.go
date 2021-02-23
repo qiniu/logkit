@@ -2,11 +2,13 @@ package mutate
 
 import (
 	"fmt"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/utils/models"
 )
 
@@ -87,6 +89,14 @@ func NewDecoder(line string) *Decoder {
 }
 
 func (d *Decoder) ScanValue(sep string) bool {
+	// 延迟处理的函数
+	defer func() {
+		// 发生宕机时，获取panic传递的上下文并打印
+		if err := recover(); err != nil {
+			log.Errorf("ScanValue PANIC:\n err:%s\n stack:%s\n key:%s\n line:%s\n sep:%s\n", err, debug.Stack(), d.key, d.line, sep)
+		}
+	}()
+
 	if len(d.line) == 0 {
 		return false
 	}
@@ -112,11 +122,11 @@ func (d *Decoder) ScanValue(sep string) bool {
 			nextSepPos = preSepPos + nextSep
 		}
 		if nextSep != -1 {
-			lastSpace := getSpacePos(strings.TrimRightFunc(d.line[:nextSepPos], unicode.IsSpace), -1)
+			lastSpace := getSpacePos(strings.TrimRightFunc(d.line[d.sepPos+len(sep):nextSepPos], unicode.IsSpace), -1)
 			if lastSpace != -1 {
-				d.value = strings.TrimSpace(d.line[d.sepPos+len(sep) : lastSpace])
-				d.line = d.line[lastSpace+1:]
-				d.sepPos = nextSepPos - lastSpace - 1
+				d.value = strings.TrimSpace(d.line[d.sepPos+len(sep) : d.sepPos+len(sep)+lastSpace])
+				d.line = d.line[d.sepPos+len(sep)+lastSpace+1:]
+				d.sepPos = nextSepPos - d.sepPos - len(sep) - lastSpace - 1
 				return true
 			}
 		}
@@ -136,7 +146,7 @@ func (d *Decoder) Key() string {
 
 func getSepPos(line, sep string) int {
 	quoterCount := 0
-	for i,s := range line {
+	for i, s := range line {
 		if i+len(sep) > len(line) {
 			break
 		}
@@ -154,7 +164,7 @@ func getSepPos(line, sep string) int {
 func getSpacePos(line string, direction int) int {
 	quoterCount := 0
 	if direction > 0 {
-		for i,r := range line {
+		for i, r := range line {
 			if r == '"' {
 				quoterCount++
 			} else if unicode.IsSpace(r) && quoterCount%2 == 0 {
