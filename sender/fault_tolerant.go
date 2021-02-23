@@ -311,7 +311,7 @@ func (ft *FtSender) Send(datas []Data) error {
 
 		if ft.isBlock {
 			log.Error("Runner[%v] Sender[%v] try Send Datas err: %v", ft.runnerName, ft.innerSender.Name(), err)
-			return se;
+			return se
 		}
 
 		err = fmt.Errorf("Runner[%v] Sender[%v] try Send Datas err: %v, will put to backup queue and retry later... ", ft.runnerName, ft.innerSender.Name(), err)
@@ -953,7 +953,7 @@ func (ft *FtSender) sendFromQueue(queueName string, readChan <-chan []byte, read
 			log.Errorf("Runner[%s] Sender[%s] cannot send points from queue %s, error is %v", ft.runnerName, ft.innerSender.Name(), queueName, err)
 			//此处的发送错误没有被stats统计
 			numWaits++
-			if numWaits > 5  {
+			if numWaits > 5 {
 				numWaits = 5
 			}
 		}
@@ -990,8 +990,12 @@ func SplitData(data string) (valArray []string) {
 		}
 		//单个slice大于2M
 		if start == last {
-			valArray = append(valArray, SplitDataWithSplitSize(data[start:offset], DefaultSplitSize)...)
-			start = offset
+			valArray = SplitDataWithSplitSize(valArray, data[start:offset], DefaultSplitSize)
+			if len(valArray) > 0 {
+				// 最后一个分片参与下次split
+				start = offset - len(valArray[len(valArray) - 1])
+				valArray = valArray[:len(valArray) - 1]
+			}
 			continue
 		}
 		valArray = append(valArray, data[start:last])
@@ -1001,30 +1005,45 @@ func SplitData(data string) (valArray []string) {
 		valArray = append(valArray, data[start:last])
 	}
 	//防止加上最后一个slice后大于2M
-	valArray = append(valArray, SplitDataWithSplitSize(data[last:], DefaultSplitSize)...)
+	valArray = SplitDataWithSplitSize(valArray, data[last:], DefaultSplitSize)
 	return valArray
 }
 
-func SplitDataWithSplitSize(data string, splitSize int64) (valArray []string) {
+func SplitDataWithSplitSize(originArray []string, data string, splitSize int64) (valArray []string) {
 	if splitSize <= 0 {
-		return []string{data}
+		return append(originArray, data)
+	}
+
+	if len(originArray) != 0 {
+		num := (DefaultMaxBatchSize - int64(len(originArray[len(originArray)-1]))) / splitSize
+		if num > 0 {
+			end := num*splitSize
+			if end > int64(len(data)) {
+				end = int64(len(data))
+			}
+			originArray[len(originArray)-1] = originArray[len(originArray)-1] + data[:end]
+			data = data[end:]
+		}
 	}
 
 	valArray = make([]string, 0)
 	lenData := int64(len(data)) / splitSize
+	maxLen := int64(DefaultMaxBatchSize) / splitSize
 
-	for i := int64(1); i <= lenData; i++ {
-		start := (i - 1) * splitSize
-		end := i * splitSize
-		valArray = append(valArray, string(data[start:end]))
+	var start, end int64
+	for i := int64(0); i < lenData; i = i + maxLen {
+		start = i * splitSize
+		end = (i + maxLen) * splitSize
+		if end >= int64(len(data)) {
+			end = int64(len(data))
+		}
+		valArray = append(valArray, data[start:end])
 	}
 
-	end := lenData * splitSize
-	remainData := string(data[end:])
-	if len(remainData) != 0 {
-		valArray = append(valArray, string(data[end:]))
+	if end < int64(len(data)) {
+		valArray = append(valArray, data[end:])
 	}
-	return valArray
+	return append(originArray, valArray...)
 }
 
 func isErrorEmpty(err error) bool {
@@ -1074,7 +1093,7 @@ func (ft *FtSender) backOffSendRawFromRunner(datas []string, failSleep int, isRe
 // 阻塞式发送
 func (ft *FtSender) backOffReTrySend(datas []Data, isRetry bool) (res []*datasContext, err error) {
 	backoff := utils.NewBackoff(2, 1, time.Second, time.Minute)
-	backoff.Duration(); // 从 1 开始
+	backoff.Duration() // 从 1 开始
 	for {
 		if atomic.LoadInt32(&ft.stopped) > 0 {
 			for _, v := range res {

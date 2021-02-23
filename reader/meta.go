@@ -504,14 +504,14 @@ func (m *Meta) AppendDoneFile(path string) (err error) {
 }
 
 // AppendDoneFileInode 将处理完的文件路径、inode以及完成时间写入doneFile中
-func (m *Meta) AppendDoneFileInode(path string, inode uint64) (err error) {
+func (m *Meta) AppendDoneFileInode(path string, inode uint64, offset int64) (err error) {
 	f, err := os.OpenFile(m.DoneFile(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, DefaultFilePerm)
 	if err != nil {
 		return
 	}
 	defer f.Close()
 
-	_, err = fmt.Fprintf(f, "%s\t%v\t%s\n", path, inode, time.Now().Format(time.RFC3339Nano))
+	_, err = fmt.Fprintf(f, "%s\t%v\t%v\t%s\n", path, inode, offset, time.Now().Format(time.RFC3339Nano))
 	return
 }
 
@@ -540,8 +540,8 @@ func JoinFileInode(filename, inode string) string {
 	return filepath.Base(filename) + "_" + inode
 }
 
-func (m *Meta) GetDoneFileInode(inodeSensitive bool) map[string]bool {
-	inodeMap := make(map[string]bool)
+func (m *Meta) GetDoneFileInode(inodeSensitive bool) map[string]int64 {
+	inodeMap := make(map[string]int64)
 	contents, err := m.getDoneFileContent()
 	if err != nil {
 		log.Error(err)
@@ -549,11 +549,25 @@ func (m *Meta) GetDoneFileInode(inodeSensitive bool) map[string]bool {
 	}
 	for _, v := range contents {
 		sps := strings.Split(v, "\t")
+		offset := int64(-1)
+		if len(sps) == 4 {
+			offset, err = strconv.ParseInt(sps[2], 10, 64)
+			if err != nil {
+				log.Warnf("parse offset from %s failed, error: %v", sps[2], err)
+			}
+		} else {
+			f, err := os.Stat(sps[0])
+			if err != nil {
+				log.Warnf("parse offset from %s failed, error: %v", sps[2], err)
+			} else {
+				offset = f.Size()
+			}
+		}
 		if len(sps) >= 2 {
 			if inodeSensitive {
-				inodeMap[JoinFileInode(sps[0], sps[1])] = true
+				inodeMap[JoinFileInode(sps[0], sps[1])] = offset
 			} else {
-				inodeMap[sps[0]] = true
+				inodeMap[sps[0]] = offset
 			}
 		}
 	}

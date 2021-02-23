@@ -99,7 +99,7 @@ func TestSyslogParser3164(t *testing.T) {
 	assert.Equal(t, uint8(5), msg["severity"])
 	assert.Equal(t, "", msg["hostname"])
 	assert.Equal(t, "", msg["tag"])
-	assert.Equal(t, time.Now().Second(), msg["timestamp"].(time.Time).Second())
+	assert.Equal(t, time.Now().Day(), msg["timestamp"].(time.Time).Day())
 	assert.Equal(t, `time:2020-05-18 11:10:30;danger_degree:2;breaking_sighn:0;event:[24482]多个应用application.ini数据库配置文件泄露漏洞;src_addr:115.238.89.35;src_port:35327;dst_addr:172.16.56.47;dst_port:80;proto:HTTP;user:`, msg["content"])
 
 	buf = []byte("<34>Oct 11 22:14:15 mymachine very.large.syslog.message.tag: 'su root' failed for lonvick on /dev/pts/8")

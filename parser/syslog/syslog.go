@@ -225,11 +225,9 @@ func (p *SyslogParser) parse(line string) (data Data, err error) {
 
 func (p *SyslogParser) Flush() (data Data, err error) {
 	line := p.buff.Bytes()
+	data = make(Data)
 	defer func() {
 		if rec := recover(); rec != nil {
-			if data == nil {
-				data = make(Data)
-			}
 			if !p.disableRecordErrData {
 				data[KeyPandoraStash] = string(line)
 			}
@@ -242,7 +240,7 @@ func (p *SyslogParser) Flush() (data Data, err error) {
 	}()
 	sparser := p.format.GetParser(line)
 	msg, err := sparser.Parse(line)
-	if err == nil || sparser.HasBestEffort() {
+	if err == nil || (sparser.HasBestEffort() && len(msg) != 0) {
 		data = Data(msg)
 		if sparser.NeedModifyTime() && p.needModefyTime {
 			dataTime, ok := data["timestamp"].(time.Time)

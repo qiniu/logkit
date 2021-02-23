@@ -90,7 +90,7 @@ func TestParse(t *testing.T) {
 
 	got, err := l.Parse([]string{"", "a"})
 	assert.NotNil(t, err)
-	assert.EqualValues(t, "success 0 errors 1 last error no splitter exist, will keep origin data in pandora_stash if disable_record_errdata field is false, send error detail <nil>", err.Error())
+	assert.EqualValues(t, "success 0 errors 1 last error data is empty after parse, will keep origin data in pandora_stash if disable_record_errdata field is false, send error detail <nil>", err.Error())
 	assert.EqualValues(t, []Data{{"pandora_stash": "a"}}, got)
 
 	l, err = NewParser(conf.MapConf{
@@ -100,8 +100,8 @@ func TestParse(t *testing.T) {
 	assert.Nil(t, err)
 
 	got, err = l.Parse([]string{"lvl= "})
-	assert.NotNil(t, err)
-	assert.EqualValues(t, []Data{{"pandora_stash": "lvl=", "raw_data": "lvl="}}, got)
+	assert.Nil(t, err)
+	assert.EqualValues(t, []Data{{"lvl": "", "raw_data": "lvl="}}, got)
 
 	got, err = l.Parse([]string{" =50"})
 	assert.NotNil(t, err)
@@ -119,9 +119,9 @@ func TestParse(t *testing.T) {
 	assert.NotNil(t, err)
 	assert.EqualValues(t, []Data{{"pandora_stash": "a", "raw_data": "a"}}, got)
 
-	got, err = l.Parse([]string{"algorithm = 1+1=2"})
+	got, err = l.Parse([]string{"algorithm =1+1=2"})
 	assert.Nil(t, err)
-	assert.EqualValues(t, []Data{{"algorithm": "1+1=2", "raw_data": "algorithm = 1+1=2"}}, got)
+	assert.EqualValues(t, []Data{{"algorithm": "1+1=2", "raw_data": "algorithm =1+1=2"}}, got)
 
 	l, err = NewParser(conf.MapConf{
 		KeyParserName:           TypeLogfmt,
@@ -194,7 +194,7 @@ func TestParseWithKeepRawData(t *testing.T) {
 		numRoutine:  1,
 	}
 	for _, tt := range tests {
-		l.splitter = tt.splitter
+		l.mp.Splitter = tt.splitter
 		got, err := l.Parse(tt.s)
 		if c, ok := err.(*StatsError); ok {
 			assert.Equal(t, int64(0), c.Errors)
@@ -206,15 +206,3 @@ func TestParseWithKeepRawData(t *testing.T) {
 	}
 }
 
-// 获取测试数据
-func GetParseTestData(line string, size int) []string {
-	testSlice := make([]string, 0)
-	totalSize := 0
-	for {
-		if totalSize > size {
-			return testSlice
-		}
-		testSlice = append(testSlice, line)
-		totalSize += len(line)
-	}
-}

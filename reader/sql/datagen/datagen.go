@@ -198,8 +198,8 @@ func insertStrMysql(db *sql.DB, table string, dataNum int64, tm time.Time, wg *s
 	}
 
 	for i := 0; i < 500; i++ {
-		sql := `INSERT INTO ` + table + ` (id, timestamp, title, author, submission_date) VALUES (` + strconv.FormatInt(dataNum+int64(i)+1, 10) + `, ` + strconv.FormatInt(tm.Unix(), 10) + `, "` + randomdata.Address() + `", "` + randomdata.Email() + `", "` + "mytest" + tm.Add(-8*time.Hour).Format("20060102150400") + `");`
-		_, err = txn.Exec(sql)
+		execSql := `INSERT INTO ` + table + ` (id, timestamp, title, author, submission_date) VALUES (` + strconv.FormatInt(dataNum+int64(i)+1, 10) + `, ` + strconv.FormatInt(tm.Unix(), 10) + `, "` + randomdata.Address() + `", "` + randomdata.Email() + `", "` + tm.Add(-8*time.Hour).Format("2006-01-02 15:04:05") + `");`
+		_, err = txn.Exec(execSql)
 		if err != nil {
 			log.Fatal(err)
 		}

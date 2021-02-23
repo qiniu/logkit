@@ -25,7 +25,7 @@ func (sm *syslogMessage) minimal() bool {
 // export is meant to be called on minimally-valid messages
 // thus it presumes priority and version values exists and are correct
 func (sm *syslogMessage) export() syslog.LogParts {
-	timestamp := time.Now()
+	timestamp := time.Now().UTC().Round(time.Second)
 	if sm.timestampSet {
 		timestamp = sm.timestamp
 	}

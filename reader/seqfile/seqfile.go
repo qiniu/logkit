@@ -49,7 +49,7 @@ type SeqFile struct {
 	SkipFileFirstLine bool   //跳过新文件的第一行，常用于带title的csv文件，title与实际格式不同
 	hasSkiped         bool
 
-	inodeDone      map[string]bool //记录filename_inode是否已经读过
+	inodeOffset      map[string]int64 //记录filename_inode是否已经读过
 	inodeSensitive bool            // 是否以inode信息作为 inodeDone 和 expireMap 的key值
 
 	lastSyncPath   string
@@ -114,7 +114,7 @@ func NewSeqFile(meta *reader.Meta, path string, ignoreHidden, newFileNewLine boo
 		mux:              sync.Mutex{},
 		newFileAsNewLine: newFileNewLine,
 		meta:             meta,
-		inodeDone:        make(map[string]bool),
+		inodeOffset:      make(map[string]int64),
 		expireMap:        expireMap,
 		inodeSensitive:   inodeSensitive,
 	}
@@ -152,7 +152,7 @@ func NewSeqFile(meta *reader.Meta, path string, ignoreHidden, newFileNewLine boo
 		sf.f = nil
 		sf.offset = 0
 	}
-	sf.inodeDone = meta.GetDoneFileInode(sf.inodeSensitive)
+	sf.inodeOffset = meta.GetDoneFileInode(sf.inodeSensitive)
 	sf.dir = dir
 	sf.currFile = currFile
 	sf.name = "SeqFile:" + dir
@@ -450,21 +450,22 @@ func (sf *SeqFile) getNextFileCondition() (condition func(os.FileInfo) bool, err
 			return false
 		}
 		if inode == sf.inode {
-			if !(sf.ReadSameInode && f.Size() < sf.offset) {
+			if !(sf.ReadSameInode && f.Size() != sf.offset) {
 				return false
 			}
 		}
 
-		if len(sf.inodeDone) < 1 {
+		if len(sf.inodeOffset) < 1 {
 			return true
 		}
-		var ok bool
+		var key string
 		if sf.inodeSensitive {
-			_, ok = sf.inodeDone[reader.JoinFileInode(f.Name(), strconv.FormatUint(inode, 10))]
+			key = reader.JoinFileInode(f.Name(), strconv.FormatUint(inode, 10))
 		} else {
-			_, ok = sf.inodeDone[filepath.Base(f.Name())]
+			key = filepath.Base(f.Name())
 		}
-		return !ok
+		offset, ok := sf.inodeOffset[key]
+		return !ok || (sf.ReadSameInode && offset != -1  && f.Size() != offset)
 	}
 
 	condition = reader.AndCondition(reader.AndCondition(newerThanCurrFile, sf.getIgnoreCondition()), isNewFile)
@@ -506,7 +507,7 @@ func (sf *SeqFile) isNewFile(newFileInfo os.FileInfo, filePath string) bool {
 		log.Debugf("Runner[%v] %s - newInode: %d, l.inode: %d", sf.meta.RunnerName, sf.dir, newInode, sf.inode)
 		return true
 	}
-	if newFsize < sf.offset {
+	if newFsize != sf.offset {
 		log.Debugf("Runner[%v] %s - newFsize: %d, l.offset: %d", sf.meta.RunnerName, sf.dir, newFsize, sf.offset)
 		return true
 	}
@@ -572,6 +573,7 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 
 	doneFile := sf.currFile
 	doneFileInode := sf.inode
+	doneFileOffset := sf.offset
 	sf.lastFile = doneFile
 	fname := fi.Name()
 	sf.currFile = filepath.Join(sf.dir, fname)
@@ -596,17 +598,19 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 		return err
 	}
 	log.Infof("Runner[%v] %s - start tail new file: %s", sf.meta.RunnerName, sf.dir, fname)
-	if sf.inodeDone == nil {
-		sf.inodeDone = make(map[string]bool)
+	if sf.inodeOffset == nil {
+		sf.inodeOffset = make(map[string]int64)
 	}
+	var key string
 	if sf.inodeSensitive {
-		sf.inodeDone[reader.JoinFileInode(doneFile, strconv.FormatUint(doneFileInode, 10))] = true
+		key = reader.JoinFileInode(doneFile, strconv.FormatUint(doneFileInode, 10))
 	} else {
-		sf.inodeDone[filepath.Base(doneFile)] = true
+		key = filepath.Base(doneFile)
 	}
+	sf.inodeOffset[key] = doneFileOffset
 	tryTime := 0
 	for {
-		err = sf.meta.AppendDoneFileInode(doneFile, doneFileInode)
+		err := sf.meta.AppendDoneFileInode(doneFile, doneFileInode, doneFileOffset)
 		if err != nil {
 			if tryTime > 3 {
 				log.Errorf("Runner[%v] cannot write done file %s, err:%v, ignore this noefi", sf.meta.RunnerName, doneFile, err)

@@ -79,7 +79,7 @@ func GetTimeFromArgs(offsetKeyIndex int, scanArgs []interface{}) (time.Time, boo
 			ret, _ := data.([]byte)
 			timeDataResult, err := times.StrToTimeLocation(string(ret), time.Local)
 			if err != nil {
-				log.Errorf("updateStartTime failed as %v(%T) is not time.Time", data, data)
+				log.Errorf("updateStartTime failed as %v(%T) is not time.Time, error: %v", data, data, err)
 			} else {
 				return timeDataResult, true
 			}

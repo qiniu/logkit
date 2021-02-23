@@ -3,6 +3,7 @@ package syslog
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+// 为了保证datasource不错乱，暂不支持多行采集，需要将socket采集中的获取方式改成按原始包读取
 func Test_SyslogParser(t *testing.T) {
 	c := conf.MapConf{}
 	c[KeyParserType] = "syslog"
@@ -21,25 +23,13 @@ func Test_SyslogParser(t *testing.T) {
 	p, err := NewParser(c)
 	assert.Nil(t, err)
 	lines := []string{
-		`<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47`,
-		`- BOM'su root' failed for lonvick on /dev/pts/8`,
-
+		`<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47- BOM'su root' failed for lonvick on /dev/pts/8`,
 		`<38>Feb 05 01:02:03 abc system[253]: Listening at 0.0.0.0:3000`,
-		`<1>Feb 05 01:02:03 abc system[23]: Listening at 0.0.0.0`,
-		`:3001`,
-		`<165>1 2003-10-11T22:14:15.003Z mymachine.example.com`,
-		`evntslog - ID47 [exampleSDID@32473 iut="3" eventSource=`,
-		`"Application" eventID="1011"][examplePriority@32473`,
-		`class="high"]`,
-		`<165>1 2003-10-11T22:14:15.003Z mymachine.example.com`,
-		`evntslog - ID47 [exampleSDID@32473 iut="3" eventSource=`,
-		`"Application" eventID="1011"] BOMAn application`,
-		`event log entry...`,
-		`<165>1 2003-08-24T05:14:15.000003-07:00 192.0.2.1`,
-		`myproc 8710 - - %% It's time to make the do-nuts.`,
-
-		`<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47`,
-		`- BOM'su root' failed for lonvick on /dev/pts/8`,
+		`<1>Feb 05 01:02:03 abc system[23]: Listening at 0.0.0.0:3001`,
+		`<165>1 2003-10-11T22:14:15.003Z mymachine.example.comevntslog - ID47 [exampleSDID@32473 iut="3" eventSource="Application" eventID="1011"][examplePriority@32473class="high"]`,
+		`<165>1 2003-10-11T22:14:15.003Z mymachine.example.comevntslog - ID47 [exampleSDID@32473 iut="3" eventSource="Application" eventID="1011"] BOMAn applicationevent log entry...`,
+		`<165>1 2003-08-24T05:14:15.000003-07:00 192.0.2.1myproc 8710 - - %% It's time to make the do-nuts.`,
+		`<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47- BOM'su root' failed for lonvick on /dev/pts/8`,
 		PandoraParseFlushSignal,
 	}
 	dts, err := p.Parse(lines)
@@ -83,7 +73,7 @@ func Test_SyslogParserError(t *testing.T) {
 	parsedData, err := p.Parse(lines)
 	st, ok := err.(*StatsError)
 	assert.True(t, ok)
-	assert.Equal(t, "No start char found for priority", st.LastError, st.LastError)
+	assert.Equal(t, "expecting a priority value within angle brackets [col 0]", st.LastError, st.LastError)
 	assert.Equal(t, int64(1), st.Errors)
 	assert.Equal(t, 1, len(parsedData))
 	assert.Equal(t, line, parsedData[0]["pandora_stash"])
@@ -133,7 +123,7 @@ func TestSyslogParser_NoMatch(t *testing.T) {
 	if st, ok := err.(*StatsError); ok {
 		err = fmt.Errorf(st.LastError)
 	}
-	assert.Equal(t, errors.New("syslog meet max line 3, try to parse err No start char found for priority, check if this is standard rfc3164/rfc5424 syslog"), err)
+	assert.Equal(t, errors.New("syslog meet max line 3, try to parse err expecting a priority value within angle brackets [col 0], check if this is standard rfc3164/rfc5424 syslog"), err)
 }
 
 func TestSyslogParser_TimeZone(t *testing.T) {
@@ -145,15 +135,22 @@ func TestSyslogParser_TimeZone(t *testing.T) {
 	lines := []string{
 		`<1>Feb 05 01:02:03 abc system[253]: Listening at 0.0.0.0:3000`,
 		`<34>1 2020-02-04T17:02:03.000Z mymachine.example.com su - ID47`,
+		`<1>Feb 25 11:02:03 abc system[253]: Listening at 0.0.0.0:3000`,
+		`<1>Feb 1 11:02:03 abc system[253]: Listening at 0.0.0.0:3000`,
+		`<1>Feb 15 11:02:03 abc system[253]: Listening at 0.0.0.0:3000`,
+		`<1>Jan 31 11:02:03 abc system[253]: Listening at 0.0.0.0:3000`,
 	}
 	dts, err := p.Parse(lines)
 	assert.Nil(t, err)
 	ndata, err := p.Parse([]string{PandoraParseFlushSignal})
 	assert.Nil(t, err)
 	dts = append(dts, ndata...)
-	for _, dt := range dts {
-		assert.Equal(t, "2020-02-04 17:02:03 +0000 UTC", dt["timestamp"].(time.Time).String())
-	}
+	assert.Equal(t, strconv.Itoa(time.Now().Year())+"-02-04 17:02:03 +0000 UTC", dts[0]["timestamp"].(time.Time).String())
+	assert.Equal(t, "2020-02-04 17:02:03 +0000 UTC", dts[1]["timestamp"].(time.Time).String())
+	assert.Equal(t, strconv.Itoa(time.Now().Year())+"-02-25 03:02:03 +0000 UTC", dts[2]["timestamp"].(time.Time).String())
+	assert.Equal(t, strconv.Itoa(time.Now().Year())+"-02-01 03:02:03 +0000 UTC", dts[3]["timestamp"].(time.Time).String())
+	assert.Equal(t, strconv.Itoa(time.Now().Year())+"-02-15 03:02:03 +0000 UTC", dts[4]["timestamp"].(time.Time).String())
+	assert.Equal(t, strconv.Itoa(time.Now().Year())+"-01-31 03:02:03 +0000 UTC", dts[5]["timestamp"].(time.Time).String())
 }
 
 func TestSyslogParser_ParseYear(t *testing.T) {
@@ -190,7 +187,7 @@ func TestSyslogParser_ParseYear(t *testing.T) {
 	assert.Nil(t, err)
 	dts = append(dts, ndata...)
 	for _, dt := range dts {
-		assert.Equal(t, "2020-10-11 14:14:15 +0000 UTC", dt["timestamp"].(time.Time).String())
+		assert.Equal(t, strconv.Itoa(time.Now().Year())+"-10-11 14:14:15 +0000 UTC", dt["timestamp"].(time.Time).String())
 	}
 
 	c = conf.MapConf{}
@@ -208,7 +205,7 @@ func TestSyslogParser_ParseYear(t *testing.T) {
 	assert.Nil(t, err)
 	dts = append(dts, ndata...)
 	for _, dt := range dts {
-		assert.Equal(t, "2020-10-11 14:14:15 +0000 UTC", dt["timestamp"].(time.Time).String())
+		assert.Equal(t, strconv.Itoa(time.Now().Year())+"-10-11 14:14:15 +0000 UTC", dt["timestamp"].(time.Time).String())
 	}
 
 	c = conf.MapConf{}
