@@ -6,15 +6,16 @@ import (
 
 // Constants for csv
 const (
-	KeyCSVSchema             = "csv_schema"               // csv 每个列的列名和类型 long/string/float/date
-	KeyCSVSplitter           = "csv_splitter"             // csv 的分隔符
-	KeyCSVLabels             = "csv_labels"               // csv 额外增加的标签信息，比如机器信息等
-	KeyCSVAutoRename         = "csv_auto_rename"          // 是否将不合法的字段名称重命名一下, 比如 header-host 重命名为 header_host
-	KeyCSVAllowNoMatch       = "csv_allow_no_match"       // 允许实际分隔的数据和schema不相等，不相等时按顺序赋值
-	KeyCSVAllowMore          = "csv_allow_more"           // 允许实际字段比schema多
-	KeyCSVAllowMoreStartNum  = "csv_more_start_number"    // 允许实际字段比schema多，名称开始的数字
-	KeyCSVIgnoreInvalidField = "csv_ignore_invalid"       // 忽略解析错误的字段
-	KeyCSVContainSplitterKey = "csv_contain_splitter_key" // 包含分隔符的字段名
+	KeyCSVSchema             = "csv_schema"                // csv 每个列的列名和类型 long/string/float/date
+	KeyCSVSplitter           = "csv_splitter"              // csv 的分隔符
+	KeyCSVLabels             = "csv_labels"                // csv 额外增加的标签信息，比如机器信息等
+	KeyCSVAutoRename         = "csv_auto_rename"           // 是否将不合法的字段名称重命名一下, 比如 header-host 重命名为 header_host
+	KeyCSVAllowNoMatch       = "csv_allow_no_match"        // 允许实际分隔的数据和schema不相等，不相等时按顺序赋值
+	KeyCSVAllowMore          = "csv_allow_more"            // 允许实际字段比schema多
+	KeyCSVAllowMoreStartNum  = "csv_more_start_number"     // 允许实际字段比schema多，名称开始的数字
+	KeyCSVIgnoreInvalidField = "csv_ignore_invalid"        // 忽略解析错误的字段
+	KeyCSVContainSplitterKey = "csv_contain_splitter_key"  // 包含分隔符的字段名
+	KeyCSVLazyQuotes         = "csv_ignore_quote_in_filed" // 忽略字段中引号
 )
 
 // Constants for logfmt/KV
@@ -305,6 +306,17 @@ var ModeKeyOptions = map[string][]Option{
 			Description:  "包含分隔符的字段名",
 			ToolTip:      `比如"name,subject,time"的表头，字段内容为: "luffy,One, Piece,2019-05-20" 'subject'字段中包含分隔符,所以填写'subject'则可避免解析出错"`,
 		},
+		{
+			KeyName:       KeyCSVLazyQuotes,
+			Element:       Radio,
+			ChooseOnly:    true,
+			Advance:       true,
+			ChooseOptions: []interface{}{"false", "true"},
+			Default:       "false",
+			Description:   "将引号当成普通字符",
+			ToolTip:       `比如字段内容为: "luffy,One, Piece,20"19-0"5-20" 这个字段20"19-0"5-20会当普通字符串，不会解析报错"`,
+		},
+
 		{
 			KeyName:       KeyCSVIgnoreInvalidField,
 			Element:       Radio,

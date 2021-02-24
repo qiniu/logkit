@@ -1,6 +1,7 @@
 package csv
 
 import (
+	"encoding/csv"
 	"errors"
 	"fmt"
 	"reflect"
@@ -48,6 +49,7 @@ type Parser struct {
 	containSplitterKey   string
 	config               conf.MapConf
 	hasHeader            headerStatus
+	lazyQuotes           bool
 }
 
 type field struct {
@@ -108,6 +110,7 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 	}
 
 	var err error
+	var lazyQuotes bool
 	if hasHeader == hasSchema {
 		// 头部处理
 		if fields, err = setHeaderWithSchema(schema); err != nil {
@@ -116,7 +119,10 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		if labels, containSplitterIndex, err = checkLabelAndSplitterKey(fields, labelList, containSplitterKey); err != nil {
 			return nil, err
 		}
+		lazyQuotes = getLazyQuotes(fields)
 	}
+
+	lazyQuotes, _ = c.GetBoolOr(KeyCSVLazyQuotes, lazyQuotes)
 
 	numRoutine := MaxProcs
 	if numRoutine == 0 {
@@ -141,7 +147,17 @@ func NewParser(c conf.MapConf) (parser.Parser, error) {
 		containSplitterKey:   containSplitterKey,
 		config:               c,
 		hasHeader:            hasHeader,
+		lazyQuotes:           lazyQuotes,
 	}, nil
+}
+
+func getLazyQuotes(fields []field) bool {
+	for _, f := range fields {
+		if f.dataType == TypeJSONMap {
+			return true
+		}
+	}
+	return false
 }
 
 func setHeaderWithSchema(schema string) (fields []field, err error) {
@@ -164,7 +180,12 @@ func setHeaderWithoutSchema(line string, delim string, c conf.MapConf) ([]field,
 	if len(line) == 0 {
 		return nil, fmt.Errorf("cannot parsed csv header, the csv first line is %v, the delim is %v", line, delim)
 	}
-	fieldList := strings.Split(line, delim)
+
+	fieldList, err := parseCSV(line, delim, false)
+	if err != nil {
+		return nil, err
+	}
+
 	fields := make([]field, len(fieldList))
 	for i := 0; i < len(fieldList); i++ {
 		f, err := newCsvField(strings.TrimSpace(fieldList[i]), "string")
@@ -517,6 +538,20 @@ func getUnmachedMessage(parts []string, schemas []field) (ret string) {
 	return
 }
 
+func parseCSV(line, delim string, lazyQuotes bool) (parts []string, err error) {
+	r := csv.NewReader(strings.NewReader(line))
+	if len(delim) > 0 {
+		r.Comma = []rune(delim)[0]
+	}
+	r.LazyQuotes = lazyQuotes
+
+	parts, err = r.Read()
+	if err != nil {
+		return nil, err
+	}
+	return
+}
+
 func (p *Parser) parse(line string) (d Data, err error) {
 
 	// 1.判断是否使用schema; 针对第一行转换为表头； 2.多线程执行parse 会导致不是第一行数据被执行，或者多条数据被解析为表头，后续考虑解决方案；
@@ -529,12 +564,21 @@ func (p *Parser) parse(line string) (d Data, err error) {
 		if p.labels, p.containSplitterIndex, err = checkLabelAndSplitterKey(p.schema, p.labelList, p.containSplitterKey); err != nil {
 			return
 		}
+		if p.lazyQuotes || getLazyQuotes(p.schema) {
+			p.lazyQuotes = true
+		}
+
 		p.hasHeader = done
 		return nil, nil
 	}
 
 	d = make(Data)
-	parts := strings.Split(line, p.delim)
+
+	parts, err := parseCSV(line, p.delim, p.lazyQuotes)
+	if err != nil {
+		return nil, err
+	}
+
 	partsLength := len(parts)
 	schemaLength := len(p.schema)
 	if partsLength != schemaLength && !p.allowNotMatch && p.containSplitterIndex < 0 {
