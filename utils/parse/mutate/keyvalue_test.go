@@ -8,6 +8,20 @@ import (
 	"github.com/qiniu/logkit/utils/models"
 )
 
+// old: 500000	      2695 ns/op | 2550 ns/op | 2431 ns/op
+// new: 500000	      2789 ns/op | 3330 ns/op | 3010 ns/op
+func Benchmark_Parse(b *testing.B) {
+	line := "ts=2018-01-02T03:04:05.123Z lvl=info msg=\"http request\" method=PUT\nduration=1.23 log_id=123456abc"
+	sep := "="
+	l := Parser{
+		KeepString: false,
+		Splitter:   sep,
+	}
+	for n := 0; n < b.N; n++ {
+		l.Parse(line)
+	}
+}
+
 func Test_parseLine(t *testing.T) {
 	tests := []struct {
 		line       string
@@ -166,15 +180,14 @@ func Test_parseLine(t *testing.T) {
 			line: `"foo=" bar=abc`,
 			expectData: []models.Data{
 				{
-					"foo": "",
-					"bar": "abc",
+					"\"foo=\" bar": "abc",
 				},
 			},
 			existErr: false,
 			splitter: "=",
 		},
 		{
-			line: `foo= `,
+			line: `foo=`,
 			expectData: []models.Data{
 				{
 					"foo": "",
@@ -210,137 +223,91 @@ func Test_parseLine(t *testing.T) {
 	}
 }
 
-func Test_splitKV(t *testing.T) {
-
+func Test_getSepPos(t *testing.T) {
 	tests := []struct {
-		line       string
-		expectData []string
-		splitter   string
+		line     string
+		pos      int
+		splitter string
 	}{
 		{
-			line: "foo=",
-			expectData: []string{
-				"foo",
-				"",
-			},
+			line:     "foo=",
+			pos:      3,
 			splitter: "=",
 		},
 		{
-			line: "=def",
-			expectData: []string{
-				"",
-				"def",
-			},
+			line:     "=def",
+			pos:      0,
 			splitter: "=",
 		},
 		{
-			line: "foo=def abc = abc ",
-			expectData: []string{
-				"foo",
-				"def",
-				"abc",
-				"abc",
-			},
+			line:     "foo=def abc = abc ",
+			pos:      3,
 			splitter: "=",
 		},
 		{
-			line: "foo\n=def\nabc=a\nbc",
-			expectData: []string{
-				"foo",
-				"def",
-				"abc",
-				"a\nbc",
-			},
+			line:     "foo\n=def\nabc=a\nbc",
+			pos:      4,
 			splitter: "=",
 		},
 		{
-			line: "foo=def \n abc =abc",
-			expectData: []string{
-				"foo",
-				"def",
-				"abc",
-				"abc",
-			},
+			line:     " foo =def \n abc =abc",
+			pos:      5,
 			splitter: "=",
 		},
 		{
-			line: "foo=def\n abc=abc",
-			expectData: []string{
-				"foo",
-				"def",
-				"abc",
-				"abc",
-			},
+			line:     "\"foo\" =def\n abc=abc",
+			pos:      6,
 			splitter: "=",
 		},
 		{
-			line: "foo=def\n test abc=abc",
-			expectData: []string{
-				"foo",
-				"def\n test",
-				"abc",
-				"abc",
-			},
+			line:     "\"a=b\"a\"foo=def",
+			pos:      10,
 			splitter: "=",
-		},
-		{
-			line: "time=2018-01-02T03:04:05.123Z \nCST abc=abc",
-			expectData: []string{
-				"time",
-				"2018-01-02T03:04:05.123Z \nCST",
-				"abc",
-				"abc",
-			},
-			splitter: "=",
-		},
-		{
-			line: "foo:de:f ad abc:a:b:c",
-			expectData: []string{
-				"foo",
-				"de:f ad",
-				"abc",
-				"a:b:c",
-			},
-			splitter: ":",
-		},
-		{
-			line: "f:o:o::def",
-			expectData: []string{
-				"f:o:o",
-				"def",
-			},
-			splitter: "::",
-		},
-		{
-			line:       "f:o:o:def",
-			expectData: []string{},
-			splitter:   "::",
-		},
-		{
-			line:       "f:o:o:\n:def",
-			expectData: nil,
-			splitter:   "::",
-		},
-		{
-			line: "f:\no::a o:\n:def",
-			expectData: []string{
-				"f:\no",
-				"a o:\n:def",
-			},
-			splitter: "::",
-		},
-		{
-			line:       "f:o:o: \n :def",
-			expectData: []string{},
-			splitter:   "::",
 		},
 	}
 	for _, tt := range tests {
-		got := splitKV(tt.line, tt.splitter)
-		assert.Equal(t, len(tt.expectData), len(got))
-		for i, m := range got {
-			assert.Equal(t, tt.expectData[i], m)
-		}
+		assert.Equal(t, tt.pos, getSepPos(tt.line, tt.splitter))
+	}
+}
 
+func Test_getSpacePos(t *testing.T) {
+	tests := []struct {
+		line      string
+		pos       int
+		direction int
+	}{
+		{
+			line:      "foo=",
+			pos:       -1,
+			direction: 1,
+		},
+		{
+			line:      "=def",
+			pos:       -1,
+			direction: 1,
+		},
+		{
+			line:      "foo=def abc = abc ",
+			pos:       7,
+			direction: 1,
+		},
+		{
+			line:      "foo\n=def\nabc=a\nbc",
+			pos:       3,
+			direction: 1,
+		},
+		{
+			line:      " foo =def \n abc =abc",
+			pos:       0,
+			direction: 1,
+		},
+		{
+			line:      "\"name = a b\" foo=def",
+			pos:       12,
+			direction: 1,
+		},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.pos, getSpacePos(tt.line, tt.direction))
 	}
 }

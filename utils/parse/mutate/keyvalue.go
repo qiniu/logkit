@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/qiniu/logkit/utils/models"
 )
@@ -27,7 +28,6 @@ func (p *Parser) Parse(line string) ([]models.Data, error) {
 	)
 
 	for decoder.ScanValue(p.Splitter) {
-		// 消除双引号； 针对foo="" ,"foo=" 情况；其他情况如 a"b"c=d"e"f等首尾不出现引号的情况视作合法。
 		key = decoder.key
 		value = decoder.value
 		kNum := strings.Count(key, "\"")
@@ -50,7 +50,7 @@ func (p *Parser) Parse(line string) ([]models.Data, error) {
 		}
 
 		if len(key) == 0 {
-			return nil, fmt.Errorf("no value or key was parsed after logfmt, %s", errMsg)
+			return nil, fmt.Errorf("key was empty after parse, %s", errMsg)
 		}
 
 		dValue := decoder.value
@@ -73,17 +73,6 @@ func (p *Parser) Parse(line string) ([]models.Data, error) {
 	return []models.Data{field}, nil
 }
 
-func splitKV(line string, sep string) []string {
-
-	kvArr := make([]string, 0)
-	d := NewDecoder(line)
-	for d.ScanValue(sep) {
-		kvArr = append(kvArr, d.Key())
-		kvArr = append(kvArr, d.Value())
-	}
-	return kvArr
-}
-
 type Decoder struct {
 	line   string
 	sepPos int
@@ -102,15 +91,15 @@ func (d *Decoder) ScanValue(sep string) bool {
 		return false
 	}
 	if d.sepPos == 0 {
-		d.sepPos = strings.Index(d.line, sep)
+		d.sepPos = getSepPos(d.line, sep)
 	}
-	if d.sepPos < 0 || d.sepPos >= len(d.line) {
+	if d.sepPos <= 0 || d.sepPos >= len(d.line) {
 		return false
 	}
 	d.key = strings.TrimSpace(d.line[:d.sepPos])
-	firstSpace := strings.IndexFunc(d.line[d.sepPos:], unicode.IsSpace)
+	firstSpace := getSpacePos(d.line[d.sepPos:], 1)
 	if firstSpace != -1 {
-		nextSep := strings.Index(d.line[d.sepPos+firstSpace:], sep)
+		nextSep := getSepPos(d.line[d.sepPos+firstSpace:], sep)
 		// 找第二个key，key不能为空,两个sep之间必须有空格
 		preSepPos := d.sepPos + len(sep)
 		nextSepPos := d.sepPos + firstSpace + nextSep
@@ -119,11 +108,11 @@ func (d *Decoder) ScanValue(sep string) bool {
 				break
 			}
 			preSepPos = nextSepPos + len(sep)
-			nextSep = strings.Index(d.line[preSepPos:], sep)
+			nextSep = getSepPos(d.line[preSepPos:], sep)
 			nextSepPos = preSepPos + nextSep
 		}
 		if nextSep != -1 {
-			lastSpace := strings.LastIndexFunc(strings.TrimRightFunc(d.line[:nextSepPos], unicode.IsSpace), unicode.IsSpace)
+			lastSpace := getSpacePos(strings.TrimRightFunc(d.line[:nextSepPos], unicode.IsSpace), -1)
 			if lastSpace != -1 {
 				d.value = strings.TrimSpace(d.line[d.sepPos+len(sep) : lastSpace])
 				d.line = d.line[lastSpace+1:]
@@ -143,4 +132,45 @@ func (d *Decoder) Value() string {
 
 func (d *Decoder) Key() string {
 	return d.key
+}
+
+func getSepPos(line, sep string) int {
+	quoterCount := 0
+	for i,s := range line {
+		if i+len(sep) > len(line) {
+			break
+		}
+		if s == '"' {
+			quoterCount++
+		} else if line[i:i+len(sep)] == sep && quoterCount%2 == 0 {
+			return i
+		}
+	}
+	return strings.LastIndex(line, sep)
+}
+
+// direction=1 get first space position
+// direction=-1 get last space position
+func getSpacePos(line string, direction int) int {
+	quoterCount := 0
+	if direction > 0 {
+		for i,r := range line {
+			if r == '"' {
+				quoterCount++
+			} else if unicode.IsSpace(r) && quoterCount%2 == 0 {
+				return i
+			}
+		}
+	} else {
+		for i := len(line); i > 0; {
+			r, size := utf8.DecodeLastRuneInString(line[0:i])
+			i -= size
+			if r == '"' {
+				quoterCount++
+			} else if unicode.IsSpace(r) && quoterCount%2 == 0 {
+				return i
+			}
+		}
+	}
+	return -1
 }
