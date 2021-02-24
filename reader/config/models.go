@@ -10,6 +10,7 @@ const (
 	KeyAuthUsername = "auth_username"
 	KeyAuthPassword = "auth_password"
 
+	KeyRawDataTimeout    = "raw_data_timeout"
 	KeyLogPath           = "log_path"
 	KeyLogPathOld        = "log_path_old"
 	KeyMetaPath          = "meta_path"

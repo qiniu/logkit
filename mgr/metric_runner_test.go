@@ -200,8 +200,8 @@ func metricRunTest(p *testParam) {
 	base := filepath.Base("")
 	metaPath := "meta/" + runnerName + "_" + Hash(base)
 	t.Log("metaPath: ", metaPath)
-	for i := 0; !utils.IsExist(metaPath) && i < 6; i++ {
-		time.Sleep(500 * time.Millisecond)
+	for i := 0; !utils.IsExist(metaPath) && i < 20; i++ {
+		time.Sleep(1 * time.Second)
 		i++
 	}
 	assert.True(t, utils.IsExist(metaPath))

@@ -37,9 +37,8 @@ const (
 	DefaultRawDataBatchLen = 10
 	RawDataMaxBatchLines   = 100
 	DefaultRawDataSize     = 16 * 1024
+	DefaultRawDataTimeout  = 30
 )
-
-var RawDataTimeOut = 30 * time.Second
 
 // RawData 从 reader 模块中根据 type 获取多条字符串形式的样例日志
 func RawData(readerConfig conf.MapConf) ([]string, error) {
@@ -53,6 +52,10 @@ func RawData(readerConfig conf.MapConf) ([]string, error) {
 	}
 
 	runnerName, _ := readerConfig.GetString(GlobalKeyName)
+	rawDataTimeOut, _ := readerConfig.GetIntOr(config.KeyRawDataTimeout, DefaultRawDataTimeout)
+	if rawDataTimeOut < 10 || rawDataTimeOut > 300 {
+		rawDataTimeOut = DefaultRawDataTimeout
+	}
 	configMetaPath := runnerName + "_" + Hash(strconv.FormatInt(time.Now().Unix(), 10))
 	metaPath := filepath.Join(MetaTmp, configMetaPath)
 	log.Debugf("Runner[%v] Using %s as default metaPath", runnerName, metaPath)
@@ -108,7 +111,7 @@ func RawData(readerConfig conf.MapConf) ([]string, error) {
 		}
 		if atomic.LoadInt32(&timeoutStatus) == 1 {
 			if lastErr != nil {
-				readChan <- dataResult{lastErr:lastErr}
+				readChan <- dataResult{lastErr: lastErr}
 				return
 			}
 		}
@@ -116,7 +119,7 @@ func RawData(readerConfig conf.MapConf) ([]string, error) {
 	}()
 
 	var rawData []string
-	timeout := time.NewTimer(RawDataTimeOut)
+	timeout := time.NewTimer(time.Duration(rawDataTimeOut) * time.Second)
 	defer timeout.Stop()
 	select {
 	case de := <-readChan:

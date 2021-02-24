@@ -9,11 +9,10 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/qiniu/pandora-go-sdk/base/reqerr"
-
 	"github.com/stretchr/testify/assert"
 
 	"github.com/qiniu/log"
+	"github.com/qiniu/pandora-go-sdk/base/reqerr"
 	"github.com/qiniu/pandora-go-sdk/pipeline"
 
 	"github.com/qiniu/logkit/conf"
