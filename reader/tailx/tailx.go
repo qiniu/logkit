@@ -606,12 +606,19 @@ func (r *Reader) sendError(err error) {
 	if err == nil {
 		return
 	}
+	if r.isStopping() || r.hasStopped() {
+		log.Debugf("Runner[%s] reader %q is not running, send error operation ignored", r.meta.RunnerName, r.Name())
+		return
+	}
 	defer func() {
 		if rec := recover(); rec != nil {
 			log.Errorf("Reader %q was panicked and recovered from %v\nstack: %s", r.Name(), rec, debug.Stack())
 		}
 	}()
-	r.errChan <- err
+	select {
+	case r.errChan <- err:
+	case <- time.After(time.Second):
+	}
 }
 
 // checkExpiredFiles 函数关闭过期的文件，再更新

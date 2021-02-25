@@ -135,8 +135,7 @@ func Test_RawDataWithReadData(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-
-	RawDataTimeOut = 30 * time.Second
+	runnerConf.ReaderConfig[readerconf.KeyRawDataTimeout] = "30"
 	rawData, err := RawData(runnerConf.ReaderConfig)
 	if err != nil {
 		t.Error(err)
@@ -144,7 +143,6 @@ func Test_RawDataWithReadData(t *testing.T) {
 
 	expected := []string{"{\n  \"logkit\": \"logkit\"\n}"}
 	assert.Equal(t, expected, rawData)
-	RawDataTimeOut = 30 * time.Second
 }
 
 func Test_RawData_DaemonReader(t *testing.T) {
@@ -681,11 +679,11 @@ func Test_RawData_MultiLines(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"abc\n", "abc\n"}, actual)
 
-	RawDataTimeOut = 3 * time.Second
+	readConfig[readerconf.KeyRawDataTimeout] = "3"
 	os.RemoveAll(fileName)
 	createRawDataFile(fileName, "abc\n")
 	actual, err = RawData(readConfig)
-	RawDataTimeOut = 30 * time.Second
+	readConfig[readerconf.KeyRawDataTimeout] = "30"
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"abc\n"}, actual)
 }
