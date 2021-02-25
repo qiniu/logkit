@@ -166,6 +166,15 @@ func Test_parseLine(t *testing.T) {
 			splitter: "=",
 		},
 		{
+			line: "fo o=def  = abc ",
+			expectData: []string{
+				"fo o",
+				"def  = abc",
+			},
+			existErr: false,
+			splitter: "=",
+		},
+		{
 			line: `abc=abc foo="def`,
 			expectData: []models.Data{
 				{
