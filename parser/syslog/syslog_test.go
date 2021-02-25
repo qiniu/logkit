@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/qiniu/logkit/utils/parse/syslog"
 	"github.com/qiniu/logkit/conf"
 	. "github.com/qiniu/logkit/parser/config"
 	. "github.com/qiniu/logkit/utils/models"
@@ -225,4 +226,23 @@ func TestSyslogParser_ParseYear(t *testing.T) {
 	for _, dt := range dts {
 		assert.Equal(t, time.Now().Month().String(), dt["timestamp"].(time.Time).Month().String())
 	}
+}
+
+func TestSyslogParser_Detail(t *testing.T) {
+	c := conf.MapConf{}
+	c[KeyParserType] = "syslog"
+	c[KeySeverityDetail] = "true"
+	c[KeyFacilityDetail] = "true"
+	p, err := NewParser(c)
+	assert.Nil(t, err)
+	lines := []string{
+		`<34>Oct 11 22:14:15 mymachine very.large.syslog.message.tag: 'su root' failed for lonvick on /dev/pts/8`,
+	}
+	dts, err := p.Parse(lines)
+	assert.Nil(t, err)
+	ndata, err := p.Parse([]string{PandoraParseFlushSignal})
+	assert.Nil(t, err)
+	dts = append(dts, ndata...)
+	assert.Equal(t, syslog.MessageFacilities[4], dts[0][Facility])
+	assert.Equal(t, syslog.MessageSeverities[2], dts[0][Severity])
 }

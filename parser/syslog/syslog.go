@@ -146,14 +146,14 @@ func (p *SyslogParser) Parse(lines []string) ([]Data, error) {
 
 		if p.facilityDetail {
 			if v, ok := parseResult.Data[Facility]; ok {
-				code, _ := v.(int)
-				parseResult.Data[Facility] = syslog.MessageFacilities[code]
+				code, _ := v.(uint8)
+				parseResult.Data[Facility] = syslog.MessageFacilities[int(code)]
 			}
 		}
 		if p.severityDetail {
 			if v, ok := parseResult.Data[Severity]; ok {
-				code, _ := v.(int)
-				parseResult.Data[Severity] = syslog.MessageSeverities[code]
+				code, _ := v.(uint8)
+				parseResult.Data[Severity] = syslog.MessageSeverities[int(code)]
 			}
 		}
 		if parseResult.Err != nil {
