@@ -4,15 +4,16 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/qiniu/logkit/utils/parse/syslog"
 	"github.com/qiniu/logkit/conf"
 	. "github.com/qiniu/logkit/parser/config"
 	. "github.com/qiniu/logkit/utils/models"
+	"github.com/qiniu/logkit/utils/parse/syslog"
 )
 
 // 为了保证datasource不错乱，暂不支持多行采集，需要将socket采集中的获取方式改成按原始包读取
@@ -211,7 +212,6 @@ func TestSyslogParser_ParseYear(t *testing.T) {
 
 	c = conf.MapConf{}
 	c[KeyParserType] = "syslog"
-	c[KeyTimeZoneOffset] = "-8"
 	c[KeyRFC3164ParseYear] = "true"
 	p, err = NewParser(c)
 	assert.Nil(t, err)
@@ -245,4 +245,45 @@ func TestSyslogParser_Detail(t *testing.T) {
 	dts = append(dts, ndata...)
 	assert.Equal(t, syslog.MessageFacilities[4], dts[0][Facility])
 	assert.Equal(t, syslog.MessageSeverities[2], dts[0][Severity])
+}
+
+func TestSyslogParser3164_Month(t *testing.T) {
+	c := conf.MapConf{}
+	c[KeyParserType] = "syslog"
+	c[KeyRFC3164ParseYear] = "true"
+	p, err := NewParser(c)
+	assert.Nil(t, err)
+	lines := []string{
+		`<34>JAN 1 22:14:15 2019`,
+		`<34>jan 01 22:14:15 2019`,
+		`<34>FEB 2 22:14:15 2019`,
+		`<34>feb 02 22:14:15 2019`,
+		`<34>MAR 3 22:14:15 2019`,
+		`<34>mar 03 22:14:15 2019`,
+		`<34>APR 4 22:14:15 2019`,
+		`<34>apr 04 22:14:15 2019`,
+		`<34>MAY 5 22:14:15 2019`,
+		`<34>may 05 22:14:15 2019`,
+		`<34>JUN 6 22:14:15 2019`,
+		`<34>jun 06 22:14:15 2019`,
+		`<34>JUL 7 22:14:15 2019`,
+		`<34>jul 07 22:14:15 2019`,
+		`<34>AUG 8 22:14:15 2019`,
+		`<34>aug 08 22:14:15 2019`,
+		`<34>SEP 9 22:14:15 2019`,
+		`<34>sep 09 22:14:15 2019`,
+		`<34>OCT 10 22:14:15 2019`,
+		`<34>oct 11 22:14:15 2019`,
+		`<34>NOV 21 22:14:15 2019`,
+		`<34>nov 25 22:14:15 2019`,
+		`<34>DEC 31 22:14:15 2019`,
+		`<34>dec 31 22:14:15 2019`,
+	}
+	datas, err := p.Parse(lines)
+	assert.Nil(t, err)
+	for i, data := range datas {
+		expected, err := time.Parse("Jan _2 15:04:05 2006", strings.TrimPrefix(lines[i], "<34>"))
+		assert.Nil(t, err)
+		assert.Equal(t, expected.Format("2006-01-02 15:04:05 +0000 UTC"), data["timestamp"].(time.Time).String())
+	}
 }
