@@ -383,8 +383,11 @@ func (t *ZIP) next() (err error) {
 	if t.f != nil {
 		t.f.Close()
 	}
-	if t.idx >= 0 && t.idx < len(t.rd.File) {
+	for ;t.idx >= 0 && t.idx < len(t.rd.File); t.idx++ {
 		t.zipf = t.rd.File[t.idx]
+		if t.zipf.FileInfo().IsDir() {
+			continue
+		}
 		t.f, err = t.zipf.Open()
 		if err != nil {
 			return err
@@ -392,7 +395,9 @@ func (t *ZIP) next() (err error) {
 		t.sLock.Lock()
 		t.source = t.zipf.Name
 		t.sLock.Unlock()
-	} else {
+		break
+	}
+	if t.idx >= len(t.rd.File) || t.idx < 0 {
 		return io.EOF
 	}
 	t.idx++
