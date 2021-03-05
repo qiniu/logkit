@@ -404,7 +404,7 @@
 			"versionExact": "v3.0.0"
 		},
 		{
-			"checksumSHA1": "LW8IqSuDESCWaGBykseTzOVAEsw=",
+			"checksumSHA1": "PMJNwoONVNE+Jq7cvRaaBsOGWAo=",
 			"path": "github.com/influxdata/go-syslog/rfc3164",
 			"revision": "a1889d947b48b1519a4615c640d993551ad6d8fc",
 			"revisionTime": "2020-11-28T20:09:27Z",
