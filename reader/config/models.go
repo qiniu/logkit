@@ -197,6 +197,7 @@ const (
 	ElasticVersion3 = "3.x"
 	ElasticVersion5 = "5.x"
 	ElasticVersion6 = "6.x"
+	ElasticVersion7 = "7.x"
 )
 
 // Constants for HTTP

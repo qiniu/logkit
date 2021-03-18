@@ -900,7 +900,7 @@ var ModeKeyOptions = map[string][]Option{
 			KeyName:       KeyESVersion,
 			Default:       ElasticVersion5,
 			ChooseOnly:    true,
-			ChooseOptions: []interface{}{ElasticVersion3, ElasticVersion5, ElasticVersion6},
+			ChooseOptions: []interface{}{ElasticVersion3, ElasticVersion5, ElasticVersion6, ElasticVersion7},
 			Description:   "版本(es_version)",
 			ToolTip:       "版本，3.x包含了2.x",
 		},
