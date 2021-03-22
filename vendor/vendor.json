@@ -1290,6 +1290,24 @@
 			"versionExact": "v5.0.41"
 		},
 		{
+			"checksumSHA1": "Vf8Ybtz14VNmPVhot5y/oE/ZhHw=",
+			"path": "gopkg.in/olivere/elastic.v7",
+			"revision": "191f3388768e0b15e6505e6d38d36c364d592708",
+			"revisionTime": "2020-11-06T16:23:29Z"
+		},
+		{
+			"checksumSHA1": "SH8td/PJ5ld1vxwBwdqHu38rlTg=",
+			"path": "gopkg.in/olivere/elastic.v7/config",
+			"revision": "191f3388768e0b15e6505e6d38d36c364d592708",
+			"revisionTime": "2020-11-06T16:23:29Z"
+		},
+		{
+			"checksumSHA1": "xOfLRzyVrzXeLY3TNdlCuSXnw10=",
+			"path": "gopkg.in/olivere/elastic.v7/uritemplates",
+			"revision": "191f3388768e0b15e6505e6d38d36c364d592708",
+			"revisionTime": "2020-11-06T16:23:29Z"
+		},
+		{
 			"checksumSHA1": "CPHUrpTG/aFe3czKUifo/8I8PIo=",
 			"path": "gopkg.in/yaml.v2",
 			"revision": ""
