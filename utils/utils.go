@@ -29,6 +29,10 @@ func init() {
 
 var JSONTool = jsoniter.Config{UseNumber: true}.Froze()
 
+const (
+	Mb = 1024 * 1024
+)
+
 // IsExist checks whether a file or directory exists.
 // It returns false when the file or directory does not exist.
 func IsExist(path string) bool {
@@ -205,4 +209,13 @@ func WriteZipToFile(zipf *zip.File, filename string) error {
 		return err
 	}
 	return nil
+}
+
+func GetKeyOfNotEmptyValueInMap(m map[string]string) (key string, exist bool) {
+	for k, v := range m {
+		if v != "" {
+			return k, true
+		}
+	}
+	return "", false
 }
