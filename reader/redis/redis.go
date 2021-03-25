@@ -101,7 +101,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 
 	for _, val := range opt.key {
 		keyType, _ := client.Type(val).Result()
-		if dataType != keyType {
+		if keyType != "none" && dataType != keyType {
 			return nil, fmt.Errorf("key[%v]'s type expect as %v,actual get %v", val, dataType, keyType)
 		}
 	}
