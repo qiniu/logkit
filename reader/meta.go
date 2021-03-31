@@ -1,6 +1,7 @@
 package reader
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -512,6 +513,25 @@ func (m *Meta) AppendDoneFileInode(path string, inode uint64, offset int64) (err
 	defer f.Close()
 
 	_, err = fmt.Fprintf(f, "%s\t%v\t%v\t%s\n", path, inode, offset, time.Now().Format(time.RFC3339Nano))
+	return
+}
+
+func (m *Meta) SyncDoneFileInode(inodeOffset map[string]int64) (err error) {
+	f, err := os.OpenFile(m.DoneFile(), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, DefaultFilePerm)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	var data bytes.Buffer
+	for inodeFile, offset := range inodeOffset {
+		str := strings.Split(inodeFile, "_")
+		if len(str) != 2 {
+			continue
+		}
+		data.WriteString(fmt.Sprintf("%s\t%v\t%v\t%s\n", str[0], str[1], offset, time.Now().Format(time.RFC3339Nano)))
+	}
+	_, err = fmt.Fprintf(f, data.String())
 	return
 }
 

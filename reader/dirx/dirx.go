@@ -303,7 +303,6 @@ func (r *Reader) statLogPath() {
 			MsgChan:            r.msgChan,
 			ErrChan:            r.errChan,
 			ReadSameInode:      r.readSameInode,
-			expireMap:          r.expireMap,
 		}, r.notFirstTime, r.maxLineLen)
 		if err != nil {
 			if err == ErrAlreadyExist {

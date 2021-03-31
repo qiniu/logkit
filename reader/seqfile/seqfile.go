@@ -49,13 +49,11 @@ type SeqFile struct {
 	SkipFileFirstLine bool   //跳过新文件的第一行，常用于带title的csv文件，title与实际格式不同
 	hasSkiped         bool
 
-	inodeOffset      map[string]int64 //记录filename_inode是否已经读过
-	inodeSensitive bool            // 是否以inode信息作为 inodeDone 和 expireMap 的key值
+	inodeOffset    map[string]int64 //记录filename_inode是否已经读过
+	inodeSensitive bool             // 是否以inode信息作为 inodeDone 和 inodeOffset 的key值
 
 	lastSyncPath   string
 	lastSyncOffset int64
-
-	expireMap map[string]int64
 
 	ReadSameInode bool //记录已经读过的filename_inode是否继续读
 }
@@ -106,7 +104,7 @@ func getStartFile(path, whence string, meta *reader.Meta, sf *SeqFile) (f *os.Fi
 	return
 }
 
-func NewSeqFile(meta *reader.Meta, path string, ignoreHidden, newFileNewLine bool, suffixes []string, validFileRegex, whence string, expireMap map[string]int64, inodeSensitive bool) (sf *SeqFile, err error) {
+func NewSeqFile(meta *reader.Meta, path string, ignoreHidden, newFileNewLine bool, suffixes []string, validFileRegex, whence string, inodeSensitive bool) (sf *SeqFile, err error) {
 	sf = &SeqFile{
 		ignoreFileSuffix: suffixes,
 		ignoreHidden:     ignoreHidden,
@@ -115,7 +113,6 @@ func NewSeqFile(meta *reader.Meta, path string, ignoreHidden, newFileNewLine boo
 		newFileAsNewLine: newFileNewLine,
 		meta:             meta,
 		inodeOffset:      make(map[string]int64),
-		expireMap:        expireMap,
 		inodeSensitive:   inodeSensitive,
 	}
 	//原来的for循环替换成单次执行，启动的时候出错就直接报错给用户即可，不需要等待重试。
@@ -465,7 +462,7 @@ func (sf *SeqFile) getNextFileCondition() (condition func(os.FileInfo) bool, err
 			key = filepath.Base(f.Name())
 		}
 		offset, ok := sf.inodeOffset[key]
-		return !ok || (sf.ReadSameInode && offset != -1  && f.Size() != offset)
+		return !ok || (sf.ReadSameInode && offset != -1 && f.Size() != offset)
 	}
 
 	condition = reader.AndCondition(reader.AndCondition(newerThanCurrFile, sf.getIgnoreCondition()), isNewFile)
@@ -582,7 +579,7 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 		log.Warnf("Runner[%v] os.Open %s: %v", sf.meta.RunnerName, fname, err)
 		return err
 	}
-	sf.f = f
+
 	//开新的之前关掉老的
 	if sf.ratereader != nil {
 		sf.ratereader.Close()
@@ -593,6 +590,7 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 		sf.ratereader = f
 	}
 	sf.offset = sf.getOffset(f, 0, true)
+	sf.f = f
 	sf.inode, err = utilsos.GetIdentifyIDByPath(sf.currFile)
 	if err != nil {
 		return err
@@ -610,7 +608,7 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 	sf.inodeOffset[key] = doneFileOffset
 	tryTime := 0
 	for {
-		err := sf.meta.AppendDoneFileInode(doneFile, doneFileInode, doneFileOffset)
+		err := sf.meta.SyncDoneFileInode(sf.inodeOffset)
 		if err != nil {
 			if tryTime > 3 {
 				log.Errorf("Runner[%v] cannot write done file %s, err:%v, ignore this noefi", sf.meta.RunnerName, doneFile, err)
@@ -692,57 +690,39 @@ type LineSkipper interface {
 }
 
 func (sf *SeqFile) getOffset(f *os.File, offset int64, seek bool) int64 {
-	if len(sf.expireMap) == 0 || offset != 0 || f == nil {
-		return offset
-	}
-
-	if sf.meta.IsExist() {
-		deleteNotExist(filepath.Dir(f.Name()), sf.expireMap, sf.inodeSensitive)
+	if len(sf.inodeOffset) == 0 || offset != 0 || f == nil {
 		return offset
 	}
 
 	fileName := f.Name()
+	fileInfo, err := f.Stat()
+	if err != nil {
+		log.Errorf("Runner[%s] NewSeqFile get file %s info error %v, ignore...", sf.meta.RunnerName, fileName, err)
+		return offset
+	}
+
 	inode, err := utilsos.GetIdentifyIDByPath(fileName)
 	if err != nil {
 		log.Errorf("Runner[%s] NewSeqFile get file %s inode error %v, ignore...", sf.meta.RunnerName, fileName, err)
 		return offset
 	}
-	inodeStr := strconv.FormatUint(inode, 10)
+	var key string
 	if sf.inodeSensitive {
-		offset = sf.expireMap[inodeStr+"_"+fileName]
+		key = reader.JoinFileInode(fileName, strconv.FormatUint(inode, 10))
 	} else {
-		offset = sf.expireMap[fileName]
+		key = filepath.Base(fileName)
+	}
+	offset = sf.inodeOffset[key]
+	if fileInfo.Size() < offset {
+		offset = 0
 	}
 	if seek {
-		_, err = f.Seek(sf.offset, io.SeekStart)
+		_, err = f.Seek(offset, io.SeekStart)
 		if err != nil {
 			log.Errorf("Runner[%s] file: %s seek offset: %d failed: %v", sf.meta.RunnerName, f.Name(), sf.offset, err)
 		}
 	}
 	return offset
-}
-
-func deleteNotExist(dir string, expireMap map[string]int64, inodeSensitive bool) {
-	if dir == "" {
-		return
-	}
-	var arr []string
-	for inodeFile := range expireMap {
-		if inodeSensitive {
-			arr = strings.SplitN(inodeFile, "_", 2)
-			if len(arr) < 2 {
-				continue
-			}
-			if filepath.Dir(arr[1]) != dir {
-				continue
-			}
-		} else {
-			if filepath.Dir(inodeFile) != dir {
-				continue
-			}
-		}
-		delete(expireMap, inodeFile)
-	}
 }
 
 var (

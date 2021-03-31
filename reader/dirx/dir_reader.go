@@ -296,8 +296,6 @@ type newReaderOptions struct {
 	Whence             string
 	BufferSize         int
 
-	expireMap map[string]int64
-
 	MsgChan chan<- message
 	ErrChan chan<- error
 
@@ -330,7 +328,7 @@ func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool, maxLi
 			return nil, fmt.Errorf("new extract reader: %v", err)
 		}
 	} else {
-		fr, err := seqfile.NewSeqFile(subMeta, opts.LogPath, opts.IgnoreHidden, opts.NewFileNewLine, opts.IgnoreFileSuffixes, opts.ValidFilesRegex, opts.Whence, opts.expireMap, true)
+		fr, err := seqfile.NewSeqFile(subMeta, opts.LogPath, opts.IgnoreHidden, opts.NewFileNewLine, opts.IgnoreFileSuffixes, opts.ValidFilesRegex, opts.Whence, true)
 		if err != nil {
 			return nil, fmt.Errorf("new sequence file: %v", err)
 		}

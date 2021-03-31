@@ -391,7 +391,7 @@ func (b *BufReader) readBytes(delim []byte) ([]byte, error) {
 			}
 			nolog = true
 			lineLen = 0
-			full = make([][]byte, 0, len(full))	// 重新申请空间
+			full = make([][]byte, 0, len(full)) // 重新申请空间
 			continue
 		}
 		buf := make([]byte, fragLen)
@@ -646,7 +646,7 @@ func NewFileDirReader(meta *reader.Meta, conf conf.MapConf) (reader reader.Reade
 	newfileNewLine, _ := conf.GetBoolOr(KeyNewFileNewLine, false)
 	skipFirstLine, _ := conf.GetBoolOr(KeySkipFileFirstLine, false)
 	readSameInode, _ := conf.GetBoolOr(KeyReadSameInode, false)
-	fr, err := seqfile.NewSeqFile(meta, logpath, ignoreHidden, newfileNewLine, ignoreFileSuffix, validFilesRegex, whence, nil, inodeSensitive)
+	fr, err := seqfile.NewSeqFile(meta, logpath, ignoreHidden, newfileNewLine, ignoreFileSuffix, validFilesRegex, whence, inodeSensitive)
 	if err != nil {
 		return
 	}

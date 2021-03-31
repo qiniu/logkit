@@ -85,7 +85,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	validFilePattern, _ := conf.GetStringOr(KeyValidFilePattern, "*")
 	bufSize, _ := conf.GetIntOr(KeyBufSize, bufreader.DefaultBufSize)
 	skipFirstLine, _ := conf.GetBoolOr(KeySkipFileFirstLine, false)
-	sf, err := seqfile.NewSeqFile(meta, opts.directory, true, true, ignoredSuffixes, validFilePattern, WhenceOldest, nil, true)
+	sf, err := seqfile.NewSeqFile(meta, opts.directory, true, true, ignoredSuffixes, validFilePattern, WhenceOldest, true)
 	if err != nil {
 		return nil, err
 	}
