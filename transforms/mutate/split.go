@@ -18,8 +18,7 @@ var (
 type Spliter struct {
 	Key          string `json:"key"`
 	SeparateKey  string `json:"sep"`
-	ArrayName    string `json:"newfield"`
-	ArrayNameNew string `json:"new"`
+	ArrayName    string `json:"new"`
 
 	stats      StatsInfo
 	keys       []string
@@ -56,9 +55,6 @@ func (g *Spliter) Transform(datas []Data) ([]Data, error) {
 		resultChan   = make(chan transforms.TransformResult)
 		wg           = new(sync.WaitGroup)
 	)
-	if g.ArrayName == "" {
-		g.ArrayName = g.ArrayNameNew
-	}
 	if g.ArrayName == "" {
 		err = errors.New("array name is empty string,can't use as array field key name")
 		errNum = dataLen
@@ -120,7 +116,7 @@ func (g *Spliter) SampleConfig() string {
 		"type":"split",
 		"key":"SplitFieldKey",
 		"sep":",",
-		"newfield":"name"
+		"new":"name"
 	}`
 }
 
@@ -128,13 +124,13 @@ func (g *Spliter) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
 		{
-			KeyName:      "newfield",
+			KeyName:      "new",
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     true,
 			Placeholder:  "new_field_keyname",
 			DefaultNoUse: true,
-			Description:  "解析后数据的字段名(newfield)",
+			Description:  "解析后数据的字段名(new)",
 			CheckRegex:   CheckPattern,
 			Type:         transforms.TransformTypeString,
 		},

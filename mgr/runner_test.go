@@ -802,8 +802,8 @@ func TestReplaceTransforms(t *testing.T) {
 		"transforms":[{
 			"type":"replace",
 			"stage":"before_parser",
-			"old":"\\x",
-			"new":"\\\\x"
+			"old_string":"\\x",
+			"new_string":"\\\\x"
 		}],
 		"senders":[{
 			"name":"file_sender",
@@ -905,7 +905,7 @@ func TestSplitAndConvertTransforms(t *testing.T) {
 			"type":"split",
 			"key":"status",
 			"sep":",",
-			"newfield":"newarray"
+			"new":"newarray"
 		},{
 			"type":"convert",
 			"dsl":"newarray array(long)"
