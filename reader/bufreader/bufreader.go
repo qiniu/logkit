@@ -315,11 +315,7 @@ func (b *BufReader) readSlice(delim []byte) (line []byte, err error) {
 	defer b.mux.Unlock()
 	for {
 		if atomic.LoadInt32(&b.stopped) > 0 {
-			if !IsSelfRunner(b.Meta.RunnerName) {
-				log.Warn("BufReader was stopped while reading...")
-			} else {
-				log.Debug("BufReader was stopped while reading...")
-			}
+			log.Debug("BufReader was stopped while reading...")
 			return
 		}
 		// Search buffer.

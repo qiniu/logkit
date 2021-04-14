@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -149,11 +150,43 @@ func NewSeqFile(meta *reader.Meta, path string, ignoreHidden, newFileNewLine boo
 		sf.f = nil
 		sf.offset = 0
 	}
-	sf.inodeOffset = meta.GetDoneFileInode(sf.inodeSensitive)
 	sf.dir = dir
+	sf.inodeOffset = meta.GetDoneFileInode(sf.inodeSensitive)
+	sf.updateInodeOffset(whence)
 	sf.currFile = currFile
 	sf.name = "SeqFile:" + dir
 	return sf, nil
+}
+
+func (sf *SeqFile) updateInodeOffset(whence string) {
+	if whence != config.WhenceNewest {
+		return
+	}
+	if len(sf.inodeOffset) != 0 {
+		return
+	}
+	files, err := ioutil.ReadDir(sf.dir)
+	if err != nil {
+		log.Errorf("Runner[%v] %v read dir error %v", sf.meta.RunnerName, sf.dir, err)
+		return
+	}
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+		inode, err := utilsos.GetIdentifyIDByPath(filepath.Join(sf.dir, f.Name()))
+		if err != nil {
+			log.Errorf("Runner[%s] NewSeqFile get file %s inode error %v, ignore...", sf.meta.RunnerName, f.Name(), err)
+			continue
+		}
+		var key string
+		if sf.inodeSensitive {
+			key = reader.JoinFileInode(f.Name(), strconv.FormatUint(inode, 10))
+		} else {
+			key = filepath.Base(f.Name())
+		}
+		sf.inodeOffset[key] = f.Size()
+	}
 }
 
 func (sf *SeqFile) getIgnoreCondition() func(os.FileInfo) bool {
@@ -424,7 +457,7 @@ func (sf *SeqFile) getNextFileCondition() (condition func(os.FileInfo) bool, err
 		}
 		return
 	}
-	currFi, err := os.Stat(sf.currFile)
+	_, err = os.Stat(sf.currFile)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			// 日志读取错误
@@ -435,9 +468,6 @@ func (sf *SeqFile) getNextFileCondition() (condition func(os.FileInfo) bool, err
 		// 当前读取的文件已经被删除
 		log.Debugf("Runner[%v] stat current file [%v] error %v, start to find the oldest file", sf.meta.RunnerName, sf.currFile, err)
 		return
-	}
-	newerThanCurrFile := func(f os.FileInfo) bool {
-		return f.ModTime().UnixNano() >= currFi.ModTime().UnixNano()
 	}
 
 	isNewFile := func(f os.FileInfo) bool {
@@ -465,7 +495,7 @@ func (sf *SeqFile) getNextFileCondition() (condition func(os.FileInfo) bool, err
 		return !ok || (sf.ReadSameInode && offset != -1 && f.Size() != offset)
 	}
 
-	condition = reader.AndCondition(reader.AndCondition(newerThanCurrFile, sf.getIgnoreCondition()), isNewFile)
+	condition = reader.AndCondition(sf.getIgnoreCondition(), isNewFile)
 	return
 }
 
@@ -572,30 +602,11 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 	doneFileInode := sf.inode
 	doneFileOffset := sf.offset
 	sf.lastFile = doneFile
-	fname := fi.Name()
-	sf.currFile = filepath.Join(sf.dir, fname)
-	f, err := os.Open(sf.currFile)
-	if err != nil {
-		log.Warnf("Runner[%v] os.Open %s: %v", sf.meta.RunnerName, fname, err)
-		return err
-	}
 
 	//开新的之前关掉老的
 	if sf.ratereader != nil {
 		sf.ratereader.Close()
 	}
-	if sf.meta.Readlimit > 0 {
-		sf.ratereader = rateio.NewRateReader(f, sf.meta.Readlimit)
-	} else {
-		sf.ratereader = f
-	}
-	sf.offset = sf.getOffset(f, 0, true)
-	sf.f = f
-	sf.inode, err = utilsos.GetIdentifyIDByPath(sf.currFile)
-	if err != nil {
-		return err
-	}
-	log.Infof("Runner[%v] %s - start tail new file: %s", sf.meta.RunnerName, sf.dir, fname)
 	if sf.inodeOffset == nil {
 		sf.inodeOffset = make(map[string]int64)
 	}
@@ -621,6 +632,25 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 		}
 		break
 	}
+	filename := fi.Name()
+	sf.currFile = filepath.Join(sf.dir, filename)
+	f, err := os.Open(sf.currFile)
+	if err != nil {
+		log.Warnf("Runner[%v] os.Open %s: %v", sf.meta.RunnerName, filename, err)
+		return err
+	}
+	if sf.meta.Readlimit > 0 {
+		sf.ratereader = rateio.NewRateReader(f, sf.meta.Readlimit)
+	} else {
+		sf.ratereader = f
+	}
+	sf.offset = sf.getOffset(f, 0, true)
+	sf.f = f
+	sf.inode, err = utilsos.GetIdentifyIDByPath(sf.currFile)
+	if err != nil {
+		return err
+	}
+	log.Infof("Runner[%v] %s - start tail new file: %s", sf.meta.RunnerName, sf.dir, filename)
 	return
 }
 
