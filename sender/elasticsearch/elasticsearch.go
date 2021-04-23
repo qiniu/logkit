@@ -8,10 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/json-iterator/go"
+	jsoniter "github.com/json-iterator/go"
 	elasticV6 "github.com/olivere/elastic"
 	elasticV3 "gopkg.in/olivere/elastic.v3"
 	elasticV5 "gopkg.in/olivere/elastic.v5"
+	elasticV7 "gopkg.in/olivere/elastic.v7"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
@@ -36,6 +37,7 @@ type Sender struct {
 	elasticV3Client *elasticV3.Client
 	elasticV5Client *elasticV5.Client
 	elasticV6Client *elasticV6.Client
+	elasticV7Client *elasticV7.Client
 
 	aliasFields map[string]string
 
@@ -93,7 +95,25 @@ func NewSender(conf conf.MapConf) (elasticSender sender.Sender, err error) {
 	var elasticV3Client *elasticV3.Client
 	var elasticV5Client *elasticV5.Client
 	var elasticV6Client *elasticV6.Client
+	var elasticV7Client *elasticV7.Client
+
 	switch eVersion {
+	case ElasticVersion7:
+		optFns := []elasticV7.ClientOptionFunc{
+			elasticV7.SetSniff(false),
+			elasticV7.SetHealthcheck(false),
+			elasticV7.SetURL(host...),
+			elasticV7.SetGzip(enableGzip),
+		}
+
+		if len(authUsername) > 0 && len(authPassword) > 0 {
+			optFns = append(optFns, elasticV7.SetBasicAuth(authUsername, authPassword))
+		}
+
+		elasticV7Client, err = elasticV7.NewClient(optFns...)
+		if err != nil {
+			return nil, err
+		}
 	case ElasticVersion6:
 		optFns := []elasticV6.ClientOptionFunc{
 			elasticV6.SetSniff(false),
@@ -156,6 +176,7 @@ func NewSender(conf conf.MapConf) (elasticSender sender.Sender, err error) {
 		elasticV3Client: elasticV3Client,
 		elasticV5Client: elasticV5Client,
 		elasticV6Client: elasticV6Client,
+		elasticV7Client: elasticV7Client,
 		eType:           eType,
 		aliasFields:     fields,
 		intervalIndex:   i,

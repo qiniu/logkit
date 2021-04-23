@@ -130,6 +130,7 @@ const (
 	ElasticVersion5 = "5.x"
 	// ElasticVersion6 v6.x
 	ElasticVersion6 = "6.x"
+	ElasticVersion7 = "7.x"
 
 	//timeZone
 	KeylocalTimezone = "Local"
@@ -208,11 +209,11 @@ const (
 	KeyKafkaCompressionSnappy = "snappy"
 	KeyKafkaCompressionLZ4    = "lz4"
 
-	KeyKafkaHost     = "kafka_host"      //主机地址,可以有多个
-	KeyKafkaTopic    = "kafka_topic"     //topic 1.填一个值,则topic为所填值 2.天两个值: %{[字段名]}, defaultTopic :根据每条event,以指定字段值为topic,若无,则用默认值
-	KeyKafkaClientId = "kafka_client_id" //客户端ID
-	KeySaslUsername  = "kafka_sasl_username"   //SASL用户名
-	KeySaslPassword  = "kafka_sasl_password"   //SASL密码
+	KeyKafkaHost     = "kafka_host"          //主机地址,可以有多个
+	KeyKafkaTopic    = "kafka_topic"         //topic 1.填一个值,则topic为所填值 2.天两个值: %{[字段名]}, defaultTopic :根据每条event,以指定字段值为topic,若无,则用默认值
+	KeyKafkaClientId = "kafka_client_id"     //客户端ID
+	KeySaslUsername  = "kafka_sasl_username" //SASL用户名
+	KeySaslPassword  = "kafka_sasl_password" //SASL密码
 	//KeyKafkaFlushNum = "kafka_flush_num"				//缓冲条数
 	//KeyKafkaFlushFrequency = "kafka_flush_frequency"	//缓冲频率
 	KeyKafkaRetryMax                  = "kafka_retry_max"        //最大重试次数
