@@ -18,8 +18,8 @@ var (
 type Replacer struct {
 	StageTime string `json:"stage"`
 	Key       string `json:"key"`
-	Old       string `json:"old"`
-	New       string `json:"new"`
+	Old       string `json:"old_string"`
+	New       string `json:"new_string"`
 	Regex     bool   `json:"regex"`
 	stats     StatsInfo
 	Regexp    *regexp.Regexp
@@ -102,8 +102,8 @@ func (g *Replacer) SampleConfig() string {
 		"type":"replace",
 		"stage":"before_parser",
 		"key":"MyReplaceFieldKey",
-		"old":"myOldString",
-		"new":"myNewString",
+		"old_string":"myOldString",
+		"new_string":"myNewString",
         "regex":"false"
 	}`
 }
@@ -113,23 +113,23 @@ func (g *Replacer) ConfigOptions() []Option {
 		transforms.KeyStage,
 		transforms.KeyFieldName,
 		{
-			KeyName:      "old",
+			KeyName:      "old_string",
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     true,
 			Placeholder:  "myOldString",
 			DefaultNoUse: true,
-			Description:  "要替换的字符串内容(old)",
+			Description:  "要替换的字符串内容(old_string)",
 			Type:         transforms.TransformTypeString,
 		},
 		{
-			KeyName:      "new",
+			KeyName:      "new_string",
 			ChooseOnly:   false,
 			Default:      "",
 			Required:     false,
 			Placeholder:  "myNewString",
 			DefaultNoUse: true,
-			Description:  "替换为的字符串内容(new)",
+			Description:  "替换为的字符串内容(new_string)",
 			Type:         transforms.TransformTypeString,
 		},
 		{
