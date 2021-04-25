@@ -21,7 +21,7 @@ import (
 )
 
 func createFileWithContent(filepathn, lines string) {
-	file, err := os.OpenFile(filepathn, os.O_CREATE|os.O_WRONLY, DefaultFilePerm)
+	file, err := os.OpenFile(filepathn, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, DefaultFilePerm)
 	if err != nil {
 		log.Error(err)
 		return
@@ -641,7 +641,6 @@ func multiReaderNewestOffsetTest(t *testing.T) {
 
 	createDirWithName(dir1)
 	createFileWithContent(dir1file1, "abc123\nabc124\nabc125\nabc126\nabc127\n")
-	time.Sleep(15 * time.Second)
 	expectResults := map[string]int{
 		"abc\nx\n": 1,
 		"abc\ny\n": 1,
@@ -728,6 +727,10 @@ func multiReaderNewestOffsetTest(t *testing.T) {
 }
 
 func multiReaderSameInodeTest(t *testing.T) {
+	
+}
+
+func TestMultiReaderSameInodeTest(t *testing.T) {
 	dirname := "multiReaderSameInodeTest"
 	dir1 := filepath.Join(dirname, "logs/abc")
 	dir2 := filepath.Join(dirname, "logs/xyz")
@@ -745,8 +748,7 @@ func multiReaderSameInodeTest(t *testing.T) {
 		"abc124\n": 3,
 		"abc125\n": 3,
 		"abc126\n": 3,
-		"abc127\n": 3,
-		"abc128\n": 1,
+		"abc127\n": 2,
 		"abc\nx\n": 1,
 		"abc\ny\n": 1,
 		"abc\nz\n": 1,
@@ -823,7 +825,7 @@ func multiReaderSameInodeTest(t *testing.T) {
 		}
 	}
 	t.Log("Reader has finished reading two")
-	createFileWithContent(dir1file1, "abc123\nabc124\nabc125\nabc126\nabc127\nabc128\n")
+	createFileWithContent(dir1file1, "abc123\nabc124\nabc125\nabc126\n")
 	time.Sleep(5 * time.Second)
 	assert.Equal(t, 2, dr.dirReaders.Num(), "Number of readers")
 

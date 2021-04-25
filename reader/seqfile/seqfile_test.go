@@ -14,7 +14,6 @@ import (
 	"github.com/qiniu/logkit/reader"
 	. "github.com/qiniu/logkit/reader/config"
 	. "github.com/qiniu/logkit/reader/test"
-	"github.com/qiniu/logkit/utils"
 	. "github.com/qiniu/logkit/utils/models"
 )
 
@@ -34,7 +33,7 @@ func Test_Read(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, "*", WhenceOldest, nil, true)
+	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, "*", WhenceOldest, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -109,7 +108,7 @@ func Test_NewReaderWithoutFile(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, "*", WhenceOldest, nil, true)
+	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, "*", WhenceOldest, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -135,7 +134,7 @@ func Test_NewReaderWithQiniuLogFile(t *testing.T) {
 	createInvalidSuffixFile(Dir)
 	defer DestroyDir()
 
-	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, `logkit.log-*`, WhenceOldest, nil, true)
+	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, `logkit.log-*`, WhenceOldest, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -159,7 +158,7 @@ func Test_NewFileNewLine(t *testing.T) {
 	createInvalidSuffixFile(Dir)
 	defer DestroyDir()
 
-	sf, err := NewSeqFile(meta, Dir, false, true, []string{".pid"}, `*`, WhenceOldest, nil, true)
+	sf, err := NewSeqFile(meta, Dir, false, true, []string{".pid"}, `*`, WhenceOldest, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -182,7 +181,7 @@ func Test_NewReaderWithInvalidFile(t *testing.T) {
 	createInvalidSuffixFile(Dir)
 	defer DestroyDir()
 
-	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, `test-logkit.log-*ss`, WhenceOldest, nil, true)
+	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, `test-logkit.log-*ss`, WhenceOldest, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -200,7 +199,7 @@ func Test_ReadWhenDelete(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, "*", WhenceOldest, nil, true)
+	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, "*", WhenceOldest, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -229,7 +228,7 @@ func Test_ReadNewest(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, "*", WhenceNewest, nil, true)
+	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, "*", WhenceNewest, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -315,7 +314,7 @@ func TestLag(t *testing.T) {
 	createInvalidSuffixFile(Dir)
 	defer DestroyDir()
 
-	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, `logkit.log-*`, WhenceOldest, nil, true)
+	sf, err := NewSeqFile(meta, Dir, false, false, []string{".pid"}, `logkit.log-*`, WhenceOldest, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -349,7 +348,7 @@ func Test_NewFileNewLine2(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	sf, err := NewSeqFile(meta, Dir, false, true, []string{".pid"}, "*", WhenceOldest, nil, true)
+	sf, err := NewSeqFile(meta, Dir, false, true, []string{".pid"}, "*", WhenceOldest, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -380,7 +379,7 @@ func Test_NewFileNewLine3(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	sf, err := NewSeqFile(meta, Dir, false, true, []string{".pid"}, "*", WhenceOldest, nil, true)
+	sf, err := NewSeqFile(meta, Dir, false, true, []string{".pid"}, "*", WhenceOldest, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -418,34 +417,23 @@ func Test_NewFileOffset(t *testing.T) {
 		t.Error(err)
 	}
 
-	expireMap := make(map[string]int64)
 	dirPath, _, err := GetRealPath(Dir)
 	assert.Nil(t, err)
-	fileMap, err := utils.GetFiles("", dirPath)
-	assert.Nil(t, err)
-	assert.EqualValues(t, 3, len(fileMap))
-	utils.UpdateExpireMap("", fileMap, expireMap)
-	t.Log("expireMap: ", expireMap)
 
-	sf, err := NewSeqFile(meta, dirPath, false, false, []string{".pid"}, "*", WhenceOldest, expireMap, true)
+	sf, err := NewSeqFile(meta, dirPath, false, false, []string{".pid"}, "*", WhenceOldest, true)
 	if err != nil {
 		t.Error(err)
 	}
 	buffer := make([]byte, 5)
 	_, err = sf.Read(buffer)
 	assert.Error(t, io.EOF, err)
-	assert.Equal(t, string(make([]byte, 5)), string(buffer))
+	assert.Equal(t, "22345", string(buffer))
 
 	AppendFiles(1000)
 
 	_, err = sf.Read(buffer)
 	assert.NoError(t, err)
-	assert.Equal(t, Appends[2], string(buffer))
-
-	buffer = make([]byte, 5)
-	_, err = sf.Read(buffer)
-	assert.Equal(t, io.EOF, err)
-	assert.Equal(t, string(make([]byte, 5)), string(buffer))
+	assert.Equal(t, "67891", string(buffer))
 }
 
 func Test_INode(t *testing.T) {
@@ -454,7 +442,7 @@ func Test_INode(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	sf, err := NewSeqFile(meta, Dir, false, true, []string{".pid"}, "*", WhenceOldest, nil, true)
+	sf, err := NewSeqFile(meta, Dir, false, true, []string{".pid"}, "*", WhenceOldest, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -501,7 +489,7 @@ func Test_INode(t *testing.T) {
 	file.WriteString("hello2")
 	file.Close()
 
-	sf, err = NewSeqFile(meta, Dir, false, true, []string{".pid"}, "*", WhenceOldest, nil, true)
+	sf, err = NewSeqFile(meta, Dir, false, true, []string{".pid"}, "*", WhenceOldest, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -514,39 +502,4 @@ func Test_INode(t *testing.T) {
 	buffer = make([]byte, 10)
 	_, err = sf.Read(buffer)
 	assert.Equal(t, io.EOF, err)
-}
-
-func Test_deleteNotExist(t *testing.T) {
-	tests := []struct {
-		dir       string
-		expireMap map[string]int64
-		expect    map[string]int64
-	}{
-		{},
-		{
-			dir:       "a/b",
-			expireMap: map[string]int64{"1_a/b/c/d/e.log": 1, "2_a/b/test.log": 2, "3_b/c/d.log": 3},
-			expect:    map[string]int64{"1_a/b/c/d/e.log": 1, "3_b/c/d.log": 3},
-		},
-		{
-			dir:       "",
-			expireMap: map[string]int64{"2_a/b/c/test.log": 2, "3_test.log": 3},
-			expect:    map[string]int64{"2_a/b/c/test.log": 2, "3_test.log": 3},
-		},
-		{
-			dir:       ".",
-			expireMap: map[string]int64{"2_a/b/c/test.log": 2, "3_test.log": 3},
-			expect:    map[string]int64{"2_a/b/c/test.log": 2},
-		},
-	}
-
-	for _, test := range tests {
-		deleteNotExist(test.dir, test.expireMap, true)
-		assert.EqualValues(t, len(test.expect), len(test.expireMap))
-		for key, value := range test.expect {
-			val, ok := test.expireMap[key]
-			assert.True(t, ok)
-			assert.EqualValues(t, value, val)
-		}
-	}
 }
