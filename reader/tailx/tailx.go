@@ -696,6 +696,11 @@ func (r *Reader) checkExpiredFiles() {
 }
 
 func (r *Reader) statLogPath() {
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Errorf("Reader %q was panicked and recovered from %v\nstack: %s", r.Name(), rec, debug.Stack())
+		}
+	}()
 	//达到最大打开文件数，不再追踪
 	if len(r.fileReaders) >= r.maxOpenFiles {
 		if !IsSelfRunner(r.meta.RunnerName) {

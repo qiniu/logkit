@@ -703,6 +703,9 @@ func GetRealPath(path string) (newPath string, fi os.FileInfo, err error) {
 		}
 		log.Infof("%s is symbol link to %v", path, newPath)
 		fi, err = os.Lstat(newPath)
+		if err != nil {
+			return
+		}
 	}
 	newPath, err = filepath.Abs(newPath)
 	if err != nil {
