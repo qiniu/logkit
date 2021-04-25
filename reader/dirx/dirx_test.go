@@ -168,7 +168,7 @@ func multiReaderOneLineTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxNum >= 18 || emptyNum > 10 {
+		if maxNum >= 60 || emptyNum > 60 {
 			break
 		}
 	}
@@ -237,7 +237,7 @@ func multiReaderMultiLineTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxNum >= 7 || emptyNum > 10 {
+		if maxNum >= 60 || emptyNum > 60 {
 			break
 		}
 	}
@@ -264,7 +264,7 @@ func multiReaderMultiLineTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxNum >= 10 || emptyNum > 10 {
+		if maxNum >= 60 || emptyNum > 60 {
 			break
 		}
 	}
@@ -340,7 +340,7 @@ func multiReaderSyncMetaOneLineTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxNum >= 2 || emptyNum > 10 {
+		if maxNum >= 60 || emptyNum > 60 {
 			break
 		}
 	}
@@ -369,7 +369,7 @@ func multiReaderSyncMetaOneLineTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxNum >= 9 || emptyNum > 10 {
+		if maxNum >= 60 || emptyNum > 60 {
 			break
 		}
 	}
@@ -396,7 +396,7 @@ func multiReaderSyncMetaOneLineTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxNum >= 12 || emptyNum > 10 {
+		if maxNum >= 60 || emptyNum > 60 {
 			break
 		}
 	}
@@ -471,7 +471,7 @@ func multiReaderSyncMetaMutilineTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxNum >= 5 || emptyNum > 10 {
+		if maxNum >= 60 || emptyNum > 60 {
 			break
 		}
 	}
@@ -501,7 +501,7 @@ func multiReaderSyncMetaMutilineTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxNum >= 7 || emptyNum > 10 {
+		if maxNum >= 60 || emptyNum > 60 {
 			break
 		}
 	}
@@ -527,7 +527,7 @@ func multiReaderSyncMetaMutilineTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxNum >= 10 || emptyNum > 10 {
+		if maxNum >= 60 || emptyNum > 60 {
 			break
 		}
 	}
@@ -619,7 +619,7 @@ func multiReaderNewestTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxNum >= 3 || emptyNum > 10 {
+		if maxNum >= 60 || emptyNum > 60 {
 			break
 		}
 	}
@@ -689,7 +689,7 @@ func multiReaderNewestOffsetTest(t *testing.T) {
 		} else {
 			emptyNum++
 		}
-		if emptyNum > 5 {
+		if emptyNum > 60 {
 			break
 		}
 	}
@@ -717,7 +717,7 @@ func multiReaderNewestOffsetTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxNum >= 6 || emptyNum > 10 {
+		if maxNum >= 60 || emptyNum > 60 {
 			break
 		}
 	}
@@ -791,7 +791,7 @@ func multiReaderSameInodeTest(t *testing.T) {
 		} else {
 			emptyNum++
 		}
-		if maxNum >= 10 || emptyNum > 5 {
+		if maxNum >= 60 || emptyNum > 60 {
 			break
 		}
 	}
@@ -818,7 +818,7 @@ func multiReaderSameInodeTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxNum >= 13 || emptyNum > 10 {
+		if maxNum >= 60 || emptyNum > 60 {
 			break
 		}
 	}
@@ -841,7 +841,7 @@ func multiReaderSameInodeTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxNum >= 19 || emptyNum > 10 {
+		if maxNum >= 60 || emptyNum > 60 {
 			break
 		}
 	}
@@ -924,7 +924,7 @@ func readerExpireDeleteTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxNum >= 18 || emptyNum > 10 {
+		if maxNum >= 100 || emptyNum > 100 {
 			break
 		}
 	}
@@ -1072,7 +1072,7 @@ func readerExpireDeleteTarTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxNum >= 18 || emptyNum > 10 {
+		if maxNum >= 60 || emptyNum > 60 {
 			break
 		}
 	}
@@ -1155,7 +1155,7 @@ func TestMultiReaderReset(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxNum >= 8 || emptyNum > 10 {
+		if maxNum >= 60 || emptyNum > 60 {
 			break
 		}
 	}
@@ -1193,7 +1193,7 @@ func TestMultiReaderReset(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxNum >= 8 || emptyNum > 10 {
+		if maxNum >= 60 || emptyNum > 60 {
 			break
 		}
 	}
@@ -1254,7 +1254,7 @@ func TestReaderErrBegin(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxNum >= 8 {
+		if maxNum >= 60 {
 			break
 		}
 	}
