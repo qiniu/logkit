@@ -73,7 +73,7 @@ type Reader struct {
 }
 
 func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
-	opts, err := buildSyncOptions(conf)
+	opts, err := buildSyncOptions(meta, conf)
 	if err != nil {
 		return nil, err
 	}
@@ -182,17 +182,14 @@ func GetS3UserInfo(conf conf.MapConf) (bucket, prefix, region, endpoint, ak, sk 
 	return
 }
 
-func buildSyncOptions(conf conf.MapConf) (*syncOptions, error) {
+func buildSyncOptions(meta *reader.Meta, conf conf.MapConf) (*syncOptions, error) {
 	var opts syncOptions
 	var err error
 	opts.bucket, opts.prefix, opts.region, opts.endpoint, opts.accessKey, opts.secretKey, err = GetS3UserInfo(conf)
 	if err != nil {
 		return nil, err
 	}
-	runnerName, err := conf.GetString(KeyRunnerName)
-	if err != nil {
-		return nil, err
-	}
+	runnerName, _ := conf.GetStringOr(KeyRunnerName, meta.RunnerName)
 	opts.directory, _ = conf.GetStringOr(KeySyncDirectory, "")
 	if opts.directory == "" {
 		_, opts.directory = GetDefaultSyncDir(opts.bucket, opts.prefix, opts.region, opts.accessKey, opts.secretKey, runnerName)
