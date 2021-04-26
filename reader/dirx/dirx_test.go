@@ -1079,6 +1079,7 @@ func readerExpireDeleteTarTest(t *testing.T) {
 		}
 	}
 	t.Log("maxNum ", maxNum, "emptyNum", emptyNum)
+	time.Sleep(60 * time.Second)
 	assert.EqualValues(t, len(expectResults), len(actualResults))
 	for k, v := range expectResults {
 		actualV, ok := actualResults[k]

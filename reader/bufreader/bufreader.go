@@ -54,16 +54,17 @@ type LastSync struct {
 
 // BufReader implements buffering for an FileReader object.
 type BufReader struct {
-	stopped       int32
-	buf           []byte
-	delim         []byte
-	mutiLineCache *LineCache
-	rd            reader.FileReader // reader provided by the client
-	r, w          int               // buf read and write positions
-	err           error
-	lastByte      int
-	lastRuneSize  int
-	lastSync      LastSync
+	stopped          int32
+	buf              []byte
+	delim            []byte
+	mutiLineCache    *LineCache
+	waitForWholeLine bool              //readWholeLine
+	rd               reader.FileReader // reader provided by the client
+	r, w             int               // buf read and write positions
+	err              error
+	lastByte         int
+	lastRuneSize     int
+	lastSync         LastSync
 
 	runTime reader.RunTime
 
@@ -88,7 +89,7 @@ type BufReader struct {
 const minReadBufferSize = 16
 
 //最大连续读到空的尝试次数
-const maxConsecutiveEmptyReads = 10
+const maxConsecutiveEmptyReads = 40
 
 // NewReaderSize returns a new Reader whose buffer has at least the specified
 // size. If the argument FileReader is already a Reader with large enough
@@ -189,6 +190,11 @@ func (b *BufReader) SetMode(mode string, v interface{}) (err error) {
 	return
 }
 
+func (b *BufReader) SetWaitFlagForWholeLine() {
+	b.waitForWholeLine = true
+	return
+}
+
 func (b *BufReader) SetRunTime(mode string, v interface{}) (err error) {
 	b.runTime, err = reader.ParseRunTimeWithMode(mode, v)
 	return err
@@ -280,6 +286,17 @@ func (b *BufReader) fill() {
 		}
 
 		b.w += n
+
+		if err == io.EOF && b.waitForWholeLine {
+			if i == 1 { //when last attempts,return err info;
+				b.err = err
+				return
+			}
+
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
 		if err != nil {
 			b.err = err
 			return
@@ -287,6 +304,7 @@ func (b *BufReader) fill() {
 		if n > 0 {
 			return
 		}
+
 	}
 	b.err = io.ErrNoProgress
 }
@@ -666,7 +684,9 @@ func NewSingleFileReader(meta *reader.Meta, conf conf.MapConf) (reader reader.Re
 		return
 	}
 	maxLineLen, _ := conf.GetInt64Or(KeyRunnerMaxLineLen, 0)
-	return NewReaderSize(fr, meta, bufSize, maxLineLen)
+	r, err := NewReaderSize(fr, meta, bufSize, maxLineLen)
+	r.SetWaitFlagForWholeLine()
+	return r, err
 }
 
 func init() {
