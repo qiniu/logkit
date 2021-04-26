@@ -68,29 +68,34 @@ type Reader struct {
 	stats     StatsInfo
 	statsLock sync.RWMutex
 
-	Cron                   *cron.Cron //定时任务
-	execOnStart            bool
-	isLoop                 bool
-	loopDuration           time.Duration
-	cronOffsetKey          string
-	cronOffsetValue        interface{}
-	cronOffsetValueIsValid bool
-	metaFile               string
-	esindex                string //es索引
-	estype                 string //es type
-	eshost                 string //eshost+port
-	authUsername           string
-	authPassword           string
-	readBatch              int    // 每次读取的数据量
-	keepAlive              string //scrollID 保留时间
-	esVersion              string //ElasticSearch version
-	offset                 string // 当前处理es的offset
-	dateShift              bool
-	dateShiftOffset        int
-	elasticV3Client        *elasticV3.Client
-	elasticV5Client        *elasticV5.Client
-	elasticV6Client        *elasticV6.Client
-	elasticV7Client        *elasticV7.Client
+	Cron            *cron.Cron //定时任务
+	execOnStart     bool
+	isLoop          bool
+	loopDuration    time.Duration
+	offsetKey       string
+	offsetKeyType   string
+	offsetValue     interface{}
+	metaFile        string
+	esindex         string //es索引
+	lastESIndex     string //上一次es索引
+	lastScrollId    string //上一次scrollId
+	estype          string //es type
+	eshost          string //eshost+port
+	authUsername    string
+	authPassword    string
+	readBatch       int    // 每次读取的数据量
+	keepAlive       string //scrollID 保留时间
+	esVersion       string //ElasticSearch version
+	offset          string // 当前处理es的offset
+	delayTimeStr    string // 延迟时间
+	delayTime       int64  // 延迟时间
+	delayTimeUnit   string // 时间戳单位
+	dateShift       bool
+	dateShiftOffset int
+	elasticV3Client *elasticV3.Client
+	elasticV5Client *elasticV5.Client
+	elasticV6Client *elasticV6.Client
+	elasticV7Client *elasticV7.Client
 }
 
 func init() {
@@ -117,16 +122,24 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	authUsername, _ := conf.GetStringOr(KeyAuthUsername, "")
 	authPassword, _ := conf.GetPasswordEnvStringOr(KeyAuthPassword, "")
 	keepAlive, _ := conf.GetStringOr(KeyESKeepAlive, "6h")
-	cronSched, _ := conf.GetStringOr(KeyESCron, "loop 3s")
+	cronSched, _ := conf.GetStringOr(KeyESCron, "")
 	execOnStart, _ := conf.GetBoolOr(KeyESExecOnstart, true)
-	cronOffset, _ := conf.GetStringOr(KeyESCronOffset, "")
+	offsetKey, _ := conf.GetStringOr(KeyESOffsetKey, "")
+	offsetKeyType, _ := conf.GetStringOr(KeyESOffsetKeyType, "")
+	startTime, _ := conf.GetStringOr(KeyESOffsetStartTime, "")
+	delayTimeStr, _ := conf.GetStringOr(KeyESDelayTime, "now+1y")
+	if delayTimeStr == "" {
+		delayTimeStr = "now+1y"
+	}
+	delayTime, _ := conf.GetInt64Or(KeyESDelayTime, 0)
+	delayTimeUnit, _ := conf.GetStringOr(KeyESDelayTimeUnit, "second")
 	metaFile := filepath.Join(meta.Dir, KeyMetaFileName)
 
 	offset, _, err := meta.ReadOffset()
 	if err != nil {
 		log.Errorf("Runner[%v] %v -meta data is corrupted err:%v, omit meta data", meta.RunnerName, meta.MetaFile(), err)
 	}
-	if cronOffset == "" {
+	if offsetKey == "" {
 		offset = ""
 	}
 
@@ -215,14 +228,17 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		dateShift:       dateshift,
 		dateShiftOffset: dateshiftoffset,
 		Cron:            cron.New(),
-		cronOffsetValueIsValid: false,
-		cronOffsetKey:          cronOffset,
-		execOnStart:            execOnStart,
-		metaFile:               metaFile,
-		elasticV3Client:        elasticV3Client,
-		elasticV5Client:        elasticV5Client,
-		elasticV6Client:        elasticV6Client,
-		elasticV7Client:        elasticV7Client,
+		offsetKey:       offsetKey,
+		offsetKeyType:   offsetKeyType,
+		delayTime:       delayTime,
+		delayTimeStr:    delayTimeStr,
+		delayTimeUnit:   delayTimeUnit,
+		execOnStart:     execOnStart,
+		metaFile:        metaFile,
+		elasticV3Client: elasticV3Client,
+		elasticV5Client: elasticV5Client,
+		elasticV6Client: elasticV6Client,
+		elasticV7Client: elasticV7Client,
 	}
 	if len(cronSched) > 0 {
 		cronSched = strings.ToLower(cronSched)
@@ -239,10 +255,8 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 				content, err := ioutil.ReadFile(metaFile)
 				if err != nil {
 					log.Warnf("Runner[%v] %v failed to read offset file[%v]: %v,reset offset and read all data", meta.RunnerName, ModeElastic, metaFile, err)
-				} else {
-					r.cronOffsetValue = string(content)
-					r.cronOffsetValueIsValid = true
 				}
+				r.offsetValue = string(content)
 			}
 		} else {
 			err = r.Cron.AddFunc(cronSched, r.run)
@@ -251,6 +265,9 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 			}
 			log.Infof("Runner[%v] %v Cron added with schedule <%v>", r.meta.RunnerName, r.Name(), cronSched)
 		}
+	}
+	if startTime != "" && r.offsetValue == nil {
+		r.offsetValue = startTime
 	}
 	return r, nil
 }
@@ -300,11 +317,7 @@ func (r *Reader) run() {
 		return
 	}
 	var err error
-	if r.isLoop {
-		err = r.execWithLoop()
-	} else {
-		err = r.execWithCron()
-	}
+	err = r.execQuery()
 	if err == nil {
 		log.Infof("Runner[%v] %s task has been successfully executed", r.meta.RunnerName, r.Name())
 		return
@@ -341,127 +354,8 @@ func (r *Reader) getIndexShift() string {
 	return magic.GoMagic(r.esindex, time.Now().Add(-1*time.Duration(r.dateShiftOffset)*time.Hour))
 }
 
-// 循环读取默认间隔时间3s，只支持全量读取，不支持offset字段
-func (r *Reader) execWithLoop() error {
-	defer func() {
-		if rec := recover(); rec != nil {
-			log.Errorf("Runner[%v] recover when exec with loop\npanic: %v\nstack: %s", r.meta.RunnerName, rec, debug.Stack())
-		}
-	}()
-	var index = r.esindex
-	if r.dateShift {
-		index = r.getIndexShift()
-	}
-	// Create a client
-	switch r.esVersion {
-	case ElasticVersion7:
-		scroll := r.elasticV7Client.Scroll(index).Size(r.readBatch).KeepAlive(r.keepAlive)
-		if r.estype != "" {
-			scroll = scroll.Type(r.estype)
-		}
-		for {
-			results, err := scroll.ScrollId(r.offset).Do(context.Background())
-			if err == io.EOF {
-				return nil // all results retrieved
-			}
-			if err != nil {
-				return err // something went wrong
-			}
-
-			// Send the hits to the hits channel
-			for _, hit := range results.Hits.Hits {
-				r.readChan <- Record{
-					data: hit.Source,
-				}
-			}
-			r.offset = results.ScrollId
-			if r.isStopping() || r.hasStopped() {
-				return nil
-			}
-		}
-	case ElasticVersion6:
-		scroll := r.elasticV6Client.Scroll(index).Size(r.readBatch).KeepAlive(r.keepAlive)
-		if r.estype != "" {
-			scroll = scroll.Type(r.estype)
-		}
-		for {
-			results, err := scroll.ScrollId(r.offset).Do(context.Background())
-			if err == io.EOF {
-				return nil // all results retrieved
-			}
-			if err != nil {
-				return err // something went wrong
-			}
-
-			// Send the hits to the hits channel
-			for _, hit := range results.Hits.Hits {
-				r.readChan <- Record{
-					data: *hit.Source,
-				}
-			}
-			r.offset = results.ScrollId
-			if r.isStopping() || r.hasStopped() {
-				return nil
-			}
-		}
-	case ElasticVersion3:
-		scroll := r.elasticV3Client.Scroll(index).Size(r.readBatch).KeepAlive(r.keepAlive)
-		if r.estype != "" {
-			scroll = scroll.Type(r.estype)
-		}
-		for {
-			if r.offset != "" {
-				scroll = scroll.ScrollId(r.offset)
-			}
-			results, err := scroll.Do()
-			if err == io.EOF {
-				return nil // all results retrieved
-			}
-			if err != nil {
-				return err // something went wrong
-			}
-
-			// Send the hits to the hits channel
-			for _, hit := range results.Hits.Hits {
-				r.readChan <- Record{
-					data: *hit.Source,
-				}
-			}
-			r.offset = results.ScrollId
-			if r.isStopping() || r.hasStopped() {
-				return nil
-			}
-		}
-	default:
-		scroll := r.elasticV5Client.Scroll(index).Size(r.readBatch).KeepAlive(r.keepAlive)
-		if r.estype != "" {
-			scroll = scroll.Type(r.estype)
-		}
-		for {
-			results, err := scroll.ScrollId(r.offset).Do(context.Background())
-			if err == io.EOF {
-				return nil // all results retrieved
-			}
-			if err != nil {
-				return err // something went wrong
-			}
-
-			// Send the hits to the hits channel
-			for _, hit := range results.Hits.Hits {
-				r.readChan <- Record{
-					data: *hit.Source,
-				}
-			}
-			r.offset = results.ScrollId
-			if r.isStopping() || r.hasStopped() {
-				return nil
-			}
-		}
-	}
-}
-
 // 定时读取，支持增量读取，需要指定具有自增属性的offset字段
-func (r *Reader) execWithCron() error {
+func (r *Reader) execQuery() error {
 	defer func() {
 		if rec := recover(); rec != nil {
 			log.Errorf("Runner[%v] recover when exec with cron\npanic: %v\nstack: %s", r.meta.RunnerName, rec, debug.Stack())
@@ -471,23 +365,52 @@ func (r *Reader) execWithCron() error {
 	if r.dateShift {
 		index = r.getIndexShift()
 	}
-	// Create a client
+	if r.lastESIndex != index {
+		r.offset = ""
+		r.lastESIndex = index
+	}
+
+	var endTime interface{}
+	switch r.offsetKeyType {
+	case "long":
+		endTime = int64(^uint64(0) >> 1)
+		if r.delayTime != 0 {
+			if r.delayTimeUnit == "second" {
+				endTime = time.Now().Unix() - r.delayTime
+			} else if r.delayTimeUnit == "millisecond" {
+				endTime = time.Now().Unix()*1000 - r.delayTime
+			}
+		}
+	case "date":
+		endTime = r.delayTimeStr
+	default:
+	}
+
 	switch r.esVersion {
 	case ElasticVersion7:
-		var rangeQuery *elasticV7.RangeQuery
-		if r.cronOffsetValueIsValid {
-			rangeQuery = elasticV7.NewRangeQuery(r.cronOffsetKey).Gte(r.cronOffsetValue)
+		var scroll *elasticV7.ScrollService
+		if r.offsetKey != "" {
+			rangeQuery := elasticV7.NewRangeQuery(r.offsetKey).Gt(r.offsetValue).Lte(endTime)
+			scroll = r.elasticV7Client.Scroll(index).Query(rangeQuery).Sort(r.offsetKey, true).Size(r.readBatch).KeepAlive(r.keepAlive)
 		} else {
-			rangeQuery = elasticV7.NewRangeQuery(r.cronOffsetKey)
+			scroll = r.elasticV7Client.Scroll(index).Size(r.readBatch).KeepAlive(r.keepAlive)
 		}
-		scroll := r.elasticV7Client.Scroll(index).Query(rangeQuery).Size(r.readBatch).KeepAlive(r.keepAlive)
 		if r.estype != "" {
 			scroll = scroll.Type(r.estype)
 		}
 		for {
 			results, err := scroll.ScrollId(r.offset).Do(context.Background())
 			if err == io.EOF {
-				return nil // all results retrieved
+				scrollIds := make([]string, 0)
+				if results.ScrollId != r.offset {
+					scrollIds = append(scrollIds, results.ScrollId)
+				}
+				if r.offsetKey != "" && r.offset != "" {
+					scrollIds = append(scrollIds, r.offset)
+					r.offset = ""
+				}
+				_, err = r.elasticV7Client.ClearScroll(scrollIds...).Do(context.Background())
+				return err
 			}
 			if err != nil {
 				return err // something went wrong
@@ -499,7 +422,7 @@ func (r *Reader) execWithCron() error {
 				jsoniter.Unmarshal(hit.Source, &m)
 				r.readChan <- Record{
 					data:       hit.Source,
-					cronOffset: m[r.cronOffsetKey],
+					cronOffset: m[r.offsetKey],
 				}
 			}
 			r.offset = results.ScrollId
@@ -508,20 +431,29 @@ func (r *Reader) execWithCron() error {
 			}
 		}
 	case ElasticVersion6:
-		var rangeQuery *elasticV6.RangeQuery
-		if r.cronOffsetValueIsValid {
-			rangeQuery = elasticV6.NewRangeQuery(r.cronOffsetKey).Gte(r.cronOffsetValue)
+		var scroll *elasticV6.ScrollService
+		if r.offsetKey != "" {
+			rangeQuery := elasticV6.NewRangeQuery(r.offsetKey).Gte(r.offsetValue).Lte(endTime)
+			scroll = r.elasticV6Client.Scroll(index).Query(rangeQuery).Sort(r.offsetKey, true).Size(r.readBatch).KeepAlive(r.keepAlive)
 		} else {
-			rangeQuery = elasticV6.NewRangeQuery(r.cronOffsetKey)
+			scroll = r.elasticV6Client.Scroll(index).Size(r.readBatch).KeepAlive(r.keepAlive)
 		}
-		scroll := r.elasticV6Client.Scroll(index).Query(rangeQuery).Size(r.readBatch).KeepAlive(r.keepAlive)
 		if r.estype != "" {
 			scroll = scroll.Type(r.estype)
 		}
 		for {
 			results, err := scroll.ScrollId(r.offset).Do(context.Background())
 			if err == io.EOF {
-				return nil // all results retrieved
+				scrollIds := make([]string, 0)
+				if results.ScrollId != r.offset {
+					scrollIds = append(scrollIds, results.ScrollId)
+				}
+				if r.offsetKey != "" && r.offset != "" {
+					scrollIds = append(scrollIds, r.offset)
+					r.offset = ""
+				}
+				_, err = r.elasticV6Client.ClearScroll(scrollIds...).Do(context.Background())
+				return err
 			}
 			if err != nil {
 				return err // something went wrong
@@ -533,7 +465,7 @@ func (r *Reader) execWithCron() error {
 				jsoniter.Unmarshal(*hit.Source, &m)
 				r.readChan <- Record{
 					data:       *hit.Source,
-					cronOffset: m[r.cronOffsetKey],
+					cronOffset: m[r.offsetKey],
 				}
 			}
 			r.offset = results.ScrollId
@@ -542,13 +474,13 @@ func (r *Reader) execWithCron() error {
 			}
 		}
 	case ElasticVersion3:
-		var rangeQuery *elasticV3.RangeQuery
-		if r.cronOffsetValueIsValid {
-			rangeQuery = elasticV3.NewRangeQuery(r.cronOffsetKey).Gte(r.cronOffsetValue)
+		var scroll *elasticV3.ScrollService
+		if r.offsetKey != "" {
+			rangeQuery := elasticV3.NewRangeQuery(r.offsetKey).Gte(r.offsetValue).Lte(endTime)
+			scroll = r.elasticV3Client.Scroll(index).Query(rangeQuery).Sort(r.offsetKey, true).Size(r.readBatch).KeepAlive(r.keepAlive)
 		} else {
-			rangeQuery = elasticV3.NewRangeQuery(r.cronOffsetKey)
+			scroll = r.elasticV3Client.Scroll(index).Size(r.readBatch).KeepAlive(r.keepAlive)
 		}
-		scroll := r.elasticV3Client.Scroll(index).Query(rangeQuery).Size(r.readBatch).KeepAlive(r.keepAlive)
 		if r.estype != "" {
 			scroll = scroll.Type(r.estype)
 		}
@@ -558,7 +490,16 @@ func (r *Reader) execWithCron() error {
 			}
 			results, err := scroll.Do()
 			if err == io.EOF {
-				return nil // all results retrieved
+				scrollIds := make([]string, 0)
+				if results.ScrollId != r.offset {
+					scrollIds = append(scrollIds, results.ScrollId)
+				}
+				if r.offsetKey != "" && r.offset != "" {
+					scrollIds = append(scrollIds, r.offset)
+					r.offset = ""
+				}
+				_, err = r.elasticV3Client.ClearScroll(scrollIds...).DoC(context.Background())
+				return err
 			}
 			if err != nil {
 				return err // something went wrong
@@ -570,7 +511,7 @@ func (r *Reader) execWithCron() error {
 				jsoniter.Unmarshal(*hit.Source, &m)
 				r.readChan <- Record{
 					data:       *hit.Source,
-					cronOffset: m[r.cronOffsetKey],
+					cronOffset: m[r.offsetKey],
 				}
 			}
 			r.offset = results.ScrollId
@@ -579,20 +520,29 @@ func (r *Reader) execWithCron() error {
 			}
 		}
 	default:
-		var rangeQuery *elasticV5.RangeQuery
-		if r.cronOffsetValueIsValid {
-			rangeQuery = elasticV5.NewRangeQuery(r.cronOffsetKey).Gte(r.cronOffsetValue)
+		var scroll *elasticV5.ScrollService
+		if r.offsetKey != "" {
+			rangeQuery := elasticV5.NewRangeQuery(r.offsetKey).Gte(r.offsetValue).Lte(endTime)
+			scroll = r.elasticV5Client.Scroll(index).Query(rangeQuery).Sort(r.offsetKey, true).Size(r.readBatch).KeepAlive(r.keepAlive)
 		} else {
-			rangeQuery = elasticV5.NewRangeQuery(r.cronOffsetKey)
+			scroll = r.elasticV5Client.Scroll(index).Size(r.readBatch).KeepAlive(r.keepAlive)
 		}
-		scroll := r.elasticV5Client.Scroll(index).Query(rangeQuery).Size(r.readBatch).KeepAlive(r.keepAlive)
 		if r.estype != "" {
 			scroll = scroll.Type(r.estype)
 		}
 		for {
 			results, err := scroll.ScrollId(r.offset).Do(context.Background())
 			if err == io.EOF {
-				return nil // all results retrieved
+				scrollIds := make([]string, 0)
+				if results.ScrollId != r.offset {
+					scrollIds = append(scrollIds, results.ScrollId)
+				}
+				if r.offsetKey != "" && r.offset != "" {
+					scrollIds = append(scrollIds, r.offset)
+					r.offset = ""
+				}
+				_, err = r.elasticV5Client.ClearScroll(scrollIds...).Do(context.Background())
+				return err
 			}
 			if err != nil {
 				return err // something went wrong
@@ -604,7 +554,7 @@ func (r *Reader) execWithCron() error {
 				jsoniter.Unmarshal(*hit.Source, &m)
 				r.readChan <- Record{
 					data:       *hit.Source,
-					cronOffset: m[r.cronOffsetKey],
+					cronOffset: m[r.offsetKey],
 				}
 			}
 			r.offset = results.ScrollId
@@ -666,9 +616,11 @@ func (r *Reader) ReadLine() (string, error) {
 	defer timer.Stop()
 	select {
 	case rec := <-r.readChan:
-		if !r.isLoop {
-			r.cronOffsetValue = rec.cronOffset
-			r.cronOffsetValueIsValid = true
+		longValue, ok := rec.cronOffset.(float64)
+		if ok {
+			r.offsetValue = int64(longValue)
+		} else {
+			r.offsetValue = rec.cronOffset
 		}
 		return string(rec.data), nil
 	case err := <-r.errChan:
@@ -689,7 +641,6 @@ func (r *Reader) Reset() error {
 	if err := os.RemoveAll(r.metaFile); err != nil {
 		return err
 	}
-	r.cronOffsetValueIsValid = false
 	return nil
 }
 
@@ -698,11 +649,9 @@ func (r *Reader) SyncMeta() {
 	if err := r.meta.WriteOffset(r.offset, 0); err != nil {
 		log.Errorf("Runner[%v] reader %s sync meta failed: %v", r.meta.RunnerName, r.Name(), err)
 	}
-	if !r.isLoop {
-		err := ioutil.WriteFile(r.metaFile, []byte(fmt.Sprintf("%s", r.cronOffsetValue)), 0644)
-		if err != nil {
-			log.Errorf("Runner[%v] %v failed to sync meta: %v", r.meta.RunnerName, r.Name(), err)
-		}
+	err := ioutil.WriteFile(r.metaFile, []byte(fmt.Sprintf("%v", r.offsetValue)), 0644)
+	if err != nil {
+		log.Errorf("Runner[%v] %v failed to sync meta: %v", r.meta.RunnerName, r.Name(), err)
 	}
 	return
 }
