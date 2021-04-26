@@ -248,12 +248,12 @@ func newSyncManager(meta *reader.Meta, opts *syncOptions) (*syncManager, error) 
 
 func makeSyncSource(bucket, prefix string) string {
 	if prefix == "" {
-		return fmt.Sprintf("s3://%s", bucket)
+		return fmt.Sprintf("%s", bucket)
 	}
 	if strings.HasPrefix(prefix, "/") {
-		return fmt.Sprintf("s3://%s%s", bucket, prefix)
+		return fmt.Sprintf("%s%s", bucket, prefix)
 	}
-	return fmt.Sprintf("s3://%s/%s", bucket, prefix)
+	return fmt.Sprintf("%s/%s", bucket, prefix)
 }
 
 func (mgr *syncManager) startSync() {
@@ -319,9 +319,6 @@ func newSyncRunner(ctx *syncContext, quitChan chan struct{}) *syncRunner {
 }
 
 func (s *syncRunner) Sync() error {
-	if !validSource(s.source) {
-		return fmt.Errorf("invalid sync source %q", s.source)
-	}
 	if !validTarget(s.target) {
 		return fmt.Errorf("invalid sync target %q", s.target)
 	}
@@ -457,10 +454,20 @@ func (r *s3Url) keys() []string {
 
 func lookupBucket(bucketName string, auth aws.Auth, region string, endpoint string) (*s3.Bucket, error) {
 	log.Infof("looking for bucket %q in region %q", bucketName, region)
-	rg := aws.Regions[region]
-	if endpoint != "" {
-		rg.S3Endpoint = endpoint
+
+	rg, ok := aws.Regions[region]
+	if !ok {
+		rg = aws.Region{
+			Name:       region,
+			S3Endpoint: endpoint,
+		}
+	} else {
+		// replace default endpoint
+		if endpoint != "" {
+			rg.S3Endpoint = endpoint
+		}
 	}
+
 	s3 := s3.New(auth, rg)
 	bucket := s3.Bucket(bucketName)
 	_, err := bucket.List("", "", "", 0)
