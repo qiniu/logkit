@@ -525,11 +525,14 @@ func (m *Meta) SyncDoneFileInode(inodeOffset map[string]int64) (err error) {
 
 	var data bytes.Buffer
 	for inodeFile, offset := range inodeOffset {
-		str := strings.Split(inodeFile, "_")
-		if len(str) != 2 {
+		pos := strings.LastIndex(inodeFile, "_")
+		if pos == -1 {
 			continue
 		}
-		data.WriteString(fmt.Sprintf("%s\t%v\t%v\t%s\n", str[0], str[1], offset, time.Now().Format(time.RFC3339Nano)))
+		_, err = data.WriteString(fmt.Sprintf("%s\t%v\t%v\t%s\n", inodeFile[:pos], inodeFile[pos+1:], offset, time.Now().Format(time.RFC3339Nano)))
+		if err != nil {
+			log.Errorf("write string to bytes.Buffer failed when sync done file inode, error: ", err)
+		}
 	}
 	_, err = fmt.Fprintf(f, data.String())
 	return
@@ -567,8 +570,9 @@ func (m *Meta) GetDoneFileInode(inodeSensitive bool) map[string]int64 {
 		log.Error(err)
 		return inodeMap
 	}
-	for _, v := range contents {
-		sps := strings.Split(v, "\t")
+	// 按从旧到新的顺序读取
+	for i := len(contents) - 1; i >= 0; i-- {
+		sps := strings.Split(contents[i], "\t")
 		offset := int64(-1)
 		if len(sps) == 4 {
 			offset, err = strconv.ParseInt(sps[2], 10, 64)
