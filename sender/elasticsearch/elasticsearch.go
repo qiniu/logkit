@@ -12,6 +12,7 @@ import (
 	elasticV6 "github.com/olivere/elastic"
 	elasticV3 "gopkg.in/olivere/elastic.v3"
 	elasticV5 "gopkg.in/olivere/elastic.v5"
+	elasticV7 "gopkg.in/olivere/elastic.v7"
 
 	"github.com/qiniu/log"
 	"github.com/qiniu/pandora-go-sdk/base/reqerr"
@@ -31,11 +32,13 @@ type Sender struct {
 	host            []string
 	retention       int
 	indexName       string
+	idField         string
 	eType           string
 	eVersion        string
 	elasticV3Client *elasticV3.Client
 	elasticV5Client *elasticV5.Client
 	elasticV6Client *elasticV6.Client
+	elasticV7Client *elasticV7.Client
 
 	aliasFields map[string]string
 
@@ -73,6 +76,7 @@ func NewSender(conf conf.MapConf) (elasticSender sender.Sender, err error) {
 		return
 	}
 	logkitSendTime, _ := conf.GetBoolOr(KeyLogkitSendTime, true)
+	idField, _ := conf.GetStringOr(KeyElasticIDField, "")
 	eType, _ := conf.GetStringOr(KeyElasticType, defaultType)
 	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("elasticSender:(elasticUrl:%s,index:%s,type:%s)", host, index, eType))
 	fields, _ := conf.GetAliasMapOr(KeyElasticAlias, make(map[string]string))
@@ -93,7 +97,24 @@ func NewSender(conf conf.MapConf) (elasticSender sender.Sender, err error) {
 	var elasticV3Client *elasticV3.Client
 	var elasticV5Client *elasticV5.Client
 	var elasticV6Client *elasticV6.Client
+	var elasticV7Client *elasticV7.Client
 	switch eVersion {
+	case ElasticVersion7:
+		optFns := []elasticV7.ClientOptionFunc{
+			elasticV7.SetSniff(false),
+			elasticV7.SetHealthcheck(false),
+			elasticV7.SetURL(host...),
+			elasticV7.SetGzip(enableGzip),
+		}
+
+		if len(authUsername) > 0 && len(authPassword) > 0 {
+			optFns = append(optFns, elasticV7.SetBasicAuth(authUsername, authPassword))
+		}
+
+		elasticV7Client, err = elasticV7.NewClient(optFns...)
+		if err != nil {
+			return nil, err
+		}
 	case ElasticVersion6:
 		optFns := []elasticV6.ClientOptionFunc{
 			elasticV6.SetSniff(false),
@@ -152,10 +173,12 @@ func NewSender(conf conf.MapConf) (elasticSender sender.Sender, err error) {
 		name:            name,
 		host:            host,
 		indexName:       index,
+		idField:         idField,
 		eVersion:        eVersion,
 		elasticV3Client: elasticV3Client,
 		elasticV5Client: elasticV5Client,
 		elasticV6Client: elasticV6Client,
+		elasticV7Client: elasticV7Client,
 		eType:           eType,
 		aliasFields:     fields,
 		intervalIndex:   i,
@@ -184,6 +207,78 @@ func (s *Sender) Name() string {
 // Send ElasticSearchSender
 func (s *Sender) Send(datas []Data) error {
 	switch s.eVersion {
+	case ElasticVersion7:
+		bulkService := s.elasticV7Client.Bulk()
+
+		makeDoc := true
+		if len(s.aliasFields) == 0 {
+			makeDoc = false
+		}
+		var indexName string
+		for _, doc := range datas {
+			//计算索引
+			indexName = buildIndexName(s.indexName, s.timeZone, s.intervalIndex)
+			//字段名称替换
+			if makeDoc {
+				doc = s.wrapDoc(doc)
+			}
+			//添加发送时间
+			if s.logkitSendTime {
+				doc[KeySendTime] = time.Now().In(s.timeZone).UnixNano() / 1000000
+			}
+			doc2 := doc
+
+			request := elasticV7.NewBulkIndexRequest().UseEasyJSON(true).Index(indexName).Type(s.eType).Doc(&doc2)
+			id, ok := doc[s.idField].(string)
+			if ok && id != "" {
+				request.Id(id)
+			}
+			bulkService.Add(request)
+		}
+
+		resp, err := bulkService.Do(context.Background())
+		if err != nil {
+			return err
+		}
+
+		var (
+			// 查找出失败的操作并回溯对应的数据返回给上层
+			lastFailedResult *elasticV7.BulkResponseItem
+			failedDatas      = make([]map[string]interface{}, len(datas))
+			failedDatasIdx   = 0
+		)
+		for i, item := range resp.Items {
+			for _, result := range item {
+				if !(result.Status >= 200 && result.Status <= 299) {
+					failedDatas[failedDatasIdx] = datas[i]
+					failedDatasIdx++
+					lastFailedResult = result
+					break // 任一情况的失败都算该条数据整体操作失败，没有必要重复检查
+				}
+			}
+		}
+		failedDatas = failedDatas[:failedDatasIdx]
+		if len(failedDatas) == 0 {
+			return nil
+		}
+		lastError, err := jsoniter.MarshalToString(lastFailedResult)
+		if err != nil {
+			lastError = fmt.Sprintf("marshal to string failed: %v", lastFailedResult)
+		}
+
+		return &StatsError{
+			StatsInfo: StatsInfo{
+				Success:   int64(len(datas) - len(failedDatas)),
+				Errors:    int64(len(failedDatas)),
+				LastError: lastError,
+			},
+			SendError: reqerr.NewSendError(
+				fmt.Sprintf("bulk failed with last error: %s", lastError),
+				failedDatas,
+				reqerr.TypeBinaryUnpack,
+			),
+		}
+
 	case ElasticVersion6:
 		bulkService := s.elasticV6Client.Bulk()
 
@@ -204,7 +299,13 @@ func (s *Sender) Send(datas []Data) error {
 				doc[KeySendTime] = time.Now().In(s.timeZone).UnixNano() / 1000000
 			}
 			doc2 := doc
-			bulkService.Add(elasticV6.NewBulkIndexRequest().UseEasyJSON(true).Index(indexName).Type(s.eType).Doc(&doc2))
+
+			request := elasticV6.NewBulkIndexRequest().UseEasyJSON(true).Index(indexName).Type(s.eType).Doc(&doc2)
+			id, ok := doc[s.idField].(string)
+			if ok && id != "" {
+				request.Id(id)
+			}
+			bulkService.Add(request)
 		}
 
 		resp, err := bulkService.Do(context.Background())
@@ -270,7 +371,12 @@ func (s *Sender) Send(datas []Data) error {
 				doc[KeySendTime] = curTime
 			}
 			doc2 := doc
-			bulkService.Add(elasticV5.NewBulkIndexRequest().Index(indexName).Type(s.eType).Doc(&doc2))
+			request := elasticV5.NewBulkIndexRequest().Index(indexName).Type(s.eType).Doc(&doc2)
+			id, ok := doc[s.idField].(string)
+			if ok && id != "" {
+				request.Id(id)
+			}
+			bulkService.Add(request)
 		}
 
 		resp, err := bulkService.Do(context.Background())
@@ -335,7 +441,12 @@ func (s *Sender) Send(datas []Data) error {
 				doc[KeySendTime] = time.Now().In(s.timeZone).UnixNano() / 1000000
 			}
 			doc2 := doc
-			bulkService.Add(elasticV3.NewBulkIndexRequest().Index(indexName).Type(s.eType).Doc(&doc2))
+			request := elasticV3.NewBulkIndexRequest().Index(indexName).Type(s.eType).Doc(&doc2)
+			id, ok := doc[s.idField].(string)
+			if ok && id != "" {
+				request.Id(id)
+			}
+			bulkService.Add(request)
 		}
 
 		resp, err := bulkService.Do()
@@ -408,6 +519,9 @@ func (s *Sender) Close() error {
 	}
 	if s.elasticV6Client != nil {
 		s.elasticV6Client.Stop()
+	}
+	if s.elasticV7Client != nil {
+		s.elasticV7Client.Stop()
 	}
 	return nil
 }
