@@ -217,6 +217,9 @@ func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 
 func (s *NetIOStats) initInterfaces() {
 	if interfaces, err := net.Interfaces(); err == nil {
+		if len(s.InterfacesMap) > 0 {
+			s.InterfacesMap = make(map[string]net.Interface)
+		}
 		for _, _interface := range interfaces {
 			s.InterfacesMap[_interface.Name] = _interface
 		}
