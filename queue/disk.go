@@ -559,6 +559,12 @@ func (d *diskQueue) persistMetaData() error {
 		return err
 	}
 
+	defer func() {
+		if err := os.RemoveAll(tmpFileName); err != nil {
+			log.Errorf("DISKQUEUE(%s): remove temp file %s failed, error: %v", d.name, tmpFileName, err)
+		}
+	}()
+
 	_, err = fmt.Fprintf(f, "%d\n%d,%d\n%d,%d\n",
 		atomic.LoadInt64(&d.depth),
 		d.readFileNum, d.readPos,
