@@ -327,6 +327,9 @@ func (b *BufReader) readSlice(delim []byte) (line []byte, err error) {
 		// Pending error?
 		if b.err != nil {
 			line = b.buf[b.r:b.w]
+			if b.Meta.RunnerName == "ccfs_atest" {
+				log.Errorf("Runner[%v] read slice error, temp content: %v,\ntemp line: %v, err: %v", b.Meta.RunnerName, string(b.buf), string(line), err)
+			}
 			b.r = b.w
 			err = b.readErr()
 			break
