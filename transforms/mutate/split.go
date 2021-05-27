@@ -19,6 +19,7 @@ type Spliter struct {
 	Key          string `json:"key"`
 	SeparateKey  string `json:"sep"`
 	ArrayName    string `json:"new"`
+	ArrayNameNew string `json:"newfield"` // 兼容老版本
 
 	stats      StatsInfo
 	keys       []string
@@ -26,6 +27,9 @@ type Spliter struct {
 }
 
 func (g *Spliter) Init() error {
+	if g.ArrayName == "" {
+		g.ArrayName = g.ArrayNameNew
+	}
 	g.keys = GetKeys(g.Key)
 
 	numRoutine := MaxProcs

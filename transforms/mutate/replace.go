@@ -18,6 +18,8 @@ var (
 type Replacer struct {
 	StageTime string `json:"stage"`
 	Key       string `json:"key"`
+	OldKey    string `json:"old"` // 兼容老版本
+	NewKey    string `json:"new"`
 	Old       string `json:"old_string"`
 	New       string `json:"new_string"`
 	Regex     bool   `json:"regex"`
@@ -29,6 +31,12 @@ type Replacer struct {
 }
 
 func (g *Replacer) Init() error {
+	if g.Old == "" {
+		g.Old = g.OldKey
+	}
+	if g.New == "" {
+		g.New = g.NewKey
+	}
 	rgexpr := g.Old
 	if !g.Regex {
 		rgexpr = regexp.QuoteMeta(g.Old)
