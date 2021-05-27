@@ -2,6 +2,8 @@ package cleaner
 
 import (
 	"path/filepath"
+	"runtime/debug"
+	"sync/atomic"
 	"time"
 
 	"github.com/bmatcuk/doublestar"
@@ -23,6 +25,7 @@ type Cleaner struct {
 	cleanChan     chan<- CleanSignal
 	name          string
 	logdir        string
+	status        int32
 }
 
 type CleanSignal struct {
@@ -91,10 +94,19 @@ func NewCleaner(conf conf.MapConf, meta *reader.Meta, cleanChan chan<- CleanSign
 		cleanChan:     cleanChan,
 		name:          name,
 		logdir:        logdir,
+		status:        config.StatusInit,
 	}, nil
 }
 
 func (c *Cleaner) Run() {
+	if !atomic.CompareAndSwapInt32(&c.status, config.StatusInit, config.StatusRunning) {
+		if c.hasStopped() {
+			log.Warnf("cleaner[%v] has stopped, run operation ignored", c.name)
+		} else {
+			log.Warnf("cleaner[%v] has already running, run operation ignored", c.name)
+		}
+		return
+	}
 	for {
 		select {
 		case <-c.exitChan:
@@ -110,7 +122,15 @@ func (c *Cleaner) Run() {
 }
 
 func (c *Cleaner) Close() {
+	if !atomic.CompareAndSwapInt32(&c.status, config.StatusRunning, config.StatusStopped) {
+		log.Warnf("cleaner[%v] is not running, close operation ignored", c.name)
+		return
+	}
 	c.exitChan <- struct{}{}
+}
+
+func (c *Cleaner) hasStopped() bool {
+	return atomic.LoadInt32(&c.status) == config.StatusStopped
 }
 
 func (c *Cleaner) Name() string {
@@ -160,6 +180,15 @@ func (c *Cleaner) checkBelong(path string) bool {
 }
 
 func (c *Cleaner) Clean() (err error) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Errorf("cleaner %q was panicked and recovered from %v\nstack: %s", c.Name(), rec, debug.Stack())
+		}
+	}()
+	if c.hasStopped() {
+		log.Warnf("cleaner[%v] reader %s has stopped, skip clean operation", c.name)
+		return
+	}
 	var size int64 = 0
 	var count int64 = 0
 	beginClean := false
