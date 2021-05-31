@@ -83,20 +83,19 @@ type Reader struct {
 }
 
 type ActiveReader struct {
-	cacheLineMux  sync.RWMutex
-	br            *bufreader.BufReader
-	realpath      string
-	originpath    string
-	readcache     string
-	halfLineCache map[string]string //针对不同的数据源做一个缓存
-	msgchan       chan<- Result
-	errChan       chan<- error
-	resetChan     chan<- string
-	status        int32
-	inactive      int32 //当inactive>0 时才会被expire回收
-	runnerName    string
-	runtime       reader.RunTime
-	inodeStr      string
+	cacheLineMux sync.RWMutex
+	br           *bufreader.BufReader
+	realpath     string
+	originpath   string
+	readcache    string
+	msgchan      chan<- Result
+	errChan      chan<- error
+	resetChan    chan<- string
+	status       int32
+	inactive     int32 //当inactive>0 时才会被expire回收
+	runnerName   string
+	runtime      reader.RunTime
+	inodeStr     string
 
 	emptyLineCnt int
 
@@ -158,21 +157,20 @@ func NewActiveReader(originPath, realPath, whence, inode string, r *Reader) (ar 
 		inode = strconv.Itoa(int(inodeInt))
 	}
 	return &ActiveReader{
-		cacheLineMux:  sync.RWMutex{},
-		br:            bf,
-		realpath:      realPath,
-		originpath:    originPath,
-		msgchan:       r.msgChan,
-		errChan:       r.errChan,
-		halfLineCache: make(map[string]string),
-		resetChan:     r.resetChan,
-		inodeStr:      inode,
-		inactive:      1,
-		emptyLineCnt:  0,
-		runnerName:    r.meta.RunnerName,
-		status:        StatusInit,
-		statsLock:     sync.RWMutex{},
-		runtime:       r.runTime,
+		cacheLineMux: sync.RWMutex{},
+		br:           bf,
+		realpath:     realPath,
+		originpath:   originPath,
+		msgchan:      r.msgChan,
+		errChan:      r.errChan,
+		resetChan:    r.resetChan,
+		inodeStr:     inode,
+		inactive:     1,
+		emptyLineCnt: 0,
+		runnerName:   r.meta.RunnerName,
+		status:       StatusInit,
+		statsLock:    sync.RWMutex{},
+		runtime:      r.runTime,
 	}, nil
 
 }
@@ -319,40 +317,7 @@ func (ar *ActiveReader) Run() {
 				ar.Stop()
 				return
 			}
-
-			source := ar.br.Source()
-			if _, ok := ar.halfLineCache[source]; !ok {
-				ar.cacheLineMux.Lock()
-				ar.halfLineCache[source] = ""
-				ar.cacheLineMux.Unlock()
-			}
-
-			if ar.readcache != "" && err == io.EOF {
-				ar.cacheLineMux.Lock()
-				if len(ar.halfLineCache[source])+len(ar.readcache) > 20*utils.Mb {
-					log.Warnf("Runner[%v] log path[%v] reader[%v] single line size has  exceed 20mb", ar.runnerName, ar.originpath, source)
-					ar.readcache = ar.halfLineCache[source] + ar.readcache
-					ar.halfLineCache[source] = ""
-				} else {
-					ar.halfLineCache[source] += ar.readcache
-					ar.readcache = ""
-				}
-				ar.cacheLineMux.Unlock()
-			}
-
-			if err == nil && ar.halfLineCache[source] != "" {
-				ar.cacheLineMux.Lock()
-				ar.readcache += ar.halfLineCache[source]
-				ar.halfLineCache[source] = ""
-				ar.cacheLineMux.Unlock()
-			}
-			if len(ar.readcache) == 0 && ar.halfLineCache[source] == "" {
-				if key, exist := utils.GetKeyOfNotEmptyValueInMap(ar.halfLineCache); exist {
-					source = key
-				}
-			}
-
-			if ar.readcache == "" && ar.halfLineCache[source] == "" {
+			if ar.readcache == "" {
 				ar.emptyLineCnt++
 				//文件EOF，同时没有任何内容，代表不是第一次EOF，休息时间设置长一些
 				if err == io.EOF {
@@ -373,17 +338,6 @@ func (ar *ActiveReader) Run() {
 				//读取的结果为空，无论如何都sleep 1s
 				time.Sleep(time.Second)
 				continue
-			} else if ar.readcache == "" && ar.halfLineCache[source] != "" {
-				ar.emptyLineCnt++
-				if err == io.EOF && ar.emptyLineCnt < 40 {
-					log.Debugf("Runner[%s] %s meet EOF, ActiveReader was inactive now, stop it", ar.runnerName, ar.originpath)
-					time.Sleep(1 * time.Second)
-					continue
-				}
-				ar.cacheLineMux.Lock()
-				ar.readcache = ar.halfLineCache[source]
-				ar.halfLineCache[source] = ""
-				ar.cacheLineMux.Unlock()
 			}
 		}
 		log.Debugf("Runner[%s] %s >>>>>>readcache <%s> linecache <%s>", ar.runnerName, ar.originpath, strings.TrimSpace(ar.readcache), string(ar.br.FormMutiLine()))
@@ -663,7 +617,7 @@ func (r *Reader) sendError(err error) {
 	}()
 	select {
 	case r.errChan <- err:
-	case <-time.After(time.Second):
+	case <- time.After(time.Second):
 	}
 }
 
