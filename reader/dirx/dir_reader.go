@@ -37,7 +37,6 @@ type dirReader struct {
 	logPath       string
 	readLock      sync.RWMutex
 	readcache     string
-	halfLineCache map[string]string //针对不同的数据源做一个缓存
 	numEmptyLines int
 
 	msgChan chan<- message
@@ -104,40 +103,8 @@ func (dr *dirReader) Run() {
 				time.Sleep(2 * time.Second)
 				continue
 			}
-			source := dr.br.Source()
-			if _, ok := dr.halfLineCache[source]; !ok {
-				dr.readLock.Lock()
-				dr.halfLineCache[source] = ""
-				dr.readLock.Unlock()
-			}
 
-			if dr.readcache != "" && err == io.EOF {
-				dr.readLock.Lock()
-				if len(dr.halfLineCache[source])+len(dr.readcache) > 20*utils.Mb {
-					log.Warnf("Runner[%v] log path[%v] reader[%v] single line size has  exceed 2k", dr.runnerName, dr.originalPath, source)
-					dr.readcache = dr.halfLineCache[source] + dr.readcache
-					dr.halfLineCache[source] = ""
-				} else {
-					dr.halfLineCache[source] += dr.readcache
-					dr.readcache = ""
-				}
-				dr.readLock.Unlock()
-			}
-
-			if err == nil && dr.halfLineCache[source] != "" {
-				dr.readLock.Lock()
-				dr.readcache += dr.halfLineCache[source]
-				dr.halfLineCache[source] = ""
-				dr.readLock.Unlock()
-			}
-
-			if len(dr.readcache) == 0 && dr.halfLineCache[source] == "" {
-				if key, exist := utils.GetKeyOfNotEmptyValueInMap(dr.halfLineCache); exist {
-					source = key
-				}
-			}
-
-			if len(dr.readcache) == 0 && dr.halfLineCache[source] == "" {
+			if len(dr.readcache) == 0 {
 				dr.numEmptyLines++
 				// 文件 EOF，同时没有任何内容，代表不是第一次 EOF，休息时间设置长一些
 				if err == io.EOF {
@@ -155,19 +122,9 @@ func (dr *dirReader) Run() {
 				// 读取的结果为空，无论如何都 sleep 1s
 				time.Sleep(time.Second)
 				continue
-			} else if len(dr.readcache) == 0 && dr.halfLineCache[source] != "" {
-				dr.numEmptyLines++
-				if err == io.EOF && dr.numEmptyLines < 40{
-					log.Debugf("Runner[%s] %s meet EOF, ActiveReader was inactive now, stop it", dr.runnerName, dr.originalPath)
-					time.Sleep(1 * time.Second)
-					continue
-				}
-				dr.readLock.Lock()
-				dr.readcache = dr.halfLineCache[source]
-				dr.halfLineCache[source] = ""
-				dr.readLock.Unlock()
 			}
 		}
+
 		log.Debugf("Runner[%v] %v >>>>>> read cache[%v] line cache [%v]", dr.runnerName, dr.originalPath, dr.readcache, string(dr.br.FormMutiLine()))
 		repeat := 0
 		for {
@@ -193,7 +150,6 @@ func (dr *dirReader) Run() {
 			case dr.msgChan <- message{result: dr.readcache, logpath: dr.originalPath, currentFile: dr.br.Source()}:
 				dr.readLock.Lock()
 				dr.readcache = ""
-
 				dr.readLock.Unlock()
 			case <-ticker.C:
 			}
@@ -239,20 +195,9 @@ func HasDirExpired(dir string, expire time.Duration) bool {
 	return latestModTime.Add(expire).Before(time.Now())
 }
 
-//对于读完的直接认为过期，因为不会追加新数据;最后一次需要等待30s
+//对于读完的直接认为过期，因为不会追加新数据
 func (dr *dirReader) ReadDone() bool {
-	return dr.br.ReadDone() && dr.halfLineCacheIsEmpty()
-}
-
-func (dr *dirReader) halfLineCacheIsEmpty() bool {
-	dr.readLock.Lock()
-	defer dr.readLock.Unlock()
-	for _, v := range dr.halfLineCache {
-		if v != "" {
-			return false
-		}
-	}
-	return true
+	return dr.br.ReadDone()
 }
 
 func (dr *dirReader) HasExpired(expire time.Duration) bool {
@@ -399,15 +344,14 @@ func (drs *dirReaders) NewReader(opts newReaderOptions, notFirstTime bool, maxLi
 	}
 
 	dr := &dirReader{
-		status:        StatusInit,
-		inactive:      1,
-		br:            br,
-		halfLineCache: make(map[string]string),
-		runnerName:    opts.Meta.RunnerName,
-		originalPath:  opts.OriginalPath,
-		logPath:       opts.LogPath,
-		msgChan:       opts.MsgChan,
-		errChan:       opts.ErrChan,
+		status:       StatusInit,
+		inactive:     1,
+		br:           br,
+		runnerName:   opts.Meta.RunnerName,
+		originalPath: opts.OriginalPath,
+		logPath:      opts.LogPath,
+		msgChan:      opts.MsgChan,
+		errChan:      opts.ErrChan,
 	}
 
 	drs.lock.Lock()
