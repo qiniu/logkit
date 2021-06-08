@@ -1,12 +1,8 @@
 FROM buildpack-deps:jessie-curl
-RUN cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
-ENV LOGKIT_VERSION nightly
-RUN wget https://pandora-dl.qiniu.com/logkit_${LOGKIT_VERSION}.tar.gz && tar xvf logkit_${LOGKIT_VERSION}.tar.gz && rm logkit_${LOGKIT_VERSION}.tar.gz
-RUN mkdir /app
-RUN mkdir /logs
-RUN mv _package_linux64_${LOGKIT_VERSION}/public /app/public
-RUN mv _package_linux64_${LOGKIT_VERSION}/logkit /app/logkit
-RUN mv _package_linux64_${LOGKIT_VERSION}/logkit.conf /app/logkit.conf
+RUN cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && mkdir /app && mkdir /logs
+ADD public /app/public
+ADD logkit /app/logkit
+ADD logkit.conf /app/logkit.conf
 
 RUN sed -i -- 's/localhost//g' /app/logkit.conf
 VOLUME /app/confs
