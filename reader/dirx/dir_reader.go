@@ -126,7 +126,7 @@ func (dr *dirReader) Run() {
 
 			if err == nil && dr.halfLineCache[source] != "" {
 				dr.readLock.Lock()
-				dr.readcache += dr.halfLineCache[source]
+				dr.readcache = dr.halfLineCache[source] + dr.readcache
 				dr.halfLineCache[source] = ""
 				dr.readLock.Unlock()
 			}

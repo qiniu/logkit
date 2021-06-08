@@ -342,7 +342,7 @@ func (ar *ActiveReader) Run() {
 
 			if err == nil && ar.halfLineCache[source] != "" {
 				ar.cacheLineMux.Lock()
-				ar.readcache += ar.halfLineCache[source]
+				ar.readcache = ar.halfLineCache[source] + ar.readcache
 				ar.halfLineCache[source] = ""
 				ar.cacheLineMux.Unlock()
 			}
