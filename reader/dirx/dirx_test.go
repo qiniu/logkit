@@ -727,7 +727,7 @@ func multiReaderNewestOffsetTest(t *testing.T) {
 }
 
 func multiReaderSameInodeTest(t *testing.T) {
-	
+
 }
 
 func TestMultiReaderSameInodeTest(t *testing.T) {
@@ -793,7 +793,7 @@ func TestMultiReaderSameInodeTest(t *testing.T) {
 		} else {
 			emptyNum++
 		}
-		if maxNum >= 60 || emptyNum > 60 {
+		if maxNum >= 10 || emptyNum > 60 {
 			break
 		}
 	}
@@ -820,7 +820,7 @@ func TestMultiReaderSameInodeTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxNum >= 60 || emptyNum > 60 {
+		if maxNum >= 13 || emptyNum > 60 {
 			break
 		}
 	}
@@ -843,7 +843,7 @@ func TestMultiReaderSameInodeTest(t *testing.T) {
 		if err == io.EOF {
 			break
 		}
-		if maxNum >= 60 || emptyNum > 60 {
+		if maxNum >= 17 || emptyNum > 60 {
 			break
 		}
 	}
@@ -1079,7 +1079,7 @@ func readerExpireDeleteTarTest(t *testing.T) {
 		}
 	}
 	t.Log("maxNum ", maxNum, "emptyNum", emptyNum)
-	time.Sleep(60 * time.Second)
+	time.Sleep(1 * time.Second)
 	assert.EqualValues(t, len(expectResults), len(actualResults))
 	for k, v := range expectResults {
 		actualV, ok := actualResults[k]

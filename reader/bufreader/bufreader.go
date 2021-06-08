@@ -54,25 +54,26 @@ type LastSync struct {
 
 // BufReader implements buffering for an FileReader object.
 type BufReader struct {
-	stopped          int32
-	buf              []byte
-	delim            []byte
-	mutiLineCache    *LineCache
-	waitForWholeLine bool              //readWholeLine
-	rd               reader.FileReader // reader provided by the client
-	r, w             int               // buf read and write positions
-	err              error
-	lastByte         int
-	lastRuneSize     int
-	lastSync         LastSync
+	stopped       int32
+	buf           []byte
+	delim         []byte
+	mutiLineCache *LineCache
+	rd            reader.FileReader // reader provided by the client
+	r, w          int               // buf read and write positions
+	err           error
+	lastByte      int
+	lastRuneSize  int
+	lastSync      LastSync
 
 	runTime reader.RunTime
 
 	mux     sync.Mutex
 	decoder mahonia.Decoder
 
-	Meta            *reader.Meta // 存放offset的元信息
-	multiLineRegexp *regexp.Regexp
+	Meta                 *reader.Meta // 存放offset的元信息
+	multiLineRegexp      *regexp.Regexp
+	lastLineSource       string // 存放多行上一次source信息
+	lastSecondLineSource string // 存放多行上上次source信息
 
 	stats     StatsInfo
 	statsLock sync.RWMutex
@@ -89,7 +90,7 @@ type BufReader struct {
 const minReadBufferSize = 16
 
 //最大连续读到空的尝试次数
-const maxConsecutiveEmptyReads = 40
+const maxConsecutiveEmptyReads = 10
 
 // NewReaderSize returns a new Reader whose buffer has at least the specified
 // size. If the argument FileReader is already a Reader with large enough
@@ -190,11 +191,6 @@ func (b *BufReader) SetMode(mode string, v interface{}) (err error) {
 	return
 }
 
-func (b *BufReader) SetWaitFlagForWholeLine() {
-	b.waitForWholeLine = true
-	return
-}
-
 func (b *BufReader) SetRunTime(mode string, v interface{}) (err error) {
 	b.runTime, err = reader.ParseRunTimeWithMode(mode, v)
 	return err
@@ -249,7 +245,6 @@ func (b *BufReader) fill() {
 		b.updateLastRdSource()
 		b.r = 0
 	}
-
 	if b.w >= len(b.buf) {
 		panic(fmt.Sprintf("Runner[%v] bufio: tried to fill full buffer", b.Meta.RunnerName))
 	}
@@ -264,10 +259,14 @@ func (b *BufReader) fill() {
 		if n < 0 {
 			panic(errNegativeRead)
 		}
-		if b.latestSource != b.rd.Source() {
-			//这个情况表示文件的数据源出现了变化，在buf中已经出现了至少2个数据源的数据，要定位是哪个位置的数据出现的分隔
+
+		if n > 0 {
 			if rc, ok := b.rd.(reader.NewSourceRecorder); ok {
 				SIdx := rc.NewSourceIndex()
+				if len(b.lastRdSource) > 0 && SIdx[0].Source == b.lastRdSource[len(b.lastRdSource)-1].Source {
+					b.lastRdSource[len(b.lastRdSource)-1].Index = SIdx[0].Index + b.w
+					SIdx = SIdx[1:]
+				}
 				for _, v := range SIdx {
 					// 从 NewSourceIndex 函数中返回的index值就是本次读取的批次中上一个DataSource的数据量，加上b.w就是上个DataSource的整体数据
 					b.lastRdSource = append(b.lastRdSource, reader.SourceIndex{
@@ -276,37 +275,24 @@ func (b *BufReader) fill() {
 					})
 				}
 			} else {
-				//如果没实现这个接口，那么就认为到上次读到的为止都是前一次source的文件
-				b.lastRdSource = append(b.lastRdSource, reader.SourceIndex{
-					Source: b.latestSource,
-					Index:  b.w,
-				})
+				if b.latestSource != b.rd.Source() {
+					//如果没实现这个接口，那么就认为到上次读到的为止都是前一次source的文件
+					b.lastRdSource = append(b.lastRdSource, reader.SourceIndex{
+						Source: b.latestSource,
+						Index:  b.w,
+					})
+				}
 			}
 			b.latestSource = b.rd.Source()
+
+			b.w += n
 		}
 
-		b.w += n
-
-		if err == io.EOF && b.waitForWholeLine {
-			if i == 1 { //when last attempts,return err info;
-				b.err = err
-				return
-			}
-
-			time.Sleep(1 * time.Second)
-			continue
-		}
-
-		if err != nil {
-			b.err = err
+		b.err = err
+		if err != nil && err != io.EOF {
 			return
 		}
-		if n > 0 {
-			return
-		}
-
 	}
-	b.err = io.ErrNoProgress
 }
 
 func (b *BufReader) readErr() error {
@@ -455,6 +441,7 @@ func (b *BufReader) ReadPattern() (string, error) {
 		//读取到line的情况
 		if len(line) > 0 {
 			if b.mutiLineCache.Size() <= 0 {
+				b.lastSecondLineSource = b.lineSource()
 				b.mutiLineCache.Set([]string{line})
 				continue
 			}
@@ -464,6 +451,10 @@ func (b *BufReader) ReadPattern() (string, error) {
 				line = string(b.mutiLineCache.Combine())
 				b.mutiLineCache.Set(make([]string, 0, 16))
 				b.mutiLineCache.Append(tmp)
+				if b.lastLineSource != "" {
+					b.lastSecondLineSource = b.lastLineSource
+				}
+				b.lastLineSource = b.lineSource()
 				return line, err
 			}
 			b.mutiLineCache.Append(line)
@@ -472,6 +463,9 @@ func (b *BufReader) ReadPattern() (string, error) {
 			if err != nil {
 				line = string(b.mutiLineCache.Combine())
 				b.mutiLineCache.Set(make([]string, 0, 16))
+				if b.lastLineSource != "" {
+					b.lastSecondLineSource = b.lastLineSource
+				}
 				return line, err
 			}
 			maxTimes++
@@ -550,6 +544,13 @@ func (b *BufReader) Name() string {
 }
 
 func (b *BufReader) Source() string {
+	if b.multiLineRegexp != nil && b.lastSecondLineSource != "" {
+		return b.lastSecondLineSource
+	}
+	return b.lineSource()
+}
+
+func (b *BufReader) lineSource() string {
 	//如果我当前读取的位置在上个数据源index之前，则返回上个数据源
 	for _, v := range b.lastRdSource {
 		if (b.r < v.Index) || (v.Index > 0 && b.r == v.Index) {
@@ -586,9 +587,11 @@ func (b *BufReader) Lag() (rl *LagInfo, err error) {
 }
 
 func (b *BufReader) ReadDone() bool {
+	b.mux.Lock()
+	defer b.mux.Unlock()
 	lr, ok := b.rd.(reader.OnceReader)
 	if ok {
-		return lr.ReadDone()
+		return lr.ReadDone() && b.r == 0 && b.w == 0
 	}
 	return false
 }
@@ -684,9 +687,7 @@ func NewSingleFileReader(meta *reader.Meta, conf conf.MapConf) (reader reader.Re
 		return
 	}
 	maxLineLen, _ := conf.GetInt64Or(KeyRunnerMaxLineLen, 0)
-	r, err := NewReaderSize(fr, meta, bufSize, maxLineLen)
-	r.SetWaitFlagForWholeLine()
-	return r, err
+	return NewReaderSize(fr, meta, bufSize, maxLineLen)
 }
 
 func init() {
@@ -703,4 +704,8 @@ func getDelimByEncodingWay(encodingWay string) []byte {
 	default:
 		return []byte("\n")
 	}
+}
+
+func (b *BufReader) GetDelimiter() []byte {
+	return b.delim
 }

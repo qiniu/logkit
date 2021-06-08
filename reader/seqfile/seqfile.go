@@ -43,7 +43,6 @@ type SeqFile struct {
 	newLineNotAdded  bool //文件最后的部分正好填满buffer，导致\n符号加不上，此时要用这个变量
 
 	newLineBytesSourceIndex []reader.SourceIndex //新文件被读取时的bytes位置
-	justOpenedNewFile       bool                 //新文件刚刚打开
 
 	validFilePattern  string // 合法的文件名正则表达式
 	stopped           int32  // 停止标志位
@@ -313,10 +312,15 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 	sf.mux.Lock()
 	defer sf.mux.Unlock()
 	n = 0
+	eofTimes := 0
 	for n < len(p) {
 		if sf.newLineNotAdded {
 			p[n] = '\n'
 			n++
+			sourceIndexLen := len(sf.newLineBytesSourceIndex)
+			if sourceIndexLen != 0 {
+				sf.newLineBytesSourceIndex[sourceIndexLen-1].Index = n
+			}
 			sf.newLineNotAdded = false
 		}
 		var n1 int
@@ -343,19 +347,30 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 			}
 			continue
 		}
-		if n1 > 0 && sf.justOpenedNewFile {
-			sf.justOpenedNewFile = false
-			sf.newLineBytesSourceIndex = append(sf.newLineBytesSourceIndex, reader.SourceIndex{
-				Source: sf.lastFile,
-				Index:  n,
-			})
-		}
 		sf.offset += int64(n1)
 		n += n1
+		if n1 > 0 {
+			eofTimes = 0
+			sourceIndexLen := len(sf.newLineBytesSourceIndex)
+			if sourceIndexLen != 0 && sf.newLineBytesSourceIndex[sourceIndexLen-1].Source == sf.currFile {
+				sf.newLineBytesSourceIndex[sourceIndexLen-1].Index = n
+			} else {
+				sf.newLineBytesSourceIndex = append(sf.newLineBytesSourceIndex, reader.SourceIndex{
+					Source: sf.currFile,
+					Index:  n,
+				})
+			}
+		}
 		if err != nil {
 			if err != io.EOF {
 				sf.handleUnexpectErr(err)
 				return n, err
+			}
+			// wait eof twice 0.1s
+			if eofTimes < 2 {
+				time.Sleep(time.Millisecond * 10)
+				eofTimes++
+				continue
 			}
 			fi, err1 := sf.nextFile()
 			if os.IsNotExist(err1) {
@@ -391,7 +406,6 @@ func (sf *SeqFile) Read(p []byte) (n int, err error) {
 				if err2 != nil {
 					return n, err2
 				}
-				sf.justOpenedNewFile = true
 				//已经获得了下一个文件，没有EOF
 				err = nil
 			} else {

@@ -224,13 +224,11 @@ func (t *Tar) Read(p []byte) (n int, err error) {
 	}()
 	t.sourceIndexes = []reader.SourceIndex{}
 	for {
-		var lastSource string
 		if t.header == nil ||
 			reader.IgnoreHidden(t.header.Name, t.opt.IgnoreHidden) ||
 			reader.IgnoreFileSuffixes(t.header.Name, t.opt.IgnoreFileSuffixes) ||
 			!reader.ValidFileRegex(filepath.Base(t.header.Name), t.opt.ValidFilesRegex) {
 			if t.header != nil {
-				lastSource = t.header.Name
 				log.Infof("ignore  %s in path %s", t.header.Name, t.path)
 			}
 			err = t.next()
@@ -239,12 +237,16 @@ func (t *Tar) Read(p []byte) (n int, err error) {
 			}
 			continue
 		}
-		t.sourceIndexes = append(t.sourceIndexes, reader.SourceIndex{Source: lastSource})
 		log.Infof("start to read %s in path %s", t.header.Name, t.path)
 		break
 	}
+	t.sourceIndexes = []reader.SourceIndex{{Index: 0, Source: t.header.Name}}
 	for {
 		n, err = t.rd.Read(p)
+		if n > 0 {
+			t.sourceIndexes[0].Index = n
+			t.sourceIndexes[0].Source = t.header.Name
+		}
 		if err == io.EOF {
 			//如果已经EOF，但是上次还读到了，先返回上次的结果
 			if n > 0 {
@@ -383,7 +385,7 @@ func (t *ZIP) next() (err error) {
 	if t.f != nil {
 		t.f.Close()
 	}
-	for ;t.idx >= 0 && t.idx < len(t.rd.File); t.idx++ {
+	for ; t.idx >= 0 && t.idx < len(t.rd.File); t.idx++ {
 		t.zipf = t.rd.File[t.idx]
 		if t.zipf.FileInfo().IsDir() {
 			continue
@@ -406,14 +408,13 @@ func (t *ZIP) next() (err error) {
 }
 
 func (t *ZIP) Read(p []byte) (n int, err error) {
+	t.sourceIndexes = []reader.SourceIndex{}
 	for {
-		var lastSource string
 		if t.f == nil ||
 			reader.IgnoreHidden(t.zipf.Name, t.opt.IgnoreHidden) ||
 			reader.IgnoreFileSuffixes(t.zipf.Name, t.opt.IgnoreFileSuffixes) ||
 			!reader.ValidFileRegex(filepath.Base(t.zipf.Name), t.opt.ValidFilesRegex) {
 			if t.f != nil {
-				lastSource = t.zipf.Name
 				log.Infof("ignore  %s in path %s", t.zipf.Name, t.path)
 			}
 			err = t.next()
@@ -422,12 +423,16 @@ func (t *ZIP) Read(p []byte) (n int, err error) {
 			}
 			continue
 		}
-		t.sourceIndexes = append(t.sourceIndexes, reader.SourceIndex{Source: lastSource})
 		log.Infof("start to read %s in path %s", t.zipf.Name, t.path)
 		break
 	}
+	t.sourceIndexes = []reader.SourceIndex{{Index: 0, Source: t.zipf.Name}}
 	for {
 		n, err = t.f.Read(p)
+		if n > 0 {
+			t.sourceIndexes[0].Index += n
+			t.sourceIndexes[0].Source = t.zipf.Name
+		}
 		if err == io.EOF {
 			//如果已经EOF，但是上次还读到了，先返回上次的结果
 			if n > 0 {
