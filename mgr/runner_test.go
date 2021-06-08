@@ -1469,7 +1469,7 @@ func TestAddDatatags(t *testing.T) {
 	assert.NoError(t, err)
 	go rr.Run()
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(60 * time.Second)
 	data, err := ioutil.ReadFile("./TestAddDatatags/filesend.json")
 	assert.Nil(t, err)
 	var res []Data
@@ -1539,7 +1539,7 @@ func TestRunWithExtra(t *testing.T) {
 	assert.NoError(t, err)
 	go rr.Run()
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(60 * time.Second)
 	data, err := ioutil.ReadFile("./TestRunWithExtra/filesend.json")
 	assert.Nil(t, err)
 	var res []Data
@@ -1671,7 +1671,7 @@ func TestRunWithDataSourceFail(t *testing.T) {
 	assert.NotNil(t, rr)
 	go rr.Run()
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(60 * time.Second)
 	data, err := ioutil.ReadFile("./TestRunWithDataSourceFail/filesend.json")
 	assert.Nil(t, err)
 	var res []Data
@@ -2076,21 +2076,21 @@ func TestTailxCleaner(t *testing.T) {
 	assert.NotNil(t, rr)
 	go rr.Run()
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(60 * time.Second)
 
 	logPatha1 := filepath.Join(dira, "a.log.1")
 	assert.NoError(t, os.Rename(logPatha, logPatha1))
 
 	assert.NoError(t, ioutil.WriteFile(logPatha, []byte("bbbb\n"), 0666))
 
-	time.Sleep(5 * time.Second)
+	time.Sleep(60 * time.Second)
 
 	logPatha2 := filepath.Join(dira, "a.log.2")
 	assert.NoError(t, os.Rename(logPatha, logPatha2))
 
 	assert.NoError(t, ioutil.WriteFile(logPatha, []byte("cccc\n"), 0666))
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(60 * time.Second)
 
 	assert.NotNil(t, rr.Cleaner())
 
@@ -2113,6 +2113,7 @@ DONE:
 			break
 		}
 	}
+	time.Sleep(50 * time.Second)
 	assert.Equal(t, 1, ret)
 }
 
