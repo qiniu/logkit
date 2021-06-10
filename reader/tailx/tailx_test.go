@@ -1531,7 +1531,7 @@ func TestReaderErrMiddle(t *testing.T) {
 		}
 	}
 	if err == nil || !strings.Contains(err.Error(), os.ErrPermission.Error()) {
-		t.Errorf("no matched error %v, expect %v", err, os.ErrPermission)
+		t.Errorf("no matched error %v, expect %v", err, os.ErrPermission.Error())
 	}
 	err = mr.Close()
 	assert.Nil(t, err)
