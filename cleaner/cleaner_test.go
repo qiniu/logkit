@@ -144,10 +144,7 @@ func Test_clean(t *testing.T) {
 	}
 	defer os.RemoveAll(donefiles)
 	cl.reserveNumber = 1
-	err = cl.Clean()
-	if err != nil {
-		t.Error(err)
-	}
+	go cl.Run()
 	time.Sleep(2 * time.Second)
 	files, err := ioutil.ReadDir(donefiles)
 	if err != nil {
@@ -162,6 +159,7 @@ func Test_clean(t *testing.T) {
 	if !reflect.DeepEqual(gots, exps) {
 		t.Fatalf("test clean error exps %v got %v", exps, gots)
 	}
+	cl.Close()
 	err = os.RemoveAll(donefiles)
 	if err != nil {
 		t.Error(err)
@@ -171,10 +169,7 @@ func Test_clean(t *testing.T) {
 		t.Fatal(err)
 	}
 	cl.reserveSize = 9 * MB
-	err = cl.Clean()
-	if err != nil {
-		t.Error(err)
-	}
+	go cl.Run()
 	time.Sleep(2 * time.Second)
 	files, err = ioutil.ReadDir(donefiles)
 	if err != nil {
@@ -196,6 +191,7 @@ func Test_clean(t *testing.T) {
 	if string(sd) != expstr {
 		t.Errorf("exps %v got %v", expstr, string(sd))
 	}
+	cl.Close()
 	err = os.RemoveAll(donefiles)
 	if err != nil {
 		t.Error(err)
@@ -205,12 +201,12 @@ func Test_clean(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	time.Sleep(1 * time.Second)
 	cl.reserveNumber = 10
 	cl.reserveSize = 10 * 1024 * 1024
-	err = cl.Clean()
-	if err != nil {
-		t.Error(err)
-	}
+	go cl.Run()
+	defer cl.Close()
 	time.Sleep(2 * time.Second)
 	files, err = ioutil.ReadDir(donefiles)
 	if err != nil {

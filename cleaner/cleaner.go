@@ -94,17 +94,13 @@ func NewCleaner(conf conf.MapConf, meta *reader.Meta, cleanChan chan<- CleanSign
 		cleanChan:     cleanChan,
 		name:          name,
 		logdir:        logdir,
-		status:        config.StatusInit,
+		status:        config.StatusStopped,
 	}, nil
 }
 
 func (c *Cleaner) Run() {
-	if !atomic.CompareAndSwapInt32(&c.status, config.StatusInit, config.StatusRunning) {
-		if c.hasStopped() {
-			log.Warnf("cleaner[%v] has stopped, run operation ignored", c.name)
-		} else {
-			log.Warnf("cleaner[%v] has already running, run operation ignored", c.name)
-		}
+	if !atomic.CompareAndSwapInt32(&c.status, config.StatusStopped, config.StatusRunning) {
+		log.Warnf("cleaner[%v] has already running, run operation ignored", c.name)
 		return
 	}
 	for {
@@ -186,7 +182,7 @@ func (c *Cleaner) Clean() (err error) {
 		}
 	}()
 	if c.hasStopped() {
-		log.Warnf("cleaner[%v] reader %s has stopped, skip clean operation", c.name)
+		log.Warnf("cleaner[%v] has stopped, skip clean operation", c.name)
 		return
 	}
 	var size int64 = 0
