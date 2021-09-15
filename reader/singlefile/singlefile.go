@@ -346,34 +346,43 @@ func (sf *SingleFile) Read(p []byte) (n int, err error) {
 	}
 	sf.mux.Lock()
 	defer sf.mux.Unlock()
-	n, err = sf.ratereader.Read(p)
-	if err != nil && strings.Contains(err.Error(), "stale NFS file handle") {
-		nerr := sf.reopenForESTALE()
-		if nerr != nil {
-			if !IsSelfRunner(sf.meta.RunnerName) {
-				log.Errorf("Runner[%v] %v meet eror %v reopen error %v", sf.meta.RunnerName, sf.originpath, err, nerr)
-			} else {
-				log.Debugf("Runner[%v] %v meet eror %v reopen error %v", sf.meta.RunnerName, sf.originpath, err, nerr)
+	eofTimes := 0
+	n1 := 0
+	n = 0
+	for n < len(p) && eofTimes <= 2 {
+		n1, err = sf.ratereader.Read(p[n:])
+		if err != nil && strings.Contains(err.Error(), "stale NFS file handle") {
+			nerr := sf.reopenForESTALE()
+			if nerr != nil {
+				if !IsSelfRunner(sf.meta.RunnerName) {
+					log.Errorf("Runner[%v] %v meet eror %v reopen error %v", sf.meta.RunnerName, sf.originpath, err, nerr)
+				} else {
+					log.Debugf("Runner[%v] %v meet eror %v reopen error %v", sf.meta.RunnerName, sf.originpath, err, nerr)
+				}
 			}
+			return n, err
 		}
-		return
+		if n1 > 0 {
+			eofTimes = 0
+			n += n1
+			sf.offset += int64(n1)
+		}
+		if err == io.EOF {
+			if n1 > 0 {
+				err = nil
+			}
+			time.Sleep(time.Millisecond * 10)
+			eofTimes++
+			err1 := sf.Reopen()
+			if err1 != nil {
+				return n, err1
+			}
+			continue
+		} else if err != nil {
+			return n, err
+		}
 	}
-	sf.offset += int64(n)
-	if err == io.EOF {
-		//读到了，如果n大于0，先把EOF抹去，返回
-		if n > 0 {
-			err = nil
-			return
-		}
-		err = sf.Reopen()
-		if err != nil {
-			return
-		}
-		n, err = sf.ratereader.Read(p)
-		sf.offset += int64(n)
-		return
-	}
-	return
+	return n, err
 }
 
 func (sf *SingleFile) SyncMeta() error {

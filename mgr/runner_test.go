@@ -711,7 +711,7 @@ func Test_QiniulogRun(t *testing.T) {
 	time.Sleep(time.Second)
 	timer := time.NewTimer(20 * time.Second).C
 	for {
-		if s.SendCount() >= 4 {
+		if s.SendCount() >= 5 {
 			break
 		}
 		select {
@@ -738,6 +738,21 @@ func Test_QiniulogRun(t *testing.T) {
 		} else {
 			assert.Equal(t, expreqid[idx], dt["reqid"], "equal reqid test")
 		}
+	}
+	if !strings.HasSuffix(dts[0]["testtag"].(string), "log1") {
+		t.Errorf("datasource should be log1, but now is %s", dts[0]["testtag"].(string))
+	}
+	if !strings.HasSuffix(dts[1]["testtag"].(string), "log1") {
+		t.Errorf("datasource should be log1, but now is %s", dts[1]["testtag"].(string))
+	}
+	if !strings.HasSuffix(dts[2]["testtag"].(string), "log2") {
+		t.Errorf("datasource should be log2, but now is %s", dts[2]["testtag"].(string))
+	}
+	if !strings.HasSuffix(dts[3]["testtag"].(string), "log2") {
+		t.Errorf("datasource should be log2, but now is %s", dts[3]["testtag"].(string))
+	}
+	if !strings.HasSuffix(dts[4]["testtag"].(string), "log3") {
+		t.Errorf("datasource should be log3, but now is %s", dts[4]["testtag"].(string))
 	}
 	ls, err := runner.LagStats()
 	assert.NoError(t, err)
@@ -2076,21 +2091,21 @@ func TestTailxCleaner(t *testing.T) {
 	assert.NotNil(t, rr)
 	go rr.Run()
 
-	time.Sleep(60 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	logPatha1 := filepath.Join(dira, "a.log.1")
 	assert.NoError(t, os.Rename(logPatha, logPatha1))
 
 	assert.NoError(t, ioutil.WriteFile(logPatha, []byte("bbbb\n"), 0666))
 
-	time.Sleep(60 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	logPatha2 := filepath.Join(dira, "a.log.2")
 	assert.NoError(t, os.Rename(logPatha, logPatha2))
 
 	assert.NoError(t, ioutil.WriteFile(logPatha, []byte("cccc\n"), 0666))
 
-	time.Sleep(60 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	assert.NotNil(t, rr.Cleaner())
 
@@ -2113,7 +2128,7 @@ DONE:
 			break
 		}
 	}
-	time.Sleep(50 * time.Second)
+	time.Sleep(5 * time.Second)
 	assert.Equal(t, 1, ret)
 }
 

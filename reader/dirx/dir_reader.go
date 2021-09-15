@@ -92,7 +92,7 @@ func (dr *dirReader) Run() {
 			log.Warnf("Runner[%v] log path[%v] reader has stopped", dr.runnerName, dr.originalPath)
 			return
 		}
-
+		source := ""
 		if len(dr.readcache) == 0 {
 			dr.readLock.Lock()
 			dr.readcache, err = dr.br.ReadLine()
@@ -104,41 +104,27 @@ func (dr *dirReader) Run() {
 				time.Sleep(2 * time.Second)
 				continue
 			}
-			source := dr.br.Source()
-			if _, ok := dr.halfLineCache[source]; !ok {
+			source = dr.br.Source()
+			// 连续2次没数据且当前没读取到数据，返回halfLineCache里的数据
+			if dr.numEmptyLines > 2 && len(dr.readcache) == 0 && len(dr.halfLineCache) != 0 {
 				dr.readLock.Lock()
-				dr.halfLineCache[source] = ""
-				dr.readLock.Unlock()
-			}
-
-			if dr.readcache != "" && err == io.EOF {
-				dr.readLock.Lock()
-				if len(dr.halfLineCache[source])+len(dr.readcache) > 20*utils.Mb {
-					log.Warnf("Runner[%v] log path[%v] reader[%v] single line size has  exceed 2k", dr.runnerName, dr.originalPath, source)
-					dr.readcache = dr.halfLineCache[source] + dr.readcache
-					dr.halfLineCache[source] = ""
-				} else {
-					dr.halfLineCache[source] += dr.readcache
-					dr.readcache = ""
+				for delaySource, line := range dr.halfLineCache {
+					dr.readcache = line
+					source = delaySource
+					break
 				}
+				delete(dr.halfLineCache, source)
 				dr.readLock.Unlock()
 			}
 
-			if err == nil && dr.halfLineCache[source] != "" {
-				dr.readLock.Lock()
-				dr.readcache += dr.halfLineCache[source]
-				dr.halfLineCache[source] = ""
-				dr.readLock.Unlock()
-			}
-
-			if len(dr.readcache) == 0 && dr.halfLineCache[source] == "" {
-				if key, exist := utils.GetKeyOfNotEmptyValueInMap(dr.halfLineCache); exist {
-					source = key
-				}
-			}
-
-			if len(dr.readcache) == 0 && dr.halfLineCache[source] == "" {
+			if len(dr.readcache) == 0 {
 				dr.numEmptyLines++
+
+				// 大约一小时没读到内容，设置为 inactive
+				if dr.numEmptyLines > 60*60 {
+					atomic.StoreInt32(&dr.inactive, 1)
+				}
+
 				// 文件 EOF，同时没有任何内容，代表不是第一次 EOF，休息时间设置长一些
 				if err == io.EOF {
 					atomic.StoreInt32(&dr.inactive, 1)
@@ -147,25 +133,27 @@ func (dr *dirReader) Run() {
 					continue
 				}
 
-				// 大约一小时没读到内容，设置为 inactive
-				if dr.numEmptyLines > 60*60 {
-					atomic.StoreInt32(&dr.inactive, 1)
-				}
-
 				// 读取的结果为空，无论如何都 sleep 1s
 				time.Sleep(time.Second)
 				continue
-			} else if len(dr.readcache) == 0 && dr.halfLineCache[source] != "" {
-				dr.numEmptyLines++
-				if err == io.EOF && dr.numEmptyLines < 40{
-					log.Debugf("Runner[%s] %s meet EOF, ActiveReader was inactive now, stop it", dr.runnerName, dr.originalPath)
-					time.Sleep(1 * time.Second)
-					continue
-				}
+			}
+
+			if cache, ok := dr.halfLineCache[source]; ok {
 				dr.readLock.Lock()
-				dr.readcache = dr.halfLineCache[source]
-				dr.halfLineCache[source] = ""
+				dr.readcache = cache + dr.readcache
 				dr.readLock.Unlock()
+			}
+			if !strings.HasSuffix(dr.readcache, string(dr.br.GetDelimiter())) && dr.numEmptyLines < 3 && len(dr.readcache) < 20*MB {
+				dr.halfLineCache[source] = dr.readcache
+				dr.readLock.Lock()
+				dr.readcache = ""
+				dr.readLock.Unlock()
+				continue
+			} else {
+				delete(dr.halfLineCache, source)
+			}
+			if len(dr.readcache) > 20*MB {
+				log.Warnf("Runner[%v] %v >>>>>> read cache has exceed 20 MB, will return current line", dr.runnerName, dr.originalPath)
 			}
 		}
 		log.Debugf("Runner[%v] %v >>>>>> read cache[%v] line cache [%v]", dr.runnerName, dr.originalPath, dr.readcache, string(dr.br.FormMutiLine()))
@@ -190,10 +178,9 @@ func (dr *dirReader) Run() {
 			}
 
 			select {
-			case dr.msgChan <- message{result: dr.readcache, logpath: dr.originalPath, currentFile: dr.br.Source()}:
+			case dr.msgChan <- message{result: dr.readcache, logpath: dr.originalPath, currentFile: source}:
 				dr.readLock.Lock()
 				dr.readcache = ""
-
 				dr.readLock.Unlock()
 			case <-ticker.C:
 			}
@@ -241,18 +228,7 @@ func HasDirExpired(dir string, expire time.Duration) bool {
 
 //对于读完的直接认为过期，因为不会追加新数据;最后一次需要等待30s
 func (dr *dirReader) ReadDone() bool {
-	return dr.br.ReadDone() && dr.halfLineCacheIsEmpty()
-}
-
-func (dr *dirReader) halfLineCacheIsEmpty() bool {
-	dr.readLock.Lock()
-	defer dr.readLock.Unlock()
-	for _, v := range dr.halfLineCache {
-		if v != "" {
-			return false
-		}
-	}
-	return true
+	return dr.br.ReadDone() && len(dr.halfLineCache) == 0
 }
 
 func (dr *dirReader) HasExpired(expire time.Duration) bool {
