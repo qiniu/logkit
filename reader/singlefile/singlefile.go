@@ -274,6 +274,16 @@ func (sf *SingleFile) Reopen() (err error) {
 	if newInode == oldInode {
 		return
 	}
+
+	endOffset, err := sf.f.Seek(0, io.SeekEnd)
+	if err != nil {
+		log.Errorf("Runner[%v] get file end offset , error: %v", sf.meta.RunnerName, err)
+	} else if endOffset > sf.offset {
+		if _, err = sf.f.Seek(sf.offset, io.SeekStart); err == nil {
+			return
+		}
+		log.Errorf("Runner[%v] set current offset  , error: %v", sf.meta.RunnerName, err)
+	}
 	sf.f.Close()
 	sf.f = nil
 	detectStr := sf.detectMovedName(oldInode)
