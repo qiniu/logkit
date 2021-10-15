@@ -1040,6 +1040,16 @@ var ModeKeyOptions = map[string][]Option{
 			AdvanceDepend: KeyESDateShift,
 			ToolTip:       `对索引(index)进行时间转换时，默认按当前时间，使用这个参数可以对时间进行偏移，单位为小时，如24表示往前偏移1天`,
 		},
+		{
+			KeyName:       KeyESSniff,
+			ChooseOnly:    false,
+			ChooseOptions: []interface{}{"false", "true"},
+			Default:       "false",
+			DefaultNoUse:  false,
+			Description:   "是否嗅探其他的es节点",
+			Advance:       true,
+			ToolTip:       `在集群环境中，考虑是否所有节点可用，如果都可用且可达，可选择true`,
+		},
 	},
 	ModeMongo: {
 		{

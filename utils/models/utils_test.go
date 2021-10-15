@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -594,9 +593,8 @@ func Test_ConvertDate(t *testing.T) {
 
 	date, err = ConvertDate("", "", 0, time.UTC, "Feb 05 01:02:03")
 	assert.NoError(t, err)
-	year := strconv.Itoa(time.Now().Year())
-	expect = strings.Replace("0000-02-05T01:02:03Z", "0000", year, -1)
-	assert.Equal(t, expect, date)
+	dateStr := date.(string)
+	assert.Equal(t, "02-05T01:02:03Z", dateStr[5:])
 
 	date, err = ConvertDate("", "", 0, time.UTC, "19/Aug/2000:14:47:37 -0400")
 	assert.NoError(t, err)
@@ -641,9 +639,7 @@ func Test_FormatWithUserOption(t *testing.T) {
 	ti, err := times.StrToTime("Feb 05 01:02:03")
 	assert.NoError(t, err)
 	date := FormatWithUserOption("", 0, ti)
-	year := strconv.Itoa(time.Now().Year())
-	expect := strings.Replace("0000-02-05T01:02:03Z", "0000", year, -1)
-	assert.Equal(t, expect, date)
+	assert.Equal(t, "02-05T01:02:03Z", date[5:])
 
 	ti, err = time.Parse("20060102150405", "20180204221045")
 	assert.NoError(t, err)
