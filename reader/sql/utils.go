@@ -152,6 +152,11 @@ func GetInitScans(length int, rows *sql.Rows, schemas map[string]string, runnerN
 				nochoiced[i] = true
 			}
 		}
+		nullable, ok := v.Nullable()
+		nullable = nullable && ok
+		if nullable {
+			scanArgs[i] = new(interface{})
+		}
 	}
 	return scanArgs, nochoiced
 }
