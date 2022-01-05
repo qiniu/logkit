@@ -465,6 +465,18 @@ func (drs *dirReaders) SyncMeta() ([]byte, error) {
 	return data, nil
 }
 
+func (drs *dirReaders) Lag() (rl *LagInfo, err error) {
+	rl = &LagInfo{Size: 0, SizeUnit: "bytes"}
+	for _, dr := range drs.getReaders() {
+		drLag, err := dr.br.Lag()
+		if err != nil {
+			return nil, err
+		}
+		rl.Size += drLag.Size
+	}
+	return rl, nil
+}
+
 func (drs *dirReaders) Close() {
 	var wg sync.WaitGroup
 	for _, dr := range drs.getReaders() {

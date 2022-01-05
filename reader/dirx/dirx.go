@@ -422,6 +422,10 @@ func (r *Reader) ReadLine() (string, error) {
 	}
 }
 
+func (r *Reader) Lag() (rl *LagInfo, err error) {
+	return r.dirReaders.Lag()
+}
+
 func (r *Reader) Status() StatsInfo {
 	r.statsLock.RLock()
 	defer r.statsLock.RUnlock()

@@ -26,7 +26,7 @@ import (
 // SeqFile 按最终修改时间依次读取文件的Reader类型
 type SeqFile struct {
 	meta *reader.Meta
-	mux  sync.Mutex
+	mux  *sync.RWMutex
 
 	name             string
 	dir              string   // 文件目录
@@ -109,7 +109,7 @@ func NewSeqFile(meta *reader.Meta, path string, ignoreHidden, newFileNewLine boo
 		ignoreFileSuffix: suffixes,
 		ignoreHidden:     ignoreHidden,
 		validFilePattern: validFileRegex,
-		mux:              sync.Mutex{},
+		mux:              new(sync.RWMutex),
 		newFileAsNewLine: newFileNewLine,
 		meta:             meta,
 		inodeOffset:      make(map[string]int64),
@@ -499,13 +499,7 @@ func (sf *SeqFile) getNextFileCondition() (condition func(os.FileInfo) bool, err
 		if len(sf.inodeOffset) < 1 {
 			return true
 		}
-		var key string
-		if sf.inodeSensitive {
-			key = reader.JoinFileInode(f.Name(), strconv.FormatUint(inode, 10))
-		} else {
-			key = filepath.Base(f.Name())
-		}
-		offset, ok := sf.inodeOffset[key]
+		offset, ok := sf.inodeOffset[getInodeKey(f.Name(), inode, sf.inodeSensitive)]
 		return !ok || (sf.ReadSameInode && offset != -1 && f.Size() != offset)
 	}
 
@@ -624,13 +618,7 @@ func (sf *SeqFile) open(fi os.FileInfo) (err error) {
 	if sf.inodeOffset == nil {
 		sf.inodeOffset = make(map[string]int64)
 	}
-	var key string
-	if sf.inodeSensitive {
-		key = reader.JoinFileInode(doneFile, strconv.FormatUint(doneFileInode, 10))
-	} else {
-		key = filepath.Base(doneFile)
-	}
-	sf.inodeOffset[key] = doneFileOffset
+	sf.inodeOffset[getInodeKey(doneFile, doneFileInode, sf.inodeSensitive)] = doneFileOffset
 	tryTime := 0
 	for {
 		err := sf.meta.SyncDoneFileInode(sf.inodeOffset)
@@ -682,19 +670,8 @@ func (sf *SeqFile) SyncMeta() (err error) {
 
 func (sf *SeqFile) Lag() (rl *LagInfo, err error) {
 	sf.mux.Lock()
-	rl = &LagInfo{Size: -sf.offset, SizeUnit: "bytes"}
-	logReading := filepath.Base(sf.currFile)
-	sf.mux.Unlock()
-
-	inode, err := utilsos.GetIdentifyIDByPath(sf.currFile)
-	if os.IsNotExist(err) || (inode != 0 && inode != sf.inode) {
-		rl.Size = 0
-		err = nil
-	}
-	if err != nil {
-		rl.Size = 0
-		return rl, err
-	}
+	defer sf.mux.Unlock()
+	rl = &LagInfo{Size: 0, SizeUnit: "bytes"}
 
 	logs, err := ReadDirByTime(sf.dir)
 	if err != nil {
@@ -705,13 +682,28 @@ func (sf *SeqFile) Lag() (rl *LagInfo, err error) {
 		if l.IsDir() {
 			continue
 		}
+
+		inode, err := utilsos.GetIdentifyIDByPath(filepath.Join(sf.dir, l.Name()))
+		if os.IsNotExist(err) || inode == 0 {
+			continue
+		}
+		if err != nil {
+			rl.Size = 0
+			return rl, err
+		}
+
+		if filepath.Base(sf.currFile) == l.Name() {
+			if sf.inodeSensitive && sf.inode != inode {
+				rl.Size += l.Size()
+			} else {
+				rl.Size += l.Size() - sf.offset
+			}
+			continue
+		}
 		if condition == nil || !condition(l) {
 			continue
 		}
-		rl.Size += l.Size()
-		if l.Name() == logReading {
-			break
-		}
+		rl.Size += l.Size() - sf.inodeOffset[getInodeKey(l.Name(), inode, sf.inodeSensitive)]
 	}
 
 	return rl, nil
@@ -750,13 +742,7 @@ func (sf *SeqFile) getOffset(f *os.File, offset int64, seek bool) int64 {
 		log.Errorf("Runner[%s] NewSeqFile get file %s inode error %v, ignore...", sf.meta.RunnerName, fileName, err)
 		return offset
 	}
-	var key string
-	if sf.inodeSensitive {
-		key = reader.JoinFileInode(fileName, strconv.FormatUint(inode, 10))
-	} else {
-		key = filepath.Base(fileName)
-	}
-	offset = sf.inodeOffset[key]
+	offset = sf.inodeOffset[getInodeKey(fileName, inode, sf.inodeSensitive)]
 	if fileInfo.Size() < offset {
 		offset = 0
 	}
@@ -767,6 +753,14 @@ func (sf *SeqFile) getOffset(f *os.File, offset int64, seek bool) int64 {
 		}
 	}
 	return offset
+}
+
+func getInodeKey(name string, inode uint64, inodeSensitive bool) string {
+	if inodeSensitive {
+		return reader.JoinFileInode(name, strconv.FormatUint(inode, 10))
+	} else {
+		return filepath.Base(name)
+	}
 }
 
 var (
