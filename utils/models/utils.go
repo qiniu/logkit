@@ -836,7 +836,7 @@ func ConvertDate(layoutBefore, layoutAfter string, offset int, loc *time.Locatio
 	return FormatWithUserOption(layoutAfter, offset, tm), nil
 }
 
-func FormatWithUserOption(layoutAfter string, offset int, t time.Time) interface{} {
+func FormatWithUserOption(layoutAfter string, offset int, t time.Time) string {
 	t = t.Add(time.Duration(offset) * time.Hour)
 	if t.Year() == 0 {
 		t = t.AddDate(time.Now().Year(), 0, 0)

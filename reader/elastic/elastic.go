@@ -124,6 +124,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	keepAlive, _ := conf.GetStringOr(KeyESKeepAlive, "6h")
 	cronSched, _ := conf.GetStringOr(KeyESCron, "")
 	execOnStart, _ := conf.GetBoolOr(KeyESExecOnstart, true)
+	sniff, _ := conf.GetBoolOr(KeyESSniff, false)
 	offsetKey, _ := conf.GetStringOr(KeyESOffsetKey, "")
 	offsetKeyType, _ := conf.GetStringOr(KeyESOffsetKeyType, "")
 	startTime, _ := conf.GetStringOr(KeyESOffsetStartTime, "")
@@ -153,6 +154,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		optFns := []elasticV7.ClientOptionFunc{
 			elasticV7.SetHealthcheck(false),
 			elasticV7.SetURL(eshost),
+			elasticV7.SetSniff(sniff),
 		}
 
 		if len(authUsername) > 0 && len(authPassword) > 0 {
@@ -167,6 +169,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		optFns := []elasticV6.ClientOptionFunc{
 			elasticV6.SetHealthcheck(false),
 			elasticV6.SetURL(eshost),
+			elasticV6.SetSniff(sniff),
 		}
 
 		if len(authUsername) > 0 && len(authPassword) > 0 {
@@ -179,7 +182,7 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 		}
 	case ElasticVersion3:
 		optFns := []elasticV3.ClientOptionFunc{
-			elasticV3.SetSniff(false),
+			elasticV3.SetSniff(sniff),
 			elasticV3.SetHealthcheck(false),
 			elasticV3.SetURL(eshost),
 		}

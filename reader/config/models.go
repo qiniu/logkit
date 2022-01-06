@@ -107,6 +107,7 @@ const (
 	KeyESOffsetStartTime = "es_offset_start_time"
 	KeyESDateShift       = "es_date_shift"
 	KeyESDateOffset      = "es_date_offset"
+	KeyESSniff           = "es_sniff"
 	KeyESDelayTime       = "es_delay_time"
 	KeyESDelayTimeUnit   = "es_delay_time_unit"
 
