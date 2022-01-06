@@ -56,8 +56,11 @@ func RawData(readerConfig conf.MapConf) ([]string, error) {
 	if rawDataTimeOut < 10 || rawDataTimeOut > 300 {
 		rawDataTimeOut = DefaultRawDataTimeout
 	}
-	configMetaPath := runnerName + "_" + Hash(strconv.FormatInt(time.Now().Unix(), 10))
-	metaPath := filepath.Join(MetaTmp, configMetaPath)
+	metaPath, _ := readerConfig.GetString(config.KeyMetaTmpPath)
+	if metaPath == "" {
+		configMetaPath := runnerName + "_" + Hash(strconv.FormatInt(time.Now().Unix(), 10))
+		metaPath = filepath.Join(MetaTmp, configMetaPath)
+	}
 	log.Debugf("Runner[%v] Using %s as default metaPath", runnerName, metaPath)
 	readerConfig[config.KeyMetaPath] = metaPath
 	size, _ := readerConfig.GetIntOr("raw_data_lines", DefaultRawDataBatchLen)

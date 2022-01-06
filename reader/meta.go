@@ -850,6 +850,18 @@ func GetLogPathAbs(conf conf.MapConf) (logpath, oldLogPath string, err error) {
 	return logpath, oldLogPath, err
 }
 
+func SetMetaPath(conf conf.MapConf, runnerName, metaDir string) {
+	if metaDir == "" {
+		return
+	}
+	logPath, _ := conf.GetStringOr(KeyLogPath, "")
+	if logPath != "" {
+		logPath = filepath.Base(logPath)
+	}
+	metaPath := filepath.Join(metaDir, fmt.Sprintf("%s_%s", runnerName, Hash(logPath)))
+	conf[KeyMetaPath] = metaPath
+}
+
 func GetMetaOption(conf conf.MapConf) (string, string, string, error) {
 	mode, _ := conf.GetStringOr(KeyMode, ModeDir)
 	logPath, oldLogPath, err := GetLogPathAbs(conf)
