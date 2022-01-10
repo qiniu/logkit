@@ -679,7 +679,7 @@ func Test_RawData_MultiLines(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, []string{"abc\n", "abc\n"}, actual)
 
-	readConfig[readerconf.KeyRawDataTimeout] = "40"
+	readConfig[readerconf.KeyRawDataTimeout] = "60"
 	os.RemoveAll(fileName)
 	createRawDataFile(fileName, "abc\n")
 	actual, err = RawData(readConfig)
