@@ -57,10 +57,10 @@ func NewReader(meta *reader.Meta, path string, opt Opts) (*Reader, error) {
 			return nil, err
 		}
 		tp = "tar"
-	} else if strings.HasSuffix(path, ".gz") {
+	} else if strings.HasSuffix(path, ".gz") || strings.HasSuffix(path, ".gzip") {
 		rd, err = NewGZ(path, opt)
 		if err != nil {
-			log.Errorf("New .gz err %v", err)
+			log.Errorf("New .gz or .gzip err %v", err)
 			return nil, err
 		}
 		tp = "gz"
@@ -303,8 +303,8 @@ type GZ struct {
 }
 
 func NewGZ(path string, opt Opts) (*GZ, error) {
-	if !strings.HasSuffix(path, ".gz") {
-		return nil, fmt.Errorf("%s is not .gz format", path)
+	if !(strings.HasSuffix(path, ".gz") || strings.HasSuffix(path, ".gzip")) {
+		return nil, fmt.Errorf("%s is not .gz  or .gzip format", path)
 	}
 	f, err := os.Open(path)
 	if err != nil {

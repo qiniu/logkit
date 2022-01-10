@@ -144,7 +144,7 @@ func getTags(tagFile string) (tags map[string]interface{}, err error) {
 }
 
 func CompressedFile(path string) bool {
-	if strings.HasSuffix(path, ".gz") || strings.HasSuffix(path, ".tar") || strings.HasSuffix(path, ".zip") {
+	if strings.HasSuffix(path, ".gzip") || strings.HasSuffix(path, ".gz") || strings.HasSuffix(path, ".tar") || strings.HasSuffix(path, ".zip") {
 		return true
 	}
 	return false

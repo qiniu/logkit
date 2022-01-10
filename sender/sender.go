@@ -9,6 +9,7 @@ import (
 	. "github.com/qiniu/logkit/utils/models"
 )
 
+
 // Sender send data to pandora, prometheus such different destinations
 type Sender interface {
 	Name() string
