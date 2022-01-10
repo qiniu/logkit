@@ -32,6 +32,10 @@ const (
 	defaultMaxProcs   = 1 // 默认没有并发
 	// TypeMarshalError 表示marshal出错
 	TypeMarshalError = reqerr.SendErrorType("Data Marshal failed")
+	// KeyUnMarshalError
+	KeyUnMarshalError = "Data unmarshal failed"
+	// NumUnMarshalError
+	NumUnMarshalError = 10
 )
 
 var _ SkipDeepCopySender = &FtSender{}
@@ -506,13 +510,13 @@ func (ft *FtSender) trySendBytes(dat []byte, failSleep int, isRetry bool) (backD
 	if ft.opt.sendRaw {
 		datas, err := ft.unmarshalRaws(dat)
 		if err != nil {
-			return nil, err
+			return nil, errors.New(KeyUnMarshalError + ":" + err.Error())
 		}
 		return ft.backOffSendRawFromQueue(datas, failSleep, isRetry)
 	}
 	datas, err := ft.unmarshalData(dat)
 	if err != nil {
-		return nil, err
+		return nil, errors.New(KeyUnMarshalError + ":" + err.Error())
 	}
 
 	return ft.backOffSendFromQueue(datas, failSleep, isRetry)
@@ -876,6 +880,7 @@ func (ft *FtSender) sendRawFromQueue(queueName string, readChan <-chan []byte, r
 	timer := time.NewTicker(time.Second)
 	defer timer.Stop()
 	numWaits := 1
+	unmarshalDataError := 0
 	var curDataContext, otherDataContext []*datasContext
 	var curIdx int
 	var backDataContext []*datasContext
@@ -908,6 +913,15 @@ func (ft *FtSender) sendRawFromQueue(queueName string, readChan <-chan []byte, r
 			if numWaits > 5 {
 				numWaits = 5
 			}
+			if strings.HasPrefix(err.Error(), KeyUnMarshalError) {
+				unmarshalDataError++
+				if unmarshalDataError > NumUnMarshalError {
+					time.Sleep(time.Second)
+					log.Errorf("Runner[%s] Sender[%s] sleep 1s due to unmarshal err", ft.runnerName, ft.innerSender.Name(), queueName, err)
+				}
+			} else {
+				unmarshalDataError = 0
+			}
 		}
 		if backDataContext != nil {
 			otherDataContext = append(otherDataContext, backDataContext...)
@@ -924,6 +938,8 @@ func (ft *FtSender) sendFromQueue(queueName string, readChan <-chan []byte, read
 	timer := time.NewTicker(time.Second)
 	defer timer.Stop()
 	numWaits := 1
+	unmarshalDataError := 0
+
 	var curDataContext, otherDataContext []*datasContext
 	var curIdx int
 	var backDataContext []*datasContext
@@ -955,6 +971,15 @@ func (ft *FtSender) sendFromQueue(queueName string, readChan <-chan []byte, read
 			numWaits++
 			if numWaits > 5 {
 				numWaits = 5
+			}
+			if strings.HasPrefix(err.Error(), KeyUnMarshalError) {
+				unmarshalDataError++
+				if unmarshalDataError > NumUnMarshalError {
+					time.Sleep(time.Second)
+					log.Errorf("Runner[%s] Sender[%s] sleep 1s due to unmarshal err", ft.runnerName, ft.innerSender.Name(), queueName, err)
+				}
+			} else {
+				unmarshalDataError = 0
 			}
 		}
 		if backDataContext != nil {
@@ -993,8 +1018,8 @@ func SplitData(data string) (valArray []string) {
 			valArray = SplitDataWithSplitSize(valArray, data[start:offset], DefaultSplitSize)
 			if len(valArray) > 0 {
 				// 最后一个分片参与下次split
-				start = offset - len(valArray[len(valArray) - 1])
-				valArray = valArray[:len(valArray) - 1]
+				start = offset - len(valArray[len(valArray)-1])
+				valArray = valArray[:len(valArray)-1]
 			}
 			continue
 		}
@@ -1017,7 +1042,7 @@ func SplitDataWithSplitSize(originArray []string, data string, splitSize int64) 
 	if len(originArray) != 0 {
 		num := (DefaultMaxBatchSize - int64(len(originArray[len(originArray)-1]))) / splitSize
 		if num > 0 {
-			end := num*splitSize
+			end := num * splitSize
 			if end > int64(len(data)) {
 				end = int64(len(data))
 			}
