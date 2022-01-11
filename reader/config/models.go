@@ -14,6 +14,7 @@ const (
 	KeyLogPath           = "log_path"
 	KeyLogPathOld        = "log_path_old"
 	KeyMetaPath          = "meta_path"
+	KeyMetaTmpPath       = "meta_tmp_path"
 	KeyFileDone          = "file_done"
 	KeyMode              = "mode"
 	KeyBufSize           = "reader_buf_size"
