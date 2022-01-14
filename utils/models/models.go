@@ -186,6 +186,7 @@ type LagInfo struct {
 	Size     int64  `json:"size"`
 	SizeUnit string `json:"sizeunit"`
 	Ftlags   int64  `json:"ftlags"`
+	FtSendLags   int64  `json:"ft_send_lags"`
 	Total    int64  `json:"total"`
 }
 
@@ -205,6 +206,7 @@ type StatsInfo struct {
 	Trend      string `json:"trend"`
 	LastError  string `json:"last_error"`
 	FtQueueLag int64  `json:"-"`
+	FtSendLag  int64  `json:"ft_send_lag"`
 }
 
 type ErrorStatistic struct {

@@ -48,7 +48,7 @@ const (
 type Statistic struct {
 	ReaderCnt       int64                     `json:"reader_count"`    // 读取总条数
 	ParserCnt       [2]int64                  `json:"parser_connt"`    // [解析成功, 解析失败]
-	SenderCnt       map[string][2]int64       `json:"sender_count"`    // [发送成功, 发送失败]
+	SenderCnt       map[string][]int64       `json:"sender_count"`    // [发送成功, 发送失败]
 	TransCnt        map[string][2]int64       `json:"transform_count"` // [解析成功, 解析失败]
 	ReadErrors      ErrorStatistic            `json:"read_errors"`
 	ParseErrors     ErrorStatistic            `json:"parse_errors"`

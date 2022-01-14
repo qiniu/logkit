@@ -1476,10 +1476,14 @@ func (r *LogExportRunner) StatusRestore() {
 		}
 		sStatus, ok := s.(sender.StatsSender)
 		if ok {
-			sStatus.Restore(&StatsInfo{
+			statsInfo:=&StatsInfo{
 				Success: info[0],
 				Errors:  info[1],
-			})
+			}
+			if len(info)>2{
+				statsInfo.FtSendLag=info[2]
+			}
+			sStatus.Restore(statsInfo)
 		}
 		status, ext := r.rs.SenderStats[name]
 		if !ext {
@@ -1519,7 +1523,7 @@ func (r *LogExportRunner) StatusBackup() {
 			status.ParserStats.Errors,
 		},
 		TransCnt:  map[string][2]int64{},
-		SenderCnt: map[string][2]int64{},
+		SenderCnt: map[string][]int64{},
 	}
 	r.historyMutex.Lock()
 	defer r.historyMutex.Unlock()
@@ -1535,9 +1539,10 @@ func (r *LogExportRunner) StatusBackup() {
 	for idx, t := range r.transformers {
 		name := formatTransformName(t.Type(), idx)
 		sta := t.Stats()
-		bStart.SenderCnt[name] = [2]int64{
+		bStart.SenderCnt[name] = []int64{
 			sta.Success,
 			sta.Errors,
+			sta.FtSendLag,
 		}
 	}
 
@@ -1563,9 +1568,10 @@ func (r *LogExportRunner) StatusBackup() {
 			status.SenderStats[name] = senderStats
 		}
 		if sta, exist := status.SenderStats[name]; exist {
-			bStart.SenderCnt[name] = [2]int64{
+			bStart.SenderCnt[name] = []int64{
 				sta.Success,
 				sta.Errors,
+				sta.FtSendLag,
 			}
 		}
 	}
