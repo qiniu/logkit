@@ -3,6 +3,7 @@ package mgr
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -82,10 +83,15 @@ func NewMetricRunner(rc RunnerConfig, wg *sync.WaitGroup, sr *sender.Registry) (
 		return nil, errors.New("Runner " + rc.RunnerName + " has no metric, ignore it")
 	}
 	interval := time.Duration(rc.CollectInterval) * time.Second
+	metaPath := ""
+	if rc.MetaDir != "" {
+		metaPath = filepath.Join(rc.MetaDir, fmt.Sprintf("%s_%s", rc.RunnerName, Hash("")))
+	}
 	cf := conf.MapConf{
 		GlobalKeyName: rc.RunnerName,
 		KeyRunnerName: rc.RunnerName,
 		KeyMode:       reader.ModeMetrics,
+		KeyMetaPath:   metaPath,
 	}
 	if rc.ExtraInfo {
 		cf[ExtraInfo] = Bool2String(rc.ExtraInfo)
