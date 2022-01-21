@@ -108,6 +108,7 @@ type RunnerInfo struct {
 	InternalKeyPrefix      string `json:"internal_key_prefix"` // 内置字段名前缀
 	MaxLineLen             int64  `json:"max_line_len"`        // 限制单条数据/每个key对应的value大小，防止读取数据/发送数据出错时内存/磁盘占用过大
 	IsBlock                bool   `json:"is_block"`            // 阻塞式发送
+	MetaDir                string `json:"meta_dir"`            // meta目录
 }
 
 type ErrorsList struct {
