@@ -582,9 +582,8 @@ DONE:
 			continue
 		}
 		basename := filepath.Base(s3file)
-		unzipPath := strings.TrimSuffix(basename, ".gz")
 		if !s.syncedFiles[basename] {
-			filePath := strings.Join([]string{s.target, unzipPath}, "/")
+			filePath := filepath.Join(s.target, basename)
 			if filepath.Dir(filePath) != "." {
 				err := os.MkdirAll(filepath.Dir(filePath), 0755)
 				if err != nil {
@@ -609,19 +608,24 @@ DONE:
 				pool <- struct{}{}
 			}(filePath, bucket, s3file)
 		} else {
-			log.Debugf("Runner[%v] %q already synced, skipped this time", s.meta.RunnerName, unzipPath)
+			log.Debugf("Runner[%v] %q already synced, skipped this time", s.meta.RunnerName, basename)
 		}
 	}
 	wg.Wait()
 }
 
 func writeFile(filename string, bucket *s3.Bucket, path string) error {
-	data, err := bucket.Get(path)
-	if err != nil {
-		return err
+	if strings.HasSuffix(filename, ".tar.gz") {
+		log.Warnf("cloudtrail not support archive file, will ignore %s", filename)
+		return nil
 	}
 	if strings.HasSuffix(filename, ".zip") {
-		rd, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+		data, err := bucket.Get(path)
+		if err != nil {
+			return err
+		}
+		r := bytes.NewReader(data)
+		rd, err := zip.NewReader(r, int64(len(data)))
 		if err != nil {
 			log.Errorf("reader file %v as zip error %v", filename, err)
 			return ioutil.WriteFile(filename, data, os.FileMode(0644))
@@ -635,20 +639,20 @@ func writeFile(filename string, bucket *s3.Bucket, path string) error {
 		}
 		return writeErr
 	}
-	if utils.IsGzipped(data) {
-		gzipData, err := gzip.NewReader(bytes.NewReader(data))
-		if err != nil {
-			log.Errorf("reader file %v as gzip error %v, write to file as raw_text", filename, err)
-			return ioutil.WriteFile(filename, data, os.FileMode(0644))
-		}
-		gdata, err := ioutil.ReadAll(gzipData)
-		if err != nil {
-			log.Errorf("reader gzip reader error %v, write to file as raw_text", err)
-			return ioutil.WriteFile(filename, data, os.FileMode(0644))
-		}
-		return ioutil.WriteFile(filename, gdata, os.FileMode(0644))
+	r, err := bucket.GetReader(path)
+	if err != nil {
+		return err
 	}
-	return ioutil.WriteFile(filename, data, os.FileMode(0644))
+	defer r.Close()
+	if strings.HasSuffix(filename, ".gz") {
+		gr, err := gzip.NewReader(r)
+		if err == nil {
+			defer gr.Close()
+			return utils.WriteReaderToFile(gr, filename)
+		}
+		log.Errorf("reader file %v as gzip error %v, write to file as raw_text", filename, err)
+	}
+	return utils.WriteReaderToFile(r, filename)
 }
 
 func newPool(concurrent int) chan struct{} {
