@@ -199,12 +199,16 @@ func WriteZipToFile(zipf *zip.File, filename string) error {
 		return err
 	}
 	defer srcF.Close()
-	distF, err := os.OpenFile(filepath.Join(filepath.Dir(filename), zipf.Name), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(0644))
+	return WriteReaderToFile(srcF, filename)
+}
+
+func WriteReaderToFile(src io.Reader, dstFile string) error {
+	dstF, err := os.OpenFile(dstFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.FileMode(0644))
 	if err != nil {
 		return err
 	}
-	defer distF.Close()
-	_, err = io.Copy(distF, srcF)
+	defer dstF.Close()
+	_, err = io.Copy(dstF, src)
 	if err != nil {
 		return err
 	}
