@@ -33,7 +33,8 @@ const (
 )
 
 const (
-	defaultCollectInterval = 30
+	defaultCollectInterval     = 30
+	defaultTimeoutCountToReset = 2
 )
 
 type MetricConfig struct {
@@ -54,6 +55,7 @@ type MetricRunner struct {
 
 	startedWG    *sync.WaitGroup
 	collectors   []metric.Collector
+	timeoutCount map[string]int
 	senders      []sender.Sender
 	transformers map[string][]transforms.Transformer
 	commonTrans  []transforms.Transformer
@@ -104,6 +106,7 @@ func NewMetricRunner(rc RunnerConfig, wg *sync.WaitGroup, sr *sender.Registry) (
 		rc.SendersConfig[i][KeyRunnerName] = rc.RunnerName
 	}
 	collectors := make([]metric.Collector, 0)
+	timeoutCount := make(map[string]int)
 	transformers := make(map[string][]transforms.Transformer)
 
 	for _, m := range rc.MetricConfig {
@@ -132,6 +135,7 @@ func NewMetricRunner(rc RunnerConfig, wg *sync.WaitGroup, sr *sender.Registry) (
 		}
 
 		collectors = append(collectors, c)
+		timeoutCount[c.Name()] = 0
 
 		// 配置文件中明确标明 false 的 attr 加入 discard transformer
 		config := c.Config()
@@ -238,6 +242,7 @@ func NewMetricRunner(rc RunnerConfig, wg *sync.WaitGroup, sr *sender.Registry) (
 		rsMutex:         new(sync.RWMutex),
 		collectInterval: interval,
 		collectors:      collectors,
+		timeoutCount:    timeoutCount,
 		transformers:    transformers,
 		commonTrans:     commonTransformers,
 		senders:         senders,
@@ -301,8 +306,9 @@ func (r *MetricRunner) Run() {
 		dataCnt := 0
 		datas := make([]Data, 0)
 		metricTime := time.Now()
-		tags[metric.Timestamp] = metricTime.Format(time.RFC3339Nano)
+		tags[metric.Timestamp] = metricTime.UnixNano() / 1e6
 		for _, c := range r.collectors {
+			before := time.Now()
 			metricName := c.Name()
 			tmpdatas, err := c.Collect()
 			if err != nil {
@@ -351,6 +357,23 @@ func (r *MetricRunner) Run() {
 				}
 				datas = append(datas, data)
 				dataCnt++
+			}
+
+			// 处理读取超时
+			if time.Now().Sub(before) > r.collectInterval {
+				log.Warnf("collecter <%v> exec timeout %d seconds", time.Now().Sub(before).Seconds())
+				r.timeoutCount[metricName]++
+				if reset, ok := c.(Resetable); ok && r.timeoutCount[metricName] >= defaultTimeoutCountToReset {
+					if err = reset.Reset(); err != nil {
+						log.Errorf("collecter <%v> reset fail: %v", metricTime, err)
+						continue
+					} else {
+						log.Infof("collecter <%v> reset success", metricTime)
+						r.timeoutCount[metricName] = 0
+					}
+				}
+			} else {
+				r.timeoutCount[metricName] = 0
 			}
 		}
 
