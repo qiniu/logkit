@@ -2,12 +2,16 @@ package mutate
 
 import (
 	"errors"
+	"io"
 	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/clbanning/mxj"
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/transform"
 
+	"github.com/qiniu/log"
 	"github.com/qiniu/logkit/transforms"
 	. "github.com/qiniu/logkit/utils/models"
 )
@@ -19,12 +23,13 @@ var (
 )
 
 type Xml struct {
-	Key        string `json:"key"`
-	New        string `json:"new"`
 	Keep       bool   `json:"keep"`
 	Expand     bool   `json:"expand"`
 	DiscardKey bool   `json:"discard_key"`
 	NoAttr     bool   `json:"no_attr"`
+	Key        string `json:"key"`
+	New        string `json:"new"`
+	Encoding   string `json:"encoding"`
 	stats      StatsInfo
 
 	keys          []string
@@ -61,6 +66,21 @@ func (g *Xml) Init() error {
 		numRoutine = 1
 	}
 	g.numRoutine = numRoutine
+
+	if len(g.Encoding) != 0 {
+		g.Encoding = strings.ToLower(g.Encoding)
+		switch g.Encoding {
+		case "utf8", "utf-8":
+			break
+		case "gbk", "gb2312", "gb18030":
+			mxj.XmlCharsetReader = func(charset string, input io.Reader) (io.Reader, error) {
+				return transform.NewReader(input, simplifiedchinese.GBK.NewDecoder()), nil
+			}
+		default:
+			log.Warn("unsupported encoding: %s, use utf-8 default", g.Encoding)
+		}
+	}
+
 	return nil
 }
 
@@ -155,6 +175,16 @@ func (g *Xml) ConfigOptions() []Option {
 	return []Option{
 		transforms.KeyFieldName,
 		transforms.KeyFieldNew,
+		{
+			KeyName:       "encoding",
+			ChooseOnly:    true,
+			ChooseOptions: []interface{}{"UTF-8", "GBK", "GB2312"},
+			Default:       "UTF-8",
+			DefaultNoUse:  false,
+			Description:   "编码方式(encoding)",
+			Advance:       true,
+			ToolTip:       "读取日志的编码方式，默认为UTF-8，即按照UTF-8的编码方式读取文件",
+		},
 		transforms.KeyKeepString,
 		transforms.KeyDiscardkey,
 		{
@@ -240,6 +270,7 @@ func (g *Xml) transform(dataPipeline <-chan transforms.TransformInfo, resultChan
 
 		m, xmlErr := mxj.NewMapXml([]byte(strVal), g.Keep)
 		if xmlErr != nil {
+			log.Warnf("xml parse error: %v", xmlErr)
 			errNum, err = transforms.SetError(errNum, xmlErr, transforms.General, "")
 			resultChan <- transforms.TransformResult{
 				Index:   transformInfo.Index,
