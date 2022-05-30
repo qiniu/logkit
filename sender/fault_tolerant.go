@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -36,6 +38,8 @@ const (
 	KeyUnMarshalError = "Data unmarshal failed"
 	// NumUnMarshalError
 	NumUnMarshalError = 10
+	// lag file
+	LagFilename = "meta.lag"
 )
 
 var _ SkipDeepCopySender = &FtSender{}
@@ -206,6 +210,9 @@ func newFtSender(innerSender Sender, runnerName string, opt *FtOption) (*FtSende
 		isBlock:     opt.isBlock,
 		backoff:     utils.NewBackoff(2, 1, 1*time.Second, 5*time.Minute),
 	}
+	ftSender.statsMutex.Lock()
+	ftSender.stats.FtSendLag = ftSender.readLag()
+	ftSender.statsMutex.Unlock()
 
 	if opt.innerSenderType == TypePandora {
 		ftSender.pandoraKeyCache = make(map[string]KeyInfo)
@@ -273,9 +280,17 @@ func (ft *FtSender) RawSend(datas []string) error {
 		} else {
 			// se 中的 lasterror 和 senderror 都为空，需要使用 se.FtQueueLag
 			se.AddSuccessNum(len(datas))
+			ft.statsMutex.Lock()
+			ft.stats.FtSendLag = ft.stats.FtSendLag + int64(len(datas))
+			ft.statsMutex.Unlock()
 			ft.backoff.Reset()
 		}
 		se.FtQueueLag = ft.BackupQueue.Depth() + ft.logQueue.Depth()
+		if se.FtQueueLag == 0 {
+			ft.statsMutex.Lock()
+			ft.stats.FtSendLag = 0
+			ft.statsMutex.Unlock()
+		}
 	}
 	return se
 }
@@ -314,7 +329,7 @@ func (ft *FtSender) Send(datas []Data) error {
 		}
 
 		if ft.isBlock {
-			log.Error("Runner[%v] Sender[%v] try Send Datas err: %v", ft.runnerName, ft.innerSender.Name(), err)
+			log.Errorf("Runner[%v] Sender[%v] try Send Datas err: %v", ft.runnerName, ft.innerSender.Name(), err)
 			return se
 		}
 
@@ -354,9 +369,17 @@ func (ft *FtSender) Send(datas []Data) error {
 	} else {
 		// se 中的 lasterror 和 senderror 都为空，需要使用 se.FtQueueLag
 		se.AddSuccessNum(len(datas))
+		ft.statsMutex.Lock()
+		ft.stats.FtSendLag = ft.stats.FtSendLag + int64(len(datas))
+		ft.statsMutex.Unlock()
 		ft.backoff.Reset()
 	}
 	se.FtQueueLag = ft.BackupQueue.Depth() + ft.logQueue.Depth()
+	if se.FtQueueLag == 0 {
+		ft.statsMutex.Lock()
+		ft.stats.FtSendLag = 0
+		ft.statsMutex.Unlock()
+	}
 	return se
 }
 
@@ -395,6 +418,9 @@ func (ft *FtSender) Close() error {
 	// persist queue's meta data
 	ft.logQueue.Close()
 	ft.BackupQueue.Close()
+	ft.statsMutex.Lock()
+	ft.writeLag(ft.stats.FtSendLag)
+	ft.statsMutex.Unlock()
 
 	return ft.innerSender.Close()
 }
@@ -481,6 +507,9 @@ func (ft *FtSender) saveToFile(datas []Data) error {
 }
 
 func (ft *FtSender) asyncSendLogFromQueue() {
+	// if not sleep, queue lag may be cleared
+	time.Sleep(time.Second * 10)
+
 	for i := 0; i < ft.procs; i++ {
 		if ft.opt.sendRaw {
 			readLinesChan := make(<-chan []string)
@@ -506,18 +535,32 @@ func (ft *FtSender) asyncSendLogFromQueue() {
 }
 
 // trySend 从bytes反序列化数据后尝试发送数据
-func (ft *FtSender) trySendBytes(dat []byte, failSleep int, isRetry bool) (backDataContext []*datasContext, err error) {
+func (ft *FtSender) trySendBytes(dat []byte, failSleep int, isRetry bool, isFromQueue bool) (backDataContext []*datasContext, err error) {
 	if ft.opt.sendRaw {
 		datas, err := ft.unmarshalRaws(dat)
 		if err != nil {
 			return nil, errors.New(KeyUnMarshalError + ":" + err.Error())
 		}
+		ft.statsMutex.Lock()
+		ft.stats.FtSendLag = ft.stats.FtSendLag - int64(len(datas))
+		if ft.stats.FtSendLag < 0 {
+			ft.stats.FtSendLag = 0
+		}
+		ft.statsMutex.Unlock()
+
 		return ft.backOffSendRawFromQueue(datas, failSleep, isRetry)
 	}
 	datas, err := ft.unmarshalData(dat)
 	if err != nil {
 		return nil, errors.New(KeyUnMarshalError + ":" + err.Error())
+
 	}
+	ft.statsMutex.Lock()
+	ft.stats.FtSendLag = ft.stats.FtSendLag - int64(len(datas))
+	if ft.stats.FtSendLag < 0 {
+		ft.stats.FtSendLag = 0
+	}
+	ft.statsMutex.Unlock()
 
 	return ft.backOffSendFromQueue(datas, failSleep, isRetry)
 }
@@ -566,6 +609,9 @@ func (ft *FtSender) trySendRaws(datas []string, failSleep int, isRetry bool) (ba
 			log.Errorf("Runner[%v] Sender[%v] cannot write points back to queue %v: %v, discard datas %d", ft.runnerName, ft.innerSender.Name(), ft.BackupQueue.Name(), err, len(datas))
 			return nil, nil
 		}
+		ft.statsMutex.Lock()
+		ft.stats.FtSendLag += int64(len(v.Lines))
+		ft.statsMutex.Unlock()
 	}
 
 	time.Sleep(time.Second * time.Duration(math.Pow(2, float64(failSleep))))
@@ -620,6 +666,9 @@ func (ft *FtSender) trySendDatas(datas []Data, failSleep int, isRetry bool) (bac
 			log.Errorf("Runner[%v] Sender[%v] cannot write points back to queue %v: %v, discard datas %d", ft.runnerName, ft.innerSender.Name(), ft.BackupQueue.Name(), err, len(datas))
 			return nil, nil
 		}
+		ft.statsMutex.Lock()
+		ft.stats.FtSendLag += int64(len(v.Datas))
+		ft.statsMutex.Unlock()
 	}
 
 	time.Sleep(time.Second * time.Duration(math.Pow(2, float64(failSleep))))
@@ -896,8 +945,14 @@ func (ft *FtSender) sendRawFromQueue(queueName string, readChan <-chan []byte, r
 		} else {
 			select {
 			case bytes := <-readChan:
-				backDataContext, err = ft.trySendBytes(bytes, numWaits, isRetry)
+				backDataContext, err = ft.trySendBytes(bytes, numWaits, isRetry, true)
 			case datas := <-readDatasChan:
+				ft.statsMutex.Lock()
+				ft.stats.FtSendLag = ft.stats.FtSendLag - int64(len(datas))
+				if ft.stats.FtSendLag < 0 {
+					ft.stats.FtSendLag = 0
+				}
+				ft.statsMutex.Unlock()
 				backDataContext, err = ft.backOffSendRawFromQueue(datas, numWaits, isRetry)
 			case <-timer.C:
 				continue
@@ -917,7 +972,7 @@ func (ft *FtSender) sendRawFromQueue(queueName string, readChan <-chan []byte, r
 				unmarshalDataError++
 				if unmarshalDataError > NumUnMarshalError {
 					time.Sleep(time.Second)
-					log.Errorf("Runner[%s] Sender[%s] sleep 1s due to unmarshal err", ft.runnerName, ft.innerSender.Name(), queueName, err)
+					log.Errorf("Runner[%s] Sender[%s] queue[%s] sleep 1s due to unmarshal err %v", ft.runnerName, ft.innerSender.Name(), queueName, err)
 				}
 			} else {
 				unmarshalDataError = 0
@@ -939,7 +994,6 @@ func (ft *FtSender) sendFromQueue(queueName string, readChan <-chan []byte, read
 	defer timer.Stop()
 	numWaits := 1
 	unmarshalDataError := 0
-
 	var curDataContext, otherDataContext []*datasContext
 	var curIdx int
 	var backDataContext []*datasContext
@@ -955,8 +1009,14 @@ func (ft *FtSender) sendFromQueue(queueName string, readChan <-chan []byte, read
 		} else {
 			select {
 			case bytes := <-readChan:
-				backDataContext, err = ft.trySendBytes(bytes, numWaits, isRetry)
+				backDataContext, err = ft.trySendBytes(bytes, numWaits, isRetry, true)
 			case datas := <-readDatasChan:
+				ft.statsMutex.Lock()
+				ft.stats.FtSendLag = ft.stats.FtSendLag - int64(len(datas))
+				if ft.stats.FtSendLag < 0 {
+					ft.stats.FtSendLag = 0
+				}
+				ft.statsMutex.Unlock()
 				backDataContext, err = ft.backOffSendFromQueue(datas, numWaits, isRetry)
 			case <-timer.C:
 				continue
@@ -976,7 +1036,7 @@ func (ft *FtSender) sendFromQueue(queueName string, readChan <-chan []byte, read
 				unmarshalDataError++
 				if unmarshalDataError > NumUnMarshalError {
 					time.Sleep(time.Second)
-					log.Errorf("Runner[%s] Sender[%s] sleep 1s due to unmarshal err", ft.runnerName, ft.innerSender.Name(), queueName, err)
+					log.Errorf("Runner[%s] Sender[%s] queue[%s] sleep 1s due to unmarshal err %v", ft.runnerName, ft.innerSender.Name(), queueName, err)
 				}
 			} else {
 				unmarshalDataError = 0
@@ -1224,4 +1284,35 @@ func (ft *FtSender) backOffReTrySendRaw(lines []string, isRetry bool) (res []*da
 
 		time.Sleep(backoff.Duration())
 	}
+}
+
+// readLag read lag from file
+func (ft *FtSender) readLag() int64 {
+	path := filepath.Join(ft.opt.saveLogPath, LagFilename)
+	f, err := ioutil.ReadFile(path)
+	if err != nil {
+		log.Errorf("Runner[%v] Sender[%v] read file error : %v", ft.runnerName, ft.innerSender.Name(), err)
+		return 0
+	}
+	lag, err := strconv.ParseInt(string(f), 10, 64)
+	if err != nil {
+		log.Errorf("Runner[%v] Sender[%v] parse lag error : %v", ft.runnerName, ft.innerSender.Name(), err)
+	}
+	return lag
+}
+
+// writeLag write lag into file
+func (ft *FtSender) writeLag(lag int64) error {
+	path := filepath.Join(ft.opt.saveLogPath, LagFilename)
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
+	defer func() {
+		file.Sync()
+		file.Close()
+	}()
+	if err != nil {
+		return err
+	}
+	lagStr := strconv.FormatInt(lag, 10)
+	_, err = file.WriteString(lagStr)
+	return err
 }

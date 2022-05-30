@@ -301,7 +301,7 @@ func (r *MetricRunner) Run() {
 		dataCnt := 0
 		datas := make([]Data, 0)
 		metricTime := time.Now()
-		tags[metric.Timestamp] = metricTime.Format(time.RFC3339Nano)
+		tags[metric.Timestamp] = metricTime.UnixNano()/1e6
 		for _, c := range r.collectors {
 			metricName := c.Name()
 			tmpdatas, err := c.Collect()
@@ -616,10 +616,14 @@ func (mr *MetricRunner) StatusRestore() {
 		}
 		sStatus, ok := s.(sender.StatsSender)
 		if ok {
-			sStatus.Restore(&StatsInfo{
+			statsInfo:=&StatsInfo{
 				Success: info[0],
 				Errors:  info[1],
-			})
+			}
+			if len(info)>2{
+				statsInfo.FtSendLag=info[2]
+			}
+			sStatus.Restore(statsInfo)
 		}
 		status, ext := mr.rs.SenderStats[name]
 		if !ext {
@@ -641,7 +645,7 @@ func (mr *MetricRunner) StatusBackup() {
 			status.ParserStats.Success,
 			status.ParserStats.Errors,
 		},
-		SenderCnt: map[string][2]int64{},
+		SenderCnt: map[string][]int64{},
 	}
 	for _, s := range mr.senders {
 		name := s.Name()
@@ -652,9 +656,10 @@ func (mr *MetricRunner) StatusBackup() {
 			status.SenderStats[name] = senderStats
 		}
 		if sta, exist := status.SenderStats[name]; exist {
-			bStart.SenderCnt[name] = [2]int64{
+			bStart.SenderCnt[name] = []int64{
 				sta.Success,
 				sta.Errors,
+				sta.FtSendLag,
 			}
 		}
 	}

@@ -109,7 +109,7 @@ func TestMeta(t *testing.T) {
 	stat := &Statistic{
 		ReaderCnt: 6,
 		ParserCnt: [2]int64{6, 8},
-		SenderCnt: map[string][2]int64{
+		SenderCnt: map[string][]int64{
 			"aaa": {1, 2},
 			"bbb": {5, 6},
 		},
