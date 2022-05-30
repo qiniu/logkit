@@ -222,6 +222,7 @@ const (
 	KeyKafkaCompression               = "kafka_compression"      //压缩模式,有none, gzip, snappy
 	KeyKafkaTimeout                   = "kafka_timeout"          //连接超时时间
 	KeyKafkaKeepAlive                 = "kafka_keep_alive"       //保持连接时长
+	KeyKafkaVersion                   = "kafka_version"          //版本
 	KeyMaxMessageBytes                = "max_message_bytes"      //每条消息最大字节数
 	KeyGZIPCompressionLevel           = "gzip_compression_level" //GZIP压缩日志的策略
 	KeyGZIPCompressionNo              = "仅打包不压缩"
