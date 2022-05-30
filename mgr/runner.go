@@ -313,6 +313,14 @@ func NewLogExportRunner(rc RunnerConfig, wg *sync.WaitGroup, cleanChan chan<- cl
 		}
 	}
 	senders := make([]sender.Sender, 0)
+	var senderClose = false
+	defer func() {
+		if senderClose {
+			for _, sender := range senders {
+				sender.Close()
+			}
+		}
+	}()
 	for i, senderConfig := range rc.SendersConfig {
 		if rc.SendRaw {
 			senderConfig[senderConf.InnerSendRaw] = "true"
@@ -334,6 +342,7 @@ func NewLogExportRunner(rc RunnerConfig, wg *sync.WaitGroup, cleanChan chan<- cl
 				intervalStr, _ := rc.ReaderConfig.GetStringOr(KeySnmpReaderInterval, "30s")
 				interval, err := time.ParseDuration(intervalStr)
 				if err != nil {
+					senderClose = true
 					return nil, err
 				}
 				senderConfig[senderConf.KeyCollectInterval] = fmt.Sprintf("%d", int64(interval.Seconds()))
@@ -343,10 +352,12 @@ func NewLogExportRunner(rc RunnerConfig, wg *sync.WaitGroup, cleanChan chan<- cl
 		}
 		senderConfig, err := setPandoraServerConfig(senderConfig, serverConfigs)
 		if err != nil {
+			senderClose = true
 			return nil, err
 		}
 		s, err := sr.NewSender(senderConfig, meta.FtSaveLogPath())
 		if err != nil {
+			senderClose = true
 			return nil, err
 		}
 		senders = append(senders, s)
@@ -354,15 +365,16 @@ func NewLogExportRunner(rc RunnerConfig, wg *sync.WaitGroup, cleanChan chan<- cl
 		delete(rc.SendersConfig[i], senderConf.KeyPandoraDescription)
 		delete(rc.SendersConfig[i], senderConf.InnerSendRaw)
 	}
-
 	senderCnt := len(senders)
 	router, err := router.NewSenderRouter(rc.Router, senderCnt)
 	if err != nil {
+		senderClose = true
 		return nil, fmt.Errorf("runner %v add sender router error, %v", rc.RunnerName, err)
 	}
 	runner, err = NewLogExportRunnerWithService(runnerInfo, wg, rd, cl, ps, transformers, senders, router, meta)
 	if err != nil {
-		return runner, err
+		senderClose = true
+		return nil, err
 	}
 	if runner.LogAudit {
 		if rc.AuditChan == nil {
