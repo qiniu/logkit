@@ -987,6 +987,14 @@ var ModeKeyOptions = map[string][]Option{
 			ToolTip:      "使用SASL协议进行鉴权的密码",
 		},
 		{
+			KeyName:      KeyKafkaVersion,
+			ChooseOnly:   false,
+			Default:      "",
+			DefaultNoUse: false,
+			Description:  "kafka版本(kafka_version)",
+			Advance:      true,
+		},
+		{
 			KeyName:      KeyKafkaRetryMax,
 			ChooseOnly:   false,
 			Default:      "3",

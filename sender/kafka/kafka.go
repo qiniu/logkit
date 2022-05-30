@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
-	"github.com/json-iterator/go"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/rcrowley/go-metrics"
 
 	"github.com/qiniu/log"
@@ -86,6 +86,7 @@ func NewSender(conf conf.MapConf) (kafkaSender sender.Sender, err error) {
 	keepAlive, _ := conf.GetStringOr(KeyKafkaKeepAlive, "0")
 	maxMessageBytes, _ := conf.GetIntOr(KeyMaxMessageBytes, 4*1024*1024)
 	gzipCompressionLevel, _ := conf.GetStringOr(KeyGZIPCompressionLevel, KeyGZIPCompressionDefault)
+	version, _ := conf.GetStringOr(KeyKafkaVersion, "")
 
 	name, _ := conf.GetStringOr(KeyName, fmt.Sprintf("kafkaSender:(kafkaUrl:%s,topic:%s)", hosts, topic))
 
@@ -108,8 +109,10 @@ func NewSender(conf conf.MapConf) (kafkaSender sender.Sender, err error) {
 	if !ok {
 		return nil, fmt.Errorf("unknown compression mode: '%v'", compression)
 	}
-	if compressionMode == sarama.CompressionLZ4 {
-		cfg.Version = sarama.V0_10_0_0
+	if version != "" {
+		if cfg.Version, err = sarama.ParseKafkaVersion(version); err != nil {
+			return nil, err
+		}
 	}
 	cfg.Producer.Compression = compressionMode
 	cfg.Net.DialTimeout, err = time.ParseDuration(timeout)
