@@ -201,7 +201,10 @@ func (s *NetIOStats) Collect() (datas []map[string]interface{}, err error) {
 	if !s.SkipProtoState {
 		// Get system wide stats for different network protocols
 		// (ignore these stats if the call fails)
-		netprotos, _ := s.ps.NetProto()
+		netprotos, err := s.ps.NetProto()
+		if err != nil {
+			log.Errorf("get netinterface failed %v", err)
+		}
 		fields := make(map[string]interface{})
 		for _, proto := range netprotos {
 			for stat, value := range proto.Stats {
