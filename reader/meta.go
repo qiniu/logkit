@@ -195,6 +195,9 @@ func NewMetaWithConf(conf conf.MapConf) (meta *Meta, err error) {
 		meta.extrainfo = make(map[string]string)
 	}
 	decoder, _ := conf.GetStringOr(KeyEncoding, "")
+	if decoder == "自动" {
+		decoder = "UTF-8"
+	}
 	if decoder != "" {
 		meta.SetEncodingWay(strings.ToLower(decoder))
 	}

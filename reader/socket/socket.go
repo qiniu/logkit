@@ -369,6 +369,9 @@ func NewReader(meta *reader.Meta, conf conf.MapConf) (reader.Reader, error) {
 	}
 	var decoder mahonia.Decoder
 	encoding, _ := conf.GetStringOr(KeyEncoding, "")
+	if encoding == "自动" {
+		encoding = "UTF-8"
+	}
 	encoding = strings.ToUpper(encoding)
 	if encoding != DefaultEncodingWay {
 		decoder = mahonia.NewDecoder(encoding)
