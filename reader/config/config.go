@@ -104,7 +104,7 @@ var (
 		KeyName:       KeyEncoding,
 		ChooseOnly:    true,
 		ChooseOptions: Encoding,
-		Default:       "UTF-8",
+		Default:       "自动",
 		DefaultNoUse:  false,
 		Description:   "编码方式(encoding)",
 		Advance:       true,
@@ -124,10 +124,10 @@ var (
 		ChooseOnly:   false,
 		Default:      "",
 		DefaultNoUse: false,
-		Description:  "读取速度限制(readio_limit)",
+		Description:  "传输带宽限制(readio_limit)",
 		CheckRegex:   "\\d+",
 		Advance:      true,
-		ToolTip:      "读取文件的磁盘限速，填写正整数，单位为MB/s, 默认不限速",
+		ToolTip:      "对网络带宽传输速度进行限制，填写正整数，单位为MB/s, 默认不限速",
 	}
 	OptionDelimiter = Option{
 		KeyName:      KeyDelimiter,
