@@ -55,6 +55,7 @@ func (g *Script) Init() error {
 		if openFileErr != nil {
 			return openFileErr
 		}
+		defer scriptFile.Close()
 		if _, fileWriteErr := io.WriteString(scriptFile, script); fileWriteErr != nil {
 			return fileWriteErr
 		}
