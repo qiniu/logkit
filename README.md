@@ -33,7 +33,7 @@ logkit-community support multiple sources and can send kinds of data to Pandora,
 
 ## Contributing
 
-Weclome to contribute to logkit:
+Welcome to contribute to logkit:
 
 * fix or [report bug](https://github.com/qiniu/logkit/issues/new)
 * [pull issue](https://github.com/qiniu/logkit/issues/new) improve [wiki doc](https://github.com/qiniu/logkit/wiki)
@@ -76,7 +76,7 @@ please download `https://pandora-dl.qiniu.com/logkit_windows_<LOGKIT_VERSION>.zi
 
 ### 2. change logkit-community configuration
 
-logkit.conf is logkit-community tool's configuration，mainly for specifing running resource and paths of runners.
+logkit.conf is logkit-community tool's configuration，mainly for specifying running resource and paths of runners.
 
 Open `logkit.conf`, for example：
 
@@ -94,7 +94,7 @@ Open `logkit.conf`, for example：
 For simply use, you can only focus on three options:
 
 1. `bind_host` port of logkit we。
-1. `static_root_path` statistic resource path of logkit page, **recommand to use absolute path** note：old version moved to "public-old" directory。
+1. `static_root_path` statistic resource path of logkit page, **recommend to use absolute path** note：old version moved to "public-old" directory。
 1. `confs_path` including add conf in web, logkit also support monitor directory to add runners. (if you only need to add logkit runner in web, you can ignore this option)
 
 
